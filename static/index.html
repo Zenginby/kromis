@@ -42,6 +42,18 @@
 
       <button id="go" class="primary">Üret</button>
       <p id="status" class="status" role="status"></p>
+
+      <hr class="divider" />
+      <details class="edit-panel" id="edit-panel">
+        <summary>Düzenle / Referans</summary>
+        <p class="hint">Bir görsel yükle <em>ya da</em> galeriden "Düzenle" de, sonra ne istediğini yaz.</p>
+        <label for="edit-file">Görsel yükle</label>
+        <input type="file" id="edit-file" accept="image/png,image/jpeg,image/webp" />
+        <p id="edit-source" class="hint"></p>
+        <label for="edit-prompt">Düzenleme promptu</label>
+        <textarea id="edit-prompt" rows="4" placeholder="Ör. arka planı beyaz yap"></textarea>
+        <button id="edit-go" class="primary">Düzenle</button>
+      </details>
     </section>
 
     <section class="stage" aria-label="Önizleme">

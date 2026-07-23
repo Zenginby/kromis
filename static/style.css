@@ -71,4 +71,9 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
   padding: 0.35rem; cursor: pointer;
 }
 .card .acts button:hover, .card .acts a:hover { color: var(--accent); }
+.divider { border: 0; border-top: 1px solid var(--panel-2); margin: 1.2rem 0; }
+.edit-panel summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+.edit-panel .hint { color: var(--muted); font-size: 0.8rem; margin: 0.4rem 0; }
+.edit-panel input[type="file"] { width: 100%; color: var(--muted); font: inherit; margin-top: 0.3rem; }
+.card .acts button.danger:hover { color: oklch(65% 0.2 25); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

@@ -15,6 +15,7 @@ async function generate() {
     n: parseInt($("n").value, 10),
   };
   $("go").disabled = true;
+  clearUploadPreviewUrl();
   setLoading(true);
   statusEl.textContent = "Üretiliyor…";
   try {

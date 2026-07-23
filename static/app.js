@@ -216,10 +216,11 @@ async function deleteImage(rec) {
 
 // Sürükle-bırak: merkez alana bırakılan görseli düzenleme girdisi olarak yükle
 const stageEl = document.querySelector(".stage");
+const ACCEPTED_UPLOAD_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
 function loadDroppedFile(file) {
-  if (!file || !file.type.startsWith("image/")) {
-    statusEl.textContent = "Lütfen bir görsel dosyası bırak.";
+  if (!file || !ACCEPTED_UPLOAD_TYPES.includes(file.type)) {
+    statusEl.textContent = "PNG, JPEG veya WebP bir görsel bırak.";
     return;
   }
   const dt = new DataTransfer();
@@ -233,11 +234,16 @@ function hasFiles(e) {
   return !!e.dataTransfer && [...e.dataTransfer.types].includes("Files");
 }
 
+// Tarayıcı, sayfaya bırakılan hiçbir dosyayı/bağlantıyı asla açmasın (koşulsuz).
+// Böylece stage'e bırakılan File-olmayan bir öğe (ör. başka sekmeden görsel) de
+// tarayıcıyı o adrese götürmez. Dosya-işleme mantığı ayrıca hasFiles ile kapılı.
+["dragover", "drop"].forEach((evt) =>
+  window.addEventListener(evt, (e) => e.preventDefault())
+);
+
 ["dragenter", "dragover"].forEach((evt) =>
   stageEl.addEventListener(evt, (e) => {
-    if (!hasFiles(e)) return;
-    e.preventDefault();
-    stageEl.classList.add("dragover");
+    if (hasFiles(e)) stageEl.classList.add("dragover");
   })
 );
 
@@ -246,18 +252,9 @@ stageEl.addEventListener("dragleave", (e) => {
 });
 
 stageEl.addEventListener("drop", (e) => {
-  if (!hasFiles(e)) return;
-  e.preventDefault();
   stageEl.classList.remove("dragover");
-  loadDroppedFile(e.dataTransfer.files[0]);
+  if (hasFiles(e)) loadDroppedFile(e.dataTransfer.files[0]);
 });
-
-// Sayfanın geri kalanına bırakınca tarayıcı dosyayı açmasın
-["dragover", "drop"].forEach((evt) =>
-  window.addEventListener(evt, (e) => {
-    if (!stageEl.contains(e.target)) e.preventDefault();
-  })
-);
 
 $("go").addEventListener("click", generate);
 $("edit-go").addEventListener("click", runEdit);

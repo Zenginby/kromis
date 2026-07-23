@@ -126,5 +126,4 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
   .spinner { animation: none; }
-  .bar-fill { transition: none; }
 }

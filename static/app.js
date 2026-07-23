@@ -8,17 +8,23 @@ let uploadPreviewUrl = null;
 
 // Simüle ilerleme: Azure tek yanıt döndürür (gerçek % akışı yok), bu yüzden
 // beklerken ~%90'a doğru yumuşakça doldurup, iş bitince %100'e tamamlarız.
+// generation token: eski/örtüşen bir işlemin stop/hide'ı yeni işlemin barını etkilemez.
 let progressTimer = null;
+let progressHideTimer = null;
+let progressGen = 0;
 
 function startProgress() {
+  const gen = ++progressGen;
+  clearInterval(progressTimer);
+  clearTimeout(progressHideTimer);
   const fill = $("progress-fill");
   const pct = $("progress-pct");
   $("progress").hidden = false;
   let value = 0;
   fill.style.width = "0%";
   pct.textContent = "0%";
-  clearInterval(progressTimer);
   progressTimer = setInterval(() => {
+    if (gen !== progressGen) return;
     const remaining = 90 - value;
     if (remaining <= 0) return;
     value += Math.max(0.25, remaining * 0.02); // asimptotik + yavaş: yaklaştıkça iyice yavaşlar
@@ -26,9 +32,11 @@ function startProgress() {
     fill.style.width = value.toFixed(1) + "%";
     pct.textContent = Math.round(value) + "%";
   }, 160);
+  return gen;
 }
 
-function stopProgress(complete) {
+function stopProgress(complete, gen) {
+  if (gen !== progressGen) return; // daha yeni bir işlem barı devraldı; dokunma
   clearInterval(progressTimer);
   progressTimer = null;
   const fill = $("progress-fill");
@@ -37,7 +45,9 @@ function stopProgress(complete) {
     fill.style.width = "100%";
     pct.textContent = "100%";
   }
-  setTimeout(() => {
+  clearTimeout(progressHideTimer);
+  progressHideTimer = setTimeout(() => {
+    if (gen !== progressGen) return; // gizleme beklerken yeni işlem başladıysa dokunma
     $("progress").hidden = true;
     fill.style.width = "0%";
     pct.textContent = "0%";
@@ -136,7 +146,7 @@ async function run() {
   }
 
   $("go").disabled = true;
-  startProgress();
+  const gen = startProgress();
   statusEl.textContent = editing ? "Düzenleniyor…" : "Üretiliyor…";
   let ok = false;
   try {
@@ -155,13 +165,13 @@ async function run() {
     statusEl.textContent = e.message;
   } finally {
     $("go").disabled = false;
-    stopProgress(ok);
+    stopProgress(ok, gen);
   }
 }
 
 async function addLogo(id) {
   statusEl.textContent = "Logo bindiriliyor…";
-  startProgress();
+  const gen = startProgress();
   let ok = false;
   try {
     const res = await fetch("/api/logo", {
@@ -181,7 +191,7 @@ async function addLogo(id) {
   } catch (e) {
     statusEl.textContent = e.message;
   } finally {
-    stopProgress(ok);
+    stopProgress(ok, gen);
   }
 }
 

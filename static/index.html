@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GPT-Image Studio</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>GPT-Image <span>Studio</span></h1>
+    <p class="sub">Azure gpt-image-2 · yerel</p>
+  </header>
+
+  <main class="layout">
+    <section class="controls" aria-label="Üretim kontrolleri">
+      <label for="prompt">Prompt</label>
+      <textarea id="prompt" rows="6" placeholder="Ne üretmek istersin?"></textarea>
+
+      <div class="row">
+        <div>
+          <label for="size">Boyut</label>
+          <select id="size">
+            <option value="1024x1024">Kare 1024²</option>
+            <option value="1024x1536">Dikey 1024×1536</option>
+            <option value="1536x1024">Yatay 1536×1024</option>
+          </select>
+        </div>
+        <div>
+          <label for="quality">Kalite</label>
+          <select id="quality">
+            <option value="low">Düşük</option>
+            <option value="medium" selected>Orta</option>
+            <option value="high">Yüksek</option>
+          </select>
+        </div>
+        <div>
+          <label for="n">Adet</label>
+          <select id="n"><option>1</option><option>2</option><option>3</option><option>4</option></select>
+        </div>
+      </div>
+
+      <button id="go" class="primary">Üret</button>
+      <p id="status" class="status" role="status"></p>
+    </section>
+
+    <section class="stage" aria-label="Önizleme">
+      <div id="preview" class="preview empty">Henüz görsel yok</div>
+    </section>
+  </main>
+
+  <section class="gallery-wrap" aria-label="Geçmiş">
+    <h2>Geçmiş</h2>
+    <div id="gallery" class="gallery"></div>
+  </section>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

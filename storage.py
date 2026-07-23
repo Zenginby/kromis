@@ -17,7 +17,16 @@ def _read_history(output_dir: str) -> list[dict]:
     if not os.path.exists(path):
         return []
     with open(path) as f:
-        return json.load(f)
+        try:
+            data = json.load(f)
+        except json.JSONDecodeError:
+            # Corrupt/unreadable history: tolerate it as empty history rather
+            # than crashing the app. Other errors (e.g. permission errors)
+            # still propagate.
+            return []
+    if not isinstance(data, list):
+        return []
+    return data
 
 
 def save(image_bytes: bytes, meta: dict, output_dir: str, *, now: str) -> dict:
@@ -37,8 +46,11 @@ def save(image_bytes: bytes, meta: dict, output_dir: str, *, now: str) -> dict:
     }
     # immutable append: yeni liste yaz
     history = _read_history(output_dir) + [record]
-    with open(_history_path(output_dir), "w") as f:
+    history_path = _history_path(output_dir)
+    tmp_path = f"{history_path}.{uuid.uuid4().hex[:8]}.tmp"
+    with open(tmp_path, "w") as f:
         json.dump(history, f, ensure_ascii=False, indent=2)
+    os.replace(tmp_path, history_path)  # atomic on POSIX: no partial-write corruption
     return record
 
 

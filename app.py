@@ -7,7 +7,7 @@ import os
 import subprocess
 import tempfile
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
@@ -79,6 +79,7 @@ def generate(req: GenerateRequest) -> dict:
 
 @app.post("/api/edit")
 async def edit(
+    request: Request,
     prompt: str = Form(...),
     size: str = Form(...),
     quality: str = Form(...),
@@ -94,6 +95,10 @@ async def edit(
         raise HTTPException(status_code=422, detail="prompt 1-4000 karakter olmalı.")
     if (file is None) == (source_id is None):
         raise HTTPException(status_code=422, detail="Tam olarak biri gerekli: file veya source_id.")
+
+    content_length = request.headers.get("content-length")
+    if content_length is not None and content_length.isdigit() and int(content_length) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Dosya çok büyük (maks 10 MB).")
 
     if source_id is not None:
         sid = os.path.basename(source_id)

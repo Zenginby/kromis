@@ -77,6 +77,17 @@ def test_edit_rejects_invalid_upload(tmp_path, monkeypatch):
     assert r.status_code == 422
 
 
+def test_edit_rejects_oversized_upload(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    big = b"\x00" * (10 * 1024 * 1024 + 1)  # > MAX_UPLOAD_BYTES
+    r = c.post(
+        "/api/edit",
+        data={"prompt": "x", "size": "1024x1024", "quality": "low", "n": "1"},
+        files={"file": ("big.png", big, "image/png")},
+    )
+    assert r.status_code == 413
+
+
 def test_edit_unknown_source_404(tmp_path, monkeypatch):
     c = _client(tmp_path, monkeypatch)
     r = c.post("/api/edit", data={"prompt": "x", "size": "1024x1024",

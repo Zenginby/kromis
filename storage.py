@@ -29,6 +29,14 @@ def _read_history(output_dir: str) -> list[dict]:
     return data
 
 
+def _write_history(output_dir: str, history: list[dict]) -> None:
+    path = _history_path(output_dir)
+    tmp_path = f"{path}.{uuid.uuid4().hex[:8]}.tmp"
+    with open(tmp_path, "w") as f:
+        json.dump(history, f, ensure_ascii=False, indent=2)
+    os.replace(tmp_path, path)
+
+
 def save(image_bytes: bytes, meta: dict, output_dir: str, *, now: str) -> dict:
     os.makedirs(output_dir, exist_ok=True)
     image_id = uuid.uuid4().hex[:12]
@@ -46,13 +54,25 @@ def save(image_bytes: bytes, meta: dict, output_dir: str, *, now: str) -> dict:
     }
     # immutable append: yeni liste yaz
     history = _read_history(output_dir) + [record]
-    history_path = _history_path(output_dir)
-    tmp_path = f"{history_path}.{uuid.uuid4().hex[:8]}.tmp"
-    with open(tmp_path, "w") as f:
-        json.dump(history, f, ensure_ascii=False, indent=2)
-    os.replace(tmp_path, history_path)  # atomic on POSIX: no partial-write corruption
+    _write_history(output_dir, history)
     return record
 
 
 def list_history(output_dir: str) -> list[dict]:
     return list(reversed(_read_history(output_dir)))
+
+
+def delete(image_id: str, output_dir: str) -> bool:
+    history = _read_history(output_dir)
+    remaining = [r for r in history if r.get("id") != image_id]
+    record_existed = len(remaining) != len(history)
+
+    file_path = os.path.join(output_dir, f"{image_id}.png")
+    file_existed = os.path.exists(file_path)
+    if file_existed:
+        os.remove(file_path)
+
+    if record_existed:
+        _write_history(output_dir, remaining)
+
+    return record_existed or file_existed

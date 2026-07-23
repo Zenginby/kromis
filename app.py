@@ -16,12 +16,14 @@ from fastapi.staticfiles import StaticFiles
 from PIL import Image
 from pydantic import BaseModel, Field, field_validator
 
+import assets_store
 import azure_client as ac
 import storage
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
+ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 COMPOSITE_SCRIPT = os.path.expanduser("~/.config/claude-tools/composite-logo.py")
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_IMAGE_PIXELS = 50 * 1024 * 1024
@@ -204,10 +206,17 @@ LOGO_POSITIONS = {
     "bottom-left", "bottom-center", "bottom-right",
 }
 LOGO_COLORS = {"auto", "blue", "white"}
+# Konumlanabilir (logo tarzı) bindirmenin varlığı hangi kütüphaneden gelebilir.
+# Banner ayrı bir yerleşim olduğu için burada değil.
+OVERLAY_ASSET_KINDS = {"logos", "mottos"}
 
 
 class LogoRequest(BaseModel):
     id: str = Field(min_length=1, max_length=64)
+    # asset_id boş/None => yerleşik KURUM logosu (mavi/beyaz auto). Doluysa
+    # asset_kind kütüphanesinden seçilen özel görsel (tek görsel) kullanılır.
+    asset_id: str | None = Field(default=None, max_length=64)
+    asset_kind: str = "logos"                                # "logos" | "mottos"
     position: str = "bottom-right"
     color: str = "auto"
     size: float = Field(default=0.14, ge=0.04, le=0.5)       # logo genişliği / görsel genişliği
@@ -228,6 +237,13 @@ class LogoRequest(BaseModel):
             raise ValueError("geçersiz color")
         return v
 
+    @field_validator("asset_kind")
+    @classmethod
+    def _asset_kind_ok(cls, v):
+        if v not in OVERLAY_ASSET_KINDS:
+            raise ValueError("geçersiz asset_kind")
+        return v
+
 
 def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
     """composite-logo.py'yi verilen seçeneklerle çalıştırır, sonuç PNG baytlarını döndürür.
@@ -246,6 +262,13 @@ def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
             "--shadow-alpha", str(req.shadow_alpha),
             "--shadow-blur", str(req.shadow_blur),
         ]
+        # Özel logo/motto seçildiyse aynı dosyayı her iki varyant olarak geç:
+        # renk seçimi (auto/blue/white) hangisine düşerse düşsün tek görsel kullanılır.
+        if req.asset_id:
+            overlay_path = assets_store.asset_path(req.asset_kind, req.asset_id, ASSETS_DIR)
+            if overlay_path is None:
+                raise HTTPException(status_code=404, detail="görsel bulunamadı")
+            cmd += ["--logo-blue", overlay_path, "--logo-white", overlay_path]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             raise HTTPException(status_code=500,
@@ -290,6 +313,128 @@ def add_logo(req: LogoRequest) -> dict:
         OUTPUT_DIR, now=_now(),
     )
     return {"image": record}
+
+
+BANNER_EDGES = {"top", "bottom"}
+
+
+class BannerRequest(BaseModel):
+    id: str = Field(min_length=1, max_length=64)          # bindirilecek görsel (history id)
+    asset_id: str = Field(min_length=1, max_length=64)    # kütüphaneden seçilen banner
+    edge: str = "bottom"
+
+    @field_validator("edge")
+    @classmethod
+    def _edge_ok(cls, v):
+        if v not in BANNER_EDGES:
+            raise ValueError("geçersiz edge")
+        return v
+
+
+def _composite_banner(src_path: str, banner_path: str, edge: str) -> bytes:
+    """Banner'ı görselin tüm genişliğine ölçekleyip üst/alt kenara bindirir.
+
+    Logo filigranından farklı: köşe değil, tam-genişlik şerit. Alfa maskesiyle
+    paste kullanılır; banner taşarsa kenardan kırpılır (paste otomatik kırpar).
+    """
+    base = Image.open(src_path).convert("RGBA")
+    banner = Image.open(banner_path).convert("RGBA")
+    new_h = max(1, round(banner.height * (base.width / banner.width)))
+    banner = banner.resize((base.width, new_h), Image.LANCZOS)
+    y = 0 if edge == "top" else max(0, base.height - banner.height)
+    composed = base.copy()
+    composed.paste(banner, (0, y), banner)  # banner alfası maske; taşma kırpılır
+    out = io.BytesIO()
+    composed.convert("RGB").save(out, format="PNG")
+    return out.getvalue()
+
+
+def _banner_asset_path(asset_id: str) -> str:
+    path = assets_store.asset_path("banners", asset_id, ASSETS_DIR)
+    if path is None:
+        raise HTTPException(status_code=404, detail="banner bulunamadı")
+    return path
+
+
+@app.post("/api/banner/preview")
+def preview_banner(req: BannerRequest) -> dict:
+    """Banner'lı geçici bir önizleme üretir — diske/geçmişe KAYDETMEZ."""
+    src_path = _logo_src_path(req.id)
+    banner_bytes = _composite_banner(src_path, _banner_asset_path(req.asset_id), req.edge)
+    b64 = base64.b64encode(banner_bytes).decode("ascii")
+    return {"b64": f"data:image/png;base64,{b64}"}
+
+
+@app.post("/api/banner")
+def add_banner(req: BannerRequest) -> dict:
+    src_path = _logo_src_path(req.id)
+    src_id = os.path.basename(req.id)
+    banner_path = _banner_asset_path(req.asset_id)
+
+    src_meta = next((h for h in storage.list_history(OUTPUT_DIR) if h["id"] == src_id), {})
+
+    banner_bytes = _composite_banner(src_path, banner_path, req.edge)
+    record = storage.save(
+        banner_bytes,
+        {"prompt": src_meta.get("prompt", ""), "size": src_meta.get("size", ""),
+         "quality": src_meta.get("quality", ""), "parent_id": src_id},
+        OUTPUT_DIR, now=_now(),
+    )
+    return {"image": record}
+
+
+def _check_asset_kind(kind: str) -> None:
+    if kind not in assets_store.KINDS:
+        raise HTTPException(status_code=404, detail="bilinmeyen tür")
+
+
+@app.post("/api/assets/{kind}")
+async def upload_asset(
+    kind: str,
+    request: Request,
+    file: UploadFile = File(...),
+    name: str = Form(""),
+) -> dict:
+    """Bir logo/banner PNG'si yükler; doğrulayıp yeniden kodlar ve kütüphaneye ekler."""
+    _check_asset_kind(kind)
+    content_length = request.headers.get("content-length")
+    if content_length is not None and content_length.isdigit() and int(content_length) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Dosya çok büyük (maks 10 MB).")
+    raw = await file.read()
+    if len(raw) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Dosya çok büyük (maks 10 MB).")
+    image_bytes = _to_png(raw)  # şeffaflığı koruyan RGBA PNG'ye yeniden kodla
+    stem = os.path.splitext(os.path.basename(file.filename or ""))[0]
+    label = (name.strip() or stem or "varlık")[:120]
+    record = assets_store.save_asset(kind, image_bytes, label, ASSETS_DIR, now=_now())
+    return {"asset": record}
+
+
+@app.get("/api/assets/{kind}")
+def list_assets_route(kind: str) -> dict:
+    _check_asset_kind(kind)
+    return {"items": assets_store.list_assets(kind, ASSETS_DIR)}
+
+
+@app.delete("/api/assets/{kind}/{asset_id}")
+def delete_asset_route(kind: str, asset_id: str) -> dict:
+    _check_asset_kind(kind)
+    removed = assets_store.delete_asset(kind, asset_id, ASSETS_DIR)
+    if not removed:
+        raise HTTPException(status_code=404, detail="varlık bulunamadı")
+    return {"deleted": os.path.basename(asset_id)}
+
+
+@app.get("/assets/{kind}/{filename}")
+def asset_file(kind: str, filename: str) -> FileResponse:
+    _check_asset_kind(kind)
+    safe = os.path.basename(filename)
+    if not safe or safe in (".", "..") or safe == assets_store.MANIFEST_FILE:
+        raise HTTPException(status_code=404, detail="bulunamadı")
+    path = os.path.join(ASSETS_DIR, kind, safe)
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="bulunamadı")
+    return FileResponse(path, media_type="image/png")
 
 
 @app.get("/output/{filename}")

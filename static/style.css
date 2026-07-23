@@ -68,18 +68,18 @@ body {
 .modal-actions { margin-top: 0.4rem; }
 .modal-actions .primary { margin-top: 0.6rem; }
 
-/* Logo modal */
-.logo-card { width: min(680px, 100%); }
-.logo-body { display: grid; grid-template-columns: 1fr 240px; gap: 1.2rem; align-items: start; }
-@media (max-width: 620px) { .logo-body { grid-template-columns: 1fr; } }
+/* Logo / banner modal */
+.logo-card { width: min(1040px, 100%); }
+.logo-body { display: grid; grid-template-columns: 1fr 300px; gap: 1.4rem; align-items: start; }
+@media (max-width: 760px) { .logo-body { grid-template-columns: 1fr; } }
 .logo-preview-wrap {
   position: relative; background:
     linear-gradient(45deg, oklch(24% 0.02 260) 25%, transparent 25%) 0 0/20px 20px,
     linear-gradient(-45deg, oklch(24% 0.02 260) 25%, transparent 25%) 0 0/20px 20px,
     var(--panel-2);
-  border-radius: 10px; min-height: 240px; display: grid; place-items: center; overflow: hidden;
+  border-radius: 10px; min-height: 420px; display: grid; place-items: center; overflow: hidden;
 }
-.logo-preview-img { max-width: 100%; max-height: 340px; display: block; border-radius: 6px; }
+.logo-preview-img { max-width: 100%; max-height: min(72vh, 680px); display: block; border-radius: 6px; }
 .logo-preview-spin { position: absolute; inset: 0; display: grid; place-items: center; background: oklch(20% 0.02 260 / 0.45); }
 .logo-preview-spin[hidden] { display: none; }
 
@@ -105,6 +105,60 @@ body {
 
 .range-val { color: var(--text); font-variant-numeric: tabular-nums; font-size: 0.78rem; }
 .logo-controls input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; margin: 0.1rem 0 0.2rem; }
+#logo-color-row[hidden], #logo-only[hidden], #banner-only[hidden] { display: none; }
+
+/* Modal içi varlık seçici (logo/banner) */
+.overlay-picker { display: flex; flex-wrap: wrap; gap: 8px; }
+.overlay-chip {
+  width: 56px; height: 56px; padding: 0; cursor: pointer; overflow: hidden;
+  display: grid; place-items: center; border-radius: 10px;
+  border: 2px solid var(--panel-2); background: var(--panel-2);
+  transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.overlay-chip:hover { border-color: var(--accent); transform: translateY(-1px); }
+.overlay-chip.active { border-color: var(--accent); box-shadow: 0 0 0 2px oklch(72% 0.17 45 / 0.35); }
+.overlay-chip img { width: 100%; height: 100%; object-fit: contain; }
+.overlay-builtin {
+  font-family: ui-serif, Georgia, serif; font-weight: 600; font-size: 0.85rem;
+  color: var(--accent); letter-spacing: 0.02em;
+}
+.overlay-empty { color: var(--muted); font-size: 0.82rem; margin: 0.2rem 0; }
+
+/* Prompt altı varlık kütüphanesi paneli */
+.assets-panel { margin-top: 1rem; border-top: 1px solid var(--panel-2); padding-top: 0.9rem; }
+.assets-head { display: flex; align-items: center; gap: 0.6rem; }
+.assets-head .seg { flex: 1; }
+.assets-head .btn-ghost { padding: 0.4rem 0.7rem; font-size: 0.82rem; flex: none; }
+.asset-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 0.5rem; margin-top: 0.7rem;
+}
+.asset-cell {
+  position: relative; background: var(--panel-2); border-radius: 9px; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.asset-cell img {
+  width: 100%; aspect-ratio: 1; object-fit: contain; display: block; padding: 6px;
+  background:
+    linear-gradient(45deg, oklch(24% 0.02 260) 25%, transparent 25%) 0 0/14px 14px,
+    linear-gradient(-45deg, oklch(24% 0.02 260) 25%, transparent 25%) 0 0/14px 14px;
+}
+.asset-name {
+  font-size: 0.68rem; color: var(--muted); padding: 0.25rem 0.35rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.asset-del {
+  position: absolute; top: 4px; right: 4px; z-index: 2;
+  width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%;
+  background: oklch(25% 0.02 260 / 0.78); color: var(--text);
+  font-size: 1rem; line-height: 1; cursor: pointer; display: grid; place-items: center;
+  opacity: 0; transform: scale(0.85);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease), background var(--dur);
+}
+.asset-cell:hover .asset-del, .asset-del:focus-visible { opacity: 1; transform: scale(1); }
+.asset-del:hover { background: oklch(55% 0.2 25); }
+.asset-empty { color: var(--muted); font-size: 0.82rem; margin: 0.4rem 0; grid-column: 1 / -1; }
+.asset-status { color: var(--muted); min-height: 1em; font-size: 0.78rem; margin: 0.45rem 0 0; }
 
 .layout {
   display: grid; gap: var(--space); padding: var(--space);

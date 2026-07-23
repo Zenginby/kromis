@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 import azure_client as ac
 import app as appmod
+import assets_store as astore
 
 
 def _fake_run_factory(recorder=None):
@@ -95,3 +96,77 @@ def test_logo_404_for_unknown_id(tmp_path, monkeypatch):
     c = TestClient(appmod.app)
     assert c.post("/api/logo", json={"id": "nope"}).status_code == 404
     assert c.post("/api/logo/preview", json={"id": "nope"}).status_code == 404
+
+
+def test_logo_builtin_passes_no_logo_path_flags(tmp_path, monkeypatch):
+    """asset_id verilmezse komut eskisiyle aynı (yerleşik KURUM logosu; regresyon)."""
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
+    monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
+    calls = []
+    monkeypatch.setattr(appmod.subprocess, "run", _fake_run_factory(calls))
+
+    c = TestClient(appmod.app)
+    src_id = _make_source(c)
+    assert c.post("/api/logo", json={"id": src_id}).status_code == 200
+    assert "--logo-blue" not in calls[-1] and "--logo-white" not in calls[-1]
+
+
+def test_logo_asset_id_passes_custom_logo_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path / "output"))
+    monkeypatch.setattr(appmod, "ASSETS_DIR", str(tmp_path / "assets"))
+    monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
+    calls = []
+    monkeypatch.setattr(appmod.subprocess, "run", _fake_run_factory(calls))
+
+    c = TestClient(appmod.app)
+    src_id = _make_source(c)
+    asset = astore.save_asset("logos", b"\x89PNG-logo", "özel", str(tmp_path / "assets"),
+                              now="2026-07-23T10:00:00")
+
+    r = c.post("/api/logo", json={"id": src_id, "asset_id": asset["id"]})
+    assert r.status_code == 200
+    cmd = calls[-1]
+    blue = cmd[cmd.index("--logo-blue") + 1]
+    white = cmd[cmd.index("--logo-white") + 1]
+    assert blue == white and blue.endswith(f"{asset['id']}.png")
+
+
+def test_logo_asset_id_404_for_unknown_asset(tmp_path, monkeypatch):
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path / "output"))
+    monkeypatch.setattr(appmod, "ASSETS_DIR", str(tmp_path / "assets"))
+    monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
+    monkeypatch.setattr(appmod.subprocess, "run", _fake_run_factory())
+
+    c = TestClient(appmod.app)
+    src_id = _make_source(c)
+    r = c.post("/api/logo", json={"id": src_id, "asset_id": "deadbeef01"})
+    assert r.status_code == 404
+
+
+def test_motto_placement_resolves_from_mottos_library(tmp_path, monkeypatch):
+    """Motto = logo tarzı konumlanabilir bindirme, ama 'mottos' kütüphanesinden."""
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path / "output"))
+    monkeypatch.setattr(appmod, "ASSETS_DIR", str(tmp_path / "assets"))
+    monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
+    calls = []
+    monkeypatch.setattr(appmod.subprocess, "run", _fake_run_factory(calls))
+
+    c = TestClient(appmod.app)
+    src_id = _make_source(c)
+    motto = astore.save_asset("mottos", b"\x89PNG-motto", "motto", str(tmp_path / "assets"),
+                              now="2026-07-23T10:00:00")
+
+    r = c.post("/api/logo", json={"id": src_id, "asset_id": motto["id"],
+                                  "asset_kind": "mottos", "position": "center"})
+    assert r.status_code == 200
+    cmd = calls[-1]
+    assert cmd[cmd.index("--logo-blue") + 1].endswith(f"{motto['id']}.png")
+    # motto id'si logos kütüphanesinde yok → yalnızca mottos'tan çözülebildi
+    assert astore.asset_path("logos", motto["id"], str(tmp_path / "assets")) is None
+
+
+def test_logo_rejects_bad_asset_kind(tmp_path, monkeypatch):
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
+    c = TestClient(appmod.app)
+    r = c.post("/api/logo", json={"id": "x", "asset_id": "deadbeef01", "asset_kind": "banners"})
+    assert r.status_code == 422

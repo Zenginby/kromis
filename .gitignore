@@ -1,4 +1,5 @@
 output/
+assets/
 .venv/
 __pycache__/
 *.pyc

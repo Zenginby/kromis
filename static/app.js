@@ -180,32 +180,6 @@ async function run() {
   }
 }
 
-async function addLogo(id) {
-  statusEl.textContent = "Logo bindiriliyor…";
-  const gen = startProgress();
-  let ok = false;
-  try {
-    const res = await fetch("/api/logo", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `Hata (${res.status})`);
-    }
-    const { image } = await res.json();
-    showPreview(image);
-    statusEl.textContent = "Logo eklendi.";
-    ok = true;
-    await loadHistory();
-  } catch (e) {
-    statusEl.textContent = e.message;
-  } finally {
-    stopProgress(ok, gen);
-  }
-}
-
 async function deleteImage(rec) {
   if (!confirm("Bu görseli silmek istediğinizden emin misiniz?")) return;
   statusEl.textContent = "Siliniyor…";
@@ -244,7 +218,7 @@ async function loadHistory() {
 
     const logoBtn = document.createElement("button");
     logoBtn.textContent = "Logo";
-    logoBtn.addEventListener("click", () => addLogo(rec.id));
+    logoBtn.addEventListener("click", () => openLogoModal(rec));
 
     const editBtn = document.createElement("button");
     editBtn.textContent = "Düzenle";
@@ -316,6 +290,142 @@ stageEl.addEventListener("dragleave", (e) => {
 stageEl.addEventListener("drop", (e) => {
   stageEl.classList.remove("dragover");
   if (hasFiles(e)) setUploadSource(e.dataTransfer.files[0]);
+});
+
+// ── Logo bindirme modalı + canlı önizleme ──────────────────────────
+let logoId = null;
+let logoPreviewTimer = null;
+let logoPreviewToken = 0;
+
+function readLogoOpts() {
+  const active = (sel) => document.querySelector(sel + " button.active");
+  const pos = active("#logo-grid");
+  const col = active("#logo-color");
+  const sizePct = parseInt($("logo-size").value, 10);
+  const shadowPct = parseInt($("logo-shadow").value, 10);
+  const blur = parseInt($("logo-blur").value, 10);
+  return {
+    id: logoId,
+    position: pos ? pos.dataset.pos : "bottom-right",
+    color: col ? col.dataset.color : "auto",
+    size: +(sizePct / 100).toFixed(3),
+    shadow_alpha: Math.round((shadowPct / 100) * 255),
+    shadow_blur: blur,
+  };
+}
+
+function selectInGroup(groupSel, btn) {
+  document.querySelectorAll(groupSel + " button").forEach((b) => b.classList.remove("active"));
+  btn.classList.add("active");
+}
+
+function syncLogoLabels() {
+  $("logo-size-val").textContent = $("logo-size").value + "%";
+  $("logo-shadow-val").textContent = $("logo-shadow").value + "%";
+  $("logo-blur-val").textContent = $("logo-blur").value;
+}
+
+function openLogoModal(rec) {
+  logoId = rec.id;
+  // varsayılanlara sıfırla
+  selectInGroup("#logo-grid", document.querySelector('#logo-grid button[data-pos="bottom-right"]'));
+  selectInGroup("#logo-color", document.querySelector('#logo-color button[data-color="auto"]'));
+  $("logo-size").value = 14;
+  $("logo-shadow").value = 47;
+  $("logo-blur").value = 6;
+  syncLogoLabels();
+  $("logo-status").textContent = "";
+  $("logo-preview-img").src = `/output/${rec.filename}`; // önce ham görsel
+  $("logo-modal").hidden = false;
+  refreshLogoPreview();
+}
+
+function closeLogoModal() {
+  $("logo-modal").hidden = true;
+  logoId = null;
+  clearTimeout(logoPreviewTimer);
+  logoPreviewToken++; // uçuştaki önizlemeleri iptal et
+}
+
+async function fetchLogoPreview() {
+  if (!logoId) return;
+  const token = ++logoPreviewToken;
+  $("logo-preview-spin").hidden = false;
+  try {
+    const res = await fetch("/api/logo/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(readLogoOpts()),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Hata (${res.status})`);
+    }
+    const { b64 } = await res.json();
+    if (token !== logoPreviewToken) return; // daha yeni bir önizleme devraldı
+    $("logo-preview-img").src = b64;
+    $("logo-status").textContent = "";
+  } catch (e) {
+    if (token === logoPreviewToken) $("logo-status").textContent = e.message;
+  } finally {
+    if (token === logoPreviewToken) $("logo-preview-spin").hidden = true;
+  }
+}
+
+// debounce: slider sürüklerken sunucuyu boğmayalım
+function refreshLogoPreview() {
+  clearTimeout(logoPreviewTimer);
+  logoPreviewTimer = setTimeout(fetchLogoPreview, 220);
+}
+
+async function applyLogo() {
+  if (!logoId) return;
+  $("logo-apply").disabled = true;
+  $("logo-status").textContent = "Uygulanıyor…";
+  try {
+    const res = await fetch("/api/logo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(readLogoOpts()),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Hata (${res.status})`);
+    }
+    const { image } = await res.json();
+    closeLogoModal();
+    showPreview(image);
+    statusEl.textContent = "Logo eklendi.";
+    await loadHistory();
+  } catch (e) {
+    $("logo-status").textContent = e.message;
+  } finally {
+    $("logo-apply").disabled = false;
+  }
+}
+
+$("logo-grid").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-pos]");
+  if (!btn) return;
+  selectInGroup("#logo-grid", btn);
+  refreshLogoPreview();
+});
+$("logo-color").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-color]");
+  if (!btn) return;
+  selectInGroup("#logo-color", btn);
+  refreshLogoPreview();
+});
+["logo-size", "logo-shadow", "logo-blur"].forEach((id) =>
+  $(id).addEventListener("input", () => { syncLogoLabels(); refreshLogoPreview(); })
+);
+$("logo-close").addEventListener("click", closeLogoModal);
+$("logo-apply").addEventListener("click", applyLogo);
+$("logo-modal").addEventListener("click", (e) => {
+  if (e.target.hasAttribute("data-logo-close")) closeLogoModal();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("logo-modal").hidden) closeLogoModal();
 });
 
 // ── Azure ayarları (admin, write-only) ──────────────────────────────

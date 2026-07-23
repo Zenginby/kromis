@@ -111,6 +111,59 @@
     </div>
   </div>
 
+  <div id="logo-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-logo-close></div>
+    <div class="modal-card logo-card" role="dialog" aria-modal="true" aria-labelledby="logo-title">
+      <div class="modal-head">
+        <h2 id="logo-title">Logo Bindir</h2>
+        <button id="logo-close" class="modal-x" type="button" aria-label="Kapat">×</button>
+      </div>
+
+      <div class="logo-body">
+        <div class="logo-preview-wrap">
+          <img id="logo-preview-img" class="logo-preview-img" alt="Logo önizleme" />
+          <div id="logo-preview-spin" class="logo-preview-spin" hidden><div class="spinner"></div></div>
+        </div>
+
+        <div class="logo-controls">
+          <label>Konum</label>
+          <div id="logo-grid" class="logo-grid" role="group" aria-label="Logo konumu">
+            <button type="button" data-pos="top-left"      aria-label="Sol üst">↖</button>
+            <button type="button" data-pos="top-center"    aria-label="Üst orta">↑</button>
+            <button type="button" data-pos="top-right"     aria-label="Sağ üst">↗</button>
+            <button type="button" data-pos="center-left"   aria-label="Sol orta">←</button>
+            <button type="button" data-pos="center"        aria-label="Merkez">•</button>
+            <button type="button" data-pos="center-right"  aria-label="Sağ orta">→</button>
+            <button type="button" data-pos="bottom-left"   aria-label="Sol alt">↙</button>
+            <button type="button" data-pos="bottom-center" aria-label="Alt orta">↓</button>
+            <button type="button" data-pos="bottom-right"  aria-label="Sağ alt">↘</button>
+          </div>
+
+          <label>Renk</label>
+          <div id="logo-color" class="seg" role="group" aria-label="Logo rengi">
+            <button type="button" data-color="auto">Oto</button>
+            <button type="button" data-color="blue">Mavi</button>
+            <button type="button" data-color="white">Beyaz</button>
+          </div>
+
+          <label for="logo-size">Boyut <span id="logo-size-val" class="range-val">14%</span></label>
+          <input id="logo-size" type="range" min="6" max="40" value="14" />
+
+          <label for="logo-shadow">Gölge yoğunluğu <span id="logo-shadow-val" class="range-val">47%</span></label>
+          <input id="logo-shadow" type="range" min="0" max="100" value="47" />
+
+          <label for="logo-blur">Gölge bulanıklığı <span id="logo-blur-val" class="range-val">6</span></label>
+          <input id="logo-blur" type="range" min="0" max="30" value="6" />
+        </div>
+      </div>
+
+      <p id="logo-status" class="modal-status" role="status"></p>
+      <div class="modal-actions">
+        <button id="logo-apply" class="primary" type="button">Uygula</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/static/app.js"></script>
 </body>
 </html>

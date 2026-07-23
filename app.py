@@ -1,6 +1,7 @@
 """GPT-Image Studio — yerel FastAPI arayüzü."""
 from __future__ import annotations
 
+import base64
 import datetime as _dt
 import io
 import os
@@ -197,36 +198,91 @@ def delete_image(image_id: str) -> dict:
     return {"deleted": iid}
 
 
+LOGO_POSITIONS = {
+    "top-left", "top-center", "top-right",
+    "center-left", "center", "center-right",
+    "bottom-left", "bottom-center", "bottom-right",
+}
+LOGO_COLORS = {"auto", "blue", "white"}
+
+
 class LogoRequest(BaseModel):
     id: str = Field(min_length=1, max_length=64)
+    position: str = "bottom-right"
+    color: str = "auto"
+    size: float = Field(default=0.14, ge=0.04, le=0.5)       # logo genişliği / görsel genişliği
+    shadow_alpha: int = Field(default=120, ge=0, le=255)     # 0 = gölge yok
+    shadow_blur: int = Field(default=6, ge=0, le=50)
+
+    @field_validator("position")
+    @classmethod
+    def _position_ok(cls, v):
+        if v not in LOGO_POSITIONS:
+            raise ValueError("geçersiz position")
+        return v
+
+    @field_validator("color")
+    @classmethod
+    def _color_ok(cls, v):
+        if v not in LOGO_COLORS:
+            raise ValueError("geçersiz color")
+        return v
 
 
-@app.post("/api/logo")
-def add_logo(req: LogoRequest) -> dict:
-    src_id = os.path.basename(req.id)
-    src_path = os.path.join(OUTPUT_DIR, f"{src_id}.png")
-    if not os.path.exists(src_path):
-        raise HTTPException(status_code=404, detail="kaynak görsel bulunamadı")
+def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
+    """composite-logo.py'yi verilen seçeneklerle çalıştırır, sonuç PNG baytlarını döndürür.
 
-    # kaynak metadata'sını history'den bul (prompt/size korunur)
-    src_meta = next((h for h in storage.list_history(OUTPUT_DIR) if h["id"] == src_id), {})
-
+    base_image ve output_path ilk iki konumsal argümandır (cmd[2], cmd[3]);
+    bayraklar sonradan gelir.
+    """
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
         tmp_out = tmp.name
     try:
-        result = subprocess.run(
-            ["python3", COMPOSITE_SCRIPT, src_path, tmp_out],
-            capture_output=True, text=True,
-        )
+        cmd = [
+            "python3", COMPOSITE_SCRIPT, src_path, tmp_out,
+            "--position", req.position,
+            "--color", req.color,
+            "--scale", str(req.size),
+            "--shadow-alpha", str(req.shadow_alpha),
+            "--shadow-blur", str(req.shadow_blur),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             raise HTTPException(status_code=500,
                                 detail=f"Logo bindirme başarısız: {result.stderr[:200]}")
         with open(tmp_out, "rb") as f:
-            logo_bytes = f.read()
+            return f.read()
     finally:
         if os.path.exists(tmp_out):
             os.remove(tmp_out)
 
+
+def _logo_src_path(image_id: str) -> str:
+    src_id = os.path.basename(image_id)
+    src_path = os.path.join(OUTPUT_DIR, f"{src_id}.png")
+    if not os.path.exists(src_path):
+        raise HTTPException(status_code=404, detail="kaynak görsel bulunamadı")
+    return src_path
+
+
+@app.post("/api/logo/preview")
+def preview_logo(req: LogoRequest) -> dict:
+    """Seçeneklerle geçici bir logo önizlemesi üretir — diske/geçmişe KAYDETMEZ."""
+    src_path = _logo_src_path(req.id)
+    logo_bytes = _composite_logo(src_path, req)
+    b64 = base64.b64encode(logo_bytes).decode("ascii")
+    return {"b64": f"data:image/png;base64,{b64}"}
+
+
+@app.post("/api/logo")
+def add_logo(req: LogoRequest) -> dict:
+    src_path = _logo_src_path(req.id)
+    src_id = os.path.basename(req.id)
+
+    # kaynak metadata'sını history'den bul (prompt/size korunur)
+    src_meta = next((h for h in storage.list_history(OUTPUT_DIR) if h["id"] == src_id), {})
+
+    logo_bytes = _composite_logo(src_path, req)
     record = storage.save(
         logo_bytes,
         {"prompt": src_meta.get("prompt", ""), "size": src_meta.get("size", ""),

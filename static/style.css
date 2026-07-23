@@ -68,6 +68,44 @@ body {
 .modal-actions { margin-top: 0.4rem; }
 .modal-actions .primary { margin-top: 0.6rem; }
 
+/* Logo modal */
+.logo-card { width: min(680px, 100%); }
+.logo-body { display: grid; grid-template-columns: 1fr 240px; gap: 1.2rem; align-items: start; }
+@media (max-width: 620px) { .logo-body { grid-template-columns: 1fr; } }
+.logo-preview-wrap {
+  position: relative; background:
+    linear-gradient(45deg, oklch(24% 0.02 260) 25%, transparent 25%) 0 0/20px 20px,
+    linear-gradient(-45deg, oklch(24% 0.02 260) 25%, transparent 25%) 0 0/20px 20px,
+    var(--panel-2);
+  border-radius: 10px; min-height: 240px; display: grid; place-items: center; overflow: hidden;
+}
+.logo-preview-img { max-width: 100%; max-height: 340px; display: block; border-radius: 6px; }
+.logo-preview-spin { position: absolute; inset: 0; display: grid; place-items: center; background: oklch(20% 0.02 260 / 0.45); }
+.logo-preview-spin[hidden] { display: none; }
+
+.logo-controls label:first-child { margin-top: 0; }
+.logo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.logo-grid button {
+  aspect-ratio: 1; border: 1px solid var(--panel-2); background: var(--panel-2);
+  color: var(--muted); border-radius: 8px; font-size: 1.1rem; line-height: 1; cursor: pointer;
+  display: grid; place-items: center;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur);
+}
+.logo-grid button:hover { color: var(--text); border-color: var(--accent); }
+.logo-grid button.active { background: var(--accent); color: oklch(20% 0.02 260); border-color: var(--accent); }
+
+.seg { display: flex; gap: 6px; }
+.seg button {
+  flex: 1; padding: 0.45rem 0.4rem; font: inherit; font-size: 0.82rem; cursor: pointer;
+  border: 1px solid var(--panel-2); background: var(--panel-2); color: var(--muted); border-radius: 8px;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur);
+}
+.seg button:hover { color: var(--text); border-color: var(--accent); }
+.seg button.active { background: var(--accent); color: oklch(20% 0.02 260); border-color: var(--accent); }
+
+.range-val { color: var(--text); font-variant-numeric: tabular-nums; font-size: 0.78rem; }
+.logo-controls input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; margin: 0.1rem 0 0.2rem; }
+
 .layout {
   display: grid; gap: var(--space); padding: var(--space);
   grid-template-columns: minmax(280px, 360px) 1fr;

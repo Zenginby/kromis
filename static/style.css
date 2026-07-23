@@ -53,6 +53,32 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 .primary:disabled { opacity: 0.55; cursor: progress; }
 .status { color: var(--muted); min-height: 1.2em; margin-top: 0.6rem; }
 
+.ref-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-top: 1rem; }
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  background: transparent; color: var(--text);
+  border: 1px solid var(--panel-2); border-radius: 10px;
+  padding: 0.55rem 0.85rem; font: inherit; cursor: pointer;
+  transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease), background var(--dur);
+}
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-ghost:active { background: var(--panel-2); }
+.btn-ghost-plus { font-size: 1.1rem; line-height: 1; }
+.ref-chip {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  background: var(--panel-2); border-radius: 999px;
+  padding: 0.3rem 0.4rem 0.3rem 0.75rem; font-size: 0.78rem; color: var(--muted);
+  max-width: 100%;
+}
+.ref-chip[hidden] { display: none; }
+.ref-chip #ref-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.ref-chip #ref-clear {
+  border: 0; background: transparent; color: var(--muted); cursor: pointer;
+  font-size: 1rem; line-height: 1; padding: 0 0.25rem; border-radius: 50%;
+  transition: color var(--dur) var(--ease);
+}
+.ref-chip #ref-clear:hover { color: oklch(65% 0.2 25); }
+
 .stage { display: flex; flex-direction: column; }
 .progress { height: 4px; width: 100%; background: var(--panel-2); border-radius: 4px; overflow: hidden; margin-bottom: 0.8rem; }
 .progress[hidden] { display: none; }
@@ -87,10 +113,6 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
   padding: 0.35rem; cursor: pointer;
 }
 .card .acts button:hover, .card .acts a:hover { color: var(--accent); }
-.divider { border: 0; border-top: 1px solid var(--panel-2); margin: 1.2rem 0; }
-.edit-panel summary { cursor: pointer; font-weight: 600; color: var(--accent); }
-.edit-panel .hint { color: var(--muted); font-size: 0.8rem; margin: 0.4rem 0; }
-.edit-panel input[type="file"] { width: 100%; color: var(--muted); font: inherit; margin-top: 0.3rem; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
   .progress span { animation: none; width: 100%; opacity: 0.6; }

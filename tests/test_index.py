@@ -8,6 +8,7 @@ def test_index_served():
     assert r.status_code == 200
     assert "GPT-Image Studio" in r.text
     assert 'id="prompt"' in r.text
-    # v1.1: düzenle akışı UI'da var
-    assert 'id="edit-prompt"' in r.text
-    assert 'id="edit-file"' in r.text
+    # birleşik akış: prompt bölümünde görsel ekleme; ayrı düzenle paneli yok
+    assert 'id="file-input"' in r.text
+    assert 'id="upload-btn"' in r.text
+    assert 'id="edit-panel"' not in r.text

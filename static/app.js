@@ -1,42 +1,19 @@
 const $ = (id) => document.getElementById(id);
 const statusEl = $("status");
+const ACCEPTED_UPLOAD_TYPES = ["image/png", "image/jpeg", "image/webp"];
+
+// Referans görsel: null | { kind: "upload", file, label } | { kind: "gallery", id, label }
+let source = null;
+let uploadPreviewUrl = null;
 
 function setLoading(on) {
   $("progress").hidden = !on;
 }
 
-async function generate() {
-  const prompt = $("prompt").value.trim();
-  if (!prompt) { statusEl.textContent = "Önce bir prompt yaz."; return; }
-  const body = {
-    prompt,
-    size: $("size").value,
-    quality: $("quality").value,
-    n: parseInt($("n").value, 10),
-  };
-  $("go").disabled = true;
-  clearUploadPreviewUrl();
-  setLoading(true);
-  statusEl.textContent = "Üretiliyor…";
-  try {
-    const res = await fetch("/api/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `Hata (${res.status})`);
-    }
-    const { images } = await res.json();
-    if (images[0]) showPreview(images[0]);
-    statusEl.textContent = `${images.length} görsel üretildi.`;
-    await loadHistory();
-  } catch (e) {
-    statusEl.textContent = e.message;
-  } finally {
-    $("go").disabled = false;
-    setLoading(false);
+function clearUploadPreviewUrl() {
+  if (uploadPreviewUrl) {
+    URL.revokeObjectURL(uploadPreviewUrl);
+    uploadPreviewUrl = null;
   }
 }
 
@@ -54,6 +31,97 @@ function showPreview(rec) {
   showPreviewSrc(`/output/${rec.filename}`, (rec.prompt || "").slice(0, 60));
 }
 
+// Referans durumunu arayüze yansıt: chip + ana buton etiketi
+function renderSource() {
+  const chip = $("ref-chip");
+  if (source) {
+    $("ref-label").textContent = source.label;
+    chip.hidden = false;
+    $("go").textContent = "Görseli düzenle";
+  } else {
+    chip.hidden = true;
+    $("go").textContent = "Üret";
+  }
+}
+
+function setUploadSource(file) {
+  if (!file || !ACCEPTED_UPLOAD_TYPES.includes(file.type)) {
+    statusEl.textContent = "PNG, JPEG veya WebP bir görsel seç.";
+    return;
+  }
+  clearUploadPreviewUrl();
+  source = { kind: "upload", file, label: `Yüklendi: ${file.name}` };
+  uploadPreviewUrl = URL.createObjectURL(file);
+  showPreviewSrc(uploadPreviewUrl, file.name);
+  renderSource();
+}
+
+function setGallerySource(rec) {
+  clearUploadPreviewUrl();
+  $("file-input").value = "";
+  source = { kind: "gallery", id: rec.id, label: `Referans: ${(rec.prompt || rec.id).slice(0, 40)}` };
+  showPreview(rec);
+  renderSource();
+  $("prompt").focus();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function clearSource() {
+  clearUploadPreviewUrl();
+  source = null;
+  $("file-input").value = "";
+  renderSource();
+}
+
+// Tek eylem: referans varsa düzenle, yoksa üret
+async function run() {
+  const prompt = $("prompt").value.trim();
+  if (!prompt) { statusEl.textContent = "Önce bir prompt yaz."; return; }
+
+  const size = $("size").value;
+  const quality = $("quality").value;
+  const n = $("n").value;
+  const editing = source !== null;
+
+  let request;
+  if (editing) {
+    const fd = new FormData();
+    fd.append("prompt", prompt);
+    fd.append("size", size);
+    fd.append("quality", quality);
+    fd.append("n", n);
+    if (source.kind === "upload") fd.append("file", source.file);
+    else fd.append("source_id", source.id);
+    request = fetch("/api/edit", { method: "POST", body: fd });
+  } else {
+    request = fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, size, quality, n: parseInt(n, 10) }),
+    });
+  }
+
+  $("go").disabled = true;
+  setLoading(true);
+  statusEl.textContent = editing ? "Düzenleniyor…" : "Üretiliyor…";
+  try {
+    const res = await request;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Hata (${res.status})`);
+    }
+    const { images } = await res.json();
+    if (images[0]) showPreview(images[0]);
+    statusEl.textContent = editing ? "Düzenleme tamam." : `${images.length} görsel üretildi.`;
+    await loadHistory();
+  } catch (e) {
+    statusEl.textContent = e.message;
+  } finally {
+    $("go").disabled = false;
+    setLoading(false);
+  }
+}
+
 async function addLogo(id) {
   statusEl.textContent = "Logo bindiriliyor…";
   try {
@@ -69,6 +137,23 @@ async function addLogo(id) {
     const { image } = await res.json();
     showPreview(image);
     statusEl.textContent = "Logo eklendi.";
+    await loadHistory();
+  } catch (e) {
+    statusEl.textContent = e.message;
+  }
+}
+
+async function deleteImage(rec) {
+  if (!confirm("Bu görseli silmek istediğinizden emin misiniz?")) return;
+  statusEl.textContent = "Siliniyor…";
+  try {
+    const res = await fetch(`/api/image/${rec.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Hata (${res.status})`);
+    }
+    if (source && source.kind === "gallery" && source.id === rec.id) clearSource();
+    statusEl.textContent = "Silindi.";
     await loadHistory();
   } catch (e) {
     statusEl.textContent = e.message;
@@ -100,7 +185,7 @@ async function loadHistory() {
 
     const editBtn = document.createElement("button");
     editBtn.textContent = "Düzenle";
-    editBtn.addEventListener("click", () => selectEditSource(rec));
+    editBtn.addEventListener("click", () => setGallerySource(rec));
 
     const acts = document.createElement("div");
     acts.className = "acts";
@@ -128,115 +213,22 @@ async function loadHistory() {
   }
 }
 
-let editSourceId = null;
-let uploadPreviewUrl = null;
-
-function clearUploadPreviewUrl() {
-  if (uploadPreviewUrl) {
-    URL.revokeObjectURL(uploadPreviewUrl);
-    uploadPreviewUrl = null;
-  }
-}
-
-function selectEditSource(rec) {
-  editSourceId = rec.id;
-  $("edit-file").value = "";
-  clearUploadPreviewUrl();
-  $("edit-source").textContent = `Kaynak: ${(rec.prompt || rec.id).slice(0, 50)} (galeri)`;
-  $("edit-panel").open = true;
-  showPreview(rec);
-}
-
-$("edit-file").addEventListener("change", () => {
-  const files = $("edit-file").files;
-  if (files.length) {
-    editSourceId = null;
-    $("edit-source").textContent = `Kaynak: ${files[0].name} (yükleme)`;
-    clearUploadPreviewUrl();
-    uploadPreviewUrl = URL.createObjectURL(files[0]);
-    showPreviewSrc(uploadPreviewUrl, files[0].name);
-  }
+// Görsel ekle butonu + gizli dosya girişi
+$("upload-btn").addEventListener("click", () => $("file-input").click());
+$("file-input").addEventListener("change", () => {
+  const files = $("file-input").files;
+  if (files.length) setUploadSource(files[0]);
 });
+$("ref-clear").addEventListener("click", clearSource);
 
-async function runEdit() {
-  const prompt = $("edit-prompt").value.trim();
-  if (!prompt) { statusEl.textContent = "Düzenleme promptu yaz."; return; }
-  const hasFile = $("edit-file").files.length > 0;
-  if (!hasFile && !editSourceId) { statusEl.textContent = "Bir görsel yükle veya galeriden seç."; return; }
-
-  const fd = new FormData();
-  fd.append("prompt", prompt);
-  fd.append("size", $("size").value);
-  fd.append("quality", $("quality").value);
-  fd.append("n", "1");
-  if (hasFile) fd.append("file", $("edit-file").files[0]);
-  else fd.append("source_id", editSourceId);
-
-  $("edit-go").disabled = true;
-  setLoading(true);
-  statusEl.textContent = "Düzenleniyor…";
-  try {
-    const res = await fetch("/api/edit", { method: "POST", body: fd });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `Hata (${res.status})`);
-    }
-    const { images } = await res.json();
-    if (images[0]) showPreview(images[0]);
-    clearUploadPreviewUrl();
-    statusEl.textContent = "Düzenleme tamam.";
-    await loadHistory();
-  } catch (e) {
-    statusEl.textContent = e.message;
-  } finally {
-    $("edit-go").disabled = false;
-    setLoading(false);
-  }
-}
-
-async function deleteImage(rec) {
-  if (!confirm("Bu görseli silmek istediğinizden emin misiniz?")) return;
-  statusEl.textContent = "Siliniyor…";
-  try {
-    const res = await fetch(`/api/image/${rec.id}`, { method: "DELETE" });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `Hata (${res.status})`);
-    }
-    if (editSourceId === rec.id) {
-      editSourceId = null;
-      $("edit-source").textContent = "";
-    }
-    statusEl.textContent = "Silindi.";
-    await loadHistory();
-  } catch (e) {
-    statusEl.textContent = e.message;
-  }
-}
-
-// Sürükle-bırak: merkez alana bırakılan görseli düzenleme girdisi olarak yükle
+// Sürükle-bırak: merkez alana bırakılan görseli referans olarak yükle
 const stageEl = document.querySelector(".stage");
-const ACCEPTED_UPLOAD_TYPES = ["image/png", "image/jpeg", "image/webp"];
-
-function loadDroppedFile(file) {
-  if (!file || !ACCEPTED_UPLOAD_TYPES.includes(file.type)) {
-    statusEl.textContent = "PNG, JPEG veya WebP bir görsel bırak.";
-    return;
-  }
-  const dt = new DataTransfer();
-  dt.items.add(file);
-  $("edit-file").files = dt.files;
-  $("edit-file").dispatchEvent(new Event("change"));
-  $("edit-panel").open = true;
-}
 
 function hasFiles(e) {
   return !!e.dataTransfer && [...e.dataTransfer.types].includes("Files");
 }
 
 // Tarayıcı, sayfaya bırakılan hiçbir dosyayı/bağlantıyı asla açmasın (koşulsuz).
-// Böylece stage'e bırakılan File-olmayan bir öğe (ör. başka sekmeden görsel) de
-// tarayıcıyı o adrese götürmez. Dosya-işleme mantığı ayrıca hasFiles ile kapılı.
 ["dragover", "drop"].forEach((evt) =>
   window.addEventListener(evt, (e) => e.preventDefault())
 );
@@ -253,9 +245,8 @@ stageEl.addEventListener("dragleave", (e) => {
 
 stageEl.addEventListener("drop", (e) => {
   stageEl.classList.remove("dragover");
-  if (hasFiles(e)) loadDroppedFile(e.dataTransfer.files[0]);
+  if (hasFiles(e)) setUploadSource(e.dataTransfer.files[0]);
 });
 
-$("go").addEventListener("click", generate);
-$("edit-go").addEventListener("click", runEdit);
+$("go").addEventListener("click", run);
 loadHistory();

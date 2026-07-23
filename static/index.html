@@ -15,7 +15,7 @@
   <main class="layout">
     <section class="controls" aria-label="Üretim kontrolleri">
       <label for="prompt">Prompt</label>
-      <textarea id="prompt" rows="6" placeholder="Ne üretmek istersin?"></textarea>
+      <textarea id="prompt" rows="6" placeholder="Ne üretmek istersin? Bir görsel eklersen prompt onun üzerinde çalışır."></textarea>
 
       <div class="row">
         <div>
@@ -40,20 +40,19 @@
         </div>
       </div>
 
+      <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" hidden />
+      <div class="ref-row">
+        <button type="button" id="upload-btn" class="btn-ghost">
+          <span class="btn-ghost-plus" aria-hidden="true">+</span> Görsel ekle
+        </button>
+        <span id="ref-chip" class="ref-chip" hidden>
+          <span id="ref-label"></span>
+          <button type="button" id="ref-clear" aria-label="Referansı kaldır">×</button>
+        </span>
+      </div>
+
       <button id="go" class="primary">Üret</button>
       <p id="status" class="status" role="status"></p>
-
-      <hr class="divider" />
-      <details class="edit-panel" id="edit-panel">
-        <summary>Düzenle / Referans</summary>
-        <p class="hint">Bir görsel yükle <em>ya da</em> galeriden "Düzenle" de, sonra ne istediğini yaz.</p>
-        <label for="edit-file">Görsel yükle</label>
-        <input type="file" id="edit-file" accept="image/png,image/jpeg,image/webp" />
-        <p id="edit-source" class="hint"></p>
-        <label for="edit-prompt">Düzenleme promptu</label>
-        <textarea id="edit-prompt" rows="4" placeholder="Ör. arka planı beyaz yap"></textarea>
-        <button id="edit-go" class="primary">Düzenle</button>
-      </details>
     </section>
 
     <section class="stage" aria-label="Önizleme">

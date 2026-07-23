@@ -90,3 +90,35 @@ def generate(prompt, size, quality, n, *, client=None, credentials=None) -> list
             body = None
         raise AzureImageError(map_error(resp.status_code, body))
     return decode_images(resp.json())
+
+
+def edit(prompt, image_bytes, filename, size, quality, n, *, client=None, credentials=None) -> list[bytes]:
+    key, base_url = credentials if credentials is not None else load_credentials()
+    endpoint = base_url.rstrip("/") + "/images/edits"
+    headers = {"Authorization": f"Bearer {key}"}  # Content-Type YOK: multipart client set eder
+    data = {
+        "model": MODEL_NAME,
+        "prompt": prompt,
+        "size": size,
+        "quality": quality,
+        "n": str(n),
+    }
+    files = {"image": (filename, image_bytes, "image/png")}
+
+    owns_client = client is None
+    if owns_client:
+        import httpx
+        client = httpx.Client()
+    try:
+        resp = client.post(endpoint, headers=headers, data=data, files=files, timeout=REQUEST_TIMEOUT)
+    finally:
+        if owns_client:
+            client.close()
+
+    if resp.status_code != 200:
+        try:
+            body = resp.json()
+        except Exception:
+            body = None
+        raise AzureImageError(map_error(resp.status_code, body))
+    return decode_images(resp.json())

@@ -112,6 +112,7 @@ async function run() {
     }
     const { images } = await res.json();
     if (images[0]) showPreview(images[0]);
+    clearUploadPreviewUrl(); // sonuç sunucu URL'inden gösteriliyor; blob artık gereksiz
     statusEl.textContent = editing ? "Düzenleme tamam." : `${images.length} görsel üretildi.`;
     await loadHistory();
   } catch (e) {

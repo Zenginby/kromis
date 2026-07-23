@@ -135,6 +135,15 @@ def history() -> dict:
     return {"images": storage.list_history(OUTPUT_DIR)}
 
 
+@app.delete("/api/image/{image_id}")
+def delete_image(image_id: str) -> dict:
+    iid = os.path.basename(image_id)
+    removed = storage.delete(iid, OUTPUT_DIR)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Görsel bulunamadı.")
+    return {"deleted": iid}
+
+
 class LogoRequest(BaseModel):
     id: str = Field(min_length=1, max_length=64)
 

@@ -214,6 +214,51 @@ async function deleteImage(rec) {
   }
 }
 
+// Sürükle-bırak: merkez alana bırakılan görseli düzenleme girdisi olarak yükle
+const stageEl = document.querySelector(".stage");
+
+function loadDroppedFile(file) {
+  if (!file || !file.type.startsWith("image/")) {
+    statusEl.textContent = "Lütfen bir görsel dosyası bırak.";
+    return;
+  }
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  $("edit-file").files = dt.files;
+  $("edit-file").dispatchEvent(new Event("change"));
+  $("edit-panel").open = true;
+}
+
+function hasFiles(e) {
+  return !!e.dataTransfer && [...e.dataTransfer.types].includes("Files");
+}
+
+["dragenter", "dragover"].forEach((evt) =>
+  stageEl.addEventListener(evt, (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    stageEl.classList.add("dragover");
+  })
+);
+
+stageEl.addEventListener("dragleave", (e) => {
+  if (e.target === stageEl) stageEl.classList.remove("dragover");
+});
+
+stageEl.addEventListener("drop", (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  stageEl.classList.remove("dragover");
+  loadDroppedFile(e.dataTransfer.files[0]);
+});
+
+// Sayfanın geri kalanına bırakınca tarayıcı dosyayı açmasın
+["dragover", "drop"].forEach((evt) =>
+  window.addEventListener(evt, (e) => {
+    if (!stageEl.contains(e.target)) e.preventDefault();
+  })
+);
+
 $("go").addEventListener("click", generate);
 $("edit-go").addEventListener("click", runEdit);
 loadHistory();

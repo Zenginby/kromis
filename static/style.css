@@ -58,8 +58,9 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 .progress[hidden] { display: none; }
 .progress span { display: block; height: 100%; width: 40%; border-radius: 4px; background: var(--accent); animation: indeterminate 1.1s var(--ease) infinite; }
 @keyframes indeterminate { 0% { transform: translateX(-120%); } 100% { transform: translateX(350%); } }
-.preview { flex: 1; display: grid; place-items: center; min-height: 340px; border-radius: 10px; background: var(--panel-2); }
+.preview { flex: 1; display: grid; place-items: center; min-height: 340px; border-radius: 10px; background: var(--panel-2); text-align: center; padding: 1rem; transition: outline-color var(--dur) var(--ease), background var(--dur); outline: 2px dashed transparent; outline-offset: -8px; }
 .preview.empty { color: var(--muted); }
+.stage.dragover .preview { outline-color: var(--accent); background: oklch(32% 0.06 45); }
 .preview img { max-width: 100%; max-height: 70vh; border-radius: 10px; }
 
 .gallery-wrap { margin: 0 var(--space) var(--space); }

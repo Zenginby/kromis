@@ -14,5 +14,12 @@ Key rotasyonu: `az cognitiveservices account keys list -g ai-services -n ai-orne
 ## Test
     python -m pytest tests/ -v
 
+## Özellikler
+- Prompt'tan görsel üretme (boyut/kalite/adet)
+- Geçmiş galerisi (indir, sil)
+- Görsel düzenleme: dosya yükle veya galeriden seç + prompt (Azure images/edits)
+- KURUM logosu bindirme
+
 ## Sonraya (v2)
-- Görsel düzenleme (edit/varyasyon)
+- Maske ile bölgesel düzenleme (inpainting)
+- Çoklu referans görsel

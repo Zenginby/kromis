@@ -3,9 +3,15 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import uuid
 
 HISTORY_FILE = "history.json"
+
+# Image ids are generated as uuid.uuid4().hex[:12] (see save()): bare lowercase
+# hex tokens with no separators or dots. Reject anything else up front so a
+# malicious/malformed id can never reach a filesystem path.
+_SAFE_ID = re.compile(r"[0-9a-f]{8,32}")
 
 
 def _history_path(output_dir: str) -> str:
@@ -63,6 +69,9 @@ def list_history(output_dir: str) -> list[dict]:
 
 
 def delete(image_id: str, output_dir: str) -> bool:
+    if not _SAFE_ID.fullmatch(image_id):
+        return False
+
     history = _read_history(output_dir)
     remaining = [r for r in history if r.get("id") != image_id]
     record_existed = len(remaining) != len(history)

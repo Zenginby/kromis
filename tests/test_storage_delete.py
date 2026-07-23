@@ -34,3 +34,27 @@ def test_delete_unknown_returns_false(tmp_path):
     out = str(tmp_path)
     _save(out, "a", "2026-07-23T10:00:00")
     assert storage.delete("doesnotexist", out) is False
+
+
+def test_delete_rejects_path_traversal(tmp_path):
+    # output_subdir is nested one level under tmp_path; the sentinel file
+    # sits in tmp_path itself (outside output_subdir). storage.delete always
+    # appends ".png" to the id, so the traversal id must account for that
+    # to actually reach the sentinel's real path/name.
+    out_subdir = tmp_path / "output"
+    out_subdir.mkdir()
+    victim = tmp_path / "victim.png"
+    victim.write_text("do not delete me")
+
+    result = storage.delete("../victim", str(out_subdir))
+
+    assert result is False
+    assert victim.exists()
+    assert victim.read_text() == "do not delete me"
+
+
+def test_delete_rejects_slash_and_dots(tmp_path):
+    out = str(tmp_path)
+    assert storage.delete("a/b", out) is False
+    assert storage.delete("..", out) is False
+    assert storage.delete("evil.png", out) is False

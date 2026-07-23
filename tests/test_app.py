@@ -1,4 +1,5 @@
 import base64
+import os
 from fastapi.testclient import TestClient
 import azure_client as ac
 import app as appmod
@@ -44,3 +45,16 @@ def test_history_returns_saved(tmp_path, monkeypatch):
                                   "quality": "low", "n": 1})
     r = c.get("/api/history")
     assert r.status_code == 200 and len(r.json()["images"]) == 1
+
+
+def test_output_directory_name_returns_404(tmp_path, monkeypatch):
+    os.makedirs(os.path.join(str(tmp_path), "sub"))
+    c = _client(tmp_path, monkeypatch)
+    r = c.get("/output/sub")
+    assert r.status_code == 404
+
+
+def test_output_missing_file_returns_404(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    r = c.get("/output/nope.png")
+    assert r.status_code == 404

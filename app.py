@@ -45,7 +45,7 @@ def _now() -> str:
 
 
 @app.post("/api/generate")
-def generate(req: GenerateRequest):
+def generate(req: GenerateRequest) -> dict:
     try:
         images = ac.generate(req.prompt, req.size, req.quality, req.n)
     except ac.AzureImageError as e:
@@ -60,21 +60,23 @@ def generate(req: GenerateRequest):
 
 
 @app.get("/api/history")
-def history():
+def history() -> dict:
     return {"images": storage.list_history(OUTPUT_DIR)}
 
 
 @app.get("/output/{filename}")
-def output_file(filename: str):
+def output_file(filename: str) -> FileResponse:
     safe = os.path.basename(filename)
+    if not safe or safe in (".", ".."):
+        raise HTTPException(status_code=404, detail="bulunamadı")
     path = os.path.join(OUTPUT_DIR, safe)
-    if not os.path.exists(path):
+    if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="bulunamadı")
     return FileResponse(path, media_type="image/png")
 
 
 @app.get("/")
-def index():
+def index() -> FileResponse:
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 

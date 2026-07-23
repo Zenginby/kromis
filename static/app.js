@@ -6,8 +6,42 @@ const ACCEPTED_UPLOAD_TYPES = ["image/png", "image/jpeg", "image/webp"];
 let source = null;
 let uploadPreviewUrl = null;
 
-function setLoading(on) {
-  $("progress").hidden = !on;
+// Simüle ilerleme: Azure tek yanıt döndürür (gerçek % akışı yok), bu yüzden
+// beklerken ~%90'a doğru yumuşakça doldurup, iş bitince %100'e tamamlarız.
+let progressTimer = null;
+
+function startProgress() {
+  const fill = $("progress-fill");
+  const pct = $("progress-pct");
+  $("progress").hidden = false;
+  let value = 0;
+  fill.style.width = "0%";
+  pct.textContent = "0%";
+  clearInterval(progressTimer);
+  progressTimer = setInterval(() => {
+    const remaining = 90 - value;
+    if (remaining <= 0) return;
+    value += Math.max(0.25, remaining * 0.02); // asimptotik + yavaş: yaklaştıkça iyice yavaşlar
+    if (value > 90) value = 90;
+    fill.style.width = value.toFixed(1) + "%";
+    pct.textContent = Math.round(value) + "%";
+  }, 160);
+}
+
+function stopProgress(complete) {
+  clearInterval(progressTimer);
+  progressTimer = null;
+  const fill = $("progress-fill");
+  const pct = $("progress-pct");
+  if (complete) {
+    fill.style.width = "100%";
+    pct.textContent = "100%";
+  }
+  setTimeout(() => {
+    $("progress").hidden = true;
+    fill.style.width = "0%";
+    pct.textContent = "0%";
+  }, complete ? 450 : 200);
 }
 
 function clearUploadPreviewUrl() {
@@ -102,8 +136,9 @@ async function run() {
   }
 
   $("go").disabled = true;
-  setLoading(true);
+  startProgress();
   statusEl.textContent = editing ? "Düzenleniyor…" : "Üretiliyor…";
+  let ok = false;
   try {
     const res = await request;
     if (!res.ok) {
@@ -114,17 +149,20 @@ async function run() {
     if (images[0]) showPreview(images[0]);
     clearUploadPreviewUrl(); // sonuç sunucu URL'inden gösteriliyor; blob artık gereksiz
     statusEl.textContent = editing ? "Düzenleme tamam." : `${images.length} görsel üretildi.`;
+    ok = true;
     await loadHistory();
   } catch (e) {
     statusEl.textContent = e.message;
   } finally {
     $("go").disabled = false;
-    setLoading(false);
+    stopProgress(ok);
   }
 }
 
 async function addLogo(id) {
   statusEl.textContent = "Logo bindiriliyor…";
+  startProgress();
+  let ok = false;
   try {
     const res = await fetch("/api/logo", {
       method: "POST",
@@ -138,9 +176,12 @@ async function addLogo(id) {
     const { image } = await res.json();
     showPreview(image);
     statusEl.textContent = "Logo eklendi.";
+    ok = true;
     await loadHistory();
   } catch (e) {
     statusEl.textContent = e.message;
+  } finally {
+    stopProgress(ok);
   }
 }
 

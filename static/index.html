@@ -56,7 +56,11 @@
     </section>
 
     <section class="stage" aria-label="Önizleme">
-      <div id="progress" class="progress" hidden aria-hidden="true"><span></span></div>
+      <div id="progress" class="progress" hidden aria-hidden="true">
+        <div class="spinner"></div>
+        <div class="bar"><div id="progress-fill" class="bar-fill"></div></div>
+        <span id="progress-pct" class="pct">0%</span>
+      </div>
       <div id="preview" class="preview empty">Henüz görsel yok · bir görseli buraya sürükle-bırak</div>
     </section>
   </main>

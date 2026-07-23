@@ -175,7 +175,7 @@ async function run() {
   } catch (e) {
     statusEl.textContent = e.message;
   } finally {
-    $("go").disabled = false;
+    $("go").disabled = !configured; // yapılandırma kaybolduysa kapıyı yeniden açma
     stopProgress(ok, gen);
   }
 }
@@ -318,5 +318,90 @@ stageEl.addEventListener("drop", (e) => {
   if (hasFiles(e)) setUploadSource(e.dataTransfer.files[0]);
 });
 
+// ── Azure ayarları (admin, write-only) ──────────────────────────────
+// API key hiçbir zaman sunucudan çekilmez/gösterilmez; sadece yazılır.
+let configured = false;
+
+function applyConfigured(s) {
+  configured = !!(s && s.configured);
+  $("go").disabled = !configured;
+  if (s && s.endpoint) $("set-endpoint").value = s.endpoint;
+  $("set-key").placeholder = configured
+    ? "Kayıtlı · değiştirmek için yeni anahtar yaz"
+    : "Azure API anahtarını yapıştır";
+  if (!configured) {
+    statusEl.textContent = "Başlamak için Azure ayarlarını gir (sağ üstteki ⚙).";
+  } else if (statusEl.textContent.startsWith("Başlamak için")) {
+    statusEl.textContent = "";
+  }
+}
+
+async function loadSettings(openIfMissing) {
+  try {
+    const res = await fetch("/api/settings");
+    const s = await res.json();
+    applyConfigured(s);
+    if (!configured && openIfMissing) openSettings();
+  } catch {
+    // durum alınamadıysa fail-closed: butonu kilitle, kullanıcıyı ayarlara yönlendir
+    configured = false;
+    $("go").disabled = true;
+    statusEl.textContent = "Ayar durumu alınamadı. Azure ayarlarını kontrol et (sağ üstteki ⚙).";
+    if (openIfMissing) openSettings();
+  }
+}
+
+function openSettings() {
+  $("set-key").value = ""; // her açılışta boş (write-only)
+  $("settings-status").textContent = "";
+  $("settings-modal").hidden = false;
+  setTimeout(() => $("set-endpoint").focus(), 0);
+}
+
+function closeSettings() {
+  $("settings-modal").hidden = true;
+}
+
+async function saveSettings() {
+  const base_url = $("set-endpoint").value.trim();
+  const api_key = $("set-key").value;
+  const st = $("settings-status");
+  if (!base_url) { st.textContent = "Endpoint gerekli."; return; }
+  if (!configured && !api_key.trim()) { st.textContent = "İlk kurulumda API key gerekli."; return; }
+
+  $("settings-save").disabled = true;
+  st.textContent = "Kaydediliyor…";
+  try {
+    const res = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key, base_url }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Hata (${res.status})`);
+    }
+    applyConfigured(await res.json());
+    $("set-key").value = "";
+    st.textContent = "Kaydedildi.";
+    setTimeout(closeSettings, 550);
+  } catch (e) {
+    st.textContent = e.message;
+  } finally {
+    $("settings-save").disabled = false;
+  }
+}
+
+$("settings-btn").addEventListener("click", openSettings);
+$("settings-close").addEventListener("click", closeSettings);
+$("settings-save").addEventListener("click", saveSettings);
+$("settings-modal").addEventListener("click", (e) => {
+  if (e.target.hasAttribute("data-close")) closeSettings();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("settings-modal").hidden) closeSettings();
+});
+
 $("go").addEventListener("click", run);
 loadHistory();
+loadSettings(true);

@@ -8,8 +8,17 @@
 </head>
 <body>
   <header class="topbar">
-    <h1>GPT-Image <span>Studio</span></h1>
-    <p class="sub">Azure gpt-image-2 · yerel</p>
+    <div class="topbar-text">
+      <h1>GPT-Image <span>Studio</span></h1>
+      <p class="sub">Azure gpt-image-2 · yerel</p>
+    </div>
+    <button id="settings-btn" class="icon-btn" type="button" aria-label="Azure ayarları" title="Azure ayarları">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </button>
   </header>
 
   <main class="layout">
@@ -74,6 +83,33 @@
     <h2>Geçmiş</h2>
     <div id="gallery" class="gallery"></div>
   </section>
+
+  <div id="settings-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="modal-head">
+        <h2 id="settings-title">Azure Ayarları</h2>
+        <button id="settings-close" class="modal-x" type="button" aria-label="Kapat">×</button>
+      </div>
+      <p class="modal-desc">
+        gpt-image-2 erişim bilgileri. Yalnızca bu makineye kaydedilir (izin 0600).
+        API anahtarı ekranda hiçbir zaman gösterilmez.
+      </p>
+
+      <label for="set-endpoint">Endpoint (Base URL)</label>
+      <input id="set-endpoint" type="url" autocomplete="off" spellcheck="false"
+             placeholder="https://…/openai/v1/" />
+
+      <label for="set-key">API Key</label>
+      <input id="set-key" type="password" autocomplete="off" spellcheck="false"
+             placeholder="Azure API anahtarını yapıştır" />
+
+      <p id="settings-status" class="modal-status" role="status"></p>
+      <div class="modal-actions">
+        <button id="settings-save" class="primary" type="button">Kaydet</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>

@@ -17,13 +17,56 @@ body {
   font-family: ui-sans-serif, system-ui, sans-serif;
   min-height: 100vh;
 }
-.topbar { padding: var(--space) var(--space) 0; }
+.topbar { padding: var(--space) var(--space) 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .topbar h1 {
   margin: 0; font-family: ui-serif, Georgia, serif;
   font-size: clamp(1.6rem, 1rem + 3vw, 2.8rem); letter-spacing: -0.02em;
 }
 .topbar h1 span { color: var(--accent); }
 .sub { color: var(--muted); margin: 0.2rem 0 0; }
+
+.icon-btn {
+  flex: none; margin-top: 0.4rem; width: 42px; height: 42px; padding: 0;
+  display: grid; place-items: center; cursor: pointer;
+  background: var(--panel); color: var(--muted);
+  border: 1px solid var(--panel-2); border-radius: 12px;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+              transform var(--dur) var(--ease), background var(--dur);
+}
+.icon-btn:hover { color: var(--accent); border-color: var(--accent); }
+.icon-btn:active { transform: scale(0.94); background: var(--panel-2); }
+.icon-btn svg { display: block; }
+
+/* Modal */
+.modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 1rem; }
+.modal[hidden] { display: none; }
+.modal-backdrop { position: absolute; inset: 0; background: oklch(12% 0.02 260 / 0.62); backdrop-filter: blur(2px); }
+.modal-card {
+  position: relative; z-index: 1; width: min(460px, 100%);
+  background: var(--panel); border: 1px solid var(--panel-2); border-radius: var(--radius);
+  padding: calc(var(--space) * 1.1); box-shadow: 0 24px 60px oklch(0% 0 0 / 0.45);
+  animation: modalIn var(--dur) var(--ease);
+}
+@keyframes modalIn { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+.modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
+.modal-head h2 { margin: 0; font-family: ui-serif, Georgia, serif; font-weight: 500; font-size: 1.35rem; }
+.modal-x {
+  border: 0; background: transparent; color: var(--muted); cursor: pointer;
+  font-size: 1.5rem; line-height: 1; padding: 0 0.25rem; border-radius: 8px;
+  transition: color var(--dur) var(--ease);
+}
+.modal-x:hover { color: var(--accent); }
+.modal-desc { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.9rem; line-height: 1.5; }
+.modal-card label { display: block; font-size: 0.85rem; color: var(--muted); margin: 0.7rem 0 0.25rem; }
+.modal-card input {
+  width: 100%; background: var(--panel-2); color: var(--text);
+  border: 1px solid transparent; border-radius: 10px; padding: 0.6rem 0.7rem;
+  font: inherit; transition: border-color var(--dur) var(--ease);
+}
+.modal-card input:focus { outline: none; border-color: var(--accent); }
+.modal-status { color: var(--muted); min-height: 1.2em; font-size: 0.82rem; margin: 0.7rem 0 0; }
+.modal-actions { margin-top: 0.4rem; }
+.modal-actions .primary { margin-top: 0.6rem; }
 
 .layout {
   display: grid; gap: var(--space); padding: var(--space);

@@ -8,7 +8,9 @@ import subprocess
 import tempfile
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 from pydantic import BaseModel, Field, field_validator
@@ -25,6 +27,19 @@ MAX_IMAGE_PIXELS = 50 * 1024 * 1024
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 app = FastAPI(title="GPT-Image Studio")
+
+
+@app.exception_handler(RequestValidationError)
+async def _redact_validation_errors(request: Request, exc: RequestValidationError):
+    """Doğrulama hatası gövdesinde API key'i yankılama (FastAPI varsayılanı 'input' döner)."""
+    safe = []
+    for err in exc.errors():
+        err = dict(err)
+        if any(str(p) == "api_key" for p in (err.get("loc") or ())):
+            err.pop("input", None)
+            err.pop("ctx", None)
+        safe.append(err)
+    return JSONResponse(status_code=422, content=jsonable_encoder({"detail": safe}))
 
 
 class GenerateRequest(BaseModel):
@@ -135,6 +150,37 @@ async def edit(
         for img in images
     ]
     return {"images": records}
+
+
+class SettingsRequest(BaseModel):
+    # api_key boş bırakılabilir: mevcut key korunur (endpoint'i tek başına güncelleme).
+    api_key: str = Field(default="", max_length=500)
+    base_url: str = Field(min_length=1, max_length=500)
+
+
+@app.get("/api/settings")
+def get_settings() -> dict:
+    """Yapılandırma durumu — API key asla dönmez, yalnızca configured + endpoint."""
+    return ac.get_settings_status()
+
+
+@app.post("/api/settings")
+def post_settings(req: SettingsRequest) -> dict:
+    """Admin kimlik bilgilerini yalnızca-yazılır kaydeder; durumu döndürür (key'siz).
+
+    api_key boşsa mevcut key korunur — ilk kurulumda ise key zorunludur.
+    """
+    api_key = req.api_key.strip()
+    if not api_key:
+        try:
+            api_key, _ = ac.load_credentials()
+        except ac.AzureImageError:
+            raise HTTPException(status_code=422, detail="İlk kurulumda API key gerekli.")
+    try:
+        ac.save_credentials(api_key, req.base_url)
+    except ac.AzureImageError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return ac.get_settings_status()
 
 
 @app.get("/api/history")

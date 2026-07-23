@@ -12,3 +12,6 @@ def test_index_served():
     assert 'id="file-input"' in r.text
     assert 'id="upload-btn"' in r.text
     assert 'id="edit-panel"' not in r.text
+    # ayarlar: dişli butonu + modal
+    assert 'id="settings-btn"' in r.text
+    assert 'id="settings-modal"' in r.text

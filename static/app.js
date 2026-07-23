@@ -65,17 +65,33 @@ async function loadHistory() {
   const g = $("gallery");
   g.innerHTML = "";
   for (const rec of images) {
+    const prompt = rec.prompt || "";
+
+    const img = document.createElement("img");
+    img.src = `/output/${rec.filename}`;
+    img.alt = prompt.slice(0, 60);
+    img.title = prompt;
+    img.addEventListener("click", () => showPreview(rec));
+
+    const downloadLink = document.createElement("a");
+    downloadLink.setAttribute("href", `/output/${rec.filename}`);
+    downloadLink.setAttribute("download", "");
+    downloadLink.textContent = "İndir";
+
+    const logoBtn = document.createElement("button");
+    logoBtn.textContent = "Logo";
+    logoBtn.addEventListener("click", () => addLogo(rec.id));
+
+    const acts = document.createElement("div");
+    acts.className = "acts";
+    acts.appendChild(downloadLink);
+    acts.appendChild(logoBtn);
+
     const card = document.createElement("div");
     card.className = "card";
-    card.innerHTML = `
-      <img src="/output/${rec.filename}" alt="${(rec.prompt || "").slice(0, 60)}"
-           title="${(rec.prompt || "").replace(/"/g, "'")}">
-      <div class="acts">
-        <a href="/output/${rec.filename}" download>İndir</a>
-        <button>Logo</button>
-      </div>`;
-    card.querySelector("img").addEventListener("click", () => showPreview(rec));
-    card.querySelector("button").addEventListener("click", () => addLogo(rec.id));
+    card.appendChild(img);
+    card.appendChild(acts);
+
     g.appendChild(card);
   }
 }

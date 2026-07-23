@@ -1,4 +1,3 @@
-import base64
 import os
 from fastapi.testclient import TestClient
 import azure_client as ac

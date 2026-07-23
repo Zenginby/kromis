@@ -62,13 +62,24 @@ function clearUploadPreviewUrl() {
 }
 
 function showPreviewSrc(src, alt = "") {
-  const preview = $("preview");
-  preview.className = "preview";
-  preview.innerHTML = "";
-  const img = document.createElement("img");
+  const img = $("preview-img");
   img.src = src;
   img.alt = alt;
-  preview.appendChild(img);
+  img.hidden = false;
+  $("preview-empty").hidden = true;
+  $("preview-clear").hidden = false;
+  $("preview").classList.remove("empty");
+}
+
+// Görseli yalnızca ekrandan kaldırır (silme yok) ve boş duruma döner.
+function clearPreview() {
+  const img = $("preview-img");
+  img.hidden = true;
+  img.removeAttribute("src");
+  img.alt = "";
+  $("preview-empty").hidden = false;
+  $("preview-clear").hidden = true;
+  $("preview").classList.add("empty");
 }
 
 function showPreview(rec) {
@@ -266,6 +277,13 @@ async function loadHistory() {
 }
 
 // Görsel ekle butonu + gizli dosya girişi
+// Önizlemeyi ekrandan kaldır (silmez): referansı da temizleyip "Üret" moduna döner
+$("preview-clear").addEventListener("click", () => {
+  clearSource();
+  clearPreview();
+  statusEl.textContent = "";
+});
+
 $("upload-btn").addEventListener("click", () => $("file-input").click());
 $("file-input").addEventListener("change", () => {
   const files = $("file-input").files;

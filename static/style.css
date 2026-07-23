@@ -94,10 +94,22 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 .bar { flex: 1; height: 6px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
 .bar-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 4px; transition: width 0.25s var(--ease); }
 .pct { font-size: 0.75rem; color: var(--muted); min-width: 2.6em; text-align: right; font-variant-numeric: tabular-nums; }
-.preview { flex: 1; display: grid; place-items: center; min-height: 340px; border-radius: 10px; background: var(--panel-2); text-align: center; padding: 1rem; transition: outline-color var(--dur) var(--ease), background var(--dur); outline: 2px dashed transparent; outline-offset: -8px; }
+.preview { position: relative; flex: 1; display: grid; place-items: center; min-height: 340px; border-radius: 10px; background: var(--panel-2); text-align: center; padding: 1rem; transition: outline-color var(--dur) var(--ease), background var(--dur); outline: 2px dashed transparent; outline-offset: -8px; }
 .preview.empty { color: var(--muted); }
 .stage.dragover .preview { outline-color: var(--accent); background: oklch(32% 0.06 45); }
-.preview img { max-width: 100%; max-height: 70vh; border-radius: 10px; }
+.preview-img { max-width: 100%; max-height: 70vh; border-radius: 10px; }
+.preview-img[hidden] { display: none; }
+.preview-empty[hidden] { display: none; }
+.preview-clear {
+  position: absolute; top: 10px; right: 10px; z-index: 2;
+  width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%;
+  background: oklch(25% 0.02 260 / 0.78); color: var(--text);
+  font-size: 1.25rem; line-height: 1; cursor: pointer;
+  display: grid; place-items: center;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.preview-clear[hidden] { display: none; }
+.preview-clear:hover { background: var(--panel); color: var(--accent); }
 
 .gallery-wrap { margin: 0 var(--space) var(--space); }
 .gallery-wrap h2 { margin: 0 0 0.8rem; font-family: ui-serif, Georgia, serif; font-weight: 500; }

@@ -61,7 +61,12 @@
         <div class="bar"><div id="progress-fill" class="bar-fill"></div></div>
         <span id="progress-pct" class="pct">0%</span>
       </div>
-      <div id="preview" class="preview empty">Henüz görsel yok · bir görseli buraya sürükle-bırak</div>
+      <div id="preview" class="preview empty">
+        <span id="preview-empty" class="preview-empty">Henüz görsel yok · bir görseli buraya sürükle-bırak</span>
+        <img id="preview-img" class="preview-img" alt="" hidden />
+        <button id="preview-clear" class="preview-clear" type="button" hidden
+                aria-label="Görseli ekrandan kaldır" title="Ekrandan kaldır">×</button>
+      </div>
     </section>
   </main>
 

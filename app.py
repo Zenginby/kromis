@@ -21,6 +21,8 @@ OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 COMPOSITE_SCRIPT = os.path.expanduser("~/.config/claude-tools/composite-logo.py")
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_IMAGE_PIXELS = 50 * 1024 * 1024
+Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 app = FastAPI(title="GPT-Image Studio")
 
@@ -54,7 +56,12 @@ def _to_png(raw: bytes) -> bytes:
     """Yüklenen görseli doğrula ve PNG'ye yeniden kodla. Geçersizse HTTPException(422)."""
     try:
         Image.open(io.BytesIO(raw)).verify()
-        im = Image.open(io.BytesIO(raw)).convert("RGBA")
+        im = Image.open(io.BytesIO(raw))
+        if im.width * im.height > MAX_IMAGE_PIXELS:
+            raise HTTPException(status_code=422, detail="Görsel çözünürlüğü çok yüksek.")
+        im = im.convert("RGBA")
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=422, detail="Geçersiz görsel dosyası.")
     out = io.BytesIO()

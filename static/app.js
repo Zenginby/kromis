@@ -166,6 +166,10 @@ async function deleteImage(rec) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || `Hata (${res.status})`);
     }
+    if (editSourceId === rec.id) {
+      editSourceId = null;
+      $("edit-source").textContent = "";
+    }
     statusEl.textContent = "Silindi.";
     await loadHistory();
   } catch (e) {

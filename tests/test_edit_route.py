@@ -95,6 +95,18 @@ def test_edit_unknown_source_404(tmp_path, monkeypatch):
     assert r.status_code == 404
 
 
+def test_edit_rejects_huge_dimensions(tmp_path, monkeypatch):
+    monkeypatch.setattr(appmod, "MAX_IMAGE_PIXELS", 100)  # tiny cap for the test
+    c = _client(tmp_path, monkeypatch)
+    # _png_bytes() makes a 32x32 = 1024px image, exceeds the 100px cap
+    r = c.post(
+        "/api/edit",
+        data={"prompt": "x", "size": "1024x1024", "quality": "low", "n": "1"},
+        files={"file": ("in.png", _png_bytes(), "image/png")},
+    )
+    assert r.status_code == 422
+
+
 def test_edit_maps_azure_error(tmp_path, monkeypatch):
     def boom(*a, **k):
         raise ac.AzureImageError("Azure isteği başarısız (HTTP 429).")

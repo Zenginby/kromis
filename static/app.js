@@ -1,6 +1,10 @@
 const $ = (id) => document.getElementById(id);
 const statusEl = $("status");
 
+function setLoading(on) {
+  $("progress").hidden = !on;
+}
+
 async function generate() {
   const prompt = $("prompt").value.trim();
   if (!prompt) { statusEl.textContent = "Önce bir prompt yaz."; return; }
@@ -11,6 +15,7 @@ async function generate() {
     n: parseInt($("n").value, 10),
   };
   $("go").disabled = true;
+  setLoading(true);
   statusEl.textContent = "Üretiliyor…";
   try {
     const res = await fetch("/api/generate", {
@@ -30,12 +35,22 @@ async function generate() {
     statusEl.textContent = e.message;
   } finally {
     $("go").disabled = false;
+    setLoading(false);
   }
 }
 
+function showPreviewSrc(src, alt = "") {
+  const preview = $("preview");
+  preview.className = "preview";
+  preview.innerHTML = "";
+  const img = document.createElement("img");
+  img.src = src;
+  img.alt = alt;
+  preview.appendChild(img);
+}
+
 function showPreview(rec) {
-  $("preview").className = "preview";
-  $("preview").innerHTML = `<img src="/output/${rec.filename}" alt="">`;
+  showPreviewSrc(`/output/${rec.filename}`, (rec.prompt || "").slice(0, 60));
 }
 
 async function addLogo(id) {
@@ -86,21 +101,26 @@ async function loadHistory() {
     editBtn.textContent = "Düzenle";
     editBtn.addEventListener("click", () => selectEditSource(rec));
 
-    const delBtn = document.createElement("button");
-    delBtn.className = "danger";
-    delBtn.textContent = "Sil";
-    delBtn.addEventListener("click", () => deleteImage(rec));
-
     const acts = document.createElement("div");
     acts.className = "acts";
     acts.appendChild(downloadLink);
     acts.appendChild(logoBtn);
     acts.appendChild(editBtn);
-    acts.appendChild(delBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "card-del";
+    delBtn.textContent = "×";
+    delBtn.title = "Sil";
+    delBtn.setAttribute("aria-label", "Görseli sil");
+    delBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      deleteImage(rec);
+    });
 
     const card = document.createElement("div");
     card.className = "card";
     card.appendChild(img);
+    card.appendChild(delBtn);
     card.appendChild(acts);
 
     g.appendChild(card);
@@ -108,19 +128,32 @@ async function loadHistory() {
 }
 
 let editSourceId = null;
+let uploadPreviewUrl = null;
+
+function clearUploadPreviewUrl() {
+  if (uploadPreviewUrl) {
+    URL.revokeObjectURL(uploadPreviewUrl);
+    uploadPreviewUrl = null;
+  }
+}
 
 function selectEditSource(rec) {
   editSourceId = rec.id;
   $("edit-file").value = "";
+  clearUploadPreviewUrl();
   $("edit-source").textContent = `Kaynak: ${(rec.prompt || rec.id).slice(0, 50)} (galeri)`;
   $("edit-panel").open = true;
   showPreview(rec);
 }
 
 $("edit-file").addEventListener("change", () => {
-  if ($("edit-file").files.length) {
+  const files = $("edit-file").files;
+  if (files.length) {
     editSourceId = null;
-    $("edit-source").textContent = `Kaynak: ${$("edit-file").files[0].name} (yükleme)`;
+    $("edit-source").textContent = `Kaynak: ${files[0].name} (yükleme)`;
+    clearUploadPreviewUrl();
+    uploadPreviewUrl = URL.createObjectURL(files[0]);
+    showPreviewSrc(uploadPreviewUrl, files[0].name);
   }
 });
 
@@ -139,6 +172,7 @@ async function runEdit() {
   else fd.append("source_id", editSourceId);
 
   $("edit-go").disabled = true;
+  setLoading(true);
   statusEl.textContent = "Düzenleniyor…";
   try {
     const res = await fetch("/api/edit", { method: "POST", body: fd });
@@ -148,17 +182,19 @@ async function runEdit() {
     }
     const { images } = await res.json();
     if (images[0]) showPreview(images[0]);
+    clearUploadPreviewUrl();
     statusEl.textContent = "Düzenleme tamam.";
     await loadHistory();
   } catch (e) {
     statusEl.textContent = e.message;
   } finally {
     $("edit-go").disabled = false;
+    setLoading(false);
   }
 }
 
 async function deleteImage(rec) {
-  if (!confirm("Bu görseli silmek istediğine emin misin?")) return;
+  if (!confirm("Bu görseli silmek istediğinizden emin misiniz?")) return;
   statusEl.textContent = "Siliniyor…";
   try {
     const res = await fetch(`/api/image/${rec.id}`, { method: "DELETE" });

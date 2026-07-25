@@ -21,6 +21,7 @@ from starlette.datastructures import UploadFile as FormUploadFile
 
 import assets_store
 import azure_client as ac
+import folders
 import storage
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -55,6 +56,7 @@ class GenerateRequest(BaseModel):
     size: str
     quality: str
     n: int = Field(ge=1, le=4)
+    folder_id: str | None = Field(default=None, max_length=64)  # None = klasörsüz (kök)
 
     @field_validator("size")
     @classmethod
@@ -134,15 +136,26 @@ async def _extra_refs(request: Request) -> tuple[list[UploadFile], list[str]]:
     return uploads, ids
 
 
+def _check_folder(folder_id: str | None) -> str | None:
+    """Boş/None ise kök (None). Doluysa klasörün var olduğunu doğrular, yoksa 404."""
+    if not folder_id:
+        return None
+    if not folders.exists(folder_id, OUTPUT_DIR):
+        raise HTTPException(status_code=404, detail="Klasör bulunamadı.")
+    return folder_id
+
+
 @app.post("/api/generate")
 def generate(req: GenerateRequest) -> dict:
+    folder_id = _check_folder(req.folder_id)
     try:
         images = ac.generate(req.prompt, req.size, req.quality, req.n)
     except ac.AzureImageError as e:
         raise HTTPException(status_code=502, detail=str(e))
     records = [
         storage.save(img, {"prompt": req.prompt, "size": req.size,
-                           "quality": req.quality, "parent_id": None},
+                           "quality": req.quality, "parent_id": None,
+                           "folder_id": folder_id},
                      OUTPUT_DIR, now=_now())
         for img in images
     ]
@@ -158,6 +171,7 @@ async def edit(
     n: int = Form(...),
     file: UploadFile | None = File(None),
     source_id: str | None = Form(None),
+    folder_id: str | None = Form(None),
 ) -> dict:
     """Ek referans görselleri (`extra_files` yüklemeleri, `extra_source_ids`
     galeri id'leri) form verisinden okunur — bkz. _extra_refs."""
@@ -169,6 +183,8 @@ async def edit(
         raise HTTPException(status_code=422, detail="prompt 1-4000 karakter olmalı.")
     if (file is None) == (source_id is None):
         raise HTTPException(status_code=422, detail="Tam olarak biri gerekli: file veya source_id.")
+
+    target_folder = _check_folder(folder_id)
 
     extra_uploads, extra_ids = await _extra_refs(request)
     if 1 + len(extra_uploads) + len(extra_ids) > MAX_EDIT_IMAGES:
@@ -202,7 +218,8 @@ async def edit(
 
     records = [
         storage.save(img, {"prompt": prompt, "size": size, "quality": quality,
-                           "parent_id": parent_id}, OUTPUT_DIR, now=_now())
+                           "parent_id": parent_id, "folder_id": target_folder},
+                     OUTPUT_DIR, now=_now())
         for img in images
     ]
     return {"images": records}
@@ -239,9 +256,69 @@ def post_settings(req: SettingsRequest) -> dict:
     return ac.get_settings_status()
 
 
+class FolderRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=80)
+
+
+@app.get("/api/folders")
+def list_folders_route() -> dict:
+    """Klasörler + içindeki görsel sayısı (arayüzde kart altında gösterilir)."""
+    counts: dict[str, int] = {}
+    for rec in storage.list_history(OUTPUT_DIR):
+        fid = rec.get("folder_id")
+        if fid:
+            counts[fid] = counts.get(fid, 0) + 1
+    items = [{**f, "count": counts.get(f["id"], 0)}
+             for f in folders.list_folders(OUTPUT_DIR)]
+    return {"items": items}
+
+
+@app.post("/api/folders")
+def create_folder_route(req: FolderRequest) -> dict:
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Klasör adı gerekli.")
+    return {"folder": folders.create(name, OUTPUT_DIR, now=_now())}
+
+
+@app.delete("/api/folders/{folder_id}")
+def delete_folder_route(folder_id: str) -> dict:
+    """Klasörü siler; içindeki görseller SİLİNMEZ, klasörsüz (kök) hale döner."""
+    fid = os.path.basename(folder_id)
+    unfiled = storage.unfile_folder(fid, OUTPUT_DIR)
+    if not folders.delete(fid, OUTPUT_DIR):
+        raise HTTPException(status_code=404, detail="Klasör bulunamadı.")
+    return {"deleted": fid, "unfiled": unfiled}
+
+
 @app.get("/api/history")
-def history() -> dict:
-    return {"images": storage.list_history(OUTPUT_DIR)}
+def history(folder_id: str | None = None) -> dict:
+    """folder_id yoksa yalnızca klasörsüz görseller (kök), varsa o klasörünkiler."""
+    items = storage.list_history(OUTPUT_DIR)
+    if folder_id:
+        _check_folder(folder_id)
+        items = [r for r in items if r.get("folder_id") == folder_id]
+    else:
+        items = [r for r in items if not r.get("folder_id")]
+    return {"images": items}
+
+
+class MoveImageRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    folder_id: str | None = Field(default=None, max_length=64)  # None = klasörsüz (kök)
+
+
+@app.patch("/api/image/{image_id}")
+def move_image(image_id: str, req: MoveImageRequest) -> dict:
+    """Görseli bir klasöre taşır (folder_id=None ise köke). Dosya taşınmaz."""
+    target = _check_folder(req.folder_id)
+    iid = os.path.basename(image_id)
+    if not storage.set_folder(iid, target, OUTPUT_DIR):
+        raise HTTPException(status_code=404, detail="Görsel bulunamadı.")
+    return {"id": iid, "folder_id": target}
 
 
 @app.delete("/api/image/{image_id}")
@@ -363,7 +440,9 @@ def add_logo(req: LogoRequest) -> dict:
     record = storage.save(
         logo_bytes,
         {"prompt": src_meta.get("prompt", ""), "size": src_meta.get("size", ""),
-         "quality": src_meta.get("quality", ""), "parent_id": src_id},
+         "quality": src_meta.get("quality", ""), "parent_id": src_id,
+         # türev, kaynağın klasöründe kalır
+         "folder_id": src_meta.get("folder_id")},
         OUTPUT_DIR, now=_now(),
     )
     return {"image": record}
@@ -458,7 +537,8 @@ def add_banner(req: BannerRequest) -> dict:
     record = storage.save(
         banner_bytes,
         {"prompt": src_meta.get("prompt", ""), "size": src_meta.get("size", ""),
-         "quality": src_meta.get("quality", ""), "parent_id": src_id},
+         "quality": src_meta.get("quality", ""), "parent_id": src_id,
+         "folder_id": src_meta.get("folder_id")},  # türev, kaynağın klasöründe kalır
         OUTPUT_DIR, now=_now(),
     )
     return {"image": record}

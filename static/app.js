@@ -265,6 +265,7 @@ async function run() {
     fd.append("n", n);
     if (source.kind === "upload") fd.append("file", source.file);
     else fd.append("source_id", source.id);
+    if (currentFolder) fd.append("folder_id", currentFolder.id);
     // ek referanslar: sunucu sırayı ana görsel → yüklemeler → galeri id'leri olarak kurar
     for (const item of extras) {
       if (item.kind === "upload") fd.append("extra_files", item.file);
@@ -275,7 +276,8 @@ async function run() {
     request = fetch("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, size, quality, n: parseInt(n, 10) }),
+      body: JSON.stringify({ prompt, size, quality, n: parseInt(n, 10),
+                             folder_id: currentFolder ? currentFolder.id : null }),
     });
   }
 
@@ -324,8 +326,239 @@ async function deleteImage(rec) {
   }
 }
 
+// ── Klasörler ────────────────────────────────────────────────────────
+// Açık klasör AYNI ZAMANDA hedeftir: içindeysen yeni görseller oraya kaydedilir,
+// kökteysen klasörsüz kaydedilir. Tek durum → "nerede görüyorum" ile "nereye
+// kaydediliyor" ayrışmaz. null = kök.
+let currentFolder = null;
+let folderCache = [];
+
+// Sürükle-bırak taşıma: kart bu MIME türünü taşır, klasör hedefleri onu arar.
+// Böylece dosya sürükleme (stage'e görsel bırakma) ile karışmaz.
+const IMAGE_DND_TYPE = "application/x-gpt-image-id";
+
+function renderFolderTarget() {
+  const el = $("folder-target");
+  if (currentFolder) {
+    el.textContent = `Yeni görseller "${currentFolder.name}" klasörüne eklenecek.`;
+    el.hidden = false;
+  } else {
+    el.hidden = true;
+  }
+}
+
+function syncFolderView() {
+  const inFolder = currentFolder !== null;
+  $("folder-back").hidden = !inFolder;
+  $("gallery-title").textContent = inFolder ? currentFolder.name : "Klasörler";
+  $("images-title").textContent = inFolder ? "Klasördeki görseller" : "Klasörsüz görseller";
+  // Şerit klasör içinde de görünür: taşıma hedefleri oradan geliyor.
+  $("folder-hint").hidden = !folderCache.length;
+  renderFolderTarget();
+  renderFolders();
+}
+
+async function loadFolders() {
+  try {
+    const res = await fetch("/api/folders");
+    if (!res.ok) throw new Error(`Hata (${res.status})`);
+    folderCache = (await res.json()).items || [];
+  } catch {
+    folderCache = [];
+    statusEl.textContent = "Klasörler alınamadı.";
+  }
+  $("folder-hint").hidden = !folderCache.length;
+  renderFolders();
+}
+
+// Bir görseli klasöre (veya köke) taşır. Dosya taşınmaz; yalnızca etiket değişir.
+async function moveImage(imageId, folderId, targetName) {
+  try {
+    const res = await fetch(`/api/image/${imageId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folder_id: folderId }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(typeof err.detail === "string" ? err.detail : `Hata (${res.status})`);
+    }
+    statusEl.textContent = `Görsel "${targetName}" içine taşındı.`;
+    await Promise.all([loadFolders(), loadHistory()]);
+  } catch (e) {
+    statusEl.textContent = e.message;
+  }
+}
+
+// Bir öğeyi görsel-bırakma hedefi yapar (klasör kartı / "Klasörsüz" kartı)
+function makeDropTarget(el, folderId, targetName) {
+  const carriesImage = (e) => !!e.dataTransfer && [...e.dataTransfer.types].includes(IMAGE_DND_TYPE);
+  el.addEventListener("dragover", (e) => {
+    if (!carriesImage(e)) return;      // dosya sürüklemesine karışma
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    el.classList.add("drop-hover");
+  });
+  el.addEventListener("dragleave", () => el.classList.remove("drop-hover"));
+  el.addEventListener("drop", (e) => {
+    el.classList.remove("drop-hover");
+    if (!carriesImage(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const imageId = e.dataTransfer.getData(IMAGE_DND_TYPE);
+    if (imageId) moveImage(imageId, folderId, targetName);
+  });
+}
+
+function renderFolders() {
+  const grid = $("folder-grid");
+  grid.innerHTML = "";
+
+  // Bir klasörün içindeyken "Klasörsüz" kartı: hem çıkış hem de köke taşıma hedefi
+  if (currentFolder) {
+    const out = document.createElement("button");
+    out.type = "button";
+    out.className = "folder-open folder-root";
+    out.title = "Klasörsüz görseller · buraya bırakarak kökten çıkar";
+    const label = document.createElement("span");
+    label.className = "folder-name";
+    label.textContent = "Klasörsüz";
+    const sub = document.createElement("span");
+    sub.className = "folder-count";
+    sub.textContent = "buraya bırak → kök";
+    out.appendChild(label);
+    out.appendChild(sub);
+    out.addEventListener("click", exitFolder);
+
+    const cell = document.createElement("div");
+    cell.className = "folder-cell";
+    cell.appendChild(out);
+    makeDropTarget(cell, null, "Klasörsüz");
+    grid.appendChild(cell);
+  }
+
+  if (!folderCache.length) {
+    const empty = document.createElement("p");
+    empty.className = "folder-empty";
+    empty.textContent = "Henüz klasör yok · + Yeni klasör ile oluştur";
+    grid.appendChild(empty);
+    return;
+  }
+  for (const f of folderCache) {
+    // SVG: 🗀 gibi glyph'ler sistem fontunda eksik olabiliyor (tofu/yanlış render)
+    const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    icon.setAttribute("class", "folder-icon");
+    icon.setAttribute("viewBox", "0 0 24 24");
+    icon.setAttribute("width", "26");
+    icon.setAttribute("height", "26");
+    icon.setAttribute("fill", "none");
+    icon.setAttribute("stroke", "currentColor");
+    icon.setAttribute("stroke-width", "1.8");
+    icon.setAttribute("stroke-linecap", "round");
+    icon.setAttribute("stroke-linejoin", "round");
+    icon.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", "M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2z");
+    icon.appendChild(path);
+
+    const name = document.createElement("span");
+    name.className = "folder-name";
+    name.textContent = f.name;
+
+    const count = document.createElement("span");
+    count.className = "folder-count";
+    count.textContent = `${f.count} görsel`;
+
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "folder-open";
+    open.title = `${f.name} klasörünü aç`;
+    open.appendChild(icon);
+    open.appendChild(name);
+    open.appendChild(count);
+    open.addEventListener("click", () => openFolder(f));
+
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "folder-del";
+    del.textContent = "×";
+    del.title = "Klasörü sil";
+    del.setAttribute("aria-label", `${f.name} klasörünü sil`);
+    del.addEventListener("click", () => deleteFolder(f));
+
+    const cell = document.createElement("div");
+    cell.className = "folder-cell";
+    const isCurrent = currentFolder && currentFolder.id === f.id;
+    if (isCurrent) cell.classList.add("current");
+    cell.appendChild(open);
+    cell.appendChild(del);
+    // İçinde bulunduğun klasöre taşıma anlamsız → hedef yapılmaz
+    if (!isCurrent) makeDropTarget(cell, f.id, f.name);
+    grid.appendChild(cell);
+  }
+}
+
+async function openFolder(f) {
+  currentFolder = { id: f.id, name: f.name };
+  syncFolderView();
+  await Promise.all([loadFolders(), loadHistory()]);
+}
+
+async function exitFolder() {
+  currentFolder = null;
+  syncFolderView();
+  await Promise.all([loadFolders(), loadHistory()]);
+}
+
+async function createFolder() {
+  const name = (prompt("Klasör adı:") || "").trim();
+  if (!name) return;
+  try {
+    const res = await fetch("/api/folders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(typeof err.detail === "string" ? err.detail : `Hata (${res.status})`);
+    }
+    statusEl.textContent = "Klasör oluşturuldu.";
+    await loadFolders();
+  } catch (e) {
+    statusEl.textContent = e.message;
+  }
+}
+
+async function deleteFolder(f) {
+  if (!confirm(`"${f.name}" klasörü silinsin mi? İçindeki görseller SİLİNMEZ, klasörsüz hale döner.`)) return;
+  try {
+    const res = await fetch(`/api/folders/${f.id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(`Hata (${res.status})`);
+    const { unfiled } = await res.json();
+    statusEl.textContent = unfiled
+      ? `Klasör silindi · ${unfiled} görsel klasörsüz hale döndü.`
+      : "Klasör silindi.";
+    // silinen klasörün içindeysek köke dön
+    if (currentFolder && currentFolder.id === f.id) await exitFolder();
+    else await Promise.all([loadFolders(), loadHistory()]);
+  } catch (e) {
+    statusEl.textContent = e.message;
+  }
+}
+
+$("folder-back").addEventListener("click", exitFolder);
+$("folder-new").addEventListener("click", createFolder);
+
 async function loadHistory() {
-  const res = await fetch("/api/history");
+  const url = currentFolder ? `/api/history?folder_id=${encodeURIComponent(currentFolder.id)}` : "/api/history";
+  const res = await fetch(url);
+  if (!res.ok) {
+    // klasör başka bir sekmede silinmiş olabilir → köke düş
+    if (currentFolder) { currentFolder = null; syncFolderView(); return loadHistory(); }
+    statusEl.textContent = "Geçmiş alınamadı.";
+    return;
+  }
   const { images } = await res.json();
   const g = $("gallery");
   g.innerHTML = "";
@@ -336,8 +569,13 @@ async function loadHistory() {
     const img = document.createElement("img");
     img.src = `/output/${rec.filename}`;
     img.alt = prompt.slice(0, 60);
-    img.title = prompt ? `${prompt}\n\nDüzenlemek için tıkla` : "Düzenlemek için tıkla";
+    img.title = prompt
+      ? `${prompt}\n\nDüzenlemek için tıkla · taşımak için klasöre sürükle`
+      : "Düzenlemek için tıkla · taşımak için klasöre sürükle";
     img.addEventListener("click", () => setGallerySource(rec));
+    // img'in yerel sürüklemesi kapatılır ki sürükleme kartın kendisinden başlasın
+    // (aksi halde dataTransfer'a görsel URL'i düşer ve sürükleme hayaleti bozulur)
+    img.draggable = false;
 
     const downloadLink = document.createElement("a");
     downloadLink.setAttribute("href", `/output/${rec.filename}`);
@@ -367,6 +605,17 @@ async function loadHistory() {
 
     const card = document.createElement("div");
     card.className = "card";
+    card.draggable = true;
+    card.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData(IMAGE_DND_TYPE, rec.id);
+      e.dataTransfer.effectAllowed = "move";
+      card.classList.add("dragging");
+      document.body.classList.add("dnd-active");   // klasör hedeflerini belirginleştir
+    });
+    card.addEventListener("dragend", () => {
+      card.classList.remove("dragging");
+      document.body.classList.remove("dnd-active");
+    });
     card.appendChild(img);
     card.appendChild(delBtn);
     card.appendChild(acts);
@@ -943,6 +1192,8 @@ document.addEventListener("keydown", (e) => {
 });
 
 $("go").addEventListener("click", run);
+syncFolderView();
+loadFolders();
 loadHistory();
 loadSettings(true);
 loadAssets("logos");

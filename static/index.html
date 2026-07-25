@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GPT-Image Studio</title>
-  <link rel="stylesheet" href="/static/style.css?v=6" />
+  <link rel="stylesheet" href="/static/style.css?v=9" />
 </head>
 <body>
   <header class="topbar">
@@ -82,6 +82,7 @@
         <p class="asset-status">"Logo ekle" önizlemedeki görsele uygulanır — galeriden bir görsele tıkla ya da yeni bir görsel üret.</p>
       </section>
 
+      <p id="folder-target" class="folder-target" hidden></p>
       <button id="go" class="primary">Üret</button>
       <p id="status" class="status" role="status"></p>
     </section>
@@ -101,8 +102,27 @@
     </section>
   </main>
 
-  <section class="gallery-wrap" aria-label="Geçmiş">
-    <h2>Geçmiş</h2>
+  <section class="gallery-wrap" aria-label="Klasörler ve geçmiş">
+    <div class="gallery-head">
+      <button type="button" id="folder-back" class="icon-btn back-btn" hidden
+              aria-label="Klasörden çık" title="Klasörden çık">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
+        </svg>
+      </button>
+      <h2 id="gallery-title">Klasörler</h2>
+      <button type="button" id="folder-new" class="btn-ghost">
+        <span class="btn-ghost-plus" aria-hidden="true">+</span> Yeni klasör
+      </button>
+    </div>
+
+    <p id="folder-hint" class="folder-hint" hidden>
+      Bir görseli klasör kartına sürükleyip bırakarak taşıyabilirsin.
+    </p>
+    <div id="folder-grid" class="folder-grid" aria-live="polite"></div>
+
+    <h3 id="images-title" class="images-title">Klasörsüz görseller</h3>
     <div id="gallery" class="gallery"></div>
   </section>
 
@@ -253,6 +273,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=6"></script>
+  <script src="/static/app.js?v=9"></script>
 </body>
 </html>

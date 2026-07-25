@@ -288,7 +288,65 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 .preview-clear:hover { background: var(--panel); color: var(--accent); }
 
 .gallery-wrap { margin: 0 var(--space) var(--space); }
-.gallery-wrap h2 { margin: 0 0 0.8rem; font-family: ui-serif, Georgia, serif; font-weight: 500; }
+.gallery-wrap h2 { margin: 0; font-family: ui-serif, Georgia, serif; font-weight: 500; }
+
+/* Klasörler */
+.gallery-head { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.9rem; }
+.gallery-head h2 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.back-btn { width: 36px; height: 36px; margin-top: 0; flex: none; }
+.back-btn[hidden] { display: none; }
+.images-title {
+  margin: 1.2rem 0 0.6rem; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--muted);
+}
+.folder-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0.6rem;
+}
+.folder-grid[hidden] { display: none; }
+.folder-empty { color: var(--muted); font-size: 0.85rem; margin: 0.2rem 0; grid-column: 1 / -1; }
+.folder-hint { margin: 0 0 0.7rem; color: var(--muted); font-size: 0.78rem; }
+.folder-hint[hidden] { display: none; }
+.folder-cell { position: relative; }
+
+/* Sürükle-bırak taşıma */
+.card.dragging { opacity: 0.45; }
+.card[draggable="true"] { cursor: grab; }
+.card[draggable="true"]:active { cursor: grabbing; }
+/* sürükleme başlarken hedefler belirginleşir; içinde bulunulan klasör hedef değil */
+body.dnd-active .folder-cell:not(.current) .folder-open { border-style: dashed; border-color: var(--muted); }
+.folder-cell.drop-hover .folder-open {
+  border-style: solid; border-color: var(--accent); background: var(--panel);
+  box-shadow: 0 0 0 3px oklch(72% 0.17 45 / 0.28);
+}
+.folder-cell.current .folder-open { border-color: var(--accent); }
+.folder-root .folder-name { padding-right: 0; }
+.folder-open {
+  width: 100%; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto;
+  column-gap: 0.6rem; align-items: center; text-align: left; cursor: pointer;
+  background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--panel-2); border-radius: 12px; padding: 0.75rem 0.85rem; font: inherit;
+  transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease), background var(--dur);
+}
+.folder-open:hover { border-color: var(--accent); transform: translateY(-1px); }
+.folder-open:active { transform: translateY(0); background: var(--panel); }
+.folder-icon { grid-row: 1 / 3; display: block; color: var(--accent); }
+.folder-name { font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 1.2rem; }
+.folder-count { font-size: 0.74rem; color: var(--muted); }
+.folder-del {
+  position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; padding: 0;
+  display: grid; place-items: center; border: 0; border-radius: 50%; cursor: pointer;
+  background: oklch(25% 0.02 260 / 0.8); color: var(--text);
+  font-size: 0.95rem; line-height: 1; opacity: 0;
+  transition: opacity var(--dur) var(--ease), background var(--dur);
+}
+.folder-cell:hover .folder-del, .folder-del:focus-visible { opacity: 1; }
+.folder-del:hover { background: oklch(55% 0.2 25); }
+.folder-target {
+  margin: 1rem 0 0; padding: 0.5rem 0.7rem; border-radius: 10px;
+  background: var(--panel-2); border-left: 3px solid var(--accent);
+  color: var(--muted); font-size: 0.78rem; line-height: 1.4;
+}
+.folder-target[hidden] { display: none; }
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.7rem; }
 .card { position: relative; background: var(--panel-2); border-radius: 10px; overflow: hidden; }
 .card img { width: 100%; display: block; aspect-ratio: 1; object-fit: cover; cursor: pointer; transition: transform var(--dur) var(--ease); }

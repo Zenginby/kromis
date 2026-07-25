@@ -138,6 +138,25 @@ def test_banner_rejects_bad_align(tmp_path, monkeypatch):
     assert r.status_code == 422
 
 
+def test_banner_rejects_unknown_field_instead_of_silently_ignoring(tmp_path, monkeypatch):
+    """Sürüm uyuşmazlığı sessiz kalmamalı: bilinmeyen alan 422 vermeli.
+
+    Pydantic varsayılanı bilinmeyen alanı yok sayar; bu yüzden bayat bir sunucu
+    süreci yeni arayüzün seçeneklerini görmezden gelip değişmemiş görseli 200 ile
+    döndürüyordu ("ayar çalışmıyor" belirtisi, hata mesajı yok).
+    """
+    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch)
+    r = c.post("/api/banner/preview", json={"id": src_id, "asset_id": banner_id,
+                                            "gelecekteki_secenek": 0.5})
+    assert r.status_code == 422
+
+
+def test_logo_rejects_unknown_field(tmp_path, monkeypatch):
+    c, src_id, _ = _setup_colored(tmp_path, monkeypatch)
+    r = c.post("/api/logo/preview", json={"id": src_id, "gelecekteki_secenek": 1})
+    assert r.status_code == 422
+
+
 def test_banner_rejects_out_of_range_scale_and_margin(tmp_path, monkeypatch):
     c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch)
     for body in ({"scale": 0.05}, {"scale": 1.5}, {"margin": -0.1}, {"margin": 0.5}):

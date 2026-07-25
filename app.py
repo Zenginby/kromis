@@ -14,7 +14,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 # Ham form değerleri Starlette'in UploadFile'ıdır; fastapi.UploadFile onun ALT
 # sınıfı olduğundan isinstance kontrolü taban sınıfa yapılmalı.
 from starlette.datastructures import UploadFile as FormUploadFile
@@ -265,6 +265,11 @@ OVERLAY_ASSET_KINDS = {"logos", "mottos"}
 
 
 class LogoRequest(BaseModel):
+    # Bilinmeyen alanı reddet: Pydantic varsayılanı onu SESSİZCE yok sayar, bu yüzden
+    # eski bir sunucu süreci yeni arayüzün seçeneklerini görmezden gelip değişmemiş
+    # görseli 200 ile döndürür ("ayar çalışmıyor" gibi görünür). Artık 422 + mesaj.
+    model_config = ConfigDict(extra="forbid")
+
     id: str = Field(min_length=1, max_length=64)
     # asset_id boş/None => yerleşik KURUM logosu (mavi/beyaz auto). Doluysa
     # asset_kind kütüphanesinden seçilen özel görsel (tek görsel) kullanılır.
@@ -369,6 +374,8 @@ BANNER_ALIGNS = {"left", "center", "right"}
 
 
 class BannerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")             # bkz. LogoRequest'teki gerekçe
+
     id: str = Field(min_length=1, max_length=64)          # bindirilecek görsel (history id)
     asset_id: str = Field(min_length=1, max_length=64)    # kütüphaneden seçilen banner
     edge: str = "bottom"

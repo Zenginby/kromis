@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GPT-Image Studio</title>
-  <link rel="stylesheet" href="/static/style.css?v=5" />
+  <link rel="stylesheet" href="/static/style.css?v=6" />
 </head>
 <body>
   <header class="topbar">
@@ -235,9 +235,13 @@
               <button type="button" data-align="center" class="active">Orta</button>
               <button type="button" data-align="right">Sağ</button>
             </div>
+            <p id="banner-align-note" class="field-note">
+              Genişlik %100 iken hizalama etkisiz — banner zaten tam genişlikte. Küçültünce açılır.
+            </p>
 
             <label for="banner-margin">Kenar boşluğu <span id="banner-margin-val" class="range-val">0%</span></label>
             <input id="banner-margin" type="range" min="0" max="20" value="0" />
+            <p class="field-note">Banner'ı seçilen kenardan içeri kaydırır (görsel yüksekliğinin oranı).</p>
           </div>
         </div>
       </div>
@@ -249,6 +253,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=5"></script>
+  <script src="/static/app.js?v=6"></script>
 </body>
 </html>

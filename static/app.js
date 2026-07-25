@@ -619,8 +619,14 @@ function syncLogoLabels() {
 }
 
 function syncBannerLabels() {
-  $("banner-scale-val").textContent = $("banner-scale").value + "%";
+  const scale = parseInt($("banner-scale").value, 10);
+  $("banner-scale-val").textContent = scale + "%";
   $("banner-margin-val").textContent = $("banner-margin").value + "%";
+  // %100'de yatayda boş alan yok → hizalama matematiksel olarak etkisiz.
+  // Ölü kontrole basılmasın diye kilitlenir ve nedeni yazılır.
+  const fullWidth = scale >= 100;
+  $("banner-align").querySelectorAll("button").forEach((b) => { b.disabled = fullWidth; });
+  $("banner-align-note").hidden = !fullWidth;
 }
 
 // Renk (Oto/Mavi/Beyaz) yalnızca yerleşik KURUM logosu için anlamlı

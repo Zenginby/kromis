@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GPT-Image Studio</title>
-  <link rel="stylesheet" href="/static/style.css?v=2" />
+  <link rel="stylesheet" href="/static/style.css?v=5" />
 </head>
 <body>
   <header class="topbar">
@@ -60,20 +60,26 @@
         </span>
       </div>
 
-      <section class="assets-panel" aria-label="Logo ve banner kütüphanesi">
-        <div class="assets-head">
-          <div id="asset-tabs" class="seg" role="group" aria-label="Varlık türü">
-            <button type="button" data-akind="logos" class="active">Logolar</button>
-            <button type="button" data-akind="mottos">Mottolar</button>
-            <button type="button" data-akind="banners">Bannerlar</button>
-          </div>
-          <button type="button" id="asset-upload-btn" class="btn-ghost">
-            <span class="btn-ghost-plus" aria-hidden="true">+</span> Yükle
+      <input type="file" id="extra-file-input" accept="image/png,image/jpeg,image/webp" multiple hidden />
+      <div id="extra-row" class="extra-row" hidden>
+        <span class="extra-title">Ek görseller <span id="extra-count" class="range-val"></span></span>
+        <div id="extra-strip" class="extra-strip" aria-live="polite"></div>
+        <button type="button" id="extra-add-btn" class="btn-ghost">
+          <span class="btn-ghost-plus" aria-hidden="true">+</span> Ek görsel
+        </button>
+        <p class="extra-hint">Prompt her iki görsele birlikte uygulanır — ör. "ikinci görseldeki ürünü sahneye yerleştir".</p>
+      </div>
+
+      <section class="assets-panel" aria-label="Bindirme ve kütüphane">
+        <div class="asset-actions">
+          <button type="button" id="logo-add-btn" class="btn-ghost" disabled
+                  title="Önizlemedeki görsele logo, motto veya banner bindir">
+            <span class="btn-ghost-plus" aria-hidden="true">+</span> Logo ekle
           </button>
+          <button type="button" id="library-btn" class="btn-ghost"
+                  title="Logo, motto ve banner kütüphanesini yönet">Kütüphane</button>
         </div>
-        <input type="file" id="asset-file-input" accept="image/png,image/jpeg,image/webp" hidden />
-        <div id="asset-grid" class="asset-grid" aria-live="polite"></div>
-        <p id="asset-status" class="asset-status" role="status"></p>
+        <p class="asset-status">"Logo ekle" önizlemedeki görsele uygulanır — galeriden bir görsele tıkla ya da yeni bir görsel üret.</p>
       </section>
 
       <button id="go" class="primary">Üret</button>
@@ -124,6 +130,34 @@
       <div class="modal-actions">
         <button id="settings-save" class="primary" type="button">Kaydet</button>
       </div>
+    </div>
+  </div>
+
+  <div id="assets-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-assets-close></div>
+    <div class="modal-card library-card" role="dialog" aria-modal="true" aria-labelledby="assets-title">
+      <div class="modal-head">
+        <h2 id="assets-title">Kütüphane</h2>
+        <button id="assets-close" class="modal-x" type="button" aria-label="Kapat">×</button>
+      </div>
+      <p class="modal-desc">
+        Bindirmede kullanılacak logo, motto ve bannerlar. Buradan yükleyip silebilirsin;
+        şeffaflık korunur (PNG olarak yeniden kodlanır).
+      </p>
+
+      <div class="assets-head">
+        <div id="asset-tabs" class="seg" role="group" aria-label="Varlık türü">
+          <button type="button" data-akind="logos" class="active">Logolar</button>
+          <button type="button" data-akind="mottos">Mottolar</button>
+          <button type="button" data-akind="banners">Bannerlar</button>
+        </div>
+        <button type="button" id="asset-upload-btn" class="btn-ghost">
+          <span class="btn-ghost-plus" aria-hidden="true">+</span> Yükle
+        </button>
+      </div>
+      <input type="file" id="asset-file-input" accept="image/png,image/jpeg,image/webp" multiple hidden />
+      <div id="asset-grid" class="asset-grid" aria-live="polite"></div>
+      <p id="asset-status" class="asset-status" role="status"></p>
     </div>
   </div>
 
@@ -191,6 +225,19 @@
               <button type="button" data-edge="top">Üst</button>
               <button type="button" data-edge="bottom" class="active">Alt</button>
             </div>
+
+            <label for="banner-scale">Genişlik <span id="banner-scale-val" class="range-val">100%</span></label>
+            <input id="banner-scale" type="range" min="20" max="100" value="100" />
+
+            <label>Hizalama</label>
+            <div id="banner-align" class="seg" role="group" aria-label="Banner hizalaması">
+              <button type="button" data-align="left">Sol</button>
+              <button type="button" data-align="center" class="active">Orta</button>
+              <button type="button" data-align="right">Sağ</button>
+            </div>
+
+            <label for="banner-margin">Kenar boşluğu <span id="banner-margin-val" class="range-val">0%</span></label>
+            <input id="banner-margin" type="range" min="0" max="20" value="0" />
           </div>
         </div>
       </div>
@@ -202,6 +249,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=2"></script>
+  <script src="/static/app.js?v=5"></script>
 </body>
 </html>

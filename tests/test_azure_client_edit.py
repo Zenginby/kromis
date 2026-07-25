@@ -28,7 +28,7 @@ def test_edit_calls_edits_endpoint_with_multipart_and_decodes():
     b64 = base64.b64encode(raw).decode()
     client = FakeMultipartClient(FakeResponse(200, {"data": [{"b64_json": b64}]}))
     out = ac.edit(
-        "make it blue", b"\x89PNG-src", "src.png", "1024x1024", "low", 1,
+        "make it blue", [("src.png", b"\x89PNG-src")], "1024x1024", "low", 1,
         client=client, credentials=("secret-key", "https://ex.azure.com/openai/v1/"),
     )
     assert out == [raw]
@@ -52,6 +52,30 @@ def test_edit_calls_edits_endpoint_with_multipart_and_decodes():
 def test_edit_raises_friendly_on_error():
     client = FakeMultipartClient(FakeResponse(429, None))
     with pytest.raises(ac.AzureImageError) as exc:
-        ac.edit("x", b"img", "a.png", "1024x1024", "low", 1,
+        ac.edit("x", [("a.png", b"img")], "1024x1024", "low", 1,
                 client=client, credentials=("k", "https://ex/"))
     assert "429" in str(exc.value)
+
+
+def test_edit_sends_repeated_image_field_for_multiple_images():
+    """Çoklu referansta OpenAI/Azure'ın beklediği tekrarlanan `image[]` alanı, sırayla."""
+    raw = b"\x89PNG-combined"
+    b64 = base64.b64encode(raw).decode()
+    client = FakeMultipartClient(FakeResponse(200, {"data": [{"b64_json": b64}]}))
+    out = ac.edit(
+        "combine them",
+        [("base.png", b"BASE"), ("ref2.png", b"TWO"), ("ref3.png", b"THREE")],
+        "1024x1024", "low", 1,
+        client=client, credentials=("k", "https://ex/openai/v1/"),
+    )
+    assert out == [raw]
+    files = client.last_call["files"]
+    assert [name for name, _ in files] == ["image[]"] * 3
+    assert [part[0] for _, part in files] == ["base.png", "ref2.png", "ref3.png"]
+    assert [part[1] for _, part in files] == [b"BASE", b"TWO", b"THREE"]
+    assert all(part[2] == "image/png" for _, part in files)
+
+
+def test_build_image_files_rejects_empty_list():
+    with pytest.raises(ac.AzureImageError):
+        ac.build_image_files([])

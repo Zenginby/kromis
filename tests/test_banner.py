@@ -63,3 +63,83 @@ def test_banner_404_for_unknown_source(tmp_path, monkeypatch):
     c, _, banner_id = _setup(tmp_path, monkeypatch)
     r = c.post("/api/banner", json={"id": "nope", "asset_id": banner_id})
     assert r.status_code == 404
+
+
+# ── boyut / hizalama / kenar boşluğu ────────────────────────────────────
+BASE_COLOR = (30, 80, 200)      # _setup'ta üretilen zemin (RGB'ye çevrilmiş hali)
+BANNER_COLOR = (240, 40, 40)    # aşağıdaki testlerde kullanılan banner rengi
+
+
+def _setup_colored(tmp_path, monkeypatch):
+    """256×256 mavi zemin + 400×40 kırmızı banner: piksel örneklemesi için."""
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path / "output"))
+    monkeypatch.setattr(appmod, "ASSETS_DIR", str(tmp_path / "assets"))
+    monkeypatch.setattr(ac, "generate", lambda *a, **k: [_png(BASE_COLOR + (255,), (256, 256))])
+    c = TestClient(appmod.app)
+    src_id = c.post("/api/generate", json={"prompt": "x", "size": "1024x1024",
+                                           "quality": "low", "n": 1}).json()["images"][0]["id"]
+    banner = astore.save_asset("banners", _png(BANNER_COLOR + (255,), (400, 40)), "footer",
+                               str(tmp_path / "assets"), now="2026-07-25T10:00:00")
+    return c, src_id, banner["id"]
+
+
+def _preview_image(client, body) -> Image.Image:
+    r = client.post("/api/banner/preview", json=body)
+    assert r.status_code == 200, r.text
+    import base64
+    raw = base64.b64decode(r.json()["b64"].split(",", 1)[1])
+    return Image.open(io.BytesIO(raw)).convert("RGB")
+
+
+def _close(actual, expected, tol=12):
+    return all(abs(a - e) <= tol for a, e in zip(actual, expected))
+
+
+def test_banner_scale_and_right_align_places_strip_on_the_right(tmp_path, monkeypatch):
+    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch)
+    im = _preview_image(c, {"id": src_id, "asset_id": banner_id, "edge": "bottom",
+                            "scale": 0.5, "align": "right", "margin": 0.0})
+    # 256 genişlik * 0.5 = 128 px banner, 400x40 -> 128x13, alt kenara yapışık
+    assert im.size == (256, 256)
+    assert _close(im.getpixel((200, 250)), BANNER_COLOR)   # sağ alt: banner
+    assert _close(im.getpixel((30, 250)), BASE_COLOR)      # sol alt: zemin (banner yok)
+
+
+def test_banner_left_align_places_strip_on_the_left(tmp_path, monkeypatch):
+    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch)
+    im = _preview_image(c, {"id": src_id, "asset_id": banner_id, "edge": "bottom",
+                            "scale": 0.5, "align": "left"})
+    assert _close(im.getpixel((30, 250)), BANNER_COLOR)
+    assert _close(im.getpixel((200, 250)), BASE_COLOR)
+
+
+def test_banner_margin_pushes_strip_away_from_edge(tmp_path, monkeypatch):
+    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch)
+    im = _preview_image(c, {"id": src_id, "asset_id": banner_id, "edge": "bottom",
+                            "scale": 1.0, "margin": 0.1})
+    # 256 * 0.1 = 26 px boşluk -> en alt satır artık zemin, banner yukarı kaydı
+    assert _close(im.getpixel((128, 255)), BASE_COLOR)
+    assert _close(im.getpixel((128, 256 - 26 - 6)), BANNER_COLOR)
+
+
+def test_banner_defaults_match_full_width_behaviour(tmp_path, monkeypatch):
+    """Seçenek gönderilmeyen istek, açıkça varsayılan gönderilenle aynı çıktıyı vermeli."""
+    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch)
+    implicit = c.post("/api/banner/preview", json={"id": src_id, "asset_id": banner_id}).json()
+    explicit = c.post("/api/banner/preview", json={
+        "id": src_id, "asset_id": banner_id, "edge": "bottom",
+        "scale": 1.0, "align": "center", "margin": 0.0}).json()
+    assert implicit["b64"] == explicit["b64"]
+
+
+def test_banner_rejects_bad_align(tmp_path, monkeypatch):
+    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch)
+    r = c.post("/api/banner", json={"id": src_id, "asset_id": banner_id, "align": "diagonal"})
+    assert r.status_code == 422
+
+
+def test_banner_rejects_out_of_range_scale_and_margin(tmp_path, monkeypatch):
+    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch)
+    for body in ({"scale": 0.05}, {"scale": 1.5}, {"margin": -0.1}, {"margin": 0.5}):
+        r = c.post("/api/banner", json={"id": src_id, "asset_id": banner_id, **body})
+        assert r.status_code == 422, body

@@ -2,9 +2,15 @@ const $ = (id) => document.getElementById(id);
 const statusEl = $("status");
 const ACCEPTED_UPLOAD_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
-// Referans görsel: null | { kind: "upload", file, label } | { kind: "gallery", id, label }
+// Ana referans görsel: null | { kind: "upload", file, label } | { kind: "gallery", id, label }
 let source = null;
 let uploadPreviewUrl = null;
+
+// Ek referanslar (ana görselin yanında gpt-image-2'ye gönderilir).
+// Öğe: { kind: "upload", file, label, src } | { kind: "gallery", id, label, src }
+// Sunucudaki MAX_EDIT_IMAGES ile aynı: 1 ana + 3 ek.
+const MAX_EDIT_IMAGES = 4;
+let extras = [];
 
 // Simüle ilerleme: Azure tek yanıt döndürür (gerçek % akışı yok), bu yüzden
 // beklerken ~%90'a doğru yumuşakça doldurup, iş bitince %100'e tamamlarız.
@@ -80,23 +86,131 @@ function clearPreview() {
   $("preview-empty").hidden = false;
   $("preview-clear").hidden = true;
   $("preview").classList.add("empty");
+  setCurrentImage(null);
+}
+
+// Merkez önizlemede görünen sunucu kaydı: logo/motto/banner bindirmesinin hedefi.
+// Yüklenmiş (henüz kaydedilmemiş) bir görsel gösterilirken null'dır.
+let currentImage = null;
+
+function setCurrentImage(rec) {
+  currentImage = rec;
+  $("logo-add-btn").disabled = !rec;
 }
 
 function showPreview(rec) {
   showPreviewSrc(`/output/${rec.filename}`, (rec.prompt || "").slice(0, 60));
+  setCurrentImage(rec);
 }
 
-// Referans durumunu arayüze yansıt: chip + ana buton etiketi
+// Referans durumunu arayüze yansıt: chip + ana buton etiketi + ek görsel şeridi
 function renderSource() {
   const chip = $("ref-chip");
   if (source) {
     $("ref-label").textContent = source.label;
     chip.hidden = false;
-    $("go").textContent = "Görseli düzenle";
+    $("go").textContent = extras.length ? "Görselleri birleştir" : "Görseli düzenle";
   } else {
     chip.hidden = true;
     $("go").textContent = "Üret";
   }
+  // Ek görsel yalnızca bir ana görsel varken anlamlı
+  $("extra-row").hidden = !source;
+  renderExtras();
+}
+
+// ── Ek referans görselleri ──────────────────────────────────────────
+function revokeExtraUrls() {
+  for (const item of extras) {
+    if (item.kind === "upload") URL.revokeObjectURL(item.src);
+  }
+}
+
+function clearExtras() {
+  revokeExtraUrls();
+  extras = [];
+  $("extra-file-input").value = "";
+}
+
+function extraSlotsLeft() {
+  return MAX_EDIT_IMAGES - 1 - extras.length;
+}
+
+function renderExtras() {
+  const strip = $("extra-strip");
+  strip.innerHTML = "";
+  for (const item of extras) {
+    const img = document.createElement("img");
+    img.src = item.src;
+    img.alt = item.label;
+
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "extra-del";
+    del.textContent = "×";
+    del.title = "Kaldır";
+    del.setAttribute("aria-label", `${item.label} kaldır`);
+    del.addEventListener("click", () => removeExtra(item));
+
+    const cell = document.createElement("div");
+    cell.className = "extra-chip";
+    cell.title = item.label;
+    cell.appendChild(img);
+    cell.appendChild(del);
+    strip.appendChild(cell);
+  }
+  $("extra-count").textContent = extras.length
+    ? `${extras.length}/${MAX_EDIT_IMAGES - 1}`
+    : "";
+  $("extra-add-btn").disabled = extraSlotsLeft() <= 0;
+}
+
+function removeExtra(item) {
+  if (item.kind === "upload") URL.revokeObjectURL(item.src);
+  extras = extras.filter((it) => it !== item);
+  renderSource();
+}
+
+function canAddExtra() {
+  if (!source) {
+    statusEl.textContent = "Önce ana görseli seç (Görsel ekle veya galeriden Düzenle).";
+    return false;
+  }
+  if (extraSlotsLeft() <= 0) {
+    statusEl.textContent = `En fazla ${MAX_EDIT_IMAGES} görsel gönderilebilir.`;
+    return false;
+  }
+  return true;
+}
+
+function addExtraUpload(file) {
+  if (!canAddExtra()) return;
+  if (!file || !ACCEPTED_UPLOAD_TYPES.includes(file.type)) {
+    statusEl.textContent = "PNG, JPEG veya WebP bir görsel seç.";
+    return;
+  }
+  extras = [...extras, { kind: "upload", file, label: file.name, src: URL.createObjectURL(file) }];
+  statusEl.textContent = "";
+  renderSource();
+}
+
+function addGalleryExtra(rec) {
+  if (!canAddExtra()) return;
+  if (source.kind === "gallery" && source.id === rec.id) {
+    statusEl.textContent = "Bu görsel zaten ana referans.";
+    return;
+  }
+  if (extras.some((it) => it.kind === "gallery" && it.id === rec.id)) {
+    statusEl.textContent = "Bu görsel zaten ek referans listesinde.";
+    return;
+  }
+  extras = [...extras, {
+    kind: "gallery", id: rec.id,
+    label: (rec.prompt || rec.id).slice(0, 40),
+    src: `/output/${rec.filename}`,
+  }];
+  statusEl.textContent = "";
+  renderSource();
 }
 
 function setUploadSource(file) {
@@ -108,6 +222,7 @@ function setUploadSource(file) {
   source = { kind: "upload", file, label: `Yüklendi: ${file.name}` };
   uploadPreviewUrl = URL.createObjectURL(file);
   showPreviewSrc(uploadPreviewUrl, file.name);
+  setCurrentImage(null); // henüz sunucuda kayıt yok → bindirme uygulanamaz
   renderSource();
 }
 
@@ -115,6 +230,8 @@ function setGallerySource(rec) {
   clearUploadPreviewUrl();
   $("file-input").value = "";
   source = { kind: "gallery", id: rec.id, label: `Referans: ${(rec.prompt || rec.id).slice(0, 40)}` };
+  // aynı görsel ek listesindeyse çift göndermemek için çıkar
+  extras = extras.filter((it) => !(it.kind === "gallery" && it.id === rec.id));
   showPreview(rec);
   renderSource();
   $("prompt").focus();
@@ -123,6 +240,7 @@ function setGallerySource(rec) {
 
 function clearSource() {
   clearUploadPreviewUrl();
+  clearExtras();
   source = null;
   $("file-input").value = "";
   renderSource();
@@ -147,6 +265,11 @@ async function run() {
     fd.append("n", n);
     if (source.kind === "upload") fd.append("file", source.file);
     else fd.append("source_id", source.id);
+    // ek referanslar: sunucu sırayı ana görsel → yüklemeler → galeri id'leri olarak kurar
+    for (const item of extras) {
+      if (item.kind === "upload") fd.append("extra_files", item.file);
+      else fd.append("extra_source_ids", item.id);
+    }
     request = fetch("/api/edit", { method: "POST", body: fd });
   } else {
     request = fetch("/api/generate", {
@@ -158,7 +281,8 @@ async function run() {
 
   $("go").disabled = true;
   const gen = startProgress();
-  statusEl.textContent = editing ? "Düzenleniyor…" : "Üretiliyor…";
+  statusEl.textContent = !editing ? "Üretiliyor…"
+    : extras.length ? "Görseller birleştiriliyor…" : "Düzenleniyor…";
   let ok = false;
   try {
     const res = await request;
@@ -190,6 +314,9 @@ async function deleteImage(rec) {
       throw new Error(err.detail || `Hata (${res.status})`);
     }
     if (source && source.kind === "gallery" && source.id === rec.id) clearSource();
+    extras = extras.filter((it) => !(it.kind === "gallery" && it.id === rec.id));
+    if (currentImage && currentImage.id === rec.id) clearPreview();
+    renderSource();
     statusEl.textContent = "Silindi.";
     await loadHistory();
   } catch (e) {
@@ -205,30 +332,28 @@ async function loadHistory() {
   for (const rec of images) {
     const prompt = rec.prompt || "";
 
+    // Küçük resme tıklamak doğrudan düzenleme moduna alır (ayrı "Düzenle" butonu yok)
     const img = document.createElement("img");
     img.src = `/output/${rec.filename}`;
     img.alt = prompt.slice(0, 60);
-    img.title = prompt;
-    img.addEventListener("click", () => showPreview(rec));
+    img.title = prompt ? `${prompt}\n\nDüzenlemek için tıkla` : "Düzenlemek için tıkla";
+    img.addEventListener("click", () => setGallerySource(rec));
 
     const downloadLink = document.createElement("a");
     downloadLink.setAttribute("href", `/output/${rec.filename}`);
     downloadLink.setAttribute("download", "");
     downloadLink.textContent = "İndir";
 
-    const logoBtn = document.createElement("button");
-    logoBtn.textContent = "Logo";
-    logoBtn.addEventListener("click", () => openLogoModal(rec));
-
-    const editBtn = document.createElement("button");
-    editBtn.textContent = "Düzenle";
-    editBtn.addEventListener("click", () => setGallerySource(rec));
+    // ana görsele ek referans olarak ekle (AI ile birleştirme)
+    const extraBtn = document.createElement("button");
+    extraBtn.textContent = "+Ek";
+    extraBtn.title = "Ek referans görseli olarak ekle";
+    extraBtn.addEventListener("click", () => addGalleryExtra(rec));
 
     const acts = document.createElement("div");
     acts.className = "acts";
     acts.appendChild(downloadLink);
-    acts.appendChild(logoBtn);
-    acts.appendChild(editBtn);
+    acts.appendChild(extraBtn);
 
     const delBtn = document.createElement("button");
     delBtn.className = "card-del";
@@ -264,6 +389,12 @@ $("file-input").addEventListener("change", () => {
   if (files.length) setUploadSource(files[0]);
 });
 $("ref-clear").addEventListener("click", clearSource);
+
+$("extra-add-btn").addEventListener("click", () => $("extra-file-input").click());
+$("extra-file-input").addEventListener("change", () => {
+  for (const file of $("extra-file-input").files) addExtraUpload(file);
+  $("extra-file-input").value = "";
+});
 
 // Sürükle-bırak: merkez alana bırakılan görseli referans olarak yükle
 const stageEl = document.querySelector(".stage");
@@ -304,6 +435,10 @@ const ASSET_EMPTY_TEXT = {
   logos: "Henüz logo yok · + Yükle ile ekle",
   mottos: "Henüz motto yok · + Yükle ile ekle",
   banners: "Henüz banner yok · + Yükle ile ekle",
+};
+const OVERLAY_EMPTY_TEXT = {
+  motto: "Önce Kütüphane'den bir motto yükle.",
+  banner: "Önce Kütüphane'den bir banner yükle.",
 };
 
 function assetStatus(msg) { $("asset-status").textContent = msg || ""; }
@@ -406,10 +541,30 @@ $("asset-tabs").addEventListener("click", (e) => {
   renderAssetPanel();
 });
 $("asset-upload-btn").addEventListener("click", () => $("asset-file-input").click());
-$("asset-file-input").addEventListener("change", () => {
-  const files = $("asset-file-input").files;
-  if (files.length) uploadAsset(assetPanelKind, files[0]);
+$("asset-file-input").addEventListener("change", async () => {
+  const files = [...$("asset-file-input").files];
   $("asset-file-input").value = "";
+  for (const file of files) await uploadAsset(assetPanelKind, file); // sırayla: manifest yazımı atomik
+});
+
+// ── Kütüphane modalı (logo/motto/banner yükle-sil) ───────────────────
+function openAssetsModal() {
+  assetStatus("");
+  renderAssetPanel();
+  $("assets-modal").hidden = false;
+}
+
+function closeAssetsModal() {
+  $("assets-modal").hidden = true;
+}
+
+$("library-btn").addEventListener("click", openAssetsModal);
+$("assets-close").addEventListener("click", closeAssetsModal);
+$("assets-modal").addEventListener("click", (e) => {
+  if (e.target.hasAttribute("data-assets-close")) closeAssetsModal();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("assets-modal").hidden) closeAssetsModal();
 });
 
 // ── Bindirme modalı: logo VEYA banner + canlı önizleme ──────────────
@@ -445,13 +600,27 @@ function readLogoOpts() {
 
 function readBannerOpts() {
   const edge = document.querySelector("#banner-edge button.active");
-  return { id: logoId, asset_id: selectedAsset.banner, edge: edge ? edge.dataset.edge : "bottom" };
+  const align = document.querySelector("#banner-align button.active");
+  return {
+    id: logoId,
+    asset_id: selectedAsset.banner,
+    edge: edge ? edge.dataset.edge : "bottom",
+    // %100 = tam genişlik (v1.4 davranışı)
+    scale: +(parseInt($("banner-scale").value, 10) / 100).toFixed(3),
+    align: align ? align.dataset.align : "center",
+    margin: +(parseInt($("banner-margin").value, 10) / 100).toFixed(3),
+  };
 }
 
 function syncLogoLabels() {
   $("logo-size-val").textContent = $("logo-size").value + "%";
   $("logo-shadow-val").textContent = $("logo-shadow").value + "%";
   $("logo-blur-val").textContent = $("logo-blur").value;
+}
+
+function syncBannerLabels() {
+  $("banner-scale-val").textContent = $("banner-scale").value + "%";
+  $("banner-margin-val").textContent = $("banner-margin").value + "%";
 }
 
 // Renk (Oto/Mavi/Beyaz) yalnızca yerleşik KURUM logosu için anlamlı
@@ -474,9 +643,7 @@ function renderOverlayPicker() {
   if (!options.length) {
     const hint = document.createElement("p");
     hint.className = "overlay-empty";
-    hint.textContent = overlayMode === "motto"
-      ? "Önce prompt altındaki panelden motto yükle."
-      : "Önce prompt altındaki panelden banner yükle.";
+    hint.textContent = OVERLAY_EMPTY_TEXT[overlayMode] || "Önce Kütüphane'den bir varlık yükle.";
     wrap.appendChild(hint);
     return;
   }
@@ -535,10 +702,14 @@ function openLogoModal(rec) {
   selectInGroup("#logo-grid", document.querySelector('#logo-grid button[data-pos="bottom-right"]'));
   selectInGroup("#logo-color", document.querySelector('#logo-color button[data-color="auto"]'));
   selectInGroup("#banner-edge", document.querySelector('#banner-edge button[data-edge="bottom"]'));
+  selectInGroup("#banner-align", document.querySelector('#banner-align button[data-align="center"]'));
   $("logo-size").value = 14;
   $("logo-shadow").value = 47;
   $("logo-blur").value = 6;
+  $("banner-scale").value = 100;
+  $("banner-margin").value = 0;
   syncLogoLabels();
+  syncBannerLabels();
   $("logo-status").textContent = "";
   $("logo-preview-img").src = rawPreviewSrc; // önce ham görsel
   renderOverlayPicker();
@@ -656,9 +827,22 @@ $("banner-edge").addEventListener("click", (e) => {
   selectInGroup("#banner-edge", btn);
   refreshLogoPreview();
 });
+$("banner-align").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-align]");
+  if (!btn) return;
+  selectInGroup("#banner-align", btn);
+  refreshLogoPreview();
+});
 ["logo-size", "logo-shadow", "logo-blur"].forEach((id) =>
   $(id).addEventListener("input", () => { syncLogoLabels(); refreshLogoPreview(); })
 );
+["banner-scale", "banner-margin"].forEach((id) =>
+  $(id).addEventListener("input", () => { syncBannerLabels(); refreshLogoPreview(); })
+);
+// Sol paneldeki "Logo ekle": bindirmeyi önizlemedeki görsele uygular
+$("logo-add-btn").addEventListener("click", () => {
+  if (currentImage) openLogoModal(currentImage);
+});
 $("logo-close").addEventListener("click", closeLogoModal);
 $("logo-apply").addEventListener("click", applyOverlay);
 $("logo-modal").addEventListener("click", (e) => {

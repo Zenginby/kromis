@@ -107,6 +107,105 @@ def test_edit_rejects_huge_dimensions(tmp_path, monkeypatch):
     assert r.status_code == 422
 
 
+def _capture_edit(monkeypatch):
+    """ac.edit çağrısındaki referans listesini yakalayan sahte."""
+    seen = {}
+
+    def fake_edit(prompt, refs, size, quality, n, **kw):
+        seen["refs"] = refs
+        return [b"\x89PNG-edited"]
+
+    monkeypatch.setattr(ac, "edit", fake_edit)
+    return seen
+
+
+def test_edit_with_extra_upload_sends_both_images_in_order(tmp_path, monkeypatch):
+    seen = _capture_edit(monkeypatch)
+    c = _client(tmp_path, monkeypatch)
+    r = c.post(
+        "/api/edit",
+        data={"prompt": "birleştir", "size": "1024x1024", "quality": "low", "n": "1"},
+        files=[
+            ("file", ("base.png", _png_bytes((10, 20, 30)), "image/png")),
+            ("extra_files", ("logo.png", _png_bytes((200, 100, 50)), "image/png")),
+        ],
+    )
+    assert r.status_code == 200, r.text
+    assert [name for name, _ in seen["refs"]] == ["upload.png", "ref2.png"]
+    assert len(seen["refs"]) == 2
+
+
+def test_edit_with_extra_source_id_uses_gallery_image(tmp_path, monkeypatch):
+    monkeypatch.setattr(ac, "generate", lambda *a, **k: [_png_bytes()])
+    c = _client(tmp_path, monkeypatch)
+    ids = [
+        c.post("/api/generate", json={"prompt": p, "size": "1024x1024",
+                                      "quality": "low", "n": 1}).json()["images"][0]["id"]
+        for p in ("cat", "dog")
+    ]
+    seen = _capture_edit(monkeypatch)
+    r = c.post("/api/edit", data={"prompt": "birleştir", "size": "1024x1024", "quality": "low",
+                                  "n": "1", "source_id": ids[0], "extra_source_ids": ids[1]})
+    assert r.status_code == 200, r.text
+    assert [name for name, _ in seen["refs"]] == [f"{ids[0]}.png", "ref2.png"]
+    # provenance yalnızca ana görselden gelir
+    assert r.json()["images"][0]["parent_id"] == ids[0]
+
+
+def test_edit_rejects_more_than_max_images(tmp_path, monkeypatch):
+    _capture_edit(monkeypatch)
+    c = _client(tmp_path, monkeypatch)
+    extras = [("extra_files", (f"e{i}.png", _png_bytes(), "image/png")) for i in range(4)]
+    r = c.post(
+        "/api/edit",
+        data={"prompt": "x", "size": "1024x1024", "quality": "low", "n": "1"},
+        files=[("file", ("base.png", _png_bytes(), "image/png"))] + extras,
+    )
+    assert r.status_code == 422
+    assert str(appmod.MAX_EDIT_IMAGES) in r.json()["detail"]
+
+
+def test_edit_rejects_invalid_extra_upload(tmp_path, monkeypatch):
+    _capture_edit(monkeypatch)
+    c = _client(tmp_path, monkeypatch)
+    r = c.post(
+        "/api/edit",
+        data={"prompt": "x", "size": "1024x1024", "quality": "low", "n": "1"},
+        files=[
+            ("file", ("base.png", _png_bytes(), "image/png")),
+            ("extra_files", ("bad.png", b"not-an-image", "image/png")),
+        ],
+    )
+    assert r.status_code == 422
+
+
+def test_edit_unknown_extra_source_404(tmp_path, monkeypatch):
+    _capture_edit(monkeypatch)
+    c = _client(tmp_path, monkeypatch)
+    r = c.post(
+        "/api/edit",
+        data={"prompt": "x", "size": "1024x1024", "quality": "low", "n": "1",
+              "extra_source_ids": "nope"},
+        files={"file": ("base.png", _png_bytes(), "image/png")},
+    )
+    assert r.status_code == 404
+
+
+def test_edit_ignores_empty_extra_fields(tmp_path, monkeypatch):
+    """Tarayıcı boş bir extra parçası gönderirse tek görselli akış bozulmamalı."""
+    seen = _capture_edit(monkeypatch)
+    c = _client(tmp_path, monkeypatch)
+    r = c.post(
+        "/api/edit",
+        data={"prompt": "x", "size": "1024x1024", "quality": "low", "n": "1",
+              "extra_source_ids": "  "},
+        files=[("file", ("base.png", _png_bytes(), "image/png")),
+               ("extra_files", ("", b"", "application/octet-stream"))],
+    )
+    assert r.status_code == 200, r.text
+    assert len(seen["refs"]) == 1
+
+
 def test_edit_maps_azure_error(tmp_path, monkeypatch):
     def boom(*a, **k):
         raise ac.AzureImageError("Azure isteği başarısız (HTTP 429).")

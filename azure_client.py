@@ -165,7 +165,23 @@ def generate(prompt, size, quality, n, *, client=None, credentials=None) -> list
     return decode_images(resp.json())
 
 
-def edit(prompt, image_bytes, filename, size, quality, n, *, client=None, credentials=None) -> list[bytes]:
+def build_image_files(images: list[tuple[str, bytes]]):
+    """images/edits için multipart `files` yapısını kurar. Sıra korunur.
+
+    Tek görselde alan adı `image` (bugüne dek canlı doğrulanmış tel formatı);
+    çoklu görselde OpenAI/Azure'ın beklediği tekrarlanan `image[]` alanı
+    (httpx tekrarlanan alan için (name, value) tuple listesi kabul eder).
+    """
+    if not images:
+        raise AzureImageError("En az bir görsel gerekli.")
+    if len(images) == 1:
+        filename, data = images[0]
+        return {"image": (filename, data, "image/png")}
+    return [("image[]", (filename, data, "image/png")) for filename, data in images]
+
+
+def edit(prompt, images, size, quality, n, *, client=None, credentials=None) -> list[bytes]:
+    """`images`: sıralı [(filename, png_bytes), ...] — ilk görsel ana referanstır."""
     key, base_url = credentials if credentials is not None else load_credentials()
     endpoint = base_url.rstrip("/") + "/images/edits"
     headers = {"Authorization": f"Bearer {key}"}  # Content-Type YOK: multipart client set eder
@@ -176,7 +192,7 @@ def edit(prompt, image_bytes, filename, size, quality, n, *, client=None, creden
         "quality": quality,
         "n": str(n),
     }
-    files = {"image": (filename, image_bytes, "image/png")}
+    files = build_image_files(images)
 
     owns_client = client is None
     if owns_client:

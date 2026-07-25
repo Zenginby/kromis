@@ -15,6 +15,9 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 from pydantic import BaseModel, Field, field_validator
+# Ham form değerleri Starlette'in UploadFile'ıdır; fastapi.UploadFile onun ALT
+# sınıfı olduğundan isinstance kontrolü taban sınıfa yapılmalı.
+from starlette.datastructures import UploadFile as FormUploadFile
 
 import assets_store
 import azure_client as ac
@@ -25,7 +28,9 @@ OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 COMPOSITE_SCRIPT = os.path.expanduser("~/.config/claude-tools/composite-logo.py")
-MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024          # dosya başına
+MAX_EDIT_IMAGES = 4                          # ana görsel + en fazla 3 ek referans
+MAX_REQUEST_BYTES = MAX_UPLOAD_BYTES * MAX_EDIT_IMAGES  # tüm multipart gövdesi
 MAX_IMAGE_PIXELS = 50 * 1024 * 1024
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
@@ -87,6 +92,48 @@ def _to_png(raw: bytes) -> bytes:
     return out.getvalue()
 
 
+def _output_png_path(image_id: str) -> str:
+    """history id → output/<id>.png yolu. Geçersiz/bulunamayan id'de HTTPException(404).
+
+    Tek path-traversal guard'ı: id yalnızca basename'e indirilir.
+    """
+    safe = os.path.basename(image_id or "")
+    path = os.path.join(OUTPUT_DIR, f"{safe}.png")
+    if not safe or not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="Kaynak görsel bulunamadı.")
+    return path
+
+
+def _read_png_file(path: str) -> bytes:
+    with open(path, "rb") as f:
+        return f.read()
+
+
+async def _read_upload_png(upload: UploadFile) -> bytes:
+    """Yüklenen dosyayı boyut sınırıyla okur ve doğrulanmış PNG'ye çevirir."""
+    raw = await upload.read()
+    if len(raw) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Dosya çok büyük (maks 10 MB).")
+    return _to_png(raw)
+
+
+async def _extra_refs(request: Request) -> tuple[list[UploadFile], list[str]]:
+    """Ek referansları form verisinden okur: (yüklemeler, galeri id'leri).
+
+    Declared parametre yerine ham form kullanılır: Starlette dosya adı olmayan
+    bir parçayı UploadFile değil düz str olarak çözdüğü için `list[UploadFile]`
+    annotation'ı iyi niyetli bir boş parçayı 422'ye düşürürdü. FastAPI formu bu
+    noktada zaten ayrıştırıp request üzerinde önbelleklemiş olur — ikinci bir
+    gövde okuması yapılmaz.
+    """
+    form = await request.form()
+    uploads = [v for v in form.getlist("extra_files")
+               if isinstance(v, FormUploadFile) and (v.filename or "").strip()]
+    ids = [v for v in form.getlist("extra_source_ids")
+           if isinstance(v, str) and v.strip()]
+    return uploads, ids
+
+
 @app.post("/api/generate")
 def generate(req: GenerateRequest) -> dict:
     try:
@@ -112,6 +159,8 @@ async def edit(
     file: UploadFile | None = File(None),
     source_id: str | None = Form(None),
 ) -> dict:
+    """Ek referans görselleri (`extra_files` yüklemeleri, `extra_source_ids`
+    galeri id'leri) form verisinden okunur — bkz. _extra_refs."""
     if size not in ac.ALLOWED_SIZES or quality not in ac.ALLOWED_QUALITIES:
         raise HTTPException(status_code=422, detail="Geçersiz size veya quality.")
     if not (1 <= n <= 4):
@@ -121,29 +170,33 @@ async def edit(
     if (file is None) == (source_id is None):
         raise HTTPException(status_code=422, detail="Tam olarak biri gerekli: file veya source_id.")
 
-    content_length = request.headers.get("content-length")
-    if content_length is not None and content_length.isdigit() and int(content_length) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="Dosya çok büyük (maks 10 MB).")
+    extra_uploads, extra_ids = await _extra_refs(request)
+    if 1 + len(extra_uploads) + len(extra_ids) > MAX_EDIT_IMAGES:
+        raise HTTPException(status_code=422,
+                            detail=f"En fazla {MAX_EDIT_IMAGES} görsel gönderilebilir "
+                                   f"(1 ana + {MAX_EDIT_IMAGES - 1} ek).")
 
+    content_length = request.headers.get("content-length")
+    if content_length is not None and content_length.isdigit() and int(content_length) > MAX_REQUEST_BYTES:
+        raise HTTPException(status_code=413, detail="İstek çok büyük.")
+
+    # Azure'a giden sıra: ana görsel → ek yüklemeler → ek galeri görselleri.
+    refs: list[tuple[str, bytes]] = []
     if source_id is not None:
         sid = os.path.basename(source_id)
-        src_path = os.path.join(OUTPUT_DIR, f"{sid}.png")
-        if not os.path.isfile(src_path):
-            raise HTTPException(status_code=404, detail="Kaynak görsel bulunamadı.")
-        with open(src_path, "rb") as f:
-            image_bytes = f.read()
-        filename = f"{sid}.png"
+        refs.append((f"{sid}.png", _read_png_file(_output_png_path(sid))))
         parent_id = sid
     else:
-        raw = await file.read()
-        if len(raw) > MAX_UPLOAD_BYTES:
-            raise HTTPException(status_code=413, detail="Dosya çok büyük (maks 10 MB).")
-        image_bytes = _to_png(raw)
-        filename = "upload.png"
+        refs.append(("upload.png", await _read_upload_png(file)))
         parent_id = None
 
+    for upload in extra_uploads:
+        refs.append((f"ref{len(refs) + 1}.png", await _read_upload_png(upload)))
+    for extra_id in extra_ids:
+        refs.append((f"ref{len(refs) + 1}.png", _read_png_file(_output_png_path(extra_id))))
+
     try:
-        images = ac.edit(prompt, image_bytes, filename, size, quality, n)
+        images = ac.edit(prompt, refs, size, quality, n)
     except ac.AzureImageError as e:
         raise HTTPException(status_code=502, detail=str(e))
 
@@ -281,11 +334,7 @@ def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
 
 
 def _logo_src_path(image_id: str) -> str:
-    src_id = os.path.basename(image_id)
-    src_path = os.path.join(OUTPUT_DIR, f"{src_id}.png")
-    if not os.path.exists(src_path):
-        raise HTTPException(status_code=404, detail="kaynak görsel bulunamadı")
-    return src_path
+    return _output_png_path(image_id)
 
 
 @app.post("/api/logo/preview")
@@ -316,12 +365,17 @@ def add_logo(req: LogoRequest) -> dict:
 
 
 BANNER_EDGES = {"top", "bottom"}
+BANNER_ALIGNS = {"left", "center", "right"}
 
 
 class BannerRequest(BaseModel):
     id: str = Field(min_length=1, max_length=64)          # bindirilecek görsel (history id)
     asset_id: str = Field(min_length=1, max_length=64)    # kütüphaneden seçilen banner
     edge: str = "bottom"
+    # Varsayılanlar v1.4 davranışını birebir korur: tam genişlik, ortalı, boşluksuz.
+    scale: float = Field(default=1.0, ge=0.2, le=1.0)     # banner genişliği / görsel genişliği
+    align: str = "center"                                # scale < 1 iken yatay yerleşim
+    margin: float = Field(default=0.0, ge=0.0, le=0.2)   # kenardan uzaklık / görsel yüksekliği
 
     @field_validator("edge")
     @classmethod
@@ -330,20 +384,37 @@ class BannerRequest(BaseModel):
             raise ValueError("geçersiz edge")
         return v
 
+    @field_validator("align")
+    @classmethod
+    def _align_ok(cls, v):
+        if v not in BANNER_ALIGNS:
+            raise ValueError("geçersiz align")
+        return v
 
-def _composite_banner(src_path: str, banner_path: str, edge: str) -> bytes:
-    """Banner'ı görselin tüm genişliğine ölçekleyip üst/alt kenara bindirir.
 
-    Logo filigranından farklı: köşe değil, tam-genişlik şerit. Alfa maskesiyle
-    paste kullanılır; banner taşarsa kenardan kırpılır (paste otomatik kırpar).
+def _composite_banner(src_path: str, banner_path: str, edge: str,
+                      scale: float = 1.0, align: str = "center", margin: float = 0.0) -> bytes:
+    """Banner'ı ölçekleyip üst/alt kenara bindirir (en-boy oranı korunur).
+
+    Logo filigranından farklı: köşe değil, yatay şerit. `scale` görsel genişliğinin
+    oranı (1.0 = tam genişlik), `align` artan boşluğun paylaşımı, `margin` seçilen
+    kenardan içeri kayma (görsel yüksekliğinin oranı). Alfa maskesiyle paste;
+    banner taşarsa kenardan kırpılır (paste otomatik kırpar).
     """
     base = Image.open(src_path).convert("RGBA")
     banner = Image.open(banner_path).convert("RGBA")
-    new_h = max(1, round(banner.height * (base.width / banner.width)))
-    banner = banner.resize((base.width, new_h), Image.LANCZOS)
-    y = 0 if edge == "top" else max(0, base.height - banner.height)
+    target_w = max(1, round(base.width * scale))
+    target_h = max(1, round(banner.height * (target_w / banner.width)))
+    banner = banner.resize((target_w, target_h), Image.LANCZOS)
+
+    free_x = base.width - target_w
+    x = 0 if align == "left" else (free_x if align == "right" else free_x // 2)
+    pad = round(base.height * margin)
+    y = pad if edge == "top" else base.height - target_h - pad
+    y = max(0, min(y, max(0, base.height - target_h)))  # kenar dışına taşmayı engelle
+
     composed = base.copy()
-    composed.paste(banner, (0, y), banner)  # banner alfası maske; taşma kırpılır
+    composed.paste(banner, (x, y), banner)  # banner alfası maske
     out = io.BytesIO()
     composed.convert("RGB").save(out, format="PNG")
     return out.getvalue()
@@ -356,11 +427,15 @@ def _banner_asset_path(asset_id: str) -> str:
     return path
 
 
+def _banner_bytes(src_path: str, req: BannerRequest) -> bytes:
+    return _composite_banner(src_path, _banner_asset_path(req.asset_id), req.edge,
+                             req.scale, req.align, req.margin)
+
+
 @app.post("/api/banner/preview")
 def preview_banner(req: BannerRequest) -> dict:
     """Banner'lı geçici bir önizleme üretir — diske/geçmişe KAYDETMEZ."""
-    src_path = _logo_src_path(req.id)
-    banner_bytes = _composite_banner(src_path, _banner_asset_path(req.asset_id), req.edge)
+    banner_bytes = _banner_bytes(_logo_src_path(req.id), req)
     b64 = base64.b64encode(banner_bytes).decode("ascii")
     return {"b64": f"data:image/png;base64,{b64}"}
 
@@ -369,11 +444,10 @@ def preview_banner(req: BannerRequest) -> dict:
 def add_banner(req: BannerRequest) -> dict:
     src_path = _logo_src_path(req.id)
     src_id = os.path.basename(req.id)
-    banner_path = _banner_asset_path(req.asset_id)
 
     src_meta = next((h for h in storage.list_history(OUTPUT_DIR) if h["id"] == src_id), {})
 
-    banner_bytes = _composite_banner(src_path, banner_path, req.edge)
+    banner_bytes = _banner_bytes(src_path, req)
     record = storage.save(
         banner_bytes,
         {"prompt": src_meta.get("prompt", ""), "size": src_meta.get("size", ""),

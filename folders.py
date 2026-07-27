@@ -48,10 +48,14 @@ def _write(output_dir: str, items: list[dict]) -> None:
     os.replace(tmp_path, path)
 
 
-def create(name: str, output_dir: str, *, now: str) -> dict:
+def create(name: str, output_dir: str, *, parent_id: str | None = None, now: str) -> dict:
+    """`parent_id` None ise kök klasör, doluysa o klasörün altına açılır.
+
+    Çağıran tarafın `parent_id`'yi `exists()` ile doğrulaması beklenir (app._check_folder).
+    """
     os.makedirs(output_dir, exist_ok=True)
     folder_id = uuid.uuid4().hex[:12]
-    record = {"id": folder_id, "name": name, "created_at": now}
+    record = {"id": folder_id, "name": name, "parent_id": parent_id, "created_at": now}
     _write(output_dir, _read(output_dir) + [record])  # immutable append
     return record
 
@@ -67,14 +71,41 @@ def exists(folder_id: str, output_dir: str) -> bool:
     return any(f.get("id") == folder_id for f in _read(output_dir))
 
 
-def delete(folder_id: str, output_dir: str) -> bool:
-    """Klasör kaydını siler. İçindeki GÖRSELLER silinmez — çağıran taraf
-    `storage.unfile_folder` ile onları klasörsüz hale getirir."""
-    if not _SAFE_ID.fullmatch(folder_id):
-        return False
+def descendants(folder_id: str, output_dir: str) -> list[str]:
+    """Klasörün kendisi + tüm alt klasörlerinin id'leri (üstten alta).
+
+    Klasör yoksa boş liste. Yeniden ebeveynleme olmadığı için `parent_id` zinciri
+    döngü içermez; yine de ziyaret edilenler işaretlenerek bozuk bir dosyada
+    sonsuz döngüye düşülmez.
+    """
+    if not folder_id or not _SAFE_ID.fullmatch(folder_id):
+        return []
     items = _read(output_dir)
-    remaining = [f for f in items if f.get("id") != folder_id]
-    if len(remaining) == len(items):
-        return False
-    _write(output_dir, remaining)
-    return True
+    if not any(f.get("id") == folder_id for f in items):
+        return []
+    found = [folder_id]
+    seen = {folder_id}
+    queue = [folder_id]
+    while queue:
+        parent = queue.pop(0)
+        for f in items:
+            fid = f.get("id")
+            if f.get("parent_id") == parent and fid and fid not in seen:
+                seen.add(fid)
+                found.append(fid)
+                queue.append(fid)
+    return found
+
+
+def delete_tree(folder_id: str, output_dir: str) -> list[str]:
+    """Klasörü ve tüm alt klasörlerini siler; silinen id'leri döndürür (yoksa boş liste).
+
+    İçindeki GÖRSELLER silinmez — çağıran taraf `storage.unfile_folders` ile onları
+    klasörsüz hale getirir.
+    """
+    doomed = descendants(folder_id, output_dir)
+    if not doomed:
+        return []
+    targets = set(doomed)
+    _write(output_dir, [f for f in _read(output_dir) if f.get("id") not in targets])
+    return doomed

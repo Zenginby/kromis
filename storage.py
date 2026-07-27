@@ -5,6 +5,7 @@ import json
 import os
 import re
 import uuid
+from collections.abc import Iterable
 
 HISTORY_FILE = "history.json"
 
@@ -60,6 +61,14 @@ def save(image_bytes: bytes, meta: dict, output_dir: str, *, now: str) -> dict:
         # None/eksik = klasörsüz (kök). Eski kayıtlarda bu alan hiç yoktur;
         # okurken .get("folder_id") ile kök kabul edilir → geçiş gerekmez.
         "folder_id": meta.get("folder_id"),
+        # None/eksik = palet kullanılmadı. folder_id ile aynı mantık: eski
+        # kayıtlarda alan yok, okurken .get("palette") None verir → geçiş yok.
+        "palette": meta.get("palette"),
+        # Azure'a GİDEN tam metin, yalnızca prompt'tan farklıysa. "Palet
+        # gerçekten uygulandı mı?" sorusunun adli cevabı; `prompt` alanı
+        # kullanıcının yazdığı ham metin olarak kalmak zorunda (galeri
+        # başlıkları, türev prompt kopyalama ve mevcut testler ona bağlı).
+        "prompt_sent": meta.get("prompt_sent"),
     }
     # immutable append: yeni liste yaz
     history = _read_history(output_dir) + [record]
@@ -89,18 +98,71 @@ def set_folder(image_id: str, folder_id: str | None, output_dir: str) -> bool:
     return True
 
 
-def unfile_folder(folder_id: str, output_dir: str) -> int:
-    """Bir klasördeki tüm kayıtları klasörsüz hale getirir; etkilenen sayıyı döndürür.
+def unfile_folders(folder_ids: Iterable[str], output_dir: str) -> int:
+    """Verilen klasörlerdeki tüm kayıtları klasörsüz hale getirir; etkilenen sayıyı döndürür.
 
-    Klasör silinirken kullanılır: görseller SİLİNMEZ, yalnızca köke döner.
+    Klasör (ve alt klasör) ağacı silinirken kullanılır: görseller SİLİNMEZ, yalnızca
+    köke döner. Ağacın tamamı TEK yazımda işlenir — id başına ayrı yazım yapılmaz.
     """
+    targets = {fid for fid in folder_ids if fid}
+    if not targets:
+        return 0
     history = _read_history(output_dir)
-    affected = sum(1 for r in history if r.get("folder_id") == folder_id)
+    affected = sum(1 for r in history if r.get("folder_id") in targets)
     if affected:
         _write_history(output_dir,
-                       [{**r, "folder_id": None} if r.get("folder_id") == folder_id else r
+                       [{**r, "folder_id": None} if r.get("folder_id") in targets else r
                         for r in history])
     return affected
+
+
+def unfile_folder(folder_id: str, output_dir: str) -> int:
+    """Tek klasör için `unfile_folders` kısayolu."""
+    return unfile_folders([folder_id], output_dir)
+
+
+def set_folder_many(image_ids: Iterable[str], folder_id: str | None, output_dir: str) -> int:
+    """Birden çok görseli tek yazımda aynı klasöre taşır; taşınan sayıyı döndürür.
+
+    Çoklu seçimle taşıma için: id başına ayrı yazım yapmak history.json'da
+    kayıp güncellemeye yol açardı (her yazım dosyanın tamamını değiştiriyor).
+    Bilinmeyen veya geçersiz id'ler sessizce atlanır — sayı gerçekten taşınanı verir.
+    """
+    targets = {iid for iid in image_ids if iid and _SAFE_ID.fullmatch(iid)}
+    if not targets:
+        return 0
+    history = _read_history(output_dir)
+    moved = sum(1 for r in history if r.get("id") in targets)
+    if moved:
+        _write_history(output_dir,
+                       [{**r, "folder_id": folder_id} if r.get("id") in targets else r
+                        for r in history])
+    return moved
+
+
+def delete_many(image_ids: Iterable[str], output_dir: str) -> int:
+    """Birden çok görseli tek yazımda siler (dosya + kayıt); silinen sayıyı döndürür.
+
+    `delete()` ile aynı sözleşme: dosya adı `{id}.png`, kaydı olmayan ama dosyası
+    olan (veya tersi) id de silinmiş sayılır.
+    """
+    targets = {iid for iid in image_ids if iid and _SAFE_ID.fullmatch(iid)}
+    if not targets:
+        return 0
+    history = _read_history(output_dir)
+    remaining = [r for r in history if r.get("id") not in targets]
+    existing_records = {r.get("id") for r in history if r.get("id") in targets}
+
+    deleted = set(existing_records)
+    for image_id in targets:
+        file_path = os.path.join(output_dir, f"{image_id}.png")
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            deleted.add(image_id)
+
+    if existing_records:
+        _write_history(output_dir, remaining)
+    return len(deleted)
 
 
 def delete(image_id: str, output_dir: str) -> bool:

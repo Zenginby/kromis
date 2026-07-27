@@ -6,6 +6,8 @@
   --muted: oklch(72% 0.02 260);
   --accent: oklch(72% 0.17 45);
   --accent-press: oklch(64% 0.17 45);
+  --danger: oklch(62% 0.19 25);
+  --danger-press: oklch(55% 0.2 25);
   --radius: 14px;
   --space: clamp(1rem, 0.6rem + 1.4vw, 1.8rem);
   --dur: 180ms;
@@ -45,14 +47,31 @@ body {
   padding: 1rem; overflow-y: auto; overscroll-behavior: contain;
 }
 .modal[hidden] { display: none; }
-.modal-backdrop { position: fixed; inset: 0; background: oklch(12% 0.02 260 / 0.62); backdrop-filter: blur(2px); }
+/* confirm-modal bir modal AÇIKKEN de çağrılıyor (palet kaydetme, varlık silme):
+   native confirm()/prompt()'un yerine geçtiği için her zaman en üstte olmak
+   zorunda. Tüm .modal'lar z-index:50 paylaşıyor ve bu DOM'da onlardan ÖNCE
+   geldiğinden eşitlikte ALTTA boyanıyordu — diyalog açılıyor, girdi odağı bile
+   alıyor, ama görünmüyor ve tıklanamıyordu. */
+#confirm-modal { z-index: 60; }
+.modal-backdrop {
+  position: fixed; inset: 0; background: oklch(12% 0.02 260 / 0.62); backdrop-filter: blur(3px);
+  animation: backdropIn 220ms var(--ease);
+}
 .modal-card {
   position: relative; z-index: 1; margin: auto; width: min(460px, 100%);
   background: var(--panel); border: 1px solid var(--panel-2); border-radius: var(--radius);
   padding: calc(var(--space) * 1.1); box-shadow: 0 24px 60px oklch(0% 0 0 / 0.45);
-  animation: modalIn var(--dur) var(--ease);
+  animation: modalIn 260ms var(--ease) both;
 }
-@keyframes modalIn { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+/* Perdenin bulanıklığı ve kartın yükselişi birlikte açılır → "yerine oturma" hissi */
+@keyframes backdropIn {
+  from { opacity: 0; backdrop-filter: blur(0); }
+  to { opacity: 1; backdrop-filter: blur(3px); }
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
 .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
 .modal-head h2 { margin: 0; font-family: ui-serif, Georgia, serif; font-weight: 500; font-size: 1.35rem; }
 .modal-x {
@@ -72,6 +91,31 @@ body {
 .modal-status { color: var(--muted); min-height: 1.2em; font-size: 0.82rem; margin: 0.7rem 0 0; }
 .modal-actions { margin-top: 0.4rem; }
 .modal-actions .primary { margin-top: 0.6rem; }
+
+/* Onay / ad sorma penceresi (native confirm() ve prompt() yerine) */
+.confirm-card { width: min(420px, 100%); }
+.confirm-head { display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.5rem; }
+.confirm-head h2 {
+  margin: 0; font-family: ui-serif, Georgia, serif; font-weight: 500; font-size: 1.2rem;
+  min-width: 0; overflow-wrap: anywhere;
+}
+.confirm-icon {
+  flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  color: var(--danger); background: oklch(62% 0.19 25 / 0.14);
+  box-shadow: 0 0 0 0 oklch(62% 0.19 25 / 0.35);
+  animation: dangerRing 620ms var(--ease) 60ms both;
+}
+.confirm-icon[hidden] { display: none; }
+/* Tehlike halkası bir kez dışa açılıp söner — dikkat çeker, titremez */
+@keyframes dangerRing {
+  from { box-shadow: 0 0 0 0 oklch(62% 0.19 25 / 0.5); transform: scale(0.88); }
+  to   { box-shadow: 0 0 0 10px oklch(62% 0.19 25 / 0); transform: none; }
+}
+.confirm-card .modal-desc { margin-bottom: 0.2rem; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.1rem; }
+.dialog-actions .primary { width: auto; margin: 0; padding: 0.6rem 1.1rem; }
+.dialog-actions .btn-ghost { padding: 0.6rem 1rem; }
+/* Animasyon kapatma dosyanın sonundaki prefers-reduced-motion bloğunda */
 
 /* Logo / banner modal */
 .logo-card { width: min(1040px, 100%); }
@@ -174,6 +218,151 @@ body {
 .asset-empty { color: var(--muted); font-size: 0.82rem; margin: 0.4rem 0; grid-column: 1 / -1; }
 .asset-status { color: var(--muted); min-height: 1em; font-size: 0.78rem; margin: 0.45rem 0 0; }
 
+/* ── Tema rengi / renk paleti ──────────────────────────────────────────
+   Uygulamanın keyfi KULLANICI renklerini render ettiği tek yer. İki kural:
+   (1) hiçbir renk örneğinin ÜSTÜNE metin yazılmaz — adlar şeridin ALTINDA,
+   panel zemininde durur; böylece keyfi renk üzerinde kontrast hesabı hiç
+   gerekmez. (2) her örnek içe doğru saç teli bir çerçeve alır: yoksa çok koyu
+   bir örnek --panel-2 üzerinde kaybolur, çok açık olan da sınırsız taşar.
+   (Aynı ruh: yukarıdaki .asset-cell img dama tahtası gradyanları.) */
+.palette-panel { margin-top: 1rem; border-top: 1px solid var(--panel-2); padding-top: 0.9rem; }
+.palette-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.palette-actions .btn-ghost { flex: 1; justify-content: center; }
+
+.palette-sw-row { display: inline-flex; gap: 2px; vertical-align: middle; }
+.palette-sw-row[hidden] { display: none; }
+.palette-sw {
+  width: 14px; height: 14px; border-radius: 3px; display: block; flex: none;
+  box-shadow: inset 0 0 0 1px oklch(100% 0 0 / 0.14);
+}
+
+/* .ref-chip'in iç kuralları id ile bağlı (#ref-label / #ref-clear), o yüzden
+   palet çipi kendi eşdeğerlerini tanımlıyor. */
+.ref-chip #palette-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
+.ref-chip #palette-clear {
+  border: 0; background: transparent; color: var(--muted); cursor: pointer;
+  font-size: 1rem; line-height: 1; padding: 0 0.25rem; border-radius: 50%;
+  transition: color var(--dur) var(--ease);
+}
+.ref-chip #palette-clear:hover { color: oklch(65% 0.2 25); }
+
+.palette-strength-row { margin-top: 0.75rem; }
+.palette-strength-row[hidden] { display: none; }
+.palette-strength-title { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.25rem; }
+
+/* Palet modalı */
+.palette-card { width: min(640px, 100%); }
+#palette-new[hidden], #palette-saved[hidden] { display: none; }
+/* Renk seçici: HSV karesi + ton kaydırıcısı + damlalık + hex.
+   `<input type="color">`in yerini alıyor — işletim sistemi seçicisi tek tıkla
+   açılmıyor ama sürükleyerek ton/doygunluk keşfi bu iş için çok daha uygun. */
+.palette-picker-title {
+  display: block; font-size: 0.85rem; color: var(--muted); margin: 0.7rem 0 0.35rem;
+}
+.palette-picker { display: grid; gap: 0.5rem; }
+.palette-field {
+  position: relative; width: 100%; aspect-ratio: 4 / 3; border-radius: 10px;
+  cursor: crosshair; touch-action: none;   /* sürüklerken sayfa kaymasın */
+  box-shadow: inset 0 0 0 1px oklch(100% 0 0 / 0.14);
+}
+.palette-field:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Nişangah her iki zeminde de görünmeli: beyaz halka + koyu dış kontur. */
+.palette-field-thumb {
+  position: absolute; width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid oklch(100% 0 0); pointer-events: none;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 1px oklch(0% 0 0 / 0.55);
+}
+
+.palette-picker-row { display: flex; align-items: center; gap: 0.5rem; }
+/* .modal-card label display:block kurduğu için burada geçersiz kılınıyor. */
+.palette-picker-row label { display: inline; margin: 0; flex: none; }
+.palette-picker-row .icon-btn { flex: none; }
+#palette-eyedrop[hidden] { display: none; }
+
+/* ID ile hedefleniyor, class ile DEĞİL: `.modal-card input` (özgüllük 0,1,1)
+   tek bir class'ı (0,1,0) yenip `background: var(--panel-2)` uyguluyordu ve
+   bu bir KISAYOL olduğu için `background-image`'ı da none'a sıfırlayıp
+   gökkuşağı gradyanını tamamen siliyordu. padding/border de aynı kuraldan
+   sızdığı için burada açıkça nötrleniyor. */
+#palette-hue {
+  flex: 1; min-width: 0; margin: 0; padding: 0; border: 0;
+  height: 14px; border-radius: 999px;
+  -webkit-appearance: none; appearance: none; cursor: pointer;
+  background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00,
+                              #00ffff, #0000ff, #ff00ff, #ff0000);
+}
+#palette-hue:focus { outline: none; }
+#palette-hue:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+#palette-hue::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px; border-radius: 50%; cursor: pointer;
+  background: var(--text); border: 2px solid var(--panel);
+  box-shadow: 0 0 0 1px oklch(0% 0 0 / 0.45);
+}
+#palette-hue::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%; cursor: pointer;
+  background: var(--text); border: 2px solid var(--panel);
+}
+#palette-hue::-moz-range-track { background: transparent; border: 0; }
+.palette-seed-sw { width: 26px; height: 26px; border-radius: 7px; }
+#palette-seed-hex {
+  width: 7.5em; flex: none; font-variant-numeric: tabular-nums; text-transform: lowercase;
+}
+
+.palette-suggestions {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr));
+  gap: 0.5rem; margin-top: 0.8rem;
+}
+/* Öneri kartı <button>: klavye gezinmesi ve odak halkası bedava gelir. */
+.palette-choice {
+  display: block; width: 100%; text-align: left; cursor: pointer; font: inherit;
+  padding: 0.55rem 0.6rem 0.6rem; border-radius: 10px;
+  border: 2px solid var(--panel-2); background: var(--panel-2); color: var(--muted);
+  transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.palette-choice:hover { border-color: var(--accent); transform: translateY(-1px); }
+.palette-choice[aria-pressed="true"] {
+  border-color: var(--accent); color: var(--text);
+  box-shadow: 0 0 0 2px oklch(72% 0.17 45 / 0.35);
+}
+.palette-choice-title {
+  display: block; font-size: 0.8rem; color: var(--text); margin-bottom: 0.4rem;
+}
+.palette-choice .palette-sw-row { display: flex; gap: 3px; }
+.palette-choice .palette-sw { width: auto; flex: 1; height: 26px; border-radius: 5px; }
+.palette-choice-names {
+  display: block; font-size: 0.68rem; line-height: 1.35; margin-top: 0.4rem;
+  color: var(--muted);
+}
+
+.palette-save-row { display: flex; gap: 0.5rem; margin-top: 0.9rem; }
+.palette-save-row .btn-ghost, .palette-save-row .primary { flex: 1; margin: 0; }
+
+.palette-lib-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.5rem; margin-top: 0.8rem;
+}
+.palette-lib-cell { position: relative; }
+.palette-lib-cell .palette-choice { padding-right: 1.8rem; }
+.palette-lib-del {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%;
+  background: oklch(25% 0.02 260 / 0.78); color: var(--text);
+  font-size: 1rem; line-height: 1; cursor: pointer; display: grid; place-items: center;
+  opacity: 0; transform: scale(0.85);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease), background var(--dur);
+}
+.palette-lib-cell:hover .palette-lib-del, .palette-lib-del:focus-visible { opacity: 1; transform: scale(1); }
+.palette-lib-del:hover { background: oklch(55% 0.2 25); }
+.palette-empty { color: var(--muted); font-size: 0.82rem; margin: 0.4rem 0; grid-column: 1 / -1; }
+
+/* Keyfi renk zeminde tarayıcı varsayılan odak halkası kaybolabiliyor;
+   accent halka panel zemininde her zaman görünür. */
+.palette-choice:focus-visible, .palette-lib-del:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
 .layout {
   display: grid; gap: var(--space); padding: var(--space);
   grid-template-columns: minmax(280px, 360px) 1fr;
@@ -200,6 +389,9 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 .primary:hover { transform: translateY(-1px); }
 .primary:active { background: var(--accent-press); transform: translateY(0); }
 .primary:disabled { opacity: 0.55; cursor: progress; }
+/* Yıkıcı eylem varyantı (onay penceresindeki "Sil") — .primary'den SONRA tanımlı olmalı */
+.btn-danger { background: var(--danger); color: var(--text); }
+.btn-danger:active { background: var(--danger-press); }
 .status { color: var(--muted); min-height: 1.2em; margin-top: 0.6rem; }
 
 .ref-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-top: 1rem; }
@@ -313,13 +505,14 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 .card[draggable="true"] { cursor: grab; }
 .card[draggable="true"]:active { cursor: grabbing; }
 /* sürükleme başlarken hedefler belirginleşir; içinde bulunulan klasör hedef değil */
-body.dnd-active .folder-cell:not(.current) .folder-open { border-style: dashed; border-color: var(--muted); }
+body.dnd-active .folder-cell .folder-open { border-style: dashed; border-color: var(--muted); }
 .folder-cell.drop-hover .folder-open {
   border-style: solid; border-color: var(--accent); background: var(--panel);
   box-shadow: 0 0 0 3px oklch(72% 0.17 45 / 0.28);
 }
-.folder-cell.current .folder-open { border-color: var(--accent); }
-.folder-root .folder-name { padding-right: 0; }
+/* "Yukarı" kartı: ikonu yok → tek kolon (ad ile alt satır normal kartlar gibi üst üste),
+   kesikli çerçeve onu gerçek klasörlerden ayırır. Sınıf .folder-open ile AYNI öğede. */
+.folder-open.folder-root { grid-template-columns: 1fr; border-style: dashed; }
 .folder-open {
   width: 100%; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto;
   column-gap: 0.6rem; align-items: center; text-align: left; cursor: pointer;
@@ -330,17 +523,12 @@ body.dnd-active .folder-cell:not(.current) .folder-open { border-style: dashed; 
 .folder-open:hover { border-color: var(--accent); transform: translateY(-1px); }
 .folder-open:active { transform: translateY(0); background: var(--panel); }
 .folder-icon { grid-row: 1 / 3; display: block; color: var(--accent); }
-.folder-name { font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 1.2rem; }
+.folder-name { font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .folder-count { font-size: 0.74rem; color: var(--muted); }
-.folder-del {
-  position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; padding: 0;
-  display: grid; place-items: center; border: 0; border-radius: 50%; cursor: pointer;
-  background: oklch(25% 0.02 260 / 0.8); color: var(--text);
-  font-size: 0.95rem; line-height: 1; opacity: 0;
-  transition: opacity var(--dur) var(--ease), background var(--dur);
-}
-.folder-cell:hover .folder-del, .folder-del:focus-visible { opacity: 1; }
-.folder-del:hover { background: oklch(55% 0.2 25); }
+/* Silme: kartta değil, klasörün içindeyken başlık şeridinin sağ üstünde */
+.danger-btn { width: 36px; height: 36px; flex: none; }
+.danger-btn[hidden] { display: none; }
+.danger-btn:hover { color: var(--danger); border-color: var(--danger); }
 .folder-target {
   margin: 1rem 0 0; padding: 0.5rem 0.7rem; border-radius: 10px;
   background: var(--panel-2); border-left: 3px solid var(--accent);
@@ -369,7 +557,45 @@ body.dnd-active .folder-cell:not(.current) .folder-open { border-style: dashed; 
   padding: 0.35rem 0.2rem; cursor: pointer; white-space: nowrap;
 }
 .card .acts button:hover, .card .acts a:hover { color: var(--accent); }
+
+/* ── Çoklu seçim (yalnızca görseller; klasörler seçilmez) ───────────── */
+.select-bar { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.select-bar[hidden] { display: none; }
+.select-count {
+  font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums;
+  padding-right: 0.2rem;
+}
+/* .btn-ghost display:inline-flex kurduğu için [hidden] tek başına yetmiyor */
+.btn-ghost[hidden] { display: none; }
+.btn-ghost-danger:hover { border-color: var(--danger); color: var(--danger); }
+
+/* Kare (boş) → tik (seçili): kutu CSS, tik SVG */
+.card-check {
+  position: absolute; top: 6px; left: 6px; z-index: 2;
+  width: 24px; height: 24px; padding: 0; cursor: pointer;
+  display: grid; place-items: center;
+  border: 2px solid oklch(94% 0.01 260 / 0.8); border-radius: 7px;
+  background: oklch(20% 0.02 260 / 0.5); color: transparent;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease),
+              color var(--dur), transform var(--dur) var(--ease);
+}
+.card-check:hover { border-color: var(--accent); transform: scale(1.08); }
+.card.selected .card-check {
+  background: var(--accent); border-color: var(--accent); color: oklch(20% 0.02 260);
+}
+/* Seçili kart: turuncu çerçeve + dışa yumuşak ışıma + üzerine ÇOK hafif turuncu perde.
+   Perde bilerek düşük: açık zeminli görsellerde 0.15 üzeri görseli yutuyor. */
+.card.selected {
+  box-shadow: 0 0 0 2px var(--accent), 0 6px 20px oklch(72% 0.17 45 / 0.22);
+}
+.card.selected::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: oklch(72% 0.17 45 / 0.09);
+}
+body.select-mode .card, body.select-mode .card img { cursor: pointer; }
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
   .spinner { animation: none; }
+  .modal-backdrop, .modal-card, .confirm-icon { animation: none; }
 }

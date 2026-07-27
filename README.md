@@ -19,6 +19,10 @@ Key rotasyonu: `az cognitiveservices account keys list -g ai-services -n ai-orne
 - Geçmiş galerisi (indir, sil)
 - Görsel düzenleme: dosya yükle veya galeriden seç + prompt (Azure images/edits)
 - KURUM logosu bindirme
+- Tema rengi + renk paleti: bir tohum renkten OKLCH renk teorisiyle 6 uyumlu
+  palet önerisi; seçilen palet prompt'a renk yönlendirmesi olarak eklenir
+  (üretimde ve düzenlemede), 3 kademeli baskı (İpucu/Dengeli/Katı), kalıcı
+  isimli palet kütüphanesi
 
 ## Sonraya (v2)
 - Maske ile bölgesel düzenleme (inpainting)

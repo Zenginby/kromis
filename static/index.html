@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GPT-Image Studio</title>
-  <link rel="stylesheet" href="/static/style.css?v=9" />
+  <link rel="stylesheet" href="/static/style.css?v=17" />
 </head>
 <body>
   <header class="topbar">
@@ -70,6 +70,31 @@
         <p class="extra-hint">Prompt her iki görsele birlikte uygulanır — ör. "ikinci görseldeki ürünü sahneye yerleştir".</p>
       </div>
 
+      <section class="palette-panel" aria-label="Tema rengi ve renk paleti">
+        <div class="palette-actions">
+          <button type="button" id="palette-btn" class="btn-ghost"
+                  title="Tema rengi seç ve uyumlu palet önerilerini gör">
+            <span class="btn-ghost-plus" aria-hidden="true">+</span> Tema rengi
+          </button>
+          <span id="palette-chip" class="ref-chip" hidden>
+            <span id="palette-chip-sw" class="palette-sw-row" aria-hidden="true"></span>
+            <span id="palette-label"></span>
+            <button type="button" id="palette-clear" aria-label="Paleti kaldır">×</button>
+          </span>
+        </div>
+        <div id="palette-strength-row" class="palette-strength-row" hidden>
+          <span id="palette-strength-label" class="palette-strength-title">Renk baskısı</span>
+          <div id="palette-strength" class="seg" role="group"
+               aria-labelledby="palette-strength-label">
+            <button type="button" data-strength="hint">İpucu</button>
+            <button type="button" data-strength="balanced" class="active">Dengeli</button>
+            <button type="button" data-strength="strict">Katı</button>
+          </div>
+        </div>
+        <p id="palette-mode-note" class="field-note" hidden></p>
+        <p id="palette-status" class="asset-status" role="status"></p>
+      </section>
+
       <section class="assets-panel" aria-label="Bindirme ve kütüphane">
         <div class="asset-actions">
           <button type="button" id="logo-add-btn" class="btn-ghost" disabled
@@ -112,9 +137,29 @@
         </svg>
       </button>
       <h2 id="gallery-title">Klasörler</h2>
+      <button type="button" id="folder-delete" class="icon-btn danger-btn" hidden
+              aria-label="Bu klasörü sil" title="Bu klasörü sil">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 6h18"></path>
+          <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path>
+          <path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"></path>
+          <path d="M10 11v6"></path><path d="M14 11v6"></path>
+        </svg>
+      </button>
+      <button type="button" id="select-toggle" class="btn-ghost"
+              title="Görselleri çoklu seç">Seç</button>
       <button type="button" id="folder-new" class="btn-ghost">
         <span class="btn-ghost-plus" aria-hidden="true">+</span> Yeni klasör
       </button>
+
+      <!-- Seçim modu şeridi: Seç / Yeni klasör / klasör silme bunlarla yer değiştirir -->
+      <div id="select-bar" class="select-bar" hidden>
+        <span id="select-count" class="select-count" role="status">0 seçili</span>
+        <button type="button" id="select-all" class="btn-ghost">Tümünü seç</button>
+        <button type="button" id="select-delete" class="btn-ghost btn-ghost-danger">Sil</button>
+        <button type="button" id="select-cancel" class="btn-ghost">Vazgeç</button>
+      </div>
     </div>
 
     <p id="folder-hint" class="folder-hint" hidden>
@@ -125,6 +170,36 @@
     <h3 id="images-title" class="images-title">Klasörsüz görseller</h3>
     <div id="gallery" class="gallery"></div>
   </section>
+
+  <!-- Onay / ad sorma penceresi: native confirm() ve prompt() yerine tek temalı modal.
+       mode="confirm" → yalnızca metin + Vazgeç/Onayla; mode="prompt" → metin girişi de var. -->
+  <div id="confirm-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-confirm-close></div>
+    <div class="modal-card confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <div class="confirm-head">
+        <span id="confirm-icon" class="confirm-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18"></path>
+            <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path>
+            <path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"></path>
+          </svg>
+        </span>
+        <h2 id="confirm-title">Emin misiniz?</h2>
+      </div>
+      <p id="confirm-desc" class="modal-desc"></p>
+
+      <div id="confirm-field" hidden>
+        <label for="confirm-input">Ad</label>
+        <input id="confirm-input" type="text" autocomplete="off" spellcheck="false" maxlength="80" />
+      </div>
+
+      <div class="dialog-actions">
+        <button id="confirm-cancel" class="btn-ghost" type="button">Vazgeç</button>
+        <button id="confirm-ok" class="primary" type="button">Onayla</button>
+      </div>
+    </div>
+  </div>
 
   <div id="settings-modal" class="modal" hidden>
     <div class="modal-backdrop" data-close></div>
@@ -178,6 +253,79 @@
       <input type="file" id="asset-file-input" accept="image/png,image/jpeg,image/webp" multiple hidden />
       <div id="asset-grid" class="asset-grid" aria-live="polite"></div>
       <p id="asset-status" class="asset-status" role="status"></p>
+    </div>
+  </div>
+
+  <div id="palette-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-palette-close></div>
+    <div class="modal-card palette-card" role="dialog" aria-modal="true"
+         aria-labelledby="palette-title">
+      <div class="modal-head">
+        <h2 id="palette-title">Tema Rengi ve Paletler</h2>
+        <button id="palette-close" class="modal-x" type="button" aria-label="Kapat">×</button>
+      </div>
+      <p class="modal-desc">
+        Bir tema rengi seç — uyumlu paletler renk teorisiyle anında üretilir.
+        Seçtiğin palet üretim ve düzenleme prompt'una renk yönlendirmesi olarak eklenir;
+        logo/banner bindirmelerini etkilemez.
+      </p>
+
+      <div id="palette-tabs" class="seg" role="group" aria-label="Palet sekmesi">
+        <button type="button" data-ptab="new" class="active">Yeni palet</button>
+        <button type="button" data-ptab="saved">Kayıtlı paletler</button>
+      </div>
+
+      <div id="palette-new">
+        <span class="palette-picker-title">Tema rengi</span>
+        <div class="palette-picker">
+          <!-- Klasik HSV karesi: x = doygunluk, y = 1 - parlaklık. Zemin iki
+               gradyanla kuruluyor, üstteki siyah örtü altta duruyor. -->
+          <div id="palette-field" class="palette-field" tabindex="0" role="group"
+               aria-label="Doygunluk ve parlaklık alanı — ok tuşlarıyla da ayarlanır">
+            <span id="palette-field-thumb" class="palette-field-thumb" aria-hidden="true"></span>
+          </div>
+          <div class="palette-picker-row">
+            <!-- EyeDropper API yalnızca Chromium'da var; desteklenmiyorsa JS gizler. -->
+            <button type="button" id="palette-eyedrop" class="icon-btn" hidden
+                    aria-label="Ekrandan renk seç" title="Ekrandan renk seç">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m2 22 1-1h3l9-9"></path>
+                <path d="M3 21v-3l9-9"></path>
+                <path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"></path>
+              </svg>
+            </button>
+            <!-- Stil id ile veriliyor: `.modal-card input` bir class seçicisini
+                 özgüllükte yeniyor (bkz. style.css'teki #palette-hue notu). -->
+            <input type="range" id="palette-hue"
+                   min="0" max="360" step="1" value="24" aria-label="Ton" />
+          </div>
+          <div class="palette-picker-row">
+            <span id="palette-seed-sw" class="palette-sw palette-seed-sw" aria-hidden="true"></span>
+            <label for="palette-seed-hex">Hex</label>
+            <input type="text" id="palette-seed-hex" maxlength="7" spellcheck="false"
+                   aria-label="Tema rengi hex kodu" placeholder="#c86a3c" />
+          </div>
+        </div>
+        <div id="palette-suggestions" class="palette-suggestions" aria-live="polite"></div>
+        <p class="field-note">
+          Renk adları prompt'a İngilizce girer — görsel modeli renk adlarına
+          hex kodlarından çok daha iyi tepki veriyor.
+        </p>
+        <div class="palette-save-row">
+          <button type="button" id="palette-save" class="btn-ghost" disabled>
+            Adlandır ve kaydet
+          </button>
+          <button type="button" id="palette-apply" class="primary" disabled>
+            Bu paleti kullan
+          </button>
+        </div>
+      </div>
+
+      <div id="palette-saved" hidden>
+        <div id="palette-lib-grid" class="palette-lib-grid" aria-live="polite"></div>
+      </div>
+      <p id="palette-modal-status" class="asset-status" role="status"></p>
     </div>
   </div>
 
@@ -273,6 +421,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=9"></script>
+  <script src="/static/app.js?v=17"></script>
 </body>
 </html>

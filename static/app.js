@@ -117,6 +117,8 @@ function renderSource() {
   // Ek görsel yalnızca bir ana görsel varken anlamlı
   $("extra-row").hidden = !source;
   renderExtras();
+  // Palet notu referans görsel varken değişir (üretim ≠ düzenleme ifadesi)
+  renderPalettePanel();
 }
 
 // ── Ek referans görselleri ──────────────────────────────────────────
@@ -255,6 +257,10 @@ async function run() {
   const quality = $("quality").value;
   const n = $("n").value;
   const editing = source !== null;
+  // Palet İKİ dalın da payload'ına eklenmeli — biri atlanırsa o yolda renk
+  // sessizce kaybolur. Palet kapalıyken {} döner, böylece gövde bugünküyle
+  // bayt bayt aynı kalır ve extra="forbid" boş bir alan görmez.
+  const pal = readPaletteOpts();
 
   let request;
   if (editing) {
@@ -266,6 +272,11 @@ async function run() {
     if (source.kind === "upload") fd.append("file", source.file);
     else fd.append("source_id", source.id);
     if (currentFolder) fd.append("folder_id", currentFolder.id);
+    if (pal.palette_hex) {
+      fd.append("palette_hex", pal.palette_hex);
+      fd.append("palette_mode", pal.palette_mode);
+      fd.append("palette_strength", pal.palette_strength);
+    }
     // ek referanslar: sunucu sırayı ana görsel → yüklemeler → galeri id'leri olarak kurar
     for (const item of extras) {
       if (item.kind === "upload") fd.append("extra_files", item.file);
@@ -277,7 +288,8 @@ async function run() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt, size, quality, n: parseInt(n, 10),
-                             folder_id: currentFolder ? currentFolder.id : null }),
+                             folder_id: currentFolder ? currentFolder.id : null,
+                             ...pal }),
     });
   }
 
@@ -290,12 +302,19 @@ async function run() {
     const res = await request;
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `Hata (${res.status})`);
+      throw new Error(detailText(err) || `Hata (${res.status})`);
     }
     const { images } = await res.json();
     if (images[0]) showPreview(images[0]);
     clearUploadPreviewUrl(); // sonuç sunucu URL'inden gösteriliyor; blob artık gereksiz
     statusEl.textContent = editing ? "Düzenleme tamam." : `${images.length} görsel üretildi.`;
+    // Bayat sunucu tespiti — /api/edit multipart olduğu için orada
+    // extra="forbid" karşılığı YOK: Starlette bilinmeyen form alanını sessizce
+    // atar ve 200 döner. Yanıtta palet yankılanmıyorsa sunucu eskidir.
+    if (pal.palette_hex && images[0] && !images[0].palette) {
+      statusEl.textContent =
+        "Palet uygulanmadı: sunucu eski sürüm görünüyor — ./run.sh ile yeniden başlat.";
+    }
     ok = true;
     await loadHistory();
   } catch (e) {
@@ -306,8 +325,84 @@ async function run() {
   }
 }
 
+// ── Onay / ad sorma penceresi ────────────────────────────────────────
+// Tek temalı modal, native confirm() ve prompt()'un yerine geçer:
+// confirmDialog → Promise<boolean>, promptDialog → Promise<string|null>.
+let dialogResolve = null;      // açık diyaloğun resolve'u (kapalıysa null)
+let dialogMode = "confirm";
+let dialogPrevFocus = null;    // kapanışta odak buraya döner
+
+function openDialog({ mode = "confirm", title, desc = "", okLabel = "Onayla",
+                      danger = false, initial = "" }) {
+  closeDialog(mode === "prompt" ? null : false);   // üst üste açılmayı engelle
+  dialogMode = mode;
+  $("confirm-title").textContent = title;
+  const descEl = $("confirm-desc");
+  descEl.textContent = desc;
+  descEl.hidden = !desc;
+  $("confirm-icon").hidden = !danger;
+  const ok = $("confirm-ok");
+  ok.textContent = okLabel;
+  ok.classList.toggle("btn-danger", danger);
+  const input = $("confirm-input");
+  $("confirm-field").hidden = mode !== "prompt";
+  if (mode === "prompt") input.value = initial;
+  dialogPrevFocus = document.activeElement;
+  $("confirm-modal").hidden = false;
+  if (mode === "prompt") { input.focus(); input.select(); } else { ok.focus(); }
+  return new Promise((resolve) => { dialogResolve = resolve; });
+}
+
+function closeDialog(value) {
+  if (!dialogResolve) return;
+  const resolve = dialogResolve;
+  dialogResolve = null;
+  $("confirm-modal").hidden = true;
+  if (dialogPrevFocus && dialogPrevFocus.isConnected) dialogPrevFocus.focus();
+  dialogPrevFocus = null;
+  resolve(value);
+}
+
+function submitDialog() {
+  if (dialogMode !== "prompt") return closeDialog(true);
+  const value = $("confirm-input").value.trim();
+  if (!value) { $("confirm-input").focus(); return; }   // boş adla kapanma
+  closeDialog(value);
+}
+
+function cancelDialog() { closeDialog(dialogMode === "prompt" ? null : false); }
+
+function confirmDialog(title, desc, { okLabel = "Sil" } = {}) {
+  return openDialog({ mode: "confirm", title, desc, okLabel, danger: true });
+}
+
+function promptDialog(title, desc, { okLabel = "Oluştur", initial = "" } = {}) {
+  return openDialog({ mode: "prompt", title, desc, okLabel, initial });
+}
+
+$("confirm-ok").addEventListener("click", submitDialog);
+$("confirm-cancel").addEventListener("click", cancelDialog);
+$("confirm-modal").addEventListener("click", (e) => {
+  if (e.target.hasAttribute("data-confirm-close")) cancelDialog();
+});
+$("confirm-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); submitDialog(); }
+});
+// En üstteki katman: Escape yalnızca BU pencereyi kapatır. stopImmediatePropagation
+// şart — aksi halde aynı olayda sonra çalışan modal handler'ları "confirm kapandı"
+// görüp altındaki modalı da kapatıyor (bu handler'dan ÖNCE kayıtlı olanlar için de
+// aşağıdaki `confirm-modal.hidden` guard'ları var).
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("confirm-modal").hidden) {
+    e.stopImmediatePropagation();
+    cancelDialog();
+  }
+});
+
 async function deleteImage(rec) {
-  if (!confirm("Bu görseli silmek istediğinizden emin misiniz?")) return;
+  const ok = await confirmDialog("Görseli sil",
+    "Bu görsel diskten kalıcı olarak silinecek. Bu işlem geri alınamaz.");
+  if (!ok) return;
   statusEl.textContent = "Siliniyor…";
   try {
     const res = await fetch(`/api/image/${rec.id}`, { method: "DELETE" });
@@ -330,12 +425,49 @@ async function deleteImage(rec) {
 // Açık klasör AYNI ZAMANDA hedeftir: içindeysen yeni görseller oraya kaydedilir,
 // kökteysen klasörsüz kaydedilir. Tek durum → "nerede görüyorum" ile "nereye
 // kaydediliyor" ayrışmaz. null = kök.
+//
+// Hiyerarşi: klasörler `parent_id` ile ağaç kurar (kök = null) ve şerit yalnızca
+// BULUNULAN seviyenin çocuklarını gösterir. `folderCache` düz listeyi tutar;
+// süzme burada yapılır, sunucuya seviye parametresi gitmez.
 let currentFolder = null;
 let folderCache = [];
+
+const parentOf = (f) => (f && f.parent_id) || null;
+const folderById = (id) => (id ? folderCache.find((f) => f.id === id) || null : null);
+
+// Kökten bulunulan klasöre kadarki zincir (kırıntı başlığı için)
+function folderPath(id) {
+  const path = [];
+  let node = folderById(id);
+  while (node && !path.some((f) => f.id === node.id)) {   // bozuk zincire karşı guard
+    path.unshift(node);
+    node = folderById(parentOf(node));
+  }
+  return path;
+}
+
+// Bir klasörün kendisi + tüm alt klasörleri (silme onayında sayı vermek için)
+function folderSubtree(id) {
+  const out = [];
+  const queue = [id];
+  const seen = new Set(queue);
+  while (queue.length) {
+    const current = queue.shift();
+    const rec = folderById(current);
+    if (rec) out.push(rec);
+    for (const f of folderCache) {
+      if (parentOf(f) === current && !seen.has(f.id)) { seen.add(f.id); queue.push(f.id); }
+    }
+  }
+  return out;
+}
 
 // Sürükle-bırak taşıma: kart bu MIME türünü taşır, klasör hedefleri onu arar.
 // Böylece dosya sürükleme (stage'e görsel bırakma) ile karışmaz.
 const IMAGE_DND_TYPE = "application/x-gpt-image-id";
+
+// Şerit ipucusunun normal (seçim dışı) metni — seçim modunda geçici olarak değişir
+const FOLDER_HINT_DEFAULT = "Bir görseli klasör kartına sürükleyip bırakarak taşıyabilirsin.";
 
 function renderFolderTarget() {
   const el = $("folder-target");
@@ -350,7 +482,14 @@ function renderFolderTarget() {
 function syncFolderView() {
   const inFolder = currentFolder !== null;
   $("folder-back").hidden = !inFolder;
-  $("gallery-title").textContent = inFolder ? currentFolder.name : "Klasörler";
+  // Silme yalnızca klasörün İÇİNDE (sağ üstte); seçim modunda şerit görsellere ayrılır
+  $("folder-delete").hidden = !inFolder || selectMode;
+  $("folder-new").hidden = selectMode;
+  const path = inFolder ? folderPath(currentFolder.id) : [];
+  // kırıntı: "A / B / C" — cache henüz gelmediyse en azından klasörün adı
+  $("gallery-title").textContent = inFolder
+    ? (path.length ? path.map((f) => f.name).join(" / ") : currentFolder.name)
+    : "Klasörler";
   $("images-title").textContent = inFolder ? "Klasördeki görseller" : "Klasörsüz görseller";
   // Şerit klasör içinde de görünür: taşıma hedefleri oradan geliyor.
   $("folder-hint").hidden = !folderCache.length;
@@ -371,19 +510,26 @@ async function loadFolders() {
   renderFolders();
 }
 
-// Bir görseli klasöre (veya köke) taşır. Dosya taşınmaz; yalnızca etiket değişir.
-async function moveImage(imageId, folderId, targetName) {
+// Görsel(ler)i klasöre (veya köke) taşır. Dosya taşınmaz; yalnızca etiket değişir.
+// Sürüklenen kart seçiliyse TÜM seçim birlikte gider; değilse yalnızca o kart.
+// Tek uç kullanılır (tek görselde de): sunucu tarafında tek yazım → kayıp güncelleme yok.
+async function moveImages(imageId, folderId, targetName) {
+  const ids = selectMode && selected.has(imageId) ? [...selected] : [imageId];
   try {
-    const res = await fetch(`/api/image/${imageId}`, {
+    const res = await fetch("/api/images", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ folder_id: folderId }),
+      body: JSON.stringify({ ids, folder_id: folderId }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(typeof err.detail === "string" ? err.detail : `Hata (${res.status})`);
     }
-    statusEl.textContent = `Görsel "${targetName}" içine taşındı.`;
+    const { moved } = await res.json();
+    statusEl.textContent = moved > 1
+      ? `${moved} görsel "${targetName}" içine taşındı.`
+      : `Görsel "${targetName}" içine taşındı.`;
+    selected.clear();   // taşınanlar bu görünümden düştü
     await Promise.all([loadFolders(), loadHistory()]);
   } catch (e) {
     statusEl.textContent = e.message;
@@ -406,7 +552,7 @@ function makeDropTarget(el, folderId, targetName) {
     e.preventDefault();
     e.stopPropagation();
     const imageId = e.dataTransfer.getData(IMAGE_DND_TYPE);
-    if (imageId) moveImage(imageId, folderId, targetName);
+    if (imageId) moveImages(imageId, folderId, targetName);
   });
 }
 
@@ -414,37 +560,44 @@ function renderFolders() {
   const grid = $("folder-grid");
   grid.innerHTML = "";
 
-  // Bir klasörün içindeyken "Klasörsüz" kartı: hem çıkış hem de köke taşıma hedefi
+  // Bir klasörün içindeyken "yukarı" kartı: bir seviye üstü gösterir (kökte "Klasörsüz"),
+  // hem çıkış hem de o seviyeye taşıma hedefi.
   if (currentFolder) {
+    const parent = folderById(parentOf(currentFolder));
+    const upName = parent ? parent.name : "Klasörsüz";
     const out = document.createElement("button");
     out.type = "button";
     out.className = "folder-open folder-root";
-    out.title = "Klasörsüz görseller · buraya bırakarak kökten çıkar";
+    out.title = `${upName} · buraya bırakarak bir üst seviyeye taşı`;
     const label = document.createElement("span");
     label.className = "folder-name";
-    label.textContent = "Klasörsüz";
+    label.textContent = parent ? `↑ ${upName}` : upName;
     const sub = document.createElement("span");
     sub.className = "folder-count";
-    sub.textContent = "buraya bırak → kök";
+    sub.textContent = "buraya bırak → bir üst";
     out.appendChild(label);
     out.appendChild(sub);
-    out.addEventListener("click", exitFolder);
+    out.addEventListener("click", goUp);
 
     const cell = document.createElement("div");
     cell.className = "folder-cell";
     cell.appendChild(out);
-    makeDropTarget(cell, null, "Klasörsüz");
+    makeDropTarget(cell, parent ? parent.id : null, upName);
     grid.appendChild(cell);
   }
 
-  if (!folderCache.length) {
+  // Yalnızca bulunulan seviyenin klasörleri: kökte kök klasörler, içeride alt klasörler
+  const children = folderCache.filter((f) => parentOf(f) === (currentFolder ? currentFolder.id : null));
+  if (!children.length) {
     const empty = document.createElement("p");
     empty.className = "folder-empty";
-    empty.textContent = "Henüz klasör yok · + Yeni klasör ile oluştur";
+    empty.textContent = currentFolder
+      ? "Bu klasörde alt klasör yok · + Yeni klasör ile oluştur"
+      : "Henüz klasör yok · + Yeni klasör ile oluştur";
     grid.appendChild(empty);
     return;
   }
-  for (const f of folderCache) {
+  for (const f of children) {
     // SVG: 🗀 gibi glyph'ler sistem fontunda eksik olabiliyor (tofu/yanlış render)
     const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     icon.setAttribute("class", "folder-icon");
@@ -467,7 +620,9 @@ function renderFolders() {
 
     const count = document.createElement("span");
     count.className = "folder-count";
-    count.textContent = `${f.count} görsel`;
+    count.textContent = f.child_count
+      ? `${f.count} görsel · ${f.child_count} klasör`
+      : `${f.count} görsel`;
 
     const open = document.createElement("button");
     open.type = "button";
@@ -478,46 +633,38 @@ function renderFolders() {
     open.appendChild(count);
     open.addEventListener("click", () => openFolder(f));
 
-    const del = document.createElement("button");
-    del.type = "button";
-    del.className = "folder-del";
-    del.textContent = "×";
-    del.title = "Klasörü sil";
-    del.setAttribute("aria-label", `${f.name} klasörünü sil`);
-    del.addEventListener("click", () => deleteFolder(f));
-
+    // Silme butonu kartta DEĞİL: klasörün içine girilince başlık şeridinin sağ üstünde.
     const cell = document.createElement("div");
     cell.className = "folder-cell";
-    const isCurrent = currentFolder && currentFolder.id === f.id;
-    if (isCurrent) cell.classList.add("current");
     cell.appendChild(open);
-    cell.appendChild(del);
-    // İçinde bulunduğun klasöre taşıma anlamsız → hedef yapılmaz
-    if (!isCurrent) makeDropTarget(cell, f.id, f.name);
+    makeDropTarget(cell, f.id, f.name);
     grid.appendChild(cell);
   }
 }
 
 async function openFolder(f) {
-  currentFolder = { id: f.id, name: f.name };
+  currentFolder = { id: f.id, name: f.name, parent_id: parentOf(f) };
   syncFolderView();
   await Promise.all([loadFolders(), loadHistory()]);
 }
 
-async function exitFolder() {
-  currentFolder = null;
+// Bir seviye yukarı: alt klasördeyse ebeveyne, kök klasördeyse köke (klasörsüz)
+async function goUp() {
+  const parent = folderById(parentOf(currentFolder));
+  currentFolder = parent ? { id: parent.id, name: parent.name, parent_id: parentOf(parent) } : null;
   syncFolderView();
   await Promise.all([loadFolders(), loadHistory()]);
 }
 
 async function createFolder() {
-  const name = (prompt("Klasör adı:") || "").trim();
+  const where = currentFolder ? `"${currentFolder.name}" içinde` : "kökte";
+  const name = await promptDialog("Yeni klasör", `Klasör ${where} oluşturulacak.`);
   if (!name) return;
   try {
     const res = await fetch("/api/folders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, parent_id: currentFolder ? currentFolder.id : null }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -530,25 +677,151 @@ async function createFolder() {
   }
 }
 
-async function deleteFolder(f) {
-  if (!confirm(`"${f.name}" klasörü silinsin mi? İçindeki görseller SİLİNMEZ, klasörsüz hale döner.`)) return;
+// İçinde bulunulan klasörü siler (başlık şeridindeki çöp kutusu). Alt klasörler de
+// silinir; GÖRSELLER silinmez, klasörsüz hale döner.
+async function deleteCurrentFolder() {
+  if (!currentFolder) return;
+  const target = currentFolder;
+  const subtree = folderSubtree(target.id);
+  // Klasör listesi alınamadıysa subtree boş kalır → sayıları 0 göster, eksiye düşme
+  const subCount = Math.max(0, subtree.length - 1);
+  const images = subtree.reduce((sum, f) => sum + (f.count || 0), 0);
+  const parts = [
+    subCount ? `${subCount} alt klasör de silinecek.` : null,
+    images ? `${images} görsel SİLİNMEZ, klasörsüz hale döner.` : "İçinde görsel yok.",
+  ].filter(Boolean);
+  const ok = await confirmDialog(`"${target.name}" klasörünü sil`, parts.join(" "),
+                                 { okLabel: "Klasörü sil" });
+  if (!ok) return;
   try {
-    const res = await fetch(`/api/folders/${f.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/folders/${target.id}`, { method: "DELETE" });
     if (!res.ok) throw new Error(`Hata (${res.status})`);
     const { unfiled } = await res.json();
     statusEl.textContent = unfiled
       ? `Klasör silindi · ${unfiled} görsel klasörsüz hale döndü.`
       : "Klasör silindi.";
-    // silinen klasörün içindeysek köke dön
-    if (currentFolder && currentFolder.id === f.id) await exitFolder();
-    else await Promise.all([loadFolders(), loadHistory()]);
+    await goUp();   // silinen klasörün içindeydik → bir üst seviyeye çık
   } catch (e) {
     statusEl.textContent = e.message;
   }
 }
 
-$("folder-back").addEventListener("click", exitFolder);
+$("folder-back").addEventListener("click", goUp);
+$("folder-delete").addEventListener("click", deleteCurrentFolder);
 $("folder-new").addEventListener("click", createFolder);
+
+// ── Çoklu seçim ──────────────────────────────────────────────────────
+// Seçim YALNIZCA görseller için: klasörler seçilmez, toplu klasör silme yok.
+// Seçim modunda kart tıklaması seçim değiştirir (düzenlemeye alma devre dışı),
+// eylemler üst şeritte toplanır ve seçili görseller birlikte sürüklenebilir.
+let selectMode = false;
+let selected = new Set();      // seçili görsel id'leri
+let historyCache = [];         // son çekilen galeri kayıtları (renderGallery kaynağı)
+
+function setSelectMode(on) {
+  selectMode = on;
+  if (!on) selected.clear();
+  document.body.classList.toggle("select-mode", on);
+  renderGallery();
+  syncFolderView();   // klasör butonlarının görünürlüğü tek yerden: syncFolderView
+  syncSelectUI();
+}
+
+function toggleSelected(id) {
+  if (selected.has(id)) selected.delete(id);
+  else selected.add(id);
+  renderGallery();
+  syncSelectUI();
+}
+
+// Kart üstündeki kare/tik işareti (sol üst köşe)
+function makeCheckbox(rec) {
+  const box = document.createElement("button");
+  box.type = "button";
+  box.className = "card-check";
+  const isOn = selected.has(rec.id);
+  box.setAttribute("aria-pressed", String(isOn));
+  box.setAttribute("aria-label", isOn ? "Seçimi kaldır" : "Görseli seç");
+  // Tik SVG olarak çizilir; kare çerçeve CSS'ten gelir (glyph'e güvenmiyoruz)
+  const tick = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  tick.setAttribute("viewBox", "0 0 24 24");
+  tick.setAttribute("width", "14");
+  tick.setAttribute("height", "14");
+  tick.setAttribute("fill", "none");
+  tick.setAttribute("stroke", "currentColor");
+  tick.setAttribute("stroke-width", "3");
+  tick.setAttribute("stroke-linecap", "round");
+  tick.setAttribute("stroke-linejoin", "round");
+  tick.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", "M20 6 9 17l-5-5");
+  tick.appendChild(path);
+  box.appendChild(tick);
+  box.addEventListener("click", (e) => { e.stopPropagation(); toggleSelected(rec.id); });
+  return box;
+}
+
+function syncSelectUI() {
+  $("select-bar").hidden = !selectMode;
+  $("select-toggle").hidden = selectMode;
+  $("folder-hint").textContent = selectMode
+    ? (selected.size
+        ? "Seçili görselleri taşımak için birini klasör kartına sürükle."
+        : "Görselleri seç, sonra taşımak için birini klasör kartına sürükle.")
+    : FOLDER_HINT_DEFAULT;
+  if (!selectMode) return;
+
+  const total = historyCache.length;
+  $("select-count").textContent = `${selected.size} seçili`;
+  const allSelected = total > 0 && selected.size === total;
+  $("select-all").textContent = allSelected ? "Seçimi temizle" : "Tümünü seç";
+  $("select-all").disabled = total === 0;
+  $("select-delete").disabled = selected.size === 0;
+}
+
+async function deleteSelected() {
+  const ids = [...selected];
+  if (!ids.length) return;
+  const ok = await confirmDialog(`${ids.length} görseli sil`,
+    `Seçili ${ids.length} görsel diskten kalıcı olarak silinecek. Bu işlem geri alınamaz.`);
+  if (!ok) return;
+  statusEl.textContent = "Siliniyor…";
+  try {
+    const res = await fetch("/api/images", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(typeof err.detail === "string" ? err.detail : `Hata (${res.status})`);
+    }
+    const { deleted } = await res.json();
+    // silinenler referans/önizlemede duruyorsa oradan da düşür
+    if (source && source.kind === "gallery" && ids.includes(source.id)) clearSource();
+    extras = extras.filter((it) => !(it.kind === "gallery" && ids.includes(it.id)));
+    if (currentImage && ids.includes(currentImage.id)) clearPreview();
+    renderSource();
+    selected.clear();
+    statusEl.textContent = `${deleted} görsel silindi.`;
+    await Promise.all([loadFolders(), loadHistory()]);
+  } catch (e) {
+    statusEl.textContent = e.message;
+  }
+}
+
+$("select-toggle").addEventListener("click", () => setSelectMode(true));
+$("select-cancel").addEventListener("click", () => setSelectMode(false));
+$("select-delete").addEventListener("click", deleteSelected);
+$("select-all").addEventListener("click", () => {
+  const allSelected = historyCache.length > 0 && selected.size === historyCache.length;
+  selected = allSelected ? new Set() : new Set(historyCache.map((r) => r.id));
+  renderGallery();
+  syncSelectUI();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && selectMode && $("confirm-modal").hidden) setSelectMode(false);
+});
 
 async function loadHistory() {
   const url = currentFolder ? `/api/history?folder_id=${encodeURIComponent(currentFolder.id)}` : "/api/history";
@@ -560,19 +833,31 @@ async function loadHistory() {
     return;
   }
   const { images } = await res.json();
+  historyCache = images;
+  // Seçim modundayken listeden düşen görsellerin seçimi de düşer
+  selected = new Set([...selected].filter((id) => images.some((r) => r.id === id)));
+  renderGallery();
+  syncSelectUI();
+}
+
+// Galeri kartlarını `historyCache`'ten çizer. loadHistory'den ayrı: seçim moduna
+// girip çıkmak yeniden istek atmaz, yalnızca yeniden çizer.
+function renderGallery() {
   const g = $("gallery");
   g.innerHTML = "";
-  for (const rec of images) {
+  for (const rec of historyCache) {
     const prompt = rec.prompt || "";
 
     // Küçük resme tıklamak doğrudan düzenleme moduna alır (ayrı "Düzenle" butonu yok)
     const img = document.createElement("img");
     img.src = `/output/${rec.filename}`;
     img.alt = prompt.slice(0, 60);
-    img.title = prompt
-      ? `${prompt}\n\nDüzenlemek için tıkla · taşımak için klasöre sürükle`
-      : "Düzenlemek için tıkla · taşımak için klasöre sürükle";
-    img.addEventListener("click", () => setGallerySource(rec));
+    img.title = selectMode
+      ? "Seçmek için tıkla · seçili görselleri taşımak için klasöre sürükle"
+      : prompt
+        ? `${prompt}\n\nDüzenlemek için tıkla · taşımak için klasöre sürükle`
+        : "Düzenlemek için tıkla · taşımak için klasöre sürükle";
+    img.addEventListener("click", () => { if (!selectMode) setGallerySource(rec); });
     // img'in yerel sürüklemesi kapatılır ki sürükleme kartın kendisinden başlasın
     // (aksi halde dataTransfer'a görsel URL'i düşer ve sürükleme hayaleti bozulur)
     img.draggable = false;
@@ -605,6 +890,7 @@ async function loadHistory() {
 
     const card = document.createElement("div");
     card.className = "card";
+    if (selectMode && selected.has(rec.id)) card.classList.add("selected");
     card.draggable = true;
     card.addEventListener("dragstart", (e) => {
       e.dataTransfer.setData(IMAGE_DND_TYPE, rec.id);
@@ -616,7 +902,14 @@ async function loadHistory() {
       card.classList.remove("dragging");
       document.body.classList.remove("dnd-active");
     });
+    // Seçim modunda kartın her yeri seçer; kart içi eylemler (İndir/+Ek/×) hariç
+    card.addEventListener("click", (e) => {
+      if (!selectMode) return;
+      if (e.target.closest(".acts") || e.target.closest(".card-del")) return;
+      toggleSelected(rec.id);
+    });
     card.appendChild(img);
+    if (selectMode) card.appendChild(makeCheckbox(rec));
     card.appendChild(delBtn);
     card.appendChild(acts);
 
@@ -765,7 +1058,9 @@ async function uploadAsset(kind, file) {
 }
 
 async function deleteAssetItem(kind, id) {
-  if (!confirm("Bu varlığı silmek istediğinizden emin misiniz?")) return;
+  const ok = await confirmDialog("Varlığı sil",
+    "Bu logo/motto/banner kütüphaneden kalıcı olarak silinecek.");
+  if (!ok) return;
   try {
     const res = await fetch(`/api/assets/${kind}/${id}`, { method: "DELETE" });
     if (!res.ok) throw new Error(`Hata (${res.status})`);
@@ -813,7 +1108,7 @@ $("assets-modal").addEventListener("click", (e) => {
   if (e.target.hasAttribute("data-assets-close")) closeAssetsModal();
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !$("assets-modal").hidden) closeAssetsModal();
+  if (e.key === "Escape" && $("confirm-modal").hidden && !$("assets-modal").hidden) closeAssetsModal();
 });
 
 // ── Bindirme modalı: logo VEYA banner + canlı önizleme ──────────────
@@ -1104,7 +1399,524 @@ $("logo-modal").addEventListener("click", (e) => {
   if (e.target.hasAttribute("data-logo-close")) closeLogoModal();
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !$("logo-modal").hidden) closeLogoModal();
+  if (e.key === "Escape" && $("confirm-modal").hidden && !$("logo-modal").hidden) closeLogoModal();
+});
+
+// ── Tema rengi / renk paleti ────────────────────────────────────────
+// Palet `(seed, mode)` çiftinin SAF FONKSİYONU: tel üzerinde iki skaler
+// (+ baskı kademesi) yeterli, istemci renk listesi göndermez. Renk
+// matematiği ve isimlendirme sunucuda — tek doğruluk kaynağı, thecolorapi
+// için CORS yok, ve repodaki tek test altyapısıyla (pytest) test edilebilir.
+let activePalette = null;      // { seed, mode, colors:[{hex,name}], name } | null
+let paletteStrength = "balanced";
+let paletteCache = [];         // GET /api/palettes
+let paletteTab = "new";
+let suggestions = [];          // son öneri seti
+let suggestSeed = "";          // önerilerin ÜRETİLDİĞİ tohum (input'tan değil, sunucudan)
+let selectedSuggestion = null; // seçili harmoni modu
+let suggestTimer = null;
+let suggestToken = 0;
+
+const HARMONY_LABELS = {
+  monochrome: "Tek renk",
+  analogic: "Komşu",
+  complement: "Karşıt",
+  "analogic-complement": "Komşu + karşıt",
+  triad: "Üçlü",
+  quad: "Dörtlü",
+};
+const STRENGTH_LABELS = { hint: "İpucu", balanced: "Dengeli", strict: "Katı" };
+const DEFAULT_SEED = "#c86a3c";
+
+// ── Renk seçici (HSV karesi + ton kaydırıcısı) ───────────────────────
+// Model HSV: alanın zemini iki gradyanla kurulan klasik HSV karesi
+// (x = doygunluk, y = 1 - parlaklık), o yüzden nişangah konumunun renge
+// birebir karşılık gelmesi için iç model de HSV olmak zorunda.
+//
+// HSV state AYRI tutuluyor, hex'ten her seferinde türetilmiyor: sürüklerken
+// hex'e gidip dönmek yuvarlama yüzünden nişangahı zıplatır.
+let pick = { h: 24, s: 0.7, v: 0.78 };
+
+function hsvToRgb(h, s, v) {
+  const c = v * s;
+  const hp = ((((h % 360) + 360) % 360) / 60);
+  const x = c * (1 - Math.abs((hp % 2) - 1));
+  const [r, g, b] =
+    hp < 1 ? [c, x, 0] : hp < 2 ? [x, c, 0] : hp < 3 ? [0, c, x] :
+    hp < 4 ? [0, x, c] : hp < 5 ? [x, 0, c] : [c, 0, x];
+  const m = v - c;
+  return [r + m, g + m, b + m].map((n) => Math.round(n * 255));
+}
+
+function rgbToHsv(r, g, b) {
+  const [rn, gn, bn] = [r / 255, g / 255, b / 255];
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const d = max - min;
+  let h = null; // akromatik: ton tanımsız (bkz. setPickFromHex)
+  if (d) {
+    if (max === rn) h = (((gn - bn) / d) % 6 + 6) % 6;
+    else if (max === gn) h = (bn - rn) / d + 2;
+    else h = (rn - gn) / d + 4;
+    h *= 60;
+  }
+  return { h, s: max ? d / max : 0, v: max };
+}
+
+function hexToRgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function rgbToHex([r, g, b]) {
+  return "#" + [r, g, b].map((n) => n.toString(16).padStart(2, "0")).join("");
+}
+
+function pickHex() { return rgbToHex(hsvToRgb(pick.h, pick.s, pick.v)); }
+
+function setPickFromHex(hex) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return false;
+  const hsv = rgbToHsv(...rgb);
+  // Gri/siyah/beyazda ton sayısal olarak anlamsız — MEVCUT tonu koru, yoksa
+  // kullanıcı beyaza sürüklediğinde alanın zemini kırmızıya sıçrar.
+  pick = { h: hsv.h === null ? pick.h : hsv.h, s: hsv.s, v: hsv.v };
+  return true;
+}
+
+function renderPicker({ syncHexField = true } = {}) {
+  const hex = pickHex();
+  const field = $("palette-field");
+  field.style.background =
+    `linear-gradient(0deg, #000, transparent),` +
+    `linear-gradient(90deg, #fff, hsl(${pick.h} 100% 50%))`;
+  field.setAttribute("aria-valuetext", `doygunluk ${Math.round(pick.s * 100)}%, ` +
+    `parlaklık ${Math.round(pick.v * 100)}%, ${hex}`);
+  const thumb = $("palette-field-thumb");
+  thumb.style.left = `${pick.s * 100}%`;
+  thumb.style.top = `${(1 - pick.v) * 100}%`;
+  thumb.style.background = hex;
+  $("palette-hue").value = String(Math.round(pick.h));
+  $("palette-seed-sw").style.background = hex;
+  // Kullanıcı yazarken alanı ezmemek için hex girdisi opsiyonel güncellenir.
+  if (syncHexField) $("palette-seed-hex").value = hex;
+}
+
+/** Alandaki bir noktadan doygunluk/parlaklık. */
+function setPickFromPoint(clientX, clientY) {
+  const r = $("palette-field").getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  pick.s = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+  pick.v = 1 - Math.min(1, Math.max(0, (clientY - r.top) / r.height));
+  renderPicker();
+  scheduleSuggest();
+}
+
+function paletteStatus(msg) { $("palette-status").textContent = msg || ""; }
+function paletteModalStatus(msg) { $("palette-modal-status").textContent = msg || ""; }
+
+/** 422 gövdesi bir dizi olabiliyor; `err.detail` doğrudan basılırsa çöp çıkar. */
+function detailText(err) {
+  const d = err && err.detail;
+  if (!d) return "";
+  if (typeof d === "string") return d;
+  if (!Array.isArray(d)) return "";
+  if (d.some((e) => e && e.type === "extra_forbidden")) {
+    return "Sunucu bu alanı tanımıyor — eski bir sunucu süreci çalışıyor. " +
+           "./run.sh ile yeniden başlat.";
+  }
+  return d.map((e) => (e && e.msg) || "").filter(Boolean).join("; ");
+}
+
+/** Renk örneği şeridi. Örneklerin ÜSTÜNE metin yazılmaz — bkz. style.css notu. */
+function swatchRow(colors) {
+  const row = document.createElement("span");
+  row.className = "palette-sw-row";
+  for (const c of colors || []) {
+    const sw = document.createElement("span");
+    sw.className = "palette-sw";
+    // Keyfi kullanıcı rengi: bu dosyadaki tek meşru satır-içi stil kullanımı,
+    // çünkü değer çalışma anında belli oluyor ve CSS'e yazılamıyor.
+    sw.style.background = c.hex;
+    sw.title = `${c.name} · ${c.hex}`;
+    row.appendChild(sw);
+  }
+  return row;
+}
+
+function paletteTitleOf(pal) {
+  return pal.name || HARMONY_LABELS[pal.mode] || pal.mode;
+}
+
+function renderPalettePanel() {
+  const chip = $("palette-chip");
+  if (!activePalette) {
+    chip.hidden = true;
+    $("palette-strength-row").hidden = true;
+    $("palette-mode-note").hidden = true;
+    return;
+  }
+  chip.hidden = false;
+  const holder = $("palette-chip-sw");
+  holder.innerHTML = "";
+  holder.appendChild(swatchRow(activePalette.colors));
+  $("palette-label").textContent =
+    `${paletteTitleOf(activePalette)} · ${STRENGTH_LABELS[paletteStrength]}`;
+
+  $("palette-strength-row").hidden = false;
+  selectInGroup("#palette-strength",
+    document.querySelector(`#palette-strength button[data-strength="${paletteStrength}"]`));
+
+  // Aynı palet iki farklı ifadeyle gidiyor: üretimde "bu renkleri kullan",
+  // düzenlemede "renkleri kaydır, kompozisyonu koru". Kullanıcı hangisinin
+  // geçerli olduğunu görmeli.
+  const note = $("palette-mode-note");
+  note.hidden = false;
+  note.textContent = source
+    ? "Referans görselde renk derecelendirmesi olarak uygulanır — kompozisyon korunur."
+    : "Renk yönlendirmesi prompt'un sonuna İngilizce eklenir.";
+}
+
+function readPaletteOpts() {
+  if (!activePalette) return {};
+  const opts = {
+    palette_hex: activePalette.seed,
+    palette_mode: activePalette.mode,
+    palette_strength: paletteStrength,
+  };
+  // Kayıtlı palette id de gider: sunucu adları kaydın dondurulmuş halinden
+  // okur, böylece kütüphanede görünen ad ile prompt'a giden ad ayrışmaz.
+  if (activePalette.id) opts.palette_id = activePalette.id;
+  return opts;
+}
+
+function applyPalette({ seed, mode, colors, name = "", strength = null, id = null }) {
+  activePalette = { seed, mode, colors, name, id };
+  if (strength) paletteStrength = strength;
+  renderPalettePanel();
+  paletteStatus(`Palet uygulandı: ${paletteTitleOf(activePalette)}`);
+}
+
+function clearPalette() {
+  activePalette = null;
+  renderPalettePanel();
+  paletteStatus("Palet kaldırıldı.");
+}
+
+// ── Öneriler ────────────────────────────────────────────────────────
+function scheduleSuggest() {
+  clearTimeout(suggestTimer);
+  suggestTimer = setTimeout(fetchSuggestions, 220);
+}
+
+async function fetchSuggestions() {
+  const token = ++suggestToken;
+  paletteModalStatus("Paletler hesaplanıyor…");
+  try {
+    const res = await fetch("/api/palette/suggest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hex: pickHex() }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(detailText(err) || `Hata (${res.status})`);
+    }
+    const body = await res.json();
+    // Sıra dışı yanıt guard'ı (logoPreviewToken deseni). DOM'dan ÖNCE state'i
+    // korumak asıl önemli olan: geç gelen bir yanıt kullanıcının sonra
+    // KAYDEDECEĞİ palete yanlış renk/isim yazarsa hata kalıcı olur.
+    if (token !== suggestToken) return;
+    suggestions = body.items || [];
+    suggestSeed = body.seed;
+    selectedSuggestion = null;
+    renderSuggestions();
+    paletteModalStatus("");
+  } catch (e) {
+    if (token !== suggestToken) return;
+    suggestions = [];
+    suggestSeed = "";
+    selectedSuggestion = null;
+    renderSuggestions();
+    paletteModalStatus(e.message);
+  }
+}
+
+function makeChoiceButton({ title, colors, subtitle }) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "palette-choice";
+  const names = (colors || []).map((c) => c.name).join(", ");
+  // Bilgi hiçbir zaman renk algısına bağlı olmasın: ad + hex her zaman metinde.
+  btn.setAttribute("aria-label", `${title}: ${names}`);
+
+  const titleEl = document.createElement("span");
+  titleEl.className = "palette-choice-title";
+  titleEl.textContent = title;
+  btn.appendChild(titleEl);
+  btn.appendChild(swatchRow(colors));
+
+  const sub = document.createElement("span");
+  sub.className = "palette-choice-names";
+  sub.textContent = subtitle === undefined ? names : subtitle;
+  btn.appendChild(sub);
+  return btn;
+}
+
+function emptyNote(grid, text) {
+  const p = document.createElement("p");
+  p.className = "palette-empty";
+  p.textContent = text;
+  grid.appendChild(p);
+}
+
+function renderSuggestions() {
+  const grid = $("palette-suggestions");
+  grid.innerHTML = "";
+  if (!suggestions.length) {
+    emptyNote(grid, "Palet önerisi yok — bir tema rengi seç.");
+  } else {
+    for (const item of suggestions) {
+      const btn = makeChoiceButton({
+        title: HARMONY_LABELS[item.mode] || item.mode,
+        colors: item.colors,
+      });
+      btn.setAttribute("aria-pressed", String(selectedSuggestion === item.mode));
+      btn.addEventListener("click", () => {
+        selectedSuggestion = item.mode;
+        renderSuggestions();
+      });
+      grid.appendChild(btn);
+    }
+  }
+  const ready = currentSuggestion() !== null;
+  $("palette-save").disabled = !ready;
+  $("palette-apply").disabled = !ready;
+}
+
+function currentSuggestion() {
+  return suggestions.find((s) => s.mode === selectedSuggestion) || null;
+}
+
+// ── Kütüphane ───────────────────────────────────────────────────────
+async function loadPalettes() {
+  try {
+    const res = await fetch("/api/palettes");
+    if (!res.ok) throw new Error(`Hata (${res.status})`);
+    paletteCache = (await res.json()).items || [];
+  } catch {
+    paletteCache = [];
+    paletteStatus("Palet kütüphanesi alınamadı.");
+  }
+  if (!$("palette-modal").hidden && paletteTab === "saved") renderPaletteLibrary();
+}
+
+function renderPaletteLibrary() {
+  const grid = $("palette-lib-grid");
+  grid.innerHTML = "";
+  if (!paletteCache.length) {
+    emptyNote(grid, "Henüz kayıtlı palet yok — \"Yeni palet\" sekmesinden oluştur.");
+    return;
+  }
+  for (const rec of paletteCache) {
+    const cell = document.createElement("div");
+    cell.className = "palette-lib-cell";
+
+    const btn = makeChoiceButton({
+      title: rec.name,
+      colors: rec.colors,
+      subtitle: `${HARMONY_LABELS[rec.mode] || rec.mode} · ` +
+                `${STRENGTH_LABELS[rec.strength] || rec.strength}`,
+    });
+    btn.addEventListener("click", () => {
+      // Kayıttaki renkler zaten dondurulmuş — yeniden hesaplamaya gerek yok.
+      applyPalette({ seed: rec.seed, mode: rec.mode, colors: rec.colors,
+                     name: rec.name, strength: rec.strength, id: rec.id });
+      closePaletteModal();
+    });
+    cell.appendChild(btn);
+
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "palette-lib-del";
+    del.setAttribute("aria-label", `${rec.name} paletini sil`);
+    del.title = "Paleti sil";
+    del.textContent = "×";
+    del.addEventListener("click", (e) => { e.stopPropagation(); deletePalette(rec); });
+    cell.appendChild(del);
+
+    grid.appendChild(cell);
+  }
+}
+
+async function savePalette() {
+  const item = currentSuggestion();
+  if (!item) return;
+  const name = await promptDialog(
+    "Paleti kaydet",
+    "\"Kayıtlı paletler\" sekmesinden sonraki üretimlerde yeniden seçebilirsin.",
+    { okLabel: "Kaydet" });
+  if (!name) return;
+  try {
+    const res = await fetch("/api/palettes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, seed: suggestSeed, mode: item.mode,
+                             strength: paletteStrength }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(detailText(err) || `Hata (${res.status})`);
+    }
+    const saved = (await res.json()).palette;
+    await loadPalettes();
+    applyPalette({ seed: saved.seed, mode: saved.mode, colors: saved.colors,
+                   name: saved.name, strength: saved.strength, id: saved.id });
+    closePaletteModal();
+  } catch (e) {
+    paletteModalStatus(e.message);
+  }
+}
+
+async function deletePalette(rec) {
+  const ok = await confirmDialog(
+    `"${rec.name}" paletini sil?`,
+    "Palet kütüphaneden kaldırılır. Üretilmiş görseller etkilenmez.");
+  if (!ok) return;
+  try {
+    const res = await fetch(`/api/palettes/${rec.id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(`Hata (${res.status})`);
+    await loadPalettes();
+    renderPaletteLibrary();
+    paletteModalStatus("Palet silindi.");
+  } catch (e) {
+    paletteModalStatus(e.message);
+  }
+}
+
+// ── Modal ───────────────────────────────────────────────────────────
+function setPaletteTab(tab) {
+  paletteTab = tab;
+  $("palette-new").hidden = tab !== "new";
+  $("palette-saved").hidden = tab !== "saved";
+  selectInGroup("#palette-tabs",
+    document.querySelector(`#palette-tabs button[data-ptab="${tab}"]`));
+  if (tab === "saved") renderPaletteLibrary();
+}
+
+function openPaletteModal() {
+  // openLogoModal dersi: HER kontrol açılışta varsayılana döndürülmeli,
+  // yoksa modal önceki tohumu/seçimi sızdırır.
+  setPickFromHex(activePalette ? activePalette.seed : DEFAULT_SEED);
+  renderPicker();
+  suggestions = [];
+  suggestSeed = "";
+  selectedSuggestion = null;
+  renderSuggestions();
+  paletteModalStatus("");
+  setPaletteTab("new");
+  $("palette-modal").hidden = false;
+  fetchSuggestions();
+}
+
+function closePaletteModal() { $("palette-modal").hidden = true; }
+
+$("palette-btn").addEventListener("click", openPaletteModal);
+$("palette-close").addEventListener("click", closePaletteModal);
+$("palette-clear").addEventListener("click", clearPalette);
+$("palette-save").addEventListener("click", savePalette);
+$("palette-apply").addEventListener("click", () => {
+  const item = currentSuggestion();
+  if (!item) return;
+  // Tohum sunucunun döndürdüğü normalize edilmiş değer — arada input
+  // değiştiyse önerilerle tutarsız bir palet uygulanmasın.
+  applyPalette({ seed: suggestSeed, mode: item.mode, colors: item.colors });
+  closePaletteModal();
+});
+
+$("palette-modal").addEventListener("click", (e) => {
+  if (e.target.hasAttribute("data-palette-close")) closePaletteModal();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && $("confirm-modal").hidden && !$("palette-modal").hidden) {
+    closePaletteModal();
+  }
+});
+
+$("palette-tabs").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-ptab]");
+  if (btn) setPaletteTab(btn.dataset.ptab);
+});
+
+// ── Seçici olayları ─────────────────────────────────────────────────
+// Sürükleme: pointer capture kullanılıyor — window'a dinleyici ekleyip
+// kaldırmaya gerek kalmıyor, imleç alanın dışına çıksa da takip sürüyor ve
+// sızdırılacak bir dinleyici olmuyor.
+const paletteField = $("palette-field");
+paletteField.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  paletteField.setPointerCapture(e.pointerId);
+  setPickFromPoint(e.clientX, e.clientY);
+});
+paletteField.addEventListener("pointermove", (e) => {
+  if (paletteField.hasPointerCapture(e.pointerId)) setPickFromPoint(e.clientX, e.clientY);
+});
+
+// Alan klavyeyle de ayarlanabilir: yalnızca fare ile çalışan bir renk seçici
+// klavye kullanıcısı için ton kaydırıcısı + hex alanına mahkûm ederdi.
+const PICK_STEP = 0.01;
+const PICK_STEP_BIG = 0.1;
+paletteField.addEventListener("keydown", (e) => {
+  const step = e.shiftKey ? PICK_STEP_BIG : PICK_STEP;
+  const moves = {
+    ArrowLeft: [-step, 0], ArrowRight: [step, 0],
+    ArrowUp: [0, step], ArrowDown: [0, -step],
+  };
+  const move = moves[e.key];
+  if (!move) return;
+  e.preventDefault();
+  pick.s = Math.min(1, Math.max(0, pick.s + move[0]));
+  pick.v = Math.min(1, Math.max(0, pick.v + move[1]));
+  renderPicker();
+  scheduleSuggest();
+});
+
+$("palette-hue").addEventListener("input", () => {
+  pick.h = Number($("palette-hue").value);
+  renderPicker();
+  scheduleSuggest();
+});
+
+// Marka rehberi sana tekerlek konumu değil hex verir; elle yazılabilmeli.
+// syncHexField=false: kullanıcı yazarken girdiyi normalize edip imleci
+// zıplatmamak için.
+$("palette-seed-hex").addEventListener("input", () => {
+  if (!setPickFromHex($("palette-seed-hex").value)) return;
+  renderPicker({ syncHexField: false });
+  scheduleSuggest();
+});
+$("palette-seed-hex").addEventListener("blur", () => renderPicker());
+
+// EyeDropper yalnızca Chromium'da var; yoksa buton hiç gösterilmez.
+if (window.EyeDropper) {
+  $("palette-eyedrop").hidden = false;
+  $("palette-eyedrop").addEventListener("click", async () => {
+    try {
+      const { sRGBHex } = await new EyeDropper().open();
+      if (setPickFromHex(sRGBHex)) { renderPicker(); scheduleSuggest(); }
+    } catch {
+      // Kullanıcı Esc ile vazgeçti — hata değil, sessizce geç.
+    }
+  });
+}
+
+$("palette-strength").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-strength]");
+  if (!btn) return;
+  paletteStrength = btn.dataset.strength;
+  renderPalettePanel();
 });
 
 // ── Azure ayarları (admin, write-only) ──────────────────────────────
@@ -1188,7 +2000,7 @@ $("settings-modal").addEventListener("click", (e) => {
   if (e.target.hasAttribute("data-close")) closeSettings();
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !$("settings-modal").hidden) closeSettings();
+  if (e.key === "Escape" && $("confirm-modal").hidden && !$("settings-modal").hidden) closeSettings();
 });
 
 $("go").addEventListener("click", run);
@@ -1199,3 +2011,6 @@ loadSettings(true);
 loadAssets("logos");
 loadAssets("mottos");
 loadAssets("banners");
+// Palet varsayılan olarak KAPALI: açılışta öneri istenmez, prompt'a hiçbir
+// şey eklenmez. Yalnızca kütüphane çekilir ki "Kayıtlı paletler" hazır olsun.
+loadPalettes();

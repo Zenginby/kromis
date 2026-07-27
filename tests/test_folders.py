@@ -78,8 +78,88 @@ def test_create_folder_rejects_blank_name(tmp_path, monkeypatch):
 
 def test_create_folder_rejects_unknown_field(tmp_path, monkeypatch):
     c = _client(tmp_path, monkeypatch)
-    r = c.post("/api/folders", json={"name": "x", "parent_id": "abc"})
+    r = c.post("/api/folders", json={"name": "x", "color": "red"})
     assert r.status_code == 422
+
+
+# ── alt klasörler (parent_id) ───────────────────────────────────────────
+def test_create_subfolder_records_parent(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    parent = _new_folder(c, "Kurban")
+    r = c.post("/api/folders", json={"name": "Afiş", "parent_id": parent})
+    assert r.status_code == 200, r.text
+    child = r.json()["folder"]
+    assert child["parent_id"] == parent
+
+    items = {f["id"]: f for f in c.get("/api/folders").json()["items"]}
+    assert items[child["id"]]["parent_id"] == parent
+    assert items[parent]["parent_id"] is None       # kök klasör
+    assert items[parent]["child_count"] == 1
+    assert items[child["id"]]["child_count"] == 0
+
+
+def test_create_subfolder_with_unknown_parent_404(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    r = c.post("/api/folders", json={"name": "Afiş", "parent_id": "deadbeef0123"})
+    assert r.status_code == 404
+
+
+def test_subfolder_images_do_not_leak_into_parent(tmp_path, monkeypatch):
+    """Ebeveynin içi yalnızca kendi görselleri; alt klasörünkiler ayrı kalır."""
+    c = _client(tmp_path, monkeypatch)
+    parent = _new_folder(c, "Kurban")
+    child = c.post("/api/folders", json={"name": "Afiş", "parent_id": parent}).json()["folder"]["id"]
+    in_parent = _generate(c, parent, prompt="ebeveyn").json()["images"][0]["id"]
+    in_child = _generate(c, child, prompt="çocuk").json()["images"][0]["id"]
+
+    assert [r["id"] for r in c.get(f"/api/history?folder_id={parent}").json()["images"]] == [in_parent]
+    assert [r["id"] for r in c.get(f"/api/history?folder_id={child}").json()["images"]] == [in_child]
+    items = {f["id"]: f for f in c.get("/api/folders").json()["items"]}
+    assert items[parent]["count"] == 1 and items[child]["count"] == 1
+
+
+def test_delete_parent_removes_subtree_and_unfiles_all_images(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    parent = _new_folder(c, "Kurban")
+    child = c.post("/api/folders", json={"name": "Afiş", "parent_id": parent}).json()["folder"]["id"]
+    keep = _new_folder(c, "Kalan")
+    p_img = _generate(c, parent).json()["images"][0]
+    c_img = _generate(c, child).json()["images"][0]
+
+    r = c.delete(f"/api/folders/{parent}")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert set(body["deleted"]) == {parent, child}
+    assert body["folders"] == 2
+    assert body["unfiled"] == 2
+
+    assert [f["id"] for f in c.get("/api/folders").json()["items"]] == [keep]
+    # görsellerin hiçbiri silinmedi, ikisi de kökte
+    root_ids = [r["id"] for r in c.get("/api/history").json()["images"]]
+    assert p_img["id"] in root_ids and c_img["id"] in root_ids
+    for rec in (p_img, c_img):
+        assert (tmp_path / "output" / rec["filename"]).exists()
+
+
+def test_delete_deep_chain_removes_every_level(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    a = _new_folder(c, "A")
+    b = c.post("/api/folders", json={"name": "B", "parent_id": a}).json()["folder"]["id"]
+    d = c.post("/api/folders", json={"name": "D", "parent_id": b}).json()["folder"]["id"]
+
+    body = c.delete(f"/api/folders/{a}").json()
+    assert set(body["deleted"]) == {a, b, d}
+    assert c.get("/api/folders").json()["items"] == []
+
+
+def test_delete_subfolder_keeps_parent(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    parent = _new_folder(c, "Kurban")
+    child = c.post("/api/folders", json={"name": "Afiş", "parent_id": parent}).json()["folder"]["id"]
+    c.delete(f"/api/folders/{child}")
+    items = c.get("/api/folders").json()["items"]
+    assert [f["id"] for f in items] == [parent]
+    assert items[0]["child_count"] == 0
 
 
 # ── görselleri klasöre kaydetme ve filtreleme ──────────────────────────
@@ -227,6 +307,103 @@ def test_move_rejects_unknown_field(tmp_path, monkeypatch):
     assert r.status_code == 422
 
 
+# ── çoklu seçim: toplu taşıma ve toplu silme ───────────────────────────
+def test_bulk_move_files_all_selected_images(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    fid = _new_folder(c)
+    ids = [_generate(c, prompt=f"g{i}").json()["images"][0]["id"] for i in range(3)]
+    keep = _generate(c, prompt="kalan").json()["images"][0]["id"]
+
+    r = c.patch("/api/images", json={"ids": ids, "folder_id": fid})
+    assert r.status_code == 200, r.text
+    assert r.json() == {"moved": 3, "folder_id": fid}
+
+    in_folder = [x["id"] for x in c.get(f"/api/history?folder_id={fid}").json()["images"]]
+    assert sorted(in_folder) == sorted(ids)
+    assert [x["id"] for x in c.get("/api/history").json()["images"]] == [keep]
+
+
+def test_bulk_move_to_root_with_null_folder(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    fid = _new_folder(c)
+    ids = [_generate(c, fid, prompt=f"g{i}").json()["images"][0]["id"] for i in range(2)]
+    assert c.patch("/api/images", json={"ids": ids, "folder_id": None}).json()["moved"] == 2
+    assert c.get(f"/api/history?folder_id={fid}").json()["images"] == []
+    assert len(c.get("/api/history").json()["images"]) == 2
+
+
+def test_bulk_move_counts_only_known_ids(tmp_path, monkeypatch):
+    """Bilinmeyen id sessizce atlanır; sayı gerçekten taşınanı verir."""
+    c = _client(tmp_path, monkeypatch)
+    fid = _new_folder(c)
+    real = _generate(c).json()["images"][0]["id"]
+    r = c.patch("/api/images", json={"ids": [real, "aabbccddeeff"], "folder_id": fid})
+    assert r.json()["moved"] == 1
+
+
+def test_bulk_move_with_no_known_ids_404(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    assert c.patch("/api/images", json={"ids": ["aabbccddeeff"]}).status_code == 404
+
+
+def test_bulk_move_to_unknown_folder_404(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    rec = _generate(c).json()["images"][0]
+    r = c.patch("/api/images", json={"ids": [rec["id"]], "folder_id": "deadbeef0123"})
+    assert r.status_code == 404
+
+
+def test_bulk_endpoints_reject_empty_and_unknown_fields(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    assert c.patch("/api/images", json={"ids": []}).status_code == 422
+    assert c.request("DELETE", "/api/images", json={"ids": []}).status_code == 422
+    r = c.patch("/api/images", json={"ids": ["aabbccddeeff"], "folder": "x"})
+    assert r.status_code == 422
+
+
+def test_bulk_delete_removes_files_and_records(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    recs = [_generate(c, prompt=f"g{i}").json()["images"][0] for i in range(3)]
+    keep = _generate(c, prompt="kalan").json()["images"][0]
+    doomed = recs[:2]
+
+    r = c.request("DELETE", "/api/images", json={"ids": [x["id"] for x in doomed]})
+    assert r.status_code == 200, r.text
+    assert r.json() == {"deleted": 2}
+
+    left = [x["id"] for x in c.get("/api/history").json()["images"]]
+    assert sorted(left) == sorted([recs[2]["id"], keep["id"]])
+    for rec in doomed:
+        assert not (tmp_path / "output" / rec["filename"]).exists()
+    assert (tmp_path / "output" / recs[2]["filename"]).exists()
+
+
+def test_bulk_delete_unknown_ids_404(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    _generate(c)
+    assert c.request("DELETE", "/api/images",
+                     json={"ids": ["aabbccddeeff"]}).status_code == 404
+    assert len(c.get("/api/history").json()["images"]) == 1
+
+
+def test_bulk_delete_updates_folder_counts(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    fid = _new_folder(c)
+    ids = [_generate(c, fid, prompt=f"g{i}").json()["images"][0]["id"] for i in range(3)]
+    c.request("DELETE", "/api/images", json={"ids": ids[:2]})
+    items = c.get("/api/folders").json()["items"]
+    assert items[0]["count"] == 1
+
+
+def test_bulk_helpers_guard_bad_ids(tmp_path, monkeypatch):
+    out = str(tmp_path / "output")
+    storage.save(b"\x89PNG", {"prompt": "x"}, out, now="2026-07-25T10:00:00")
+    for bad in ("../../etc/passwd", "not-hex", ""):
+        assert storage.set_folder_many([bad], None, out) == 0
+        assert storage.delete_many([bad], out) == 0
+    assert len(storage.list_history(out)) == 1
+
+
 def test_set_folder_guards_bad_image_id(tmp_path, monkeypatch):
     out = str(tmp_path / "output")
     storage.save(b"\x89PNG", {"prompt": "x"}, out, now="2026-07-25T10:00:00")
@@ -283,6 +460,22 @@ def test_legacy_records_without_folder_id_are_treated_as_root(tmp_path, monkeypa
     assert ids == ["aabbccddeeff"]
 
 
+def test_legacy_folders_without_parent_id_are_treated_as_root(tmp_path, monkeypatch):
+    """v1.6 kayıtlarında parent_id alanı hiç yok — kök klasör kabul edilmeli (migration yok)."""
+    out = tmp_path / "output"
+    out.mkdir(parents=True)
+    (out / "folders.json").write_text(json.dumps([
+        {"id": "aabbccddeeff", "name": "Eski klasör", "created_at": "2026-07-25T10:00:00"},
+    ]), encoding="utf-8")
+    c = _client(tmp_path, monkeypatch)
+    items = c.get("/api/folders").json()["items"]
+    assert items[0]["parent_id"] is None
+    assert items[0]["child_count"] == 0
+    # eski klasör hâlâ hedef alınabiliyor ve silinebiliyor
+    assert _generate(c, "aabbccddeeff").status_code == 200
+    assert c.delete("/api/folders/aabbccddeeff").json()["unfiled"] == 1
+
+
 def test_corrupt_folders_file_is_tolerated(tmp_path, monkeypatch):
     out = tmp_path / "output"
     out.mkdir(parents=True)
@@ -304,3 +497,11 @@ def test_unfile_folder_returns_zero_when_nothing_matches(tmp_path, monkeypatch):
     out = str(tmp_path / "output")
     storage.save(b"\x89PNG", {"prompt": "x", "folder_id": None}, out, now="2026-07-25T10:00:00")
     assert storage.unfile_folder("aabbccddeeff", out) == 0
+
+
+def test_descendants_of_unknown_folder_is_empty(tmp_path, monkeypatch):
+    out = str(tmp_path / "output")
+    folders.create("A", out, now="2026-07-25T10:00:00")
+    assert folders.descendants("deadbeef0123", out) == []
+    assert folders.delete_tree("deadbeef0123", out) == []
+    assert len(folders.list_folders(out)) == 1

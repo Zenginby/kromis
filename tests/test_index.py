@@ -84,3 +84,31 @@ def test_static_cache_busters_are_bumped_together():
     r = TestClient(appmod.app).get("/")
     versions = set(re.findall(r"\?v=(\d+)", r.text))
     assert len(versions) == 1, f"style.css ve app.js sürümleri ayrışmış: {versions}"
+
+
+def test_edit_request_forwards_every_palette_option():
+    """Düzenleme dalı palet alanlarını ELLE saymamalı.
+
+    JSON dalı `...pal` ile hepsini gönderirken multipart dalı üç alanı tek tek
+    sayıyordu ve `palette_id` düşüyordu: sunucu kayıtlı paletin DONDURULMUŞ
+    adlarını kullanamıyor, (seed, mode)'dan çevrimdışı yeniden hesaplıyordu —
+    kütüphanede görünen ad ile prompt'a giden ad ayrışıyordu. Sunucu tarafı
+    doğruydu (tests/test_palette_route.py: saved palette id'yi onurlandırıyor),
+    o yüzden hatayı yalnızca istemci tarafı bir iddia yakalayabilir.
+    """
+    js = TestClient(appmod.app).get("/static/app.js").text
+    assert 'fd.append("palette_hex"' not in js, (
+        "palet alanları elle sayılmış — yeni bir alan eklendiğinde yine düşer")
+    assert re.search(r"Object\.entries\(pal\)", js), (
+        "düzenleme dalı palet seçeneklerinin tamamını dolaşarak eklemeli")
+
+
+def test_ui_surfaces_a_palette_that_did_not_fit_in_the_prompt():
+    """Ek 4000 karakter sınırına sığmadıysa kullanıcı bunu GÖRMELİ.
+
+    Kayıtta palet var ama prompt'a girmedi; bayrak okunmazsa arayüz paleti
+    uygulanmış gösterir ve kullanıcı renksiz sonucu açıklayamaz.
+    """
+    js = TestClient(appmod.app).get("/static/app.js").text
+    assert re.search(r"palette\.applied\s*===\s*false", js), (
+        "applied=false durumu arayüzde ele alınmıyor")

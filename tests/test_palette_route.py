@@ -324,7 +324,22 @@ def test_palette_suffix_is_dropped_when_the_prompt_is_already_at_the_limit(
     assert sent[0] == long_prompt
     assert len(sent[0]) <= appmod.MAX_PROMPT_CHARS
     # Palet yine de kayda geçer: "istedim ama sığmadı" görünür kalsın.
-    assert r.json()["images"][0]["palette"]["seed"] == SEED
+    record = r.json()["images"][0]
+    assert record["palette"]["seed"] == SEED
+    # ...ama "istedim" ile "oldu" AYIRT EDİLEBİLİR olmalı: bayrak olmadan
+    # arayüz düşen eki uygulanmış paletten ayıramaz ve sessizce renksiz
+    # görsel gösterir (bkz. 15c6646 — bayat sunucu sapmasını yüzeye çıkarma).
+    assert record["palette"]["applied"] is False
+    # prompt_sent sözleşmesi: "Azure'a giden metin, YALNIZCA prompt'tan
+    # farklıysa" (bkz. storage.save). Ek düştüyse metin birebir aynı.
+    assert record["prompt_sent"] is None
+
+
+def test_an_applied_palette_is_marked_as_applied(tmp_path, monkeypatch):
+    """`applied` bayrağının karşı ucu: normal yolda True olmalı."""
+    client, _ = _client(tmp_path, monkeypatch)
+    record = _gen(client, palette_hex=SEED, palette_mode="triad").json()["images"][0]
+    assert record["palette"]["applied"] is True
 
 
 @pytest.mark.parametrize("field,bad", [

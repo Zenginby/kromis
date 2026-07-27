@@ -229,6 +229,12 @@ def _palette_prompt(prompt: str, seed: str | None, mode: str, strength: str,
     için birleşik metin 4000'i aşabilir. Bu durumda EK DÜŞÜRÜLÜR, kullanıcının
     metni asla kırpılmaz ve istek reddedilmez: paletin görsel üretimini bloke
     etmesi, renk yönlendirmesinin kaybolmasından kötü.
+
+    Düşen ek `applied: False` ile İŞARETLENİR. Kayıt yine tutulur ("istedim")
+    ama arayüz bunu uygulanmış bir paletten ayırabilmek zorunda; ayıramazsa
+    kullanıcı renksiz sonucu açıklayamaz. Bayrağı çıkarmak yerine koymak, aynı
+    sessiz-sapma hatasının bindirme seçeneklerinde yaşanmış halinin tekrarı
+    olmasını engelliyor (bkz. 15c6646).
     """
     if not seed:
         return prompt, None
@@ -240,13 +246,13 @@ def _palette_prompt(prompt: str, seed: str | None, mode: str, strength: str,
     else:
         colors = _resolve_palette(seed, mode, offline=True)
     suffix = palette.prompt_suffix(colors, strength, task=task)
-    record = {"seed": seed, "mode": mode, "strength": strength, "colors": colors}
+    applied = len(prompt) + len(suffix) <= MAX_PROMPT_CHARS
+    record = {"seed": seed, "mode": mode, "strength": strength,
+              "colors": colors, "applied": applied}
     if saved:
         record["id"] = saved["id"]
         record["name"] = saved.get("name", "")
-    if len(prompt) + len(suffix) > MAX_PROMPT_CHARS:
-        return prompt, record
-    return prompt + suffix, record
+    return (prompt + suffix if applied else prompt), record
 
 
 @app.post("/api/generate")
@@ -263,7 +269,9 @@ def generate(req: GenerateRequest) -> dict:
         storage.save(img, {"prompt": req.prompt, "size": req.size,
                            "quality": req.quality, "parent_id": None,
                            "folder_id": folder_id, "palette": pal,
-                           "prompt_sent": prompt_sent if pal else None},
+                           # Ek düştüyse metin prompt'un birebir aynısı; storage
+                           # sözleşmesi "yalnızca farklıysa" diyor (bkz. save).
+                           "prompt_sent": prompt_sent if pal and pal["applied"] else None},
                      OUTPUT_DIR, now=_now())
         for img in images
     ]
@@ -353,7 +361,7 @@ async def edit(
         storage.save(img, {"prompt": prompt, "size": size, "quality": quality,
                            "parent_id": parent_id, "folder_id": target_folder,
                            "palette": pal,
-                           "prompt_sent": prompt_sent if pal else None},
+                           "prompt_sent": prompt_sent if pal and pal["applied"] else None},
                      OUTPUT_DIR, now=_now())
         for img in images
     ]

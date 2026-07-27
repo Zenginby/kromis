@@ -272,11 +272,12 @@ async function run() {
     if (source.kind === "upload") fd.append("file", source.file);
     else fd.append("source_id", source.id);
     if (currentFolder) fd.append("folder_id", currentFolder.id);
-    if (pal.palette_hex) {
-      fd.append("palette_hex", pal.palette_hex);
-      fd.append("palette_mode", pal.palette_mode);
-      fd.append("palette_strength", pal.palette_strength);
-    }
+    // Alanlar TEK TEK sayılmaz: JSON dalı `...pal` ile hepsini gönderirken
+    // burada elle saymak `palette_id`'yi düşürmüştü — kayıtlı palet
+    // düzenlemede dondurulmuş adlarını kaybediyor, sunucu (seed, mode)'dan
+    // çevrimdışı yeniden hesaplıyordu. Anahtarları dolaşmak iki dalı eşitler
+    // ve ileride eklenecek alanlar da kendiliğinden gider.
+    for (const [key, value] of Object.entries(pal)) fd.append(key, value);
     // ek referanslar: sunucu sırayı ana görsel → yüklemeler → galeri id'leri olarak kurar
     for (const item of extras) {
       if (item.kind === "upload") fd.append("extra_files", item.file);
@@ -314,6 +315,13 @@ async function run() {
     if (pal.palette_hex && images[0] && !images[0].palette) {
       statusEl.textContent =
         "Palet uygulanmadı: sunucu eski sürüm görünüyor — ./run.sh ile yeniden başlat.";
+    } else if (images[0] && images[0].palette && images[0].palette.applied === false) {
+      // Ek, prompt karakter sınırına sığmadığı için düşürüldü. Kayıtta palet
+      // görünür ama prompt'a girmedi; söylenmezse kullanıcı renksiz sonucu
+      // açıklayamaz. Eski kayıtlarda alan yok → `=== false` bilinçli.
+      statusEl.textContent =
+        "Palet prompt'a sığmadı (4000 karakter sınırı): görsel renk " +
+        "yönlendirmesi olmadan üretildi. Prompt'u kısaltıp tekrar dene.";
     }
     ok = true;
     await loadHistory();

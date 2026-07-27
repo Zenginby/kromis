@@ -337,6 +337,23 @@ _LADDERS = {
 }
 
 
+def _distinct(candidate: str, name: str, rank: int, taken: set[str]) -> str:
+    """Aday ad zaten alınmışsa tekilliği koruyan bir sonrakine geçer.
+
+    Merdiven sözcüğü tek başına yetmediği iki durum var: (a) aday, listede
+    zaten var olan BAŞKA bir adla çakışıyor, (b) sözcük adın içinde olduğu
+    için ad hiç değişmedi ve grubun bir diğer üyesiyle aynı kaldı.
+    """
+    if candidate not in taken:
+        return candidate
+    alternative = f"shade {rank + 1} {name}"
+    counter = 2
+    while alternative in taken:
+        alternative = f"shade {rank + 1} {name} {counter}"
+        counter += 1
+    return alternative
+
+
 def dedupe_names(colors: list[dict]) -> list[dict]:
     """Aynı ada düşen renkleri açıklık sırasına göre ayırır (yeni liste döner).
 
@@ -348,12 +365,18 @@ def dedupe_names(colors: list[dict]) -> list[dict]:
 
     Çözüm gruptaki renkleri açıklığa göre sıralayıp "dark/light" gibi bir
     sözcük eklemek: tekilliği garanti eder, doğal okunur ve bilgi taşır.
+
+    Üretilen ad LİSTENİN TAMAMINA karşı kontrol edilir, yalnızca kendi grubuna
+    karşı değil: ["dark blue", "blue", "blue"] girdisinde merdiven ikinci
+    girdiyi "dark blue" yapıp birinciyle çakıştırıyordu.
     """
     groups: dict[str, list[int]] = {}
     for index, color in enumerate(colors):
         groups.setdefault(color["name"], []).append(index)
 
     renamed = list(colors)
+    # Tek başına duran adlar dokunulmadan kalacağı için baştan "alınmış" sayılır.
+    taken = {name for name, indexes in groups.items() if len(indexes) < 2}
     for name, indexes in groups.items():
         if len(indexes) < 2:
             continue
@@ -362,9 +385,11 @@ def dedupe_names(colors: list[dict]) -> list[dict]:
         for rank, index in enumerate(by_lightness):
             # Merdiven yoksa (çok büyük grup) sırayı sayıyla ver — tekillik şart.
             word = ladder[rank] if ladder else f"shade {rank + 1}"
-            if word in name:
-                continue
-            renamed[index] = {**colors[index], "name": f"{word} {name}"}
+            # Sözcük adın içindeyse tekrar etme ("dark dark rose").
+            candidate = name if word in name else f"{word} {name}"
+            candidate = _distinct(candidate, name, rank, taken)
+            taken.add(candidate)
+            renamed[index] = {**colors[index], "name": candidate}
     return renamed
 
 

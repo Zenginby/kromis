@@ -498,3 +498,42 @@ def test_legacy_history_records_without_palette_are_tolerated(tmp_path, monkeypa
     record = r.json()["images"][0]
     assert record["id"] == "abc123abc123"
     assert record.get("palette") is None
+
+
+# ── Bozuk palettes.json ─────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("broken", [
+    {"mode": "bogus", "colors": []},                    # geçersiz mod
+    {"seed": "kırmızı", "colors": []},                  # geçersiz hex
+    {"mode": None, "seed": None, "colors": []},         # alanlar boş
+    {"colors": [{"hex": "#c86a3c"}]},                   # ad yok
+    {"colors": "yeşil"},                                # liste bile değil
+    {"colors": [{"name": "copper orange"}]},            # hex yok
+])
+def test_a_corrupt_saved_palette_does_not_break_generation(tmp_path, monkeypatch, broken):
+    """Elle düzenlenmiş/bozulmuş kayıt üretimi 500'e düşürmemeli.
+
+    Bütün okuma katmanları bozuk JSON'da boş listeye düşüyor (palette_store._read,
+    storage._read_history, folders._read); kaydın İÇERİĞİ tek istisnaydı:
+    `mode`/`seed` doğrudan palette.harmony'ye gidiyor, ValueID yakalanmadan
+    500 dönüyordu. Silinmiş palet zaten bloke etmiyor (bkz. yukarıdaki test) —
+    bozuk palet de etmemeli.
+    """
+    client, sent = _client(tmp_path, monkeypatch)
+    output = tmp_path / "output"
+    output.mkdir(parents=True, exist_ok=True)
+    record = {"id": "a1b2c3d4e5f6", "name": "Bozuk", "seed": SEED,
+              "mode": "triad", "strength": "balanced", **broken}
+    (output / "palettes.json").write_text(json.dumps([record]), encoding="utf-8")
+
+    r = _gen(client, palette_hex=SEED, palette_mode="analogic",
+             palette_id="a1b2c3d4e5f6")
+    assert r.status_code == 200, r.text
+    assert "Color direction" in sent[0]
+
+
+def test_the_prompt_limit_is_declared_once(tmp_path, monkeypatch):
+    """Sınır iki yerde ayrı ayrı yazılırsa biri değişip diğeri kalır."""
+    field = appmod.GenerateRequest.model_fields["prompt"]
+    limits = [m.max_length for m in field.metadata if hasattr(m, "max_length")]
+    assert limits == [appmod.MAX_PROMPT_CHARS]

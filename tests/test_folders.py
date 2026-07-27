@@ -505,3 +505,41 @@ def test_descendants_of_unknown_folder_is_empty(tmp_path, monkeypatch):
     assert folders.descendants("deadbeef0123", out) == []
     assert folders.delete_tree("deadbeef0123", out) == []
     assert len(folders.list_folders(out)) == 1
+
+
+# ── İç içe klasör derinliği ─────────────────────────────────────────────────
+
+def test_folder_nesting_is_capped(tmp_path, monkeypatch):
+    """Sınırsız derinlik başlık şeridini taşırıyor ve geri dönüşü zorlaştırıyor."""
+    c = _client(tmp_path, monkeypatch)
+    parent = None
+    for level in range(appmod.MAX_FOLDER_DEPTH):
+        r = c.post("/api/folders", json={"name": f"k{level}", "parent_id": parent})
+        assert r.status_code == 200, (level, r.text)
+        parent = r.json()["folder"]["id"]
+    r = c.post("/api/folders", json={"name": "bir fazla", "parent_id": parent})
+    assert r.status_code == 422, r.text
+    assert str(appmod.MAX_FOLDER_DEPTH) in r.json()["detail"]
+
+
+def test_depth_of_a_root_folder_is_one(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    root = _new_folder(c)
+    child = c.post("/api/folders", json={"name": "alt", "parent_id": root}
+                   ).json()["folder"]["id"]
+    out = str(tmp_path / "output")
+    assert folders.depth(root, out) == 1
+    assert folders.depth(child, out) == 2
+    assert folders.depth("yoksa", out) == 0
+
+
+def test_depth_survives_a_broken_parent_chain(tmp_path, monkeypatch):
+    """Elle bozulmuş folders.json sonsuz döngüye düşürmemeli (descendants ile aynı duruş)."""
+    c = _client(tmp_path, monkeypatch)
+    root = _new_folder(c)
+    out = str(tmp_path / "output")
+    path = tmp_path / "output" / "folders.json"
+    items = json.loads(path.read_text())
+    items[0]["parent_id"] = items[0]["id"]  # kendi kendinin ebeveyni
+    path.write_text(json.dumps(items), encoding="utf-8")
+    assert folders.depth(root, out) >= 1  # dönmeli, asılmamalı

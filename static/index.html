@@ -421,6 +421,12 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=18"></script>
+  <!-- SIRA bağlayıcı: dosyalar tek global kapsamı paylaşıyor ve açılış
+       çağrıları settings.js'in dibinde. Bkz. core.js başlığı. -->
+  <script src="/static/core.js?v=18"></script>
+  <script src="/static/folders.js?v=18"></script>
+  <script src="/static/assets.js?v=18"></script>
+  <script src="/static/palette.js?v=18"></script>
+  <script src="/static/settings.js?v=18"></script>
 </body>
 </html>

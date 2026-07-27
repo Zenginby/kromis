@@ -288,3 +288,26 @@ def test_names_for_keeps_duplicate_positions(monkeypatch):
 def test_names_for_rejects_invalid_hex():
     with pytest.raises(ValueError):
         cn.names_for(["not-a-color"], offline=True)
+
+
+def test_dedupe_does_not_collide_with_a_name_that_already_exists():
+    """Merdiven eki listede ZATEN VAR OLAN bir adı üretmemeli.
+
+    Eski hâl grubun adını yalnızca kendi içinde ayırıyor, sonucu listenin
+    geri kalanıyla karşılaştırmıyordu: ["dark blue", "blue", "blue"] →
+    ["dark blue", "dark blue", "light blue"]. Gerçek paletlerde ölçülmedi
+    (24.000 palet tarandı, sıfır çakışma) ama fonksiyonun sözü tekillik.
+    """
+    colors = [{"hex": "#123456", "name": "dark blue"},
+              {"hex": "#2e6ba8", "name": "blue"},
+              {"hex": "#7aa8d8", "name": "blue"}]
+    names = [c["name"] for c in cn.dedupe_names(colors)]
+    assert len(set(names)) == len(names), names
+
+
+def test_dedupe_separates_two_entries_whose_ladder_words_are_both_in_the_name():
+    """Her iki merdiven sözcüğü de adın içindeyse ikisi de atlanır ve ad tekrarlanırdı."""
+    colors = [{"hex": "#8b3a3a", "name": "dark light grey"},
+              {"hex": "#f18f61", "name": "dark light grey"}]
+    names = [c["name"] for c in cn.dedupe_names(colors)]
+    assert len(set(names)) == 2, names

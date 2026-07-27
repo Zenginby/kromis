@@ -14,7 +14,6 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
-from pydantic import BaseModel, ConfigDict, Field, field_validator
 # Ham form değerleri Starlette'in UploadFile'ıdır; fastapi.UploadFile onun ALT
 # sınıfı olduğundan isinstance kontrolü taban sınıfa yapılmalı.
 from starlette.datastructures import UploadFile as FormUploadFile
@@ -26,6 +25,10 @@ import folders
 import palette
 import palette_store
 import storage
+from models import (MAX_PROMPT_CHARS, BannerRequest, BulkImagesRequest,
+                    BulkMoveRequest, FolderRequest, GenerateRequest, LogoRequest,
+                    MoveImageRequest, SavePaletteRequest, SettingsRequest,
+                    SuggestRequest)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
@@ -36,7 +39,7 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024          # dosya başına
 MAX_EDIT_IMAGES = 4                          # ana görsel + en fazla 3 ek referans
 MAX_REQUEST_BYTES = MAX_UPLOAD_BYTES * MAX_EDIT_IMAGES  # tüm multipart gövdesi
 MAX_IMAGE_PIXELS = 50 * 1024 * 1024
-MAX_PROMPT_CHARS = 4000                      # kullanıcı prompt'u + palet eki
+MAX_FOLDER_DEPTH = 5                         # iç içe klasör kademesi
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 app = FastAPI(title="GPT-Image Studio")
@@ -53,66 +56,6 @@ async def _redact_validation_errors(request: Request, exc: RequestValidationErro
             err.pop("ctx", None)
         safe.append(err)
     return JSONResponse(status_code=422, content=jsonable_encoder({"detail": safe}))
-
-
-class GenerateRequest(BaseModel):
-    # Bilinmeyen alanı reddet — LogoRequest ile aynı gerekçe (bkz. oradaki
-    # yorum). Palet için bu özellikle kritik: eski bir sunucu süreci
-    # `palette_hex`'i sessizce yok sayıp 200 ile renksiz görsel döndürürdü ve
-    # kullanıcı "palet çalışmıyor" derdi. Artık yüksek sesle 422.
-    model_config = ConfigDict(extra="forbid")
-
-    prompt: str = Field(min_length=1, max_length=4000)
-    size: str
-    quality: str
-    n: int = Field(ge=1, le=4)
-    folder_id: str | None = Field(default=None, max_length=64)  # None = klasörsüz (kök)
-    # None = palet yok. Palet `(hex, mod)` çiftinin saf fonksiyonu olduğu için
-    # tel üzerinde iki skaler yetiyor; sunucunun bir depoya bakması gerekmez.
-    palette_hex: str | None = Field(default=None, max_length=7)
-    palette_mode: str = "analogic"
-    palette_strength: str = "balanced"
-    # Kayıtlı palet kullanılıyorsa id'si: adlar kaydın dondurulmuş halinden
-    # okunur, böylece gösterilen ad ile prompt'a giden ad hiç ayrışmaz.
-    palette_id: str | None = Field(default=None, max_length=64)
-
-    @field_validator("palette_hex")
-    @classmethod
-    def _palette_hex_ok(cls, v):
-        if not v:
-            return None
-        try:
-            return palette.parse_hex(v)
-        except ValueError:
-            raise ValueError("geçersiz palette_hex")
-
-    @field_validator("palette_mode")
-    @classmethod
-    def _palette_mode_ok(cls, v):
-        if v not in palette.MODES:
-            raise ValueError("geçersiz palette_mode")
-        return v
-
-    @field_validator("palette_strength")
-    @classmethod
-    def _palette_strength_ok(cls, v):
-        if v not in palette.STRENGTHS:
-            raise ValueError("geçersiz palette_strength")
-        return v
-
-    @field_validator("size")
-    @classmethod
-    def _size_ok(cls, v):
-        if v not in ac.ALLOWED_SIZES:
-            raise ValueError("geçersiz size")
-        return v
-
-    @field_validator("quality")
-    @classmethod
-    def _quality_ok(cls, v):
-        if v not in ac.ALLOWED_QUALITIES:
-            raise ValueError("geçersiz quality")
-        return v
 
 
 def _now() -> str:
@@ -208,6 +151,29 @@ def _saved_palette(palette_id: str | None) -> dict | None:
                  if p.get("id") == pid), None)
 
 
+# palettes.json elle düzenlenebilir bir dosya. Okuma katmanı bozuk JSON'a
+# dayanıklı (palette_store._read), ama kaydın İÇERİĞİ de doğrulanmalı: `mode`
+# ve `seed` doğrudan palette.harmony'ye gidiyor ve orada ValueError üretip
+# üretimi 500'e düşürüyordu. Bozuk alan sessizce yok sayılır ve istekle gelen
+# değere düşülür — silinmiş palet nasıl bloke etmiyorsa bozuk palet de etmemeli.
+
+def _safe_seed(value) -> str | None:
+    """Kayıttan gelen tohum hex'i; geçersizse None."""
+    try:
+        return palette.parse_hex(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def _saved_colors(saved: dict) -> list[dict]:
+    """Kayıttaki kullanılabilir renkler: hem `hex` hem `name` taşıyan girdiler."""
+    raw = saved.get("colors")
+    if not isinstance(raw, list):
+        return []
+    return [c for c in raw
+            if isinstance(c, dict) and c.get("hex") and c.get("name")]
+
+
 def _palette_prompt(prompt: str, seed: str | None, mode: str, strength: str,
                     palette_id: str | None = None, *, task: str) -> tuple[str, dict | None]:
     """Prompt'a renk yönlendirmesi ekler. Palet yoksa prompt aynen döner.
@@ -240,9 +206,9 @@ def _palette_prompt(prompt: str, seed: str | None, mode: str, strength: str,
         return prompt, None
     saved = _saved_palette(palette_id)
     if saved:
-        mode = saved.get("mode", mode)
-        seed = saved.get("seed", seed)
-        colors = saved.get("colors") or _resolve_palette(seed, mode, offline=True)
+        mode = saved["mode"] if saved.get("mode") in palette.MODES else mode
+        seed = _safe_seed(saved.get("seed")) or seed
+        colors = _saved_colors(saved) or _resolve_palette(seed, mode, offline=True)
     else:
         colors = _resolve_palette(seed, mode, offline=True)
     suffix = palette.prompt_suffix(colors, strength, task=task)
@@ -278,6 +244,77 @@ def generate(req: GenerateRequest) -> dict:
     return {"images": records}
 
 
+def _check_edit_form(prompt: str, size: str, quality: str, n: int,
+                     file: UploadFile | None, source_id: str | None,
+                     palette_mode: str, palette_strength: str) -> None:
+    """`/api/edit` form alanlarını doğrular; geçersizse HTTPException(422).
+
+    Doğrulama neden elle: uç multipart olduğu için GenerateRequest gibi tek bir
+    Pydantic modeli yok. Not: multipart'ta `extra="forbid"` karşılığı YOK —
+    Starlette bilinmeyen form alanını sessizce atar. Bayat sunucu tespiti bu
+    yüzden arayüz tarafında, yanıtın paleti geri yansıtıp yansıtmadığına
+    bakılarak yapılıyor.
+    """
+    if size not in ac.ALLOWED_SIZES or quality not in ac.ALLOWED_QUALITIES:
+        raise HTTPException(status_code=422, detail="Geçersiz size veya quality.")
+    if not (1 <= n <= 4):
+        raise HTTPException(status_code=422, detail="n 1-4 arasında olmalı.")
+    if not prompt or len(prompt) > MAX_PROMPT_CHARS:
+        raise HTTPException(status_code=422,
+                            detail=f"prompt 1-{MAX_PROMPT_CHARS} karakter olmalı.")
+    if palette_mode not in palette.MODES:
+        raise HTTPException(status_code=422, detail="Geçersiz palette_mode.")
+    if palette_strength not in palette.STRENGTHS:
+        raise HTTPException(status_code=422, detail="Geçersiz palette_strength.")
+    if (file is None) == (source_id is None):
+        raise HTTPException(status_code=422,
+                            detail="Tam olarak biri gerekli: file veya source_id.")
+
+
+def _check_palette_hex(palette_hex: str | None) -> str | None:
+    """Form'dan gelen tohum hex'i normalleştirir; boşsa None, geçersizse 422."""
+    if not palette_hex:
+        return None
+    try:
+        return palette.parse_hex(palette_hex)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Geçersiz palette_hex.")
+
+
+async def _collect_edit_refs(
+    request: Request, file: UploadFile | None, source_id: str | None,
+) -> tuple[list[tuple[str, bytes]], str | None]:
+    """Azure'a gidecek referans görselleri toplar: `(refs, parent_id)`.
+
+    Sıra sözleşme: ana görsel → ek yüklemeler → ek galeri görselleri. `parent_id`
+    yalnızca ana görsel galeriden seçildiğinde dolu (türev zinciri buna bağlı).
+    """
+    extra_uploads, extra_ids = await _extra_refs(request)
+    if 1 + len(extra_uploads) + len(extra_ids) > MAX_EDIT_IMAGES:
+        raise HTTPException(status_code=422,
+                            detail=f"En fazla {MAX_EDIT_IMAGES} görsel gönderilebilir "
+                                   f"(1 ana + {MAX_EDIT_IMAGES - 1} ek).")
+
+    content_length = request.headers.get("content-length")
+    if content_length is not None and content_length.isdigit() and int(content_length) > MAX_REQUEST_BYTES:
+        raise HTTPException(status_code=413, detail="İstek çok büyük.")
+
+    refs: list[tuple[str, bytes]] = []
+    if source_id is not None:
+        sid = os.path.basename(source_id)
+        refs.append((f"{sid}.png", _read_png_file(_output_png_path(sid))))
+        parent_id = sid
+    else:
+        refs.append(("upload.png", await _read_upload_png(file)))
+        parent_id = None
+
+    for upload in extra_uploads:
+        refs.append((f"ref{len(refs) + 1}.png", await _read_upload_png(upload)))
+    for extra_id in extra_ids:
+        refs.append((f"ref{len(refs) + 1}.png", _read_png_file(_output_png_path(extra_id))))
+    return refs, parent_id
+
+
 @app.post("/api/edit")
 async def edit(
     request: Request,
@@ -295,58 +332,12 @@ async def edit(
 ) -> dict:
     """Ek referans görselleri (`extra_files` yüklemeleri, `extra_source_ids`
     galeri id'leri) form verisinden okunur — bkz. _extra_refs."""
-    if size not in ac.ALLOWED_SIZES or quality not in ac.ALLOWED_QUALITIES:
-        raise HTTPException(status_code=422, detail="Geçersiz size veya quality.")
-    if not (1 <= n <= 4):
-        raise HTTPException(status_code=422, detail="n 1-4 arasında olmalı.")
-    if not prompt or len(prompt) > MAX_PROMPT_CHARS:
-        raise HTTPException(status_code=422,
-                            detail=f"prompt 1-{MAX_PROMPT_CHARS} karakter olmalı.")
-    # Bu uçta doğrulama elle yapılıyor (GenerateRequest gibi bir Pydantic modeli
-    # yok, bkz. yukarıdaki mevcut kontroller). Not: multipart'ta extra="forbid"
-    # karşılığı YOK — Starlette bilinmeyen form alanını sessizce atar. Bayat
-    # sunucu tespiti bu yüzden arayüz tarafında yanıtın paleti geri yansıtıp
-    # yansıtmadığına bakılarak yapılıyor.
-    if palette_mode not in palette.MODES:
-        raise HTTPException(status_code=422, detail="Geçersiz palette_mode.")
-    if palette_strength not in palette.STRENGTHS:
-        raise HTTPException(status_code=422, detail="Geçersiz palette_strength.")
-    if palette_hex:
-        try:
-            palette_hex = palette.parse_hex(palette_hex)
-        except ValueError:
-            raise HTTPException(status_code=422, detail="Geçersiz palette_hex.")
-    else:
-        palette_hex = None
-    if (file is None) == (source_id is None):
-        raise HTTPException(status_code=422, detail="Tam olarak biri gerekli: file veya source_id.")
+    _check_edit_form(prompt, size, quality, n, file, source_id,
+                     palette_mode, palette_strength)
+    palette_hex = _check_palette_hex(palette_hex)
 
     target_folder = _check_folder(folder_id)
-
-    extra_uploads, extra_ids = await _extra_refs(request)
-    if 1 + len(extra_uploads) + len(extra_ids) > MAX_EDIT_IMAGES:
-        raise HTTPException(status_code=422,
-                            detail=f"En fazla {MAX_EDIT_IMAGES} görsel gönderilebilir "
-                                   f"(1 ana + {MAX_EDIT_IMAGES - 1} ek).")
-
-    content_length = request.headers.get("content-length")
-    if content_length is not None and content_length.isdigit() and int(content_length) > MAX_REQUEST_BYTES:
-        raise HTTPException(status_code=413, detail="İstek çok büyük.")
-
-    # Azure'a giden sıra: ana görsel → ek yüklemeler → ek galeri görselleri.
-    refs: list[tuple[str, bytes]] = []
-    if source_id is not None:
-        sid = os.path.basename(source_id)
-        refs.append((f"{sid}.png", _read_png_file(_output_png_path(sid))))
-        parent_id = sid
-    else:
-        refs.append(("upload.png", await _read_upload_png(file)))
-        parent_id = None
-
-    for upload in extra_uploads:
-        refs.append((f"ref{len(refs) + 1}.png", await _read_upload_png(upload)))
-    for extra_id in extra_ids:
-        refs.append((f"ref{len(refs) + 1}.png", _read_png_file(_output_png_path(extra_id))))
+    refs, parent_id = await _collect_edit_refs(request, file, source_id)
 
     # task="edit": üretim ifadesi modele yeniden boyama söyler ve referans
     # görselin kompozisyonunu yok eder; düzenlemede istenen renk derecelendirmesi.
@@ -366,12 +357,6 @@ async def edit(
         for img in images
     ]
     return {"images": records}
-
-
-class SettingsRequest(BaseModel):
-    # api_key boş bırakılabilir: mevcut key korunur (endpoint'i tek başına güncelleme).
-    api_key: str = Field(default="", max_length=500)
-    base_url: str = Field(min_length=1, max_length=500)
 
 
 @app.get("/api/settings")
@@ -397,13 +382,6 @@ def post_settings(req: SettingsRequest) -> dict:
     except ac.AzureImageError as e:
         raise HTTPException(status_code=422, detail=str(e))
     return ac.get_settings_status()
-
-
-class FolderRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    name: str = Field(min_length=1, max_length=80)
-    parent_id: str | None = Field(default=None, max_length=64)  # None = kök klasör
 
 
 @app.get("/api/folders")
@@ -436,6 +414,12 @@ def create_folder_route(req: FolderRequest) -> dict:
     if not name:
         raise HTTPException(status_code=422, detail="Klasör adı gerekli.")
     parent_id = _check_folder(req.parent_id)
+    # Sınırsız derinlik başlık şeridini taşırıyor ve köke dönüşü zorlaştırıyor;
+    # yeniden ebeveynleme olmadığı için tek kapı burası.
+    if parent_id and folders.depth(parent_id, OUTPUT_DIR) >= MAX_FOLDER_DEPTH:
+        raise HTTPException(
+            status_code=422,
+            detail=f"En fazla {MAX_FOLDER_DEPTH} kademe klasör açılabilir.")
     return {"folder": folders.create(name, OUTPUT_DIR, parent_id=parent_id, now=_now())}
 
 
@@ -464,12 +448,6 @@ def history(folder_id: str | None = None) -> dict:
     return {"images": items}
 
 
-class MoveImageRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    folder_id: str | None = Field(default=None, max_length=64)  # None = klasörsüz (kök)
-
-
 @app.patch("/api/image/{image_id}")
 def move_image(image_id: str, req: MoveImageRequest) -> dict:
     """Görseli bir klasöre taşır (folder_id=None ise köke). Dosya taşınmaz."""
@@ -487,21 +465,6 @@ def delete_image(image_id: str) -> dict:
     if not removed:
         raise HTTPException(status_code=404, detail="Görsel bulunamadı.")
     return {"deleted": iid}
-
-
-# Çoklu seçim uçları: tek istek = tek history.json yazımı. İstemci tarafında
-# id başına ayrı istek atılsaydı yazımlar birbirini ezip güncelleme kaybettirirdi.
-MAX_BULK_IDS = 500
-
-
-class BulkImagesRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    ids: list[str] = Field(min_length=1, max_length=MAX_BULK_IDS)
-
-
-class BulkMoveRequest(BulkImagesRequest):
-    folder_id: str | None = Field(default=None, max_length=64)  # None = klasörsüz (kök)
 
 
 @app.patch("/api/images")
@@ -523,53 +486,6 @@ def delete_images(req: BulkImagesRequest) -> dict:
     if not deleted:
         raise HTTPException(status_code=404, detail="Görsel bulunamadı.")
     return {"deleted": deleted}
-
-
-class SuggestRequest(BaseModel):
-    # POST + extra="forbid": query parametreleri bilinmeyen alanı reddedemez,
-    # bayat sunucu tespiti bu özellikte en büyük risk olduğu için GET değil.
-    model_config = ConfigDict(extra="forbid")
-
-    hex: str = Field(min_length=6, max_length=7)
-
-    @field_validator("hex")
-    @classmethod
-    def _hex_ok(cls, v):
-        try:
-            return palette.parse_hex(v)
-        except ValueError:
-            raise ValueError("geçersiz hex")
-
-
-class SavePaletteRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    name: str = Field(min_length=1, max_length=80)
-    seed: str = Field(min_length=6, max_length=7)
-    mode: str
-    strength: str = "balanced"
-
-    @field_validator("seed")
-    @classmethod
-    def _seed_ok(cls, v):
-        try:
-            return palette.parse_hex(v)
-        except ValueError:
-            raise ValueError("geçersiz seed")
-
-    @field_validator("mode")
-    @classmethod
-    def _mode_ok(cls, v):
-        if v not in palette.MODES:
-            raise ValueError("geçersiz mode")
-        return v
-
-    @field_validator("strength")
-    @classmethod
-    def _strength_ok(cls, v):
-        if v not in palette.STRENGTHS:
-            raise ValueError("geçersiz strength")
-        return v
 
 
 @app.post("/api/palette/suggest")
@@ -631,56 +547,6 @@ def delete_palette_route(palette_id: str) -> dict:
     if not palette_store.delete(pid, OUTPUT_DIR):
         raise HTTPException(status_code=404, detail="Palet bulunamadı.")
     return {"deleted": pid}
-
-
-LOGO_POSITIONS = {
-    "top-left", "top-center", "top-right",
-    "center-left", "center", "center-right",
-    "bottom-left", "bottom-center", "bottom-right",
-}
-LOGO_COLORS = {"auto", "blue", "white"}
-# Konumlanabilir (logo tarzı) bindirmenin varlığı hangi kütüphaneden gelebilir.
-# Banner ayrı bir yerleşim olduğu için burada değil.
-OVERLAY_ASSET_KINDS = {"logos", "mottos"}
-
-
-class LogoRequest(BaseModel):
-    # Bilinmeyen alanı reddet: Pydantic varsayılanı onu SESSİZCE yok sayar, bu yüzden
-    # eski bir sunucu süreci yeni arayüzün seçeneklerini görmezden gelip değişmemiş
-    # görseli 200 ile döndürür ("ayar çalışmıyor" gibi görünür). Artık 422 + mesaj.
-    model_config = ConfigDict(extra="forbid")
-
-    id: str = Field(min_length=1, max_length=64)
-    # asset_id boş/None => yerleşik KURUM logosu (mavi/beyaz auto). Doluysa
-    # asset_kind kütüphanesinden seçilen özel görsel (tek görsel) kullanılır.
-    asset_id: str | None = Field(default=None, max_length=64)
-    asset_kind: str = "logos"                                # "logos" | "mottos"
-    position: str = "bottom-right"
-    color: str = "auto"
-    size: float = Field(default=0.14, ge=0.04, le=0.5)       # logo genişliği / görsel genişliği
-    shadow_alpha: int = Field(default=120, ge=0, le=255)     # 0 = gölge yok
-    shadow_blur: int = Field(default=6, ge=0, le=50)
-
-    @field_validator("position")
-    @classmethod
-    def _position_ok(cls, v):
-        if v not in LOGO_POSITIONS:
-            raise ValueError("geçersiz position")
-        return v
-
-    @field_validator("color")
-    @classmethod
-    def _color_ok(cls, v):
-        if v not in LOGO_COLORS:
-            raise ValueError("geçersiz color")
-        return v
-
-    @field_validator("asset_kind")
-    @classmethod
-    def _asset_kind_ok(cls, v):
-        if v not in OVERLAY_ASSET_KINDS:
-            raise ValueError("geçersiz asset_kind")
-        return v
 
 
 def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
@@ -752,36 +618,6 @@ def add_logo(req: LogoRequest) -> dict:
         OUTPUT_DIR, now=_now(),
     )
     return {"image": record}
-
-
-BANNER_EDGES = {"top", "bottom"}
-BANNER_ALIGNS = {"left", "center", "right"}
-
-
-class BannerRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")             # bkz. LogoRequest'teki gerekçe
-
-    id: str = Field(min_length=1, max_length=64)          # bindirilecek görsel (history id)
-    asset_id: str = Field(min_length=1, max_length=64)    # kütüphaneden seçilen banner
-    edge: str = "bottom"
-    # Varsayılanlar v1.4 davranışını birebir korur: tam genişlik, ortalı, boşluksuz.
-    scale: float = Field(default=1.0, ge=0.2, le=1.0)     # banner genişliği / görsel genişliği
-    align: str = "center"                                # scale < 1 iken yatay yerleşim
-    margin: float = Field(default=0.0, ge=0.0, le=0.2)   # kenardan uzaklık / görsel yüksekliği
-
-    @field_validator("edge")
-    @classmethod
-    def _edge_ok(cls, v):
-        if v not in BANNER_EDGES:
-            raise ValueError("geçersiz edge")
-        return v
-
-    @field_validator("align")
-    @classmethod
-    def _align_ok(cls, v):
-        if v not in BANNER_ALIGNS:
-            raise ValueError("geçersiz align")
-        return v
 
 
 def _composite_banner(src_path: str, banner_path: str, edge: str,

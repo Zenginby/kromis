@@ -71,6 +71,27 @@ def exists(folder_id: str, output_dir: str) -> bool:
     return any(f.get("id") == folder_id for f in _read(output_dir))
 
 
+def depth(folder_id: str, output_dir: str) -> int:
+    """Kök klasör 1, onun altındaki 2… Klasör yoksa 0.
+
+    `descendants` ile aynı duruş: yeniden ebeveynleme olmadığı için zincir
+    döngü içermez, ama elle bozulmuş bir dosyada asılı kalmamak için ziyaret
+    edilenler işaretlenir.
+    """
+    if not folder_id or not _SAFE_ID.fullmatch(folder_id):
+        return 0
+    by_id = {f.get("id"): f for f in _read(output_dir) if f.get("id")}
+    if folder_id not in by_id:
+        return 0
+    seen: set[str] = set()
+    level, current = 0, folder_id
+    while current and current in by_id and current not in seen:
+        seen.add(current)
+        level += 1
+        current = by_id[current].get("parent_id")
+    return level
+
+
 def descendants(folder_id: str, output_dir: str) -> list[str]:
     """Klasörün kendisi + tüm alt klasörlerinin id'leri (üstten alta).
 

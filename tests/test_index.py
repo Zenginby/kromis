@@ -77,13 +77,15 @@ def test_hue_slider_gradient_outranks_the_generic_modal_input_rule():
 
 
 def test_static_cache_busters_are_bumped_together():
-    """Tek taraflı ?v= artışı bayat app.js'e yol açar → palet sessizce gönderilmez.
+    """Tek taraflı ?v= artışı bayat script'e yol açar → palet sessizce gönderilmez.
 
-    Sürümden bağımsız: gelecekteki artışlarda da geçerli kalır.
+    Sürümden bağımsız: gelecekteki artışlarda da geçerli kalır. Beş script'in
+    bölünmesiyle daha da kritikleşti — biri eski sürümde kalırsa sayfa tutarsız
+    bir karışım çalıştırır.
     """
     r = TestClient(appmod.app).get("/")
     versions = set(re.findall(r"\?v=(\d+)", r.text))
-    assert len(versions) == 1, f"style.css ve app.js sürümleri ayrışmış: {versions}"
+    assert len(versions) == 1, f"statik dosya sürümleri ayrışmış: {versions}"
 
 
 def test_edit_request_forwards_every_palette_option():
@@ -96,7 +98,7 @@ def test_edit_request_forwards_every_palette_option():
     doğruydu (tests/test_palette_route.py: saved palette id'yi onurlandırıyor),
     o yüzden hatayı yalnızca istemci tarafı bir iddia yakalayabilir.
     """
-    js = TestClient(appmod.app).get("/static/app.js").text
+    js = TestClient(appmod.app).get("/static/core.js").text
     assert 'fd.append("palette_hex"' not in js, (
         "palet alanları elle sayılmış — yeni bir alan eklendiğinde yine düşer")
     assert re.search(r"Object\.entries\(pal\)", js), (
@@ -109,6 +111,23 @@ def test_ui_surfaces_a_palette_that_did_not_fit_in_the_prompt():
     Kayıtta palet var ama prompt'a girmedi; bayrak okunmazsa arayüz paleti
     uygulanmış gösterir ve kullanıcı renksiz sonucu açıklayamaz.
     """
-    js = TestClient(appmod.app).get("/static/app.js").text
+    js = TestClient(appmod.app).get("/static/core.js").text
     assert re.search(r"palette\.applied\s*===\s*false", js), (
         "applied=false durumu arayüzde ele alınmıyor")
+
+
+def test_every_frontend_script_is_loaded_and_in_order():
+    """app.js beş parçaya bölündü; biri unutulursa sayfa sessizce yarım çalışır.
+
+    Klasik script oldukları ve tek global kapsamı paylaştıkları için SIRA da
+    sözleşmenin parçası: açılış çağrıları settings.js'in dibinde ve oradan
+    önceki dosyalarda tanımlı adlara dokunuyor.
+    """
+    client = TestClient(appmod.app)
+    order = ["core.js", "folders.js", "assets.js", "palette.js", "settings.js"]
+    html = client.get("/").text
+    positions = [html.find(f"/static/{name}") for name in order]
+    assert all(p > 0 for p in positions), dict(zip(order, positions))
+    assert positions == sorted(positions), "script sırası bozulmuş"
+    for name in order:
+        assert client.get(f"/static/{name}").status_code == 200, name

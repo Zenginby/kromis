@@ -58,3 +58,36 @@ def test_delete_rejects_slash_and_dots(tmp_path):
     assert storage.delete("a/b", out) is False
     assert storage.delete("..", out) is False
     assert storage.delete("evil.png", out) is False
+
+
+def test_delete_survives_a_file_that_vanishes_mid_flight(tmp_path, monkeypatch):
+    """`exists` ile `remove` arasında dosya kaybolursa 500 değil, normal silme.
+
+    Yerel araç olsa da aynı görseli iki sekmeden silmek bunu tetikleyebiliyor.
+    """
+    out = str(tmp_path)
+    rec = _save(out, "cat", "2026-07-23T10:00:00")
+    real_remove = os.remove
+
+    def racing_remove(path):
+        real_remove(path)
+        raise FileNotFoundError(path)  # sanki başka bir süreç önce silmiş
+
+    monkeypatch.setattr(os, "remove", racing_remove)
+    assert storage.delete(rec["id"], out) is True
+    assert storage.delete_many([rec["id"]], out) == 0  # kayıt da dosya da gitti
+
+
+def test_delete_many_survives_a_file_that_vanishes_mid_flight(tmp_path, monkeypatch):
+    out = str(tmp_path)
+    a = _save(out, "a", "2026-07-23T10:00:00")
+    b = _save(out, "b", "2026-07-23T10:00:01")
+    real_remove = os.remove
+
+    def racing_remove(path):
+        real_remove(path)
+        raise FileNotFoundError(path)
+
+    monkeypatch.setattr(os, "remove", racing_remove)
+    assert storage.delete_many([a["id"], b["id"]], out) == 2
+    assert json.loads((tmp_path / "history.json").read_text()) == []

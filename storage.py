@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import contextlib
 import os
 import re
 import uuid
@@ -157,7 +158,10 @@ def delete_many(image_ids: Iterable[str], output_dir: str) -> int:
     for image_id in targets:
         file_path = os.path.join(output_dir, f"{image_id}.png")
         if os.path.exists(file_path):
-            os.remove(file_path)
+            # `exists` ile `remove` arasında dosya kaybolabilir (aynı görseli
+            # iki sekmeden silmek yeter). Sonuç zaten istenen: dosya yok.
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(file_path)
             deleted.add(image_id)
 
     if existing_records:
@@ -176,7 +180,9 @@ def delete(image_id: str, output_dir: str) -> bool:
     file_path = os.path.join(output_dir, f"{image_id}.png")
     file_existed = os.path.exists(file_path)
     if file_existed:
-        os.remove(file_path)
+        # delete_many ile aynı yarış: araya başka bir silme girebilir.
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(file_path)
 
     if record_existed:
         _write_history(output_dir, remaining)

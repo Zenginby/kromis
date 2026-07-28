@@ -17,7 +17,7 @@ bkz. altta), macOS ilk açılışta soru soruyor. Bir kez izin verirsin, sonraki
 açılışlarda sormaz.
 
 1. Uygulamaya çift tıkla. "açılamadı" uyarısı çıkacak — **Tamam**'a bas.
-2.  → **Sistem Ayarları** → **Gizlilik ve Güvenlik**.
+2. Ekranın sol üstündeki **Apple menüsü** → **Sistem Ayarları** → **Gizlilik ve Güvenlik**.
 3. Sayfayı aşağı kaydır: *"GPT-Image Studio engellendi"* satırını bul → **Yine de Aç**.
 4. Çıkan onayda tekrar **Yine de Aç** → Mac şifreni gir.
 

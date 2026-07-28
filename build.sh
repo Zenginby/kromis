@@ -31,4 +31,7 @@ echo "→ zip (ditto: .app'in sembolik bağları korunur, 'zip' bozar)"
 rm -f "$ZIP"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 
+echo "→ ara derleme dizinini temizle"
+rm -rf build
+
 echo "✓ hazır: $ZIP ($(du -h "$ZIP" | cut -f1))"

@@ -14,6 +14,23 @@ Key rotasyonu: `az cognitiveservices account keys list -g ai-services -n ai-orne
 ## Test
     python -m pytest tests/ -v
 
+## Masaüstü uygulaması olarak paketleme
+    ./build.sh          # → dist/GPT-Image Studio.zip (host mimarisi, ad-hoc imzalı)
+Pencereyi kaynaktan denemek için: `.venv/bin/python desktop.py`
+Son kullanıcı talimatı: `KURULUM.md`. Tasarım/plan: `docs/superpowers/`.
+
+İki hat var: `gpt-image-studio.spec` kasıtlı olarak `target_arch` vermez —
+PyInstaller derlemeyi çalıştıran yorumlayıcının mimarisini hedefler (bu
+çapraz derleme yapamadığı için tektir).
+
+**Doğrulama hattı (yerel):** Bu makinede (Intel) `./build.sh` x86_64 üretir —
+paketleme yolunu uçtan uca sınamak için.
+
+**Gönderim hattı (CI):** Ofis çalışanlarına gidecek arm64 paket, GitHub Actions'ın
+arm64 runner'ında (macos-14) aynı spec ve `build.sh` ile üretilir. Actions → **Kodu
+Çalıştır** (Run Workflow) → **macOS arm64 paketi** → **Yapıtlar** (Artifacts) den
+`gpt-image-studio-macos-arm64.zip` indir (`.github/workflows/build-macos-arm64.yml`).
+
 ## Özellikler
 - Prompt'tan görsel üretme (boyut/kalite/adet)
 - Geçmiş galerisi (indir, sil)

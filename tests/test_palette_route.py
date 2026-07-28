@@ -32,17 +32,6 @@ def _png(color=(30, 80, 200, 255), size=(64, 64)) -> bytes:
     return b.getvalue()
 
 
-def _fake_composite(cmd, capture_output, text):
-    """tests/test_folders.py:20-28 ile aynı sözleşme: cmd[2]=girdi, cmd[3]=çıktı."""
-    with open(cmd[2], "rb") as s, open(cmd[3], "wb") as d:
-        d.write(s.read())
-
-    class R:
-        returncode = 0
-        stderr = ""
-    return R()
-
-
 @pytest.fixture(autouse=True)
 def _no_network(monkeypatch):
     """Adlandırma ağı her testte kapalı; gömülü tablo/betimleyici kullanılır."""
@@ -470,11 +459,9 @@ def test_edit_also_honors_a_saved_palette_id(tmp_path, monkeypatch):
 
 # ── Türevler ve eski kayıtlar ───────────────────────────────────────────────
 
-def test_logo_derivative_inherits_the_palette(tmp_path, monkeypatch):
+def test_logo_derivative_inherits_the_palette(tmp_path, monkeypatch, fake_composite):
     client, _ = _client(tmp_path, monkeypatch, real_png=True)
-    monkeypatch.setattr(appmod.subprocess, "run", _fake_composite)
-    monkeypatch.setattr(appmod, "COMPOSITE_SCRIPT", str(tmp_path / "fake.py"))
-    (tmp_path / "fake.py").write_text("#", encoding="utf-8")
+    monkeypatch.setattr(appmod.composite, "composite_logo", fake_composite)
 
     src = _gen(client, palette_hex=SEED, palette_mode="triad").json()["images"][0]
     r = client.post("/api/logo", json={"id": src["id"]})

@@ -5,8 +5,8 @@ import base64
 import datetime as _dt
 import io
 import os
-import subprocess
-import tempfile
+import traceback
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
@@ -21,20 +21,23 @@ from starlette.datastructures import UploadFile as FormUploadFile
 import assets_store
 import azure_client as ac
 import color_names
+import composite
+import errlog
 import folders
 import palette
 import palette_store
+import paths
+import seed
 import storage
 from models import (MAX_PROMPT_CHARS, BannerRequest, BulkImagesRequest,
                     BulkMoveRequest, FolderRequest, GenerateRequest, LogoRequest,
                     MoveImageRequest, SavePaletteRequest, SettingsRequest,
                     SuggestRequest)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_DIR = os.path.join(BASE_DIR, "output")
-STATIC_DIR = os.path.join(BASE_DIR, "static")
-ASSETS_DIR = os.path.join(BASE_DIR, "assets")
-COMPOSITE_SCRIPT = os.path.expanduser("~/.config/claude-tools/composite-logo.py")
+BASE_DIR = paths.REPO_DIR                    # geriye uyum: mevcut kullanımlar bozulmasın
+OUTPUT_DIR = paths.output_dir()
+STATIC_DIR = paths.static_dir()
+ASSETS_DIR = paths.assets_dir()
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024          # dosya başına
 MAX_EDIT_IMAGES = 4                          # ana görsel + en fazla 3 ek referans
 MAX_REQUEST_BYTES = MAX_UPLOAD_BYTES * MAX_EDIT_IMAGES  # tüm multipart gövdesi
@@ -42,7 +45,38 @@ MAX_IMAGE_PIXELS = 50 * 1024 * 1024
 MAX_FOLDER_DEPTH = 5                         # iç içe klasör kademesi
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
-app = FastAPI(title="GPT-Image Studio")
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """Sunucu başlarken çalışır — import anında DEĞİL.
+
+    Hem dizin açma hem tohumlama gerçek dosya sistemine dokunduğu için modül
+    kapsamında çalışmamalı: app'i yalnızca import eden bir test ya da betik
+    kullanıcının gerçek veri dizinini (frozen'da ~/Library/Application
+    Support/...) yaratmasın, assets/'ine yazmasın.
+
+    Tohumlama kozmetik bir kolaylıktır (logo seçiciyi önceden doldurur) —
+    başarısız olması (dolu disk, kısıtlı Application Support, okunamayan
+    gömülü PNG) uygulamanın TAMAMINI düşürmemeli: guard olmadan uvicorn'un
+    startup()'ı asla bitmez, desktop.py 15 sn sonra hata verir ve kullanıcı
+    hiçbir pencere görmez. Hata hata.log'a yazılır, uygulama yine de açılır.
+
+    Dizin açma da aynı guard'ın içinde: patlarsa (izinsiz Application Support)
+    tek başına pencereyi engellememeli — yazma yollarının hepsi (storage,
+    assets_store, folders, palette_store) kendi `makedirs`'ini zaten yapıyor,
+    yani hata gerçekten kalıcıysa kullanıcı istek başına anlaşılır bir hata
+    görür; açılmayan bir uygulamadan iyidir.
+    """
+    try:
+        paths.ensure_data_dirs()
+        seed.seed_builtin_logos(ASSETS_DIR, paths.bundled_logos_dir(),
+                                paths.data_dir(), now=_now())
+    except Exception:
+        errlog.safe_append(paths.data_dir(), traceback.format_exc())
+    yield
+
+
+app = FastAPI(title="GPT-Image Studio", lifespan=_lifespan)
 
 
 @app.exception_handler(RequestValidationError)
@@ -550,38 +584,36 @@ def delete_palette_route(palette_id: str) -> dict:
 
 
 def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
-    """composite-logo.py'yi verilen seçeneklerle çalıştırır, sonuç PNG baytlarını döndürür.
+    """Logo/motto filigranını süreç içinde bindirir (composite.py).
 
-    base_image ve output_path ilk iki konumsal argümandır (cmd[2], cmd[3]);
-    bayraklar sonradan gelir.
+    asset_id verilirse seçilen tek görsel her iki varyant olarak geçilir: renk
+    seçimi (auto/blue/white) hangisine düşerse düşsün aynı görsel kullanılır.
     """
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-        tmp_out = tmp.name
+    logo_blue = paths.builtin_logo("blue")
+    logo_white = paths.builtin_logo("white")
+    if req.asset_id:
+        overlay_path = assets_store.asset_path(req.asset_kind, req.asset_id, ASSETS_DIR)
+        if overlay_path is None:
+            raise HTTPException(status_code=404, detail="görsel bulunamadı")
+        logo_blue = logo_white = overlay_path
     try:
-        cmd = [
-            "python3", COMPOSITE_SCRIPT, src_path, tmp_out,
-            "--position", req.position,
-            "--color", req.color,
-            "--scale", str(req.size),
-            "--shadow-alpha", str(req.shadow_alpha),
-            "--shadow-blur", str(req.shadow_blur),
-        ]
-        # Özel logo/motto seçildiyse aynı dosyayı her iki varyant olarak geç:
-        # renk seçimi (auto/blue/white) hangisine düşerse düşsün tek görsel kullanılır.
-        if req.asset_id:
-            overlay_path = assets_store.asset_path(req.asset_kind, req.asset_id, ASSETS_DIR)
-            if overlay_path is None:
-                raise HTTPException(status_code=404, detail="görsel bulunamadı")
-            cmd += ["--logo-blue", overlay_path, "--logo-white", overlay_path]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise HTTPException(status_code=500,
-                                detail=f"Logo bindirme başarısız: {result.stderr[:200]}")
-        with open(tmp_out, "rb") as f:
-            return f.read()
-    finally:
-        if os.path.exists(tmp_out):
-            os.remove(tmp_out)
+        return composite.composite_logo(
+            src_path,
+            logo_blue=logo_blue, logo_white=logo_white,
+            position=req.position, color=req.color, scale=req.size,
+            shadow_alpha=req.shadow_alpha, shadow_blur=req.shadow_blur,
+        )
+    except Exception as exc:
+        # Geniş yakalama bilinçli: PIL'in DecompressionBombError'ı doğrudan
+        # Exception'dan türüyor, OSError/ValueError ile sınırlı bir except onu
+        # kaçırıp kullanıcıya çıplak bir sunucu hatası gösteriyordu. Buradaki
+        # sözleşme "bindirme neyle patlarsa patlasın Türkçe 500 dön".
+        raise HTTPException(
+            status_code=500,
+            # str(exc) boş olabilir (argümansız istisna) — o zaman sınıf adı
+            # hiç yoktan iyidir. `exc or ...` işe yaramaz: istisna nesneleri
+            # her zaman truthy.
+            detail=f"Logo bindirme başarısız: {str(exc) or type(exc).__name__}") from exc
 
 
 def _logo_src_path(image_id: str) -> str:
@@ -758,8 +790,16 @@ def index() -> FileResponse:
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 
-# static/ dosyalarını /static altında servis et (index route'undan sonra mount)
-# STATIC_DIR Task 6'da oluşturulacak; mount import anında hata vermesin diye
-# önce garanti altına alınır.
-os.makedirs(STATIC_DIR, exist_ok=True)
+# static/ dosyalarını /static altında servis et (index route'undan sonra mount).
+# Geliştirmede STATIC_DIR git'te izlenen bir dizindir ama boş bir checkout'ta
+# (taze klon) henüz yoksa StaticFiles mount'u import anında patlardı — bu
+# yüzden yalnızca geliştirmede garanti altına alınır. Paket içindeyken
+# (frozen) STATIC_DIR sys._MEIPASS altında PyInstaller'ın gömdüğü salt-okunur
+# bir dizindir: hem zaten var, hem de oraya os.makedirs YAZMA denemesi bile
+# yanlış — bu dal frozen'da hiç çalışmamalı.
+#
+# Yazılabilir dizinler (output/, assets/) burada AÇILMAZ: mount'un onlara
+# ihtiyacı yok ve import'un yan etkisi olmamalı — açılış `_lifespan`'da.
+if not paths.is_frozen():
+    os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

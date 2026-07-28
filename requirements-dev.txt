@@ -1,0 +1,2 @@
+# Yalnız paket derlemek için gerekir; uygulamanın çalışma zamanı bağımlılığı DEĞİL.
+pyinstaller==6.21.*

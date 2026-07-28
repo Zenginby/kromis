@@ -5,6 +5,14 @@ __pycache__/
 *.pyc
 .env
 .DS_Store
+.logos-seeded
+hata.log
+build/
+dist/
 
 # graphify generated artifacts
 graphify-out/
+.superpowers/
+
+# Claude Code tool directory (not project content)
+.claude/

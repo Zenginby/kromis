@@ -1,7 +1,10 @@
 import os
+from unittest.mock import MagicMock
 
+import app as appmod
 import assets_store as astore
 import seed
+from fastapi.testclient import TestClient
 
 NOW = "2026-07-28T12:00:00"
 
@@ -78,3 +81,42 @@ def test_writes_the_marker_file(tmp_path):
     bundled = _make_bundled(tmp_path)
     seed.seed_builtin_logos(str(tmp_path / "assets"), bundled, str(tmp_path), now=NOW)
     assert (tmp_path / ".logos-seeded").is_file()
+
+
+def test_seeding_does_not_fire_on_plain_import(monkeypatch):
+    """Seeding should NOT fire when app is imported or TestClient is created without context."""
+    # Monkeypatch to track calls
+    original_seed = appmod.seed.seed_builtin_logos
+    call_recorder = MagicMock()
+    monkeypatch.setattr(appmod.seed, "seed_builtin_logos", call_recorder)
+
+    # Create TestClient without context manager — should NOT trigger lifespan startup
+    client = TestClient(appmod.app)
+
+    # Seeding should not have been called during client construction without `with`
+    call_recorder.assert_not_called()
+
+    # Restore for other tests
+    monkeypatch.setattr(appmod.seed, "seed_builtin_logos", original_seed)
+
+
+def test_seeding_fires_on_lifespan_startup(monkeypatch):
+    """Seeding MUST fire when the ASGI app actually starts (within lifespan context)."""
+    # Monkeypatch to track calls
+    original_seed = appmod.seed.seed_builtin_logos
+    call_recorder = MagicMock()
+    monkeypatch.setattr(appmod.seed, "seed_builtin_logos", call_recorder)
+
+    # Use context manager — this triggers lifespan startup
+    with TestClient(appmod.app) as client:
+        # Seeding should have been called exactly once during startup
+        call_recorder.assert_called_once()
+        # Verify it was called with the expected arguments
+        args, kwargs = call_recorder.call_args
+        assert args[0] == appmod.ASSETS_DIR
+        assert args[1] == appmod.paths.bundled_logos_dir()
+        assert args[2] == appmod.paths.data_dir()
+        assert "now" in kwargs
+
+    # Restore for other tests
+    monkeypatch.setattr(appmod.seed, "seed_builtin_logos", original_seed)

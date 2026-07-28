@@ -5,6 +5,7 @@ import base64
 import datetime as _dt
 import io
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
@@ -42,7 +43,21 @@ MAX_IMAGE_PIXELS = 50 * 1024 * 1024
 MAX_FOLDER_DEPTH = 5                         # iç içe klasör kademesi
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
-app = FastAPI(title="GPT-Image Studio")
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """Sunucu başlarken çalışır — import anında DEĞİL.
+
+    Tohumlama gerçek dosya sistemine yazdığı için modül kapsamında çalışmamalı:
+    app'i yalnızca import eden testler kullanıcının gerçek assets/ dizinine
+    dokunmasın.
+    """
+    seed.seed_builtin_logos(ASSETS_DIR, paths.bundled_logos_dir(),
+                            paths.data_dir(), now=_now())
+    yield
+
+
+app = FastAPI(title="GPT-Image Studio", lifespan=_lifespan)
 
 
 @app.exception_handler(RequestValidationError)
@@ -752,7 +767,5 @@ def index() -> FileResponse:
 # STATIC_DIR Task 6'da oluşturulacak; mount import anında hata vermesin diye
 # önce garanti altına alınır.
 paths.ensure_data_dirs()
-seed.seed_builtin_logos(ASSETS_DIR, paths.bundled_logos_dir(), paths.data_dir(),
-                        now=_now())
 os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

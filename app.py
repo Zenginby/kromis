@@ -24,16 +24,17 @@ import color_names
 import folders
 import palette
 import palette_store
+import paths
 import storage
 from models import (MAX_PROMPT_CHARS, BannerRequest, BulkImagesRequest,
                     BulkMoveRequest, FolderRequest, GenerateRequest, LogoRequest,
                     MoveImageRequest, SavePaletteRequest, SettingsRequest,
                     SuggestRequest)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_DIR = os.path.join(BASE_DIR, "output")
-STATIC_DIR = os.path.join(BASE_DIR, "static")
-ASSETS_DIR = os.path.join(BASE_DIR, "assets")
+BASE_DIR = paths.REPO_DIR                    # geriye uyum: mevcut kullanımlar bozulmasın
+OUTPUT_DIR = paths.output_dir()
+STATIC_DIR = paths.static_dir()
+ASSETS_DIR = paths.assets_dir()
 COMPOSITE_SCRIPT = os.path.expanduser("~/.config/claude-tools/composite-logo.py")
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024          # dosya başına
 MAX_EDIT_IMAGES = 4                          # ana görsel + en fazla 3 ek referans
@@ -761,5 +762,5 @@ def index() -> FileResponse:
 # static/ dosyalarını /static altında servis et (index route'undan sonra mount)
 # STATIC_DIR Task 6'da oluşturulacak; mount import anında hata vermesin diye
 # önce garanti altına alınır.
-os.makedirs(STATIC_DIR, exist_ok=True)
+paths.ensure_data_dirs()
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

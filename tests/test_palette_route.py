@@ -32,12 +32,6 @@ def _png(color=(30, 80, 200, 255), size=(64, 64)) -> bytes:
     return b.getvalue()
 
 
-def _fake_composite(base_path, **kwargs):
-    """composite.composite_logo yerine geçer: girdiyi olduğu gibi döndürür."""
-    with open(base_path, "rb") as f:
-        return f.read()
-
-
 @pytest.fixture(autouse=True)
 def _no_network(monkeypatch):
     """Adlandırma ağı her testte kapalı; gömülü tablo/betimleyici kullanılır."""
@@ -465,9 +459,9 @@ def test_edit_also_honors_a_saved_palette_id(tmp_path, monkeypatch):
 
 # ── Türevler ve eski kayıtlar ───────────────────────────────────────────────
 
-def test_logo_derivative_inherits_the_palette(tmp_path, monkeypatch):
+def test_logo_derivative_inherits_the_palette(tmp_path, monkeypatch, fake_composite):
     client, _ = _client(tmp_path, monkeypatch, real_png=True)
-    monkeypatch.setattr(appmod.composite, "composite_logo", _fake_composite)
+    monkeypatch.setattr(appmod.composite, "composite_logo", fake_composite)
 
     src = _gen(client, palette_hex=SEED, palette_mode="triad").json()["images"][0]
     r = client.post("/api/logo", json={"id": src["id"]})

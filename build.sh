@@ -11,11 +11,28 @@ cd "$(dirname "$0")"
 APP="dist/GPT-Image Studio.app"
 ZIP="dist/GPT-Image Studio.zip"
 
+# python3, python DEĞİL: macOS'te `python` diye bir komut yok. Erken ve
+# anlaşılır başarısız ol — yoksa hata "command not found" olarak çıkıp
+# kullanıcıya ne kuracağını söylemiyor.
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "HATA: python3 bulunamadı." >&2
+  echo "Xcode Command Line Tools kur:  xcode-select --install" >&2
+  exit 1
+fi
+
+# .venv'i BURADA oluştur. Önceki sürüm var olmasını bekliyordu; taze bir
+# kopyada (ör. GitHub'dan indirilen zip) "activate: No such file or directory"
+# ile düşüyordu ve CI bu kusuru ayrı bir "venv kur" adımıyla etrafından
+# dolaşıyordu. run.sh zaten bu deseni kullanıyor.
+if [[ ! -d .venv ]]; then
+  echo "→ .venv yok, oluşturuluyor"
+  python3 -m venv .venv
+fi
 source .venv/bin/activate
 pip install -q -r requirements.txt -r requirements-dev.txt
 
 echo "→ testler"
-python -m pytest tests/ -q
+python3 -m pytest tests/ -q
 
 echo "→ temizlik"
 rm -rf build dist

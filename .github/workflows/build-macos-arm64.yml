@@ -30,7 +30,9 @@ jobs:
           # çalışabilir. İkisi ayrı kontrol edilir: runner donanımı (uname) ve Python binary'si (platform).
           python -c "import platform; plat=platform.machine(); print('python mimarisi:', plat); plat=='arm64' or exit(1)"
 
-      - name: venv kur (build.sh bunu bekliyor)
+      # build.sh artık .venv'i kendisi oluşturuyor; bu adım yalnızca pip'i
+      # tazeliyor (runner imajındaki pip eski olabilir).
+      - name: pip'i tazele
         run: |
           set -euo pipefail
           python -m venv .venv

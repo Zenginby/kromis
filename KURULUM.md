@@ -19,26 +19,41 @@ native), Rosetta çevirisi yapılmaz.
 
 1. Uygulamaya çift tıkla. Uygulama **açılmayacak** ve şu uyarı çıkacak:
 
-   > **"GPT-Image Studio" Açılmadı**
-   > Apple, "GPT-Image Studio" uygulamasının Mac'ine zarar verebilecek ya da
-   > gizliliğini tehlikeye atabilecek kötücül yazılım içermediğini doğrulayamadı.
+   > **"GPT-Image Studio" Not Opened**
+   > Apple could not verify "GPT-Image Studio" is free of malware that may harm
+   > your Mac or compromise your privacy.
    >
-   > *(İngilizce sistemde: "GPT-Image Studio" Not Opened — Apple could not verify
-   > "GPT-Image Studio" is free of malware…)*
+   > *(Türkçe sistemde aynı uyarı "…Açılmadı / Apple … doğrulayamadı" biçiminde
+   > çıkar.)*
 
-   ⚠️ **"Çöp Sepetine Taşı" (Move to Trash) düğmesine BASMA** — uygulamayı siler.
-   **Bitti** (Done) düğmesine bas. Bu uyarı normaldir: uygulama Apple'a ücretli
-   geliştirici kaydıyla imzalanmadığı için macOS onu tanımıyor, bir sorun
-   olduğu anlamına gelmiyor.
-2. Ekranın sol üstündeki **Apple menüsü** → **Sistem Ayarları** → **Gizlilik ve Güvenlik**.
-3. Sayfayı aşağı kaydır: *"GPT-Image Studio engellendi"* satırını bul → **Yine de Aç**.
+   ### ⚠️ Burada dikkat — yanlış düğme uygulamayı siler
+
+   Uyarıdaki iki düğmeden **"Move to Trash" (Çöp Sepetine Taşı) MAVİ olan**,
+   yani macOS'un **varsayılan** düğmesi. Bu da şu demek: **Enter'a basmak
+   uygulamayı siler.**
+
+   - ❌ **"Move to Trash"e BASMA. Enter'a da BASMA.**
+   - ✅ Alttaki **"Done" (Bitti)** düğmesine bas.
+
+   Bu uyarı normaldir ve bir sorun olduğunu göstermez: uygulama Apple'a ücretli
+   geliştirici kaydıyla imzalanmadığı için macOS onu tanımıyor. İmza geçerli,
+   yalnızca Apple onayı (notarization) yok.
+2. Ekranın sol üstündeki **Apple menüsü** → **Sistem Ayarları** (System Settings)
+   → **Gizlilik ve Güvenlik** (Privacy & Security).
+3. Sayfayı aşağı kaydır: *"GPT-Image Studio engellendi"* / *"was blocked"* satırını
+   bul → **Yine de Aç** (**Open Anyway**).
 4. Çıkan onayda tekrar **Yine de Aç** → Mac şifreni gir (ya da Touch ID).
 5. Uygulama açılır. Bir daha sormaz.
 
-<!-- Adım 1'in uyarı metni 2026-07-29'da gerçek bir quarantine bayrağıyla
-(zip'ten çıkarılmış temiz kopya, flags=0001) gözle doğrulandı; İngilizce sistemde
-görülen metin yukarıda. TODO(insan): Türkçe sistemdeki birebir metin ve adım
-2-4'ün ekran görüntüleri hâlâ eksik. -->
+<!-- Adım 1-5, 2026-07-29'da İKİ makinede uçtan uca gözle doğrulandı: (a) Intel,
+zip'ten çıkarılmış temiz kopya + elle quarantine bayrağı (flags=0001);
+(b) Apple Silicon (Mac mini), AirDrop ile gelen gerçek arm64 paketi. İkisinde de
+sistem dili İngilizce'ydi, uyarı metni yukarıdaki gibiydi ve "Open Anyway"
+sonrası uygulama açıldı, ikinci açılışta sormadı.
+"Move to Trash"in MAVİ/varsayılan düğme olduğu (yani Enter'ın uygulamayı sildiği)
+ekran görüntüsüyle teyit edildi — adım 1'deki uyarı bu yüzden var.
+TODO(insan): Türkçe sistemdeki birebir metin (henüz Türkçe bir macOS'te
+denenmedi) ve adımların ekran görüntüleri. -->
 
 
 ## 3. Azure kimliğini gir

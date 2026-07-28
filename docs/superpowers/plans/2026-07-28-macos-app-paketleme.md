@@ -1042,12 +1042,13 @@ Expected: PASS (6 test).
 
 - [ ] **Step 5: `app.py`'ye bağla**
 
-Task 1'de eklenen `paths.ensure_data_dirs()` satırının hemen altına:
-
-```python
-seed.seed_builtin_logos(ASSETS_DIR, paths.bundled_logos_dir(), paths.data_dir(),
-                        now=_now())
-```
+> ⚠️ **Uygulama sırasında değişti (insan kararı).** Bu adım ilk yazımda tohumlamayı
+> **modül kapsamında** çağırıyordu. Review bunu haklı olarak kusur buldu: `run.sh`
+> uygulamayı `uvicorn app:app` ile başlatıyor, yani modülü **import** ediyor →
+> "test için import" ile "sunucu başlatma" arasında sınır yok, dolayısıyla her test
+> gerçek `assets/` dizinine tohumlama tetikliyordu. Boş `assets/` olan bir makinede
+> (temiz klon / CI) sadece test toplamak iki 300 KB PNG'yi gerçek kütüphaneye
+> kopyalardı. Karar: tohumlama **lifespan hook'una** taşındı.
 
 Import bloğuna ekle (alfabetik: `paths`'ten sonra, `storage`'tan önce):
 
@@ -1055,12 +1056,47 @@ Import bloğuna ekle (alfabetik: `paths`'ten sonra, `storage`'tan önce):
 import seed
 ```
 
-`_now()` `app.py:61`'de tanımlı, bu blok ise dosyanın en sonunda (~763. satır) → sıra sorunu yok.
+`app = FastAPI(...)` satırının hemen ÜSTÜNE lifespan'i tanımla ve bağla:
+
+```python
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """Sunucu başlarken çalışır — import anında DEĞİL.
+
+    Tohumlama gerçek dosya sistemine yazdığı için modül kapsamında olmamalı:
+    app'i yalnızca import eden testler kullanıcının gerçek assets/ dizinine
+    dokunmasın.
+    """
+    seed.seed_builtin_logos(ASSETS_DIR, paths.bundled_logos_dir(),
+                            paths.data_dir(), now=_now())
+    yield
+
+
+app = FastAPI(title="GPT-Image Studio", lifespan=_lifespan)
+```
+
+Gövde başlangıçta çalıştığı için kendisinden sonra tanımlanan `_now`'a erişmesi
+sorun değil. `@app.on_event("startup")` **kullanma** — bu FastAPI sürümünde
+deprecated, suite'in 26'lık temiz uyarı tabanını bozar.
+
+**Modül kapsamında KALMASI gerekenler** (dosya sonundaki blok):
+`paths.ensure_data_dirs()` ve `os.makedirs(STATIC_DIR, exist_ok=True)`. İkincisi
+zorunlu: `app.mount("/static", StaticFiles(...))` import anında kuruluyor ve dizin
+yoksa patlıyor. İlki bilinçli minimal müdahale — iki boş dizin yaratmak, 600 KB
+görsel kopyalamaktan bambaşka bir şey.
+
+**İki kanıt testi** (`tests/test_seed.py`): `appmod.seed.seed_builtin_logos`'a casus
+tak; (1) düz `TestClient(appmod.app)` ile hiç çağrılmadığını, (2) `with
+TestClient(appmod.app)` altında tam bir kez çağrıldığını doğrula. İkincisi
+paketlenmiş uygulamanın hâlâ tohumladığının kanıtıdır.
 
 - [ ] **Step 6: Tüm suite — mevcut kurulumun kütüphanesi bozulmadı**
 
 Run: `.venv/bin/python -m pytest tests/ -q`
-Expected: PASS, **638 test**.
+Expected: PASS, **641 test** (639 = 633 + 6 tohumlama; + 2 lifespan kanıt testi).
 
 Sonra gerçek çalıştırma: `./run.sh` → Kütüphane modalını aç → logolar listesi **eskisiyle aynı** olmalı (senin makinende kütüphane dolu → tohumlama atlanır, yalnız marker yazılır). Kontrol: `ls -la .logos-seeded` (repo kökünde, geliştirme modunda `data_dir()` = repo).
 
@@ -1249,7 +1285,7 @@ if __name__ == "__main__":
 Run: `.venv/bin/python -m pytest tests/test_desktop.py -v`
 Expected: PASS (4 test).
 
-Sonra tüm suite: `.venv/bin/python -m pytest tests/ -q` → **642 test**.
+Sonra tüm suite: `.venv/bin/python -m pytest tests/ -q` → **645 test**.
 
 - [ ] **Step 6: Pencereyi manuel doğrula (paketlemeden önce, kaynaktan)**
 
@@ -1514,9 +1550,10 @@ görüntüleriyle anlatır — terminal gerekmiyor."
 
 ## Bitirme
 
-- [ ] Tüm suite son bir kez: `.venv/bin/python -m pytest tests/ -q` → **642 test PASS**
-  (599 taban + 7 paths + 25 composite + 1 logo-500 + 6 seed + 4 desktop; composite
-  25 = planın 19'u + review sonrası 4 doğrulama + 2 eksik konum)
+- [ ] Tüm suite son bir kez: `.venv/bin/python -m pytest tests/ -q` → **645 test PASS**
+  (599 taban + 7 paths + 25 composite + 1 logo-500 + 1 logo-e2e + 8 seed + 4 desktop)
+  Review sonrası eklenenler: composite 19→25 (4 doğrulama + 2 eksik konum),
+  logo-e2e (tarayıcı adımının otomatik ikamesi), seed 6→8 (2 lifespan kanıtı)
 - [ ] `git log --oneline 04dab75..HEAD` → 6 task = 6 commit + spec commit
 - [ ] Wiki'yi güncelle (`Concepts/GPT-Image Studio.md`): v1.8 bölümü + `log.md` girdisi. Mutlaka yazılacak üç şey:
   1. `composite-logo.py`'nin **iki kopyası** olduğu (repo = uygulama kaynağı, `~/.config/claude-tools/` = blog routine'i) ve golden fixture'ların bu ikisi arasındaki kaymayı ölçtüğü.

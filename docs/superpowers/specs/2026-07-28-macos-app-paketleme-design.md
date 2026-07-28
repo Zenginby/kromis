@@ -151,7 +151,11 @@ fonksiyonu, `desktop.py` yalnızca süreç yaşam döngüsü.
 
 ## Test
 
-- **Mevcut 581 test elden geçmeden geçmeli.** Geliştirme modunda yollar birebir aynı.
+- **Test tabanı 599** (`pytest --collect-only`). Geliştirme modunda yollar birebir aynı
+  kaldığı için yol değişikliği hiçbir testi elden geçirmez. **Tek istisna:** 10 test
+  logo bindirmeyi `appmod.subprocess.run` mock'layıp komut dizisine assert ediyor
+  (`tests/test_logo.py` 7, `tests/test_folders.py` 2, `tests/test_palette_route.py` 1)
+  → port sonrası bunlar `composite.composite_logo` kwargs sözleşmesine taşınır.
 - `composite.py`: golden fixture karşılaştırmaları (K2), artı konum/ölçek/renk-seçimi
   birim testleri.
 - `paths.py`: frozen/dev ayrımı (`sys.frozen` monkeypatch'iyle), dizin oluşturma
@@ -179,6 +183,6 @@ fonksiyonu, `desktop.py` yalnızca süreç yaşam döngüsü.
 
 - Dış script'in repo modülünü import eden ince bir sarmalayıcıya indirilmesi (tek
   kaynak).
-- `app.py` 921 satır (stil sınırı 800) — palet rotalarını ayırma işi zaten ayrı bir
-  refactor olarak bekliyor; bu iş onu büyütmemeli, `_composite_logo` küçüldüğü için
-  hafif azaltmalı.
+- `app.py` **765 satır** (Wiki'deki "921 satır" notu `04dab75` refactor'ından sonra
+  stale). Stil sınırı 800 → bu iş dosyayı büyütmemeli; `_composite_logo` süreç içine
+  taşınınca subprocess/tempfile bloğu düştüğü için hafif azalmalı.

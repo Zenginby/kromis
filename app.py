@@ -5,8 +5,6 @@ import base64
 import datetime as _dt
 import io
 import os
-import subprocess
-import tempfile
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
@@ -21,6 +19,7 @@ from starlette.datastructures import UploadFile as FormUploadFile
 import assets_store
 import azure_client as ac
 import color_names
+import composite
 import folders
 import palette
 import palette_store
@@ -35,7 +34,6 @@ BASE_DIR = paths.REPO_DIR                    # geriye uyum: mevcut kullanımlar 
 OUTPUT_DIR = paths.output_dir()
 STATIC_DIR = paths.static_dir()
 ASSETS_DIR = paths.assets_dir()
-COMPOSITE_SCRIPT = os.path.expanduser("~/.config/claude-tools/composite-logo.py")
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024          # dosya başına
 MAX_EDIT_IMAGES = 4                          # ana görsel + en fazla 3 ek referans
 MAX_REQUEST_BYTES = MAX_UPLOAD_BYTES * MAX_EDIT_IMAGES  # tüm multipart gövdesi
@@ -551,38 +549,28 @@ def delete_palette_route(palette_id: str) -> dict:
 
 
 def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
-    """composite-logo.py'yi verilen seçeneklerle çalıştırır, sonuç PNG baytlarını döndürür.
+    """Logo/motto filigranını süreç içinde bindirir (composite.py).
 
-    base_image ve output_path ilk iki konumsal argümandır (cmd[2], cmd[3]);
-    bayraklar sonradan gelir.
+    asset_id verilirse seçilen tek görsel her iki varyant olarak geçilir: renk
+    seçimi (auto/blue/white) hangisine düşerse düşsün aynı görsel kullanılır.
     """
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-        tmp_out = tmp.name
+    logo_blue = paths.builtin_logo("blue")
+    logo_white = paths.builtin_logo("white")
+    if req.asset_id:
+        overlay_path = assets_store.asset_path(req.asset_kind, req.asset_id, ASSETS_DIR)
+        if overlay_path is None:
+            raise HTTPException(status_code=404, detail="görsel bulunamadı")
+        logo_blue = logo_white = overlay_path
     try:
-        cmd = [
-            "python3", COMPOSITE_SCRIPT, src_path, tmp_out,
-            "--position", req.position,
-            "--color", req.color,
-            "--scale", str(req.size),
-            "--shadow-alpha", str(req.shadow_alpha),
-            "--shadow-blur", str(req.shadow_blur),
-        ]
-        # Özel logo/motto seçildiyse aynı dosyayı her iki varyant olarak geç:
-        # renk seçimi (auto/blue/white) hangisine düşerse düşsün tek görsel kullanılır.
-        if req.asset_id:
-            overlay_path = assets_store.asset_path(req.asset_kind, req.asset_id, ASSETS_DIR)
-            if overlay_path is None:
-                raise HTTPException(status_code=404, detail="görsel bulunamadı")
-            cmd += ["--logo-blue", overlay_path, "--logo-white", overlay_path]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise HTTPException(status_code=500,
-                                detail=f"Logo bindirme başarısız: {result.stderr[:200]}")
-        with open(tmp_out, "rb") as f:
-            return f.read()
-    finally:
-        if os.path.exists(tmp_out):
-            os.remove(tmp_out)
+        return composite.composite_logo(
+            src_path,
+            logo_blue=logo_blue, logo_white=logo_white,
+            position=req.position, color=req.color, scale=req.size,
+            shadow_alpha=req.shadow_alpha, shadow_blur=req.shadow_blur,
+        )
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=500,
+                            detail=f"Logo bindirme başarısız: {exc}") from exc
 
 
 def _logo_src_path(image_id: str) -> str:

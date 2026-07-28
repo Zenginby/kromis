@@ -17,15 +17,10 @@ def _png(color=(30, 80, 200, 255), size=(64, 64)) -> bytes:
     return b.getvalue()
 
 
-def _fake_composite(cmd, capture_output, text):
-    """test_logo._fake_run_factory ile aynı sözleşme: cmd[2]=girdi, cmd[3]=çıktı."""
-    with open(cmd[2], "rb") as s, open(cmd[3], "wb") as d:
-        d.write(s.read())
-
-    class R:
-        returncode = 0
-        stderr = ""
-    return R()
+def _fake_composite(base_path, **kwargs):
+    """composite.composite_logo yerine geçer: girdiyi olduğu gibi döndürür."""
+    with open(base_path, "rb") as f:
+        return f.read()
 
 
 def _client(tmp_path, monkeypatch, *, real_png=False):
@@ -216,7 +211,7 @@ def test_edit_with_unknown_folder_404(tmp_path, monkeypatch):
 # ── türevler kaynağın klasörünü miras alır ─────────────────────────────
 def test_logo_derivative_inherits_source_folder(tmp_path, monkeypatch):
     c = _client(tmp_path, monkeypatch)
-    monkeypatch.setattr(appmod.subprocess, "run", _fake_composite)
+    monkeypatch.setattr(appmod.composite, "composite_logo", _fake_composite)
     fid = _new_folder(c)
     src_id = _generate(c, fid).json()["images"][0]["id"]
     rec = c.post("/api/logo", json={"id": src_id}).json()["image"]
@@ -276,7 +271,7 @@ def test_move_image_between_folders(tmp_path, monkeypatch):
 def test_move_does_not_touch_the_file_or_provenance(tmp_path, monkeypatch):
     """Klasör yalnızca etiket: dosya adı/yolu ve parent_id değişmemeli."""
     c = _client(tmp_path, monkeypatch)
-    monkeypatch.setattr(appmod.subprocess, "run", _fake_composite)
+    monkeypatch.setattr(appmod.composite, "composite_logo", _fake_composite)
     fid = _new_folder(c)
     src_id = _generate(c).json()["images"][0]["id"]
     derived = c.post("/api/logo", json={"id": src_id}).json()["image"]

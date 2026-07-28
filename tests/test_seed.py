@@ -85,8 +85,6 @@ def test_writes_the_marker_file(tmp_path):
 
 def test_seeding_does_not_fire_on_plain_import(monkeypatch):
     """Seeding should NOT fire when app is imported or TestClient is created without context."""
-    # Monkeypatch to track calls
-    original_seed = appmod.seed.seed_builtin_logos
     call_recorder = MagicMock()
     monkeypatch.setattr(appmod.seed, "seed_builtin_logos", call_recorder)
 
@@ -96,14 +94,9 @@ def test_seeding_does_not_fire_on_plain_import(monkeypatch):
     # Seeding should not have been called during client construction without `with`
     call_recorder.assert_not_called()
 
-    # Restore for other tests
-    monkeypatch.setattr(appmod.seed, "seed_builtin_logos", original_seed)
-
 
 def test_seeding_fires_on_lifespan_startup(monkeypatch):
     """Seeding MUST fire when the ASGI app actually starts (within lifespan context)."""
-    # Monkeypatch to track calls
-    original_seed = appmod.seed.seed_builtin_logos
     call_recorder = MagicMock()
     monkeypatch.setattr(appmod.seed, "seed_builtin_logos", call_recorder)
 
@@ -118,5 +111,27 @@ def test_seeding_fires_on_lifespan_startup(monkeypatch):
         assert args[2] == appmod.paths.data_dir()
         assert "now" in kwargs
 
-    # Restore for other tests
-    monkeypatch.setattr(appmod.seed, "seed_builtin_logos", original_seed)
+
+def test_lifespan_survives_a_seeding_error(monkeypatch, tmp_path):
+    """I2: tohumlama patlarsa (dolu disk, izinsiz dizin, bozuk PNG) uygulamanın
+    TAMAMI düşmemeli — guard olmadan uvicorn'un startup()'ı hiç bitmez,
+    desktop.py 15 sn sonra hata verir ve kullanıcı hiçbir pencere görmez.
+
+    `paths.data_dir()` gerçek repo köküne değil `tmp_path`'e yönlendirilir ki
+    hata.log gerçek dosya sistemine değil izole bir dizine yazılsın.
+    """
+    monkeypatch.setattr(appmod, "ASSETS_DIR", str(tmp_path / "assets"))
+    monkeypatch.setattr(appmod.paths, "data_dir", lambda: str(tmp_path))
+
+    def boom(*args, **kwargs):
+        raise OSError("disk dolu (simüle)")
+
+    monkeypatch.setattr(appmod.seed, "seed_builtin_logos", boom)
+
+    with TestClient(appmod.app) as client:
+        r = client.get("/api/settings")
+        assert r.status_code == 200
+
+    log_path = tmp_path / "hata.log"
+    assert log_path.is_file()
+    assert "disk dolu" in log_path.read_text(encoding="utf-8")

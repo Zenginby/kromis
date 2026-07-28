@@ -5,6 +5,7 @@ import base64
 import datetime as _dt
 import io
 import os
+import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -21,6 +22,7 @@ import assets_store
 import azure_client as ac
 import color_names
 import composite
+import errlog
 import folders
 import palette
 import palette_store
@@ -51,9 +53,18 @@ async def _lifespan(app: FastAPI):
     Tohumlama gerçek dosya sistemine yazdığı için modül kapsamında çalışmamalı:
     app'i yalnızca import eden testler kullanıcının gerçek assets/ dizinine
     dokunmasın.
+
+    Tohumlama kozmetik bir kolaylıktır (logo seçiciyi önceden doldurur) —
+    başarısız olması (dolu disk, kısıtlı Application Support, okunamayan
+    gömülü PNG) uygulamanın TAMAMINI düşürmemeli: guard olmadan uvicorn'un
+    startup()'ı asla bitmez, desktop.py 15 sn sonra hata verir ve kullanıcı
+    hiçbir pencere görmez. Hata hata.log'a yazılır, uygulama yine de açılır.
     """
-    seed.seed_builtin_logos(ASSETS_DIR, paths.bundled_logos_dir(),
-                            paths.data_dir(), now=_now())
+    try:
+        seed.seed_builtin_logos(ASSETS_DIR, paths.bundled_logos_dir(),
+                                paths.data_dir(), now=_now())
+    except Exception:
+        errlog.safe_append(paths.data_dir(), traceback.format_exc())
     yield
 
 
@@ -763,9 +774,14 @@ def index() -> FileResponse:
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 
-# static/ dosyalarını /static altında servis et (index route'undan sonra mount)
-# STATIC_DIR Task 6'da oluşturulacak; mount import anında hata vermesin diye
-# önce garanti altına alınır.
+# static/ dosyalarını /static altında servis et (index route'undan sonra mount).
+# Geliştirmede STATIC_DIR git'te izlenen bir dizindir ama boş bir checkout'ta
+# (taze klon) henüz yoksa StaticFiles mount'u import anında patlardı — bu
+# yüzden yalnızca geliştirmede garanti altına alınır. Paket içindeyken
+# (frozen) STATIC_DIR sys._MEIPASS altında PyInstaller'ın gömdüğü salt-okunur
+# bir dizindir: hem zaten var, hem de oraya os.makedirs YAZMA denemesi bile
+# yanlış — bu dal frozen'da hiç çalışmamalı.
 paths.ensure_data_dirs()
-os.makedirs(STATIC_DIR, exist_ok=True)
+if not paths.is_frozen():
+    os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

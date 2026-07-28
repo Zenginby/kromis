@@ -65,6 +65,35 @@ def test_dead_thread_raises_instead_of_hanging():
         desktop.start_server(_probe_app(), host="256.256.256.256", timeout=3.0)
 
 
+def test_dead_thread_error_reports_the_underlying_exception(monkeypatch):
+    """I1: 'thread öldü' NEDENsiz kalmamalı — thread'i öldüren gerçek istisna
+    mesaja eklenmeli, aksi halde Finder'dan açan kullanıcı stderr'i göremediği
+    için teşhis imkânsız kalır.
+
+    Gerçek uvicorn yerine anında çöken sahte bir sunucu kullanılır (aynı desen
+    `test_deadline_raises_when_server_never_starts`'ta) — geçersiz host'un
+    tetiklediği gerçek soket/uvloop kurulumunu (ve onun üçüncü taraf
+    uyarılarını) tekrar tetiklemeden yalnızca yakalama mekanizmasını sınar."""
+
+    class _DiesImmediatelyServer:
+        def __init__(self, config: uvicorn.Config) -> None:
+            self.config = config
+            self.started = False
+            self.should_exit = False
+            self.servers: list = []
+
+        def run(self, sockets=None) -> None:
+            raise ValueError("yapay çöküş")
+
+    monkeypatch.setattr(desktop.uvicorn, "Server", _DiesImmediatelyServer)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        desktop.start_server(_probe_app())
+    message = str(exc_info.value)
+    assert "thread öldü" in message
+    assert "yapay çöküş" in message
+
+
 def test_deadline_raises_when_server_never_starts(monkeypatch):
     """Thread canlı kalıp `started` hiç True olmazsa, poll döngüsü gerçekten
     deadline'da çıkmalı — bu, `test_dead_thread_raises_instead_of_hanging`'in
@@ -166,3 +195,78 @@ def test_main_wires_real_port_into_window_and_shuts_down_cleanly(monkeypatch):
     assert live_thread_at_start_return["alive_before_shutdown"] is True
     assert captured["server"].should_exit is True
     assert not captured["thread"].is_alive()
+
+
+def test_shutdown_logs_when_thread_join_times_out(monkeypatch, tmp_path):
+    """Minor bulgu: `thread.join(timeout=...)` dönüş değeri eskiden atılıyordu
+    — zaman aşımına uğrayan bir kapanış sessizce geçiyordu. Artık hata.log'a
+    yazılmalı (isimli sabit `_JOIN_TIMEOUT`, `daemon=True` yine de süreci
+    kurtarır — bkz. desktop.py docstring'i)."""
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+
+    class _NeverJoinsThread:
+        def is_alive(self) -> bool:
+            return True
+
+        def join(self, timeout: float | None = None) -> None:
+            return None
+
+    class _FakeServer:
+        should_exit = False
+
+    desktop._shutdown(_FakeServer(), _NeverJoinsThread())
+
+    log_path = tmp_path / "hata.log"
+    assert log_path.is_file()
+    assert "kapanmadı" in log_path.read_text(encoding="utf-8")
+
+
+def test_main_logs_and_shows_alert_when_startup_fails(monkeypatch, tmp_path):
+    """I1: Finder'dan açan kullanıcı stderr göremez — main() her hatayı
+    hata.log'a yazmalı, native bir uyarı göstermeli ve süreç non-zero çıkmalı.
+
+    `_run` doğrudan patlatılır (start_server/webview'ın gerçek başarısızlık
+    yollarının hepsi zaten `_run` içinden aynı istisna sınıfıyla çıkar);
+    burada asıl doğrulanan main()'in sarmalayıcı davranışı."""
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+
+    def boom() -> None:
+        raise RuntimeError("test patlaması")
+
+    monkeypatch.setattr(desktop, "_run", boom)
+
+    alert_calls: list[tuple] = []
+    monkeypatch.setattr(desktop.subprocess, "run",
+                        lambda *a, **k: alert_calls.append((a, k)))
+
+    with pytest.raises(SystemExit) as exc_info:
+        desktop.main()
+    assert exc_info.value.code == 1
+
+    log_path = tmp_path / "hata.log"
+    assert log_path.is_file()
+    content = log_path.read_text(encoding="utf-8")
+    assert "RuntimeError" in content
+    assert "test patlaması" in content
+
+    assert len(alert_calls) == 1
+    args, kwargs = alert_calls[0]
+    assert args[0][0] == "osascript"
+
+
+def test_alert_failure_does_not_crash_main(monkeypatch, tmp_path):
+    """I1: uyarı gösterme denemesinin kendisi patlarsa bile main() yine de
+    (loglanmış, non-zero) temiz çıkmalı — kullanıcı hâlâ hiçbir şey görmese
+    de süreç asılı kalmamalı."""
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(desktop, "_run", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+
+    def boom_subprocess(*args, **kwargs):
+        raise OSError("osascript bulunamadı (simüle)")
+
+    monkeypatch.setattr(desktop.subprocess, "run", boom_subprocess)
+
+    with pytest.raises(SystemExit) as exc_info:
+        desktop.main()
+    assert exc_info.value.code == 1
+    assert (tmp_path / "hata.log").is_file()

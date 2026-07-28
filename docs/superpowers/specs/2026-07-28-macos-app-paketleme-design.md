@@ -23,8 +23,31 @@ bir kez Gatekeeper uyarısını geçer, dişli ikonundan Azure kimliğini girer 
 
 ## Kapsam dışı (bilinçli)
 
-Windows `.exe`, Apple notarization, otomatik güncelleme, universal2/Intel desteği,
-DMG installer. Hedef makinelerin hepsi Apple Silicon.
+Windows `.exe`, Apple notarization, otomatik güncelleme, universal2, DMG installer.
+
+## ⚠️ Uygulama sırasında ortaya çıkan kısıt: derleme makinesi Intel
+
+Bu spec "hedef makinelerin hepsi Apple Silicon" bilgisinden yola çıkıp derlemenin
+geliştirme makinesinde yapılacağını varsaymıştı. **Task 6'da ortaya çıktı ki
+geliştirme makinesi Intel'dir** (`uname -m` → `x86_64`; iMac20,2, Core i9-10910;
+venv Python `macosx-26.0-x86_64`). PyInstaller çalışan CPython'un kendi C
+uzantılarını pakete gömdüğü için **çapraz derleme yapamaz** → Intel'de arm64
+paket üretilemez.
+
+**Karar (insan): iki hatlı yaklaşım.**
+
+1. **Yerel x86_64 derlemesi = doğrulama hattı.** Intel'de nativ çalışır, yani
+   paketleme yolunun tamamı (pencere, kimlik girişi, üretim, geçmiş kalıcılığı,
+   Gatekeeper akışı) geliştirme makinesinde uçtan uca sınanabilir. Bu, arm64
+   hattının test edilemezliğini telafi eder.
+2. **GitHub Actions arm64 = gönderim hattı.** `macos-14`+ runner'ları arm64'tür;
+   ofis makinelerine gidecek paketi orada derleyip artifact olarak indiririz.
+   Rosetta diyalogu çıkmaz.
+
+Reddedilen alternatifler: **yalnız x86_64 + Rosetta** (bugün biterdi ama her
+makinede bir kerelik yönetici şifreli Rosetta kurulumu ister ve Apple Rosetta'yı
+macOS 27 sonrası kısıtlıyor); **yalnız Actions** (nativ ama paketi ne geliştirici
+ne asistan test edebilir, ilk çalıştıran ofis çalışanı olur).
 
 ## Doğrulanmış ortam
 

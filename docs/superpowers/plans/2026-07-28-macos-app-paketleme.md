@@ -12,7 +12,13 @@
 
 ## Global Constraints
 
-- Hedef yalnız **macOS + Apple Silicon (arm64)**. Windows, Intel, universal2, notarization kapsam dışı.
+- Hedef **macOS**. Windows, universal2, notarization kapsam dışı.
+- ⚠️ **Mimari (Task 6'da düzeltildi):** ofis makineleri arm64, ama **derleme
+  makinesi Intel'dir** (`uname -m` → `x86_64`, iMac20,2). PyInstaller çapraz
+  derleme yapamaz. İki hat: yerel **x86_64** derlemesi doğrulama için (Intel'de
+  nativ çalışır → paketleme yolu uçtan uca sınanabilir), **GitHub Actions arm64**
+  runner'ı gönderim paketi için. `build.sh` mimariyi host'tan almalı, sabitlemek
+  yerine.
 - Kod imzalama kimliği **yok** → yalnızca ad-hoc imza (`codesign --sign -`).
 - Python **3.14.6**; bağımlılıklar `requirements.txt`'te pinli kalır. Yeni: `pywebview==6.2.*` (runtime), `pyinstaller==6.21.*` (yalnız build, `requirements-dev.txt`).
 - **Test tabanı: 599 test** (`.venv/bin/python -m pytest tests/ -q`). Task 3'te 10 test bilinçli olarak yeniden yazılır; onun dışında hiçbir mevcut test elden geçmez ve suite her task sonunda **tamamen yeşil** olmalı.

@@ -63,6 +63,8 @@ def test_leaves_a_non_empty_library_alone(tmp_path):
 
     assert added == []
     assert [r["name"] for r in astore.list_assets("logos", assets)] == ["kendi logom"]
+    # Marker must be written even when no seeding occurs (protects against resurrection)
+    assert (tmp_path / ".logos-seeded").is_file()
 
 
 def test_missing_bundled_dir_is_not_fatal(tmp_path):

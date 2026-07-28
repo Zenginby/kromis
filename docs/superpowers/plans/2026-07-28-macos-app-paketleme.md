@@ -853,7 +853,7 @@ Expected: **çıktı yok**.
 - [ ] **Step 6: Tüm suite + gerçek logo ile canlı doğrulama**
 
 Run: `.venv/bin/python -m pytest tests/ -q`
-Expected: PASS, **626 test** (625 + 1 yeni 500 testi; 10 test yeniden yazıldı, sayı değişmez).
+Expected: PASS, **632 test** (631 + 1 yeni 500 testi; 10 test yeniden yazıldı, sayı değişmez).
 
 Sonra gerçek uçtan uca (mock'suz):
 
@@ -1060,7 +1060,7 @@ import seed
 - [ ] **Step 6: Tüm suite — mevcut kurulumun kütüphanesi bozulmadı**
 
 Run: `.venv/bin/python -m pytest tests/ -q`
-Expected: PASS, **632 test**.
+Expected: PASS, **638 test**.
 
 Sonra gerçek çalıştırma: `./run.sh` → Kütüphane modalını aç → logolar listesi **eskisiyle aynı** olmalı (senin makinende kütüphane dolu → tohumlama atlanır, yalnız marker yazılır). Kontrol: `ls -la .logos-seeded` (repo kökünde, geliştirme modunda `data_dir()` = repo).
 
@@ -1249,7 +1249,7 @@ if __name__ == "__main__":
 Run: `.venv/bin/python -m pytest tests/test_desktop.py -v`
 Expected: PASS (4 test).
 
-Sonra tüm suite: `.venv/bin/python -m pytest tests/ -q` → **636 test**.
+Sonra tüm suite: `.venv/bin/python -m pytest tests/ -q` → **642 test**.
 
 - [ ] **Step 6: Pencereyi manuel doğrula (paketlemeden önce, kaynaktan)**
 
@@ -1514,8 +1514,9 @@ görüntüleriyle anlatır — terminal gerekmiyor."
 
 ## Bitirme
 
-- [ ] Tüm suite son bir kez: `.venv/bin/python -m pytest tests/ -q` → **636 test PASS**
-  (599 taban + 7 paths + 19 composite + 1 logo-500 + 6 seed + 4 desktop)
+- [ ] Tüm suite son bir kez: `.venv/bin/python -m pytest tests/ -q` → **642 test PASS**
+  (599 taban + 7 paths + 25 composite + 1 logo-500 + 6 seed + 4 desktop; composite
+  25 = planın 19'u + review sonrası 4 doğrulama + 2 eksik konum)
 - [ ] `git log --oneline 04dab75..HEAD` → 6 task = 6 commit + spec commit
 - [ ] Wiki'yi güncelle (`Concepts/GPT-Image Studio.md`): v1.8 bölümü + `log.md` girdisi. Mutlaka yazılacak üç şey:
   1. `composite-logo.py`'nin **iki kopyası** olduğu (repo = uygulama kaynağı, `~/.config/claude-tools/` = blog routine'i) ve golden fixture'ların bu ikisi arasındaki kaymayı ölçtüğü.

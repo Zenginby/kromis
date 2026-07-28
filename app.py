@@ -24,6 +24,7 @@ import folders
 import palette
 import palette_store
 import paths
+import seed
 import storage
 from models import (MAX_PROMPT_CHARS, BannerRequest, BulkImagesRequest,
                     BulkMoveRequest, FolderRequest, GenerateRequest, LogoRequest,
@@ -751,5 +752,7 @@ def index() -> FileResponse:
 # STATIC_DIR Task 6'da oluşturulacak; mount import anında hata vermesin diye
 # önce garanti altına alınır.
 paths.ensure_data_dirs()
+seed.seed_builtin_logos(ASSETS_DIR, paths.bundled_logos_dir(), paths.data_dir(),
+                        now=_now())
 os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

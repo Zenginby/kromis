@@ -5,6 +5,9 @@ name: macOS arm64 paketi
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: macos-14          # arm64 (Apple Silicon) runner
@@ -23,7 +26,9 @@ jobs:
           ARCH="$(uname -m)"
           echo "runner mimarisi: $ARCH"
           test "$ARCH" = "arm64" || { echo "HATA: arm64 bekleniyordu, $ARCH bulundu"; exit 1; }
-          python -c "import sysconfig; print('python plat:', sysconfig.get_platform())"
+          # PyInstaller runner'daki yorumlayıcıyı embed ediyor; runner mimarisinden bağımsız olarak
+          # çalışabilir. İkisi ayrı kontrol edilir: runner donanımı (uname) ve Python binary'si (platform).
+          python -c "import platform; plat=platform.machine(); print('python mimarisi:', plat); plat=='arm64' or exit(1)"
 
       - name: venv kur (build.sh bunu bekliyor)
         run: |

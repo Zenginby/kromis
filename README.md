@@ -28,8 +28,8 @@ paketleme yolunu uçtan uca sınamak için.
 
 **Gönderim hattı (CI):** Ofis çalışanlarına gidecek arm64 paket, GitHub Actions'ın
 arm64 runner'ında (macos-14) aynı spec ve `build.sh` ile üretilir. Actions → **Kodu
-Çalıştır** (Run Workflow) → `build-macos-arm64` → **Yapıtlar** (Artifacts) den
-`gpt-image-studio-macos-arm64.zip` indir.
+Çalıştır** (Run Workflow) → **macOS arm64 paketi** → **Yapıtlar** (Artifacts) den
+`gpt-image-studio-macos-arm64.zip` indir (`.github/workflows/build-macos-arm64.yml`).
 
 ## Özellikler
 - Prompt'tan görsel üretme (boyut/kalite/adet)

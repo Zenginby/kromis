@@ -8,3 +8,4 @@ __pycache__/
 
 # graphify generated artifacts
 graphify-out/
+.superpowers/

@@ -308,6 +308,7 @@ tests/test_composite.py bunlara karşı bayt bayt karşılaştırma yapar.
 """
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -350,11 +351,25 @@ def make_bases() -> None:
     overlay.save(os.path.join(FIXTURES, "overlay.png"), "PNG")
 
 
+def write_cases_manifest() -> None:
+    """Vakaları JSON'a yazar; test buradan parametrize olur.
+
+    Liste iki yerde (üretici + test) elle durursa sessizce ayrışır ve golden'lar
+    yanlış vakayla karşılaştırılır. Tek kaynak burada.
+    """
+    keys = ("name", "base", "position", "color", "scale",
+            "shadow_alpha", "shadow_blur", "overlay")
+    with open(os.path.join(FIXTURES, "cases.json"), "w") as f:
+        json.dump([dict(zip(keys, case)) for case in CASES], f,
+                  ensure_ascii=False, indent=2)
+
+
 def main() -> int:
     if not os.path.isfile(SCRIPT):
         print(f"HATA: dış script bulunamadı: {SCRIPT}", file=sys.stderr)
         return 1
     make_bases()
+    write_cases_manifest()
     for (name, base, position, color, scale, sa, sb, overlay) in CASES:
         out = os.path.join(FIXTURES, f"golden-{name}.png")
         blue, white = LOGO_BLUE, LOGO_WHITE
@@ -384,7 +399,7 @@ ls -la tests/fixtures/logo/
 open tests/fixtures/logo/golden-auto-on-light.png tests/fixtures/logo/golden-auto-on-dark.png
 ```
 
-Expected: 6 `golden-*.png` + 2 base + 1 overlay. **Gözle kontrol:** açık zeminde MAVİ logo, koyu zeminde BEYAZ logo görünmeli (auto dalı iki yönü de kapsıyor). Toplam boyut ~1 MB'ı geçmemeli (`du -sh tests/fixtures/logo/`).
+Expected: 6 `golden-*.png` + 2 base + 1 overlay + `cases.json`. **Gözle kontrol:** açık zeminde MAVİ logo, koyu zeminde BEYAZ logo görünmeli (auto dalı iki yönü de kapsıyor). Toplam boyut ~1 MB'ı geçmemeli (`du -sh tests/fixtures/logo/`).
 
 - [ ] **Step 4: Golden testleri yaz (başarısız olacak)**
 
@@ -393,6 +408,7 @@ Expected: 6 `golden-*.png` + 2 base + 1 overlay. **Gözle kontrol:** açık zemi
 ```python
 """composite.py, dış composite-logo.py ile bayt bayt aynı çıktı vermeli."""
 import io
+import json
 import os
 
 import pytest
@@ -406,24 +422,21 @@ LOGO_BLUE = os.path.join(REPO, "bundled", "logos", "kurum-logo-blue.png")
 LOGO_WHITE = os.path.join(REPO, "bundled", "logos", "kurum-logo-white.png")
 OVERLAY = os.path.join(FIXTURES, "overlay.png")
 
-# tools/make_logo_goldens.py CASES ile birebir aynı olmalı.
-CASES = [
-    ("defaults",         "base-light", "bottom-right",  "auto",  0.14, 120, 6,  None),
-    ("topleft-blue-lg",  "base-light", "top-left",      "blue",  0.30, 0,   0,  None),
-    ("center-white",     "base-dark",  "center",        "white", 0.14, 200, 12, None),
-    ("auto-on-light",    "base-light", "bottom-center", "auto",  0.14, 120, 6,  None),
-    ("auto-on-dark",     "base-dark",  "top-right",     "auto",  0.14, 120, 6,  None),
-    ("custom-overlay",   "base-dark",  "center",        "auto",  0.20, 60,  4,  "overlay"),
-]
+# Vakaların tek kaynağı üreticinin yazdığı manifest — elle ikinci bir liste
+# tutulsa golden'lar sessizce yanlış vakayla eşleşebilirdi.
+with open(os.path.join(FIXTURES, "cases.json")) as _f:
+    CASES = json.load(_f)
 
 
-@pytest.mark.parametrize("name,base,position,color,scale,sa,sb,overlay", CASES)
-def test_port_matches_the_external_script(name, base, position, color, scale, sa, sb, overlay):
-    blue, white = (OVERLAY, OVERLAY) if overlay else (LOGO_BLUE, LOGO_WHITE)
+@pytest.mark.parametrize("case", CASES, ids=[c["name"] for c in CASES])
+def test_port_matches_the_external_script(case):
+    name, base = case["name"], case["base"]
+    blue, white = (OVERLAY, OVERLAY) if case["overlay"] else (LOGO_BLUE, LOGO_WHITE)
     produced = composite.composite_logo(
         os.path.join(FIXTURES, f"{base}.png"),
-        logo_blue=blue, logo_white=white, position=position, color=color,
-        scale=scale, shadow_alpha=sa, shadow_blur=sb)
+        logo_blue=blue, logo_white=white,
+        position=case["position"], color=case["color"], scale=case["scale"],
+        shadow_alpha=case["shadow_alpha"], shadow_blur=case["shadow_blur"])
 
     golden_path = os.path.join(FIXTURES, f"golden-{name}.png")
     with open(golden_path, "rb") as f:

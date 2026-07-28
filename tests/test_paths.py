@@ -1,7 +1,9 @@
 import os
 import sys
+from unittest.mock import MagicMock
 
 import pytest
+from fastapi.testclient import TestClient
 
 import paths
 
@@ -53,6 +55,24 @@ def test_builtin_logo_resolves_both_variants():
 def test_builtin_logo_rejects_unknown_variant():
     with pytest.raises(ValueError):
         paths.builtin_logo("kirmizi")
+
+
+def test_ensure_data_dirs_runs_on_startup_not_on_import(monkeypatch):
+    """Dizin açmak da bir yan etkidir — tohumlamayla aynı gerekçe (I3).
+
+    `import app` eden herhangi bir araç (test, tip denetleyici, betik)
+    kullanıcının gerçek `~/Library/Application Support/...` ağacını
+    yaratmamalı; dizinler sunucu gerçekten başlarken açılır.
+    """
+    import app as appmod
+    recorder = MagicMock()
+    monkeypatch.setattr(appmod.paths, "ensure_data_dirs", recorder)
+
+    TestClient(appmod.app)  # context yok → lifespan çalışmaz
+    recorder.assert_not_called()
+
+    with TestClient(appmod.app):
+        recorder.assert_called_once()
 
 
 def test_ensure_data_dirs_is_idempotent(monkeypatch, tmp_path):

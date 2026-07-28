@@ -50,17 +50,25 @@ Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 async def _lifespan(app: FastAPI):
     """Sunucu başlarken çalışır — import anında DEĞİL.
 
-    Tohumlama gerçek dosya sistemine yazdığı için modül kapsamında çalışmamalı:
-    app'i yalnızca import eden testler kullanıcının gerçek assets/ dizinine
-    dokunmasın.
+    Hem dizin açma hem tohumlama gerçek dosya sistemine dokunduğu için modül
+    kapsamında çalışmamalı: app'i yalnızca import eden bir test ya da betik
+    kullanıcının gerçek veri dizinini (frozen'da ~/Library/Application
+    Support/...) yaratmasın, assets/'ine yazmasın.
 
     Tohumlama kozmetik bir kolaylıktır (logo seçiciyi önceden doldurur) —
     başarısız olması (dolu disk, kısıtlı Application Support, okunamayan
     gömülü PNG) uygulamanın TAMAMINI düşürmemeli: guard olmadan uvicorn'un
     startup()'ı asla bitmez, desktop.py 15 sn sonra hata verir ve kullanıcı
     hiçbir pencere görmez. Hata hata.log'a yazılır, uygulama yine de açılır.
+
+    Dizin açma da aynı guard'ın içinde: patlarsa (izinsiz Application Support)
+    tek başına pencereyi engellememeli — yazma yollarının hepsi (storage,
+    assets_store, folders, palette_store) kendi `makedirs`'ini zaten yapıyor,
+    yani hata gerçekten kalıcıysa kullanıcı istek başına anlaşılır bir hata
+    görür; açılmayan bir uygulamadan iyidir.
     """
     try:
+        paths.ensure_data_dirs()
         seed.seed_builtin_logos(ASSETS_DIR, paths.bundled_logos_dir(),
                                 paths.data_dir(), now=_now())
     except Exception:
@@ -595,9 +603,17 @@ def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
             position=req.position, color=req.color, scale=req.size,
             shadow_alpha=req.shadow_alpha, shadow_blur=req.shadow_blur,
         )
-    except (OSError, ValueError) as exc:
-        raise HTTPException(status_code=500,
-                            detail=f"Logo bindirme başarısız: {exc}") from exc
+    except Exception as exc:
+        # Geniş yakalama bilinçli: PIL'in DecompressionBombError'ı doğrudan
+        # Exception'dan türüyor, OSError/ValueError ile sınırlı bir except onu
+        # kaçırıp kullanıcıya çıplak bir sunucu hatası gösteriyordu. Buradaki
+        # sözleşme "bindirme neyle patlarsa patlasın Türkçe 500 dön".
+        raise HTTPException(
+            status_code=500,
+            # str(exc) boş olabilir (argümansız istisna) — o zaman sınıf adı
+            # hiç yoktan iyidir. `exc or ...` işe yaramaz: istisna nesneleri
+            # her zaman truthy.
+            detail=f"Logo bindirme başarısız: {str(exc) or type(exc).__name__}") from exc
 
 
 def _logo_src_path(image_id: str) -> str:
@@ -781,7 +797,9 @@ def index() -> FileResponse:
 # (frozen) STATIC_DIR sys._MEIPASS altında PyInstaller'ın gömdüğü salt-okunur
 # bir dizindir: hem zaten var, hem de oraya os.makedirs YAZMA denemesi bile
 # yanlış — bu dal frozen'da hiç çalışmamalı.
-paths.ensure_data_dirs()
+#
+# Yazılabilir dizinler (output/, assets/) burada AÇILMAZ: mount'un onlara
+# ihtiyacı yok ve import'un yan etkisi olmamalı — açılış `_lifespan`'da.
 if not paths.is_frozen():
     os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

@@ -86,6 +86,23 @@ def test_region_box_stays_inside_the_image() -> None:
         assert 0 <= y0 < y1 <= 100
 
 
+def test_region_box_never_collapses_on_tiny_images() -> None:
+    """frac * kenar 1 px'in altına düşerse kutu boşalır.
+
+    Boş bir crop'ta ImageStat.Stat ortalama hesaplarken sıfıra bölerdi — yani
+    color="auto" küçücük bir görselde ZeroDivisionError'a düşerdi.
+    """
+    for position in composite.POSITIONS:
+        x0, y0, x1, y1 = composite.region_box(3, 3, position)
+        assert x0 < x1 and y0 < y1, f"{position}: kutu boş — {(x0, y0, x1, y1)}"
+
+
+def test_auto_color_works_on_a_tiny_image() -> None:
+    tiny = Image.new("RGBA", (3, 3), (255, 255, 255, 255))
+    assert composite.pick_logo(tiny, "bottom-right", "auto",
+                               LOGO_BLUE, LOGO_WHITE) == LOGO_BLUE
+
+
 def test_returns_png_bytes_without_touching_disk() -> None:
     """PNG bayt döner; fixtures dizinine ve cwd'ye hiçbir şey yazmaz.
 

@@ -46,6 +46,9 @@ def seed_builtin_logos(assets_dir: str, bundled_dir: str, marker_dir: str,
 
 
 def _touch(path: str) -> None:
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
-        f.write("")
+    # dirname boş olabilir (marker_dir göreli ve tek parçalı) — makedirs("") patlar.
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(path, "w"):
+        pass

@@ -15,6 +15,9 @@ import io
 from PIL import Image, ImageFilter, ImageStat
 
 BRIGHTNESS_THRESHOLD = 140  # 0-255; üstü "açık zemin" sayılır
+# Gölgenin logoya göre kaydırması (px) — dış script'ten birebir taşındı;
+# golden fixture'lar bu iki sayıya bağlı, değiştirilirse yeniden üretilmeli.
+SHADOW_OFFSET = (4, 6)
 
 POSITIONS = [
     "top-left", "top-center", "top-right",
@@ -56,8 +59,12 @@ def _vh(position: str) -> tuple[str, str]:
 
 def region_box(img_w: int, img_h: int, position: str,
                frac: float = 0.22) -> tuple[int, int, int, int]:
-    """Logonun düşeceği alanın kutusu — parlaklık örneklemesi için."""
-    rw, rh = int(img_w * frac), int(img_h * frac)
+    """Logonun düşeceği alanın kutusu — parlaklık örneklemesi için.
+
+    Kenar en az 1 px: `frac * kenar` 1'in altına düşen çok küçük görsellerde
+    kutu boşalır ve boş bir crop'ta ImageStat ortalama alırken sıfıra bölerdi.
+    """
+    rw, rh = max(1, int(img_w * frac)), max(1, int(img_h * frac))
     v, h = _vh(position)
     x0 = 0 if h == "left" else (img_w - rw if h == "right" else (img_w - rw) // 2)
     y0 = 0 if v == "top" else (img_h - rh if v == "bottom" else (img_h - rh) // 2)
@@ -117,7 +124,8 @@ def composite_logo(base_path: str, *, logo_blue: str, logo_white: str,
         shadow_layer = Image.new("RGBA", logo.size,
                                  (0, 0, 0, max(0, min(255, shadow_alpha))))
         shadow_layer.putalpha(shadow_mask)
-        shadow.paste(shadow_layer, (x + 4, y + 6), shadow_layer)
+        shadow.paste(shadow_layer,
+                     (x + SHADOW_OFFSET[0], y + SHADOW_OFFSET[1]), shadow_layer)
         shadow = shadow.filter(ImageFilter.GaussianBlur(max(0, shadow_blur)))
         composed = Image.alpha_composite(base, shadow)
 

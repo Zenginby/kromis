@@ -190,6 +190,27 @@ def test_composite_failure_becomes_500(tmp_path, monkeypatch):
     assert "Logo bindirme başarısız" in r.json()["detail"]
 
 
+def test_unexpected_composite_error_also_becomes_500(tmp_path, monkeypatch):
+    """OSError/ValueError olmayan hatalar da Türkçe 500'e dönmeli.
+
+    `Image.DecompressionBombError` doğrudan `Exception`'dan türüyor: dar bir
+    except onu yakalamaz, kullanıcı "Logo bindirme başarısız" mesajı yerine
+    çıplak bir sunucu hatası görürdü.
+    """
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
+    monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
+
+    def boom(base_path, **kwargs):
+        raise Image.DecompressionBombError("görsel çok büyük (simüle)")
+    monkeypatch.setattr(appmod.composite, "composite_logo", boom)
+
+    c = TestClient(appmod.app)
+    src_id = _make_source(c)
+    r = c.post("/api/logo", json={"id": src_id})
+    assert r.status_code == 500
+    assert "Logo bindirme başarısız" in r.json()["detail"]
+
+
 def test_logo_end_to_end_with_real_compositing(tmp_path, monkeypatch):
     """composite.composite_logo hiç mocklanmadan, gerçek gömülü KURUM logolarıyla çalışır.
 

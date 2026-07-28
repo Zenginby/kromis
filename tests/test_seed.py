@@ -83,6 +83,17 @@ def test_writes_the_marker_file(tmp_path):
     assert (tmp_path / ".logos-seeded").is_file()
 
 
+def test_marker_dir_without_a_parent_component(tmp_path, monkeypatch):
+    """marker_dir göreli ve tek parçalıysa dirname("") olur — makedirs("") patlardı."""
+    monkeypatch.chdir(tmp_path)
+    bundled = _make_bundled(tmp_path)
+
+    added = seed.seed_builtin_logos(str(tmp_path / "assets"), bundled, "", now=NOW)
+
+    assert len(added) == 2
+    assert (tmp_path / ".logos-seeded").is_file()
+
+
 def test_seeding_does_not_fire_on_plain_import(monkeypatch):
     """Seeding should NOT fire when app is imported or TestClient is created without context."""
     call_recorder = MagicMock()

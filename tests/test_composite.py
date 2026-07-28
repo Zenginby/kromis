@@ -96,3 +96,31 @@ def test_missing_base_raises_oserror():
     with pytest.raises(OSError):
         composite.composite_logo("/yok/boyle/bir/dosya.png",
                                  logo_blue=LOGO_BLUE, logo_white=LOGO_WHITE)
+
+
+def test_composite_logo_rejects_invalid_position():
+    with pytest.raises(ValueError):
+        composite.composite_logo(
+            os.path.join(FIXTURES, "base-light.png"),
+            logo_blue=LOGO_BLUE, logo_white=LOGO_WHITE,
+            position="bottom_right")  # alt çizgi yazım hatası — tireli değil
+
+
+def test_composite_logo_rejects_invalid_color():
+    with pytest.raises(ValueError):
+        composite.composite_logo(
+            os.path.join(FIXTURES, "base-light.png"),
+            logo_blue=LOGO_BLUE, logo_white=LOGO_WHITE,
+            color="Blue")  # büyük harf — tanınan küme "blue"
+
+
+def test_pick_logo_rejects_invalid_position():
+    base = Image.open(os.path.join(FIXTURES, "base-light.png")).convert("RGBA")
+    with pytest.raises(ValueError):
+        composite.pick_logo(base, "bottom_right", "auto", LOGO_BLUE, LOGO_WHITE)
+
+
+def test_pick_logo_rejects_invalid_color():
+    base = Image.open(os.path.join(FIXTURES, "base-light.png")).convert("RGBA")
+    with pytest.raises(ValueError):
+        composite.pick_logo(base, "bottom-right", "none", LOGO_BLUE, LOGO_WHITE)

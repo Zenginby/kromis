@@ -22,6 +22,29 @@ POSITIONS = [
     "bottom-left", "bottom-center", "bottom-right",
 ]
 
+LOGO_COLORS = {"auto", "blue", "white"}
+
+
+def _check_position(position: str) -> None:
+    """position 9'lu ızgarada değilse ValueError fırlatır.
+
+    Dış scriptte bu argparse `choices` ile garanti edilirdi; port'ta o kapı
+    yoktu — geçersiz bir değer sessizce ortalanmış bir logoya (_vh eşleşmez)
+    dönüşüyordu. Burada erken ve gürültülü başarısız oluyoruz.
+    """
+    if position not in POSITIONS:
+        raise ValueError(f"geçersiz konum: {position!r}")
+
+
+def _check_color(color: str) -> None:
+    """color auto/blue/white dışındaysa ValueError fırlatır.
+
+    Dış scriptte argparse `choices` ile sınırlıydı; port'ta beklenmeyen bir
+    değer sessizce "auto" gibi davranıyordu.
+    """
+    if color not in LOGO_COLORS:
+        raise ValueError(f"geçersiz renk: {color!r}")
+
 
 def _vh(position: str) -> tuple[str, str]:
     """Konum adını (dikey, yatay) belirteçlerine ayırır."""
@@ -44,6 +67,8 @@ def region_box(img_w: int, img_h: int, position: str,
 def pick_logo(base: Image.Image, position: str, color: str,
               logo_blue: str, logo_white: str) -> str:
     """color=auto ise zemin parlaklığına göre mavi/beyaz varyantı seçer."""
+    _check_position(position)
+    _check_color(color)
     if color == "blue":
         return logo_blue
     if color == "white":
@@ -70,6 +95,8 @@ def composite_logo(base_path: str, *, logo_blue: str, logo_white: str,
                    scale: float = 0.14, margin: float = 0.03,
                    shadow_alpha: int = 120, shadow_blur: int = 6) -> bytes:
     """Filigranı bindirip sonuç PNG'yi bayt olarak döndürür (diske yazmaz)."""
+    _check_position(position)
+    _check_color(color)
     base = Image.open(base_path).convert("RGBA")
     logo_path = pick_logo(base, position, color, logo_blue, logo_white)
     logo = Image.open(logo_path).convert("RGBA")

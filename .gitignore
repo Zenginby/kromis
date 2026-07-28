@@ -6,6 +6,8 @@ __pycache__/
 .env
 .DS_Store
 .logos-seeded
+build/
+dist/
 
 # graphify generated artifacts
 graphify-out/

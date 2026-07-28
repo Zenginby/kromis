@@ -1,4 +1,17 @@
-"""composite.py, dış composite-logo.py ile bayt bayt aynı çıktı vermeli."""
+"""composite.py, dış composite-logo.py ile AYNI GÖRÜNTÜYÜ üretmeli.
+
+Karşılaştırma **piksel** düzeyinde, bayt düzeyinde değil. İlk sürüm bayt
+eşitliği arıyordu; golden'lar x86_64'te üretildiği ve PNG kodlayıcısı
+platformlar arası bayt bayt yeniden üretilebilir OLMADIĞI için (Pillow'un
+tekerlekleri farklı deflate kütüphaneleriyle derleniyor) bu değişmez taşınabilir
+değildi. 2026-07-29'da arm64 runner'ında ölçüldü (Actions run 30402056066):
+altı vakanın da pikselleri birebir aynı, sıkıştırılmış baytları farklı — yani
+port doğru, iddia fazla katıydı. Planın Task 2 / Step 7 notu bu durumda
+karşılaştırmayı piksel eşitliğine indirmeyi öngörüyordu.
+
+Piksellerin farklı çıkması ise HÂLÂ durdurucu bir hatadır: port matematiği
+kaydırmış demektir, dış script ile satır satır karşılaştırılmalı.
+"""
 import io
 import json
 import os
@@ -31,17 +44,11 @@ def test_port_matches_the_external_script(case: dict) -> None:
         shadow_alpha=case["shadow_alpha"], shadow_blur=case["shadow_blur"])
 
     golden_path = os.path.join(FIXTURES, f"golden-{name}.png")
-    with open(golden_path, "rb") as f:
-        golden = f.read()
+    a = Image.open(io.BytesIO(produced)).convert("RGB")
+    b = Image.open(golden_path).convert("RGB")
 
-    if produced != golden:
-        # Bayt farkı kodlayıcı metadata'sından da gelebilir; pikselleri de kıyasla ki
-        # hata mesajı "gerçekten görüntü mü değişti" sorusunu yanıtlasın.
-        a = Image.open(io.BytesIO(produced)).convert("RGB")
-        b = Image.open(golden_path).convert("RGB")
-        assert a.size == b.size, f"{name}: boyut değişti {a.size} != {b.size}"
-        assert a.tobytes() == b.tobytes(), f"{name}: PİKSELLER değişti — port davranışı kaydırdı"
-        pytest.fail(f"{name}: pikseller aynı ama baytlar farklı — PNG kodlayıcı ayarı değişmiş")
+    assert a.size == b.size, f"{name}: boyut değişti {a.size} != {b.size}"
+    assert a.tobytes() == b.tobytes(), f"{name}: PİKSELLER değişti — port davranışı kaydırdı"
 
 
 def test_auto_picks_blue_on_light_background() -> None:

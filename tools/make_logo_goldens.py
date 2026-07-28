@@ -2,7 +2,9 @@
 """Golden fixture üretici — composite.py port'unun referansını dış script'ten alır.
 
 BİR KEZ çalıştırılır (port yazılmadan önce). Ürettiği PNG'ler commit edilir ve
-tests/test_composite.py bunlara karşı bayt bayt karşılaştırma yapar.
+tests/test_composite.py bunlara karşı **piksel** karşılaştırması yapar — bayt
+değil: PNG sıkıştırması platformlar arası yeniden üretilebilir olmadığı için
+golden'ların hangi mimaride üretildiği önemsiz kalır (bkz. test docstring'i).
 
     .venv/bin/python tools/make_logo_goldens.py
 """

@@ -1554,6 +1554,121 @@ görüntüleriyle anlatır — terminal gerekmiyor."
 
 ---
 
+---
+
+### Task 7: GitHub Actions arm64 gönderim hattı
+
+**Files:**
+- Create: `.github/workflows/build-macos-arm64.yml`
+- Modify: `README.md` (gönderim paketinin nasıl alındığı)
+- Modify: `KURULUM.md` (TODO satırının yanına: paketin nereden geldiği)
+
+**Interfaces:**
+- Consumes: `build.sh`, `gpt-image-studio.spec`, `requirements.txt`, `requirements-dev.txt` (Task 6)
+- Produces: indirilebilir artifact — `GPT-Image Studio.zip` (arm64, ad-hoc imzalı)
+
+**Neden gerekli:** derleme makinesi Intel; ofis makineleri Apple Silicon. PyInstaller
+çapraz derleme yapamıyor (bkz. Global Constraints). `macos-14`+ runner'ları arm64.
+
+- [ ] **Step 1: `build.sh`'in CI'da çalıştığını incele**
+
+`build.sh` `source .venv/bin/activate` yapıyor; CI'da `.venv` yok. **Tek build
+yolunu korumak için** workflow `.venv` oluşturur — `build.sh`'i CI'ya özel
+dallanmayla kirletmek yerine. Bu, yerelde doğrulanan yolun birebir aynısının
+gönderim paketini üretmesini garanti eder.
+
+- [ ] **Step 2: Workflow'u yaz**
+
+```yaml
+name: macOS arm64 paketi
+
+# Elle tetiklenir: her push'ta 25 MB artifact üretmek gereksiz ve private repo'da
+# macOS dakikaları 10x sayılıyor.
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14          # arm64 (Apple Silicon) runner
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: Mimariyi doğrula (yanlış runner'da sessizce x86_64 üretmesin)
+        run: |
+          set -euo pipefail
+          ARCH="$(uname -m)"
+          echo "runner mimarisi: $ARCH"
+          test "$ARCH" = "arm64" || { echo "HATA: arm64 bekleniyordu, $ARCH bulundu"; exit 1; }
+          python -c "import sysconfig; print('python plat:', sysconfig.get_platform())"
+
+      - name: venv kur (build.sh bunu bekliyor)
+        run: |
+          set -euo pipefail
+          python -m venv .venv
+          .venv/bin/pip install -q --upgrade pip
+
+      - name: Derle (yerelde doğrulanan build.sh ile, değiştirmeden)
+        run: ./build.sh
+
+      - name: Paketi doğrula
+        run: |
+          set -euo pipefail
+          APP="dist/GPT-Image Studio.app"
+          lipo -archs "$APP/Contents/MacOS/GPT-Image Studio" | tee /dev/stderr | grep -qx arm64
+          codesign --verify --strict "$APP"
+          for f in static/index.html static/core.js \
+                   bundled/logos/kurum-logo-blue.png bundled/logos/kurum-logo-white.png; do
+            test -f "$APP/Contents/Resources/$f" || { echo "EKSİK: $f"; exit 1; }
+          done
+          du -sh "$APP" dist/*.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gpt-image-studio-macos-arm64
+          path: dist/GPT-Image Studio.zip
+          retention-days: 30
+```
+
+**Doğrulama adımı neden şart:** yanlış runner etiketi (`macos-13` x86_64'tür)
+sessizce Intel paketi üretir ve kimse fark etmez — ofis Mac'lerinde Rosetta ile
+çalışacağı için hata bile vermez, sadece yavaş olur. `grep -qx arm64` bunu
+build'i kırarak yakalar.
+
+- [ ] **Step 3: `hiddenimports=[]` bulgusunu arm64'te teyit et**
+
+Task 6 bunu x86_64'te PYZ arşivini sayarak kanıtladı ama host'a özgü. Workflow
+başarılı olursa ve `Paketi doğrula` adımı geçerse bulgu arm64'te de geçerlidir.
+Kırılırsa `.spec`'e yalnız **kanıtlanabilir** eksik modüller eklenir.
+
+- [ ] **Step 4: Belgeleri güncelle**
+
+`README.md`: gönderim paketinin Actions'tan `workflow_dispatch` ile alındığı,
+yereldeki `./build.sh`'in **doğrulama** amaçlı x86_64 ürettiği.
+`KURULUM.md`: iş arkadaşlarına giden zip'in arm64 olduğu (Rosetta gerekmez).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add .github/workflows/build-macos-arm64.yml README.md KURULUM.md
+git commit -m "ci: arm64 macOS paketi için Actions hattı
+
+Derleme makinesi Intel, hedef makineler Apple Silicon; PyInstaller çapraz
+derleme yapamıyor. macos-14 runner'ı yerelde doğrulanan build.sh'i
+değiştirmeden çalıştırır. Mimari doğrulama adımı yanlış runner etiketinin
+sessizce x86_64 üretmesini engeller."
+```
+
+> **Not:** workflow'u gerçekten çalıştırmak `push` gerektirir — bu dışa dönük bir
+> işlem, kullanıcının kararı. Bu task yalnız hattı yazar.
+
+---
+
 ## Bitirme
 
 - [ ] Tüm suite son bir kez: `.venv/bin/python -m pytest tests/ -q` → **645 test PASS**

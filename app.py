@@ -763,4 +763,5 @@ def index() -> FileResponse:
 # STATIC_DIR Task 6'da oluşturulacak; mount import anında hata vermesin diye
 # önce garanti altına alınır.
 paths.ensure_data_dirs()
+os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

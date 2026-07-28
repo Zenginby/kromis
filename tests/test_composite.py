@@ -21,7 +21,7 @@ with open(os.path.join(FIXTURES, "cases.json")) as _f:
 
 
 @pytest.mark.parametrize("case", CASES, ids=[c["name"] for c in CASES])
-def test_port_matches_the_external_script(case):
+def test_port_matches_the_external_script(case: dict) -> None:
     name, base = case["name"], case["base"]
     blue, white = (OVERLAY, OVERLAY) if case["overlay"] else (LOGO_BLUE, LOGO_WHITE)
     produced = composite.composite_logo(
@@ -44,21 +44,21 @@ def test_port_matches_the_external_script(case):
         pytest.fail(f"{name}: pikseller aynı ama baytlar farklı — PNG kodlayıcı ayarı değişmiş")
 
 
-def test_auto_picks_blue_on_light_background():
+def test_auto_picks_blue_on_light_background() -> None:
     chosen = composite.pick_logo(
         Image.open(os.path.join(FIXTURES, "base-light.png")).convert("RGBA"),
         "bottom-right", "auto", LOGO_BLUE, LOGO_WHITE)
     assert chosen == LOGO_BLUE
 
 
-def test_auto_picks_white_on_dark_background():
+def test_auto_picks_white_on_dark_background() -> None:
     chosen = composite.pick_logo(
         Image.open(os.path.join(FIXTURES, "base-dark.png")).convert("RGBA"),
         "bottom-right", "auto", LOGO_BLUE, LOGO_WHITE)
     assert chosen == LOGO_WHITE
 
 
-def test_explicit_color_skips_brightness_sampling():
+def test_explicit_color_skips_brightness_sampling() -> None:
     base = Image.open(os.path.join(FIXTURES, "base-dark.png")).convert("RGBA")
     assert composite.pick_logo(base, "center", "blue", LOGO_BLUE, LOGO_WHITE) == LOGO_BLUE
     assert composite.pick_logo(base, "center", "white", LOGO_BLUE, LOGO_WHITE) == LOGO_WHITE
@@ -72,33 +72,45 @@ def test_explicit_color_skips_brightness_sampling():
     ("center", ((100 - 20) // 2, (80 - 15) // 2)),
     ("top-center", ((100 - 20) // 2, 10)),
     ("center-left", (10, (80 - 15) // 2)),
+    ("bottom-center", ((100 - 20) // 2, 80 - 15 - 10)),
+    ("center-right", (100 - 20 - 10, (80 - 15) // 2)),
 ])
-def test_paste_position_covers_the_nine_grid(position, expected):
+def test_paste_position_covers_the_nine_grid(position: str, expected: tuple[int, int]) -> None:
     assert composite.paste_position(100, 80, 20, 15, position, 10) == expected
 
 
-def test_region_box_stays_inside_the_image():
+def test_region_box_stays_inside_the_image() -> None:
     for position in composite.POSITIONS:
         x0, y0, x1, y1 = composite.region_box(200, 100, position)
         assert 0 <= x0 < x1 <= 200
         assert 0 <= y0 < y1 <= 100
 
 
-def test_returns_png_bytes_without_touching_disk(tmp_path):
+def test_returns_png_bytes_without_touching_disk() -> None:
+    """PNG bayt döner; fixtures dizinine ve cwd'ye hiçbir şey yazmaz.
+
+    Önceki sürüm boş bir tmp_path'in boş kaldığını doğruluyordu — composite_logo
+    zaten o dizinden habersizdi, dolayısıyla iddia her koşulda geçerdi. Burada
+    fonksiyonun gerçekten dokunabileceği iki yerin (fixtures dizini, cwd)
+    çağrı öncesi/sonrası içerikleri karşılaştırılıyor.
+    """
+    fixtures_before = set(os.listdir(FIXTURES))
+    cwd_before = set(os.listdir(os.getcwd()))
     out = composite.composite_logo(
         os.path.join(FIXTURES, "base-light.png"),
         logo_blue=LOGO_BLUE, logo_white=LOGO_WHITE)
     assert out[:8] == b"\x89PNG\r\n\x1a\n"
-    assert list(tmp_path.iterdir()) == []  # geçici dosya bırakmıyor
+    assert set(os.listdir(FIXTURES)) == fixtures_before
+    assert set(os.listdir(os.getcwd())) == cwd_before
 
 
-def test_missing_base_raises_oserror():
+def test_missing_base_raises_oserror() -> None:
     with pytest.raises(OSError):
         composite.composite_logo("/yok/boyle/bir/dosya.png",
                                  logo_blue=LOGO_BLUE, logo_white=LOGO_WHITE)
 
 
-def test_composite_logo_rejects_invalid_position():
+def test_composite_logo_rejects_invalid_position() -> None:
     with pytest.raises(ValueError):
         composite.composite_logo(
             os.path.join(FIXTURES, "base-light.png"),
@@ -106,7 +118,7 @@ def test_composite_logo_rejects_invalid_position():
             position="bottom_right")  # alt çizgi yazım hatası — tireli değil
 
 
-def test_composite_logo_rejects_invalid_color():
+def test_composite_logo_rejects_invalid_color() -> None:
     with pytest.raises(ValueError):
         composite.composite_logo(
             os.path.join(FIXTURES, "base-light.png"),
@@ -114,13 +126,13 @@ def test_composite_logo_rejects_invalid_color():
             color="Blue")  # büyük harf — tanınan küme "blue"
 
 
-def test_pick_logo_rejects_invalid_position():
+def test_pick_logo_rejects_invalid_position() -> None:
     base = Image.open(os.path.join(FIXTURES, "base-light.png")).convert("RGBA")
     with pytest.raises(ValueError):
         composite.pick_logo(base, "bottom_right", "auto", LOGO_BLUE, LOGO_WHITE)
 
 
-def test_pick_logo_rejects_invalid_color():
+def test_pick_logo_rejects_invalid_color() -> None:
     base = Image.open(os.path.join(FIXTURES, "base-light.png")).convert("RGBA")
     with pytest.raises(ValueError):
         composite.pick_logo(base, "bottom-right", "none", LOGO_BLUE, LOGO_WHITE)

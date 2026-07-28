@@ -62,6 +62,7 @@ def write_cases_manifest() -> None:
     with open(os.path.join(FIXTURES, "cases.json"), "w") as f:
         json.dump([dict(zip(keys, case)) for case in CASES], f,
                   ensure_ascii=False, indent=2)
+        f.write("\n")
 
 
 def main() -> int:
@@ -75,7 +76,7 @@ def main() -> int:
         blue, white = LOGO_BLUE, LOGO_WHITE
         if overlay:
             blue = white = os.path.join(FIXTURES, "overlay.png")
-        cmd = ["python3", SCRIPT, os.path.join(FIXTURES, f"{base}.png"), out,
+        cmd = [sys.executable, SCRIPT, os.path.join(FIXTURES, f"{base}.png"), out,
                "--position", position, "--color", color, "--scale", str(scale),
                "--shadow-alpha", str(sa), "--shadow-blur", str(sb),
                "--logo-blue", blue, "--logo-white", white]

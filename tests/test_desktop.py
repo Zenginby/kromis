@@ -1,13 +1,16 @@
 """desktop.start_server gerçek bir sokete bağlanır — pencere kısmı manuel doğrulanır."""
 import sys
 import threading
+import time
 import types
 
 import httpx
 import pytest
+import uvicorn
 from fastapi import FastAPI
 
 import desktop
+import seed
 
 
 def _probe_app() -> FastAPI:
@@ -55,9 +58,49 @@ def test_start_server_binds_only_to_loopback():
         thread.join(timeout=5)
 
 
-def test_timeout_raises_instead_of_hanging():
-    with pytest.raises(RuntimeError, match="başlatılamadı"):
+def test_dead_thread_raises_instead_of_hanging():
+    """Geçersiz host → uvicorn thread'i saniyeler içinde ölür; poll döngüsü
+    deadline'ı beklemeden 'thread öldü' dalıyla çıkmalı (deadline dalı değil)."""
+    with pytest.raises(RuntimeError, match="thread öldü"):
         desktop.start_server(_probe_app(), host="256.256.256.256", timeout=3.0)
+
+
+def test_deadline_raises_when_server_never_starts(monkeypatch):
+    """Thread canlı kalıp `started` hiç True olmazsa, poll döngüsü gerçekten
+    deadline'da çıkmalı — bu, `test_dead_thread_raises_instead_of_hanging`'in
+    kapsamadığı, brief'in asıl "sonsuz asılı kalma" korumasıdır."""
+
+    class _NeverStartsServer:
+        """uvicorn.Server yerine geçer: started hiç True olmaz, run() should_exit'e
+        kadar canlı kalır (gerçek bir sunucunun asla hazır olmama senaryosu)."""
+
+        def __init__(self, config: uvicorn.Config) -> None:
+            self.config = config
+            self.started = False
+            self.should_exit = False
+            self.servers: list = []
+
+        def run(self, sockets=None) -> None:
+            while not self.should_exit:
+                time.sleep(0.02)
+
+    monkeypatch.setattr(desktop.uvicorn, "Server", _NeverStartsServer)
+
+    timeout = 0.5
+    start = time.monotonic()
+    with pytest.raises(RuntimeError, match="hazır olmadı"):
+        desktop.start_server(_probe_app(), timeout=timeout)
+    elapsed = time.monotonic() - start
+
+    # Deadline'a yakın çıkmalı — asılı kalmadığının kanıtı (sabit sınır: 2 sn).
+    assert timeout <= elapsed < 2.0
+
+    # start_server, should_exit'i işaretleyip döner; thread'in de fiilen
+    # kapandığını doğrula — sahte thread arkada asılı kalmasın.
+    uvicorn_threads = [t for t in threading.enumerate() if t.name == "uvicorn"]
+    for stray_thread in uvicorn_threads:
+        stray_thread.join(timeout=1)
+    assert all(not t.is_alive() for t in uvicorn_threads)
 
 
 def test_main_wires_real_port_into_window_and_shuts_down_cleanly(monkeypatch):
@@ -94,6 +137,10 @@ def test_main_wires_real_port_into_window_and_shuts_down_cleanly(monkeypatch):
     monkeypatch.setitem(sys.modules, "webview", fake_webview)
 
     monkeypatch.setattr("paths.ensure_data_dirs", lambda: None)
+    # app.app'in lifespan'ı gerçekten çalışıyor (bu testin amacı budur) ama
+    # seed.seed_builtin_logos gerçek dosya sistemine (repo kökündeki .logos-seeded
+    # ve assets/logos/) yazar — testler kullanıcının gerçek kütüphanesine dokunmamalı.
+    monkeypatch.setattr(seed, "seed_builtin_logos", lambda *args, **kwargs: [])
 
     real_start_server = desktop.start_server
 

@@ -14,7 +14,8 @@ sana gönderilen paket değildir.
 ## 2. İlk açılış — bir kerelik güvenlik izni
 Uygulama Apple'a ücretli geliştirici kaydıyla imzalanmadığı için (ad-hoc imza —
 bkz. altta), macOS ilk açılışta soru soruyor. Bir kez izin verirsin, sonraki
-açılışlarda sormaz.
+açılışlarda sormaz. *Not:* Bu zip Apple Silicon Mac'in için derlendiğinden (arm64
+native), Rosetta çevirisi yapılmaz.
 
 1. Uygulamaya çift tıkla. "açılamadı" uyarısı çıkacak — **Tamam**'a bas.
 2. Ekranın sol üstündeki **Apple menüsü** → **Sistem Ayarları** → **Gizlilik ve Güvenlik**.

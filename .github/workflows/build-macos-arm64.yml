@@ -1,0 +1,53 @@
+name: macOS arm64 paketi
+
+# Elle tetiklenir: her push'ta 25 MB artifact üretmek gereksiz ve private repo'da
+# macOS dakikaları 10x sayılıyor.
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14          # arm64 (Apple Silicon) runner
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: Mimariyi doğrula (yanlış runner'da sessizce x86_64 üretmesin)
+        run: |
+          set -euo pipefail
+          ARCH="$(uname -m)"
+          echo "runner mimarisi: $ARCH"
+          test "$ARCH" = "arm64" || { echo "HATA: arm64 bekleniyordu, $ARCH bulundu"; exit 1; }
+          python -c "import sysconfig; print('python plat:', sysconfig.get_platform())"
+
+      - name: venv kur (build.sh bunu bekliyor)
+        run: |
+          set -euo pipefail
+          python -m venv .venv
+          .venv/bin/pip install -q --upgrade pip
+
+      - name: Derle (yerelde doğrulanan build.sh ile, değiştirmeden)
+        run: ./build.sh
+
+      - name: Paketi doğrula
+        run: |
+          set -euo pipefail
+          APP="dist/GPT-Image Studio.app"
+          lipo -archs "$APP/Contents/MacOS/GPT-Image Studio" | tee /dev/stderr | grep -qx arm64
+          codesign --verify --strict "$APP"
+          for f in static/index.html static/core.js \
+                   bundled/logos/kurum-logo-blue.png bundled/logos/kurum-logo-white.png; do
+            test -f "$APP/Contents/Resources/$f" || { echo "EKSİK: $f"; exit 1; }
+          done
+          du -sh "$APP" dist/*.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gpt-image-studio-macos-arm64
+          path: dist/GPT-Image Studio.zip
+          retention-days: 30

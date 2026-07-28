@@ -21,11 +21,15 @@ Son kullanıcı talimatı: `KURULUM.md`. Tasarım/plan: `docs/superpowers/`.
 
 İki hat var: `gpt-image-studio.spec` kasıtlı olarak `target_arch` vermez —
 PyInstaller derlemeyi çalıştıran yorumlayıcının mimarisini hedefler (bu
-çapraz derleme yapamadığı için tektir). Bu makinede (Intel) `./build.sh`
-x86_64 üretir ve yerel doğrulama hattıdır — paketleme yolunu uçtan uca
-sınamak için. Ofis çalışanlarına gidecek gerçek arm64 paket, GitHub
-Actions'ın arm64 runner'ında aynı spec ve `build.sh` ile üretilir (gönderim
-hattı — ayrı bir iş).
+çapraz derleme yapamadığı için tektir).
+
+**Doğrulama hattı (yerel):** Bu makinede (Intel) `./build.sh` x86_64 üretir —
+paketleme yolunu uçtan uca sınamak için.
+
+**Gönderim hattı (CI):** Ofis çalışanlarına gidecek arm64 paket, GitHub Actions'ın
+arm64 runner'ında (macos-14) aynı spec ve `build.sh` ile üretilir. Actions → **Kodu
+Çalıştır** (Run Workflow) → `build-macos-arm64` → **Yapıtlar** (Artifacts) den
+`gpt-image-studio-macos-arm64.zip` indir.
 
 ## Özellikler
 - Prompt'tan görsel üretme (boyut/kalite/adet)

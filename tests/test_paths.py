@@ -1,6 +1,8 @@
 import os
 import sys
 
+import pytest
+
 import paths
 
 
@@ -49,7 +51,6 @@ def test_builtin_logo_resolves_both_variants():
 
 
 def test_builtin_logo_rejects_unknown_variant():
-    import pytest
     with pytest.raises(ValueError):
         paths.builtin_logo("kirmizi")
 

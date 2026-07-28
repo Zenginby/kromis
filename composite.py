@@ -82,6 +82,7 @@ def pick_logo(base: Image.Image, position: str, color: str,
 
 def paste_position(img_w: int, img_h: int, logo_w: int, logo_h: int,
                    position: str, margin_px: int) -> tuple[int, int]:
+    """Logonun sol-üst köşe koordinatı (x, y) — 9'lu ızgara + kenar boşluğuna göre."""
     v, h = _vh(position)
     x = margin_px if h == "left" else (
         img_w - logo_w - margin_px if h == "right" else (img_w - logo_w) // 2)

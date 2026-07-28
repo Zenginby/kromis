@@ -24,7 +24,7 @@ echo "→ derleme"
 pyinstaller gpt-image-studio.spec --noconfirm
 
 echo "→ ad-hoc imza"
-codesign --force --deep --sign - "$APP"
+codesign --force --sign - "$APP"
 codesign --verify --verbose "$APP"
 
 echo "→ zip (ditto: .app'in sembolik bağları korunur, 'zip' bozar)"

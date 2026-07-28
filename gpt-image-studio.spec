@@ -41,6 +41,11 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+# upx=False (her iki yerde de): PyInstaller'ın şablon varsayılanı upx=True idi —
+# bilinçli bir seçim değildi. UPX yerelde ve macos-14 runner imajında YOK,
+# yani bugün sessiz bir no-op; ama PATH'e bir gün eklenirse UPX'in
+# Mach-O ikilisini paketlemesi ad-hoc imzayı bozar ve açılmayan bir .app
+# üretebilir. Sıfır kazanç için gizli bir kırılma noktası tutmaya değmez.
 pyz = PYZ(a.pure)
 
 exe = EXE(
@@ -52,7 +57,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -64,7 +69,7 @@ coll = COLLECT(
     a.binaries,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     name='GPT-Image Studio',
 )

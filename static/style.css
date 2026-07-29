@@ -91,6 +91,8 @@ body {
 .modal-status { color: var(--muted); min-height: 1.2em; font-size: 0.82rem; margin: 0.7rem 0 0; }
 .modal-actions { margin-top: 0.4rem; }
 .modal-actions .primary { margin-top: 0.6rem; }
+/* Sürüm satırı: bilgi, eylem değil — .field-note ile aynı sessiz ton. */
+.modal-version { color: var(--muted); font-size: 0.74rem; margin: 0.9rem 0 0; text-align: right; }
 
 /* Onay / ad sorma penceresi (native confirm() ve prompt() yerine) */
 .confirm-card { width: min(420px, 100%); }

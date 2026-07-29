@@ -1,0 +1,19 @@
+[
+  {
+    "id": "acf949875158",
+    "name": "Kampanya",
+    "parent_id": null,
+    "created_at": "2026-07-29T10:00:00"
+  },
+  {
+    "id": "ba41347addfc",
+    "name": "Instagram",
+    "parent_id": "acf949875158",
+    "created_at": "2026-07-29T10:00:00"
+  },
+  {
+    "id": "bbbbbbbbbbbb",
+    "name": "Eski Klasör (parent_id anahtarı YOK)",
+    "created_at": "2026-07-01T09:00:00"
+  }
+]

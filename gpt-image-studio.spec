@@ -12,13 +12,36 @@ geri getirir (bkz. task-6 raporu).
 
 Not: `uvicorn`, `_pyinstaller_hooks_contrib`'in kendi `hook-uvicorn.py`'si
 üzerinden `collect_submodules('uvicorn')` ile zaten TÜMÜYLE toplanıyor;
-`desktop.py -> app.py -> (paths/seed/composite/storage/folders/assets_store/
-azure_client/models/palette/palette_store/color_names)` zinciri de düz
-`import` ifadeleri olduğundan statik analiz zaten buluyor. Bu yüzden
-`hiddenimports` burada boş — bu makinede üretilen bitmiş `.app` bundle'ı
-üzerinde doğrulandı (bkz. task-6 raporu); arm64 runner'da farklı çıkarsa
-orada yeniden doğrulanmalı.
+`desktop.py -> app.py -> (paths/seed/backup/composite/storage/folders/
+assets_store/azure_client/models/palette/palette_store/color_names/version)`
+zinciri de düz `import` ifadeleri olduğundan statik analiz zaten buluyor. Bu
+yüzden `hiddenimports` burada boş — bu makinede üretilen bitmiş `.app`
+bundle'ı üzerinde doğrulandı (bkz. task-6 raporu); arm64 runner'da farklı
+çıkarsa orada yeniden doğrulanmalı.
+
+DİKKAT: `version.py` pakete YALNIZCA `app.py`'nin `import version`'ı sayesinde
+giriyor. Aşağıdaki derleme-zamanı yüklemesi hiçbir şey PAKETLEMEZ; yalnızca
+plist için değeri okur. O import "kullanılmıyor" diye silinirse paket
+`ModuleNotFoundError` ile ölür ve tek iz `hata.log` olur.
 """
+
+# Sürüm TEK kaynaktan (version.py) okunur; buraya elle YAZILMAZ.
+#
+# Düz `import version` DEĞİL: PyInstaller bu dosyayı `exec(code, {...})` ile
+# çalıştırıyor — namespace'te `__file__` YOK ve spec'in dizini sys.path'e
+# EKLENMİYOR (`pathex` yalnızca Analysis içinde ekleniyor, o da bu satırdan
+# sonra). `pyinstaller` kurulu bir konsol betiği olduğu için sys.path[0]
+# .venv/bin'dir; build.sh repo köküne `cd` etse bile düz import ImportError
+# verir. PyInstaller'ın verdiği `SPECPATH` globali spec dosyasının dizinidir —
+# tek doğru çapa o. importlib ile yükleme sys.path'i de kirletmez.
+import importlib.util
+import os
+
+_version_spec = importlib.util.spec_from_file_location(
+    "_gis_version", os.path.join(SPECPATH, "version.py"))
+_version_module = importlib.util.module_from_spec(_version_spec)
+_version_spec.loader.exec_module(_version_module)
+APP_VERSION = _version_module.APP_VERSION
 
 a = Analysis(
     ['desktop.py'],
@@ -81,8 +104,8 @@ app = BUNDLE(
     info_plist={
         'LSMultipleInstancesProhibited': True,   # iki kez çift tıklama ikinci sunucu doğurmaz
         'NSHighResolutionCapable': True,
-        'CFBundleShortVersionString': '1.8.0',
-        'CFBundleVersion': '1.8.0',
+        'CFBundleShortVersionString': APP_VERSION,
+        'CFBundleVersion': APP_VERSION,
         'LSMinimumSystemVersion': '13.0',
     },
 )

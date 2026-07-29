@@ -51,6 +51,15 @@ jobs:
                    bundled/logos/kurum-logo-blue.png bundled/logos/kurum-logo-white.png; do
             test -f "$APP/Contents/Resources/$f" || { echo "EKSİK: $f"; exit 1; }
           done
+          # Info.plist'teki sürüm version.py ile aynı mı? Spec sürümü SPECPATH +
+          # importlib ile okuyor; o zincirin GERÇEKTEN koştuğunu yalnızca bu adım
+          # kanıtlar — plist'i PyInstaller üretiyor, hiçbir pytest onu görmüyor.
+          EXPECTED="$(python -c 'import version; print(version.APP_VERSION)')"
+          for k in CFBundleShortVersionString CFBundleVersion; do
+            GOT="$(/usr/bin/plutil -extract "$k" raw -o - "$APP/Contents/Info.plist")"
+            test "$GOT" = "$EXPECTED" || { echo "HATA: $k=$GOT, beklenen $EXPECTED"; exit 1; }
+          done
+          echo "Info.plist sürümü: $EXPECTED"
           du -sh "$APP" dist/*.zip
 
       - uses: actions/upload-artifact@v4

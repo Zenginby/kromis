@@ -2,6 +2,7 @@ import re
 
 from fastapi.testclient import TestClient
 import app as appmod
+import version
 
 
 def test_index_served():
@@ -76,16 +77,79 @@ def test_hue_slider_gradient_outranks_the_generic_modal_input_rule():
     assert "border: 0" in body, ".modal-card input'tan sızan border nötrlenmemiş"
 
 
-def test_static_cache_busters_are_bumped_together():
-    """Tek taraflı ?v= artışı bayat script'e yol açar → palet sessizce gönderilmez.
+def test_static_cache_busters_all_equal_the_app_version():
+    """Cache-buster ELLE artırılmıyor: tek kaynak version.APP_VERSION.
 
-    Sürümden bağımsız: gelecekteki artışlarda da geçerli kalır. Beş script'in
-    bölünmesiyle daha da kritikleşti — biri eski sürümde kalırsa sayfa tutarsız
-    bir karışım çalıştırır.
+    Tek taraflı ?v= artışı bayat script'e yol açar → sayfa tutarsız bir karışım
+    çalıştırır. Ama "hepsi aynı" artık YETMİYOR, "hepsi doğru" gerekiyor:
+
+    Önceki hâli `\\?v=(\\d+)` arıyordu ve `?v=18` için çalışıyordu. `?v=1.9.0`
+    karşısında o desen yalnızca baştaki "1"i yakalar → küme {'1'} olur, len==1
+    GEÇER ve test SESSİZCE ANLAMSIZLAŞIR: 1.9.0 ile 1.10.0 ayrışması bile
+    yakalanmaz. Ölçüldü:
+        ?v=1.9.0 + ?v=1.10.0  →  eski desen {'1'} (geçer) / tam desen 2 öğe (düşer)
+    Bu kusur testi KOŞARAK keşfedilemez, o yüzden desen burada tam değeri
+    okuyor ve sürümle EŞİTLİK arıyor.
+    """
+    html = TestClient(appmod.app).get("/").text
+    found = set(re.findall(r"\?v=([^\"'\s>]+)", html))
+    assert found == {version.APP_VERSION}, f"cache-buster ayrışmış: {found}"
+
+
+def test_index_has_no_unsubstituted_placeholder():
+    """Yer tutucu servise sızarsa sayfa `?v=__APP_VERSION__` ile yüklenir.
+
+    Çalışır ama cache-buster ÖLÜR: URL her sürümde aynı kalır, kullanıcı
+    .app'i değiştirse bile istemci eski JS'i sunabilir. Sessiz olduğu için
+    kimse fark etmez — bu yüzden testi var.
+    """
+    assert "__APP_VERSION__" not in TestClient(appmod.app).get("/").text
+
+
+def test_index_document_is_never_cached():
+    """WKWebView BELGEYİ de önbelleğe alıyor; belge bayatsa `?v=` işe yaramaz.
+
+    Paket tarafında bu delik bugün desktop.py'nin port=0'ı sayesinde KAZARA
+    kapalı (her açılış farklı origin). run.sh tarafında (sabit 8765) canlı.
+    Port bir gün sabitlenirse bu test tek tripwire.
     """
     r = TestClient(appmod.app).get("/")
-    versions = set(re.findall(r"\?v=(\d+)", r.text))
-    assert len(versions) == 1, f"statik dosya sürümleri ayrışmış: {versions}"
+    assert "no-store" in r.headers.get("cache-control", "").lower()
+
+
+def test_static_assets_stay_cacheable():
+    """Asimetri KASITLI: `/` önbeleklenmez, /static önbelleklenir.
+
+    `?v=<sürüm>` her sürüme ayrı URL veriyor, yani bayat kayıt hiç
+    ADRESLENMİYOR. Buraya no-store eklemek mekanizmayı öldürür.
+    """
+    r = TestClient(appmod.app).get("/static/core.js")
+    assert "no-store" not in r.headers.get("cache-control", "").lower()
+    assert r.headers.get("etag"), "StaticFiles doğrulayıcı göndermeli"
+
+
+def test_index_read_failure_is_reported_in_turkish(monkeypatch, tmp_path):
+    """--windowed pakette stderr YOK: okunamayan index.html iz bırakmıyordu.
+
+    FileResponse gönderim anında yakalanmayan bir RuntimeError'a düşüyordu →
+    kullanıcı boş pencere görür, hata.log'a hiçbir şey yazılmaz.
+    """
+    monkeypatch.setattr(appmod, "STATIC_DIR", str(tmp_path / "yok"))
+    written = []
+    monkeypatch.setattr(appmod.errlog, "safe_append",
+                        lambda d, t: (written.append(t), "hata.log")[1])
+    r = TestClient(appmod.app).get("/")
+    assert r.status_code == 500
+    assert "Arayüz yüklenemedi" in r.text
+    assert "Traceback" not in r.text, "kullanıcıya traceback gösterilmez"
+    assert written and "Traceback" in written[0], "hata.log'a traceback yazılmalı"
+
+
+def test_settings_modal_shows_the_app_version():
+    """Destek sorusu "hangi sürümdesiniz?" — cevabı arayüzde OLMALI."""
+    client = TestClient(appmod.app)
+    assert 'id="settings-version"' in client.get("/").text
+    assert "settings-version" in client.get("/static/settings.js").text
 
 
 def test_edit_request_forwards_every_palette_option():

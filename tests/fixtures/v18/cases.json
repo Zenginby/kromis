@@ -1,0 +1,74 @@
+{
+  "produced_from": "7a388686e940fa3dd50a1c0bee1bf31efcb0b995",
+  "produced_at": "2026-07-29T10:00:00",
+  "app_version": "1.8.0",
+  "note": "Bu ağaç 1.8.0'ı gönderen çalışma ağacının KENDİ yazıcılarıyla üretildi; 'handmade' dışındaki hiçbir kayıt elle yazılmadı.",
+  "handmade": [
+    "aaaaaaaaaaaa",
+    "bbbbbbbbbbbb"
+  ],
+  "expect": {
+    "root_history_ids": [
+      "aaaaaaaaaaaa",
+      "abf1d149451f",
+      "9a47403f64a5",
+      "b6f4a17039ba"
+    ],
+    "foldered": {
+      "ba41347addfc": [
+        "a70272082f8a"
+      ]
+    },
+    "folders": {
+      "root": "acf949875158",
+      "child": "ba41347addfc",
+      "legacy_no_parent_id": "bbbbbbbbbbbb"
+    },
+    "derivative": {
+      "id": "abf1d149451f",
+      "parent_id": "b6f4a17039ba"
+    },
+    "palette_record_image_id": "9a47403f64a5",
+    "palette": {
+      "id": "114baecff8fb",
+      "name": "Sonbahar",
+      "seed": "#c86a3c",
+      "mode": "triad",
+      "strength": "balanced",
+      "colors": [
+        {
+          "hex": "#c86a3c",
+          "name": "Kiremit"
+        },
+        {
+          "hex": "#3c86c8",
+          "name": "Gök Mavisi"
+        },
+        {
+          "hex": "#6ac83c",
+          "name": "Fıstık Yeşili"
+        },
+        {
+          "hex": "#c83c86",
+          "name": "Fuşya"
+        },
+        {
+          "hex": "#3cc86a",
+          "name": "Zümrüt"
+        }
+      ]
+    },
+    "assets": {
+      "logos": [
+        "c0a67144a2ee",
+        "88042e0d438d"
+      ],
+      "banners": [
+        "e06d401cf98a"
+      ],
+      "mottos": [
+        "3557f56db2d4"
+      ]
+    }
+  }
+}

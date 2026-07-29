@@ -69,6 +69,15 @@ Prompt yaz → **Üret**. Ürettiğin görseller bilgisayarında
 `~/Library/Application Support/GPT-Image Studio/output/` altında saklanır;
 uygulamayı kapatıp açsan da geçmişin durur.
 
+Hangi sürümü kullandığını **⚙ Ayarlar** penceresinin altındaki **Sürüm**
+satırından görebilirsin.
+
+## Sonra: yeni sürüm gelirse
+Kurum yeni bir `.zip` gönderdiğinde [GUNCELLEME.md](GUNCELLEME.md) sayfasını izle.
+Kısaca: uygulamayı kapat → yenisini Programlar'a sürükleyip **Değiştir** → güvenlik
+iznini bir kez daha ver. **Verin kaybolmaz** ve Azure anahtarını yeniden girmen
+gerekmez — ama `Application Support` klasörünü SİLME, geçmişin orada.
+
 ## Sorun çıkarsa
 - **Pencere boş açılıyor:** uygulamayı kapat, tekrar aç.
 - **"Üret" kilitli:** Ayarlar (dişli) → endpoint + key girilmiş mi?

@@ -23,6 +23,11 @@ function applyConfigured(s) {
   } else if (statusEl.textContent.startsWith("Başlamak için")) {
     statusEl.textContent = "";
   }
+  // POST /api/settings yanıtında `version` YOK (sürüm çalışma anında
+  // değişmediği için orada gereksiz). Bu fonksiyon hem GET hem POST yanıtı
+  // için çağrılıyor; guard MEKANİZMANIN PARÇASI — olmadan "Kaydet"ten sonra
+  // sürüm satırı silinirdi.
+  if (s && s.version) $("settings-version").textContent = s.version;
 }
 
 async function loadSettings(openIfMissing) {

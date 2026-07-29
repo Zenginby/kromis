@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GPT-Image Studio</title>
-  <link rel="stylesheet" href="/static/style.css?v=18" />
+  <link rel="stylesheet" href="/static/style.css?v=__APP_VERSION__" />
 </head>
 <body>
   <header class="topbar">
@@ -225,6 +225,9 @@
       <div class="modal-actions">
         <button id="settings-save" class="primary" type="button">Kaydet</button>
       </div>
+      <!-- Destek sorusu "hangi sürümdesiniz?" — GET /api/settings dolduruyor.
+           Yükseltmenin gerçekten geçtiğinin tek gözle görülür kanıtı. -->
+      <p class="modal-version">Sürüm <span id="settings-version">—</span></p>
     </div>
   </div>
 
@@ -422,11 +425,20 @@
   </div>
 
   <!-- SIRA bağlayıcı: dosyalar tek global kapsamı paylaşıyor ve açılış
-       çağrıları settings.js'in dibinde. Bkz. core.js başlığı. -->
-  <script src="/static/core.js?v=18"></script>
-  <script src="/static/folders.js?v=18"></script>
-  <script src="/static/assets.js?v=18"></script>
-  <script src="/static/palette.js?v=18"></script>
-  <script src="/static/settings.js?v=18"></script>
+       çağrıları settings.js'in dibinde. Bkz. core.js başlığı.
+
+       Aşağıdaki sorgu değerlerindeki __APP_VERSION__ bir YER TUTUCUDUR —
+       app.py'deki index() her istekte version.APP_VERSION ile değiştirir.
+       Buraya elle sürüm YAZMA; tek kaynak version.py (tests/test_index.py yer
+       tutucunun servise sızmadığını da doğruluyor). Bu yüzden bu dosya
+       file:// ile doğrudan açılmaz.
+       Not: bu yorumda örnek olarak tam sorgu dizesi YAZILMAZ — yer tutucu
+       burada da değiştirilir ve cache-buster testi onu gerçek bir varlık
+       sürümü sanar (bir kez öyle oldu). -->
+  <script src="/static/core.js?v=__APP_VERSION__"></script>
+  <script src="/static/folders.js?v=__APP_VERSION__"></script>
+  <script src="/static/assets.js?v=__APP_VERSION__"></script>
+  <script src="/static/palette.js?v=__APP_VERSION__"></script>
+  <script src="/static/settings.js?v=__APP_VERSION__"></script>
 </body>
 </html>

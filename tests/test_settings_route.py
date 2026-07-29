@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 import azure_client as ac
 import app as appmod
+import version
 
 
 @pytest.fixture
@@ -67,6 +68,26 @@ def test_validation_error_does_not_echo_api_key(client):
     assert r.status_code == 422
     assert secret not in r.text
     assert "S3CRET" not in r.text
+
+
+def test_get_settings_exposes_the_app_version(client):
+    """Destek sorusu "hangi sürümdesiniz?" — arayüz bunu buradan okuyor.
+
+    Sürüm azure_client'ın get_settings_status'una DEĞİL, route'a eklendi:
+    kimlik bilgisi modülünün uygulama sürümünü bilmesi gereksiz bir bağ olurdu.
+    """
+    assert client.get("/api/settings").json()["version"] == version.APP_VERSION
+
+
+def test_post_settings_does_not_claim_a_version(client):
+    """Sürüm çalışma anında değişmez → mutasyon ucundan yansıtmak gürültü olur.
+
+    settings.js'teki `if (s && s.version)` guard'ı tam bu yüzden var: aynı
+    fonksiyon POST yanıtını da işliyor, guard olmadan "Kaydet"ten sonra sürüm
+    satırı silinirdi.
+    """
+    r = client.post("/api/settings", json={"api_key": "K", "base_url": "https://x/"})
+    assert "version" not in r.json()
 
 
 def test_get_settings_never_returns_key(client):

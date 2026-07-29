@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 # Ham form değerleri Starlette'in UploadFile'ıdır; fastapi.UploadFile onun ALT
@@ -20,6 +20,7 @@ from starlette.datastructures import UploadFile as FormUploadFile
 
 import assets_store
 import azure_client as ac
+import backup
 import color_names
 import composite
 import errlog
@@ -29,6 +30,7 @@ import palette_store
 import paths
 import seed
 import storage
+import version
 from models import (MAX_PROMPT_CHARS, BannerRequest, BulkImagesRequest,
                     BulkMoveRequest, FolderRequest, GenerateRequest, LogoRequest,
                     MoveImageRequest, SavePaletteRequest, SettingsRequest,
@@ -66,11 +68,31 @@ async def _lifespan(app: FastAPI):
     assets_store, folders, palette_store) kendi `makedirs`'ini zaten yapıyor,
     yani hata gerçekten kalıcıysa kullanıcı istek başına anlaşılır bir hata
     görür; açılmayan bir uygulamadan iyidir.
+
+    SIRA YÜK TAŞIYOR: yedek, tohumlamadan ÖNCE koşar. `seed` yazan bir işlem
+    (assets/logos/index.json); tohumlama önce koşsa taze bir makinede yedek
+    "kullanıcının verisi var" diye taze tohum verisinin işe yaramaz yedeğini
+    alırdı. Yükseltmede sıra fark etmez (seed marker yüzünden no-op) — yani bu
+    hata YALNIZCA taze kurulumda görünür, yani ofiste, asla geliştirmede. Bu
+    yüzden yoruma değil teste bağlandı (tests/test_backup.py).
+
+    İKİ AYRI guard: yedek hatası kullanıcının tohumlanmış logolarına mal
+    olmasın. Yedek bir EMNİYET özelliği olduğu için "başarısızsa durdur"
+    cazibesi var; YAPILMIYOR — yedek yüzünden uygulamaya giremeyen kullanıcının
+    verisine arayüzden hiçbir yolu kalmaz, bu loglanmış-ama-alınmamış bir
+    yedekten kesinlikle kötüdür.
     """
+    now = _now()
     try:
         paths.ensure_data_dirs()
+        backup.backup_manifests_if_version_changed(
+            paths.data_dir(), OUTPUT_DIR, ASSETS_DIR,
+            version=version.APP_VERSION, now=now)
+    except Exception:
+        errlog.safe_append(paths.data_dir(), traceback.format_exc())
+    try:
         seed.seed_builtin_logos(ASSETS_DIR, paths.bundled_logos_dir(),
-                                paths.data_dir(), now=_now())
+                                paths.data_dir(), now=now)
     except Exception:
         errlog.safe_append(paths.data_dir(), traceback.format_exc())
     yield
@@ -395,8 +417,16 @@ async def edit(
 
 @app.get("/api/settings")
 def get_settings() -> dict:
-    """Yapılandırma durumu — API key asla dönmez, yalnızca configured + endpoint."""
-    return ac.get_settings_status()
+    """Yapılandırma durumu + uygulama sürümü. API key asla dönmez.
+
+    `version` BURADA birleştiriliyor, azure_client'ta DEĞİL: onun işi kimlik
+    bilgisi, uygulama sürümünü bilmesi gereksiz bir bağ olurdu ve
+    tests/test_settings.py'deki get_settings_status sözleşmesini genişletirdi.
+
+    Destek sorusu "hangi sürümdesiniz?" v1.8'de cevaplanamıyordu — sürüm
+    yalnızca Info.plist'te vardı ve arayüz onu hiç göstermiyordu.
+    """
+    return {**ac.get_settings_status(), "version": version.APP_VERSION}
 
 
 @app.post("/api/settings")
@@ -786,8 +816,47 @@ def output_file(filename: str) -> FileResponse:
 
 
 @app.get("/")
-def index() -> FileResponse:
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+def index() -> HTMLResponse:
+    """index.html'i sürüm yerine konarak servis eder.
+
+    Neden FileResponse DEĞİL, üç sebep:
+
+    1. `?v=` cache-buster'ı artık version.py'den TÜRETİLİYOR. Şablonda
+       `__APP_VERSION__` yer tutucusu duruyor, burada gerçek sürümle
+       değiştiriliyor — elle artırılan ikinci bir sürüm literali kalmıyor.
+
+    2. `no-store` şart, süs değil: WKWebView (pywebview) HTML BELGESİNİN
+       KENDİSİNİ de önbelleğe alır. Belge bayatlarsa içindeki `?v=` de
+       bayatlar ve cache-buster hiçbir işe yaramaz — kullanıcı .app'i
+       değiştirse bile eski arayüzü görür. Bu delik paket tarafında bugün
+       desktop.py'nin `port=0`'ı sayesinde KAZARA kapalı (her açılış farklı
+       origin); `run.sh` tarafında ise CANLI (sabit 8765 + Cache-Control yok
+       + frozen'da Last-Modified = build tarihi → sezgisel tazelik penceresi
+       günlere çıkabilir). Portu bir gün sabitleme kararı deliği sessizce
+       geri getirirdi. `/static`'e bu başlık BİLEREK konmuyor — orada `?v=`
+       her sürüme ayrı URL veriyor (bkz. mount açıklaması).
+
+    3. Okuma hatası artık sessiz değil: FileResponse'ın davranışı gönderim
+       anında yakalanmayan bir RuntimeError'dı ve --windowed pakette stderr
+       olmadığı için kullanıcı boş pencere görür, hata.log'a hiçbir şey
+       düşmezdi. HTTPException değil HTMLResponse dönüyor — çalışan çıplak
+       JSON görmesin.
+
+    Şablon her istekte diskten okunuyor, BELLEKTE TUTULMUYOR: run.sh ile
+    geliştirirken "HTML'i düzenle → yenile → gör" akışı böyle korunuyor.
+    """
+    try:
+        with open(os.path.join(STATIC_DIR, "index.html"), encoding="utf-8") as f:
+            template = f.read()
+    except OSError:
+        log_path = errlog.safe_append(paths.data_dir(), traceback.format_exc())
+        return HTMLResponse(
+            "<h1>Arayüz yüklenemedi</h1>"
+            "<p>Uygulama dosyaları okunamadı. Lütfen uygulamayı kapatıp yeniden açın; "
+            f"sürerse hata kaydını (<code>{log_path or 'hata.log'}</code>) Kurum'ya iletin.</p>",
+            status_code=500, headers={"Cache-Control": "no-store"})
+    return HTMLResponse(template.replace("__APP_VERSION__", version.APP_VERSION),
+                        headers={"Cache-Control": "no-store"})
 
 
 # static/ dosyalarını /static altında servis et (index route'undan sonra mount).
@@ -800,6 +869,13 @@ def index() -> FileResponse:
 #
 # Yazılabilir dizinler (output/, assets/) burada AÇILMAZ: mount'un onlara
 # ihtiyacı yok ve import'un yan etkisi olmamalı — açılış `_lifespan`'da.
+#
+# `/` no-store gönderirken /static'in ÖNBELLEKLENEBİLİR kalması KASITLI bir
+# asimetridir, tutarsızlık değil: `?v=<sürüm>` her sürüme ayrı URL veriyor,
+# yani bayat bir kayıt hiç ADRESLENMİYOR; üstelik StaticFiles ETag/
+# Last-Modified gönderdiği için aynı URL'ye gelen istek loopback'te ucuz bir
+# 304'e düşüyor. Buraya no-store eklemek cache-buster mekanizmasının bütün
+# anlamını siler.
 if not paths.is_frozen():
     os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

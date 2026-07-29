@@ -1,11 +1,19 @@
-output/
-assets/
+# ÇAPALI (`/` ile): çapasız `output/` her derinlikte eşleşiyordu ve
+# tests/fixtures/v18/output/history.json'ı da yutuyordu — testler yerelde
+# yeşil, CI'da dosyalar HİÇ YOK oluyordu. Kastedilen zaten repo kökündeki
+# kullanıcı verisi; bu adda başka iç dizin yok.
+/output/
+/assets/
 .venv/
 __pycache__/
 *.pyc
 .env
 .DS_Store
+# Dev'de data_dir() == REPO_DIR: gerçek uygulamayı repodan çalıştırmak
+# bunları repo köküne yazar (bkz. paths.py).
 .logos-seeded
+.last-version
+backups/
 hata.log
 build/
 dist/

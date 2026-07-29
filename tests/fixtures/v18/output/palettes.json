@@ -1,0 +1,50 @@
+[
+  {
+    "id": "114baecff8fb",
+    "name": "Sonbahar",
+    "seed": "#c86a3c",
+    "mode": "triad",
+    "strength": "balanced",
+    "colors": [
+      {
+        "hex": "#c86a3c",
+        "name": "Kiremit"
+      },
+      {
+        "hex": "#3c86c8",
+        "name": "Gök Mavisi"
+      },
+      {
+        "hex": "#6ac83c",
+        "name": "Fıstık Yeşili"
+      },
+      {
+        "hex": "#c83c86",
+        "name": "Fuşya"
+      },
+      {
+        "hex": "#3cc86a",
+        "name": "Zümrüt"
+      }
+    ],
+    "created_at": "2026-07-29T10:00:00"
+  },
+  {
+    "id": "c153941ae05b",
+    "name": "Kış",
+    "seed": "#3c86c8",
+    "mode": "complementary",
+    "strength": "strict",
+    "colors": [
+      {
+        "hex": "#3c86c8",
+        "name": "Buz"
+      },
+      {
+        "hex": "#c8863c",
+        "name": "Kehribar"
+      }
+    ],
+    "created_at": "2026-07-29T10:00:00"
+  }
+]

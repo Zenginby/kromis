@@ -13,6 +13,20 @@ her testte no-op'a çevrilir. Tohumlamanın KENDİSİNİ test eden tek dosya
 kasıtlı olarak muaf tutulur: onlar ya gerçek fonksiyonu doğrudan çağırıyor
 ya da kendi casus'larını (spy) kuruyor; ikisi de bu guard'ın no-op'uyla
 ezilirse test vacuous (anlamsız) hale gelir.
+
+v1.9'da lifespan'a İKİNCİ bir yan etki eklendi (backup.py, sürüm değişiminde
+manifest yedeği) ve aynı tehdide açık — hatta sonucu daha kötü: geliştiricinin
+repo kökünde gerçek `output/history.json` ve `assets/*/index.json` dosyaları
+VAR (`.logos-seeded`'ın repo kökünde durması bunun kanıtı), yani `with
+TestClient(app)` kullanan tek bir test `<repo>/backups/bilinmeyen-<bugün>/` ve
+`<repo>/.last-version` bırakırdı. O kaçak damga, geliştiricinin KENDİ
+uygulamasının v1.8→v1.9 yedeğini bir daha hiç almamasına yol açar.
+
+İkinci guard AYRI tutuldu (mevcut olanı bir muafiyet tablosuna çevirmek yerine)
+çünkü muafiyetler kesişmiyor: tests/test_seed.py seed guard'ından muaf ama
+yedek guard'ına TABİ kalmalı (lifespan testleri repoya yedek yazmasın);
+simetrik olarak tests/test_backup.py gerçek yedeği koşarken tohumlama no-op
+kalmalı (yedek testleri tohum verisiyle kirlenmesin).
 """
 from __future__ import annotations
 
@@ -20,9 +34,11 @@ import os
 
 import pytest
 
+import backup as backup_module
 import seed as seed_module
 
 _UNGUARDED_FILENAME = "test_seed.py"
+_UNGUARDED_BACKUP_FILENAME = "test_backup.py"
 
 
 @pytest.fixture(autouse=True)
@@ -33,6 +49,22 @@ def _guard_against_real_seeding(request: pytest.FixtureRequest,
         yield
         return
     monkeypatch.setattr(seed_module, "seed_builtin_logos", lambda *a, **k: [])
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _guard_against_real_backups(request: pytest.FixtureRequest,
+                                monkeypatch: pytest.MonkeyPatch):
+    """Varsayılan olarak sürüm-değişimi yedeğini no-op yapar (bkz. modül docstring'i).
+
+    app.py bu fonksiyonu MODÜL ATTRIBUTE'u üzerinden çağırmak zorunda —
+    `from backup import ...` bu guard'ı sessizce devre dışı bırakır.
+    """
+    if os.path.basename(str(request.node.fspath)) == _UNGUARDED_BACKUP_FILENAME:
+        yield
+        return
+    monkeypatch.setattr(backup_module, "backup_manifests_if_version_changed",
+                        lambda *a, **k: None)
     yield
 
 

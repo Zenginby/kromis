@@ -72,6 +72,22 @@ de bu numarayı söyle.
 Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya yaz
 (aşağıdaki yedek işine yarayabilir).
 
+## Sürüm 1.10.0'da ne değişti
+
+- **"İndir" artık gerçekten indiriyor.** Önceki sürümde İndir'e basınca dosya
+  kaydedilmiyor, görselin büyük hâli uygulamanın yerine açılıyor ve geri dönüş
+  yolu kalmıyordu. Artık macOS'un **kaydetme penceresi** açılıyor; klasör olarak
+  **İndirilenler (Downloads)** hazır geliyor, dosya adı da dolu geliyor. Başka
+  bir klasör seçmek istersen o pencereden seçebilirsin.
+- **Görsele tıklayınca büyüyor.** Ortadaki görsele tıkla → tam ekran açılır.
+  Orada:
+  - fare tekerleği ya da trackpad'de **iki parmakla kıstırma** → yakınlaştır /
+    uzaklaştır (imlecin durduğu yere doğru),
+  - **çift tıklama** → büyüt / sığdır arası geçiş,
+  - büyütülmüşken **sürükle** → görselin içinde gezin,
+  - alttaki şeritten **Sığdır** ile başa dön, **İndir** ile kaydet,
+  - **Esc** ya da **×** ile kapat.
+
 ## Yedek nerede
 
 Uygulama, sürüm değiştiğinde listelerinin bir kopyasını kendiliğinden alıyor:

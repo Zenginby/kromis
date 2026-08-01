@@ -23,6 +23,28 @@ def _probe_app() -> FastAPI:
     return probe
 
 
+class _FakeSettings(dict):
+    """pywebview'ın `webview.settings`'i (ImmutableDict) gibi davranır.
+
+    Düz bir dict KULLANILMADI: gerçek nesne var olmayan bir anahtara yazmayı
+    reddediyor (webview/util.py: "Cannot add new key"). Anahtar adındaki bir
+    yazım hatası (ör. ALLOW_DOWNLOAD) düz dict'te sessizce geçer, pakette ise
+    açılışta KeyError'a düşer — yani test yeşil kalırken uygulama çöker.
+    """
+
+    def __setitem__(self, key, value):
+        if key not in self:
+            raise KeyError(f"Cannot add new key '{key}'.")
+        super().__setitem__(key, value)
+
+
+def _fake_webview_module() -> types.ModuleType:
+    """`_run()`'ın dokunduğu yüzeyi taşıyan sahte modül (pencere hiç açılmaz)."""
+    module = types.ModuleType("webview")
+    module.settings = _FakeSettings(ALLOW_DOWNLOADS=False)
+    return module
+
+
 def test_start_server_binds_a_free_port_and_serves():
     server, thread, port = desktop.start_server(_probe_app())
     try:
@@ -144,7 +166,7 @@ def test_main_wires_real_port_into_window_and_shuts_down_cleanly(monkeypatch):
     captured: dict = {}
     live_thread_at_start_return: dict = {}
 
-    fake_webview = types.ModuleType("webview")
+    fake_webview = _fake_webview_module()
 
     def fake_create_window(title: str, url: str, width: int, height: int,
                             min_size: tuple[int, int]) -> None:
@@ -195,6 +217,56 @@ def test_main_wires_real_port_into_window_and_shuts_down_cleanly(monkeypatch):
     assert live_thread_at_start_return["alive_before_shutdown"] is True
     assert captured["server"].should_exit is True
     assert not captured["thread"].is_alive()
+
+
+def test_downloads_are_enabled_before_the_window_opens(monkeypatch):
+    """ARM Mac mini'de bildirilen hata: "İndir" hiçbir şey kaydetmiyor, görselin
+    büyük hâli uygulamanın YERİNE açılıyordu.
+
+    Nedeni istemcide değildi — folders.js standarda uygun `<a download>` üretiyor.
+    WKWebView bu özniteliği YALNIZCA `ALLOW_DOWNLOADS` açıkken indirmeye çeviriyor
+    (webview/platforms/cocoa.py: `action.shouldPerformDownload() and
+    webview_settings['ALLOW_DOWNLOADS']`); pywebview'ın varsayılanı False. Kapalıyken
+    tıklama sıradan gezinmeye düşüyor, PNG'nin MIME türü gösterilebilir olduğu için
+    de görsel tam pencerede çiziliyordu — üstelik Delete-ile-geri hareketi aynı
+    dosyada bilerek kapalı olduğu için geri dönüş yolu YOK.
+
+    Ayar penceresel bir yan etki olduğundan otomatik olarak yalnızca burada
+    yakalanabilir; hatanın kendisi sadece paketlenmiş .app'te görünür (tarayıcı
+    kendi indirme yolunu kullandığı için run.sh ile test edilince sağlam görünür).
+    """
+    seen: dict = {}
+
+    fake_webview = _fake_webview_module()
+    settings_at_import = fake_webview.settings
+
+    def fake_create_window(title: str, url: str, width: int, height: int,
+                            min_size: tuple[int, int]) -> None:
+        seen["at_create_window"] = fake_webview.settings["ALLOW_DOWNLOADS"]
+
+    def fake_start() -> None:
+        seen["at_start"] = fake_webview.settings["ALLOW_DOWNLOADS"]
+
+    fake_webview.create_window = fake_create_window
+    fake_webview.start = fake_start
+    monkeypatch.setitem(sys.modules, "webview", fake_webview)
+    monkeypatch.setattr("paths.ensure_data_dirs", lambda: None)
+    monkeypatch.setattr(seed, "seed_builtin_logos", lambda *args, **kwargs: [])
+
+    desktop._run()
+
+    # Pencere açılmadan ÖNCE açılmış olmalı: ayar tıklama anında okunuyor ama
+    # create_window'dan sonra yazmak yarış penceresi bırakır.
+    assert seen["at_create_window"] is True, "indirmeler pencere açılmadan açılmalı"
+    assert seen["at_start"] is True
+
+    # Ayar YERİNDE değiştirilmeli. cocoa.py modül düzeyinde
+    # `from webview import settings as webview_settings` ile bu nesneye bağlanıyor;
+    # `webview.settings = {...}` diye yeniden atamak o bağı koparır ve backend
+    # ESKİ nesneyi okumaya devam eder → düzeltme sessizce ölür, hata geri gelir.
+    # Bu kusur testi koşarak keşfedilemez, o yüzden kimlik açıkça karşılaştırılıyor.
+    assert fake_webview.settings is settings_at_import, (
+        "settings yeniden atanmış — cocoa.py'nin bağlandığı nesne artık başkası")
 
 
 def test_shutdown_logs_when_thread_join_times_out(monkeypatch, tmp_path):

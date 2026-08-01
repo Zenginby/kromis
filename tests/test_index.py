@@ -43,6 +43,109 @@ def test_index_served():
     assert 'data-akind="palettes"' not in r.text
 
 
+def test_viewer_markup_is_served():
+    """Görsel büyüteci: ortadaki önizlemeye tıklayınca açılan tam ekran görüntüleyici.
+
+    viewer.js bu id'lere doğrudan bağlanıyor ve dosya en sonda yükleniyor —
+    biri yeniden adlandırılırsa script yükleme anında patlar ve ONDAN SONRAKİ
+    hiçbir dinleyici kurulmaz.
+    """
+    html = TestClient(appmod.app).get("/").text
+    for element_id in ("viewer", "viewer-stage", "viewer-img", "viewer-download",
+                       "viewer-zoom-in", "viewer-zoom-out", "viewer-fit", "viewer-close"):
+        assert f'id="{element_id}"' in html, element_id
+
+
+def test_viewer_stacks_above_modals_but_below_the_confirm_dialog():
+    """Büyüteç .modal katmanının (50) üstünde, confirm'in (60) ALTINDA olmalı.
+
+    Üstünde olmalı: kütüphane/palet modalları açıkken de görsel tam ekran açılır.
+    Altında kalmalı: confirm-modal native confirm()'in yerine geçtiği için her
+    zaman en üstte olmak zorunda (bkz. bir üstteki test) — büyüteç onu örterse
+    kullanıcı görmediği bir diyaloğu beklemeye başlar.
+    """
+    css = TestClient(appmod.app).get("/static/style.css").text
+    base = re.search(r"\.modal\s*\{[^}]*?z-index:\s*(\d+)", css, re.S)
+    viewer = re.search(r"#viewer\s*\{[^}]*?z-index:\s*(\d+)", css, re.S)
+    top = re.search(r"#confirm-modal\s*\{[^}]*?z-index:\s*(\d+)", css, re.S)
+    assert viewer, "#viewer için z-index kuralı yok"
+    assert int(base.group(1)) < int(viewer.group(1)) < int(top.group(1)), (
+        f"katman sırası bozuk: modal={base.group(1)} "
+        f"viewer={viewer.group(1)} confirm={top.group(1)}")
+
+
+def test_viewer_wheel_handler_prevents_the_default_page_zoom():
+    """WKWebView'da ctrl'lü `wheel` (trackpad pinch) engellenmezse TÜM sayfayı
+    zoom'lar: arayüz bozulur ve kullanıcı bunu kolayca geri alamaz.
+
+    `{ passive: false }` de şart — passive bir dinleyicide preventDefault()
+    sessizce yok sayılır, yani çağrının VARLIĞI tek başına yetmiyor.
+    """
+    js = TestClient(appmod.app).get("/static/viewer.js").text
+    block = re.search(r'addEventListener\("wheel".*?\}\s*,\s*\{([^}]*)\}', js, re.S)
+    assert block, "wheel dinleyicisi bulunamadı"
+    assert "preventDefault" in block.group(0), "wheel varsayılanı engellenmiyor"
+    assert re.search(r"passive:\s*false", block.group(1)), (
+        "wheel dinleyicisi passive — preventDefault() yok sayılır")
+
+
+def test_viewer_pan_captures_the_pointer():
+    """Kaydırma sırasında imleç görselin dışına çıkabiliyor (hızlı sürükleme).
+
+    setPointerCapture olmadan pointermove olayları başka bir öğeye gider ve
+    kaydırma yarıda kopar — kullanıcı "takılıyor" diye bildirir.
+    """
+    js = TestClient(appmod.app).get("/static/viewer.js").text
+    assert "setPointerCapture" in js
+
+
+def test_viewer_pan_bounds_are_measured_without_the_rendered_transform():
+    """Kaydırma sınırları getBoundingClientRect() ile ÖLÇÜLEMEZ.
+
+    Tarayıcıda koşarken yakalandı: rect UYGULANMIŞ transform'u yansıtır, ama
+    render() requestAnimationFrame'e ertelendiği için zoomAt() clampPan()'i
+    çağırdığında DOM hâlâ ESKİ ölçeği taşıyor. İlk yakınlaştırmada rect
+    sığdırılmış boyutu döndürüyor, sınırlar 0 çıkıyor ve imleç-sabitli zoom'un
+    hesapladığı tx/ty anında sıfırlanıyordu — özellik sessizce "merkeze zoom"a
+    dönüşüyordu. Görsel olarak fark edilmesi zor, bu yüzden tripwire.
+
+    offsetWidth/clientWidth yerleşim tabanlıdır, transform'dan etkilenmez.
+    """
+    js = TestClient(appmod.app).get("/static/viewer.js").text
+    bounds = re.search(r"function panBounds\(\)\s*\{(.*?)\n  \}", js, re.S)
+    assert bounds, "panBounds() bulunamadı"
+    assert "getBoundingClientRect" not in bounds.group(1), (
+        "panBounds getBoundingClientRect kullanıyor — sınırlar bir kare geriden gelir")
+    assert "offsetWidth" in bounds.group(1) and "clientWidth" in bounds.group(1)
+
+
+def test_viewer_download_is_limited_to_saved_images():
+    """İndir bağlantısı yalnız /output/ altındaki KAYITLI görseller için kurulur.
+
+    Henüz kaydedilmemiş yüklemeler blob: URL taşır; macOS kayıt paneline
+    anlamsız bir ad düşerdi. Bu yüzden bağlantı o durumda gizlenir.
+    """
+    js = TestClient(appmod.app).get("/static/viewer.js").text
+    assert '"/output/"' in js, "kaynak /output/ kontrolü yapılmıyor"
+    assert "dlLink.hidden" in js, "kaydedilmemiş görselde indir bağlantısı gizlenmiyor"
+
+
+def test_viewer_zoom_survives_reduced_motion():
+    """prefers-reduced-motion yalnız ANİMASYONU kaldırmalı, özelliği DEĞİL.
+
+    Dosyanın dibindeki genel kural `* { transition: none !important }` — oraya
+    refleksle `.viewer-img { transform: none !important }` eklemek büyütmeyi ve
+    kaydırmayı tümden öldürür (transform durumun kendisi, bir süsleme değil).
+    Bir kez o hataya düşüldü; bu test tripwire.
+    """
+    css = TestClient(appmod.app).get("/static/style.css").text
+    reduced = re.search(r"@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{(.*)$",
+                        css, re.S)
+    assert reduced, "prefers-reduced-motion bloğu yok"
+    assert not re.search(r"\.viewer-img[^{]*\{[^}]*transform:\s*none", reduced.group(1)), (
+        "reduced-motion viewer-img'in transform'unu sıfırlıyor — zoom/pan ölür")
+
+
 def test_confirm_dialog_stacks_above_the_other_modals():
     """confirm-modal bir modal AÇIKKEN çağrılıyor (palet kaydet, varlık sil).
 
@@ -188,7 +291,8 @@ def test_every_frontend_script_is_loaded_and_in_order():
     önceki dosyalarda tanımlı adlara dokunuyor.
     """
     client = TestClient(appmod.app)
-    order = ["core.js", "folders.js", "assets.js", "palette.js", "settings.js"]
+    order = ["core.js", "folders.js", "assets.js", "palette.js", "settings.js",
+             "viewer.js"]
     html = client.get("/").text
     positions = [html.find(f"/static/{name}") for name in order]
     assert all(p > 0 for p in positions), dict(zip(order, positions))

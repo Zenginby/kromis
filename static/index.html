@@ -424,6 +424,29 @@
     </div>
   </div>
 
+  <!-- Görsel büyüteci: ortadaki önizlemeye tıklayınca açılır, yakınlaştırılıp
+       kaydırılabilir. .modal-card KULLANILMIYOR — o kalıp ortalanmış, sınırlı
+       genişlikte bir kart için; burada görsel tüm ekranı kullanmalı. -->
+  <div id="viewer" class="modal viewer" hidden>
+    <div class="modal-backdrop" data-viewer-close></div>
+    <div id="viewer-stage" class="viewer-stage" role="dialog" aria-modal="true"
+         aria-label="Görseli büyüt" tabindex="-1">
+      <img id="viewer-img" class="viewer-img" alt="" draggable="false" />
+    </div>
+    <div class="viewer-bar">
+      <button id="viewer-zoom-out" class="viewer-btn" type="button"
+              aria-label="Uzaklaştır" title="Uzaklaştır (−)">−</button>
+      <span id="viewer-zoom-pct" class="viewer-pct" role="status">%100</span>
+      <button id="viewer-zoom-in" class="viewer-btn" type="button"
+              aria-label="Yakınlaştır" title="Yakınlaştır (+)">+</button>
+      <button id="viewer-fit" class="viewer-btn" type="button"
+              title="Ekrana sığdır (0)">Sığdır</button>
+      <a id="viewer-download" class="viewer-btn" download>İndir</a>
+      <button id="viewer-close" class="viewer-btn" type="button"
+              aria-label="Kapat" title="Kapat (Esc)">×</button>
+    </div>
+  </div>
+
   <!-- SIRA bağlayıcı: dosyalar tek global kapsamı paylaşıyor ve açılış
        çağrıları settings.js'in dibinde. Bkz. core.js başlığı.
 
@@ -440,5 +463,6 @@
   <script src="/static/assets.js?v=__APP_VERSION__"></script>
   <script src="/static/palette.js?v=__APP_VERSION__"></script>
   <script src="/static/settings.js?v=__APP_VERSION__"></script>
+  <script src="/static/viewer.js?v=__APP_VERSION__"></script>
 </body>
 </html>

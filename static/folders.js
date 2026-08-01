@@ -448,9 +448,11 @@ function renderGallery() {
     // (aksi halde dataTransfer'a görsel URL'i düşer ve sürükleme hayaleti bozulur)
     img.draggable = false;
 
+    // download'a dosya adı AÇIKÇA veriliyor: boş bırakılırsa macOS kayıt
+    // panelinin ad alanını WebKit'in URL'den türetmesine kalıyoruz.
     const downloadLink = document.createElement("a");
     downloadLink.setAttribute("href", `/output/${rec.filename}`);
-    downloadLink.setAttribute("download", "");
+    downloadLink.setAttribute("download", rec.filename);
     downloadLink.textContent = "İndir";
 
     // ana görsele ek referans olarak ekle (AI ile birleştirme)

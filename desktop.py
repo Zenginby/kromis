@@ -133,6 +133,20 @@ def _run() -> None:
     paths.ensure_data_dirs()
     import app as appmod  # yollar hazır olduktan sonra
 
+    # WKWebView'da `<a download>` YALNIZCA bu ayar açıkken indirmeye dönüşür
+    # (webview/platforms/cocoa.py: `action.shouldPerformDownload() and
+    # webview_settings['ALLOW_DOWNLOADS']`). pywebview'ın varsayılanı False ve
+    # kapalıyken tıklama sıradan bir gezinmeye düşüyordu: PNG'nin MIME türünü
+    # WKWebView gösterebildiği için görsel uygulamanın YERİNE çiziliyor, hiçbir
+    # şey kaydedilmiyor ve kullanıcı orada mahsur kalıyordu — Delete ile geri
+    # gitme hareketi de aynı dosyada bilerek kapalı, yani çıkış yolu yok.
+    #
+    # Atama YERİNDE yapılmak ZORUNDA (`webview.settings[...] = True`).
+    # cocoa.py modül düzeyinde `from webview import settings as webview_settings`
+    # ile AYNI nesneye bağlanıyor; `webview.settings = {...}` diye yeniden
+    # atamak o bağı koparır ve düzeltme sessizce ölür.
+    webview.settings["ALLOW_DOWNLOADS"] = True
+
     server, thread, port = start_server(appmod.app)
     try:
         webview.create_window(WINDOW_TITLE, f"http://127.0.0.1:{port}",

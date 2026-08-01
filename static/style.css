@@ -596,8 +596,61 @@ body.dnd-active .folder-cell .folder-open { border-style: dashed; border-color: 
 }
 body.select-mode .card, body.select-mode .card img { cursor: pointer; }
 
+/* --- Görsel büyüteci (lightbox) ------------------------------------------ */
+
+/* Önizleme artık tıklanabilir: imleç bunu söylemeli, yoksa özellik keşfedilmez. */
+.preview-img { cursor: zoom-in; }
+
+/* z-index 50 (.modal) ile 60 (#confirm-modal) ARASINDA: büyüteç diğer
+   pencerelerin üstünde açılır ama onay diyaloğunun altında kalır — confirm
+   native confirm()'in yerine geçtiği için her zaman en üstte olmak zorunda. */
+#viewer { z-index: 55; padding: 0; overflow: hidden; }
+body.viewer-open { overflow: hidden; }
+
+.viewer-stage {
+  position: fixed; inset: 0; z-index: 1;
+  display: grid; place-items: center;
+  overflow: hidden; outline: none; touch-action: none;
+}
+.viewer-img {
+  max-width: 92vw; max-height: 86vh; border-radius: 10px;
+  will-change: transform; user-select: none; -webkit-user-drag: none;
+  box-shadow: 0 30px 80px oklch(0% 0 0 / 0.55);
+}
+/* Kaydırma yalnız büyütülmüşken mümkün — imleç de bunu yansıtmalı. */
+.viewer-stage.zoomed .viewer-img { cursor: grab; }
+.viewer-stage.panning .viewer-img { cursor: grabbing; }
+
+/* Yüzen, yarı saydam şerit: içerik altından geçer, opak bir bant ekranı yemez. */
+.viewer-bar {
+  position: fixed; z-index: 2; left: 50%; bottom: 1.1rem; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 0.3rem; padding: 0.35rem;
+  background: oklch(26% 0.02 260 / 0.72); backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid oklch(94% 0.01 260 / 0.14); border-radius: 12px;
+  box-shadow: 0 12px 34px oklch(0% 0 0 / 0.4);
+}
+.viewer-btn {
+  min-width: 2rem; height: 2rem; padding: 0 0.6rem;
+  display: grid; place-items: center; cursor: pointer; text-decoration: none;
+  font-size: 0.85rem; line-height: 1; white-space: nowrap;
+  background: transparent; color: var(--text); border: 0; border-radius: 8px;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.viewer-btn:hover { background: var(--panel-2); color: var(--accent); }
+.viewer-btn:active { transform: scale(0.94); }
+.viewer-btn[hidden] { display: none; }
+.viewer-pct {
+  min-width: 3.4rem; text-align: center; font-size: 0.78rem;
+  color: var(--muted); font-variant-numeric: tabular-nums;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
   .spinner { animation: none; }
   .modal-backdrop, .modal-card, .confirm-icon { animation: none; }
+  /* Büyüteç küçük resminden büyüyerek AÇILMAZ, yalnız belirir (JS de aynı
+     sorguyu okuyup FLIP hesabını tümden atlar). transform'un KENDİSİ burada
+     sıfırlanamaz: yakınlaştırma ve kaydırma bir süsleme değil, özelliğin
+     ta kendisi — yalnızca geçiş/animasyon kaldırılır. */
+  .viewer-img { animation: none; }
 }

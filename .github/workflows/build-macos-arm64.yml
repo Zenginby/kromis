@@ -47,7 +47,7 @@ jobs:
           APP="dist/GPT-Image Studio.app"
           lipo -archs "$APP/Contents/MacOS/GPT-Image Studio" | tee /dev/stderr | grep -qx arm64
           codesign --verify --strict "$APP"
-          for f in static/index.html static/core.js \
+          for f in static/index.html static/core.js static/viewer.js \
                    bundled/logos/kurum-logo-blue.png bundled/logos/kurum-logo-white.png; do
             test -f "$APP/Contents/Resources/$f" || { echo "EKSİK: $f"; exit 1; }
           done

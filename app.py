@@ -6,6 +6,7 @@ import datetime as _dt
 import io
 import os
 import traceback
+from collections.abc import Sequence
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -34,7 +35,7 @@ import version
 from models import (MAX_PROMPT_CHARS, BannerRequest, BulkImagesRequest,
                     BulkMoveRequest, FolderRequest, GenerateRequest, LogoRequest,
                     MoveImageRequest, SavePaletteRequest, SettingsRequest,
-                    SuggestRequest)
+                    SuggestRequest, check_drop_indices)
 
 BASE_DIR = paths.REPO_DIR                    # geriye uyum: mevcut kullanımlar bozulmasın
 OUTPUT_DIR = paths.output_dir()
@@ -231,7 +232,8 @@ def _saved_colors(saved: dict) -> list[dict]:
 
 
 def _palette_prompt(prompt: str, seed: str | None, mode: str, strength: str,
-                    palette_id: str | None = None, *, task: str) -> tuple[str, dict | None]:
+                    palette_id: str | None = None, *, task: str,
+                    drop: Sequence[int] = ()) -> tuple[str, dict | None]:
     """Prompt'a renk yönlendirmesi ekler. Palet yoksa prompt aynen döner.
 
     KAYITLI palet kullanılıyorsa renkler/adlar kaydın DONDURULMUŞ halinden
@@ -267,10 +269,27 @@ def _palette_prompt(prompt: str, seed: str | None, mode: str, strength: str,
         colors = _saved_colors(saved) or _resolve_palette(seed, mode, offline=True)
     else:
         colors = _resolve_palette(seed, mode, offline=True)
-    suffix = palette.prompt_suffix(colors, strength, task=task)
+
+    # Çıkarma TEK NOKTADA, renkler çözüldükten SONRA uygulanıyor: indeksler
+    # böylece kayıtlı paletin DONMUŞ listesinde de tutarlı oluyor (kullanıcı
+    # çıkarıp kaydettiyse o liste 5'ten kısa olabilir).
+    kept = _drop_colors(colors, drop)
+    if not kept:
+        # models.check_drop_indices'in üst sınırı 5'lik listeye göre; 3 renkli
+        # donmuş bir kayıtta [0,1,2] o kapıdan GEÇER ama sonuç boş palet olur.
+        # Sessizce çıkarmayı yok saymak yerine gürültülü 422: renksiz sonucu
+        # açıklayamayan kullanıcı, bu özelliğin engellemek için var olduğu şey.
+        raise HTTPException(status_code=422,
+                            detail="Paletten en az bir renk kalmalı.")
+
+    suffix = palette.prompt_suffix(kept, strength, task=task)
     applied = len(prompt) + len(suffix) <= MAX_PROMPT_CHARS
     record = {"seed": seed, "mode": mode, "strength": strength,
-              "colors": colors, "applied": applied}
+              # `colors` = KALANLAR: çip ve galeri bunu gösteriyor, yani
+              # gösterilen şerit prompt'a gidenle birebir. `dropped` ise
+              # geçmişten aynı durumu kurabilmek için.
+              "colors": kept, "applied": applied,
+              "dropped": sorted(set(drop))}
     if saved:
         record["id"] = saved["id"]
         record["name"] = saved.get("name", "")
@@ -282,6 +301,7 @@ def generate(req: GenerateRequest) -> dict:
     folder_id = _check_folder(req.folder_id)
     prompt_sent, pal = _palette_prompt(req.prompt, req.palette_hex, req.palette_mode,
                                        req.palette_strength, req.palette_id,
+                                       drop=req.palette_drop,
                                        task="generate")
     try:
         images = ac.generate(prompt_sent, req.size, req.quality, req.n)
@@ -337,6 +357,42 @@ def _check_palette_hex(palette_hex: str | None) -> str | None:
         raise HTTPException(status_code=422, detail="Geçersiz palette_hex.")
 
 
+def _check_palette_drop(value: str | None) -> list[int]:
+    """Form'dan gelen `"0,3"` biçimini indeks listesine çevirir; geçersizse 422.
+
+    Arayüz hiçbir şey çıkarılmadığında alanı GÖNDERMİYOR; boş dize de "çıkarma
+    yok" demek, hata değil.
+
+    Biçim neden virgüllü metin: core.js palet seçeneklerini genel bir döngüyle
+    (`Object.entries(pal)`) FormData'ya basıyor ve orada JS dizisi kendiliğinden
+    `"0,3"`'e dönüyor. Döngüyü elle sayıma çevirmek bir kez `palette_id`'yi
+    sessizce düşürmüştü (core.js'teki not), o yüzden ayrıştırma burada.
+    """
+    if not value:
+        return []
+    try:
+        indices = [int(part) for part in value.split(",")]
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Geçersiz palette_drop.")
+    try:
+        return check_drop_indices(indices)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def _drop_colors(colors: list[dict], drop: Sequence[int]) -> list[dict]:
+    """Verilen indeksleri çıkarır; KALANLARIN SIRASI korunur.
+
+    Sıra prompt'ta anlam taşıyor (palette._ORDER_CUE: baştaki renkler geniş
+    alanlara, sondaki küçük vurgu olarak). Yeniden dizilse kullanıcının çipte
+    gördüğü şerit ile modele giden ağırlık sırası ayrışırdı.
+    """
+    if not drop:
+        return colors
+    excluded = set(drop)
+    return [c for i, c in enumerate(colors) if i not in excluded]
+
+
 async def _collect_edit_refs(
     request: Request, file: UploadFile | None, source_id: str | None,
 ) -> tuple[list[tuple[str, bytes]], str | None]:
@@ -385,12 +441,16 @@ async def edit(
     palette_mode: str = Form("analogic"),
     palette_strength: str = Form("balanced"),
     palette_id: str | None = Form(None),
+    # Virgüllü metin, dizi DEĞİL: core.js FormData'ya böyle yazıyor
+    # (bkz. _check_palette_drop). Boş = çıkarma yok.
+    palette_drop: str = Form(""),
 ) -> dict:
     """Ek referans görselleri (`extra_files` yüklemeleri, `extra_source_ids`
     galeri id'leri) form verisinden okunur — bkz. _extra_refs."""
     _check_edit_form(prompt, size, quality, n, file, source_id,
                      palette_mode, palette_strength)
     palette_hex = _check_palette_hex(palette_hex)
+    drop = _check_palette_drop(palette_drop)
 
     target_folder = _check_folder(folder_id)
     refs, parent_id = await _collect_edit_refs(request, file, source_id)
@@ -398,7 +458,8 @@ async def edit(
     # task="edit": üretim ifadesi modele yeniden boyama söyler ve referans
     # görselin kompozisyonunu yok eder; düzenlemede istenen renk derecelendirmesi.
     prompt_sent, pal = _palette_prompt(prompt, palette_hex, palette_mode,
-                                       palette_strength, palette_id, task="edit")
+                                       palette_strength, palette_id, task="edit",
+                                       drop=drop)
     try:
         images = ac.edit(prompt_sent, refs, size, quality, n)
     except ac.AzureImageError as e:
@@ -601,6 +662,10 @@ def create_palette_route(req: SavePaletteRequest) -> dict:
     # ve palette_id ile prompt'a girer; API sonradan çökse bile bu palet
     # kaydedildiği günkü prompt'u üretmeye devam eder.
     colors = _resolve_palette(req.seed, req.mode, offline=False)
+    # Çıkarma DONMA'dan önce uygulanır: kayıt kaç renk taşıyorsa o kadarı
+    # prompt'a gider ve sonraki kullanımlarda çıkarma göndermek gerekmez.
+    # Kalıcı olarak daha az renkli bir paletin tek yolu bu (bkz. models.drop).
+    colors = _drop_colors(colors, req.drop)
     return {"palette": palette_store.create(name, req.seed, req.mode, req.strength,
                                             colors, OUTPUT_DIR, now=_now())}
 
@@ -632,6 +697,7 @@ def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
             logo_blue=logo_blue, logo_white=logo_white,
             position=req.position, color=req.color, scale=req.size,
             shadow_alpha=req.shadow_alpha, shadow_blur=req.shadow_blur,
+            offset_x=req.offset_x, offset_y=req.offset_y,
         )
     except Exception as exc:
         # Geniş yakalama bilinçli: PIL'in DecompressionBombError'ı doğrudan

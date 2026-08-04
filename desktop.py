@@ -25,6 +25,7 @@ from fastapi import FastAPI
 
 import errlog
 import paths
+import screencolor
 
 WINDOW_TITLE = "GPT-Image Studio"
 WINDOW_SIZE = (1440, 900)
@@ -113,6 +114,38 @@ def _show_fatal_alert(log_path: str) -> None:
         pass
 
 
+class Api:
+    """pywebview js_api köprüsü — JS'ten `window.pywebview.api` olarak görünür.
+
+    Tek üyesi damlalık. Tarayıcıda aynı işi `EyeDropper` yapıyor ama o API
+    Chromium'a özel ve pywebview'ın macOS arka ucu WKWebView (WebKit) — orada
+    yok. Bu köprü ikisini davranış olarak eşitliyor: her iki ortamda da ekranın
+    her yerinden renk seçilebiliyor.
+
+    pywebview bu metotları AYRI bir thread'de çağırıyor (webview/util.py), yani
+    içindeki bekleme ana AppKit döngüsünü kilitlemiyor — screencolor'ın thread
+    modeli buna dayanıyor.
+    """
+
+    # Test edilebilirlik için ayrı bir isim: testler sampler'ı buradan
+    # değiştiriyor, gerçek AppKit yolunu hiç çalıştırmadan.
+    _pick = staticmethod(screencolor.pick)
+
+    def pick_screen_color(self) -> str | None:
+        """Ekrandan seçilen rengi `#rrggbb` olarak döndürür; seçim yoksa None.
+
+        HİÇBİR koşulda fırlatmaz. js_api metodundan çıkan bir istisna
+        pywebview'ın worker thread'inde kalır ve `--windowed` pakette stderr
+        olmadığı için izsiz kaybolur; kullanıcı yalnızca "düğme çalışmıyor"
+        görür. Bu yüzden yakalanıp hata.log'a yazılıyor (errlog'un gerekçesi).
+        """
+        try:
+            return self._pick()
+        except Exception:
+            _safe_log(traceback.format_exc())
+            return None
+
+
 def _shutdown(server: uvicorn.Server, thread: threading.Thread) -> None:
     """Sunucuya çıkışı işaretler, thread'in kapanmasını bekler.
 
@@ -149,9 +182,12 @@ def _run() -> None:
 
     server, thread, port = start_server(appmod.app)
     try:
+        # js_api: damlalık için native köprü (bkz. Api). Olmadan
+        # `window.pywebview.api` hiç oluşmaz ve WKWebView'da EyeDropper de
+        # bulunmadığı için düğme sessizce gizli kalır.
         webview.create_window(WINDOW_TITLE, f"http://127.0.0.1:{port}",
                               width=WINDOW_SIZE[0], height=WINDOW_SIZE[1],
-                              min_size=MIN_WINDOW_SIZE)
+                              min_size=MIN_WINDOW_SIZE, js_api=Api())
         webview.start()
     finally:
         _shutdown(server, thread)

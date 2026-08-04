@@ -168,6 +168,98 @@ def test_motto_placement_resolves_from_mottos_library(tmp_path, monkeypatch):
     assert astore.asset_path("logos", motto["id"], str(tmp_path / "assets")) is None
 
 
+def test_logo_passes_offset_to_composite(tmp_path, monkeypatch):
+    """Izgara noktasından sapma composite'e ORAN olarak geçmeli."""
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
+    monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
+    calls = []
+    monkeypatch.setattr(appmod.composite, "composite_logo", _fake_composite_factory(calls))
+
+    c = TestClient(appmod.app)
+    src_id = _make_source(c)
+    r = c.post("/api/logo", json={"id": src_id, "offset_x": 0.08, "offset_y": -0.05})
+    assert r.status_code == 200
+    kw = calls[-1]
+    assert kw["offset_x"] == 0.08
+    assert kw["offset_y"] == -0.05
+
+
+def test_logo_defaults_send_zero_offset(tmp_path, monkeypatch):
+    """Alan gönderilmezse sıfır gitmeli — eski istemci birebir eski çıktıyı alır."""
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
+    monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
+    calls = []
+    monkeypatch.setattr(appmod.composite, "composite_logo", _fake_composite_factory(calls))
+
+    c = TestClient(appmod.app)
+    src_id = _make_source(c)
+    assert c.post("/api/logo", json={"id": src_id}).status_code == 200
+    assert calls[-1]["offset_x"] == 0.0
+    assert calls[-1]["offset_y"] == 0.0
+
+
+def test_logo_rejects_out_of_range_offset(tmp_path, monkeypatch):
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
+    c = TestClient(appmod.app)
+    assert c.post("/api/logo", json={"id": "x", "offset_x": 0.9}).status_code == 422
+    assert c.post("/api/logo", json={"id": "x", "offset_y": -0.9}).status_code == 422
+
+
+def test_motto_offset_also_reaches_composite(tmp_path, monkeypatch):
+    """Motto logo ile aynı paneli paylaşıyor; kaydırma onda da çalışmalı.
+
+    Arayüz tarafında ortak panel yeterli görünüyor ama sunucu sözleşmesinin de
+    motto yolunda tuttuğu ayrıca kanıtlanmalı: asset_kind ayrı bir daldan
+    geçiyor (_composite_logo'daki asset_id çözümlemesi).
+    """
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path / "output"))
+    monkeypatch.setattr(appmod, "ASSETS_DIR", str(tmp_path / "assets"))
+    monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
+    calls = []
+    monkeypatch.setattr(appmod.composite, "composite_logo", _fake_composite_factory(calls))
+
+    c = TestClient(appmod.app)
+    src_id = _make_source(c)
+    motto = astore.save_asset("mottos", b"\x89PNG-motto", "motto", str(tmp_path / "assets"),
+                              now="2026-07-23T10:00:00")
+
+    r = c.post("/api/logo", json={"id": src_id, "asset_id": motto["id"],
+                                  "asset_kind": "mottos", "position": "bottom-center",
+                                  "offset_x": -0.12, "offset_y": 0.04})
+    assert r.status_code == 200
+    kw = calls[-1]
+    assert kw["logo_blue"].endswith(f"{motto['id']}.png")
+    assert (kw["offset_x"], kw["offset_y"]) == (-0.12, 0.04)
+
+
+def test_offset_actually_moves_the_output(tmp_path, monkeypatch):
+    """Mock YOK: kaydırmalı ve kaydırmasız bindirmenin PİKSELLERİ farklı olmalı.
+
+    Uçtan uca kanıt. Yalnız kwargs'ı ölçen testler yeşil kalırken uç offset'i
+    composite'e geçirmeyi unutabilir — kullanıcı slider'ı sürükler, hiçbir şey
+    olmaz ve testler bunu görmez.
+    """
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
+
+    buf = io.BytesIO()
+    Image.new("RGB", (320, 240), (200, 60, 60)).save(buf, format="PNG")
+    monkeypatch.setattr(ac, "generate", lambda *a, **k: [buf.getvalue()])
+
+    c = TestClient(appmod.app)
+    src_id = _make_source(c)
+
+    plain = c.post("/api/logo", json={"id": src_id, "color": "blue"})
+    moved = c.post("/api/logo", json={"id": src_id, "color": "blue",
+                                      "offset_x": -0.15, "offset_y": -0.15})
+    assert plain.status_code == 200 and moved.status_code == 200
+
+    a = (tmp_path / plain.json()["image"]["filename"]).read_bytes()
+    b = (tmp_path / moved.json()["image"]["filename"]).read_bytes()
+    with Image.open(io.BytesIO(a)) as ia, Image.open(io.BytesIO(b)) as ib:
+        assert ia.size == ib.size
+        assert ia.convert("RGB").tobytes() != ib.convert("RGB").tobytes()
+
+
 def test_logo_rejects_bad_asset_kind(tmp_path, monkeypatch):
     monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
     c = TestClient(appmod.app)

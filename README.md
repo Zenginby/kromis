@@ -35,11 +35,15 @@ arm64 runner'ında (macos-14) aynı spec ve `build.sh` ile üretilir. Actions �
 - Prompt'tan görsel üretme (boyut/kalite/adet)
 - Geçmiş galerisi (indir, sil)
 - Görsel düzenleme: dosya yükle veya galeriden seç + prompt (Azure images/edits)
-- KURUM logosu bindirme
+- Logo / motto / banner bindirme: 9'lu konum ızgarası + ince kaydırma
+  (yatay/dikey, görselin dışına taşmaz), boyut ve gölge; canlı önizleme
 - Tema rengi + renk paleti: bir tohum renkten OKLCH renk teorisiyle 6 uyumlu
   palet önerisi; seçilen palet prompt'a renk yönlendirmesi olarak eklenir
   (üretimde ve düzenlemede), 3 kademeli baskı (İpucu/Dengeli/Katı), kalıcı
-  isimli palet kütüphanesi
+  isimli palet kütüphanesi. Paletten istenmeyen renk çipe tıklanarak çıkarılır
+  (kalanların sırası korunur; çıkarıp kaydedince palet o renksiz donar)
+- Damlalık: ekranın her yerinden renk seçme — tarayıcıda EyeDropper API,
+  paketlenmiş uygulamada macOS NSColorSampler (WKWebView'da EyeDropper yok)
 
 ## Sonraya (v2)
 - Maske ile bölgesel düzenleme (inpainting)

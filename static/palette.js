@@ -12,7 +12,9 @@
 // (+ baskı kademesi) yeterli, istemci renk listesi göndermez. Renk
 // matematiği ve isimlendirme sunucuda — tek doğruluk kaynağı, thecolorapi
 // için CORS yok, ve repodaki tek test altyapısıyla (pytest) test edilebilir.
-let activePalette = null;      // { seed, mode, colors:[{hex,name}], name } | null
+// dropped: bu üretimde paletten çıkarılan renklerin indeks kümesi (Set<number>).
+// activePalette YALNIZCA applyPalette ile kurulur, o yüzden dropped hep var.
+let activePalette = null;      // { seed, mode, colors:[{hex,name}], name, id, dropped } | null
 let paletteStrength = "balanced";
 let paletteCache = [];         // GET /api/palettes
 let paletteTab = "new";
@@ -136,18 +138,35 @@ function detailText(err) {
 }
 
 /** Renk örneği şeridi. Örneklerin ÜSTÜNE metin yazılmaz — bkz. style.css notu. */
-function swatchRow(colors) {
+// `interactive`: her swatch bir <button> olur ve tıklanınca renk paletten
+// çıkarılır/geri alınır. YALNIZCA çipte açılıyor — öneri kartları
+// makeChoiceButton içinde bir <button>'ın içinde duruyor ve iç içe buton
+// geçersiz HTML.
+function swatchRow(colors, { interactive = false, dropped = null, onToggle = null } = {}) {
   const row = document.createElement("span");
   row.className = "palette-sw-row";
-  for (const c of colors || []) {
-    const sw = document.createElement("span");
-    sw.className = "palette-sw";
+  (colors || []).forEach((c, index) => {
+    const isDropped = dropped ? dropped.has(index) : false;
+    const sw = document.createElement(interactive ? "button" : "span");
+    sw.className = "palette-sw" + (isDropped ? " palette-sw-dropped" : "");
     // Keyfi kullanıcı rengi: bu dosyadaki tek meşru satır-içi stil kullanımı,
     // çünkü değer çalışma anında belli oluyor ve CSS'e yazılamıyor.
-    sw.style.background = c.hex;
+    //
+    // `background` DEĞİL `backgroundColor`: kısayol satır-içi olarak
+    // background-image'ı da `none`'a çeker ve satır-içi stil sınıfı yendiği
+    // için .palette-sw-dropped'ın çapraz çizgisi hiç görünmezdi.
+    sw.style.backgroundColor = c.hex;
     sw.title = `${c.name} · ${c.hex}`;
+    if (interactive) {
+      sw.type = "button";
+      // Bilgi renk algısına bağlı olmasın: durum hem aria-pressed hem metinde.
+      sw.setAttribute("aria-pressed", String(isDropped));
+      sw.setAttribute("aria-label",
+        `${c.name} ${c.hex} — ${isDropped ? "geri ekle" : "paletten çıkar"}`);
+      sw.addEventListener("click", () => onToggle(index));
+    }
     row.appendChild(sw);
-  }
+  });
   return row;
 }
 
@@ -166,9 +185,19 @@ function renderPalettePanel() {
   chip.hidden = false;
   const holder = $("palette-chip-sw");
   holder.innerHTML = "";
-  holder.appendChild(swatchRow(activePalette.colors));
+  holder.appendChild(swatchRow(activePalette.colors, {
+    interactive: true,
+    dropped: activePalette.dropped,
+    onToggle: toggleDroppedColor,
+  }));
+
+  const total = (activePalette.colors || []).length;
+  const kept = total - activePalette.dropped.size;
+  // Sayaç YALNIZCA bir şey çıkarıldığında görünüyor: her zaman "5/5" yazmak
+  // kullanıcıya taşımadığı bir bilgiyi sürekli okutur.
+  const count = activePalette.dropped.size ? ` · ${kept}/${total} renk` : "";
   $("palette-label").textContent =
-    `${paletteTitleOf(activePalette)} · ${STRENGTH_LABELS[paletteStrength]}`;
+    `${paletteTitleOf(activePalette)} · ${STRENGTH_LABELS[paletteStrength]}${count}`;
 
   $("palette-strength-row").hidden = false;
   selectInGroup("#palette-strength",
@@ -194,14 +223,43 @@ function readPaletteOpts() {
   // Kayıtlı palette id de gider: sunucu adları kaydın dondurulmuş halinden
   // okur, böylece kütüphanede görünen ad ile prompt'a giden ad ayrışmaz.
   if (activePalette.id) opts.palette_id = activePalette.id;
+  // YALNIZCA bir şey çıkarıldığında gönderiliyor: hiçbir şey çıkarılmadığında
+  // tel v1.10'dakiyle birebir aynı kalıyor.
+  //
+  // /api/generate (JSON) bunu dizi olarak alır; /api/edit multipart olduğu için
+  // core.js'in genel döngüsü aynı diziyi FormData'ya "0,3" diye yazar (JS
+  // Array→String) ve sunucu orada ayrıştırır. Döngüyü elle sayıma çevirmek bir
+  // kez palette_id'yi düşürmüştü — bkz. core.js'teki not.
+  if (activePalette.dropped.size) {
+    opts.palette_drop = [...activePalette.dropped].sort((a, b) => a - b);
+  }
   return opts;
 }
 
+// Çıkarma O ÜRETİME özel: yeni palet seçilince sıfırlanır. Kalıcı olarak daha
+// az renkli bir palet isteyen kullanıcı çıkarıp KAYDEDİYOR — kayıt donmuş renk
+// listesi tuttuğu için o palet 4 renkle donar (bkz. sunucudaki SavePaletteRequest.drop).
 function applyPalette({ seed, mode, colors, name = "", strength = null, id = null }) {
-  activePalette = { seed, mode, colors, name, id };
+  activePalette = { seed, mode, colors, name, id, dropped: new Set() };
   if (strength) paletteStrength = strength;
   renderPalettePanel();
   paletteStatus(`Palet uygulandı: ${paletteTitleOf(activePalette)}`);
+}
+
+function toggleDroppedColor(index) {
+  if (!activePalette) return;
+  const dropped = activePalette.dropped;
+  if (!dropped.has(index) && dropped.size + 1 >= activePalette.colors.length) {
+    // Son rengi de çıkarmak paleti anlamsız kılar (sunucu da 422 verir).
+    // Kapıyı burada tutmak kullanıcıya nedenini söylüyor; sunucuya bırakmak
+    // "üret" anında patlayan bir hata olurdu.
+    paletteStatus("En az bir renk kalmalı.");
+    return;
+  }
+  if (dropped.has(index)) dropped.delete(index);
+  else dropped.add(index);
+  renderPalettePanel();
+  paletteStatus("");
 }
 
 function clearPalette() {
@@ -504,17 +562,54 @@ $("palette-seed-hex").addEventListener("input", () => {
 });
 $("palette-seed-hex").addEventListener("blur", () => renderPicker());
 
-// EyeDropper yalnızca Chromium'da var; yoksa buton hiç gösterilmez.
-if (window.EyeDropper) {
-  $("palette-eyedrop").hidden = false;
-  $("palette-eyedrop").addEventListener("click", async () => {
+// ── Damlalık: iki ortam, iki API, AYNI davranış ─────────────────────
+//
+// Tarayıcı → EyeDropper (Chromium'a özel)
+// Paket    → window.pywebview.api.pick_screen_color (macOS NSColorSampler)
+//
+// İkisi de EKRAN GENELİ seçim yapıyor, yani kullanıcı ortam farkını görmüyor.
+// Köprü v1.11'de eklendi: pywebview'ın macOS arka ucu WKWebView (WebKit) ve
+// WebKit EyeDropper'ı hiç uygulamadı — o yüzden düğme v1.10'a kadar app'te
+// gizli kalıyordu (bug değil, motor farkıydı).
+
+function nativeScreenPicker() {
+  return window.pywebview && window.pywebview.api
+    && window.pywebview.api.pick_screen_color;
+}
+
+async function pickScreenColor() {
+  const native = nativeScreenPicker();
+  if (native) return await native();
+  const { sRGBHex } = await new EyeDropper().open();
+  return sRGBHex;
+}
+
+function enableEyedropper() {
+  const btn = $("palette-eyedrop");
+  if (btn.dataset.wired) return;      // iki yoklama birden geçmesin
+  btn.dataset.wired = "1";
+  btn.hidden = false;
+  btn.addEventListener("click", async () => {
     try {
-      const { sRGBHex } = await new EyeDropper().open();
-      if (setPickFromHex(sRGBHex)) { renderPicker(); scheduleSuggest(); }
+      const hex = await pickScreenColor();
+      // Native yol iptalde null döner (istisna DEĞİL); EyeDropper ise
+      // fırlatır. İki sözleşme de "seçim yok" demek, ikisi de sessiz.
+      if (hex && setPickFromHex(hex)) { renderPicker(); scheduleSuggest(); }
     } catch {
       // Kullanıcı Esc ile vazgeçti — hata değil, sessizce geç.
     }
   });
+}
+
+// TUZAK: pywebview köprüsü sayfa yüklendikten SONRA enjekte ediliyor, yani bu
+// dosya koşarken `window.pywebview` henüz yok olabilir. Yalnızca senkron
+// kontrol yapılsa app'te yanlış negatif çıkar ve düzeltme "bazen görünmüyor"
+// diye geri dönerdi. Bu yüzden hem şimdi bakılıyor hem de pywebview'ın kendi
+// hazır olayı dinleniyor.
+if (window.EyeDropper || nativeScreenPicker()) {
+  enableEyedropper();
+} else {
+  window.addEventListener("pywebviewready", enableEyedropper, { once: true });
 }
 
 $("palette-strength").addEventListener("click", (e) => {

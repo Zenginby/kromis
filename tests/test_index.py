@@ -43,6 +43,122 @@ def test_index_served():
     assert 'data-akind="palettes"' not in r.text
 
 
+def test_logo_offset_controls_are_served():
+    """Kaydırma kontrolleri: assets.js bu id'lere `$()` ile DOĞRUDAN bağlanıyor.
+
+    viewer testindeki gerekçenin aynısı: biri yeniden adlandırılırsa script
+    yükleme anında patlar ve ONDAN SONRAKİ hiçbir dinleyici kurulmaz — yani
+    "Uygula" düğmesi de sessizce ölür.
+    """
+    html = TestClient(appmod.app).get("/").text
+    for element_id in ("logo-offset-x", "logo-offset-y", "logo-offset-reset",
+                       "logo-offset-x-val", "logo-offset-y-val"):
+        assert f'id="{element_id}"' in html, element_id
+
+
+def test_offset_sliders_are_bipolar():
+    """Aralık negatifi KAPSAMALI — yoksa logo yalnız sağa/aşağı kayar.
+
+    `min="0"` diye bir yazım hatası gözle fark edilmez: slider çalışır görünür,
+    yalnızca yarısı eksiktir.
+    """
+    html = TestClient(appmod.app).get("/").text
+    for element_id in ("logo-offset-x", "logo-offset-y"):
+        row = re.search(rf'id="{element_id}"[^>]*', html)
+        assert row, element_id
+        assert 'min="-25"' in row.group(0), f"{element_id} negatife inmiyor: {row.group(0)}"
+        assert 'value="0"' in row.group(0), f"{element_id} sıfırda başlamıyor"
+
+
+def test_overlay_offset_is_restored_per_mode():
+    """Logo ve motto kaydırmaları AYRI hatırlanmalı (kullanıcı kararı).
+
+    setOverlayMode geri yüklemeyi düşürürse ikisi sessizce birleşir: motto'ya
+    geçen kullanıcı logonun ince ayarını devralır ve bunu fark etmesi zor.
+    Tripwire, panBounds testiyle aynı kalıpta.
+    """
+    js = TestClient(appmod.app).get("/static/assets.js").text
+    body = re.search(r"function setOverlayMode\(mode\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "setOverlayMode() bulunamadı"
+    assert "overlayOffset" in body.group(1), (
+        "setOverlayMode kaydırmayı mod başına geri yüklemiyor — logo ve motto birleşti")
+
+
+def test_palette_chip_swatches_are_not_hidden_from_screen_readers():
+    """Çip swatch'ları v1.11'den beri tıklanabilir düğme (renk çıkarma).
+
+    `aria-hidden="true"` içinde odaklanabilir bir kontrol bırakmak onu ekran
+    okuyucudan TAMAMEN saklar: klavyeyle ulaşılan ama hiç duyurulmayan bir
+    düğme kalır. Öznitelik geri eklenirse bu test düşer.
+    """
+    html = TestClient(appmod.app).get("/").text
+    chip = re.search(r'id="palette-chip-sw"[^>]*', html)
+    assert chip, "palet çipi swatch kabı bulunamadı"
+    assert "aria-hidden" not in chip.group(0), (
+        f"tıklanabilir swatch'lar aria-hidden içinde: {chip.group(0)}")
+
+
+def test_dropped_swatch_is_marked_by_more_than_colour():
+    """Durum yalnız renkle (opacity) anlatılamaz.
+
+    Koyu bir swatch soluklaştığında fark neredeyse görünmüyor; ayrıca renk
+    körlüğü/düşük kontrast ekranlarda tamamen kaybolur. Bu yüzden çapraz çizgi
+    (CSS) + aria-pressed (JS) birlikte gerekiyor.
+    """
+    css = TestClient(appmod.app).get("/static/style.css").text
+    js = TestClient(appmod.app).get("/static/palette.js").text
+    dropped = re.search(r"\.palette-sw-dropped\s*\{([^}]*)\}", css, re.S)
+    assert dropped, ".palette-sw-dropped kuralı yok"
+    assert "linear-gradient" in dropped.group(1), "çıkarılan renk yalnız opacity ile işaretli"
+    assert "aria-pressed" in js, "çıkarma durumu yardımcı teknolojiye bildirilmiyor"
+
+
+def test_swatch_colour_is_set_without_the_background_shorthand():
+    """`style.background` satır-içi olarak background-image'ı `none`'a çeker.
+
+    Satır-içi stil sınıfı yendiği için .palette-sw-dropped'ın çapraz çizgisi
+    sessizce kaybolur — çıkarılan renk yalnız soluklaşır ve az önceki testin
+    koruduğu şey pratikte çalışmaz. Tarayıcıda fark edilmesi zor.
+
+    Yalnız swatchRow'a bakılıyor: HSV alanının çok katmanlı gradyanı ve tohum
+    önizlemesi kısayolu meşru şekilde kullanıyor, onlara .palette-sw-dropped
+    hiç uygulanmıyor.
+    """
+    js = TestClient(appmod.app).get("/static/palette.js").text
+    body = re.search(r"function swatchRow\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "swatchRow() bulunamadı"
+    assert "style.backgroundColor" in body.group(1)
+    assert "style.background =" not in body.group(1), (
+        "background kısayolu background-image'ı eziyor")
+
+
+def test_eyedropper_has_a_native_bridge_branch():
+    """Damlalık pakette NATIVE köprüden geçmek zorunda.
+
+    WKWebView'da `window.EyeDropper` yok (WebKit onu hiç uygulamadı), o yüzden
+    yalnız-EyeDropper bir kontrol app'te her zaman false döner ve düğme gizli
+    kalır — v1.10'a kadarki davranış. Bu dal düşerse hata tarayıcıda GÖRÜNMEZ
+    (Chrome'da EyeDropper var, her şey çalışır gibi durur) ve yalnızca pakette
+    ortaya çıkar; ucuz bir tripwire o yüzden değerli.
+    """
+    js = TestClient(appmod.app).get("/static/palette.js").text
+    assert "pick_screen_color" in js, "native köprü dalı yok — app'te damlalık gizli kalır"
+    assert "EyeDropper" in js, "tarayıcı yolu düşmüş"
+
+
+def test_eyedropper_waits_for_the_late_pywebview_bridge():
+    """pywebview köprüsü sayfa yüklendikten SONRA enjekte ediliyor.
+
+    Yalnız senkron kontrol yapılırsa app'te yanlış negatif çıkar: script
+    koşarken `window.pywebview` henüz yoktur, düğme gizli kalır ve hata
+    "bazen görünmüyor" diye geri döner. pywebview kendi hazır olayını
+    gönderiyor (webview/js/finish.js: `pywebviewready`), o dinlenmeli.
+    """
+    js = TestClient(appmod.app).get("/static/palette.js").text
+    assert "pywebviewready" in js, (
+        "geç yüklenen köprü için hazır olayı dinlenmiyor — app'te yanlış negatif")
+
+
 def test_viewer_markup_is_served():
     """Görsel büyüteci: ortadaki önizlemeye tıklayınca açılan tam ekran görüntüleyici.
 

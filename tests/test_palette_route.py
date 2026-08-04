@@ -524,3 +524,219 @@ def test_the_prompt_limit_is_declared_once(tmp_path, monkeypatch):
     field = appmod.GenerateRequest.model_fields["prompt"]
     limits = [m.max_length for m in field.metadata if hasattr(m, "max_length")]
     assert limits == [appmod.MAX_PROMPT_CHARS]
+
+
+# ── palette_drop: seçili paletten renk çıkarma ──────────────────────────────
+#
+# Palet 5 rengi zorluyordu; kullanıcı bazen 3-4 tanesini istiyor. Çıkarma
+# İNDEKSLE yapılıyor, hex'le değil: renk SIRASI prompt'ta anlam taşıyor
+# (_ORDER_CUE) ve aynı hex bir palette iki kez düşebilir — hex'le çıkarmak
+# ikisini birden düşürürdü.
+
+def _colors_of(seed=SEED, mode="analogic"):
+    """Sunucunun çözeceği renklerin aynısı (ağ kapalı, aynı deterministik yol)."""
+    return appmod._resolve_palette(seed, mode, offline=True)
+
+
+def test_palette_drop_removes_only_the_named_indices(tmp_path, monkeypatch):
+    client, sent = _client(tmp_path, monkeypatch)
+    colors = _colors_of()
+    dropped, kept = colors[2], colors[:2] + colors[3:]
+
+    r = _gen(client, palette_hex=SEED, palette_mode="analogic", palette_drop=[2])
+    assert r.status_code == 200, r.text
+
+    assert dropped["hex"] not in sent[0], "çıkarılan renk hâlâ prompt'ta"
+    for color in kept:
+        assert color["hex"] in sent[0], f"kalan renk düştü: {color['hex']}"
+
+
+def test_palette_drop_preserves_the_order_of_the_survivors(tmp_path, monkeypatch):
+    """Sıra prompt'ta ANLAM taşıyor: "baştaki renkler geniş alanlara, sondaki
+    küçük vurgu olarak" (palette._ORDER_CUE). Ortadan bir renk çıkarılınca
+    kalanlar yeniden dizilmemeli, yoksa kullanıcının gördüğü şerit ile modele
+    giden ağırlık sırası ayrışır.
+    """
+    client, sent = _client(tmp_path, monkeypatch)
+    colors = _colors_of()
+    kept = colors[:1] + colors[2:4]      # 1 ve 4 çıkarıldı
+
+    r = _gen(client, palette_hex=SEED, palette_mode="analogic", palette_drop=[1, 4])
+    assert r.status_code == 200, r.text
+
+    positions = [sent[0].index(c["hex"]) for c in kept]
+    assert positions == sorted(positions), "kalan renklerin sırası değişti"
+
+
+def test_palette_drop_is_echoed_in_the_record(tmp_path, monkeypatch):
+    """Kayıt hem KALANLARI (çip/galeri onu gösteriyor) hem çıkarılan
+    indeksleri taşımalı — ikincisi olmadan geçmişten aynı durum kurulamaz.
+    """
+    client, _ = _client(tmp_path, monkeypatch)
+    r = _gen(client, palette_hex=SEED, palette_mode="analogic", palette_drop=[3, 0])
+    assert r.status_code == 200, r.text
+
+    pal = r.json()["images"][0]["palette"]
+    assert len(pal["colors"]) == palette.COLORS_PER_PALETTE - 2
+    assert pal["dropped"] == [0, 3], "çıkarılan indeksler sıralı kaydedilmeli"
+    assert pal["applied"] is True
+
+
+def test_no_drop_leaves_the_record_and_prompt_untouched(tmp_path, monkeypatch):
+    """GERİLEME BEKÇİSİ: alan gönderilmeyince her şey v1.10'daki gibi.
+
+    Bu özellik palet yolunun en sıcak noktasına dokunuyor; varsayılan davranışın
+    birebir korunduğu ayrıca çivilenmeli.
+    """
+    client, sent = _client(tmp_path, monkeypatch)
+    r = _gen(client, palette_hex=SEED, palette_mode="analogic")
+    assert r.status_code == 200, r.text
+
+    pal = r.json()["images"][0]["palette"]
+    assert len(pal["colors"]) == palette.COLORS_PER_PALETTE
+    assert pal["dropped"] == []
+    for color in _colors_of():
+        assert color["hex"] in sent[0]
+
+
+@pytest.mark.parametrize("drop", [[0, 1, 2, 3, 4], [4, 3, 2, 1, 0]])
+def test_palette_drop_rejects_dropping_every_color(tmp_path, monkeypatch, drop):
+    """Hepsi çıkarılırsa prompt_suffix boş metin döner ve kullanıcı renksiz
+    sonucu açıklayamaz — tam olarak `applied: False` bayrağının var olma
+    nedeni olan sessiz sapma. Gürültülü 422 tercih edildi.
+    """
+    client, _ = _client(tmp_path, monkeypatch)
+    r = _gen(client, palette_hex=SEED, palette_mode="analogic", palette_drop=drop)
+    assert r.status_code == 422, r.text
+
+
+@pytest.mark.parametrize("drop", [[5], [-1], [0, 99]])
+def test_palette_drop_rejects_out_of_range_index(tmp_path, monkeypatch, drop):
+    client, _ = _client(tmp_path, monkeypatch)
+    r = _gen(client, palette_hex=SEED, palette_mode="analogic", palette_drop=drop)
+    assert r.status_code == 422, r.text
+
+
+def test_palette_drop_tolerates_repeated_indices(tmp_path, monkeypatch):
+    """Aynı indeks iki kez gelirse küme gibi davranılır — istemci hatası
+    yüzünden üretim bloke edilmemeli (silinmiş/bozuk paletteki duruşun aynısı).
+    """
+    client, _ = _client(tmp_path, monkeypatch)
+    r = _gen(client, palette_hex=SEED, palette_mode="analogic", palette_drop=[2, 2])
+    assert r.status_code == 200, r.text
+    pal = r.json()["images"][0]["palette"]
+    assert len(pal["colors"]) == palette.COLORS_PER_PALETTE - 1
+    assert pal["dropped"] == [2]
+
+
+def test_palette_drop_indexes_a_saved_palettes_frozen_colors(tmp_path, monkeypatch):
+    """KAYITLI palette indeksler DONMUŞ listeye göre çözülmeli.
+
+    Kayıt 4 renkle donmuşsa (kullanıcı çıkarıp kaydetmişse) indeks 3 o
+    listenin dördüncüsü demektir, yeniden hesaplanan 5'linin değil. Filtre bu
+    yüzden `colors` çözüldükten SONRA, tek noktada uygulanıyor.
+    """
+    client, sent = _client(tmp_path, monkeypatch)
+    output = tmp_path / "output"
+    output.mkdir(parents=True, exist_ok=True)
+    frozen = [{"hex": "#111111", "name": "bir"}, {"hex": "#222222", "name": "iki"},
+              {"hex": "#333333", "name": "üç"}]
+    record = {"id": "a1b2c3d4e5f6", "name": "Donmuş", "seed": SEED,
+              "mode": "triad", "strength": "balanced", "colors": frozen}
+    (output / "palettes.json").write_text(json.dumps([record]), encoding="utf-8")
+
+    r = _gen(client, palette_hex=SEED, palette_mode="analogic",
+             palette_id="a1b2c3d4e5f6", palette_drop=[1])
+    assert r.status_code == 200, r.text
+    assert "#111111" in sent[0] and "#333333" in sent[0]
+    assert "#222222" not in sent[0], "donmuş listenin ikincisi çıkarılmadı"
+
+
+def test_palette_drop_rejects_emptying_a_saved_palette(tmp_path, monkeypatch):
+    """Donmuş liste 5'ten kısa olabilir; model sınırı tek başına yetmez.
+
+    3 renkli bir kayıtta [0,1,2] model doğrulamasını GEÇER (5'ten az) ama
+    sonuç boş palet olur. İkinci kapı çözümlemeden sonra.
+    """
+    client, _ = _client(tmp_path, monkeypatch)
+    output = tmp_path / "output"
+    output.mkdir(parents=True, exist_ok=True)
+    frozen = [{"hex": "#111111", "name": "bir"}, {"hex": "#222222", "name": "iki"},
+              {"hex": "#333333", "name": "üç"}]
+    record = {"id": "a1b2c3d4e5f6", "name": "Donmuş", "seed": SEED,
+              "mode": "triad", "strength": "balanced", "colors": frozen}
+    (output / "palettes.json").write_text(json.dumps([record]), encoding="utf-8")
+
+    r = _gen(client, palette_hex=SEED, palette_mode="analogic",
+             palette_id="a1b2c3d4e5f6", palette_drop=[0, 1, 2])
+    assert r.status_code == 422, r.text
+
+
+def test_edit_parses_comma_separated_palette_drop(tmp_path, monkeypatch):
+    """Multipart yolu: arayüz diziyi FormData'ya "0,3" olarak yazıyor.
+
+    core.js paleti genel bir döngüyle (`Object.entries`) forma basıyor — orada
+    JS dizisi kendiliğinden virgüllü metne dönüyor. Elle sayıma çevirmek bir
+    kez `palette_id`'yi düşürmüştü (core.js'teki not), o yüzden döngü kalıyor
+    ve ayrıştırma sunucu tarafında çivileniyor.
+    """
+    client, sent = _client(tmp_path, monkeypatch)
+    colors = _colors_of(mode="complement")
+
+    r = _edit(client, palette_hex=SEED, palette_mode="complement",
+              palette_drop="0,3")
+    assert r.status_code == 200, r.text
+    assert colors[0]["hex"] not in sent[0]
+    assert colors[3]["hex"] not in sent[0]
+    assert colors[1]["hex"] in sent[0]
+    assert r.json()["images"][0]["palette"]["dropped"] == [0, 3]
+
+
+@pytest.mark.parametrize("bad", ["abc", "0;3", "1.5", "0,,3", "0,99"])
+def test_edit_rejects_a_malformed_palette_drop(tmp_path, monkeypatch, bad):
+    client, _ = _client(tmp_path, monkeypatch)
+    r = _edit(client, palette_hex=SEED, palette_mode="complement", palette_drop=bad)
+    assert r.status_code == 422, r.text
+
+
+def test_edit_treats_an_empty_palette_drop_as_no_drop(tmp_path, monkeypatch):
+    """Arayüz hiçbir şey çıkarılmadığında alanı hiç göndermiyor; boş dize de
+    (ör. elle kurulmuş bir istek) "çıkarma yok" demek — 422 değil.
+    """
+    client, sent = _client(tmp_path, monkeypatch)
+    r = _edit(client, palette_hex=SEED, palette_mode="complement", palette_drop="")
+    assert r.status_code == 200, r.text
+    assert r.json()["images"][0]["palette"]["dropped"] == []
+
+
+def test_saving_a_palette_freezes_only_the_survivors(tmp_path, monkeypatch):
+    """Kalıcı 4 renkli palet yolu: çıkar → kaydet.
+
+    Kayıt donmuş `colors` tuttuğu için (palette_store başlığı) 4 renkle donar
+    ve sonraki kullanımlarda çıkarma göndermek GEREKMEZ. Kayıtlı paleti
+    sonradan düzenleme özelliği bu yüzden yazılmadı.
+    """
+    client, _ = _client(tmp_path, monkeypatch)
+    full = _colors_of(mode="triad")
+
+    r = client.post("/api/palettes", json={"name": "Dörtlü", "seed": SEED,
+                                           "mode": "triad", "drop": [2]})
+    assert r.status_code == 200, r.text
+    saved = r.json()["palette"]
+    assert len(saved["colors"]) == palette.COLORS_PER_PALETTE - 1
+    assert full[2]["hex"] not in [c["hex"] for c in saved["colors"]]
+
+    # Kaydedilen palet ÇIKARMASIZ kullanıldığında da 4 renk gitmeli.
+    client2, sent2 = _client(tmp_path, monkeypatch)
+    r2 = _gen(client2, palette_hex=SEED, palette_mode="triad",
+              palette_id=saved["id"])
+    assert r2.status_code == 200, r2.text
+    assert full[2]["hex"] not in sent2[0]
+    assert r2.json()["images"][0]["palette"]["dropped"] == []
+
+
+def test_saving_a_palette_rejects_dropping_everything(tmp_path, monkeypatch):
+    client, _ = _client(tmp_path, monkeypatch)
+    r = client.post("/api/palettes", json={"name": "Boş", "seed": SEED,
+                                           "mode": "triad", "drop": [0, 1, 2, 3, 4]})
+    assert r.status_code == 422, r.text

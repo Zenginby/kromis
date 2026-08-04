@@ -154,8 +154,33 @@ let rawPreviewSrc = "";                                 // ham (bindirmesiz) gö
 let overlayMode = "logo";                               // "logo" | "motto" | "banner"
 // logo: "builtin"|id · motto: id|null · banner: id|null
 let selectedAsset = { logo: "builtin", motto: null, banner: null };
+// Kaydırma, boyut/gölgenin AKSİNE mod başına hatırlanır: motto genelde logodan
+// farklı bir noktaya konur, ortak tutulsa tür değiştirmek diğerinin ince
+// ayarını sessizce devralırdı (kullanıcı kararı). Banner burada yok — onun
+// yerleşimi ayrı (edge/align/margin), #logo-only kontrolleri ona görünmüyor.
+let overlayOffset = { logo: { x: 0, y: 0 }, motto: { x: 0, y: 0 } };
 let logoPreviewTimer = null;
 let logoPreviewToken = 0;
+
+const OFFSET_ZERO = () => ({ logo: { x: 0, y: 0 }, motto: { x: 0, y: 0 } });
+
+// İşaretli gösterim. Eksi U+2212 (−), ASCII tire değil: viewer.js'in
+// uzaklaştırma düğmesi de onu kullanıyor, tipografik tutarlılık.
+function formatOffset(value) {
+  const n = parseInt(value, 10);
+  if (n === 0) return "0";
+  return (n > 0 ? "+%" : "−%") + Math.abs(n);
+}
+
+function readOffsetSliders() {
+  return { x: parseInt($("logo-offset-x").value, 10),
+           y: parseInt($("logo-offset-y").value, 10) };
+}
+
+function writeOffsetSliders({ x, y }) {
+  $("logo-offset-x").value = x;
+  $("logo-offset-y").value = y;
+}
 
 // Logo ve motto aynı (konumlanabilir, 9-grid) yerleşimi paylaşır; yalnızca
 // varlık hangi kütüphaneden geldiği ve renk varyantı (yalnız yerleşik logo) farklıdır.
@@ -167,6 +192,9 @@ function readLogoOpts() {
   const shadowPct = parseInt($("logo-shadow").value, 10);
   const blur = parseInt($("logo-blur").value, 10);
   const isMotto = overlayMode === "motto";
+  // Slider'lar aktif modun değerini taşır ⇒ tek kaynak onlar; overlayOffset
+  // yalnızca mod değişiminde geri yükleme için tutuluyor.
+  const offset = readOffsetSliders();
   return {
     id: logoId,
     asset_kind: isMotto ? "mottos" : "logos",
@@ -176,6 +204,8 @@ function readLogoOpts() {
     size: +(sizePct / 100).toFixed(3),
     shadow_alpha: Math.round((shadowPct / 100) * 255),
     shadow_blur: blur,
+    offset_x: +(offset.x / 100).toFixed(3),
+    offset_y: +(offset.y / 100).toFixed(3),
   };
 }
 
@@ -197,6 +227,8 @@ function syncLogoLabels() {
   $("logo-size-val").textContent = $("logo-size").value + "%";
   $("logo-shadow-val").textContent = $("logo-shadow").value + "%";
   $("logo-blur-val").textContent = $("logo-blur").value;
+  $("logo-offset-x-val").textContent = formatOffset($("logo-offset-x").value);
+  $("logo-offset-y-val").textContent = formatOffset($("logo-offset-y").value);
 }
 
 function syncBannerLabels() {
@@ -268,6 +300,13 @@ function setOverlayMode(mode) {
   // logo ve motto aynı konumlanabilir kontrolleri paylaşır; yalnız banner farklı
   $("logo-only").hidden = mode === "banner";
   $("banner-only").hidden = mode !== "banner";
+  // Kaydırmayı o TÜRÜN değerine geri yükle. Bu satır düşerse logo ve motto
+  // kaydırmaları sessizce birleşir — gözle fark edilmesi zor, o yüzden
+  // tests/test_index.py'de bir tripwire var.
+  if (overlayOffset[mode]) {
+    writeOffsetSliders(overlayOffset[mode]);
+    syncLogoLabels();
+  }
   renderOverlayPicker();
   syncColorRow();
   refreshLogoPreview();
@@ -293,6 +332,8 @@ function openLogoModal(rec) {
   $("logo-size").value = 14;
   $("logo-shadow").value = 47;
   $("logo-blur").value = 6;
+  overlayOffset = OFFSET_ZERO();
+  writeOffsetSliders(overlayOffset.logo);
   $("banner-scale").value = 100;
   $("banner-margin").value = 0;
   syncLogoLabels();
@@ -423,6 +464,25 @@ $("banner-align").addEventListener("click", (e) => {
 ["logo-size", "logo-shadow", "logo-blur"].forEach((id) =>
   $(id).addEventListener("input", () => { syncLogoLabels(); refreshLogoPreview(); })
 );
+// Kaydırma slider'ları yukarıdaki listeye KATILMIYOR: ayrıca overlayOffset'e
+// yazmaları gerek. Mod guard'ı savunma amaçlı — banner modunda #logo-only
+// gizli olduğu için olay gelmemeli, ama gelirse banner'ın olmayan kaydırma
+// durumunu yaratmasın.
+["logo-offset-x", "logo-offset-y"].forEach((id) =>
+  $(id).addEventListener("input", () => {
+    if (overlayOffset[overlayMode]) overlayOffset[overlayMode] = readOffsetSliders();
+    syncLogoLabels();
+    refreshLogoPreview();
+  })
+);
+// Bipolar bir slider'da fareyle tam 0'a dönmek zor (ok tuşları 1 birim
+// adımlıyor, o yol açık ama tek tıkla dönüş de olmalı).
+$("logo-offset-reset").addEventListener("click", () => {
+  writeOffsetSliders({ x: 0, y: 0 });
+  if (overlayOffset[overlayMode]) overlayOffset[overlayMode] = { x: 0, y: 0 };
+  syncLogoLabels();
+  refreshLogoPreview();
+});
 ["banner-scale", "banner-margin"].forEach((id) =>
   $(id).addEventListener("input", () => { syncBannerLabels(); refreshLogoPreview(); })
 );

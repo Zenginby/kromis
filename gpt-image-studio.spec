@@ -12,12 +12,18 @@ geri getirir (bkz. task-6 raporu).
 
 Not: `uvicorn`, `_pyinstaller_hooks_contrib`'in kendi `hook-uvicorn.py`'si
 üzerinden `collect_submodules('uvicorn')` ile zaten TÜMÜYLE toplanıyor;
-`desktop.py -> app.py -> (paths/seed/backup/composite/storage/folders/
-assets_store/azure_client/models/palette/palette_store/color_names/version)`
-zinciri de düz `import` ifadeleri olduğundan statik analiz zaten buluyor. Bu
-yüzden `hiddenimports` burada boş — bu makinede üretilen bitmiş `.app`
-bundle'ı üzerinde doğrulandı (bkz. task-6 raporu); arm64 runner'da farklı
-çıkarsa orada yeniden doğrulanmalı.
+`desktop.py -> (errlog/paths/screencolor) + app.py -> (paths/seed/backup/
+composite/storage/folders/assets_store/azure_client/models/palette/
+palette_store/color_names/version)` zinciri de düz `import` ifadeleri
+olduğundan statik analiz zaten buluyor. Bu yüzden `hiddenimports` burada boş —
+bu makinede üretilen bitmiş `.app` bundle'ı üzerinde doğrulandı (bkz. task-6
+raporu); arm64 runner'da farklı çıkarsa orada yeniden doğrulanmalı.
+
+`screencolor` (v1.11, damlalık köprüsü) `AppKit`'i FONKSİYON İÇİNDE import
+ediyor. PyInstaller bunu bytecode'dan bulur, ayrıca `AppKit` pywebview'ın
+cocoa arka ucu üzerinden zaten toplanıyor — yani ek bir hiddenimport
+beklenmiyor. Ama bu, paket üzerinde damlalık gerçekten açılarak doğrulanmalı:
+açılmıyorsa `hiddenimports=['AppKit']` gerekir.
 
 DİKKAT: `version.py` pakete YALNIZCA `app.py`'nin `import version`'ı sayesinde
 giriyor. Aşağıdaki derleme-zamanı yüklemesi hiçbir şey PAKETLEMEZ; yalnızca

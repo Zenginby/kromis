@@ -160,6 +160,23 @@ body {
 
 .range-val { color: var(--text); font-variant-numeric: tabular-nums; font-size: 0.78rem; }
 .logo-controls input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; margin: 0.1rem 0 0.2rem; }
+
+/* Bipolar kaydırıcı: sıfır ORTADA ve gözle bulunabilir olmalı. Çentik native
+   track'e değil sarmalayıcıya çiziliyor — track'i özelleştirmek `accent-color`
+   yaklaşımını (yukarıdaki satır) bırakıp her motor için ayrı ::-webkit-* /
+   ::-moz-* kuralları yazmak demekti; sarmalayıcı üçünde de aynı görünür. */
+.nudge { position: relative; }
+.nudge::before {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: 1px; height: 14px; transform: translate(-50%, -50%);
+  background: var(--muted); opacity: 0.45; pointer-events: none;
+}
+.nudge input[type="range"] { position: relative; }
+/* Nota gömülü ghost düğme: .assets-head .btn-ghost ile aynı küçültme. */
+#logo-offset-reset {
+  padding: 0.2rem 0.5rem; font-size: 0.74rem; margin-left: 0.35rem;
+  vertical-align: baseline;
+}
 #logo-color-row[hidden], #logo-only[hidden], #banner-only[hidden] { display: none; }
 
 /* Modal içi varlık seçici (logo/banner) */
@@ -236,6 +253,23 @@ body {
 .palette-sw {
   width: 14px; height: 14px; border-radius: 3px; display: block; flex: none;
   box-shadow: inset 0 0 0 1px oklch(100% 0 0 / 0.14);
+}
+/* Çipteki swatch'lar <button>: paletten renk çıkarma anahtarı. Tarayıcının
+   düğme varsayılanları (kenarlık, padding) rengi bozacağı için sıfırlanıyor. */
+button.palette-sw {
+  padding: 0; border: 0; cursor: pointer; appearance: none;
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+button.palette-sw:hover { transform: translateY(-1px); }
+/* Odak halkası GÖRÜNÜR olmalı: bunlar artık gerçek kontrol ve klavyeyle
+   geziliyor. inset gölge rengin üstünde kaybolduğu için outline kullanılıyor. */
+button.palette-sw:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Çıkarılmış renk: soluk + çapraz çizgi. Yalnız opacity ile ayırmak koyu
+   renklerde okunmuyordu — durum ayrıca aria-pressed'te ve etikette de var. */
+.palette-sw-dropped {
+  opacity: 0.3;
+  background-image: linear-gradient(
+    to top right, transparent 44%, var(--text) 44%, var(--text) 56%, transparent 56%);
 }
 
 /* .ref-chip'in iç kuralları id ile bağlı (#ref-label / #ref-clear), o yüzden

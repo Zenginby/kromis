@@ -77,7 +77,12 @@
             <span class="btn-ghost-plus" aria-hidden="true">+</span> Tema rengi
           </button>
           <span id="palette-chip" class="ref-chip" hidden>
-            <span id="palette-chip-sw" class="palette-sw-row" aria-hidden="true"></span>
+            <!-- aria-hidden YOK: v1.11'den beri swatch'lar tıklanabilir düğme
+                 (renk paletten çıkarılıyor). Odaklanabilir bir kontrolü
+                 aria-hidden içinde bırakmak ekran okuyucudan tamamen saklar —
+                 klavyeyle ulaşılan ama duyurulmayan bir kontrol kalırdı. -->
+            <span id="palette-chip-sw" class="palette-sw-row"
+                  role="group" aria-label="Palet renkleri — çıkarmak için tıkla"></span>
             <span id="palette-label"></span>
             <button type="button" id="palette-clear" aria-label="Paleti kaldır">×</button>
           </span>
@@ -382,6 +387,22 @@
 
             <label for="logo-size">Boyut <span id="logo-size-val" class="range-val">14%</span></label>
             <input id="logo-size" type="range" min="6" max="40" value="14" />
+
+            <!-- Izgara noktasından ince ayar. .nudge sarmalayıcı orta çentiği
+                 taşır: bipolar bir kaydırıcıda sıfırın nerede olduğu gözle
+                 bulunabilmeli (native track özelleştirilmiyor, bkz. style.css). -->
+            <label for="logo-offset-x">Yatay kaydırma
+              <span id="logo-offset-x-val" class="range-val">0</span></label>
+            <div class="nudge"><input id="logo-offset-x" type="range" min="-25" max="25" value="0" /></div>
+
+            <label for="logo-offset-y">Dikey kaydırma (− yukarı / + aşağı)
+              <span id="logo-offset-y-val" class="range-val">0</span></label>
+            <div class="nudge"><input id="logo-offset-y" type="range" min="-25" max="25" value="0" /></div>
+
+            <p class="field-note">
+              Izgaradaki noktadan ince ayar. Görselin dışına taşmaz — kenara gelince durur.
+              <button type="button" id="logo-offset-reset" class="btn-ghost">Sıfırla</button>
+            </p>
 
             <label for="logo-shadow">Gölge yoğunluğu <span id="logo-shadow-val" class="range-val">47%</span></label>
             <input id="logo-shadow" type="range" min="0" max="100" value="47" />

@@ -27,12 +27,42 @@ LOGO_POSITIONS = {
     "bottom-left", "bottom-center", "bottom-right",
 }
 LOGO_COLORS = {"auto", "blue", "white"}
+# Izgara noktasından kaydırmanın ± sınırı (görsel kenarının oranı).
+# `composite.OFFSET_LIMIT` ile AYNI olmak zorunda: uçta geçen bir değer orada
+# ValueError'a düşerse kullanıcı Türkçe 500 görür. composite import EDİLMİYOR —
+# yukarıdaki konum/renk kümelerindeki gerekçenin aynısı; kayma
+# tests/test_composite.py'deki tripwire ile ölçülüyor.
+LOGO_OFFSET_LIMIT = 0.5
 # Konumlanabilir (logo tarzı) bindirmenin varlığı hangi kütüphaneden gelebilir.
 # Banner ayrı bir yerleşim olduğu için burada değil.
 OVERLAY_ASSET_KINDS = {"logos", "mottos"}
 
 BANNER_EDGES = {"top", "bottom"}
 BANNER_ALIGNS = {"left", "center", "right"}
+
+
+def check_drop_indices(values: list[int]) -> list[int]:
+    """Paletten çıkarılan indeksleri tekilleştirip sıralar; geçersizse ValueError.
+
+    İNDEKS, hex DEĞİL: renk sırası prompt'ta anlam taşıyor (palette._ORDER_CUE
+    — baştaki renkler geniş alanlara, sondaki küçük vurgu olarak) ve aynı hex
+    bir palette iki kez düşebilir; hex'le çıkarmak ikisini birden düşürürdü.
+
+    Küme semantiği: aynı indeks iki kez gelirse istemci hatası yüzünden üretim
+    bloke edilmez (silinmiş/bozuk palette benimsenen duruşun aynısı).
+
+    Hepsi çıkarılamaz: boş palet `prompt_suffix`'i boş metne düşürür, kullanıcı
+    da renksiz sonucu açıklayamaz — tam olarak `applied: False` bayrağının var
+    olma nedeni olan sessiz sapma. DİKKAT: buradaki üst sınır 5'lik listeye
+    göre; kayıtlı bir paletin DONMUŞ listesi daha kısa olabileceği için
+    app._palette_prompt'ta çözümlemeden sonra ikinci bir kapı var.
+    """
+    unique = sorted(set(values))
+    if any(not 0 <= index < palette.COLORS_PER_PALETTE for index in unique):
+        raise ValueError("geçersiz palette_drop indeksi")
+    if len(unique) >= palette.COLORS_PER_PALETTE:
+        raise ValueError("paletten en az bir renk kalmalı")
+    return unique
 
 
 class GenerateRequest(BaseModel):
@@ -54,6 +84,10 @@ class GenerateRequest(BaseModel):
     # Kayıtlı palet kullanılıyorsa id'si: adlar kaydın dondurulmuş halinden
     # okunur, böylece gösterilen ad ile prompt'a giden ad hiç ayrışmaz.
     palette_id: str | None = Field(default=None, max_length=64)
+    # Seçili paletten çıkarılan renklerin indeksleri (bkz. check_drop_indices).
+    # Boş = çıkarma yok ⇒ tel ve prompt v1.10'daki gibi.
+    palette_drop: list[int] = Field(default_factory=list,
+                                    max_length=palette.COLORS_PER_PALETTE)
 
     @field_validator("palette_hex")
     @classmethod
@@ -78,6 +112,11 @@ class GenerateRequest(BaseModel):
         if v not in palette.STRENGTHS:
             raise ValueError("geçersiz palette_strength")
         return v
+
+    @field_validator("palette_drop")
+    @classmethod
+    def _palette_drop_ok(cls, v):
+        return check_drop_indices(v)
 
     @field_validator("size")
     @classmethod
@@ -149,6 +188,17 @@ class SavePaletteRequest(BaseModel):
     seed: str = Field(min_length=6, max_length=7)
     mode: str
     strength: str = "balanced"
+    # Kaydedilirken çıkarılacak renkler. Kayıt donmuş `colors` tuttuğu için
+    # (palette_store başlığı) bu, KALICI olarak daha az renkli bir paletin tek
+    # yolu: çıkar → kaydet. Kayıtlı paleti sonradan düzenleme özelliği bu
+    # yüzden yazılmadı; aynı sonucu veriyor.
+    drop: list[int] = Field(default_factory=list,
+                            max_length=palette.COLORS_PER_PALETTE)
+
+    @field_validator("drop")
+    @classmethod
+    def _drop_ok(cls, v):
+        return check_drop_indices(v)
 
     @field_validator("seed")
     @classmethod
@@ -186,6 +236,11 @@ class LogoRequest(BaseModel):
     size: float = Field(default=0.14, ge=0.04, le=0.5)       # logo genişliği / görsel genişliği
     shadow_alpha: int = Field(default=120, ge=0, le=255)     # 0 = gölge yok
     shadow_blur: int = Field(default=6, ge=0, le=50)
+    # `position` ızgara noktası ÇAPA; bunlar ondan sapma. Oran, piksel DEĞİL
+    # (size/scale/margin ile aynı gelenek): 1024² ile 1536×1024'te aynı slider
+    # aynı görünsün. + sağ/aşağı, − sol/yukarı.
+    offset_x: float = Field(default=0.0, ge=-LOGO_OFFSET_LIMIT, le=LOGO_OFFSET_LIMIT)
+    offset_y: float = Field(default=0.0, ge=-LOGO_OFFSET_LIMIT, le=LOGO_OFFSET_LIMIT)
 
     @field_validator("position")
     @classmethod

@@ -154,6 +154,65 @@ def test_deadline_raises_when_server_never_starts(monkeypatch):
     assert all(not t.is_alive() for t in uvicorn_threads)
 
 
+def test_pick_screen_color_returns_the_sampled_hex():
+    """js_api köprüsü screencolor.pick'in sonucunu olduğu gibi geçirir."""
+    api = desktop.Api()
+    api._pick = lambda: "#c86a3c"        # sampler yerine sabit
+    assert api.pick_screen_color() == "#c86a3c"
+
+
+def test_pick_screen_color_returns_none_and_logs_when_the_bridge_fails(monkeypatch, tmp_path):
+    """Bir renk seçme denemesi HİÇBİR koşulda uygulamayı düşürmemeli.
+
+    js_api metodundan çıkan istisna pywebview'ın worker thread'inde kalır:
+    kullanıcı yalnızca "hiçbir şey olmadı" görür ve neden olduğunu asla
+    öğrenemez (paket --windowed, stderr yok). Bu yüzden yakalanıp hata.log'a
+    yazılıyor — errlog'un var olma gerekçesinin aynısı.
+    """
+    monkeypatch.setattr("paths.data_dir", lambda: str(tmp_path))
+
+    api = desktop.Api()
+
+    def boom():
+        raise RuntimeError("AppKit yok")
+
+    api._pick = boom
+    assert api.pick_screen_color() is None
+
+    log = tmp_path / "hata.log"
+    assert log.exists(), "köprü hatası loglanmadı"
+    assert "AppKit yok" in log.read_text(encoding="utf-8")
+
+
+def test_window_is_created_with_the_color_picker_api(monkeypatch):
+    """Pencere js_api ile açılmalı, yoksa damlalık app'te SESSİZCE kaybolur.
+
+    WKWebView'da `window.EyeDropper` yok (WebKit onu hiç uygulamadı), yani
+    native köprü tek yol. `js_api` düşerse `window.pywebview.api` hiç
+    oluşmaz, palette.js yetenek tespitinde ikisini de bulamaz ve düğmeyi
+    gizler — tam olarak v1.10'daki davranışa geri dönülür.
+    """
+    captured: dict = {}
+    fake_webview = _fake_webview_module()
+
+    def fake_create_window(title: str, url: str, width: int, height: int,
+                            min_size: tuple[int, int], js_api=None) -> None:
+        captured["js_api"] = js_api
+
+    fake_webview.create_window = fake_create_window
+    fake_webview.start = lambda: None
+    monkeypatch.setitem(sys.modules, "webview", fake_webview)
+    monkeypatch.setattr("paths.ensure_data_dirs", lambda: None)
+    monkeypatch.setattr(seed, "seed_builtin_logos", lambda *a, **k: [])
+
+    desktop._run()
+
+    api = captured["js_api"]
+    assert api is not None, "create_window'a js_api geçilmiyor"
+    assert callable(getattr(api, "pick_screen_color", None)), (
+        "js_api pick_screen_color taşımıyor — JS tarafı onu arıyor")
+
+
 def test_main_wires_real_port_into_window_and_shuts_down_cleanly(monkeypatch):
     """main(): sahte webview modülü enjekte edilir; pencere kısmı hiç gerçek açılmaz.
 
@@ -169,7 +228,7 @@ def test_main_wires_real_port_into_window_and_shuts_down_cleanly(monkeypatch):
     fake_webview = _fake_webview_module()
 
     def fake_create_window(title: str, url: str, width: int, height: int,
-                            min_size: tuple[int, int]) -> None:
+                            min_size: tuple[int, int], js_api=None) -> None:
         captured["title"] = title
         captured["url"] = url
         captured["width"] = width
@@ -241,7 +300,7 @@ def test_downloads_are_enabled_before_the_window_opens(monkeypatch):
     settings_at_import = fake_webview.settings
 
     def fake_create_window(title: str, url: str, width: int, height: int,
-                            min_size: tuple[int, int]) -> None:
+                            min_size: tuple[int, int], js_api=None) -> None:
         seen["at_create_window"] = fake_webview.settings["ALLOW_DOWNLOADS"]
 
     def fake_start() -> None:

@@ -61,6 +61,13 @@ arm64 runner'ında (macos-14) aynı spec ve `build.sh` ile üretilir. Actions �
 - Prompt'tan görsel üretme (boyut/kalite/adet)
 - Geçmiş galerisi (indir, sil)
 - Görsel düzenleme: dosya yükle veya galeriden seç + prompt (Azure images/edits)
+- Çoklu referans görsel: ana görselin yanına en fazla 3 ek referans (yükleme
+  ya da galeriden), hepsi tek istekte gönderilir
+- Klasörler: görselleri klasörlere ayır, kartları sürükle-bırak ile taşı; çoklu
+  seçimle toplu taşıma. İç içe klasör destekleniyor (`parent_id` ağacı), başlık
+  şeridinde yol görünür
+- Varlık kütüphanesi: bindirmede kullanılacak logo, motto ve bannerları yükle
+  ve sil; yerleşik KURUM logosu da kullanılabilir
 - Logo / motto / banner bindirme: 9'lu konum ızgarası + ince kaydırma
   (yatay/dikey, görselin dışına taşmaz), boyut ve gölge; canlı önizleme
 - Tema rengi + renk paleti: bir tohum renkten OKLCH renk teorisiyle 6 uyumlu
@@ -77,7 +84,11 @@ arm64 runner'ında (macos-14) aynı spec ve `build.sh` ile üretilir. Actions �
   sürükleyip bırakınca o klasöre kaydedilir (çoklu dosya, PNG'ye kodlanır,
   kartta "içe aktarıldı" işareti). Merkez alana bırakmak değişmedi: orası
   hâlâ "referans görsel olarak yükle"
+- Ayarlar penceresinde sürüm görünür (destek konuşmasının ilk sorusunun cevabı)
+- Sürüm değiştiğinde manifest yedeği: `backups/<eski sürüm>-<tarih>/` altına
+  liste dosyalarının bayt kopyası (görsellerin kendisi kopyalanmaz)
 
 ## Sonraya (v2)
 - Maske ile bölgesel düzenleme (inpainting)
-- Çoklu referans görsel
+- Varlık kütüphanesinden AI'a referans verme (piksel bindirme yerine "bu logoyu
+  sahneye doğal biçimde yerleştir")

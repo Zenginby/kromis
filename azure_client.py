@@ -1,4 +1,9 @@
-"""Azure gpt-image-2 istemcisi. Kimlik `~/.config/claude-tools/azure-gpt-image2.env`'den okunur."""
+"""Azure gpt-image-2 istemcisi.
+
+Kimlik iki dosyadan SIRAYLA okunur, ilk tam olan kazanır (bkz. `_candidate_paths`):
+`~/.config/gpt-image-studio/credentials.env` (uygulamanın kendi dosyası, Ayarlar
+penceresi buraya yazar) → `~/.config/claude-tools/azure-gpt-image2.env` (paylaşılan).
+"""
 from __future__ import annotations
 
 import base64

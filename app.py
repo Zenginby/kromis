@@ -22,6 +22,7 @@ from starlette.datastructures import UploadFile as FormUploadFile
 import assets_store
 import azure_client as ac
 import backup
+import chat_client as cc
 import color_names
 import composite
 import errlog
@@ -33,9 +34,9 @@ import seed
 import storage
 import version
 from models import (MAX_PROMPT_CHARS, BannerRequest, BulkImagesRequest,
-                    BulkMoveRequest, FolderRequest, GenerateRequest, LogoRequest,
-                    MoveImageRequest, SavePaletteRequest, SettingsRequest,
-                    SuggestRequest, check_drop_indices)
+                    BulkMoveRequest, ChatRequest, FolderRequest, GenerateRequest,
+                    LogoRequest, MoveImageRequest, SavePaletteRequest,
+                    SettingsRequest, SuggestRequest, check_drop_indices)
 
 BASE_DIR = paths.REPO_DIR                    # geriye uyum: mevcut kullanımlar bozulmasın
 OUTPUT_DIR = paths.output_dir()
@@ -493,8 +494,13 @@ def get_settings() -> dict:
 
     Destek sorusu "hangi sürümdesiniz?" v1.8'de cevaplanamıyordu — sürüm
     yalnızca Info.plist'te vardı ve arayüz onu hiç göstermiyordu.
+
+    `chat_instructions_path` da burada birleşiyor: talimatı ezme özelliği
+    keşfedilebilir olmasa var olmakla olmamak arasında bir fark kalmaz.
     """
-    return {**ac.get_settings_status(), "version": version.APP_VERSION}
+    return {**ac.get_settings_status(),
+            "version": version.APP_VERSION,
+            "chat_instructions_path": paths.chat_instructions_override()}
 
 
 @app.post("/api/settings")
@@ -502,6 +508,10 @@ def post_settings(req: SettingsRequest) -> dict:
     """Admin kimlik bilgilerini yalnızca-yazılır kaydeder; durumu döndürür (key'siz).
 
     api_key boşsa mevcut key korunur — ilk kurulumda ise key zorunludur.
+
+    Sohbet dağıtımı AYRI bir çağrıyla ve görsel kimliği doğrulamadan GEÇTİKTEN
+    SONRA yazılıyor: geçersiz bir endpoint'le gelen istek hiçbir şey yazmadan
+    422 dönmeli.
     """
     api_key = req.api_key.strip()
     if not api_key:
@@ -511,9 +521,30 @@ def post_settings(req: SettingsRequest) -> dict:
             raise HTTPException(status_code=422, detail="İlk kurulumda API key gerekli.")
     try:
         ac.save_credentials(api_key, req.base_url)
+        # None = alan hiç gönderilmedi → dokunma (bkz. models.SettingsRequest).
+        if req.chat_deployment is not None:
+            ac.save_env({ac.CHAT_DEPLOYMENT: req.chat_deployment.strip()})
     except ac.AzureImageError as e:
         raise HTTPException(status_code=422, detail=str(e))
     return ac.get_settings_status()
+
+
+@app.post("/api/chat")
+def chat(req: ChatRequest) -> dict:
+    """Prompt Yönetmeni: Türkçe sohbet → İngilizce gpt-image-2 prompt'u.
+
+    SENKRON `def` (bilinçli): httpx çağrısı bloklayıcı, Starlette bunu kendi
+    threadpool'unda koşturur ve olay döngüsü — yani pencere — donmaz;
+    `/api/generate`'in aynısı.
+
+    Yanıt DİSKE YAZILMAZ (karar 4): tek kalıcı çıktı prompt'un kendisi ve o
+    zaten üretim anında `storage.save` ile history.json'a giriyor. Bir
+    `chat_store.py` dördüncü bir "prompt yaşayan yer" üretirdi.
+    """
+    try:
+        return cc.complete([m.model_dump() for m in req.messages])
+    except cc.ChatError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 @app.get("/api/folders")

@@ -72,6 +72,31 @@ de bu numarayı söyle.
 Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya yaz
 (aşağıdaki yedek işine yarayabilir).
 
+## Sürüm 1.13.0'da ne değişti
+
+- **Prompt Yönetmeni geldi.** Uygulamanın üstünde artık iki sekme var: **Görsel**
+  ve **Prompt Yönetmeni**. İkincisi bir sohbet: ne istediğini **Türkçe** anlatıyorsun,
+  o da eksik kalan yerleri soruyor (en fazla 3 soru) ve sonunda görsel modelin en
+  iyi anladığı **İngilizce prompt'u** + boyut/kalite/adet önerisini yazıyor.
+  - **"Forma aktar"** düğmesi prompt'u Görsel sekmesindeki prompt alanına yazıyor
+    ve ayarları uyguluyor — sen yalnızca **Üret**'e basıyorsun. Üretimi kendisi
+    başlatmıyor (para harcayan adımı sen onaylıyorsun).
+  - Önerdiği bir ayar formda yoksa **söylüyor** ("… uygulanamadı"), sessizce
+    başka bir ayarla üretmiyor.
+  - Sohbet **kaydedilmiyor**: uygulamayı kapatınca gider. Kalıcı olan, üretilen
+    görselin prompt'u (o zaten geçmişte duruyor). "Sohbeti temizle" onay soruyor.
+  - Kullanmak için **bir kerelik** ayar gerekiyor: ⚙ **Ayarlar** → *Prompt Yönetmeni
+    (sohbet modeli)* → **Dağıtım adı** (Kurum verecek, ör. `gpt-5.6-luna`) → **Kaydet**.
+    Girilmezse sekme açılır ama "Gönder" kilitli kalır ve nedeni panelde yazar.
+  - Azure anahtarını **yeniden girmen gerekmiyor**; sohbet görselinkini kullanıyor.
+- **Ayarlar kaydetmek artık başka ayarları silmiyor.** Endpoint'i tek başına
+  güncellediğinde dağıtım adı yerinde kalıyor.
+
+> Not: Bu dosya 1.11 ve 1.12 sürümlerini atlıyor — o sürümlerin notları yazılmadı
+> (1.11: logo ince konum + damlalık + paletten renk çıkarma, 1.12: bilgisayardan
+> sürükle-bırak ile içe aktarma). Eksiklik bilinçli olarak burada duruyor, sessizce
+> yeniden yazılmadı.
+
 ## Sürüm 1.10.0'da ne değişti
 
 - **"İndir" artık gerçekten indiriyor.** Önceki sürümde İndir'e basınca dosya

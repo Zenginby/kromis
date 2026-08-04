@@ -11,6 +11,15 @@
     <div class="topbar-text">
       <h1>GPT-Image <span>Studio</span></h1>
       <p class="sub">Azure gpt-image-2 · yerel</p>
+      <!-- Çalışma alanı sekmeleri: mevcut .seg bileşeni yeniden kullanılıyor.
+           Ok tuşu gezinmesi henüz YOK (modal içi .seg kullanımları da öyle) —
+           Tab+Enter ile çalışır ve aria-selected doğru güncellenir. -->
+      <div class="seg view-tabs" role="tablist" aria-label="Çalışma alanı">
+        <button id="tab-image" type="button" class="active" role="tab"
+                aria-selected="true" aria-controls="view-image">Görsel</button>
+        <button id="tab-chat" type="button" role="tab"
+                aria-selected="false" aria-controls="view-chat">Prompt Yönetmeni</button>
+      </div>
     </div>
     <button id="settings-btn" class="icon-btn" type="button" aria-label="Azure ayarları" title="Azure ayarları">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -21,163 +30,216 @@
     </button>
   </header>
 
-  <main class="layout">
-    <section class="controls" aria-label="Üretim kontrolleri">
-      <label for="prompt">Prompt</label>
-      <textarea id="prompt" rows="6" placeholder="Ne üretmek istersin? Bir görsel eklersen prompt onun üzerinde çalışır."></textarea>
+  <main>
+    <div id="view-image" role="tabpanel" aria-labelledby="tab-image">
+      <div class="layout">
+        <section class="controls" aria-label="Üretim kontrolleri">
+          <label for="prompt">Prompt</label>
+          <textarea id="prompt" rows="6" placeholder="Ne üretmek istersin? Bir görsel eklersen prompt onun üzerinde çalışır."></textarea>
 
-      <div class="row">
-        <div>
-          <label for="size">Boyut</label>
-          <select id="size">
-            <option value="1024x1024">Kare 1024²</option>
-            <option value="1024x1536">Dikey 1024×1536</option>
-            <option value="1536x1024">Yatay 1536×1024</option>
-          </select>
-        </div>
-        <div>
-          <label for="quality">Kalite</label>
-          <select id="quality">
-            <option value="low">Düşük</option>
-            <option value="medium" selected>Orta</option>
-            <option value="high">Yüksek</option>
-          </select>
-        </div>
-        <div>
-          <label for="n">Adet</label>
-          <select id="n"><option>1</option><option>2</option><option>3</option><option>4</option></select>
-        </div>
+          <div class="row">
+            <div>
+              <label for="size">Boyut</label>
+              <select id="size">
+                <option value="1024x1024">Kare 1024²</option>
+                <option value="1024x1536">Dikey 1024×1536</option>
+                <option value="1536x1024">Yatay 1536×1024</option>
+              </select>
+            </div>
+            <div>
+              <label for="quality">Kalite</label>
+              <select id="quality">
+                <option value="low">Düşük</option>
+                <option value="medium" selected>Orta</option>
+                <option value="high">Yüksek</option>
+              </select>
+            </div>
+            <div>
+              <label for="n">Adet</label>
+              <select id="n"><option>1</option><option>2</option><option>3</option><option>4</option></select>
+            </div>
+          </div>
+
+          <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" hidden />
+          <div class="ref-row">
+            <button type="button" id="upload-btn" class="btn-ghost">
+              <span class="btn-ghost-plus" aria-hidden="true">+</span> Görsel ekle
+            </button>
+            <span id="ref-chip" class="ref-chip" hidden>
+              <span id="ref-label"></span>
+              <button type="button" id="ref-clear" aria-label="Referansı kaldır">×</button>
+            </span>
+          </div>
+
+          <input type="file" id="extra-file-input" accept="image/png,image/jpeg,image/webp" multiple hidden />
+          <div id="extra-row" class="extra-row" hidden>
+            <span class="extra-title">Ek görseller <span id="extra-count" class="range-val"></span></span>
+            <div id="extra-strip" class="extra-strip" aria-live="polite"></div>
+            <button type="button" id="extra-add-btn" class="btn-ghost">
+              <span class="btn-ghost-plus" aria-hidden="true">+</span> Ek görsel
+            </button>
+            <p class="extra-hint">Prompt her iki görsele birlikte uygulanır — ör. "ikinci görseldeki ürünü sahneye yerleştir".</p>
+          </div>
+
+          <section class="palette-panel" aria-label="Tema rengi ve renk paleti">
+            <div class="palette-actions">
+              <button type="button" id="palette-btn" class="btn-ghost"
+                      title="Tema rengi seç ve uyumlu palet önerilerini gör">
+                <span class="btn-ghost-plus" aria-hidden="true">+</span> Tema rengi
+              </button>
+              <span id="palette-chip" class="ref-chip" hidden>
+                <!-- aria-hidden YOK: v1.11'den beri swatch'lar tıklanabilir düğme
+                     (renk paletten çıkarılıyor). Odaklanabilir bir kontrolü
+                     aria-hidden içinde bırakmak ekran okuyucudan tamamen saklar —
+                     klavyeyle ulaşılan ama duyurulmayan bir kontrol kalırdı. -->
+                <span id="palette-chip-sw" class="palette-sw-row"
+                      role="group" aria-label="Palet renkleri — çıkarmak için tıkla"></span>
+                <span id="palette-label"></span>
+                <button type="button" id="palette-clear" aria-label="Paleti kaldır">×</button>
+              </span>
+            </div>
+            <div id="palette-strength-row" class="palette-strength-row" hidden>
+              <span id="palette-strength-label" class="palette-strength-title">Renk baskısı</span>
+              <div id="palette-strength" class="seg" role="group"
+                   aria-labelledby="palette-strength-label">
+                <button type="button" data-strength="hint">İpucu</button>
+                <button type="button" data-strength="balanced" class="active">Dengeli</button>
+                <button type="button" data-strength="strict">Katı</button>
+              </div>
+            </div>
+            <p id="palette-mode-note" class="field-note" hidden></p>
+            <p id="palette-status" class="asset-status" role="status"></p>
+          </section>
+
+          <section class="assets-panel" aria-label="Bindirme ve kütüphane">
+            <div class="asset-actions">
+              <button type="button" id="logo-add-btn" class="btn-ghost" disabled
+                      title="Önizlemedeki görsele logo, motto veya banner bindir">
+                <span class="btn-ghost-plus" aria-hidden="true">+</span> Logo ekle
+              </button>
+              <button type="button" id="library-btn" class="btn-ghost"
+                      title="Logo, motto ve banner kütüphanesini yönet">Kütüphane</button>
+            </div>
+            <p class="asset-status">"Logo ekle" önizlemedeki görsele uygulanır — galeriden bir görsele tıkla ya da yeni bir görsel üret.</p>
+          </section>
+
+          <p id="folder-target" class="folder-target" hidden></p>
+          <button id="go" class="primary">Üret</button>
+          <p id="status" class="status" role="status"></p>
+        </section>
+
+        <section class="stage" aria-label="Önizleme">
+          <div id="progress" class="progress" hidden aria-hidden="true">
+            <div class="spinner"></div>
+            <div class="bar"><div id="progress-fill" class="bar-fill"></div></div>
+            <span id="progress-pct" class="pct">0%</span>
+          </div>
+          <div id="preview" class="preview empty">
+            <span id="preview-empty" class="preview-empty">Henüz görsel yok · bir görseli buraya sürükle-bırak</span>
+            <img id="preview-img" class="preview-img" alt="" hidden />
+            <button id="preview-clear" class="preview-clear" type="button" hidden
+                    aria-label="Görseli ekrandan kaldır" title="Ekrandan kaldır">×</button>
+          </div>
+        </section>
       </div>
 
-      <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" hidden />
-      <div class="ref-row">
-        <button type="button" id="upload-btn" class="btn-ghost">
-          <span class="btn-ghost-plus" aria-hidden="true">+</span> Görsel ekle
-        </button>
-        <span id="ref-chip" class="ref-chip" hidden>
-          <span id="ref-label"></span>
-          <button type="button" id="ref-clear" aria-label="Referansı kaldır">×</button>
-        </span>
-      </div>
-
-      <input type="file" id="extra-file-input" accept="image/png,image/jpeg,image/webp" multiple hidden />
-      <div id="extra-row" class="extra-row" hidden>
-        <span class="extra-title">Ek görseller <span id="extra-count" class="range-val"></span></span>
-        <div id="extra-strip" class="extra-strip" aria-live="polite"></div>
-        <button type="button" id="extra-add-btn" class="btn-ghost">
-          <span class="btn-ghost-plus" aria-hidden="true">+</span> Ek görsel
-        </button>
-        <p class="extra-hint">Prompt her iki görsele birlikte uygulanır — ör. "ikinci görseldeki ürünü sahneye yerleştir".</p>
-      </div>
-
-      <section class="palette-panel" aria-label="Tema rengi ve renk paleti">
-        <div class="palette-actions">
-          <button type="button" id="palette-btn" class="btn-ghost"
-                  title="Tema rengi seç ve uyumlu palet önerilerini gör">
-            <span class="btn-ghost-plus" aria-hidden="true">+</span> Tema rengi
+      <section class="gallery-wrap" aria-label="Klasörler ve geçmiş">
+        <div class="gallery-head">
+          <button type="button" id="folder-back" class="icon-btn back-btn" hidden
+                  aria-label="Klasörden çık" title="Klasörden çık">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
+            </svg>
           </button>
-          <span id="palette-chip" class="ref-chip" hidden>
-            <!-- aria-hidden YOK: v1.11'den beri swatch'lar tıklanabilir düğme
-                 (renk paletten çıkarılıyor). Odaklanabilir bir kontrolü
-                 aria-hidden içinde bırakmak ekran okuyucudan tamamen saklar —
-                 klavyeyle ulaşılan ama duyurulmayan bir kontrol kalırdı. -->
-            <span id="palette-chip-sw" class="palette-sw-row"
-                  role="group" aria-label="Palet renkleri — çıkarmak için tıkla"></span>
-            <span id="palette-label"></span>
-            <button type="button" id="palette-clear" aria-label="Paleti kaldır">×</button>
-          </span>
-        </div>
-        <div id="palette-strength-row" class="palette-strength-row" hidden>
-          <span id="palette-strength-label" class="palette-strength-title">Renk baskısı</span>
-          <div id="palette-strength" class="seg" role="group"
-               aria-labelledby="palette-strength-label">
-            <button type="button" data-strength="hint">İpucu</button>
-            <button type="button" data-strength="balanced" class="active">Dengeli</button>
-            <button type="button" data-strength="strict">Katı</button>
+          <h2 id="gallery-title">Klasörler</h2>
+          <button type="button" id="folder-delete" class="icon-btn danger-btn" hidden
+                  aria-label="Bu klasörü sil" title="Bu klasörü sil">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 6h18"></path>
+              <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path>
+              <path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"></path>
+              <path d="M10 11v6"></path><path d="M14 11v6"></path>
+            </svg>
+          </button>
+          <button type="button" id="select-toggle" class="btn-ghost"
+                  title="Görselleri çoklu seç">Seç</button>
+          <button type="button" id="folder-new" class="btn-ghost">
+            <span class="btn-ghost-plus" aria-hidden="true">+</span> Yeni klasör
+          </button>
+
+          <!-- Seçim modu şeridi: Seç / Yeni klasör / klasör silme bunlarla yer değiştirir -->
+          <div id="select-bar" class="select-bar" hidden>
+            <span id="select-count" class="select-count" role="status">0 seçili</span>
+            <button type="button" id="select-all" class="btn-ghost">Tümünü seç</button>
+            <button type="button" id="select-delete" class="btn-ghost btn-ghost-danger">Sil</button>
+            <button type="button" id="select-cancel" class="btn-ghost">Vazgeç</button>
           </div>
         </div>
-        <p id="palette-mode-note" class="field-note" hidden></p>
-        <p id="palette-status" class="asset-status" role="status"></p>
+
+        <!-- Statik metin İÇE AKTARMAYI anlatır: o özellik klasör olmadan da çalışıyor
+             ve JS düşse bile keşfedilebilir kalmalı. Taşıma cümlesini folders.js
+             (renderFolderHint) yalnızca klasör varken ekliyor. -->
+        <p id="folder-hint" class="folder-hint">
+          Bilgisayarındaki bir görseli klasör kartına ya da bu alana bırakarak içe aktarabilirsin.
+        </p>
+        <div id="folder-grid" class="folder-grid" aria-live="polite"></div>
+
+        <h3 id="images-title" class="images-title">Klasörsüz görseller</h3>
+        <div id="gallery" class="gallery"></div>
       </section>
-
-      <section class="assets-panel" aria-label="Bindirme ve kütüphane">
-        <div class="asset-actions">
-          <button type="button" id="logo-add-btn" class="btn-ghost" disabled
-                  title="Önizlemedeki görsele logo, motto veya banner bindir">
-            <span class="btn-ghost-plus" aria-hidden="true">+</span> Logo ekle
-          </button>
-          <button type="button" id="library-btn" class="btn-ghost"
-                  title="Logo, motto ve banner kütüphanesini yönet">Kütüphane</button>
-        </div>
-        <p class="asset-status">"Logo ekle" önizlemedeki görsele uygulanır — galeriden bir görsele tıkla ya da yeni bir görsel üret.</p>
-      </section>
-
-      <p id="folder-target" class="folder-target" hidden></p>
-      <button id="go" class="primary">Üret</button>
-      <p id="status" class="status" role="status"></p>
-    </section>
-
-    <section class="stage" aria-label="Önizleme">
-      <div id="progress" class="progress" hidden aria-hidden="true">
-        <div class="spinner"></div>
-        <div class="bar"><div id="progress-fill" class="bar-fill"></div></div>
-        <span id="progress-pct" class="pct">0%</span>
-      </div>
-      <div id="preview" class="preview empty">
-        <span id="preview-empty" class="preview-empty">Henüz görsel yok · bir görseli buraya sürükle-bırak</span>
-        <img id="preview-img" class="preview-img" alt="" hidden />
-        <button id="preview-clear" class="preview-clear" type="button" hidden
-                aria-label="Görseli ekrandan kaldır" title="Ekrandan kaldır">×</button>
-      </div>
-    </section>
-  </main>
-
-  <section class="gallery-wrap" aria-label="Klasörler ve geçmiş">
-    <div class="gallery-head">
-      <button type="button" id="folder-back" class="icon-btn back-btn" hidden
-              aria-label="Klasörden çık" title="Klasörden çık">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
-        </svg>
-      </button>
-      <h2 id="gallery-title">Klasörler</h2>
-      <button type="button" id="folder-delete" class="icon-btn danger-btn" hidden
-              aria-label="Bu klasörü sil" title="Bu klasörü sil">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M3 6h18"></path>
-          <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path>
-          <path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"></path>
-          <path d="M10 11v6"></path><path d="M14 11v6"></path>
-        </svg>
-      </button>
-      <button type="button" id="select-toggle" class="btn-ghost"
-              title="Görselleri çoklu seç">Seç</button>
-      <button type="button" id="folder-new" class="btn-ghost">
-        <span class="btn-ghost-plus" aria-hidden="true">+</span> Yeni klasör
-      </button>
-
-      <!-- Seçim modu şeridi: Seç / Yeni klasör / klasör silme bunlarla yer değiştirir -->
-      <div id="select-bar" class="select-bar" hidden>
-        <span id="select-count" class="select-count" role="status">0 seçili</span>
-        <button type="button" id="select-all" class="btn-ghost">Tümünü seç</button>
-        <button type="button" id="select-delete" class="btn-ghost btn-ghost-danger">Sil</button>
-        <button type="button" id="select-cancel" class="btn-ghost">Vazgeç</button>
-      </div>
     </div>
 
-    <!-- Statik metin İÇE AKTARMAYI anlatır: o özellik klasör olmadan da çalışıyor
-         ve JS düşse bile keşfedilebilir kalmalı. Taşıma cümlesini folders.js
-         (renderFolderHint) yalnızca klasör varken ekliyor. -->
-    <p id="folder-hint" class="folder-hint">
-      Bilgisayarındaki bir görseli klasör kartına ya da bu alana bırakarak içe aktarabilirsin.
-    </p>
-    <div id="folder-grid" class="folder-grid" aria-live="polite"></div>
+    <!-- Prompt Yönetmeni: Türkçe sohbet → İngilizce prompt + teknik ayarlar.
+         Geçmiş yalnızca istemcide (JS dizisi) yaşar, diske yazılmaz; kalıcı olan
+         tek şey prompt'un kendisi ve o üretim anında history.json'a giriyor. -->
+    <div id="view-chat" role="tabpanel" aria-labelledby="tab-chat" hidden>
+      <div class="chat-shell">
+        <div id="chat-empty" class="chat-empty">
+          <h2>Fikri anlat, prompt'u o yazsın.</h2>
+          <p>
+            Türkçe anlatman yeterli. Yönetmen eksik kalan yerleri sorar, sonra
+            İngilizce bir <code>gpt-image-2</code> prompt'u ve teknik ayarları
+            üretir — tek tıkla üretim formuna geçer.
+          </p>
+          <div class="chat-chips" role="group" aria-label="Başlangıç önerileri">
+            <button type="button" class="chat-chip">Kurban Bayramı için kare Instagram görseli</button>
+            <button type="button" class="chat-chip">Blog kapağı — sıcak editoryal fotoğraf</button>
+            <button type="button" class="chat-chip">Üç renkli düz vektör illüstrasyon</button>
+            <button type="button" class="chat-chip">Bağış kampanyası için dikey afiş</button>
+          </div>
+        </div>
 
-    <h3 id="images-title" class="images-title">Klasörsüz görseller</h3>
-    <div id="gallery" class="gallery"></div>
-  </section>
+        <div id="chat-log" class="chat-log" aria-live="polite" aria-label="Sohbet akışı"></div>
+
+        <div class="chat-composer">
+          <!-- Bekleme göstergesi BURADA, .stage'deki #progress'te DEĞİL: o düğümler
+               diğer sekmede yaşıyor ve startProgress() onlara dokunuyor. -->
+          <div id="chat-wait" class="chat-wait" hidden>
+            <div class="spinner"></div>
+            <span>Yönetmen düşünüyor… ilk yanıt yarım dakikayı bulabilir.</span>
+          </div>
+          <!-- Kapı açıklaması: sekmenin KENDİSİ kilitlenmiyor. Kilitli bir sekme
+               "neden kapalı" bilgisini de saklardı; burada kullanıcı tıklayıp ne
+               yapması gerektiğini okuyor. settings.js chat_configured ile yönetir. -->
+          <p id="chat-gate" class="chat-gate" hidden>
+            Prompt Yönetmeni kapalı: Ayarlar'dan (sağ üstteki ⚙) sohbet modelinin
+            <strong>dağıtım adını</strong> gir.
+          </p>
+          <label class="chat-input-label" for="chat-input">Mesajın</label>
+          <textarea id="chat-input" rows="3" maxlength="6000"
+                    placeholder="Ne üretmek istiyorsun? Amaç ve mecrayı söylersen (Instagram, blog kapağı, afiş…) daha isabetli olur."></textarea>
+          <div class="chat-actions">
+            <span class="chat-hint">⌘/Ctrl + Enter gönderir</span>
+            <button type="button" id="chat-clear" class="btn-ghost">Sohbeti temizle</button>
+            <button type="button" id="chat-send" class="primary chat-send">Gönder</button>
+          </div>
+          <p id="chat-status" class="chat-status" role="status"></p>
+        </div>
+      </div>
+    </div>
+  </main>
 
   <!-- Onay / ad sorma penceresi: native confirm() ve prompt() yerine tek temalı modal.
        mode="confirm" → yalnızca metin + Vazgeç/Onayla; mode="prompt" → metin girişi de var. -->
@@ -228,6 +290,22 @@
       <label for="set-key">API Key</label>
       <input id="set-key" type="password" autocomplete="off" spellcheck="false"
              placeholder="Azure API anahtarını yapıştır" />
+
+      <h3 class="modal-subhead">Prompt Yönetmeni (sohbet modeli)</h3>
+      <label for="set-chat-deployment">Dağıtım adı</label>
+      <input id="set-chat-deployment" type="text" autocomplete="off" spellcheck="false"
+             maxlength="200" placeholder="ör. gpt-5.6-luna" />
+      <p class="field-note">
+        Azure AI Foundry'deki <strong>deployment</strong> adı — model ailesi adı değil.
+        Boş bırakılırsa Prompt Yönetmeni kapalı kalır. Sohbet, görselin endpoint ve
+        API anahtarını paylaşır.
+      </p>
+      <!-- Talimatı ezme yolu: keşfedilebilir olmasa özellik var olmakla olmamak
+           arasında bir fark taşımaz. GET /api/settings dolduruyor. -->
+      <p class="field-note">
+        Yönetmenin talimatını değiştirmek için bu dosyayı oluştur:
+        <code id="chat-instructions-path">—</code>
+      </p>
 
       <p id="settings-status" class="modal-status" role="status"></p>
       <div class="modal-actions">
@@ -474,6 +552,12 @@
   <!-- SIRA bağlayıcı: dosyalar tek global kapsamı paylaşıyor ve açılış
        çağrıları settings.js'in dibinde. Bkz. core.js başlığı.
 
+       chat.js EN SONDA: bir yaprak dosya, yalnızca kendinden önce tanımlanan
+       adlara bakıyor ($, statusEl, detailText, confirmDialog, showView,
+       MAX_PROMPT_CHARS). Açılış çağrılarından SONRA yüklenmesi sorun değil —
+       loadSettings() zaten asenkron ve yanıtı geldiğinde yalnızca DOM id'lerine
+       dokunuyor, chat.js'in fonksiyonlarına değil.
+
        Aşağıdaki sorgu değerlerindeki __APP_VERSION__ bir YER TUTUCUDUR —
        app.py'deki index() her istekte version.APP_VERSION ile değiştirir.
        Buraya elle sürüm YAZMA; tek kaynak version.py (tests/test_index.py yer
@@ -488,5 +572,6 @@
   <script src="/static/palette.js?v=__APP_VERSION__"></script>
   <script src="/static/settings.js?v=__APP_VERSION__"></script>
   <script src="/static/viewer.js?v=__APP_VERSION__"></script>
+  <script src="/static/chat.js?v=__APP_VERSION__"></script>
 </body>
 </html>

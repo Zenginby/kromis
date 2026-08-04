@@ -405,6 +405,13 @@ button.palette-sw:focus-visible { outline: 2px solid var(--accent); outline-offs
 }
 @media (max-width: 780px) { .layout { grid-template-columns: 1fr; } }
 
+/* Çalışma alanı sekmeleri: başlığın altında, sol hizalı. .seg'in tuşlarından
+   daha yüksek/geniş — bunlar sayfa değiştiren birinci sınıf kontroller, bir
+   modal içindeki üç durumlu anahtar değil. */
+.view-tabs { margin-top: 0.85rem; }
+.view-tabs button { padding: 0.5rem 0.95rem; font-size: 0.88rem; }
+#view-image[hidden], #view-chat[hidden] { display: none; }
+
 .controls, .stage, .gallery-wrap {
   background: var(--panel); border-radius: var(--radius); padding: var(--space);
 }
@@ -693,6 +700,118 @@ body.viewer-open { overflow: hidden; }
 .viewer-pct {
   min-width: 3.4rem; text-align: center; font-size: 0.78rem;
   color: var(--muted); font-variant-numeric: tabular-nums;
+}
+
+/* ── Prompt Yönetmeni sohbeti ──────────────────────────────────────────
+   Ortalanmış TEK kolon: burada okunabilirlik ölçüsü (~70 karakter) yerleşimi
+   belirliyor, iki kolonlu üretim ekranının aksine. Besteci dipte yapışkan
+   duruyor, akış onun ARDINDAN kayıyor. */
+.chat-shell {
+  max-width: 860px; margin: 0 auto; padding: var(--space);
+  display: flex; flex-direction: column; gap: 1.1rem;
+  min-height: 60vh;
+}
+
+.chat-log { display: flex; flex-direction: column; gap: 1.1rem; }
+
+/* Boş durum: "ne yazacağım" sürtünmesini kaldıran çipler. */
+.chat-empty { padding: 1.6rem 0 0.4rem; }
+.chat-empty[hidden] { display: none; }
+.chat-empty h2 {
+  margin: 0 0 0.6rem; font-family: ui-serif, Georgia, serif; font-weight: 500;
+  font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2.1rem); letter-spacing: -0.01em;
+}
+.chat-empty p { color: var(--muted); line-height: 1.65; margin: 0 0 1.2rem; max-width: 58ch; }
+.chat-empty code {
+  background: var(--panel-2); border-radius: 5px; padding: 0.05em 0.35em; font-size: 0.9em;
+}
+.chat-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.chat-chip {
+  background: var(--panel); color: var(--muted);
+  border: 1px solid var(--panel-2); border-radius: 999px;
+  padding: 0.5rem 0.9rem; font: inherit; font-size: 0.84rem; cursor: pointer;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+              transform var(--dur) var(--ease);
+}
+.chat-chip:hover { color: var(--text); border-color: var(--accent); transform: translateY(-1px); }
+.chat-chip:active { transform: translateY(0); background: var(--panel-2); }
+
+/* İki mesaj türü BİLEREK aynı görünmüyor: kullanıcının söylediği bir replik
+   (dar, sağa yapışık balon), yönetmenin döndürdüğü ise bir ÇIKTI (tam
+   genişlikte panel, kod blokları ve eylem satırıyla). */
+.chat-msg-user {
+  align-self: flex-end; max-width: 76%;
+  background: var(--panel-2); border-radius: 14px 14px 4px 14px;
+  padding: 0.7rem 0.95rem; line-height: 1.55;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.chat-msg-bot {
+  background: var(--panel); border-radius: var(--radius); padding: var(--space);
+  line-height: 1.6;
+}
+.chat-role {
+  display: block; margin-bottom: 0.6rem; color: var(--accent);
+  font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase;
+}
+.chat-msg-bot code {
+  background: var(--panel-2); border-radius: 5px; padding: 0.05em 0.35em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88em;
+}
+.chat-msg-bot pre code { background: none; padding: 0; border-radius: 0; }
+.chat-msg-bot p { margin: 0 0 0.7rem; overflow-wrap: anywhere; }
+.chat-msg-bot p:last-child { margin-bottom: 0; }
+.chat-msg-bot ul { margin: 0 0 0.75rem; padding-left: 1.15rem; }
+.chat-msg-bot li { margin: 0.2rem 0; line-height: 1.55; }
+.chat-msg-bot pre {
+  margin: 0 0 0.8rem; padding: 0.8rem 0.9rem; border-radius: 10px;
+  background: var(--panel-2); overflow-x: auto;   /* uzun satır sayfayı yatay kaydırmaz */
+}
+.chat-msg-bot pre code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.84rem; line-height: 1.55; white-space: pre;
+}
+/* Sayfadaki asıl ürün prompt bloğu — akışta gözle bulunabilmeli. */
+.chat-msg-bot pre.chat-prompt-block { border-left: 3px solid var(--accent); }
+
+.chat-msg-actions {
+  display: flex; flex-wrap: wrap; gap: 0.5rem;
+  margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px dashed var(--panel-2);
+}
+.chat-msg-actions .primary { margin-top: 0; width: auto; padding: 0.55rem 0.95rem; }
+
+.chat-composer {
+  position: sticky; bottom: 0; margin-top: auto;
+  background: var(--bg); padding: 0.8rem 0 var(--space);
+}
+/* Altına kayan içerik keskin bir kenarda kesilmesin: besteci bir KATMAN,
+   sayfanın sonu değil. */
+.chat-composer::before {
+  content: ""; position: absolute; left: 0; right: 0; top: -1.5rem; height: 1.5rem;
+  background: linear-gradient(to bottom, transparent, var(--bg)); pointer-events: none;
+}
+/* Kapı açıklaması: kilitli "Gönder"in NEDENİ. Uyarı tonunda ama alarm değil. */
+.chat-gate {
+  margin: 0 0 0.8rem; padding: 0.7rem 0.85rem; border-radius: 10px;
+  background: var(--panel); border-left: 3px solid var(--accent);
+  color: var(--muted); font-size: 0.84rem; line-height: 1.5;
+}
+.chat-gate[hidden] { display: none; }
+.chat-input-label { display: block; font-size: 0.85rem; color: var(--muted); margin: 0 0 0.25rem; }
+#chat-input { min-height: 4.6rem; resize: vertical; }
+.chat-actions { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.6rem; }
+.chat-hint { flex: 1; font-size: 0.74rem; color: var(--muted); }
+.chat-send { margin-top: 0; width: auto; padding: 0.65rem 1.5rem; }
+.chat-wait {
+  display: flex; align-items: center; gap: 0.6rem;
+  margin-bottom: 0.75rem; color: var(--muted); font-size: 0.85rem;
+}
+.chat-wait[hidden] { display: none; }
+.chat-status { margin: 0.5rem 0 0; min-height: 1.2em; color: var(--muted); font-size: 0.85rem; }
+
+/* Ayarlar modalindeki bölüm başlığı (Azure kimliği / Prompt Yönetmeni ayrımı) */
+.modal-subhead {
+  margin: 1.4rem 0 0; padding-top: 1rem; border-top: 1px solid var(--panel-2);
+  font-family: ui-serif, Georgia, serif; font-weight: 500; font-size: 1.02rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

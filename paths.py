@@ -53,6 +53,21 @@ def bundled_logos_dir() -> str:
     return os.path.join(resource_dir(), "bundled", "logos")
 
 
+def bundled_prompts_dir() -> str:
+    """Gömülü sistem talimatlarının dizini (Prompt Yönetmeni personası)."""
+    return os.path.join(resource_dir(), "bundled", "prompts")
+
+
+def chat_instructions_override() -> str:
+    """Kullanıcının düzenleyebildiği talimat dosyası (varsa gömülü olanı EZER).
+
+    data_dir()'de, resource_dir()'de DEĞİL: paket içeriği salt-okunur ve frozen'da
+    _MEIPASS her kapanışta siliniyor — oraya yazılan bir talimat kaybolur ve
+    paketlenmiş .app'te hiç düzenlenemez.
+    """
+    return os.path.join(data_dir(), "chat-instructions.md")
+
+
 def builtin_logo(variant: str) -> str:
     """Gömülü KURUM logosunun yolu. variant: "blue" | "white"."""
     if variant not in _LOGO_VARIANTS:

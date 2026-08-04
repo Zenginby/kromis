@@ -2,6 +2,7 @@ import re
 
 from fastapi.testclient import TestClient
 import app as appmod
+import models
 import version
 
 
@@ -506,10 +507,202 @@ def test_every_frontend_script_is_loaded_and_in_order():
     """
     client = TestClient(appmod.app)
     order = ["core.js", "folders.js", "assets.js", "palette.js", "settings.js",
-             "viewer.js"]
+             "viewer.js", "chat.js"]
     html = client.get("/").text
     positions = [html.find(f"/static/{name}") for name in order]
     assert all(p > 0 for p in positions), dict(zip(order, positions))
     assert positions == sorted(positions), "script sırası bozulmuş"
     for name in order:
         assert client.get(f"/static/{name}").status_code == 200, name
+
+
+# ── Prompt Yönetmeni (v1.13) ───────────────────────────────────────────
+
+def test_chat_workspace_markup_is_served():
+    """chat.js bu id'lere `$()` ile DOĞRUDAN bağlanıyor ve dosya EN SONDA yükleniyor.
+
+    Biri yeniden adlandırılırsa script yükleme anında patlar; chat.js sondaki
+    dosya olduğu için görsel sekmesi ayakta kalır ve kırılma yalnızca sohbete
+    girildiğinde fark edilir — ucuz tripwire o yüzden değerli.
+    """
+    html = TestClient(appmod.app).get("/").text
+    for element_id in ("tab-image", "tab-chat", "view-image", "view-chat",
+                       "chat-log", "chat-empty", "chat-input", "chat-send",
+                       "chat-clear", "chat-status", "chat-wait", "chat-gate",
+                       "set-chat-deployment", "chat-instructions-path"):
+        assert f'id="{element_id}"' in html, element_id
+
+
+def test_chat_tab_itself_is_not_disabled_in_the_markup():
+    """Kapı "Gönder"de: kilitli bir SEKME "neden kapalı" bilgisini de saklar.
+
+    Kullanıcı sekmeye girip Ayarlar'a yönlendiren açıklamayı okuyabilmeli.
+    """
+    html = TestClient(appmod.app).get("/").text
+    tab = re.search(r'id="tab-chat"[^>]*', html)
+    assert tab, "#tab-chat yok"
+    assert "disabled" not in tab.group(0), f"sekme kilitli: {tab.group(0)}"
+    js = TestClient(appmod.app).get("/static/settings.js").text
+    assert 'chat-send").disabled' in js, "Gönder kapısı kurulmamış"
+    assert 'chat-gate").hidden' in js, "kapı açıklaması yönetilmiyor"
+
+
+def test_chat_never_puts_server_text_into_innerhtml():
+    """GÜVENLİK TRIPWIRE: model metni DOM'a yalnızca textContent ile girer.
+
+    `innerHTML` bu dosyada TEK bir yerde, akışı boş dizeyle temizlemek için
+    geçebilir (core.js:renderExtras deseni). Model çıktısı için kullanılırsa
+    yanıttaki bir `<script>`/`onerror` yerel sunucu origin'inde çalışır.
+    """
+    js = TestClient(appmod.app).get("/static/chat.js").text
+    uses = re.findall(r"innerHTML\s*=\s*([^;]+);", js)
+    assert uses, "innerHTML hiç geçmiyor — temizleme yolu değişmiş, testi güncelle"
+    for value in uses:
+        assert value.strip() in ('""', "''"), f"innerHTML'e metin atanıyor: {value.strip()}"
+
+
+def test_chat_applies_only_settings_the_form_actually_offers():
+    """SAVUNMACI UYGULAMA TRIPWIRE'ı: `.options` kontrolü düşerse 422 gelir.
+
+    Yönetmen `2048x1152` önerirse ve değer doğrudan `select.value`'ya yazılırsa
+    tarayıcı onu SESSİZCE yok sayar (ya da boşa düşürür) — kullanıcı "Üret"e
+    basana kadar hiçbir şey görünmez, sonra sunucudan 422 alır.
+    """
+    js = TestClient(appmod.app).get("/static/chat.js").text
+    body = re.search(r"function applyIfSupported\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "applyIfSupported() bulunamadı"
+    assert ".options" in body.group(1), "seçenek listesi kontrol edilmiyor"
+
+
+def test_chat_says_out_loud_when_a_suggestion_could_not_be_applied():
+    """SESSİZ SAPMA YASAK — palette `applied: false` ile aynı gerekçe.
+
+    Uygulanamayan öneri söylenmezse kullanıcı formda başka bir ayar görür ve
+    sonucu açıklayamaz.
+    """
+    js = TestClient(appmod.app).get("/static/chat.js").text
+    assert "uygulanamadı" in js, "uygulanamayan öneri kullanıcıya söylenmiyor"
+
+
+def test_chat_does_not_truncate_an_oversized_prompt():
+    """Kırpılmış prompt SESSİZCE başka bir görsel üretir.
+
+    Sunucu 4000 karakteri aşan prompt'a 422 veriyor; doğru davranış kırpmak
+    değil, yönetmene kısaltmasını söylemek.
+    """
+    js = TestClient(appmod.app).get("/static/chat.js").text
+    assert "MAX_PROMPT_CHARS" in js, "prompt uzunluğu hiç kontrol edilmiyor"
+    body = re.search(r"function applyToForm\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "applyToForm() bulunamadı"
+    assert ".slice(0, MAX_PROMPT_CHARS" not in body.group(1), "prompt sessizce kırpılıyor"
+
+
+def test_client_never_sends_a_system_role():
+    """Sistem mesajını SUNUCU koyuyor; istemci persona'ya dokunmamalı.
+
+    Sunucu tarafı bunu 422 ile reddediyor (tests/test_chat_route.py), ama
+    istemcinin hiç denememesi gerekiyor — yoksa özellik ilk turda ölür.
+    """
+    js = TestClient(appmod.app).get("/static/chat.js").text
+    assert '"system"' not in js and "'system'" not in js
+
+
+def test_chat_prompt_char_limit_mirrors_the_server():
+    """İstemci sabiti sunucudakiyle AYNI olmak zorunda (MAX_EDIT_IMAGES geleneği)."""
+    js = TestClient(appmod.app).get("/static/core.js").text
+    match = re.search(r"const MAX_PROMPT_CHARS = (\d+);", js)
+    assert match, "MAX_PROMPT_CHARS istemcide tanımlı değil"
+    assert int(match.group(1)) == models.MAX_PROMPT_CHARS
+
+
+def test_chat_limits_mirror_the_server():
+    """Sohbet sınırları da aynalanmalı: aksi halde kullanıcı pydantic'in
+    İNGİLİZCE 422 metnini görür."""
+    js = TestClient(appmod.app).get("/static/chat.js").text
+    for name, expected in (("MAX_CHAT_MESSAGES", models.MAX_CHAT_MESSAGES),
+                           ("MAX_CHAT_MSG_CHARS", models.MAX_CHAT_MSG_CHARS),
+                           ("MAX_CHAT_TOTAL_CHARS", models.MAX_CHAT_TOTAL_CHARS)):
+        match = re.search(rf"const {name} = (\d+);", js)
+        assert match, f"{name} istemcide tanımlı değil"
+        assert int(match.group(1)) == expected, name
+
+
+def test_chat_does_not_reuse_the_image_progress_bar():
+    """`startProgress()` `.stage` içindeki düğümlere dokunuyor — o DİĞER sekmede.
+
+    Sohbetten çağrılsa gizli bir barı doldurur; kullanıcı hiçbir geri bildirim
+    görmez. Sohbetin kendi bekleme göstergesi var (#chat-wait).
+    """
+    js = TestClient(appmod.app).get("/static/chat.js").text
+    assert "startProgress" not in js, "sohbet görsel sekmesinin ilerleme barını kullanıyor"
+    assert "chat-wait" in js, "sohbetin bekleme göstergesi kurulmamış"
+
+
+def test_chat_scroll_helper_calls_the_native_dom_api():
+    """Sarmalayıcı, düğümün GERÇEK `scrollIntoView`'unu çağırmak zorunda.
+
+    Bir kez kırıldı ve bütün özelliği öldürdü: sarmalayıcı `scrollIntoView`'dan
+    `scrollMessageIntoView`'a yeniden adlandırılırken toplu değiştirme
+    `node.scrollIntoView(` çağrısının İÇİNİ de değiştirdi. Sonuç
+    `node.scrollMessageIntoView is not a function` — `appendUser()` içinde,
+    `sendChat`'in try bloğundan ÖNCE fırlıyor: istek hiç gitmiyor, spinner
+    çıkmıyor, kullanıcıya hata da yazılmıyor. "Gönder'e basınca hiçbir şey
+    olmuyor."
+
+    Bu sınıf hata pytest'in kör noktası: sözdizimi geçerli (`node --check`
+    geçiyor) ve sunucu tarafı etkilenmiyor. Ucuz tripwire o yüzden değerli.
+    """
+    js = TestClient(appmod.app).get("/static/chat.js").text
+    body = re.search(r"function scrollMessageIntoView\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "scrollMessageIntoView() bulunamadı"
+    assert ".scrollIntoView(" in body.group(1), (
+        "sarmalayıcı native scrollIntoView'u çağırmıyor — var olmayan bir DOM "
+        "metodu çağrılıyor ve gönderme sessizce ölür")
+
+
+def test_failed_turn_is_rolled_back_out_of_the_thread():
+    """Başarısız tur geçmişte kalırsa her yeniden gönderim aynı hatayı tekrarlar."""
+    js = TestClient(appmod.app).get("/static/chat.js").text
+    body = re.search(r"async function sendChat\(\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "sendChat() bulunamadı"
+    assert "chatThread.pop()" in body.group(1), "başarısız tur geçmişten çıkarılmıyor"
+
+
+def test_view_switching_updates_aria_selected():
+    """role="tab" verildiği anda ekran okuyucu seçili sekmeyi SINIFTAN değil
+    aria-selected'dan okur; yalnız `.active` güncellenirse durum yanlış duyurulur.
+    """
+    js = TestClient(appmod.app).get("/static/core.js").text
+    body = re.search(r"function showView\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "showView() bulunamadı"
+    assert "aria-selected" in body.group(1)
+    assert "hidden" in body.group(1)
+
+
+def test_apply_to_form_switches_to_the_image_view():
+    """Aktarma görünümü çevirmezse kullanıcı sohbette kalır ve prompt'un forma
+    girdiğini GÖRMEZ: "bir şey olmadı" sanıp ikinci kez basar, ayarlar da
+    sessizce ikinci kez ezilir.
+
+    Bu davranış bir kez ölçüm yüzünden şüpheye düştü: tarayıcı otomasyonunun
+    sayfa okuma adımı sekmeyi kendisi değiştirip odağı kaydırdığı için geçiş
+    "olmamış" göründü — davranış doğruydu, ölçüm yanlıştı. Tripwire o yüzden
+    burada: bir dahaki sefere cevap testten okunsun.
+    """
+    js = TestClient(appmod.app).get("/static/chat.js").text
+    body = re.search(r"function applyToForm\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "applyToForm() bulunamadı"
+    assert 'showView("image")' in body.group(1), (
+        "aktarma görsel sekmesine geçmiyor — kullanıcı sonucu görmez")
+    assert '$("prompt").focus()' in body.group(1), (
+        "prompt alanı odaklanmıyor — aktarılan metin gözle bulunabilmeli")
+
+
+def test_chat_view_is_hidden_on_first_paint():
+    """Açılışta görsel sekmesi seçili: sohbet paneli işaretlemede gizli gelmeli."""
+    html = TestClient(appmod.app).get("/").text
+    chat_view = re.search(r'<div id="view-chat"[^>]*>', html)
+    assert chat_view, "#view-chat yok"
+    assert "hidden" in chat_view.group(0), "sohbet paneli açılışta görünür"
+    image_view = re.search(r'<div id="view-image"[^>]*>', html)
+    assert "hidden" not in image_view.group(0), "görsel sekmesi açılışta gizli"

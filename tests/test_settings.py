@@ -134,3 +134,179 @@ def test_get_settings_status_not_configured(tmp_path, monkeypatch):
     status = ac.get_settings_status()
     assert status["configured"] is False
     assert status["endpoint"] is None
+
+
+# ── Birleştirmeli yazım (v1.13: sohbet ayarı aynı dosyada yaşıyor) ──────
+#
+# save_credentials v1.12'ye kadar dosyayı SIFIRDAN iki satır yazıyordu. Sohbet
+# dağıtımı aynı dosyada durduğu için o davranış "endpoint'i güncelle" eylemini
+# sessizce "Prompt Yönetmeni'ni kapat" eylemine çeviriyordu.
+
+def test_save_env_keeps_the_keys_it_was_not_asked_to_change(tmp_path):
+    envp = tmp_path / "credentials.env"
+    ac.save_credentials("KEY", "https://ep/openai/v1/", env_path=str(envp))
+    ac.save_env({"AZURE_CHAT_DEPLOYMENT": "gpt-5.6-luna"}, env_path=str(envp))
+
+    values = ac.read_env_values(str(envp))
+    assert values["AZURE_IMAGE_API_KEY"] == "KEY"
+    assert values["AZURE_IMAGE_BASE_URL"] == "https://ep/openai/v1/"
+    assert values["AZURE_CHAT_DEPLOYMENT"] == "gpt-5.6-luna"
+
+
+def test_saving_image_credentials_does_not_wipe_the_chat_deployment(tmp_path):
+    """REGRESYON: sıfırdan yazan save_credentials bu satırı siliyordu."""
+    envp = tmp_path / "credentials.env"
+    ac.save_env({"AZURE_CHAT_DEPLOYMENT": "gpt-5.6-luna"}, env_path=str(envp))
+    ac.save_credentials("KEY", "https://ep/openai/v1/", env_path=str(envp))
+
+    assert ac.read_env_values(str(envp))["AZURE_CHAT_DEPLOYMENT"] == "gpt-5.6-luna"
+
+
+def test_saving_the_chat_deployment_does_not_break_image_credentials(tmp_path):
+    """Aynanın öteki yüzü: sohbet ayarı görsel üretimini bozmamalı."""
+    envp = tmp_path / "credentials.env"
+    ac.save_credentials("KEY", "https://ep/openai/v1/", env_path=str(envp))
+    ac.save_env({"AZURE_CHAT_DEPLOYMENT": "gpt-5.6-luna"}, env_path=str(envp))
+
+    assert ac.load_credentials(env_path=str(envp)) == ("KEY", "https://ep/openai/v1/")
+
+
+def test_save_env_preserves_hand_written_extra_keys(tmp_path):
+    """Elle eklenmiş bir değişken sessizce silinmemeli (bilinen anahtar süzgeci YOK)."""
+    envp = tmp_path / "credentials.env"
+    envp.write_text("ELLE_YAZILMIS=deger\nAZURE_IMAGE_API_KEY=K\n", encoding="utf-8")
+    ac.save_env({"AZURE_CHAT_DEPLOYMENT": "d"}, env_path=str(envp))
+
+    assert ac.read_env_values(str(envp))["ELLE_YAZILMIS"] == "deger"
+
+
+def test_save_env_keeps_the_file_0600_and_the_directory_0700(tmp_path):
+    envp = tmp_path / "cfg" / "credentials.env"
+    ac.save_env({"AZURE_CHAT_DEPLOYMENT": "d"}, env_path=str(envp))
+
+    assert stat.S_IMODE(os.stat(envp).st_mode) == 0o600
+    assert stat.S_IMODE(os.stat(envp.parent).st_mode) == 0o700
+
+
+def test_save_env_rejects_newlines_in_values(tmp_path):
+    """Satır sonu taşıyan bir değer dosyaya İKİNCİ bir anahtar enjekte ederdi.
+
+    `chat_deployment` bir FORM alanı: uzunluk sınırı var ama içeriği serbest.
+    save_credentials'taki aynı guard bu yolda da olmak zorunda.
+    """
+    envp = tmp_path / "credentials.env"
+    with pytest.raises(ac.AzureImageError):
+        ac.save_env({"AZURE_CHAT_DEPLOYMENT": "d\nAZURE_IMAGE_API_KEY=kotu"},
+                    env_path=str(envp))
+    assert not envp.exists()
+
+
+def test_save_env_writes_an_empty_value_to_clear_a_setting(tmp_path):
+    envp = tmp_path / "credentials.env"
+    ac.save_env({"AZURE_CHAT_DEPLOYMENT": "gpt-5.6-luna"}, env_path=str(envp))
+    ac.save_env({"AZURE_CHAT_DEPLOYMENT": ""}, env_path=str(envp))
+
+    assert ac.read_env_values(str(envp)).get("AZURE_CHAT_DEPLOYMENT", "") == ""
+
+
+def test_read_env_values_merges_the_candidate_files(tmp_path, monkeypatch):
+    """Sohbet ayarı app dosyasında, görsel kimliği paylaşılan dosyada olabilir."""
+    app_env = tmp_path / "app.env"
+    default_env = tmp_path / "default.env"
+    app_env.write_text("AZURE_CHAT_DEPLOYMENT=gpt-5.6-luna\n", encoding="utf-8")
+    default_env.write_text("AZURE_IMAGE_API_KEY=SHARED\n"
+                           "AZURE_IMAGE_BASE_URL=https://shared/openai/v1/\n",
+                           encoding="utf-8")
+    monkeypatch.setattr(ac, "APP_ENV_PATH", str(app_env))
+    monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", str(default_env))
+
+    values = ac.read_env_values()
+    assert values["AZURE_CHAT_DEPLOYMENT"] == "gpt-5.6-luna"
+    assert values["AZURE_IMAGE_API_KEY"] == "SHARED"
+
+
+def test_read_env_values_lets_the_first_non_empty_value_win(tmp_path, monkeypatch):
+    """Boş bir app değeri, dolu paylaşılan değeri GÖLGELEMEMELİ.
+
+    `_first_complete_credentials`'ın fallback semantiğinin aynısı: yarım
+    doldurulmuş app dosyası çalışan kurulumu bozmasın.
+    """
+    app_env = tmp_path / "app.env"
+    default_env = tmp_path / "default.env"
+    app_env.write_text("AZURE_IMAGE_API_KEY=\n", encoding="utf-8")
+    default_env.write_text("AZURE_IMAGE_API_KEY=SHARED\n", encoding="utf-8")
+    monkeypatch.setattr(ac, "APP_ENV_PATH", str(app_env))
+    monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", str(default_env))
+
+    assert ac.read_env_values()["AZURE_IMAGE_API_KEY"] == "SHARED"
+
+
+# ── Sohbet kimliği çözümü ve durum alanları ────────────────────────────
+
+def test_resolve_chat_credentials_falls_back_to_the_image_credentials(tmp_path, monkeypatch):
+    app_env = tmp_path / "app.env"
+    app_env.write_text("AZURE_IMAGE_API_KEY=K\n"
+                       "AZURE_IMAGE_BASE_URL=https://ep/openai/v1/\n"
+                       "AZURE_CHAT_DEPLOYMENT=gpt-5.6-luna\n", encoding="utf-8")
+    monkeypatch.setattr(ac, "APP_ENV_PATH", str(app_env))
+    monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", str(tmp_path / "no.env"))
+
+    assert ac.resolve_chat_credentials() == ("K", "https://ep/openai/v1/", "gpt-5.6-luna")
+
+
+def test_resolve_chat_credentials_prefers_the_chat_specific_keys(tmp_path, monkeypatch):
+    """Ayrı bir sohbet kaynağı kullanılabilsin (elle yazılan AZURE_CHAT_*)."""
+    app_env = tmp_path / "app.env"
+    app_env.write_text("AZURE_IMAGE_API_KEY=IMGKEY\n"
+                       "AZURE_IMAGE_BASE_URL=https://img/openai/v1/\n"
+                       "AZURE_CHAT_API_KEY=CHATKEY\n"
+                       "AZURE_CHAT_BASE_URL=https://chat/openai/v1/\n"
+                       "AZURE_CHAT_DEPLOYMENT=d\n", encoding="utf-8")
+    monkeypatch.setattr(ac, "APP_ENV_PATH", str(app_env))
+    monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", str(tmp_path / "no.env"))
+
+    assert ac.resolve_chat_credentials() == ("CHATKEY", "https://chat/openai/v1/", "d")
+
+
+def test_status_exposes_the_chat_deployment_but_never_a_key(tmp_path, monkeypatch):
+    app_env = tmp_path / "app.env"
+    app_env.write_text("AZURE_IMAGE_API_KEY=SECRET\n"
+                       "AZURE_IMAGE_BASE_URL=https://ep/openai/v1/\n"
+                       "AZURE_CHAT_API_KEY=CHATSECRET\n"
+                       "AZURE_CHAT_DEPLOYMENT=gpt-5.6-luna\n", encoding="utf-8")
+    monkeypatch.setattr(ac, "APP_ENV_PATH", str(app_env))
+    monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", str(tmp_path / "no.env"))
+
+    status = ac.get_settings_status()
+    assert status["chat_deployment"] == "gpt-5.6-luna"
+    assert status["chat_configured"] is True
+    assert "SECRET" not in str(status)
+    assert "CHATSECRET" not in str(status)
+    assert "api_key" not in status and "key" not in status
+
+
+def test_chat_is_not_configured_without_a_deployment_name(tmp_path, monkeypatch):
+    """Dağıtım adı olmadan sohbet çalışamaz → arayüz kapısı kapalı kalmalı."""
+    app_env = tmp_path / "app.env"
+    app_env.write_text("AZURE_IMAGE_API_KEY=K\n"
+                       "AZURE_IMAGE_BASE_URL=https://ep/openai/v1/\n", encoding="utf-8")
+    monkeypatch.setattr(ac, "APP_ENV_PATH", str(app_env))
+    monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", str(tmp_path / "no.env"))
+
+    status = ac.get_settings_status()
+    assert status["chat_configured"] is False
+    assert status["chat_deployment"] == ""
+
+
+def test_chat_is_not_configured_without_any_credentials(tmp_path, monkeypatch):
+    """Dağıtım adı tek başına yetmez: key/url yoksa istek Türkçe hatayla ölür.
+
+    Kapı burada kapanmazsa arayüz sohbeti AÇAR ve kullanıcı ilk mesajında
+    502 görür — teşhisi zor, oysa sebep basit.
+    """
+    app_env = tmp_path / "app.env"
+    app_env.write_text("AZURE_CHAT_DEPLOYMENT=gpt-5.6-luna\n", encoding="utf-8")
+    monkeypatch.setattr(ac, "APP_ENV_PATH", str(app_env))
+    monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", str(tmp_path / "no.env"))
+
+    assert ac.get_settings_status()["chat_configured"] is False

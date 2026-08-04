@@ -2,14 +2,39 @@
 //
 // Klasik script (ES module DEĞİL): bütün parçalar TEK global kapsamı paylaşır
 // ve index.html'deki yükleme SIRASI bağlayıcıdır:
-//   core.js → folders.js → assets.js → palette.js → settings.js
+//   core.js → folders.js → assets.js → palette.js → settings.js → viewer.js → chat.js
 // Her dosya yüklenirken yalnızca kendi DOM dinleyicilerini kurar; başka bir
 // dosyadaki ada ancak olay anında dokunur — bu yüzden sıra TDZ hatası üretmez.
-// Açılış çağrılarının tamamı en sonda, settings.js'in dibinde toplanır.
+// Açılış çağrılarının tamamı settings.js'in dibinde toplanır.
 
 const $ = (id) => document.getElementById(id);
 const statusEl = $("status");
 const ACCEPTED_UPLOAD_TYPES = ["image/png", "image/jpeg", "image/webp"];
+
+// Sunucudaki models.MAX_PROMPT_CHARS ile AYNI olmak zorunda (MAX_EDIT_IMAGES
+// geleneği): yönetmenin ürettiği prompt buraya sığmıyorsa forma yazmak yerine
+// kısaltılması isteniyor — sunucu aksi halde 422 döner.
+const MAX_PROMPT_CHARS = 4000;
+
+// ── Çalışma alanı sekmeleri ─────────────────────────────────────────
+// Kabuk sorumluluğu, sohbete özel DEĞİL: bu yüzden chat.js'te değil burada.
+// chat.js yalnızca showView("image") çağırıyor, böylece sadece kendinden
+// önceki dosyalara bakan bir yaprak kalıyor ve yükleme sırası bozulmuyor.
+const VIEWS = { image: ["view-image", "tab-image"], chat: ["view-chat", "tab-chat"] };
+
+function showView(name) {
+  for (const [key, [viewId, tabId]] of Object.entries(VIEWS)) {
+    const active = key === name;
+    $(viewId).hidden = !active;
+    $(tabId).classList.toggle("active", active);
+    // aria-selected tel üzerinde güncellenmeli: role="tab" verildiği anda
+    // ekran okuyucu hangi sekmenin seçili olduğunu SINIFTAN değil bundan okur.
+    $(tabId).setAttribute("aria-selected", active ? "true" : "false");
+  }
+}
+
+$("tab-image").addEventListener("click", () => showView("image"));
+$("tab-chat").addEventListener("click", () => showView("chat"));
 
 // Ana referans görsel: null | { kind: "upload", file, label } | { kind: "gallery", id, label }
 let source = null;

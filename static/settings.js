@@ -2,14 +2,17 @@
 //
 // Klasik script (ES module DEĞİL): bütün parçalar TEK global kapsamı paylaşır
 // ve index.html'deki yükleme SIRASI bağlayıcıdır:
-//   core.js → folders.js → assets.js → palette.js → settings.js
+//   core.js → folders.js → assets.js → palette.js → settings.js → viewer.js → chat.js
 // Her dosya yüklenirken yalnızca kendi DOM dinleyicilerini kurar; başka bir
 // dosyadaki ada ancak olay anında dokunur — bu yüzden sıra TDZ hatası üretmez.
-// Açılış çağrılarının tamamı en sonda, settings.js'in dibinde toplanır.
+// Açılış çağrıları bu dosyanın dibinde toplanır; chat.js sonra yükleniyor ama
+// sorun değil — aşağıdaki kapı yalnızca DOM id'lerine dokunuyor.
 
 // ── Azure ayarları (admin, write-only) ──────────────────────────────
 // API key hiçbir zaman sunucudan çekilmez/gösterilmez; sadece yazılır.
+// Dağıtım adı GİZLİ DEĞİL: GET'ten geliyor ve forma önceden doluyor.
 let configured = false;
+let chatConfigured = false;   // chat.js okuyor (o dosya BUNDAN SONRA yükleniyor)
 
 function applyConfigured(s) {
   configured = !!(s && s.configured);
@@ -28,6 +31,21 @@ function applyConfigured(s) {
   // için çağrılıyor; guard MEKANİZMANIN PARÇASI — olmadan "Kaydet"ten sonra
   // sürüm satırı silinirdi.
   if (s && s.version) $("settings-version").textContent = s.version;
+
+  // ── Prompt Yönetmeni kapısı ──
+  // Sekmenin KENDİSİ kilitlenmiyor: kilitli bir sekme "neden kapalı" bilgisini
+  // de saklar. Yalnızca "Gönder" kilitli ve panelde açıklama görünüyor.
+  chatConfigured = !!(s && s.chat_configured);
+  $("chat-send").disabled = !chatConfigured;
+  $("chat-gate").hidden = chatConfigured;
+  // `!== undefined`: boş dize "temizlendi" demek ve forma YANSIMASI gerekir.
+  if (s && s.chat_deployment !== undefined) {
+    $("set-chat-deployment").value = s.chat_deployment;
+  }
+  // Yalnızca GET'te var (yol çalışma anında değişmez) — version ile aynı guard.
+  if (s && s.chat_instructions_path) {
+    $("chat-instructions-path").textContent = s.chat_instructions_path;
+  }
 }
 
 async function loadSettings(openIfMissing) {
@@ -47,6 +65,9 @@ async function loadSettings(openIfMissing) {
 
 function openSettings() {
   $("set-key").value = ""; // her açılışta boş (write-only)
+  // #set-chat-deployment BİLEREK temizlenmiyor: write-only değil, GET'ten dolu
+  // geliyor. Temizlenirse kullanıcı endpoint'ini güncellemek için modalı açıp
+  // kaydettiğinde dağıtım adını da silmiş olurdu.
   $("settings-status").textContent = "";
   $("settings-modal").hidden = false;
   setTimeout(() => $("set-endpoint").focus(), 0);
@@ -69,7 +90,11 @@ async function saveSettings() {
     const res = await fetch("/api/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ api_key, base_url }),
+      // chat_deployment HER ZAMAN gönderiliyor: sunucu "alan yok" ile "boş"
+      // arasında ayrım yapıyor (bkz. models.SettingsRequest) ve boş dize
+      // "Prompt Yönetmeni'ni kapat" demek.
+      body: JSON.stringify({ api_key, base_url,
+                             chat_deployment: $("set-chat-deployment").value.trim() }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

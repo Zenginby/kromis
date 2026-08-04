@@ -10,6 +10,9 @@ Ortak duruş: her modelde `extra="forbid"`. Pydantic varsayılanı bilinmeyen al
 SESSİZCE yok sayar — eski bir sunucu süreci yeni arayüzün seçeneklerini
 görmezden gelip 200 döndürür ve kullanıcı "ayar çalışmıyor" der. Tek istisna
 `SettingsRequest`: kimlik bilgisi formu, alan kümesi arayüzle birebir sabit.
+O istisnanın bedeli v1.13'te görüldü — forma `chat_deployment` eklenince eski
+bir istemcinin alanı HİÇ göndermemesi ile BOŞ göndermesi ayırt edilemez hale
+geldi; ayrım `None` varsayılanıyla kuruldu (bkz. alanın yorumu).
 """
 from __future__ import annotations
 
@@ -137,6 +140,18 @@ class SettingsRequest(BaseModel):
     # api_key boş bırakılabilir: mevcut key korunur (endpoint'i tek başına güncelleme).
     api_key: str = Field(default="", max_length=500)
     base_url: str = Field(min_length=1, max_length=500)
+    # Prompt Yönetmeni'nin Azure DAĞITIM adı (model ailesi adı değil).
+    #
+    # `None` ile `""` BİLEREK ayrı anlam taşıyor — api_key'in aksine burada üç
+    # durum var, iki değil:
+    #   None : alan hiç gönderilmedi → DOKUNMA. Bayat bir settings.js (cache-
+    #          buster'ı atlatmış bir kopya) endpoint kaydettiğinde Prompt
+    #          Yönetmeni'ni sessizce kapatmasın diye.
+    #   ""   : kullanıcı alanı boşalttı → TEMİZLE (sohbeti kapat).
+    #   dolu : kaydet.
+    # Gizli bilgi olmadığı için `GET /api/settings` bu alanı geri döndürüyor ve
+    # form önceden dolu geliyor; o yüzden write-only değil.
+    chat_deployment: str | None = Field(default=None, max_length=200)
 
 
 class FolderRequest(BaseModel):
@@ -261,6 +276,55 @@ class LogoRequest(BaseModel):
     def _asset_kind_ok(cls, v):
         if v not in OVERLAY_ASSET_KINDS:
             raise ValueError("geçersiz asset_kind")
+        return v
+
+
+# ── Prompt Yönetmeni sohbeti ───────────────────────────────────────────
+#
+# Geçmiş yalnızca istemcide yaşıyor (diske yazılmıyor), yani her turda tel
+# üzerinden TAMAMI geliyor. Sınırlar bu yüzden burada: ~9 bin karakterlik sistem
+# talimatının üstüne sınırsız bir geçmiş binerse token maliyeti sessizce patlar.
+MAX_CHAT_MESSAGES = 24          # ~12 tur
+MAX_CHAT_MSG_CHARS = 6000       # tek mesaj
+MAX_CHAT_TOTAL_CHARS = 60000    # tüm geçmiş — mesaj sayısı × tek mesajdan DAHA DAR
+CHAT_ROLES = {"user", "assistant"}
+
+
+class ChatMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # "system" BİLEREK KABUL EDİLMİYOR: sistem mesajını sunucu koyuyor. İzin
+    # verilse istemci persona'yı tümden değiştirebilirdi ve `extra="forbid"` bunu
+    # YAKALAMAZ — `role` geçerli bir alan, kabul edilmeyen şey DEĞERİ.
+    role: str
+    content: str = Field(min_length=1, max_length=MAX_CHAT_MSG_CHARS)
+
+    @field_validator("role")
+    @classmethod
+    def _role_ok(cls, v):
+        if v not in CHAT_ROLES:
+            raise ValueError("geçersiz role")
+        return v
+
+
+class ChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    messages: list[ChatMessage] = Field(min_length=1, max_length=MAX_CHAT_MESSAGES)
+
+    @field_validator("messages")
+    @classmethod
+    def _messages_ok(cls, v):
+        # `min_length` bu validator'dan ÖNCE koşuyor (ölçüldü: boş liste
+        # `too_short` veriyor), yani buraya boş liste gelmez. Guard yine de
+        # duruyor: sınır bir gün kaldırılırsa `v[-1]` IndexError → 500 olurdu.
+        if not v:
+            raise ValueError("en az bir mesaj gerekli")
+        if v[-1].role != "user":
+            # Son mesaj asistandaysa model kendi cevabını yeniden üretmeye çalışır.
+            raise ValueError("son mesaj kullanıcıdan olmalı")
+        if sum(len(m.content) for m in v) > MAX_CHAT_TOTAL_CHARS:
+            raise ValueError("sohbet çok uzun: yeni bir sohbet başlat")
         return v
 
 

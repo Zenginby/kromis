@@ -64,7 +64,16 @@ denenmedi) ve adımların ekran görüntüleri. -->
 Key bilgisayarında `~/.config/gpt-image-studio/credentials.env` dosyasında, yalnız
 senin okuyabileceğin izinle saklanır ve bir daha ekranda gösterilmez.
 
-## 4. Kullan
+## 4. Prompt Yönetmeni'ni aç (istersen)
+Aynı Ayarlar penceresinde, **Prompt Yönetmeni (sohbet modeli)** başlığının altındaki
+**Dağıtım adı** alanına Kurum'dan aldığın adı yaz (ör. `gpt-5.6-luna`) → **Kaydet**.
+
+Bu, Azure AI Foundry'deki **deployment** adıdır; model ailesi adı değil. Boş
+bırakırsan üst bardaki "Prompt Yönetmeni" sekmesi açılır ama **Gönder** kilitli
+kalır ve nedenini panelde yazar. Sohbet, görselinkiyle aynı endpoint ve API
+anahtarını kullanır — ikinci bir anahtar girmen gerekmez.
+
+## 5. Kullan
 Prompt yaz → **Üret**. Ürettiğin görseller bilgisayarında
 `~/Library/Application Support/GPT-Image Studio/output/` altında saklanır;
 uygulamayı kapatıp açsan da geçmişin durur.
@@ -82,3 +91,6 @@ gerekmez — ama `Application Support` klasörünü SİLME, geçmişin orada.
 - **Pencere boş açılıyor:** uygulamayı kapat, tekrar aç.
 - **"Üret" kilitli:** Ayarlar (dişli) → endpoint + key girilmiş mi?
 - **Görsel üretilmiyor, hata mesajı çıkıyor:** key süresi/rotasyonu için Kurum'ya yaz.
+- **Prompt Yönetmeni'nde "Gönder" kilitli:** Ayarlar → **Dağıtım adı** boş.
+- **"Sohbet dağıtımı bulunamadı (404)":** yazdığın dağıtım adı Azure'daki adla
+  birebir aynı değil. Kurum'ya doğru adı sor.

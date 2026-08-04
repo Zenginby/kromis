@@ -161,6 +161,13 @@ async def _read_upload_png(upload: UploadFile) -> bytes:
     return _to_png(raw)
 
 
+def _png_dimensions(data: bytes) -> str:
+    """PNG baytlarından `"GENİŞLİKxYÜKSEKLİK"`. Üretimde bu alan Azure'ın boyut
+    dizesi; içe aktarmada uydurulacak bir değer yok, gerçek çözünürlük yazılır."""
+    with Image.open(io.BytesIO(data)) as im:
+        return f"{im.width}x{im.height}"
+
+
 async def _extra_refs(request: Request) -> tuple[list[UploadFile], list[str]]:
     """Ek referansları form verisinden okur: (yüklemeler, galeri id'leri).
 
@@ -611,6 +618,44 @@ def delete_images(req: BulkImagesRequest) -> dict:
     if not deleted:
         raise HTTPException(status_code=404, detail="Görsel bulunamadı.")
     return {"deleted": deleted}
+
+
+@app.post("/api/import")
+async def import_image(request: Request,
+                      file: UploadFile = File(...),
+                      folder_id: str | None = Form(None)) -> dict:
+    """Bilgisayardan sürüklenen bir görseli galeriye (isteğe bağlı klasöre) aktarır.
+
+    ÜRETİMDEN DOĞMAYAN ilk kayıt türü: prompt yok, palet yok, Azure'a hiç
+    çıkılmaz. Dosya `_read_upload_png` ile doğrulanıp PNG'ye YENİDEN KODLANIR —
+    `/output/{filename}`, `storage.delete` ve `_output_png_path` dosyanın
+    `{id}.png` olduğunu varsayıyor; JPEG olduğu gibi kaydedilirse kayıt görünür
+    ama görsel açılmaz.
+
+    Sıra bilinçli: content-length → klasör → gövde. Geçersiz bir klasör için
+    10 MB'ı okumak boşuna iş.
+
+    Dosya başına TEK istek: arayüz çoklu bırakmayı sıraya koyuyor. Toplu bir uç
+    yok, çünkü `storage.save` her kayıtta history.json'ın tamamını yeniden
+    yazıyor ve eşzamanlılık kayıp güncelleme üretir.
+    """
+    content_length = request.headers.get("content-length")
+    if content_length is not None and content_length.isdigit() and int(content_length) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Dosya çok büyük (maks 10 MB).")
+    target_folder = _check_folder(folder_id)
+    png = await _read_upload_png(file)
+
+    # Dosya adı yalnızca ETİKET (galeri başlığı/alt metni); kayıt adı uuid'den
+    # geliyor. basename yol parçalarını düşürür, kırpma başlığı taşırmaz.
+    label = os.path.basename(file.filename or "").strip()[:120] or "içe aktarılan görsel"
+    record = storage.save(
+        png,
+        {"prompt": label, "size": _png_dimensions(png), "quality": "",
+         "parent_id": None, "folder_id": target_folder,
+         "palette": None, "prompt_sent": None, "imported": True},
+        OUTPUT_DIR, now=_now(),
+    )
+    return {"image": record}
 
 
 @app.post("/api/palette/suggest")

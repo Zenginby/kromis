@@ -516,6 +516,15 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 .preview-clear:hover { background: var(--panel); color: var(--accent); }
 
 .gallery-wrap { margin: 0 var(--space) var(--space); }
+/* Bilgisayardan dosya sürüklenirken bulunulan görünüm hedef olduğunu gösterir.
+   OUTLINE, border DEĞİL: kenarlık bölgeyi büyütür, kartlar zıplar ve imleç
+   altındaki klasör kartı yerinden oynar — bırakmak istediğin hedef kaçar.
+   outline yerleşimin dışında çizilir. (.stage.dragover aynı dili kullanıyor.) */
+.gallery-wrap {
+  outline: 2px dashed transparent; outline-offset: -6px;
+  transition: outline-color var(--dur) var(--ease), background var(--dur);
+}
+.gallery-wrap.dropzone { outline-color: var(--accent); background: oklch(30% 0.045 45); }
 .gallery-wrap h2 { margin: 0; font-family: ui-serif, Georgia, serif; font-weight: 500; }
 
 /* Klasörler */
@@ -585,6 +594,14 @@ body.dnd-active .folder-cell .folder-open { border-style: dashed; border-color: 
 }
 .card:hover .card-del, .card-del:focus-visible { opacity: 1; transform: scale(1); }
 .card-del:hover { background: oklch(55% 0.2 25); }
+/* İçe aktarılan görselin işareti. Dekoratif değil BİLGİ: bu kaydın prompt'u yok,
+   başlığı dosya adı. pointer-events kapalı — kartın tıklama/sürükleme alanını yemesin. */
+.card-badge {
+  position: absolute; top: 6px; left: 6px; z-index: 2; pointer-events: none;
+  padding: 0.12rem 0.4rem; border-radius: 999px;
+  background: oklch(25% 0.02 260 / 0.82); color: var(--muted);
+  font-size: 0.62rem; letter-spacing: 0.02em; line-height: 1.5;
+}
 .card img:hover { transform: scale(1.03); }
 .card .acts { display: flex; gap: 0.3rem; padding: 0.4rem; }
 .card .acts a, .card .acts button {

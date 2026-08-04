@@ -44,6 +44,10 @@ arm64 runner'ında (macos-14) aynı spec ve `build.sh` ile üretilir. Actions �
   (kalanların sırası korunur; çıkarıp kaydedince palet o renksiz donar)
 - Damlalık: ekranın her yerinden renk seçme — tarayıcıda EyeDropper API,
   paketlenmiş uygulamada macOS NSColorSampler (WKWebView'da EyeDropper yok)
+- Bilgisayardan içe aktarma: görseli klasör kartına ya da galeri alanına
+  sürükleyip bırakınca o klasöre kaydedilir (çoklu dosya, PNG'ye kodlanır,
+  kartta "içe aktarıldı" işareti). Merkez alana bırakmak değişmedi: orası
+  hâlâ "referans görsel olarak yükle"
 
 ## Sonraya (v2)
 - Maske ile bölgesel düzenleme (inpainting)

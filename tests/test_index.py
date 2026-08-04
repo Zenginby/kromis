@@ -132,6 +132,104 @@ def test_swatch_colour_is_set_without_the_background_shorthand():
         "background kısayolu background-image'ı eziyor")
 
 
+def test_gallery_accepts_dropped_files_from_the_computer():
+    """Bırakma yolunun teli: `/api/import` + `importFiles`.
+
+    Uç yeniden adlandırılır ya da çağrı düşerse sürükle-bırak SESSİZCE hiçbir
+    şey yapmaz — hata mesajı da yok, dosya da girmez. Ucuz tripwire o yüzden
+    değerli: kırılma yalnızca gerçek bir fare sürüklemesiyle görülür.
+    """
+    js = TestClient(appmod.app).get("/static/folders.js").text
+    assert "/api/import" in js, "içe aktarma ucu çağrılmıyor"
+    assert "function importFiles" in js
+    # bulunulan klasör/kök hedefi: şeritte kendi kartı olmayan klasöre de aktarılabilmeli
+    assert "gallery-wrap" in js, "görseller alanı bırakma bölgesi kurulmamış"
+
+
+def test_folder_drop_target_serves_both_move_and_import():
+    """Tek hedef iki iş yapıyor: iç taşıma + dosya aktarma.
+
+    `stopPropagation` DÜŞERSE olay `.gallery-wrap` bölgesine çıkar ve aynı
+    dosya İKİ KEZ aktarılır (biri klasöre, biri bulunulan görünüme). Kullanıcı
+    bunu "bazen iki kopya oluşuyor" diye görür; teşhisi zor, veri kirliliği
+    kalıcı.
+    """
+    js = TestClient(appmod.app).get("/static/folders.js").text
+    body = re.search(r"function makeDropTarget\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "makeDropTarget() bulunamadı"
+    assert "hasFiles" in body.group(1), "klasör kartı dosya bırakmayı kabul etmiyor"
+    assert "stopPropagation" in body.group(1), "çift aktarma guard'ı yok"
+    assert "IMAGE_DND_TYPE" in js, "iç taşıma yolu düşmüş"
+
+
+def test_import_is_sequential_not_parallel():
+    """Aktarma dosyaları SIRAYLA göndermek zorunda.
+
+    `storage.save` her kayıtta history.json'ın TAMAMINI yeniden yazıyor.
+    İstekler paralel giderse ikisi aynı listeyi okur, ikincisi birincisinin
+    kaydını ezer: dosyalar diske yazılmış olur ama galeride görünmez —
+    kaybın hiçbir hata mesajı yok. (`set_folder_many`/`delete_many`'nin
+    "tek yazım" gerekçesiyle aynı sebep.)
+    """
+    js = TestClient(appmod.app).get("/static/folders.js").text
+    body = re.search(r"async function importFiles\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "importFiles() bulunamadı"
+    assert "await fetch" in body.group(1), "istekler beklenmiyor"
+    assert "Promise.all(batch" not in body.group(1), "dosyalar paralel gönderiliyor"
+
+
+def test_drop_highlight_cleanup_runs_in_the_capture_phase():
+    """Temizlik YAKALAMA fazında dinlenmek zorunda.
+
+    Klasör kartının `drop` dinleyicisi çift aktarmayı önlemek için
+    `stopPropagation` çağırıyor; balonlanan bir temizlik dinleyicisi o yüzden
+    hiç koşmaz ve kartın üstüne bırakınca galeri alanının kesikli çerçevesi
+    ekranda TAKILI kalır (canlı ölçüldü). Yakalama fazı hedeften önce koşar.
+    """
+    js = TestClient(appmod.app).get("/static/folders.js").text
+    assert re.search(r'addEventListener\(evt,\s*clearDropHighlights,\s*true\)', js), (
+        "vurgu temizliği yakalama fazında değil — stopPropagation onu yutar")
+
+
+def test_imported_card_is_marked_in_the_gallery():
+    """İçe aktarılan görsel üretilmiş gibi görünmemeli (etiket + CSS birlikte)."""
+    js = TestClient(appmod.app).get("/static/folders.js").text
+    css = TestClient(appmod.app).get("/static/style.css").text
+    assert "card-badge" in js and "rec.imported" in js
+    assert ".card-badge" in css, "işaretin stili yok → görünmez kalır"
+
+
+def test_dropzone_highlight_does_not_shift_the_layout():
+    """Vurgu `outline` ile yapılmalı, `border` ile değil.
+
+    Sürükleme sırasında kenarlık eklemek bölgeyi büyütür: kartlar zıplar ve
+    imleç altındaki hedef kayar — bırakmak istediğin klasör yerinden oynar.
+    `outline` yerleşimin dışında çizilir. (.stage.dragover da aynı dili
+    kullanıyor.)
+    """
+    css = TestClient(appmod.app).get("/static/style.css").text
+    rule = re.search(r"\.gallery-wrap\.dropzone\s*\{([^}]*)\}", css, re.S)
+    assert rule, ".gallery-wrap.dropzone kuralı yok"
+    assert "outline" in rule.group(1)
+    assert "border:" not in rule.group(1), "kenarlık yerleşimi kaydırır"
+
+
+def test_folder_hint_is_visible_without_any_folder():
+    """İpucu klasör yokken de görünmeli.
+
+    v1.11'e kadar `#folder-hint` yalnızca klasör varken açılıyordu (metin
+    yalnız taşımayı anlatıyordu). Artık dosya bırakmayı da anlatıyor ve o
+    özellik klasör olmadan da çalışıyor: gizli kalırsa yeni kullanıcı
+    keşfedemez.
+    """
+    html = TestClient(appmod.app).get("/").text
+    hint = re.search(r'<p id="folder-hint"[^>]*>', html)
+    assert hint, "#folder-hint yok"
+    assert "hidden" not in hint.group(0), "ipucu başlangıçta gizli"
+    js = TestClient(appmod.app).get("/static/folders.js").text
+    assert "function renderFolderHint" in js
+
+
 def test_eyedropper_has_a_native_bridge_branch():
     """Damlalık pakette NATIVE köprüden geçmek zorunda.
 

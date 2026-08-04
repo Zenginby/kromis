@@ -52,8 +52,23 @@ function folderSubtree(id) {
 // Böylece dosya sürükleme (stage'e görsel bırakma) ile karışmaz.
 const IMAGE_DND_TYPE = "application/x-gpt-image-id";
 
-// Şerit ipucusunun normal (seçim dışı) metni — seçim modunda geçici olarak değişir
+// Şerit ipucusunun normal (seçim dışı) metni — seçim modunda geçici olarak değişir.
+// İki cümle iki farklı koşula bağlı: TAŞIMA yalnız klasör varken anlamlı, İÇE
+// AKTARMA her zaman geçerli (klasör hiç yokken de görseller alanına bırakılabilir).
+// v1.11'e kadar ipucu klasör yokken hiç görünmüyordu; bırakma özelliği o yüzden
+// yeni kullanıcı için keşfedilemez kalırdı.
 const FOLDER_HINT_DEFAULT = "Bir görseli klasör kartına sürükleyip bırakarak taşıyabilirsin.";
+const FOLDER_HINT_IMPORT =
+  "Bilgisayarındaki bir görseli klasör kartına ya da bu alana bırakarak içe aktarabilirsin.";
+
+function renderFolderHint() {
+  const el = $("folder-hint");
+  el.hidden = false;
+  if (selectMode) return;   // seçim modunda metni syncSelectUI yönetiyor
+  el.textContent = folderCache.length
+    ? `${FOLDER_HINT_DEFAULT} ${FOLDER_HINT_IMPORT}`
+    : FOLDER_HINT_IMPORT;
+}
 
 function renderFolderTarget() {
   const el = $("folder-target");
@@ -78,7 +93,7 @@ function syncFolderView() {
     : "Klasörler";
   $("images-title").textContent = inFolder ? "Klasördeki görseller" : "Klasörsüz görseller";
   // Şerit klasör içinde de görünür: taşıma hedefleri oradan geliyor.
-  $("folder-hint").hidden = !folderCache.length;
+  renderFolderHint();
   renderFolderTarget();
   renderFolders();
 }
@@ -92,7 +107,7 @@ async function loadFolders() {
     folderCache = [];
     statusEl.textContent = "Klasörler alınamadı.";
   }
-  $("folder-hint").hidden = !folderCache.length;
+  renderFolderHint();
   renderFolders();
 }
 
@@ -122,23 +137,93 @@ async function moveImages(imageId, folderId, targetName) {
   }
 }
 
-// Bir öğeyi görsel-bırakma hedefi yapar (klasör kartı / "Klasörsüz" kartı)
+// Bir seferde aktarılacak azami dosya. Aşan kısım KIRPILIR ve söylenir —
+// sessiz kırpma "hepsini aktardım" gibi görünür.
+const MAX_IMPORT_FILES = 20;
+
+// Bilgisayardan bırakılan dosyaları hedefe (klasör ya da kök) aktarır.
+//
+// SIRAYLA gönderilir, paralel DEĞİL: sunucuda her aktarma history.json'ın
+// TAMAMINI yeniden yazıyor; eşzamanlı istekler aynı listeyi okur ve biri
+// diğerinin kaydını ezer — dosya diskte olur, galeride görünmez, hiçbir hata
+// mesajı da çıkmaz. (storage.set_folder_many/delete_many'nin "tek yazım"
+// gerekçesiyle aynı sebep.)
+async function importFiles(fileList, folderId, targetName) {
+  const dropped = [...fileList];
+  const images = dropped.filter((f) => ACCEPTED_UPLOAD_TYPES.includes(f.type));
+  // Finder'dan bir KLASÖR sürüklenirse tür boş gelir → buradan elenir.
+  const wrongType = dropped.length - images.length;
+  const batch = images.slice(0, MAX_IMPORT_FILES);
+  const overflow = images.length - batch.length;
+  if (!batch.length) {
+    statusEl.textContent = dropped.length
+      ? "PNG, JPEG veya WebP bir görsel bırak."
+      : "Bırakılan dosya okunamadı.";
+    return;
+  }
+
+  const failures = [];
+  let done = 0;
+  for (const file of batch) {
+    statusEl.textContent = `"${targetName}" içine aktarılıyor… ${done + 1}/${batch.length}`;
+    const fd = new FormData();
+    fd.append("file", file);
+    if (folderId) fd.append("folder_id", folderId);
+    try {
+      const res = await fetch("/api/import", { method: "POST", body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(detailText(err) || `Hata (${res.status})`);
+      }
+      done++;
+    } catch (e) {
+      // Tek dosyanın hatası kalanları düşürmez; hepsi sonda sayılır.
+      failures.push(`${file.name}: ${e.message}`);
+    }
+  }
+
+  statusEl.textContent = [
+    done
+      ? (done > 1 ? `${done} görsel "${targetName}" içine aktarıldı.`
+                  : `Görsel "${targetName}" içine aktarıldı.`)
+      : "Hiçbir görsel aktarılamadı.",
+    wrongType ? `${wrongType} dosya atlandı (PNG, JPEG veya WebP değil).` : null,
+    overflow ? `${overflow} dosya alınmadı (bir seferde en fazla ${MAX_IMPORT_FILES}).` : null,
+    failures.length ? failures.join(" · ") : null,
+  ].filter(Boolean).join(" ");
+  await Promise.all([loadFolders(), loadHistory()]);
+}
+
+// Bir öğeyi bırakma hedefi yapar (klasör kartı / "Klasörsüz" / bir üst seviye kartı).
+// TEK hedef, İKİ iş — ayırt eden şey sürüklenenin türü:
+//   iç sürükleme (IMAGE_DND_TYPE) → galerideki görseli o klasöre TAŞI
+//   bilgisayardan dosya (Files)   → o klasöre İÇE AKTAR
+// İmleç de farklı (move / copy), böylece bırakmadan önce hangi iş olduğu belli.
 function makeDropTarget(el, folderId, targetName) {
   const carriesImage = (e) => !!e.dataTransfer && [...e.dataTransfer.types].includes(IMAGE_DND_TYPE);
   el.addEventListener("dragover", (e) => {
-    if (!carriesImage(e)) return;      // dosya sürüklemesine karışma
+    const image = carriesImage(e);
+    if (!image && !hasFiles(e)) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
+    e.dataTransfer.dropEffect = image ? "move" : "copy";
     el.classList.add("drop-hover");
   });
   el.addEventListener("dragleave", () => el.classList.remove("drop-hover"));
   el.addEventListener("drop", (e) => {
     el.classList.remove("drop-hover");
-    if (!carriesImage(e)) return;
+    const image = carriesImage(e);
+    if (!image && !hasFiles(e)) return;
     e.preventDefault();
+    // stopPropagation ŞART: olay .gallery-wrap bölgesine çıkarsa aynı dosya
+    // İKİNCİ kez (bu kez bulunulan görünüme) aktarılır — "bazen iki kopya
+    // oluşuyor" diye görünen, teşhisi zor bir kirlenme.
     e.stopPropagation();
-    const imageId = e.dataTransfer.getData(IMAGE_DND_TYPE);
-    if (imageId) moveImages(imageId, folderId, targetName);
+    if (image) {
+      const imageId = e.dataTransfer.getData(IMAGE_DND_TYPE);
+      if (imageId) moveImages(imageId, folderId, targetName);
+      return;
+    }
+    importFiles(e.dataTransfer.files, folderId, targetName);
   });
 }
 
@@ -350,11 +435,13 @@ function makeCheckbox(rec) {
 function syncSelectUI() {
   $("select-bar").hidden = !selectMode;
   $("select-toggle").hidden = selectMode;
-  $("folder-hint").textContent = selectMode
-    ? (selected.size
-        ? "Seçili görselleri taşımak için birini klasör kartına sürükle."
-        : "Görselleri seç, sonra taşımak için birini klasör kartına sürükle.")
-    : FOLDER_HINT_DEFAULT;
+  if (selectMode) {
+    $("folder-hint").textContent = selected.size
+      ? "Seçili görselleri taşımak için birini klasör kartına sürükle."
+      : "Görselleri seç, sonra taşımak için birini klasör kartına sürükle.";
+  } else {
+    renderFolderHint();   // seçim dışı metnin TEK kaynağı (taşıma + içe aktarma)
+  }
   if (!selectMode) return;
 
   const total = historyCache.length;
@@ -498,6 +585,14 @@ function renderGallery() {
     });
     card.appendChild(img);
     if (selectMode) card.appendChild(makeCheckbox(rec));
+    // İçe aktarılan görsel üretilmiş gibi görünmesin: prompt'u yoktur, dosya
+    // adı taşır. Seçim modunda sol üst köşe card-check'in, o yüzden gizlenir.
+    if (rec.imported && !selectMode) {
+      const badge = document.createElement("span");
+      badge.className = "card-badge";
+      badge.textContent = "içe aktarıldı";
+      card.appendChild(badge);
+    }
     card.appendChild(delBtn);
     card.appendChild(acts);
 
@@ -528,14 +623,42 @@ $("extra-file-input").addEventListener("change", () => {
 
 // Sürükle-bırak: merkez alana bırakılan görseli referans olarak yükle
 const stageEl = document.querySelector(".stage");
+// Görseller alanı = BULUNULAN klasör. Şerit yalnız BAŞKA klasörleri hedef
+// yapıyor (içinde olduğun klasörün kartı yok) ve hiç klasör yokken şeritte
+// hiçbir kart yok — bu bölge iki boşluğu da kapatıyor.
+const galleryWrapEl = document.querySelector(".gallery-wrap");
 
 function hasFiles(e) {
   return !!e.dataTransfer && [...e.dataTransfer.types].includes("Files");
 }
 
+// BİLİNÇLİ ASİMETRİ: merkez alana dosya bırakmak "referans olarak yükle"
+// (kaydetmez), galeri alanına bırakmak "kütüphaneye aktar" (kaydeder).
+// İki bölge kardeş (.stage ile .gallery-wrap iç içe değil), o yüzden çakışmaz.
+
+function clearDropHighlights() {
+  stageEl.classList.remove("dragover");
+  galleryWrapEl.classList.remove("dropzone");
+  document.querySelectorAll(".drop-hover")
+    .forEach((el) => el.classList.remove("drop-hover"));
+}
+
 // Tarayıcı, sayfaya bırakılan hiçbir dosyayı/bağlantıyı asla açmasın (koşulsuz).
 ["dragover", "drop"].forEach((evt) =>
   window.addEventListener(evt, (e) => e.preventDefault())
+);
+
+// Vurguların temizliği de pencere seviyesinde: `dragleave` çocuk öğeye
+// geçildiğinde tetiklenmediği için sürükleme iptal edilir ya da pencere
+// dışında bırakılırsa vurgu takılı kalıyordu.
+//
+// YAKALAMA fazı (üçüncü argüman `true`) ŞART ve ÖLÇÜLDÜ: klasör kartının
+// `drop` dinleyicisi çift aktarmayı önlemek için `stopPropagation` çağırıyor,
+// bu da pencereye BALONLANAN temizliği yutuyor — kartın üstüne bırakınca
+// galeri alanının kesikli çerçevesi ekranda takılı kalıyordu. Yakalama fazı
+// hedeften ÖNCE koştuğu için stopPropagation onu engelleyemez.
+["drop", "dragend"].forEach((evt) =>
+  window.addEventListener(evt, clearDropHighlights, true)
 );
 
 ["dragenter", "dragover"].forEach((evt) =>
@@ -551,6 +674,27 @@ stageEl.addEventListener("dragleave", (e) => {
 stageEl.addEventListener("drop", (e) => {
   stageEl.classList.remove("dragover");
   if (hasFiles(e)) setUploadSource(e.dataTransfer.files[0]);
+});
+
+["dragenter", "dragover"].forEach((evt) =>
+  galleryWrapEl.addEventListener(evt, (e) => {
+    if (!hasFiles(e)) return;          // iç taşıma sürüklemesi bu bölgeyi ilgilendirmez
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    galleryWrapEl.classList.add("dropzone");
+  })
+);
+
+galleryWrapEl.addEventListener("dragleave", (e) => {
+  if (e.target === galleryWrapEl) galleryWrapEl.classList.remove("dropzone");
+});
+
+galleryWrapEl.addEventListener("drop", (e) => {
+  galleryWrapEl.classList.remove("dropzone");
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  importFiles(e.dataTransfer.files, currentFolder ? currentFolder.id : null,
+              currentFolder ? currentFolder.name : "Klasörsüz");
 });
 
 function selectInGroup(groupSel, btn) {

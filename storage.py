@@ -70,6 +70,12 @@ def save(image_bytes: bytes, meta: dict, output_dir: str, *, now: str) -> dict:
         # kullanıcının yazdığı ham metin olarak kalmak zorunda (galeri
         # başlıkları, türev prompt kopyalama ve mevcut testler ona bağlı).
         "prompt_sent": meta.get("prompt_sent"),
+        # İÇE AKTARMA İŞARETİ (v1.12): kayıt bilgisayardan sürüklenen bir
+        # dosyadan doğduysa True. KOŞULLU yazılıyor — üretilen kayıtlar
+        # bugünküyle bayt bayt aynı kalsın (galeri ve eski-biçim testleri buna
+        # bağlı). folder_id/palette ile aynı geçiş stratejisi: eski kayıtlarda
+        # alan yok, okuyan taraf .get()/falsy kontrolü yapıyor → göç gerekmez.
+        **({"imported": True} if meta.get("imported") else {}),
     }
     # immutable append: yeni liste yaz
     history = _read_history(output_dir) + [record]

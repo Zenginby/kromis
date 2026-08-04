@@ -167,8 +167,11 @@
       </div>
     </div>
 
-    <p id="folder-hint" class="folder-hint" hidden>
-      Bir görseli klasör kartına sürükleyip bırakarak taşıyabilirsin.
+    <!-- Statik metin İÇE AKTARMAYI anlatır: o özellik klasör olmadan da çalışıyor
+         ve JS düşse bile keşfedilebilir kalmalı. Taşıma cümlesini folders.js
+         (renderFolderHint) yalnızca klasör varken ekliyor. -->
+    <p id="folder-hint" class="folder-hint">
+      Bilgisayarındaki bir görseli klasör kartına ya da bu alana bırakarak içe aktarabilirsin.
     </p>
     <div id="folder-grid" class="folder-grid" aria-live="polite"></div>
 

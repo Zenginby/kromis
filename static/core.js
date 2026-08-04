@@ -94,6 +94,69 @@ function stopProgress(complete, gen) {
   }, complete ? 450 : 200);
 }
 
+// ── İndirme ─────────────────────────────────────────────────────────
+// Konum seçtiren TEK yol. Galeri kartı da (folders.js) büyüteç de
+// (viewer.js) buradan geçiyor: v1.10'daki "İndir düzeltmesi" iki yerde ayrı
+// ayrı yapılmıştı ve biri düzeltilip diğeri unutulduğunda kırılma
+// "bazen çalışıyor" diye geri döner.
+//
+// Neden gerekti: `.app`'te WKWebView `ALLOW_DOWNLOADS` ile <a download>'u bir
+// macOS kayıt paneline çeviriyor (desktop.py) — kullanıcı konumu SEÇİYOR.
+// Tarayıcıda öyle bir panel yok; <a download> dosyayı sormadan indirme
+// klasörüne atar. Kullanıcı tarafından bu "app'te indirebiliyorum, web'de
+// indiremiyorum" olarak görünüyordu.
+//
+// Özellik yoksa (paketin WKWebView'ı — WebKit File System Access'i hiç
+// uygulamadı — ayrıca Safari ve Firefox) eski <a download> yolu AYNEN kalır:
+// pakette davranış değişmiyor.
+const SUPPORTS_SAVE_PICKER = typeof window.showSaveFilePicker === "function";
+
+function downloadViaAnchor(url, filename) {
+  const a = document.createElement("a");
+  a.href = url;
+  // Ad AÇIKÇA veriliyor: boş bırakılırsa macOS kayıt panelinin ad alanını
+  // WebKit'in URL'den türetmesine kalıyoruz.
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+// Kayıt panelini açar, seçilen dosyaya görselin baytlarını yazar.
+async function downloadImage(url, filename) {
+  if (!SUPPORTS_SAVE_PICKER) { downloadViaAnchor(url, filename); return; }
+
+  let handle;
+  try {
+    handle = await window.showSaveFilePicker({
+      suggestedName: filename,
+      types: [{ description: "PNG görsel", accept: { "image/png": [".png"] } }],
+    });
+  } catch (e) {
+    // Vazgeçmek hata değil: panel kapatıldıysa hiçbir şey yapma. Panelin
+    // KENDİSİ açılamadıysa indirme hiç olmamasındansa eski yola düşülür.
+    if (e.name === "AbortError") return;
+    downloadViaAnchor(url, filename);
+    return;
+  }
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`sunucu ${res.status}`);
+    const stream = await handle.createWritable();
+    await stream.write(await res.blob());
+    await stream.close();
+    statusEl.textContent = `İndirildi: ${filename}`;
+  } catch (e) {
+    // Hem söyle hem kurtar: durum satırı büyüteç açıkken perdenin ARKASINDA
+    // kalıyor, o yüzden tek başına yeterli değil — geri düşüş dosyayı hiç
+    // olmazsa indirme klasörüne bırakır. `createWritable` yazmayı takas
+    // dosyasında biriktirdiği için yarım dosya kalmaz.
+    statusEl.textContent = `İndirilemedi (${e.message}); indirme klasörüne kaydediliyor.`;
+    downloadViaAnchor(url, filename);
+  }
+}
+
 function clearUploadPreviewUrl() {
   if (uploadPreviewUrl) {
     URL.revokeObjectURL(uploadPreviewUrl);

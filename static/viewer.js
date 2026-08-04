@@ -142,6 +142,15 @@
     }
   }
 
+  // Kayıt paneli olan tarayıcıda konumu KULLANICI seçsin (core.js). Panel
+  // yoksa hiç araya girilmiyor: <a download> zaten pakette doğru davranıyor.
+  dlLink.addEventListener("click", (e) => {
+    const href = dlLink.getAttribute("href");
+    if (!href || !SUPPORTS_SAVE_PICKER) return;
+    e.preventDefault();
+    downloadImage(href, dlLink.getAttribute("download"));
+  });
+
   function open(src, alt) {
     if (!src) return;
     vimg.src = src;

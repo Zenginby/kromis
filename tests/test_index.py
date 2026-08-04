@@ -345,6 +345,46 @@ def test_viewer_download_is_limited_to_saved_images():
     assert "dlLink.hidden" in js, "kaydedilmemiş görselde indir bağlantısı gizlenmiyor"
 
 
+def test_browser_download_asks_where_to_save():
+    """Tarayıcıda da konum seçilebilmeli — app'teki kayıt panelinin karşılığı.
+
+    `.app`'te WKWebView `ALLOW_DOWNLOADS` sayesinde <a download>'u bir kayıt
+    paneline çeviriyor (desktop.py) ve kullanıcı konumu seçiyor. Tarayıcıda
+    böyle bir panel YOK: <a download> dosyayı sormadan indirme klasörüne atar.
+    File System Access API o boşluğu kapatan TEK yol.
+    """
+    js = TestClient(appmod.app).get("/static/core.js").text
+    assert "showSaveFilePicker" in js, (
+        "tarayıcıda kayıt paneli açılmıyor — indirme yine sessizce Downloads'a düşer")
+
+
+def test_download_still_works_without_the_save_picker():
+    """Panel yoksa ESKİ <a download> yolu aynen kalmalı.
+
+    Bu dalın tek gerçek kullanıcısı paketin WKWebView'ı (WebKit File System
+    Access'i uygulamadı) — yani burası düşerse hata TARAYICIDA GÖRÜNMEZ,
+    yalnız .app'te ortaya çıkar: damlalıktaki (test_eyedropper_*) tuzağın aynısı.
+    Safari ve Firefox da bu daldan geçiyor.
+    """
+    js = TestClient(appmod.app).get("/static/core.js").text
+    assert "typeof window.showSaveFilePicker" in js, (
+        "özellik kontrolü yok — panelsiz tarayıcıda/pakette indirme kırılır")
+    assert "downloadViaAnchor" in js, "geri düşüş yolu (<a download>) yok"
+
+
+def test_both_download_buttons_go_through_the_shared_helper():
+    """Galeri kartı ve büyüteç AYNI yardımcıdan geçmeli.
+
+    v1.10'da "İndir düzeltmesi" iki yerde ayrı ayrı yapılmıştı; biri
+    düzeltilip diğeri unutulduğunda kullanıcı "bazen çalışıyor" diye geri
+    döner. Tek yardımcı bu ayrışmayı imkânsız kılıyor.
+    """
+    client = TestClient(appmod.app)
+    for name in ("folders.js", "viewer.js"):
+        assert "downloadImage(" in client.get(f"/static/{name}").text, (
+            f"{name} paylaşılan indirme yardımcısını kullanmıyor")
+
+
 def test_viewer_zoom_survives_reduced_motion():
     """prefers-reduced-motion yalnız ANİMASYONU kaldırmalı, özelliği DEĞİL.
 

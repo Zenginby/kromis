@@ -541,6 +541,13 @@ function renderGallery() {
     downloadLink.setAttribute("href", `/output/${rec.filename}`);
     downloadLink.setAttribute("download", rec.filename);
     downloadLink.textContent = "İndir";
+    // Kayıt paneli olan tarayıcıda konumu KULLANICI seçsin (core.js). Panel
+    // yoksa hiç araya girilmiyor: <a download> zaten pakette doğru davranıyor.
+    downloadLink.addEventListener("click", (e) => {
+      if (!SUPPORTS_SAVE_PICKER) return;
+      e.preventDefault();
+      downloadImage(`/output/${rec.filename}`, rec.filename);
+    });
 
     // ana görsele ek referans olarak ekle (AI ile birleştirme)
     const extraBtn = document.createElement("button");

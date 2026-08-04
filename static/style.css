@@ -12,6 +12,14 @@
   --space: clamp(1rem, 0.6rem + 1.4vw, 1.8rem);
   --dur: 180ms;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Sohbet mesajları: iki taraf --panel/--panel-2 ile neredeyse aynı tondaydı
+     ve akışta kimin konuştuğu köşe yarıçapından okunuyordu. Kullanıcı balonu
+     accent'e çalan AÇIK bir yüzey (söylenen replik), yönetmen paneli koyu ve
+     düz (dönen çıktı). İkisi de --text ile AA kontrastını korumak zorunda. */
+  --chat-user: oklch(36% 0.035 45);
+  --chat-user-border: oklch(46% 0.06 45);
+  --chat-bot: oklch(24% 0.018 260);
+  --chat-bot-border: oklch(32% 0.02 260);
 }
 * { box-sizing: border-box; }
 body {
@@ -405,12 +413,45 @@ button.palette-sw:focus-visible { outline: 2px solid var(--accent); outline-offs
 }
 @media (max-width: 780px) { .layout { grid-template-columns: 1fr; } }
 
-/* Çalışma alanı sekmeleri: başlığın altında, sol hizalı. .seg'in tuşlarından
-   daha yüksek/geniş — bunlar sayfa değiştiren birinci sınıf kontroller, bir
-   modal içindeki üç durumlu anahtar değil. */
-.view-tabs { margin-top: 0.85rem; }
-.view-tabs button { padding: 0.5rem 0.95rem; font-size: 0.88rem; }
+/* Çalışma alanı sekmeleri: başlığın altında, sol hizalı, BİTİŞİK bir segment
+   denetimi. .seg'in tuşlarından daha yüksek/geniş — bunlar sayfa değiştiren
+   birinci sınıf kontroller, bir modal içindeki üç durumlu anahtar değil.
+   Aktif sekmeyi kayan .view-tabs-thumb boyuyor; düğmelerin kendi dolgusu ve
+   kenarlığı bu yüzden kaldırıldı (yoksa iki katman üst üste binerdi). */
+.view-tabs {
+  position: relative; margin-top: 0.85rem; gap: 0; padding: 4px;
+  display: inline-flex; background: var(--panel);
+  border: 1px solid var(--panel-2); border-radius: 12px;
+}
+.view-tabs button {
+  position: relative; z-index: 1; flex: none;
+  padding: 0.5rem 0.95rem; font-size: 0.88rem;
+  background: none; border-color: transparent;
+}
+.view-tabs button:hover { color: var(--text); border-color: transparent; }
+.view-tabs button.active {
+  background: none; border-color: transparent; color: oklch(20% 0.02 260);
+}
+.view-tabs-thumb {
+  position: absolute; top: 4px; bottom: 4px; left: 0;
+  background: var(--accent); border-radius: 8px;
+  transition: transform var(--dur) var(--ease), width var(--dur) var(--ease);
+}
 #view-image[hidden], #view-chat[hidden] { display: none; }
+
+/* Görünüm geçişi: yalnızca GİREN panel canlanıyor (çift panelli cross-fade
+   katman + çift odak + sıçrayan yerleşim demekti). Yön sekme sırasından
+   geliyor, compositor dostu iki özellikle: transform + opacity. */
+@keyframes viewInRight {
+  from { opacity: 0; transform: translateX(14px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes viewInLeft {
+  from { opacity: 0; transform: translateX(-14px); }
+  to   { opacity: 1; transform: none; }
+}
+.view-in-right { animation: viewInRight 220ms var(--ease); }
+.view-in-left { animation: viewInLeft 220ms var(--ease); }
 
 .controls, .stage, .gallery-wrap {
   background: var(--panel); border-radius: var(--radius); padding: var(--space);
@@ -703,14 +744,88 @@ body.viewer-open { overflow: hidden; }
 }
 
 /* ── Prompt Yönetmeni sohbeti ──────────────────────────────────────────
-   Ortalanmış TEK kolon: burada okunabilirlik ölçüsü (~70 karakter) yerleşimi
-   belirliyor, iki kolonlu üretim ekranının aksine. Besteci dipte yapışkan
-   duruyor, akış onun ARDINDAN kayıyor. */
+   Solda kayıtlı sohbetler, sağda akış. Akış kolonu ortalanmış TEK kolon
+   kalıyor: orada okunabilirlik ölçüsü (~70 karakter) yerleşimi belirliyor.
+   Besteci dipte yapışkan duruyor, akış onun ARDINDAN kayıyor. */
+.chat-workspace {
+  position: relative;
+  display: grid; grid-template-columns: 248px minmax(0, 1fr);
+  align-items: start;
+}
 .chat-shell {
   max-width: 860px; margin: 0 auto; padding: var(--space);
   display: flex; flex-direction: column; gap: 1.1rem;
-  min-height: 60vh;
+  min-height: 60vh; width: 100%;
 }
+
+/* Kenar panel: sayfayla birlikte kaymıyor, kendi içinde kayıyor — uzun bir
+   sohbet listesi akışın yanında dolaşmasın. */
+.chat-sidebar {
+  position: sticky; top: 0; align-self: stretch;
+  display: flex; flex-direction: column; gap: 0.5rem;
+  max-height: 100vh; overflow-y: auto;
+  padding: var(--space) 0 var(--space) var(--space);
+}
+.chat-new {
+  flex: none; margin: 0; width: 100%; padding: 0.6rem 0.8rem; font: inherit;
+  font-size: 0.86rem; text-align: left; cursor: pointer;
+  background: var(--panel); color: var(--text);
+  border: 1px dashed var(--panel-2); border-radius: 10px;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.chat-new:hover { color: var(--accent); border-color: var(--accent); }
+.chat-list { list-style: none; margin: 0.3rem 0 0; padding: 0; display: grid; gap: 2px; }
+.chat-list-empty {
+  margin: 0.4rem 0 0; color: var(--muted); font-size: 0.78rem; line-height: 1.5;
+}
+.chat-list-empty[hidden] { display: none; }
+
+/* Satır: başlığın kendisi bir düğme, 3-nokta ONUN İÇİNDE değil YANINDA —
+   iç içe düğme geçersiz işaretleme olurdu. */
+.chat-item {
+  position: relative; display: flex; align-items: stretch; gap: 2px;
+  border-radius: 9px;
+}
+.chat-item:hover { background: var(--panel); }
+.chat-item.active { background: var(--panel); box-shadow: inset 2px 0 0 var(--accent); }
+.chat-item-open {
+  flex: 1; min-width: 0; display: grid; gap: 0.1rem; padding: 0.5rem 0.6rem;
+  font: inherit; text-align: left; cursor: pointer;
+  background: none; border: 0; border-radius: 9px; color: var(--text);
+}
+.chat-item-title {
+  font-size: 0.84rem; line-height: 1.35;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.chat-item-meta { color: var(--muted); font-size: 0.7rem; }
+.chat-item-menu {
+  flex: none; width: 28px; padding: 0; cursor: pointer; font: inherit;
+  line-height: 1; color: var(--muted);
+  background: none; border: 0; border-radius: 8px;
+  opacity: 0; transition: opacity var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+/* Menü düğmesi durgunda gizli ama ODAKLANDIĞINDA görünür: yalnız hover'a
+   bağlanırsa klavyeyle erişilebilir olmaktan çıkardı. */
+.chat-item:hover .chat-item-menu,
+.chat-item-menu:focus-visible,
+.chat-item-menu[aria-expanded="true"] { opacity: 1; }
+.chat-item-menu:hover { color: var(--accent); }
+.chat-menu {
+  position: absolute; z-index: 5; right: 4px; top: calc(100% - 4px);
+  display: grid; min-width: 168px; padding: 4px;
+  background: var(--panel-2); border: 1px solid var(--panel);
+  border-radius: 10px; box-shadow: 0 12px 28px oklch(12% 0.02 260 / 0.45);
+}
+.chat-menu[hidden] { display: none; }
+.chat-menu-item {
+  padding: 0.5rem 0.6rem; font: inherit; font-size: 0.82rem; text-align: left;
+  cursor: pointer; color: var(--text); background: none; border: 0; border-radius: 7px;
+}
+.chat-menu-item:hover { background: var(--panel); }
+.chat-menu-danger { color: var(--danger); }
+
+/* Çekmece düğmesi yalnız dar ekranda görünür (aşağıdaki sorgu açıyor). */
+.chat-sidebar-toggle { display: none; }
 
 .chat-log { display: flex; flex-direction: column; gap: 1.1rem; }
 
@@ -741,12 +856,14 @@ body.viewer-open { overflow: hidden; }
    genişlikte panel, kod blokları ve eylem satırıyla). */
 .chat-msg-user {
   align-self: flex-end; max-width: 76%;
-  background: var(--panel-2); border-radius: 14px 14px 4px 14px;
+  background: var(--chat-user); border: 1px solid var(--chat-user-border);
+  border-radius: 14px 14px 4px 14px;
   padding: 0.7rem 0.95rem; line-height: 1.55;
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .chat-msg-bot {
-  background: var(--panel); border-radius: var(--radius); padding: var(--space);
+  background: var(--chat-bot); border: 1px solid var(--chat-bot-border);
+  border-radius: var(--radius); padding: var(--space);
   line-height: 1.6;
 }
 .chat-role {
@@ -770,14 +887,71 @@ body.viewer-open { overflow: hidden; }
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.84rem; line-height: 1.55; white-space: pre;
 }
-/* Sayfadaki asıl ürün prompt bloğu — akışta gözle bulunabilmeli. */
-.chat-msg-bot pre.chat-prompt-block { border-left: 3px solid var(--accent); }
-
-.chat-msg-actions {
-  display: flex; flex-wrap: wrap; gap: 0.5rem;
-  margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px dashed var(--panel-2);
+/* ── Prompt bloğu: sayfadaki asıl ürün ────────────────────────────────
+   Eylemler bloğun BAŞINDA (v1.14'te mesajın en altındaydı, prompt'u okuyan göz
+   varyasyon listelerini geçmek zorundaydı). */
+.chat-prompt {
+  margin: 0 0 0.9rem;
+  border: 1px solid var(--panel-2); border-left: 3px solid var(--accent);
+  border-radius: 10px; overflow: hidden;
 }
-.chat-msg-actions .primary { margin-top: 0; width: auto; padding: 0.55rem 0.95rem; }
+.chat-prompt-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+  padding: 0.45rem 0.6rem 0.45rem 0.8rem; background: var(--panel);
+}
+.chat-prompt-label {
+  flex: 1; color: var(--accent); font-size: 0.68rem;
+  letter-spacing: 0.12em; text-transform: uppercase;
+}
+.chat-prompt-btn { margin-top: 0; width: auto; padding: 0.4rem 0.8rem; font-size: 0.8rem; }
+/* Prompt bir PROZA, kod değil: sarılıyor. Yatay kaydırma tek satırlık bir şerit
+   üretiyordu ve prompt okunamıyordu — teknik ayar JSON'u ise `pre` kalıyor
+   (aşağıdaki kural yalnız bu bloğu hedefliyor), yoksa biçimi bozulurdu. */
+.chat-msg-bot pre.chat-prompt-block {
+  margin: 0; padding: 0.9rem 1rem; border-radius: 0;
+  background: var(--panel-2); overflow-x: visible;
+}
+.chat-msg-bot pre.chat-prompt-block code {
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  font-size: 0.9rem; line-height: 1.75;
+}
+
+/* ── Tıklanabilir seçenekler ──────────────────────────────────────────
+   Serbest yazı alanı HER ZAMAN çiplerin altında: "bunların hiçbiri değil"
+   cevabı bir seçenek olarak listelenemez. */
+.chat-options {
+  margin-top: 1rem; padding-top: 0.9rem; border-top: 1px dashed var(--panel-2);
+}
+.chat-options-q { margin: 0 0 0.6rem; font-size: 0.9rem; color: var(--text); }
+.chat-options-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.chat-option {
+  background: var(--panel); color: var(--muted);
+  border: 1px solid var(--panel-2); border-radius: 999px;
+  padding: 0.5rem 0.9rem; font: inherit; font-size: 0.84rem; cursor: pointer;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+              background var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.chat-option:hover { color: var(--text); border-color: var(--accent); transform: translateY(-1px); }
+.chat-option:active { transform: translateY(0); }
+/* Seçili durum RENKLE DEĞİL işaretle de anlatılıyor: yalnız renk kullanılsa
+   renk ayrımı zayıf gören kullanıcı hangi seçeneği verdiğini göremezdi. */
+.chat-option[aria-checked="true"] {
+  background: var(--accent); color: oklch(20% 0.02 260); border-color: var(--accent);
+}
+.chat-option[aria-checked="true"]::before { content: "✓ "; }
+.chat-own { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem; margin-top: 0.85rem; }
+.chat-own-label { flex: 1 0 100%; font-size: 0.78rem; color: var(--muted); }
+.chat-own-input {
+  flex: 1 1 12rem; min-width: 0; padding: 0.55rem 0.7rem; font: inherit; font-size: 0.86rem;
+  background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--panel); border-radius: 9px;
+}
+.chat-own-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.chat-own-send { margin-top: 0; width: auto; padding: 0.55rem 1.1rem; font-size: 0.86rem; }
+/* Kilitlenmiş grup SİLİNMİYOR: akış geçmişi dürüst kalsın, ama eski bir soruya
+   ikinci kez cevap gönderilemesin. */
+.chat-options-done { opacity: 0.55; }
+.chat-options-done .chat-option, .chat-options-done button { cursor: not-allowed; }
 
 .chat-composer {
   position: sticky; bottom: 0; margin-top: auto;
@@ -808,6 +982,25 @@ body.viewer-open { overflow: hidden; }
 .chat-wait[hidden] { display: none; }
 .chat-status { margin: 0.5rem 0 0; min-height: 1.2em; color: var(--muted); font-size: 0.85rem; }
 
+/* Dar ekran: 248px'lik kolon sohbetin okunabilirlik ölçüsünden çalıyor, panel
+   bir ÇEKMECEYE dönüyor. Akışın ÜSTÜNE biniyor (yanına değil) — yerleşimi
+   kaydırsaydı çekmece her açılışta sayfayı zıplatırdı. */
+@media (max-width: 900px) {
+  .chat-workspace { grid-template-columns: minmax(0, 1fr); }
+  .chat-sidebar-toggle {
+    display: block; justify-self: start; margin: var(--space) var(--space) 0;
+  }
+  /* Konumlandırma YOK, akışta bir açılır blok: düğmenin hemen altına iniyor ve
+     akışı aşağı itiyor. `position: absolute` bir ata gerektirir ve panel uzun
+     bir listede kırpılırdı; itmek burada daha dürüst ve daha az kırılgan. */
+  .chat-sidebar {
+    position: static; max-height: 60vh;
+    margin: 0.6rem var(--space) 0; padding: 0.6rem;
+    background: var(--panel-2); border: 1px solid var(--panel); border-radius: 12px;
+  }
+  .chat-sidebar:not(.open) { display: none; }
+}
+
 /* Ayarlar modalindeki bölüm başlığı (Azure kimliği / Prompt Yönetmeni ayrımı) */
 .modal-subhead {
   margin: 1.4rem 0 0; padding-top: 1rem; border-top: 1px solid var(--panel-2);
@@ -818,6 +1011,10 @@ body.viewer-open { overflow: hidden; }
   * { transition: none !important; }
   .spinner { animation: none; }
   .modal-backdrop, .modal-card, .confirm-icon { animation: none; }
+  /* Sekme geçişi ve segmentin kayan dolgusu: `animation` yukarıdaki
+     `transition: none` kuralıyla susmuyor, kendi kuralını istiyor. Sekme
+     DEĞİŞMEYE devam ediyor — yalnızca hareket kalkıyor. */
+  .view-in-right, .view-in-left { animation: none; }
   /* Büyüteç küçük resminden büyüyerek AÇILMAZ, yalnız belirir (JS de aynı
      sorguyu okuyup FLIP hesabını tümden atlar). transform'un KENDİSİ burada
      sıfırlanamaz: yakınlaştırma ve kaydırma bir süsleme değil, özelliğin

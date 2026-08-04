@@ -11,10 +11,13 @@
     <div class="topbar-text">
       <h1>GPT-Image <span>Studio</span></h1>
       <p class="sub">Azure gpt-image-2 · yerel</p>
-      <!-- Çalışma alanı sekmeleri: mevcut .seg bileşeni yeniden kullanılıyor.
+      <!-- Çalışma alanı sekmeleri: bitişik segment denetimi. Aktif sekmeyi
+           #view-tabs-thumb boyuyor (core.js:showView konumu ölçüp kaydırıyor) —
+           iki düğmenin arasındaki boşluk kalksın diye .seg'in gap'i ezildi.
            Ok tuşu gezinmesi henüz YOK (modal içi .seg kullanımları da öyle) —
            Tab+Enter ile çalışır ve aria-selected doğru güncellenir. -->
       <div class="seg view-tabs" role="tablist" aria-label="Çalışma alanı">
+        <span id="view-tabs-thumb" class="view-tabs-thumb" aria-hidden="true"></span>
         <button id="tab-image" type="button" class="active" role="tab"
                 aria-selected="true" aria-controls="view-image">Görsel</button>
         <button id="tab-chat" type="button" role="tab"
@@ -192,10 +195,24 @@
     </div>
 
     <!-- Prompt Yönetmeni: Türkçe sohbet → İngilizce prompt + teknik ayarlar.
-         Geçmiş yalnızca istemcide (JS dizisi) yaşar, diske yazılmaz; kalıcı olan
-         tek şey prompt'un kendisi ve o üretim anında history.json'a giriyor. -->
+         Açık sohbet istemcide (JS dizisi) yaşar; her tur sonunda /api/chats ile
+         output/chats.json'a yazılır (v1.15). Kalıcılık SUNUCUDA çünkü paketli
+         .app pencereyi pywebview'ın private mode varsayılanıyla açıyor ve orada
+         localStorage her kapanışta siliniyor. -->
     <div id="view-chat" role="tabpanel" aria-labelledby="tab-chat" hidden>
-      <div class="chat-shell">
+      <div class="chat-workspace">
+        <!-- Kayıtlı sohbetler. 900px altında bu panel bir çekmeceye dönüşüyor
+             ve aşağıdaki düğmeyle açılıyor (dar ekranda 248px kolon, sohbetin
+             okunabilirlik ölçüsünden çalardı). -->
+        <button type="button" id="chat-sidebar-toggle" class="btn-ghost chat-sidebar-toggle"
+                aria-controls="chat-sidebar" aria-expanded="false">Sohbetler</button>
+        <aside id="chat-sidebar" class="chat-sidebar" aria-label="Kayıtlı sohbetler">
+          <button type="button" id="chat-new" class="chat-new">+ Yeni sohbet</button>
+          <ul id="chat-list" class="chat-list"></ul>
+          <p id="chat-list-empty" class="chat-list-empty">Henüz kayıtlı sohbet yok.</p>
+        </aside>
+
+        <div class="chat-shell">
         <div id="chat-empty" class="chat-empty">
           <h2>Fikri anlat, prompt'u o yazsın.</h2>
           <p>
@@ -230,12 +247,16 @@
           <label class="chat-input-label" for="chat-input">Mesajın</label>
           <textarea id="chat-input" rows="3" maxlength="6000"
                     placeholder="Ne üretmek istiyorsun? Amaç ve mecrayı söylersen (Instagram, blog kapağı, afiş…) daha isabetli olur."></textarea>
+          <!-- "Sohbeti temizle" v1.15'te KALDIRILDI: işlevi ikiye bölündü —
+               yeni bir sohbete geçmek soldaki "Yeni sohbet", bir sohbetten
+               kurtulmak listedeki 3-nokta → Sil. Eskisi ikisini de yapmıyordu
+               (temizlenen sohbet kaydedilmiş olsa diskte kalırdı). -->
           <div class="chat-actions">
             <span class="chat-hint">⌘/Ctrl + Enter gönderir</span>
-            <button type="button" id="chat-clear" class="btn-ghost">Sohbeti temizle</button>
             <button type="button" id="chat-send" class="primary chat-send">Gönder</button>
           </div>
           <p id="chat-status" class="chat-status" role="status"></p>
+        </div>
         </div>
       </div>
     </div>

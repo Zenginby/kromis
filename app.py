@@ -23,6 +23,7 @@ import assets_store
 import azure_client as ac
 import backup
 import chat_client as cc
+import chat_store
 import color_names
 import composite
 import errlog
@@ -34,9 +35,10 @@ import seed
 import storage
 import version
 from models import (MAX_PROMPT_CHARS, BannerRequest, BulkImagesRequest,
-                    BulkMoveRequest, ChatRequest, FolderRequest, GenerateRequest,
-                    LogoRequest, MoveImageRequest, SavePaletteRequest,
-                    SettingsRequest, SuggestRequest, check_drop_indices)
+                    BulkMoveRequest, ChatRequest, ChatSaveRequest, FolderRequest,
+                    GenerateRequest, LogoRequest, MoveImageRequest,
+                    SavePaletteRequest, SettingsRequest, SuggestRequest,
+                    check_drop_indices)
 
 BASE_DIR = paths.REPO_DIR                    # geriye uyum: mevcut kullanımlar bozulmasın
 OUTPUT_DIR = paths.output_dir()
@@ -537,14 +539,74 @@ def chat(req: ChatRequest) -> dict:
     threadpool'unda koşturur ve olay döngüsü — yani pencere — donmaz;
     `/api/generate`'in aynısı.
 
-    Yanıt DİSKE YAZILMAZ (karar 4): tek kalıcı çıktı prompt'un kendisi ve o
-    zaten üretim anında `storage.save` ile history.json'a giriyor. Bir
-    `chat_store.py` dördüncü bir "prompt yaşayan yer" üretirdi.
+    BU ROTA diske hiçbir şey yazmaz ve v1.15'ten sonra da yazmıyor. v1.13'ün
+    "karar 4"ü iptal edilmedi, KAPSAMI daraldı: sohbetler artık saklanabiliyor
+    ama yazan tek yol kullanıcının kendi başlattığı `/api/chats` (bkz.
+    chat_store.py). Modelden dönen her yanıtı sessizce diske almak ile
+    kullanıcının "bunu sakla" demesi aynı şey değil; ayrımı
+    tests/test_chat_route.py mekanik olarak koruyor.
     """
     try:
         return cc.complete([m.model_dump() for m in req.messages])
     except cc.ChatError as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+
+# ── Kayıtlı sohbetler ───────────────────────────────────────────────────
+# Kalıcılık SUNUCUDA, istemcide değil: `desktop.py` pencereyi private mode'da
+# açıyor (pywebview varsayılanı) ve orada localStorage her kapanışta silinir —
+# paketlenmiş .app'te geçmiş sessizce buharlaşırdı.
+
+@app.get("/api/chats")
+def list_chats_route() -> dict:
+    """Kenar panelinin listesi: başlıklar, gövdeler DEĞİL (bkz. chat_store)."""
+    return {"chats": chat_store.list_chats(OUTPUT_DIR)}
+
+
+@app.get("/api/chats/{chat_id}")
+def get_chat_route(chat_id: str) -> dict:
+    rec = chat_store.get(os.path.basename(chat_id), OUTPUT_DIR)
+    if rec is None:
+        raise HTTPException(status_code=404, detail="Sohbet bulunamadı.")
+    return {"chat": rec}
+
+
+@app.post("/api/chats")
+def create_chat_route(req: ChatSaveRequest) -> dict:
+    """Yeni kayıt. Başlık ve gövde ZORUNLU: boş bir sohbet kaydetmek anlamsız."""
+    title = (req.title or "").strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="Sohbet başlığı gerekli.")
+    if not req.messages:
+        raise HTTPException(status_code=422, detail="Kaydedilecek mesaj yok.")
+    messages = [m.model_dump() for m in req.messages]
+    return {"chat": chat_store.create(title, messages, OUTPUT_DIR, now=_now())}
+
+
+@app.put("/api/chats/{chat_id}")
+def update_chat_route(chat_id: str, req: ChatSaveRequest) -> dict:
+    """Gövdeyi ve/veya başlığı değiştirir (tur sonu kaydı + yeniden adlandırma).
+
+    Başlık BOŞ dizeyle gelirse reddedilir: adsız bir sohbet kenar panelinde
+    tıklanacak hiçbir şey bırakmaz.
+    """
+    title = None if req.title is None else req.title.strip()
+    if title is not None and not title:
+        raise HTTPException(status_code=422, detail="Sohbet başlığı boş olamaz.")
+    messages = None if req.messages is None else [m.model_dump() for m in req.messages]
+    rec = chat_store.update(os.path.basename(chat_id), OUTPUT_DIR,
+                            messages=messages, title=title, now=_now())
+    if rec is None:
+        raise HTTPException(status_code=404, detail="Sohbet bulunamadı.")
+    return {"chat": rec}
+
+
+@app.delete("/api/chats/{chat_id}")
+def delete_chat_route(chat_id: str) -> dict:
+    cid = os.path.basename(chat_id)
+    if not chat_store.delete(cid, OUTPUT_DIR):
+        raise HTTPException(status_code=404, detail="Sohbet bulunamadı.")
+    return {"deleted": cid}
 
 
 @app.get("/api/folders")

@@ -45,11 +45,12 @@ def _write(path: str, text: str) -> None:
 
 
 def _seed_library(tmp_path, *, history='[{"id": "aaaaaaaaaaaa"}]'):
-    """Altı manifest'i de yazar (içerik önemsiz — backup ayrıştırmıyor)."""
+    """Bütün manifest'leri yazar (içerik önemsiz — backup ayrıştırmıyor)."""
     _, output_dir, assets_dir = _dirs(tmp_path)
     _write(os.path.join(output_dir, "history.json"), history)
     _write(os.path.join(output_dir, "folders.json"), '[{"id": "bbbbbbbbbbbb"}]')
     _write(os.path.join(output_dir, "palettes.json"), '[{"id": "cccccccccccc"}]')
+    _write(os.path.join(output_dir, "chats.json"), '[{"id": "dddddddddddd"}]')
     for kind in assets_store.KINDS:
         _write(os.path.join(assets_dir, kind, "index.json"), f'[{{"kind": "{kind}"}}]')
 
@@ -67,7 +68,11 @@ def test_upgrade_copies_every_manifest_byte_for_byte(tmp_path):
     assert dest == os.path.join(data_dir, "backups", "1.8.0-2026-07-30")
     for rel, source in (("output/history.json", os.path.join(output_dir, "history.json")),
                         ("output/folders.json", os.path.join(output_dir, "folders.json")),
-                        ("output/palettes.json", os.path.join(output_dir, "palettes.json"))):
+                        ("output/palettes.json", os.path.join(output_dir, "palettes.json")),
+                        # v1.15: sohbetler. İçindeki prompt'lar başka hiçbir yerde
+                        # durmuyor — bu manifest yedeklenmezse yükseltmede tek
+                        # kopyaları risk altında olurdu.
+                        ("output/chats.json", os.path.join(output_dir, "chats.json"))):
         with open(os.path.join(dest, *rel.split("/")), "rb") as a, open(source, "rb") as b:
             assert a.read() == b.read(), rel
     for kind in assets_store.KINDS:

@@ -51,13 +51,28 @@ arm64 runner'ında (macos-14) aynı spec ve `build.sh` ile üretilir. Actions �
 ## Özellikler
 - **Prompt Yönetmeni** (üst bardaki "Prompt Yönetmeni" sekmesi): Türkçe anlatılan
   fikri İngilizce bir `gpt-image-2` prompt'una + teknik ayarlara çeviren sohbet.
+  Prompt bloğunun kendi başında **Kopyala** ve **Forma aktar** düğmeleri var;
   "Forma aktar" prompt'u `#prompt`'a yazar, `size/quality/n` önerilerini yalnızca
   formda GERÇEKTEN var olan değerlerse uygular, uygulanamayanı açıkça söyler.
-  Yanıt tek seferde gelir (streaming yok), sohbet geçmişi diske yazılmaz.
-  Persona `bundled/prompts/prompt-yonetmeni.md`'de; kullanıcı
-  `<data_dir>/chat-instructions.md` dosyasını oluşturarak ezebilir (yol Ayarlar'da
-  yazılı). Gömülü dosya kopyalanmaz, her açılışta okunur — yeni sürümdeki
-  iyileştirme kendi dosyasını yazmamış herkese ulaşır.
+  Yanıt tek seferde gelir (streaming yok).
+  - **Tıklanabilir seçenekler (v1.15):** yönetmen soru sorduğunda yanıtına bir
+    ` ```options ` bloğu koyuyor (`{"soru", "coklu", "secenekler"}`) ve arayüz onu
+    seçilebilir çiplere + "kendi fikrini yaz" alanına çeviriyor; seçim tek
+    mesajda gidiyor. **Kendi `chat-instructions.md` dosyasını yazan kullanıcı bu
+    bloğu da yazmak zorunda** — yoksa çipler çıkmaz (prozadan seçenek ayıklamaya
+    çalışılmıyor: kırılgan ve yanlış çip üretir). Sözleşme gömülü personada
+    örnekli anlatılıyor.
+  - **Kayıtlı sohbetler (v1.15):** her tur sonunda `output/chats.json`'a yazılıyor
+    (`/api/chats`), sol panelde listeleniyor; 3-nokta menüsünden yeniden
+    adlandırılıp silinebiliyor. Başlık ilk mesajdan türetiliyor — modele ikinci
+    bir çağrı yapılmıyor. Kalıcılık istemcide (localStorage) DEĞİL sunucuda,
+    çünkü `desktop.py` pencereyi pywebview'ın `private_mode=True` varsayılanıyla
+    açıyor ve orada localStorage her kapanışta siliniyor. Tamamlama rotası
+    (`POST /api/chat`) hâlâ diske hiçbir şey yazmıyor.
+  - Persona `bundled/prompts/prompt-yonetmeni.md`'de; kullanıcı
+    `<data_dir>/chat-instructions.md` dosyasını oluşturarak ezebilir (yol
+    Ayarlar'da yazılı). Gömülü dosya kopyalanmaz, her açılışta okunur — yeni
+    sürümdeki iyileştirme kendi dosyasını yazmamış herkese ulaşır.
 - Prompt'tan görsel üretme (boyut/kalite/adet)
 - Geçmiş galerisi (indir, sil)
 - Görsel düzenleme: dosya yükle veya galeriden seç + prompt (Azure images/edits)

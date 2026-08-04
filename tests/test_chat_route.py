@@ -68,11 +68,12 @@ def test_chat_error_becomes_502_with_the_turkish_message(client, monkeypatch):
 
 
 def test_chat_never_writes_the_thread_to_disk(client, fake_complete, tmp_path):
-    """Karar 4: sohbet geçmişi diske YAZILMAZ.
+    """Karar 4'ün KALAN kapsamı: TAMAMLAMA rotası diske yazmaz.
 
-    Tek kalıcı çıktı prompt'un kendisi ve o zaten üretim anında history.json'a
-    giriyor. Bir `chat_store.py` dördüncü bir "prompt yaşayan yer" üretirdi;
-    bu iddia o kararı mekanik hale getiriyor.
+    v1.15 kayıtlı sohbetleri getirdi (`chat_store.py`) ama kararı iptal etmedi,
+    kapsamını daralttı: modelden dönen her yanıtı sessizce diske almak ile
+    kullanıcının "bunu sakla" demesi aynı şey değil. Yazan tek yol
+    `/api/chats`; bu rota bir tur sırasında hiçbir dosyaya dokunmuyor.
     """
     _post(client, [{"role": "user", "content": "x"}])
 

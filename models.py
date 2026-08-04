@@ -281,13 +281,29 @@ class LogoRequest(BaseModel):
 
 # ── Prompt Yönetmeni sohbeti ───────────────────────────────────────────
 #
-# Geçmiş yalnızca istemcide yaşıyor (diske yazılmıyor), yani her turda tel
-# üzerinden TAMAMI geliyor. Sınırlar bu yüzden burada: ~9 bin karakterlik sistem
-# talimatının üstüne sınırsız bir geçmiş binerse token maliyeti sessizce patlar.
+# Açık sohbet istemcide yaşıyor, yani her turda tel üzerinden TAMAMI geliyor.
+# Sınırlar bu yüzden burada: ~9 bin karakterlik sistem talimatının üstüne
+# sınırsız bir geçmiş binerse token maliyeti sessizce patlar.
+#
+# v1.15: aynı sınırlar KAYDETME yolunda da geçerli (`ChatSaveRequest`) — yoksa
+# chats.json istemcinin gönderdiği kadar büyüyebilirdi ve kaydedilmiş bir sohbet
+# yeniden açıldığında tamamlama rotasının 422'siyle KİLİTLENİRDİ.
 MAX_CHAT_MESSAGES = 24          # ~12 tur
 MAX_CHAT_MSG_CHARS = 6000       # tek mesaj
 MAX_CHAT_TOTAL_CHARS = 60000    # tüm geçmiş — mesaj sayısı × tek mesajdan DAHA DAR
+MAX_CHAT_TITLE_CHARS = 120      # kenar panelinde gösterilen başlık
 CHAT_ROLES = {"user", "assistant"}
+
+
+def _check_chat_total(messages: list["ChatMessage"]) -> list["ChatMessage"]:
+    """Toplam karakter kapısı — tamamlama ve kaydetme yollarının PAYLAŞTIĞI kural.
+
+    Rol kuralı paylaşılmıyor: tamamlamada son mesaj kullanıcıdan olmak ZORUNDA,
+    kaydetmede ise normalde asistandan (turun yanıtı).
+    """
+    if sum(len(m.content) for m in messages) > MAX_CHAT_TOTAL_CHARS:
+        raise ValueError("sohbet çok uzun: yeni bir sohbet başlat")
+    return messages
 
 
 class ChatMessage(BaseModel):
@@ -323,9 +339,29 @@ class ChatRequest(BaseModel):
         if v[-1].role != "user":
             # Son mesaj asistandaysa model kendi cevabını yeniden üretmeye çalışır.
             raise ValueError("son mesaj kullanıcıdan olmalı")
-        if sum(len(m.content) for m in v) > MAX_CHAT_TOTAL_CHARS:
-            raise ValueError("sohbet çok uzun: yeni bir sohbet başlat")
-        return v
+        return _check_chat_total(v)
+
+
+class ChatSaveRequest(BaseModel):
+    """`POST /api/chats` ve `PUT /api/chats/{id}` gövdesi.
+
+    `messages` OPSİYONEL çünkü yeniden adlandırma gövdeyi göndermek zorunda
+    değil; `POST`ta zorunluluğu rota kontrol ediyor (yeni ve boş bir kayıt
+    yaratmak anlamsız). "Alan hiç gelmedi" ile "boş geldi" ayrımı burada da
+    None ile taşınıyor — settings yolundaki desenin aynısı.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(default=None, min_length=1,
+                              max_length=MAX_CHAT_TITLE_CHARS)
+    messages: list[ChatMessage] | None = Field(default=None, min_length=1,
+                                               max_length=MAX_CHAT_MESSAGES)
+
+    @field_validator("messages")
+    @classmethod
+    def _messages_ok(cls, v):
+        # Rol kuralı YOK: kaydedilen sohbetin son mesajı normalde asistandan.
+        return v if v is None else _check_chat_total(v)
 
 
 class BannerRequest(BaseModel):

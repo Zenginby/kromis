@@ -122,3 +122,25 @@ def test_override_path_is_writable_user_data_not_read_only_resources(monkeypatch
     assert override.startswith(paths.data_dir())
     assert not override.startswith(paths.resource_dir())
     assert paths.bundled_prompts_dir() == "/tmp/meipass-test/bundled/prompts"
+
+
+def test_the_persona_teaches_the_clickable_options_contract():
+    """v1.15: çiplerin var olma koşulu, personanın `options` bloğu yazması.
+
+    Arayüz tarafı sağlam olsa bile talimat dosyası bu bloğu istemezse yönetmen
+    seçenekleri prozada bırakır ve özellik SESSİZCE ölür — kırılma "hata" gibi
+    değil "model bugün öyle cevap vermedi" gibi görünür. Bu tripwire persona
+    yeniden yazıldığında sözleşmenin düşmesini engelliyor
+    (chat_prompt.MIN_INSTRUCTIONS_CHARS ile aynı ruh).
+    """
+    path = os.path.join(paths.bundled_prompts_dir(), chat_prompt.INSTRUCTIONS_FILE)
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+
+    assert "```options" in text, "seçenek bloğu sözleşmesi yok"
+    assert '"secenekler"' in text, "arayüzün okuduğu anahtar örneklenmemiş"
+    # İstemci bu iki anahtarı da okuyor (chat.js: spec.soru, spec.coklu).
+    assert '"soru"' in text and '"coklu"' in text
+    # Prompt üretilen yanıtta blok OLMAMALI: aksi halde her yanıtta çip çıkar.
+    assert re.search(r"[Ss]oru sormadığın yanıta bu bloğu KOYMA", text), \
+        "bloğun NEREDE olmayacağı söylenmemiş"

@@ -21,20 +21,55 @@ const MAX_PROMPT_CHARS = 4000;
 // chat.js yalnızca showView("image") çağırıyor, böylece sadece kendinden
 // önceki dosyalara bakan bir yaprak kalıyor ve yükleme sırası bozulmuyor.
 const VIEWS = { image: ["view-image", "tab-image"], chat: ["view-chat", "tab-chat"] };
+// Sekme SIRASI yönü belirliyor: sağdaki sekmeye geçerken panel sağdan, soldakine
+// dönerken soldan giriyor. Yön olmadan iki taraf aynı görünür ve hareket
+// "nereden nereye" bilgisini taşımaz.
+const VIEW_ORDER = ["image", "chat"];
+let currentView = "image";
+
+/** Bitişik segmentin kayan dolgusu: aktif düğmenin ölçüsünden okunuyor.
+ *
+ * Genişlik CSS'e SABİTLENEMEZ — "Görsel" ile "Prompt Yönetmeni" farklı
+ * genişlikte ve etiketler çeviriyle/yazı tipiyle değişiyor.
+ */
+function syncTabThumb() {
+  const thumb = $("view-tabs-thumb");
+  const tab = $(VIEWS[currentView][1]);
+  thumb.style.width = `${tab.offsetWidth}px`;
+  thumb.style.transform = `translateX(${tab.offsetLeft}px)`;
+}
 
 function showView(name) {
+  const forward = VIEW_ORDER.indexOf(name) > VIEW_ORDER.indexOf(currentView);
+  const changed = name !== currentView;
+  currentView = name;
   for (const [key, [viewId, tabId]] of Object.entries(VIEWS)) {
     const active = key === name;
-    $(viewId).hidden = !active;
+    const view = $(viewId);
+    // `hidden` ANINDA çevriliyor (çift panelli cross-fade YOK): iki paneli
+    // birlikte görünür tutmak katman + çift odak + sıçrayan yerleşim demekti.
+    // Animasyon yalnızca GİREN panelde ve `hidden` kalkar kalkmaz başlıyor.
+    view.hidden = !active;
+    if (active && changed) {
+      view.classList.remove("view-in-left", "view-in-right");
+      // reflow: sınıf aynı karede kaldırılıp eklenirse animasyon yeniden başlamaz
+      void view.offsetWidth;
+      view.classList.add(forward ? "view-in-right" : "view-in-left");
+    }
     $(tabId).classList.toggle("active", active);
     // aria-selected tel üzerinde güncellenmeli: role="tab" verildiği anda
     // ekran okuyucu hangi sekmenin seçili olduğunu SINIFTAN değil bundan okur.
     $(tabId).setAttribute("aria-selected", active ? "true" : "false");
   }
+  syncTabThumb();
 }
 
 $("tab-image").addEventListener("click", () => showView("image"));
 $("tab-chat").addEventListener("click", () => showView("chat"));
+// Yazı tipi geldiğinde ve pencere değiştiğinde dolgu kayar: ölçüm tazelenmeli.
+window.addEventListener("resize", syncTabThumb);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(syncTabThumb);
+syncTabThumb();
 
 // Ana referans görsel: null | { kind: "upload", file, label } | { kind: "gallery", id, label }
 let source = null;

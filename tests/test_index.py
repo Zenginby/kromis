@@ -566,11 +566,27 @@ def test_chat_workspace_markup_is_served():
     girildiğinde fark edilir — ucuz tripwire o yüzden değerli.
     """
     html = TestClient(appmod.app).get("/").text
-    for element_id in ("tab-image", "tab-chat", "view-image", "view-chat",
-                       "chat-log", "chat-empty", "chat-input", "chat-send",
-                       "chat-clear", "chat-status", "chat-wait", "chat-gate",
+    for element_id in ("tab-image", "tab-chat", "view-tabs-thumb", "view-image",
+                       "view-chat", "chat-log", "chat-empty", "chat-input",
+                       "chat-send", "chat-status", "chat-wait", "chat-gate",
+                       # v1.15: kayıtlı sohbet paneli
+                       "chat-sidebar", "chat-sidebar-toggle", "chat-new",
+                       "chat-list", "chat-list-empty",
                        "set-chat-deployment", "chat-instructions-path"):
         assert f'id="{element_id}"' in html, element_id
+
+
+def test_the_clear_chat_button_is_gone():
+    """v1.15: "Sohbeti temizle" KALDIRILDI, işlevi ikiye bölündü.
+
+    Yeni bir sohbete geçmek "Yeni sohbet" (kenar panel), bir sohbetten kurtulmak
+    3-nokta → Sil. Eskisi ikisini de yapmıyordu: temizlenen sohbet kaydedilmişse
+    diskte kalıyordu, yani düğme artık YANILTICI olurdu.
+    """
+    html = TestClient(appmod.app).get("/").text
+    assert 'id="chat-clear"' not in html
+    js = TestClient(appmod.app).get("/static/chat.js").text
+    assert "chat-clear" not in js, "chat.js hâlâ var olmayan bir id'ye bağlanıyor"
 
 
 def test_chat_tab_itself_is_not_disabled_in_the_markup():
@@ -746,3 +762,170 @@ def test_chat_view_is_hidden_on_first_paint():
     assert "hidden" in chat_view.group(0), "sohbet paneli açılışta görünür"
     image_view = re.search(r'<div id="view-image"[^>]*>', html)
     assert "hidden" not in image_view.group(0), "görsel sekmesi açılışta gizli"
+
+
+# ── Tıklanabilir seçenekler + prompt barı (v1.15) ──────────────────────
+
+def _chat_js() -> str:
+    return TestClient(appmod.app).get("/static/chat.js").text
+
+
+def test_settings_block_is_recognised_by_its_keys_not_by_being_first_json():
+    """Blok tipi ANAHTARDAN okunmalı, sıradan değil.
+
+    v1.14'te ayar bloğu "ilk JSON nesnesi" diye seçiliyordu. v1.15'in seçenek
+    bloğu da `{` ile başlıyor ve yanıtta ondan ÖNCE geliyor: eski kural
+    yönetmenin SEÇENEKLERİNİ forma ayar olarak yazardı ve desteklenmeyen bir
+    değer üretimde 422'ye dönerdi.
+    """
+    js = _chat_js()
+    keys = re.search(r"const SETTING_KEYS\s*=\s*\[(.*?)\]", js, re.S)
+    assert keys, "SETTING_KEYS bulunamadı"
+    for key in ('"size"', '"quality"', '"n"'):
+        assert key in keys.group(1), key
+    body = re.search(r"function parseDirectorReply\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "parseDirectorReply() bulunamadı"
+    assert "SETTING_KEYS.some" in body.group(1), (
+        "ayar bloğu anahtarla tanınmıyor — seçenek bloğu forma ayar olarak girebilir")
+    assert "secenekler" in body.group(1), "seçenek bloğu ayrıştırılmıyor"
+
+
+def test_the_options_block_is_never_drawn_as_a_code_block():
+    """Seçenek bloğunun görünür karşılığı ÇİPLER; ham JSON gösterilmemeli."""
+    js = _chat_js()
+    body = re.search(r"function renderMarkdownInto\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "renderMarkdownInto() bulunamadı"
+    assert "parsed.optionsBody" in body.group(1), (
+        "seçenek bloğu atlanmıyor — kullanıcı ham JSON okur")
+
+
+def test_option_clicks_go_through_the_single_send_path():
+    """Çipler ikinci bir gönderim yolu açmamalı.
+
+    `sendChat` sınır kapılarını, başarısız turun geri alınmasını ve kaydetmeyi
+    tek yerde tutuyor; ayrı bir fetch yazılsa bunların hepsi çiplerde eksik
+    kalırdı (v1.13'te tam bu tür bir ikinci yol hiç yazılmadığı için sağlamdı).
+    """
+    js = _chat_js()
+    body = re.search(r"function renderOptions\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "renderOptions() bulunamadı"
+    assert "sendChat()" in body.group(1), "çipler sendChat'i çağırmıyor"
+    assert "fetch(" not in body.group(1), "çipler kendi isteğini atıyor"
+
+
+def test_prompt_actions_live_on_the_prompt_block_not_at_the_bottom():
+    """İstenen değişiklik: eylemler prompt'un yanında, mesajın dibinde değil."""
+    js = _chat_js()
+    body = re.search(r"function promptFigure\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "promptFigure() bulunamadı"
+    assert "chat-prompt-bar" in body.group(1)
+    assert "copyPrompt(parsed.prompt)" in body.group(1), "Kopyala bağlı değil"
+    assert "applyToForm(parsed)" in body.group(1), "Forma aktar bağlı değil"
+    # Sınıf adı bir AÇIKLAMADA geçebilir (neden kaldırıldığı yazıyor); yasak olan
+    # şey ona bir düğüm bağlanması, yani dizeyle atanması.
+    assert '"chat-msg-actions"' not in js, "eski alt eylem satırı hâlâ üretiliyor"
+    css = TestClient(appmod.app).get("/static/style.css").text
+    assert ".chat-msg-actions" not in css, "ölü kural CSS'te kalmış"
+
+
+def test_the_duplicate_prompt_heading_is_swallowed():
+    """Barın etiketi ile talimatın "**PROMPT**" başlığı aynı şeyi söylüyordu.
+
+    Etiket barda KALIYOR (yapısal, her zaman doğru); yutulan şey modelin tekrar
+    satırı ve yalnızca TAM eşleşmede — model başka bir başlık yazdıysa duruyor.
+    """
+    js = _chat_js()
+    assert re.search(r"const PROMPT_HEADING\s*=\s*/\^", js), "desen bulunamadı"
+    body = re.search(r"function renderMarkdownInto\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert "PROMPT_HEADING.test" in body.group(1)
+
+
+def test_the_prompt_block_wraps_instead_of_scrolling_sideways():
+    """Prompt bir PROZA: `white-space: pre` onu tek satırlık şeride çeviriyordu.
+
+    Teknik ayar JSON'u için kural DEĞİŞMEMELİ — bu yüzden seçici yalnız
+    .chat-prompt-block'u hedefliyor.
+    """
+    css = TestClient(appmod.app).get("/static/style.css").text
+    rule = re.search(r"\.chat-msg-bot pre\.chat-prompt-block code\s*\{([^}]*)\}", css)
+    assert rule, "prompt bloğu kod kuralı bulunamadı"
+    assert "pre-wrap" in rule.group(1), "prompt sarmıyor"
+
+
+def test_stale_option_groups_are_locked_but_not_deleted():
+    """Akış geçmişi dürüst kalmalı; eski soruya ikinci cevap gitmemeli.
+
+    Canlılık ölçüsü "son GRUP" değil, "SON MESAJIN içinde olmak" — ilk yazımda
+    öyleydi ve tarayıcıda kırıldı: kaydedilmiş bir sohbet açıldığında
+    cevaplanmış tek soru da "son grup" olduğu için yeniden canlanıyordu.
+    """
+    js = _chat_js()
+    body = re.search(r"function lockStaleOptions\(\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "lockStaleOptions() bulunamadı"
+    assert "lastElementChild" in body.group(1) and ".contains(group)" in body.group(1), (
+        "kilit ölçüsü son mesaja bağlı değil — bayat bir soru yeniden canlanabilir")
+    assert "remove()" not in body.group(1), "eski gruplar siliniyor"
+
+
+# ── Kayıtlı sohbetler (v1.15) ──────────────────────────────────────────
+
+def test_a_failed_save_does_not_drop_the_turn():
+    """Kaydetme hatası yanıtı ekrandan silmemeli, ama SESSİZ de geçmemeli.
+
+    Sessiz geçilse kullanıcı sohbetin kaydedildiğini sanardı ve uygulamayı
+    kapattığında turu kaybederdi.
+    """
+    js = _chat_js()
+    body = re.search(r"async function persistThread\(\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "persistThread() bulunamadı"
+    assert "catch" in body.group(1), "kaydetme hatası yakalanmıyor"
+    assert "chatStatus(" in body.group(1), "kaydetme hatası kullanıcıya söylenmiyor"
+    assert "chatThread = []" not in body.group(1), "hata turu düşürüyor"
+
+
+def test_deleting_the_open_chat_clears_the_stream():
+    """Silinen sohbeti ekranda bırakmak yanıltıcı: sonraki tur 404 alır ve
+    kullanıcı "kaydedilmiyor" sanır."""
+    js = _chat_js()
+    body = re.search(r"async function deleteChat\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "deleteChat() bulunamadı"
+    assert "resetThread()" in body.group(1)
+
+
+def test_the_chat_title_is_derived_locally_not_asked_from_the_model():
+    """Başlık için İKİNCİ bir model çağrısı YOK: para ve gecikme, kazancı etiket."""
+    js = _chat_js()
+    body = re.search(r"function deriveTitle\(\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "deriveTitle() bulunamadı"
+    assert "fetch(" not in body.group(1)
+    assert "/api/chat" not in body.group(1)
+
+
+# ── Sekme geçişi (v1.15) ───────────────────────────────────────────────
+
+def test_the_tab_thumb_is_measured_from_the_active_button():
+    """Genişlik CSS'e sabitlenemez: "Görsel" ile "Prompt Yönetmeni" aynı
+    genişlikte değil ve etiketler yazı tipiyle kayıyor."""
+    js = TestClient(appmod.app).get("/static/core.js").text
+    body = re.search(r"function syncTabThumb\(\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "syncTabThumb() bulunamadı"
+    assert "offsetWidth" in body.group(1) and "offsetLeft" in body.group(1)
+
+
+def test_the_view_transition_only_animates_compositor_properties():
+    """Yerleşim tetikleyen bir özellik animasyona girerse geçiş takılır."""
+    css = TestClient(appmod.app).get("/static/style.css").text
+    for name in ("viewInRight", "viewInLeft"):
+        frames = re.search(r"@keyframes " + name + r"\s*\{(.*?)\n\}", css, re.S)
+        assert frames, name
+        for banned in ("width:", "height:", "margin", "padding", "top:", "left:"):
+            assert banned not in frames.group(1), f"{name} → {banned}"
+
+
+def test_reduced_motion_silences_the_view_animation():
+    """`transition: none !important` bloğu `animation`'ı SUSTURMUYOR."""
+    css = TestClient(appmod.app).get("/static/style.css").text
+    block = re.search(r"@media \(prefers-reduced-motion: reduce\)\s*\{(.*)", css, re.S)
+    assert block, "reduced-motion bloğu bulunamadı"
+    assert re.search(r"\.view-in-right[^{]*\{[^}]*animation: none", block.group(1)), (
+        "sekme geçişi reduced-motion'da susturulmuyor")

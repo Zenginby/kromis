@@ -5,23 +5,31 @@
 //   core.js → folders.js → assets.js → palette.js → settings.js → viewer.js → chat.js
 //
 // Bu dosya EN SONDA: bir YAPRAK, yalnızca kendinden önce tanımlanan adlara
-// bakıyor ($, statusEl, detailText, confirmDialog, showView, MAX_PROMPT_CHARS).
-// Sekme geçişinin kendisi core.js'te (kabuk sorumluluğu), burada değil.
+// bakıyor ($, statusEl, detailText, confirmDialog, promptDialog, showView,
+// MAX_PROMPT_CHARS). Sekme geçişinin kendisi core.js'te (kabuk sorumluluğu).
 //
 // GÜVENLİK DURUŞU: sunucudan/modelden gelen metin DOM'a yalnızca `textContent`
 // ile girer (renderExtras ile aynı duruş). `innerHTML` bu dosyada tek bir yerde,
-// akışı BOŞ DİZEYLE temizlemek için kullanılıyor.
+// akışı BOŞ DİZEYLE temizlemek için kullanılıyor. Yönetmenin seçenek etiketleri
+// de model metnidir — onlar da aynı kapıdan geçer.
 
 // Sunucudaki models.py sınırlarının aynası. İstemci kapısı olmadan sınır aşımı
 // pydantic'in İNGİLİZCE 422 metniyle geri dönerdi.
 const MAX_CHAT_MESSAGES = 24;        // models.MAX_CHAT_MESSAGES
 const MAX_CHAT_MSG_CHARS = 6000;     // models.MAX_CHAT_MSG_CHARS
 const MAX_CHAT_TOTAL_CHARS = 60000;  // models.MAX_CHAT_TOTAL_CHARS
+// Başlık ilk kullanıcı mesajından türetiliyor. Modele "bu sohbete isim ver"
+// diye İKİNCİ bir çağrı YAPILMIYOR: para ve gecikme, kazancı bir etiket.
+// Beğenmeyen kullanıcı 3-nokta menüsünden yeniden adlandırıyor.
+const CHAT_TITLE_CHARS = 48;         // models.MAX_CHAT_TITLE_CHARS'tan (120) dar
 
-// Sohbet geçmişi YALNIZCA burada yaşar; diske yazılmaz (karar 4). Kayıp riski
-// "Sohbeti temizle"nin onay penceresiyle kapatılıyor.
+// Açık sohbetin gövdesi burada yaşıyor; her tur sonunda /api/chats'e yazılıyor
+// (v1.15). currentChatId null = henüz kaydedilmemiş yeni sohbet.
 let chatThread = [];
 let chatBusy = false;
+let currentChatId = null;
+let chatSummaries = [];
+let openMenuId = null;               // 3-nokta menüsü açık olan sohbet (yoksa null)
 
 const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -35,6 +43,8 @@ function chatStatus(text) {
 // dosyasının zorunlu çıktı formatı tablo kullanmıyor.
 const FENCE = /^\s*```(\w*)\s*$/;
 const INLINE = /\*\*([^*]+)\*\*|`([^`]+)`/g;
+// Prompt bloğunun hemen üstündeki tekrar başlık ("PROMPT" / "PROMPT:").
+const PROMPT_HEADING = /^\s*prompt\s*:?\s*$/i;
 
 function appendInline(host, text) {
   let last = 0;
@@ -64,7 +74,41 @@ function prose(line) {
   return p;
 }
 
-function renderMarkdownInto(host, text, promptBody) {
+/** Prompt bloğu + eylem barı: sayfadaki asıl ürün, düğmeleri de kendi başında.
+ *
+ * Eylemler v1.14'te mesajın EN ALTINDA duruyordu (`.chat-msg-actions`): prompt'u
+ * okuyan göz düğmeleri bulmak için varyasyon ve parametre listelerini geçmek
+ * zorundaydı. Bar bloğun başında, bakılan şeyin yanında.
+ */
+function promptFigure(pre, parsed) {
+  const fig = document.createElement("figure");
+  fig.className = "chat-prompt";
+
+  const bar = document.createElement("div");
+  bar.className = "chat-prompt-bar";
+
+  const label = document.createElement("span");
+  label.className = "chat-prompt-label";
+  label.textContent = "PROMPT";
+
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.className = "btn-ghost chat-prompt-btn";
+  copy.textContent = "Kopyala";
+  copy.addEventListener("click", () => copyPrompt(parsed.prompt));
+
+  const apply = document.createElement("button");
+  apply.type = "button";
+  apply.className = "primary chat-prompt-btn";
+  apply.textContent = "Forma aktar";
+  apply.addEventListener("click", () => applyToForm(parsed));
+
+  bar.append(label, copy, apply);
+  fig.append(bar, pre);
+  return fig;
+}
+
+function renderMarkdownInto(host, text, parsed) {
   const lines = text.split("\n");
   let list = null;
   for (let i = 0; i < lines.length; i++) {
@@ -74,10 +118,23 @@ function renderMarkdownInto(host, text, promptBody) {
       const body = [];
       i++;
       while (i < lines.length && !FENCE.test(lines[i])) body.push(lines[i++]);
-      const pre = codeBlock(body.join("\n"), fence[1] || "");
-      // Sayfadaki asıl ürün prompt bloğu: akışta gözle bulunabilmeli.
-      if (promptBody && body.join("\n").trim() === promptBody) {
+      const joined = body.join("\n");
+      // Seçenek bloğu ÇİZİLMEZ: onun görünür karşılığı tıklanabilir çipler
+      // (renderOptions). Atlanmasa kullanıcı ham JSON okurdu.
+      if (parsed.optionsBody && joined.trim() === parsed.optionsBody) continue;
+      const pre = codeBlock(joined, fence[1] || "");
+      if (parsed.prompt && joined.trim() === parsed.prompt) {
         pre.classList.add("chat-prompt-block");
+        // Talimat dosyası bloğun üstüne "**PROMPT**" yazdırıyor; barın etiketi de
+        // aynı şeyi söylüyor. Etiket barda KALIYOR (yapısal ve her zaman doğru),
+        // yalnız o tekrar satırı yutuluyor. Model başka bir şey yazdıysa
+        // dokunulmaz — desen tam eşleşmeye bakıyor.
+        const last = host.lastElementChild;
+        if (last && last.tagName === "P" && PROMPT_HEADING.test(last.textContent)) {
+          last.remove();
+        }
+        host.appendChild(promptFigure(pre, parsed));
+        continue;
       }
       host.appendChild(pre);
       continue;
@@ -119,30 +176,176 @@ function fencedBlocks(text) {
   return blocks;
 }
 
-/** → { prompt, settings }. Biçim kayarsa SESSİZCE boş dönmez, en iyi adayı seçer. */
+/** Gövdesi JSON NESNESİ olan bloğu ayrıştırır; değilse null. */
+function jsonObject(block) {
+  if (block.lang !== "json" && block.lang !== "options"
+      && !block.body.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(block.body);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+  } catch { return null; }   // biçimi kaymış blok: prompt adayı olarak kalsın
+}
+
+// Teknik ayar bloğunun İMZASI. Blok tipini "ilk JSON nesnesi" diye seçmek
+// v1.15'te KIRILDI: seçenek bloğu da `{` ile başlıyor ve yanıtta ondan ÖNCE
+// geliyor — o kural yönetmenin seçeneklerini forma AYAR olarak yazardı
+// (desteklenmeyen değer → üretimde 422). Tip artık anahtardan okunuyor.
+const SETTING_KEYS = ["size", "quality", "n"];
+
+/** → { prompt, settings, options, optionsBody }. Biçim kayarsa en iyi adayı seçer. */
 function parseDirectorReply(text) {
   const blocks = fencedBlocks(text);
   let settings = null;
   let settingsBlock = null;
+  let options = null;
+  let optionsBlock = null;
+
   for (const b of blocks) {
-    if (b.lang !== "json" && !b.body.startsWith("{")) continue;
-    try {
-      const parsed = JSON.parse(b.body);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        settings = parsed;
-        settingsBlock = b;
-        break;
-      }
-    } catch { /* biçimi kaymış blok: prompt adayı olarak kalsın */ }
+    const obj = jsonObject(b);
+    if (!obj) continue;
+    if (!settings && SETTING_KEYS.some((k) => obj[k] !== undefined)) {
+      settings = obj;
+      settingsBlock = b;
+      continue;
+    }
+    if (!options && Array.isArray(obj.secenekler) && obj.secenekler.length) {
+      options = obj;
+      optionsBlock = b;
+    }
   }
-  const candidates = blocks.filter((b) => b !== settingsBlock && b.body);
+
+  const candidates = blocks.filter(
+    (b) => b !== settingsBlock && b !== optionsBlock && b.body);
   let promptBlock = candidates.find((b) => /PROMPT/i.test(b.heading));
   if (!promptBlock) {
     // Başlık kayarsa en UZUN blok: yönetmenin prozası her zaman en uzundur.
     promptBlock = candidates.reduce(
       (best, b) => (!best || b.body.length > best.body.length ? b : best), null);
   }
-  return { prompt: promptBlock ? promptBlock.body : "", settings };
+  return {
+    prompt: promptBlock ? promptBlock.body : "",
+    settings,
+    options,
+    optionsBody: optionsBlock ? optionsBlock.body : "",
+  };
+}
+
+// ── Tıklanabilir seçenekler ─────────────────────────────────────────
+// Yönetmen soruyu prozada da soruyor; buradaki çipler onun makine tarafı.
+// Serbest yazı alanı HER ZAMAN var: "bunların hiçbiri değil" cevabı bir
+// seçenek olarak listelenemez (talimat dosyası "diğer" yazmayı da yasaklıyor).
+
+const OPTION_MAX = 8;                // savunma: model uzun bir liste döndürürse
+const OPTION_JOIN = " · ";
+
+function optionChip(label, multi, group) {
+  const chip = document.createElement("button");
+  chip.type = "button";
+  chip.className = "chat-option";
+  chip.setAttribute("role", multi ? "checkbox" : "radio");
+  chip.setAttribute("aria-checked", "false");
+  chip.textContent = label;          // ← model metni: yalnızca textContent
+  chip.addEventListener("click", () => {
+    const on = chip.getAttribute("aria-checked") === "true";
+    if (!multi) {
+      // Tek seçim: birbirini dışlayan eksenlerde (mecra gibi) iki cevap
+      // göndermek yönetmene çelişki okutur.
+      for (const other of group.querySelectorAll(".chat-option")) {
+        other.setAttribute("aria-checked", "false");
+      }
+    }
+    chip.setAttribute("aria-checked", on ? "false" : "true");
+  });
+  return chip;
+}
+
+function optionsValue(group) {
+  const picked = [...group.querySelectorAll(".chat-option")]
+    .filter((c) => c.getAttribute("aria-checked") === "true")
+    .map((c) => c.textContent);
+  const own = group.querySelector(".chat-own-input").value.trim();
+  if (!picked.length && !own) return "";
+  return picked.length && own ? `${picked.join(OPTION_JOIN)}\n${own}`
+                              : (own || picked.join(OPTION_JOIN));
+}
+
+/** Grubu kilitler: eski bir soruya ikinci kez cevap gönderilmesin. */
+function lockOptions(group) {
+  group.classList.add("chat-options-done");
+  for (const el of group.querySelectorAll("button, input")) el.disabled = true;
+}
+
+/** Yalnızca SON mesajın içindeki grup canlı kalır; geri kalanı kilitlenir.
+ *
+ * Ölçü "son grup" DEĞİL: kaydedilmiş bir sohbet yeniden açıldığında cevaplanmış
+ * tek bir soru da "son grup" olur ve yeniden canlanırdı — kullanıcı eski bir
+ * soruya ikinci kez cevap gönderirdi. Ölçü "arkasından başka mesaj gelmemiş
+ * olmak"; son mesaj kullanıcıdan ise hiçbir grup canlı değil, o da doğru.
+ */
+function lockStaleOptions() {
+  const log = $("chat-log");
+  const last = log.lastElementChild;
+  for (const group of log.querySelectorAll(".chat-options")) {
+    if (!last || !last.contains(group)) lockOptions(group);
+  }
+}
+
+function renderOptions(parsed) {
+  const spec = parsed.options;
+  const group = document.createElement("div");
+  group.className = "chat-options";
+  group.setAttribute("role", spec.coklu === false ? "radiogroup" : "group");
+  group.setAttribute("aria-label", String(spec.soru || "Seçenekler"));
+
+  if (spec.soru) {
+    const q = document.createElement("p");
+    q.className = "chat-options-q";
+    q.textContent = String(spec.soru);
+    group.appendChild(q);
+  }
+
+  const chips = document.createElement("div");
+  chips.className = "chat-options-chips";
+  for (const raw of spec.secenekler.slice(0, OPTION_MAX)) {
+    chips.appendChild(optionChip(String(raw), spec.coklu !== false, group));
+  }
+  group.appendChild(chips);
+
+  const own = document.createElement("div");
+  own.className = "chat-own";
+  const label = document.createElement("label");
+  label.className = "chat-own-label";
+  label.textContent = "Bunlardan biri değilse kendi fikrini yaz";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "chat-own-input";
+  input.maxLength = MAX_CHAT_MSG_CHARS;
+  input.placeholder = "Kendi fikrim…";
+  const id = `chat-own-${Math.random().toString(36).slice(2, 8)}`;
+  input.id = id;
+  label.htmlFor = id;
+
+  const send = document.createElement("button");
+  send.type = "button";
+  send.className = "primary chat-own-send";
+  send.textContent = "Devam et";
+
+  const submit = async () => {
+    const value = optionsValue(group);
+    if (!value) { chatStatus("Bir seçenek seç ya da kendi fikrini yaz."); return; }
+    // Gönderim TEK yoldan: sınır kapıları, hata geri alma ve kaydetme
+    // sendChat'te yaşıyor; ikinci bir gönderim yolu yazılmıyor.
+    $("chat-input").value = value;
+    if (await sendChat()) lockOptions(group);
+  };
+  send.addEventListener("click", submit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); submit(); }
+  });
+
+  own.append(label, input, send);
+  group.appendChild(own);
+  return group;
 }
 
 // ── Forma uygulama ──────────────────────────────────────────────────
@@ -236,28 +439,8 @@ function appendBot(text) {
   role.textContent = "Yönetmen";
   div.appendChild(role);
 
-  renderMarkdownInto(div, text, parsed.prompt);
-
-  if (parsed.prompt) {
-    const actions = document.createElement("div");
-    actions.className = "chat-msg-actions";
-
-    const apply = document.createElement("button");
-    apply.type = "button";
-    apply.className = "primary";
-    apply.textContent = "Forma aktar (prompt + ayarlar)";
-    apply.addEventListener("click", () => applyToForm(parsed));
-
-    const copy = document.createElement("button");
-    copy.type = "button";
-    copy.className = "btn-ghost";
-    copy.textContent = "Prompt'u kopyala";
-    copy.addEventListener("click", () => copyPrompt(parsed.prompt));
-
-    actions.appendChild(apply);
-    actions.appendChild(copy);
-    div.appendChild(actions);
-  }
+  renderMarkdownInto(div, text, parsed);
+  if (parsed.options) div.appendChild(renderOptions(parsed));
 
   $("chat-log").appendChild(div);
   syncEmptyState();
@@ -279,24 +462,25 @@ function setChatBusy(busy) {
 
 // ── Gönderim ────────────────────────────────────────────────────────
 
+/** → true yalnızca tur BAŞARIYLA tamamlandıysa (seçenek grubu buna göre kilitlenir). */
 async function sendChat() {
-  if (chatBusy) return;
+  if (chatBusy) return false;
   const input = $("chat-input");
   const message = input.value.trim();
-  if (!message) { chatStatus("Önce bir mesaj yaz."); return; }
+  if (!message) { chatStatus("Önce bir mesaj yaz."); return false; }
   if (message.length > MAX_CHAT_MSG_CHARS) {
     chatStatus(`Mesaj çok uzun (${message.length}/${MAX_CHAT_MSG_CHARS} karakter).`);
-    return;
+    return false;
   }
   if (chatThread.length >= MAX_CHAT_MESSAGES) {
-    chatStatus("Bu sohbet doldu (en fazla 12 tur). \"Sohbeti temizle\" ile yeni bir sohbet başlat.");
-    return;
+    chatStatus("Bu sohbet doldu (en fazla 12 tur). Soldaki \"Yeni sohbet\" ile devam et.");
+    return false;
   }
   const total = chatThread.reduce((n, m) => n + m.content.length, 0) + message.length;
   if (total > MAX_CHAT_TOTAL_CHARS) {
-    chatStatus("Sohbet çok uzadı — yeni bir sohbet başlat. (Son prompt'u kaybetmemek "
-      + "için önce \"Forma aktar\"a bas.)");
-    return;
+    chatStatus("Sohbet çok uzadı — soldaki \"Yeni sohbet\" ile devam et. (Son prompt'u "
+      + "kaybetmemek için önce \"Forma aktar\"a bas.)");
+    return false;
   }
 
   chatThread.push({ role: "user", content: message });
@@ -317,8 +501,13 @@ async function sendChat() {
     const { content, finish_reason } = await res.json();
     chatThread.push({ role: "assistant", content });
     appendBot(content);
+    lockStaleOptions();
     chatStatus(finish_reason === "length"
       ? "Yanıt uzunluk sınırında kesilmiş olabilir — kısa bir brief'le tekrar dene." : "");
+    // Kaydetme EN SONDA ve turu düşürmüyor: başarısız olursa yanıt ekranda kalır
+    // ve durum satırı bunu söyler (bkz. persistThread).
+    await persistThread();
+    return true;
   } catch (e) {
     // BAŞARISIZ TUR GEÇMİŞTE KALMAZ: kalsaydı her yeniden gönderim aynı hatayı
     // tekrarlardı. Mesaj kaybolmasın diye girdiye geri konuyor.
@@ -327,30 +516,260 @@ async function sendChat() {
     input.value = message;
     syncEmptyState();
     chatStatus(e.message);
+    return false;
   } finally {
     setChatBusy(false);
   }
 }
 
-async function clearChat() {
-  if (!chatThread.length) { $("chat-input").value = ""; return; }
-  const ok = await confirmDialog("Sohbeti temizle",
-    "Bu sohbetin tamamı silinecek. Sohbet diske kaydedilmiyor, geri alınamaz.",
-    { okLabel: "Temizle" });
-  if (!ok) return;
+// ── Kayıtlı sohbetler (kenar panel) ─────────────────────────────────
+// Kalıcılık SUNUCUDA: `desktop.py` pencereyi pywebview'ın private mode
+// varsayılanıyla açıyor ve orada localStorage her kapanışta silinir — paketli
+// .app'te geçmiş sessizce buharlaşırdı.
+
+async function chatApi(path, { method = "GET", body } = {}) {
+  const res = await fetch(path, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(detailText(err) || `Hata (${res.status})`);
+  }
+  return res.json();
+}
+
+/** Başlık = ilk kullanıcı mesajı, kelime sınırında kısaltılmış. */
+function deriveTitle() {
+  const first = chatThread.find((m) => m.role === "user");
+  const text = (first ? first.content : "").replace(/\s+/g, " ").trim();
+  if (!text) return "Adsız sohbet";
+  if (text.length <= CHAT_TITLE_CHARS) return text;
+  const cut = text.slice(0, CHAT_TITLE_CHARS);
+  const space = cut.lastIndexOf(" ");
+  return `${space > 20 ? cut.slice(0, space) : cut}…`;
+}
+
+async function persistThread() {
+  try {
+    if (currentChatId) {
+      await chatApi(`/api/chats/${currentChatId}`, {
+        method: "PUT", body: { messages: chatThread },
+      });
+    } else {
+      const { chat } = await chatApi("/api/chats", {
+        method: "POST", body: { title: deriveTitle(), messages: chatThread },
+      });
+      currentChatId = chat.id;
+    }
+    await loadChats();
+  } catch (e) {
+    // Tur DÜŞMÜYOR: yanıt ekranda ve bellekte duruyor, yalnız diske yazılamadı.
+    // Sessiz geçilse kullanıcı sohbetin kaydedildiğini sanardı.
+    chatStatus(`Sohbet kaydedilemedi (${e.message}) — yanıt ekranda duruyor.`);
+  }
+}
+
+/** "14:32" (bugünse) ya da "5 Ağu" — panelde tek satır sığacak kadar kısa. */
+function shortStamp(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  return sameDay
+    ? d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
+}
+
+function closeMenus() {
+  openMenuId = null;
+  for (const menu of $("chat-list").querySelectorAll(".chat-menu")) menu.hidden = true;
+  for (const btn of $("chat-list").querySelectorAll(".chat-item-menu")) {
+    btn.setAttribute("aria-expanded", "false");
+  }
+}
+
+function chatMenu(summary) {
+  const menu = document.createElement("div");
+  menu.className = "chat-menu";
+  menu.hidden = true;
+
+  const rename = document.createElement("button");
+  rename.type = "button";
+  rename.className = "chat-menu-item";
+  rename.textContent = "Yeniden adlandır";
+  rename.addEventListener("click", () => { closeMenus(); renameChat(summary); });
+
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "chat-menu-item chat-menu-danger";
+  remove.textContent = "Sil";
+  remove.addEventListener("click", () => { closeMenus(); deleteChat(summary); });
+
+  menu.append(rename, remove);
+  return menu;
+}
+
+function chatItem(summary) {
+  const li = document.createElement("li");
+  li.className = "chat-item";
+  if (summary.id === currentChatId) {
+    li.classList.add("active");
+    li.setAttribute("aria-current", "true");
+  }
+
+  const open = document.createElement("button");
+  open.type = "button";
+  open.className = "chat-item-open";
+  const title = document.createElement("span");
+  title.className = "chat-item-title";
+  title.textContent = summary.title || "Adsız sohbet";
+  const meta = document.createElement("span");
+  meta.className = "chat-item-meta";
+  meta.textContent = shortStamp(summary.updated_at);
+  open.append(title, meta);
+  open.addEventListener("click", () => openChat(summary.id));
+
+  const menuBtn = document.createElement("button");
+  menuBtn.type = "button";
+  menuBtn.className = "chat-item-menu";
+  menuBtn.setAttribute("aria-haspopup", "true");
+  menuBtn.setAttribute("aria-expanded", "false");
+  menuBtn.setAttribute("aria-label", `${title.textContent} — işlemler`);
+  menuBtn.title = "İşlemler";
+  menuBtn.textContent = "⋯";
+
+  const menu = chatMenu(summary);
+  menuBtn.addEventListener("click", () => {
+    const wasOpen = openMenuId === summary.id;
+    closeMenus();
+    if (wasOpen) return;            // aynı düğme ikinci tıklamada kapatır
+    openMenuId = summary.id;
+    menu.hidden = false;
+    menuBtn.setAttribute("aria-expanded", "true");
+    menu.querySelector(".chat-menu-item").focus();
+  });
+
+  li.append(open, menuBtn, menu);
+  return li;
+}
+
+function renderChatList() {
+  const list = $("chat-list");
+  list.innerHTML = "";               // ← innerHTML yalnız BOŞ DİZEYLE
+  for (const summary of chatSummaries) list.appendChild(chatItem(summary));
+  $("chat-list-empty").hidden = chatSummaries.length > 0;
+}
+
+async function loadChats() {
+  try {
+    const { chats } = await chatApi("/api/chats");
+    chatSummaries = chats;
+    renderChatList();
+  } catch {
+    // Panel boş kalır ama sohbet ÇALIŞMAYA devam eder: liste bir kolaylık,
+    // turun ön koşulu değil.
+    $("chat-list-empty").hidden = false;
+    $("chat-list-empty").textContent = "Sohbet listesi alınamadı.";
+  }
+}
+
+function resetThread() {
   chatThread = [];
-  $("chat-log").innerHTML = "";   // ← innerHTML yalnız BOŞ DİZEYLE (core.js:renderExtras deseni)
-  syncEmptyState();
+  currentChatId = null;
+  $("chat-log").innerHTML = "";       // ← innerHTML yalnız BOŞ DİZEYLE
   chatStatus("");
+  syncEmptyState();
+}
+
+function newChat() {
+  if (chatBusy) { chatStatus("Yönetmen yanıtlıyor — bitmesini bekle."); return; }
+  closeMenus();
+  resetThread();
+  renderChatList();                   // seçili işaret kalkar
+  closeSidebarOnMobile();
   $("chat-input").focus();
+}
+
+async function openChat(chatId) {
+  if (chatBusy) { chatStatus("Yönetmen yanıtlıyor — bitmesini bekle."); return; }
+  closeMenus();
+  if (chatId === currentChatId) { closeSidebarOnMobile(); return; }
+  try {
+    const { chat } = await chatApi(`/api/chats/${chatId}`);
+    resetThread();
+    currentChatId = chat.id;
+    chatThread = chat.messages || [];
+    for (const m of chatThread) {
+      if (m.role === "user") appendUser(m.content); else appendBot(m.content);
+    }
+    // Eski turların seçenekleri BAYAT: yalnız son grup canlı kalır.
+    lockStaleOptions();
+    syncEmptyState();
+    renderChatList();
+    closeSidebarOnMobile();
+    $("chat-input").focus();
+  } catch (e) {
+    chatStatus(`Sohbet açılamadı: ${e.message}`);
+  }
+}
+
+async function renameChat(summary) {
+  const name = await promptDialog("Sohbeti yeniden adlandır",
+    "Kenar panelinde görünecek ad.", { okLabel: "Kaydet", initial: summary.title || "" });
+  if (name === null) return;
+  try {
+    await chatApi(`/api/chats/${summary.id}`, { method: "PUT", body: { title: name } });
+    await loadChats();
+  } catch (e) {
+    chatStatus(`Yeniden adlandırılamadı: ${e.message}`);
+  }
+}
+
+async function deleteChat(summary) {
+  const ok = await confirmDialog("Sohbeti sil",
+    `"${summary.title || "Adsız sohbet"}" kalıcı olarak silinecek. Bu işlem geri alınamaz.`,
+    { okLabel: "Sil" });
+  if (!ok) return;
+  try {
+    await chatApi(`/api/chats/${summary.id}`, { method: "DELETE" });
+    // Açık sohbet silindiyse ekranda bırakmak yanıltıcı olurdu: bir sonraki tur
+    // 404 alır ve kullanıcı "kaydedilmiyor" sanır.
+    if (summary.id === currentChatId) resetThread();
+    await loadChats();
+  } catch (e) {
+    chatStatus(`Silinemedi: ${e.message}`);
+  }
+}
+
+// Dar ekranda panel bir çekmece (CSS 900px altında üstüne biniyor).
+function closeSidebarOnMobile() {
+  $("chat-sidebar").classList.remove("open");
+  $("chat-sidebar-toggle").setAttribute("aria-expanded", "false");
 }
 
 // ── Dinleyiciler ────────────────────────────────────────────────────
 
 $("chat-send").addEventListener("click", sendChat);
-$("chat-clear").addEventListener("click", clearChat);
+$("chat-new").addEventListener("click", newChat);
 $("chat-input").addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); sendChat(); }
+});
+
+$("chat-sidebar-toggle").addEventListener("click", () => {
+  const open = $("chat-sidebar").classList.toggle("open");
+  $("chat-sidebar-toggle").setAttribute("aria-expanded", open ? "true" : "false");
+});
+
+// Menü dışına tıklama ve Escape kapatır. `#confirm-modal` açıkken core.js'in
+// Escape dinleyicisi stopImmediatePropagation çağırıyor — bu handler o
+// dosyadan SONRA kayıtlı olduğu için diyalogun Escape'i buraya sızmıyor.
+document.addEventListener("click", (e) => {
+  if (openMenuId && !e.target.closest(".chat-item")) closeMenus();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && openMenuId) closeMenus();
 });
 
 for (const chip of document.querySelectorAll(".chat-chip")) {
@@ -372,3 +791,4 @@ $("tab-chat").addEventListener("click", () => {
 });
 
 syncEmptyState();
+loadChats();

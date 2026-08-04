@@ -72,6 +72,33 @@ de bu numarayı söyle.
 Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya yaz
 (aşağıdaki yedek işine yarayabilir).
 
+## Sürüm 1.15.0'da ne değişti
+
+Hepsi **Prompt Yönetmeni** sekmesinde:
+
+- **Yönetmenin sorduğu seçenekler artık tıklanabilir.** Soru sorduğunda altında
+  düğmeler çıkıyor: birden fazlasını seçebiliyorsun, en altta da **"Kendi
+  fikrim"** kutusu var (listede olmayan bir cevabı oraya yazıyorsun). **Devam
+  et**'e basınca seçtiklerin ve yazdığın tek mesaj olarak gidiyor — elle
+  yazmaya gerek kalmıyor.
+- **Prompt artık okunuyor.** Prompt metni satır sonuna gelince alt satıra
+  geçiyor (eskiden tek satır halinde yana kayıyordu) ve **Kopyala** ile **Forma
+  aktar** düğmeleri prompt'un **hemen üstünde** duruyor — mesajın en altında
+  değil.
+- **Sohbetler kaydediliyor.** Solda bir liste var: **+ Yeni sohbet** ile temiz
+  bir sayfa açıyorsun, eski sohbetlere tıklayarak dönüyorsun. Uygulamayı
+  kapatıp açsan da yerlerinde duruyorlar. Her satırın sağındaki **⋯**
+  düğmesinden **Yeniden adlandır** ya da **Sil**. Sohbet adını uygulama ilk
+  mesajından kendisi türetiyor.
+  - "Sohbeti temizle" düğmesi **kalktı**: işini "Yeni sohbet" ve "Sil"
+    devraldı.
+  - Sohbetler de sürüm değişimindeki otomatik yedeğe dahil (aşağıya bak).
+  - Dar pencerede liste soldan gizleniyor, üstteki **Sohbetler** düğmesiyle
+    açılıyor.
+- **Kimin konuştuğu bir bakışta belli.** Senin yazdıkların ve yönetmenin
+  yanıtları farklı zeminde duruyor.
+- **Sekmeler bitişik** ve aralarında geçiş yaparken sayfa yumuşakça kayıyor.
+
 ## Sürüm 1.13.0'da ne değişti
 
 - **Prompt Yönetmeni geldi.** Uygulamanın üstünde artık iki sekme var: **Görsel**
@@ -121,8 +148,9 @@ Uygulama, sürüm değiştiğinde listelerinin bir kopyasını kendiliğinden al
 ~/Library/Application Support/GPT-Image Studio/backups/<sürüm>-<tarih>/
 ```
 
-İçinde yalnızca küçük liste dosyaları var (geçmiş, klasörler, paletler, logo
-kütüphanesi) — **görseller kopyalanmıyor**, onlar zaten yerlerinde duruyor.
+İçinde yalnızca küçük liste dosyaları var (geçmiş, klasörler, paletler, kayıtlı
+sohbetler, logo kütüphanesi) — **görseller kopyalanmıyor**, onlar zaten
+yerlerinde duruyor.
 Birkaç KB tutar, silmen gerekmez.
 
 Geri yüklemek gerekirse (Kurum söylerse): o klasörün içindeki `output` ve `assets`

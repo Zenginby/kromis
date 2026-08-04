@@ -38,6 +38,7 @@ import shutil
 import uuid
 
 import assets_store
+import chat_store
 import folders
 import palette_store
 import storage
@@ -54,6 +55,10 @@ _SOURCES = (
     ("output", (storage.HISTORY_FILE,)),
     ("output", (folders.FOLDERS_FILE,)),
     ("output", (palette_store.PALETTES_FILE,)),
+    # v1.15: kaydedilmiş sohbetler. Bu listeye eklenmezse sürüm değişiminde
+    # yedeklenmeyen tek manifest olurdu — ve içindeki prompt'lar başka hiçbir
+    # yerde durmuyor (history.json yalnız ÜRETİLMİŞ prompt'u taşıyor).
+    ("output", (chat_store.CHATS_FILE,)),
     *(("assets", (kind, assets_store.MANIFEST_FILE)) for kind in assets_store.KINDS),
 )
 

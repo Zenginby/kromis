@@ -1,4 +1,8 @@
-"""Üretilen görsellerin diske kaydı ve history.json yönetimi."""
+"""Üretilen görsellerin diske kaydı ve history.json yönetimi.
+
+Atomik yazım ve "oku → değiştir → yaz" kilidi jsonstore.py'de paylaşılıyor:
+manifest deposu olan beş dosya aynı iki mekaniği kullanıyor.
+"""
 from __future__ import annotations
 
 import json
@@ -7,6 +11,8 @@ import os
 import re
 import uuid
 from collections.abc import Iterable
+
+import jsonstore
 
 HISTORY_FILE = "history.json"
 
@@ -38,11 +44,12 @@ def _read_history(output_dir: str) -> list[dict]:
 
 
 def _write_history(output_dir: str, history: list[dict]) -> None:
-    path = _history_path(output_dir)
-    tmp_path = f"{path}.{uuid.uuid4().hex[:8]}.tmp"
-    with open(tmp_path, "w") as f:
-        json.dump(history, f, ensure_ascii=False, indent=2)
-    os.replace(tmp_path, path)
+    jsonstore.write_atomic(_history_path(output_dir), history)
+
+
+def _lock(output_dir: str):
+    """Bu history.json'ın yazma kilidi — okuma ile yazım arasına girilmesin."""
+    return jsonstore.lock_for(_history_path(output_dir))
 
 
 def save(image_bytes: bytes, meta: dict, output_dir: str, *, now: str) -> dict:
@@ -78,8 +85,8 @@ def save(image_bytes: bytes, meta: dict, output_dir: str, *, now: str) -> dict:
         **({"imported": True} if meta.get("imported") else {}),
     }
     # immutable append: yeni liste yaz
-    history = _read_history(output_dir) + [record]
-    _write_history(output_dir, history)
+    with _lock(output_dir):
+        _write_history(output_dir, _read_history(output_dir) + [record])
     return record
 
 
@@ -96,12 +103,13 @@ def set_folder(image_id: str, folder_id: str | None, output_dir: str) -> bool:
     """
     if not _SAFE_ID.fullmatch(image_id):
         return False
-    history = _read_history(output_dir)
-    if not any(r.get("id") == image_id for r in history):
-        return False
-    _write_history(output_dir,
-                   [{**r, "folder_id": folder_id} if r.get("id") == image_id else r
-                    for r in history])
+    with _lock(output_dir):
+        history = _read_history(output_dir)
+        if not any(r.get("id") == image_id for r in history):
+            return False
+        _write_history(output_dir,
+                       [{**r, "folder_id": folder_id} if r.get("id") == image_id else r
+                        for r in history])
     return True
 
 
@@ -114,12 +122,13 @@ def unfile_folders(folder_ids: Iterable[str], output_dir: str) -> int:
     targets = {fid for fid in folder_ids if fid}
     if not targets:
         return 0
-    history = _read_history(output_dir)
-    affected = sum(1 for r in history if r.get("folder_id") in targets)
-    if affected:
-        _write_history(output_dir,
-                       [{**r, "folder_id": None} if r.get("folder_id") in targets else r
-                        for r in history])
+    with _lock(output_dir):
+        history = _read_history(output_dir)
+        affected = sum(1 for r in history if r.get("folder_id") in targets)
+        if affected:
+            _write_history(output_dir,
+                           [{**r, "folder_id": None} if r.get("folder_id") in targets else r
+                            for r in history])
     return affected
 
 
@@ -138,12 +147,13 @@ def set_folder_many(image_ids: Iterable[str], folder_id: str | None, output_dir:
     targets = {iid for iid in image_ids if iid and _SAFE_ID.fullmatch(iid)}
     if not targets:
         return 0
-    history = _read_history(output_dir)
-    moved = sum(1 for r in history if r.get("id") in targets)
-    if moved:
-        _write_history(output_dir,
-                       [{**r, "folder_id": folder_id} if r.get("id") in targets else r
-                        for r in history])
+    with _lock(output_dir):
+        history = _read_history(output_dir)
+        moved = sum(1 for r in history if r.get("id") in targets)
+        if moved:
+            _write_history(output_dir,
+                           [{**r, "folder_id": folder_id} if r.get("id") in targets else r
+                            for r in history])
     return moved
 
 
@@ -156,22 +166,23 @@ def delete_many(image_ids: Iterable[str], output_dir: str) -> int:
     targets = {iid for iid in image_ids if iid and _SAFE_ID.fullmatch(iid)}
     if not targets:
         return 0
-    history = _read_history(output_dir)
-    remaining = [r for r in history if r.get("id") not in targets]
-    existing_records = {r.get("id") for r in history if r.get("id") in targets}
+    with _lock(output_dir):
+        history = _read_history(output_dir)
+        remaining = [r for r in history if r.get("id") not in targets]
+        existing_records = {r.get("id") for r in history if r.get("id") in targets}
 
-    deleted = set(existing_records)
-    for image_id in targets:
-        file_path = os.path.join(output_dir, f"{image_id}.png")
-        if os.path.exists(file_path):
-            # `exists` ile `remove` arasında dosya kaybolabilir (aynı görseli
-            # iki sekmeden silmek yeter). Sonuç zaten istenen: dosya yok.
-            with contextlib.suppress(FileNotFoundError):
-                os.remove(file_path)
-            deleted.add(image_id)
+        deleted = set(existing_records)
+        for image_id in targets:
+            file_path = os.path.join(output_dir, f"{image_id}.png")
+            if os.path.exists(file_path):
+                # `exists` ile `remove` arasında dosya kaybolabilir (aynı görseli
+                # iki sekmeden silmek yeter). Sonuç zaten istenen: dosya yok.
+                with contextlib.suppress(FileNotFoundError):
+                    os.remove(file_path)
+                deleted.add(image_id)
 
-    if existing_records:
-        _write_history(output_dir, remaining)
+        if existing_records:
+            _write_history(output_dir, remaining)
     return len(deleted)
 
 
@@ -179,18 +190,19 @@ def delete(image_id: str, output_dir: str) -> bool:
     if not _SAFE_ID.fullmatch(image_id):
         return False
 
-    history = _read_history(output_dir)
-    remaining = [r for r in history if r.get("id") != image_id]
-    record_existed = len(remaining) != len(history)
+    with _lock(output_dir):
+        history = _read_history(output_dir)
+        remaining = [r for r in history if r.get("id") != image_id]
+        record_existed = len(remaining) != len(history)
 
-    file_path = os.path.join(output_dir, f"{image_id}.png")
-    file_existed = os.path.exists(file_path)
-    if file_existed:
-        # delete_many ile aynı yarış: araya başka bir silme girebilir.
-        with contextlib.suppress(FileNotFoundError):
-            os.remove(file_path)
+        file_path = os.path.join(output_dir, f"{image_id}.png")
+        file_existed = os.path.exists(file_path)
+        if file_existed:
+            # delete_many ile aynı yarış: araya başka bir silme girebilir.
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(file_path)
 
-    if record_existed:
-        _write_history(output_dir, remaining)
+        if record_existed:
+            _write_history(output_dir, remaining)
 
     return record_existed or file_existed

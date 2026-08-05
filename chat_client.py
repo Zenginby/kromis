@@ -19,6 +19,10 @@ from __future__ import annotations
 
 import azure_client as ac
 import chat_prompt
+# Yanıt sınırı `models`'ta yaşıyor çünkü ORASI onu zorunlu kılan yer
+# (`ChatMessage.content`); ikinci bir sabit iki sayının ayrışmasına davetiye
+# olurdu. Döngü yok: `models` yalnız `azure_client` ve `palette`'e bakıyor.
+import models
 
 # Okuma zaman aşımı. ~13,6 bin karakter sistem talimatı + akıl yürüten dağıtım
 # için bol başlık payı: ÖLÇÜLEN turlar 4,9 s ve 9,3 s (2026-08-04).
@@ -108,6 +112,14 @@ def extract_content(response_json: dict) -> tuple[str, str]:
         raise ChatError("Sohbet yanıtı boş içerik döndürdü"
                         + (f" (finish_reason: {finish_reason})" if finish_reason else "")
                         + ". Mesajı kısaltıp tekrar deneyin.")
+    # AŞIRI UZUN yanıt da burada, ayrıştırıldığı yerde patlar. Geçirilse ekrana
+    # çizilirdi ama `models.ChatMessage`'a sığmazdı: bir sonraki tur ve kaydetme
+    # pydantic'in İNGİLİZCE 422'siyle geri döner, sohbet sessizce kilitlenirdi.
+    # Uzunluğu biz seçemiyoruz — `build_payload` bilerek `max_tokens` göndermiyor.
+    if len(content) > models.MAX_CHAT_REPLY_CHARS:
+        raise ChatError(
+            f"Yönetmenin yanıtı beklenmedik biçimde uzun geldi ({len(content)} karakter, "
+            f"sınır {models.MAX_CHAT_REPLY_CHARS}). Brief'i kısaltıp tekrar deneyin.")
     return content, finish_reason
 
 

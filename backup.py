@@ -40,6 +40,7 @@ import uuid
 import assets_store
 import chat_store
 import folders
+import jsonstore
 import palette_store
 import storage
 
@@ -100,17 +101,13 @@ def read_stamp(data_dir: str) -> str | None:
 
 
 def write_stamp(data_dir: str, version: str) -> None:
-    """Damgayı atomik yazar (manifest'lerin `_write` deyimi).
+    """Damgayı atomik yazar (manifest'lerle PAYLAŞILAN mekanik: jsonstore).
 
     Yarım yazılmış bir damga "bu sürümü gördüm" der ve yedek bir daha hiç
     alınmazdı; os.replace o pencereyi kapatıyor.
     """
     os.makedirs(data_dir, exist_ok=True)
-    path = stamp_path(data_dir)
-    tmp_path = f"{path}.{uuid.uuid4().hex[:8]}.tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        f.write(version)
-    os.replace(tmp_path, path)
+    jsonstore.write_text(stamp_path(data_dir), version)
 
 
 def _existing_sources(output_dir: str, assets_dir: str) -> list[tuple[str, str]]:

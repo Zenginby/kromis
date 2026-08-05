@@ -78,17 +78,41 @@ def test_post_rejects_a_thread_over_the_message_cap(client):
     assert _create(client, messages=long_thread).status_code == 422
 
 
-def test_post_rejects_a_thread_over_the_total_char_cap(client):
-    """Kaydetme yolunda da toplam kapısı var: aksi halde kaydedilen bir sohbet
-    yeniden açıldığında tamamlama rotasının 422'siyle KİLİTLENİRDİ."""
+def test_post_rejects_a_thread_over_the_save_total_cap(client):
+    """Kaydetme yolunda da bir toplam kapısı var — yalnız tamamlamadan GENİŞ.
+
+    Sınırsız olsa chats.json istemcinin gönderdiği kadar büyürdü; tamamlamayla
+    AYNI olsa turun son yanıtı hiç kaydedilemezdi (bkz. aşağıdaki test).
+    """
     big = "a" * models.MAX_CHAT_MSG_CHARS
-    count = models.MAX_CHAT_TOTAL_CHARS // models.MAX_CHAT_MSG_CHARS + 1
+    count = models.MAX_CHAT_SAVE_TOTAL_CHARS // models.MAX_CHAT_MSG_CHARS + 1
     thread = [{"role": "user", "content": big} for _ in range(count)]
+    assert len(thread) <= models.MAX_CHAT_MESSAGES, "mesaj sayısı sınırı önce dolmamalı"
 
     r = _create(client, messages=thread)
 
     assert r.status_code == 422
     assert "uzun" in str(r.json()["detail"])
+
+
+def test_a_thread_at_the_completion_cap_plus_a_full_reply_still_saves(client):
+    """Turun SON yanıtı diske girmek zorunda — kaydetme kapısı yanıta yer ayırır.
+
+    İstemci kapısı `geçmiş + KULLANICI mesajı ≤ MAX_CHAT_TOTAL_CHARS` diye
+    ölçüyor, yani tamamlama isteği sınırın DİBİNDE geçebilir; asistan yanıtı
+    üstüne bindiğinde gövde o sınırı zorunlu olarak aşar. İki kapı aynı sayı
+    olsaydı 422 dönerdi ve kullanıcı kenar panelinde güncel görünen, ama
+    prompt'u üreten turu taşımayan bir sohbet bırakırdı.
+    """
+    per = models.MAX_CHAT_MSG_CHARS
+    sent = [{"role": "assistant" if i % 2 else "user", "content": "x" * per}
+            for i in range(models.MAX_CHAT_TOTAL_CHARS // per)]
+    sent[-1]["role"] = "user"
+    assert sum(len(m["content"]) for m in sent) == models.MAX_CHAT_TOTAL_CHARS
+    thread = sent + [{"role": "assistant", "content": "y" * models.MAX_CHAT_REPLY_CHARS}]
+    assert len(thread) <= models.MAX_CHAT_MESSAGES
+
+    assert _create(client, messages=thread).status_code == 200
 
 
 def test_post_rejects_a_title_over_the_cap(client):

@@ -16,7 +16,8 @@ geldi; ayrım `None` varsayılanıyla kuruldu (bkz. alanın yorumu).
 """
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (BaseModel, ConfigDict, Field, field_validator,
+                      model_validator)
 
 import azure_client as ac
 import palette
@@ -286,22 +287,36 @@ class LogoRequest(BaseModel):
 # sınırsız bir geçmiş binerse token maliyeti sessizce patlar.
 #
 # v1.15: aynı sınırlar KAYDETME yolunda da geçerli (`ChatSaveRequest`) — yoksa
-# chats.json istemcinin gönderdiği kadar büyüyebilirdi ve kaydedilmiş bir sohbet
-# yeniden açıldığında tamamlama rotasının 422'siyle KİLİTLENİRDİ.
+# chats.json istemcinin gönderdiği kadar büyüyebilirdi.
 MAX_CHAT_MESSAGES = 24          # ~12 tur
-MAX_CHAT_MSG_CHARS = 6000       # tek mesaj
+MAX_CHAT_MSG_CHARS = 6000       # tek KULLANICI mesajı (textarea'nın maxlength'i)
+# Asistan yanıtı için AYRI ve daha geniş sınır. Sebep ölçülü: `chat_client` bilerek
+# `max_tokens` göndermiyor (akıl yürüten dağıtımlar 400 veriyor), yani yanıtın
+# uzunluğunu sunucu SEÇMİYOR — ve o yanıt bir sonraki turda tel üzerinden GERİ
+# geliyor, kaydetmede de gövdenin parçası oluyor. İki rol tek sınırı paylaşsaydı
+# 6.000'i aşan tek bir yanıt sohbeti tümden kilitlerdi: sonraki her tamamlama ve
+# her kaydetme pydantic'in İNGİLİZCE 422'siyle geri dönerdi. Sınırsız da değil —
+# aşan yanıt `chat_client.extract_content`'te Türkçe bir hatayla patlıyor.
+MAX_CHAT_REPLY_CHARS = 12000    # tek ASİSTAN yanıtı
 MAX_CHAT_TOTAL_CHARS = 60000    # tüm geçmiş — mesaj sayısı × tek mesajdan DAHA DAR
+# Kaydetme kapısı tamamlama kapısından TAM BİR YANIT KADAR geniş. İstemci
+# "geçmiş + kullanıcı mesajı ≤ MAX_CHAT_TOTAL_CHARS" diye ölçüp gönderiyor, yani
+# tamamlama isteği sınırın dibinde geçebilir; asistan yanıtı üstüne bindiğinde
+# kaydedilecek gövde o sınırı ZORUNLU olarak aşar. İki sayı eşit olsaydı uzun bir
+# sohbetin son turu — prompt'u üreten tur — hiç diske yazılamazdı ve kullanıcı
+# panelde güncel görünen, ama bir tur geride bir sohbet bulurdu.
+MAX_CHAT_SAVE_TOTAL_CHARS = MAX_CHAT_TOTAL_CHARS + MAX_CHAT_REPLY_CHARS
 MAX_CHAT_TITLE_CHARS = 120      # kenar panelinde gösterilen başlık
 CHAT_ROLES = {"user", "assistant"}
 
 
-def _check_chat_total(messages: list["ChatMessage"]) -> list["ChatMessage"]:
-    """Toplam karakter kapısı — tamamlama ve kaydetme yollarının PAYLAŞTIĞI kural.
+def _check_chat_total(messages: list["ChatMessage"], limit: int) -> list["ChatMessage"]:
+    """Toplam karakter kapısı. Sınır ROTAYA GÖRE değişiyor (bkz. sabitler).
 
-    Rol kuralı paylaşılmıyor: tamamlamada son mesaj kullanıcıdan olmak ZORUNDA,
+    Rol kuralı da paylaşılmıyor: tamamlamada son mesaj kullanıcıdan olmak ZORUNDA,
     kaydetmede ise normalde asistandan (turun yanıtı).
     """
-    if sum(len(m.content) for m in messages) > MAX_CHAT_TOTAL_CHARS:
+    if sum(len(m.content) for m in messages) > limit:
         raise ValueError("sohbet çok uzun: yeni bir sohbet başlat")
     return messages
 
@@ -313,7 +328,10 @@ class ChatMessage(BaseModel):
     # verilse istemci persona'yı tümden değiştirebilirdi ve `extra="forbid"` bunu
     # YAKALAMAZ — `role` geçerli bir alan, kabul edilmeyen şey DEĞERİ.
     role: str
-    content: str = Field(min_length=1, max_length=MAX_CHAT_MSG_CHARS)
+    # Alan sınırı GENİŞ olanı (asistan); dar olan kullanıcı sınırı aşağıda,
+    # rolü bilen doğrulayıcıda. Alan düzeyinde ayrılamaz: `max_length` başka bir
+    # alanın değerine bakamaz.
+    content: str = Field(min_length=1, max_length=MAX_CHAT_REPLY_CHARS)
 
     @field_validator("role")
     @classmethod
@@ -321,6 +339,14 @@ class ChatMessage(BaseModel):
         if v not in CHAT_ROLES:
             raise ValueError("geçersiz role")
         return v
+
+    @model_validator(mode="after")
+    def _content_fits_the_role(self):
+        """Kullanıcı mesajı için dar kapı. Metin TÜRKÇE ve istemcinin aynasıyla
+        aynı sayıyı söylüyor — pydantic'in `max_length` metni İngilizce olurdu."""
+        if self.role == "user" and len(self.content) > MAX_CHAT_MSG_CHARS:
+            raise ValueError(f"mesaj çok uzun: en fazla {MAX_CHAT_MSG_CHARS} karakter")
+        return self
 
 
 class ChatRequest(BaseModel):
@@ -339,7 +365,7 @@ class ChatRequest(BaseModel):
         if v[-1].role != "user":
             # Son mesaj asistandaysa model kendi cevabını yeniden üretmeye çalışır.
             raise ValueError("son mesaj kullanıcıdan olmalı")
-        return _check_chat_total(v)
+        return _check_chat_total(v, MAX_CHAT_TOTAL_CHARS)
 
 
 class ChatSaveRequest(BaseModel):
@@ -361,7 +387,8 @@ class ChatSaveRequest(BaseModel):
     @classmethod
     def _messages_ok(cls, v):
         # Rol kuralı YOK: kaydedilen sohbetin son mesajı normalde asistandan.
-        return v if v is None else _check_chat_total(v)
+        # Toplam kapısı bir yanıt kadar GENİŞ (bkz. MAX_CHAT_SAVE_TOTAL_CHARS).
+        return v if v is None else _check_chat_total(v, MAX_CHAT_SAVE_TOTAL_CHARS)
 
 
 class BannerRequest(BaseModel):

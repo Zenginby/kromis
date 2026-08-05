@@ -72,6 +72,26 @@ de bu numarayı söyle.
 Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya yaz
 (aşağıdaki yedek işine yarayabilir).
 
+## Sürüm 1.15.1'de ne değişti
+
+Yeni özellik yok; 1.15.0'ın kod incelemesinde çıkan pürüzler kapatıldı.
+
+- **Prompt kutusu artık kaçmıyor.** Sağ alt köşesinden çekerek büyütürken kutu
+  sağa doğru ekrandan taşabiliyor ve **bir daha geri çekilemiyordu.** Artık
+  yalnızca aşağı-yukarı büyüyor, sütununun dışına çıkmıyor ve çok uzayıp
+  altındaki düğmeleri görüş alanından çıkarmıyor. Sohbetteki mesaj kutusu için
+  de aynı.
+- **Uzun sohbetlerin son turu da kaydediliyor.** Sohbet sınıra yaklaştığında
+  turun son yanıtı diske yazılamıyor, sohbet listede güncel görünüp bir tur
+  geride kalıyordu.
+- **Yönetmenin uzun bir yanıtı sohbeti kilitlemiyor.** Beklenenden uzun gelen
+  bir yanıttan sonra sohbet ne devam ediyor ne kaydediliyordu; artık ya normal
+  çalışıyor ya da ne olduğunu Türkçe söyleyen bir hata veriyor.
+- **Sohbet listesi doğru sırada.** En son konuştuğun sohbet en üstte: eskiden
+  satırda "bugün 14:32" yazarken sohbet listenin dibinde kalabiliyordu.
+- **Klavyeyle gezinme.** Sol paneldeki düğmelerde ve seçenek çiplerinde odak
+  çerçevesi görünüyor; ⋯ menüsü Esc ile kapanınca imleç geldiği düğmeye dönüyor.
+
 ## Sürüm 1.15.0'da ne değişti
 
 Hepsi **Prompt Yönetmeni** sekmesinde:

@@ -13,8 +13,9 @@ Kalıcılık İSTEMCİDE (localStorage) tutulamıyor, ölçülen bir sebeple:
 açılışta sessizce silinirdi.
 
 storage.py / folders.py / palette_store.py ile aynı desenler: bozuk JSON'a
-dayanıklı okuma, atomik yazım (`os.replace`), immutable append, `_SAFE_ID`
-guard'ı.
+dayanıklı okuma, immutable append, `_SAFE_ID` guard'ı. Atomik yazım ve yazma
+kilidi beş depoda PAYLAŞILIYOR (bkz. jsonstore.py) — desen beş kez kopyalanmış
+olduğu için eksikleri de beş yerde birden düzeltilmek zorundaydı.
 
 Sohbet SAYISINA üst sınır konmadı (bilinçli): tek kayıt models.py'deki
 MAX_CHAT_TOTAL_CHARS ile zaten sınırlı ve sessizce eski sohbet düşüren bir
@@ -26,6 +27,8 @@ import json
 import os
 import re
 import uuid
+
+import jsonstore
 
 CHATS_FILE = "chats.json"
 
@@ -59,11 +62,7 @@ def _read(output_dir: str) -> list[dict]:
 
 
 def _write(output_dir: str, items: list[dict]) -> None:
-    path = _chats_path(output_dir)
-    tmp_path = f"{path}.{uuid.uuid4().hex[:8]}.tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(items, f, ensure_ascii=False, indent=2)
-    os.replace(tmp_path, path)
+    jsonstore.write_atomic(_chats_path(output_dir), items)
 
 
 def create(title: str, messages: list[dict], output_dir: str, *, now: str) -> dict:
@@ -76,16 +75,34 @@ def create(title: str, messages: list[dict], output_dir: str, *, now: str) -> di
         "created_at": now,
         "updated_at": now,
     }
-    _write(output_dir, _read(output_dir) + [record])  # immutable append
+    # Kilit "oku → değiştir → yaz"ın TAMAMINI sarıyor (bkz. jsonstore): tur sonu
+    # otomatik kaydı ile kullanıcının yeniden adlandırması gerçekten paralel
+    # çalışabiliyor ve araya girilse kaybeden yazım sessizce düşerdi.
+    with jsonstore.lock_for(_chats_path(output_dir)):
+        _write(output_dir, _read(output_dir) + [record])  # immutable append
     return record
 
 
 def list_chats(output_dir: str) -> list[dict]:
-    """Özetler, en yeni başta (folders.list_folders ile aynı sıra)."""
+    """Özetler, EN SON GÜNCELLENEN başta.
+
+    Dosya sırası oluşturma sırası: `update` kaydı yerinde değiştiriyor, hiç
+    taşımıyor. Sıra dosyadan okunsaydı panel kendi kendisiyle çelişirdi — bugün
+    devam edilen üç haftalık bir sohbet damgasında "14:32" yazıp, haftalardır
+    dokunulmamış ama daha yeni oluşturulmuş sohbetlerin ALTINDA kalırdı.
+
+    Damga ISO 8601 (`app._now`), yani sözlük sırası = zaman sırası; ayrı bir
+    tarih ayrıştırma gerekmiyor. Eşitlikte dosya sırası ters çevriliyor (aynı
+    saniyede oluşturulan iki kayıtta yeni olan başta kalsın, folders.list_folders
+    geleneği), damgası eksik bayat bir kayıt ise çökmek yerine sona düşüyor.
+    """
+    ordered = sorted(enumerate(_read(output_dir)),
+                     key=lambda pair: (str(pair[1].get("updated_at") or ""), pair[0]),
+                     reverse=True)
     return [
         {**{k: c.get(k) for k in _SUMMARY_FIELDS},
          "message_count": len(c.get("messages") or [])}
-        for c in reversed(_read(output_dir))
+        for _, c in ordered
     ]
 
 
@@ -104,25 +121,26 @@ def update(chat_id: str, output_dir: str, *, messages: list[dict] | None = None,
     """Gövdeyi ve/veya başlığı değiştirir; yeni kaydı döndürür (yoksa None).
 
     İkisi de verilmediyse dosyaya DOKUNULMAZ: boş bir güncelleme `updated_at`'i
-    öne alıp sohbeti listenin başına taşırdı — kullanıcının yapmadığı bir iş,
-    sıralamayı bozardı.
+    öne alırdı ve panel sıralaması onu izlediği için (bkz. `list_chats`) sohbet
+    listenin başına atlardı — kullanıcının yapmadığı bir iş.
     """
     if not chat_id or not _SAFE_ID.fullmatch(chat_id):
         return None
-    items = _read(output_dir)
-    index = next((i for i, c in enumerate(items) if c.get("id") == chat_id), None)
-    if index is None:
-        return None
-    if messages is None and title is None:
-        return items[index]
+    with jsonstore.lock_for(_chats_path(output_dir)):
+        items = _read(output_dir)
+        index = next((i for i, c in enumerate(items) if c.get("id") == chat_id), None)
+        if index is None:
+            return None
+        if messages is None and title is None:
+            return items[index]
 
-    changes: dict = {"updated_at": now}
-    if messages is not None:
-        changes["messages"] = messages
-    if title is not None:
-        changes["title"] = title
-    record = {**items[index], **changes}          # immutable: kopya üretilir
-    _write(output_dir, items[:index] + [record] + items[index + 1:])
+        changes: dict = {"updated_at": now}
+        if messages is not None:
+            changes["messages"] = messages
+        if title is not None:
+            changes["title"] = title
+        record = {**items[index], **changes}      # immutable: kopya üretilir
+        _write(output_dir, items[:index] + [record] + items[index + 1:])
     return record
 
 
@@ -130,9 +148,10 @@ def delete(chat_id: str, output_dir: str) -> bool:
     """Sohbeti siler. Bulunamadıysa/geçersiz id ise False."""
     if not chat_id or not _SAFE_ID.fullmatch(chat_id):
         return False
-    items = _read(output_dir)
-    kept = [c for c in items if c.get("id") != chat_id]
-    if len(kept) == len(items):
-        return False
-    _write(output_dir, kept)
+    with jsonstore.lock_for(_chats_path(output_dir)):
+        items = _read(output_dir)
+        kept = [c for c in items if c.get("id") != chat_id]
+        if len(kept) == len(items):
+            return False
+        _write(output_dir, kept)
     return True

@@ -458,9 +458,22 @@ button.palette-sw:focus-visible { outline: 2px solid var(--accent); outline-offs
 }
 .controls label { display: block; font-size: 0.85rem; color: var(--muted); margin: 0.6rem 0 0.25rem; }
 textarea, select {
-  width: 100%; background: var(--panel-2); color: var(--text);
+  /* `max-width` ŞART: `width: 100%` yalnız başlangıç genişliğini veriyor,
+     tarayıcının `resize` tutamacı kolonu aşmayı engellemiyor. */
+  width: 100%; max-width: 100%;
+  background: var(--panel-2); color: var(--text);
   border: 1px solid transparent; border-radius: 10px; padding: 0.6rem 0.7rem;
   font: inherit; transition: border-color var(--dur) var(--ease);
+}
+/* Boyutlandırma YALNIZ DİKEY ve sınırlı. Tarayıcı varsayılanı `resize: both`:
+   kullanıcı prompt alanını sağa doğru kolondan (ve pencereden) taşıracak kadar
+   çekebiliyordu ve tutamak görünür alanın dışında kaldığı için GERİ
+   ÇEKİLEMİYORDU — alan o genişlikte kilitleniyordu. Yükseklik de sınırlı:
+   ekranı dolduran bir textarea altındaki "Üret" düğmesini görüş alanından
+   çıkarıyor. `min-height` `rows` ile uyumlu, alan sıfıra ezilmesin. */
+textarea {
+  resize: vertical;
+  min-height: 4.5rem; max-height: min(60vh, 640px);
 }
 textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 .row { display: grid; grid-template-columns: 1fr 1fr 0.7fr; gap: 0.6rem; }
@@ -823,6 +836,18 @@ body.viewer-open { overflow: hidden; }
 }
 .chat-menu-item:hover { background: var(--panel); }
 .chat-menu-danger { color: var(--danger); }
+
+/* Odak halkası AÇIKÇA yazılıyor (button.palette-sw / .palette-choice geleneği):
+   bu düğmelerin kendi zemini ve kenarlığı yok, yani tarayıcının varsayılan
+   halkası dışında görünür hiçbir odak işareti kalmıyordu — panelin tamamı
+   klavyeyle gezilen bir liste. */
+.chat-new:focus-visible,
+.chat-item-open:focus-visible,
+.chat-item-menu:focus-visible,
+.chat-menu-item:focus-visible,
+.chat-option:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
 
 /* Çekmece düğmesi yalnız dar ekranda görünür (aşağıdaki sorgu açıyor). */
 .chat-sidebar-toggle { display: none; }

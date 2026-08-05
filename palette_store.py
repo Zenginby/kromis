@@ -10,7 +10,8 @@ palet kaydedildiği günkü prompt'u üretmeye devam eder. "Bu palet bana o
 görseli vermişti" sözünün tutulabilmesi buna bağlı.
 
 storage.py / folders.py ile aynı desenler: bozuk JSON'a dayanıklı okuma,
-atomik yazım (`os.replace`), immutable-append, `_SAFE_ID` guard'ı.
+immutable-append, `_SAFE_ID` guard'ı. Atomik yazım ve yazma kilidi
+jsonstore.py'de paylaşılıyor.
 """
 from __future__ import annotations
 
@@ -18,6 +19,8 @@ import json
 import os
 import re
 import uuid
+
+import jsonstore
 
 PALETTES_FILE = "palettes.json"
 
@@ -46,11 +49,7 @@ def _read(output_dir: str) -> list[dict]:
 
 
 def _write(output_dir: str, items: list[dict]) -> None:
-    path = _palettes_path(output_dir)
-    tmp_path = f"{path}.{uuid.uuid4().hex[:8]}.tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(items, f, ensure_ascii=False, indent=2)
-    os.replace(tmp_path, path)
+    jsonstore.write_atomic(_palettes_path(output_dir), items)
 
 
 def create(name: str, seed: str, mode: str, strength: str,
@@ -71,7 +70,8 @@ def create(name: str, seed: str, mode: str, strength: str,
         "colors": colors,
         "created_at": now,
     }
-    _write(output_dir, _read(output_dir) + [record])  # immutable append
+    with jsonstore.lock_for(_palettes_path(output_dir)):  # oku→değiştir→yaz bölünmez
+        _write(output_dir, _read(output_dir) + [record])   # immutable append
     return record
 
 
@@ -84,9 +84,10 @@ def delete(palette_id: str, output_dir: str) -> bool:
     """Paleti siler. Bulunamadıysa/geçersiz id ise False."""
     if not palette_id or not _SAFE_ID.fullmatch(palette_id):
         return False
-    items = _read(output_dir)
-    kept = [p for p in items if p.get("id") != palette_id]
-    if len(kept) == len(items):
-        return False
-    _write(output_dir, kept)
+    with jsonstore.lock_for(_palettes_path(output_dir)):
+        items = _read(output_dir)
+        kept = [p for p in items if p.get("id") != palette_id]
+        if len(kept) == len(items):
+            return False
+        _write(output_dir, kept)
     return True

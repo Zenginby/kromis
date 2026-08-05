@@ -1,7 +1,7 @@
 """Kullanıcının logo/banner varlıklarının diske kaydı ve manifest yönetimi.
 
-storage.py ile aynı desenleri izler: _SAFE_ID guard'ı, atomik manifest yazımı,
-immutable-append. Varlıklar tür başına ayrı bir alt dizinde tutulur:
+storage.py ile aynı desenleri izler: _SAFE_ID guard'ı, immutable-append; atomik
+manifest yazımı ve yazma kilidi jsonstore.py'de paylaşılıyor. Varlıklar tür başına ayrı bir alt dizinde tutulur:
 
     <assets_dir>/<kind>/{id}.png
     <assets_dir>/<kind>/index.json   # [{id, filename, name, kind, created_at}]
@@ -12,6 +12,8 @@ import json
 import os
 import re
 import uuid
+
+import jsonstore
 
 MANIFEST_FILE = "index.json"
 KINDS = ("logos", "banners", "mottos")
@@ -51,11 +53,7 @@ def _read_manifest(kind_dir: str) -> list[dict]:
 
 
 def _write_manifest(kind_dir: str, items: list[dict]) -> None:
-    path = _manifest_path(kind_dir)
-    tmp_path = f"{path}.{uuid.uuid4().hex[:8]}.tmp"
-    with open(tmp_path, "w") as f:
-        json.dump(items, f, ensure_ascii=False, indent=2)
-    os.replace(tmp_path, path)
+    jsonstore.write_atomic(_manifest_path(kind_dir), items)
 
 
 def save_asset(kind: str, image_bytes: bytes, name: str, assets_dir: str, *, now: str) -> dict:
@@ -72,9 +70,10 @@ def save_asset(kind: str, image_bytes: bytes, name: str, assets_dir: str, *, now
         "kind": kind,
         "created_at": now,
     }
-    # immutable append: yeni liste yaz
-    items = _read_manifest(kind_dir) + [record]
-    _write_manifest(kind_dir, items)
+    # immutable append: yeni liste yaz. Kilit oku→yaz'ı sarıyor (bkz. jsonstore);
+    # tür başına ayrı manifest, yani ayrı kilit.
+    with jsonstore.lock_for(_manifest_path(kind_dir)):
+        _write_manifest(kind_dir, _read_manifest(kind_dir) + [record])
     return record
 
 
@@ -96,16 +95,17 @@ def delete_asset(kind: str, asset_id: str, assets_dir: str) -> bool:
     if not _SAFE_ID.fullmatch(asset_id):
         return False
 
-    items = _read_manifest(kind_dir)
-    remaining = [r for r in items if r.get("id") != asset_id]
-    record_existed = len(remaining) != len(items)
+    with jsonstore.lock_for(_manifest_path(kind_dir)):
+        items = _read_manifest(kind_dir)
+        remaining = [r for r in items if r.get("id") != asset_id]
+        record_existed = len(remaining) != len(items)
 
-    file_path = os.path.join(kind_dir, f"{asset_id}.png")
-    file_existed = os.path.exists(file_path)
-    if file_existed:
-        os.remove(file_path)
+        file_path = os.path.join(kind_dir, f"{asset_id}.png")
+        file_existed = os.path.exists(file_path)
+        if file_existed:
+            os.remove(file_path)
 
-    if record_existed:
-        _write_manifest(kind_dir, remaining)
+        if record_existed:
+            _write_manifest(kind_dir, remaining)
 
     return record_existed or file_existed

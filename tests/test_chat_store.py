@@ -8,6 +8,8 @@ mekanik hale getiriyor.
 """
 import json
 import os
+import threading
+import time
 
 import chat_store
 
@@ -61,6 +63,34 @@ def test_list_is_newest_first(tmp_path):
     chat_store.create("iki", THREAD, out, now="2026-08-05T11:00:00")
 
     assert [c["title"] for c in chat_store.list_chats(out)] == ["iki", "bir"]
+
+
+def test_list_is_ordered_by_last_update_not_by_creation(tmp_path):
+    """Panelde gösterilen damga `updated_at` — sıra da ONU izlemek zorunda.
+
+    Dosya sırası oluşturma sırası: `update` kaydı yerinde değiştiriyor. Sıra
+    dosyadan okunsa bugün devam edilen üç haftalık bir sohbet "14:32" yazıp
+    listenin dibinde, haftalardır dokunulmamış ama daha yeni oluşturulmuş
+    sohbetlerin ALTINDA kalırdı.
+    """
+    out = str(tmp_path / "output")
+    old = chat_store.create("eski", THREAD, out, now="2026-07-15T10:00:00")
+    chat_store.create("yeni", THREAD, out, now="2026-08-05T11:00:00")
+
+    chat_store.update(old["id"], out, messages=THREAD, now="2026-08-05T14:32:00")
+
+    assert [c["title"] for c in chat_store.list_chats(out)] == ["eski", "yeni"]
+
+
+def test_records_without_a_stamp_sort_last_instead_of_crashing(tmp_path):
+    """Elle düzenlenmiş/bayat bir kayıtta alan eksik olabilir: sıralama çökmemeli."""
+    out = str(tmp_path / "output")
+    chat_store.create("damgalı", THREAD, out, now="2026-08-05T10:00:00")
+    raw = _read_raw(out)
+    raw.append({"id": "beef1234beef", "title": "damgasız", "messages": []})
+    chat_store._write(out, raw)
+
+    assert [c["title"] for c in chat_store.list_chats(out)] == ["damgalı", "damgasız"]
 
 
 def test_list_does_not_leak_message_bodies(tmp_path):
@@ -196,6 +226,38 @@ def test_a_json_object_instead_of_a_list_reads_as_empty(tmp_path):
         json.dump({"neden": "yanlış şekil"}, f)
 
     assert chat_store.list_chats(out) == []
+
+
+def test_concurrent_creates_do_not_lose_records(tmp_path, monkeypatch):
+    """"Oku → değiştir → yaz" bölünmez olmak zorunda (jsonstore kilidi).
+
+    Rotalar senkron `def`, yani Starlette onları threadpool'da koşturuyor: tur
+    sonu otomatik kaydı ile kullanıcının yeniden adlandırması GERÇEKTEN paralel
+    çalışabiliyor. Kilit olmasa aşağıdaki dört yazımın üçü kaybolurdu — hepsi
+    aynı bir-kayıtlık listeyi okuyup üstüne yazardı.
+    """
+    out = str(tmp_path / "output")
+    chat_store.create("ilk", THREAD, out, now="2026-08-05T10:00:00")
+
+    real_read = chat_store._read
+
+    def slow_read(output_dir):
+        items = real_read(output_dir)
+        time.sleep(0.03)          # okuma ile yazım ARASINDA araya girme penceresi
+        return items
+
+    monkeypatch.setattr(chat_store, "_read", slow_read)
+    threads = [threading.Thread(target=chat_store.create,
+                                args=(f"eş{i}", THREAD, out),
+                                kwargs={"now": "2026-08-05T11:00:00"})
+               for i in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(5)
+
+    titles = sorted(c["title"] for c in _read_raw(out))
+    assert titles == ["eş0", "eş1", "eş2", "eş3", "ilk"]
 
 
 def test_write_is_atomic_and_leaves_no_temp_file(tmp_path):

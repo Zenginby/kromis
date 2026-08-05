@@ -4,8 +4,8 @@ Klasörler diskte gerçek dizin DEĞİL: görseller `output/` altında düz duru
 klasör yalnızca kayıttaki bir etikettir (`folder_id`). Böylece `/output/{filename}`
 URL'leri ile `parent_id` türev zincirleri klasör taşımalarından etkilenmez.
 
-storage.py ile aynı desenler: bozuk JSON'a dayanıklı okuma, atomik yazım
-(`os.replace`), immutable-append, `_SAFE_ID` guard'ı.
+storage.py ile aynı desenler: bozuk JSON'a dayanıklı okuma, immutable-append,
+`_SAFE_ID` guard'ı. Atomik yazım ve yazma kilidi jsonstore.py'de paylaşılıyor.
 """
 from __future__ import annotations
 
@@ -13,6 +13,8 @@ import json
 import os
 import re
 import uuid
+
+import jsonstore
 
 FOLDERS_FILE = "folders.json"
 
@@ -41,11 +43,7 @@ def _read(output_dir: str) -> list[dict]:
 
 
 def _write(output_dir: str, items: list[dict]) -> None:
-    path = _folders_path(output_dir)
-    tmp_path = f"{path}.{uuid.uuid4().hex[:8]}.tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(items, f, ensure_ascii=False, indent=2)
-    os.replace(tmp_path, path)
+    jsonstore.write_atomic(_folders_path(output_dir), items)
 
 
 def create(name: str, output_dir: str, *, parent_id: str | None = None, now: str) -> dict:
@@ -56,7 +54,8 @@ def create(name: str, output_dir: str, *, parent_id: str | None = None, now: str
     os.makedirs(output_dir, exist_ok=True)
     folder_id = uuid.uuid4().hex[:12]
     record = {"id": folder_id, "name": name, "parent_id": parent_id, "created_at": now}
-    _write(output_dir, _read(output_dir) + [record])  # immutable append
+    with jsonstore.lock_for(_folders_path(output_dir)):   # oku→değiştir→yaz bölünmez
+        _write(output_dir, _read(output_dir) + [record])  # immutable append
     return record
 
 
@@ -124,9 +123,10 @@ def delete_tree(folder_id: str, output_dir: str) -> list[str]:
     İçindeki GÖRSELLER silinmez — çağıran taraf `storage.unfile_folders` ile onları
     klasörsüz hale getirir.
     """
-    doomed = descendants(folder_id, output_dir)
-    if not doomed:
-        return []
-    targets = set(doomed)
-    _write(output_dir, [f for f in _read(output_dir) if f.get("id") not in targets])
+    with jsonstore.lock_for(_folders_path(output_dir)):
+        doomed = descendants(folder_id, output_dir)   # o da okuyor: kilit içinde
+        if not doomed:
+            return []
+        targets = set(doomed)
+        _write(output_dir, [f for f in _read(output_dir) if f.get("id") not in targets])
     return doomed

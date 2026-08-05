@@ -929,3 +929,53 @@ def test_reduced_motion_silences_the_view_animation():
     assert block, "reduced-motion bloğu bulunamadı"
     assert re.search(r"\.view-in-right[^{]*\{[^}]*animation: none", block.group(1)), (
         "sekme geçişi reduced-motion'da susturulmuyor")
+
+
+# ── v1.15 sonrası inceleme düzeltmeleri (L2–L4 + textarea sınırı) ────────
+
+def test_textareas_cannot_be_dragged_wider_than_their_column():
+    """Tarayıcı varsayılanı `resize: both`: prompt alanı kolonu ve pencereyi
+    aşacak kadar sağa çekilebiliyordu ve tutamak görünür alanın dışına
+    düştüğü için GERİ ÇEKİLEMİYORDU — alan o genişlikte kilitleniyordu."""
+    css = TestClient(appmod.app).get("/static/style.css").text
+    shared = re.search(r"\ntextarea, select \{(.*?)\n\}", css, re.S)
+    assert shared, "textarea/select kuralı bulunamadı"
+    assert "max-width: 100%" in shared.group(1), "yatay büyüme sınırlanmamış"
+
+    only = re.search(r"\ntextarea \{(.*?)\n\}", css, re.S)
+    assert only, "textarea'ya özel kural bulunamadı"
+    assert "resize: vertical" in only.group(1), "yatay boyutlandırma kapatılmamış"
+    assert "max-height" in only.group(1), "dikey büyüme sınırsız"
+    assert "min-height" in only.group(1), "alan sıfıra ezilebiliyor"
+
+
+def test_the_new_chat_controls_have_a_visible_focus_ring():
+    """Kendi zemini/kenarlığı olmayan düğmeler: odak halkası AÇIKÇA yazılmalı
+    (button.palette-sw geleneği)."""
+    css = TestClient(appmod.app).get("/static/style.css").text
+    for selector in (".chat-new", ".chat-item-open", ".chat-item-menu",
+                     ".chat-menu-item", ".chat-option"):
+        assert re.search(re.escape(selector) + r":focus-visible", css), selector
+
+
+def test_the_row_menu_carries_menu_roles_and_returns_focus():
+    """`aria-haspopup="true"` bir MENÜ vaat ediyor; kapanışta odak tetikleyiciye
+    dönmezse klavye kullanıcısı listede yerini kaybediyor."""
+    js = TestClient(appmod.app).get("/static/chat.js").text
+    assert '"role", "menu"' in js, "açılan katmana menu rolü verilmemiş"
+    assert '"role", "menuitem"' in js, "menü öğelerine menuitem rolü verilmemiş"
+    close = re.search(r"function closeMenus\(\) \{(.*?)\n\}", js, re.S)
+    assert close, "closeMenus bulunamadı"
+    assert "focus()" in close.group(1), "kapanışta odak tetikleyiciye dönmüyor"
+
+
+def test_a_turn_does_not_refetch_the_whole_chat_list():
+    """Yazan istek güncel kaydı zaten döndürüyor: tur başına ikinci bir istek
+    chats.json'ı gövdeleriyle baştan okumak demekti."""
+    js = TestClient(appmod.app).get("/static/chat.js").text
+    persist = re.search(r"async function persistThread\(\) \{(.*?)\n\}", js, re.S)
+    assert persist, "persistThread bulunamadı"
+    assert "loadChats" not in persist.group(1), "tur sonunda liste baştan çekiliyor"
+    assert "upsertSummary" in persist.group(1)
+    # `loadChats` KALMALI: ilk yükleme ve hata sonrası kurtarma yolu.
+    assert "async function loadChats()" in js

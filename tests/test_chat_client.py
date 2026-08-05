@@ -8,6 +8,7 @@ import pytest
 
 import azure_client as ac
 import chat_client as cc
+import models
 
 CREDS = ("secret-key", "https://ex.azure.com/openai/v1/", "gpt-5.6-luna")
 MESSAGES = [{"role": "user", "content": "kare instagram görseli"}]
@@ -200,6 +201,25 @@ def test_extract_content_puts_the_finish_reason_in_the_error():
 
 def test_extract_content_returns_the_content_and_finish_reason():
     assert cc.extract_content(_ok_body("metin", "stop")) == ("metin", "stop")
+
+
+def test_a_reply_at_the_cap_passes_through():
+    content = "y" * models.MAX_CHAT_REPLY_CHARS
+
+    assert cc.extract_content(_ok_body(content)) == (content, "stop")
+
+
+def test_a_reply_over_the_cap_is_a_turkish_chat_error():
+    """Sınırı AŞAN yanıt burada, ayrıştırıldığı yerde patlar.
+
+    Geçirilse ekrana çizilirdi ama `ChatMessage`'a sığmazdı: bir sonraki tur ve
+    kaydetme İngilizce bir 422 ile geri dönerdi ve sohbet sessizce kilitlenirdi.
+    Hata metni Türkçe ve eyleme dönük — rota bunu 502 olarak veriyor.
+    """
+    with pytest.raises(cc.ChatError) as exc:
+        cc.extract_content(_ok_body("y" * (models.MAX_CHAT_REPLY_CHARS + 1)))
+
+    assert "uzun" in str(exc.value)
 
 
 def test_complete_reports_the_finish_reason_to_the_caller():

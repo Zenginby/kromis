@@ -16,8 +16,13 @@
 // Sunucudaki models.py sınırlarının aynası. İstemci kapısı olmadan sınır aşımı
 // pydantic'in İNGİLİZCE 422 metniyle geri dönerdi.
 const MAX_CHAT_MESSAGES = 24;        // models.MAX_CHAT_MESSAGES
-const MAX_CHAT_MSG_CHARS = 6000;     // models.MAX_CHAT_MSG_CHARS
+const MAX_CHAT_MSG_CHARS = 6000;     // models.MAX_CHAT_MSG_CHARS (KULLANICI mesajı)
 const MAX_CHAT_TOTAL_CHARS = 60000;  // models.MAX_CHAT_TOTAL_CHARS
+// Yanıt sınırı (models.MAX_CHAT_REPLY_CHARS) BİLEREK aynalanmıyor: burada
+// ölçülecek bir şey yok, gelen yanıtı sunucu zaten kapıda kesiyor. Aşağıdaki
+// toplam kapısı da yanıt için yer AYIRMIYOR — kaydetme kapısı (models
+// .MAX_CHAT_SAVE_TOTAL_CHARS) tam bir yanıt kadar geniş, yoksa sınırın dibinde
+// geçen bir turun yanıtı hiç kaydedilemezdi.
 // Başlık ilk kullanıcı mesajından türetiliyor. Modele "bu sohbete isim ver"
 // diye İKİNCİ bir çağrı YAPILMIYOR: para ve gecikme, kazancı bir etiket.
 // Beğenmeyen kullanıcı 3-nokta menüsünden yeniden adlandırıyor.
@@ -551,19 +556,46 @@ function deriveTitle() {
   return `${space > 20 ? cut.slice(0, space) : cut}…`;
 }
 
+/** Sunucunun döndürdüğü kaydı panel listesine işler — İKİNCİ bir istek YOK.
+ *
+ * Eskiden her tur sonunda `loadChats()` çağrılıyordu: aynı chats.json'ı bir kez
+ * yazıp hemen ardından gövdeleriyle birlikte baştan okumak demekti (sohbet
+ * başına 60 bin karaktere kadar metin). Yazan istek zaten güncel kaydı
+ * döndürüyor, liste ondan kurulabiliyor.
+ *
+ * Sıralama kuralı `chat_store.list_chats` ile AYNI olmak zorunda: `updated_at`
+ * azalan. Damga ISO 8601, yani dizi karşılaştırması = zaman karşılaştırması.
+ */
+function upsertSummary(chat) {
+  const summary = {
+    id: chat.id,
+    title: chat.title,
+    created_at: chat.created_at,
+    updated_at: chat.updated_at,
+    message_count: (chat.messages || []).length,
+  };
+  // Dokunulan kayıt başa, sonra damgaya göre sırala: `sort` KARARLI olduğu için
+  // eşit damgalı kayıtlarda az önce yazılan üstte kalır (kullanıcının içinde
+  // olduğu sohbet), sunucunun "eşitlikte yeni olan başta" kuralıyla aynı yön.
+  chatSummaries = [summary, ...chatSummaries.filter((c) => c.id !== summary.id)]
+    .sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
+  renderChatList();
+}
+
+function dropSummary(chatId) {
+  chatSummaries = chatSummaries.filter((c) => c.id !== chatId);
+  renderChatList();
+}
+
 async function persistThread() {
   try {
-    if (currentChatId) {
-      await chatApi(`/api/chats/${currentChatId}`, {
-        method: "PUT", body: { messages: chatThread },
-      });
-    } else {
-      const { chat } = await chatApi("/api/chats", {
-        method: "POST", body: { title: deriveTitle(), messages: chatThread },
-      });
-      currentChatId = chat.id;
-    }
-    await loadChats();
+    const path = currentChatId ? `/api/chats/${currentChatId}` : "/api/chats";
+    const method = currentChatId ? "PUT" : "POST";
+    const body = currentChatId ? { messages: chatThread }
+                               : { title: deriveTitle(), messages: chatThread };
+    const { chat } = await chatApi(path, { method, body });
+    currentChatId = chat.id;
+    upsertSummary(chat);
   } catch (e) {
     // Tur DÜŞMÜYOR: yanıt ekranda ve bellekte duruyor, yalnız diske yazılamadı.
     // Sessiz geçilse kullanıcı sohbetin kaydedildiğini sanardı.
@@ -582,28 +614,47 @@ function shortStamp(iso) {
     : d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
 }
 
+/** Açık menüyü kapatır ve ODAĞI TETİKLEYİCİYE geri verir.
+ *
+ * Odak iadesi olmadan `Escape`/dışa tıklama, kapanan katmanın içindeki odağı
+ * `body`'ye düşürüyordu: klavye kullanıcısı listede yerini kaybediyor ve Tab'a
+ * baştan başlıyordu. `document.activeElement` kontrolü şart — fare ile
+ * kapatanın odağı zorla panele taşınmasın.
+ */
 function closeMenus() {
+  const list = $("chat-list");
+  const focusWasInMenu = document.activeElement
+    && document.activeElement.closest && document.activeElement.closest(".chat-menu");
+  const trigger = openMenuId
+    ? list.querySelector(`.chat-item-menu[data-chat-id="${openMenuId}"]`) : null;
   openMenuId = null;
-  for (const menu of $("chat-list").querySelectorAll(".chat-menu")) menu.hidden = true;
-  for (const btn of $("chat-list").querySelectorAll(".chat-item-menu")) {
+  for (const menu of list.querySelectorAll(".chat-menu")) menu.hidden = true;
+  for (const btn of list.querySelectorAll(".chat-item-menu")) {
     btn.setAttribute("aria-expanded", "false");
   }
+  if (focusWasInMenu && trigger) trigger.focus();
 }
 
 function chatMenu(summary) {
   const menu = document.createElement("div");
   menu.className = "chat-menu";
   menu.hidden = true;
+  // `aria-haspopup="true"` tetikleyicide bir MENÜ vaat ediyor; rolleri
+  // vermezsek ekran okuyucu iki düğmeli düz bir grup okur ve vaat tutulmaz.
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", `${summary.title || "Adsız sohbet"} — işlemler`);
 
   const rename = document.createElement("button");
   rename.type = "button";
   rename.className = "chat-menu-item";
+  rename.setAttribute("role", "menuitem");
   rename.textContent = "Yeniden adlandır";
   rename.addEventListener("click", () => { closeMenus(); renameChat(summary); });
 
   const remove = document.createElement("button");
   remove.type = "button";
   remove.className = "chat-menu-item chat-menu-danger";
+  remove.setAttribute("role", "menuitem");
   remove.textContent = "Sil";
   remove.addEventListener("click", () => { closeMenus(); deleteChat(summary); });
 
@@ -637,6 +688,7 @@ function chatItem(summary) {
   menuBtn.setAttribute("aria-haspopup", "true");
   menuBtn.setAttribute("aria-expanded", "false");
   menuBtn.setAttribute("aria-label", `${title.textContent} — işlemler`);
+  menuBtn.dataset.chatId = summary.id;   // closeMenus odağı buraya geri veriyor
   menuBtn.title = "İşlemler";
   menuBtn.textContent = "⋯";
 
@@ -720,8 +772,9 @@ async function renameChat(summary) {
     "Kenar panelinde görünecek ad.", { okLabel: "Kaydet", initial: summary.title || "" });
   if (name === null) return;
   try {
-    await chatApi(`/api/chats/${summary.id}`, { method: "PUT", body: { title: name } });
-    await loadChats();
+    const { chat } = await chatApi(`/api/chats/${summary.id}`,
+                                   { method: "PUT", body: { title: name } });
+    upsertSummary(chat);              // dönen kayıt yeter, listeyi baştan çekme
   } catch (e) {
     chatStatus(`Yeniden adlandırılamadı: ${e.message}`);
   }
@@ -737,7 +790,7 @@ async function deleteChat(summary) {
     // Açık sohbet silindiyse ekranda bırakmak yanıltıcı olurdu: bir sonraki tur
     // 404 alır ve kullanıcı "kaydedilmiyor" sanır.
     if (summary.id === currentChatId) resetThread();
-    await loadChats();
+    dropSummary(summary.id);
   } catch (e) {
     chatStatus(`Silinemedi: ${e.message}`);
   }

@@ -131,6 +131,37 @@ def test_a_single_oversized_message_is_rejected(client, fake_complete):
     assert not fake_complete
 
 
+def test_the_user_cap_is_reported_in_turkish(client, fake_complete):
+    """Sınır rol duyarlı olduğu için mesajı pydantic DEĞİL biz yazıyoruz."""
+    r = _post(client, [{"role": "user", "content": "x" * (models.MAX_CHAT_MSG_CHARS + 1)}])
+
+    assert "uzun" in str(r.json()["detail"])
+
+
+def test_the_directors_own_reply_may_be_longer_than_a_user_message(client, fake_complete):
+    """Yanıt sınırı KULLANICI sınırından geniş: model yanıtını hiçbir yerde
+    ölçmüyoruz (`max_tokens` bilerek gönderilmiyor) ve o yanıt bir sonraki turda
+    tel üzerinden GERİ geliyor. İki sınır aynı olsa 6.000'i aşan tek bir yanıt
+    sohbeti tümden kilitlerdi: ne devam ettirilebilir ne kaydedilebilir olurdu.
+    """
+    reply = "y" * (models.MAX_CHAT_MSG_CHARS + 1)
+    thread = [{"role": "user", "content": "kare instagram görseli"},
+              {"role": "assistant", "content": reply},
+              {"role": "user", "content": "devam"}]
+
+    assert _post(client, thread).status_code == 200
+    assert fake_complete
+
+
+def test_a_reply_over_the_reply_cap_is_still_rejected(client, fake_complete):
+    """Geniş, ama sınırsız değil: chats.json ve token maliyeti yine bağlı."""
+    thread = [{"role": "assistant", "content": "y" * (models.MAX_CHAT_REPLY_CHARS + 1)},
+              {"role": "user", "content": "devam"}]
+
+    assert _post(client, thread).status_code == 422
+    assert not fake_complete
+
+
 def test_total_thread_length_is_capped(client, fake_complete):
     """Tek mesaj sınırı × mesaj sayısı, toplam sınırdan büyük — ikisi de gerekli.
 

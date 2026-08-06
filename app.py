@@ -34,11 +34,11 @@ import paths
 import seed
 import storage
 import version
-from models import (MAX_PROMPT_CHARS, BannerRequest, BulkImagesRequest,
-                    BulkMoveRequest, ChatRequest, ChatSaveRequest, FolderRequest,
-                    GenerateRequest, LogoRequest, MoveImageRequest,
-                    SavePaletteRequest, SettingsRequest, SuggestRequest,
-                    check_drop_indices)
+from models import (MAX_PROMPT_CHARS, WIRE_MESSAGE_FIELDS, BannerRequest,
+                    BulkImagesRequest, BulkMoveRequest, ChatRequest,
+                    ChatSaveRequest, FolderRequest, GenerateRequest, LogoRequest,
+                    MoveImageRequest, SavePaletteRequest, SettingsRequest,
+                    SuggestRequest, check_drop_indices)
 
 BASE_DIR = paths.REPO_DIR                    # geriye uyum: mevcut kullanımlar bozulmasın
 OUTPUT_DIR = paths.output_dir()
@@ -545,9 +545,15 @@ def chat(req: ChatRequest) -> dict:
     chat_store.py). Modelden dönen her yanıtı sessizce diske almak ile
     kullanıcının "bunu sakla" demesi aynı şey değil; ayrımı
     tests/test_chat_route.py mekanik olarak koruyor.
+
+    Dump ALLOWLIST ile: `ChatMessage.display` yalnızca arayüzün çizdiği etikettir
+    ve Azure onu bilmiyor — çıplak `model_dump()` onu tel üzerine koyar ve istek
+    400 döner. Süzgeç `chat_client.build_payload`'ta da var (gerçek tel sınırı
+    orası); burada olması isteğin hiç oraya kadar gitmemesini sağlıyor.
     """
     try:
-        return cc.complete([m.model_dump() for m in req.messages])
+        return cc.complete([m.model_dump(include=WIRE_MESSAGE_FIELDS)
+                            for m in req.messages])
     except cc.ChatError as e:
         raise HTTPException(status_code=502, detail=str(e))
 
@@ -573,13 +579,19 @@ def get_chat_route(chat_id: str) -> dict:
 
 @app.post("/api/chats")
 def create_chat_route(req: ChatSaveRequest) -> dict:
-    """Yeni kayıt. Başlık ve gövde ZORUNLU: boş bir sohbet kaydetmek anlamsız."""
+    """Yeni kayıt. Başlık ve gövde ZORUNLU: boş bir sohbet kaydetmek anlamsız.
+
+    Kaydetmede allowlist DEĞİL `exclude_none` var — ayrım bilinçli: tamamlama
+    yolunun sınırı Azure'ın şeması, kaydetmenin sınırı ise diskteki biçim.
+    `display` diske YAZILMAK ZORUNDA (pil yeniden açılışta sağ kalsın), ama
+    `display: null` satırları eski sohbetlerin gövdesini sebepsiz büyütür.
+    """
     title = (req.title or "").strip()
     if not title:
         raise HTTPException(status_code=422, detail="Sohbet başlığı gerekli.")
     if not req.messages:
         raise HTTPException(status_code=422, detail="Kaydedilecek mesaj yok.")
-    messages = [m.model_dump() for m in req.messages]
+    messages = [m.model_dump(exclude_none=True) for m in req.messages]
     return {"chat": chat_store.create(title, messages, OUTPUT_DIR, now=_now())}
 
 
@@ -593,7 +605,8 @@ def update_chat_route(chat_id: str, req: ChatSaveRequest) -> dict:
     title = None if req.title is None else req.title.strip()
     if title is not None and not title:
         raise HTTPException(status_code=422, detail="Sohbet başlığı boş olamaz.")
-    messages = None if req.messages is None else [m.model_dump() for m in req.messages]
+    messages = (None if req.messages is None
+                else [m.model_dump(exclude_none=True) for m in req.messages])
     rec = chat_store.update(os.path.basename(chat_id), OUTPUT_DIR,
                             messages=messages, title=title, now=_now())
     if rec is None:

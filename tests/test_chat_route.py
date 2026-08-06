@@ -183,3 +183,60 @@ def test_total_thread_length_is_capped(client, fake_complete):
 def test_empty_content_is_rejected(client, fake_complete):
     assert _post(client, [{"role": "user", "content": ""}]).status_code == 422
     assert not fake_complete
+
+
+# ── v1.16: `display` (arayüzün çizdiği seçim etiketi) ───────────────────
+
+def test_the_display_label_never_reaches_azure(client, fake_complete):
+    """`display` YALNIZCA arayüz alanı: Azure onu bilmiyor ve 400 döndürür.
+
+    Bu, v1.16'nın en pahalı sessiz hatası olurdu: çip seçimiyle gönderilen her
+    tur, kullanıcıya "sohbet bozuldu" gibi görünen bir hatayla düşerdi. Dump
+    ALLOWLIST ile yapılıyor (`models.WIRE_MESSAGE_FIELDS`), kara listeyle değil —
+    bundan sonra eklenen her arayüz alanı da varsayılan olarak dışarıda kalır.
+    """
+    r = _post(client, [{"role": "user", "content": "Instagram karesi",
+                        "display": "Seçim: Instagram karesi"}])
+
+    assert r.status_code == 200
+    assert fake_complete[0] == [{"role": "user", "content": "Instagram karesi"}], \
+        "display tel üzerine sızdı — Azure bilinmeyen alan için 400 döner"
+
+
+def test_a_display_label_on_an_assistant_message_is_rejected(client, fake_complete):
+    """Pil KULLANICININ seçimini gösteriyor.
+
+    Asistan mesajında kabul edilse yönetmenin yanıtı ekranda tek satırlık bir
+    pile inerdi: prompt da, "Forma aktar" düğmesi de görünmez olurdu.
+    """
+    r = _post(client, [{"role": "assistant", "content": "merhaba", "display": "x"},
+                       {"role": "user", "content": "devam"}])
+
+    assert r.status_code == 422
+    assert "display" in r.text
+
+
+def test_an_oversized_display_label_is_rejected(client, fake_complete):
+    r = _post(client, [{"role": "user", "content": "kare",
+                        "display": "ç" * (models.MAX_CHAT_DISPLAY_CHARS + 1)}])
+
+    assert r.status_code == 422
+
+
+def test_the_display_label_counts_towards_the_total_thread_cap(client, fake_complete):
+    """Sayılmasa `chats.json`'da ÖLÇÜLMEYEN bir ağırlık olurdu.
+
+    İstemci aynı toplamı sayıyor (chat.js), yoksa sınırın dibindeki bir tur
+    gönderilir ve pydantic'in İngilizce hatasıyla geri dönerdi.
+    """
+    filler = "a" * (models.MAX_CHAT_MSG_CHARS - 1)
+    turns = models.MAX_CHAT_TOTAL_CHARS // models.MAX_CHAT_MSG_CHARS
+    messages = [{"role": "user", "content": filler} for _ in range(turns)]
+    # Son mesajın `display`'i toplamı sınırın ÜSTÜNE taşıyor.
+    messages[-1] = {**messages[-1], "display": "ç" * models.MAX_CHAT_DISPLAY_CHARS}
+    content_only = sum(len(m["content"]) for m in messages)
+    assert content_only <= models.MAX_CHAT_TOTAL_CHARS, "kurgu hatalı: content zaten aşıyor"
+
+    r = _post(client, messages)
+
+    assert r.status_code == 422, "display toplam kapısına sayılmıyor"

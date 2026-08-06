@@ -6,10 +6,15 @@ kopyala" deseni burada YANLIŞ olurdu. O desen kullanıcı varlıkları silinse 
 geri gelsin diye var; talimat ise tam tersini istiyor — bir sonraki sürümde
 iyileştirilen varsayılan, kendi dosyasını özelleştirmemiş herkese ULAŞMALI.
 
-Talimat neden `.py` içinde bir dize DEĞİL: dokuz bin karakterlik Türkçe
+Talimat neden `.py` içinde bir dize DEĞİL: on altı bin karakterlik Türkçe
 markdown'ı kaynağa gömmek okunamaz hale getirir ve paketlenmiş `.app` içinde
 düzenlenemez. Ayrı dosya olduğu için kullanıcı personayı `data_dir()`'e bir
 dosya bırakarak değiştirebiliyor.
+
+Bu sayı bir kez bayatladı: dosya 9 binden 15,4 bine çıkarken buradaki ve
+`chat_client`'taki yorum "dokuz bin" demeye devam etti, yani birikmenin tek
+kaydı sessizce yanlışa döndü. Üst sınır artık testte yaşıyor
+(tests/test_chat_prompt.py, 18 bin karakter bütçesi).
 
 Bu modül BİLEREK yalnızca `paths`'e bakıyor ve düz `ValueError` yükseltiyor;
 `ChatError`'a çevirmek `chat_client`'ın işi. Tek yönlü bağımlılık

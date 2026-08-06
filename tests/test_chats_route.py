@@ -224,3 +224,40 @@ def test_the_completion_route_still_writes_nothing(client, out_dir, monkeypatch)
     client.post("/api/chat", json={"messages": [{"role": "user", "content": "x"}]})
 
     assert client.get("/api/chats").json() == {"chats": []}
+
+
+# ── v1.16: seçim etiketi (`display`) diskte ─────────────────────────────
+
+def test_a_saved_selection_label_round_trips_through_the_store(client):
+    """Pil yeniden açılışta sağ kalmalı.
+
+    `openChat` akışı `chatThread`'den yeniden çiziyor, yani `display` diske
+    yazılmazsa kaydedilmiş bir sohbet açıldığında piller baloncuğa döner ve
+    birleştirilmiş seçim metni yeniden görünür — v1.16'nın düzelttiği şikâyetin
+    aynısı, bir tur gecikmeyle.
+    """
+    thread = [{"role": "user", "content": "Instagram karesi",
+               "display": "Instagram karesi · Blog kapağı"},
+              {"role": "assistant", "content": "kurdum"}]
+    cid = _create(client, messages=thread).json()["chat"]["id"]
+
+    got = client.get(f"/api/chats/{cid}").json()["chat"]["messages"]
+
+    assert got[0]["display"] == "Instagram karesi · Blog kapağı"
+    assert got[1].get("display") is None
+
+
+def test_saving_a_plain_thread_adds_no_null_display_to_the_file(client, out_dir):
+    """`exclude_none` olmadan her mesaja `"display": null` yazılırdı.
+
+    Eski sohbetlerin gövdesi sebepsiz büyür ve gövde eşitliğini ölçen testler
+    kırılır. Kaydetme yolunun sınırı Azure'ın şeması değil DİSKTEKİ biçim, bu
+    yüzden burada allowlist değil `exclude_none` var.
+    """
+    cid = _create(client).json()["chat"]["id"]
+
+    stored = chat_store.get(cid, out_dir)
+
+    assert stored["messages"] == THREAD, "kaydedilen gövde girdiyle birebir değil"
+    for m in stored["messages"]:
+        assert "display" not in m, "None display diske yazılmış"

@@ -24,7 +24,7 @@ import chat_prompt
 # olurdu. Döngü yok: `models` yalnız `azure_client` ve `palette`'e bakıyor.
 import models
 
-# Okuma zaman aşımı. ~13,6 bin karakter sistem talimatı + akıl yürüten dağıtım
+# Okuma zaman aşımı. ~16,5 bin karakter sistem talimatı + akıl yürüten dağıtım
 # için bol başlık payı: ÖLÇÜLEN turlar 4,9 s ve 9,3 s (2026-08-04).
 #
 # ⚠️ Bu değer bir zamanlar "görsel üretiminden UZUN olmalı" diye çivilenmişti;
@@ -82,12 +82,24 @@ def build_payload(messages: list[dict], deployment: str, instructions: str) -> d
     tamamı sistem talimatında yaşıyor. Yeni bir alan eklenirse CANLI doğrulanmalı
     (tests/test_chat_client.py'deki tripwire bunu zorluyor).
 
+    Minimallik v1.16'da MESAJ İÇİNE de indi: her mesaj sözlüğü
+    `models.WIRE_MESSAGE_FIELDS`'e süzülüyor. Sebebi somut — `ChatMessage.display`
+    yalnızca arayüzün çizdiği etiket ve Azure onu bilmiyor; süzgeç olmasa tel
+    üzerine çıkar ve istek 400 dönerdi. Süzgeç BURADA çünkü Azure gövdesini
+    gerçekten kuran yer burası: `complete()`'in bugünkü tek çağıranı rota, ama
+    yarınki çağıran da korunmuş oluyor. ALLOWLIST olduğu için bundan sonra
+    eklenen her arayüz alanı da varsayılan olarak dışarıda kalır.
+
     Sistem mesajını SUNUCU koyuyor; istemciden gelen listede `role: "system"`
     kabul edilmiyor (bkz. models.ChatMessage).
     """
     return {
         "model": deployment,  # DAĞITIM adı, model ailesi adı DEĞİL
-        "messages": [{"role": "system", "content": instructions}, *messages],
+        "messages": [
+            {"role": "system", "content": instructions},
+            *({k: m[k] for k in models.WIRE_MESSAGE_FIELDS if k in m}
+              for m in messages),
+        ],
     }
 
 

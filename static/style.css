@@ -978,6 +978,43 @@ body.viewer-open { overflow: hidden; }
 .chat-options-done { opacity: 0.55; }
 .chat-options-done .chat-option, .chat-options-done button { cursor: not-allowed; }
 
+/* ── Varyasyon ve parametre panelleri (v1.16) ─────────────────────────
+   Kök sınıf `.chat-options` PAYLAŞILIYOR: kilit kuralı (lockStaleOptions), odak
+   halkası ve `.chat-options-done` oradan geliyor. Buradaki kurallar yalnızca
+   YERLEŞİM ekliyor. Varyasyon düğmeleri de `.chat-option` taşıdığı için hover,
+   :active ve odak halkası kuralları değişmeden geçerli. */
+.chat-axis {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: 0.5rem; margin: 0 0 0.65rem;
+}
+.chat-axis-name { flex: 0 0 auto; font-size: 0.82rem; color: var(--text); }
+/* Şu anki değer: takas edilen şeyin görünmesi gerekiyor ama TIKLANABİLİR
+   görünmemeli — o yüzden çip değil kod rozeti. */
+.chat-axis-now {
+  flex: 0 0 auto; padding: 0.1em 0.4em; border-radius: 5px;
+  background: var(--panel-2); color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.76rem;
+}
+.chat-axis .chat-options-chips { flex: 1 1 12rem; }
+
+/* ── Seçim pili: çipten gelen tur (v1.16) ─────────────────────────────
+   Baloncuk DEĞİL. Birleştirilmiş seçim metni bir replik gibi çizilince kullanıcı
+   onu kendi yazdığı sanıyordu. Kullanıcı tarafında kalıyor (sağa yaslı) ama
+   dolgusu yok, kenarı kesikli ve tipi küçük: "söylenmiş" değil "seçilmiş"
+   grameri. Ayrım mesajın kendisinde taşınıyor (models.ChatMessage.display), o
+   yüzden yeniden açılan sohbette de pil pil kalıyor. */
+.chat-pick {
+  align-self: flex-end; display: flex; align-items: baseline; gap: 0.45rem;
+  max-width: 76%; padding: 0.3rem 0.7rem;
+  border: 1px dashed var(--panel-2); border-radius: 999px;
+  color: var(--muted); font-size: 0.8rem; line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.chat-pick-tag {
+  flex: 0 0 auto; color: var(--accent);
+  font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase;
+}
+
 .chat-composer {
   position: sticky; bottom: 0; margin-top: auto;
   background: var(--bg); padding: 0.8rem 0 var(--space);

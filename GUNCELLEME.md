@@ -72,6 +72,45 @@ de bu numarayı söyle.
 Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya yaz
 (aşağıdaki yedek işine yarayabilir).
 
+## Sürüm 1.16.0'da ne değişti
+
+Prompt Yönetmeni'nin tamamı bu sürümde elden geçti: artık daha sade prompt
+yazıyor, varyasyonları tıklanabilir hâle geldi ve sohbet dışı sorulara cevap
+vermiyor.
+
+- **Varyasyonlar tek tıkla uygulanıyor.** Eskiden "A — Serin ve kurumsal: şunu
+  şununla değiştir" diye yazıyordu ve prompt'u **elle** düzeltmen gerekiyordu.
+  Artık varyasyonlar düğme: birine bastığında yönetmen prompt'u ona göre baştan
+  yazıyor. Yarım dakikayı bulabilir, çünkü gerçekten yeniden yazıyor — yerinde
+  kelime değiştirmiyor. Sebebi şu: varyasyonların çoğu tek kelime değişikliği
+  değil ("fotoğraf üslubuna çevir" gibi), ve yerinde değiştirme tutmadığında
+  sana hiç seçmediğin bir prompt verirdi.
+- **Ayarlanabilir parametreler de tıklanabilir.** Işık, palet, kadraj gibi
+  eksenler artık seçenek düğmeleri hâlinde geliyor; yanında **kendi fikrini
+  yazabileceğin bir alan** var. Birkaç ekseni birlikte seçip tek "Uygula" ile
+  gönderiyorsun. Her eksenin yanında şu an prompt'ta duran ifade yazılı, yani
+  neyi takas ettiğini görüyorsun.
+- **Seçimlerin artık senin yazdığın mesaj gibi görünmüyor.** Çiplerden seçip
+  "Devam et"e bastığında akışta `Instagram karesi · Blog kapağı` diye bir
+  baloncuk çıkıyordu — sanki sen yazmışsın gibi. Artık orada sessiz, küçük bir
+  **SEÇİM** etiketi var. Kaydedilmiş sohbeti tekrar açtığında da öyle kalıyor.
+- **Promptlar sadeleşti.** Yönetmene "en az 60 kelime yaz" diyen bir kural
+  vardı; sen iki cümlelik bir fikir söylediğinde bile aradaki boşluğu **uydurma
+  ayrıntıyla** doldurmak zorunda kalıyordu (senin hiç istemediğin ışık, doku,
+  film graini). O kural kalktı: artık prompt'un uzunluğunu senin anlattığın
+  belirliyor. Az anlatırsan kısa, çok anlatırsan uzun olur — ama uydurma
+  ayrıntı girmez. Kısa prompt eksik prompt değil; yazılmayan her şeyi model
+  kendi kararıyla iyi dolduruyor.
+- **Yönetmen artık sohbet asistanı değil.** Şiir, kod, genel bilgi ya da alakasız
+  bir soru sorarsan tek cümleyle "ben yalnızca görsel prompt'u hazırlıyorum"
+  diyor. Prompt'la ilgili her şey hâlâ işinin içinde: "bu prompt'u Türkçe
+  açıklar mısın", "görsel neden bulanık çıktı", "story için hangi oran" —
+  hepsine cevap veriyor.
+- **Yanlış bilgiler temizlendi.** Yönetmen sana olgu gibi söylediği ama
+  doğrulanamayan birkaç şey biliyordu — en kötüsü "Türkçe desteklenen diller
+  listesinde yok" iddiasıydı; öyle bir liste hiç yok. Türkçe karakterlerin
+  bozulabildiği uyarısı ve üç pratik çaresi duruyor.
+
 ## Sürüm 1.15.1'de ne değişti
 
 Yeni özellik yok; 1.15.0'ın kod incelemesinde çıkan pürüzler kapatıldı.

@@ -307,6 +307,16 @@ MAX_CHAT_TOTAL_CHARS = 60000    # tüm geçmiş — mesaj sayısı × tek mesajd
 # panelde güncel görünen, ama bir tur geride bir sohbet bulurdu.
 MAX_CHAT_SAVE_TOTAL_CHARS = MAX_CHAT_TOTAL_CHARS + MAX_CHAT_REPLY_CHARS
 MAX_CHAT_TITLE_CHARS = 120      # kenar panelinde gösterilen başlık
+# Çipten gelen turun EKRANDA görünen etiketi (v1.16). Modele giden `content` ile
+# aynı şey DEĞİL: kullanıcı "Instagram karesi" çipine bastığında modele bir
+# cümle, akışa ise kısa bir "seçim" pili gidiyor. 400 bir çip listesine bol
+# geliyor (8 çip × 40 karakter + ayraçlar ≈ 341).
+MAX_CHAT_DISPLAY_CHARS = 400
+# Azure'a ÇIKAN alanlar. ALLOWLIST, kara liste değil: `display` gibi yalnızca
+# arayüze ait bir alan tel üzerine sızsa Azure bilinmeyen alan için 400 döner ve
+# hata "sohbet bozuldu" gibi görünürdü. Allowlist olduğu için bundan sonra
+# eklenen her arayüz alanı da varsayılan olarak DIŞARIDA kalır.
+WIRE_MESSAGE_FIELDS = {"role", "content"}
 CHAT_ROLES = {"user", "assistant"}
 
 
@@ -315,8 +325,12 @@ def _check_chat_total(messages: list["ChatMessage"], limit: int) -> list["ChatMe
 
     Rol kuralı da paylaşılmıyor: tamamlamada son mesaj kullanıcıdan olmak ZORUNDA,
     kaydetmede ise normalde asistandan (turun yanıtı).
+
+    `display` de SAYILIYOR: sayılmasa `chats.json`'da ölçülmeyen bir ağırlık
+    olurdu — tek başına küçük, ama sınırın amacı "dosya istemcinin gönderdiği
+    kadar büyüyebilmesin" ve ölçülmeyen her alan o amacı deler.
     """
-    if sum(len(m.content) for m in messages) > limit:
+    if sum(len(m.content) + len(m.display or "") for m in messages) > limit:
         raise ValueError("sohbet çok uzun: yeni bir sohbet başlat")
     return messages
 
@@ -332,6 +346,20 @@ class ChatMessage(BaseModel):
     # rolü bilen doğrulayıcıda. Alan düzeyinde ayrılamaz: `max_length` başka bir
     # alanın değerine bakamaz.
     content: str = Field(min_length=1, max_length=MAX_CHAT_REPLY_CHARS)
+    # Yalnızca ARAYÜZ alanı: varsa akışa baloncuk değil kısa bir "seçim" pili
+    # çiziliyor ve `content` hiç gösterilmiyor (v1.16). Çip seçimleri modele bir
+    # cümle olarak gidiyor; o cümlenin kullanıcının kendi yazdığı bir replik gibi
+    # görünmesi v1.15'in şikâyet edilen yanıydı.
+    #
+    # Alan MESAJLA birlikte yolculuk ediyor, ayrı bir istemci durumunda DEĞİL:
+    # `openChat` sohbeti `chatThread`'den yeniden çiziyor, yani işaret mesajda
+    # olmazsa kaydedilmiş bir sohbet açıldığında piller baloncuğa dönerdi. Metni
+    # önceki bot mesajının çiplerinden geri türetmek de seçenek değildi: tahmin
+    # olurdu ve kullanıcının GERÇEKTEN yazdığı bir cümle pil gibi çizilebilirdi.
+    #
+    # Azure'a ÇIKMIYOR (bkz. WIRE_MESSAGE_FIELDS).
+    display: str | None = Field(default=None, min_length=1,
+                                max_length=MAX_CHAT_DISPLAY_CHARS)
 
     @field_validator("role")
     @classmethod
@@ -346,6 +374,12 @@ class ChatMessage(BaseModel):
         aynı sayıyı söylüyor — pydantic'in `max_length` metni İngilizce olurdu."""
         if self.role == "user" and len(self.content) > MAX_CHAT_MSG_CHARS:
             raise ValueError(f"mesaj çok uzun: en fazla {MAX_CHAT_MSG_CHARS} karakter")
+        # `display` yalnızca KULLANICI turunda anlamlı: pil, kullanıcının verdiği
+        # seçimi gösteriyor. Asistan mesajında kabul edilse yönetmenin yanıtı
+        # ekranda tek satırlık bir pile inerdi — prompt'u da, "Forma aktar"
+        # düğmesini de görünmez yapan sessiz bir kırılma.
+        if self.role != "user" and self.display is not None:
+            raise ValueError("display yalnızca kullanıcı mesajında kullanılabilir")
         return self
 
 

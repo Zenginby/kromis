@@ -717,9 +717,13 @@ def test_chat_scroll_helper_calls_the_native_dom_api():
 
 
 def test_failed_turn_is_rolled_back_out_of_the_thread():
-    """Başarısız tur geçmişte kalırsa her yeniden gönderim aynı hatayı tekrarlar."""
+    """Başarısız tur geçmişte kalırsa her yeniden gönderim aynı hatayı tekrarlar.
+
+    Desen v1.16'da GENİŞLETİLDİ (`sendChat()` → `sendChat(...)`): imza `display`
+    parametresini aldı. Testin ölçtüğü şey değişmedi — geri alma hâlâ zorunlu.
+    """
     js = TestClient(appmod.app).get("/static/chat.js").text
-    body = re.search(r"async function sendChat\(\)\s*\{(.*?)\n\}", js, re.S)
+    body = re.search(r"async function sendChat\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
     assert body, "sendChat() bulunamadı"
     assert "chatThread.pop()" in body.group(1), "başarısız tur geçmişten çıkarılmıyor"
 
@@ -799,18 +803,26 @@ def test_the_options_block_is_never_drawn_as_a_code_block():
         "seçenek bloğu atlanmıyor — kullanıcı ham JSON okur")
 
 
-def test_option_clicks_go_through_the_single_send_path():
-    """Çipler ikinci bir gönderim yolu açmamalı.
+def test_every_answer_panel_sends_through_the_single_send_path():
+    """Hiçbir panel ikinci bir gönderim yolu açmamalı.
 
     `sendChat` sınır kapılarını, başarısız turun geri alınmasını ve kaydetmeyi
     tek yerde tutuyor; ayrı bir fetch yazılsa bunların hepsi çiplerde eksik
     kalırdı (v1.13'te tam bu tür bir ikinci yol hiç yazılmadığı için sağlamdı).
+
+    v1.16: kapsam üç panele çıktı (seçenek, varyasyon, parametre) ve aranan desen
+    `sendChat()` → `sendChat(` oldu, çünkü çağrı artık `display` argümanı
+    geçiriyor. Ölçülen şey aynı: tek gönderim yolu, kendi fetch'i olmayan panel.
+
+    Ortak bir `wireSubmit()` yardımcısı BİLEREK yazılmadı: çağrıyı sarmalayıcının
+    içine saklamak bu testi teknik olarak geçirip işlevsiz bırakırdı.
     """
     js = _chat_js()
-    body = re.search(r"function renderOptions\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
-    assert body, "renderOptions() bulunamadı"
-    assert "sendChat()" in body.group(1), "çipler sendChat'i çağırmıyor"
-    assert "fetch(" not in body.group(1), "çipler kendi isteğini atıyor"
+    for name in ("renderOptions", "renderVariations", "renderParameters"):
+        body = re.search(rf"function {name}\([^)]*\)\s*\{{(.*?)\n\}}", js, re.S)
+        assert body, f"{name}() bulunamadı"
+        assert "sendChat(" in body.group(1), f"{name} sendChat'i çağırmıyor"
+        assert "fetch(" not in body.group(1), f"{name} kendi isteğini atıyor"
 
 
 def test_prompt_actions_live_on_the_prompt_block_not_at_the_bottom():
@@ -979,3 +991,205 @@ def test_a_turn_does_not_refetch_the_whole_chat_list():
     assert "upsertSummary" in persist.group(1)
     # `loadChats` KALMALI: ilk yükleme ve hata sonrası kurtarma yolu.
     assert "async function loadChats()" in js
+
+
+# ── v1.16: makine blokları, tıklanabilir paneller, seçim pili ──────────
+
+def test_a_machine_block_can_never_be_picked_as_the_prompt():
+    """Kısalan prompt + uzun varyasyon bloğu, "en uzun blok" kuralını JSON'a
+    yönlendiriyordu ve "Forma aktar" forma JSON yazıyordu.
+
+    v1.15'in aday süzgeci ayar ve seçenek bloğunu ELLE dışlıyordu. v1.16 iki blok
+    daha ekliyor ve aynı sürümde promptlar KISALIYOR — ölçüldü: 133 karakterlik
+    bir prompt yanında 352 karakterlik varyasyon bloğu, başlık satırı kaymışsa
+    prompt seçilen blok oluyordu. Kural artık liste tutmuyor: JSON nesnesi olarak
+    ayrıştırılan HER blok adaylıktan düşüyor (prompt akıcı prozadır, JSON olamaz).
+    Yan kazanç: modelin uydurduğu tanınmayan bir JSON bloğu da prompt sanılamıyor.
+    """
+    js = _chat_js()
+    body = re.search(r"function parseDirectorReply\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "parseDirectorReply() bulunamadı"
+    assert "jsonBlocks.has(b)" in body.group(1), (
+        "aday süzgeci JSON bloklarını dışlamıyor — varyasyon JSON'u forma yazılabilir")
+    for key in ("varyasyonlar", "eksenler"):
+        assert key in body.group(1), f"{key} imzası tanınmıyor"
+
+
+def test_the_variation_and_parameter_blocks_are_never_drawn_as_code_blocks():
+    """Üç bloğun da görünür karşılığı ÇİPLER; ham JSON gösterilmemeli.
+
+    Ayar JSON'u listede BİLEREK yok: kullanıcının "Forma aktar"a basmadan da
+    hangi boyut/kalite önerildiğini görmesi gerekiyor.
+    """
+    js = _chat_js()
+    body = re.search(r"function renderMarkdownInto\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "renderMarkdownInto() bulunamadı"
+    for field in ("parsed.optionsBody", "parsed.variationsBody", "parsed.parametersBody"):
+        assert field in body.group(1), f"{field} atlama kümesinde değil — ham JSON çizilir"
+
+
+def test_a_variation_click_never_edits_the_prompt_locally():
+    """Yerel `x → y` değiştirme SESSİZCE yanlış prompt üretir.
+
+    Varyasyonlar cümle düzeyi düzenlemeler ("photorealistic + doku + derinlik
+    cümlelerini kaldır"), bir kelime çifti değil. Eşleşme tutmazsa kullanıcı hiç
+    seçmediği bir prompt'u forma aktarır — `applyToForm`'un kırpmayı reddetmesiyle
+    aynı gerekçe. Tıklama bu yüzden yönetmene tek turluk bir istek gönderiyor.
+    """
+    js = _chat_js()
+    body = re.search(r"function renderVariations\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "renderVariations() bulunamadı"
+    for banned in (".replace(", '$("prompt")', "parsed.prompt"):
+        assert banned not in body.group(1), (
+            f"varyasyon prompt'u yerelde değiştiriyor: {banned}")
+
+
+def test_every_answer_panel_shares_the_lockable_group_class():
+    """Kök sınıf ayrışırsa `lockStaleOptions` yeni panellere ULAŞMAZ.
+
+    Bu, testi geçerken davranışın sessizce bozulduğu sınıf bir hata: yeniden
+    açılan bir sohbette eski varyasyon düğmeleri sonsuza dek canlı kalır ve
+    kullanıcı artık var olmayan bir prompt'a delta gönderir.
+    """
+    js = _chat_js()
+    group = re.search(r"function answerGroup\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert group, "answerGroup() bulunamadı"
+    assert '"chat-options"' in group.group(1), "ortak kök sınıf verilmiyor"
+    for name in ("renderVariations", "renderParameters"):
+        body = re.search(rf"function {name}\([^)]*\)\s*\{{(.*?)\n\}}", js, re.S)
+        assert "answerGroup(" in body.group(1), f"{name} ortak kökü kullanmıyor"
+
+
+def test_each_parameter_axis_is_mutually_exclusive_on_its_own_row():
+    """Dışlayıcılık kapsamı SATIR olmalı, panel değil.
+
+    Panel geçilse tek bir ışık seçimi bütün eksenlerin seçimini silerdi: kullanıcı
+    ışık + palet + kadraj birlikte seçemezdi.
+    """
+    js = _chat_js()
+    body = re.search(r"function renderParameters\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "renderParameters() bulunamadı"
+    assert "optionChip(String(raw), false, row)" in body.group(1), (
+        "eksen alternatifleri satıra bağlı tek seçim değil")
+
+
+def test_the_merged_selection_is_drawn_as_a_pill_not_as_a_typed_message():
+    """Birleştirilmiş seçim metni baloncuk olarak çizilince kullanıcı onu KENDİ
+    yazdığı sanıyordu (v1.15'in şikâyet edilen yanı).
+
+    Ayrım mesajın İÇİNDE taşınıyor (models.ChatMessage.display), istemcide ayrı
+    bir durumda değil: `openChat` akışı `chatThread`'den yeniden çiziyor, yani
+    işaret mesajda olmasa kaydedilmiş bir sohbet açıldığında piller baloncuğa
+    dönerdi.
+    """
+    js = _chat_js()
+    body = re.search(r"function appendUser\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "appendUser() bulunamadı"
+    assert "msg.display" in body.group(1), "pil/baloncuk ayrımı yapılmıyor"
+    assert '"chat-pick"' in body.group(1), "pil sınıfı verilmiyor"
+    # Yeniden açılışta da pil kalsın: openChat mesaj NESNESİ geçirmeli.
+    open_body = re.search(r"async function openChat\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert "appendUser(m)" in open_body.group(1), (
+        "openChat content geçiriyor — yeniden açılan sohbette piller baloncuğa döner")
+
+
+def test_the_send_button_does_not_leak_the_click_event_into_the_display_field():
+    """`("click", sendChat)` yazılsa MouseEvent `display` argümanı olurdu.
+
+    Sonuç: pilde "[object MouseEvent]" görünür ve o dize `display` alanı olarak
+    SUNUCUYA gider. Tek karakterlik bir sadeleştirmenin bedeli; sözdizimi geçerli
+    olduğu için hiçbir şey uyarmaz.
+    """
+    js = _chat_js()
+    assert re.search(r'\$\("chat-send"\)\.addEventListener\("click",\s*\(\)\s*=>\s*sendChat\(\)\)',
+                     js), "gönder dinleyicisi sarmalanmamış — MouseEvent display olur"
+
+
+def test_the_client_counts_the_display_label_in_the_total_gate():
+    """İstemci ve sunucu AYNI şeyi saymazsa sınırın dibindeki tur 422 ile döner.
+
+    Sunucu `models._check_chat_total` içinde `content` + `display` topluyor;
+    istemci yalnız `content` sayarsa isteği gönderir ve pydantic'in İNGİLİZCE
+    hatasıyla geri gelir.
+    """
+    js = _chat_js()
+    body = re.search(r"async function sendChat\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "sendChat() bulunamadı"
+    assert 'm.display || ""' in body.group(1), "toplam kapısı display'i saymıyor"
+    assert "MAX_CHAT_DISPLAY_CHARS" in js, "sunucu sınırı aynalanmamış"
+
+
+def test_a_failed_chip_turn_does_not_dump_the_directors_delta_into_the_composer():
+    """Çip turu başarısız olursa besteciye modelin uzun Türkçe cümlesi düşmemeli.
+
+    Grup kilitlenmemiş oluyor (sendChat false döndü), yani tıklama zaten
+    tekrarlanabilir; metni bestecide göstermek tam olarak kaldırılan çirkinliği
+    geri getirirdi. Elle yazılan tur için geri koyma DEVAM ediyor.
+    """
+    js = _chat_js()
+    body = re.search(r"async function sendChat\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert "if (!label) input.value = message;" in body.group(1), (
+        "başarısız çip turunda delta metni besteciye dökülüyor")
+
+
+def test_the_selection_pill_is_quieter_than_a_typed_message():
+    """Pil bir REPLİK gibi görünmemeli: dolgusu yok, kenarı kesikli, tipi küçük."""
+    css = TestClient(appmod.app).get("/static/style.css").text
+    rule = re.search(r"\.chat-pick\s*\{([^}]*)\}", css)
+    assert rule, "pil kuralı bulunamadı"
+    assert "flex-end" in rule.group(1), "pil kullanıcı tarafında durmuyor"
+    assert "dashed" in rule.group(1), "pil baloncuktan ayrışmıyor"
+    assert "background:" not in rule.group(1), "pil baloncuk gibi dolduruluyor"
+
+
+def test_a_free_text_only_parameter_turn_is_not_attributed_to_the_user():
+    """Parametre panelinde iskeleti İSTEMCİ yazıyor — tur baloncuk olamaz.
+
+    `axesValue` hiç eksen seçilmediğinde de `content`'e kapanış cümlesini
+    ("Prompt'un geri kalanını aynı tut.") ekliyor. `display` boş bırakılsaydı
+    `appendUser` baloncuğa düşerdi ve kullanıcı akışta KENDİ YAZMADIĞI bir cümleyi
+    kendi repliği olarak görürdü — v1.16'nın pili getirme sebebi tam olarak bu
+    yanlış atıftı, yani hata özelliğin kendi amacını deliyordu.
+
+    Ayrım `optionsValue` ile bilinçli olarak FARKLI: orada serbest metin modele
+    AYNEN gidiyor (turu kullanıcı yazdı, baloncuk doğru). Ölçü "seçim yapıldı mı"
+    değil, "turu kim yazdı".
+    """
+    js = _chat_js()
+    body = re.search(r"function axesValue\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "axesValue() bulunamadı"
+    assert "if (!parts.length) return { content, display: own };" in body.group(1), (
+        "eksen seçilmeyen tur baloncuk olarak çiziliyor — kullanıcı yazmadığı "
+        "cümleyi kendi repliği sanır")
+    # Seçenek panelinde ters yön korunmalı: orada serbest metin baloncuk KALIR.
+    opts = re.search(r"function optionsValue\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert 'return { content: own, display: "" };' in opts.group(1), (
+        "seçenek panelinde kullanıcının kendi cümlesi pile çevrilmiş")
+
+
+def test_a_machine_block_that_breaks_its_contract_is_still_shown_to_the_user():
+    """Blok ne panel ne kod bloğu olarak çizilmezse SESSİZCE kaybolur.
+
+    Atlama koşulu "blok var" olsaydı, sözleşmeye uymayan bir varyasyon bloğu
+    (örn. `istek` alanı düşmüş) iki kere elenirdi: `renderVariations` `null`
+    döndüğü için panel çizilmez, atlama kümesinde olduğu için ham JSON da
+    çizilmez — kullanıcı hiçbir şey görmez. Bu, aynı fonksiyondaki "tanınmayan
+    JSON bloğu ÇİZİLİR, kullanıcı onu görsün" dürüstlük kuralının tam tersi.
+
+    Çözüm süzgeci PAYLAŞMAK: panelin çizilip çizilmeyeceğini iki yer aynı
+    fonksiyona soruyor, o yüzden ayrışamıyorlar.
+    """
+    js = _chat_js()
+    body = re.search(r"function renderMarkdownInto\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "renderMarkdownInto() bulunamadı"
+    skip = re.search(r"const skip = new Set\(\[(.*?)\]", body.group(1), re.S)
+    assert skip, "atlama kümesi bulunamadı"
+    for fn in ("variationItems(parsed).length", "axisItems(parsed).length"):
+        assert fn in skip.group(1), (
+            f"atlama kümesi {fn} sormuyor — sözleşmesi bozuk blok sessizce kaybolur")
+    # Süzgeç GERÇEKTEN paylaşılıyor mu: paneller de aynı fonksiyonu çağırmalı.
+    for name, fn in (("renderVariations", "variationItems(parsed)"),
+                     ("renderParameters", "axisItems(parsed)")):
+        panel = re.search(rf"function {name}\([^)]*\)\s*\{{(.*?)\n\}}", js, re.S)
+        assert fn in panel.group(1), (
+            f"{name} kendi süzgecini tutuyor — atlama kuralıyla ayrışabilir")

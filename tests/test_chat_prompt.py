@@ -14,6 +14,15 @@ import paths
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def _bundled_text() -> str:
+    """GÖMÜLÜ dosyanın metni. `load_instructions()` DEĞİL: içerik testleri repoyu
+    doğruluyor, geliştiricinin `data_dir()`'deki kişisel ezme dosyasını değil —
+    yoksa kendi personasını yazan biri repo suite'ini kırmış olurdu."""
+    path = os.path.join(paths.bundled_prompts_dir(), chat_prompt.INSTRUCTIONS_FILE)
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
 def test_bundled_default_ships_with_the_repo():
     """Gömülü varsayılan yoksa özellik ilk açılışta ölür (ezme dosyası da yok)."""
     path = os.path.join(paths.bundled_prompts_dir(), chat_prompt.INSTRUCTIONS_FILE)
@@ -144,3 +153,157 @@ def test_the_persona_teaches_the_clickable_options_contract():
     # Prompt üretilen yanıtta blok OLMAMALI: aksi halde her yanıtta çip çıkar.
     assert re.search(r"[Ss]oru sormadığın yanıta bu bloğu KOYMA", text), \
         "bloğun NEREDE olmayacağı söylenmemiş"
+
+
+# ── v1.16: tıklanabilir varyasyon/parametre + kapsam sınırı ─────────────
+
+def test_the_persona_teaches_the_clickable_variation_contract():
+    """Varyasyon çiplerinin var olma koşulu, personanın `variations` bloğu yazması.
+
+    Arayüz tarafı sağlam olsa bile bu blok gelmezse panel HİÇ çizilmez ve özellik
+    sessizce v1.15'e döner: kullanıcı yine prozadan okuyup prompt'u elle düzenler.
+    `istek` alanı ayrıca kritik — uygulama onu kullanıcının bir sonraki MESAJI
+    olarak gönderiyor, yani kendi başına anlaşılır olmak zorunda.
+    """
+    text = _bundled_text()
+    assert "```variations" in text, "varyasyon bloğu sözleşmesi yok"
+    for key in ('"varyasyonlar"', '"ad"', '"istek"'):
+        assert key in text, f"arayüzün okuduğu anahtar örneklenmemiş: {key}"
+
+
+def test_the_persona_teaches_the_clickable_parameter_contract():
+    """`simdi` alanı prompt'ta AYNEN geçen ifade olmak zorunda.
+
+    Geçmezse kullanıcı panelde takas ettiğini sandığı bir ifadeyi görür ama
+    prompt'ta o ifade yoktur — yönetmen de deltayı uygulayacak yeri bulamaz.
+    """
+    text = _bundled_text()
+    assert "```parameters" in text, "parametre bloğu sözleşmesi yok"
+    for key in ('"eksenler"', '"simdi"', '"secenekler"'):
+        assert key in text, f"arayüzün okuduğu anahtar örneklenmemiş: {key}"
+    assert "AYNEN geçen" in text, "`simdi`nin prompt'ta birebir bulunma şartı yok"
+
+
+def test_the_persona_does_not_repeat_the_panels_in_prose():
+    """İki liste hem blokta hem prozada yazılırsa yanıt iki katına çıkar.
+
+    Sınır somut: `models.MAX_CHAT_REPLY_CHARS` (12.000) aşıldığında
+    `chat_client.extract_content` turu Türkçe bir hatayla düşürüyor. Panel
+    başlıklarını arayüz kendisi yazdığı için prozada tekrar GEREKSİZ.
+    """
+    text = _bundled_text()
+    assert "PROZADA TEKRARLAMA" in text, "prozada tekrar yasağı düşmüş"
+    # v1.15'in proza varyasyon listesi (`- **A — [isim]:**`) geri gelmemeli.
+    assert not re.search(r"^-\s+\*\*[A-C]\s+—", text, re.M), \
+        "proza varyasyon listesi geri eklenmiş — blokla birlikte iki kat yanıt"
+
+
+def test_the_persona_refuses_off_topic_requests_without_drawing_a_form_button():
+    """Ret yanıtında kod bloğu KALIRSA arayüz "Forma aktar" düğmesi çizer.
+
+    `parseDirectorReply` prompt'u "JSON olmayan en uzun fence" diye seçiyor: ret
+    cümlesinin yanına konan herhangi bir blok prompt sanılır ve `applyToForm` onu
+    doğrudan #prompt alanına yazar. Kırılma sessiz — düğme çalışır, yalnızca
+    alakasız metni aktarır.
+    """
+    text = _bundled_text()
+    assert "sohbet için değilim" in text, "kapsam reddinin cümlesi kaybolmuş"
+    assert re.search(r"[Rr]et yanıtına hiçbir kod bloğu KOYMA", text), \
+        "reddin BLOKSUZ olacağı söylenmemiş"
+
+
+def test_the_scope_gate_keeps_its_valve_against_over_refusal():
+    """Kapsam kapısının en olası kırılması FAZLA reddetmek.
+
+    "Bu prompt'u Türkçe açıklar mısın" ya da "görsel neden bulanık çıktı"
+    reddedilirse kullanıcı işini yapamaz ve bunu hata olarak da bildirmez —
+    "yönetmen bugün huysuz" der. İki valf de silinmemeli: şüphe kuralı ve sınırı
+    kelimeye değil hedefe göre çizme kuralı.
+    """
+    text = _bundled_text()
+    assert "Şüphedeyken prompt işi say" in text, "aşırı-ret valfi kaldırılmış"
+    assert "kelimeye değil HEDEFE" in text, "hedef-tabanlı sınır kuralı düşmüş"
+
+
+def test_the_persona_does_not_set_a_minimum_prompt_length():
+    """Alt sınır bir DOLGU EMRİdir.
+
+    v1.15'teki "Varsayılan biçim: 60–150 kelime" kuralı, brief'in belirlemediği
+    katmanları modele uydurtuyordu: brief 25 kelime belirlediğinde dosya 60 kelime
+    sipariş ediyordu. Uygulama sahibinin şikâyeti (her çıktıyı elle kısaltmak)
+    doğrudan o satırdan geliyordu. gpt-image-2 için KAYNAKLI bir kelime sınırı
+    yok — ne alt ne üst; resmî kılavuz "minimal prompts … can all work well"
+    diyor. Bu test uydurma bir sınırın geri sızmasını engelliyor.
+    """
+    assert not re.search(r"\d+\s*[–-]\s*\d+\s*kelime", _bundled_text()), \
+        "prompt uzunluğuna sayısal aralık geri eklenmiş"
+
+
+def test_the_worked_example_prompt_stays_short_enough_to_imitate():
+    """Örnek, çıktı uzunluğunun GERÇEK şartnamesi — kural metninden güçlü.
+
+    Model kuralı okuyup örneği taklit ediyor: v1.15'te örnek prompt 126 kelimeydi
+    ve 12 kelimelik bir brief'ten üretilmişti (saksı, palet, altın ışık, cilt
+    gözenekleri — hiçbiri brief'te yok). Bütün çıktılar da o boya çıkıyordu.
+
+    Buradaki 60 MODEL HAKKINDA bir iddia değil, bu uygulamanın ev kuralı.
+    Desen aynı zamanda `**PROMPT**` satırının fence'in HEMEN üstünde durmasını
+    sabitliyor: ayrıştırıcının ilk tercihi o başlık, yoksa "en uzun blok"
+    yedeğine düşüyor.
+    """
+    prompts = re.findall(r"\*\*PROMPT\*\*\s*\n+```[a-z]*\n(.*?)\n```",
+                         _bundled_text(), re.S)
+    assert prompts, "PROMPT başlığının hemen altında fence'li örnek yok"
+    for body in prompts:
+        # Şablondaki köşeli parantezli yer tutucu ("[İngilizce prompt — …]")
+        # gerçek bir örnek değil; ölçülen şey modelin taklit ettiği metin.
+        if body.strip().startswith("["):
+            continue
+        assert len(body.split()) <= 60, f"örnek prompt {len(body.split())} kelime"
+
+
+def test_the_persona_repeats_the_whole_prompt_on_iteration_turns():
+    """`applyToForm` #prompt alanının ÜSTÜNE yazıyor: fark yeterli değil.
+
+    v1.15'in "prompt'u baştan yazma, sadece ilgili katmanı değiştir" kuralı
+    modeli kod bloğuna bir FARK koymaya itiyordu ("… yerine …"). "Forma aktar" o
+    farkı prompt sanıp forma yazar ve kullanıcı bambaşka bir görsel üretir —
+    yine sessiz kırılma.
+    """
+    assert "prompt'un TAMAMINI" in _bundled_text(), \
+        "iterasyonda tam prompt şartı düşmüş"
+
+
+def test_the_persona_does_not_ship_unsourced_model_claims():
+    """Yönetmen bunları kullanıcıya OLGU gibi söylüyor; yanlışsa uygulama yalancı olur.
+
+    Silinen iddialar ve neden: "%95+ metin doğruluğu" (OpenAI böyle bir oran
+    yayımlamadı) · "render öncesi akıl yürütme" (model içi mekanizma iddiası,
+    doğrulanamaz) · desteklenen dil listesi ve "Türkçe bu listede yok" çıkarımı
+    (resmî gpt-image-2 kılavuzunda böyle bir liste HİÇ yok — üstelik uygulamanın
+    ANA DİLİ hakkında dayanaksız olumsuz bir iddia) · "2K güvenilirlik sınırı"
+    (uydurma sayı; formda 1536'nın üstü zaten yok).
+
+    Kaynak bulunursa iddiayı geri koymak serbest — ama o zaman bu testi de
+    kaldırmak gerekir, yani karar BİLİNÇLİ olur.
+    """
+    text = _bundled_text()
+    for claim in ("%95", "render öncesi", "Bengalce", "2K"):
+        assert claim not in text, f"kaynaksız iddia geri eklenmiş: {claim}"
+
+
+def test_the_bundled_default_stays_within_its_budget():
+    """Talimat HER turda sistem mesajı olarak gidiyor: her satır kalıcı maliyet.
+
+    Dosya birikimle 9 binden 15,4 bin karaktere çıktı ve kimse fark etmedi —
+    koddaki iki yorum hâlâ eski sayıları söylüyordu. v1.16 iki YENİ sözleşme
+    ekledi (kapsam/ret + iki makine bloğu), yani dosya bilinçli olarak büyüdü;
+    tavan o yüzden 18 bin. Bu bir BÜTÇE: yükseltmek serbest ama gerekçesi commit
+    mesajında yazılmak zorunda.
+
+    Tavan neden çalışma zamanında DEĞİL: uzun bir dosyayı kırpmak persona'yı
+    sessizce öldürür — tam olarak `MIN_INSTRUCTIONS_CHARS`'ın engellediği kırılma,
+    ters yönde.
+    """
+    text = _bundled_text()
+    assert len(text) <= 18000, f"talimat bütçesi aşıldı: {len(text)} karakter"

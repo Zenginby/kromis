@@ -284,3 +284,24 @@ def test_missing_instructions_file_becomes_a_chat_error(monkeypatch):
     with pytest.raises(cc.ChatError) as exc:
         cc.complete(MESSAGES, client=client, credentials=CREDS)
     assert "talimat" in str(exc.value).lower()
+
+
+def test_build_payload_strips_every_field_azure_does_not_know():
+    """Minimallik MESAJ İÇİNE de iniyor (v1.16).
+
+    `test_payload_stays_minimal` üst düzey anahtarları koruyor; bu test aynı
+    duruşu mesaj sözlüklerine indiriyor. Somut sebep: `ChatMessage.display`
+    yalnızca arayüzün çizdiği "seçim" etiketi ve Azure onu bilmiyor — süzgeç
+    olmasa çip seçimiyle gönderilen her tur 400 alırdı.
+
+    Süzgeç BURADA (rotada da var) çünkü Azure gövdesini gerçekten kuran yer bu:
+    `complete()`'in yarınki çağıranı da korunmuş oluyor. ALLOWLIST olduğu için
+    uydurma bir alan da düşüyor.
+    """
+    payload = cc.build_payload(
+        [{"role": "user", "content": "kare", "display": "Seçim: kare",
+          "uydurma": "x"}],
+        "dep", "T")
+
+    assert payload["messages"][1] == {"role": "user", "content": "kare"}
+    assert payload["messages"][0]["role"] == "system"

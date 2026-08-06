@@ -69,10 +69,36 @@ arm64 runner'ında (macos-14) aynı spec ve `build.sh` ile üretilir. Actions �
     çünkü `desktop.py` pencereyi pywebview'ın `private_mode=True` varsayılanıyla
     açıyor ve orada localStorage her kapanışta siliniyor. Tamamlama rotası
     (`POST /api/chat`) hâlâ diske hiçbir şey yazmıyor.
+  - **Tek tıkla varyasyon ve parametre (v1.16):** prompt üreten yanıt iki makine
+    bloğu daha taşıyor — ` ```variations ` (`{"varyasyonlar": [{"ad", "istek"}]}`)
+    ve ` ```parameters ` (`{"eksenler": [{"ad", "simdi", "secenekler"}]}`). Arayüz
+    ikisini de tıklanabilir çiplere çeviriyor. **Tıklama prompt'u yerelde
+    DEĞİŞTİRMİYOR**, yönetmene tek turluk bir istek gönderiyor: varyasyonlar
+    `x → y` çifti değil cümle düzeyi düzenlemeler, yani yerel bir metin
+    değiştirme eşleşme tutmadığında sessizce yanlış prompt üretirdi. Resmî
+    gpt-image-2 kılavuzu da aynı yolu öneriyor ("start with a clean base prompt
+    and refine with small, single-change follow-ups"). Blokların proza karşılığı
+    KALDIRILDI — ikisi birden yazılsa yanıt iki katına çıkar.
+  - **Seçim pili (v1.16):** çiplerle gönderilen tur artık kullanıcı baloncuğu
+    olarak çizilmiyor; birleştirilmiş `" · "` metni yerine sessiz bir "SEÇİM"
+    pili görünüyor. Ayrım mesajın kendisinde taşınıyor
+    (`models.ChatMessage.display`), istemcide ayrı bir durumda değil — yoksa
+    kaydedilmiş bir sohbet yeniden açıldığında piller baloncuğa dönerdi. Alan
+    Azure'a ÇIKMIYOR (`models.WIRE_MESSAGE_FIELDS` allowlist'i); elle yazılan tur
+    `display` almıyor ve baloncuk olarak kalıyor.
+  - **Kapsam sınırı (v1.16):** persona artık yalnızca prompt işini kabul ediyor;
+    alakasız istek tek cümleyle reddediliyor ve **ret yanıtına hiçbir kod bloğu
+    konmuyor** (konsa arayüz reddin altına "Forma aktar" düğmesi çizerdi). Sınır
+    kelimeye değil HEDEFE göre çizili: "bu prompt'u Türkçe açıklar mısın" ve
+    "görsel neden bulanık çıktı" işin İÇİNDE. Mekanizma yalnızca sistem talimatı
+    — tool-calling/structured output kullanılmıyor, çünkü `build_payload` bilerek
+    yalnız `model` + `messages` gönderiyor.
   - Persona `bundled/prompts/prompt-yonetmeni.md`'de; kullanıcı
     `<data_dir>/chat-instructions.md` dosyasını oluşturarak ezebilir (yol
     Ayarlar'da yazılı). Gömülü dosya kopyalanmaz, her açılışta okunur — yeni
-    sürümdeki iyileştirme kendi dosyasını yazmamış herkese ulaşır.
+    sürümdeki iyileştirme kendi dosyasını yazmamış herkese ulaşır. **Kendi
+    dosyasını yazan kullanıcı `options`, `variations` ve `parameters`
+    sözleşmelerini de yazmak zorunda**, yoksa o paneller hiç çıkmaz.
 - Prompt'tan görsel üretme (boyut/kalite/adet)
 - Geçmiş galerisi (indir, sil)
 - Görsel düzenleme: dosya yükle veya galeriden seç + prompt (Azure images/edits)

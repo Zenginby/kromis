@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GPT-Image Studio → Flow · ekranlar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="flow.css" />
+<style>
+  body { overflow-y: auto; }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 40px 32px 72px; }
+  .head { display: flex; align-items: flex-start; gap: 20px; margin-bottom: 12px; }
+  .head h1 { margin: 0; font: 500 28px/1.3 var(--font-display); letter-spacing: -0.015em; }
+  .head p { margin: 6px 0 0; color: var(--muted); font-size: 14px; max-width: 62ch; }
+  .head .ver { margin-left: auto; flex: none; }
+  section { margin-top: 40px; }
+  .screens { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(324px, 1fr)); }
+  .screen {
+    display: block; background: var(--surface); border-radius: var(--r-panel);
+    padding: 20px; text-decoration: none; color: inherit;
+    transition: background var(--dur) var(--ease);
+  }
+  .screen:hover { background: var(--surface-2); }
+  .screen .n {
+    font: 500 11px/1 var(--font-mono); letter-spacing: 0.08em; color: var(--muted);
+  }
+  .screen b { display: block; font: 500 17px/1.35 var(--font-display); margin: 10px 0 8px; }
+  .screen p { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--muted); }
+  .screen ul { margin: 12px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: var(--muted); }
+  .screen .go {
+    display: inline-flex; align-items: center; gap: 8px; margin-top: 14px;
+    font-size: 13px; color: var(--fg);
+  }
+  .screen:hover .go svg { transform: translateX(3px); }
+  .screen .go svg { transition: transform var(--dur) var(--ease); }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .sw { background: var(--surface); border-radius: var(--r-item); padding: 10px; }
+  .sw i { display: block; height: 44px; border-radius: 7px; border: 1px solid var(--border); margin-bottom: 8px; }
+  .sw b { display: block; font: 450 12.5px/1.4 var(--font-body); }
+  .sw code { font-size: 11px; color: var(--muted); }
+  .themes { display: flex; gap: 8px; flex-wrap: wrap; }
+  .themes button {
+    display: flex; align-items: center; gap: 10px; padding: 9px 16px 9px 12px;
+    border-radius: var(--r-pill); background: var(--surface-2); font-size: 14px; color: var(--muted);
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+  }
+  .themes button:hover { background: var(--surface-3); color: var(--fg); }
+  .themes button[aria-pressed="true"] { background: var(--selected); color: var(--fg); }
+  .themes i { width: 18px; height: 18px; border-radius: 50%; display: block; border: 1px solid var(--border); }
+  .scale div { display: flex; align-items: baseline; gap: 20px; margin-bottom: 12px; }
+  .scale span { flex: none; width: 176px; font: 400 12px/1 var(--font-mono); color: var(--muted); }
+  .notes { max-width: 78ch; }
+  .notes li { margin-bottom: 8px; line-height: 1.65; }
+  .notes b { font-weight: 500; }
+</style>
+</head>
+<body data-theme="mono">
+<div class="wrap">
+
+  <header class="head" data-od-id="overview-head">
+    <div>
+      <h1>GPT-Image Studio → Flow</h1>
+      <p>Beş ekran, tek tasarım sistemi (<code>flow.css</code>). Tokenlar Google Flow
+        ekran görüntülerinden piksel örneklemesiyle ölçüldü; görseller uygulamanın kendi
+        çıktılarından geldi. Hedef pencere 1440×900, en küçük 1024×700.</p>
+    </div>
+    <div class="ver"><span>v1.17.0</span><i aria-hidden="true"></i></div>
+  </header>
+
+  <section data-od-id="screens">
+    <p class="sec-label">Ekranlar</p>
+    <div class="screens">
+
+      <a class="screen" href="studio-session.html" data-od-id="screen-session">
+        <span class="n">01 · ANA EKRAN</span>
+        <b>Stüdyo — birleşik oturum</b>
+        <p>Konuşma ve üretilen görseller aynı akışta. Sekme yok.</p>
+        <ul>
+          <li>(+) yanında <b>Görsel / Yönetmen</b> mod anahtarı — <kbd>⌘ J</kbd></li>
+          <li>Hamburger → oturum listesi (otomatik kayıt anahtarıyla)</li>
+          <li>Yaz → “Yönetmen'e sor” çıkar; ayar çipi paneli açar</li>
+        </ul>
+        <span class="go">Aç
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 12h13"/><path d="M13 6l6 6-6 6"/></svg>
+        </span>
+      </a>
+
+      <a class="screen" href="media-browser.html" data-od-id="screen-media">
+        <span class="n">02</span>
+        <b>Medya — arama burada</b>
+        <p>Tüm arşiv: arama, sıralama, klasör çipleri, çoklu seçim.</p>
+        <ul>
+          <li>Arama gerçekten filtreliyor; sonuç yoksa boş durum</li>
+          <li>“Seç” → seçim şeridi, kartta onay dairesi</li>
+          <li>Karta hover: İndir · Referans</li>
+        </ul>
+        <span class="go">Aç
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 12h13"/><path d="M13 6l6 6-6 6"/></svg>
+        </span>
+      </a>
+
+      <a class="screen" href="studio-preview.html" data-od-id="screen-preview">
+        <span class="n">03</span>
+        <b>Önizleme ve bindirme</b>
+        <p>Tam kaplama sahne + sağda çalışan bindirme paneli.</p>
+        <ul>
+          <li>Konum ızgarası, ölçek, kenar boşluğu, çift yönlü X/Y kaydırma</li>
+          <li>Kaydırıcılar logoyu canlı taşıyor; “Sıfırla” geri alır</li>
+          <li>Zoom şeridi: %50–%300 · Sığdır</li>
+        </ul>
+        <span class="go">Aç
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 12h13"/><path d="M13 6l6 6-6 6"/></svg>
+        </span>
+      </a>
+
+      <a class="screen" href="library-assets.html" data-od-id="screen-library">
+        <span class="n">04</span>
+        <b>Kütüphane — modal seçici</b>
+        <p>Logolar, mottolar, bannerlar, yüklemeler. Flow'un varlık diyaloğu.</p>
+        <ul>
+          <li>Solda tür navigasyonu (gerçek sayılar: 2 · 4 · 1)</li>
+          <li>Sağda seçili varlığın önizlemesi ve künyesi</li>
+          <li>Yüklemeler boş → boş durum + “Medya yükle”</li>
+        </ul>
+        <span class="go">Aç
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 12h13"/><path d="M13 6l6 6-6 6"/></svg>
+        </span>
+      </a>
+
+      <a class="screen" href="settings-panels.html" data-od-id="screen-settings">
+        <span class="n">05</span>
+        <b>Araçlar — görünüm ve paletler</b>
+        <p>Araçlar iki karta indi; Azure ve Yedekler dişli düğmesinde.</p>
+        <ul>
+          <li>Renk seçici çalışıyor: HSV alanı + ton + hex, klavyeyle de</li>
+          <li>Altı uyumlu palet seçilen tondan canlı üretiliyor</li>
+          <li>Görünüm panelinden tema seç → tüm ekranlar takip eder</li>
+          <li>Dişli → tek “Ayarlar” paneli: Azure · gpt-image-2 + Yedekler</li>
+        </ul>
+        <span class="go">Aç
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 12h13"/><path d="M13 6l6 6-6 6"/></svg>
+        </span>
+      </a>
+
+      <a class="screen" href="flow-redesign-plan.md" data-od-id="screen-plan">
+        <span class="n">PLAN</span>
+        <b>flow-redesign-plan.md</b>
+        <p>Tasarım sözleşmesi: ölçülen tokenlar, bilgi mimarisi, birleşik oturum veri
+          modeli, taşıma sırası ve riskler.</p>
+        <span class="go">Oku
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 12h13"/><path d="M13 6l6 6-6 6"/></svg>
+        </span>
+      </a>
+
+    </div>
+  </section>
+
+  <section data-od-id="theme-row">
+    <p class="sec-label">Tema — tek token, tüm ekranlarda geçerli</p>
+    <div class="themes" role="group" aria-label="Tema">
+      <button aria-pressed="true" data-set-theme="mono"><i style="background:#e8eaed"></i>Monokrom</button>
+      <button aria-pressed="false" data-set-theme="kurumsal"><i style="background:oklch(72% 0.11 245)"></i>KURUM mavisi</button>
+      <button aria-pressed="false" data-set-theme="amber"><i style="background:oklch(76% 0.14 68)"></i>Amber</button>
+      <button aria-pressed="false" data-set-theme="viola"><i style="background:oklch(72% 0.13 300)"></i>Menekşe</button>
+    </div>
+  </section>
+
+  <section data-od-id="tokens">
+    <p class="sec-label">Renk — ölçülen değerler</p>
+    <div class="swatches">
+      <div class="sw"><i style="background:#000"></i><b>Tuval</b><code>--bg · #000000</code></div>
+      <div class="sw"><i style="background:#141415"></i><b>Yüzey</b><code>--surface · #141415</code></div>
+      <div class="sw"><i style="background:#1e1e1f"></i><b>Kontrol</b><code>--surface-2 · #1e1e1f</code></div>
+      <div class="sw"><i style="background:#2a2a2b"></i><b>Yükseltilmiş</b><code>--surface-3 · #2a2a2b</code></div>
+      <div class="sw"><i style="background:#353637"></i><b>Aktif nav</b><code>--selected · #353637</code></div>
+      <div class="sw"><i style="background:#4d4e50"></i><b>Aktif kutucuk</b><code>--selected-strong · #4d4e50</code></div>
+      <div class="sw"><i style="background:#e8eaed"></i><b>Metin</b><code>--fg · #e8eaed</code></div>
+      <div class="sw"><i style="background:#9aa0a6"></i><b>İkincil</b><code>--muted · #9aa0a6</code></div>
+      <div class="sw"><i style="background:#fff"></i><b>Birincil eylem</b><code>--primary · #ffffff</code></div>
+      <div class="sw"><i style="background:var(--accent)"></i><b>Durum / odak</b><code>--accent · temaya bağlı</code></div>
+    </div>
+  </section>
+
+  <section data-od-id="type">
+    <p class="sec-label">Tipografi — DM Sans (display) · sistem (gövde) · mono (teknik)</p>
+    <div class="scale">
+      <div><span>28 / 500 / -0.015em</span><p style="margin:0;font:500 28px/1.3 var(--font-display);letter-spacing:-0.015em">Oturum başlığı</p></div>
+      <div><span>20 / 500 / -0.01em</span><p style="margin:0;font:500 20px/1.3 var(--font-display);letter-spacing:-0.01em">Panel başlığı</p></div>
+      <div><span>15 / 400 / 1.5</span><p style="margin:0">Gövde metni — prompt, açıklama, sohbet dökümü.</p></div>
+      <div><span>13 / 500 / 0.01em</span><p style="margin:0" class="sec-label">Bölüm etiketi (ALL-CAPS başlıkların yerine)</p></div>
+      <div><span>mono 13 / 0.08em</span><p style="margin:0;font:500 13px/1.5 var(--font-mono);letter-spacing:0.08em">GPT-IMAGE STUDIO · 1024×1536</p></div>
+    </div>
+  </section>
+
+  <section data-od-id="notes">
+    <p class="sec-label">Kararlar bu turda nasıl uygulandı</p>
+    <ul class="notes">
+      <li><b>Birleşik sohbet:</b> Görsel prompt'u ve Yönetmen aynı composer'da; mod
+        anahtarı (+) işaretinin yanında, aktif taraf beyaz.</li>
+      <li><b>Geçmiş:</b> döküm konuşmayı ve üretilen görselleri birlikte tutuyor; oturum
+        listesi hamburger düğmesinden açılıyor ve otomatik kayıt açık.</li>
+      <li><b>Arama:</b> üst şeritten kalktı, Medya'nın başlığında ve gerçekten çalışıyor.</li>
+      <li><b>Tema:</b> KURUM mavisi zorunlu değil — dört tema var, varsayılan monokrom.</li>
+      <li><b>Pencere:</b> <code>desktop.py</code>'den okundu, 1024×700 tabana göre
+        çalışılıyor; 1200 altında ray daralıyor.</li>
+      <li><b>Görseller:</b> uydurma yer tutucu yok — hepsi <code>output/</code>'taki
+        gerçek üretimlerden ve <code>assets/</code>'taki gerçek logo/motto/bannerlardan
+        kopyalandı.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+(function () {
+  var LS = 'flow-theme';
+  function paint(v) {
+    document.body.dataset.theme = v;
+    document.querySelectorAll('[data-set-theme]').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.setTheme === v));
+    });
+  }
+  try {
+    var t = localStorage.getItem(LS);
+    if (t) paint(t);
+  } catch (e) {}
+  document.querySelectorAll('[data-set-theme]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      paint(b.dataset.setTheme);
+      try { localStorage.setItem(LS, b.dataset.setTheme); } catch (e) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>

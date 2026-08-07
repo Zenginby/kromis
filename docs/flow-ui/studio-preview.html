@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Önizleme · bindirme — GPT-Image Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="flow.css" />
+<style>
+  .app.with-panel {
+    grid-template-columns: var(--rail) minmax(0, 1fr) 340px;
+    grid-template-areas: "rail topbar topbar" "rail canvas panel";
+  }
+  .panel {
+    grid-area: panel; position: static; transform: none; width: auto; box-shadow: none;
+    border-left: 1px solid var(--border);
+  }
+  .stage {
+    grid-area: canvas; position: relative; overflow: hidden;
+    display: grid; place-items: center; padding: 24px 24px 76px;
+    background:
+      repeating-conic-gradient(from 0deg, rgba(255,255,255,.018) 0% 25%, transparent 0% 50%) 0 0 / 22px 22px;
+  }
+  .frame {
+    position: relative; max-width: 100%; max-height: 100%;
+    border-radius: 8px; overflow: hidden; box-shadow: var(--shadow);
+    transition: transform var(--dur) var(--ease);
+  }
+  .frame img { display: block; max-width: 100%; max-height: 100%; height: auto; }
+  .ovl {
+    position: absolute; right: 0; bottom: 0; width: 22%;
+    transform-origin: bottom right; pointer-events: none;
+  }
+  .ovl img { display: block; width: 100%; height: auto; }
+  .stage-bar {
+    position: absolute; left: 50%; transform: translateX(-50%); bottom: 20px;
+    display: flex; align-items: center; gap: 4px; background: var(--surface);
+    border-radius: var(--r-pill); padding: 6px; box-shadow: var(--shadow);
+  }
+  .stage-bar .zoom {
+    min-width: 62px; text-align: center; font: 500 12px/1 var(--font-mono);
+    letter-spacing: 0.04em; color: var(--muted);
+  }
+  .slider { display: flex; align-items: center; gap: 12px; }
+  .slider input[type="range"] {
+    flex: 1; min-width: 0; appearance: none; height: 22px; background: none; cursor: pointer;
+  }
+  .slider input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 2px; background: var(--surface-3);
+  }
+  .slider input[type="range"]::-webkit-slider-thumb {
+    appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%;
+    background: var(--fg);
+  }
+  .slider input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--accent); }
+  .slider output {
+    width: 52px; text-align: right; font: 500 12px/1 var(--font-mono);
+    letter-spacing: 0.04em; color: var(--muted);
+  }
+  .assetrow { display: flex; gap: 8px; }
+  .assetrow button {
+    flex: 1; aspect-ratio: 1; border-radius: 10px; background: var(--surface-2);
+    display: grid; place-items: center; padding: 8px;
+    transition: background var(--dur) var(--ease);
+  }
+  .assetrow button:hover { background: var(--surface-3); }
+  .assetrow button[aria-pressed="true"] { background: var(--selected-strong); outline: 2px solid var(--accent); outline-offset: -2px; }
+  .assetrow img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .pos3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .pos3 button {
+    aspect-ratio: 3 / 2; border-radius: 8px; background: var(--surface-2);
+    transition: background var(--dur) var(--ease);
+  }
+  .pos3 button:hover { background: var(--surface-3); }
+  .pos3 button[aria-pressed="true"] { background: var(--selected-strong); }
+</style>
+</head>
+<body data-theme="mono">
+
+<div class="app with-panel" data-od-id="app-shell">
+
+  <nav class="rail" data-od-id="rail" aria-label="Ana gezinme">
+    <a class="rail-item" href="studio-session.html" aria-current="page" data-od-id="rail-studio">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-5 4z"/><path d="M8.5 8.5h7M8.5 12h4"/></svg>
+      <span>Stüdyo</span>
+    </a>
+    <a class="rail-item" href="media-browser.html" data-od-id="rail-media">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15l4.5-4 3.5 3 3-2.5L21 17"/><circle cx="15.5" cy="8.5" r="1.4"/></svg>
+      <span>Medya</span><em class="rail-count">8</em>
+    </a>
+    <a class="rail-item" href="library-assets.html" data-od-id="rail-library">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5H9l1.8 2H18.5A1.5 1.5 0 0 1 20 8.5V17a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17z"/><path d="M9 12.5h6"/></svg>
+      <span>Kütüphane</span>
+    </a>
+    <hr />
+    <a class="rail-item" href="settings-panels.html" data-od-id="rail-tools">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M14.5 3.5l6 6-9 9H5.5v-6z"/><path d="M12 6l6 6"/></svg>
+      <span>Araçlar</span>
+    </a>
+    <div class="spacer"></div>
+    <button class="rail-item" data-od-id="rail-collapse">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M16 9l-2.5 3 2.5 3"/></svg>
+      <span>Daralt</span>
+    </button>
+  </nav>
+
+  <header class="topbar" data-od-id="topbar">
+    <a class="icon-btn" href="studio-session.html" aria-label="Oturuma dön">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>
+    </a>
+    <div class="session">
+      <h1>Önizleme · ofis-masasi</h1>
+      <span class="stamp">1536×1024 · Yüksek · düzenlendi</span>
+    </div>
+    <div class="right">
+      <button class="btn-ghost sm">İndir</button>
+      <button class="icon-btn" aria-label="Görsel menüsü">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+      </button>
+      <div class="ver"><span>v1.17.0</span><i aria-hidden="true"></i></div>
+    </div>
+  </header>
+
+  <div class="stage" data-od-id="stage">
+    <div class="frame" id="frame" data-od-id="preview-frame">
+      <img src="assets/samples/ofis-masasi-yatay.jpg" width="1400" height="933" alt="Ofis fotoğrafına eklenen dört kişilik çalışma masası" />
+      <div class="ovl" id="ovl" data-od-id="overlay">
+        <img src="assets/brand/logo-beyaz.png" width="323" height="420" alt="KURUM Derneği beyaz logo bindirmesi" />
+      </div>
+    </div>
+
+    <div class="stage-bar" data-od-id="stage-bar">
+      <button class="icon-btn" id="zoom-out" aria-label="Uzaklaş">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 12h14"/></svg>
+      </button>
+      <span class="zoom" id="zoom-val">%100</span>
+      <button class="icon-btn" id="zoom-in" aria-label="Yaklaş">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <button class="btn-ghost sm" id="zoom-fit" style="margin-left:4px">Sığdır</button>
+    </div>
+  </div>
+
+  <!-- --------------------------------------------------- bindirme paneli -->
+  <aside class="sheet panel open" aria-label="Bindirme" data-od-id="overlay-panel">
+    <div class="sheet-head">
+      <h2>Bindirme</h2>
+      <div class="right">
+        <a class="icon-btn" href="library-assets.html" aria-label="Kütüphane">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5H9l1.8 2H18.5A1.5 1.5 0 0 1 20 8.5V17a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17z"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <div class="sheet-body">
+      <div class="field">
+        <span class="field-label">Varlık türü</span>
+        <div class="seg compact" role="group" aria-label="Varlık türü" id="kind">
+          <button aria-pressed="true" data-kind="logo">Logo</button>
+          <button aria-pressed="false" data-kind="motto">Motto</button>
+          <button aria-pressed="false" data-kind="banner">Banner</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label">Varlık</span>
+        <div class="assetrow" role="group" aria-label="Varlık" id="assets">
+          <button aria-pressed="true" data-src="assets/brand/logo-beyaz.png" title="KURUM Logo Beyaz">
+            <img src="assets/brand/logo-beyaz.png" alt="KURUM Logo Beyaz" width="323" height="420" />
+          </button>
+          <button aria-pressed="false" data-src="assets/brand/logo-mavi.png" title="KURUM Logo Mavi">
+            <img src="assets/brand/logo-mavi.png" alt="KURUM Logo Mavi" width="323" height="420" />
+          </button>
+          <button aria-pressed="false" data-src="assets/brand/motto-mavi-beyaz.png" title="Motto Mavi-Beyaz">
+            <img src="assets/brand/motto-mavi-beyaz.png" alt="Motto Mavi-Beyaz" width="520" height="305" />
+          </button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label">Konum</span>
+        <div class="pos3" role="group" aria-label="Konum" id="pos">
+          <button aria-pressed="false" data-pos="top-left" aria-label="Sol üst"></button>
+          <button aria-pressed="false" data-pos="top-center" aria-label="Üst orta"></button>
+          <button aria-pressed="false" data-pos="top-right" aria-label="Sağ üst"></button>
+          <button aria-pressed="false" data-pos="mid-left" aria-label="Sol orta"></button>
+          <button aria-pressed="false" data-pos="center" aria-label="Orta"></button>
+          <button aria-pressed="false" data-pos="mid-right" aria-label="Sağ orta"></button>
+          <button aria-pressed="false" data-pos="bottom-left" aria-label="Sol alt"></button>
+          <button aria-pressed="false" data-pos="bottom-center" aria-label="Alt orta"></button>
+          <button aria-pressed="true" data-pos="bottom-right" aria-label="Sağ alt"></button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="scale">Ölçek</label>
+        <div class="slider">
+          <input id="scale" type="range" min="8" max="60" value="22" />
+          <output for="scale" id="scale-val">%22</output>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="margin">Kenar boşluğu</label>
+        <div class="slider">
+          <input id="margin" type="range" min="0" max="20" value="4" />
+          <output for="margin" id="margin-val">%4</output>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label">İnce kaydırma</span>
+        <div class="slider" style="margin-bottom:8px">
+          <span style="width:14px;font:500 12px/1 var(--font-mono);color:var(--muted)">X</span>
+          <input id="logo-offset-x" type="range" min="-100" max="100" value="0" />
+          <output for="logo-offset-x" id="logo-offset-x-val">0</output>
+        </div>
+        <div class="slider">
+          <span style="width:14px;font:500 12px/1 var(--font-mono);color:var(--muted)">Y</span>
+          <input id="logo-offset-y" type="range" min="-100" max="100" value="0" />
+          <output for="logo-offset-y" id="logo-offset-y-val">0</output>
+        </div>
+        <p class="help">İki kaydırıcı da çift yönlü: negatif değer sola / yukarı taşır.
+          <button class="btn-text" id="logo-offset-reset" style="padding:0 2px">Sıfırla</button>
+        </p>
+      </div>
+    </div>
+
+    <div class="sheet-foot">
+      <button class="btn-primary" id="apply">Bindirmeyi uygula</button>
+      <button class="btn-text" style="justify-self:center">Bindirmeyi kaldır</button>
+    </div>
+  </aside>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  try {
+    var t = localStorage.getItem('flow-theme');
+    if (t) document.body.dataset.theme = t;
+  } catch (e) {}
+
+  var ovl = $('ovl'), frame = $('frame');
+  var state = { pos: 'bottom-right', scale: 22, margin: 4, x: 0, y: 0, zoom: 100 };
+
+  function draw() {
+    var m = state.margin;
+    ovl.style.width = state.scale + '%';
+    /* konum: yüzde bazlı yerleşim + ince kaydırma (piksel) */
+    var v = state.pos.split('-')[0], h = state.pos.split('-')[1] || 'center';
+    ovl.style.top = ovl.style.bottom = ovl.style.left = ovl.style.right = 'auto';
+    ovl.style.transform = 'translate(' + state.x + 'px,' + state.y + 'px)';
+    if (v === 'top') ovl.style.top = m + '%';
+    else if (v === 'bottom') ovl.style.bottom = m + '%';
+    else { ovl.style.top = '50%'; ovl.style.transform += ' translateY(-50%)'; }
+    if (h === 'left') ovl.style.left = m + '%';
+    else if (h === 'right') ovl.style.right = m + '%';
+    else { ovl.style.left = '50%'; ovl.style.transform += ' translateX(-50%)'; }
+    frame.style.transform = 'scale(' + (state.zoom / 100) + ')';
+    $('zoom-val').textContent = '%' + state.zoom;
+    $('scale-val').textContent = '%' + state.scale;
+    $('margin-val').textContent = '%' + state.margin;
+    $('logo-offset-x-val').textContent = state.x;
+    $('logo-offset-y-val').textContent = state.y;
+  }
+
+  function group(id, attr, fn) {
+    var g = $(id);
+    g.addEventListener('click', function (e) {
+      var b = e.target.closest('button[' + attr + ']');
+      if (!b) return;
+      g.querySelectorAll('button').forEach(function (x) {
+        x.setAttribute('aria-pressed', String(x === b));
+      });
+      fn(b);
+    });
+  }
+  group('pos', 'data-pos', function (b) { state.pos = b.dataset.pos; draw(); });
+  group('kind', 'data-kind', function () {});
+  group('assets', 'data-src', function (b) {
+    ovl.querySelector('img').src = b.dataset.src;
+  });
+
+  $('scale').addEventListener('input', function () { state.scale = +this.value; draw(); });
+  $('margin').addEventListener('input', function () { state.margin = +this.value; draw(); });
+  $('logo-offset-x').addEventListener('input', function () { state.x = +this.value; draw(); });
+  $('logo-offset-y').addEventListener('input', function () { state.y = +this.value; draw(); });
+  $('logo-offset-reset').addEventListener('click', function () {
+    state.x = state.y = 0;
+    $('logo-offset-x').value = 0;
+    $('logo-offset-y').value = 0;
+    draw();
+  });
+
+  $('zoom-in').addEventListener('click', function () { state.zoom = Math.min(300, state.zoom + 25); draw(); });
+  $('zoom-out').addEventListener('click', function () { state.zoom = Math.max(50, state.zoom - 25); draw(); });
+  $('zoom-fit').addEventListener('click', function () { state.zoom = 100; draw(); });
+
+  $('apply').addEventListener('click', function () {
+    var b = $('apply');
+    b.disabled = true;
+    b.textContent = 'Uygulanıyor…';
+    setTimeout(function () {
+      b.disabled = false;
+      b.textContent = 'Bindirmeyi uygula';
+    }, 1200);
+  });
+
+  draw();
+})();
+</script>
+</body>
+</html>

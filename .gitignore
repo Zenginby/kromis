@@ -24,3 +24,7 @@ graphify-out/
 
 # Claude Code tool directory (not project content)
 .claude/
+
+# Tasarım aracı artıkları (oturuma özel, proje içeriği değil)
+.impeccable/
+.playwright-mcp/

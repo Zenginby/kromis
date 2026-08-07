@@ -1,0 +1,67 @@
+/* Flow tasarım sisteminin TOKEN katmanı — sözleşmenin birebir kopyası.
+ *
+ * Kaynak: docs/flow-ui/flow.css (Open Design teslimi), yalnızca `:root` bloğu
+ * ve üç tema satırı. Değerler docs/flow-ui/flow-redesign-plan.md §2.1'de
+ * Flow ekran görüntülerinden piksel örneklemesiyle ölçüldü; tahmin yok.
+ *
+ * NEDEN yalnızca :root:
+ *   flow.css'in 70 sınıfının 15'i style.css'teki sınıflarla AYNI adı taşıyor
+ *   (.modal .modal-head .card .row .seg .topbar .icon-btn .btn-ghost
+ *    .btn-danger .progress .viewer-bar .viewer-btn .viewer-img .viewer-pct
+ *    .viewer-stage). Bu dosya style.css'ten SONRA yüklendiği için sınıfları da
+ *   getirseydi o 15 bileşeni sessizce yeniden giydirirdi. Bileşen CSS'i
+ *   çakışmalar tek tek çözülerek Adım 3'te geliyor.
+ *   → Bu dosyada sınıf seçici YOK. index.html'deki <link> satırını silmek
+ *     uygulamayı olduğu gibi eski paletine döndürür.
+ *
+ * Bağlanma: style.css'in `:root`'u eski token adlarını (--panel, --text …)
+ * buradaki adlara köprüler. Aynı adı taşıyan altı token (--bg --muted --accent
+ * --danger --dur --ease) burada yeniden tanımlandığı için doğrudan bu dosyanın
+ * değerlerini alır — bu bilinçli.
+ *
+ * DİKKAT --accent: Flow'da bu token yalnızca DURUM anlatır (üretim ilerlemesi,
+ * odak halkası, seçili çerçeve). Birincil eylem rengi --primary'dir (beyaz).
+ * Uygulamada --accent eskiden birincil eylem rengiydi; dolgu yapan yerler
+ * style.css'te --primary/--selected-strong'a taşındı.
+ */
+
+:root {
+  --bg: #000000;
+  --surface: #141415;
+  --surface-2: #1e1e1f;
+  --surface-3: #2a2a2b;
+  --pill: #161616;
+  --selected: #353637;
+  --selected-strong: #4d4e50;
+  --fg: #e8eaed;
+  --muted: #9aa0a6;
+  --placeholder: #8a8f94;
+  --border: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --primary: #ffffff;
+  --on-primary: #101011;
+  --danger: oklch(64% 0.17 25);
+
+  /* tema: tek değiştirilebilir token. varsayılan monokrom = Flow'a birebir */
+  --accent: #e8eaed;
+
+  --font-display: "DM Sans", -apple-system, system-ui, sans-serif;
+  --font-body: -apple-system, "SF Pro Text", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
+
+  --r-panel: 24px;
+  --r-item: 12px;
+  --r-seg: 10px;
+  --r-pill: 999px;
+  --dur: 200ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --rail: 228px;
+  --topbar: 72px;
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.66);
+}
+
+/* Tema = tek token. Yüzeyler, metin ve birincil eylem (beyaz) her temada aynı
+   kaldığı için hiçbir tema kontrast kapılarını bozamıyor (plan §2.1). */
+[data-theme="kurumsal"]   { --accent: oklch(72% 0.11 245); }
+[data-theme="amber"] { --accent: oklch(76% 0.14 68); }
+[data-theme="viola"] { --accent: oklch(72% 0.13 300); }

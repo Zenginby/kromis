@@ -26,6 +26,9 @@ const VIEWS = { image: ["view-image", "tab-image"], chat: ["view-chat", "tab-cha
 // "nereden nereye" bilgisini taşımaz.
 const VIEW_ORDER = ["image", "chat"];
 let currentView = "image";
+// Ray bölümü: "studio" (mod anahtarıyla iki panel) | "media" (galeri).
+// Kütüphane ve Araçlar kendi modallarını açıyor, bölüm değiştirmiyorlar.
+let currentSection = "studio";
 
 /** Bitişik segmentin kayan dolgusu: aktif düğmenin ölçüsünden okunuyor.
  *
@@ -40,6 +43,10 @@ function syncTabThumb() {
 }
 
 function showView(name) {
+  // Medya'dayken bir mod çağrısı gelirse (ör. chat.js prompt'u forma aktarıp
+  // showView("image") diyor) önce Stüdyo'ya dönülür. `fromShowView` bayrağı
+  // showSection'ın buraya geri dönmesini engelliyor.
+  if (currentSection !== "studio") showSection("studio", true);
   const forward = VIEW_ORDER.indexOf(name) > VIEW_ORDER.indexOf(currentView);
   const changed = name !== currentView;
   currentView = name;
@@ -61,6 +68,11 @@ function showView(name) {
     // ekran okuyucu hangi sekmenin seçili olduğunu SINIFTAN değil bundan okur.
     $(tabId).setAttribute("aria-selected", active ? "true" : "false");
   }
+  // Composer'ın hangi yarısı görünecek: karar CSS'te (`#composer[data-mode=…]`).
+  // Sebep: #chat-gate ve #chat-send'in `hidden`/`disabled`'ını settings.js ve
+  // chat.js yönetiyor (sohbet yapılandırma kapısı). Aynı öznitelikleri moda
+  // göre buradan da oynatmak iki sahip demekti; `display` ayrı bir eksen.
+  $("composer").dataset.mode = name === "image" ? "image" : "director";
   syncTabThumb();
 }
 
@@ -70,6 +82,134 @@ $("tab-chat").addEventListener("click", () => showView("chat"));
 window.addEventListener("resize", syncTabThumb);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(syncTabThumb);
 syncTabThumb();
+
+// ══ Flow kabuğu ══════════════════════════════════════════════════════
+// Ray gezinme, slide-over'lar, (+) menüsü, composer modu. Kabuk sorumluluğu
+// olduğu için BURADA (bkz. yukarıdaki sekme notu): chat.js bir yaprak dosya.
+//
+// Perde (#shell-scrim) JS ile YÖNETİLMİYOR: görünürlüğü CSS'te `:has()` ile
+// açık panelden türetiliyor. Sebebi somut — oturum listesini açan dinleyici
+// chat.js'te ve o dosya core.js'ten SONRA yükleniyor; perdeyi buradan
+// senkronlamak "diğer dinleyici çalıştıktan sonra oku" gibi kırılgan bir
+// sıralama numarası gerektirirdi. Türetilmiş durum o numarayı gereksiz kılıyor.
+
+const APP = document.querySelector(".app");
+
+function showSection(name, fromShowView = false) {
+  currentSection = name;
+  const studio = name === "studio";
+  $("view-media").hidden = studio;
+  $("composer").hidden = !studio;
+  if (studio) {
+    // Panelleri ve mod anahtarını geri kur — showView'dan gelindiyse o zaten
+    // yapacak, ikinci kez çağırmak animasyonu boşa tetiklerdi.
+    if (!fromShowView) showView(currentView);
+  } else {
+    for (const [viewId] of Object.values(VIEWS)) $(viewId).hidden = true;
+  }
+  for (const [id, on] of [["rail-studio", studio], ["rail-media", !studio]]) {
+    $(id).classList.toggle("active", on);
+    if (on) $(id).setAttribute("aria-current", "page");
+    else $(id).removeAttribute("aria-current");
+  }
+}
+
+$("rail-studio").addEventListener("click", () => showSection("studio"));
+$("rail-media").addEventListener("click", () => showSection("media"));
+// Kütüphane ve Araçlar henüz kendi görünümleri değil: var olan modalları
+// açıyorlar. Programatik `.click()` gizli bir düğmede de dinleyiciyi çalıştırır,
+// o yüzden #specs-sheet kapalıyken de işliyor. Görünüme dönüşmesi Adım 3/5'te.
+$("rail-library").addEventListener("click", () => $("library-btn").click());
+$("rail-tools").addEventListener("click", () => $("palette-btn").click());
+
+$("rail-collapse").addEventListener("click", () => {
+  const on = APP.classList.toggle("rail-collapsed");
+  $("rail-collapse").setAttribute("aria-pressed", on ? "true" : "false");
+  syncTabThumb(); // composer genişliği değişti → kayan dolgu yeniden ölçülmeli
+});
+
+// ── Slide-over'lar ──
+function closeSheets() {
+  for (const el of document.querySelectorAll(".sheet.open")) el.classList.remove("open");
+  $("chat-sidebar-toggle").setAttribute("aria-expanded", "false");
+  $("specs-btn").setAttribute("aria-expanded", "false");
+}
+
+$("specs-btn").addEventListener("click", () => {
+  const sheet = $("specs-sheet");
+  const willOpen = !sheet.classList.contains("open");
+  closeSheets();
+  if (willOpen) {
+    sheet.classList.add("open");
+    $("specs-btn").setAttribute("aria-expanded", "true");
+  }
+});
+$("specs-close").addEventListener("click", closeSheets);
+$("sessions-close").addEventListener("click", closeSheets);
+$("shell-scrim").addEventListener("click", closeSheets);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && document.querySelector(".sheet.open")) closeSheets();
+});
+
+// ── (+) menüsü ──
+$("plus-btn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  const open = $("plus-menu").hidden;
+  $("plus-menu").hidden = !open;
+  $("plus-btn").setAttribute("aria-expanded", open ? "true" : "false");
+});
+function closePlusMenu() {
+  $("plus-menu").hidden = true;
+  $("plus-btn").setAttribute("aria-expanded", "false");
+}
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".plus-wrap")) closePlusMenu();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePlusMenu(); });
+// Menüdeki düğmeler kendi dinleyicilerini folders.js'te kuruyor; burada yalnız
+// menünün kapanması eklenir (aynı düğümde birden çok dinleyici sorun değil).
+for (const id of ["upload-btn", "extra-add-btn"]) {
+  $(id).addEventListener("click", closePlusMenu);
+}
+
+// ── Üretim ayarları çipi ──
+// Oranlar azure_client.ALLOWED_SIZES ile birebir: başka boyut sunucudan geçmez.
+const SIZE_RATIO = { "1024x1024": "1:1", "1024x1536": "2:3", "1536x1024": "3:2" };
+function syncSpecs() {
+  const size = $("size").value;
+  const quality = $("quality").selectedOptions[0].textContent.trim().toUpperCase();
+  $("specs-label").textContent =
+    `${SIZE_RATIO[size] || size} · ${quality} · x${$("n").value}`;
+}
+for (const id of ["size", "quality", "n"]) $(id).addEventListener("change", syncSpecs);
+syncSpecs();
+
+// ── Composer: otomatik büyüyen kutu + ⌘Enter + ⌘J ──
+// Yükseklik satır sayısıyla büyür, `.composer-input`'un max-height'ı tavan.
+function autoGrow(el) {
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}
+for (const id of ["prompt", "chat-input"]) {
+  const el = $(id);
+  el.addEventListener("input", () => autoGrow(el));
+}
+
+// Görsel modunda ⌘/Ctrl+Enter üretime gider. Sohbette bu davranış zaten vardı
+// (chat.js:1162); composer'ın altındaki ipucu iki modda da geçerli olduğu için
+// eksik taraf tamamlandı.
+$("prompt").addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); $("go").click(); }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "j") return;
+  if (currentSection !== "studio") return;
+  e.preventDefault();
+  // `.click()` çünkü chat.js'in kendi tab-chat dinleyicisi de var (taslağı
+  // sohbete taşıyıp kutuya odaklanıyor); showView'ı doğrudan çağırmak onu atlar.
+  $(currentView === "image" ? "tab-chat" : "tab-image").click();
+});
 
 // Ana referans görsel: null | { kind: "upload", file, label } | { kind: "gallery", id, label }
 let source = null;

@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Araçlar · ayarlar ve paletler — GPT-Image Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="flow.css" />
+<style>
+  .tools { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); max-width: 1120px; }
+  .tool { background: var(--surface); border-radius: var(--r-panel); padding: 18px; text-align: left; }
+  .tool:hover { background: var(--surface-2); }
+  .tool .ic { width: 36px; height: 36px; border-radius: 10px; background: var(--surface-2); display: grid; place-items: center; color: var(--muted); margin-bottom: 14px; }
+  .tool:hover .ic { background: var(--surface-3); color: var(--fg); }
+  .tool b { display: block; font: 500 15px/1.4 var(--font-body); }
+  .tool span { display: block; font-size: 13px; line-height: 1.55; color: var(--muted); margin-top: 4px; }
+
+  /* renk seçici */
+  .sv {
+    position: relative; height: 168px; border-radius: 12px; cursor: crosshair;
+    background-image:
+      linear-gradient(to top, #000, transparent),
+      linear-gradient(to right, #fff, transparent);
+    background-color: var(--seed-hue, #c86a3c);
+  }
+  .sv .knob {
+    position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%;
+    border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45); pointer-events: none;
+  }
+  .hue {
+    appearance: none; width: 100%; height: 14px; border-radius: 7px; margin: 12px 0 0; cursor: pointer;
+    background: linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);
+  }
+  .hue::-webkit-slider-thumb {
+    appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.45);
+  }
+  .hexrow { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  .hexrow .chip { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--border); flex: none; }
+  .hexrow .input { flex: 1; font-family: var(--font-mono); letter-spacing: 0.04em; }
+  .harmonies { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+  .harm { background: var(--surface-2); border-radius: 12px; padding: 12px; text-align: left; }
+  .harm:hover { background: var(--surface-3); }
+  .harm[aria-pressed="true"] { background: var(--selected); outline: 2px solid var(--accent); outline-offset: -2px; }
+  .harm b { display: block; font: 500 13px/1.4 var(--font-body); margin-bottom: 8px; }
+  .harm .sw { display: flex; gap: 3px; }
+  .harm .sw i { flex: 1; height: 26px; border-radius: 5px; display: block; }
+  .harm code { display: block; margin-top: 8px; font-size: 10.5px; letter-spacing: 0.02em; color: var(--muted); word-spacing: 4px; }
+  .saved { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+</style>
+</head>
+<body data-theme="mono">
+
+<div class="app" data-od-id="app-shell">
+
+  <nav class="rail" data-od-id="rail" aria-label="Ana gezinme">
+    <a class="rail-item" href="studio-session.html" data-od-id="rail-studio">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-5 4z"/><path d="M8.5 8.5h7M8.5 12h4"/></svg>
+      <span>Stüdyo</span>
+    </a>
+    <a class="rail-item" href="media-browser.html" data-od-id="rail-media">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15l4.5-4 3.5 3 3-2.5L21 17"/><circle cx="15.5" cy="8.5" r="1.4"/></svg>
+      <span>Medya</span><em class="rail-count">8</em>
+    </a>
+    <a class="rail-item" href="library-assets.html" data-od-id="rail-library">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5H9l1.8 2H18.5A1.5 1.5 0 0 1 20 8.5V17a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17z"/><path d="M9 12.5h6"/></svg>
+      <span>Kütüphane</span><em class="rail-count">7</em>
+    </a>
+    <hr />
+    <a class="rail-item" href="settings-panels.html" aria-current="page" data-od-id="rail-tools">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M14.5 3.5l6 6-9 9H5.5v-6z"/><path d="M12 6l6 6"/></svg>
+      <span>Araçlar</span>
+    </a>
+    <div class="spacer"></div>
+    <button class="rail-item" data-od-id="rail-collapse">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M16 9l-2.5 3 2.5 3"/></svg>
+      <span>Daralt</span>
+    </button>
+  </nav>
+
+  <header class="topbar" data-od-id="topbar">
+    <a class="icon-btn" href="studio-session.html" aria-label="Oturuma dön">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>
+    </a>
+    <div class="session">
+      <h1>Araçlar</h1>
+      <span class="stamp">görünüm ve palet · uygulama ayarları dişlide</span>
+    </div>
+    <div class="right">
+      <button class="icon-btn" id="settings-btn" aria-label="Ayarlar" data-open="settings-sheet" data-od-id="settings-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.7"/><path d="M19.3 13.6a7.7 7.7 0 0 0 0-3.2l1.9-1.4-1.9-3.3-2.2 1a7.7 7.7 0 0 0-2.7-1.6L13.9 2.7h-3.8l-.5 2.4a7.7 7.7 0 0 0-2.7 1.6l-2.2-1L2.8 9l1.9 1.4a7.7 7.7 0 0 0 0 3.2L2.8 15l1.9 3.3 2.2-1a7.7 7.7 0 0 0 2.7 1.6l.5 2.4h3.8l.5-2.4a7.7 7.7 0 0 0 2.7-1.6l2.2 1 1.9-3.3z"/></svg>
+      </button>
+      <div class="ver"><span>v1.17.0</span><i aria-hidden="true"></i></div>
+    </div>
+  </header>
+
+  <main class="canvas" data-od-id="canvas">
+    <div class="canvas-pad">
+      <p class="sec-label">Araçlar</p>
+      <div class="tools" data-od-id="tool-cards">
+        <button class="tool" data-open="palette-sheet" data-od-id="tool-palette">
+          <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><circle cx="9" cy="10" r="1.3"/><circle cx="14.5" cy="9.5" r="1.3"/><circle cx="14" cy="15" r="1.3"/></svg></span>
+          <b>Tema rengi ve paletler</b>
+          <span>Bir tema rengi seç; uyumlu paletler renk teorisiyle üretilir ve prompt'a
+            renk yönlendirmesi olarak eklenir.</span>
+        </button>
+        <button class="tool" data-open="look-sheet" data-od-id="tool-look">
+          <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17"/><path d="M12 8.5a3.5 3.5 0 0 1 0 7"/></svg></span>
+          <b>Görünüm</b>
+          <span>Arayüz teması. Yüzeyler ve metin sabit; yalnızca durum rengi değişir.</span>
+        </button>
+      </div>
+      <p class="help" style="max-width:66ch;margin-top:18px">Azure erişim bilgileri ve
+        yedekler burada değil: onlar uygulama ayarı, üst şeritteki
+        <button class="btn-text" data-open="settings-sheet" style="padding:0 2px">dişli
+        düğmesinden</button> açılıyor.</p>
+    </div>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<!-- --------------------------------------------------- tema rengi / palet -->
+<aside class="sheet open" id="palette-sheet" aria-label="Tema rengi ve paletler" data-od-id="palette-sheet">
+  <div class="sheet-head">
+    <button class="icon-btn" data-close aria-label="Kapat">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>
+    </button>
+    <h2>Tema rengi</h2>
+  </div>
+  <div class="sheet-body">
+    <div class="seg compact" role="group" aria-label="Palet kaynağı" id="palette-tabs" style="margin-bottom:18px">
+      <button aria-pressed="true" data-tab="new">Yeni palet</button>
+      <button aria-pressed="false" data-tab="saved">Kayıtlı paletler</button>
+    </div>
+
+    <div id="tab-new">
+      <div class="field">
+        <div class="sv" id="palette-field" tabindex="0" role="slider" aria-label="Doygunluk ve parlaklık"
+             aria-valuetext="doygunluk 72, parlaklık 78">
+          <span class="knob" id="knob" style="left:72%;top:22%"></span>
+        </div>
+        <input class="hue" id="palette-hue" type="range" min="0" max="360" value="25" aria-label="Ton" />
+        <div class="hexrow">
+          <span class="chip" id="seed-chip"></span>
+          <input class="input" id="palette-seed-hex" value="#c86a3c" aria-label="Hex" spellcheck="false" />
+          <button class="icon-btn" id="palette-eyedrop" aria-label="Ekrandan renk al" style="background:var(--surface-2)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M14.5 4.5l5 5"/><path d="M12.5 6.5l5 5-8 8H5v-4.5z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label">Uyumlu paletler</span>
+        <div class="harmonies" id="palette-suggestions"></div>
+      </div>
+
+      <div class="field">
+        <span class="field-label">Palet baskısı</span>
+        <div class="seg compact" role="group" aria-label="Palet baskısı" id="strength">
+          <button aria-pressed="true" data-strength="strict">Katı</button>
+          <button aria-pressed="false" data-strength="balanced">Dengeli</button>
+          <button aria-pressed="false" data-strength="loose">Serbest</button>
+        </div>
+        <p class="help">Renk adları prompt'a İngilizce girer — adlandırma ve OKLCH
+          hesabı sunucu tarafında (<code>palette.py</code>, <code>color_names.py</code>)
+          yapılır; görsel modeli renk adlarına hex kodlarından daha iyi tepki veriyor.</p>
+      </div>
+    </div>
+
+    <div id="tab-saved" hidden>
+      <div class="saved" id="palette-lib-grid">
+        <button class="harm" data-od-id="saved-1">
+          <b>Kandil</b>
+          <span class="sw">
+            <i style="background:#1c3b6e"></i><i style="background:#2d5a8e"></i>
+            <i style="background:#c9a227"></i><i style="background:#e8d9a8"></i>
+            <i style="background:#0f2444"></i>
+          </span>
+          <code>Üçlü · Dengeli</code>
+        </button>
+        <button class="harm" data-od-id="saved-2">
+          <b>KURUM kurumsal</b>
+          <span class="sw">
+            <i style="background:#085888"></i><i style="background:#0a6fac"></i>
+            <i style="background:#e08038"></i><i style="background:#f2c9a0"></i>
+            <i style="background:#04405f"></i>
+          </span>
+          <code>Karşıt · Katı</code>
+        </button>
+      </div>
+      <p class="help">Kayıtlı paletler <code>palette_store</code>'da tutulur; adlandırıp
+        kaydettiğin her palet burada kalır.</p>
+    </div>
+  </div>
+  <div class="sheet-foot">
+    <button class="btn-primary">Bu paleti kullan</button>
+    <button class="btn-text" style="justify-self:center">Adlandır ve kaydet</button>
+  </div>
+</aside>
+
+<!-- --------------------------------------------------------- görünüm / tema -->
+<aside class="sheet" id="look-sheet" aria-label="Görünüm" data-od-id="look-sheet">
+  <div class="sheet-head">
+    <button class="icon-btn" data-close aria-label="Kapat">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>
+    </button>
+    <h2>Görünüm</h2>
+  </div>
+  <div class="sheet-body">
+    <div class="field">
+      <span class="field-label">Arayüz teması</span>
+      <button class="radio-row" role="radio" aria-checked="true" data-theme-val="mono">
+        <span class="dot" aria-hidden="true"></span>
+        <span><b>Monokrom</b><span>Renk yok; durum rengi de beyaza yakın. Flow'un
+          varsayılanı.</span></span>
+      </button>
+      <button class="radio-row" role="radio" aria-checked="false" data-theme-val="kurumsal">
+        <span class="dot" aria-hidden="true"></span>
+        <span><b>KURUM mavisi</b><span>Logo varlıklarından ölçülen <code>#085888</code>'in
+          koyu zeminde okunabilir türevi.</span></span>
+      </button>
+      <button class="radio-row" role="radio" aria-checked="false" data-theme-val="amber">
+        <span class="dot" aria-hidden="true"></span>
+        <span><b>Amber</b><span>Motto turuncusu ailesinden sıcak bir durum rengi.</span></span>
+      </button>
+      <button class="radio-row" role="radio" aria-checked="false" data-theme-val="viola">
+        <span class="dot" aria-hidden="true"></span>
+        <span><b>Menekşe</b><span>Nötr üçüncü seçenek.</span></span>
+      </button>
+      <p class="help">Tema yalnızca durum rengini değiştirir: üretim ilerlemesi, odak
+        halkası, seçili görsel çerçevesi ve döküm sonuç satırı. Yüzeyler, metin ve
+        birincil eylem her temada aynı kalır.</p>
+    </div>
+    <div class="field">
+      <span class="field-label">Pencere</span>
+      <p class="help" style="margin-top:0">Açılış <code>1440×900</code>, en küçük
+        <code>1024×700</code>. 1200 pikselin altında sol ray otomatik daralır.</p>
+    </div>
+  </div>
+  <div class="sheet-foot">
+    <button class="btn-primary" data-close>Kaydet</button>
+  </div>
+</aside>
+
+<!-- ------------------------------ uygulama ayarları: Azure + Yedekler -->
+<aside class="sheet" id="settings-sheet" aria-label="Ayarlar" data-od-id="settings-sheet">
+  <div class="sheet-head">
+    <button class="icon-btn" data-close aria-label="Kapat">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>
+    </button>
+    <h2>Ayarlar</h2>
+  </div>
+  <div class="sheet-body">
+    <span class="field-label" style="margin-bottom:6px">Azure · gpt-image-2</span>
+    <p class="help" style="margin:0 0 18px">Erişim bilgileri yalnızca bu makineye
+      kaydedilir (izin <code>0600</code>). API anahtarı ekranda hiçbir zaman
+      gösterilmez.</p>
+
+    <div class="field">
+      <label for="endpoint">Endpoint (Base URL)</label>
+      <input class="input" id="endpoint" value="https://ai-ornek-swedencentral.cognitiveservices.azure.com" spellcheck="false" />
+    </div>
+
+    <div class="field">
+      <label for="apikey">API Key</label>
+      <input class="input" id="apikey" type="password" placeholder="Kayıtlı · değiştirmek için yeni anahtar yaz" />
+    </div>
+
+    <hr style="border:0;border-top:1px solid var(--border);margin:0 0 18px" />
+
+    <div class="field">
+      <label for="deployment">Prompt Yönetmeni · dağıtım adı</label>
+      <input class="input" id="deployment" value="gpt-5.6-luna" spellcheck="false" />
+      <p class="help">Azure AI Foundry'deki <b>deployment</b> adı — model ailesi adı değil.
+        Boş bırakılırsa Yönetmen kapalı kalır. Sohbet, görselin endpoint ve API anahtarını
+        paylaşır.</p>
+    </div>
+
+    <div class="field">
+      <span class="field-label">Yönetmen talimatı</span>
+      <p class="help" style="margin-top:0">Talimatı değiştirmek için proje kökünde
+        <code>chat-instructions.md</code> dosyasını oluştur.</p>
+    </div>
+
+    <div class="field">
+      <button class="switch-row" role="switch" aria-checked="true" style="border-bottom:0;padding:0">
+        <span class="txt">
+          <b>Oturumları otomatik kaydet</b>
+          <span>Konuşma ve üretilen görseller aynı geçmişte tutulur. Kapatırsan yalnızca
+            "sohbeti sakla" dediğinde yazılır.</span>
+        </span>
+        <span class="switch"><i></i></span>
+      </button>
+    </div>
+
+    <hr style="border:0;border-top:1px solid var(--border);margin:4px 0 18px" />
+
+    <span class="field-label" style="margin-bottom:6px">Yedekler</span>
+    <p class="help" style="margin:0 0 14px">Manifest yedekleri ve eski biçim göçü.
+      Yükseltmelerde yedek otomatik alınır; yedekler <code>output/</code> altındaki
+      kendi klasöründe durur.</p>
+
+    <div class="field">
+      <button class="switch-row" role="switch" aria-checked="true" data-od-id="auto-backup">
+        <span class="txt">
+          <b>Yükseltmede otomatik yedek al</b>
+          <span>Sürüm atlarken manifest ve klasör yapısı kopyalanır.</span>
+        </span>
+        <span class="switch"><i></i></span>
+      </button>
+      <button class="switch-row" role="switch" aria-checked="false" data-od-id="legacy-migrate"
+              style="border-bottom:0">
+        <span class="txt">
+          <b>Eski biçimi otomatik göç ettir</b>
+          <span>Kapalıyken eski kayıtlar olduğu gibi okunur, yazılmaz.</span>
+        </span>
+        <span class="switch"><i></i></span>
+      </button>
+    </div>
+
+    <div class="field" style="margin-bottom:0">
+      <div class="row">
+        <button class="btn-ghost sm" data-od-id="backup-now">Şimdi yedek al</button>
+        <button class="btn-ghost sm" data-od-id="backup-open">Yedek klasörünü aç</button>
+      </div>
+      <p class="help">Bir yedekten dönmek geri alınamaz; geri yükleme yedek klasöründen
+        elle yapılır.</p>
+    </div>
+  </div>
+  <div class="sheet-foot">
+    <button class="btn-primary" data-close>Kaydet</button>
+    <span class="help" style="justify-self:center;margin:0">Sürüm 1.17.0</span>
+  </div>
+</aside>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var LS_THEME = 'flow-theme';
+  try {
+    var t = localStorage.getItem(LS_THEME);
+    if (t) {
+      document.body.dataset.theme = t;
+      document.querySelectorAll('[data-theme-val]').forEach(function (r) {
+        r.setAttribute('aria-checked', String(r.dataset.themeVal === t));
+      });
+    }
+  } catch (e) {}
+
+  /* ------------------------------------------------------- sheet yönetimi */
+  var scrim = $('scrim');
+  function closeAll() {
+    document.querySelectorAll('.sheet.open').forEach(function (s) { s.classList.remove('open'); });
+    scrim.classList.remove('open');
+  }
+  document.querySelectorAll('[data-open]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      closeAll();
+      $(b.dataset.open).classList.add('open');
+      scrim.classList.add('open');
+    });
+  });
+  document.querySelectorAll('[data-close]').forEach(function (b) { b.addEventListener('click', closeAll); });
+  scrim.addEventListener('click', closeAll);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+
+  /* diğer ekranlardaki dişli düğmesi buraya #ayarlar ile geliyor */
+  if (location.hash === '#ayarlar') {
+    closeAll();
+    $('settings-sheet').classList.add('open');
+    scrim.classList.add('open');
+  }
+
+  /* --------------------------------------------------------------- tema */
+  document.querySelectorAll('[data-theme-val]').forEach(function (r) {
+    r.addEventListener('click', function () {
+      document.querySelectorAll('[data-theme-val]').forEach(function (x) {
+        x.setAttribute('aria-checked', String(x === r));
+      });
+      document.body.dataset.theme = r.dataset.themeVal;
+      try { localStorage.setItem(LS_THEME, r.dataset.themeVal); } catch (e) {}
+    });
+  });
+
+  /* --------------------------------------------------------- renk seçici */
+  var hsv = { h: 25, s: 0.72, v: 0.78 };
+
+  function hsv2hex(h, s, v) {
+    var c = v * s, hp = (h % 360) / 60, x = c * (1 - Math.abs(hp % 2 - 1)), m = v - c, r, g, b;
+    if (hp < 1) { r = c; g = x; b = 0; }
+    else if (hp < 2) { r = x; g = c; b = 0; }
+    else if (hp < 3) { r = 0; g = c; b = x; }
+    else if (hp < 4) { r = 0; g = x; b = c; }
+    else if (hp < 5) { r = x; g = 0; b = c; }
+    else { r = c; g = 0; b = x; }
+    return '#' + [r + m, g + m, b + m].map(function (u) {
+      return ('0' + Math.round(Math.max(0, Math.min(1, u)) * 255).toString(16)).slice(-2);
+    }).join('');
+  }
+
+  var HARMONIES = [
+    { name: 'Tek renk', offs: [0, 0, 0, 0, 0], vs: [-0.34, -0.16, 0, 0.12, 0.2], ss: [0.1, 0.04, 0, -0.22, -0.5] },
+    { name: 'Komşu', offs: [-58, -28, 0, 28, 58], vs: [-0.06, -0.02, 0, -0.02, -0.06], ss: [0, 0, 0, 0, -0.05] },
+    { name: 'Karşıt', offs: [-12, 0, 178, 192, 22], vs: [-0.16, 0, -0.05, 0.12, 0.1], ss: [0.08, 0, -0.1, -0.32, -0.4] },
+    { name: 'Komşu + karşıt', offs: [-30, 0, 30, 178, 196], vs: [0.04, 0, -0.08, -0.04, 0.1], ss: [-0.2, 0, 0.05, -0.1, -0.3] },
+    { name: 'Üçlü', offs: [0, 120, 240, 18, 140], vs: [0, -0.06, 0.04, 0.12, -0.2], ss: [0, -0.08, -0.18, -0.34, 0.05] },
+    { name: 'Dörtlü', offs: [0, 90, 180, 270, 40], vs: [0, -0.04, -0.06, 0.06, -0.22], ss: [0, -0.06, -0.1, -0.2, 0.08] }
+  ];
+
+  function renderHarmonies() {
+    var box = $('palette-suggestions');
+    box.innerHTML = '';
+    HARMONIES.forEach(function (hm, i) {
+      var hexes = hm.offs.map(function (o, k) {
+        return hsv2hex(hsv.h + o,
+          Math.max(0.08, Math.min(1, hsv.s + hm.ss[k])),
+          Math.max(0.12, Math.min(1, hsv.v + hm.vs[k])));
+      });
+      var b = document.createElement('button');
+      b.className = 'harm';
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(i === 4));
+      b.setAttribute('data-od-id', 'harmony-' + (i + 1));
+      b.innerHTML = '<b>' + hm.name + '</b><span class="sw">'
+        + hexes.map(function (h) { return '<i style="background:' + h + '"></i>'; }).join('')
+        + '</span><code>' + hexes.slice(0, 3).join(' ') + '</code>';
+      b.addEventListener('click', function () {
+        box.querySelectorAll('.harm').forEach(function (x) {
+          x.setAttribute('aria-pressed', String(x === b));
+        });
+      });
+      box.appendChild(b);
+    });
+  }
+
+  function drawSeed() {
+    var hex = hsv2hex(hsv.h, hsv.s, hsv.v);
+    $('palette-seed-hex').value = hex;
+    $('seed-chip').style.background = hex;
+    $('palette-field').style.backgroundColor = hsv2hex(hsv.h, 1, 1);
+    $('knob').style.left = (hsv.s * 100) + '%';
+    $('knob').style.top = ((1 - hsv.v) * 100) + '%';
+    $('palette-field').setAttribute('aria-valuetext',
+      'doygunluk ' + Math.round(hsv.s * 100) + ', parlaklık ' + Math.round(hsv.v * 100));
+    renderHarmonies();
+  }
+
+  var field = $('palette-field');
+  function pickFrom(e) {
+    var r = field.getBoundingClientRect();
+    hsv.s = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    hsv.v = Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height));
+    drawSeed();
+  }
+  field.addEventListener('pointerdown', function (e) {
+    field.setPointerCapture(e.pointerId);
+    pickFrom(e);
+    field.onpointermove = pickFrom;
+  });
+  field.addEventListener('pointerup', function () { field.onpointermove = null; });
+  field.addEventListener('keydown', function (e) {
+    var step = e.shiftKey ? 0.1 : 0.02, used = true;
+    if (e.key === 'ArrowRight') hsv.s = Math.min(1, hsv.s + step);
+    else if (e.key === 'ArrowLeft') hsv.s = Math.max(0, hsv.s - step);
+    else if (e.key === 'ArrowUp') hsv.v = Math.min(1, hsv.v + step);
+    else if (e.key === 'ArrowDown') hsv.v = Math.max(0, hsv.v - step);
+    else used = false;
+    if (used) { e.preventDefault(); drawSeed(); }
+  });
+  $('palette-hue').addEventListener('input', function () { hsv.h = +this.value; drawSeed(); });
+  $('palette-seed-hex').addEventListener('change', function () {
+    var m = /^#?([0-9a-f]{6})$/i.exec(this.value.trim());
+    if (!m) { drawSeed(); return; }
+    var n = parseInt(m[1], 16), r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    hsv.v = mx;
+    hsv.s = mx ? d / mx : 0;
+    if (!d) hsv.h = 0;
+    else if (mx === r) hsv.h = 60 * (((g - b) / d) % 6);
+    else if (mx === g) hsv.h = 60 * ((b - r) / d + 2);
+    else hsv.h = 60 * ((r - g) / d + 4);
+    if (hsv.h < 0) hsv.h += 360;
+    $('palette-hue').value = Math.round(hsv.h);
+    drawSeed();
+  });
+
+  /* ------------------------------------------------------ küçük gruplar */
+  ['palette-tabs', 'strength'].forEach(function (id) {
+    $(id).addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      this.querySelectorAll('button').forEach(function (x) {
+        x.setAttribute('aria-pressed', String(x === b));
+      });
+      if (id === 'palette-tabs') {
+        $('tab-new').hidden = b.dataset.tab !== 'new';
+        $('tab-saved').hidden = b.dataset.tab !== 'saved';
+      }
+    });
+  });
+  document.querySelectorAll('[role="switch"]').forEach(function (sw) {
+    sw.addEventListener('click', function () {
+      sw.setAttribute('aria-checked', sw.getAttribute('aria-checked') === 'true' ? 'false' : 'true');
+    });
+  });
+
+  drawSeed();
+})();
+</script>
+</body>
+</html>

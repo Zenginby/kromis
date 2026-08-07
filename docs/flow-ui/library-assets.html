@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kütüphane — GPT-Image Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="flow.css" />
+<style>
+  .modal.three {
+    grid-template-columns: 208px minmax(0, 1fr) 236px;
+    grid-template-areas: "mhead mhead mhead" "mnav mbody mside";
+  }
+  .modal-side {
+    grid-area: mside; border-left: 1px solid var(--border);
+    padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    padding: 9px 12px; border-radius: 10px; color: var(--muted); font-size: 14px;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+  }
+  .nav-item:hover { background: var(--surface-2); color: var(--fg); }
+  .nav-item[aria-current="true"] { background: var(--selected); color: var(--fg); }
+  .nav-item em { margin-left: auto; font: 500 11px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--muted); }
+  .asset-grid {
+    display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  }
+  .asset {
+    background: var(--surface-2); border-radius: var(--r-item); overflow: hidden;
+    text-align: left; transition: background var(--dur) var(--ease);
+  }
+  .asset:hover { background: var(--surface-3); }
+  .asset .thumb {
+    aspect-ratio: 1; display: grid; place-items: center; padding: 14px;
+    background-image:
+      repeating-conic-gradient(from 0deg, rgba(255,255,255,.05) 0% 25%, transparent 0% 50%);
+    background-size: 16px 16px;
+  }
+  .asset .thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .asset figcaption {
+    padding: 8px 10px 10px; font-size: 12px; line-height: 1.45; color: var(--muted);
+    border-top: 1px solid var(--border);
+  }
+  .asset[aria-selected="true"] { background: var(--selected); outline: 2px solid var(--accent); outline-offset: -2px; }
+  .asset[aria-selected="true"] figcaption { color: var(--fg); }
+  .side-preview {
+    border-radius: var(--r-item); background: var(--surface-2); aspect-ratio: 1;
+    display: grid; place-items: center; padding: 16px;
+  }
+  .side-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .kv { display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+  .kv div { display: flex; justify-content: space-between; gap: 10px; }
+  .kv b { font-weight: 500; color: var(--fg); font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.04em; }
+  .backdrop-note {
+    max-width: 560px; color: var(--muted); font-size: 13px; line-height: 1.6;
+  }
+</style>
+</head>
+<body data-theme="mono">
+
+<div class="app" data-od-id="app-shell">
+
+  <nav class="rail" data-od-id="rail" aria-label="Ana gezinme">
+    <a class="rail-item" href="studio-session.html" data-od-id="rail-studio">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-5 4z"/><path d="M8.5 8.5h7M8.5 12h4"/></svg>
+      <span>Stüdyo</span>
+    </a>
+    <a class="rail-item" href="media-browser.html" data-od-id="rail-media">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15l4.5-4 3.5 3 3-2.5L21 17"/><circle cx="15.5" cy="8.5" r="1.4"/></svg>
+      <span>Medya</span><em class="rail-count">8</em>
+    </a>
+    <a class="rail-item" href="library-assets.html" aria-current="page" data-od-id="rail-library">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5H9l1.8 2H18.5A1.5 1.5 0 0 1 20 8.5V17a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17z"/><path d="M9 12.5h6"/></svg>
+      <span>Kütüphane</span><em class="rail-count">7</em>
+    </a>
+    <hr />
+    <a class="rail-item" href="settings-panels.html" data-od-id="rail-tools">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M14.5 3.5l6 6-9 9H5.5v-6z"/><path d="M12 6l6 6"/></svg>
+      <span>Araçlar</span>
+    </a>
+    <div class="spacer"></div>
+    <button class="rail-item" data-od-id="rail-collapse">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M16 9l-2.5 3 2.5 3"/></svg>
+      <span>Daralt</span>
+    </button>
+  </nav>
+
+  <header class="topbar" data-od-id="topbar">
+    <a class="icon-btn" href="studio-session.html" aria-label="Oturuma dön">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>
+    </a>
+    <div class="session">
+      <h1>Kütüphane</h1>
+      <span class="stamp">bindirme varlıkları · şeffaflık korunur</span>
+    </div>
+    <div class="right">
+      <button class="btn-ghost sm" id="reopen">Seçiciyi aç</button>
+      <div class="ver"><span>v1.17.0</span><i aria-hidden="true"></i></div>
+    </div>
+  </header>
+
+  <main class="canvas" data-od-id="canvas">
+    <div class="canvas-pad">
+      <p class="sec-label">Kütüphane bir modal seçici olarak açılıyor</p>
+      <p class="backdrop-note">Bindirme varlıkları üretim akışını kesmeden seçilsin diye
+        Kütüphane tam sayfa değil, Flow'un varlık diyaloğu gibi bir modal: solda tür
+        navigasyonu, üstte arama ve sıralama, sağda seçilen varlığın önizlemesi.
+        Seçtiğin varlık doğrudan aktif oturumun bindirme paneline düşer.</p>
+      <div class="row" style="margin-top:20px">
+        <a class="btn-ghost" href="studio-preview.html">Bindirme panelini gör</a>
+        <a class="btn-text" href="media-browser.html">Üretilen görseller Medya'da</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-wrap open" id="wrap" data-od-id="library-modal">
+  <div class="modal three" role="dialog" aria-modal="true" aria-label="Kütüphane">
+
+    <div class="modal-head">
+      <label class="search" style="flex:1 1 240px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+        <input id="q" type="search" placeholder="Öğeleri arayın" autocomplete="off" />
+      </label>
+      <button class="sortbtn" id="sort-btn">
+        <span id="sort-label">En son kullanılan</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <button class="icon-btn" id="close" aria-label="Kapat">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+
+    <nav class="modal-nav" aria-label="Varlık türü" id="kinds">
+      <button class="nav-item" aria-current="true" data-kind="">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Tümü <em>7</em>
+      </button>
+      <button class="nav-item" aria-current="false" data-kind="logo">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M8.5 14.5c2-3.5 5-5 7-5.5"/></svg>
+        Logolar <em>2</em>
+      </button>
+      <button class="nav-item" aria-current="false" data-kind="motto">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M4 12h12M4 17h8"/></svg>
+        Mottolar <em>4</em>
+      </button>
+      <button class="nav-item" aria-current="false" data-kind="banner">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="8" width="18" height="8" rx="1.5"/></svg>
+        Bannerlar <em>1</em>
+      </button>
+      <button class="nav-item" aria-current="false" data-kind="upload">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 16V4"/><path d="M8 8l4-4 4 4"/><path d="M4 16v3.5h16V16"/></svg>
+        Yüklemeler <em>0</em>
+      </button>
+    </nav>
+
+    <div class="modal-body">
+      <div class="asset-grid" id="grid">
+        <button class="asset" aria-selected="true" data-kind="logo" data-name="KURUM Logo Beyaz" data-src="assets/brand/logo-beyaz.png" data-px="1371×1782">
+          <span class="thumb"><img src="assets/brand/logo-beyaz.png" alt="KURUM Logo Beyaz" width="323" height="420" /></span>
+          <figcaption>KURUM Logo Beyaz</figcaption>
+        </button>
+        <button class="asset" aria-selected="false" data-kind="logo" data-name="KURUM Logo Mavi" data-src="assets/brand/logo-mavi.png" data-px="1370×1783">
+          <span class="thumb"><img src="assets/brand/logo-mavi.png" alt="KURUM Logo Mavi" width="323" height="420" /></span>
+          <figcaption>KURUM Logo Mavi</figcaption>
+        </button>
+        <button class="asset" aria-selected="false" data-kind="motto" data-name="Motto Turuncu-Mavi" data-src="assets/brand/motto-turuncu-mavi.png" data-px="2036×1197">
+          <span class="thumb"><img src="assets/brand/motto-turuncu-mavi.png" alt="Motto Turuncu-Mavi" width="520" height="306" /></span>
+          <figcaption>Motto Turuncu-Mavi</figcaption>
+        </button>
+        <button class="asset" aria-selected="false" data-kind="motto" data-name="Motto Mavi-Beyaz" data-src="assets/brand/motto-mavi-beyaz.png" data-px="2036×1196">
+          <span class="thumb"><img src="assets/brand/motto-mavi-beyaz.png" alt="Motto Mavi-Beyaz" width="520" height="305" /></span>
+          <figcaption>Motto Mavi-Beyaz</figcaption>
+        </button>
+        <button class="asset" aria-selected="false" data-kind="motto" data-name="Motto Mavi-Turuncu" data-src="assets/brand/motto-mavi-turuncu.png" data-px="2036×1196">
+          <span class="thumb"><img src="assets/brand/motto-mavi-turuncu.png" alt="Motto Mavi-Turuncu" width="520" height="305" /></span>
+          <figcaption>Motto Mavi-Turuncu</figcaption>
+        </button>
+        <button class="asset" aria-selected="false" data-kind="motto" data-name="Motto Mavi-Mavi" data-src="assets/brand/motto-mavi-mavi.png" data-px="2036×1197">
+          <span class="thumb"><img src="assets/brand/motto-mavi-mavi.png" alt="Motto Mavi-Mavi" width="520" height="306" /></span>
+          <figcaption>Motto Mavi-Mavi</figcaption>
+        </button>
+        <button class="asset" aria-selected="false" data-kind="banner" data-name="Alt şerit banner" data-src="assets/brand/banner.png" data-px="3330×748">
+          <span class="thumb"><img src="assets/brand/banner.png" alt="Alt şerit banner" width="900" height="202" /></span>
+          <figcaption>Alt şerit banner</figcaption>
+        </button>
+      </div>
+
+      <div class="empty" id="empty" hidden style="padding:40px 20px">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 16V4"/><path d="M8 8l4-4 4 4"/><path d="M4 16v3.5h16V16"/></svg>
+        <p id="empty-text">Sonuç bulunamadı</p>
+        <button class="btn-ghost sm">Medya yükle</button>
+      </div>
+    </div>
+
+    <aside class="modal-side" data-od-id="asset-preview">
+      <div class="side-preview">
+        <img id="pv-img" src="assets/brand/logo-beyaz.png" alt="Seçili varlığın önizlemesi" width="323" height="420" />
+      </div>
+      <div class="kv">
+        <div><span>Ad</span><b id="pv-name">KURUM Logo Beyaz</b></div>
+        <div><span>Tür</span><b id="pv-kind">Logo</b></div>
+        <div><span>Boyut</span><b id="pv-px">1371×1782</b></div>
+        <div><span>Biçim</span><b>PNG · şeffaf</b></div>
+      </div>
+      <p class="help" style="margin:0">Şeffaflık korunur; yüklenen dosya PNG olarak
+        yeniden kodlanır.</p>
+      <div style="margin-top:auto;display:grid;gap:8px">
+        <button class="btn-primary" id="use">Bindirmede kullan</button>
+        <button class="btn-text" style="justify-self:center">Kütüphaneden sil</button>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  try {
+    var t = localStorage.getItem('flow-theme');
+    if (t) document.body.dataset.theme = t;
+  } catch (e) {}
+
+  var KIND_TR = { logo: 'Logo', motto: 'Motto', banner: 'Banner' };
+  var assets = Array.prototype.slice.call(document.querySelectorAll('#grid .asset'));
+  var kind = '';
+
+  function apply() {
+    var q = $('q').value.trim().toLowerCase();
+    var shown = 0;
+    assets.forEach(function (a) {
+      var okK = true;
+      if (kind === 'upload') okK = false;
+      else if (kind) okK = a.dataset.kind === kind;
+      var okQ = !q || a.dataset.name.toLowerCase().indexOf(q) > -1;
+      var vis = okK && okQ;
+      a.hidden = !vis;
+      if (vis) shown++;
+    });
+    $('empty').hidden = shown > 0;
+    $('empty-text').textContent = kind === 'upload'
+      ? 'Henüz yükleme yok' : 'Sonuç bulunamadı';
+  }
+  $('q').addEventListener('input', apply);
+
+  $('kinds').addEventListener('click', function (e) {
+    var b = e.target.closest('.nav-item');
+    if (!b) return;
+    document.querySelectorAll('#kinds .nav-item').forEach(function (x) {
+      x.setAttribute('aria-current', String(x === b));
+    });
+    kind = b.dataset.kind;
+    apply();
+  });
+
+  assets.forEach(function (a) {
+    a.addEventListener('click', function () {
+      assets.forEach(function (x) { x.setAttribute('aria-selected', String(x === a)); });
+      $('pv-img').src = a.dataset.src;
+      $('pv-img').alt = a.dataset.name + ' önizlemesi';
+      $('pv-name').textContent = a.dataset.name;
+      $('pv-kind').textContent = KIND_TR[a.dataset.kind] || '—';
+      $('pv-px').textContent = a.dataset.px;
+    });
+  });
+
+  var sorts = ['En son kullanılan', 'Ada göre', 'Türe göre'];
+  var si = 0;
+  $('sort-btn').addEventListener('click', function () {
+    si = (si + 1) % sorts.length;
+    $('sort-label').textContent = sorts[si];
+  });
+
+  function close() { $('wrap').classList.remove('open'); }
+  $('close').addEventListener('click', close);
+  $('reopen').addEventListener('click', function () { $('wrap').classList.add('open'); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+  $('wrap').addEventListener('click', function (e) { if (e.target === $('wrap')) close(); });
+  $('use').addEventListener('click', function () { window.location.href = 'studio-preview.html'; });
+})();
+</script>
+</body>
+</html>

@@ -759,13 +759,20 @@ def test_apply_to_form_switches_to_the_image_view():
 
 
 def test_chat_view_is_hidden_on_first_paint():
-    """Açılışta görsel sekmesi seçili: sohbet paneli işaretlemede gizli gelmeli."""
+    """Açılışta Görsel modu seçili: yönetmen paneli işaretlemede gizli gelmeli.
+
+    Desen ETİKETTEN BAĞIMSIZ: iddia edilen şey panelin `hidden` gelmesi, hangi
+    elementle sarıldığı değil. Flow kabuğunda iki panel `<div>` yerine
+    `<section>` oldu (§ kabuk) ve `<div id="view-chat"` arayan eski desen bunu
+    "panel yok" diye okuyordu — kapsanan davranış hiç değişmemişti.
+    """
     html = TestClient(appmod.app).get("/").text
-    chat_view = re.search(r'<div id="view-chat"[^>]*>', html)
+    chat_view = re.search(r'<\w+ id="view-chat"[^>]*>', html)
     assert chat_view, "#view-chat yok"
-    assert "hidden" in chat_view.group(0), "sohbet paneli açılışta görünür"
-    image_view = re.search(r'<div id="view-image"[^>]*>', html)
-    assert "hidden" not in image_view.group(0), "görsel sekmesi açılışta gizli"
+    assert "hidden" in chat_view.group(0), "yönetmen paneli açılışta görünür"
+    image_view = re.search(r'<\w+ id="view-image"[^>]*>', html)
+    assert image_view, "#view-image yok"
+    assert "hidden" not in image_view.group(0), "görsel paneli açılışta gizli"
 
 
 # ── Tıklanabilir seçenekler + prompt barı (v1.15) ──────────────────────
@@ -963,9 +970,15 @@ def test_textareas_cannot_be_dragged_wider_than_their_column():
 
 def test_the_new_chat_controls_have_a_visible_focus_ring():
     """Kendi zemini/kenarlığı olmayan düğmeler: odak halkası AÇIKÇA yazılmalı
-    (button.palette-sw geleneği)."""
+    (button.palette-sw geleneği).
+
+    `.chat-new` listeden ÇIKTI (PR1/Adım 4): sınıf Adım 2'den beri işaretlemede
+    yok — düğme üst şeritte `#chat-new.icon-btn` ve odak halkasını global
+    `:focus-visible`/icon-btn hattı veriyor. Ölü sınıf kuralı silinince bu
+    iddia da onunla birlikte düştü; id'nin varlığını ayrı test doğruluyor.
+    """
     css = TestClient(appmod.app).get("/static/style.css").text
-    for selector in (".chat-new", ".chat-item-open", ".chat-item-menu",
+    for selector in (".chat-item-open", ".chat-item-menu",
                      ".chat-menu-item", ".chat-option"):
         assert re.search(re.escape(selector) + r":focus-visible", css), selector
 

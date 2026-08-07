@@ -1,50 +1,348 @@
+/* ── Token köprüsü ───────────────────────────────────────────────────
+ *
+ * Eski token adları KORUNUYOR (55 KB CSS yeniden yazılmıyor) ama artık
+ * flow-tokens.css'teki Flow adlarına bakıyorlar. Desen her yerde aynı:
+ *
+ *     --panel: var(--surface, <eski değer>);
+ *              └ Flow'dan gelir  └ flow-tokens.css yoksa eski palet
+ *
+ * Bu yüzden index.html'deki flow-tokens.css <link>'ini silmek uygulamayı
+ * tek satırla bugünkü paletine döndürür — ikinci bir tanım yeri yok.
+ *
+ * Altı token (--bg --muted --accent --danger --dur --ease) flow-tokens.css'te
+ * AYNI adla yeniden tanımlanıyor; o dosya sonra yüklendiği için değerini o
+ * veriyor. Buradaki değerleri geri dönüş içindir, bilerek eski palette kaldı.
+ *
+ * Geometri Adım 3'te bağlandı: Flow'un yarıçap üçlüsü (--r-panel 24 /
+ * --r-item 12 / --r-seg 10, balon 20 + kaynak köşesi 6, pill 999) artık
+ * bileşen kurallarının içinde. Eski --radius'un üç kullanıcısı da bu üçlüye
+ * taşındığı için token silindi. --space (boşluk ritmi) duruyor.
+ */
 :root {
   --bg: oklch(20% 0.02 260);
-  --panel: oklch(26% 0.02 260);
-  --panel-2: oklch(30% 0.02 260);
-  --text: oklch(94% 0.01 260);
+  --panel: var(--surface, oklch(26% 0.02 260));
+  --panel-2: var(--surface-2, oklch(30% 0.02 260));
+  --text: var(--fg, oklch(94% 0.01 260));
   --muted: oklch(72% 0.02 260);
   --accent: oklch(72% 0.17 45);
-  --accent-press: oklch(64% 0.17 45);
+  /* Flow §8: beyaz birincil eylemin basılı/hover hâli #e8eaed. */
+  --accent-press: var(--fg, oklch(64% 0.17 45));
   --danger: oklch(62% 0.19 25);
-  --danger-press: oklch(55% 0.2 25);
-  --radius: 14px;
+  /* Basılı hâl --danger'dan TÜRETİLİYOR, sabit değil: üstündeki metin --text
+     ve sabit `oklch(55% 0.2 25)` ile ölçüm 4.47:1 veriyordu — 4.5 kapısının
+     kılpayı altı. %80 karışım 5.06:1. Türetilmiş olduğu için --danger değişirse
+     birlikte döner. */
+  --danger-press: color-mix(in oklab, var(--danger) 80%, black);
   --space: clamp(1rem, 0.6rem + 1.4vw, 1.8rem);
   --dur: 180ms;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  /* Sohbet mesajları: iki taraf --panel/--panel-2 ile neredeyse aynı tondaydı
-     ve akışta kimin konuştuğu köşe yarıçapından okunuyordu. Kullanıcı balonu
-     accent'e çalan AÇIK bir yüzey (söylenen replik), yönetmen paneli koyu ve
-     düz (dönen çıktı). İkisi de --text ile AA kontrastını korumak zorunda. */
-  --chat-user: oklch(36% 0.035 45);
-  --chat-user-border: oklch(46% 0.06 45);
-  --chat-bot: oklch(24% 0.018 260);
-  --chat-bot-border: oklch(32% 0.02 260);
+  /* Sohbet mesajları: Flow ikisini de --surface-2 üstüne koyuyor ve kimin
+     konuştuğunu KÖŞE YARIÇAPI ile söylüyor (flow.css .msg-user/.msg-bot:
+     20/20/6/20 ve 20/20/20/6). Renkle ayırma bu yüzden geri alındı; kullanıcı
+     balonunun asimetrik köşesi (14px 14px 4px 14px) yerinde duruyor.
+     Yönetmen balonunun aynalı kuyruğu bileşen turunda (Adım 3) geliyor. */
+  --chat-user: var(--surface-2, oklch(36% 0.035 45));
+  --chat-user-border: var(--border, oklch(46% 0.06 45));
+  --chat-bot: var(--surface-2, oklch(24% 0.018 260));
+  --chat-bot-border: var(--border, oklch(32% 0.02 260));
+
+  /* ── Türetilmiş tokenlar ──────────────────────────────────────────
+   * Aşağıdakiler bugüne kadar CSS'in içinde SABİT yazılıydı; 55 sabit renk
+   * değeri vardı ve çoğu eski mavi-260 / turuncu-45 tonunu taşıyordu. Token
+   * olmadıkları için temayı takip etmiyorlardı — yalnızca :root'u bağlamak
+   * ekranda turuncu parıltılar bırakırdı. */
+
+  /* Açık dolgu (beyaz birincil, seçili segmented) üstündeki metin. Bugüne
+     kadar altı yerde `oklch(20% 0.02 260)` olarak elle yazılıydı. */
+  --on-accent: var(--on-primary, oklch(20% 0.02 260));
+  /* DOLGU rolleri. Flow'da --accent yalnızca durum anlatır; dolgu yapan
+     yüzeyler --primary (beyaz birincil eylem) ve --selected-strong (seçili
+     segmented kutucuk / çip) üstünden gelir — plan §2.1 ve §8. Eskiden ikisi
+     de --accent'ti, o yüzden ayrıştırıldı. */
+  --fill-primary: var(--primary, var(--accent));
+  --fill-selected: var(--selected-strong, var(--accent));
+  --on-fill-selected: var(--primary, var(--on-accent));
+  /* Yükseltilmiş kontrol / şeffaflık daması. */
+  --raised: var(--surface-3, oklch(24% 0.02 260));
+  --hairline: var(--border, oklch(94% 0.01 260 / 0.14));
+  /* TEK BİLİNÇLİ SAPMA — ölçülen Flow paletinden ayrıldığımız tek yer.
+     Flow'un kontrol sınırları (--border 0.10, --border-strong 0.18) komşu
+     yüzeye karşı 1.21–1.77:1 veriyor; plan §8'in "kontrol komşu yüzeye karşı
+     ≥3:1" kapısı ve WCAG 1.4.11 bunu geçmiyor. Daha kötüsü: `textarea, select`
+     ve `.modal-card input` dinlenme hâlinde `border: 1px solid transparent`
+     kullanıyordu, yani metin girişlerinin algılanabilir sınırı hiç yoktu —
+     boundary yalnızca 1.11:1'lik dolgudan geliyordu.
+     0.36 ölçüldü: #000 üzerinde 3.14, #141415'te 3.31, #1e1e1f'te 3.31,
+     #2a2a2b'de 3.16 — kapıyı geçen EN SESSİZ değer (0.35 → 3.00, payı yok).
+     Kapsam bilerek dar: yalnızca tıklanabilir/odaklanabilir kontrollerin
+     sınırı. Dekoratif ayırıcılar ve panel kenarları Flow'a birebir kalıyor
+     (--hairline). Disabled hâller de dışarıda — §8 kontrast düşürmeye izin
+     verdiği tek durum o. Karar: 6 Ağustos, kullanıcı onayı. */
+  --control-border: rgba(255, 255, 255, 0.36);
+  /* Perde ve künye katmanları: Flow zemini #000 olduğu için nötr siyah alfa. */
+  --scrim: oklch(0% 0 0 / 0.62);
+  --overlay: oklch(0% 0 0 / 0.72);
+  --overlay-soft: oklch(0% 0 0 / 0.55);
+  --glass: oklch(8% 0 0 / 0.72);
+  /* Durum renkleri temayı color-mix ile takip eder → tema değişince ışıma,
+     perde ve halkalar birlikte döner, ikinci bir tema bloğu gerekmez. */
+  --accent-glow: color-mix(in oklab, var(--accent) 22%, transparent);
+  --accent-ring: color-mix(in oklab, var(--accent) 35%, transparent);
+  --accent-ring-wide: color-mix(in oklab, var(--accent) 28%, transparent);
+  --accent-wash: color-mix(in oklab, var(--accent) 9%, transparent);
+  --accent-veil: color-mix(in oklab, var(--accent) 9%, var(--panel-2));
+  --danger-text: color-mix(in oklab, var(--danger) 78%, var(--text));
+  --danger-soft: color-mix(in oklab, var(--danger) 14%, transparent);
+  --danger-ring: color-mix(in oklab, var(--danger) 35%, transparent);
+  --danger-ring-mid: color-mix(in oklab, var(--danger) 50%, transparent);
+  --danger-ring-out: color-mix(in oklab, var(--danger) 0%, transparent);
 }
 * { box-sizing: border-box; }
 body {
   margin: 0; background: var(--bg); color: var(--text);
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  min-height: 100vh;
+  /* Flow gövdesi: 15px/1.5, yerel sistem ailesi (plan §3). rem tabanı (html)
+     değişmiyor — rem ölçüleri olduğu gibi kalır. */
+  font: 400 15px/1.5 var(--font-body, -apple-system, system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  /* Kaydırma TUVALDE (.canvas): ray ve üst şerit sabit kalmalı. */
+  height: 100vh; height: 100dvh; overflow: hidden;
 }
-.topbar { padding: var(--space) var(--space) 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
-.topbar h1 {
-  margin: 0; font-family: ui-serif, Georgia, serif;
-  font-size: clamp(1.6rem, 1rem + 3vw, 2.8rem); letter-spacing: -0.02em;
-}
-.topbar h1 span { color: var(--accent); }
-.sub { color: var(--muted); margin: 0.2rem 0 0; }
 
-.icon-btn {
-  flex: none; margin-top: 0.4rem; width: 42px; height: 42px; padding: 0;
-  display: grid; place-items: center; cursor: pointer;
-  background: var(--panel); color: var(--muted);
-  border: 1px solid var(--panel-2); border-radius: 12px;
-  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
-              transform var(--dur) var(--ease), background var(--dur);
+/* ══ Flow kabuğu ═══════════════════════════════════════════════════════
+   Sol ray · üst şerit · tuval · yüzen composer. Ölçüler tasarım §2.2'den:
+   ray 228px açık / 72px daralt, üst şerit 72px, composer max 620px.
+
+   Composer TUVALLE AYNI IZGARA ALANINDA duruyor (`grid-area: canvas`),
+   `position: fixed` DEĞİL: ray daralınca kendiliğinden hizalanıyor, aksi
+   halde ray genişliğini bir değişkenle kovalamak gerekirdi. */
+.app {
+  --rail-w: var(--rail, 228px);
+  --topbar-h: var(--topbar, 72px);
+  height: 100%;
+  display: grid;
+  grid-template-columns: var(--rail-w) minmax(0, 1fr);
+  grid-template-rows: var(--topbar-h) minmax(0, 1fr);
+  grid-template-areas: "rail topbar" "rail canvas";
 }
-.icon-btn:hover { color: var(--accent); border-color: var(--accent); }
-.icon-btn:active { transform: scale(0.94); background: var(--panel-2); }
+.app.rail-collapsed { --rail-w: 72px; }
+
+/* §8: "focus-visible 2px --accent halka + 2px offset; HER odaklanabilir öğede".
+   flow.css'in global kuralının karşılığı (oradaki border-radius alınmadı —
+   odakta öğenin kendi yarıçapını değiştirirdi). Bileşenlerin kendi
+   :focus-visible kuralları aynı değerleri yazıyor; bu kural ağdaki delikleri
+   (ör. üst şeritteki #chat-new) kapatır. Inputlar :focus'ta outline:none +
+   accent kenarlık kullanmaya devam ediyor — özgüllük onları koruyor. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+/* ── Sol ray ── */
+.rail {
+  grid-area: rail; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 16px 12px; background: var(--panel);
+  border-right: 1px solid var(--hairline);
+}
+.brand { padding: 4px 8px 16px; display: grid; gap: 3px; min-width: 0; }
+/* Wordmark mono kalıyor (plan §3: "mono yalnızca wordmark ve teknik bloklar",
+   izleme 0.08em). Serif eski kimlikti. Accent'li yarı da kalktı: --accent
+   yalnızca durum anlatır, marka dekoru değil. */
+.brand-mark {
+  font: 500 13px/1.4 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.08em; white-space: nowrap;
+}
+.brand-mark span { color: var(--muted); }
+.brand-sub { font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
+.rail-item {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; min-height: 44px; padding: 0 12px; margin: 0;
+  background: none; border: 0; border-radius: var(--r-item, 12px);
+  color: var(--muted); font: inherit; font-size: 0.9rem; text-align: left;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.rail-item svg { width: 22px; height: 22px; flex: none; }
+.rail-item span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-item:hover { background: var(--panel-2); color: var(--text); }
+.rail-item.active { background: var(--selected, var(--panel-2)); color: var(--text); }
+.rail-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rail-sep { width: 100%; border: 0; border-top: 1px solid var(--hairline); margin: 12px 0; }
+.rail-spacer { flex: 1 1 auto; min-height: 8px; }
+/* Daralmış ray: yalnızca ikonlar. Etiket `display: none` — genişlik animasyonu
+   yerleşimi zorlar, ızgara kolonu zaten anında değişiyor. */
+.app.rail-collapsed .brand { display: none; }
+.app.rail-collapsed .rail-item { justify-content: center; padding: 0; gap: 0; }
+.app.rail-collapsed .rail-item span { display: none; }
+
+/* ── Üst şerit ── */
+.topbar {
+  grid-area: topbar; display: flex; align-items: center; gap: 12px;
+  padding: 0 var(--space); background: var(--bg);
+  border-bottom: 1px solid var(--hairline);
+}
+.session { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+.topbar h1 {
+  margin: 0; font: 500 20px/1.3 var(--font-display, system-ui, sans-serif);
+  letter-spacing: -0.01em; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.stamp { flex: none; color: var(--muted); font-size: 0.76rem; }
+.topbar-right { flex: none; display: flex; align-items: center; gap: 8px; }
+.ver {
+  padding: 6px 14px; border-radius: 999px;
+  background: var(--pill, var(--panel));
+  color: var(--muted); letter-spacing: 0.06em;
+  font: 500 12px/1.5 var(--font-mono, ui-monospace, monospace);
+}
+
+/* ── Tuval ── */
+.canvas {
+  grid-area: canvas; overflow-y: auto;
+  /* Alt boşluk composer'ın yüksekliğini karşılıyor: akışın son satırı onun
+     altında kalmasın. */
+  padding: 24px var(--space) 260px;
+}
+.section { max-width: 880px; margin: 0 auto; }
+.section[hidden] { display: none; }
+#view-media.section { max-width: 1180px; }
+
+/* ── Yüzen composer ── */
+.composer {
+  grid-area: canvas; align-self: end; justify-self: center; z-index: 5;
+  width: min(620px, 100%); margin-bottom: 24px;
+  display: grid; gap: 8px; padding: 12px;
+  background: var(--panel); border: 1px solid var(--control-border);
+  border-radius: var(--r-panel, 24px);
+  box-shadow: var(--shadow, 0 18px 48px rgba(0, 0, 0, 0.66));
+  transition: border-color var(--dur) var(--ease);
+}
+.composer:focus-within { border-color: var(--accent); }
+.composer[hidden] { display: none; }
+.composer-refs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.composer-refs:empty { display: none; }
+/* Composer içindeki metin alanı KENDİ yüzeyini taşımıyor: kutu composer'ın
+   kendisi (tasarım §2.4/2). Bu yüzden `textarea, select` kuralının zemini ve
+   kenarlığı burada geri alınıyor. */
+.composer-input {
+  background: none; border: 0; border-radius: 0; padding: 6px;
+  min-height: 2.5rem; max-height: 40vh; resize: none; line-height: 1.5;
+}
+.composer-input:focus { outline: none; border-color: transparent; }
+.composer-input[hidden] { display: none; }
+.composer-bar { display: flex; align-items: center; gap: 8px; }
+.plus-wrap { position: relative; flex: none; }
+.plus {
+  width: 34px; height: 34px; padding: 0; display: grid; place-items: center;
+  cursor: pointer; color: var(--text);
+  background: var(--panel-2); border: 1px solid var(--control-border);
+  border-radius: 50%;
+  transition: background var(--dur) var(--ease);
+}
+.plus:hover { background: var(--raised); }
+.plus:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.popover {
+  position: absolute; bottom: calc(100% + 10px); left: 0; z-index: 10;
+  min-width: 236px; display: grid; gap: 2px; padding: 6px;
+  background: var(--panel); border: 1px solid var(--hairline);
+  border-radius: 16px; box-shadow: var(--shadow, 0 18px 48px rgba(0, 0, 0, 0.66));
+}
+.popover[hidden] { display: none; }
+.popover .btn-ghost {
+  width: 100%; justify-content: flex-start;
+  border-color: transparent; border-radius: 10px;
+}
+.popover .btn-ghost:hover { background: var(--panel-2); }
+.composer .view-tabs { margin-top: 0; }
+.composer-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.specs {
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  padding: 7px 10px; cursor: pointer;
+  background: var(--panel-2); color: var(--muted);
+  border: 1px solid var(--control-border); border-radius: 999px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.72rem;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.specs:hover { background: var(--raised); color: var(--text); }
+.specs:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* `.primary` tam genişlik ve üstten boşluklu — composer'da ikisi de yanlış. */
+.composer-send { width: auto; margin-top: 0; padding: 0.55rem 1.1rem; border-radius: 999px; }
+.composer-send[hidden] { display: none; }
+.composer-foot {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 0 6px; font-size: 0.74rem; color: var(--muted);
+}
+.composer-foot p { margin: 0; }
+.composer-foot p:empty { display: none; }
+
+/* ── Slide-over'lar ── */
+.scrim { position: fixed; inset: 0; z-index: 40; background: var(--scrim); display: none; }
+/* Perde TÜRETİLMİŞ durum: açık bir slide-over varsa görünür. JS'ten
+   senkronlamak, oturum listesini açan dinleyicinin chat.js'te (core.js'ten
+   SONRA yüklenen dosyada) olması yüzünden sıralamaya bağımlı olurdu. */
+body:has(.sheet.open) .scrim { display: block; }
+
+/* Composer'ın iki yarısı: hangi modun kontrolleri görünecek. `hidden` yerine
+   `display` kullanılıyor çünkü #chat-gate ve #chat-send'in `hidden`/`disabled`
+   sahibi settings.js ve chat.js (sohbet yapılandırma kapısı) — iki sahip
+   olmasın diye mod ekseni ayrı tutuldu. */
+#composer[data-mode="image"] #chat-input,
+#composer[data-mode="image"] #chat-send,
+#composer[data-mode="image"] #chat-gate,
+#composer[data-mode="image"] #chat-status { display: none; }
+#composer[data-mode="director"] #prompt,
+#composer[data-mode="director"] #go,
+#composer[data-mode="director"] #specs-btn,
+#composer[data-mode="director"] #status,
+#composer[data-mode="director"] #folder-target { display: none; }
+.sheet {
+  position: fixed; top: 0; bottom: 0; z-index: 50;
+  width: 320px; max-width: 88vw;
+  display: flex; flex-direction: column;
+  background: var(--panel); visibility: hidden;
+  box-shadow: var(--shadow, 0 18px 48px rgba(0, 0, 0, 0.66));
+  transition: transform var(--dur) var(--ease), visibility 0s linear var(--dur);
+}
+.sheet.open { visibility: visible; transition-delay: 0s; }
+.sheet-left { left: 0; border-right: 1px solid var(--hairline); transform: translateX(-100%); }
+.sheet-right { right: 0; border-left: 1px solid var(--hairline); transform: translateX(100%); }
+.sheet.open { transform: none; }
+.sheet-head {
+  flex: none; display: flex; align-items: center; gap: 10px;
+  padding: 16px 18px; border-bottom: 1px solid var(--hairline);
+}
+.sheet-head h2 {
+  flex: 1; margin: 0;
+  font: 500 17px/1.3 var(--font-display, system-ui, sans-serif);
+}
+.sheet-body { flex: 1 1 auto; overflow-y: auto; padding: 16px 18px; }
+
+/* 1200px altında ray otomatik daralır, 760px yükseklik altında şerit 60px
+   (tasarım §2.2). En küçük pencere 1024×700 — ikisi de orada devrede. */
+@media (max-width: 1200px) {
+  .app { --rail-w: 72px; }
+  .brand { display: none; }
+  .rail-item { justify-content: center; padding: 0; gap: 0; }
+  .rail-item span { display: none; }
+}
+@media (max-height: 760px) {
+  .app { --topbar-h: 60px; }
+  .canvas { padding-top: 16px; padding-bottom: 240px; }
+}
+
+/* Flow ikon düğmesi: 40px daire, dolgusuz. Sınır yok — kontrolü glifin kendisi
+   tanımlıyor (muted #9aa0a6 siyahta ≥4.5:1); §8 hover'ı yüzey yükseltmesi. */
+.icon-btn {
+  flex: none; margin: 0; width: 40px; height: 40px; padding: 0;
+  display: grid; place-items: center; cursor: pointer;
+  background: none; color: var(--muted);
+  border: 0; border-radius: 50%;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.icon-btn:hover { background: var(--panel-2); color: var(--text); }
+.icon-btn[aria-expanded="true"] { background: var(--selected, var(--panel-2)); color: var(--text); }
 .icon-btn svg { display: block; }
 
 /* Modal */
@@ -62,64 +360,66 @@ body {
    alıyor, ama görünmüyor ve tıklanamıyordu. */
 #confirm-modal { z-index: 60; }
 .modal-backdrop {
-  position: fixed; inset: 0; background: oklch(12% 0.02 260 / 0.62); backdrop-filter: blur(3px);
-  animation: backdropIn 220ms var(--ease);
+  position: fixed; inset: 0; background: var(--scrim); backdrop-filter: blur(3px);
+  animation: backdropIn var(--dur, 200ms) var(--ease);
 }
 .modal-card {
   position: relative; z-index: 1; margin: auto; width: min(460px, 100%);
-  background: var(--panel); border: 1px solid var(--panel-2); border-radius: var(--radius);
-  padding: calc(var(--space) * 1.1); box-shadow: 0 24px 60px oklch(0% 0 0 / 0.45);
-  animation: modalIn 260ms var(--ease) both;
+  background: var(--panel); border: 0; border-radius: var(--r-panel, 24px);
+  padding: calc(var(--space) * 1.1);
+  box-shadow: var(--shadow, 0 18px 48px rgba(0, 0, 0, 0.66));
+  animation: modalIn var(--dur, 200ms) var(--ease) both;
 }
-/* Perdenin bulanıklığı ve kartın yükselişi birlikte açılır → "yerine oturma" hissi */
 @keyframes backdropIn {
   from { opacity: 0; backdrop-filter: blur(0); }
   to { opacity: 1; backdrop-filter: blur(3px); }
 }
+/* Flow modal hareketi: scale(0.98) → 1 + opacity (plan §2.3) */
 @keyframes modalIn {
-  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  from { opacity: 0; transform: scale(0.98); }
   to { opacity: 1; transform: none; }
 }
 .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
-.modal-head h2 { margin: 0; font-family: ui-serif, Georgia, serif; font-weight: 500; font-size: 1.35rem; }
+.modal-head h2 {
+  margin: 0; font: 500 20px/1.3 var(--font-display, system-ui, sans-serif);
+  letter-spacing: -0.01em;
+}
 .modal-x {
   border: 0; background: transparent; color: var(--muted); cursor: pointer;
   font-size: 1.5rem; line-height: 1; padding: 0 0.25rem; border-radius: 8px;
   transition: color var(--dur) var(--ease);
 }
-.modal-x:hover { color: var(--accent); }
+.modal-x:hover { color: var(--text); }
 .modal-desc { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.9rem; line-height: 1.5; }
 .modal-card label { display: block; font-size: 0.85rem; color: var(--muted); margin: 0.7rem 0 0.25rem; }
 .modal-card input {
   width: 100%; background: var(--panel-2); color: var(--text);
-  border: 1px solid transparent; border-radius: 10px; padding: 0.6rem 0.7rem;
+  border: 1px solid var(--control-border); border-radius: 10px; padding: 0.6rem 0.7rem;
   font: inherit; transition: border-color var(--dur) var(--ease);
 }
 .modal-card input:focus { outline: none; border-color: var(--accent); }
 .modal-status { color: var(--muted); min-height: 1.2em; font-size: 0.82rem; margin: 0.7rem 0 0; }
 .modal-actions { margin-top: 0.4rem; }
 .modal-actions .primary { margin-top: 0.6rem; }
-/* Sürüm satırı: bilgi, eylem değil — .field-note ile aynı sessiz ton. */
-.modal-version { color: var(--muted); font-size: 0.74rem; margin: 0.9rem 0 0; text-align: right; }
 
 /* Onay / ad sorma penceresi (native confirm() ve prompt() yerine) */
 .confirm-card { width: min(420px, 100%); }
 .confirm-head { display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.5rem; }
 .confirm-head h2 {
-  margin: 0; font-family: ui-serif, Georgia, serif; font-weight: 500; font-size: 1.2rem;
+  margin: 0; font: 500 17px/1.3 var(--font-display, system-ui, sans-serif);
   min-width: 0; overflow-wrap: anywhere;
 }
 .confirm-icon {
   flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
-  color: var(--danger); background: oklch(62% 0.19 25 / 0.14);
-  box-shadow: 0 0 0 0 oklch(62% 0.19 25 / 0.35);
+  color: var(--danger); background: var(--danger-soft);
+  box-shadow: 0 0 0 0 var(--danger-ring);
   animation: dangerRing 620ms var(--ease) 60ms both;
 }
 .confirm-icon[hidden] { display: none; }
 /* Tehlike halkası bir kez dışa açılıp söner — dikkat çeker, titremez */
 @keyframes dangerRing {
-  from { box-shadow: 0 0 0 0 oklch(62% 0.19 25 / 0.5); transform: scale(0.88); }
-  to   { box-shadow: 0 0 0 10px oklch(62% 0.19 25 / 0); transform: none; }
+  from { box-shadow: 0 0 0 0 var(--danger-ring-mid); transform: scale(0.88); }
+  to   { box-shadow: 0 0 0 10px var(--danger-ring-out); transform: none; }
 }
 .confirm-card .modal-desc { margin-bottom: 0.2rem; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.1rem; }
@@ -133,36 +433,43 @@ body {
 @media (max-width: 760px) { .logo-body { grid-template-columns: 1fr; } }
 .logo-preview-wrap {
   position: relative; background:
-    linear-gradient(45deg, oklch(24% 0.02 260) 25%, transparent 25%) 0 0/20px 20px,
-    linear-gradient(-45deg, oklch(24% 0.02 260) 25%, transparent 25%) 0 0/20px 20px,
+    linear-gradient(45deg, var(--raised) 25%, transparent 25%) 0 0/20px 20px,
+    linear-gradient(-45deg, var(--raised) 25%, transparent 25%) 0 0/20px 20px,
     var(--panel-2);
   border-radius: 10px; min-height: 420px; display: grid; place-items: center; overflow: hidden;
 }
 .logo-preview-img { max-width: 100%; max-height: min(72vh, 680px); display: block; border-radius: 6px; }
-.logo-preview-spin { position: absolute; inset: 0; display: grid; place-items: center; background: oklch(20% 0.02 260 / 0.45); }
+.logo-preview-spin { position: absolute; inset: 0; display: grid; place-items: center; background: var(--overlay-soft); }
 .logo-preview-spin[hidden] { display: none; }
 
 .logo-controls label:first-child { margin-top: 0; }
 .logo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .logo-grid button {
-  aspect-ratio: 1; border: 1px solid var(--panel-2); background: var(--panel-2);
+  aspect-ratio: 1; border: 1px solid var(--control-border); background: var(--panel-2);
   color: var(--muted); border-radius: 8px; font-size: 1.1rem; line-height: 1; cursor: pointer;
   display: grid; place-items: center;
   transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur);
 }
-.logo-grid button:hover { color: var(--text); border-color: var(--accent); }
-.logo-grid button.active { background: var(--accent); color: oklch(20% 0.02 260); border-color: var(--accent); }
+.logo-grid button:hover { color: var(--text); background: var(--raised); }
+.logo-grid button.active { background: var(--fill-selected); color: var(--on-fill-selected); border-color: var(--fill-selected); }
 
-.seg { display: flex; gap: 6px; }
+/* Flow segmented: kutu tek yüzey (surface-2, r-seg 10), düğmeler dolgusuz.
+   Kontrol sınırı (3:1 kapısı, §0.0/G) düğmelerden KUTUYA taşındı — .view-tabs
+   Adım 2'den beri aynı deseni kullanıyor. */
+.seg {
+  display: flex; gap: 4px; padding: 4px;
+  background: var(--panel-2); border: 1px solid var(--control-border);
+  border-radius: var(--r-seg, 10px);
+}
 .seg button {
   flex: 1; padding: 0.45rem 0.4rem; font: inherit; font-size: 0.82rem; cursor: pointer;
-  border: 1px solid var(--panel-2); background: var(--panel-2); color: var(--muted); border-radius: 8px;
-  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur);
+  border: 0; background: none; color: var(--muted); border-radius: 7px;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
-.seg button:hover { color: var(--text); border-color: var(--accent); }
-.seg button.active { background: var(--accent); color: oklch(20% 0.02 260); border-color: var(--accent); }
+.seg button:hover { color: var(--text); background: var(--raised); }
+.seg button.active { background: var(--fill-selected); color: var(--on-fill-selected); }
 .seg button:disabled { opacity: 0.4; cursor: not-allowed; }
-.seg button:disabled:hover { color: var(--muted); border-color: var(--panel-2); }
+.seg button:disabled:hover { color: var(--muted); background: none; }
 .field-note { color: var(--muted); font-size: 0.74rem; line-height: 1.4; margin: 0.3rem 0 0; }
 .field-note[hidden] { display: none; }
 
@@ -192,20 +499,20 @@ body {
 .overlay-chip {
   width: 56px; height: 56px; padding: 0; cursor: pointer; overflow: hidden;
   display: grid; place-items: center; border-radius: 10px;
-  border: 2px solid var(--panel-2); background: var(--panel-2);
-  transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease);
+  border: 2px solid var(--control-border); background: var(--panel-2);
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
-.overlay-chip:hover { border-color: var(--accent); transform: translateY(-1px); }
-.overlay-chip.active { border-color: var(--accent); box-shadow: 0 0 0 2px oklch(72% 0.17 45 / 0.35); }
+.overlay-chip:hover { background: var(--raised); }
+.overlay-chip.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring); }
 .overlay-chip img { width: 100%; height: 100%; object-fit: contain; }
 .overlay-builtin {
-  font-family: ui-serif, Georgia, serif; font-weight: 600; font-size: 0.85rem;
-  color: var(--accent); letter-spacing: 0.02em;
+  font-family: var(--font-display, system-ui, sans-serif); font-weight: 600;
+  font-size: 0.85rem; color: var(--text); letter-spacing: 0.02em;
 }
 .overlay-empty { color: var(--muted); font-size: 0.82rem; margin: 0.2rem 0; }
 
 /* Prompt altı varlık kütüphanesi paneli */
-.assets-panel { margin-top: 1rem; border-top: 1px solid var(--panel-2); padding-top: 0.9rem; }
+.assets-panel { margin-top: 1rem; border-top: 1px solid var(--hairline); padding-top: 0.9rem; }
 .asset-actions { display: flex; gap: 0.5rem; }
 .asset-actions .btn-ghost { flex: 1; justify-content: center; }
 /* Kütüphane modalı: grid'e nefes alacak genişlik */
@@ -225,8 +532,8 @@ body {
 .asset-cell img {
   width: 100%; aspect-ratio: 1; object-fit: contain; display: block; padding: 6px;
   background:
-    linear-gradient(45deg, oklch(24% 0.02 260) 25%, transparent 25%) 0 0/14px 14px,
-    linear-gradient(-45deg, oklch(24% 0.02 260) 25%, transparent 25%) 0 0/14px 14px;
+    linear-gradient(45deg, var(--raised) 25%, transparent 25%) 0 0/14px 14px,
+    linear-gradient(-45deg, var(--raised) 25%, transparent 25%) 0 0/14px 14px;
 }
 .asset-name {
   font-size: 0.68rem; color: var(--muted); padding: 0.25rem 0.35rem;
@@ -235,13 +542,13 @@ body {
 .asset-del {
   position: absolute; top: 4px; right: 4px; z-index: 2;
   width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%;
-  background: oklch(25% 0.02 260 / 0.78); color: var(--text);
+  background: var(--overlay); color: var(--text);
   font-size: 1rem; line-height: 1; cursor: pointer; display: grid; place-items: center;
   opacity: 0; transform: scale(0.85);
   transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease), background var(--dur);
 }
 .asset-cell:hover .asset-del, .asset-del:focus-visible { opacity: 1; transform: scale(1); }
-.asset-del:hover { background: oklch(55% 0.2 25); }
+.asset-del:hover { background: var(--danger-press); }
 .asset-empty { color: var(--muted); font-size: 0.82rem; margin: 0.4rem 0; grid-column: 1 / -1; }
 .asset-status { color: var(--muted); min-height: 1em; font-size: 0.78rem; margin: 0.45rem 0 0; }
 
@@ -252,7 +559,7 @@ body {
    gerekmez. (2) her örnek içe doğru saç teli bir çerçeve alır: yoksa çok koyu
    bir örnek --panel-2 üzerinde kaybolur, çok açık olan da sınırsız taşar.
    (Aynı ruh: yukarıdaki .asset-cell img dama tahtası gradyanları.) */
-.palette-panel { margin-top: 1rem; border-top: 1px solid var(--panel-2); padding-top: 0.9rem; }
+.palette-panel { margin-top: 1rem; border-top: 1px solid var(--hairline); padding-top: 0.9rem; }
 .palette-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
 .palette-actions .btn-ghost { flex: 1; justify-content: center; }
 
@@ -288,7 +595,7 @@ button.palette-sw:focus-visible { outline: 2px solid var(--accent); outline-offs
   font-size: 1rem; line-height: 1; padding: 0 0.25rem; border-radius: 50%;
   transition: color var(--dur) var(--ease);
 }
-.ref-chip #palette-clear:hover { color: oklch(65% 0.2 25); }
+.ref-chip #palette-clear:hover { color: var(--danger-text); }
 
 .palette-strength-row { margin-top: 0.75rem; }
 .palette-strength-row[hidden] { display: none; }
@@ -362,13 +669,13 @@ button.palette-sw:focus-visible { outline: 2px solid var(--accent); outline-offs
 .palette-choice {
   display: block; width: 100%; text-align: left; cursor: pointer; font: inherit;
   padding: 0.55rem 0.6rem 0.6rem; border-radius: 10px;
-  border: 2px solid var(--panel-2); background: var(--panel-2); color: var(--muted);
-  transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease);
+  border: 2px solid var(--control-border); background: var(--panel-2); color: var(--muted);
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
-.palette-choice:hover { border-color: var(--accent); transform: translateY(-1px); }
+.palette-choice:hover { background: var(--raised); }
 .palette-choice[aria-pressed="true"] {
   border-color: var(--accent); color: var(--text);
-  box-shadow: 0 0 0 2px oklch(72% 0.17 45 / 0.35);
+  box-shadow: 0 0 0 2px var(--accent-ring);
 }
 .palette-choice-title {
   display: block; font-size: 0.8rem; color: var(--text); margin-bottom: 0.4rem;
@@ -392,13 +699,13 @@ button.palette-sw:focus-visible { outline: 2px solid var(--accent); outline-offs
 .palette-lib-del {
   position: absolute; top: 6px; right: 6px; z-index: 2;
   width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%;
-  background: oklch(25% 0.02 260 / 0.78); color: var(--text);
+  background: var(--overlay); color: var(--text);
   font-size: 1rem; line-height: 1; cursor: pointer; display: grid; place-items: center;
   opacity: 0; transform: scale(0.85);
   transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease), background var(--dur);
 }
 .palette-lib-cell:hover .palette-lib-del, .palette-lib-del:focus-visible { opacity: 1; transform: scale(1); }
-.palette-lib-del:hover { background: oklch(55% 0.2 25); }
+.palette-lib-del:hover { background: var(--danger-press); }
 .palette-empty { color: var(--muted); font-size: 0.82rem; margin: 0.4rem 0; grid-column: 1 / -1; }
 
 /* Keyfi renk zeminde tarayıcı varsayılan odak halkası kaybolabiliyor;
@@ -407,34 +714,31 @@ button.palette-sw:focus-visible { outline: 2px solid var(--accent); outline-offs
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
 
-.layout {
-  display: grid; gap: var(--space); padding: var(--space);
-  grid-template-columns: minmax(280px, 360px) 1fr;
-}
-@media (max-width: 780px) { .layout { grid-template-columns: 1fr; } }
-
 /* Çalışma alanı sekmeleri: başlığın altında, sol hizalı, BİTİŞİK bir segment
    denetimi. .seg'in tuşlarından daha yüksek/geniş — bunlar sayfa değiştiren
    birinci sınıf kontroller, bir modal içindeki üç durumlu anahtar değil.
    Aktif sekmeyi kayan .view-tabs-thumb boyuyor; düğmelerin kendi dolgusu ve
    kenarlığı bu yüzden kaldırıldı (yoksa iki katman üst üste binerdi). */
 .view-tabs {
-  position: relative; margin-top: 0.85rem; gap: 0; padding: 4px;
-  display: inline-flex; background: var(--panel);
-  border: 1px solid var(--panel-2); border-radius: 12px;
+  position: relative; margin-top: 0.85rem; gap: 2px; padding: 3px;
+  display: inline-flex; background: var(--panel-2);
+  border: 1px solid var(--control-border); border-radius: 999px;
 }
 .view-tabs button {
   position: relative; z-index: 1; flex: none;
-  padding: 0.5rem 0.95rem; font-size: 0.88rem;
+  padding: 7px 14px; font-size: 13px; border-radius: 999px;
   background: none; border-color: transparent;
 }
-.view-tabs button:hover { color: var(--text); border-color: transparent; }
+.view-tabs button:hover { color: var(--text); background: none; border-color: transparent; }
+/* Mod anahtarının aktif tarafı BEYAZ (plan §8 "mod beyaz + #101011") —
+   segmented'in #4d4e50'sinden bilinçli olarak ayrı. */
 .view-tabs button.active {
-  background: none; border-color: transparent; color: oklch(20% 0.02 260);
+  background: none; border-color: transparent;
+  color: var(--on-accent); font-weight: 500;
 }
 .view-tabs-thumb {
-  position: absolute; top: 4px; bottom: 4px; left: 0;
-  background: var(--accent); border-radius: 8px;
+  position: absolute; top: 3px; bottom: 3px; left: 0;
+  background: var(--fill-primary); border-radius: 999px;
   transition: transform var(--dur) var(--ease), width var(--dur) var(--ease);
 }
 #view-image[hidden], #view-chat[hidden] { display: none; }
@@ -453,16 +757,17 @@ button.palette-sw:focus-visible { outline: 2px solid var(--accent); outline-offs
 .view-in-right { animation: viewInRight 220ms var(--ease); }
 .view-in-left { animation: viewInLeft 220ms var(--ease); }
 
-.controls, .stage, .gallery-wrap {
-  background: var(--panel); border-radius: var(--radius); padding: var(--space);
-}
+/* Flow tuvali DÜZ: .stage ve .gallery-wrap Adım 3'te kart olmaktan çıktı —
+   içerik doğrudan siyah tuvalde duruyor (referans: media-browser.html ve
+   studio-session.html'de ızgara/döküm tuvale doğrudan basılı). Dropzone
+   vurguları ve iç yerleşim kuralları aşağıda aynen duruyor. */
 .controls label { display: block; font-size: 0.85rem; color: var(--muted); margin: 0.6rem 0 0.25rem; }
 textarea, select {
   /* `max-width` ŞART: `width: 100%` yalnız başlangıç genişliğini veriyor,
      tarayıcının `resize` tutamacı kolonu aşmayı engellemiyor. */
   width: 100%; max-width: 100%;
   background: var(--panel-2); color: var(--text);
-  border: 1px solid transparent; border-radius: 10px; padding: 0.6rem 0.7rem;
+  border: 1px solid var(--control-border); border-radius: 10px; padding: 0.6rem 0.7rem;
   font: inherit; transition: border-color var(--dur) var(--ease);
 }
 /* Boyutlandırma YALNIZ DİKEY ve sınırlı. Tarayıcı varsayılanı `resize: both`:
@@ -478,33 +783,35 @@ textarea {
 textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 .row { display: grid; grid-template-columns: 1fr 1fr 0.7fr; gap: 0.6rem; }
 
+/* Flow birincili: beyaz pill; hover/basılı hâl #e8eaed (--accent-press köprüsü),
+   yükselme-transform'u yok (§8: metin sabit, yalnız dolgu döner). */
 .primary {
-  margin-top: 1rem; width: 100%; padding: 0.8rem; border: 0; cursor: pointer;
-  background: var(--accent); color: oklch(20% 0.02 260); font-weight: 600;
-  border-radius: 10px; transition: transform var(--dur) var(--ease), background var(--dur);
+  margin-top: 1rem; width: 100%; padding: 0.7rem 1.4rem; border: 0; cursor: pointer;
+  background: var(--fill-primary); color: var(--on-accent); font-weight: 500;
+  border-radius: 999px; transition: background var(--dur) var(--ease);
 }
-.primary:hover { transform: translateY(-1px); }
-.primary:active { background: var(--accent-press); transform: translateY(0); }
-.primary:disabled { opacity: 0.55; cursor: progress; }
+.primary:hover, .primary:active { background: var(--accent-press); }
+.primary:disabled {
+  background: var(--raised); color: var(--muted); cursor: progress;
+}
 /* Yıkıcı eylem varyantı (onay penceresindeki "Sil") — .primary'den SONRA tanımlı olmalı */
 .btn-danger { background: var(--danger); color: var(--text); }
 .btn-danger:active { background: var(--danger-press); }
 .status { color: var(--muted); min-height: 1.2em; margin-top: 0.6rem; }
 
-.ref-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-top: 1rem; }
 .btn-ghost {
   display: inline-flex; align-items: center; gap: 0.4rem;
   background: transparent; color: var(--text);
-  border: 1px solid var(--panel-2); border-radius: 10px;
-  padding: 0.55rem 0.85rem; font: inherit; cursor: pointer;
-  transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease), background var(--dur);
+  border: 1px solid var(--control-border); border-radius: 999px;
+  padding: 0.55rem 1rem; font: inherit; cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
-.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
-.btn-ghost:active { background: var(--panel-2); }
+.btn-ghost:hover { background: var(--panel-2); }
+.btn-ghost:active { background: var(--raised); }
 .btn-ghost-plus { font-size: 1.1rem; line-height: 1; }
 .btn-block { width: 100%; justify-content: center; margin-top: 0.8rem; }
 .btn-ghost:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn-ghost:disabled:hover { border-color: var(--panel-2); color: var(--text); }
+.btn-ghost:disabled:hover { background: transparent; }
 .ref-chip {
   display: inline-flex; align-items: center; gap: 0.35rem;
   background: var(--panel-2); border-radius: 999px;
@@ -518,30 +825,30 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
   font-size: 1rem; line-height: 1; padding: 0 0.25rem; border-radius: 50%;
   transition: color var(--dur) var(--ease);
 }
-.ref-chip #ref-clear:hover { color: oklch(65% 0.2 25); }
+.ref-chip #ref-clear:hover { color: var(--danger-text); }
 
 /* Ek referans görselleri (ana görselin yanında AI'a gönderilir) */
 .extra-row {
   display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
-  margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px dashed var(--panel-2);
+  margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px dashed var(--hairline);
 }
 .extra-row[hidden] { display: none; }
 .extra-title { font-size: 0.8rem; color: var(--muted); display: inline-flex; gap: 0.35rem; }
 .extra-strip { display: flex; gap: 8px; flex-wrap: wrap; }
 .extra-chip {
   position: relative; width: 54px; height: 54px; border-radius: 10px; overflow: hidden;
-  background: var(--panel-2); border: 1px solid var(--panel-2);
+  background: var(--panel-2); border: 1px solid var(--control-border);
 }
 .extra-chip img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .extra-del {
   position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; padding: 0;
   display: grid; place-items: center; border: 0; border-radius: 50%; cursor: pointer;
-  background: oklch(12% 0.02 260 / 0.72); color: var(--text);
+  background: var(--overlay); color: var(--text);
   font-size: 0.85rem; line-height: 1; opacity: 0;
   transition: opacity var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 .extra-chip:hover .extra-del, .extra-del:focus-visible { opacity: 1; }
-.extra-del:hover { color: oklch(65% 0.2 25); }
+.extra-del:hover { color: var(--danger-text); }
 .extra-hint { flex-basis: 100%; margin: 0; font-size: 0.76rem; color: var(--muted); line-height: 1.45; }
 
 .stage { display: flex; flex-direction: column; }
@@ -556,27 +863,28 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
   80%  { transform: scale(1.05) rotate(288deg); border-radius: 25%; }
   100% { transform: scale(1) rotate(360deg);    border-radius: 50%; }
 }
-.bar { flex: 1; height: 6px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
+.bar { flex: 1; height: 3px; background: var(--panel-2); border-radius: 2px; overflow: hidden; }
 .bar-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 4px; transition: width 0.25s var(--ease); }
 .pct { font-size: 0.75rem; color: var(--muted); min-width: 2.6em; text-align: right; font-variant-numeric: tabular-nums; }
-.preview { position: relative; flex: 1; display: grid; place-items: center; min-height: 340px; border-radius: 10px; background: var(--panel-2); text-align: center; padding: 1rem; transition: outline-color var(--dur) var(--ease), background var(--dur); outline: 2px dashed transparent; outline-offset: -8px; }
+.preview { position: relative; flex: 1; display: grid; place-items: center; min-height: 340px; border-radius: var(--r-panel, 24px); background: var(--panel-2); text-align: center; padding: 1rem; transition: outline-color var(--dur) var(--ease), background var(--dur); outline: 2px dashed transparent; outline-offset: -8px; }
 .preview.empty { color: var(--muted); }
-.stage.dragover .preview { outline-color: var(--accent); background: oklch(32% 0.06 45); }
+/* drag-over sözleşmesi (§8): kesikli --accent çerçeve + #141415 (=--panel) örtü */
+.stage.dragover .preview { outline-color: var(--accent); background: var(--panel); }
 .preview-img { max-width: 100%; max-height: 70vh; border-radius: 10px; }
 .preview-img[hidden] { display: none; }
 .preview-empty[hidden] { display: none; }
 .preview-clear {
   position: absolute; top: 10px; right: 10px; z-index: 2;
   width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%;
-  background: oklch(25% 0.02 260 / 0.78); color: var(--text);
+  background: var(--overlay); color: var(--text);
   font-size: 1.25rem; line-height: 1; cursor: pointer;
   display: grid; place-items: center;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 .preview-clear[hidden] { display: none; }
-.preview-clear:hover { background: var(--panel); color: var(--accent); }
+.preview-clear:hover { background: var(--panel); color: var(--text); }
 
-.gallery-wrap { margin: 0 var(--space) var(--space); }
+.gallery-wrap { margin: 0; }
 /* Bilgisayardan dosya sürüklenirken bulunulan görünüm hedef olduğunu gösterir.
    OUTLINE, border DEĞİL: kenarlık bölgeyi büyütür, kartlar zıplar ve imleç
    altındaki klasör kartı yerinden oynar — bırakmak istediğin hedef kaçar.
@@ -585,17 +893,25 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
   outline: 2px dashed transparent; outline-offset: -6px;
   transition: outline-color var(--dur) var(--ease), background var(--dur);
 }
-.gallery-wrap.dropzone { outline-color: var(--accent); background: oklch(30% 0.045 45); }
-.gallery-wrap h2 { margin: 0; font-family: ui-serif, Georgia, serif; font-weight: 500; }
+.gallery-wrap.dropzone { outline-color: var(--accent); background: var(--panel); }
+.gallery-wrap h2 {
+  margin: 0; font: 500 17px/1.3 var(--font-display, system-ui, sans-serif);
+}
 
-/* Klasörler */
-.gallery-head { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.9rem; }
+/* Klasörler — başlık şeridi Flow'un crumb'ı: altında saç teli, başlık display
+   ailesinde. Geri düğmesi ve eylemler aynı şeritte duruyor. */
+.gallery-head {
+  display: flex; align-items: center; gap: 0.7rem;
+  margin-bottom: 1.1rem; padding-bottom: 14px;
+  border-bottom: 1px solid var(--hairline);
+}
 .gallery-head h2 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.back-btn { width: 36px; height: 36px; margin-top: 0; flex: none; }
+.back-btn { flex: none; }
 .back-btn[hidden] { display: none; }
+/* Bölüm etiketi cümle düzeninde (§2.4/7: ALL-CAPS yok) — Flow'un .sec-label'ı */
 .images-title {
-  margin: 1.2rem 0 0.6rem; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.04em;
-  text-transform: uppercase; color: var(--muted);
+  margin: 1.4rem 0 0.9rem; font-size: 13px; font-weight: 500;
+  letter-spacing: 0.01em; color: var(--muted);
 }
 .folder-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0.6rem;
@@ -614,7 +930,7 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 body.dnd-active .folder-cell .folder-open { border-style: dashed; border-color: var(--muted); }
 .folder-cell.drop-hover .folder-open {
   border-style: solid; border-color: var(--accent); background: var(--panel);
-  box-shadow: 0 0 0 3px oklch(72% 0.17 45 / 0.28);
+  box-shadow: 0 0 0 3px var(--accent-ring-wide);
 }
 /* "Yukarı" kartı: ikonu yok → tek kolon (ad ile alt satır normal kartlar gibi üst üste),
    kesikli çerçeve onu gerçek klasörlerden ayırır. Sınıf .folder-open ile AYNI öğede. */
@@ -623,18 +939,21 @@ body.dnd-active .folder-cell .folder-open { border-style: dashed; border-color: 
   width: 100%; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto;
   column-gap: 0.6rem; align-items: center; text-align: left; cursor: pointer;
   background: var(--panel-2); color: var(--text);
-  border: 1px solid var(--panel-2); border-radius: 12px; padding: 0.75rem 0.85rem; font: inherit;
-  transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease), background var(--dur);
+  border: 1px solid var(--control-border); border-radius: var(--r-item, 12px);
+  padding: 0.75rem 0.85rem; font: inherit;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
-.folder-open:hover { border-color: var(--accent); transform: translateY(-1px); }
-.folder-open:active { transform: translateY(0); background: var(--panel); }
-.folder-icon { grid-row: 1 / 3; display: block; color: var(--accent); }
+.folder-open:hover { background: var(--raised); }
+.folder-open:active { background: var(--panel-2); }
+/* İkon durum anlatmıyor → --accent değil (accent yalnızca durum, plan §2.1) */
+.folder-icon { grid-row: 1 / 3; display: block; color: var(--muted); }
 .folder-name { font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .folder-count { font-size: 0.74rem; color: var(--muted); }
 /* Silme: kartta değil, klasörün içindeyken başlık şeridinin sağ üstünde */
-.danger-btn { width: 36px; height: 36px; flex: none; }
+.danger-btn { flex: none; }
 .danger-btn[hidden] { display: none; }
-.danger-btn:hover { color: var(--danger); border-color: var(--danger); }
+/* Yıkıcı eylem rengi SEMANTİK — accent yasağının dışında */
+.danger-btn:hover { color: var(--danger); background: var(--panel-2); }
 .folder-target {
   margin: 1rem 0 0; padding: 0.5rem 0.7rem; border-radius: 10px;
   background: var(--panel-2); border-left: 3px solid var(--accent);
@@ -642,38 +961,54 @@ body.dnd-active .folder-cell .folder-open { border-style: dashed; border-color: 
 }
 .folder-target[hidden] { display: none; }
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.7rem; }
-.card { position: relative; background: var(--panel-2); border-radius: 10px; overflow: hidden; }
-.card img { width: 100%; display: block; aspect-ratio: 1; object-fit: cover; cursor: pointer; transition: transform var(--dur) var(--ease); }
+.card { position: relative; background: var(--panel-2); border-radius: var(--r-item, 12px); overflow: hidden; }
+.card img { width: 100%; display: block; aspect-ratio: 1; object-fit: cover; cursor: pointer; }
 .card-del {
   position: absolute; top: 6px; right: 6px; z-index: 2;
   width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%;
-  background: oklch(25% 0.02 260 / 0.72); color: var(--text);
+  background: var(--overlay); color: var(--text);
   font-size: 1.1rem; line-height: 1; cursor: pointer;
   display: grid; place-items: center;
   opacity: 0; transform: scale(0.85);
   transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease), background var(--dur);
 }
 .card:hover .card-del, .card-del:focus-visible { opacity: 1; transform: scale(1); }
-.card-del:hover { background: oklch(55% 0.2 25); }
+.card-del:hover { background: var(--danger-press); }
 /* İçe aktarılan görselin işareti. Dekoratif değil BİLGİ: bu kaydın prompt'u yok,
    başlığı dosya adı. pointer-events kapalı — kartın tıklama/sürükleme alanını yemesin. */
 .card-badge {
   position: absolute; top: 6px; left: 6px; z-index: 2; pointer-events: none;
   padding: 0.12rem 0.4rem; border-radius: 999px;
-  background: oklch(25% 0.02 260 / 0.82); color: var(--muted);
+  background: var(--overlay); color: var(--muted);
   font-size: 0.62rem; letter-spacing: 0.02em; line-height: 1.5;
 }
-.card img:hover { transform: scale(1.03); }
-.card .acts { display: flex; gap: 0.3rem; padding: 0.4rem; }
-.card .acts a, .card .acts button {
-  flex: 1; min-width: 0; text-align: center; font-size: 0.72rem; text-decoration: none;
-  background: var(--panel); color: var(--text); border: 0; border-radius: 7px;
-  padding: 0.35rem 0.2rem; cursor: pointer; white-space: nowrap;
+/* Eylemler sürekli görünür bir alt şerit DEĞİL: Flow medya kartında hover ya
+   da odakta beliren yüzen satır (tasarım §6 "hover'da açılan eylem satırı").
+   :focus-within şart — klavyeyle düğmeye sekince satır görünür kalır.
+   reduced-motion'da yalnız opacity (dosya sonundaki blok). */
+.card .acts {
+  position: absolute; inset: auto 8px 8px; z-index: 2;
+  display: flex; gap: 6px; justify-content: flex-end;
+  opacity: 0; transform: translateY(4px);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
-.card .acts button:hover, .card .acts a:hover { color: var(--accent); }
+.card:hover .acts, .card:focus-within .acts { opacity: 1; transform: none; }
+.card .acts a, .card .acts button {
+  flex: none; text-align: center; font-size: 12px; text-decoration: none;
+  background: var(--glass); backdrop-filter: blur(8px);
+  color: var(--text); border: 1px solid var(--hairline); border-radius: 999px;
+  padding: 6px 12px; cursor: pointer; white-space: nowrap;
+  transition: background var(--dur) var(--ease);
+}
+.card .acts button:hover, .card .acts a:hover { background: var(--raised); }
 
 /* ── Çoklu seçim (yalnızca görseller; klasörler seçilmez) ───────────── */
-.select-bar { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+/* Flow selectbar: pill kabuk (referans media-browser çoklu seçim şeridi) */
+.select-bar {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  background: var(--panel); border: 1px solid var(--hairline);
+  border-radius: 999px; padding: 6px 6px 6px 14px;
+}
 .select-bar[hidden] { display: none; }
 .select-count {
   font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums;
@@ -688,23 +1023,23 @@ body.dnd-active .folder-cell .folder-open { border-style: dashed; border-color: 
   position: absolute; top: 6px; left: 6px; z-index: 2;
   width: 24px; height: 24px; padding: 0; cursor: pointer;
   display: grid; place-items: center;
-  border: 2px solid oklch(94% 0.01 260 / 0.8); border-radius: 7px;
-  background: oklch(20% 0.02 260 / 0.5); color: transparent;
+  border: 2px solid oklch(100% 0 0 / 0.8); border-radius: 7px;
+  background: var(--overlay-soft); color: transparent;
   transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease),
               color var(--dur), transform var(--dur) var(--ease);
 }
-.card-check:hover { border-color: var(--accent); transform: scale(1.08); }
+.card-check:hover { border-color: oklch(100% 0 0); }
 .card.selected .card-check {
-  background: var(--accent); border-color: var(--accent); color: oklch(20% 0.02 260);
+  background: var(--fill-primary); border-color: var(--fill-primary); color: var(--on-accent);
 }
 /* Seçili kart: turuncu çerçeve + dışa yumuşak ışıma + üzerine ÇOK hafif turuncu perde.
    Perde bilerek düşük: açık zeminli görsellerde 0.15 üzeri görseli yutuyor. */
 .card.selected {
-  box-shadow: 0 0 0 2px var(--accent), 0 6px 20px oklch(72% 0.17 45 / 0.22);
+  box-shadow: 0 0 0 2px var(--accent), 0 6px 20px var(--accent-glow);
 }
 .card.selected::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: oklch(72% 0.17 45 / 0.09);
+  background: var(--accent-wash);
 }
 body.select-mode .card, body.select-mode .card img { cursor: pointer; }
 
@@ -733,60 +1068,33 @@ body.viewer-open { overflow: hidden; }
 .viewer-stage.zoomed .viewer-img { cursor: grab; }
 .viewer-stage.panning .viewer-img { cursor: grabbing; }
 
-/* Yüzen, yarı saydam şerit: içerik altından geçer, opak bir bant ekranı yemez. */
+/* Flow büyüteç şeridi: --surface pill + tek büyük gölge (flow.css .viewer-bar).
+   Dizilim değişmedi: − %100 + Sığdır İndir × (devir planı §1.3). */
 .viewer-bar {
   position: fixed; z-index: 2; left: 50%; bottom: 1.1rem; transform: translateX(-50%);
-  display: flex; align-items: center; gap: 0.3rem; padding: 0.35rem;
-  background: oklch(26% 0.02 260 / 0.72); backdrop-filter: blur(14px) saturate(140%);
-  border: 1px solid oklch(94% 0.01 260 / 0.14); border-radius: 12px;
-  box-shadow: 0 12px 34px oklch(0% 0 0 / 0.4);
+  display: flex; align-items: center; gap: 2px; padding: 6px;
+  background: var(--panel); border-radius: 999px;
+  box-shadow: var(--shadow, 0 18px 48px rgba(0, 0, 0, 0.66));
 }
 .viewer-btn {
-  min-width: 2rem; height: 2rem; padding: 0 0.6rem;
+  min-width: 36px; height: 36px; padding: 0 14px;
   display: grid; place-items: center; cursor: pointer; text-decoration: none;
-  font-size: 0.85rem; line-height: 1; white-space: nowrap;
-  background: transparent; color: var(--text); border: 0; border-radius: 8px;
-  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+  font-size: 13px; line-height: 1; white-space: nowrap;
+  background: transparent; color: var(--text); border: 0; border-radius: 999px;
+  transition: background var(--dur) var(--ease);
 }
-.viewer-btn:hover { background: var(--panel-2); color: var(--accent); }
-.viewer-btn:active { transform: scale(0.94); }
+.viewer-btn:hover { background: var(--raised); }
 .viewer-btn[hidden] { display: none; }
 .viewer-pct {
-  min-width: 3.4rem; text-align: center; font-size: 0.78rem;
+  min-width: 62px; text-align: center; letter-spacing: 0.04em;
+  font: 500 12px/1 var(--font-mono, ui-monospace, monospace);
   color: var(--muted); font-variant-numeric: tabular-nums;
 }
 
 /* ── Prompt Yönetmeni sohbeti ──────────────────────────────────────────
-   Solda kayıtlı sohbetler, sağda akış. Akış kolonu ortalanmış TEK kolon
-   kalıyor: orada okunabilirlik ölçüsü (~70 karakter) yerleşimi belirliyor.
-   Besteci dipte yapışkan duruyor, akış onun ARDINDAN kayıyor. */
-.chat-workspace {
-  position: relative;
-  display: grid; grid-template-columns: 248px minmax(0, 1fr);
-  align-items: start;
-}
-.chat-shell {
-  max-width: 860px; margin: 0 auto; padding: var(--space);
-  display: flex; flex-direction: column; gap: 1.1rem;
-  min-height: 60vh; width: 100%;
-}
-
-/* Kenar panel: sayfayla birlikte kaymıyor, kendi içinde kayıyor — uzun bir
-   sohbet listesi akışın yanında dolaşmasın. */
-.chat-sidebar {
-  position: sticky; top: 0; align-self: stretch;
-  display: flex; flex-direction: column; gap: 0.5rem;
-  max-height: 100vh; overflow-y: auto;
-  padding: var(--space) 0 var(--space) var(--space);
-}
-.chat-new {
-  flex: none; margin: 0; width: 100%; padding: 0.6rem 0.8rem; font: inherit;
-  font-size: 0.86rem; text-align: left; cursor: pointer;
-  background: var(--panel); color: var(--text);
-  border: 1px dashed var(--panel-2); border-radius: 10px;
-  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
-}
-.chat-new:hover { color: var(--accent); border-color: var(--accent); }
+   Oturum listesi soldan açılan slide-over (.sheet); konumlandırma ve kaydırma
+   `.sheet`/`.sheet-body`'de, burada yalnızca listeye özel kurallar var. */
+.chat-sidebar .chat-list { display: flex; flex-direction: column; gap: 0.5rem; }
 .chat-list { list-style: none; margin: 0.3rem 0 0; padding: 0; display: grid; gap: 2px; }
 .chat-list-empty {
   margin: 0.4rem 0 0; color: var(--muted); font-size: 0.78rem; line-height: 1.5;
@@ -797,10 +1105,12 @@ body.viewer-open { overflow: hidden; }
    iç içe düğme geçersiz işaretleme olurdu. */
 .chat-item {
   position: relative; display: flex; align-items: stretch; gap: 2px;
-  border-radius: 9px;
+  border-radius: var(--r-item, 12px);
+  transition: background var(--dur) var(--ease);
 }
-.chat-item:hover { background: var(--panel); }
-.chat-item.active { background: var(--panel); box-shadow: inset 2px 0 0 var(--accent); }
+.chat-item:hover { background: var(--panel-2); }
+/* Flow session-item[aria-current]: seçili durum --selected dolgusuyla (§8) */
+.chat-item.active { background: var(--selected, var(--panel-2)); }
 .chat-item-open {
   flex: 1; min-width: 0; display: grid; gap: 0.1rem; padding: 0.5rem 0.6rem;
   font: inherit; text-align: left; cursor: pointer;
@@ -822,26 +1132,25 @@ body.viewer-open { overflow: hidden; }
 .chat-item:hover .chat-item-menu,
 .chat-item-menu:focus-visible,
 .chat-item-menu[aria-expanded="true"] { opacity: 1; }
-.chat-item-menu:hover { color: var(--accent); }
+.chat-item-menu:hover { color: var(--text); }
 .chat-menu {
   position: absolute; z-index: 5; right: 4px; top: calc(100% - 4px);
   display: grid; min-width: 168px; padding: 4px;
-  background: var(--panel-2); border: 1px solid var(--panel);
-  border-radius: 10px; box-shadow: 0 12px 28px oklch(12% 0.02 260 / 0.45);
+  background: var(--panel); border: 1px solid var(--hairline);
+  border-radius: 12px; box-shadow: var(--shadow, 0 18px 48px rgba(0, 0, 0, 0.66));
 }
 .chat-menu[hidden] { display: none; }
 .chat-menu-item {
   padding: 0.5rem 0.6rem; font: inherit; font-size: 0.82rem; text-align: left;
-  cursor: pointer; color: var(--text); background: none; border: 0; border-radius: 7px;
+  cursor: pointer; color: var(--text); background: none; border: 0; border-radius: 8px;
 }
-.chat-menu-item:hover { background: var(--panel); }
+.chat-menu-item:hover { background: var(--panel-2); }
 .chat-menu-danger { color: var(--danger); }
 
 /* Odak halkası AÇIKÇA yazılıyor (button.palette-sw / .palette-choice geleneği):
    bu düğmelerin kendi zemini ve kenarlığı yok, yani tarayıcının varsayılan
    halkası dışında görünür hiçbir odak işareti kalmıyordu — panelin tamamı
    klavyeyle gezilen bir liste. */
-.chat-new:focus-visible,
 .chat-item-open:focus-visible,
 .chat-item-menu:focus-visible,
 .chat-menu-item:focus-visible,
@@ -849,17 +1158,15 @@ body.viewer-open { overflow: hidden; }
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
 
-/* Çekmece düğmesi yalnız dar ekranda görünür (aşağıdaki sorgu açıyor). */
-.chat-sidebar-toggle { display: none; }
-
 .chat-log { display: flex; flex-direction: column; gap: 1.1rem; }
 
 /* Boş durum: "ne yazacağım" sürtünmesini kaldıran çipler. */
 .chat-empty { padding: 1.6rem 0 0.4rem; }
 .chat-empty[hidden] { display: none; }
 .chat-empty h2 {
-  margin: 0 0 0.6rem; font-family: ui-serif, Georgia, serif; font-weight: 500;
-  font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2.1rem); letter-spacing: -0.01em;
+  margin: 0 0 0.6rem; font-family: var(--font-display, system-ui, sans-serif);
+  font-weight: 500;
+  font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2.1rem); letter-spacing: -0.015em;
 }
 .chat-empty p { color: var(--muted); line-height: 1.65; margin: 0 0 1.2rem; max-width: 58ch; }
 .chat-empty code {
@@ -867,33 +1174,35 @@ body.viewer-open { overflow: hidden; }
 }
 .chat-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .chat-chip {
-  background: var(--panel); color: var(--muted);
-  border: 1px solid var(--panel-2); border-radius: 999px;
+  background: none; color: var(--muted);
+  border: 1px solid var(--control-border); border-radius: 999px;
   padding: 0.5rem 0.9rem; font: inherit; font-size: 0.84rem; cursor: pointer;
-  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
-              transform var(--dur) var(--ease);
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
-.chat-chip:hover { color: var(--text); border-color: var(--accent); transform: translateY(-1px); }
-.chat-chip:active { transform: translateY(0); background: var(--panel-2); }
+.chat-chip:hover { color: var(--text); background: var(--panel-2); }
+.chat-chip:active { background: var(--raised); }
 
 /* İki mesaj türü BİLEREK aynı görünmüyor: kullanıcının söylediği bir replik
    (dar, sağa yapışık balon), yönetmenin döndürdüğü ise bir ÇIKTI (tam
    genişlikte panel, kod blokları ve eylem satırıyla). */
+/* Balon geometrisi Flow: 20px köşe, konuşanın KAYNAK köşesi 6px — kullanıcıda
+   sağ alt, yönetmende sol alt (aynalı kuyruk; flow.css .msg-user/.msg-bot). */
 .chat-msg-user {
   align-self: flex-end; max-width: 76%;
   background: var(--chat-user); border: 1px solid var(--chat-user-border);
-  border-radius: 14px 14px 4px 14px;
-  padding: 0.7rem 0.95rem; line-height: 1.55;
+  border-radius: 20px 20px 6px 20px;
+  padding: 12px 18px; line-height: 1.55;
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .chat-msg-bot {
   background: var(--chat-bot); border: 1px solid var(--chat-bot-border);
-  border-radius: var(--radius); padding: var(--space);
+  border-radius: 20px 20px 20px 6px; padding: 16px 18px;
   line-height: 1.6;
 }
+/* Flow .who: sessiz gri etiket; ALL-CAPS ve accent kalktı (§2.4/7, §3) */
 .chat-role {
-  display: block; margin-bottom: 0.6rem; color: var(--accent);
-  font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase;
+  display: block; margin-bottom: 0.6rem; color: var(--muted);
+  font-size: 12px; font-weight: 500; letter-spacing: 0.02em;
 }
 .chat-msg-bot code {
   background: var(--panel-2); border-radius: 5px; padding: 0.05em 0.35em;
@@ -915,26 +1224,27 @@ body.viewer-open { overflow: hidden; }
 /* ── Prompt bloğu: sayfadaki asıl ürün ────────────────────────────────
    Eylemler bloğun BAŞINDA (v1.14'te mesajın en altındaydı, prompt'u okuyan göz
    varyasyon listelerini geçmek zorundaydı). */
+/* Flow promptblock: balonun içinde SİYAH zemin + mono etiket (flow.css
+   .promptblock). Accent'li sol kenar kalktı — accent yalnızca durum anlatır. */
 .chat-prompt {
-  margin: 0 0 0.9rem;
-  border: 1px solid var(--panel-2); border-left: 3px solid var(--accent);
-  border-radius: 10px; overflow: hidden;
+  margin: 0 0 0.9rem; background: var(--bg);
+  border: 0; border-radius: 14px; overflow: hidden;
 }
 .chat-prompt-bar {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
-  padding: 0.45rem 0.6rem 0.45rem 0.8rem; background: var(--panel);
+  padding: 0.6rem 0.6rem 0.2rem 0.9rem; background: none;
 }
 .chat-prompt-label {
-  flex: 1; color: var(--accent); font-size: 0.68rem;
-  letter-spacing: 0.12em; text-transform: uppercase;
+  flex: 1; color: var(--muted); letter-spacing: 0.08em;
+  font: 500 11px/1 var(--font-mono, ui-monospace, monospace);
 }
 .chat-prompt-btn { margin-top: 0; width: auto; padding: 0.4rem 0.8rem; font-size: 0.8rem; }
 /* Prompt bir PROZA, kod değil: sarılıyor. Yatay kaydırma tek satırlık bir şerit
    üretiyordu ve prompt okunamıyordu — teknik ayar JSON'u ise `pre` kalıyor
    (aşağıdaki kural yalnız bu bloğu hedefliyor), yoksa biçimi bozulurdu. */
 .chat-msg-bot pre.chat-prompt-block {
-  margin: 0; padding: 0.9rem 1rem; border-radius: 0;
-  background: var(--panel-2); overflow-x: visible;
+  margin: 0; padding: 0.7rem 1rem 0.9rem; border-radius: 0;
+  background: none; overflow-x: visible;
 }
 .chat-msg-bot pre.chat-prompt-block code {
   white-space: pre-wrap; overflow-wrap: anywhere;
@@ -945,23 +1255,22 @@ body.viewer-open { overflow: hidden; }
    Serbest yazı alanı HER ZAMAN çiplerin altında: "bunların hiçbiri değil"
    cevabı bir seçenek olarak listelenemez. */
 .chat-options {
-  margin-top: 1rem; padding-top: 0.9rem; border-top: 1px dashed var(--panel-2);
+  margin-top: 1rem; padding-top: 0.9rem; border-top: 1px dashed var(--hairline);
 }
 .chat-options-q { margin: 0 0 0.6rem; font-size: 0.9rem; color: var(--text); }
 .chat-options-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .chat-option {
-  background: var(--panel); color: var(--muted);
-  border: 1px solid var(--panel-2); border-radius: 999px;
+  background: none; color: var(--muted);
+  border: 1px solid var(--control-border); border-radius: 999px;
   padding: 0.5rem 0.9rem; font: inherit; font-size: 0.84rem; cursor: pointer;
-  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
-              background var(--dur) var(--ease), transform var(--dur) var(--ease);
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
-.chat-option:hover { color: var(--text); border-color: var(--accent); transform: translateY(-1px); }
-.chat-option:active { transform: translateY(0); }
+.chat-option:hover { color: var(--text); background: var(--raised); }
+.chat-option:active { background: var(--selected, var(--raised)); }
 /* Seçili durum RENKLE DEĞİL işaretle de anlatılıyor: yalnız renk kullanılsa
    renk ayrımı zayıf gören kullanıcı hangi seçeneği verdiğini göremezdi. */
 .chat-option[aria-checked="true"] {
-  background: var(--accent); color: oklch(20% 0.02 260); border-color: var(--accent);
+  background: var(--fill-selected); color: var(--on-fill-selected); border-color: var(--fill-selected);
 }
 .chat-option[aria-checked="true"]::before { content: "✓ "; }
 .chat-own { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem; margin-top: 0.85rem; }
@@ -969,7 +1278,9 @@ body.viewer-open { overflow: hidden; }
 .chat-own-input {
   flex: 1 1 12rem; min-width: 0; padding: 0.55rem 0.7rem; font: inherit; font-size: 0.86rem;
   background: var(--panel-2); color: var(--text);
-  border: 1px solid var(--panel); border-radius: 9px;
+  /* Metin girişi: sınır --control-border olmak ZORUNDA (§0.0/G, 3:1 kapısı).
+     Eski --panel sınırı zeminle aynıydı — algılanabilir sınır yoktu. */
+  border: 1px solid var(--control-border); border-radius: 10px;
 }
 .chat-own-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .chat-own-send { margin-top: 0; width: auto; padding: 0.55rem 1.1rem; font-size: 0.86rem; }
@@ -1006,35 +1317,24 @@ body.viewer-open { overflow: hidden; }
 .chat-pick {
   align-self: flex-end; display: flex; align-items: baseline; gap: 0.45rem;
   max-width: 76%; padding: 0.3rem 0.7rem;
-  border: 1px dashed var(--panel-2); border-radius: 999px;
+  border: 1px dashed var(--control-border); border-radius: 999px;
   color: var(--muted); font-size: 0.8rem; line-height: 1.45;
   overflow-wrap: anywhere;
 }
 .chat-pick-tag {
-  flex: 0 0 auto; color: var(--accent);
-  font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase;
+  flex: 0 0 auto; color: var(--muted);
+  font-size: 11px; font-weight: 500; letter-spacing: 0.02em;
 }
 
-.chat-composer {
-  position: sticky; bottom: 0; margin-top: auto;
-  background: var(--bg); padding: 0.8rem 0 var(--space);
-}
-/* Altına kayan içerik keskin bir kenarda kesilmesin: besteci bir KATMAN,
-   sayfanın sonu değil. */
-.chat-composer::before {
-  content: ""; position: absolute; left: 0; right: 0; top: -1.5rem; height: 1.5rem;
-  background: linear-gradient(to bottom, transparent, var(--bg)); pointer-events: none;
-}
 /* Kapı açıklaması: kilitli "Gönder"in NEDENİ. Uyarı tonunda ama alarm değil. */
 .chat-gate {
   margin: 0 0 0.8rem; padding: 0.7rem 0.85rem; border-radius: 10px;
-  background: var(--panel); border-left: 3px solid var(--accent);
+  background: var(--panel-2); border-left: 3px solid var(--border-strong, var(--control-border));
   color: var(--muted); font-size: 0.84rem; line-height: 1.5;
 }
 .chat-gate[hidden] { display: none; }
-.chat-input-label { display: block; font-size: 0.85rem; color: var(--muted); margin: 0 0 0.25rem; }
-#chat-input { min-height: 4.6rem; resize: vertical; }
-.chat-actions { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.6rem; }
+/* #chat-input composer'ın içinde: yükseklik/yeniden boyutlandırma
+   `.composer-input`'tan geliyor, id seçicisi onu ezmesin. */
 .chat-hint { flex: 1; font-size: 0.74rem; color: var(--muted); }
 .chat-send { margin-top: 0; width: auto; padding: 0.65rem 1.5rem; }
 .chat-wait {
@@ -1044,29 +1344,11 @@ body.viewer-open { overflow: hidden; }
 .chat-wait[hidden] { display: none; }
 .chat-status { margin: 0.5rem 0 0; min-height: 1.2em; color: var(--muted); font-size: 0.85rem; }
 
-/* Dar ekran: 248px'lik kolon sohbetin okunabilirlik ölçüsünden çalıyor, panel
-   bir ÇEKMECEYE dönüyor. Akışın ÜSTÜNE biniyor (yanına değil) — yerleşimi
-   kaydırsaydı çekmece her açılışta sayfayı zıplatırdı. */
-@media (max-width: 900px) {
-  .chat-workspace { grid-template-columns: minmax(0, 1fr); }
-  .chat-sidebar-toggle {
-    display: block; justify-self: start; margin: var(--space) var(--space) 0;
-  }
-  /* Konumlandırma YOK, akışta bir açılır blok: düğmenin hemen altına iniyor ve
-     akışı aşağı itiyor. `position: absolute` bir ata gerektirir ve panel uzun
-     bir listede kırpılırdı; itmek burada daha dürüst ve daha az kırılgan. */
-  .chat-sidebar {
-    position: static; max-height: 60vh;
-    margin: 0.6rem var(--space) 0; padding: 0.6rem;
-    background: var(--panel-2); border: 1px solid var(--panel); border-radius: 12px;
-  }
-  .chat-sidebar:not(.open) { display: none; }
-}
-
-/* Ayarlar modalindeki bölüm başlığı (Azure kimliği / Prompt Yönetmeni ayrımı) */
+/* Ayarlar modalindeki bölüm başlığı (Azure kimliği / Prompt Yönetmeni ayrımı) —
+   Flow alan etiketi dilinde: 13px, gri, cümle düzeni (§3) */
 .modal-subhead {
-  margin: 1.4rem 0 0; padding-top: 1rem; border-top: 1px solid var(--panel-2);
-  font-family: ui-serif, Georgia, serif; font-weight: 500; font-size: 1.02rem;
+  margin: 1.4rem 0 0; padding-top: 1rem; border-top: 1px solid var(--hairline);
+  font-size: 13px; font-weight: 500; letter-spacing: 0.01em; color: var(--muted);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1082,4 +1364,6 @@ body.viewer-open { overflow: hidden; }
      sıfırlanamaz: yakınlaştırma ve kaydırma bir süsleme değil, özelliğin
      ta kendisi — yalnızca geçiş/animasyon kaldırılır. */
   .viewer-img { animation: none; }
+  /* Kart eylem satırı yalnız opacity ile belirir (flow.css'in aynı kuralı) */
+  .card .acts { transform: none; }
 }

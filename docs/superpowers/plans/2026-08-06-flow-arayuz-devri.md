@@ -32,13 +32,18 @@ JS'ten `$()` ile dokunulan id sayısı **145**; bunların **56'sı top-level ba�
 
 ---
 
-## 0.1 Durum — nerede kaldık (7 Ağustos: PR 1 tamam)
+## 0.1 Durum — nerede kaldık (7 Ağustos: PR 1 merge edildi)
 
-**PR 1'in dört adımı da bitti.** `HEAD = ee867fb`, çalışma ağacı temiz,
-`pytest` → **1000 test yeşil**, `test_id_contract` 6 yeşil. Dal `feat/flow-ui`
-**yalnızca yerelde**; `origin`'e itilmedi.
+**PR 1 bitti ve `main`'e indi.** [PR #16](https://github.com/Zenginby/gpt-image-studio/pull/16)
+squash ile merge edildi → `main` = **`a1478d4`**. Merge sonrası ağaç hash'i dal
+ucuyla birebir aynı (`a717ef93`), yani squash'ta içerik kaybı yok.
 
-| Adım | Durum | Commit |
+> **Adım commit'leri `main`'in geçmişinde YOK.** Squash tek commit bıraktı;
+> aşağıdaki SHA'lar `feat/flow-ui` dalının geçmişine ait ve yalnızca PR #16
+> üzerinden erişilebilir (`git log main` içinde bulunamazlar). Dal hem yerelde
+> hem `origin`'de duruyor, silinmedi.
+
+| Adım | Durum | Commit (dal geçmişi) |
 |---|---|---|
 | 0 · tasarımı depoya al | bitti | `3190e37` + `3b5a508` (6. ekran) |
 | 1 · token katmanı + id mandalı | bitti | `1dce0aa`, `de1ea91`, `46443a6` |
@@ -55,34 +60,37 @@ listesinden ölü `.chat-new` çıkarıldı (gerekçe docstring'de) ve flow.css'
 global `:focus-visible` kuralı style.css'e alındı — §8'in "her odaklanabilir
 öğede halka" şartını ağ olarak kapatıyor.
 
-Adım 2'nin kanıtları: pytest 1000 yeşil · `test_id_contract.py` 6 yeşil
-(**152 id'nin hepsi duruyor, id defteri hâlâ boş**) · tarayıcı konsolu 0 hata ·
-1024×700 / 1280 / 1440 / 1920'de taşan öğe 0.
+PR 1'in kanıtları (her adımda toplandı, sonuncusu Adım 4): pytest **1000 yeşil**
+(taban 994, +6 id sözleşmesi) · `test_id_contract.py` 6 yeşil (**152 id'nin hepsi
+duruyor, id defteri hâlâ boş**) · tarayıcı konsolu 0 hata · 1024×700 / 1280 /
+1440 / 1920'de taşan öğe 0 · negatif testler (§1.2) korunuyor.
 
-**Adım 2'de bilinçli olarak yapılmayanlar** (Adım 3'ün girdisi):
+**PR 1'de bilinçli olarak yapılmayan arayüz işleri** (PR 2 / Adım 7'nin girdisi —
+7 Ağustos'ta koda karşı doğrulandı, ikisi de hâlâ açık):
 
-- **Hover hâlâ `--accent`e boyuyor.** 11 kural sınır rengini değiştiriyor;
-  sözleşme (§8) bunun yerine *yüzey yükseltmesi* istiyor. Adım 3'te ikisi
-  birlikte değişmeli — tek başına sınır rengini kaldırmak hover'ı görünmez yapar.
-- **Geometri tokenları eski:** `--radius` 14px duruyor, Flow'un `--r-panel` 24 /
-  `--r-item` 12 / `--r-seg` 10 üçlüsü bileşenlere bağlanmadı.
-- **Medya kartı eylemleri sürekli görünür** (`İndir` / `+Ek`); sözleşmede
-  hover'da açılan satır.
-- **Yönetmen balonunun aynalı kuyruğu** yok.
-- **Kütüphane ve Araçlar görünüm değil**, ray düğmeleri mevcut modalları açıyor
-  (`$("library-btn").click()` / `$("palette-btn").click()`). Görünüme dönüşmeleri
-  `assets.js` / `palette.js` işi.
+- **Kütüphane ve Araçlar görünüm değil**, ray düğmeleri mevcut modalları açıyor:
+  `core.js:122-123` → `$("library-btn").click()` / `$("palette-btn").click()`.
+  Görünüme dönüşmeleri `assets.js` / `palette.js` işi.
 - **Medya'da arama yok** — `folders.js` tarafı gelmeden çalışmayan bir arama
-  kutusu konmadı (işlevsiz işaretleme bilerek eklenmiyor).
+  kutusu konmadı (işlevsiz işaretleme bilerek eklenmiyor). Referans işaretleme
+  `docs/flow-ui/media-browser.html`'de: `.search` + `.sortbtn` + `.sizeseg` (S/M/L).
+
+> Adım 2'nin girdi listesindeki diğer dört madde (accent hover, geometri
+> tokenları, kart eylemlerinin sürekli görünürlüğü, yönetmen balonunun aynalı
+> kuyruğu) **Adım 3'te kapandı** — bu listeden o yüzden düştüler.
 
 **Adım 4'ün doğrulanmış ölü sınıf listesi** — **silindi (`ee867fb`)**; silme
 öncesi yeniden ölçüldü, tuzağa uyuldu (yalnız nokta seçicileri gitti). Kayıt
 için liste (7 Ağustos ölçümü: `style.css`'te kural var, `index.html` ve
 `static/*.js`'te kullanım yok):
 
-`.modal-version:380` · `.layout:687,691` · `.ref-row:773` · `.chat-workspace:1042` ·
-`.chat-shell:1047` · `.chat-new:1058,1065,1120` · `.chat-sidebar-toggle:1129` ·
-`.chat-composer:1294,1300` · `.chat-input-label:1311` · `.chat-actions:1314`
+`.modal-version` · `.layout` (+780px sorgusu) · `.ref-row` · `.chat-workspace` ·
+`.chat-shell` · `.chat-new` (3 kural) · `.chat-sidebar-toggle` · `.chat-composer`
+(+`::before`) · `.chat-input-label` · `.chat-actions` · boş 900px medya sorgusu
+
+(İlk taslaktaki satır numaraları düştü: Adım 3 dosyayı yeniden düzenledi, sonra
+Adım 4 bu kuralları sildi — numaralar artık var olmayan bir dosya durumunu
+gösteriyordu.)
 
 > **Tuzak:** son ikisi değil ama `.chat-new` ve `.chat-sidebar-toggle` **sınıf**
 > olarak ölü, **id** olarak canlı — `#chat-new` ve `#chat-sidebar-toggle` üst
@@ -90,18 +98,36 @@ için liste (7 Ağustos ölçümü: `style.css`'te kural var, `index.html` ve
 > seçici. İlk taslakta listede olan `sub` ve `topbar-text` **düştü**: `.sub`
 > CSS'te hiç yok, `topbar-text` depoda hiçbir yerde geçmiyor.
 
-**Açık kalan işler (adım dışı):**
+**Açık kalan işler (adım dışı).** Üçü de Adım 5'i bloke etmez ama devrin sonunu
+bloke eder — ilk ikisi kullanıcı kararı bekliyor:
 
+- **Sürüm numarası:** v1.18.0 mı v2.0.0 mı. Arayüz baştan değişti ve otomatik
+  kayıt bilinçli bir ürün kararını tersine çeviriyor (D1) — ikisi de major'ı
+  savunur.
 - **DM Sans bundle** (§4). İndirme izni alındı; **indirmeden önce dosya adı ve
-  boyutu söylenip onay alınacak.** `latin` + `latin-ext` şart, 400 + 500.
+  boyutu söylenip son onay alınacak.** `latin` + `latin-ext` şart (Türkçe),
+  400 + 500.
 - **Tema seçici arayüzü** — dört tema (`kurumsal` / `amber` / `viola` / monokrom)
-  token katmanında hazır, seçici yok.
-- **Sürüm numarası kararı** (v1.18.0 mı v2.0.0 mı) devrin sonuna ertelendi.
+  token katmanında hazır, seçici yok. Yeri sözleşmede belli: Araçlar → Görünüm.
 
-**Devam etmek için:** PR 2 (Adım 5–7) arka uç işi — §3'teki veri modeli,
-otomatik kayıt (D1) ve JS dokunuş noktaları. TDD: test önce. Adım 5'ten önce
-sürüm numarası kararı ve DM Sans bundle'ı (§4, indirme onayı alınmış ama dosya
-adı/boyutu söylenip son onay bekleniyor) hâlâ açık.
+**Devam etmek için (yeni oturum).** Başlangıç hâli: `main` = `a1478d4`, çalışma
+ağacı temiz, `pytest` 1000 yeşil. Sıradaki tur **PR 2 / Adım 5** — §3'teki veri
+modeli. Bu adım kozmetik değil, **kendi testleriyle gelir: TDD, test önce.**
+
+```
+docs/flow-ui/flow-redesign-plan.md ve docs/superpowers/plans/2026-08-06-flow-arayuz-devri.md
+dosyalarını tamamen oku (§0.0 revizyonu ve §0.1 durumu dahil). PR 1 merge edildi;
+artık arka uçtayız.
+
+Bu turda sadece PR 2 / Adım 5'i yap: §3'teki üç alan (koşullu `session_id`,
+`result` rolü, `cover_image_id`) + `result`'ın Azure isteminden ve
+MAX_CHAT_TOTAL_CHARS bütçesinden filtrelenmesi. TDD: önce kırmızı test.
+
+Kısıtlar §1'de: göç YOK (koşullu yazım + .get() ile okuma), id sözleşmesi
+korunur (§1.1), negatif testler ihlal edilmez (§1.2).
+
+Bitirince §1.4'ün kanıtlarını göster. Hepsi temiz olmadan commit yok.
+```
 
 ---
 
@@ -377,7 +403,11 @@ yolları eklenir.
 
 ## 6. Adım başına kalıp
 
-Her tur tek adım, sonunda §1.4'ün kanıtları ve onay beklemesi:
+Her tur tek adım, sonunda §1.4'ün kanıtları ve onay beklemesi.
+
+> Aşağıdaki kalıp **PR 1'e aitti ve tüketildi** (Adım 1–4 bitti). PR 2'nin
+> Adım 5 kalıbı §0.1'in sonunda — arka uç işi olduğu için çerçevesi farklı
+> (TDD, "flow.css'i taşı" değil).
 
 ```
 docs/flow-ui/flow-redesign-plan.md ve docs/superpowers/plans/2026-08-06-flow-arayuz-devri.md

@@ -31,14 +31,16 @@ import folders
 import palette
 import palette_store
 import paths
+import prefs
 import seed
 import storage
 import version
-from models import (MAX_PROMPT_CHARS, WIRE_MESSAGE_FIELDS, BannerRequest,
-                    BulkImagesRequest, BulkMoveRequest, ChatRequest,
-                    ChatSaveRequest, FolderRequest, GenerateRequest, LogoRequest,
-                    MoveImageRequest, SavePaletteRequest, SettingsRequest,
-                    SuggestRequest, check_drop_indices)
+from models import (MAX_CHAT_TITLE_CHARS, MAX_PROMPT_CHARS, WIRE_CHAT_ROLES,
+                    WIRE_MESSAGE_FIELDS, BannerRequest, BulkImagesRequest,
+                    BulkMoveRequest, ChatRequest, ChatSaveRequest, FolderRequest,
+                    GenerateRequest, LogoRequest, MoveImageRequest, PrefsRequest,
+                    SavePaletteRequest, SettingsRequest, SuggestRequest,
+                    check_drop_indices)
 
 BASE_DIR = paths.REPO_DIR                    # geriye uyum: mevcut kullanımlar bozulmasın
 OUTPUT_DIR = paths.output_dir()
@@ -197,6 +199,26 @@ def _check_folder(folder_id: str | None) -> str | None:
     return folder_id
 
 
+def _check_session(session_id: str | None) -> str | None:
+    """Boş/None ise oturum dışı üretim (None). Doluysa BİÇİMİ doğrular, 422.
+
+    `_check_folder`'ın aksine VARLIK kapısı yok — bilerek. Konsaydı, oturum kaydı
+    diske yazılmadan önce (otomatik kayıt kapalıyken hiç yazılmıyor) ya da oturum
+    başka bir sekmede silindikten sonra yapılan üretim 422 ile düşerdi: pahalı bir
+    Azure turu bir ETİKET yüzünden kaybedilirdi. Ters yön de zaten hoşgörülü —
+    silinmiş görselin dökümde bıraktığı sarkan id kaydı çökertmiyor (tasarım §5),
+    simetrik duruş tutarlı olan.
+
+    Sessizce düşürmek seçenek değil: kullanıcı üretimini oturumda göremez ve
+    sebebi hiçbir yerde görünmezdi.
+    """
+    if not session_id:
+        return None
+    if not chat_store.valid_id(session_id):
+        raise HTTPException(status_code=422, detail="Geçersiz session_id.")
+    return session_id
+
+
 def _resolve_palette(seed: str, mode: str, *, offline: bool = False) -> list[dict]:
     """`(seed, mod)` → `[{"hex", "name"}]`. offline=True ise ağa ÇIKMAZ.
 
@@ -309,6 +331,7 @@ def _palette_prompt(prompt: str, seed: str | None, mode: str, strength: str,
 @app.post("/api/generate")
 def generate(req: GenerateRequest) -> dict:
     folder_id = _check_folder(req.folder_id)
+    session_id = _check_session(req.session_id)
     prompt_sent, pal = _palette_prompt(req.prompt, req.palette_hex, req.palette_mode,
                                        req.palette_strength, req.palette_id,
                                        drop=req.palette_drop,
@@ -321,6 +344,7 @@ def generate(req: GenerateRequest) -> dict:
         storage.save(img, {"prompt": req.prompt, "size": req.size,
                            "quality": req.quality, "parent_id": None,
                            "folder_id": folder_id, "palette": pal,
+                           "session_id": session_id,
                            # Ek düştüyse metin prompt'un birebir aynısı; storage
                            # sözleşmesi "yalnızca farklıysa" diyor (bkz. save).
                            "prompt_sent": prompt_sent if pal and pal["applied"] else None},
@@ -454,6 +478,8 @@ async def edit(
     # Virgüllü metin, dizi DEĞİL: core.js FormData'ya böyle yazıyor
     # (bkz. _check_palette_drop). Boş = çıkarma yok.
     palette_drop: str = Form(""),
+    # Düzenlemenin doğduğu oturum; boş = oturum dışı (bkz. _check_session).
+    session_id: str | None = Form(None),
 ) -> dict:
     """Ek referans görselleri (`extra_files` yüklemeleri, `extra_source_ids`
     galeri id'leri) form verisinden okunur — bkz. _extra_refs."""
@@ -463,6 +489,7 @@ async def edit(
     drop = _check_palette_drop(palette_drop)
 
     target_folder = _check_folder(folder_id)
+    session = _check_session(session_id)
     refs, parent_id = await _collect_edit_refs(request, file, source_id)
 
     # task="edit": üretim ifadesi modele yeniden boyama söyler ve referans
@@ -478,7 +505,7 @@ async def edit(
     records = [
         storage.save(img, {"prompt": prompt, "size": size, "quality": quality,
                            "parent_id": parent_id, "folder_id": target_folder,
-                           "palette": pal,
+                           "palette": pal, "session_id": session,
                            "prompt_sent": prompt_sent if pal and pal["applied"] else None},
                      OUTPUT_DIR, now=_now())
         for img in images
@@ -550,18 +577,97 @@ def chat(req: ChatRequest) -> dict:
     ve Azure onu bilmiyor — çıplak `model_dump()` onu tel üzerine koyar ve istek
     400 döner. Süzgeç `chat_client.build_payload`'ta da var (gerçek tel sınırı
     orası); burada olması isteğin hiç oraya kadar gitmemesini sağlıyor.
+
+    ROL süzgeci de aynı çift kapıdan geçiyor (v2.0): birleşik döküm `result`
+    kayıtlarını konuşmanın içinde tutuyor, Azure ise yalnız `user`/`assistant`
+    biliyor. Alan allowlist'i onları tek başına çıkaramaz — `{"role": "result"}`
+    geride kalır ve istek 400 döner.
     """
     try:
         return cc.complete([m.model_dump(include=WIRE_MESSAGE_FIELDS)
-                            for m in req.messages])
+                            for m in req.messages if m.role in WIRE_CHAT_ROLES])
     except cc.ChatError as e:
         raise HTTPException(status_code=502, detail=str(e))
 
 
-# ── Kayıtlı sohbetler ───────────────────────────────────────────────────
+# ── Kullanıcı tercihleri ────────────────────────────────────────────────
+
+@app.get("/api/prefs")
+def get_prefs_route() -> dict:
+    """Tercihlerin birleşik görünümü (bkz. prefs.py). Gizli alan taşımıyor."""
+    return prefs.read(OUTPUT_DIR)
+
+
+@app.post("/api/prefs")
+def post_prefs_route(req: PrefsRequest) -> dict:
+    """Gönderilen tercihleri yazar, diğerlerine dokunmaz; yeni görünümü döndürür.
+
+    Anahtar BİLEREK `/api/settings`'te DEĞİL: o uç kimlik formu ve `api_key` +
+    `base_url` istiyor — bir tercihi çevirmek Azure kimliğini yeniden yazmak
+    zorunda kalırdı ve Azure hiç yapılandırılmamışken anahtar çevrilemez olurdu.
+    Değer de tek yerden okunuyor (`/api/settings` onu YANSITMIYOR): iki uç aynı
+    değeri döndürseydi ayrışabilirlerdi.
+    """
+    values = req.model_dump(exclude_none=True)
+    try:
+        return prefs.update(values, OUTPUT_DIR)
+    except ValueError as e:
+        # prefs katmanı da bilinmeyen anahtarı/yanlış türü reddediyor; buraya
+        # düşmek pydantic ile prefs şemasının ayrışması demek olur.
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+# ── Kayıtlı oturumlar ───────────────────────────────────────────────────
 # Kalıcılık SUNUCUDA, istemcide değil: `desktop.py` pencereyi private mode'da
 # açıyor (pywebview varsayılanı) ve orada localStorage her kapanışta silinir —
 # paketlenmiş .app'te geçmiş sessizce buharlaşırdı.
+
+
+def _guard_autosave(title: str | None) -> None:
+    """Otomatik yazımı anahtar kapalıyken reddeder (409). Karar D1, güvence (c).
+
+    Ayrımı taşıyan işaret zaten elde: **otomatik kaydın verecek bir ADI yok.**
+    Kullanıcı bir oturumu kendisi kaydediyor ya da yeniden adlandırıyorsa istekte
+    başlık VAR; tur sonunda kendi kendine büyüyen yazımda YOK. Yani "başlıksız
+    yazım = otomatik yazım" ve kapalı anahtarda durduruluyor — adlandırılmış yazım
+    her koşulda çalışıyor, yani "kapatınca bugünkü davranış" (v1.15) gerçekten
+    sağlanıyor.
+
+    İsteğe "bu otomatik" diye bir bayrak KONMADI: bayat/hatalı bir istemci onu
+    yanlış gönderdiğinde anahtar sessizce delinirdi. Başlığın yokluğu ise
+    uydurulamaz bir işaret.
+
+    409, 422 değil: gövde geçerli, reddin sebebi kullanıcının AYARI. 403 de değil —
+    yerel tek kullanıcılı bir uygulamada yetkilendirme çağrışımı yanlış olurdu.
+    """
+    if title is None and not prefs.read(OUTPUT_DIR)["autosave_sessions"]:
+        raise HTTPException(status_code=409,
+                            detail="Oturumların otomatik kaydı kapalı: "
+                                   "Ayarlar'dan açabilir ya da oturuma ad vererek "
+                                   "kendiniz kaydedebilirsiniz.")
+
+
+def _auto_title(messages: list[dict]) -> str:
+    """Otomatik kaydedilen oturumun adı: ilk KULLANICI turunun ilk satırı.
+
+    `display` varsa o kazanıyor: çip turunda modele giden cümle ile ekranda
+    görünen etiket farklı (v1.16) ve panelde kullanıcının GÖRDÜĞÜ metin durmalı.
+
+    Tek satır + sıkıştırılmış boşluk: kenar paneli tek satır çiziyor, gövdedeki
+    satır sonu oraya boşluk olarak sızardı. Sınır `MAX_CHAT_TITLE_CHARS` (kayıt
+    kapısıyla aynı sayı) ve kesme işareti görünür — kırpıldığı belli olsun.
+
+    Sonuç kaydıyla başlayan döküm (Görsel modunda üretimle açılan oturum) için
+    yedek ad var: kullanıcı mesajı olmayabilir, ama adsız oturum olamaz.
+    """
+    for m in messages:
+        if m.get("role") != "user":
+            continue
+        text = " ".join((m.get("display") or m.get("content") or "").split("\n")[0].split())
+        if text:
+            return (text if len(text) <= MAX_CHAT_TITLE_CHARS
+                    else text[:MAX_CHAT_TITLE_CHARS - 1] + "…")
+    return "Adsız oturum"
 
 @app.get("/api/chats")
 def list_chats_route() -> dict:
@@ -579,20 +685,36 @@ def get_chat_route(chat_id: str) -> dict:
 
 @app.post("/api/chats")
 def create_chat_route(req: ChatSaveRequest) -> dict:
-    """Yeni kayıt. Başlık ve gövde ZORUNLU: boş bir sohbet kaydetmek anlamsız.
+    """Yeni kayıt. Gövde ZORUNLU, başlık DEĞİL (v2.0: otomatik kayıt).
+
+    Başlık gelmediyse ilk mesajdan türetiliyor (`_auto_title`) — kural aynı
+    kalıyor ("adsız sohbet olmaz"), onu sağlayan taraf değişti: otomatik kaydın
+    ad verecek bir kullanıcı eylemi yok. BOŞ gelen başlık ise hâlâ 422; "alan hiç
+    gelmedi" ile "boş geldi" ayrımı `chat_deployment`'taki geleneğin aynısı.
 
     Kaydetmede allowlist DEĞİL `exclude_none` var — ayrım bilinçli: tamamlama
     yolunun sınırı Azure'ın şeması, kaydetmenin sınırı ise diskteki biçim.
     `display` diske YAZILMAK ZORUNDA (pil yeniden açılışta sağ kalsın), ama
     `display: null` satırları eski sohbetlerin gövdesini sebepsiz büyütür.
     """
-    title = (req.title or "").strip()
-    if not title:
-        raise HTTPException(status_code=422, detail="Sohbet başlığı gerekli.")
+    if req.title is not None and not req.title.strip():
+        raise HTTPException(status_code=422, detail="Sohbet başlığı boş olamaz.")
     if not req.messages:
         raise HTTPException(status_code=422, detail="Kaydedilecek mesaj yok.")
     messages = [m.model_dump(exclude_none=True) for m in req.messages]
+    _guard_autosave(req.title)
+    title = req.title.strip() if req.title else _auto_title(messages)
     return {"chat": chat_store.create(title, messages, OUTPUT_DIR, now=_now())}
+
+
+@app.delete("/api/chats")
+def delete_all_chats_route() -> dict:
+    """Tüm oturumları siler (karar D1'in güvence b'si: "tümünü sil").
+
+    Boş depoda 404 DEĞİL: tek kayıt silmede 404'ün anlamı "hangi kayıt?" sorusunun
+    cevapsız kalması; burada soru yok, istenen durum zaten sağlanmış.
+    """
+    return {"deleted": chat_store.delete_all(OUTPUT_DIR)}
 
 
 @app.put("/api/chats/{chat_id}")
@@ -605,6 +727,9 @@ def update_chat_route(chat_id: str, req: ChatSaveRequest) -> dict:
     title = None if req.title is None else req.title.strip()
     if title is not None and not title:
         raise HTTPException(status_code=422, detail="Sohbet başlığı boş olamaz.")
+    # Gövde-yalnız `PUT` = tur sonu otomatik yazımı (bkz. _guard_autosave).
+    if req.messages is not None:
+        _guard_autosave(req.title)
     messages = (None if req.messages is None
                 else [m.model_dump(exclude_none=True) for m in req.messages])
     rec = chat_store.update(os.path.basename(chat_id), OUTPUT_DIR,

@@ -2,7 +2,7 @@
 
 **Tarih:** 6 Ağustos 2026
 **Dal:** `feat/flow-ui`
-**Başlangıç:** `25713f8` (v1.17.0), çalışma ağacı temiz
+**Başlangıç:** `25713f8` (`APP_VERSION` = **1.16.0**), çalışma ağacı temiz
 **Tasarım sözleşmesi:** `docs/flow-ui/flow-redesign-plan.md`
 
 Arayüz Google Flow'un tasarım diline taşınıyor. Tasarım kararları **verilmiş
@@ -50,7 +50,14 @@ ağaç hash'i dal ucuyla birebir aynı (`a717ef93`), yani squash'ta içerik kayb
 | 2 · kabuk (ray/şerit/tuval/composer) | bitti | `f13fdd2` |
 | 3 · bileşen CSS'i | bitti | `bc14b9a` |
 | 4 · temizlik | bitti | `ee867fb` |
-| **5–7 · PR 2 birleşik oturum** | **sırada** | — |
+| 5 · veri modeli (PR 2) | **bitti** (7 Ağustos, §0.4) | commit'lenmedi |
+| 6 · otomatik kayıt (PR 2) | **bitti** (7 Ağustos, §0.5) | commit'lenmedi |
+| 7a · JS dokunuş noktaları — **PR 2'nin ekran payı** | **bitti** (7 Ağustos, §0.6) | commit'lenmedi |
+| **7b · JS dokunuş noktaları — PR 1'in giydirme borcu (A1–A6)** | **sırada** | — |
+| 8 · §4.2'nin tamamlanması (devrin manşeti) | §0.2 denetiminden geldi | — |
+| 9 · tema kalıcılığı + Kütüphane yüklemeleri | §0.2 denetiminden geldi | — |
+| 10 · kozmetik süpürme | §0.2 denetiminden geldi | — |
+| — · Yedekler paneli | **ertelendi** (§0.2) | — |
 
 Adım 3'te ayrıca: 16 accent-hover kuralı §8'in yüzey yükseltmesine döndü,
 `--radius` kalktı (üçlü bileşenlere bağlandı), tuval düzleşti (.stage/.gallery-wrap
@@ -65,19 +72,14 @@ PR 1'in kanıtları (her adımda toplandı, sonuncusu Adım 4): pytest **1000 ye
 duruyor, id defteri hâlâ boş**) · tarayıcı konsolu 0 hata · 1024×700 / 1280 /
 1440 / 1920'de taşan öğe 0 · negatif testler (§1.2) korunuyor.
 
-**PR 1'de bilinçli olarak yapılmayan arayüz işleri** (PR 2 / Adım 7'nin girdisi —
-7 Ağustos'ta koda karşı doğrulandı, ikisi de hâlâ açık):
+**PR 1'de yapılmayan arayüz işleri: bkz. §0.2.** Burada elle tutulan iki maddelik
+liste **kaldırıldı** — 7 Ağustos denetimi onun eksik olduğunu gösterdi (wordmark,
+kebab, boş durum glifi ve §4.2'nin iki düğmesi listede yoktu). Elle yazılan liste
+hafızadan besleniyordu; yerine referans ekranlara karşı ölçülmüş §0.2 tablosu geçti.
 
-- **Kütüphane ve Araçlar görünüm değil**, ray düğmeleri mevcut modalları açıyor:
-  `core.js:122-123` → `$("library-btn").click()` / `$("palette-btn").click()`.
-  Görünüme dönüşmeleri `assets.js` / `palette.js` işi.
-- **Medya'da arama yok** — `folders.js` tarafı gelmeden çalışmayan bir arama
-  kutusu konmadı (işlevsiz işaretleme bilerek eklenmiyor). Referans işaretleme
-  `docs/flow-ui/media-browser.html`'de: `.search` + `.sortbtn` + `.sizeseg` (S/M/L).
-
-> Adım 2'nin girdi listesindeki diğer dört madde (accent hover, geometri
-> tokenları, kart eylemlerinin sürekli görünürlüğü, yönetmen balonunun aynalı
-> kuyruğu) **Adım 3'te kapandı** — bu listeden o yüzden düştüler.
+> Adım 2'nin girdi listesindeki dört madde (accent hover, geometri tokenları,
+> kart eylemlerinin sürekli görünürlüğü, yönetmen balonunun aynalı kuyruğu)
+> **Adım 3'te kapandı.**
 
 **Adım 4'ün doğrulanmış ölü sınıf listesi** — **silindi (`ee867fb`)**; silme
 öncesi yeniden ölçüldü, tuzağa uyuldu (yalnız nokta seçicileri gitti). Kayıt
@@ -101,35 +103,406 @@ gösteriyordu.)
 **Açık kalan işler (adım dışı).** Üçü de Adım 5'i bloke etmez ama devrin sonunu
 bloke eder — ilk ikisi kullanıcı kararı bekliyor:
 
-- **Sürüm numarası:** v1.18.0 mı v2.0.0 mı. Arayüz baştan değişti ve otomatik
-  kayıt bilinçli bir ürün kararını tersine çeviriyor (D1) — ikisi de major'ı
-  savunur.
+- ~~**Sürüm numarası:** v1.18.0 mı v2.0.0 mı.~~ **Karar (7 Ağustos): `2.0.0`.**
+  Arayüz baştan değişti ve otomatik kayıt bilinçli bir ürün kararını tersine
+  çeviriyor (D1) — ikisi de major'ı savunuyordu. `version.py` güncellendi.
+  > **PR 1'in atladığı şey buydu:** `version.py`'nin kendi kuralı "gönderilen
+  > HER build APP_VERSION'ı artırır — yalnızca bir CSS/JS düzeltmesi de olsa",
+  > çünkü `?v=` cache-buster'ı buna bağlı. PR 1 `style.css`'in 834 satırını ve
+  > `index.html`'in 535 satırını değiştirdi ama `APP_VERSION`'a dokunmadı:
+  > `/static/style.css?v=1.16.0` aynı URL altında bambaşka içerik servis etti,
+  > yani 1.16.0'ı bir kez yüklemiş kullanıcı ESKİ stil dosyasını önbellekten
+  > alıyordu. 2.0.0 bunu da kapatıyor.
 - **DM Sans bundle** (§4). İndirme izni alındı; **indirmeden önce dosya adı ve
   boyutu söylenip son onay alınacak.** `latin` + `latin-ext` şart (Türkçe),
   400 + 500.
 - **Tema seçici arayüzü** — dört tema (`kurumsal` / `amber` / `viola` / monokrom)
   token katmanında hazır, seçici yok. Yeri sözleşmede belli: Araçlar → Görünüm.
+  **Artık adıma bağlandı:** JS tarafı Adım 7 (`settings.js (tema…)`), kalıcılık
+  tarafı Adım 9 — çünkü `SettingsRequest`'te tema alanı yok ve Adım 7 "mantık
+  değişmez" diyor. Bkz. §0.2/D8.
 
-**Devam etmek için (yeni oturum).** Başlangıç hâli: `main`'in ucu (PR #16 + bu
-notun kendi düzeltmesi #17), çalışma ağacı temiz, `pytest` **1000 yeşil**. Önce
-`git switch main && git pull` — SHA'yı buradan okuma, taze olanı al. Sıradaki tur
-**PR 2 / Adım 5** — §3'teki veri modeli. Bu adım kozmetik değil, **kendi
-testleriyle gelir: TDD, test önce.**
+**Devam etmek için (yeni oturum).** Adım 5, 6 ve **7a** bitti (§0.4, §0.5, §0.6),
+**commit'lenmedi**: çalışma ağacı `main`'in ucunda, `pytest` **1080 yeşil**.
+**PR 2 tamam** — arka uç ve ekran payı birlikte. Sıradaki tur **Adım 7b**:
+`Adım 7` satırının PR 1'den devraldığı giydirme borcu (§0.2'nin A1–A6'sı).
 
 ```
 docs/flow-ui/flow-redesign-plan.md ve docs/superpowers/plans/2026-08-06-flow-arayuz-devri.md
-dosyalarını tamamen oku (§0.0 revizyonu ve §0.1 durumu dahil). PR 1 merge edildi;
-artık arka uçtayız.
+dosyalarını tamamen oku (§0.0 revizyonu, §0.1 durumu, §0.4/§0.5/§0.6 adım
+kayıtları dahil). PR 1 merge edildi; PR 2 (Adım 5-6-7a) çalışma ağacında duruyor.
 
-Bu turda sadece PR 2 / Adım 5'i yap: §3'teki üç alan (koşullu `session_id`,
-`result` rolü, `cover_image_id`) + `result`'ın Azure isteminden ve
-MAX_CHAT_TOTAL_CHARS bütçesinden filtrelenmesi. TDD: önce kırmızı test.
+Bu turda sadece Adım 7b'yi yap: §0.2'nin A1–A6 maddeleri, yani PR 1'in
+giydirme borcunun JS payı. §7'de kutulu:
+  · Kütüphane kendi görünümü olsun (ray düğmesi modal açmasın),
+  · Araçlar kendi görünümü olsun, iki araç kartıyla (Görünüm · Tema rengi/paletler),
+  · Medya'da arama + "Arama sonuçları — tüm klasörler" etiketi,
+  · Izgara boyutu S/M/L,
+  · Azure/Ayarlar ve Tema panelleri slide-over olsun (modal değil),
+  · tema seçici arayüzü dört temayı uygulasın (`data-theme` gerçekten yazılsın).
 
-Kısıtlar §1'de: göç YOK (koşullu yazım + .get() ile okuma), id sözleşmesi
-korunur (§1.1), negatif testler ihlal edilmez (§1.2).
+Tema KALICILIĞI bu turda DEĞİL — o Adım 9'un arka uç işi (§0.3). Bu tur
+seçiciyi kurup `data-theme`'i yazıyor, oturum arası hatırlamayı Adım 9 ekliyor.
 
-Bitirince §1.4'ün kanıtlarını göster. Hepsi temiz olmadan commit yok.
+Kısıtlar §1'de: id ancak defterde gerekçesiyle ve JS bağı birlikte silinerek
+kaldırılır (§1.1), negatif testler ihlal edilmez (§1.2), viewer.js yeniden
+yazılmaz (§1.3). TDD: önce kırmızı test.
+
+Bitirince §1.4'ün kanıtlarını göster — bu tur işaretlemeye dokunuyor, yani
+tarayıcı konsolu VE 1024/1280/1440/1920 ekran görüntüleri zorunlu.
+⚠️ Doğrulamada §0.6'nın "aynı sürüm altında bayat JS" tuzağına dikkat:
+`?v=APP_VERSION` aynı kaldığı için tarayıcı ESKİ dosyayı önbellekten verir.
+Hepsi temiz olmadan commit yok.
 ```
+
+---
+
+## 0.2 Referans ekran ↔ uygulama denetimi (7 Ağustos)
+
+Beş referans ekran (`studio-session` · `media-browser` · `studio-preview` ·
+`library-assets` · `settings-panels`) uygulamanın işaretlemesine ve JS'ine karşı
+tek tek okundu. **Göz kararı değil:** her satır ya işaretlemede ya kodda
+doğrulandı, dosya/satır referansı verildi.
+
+**Neden gerekti:** §0.1'in elle yazılmış "yapılmayan işler" listesi iki madde
+sayıyordu; denetim **18** açık madde buldu. Elle tutulan liste hafızadan
+besleniyor ve sessizce eksik kalıyor — bu yüzden kaldırıldı (yukarı bkz.).
+
+### Zaten bir adıma bağlı olanlar (9)
+
+| # | Eksik | Nerede kapanıyor |
+|---|---|---|
+| A1 | Kütüphane görünüm değil (`core.js:122` → `$("library-btn").click()`) | Adım 7 |
+| A2 | Araçlar görünüm değil (`core.js:123` → `$("palette-btn").click()`) | Adım 7 |
+| A3 | Medya'da arama yok | Adım 7 (`folders.js`: "arama") |
+| A4 | Izgara boyutu S/M/L yok (`#size-seg`) | Adım 7 (`folders.js`: "ızgara boyutu") |
+| A5 | Azure + Tema modalları hâlâ `.modal`; §2.4/3 slide-over istiyor | Adım 7 ("modal→slide-over … yolları") |
+| A6 | Tema seçici JS'i | Adım 7 (`settings.js`: "tema") |
+| A7 | Otomatik kayıt anahtarı | Adım 6 (D1) |
+| A8 | Oturumu sil / tümünü sil | Adım 6 (D1 güvencesi b) |
+| A9 | Birleşik döküm (konuşma + sonuç aynı akışta) | Adım 5 + 7 |
+
+### Hiçbir adımın sahiplenmediği açıklar (10) — yeni Adım 8/9/10
+
+> **Sayım:** denetim 18 açık madde buldu. Bunların 8'i zaten bir adıma bağlıydı
+> (A1–A6, A9 ve D8'in JS yarısı), 9'u sahipsizdi, 1'i (D7) ertelendi. Aşağıdaki
+> tablo 10 satır: dokuz sahipsiz madde + **D8'in arka uç yarısı** — tema seçici
+> ikiye bölündüğü için hem A6 hem D8 olarak geçiyor. A tablosundaki A9 (birleşik
+> döküm) denetimden değil, §3/§5'ten geliyor; tamlık için oraya yazıldı.
+
+| # | Eksik | Sözleşme | Kanıt |
+|---|---|---|---|
+| **D14** | **"Görsel modunda üret" yok; `chat.js:109` hâlâ "Forma aktar" diyor** | §4.2: bu gidiş-geliş "ortadan kalkıyor" | `static/chat.js:109` |
+| **D13** | **"Yönetmen'e sor" düğmesi yok** | §4.2: Görsel modunda metin yazınca sağda çıkar | `static/` genelinde 0 eşleşme |
+| D8 | Tema **kalıcılığı** yok: dört tema `[data-theme=…]` olarak var ama hiçbir JS `data-theme` yazmıyor **ve** `SettingsRequest`'te tema alanı yok | §2.1 "settings.py'nin yazdığı yerel ayara yazılır" | `flow-tokens.css:65`, `models.py:140` |
+| D9 | Kütüphane'de **"Yüklemeler"** türü ve **"Tümü"** filtresi yok (uygulamada 3 tür, referansta 5 gezinme öğesi) | §4.1 "logolar, mottolar, bannerlar, **yüklemeler**" | `assets_store.py:19` → `KINDS = ("logos","banners","mottos")` |
+| D10 | Medya'da **sıralama** yok (`#sort-btn` · "En son üretilen") | §4.1 "arama burada + **sıralama**" | Adım 7 yalnızca arama/ızgara/gezinme sayıyor |
+| D12 | Klasör kartlarında **kapak görseli** yok, genel klasör glifi var | §4.1 "klasör kartları (**kapak görseli** + ad + sayı)" | `folders.js:272` (SVG glif) |
+| D15 | Üst şeritte **kebab** (oturum menüsü) yok | §2.2 · §6 · **bu planın 297. satırı** (Adım 2'nin kendi kapsamı) | Adım 2 bitti, gelmedi |
+| D16 | Boş durumda **glif** yok, yalnız metin var | §2.4/5 "küçük tek glif + tek satır" | Adım 3 bitti (`empty-state` listesindeydi), gelmedi |
+| D17 | Klasörde **"Yeniden adlandır"** yok | yalnız referans işaretlemesinde (`media-browser.html` crumb), düzyazıda yok | `static/` genelinde 0 eşleşme |
+| D18 | Medya'da **`rail-count`** sayacı yok | yalnız referans işaretlemesinde, düzyazıda yok | — |
+
+> **D14 devrin manşeti.** Sekmeler §4.2 uğruna kaldırıldı ve o bölümün
+> gerekçesi "Forma aktar → diğer sekme gidiş gelişi ortadan kalkıyor" cümlesi.
+> O gidiş-geliş **hâlâ duruyor**: sekme kabuğu gitti, hand-off kalmadı sanıldı,
+> ama düğme `chat.js`'te aynı adla yaşıyor. Yani yeniden tasarımın satış
+> argümanı henüz teslim edilmedi ve hiçbir adım onu sahiplenmiyor.
+
+### Ertelenen (7 Ağustos kararı)
+
+| # | Eksik | Karar |
+|---|---|---|
+| D7 | **Yedekler paneli** (otomatik yedek · eski biçim göçü · şimdi yedek al · klasörü aç) | **Şimdilik atlanıyor.** Kullanıcı kararı: "yedek alma özelliği şu anda yok, şimdilik es geçelim." Devrin bitiş ölçütünden de düşürüldü (§7), sessizce kaybolmasın diye burada duruyor. |
+
+> Kayıt için: §4.1'in **"Yedekler artık sol rayda değil"** cümlesi yanlıştı.
+> `25713f8`'in `static/index.html`'i ve `settings.js`'i denetlendi — yedek
+> arayüzü **hiç var olmamıştı**, dolayısıyla raydan kaldırılmadı. Bu bir
+> gerileme değil, hiç yazılmamış kapsam. `backup.py` yalnızca açılışta
+> otomatik çalışıyor (`app.py:92`), kullanıcıya dönük ne arayüz ne rota var.
+
+### Denetimde SAĞLAM çıkanlar
+
+Liste güvenilir olsun diye: bindirme paneli tam (`logo-size`, `logo-offset-x/y`
++ `-val` + `logo-offset-reset`, `logo-shadow`, `logo-blur`, `banner-scale` —
+referans bilerek uygulamanın **kendi id'lerini** kullanıyor) · büyütecin dokuz
+id'si ve alt şerit dizilimi duruyor · oturum drawer'ı ve üretim ayarları gerçek
+slide-over · dört ray öğesi + Daralt (228↔72 ölçüldü) · mod anahtarı ve `⌘J`
+çalışıyor · çoklu seçim şeridi ve sürükle-bırak içe aktarma yerinde
+(`folders.js`'te 8 `dragover`) · §1.2'nin negatif testleri korunuyor.
+
+---
+
+## 0.3 Adım 8 · 9 · 10 — denetimden doğan turlar
+
+Sıra §0.2'nin şiddet sırasına göre: önce sözleşmenin manşeti, sonra arka uç
+gerektirenler, en sonda kozmetik.
+
+### Adım 8 — §4.2'yi gerçekten teslim et (D13 + D14)
+
+Kozmetik **değil**, davranış: kendi testleriyle gelir.
+
+- `chat.js`'in prompt bloğundaki **"Forma aktar" → "Görsel modunda üret"**:
+  modu Görsel'e alır, prompt'u composer'a basar, sekme yolculuğu yok.
+- Görsel modunda prompt kutusuna yazınca sağda **"Yönetmen'e sor"** metin
+  düğmesi (kutu boşken görünmez — §4.2 "ikinci dolu düğme oluşmasın").
+- Zorunlu testler: düğme etiketi artık "Forma aktar" **değil**; boş kutuda
+  "Yönetmen'e sor" **yok**, doluyken **var**; mod geçişi `tab-image`/`tab-chat`
+  mandalını bozmuyor (§1.1).
+
+### Adım 9 — arka uç gerektiren iki açık (D8 kalıcılığı + D9)
+
+- **Tema kalıcılığı:** `SettingsRequest`'e tema alanı + `GET /api/settings`'in
+  onu döndürmesi. §2.1: API anahtarıyla aynı dosya, aynı `0600` izni.
+  Doğrulama listesi `kurumsal` / `amber` / `viola` / monokrom ile sınırlı
+  (allowlist — serbest metin değil).
+- **Kütüphane "Yüklemeler":** `assets_store.KINDS`'a dördüncü tür + "Tümü"
+  filtresi. `KINDS` bir sözleşme: `_check_asset_kind` ona bakıyor, yani
+  genişletme testle gelir.
+
+### Adım 10 — kozmetik süpürme (D10 · D12 · D15 · D16 · D17 · D18)
+
+Tek tur, tek commit. Hiçbiri arka uca dokunmuyor.
+
+| # | İş | Not |
+|---|---|---|
+| D15 | Üst şeride kebab | Menü içeriği Adım 6'da geldiği için ondan SONRA — işlevsiz işaretleme konmuyor |
+| D10 | Medya sıralama düğmesi | `folders.js`; Adım 7 dosyayı zaten açıyor, orada yapmak daha ucuz |
+| D12 | Klasör kartına kapak görseli | `folders.js:272`'deki glif yerine ilk görselin küçük resmi |
+| D18 | Medya'da `rail-count` sayacı | sayı `folders.js`'te zaten hesaplanıyor |
+| D17 | Klasör "Yeniden adlandır" | düzyazıda yok; **onay gerekiyor** — sözleşmeye eklenecek mi, düşecek mi |
+| D16 | Boş durum glifi | saf CSS/işaretleme, bağımlılığı yok |
+
+> **Tuzak:** D15 ve D10/D12/D18 aynı turda ama farklı bağımlılıkta. Kebab
+> Adım 6'yı bekliyor, Medya maddeleri Adım 7'yi. Adım 10'u ikisinden önce
+> açmak işlevsiz işaretleme üretir — §0.1'in "çalışmayan bir arama kutusu
+> konmadı" kuralı burada da geçerli.
+
+---
+
+## 0.4 Adım 5 kaydı — veri modeli (7 Ağustos)
+
+TDD ile: 32 test önce yazıldı, hepsi kırmızı görüldü, sonra kod. `pytest`
+**1000 → 1032**. Arayüz ve işaretleme kıpırdamadı; id sözleşmesi de öyle.
+
+### Teslim edilen üç alan (tasarım §5)
+
+| # | Nerede | Ne |
+|---|---|---|
+| 1 | `storage.save` + `GenerateRequest.session_id` + `/api/edit` form alanı | Görsel kaydına **koşullu `session_id`** — `imported` deseninin birebir aynısı |
+| 2 | `models.ChatMessage` + `ResultParams` | Dökümde üçüncü rol: `{"role": "result", "image_ids": [...], "params": {kind, size, quality}}` |
+| 3 | `chat_store._SUMMARY_FIELDS` + `cover_from` | Oturum özetine **`cover_image_id`** |
+
+Filtreler (plan R4/R5): `chat_client.build_payload` **rol** allowlist'i
+(`WIRE_CHAT_ROLES`) ile süzüyor, `app.chat` aynı süzgeci isteğin girişinde
+tekrarlıyor, `_check_chat_total` sonuç kayıtlarını **saymıyor**.
+
+### Bu turda verilen ve yazıya geçen beş karar
+
+| # | Karar | Gerekçe |
+|---|---|---|
+| K1 | Rol süzgeci **alan** allowlist'ine ek olarak geldi, onun yerine değil | `WIRE_MESSAGE_FIELDS` bir sonuç kaydından geride `{"role": "result"}` bırakır: Azure o rolü bilmez, 400 döner ve **bir kez üretim yapmış oturum bir daha hiç konuşamaz.** Mutasyon testiyle doğrulandı |
+| K2 | `session_id`'de **biçim kapısı var, varlık kapısı yok** | `_check_folder` gibi varlık sorulsaydı, oturum kaydı yazılmadan önce (otomatik kayıt kapalıyken hiç yazılmıyor) ya da oturum başka sekmede silindikten sonra yapılan üretim 422 ile düşerdi — pahalı bir Azure turu bir ETİKET yüzünden kaybedilirdi. Ters yön zaten hoşgörülü (sarkan `image_id` dökümü çökertmiyor); simetrik duruş tutarlı olan. Bozuk biçim ise **sessizce düşürülmüyor**, 422 dönüyor |
+| K3 | `cover_image_id` **parametre değil, dökümden türetiliyor** (ilk sonucun ilk görseli) | İstemciden alınsaydı dökümde hiç bulunmayan bir görsel kapak olabilirdi: panelde görünen küçük resim ile açılan oturum ayrışırdı. SON değil İLK: liste küçük resmi her üretimde değişmesin. Döküm küçülürse alan **düşüyor** — kapak dökümün dışını gösteremez |
+| K4 | Sonuç kayıtlarına **kendi sayı payı**: `MAX_CHAT_ITEMS = MAX_CHAT_MESSAGES + MAX_CHAT_RESULTS` (24+24) | Aynı 24'ü paylaşsalardı üretim yapan oturum ~8 turda dolar ve kullanıcı pydantic'in **İngilizce** `too_long` hatasını görürdü. Konuşma turu sayısı artık Türkçe mesajlı bir doğrulayıcıda |
+| K5 | `ResultParams.size/quality` **allowlist'e karşı doğrulanmıyor** (yalnız uzunluk) | Allowlist bir gün daralırsa (Azure bir boyutu kaldırır) o boyutla üretilmiş eski oturumlar bir daha **kaydedilemez** olurdu: `PUT /api/chats/{id}` 422 döner, oturum sessizce donar. `MAX_CHAT_REPLY_CHARS`'ın var olma sebebi bu sınıf hataydı. `kind` bizim kümemiz, altımızdan değişmez |
+
+Ek olarak `content` opsiyonel oldu (sonuç kaydının metni yok) ve alan-rol
+kuralları tek doğrulayıcıda toplandı; `chat_store.valid_id` üç guard'ın
+tekrarını kaldırdı ve `/api/generate`'in de kullandığı kapı oldu.
+
+### Ölçülen kanıtlar
+
+- `pytest` **1032 yeşil** (taban 1000, +32). Silinen test yok, id defteri boş kaldı.
+- **Mutasyon testi** — beş çekirdek iddianın her biri, kodu bozunca kırmızıya
+  döndü: rol süzgeci (istemci ve rota ayrı ayrı), kapak türetimi, bütçe süzgeci,
+  koşullu `session_id`. Boş geçen tek iddia yok.
+- **Canlı tur** (8799, süreç yeniden başlatıldı): sonuç kaydı olan bir oturum
+  kaydedildi → `POST` 200, `image_ids`/`params` diske birebir indi, özet
+  `cover_image_id`'yi taşıdı, `DELETE` 200 ile temizlendi.
+- **Göç gerçekten yok:** geliştiricinin gerçek `output/chats.json`'ındaki 5
+  oturumun hiçbirine `cover_image_id` yazılmadı (sonuçları yok), `history.json`
+  kayıtlarına `session_id` girmedi.
+- Tarayıcı konsolu **0 hata/0 mesaj**. İşaretleme değişmediği için ekran
+  görüntüsü turu (§1.4/4) gerekmedi.
+
+### Adım 5'in bıraktığı iki arayüz borcu (Adım 7'ye) — Adım 6 ikiye daha ekledi
+
+Sunucu payı bitti; ekran payı Adım 7'nin. İkisi de §7'de kutulu — yazılı
+olmayan bir şey "yapıldı" sayılamıyor (§0.2'nin dersi):
+
+1. **"Görsel silindi" yer tutucusu.** Sarkan `image_id` sunucuda kasten
+   budanmıyor (`test_a_deleted_image_leaves_the_transcript_readable`); dökümün
+   onu yer tutucuyla çizmesi gerekiyor (tasarım §5, kabul ölçütü).
+2. **`chat.js`'in mesaj sayısı kapısı.** `chatThread.length >= MAX_CHAT_MESSAGES`
+   (chat.js:817) artık yanlış sayar: sonuç kayıtlarının kendi payı var (K4).
+   Sunucu 48 öğeye izin verirken istemci 24'te durdurursa üretim yapan oturum
+   sebepsiz kilitlenir. Aynı yerde `MAX_CHAT_ITEMS` de aynalanmalı.
+
+---
+
+## 0.5 Adım 6 kaydı — otomatik kayıt (7 Ağustos)
+
+TDD ile: 30 test önce, hepsi kırmızı, sonra kod. `pytest` **1032 → 1062**.
+Arayüz ve işaretleme yine kıpırdamadı — bu tur da tamamen arka uç.
+
+Karar D1'in üç güvencesi, üçü de mekanik:
+
+| Güvence | Nasıl karşılandı |
+|---|---|
+| (a) her şey yerelde; `output_dir` ve izinler değişmez | Yeni dosya `output/prefs.json`, diğer beş manifestin yanında; yazım `jsonstore` (atomik + kilit). Kimlik dosyasına dokunulmadı |
+| (b) tek tıkla **sil** ve **tümünü sil** | `chat_store.delete_all` + `DELETE /api/chats` (boş depoda 404 değil, `{"deleted": 0}`) |
+| (c) "oturumları otomatik kaydet" anahtarı; kapatınca bugünkü davranış | `prefs.py` + `GET/POST /api/prefs`; kapalıyken otomatik yazım **409** ile durduruluyor, adlandırılmış yazım çalışmaya devam ediyor |
+
+### Bu turda verilen ve yazıya geçen dört karar
+
+| # | Karar | Gerekçe |
+|---|---|---|
+| K6 | Anahtar `credentials.env`'e DEĞİL yeni bir `prefs.py` deposuna yazılıyor | `credentials.env` bir KİMLİK dosyası (0600, `~/.config`) ve `POST /api/settings` `api_key` + `base_url` istiyor: anahtarı çevirmek Azure kimliğini yeniden yazmak zorunda kalırdı, Azure hiç yapılandırılmamışken de anahtar çevrilemez olurdu. Bir tema adının 0600 olması da anlamsız. localStorage ise pywebview'ın private mode'unda her kapanışta siliniyor (`chat_store`'un ölçülmüş sebebi). Tema (Adım 9) aynı dosyaya girecek |
+| K7 | Uç ayrı: `GET/POST /api/prefs`. `/api/settings` bu değeri **yansıtmıyor** | Aynı değer iki uçtan okunsa ayrışabilirdi; ayrıca tercih formu ile kimlik formu farklı iki form |
+| K8 | **"Başlıksız yazım = otomatik yazım"** ve kapalı anahtarda 409 | Anahtarın teeth'i olması için otomatik yazımın ayırt edilmesi gerekiyordu. İsteğe "bu otomatik" bayrağı KONMADI: bayat/hatalı bir istemci onu yanlış gönderdiğinde anahtar sessizce delinirdi. Otomatik kaydın verecek bir ADI yok — uydurulamaz işaret bu. Sonuç: adlandırılmış POST/PUT (elle kaydet, yeniden adlandır) her koşulda çalışıyor, yani "kapatınca v1.15 davranışı" gerçekten sağlanıyor. Silme de anahtardan bağımsız: anahtar YAZIMI kısıtlıyor, kullanıcının kendi verisini silmesini değil |
+| K9 | Başlıksız POST artık 422 değil: başlık **ilk kullanıcı turundan türetiliyor** | Otomatik kaydın ad verecek kullanıcı eylemi yok. Kural ("adsız sohbet olmaz") aynı kaldı, sağlayan taraf değişti. `display` varsa o kazanıyor (çip turunda ekranda görünen metin odur); tek satır, boşluk sıkıştırılmış, `MAX_CHAT_TITLE_CHARS`'ta "…" ile kesiliyor; kullanıcı mesajı hiç yoksa "Adsız oturum". **BOŞ** gelen başlık hâlâ 422 — "alan gelmedi" ile "boş geldi" ayrımı `chat_deployment` geleneği |
+
+`POST /api/chat` hâlâ hiçbir şey yazmıyor ve bu bilinçli: oturumu yazan taraf
+istemci. Sebep birleşik dökümün kendisi — Görsel modunda üretilen sonuç kayıtları
+tamamlama rotasına hiç uğramıyor, dolayısıyla kalıcılık oraya konsa sohbetsiz bir
+oturum hiç kaydedilemezdi. `chat_store.py`'nin başındaki not bu üç aşamayı
+(v1.13 → v1.15 → D1) silmeden anlatacak şekilde yeniden yazıldı.
+
+### Ölçülen kanıtlar
+
+- `pytest` **1062 yeşil** (Adım 5 sonu 1032, +30). **Silinen test yok.** Tek
+  yeniden adlandırma: `test_post_without_a_title_is_422` →
+  `test_post_without_a_title_is_an_automatic_save` — iddia D1 yüzünden tersine
+  döndü, gerekçesi testin kendi docstring'inde yazılı.
+- **Mutasyon testi** — yedi çekirdek iddia, kodu bozunca hepsi kırmızıya döndü:
+  POST guard'ı, PUT guard'ı, guard'ın adlandırılmış yazımı serbest bırakması,
+  varsayılanın açık olması, başlıkta `display` önceliği, boş depoda dosya
+  yaratmama, tercih birleştirme (diğer tercihi düşürmeme).
+- **Canlı tur** (8799, süreç yeniden başlatıldı): başlıksız POST → 200 ve başlık
+  "mevlid kandili için kare tebrik" (ikinci satır düştü) · gövde-yalnız PUT → 200,
+  kapak türedi · anahtar kapatıldı → otomatik POST **409**, tur sonu PUT **409**,
+  yeniden adlandırma **200**, adlandırılmış kayıt **200** · iki oturum silindi,
+  anahtar geri açıldı, geliştiricinin 5 oturumu olduğu gibi kaldı.
+- **Doğrulama artığı temizlendi:** canlı tur `output/prefs.json` yaratmıştı
+  (içeriği varsayılanla aynı), silindi.
+- Tarayıcı konsolu: uygulama açılışında **0 mesaj**. (Kontrol turunda görülen iki
+  409, benim `fetch` çağrılarımın kendi çıktısıydı — uygulamanın JS'i değil.)
+
+---
+
+## 0.6 Adım 7a kaydı — PR 2'nin ekran payı (7 Ağustos)
+
+TDD ile: 15 test önce, hepsi kırmızı, sonra kod. Sonradan üç test daha eklendi
+(biri ikiye ayrıldı, ikisi aşağıdaki kod incelemesinden doğdu) → **18**.
+`pytest` **1062 → 1080**. **Bu turda PR 2 kapandı**: arka ucun teslim ettiği üç
+alan artık ekranda.
+
+> **Adım 7 ikiye ayrıldı ve bu bilinçli.** `Adım 7` satırı iki ayrı işi
+> taşıyordu: (a) PR 2'nin ekran payı — Adım 5–6'nın bıraktığı dört borç,
+> (b) §0.2 denetiminden gelen A1–A6, yani **PR 1'in** giydirme borcu (Kütüphane/
+> Araçlar görünümleri, Medya araması, ızgara boyutu, modal→slide-over, tema
+> seçici). İkisi aynı satırda olsa da aynı iş değil: (a) birleşik oturumun
+> parçası ve arka ucu hazır bekliyor, (b) kabuğun tamamlanması. §0.1'in devam
+> istemi de bu turu "sadece PR 2 / Adım 7" diye yazmıştı. Ayrım **satır olarak**
+> yazıldı (7a/7b) ki (b) yine §0.2'nin yakaladığı biçimde sessizce düşmesin.
+
+### Teslim edilen dört borç
+
+| # | Borç | Nasıl karşılandı |
+|---|---|---|
+| 1 | Döküm `result` rolünü çiziyor | `appendResult` + `resultThumb`; künye `Üretildi · 1024² · Orta · x2` (referans ekranın `.result .who` satırı). `openChat` artık ÜÇ dallı — iki dallı hâlinde sonuç kaydı `appendBot(undefined)`'a düşüp dökümü çökertirdi |
+| 2 | "Görsel silindi" yer tutucusu | `resultThumb`'ın `error` dinleyicisi; `.chat-media.gone` çizgili zeminle (flow.css'in `.media .ph` grameri) |
+| 3 | Mesaj sayısı kapısı yalnız konuşmayı sayıyor | `conversationIsFull()` + `transcriptIsFull(slots)`; `chatThread.length >= MAX_CHAT_MESSAGES` kalktı |
+| 4 | Oturumlar gerçekten otomatik kaydediliyor | `persistThread` **başlıksız** `POST`/gövde-yalnız `PUT`; 409 Türkçe; anahtar `/api/prefs`'ten; "tüm oturumları sil" panelin dibinde |
+
+Ek olarak, borç listesinde OLMAYAN üç şey bu turda kapandı çünkü üçü de bu
+turun kendi işinden doğdu:
+
+- **Üretim açık oturuma katılıyor** (`core.js`'in `run()`'ı): `session_id` iki
+  dalda da gidiyor, prompt bir kullanıcı turu olarak döküme basılıyor, sonuç
+  kaydı ekleniyor. Bu olmadan Adım 5'in üç alanı da **ulaşılamaz** kalırdı.
+- **`#session-title` / `#session-stamp` bağlandı.** PR 1'de kondu, hiç
+  bağlanmamıştı — §0.2 bunu da kaçırmıştı. Süs değil gereklilik: kabuk iki
+  modda da aynı, üretim açık oturumun dökümüne düşüyor, yani "hangi
+  oturumdayım" sorusunun cevabı üst şeritte olmak zorunda.
+- **Ayarlar panelinin başlığı** "Azure Ayarları" → **"Ayarlar"**, Azure kendi alt
+  başlığına indi. Panelin içine kimlik dışı bir tercih girdiği anda eski başlık
+  yalan oldu; tasarım §4.1 de dişliyi tek bir "Ayarlar" paneli sayıyor.
+
+### Bu turda verilen ve yazıya geçen beş karar
+
+| # | Karar | Gerekçe |
+|---|---|---|
+| K10 | Üretim açık bir oturuma **katılıyor**, kendi başına oturum **açmıyor** | `session_id`'de varlık kapısı yok (§0.4/K2), yani henüz yazılmamış bir oturumun id'si gönderilemez — sarkan bir etiket diske yazılırdı. Boş oturum da açılamıyor (`POST /api/chats` gövde istiyor, 422). Üretimden önce bir kullanıcı turu yazıp oturum açmak ise BAŞARISIZ her üretimden sonra dökümde cevapsız bir tur bırakırdı; yeniden deneme onu ikinci kez eklerdi. Oturumu Görsel modundan BAŞLATMAK tek composer'ın kararı (tasarım §4.2 → Adım 8): orada prompt yapısı gereği bir döküm turu |
+| K11 | Sonuç görselinin URL'i **id'den kuruluyor** (`/output/{id}.png`), ikinci bir istek yok | Dosya adı sözleşmesi `storage.py`'de yazılı (`save`'in `filename` satırı, `delete_many`'nin docstring'i). `/api/history` KULLANILAMAZDI: o uç klasöre göre süzülüyor, yani başka bir klasöre taşınmış bir sonuç görselini hiç döndürmezdi ve kart sebepsiz "silindi" derdi |
+| K12 | Yer tutucunun ölçüsü **`error` olayı**, tutulan bir liste değil | Dosya gerçekten yoksa `/output/{id}.png` 404 döner — gerçek koşul ölçülüyor. Bayat bir dizinden bakmak, silinmiş ama dizinde duran bir görseli "var" gösterirdi. `loading="lazy"` ile birlikte yer tutucu kart görüş alanına GİRDİĞİNDE çiziliyor; kullanıcının baktığı an da tam olarak o |
+| K13 | **`MAX_CHAT_RESULTS` istemcide aynalanMIYOR** | Sunucu sonuç ADEDİNİ ayrıca kapamıyor: kuralları "konuşma ≤ 24" ve "toplam ≤ 48". İstemci ayrıca 24 sonuçta durursa **sunucudan katı** olur ve sohbetsiz bir oturum 24. üretimde sebepsiz kilitlenir — kapatılan borcun ekseni değişmiş aynısı. Aynalanan tek yeni sabit `MAX_CHAT_ITEMS`; testi bunu hem doğruluyor hem `MAX_CHAT_RESULTS`'ın tanımlanMAdığını mandallıyor |
+| K14 | Sonuç kartında "Düzenle" ve "+ Ek" **yok**, "İndir" var | İkisi de tam bir geçmiş KAYDI istiyor (prompt, boyut, klasör); döküm yalnız id taşıyor. Çalışmayan bir düğme çizmek yerine composer turuna (Adım 8) bırakıldı. "İndir" yalnız URL istiyor, o yüzden bugün gerçek. Karenin kendisi büyüteci açıyor (tasarım §6) |
+
+`viewer.js` **yeniden yazılmadı** (§1.3): tek bir açılış dikişi dışa verildi
+(`window.openViewer`), imleç-sabitli zoom / rubberband / pinch / ok adımı aynen
+duruyor ve `openerRect` sayesinde büyüteç tıklanan karenin bulunduğu yerden
+büyüyor. Testi korunan davranışların adlarını da ayrıca sayıyor.
+
+`test_the_chat_title_is_derived_locally_not_asked_from_the_model` **silinmedi,
+taşındı**: iddiası ("başlık için ikinci bir model çağrısı yok") aynı kaldı ama
+ölçüldüğü yer `chat.js`'in `deriveTitle`'ından `app._auto_title`'a geçti.
+
+### Ölçülen kanıtlar
+
+- `pytest` **1080 yeşil** (Adım 6 sonu 1062, +18). **Silinen test yok.**
+- **Kendi kodumun incelemesi iki gerçek açık buldu ve ikisi de kapandı:**
+  (a) `run()`'ın `try` bloğu sonuç kaydını da kapsıyor, yani sonuç yazıldıktan
+  SONRA bir hata (ör. `loadHistory`'nin ağ hatası) `catch`'e düşse kullanıcı
+  turu silinir ama sonuç kaydı kalırdı — dökümde **sahipsiz bir kart**. `pending
+  .done` işareti kapanmış turu geri alınamaz yaptı. (b) Azure hiç görsel
+  döndürmezse `image_ids: []` yazılırdı ve sunucu `min_length=1` ile **422**
+  verirdi — kullanıcının açıklayamayacağı bir hata. Artık boş sonuç yazılmıyor,
+  kullanıcı turu da cevapsız bırakılmıyor. İkisinin de testi ve mutasyonu var.
+- **Mutasyon testi — 18 çekirdek iddia, hepsi kırmızıya döndü.** İlk turda
+  DÖRDÜ boş geçti ve dördü de aynı sebepten: iddia kodu değil KELİMEYİ arıyordu
+  (gövdedeki not "409"/"session_id"/"session-title" yazdığı için, ya da kardeş
+  bir çağrı yeri aynı dizeyi taşıdığı için). Düzeltilen iddialar artık
+  `e.status === 409`, `fd.append("session_id", …)` + JSON dalını ayrı ayrı,
+  `$("session-title").textContent` gibi **kodun kendisini** arıyor.
+- **Canlı tur** (8799, süreç yeniden başlatıldı, geliştiricinin gerçek verisi):
+  başlıksız `POST` → 200 ve türetilen başlık "Mevlid kandili için ornamental kare
+  tebrik görseli" · iki sonuç kartı çizildi (`Üretildi · 1024² · Orta · x2` ve
+  `Düzenlendi · 1536×1024 · Yüksek · x1`) · sarkan `ffffffffdead` id'si **"Görsel
+  silindi"** yer tutucusuna döndü · anahtar kapatıldı → otomatik `POST` **409**
+  ve Türkçe satır, `currentChatId` null kaldı, adlandırılmış `POST` **200** ·
+  anahtar geri açıldı · `run()` stub'lı `/api/generate` ile çalıştırıldı:
+  gövdede `session_id`, dökümde `user, assistant, user, result`, diske aynısı
+  indi ve `cover_image_id` türedi · üretim 500 ile başarısız edildi: döküm
+  BÜYÜMEDİ, prompt kutuda kaldı, diskteki gövde değişmedi · "tüm oturumları sil"
+  onay penceresini açtı ("8 oturum kalıcı olarak silinecek… görseller SİLİNMEZ"),
+  **Vazgeç** 8'i 8 bıraktı, **onay** 0'a indirdi, 25 görsel yerinde kaldı, ikinci
+  `DELETE` boş depoda 404 değil `{"deleted": 0}` döndü.
+- **Geliştiricinin verisi bozulmadı:** `chats.json` tur öncesinde yedeklendi,
+  sonunda **bayt bayt aynı** geri kondu (sha `dd7af60ecd75d684`); 5 oturum,
+  25 görsel. Kayıt alanları değişmedi (`cover_image_id` yazılmadı, `history.json`'a
+  `session_id` girmedi) — göç gerçekten yok. Doğrulamanın yarattığı
+  `output/prefs.json` silindi.
+- **Tarayıcı konsolu:** temiz sekmede, geliştiricinin gerçek oturumu açıkken
+  **0 mesaj**. (Doğrulama sekmesinde görülen 404'ler benim kasten uydurduğum
+  silinmiş görsel id'leriydi — yer tutucu yolunun kanıtı; 409 da anahtarı
+  kapatma denemem.)
+- **Ekran görüntüleri 1024×700 / 1280 / 1440 / 1920:** dördünde de yatay taşma
+  **yok** (`scrollWidth == clientWidth`). Sağ/sol slide-over'lar ölçümde
+  "taşıyor" görünüyor ama kapalı hâlde `translateX(100%)` ile ekran dışında
+  duruyorlar — tasarım gereği.
+
+> **⚠️ Doğrulama tuzağı — aynı sürüm altında bayat JS.** `index.html` statikleri
+> `?v={APP_VERSION}` ile çağırıyor. Sürüm 2.0.0'da SABİT kalırken içerik
+> değiştiği için tarayıcı **eski** `chat.js`/`viewer.js`'i önbellekten verdi ve
+> yeni fonksiyonların hiçbiri tanımlı görünmedi (`window.location.reload()` de
+> kurtarmıyor). Çözüm: doğrulamayı **başka bir origin'de** yapmak
+> (`127.0.0.1` ↔ `localhost` ayrı önbellek anahtarı). 2.0.0 henüz
+> gönderilmediği için bu kullanıcıyı etkilemiyor — `version.py`'nin "gönderilen
+> HER build sürümü artırır" kuralı zaten kapıyı kapatıyor. Ama tur içinde
+> tekrar edeceği için buraya yazıldı; `run.sh`'in bayat-arka-uç tuzağının
+> ön yüz kardeşi.
 
 ---
 
@@ -295,7 +668,10 @@ sürüm) · tuval · yüzen composer.
 - Hamburger, mevcut `chat-sidebar-toggle` id'sine bağlanır; oturum listesi
   `chat-sidebar`.
 - Üst şeritteki merkezi arama **kalkar** (arama Medya'ya taşındı).
-- Yedekler sol raydan kalkar; dişliden açılan Ayarlar paneline girer.
+- ~~Yedekler sol raydan kalkar; dişliden açılan Ayarlar paneline girer.~~
+  **Bu madde yanlıştı ve düştü (7 Ağustos, §0.2/D7):** `25713f8` denetlendi,
+  raydaki bir yedek arayüzü **hiç yoktu** — kaldırılacak bir şey de yoktu.
+  Yedekler paneli şimdilik ertelendi; bkz. §0.2 ertelenen tablosu.
 
 ### Adım 3 — bileşen CSS'i
 
@@ -317,7 +693,12 @@ Eski panel CSS'i hemen silinmez: önce yeni sınıflara devredilir.
 Konuşma ve üretilen görseller aynı geçmişte tutulur. Bu adım kozmetik değil;
 kendi testleriyle gelir. TDD: test önce.
 
-### Adım 5 — veri modeli
+### Adım 5 — veri modeli — **bitti (7 Ağustos), kaydı §0.4'te**
+
+> Aşağıdaki üç madde ve zorunlu testler **teslim edildi.** Turda verilen beş
+> karar (rol süzgecinin iki katmanı, `session_id`'de varlık kapısı olmaması,
+> kapağın türetilmesi, sonuç kayıtlarının kendi sayı payı, `size/quality`'nin
+> allowlist'e karşı doğrulanmaması) ve ölçülen kanıtlar **§0.4'te.**
 
 Deponun kendi geleneği kullanılır (koşullu yazım + `.get()` ile okuma →
 **göç gerekmez**):
@@ -333,14 +714,24 @@ Deponun kendi geleneği kullanılır (koşullu yazım + `.get()` ile okuma →
 
 **Zorunlu testler:**
 
-- `result` rolü Azure istemine **gitmiyor** (`chat_client.py` yalnızca
-  `user`/`assistant` gönderir).
-- `result` rolü `models.py`'deki `MAX_CHAT_TOTAL_CHARS` bütçesine **sayılmıyor**
-  (modele gitmiyor).
-- Silinmiş görselin sarkan `image_id`'si dökümü çökertmiyor; "görsel silindi"
-  yer tutucusu gösteriyor (`storage.delete_many` sonrası).
+- [x] `result` rolü Azure istemine **gitmiyor** (`chat_client.py` yalnızca
+  `user`/`assistant` gönderir) — `test_build_payload_drops_result_records` +
+  `test_a_result_record_is_accepted_but_never_forwarded`. Süzgeç **rol**
+  düzeyinde; alan allowlist'i tek başına yetmiyordu (§0.4/K1).
+- [x] `result` rolü `models.py`'deki `MAX_CHAT_TOTAL_CHARS` bütçesine
+  **sayılmıyor** — `test_result_records_do_not_count_towards_the_total_cap`.
+  Ölçülmemiş ağırlık da bırakmıyor: `content` ve `display` sonuç kaydında yasak,
+  şema kapalı, adet `MAX_CHAT_RESULTS` ile bağlı.
+- [x] Silinmiş görselin sarkan `image_id`'si dökümü çökertmiyor — sunucu payı:
+  `test_a_deleted_image_leaves_the_transcript_readable` (kayıt budanmıyor,
+  `GET /api/chats/{id}` 200 kalıyor). **"Görsel silindi" yer tutucusunun kendisi
+  Adım 7'nin işi** (§0.4'ün borç listesi, §7'de kutusu var).
 
-### Adım 6 — otomatik kayıt (karar D1)
+### Adım 6 — otomatik kayıt (karar D1) — **bitti (7 Ağustos), kaydı §0.5'te**
+
+> Üç güvence de mekanik olarak karşılandı. Anahtarın nereye yazıldığı (yeni
+> `prefs.py`, kimlik dosyası değil), ucun neden ayrı olduğu ve "başlıksız yazım =
+> otomatik yazım" kuralının nasıl teeth kazandığı **§0.5'te** (K6–K9).
 
 `chat_store.py`'nin başındaki not bilinçli bir kararı anlatıyor: `POST /api/chat`
 diske hiçbir şey yazmıyor, yazan tek yol kullanıcının başlattığı `/api/chats`.
@@ -356,7 +747,19 @@ ancak otomatik yazımla karşılanır. Üç güvence:
 `chat_store.py`'nin başındaki notu bu kararla **güncelle** — silme, "v1.15'te
 şu gerekçeyle daraltıldı, 2026-08-06'da şu gerekçeyle açıldı" olarak yaz.
 
-### Adım 7 — JS dokunuş noktaları
+### Adım 7 — JS dokunuş noktaları — **7a bitti (7 Ağustos), kaydı §0.6'da**
+
+> Satır İKİYE ayrıldı; gerekçe §0.6'nın başında. **7a (bitti):** PR 2'nin ekran
+> payı — `result` kartı, "görsel silindi" yer tutucusu, sayı kapısı, otomatik
+> kayıt + anahtar + tümünü sil, üretimin oturuma katılması. Turda verilen beş
+> karar (K10–K14) ve kanıtlar **§0.6'da**. **7b (sırada):** aşağıdaki
+> `folders.js` / `palette.js` / `assets.js` / `settings.js` payı, yani §0.2'nin
+> A1–A6'sı.
+
+**Adım 5'ten devraldığı iki borç** (§0.4) — **ikisi de 7a'da kapandı:** silinmiş
+görselin "görsel silindi" yer tutucusu ve `chat.js:817`'deki mesaj sayısı
+kapısının yalnız konuşma mesajlarını sayması (sunucu 48 öğeye izin veriyor,
+istemci 24'te durduruyordu).
 
 `core.js` (composer + döküm render), `chat.js` (mod anahtarı, `result` kartı),
 `folders.js` (Medya görünümü: arama, ızgara boyutu, klasör gezinme),
@@ -432,14 +835,79 @@ görüntüsü. Hepsi temiz olmadan commit yok.
 ## 7. Bitti sayılma ölçütü
 
 - [ ] Sekme yok: tek ray + tek composer; mod anahtarı (+) yanında, klavyeyle erişilebilir
-- [ ] Döküm konuşmayı ve üretilen görselleri aynı akışta gösteriyor
+- [x] Döküm konuşmayı ve üretilen görselleri aynı akışta gösteriyor — Adım 7a
+      (§0.6): `result` kartı + silinmiş görsel yer tutucusu + üretimin açık
+      oturuma katılması
 - [ ] Arama yalnızca Medya'da; klasörler gezinme (kökte klasör kartları + klasörsüzler)
 - [ ] Dört tema da kontrast kapılarını geçiyor; monokrom varsayılan
 - [ ] Bugünkü tüm yetenekler yerinde: prompt, boyut/kalite/adet, referans + ek görsel,
       tema rengi/palet, logo/motto/banner + offset, klasörler, çoklu seçim, indirme,
-      büyüteç, Azure ayarları, yönetmen sohbeti, yedekler, içe aktarma
+      büyüteç, Azure ayarları, yönetmen sohbeti, içe aktarma
+      (**yedekler bilerek düştü** — bkz. §0.2 ertelenen D7)
 - [ ] 1024×700'de taşma yok
 - [ ] `pytest` tamamen yeşil (994'ten düşen her test id defterinde gerekçeli)
 - [ ] `test_id_contract.py` yeşil: kayıp id yok, sarkan JS bağı yok, defter dürüst
 - [ ] Tarayıcı konsolu 0 hata
 - [ ] DM Sans `latin-ext` ile paketli; `.app` içinde font dosyası doğrulandı
+
+### §0.2 denetiminin maddeleri — mandal
+
+Aşağıdaki kutular §0.2'den geliyor. **Amaç tam olarak şu:** bir madde ancak
+işaretlenerek ya da gerekçesiyle ertelenerek kapanabilir; listede yazmayan bir
+şey "yapıldı" sayılamaz. §0.1'in elle yazılmış listesi bu ağ olmadığı için
+wordmark'ı, kebab'ı ve §4.2'nin iki düğmesini kaçırdı.
+
+Adım **7b**'ye bağlı (A1–A6) — 7a bu altı maddeye dokunmadı:
+
+- [ ] Kütüphane kendi görünümü (ray düğmesi modal açmıyor)
+- [ ] Araçlar kendi görünümü, iki araç kartıyla (Görünüm · Tema rengi/paletler)
+- [ ] Medya'da arama + "Arama sonuçları — tüm klasörler" etiketi
+- [ ] Izgara boyutu S/M/L
+- [ ] Azure ve Tema paneli slide-over (modal değil)
+- [ ] Tema seçici arayüzü dört temayı uyguluyor (`data-theme` gerçekten yazılıyor)
+
+Adım 5–6'ya bağlı (A7–A9):
+
+- [x] Otomatik kayıt anahtarı; kapatınca bugünkü davranış — arka uç Adım 6,
+      **arayüzü + 409'un Türkçe gösterimi Adım 7a** (`#pref-autosave`,
+      Ayarlar → Oturumlar; kapalıyken satır "Otomatik kayıt kapalı — bu oturum
+      diske yazılmadı")
+- [x] Oturumu sil + tümünü sil — arka uç Adım 6, **bağlaması Adım 7a**
+      (`#chats-delete-all`, oturum panelinin dibinde, onay pencereli).
+      **Kebabın kendisi hâlâ Adım 10'da**
+- [x] Oturumlar gerçekten otomatik kaydediliyor: istemci **başlıksız** `POST` ile
+      açıyor, tur sonunda gövde-yalnız `PUT` ile büyütüyor — Adım 7a
+      (`persistThread`; başlık uydurmak anahtarı delerdi, §0.6)
+- [x] `result` rolü Azure istemine gitmiyor **ve** `MAX_CHAT_TOTAL_CHARS`'a
+      sayılmıyor — Adım 5, iki katmanlı süzgeç (§0.4/K1)
+- [x] Sunucu payı: sarkan `image_id` dökümü çökertmiyor, kayıt budanmıyor — Adım 5
+- [x] **Ekran payı: "görsel silindi" yer tutucusu çiziliyor** — Adım 7a
+      (`resultThumb`'ın `error` dinleyicisi, §0.6/K12)
+- [x] **`chat.js` mesaj sayısı kapısı yalnız KONUŞMA mesajlarını sayıyor**
+      (`MAX_CHAT_ITEMS` aynalandı; `MAX_CHAT_RESULTS` bilerek aynalanMADI,
+      §0.6/K13) — Adım 7a
+- [x] **Üretim açık oturuma katılıyor:** `session_id` iki dalda da gidiyor,
+      prompt kullanıcı turu olarak döküme giriyor, sonuç kaydı ekleniyor —
+      Adım 7a. Oturumu Görsel modundan BAŞLATMAK Adım 8'in işi (§0.6/K10)
+- [x] **`#session-title` / `#session-stamp` bağlandı** — Adım 7a. §0.2 bu ölü
+      işaretlemeyi kaçırmıştı; üretim açık oturumun dökümüne düştüğü için
+      "hangi oturumdayım" cevabının üst şeritte olması zorunlu
+
+Adım 8 — §4.2'nin manşeti:
+
+- [ ] `chat.js`'te "Forma aktar" **kalmadı**; yerine "Görsel modunda üret"
+- [ ] Görsel modunda dolu kutuda "Yönetmen'e sor" çıkıyor, boş kutuda çıkmıyor
+
+Adım 9 — arka uç:
+
+- [ ] Tema `settings`'e yazılıyor (allowlist: `kurumsal`/`amber`/`viola`/monokrom), `0600`
+- [ ] Kütüphane'de "Yüklemeler" türü + "Tümü" filtresi (`KINDS` testle genişletildi)
+
+Adım 10 — kozmetik:
+
+- [ ] Üst şeritte kebab (oturum menüsü) — Adım 6'dan sonra
+- [ ] Medya'da sıralama düğmesi
+- [ ] Klasör kartında kapak görseli (glif değil)
+- [ ] Medya'da `rail-count` sayacı
+- [ ] Boş durumda glif + tek satır metin
+- [ ] Klasör "Yeniden adlandır" **veya** sözleşmeden düşürüldüğü yazılı (D17 kararı)

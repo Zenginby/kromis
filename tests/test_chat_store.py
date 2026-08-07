@@ -16,6 +16,12 @@ import chat_store
 THREAD = [{"role": "user", "content": "kare instagram görseli"},
           {"role": "assistant", "content": "**PROMPT**\n```\na cat\n```"}]
 
+# Dökümdeki üçüncü rol (v2.0). Store rolleri DOĞRULAMIYOR — doğrulama
+# models.ChatMessage'ta; buradaki tek ilgisi kapak id'sini türetmek.
+def _result(*image_ids):
+    return {"role": "result", "image_ids": list(image_ids),
+            "params": {"kind": "generate", "size": "1024x1024", "quality": "medium"}}
+
 
 def _read_raw(output_dir) -> list:
     with open(os.path.join(str(output_dir), chat_store.CHATS_FILE), encoding="utf-8") as f:
@@ -106,7 +112,11 @@ def test_list_does_not_leak_message_bodies(tmp_path):
 
     assert "messages" not in summary
     assert summary["message_count"] == 2
-    assert set(summary) == {"id", "title", "created_at", "updated_at", "message_count"}
+    assert set(summary) == {"id", "title", "created_at", "updated_at",
+                            # v2.0: liste küçük resmi için TEK id alanı. Gövdenin
+                            # dışarıda kalma gerekçesi aynı — bu alan gövde değil,
+                            # gövdeden türetilen 12 karakter (bkz. cover_from).
+                            "cover_image_id", "message_count"}
 
 
 def test_list_is_empty_when_nothing_saved(tmp_path):
@@ -198,6 +208,29 @@ def test_delete_removes_only_the_named_chat(tmp_path):
     assert [c["id"] for c in _read_raw(out)] == [keep["id"]]
 
 
+def test_delete_all_empties_the_store_and_returns_the_count(tmp_path):
+    """Karar D1'in ikinci güvencesi: tek tıkla "tümünü sil".
+
+    Otomatik kayıt geçmişi kullanıcının istemediği kadar büyütebiliyor; tek tek
+    silmek tek çıkış yolu olsaydı güvence lafta kalırdı.
+    """
+    out = str(tmp_path / "output")
+    chat_store.create("bir", THREAD, out, now="2026-08-07T10:00:00")
+    chat_store.create("iki", THREAD, out, now="2026-08-07T11:00:00")
+
+    assert chat_store.delete_all(out) == 2
+    assert chat_store.list_chats(out) == []
+    assert _read_raw(out) == []
+
+
+def test_delete_all_is_zero_on_an_empty_store(tmp_path):
+    """Dosya yokken de çökmemeli ve dosya YARATMAMALI."""
+    out = str(tmp_path / "output")
+
+    assert chat_store.delete_all(out) == 0
+    assert not os.path.exists(out)
+
+
 def test_delete_is_false_for_unknown_or_unsafe_id(tmp_path):
     out = str(tmp_path / "output")
     chat_store.create("bir", THREAD, out, now="2026-08-05T10:00:00")
@@ -266,6 +299,95 @@ def test_write_is_atomic_and_leaves_no_temp_file(tmp_path):
     chat_store.create("bir", THREAD, out, now="2026-08-05T10:00:00")
 
     assert os.listdir(out) == [chat_store.CHATS_FILE]
+
+
+# ── v2.0: kapak görseli (liste küçük resmi) ─────────────────────────────
+#
+# Kapak PARAMETRE DEĞİL, dökümden TÜRETİLİYOR. Sebep: istemciden alınsaydı
+# oturumun dökümünde HİÇ olmayan bir görseli kapak yapabilirdi — panelde
+# gösterilen küçük resim ile açılan oturumun içeriği ayrışırdı. Türetme aynı
+# zamanda tek kaynak bırakıyor: kapak, dökümün kendisi.
+
+def test_a_session_without_a_result_has_no_cover_key(tmp_path):
+    """Koşullu yazım (storage'ın `imported`/`session_id` deseni): sohbet-yalnız
+    oturumlar bugünküyle aynı şekilde kalır."""
+    out = str(tmp_path / "output")
+
+    rec = chat_store.create("sohbet", THREAD, out, now="2026-08-07T10:00:00")
+
+    assert "cover_image_id" not in rec
+    assert "cover_image_id" not in _read_raw(out)[0]
+    # Özet alanı yine de VAR ve None: panel `.cover_image_id` diye bakabilsin.
+    assert chat_store.list_chats(out)[0]["cover_image_id"] is None
+
+
+def test_cover_is_the_first_image_of_the_first_result(tmp_path):
+    """İLK sonuç, son sonuç değil: kapak sabit kalmalı.
+
+    Son sonuçtan alınsaydı liste küçük resmi her üretimde değişirdi — kullanıcı
+    oturumu "o kırmızı afişli olan" diye tanıyorsa o iz kaybolur.
+    """
+    out = str(tmp_path / "output")
+    thread = (THREAD + [_result("aaaa1111aaaa", "bbbb2222bbbb")]
+              + [{"role": "user", "content": "bir de yatay"}]
+              + [_result("cccc3333cccc")])
+
+    rec = chat_store.create("üretimli", thread, out, now="2026-08-07T10:00:00")
+
+    assert rec["cover_image_id"] == "aaaa1111aaaa"
+    assert chat_store.list_chats(out)[0]["cover_image_id"] == "aaaa1111aaaa"
+
+
+def test_update_derives_the_cover_when_the_first_result_arrives(tmp_path):
+    """Otomatik kayıt (Adım 6) dökümü büyüterek yazıyor: kapak o turda doğar."""
+    out = str(tmp_path / "output")
+    rec = chat_store.create("sohbet", THREAD, out, now="2026-08-07T10:00:00")
+
+    grown = chat_store.update(rec["id"], out,
+                              messages=THREAD + [_result("aaaa1111aaaa")],
+                              now="2026-08-07T10:05:00")
+
+    assert grown["cover_image_id"] == "aaaa1111aaaa"
+
+
+def test_renaming_keeps_the_cover(tmp_path):
+    """`messages` verilmediyse döküme dokunulmuyor — kapak da öyle."""
+    out = str(tmp_path / "output")
+    rec = chat_store.create("üretimli", THREAD + [_result("aaaa1111aaaa")], out,
+                            now="2026-08-07T10:00:00")
+
+    renamed = chat_store.update(rec["id"], out, title="yeni ad",
+                                now="2026-08-07T11:00:00")
+
+    assert renamed["cover_image_id"] == "aaaa1111aaaa"
+
+
+def test_cover_leaves_with_the_result_it_came_from(tmp_path):
+    """Kapak dökümün DIŞINI gösteremez.
+
+    Bayat bir alan kalsaydı panel, o oturumda artık bulunmayan bir görselin
+    küçük resmini çizmeye devam ederdi — silinmiş görselin yer tutucusundan
+    (§5) farklı bir şey: burada kayıt yanlış, orada görsel yok.
+    """
+    out = str(tmp_path / "output")
+    rec = chat_store.create("üretimli", THREAD + [_result("aaaa1111aaaa")], out,
+                            now="2026-08-07T10:00:00")
+
+    trimmed = chat_store.update(rec["id"], out, messages=THREAD,
+                                now="2026-08-07T11:00:00")
+
+    assert "cover_image_id" not in trimmed
+    assert chat_store.list_chats(out)[0]["cover_image_id"] is None
+
+
+def test_cover_ignores_a_result_with_no_image_ids(tmp_path):
+    """Elle düzenlenmiş/bayat bir kayıt: çökmek yerine kapaksız kalınır."""
+    out = str(tmp_path / "output")
+    thread = THREAD + [{"role": "result", "params": {}}, _result("aaaa1111aaaa")]
+
+    rec = chat_store.create("bozuk", thread, out, now="2026-08-07T10:00:00")
+
+    assert rec["cover_image_id"] == "aaaa1111aaaa"
 
 
 def test_turkish_characters_survive_the_round_trip(tmp_path):

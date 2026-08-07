@@ -83,6 +83,12 @@ def save(image_bytes: bytes, meta: dict, output_dir: str, *, now: str) -> dict:
         # bağlı). folder_id/palette ile aynı geçiş stratejisi: eski kayıtlarda
         # alan yok, okuyan taraf .get()/falsy kontrolü yapıyor → göç gerekmez.
         **({"imported": True} if meta.get("imported") else {}),
+        # OTURUM ETİKETİ (v2.0): kayıt bir oturumun içinde üretildiyse o oturumun
+        # `chats.json` id'si. Yeni bir kimlik uzayı açılmadı. `imported` ile
+        # birebir aynı koşullu desen ve aynı gerekçe: oturum dışı üretim (Medya'dan
+        # doğrudan ya da otomatik kayıt kapalıyken) kalıcı bir hâl, o kayıtlara
+        # `"session_id": null` yazmak history.json'ın tamamını değiştirirdi.
+        **({"session_id": meta["session_id"]} if meta.get("session_id") else {}),
     }
     # immutable append: yeni liste yaz
     with _lock(output_dir):

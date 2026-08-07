@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 import app as appmod
 import chat_store
 import models
+import storage
 
 THREAD = [{"role": "user", "content": "kare instagram görseli"},
           {"role": "assistant", "content": "hangi mecra?"}]
@@ -44,15 +45,68 @@ def test_post_creates_a_chat_and_returns_the_record(client, out_dir):
     assert chat_store.get(chat["id"], out_dir) == chat
 
 
-def test_post_without_a_title_is_422(client):
+def test_post_without_a_title_is_an_automatic_save(client):
+    """v2.0 (karar D1): başlıksız POST = kullanıcının AD VERMEDİĞİ yazım.
+
+    v1.15'te bu 422'ydi ("Sohbet başlığı gerekli") çünkü yazan tek yol
+    kullanıcının kendi eylemiydi ve adsız bir sohbet kenar panelinde tıklanacak
+    hiçbir şey bırakmazdı. Otomatik kayıtla birlikte ad verecek bir kullanıcı
+    eylemi YOK: başlık ilk kullanıcı mesajından türetiliyor. Kural aynı kalıyor
+    (adsız sohbet olmaz), onu sağlayan taraf değişti.
+    """
     r = client.post("/api/chats", json={"messages": THREAD})
 
-    assert r.status_code == 422
-    assert "başlığı" in r.json()["detail"].lower()
+    assert r.status_code == 200, r.text
+    assert r.json()["chat"]["title"] == "kare instagram görseli"
+
+
+def test_a_derived_title_prefers_the_selection_label(client):
+    """Çip turunda modele giden cümle ile EKRANDA görünen etiket farklı
+    (`display`, v1.16). Panelde kullanıcının gördüğü metin başlık olmalı."""
+    thread = [{"role": "user", "content": "Instagram karesi üret, 1:1, kalabalık yok",
+               "display": "Instagram karesi"},
+              {"role": "assistant", "content": "kurdum"}]
+
+    r = client.post("/api/chats", json={"messages": thread})
+
+    assert r.json()["chat"]["title"] == "Instagram karesi"
+
+
+def test_a_derived_title_is_a_single_trimmed_line(client):
+    thread = [{"role": "user", "content": "  bayram için\nkare görsel  \n\nlazım "}]
+
+    r = client.post("/api/chats", json={"messages": thread})
+
+    assert r.json()["chat"]["title"] == "bayram için"
+
+
+def test_a_long_derived_title_is_cut_at_the_cap(client):
+    thread = [{"role": "user", "content": "ç" * (models.MAX_CHAT_TITLE_CHARS + 50)}]
+
+    title = client.post("/api/chats", json={"messages": thread}).json()["chat"]["title"]
+
+    assert len(title) == models.MAX_CHAT_TITLE_CHARS
+    assert title.endswith("…")
+
+
+def test_an_image_only_session_still_gets_a_title(client):
+    """Görsel modunda başlayan oturumun kullanıcı mesajı vardır (prompt), ama
+    döküm sonuç kaydıyla da başlayabilir: o zaman da adsız kalmamalı."""
+    result = {"role": "result", "image_ids": ["aaaa1111aaaa"],
+              "params": {"kind": "generate", "size": "1024x1024", "quality": "medium"}}
+
+    title = client.post("/api/chats", json={"messages": [result]}).json()["chat"]["title"]
+
+    assert title.strip()
 
 
 def test_post_with_a_whitespace_title_is_422(client):
-    """Boşluktan oluşan başlık, kenar panelinde tıklanacak hiçbir şey bırakmaz."""
+    """Boşluktan oluşan başlık, kenar panelinde tıklanacak hiçbir şey bırakmaz.
+
+    v2.0: "alan hiç gelmedi" ile "boş geldi" AYRI anlam taşıyor (`chat_deployment`
+    geleneği). Gelmeyen başlık türetiliyor (otomatik kayıt), boş gelen başlık ise
+    istemci hatası — sessizce türetilmesi o hatayı gizlerdi.
+    """
     r = _create(client, title="   ")
 
     assert r.status_code == 422
@@ -209,14 +263,112 @@ def test_delete_removes_the_chat_and_is_404_the_second_time(client, out_dir):
     assert chat_store.get(chat_id, out_dir) is None
 
 
+# ── v2.0: "tümünü sil" (karar D1'in ikinci güvencesi) ───────────────────
+
+def test_delete_all_empties_the_store(client, out_dir):
+    _create(client, title="bir")
+    _create(client, title="iki")
+
+    r = client.delete("/api/chats")
+
+    assert r.status_code == 200
+    assert r.json() == {"deleted": 2}
+    assert client.get("/api/chats").json() == {"chats": []}
+
+
+def test_delete_all_on_an_empty_store_is_not_an_error(client):
+    """404 DEĞİL: "hepsini sil" isteğinin sonucu zaten istenen durum.
+
+    Tek kayıt silmede 404 var çünkü orada "hangi kayıt?" sorusunun cevabı yok;
+    burada soru yok.
+    """
+    r = client.delete("/api/chats")
+
+    assert r.status_code == 200
+    assert r.json() == {"deleted": 0}
+
+
+# ── v2.0: otomatik kayıt anahtarı (karar D1'in üçüncü güvencesi) ─────────
+#
+# Anahtarın kapalı olması gerçekten YAZIM ENGELLİYOR, yalnızca istemciye rica
+# etmiyor. Ayrımı taşıyan işaret zaten elimizde: otomatik kaydın verecek bir ADI
+# yok. Yani "başlıksız yazım = otomatik yazım" ve kapalı anahtarda reddediliyor;
+# kullanıcının kendi başlattığı (adlandırdığı) yazım her koşulda çalışıyor —
+# "kapatınca bugünkü davranış" tam olarak bu.
+
+def test_an_automatic_save_is_refused_while_the_switch_is_off(client, out_dir):
+    client.post("/api/prefs", json={"autosave_sessions": False})
+
+    r = client.post("/api/chats", json={"messages": THREAD})
+
+    assert r.status_code == 409
+    assert "otomatik" in r.json()["detail"].lower()
+    assert client.get("/api/chats").json() == {"chats": []}, "kapalıyken diske yazıldı"
+
+
+def test_a_named_save_still_works_while_the_switch_is_off(client):
+    """"Bugünkü davranış" = v1.15'in davranışı: kullanıcı isterse kaydedilir."""
+    client.post("/api/prefs", json={"autosave_sessions": False})
+
+    r = _create(client, title="elle kaydettim")
+
+    assert r.status_code == 200
+    assert [c["title"] for c in client.get("/api/chats").json()["chats"]] \
+        == ["elle kaydettim"]
+
+
+def test_an_automatic_body_update_is_refused_while_the_switch_is_off(client, out_dir):
+    """Tur sonu yazımı da gövde-yalnız bir `PUT`: anahtar kapalıysa o da durur.
+
+    Yalnız `POST` kapatılsaydı anahtar yarım çalışırdı — açıkken başlamış bir
+    oturum kapatıldıktan sonra da her turda sessizce büyümeye devam ederdi.
+    """
+    cid = _create(client).json()["chat"]["id"]
+    client.post("/api/prefs", json={"autosave_sessions": False})
+
+    r = client.put(f"/api/chats/{cid}", json={"messages": THREAD + [
+        {"role": "user", "content": "devam"}]})
+
+    assert r.status_code == 409
+    assert chat_store.get(cid, out_dir)["messages"] == THREAD
+
+
+def test_renaming_still_works_while_the_switch_is_off(client, out_dir):
+    """Yeniden adlandırma kullanıcının kendi eylemi — anahtarla ilgisi yok."""
+    cid = _create(client).json()["chat"]["id"]
+    client.post("/api/prefs", json={"autosave_sessions": False})
+
+    r = client.put(f"/api/chats/{cid}", json={"title": "yeni ad"})
+
+    assert r.status_code == 200
+    assert chat_store.get(cid, out_dir)["title"] == "yeni ad"
+
+
+def test_deleting_still_works_while_the_switch_is_off(client):
+    """Anahtar YAZIMI kısıtlıyor; kullanıcının kendi verisini silmesini değil."""
+    cid = _create(client).json()["chat"]["id"]
+    client.post("/api/prefs", json={"autosave_sessions": False})
+
+    assert client.delete(f"/api/chats/{cid}").status_code == 200
+    assert client.delete("/api/chats").status_code == 200
+
+
 # ── Karar 4'ün kalan kapsamı ────────────────────────────────────────────
 
 def test_the_completion_route_still_writes_nothing(client, out_dir, monkeypatch):
     """Tamamlama rotası kaydetme yolundan AYRI kalmalı.
 
     v1.15 sohbet saklamayı getirdi ama "her yanıt sessizce diske" DEĞİL:
-    yazan tek yol kullanıcının başlattığı /api/chats. Bu iddia o sınırı
-    mekanik tutuyor (ikizi tests/test_chat_route.py'de).
+    yazan tek yol `/api/chats`. Bu iddia o sınırı mekanik tutuyor (ikizi
+    tests/test_chat_route.py'de).
+
+    **v2.0'da otomatik kayıt geldi ve bu sınır YİNE duruyor** — kasten. Otomatik
+    kayıt `/api/chat`'i yazan bir uca çevirmiyor; oturumu `/api/chats`'e yazan
+    istemci. Sebep birleşik dökümün kendisi: oturum yalnız konuşmadan oluşmuyor,
+    Görsel modunda üretilen sonuç kayıtları da içinde ve onlar `/api/chat`'e hiç
+    uğramıyor (`/api/generate`'ten doğuyorlar). Kalıcılık tamamlama rotasına
+    konsaydı sohbetsiz bir oturum hiç kaydedilemezdi; iki rotaya birden konsaydı
+    dökümün sırası iki yazımın damgalarından kurulmaya çalışılırdı.
     """
     monkeypatch.setattr(appmod.cc, "complete",
                         lambda messages, **kw: {"content": "x", "finish_reason": "stop"})
@@ -261,3 +413,60 @@ def test_saving_a_plain_thread_adds_no_null_display_to_the_file(client, out_dir)
     assert stored["messages"] == THREAD, "kaydedilen gövde girdiyle birebir değil"
     for m in stored["messages"]:
         assert "display" not in m, "None display diske yazılmış"
+
+
+# ── v2.0: birleşik oturum (sonuç kayıtları + kapak) ─────────────────────
+
+def _result(*image_ids):
+    return {"role": "result", "image_ids": list(image_ids),
+            "params": {"kind": "generate", "size": "1024x1024", "quality": "medium"}}
+
+
+def test_a_result_record_round_trips_through_the_store(client, out_dir):
+    """Birleşik dökümün tamamı TEK kayıtta: konuşma + üretilen görseller.
+
+    İkinci bir depo açılmadı çünkü sıra bilgisi tam olarak burada yaşıyor —
+    ayrı tutulsalar "hangi görsel hangi replikten sonra geldi" sorusunun cevabı
+    iki dosyanın damgalarını karşılaştırmaya kalırdı.
+    """
+    thread = THREAD + [_result("aaaa1111aaaa", "bbbb2222bbbb")]
+
+    cid = _create(client, messages=thread).json()["chat"]["id"]
+
+    got = client.get(f"/api/chats/{cid}").json()["chat"]["messages"]
+    assert got[-1] == {"role": "result",
+                       "image_ids": ["aaaa1111aaaa", "bbbb2222bbbb"],
+                       "params": {"kind": "generate", "size": "1024x1024",
+                                  "quality": "medium"}}
+    assert "content" not in got[-1], "sonuç kaydına None content yazılmış"
+
+
+def test_the_list_carries_the_cover_for_the_side_panel(client):
+    _create(client, title="üretimli", messages=THREAD + [_result("aaaa1111aaaa")])
+    _create(client, title="sohbet")
+
+    chats = client.get("/api/chats").json()["chats"]
+
+    assert {c["title"]: c["cover_image_id"] for c in chats} == {
+        "sohbet": None, "üretimli": "aaaa1111aaaa"}
+
+
+def test_a_deleted_image_leaves_the_transcript_readable(client, out_dir):
+    """`storage.delete_many` dökümdeki `image_id`'yi SARKIK bırakıyor — kasten.
+
+    Sunucu kaydı budamıyor: budasa oturum "burada iki görsel üretmiştim"
+    bilgisini kaybederdi. Sarkan id'yi arayüz "görsel silindi" yer tutucusuyla
+    çiziyor (tasarım §5); bu testin ölçtüğü şey sunucunun kendi payı —
+    döküm 200 dönmeye devam eder ve id'ler olduğu gibi kalır.
+    """
+    gen = storage.save(b"\x89PNG", {"prompt": "cat", "size": "1024x1024",
+                                    "quality": "low", "parent_id": None},
+                       out_dir, now="2026-08-07T10:00:00")
+    cid = _create(client, messages=THREAD + [_result(gen["id"])]).json()["chat"]["id"]
+
+    assert storage.delete_many([gen["id"]], out_dir) == 1
+
+    r = client.get(f"/api/chats/{cid}")
+    assert r.status_code == 200
+    assert r.json()["chat"]["messages"][-1]["image_ids"] == [gen["id"]]
+    assert client.get("/api/chats").json()["chats"][0]["cover_image_id"] == gen["id"]

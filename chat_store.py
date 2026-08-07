@@ -1,10 +1,28 @@
-"""Kayıtlı Prompt Yönetmeni sohbetleri ve chats.json yönetimi.
+"""Kayıtlı oturumlar (konuşma + üretilen görseller) ve chats.json yönetimi.
 
-v1.13'ün "karar 4"ü sohbeti diske hiç yazmıyordu; v1.15 o kararı İPTAL ETMİYOR,
-KAPSAMINI DARALTIYOR: tamamlama rotası (`POST /api/chat`) hâlâ hiçbir şey
-yazmıyor — yazan tek yol kullanıcının kendi başlattığı `/api/chats`. Ayrım
-önemli: modelden dönen her yanıtı sessizce diske almak ile kullanıcının
-"bu sohbeti sakla" demesi aynı şey değil.
+Kararın üç aşaması — hiçbiri silinmedi, her biri ötekini daralttı ya da açtı:
+
+**v1.13, "karar 4": sohbet diske HİÇ yazılmıyordu.** Gerekçe: modelden dönen her
+yanıtı sessizce diske almak ile kullanıcının "bu sohbeti sakla" demesi aynı şey
+değil.
+
+**v1.15: karar iptal edilmedi, KAPSAMI daraldı.** Sohbetler saklanabilir oldu ama
+yazan tek yol kullanıcının kendi başlattığı `/api/chats`; tamamlama rotası
+(`POST /api/chat`) hâlâ hiçbir şey yazmıyordu.
+
+**2026-08-06, karar D1: otomatik kayıt AÇILDI.** Gerekçe, v1.13'ün gerekçesini
+çürüten yeni bir gereksinim: birleşik oturum geçmişi ("konuşmalar ve üretilen
+görseller aynı yerde") ancak otomatik yazımla dolar — kullanıcı her turda "sakla"
+demek zorunda kalırsa geçmiş boş kalır. Üç güvence bunu v1.13'ün korktuğu şeyden
+ayırıyor: (a) her şey yerelde, `output_dir` ve izinler değişmedi; (b) oturum
+menüsünde tek tıkla sil ve tümünü sil (`delete`, `delete_all`); (c) `prefs.py`'de
+"oturumları otomatik kaydet" anahtarı — kapatınca v1.15 davranışına dönülüyor.
+
+**`POST /api/chat` yine hiçbir şey yazmıyor** ve bu tesadüf değil: oturumu
+`/api/chats`'e yazan taraf istemci. Oturum yalnız konuşmadan oluşmuyor — Görsel
+modunda üretilen sonuç kayıtları da dökümün parçası ve onlar tamamlama rotasına
+hiç uğramıyor. Kalıcılık oraya konsaydı sohbetsiz bir oturum hiç
+kaydedilemezdi (bkz. tests/test_chats_route.py'deki mekanik iddia).
 
 Kalıcılık İSTEMCİDE (localStorage) tutulamıyor, ölçülen bir sebeple:
 `desktop.py` pencereyi `webview.start()` ile argümansız açıyor ve pywebview
@@ -19,7 +37,9 @@ olduğu için eksikleri de beş yerde birden düzeltilmek zorundaydı.
 
 Sohbet SAYISINA üst sınır konmadı (bilinçli): tek kayıt models.py'deki
 MAX_CHAT_TOTAL_CHARS ile zaten sınırlı ve sessizce eski sohbet düşüren bir
-kırpma, kullanıcının "kaydedildi" beklentisini bozardı.
+kırpma, kullanıcının "kaydedildi" beklentisini bozardı. Otomatik kayıt bu sayıyı
+hızlandırıyor ama kararı değiştirmiyor: sessiz kırpma yerine görünür bir
+"tümünü sil" var (güvence b).
 """
 from __future__ import annotations
 
@@ -38,11 +58,62 @@ _SAFE_ID = re.compile(r"[0-9a-f]{8,32}")
 
 # Kenar panelinin gördüğü alanlar. `messages` BİLEREK yok: otuz sohbetin
 # gövdesini her açılışta göndermek boşuna trafik, gövde `get` ile geliyor.
-_SUMMARY_FIELDS = ("id", "title", "created_at", "updated_at")
+# `cover_image_id` (v2.0) o kuralın istisnası değil, uygulaması: liste küçük
+# resmi için gövdenin tamamı değil ondan TÜRETİLEN 12 karakter gidiyor.
+_SUMMARY_FIELDS = ("id", "title", "created_at", "updated_at", "cover_image_id")
+
+# Dökümdeki sonuç kaydının rolü. `models.RESULT_ROLE` ile aynı dize olmak
+# zorunda; import EDİLMİYOR çünkü models pydantic'e bağlı ve bu depo (diğer
+# dördü gibi) bilerek bağımsız — kayma tests/test_chat_store.py'de ölçülüyor.
+RESULT_ROLE = "result"
 
 
 def _chats_path(output_dir: str) -> str:
     return os.path.join(output_dir, CHATS_FILE)
+
+
+def valid_id(chat_id: str | None) -> bool:
+    """`_SAFE_ID` guard'ı — yol parçası taşıyan bir id dosyaya hiç ulaşmasın.
+
+    Ayrı bir fonksiyon çünkü `/api/generate` de bunu soruyor: bir görsel kaydına
+    yazılacak `session_id` aynı kapıdan geçmek zorunda (bkz. app._check_session).
+    """
+    return bool(chat_id) and _SAFE_ID.fullmatch(chat_id) is not None
+
+
+def cover_from(messages: list[dict]) -> str | None:
+    """Dökümdeki İLK sonuç kaydının ilk görseli; sonuç yoksa None.
+
+    Kapak PARAMETRE DEĞİL, türetiliyor. İstemciden alınsaydı oturumun dökümünde
+    hiç bulunmayan bir görseli kapak yapabilirdi: panelde görünen küçük resim ile
+    açılan oturumun içeriği ayrışırdı. Türetme tek kaynak bırakıyor — kapak,
+    dökümün kendisi.
+
+    SON değil İLK: son sonuçtan alınsaydı liste küçük resmi her üretimde
+    değişirdi ve kullanıcı oturumu "o kırmızı afişli olan" diye tanıyorsa o iz
+    kaybolurdu.
+
+    Bayat/elle düzenlenmiş kayda dayanıklı: `image_ids`'i olmayan bir sonuç
+    kaydı çökmeye değil, sıradakine bakmaya yol açar.
+    """
+    for m in messages or []:
+        if not isinstance(m, dict) or m.get("role") != RESULT_ROLE:
+            continue
+        image_ids = m.get("image_ids")
+        if isinstance(image_ids, list) and image_ids:
+            return image_ids[0]
+    return None
+
+
+def _with_cover(record: dict, messages: list[dict]) -> dict:
+    """Kaydı kapak alanı dökümle TUTARLI hale getirilmiş kopyasıyla değiştirir.
+
+    Kapak yoksa alan hiç yazılmaz (koşullu yazım geleneği) ve bayat bir alan
+    varsa DÜŞER: kapak dökümün dışını gösteremez.
+    """
+    cover = cover_from(messages)
+    rest = {k: v for k, v in record.items() if k != "cover_image_id"}
+    return {**rest, **({"cover_image_id": cover} if cover else {})}
 
 
 def _read(output_dir: str) -> list[dict]:
@@ -66,15 +137,21 @@ def _write(output_dir: str, items: list[dict]) -> None:
 
 
 def create(title: str, messages: list[dict], output_dir: str, *, now: str) -> dict:
-    """Yeni sohbet kaydı. `messages`: `[{"role": ..., "content": ...}, ...]`."""
+    """Yeni sohbet kaydı.
+
+    `messages` iki biçim taşıyabilir (v2.0, birleşik döküm):
+    `{"role": "user"|"assistant", "content": ...}` ve
+    `{"role": "result", "image_ids": [...], "params": {...}}`. Doğrulama BURADA
+    değil `models.ChatMessage`'ta; depo rolleri yalnızca kapak için okuyor.
+    """
     os.makedirs(output_dir, exist_ok=True)
-    record = {
+    record = _with_cover({
         "id": uuid.uuid4().hex[:12],
         "title": title,
         "messages": messages,
         "created_at": now,
         "updated_at": now,
-    }
+    }, messages)
     # Kilit "oku → değiştir → yaz"ın TAMAMINI sarıyor (bkz. jsonstore): tur sonu
     # otomatik kaydı ile kullanıcının yeniden adlandırması gerçekten paralel
     # çalışabiliyor ve araya girilse kaybeden yazım sessizce düşerdi.
@@ -108,7 +185,7 @@ def list_chats(output_dir: str) -> list[dict]:
 
 def get(chat_id: str, output_dir: str) -> dict | None:
     """Tam kayıt (gövdesiyle). Yok ya da geçersiz id ise None."""
-    if not chat_id or not _SAFE_ID.fullmatch(chat_id):
+    if not valid_id(chat_id):
         return None
     for c in _read(output_dir):
         if c.get("id") == chat_id:
@@ -124,7 +201,7 @@ def update(chat_id: str, output_dir: str, *, messages: list[dict] | None = None,
     öne alırdı ve panel sıralaması onu izlediği için (bkz. `list_chats`) sohbet
     listenin başına atlardı — kullanıcının yapmadığı bir iş.
     """
-    if not chat_id or not _SAFE_ID.fullmatch(chat_id):
+    if not valid_id(chat_id):
         return None
     with jsonstore.lock_for(_chats_path(output_dir)):
         items = _read(output_dir)
@@ -140,13 +217,32 @@ def update(chat_id: str, output_dir: str, *, messages: list[dict] | None = None,
         if title is not None:
             changes["title"] = title
         record = {**items[index], **changes}      # immutable: kopya üretilir
+        if messages is not None:
+            # Kapak dökümden türetiliyor, yani gövde değiştiyse yeniden hesaplanır.
+            # Yeniden adlandırmada gövdeye dokunulmadığı için kapak da korunur.
+            record = _with_cover(record, messages)
         _write(output_dir, items[:index] + [record] + items[index + 1:])
     return record
 
 
+def delete_all(output_dir: str) -> int:
+    """Tüm oturumları siler; silinen sayıyı döndürür (karar D1'in güvence b'si).
+
+    Dosya YOKSA yaratılmıyor: boş bir depoda "tümünü sil", var olmayan bir dosyayı
+    var etmemeli. Tek tek silmenin tek çıkış yolu olması otomatik kayıtla birlikte
+    güvenceyi lafta bırakırdı — otomatik yazım geçmişi kullanıcının istemediği
+    kadar büyütebiliyor.
+    """
+    with jsonstore.lock_for(_chats_path(output_dir)):
+        items = _read(output_dir)
+        if items:
+            _write(output_dir, [])
+    return len(items)
+
+
 def delete(chat_id: str, output_dir: str) -> bool:
     """Sohbeti siler. Bulunamadıysa/geçersiz id ise False."""
-    if not chat_id or not _SAFE_ID.fullmatch(chat_id):
+    if not valid_id(chat_id):
         return False
     with jsonstore.lock_for(_chats_path(output_dir)):
         items = _read(output_dir)

@@ -240,3 +240,134 @@ def test_the_display_label_counts_towards_the_total_thread_cap(client, fake_comp
     r = _post(client, messages)
 
     assert r.status_code == 422, "display toplam kapısına sayılmıyor"
+
+
+# ── v2.0: dökümdeki üçüncü rol (`result`) ───────────────────────────────
+
+def _result(*image_ids, **params):
+    return {"role": "result", "image_ids": list(image_ids),
+            "params": {"kind": "generate", "size": "1024x1024",
+                       "quality": "medium", **params}}
+
+
+def test_a_result_record_is_accepted_but_never_forwarded(client, fake_complete):
+    """Birleşik döküm: üretilen görseller konuşmanın İÇİNDE yaşıyor, yani her
+    turda tel üzerinden geri geliyorlar. Modele giden gövdede olmamaları
+    şart — Azure `result` rolünü bilmiyor (400) ve bilse de işine yaramaz.
+    """
+    thread = [{"role": "user", "content": "kare instagram görseli"},
+              {"role": "assistant", "content": "**PROMPT**\n```\na cat\n```"},
+              _result("aaaa1111aaaa", "bbbb2222bbbb"),
+              {"role": "user", "content": "bir de yatay olsun"}]
+
+    r = _post(client, thread)
+
+    assert r.status_code == 200, r.text
+    assert fake_complete[0] == [thread[0], thread[1], thread[3]], \
+        "sonuç kaydı Azure gövdesine sızdı"
+
+
+def test_result_records_do_not_count_towards_the_total_cap(client, fake_complete):
+    """Modele gitmeyen bir kayıt token bütçesini yemez (plan R5).
+
+    Sayılsaydı otomatik kayıtla dolan bir oturum sınıra ÜRETİM YAPTIKÇA çarpardı:
+    kullanıcı hiç uzun yazmadığı hâlde "sohbet çok uzun" görürdü.
+    """
+    per = models.MAX_CHAT_MSG_CHARS
+    messages = [{"role": "user", "content": "x" * per}
+                for _ in range(models.MAX_CHAT_TOTAL_CHARS // per)]
+    # Metin sınırın TAM dibinde; üstüne yalnızca sonuç kayıtları biniyor.
+    assert sum(len(m["content"]) for m in messages) == models.MAX_CHAT_TOTAL_CHARS
+    # Sonuçlar ARAYA giriyor: son mesaj kullanıcıda kalmak zorunda.
+    thread = [item for m in messages[:-1]
+              for item in (m, _result("aaaa1111aaaa"))] + [messages[-1]]
+
+    r = _post(client, thread)
+
+    assert r.status_code == 200, r.text
+
+
+def test_a_result_record_with_content_is_rejected(client, fake_complete):
+    """Sonuç kaydının metni YOK: kart görsellerden ve parametrelerden çiziliyor.
+
+    Kabul edilse döküme modele hiç gitmeyen, ölçülmeyen serbest metin girerdi —
+    `MAX_CHAT_TOTAL_CHARS`'ın delindiği yer tam burası olurdu.
+    """
+    bad = {**_result("aaaa1111aaaa"), "content": "üretildi"}
+
+    assert _post(client, [bad, {"role": "user", "content": "devam"}]).status_code == 422
+    assert not fake_complete
+
+
+def test_a_result_record_without_image_ids_is_rejected(client, fake_complete):
+    bad = {"role": "result",
+           "params": {"kind": "generate", "size": "1024x1024", "quality": "medium"}}
+
+    assert _post(client, [bad, {"role": "user", "content": "devam"}]).status_code == 422
+    assert not fake_complete
+
+
+def test_a_result_record_without_params_is_rejected(client, fake_complete):
+    """Kartın başlığı ("Üretildi · 1024² · Orta") parametrelerden geliyor;
+    onlar olmadan kart kendi geçmişini anlatamaz."""
+    bad = {"role": "result", "image_ids": ["aaaa1111aaaa"]}
+
+    assert _post(client, [bad, {"role": "user", "content": "devam"}]).status_code == 422
+    assert not fake_complete
+
+
+def test_a_result_record_with_an_unknown_kind_is_rejected(client, fake_complete):
+    bad = _result("aaaa1111aaaa", kind="teleport")
+
+    assert _post(client, [bad, {"role": "user", "content": "devam"}]).status_code == 422
+    assert not fake_complete
+
+
+def test_a_result_record_with_too_many_images_is_rejected(client, fake_complete):
+    """Tek üretim en çok `n=4` görsel döndürüyor (allowlist). Sınır olmasa
+    sonuç kayıtları chats.json'da ölçülmeyen tek yer olurdu."""
+    ids = [f"{i:012x}" for i in range(models.MAX_IMAGES_PER_RUN + 1)]
+
+    assert _post(client, [_result(*ids),
+                          {"role": "user", "content": "devam"}]).status_code == 422
+    assert not fake_complete
+
+
+def test_image_ids_on_a_conversation_message_are_rejected(client, fake_complete):
+    """Alanlar ROLE bağlı (`display` kuralının aynısı): kullanıcı mesajına
+    görsel id'si takılsa döküm iki farklı yerden sonuç çizmeye başlardı."""
+    bad = {"role": "user", "content": "kare", "image_ids": ["aaaa1111aaaa"]}
+
+    assert _post(client, [bad]).status_code == 422
+    assert not fake_complete
+
+
+def test_a_result_record_with_a_display_label_is_rejected(client, fake_complete):
+    """Pil KULLANICININ seçimini gösteriyor; sonuç kaydında yeri yok."""
+    bad = {**_result("aaaa1111aaaa"), "display": "Seçim: kare"}
+
+    assert _post(client, [bad, {"role": "user", "content": "devam"}]).status_code == 422
+    assert not fake_complete
+
+
+def test_a_thread_of_only_results_is_rejected(client, fake_complete):
+    """Son mesaj kullanıcıdan olmak zorunda kuralı korunuyor: yoksa Azure'a
+    yalnız sistem talimatı giderdi ve model kendi kendine konuşurdu."""
+    assert _post(client, [_result("aaaa1111aaaa")]).status_code == 422
+    assert not fake_complete
+
+
+def test_results_get_their_own_headroom_on_top_of_the_message_count(client, fake_complete):
+    """`MAX_CHAT_MESSAGES` KONUŞMA turlarını sayıyor.
+
+    Sonuç kayıtları aynı 24'lük kotayı paylaşsaydı üretim yapan bir oturum ~8
+    turda tükenir ve kullanıcı pydantic'in İNGİLİZCE `too_long` hatasını görürdü.
+    """
+    thread = [{"role": "assistant" if i % 2 else "user", "content": "x"}
+              for i in range(models.MAX_CHAT_MESSAGES)]
+    thread[-1] = {"role": "user", "content": "devam"}
+    with_results = thread[:-1] + [_result(f"{i:012x}") for i in range(4)] + [thread[-1]]
+    assert len(with_results) > models.MAX_CHAT_MESSAGES
+
+    assert _post(client, with_results).status_code == 200
+    assert len(fake_complete[0]) == models.MAX_CHAT_MESSAGES

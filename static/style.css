@@ -146,16 +146,6 @@ body {
   padding: 16px 12px; background: var(--panel);
   border-right: 1px solid var(--hairline);
 }
-.brand { padding: 4px 8px 16px; display: grid; gap: 3px; min-width: 0; }
-/* Wordmark mono kalıyor (plan §3: "mono yalnızca wordmark ve teknik bloklar",
-   izleme 0.08em). Serif eski kimlikti. Accent'li yarı da kalktı: --accent
-   yalnızca durum anlatır, marka dekoru değil. */
-.brand-mark {
-  font: 500 13px/1.4 var(--font-mono, ui-monospace, monospace);
-  letter-spacing: 0.08em; white-space: nowrap;
-}
-.brand-mark span { color: var(--muted); }
-.brand-sub { font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
 .rail-item {
   display: flex; align-items: center; gap: 12px;
   width: 100%; min-height: 44px; padding: 0 12px; margin: 0;
@@ -173,7 +163,6 @@ body {
 .rail-spacer { flex: 1 1 auto; min-height: 8px; }
 /* Daralmış ray: yalnızca ikonlar. Etiket `display: none` — genişlik animasyonu
    yerleşimi zorlar, ızgara kolonu zaten anında değişiyor. */
-.app.rail-collapsed .brand { display: none; }
 .app.rail-collapsed .rail-item { justify-content: center; padding: 0; gap: 0; }
 .app.rail-collapsed .rail-item span { display: none; }
 
@@ -318,12 +307,18 @@ body:has(.sheet.open) .scrim { display: block; }
   font: 500 17px/1.3 var(--font-display, system-ui, sans-serif);
 }
 .sheet-body { flex: 1 1 auto; overflow-y: auto; padding: 16px 18px; }
+/* Panelin dibi: yıkıcı eylem (tüm oturumları sil) tıklanacak satırların
+   ARASINDA durmasın — kendi bölmesinde, ayıran bir çizgiyle. `flex: none`
+   şart, yoksa gövdenin kaydırma alanını paylaşır. */
+.sheet-foot {
+  flex: none; padding: 12px 18px; border-top: 1px solid var(--hairline);
+}
+.sheet-foot .btn-ghost { width: 100%; margin: 0; }
 
 /* 1200px altında ray otomatik daralır, 760px yükseklik altında şerit 60px
    (tasarım §2.2). En küçük pencere 1024×700 — ikisi de orada devrede. */
 @media (max-width: 1200px) {
   .app { --rail-w: 72px; }
-  .brand { display: none; }
   .rail-item { justify-content: center; padding: 0; gap: 0; }
   .rail-item span { display: none; }
 }
@@ -1326,6 +1321,72 @@ body.viewer-open { overflow: hidden; }
   font-size: 11px; font-weight: 500; letter-spacing: 0.02em;
 }
 
+/* ── Sonuç kartı (üçüncü rol) ─────────────────────────────────────────
+   Döküm konuşmayı VE üretilen görselleri aynı akışta gösteriyor (tasarım §5).
+   Kart bir BALON DEĞİL: yönetmenin dediği bir replik değil, üretimin çıktısı —
+   o yüzden dolgusuz, tam genişlikte ve künyesi `.chat-role`'ün sessiz gri
+   diliyle (referans ekranın `.result .who` satırı). */
+.chat-result { display: flex; flex-direction: column; }
+.chat-result-grid { display: grid; gap: 10px; }
+/* Sütun ADETTEN geliyor: tek görsel yarım kart olarak değil geniş çizilmeli
+   (referans ekranın `.media.r32` kartı), dört görsel 2×2 olmalı. */
+.chat-result-grid[data-count="1"] { max-width: 520px; }
+.chat-result-grid:not([data-count="1"]) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.chat-media {
+  position: relative; margin: 0; overflow: hidden;
+  border-radius: 14px; background: var(--panel-2);
+  aspect-ratio: 1; cursor: zoom-in;
+}
+.chat-media > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.chat-media:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Künye ve eylem: `pointer-events` KAPALI olan yalnızca sayı — düğme
+   tıklanabilir kalmak zorunda (indirme büyüteci açmasın diye JS'te de
+   stopPropagation var). */
+.chat-media-num {
+  position: absolute; top: 8px; left: 8px; pointer-events: none;
+  background: rgba(20, 20, 21, 0.88); border-radius: 999px; padding: 4px 9px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; font-weight: 500; letter-spacing: 0.04em; color: var(--muted);
+}
+.chat-media-act {
+  position: absolute; right: 8px; bottom: 8px;
+  background: rgba(20, 20, 21, 0.88); color: var(--text);
+  border: 1px solid var(--control-border); border-radius: 999px;
+  padding: 6px 12px; font: inherit; font-size: 12px; cursor: pointer;
+  opacity: 0; transform: translateY(4px);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease),
+              background var(--dur) var(--ease);
+}
+.chat-media:hover .chat-media-act,
+.chat-media:focus-within .chat-media-act { opacity: 1; transform: none; }
+.chat-media-act:hover { background: var(--raised); }
+.chat-media-act:focus-visible {
+  opacity: 1; transform: none;
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+/* Silinmiş görsel: sunucu sarkan `image_id`'yi kasten budamıyor, döküm de
+   çökmüyor — kare "görsel silindi" diyor. Çizgili zemin (flow.css `.media .ph`)
+   "burada bir şey VARDI" bilgisini taşıyor; boş bir kutu bunu söylemezdi. */
+.chat-media.gone {
+  cursor: default; display: grid; place-content: center;
+  color: var(--placeholder); font-size: 11px; text-align: center;
+  background-image: repeating-linear-gradient(45deg,
+    rgba(255, 255, 255, 0.03) 0 10px, transparent 10px 20px);
+}
+.chat-media.gone .chat-media-act { display: none; }
+
+/* Ayarlar'daki anahtar satırı: kutucuk + etiket tek tıklama hedefi (<label>). */
+.switch-row {
+  display: flex; align-items: center; gap: 0.6rem;
+  margin: 0.7rem 0 0; cursor: pointer; font-size: 0.9rem;
+}
+.switch-row input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+.switch-row:has(input:focus-visible) {
+  outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px;
+}
+
 /* Kapı açıklaması: kilitli "Gönder"in NEDENİ. Uyarı tonunda ama alarm değil. */
 .chat-gate {
   margin: 0 0 0.8rem; padding: 0.7rem 0.85rem; border-radius: 10px;
@@ -1350,6 +1411,9 @@ body.viewer-open { overflow: hidden; }
   margin: 1.4rem 0 0; padding-top: 1rem; border-top: 1px solid var(--hairline);
   font-size: 13px; font-weight: 500; letter-spacing: 0.01em; color: var(--muted);
 }
+/* İlk alt başlık: modal başlığının hemen altında, ayıran çizgi GEREKSİZ
+   (modal-head'in kendi çizgisi zaten orada) ve üst boşluk da fazla olur. */
+.modal-subhead-first { margin-top: 0.2rem; padding-top: 0; border-top: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
@@ -1366,4 +1430,5 @@ body.viewer-open { overflow: hidden; }
   .viewer-img { animation: none; }
   /* Kart eylem satırı yalnız opacity ile belirir (flow.css'in aynı kuralı) */
   .card .acts { transform: none; }
+  .chat-media-act { transform: none; }
 }

@@ -193,6 +193,16 @@
     openerRect = null;
   }
 
+  // Tek dışa açılan dikiş: dökümdeki sonuç kartı da büyüteci açıyor
+  // (tasarım §6). Yeniden yazım YOK (§1.3) — imleç-sabitli zoom, rubberband
+  // pan sınırı, ctrl+wheel pinch ve ok adımı aynen yukarıda. `rect` verilirse
+  // büyüteç tıklanan karenin BULUNDUĞU yerden büyüyor: `openerRect` zaten bu
+  // iş için vardı, yalnız erişimi #preview-img'e kapalıydı.
+  window.openViewer = (src, alt, rect) => {
+    openerRect = rect || null;
+    open(src, alt);
+  };
+
   // --- olaylar --------------------------------------------------------------
 
   const previewImg = $("preview-img");

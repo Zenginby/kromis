@@ -18,12 +18,10 @@
        showView/syncTabThumb mekaniği olduğu gibi çalışmaya devam ediyor.
        Bkz. docs/flow-ui/flow-redesign-plan.md §4. -->
   <div class="app">
+    <!-- Rayda wordmark YOK (tasarım §6): kimlik üst şeritteki oturum adına ve
+         pencere başlığına (<title>) devredildi. Referans ekranların rayı da
+         yalnızca gezinme öğelerinden oluşuyor. -->
     <nav id="rail" class="rail" aria-label="Ana gezinme">
-      <div class="brand">
-        <span class="brand-mark">GPT-Image <span>Studio</span></span>
-        <span class="brand-sub">Azure gpt-image-2 · yerel</span>
-      </div>
-
       <button id="rail-studio" class="rail-item active" type="button" data-section="studio"
               aria-current="page" title="Stüdyo">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
@@ -341,6 +339,15 @@
       <ul id="chat-list" class="chat-list"></ul>
       <p id="chat-list-empty" class="chat-list-empty">Henüz kayıtlı sohbet yok.</p>
     </div>
+    <!-- Karar D1'in güvence (b)'si: tek tıkla "tümünü sil". Listenin ALTINDA
+         (tasarım §4.1) ve ayrı bir dipte: yıkıcı eylem, tıklanacak satırların
+         arasında durmamalı. Anahtarın kendisi Ayarlar'da — orası tercihlerin
+         yeri, burası oturumların. -->
+    <div class="sheet-foot">
+      <button type="button" id="chats-delete-all" class="btn-ghost btn-ghost-danger">
+        Tüm oturumları sil
+      </button>
+    </div>
   </aside>
 
   <!-- Üretim ayarları: sağdan slide-over. Bugünkü SİPARİŞ panelinin prompt
@@ -453,9 +460,15 @@
     <div class="modal-backdrop" data-close></div>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <div class="modal-head">
-        <h2 id="settings-title">Azure Ayarları</h2>
+        <!-- Başlık "Azure Ayarları" DEĞİL "Ayarlar": panel artık kimlik dışında
+             bir tercih de taşıyor (oturumların otomatik kaydı) ve tasarım §4.1
+             dişliyi tek bir "Ayarlar" paneli olarak adlandırıyor. Azure kendi
+             alt başlığına indi. -->
+        <h2 id="settings-title">Ayarlar</h2>
         <button id="settings-close" class="modal-x" type="button" aria-label="Kapat">×</button>
       </div>
+
+      <h3 class="modal-subhead modal-subhead-first">Azure · gpt-image-2</h3>
       <p class="modal-desc">
         gpt-image-2 erişim bilgileri. Yalnızca bu makineye kaydedilir (izin 0600).
         API anahtarı ekranda hiçbir zaman gösterilmez.
@@ -483,6 +496,23 @@
       <p class="field-note">
         Yönetmenin talimatını değiştirmek için bu dosyayı oluştur:
         <code id="chat-instructions-path">—</code>
+      </p>
+
+      <!-- Oturum tercihleri: karar D1'in güvence (c)'si. "Kaydet" düğmesinin
+           DIŞINDA ve bilerek — bu anahtar `/api/prefs`'e yazıyor, kimlik formu
+           ise `/api/settings`'e (§0.5/K7). Aynı düğmeye bağlanırsa bir tercihi
+           çevirmek Azure kimliğini yeniden yazmak zorunda kalır ve Azure hiç
+           yapılandırılmamışken anahtar çevrilemez olur; o yüzden anında yazıyor. -->
+      <h3 class="modal-subhead">Oturumlar</h3>
+      <label class="switch-row" for="pref-autosave">
+        <input type="checkbox" id="pref-autosave" checked />
+        <span>Oturumları otomatik kaydet</span>
+      </label>
+      <p class="field-note">
+        Açıkken her tur ve her üretim açık oturumun dökümüne yazılır — hepsi
+        <strong>yerelde</strong>, bugünkü çıktı klasöründe. Kapatılırsa yalnızca
+        kendin kaydettiğin ve adlandırdığın oturumlar yazılır. Üretilen görseller
+        her koşulda diske kaydedilmeye devam eder.
       </p>
 
       <p id="settings-status" class="modal-status" role="status"></p>

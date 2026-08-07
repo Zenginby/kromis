@@ -534,6 +534,20 @@ async function run() {
   // bayt bayt aynı kalır ve extra="forbid" boş bir alan görmez.
   const pal = readPaletteOpts();
 
+  // ── Birleşik oturum (tasarım §5) ──
+  // Üretim AÇIK bir oturuma katılıyor, kendi başına oturum AÇMIYOR: `session_id`
+  // biçim kapısından geçiyor ama varlık kapısı yok (§0.4/K2), yani henüz
+  // yazılmamış bir oturumun id'si gönderilemez — sarkan bir etiket diske
+  // yazılırdı. Oturumu Görsel modundan BAŞLATMAK tek composer'ın kararı
+  // (tasarım §4.2 → Adım 8): orada prompt yapısı gereği bir döküm turu.
+  //
+  // chat.js'in adlarına OLAY ANINDA dokunuluyor (tıklama) — dosyanın başındaki
+  // yükleme sırası kuralının izin verdiği tek yol.
+  const sessionId = openSessionId();
+  // Kullanıcının repliği üretimden ÖNCE döküme basılıyor (sendChat'in sırası):
+  // beklerken kendi cümlesini görüyor. Başarısızlıkta geri alınıyor.
+  const pending = sessionId ? beginResultTurn(prompt) : null;
+
   let request;
   if (editing) {
     const fd = new FormData();
@@ -544,6 +558,7 @@ async function run() {
     if (source.kind === "upload") fd.append("file", source.file);
     else fd.append("source_id", source.id);
     if (currentFolder) fd.append("folder_id", currentFolder.id);
+    if (sessionId) fd.append("session_id", sessionId);
     // Alanlar TEK TEK sayılmaz: JSON dalı `...pal` ile hepsini gönderirken
     // burada elle saymak `palette_id`'yi düşürmüştü — kayıtlı palet
     // düzenlemede dondurulmuş adlarını kaybediyor, sunucu (seed, mode)'dan
@@ -560,8 +575,11 @@ async function run() {
     request = fetch("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      // `session_id` KOŞULLU: oturum yoksa alan hiç gönderilmiyor, böylece
+      // gövde bugünküyle bayt bayt aynı kalıyor (palet dalının gerekçesi).
       body: JSON.stringify({ prompt, size, quality, n: parseInt(n, 10),
                              folder_id: currentFolder ? currentFolder.id : null,
+                             ...(sessionId ? { session_id: sessionId } : {}),
                              ...pal }),
     });
   }
@@ -596,8 +614,17 @@ async function run() {
         "yönlendirmesi olmadan üretildi. Prompt'u kısaltıp tekrar dene.";
     }
     ok = true;
+    // Sonuç kaydı döküme: konuşma ve üretilen görseller aynı akışta (tasarım §5).
+    // `image_ids` sunucunun döndürdüğü kayıtlardan geliyor; adet ayrı
+    // taşınmıyor, dizinin uzunluğundan okunuyor.
+    await appendResultTurn(pending, images.map((r) => r.id),
+                           { kind: editing ? "edit" : "generate", size, quality });
     await loadHistory();
   } catch (e) {
+    // BAŞARISIZ TUR GEÇMİŞTE KALMAZ (sendChat'in kuralı): kalsaydı döküme
+    // cevapsız bir kullanıcı turu düşer, yeniden denemek onu ikinci kez
+    // eklerdi. Prompt kutuda duruyor — core.js kutuyu hiç temizlemiyor.
+    dropPendingTurn(pending);
     statusEl.textContent = e.message;
   } finally {
     $("go").disabled = !configured; // yapılandırma kaybolduysa kapıyı yeniden açma

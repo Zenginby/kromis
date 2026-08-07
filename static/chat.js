@@ -15,18 +15,32 @@
 
 // Sunucudaki models.py sınırlarının aynası. İstemci kapısı olmadan sınır aşımı
 // pydantic'in İNGİLİZCE 422 metniyle geri dönerdi.
-const MAX_CHAT_MESSAGES = 24;        // models.MAX_CHAT_MESSAGES
+const MAX_CHAT_MESSAGES = 24;        // models.MAX_CHAT_MESSAGES (yalnız KONUŞMA)
 const MAX_CHAT_MSG_CHARS = 6000;     // models.MAX_CHAT_MSG_CHARS (KULLANICI mesajı)
 const MAX_CHAT_TOTAL_CHARS = 60000;  // models.MAX_CHAT_TOTAL_CHARS
+// Dökümün TOPLAM öğe sınırı (models.MAX_CHAT_ITEMS = MAX_CHAT_MESSAGES +
+// MAX_CHAT_RESULTS). Sonuç kayıtları konuşma kotasını PAYLAŞMIYOR: paylaşsalardı
+// üretim yapan bir oturum ~8 turda dolardı (§0.4/K4).
+//
+// ⚠️ `MAX_CHAT_RESULTS` BİLEREK aynalanmıyor: sunucu sonuç ADEDİNİ ayrıca
+// kapamıyor, yalnız "konuşma ≤ 24" ve "toplam ≤ 48" diyor. İstemci burada 24'te
+// durursa SUNUCUDAN KATI olur ve bu tam olarak düzeltilen hatanın kendisi —
+// sohbetsiz bir oturum 24. üretimde sebepsiz kilitlenirdi.
+const MAX_CHAT_ITEMS = 48;
+// Üçüncü rol (models.RESULT_ROLE). Bu dize İKİ kapıda ve üç çizim dalında
+// geçiyor — sabit olarak duruyor ki biri yanlış yazıldığında sessizce
+// "konuşma mesajı" sayılmasın.
+const RESULT_ROLE = "result";
 // Yanıt sınırı (models.MAX_CHAT_REPLY_CHARS) BİLEREK aynalanmıyor: burada
 // ölçülecek bir şey yok, gelen yanıtı sunucu zaten kapıda kesiyor. Aşağıdaki
 // toplam kapısı da yanıt için yer AYIRMIYOR — kaydetme kapısı (models
 // .MAX_CHAT_SAVE_TOTAL_CHARS) tam bir yanıt kadar geniş, yoksa sınırın dibinde
 // geçen bir turun yanıtı hiç kaydedilemezdi.
-// Başlık ilk kullanıcı mesajından türetiliyor. Modele "bu sohbete isim ver"
-// diye İKİNCİ bir çağrı YAPILMIYOR: para ve gecikme, kazancı bir etiket.
-// Beğenmeyen kullanıcı 3-nokta menüsünden yeniden adlandırıyor.
-const CHAT_TITLE_CHARS = 48;         // models.MAX_CHAT_TITLE_CHARS'tan (120) dar
+// Başlık SUNUCUDA türetiliyor (v2.0 / `app._auto_title`) ve istemcideki
+// `deriveTitle` bu yüzden kalktı: başlıksız yazım artık "bu otomatik kayıt"
+// işareti (bkz. persistThread). Modele "bu sohbete isim ver" diye İKİNCİ bir
+// çağrı hâlâ yapılmıyor — para ve gecikme, kazancı bir etiket. Beğenmeyen
+// kullanıcı kebap menüsünden yeniden adlandırıyor.
 const MAX_CHAT_DISPLAY_CHARS = 400;  // models.MAX_CHAT_DISPLAY_CHARS
 
 // Açık sohbetin gövdesi burada yaşıyor; her tur sonunda /api/chats'e yazılıyor
@@ -717,6 +731,23 @@ function scrollMessageIntoView(node) {
   });
 }
 
+// ── Sayım: iki kotanın tek kaynağı ──────────────────────────────────
+// Sunucudaki `models._check_chat_counts` ile aynı ayrımı yapıyor. Ayrı ayrı
+// `filter(...).length` yazılsa iki kapı zamanla ayrışırdı.
+function conversationCount() {
+  return chatThread.filter((m) => m.role !== RESULT_ROLE).length;
+}
+
+/** Konuşma kotası dolu mu (`models._check_chat_counts`'un aynası). */
+function conversationIsFull() {
+  return conversationCount() >= MAX_CHAT_MESSAGES;
+}
+
+/** `slots` öğe daha sığmıyor mu (`ChatSaveRequest.messages`'ın alan sınırı). */
+function transcriptIsFull(slots) {
+  return chatThread.length + slots > MAX_CHAT_ITEMS;
+}
+
 /** Kullanıcı turu. `msg.display` VARSA baloncuk değil sessiz bir "seçim" pili.
  *
  * v1.15'te çip seçimleri `" · "` ile birleştirilip normal baloncuk olarak
@@ -745,6 +776,127 @@ function appendUser(msg) {
     div.className = "chat-msg-user";
     div.textContent = msg.content;
   }
+  $("chat-log").appendChild(div);
+  syncEmptyState();
+  scrollMessageIntoView(div);
+  return div;
+}
+
+// ── Sonuç kartı (üçüncü rol) ────────────────────────────────────────
+// Döküm konuşmayı VE üretilen görselleri aynı akışta gösteriyor: kayıt
+// `{role:"result", image_ids:[…], params:{kind,size,quality}}` (models.py).
+//
+// Kart kendi başına yetiyor, ikinci bir istek YOK: dosya adı sözleşmesi
+// `{id}.png` (bkz. storage.save / delete_many docstring'i), yani URL id'den
+// kuruluyor. `/api/history` KULLANILAMAZDI — o uç klasöre göre süzülüyor ve
+// başka bir klasöre taşınmış bir sonuç görselini hiç döndürmezdi.
+
+// Sunucu bu değerleri allowlist'e karşı DOĞRULAMIYOR (§0.4/K5): allowlist bir
+// gün daralırsa eski oturumlar kaydedilemez hale gelirdi. Tanınmayan bir değer
+// bu yüzden burada da hata değil — ham hâliyle gösteriliyor.
+const SIZE_LABELS = { "1024x1024": "1024²", "1024x1536": "1024×1536",
+                      "1536x1024": "1536×1024" };
+const QUALITY_LABELS = { low: "Düşük", medium: "Orta", high: "Yüksek" };
+const RESULT_KIND_LABELS = { generate: "Üretildi", edit: "Düzenlendi" };
+
+/** Kart künyesi: "Üretildi · 1024² · Orta · x2".
+ *
+ * Adet `image_ids`'in UZUNLUĞUNDAN geliyor, `params`'tan değil (tasarım §5):
+ * silinmiş bir görsel bile o sayıyı dürüst tutuyor.
+ */
+function resultCaption(msg) {
+  const p = msg.params || {};
+  const parts = [RESULT_KIND_LABELS[p.kind] || "Üretildi"];
+  if (p.size) parts.push(SIZE_LABELS[p.size] || p.size);
+  if (p.quality) parts.push(QUALITY_LABELS[p.quality] || p.quality);
+  parts.push(`x${(msg.image_ids || []).length}`);
+  return parts.join(" · ");
+}
+
+/** Tek kare. Sarkan id'de "görsel silindi" yer tutucusu çiziliyor.
+ *
+ * Ölçü `error` OLAYI, bayat bir dizin değil: sunucu sarkan `image_id`'yi kasten
+ * budamıyor (test_a_deleted_image_leaves_the_transcript_readable) ve dosya
+ * gerçekten yoksa `/output/{id}.png` 404 döner. Gerçek koşulu ölçmek, ayrıca
+ * tutulacak bir liste de bırakmıyor.
+ */
+function resultThumb(imageId, index, caption) {
+  const fig = document.createElement("figure");
+  fig.className = "chat-media";
+
+  const num = document.createElement("span");
+  num.className = "chat-media-num";
+  num.textContent = String(index + 1).padStart(2, "0");
+
+  const src = `/output/${encodeURIComponent(imageId)}.png`;
+  const img = document.createElement("img");
+  img.src = src;
+  img.alt = caption;
+  img.loading = "lazy";
+  img.addEventListener("error", () => {
+    // Kare boş KALMIYOR: kaybolan bir küçük resim "yükleniyor" ile
+    // "silindi"yi ayırt edilemez yapardı.
+    img.remove();
+    const ph = document.createElement("span");
+    ph.className = "chat-media-ph";
+    ph.textContent = "Görsel silindi";
+    fig.append(ph);
+    fig.classList.add("gone");
+    fig.removeAttribute("tabindex");
+    fig.removeAttribute("role");
+  });
+
+  // Tıklama VE Enter: kare bir düğme değil (içinde kendi eylemi olan bir
+  // <figure>), o yüzden ikisi de elle bağlanıyor.
+  fig.tabIndex = 0;
+  fig.setAttribute("role", "button");
+  fig.setAttribute("aria-label", `${caption} — büyüt`);
+  const zoom = () => {
+    if (fig.classList.contains("gone")) return;
+    window.openViewer(src, caption, fig.getBoundingClientRect());
+  };
+  fig.addEventListener("click", zoom);
+  fig.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); zoom(); }
+  });
+
+  const dl = document.createElement("button");
+  dl.type = "button";
+  dl.className = "chat-media-act";
+  dl.textContent = "İndir";
+  dl.addEventListener("click", (e) => {
+    e.stopPropagation();               // indirme büyüteci açmasın
+    downloadImage(src, `${imageId}.png`);
+  });
+
+  // "Düzenle" ve "+ Ek" BİLEREK yok: ikisi de tam bir geçmiş KAYDI istiyor
+  // (prompt, boyut, klasör), döküm ise yalnız id taşıyor. Çalışmayan bir düğme
+  // çizmek yerine composer turuna (Adım 8) bırakıldı.
+  fig.append(img, num, dl);
+  return fig;
+}
+
+function appendResult(msg) {
+  const div = document.createElement("div");
+  div.className = "chat-result";
+
+  const caption = resultCaption(msg);
+  const role = document.createElement("span");
+  role.className = "chat-role";
+  role.textContent = caption;
+  div.appendChild(role);
+
+  const grid = document.createElement("div");
+  grid.className = "chat-result-grid";
+  const ids = msg.image_ids || [];
+  // Izgara sütunu ADETTEN geliyor: tek görsel yarım kart olarak değil geniş
+  // çizilmeli (referans ekranın `.media.r32` kartı). Üst sınır SUNUCUDA
+  // (`models.MAX_IMAGES_PER_RUN`), burada aynalanacak bir şey yok — CSS
+  // yalnızca "1 mi, 2 mi, daha fazla mı" sorusunu soruyor.
+  grid.dataset.count = String(ids.length);
+  ids.forEach((id, i) => grid.appendChild(resultThumb(id, i, caption)));
+  div.appendChild(grid);
+
   $("chat-log").appendChild(div);
   syncEmptyState();
   scrollMessageIntoView(div);
@@ -814,15 +966,21 @@ async function sendChat(display = "") {
     chatStatus(`Mesaj çok uzun (${message.length}/${MAX_CHAT_MSG_CHARS} karakter).`);
     return false;
   }
-  if (chatThread.length >= MAX_CHAT_MESSAGES) {
-    chatStatus("Bu sohbet doldu (en fazla 12 tur). Soldaki \"Yeni sohbet\" ile devam et.");
+  // İKİ kapı, çünkü sunucuda da iki tane var: konuşma turu sayısı
+  // (`_check_chat_counts`) ve TOPLAM öğe sayısı (alan sınırı). `chatThread.length`
+  // tek başına konuşma kapısı olarak sayılsaydı dökümdeki her sonuç kartı bir
+  // tur çalar ve üretim yapan oturum ~8 turda kilitlenirdi.
+  if (conversationIsFull() || transcriptIsFull(1)) {
+    chatStatus("Bu sohbet doldu (en fazla 12 tur). Üst şeritteki \"Yeni oturum\" ile devam et.");
     return false;
   }
   // Toplam, sunucunun `models._check_chat_total` ile AYNI şeyi sayıyor:
-  // `content` + `display`. Ayrışsalar istemci sınırın dibinde geçen bir turu
-  // gönderir ve sunucu 422 ile geri çevirirdi.
+  // `content` + `display`, sonuç kayıtları HARİÇ (onlar modele gitmiyor).
+  // `m.content.length` yazılamaz: sonuç kaydında `content` HİÇ YOK ve okumak
+  // TypeError atardı — gönderim tümden ölürdü.
   const used = chatThread.reduce(
-    (n, m) => n + m.content.length + (m.display || "").length, 0);
+    (n, m) => (m.role === RESULT_ROLE ? n
+      : n + (m.content || "").length + (m.display || "").length), 0);
   if (used + message.length + label.length > MAX_CHAT_TOTAL_CHARS) {
     chatStatus("Sohbet çok uzadı — soldaki \"Yeni sohbet\" ile devam et. (Son prompt'u "
       + "kaybetmemek için önce \"Forma aktar\"a bas.)");
@@ -887,20 +1045,14 @@ async function chatApi(path, { method = "GET", body } = {}) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(detailText(err) || `Hata (${res.status})`);
+    const e = new Error(detailText(err) || `Hata (${res.status})`);
+    // Durum kodu METİNDEN okunamaz: `detail` varsa `${res.status}` hiç
+    // yazılmıyor. 409'u (otomatik kayıt kapalı) beklenen bir durum olarak
+    // ayırmak için kodun kendisi taşınıyor.
+    e.status = res.status;
+    throw e;
   }
   return res.json();
-}
-
-/** Başlık = ilk kullanıcı mesajı, kelime sınırında kısaltılmış. */
-function deriveTitle() {
-  const first = chatThread.find((m) => m.role === "user");
-  const text = (first ? first.content : "").replace(/\s+/g, " ").trim();
-  if (!text) return "Adsız sohbet";
-  if (text.length <= CHAT_TITLE_CHARS) return text;
-  const cut = text.slice(0, CHAT_TITLE_CHARS);
-  const space = cut.lastIndexOf(" ");
-  return `${space > 20 ? cut.slice(0, space) : cut}…`;
 }
 
 /** Sunucunun döndürdüğü kaydı panel listesine işler — İKİNCİ bir istek YOK.
@@ -934,20 +1086,118 @@ function dropSummary(chatId) {
   renderChatList();
 }
 
+/** Turu diske yazar. Başlık GÖNDERİLMİYOR — ve bu bir güvenlik mandalı.
+ *
+ * "Başlıksız yazım = otomatik yazım" sunucunun anahtarı uygulamak için
+ * kullandığı işaret (§0.5/K8): uydurulamaz, çünkü otomatik kaydın verecek bir
+ * adı yok. İstemci burada bir başlık türetirse (v1.15'te türetiyordu) o işaret
+ * yok olur ve "oturumları otomatik kaydet" anahtarı SESSİZCE delinir — kapalıyken
+ * de yazım geçer. Adı sunucu türetiyor (`app._auto_title`); kullanıcı kebaptan
+ * yeniden adlandırabiliyor, o yol adlandırılmış yazım olduğu için hep çalışıyor.
+ */
 async function persistThread() {
   try {
     const path = currentChatId ? `/api/chats/${currentChatId}` : "/api/chats";
-    const method = currentChatId ? "PUT" : "POST";
-    const body = currentChatId ? { messages: chatThread }
-                               : { title: deriveTitle(), messages: chatThread };
-    const { chat } = await chatApi(path, { method, body });
+    const { chat } = await chatApi(path, {
+      method: currentChatId ? "PUT" : "POST", body: { messages: chatThread },
+    });
     currentChatId = chat.id;
     upsertSummary(chat);
+    syncSessionHeader(chat);
   } catch (e) {
+    // 409 = anahtar KAPALI. Bu bir hata değil, kullanıcının kendi kararı:
+    // "kaydedilemedi" tonuyla söylenirse her turda bir arıza sanılır. Yanıt
+    // ekranda duruyor ve elle kaydetmek (yeniden adlandırma) hâlâ çalışıyor.
+    if (e.status === 409) {
+      chatStatus("Otomatik kayıt kapalı — bu oturum diske yazılmadı. "
+        + "Ayarlar'dan açabilirsin.");
+      return;
+    }
     // Tur DÜŞMÜYOR: yanıt ekranda ve bellekte duruyor, yalnız diske yazılamadı.
     // Sessiz geçilse kullanıcı sohbetin kaydedildiğini sanardı.
     chatStatus(`Sohbet kaydedilemedi (${e.message}) — yanıt ekranda duruyor.`);
   }
+}
+
+// ── Görsel modundaki üretimin döküme yazılması ───────────────────────
+// core.js'in `run()`'ı bu üç fonksiyonu OLAY ANINDA çağırıyor (yükleme sırası
+// bozulmuyor: chat.js en sonda yükleniyor, core.js yalnız tıklama anında
+// buraya bakıyor — dosyanın başındaki yaprak kuralının aynısı).
+//
+// Üretim AÇIK bir oturuma katılıyor, kendi başına oturum AÇMIYOR: `session_id`
+// biçim kapısından geçiyor ama varlık kapısı yok (§0.4/K2), yani var olmayan
+// bir id sarkan bir etiket olarak diske yazılırdı. Oturumu Görsel modundan
+// BAŞLATMAK tek composer'ın kararı (tasarım §4.2 → Adım 8); orada prompt
+// yapısı gereği bir döküm turu.
+
+/** İki kotanın TEK kapısı; dolu ise gerekçesini de yazar.
+ *
+ * Paylaşılıyor çünkü iki yer aynı soruyu soruyor: turu AÇAN `beginResultTurn`
+ * ve turu KAPATAN `appendResultTurn`. Ayrı yazılsalar açılan ama kapatılamayan
+ * bir tur doğardı — dökümde cevapsız bir kullanıcı satırı kalırdı.
+ */
+function transcriptHasRoom(slots) {
+  if (conversationIsFull() || transcriptIsFull(slots)) {
+    // Üretimin KENDİSİ engellenmiyor: görsel diske yazılıyor ve Medya'da
+    // duruyor. Sessiz sapma yasak (applyToForm geleneği), o yüzden döküme
+    // girmediği açıkça söyleniyor.
+    chatStatus("Oturum doldu — bu üretim döküme eklenmedi. "
+      + "Üst şeritteki \"Yeni oturum\" ile devam et.");
+    return false;
+  }
+  return true;
+}
+
+/** Prompt'u kullanıcı turu olarak döküme basar. → tur nesnesi | null.
+ *
+ * Üretimden ÖNCE çağrılıyor: kullanıcı kendi repliğini beklerken görüyor
+ * (sendChat'in aynı sırası). Başarısızlıkta `dropPendingTurn` geri alıyor.
+ */
+function beginResultTurn(prompt) {
+  // İKİ öğe için yer isteniyor: bu kullanıcı turu VE onu izleyecek sonuç kaydı.
+  // Bir öğe sorulsa tur açılır ama kapatılamazdı — dökümde cevapsız bir
+  // kullanıcı satırı kalırdı.
+  if (!transcriptHasRoom(2)) return null;
+  const turn = { role: "user", content: prompt.slice(0, MAX_CHAT_MSG_CHARS) };
+  chatThread.push(turn);
+  return { turn, bubble: appendUser(turn) };
+}
+
+/** BAŞARISIZ TUR GEÇMİŞTE KALMAZ (sendChat'in kuralı).
+ *
+ * Kalsaydı döküme cevapsız bir kullanıcı turu düşer, yeniden denemek onu ikinci
+ * kez eklerdi ve oturum aynı prompt'un kopyalarıyla dolardı. Prompt kutuda
+ * duruyor (core.js temizlemiyor), yani metin de kaybolmuyor.
+ */
+function dropPendingTurn(pending) {
+  // `done` işareti ŞART: sonuç kaydı yazıldıktan SONRA bir hata bu yola düşerse
+  // (ör. `loadHistory` ağ hatası) kullanıcı turu silinir, sonuç kaydı KALIR ve
+  // döküme sahipsiz bir kart düşer. Kapanmış tur geri alınamaz.
+  if (!pending || pending.done) return;
+  chatThread = chatThread.filter((m) => m !== pending.turn);
+  pending.bubble.remove();
+  syncEmptyState();
+}
+
+/** Sonuç kaydını döküme ekler ve oturumu diske yazar. */
+async function appendResultTurn(pending, imageIds, params) {
+  // Yeniden sorulUYOR: üretim sürerken kullanıcı sohbet etmeye devam edebilir
+  // (`#go` kilitli ama "Gönder" değil), yani döküm arada büyümüş olabilir.
+  if (!pending || !transcriptHasRoom(1)) return;
+  // Boş `image_ids` sunucuda 422 (`min_length=1`) ve kullanıcının açıklayamadığı
+  // bir hata olurdu: görsel dönmediyse yazılacak bir sonuç da yok. Kullanıcı
+  // turu da düşüyor — cevapsız kalmasın.
+  if (!imageIds.length) { dropPendingTurn(pending); return; }
+  pending.done = true;
+  const record = { role: RESULT_ROLE, image_ids: imageIds, params };
+  chatThread.push(record);
+  appendResult(record);
+  await persistThread();
+}
+
+/** Açık oturumun id'si — core.js üretimi ona etiketliyor (yoksa null). */
+function openSessionId() {
+  return currentChatId;
 }
 
 /** "14:32" (bugünse) ya da "5 Ağu" — panelde tek satır sığacak kadar kısa. */
@@ -1061,6 +1311,74 @@ function renderChatList() {
   $("chat-list-empty").hidden = chatSummaries.length > 0;
 }
 
+// ── Üst şerit: hangi oturumdayım ─────────────────────────────────────
+// `#session-title` / `#session-stamp` PR 1'de kondu, hiç bağlanmamıştı.
+// Bağlanması bir GEREKLİLİK, süs değil: kabuk iki modda da aynı ve Görsel
+// modunda üretilen görsel açık oturumun dökümüne düşüyor — kullanıcı hangi
+// oturumda olduğunu görmezse görsel bilmediği bir yere gitmiş olurdu.
+function syncSessionHeader(chat) {
+  $("session-title").textContent = chat ? (chat.title || "Adsız oturum") : "Yeni oturum";
+  $("session-stamp").textContent = chat ? shortStamp(chat.updated_at) : "";
+}
+
+/** Karar D1'in güvence (b)'si: tümünü sil.
+ *
+ * Onay ZORUNLU ve tek kayıt silmekten daha güçlü bir gerekçeyle: burada geri
+ * alınamayan işlem TOPLU. Anahtardan bağımsız (§0.5/K8) — anahtar YAZIMI
+ * kısıtlıyor, kullanıcının kendi verisini silmesini değil.
+ */
+async function deleteAllChats() {
+  const count = chatSummaries.length;
+  if (!count) { chatStatus("Silinecek oturum yok."); return; }
+  const ok = await confirmDialog("Tüm oturumları sil",
+    `${count} oturum kalıcı olarak silinecek. Üretilen görseller SİLİNMEZ — `
+    + "yalnızca oturum dökümleri gider. Bu işlem geri alınamaz.",
+    { okLabel: "Tümünü sil" });
+  if (!ok) return;
+  try {
+    const { deleted } = await chatApi("/api/chats", { method: "DELETE" });
+    resetThread();                    // açık oturum da silindi
+    chatSummaries = [];
+    renderChatList();
+    syncSessionHeader(null);
+    chatStatus(`${deleted} oturum silindi.`);
+  } catch (e) {
+    chatStatus(`Silinemedi: ${e.message}`);
+  }
+}
+
+// ── "Oturumları otomatik kaydet" anahtarı ────────────────────────────
+// Uç BİLEREK `/api/settings` değil `/api/prefs` (§0.5/K7): bir tercihi çevirmek
+// Azure kimliğini yeniden yazmak zorunda kalmasın ve Azure hiç
+// yapılandırılmamışken de anahtar çevrilebilsin.
+async function loadPrefs() {
+  try {
+    const p = await chatApi("/api/prefs");
+    $("pref-autosave").checked = p.autosave_sessions !== false;
+  } catch {
+    // Tercih alınamadı: anahtarın GÖRÜNEN hâli varsayılana (açık) düşüyor,
+    // ama yazımı sunucu zaten kendisi kapıyor — burada fail-open yok.
+    $("pref-autosave").checked = true;
+  }
+}
+
+async function saveAutosavePref() {
+  const on = $("pref-autosave").checked;
+  try {
+    const p = await chatApi("/api/prefs",
+      { method: "POST", body: { autosave_sessions: on } });
+    // Anahtar SUNUCUNUN döndürdüğü değere göre kuruluyor: yazım reddedilmişse
+    // kutucuk kullanıcıya yalan söylemesin.
+    $("pref-autosave").checked = p.autosave_sessions !== false;
+    $("settings-status").textContent = p.autosave_sessions
+      ? "Oturumlar otomatik kaydedilecek."
+      : "Otomatik kayıt kapatıldı — yalnızca elle kaydedilen oturumlar yazılır.";
+  } catch (e) {
+    $("pref-autosave").checked = !on;   // gerçekleşmeyen değişikliği geri al
+    $("settings-status").textContent = `Tercih kaydedilemedi: ${e.message}`;
+  }
+}
+
 async function loadChats() {
   try {
     const { chats } = await chatApi("/api/chats");
@@ -1080,6 +1398,7 @@ function resetThread() {
   $("chat-log").innerHTML = "";       // ← innerHTML yalnız BOŞ DİZEYLE
   chatStatus("");
   syncEmptyState();
+  syncSessionHeader(null);
 }
 
 function newChat() {
@@ -1103,12 +1422,18 @@ async function openChat(chatId) {
     for (const m of chatThread) {
       // Mesaj NESNESİ geçiliyor, `content` değil: pil/baloncuk ayrımı
       // `m.display`'de yaşıyor ve yeniden açılışta da aynı kalması gerekiyor.
-      if (m.role === "user") appendUser(m); else appendBot(m.content);
+      //
+      // Üç dal ZORUNLU: sonuç kaydında `content` hiç yok, iki dallı hâlinde
+      // `appendBot(undefined)` çağrılır ve `text.split` ile döküm çökerdi.
+      if (m.role === RESULT_ROLE) appendResult(m);
+      else if (m.role === "user") appendUser(m);
+      else appendBot(m.content);
     }
     // Eski turların seçenekleri BAYAT: yalnız son grup canlı kalır.
     lockStaleOptions();
     syncEmptyState();
     renderChatList();
+    syncSessionHeader(chat);
     closeSidebarOnMobile();
     $("chat-input").focus();
   } catch (e) {
@@ -1124,6 +1449,9 @@ async function renameChat(summary) {
     const { chat } = await chatApi(`/api/chats/${summary.id}`,
                                    { method: "PUT", body: { title: name } });
     upsertSummary(chat);              // dönen kayıt yeter, listeyi baştan çekme
+    // Üst şerit yalnız AÇIK oturumu gösteriyor: listeden başka bir oturumu
+    // yeniden adlandırmak başlığı değiştirmemeli.
+    if (chat.id === currentChatId) syncSessionHeader(chat);
   } catch (e) {
     chatStatus(`Yeniden adlandırılamadı: ${e.message}`);
   }
@@ -1196,5 +1524,9 @@ $("tab-chat").addEventListener("click", () => {
   $("chat-input").focus();
 });
 
+$("chats-delete-all").addEventListener("click", deleteAllChats);
+$("pref-autosave").addEventListener("change", saveAutosavePref);
+
 syncEmptyState();
 loadChats();
+loadPrefs();

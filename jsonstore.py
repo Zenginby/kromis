@@ -62,13 +62,17 @@ def _replace_via_tmp(path: str, render) -> None:
         raise
 
 
-def write_atomic(path: str, items: list[dict]) -> None:
+def write_atomic(path: str, data: list[dict] | dict) -> None:
     """Manifesti tek parçada yazar: yarım dosya bırakmaz, `*.tmp` de bırakmaz.
 
     `encoding="utf-8"` AÇIKÇA veriliyor: iki depo bunu vermiyordu ve klasör/palet
     adlarındaki Türkçe karakterler platformun varsayılan kodlamasına kalıyordu.
+
+    Beş manifest LİSTE yazıyor, `prefs.py` (v2.0) NESNE — tür bu yüzden geniş.
+    Mekanik ikisi için de aynı; ayrı bir yazıcı açmak bu modülün var olma
+    sebebine (deseni beş yerde kopyalamayı bitirmek) aykırı olurdu.
     """
-    _replace_via_tmp(path, lambda f: json.dump(items, f, ensure_ascii=False, indent=2))
+    _replace_via_tmp(path, lambda f: json.dump(data, f, ensure_ascii=False, indent=2))
 
 
 def write_text(path: str, text: str) -> None:

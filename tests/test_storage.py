@@ -68,3 +68,35 @@ def test_imported_flag_is_written_when_asked(tmp_path):
                        str(tmp_path), now="2026-08-04T10:00:00")
     assert rec["imported"] is True
     assert json.loads((tmp_path / "history.json").read_text())[0]["imported"] is True
+
+
+# ── v2.0: oturum etiketi (birleşik döküm) ───────────────────────────────
+
+def test_record_made_outside_a_session_has_no_session_id_key(tmp_path):
+    """`imported` ile BİREBİR aynı koşullu desen — ve aynı gerekçe.
+
+    Koşul düşerse bugün üretilen her kayda `"session_id": null` girer:
+    history.json'ın TAMAMI değişir (eski-biçim testleri ve galeri buna bağlı) ve
+    "bu görsel bir oturumdan mı doğdu?" sorusunu `.session_id` ile soran arayüz
+    null ile yok arasında gereksiz bir ayrım yapmaya başlar. Oturumsuz üretim
+    (Medya'dan doğrudan, ya da otomatik kayıt kapalıyken) kalıcı bir hâl —
+    geçici bir durum değil.
+    """
+    rec = storage.save(b"\x89PNG", {"prompt": "cat", "size": "1024x1024",
+                                    "quality": "low", "parent_id": None},
+                       str(tmp_path), now="2026-08-07T10:00:00")
+
+    assert "session_id" not in rec
+    assert "session_id" not in json.loads((tmp_path / "history.json").read_text())[0]
+
+
+def test_session_id_is_written_when_the_image_is_born_in_a_session(tmp_path):
+    """Oturum id'si `chats.json`'ın MEVCUT `id`'si — yeni bir kimlik uzayı yok."""
+    rec = storage.save(b"\x89PNG", {"prompt": "cat", "size": "1024x1024",
+                                    "quality": "low", "parent_id": None,
+                                    "session_id": "beef1234beef"},
+                       str(tmp_path), now="2026-08-07T10:00:00")
+
+    assert rec["session_id"] == "beef1234beef"
+    raw = json.loads((tmp_path / "history.json").read_text())
+    assert raw[0]["session_id"] == "beef1234beef"

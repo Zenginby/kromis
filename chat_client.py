@@ -92,13 +92,20 @@ def build_payload(messages: list[dict], deployment: str, instructions: str) -> d
 
     Sistem mesajını SUNUCU koyuyor; istemciden gelen listede `role: "system"`
     kabul edilmiyor (bkz. models.ChatMessage).
+
+    v2.0'da süzgeç ROL düzeyine de çıktı (`models.WIRE_CHAT_ROLES`): birleşik
+    döküm `result` kayıtlarını konuşmanın İÇİNDE tutuyor ve her tur tel üzerinden
+    geri geliyor. Alan allowlist'i tek başına yetmez — süzülmüş bir sonuç kaydı
+    geride `{"role": "result"}` bırakır, Azure o rolü bilmez ve 400 döner: bir
+    kez üretim yapmış oturum bir daha hiç konuşamaz. Rol allowlist'i olduğu için
+    dökümde açılacak SONRAKİ roller de varsayılan olarak dışarıda kalır.
     """
     return {
         "model": deployment,  # DAĞITIM adı, model ailesi adı DEĞİL
         "messages": [
             {"role": "system", "content": instructions},
             *({k: m[k] for k in models.WIRE_MESSAGE_FIELDS if k in m}
-              for m in messages),
+              for m in messages if m.get("role") in models.WIRE_CHAT_ROLES),
         ],
     }
 

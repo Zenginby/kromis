@@ -305,3 +305,43 @@ def test_build_payload_strips_every_field_azure_does_not_know():
 
     assert payload["messages"][1] == {"role": "user", "content": "kare"}
     assert payload["messages"][0]["role"] == "system"
+
+
+# ── v2.0: `result` rolü Azure'a ÇIKMAZ (plan R4) ────────────────────────
+
+RESULT = {"role": "result", "image_ids": ["aaaa1111aaaa", "bbbb2222bbbb"],
+          "params": {"kind": "generate", "size": "1024x1024", "quality": "medium"}}
+
+
+def test_build_payload_drops_result_records():
+    """Süzgeç ROL düzeyinde olmak ZORUNDA, alan düzeyinde yetmez.
+
+    `WIRE_MESSAGE_FIELDS` allowlist'i `image_ids`/`params`'ı düşürür ama geride
+    `{"role": "result"}` bırakır: içeriksiz, Azure'ın bilmediği bir rol. İstek
+    400 döner ve kullanıcı, ürettiği görselden SONRAKİ her turda "sohbet
+    bozuldu" hatası alır — bir kez üretim yapan oturum bir daha konuşamaz.
+    """
+    payload = cc.build_payload(
+        [{"role": "user", "content": "kare"}, RESULT,
+         {"role": "user", "content": "bir de yatay"}], "dep", "T")
+
+    assert [m["role"] for m in payload["messages"]] == ["system", "user", "user"]
+    assert all("image_ids" not in m and "params" not in m
+               for m in payload["messages"])
+
+
+def test_the_wire_roles_are_a_strict_subset_of_the_stored_roles():
+    """TRIPWIRE: dökümde yeni bir rol açılırsa Azure süzgeci onu KENDİLİĞİNDEN
+    dışarıda bırakır — allowlist genişletilmeden tel üzerine çıkamaz."""
+    assert models.WIRE_CHAT_ROLES < models.CHAT_ROLES
+    assert "result" not in models.WIRE_CHAT_ROLES
+
+
+def test_complete_sends_a_result_free_thread():
+    """Uçtan uca: `complete()` çağrısı da süzülmüş gövdeyi gönderir."""
+    client = FakeClient(FakeResponse(200, _ok_body()))
+    cc.complete([{"role": "user", "content": "kare"}, RESULT],
+                client=client, credentials=CREDS, instructions="T")
+
+    sent = client.last_call["json"]["messages"]
+    assert [m["role"] for m in sent] == ["system", "user"]

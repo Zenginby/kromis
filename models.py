@@ -16,6 +16,8 @@ geldi; ayrım `None` varsayılanıyla kuruldu (bkz. alanın yorumu).
 """
 from __future__ import annotations
 
+from typing import Annotated
+
 from pydantic import (BaseModel, ConfigDict, Field, field_validator,
                       model_validator)
 
@@ -24,6 +26,14 @@ import palette
 
 MAX_PROMPT_CHARS = 4000    # kullanıcı prompt'u + palet eki
 MAX_BULK_IDS = 500         # tek çoklu-seçim isteğindeki azami görsel
+# Tek üretim turunda istenebilecek azami görsel. `GenerateRequest.n`'in üst
+# sınırı ve dökümdeki bir sonuç kaydının azami `image_ids` uzunluğu AYNI sayı
+# olmak zorunda: sonuç kaydı tam olarak bir turun çıktısını taşıyor.
+MAX_IMAGES_PER_RUN = 4
+# history.json / chats.json id'lerinin alan sınırı (uuid4().hex[:12] = 12).
+# Biçimin KENDİSİ burada doğrulanmıyor — regex guard'ı depolarda (`_SAFE_ID`),
+# bu dosya id'leri yalnızca uzunlukla sınırlıyor (folder_id geleneği).
+MAX_ID_CHARS = 64
 
 LOGO_POSITIONS = {
     "top-left", "top-center", "top-right",
@@ -78,8 +88,12 @@ class GenerateRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=MAX_PROMPT_CHARS)
     size: str
     quality: str
-    n: int = Field(ge=1, le=4)
+    n: int = Field(ge=1, le=MAX_IMAGES_PER_RUN)
     folder_id: str | None = Field(default=None, max_length=64)  # None = klasörsüz (kök)
+    # Üretimin doğduğu oturum (`chats.json`'daki mevcut `id`). None/boş = oturum
+    # dışı üretim; etiket o zaman kayda HİÇ yazılmaz (bkz. storage.save).
+    # Varlık kapısı BİLEREK yok, yalnızca biçim: bkz. app._check_session.
+    session_id: str | None = Field(default=None, max_length=MAX_ID_CHARS)
     # None = palet yok. Palet `(hex, mod)` çiftinin saf fonksiyonu olduğu için
     # tel üzerinde iki skaler yetiyor; sunucunun bir depoya bakması gerekmez.
     palette_hex: str | None = Field(default=None, max_length=7)
@@ -153,6 +167,23 @@ class SettingsRequest(BaseModel):
     # Gizli bilgi olmadığı için `GET /api/settings` bu alanı geri döndürüyor ve
     # form önceden dolu geliyor; o yüzden write-only değil.
     chat_deployment: str | None = Field(default=None, max_length=200)
+
+
+class PrefsRequest(BaseModel):
+    """`POST /api/prefs` gövdesi — gizli olmayan kullanıcı tercihleri (v2.0).
+
+    `SettingsRequest`'ten AYRI bir model, çünkü ayrı bir uç: o uç kimlik formu
+    (`api_key` + `base_url` zorunlu) ve bir tercihi çevirmek kimliği yeniden
+    yazmak zorunda kalırdı. Buradaki `extra="forbid"` de o modelin istisnasını
+    tekrarlamıyor: tercih kümesi arayüzle birebir sabit DEĞİL, zamanla büyüyecek
+    (tema, Adım 9) ve bayat bir istemcinin bilinmeyen alanı yüksek sesle 422 olmalı.
+
+    `None` = "alan hiç gönderilmedi → DOKUNMA" (`chat_deployment` geleneği):
+    tema kaydeden bir istek otomatik kayıt anahtarını sessizce açmasın.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    autosave_sessions: bool | None = None
 
 
 class FolderRequest(BaseModel):
@@ -317,7 +348,26 @@ MAX_CHAT_DISPLAY_CHARS = 400
 # hata "sohbet bozuldu" gibi görünürdü. Allowlist olduğu için bundan sonra
 # eklenen her arayüz alanı da varsayılan olarak DIŞARIDA kalır.
 WIRE_MESSAGE_FIELDS = {"role", "content"}
-CHAT_ROLES = {"user", "assistant"}
+# v2.0 (birleşik oturum): dökümde ÜÇ rol var, Azure'da hâlâ iki.
+#
+# `result` yalnızca DİSKTE ve EKRANDA yaşıyor: `{"role": "result",
+# "image_ids": [...], "params": {...}}`. Alan allowlist'i tek başına yetmez —
+# süzülmüş bir sonuç kaydı geride `{"role": "result"}` bırakır ve Azure o rolü
+# bilmediği için 400 döner. Bu yüzden ROL allowlist'i de var; süzgeç
+# `chat_client.build_payload`'ta, yani gövdeyi gerçekten kuran yerde.
+RESULT_ROLE = "result"
+WIRE_CHAT_ROLES = {"user", "assistant"}
+CHAT_ROLES = WIRE_CHAT_ROLES | {RESULT_ROLE}
+# Sonuç kaydının nasıl doğduğu. Kart başlığı buradan çiziliyor
+# ("Üretildi · …" / "Düzenlendi · …"). Bu küme BİZE ait, Azure'a değil:
+# `size`/`quality` allowlist'e karşı doğrulanmıyor (aşağıdaki not).
+RESULT_KINDS = {"generate", "edit"}
+# Sonuç kayıtları KONUŞMA kotasından ayrı bir baş payı alıyor. Aynı 24'ü
+# paylaşsalardı üretim yapan bir oturum ~8 turda dolar ve kullanıcı pydantic'in
+# İNGİLİZCE `too_long` hatasını görürdü — modele hiç gitmeyen bir kaydın
+# konuşmayı kısaltması için bir sebep yok.
+MAX_CHAT_RESULTS = 24
+MAX_CHAT_ITEMS = MAX_CHAT_MESSAGES + MAX_CHAT_RESULTS
 
 
 def _check_chat_total(messages: list["ChatMessage"], limit: int) -> list["ChatMessage"]:
@@ -329,10 +379,52 @@ def _check_chat_total(messages: list["ChatMessage"], limit: int) -> list["ChatMe
     `display` de SAYILIYOR: sayılmasa `chats.json`'da ölçülmeyen bir ağırlık
     olurdu — tek başına küçük, ama sınırın amacı "dosya istemcinin gönderdiği
     kadar büyüyebilmesin" ve ölçülmeyen her alan o amacı deler.
+
+    `result` kayıtları SAYILMIYOR (v2.0): bu sınır token bütçesi, sonuç kayıtları
+    ise modele hiç gitmiyor. Ölçülmemiş ağırlık da bırakmıyorlar — şemaları
+    kapalı: en çok `MAX_IMAGES_PER_RUN` id + üç kısa parametre, adetleri de
+    `MAX_CHAT_RESULTS` ile bağlı. Serbest metin taşıyabildikleri tek alan
+    (`content`) onlara YASAK; `display` de öyle.
     """
-    if sum(len(m.content) + len(m.display or "") for m in messages) > limit:
+    if sum(len(m.content or "") + len(m.display or "")
+           for m in messages if m.role in WIRE_CHAT_ROLES) > limit:
         raise ValueError("sohbet çok uzun: yeni bir sohbet başlat")
     return messages
+
+
+def _check_chat_counts(messages: list["ChatMessage"]) -> list["ChatMessage"]:
+    """Konuşma turu sayısı kapısı — Türkçe, çünkü kullanıcıya görünüyor.
+
+    Alan düzeyindeki `max_length` artık TOPLAM öğe sayısını (`MAX_CHAT_ITEMS`)
+    tutuyor; konuşma turlarının kendi sınırı burada sayılıyor.
+    """
+    if sum(1 for m in messages if m.role in WIRE_CHAT_ROLES) > MAX_CHAT_MESSAGES:
+        raise ValueError("sohbet çok uzun: yeni bir sohbet başlat")
+    return messages
+
+
+class ResultParams(BaseModel):
+    """Sonuç kartının başlığını çizen üretim parametreleri.
+
+    `size`/`quality` `azure_client` allowlist'lerine karşı DOĞRULANMIYOR, yalnızca
+    uzunlukla sınırlı. Sebep ölçülü bir tuzak: allowlist bir gün daralırsa (Azure
+    bir boyutu kaldırır) o boyutla üretilmiş eski oturumlar bir daha
+    KAYDEDİLEMEZ olurdu — `PUT /api/chats/{id}` 422 döner ve kullanıcı sessizce
+    donmuş bir oturumla kalır. `MAX_CHAT_REPLY_CHARS`'ın var olma sebebi de bu
+    sınıf hataydı. `kind` ise bizim kümemiz; altımızdan değişmez.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str
+    size: str = Field(min_length=1, max_length=32)
+    quality: str = Field(min_length=1, max_length=32)
+
+    @field_validator("kind")
+    @classmethod
+    def _kind_ok(cls, v):
+        if v not in RESULT_KINDS:
+            raise ValueError("geçersiz kind")
+        return v
 
 
 class ChatMessage(BaseModel):
@@ -345,7 +437,13 @@ class ChatMessage(BaseModel):
     # Alan sınırı GENİŞ olanı (asistan); dar olan kullanıcı sınırı aşağıda,
     # rolü bilen doğrulayıcıda. Alan düzeyinde ayrılamaz: `max_length` başka bir
     # alanın değerine bakamaz.
-    content: str = Field(min_length=1, max_length=MAX_CHAT_REPLY_CHARS)
+    #
+    # v2.0'da OPSİYONEL oldu — `result` kaydının metni yok, kart görsellerden ve
+    # parametrelerden çiziliyor. Zorunluluk role bağlandı (aşağıdaki
+    # doğrulayıcı): boş dize hâlâ reddedilir, çünkü `min_length` açıkça
+    # gönderilen `""`'yi de görür.
+    content: str | None = Field(default=None, min_length=1,
+                                max_length=MAX_CHAT_REPLY_CHARS)
     # Yalnızca ARAYÜZ alanı: varsa akışa baloncuk değil kısa bir "seçim" pili
     # çiziliyor ve `content` hiç gösterilmiyor (v1.16). Çip seçimleri modele bir
     # cümle olarak gidiyor; o cümlenin kullanıcının kendi yazdığı bir replik gibi
@@ -360,6 +458,15 @@ class ChatMessage(BaseModel):
     # Azure'a ÇIKMIYOR (bkz. WIRE_MESSAGE_FIELDS).
     display: str | None = Field(default=None, min_length=1,
                                 max_length=MAX_CHAT_DISPLAY_CHARS)
+    # ── yalnızca `result` rolünde (v2.0) ────────────────────────────────
+    # Üretilen görsellerin `history.json` id'leri. Görsel BURAYA kopyalanmıyor,
+    # yalnızca işaret ediliyor: tek kaynak history deposu ve kullanıcı bir
+    # görseli Medya'dan sildiğinde döküm onu "silinmiş" gösterebilsin. Sarkan id
+    # bir hata değil, BEKLENEN durum (tasarım §5) — sunucu kaydı budamıyor,
+    # yoksa oturum "burada iki görsel üretmiştim" bilgisini kaybederdi.
+    image_ids: list[Annotated[str, Field(min_length=1, max_length=MAX_ID_CHARS)]] | None \
+        = Field(default=None, min_length=1, max_length=MAX_IMAGES_PER_RUN)
+    params: ResultParams | None = None
 
     @field_validator("role")
     @classmethod
@@ -369,9 +476,26 @@ class ChatMessage(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def _content_fits_the_role(self):
-        """Kullanıcı mesajı için dar kapı. Metin TÜRKÇE ve istemcinin aynasıyla
-        aynı sayıyı söylüyor — pydantic'in `max_length` metni İngilizce olurdu."""
+    def _fields_fit_the_role(self):
+        """Alanlar ROLE bağlı. Metinler TÜRKÇE ve istemcinin aynasıyla aynı
+        sayıyı söylüyor — pydantic'in `max_length` metni İngilizce olurdu."""
+        if self.role == RESULT_ROLE:
+            # Sonuç kaydında SERBEST METİN yok: `content` kabul edilse dökümde
+            # `MAX_CHAT_TOTAL_CHARS`'a sayılmayan (bkz. _check_chat_total)
+            # ölçülmemiş bir ağırlık açılırdı — bütçenin delindiği yer tam burası.
+            if self.content is not None:
+                raise ValueError("sonuç kaydında content olamaz")
+            if not self.image_ids:
+                raise ValueError("sonuç kaydında image_ids zorunlu")
+            if self.params is None:
+                raise ValueError("sonuç kaydında params zorunlu")
+        else:
+            if self.content is None:
+                raise ValueError("content zorunlu")
+            # Konuşma mesajına sonuç alanı takılsa döküm İKİ ayrı yerden sonuç
+            # kartı çizmeye başlardı; hangisinin doğru olduğu belirsiz kalırdı.
+            if self.image_ids is not None or self.params is not None:
+                raise ValueError("image_ids/params yalnızca sonuç kaydında kullanılabilir")
         if self.role == "user" and len(self.content) > MAX_CHAT_MSG_CHARS:
             raise ValueError(f"mesaj çok uzun: en fazla {MAX_CHAT_MSG_CHARS} karakter")
         # `display` yalnızca KULLANICI turunda anlamlı: pil, kullanıcının verdiği
@@ -386,7 +510,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    messages: list[ChatMessage] = Field(min_length=1, max_length=MAX_CHAT_MESSAGES)
+    messages: list[ChatMessage] = Field(min_length=1, max_length=MAX_CHAT_ITEMS)
 
     @field_validator("messages")
     @classmethod
@@ -397,9 +521,10 @@ class ChatRequest(BaseModel):
         if not v:
             raise ValueError("en az bir mesaj gerekli")
         if v[-1].role != "user":
-            # Son mesaj asistandaysa model kendi cevabını yeniden üretmeye çalışır.
+            # Son mesaj asistandaysa model kendi cevabını yeniden üretmeye
+            # çalışır; sonuç kaydıysa Azure'a yalnız sistem talimatı giderdi.
             raise ValueError("son mesaj kullanıcıdan olmalı")
-        return _check_chat_total(v, MAX_CHAT_TOTAL_CHARS)
+        return _check_chat_total(_check_chat_counts(v), MAX_CHAT_TOTAL_CHARS)
 
 
 class ChatSaveRequest(BaseModel):
@@ -415,14 +540,17 @@ class ChatSaveRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1,
                               max_length=MAX_CHAT_TITLE_CHARS)
     messages: list[ChatMessage] | None = Field(default=None, min_length=1,
-                                               max_length=MAX_CHAT_MESSAGES)
+                                               max_length=MAX_CHAT_ITEMS)
 
     @field_validator("messages")
     @classmethod
     def _messages_ok(cls, v):
-        # Rol kuralı YOK: kaydedilen sohbetin son mesajı normalde asistandan.
+        # Rol kuralı YOK: kaydedilen sohbetin son mesajı normalde asistandan —
+        # otomatik kayıtta (Adım 6) bir sonuç kaydı da olabilir.
         # Toplam kapısı bir yanıt kadar GENİŞ (bkz. MAX_CHAT_SAVE_TOTAL_CHARS).
-        return v if v is None else _check_chat_total(v, MAX_CHAT_SAVE_TOTAL_CHARS)
+        if v is None:
+            return v
+        return _check_chat_total(_check_chat_counts(v), MAX_CHAT_SAVE_TOTAL_CHARS)
 
 
 class BannerRequest(BaseModel):

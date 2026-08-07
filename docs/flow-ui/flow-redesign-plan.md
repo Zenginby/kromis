@@ -1,6 +1,6 @@
 # GPT-Image Studio → Google Flow Arayüz Planı
 
-**Amaç:** GPT-Image Studio'nun (FastAPI + vanilla JS, yerel masaüstü uygulaması, v1.17.0)
+**Amaç:** GPT-Image Studio'nun (FastAPI + vanilla JS, yerel masaüstü uygulaması)
 arayüzünü Google Flow'un tasarım diline taşımak — aynı yetenekler, Flow'un kabuğu,
 etkileşim grameri ve renk/tipografi sistemi.
 
@@ -24,13 +24,40 @@ etkileşim grameri ve renk/tipografi sistemi.
 | En küçük pencere | Koddan okundu: `desktop.py` → `WINDOW_SIZE (1440, 900)`, **`MIN_WINDOW_SIZE (1024, 700)`** | §2.2, `flow.css` duyarlılık kuralları |
 | Taşıma kapsamı | **Ayrı dalda** | §9, `feat/flow-ui` |
 
+**Sürüm v4 — 7 Ağustos 2026: taşıma başladıktan sonraki gerçeklik düzeltmesi.**
+
+Bu tur yeni tasarım kararı getirmiyor; **sözleşmenin koda uymayan iddialarını**
+düzeltiyor. PR 1 (`a1478d4`) merge edildikten sonra beş referans ekran uygulamaya
+karşı tek tek denetlendi ve 18 açık madde bulundu. Denetimin kendisi ve adım
+ataması uygulama planında: `docs/superpowers/plans/2026-08-06-flow-arayuz-devri.md`
+**§0.2** (denetim tabloları) ve **§0.3** (Adım 8/9/10).
+
+| # | Düzeltilen iddia | Gerçek |
+|---|---|---|
+| V1 | "v1.17.0" (§ başlık ve §6; §2.2 yalnızca "sürüm pill'i" diyor, literal yok) | `25713f8`'de `APP_VERSION` **1.16.0**'dı; sürüm hiç 1.17.0 olmadı. 7 Ağustos'ta **2.0.0**'a çıkarıldı (arayüz baştan değişti + D1 bir ürün kararını tersine çeviriyor). Referans ekranlardaki `v1.17.0` **maket metnidir**, sözleşme değil. |
+| V2 | "Yedekler artık sol rayda değil" (§4.1) | Yedek arayüzü **hiç var olmamıştı** — `25713f8`'in `index.html` ve `settings.js`'i denetlendi, raydan kaldırılan bir şey yok. `backup.py` yalnızca açılışta otomatik çalışıyor (`app.py:92`); kullanıcıya dönük ne panel ne rota var. |
+| V3 | Ayarlar panelinin **Yedekler** yarısı (§4.1, §6, §7/5, §11) | **Ertelendi** (7 Ağustos kullanıcı kararı). Yazılmamış kapsam; arka uç rotası da gerektiriyor. Kabul ölçütünden düşürüldü, plan §0.2'de gerekçesiyle kayıtlı. |
+| V4 | §1'in "arayüzde henüz hiçbir değişiklik yok" satırı | Bayat: PR 1 merge edildi. §1 artık **taşıma öncesi ölçüm** olarak etiketli. |
+| V5 | §12 "Sonraki adım: ekranları gez, onay ver, taşımaya geçiyorum" | Taşıma başladı ve PR 1 bitti. §12 güncel duruma çevrildi. |
+
+> **Sözleşme ↔ uygulama farkı bulunduğunda kural:** tasarım kararı haklıysa kod
+> düzeltilir; sözleşme **kod hakkında yanlış bir şey söylüyorsa** (V1, V2, V4)
+> sözleşme düzeltilir. Maket metinleri (ekranlardaki örnek prompt, tarih, sürüm
+> pill'i) hiçbir zaman sözleşme değildir.
+
 ---
 
-## 1. Mevcut durum (doğrulanmış)
+## 1. Taşıma öncesi ölçüm — `25713f8` (tarihsel taban, 6 Ağustos)
 
-| Ne | Durum |
+> **Bu tablo dondurulmuş bir ölçümdür, bugünün durumu DEĞİL.** PR 1 (`a1478d4`)
+> merge edildi: `index.html` ve `style.css` yeniden yazıldı, `flow-tokens.css`
+> eklendi, `test_id_contract.py` geldi (`pytest` tabanı 994 → 1000). Güncel durum
+> için uygulama planının §0.1'ine bak. Tablo, "neyi korumak zorundayız" sorusunun
+> cevabı olduğu için silinmiyor — 152 id kısıtının kaynağı burada.
+
+| Ne | Durum (`25713f8`) |
 |---|---|
-| Depo | `~/Documents/Projects/Claude Code Projects/gpt-image-studio` — `git status` temiz, HEAD `25713f8`. Arayüzde **henüz hiçbir değişiklik yok.** |
+| Depo | `~/Documents/Projects/Claude Code Projects/gpt-image-studio` — `git status` temiz, HEAD `25713f8`, `APP_VERSION` **1.16.0**. O tarihte arayüzde henüz hiçbir değişiklik yoktu. |
 | Ön yüz | `static/index.html` (33 KB, **152 `id`**), `static/style.css` (55 KB, `:root`'ta 17 token), `core.js` `folders.js` `palette.js` `assets.js` `chat.js` `settings.js` `viewer.js` |
 | Test | `tests/test_index.py` içinde **82 test**, servis edilen HTML'de **27 element id'sini** doğrudan doğruluyor |
 | Veri | `history.json` (görseller, `storage.py`) ve `chats.json` (sohbetler, `chat_store.py`) — **bugün birbirinden tamamen bağımsız iki depo** |
@@ -150,11 +177,21 @@ Alt grup: yalnızca **Daralt**. Üst şeritteki merkezi arama pill'i **kaldırı
 aranacak tek şey medya, o yüzden arama medyanın yanında duruyor.
 
 **Uygulama ayarları dişlide.** Üst şeridin sağındaki dişli düğmesi tek bir "Ayarlar"
-slide-over'ı açıyor: **Azure · gpt-image-2** (endpoint, API anahtarı, Yönetmen dağıtım adı)
-ve **Yedekler** (otomatik yedek, eski biçim göçü, şimdi yedek al / klasörü aç). Ayrım
-kasıtlı: Araçlar = tasarım kararları (tema, palet), dişli = makine/kurulum ayarları.
-Yedekler artık sol rayda değil. Diğer ekranlardaki dişli
-`settings-panels.html#ayarlar` ile aynı paneli açıyor.
+slide-over'ı açıyor: **Azure · gpt-image-2** (endpoint, API anahtarı, Yönetmen dağıtım adı).
+Ayrım kasıtlı: Araçlar = tasarım kararları (tema, palet), dişli = makine/kurulum
+ayarları. Diğer ekranlardaki dişli `settings-panels.html#ayarlar` ile aynı paneli açıyor.
+
+> **Yedekler yarısı ertelendi — 7 Ağustos (bkz. v4/V2, V3).** Panelin ikinci bölümü
+> (otomatik yedek · eski biçim göçü · şimdi yedek al / klasörü aç) **şimdilik
+> kapsam dışı.** Referans ekran `settings-panels.html` onu hâlâ gösteriyor; o
+> maket, taahhüt değil.
+>
+> Bu paragraf daha önce "Yedekler artık sol rayda değil" diyordu — **yanlıştı.**
+> `25713f8` denetlendi: yedek arayüzü hiç var olmamıştı, dolayısıyla raydan
+> kaldırılmadı. Bu yazılmamış kapsamdır, gerileme değil. `backup.py` bugün
+> yalnızca açılışta `backup_manifests_if_version_changed` ile çalışıyor
+> (`app.py:92`); ne kullanıcı arayüzü ne API rotası var, yani panel işi arka uç
+> da gerektiriyor.
 
 **Oturum listesi.** Üst şeridin en solunda geri oku değil **hamburger** düğmesi var; soldan
 320px'lik bir liste açılıyor (scrim + `Esc` ile kapanır). Her satır: kapak görseli, başlık,
@@ -183,7 +220,36 @@ aktif taraf beyaz, pasif taraf `--muted`:
 
 ---
 
-## 5. Birleşik oturum veri modeli
+## 5. Birleşik oturum veri modeli — **arka ucu teslim edildi (7 Ağustos)**
+
+> Aşağıdaki üç ekleme **kodda**: `storage.save`'de koşullu `session_id`,
+> `models.ChatMessage`'ta `result` rolü, `chat_store._SUMMARY_FIELDS`'te
+> `cover_image_id`. Göç gerçekten gerekmedi — geliştiricinin mevcut 5 oturumuna
+> ve `history.json` kayıtlarına tek bir alan yazılmadı. Uygulama sırası ve
+> ölçülen kanıtlar planın **§0.4**'ünde.
+>
+> Sözleşmeyi netleştiren üç karar aynı turda verildi:
+> - **`params` kapalı bir şema:** `{kind, size, quality}`. Adet ayrı taşınmıyor,
+>   `image_ids`'in uzunluğundan geliyor ("x2") — silinmiş bir görsel bile o sayıyı
+>   dürüst tutuyor. `size`/`quality` Azure allowlist'ine karşı **doğrulanmıyor**:
+>   allowlist daralırsa o boyutla üretilmiş eski oturumlar bir daha
+>   kaydedilemez olurdu.
+> - **`cover_image_id` istemciden gelmiyor, dökümden türetiliyor** — ilk sonuç
+>   kaydının ilk görseli. Son sonuçtan alınsaydı liste küçük resmi her üretimde
+>   değişirdi; istemciden alınsaydı dökümde bulunmayan bir görseli kapak yapabilirdi.
+> - **Sonuç kayıtlarının kendi sayı payı var** (24 konuşma + 24 sonuç): aynı kotayı
+>   paylaşsalardı üretim yapan oturum ~8 turda dolardı.
+>
+> **Ekran payı da teslim edildi (7 Ağustos, Adım 7a — plan §0.6).** Döküm
+> `result` kayıtlarını künyeli kartlar olarak çiziyor, silinmiş görsel
+> **"görsel silindi"** yer tutucusuna dönüyor, üretim açık oturumun dökümüne
+> katılıyor. İki nokta bilinçli olarak sonraki turlarda:
+> - Sonuç kartında **"Düzenle" / "+ Ek" yok** (§0.6/K14): ikisi de tam bir
+>   geçmiş kaydı istiyor, döküm yalnız id taşıyor — composer turunda (Adım 8).
+> - **Görsel modu kendi başına oturum AÇMIYOR** (§0.6/K10): açık bir oturum
+>   varsa üretim ona katılıyor. Oturumu Görsel modundan başlatmak §4.2'nin
+>   kararı, çünkü orada prompt yapısı gereği bir döküm turu.
+
 
 Bugün iki ayrı depo var ve aralarında **hiçbir bağ yok**:
 
@@ -226,19 +292,40 @@ kaldırmayı gerektiriyor — geçmiş ancak otomatik yazılırsa dolu olur.
 (c) Ayarlar'da "oturumları otomatik kaydet" anahtarı, kapatınca bugünkü davranışa döner.
 Görseller zaten diske yazılıyor; yeni olan tek şey sohbet metni.
 
+> **Arka ucu teslim edildi (7 Ağustos).** Üç güvence de mekanik: `prefs.py`
+> deposu + `GET/POST /api/prefs` (anahtar), `DELETE /api/chats` (tümünü sil).
+> Uygulama sırası ve kanıtlar planın **§0.5**'inde. Sözleşmeyi netleştiren üç
+> nokta:
+> - **Anahtar kimlik dosyasında değil**, kullanıcının veri dizinindeki
+>   `prefs.json`'da. Ayarlar panelinde görünüyor ama kimlik formundan AYRI bir uç
+>   kullanıyor: bir anahtarı çevirmek Azure kimliğini yeniden yazmamalı ve Azure
+>   hiç yapılandırılmamışken de anahtar çevrilebilmeli.
+> - **Anahtar kapalıyken sunucu gerçekten yazmıyor** (409), yalnız istemciye rica
+>   etmiyor. Ayrımı taşıyan işaret: otomatik kaydın verecek bir ADI yok. Kullanıcının
+>   kendi kaydettiği/adlandırdığı oturum her koşulda yazılıyor — "kapatınca bugünkü
+>   davranış" tam olarak bu. Silme anahtardan bağımsız.
+> - **Otomatik kaydedilen oturumun adı türetiliyor** (ilk kullanıcı turunun ilk
+>   satırı; çip turunda ekranda görünen etiket). Kullanıcı kebaptan yeniden
+>   adlandırabiliyor. "Adsız oturum olmaz" kuralı korundu.
+>
+> `POST /api/chat` **hâlâ hiçbir şey yazmıyor**: oturumu yazan taraf istemci.
+> Sebep birleşik dökümün kendisi — Görsel modunda üretilen sonuç kayıtları
+> tamamlama rotasına hiç uğramıyor, kalıcılık oraya konsa sohbetsiz bir oturum
+> hiç kaydedilemezdi.
+
 ---
 
 ## 6. Yapısal eşleme (bugünkü → Flow)
 
 | Bugün | Flow karşılığı |
 |---|---|
-| Wordmark + "Azure gpt-image-2 · yerel" + sağ üstte dişli | Üst şerit: oturum adı + kebab · sağda yeni oturum, ayarlar, `v1.17` pill'i |
+| Wordmark + "Azure gpt-image-2 · yerel" + sağ üstte dişli | Üst şerit: oturum adı + kebab · sağda yeni oturum, ayarlar, sürüm pill'i. **Wordmark 7 Ağustos'ta raydan kaldırıldı**; kimlik oturum adına ve `<title>`a devredildi. Pill'de sürüm literali yok — tek kaynak `version.py` (bugün **2.0.0**). |
 | `Görsel` / `Prompt Yönetmeni` sekmeleri | **Kalkıyor.** Sol ray + composer'daki mod anahtarı (§4.2) |
 | SİPARİŞ paneli (prompt + boyut/kalite/adet + referans + renk + logo + CTA) | Prompt → composer; boyut/kalite/adet → sağ slide-over'da segmented; referans/ek görsel → (+) menüsü ve composer çipleri; tema rengi → Araçlar + slide-over; logo/motto → Kütüphane + önizleme paneli |
 | Ortadaki büyük önizleme + `X` | Döküm içindeki sonuç kartına tıklayınca tam-kaplama önizleme (`viewer.js` korunur) |
 | Alt çekmece "KONTAK BASKI · 17 KARE" + KLASÖRLER + film şeridi | **Medya** görünümü: arama + sıralama + ızgara boyutu + klasör kartları (kök) / klasör içi ızgara |
 | Her küçük resmin altında sürekli görünen `İndir` `+Ek` | Kart üzerinde hover/focus'ta açılan eylem satırı + seçim onay kutusu (`select-bar` akışı korunur) |
-| Modal'lar (Tema rengi, Kütüphane, Azure ayarları) | Tema rengi → Araçlar'dan sağ slide-over; Azure + Yedekler → üst şeritteki **dişli** düğmesinden tek "Ayarlar" slide-over'ı; Kütüphane → iç navigasyonlu medya seçici modalı |
+| Modal'lar (Tema rengi, Kütüphane, Azure ayarları) | Tema rengi → Araçlar'dan sağ slide-over; Azure → üst şeritteki **dişli** düğmesinden "Ayarlar" slide-over'ı (Yedekler yarısı ertelendi, §4.1); Kütüphane → iç navigasyonlu medya seçici modalı |
 | Sohbet: yan liste + döküm + ayrı composer | Aynı kabuk: oturum listesi (üst şeritteki geri oku) + tek döküm + tek composer. YÖNETMEN kartları `--surface-2` balon, seçenekler Flow çipi, PROMPT bloğu mono kalır |
 
 ---
@@ -259,7 +346,7 @@ Hepsi ortak `flow.css` tasarım sistemini kullanıyor (tokenlar tek yerde, ekran
    (offset kaydırıcıları dahil) + düzenleme akışı.
 4. `library-assets.html` — Kütüphane: logolar/mottolar/bannerlar/yüklemeler + yükleme akışı.
 5. `settings-panels.html` — Araçlar: Görünüm (tema) · Tema rengi/paletler; dişliden açılan
-   Ayarlar paneli (Azure + Yedekler)
+   Ayarlar paneli (Azure; ekranda görünen **Yedekler** bölümü ertelendi — §4.1)
    (HSV alanı, ton kaydırıcısı, hex, damlalık, harmoni kartları, kayıtlı paletler).
 6. `index.html` — genel bakış + token levhası (şu an yön onay levhası; mod anahtarı ve
    tema seçici çalışıyor).
@@ -300,7 +387,14 @@ Hedef boyutu ≥40px (masaüstü penceresi).
 ## 9. Gerçek depoya taşıma — **`feat/flow-ui` dalında**
 
 Ana dal (`main`) bu iş bitene kadar bugünkü arayüzle kalır; taşıma ayrı dalda yapılıp
-PR olarak açılacak (`git switch -c feat/flow-ui`, altı adım altı commit).
+PR olarak açılacak (`git switch -c feat/flow-ui`).
+
+> **"Altı adım altı commit" tahmini tutmadı (7 Ağustos).** Aşağıdaki altı madde
+> *işin türlerini* doğru sayıyor ama sırayı/sayıyı değil: gerçekleşen bölünme
+> **PR 1 = Adım 0–4** (merge edildi, `a1478d4`), **PR 2 = Adım 5–7**, artı
+> denetimden doğan **Adım 8–10**. Kanonik sıra uygulama planında
+> (`…/2026-08-06-flow-arayuz-devri.md` §0.1 tablosu + §0.3); bu liste taşımanın
+> *kapsamını* anlatan tasarım metni olarak kalıyor.
 
 1. **Token katmanı.** `static/style.css` `:root` → Flow paleti; `--panel`/`--panel-2` gibi
    eski adlar korunup yeni değerlere bağlanır (55 KB CSS yeniden yazılmadan tüm ekran
@@ -362,26 +456,82 @@ tasarımı değiştirmeyen üç teknik nokta kaldı:
 
 - [ ] Sekme yok: tek ray + tek composer; mod anahtarı (+) işaretinin yanında ve klavyeyle
       erişilebilir.
-- [ ] Döküm konuşmayı ve üretilen görselleri **aynı akışta** gösteriyor; sonuç kartından
-      indirme, düzenleme, klasöre taşıma çalışıyor.
+- [x] Döküm konuşmayı ve üretilen görselleri **aynı akışta** gösteriyor.
+      **7 Ağustos'ta teslim** (Adım 7a, plan §0.6): `result` kartı künyesiyle
+      çiziliyor (`Üretildi · 1024² · Orta · x2`), kare büyüteci açıyor, üretim
+      açık oturumun dökümüne katılıyor. **Kartta "İndir" var; "Düzenle" ve
+      "+ Ek" YOK ve bu ölçülmüş bir karar** (§0.6/K14): ikisi de tam bir geçmiş
+      kaydı istiyor, döküm yalnız id taşıyor — Adım 8'in composer turuna kaldı.
+      Klasöre taşıma sonuç kartında hiç planlanmadı, Medya'nın işi.
 - [ ] Arama yalnızca Medya'da; üst şeritte arama alanı yok.
 - [ ] Dört tema da kontrast kapılarını geçiyor; monokrom varsayılan.
-- [ ] Silinmiş bir görselin sarkan `image_id`'si dökümü çökertmiyor, yer tutucu gösteriyor.
-- [ ] `result` rolü Azure istemine gitmiyor ve token bütçesine sayılmıyor (birim testi).
+- [x] Silinmiş bir görselin sarkan `image_id`'si dökümü çökertmiyor, yer tutucu gösteriyor.
+      **İki payı da bitti:** sunucu kaydı budamıyor ve 200 kalıyor (Adım 5);
+      yer tutucu `resultThumb`'ın `error` dinleyicisiyle çiziliyor (Adım 7a).
+      Ölçü gerçek koşul — dosya yoksa `/output/{id}.png` 404 döner (§0.6/K12).
+- [x] `result` rolü Azure istemine gitmiyor ve token bütçesine sayılmıyor (birim testi).
+      **7 Ağustos'ta teslim** — süzgeç rol düzeyinde, hem `chat_client.build_payload`'ta
+      hem rotada; beşi de mutasyon testiyle doğrulandı (plan §0.4).
 - [ ] Bugünkü tüm yetenekler temsil edilmiş: prompt, boyut/kalite/adet, referans + ek
       görsel, tema rengi/palet, logo/motto/banner + offset, klasörler, çoklu seçim,
-      indirme, büyüteç, Azure ayarları, yönetmen sohbeti, yedekler, içe aktarma.
+      indirme, büyüteç, Azure ayarları, yönetmen sohbeti, içe aktarma.
+      (**Yedekler bilerek düştü** — v4/V3, §4.1.)
+- [ ] §4.2 gerçekten teslim edildi: `chat.js`'te "Forma aktar" **kalmadı**, yerine
+      "Görsel modunda üret"; Görsel modunda dolu kutuda "Yönetmen'e sor" çıkıyor.
+      Sekmelerin kaldırılma gerekçesi bu maddedir — o yüzden ayrı kutu.
+- [ ] Tema seçici dört temayı gerçekten uyguluyor (`data-theme` yazılıyor) ve seçim
+      kalıcı (§2.1). Token'ın var olması yetmez. **Kalıcılığın yeri değişti:**
+      `settings` (kimlik dosyası) değil `prefs.json` — Adım 6'nın K6 kararı bir
+      arayüz tercihini 0600'lük kimlik dosyasına koymayı reddetti ve tema o
+      dosyayı otomatik kayıt anahtarıyla paylaşacak (seçici Adım 7b, kalıcılık Adım 9).
 - [ ] Emoji ikon yok, uydurma metrik yok, sol kenarı renkli yuvarlak kart yok, dekoratif
       gradient yok, aynı eylem için ikinci dolu düğme yok.
-- [ ] Taşımada: `pytest` yeşil ve id farkı boş.
+- [ ] Taşımada: `pytest` yeşil ve id sözleşmesi (`test_id_contract.py`) yeşil.
+
+> **Bu liste tek başına yeterli değil.** 7 Ağustos denetimi, buradaki kaba
+> ölçütlerin geçtiği hâlde 18 maddenin açık kalabildiğini gösterdi (wordmark,
+> kebab, boş durum glifi, §4.2'nin iki düğmesi…). Madde-madde mandal uygulama
+> planının **§7**'sinde: her açık maddenin kendi kutusu var ve bir madde ancak
+> işaretlenerek ya da gerekçesiyle ertelenerek kapanıyor.
 
 ---
 
-## 12. Sonraki adım
+## 12. Nerede kaldık (7 Ağustos)
 
-1. `index.html`'i aç (genel bakış) → beş ekranı sırayla gez. Özellikle
-   `studio-session.html`'de mod anahtarı, hamburger ve ayar çipini dene.
-2. Beğenmediğin yerleri söyle — ekranlar `flow.css` üstünde durduğu için token
-   değişikliği beş ekranda birden karşılık buluyor.
-3. Onay verdiğinde taşımaya geçiyorum: `feat/flow-ui` dalı, §9'daki altı adım,
-   `pytest` yeşil ve id farkı boş olacak şekilde.
+Bu bölüm "ekranları gez, onay ver, taşımaya başlayayım" diyordu — **o aşama
+geçildi.** Ekranlar onaylandı, taşıma başladı, PR 1 merge edildi.
+
+- **Bitti:** Adım 0–4 (tasarımın depoya alınması, token katmanı + id mandalı,
+  kabuk, bileşen CSS'i, temizlik) → PR #16, `a1478d4`. Ayrıca 7 Ağustos'ta
+  sürüm **2.0.0** ve wordmark'ın kaldırılması.
+- **Bitti (7 Ağustos, commit'lenmedi):** Adım 5 — §5'teki veri modeli. Koşullu
+  `session_id`, `result` rolü + `params` şeması, türetilen `cover_image_id`,
+  istem ve bütçe filtreleri. TDD ile: 32 test önce, `pytest` 1000 → **1032**.
+- **Bitti (7 Ağustos, commit'lenmedi):** Adım 6 — otomatik kayıt (D1) ve üç
+  güvencesi. Yeni `prefs.py` deposu + `/api/prefs`, `DELETE /api/chats`,
+  türetilen oturum adı, anahtar kapalıyken 409. `pytest` 1032 → **1062**.
+- **Bitti (7 Ağustos, commit'lenmedi):** Adım **7a** — PR 2'nin ekran payı ve
+  bununla **PR 2 kapandı**. Sonuç kartı, "görsel silindi" yer tutucusu, sayı
+  kapısının düzeltilmesi, başlıksız otomatik kayıt + anahtarın arayüzü + 409'un
+  Türkçesi, "tüm oturumları sil", üretimin açık oturuma katılması, üst şeritteki
+  oturum adı. `pytest` 1062 → **1080**; 18 mutasyonun hepsi kırmızı.
+- **Sırada:** Adım **7b** — `Adım 7` satırının PR 1'den devraldığı giydirme
+  borcu (plan §0.2'nin A1–A6'sı): Kütüphane ve Araçlar kendi görünümleri,
+  Medya'da arama, ızgara boyutu S/M/L, modal→slide-over, tema seçici arayüzü.
+- **Sonra:** denetimden doğan Adım 8 (§4.2'nin manşeti) · 9 (tema kalıcılığı +
+  Kütüphane yüklemeleri) · 10 (kozmetik süpürme; kebap menüsü de burada).
+- **Ertelendi:** Yedekler paneli (v4/V3).
+- **Karar bekleyen:** DM Sans bundle (§3 · plan §4) — indirme izni alındı, dosya
+  adı ve boyutu söylenip son onay alınacak. Klasör "Yeniden adlandır" sözleşmeye
+  girecek mi (plan §0.2/D17).
+
+**Sıra, adım ataması ve madde-madde mandal:**
+`docs/superpowers/plans/2026-08-06-flow-arayuz-devri.md` — §0.1 (durum),
+§0.2 (referans ekran ↔ uygulama denetimi), §0.3 (Adım 8/9/10),
+§0.4 (Adım 5 kaydı: K1–K5), §0.5 (Adım 6 kaydı: K6–K9),
+§0.6 (Adım 7a kaydı: K10–K14 + "aynı sürüm altında bayat JS" tuzağı),
+§7 (kutular).
+
+> Bu dosya **tasarım sözleşmesi**; ne yapılacağını söyler. Uygulama planı
+> **sıra ve kanıt**tan sorumludur. İkisi çeliştiğinde: tasarım kararı için bu
+> dosya, deponun bugünkü hâli için plan geçerlidir.

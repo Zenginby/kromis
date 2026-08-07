@@ -45,6 +45,44 @@ def test_edit_from_source_id(tmp_path, monkeypatch):
     assert r.json()["images"][0]["parent_id"] == src_id
 
 
+def test_edit_labels_the_image_with_its_session(tmp_path, monkeypatch):
+    """Düzenleme de oturum içinde oluyor ("Düzenlendi · referanslı üretim")."""
+    monkeypatch.setattr(ac, "edit", lambda *a, **k: [b"\x89PNG-edited"])
+    c = _client(tmp_path, monkeypatch)
+
+    r = c.post("/api/edit",
+               data={"prompt": "make blue", "size": "1024x1024", "quality": "low",
+                     "n": "1", "session_id": "beef1234beef"},
+               files={"file": ("in.png", _png_bytes(), "image/png")})
+
+    assert r.status_code == 200, r.text
+    assert r.json()["images"][0]["session_id"] == "beef1234beef"
+
+
+def test_edit_without_a_session_writes_no_session_key(tmp_path, monkeypatch):
+    monkeypatch.setattr(ac, "edit", lambda *a, **k: [b"\x89PNG-edited"])
+    c = _client(tmp_path, monkeypatch)
+
+    r = c.post("/api/edit",
+               data={"prompt": "make blue", "size": "1024x1024", "quality": "low",
+                     "n": "1"},
+               files={"file": ("in.png", _png_bytes(), "image/png")})
+
+    assert "session_id" not in r.json()["images"][0]
+
+
+def test_edit_rejects_a_malformed_session_id(tmp_path, monkeypatch):
+    monkeypatch.setattr(ac, "edit", lambda *a, **k: [b"\x89PNG-edited"])
+    c = _client(tmp_path, monkeypatch)
+
+    r = c.post("/api/edit",
+               data={"prompt": "make blue", "size": "1024x1024", "quality": "low",
+                     "n": "1", "session_id": "../../etc/passwd"},
+               files={"file": ("in.png", _png_bytes(), "image/png")})
+
+    assert r.status_code == 422
+
+
 def test_edit_rejects_both_file_and_source_id(tmp_path, monkeypatch):
     c = _client(tmp_path, monkeypatch)
     r = c.post("/api/edit",

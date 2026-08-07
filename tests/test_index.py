@@ -911,13 +911,19 @@ def test_deleting_the_open_chat_clears_the_stream():
     assert "resetThread()" in body.group(1)
 
 
-def test_the_chat_title_is_derived_locally_not_asked_from_the_model():
-    """Başlık için İKİNCİ bir model çağrısı YOK: para ve gecikme, kazancı etiket."""
-    js = _chat_js()
-    body = re.search(r"function deriveTitle\(\)\s*\{(.*?)\n\}", js, re.S)
-    assert body, "deriveTitle() bulunamadı"
-    assert "fetch(" not in body.group(1)
-    assert "/api/chat" not in body.group(1)
+def test_the_chat_title_is_derived_not_asked_from_the_model():
+    """Başlık için İKİNCİ bir model çağrısı YOK: para ve gecikme, kazancı etiket.
+
+    v2.0'da türeten taraf DEĞİŞTİ (istemcideki `deriveTitle` → sunucudaki
+    `_auto_title`): başlıksız yazım artık "bu otomatik" işareti, istemci bir ad
+    uydurursa otomatik kayıt anahtarı delinir (§0.5/K8). Kural aynı kaldığı için
+    iddia da duruyor, yalnız ölçüldüğü yer taşındı — silinmedi.
+    """
+    import inspect
+    src = inspect.getsource(appmod._auto_title)
+    assert "chat_client" not in src and "complete" not in src, (
+        "başlık için modele gidiliyor")
+    assert "requests" not in src and "httpx" not in src
 
 
 # ── Sekme geçişi (v1.15) ───────────────────────────────────────────────
@@ -1206,3 +1212,315 @@ def test_a_machine_block_that_breaks_its_contract_is_still_shown_to_the_user():
         panel = re.search(rf"function {name}\([^)]*\)\s*\{{(.*?)\n\}}", js, re.S)
         assert fn in panel.group(1), (
             f"{name} kendi süzgecini tutuyor — atlama kuralıyla ayrışabilir")
+
+
+# ── Birleşik döküm: sonuç kartları ve otomatik kayıt (v2.0 / Adım 7) ────
+# Adım 5–6 arka ucu teslim etti; buradaki iddialar EKRAN payını mandallıyor.
+# Hepsi planın §7'sindeki kutulara birebir karşılık geliyor.
+
+def _core_js() -> str:
+    return TestClient(appmod.app).get("/static/core.js").text
+
+
+def test_chat_item_limit_mirrors_the_server():
+    """Toplam öğe sınırı da aynalanmalı (MAX_CHAT_MESSAGES geleneği).
+
+    İstemci yalnız 24'ü bilirse üretim yapan oturum sunucu 48 öğeye izin
+    verirken 24'te kilitlenir — kullanıcı sebepsiz "sohbet doldu" görür (§0.4/K4).
+    """
+    js = _chat_js()
+    match = re.search(r"const MAX_CHAT_ITEMS = (\d+);", js)
+    assert match, "MAX_CHAT_ITEMS istemcide tanımlı değil"
+    assert int(match.group(1)) == models.MAX_CHAT_ITEMS
+
+
+def test_the_client_is_never_stricter_than_the_server_about_results():
+    """`MAX_CHAT_RESULTS` istemcide BULUNMAMALI ve bu bilinçli.
+
+    Sunucu sonuç ADEDİNİ ayrıca kapamıyor: kurallar "konuşma ≤ MAX_CHAT_MESSAGES"
+    ve "toplam ≤ MAX_CHAT_ITEMS". İstemci ayrıca 24 sonuçta durursa SUNUCUDAN
+    KATI olur ve sohbetsiz bir oturum 24. üretimde sebepsiz kilitlenir — Adım 7'nin
+    kapattığı borcun tam olarak aynısı, yalnız ekseni değişmiş hâli.
+    """
+    assert models.MAX_CHAT_ITEMS == models.MAX_CHAT_MESSAGES + models.MAX_CHAT_RESULTS
+    # Sunucunun konuşma kapısı sonuç kayıtlarını saymıyor → sonuç adedi yalnızca
+    # toplam sınırla bağlı. İddia bunu doğruluyor ki sunucu bir gün ayrı bir
+    # sonuç kapısı eklediğinde bu test kırmızıya dönsün ve istemci de aynalasın.
+    import inspect
+    assert "MAX_CHAT_RESULTS" not in inspect.getsource(models._check_chat_counts)
+    # TANIM aranıyor, kelime değil: chat.js'in başındaki not neden
+    # aynalanmadığını anlatıyor ve o notun kalması gerekiyor (yoksa bir gün
+    # "tutarlılık olsun" diye geri eklenir).
+    assert not re.search(r"const MAX_CHAT_RESULTS\s*=", _chat_js()), (
+        "istemci sunucuda olmayan bir sonuç kapısı kuruyor")
+
+
+def test_the_conversation_gate_counts_only_conversation_messages():
+    """`chatThread.length >= MAX_CHAT_MESSAGES` ARTIK YANLIŞ sayıyor.
+
+    Sonuç kayıtlarının kendi payı var (§0.4/K4): dökümdeki her sonuç kartı
+    konuşma kotasından bir tur çalardı ve üretim yapan oturum ~8 turda
+    kilitlenirdi. Kapı rolü sormak zorunda.
+    """
+    js = _chat_js()
+    body = re.search(r"async function sendChat\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "sendChat() bulunamadı"
+    assert "chatThread.length >= MAX_CHAT_MESSAGES" not in body.group(1), (
+        "konuşma kapısı sonuç kayıtlarını da sayıyor")
+    assert "conversationIsFull()" in body.group(1), (
+        "konuşma kapısı paylaşılan sayacı kullanmıyor")
+    full = re.search(r"function conversationIsFull\(\)\s*\{(.*?)\n\}", js, re.S)
+    assert full and "MAX_CHAT_MESSAGES" in full.group(1)
+    # Sayaç GERÇEKTEN rolü süzüyor mu: yoksa yeniden adlandırılmış bir
+    # `chatThread.length` olur ve iddia boş geçer.
+    counter = re.search(r"function conversationCount\(\)\s*\{(.*?)\n\}", js, re.S)
+    assert counter, "conversationCount() bulunamadı"
+    assert "RESULT_ROLE" in counter.group(1), "sayaç sonuç kayıtlarını ayırmıyor"
+
+
+def test_the_total_char_gate_skips_result_records():
+    """Toplam kapısı sunucunun `_check_chat_total`'ıyla AYNI şeyi saymalı.
+
+    Sunucu sonuç kayıtlarını saymıyor (modele gitmiyorlar). Ayrıca sonuç
+    kaydında `content` HİÇ YOK: `m.content.length` bir TypeError atar ve
+    gönderim tümden ölür — kapı bu yüzden hem rolü süzmek hem de eksik
+    `content`'e dayanıklı olmak zorunda.
+    """
+    js = _chat_js()
+    body = re.search(r"async function sendChat\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    used = re.search(r"const used = chatThread(.*?);\n", body.group(1), re.S)
+    assert used, "toplam kapısının hesabı bulunamadı"
+    assert "m.content.length" not in used.group(1), (
+        "sonuç kaydında content yok — TypeError ile gönderim ölür")
+    assert "RESULT_ROLE" in used.group(1), (
+        "toplam kapısı sonuç kayıtlarını da sayıyor")
+
+
+def test_the_result_turn_reserves_room_for_both_of_its_records():
+    """Sonuç turu İKİ öğe yazıyor: kullanıcı prompt'u + sonuç kaydı.
+
+    Turu AÇAN tek öğe için yer sorsa, tur açılır ama kapatılamazdı: dökümde
+    cevapsız bir kullanıcı satırı kalır ve kullanıcı üretimin kaydedilmediğini
+    hiç anlamaz. Kapı ayrıca turu KAPATAN tarafta da soruluyor — üretim sürerken
+    kullanıcı sohbet edebiliyor, yani döküm arada büyümüş olabilir.
+    """
+    js = _chat_js()
+    room = re.search(r"function transcriptHasRoom\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert room, "transcriptHasRoom() bulunamadı"
+    assert "conversationIsFull()" in room.group(1) and "transcriptIsFull(" in room.group(1)
+    begin = re.search(r"function beginResultTurn\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert begin and "transcriptHasRoom(2)" in begin.group(1), (
+        "açılan tur kapatılamayacak bir yere yazılıyor")
+    end = re.search(r"async function appendResultTurn\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert end and "transcriptHasRoom(1)" in end.group(1), (
+        "sonuç kaydı kapıyı hiç sormuyor")
+
+
+def test_the_transcript_draws_result_records():
+    """Üçüncü rol EKRANDA olmak zorunda; yoksa Adım 5'in modeli ölü kod.
+
+    `openChat` iki dallıydı (user → appendUser, aksi → appendBot): bir sonuç
+    kaydı `appendBot(undefined)`'a düşer ve döküm çöker.
+    """
+    js = _chat_js()
+    assert re.search(r"function appendResult\(", js), "appendResult() yok"
+    body = re.search(r"async function openChat\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "openChat() bulunamadı"
+    assert re.search(r'RESULT_ROLE|=== "result"', body.group(1)), (
+        "yeniden açılan oturumda sonuç kaydı role göre çizilmiyor")
+
+
+def test_a_result_image_url_is_built_from_the_id():
+    """Döküm yalnız `image_ids` taşıyor; dosya adı sözleşmesi `{id}.png`.
+
+    Sözleşme storage.py'de yazılı (`delete_many` docstring'i, `save`'in
+    `filename` satırı) ve ikinci bir istek gerektirmiyor. `/api/history`
+    KULLANILAMAZ: o uç klasöre göre süzülüyor, yani başka bir klasördeki
+    sonuç görselini hiç döndürmezdi.
+    """
+    js = _chat_js()
+    assert re.search(r"/output/\$\{[^}]*\}\.png", js), (
+        "sonuç görselinin URL'i id'den kurulmuyor")
+
+
+def test_a_deleted_result_image_draws_a_placeholder():
+    """Sarkan `image_id` sunucuda KASTEN budanmıyor (Adım 5'in testi); ekran payı bu.
+
+    Ölçü `error` olayı: dosya gerçekten yoksa `/output/{id}.png` 404 döner.
+    Bayat bir dizinden bakmak yerine gerçek koşulu ölçüyor.
+    """
+    js = _chat_js()
+    fn = re.search(r"function resultThumb\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert fn, "resultThumb() bulunamadı"
+    assert '"error"' in fn.group(1), "yükleme hatası dinlenmiyor"
+    assert "silindi" in fn.group(1), "yer tutucu metni yok"
+
+
+def test_result_thumbnails_open_the_full_viewer():
+    """Tasarım §6: "sonuç kartına tıklayınca tam-kaplama önizleme".
+
+    `viewer.js` YENİDEN YAZILMIYOR (§1.3) — yalnızca tek bir açılış dikişi
+    dışa veriliyor, imleç-sabitli zoom/rubberband/pinch aynen duruyor.
+    """
+    viewer = TestClient(appmod.app).get("/static/viewer.js").text
+    assert "window.openViewer" in viewer, "büyüteç dışa açılan bir dikiş vermiyor"
+    for kept in ("zoomAt", "rubberband", "ARROW_STEP", "openerRect"):
+        assert kept in viewer, f"§1.3 korunan davranış kaybolmuş: {kept}"
+    assert "openViewer" in _chat_js(), "sonuç kartı büyüteci açmıyor"
+
+
+def test_the_client_no_longer_invents_a_title():
+    """Başlık artık SUNUCUDA türetiliyor (§0.5/K9) ve bu bir güvenlik mandalı.
+
+    Başlıksız yazım = otomatik yazım işareti (K8). İstemci bir başlık
+    uydurursa o işaret yok olur ve "oturumları otomatik kaydet" anahtarı
+    SESSİZCE delinir: kapalıyken de yazım geçer.
+    """
+    js = _chat_js()
+    # ÇAĞRI aranıyor, kelime değil: dosyanın başındaki not `deriveTitle`'ın neden
+    # kaldırıldığını anlatıyor ve o notun kalması gerekiyor (yoksa bir gün
+    # "kolaylık olsun" diye geri gelir).
+    assert "deriveTitle(" not in js, (
+        "istemci hâlâ başlık türetiyor — otomatik kayıt anahtarı delinir")
+    body = re.search(r"async function persistThread\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "persistThread() bulunamadı"
+    assert "title" not in body.group(1), "otomatik yazımda başlık gönderiliyor"
+
+
+def test_a_blocked_autosave_is_explained_in_turkish():
+    """Anahtar kapalıyken sunucu 409 dönüyor; kullanıcı sebebini görmeli.
+
+    Ham `detail` metni de Türkçe (app._guard_autosave), ama 409 BEKLENEN bir
+    durum — hata gibi gösterilmemeli, yoksa kullanıcı her turda kırmızı bir
+    satır görür ve anahtarı kendisinin kapattığını unutur.
+    """
+    js = _chat_js()
+    body = re.search(r"async function persistThread\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    # Kodun KENDİSİ aranıyor: gövdedeki not da "409" yazıyor, kelime araması
+    # kod silinse de geçerdi.
+    assert "e.status === 409" in body.group(1), "409 ayrı ele alınmıyor"
+    # Durum kodu istisnaya GERÇEKTEN takılıyor mu (yoksa dal hiç girilmez):
+    api = re.search(r"async function chatApi\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert "e.status = res.status" in api.group(1), "durum kodu taşınmıyor"
+
+
+def test_the_autosave_switch_uses_its_own_endpoint():
+    """Anahtar `/api/prefs`'ten okunuyor ve oraya yazılıyor (§0.5/K7).
+
+    `/api/settings`'e bağlanırsa bir tercihi çevirmek Azure kimliğini yeniden
+    yazmak zorunda kalır ve Azure yapılandırılmamışken anahtar çevrilemez olur.
+    """
+    js = _chat_js()
+    # OKUMA ve YAZMA ayrı ayrı sorulUYOR: tek bir `in js` araması, iki
+    # fonksiyondan biri `/api/settings`'e kaysa da geçerdi.
+    for name in ("loadPrefs", "saveAutosavePref"):
+        fn = re.search(rf"async function {name}\([^)]*\)\s*\{{(.*?)\n\}}", js, re.S)
+        assert fn, f"{name}() bulunamadı"
+        assert '"/api/prefs"' in fn.group(1), f"{name} tercih ucunu kullanmıyor"
+        assert "/api/settings" not in fn.group(1), f"{name} kimlik ucuna yazıyor"
+    assert "autosave_sessions" in js, "anahtarın alan adı yok"
+    html = TestClient(appmod.app).get("/").text
+    assert 'id="pref-autosave"' in html, "anahtarın arayüzü yok"
+
+
+def test_deleting_every_session_is_wired_and_confirmed():
+    """Karar D1'in güvence (b)'si: tek tıkla "tümünü sil".
+
+    Onay ZORUNLU (`confirmDialog`): geri alınamayan ve TOPLU bir silme, tek
+    kayıt silmenin onayından daha çok gerekiyor.
+    """
+    js = _chat_js()
+    body = re.search(r"async function deleteAllChats\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "deleteAllChats() bulunamadı"
+    assert "confirmDialog" in body.group(1), "toplu silme onay sormuyor"
+    assert '"/api/chats"' in body.group(1) and "DELETE" in body.group(1)
+    html = TestClient(appmod.app).get("/").text
+    assert 'id="chats-delete-all"' in html, "düğme işaretlemede yok"
+
+
+def test_the_top_bar_names_the_open_session():
+    """`#session-title` PR 1'de kondu ama hiç bağlanmadı — ölü işaretlemeydi.
+
+    Bağlanması Adım 7'nin işi ve bir GEREKLİLİK: iki modda da aynı kabuk
+    görünüyor, yani "hangi oturumdayım" sorusunun cevabı üst şeritte olmazsa
+    Görsel modunda üretilen görsel kullanıcının bilmediği bir döküme düşer.
+    """
+    js = _chat_js()
+    fn = re.search(r"function syncSessionHeader\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert fn, "syncSessionHeader() bulunamadı"
+    # YAZIM aranıyor, id'nin adı değil: nottaki `#session-title` kelimesi kod
+    # silinse de geçerdi.
+    assert '$("session-title").textContent' in fn.group(1), (
+        "oturum adı üst şeritte güncellenmiyor")
+    assert '$("session-stamp").textContent' in fn.group(1), "oturum damgası bağlanmamış"
+    # Üç yol da başlığı tazelemek ZORUNDA: yazım (yeni oturum burada doğuyor),
+    # açma ve sıfırlama. Biri atlanırsa üst şerit başka bir oturumu gösterir.
+    for name, pattern in (("persistThread", r"async function persistThread"),
+                          ("openChat", r"async function openChat"),
+                          ("resetThread", r"function resetThread")):
+        body = re.search(rf"{pattern}\([^)]*\)\s*\{{(.*?)\n\}}", js, re.S)
+        assert "syncSessionHeader(" in body.group(1), f"{name} üst şeridi tazelemiyor"
+
+
+def test_generation_joins_the_open_session():
+    """Görsel modunda üretim, AÇIK bir oturum varsa onun dökümüne düşüyor.
+
+    `session_id` biçim kapısından geçiyor ama varlık kapısı YOK (§0.4/K2):
+    var olmayan bir id gönderilse sarkan bir etiket diske yazılırdı. Bu yüzden
+    yalnızca oturum GERÇEKTEN açıkken gönderiliyor.
+    """
+    js = _core_js()
+    body = re.search(r"async function run\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "run() bulunamadı"
+    # İKİ dal da sorulUYOR: `/api/generate` (JSON) ve `/api/edit` (multipart).
+    # Tek bir `in` araması, biri düşse de diğerinin varlığıyla geçerdi — palet
+    # alanının `/api/edit`'te bir kez tam olarak böyle düşmesi bunun kanıtı.
+    assert '...(sessionId ? { session_id: sessionId } : {})' in body.group(1), (
+        "üretim (JSON dalı) oturuma bağlanmıyor")
+    assert 'fd.append("session_id", sessionId)' in body.group(1), (
+        "düzenleme (multipart dalı) oturuma bağlanmıyor")
+    # Etiket KOŞULLU: oturum yoksa alan hiç gitmiyor, çünkü sunucuda varlık
+    # kapısı yok (§0.4/K2) ve uydurulan bir id sarkan bir etiket olarak yazılırdı.
+    assert "const sessionId = openSessionId();" in body.group(1)
+    assert "appendResultTurn" in body.group(1), "sonuç kaydı döküme girmiyor"
+
+
+def test_a_closed_result_turn_can_no_longer_be_rolled_back():
+    """Sonuç kaydı yazıldıktan SONRA geri alma çağrılırsa döküm bozulur.
+
+    `run()`'ın `try` bloğu sonuç kaydını da kapsıyor: sonraki bir hata (ör.
+    `loadHistory`'nin ağ hatası) `catch`'e düşerse kullanıcı turu silinir ama
+    sonuç kaydı KALIR — dökümde sahipsiz bir kart. `done` işareti bu yolu kapıyor.
+    """
+    js = _chat_js()
+    drop = re.search(r"function dropPendingTurn\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert drop and "pending.done" in drop.group(1), (
+        "kapanmış tur geri alınabiliyor — döküme sahipsiz sonuç kartı düşer")
+    end = re.search(r"async function appendResultTurn\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert "pending.done = true" in end.group(1), "tur kapanmış olarak işaretlenmiyor"
+
+
+def test_a_result_with_no_images_is_not_written():
+    """Boş `image_ids` sunucuda 422 (`min_length=1`) — kullanıcının açıklayamadığı bir hata.
+
+    Görsel dönmediyse yazılacak bir sonuç da yok. Kullanıcı turu da düşüyor:
+    cevapsız bir replik bırakmak, başarısız üretimin kuralına aykırı olurdu.
+    """
+    assert models.ChatMessage.model_fields["image_ids"].metadata, "alan sınırı yok"
+    js = _chat_js()
+    end = re.search(r"async function appendResultTurn\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert "if (!imageIds.length)" in end.group(1), "boş sonuç yazılmaya çalışılıyor"
+    assert "dropPendingTurn(pending)" in end.group(1), (
+        "boş sonuçta kullanıcı turu cevapsız kalıyor")
+
+
+def test_a_failed_generation_leaves_no_turn_behind():
+    """sendChat'in kuralı burada da geçerli: BAŞARISIZ TUR GEÇMİŞTE KALMAZ.
+
+    Kalsaydı döküme cevapsız bir kullanıcı turu düşer, yeniden denemek onu
+    ikinci kez eklerdi ve oturum aynı prompt'un kopyalarıyla dolardı.
+    """
+    js = _core_js()
+    body = re.search(r"async function run\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert "dropPendingTurn" in body.group(1), (
+        "başarısız üretim dökümde cevapsız bir tur bırakıyor")

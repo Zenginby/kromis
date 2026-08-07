@@ -35,8 +35,8 @@ JS'ten `$()` ile dokunulan id sayısı **145**; bunların **56'sı top-level ba�
 ## 0.1 Durum — nerede kaldık (7 Ağustos: PR 1 merge edildi)
 
 **PR 1 bitti ve `main`'e indi.** [PR #16](https://github.com/Zenginby/gpt-image-studio/pull/16)
-squash ile merge edildi → `main` = **`a1478d4`**. Merge sonrası ağaç hash'i dal
-ucuyla birebir aynı (`a717ef93`), yani squash'ta içerik kaybı yok.
+squash ile merge edildi; `main`'e inen tek commit **`a1478d4`**. Merge sonrası
+ağaç hash'i dal ucuyla birebir aynı (`a717ef93`), yani squash'ta içerik kaybı yok.
 
 > **Adım commit'leri `main`'in geçmişinde YOK.** Squash tek commit bıraktı;
 > aşağıdaki SHA'lar `feat/flow-ui` dalının geçmişine ait ve yalnızca PR #16
@@ -110,9 +110,11 @@ bloke eder — ilk ikisi kullanıcı kararı bekliyor:
 - **Tema seçici arayüzü** — dört tema (`kurumsal` / `amber` / `viola` / monokrom)
   token katmanında hazır, seçici yok. Yeri sözleşmede belli: Araçlar → Görünüm.
 
-**Devam etmek için (yeni oturum).** Başlangıç hâli: `main` = `a1478d4`, çalışma
-ağacı temiz, `pytest` 1000 yeşil. Sıradaki tur **PR 2 / Adım 5** — §3'teki veri
-modeli. Bu adım kozmetik değil, **kendi testleriyle gelir: TDD, test önce.**
+**Devam etmek için (yeni oturum).** Başlangıç hâli: `main`'in ucu (PR #16 + bu
+notun kendi düzeltmesi #17), çalışma ağacı temiz, `pytest` **1000 yeşil**. Önce
+`git switch main && git pull` — SHA'yı buradan okuma, taze olanı al. Sıradaki tur
+**PR 2 / Adım 5** — §3'teki veri modeli. Bu adım kozmetik değil, **kendi
+testleriyle gelir: TDD, test önce.**
 
 ```
 docs/flow-ui/flow-redesign-plan.md ve docs/superpowers/plans/2026-08-06-flow-arayuz-devri.md

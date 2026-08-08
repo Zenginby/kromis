@@ -492,6 +492,13 @@ function addExtraUpload(file) {
   renderSource();
 }
 
+// ŞU AN ÇAĞRISIZ — bilerek duruyor, ölü kod değil bekleyen dikiş.
+// Tek çağıranı galeri kartının "+Ek" düğmesiydi; o düğme Adım 11'de ÖLÇÜMLE
+// düştü (üç pill S'de karonun %89'unu kaplıyordu, bkz. folders.js'teki A9
+// notu). Yeni çağıranı Adım 12'nin Medya seçicisi olacak: plan B6/B7 bu
+// fonksiyonu ve `canAddExtra`'yı ADIYLA yeniden kullanmayı şart koşuyor —
+// silinip yeniden yazılırsa oradaki "ret gerekçesi tek kaynakta" kuralı
+// (Türkçe cümleler kodda bir kez geçer) kırılır.
 function addGalleryExtra(rec) {
   if (!canAddExtra()) return;
   if (source.kind === "gallery" && source.id === rec.id) {

@@ -2005,3 +2005,233 @@ def test_a_session_id_is_never_invented_for_the_generation_request():
         "düzenleme dalı koşulu düşürmüş")
     assert "/api/chats" not in core, (
         "üretimden önce oturum açılıyor — başarısız üretim dökümde cevapsız tur bırakır")
+
+
+# ── Adım 11 · Medya'da büyüteç + görünür kart eylemleri ────────────────
+#
+# Kök neden (ölçüldü, PR 3 sonrası HEAD): küçük resmin tek `click` dinleyicisi
+# `setGallerySource(rec)`'e gidiyordu — Medya'da bir karta tıklamak büyüteci
+# HİÇ açmıyordu (`window.openViewer` yalnız `chat.js`'e bağlanmıştı). İkinci ve
+# bağımsız kusur: `core.js`'in `$("composer").hidden = !studio` satırı yüzünden
+# Medya'dayken `setGallerySource`'un yazdığı `#ref-chip`/`#status` gizli kapların
+# içinde kalıyordu — eylem çalışıyor, geri bildirimi görünmüyordu.
+
+def _viewer_js() -> str:
+    return TestClient(appmod.app).get("/static/viewer.js").text
+
+
+def _render_gallery_body() -> str:
+    """`renderGallery()`'nin gövdesi (sütun 0'daki kapanış süslüsüne kadar)."""
+    js = _folders_js()
+    match = re.search(r"function renderGallery\(\)\s*\{(.*?)\n\}", js, re.S)
+    assert match, "renderGallery bulunamadı"
+    return match.group(1)
+
+
+def _balanced_body(src: str, anchor: str) -> str:
+    """`anchor`'dan sonraki ilk `{`'ten eşleşen `}`'e kadarki dilim.
+
+    Girinti saymaktan daha sağlam: kart dinleyicileri iç içe süslü taşıyor ve
+    girinti tabanlı bir kesim ilk `\\n    })`'te yanlış yerde biterdi.
+    """
+    start = src.find(anchor)
+    assert start >= 0, f"{anchor} bulunamadı"
+    open_idx = src.find("{", start)
+    assert open_idx > 0, f"{anchor} gövdesiz"
+    depth = 0
+    for i in range(open_idx, len(src)):
+        if src[i] == "{":
+            depth += 1
+        elif src[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return src[open_idx:i + 1]
+    raise AssertionError(f"{anchor} gövdesi kapanmıyor")
+
+
+def _css_block(selector: str) -> str:
+    """Tek bir CSS kuralının gövdesi."""
+    css = _css()
+    match = re.search(re.escape(selector) + r"\s*\{([^}]*)\}", css)
+    assert match, f"{selector} kuralı yok"
+    return match.group(1)
+
+
+def test_a_gallery_card_opens_the_full_viewer():
+    """A1: Medya'da karta tıklamak büyüteci açar.
+
+    `window.openViewer` PR 2'de dışa verildi ama yalnız `chat.js:905`'e
+    bağlandı; `folders.js` hiç güncellenmedi (`git log -S openViewer -- static/`
+    tek commit gösteriyor — kayıp değil, hiç yazılmamış). Sözleşme
+    `docs/flow-ui/media-browser.html`: kart tıklaması büyüteci açar.
+
+    `rect` veriliyor ki büyüteç tıklanan karonun BULUNDUĞU yerden büyüsün —
+    `openerRect` zaten bu iş için var (viewer.js:201).
+    """
+    body = _render_gallery_body()
+    assert re.search(r"window\.openViewer\(\s*`/output/\$\{rec\.filename\}`", body), (
+        "kart büyüteci açmıyor (ya da URL'i şablon değil)")
+    assert "getBoundingClientRect()" in body, (
+        "rect verilmiyor → büyüteç karonun yerinden değil ekranın ortasından açılır")
+    # img'in yerel sürüklemesi kapalı kalmalı: açıksa dataTransfer'a görsel
+    # URL'i düşer ve kartın sürükleme hayaleti bozulur (PR 1'in dersi).
+    assert "img.draggable = false" in body, "img'in yerel sürüklemesi geri gelmiş"
+
+
+def test_the_thumbnail_click_is_no_longer_the_edit_shortcut():
+    """A4: "Referans yap" gizli bir kısayol değil, `.acts` içinde AÇIK bir düğme.
+
+    Küçük resme tıklamak iki işi birden yapamaz. Büyüteç kartın işi olunca
+    düzenleme kısayolu (`img.addEventListener("click", …)`) SİLİNİR ve yerine
+    şeritte adı yazan bir düğme gelir — keşfedilebilirlik sözleşmenin
+    `.acts` şeridine bağlı.
+    """
+    body = _render_gallery_body()
+    assert 'img.addEventListener("click"' not in body, (
+        "küçük resmin gizli düzenleme kısayolu duruyor")
+    # Konumsal: düğme önce doğar, eylemi setGallerySource'a gider, sonra şerit kurulur.
+    ref_label = body.find('"Referans"')
+    set_source = body.find("setGallerySource(rec)")
+    acts_class = body.find("acts.className")
+    assert ref_label >= 0, '"Referans" düğmesi yok'
+    assert set_source >= 0, "setGallerySource bağı yok"
+    assert acts_class >= 0, ".acts şeridi kurulmuyor"
+    assert ref_label < set_source < acts_class, (
+        "Referans düğmesi/eylemi şeridin kurulumundan sonra yazılmış")
+
+
+def test_select_mode_still_wins_over_the_viewer():
+    """A3: seçim modunda kart SEÇER, büyütmez.
+
+    Sıra indeksle mandallanıyor: `selectMode` dalı `openViewer` çağrısından
+    ÖNCE gelmezse çoklu seçim sırasında her tıklama lightbox açar ve seçim
+    yapılamaz hâle gelir.
+
+    Dilim `activateCard`: plan bu iddiayı tıklama dinleyicisinin gövdesinde
+    tarif ediyordu, ama kart ARTIK klavyeden de etkinleşiyor (A7) ve iki
+    dinleyici aynı gövdeyi çağırıyor. Dalı iki yere kopyalamak, birinde seçim
+    modunu unutmakla biten ayrışma olurdu; değişmez aynı yerde duruyor,
+    yalnız tek kopya hâlinde.
+    """
+    handler = _balanced_body(_render_gallery_body(), "const activateCard =")
+    select = handler.find("selectMode")
+    viewer = handler.find("openViewer")
+    assert select >= 0, "kart tıklamasında seçim modu dalı yok"
+    assert viewer >= 0, "kart tıklamasında büyüteç yok"
+    assert select < viewer, "büyüteç seçim modunun önüne geçmiş"
+
+
+def test_card_actions_are_excluded_from_the_card_click():
+    """A2: dışlama TEK muhafızda toplanır (`.acts`, `.card-del`, `.card-check`).
+
+    Üçü de kartın üstünde duran kendi eylemleri: şeride, silme düğmesine ya da
+    seçim kutusuna tıklamak büyüteci açmamalı. Tek `closest()` çağrısı üçünü de
+    saymak zorunda — dağınık muhafızlar birinin unutulmasıyla sonuçlanıyordu.
+    """
+    handler = _balanced_body(_render_gallery_body(), 'card.addEventListener("click"')
+    guard = re.search(r'closest\(\s*"([^"]*)"\s*\)', handler)
+    assert guard, "kart tıklamasında closest() muhafızı yok"
+    for sel in (".acts", ".card-del", ".card-check"):
+        assert sel in guard.group(1), f"{sel} dışlanmıyor → kendi eylemi büyüteç açar"
+
+
+def test_the_invisible_action_row_does_not_swallow_card_clicks():
+    """A6: `opacity: 0` bir öğe tıklamayı YUTAR — şerit `pointer-events` ile kapanır.
+
+    `.acts` kartın alt şeridini kaplıyor ve hover'a kadar görünmez. Görünmez
+    olması tıklanamaz yapmıyor: şeridin boş sol yarısı kartın tıklamasını
+    yiyordu, yani karonun alt kısmına tıklamak hiçbir şey yapmıyordu.
+    `.card-badge` (aynı dosya) zaten bu ilacı kullanıyor.
+    """
+    acts = _css_block(".card .acts")
+    assert "opacity: 0" in acts, "şerit artık gizli değil — bu testin öncülü düştü"
+    assert "pointer-events: none" in acts, (
+        "görünmez şerit hâlâ kartın tıklamasını yutuyor")
+    children = _css_block(".card .acts a, .card .acts button")
+    assert "pointer-events: auto" in children, (
+        "şerit kapatıldı ama düğmeleri geri açılmadı → İndir/Referans tıklanamaz")
+
+
+def test_a_gallery_card_is_reachable_by_keyboard():
+    """A7: kart bir düğme gibi davranır (odak + Enter/Space).
+
+    `e.target !== card` muhafızı ZORUNLU: `chat.js:908-910`'un keydown'ı bu
+    muhafızı taşımıyor ve kartın İÇİNDEKİ düğmeye basılan Enter hem düğmeyi
+    hem kartı tetikliyor (gizli çift-tetikleme). O kopyalanmaz.
+    """
+    body = _render_gallery_body()
+    assert "card.tabIndex = 0" in body, "kart klavyeyle odaklanamıyor"
+    assert 'card.setAttribute("role", "button")' in body, "kart düğme olarak duyurulmuyor"
+    assert 'card.setAttribute("aria-label"' in body, "kartın erişilebilir adı yok"
+    keydown = _balanced_body(body, 'card.addEventListener("keydown"')
+    assert '"Enter"' in keydown and '" "' in keydown, "Enter/Space bağlı değil"
+    assert "e.target !== card" in keydown, (
+        "kart içi düğmeye basılan Enter kartı da tetikler (çift-tetikleme)")
+    assert "preventDefault()" in keydown, "Space sayfayı kaydırır"
+
+
+def test_making_a_gallery_image_the_reference_lands_where_it_is_visible():
+    """A5: durum değiştiren eylem önce Stüdyo'ya döner.
+
+    `core.js`'in `$("composer").hidden = !studio` satırı yüzünden Medya'dayken
+    `#ref-chip` ve `#status` gizli kapların içinde: referans gerçekten
+    atanıyor ama kullanıcı hiçbir şey görmüyordu.
+
+    Alttaki CSS iddiası navigasyonun neden ZORUNLU olduğunun kanıtı: `#status`
+    Yönetmen modunda ayrıca `display:none`, yani "nasılsa görünür" varsayımı
+    iki ayrı eksende yanlış.
+    """
+    body = _render_gallery_body()
+    # Durum değiştiren eylemde navigasyon kendi çağrısından ÖNCE gelmeli.
+    handler = _balanced_body(body, "refBtn.addEventListener")
+    nav = handler.find('showSection("studio")')
+    target = handler.find("setGallerySource(rec)")
+    assert nav >= 0, "Referans: Stüdyo'ya dönüş yok"
+    assert target >= 0, "Referans: eylem bağı yok"
+    assert nav < target, "referans atanıyor ama görünmeyen bir yüzeye yazılıyor"
+    # İndir navigasyon YAPMAZ: dosya iner, bölüm değişmez.
+    dl_handler = _balanced_body(body, "downloadLink.addEventListener")
+    assert 'showSection("studio")' not in dl_handler, "İndir kullanıcıyı Medya'dan atıyor"
+    assert re.search(r'#composer\[data-mode="director"\][^{]*#status', _css(), re.S), (
+        "#status'un mod ekseninde de gizlendiği kuralı kayboldu")
+
+
+def test_the_card_action_row_stays_at_two_pills():
+    """A9 (ölçümle karara bağlandı): şerit İKİ pill — İndir · Referans.
+
+    Üçüncü pill (`+Ek`) 8799'daki canlı turda ölçüldü ve düştü: üç pill
+    184.8px istiyor, karonun şeride verdiği genişlik S'de 97px, M'de 138px.
+    Sonuç S'de ÜÇ satır (karonun %89'u) ve M'de iki satır (%43) — şerit
+    görselin kendisini yutuyordu. İki pill'le S %58, M %21, L %13.
+
+    Bu bir "yetenek silindi" değil, tamamlanmamış bir yolun geri çekilmesi:
+    `+Ek` Medya'da zaten GÖRÜNMEZ çalışıyordu (geri bildirimi `hidden`
+    composer'ın içinde). Yeri Adım 12'nin Medya seçicisi (plan B6/B7).
+
+    `flex-wrap` KALIYOR: iki pill bile S'de (97px < 131.8px) sarıyor;
+    kaldırmak şeridi karonun dışına taşırırdı.
+    """
+    body = _render_gallery_body()
+    # KOD deseni aranıyor, kelime değil: yukarıdaki gerekçe yorumu da "+Ek"
+    # yazıyor ve düz kelime araması kendi açıklamasına takılıyordu (§0.6/§0.7'de
+    # iki kez düşülen tuzağın aynısı).
+    assert '.textContent = "+Ek"' not in body, (
+        "üçüncü pill geri gelmiş — S'de şerit karonun %89'unu kaplıyor (A9)")
+    assert "addGalleryExtra(" not in body, "galeri kartı hâlâ ek referans kapısı"
+    appends = re.findall(r"acts\.appendChild\((\w+)\)", body)
+    assert appends == ["downloadLink", "refBtn"], (
+        f"şerit İndir · Referans değil: {appends}")
+    assert "flex-wrap: wrap" in _css_block(".card .acts"), (
+        "iki pill S'de sarıyor (97px < 131.8px) — sarma kapatılırsa şerit karodan taşar")
+
+
+def test_the_gallery_viewer_keeps_the_download_seam():
+    """A8: kartın verdiği URL biçimi büyütecin indirme dikişini AÇIK tutar.
+
+    `viewer.js:134` indirilecek dosya adını `/output/` önekinden türetiyor.
+    Kart başka bir URL biçimi verirse (örn. tam origin) büyütecin "İndir"i
+    adsız kalır — sessiz ve teşhisi zor bir kırılma.
+    """
+    assert 'path.startsWith("/output/")' in _viewer_js(), (
+        "büyütecin dosya adı türetmesi değişmiş")
+    assert "openViewer" in _folders_js(), "galeri büyüteci hiç açmıyor"

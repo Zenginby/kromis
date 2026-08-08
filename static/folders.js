@@ -599,16 +599,17 @@ function renderGallery() {
   for (const rec of historyCache) {
     const prompt = rec.prompt || "";
 
-    // Küçük resme tıklamak doğrudan düzenleme moduna alır (ayrı "Düzenle" butonu yok)
+    // Karta tıklamak BÜYÜTECİ açar (tasarım §6 / media-browser.html). Küçük
+    // resmin eski gizli "düzenleme kısayolu" kaldırıldı: aynı tıklama iki iş
+    // yapamaz ve referans atama artık .acts şeridinde adı yazan bir düğme.
     const img = document.createElement("img");
     img.src = `/output/${rec.filename}`;
     img.alt = prompt.slice(0, 60);
     img.title = selectMode
       ? "Seçmek için tıkla · seçili görselleri taşımak için klasöre sürükle"
       : prompt
-        ? `${prompt}\n\nDüzenlemek için tıkla · taşımak için klasöre sürükle`
-        : "Düzenlemek için tıkla · taşımak için klasöre sürükle";
-    img.addEventListener("click", () => { if (!selectMode) setGallerySource(rec); });
+        ? `${prompt}\n\nBüyütmek için tıkla · taşımak için klasöre sürükle`
+        : "Büyütmek için tıkla · taşımak için klasöre sürükle";
     // img'in yerel sürüklemesi kapatılır ki sürükleme kartın kendisinden başlasın
     // (aksi halde dataTransfer'a görsel URL'i düşer ve sürükleme hayaleti bozulur)
     img.draggable = false;
@@ -627,16 +628,36 @@ function renderGallery() {
       downloadImage(`/output/${rec.filename}`, rec.filename);
     });
 
-    // ana görsele ek referans olarak ekle (AI ile birleştirme)
-    const extraBtn = document.createElement("button");
-    extraBtn.textContent = "+Ek";
-    extraBtn.title = "Ek referans görseli olarak ekle";
-    extraBtn.addEventListener("click", () => addGalleryExtra(rec));
+    // Bu görseli ana referans yap. Eskiden küçük resmin GİZLİ tıklamasıydı;
+    // artık adı yazan bir düğme (sözleşmenin .acts şeridi).
+    //
+    // Önce Stüdyo'ya dönülüyor: composer Medya'dayken `hidden` (core.js'in
+    // `$("composer").hidden = !studio` satırı), yani `setGallerySource`'un
+    // yazdığı #ref-chip ve #status gizli kapların içinde kalıyordu — referans
+    // gerçekten atanıyor ama kullanıcı hiçbir geri bildirim görmüyordu.
+    const refBtn = document.createElement("button");
+    refBtn.textContent = "Referans";
+    refBtn.title = "Bu görseli ana referans yap";
+    refBtn.addEventListener("click", () => {
+      showSection("studio");
+      setGallerySource(rec);
+    });
 
+    // Şerit İKİ pill: İndir · Referans — media-browser.html'in yazdığı
+    // kompozisyonun aynısı. Eski "+Ek" düğmesi ÖLÇÜMLE düştü (A9): üçüncü
+    // pill 184.8px istiyor, karonun şeride verdiği genişlik S'de 97px, M'de
+    // 138px. Sonuç S'de üç satır (karonun %89'u) ve M'de iki satır (%43) —
+    // şerit görselin kendisini yutuyordu. İki pill'le: S %58, M %21, L %13.
+    //
+    // Yetenek kaybı bilerek ve ölçülü: o düğme bugüne kadar zaten GÖRÜNMEZ
+    // çalışıyordu (geri bildirimi Medya'da `hidden` composer'ın içindeydi),
+    // yani tamamlanmamış bir yol geri çekildi. Galeri görselini ek referans
+    // yapmanın yeri Adım 12'nin Medya seçicisi: orada "Ek olarak ekle" kendi
+    // gerekçeli kapalı hâliyle duruyor (plan B6/B7).
     const acts = document.createElement("div");
     acts.className = "acts";
     acts.appendChild(downloadLink);
-    acts.appendChild(extraBtn);
+    acts.appendChild(refBtn);
 
     const delBtn = document.createElement("button");
     delBtn.className = "card-del";
@@ -662,11 +683,38 @@ function renderGallery() {
       card.classList.remove("dragging");
       document.body.classList.remove("dnd-active");
     });
-    // Seçim modunda kartın her yeri seçer; kart içi eylemler (İndir/+Ek/×) hariç
+    // Kartın TEK etkinleştirme gövdesi: seçim modu kazanır, yoksa büyüteç.
+    // Tıklama ve klavye aynı gövdeyi çağırıyor; iki kopya yazmak, birinde
+    // seçim modu dalını unutmakla biten klasik ayrışma olurdu.
+    //
+    // `rect` veriliyor: büyüteç tıklanan karonun BULUNDUĞU yerden büyüsün
+    // (viewer.js'in `openerRect`'i zaten bunun için var).
+    const activateCard = () => {
+      if (selectMode) { toggleSelected(rec.id); return; }
+      window.openViewer(`/output/${rec.filename}`, prompt || rec.filename,
+                        card.getBoundingClientRect());
+    };
+    // Kart içi eylemler kartın işini tetiklemez: şerit, silme, seçim kutusu.
+    // Tek muhafızda toplanıyor — dağınık muhafızlar birinin unutulmasıyla
+    // bitiyordu (.card-check bu listede yeni; kendi stopPropagation'ı duruyor).
     card.addEventListener("click", (e) => {
-      if (!selectMode) return;
-      if (e.target.closest(".acts") || e.target.closest(".card-del")) return;
-      toggleSelected(rec.id);
+      if (e.target.closest(".acts, .card-del, .card-check")) return;
+      activateCard();
+    });
+    // Kart bir <div>, yani klavyeye kendiliğinden açık değil: düğme gibi
+    // duyurulup Enter/Space'e bağlanıyor.
+    card.tabIndex = 0;
+    card.setAttribute("role", "button");
+    card.setAttribute("aria-label",
+      `${prompt ? prompt.slice(0, 60) : rec.filename} — ${selectMode ? "seç" : "büyüt"}`);
+    card.addEventListener("keydown", (e) => {
+      // Kart İÇİNDEKİ düğmeye basılan Enter kartı da tetiklemesin: olay
+      // oradan köpürür ve tek tuş iki eylem çalıştırır. (chat.js:908-910'un
+      // taşımadığı muhafız — o gizli çift-tetikleme buraya kopyalanmıyor.)
+      if (e.target !== card) return;
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();   // Space sayfayı kaydırır
+      activateCard();
     });
     card.appendChild(img);
     if (selectMode) card.appendChild(makeCheckbox(rec));

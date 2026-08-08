@@ -1088,7 +1088,10 @@ body.dnd-active .folder-cell .folder-open { border-style: dashed; border-color: 
 .gallery[data-size="s"] { --tile: 110px; }
 .gallery[data-size="l"] { --tile: 210px; }
 .card { position: relative; background: var(--panel-2); border-radius: var(--r-item, 12px); overflow: hidden; }
-.card img { width: 100%; display: block; aspect-ratio: 1; object-fit: cover; cursor: pointer; }
+/* zoom-in: karo artık büyüteci açıyor. İmleç bunu söylemeli, yoksa özellik
+   keşfedilmez (`.preview-img`'de zaten yazılmış kural). Seçim modunda
+   `body.select-mode .card img` özgüllükle kazanıp pointer'a döndürüyor. */
+.card img { width: 100%; display: block; aspect-ratio: 1; object-fit: cover; cursor: zoom-in; }
 .card-del {
   position: absolute; top: 6px; right: 6px; z-index: 2;
   width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%;
@@ -1118,12 +1121,18 @@ body.dnd-active .folder-cell .folder-open { border-style: dashed; border-color: 
    reduced-motion'da yalnız opacity (dosya sonundaki blok). */
 .card .acts {
   position: absolute; inset: auto 8px 8px; z-index: 2;
-  display: flex; gap: 6px; justify-content: flex-end;
+  display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;
   opacity: 0; transform: translateY(4px);
+  /* `opacity: 0` bir öğe tıklamayı YUTAR: şerit karonun alt bandını kaplıyor
+     ve boş sol yarısı kartın tıklamasını yiyordu (karonun altına tıklamak
+     hiçbir şey yapmıyordu). Şerit geçirgen, düğmeleri değil — `.card-badge`
+     yukarıda aynı ilacı kullanıyor. */
+  pointer-events: none;
   transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
 .card:hover .acts, .card:focus-within .acts { opacity: 1; transform: none; }
 .card .acts a, .card .acts button {
+  pointer-events: auto;
   flex: none; text-align: center; font-size: 12px; text-decoration: none;
   background: var(--glass); backdrop-filter: blur(8px);
   color: var(--text); border: 1px solid var(--hairline); border-radius: 999px;

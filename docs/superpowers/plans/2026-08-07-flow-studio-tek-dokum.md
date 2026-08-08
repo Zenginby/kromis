@@ -20,7 +20,9 @@ Bu plan başka bir oturumda uygulanmak üzere yazıldı. Sırayla:
    `2d97d94`) atıf veren dokümanlar bu turun ilk commit'inde düzeltildi.
 2. **Kanıtı tazele.** `.venv/bin/python -m pytest tests/ -q` → 1106 yeşil olmalı.
    Değilse önce onu çöz; yeni tur yeşil tabandan başlar.
-3. **Adım 11'e geç** (aşağıda). 11 → 12 → 13 sırası bilinçli; gerekçesi en altta.
+3. ~~**Adım 11'e geç.**~~ **Bitti (8 Ağustos, `b79dc17`, `APP_VERSION` 2.1.1).**
+   Karar kaydı ve kanıtlar **§0.9**'da; A9 ölçümle reddedildi (şerit iki pill).
+   Sıradaki iş **Adım 12**. 12 → 13 sırası bilinçli; gerekçesi en altta.
 
 Faz 0 (Open Design mock) yalnız **12 ve 13** için zorunlu, 11 için değil — 11'in tek
 tasarım sorusu (A9) o mock'ta cevaplanıyor, o yüzden 11'in mock'u 12'ninkiyle birlikte
@@ -81,7 +83,11 @@ kullanıcının manşet isteği (12), en sonda yapısal olan (13).
 
 ---
 
-## Adım 11 — Medya'da karta tıklamak büyüteci açar (hata + görünmez geri bildirim)
+## Adım 11 — Medya'da karta tıklamak büyüteci açar (hata + görünmez geri bildirim) — **BİTTİ** (`b79dc17`)
+
+> Aşağıdaki bölüm **planın kendisi** (uygulama öncesi hâli, olduğu gibi bırakıldı).
+> Ne olduğu, A9'un nasıl karara bağlandığı ve plandan bilerek ayrılan iki nokta
+> için **§0.9**'a bak.
 
 **Kök neden (ölçüldü):** `folders.js:611` küçük resmin tek `click` dinleyicisi ve
 `setGallerySource(rec)`'e gidiyor; viewer'a giden hiçbir yol yok. İkinci ve bağımsız kusur:
@@ -139,6 +145,58 @@ Yardımcı: `_render_gallery_body()` (regex `function renderGallery\(\)\s*\{(.*?
 **Mutasyon:** `openViewer` çağrısını sil → A-T1 · img click'i geri koy → A-T2 · `selectMode`
 dalını aşağı al → A-T3 · `.acts`'ı listeden çıkar → A-T4 · `pointer-events` sil → A-T5 ·
 `tabIndex`/`e.target !== card` sil → A-T6 · `showSection`/`setGallerySource` sırasını takas et → A-T7.
+
+---
+
+## §0.9 Adım 11 — karar kaydı ve kanıtlar (bitti, 8 Ağustos, `b79dc17`)
+
+Adım 11 planlandığı gibi indi; **iki nokta** plandan bilerek ayrıldı, ikisi de
+ölçüme dayanıyor.
+
+**K23 · A9 reddedildi: şerit iki pill kalıyor (İndir · Referans).** Plan üçüncü
+pill'i (`+Ek`) Faz 0 mock'unda gözle onaylatmayı öneriyordu; mock yerine 8799'da
+**gerçek karolarda ölçüldü**, çünkü ölçülecek şey zaten canlı yerleşimdi:
+
+| Yoğunluk | Karo | Şeride kalan | 3 pill (184.8px) | 2 pill (131.8px) |
+|---|---|---|---|---|
+| S | 113px | 97px | 3 satır · karonun **%89**'u | 2 satır · %58 |
+| M | 154px | 138px | 2 satır · %43 | 1 satır · %21 |
+| L | 237px | 221px | 1 satır · %13 | 1 satır · %14 |
+
+S'de şerit görselin kendisini yutuyordu (ekran görüntüsüyle onaylandı). Planın
+yazılı yedeği uygulandı: `+Ek` düştü. **Bedel açıkça kabul edildi:**
+`addGalleryExtra`'nın tek çağıranı oydu, yani galeri görselini ek referans yapma
+yolu Adım 12'nin seçicisi gelene kadar YOK. Hafifletici ve kararı taşıyan gerekçe:
+o düğme Medya'da zaten **görünmez** çalışıyordu (geri bildirimi `hidden` composer'ın
+içindeydi), yani çalışan bir özellik değil tamamlanmamış bir yol geri çekildi.
+`addGalleryExtra` **silinmedi**: Adım 12'nin B6/B7'si onu ve `canAddExtra`'yı
+adıyla yeniden kullanmayı şart koşuyor; core.js'te çağrısız beklediği
+gerekçesiyle yorumlandı.
+
+**K24 · A-T3'ün dilimi `activateCard`'a taşındı.** Plan iddiayı tıklama
+dinleyicisinin gövdesinde tarif ediyordu; kart A7 ile klavyeden de etkinleşince
+iki dinleyici aynı gövdeyi çağırır oldu. Dalı iki yere kopyalamak, birinde seçim
+modunu unutmakla biten ayrışma olurdu — değişmez ("seçim modu büyütecin önünde")
+aynı yerde, yalnız tek kopya hâlinde. Testin docstring'i sebebi yazıyor (§1.2:
+iddia yeniden yazılır, kaldırılmaz).
+
+**Tuzağa üçüncü kez düşüldü ve yakalandı.** A9'un yeni testi ilk hâlinde `"+Ek"`
+**kelimesini** arıyordu ve kendi gerekçe yorumuna takılıp kırmızı kaldı; iddia
+kod desenine (`.textContent = "+Ek"`) çevrildi. §0.6 ve §0.7'nin dersi aynen
+geçerli: **iddia kodu arar, kelimeyi değil.**
+
+**Kanıtlar.** `pytest` 1106 → **1115** (9 yeni test, silinen yok) ·
+`test_id_contract.py` 6 yeşil (kaldırılan id yok → defter satırı gerekmedi) ·
+**12 mutasyonun hepsi kırmızıya döndü** (A-T1…A-T9 + pointer-events'in iki yarısı
++ flex-wrap) · 8799'da canlı tur: kart tıklaması büyüteci açtı ve indirme dikişi
+`download="a5fefdf98088.png"` ile `/output/` önekinden türedi (A-T8 kodda değil
+**gerçekte** doğrulandı), "Referans" büyüteci açmadan Stüdyo'ya döndü ve çip
+görünür oldu (`#go` → "Görseli düzenle"), seçim modu kazandı, kart içi düğmeden
+gelen Enter kartı tetiklemedi · tarayıcı konsolu **0 mesaj**, sunucu hatası yok ·
+**1024/1280/1440/1920**'de yatay taşma **0** (taşan tek şey kapalı yan çekmecenin
+`translateX(-320px)` park hâli — mevcut davranış, kaydırma üretmiyor) ·
+geliştiricinin verisine **yazılmadı** (`history.json`/`chats.json` mtime'ları
+7 Ağustos'ta kaldı).
 
 ---
 

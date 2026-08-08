@@ -545,10 +545,19 @@ geçildi.** Ekranlar onaylandı, taşıma başladı, PR 1 merge edildi.
   yönetmenin yazılmış mesajının üstüne yazmaz, sığmazsa kırpmaz reddeder) ve
   Görsel modu kendi oturumunu başlatıyor. `pytest` 1095 → **1106**; 9 mutasyonun
   hepsi kırmızı. Kararlar K19–K22 ve kanıtlar plan §0.8'de.
-- **Sırada:** Adım **11 · 12 · 13** — 7 Ağustos kullanıcı denemesinin bulduğu üç
-  açık, kendi planında: `docs/superpowers/plans/2026-08-07-flow-studio-tek-dokum.md`.
-  11: Medya'da karta tıklamak büyüteci açar (+ kart eylemlerinin görünmez geri
-  bildirimi). 12: (+) menüsünün dördüncü maddesi — bu dosyanın §4.2'de söz verdiği
+- **Bitti (`b79dc17`, PR 4 · `APP_VERSION` 2.1.1):** Adım **11** — Medya'da karta
+  tıklamak büyüteci açıyor (bağ küçük resimden karta taşındı; küçük resmin gizli
+  "düzenle" kısayolu yerine `.acts` şeridinde adı yazan **Referans** düğmesi) ve
+  kart eylemlerinin **görünmez geri bildirimi** kapandı: durum değiştiren eylem
+  önce Stüdyo'ya dönüyor, çünkü composer Medya'dayken `hidden`. Şerit
+  `pointer-events` ile kartın tıklamasını yutmayı bıraktı; kart klavyeyle
+  erişilir. **A9 ölçümle karara bağlandı:** şerit **iki pill** (İndir · Referans)
+  — üçüncü pill S'de karonun %89'unu kaplıyordu; "+Ek"in yeri Adım 12'nin
+  seçicisi. `pytest` 1106 → **1115**; 12 mutasyonun hepsi kırmızı. Kararlar ve
+  kanıtlar tek-döküm planı §0.9'da.
+- **Sırada:** Adım **12 · 13** — 7 Ağustos kullanıcı denemesinin kalan iki
+  açığı, kendi planında: `docs/superpowers/plans/2026-08-07-flow-studio-tek-dokum.md`.
+  12: (+) menüsünün dördüncü maddesi — bu dosyanın §4.2'de söz verdiği
   "Medya'dan seç" seçicisi (ölçüsü §2'de: 776×570). 13: `studio-session.html`'in
   kendisi — tek döküm, tek composer; mod değişince pencere de yazılan metin de
   değişmez.

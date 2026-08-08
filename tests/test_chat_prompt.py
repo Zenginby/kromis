@@ -39,7 +39,7 @@ def test_bundled_default_keeps_the_anchors_the_frontend_parser_needs():
     """chat.js yanıtı `PROMPT` başlığı ve bir ```json fence'i üzerinden ayrıştırıyor.
 
     Talimat dosyası bir gün "daha okunaklı" bir çıktı formatına çevrilirse
-    "Forma aktar" düğmesi SESSİZCE hiçbir şey uygulamaz — ayrıştırıcının
+    "Görsel modunda üret" düğmesi SESSİZCE hiçbir şey uygulamaz — ayrıştırıcının
     dayandığı çıpalar bu yüzden testle sabitlendi.
     """
     text = chat_prompt.load_instructions()
@@ -199,7 +199,7 @@ def test_the_persona_does_not_repeat_the_panels_in_prose():
 
 
 def test_the_persona_refuses_off_topic_requests_without_drawing_a_form_button():
-    """Ret yanıtında kod bloğu KALIRSA arayüz "Forma aktar" düğmesi çizer.
+    """Ret yanıtında kod bloğu KALIRSA arayüz "Görsel modunda üret" düğmesi çizer.
 
     `parseDirectorReply` prompt'u "JSON olmayan en uzun fence" diye seçiyor: ret
     cümlesinin yanına konan herhangi bir blok prompt sanılır ve `applyToForm` onu
@@ -266,9 +266,9 @@ def test_the_persona_repeats_the_whole_prompt_on_iteration_turns():
     """`applyToForm` #prompt alanının ÜSTÜNE yazıyor: fark yeterli değil.
 
     v1.15'in "prompt'u baştan yazma, sadece ilgili katmanı değiştir" kuralı
-    modeli kod bloğuna bir FARK koymaya itiyordu ("… yerine …"). "Forma aktar" o
-    farkı prompt sanıp forma yazar ve kullanıcı bambaşka bir görsel üretir —
-    yine sessiz kırılma.
+    modeli kod bloğuna bir FARK koymaya itiyordu ("… yerine …"). "Görsel modunda
+    üret" o farkı prompt sanıp composer'a yazar ve kullanıcı bambaşka bir görsel
+    üretir — yine sessiz kırılma.
     """
     assert "prompt'un TAMAMINI" in _bundled_text(), \
         "iterasyonda tam prompt şartı düşmüş"

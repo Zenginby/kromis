@@ -558,19 +558,22 @@ async function run() {
   // bayt bayt aynı kalır ve extra="forbid" boş bir alan görmez.
   const pal = readPaletteOpts();
 
-  // ── Birleşik oturum (tasarım §5) ──
-  // Üretim AÇIK bir oturuma katılıyor, kendi başına oturum AÇMIYOR: `session_id`
-  // biçim kapısından geçiyor ama varlık kapısı yok (§0.4/K2), yani henüz
-  // yazılmamış bir oturumun id'si gönderilemez — sarkan bir etiket diske
-  // yazılırdı. Oturumu Görsel modundan BAŞLATMAK tek composer'ın kararı
-  // (tasarım §4.2 → Adım 8): orada prompt yapısı gereği bir döküm turu.
+  // ── Birleşik oturum (tasarım §5 · §4.2) ──
+  // Görsel modu artık kendi oturumunu BAŞLATIYOR (Adım 8, K10'un ikinci yarısı):
+  // prompt yapısı gereği bir döküm turu, o yüzden koşulsuz basılıyor. Oturum
+  // yoksa `persistThread` üretimden SONRA POST ile açıyor.
+  //
+  // K10'un durduğu yer korunuyor: üretim isteğine UYDURMA id konmuyor. Oturum
+  // henüz yazılmadığı için ilk partinin görsel kaydında ters bağ (`session_id`)
+  // olmuyor — ileri bağ (`result.image_ids`) tam, dökümün çizdiği de o.
   //
   // chat.js'in adlarına OLAY ANINDA dokunuluyor (tıklama) — dosyanın başındaki
   // yükleme sırası kuralının izin verdiği tek yol.
   const sessionId = openSessionId();
   // Kullanıcının repliği üretimden ÖNCE döküme basılıyor (sendChat'in sırası):
-  // beklerken kendi cümlesini görüyor. Başarısızlıkta geri alınıyor.
-  const pending = sessionId ? beginResultTurn(prompt) : null;
+  // beklerken kendi cümlesini görüyor. Başarısızlıkta geri alınıyor — diske de
+  // hiçbir şey yazılmamış olur, çünkü yazan taraf başarıdan sonraki sonuç kaydı.
+  const pending = beginResultTurn(prompt);
 
   let request;
   if (editing) {

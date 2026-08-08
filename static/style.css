@@ -284,8 +284,12 @@ body:has(.sheet.open) .scrim { display: block; }
 #composer[data-mode="director"] #prompt,
 #composer[data-mode="director"] #go,
 #composer[data-mode="director"] #specs-btn,
+#composer[data-mode="director"] #ask-director,
 #composer[data-mode="director"] #status,
 #composer[data-mode="director"] #folder-target { display: none; }
+/* "Yönetmen'e sor" Görsel modunun kutusuna bağlı: Yönetmen modunda kendine
+   sormak anlamsız olurdu. Doluluk ekseni chat.js'te (`hidden`), görünüşü
+   `.btn-ghost` varyantlarının yanında (aynı özgüllük — sıra belirleyici). */
 .sheet {
   position: fixed; top: 0; bottom: 0; z-index: 50;
   width: 320px; max-width: 88vw;
@@ -1143,6 +1147,22 @@ body.dnd-active .folder-cell .folder-open { border-style: dashed; border-color: 
 /* .btn-ghost display:inline-flex kurduğu için [hidden] tek başına yetmiyor */
 .btn-ghost[hidden] { display: none; }
 .btn-ghost-danger:hover { border-color: var(--danger); color: var(--danger); }
+/* "Yönetmen'e sor" (§4.2) ÇERÇEVESİZ — bölümün dediği gibi bir "metin düğmesi".
+   Hatlı olsa composer barında üst üste üç hatlı pill olurdu (mod anahtarı · bu ·
+   üretim çipi) ve kaçış kapısı ayarların ağırlığında görünürdü. Hiyerarşi böyle
+   okunuyor: dolu = Üret, hatlı = kontroller, düz metin = ikincil yol.
+   `.btn-ghost` ile AYNI özgüllükte olduğu için bu blok ondan SONRA gelmek
+   zorunda — mod bloğunun yanına konduğunda çerçeve geri geliyordu (ölçüldü). */
+.composer-ask {
+  white-space: nowrap; border-color: transparent;
+  color: var(--muted); padding-inline: 0.5rem;
+  transition: color var(--dur) var(--ease);
+}
+.composer-ask:hover { background: transparent; color: var(--text); }
+.composer-ask:active { background: transparent; }
+/* Halka global `:focus-visible` kuralından geliyor (§8); eklenen tek şey
+   odaklanmış düğmenin sönük renkte kalmaması. */
+.composer-ask:focus-visible { color: var(--text); }
 
 /* Kare (boş) → tik (seçili): kutu CSS, tik SVG */
 .card-check {

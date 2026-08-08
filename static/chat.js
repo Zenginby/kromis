@@ -120,7 +120,10 @@ function promptFigure(pre, parsed) {
   const apply = document.createElement("button");
   apply.type = "button";
   apply.className = "primary chat-prompt-btn";
-  apply.textContent = "Forma aktar";
+  // Devrin manşeti (tasarım §4.2): sekmeler bu düğme uğruna kaldırıldı — eski
+  // etiketin vaat ettiği "diğer sekmeye git" yolculuğu ortadan kalkacaktı.
+  // Ortada bir form da yok artık; tek composer var, düğme onun MODUNU söylüyor.
+  apply.textContent = "Görsel modunda üret";
   apply.addEventListener("click", () => applyToForm(parsed));
 
   bar.append(label, copy, apply);
@@ -135,7 +138,7 @@ function renderMarkdownInto(host, text, parsed) {
   // renderParameters). Atlanmasalar kullanıcı ham JSON okurdu.
   //
   // Ayar JSON'u listede YOK ve çizilmeye devam ediyor (bilinçli): kullanıcının
-  // "Forma aktar"a basmadan da hangi boyut/kalite önerildiğini görmesi gerekiyor.
+  // "Görsel modunda üret"e basmadan da hangi boyut/kalite önerildiğini görmesi gerekiyor.
   // Tanınmayan bir JSON bloğu da çizilir — dürüst sonuç: yönetmen anlaşılmayan
   // bir şey yazdıysa kullanıcı onu görsün.
   //
@@ -693,6 +696,9 @@ function applyToForm(parsed) {
   }
 
   $("prompt").value = parsed.prompt;
+  // Programatik yazım `input` olayı DOĞURMAZ: ters yönün düğmesi elle
+  // eşitlenmezse dolu kutunun yanında görünmez kalırdı.
+  syncAskDirector();
   const skipped = [];
   for (const [key, selectId, label] of SETTING_TARGETS) {
     const value = parsed.settings ? parsed.settings[key] : undefined;
@@ -705,10 +711,53 @@ function applyToForm(parsed) {
   // SESSİZ SAPMA YASAK (palette applied:false ile aynı gerekçe): uygulanamayan
   // öneri açıkça söylenir, yoksa kullanıcı formda başka bir ayar görür ve
   // sonucu açıklayamaz.
-  statusEl.textContent = "Prompt forma aktarıldı."
+  statusEl.textContent = "Prompt Görsel moduna aktarıldı."
     + (skipped.length ? ` Şu öneriler uygulanamadı: ${skipped.join(", ")}`
-                        + " — formdaki seçeneklerde yok." : "");
+                        + " — üretim ayarlarındaki seçeneklerde yok." : "");
 }
+
+// ── Ters yön: "Yönetmen'e sor" (tasarım §4.2 · D13) ──────────────────
+// Görsel modunda kutuya yazılan HAM metni yönetmene devreder. İki yön aynı
+// dosyada duruyor çünkü ikisi de aynı devri anlatıyor; `showView` core.js'in
+// global fonksiyonu ve olay anında çağrılıyor (yaprak dosya kuralı bozulmuyor).
+
+/** Düğmenin DOLULUK ekseni. Mod ekseni CSS'te (`#composer[data-mode=…]`). */
+function syncAskDirector() {
+  $("ask-director").hidden = !$("prompt").value.trim();
+}
+
+function askDirector() {
+  const text = $("prompt").value.trim();
+  if (!text) return;                       // düğme gizliyken ⏎/kod yolu
+  const existing = $("chat-input").value.trim();
+  // ÜZERİNE YAZMIYOR: yönetmen kutusunda yazılmış ama gönderilmemiş bir mesaj
+  // olabilir; onu silmek sessiz veri kaybı olurdu. Yeni metin ALTINA giriyor.
+  const merged = existing ? `${existing}\n\n${text}` : text;
+  // KIRPMA YOK (applyToForm'un kırpma yasağının ters yönü): kırpılmış metin
+  // yönetmene BAŞKA bir şey sorar. Sunucu tek kullanıcı mesajını da bu sınırla
+  // reddediyor, yani sığmayan devir zaten 422 dönerdi.
+  if (merged.length > MAX_CHAT_MSG_CHARS) {
+    // Ret GÖRSEL modunun satırına yazılıyor: devir olmadığı için mod değişmiyor
+    // ve `#chat-status` burada `display:none`. `chatStatus` kullanılsaydı düğme
+    // tıklanır, hiçbir şey olmaz, sebebi de görünmezdi — sessiz ret.
+    statusEl.textContent =
+      `Devredilecek metin ${MAX_CHAT_MSG_CHARS} karakter sınırını aşıyor `
+      + `(${merged.length}) — yönetmenin kutusunu boşalt ya da prompt'u kısalt.`;
+    return;
+  }
+  $("chat-input").value = merged;
+  $("prompt").value = "";
+  syncAskDirector();
+  // Mod anahtarının TEK kapısı: `data-mode`'u buradan yazmak `showView`'un
+  // ölçtüğü kayan dolguyu ve `aria-selected`'ı geride bırakırdı.
+  showView("chat");
+  autoGrow($("chat-input"));
+  $("chat-input").focus();
+  // Gönderilmedi ve gönderilmiş gibi de durmuyor: model çağrısı kullanıcının
+  // kararı (bir tur para ve zaman), üstelik metnine bağlam ekleyebilir.
+  chatStatus("Ham metin yönetmene devredildi — göndermeden önce ekleme yapabilirsin.");
+}
+
 
 async function copyPrompt(text) {
   try {
@@ -983,7 +1032,7 @@ async function sendChat(display = "") {
       : n + (m.content || "").length + (m.display || "").length), 0);
   if (used + message.length + label.length > MAX_CHAT_TOTAL_CHARS) {
     chatStatus("Sohbet çok uzadı — soldaki \"Yeni sohbet\" ile devam et. (Son prompt'u "
-      + "kaybetmemek için önce \"Forma aktar\"a bas.)");
+      + "kaybetmemek için önce \"Görsel modunda üret\"e bas.)");
     return false;
   }
 
@@ -1124,11 +1173,14 @@ async function persistThread() {
 // bozulmuyor: chat.js en sonda yükleniyor, core.js yalnız tıklama anında
 // buraya bakıyor — dosyanın başındaki yaprak kuralının aynısı).
 //
-// Üretim AÇIK bir oturuma katılıyor, kendi başına oturum AÇMIYOR: `session_id`
-// biçim kapısından geçiyor ama varlık kapısı yok (§0.4/K2), yani var olmayan
-// bir id sarkan bir etiket olarak diske yazılırdı. Oturumu Görsel modundan
-// BAŞLATMAK tek composer'ın kararı (tasarım §4.2 → Adım 8); orada prompt
-// yapısı gereği bir döküm turu.
+// Görsel modu KENDİ oturumunu başlatıyor (Adım 8 · tasarım §4.2): prompt yapısı
+// gereği bir döküm turu. Oturum yoksa `persistThread`'in POST'u açıyor ve bu
+// SIRA kritik — yazma yalnızca başarılı üretimden sonra oluyor, yani başarısız
+// üretim diskte cevapsız bir kullanıcı turu bırakmıyor (K10'un asıl itirazı).
+//
+// Üretim isteğine uydurma id konmuyor: `session_id` biçim kapısından geçiyor ama
+// varlık kapısı yok (§0.4/K2). Bedeli ilk partide ters bağın (görsel kaydındaki
+// `session_id`) eksik kalması; ileri bağ (`result.image_ids`) tam.
 
 /** İki kotanın TEK kapısı; dolu ise gerekçesini de yazar.
  *
@@ -1523,6 +1575,14 @@ $("tab-chat").addEventListener("click", () => {
   }
   $("chat-input").focus();
 });
+
+// Ters yönün düğmesi (§4.2/D13). Yukarıdaki dinleyici bir NEZAKET (boş kutuya
+// taslağı kopyalar); bu düğme bir KARAR — her koşulda devrediyor ve metni
+// Görsel modundan alıyor. İlk çağrı ilk kareyi eşitliyor: kutu boş olduğu için
+// düğme gizli kalır, işaretlemedeki `hidden` ile aynı şeyi söylüyor.
+$("ask-director").addEventListener("click", askDirector);
+$("prompt").addEventListener("input", syncAskDirector);
+syncAskDirector();
 
 $("chats-delete-all").addEventListener("click", deleteAllChats);
 $("pref-autosave").addEventListener("change", saveAutosavePref);

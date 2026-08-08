@@ -839,7 +839,7 @@ def test_prompt_actions_live_on_the_prompt_block_not_at_the_bottom():
     assert body, "promptFigure() bulunamadı"
     assert "chat-prompt-bar" in body.group(1)
     assert "copyPrompt(parsed.prompt)" in body.group(1), "Kopyala bağlı değil"
-    assert "applyToForm(parsed)" in body.group(1), "Forma aktar bağlı değil"
+    assert "applyToForm(parsed)" in body.group(1), "Görsel modunda üret bağlı değil"
     # Sınıf adı bir AÇIKLAMADA geçebilir (neden kaldırıldığı yazıyor); yasak olan
     # şey ona bir düğüm bağlanması, yani dizeyle atanması.
     assert '"chat-msg-actions"' not in js, "eski alt eylem satırı hâlâ üretiliyor"
@@ -1016,7 +1016,7 @@ def test_a_turn_does_not_refetch_the_whole_chat_list():
 
 def test_a_machine_block_can_never_be_picked_as_the_prompt():
     """Kısalan prompt + uzun varyasyon bloğu, "en uzun blok" kuralını JSON'a
-    yönlendiriyordu ve "Forma aktar" forma JSON yazıyordu.
+    yönlendiriyordu ve eylem düğmesi composer'a JSON yazıyordu.
 
     v1.15'in aday süzgeci ayar ve seçenek bloğunu ELLE dışlıyordu. v1.16 iki blok
     daha ekliyor ve aynı sürümde promptlar KISALIYOR — ölçüldü: 133 karakterlik
@@ -1037,7 +1037,7 @@ def test_a_machine_block_can_never_be_picked_as_the_prompt():
 def test_the_variation_and_parameter_blocks_are_never_drawn_as_code_blocks():
     """Üç bloğun da görünür karşılığı ÇİPLER; ham JSON gösterilmemeli.
 
-    Ayar JSON'u listede BİLEREK yok: kullanıcının "Forma aktar"a basmadan da
+    Ayar JSON'u listede BİLEREK yok: kullanıcının "Görsel modunda üret"e basmadan da
     hangi boyut/kalite önerildiğini görmesi gerekiyor.
     """
     js = _chat_js()
@@ -1813,3 +1813,195 @@ def test_only_one_slide_over_is_open_at_a_time():
     body = re.search(r"function openSheet\([^)]*\)\s*\{(.*?)\n\}", core, re.S)
     assert body, "openSheet() yok"
     assert "closeSheets()" in body.group(1), "önceki panel kapatılmıyor"
+
+
+# ── Adım 8: §4.2'nin manşeti (D13 + D14) ────────────────────────────────
+# Sekmeler bu bölüm uğruna kaldırıldı ve gerekçe tek bir cümleydi: "Forma
+# aktar → diğer sekme gidiş gelişi ortadan kalkıyor". Sekme KABUĞU gitti, ama
+# gidiş-geliş chat.js'te aynı adla yaşamaya devam etti (§0.2/D14) ve ters yön
+# hiç yazılmadı (D13). Aşağıdaki iddialar §0.3'ün zorunlu üç testini ve
+# K10'un ikinci yarısını mandallıyor.
+
+
+def _run_body() -> str:
+    """core.js'in `run()` gövdesi — üretim akışının tamamı."""
+    body = re.search(r"async function run\(\)\s*\{(.*?)\n\}", _core_js(), re.S)
+    assert body, "run() bulunamadı"
+    return body.group(1)
+
+
+def _ask_director_body() -> str:
+    body = re.search(r"function askDirector\(\)\s*\{(.*?)\n\}", _chat_js(), re.S)
+    assert body, "askDirector() bulunamadı"
+    return body.group(1)
+
+
+def test_the_prompt_block_button_names_the_mode_not_a_form():
+    """D14: devrin manşeti. Ortada bir "form" yok — tek composer var.
+
+    Eski etiket ("Forma aktar") kaldığı sürece §4.2'nin satış argümanı teslim
+    edilmemiş sayılır: kullanıcı hâlâ olmayan bir forma aktardığını okuyor.
+    Yorumlar da sayılıyor — kabul ölçütü "chat.js'te KALMADI" diyor.
+    """
+    js = _chat_js()
+    assert "Forma aktar" not in js, "eski etiket chat.js'te duruyor"
+    body = re.search(r"function promptFigure\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "promptFigure() bulunamadı"
+    assert re.search(r'apply\.textContent\s*=\s*"Görsel modunda üret"', body.group(1)), (
+        "prompt bloğunun eylem düğmesi §4.2'nin adını taşımıyor")
+
+
+def test_the_image_mode_button_pastes_the_prompt_and_switches_mode():
+    """Etiket değişti diye davranış kaymamalı: mod + prompt, ikisi birlikte.
+
+    Ayrıca kullanıcıya söylenen cümle de "form" demiyor — sessiz sapma yasağının
+    (`applyToForm`'un `skipped` geleneği) dil tarafı.
+    """
+    body = re.search(
+        r"function applyToForm\([^)]*\)\s*\{(.*?)\n\}", _chat_js(), re.S)
+    assert body, "applyToForm() bulunamadı"
+    fn = body.group(1)
+    assert '$("prompt").value = parsed.prompt' in fn, "prompt composer'a basılmıyor"
+    assert 'showView("image")' in fn, "mod Görsel'e alınmıyor"
+    assert "forma aktarıldı" not in fn.lower(), "durum satırı hâlâ 'form' diyor"
+    assert "Görsel modu" in fn, "durum satırı nereye aktarıldığını söylemiyor"
+
+
+def test_ask_director_is_invisible_while_the_prompt_box_is_empty():
+    """D13: §4.2 "kutu boşken görünmez" diyor — sebebi de yazılı.
+
+    Boş kutuda duran düğme ekranda ikinci bir eylem gibi durur ve tıklanınca
+    yönetmene boş bir metin devreder.
+    """
+    tag = re.search(r'<button[^>]*id="ask-director"[^>]*>', _html())
+    assert tag, "Yönetmen'e sor düğmesi işaretlemede yok"
+    assert "hidden" in tag.group(0), "düğme ilk karede görünür"
+    js = _chat_js()
+    body = re.search(r"function syncAskDirector\(\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "görünürlük eşitleyicisi yok"
+    assert re.search(
+        r'\$\("ask-director"\)\.hidden\s*=\s*!\$\("prompt"\)\.value\.trim\(\)',
+        body.group(1)), "görünürlük kutunun DOLULUĞUNDAN okunmuyor"
+    assert re.search(r'\$\("prompt"\)\.addEventListener\("input"', js), (
+        "yazarken düğme belirmiyor")
+
+
+def test_ask_director_belongs_to_image_mode_only():
+    """Görünürlüğün İKİ ekseni var ve iki sahibi: doluluk JS'te, mod CSS'te.
+
+    core.js'in composer notunun aynı gerekçesi — aynı `hidden` özniteliğini iki
+    yerden oynatmak "hangisi kazandı" sorusunu doğuruyor. `display` ayrı eksen.
+    """
+    css = _css()
+    group = re.search(
+        r'((?:#composer\[data-mode="director"\][^{,]*,\s*)+'
+        r'#composer\[data-mode="director"\][^{,]*)\{([^}]*)\}', css)
+    assert group, "Yönetmen modu görünürlük bloğu bulunamadı"
+    assert "#ask-director" in group.group(1), (
+        "düğme Yönetmen modunda da duruyor — kendi moduna sor düğmesi")
+    assert "display: none" in group.group(2)
+
+
+def test_ask_director_moves_the_raw_text_into_the_director_box():
+    """"Devreder": kopyalamıyor, TAŞIYOR.
+
+    Metin iki kutuda birden kalırsa Görsel'e dönüp Üret'e basmak yönetmene
+    sorulmuş olan ham metni ayrıca üretir; düğme de görünür kalıp ikinci bir
+    devir daha davet eder.
+    """
+    fn = _ask_director_body()
+    assert '$("chat-input").value = merged' in fn, "metin yönetmenin kutusuna yazılmıyor"
+    assert re.search(r'\$\("prompt"\)\.value\s*=\s*""', fn), (
+        "ham metin Görsel modunda da kalıyor")
+    assert 'showView("chat")' in fn, "mod Yönetmen'e geçmiyor"
+    assert "syncAskDirector()" in fn, (
+        "programatik temizlik `input` olayı doğurmaz — düğme görünür kalır")
+
+
+def test_ask_director_does_not_overwrite_an_unsent_director_message():
+    """Yönetmen kutusunda yazılmış ama gönderilmemiş bir mesaj olabilir.
+
+    Üzerine yazmak sessiz veri kaybı olurdu (`applyToForm`'un kırpma yasağıyla
+    aynı duruş): eldeki metin korunuyor, yeni metin ALTINA ekleniyor.
+    """
+    fn = _ask_director_body()
+    assert re.search(r'const existing = \$\("chat-input"\)\.value', fn), (
+        "kutudaki mevcut metin hiç okunmuyor")
+    assert re.search(
+        r"const merged = existing \? `\$\{existing\}[^`]*\$\{text\}` : text", fn), (
+        "mevcut metin birleşime girmiyor — üzerine yazılıyor")
+
+
+def test_ask_director_refuses_to_truncate_the_hand_off():
+    """KIRPMA YOK: sunucu 6000 karakteri aşan kullanıcı mesajını reddediyor.
+
+    Sessizce kırpmak yönetmene BAŞKA bir metin sorardı — `MAX_PROMPT_CHARS`
+    dalının aynısı, yönü ters.
+    """
+    fn = _ask_director_body()
+    guard = re.search(r"merged\.length > MAX_CHAT_MSG_CHARS", fn)
+    assert guard, "tek mesaj sınırı hiç kontrol edilmiyor"
+    write = fn.index('$("chat-input").value = merged')
+    assert guard.start() < write, "sınır kontrolü yazımdan SONRA — kırpma bile değil"
+    assert ".slice(0, MAX_CHAT_MSG_CHARS" not in fn, "metin sessizce kırpılıyor"
+    # Ret GÖRÜNÜR satıra yazılmalı: devir olmadığı için mod Görsel'de kalıyor ve
+    # `#chat-status` orada `display:none` (CSS'in mod ekseni). Canlı ölçümde
+    # yakalandı — `chatStatus` ile ret sessizdi: düğme tıklanıyor, hiçbir şey
+    # olmuyor, sebebi de görünmüyordu.
+    refusal = fn[guard.start():write]
+    assert "statusEl.textContent" in refusal, "sınır aşımı sessizce geçiliyor"
+    assert "chatStatus(" not in refusal, (
+        "ret Görsel modunda gizli olan #chat-status'a yazılıyor")
+
+
+def test_ask_director_is_a_text_button_not_a_second_filled_one():
+    """§4.2'nin kendi cümlesi: "ekranda ikinci bir dolu düğme oluşmaz"."""
+    tag = re.search(r'<button[^>]*id="ask-director"[^>]*>', _html()).group(0)
+    assert "btn-ghost" in tag, "metin düğmesi değil"
+    assert "primary" not in tag, "Üret'in yanında ikinci dolu düğme"
+
+
+def test_the_hand_off_still_goes_through_the_mode_switch():
+    """§1.1: iki yeni yol mod anahtarının mandalını bozmuyor.
+
+    `data-mode`'u kendi başına yazan bir kısayol, `showView`'un ölçtüğü kayan
+    dolguyu ve `aria-selected`'ı geride bırakırdı — sekme düğmeleri yanlış
+    tarafı seçili gösterirdi.
+    """
+    core = _core_js()
+    assert '$("tab-image").addEventListener' in core, "mod anahtarının bağı gitti"
+    assert '$("tab-chat").addEventListener' in core, "mod anahtarının bağı gitti"
+    fn = _ask_director_body()
+    assert "dataset.mode" not in fn, "devir kendi başına mod yazıyor"
+
+
+def test_image_mode_starts_a_session_on_its_own():
+    """K10'un ikinci yarısı (§0.6): Görsel modu artık oturum BAŞLATIYOR.
+
+    Döküm açık bir oturuma bağlı kaldığı sürece sohbetsiz üreten kullanıcının
+    hiçbir üretimi geçmişe girmiyordu — §5'in birleşik oturumu yarım kalıyordu.
+    """
+    fn = _run_body()
+    assert re.search(r"const pending = beginResultTurn\(prompt\)", fn), (
+        "prompt turu döküme koşulsuz basılmıyor")
+    assert "sessionId ? beginResultTurn" not in fn, (
+        "döküm hâlâ AÇIK bir oturum şartına bağlı")
+
+
+def test_a_session_id_is_never_invented_for_the_generation_request():
+    """K10'un durduğu yer korunuyor: var olmayan bir id diske YAZILMAZ.
+
+    Oturum üretimden SONRA (`persistThread`'in POST'u) doğuyor; üretim isteği
+    henüz yazılmamış bir oturumun etiketini taşıyamaz — `session_id`'de varlık
+    kapısı yok (§0.4/K2). Bedeli bilinçli: ilk partinin görsel kaydında ters bağ
+    (`session_id`) YOK, ileri bağ (`result.image_ids`) tam.
+    """
+    core = _core_js()
+    fn = _run_body()
+    assert re.search(
+        r"\.\.\.\(sessionId \? \{ session_id: sessionId \} : \{\}\)", fn), (
+        "oturum yokken de session_id gönderiliyor")
+    assert 'if (sessionId) fd.append("session_id", sessionId)' in fn, (
+        "düzenleme dalı koşulu düşürmüş")
+    assert "/api/chats" not in core, (
+        "üretimden önce oturum açılıyor — başarısız üretim dökümde cevapsız tur bırakır")

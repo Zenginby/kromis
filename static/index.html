@@ -407,6 +407,15 @@
       </div>
 
       <div class="composer-right">
+        <!-- Ters yön (tasarım §4.2): Görsel modunda kutuya bir şey yazdığın an
+             belirir, yazdığın ham metni yönetmene devreder. METİN düğmesi ve
+             `hidden` başlıyor — §4.2'nin kendi cümlesi "ekranda ikinci bir dolu
+             düğme oluşmaz". Görünürlüğün iki ekseni var, iki sahibi: doluluk
+             chat.js'te (`hidden`), mod CSS'te (`display`) — composer'ın
+             yukarıdaki notuyla aynı gerekçe. -->
+        <button type="button" id="ask-director" class="btn-ghost composer-ask" hidden>
+          Yönetmen'e sor
+        </button>
         <!-- Üretim ayarları çipi: boyut · kalite · adet özetini gösterir,
              tıklayınca sağdan slide-over açar. Etiketi core.js tazeliyor. -->
         <button type="button" id="specs-btn" class="specs" aria-controls="specs-sheet"

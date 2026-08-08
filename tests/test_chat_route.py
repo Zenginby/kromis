@@ -207,7 +207,7 @@ def test_a_display_label_on_an_assistant_message_is_rejected(client, fake_comple
     """Pil KULLANICININ seçimini gösteriyor.
 
     Asistan mesajında kabul edilse yönetmenin yanıtı ekranda tek satırlık bir
-    pile inerdi: prompt da, "Forma aktar" düğmesi de görünmez olurdu.
+    pile inerdi: prompt da, "Görsel modunda üret" düğmesi de görünmez olurdu.
     """
     r = _post(client, [{"role": "assistant", "content": "merhaba", "display": "x"},
                        {"role": "user", "content": "devam"}])

@@ -1141,6 +1141,149 @@ body.dnd-active .folder-cell .folder-open { border-style: dashed; border-color: 
 }
 .card .acts button:hover, .card .acts a:hover { background: var(--raised); }
 
+/* ── Medya seçici (Adım 12) ────────────────────────────────────────────
+ *
+ * Kaynak: docs/flow-ui/media-picker-modal.html (Faz 0 mock'u), o da
+ * library-assets.html'in satır içi 12-53'ünün portu. HER seçici yeniden
+ * adlandırıldı — mock'un `.asset-grid`/`.asset`/`.modal-nav` adları burada
+ * çakışırdı: `.asset-grid` uygulamada zaten Kütüphane'nin.
+ *
+ * Token eşlemesi bir AD eşlemesidir, değer icadı değil (Faz 0 kapısı, madde 4):
+ *   --surface → --panel · --surface-2 → --panel-2 · --surface-3 → --raised
+ *   --fg → --text · hairline → --hairline · kontrol kenarı → --control-border
+ *   seçili çerçeve → --accent (Flow'da --accent DURUM anlatır; "seçili görsel
+ *   çerçevesi" sözleşmede sanksiyonlu kullanım, bkz. flow-tokens.css başlığı)
+ *
+ * Yeniden kullanılanlar, kopyalanmayanlar: arama pill'i `.search`, karo
+ * görseli `.card img`'in ölçüleri, boyut rozeti `.card-badge`, birincil eylem
+ * `.primary`, ikincil `.btn-ghost`. `.primary:disabled`'ın `cursor: progress`i
+ * bu kod tabanında "üretiliyor" demek — ikincil için kullanılmaz.
+ */
+.picker-card {
+  position: relative; z-index: 1; margin: auto;
+  width: min(776px, 94vw); height: min(570px, 88vh);
+  background: var(--panel); border-radius: var(--r-panel, 24px);
+  box-shadow: var(--shadow, 0 18px 48px rgba(0, 0, 0, 0.66));
+  animation: modalIn var(--dur, 200ms) var(--ease) both;
+  display: grid; overflow: hidden;
+  /* K25 · Faz 0'da ÜÇ bölünme ölçüldü (plan §0.10). Sözleşmenin 236px'lik yan
+     bölmesi orta sütunu 277px'te bırakıyordu = 2 sütun × 133px, bir bakışta
+     ~5 karo. 180px ile ızgara 333px = 3 sütun × 103px (~9 karo) ve sol
+     gezinmedeki klasör adları hâlâ kırpılmıyor — 168px'lik üçüncü seçenek
+     kırpıyordu ve kapsamı daraltmanın birincil aracı okunmaz oluyordu. */
+  grid-template-columns: 208px minmax(0, 1fr) 180px;
+  grid-template-rows: 68px minmax(0, 1fr);
+  grid-template-areas: "phead phead phead" "pnav pbody pside";
+}
+.picker-head {
+  grid-area: phead; display: flex; align-items: center; gap: 10px;
+  padding: 0 16px 0 20px; min-width: 0;
+}
+.picker-nav { grid-area: pnav; padding: 4px 12px 16px; overflow-y: auto; }
+.picker-nav-item {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 9px 12px; border: 0; border-radius: 10px; cursor: pointer;
+  background: none; color: var(--muted); font: inherit; font-size: 14px;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.picker-nav-item:hover { background: var(--panel-2); color: var(--text); }
+.picker-nav-item[aria-current="true"] { background: var(--selected, var(--panel-2)); color: var(--text); }
+.picker-nav-item svg { flex: none; }
+.picker-nav-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-nav-item em {
+  margin-left: auto; font-style: normal;
+  font: 500 11px/1 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.04em; color: var(--muted);
+}
+/* "İçe aktarılanlar" bir BÖLME değil kesişen süzgeç: Klasörsüz + klasörler
+   zaten Tümü'nü tüketiyor, bu satır onların İÇİNDEN geçiyor. Hairline bunu
+   gözle söylüyor, yoksa toplam tutmuyor sanılır. */
+.picker-nav-item.crossing {
+  margin-top: 8px; padding-top: 15px;
+  border-top: 1px solid var(--hairline); border-radius: 0 0 10px 10px;
+}
+
+.picker-body { grid-area: pbody; padding: 4px 20px 20px; overflow-y: auto; }
+.picker-grid {
+  display: grid; gap: 12px;
+  /* 3. sütunu açan şey bu min: 132px'lik Kütüphane değeri 333px'lik ızgarada
+     da 2 sütunda kalırdı — floor((333+12)/(132+12)) = 2. */
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  align-items: start;
+}
+.picker-tile {
+  position: relative; display: block; width: 100%; text-align: left;
+  /* Faz 0 ölçümü: UA'nın `padding: 1px 6px`'i sıfırlanmazsa 133px'lik karo
+     121px'lik görsel taşıyor. Kütüphane'de `.thumb`'ın kendi 14px'i bunu
+     gizliyor, tam kanamalı karoda gizlemiyor. */
+  padding: 0; border: 0; cursor: pointer;
+  background: var(--panel-2); border-radius: var(--r-item, 12px); overflow: hidden;
+  transition: background var(--dur) var(--ease);
+}
+.picker-tile:hover { background: var(--raised); }
+/* <img> doğrudan düğmenin çocuğu — ara kap YOK. <button> `<div>` taşıyamıyor,
+   `<span>` kap ise satır içi olur ve aspect-ratio'yu yutar (mock'ta ölçüldü:
+   121×194, kare değil). Ölçüler `.card img` ile birebir; zoom imleci yok,
+   burada tıklama büyütmüyor SEÇİYOR. */
+.picker-tile img {
+  width: 100%; display: block; aspect-ratio: 1; object-fit: cover;
+}
+.picker-cap {
+  display: block; padding: 8px 10px 10px; font-size: 12px; line-height: 1.45;
+  color: var(--muted); border-top: 1px solid var(--hairline);
+}
+.picker-cap b {
+  display: block; font-weight: 450; color: var(--text); margin-bottom: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.picker-tile[aria-selected="true"] {
+  background: var(--selected, var(--panel-2));
+  outline: 2px solid var(--accent); outline-offset: -2px;
+}
+.picker-tile[aria-selected="true"] .picker-cap { color: var(--text); }
+.picker-empty {
+  display: grid; place-content: center; justify-items: center; gap: 14px;
+  padding: 40px 20px; color: var(--muted); text-align: center;
+}
+.picker-empty[hidden] { display: none; }
+.picker-empty svg { color: var(--raised); }
+.picker-empty p { margin: 0; font-size: 15px; }
+
+.picker-side {
+  grid-area: pside; border-left: 1px solid var(--hairline);
+  padding: 16px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.picker-preview {
+  border-radius: var(--r-item, 12px); background: var(--panel-2); aspect-ratio: 1;
+  display: grid; place-items: center; padding: 16px;
+}
+/* `height: auto` şart: `max-height: 100%` ana ekseni belirsiz esnek kolonda
+   çözülmüyor ve <img>'in height ÖZNİTELİĞİ kazanıyor — mock'ta ölçüldü,
+   önizleme 156×1000 oluyor ve künyeyi ekrandan taşırıyordu. */
+.picker-preview img { max-width: 100%; max-height: 100%; height: auto; object-fit: contain; }
+/* Etiket değerin ÜSTÜNDE: 180px'lik yan bölmede "Kandil kapakları" gibi bir
+   klasör adı yan yana dizilimde sarıyordu (Faz 0 ölçümü, K25'in kabul edilen
+   bedeli). Mono yalnız ÖLÇÜM taşıyan değerde. */
+.picker-kv { display: grid; gap: 8px; font-size: 12px; color: var(--muted); }
+.picker-kv div { display: grid; gap: 2px; }
+.picker-kv b {
+  font-weight: 500; color: var(--text);
+  font: 500 11.5px/1.45 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.04em; overflow-wrap: anywhere;
+}
+.picker-commit { margin-top: auto; display: grid; gap: 8px; }
+.picker-commit .primary, .picker-commit .btn-ghost { width: 100%; }
+/* Renk --danger DEĞİL: bu bir hata değil, henüz karşılanmamış bir önkoşul —
+   kırmızı okuyunca kullanıcı yanlış bir şey yaptığını sanıyor. */
+.picker-note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); min-height: 36px; }
+/* Kapalı "Ek olarak ekle" için YENİ kural yazılmadı: `.btn-ghost:disabled`
+   (satır 885, opacity .45 + not-allowed) zaten var ve #extra-add-btn'i de o
+   giydiriyor. Faz 0'ın beşinci bulgusu `flow.css`'in eksiğiydi, bu dosyanın
+   değil — ikinci bir kural yazmak diğer ghost düğmelerin kapalı hâlini de
+   sessizce değiştirirdi. */
+.popover-sep { border: 0; border-top: 1px solid var(--hairline); margin: 6px 8px; }
+
 /* ── Çoklu seçim (yalnızca görseller; klasörler seçilmez) ───────────── */
 /* Flow selectbar: pill kabuk (referans media-browser çoklu seçim şeridi) */
 .select-bar {
@@ -1578,7 +1721,7 @@ body.viewer-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
   .spinner { animation: none; }
-  .modal-backdrop, .modal-card, .confirm-icon { animation: none; }
+  .modal-backdrop, .modal-card, .picker-card, .confirm-icon { animation: none; }
   /* Sekme geçişi ve segmentin kayan dolgusu: `animation` yukarıdaki
      `transition: none` kuralıyla susmuyor, kendi kuralını istiyor. Sekme
      DEĞİŞMEYE devam ediyor — yalnızca hareket kalkıyor. */

@@ -506,19 +506,26 @@ $("select-all").addEventListener("click", () => {
   renderGallery();
   syncSelectUI();
 });
+// `media-picker` muhafızı (plan B10): seçici açıkken Escape ONU kapatmalı.
+// Muhafız olmasaydı tek Escape hem seçiciyi kapatır hem arkadaki seçim
+// modundan çıkarırdı — kullanıcı bir tuşla iki şey kaybederdi.
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && selectMode && $("confirm-modal").hidden) setSelectMode(false);
+  if (e.key === "Escape" && selectMode && $("confirm-modal").hidden
+      && $("media-picker").hidden) setSelectMode(false);
 });
 
 // ── Medya araması (A3 / Adım 7b) ─────────────────────────────────────
 // Arama üç alanda (tasarım §4.1): prompt, klasör adı, boyut. İçe aktarılan
 // kayıtların prompt'u yok, onlar dosya adıyla bulunur.
-function matchesSearch(rec) {
+// `q` parametreli: TEK yüklem, iki çağıran (Medya araması + Medya seçicisi).
+// Seçici kendi eşleştirmesini yazsaydı arama iki yerde ayrışırdı — birinde
+// klasör adı aranır, diğerinde aranmaz ve fark sessiz olurdu (plan B5).
+function matchesSearch(rec, q = searchQuery) {
   const folder = folderById(rec.folder_id);
   const folderName = folder ? folder.name : "";
   const size = rec.size || "";
   const prompt = rec.prompt || rec.filename || "";
-  return `${prompt} ${folderName} ${size}`.toLowerCase().includes(searchQuery);
+  return `${prompt} ${folderName} ${size}`.toLowerCase().includes(q);
 }
 
 // Tüm klasörlerin görselleri: `/api/history` klasörsüzleri, `?folder_id=` tek
@@ -557,6 +564,305 @@ $("media-search").addEventListener("input", async () => {
   if (!searchQuery) { await loadHistory(); return; }
   await refreshSearch(token);
 });
+
+// ══════════════════════════════════════════════════════════════════════
+// Medya seçici (Adım 12) — composer'ın (+) menüsünden açılan modal
+//
+// Sahibi bu dosya, sekizinci bir dosya DEĞİL (plan B1): `folderCache`,
+// `folderById`, `folderPath`, `loadAllImages`, `matchesSearch` zaten burada.
+// Asıl risk sekizinci dosyanın `tests/test_id_contract.py:36 JS_FILES`'a
+// eklenmemesiydi — o zaman içindeki tüm `$()` bağları id mandalının DIŞINDA
+// kalırdı.
+//
+// Bölüm banner'la sınırlı ve testler bu dilimi kesip iddia kuruyor: "seçici
+// historyCache yazmıyor" iddiası tüm dosyaya bakarsa hep kırmızı kalır
+// (galeri onu meşru olarak yazıyor).
+// ══════════════════════════════════════════════════════════════════════
+
+// Seçici KENDİ kopyasını tutar (B3). `historyCache`, `searchQuery`, `selected`
+// ve `renderGallery()` buradan HİÇ yazılmaz: modal kapandığında Medya görünümü
+// bıraktığı yerde durmalı, filtresi değişmiş bir liste bulunmamalı.
+let pickerImages = [];
+let pickerScope = "";
+let pickerQuery = "";
+let pickerSelectedId = null;
+let pickerToken = 0;
+
+// Sol gezinme (B4). "İçe aktarılanlar" bir BÖLME değil kesişen süzgeç:
+// Klasörsüz + klasörler zaten Tümü'nü tüketiyor, bu satır onların İÇİNDEN
+// geçiyor. Toplam bilerek tutmuyor — `crossing` sınıfı hairline ile bunu gözle
+// söylüyor, yoksa sonraki okuyucu "toplam yanlış" diye düzeltmeye kalkar.
+const PICKER_ICONS = {
+  all: [["rect", { x: 3, y: 3, width: 7, height: 7, rx: 1.5 }],
+        ["rect", { x: 14, y: 3, width: 7, height: 7, rx: 1.5 }],
+        ["rect", { x: 3, y: 14, width: 7, height: 7, rx: 1.5 }],
+        ["rect", { x: 14, y: 14, width: 7, height: 7, rx: 1.5 }]],
+  loose: [["rect", { x: 3, y: 4, width: 18, height: 16, rx: 2 }],
+          ["path", { d: "M3 15l4.5-4 3.5 3 3-2.5L21 17" }]],
+  folder: [["path", { d: "M4 6.5A1.5 1.5 0 0 1 5.5 5H9l1.8 2H18.5A1.5 1.5 0 0 1 20 8.5V17a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17z" }]],
+  imported: [["path", { d: "M12 16V4" }], ["path", { d: "M8 8l4-4 4 4" }],
+             ["path", { d: "M4 16v3.5h16V16" }]],
+};
+
+// `folderPath` bir ETİKET DEĞİL, klasör NESNELERİNDEN oluşan kırıntı zinciri
+// döndürüyor (bkz. tanımı: `path.unshift(node)`). Doğrudan `textContent`e
+// verilirse "[object Object],[object Object]" yazıyor — canlı turda tam olarak
+// bu görüldü. Ayraç kod tabanından alınıyor: galeri başlığı da " / " ile
+// birleştiriyor (bu dosyada `path.map((f) => f.name).join(" / ")`).
+const pickerFolderLabel = (id) => folderPath(id).map((f) => f.name).join(" / ");
+
+function pickerScopes() {
+  return [
+    { key: "", label: "Tümü", icon: PICKER_ICONS.all, test: () => true },
+    { key: "none", label: "Klasörsüz", icon: PICKER_ICONS.loose,
+      test: (r) => !r.folder_id },
+    ...folderCache.map((f) => ({
+      key: `f:${f.id}`, label: pickerFolderLabel(f.id), icon: PICKER_ICONS.folder,
+      test: (r) => r.folder_id === f.id,
+    })),
+    { key: "imported", label: "İçe aktarılanlar", icon: PICKER_ICONS.imported,
+      test: (r) => !!r.imported, crossing: true },
+  ];
+}
+
+const pickerScopeOf = (key) =>
+  pickerScopes().find((s) => s.key === key) || pickerScopes()[0];
+
+const pickerById = (id) => pickerImages.find((r) => r.id === id) || null;
+
+function pickerVisible() {
+  const scope = pickerScopeOf(pickerScope);
+  return pickerImages.filter((r) => scope.test(r) && matchesSearch(r, pickerQuery));
+}
+
+// İkon SVG'si tek yerde kuruluyor: `innerHTML` bu dosyada YALNIZ boş dizeyle
+// çağrılıyor (chat.js:12'nin yazdığı ev kuralı), o yüzden path'ler de
+// createElementNS ile geliyor — prompt ve dosya adı kullanıcı verisi.
+function pickerIcon(paths, size = 18) {
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("width", size);
+  svg.setAttribute("height", size);
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "1.7");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("aria-hidden", "true");
+  for (const [tag, attrs] of paths) {
+    const node = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+    svg.appendChild(node);
+  }
+  return svg;
+}
+
+function renderPickerNav() {
+  const nav = $("picker-kinds");
+  nav.innerHTML = "";
+  for (const s of pickerScopes()) {
+    const n = pickerImages.filter((r) => s.test(r) && matchesSearch(r, pickerQuery)).length;
+
+    const label = document.createElement("span");
+    label.textContent = s.label;
+    const count = document.createElement("em");
+    count.textContent = String(n);
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = s.crossing ? "picker-nav-item crossing" : "picker-nav-item";
+    btn.dataset.key = s.key;
+    btn.title = s.label;                       // 208px'te uzun klasör yolu kırpılır
+    btn.setAttribute("aria-current", String(s.key === pickerScope));
+    btn.appendChild(pickerIcon(s.icon));
+    btn.appendChild(label);
+    btn.appendChild(count);
+    nav.appendChild(btn);
+  }
+}
+
+function renderPickerGrid() {
+  const grid = $("picker-grid");
+  grid.innerHTML = "";
+  const list = pickerVisible();
+  for (const rec of list) {
+    const title = rec.prompt || rec.filename || rec.id;
+    const folder = folderById(rec.folder_id);
+
+    const img = document.createElement("img");
+    img.src = `/output/${rec.filename}`;
+    img.alt = "";                              // başlık künyede, çift okunmasın
+    img.loading = "lazy";
+
+    const name = document.createElement("b");
+    name.textContent = title.slice(0, 60);
+    const cap = document.createElement("span");
+    cap.className = "picker-cap";
+    cap.appendChild(name);
+    cap.appendChild(document.createTextNode(folder ? folder.name : "Klasörsüz"));
+
+    const tile = document.createElement("button");
+    tile.type = "button";
+    tile.className = "picker-tile";
+    tile.dataset.id = rec.id;
+    tile.title = title;
+    tile.setAttribute("aria-selected", String(rec.id === pickerSelectedId));
+    tile.appendChild(img);
+    if (rec.size) {
+      const badge = document.createElement("span");
+      badge.className = "card-badge";
+      badge.textContent = rec.size;
+      tile.appendChild(badge);
+    }
+    tile.appendChild(cap);
+    grid.appendChild(tile);
+  }
+  $("picker-empty").hidden = list.length > 0;
+  $("picker-empty-text").textContent = pickerQuery
+    ? "Sonuç bulunamadı" : "Bu kapsamda görsel yok";
+}
+
+function renderPickerSide() {
+  // Seçim `pickerSelectedId`'den okunuyor, DOM'dan SORULMUYOR: ızgara yeniden
+  // çizildiğinde (arama, kapsam değişimi) `querySelector('[aria-selected]')`
+  // sessizce null döner ve commit düğmeleri "hiçbir şey seçili" sanar.
+  const rec = pickerById(pickerSelectedId);
+  const img = $("picker-preview-img");
+  img.src = rec ? `/output/${rec.filename}` : "";
+  img.hidden = !rec;
+  const folder = rec ? folderById(rec.folder_id) : null;
+  const meta = $("picker-meta");
+  meta.innerHTML = "";
+  const rows = rec
+    ? [["Klasör", folder ? pickerFolderLabel(folder.id) : "Klasörsüz"],
+       ["Boyut", rec.size || "—"],
+       ["Kaynak", rec.imported ? "İçe aktarıldı" : "Üretildi"]]
+    : [];
+  for (const [key, value] of rows) {
+    const label = document.createElement("span");
+    label.textContent = key;
+    const val = document.createElement("b");
+    val.textContent = String(value);
+    const row = document.createElement("div");
+    row.appendChild(label);
+    row.appendChild(val);
+    meta.appendChild(row);
+  }
+
+  const why = extraBlockReason(rec);
+  $("picker-use-ref").disabled = !rec;
+  $("picker-use-extra").disabled = !!why;
+  // Sayaç gerekçeyi YENER: 3/3'te "En fazla 4 görsel gönderilebilir." demek,
+  // az önce olan şeyi (üçüncü ek eklendi) söylemeden reddi tekrarlamak olur.
+  // Paydası olan sayaç zaten kapalı düğmeyi açıklıyor.
+  $("picker-note").textContent = extras.length
+    ? `Eklendi · ${extras.length}/${MAX_EDIT_IMAGES - 1}` : why;
+}
+
+// Adı `renderPicker` DEĞİL: `palette.js:96` aynı adı çoktan kullanıyor (renk
+// seçicinin render'ı) ve o dosya `index.html`'de folders.js'ten SONRA
+// yükleniyor — klasik script'ler tek global alanı paylaştığı için sonraki
+// tanım öncekini SESSİZCE eziyordu. Sonuç: `openPicker()` medya seçicisini
+// değil renk paletini çiziyordu, seçici bomboş açılıyordu. Hata vermiyordu,
+// o yüzden yalnız canlı turda görüldü. Çarpışmayı `test_id_contract.py`
+// mandallıyor artık.
+function renderMediaPicker() {
+  renderPickerNav();
+  renderPickerGrid();
+  renderPickerSide();
+}
+
+async function openPicker() {
+  // `.sheet` ve `.modal` aynı z-index 50'yi paylaşıyor: açık kalan bir
+  // slide-over "Escape neyi kapatır" belirsizliği yaratır (B10).
+  closeSheets();
+  $("media-picker").hidden = false;
+  $("picker-search").value = "";
+  pickerQuery = "";
+  pickerScope = "";
+  renderMediaPicker();
+  $("picker-search").focus();
+  // "Tümü" `loadAllImages()` ile toplanıyor, satır içine kopyalanmıyor (B2):
+  // `GET /api/history` klasör-DIŞLAYICI (klasörsüz VEYA tek klasör; "hepsi"
+  // ucu yok) ve bu incelik ikinci kez keşfedilmek zorunda kalmamalı.
+  const token = ++pickerToken;
+  const all = await loadAllImages();
+  if (token !== pickerToken || $("media-picker").hidden) return;
+  pickerImages = all;
+  if (!pickerById(pickerSelectedId)) pickerSelectedId = all.length ? all[0].id : null;
+  renderMediaPicker();
+}
+
+// Kapanış SINIF değil ÖZNİTELİK çeviriyor: `.modal[hidden]` `display: none`
+// oluyor ve içindeki kontroller sekme sırasından çıkıyor. Yalnız görünürlükle
+// (opacity/pointer-events) kapatılan bir kapta 25 kontrol odaklanabilir
+// kalıyordu — Faz 0 mock'unda ölçüldü.
+function closePicker() {
+  $("media-picker").hidden = true;
+  pickerToken++;   // uçuşta olan loadAllImages yanıtı kapalı modalı boyamasın
+}
+
+$("media-pick-btn").addEventListener("click", openPicker);
+$("picker-close").addEventListener("click", closePicker);
+$("media-picker").querySelector("[data-picker-close]")
+  .addEventListener("click", closePicker);
+
+$("picker-search").addEventListener("input", () => {
+  pickerQuery = $("picker-search").value.trim().toLowerCase();
+  renderMediaPicker();
+});
+
+$("picker-kinds").addEventListener("click", (e) => {
+  const btn = e.target.closest(".picker-nav-item");
+  if (!btn) return;
+  pickerScope = btn.dataset.key;
+  renderMediaPicker();
+});
+
+$("picker-grid").addEventListener("click", (e) => {
+  const tile = e.target.closest(".picker-tile");
+  if (!tile) return;
+  pickerSelectedId = tile.dataset.id;
+  renderPickerGrid();
+  renderPickerSide();
+});
+
+// Commit bilerek ASİMETRİK (B7).
+// "Referans yap": önce kapat, sonra kaynağı kur. Sıra bağlayıcı —
+// `setGallerySource` `$("prompt").focus()` çağırıyor ve açık bir
+// `aria-modal="true"` diyaloğun ARKASINA odak verilirse ekran okuyucu
+// kullanıcısı diyalogda kilitli kalır.
+$("picker-use-ref").addEventListener("click", () => {
+  const rec = pickerById(pickerSelectedId);
+  if (!rec) return;
+  closePicker();
+  setGallerySource(rec);
+});
+
+// "Ek olarak ekle": seçici AÇIK kalır. Üç ek slotu var, her biri için menüden
+// dönmek saçma olurdu. Gerekçe/sayaç #picker-note'ta; `addGalleryExtra` ADIYLA
+// yeniden kullanılıyor ve gerekçeyi DÖNDÜRÜYOR (statusEl'e yazmıyor — o yüzey
+// modalın arkasında).
+$("picker-use-extra").addEventListener("click", () => {
+  const rec = pickerById(pickerSelectedId);
+  if (!rec) return;
+  const why = addGalleryExtra(rec);
+  if (why) { $("picker-note").textContent = why; return; }
+  renderPickerSide();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || $("media-picker").hidden) return;
+  // #confirm-modal her zaman üstte (native confirm() yerine geçiyor):
+  // açıkken Escape ONU kapatmalı, altındaki seçiciyi değil.
+  if (!$("confirm-modal").hidden) return;
+  e.stopImmediatePropagation();
+  closePicker();
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// Medya seçici sonu
+// ══════════════════════════════════════════════════════════════════════
 
 // ── Izgara boyutu S/M/L (A4 / Adım 7b) ───────────────────────────────
 // Ölçü CSS'te: düğme yalnızca `data-size` yazar, kutucuk genişliğini

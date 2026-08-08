@@ -388,6 +388,20 @@
           <button type="button" id="extra-add-btn" class="btn-ghost">
             <span class="btn-ghost-plus" aria-hidden="true">+</span> Ek görsel
           </button>
+          <!-- Hairline dosya yolunu (yukarısı #file-input'a gider) Medya
+               yolundan ayırıyor. Sözleşmenin dördüncü maddesi "Dosyadan yükle"
+               BİLEREK eklenmedi: üstteki iki madde zaten o yol, dördüncüsü aynı
+               girdiye ikinci kapı olurdu (plan, Markup). -->
+          <hr class="popover-sep" />
+          <button type="button" id="media-pick-btn" class="btn-ghost">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+              <path d="M3 15l4.5-4 3.5 3 3-2.5L21 17"></path>
+              <circle cx="15.5" cy="8.5" r="1.4"></circle>
+            </svg>
+            Medya'dan seç
+          </button>
         </div>
         <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" hidden />
         <input type="file" id="extra-file-input" accept="image/png,image/jpeg,image/webp" multiple hidden />
@@ -862,6 +876,69 @@
       <div class="modal-actions">
         <button id="logo-apply" class="primary" type="button">Uygula</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Medya seçici (Adım 12): composer'ın (+) menüsünden açılır.
+       Kapsam YALNIZ Medya — üretilen ve içe aktarılan görseller, klasörleriyle.
+       Kütüphane'nin bindirme varlıkları #overlay-picker'da kalıyor; seçici
+       onlara ikinci kapı DEĞİL (plan B11).
+
+       .modal-card KULLANILMIYOR: style.css:464-465'teki `.modal-card label`
+       ve `.modal-card input` kuralları arama pill'ini blok yapar ve girdiyi
+       yeniden giydirir — #palette-hue için zaten yazılmış tuzağın aynısı.
+       Kartın kendi sınıfı var (.picker-card), ölçüsü sözleşmeden gelir
+       (776×570, flow-redesign-plan.md:117); iç bölünme 208/1fr/180 Faz 0
+       mock'unda ölçülerek seçildi (K25, plan §0.10). -->
+  <div id="media-picker" class="modal" hidden>
+    <div class="modal-backdrop" data-picker-close></div>
+    <div class="picker-card" role="dialog" aria-modal="true" aria-label="Medya'dan seç">
+
+      <div class="picker-head">
+        <label class="search">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path>
+          </svg>
+          <input id="picker-search" type="search" autocomplete="off" spellcheck="false"
+                 placeholder="Prompt, klasör veya boyutta ara" />
+        </label>
+        <!-- Sıralama YOK ve bu bir eksiklik değil karar: #sort-btn hiçbir yerde
+             ship etmedi, arkasındaki Medya görünümünde de yok. Yalnız modalda
+             sıralama koymak "çalışmayan arama kutusu konmadı" kuralının tersi
+             olurdu. D10 ile iki yüzeye birlikte gelecek (plan B9). -->
+        <button id="picker-close" class="modal-x" type="button" aria-label="Kapat">×</button>
+      </div>
+
+      <nav id="picker-kinds" class="picker-nav" aria-label="Kapsam"></nav>
+
+      <div class="picker-body">
+        <div id="picker-grid" class="picker-grid"></div>
+        <div id="picker-empty" class="picker-empty" hidden>
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+            <path d="M3 15l4.5-4 3.5 3 3-2.5L21 17"></path>
+          </svg>
+          <p id="picker-empty-text">Sonuç bulunamadı</p>
+        </div>
+      </div>
+
+      <aside class="picker-side">
+        <div class="picker-preview">
+          <img id="picker-preview-img" alt="Seçili görselin önizlemesi" />
+        </div>
+        <div id="picker-meta" class="picker-kv"></div>
+        <div class="picker-commit">
+          <button id="picker-use-ref" class="primary" type="button">Referans yap</button>
+          <button id="picker-use-extra" class="btn-ghost" type="button">Ek olarak ekle</button>
+          <!-- TEK geri bildirim yüzeyi (B8). #status buraya yazamaz: Yönetmen
+               modunda display:none, Görsel modunda modalın arkasında — Adım
+               11'in kök nedeni tam olarak buydu (§0.9). Not düğmelerin ALTINDA:
+               hem gerekçe hem sayaç yalnız ikinci düğmeyi anlatıyor. -->
+          <p id="picker-note" class="picker-note" role="status"></p>
+        </div>
+      </aside>
     </div>
   </div>
 

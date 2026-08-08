@@ -32,16 +32,22 @@ JS'ten `$()` ile dokunulan id sayısı **145**; bunların **56'sı top-level ba�
 
 ---
 
-## 0.1 Durum — nerede kaldık (7 Ağustos: PR 1 merge edildi)
+## 0.1 Durum — nerede kaldık (8 Ağustos: PR 1 ve PR 2 merge edildi, PR 3 açıldı)
 
 **PR 1 bitti ve `main`'e indi.** [PR #16](https://github.com/Zenginby/gpt-image-studio/pull/16)
 squash ile merge edildi; `main`'e inen tek commit **`a1478d4`**. Merge sonrası
 ağaç hash'i dal ucuyla birebir aynı (`a717ef93`), yani squash'ta içerik kaybı yok.
+**PR 2 de indi:** [PR #19](https://github.com/Zenginby/gpt-image-studio/pull/19)
+→ **`55b3356`**, Adım 5 + 6 + 7a'nın üçü birden (`APP_VERSION` 2.0.0).
+**PR 3** Adım 7b + 8'i taşıyor: `feat/flow-ui-pr3` dalında `0223a19` ve `2d97d94`
+(`APP_VERSION` 2.1.0).
 
-> **Adım commit'leri `main`'in geçmişinde YOK.** Squash tek commit bıraktı;
-> aşağıdaki SHA'lar `feat/flow-ui` dalının geçmişine ait ve yalnızca PR #16
-> üzerinden erişilebilir (`git log main` içinde bulunamazlar). Dal hem yerelde
-> hem `origin`'de duruyor, silinmedi.
+> **Adım commit'leri `main`'in geçmişinde YOK** (PR 1 ve PR 2 için). Squash her
+> ikisinde de tek commit bıraktı; aşağıdaki 0–4 SHA'ları `feat/flow-ui` dalının
+> geçmişine ait ve yalnızca PR #16 üzerinden erişilebilir (`git log main` içinde
+> bulunamazlar). Dal hem yerelde hem `origin`'de duruyor, silinmedi. 5 · 6 · 7a
+> tek satırda `55b3356`'ya işaret ediyor çünkü PR #19 üçünü birleştirdi; 7b ve 8
+> ise PR 3'te **ayrı ayrı** duruyor ve merge edilene kadar `main`'de yoklar.
 
 | Adım | Durum | Commit (dal geçmişi) |
 |---|---|---|
@@ -50,14 +56,24 @@ ağaç hash'i dal ucuyla birebir aynı (`a717ef93`), yani squash'ta içerik kayb
 | 2 · kabuk (ray/şerit/tuval/composer) | bitti | `f13fdd2` |
 | 3 · bileşen CSS'i | bitti | `bc14b9a` |
 | 4 · temizlik | bitti | `ee867fb` |
-| 5 · veri modeli (PR 2) | **bitti** (7 Ağustos, §0.4) | commit'lenmedi |
-| 6 · otomatik kayıt (PR 2) | **bitti** (7 Ağustos, §0.5) | commit'lenmedi |
-| 7a · JS dokunuş noktaları — **PR 2'nin ekran payı** | **bitti** (7 Ağustos, §0.6) | commit'lenmedi |
-| **7b · JS dokunuş noktaları — PR 1'in giydirme borcu (A1–A6)** | **sırada** | — |
-| 8 · §4.2'nin tamamlanması (devrin manşeti) | §0.2 denetiminden geldi | — |
+| 5 · veri modeli (PR 2) | **bitti** (7 Ağustos, §0.4) | `55b3356` (PR #19, squash) |
+| 6 · otomatik kayıt (PR 2) | **bitti** (7 Ağustos, §0.5) | `55b3356` (PR #19, squash) |
+| 7a · JS dokunuş noktaları — **PR 2'nin ekran payı** | **bitti** (7 Ağustos, §0.6) | `55b3356` (PR #19, squash) |
+| 7b · JS dokunuş noktaları — PR 1'in giydirme borcu (A1–A6) | **bitti** (7 Ağustos, §0.7) | `0223a19` (PR 3, `feat/flow-ui-pr3`) |
+| 8 · §4.2'nin tamamlanması (devrin manşeti) | **bitti** (7 Ağustos, §0.8) | `2d97d94` (PR 3, `APP_VERSION` → 2.1.0) |
+| **11 · Medya'da büyüteç + kart eylemleri** | **sırada** (kullanıcı denemesi, 7 Ağustos) | — |
+| 12 · composer'dan Medya seçici (§4.2'nin (+) menüsü) | kullanıcı denemesinden geldi | — |
+| 13 · tek döküm + tek composer (`studio-session.html`) | kullanıcı denemesinden geldi | — |
 | 9 · tema kalıcılığı + Kütüphane yüklemeleri | §0.2 denetiminden geldi | — |
 | 10 · kozmetik süpürme | §0.2 denetiminden geldi | — |
 | — · Yedekler paneli | **ertelendi** (§0.2) | — |
+
+> **Sıra 8'den sonra değişti.** 7 Ağustos denemesinde kullanıcı üç açık buldu ve üçü de
+> Adım 9/10'un kapsamında değildi: (+) menüsünde "Medya'dan seç" yok, Medya'da karta
+> tıklamak büyüteci açmıyor, mod değişince görünen pencere ve yazılan metin değişiyor.
+> Üçü **Adım 11 · 12 · 13** olarak kendi planına yazıldı ve 9/10'un önüne alındı:
+> **`docs/superpowers/plans/2026-08-07-flow-studio-tek-dokum.md`**. Bu dosya (§0.1–§0.8)
+> geçmişin kaydı olarak kalıyor; sıradaki turun tanımı orada.
 
 Adım 3'te ayrıca: 16 accent-hover kuralı §8'in yüzey yükseltmesine döndü,
 `--radius` kalktı (üçlü bileşenlere bağlandı), tuval düzleşti (.stage/.gallery-wrap
@@ -122,38 +138,22 @@ bloke eder — ilk ikisi kullanıcı kararı bekliyor:
   tarafı Adım 9 — çünkü `SettingsRequest`'te tema alanı yok ve Adım 7 "mantık
   değişmez" diyor. Bkz. §0.2/D8.
 
-**Devam etmek için (yeni oturum).** Adım 5, 6 ve **7a** bitti (§0.4, §0.5, §0.6),
-**commit'lenmedi**: çalışma ağacı `main`'in ucunda, `pytest` **1080 yeşil**.
-**PR 2 tamam** — arka uç ve ekran payı birlikte. Sıradaki tur **Adım 7b**:
-`Adım 7` satırının PR 1'den devraldığı giydirme borcu (§0.2'nin A1–A6'sı).
+**Devam etmek için (yeni oturum).** Adım 5, 6, **7a**, **7b** ve **8** bitti
+(§0.4–§0.8) ve **commit'lendi**: 5-6-7a `55b3356` ile `main`'de, 7b ve 8
+`feat/flow-ui-pr3` dalında (`0223a19`, `2d97d94`; `pytest` **1106 yeşil**,
+`APP_VERSION` 2.1.0). PR 2 tamam, PR 1'in giydirme borcu (A1–A6) kapandı,
+§4.2'nin manşeti teslim edildi.
 
-```
-docs/flow-ui/flow-redesign-plan.md ve docs/superpowers/plans/2026-08-06-flow-arayuz-devri.md
-dosyalarını tamamen oku (§0.0 revizyonu, §0.1 durumu, §0.4/§0.5/§0.6 adım
-kayıtları dahil). PR 1 merge edildi; PR 2 (Adım 5-6-7a) çalışma ağacında duruyor.
+**Sıradaki tur bu dosyada DEĞİL.** 7 Ağustos kullanıcı denemesi üç açık buldu
+ve üçü Adım **11 · 12 · 13** olarak kendi planına yazıldı; Adım 9 ile 10 onların
+arkasına düştü (§0.1'in tablosu ve §0.3'ün başındaki not). Devam istemi ve
+adım tanımları orada:
 
-Bu turda sadece Adım 7b'yi yap: §0.2'nin A1–A6 maddeleri, yani PR 1'in
-giydirme borcunun JS payı. §7'de kutulu:
-  · Kütüphane kendi görünümü olsun (ray düğmesi modal açmasın),
-  · Araçlar kendi görünümü olsun, iki araç kartıyla (Görünüm · Tema rengi/paletler),
-  · Medya'da arama + "Arama sonuçları — tüm klasörler" etiketi,
-  · Izgara boyutu S/M/L,
-  · Azure/Ayarlar ve Tema panelleri slide-over olsun (modal değil),
-  · tema seçici arayüzü dört temayı uygulasın (`data-theme` gerçekten yazılsın).
+**`docs/superpowers/plans/2026-08-07-flow-studio-tek-dokum.md`**
 
-Tema KALICILIĞI bu turda DEĞİL — o Adım 9'un arka uç işi (§0.3). Bu tur
-seçiciyi kurup `data-theme`'i yazıyor, oturum arası hatırlamayı Adım 9 ekliyor.
-
-Kısıtlar §1'de: id ancak defterde gerekçesiyle ve JS bağı birlikte silinerek
-kaldırılır (§1.1), negatif testler ihlal edilmez (§1.2), viewer.js yeniden
-yazılmaz (§1.3). TDD: önce kırmızı test.
-
-Bitirince §1.4'ün kanıtlarını göster — bu tur işaretlemeye dokunuyor, yani
-tarayıcı konsolu VE 1024/1280/1440/1920 ekran görüntüleri zorunlu.
-⚠️ Doğrulamada §0.6'nın "aynı sürüm altında bayat JS" tuzağına dikkat:
-`?v=APP_VERSION` aynı kaldığı için tarayıcı ESKİ dosyayı önbellekten verir.
-Hepsi temiz olmadan commit yok.
-```
+Adım 9'un tanımı §0.3'te geçerliliğini koruyor — yalnız sırası değişti; oraya
+gelindiğinde tema kalıcılığının yeri `prefs.json` (K6), Kütüphane "Yüklemeler"
+için `assets_store.KINDS` bir sözleşme (`_check_asset_kind` ona bakıyor).
 
 ---
 
@@ -235,10 +235,17 @@ slide-over · dört ray öğesi + Daralt (228↔72 ölçüldü) · mod anahtarı
 
 ## 0.3 Adım 8 · 9 · 10 — denetimden doğan turlar
 
+> **Devamı yeni planda.** Adım 8 bitti (§0.8). 9 ve 10 duruyor ama sıraları **geriye**
+> düştü: kullanıcı denemesinden doğan Adım 11 · 12 · 13 önlerine geçti —
+> `docs/superpowers/plans/2026-08-07-flow-studio-tek-dokum.md`. Aşağıdaki 9 ve 10
+> tanımları geçerli; yalnız zamanlaması değişti. Bir madde iki planda birden yaşıyor:
+> **D10 (sıralama)** — Adım 12'nin seçicisi sıralamayı bilerek ship etmiyor, çünkü D10
+> Medya görünümüyle AYNI turda gelmeli (bkz. yeni planın B9 kararı).
+
 Sıra §0.2'nin şiddet sırasına göre: önce sözleşmenin manşeti, sonra arka uç
 gerektirenler, en sonda kozmetik.
 
-### Adım 8 — §4.2'yi gerçekten teslim et (D13 + D14)
+### Adım 8 — §4.2'yi gerçekten teslim et (D13 + D14) — **bitti (7 Ağustos, §0.8)**
 
 Kozmetik **değil**, davranış: kendi testleriyle gelir.
 
@@ -506,6 +513,142 @@ taşındı**: iddiası ("başlık için ikinci bir model çağrısı yok") aynı
 
 ---
 
+## 0.7 Adım 7b kaydı — PR 1'in giydirme borcu (7 Ağustos)
+
+TDD ile: **15 test önce**, hepsi kırmızı görüldü, sonra kod. `pytest`
+**1080 → 1095**. Silinen test yok. §0.2'nin A1–A6'sı kapandı; id sözleşmesinden
+**iki id defterli olarak düştü** (aşağıda).
+
+### Teslim edilen altı madde
+
+| # | Borç | Nasıl karşılandı |
+|---|---|---|
+| A1 | Kütüphane kendi görünümü | `#view-library` bölümü; içerik id'leri (`asset-tabs`, `asset-grid`…) modaldan taşındı, **modal kabuğu** (`assets-modal`, `assets-close`) id defterine yazılarak kaldırıldı. `assets.js`'te `openLibraryView` görünüme girişte paneli tazeliyor |
+| A2 | Araçlar kendi görünümü | `#view-tools` + iki kart (`#tool-palette`, `#tool-look`). Azure kimliği bilerek DIŞARIDA — Araçlar = tasarım kararları, dişli = makine ayarı (§4.1); testi ayrı (`test_the_gear_and_the_tools_view_are_different_doors`) |
+| A3 | Medya'da arama | `#media-search`; sorgu üç alanda (prompt/klasör adı/boyut, içe aktarılanlarda dosya adı). Sorgu yazıldığı an klasör sınırı kalkıyor: `loadAllImages` kök + her klasörü çekip birleştiriyor, `#search-label` kapsamı söylüyor, kartlara `card-where` klasör künyesi basılıyor |
+| A4 | Izgara boyutu S/M/L | `#size-seg` yalnızca `data-size` yazıyor; kutucuk ölçüsü CSS'te `.gallery[data-size=…]`nin `--tile`'ından. JS'ten `grid-template-columns` yazmak `auto-fill` duyarlılığını ezerdi |
+| A5 | Azure + Tema panelleri slide-over | `#settings-modal` ve `#palette-modal` `<aside class="sheet sheet-right">` oldu — **id'ler bilerek aynı** (152 sözleşmesi + JS bağı; ad telin üstündeki isim, yüzey iddiası değil). Palet paneline 420px (renk seçmek onun ana işi). Form sınırı kuralı `.sheet-body input`'a taşındı (§0.0/G kapısı açılmadı) |
+| A6 | Tema seçici | `#look-sheet` + `#theme-picker`; `change` → `document.body.dataset.theme`. **Monokrom = öznitelik YOK** (aşağıda K15). Kalıcılık BİLEREK yok ve panel bunu yazıyla söylüyor — Adım 9'un işi |
+
+### Bu turda verilen ve yazıya geçen dört karar
+
+| # | Karar | Gerekçe |
+|---|---|---|
+| K15 | Monokrom seçimi `data-theme` YAZMIYOR, özniteliği siliyor | `flow-tokens.css`'te `[data-theme="mono"]` diye bir satır yok — varsayılan `--accent` zaten monokrom. Sahte bir "mono" değeri token katmanında karşılığı olmayan bir durum üretir ve dördüncü tema satırı yazdırırdı |
+| K16 | Slide-over açmanın TEK kapısı `openSheet` (önce `closeSheets`) | Beş panel aynı perdeyi ve aynı şeridi paylaşıyor; ikisi birlikte açılırsa üst üste biner ve `Esc`in hangisini kapattığı belirsizleşir. Escape dinleyicisine `confirm-modal` guard'ı da eklendi: onay penceresi panelin ÜSTÜNDE açılıyor (palet kaydetme) ve guard'sız tek Escape iki katmanı birden kapatırdı |
+| K17 | Arama filtresi İSTEMCİDE, sunucuya arama parametresi eklenmedi | 25 kayıtlık yerel arşivde sunucu tarafı arama ucu YAGNI; `loadAllImages` GET'leri paralel (importFiles'ın "sırayla" kuralı YAZAN uçlar için). Eşik tasarım §10/3'te zaten var: 500 görselde yeniden ölçülecek |
+| K18 | `loadHistory` arama açıkken `refreshSearch`'e sapıyor | Silme/taşıma/içe aktarma sonrası tazeleme klasör görünümüne sessizce dönmemeli — kullanıcı arama sonuçlarına bakarken listenin altından görünüm değişirdi |
+
+### Ölçülen kanıtlar
+
+- `pytest` **1095 yeşil** (7a sonu 1080, +15) · `test_id_contract.py` 6 yeşil
+  (defterde 2 kayıt: `assets-modal`, `assets-close` — gerekçe ve JS temizliği yazılı).
+- **Mutasyon turu:** 5 çekirdek iddia mutasyonla sınandı; İKİSİ ilk turda boş
+  geçti ve ikisi de §0.6'daki sebepten (iddia kodu değil KELİMEYİ arıyordu):
+  (a) arama testi `folder` kelimesini `const folder =` satırında buldu —
+  artık şablon dizesinin kendisinde `${folderName}` arıyor; (b) tema testi
+  `dataset.theme`'i `delete` satırında buldu — artık ATAMA ve SİLME ayrı ayrı
+  aranıyor. Düzeltme sonrası beşi de kırmızıya döndü.
+- **Canlı tur** (8799 — §0.6 tuzağına karşı ayrı origin, geliştiricinin gerçek
+  verisi, tümü SALT OKUNUR): dört ray görünümü gezildi; Kütüphane gerçek
+  logoları, Araçlar iki kartı gösterdi · Görünüm panelinden KURUM mavisi seçildi
+  → `data-theme="kurumsal"` + `--accent oklch(72% 0.11 245)`, Monokrom'a dönüş
+  özniteliği sildi · Tema rengi kartı 420px slide-over'ı açtı, HSV/ton/hex/
+  öneriler canlı · dişli Ayarlar'ı sağdan açtı (endpoint dolu, anahtar
+  "Kayıtlı" yer tutucusu) · Medya'da "kurban" araması 6 sonucu **iki klasörden**
+  getirdi, künyeler ("Kurban 2026" / "Klasörsüz") ve "Arama sonuçları — tüm
+  klasörler" etiketi göründü; sorgu silinince klasör görünümü döndü · S/M/L
+  `--tile` 110/150/210 ölçüldü, `aria-pressed` tekil · specs panelindeki
+  "Kütüphane" kısayolu paneli kapatıp görünüme gitti · oturum drawer'ı açıldı
+  ve Escape kapattı (regresyon yok). Geliştiricinin verisine tek bayt yazılmadı.
+- **Tarayıcı konsolu:** tur boyunca **0 mesaj**.
+- **Ekran görüntüleri 1024×700 / 1280 / 1440 / 1920:** dördünde de
+  `scrollWidth == clientWidth` (yatay taşma 0); 1200px altında ray daraldı.
+- Ölçülen tek pürüz kapatıldı: `#chat-instructions-path` (boşluksuz uzun yol)
+  320px şeritte gövde dolgusuna 9px taşıyordu → `overflow-wrap: anywhere`.
+
+---
+
+## 0.8 Adım 8 kaydı — §4.2'nin manşeti (7 Ağustos)
+
+TDD ile: 11 test önce yazıldı, onu kırmızı görüldü (biri sınır testi — mevcut
+davranışı mandallıyor, bkz. K20). `pytest` **1095 → 1106**. Silinen test yok.
+
+Sekmeler §4.2 uğruna kaldırılmıştı ve o bölümün gerekçesi tek bir cümleydi:
+"Forma aktar → diğer sekme gidiş gelişi ortadan kalkıyor". §0.2 denetimi
+gidiş-gelişin **hâlâ durduğunu** buldu (D14) ve ters yönün hiç yazılmadığını
+(D13). Bu tur ikisini de kapattı; üçüncü iş K10'un ikinci yarısıydı.
+
+### Teslim edilen üç iş
+
+| # | İş | Nasıl |
+|---|---|---|
+| **D14** | prompt bloğunun eylem düğmesi **"Görsel modunda üret"** | `promptFigure`'ın etiketi + `applyToForm`'un durum satırı. Davranış aynı kaldı (mod + prompt + ayarlar); değişen, olmayan bir "form"a işaret etmemesi. "Forma aktar" dizesi **yorumlarda da** kalmadı — kabul ölçütü "chat.js'te kalmadı" diyor |
+| **D13** | Görsel modunda **"Yönetmen'e sor"** | `#ask-director`; `askDirector()` ham metni yönetmenin kutusuna TAŞIYOR (K21), `syncAskDirector()` görünürlüğü kutunun doluluğundan okuyor |
+| **K10/2** | Görsel modu **kendi oturumunu başlatıyor** | `run()` döküm turunu koşulsuz açıyor; oturumu `persistThread` üretimden SONRA POST'la yazıyor (K19) |
+
+### Bu turda verilen ve yazıya geçen dört karar
+
+| # | Karar | Gerekçe |
+|---|---|---|
+| K19 | Oturum üretimden **SONRA** doğuyor (`persistThread`'in POST'u), önce değil | K10'un itirazı "üretimden önce kullanıcı turu yazmak" biçimindeydi: BAŞARISIZ üretim diskte cevapsız bir tur bırakır, yeniden deneme onu ikinci kez eklerdi. Yazma başarıya bağlanınca itiraz kendiliğinden düşüyor — `dropPendingTurn` yalnız BELLEKTEN siliyor, diskte hiçbir şey yok. Ön-uçuş POST'u ayrıca yeni bir tehlike doğuruyordu: üretim sürerken kullanıcı sohbete devam edebiliyor (`#go` kilitli, "Gönder" değil), yani hata anında silinecek oturum artık kullanıcının kendi mesajlarını taşıyor olabilirdi. Kapı da yeni değil: sohbetsiz oturum POST'u yönetmen akışının her gün kullandığı yol, sunucu tarafı `test_an_image_only_session_still_gets_a_title` ile Adım 5'ten beri yeşil |
+| K20 | Üretim isteğine **uydurma `session_id` konmuyor** — ilk partide ters bağ eksik kalıyor | `session_id`'de varlık kapısı yok (§0.4/K2): henüz yazılmamış bir oturumun id'si diske sarkan bir etiket olarak düşerdi. Bedel ölçülü ve tek yönlü — **ileri bağ tam** (`result.image_ids`, dökümün çizdiği bağ), eksik olan ters bağ (görsel kaydındaki `session_id`) bugün hiçbir yerde OKUNMUYOR (`grep`: yalnız `storage.save` yazıyor). Tamamlanması bir arka uç işi (mevcut kayda oturum etiketi yazan rota) → Adım 9'un alanı. Sınır testle mandallandı: uydurma id yok, üretimden önce `/api/chats` çağrısı yok |
+| K21 | "Yönetmen'e sor" metni **taşıyor**, kopyalamıyor; yönetmenin kutusundaki metnin **üstüne yazmıyor** | Kopyalasa metin iki kutuda kalırdı: Görsel'e dönüp Üret'e basmak yönetmene sorulmuş ham metni ayrıca üretir, düğme de görünür kalıp ikinci bir devir davet ederdi. Üstüne yazsa yazılmış ama gönderilmemiş bir yönetmen mesajı sessizce silinirdi — o yüzden birleşim `existing\n\ntext`. Sığmazsa **kırpma yok**, ret var (`applyToForm`'un `MAX_PROMPT_CHARS` duruşunun ters yönü) |
+| K22 | Düğme **çerçevesiz** metin | §4.2 "metin düğmesi" diyor ve "ekranda ikinci bir dolu düğme oluşmaz" gerekçesini de yazıyor. Çerçeveli olsa composer barında üst üste üç hatlı pill olurdu (mod anahtarı · bu · üretim çipi) ve kaçış kapısı ayarların ağırlığında görünürdü. Hiyerarşi: dolu = Üret, hatlı = kontroller, düz metin = ikincil yol. Kontrast `--muted` ile **6.97:1** ölçüldü (mevcut `--muted` kullanımlarıyla birebir aynı) |
+
+### Ölçülen kanıtlar (§1.4)
+
+- `pytest` **1106 yeşil** · `test_id_contract.py` 6 yeşil (`ask-director` bir
+  EKLEME, defterde iş yok — defter yalnız kaybı sorar).
+- **Mutasyon turu: 9 iddia sınandı, dokuzu da kırmızıya döndü** (etiket, görünürlük
+  yönü `hidden = !…`, birleşim `existing ? … : text`, sınır kapısı, `showView`
+  yerine elle `dataset.mode`, koşulsuz `beginResultTurn`, uydurma POST, CSS mod
+  ekseni, durum satırı). Bu turda boş geçen iddia **yok** — §0.6/§0.7'nin dersi
+  önden uygulandı: iddialar kod deseni arıyor, kelime değil.
+- **Tarayıcı (8799, ayrı origin — bayat JS tuzağı):** yeni sekmede konsol
+  **0 mesaj**. Ölçülen davranışlar: boş kutu → düğme yok; yazınca → var;
+  Yönetmen moduna geçince `display:none`, Görsel'e dönünce geri · devir sonrası
+  `chat-input` dolu, `#prompt` boş, odak `chat-input`, düğme kendini gizledi ·
+  yönetmen kutusunda metin varken devir **eklendi** (`…kılavuzu var\n\nkar
+  altında bir kule`), üzerine yazmadı · 5990 karakterlik kutuya devir
+  **reddedildi**, hiçbir şey kırpılmadı · yönetmen yanıtı çizildiğinde bar
+  düğmeleri `["Kopyala", "Görsel modunda üret"]`, düğme prompt'u composer'a
+  bastı ve `1024x1536`/`high` ayarlarını uyguladı · açık oturum YOKKEN
+  `beginResultTurn` turu açtı (balon çizildi, boş durum kalktı),
+  `dropPendingTurn` geri aldı. Geliştiricinin verisine tek bayt yazılmadı.
+- **1024×700 / 1280 / 1440 / 1920:** dördünde de yatay taşma 0, composer barında
+  da 0 (`scrollWidth == clientWidth`).
+
+### Bu turun iki dersi
+
+1. **Canlı ölçüm testin göremediğini gösterdi.** Sınır aşımı reddi ilk yazımda
+   `chatStatus`'a gidiyordu — ama devir olmadığı için mod Görsel'de kalıyor ve
+   `#chat-status` orada `display:none`. Yani düğme tıklanıyor, hiçbir şey olmuyor
+   ve sebebi de **görünmüyordu**: kod doğru, kullanıcı için sessiz. Ret
+   `statusEl`'e taşındı ve iddiaya "hangi satıra yazıldığı" eklendi.
+2. **Kaskad, özgüllük kadar sıra demek.** `.composer-ask` ilk yazımda composer
+   mod bloğunun yanına konmuştu, yani `.btn-ghost`'tan ÖNCE — aynı özgüllükte
+   sonraki kazandığı için çerçeve geri geliyordu (ölçüldü: `borderColor` hâlâ
+   `--control-border`). Blok düğme varyantlarının yanına taşındı.
+
+### Bu turda BİLEREK yapılmayanlar
+
+- **K14 (sonuç kartında "Düzenle" / "+ Ek")** §0.6'da "composer turuna bırakıldı"
+  diye anılıyor ama §0.3'ün Adım 8 tanımına hiç girmedi (o liste D13 + D14 ve üç
+  zorunlu test). Bu turda ölçülen yeni bilgi: **"+ Ek" bugün yapılabilir** (yalnız
+  id istiyor), **"Düzenle" ise bir tercih gerektiriyor** — prompt'u dökümden
+  (sonuç kaydından önceki kullanıcı turu) yeniden kurmak mı, yoksa tek bir geçmiş
+  kaydını döndüren rotayı beklemek mi. İkincisi arka uç işi, yani Adım 9'un alanı.
+  **Karar kullanıcıya bırakıldı**; sessizce kaybolmasın diye burada duruyor.
+- `applyToForm` **adı değişmedi**. Ad kullanıcıya dönük bir iddia değil (7b'nin
+  `settings-modal` gerekçesinin aynısı) ve üç test regex'i ile 2026-08-04 planı
+  ona referans veriyor. Kullanıcıya görünen her dize değişti.
+- §4.2'nin Yönetmen modu için saydığı **"Yönetmen talimatları ikonu"** bu tura
+  girmedi: §0.2 denetiminin 18 maddesinde yok, talimat yolu bugün Ayarlar
+  panelinde (`#chat-instructions-path`). Kapsam genişletilmedi, kayda geçti.
+
+---
+
 ## 0. Tasarımı depoya al (ilk commit)
 
 Tasarım dosyaları Open Design proje klasöründe duruyor; versiyonlu olması için
@@ -747,14 +890,14 @@ ancak otomatik yazımla karşılanır. Üç güvence:
 `chat_store.py`'nin başındaki notu bu kararla **güncelle** — silme, "v1.15'te
 şu gerekçeyle daraltıldı, 2026-08-06'da şu gerekçeyle açıldı" olarak yaz.
 
-### Adım 7 — JS dokunuş noktaları — **7a bitti (7 Ağustos), kaydı §0.6'da**
+### Adım 7 — JS dokunuş noktaları — **7a ve 7b bitti (7 Ağustos), kayıtları §0.6 ve §0.7'de**
 
 > Satır İKİYE ayrıldı; gerekçe §0.6'nın başında. **7a (bitti):** PR 2'nin ekran
 > payı — `result` kartı, "görsel silindi" yer tutucusu, sayı kapısı, otomatik
 > kayıt + anahtar + tümünü sil, üretimin oturuma katılması. Turda verilen beş
-> karar (K10–K14) ve kanıtlar **§0.6'da**. **7b (sırada):** aşağıdaki
-> `folders.js` / `palette.js` / `assets.js` / `settings.js` payı, yani §0.2'nin
-> A1–A6'sı.
+> karar (K10–K14) ve kanıtlar **§0.6'da**. **7b (bitti):** `folders.js` /
+> `palette.js` / `assets.js` / `settings.js` payı, yani §0.2'nin A1–A6'sı —
+> kararlar (K15–K18) ve kanıtlar **§0.7'de**.
 
 **Adım 5'ten devraldığı iki borç** (§0.4) — **ikisi de 7a'da kapandı:** silinmiş
 görselin "görsel silindi" yer tutucusu ve `chat.js:817`'deki mesaj sayısı
@@ -857,14 +1000,21 @@ işaretlenerek ya da gerekçesiyle ertelenerek kapanabilir; listede yazmayan bir
 şey "yapıldı" sayılamaz. §0.1'in elle yazılmış listesi bu ağ olmadığı için
 wordmark'ı, kebab'ı ve §4.2'nin iki düğmesini kaçırdı.
 
-Adım **7b**'ye bağlı (A1–A6) — 7a bu altı maddeye dokunmadı:
+Adım **7b**'ye bağlı (A1–A6) — **altısı da 7 Ağustos'ta kapandı (§0.7)**:
 
-- [ ] Kütüphane kendi görünümü (ray düğmesi modal açmıyor)
-- [ ] Araçlar kendi görünümü, iki araç kartıyla (Görünüm · Tema rengi/paletler)
-- [ ] Medya'da arama + "Arama sonuçları — tüm klasörler" etiketi
-- [ ] Izgara boyutu S/M/L
-- [ ] Azure ve Tema paneli slide-over (modal değil)
-- [ ] Tema seçici arayüzü dört temayı uyguluyor (`data-theme` gerçekten yazılıyor)
+- [x] Kütüphane kendi görünümü (ray düğmesi modal açmıyor) — `#view-library`;
+      modal kabuğu id defteriyle kaldırıldı (`assets-modal`, `assets-close`)
+- [x] Araçlar kendi görünümü, iki araç kartıyla (Görünüm · Tema rengi/paletler) —
+      `#view-tools`; Azure kimliği bilerek dışarıda (dişli), testi ayrı
+- [x] Medya'da arama + "Arama sonuçları — tüm klasörler" etiketi — `#media-search`,
+      `loadAllImages` klasör sınırını aşıyor, kartlarda `card-where` künyesi
+- [x] Izgara boyutu S/M/L — `#size-seg` yalnız `data-size` yazıyor, ölçü
+      CSS'teki `--tile`'dan (110/150/210)
+- [x] Azure ve Tema paneli slide-over (modal değil) — id'ler bilerek aynı kaldı
+      (`settings-modal` / `palette-modal`: 152 sözleşmesi), yüzey `.sheet` oldu
+- [x] Tema seçici arayüzü dört temayı uyguluyor (`data-theme` gerçekten
+      yazılıyor) — monokrom özniteliği siler (§0.7/K15). **Kalıcılık hâlâ
+      Adım 9'da** (panel geçiciliği yazıyla söylüyor)
 
 Adım 5–6'ya bağlı (A7–A9):
 
@@ -888,15 +1038,21 @@ Adım 5–6'ya bağlı (A7–A9):
       §0.6/K13) — Adım 7a
 - [x] **Üretim açık oturuma katılıyor:** `session_id` iki dalda da gidiyor,
       prompt kullanıcı turu olarak döküme giriyor, sonuç kaydı ekleniyor —
-      Adım 7a. Oturumu Görsel modundan BAŞLATMAK Adım 8'in işi (§0.6/K10)
+      Adım 7a. Oturumu Görsel modundan BAŞLATMAK Adım 8'te yapıldı (§0.8/K19)
 - [x] **`#session-title` / `#session-stamp` bağlandı** — Adım 7a. §0.2 bu ölü
       işaretlemeyi kaçırmıştı; üretim açık oturumun dökümüne düştüğü için
       "hangi oturumdayım" cevabının üst şeritte olması zorunlu
 
 Adım 8 — §4.2'nin manşeti:
 
-- [ ] `chat.js`'te "Forma aktar" **kalmadı**; yerine "Görsel modunda üret"
-- [ ] Görsel modunda dolu kutuda "Yönetmen'e sor" çıkıyor, boş kutuda çıkmıyor
+- [x] `chat.js`'te "Forma aktar" **kalmadı** (yorumlar dahil); yerine "Görsel
+      modunda üret" — durum satırı da artık "form" demiyor. Adım 8, §0.8
+- [x] Görsel modunda dolu kutuda "Yönetmen'e sor" çıkıyor, boş kutuda çıkmıyor
+      — iki eksen iki sahip (doluluk `hidden`/chat.js, mod `display`/CSS) ve
+      düğme çerçevesiz metin (§4.2'nin "ikinci dolu düğme yok" cümlesi). Adım 8
+- [x] **Görsel modu kendi oturumunu başlatıyor** (K10'un ikinci yarısı, §0.8/K19):
+      döküm turu koşulsuz açılıyor, oturumu `persistThread` üretimden SONRA
+      yazıyor. Uydurma `session_id` yok — bedeli K20'de yazılı
 
 Adım 9 — arka uç:
 

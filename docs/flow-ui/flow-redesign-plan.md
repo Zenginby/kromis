@@ -211,11 +211,14 @@ aktif taraf beyaz, pasif taraf `--muted`:
 - Klavye: `⌘/Ctrl + Enter` gönderir (bugünkü davranış korunur), `⌘/Ctrl + J` mod değiştirir.
 - Mod, oturum başına hatırlanır; oturum listesinde son mod etiketi görünür.
 - Yönetmen'in ürettiği prompt bloğunda **"Görsel modunda üret"** düğmesi var: modu
-  değiştirip prompt'u composer'a basar. Bugünkü "Forma aktar → diğer sekme" gidiş gelişi
-  ortadan kalkıyor.
+  değiştirip prompt'u composer'a basar. Eski etiketin ("Forma aktar") vaat ettiği
+  diğer sekmeye gidiş geliş ortadan kalkıyor — **7 Ağustos'ta teslim edildi**
+  (Adım 8, plan §0.8); sekmelerin kaldırılma gerekçesi bu maddeydi.
 - Ters yön de var: **Görsel modunda** prompt kutusuna bir şey yazdığın anda sağda
   **"Yönetmen'e sor"** metin düğmesi çıkar — yazdığın ham metni yönetmene devreder.
   Kutu boşken görünmez (o yüzden ekranda ikinci bir dolu düğme oluşmaz).
+  **7 Ağustos'ta teslim edildi**: metni TAŞIYOR (kopyalamıyor) ve yönetmenin
+  yazılmış ama gönderilmemiş mesajının üstüne yazmıyor — altına ekliyor (K21).
 - (+) menüsü her iki modda aynı: Referans görsel · Ek görsel · Medya'dan seç · Dosyadan yükle.
 
 ---
@@ -244,11 +247,15 @@ aktif taraf beyaz, pasif taraf `--muted`:
 > `result` kayıtlarını künyeli kartlar olarak çiziyor, silinmiş görsel
 > **"görsel silindi"** yer tutucusuna dönüyor, üretim açık oturumun dökümüne
 > katılıyor. İki nokta bilinçli olarak sonraki turlarda:
-> - Sonuç kartında **"Düzenle" / "+ Ek" yok** (§0.6/K14): ikisi de tam bir
->   geçmiş kaydı istiyor, döküm yalnız id taşıyor — composer turunda (Adım 8).
-> - **Görsel modu kendi başına oturum AÇMIYOR** (§0.6/K10): açık bir oturum
->   varsa üretim ona katılıyor. Oturumu Görsel modundan başlatmak §4.2'nin
->   kararı, çünkü orada prompt yapısı gereği bir döküm turu.
+> - Sonuç kartında **"Düzenle" / "+ Ek" hâlâ yok** (§0.6/K14): ikisi de tam bir
+>   geçmiş kaydı istiyor, döküm yalnız id taşıyor. Adım 8'de ölçüldü ki "+ Ek"
+>   bugün yapılabilir (yalnız id ister), "Düzenle" ise bir tercih gerektiriyor —
+>   prompt'u dökümden yeniden kurmak mı, tek kayıt döndüren rotayı beklemek mi
+>   (plan §0.8'in "bilerek yapılmayanlar" başlığı). Karar bekliyor.
+> - **Görsel modu kendi oturumunu BAŞLATIYOR** (7 Ağustos, Adım 8 — plan
+>   §0.8/K19): prompt yapısı gereği bir döküm turu, o yüzden koşulsuz basılıyor
+>   ve oturum üretimden SONRA yazılıyor. Uydurma `session_id` yok; bedeli ilk
+>   partide ters bağın eksik kalması (K20), ileri bağ tam.
 
 
 Bugün iki ayrı depo var ve aralarında **hiçbir bağ yok**:
@@ -463,7 +470,11 @@ tasarımı değiştirmeyen üç teknik nokta kaldı:
       "+ Ek" YOK ve bu ölçülmüş bir karar** (§0.6/K14): ikisi de tam bir geçmiş
       kaydı istiyor, döküm yalnız id taşıyor — Adım 8'in composer turuna kaldı.
       Klasöre taşıma sonuç kartında hiç planlanmadı, Medya'nın işi.
-- [ ] Arama yalnızca Medya'da; üst şeritte arama alanı yok.
+- [x] Arama yalnızca Medya'da; üst şeritte arama alanı yok.
+      **7 Ağustos'ta teslim** (Adım 7b, plan §0.7): sorgu üç alanda (prompt ·
+      klasör adı · boyut), yazıldığı an klasör sınırı kalkıyor ("Arama
+      sonuçları — tüm klasörler" + kartlarda klasör künyesi). Izgara boyutu
+      S/M/L de aynı turda geldi.
 - [ ] Dört tema da kontrast kapılarını geçiyor; monokrom varsayılan.
 - [x] Silinmiş bir görselin sarkan `image_id`'si dökümü çökertmiyor, yer tutucu gösteriyor.
       **İki payı da bitti:** sunucu kaydı budamıyor ve 200 kalıyor (Adım 5);
@@ -476,14 +487,21 @@ tasarımı değiştirmeyen üç teknik nokta kaldı:
       görsel, tema rengi/palet, logo/motto/banner + offset, klasörler, çoklu seçim,
       indirme, büyüteç, Azure ayarları, yönetmen sohbeti, içe aktarma.
       (**Yedekler bilerek düştü** — v4/V3, §4.1.)
-- [ ] §4.2 gerçekten teslim edildi: `chat.js`'te "Forma aktar" **kalmadı**, yerine
+- [x] §4.2 gerçekten teslim edildi: `chat.js`'te "Forma aktar" **kalmadı**, yerine
       "Görsel modunda üret"; Görsel modunda dolu kutuda "Yönetmen'e sor" çıkıyor.
       Sekmelerin kaldırılma gerekçesi bu maddedir — o yüzden ayrı kutu.
+      **7 Ağustos'ta teslim** (Adım 8, plan §0.8): eski etiket yorumlarda da
+      kalmadı; ters yön metni KOPYALAMIYOR taşıyor ve yönetmenin yazılmış
+      mesajının üstüne yazmıyor (K21); düğme çerçevesiz metin (K22). Aynı turda
+      Görsel modu kendi oturumunu başlatmaya başladı (K19).
 - [ ] Tema seçici dört temayı gerçekten uyguluyor (`data-theme` yazılıyor) ve seçim
       kalıcı (§2.1). Token'ın var olması yetmez. **Kalıcılığın yeri değişti:**
       `settings` (kimlik dosyası) değil `prefs.json` — Adım 6'nın K6 kararı bir
       arayüz tercihini 0600'lük kimlik dosyasına koymayı reddetti ve tema o
       dosyayı otomatik kayıt anahtarıyla paylaşacak (seçici Adım 7b, kalıcılık Adım 9).
+      **Seçici yarısı 7 Ağustos'ta teslim** (Adım 7b, plan §0.7): Araçlar →
+      Görünüm dört temayı uyguluyor; monokrom özniteliği siliyor (K15) ve panel
+      geçiciliği yazıyla söylüyor. Kutu kalıcılık gelmeden işaretlenmez.
 - [ ] Emoji ikon yok, uydurma metrik yok, sol kenarı renkli yuvarlak kart yok, dekoratif
       gradient yok, aynı eylem için ikinci dolu düğme yok.
 - [ ] Taşımada: `pytest` yeşil ve id sözleşmesi (`test_id_contract.py`) yeşil.
@@ -504,33 +522,58 @@ geçildi.** Ekranlar onaylandı, taşıma başladı, PR 1 merge edildi.
 - **Bitti:** Adım 0–4 (tasarımın depoya alınması, token katmanı + id mandalı,
   kabuk, bileşen CSS'i, temizlik) → PR #16, `a1478d4`. Ayrıca 7 Ağustos'ta
   sürüm **2.0.0** ve wordmark'ın kaldırılması.
-- **Bitti (7 Ağustos, commit'lenmedi):** Adım 5 — §5'teki veri modeli. Koşullu
+- **Bitti (`55b3356`, PR #19):** Adım 5 — §5'teki veri modeli. Koşullu
   `session_id`, `result` rolü + `params` şeması, türetilen `cover_image_id`,
   istem ve bütçe filtreleri. TDD ile: 32 test önce, `pytest` 1000 → **1032**.
-- **Bitti (7 Ağustos, commit'lenmedi):** Adım 6 — otomatik kayıt (D1) ve üç
+- **Bitti (`55b3356`, PR #19):** Adım 6 — otomatik kayıt (D1) ve üç
   güvencesi. Yeni `prefs.py` deposu + `/api/prefs`, `DELETE /api/chats`,
   türetilen oturum adı, anahtar kapalıyken 409. `pytest` 1032 → **1062**.
-- **Bitti (7 Ağustos, commit'lenmedi):** Adım **7a** — PR 2'nin ekran payı ve
+- **Bitti (`55b3356`, PR #19):** Adım **7a** — PR 2'nin ekran payı ve
   bununla **PR 2 kapandı**. Sonuç kartı, "görsel silindi" yer tutucusu, sayı
   kapısının düzeltilmesi, başlıksız otomatik kayıt + anahtarın arayüzü + 409'un
   Türkçesi, "tüm oturumları sil", üretimin açık oturuma katılması, üst şeritteki
   oturum adı. `pytest` 1062 → **1080**; 18 mutasyonun hepsi kırmızı.
-- **Sırada:** Adım **7b** — `Adım 7` satırının PR 1'den devraldığı giydirme
-  borcu (plan §0.2'nin A1–A6'sı): Kütüphane ve Araçlar kendi görünümleri,
-  Medya'da arama, ızgara boyutu S/M/L, modal→slide-over, tema seçici arayüzü.
-- **Sonra:** denetimden doğan Adım 8 (§4.2'nin manşeti) · 9 (tema kalıcılığı +
-  Kütüphane yüklemeleri) · 10 (kozmetik süpürme; kebap menüsü de burada).
+- **Bitti (`0223a19`, PR 3):** Adım **7b** — PR 1'in giydirme borcu
+  (plan §0.2'nin A1–A6'sı): Kütüphane ve Araçlar kendi görünümleri, Medya'da
+  arama (klasör sınırını aşan, künyeli), ızgara boyutu S/M/L, Azure/Tema
+  panelleri slide-over, tema seçici (`data-theme` gerçekten yazılıyor; monokrom
+  özniteliği siliyor). `pytest` 1080 → **1095**; iki id defterli kaldırıldı
+  (`assets-modal`, `assets-close`). Kararlar K15–K18 ve kanıtlar plan §0.7'de.
+- **Bitti (`2d97d94`, PR 3 · `APP_VERSION` 2.1.0):** Adım **8** — §4.2'nin manşeti.
+  Prompt bloğunun düğmesi "Görsel modunda üret" (eski etiket yorumlarda da
+  kalmadı), Görsel modunda dolu kutuda çerçevesiz "Yönetmen'e sor" (metni taşır,
+  yönetmenin yazılmış mesajının üstüne yazmaz, sığmazsa kırpmaz reddeder) ve
+  Görsel modu kendi oturumunu başlatıyor. `pytest` 1095 → **1106**; 9 mutasyonun
+  hepsi kırmızı. Kararlar K19–K22 ve kanıtlar plan §0.8'de.
+- **Sırada:** Adım **11 · 12 · 13** — 7 Ağustos kullanıcı denemesinin bulduğu üç
+  açık, kendi planında: `docs/superpowers/plans/2026-08-07-flow-studio-tek-dokum.md`.
+  11: Medya'da karta tıklamak büyüteci açar (+ kart eylemlerinin görünmez geri
+  bildirimi). 12: (+) menüsünün dördüncü maddesi — bu dosyanın §4.2'de söz verdiği
+  "Medya'dan seç" seçicisi (ölçüsü §2'de: 776×570). 13: `studio-session.html`'in
+  kendisi — tek döküm, tek composer; mod değişince pencere de yazılan metin de
+  değişmez.
+- **Sonra:** Adım 9 (tema kalıcılığı — yeri `prefs.json`, bkz. §11 · Kütüphane
+  "Yüklemeler" + "Tümü"), ardından Adım 10 (kozmetik süpürme; kebap menüsü ve
+  **Medya sıralaması/D10** burada — sıralama Medya görünümüyle aynı turda gelsin
+  diye Adım 12'nin seçicisine bilerek konmadı).
 - **Ertelendi:** Yedekler paneli (v4/V3).
 - **Karar bekleyen:** DM Sans bundle (§3 · plan §4) — indirme izni alındı, dosya
   adı ve boyutu söylenip son onay alınacak. Klasör "Yeniden adlandır" sözleşmeye
-  girecek mi (plan §0.2/D17).
+  girecek mi (plan §0.2/D17). Sonuç kartındaki "Düzenle" dökümden yeniden mi
+  kurulacak, tek kayıt döndüren rotayı mı bekleyecek (plan §0.8 · K14).
 
 **Sıra, adım ataması ve madde-madde mandal:**
 `docs/superpowers/plans/2026-08-06-flow-arayuz-devri.md` — §0.1 (durum),
 §0.2 (referans ekran ↔ uygulama denetimi), §0.3 (Adım 8/9/10),
 §0.4 (Adım 5 kaydı: K1–K5), §0.5 (Adım 6 kaydı: K6–K9),
 §0.6 (Adım 7a kaydı: K10–K14 + "aynı sürüm altında bayat JS" tuzağı),
-§7 (kutular).
+§0.7 (Adım 7b kaydı: K15–K18 + mutasyon dersi),
+§0.8 (Adım 8 kaydı: K19–K22 + "görünmez durum satırı" ve kaskad sırası
+dersleri), §7 (kutular). Adım 0–8'in kaydı orada **kalıyor**; sıradaki turun
+(11 · 12 · 13) tanımı ise ikinci planda:
+`docs/superpowers/plans/2026-08-07-flow-studio-tek-dokum.md` — kararlar
+A1–A9 (Medya kartı), B1–B11 (Medya seçici), C1–C8 (tek döküm) ve 12/13'ten
+önce geçilecek Open Design mock kapısı.
 
 > Bu dosya **tasarım sözleşmesi**; ne yapılacağını söyler. Uygulama planı
 > **sıra ve kanıt**tan sorumludur. İkisi çeliştiğinde: tasarım kararı için bu

@@ -532,15 +532,22 @@ function matchesSearch(rec, q = searchQuery) {
 // klasörü döndürüyor — "tüm klasörler" görünümü için hepsi ayrı ayrı çekilip
 // birleştiriliyor. GET'ler paralel: importFiles'ın "sırayla" kuralı YAZAN
 // uçlar için, okuma yarışı yok.
+// Dönüş `{ images, failed }`: düşen uç SAYISI da geliyor. `fetch` HTTP hatasında
+// **reddetmez** — `res.ok === false` ile çözülür — yani aşağıdaki `continue`
+// 500'leri sessizce yutuyor ve çağıranın `try/catch`ine hiçbir şey ulaşmıyor.
+// Sayaç olmadan "liste boş çünkü gerçekten boş" ile "liste boş çünkü uçlar
+// düştü" ayırt edilemiyor (PR #23 incelemesi). Sayı DÖNÜŞTE taşınıyor, modül
+// değişkeninde değil: iki çağıran (Medya araması + seçici) çakışabilir.
 async function loadAllImages() {
   const requests = [fetch("/api/history"), ...folderCache.map(
     (f) => fetch(`/api/history?folder_id=${encodeURIComponent(f.id)}`))];
-  const all = [];
+  const images = [];
+  let failed = 0;
   for (const res of await Promise.all(requests)) {
-    if (!res.ok) continue;   // tek klasörün hatası aramanın kalanını düşürmez
-    all.push(...((await res.json()).images || []));
+    if (!res.ok) { failed++; continue; }   // tek klasörün hatası kalanını düşürmez
+    images.push(...((await res.json()).images || []));
   }
-  return all;
+  return { images, failed };
 }
 
 // Yavaş yanıt yarışı: kullanıcı yazmaya devam ederse eski sorgunun sonucu
@@ -548,7 +555,7 @@ async function loadAllImages() {
 let searchToken = 0;
 
 async function refreshSearch(token = searchToken) {
-  const all = await loadAllImages();
+  const { images: all } = await loadAllImages();
   if (token !== searchToken || !searchQuery) return;
   historyCache = all.filter(matchesSearch);
   selected = new Set([...selected].filter((id) => historyCache.some((r) => r.id === id)));
@@ -587,6 +594,9 @@ let pickerScope = "";
 let pickerQuery = "";
 let pickerSelectedId = null;
 let pickerToken = 0;
+// Boş ızgaranın ÜÇ ayrı nedeni var — yükleniyor, alınamadı, gerçekten boş — ve
+// üçü tek cümleyle anlatılırsa ikisi yalan olur (PR #23 incelemesi, H2).
+let pickerState = "loading";   // "loading" · "error" · "ready"
 
 // Sol gezinme (B4). "İçe aktarılanlar" bir BÖLME değil kesişen süzgeç:
 // Klasörsüz + klasörler zaten Tümü'nü tüketiyor, bu satır onların İÇİNDEN
@@ -718,8 +728,14 @@ function renderPickerGrid() {
     grid.appendChild(tile);
   }
   $("picker-empty").hidden = list.length > 0;
-  $("picker-empty-text").textContent = pickerQuery
-    ? "Sonuç bulunamadı" : "Bu kapsamda görsel yok";
+  // "Bu kapsamda görsel yok" YALNIZ gerçekten boşken kurulur. İlk hâl bu cümleyi
+  // yükleme sırasında ve ağ hatasında da söylüyordu: ölçümde `fetch` reddedilince
+  // kullanıcı "görselin yok" okuyordu (PR #23 incelemesi, H2).
+  $("picker-empty-text").textContent =
+    pickerState === "loading" ? "Görseller yükleniyor…"
+    : pickerState === "error" ? "Görseller alınamadı."
+    : pickerQuery ? "Sonuç bulunamadı"
+    : "Bu kapsamda görsel yok";
 }
 
 function renderPickerSide() {
@@ -752,11 +768,20 @@ function renderPickerSide() {
   const why = extraBlockReason(rec);
   $("picker-use-ref").disabled = !rec;
   $("picker-use-extra").disabled = !!why;
-  // Sayaç gerekçeyi YENER: 3/3'te "En fazla 4 görsel gönderilebilir." demek,
-  // az önce olan şeyi (üçüncü ek eklendi) söylemeden reddi tekrarlamak olur.
-  // Paydası olan sayaç zaten kapalı düğmeyi açıklıyor.
-  $("picker-note").textContent = extras.length
-    ? `Eklendi · ${extras.length}/${MAX_EDIT_IMAGES - 1}` : why;
+  // GEREKÇE kazanır: kapalı bir düğme sebepsiz kalmaz. Eski hâl
+  // `extras.length ? sayaç : gerekçe` idi — "3/3'te sayaç gerekçeyi yener"
+  // savunması doğruydu ama yalnız KAPASİTE gerekçesi için, oysa koşul
+  // `extras.length`e bağlıydı: ilk ek eklenir eklenmez "zaten ana referans" ve
+  // "zaten ek referans listesinde" cümleleri de susuyordu. Kullanıcı 1/3
+  // okuyup (yer var) ölü düğmeye basıyordu (PR #23 incelemesi, H1).
+  //
+  // Buradaki sayaç DURAN bir okuma ("şu an şu kadar ek var"), eylem onayı değil
+  // — o yüzden fiil taşımıyor. Onay ("Eklendi") yalnız ekleme ANINDA, çağrı
+  // yerinde yazılıyor. İki cümle AYRI olmak zorunda: aynı dize kullanılsaydı
+  // hiç eklenmemiş bir karoya geçince de "Eklendi" yazardı ve kullanıcı o karoyu
+  // eklemiş sanırdı (`why` boş olan HER karo bu dala düşüyor).
+  $("picker-note").textContent = why
+    || (extras.length ? `Ek referans · ${extras.length}/${MAX_EDIT_IMAGES - 1}` : "");
 }
 
 // Adı `renderPicker` DEĞİL: `palette.js:96` aynı adı çoktan kullanıyor (renk
@@ -780,16 +805,38 @@ async function openPicker() {
   $("picker-search").value = "";
   pickerQuery = "";
   pickerScope = "";
+  pickerState = "loading";
   renderMediaPicker();
   $("picker-search").focus();
   // "Tümü" `loadAllImages()` ile toplanıyor, satır içine kopyalanmıyor (B2):
   // `GET /api/history` klasör-DIŞLAYICI (klasörsüz VEYA tek klasör; "hepsi"
   // ucu yok) ve bu incelik ikinci kez keşfedilmek zorunda kalmamalı.
   const token = ++pickerToken;
-  const all = await loadAllImages();
+  // Arıza İKİ ayrı yoldan geliyor ve ikisi de karşılanmak zorunda:
+  //   • ağ katmanı (sunucu kapalı, bağlantı koptu) → `fetch` REDDEDER → catch
+  //   • sunucu tarafı (500, 404) → `fetch` REDDETMEZ, `res.ok` false olur ve
+  //     `loadAllImages` onu yutar → catch HİÇ çalışmaz, liste boş döner
+  // İkincisi ilk düzeltmede atlanmıştı: kullanıcı 500 alınca yine "görselin yok"
+  // okuyordu. Ayrım `failed` sayacıyla yapılıyor (PR #23 incelemesi).
+  let res;
+  try {
+    res = await loadAllImages();
+  } catch {
+    if (token !== pickerToken || $("media-picker").hidden) return;
+    pickerState = "error";
+    pickerImages = [];   // bayat listeyi hata cümlesinin altında bırakma
+    renderMediaPicker();
+    return;
+  }
   if (token !== pickerToken || $("media-picker").hidden) return;
-  pickerImages = all;
-  if (!pickerById(pickerSelectedId)) pickerSelectedId = all.length ? all[0].id : null;
+  // Boş liste TEK BAŞINA "görselin yok" demek değil. Kısmi arızada (bir klasör
+  // düştü, gerisi geldi) ızgara doluyor ve akış bozulmuyor — sözleşme yalnız
+  // "boşluk gerçek mi" sorusunu koruyor.
+  pickerState = res.images.length === 0 && res.failed > 0 ? "error" : "ready";
+  pickerImages = res.images;
+  if (!pickerById(pickerSelectedId)) {
+    pickerSelectedId = res.images.length ? res.images[0].id : null;
+  }
   renderMediaPicker();
 }
 
@@ -849,6 +896,12 @@ $("picker-use-extra").addEventListener("click", () => {
   const why = addGalleryExtra(rec);
   if (why) { $("picker-note").textContent = why; return; }
   renderPickerSide();
+  // Onay ekleme ANINDA yazılıyor. `renderPickerSide` gerekçeyi öne aldığı için
+  // (H1) az önce eklenen karo hemen "zaten ek referans listesinde" derdi ve
+  // kullanıcı eyleminin işlediğini hiç göremezdi. Fiil ("Eklendi") YALNIZ burada
+  // geçiyor; karo değişince not duran okumaya ("Ek referans · N/3") ya da
+  // gerekçeye döner.
+  $("picker-note").textContent = `Eklendi · ${extras.length}/${MAX_EDIT_IMAGES - 1}`;
 });
 
 document.addEventListener("keydown", (e) => {

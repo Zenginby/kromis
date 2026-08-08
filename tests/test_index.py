@@ -2451,6 +2451,95 @@ def test_the_picker_writes_only_to_its_own_note():
     assert "picker-note" in picker, "tek geri bildirim yüzeyi kullanılmıyor"
 
 
+def test_the_picker_note_shows_the_reason_not_just_the_counter():
+    """K28 · Kapalı "Ek olarak ekle" sebepsiz kalmaz (PR #23 incelemesi, H1).
+
+    İlk hâlde not `extras.length ? sayaç : gerekçe` idi. Yorumun savunduğu şey
+    ("3/3'te sayaç gerekçeyi yener") DOĞRU, ama yalnız KAPASİTE gerekçesi için;
+    koşul gerekçeye değil `extras.length`e bağlandığı için İLK ek eklendiği anda
+    diğer iki gerekçe de susuyordu. Canlı ölçüm (ana referans A, ek olarak B):
+
+        seçili B → "Bu görsel zaten ek referans listesinde." · düğme KAPALI,
+                   not "Eklendi · 1/3" — kullanıcı yer olduğunu okuyor, sebep yok
+        seçili A → "Bu görsel zaten ana referans."           · aynısı
+
+    §0.9'un kök nedeni (eylem çalışıyor, geri bildirimi görünmüyor) üçüncü
+    kılığında. Artık GEREKÇE varsayılan olarak kazanıyor; "Eklendi" onayı ise
+    ekleme ANINDA, çağrı yerinde veriliyor — çünkü ekleme başarılı olduğunda
+    seçili karo ARTIK ek listesindedir ve `why` o an da doludur, yani onay
+    `renderPickerSide`'a bırakılsa hiç görünmezdi.
+    """
+    picker = _picker_js()
+    # 1) Notun ifadesi GEREKÇEYLE başlıyor; sayaç yalnız gerekçe yokken.
+    assert re.search(r'"picker-note"\)\.textContent\s*=\s*why\s*\|\|', picker), (
+        "sayaç gerekçeyi eziyor: kapalı düğme açıklamasız kalır")
+    # 2) Onay çağrı yerinde: ekleme başarılıysa fiil O AN yazılıyor.
+    assert re.search(
+        r"addGalleryExtra\(rec\).*?renderPickerSide\(\);\s*"
+        r'\$\("picker-note"\)\.textContent\s*=\s*`Eklendi', picker, re.S), (
+        "ekleme onayı verilmiyor: gerekçe kazanınca 'Eklendi' hiç görünmez")
+    # 3) DURAN okuma ile EYLEM onayı ayrı cümleler. Aynı dize kullanılırsa
+    #    `why` boş olan HER karo "Eklendi" der — hiç eklenmemiş karoya geçen
+    #    kullanıcı onu eklemiş sanır. `renderPickerSide`'ın dalı fiil taşımaz.
+    yan = _balanced_body(picker, "function renderPickerSide()")
+    assert "`Eklendi" not in yan, (
+        "duran sayaç eylem onayıyla aynı cümleyi kullanıyor: hiç eklenmemiş "
+        "karoda 'Eklendi' yazar")
+    assert re.search(r"`Ek referans · \$\{extras\.length\}", yan), (
+        "duran sayaç yok: ek varken kullanıcı kaç ek olduğunu göremiyor")
+
+
+def test_the_picker_separates_loading_and_failure_from_emptiness():
+    """K29 · "Görselin yok" cümlesi YALNIZ gerçekten boşken kurulur (H2).
+
+    İlk hâlde `#picker-empty` üç durumu tek cümleyle anlatıyordu. Canlı ölçüm
+    (`window.fetch` reddedecek şekilde saplandı):
+
+        yakalanmamisRet:         ["TypeError: Failed to fetch"]
+        kullaniciyaGorunenMetin: "Bu kapsamda görsel yok"
+
+    Yükleme çökmüşken kullanıcıya YANLIŞ bir cümle söyleniyordu, üstüne
+    yakalanmamış promise reddi kalıyordu. Aynı kök neden ikinci belirtiyi de
+    veriyordu: `renderMediaPicker()` `await`'ten ÖNCE çağrıldığı için boş durum
+    HER açılışta bir an görünüyordu (açılışın ilk karesinde ölçüldü:
+    `picker-empty.hidden === false`, `await` sonrası 25 karo).
+
+    Arıza İKİ ayrı yoldan geliyor ve ilk düzeltme yalnız birini kapatmıştı:
+    ağ katmanı (`fetch` REDDEDER → `catch`) ve sunucu tarafı (500/404 —
+    `fetch` **reddetmez**, `res.ok` false olur ve `loadAllImages` onu yutar,
+    yani `catch` HİÇ çalışmaz, liste boş döner). İkincisinde kullanıcı gene
+    "görselin yok" okuyordu. `loadAllImages` artık düşen uç sayısını da
+    döndürüyor; boş liste **tek başına** "yok" anlamına gelmiyor.
+    """
+    picker = _picker_js()
+    govde = _balanced_body(picker, "async function openPicker()")
+    # 1) Redde bir karşılayıcı var: yakalanmamış promise reddi bırakılmıyor.
+    #    Sıraya bakılıyor, tek bir yazıma değil — try gövdesine küme parantezi
+    #    girse de iddia ayakta kalmalı.
+    i_try, i_cagri, i_catch = (govde.find("try {"),
+                               govde.find("await loadAllImages()"),
+                               govde.find("catch"))
+    assert -1 < i_try < i_cagri < i_catch, (
+        "openPicker ağ reddini yakalamıyor: yakalanmamış promise + yanlış cümle")
+    # 2) Sunucu tarafı arıza da ayırt ediliyor: boş liste tek başına yetmiyor.
+    assert "failed" in govde, (
+        "düşen uç sayısı hesaba katılmıyor: 500'de gene 'görselin yok' denir")
+    # 3) Durum AÇILIŞTA sıfırlanıyor. `picker` diliminin tamamına bakmak
+    #    yetmez: `let pickerState = "loading"` BİLDİRİMİ de o dilimde ve iddiayı
+    #    kendi başına karşılar — sıfırlama silinse test yeşil kalırdı (ölçüldü).
+    #    Sonuç: hatadan sonra tekrar açılışta ekranda "alınamadı" asılı kalır.
+    assert 'pickerState = "loading"' in govde, "açılışta durum sıfırlanmıyor"
+    # 4) Boş durum metni DURUMU biliyor, yalnız sorguyu değil.
+    metin = re.search(r'"picker-empty-text"\)\.textContent\s*=(.*?);', picker, re.S)
+    assert metin and "pickerState" in metin.group(1), (
+        "boş durum metni yükleme/hata durumunu bilmiyor: üç durum tek cümlede")
+    assert 'pickerState = "error"' in govde, "ağ reddi hata durumunu kurmuyor"
+    assert '"ready"' in govde, "başarılı yükleme durumu kurulmuyor"
+    # 5) Hata cümlesi ekran okuyucuya da ulaşıyor: kap canlı bölge.
+    assert re.search(r'id="picker-empty"[^>]*role="status"', _html()), (
+        "#picker-empty canlı bölge değil: hata cümlesi hiç duyurulmuyor")
+
+
 def test_the_extra_rejection_sentence_lives_in_exactly_one_place():
     """B6 · Ret gerekçesi tek kaynakta: `extraBlockReason(rec)`.
 

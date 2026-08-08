@@ -39,7 +39,8 @@ squash ile merge edildi; `main`'e inen tek commit **`a1478d4`**. Merge sonrası
 ağaç hash'i dal ucuyla birebir aynı (`a717ef93`), yani squash'ta içerik kaybı yok.
 **PR 2 de indi:** [PR #19](https://github.com/Zenginby/gpt-image-studio/pull/19)
 → **`55b3356`**, Adım 5 + 6 + 7a'nın üçü birden (`APP_VERSION` 2.0.0).
-**PR 3** Adım 7b + 8'i taşıyor: `feat/flow-ui-pr3` dalında `0223a19` ve `2d97d94`
+**PR 3** ([#21](https://github.com/Zenginby/gpt-image-studio/pull/21)) Adım 7b + 8'i
+taşıyor: `feat/flow-ui-pr3` dalında `0223a19` ve `2d97d94`
 (`APP_VERSION` 2.1.0).
 
 > **Adım commit'leri `main`'in geçmişinde YOK** (PR 1 ve PR 2 için). Squash her

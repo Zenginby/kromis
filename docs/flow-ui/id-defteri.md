@@ -30,11 +30,10 @@ kaldırmak gerekir. Testin ikinci iddiası bunu zorunlu tutuyor.
 
 ## Kaldırılanlar
 
-Henüz kaldırılan id yok — Adım 1 yalnızca token katmanı, işaretlemeye
-dokunmadı. Tablo Adım 2'de (kabuk) dolmaya başlayacak.
-
 | id | Hangi tasarım kararıyla | JS bağı nerede kaldırıldı | Güncellenen test |
 |---|---|---|---|
+| `assets-modal` | Kütüphane modal değil GÖRÜNÜM (tasarım §4.1, plan §0.2/A1 — Adım 7b). İçerik id'leri (`asset-tabs`, `asset-grid`…) `#view-library` bölümüne taşındı; giden yalnızca modal kabuğu. | `assets.js` — `openAssetsModal`/`closeAssetsModal` ve backdrop/Escape dinleyicileri silindi; `loadAssets` artık modal açıklığına bakmıyor | `test_index.py::test_library_is_a_rail_view_not_a_click_on_a_hidden_button` (yokluğunu doğruluyor) |
+| `assets-close` | Aynı karar: kapatılacak modal kalmadı, görünümden ray ile çıkılıyor. | `assets.js` — kapatma dinleyicisi `openAssetsModal` ile birlikte gitti | aynı test |
 
 <!-- Tablo biçimi bağlayıcı: ilk hücre backtick içinde id olmak zorunda,
      test satırları böyle ayıklıyor. Örnek:

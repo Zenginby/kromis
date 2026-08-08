@@ -128,24 +128,22 @@ $("asset-file-input").addEventListener("change", async () => {
   for (const file of files) await uploadAsset(assetPanelKind, file); // sırayla: manifest yazımı atomik
 });
 
-// ── Kütüphane modalı (logo/motto/banner yükle-sil) ───────────────────
-function openAssetsModal() {
+// ── Kütüphane görünümü (logo/motto/banner yükle-sil) ─────────────────
+// A1 (Adım 7b): Kütüphane modaldan GÖRÜNÜME taşındı — ray öğesi bölüm
+// değiştiriyor (core.js). Buradaki dinleyiciler görünüme girişte panelin
+// bayat durumunu tazeliyor; aynı düğmede ikinci dinleyici plus-menü kalıbı.
+function openLibraryView() {
   assetStatus("");
   renderAssetPanel();
-  $("assets-modal").hidden = false;
 }
 
-function closeAssetsModal() {
-  $("assets-modal").hidden = true;
-}
-
-$("library-btn").addEventListener("click", openAssetsModal);
-$("assets-close").addEventListener("click", closeAssetsModal);
-$("assets-modal").addEventListener("click", (e) => {
-  if (e.target.hasAttribute("data-assets-close")) closeAssetsModal();
-});
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && $("confirm-modal").hidden && !$("assets-modal").hidden) closeAssetsModal();
+$("rail-library").addEventListener("click", openLibraryView);
+// Üretim ayarları panelindeki "Kütüphane" kısayolu da aynı görünüme gider;
+// id ve bağ duruyor (152 id sözleşmesi), yalnız hedefi değişti.
+$("library-btn").addEventListener("click", () => {
+  closeSheets();
+  openLibraryView();
+  showSection("library");
 });
 
 // ── Bindirme modalı: logo VEYA banner + canlı önizleme ──────────────

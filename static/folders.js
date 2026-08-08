@@ -17,6 +17,10 @@
 // süzme burada yapılır, sunucuya seviye parametresi gitmez.
 let currentFolder = null;
 let folderCache = [];
+// Medya araması (A3 / Adım 7b). Boş dize = arama kapalı. Sorgu KÜÇÜK harfe
+// indirilmiş tutulur; eşleşme de öyle yapılır (Türkçe İ/ı tuzağına rağmen
+// toLowerCase iki tarafa da aynı biçimde uygulandığı için tutarlı).
+let searchQuery = "";
 
 const parentOf = (f) => (f && f.parent_id) || null;
 const folderById = (id) => (id ? folderCache.find((f) => f.id === id) || null : null);
@@ -63,8 +67,10 @@ const FOLDER_HINT_IMPORT =
 
 function renderFolderHint() {
   const el = $("folder-hint");
-  el.hidden = false;
-  if (selectMode) return;   // seçim modunda metni syncSelectUI yönetiyor
+  // Aramadayken ipucu gizli: klasör kartları da ekranda değil, "kartına
+  // sürükle" cümlesi hedefsiz kalırdı.
+  el.hidden = searchQuery.length > 0;
+  if (el.hidden || selectMode) return;   // seçim modunda metni syncSelectUI yönetiyor
   el.textContent = folderCache.length
     ? `${FOLDER_HINT_DEFAULT} ${FOLDER_HINT_IMPORT}`
     : FOLDER_HINT_IMPORT;
@@ -82,6 +88,14 @@ function renderFolderTarget() {
 
 function syncFolderView() {
   const inFolder = currentFolder !== null;
+  const searching = searchQuery.length > 0;
+  // Arama klasör sınırından bağımsız (tasarım §4.1): sorgu yazıldığı an
+  // kırıntı, klasör kartları ve bölüm başlığı çekilir; yerini kapsamı
+  // söyleyen tek etiket alır ("Arama sonuçları — tüm klasörler").
+  $("search-label").hidden = !searching;
+  document.querySelector("#view-media .gallery-head").hidden = searching;
+  $("images-title").hidden = searching;
+  $("folder-grid").hidden = searching;
   $("folder-back").hidden = !inFolder;
   // Silme yalnızca klasörün İÇİNDE (sağ üstte); seçim modunda şerit görsellere ayrılır
   $("folder-delete").hidden = !inFolder || selectMode;
@@ -496,7 +510,71 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && selectMode && $("confirm-modal").hidden) setSelectMode(false);
 });
 
+// ── Medya araması (A3 / Adım 7b) ─────────────────────────────────────
+// Arama üç alanda (tasarım §4.1): prompt, klasör adı, boyut. İçe aktarılan
+// kayıtların prompt'u yok, onlar dosya adıyla bulunur.
+function matchesSearch(rec) {
+  const folder = folderById(rec.folder_id);
+  const folderName = folder ? folder.name : "";
+  const size = rec.size || "";
+  const prompt = rec.prompt || rec.filename || "";
+  return `${prompt} ${folderName} ${size}`.toLowerCase().includes(searchQuery);
+}
+
+// Tüm klasörlerin görselleri: `/api/history` klasörsüzleri, `?folder_id=` tek
+// klasörü döndürüyor — "tüm klasörler" görünümü için hepsi ayrı ayrı çekilip
+// birleştiriliyor. GET'ler paralel: importFiles'ın "sırayla" kuralı YAZAN
+// uçlar için, okuma yarışı yok.
+async function loadAllImages() {
+  const requests = [fetch("/api/history"), ...folderCache.map(
+    (f) => fetch(`/api/history?folder_id=${encodeURIComponent(f.id)}`))];
+  const all = [];
+  for (const res of await Promise.all(requests)) {
+    if (!res.ok) continue;   // tek klasörün hatası aramanın kalanını düşürmez
+    all.push(...((await res.json()).images || []));
+  }
+  return all;
+}
+
+// Yavaş yanıt yarışı: kullanıcı yazmaya devam ederse eski sorgunun sonucu
+// yenisini ezmesin diye jeton karşılaştırılıyor (viewer'ın token kalıbı).
+let searchToken = 0;
+
+async function refreshSearch(token = searchToken) {
+  const all = await loadAllImages();
+  if (token !== searchToken || !searchQuery) return;
+  historyCache = all.filter(matchesSearch);
+  selected = new Set([...selected].filter((id) => historyCache.some((r) => r.id === id)));
+  renderGallery();
+  syncSelectUI();
+}
+
+$("media-search").addEventListener("input", async () => {
+  searchQuery = $("media-search").value.trim().toLowerCase();
+  const token = ++searchToken;
+  syncFolderView();
+  // Sorgu silinince bulunulan klasörün normal görünümüne dönülür.
+  if (!searchQuery) { await loadHistory(); return; }
+  await refreshSearch(token);
+});
+
+// ── Izgara boyutu S/M/L (A4 / Adım 7b) ───────────────────────────────
+// Ölçü CSS'te: düğme yalnızca `data-size` yazar, kutucuk genişliğini
+// `.gallery[data-size=…]`nin --tile değeri belirler. grid-template-columns'u
+// JS'ten yazmak duyarlılık kurallarını sessizce ezerdi.
+$("size-seg").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-size]");
+  if (!btn) return;
+  for (const b of $("size-seg").querySelectorAll("button[data-size]")) {
+    b.setAttribute("aria-pressed", String(b === btn));
+  }
+  $("gallery").dataset.size = btn.dataset.size;
+});
+
 async function loadHistory() {
+  // Arama açıkken geçmişin tazelenmesi (silme, taşıma, içe aktarma sonrası)
+  // arama sonuçlarını tazelemek demek — klasör görünümüne sessizce dönülmez.
+  if (searchQuery) { await refreshSearch(); return; }
   const url = currentFolder ? `/api/history?folder_id=${encodeURIComponent(currentFolder.id)}` : "/api/history";
   const res = await fetch(url);
   if (!res.ok) {
@@ -599,6 +677,16 @@ function renderGallery() {
       badge.className = "card-badge";
       badge.textContent = "içe aktarıldı";
       card.appendChild(badge);
+    }
+    // Arama sonucu kartı hangi klasörden geldiğini söyler (§4.1 künye kuralı):
+    // sonuçlar tüm klasörlerden geliyor, adsız iki varyant ayırt edilemez.
+    // Sol ALT köşede — sol üst card-check/card-badge'in, sağ alt .acts'ın.
+    if (searchQuery) {
+      const where = document.createElement("span");
+      where.className = "card-badge card-where";
+      const folder = folderById(rec.folder_id);
+      where.textContent = folder ? folder.name : "Klasörsüz";
+      card.appendChild(where);
     }
     card.appendChild(delBtn);
     card.appendChild(acts);

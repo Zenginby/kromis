@@ -66,16 +66,16 @@ async function loadSettings(openIfMissing) {
 function openSettings() {
   $("set-key").value = ""; // her açılışta boş (write-only)
   // #set-chat-deployment BİLEREK temizlenmiyor: write-only değil, GET'ten dolu
-  // geliyor. Temizlenirse kullanıcı endpoint'ini güncellemek için modalı açıp
+  // geliyor. Temizlenirse kullanıcı endpoint'ini güncellemek için paneli açıp
   // kaydettiğinde dağıtım adını da silmiş olurdu.
   $("settings-status").textContent = "";
-  $("settings-modal").hidden = false;
+  // A5 (Adım 7b): panel sağdan slide-over (tasarım §2.4/3). Açma/kapama tek
+  // kapıdan (core.openSheet); perde ve Escape kabuğun ortak dinleyicilerinde.
+  openSheet("settings-modal");
   setTimeout(() => $("set-endpoint").focus(), 0);
 }
 
-function closeSettings() {
-  $("settings-modal").hidden = true;
-}
+function closeSettings() { closeSheets(); }
 
 async function saveSettings() {
   const base_url = $("set-endpoint").value.trim();
@@ -114,11 +114,23 @@ async function saveSettings() {
 $("settings-btn").addEventListener("click", openSettings);
 $("settings-close").addEventListener("click", closeSettings);
 $("settings-save").addEventListener("click", saveSettings);
-$("settings-modal").addEventListener("click", (e) => {
-  if (e.target.hasAttribute("data-close")) closeSettings();
-});
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && $("confirm-modal").hidden && !$("settings-modal").hidden) closeSettings();
+
+// ── Tema seçici (A6 / Adım 7b) ──────────────────────────────────────
+// Dört temanın token'ları flow-tokens.css'te Adım 1'den beri hazırdı
+// ([data-theme=…]); burası onları GERÇEKTEN uygulayan taraf. Monokrom =
+// öznitelik yok: varsayılan --accent zaten monokrom, sahte bir "mono"
+// değeri yazmak token katmanında karşılığı olmayan bir durum üretirdi.
+// KALICILIK BİLEREK YOK — SettingsRequest'te tema alanı yok; o Adım 9'un
+// arka uç işi ve panel bunu kullanıcıya açıkça söylüyor.
+function applyTheme(theme) {
+  if (theme === "mono") delete document.body.dataset.theme;
+  else document.body.dataset.theme = theme;
+}
+
+$("tool-look").addEventListener("click", () => openSheet("look-sheet"));
+$("look-close").addEventListener("click", closeSheets);
+$("theme-picker").addEventListener("change", (e) => {
+  if (e.target.name === "theme") applyTheme(e.target.value);
 });
 
 $("go").addEventListener("click", run);

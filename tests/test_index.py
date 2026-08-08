@@ -1524,3 +1524,292 @@ def test_a_failed_generation_leaves_no_turn_behind():
     body = re.search(r"async function run\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
     assert "dropPendingTurn" in body.group(1), (
         "başarısız üretim dökümde cevapsız bir tur bırakıyor")
+
+
+# ── Adım 7b: PR 1'in giydirme borcu (§0.2 · A1–A6) ──────────────────────
+# PR 1 kabuğu kurdu ama altı iş yarım kaldı: Kütüphane ve Araçlar ray
+# düğmeleri GÖRÜNÜM değil gizli bir düğmeye programatik tıklama, Medya'da
+# arama ve ızgara boyutu yok, Azure/Tema hâlâ ortalanmış modal, tema seçici
+# hiç yok. Aşağıdaki iddialar planın §7'sindeki A1–A6 kutularına birebir
+# karşılık geliyor.
+
+def _html() -> str:
+    return TestClient(appmod.app).get("/").text
+
+
+def _css() -> str:
+    return TestClient(appmod.app).get("/static/style.css").text
+
+
+def _folders_js() -> str:
+    return TestClient(appmod.app).get("/static/folders.js").text
+
+
+def _settings_js() -> str:
+    return TestClient(appmod.app).get("/static/settings.js").text
+
+
+def _assets_js() -> str:
+    return TestClient(appmod.app).get("/static/assets.js").text
+
+
+def _palette_js() -> str:
+    return TestClient(appmod.app).get("/static/palette.js").text
+
+
+def _section(html: str, element_id: str) -> str:
+    """`id="…"` ile başlayan bölümün gövdesi (bir sonraki kapanışa kadar)."""
+    start = html.find(f'id="{element_id}"')
+    assert start > 0, element_id
+    end = html.find("</section>", start)
+    if end < 0:
+        end = html.find("</aside>", start)
+    assert end > start, f"{element_id} kapanmıyor"
+    return html[start:end]
+
+
+def test_library_is_a_rail_view_not_a_click_on_a_hidden_button():
+    """A1: Kütüphane ray öğesi GÖRÜNÜM açmalı, gizli bir düğmeye tıklamamalı.
+
+    PR 1 rayı kurdu ama `core.js` "Kütüphane"yi `$("library-btn").click()`
+    ile karşılıyordu — düğme #specs-sheet'in içinde, yani ray öğesi kapalı bir
+    panelin düğmesine programatik tıklıyordu. Tasarım §4.1 rayı dört GÖRÜNÜM
+    olarak sayıyor; modal açan bir ray öğesi o grameri bozuyor.
+    """
+    html = _html()
+    assert 'id="view-library"' in html, "Kütüphane görünümü yok"
+    assert 'id="assets-modal"' not in html, "Kütüphane hâlâ modal"
+    assert 'id="assets-close"' not in html, "modalın kapatma düğmesi kalmış"
+    core = _core_js()
+    assert 'showSection("library")' in core, "ray öğesi görünüm değiştirmiyor"
+    assert '$("library-btn").click()' not in core, (
+        "ray öğesi hâlâ gizli bir düğmeye programatik tıklıyor")
+    assets = _assets_js()
+    assert "openAssetsModal" not in assets, "modal açma yolu duruyor"
+    assert "assets-modal" not in assets, (
+        "assets.js var olmayan bir id'ye bakıyor → yükleme anında TypeError")
+
+
+def test_library_view_keeps_every_asset_control():
+    """Kütüphane modaldan görünüme taşındı; kontrollerin HİÇBİRİ düşmedi.
+
+    `assets.js` bu id'lere top-level `$()` ile bağlanıyor (16 bağ, en kalabalık
+    dosya): biri taşınırken kaybolursa dosya yüklenirken patlar ve ondan
+    sonraki tüm dinleyiciler — bindirme paneli dahil — hiç kurulmaz.
+    """
+    view = _section(_html(), "view-library")
+    for element_id in ("assets-title", "asset-tabs", "asset-upload-btn",
+                       "asset-file-input", "asset-grid", "asset-status"):
+        assert f'id="{element_id}"' in view, f"{element_id} Kütüphane görünümünde değil"
+    assert 'data-akind="palettes"' not in view, "paletler bir varlık türü değil"
+
+
+def test_tools_is_a_rail_view_with_two_tool_cards():
+    """A2: Araçlar da görünüm — iki araç kartıyla (tasarım §4.1).
+
+    `core.js` bunu da `$("palette-btn").click()` ile karşılıyordu: Araçlar
+    doğrudan renk seçiciyi açıyor, "Görünüm" (tema) ise hiç erişilemiyordu.
+    """
+    html = _html()
+    assert 'id="view-tools"' in html, "Araçlar görünümü yok"
+    view = _section(html, "view-tools")
+    assert 'id="tool-palette"' in view, "Tema rengi/paletler kartı yok"
+    assert 'id="tool-look"' in view, "Görünüm kartı yok"
+    core = _core_js()
+    assert 'showSection("tools")' in core
+    assert '$("palette-btn").click()' not in core, (
+        "Araçlar hâlâ gizli bir düğmeye programatik tıklıyor")
+
+
+def test_the_gear_and_the_tools_view_are_different_doors():
+    """Ayrım KASITLI (§4.1): Araçlar = tasarım kararları, dişli = makine ayarı.
+
+    Azure kimliği Araçlar görünümüne sızarsa iki kapı aynı şeyi yapar ve
+    "yalnızca bu makineye kaydedilir" uyarısının bağlamı kaybolur.
+    """
+    view = _section(_html(), "view-tools")
+    for leaked in ("set-endpoint", "set-key", "set-chat-deployment"):
+        assert leaked not in view, f"{leaked} Araçlar görünümüne sızmış"
+    assert "dişli" in view, "kullanıcı Azure ayarlarının nerede olduğunu okuyamıyor"
+
+
+def test_media_search_is_served_and_filters_by_prompt_folder_and_size():
+    """A3: Arama YALNIZCA Medya'da (üst şeritten kaldırıldı, §4.1).
+
+    Sözleşme üç alanı sayıyor: prompt, klasör, boyut. Biri düşerse arama
+    "çalışıyor" görünür ama kullanıcı aradığını bulamaz — sessiz bir eksik.
+    """
+    html = _html()
+    assert 'id="media-search"' in html, "Medya'da arama alanı yok"
+    assert 'class="search"' in html, "arama pill'inin kabuğu yok"
+    js = _folders_js()
+    assert "searchQuery" in js, "arama durumu yok"
+    body = re.search(r"function matchesSearch\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "matchesSearch() bulunamadı"
+    # Üç alan da SAMANLIĞIN KENDİSİNDE aranıyor (şablon dizesi), gövdede adı
+    # geçen bir değişkende değil — mutasyon dersi: `const folder = …` satırı
+    # tek başına "klasör aranıyor" saymaya yetiyordu.
+    haystack = re.search(r"return `([^`]*)`", body.group(1))
+    assert haystack, "eşleşme şablon dizesiyle kurulmuyor"
+    for field in ("prompt", "folderName", "size"):
+        assert f"${{{field}}}" in haystack.group(1), f"{field} aranmıyor"
+    assert "folder.name" in body.group(1), "klasör ADI değil başka bir alan aranıyor"
+
+
+def test_search_leaves_the_folder_boundary():
+    """Arama klasör sınırından BAĞIMSIZ (§4.1): "tüm klasörler" görünümü.
+
+    `/api/history` klasörsüzleri, `?folder_id=` ise tek klasörü döndürüyor —
+    yani arama yalnız bulunulan seviyede kalırsa kullanıcı başka klasördeki
+    görseli ARADIĞINI bilerek bulamaz ve arama yanıltıcı olur.
+    """
+    html = _html()
+    label = re.search(r'<p id="search-label"[^>]*>\s*([^<]*)', html)
+    assert label, "#search-label yok"
+    assert "hidden" in label.group(0), "arama etiketi başlangıçta görünür"
+    assert "tüm klasörler" in label.group(1), "etiket kapsamı söylemiyor"
+    js = _folders_js()
+    body = re.search(r"async function loadAllImages\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "loadAllImages() yok — arama tek klasörde kalıyor"
+    assert "folderCache" in body.group(1), "klasörler taranmıyor"
+
+
+def test_a_search_result_says_which_folder_it_came_from():
+    """Sonuç kartı hangi klasörde olduğunu SÖYLEMELİ (§4.1 künye kuralı).
+
+    Aramada kartlar farklı klasörlerden geliyor; klasör adı yazmazsa aynı
+    prompt'un iki varyantı ayırt edilemez ve kullanıcı yanlış kareyi açar.
+    """
+    js = _folders_js()
+    assert "card-where" in js, "kartta klasör künyesi yok"
+    assert ".card-where" in _css(), "künyenin stili yok → görünmez kalır"
+
+
+def test_grid_size_segment_is_served_and_applied():
+    """A4: Izgara boyutu S/M/L (§4.1).
+
+    Kutucuk ölçüsü CSS'te `--tile` üzerinden değişmeli: `grid-template-columns`
+    JS'ten yazılırsa duyarlılık kuralları (1024×700) sessizce ezilir.
+    """
+    html = _html()
+    seg = re.search(r'id="size-seg".*?</div>', html, re.S)
+    assert seg, "#size-seg yok"
+    for size in ("s", "m", "l"):
+        assert f'data-size="{size}"' in seg.group(0), size
+    assert 'aria-pressed="true"' in seg.group(0), "aktif boyut duyurulmuyor"
+    js = _folders_js()
+    assert "dataset.size" in js, "boyut ızgaraya yazılmıyor"
+    css = _css()
+    assert re.search(r'\.gallery\[data-size="s"\]\s*\{[^}]*--tile', css), "S ölçüsü yok"
+    assert re.search(r'\.gallery\[data-size="l"\]\s*\{[^}]*--tile', css), "L ölçüsü yok"
+    assert re.search(r"\.gallery\s*\{[^}]*minmax\(var\(--tile", css), (
+        "ızgara --tile'ı okumuyor")
+
+
+def test_settings_is_a_slide_over_not_a_centered_modal():
+    """A5: Ayarlar sağdan slide-over (§2.4/3), ortalanmış modal değil.
+
+    id `settings-modal` olarak KALIYOR: 152 id sözleşmesinin (test_id_contract)
+    ve JS bağının parçası — ad telin üstündeki isim, yüzey hakkında bir iddia
+    değil. Değişen şey kabuk: `.sheet` + `.open` + ortak perde.
+    """
+    html = _html()
+    tag = re.search(r"<aside id=\"settings-modal\"[^>]*", html)
+    assert tag, "Ayarlar hâlâ <aside class=\"sheet\"> değil"
+    assert "sheet" in tag.group(0), "slide-over sınıfı yok"
+    assert 'data-close' not in _section(html, "settings-modal"), (
+        "modal perdesi kalmış — slide-over ortak #shell-scrim kullanır")
+    js = _settings_js()
+    assert "openSheet" in js, "panel slide-over mekaniğiyle açılmıyor"
+    assert '$("settings-modal").hidden = false' not in js, "hâlâ modal gibi açılıyor"
+
+
+def test_palette_is_a_slide_over_not_a_centered_modal():
+    """A5'in ikinci yarısı: Tema rengi paneli de slide-over.
+
+    Renk seçici Araçlar'dan açılıyor (§4.1) ve seçim sırasında ARKADAKİ
+    tuvalin görünür kalması işin kendisi — ortalanmış bir modal onu kapatıyordu.
+    """
+    html = _html()
+    tag = re.search(r"<aside id=\"palette-modal\"[^>]*", html)
+    assert tag and "sheet" in tag.group(0), "Tema rengi paneli slide-over değil"
+    js = _palette_js()
+    assert "openSheet" in js
+    assert '$("palette-modal").hidden = false' not in js, "hâlâ modal gibi açılıyor"
+
+
+def test_slide_over_form_fields_keep_their_visible_border():
+    """Girişlerin sınırı `.modal-card input`'tan geliyordu; panel artık modal değil.
+
+    Kural taşınmazsa endpoint/API anahtarı/hex alanları zeminsiz ve
+    SINIRSIZ kalır — §0.0/G'nin "metin girişinin algılanabilir sınırı olmalı"
+    kapısı (≥3:1) sessizce açılır.
+    """
+    css = _css()
+    rule = re.search(r"[^}]*\.sheet-body input[^{]*\{([^}]*)\}", css)
+    assert rule, ".sheet-body input kuralı yok"
+    assert "--control-border" in rule.group(1), "sınır kontrast kapısını kullanmıyor"
+
+
+def test_theme_picker_really_writes_data_theme():
+    """A6: Tema seçici dört temayı UYGULAMALI (§2.1).
+
+    Token'ın var olması yetmez: `flow-tokens.css` üç `[data-theme=…]` satırını
+    Adım 1'den beri taşıyor ama hiçbir JS `data-theme` yazmıyordu — yani
+    özellik kodda vardı, arayüzde yoktu.
+    """
+    html = _html()
+    sheet = _section(html, "look-sheet")
+    for theme in ("mono", "kurumsal", "amber", "viola"):
+        assert f'value="{theme}"' in sheet, f"{theme} seçeneği yok"
+    js = _settings_js()
+    # ATAMA ve SİLME ayrı ayrı aranıyor — mutasyon dersi: yalnız
+    # "dataset.theme" aramak, atama dalı koparılıp delete satırı dururken de
+    # geçiyordu. Monokrom = öznitelik YOK (flow-tokens'ta mono satırı yok).
+    assert re.search(r"document\.body\.dataset\.theme\s*=\s*theme", js), (
+        "tema body'ye atanmıyor")
+    assert "delete document.body.dataset.theme" in js, (
+        "monokrom seçimi özniteliği silmiyor — token katmanında mono diye bir tema yok")
+    tokens = TestClient(appmod.app).get("/static/flow-tokens.css").text
+    for theme in ("kurumsal", "amber", "viola"):
+        assert f'[data-theme="{theme}"]' in tokens, theme
+
+
+def test_theme_picker_admits_it_is_not_persisted_yet():
+    """Kalıcılık Adım 9'un arka uç işi; seçici onu VAAT ETMEMELİ.
+
+    `SettingsRequest`'te tema alanı yok (models.py) — bir "Kaydet" düğmesi
+    koymak ya da sessiz kalmak, yeniden başlatınca sıfırlanan seçimi
+    kullanıcının hatası gibi gösterirdi.
+    """
+    sheet = _section(_html(), "look-sheet")
+    assert "yeniden başla" in sheet, "geçiciliği söyleyen satır yok"
+    assert "theme" not in models.SettingsRequest.model_fields, (
+        "tema ayara girdiyse bu testin gerekçesi de bitmiştir — Adım 9'da güncelle")
+
+
+def test_escape_keeps_a_slide_over_open_under_a_confirm_dialog():
+    """Onay penceresi bir slide-over'ın ÜSTÜNDE açılıyor (palet kaydetme).
+
+    Escape guard'ı olmadan tek tuş iki katmanı birden kapatıyor: kullanıcı
+    palet adını yazmaktan vazgeçince açık olan panel de gidiyor ve seçtiği
+    renk kaybolmuş gibi görünüyor.
+    """
+    core = _core_js()
+    body = re.search(
+        r'if \(e\.key === "Escape" && [^\n]*\.sheet\.open[^\n]*\)[^\n]*', core)
+    assert body, "slide-over Escape dinleyicisi bulunamadı"
+    assert 'confirm-modal' in body.group(0), (
+        "Escape onay penceresi açıkken de paneli kapatıyor")
+
+
+def test_only_one_slide_over_is_open_at_a_time():
+    """Dört panel aynı perdeyi ve aynı 320px şeridi paylaşıyor.
+
+    İkisi birlikte açılırsa üst üste biner, alttaki tıklanamaz ve `Esc`
+    hangisini kapattığı belirsizleşir. Açan tek kapı: `openSheet`.
+    """
+    core = _core_js()
+    body = re.search(r"function openSheet\([^)]*\)\s*\{(.*?)\n\}", core, re.S)
+    assert body, "openSheet() yok"
+    assert "closeSheets()" in body.group(1), "önceki panel kapatılmıyor"

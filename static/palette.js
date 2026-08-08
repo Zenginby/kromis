@@ -373,7 +373,10 @@ async function loadPalettes() {
     paletteCache = [];
     paletteStatus("Palet kütüphanesi alınamadı.");
   }
-  if (!$("palette-modal").hidden && paletteTab === "saved") renderPaletteLibrary();
+  // Panel slide-over: açıklık `hidden` ile değil `.open` sınıfıyla anlatılıyor.
+  if ($("palette-modal").classList.contains("open") && paletteTab === "saved") {
+    renderPaletteLibrary();
+  }
 }
 
 function renderPaletteLibrary() {
@@ -480,13 +483,17 @@ function openPaletteModal() {
   renderSuggestions();
   paletteModalStatus("");
   setPaletteTab("new");
-  $("palette-modal").hidden = false;
+  // A5 (Adım 7b): ortalanmış modal değil sağdan slide-over — renk seçilirken
+  // arkadaki tuval görünür kalmalı. Açma/kapama tek kapıdan (core.openSheet).
+  openSheet("palette-modal");
   fetchSuggestions();
 }
 
-function closePaletteModal() { $("palette-modal").hidden = true; }
+function closePaletteModal() { closeSheets(); }
 
 $("palette-btn").addEventListener("click", openPaletteModal);
+// Araçlar görünümündeki kart da aynı paneli açıyor (tasarım §4.1).
+$("tool-palette").addEventListener("click", openPaletteModal);
 $("palette-close").addEventListener("click", closePaletteModal);
 $("palette-clear").addEventListener("click", clearPalette);
 $("palette-save").addEventListener("click", savePalette);
@@ -499,14 +506,9 @@ $("palette-apply").addEventListener("click", () => {
   closePaletteModal();
 });
 
-$("palette-modal").addEventListener("click", (e) => {
-  if (e.target.hasAttribute("data-palette-close")) closePaletteModal();
-});
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && $("confirm-modal").hidden && !$("palette-modal").hidden) {
-    closePaletteModal();
-  }
-});
+// Perde tıklaması ve Escape artık kabuğun ortak slide-over dinleyicilerinde
+// (core.js: #shell-scrim + confirm-modal guard'lı Escape) — panele özel
+// backdrop/Escape kodu bilerek yok.
 
 $("palette-tabs").addEventListener("click", (e) => {
   const btn = e.target.closest("button[data-ptab]");

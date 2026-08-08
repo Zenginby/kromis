@@ -26,8 +26,10 @@ const VIEWS = { image: ["view-image", "tab-image"], chat: ["view-chat", "tab-cha
 // "nereden nereye" bilgisini taşımaz.
 const VIEW_ORDER = ["image", "chat"];
 let currentView = "image";
-// Ray bölümü: "studio" (mod anahtarıyla iki panel) | "media" (galeri).
-// Kütüphane ve Araçlar kendi modallarını açıyor, bölüm değiştirmiyorlar.
+// Ray bölümü: "studio" (mod anahtarıyla iki panel) | "media" (galeri) |
+// "library" (bindirme varlıkları) | "tools" (görünüm + paletler).
+// Dördü de GÖRÜNÜM (tasarım §4.1) — Adım 7b'ye kadar son ikisi gizli
+// düğmelere programatik tıklıyordu ve ray grameri bozuktu.
 let currentSection = "studio";
 
 /** Bitişik segmentin kayan dolgusu: aktif düğmenin ölçüsünden okunuyor.
@@ -95,10 +97,19 @@ syncTabThumb();
 
 const APP = document.querySelector(".app");
 
+// Ray bölümü → görünüm eşlemesi. "studio" burada null: onun iki paneli
+// (view-image / view-chat) showView'un işi, bölüm anahtarının değil.
+const SECTION_VIEWS = { studio: null, media: "view-media",
+                        library: "view-library", tools: "view-tools" };
+
 function showSection(name, fromShowView = false) {
   currentSection = name;
   const studio = name === "studio";
-  $("view-media").hidden = studio;
+  for (const [key, viewId] of Object.entries(SECTION_VIEWS)) {
+    if (viewId) $(viewId).hidden = key !== name;
+  }
+  // Composer yalnız Stüdyo'da: prompt bir oturumun repliği (tasarım §4.2),
+  // Medya/Kütüphane/Araçlar'da gönderilecek bir döküm yok.
   $("composer").hidden = !studio;
   if (studio) {
     // Panelleri ve mod anahtarını geri kur — showView'dan gelindiyse o zaten
@@ -107,20 +118,22 @@ function showSection(name, fromShowView = false) {
   } else {
     for (const [viewId] of Object.values(VIEWS)) $(viewId).hidden = true;
   }
-  for (const [id, on] of [["rail-studio", studio], ["rail-media", !studio]]) {
-    $(id).classList.toggle("active", on);
-    if (on) $(id).setAttribute("aria-current", "page");
-    else $(id).removeAttribute("aria-current");
+  for (const key of Object.keys(SECTION_VIEWS)) {
+    const on = key === name;
+    $(`rail-${key}`).classList.toggle("active", on);
+    if (on) $(`rail-${key}`).setAttribute("aria-current", "page");
+    else $(`rail-${key}`).removeAttribute("aria-current");
   }
 }
 
 $("rail-studio").addEventListener("click", () => showSection("studio"));
 $("rail-media").addEventListener("click", () => showSection("media"));
-// Kütüphane ve Araçlar henüz kendi görünümleri değil: var olan modalları
-// açıyorlar. Programatik `.click()` gizli bir düğmede de dinleyiciyi çalıştırır,
-// o yüzden #specs-sheet kapalıyken de işliyor. Görünüme dönüşmesi Adım 3/5'te.
-$("rail-library").addEventListener("click", () => $("library-btn").click());
-$("rail-tools").addEventListener("click", () => $("palette-btn").click());
+// A1/A2 (Adım 7b): Kütüphane ve Araçlar artık kendi görünümleri. Eskiden
+// library-btn / palette-btn'e programatik .click() atılıyordu — kapalı bir
+// panelin gizli düğmesi. Kütüphane grid'inin tazelenmesi assets.js'te
+// (aynı düğmeye ikinci dinleyici, plus-menü kalıbı).
+$("rail-library").addEventListener("click", () => showSection("library"));
+$("rail-tools").addEventListener("click", () => showSection("tools"));
 
 $("rail-collapse").addEventListener("click", () => {
   const on = APP.classList.toggle("rail-collapsed");
@@ -135,20 +148,31 @@ function closeSheets() {
   $("specs-btn").setAttribute("aria-expanded", "false");
 }
 
+// Panel açmanın TEK kapısı: dört panel aynı perdeyi ve aynı sağ/sol şeridi
+// paylaşıyor — önce hepsi kapanır, sonra istenen açılır. İkisi birlikte
+// açılırsa üst üste biner ve `Esc`in hangisini kapattığı belirsizleşir.
+function openSheet(id) {
+  closeSheets();
+  $(id).classList.add("open");
+}
+
 $("specs-btn").addEventListener("click", () => {
-  const sheet = $("specs-sheet");
-  const willOpen = !sheet.classList.contains("open");
+  const willOpen = !$("specs-sheet").classList.contains("open");
   closeSheets();
   if (willOpen) {
-    sheet.classList.add("open");
+    openSheet("specs-sheet");
     $("specs-btn").setAttribute("aria-expanded", "true");
   }
 });
 $("specs-close").addEventListener("click", closeSheets);
 $("sessions-close").addEventListener("click", closeSheets);
 $("shell-scrim").addEventListener("click", closeSheets);
+// `confirm-modal` guard'ı ŞART: onay penceresi bir panelin ÜSTÜNDE açılıyor
+// (palet kaydetme). Bu dinleyici confirm'in stopImmediatePropagation'ından
+// ÖNCE kayıtlı, yani o çağrı bunu durduramaz — guard'sız tek Escape iki
+// katmanı birden kapatırdı.
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && document.querySelector(".sheet.open")) closeSheets();
+  if (e.key === "Escape" && $("confirm-modal").hidden && document.querySelector(".sheet.open")) closeSheets();
 });
 
 // ── (+) menüsü ──

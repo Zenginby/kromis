@@ -315,6 +315,77 @@ body:has(.sheet.open) .scrim { display: block; }
 }
 .sheet-foot .btn-ghost { width: 100%; margin: 0; }
 
+/* Slide-over form alanları (A5): kurallar .modal-card input'un birebir
+   karşılığı — Ayarlar ve Tema rengi panelleri artık modal değil, ama metin
+   girişinin algılanabilir sınırı kalmalı (§0.0/G, ≥3:1). Radyo/onay
+   kutusu/kaydırıcı dışarıda: onların ölçüsünü kendi satır bileşenleri veriyor. */
+.sheet-body input:not([type="radio"]):not([type="checkbox"]):not([type="range"]) {
+  width: 100%; background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--control-border); border-radius: 10px; padding: 0.6rem 0.7rem;
+  font: inherit; transition: border-color var(--dur) var(--ease);
+}
+.sheet-body input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):focus {
+  outline: none; border-color: var(--accent);
+}
+/* Etiket düzeni yalnız Ayarlar panelinde blok: Tema rengi panelinin kendi
+   satır kuralları var (.palette-picker-row label display:inline). */
+#settings-modal .sheet-body label {
+  display: block; font-size: 0.85rem; color: var(--muted); margin: 0.7rem 0 0.25rem;
+}
+/* Talimat dosyasının yolu boşluksuz tek sözcük: 320px şeritte kırılmazsa
+   gövdenin iç dolgusuna taşıyor (ölçüldü: 9px). */
+#chat-instructions-path { overflow-wrap: anywhere; }
+
+/* ── Araçlar görünümü (A2) ─────────────────────────────────────────────
+   İki kapı kartı (referans settings-panels.html .tool): yüzey kart, hover bir
+   kademe yükselir. Kenarlık yok — Flow'a birebir; kontrast işi metinde. */
+.tools {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+}
+.tool {
+  background: var(--panel); border: 0; border-radius: var(--r-panel, 24px);
+  padding: 18px; text-align: left; cursor: pointer; font: inherit; color: var(--text);
+  transition: background var(--dur) var(--ease);
+}
+.tool:hover { background: var(--panel-2); }
+.tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tool-ic {
+  width: 36px; height: 36px; border-radius: 10px; background: var(--panel-2);
+  display: grid; place-items: center; color: var(--muted); margin-bottom: 14px;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.tool:hover .tool-ic { background: var(--raised); color: var(--text); }
+.tool b { display: block; font-weight: 500; font-size: 15px; line-height: 1.4; }
+.tool > span:not(.tool-ic) {
+  display: block; font-size: 13px; line-height: 1.55; color: var(--muted); margin-top: 4px;
+}
+/* Görünüm altı açıklama satırı (Kütüphane/Araçlar) */
+.view-desc { max-width: 66ch; color: var(--muted); font-size: 0.85rem; line-height: 1.5; margin: 0.9rem 0; }
+
+/* ── Tema seçici (A6) ──────────────────────────────────────────────────
+   Radyo satırları Flow'un .radio-row'u. İşaret accent-color'dan geliyor:
+   tema değişince işaretin kendisi yeni durum rengini gösterir. */
+.theme-picker { border: 0; margin: 0; padding: 0; min-width: 0; }
+.theme-picker .radio-row {
+  display: flex; gap: 12px; align-items: flex-start; width: 100%;
+  background: var(--panel-2); border-radius: var(--r-item, 12px);
+  padding: 12px 14px; margin-bottom: 8px; cursor: pointer;
+  transition: background var(--dur) var(--ease);
+}
+.theme-picker .radio-row:hover { background: var(--raised); }
+.theme-picker .radio-row:has(input:focus-visible) {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.theme-picker .radio-row input {
+  width: 16px; height: 16px; margin: 2px 0 0; flex: none; accent-color: var(--accent);
+}
+.theme-picker .radio-row > span { min-width: 0; }
+.theme-picker .radio-row b { display: block; font-weight: 500; font-size: 14px; }
+.theme-picker .radio-row span span {
+  display: block; font-size: 12px; line-height: 1.5; color: var(--muted); margin-top: 3px;
+}
+
 /* 1200px altında ray otomatik daralır, 760px yükseklik altında şerit 60px
    (tasarım §2.2). En küçük pencere 1024×700 — ikisi de orada devrede. */
 @media (max-width: 1200px) {
@@ -482,7 +553,7 @@ body:has(.sheet.open) .scrim { display: block; }
   background: var(--muted); opacity: 0.45; pointer-events: none;
 }
 .nudge input[type="range"] { position: relative; }
-/* Nota gömülü ghost düğme: .assets-head .btn-ghost ile aynı küçültme. */
+/* Nota gömülü ghost düğme: normal .btn-ghost dolgusu satırı taşırırdı. */
 #logo-offset-reset {
   padding: 0.2rem 0.5rem; font-size: 0.74rem; margin-left: 0.35rem;
   vertical-align: baseline;
@@ -510,12 +581,12 @@ body:has(.sheet.open) .scrim { display: block; }
 .assets-panel { margin-top: 1rem; border-top: 1px solid var(--hairline); padding-top: 0.9rem; }
 .asset-actions { display: flex; gap: 0.5rem; }
 .asset-actions .btn-ghost { flex: 1; justify-content: center; }
-/* Kütüphane modalı: grid'e nefes alacak genişlik */
-.library-card { width: min(680px, 100%); }
-.library-card .asset-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); max-height: 46vh; overflow-y: auto; }
-.assets-head { display: flex; align-items: center; gap: 0.6rem; }
-.assets-head .seg { flex: 1; }
-.assets-head .btn-ghost { padding: 0.4rem 0.7rem; font-size: 0.82rem; flex: none; }
+/* Kütüphane görünümü (A1): modal kabuğun kuralları (.library-card,
+   .assets-head) onunla birlikte gitti. Tam görünümde hücreler modaldakinden
+   geniş; segment sekmeleri içerik kadar (tam genişlik üç dev sekme üretiyordu). */
+#view-library .asset-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+#view-library .seg { display: inline-flex; margin-top: 0.4rem; }
+#view-library .seg button { flex: none; padding: 0.45rem 1rem; }
 .asset-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
   gap: 0.5rem; margin-top: 0.7rem;
@@ -596,8 +667,10 @@ button.palette-sw:focus-visible { outline: 2px solid var(--accent); outline-offs
 .palette-strength-row[hidden] { display: none; }
 .palette-strength-title { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.25rem; }
 
-/* Palet modalı */
-.palette-card { width: min(640px, 100%); }
+/* Tema rengi paneli: modal değil slide-over (A5). Standart 320px şeritte HSV
+   alanı ve öneri kartları sıkışıyor; renk seçmek bu panelin ana işi olduğu
+   için ona daha geniş bir şerit veriliyor (max-width .sheet'ten geliyor). */
+#palette-modal.sheet { width: 420px; }
 #palette-new[hidden], #palette-saved[hidden] { display: none; }
 /* Renk seçici: HSV karesi + ton kaydırıcısı + damlalık + hex.
    `<input type="color">`in yerini alıyor — işletim sistemi seçicisi tek tıkla
@@ -893,13 +966,59 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
   margin: 0; font: 500 17px/1.3 var(--font-display, system-ui, sans-serif);
 }
 
+/* ── Medya araç şeridi (A3/A4) ─────────────────────────────────────────
+   Arama pill'i + ızgara boyutu + seçim/yeni klasör. Kırıntıdan (gallery-head)
+   AYRI şerit: kırıntı bulunulan yere göre değişiyor, bu şerit sabit.
+   Referans: media-browser.html'in .media-head'i; pill yüksekliği 42px. */
+.media-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 1.1rem;
+}
+.search {
+  flex: 1 1 240px; display: flex; align-items: center; gap: 10px; min-width: 0;
+  height: 42px; padding: 0 16px; border-radius: 999px;
+  background: var(--raised); color: var(--text); cursor: text;
+  border: 1px solid var(--control-border);
+  transition: border-color var(--dur) var(--ease);
+}
+.search:focus-within { border-color: var(--accent); }
+.search svg { flex: none; color: var(--muted); }
+.search input {
+  flex: 1; min-width: 0; background: none; border: 0; outline: none;
+  color: var(--text); font: inherit; font-size: 14px;
+  -webkit-appearance: none; appearance: none;
+}
+.search input::placeholder { color: var(--placeholder, var(--muted)); }
+
+/* Izgara boyutu S/M/L: arama pill'iyle aynı yükseklik ve aynı dil. .seg'den
+   ayrı varyant — buradaki kutu pill, düğmeler mini pill (referansın .sizeseg'i). */
+.sizeseg {
+  flex: none; display: flex; align-items: center; gap: 3px; height: 42px;
+  padding: 4px 4px 4px 12px; border-radius: 999px;
+  background: var(--panel-2); border: 1px solid var(--control-border);
+}
+.sizeseg > svg { color: var(--muted); margin-right: 6px; }
+.sizeseg button {
+  min-width: 34px; height: 32px; padding: 0 10px; border: 0; border-radius: 999px;
+  background: none; color: var(--muted); font: inherit; font-size: 13px;
+  letter-spacing: 0.02em; cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.sizeseg button:hover { background: var(--raised); color: var(--text); }
+.sizeseg button[aria-pressed="true"] {
+  background: var(--fill-selected); color: var(--on-fill-selected); font-weight: 500;
+}
+
 /* Klasörler — başlık şeridi Flow'un crumb'ı: altında saç teli, başlık display
-   ailesinde. Geri düğmesi ve eylemler aynı şeritte duruyor. */
+   ailesinde. Geri düğmesi ve eylemler aynı şeritte duruyor. Aramada şeridin
+   tamamı çekiliyor (yerini #search-label alıyor) — display:flex'i [hidden]'ın
+   UA kuralına ezdirmemek için açık kural şart. */
 .gallery-head {
   display: flex; align-items: center; gap: 0.7rem;
   margin-bottom: 1.1rem; padding-bottom: 14px;
   border-bottom: 1px solid var(--hairline);
 }
+.gallery-head[hidden] { display: none; }
 .gallery-head h2 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .back-btn { flex: none; }
 .back-btn[hidden] { display: none; }
@@ -955,7 +1074,15 @@ body.dnd-active .folder-cell .folder-open { border-style: dashed; border-color: 
   color: var(--muted); font-size: 0.78rem; line-height: 1.4;
 }
 .folder-target[hidden] { display: none; }
-.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.7rem; }
+/* Izgara boyutu S/M/L (A4): kutucuk ölçüsü --tile'dan gelir, folders.js
+   yalnızca data-size yazar — grid-template-columns JS'ten yazılsaydı buradaki
+   duyarlılık davranışı (auto-fill) sessizce ezilirdi. */
+.gallery {
+  --tile: 150px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--tile), 1fr)); gap: 0.7rem;
+}
+.gallery[data-size="s"] { --tile: 110px; }
+.gallery[data-size="l"] { --tile: 210px; }
 .card { position: relative; background: var(--panel-2); border-radius: var(--r-item, 12px); overflow: hidden; }
 .card img { width: 100%; display: block; aspect-ratio: 1; object-fit: cover; cursor: pointer; }
 .card-del {
@@ -977,6 +1104,10 @@ body.dnd-active .folder-cell .folder-open { border-style: dashed; border-color: 
   background: var(--overlay); color: var(--muted);
   font-size: 0.62rem; letter-spacing: 0.02em; line-height: 1.5;
 }
+/* Arama sonucunun klasör künyesi (§4.1): sol ALT köşe — sol üst içe-aktarma
+   rozetinin / seçim kutusunun, sağ alt hover eylemlerinin. */
+.card-where { top: auto; bottom: 6px; max-width: calc(100% - 12px);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Eylemler sürekli görünür bir alt şerit DEĞİL: Flow medya kartında hover ya
    da odakta beliren yüzen satır (tasarım §6 "hover'da açılan eylem satırı").
    :focus-within şart — klavyeyle düğmeye sekince satır görünür kalır.

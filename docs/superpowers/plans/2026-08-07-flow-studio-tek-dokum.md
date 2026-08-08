@@ -27,7 +27,11 @@ Bu plan başka bir oturumda uygulanmak üzere yazıldı. Sırayla:
    fast-forward mümkünken bile commit'leri yeniden yazdı (`b79dc17` → `c65fbb7`,
    `6cf86f4` → `2bfd87e`), atıflar bu turun commit'inde düzeltildi.
 4. ~~**Adım 12.**~~ **Bitti (8 Ağustos, `APP_VERSION` 2.2.0).** Faz 0 kapısı **§0.10**,
-   port ve doğrulama kapısının bulduğu iki kusur **§0.11**. Sıradaki iş **Adım 13**.
+   port ve doğrulama kapısının bulduğu üç kusur **§0.11**, PR'dan sonra çalıştırılan
+   **inceleme turunun** bulduğu iki HIGH ve düzeltmeleri **§0.12** (K28 · K29).
+   PR **[#23](https://github.com/Zenginby/gpt-image-studio/pull/23)** açık.
+   Sıradaki iş **Adım 13**; bekleyen kararlar **K27** (iç içe klasör yolu) ve
+   **M1** (`aria-selected` düz `<button>`da geçersiz) — ikisi de D10 turunda.
 
 Faz 0 (Open Design mock) yalnız **12 ve 13** için zorunlu, 11 için değil — 11'in tek
 tasarım sorusu (A9) o mock'ta cevaplanıyor, o yüzden 11'in mock'u 12'ninkiyle birlikte
@@ -546,6 +550,144 @@ buraya özel kural yazmak "port bir **ad** eşlemesidir, **değer** icadı deği
 "Kandil kapaklar…") ve ebeveyniyle neredeyse aynı görünüyor; `title` tam yolu veriyor.
 §0.10'un ölçümü **kök** adlarını ölçmüştü, iç içe yolu değil. Karar gerektirir (K27 adayı:
 yaprak adı + girinti mi, tam yol mu) — D10 turuna bırakıldı.
+
+---
+
+## §0.12 Adım 12 — inceleme turu: yeşil süitin altından geçen iki geri bildirim kusuru (8 Ağustos)
+
+PR **#23** açıldıktan **sonra** kod incelemesi çalıştırıldı. O anda süit 1139 yeşildi,
+mutasyon turu 23/23 kırmızıydı, canlı tur temizdi. **Yine de iki HIGH çıktı** — ikisi de
+§0.9'un kök nedeninin (eylem çalışıyor, **geri bildirimi görünmüyor**) yeni kılığı, ikisi de
+canlı ölçüldü. Ders şu: mutasyon turu **iddiaların** gücünü ölçer, **iddia edilmeyen** şeyi
+değil. İkisi de "kullanıcıya ne yazıyoruz" sorusuydu ve hiçbir iddia notun **içeriğine**
+bakmıyordu.
+
+**H1 · Sayaç ret gerekçesini yutuyordu — kapalı düğme sebepsiz kalıyordu (K28).**
+Not `extras.length ? sayaç : gerekçe` idi. Yorumun savunması ("3/3'te sayaç gerekçeyi yener,
+yoksa az önce olanı söylemeden reddi tekrarlamış oluruz") **doğruydu** — ama yalnız
+**kapasite** gerekçesi için. Koşul gerekçeye değil `extras.length`e bağlandığı için **ilk ek
+eklendiği anda** diğer iki gerekçe de susuyordu. Canlı ölçüm (ana referans A, ek olarak B):
+
+| Seçili karo | `extraBlockReason` | düğme | not (eski) | not (yeni) |
+|---|---|---|---|---|
+| B — ek listesinde | `Bu görsel zaten ek referans listesinde.` | kapalı | `Eklendi · 1/3` | gerekçe |
+| A — ana referans | `Bu görsel zaten ana referans.` | kapalı | `Eklendi · 1/3` | gerekçe |
+| C — eklenebilir | — | açık | `Eklendi · 1/3` | `Eklendi · 1/3` |
+
+Kullanıcı `1/3` okuyup (yer var) ölü düğmeye basıyordu. Artık **gerekçe varsayılan olarak
+kazanıyor**. Düzeltmedeki gerçek gerilim şuydu: ekleme başarılı olduğunda seçili karo **artık**
+ek listesindedir, yani `why` o an da doludur — gerekçeyi koşulsuz öne almak "Eklendi" onayını
+öldürürdü. Çözüm onayı **çağrı yerine** taşımak: `renderPickerSide` gerekçeyi tercih eder,
+"Ek olarak ekle" dinleyicisi ekleme **anında** sayacı yazar. Kapasite ucu da canlı ölçüldü:
+3. ek eklenince `Eklendi · 3/3`, sonra başka karoya geçilince
+`En fazla 4 görsel gönderilebilir.` — yani gerekçe kapalı düğmeyi **payda ima etmeden**
+açıklıyor, eski hâlden de iyi.
+
+**H2 · `#picker-empty` üç durumu tek cümleyle anlatıyordu (K29).**
+`openPicker()` `loadAllImages()`i `await` ediyor ama **reddi yakalamıyordu**; içerideki
+`if (!res.ok) continue` yalnız HTTP hatasını süzüyor, `Promise.all(fetch…)` ağ reddinde komple
+düşüyor. `window.fetch` reddedecek şekilde saplandığında ölçülen:
+
+```
+yakalanmamisRet:         ["TypeError: Failed to fetch"]     → düzeltmeden sonra []
+kullaniciyaGorunenMetin: "Bu kapsamda görsel yok"           → "Görseller alınamadı."
+```
+
+Yükleme çökmüşken kullanıcıya **yanlış bir cümle** söyleniyordu. Aynı kök neden ikinci
+belirtiyi de veriyordu: `renderMediaPicker()` `await`'ten **önce** çağrıldığı için boş durum
+**her açılışta** bir an görünüyordu (ölçüldü: açılışın ilk karesinde
+`picker-empty.hidden === false`, `await` sonrası 25 karo) — yerelde göz kırpma, uzak/yavaş
+sunucuda kalıcı, çünkü `loadAllImages` klasör başına bir istek atıyor (N+1). Artık
+`pickerState` üç durumu ayırıyor: **yükleniyor · alınamadı · gerçekten boş**.
+
+### İkinci geçiş — düzeltmenin kendisi eksikti (aynı gün)
+
+İlk düzeltme commit'lenmeden **çekişmeli bir doğrulama turundan** geçirildi: üç ayrı mercek
+(doğruluk · gerileme · yorum-kod uyumu) diff'i bağımsız okudu, her aday bulgu ayrı bir
+ajan tarafından **çürütülmeye** çalışıldı. Üç bulgu ayakta kaldı ve **üçü de gerçekti.**
+Ders §0.11'inkinin devamı: **mutasyon turu iddiaların gücünü ölçer, iddia EDİLMEYEN şeyi
+değil.**
+
+**(a) H2'nin ilk düzeltmesi asıl hata yolunu kaçırıyordu.** `fetch` HTTP hatasında
+**reddetmez** — `res.ok === false` ile çözülür — ve `loadAllImages` onu `continue` ile
+yutuyordu. Yani `try/catch` **yalnız ağ katmanı** kesintisini yakalıyordu; sunucu 500
+döndürdüğünde liste boş geliyor, `pickerState` "ready" oluyor ve kullanıcı gene
+"Bu kapsamda görsel yok" okuyordu. Erişilebilir somut yol kodun kendi belgesinde:
+`storage._read_history` yalnız `JSONDecodeError`ı yutuyor, docstring'i "Other errors
+(e.g. permission errors) still propagate" diyor → izin/IO hatası `/api/history`yi 500'e
+çeviriyor. **Düzeltmenin düzeltmesi:** `loadAllImages` artık `{ images, failed }`
+döndürüyor (sayı dönüşte taşınıyor, modül değişkeninde değil — iki çağıran çakışabilir) ve
+`openPicker` "boş liste + düşen uç" bileşimini hataya çeviriyor. Kısmi arıza bilerek
+akışı bozmuyor: bir klasör düşse de gerisi geliyor, ızgara doluyor.
+
+**Yazdığım yorum yanlıştı ve yanlış hâliyle bu belgeye de geçmişti.** "`Promise.all`
+bilerek… sinyal fail-loud yukarı geliyor" diyordu; oysa yutma bir kat **aşağıda**,
+`loadAllImages`'ın döngüsündeydi. Bu depoda yorum bir tasarım kaydı ve testler onu
+alıntılıyor — yanlış bir değişmez sonraki okuyucuyu yanıltır. Hem yorum hem K29'un
+docstring'i gerçeğe çekildi. (`catch`in `console.error` yazmaması **doğru** kaldı: deponun
+kapısı "konsol 0 mesaj" ve sinyal kullanıcının gördüğü cümleye çevriliyor — yutulan değil,
+**çevrilen** bir hata.)
+
+**(b) K29'un `"loading"` kolu kendi bekçiliğini yapamıyordu.** İddia `_picker_js()`
+diliminin tamamında `pickerState = "loading"` arıyordu; **bildirim satırının kendisi**
+(`let pickerState = "loading";`) o dilimde olduğu için iddia hep karşılanıyordu. Mutasyonla
+ölçüldü: `openPicker`'daki **sıfırlama** silindiğinde süit **1141 yeşil** kalıyordu (kontrol:
+`"error"` silinince 1 kırmızı — yani iddia bütün olarak zayıf değil, yalnız o kol). Davranış
+sonucu gerçek: hatadan sonra tekrar açılışta taze istek uçarken ekranda "Görseller alınamadı."
+asılı kalırdı. İddia artık `_balanced_body(picker, "async function openPicker()")` gövdesine
+bakıyor.
+
+**(c) "Eklendi · N/3" hiç eklenmemiş karoya yapışıyordu.** H1 düzeltmesi aynı dizeye
+**ikinci bir anlam** yüklemişti (duran sayaç *ve* eylem onayı). B eklendikten sonra hiç
+eklenmemiş C'ye geçince not "Eklendi · 1/3" diyordu, düğme açıktı — kullanıcı C'yi de
+eklemiş sanabilirdi. `#picker-note` `role="status"`, yani ekran okuyucuda **yapılmamış
+eylemin duyulur onayı**. Fiil ayrıldı: duran okuma **"Ek referans · N/3"**, onay yalnız
+ekleme anında **"Eklendi · N/3"**. Yazdığım "«Eklendi» onayı BURADA verilmiyor" yorumu da
+hemen altındaki satırı yanlış tarif ediyordu; düzeltildi.
+
+**Bonus:** `#picker-empty` canlı bölge değildi. Kap artık yalnız "boş" demiyor,
+"yükleniyor" ve "alınamadı" da diyor — `role="status"` verildi. Yanındaki `#picker-note`
+zaten canlıydı; asimetriyi bu diff imal etmişti.
+
+**Yeni iddialar.** `test_the_picker_note_shows_the_reason_not_just_the_counter` (K28) ·
+`test_the_picker_separates_loading_and_failure_from_emptiness` (K29). Mutasyon turu
+**8/8 kırmızı**: sayacın gerekçeyi ezmesi · onayın çağrı yerinden düşmesi · duran okumanın
+da "Eklendi" demesi · `try/catch`in kalkması · boş durum metninin yeniden yalnız sorguya
+bakması · **açılıştaki `"loading"` sıfırlamasının silinmesi** (önceki turda hayatta kalan
+mutant) · düşen uç sayısının yok sayılması · `role="status"`un kalkması. Her JS mutantı
+ayrıca `node --check`ten geçirildi — geçersiz JS olan bir mutant "gerçekçi gerileme"
+sayılmaz, testi yanlış nedenle kırmızı yapar.
+
+**Kanıtlar (8799, geliştiricinin verisine yazmadan).** Süit **1141 yeşil** (1139 + 2) ·
+konsol kendi kodumuzdan **0 mesaj** (yalnız süregelen `favicon.ico` 404'ü ve tarayıcının
+parola alanı notu; bilerek çökertilen `fetch`ler bile yeni giriş üretmedi) ·
+**yakalanmamış promise reddi 0**. Dört arıza biçimi ayrı ayrı ölçüldü:
+
+| Senaryo | Ekranda | Karo |
+|---|---|---|
+| HTTP 500 (tüm uçlar) | `Görseller alınamadı.` | 0 |
+| kısmi (kök 200, klasör 500) | ızgara dolu, boş durum gizli | 19 |
+| ağ reddi | `Görseller alınamadı.` | 0 |
+| hatadan sonra tekrar açılış | `Görseller yükleniyor…` → ızgara | 25 |
+
+Not akışı da adım adım ölçüldü: eklenebilir karo → boş · az önce eklendi →
+`Eklendi · 1/3` · **hiç eklenmemiş karo → `Ek referans · 1/3`** · tekrar seçilen ek →
+`Bu görsel zaten ek referans listesinde.` · ana referans → `Bu görsel zaten ana referans.`
+En dar bağlayıcı genişlikte (**1024×700**, en uzun yeni cümleyle): yatay taşma **0**, modal
+**776×570** ve tümüyle ekran içinde, boş durum kutusu kartın içinde, `role="status"` yerinde ·
+`output/*.json` `mtime`'ları tur öncesi/sonrası **birebir aynı**. Geometri değişmediği için
+§0.11'in dört genişlikli süpürmesi geçerliliğini koruyor — bu tur metin değişikliği,
+yerleşim değişikliği değil.
+
+**İncelemenin geri kalanı, kapatılmadan bırakıldı.** 1 MEDIUM + 5 LOW, tam kayıt
+`.claude/reviews/pr-23-review.md`'de. En önemlisi **M1**: `aria-selected` düz `<button>`
+üzerinde **desteklenmiyor** (yalnız `gridcell · option · row · tab · treeitem` rollerinde) ve
+canlı erişilebilirlik ağacında 25 karonun hiçbirinde "selected" **geçmiyor** — gören kullanıcı
+2px accent çerçeveyi görüyor, ekran okuyucu kullanıcısı hangi görselin seçili olduğunu
+bilmiyor, oysa "Referans yap" tam o seçime göre çalışıyor. Deponun doğru kullanımı
+`role="tab"` üzerinde (`core.js:71`); seçici ondan ayrılmış. Asgari geçerli düzeltme
+`#picker-grid`e `role="listbox"` + karoya `role="option"` (CSS aynı kalır); tam listbox klavye
+kalıbı (ok tuşları + roving tabindex) ayrı bir iş. **K27 ile birlikte D10 turuna** bırakıldı.
 
 ---
 

@@ -20,9 +20,14 @@ Bu plan başka bir oturumda uygulanmak üzere yazıldı. Sırayla:
    `2d97d94`) atıf veren dokümanlar bu turun ilk commit'inde düzeltildi.
 2. **Kanıtı tazele.** `.venv/bin/python -m pytest tests/ -q` → 1106 yeşil olmalı.
    Değilse önce onu çöz; yeni tur yeşil tabandan başlar.
-3. ~~**Adım 11'e geç.**~~ **Bitti (8 Ağustos, `b79dc17`, `APP_VERSION` 2.1.1).**
+3. ~~**Adım 11'e geç.**~~ **Bitti (8 Ağustos, `c65fbb7`, `APP_VERSION` 2.1.1).**
    Karar kaydı ve kanıtlar **§0.9**'da; A9 ölçümle reddedildi (şerit iki pill).
-   Sıradaki iş **Adım 12**. 12 → 13 sırası bilinçli; gerekçesi en altta.
+   PR **[#22](https://github.com/Zenginby/gpt-image-studio/pull/22)** rebase ile
+   `main`'e indi (8 Ağustos). 1. maddedeki not **yine geçerli çıktı**: rebase merge
+   fast-forward mümkünken bile commit'leri yeniden yazdı (`b79dc17` → `c65fbb7`,
+   `6cf86f4` → `2bfd87e`), atıflar bu turun commit'inde düzeltildi.
+4. ~~**Adım 12.**~~ **Bitti (8 Ağustos, `APP_VERSION` 2.2.0).** Faz 0 kapısı **§0.10**,
+   port ve doğrulama kapısının bulduğu iki kusur **§0.11**. Sıradaki iş **Adım 13**.
 
 Faz 0 (Open Design mock) yalnız **12 ve 13** için zorunlu, 11 için değil — 11'in tek
 tasarım sorusu (A9) o mock'ta cevaplanıyor, o yüzden 11'in mock'u 12'ninkiyle birlikte
@@ -83,7 +88,7 @@ kullanıcının manşet isteği (12), en sonda yapısal olan (13).
 
 ---
 
-## Adım 11 — Medya'da karta tıklamak büyüteci açar (hata + görünmez geri bildirim) — **BİTTİ** (`b79dc17`)
+## Adım 11 — Medya'da karta tıklamak büyüteci açar (hata + görünmez geri bildirim) — **BİTTİ** (`c65fbb7`)
 
 > Aşağıdaki bölüm **planın kendisi** (uygulama öncesi hâli, olduğu gibi bırakıldı).
 > Ne olduğu, A9'un nasıl karara bağlandığı ve plandan bilerek ayrılan iki nokta
@@ -148,7 +153,7 @@ dalını aşağı al → A-T3 · `.acts`'ı listeden çıkar → A-T4 · `pointe
 
 ---
 
-## §0.9 Adım 11 — karar kaydı ve kanıtlar (bitti, 8 Ağustos, `b79dc17`)
+## §0.9 Adım 11 — karar kaydı ve kanıtlar (bitti, 8 Ağustos, `c65fbb7`)
 
 Adım 11 planlandığı gibi indi; **iki nokta** plandan bilerek ayrıldı, ikisi de
 ölçüme dayanıyor.
@@ -200,7 +205,14 @@ geliştiricinin verisine **yazılmadı** (`history.json`/`chats.json` mtime'lar�
 
 ---
 
-## Adım 12 — Composer'ın (+) menüsünden açılan **Medya seçici**
+## Adım 12 — Composer'ın (+) menüsünden açılan **Medya seçici** — **BİTTİ**
+
+> **Faz 0 kapısı kapandı (8 Ağustos) — bkz. §0.10.** Mock `docs/flow-ui/media-picker-modal.html`.
+> Bölünme **`208 / 388 / 180`** (K25), ret cümlesi **"Önce ana görseli seç."** (K26).
+> Mock'un ölçtüğü beş düzeltme aşağıdaki CSS bölümüne işlendi. **Port başlayabilir.**
+>
+> **Port bitti; doğrulama kapısının bulduğu iki kusur kapatıldı — bkz. §0.11.**
+> `APP_VERSION` 2.1.1 → **2.2.0**.
 
 **Kullanıcı kararları (kilitli):** kapsam **yalnız Medya** (üretilen/içe aktarılan + klasörler);
 Kütüphane bindirme varlıkları bugünkü `#overlay-picker`'da kalır. Commit **tek seçim + iki
@@ -272,9 +284,17 @@ düğme**: "Referans yap" (birincil) ve "Ek olarak ekle" (ana referans yokken ka
 Token eşlemesi: `--surface→--panel`, `--surface-2→--panel-2`, `--surface-3→--raised`,
 `--fg→--text`, hairline'da `--hairline` / kontrol kenarında **`--control-border`**,
 seçili karo `--accent` (durum rengi — "seçili görsel çerçevesi" sözleşmede sanksiyonlu).
-Geometri: `width: min(776px, 94vw); height: min(570px, 88vh)`; ızgara `208px | 1fr | 236px`.
-`.picker-grid` `repeat(auto-fill, minmax(96px, 1fr))` — orta sütun 292px, 132px'te 2 sütun
-çıkıyor; aritmetik yorumda yazılı.
+Geometri: `width: min(776px, 94vw); height: min(570px, 88vh)`; ızgara **`208px | 1fr | 180px`**
+(K25 · §0.10). `.picker-grid` `repeat(auto-fill, minmax(96px, 1fr))` → **ölçüldü: 333px ızgara,
+3 sütun × 103px**; 132px'lik eski min bu genişlikte bile 2 sütunda kalırdı, yani 96px kararı
+3. sütunu açan şey. Aritmetik yorumda yazılı.
+
+**Mock'un ölçtüğü beş düzeltme de bu bölümün parçası** (gerekçeler §0.10'da):
+`.picker-tile`'ın `<button>` `padding`'i **sıfırlanır** · karo görseli `.thumb` değil
+uygulamadaki **medya kartı** desenini kullanır ve kabı `display: block` olur ·
+`.picker-preview img`'e **`height: auto`** · `.btn-ghost`'un **kapalı hâli tanımlanır**
+(`--muted` metin, `--border` kenar, `not-allowed`) · `.picker-kv` etiketi değerin **üstüne**
+alır (180px yan bölmede uzun klasör adı sarıyor).
 
 ### Testler (önce kırmızı) — seçilmiş çekirdek
 `_picker_js()` (banner'lar arası dilim) ve `_section(html, "media-picker")` yardımcılarıyla:
@@ -393,6 +413,142 @@ token'ları kullanıyor — port bir **ad** eşlemesi olmalı, **değer** icadı
 
 ---
 
+## §0.10 Faz 0 — Adım 12'nin mock'u teslim edildi (8 Ağustos) — **onay bekliyor**
+
+**Teslim.** `docs/flow-ui/media-picker-modal.html` (493 satır, kardeş ekranların yanında,
+göreli `flow.css` + `assets/` ile). Open Design projesi **`gpt-image-studio-flow-574a`**
+(daemon gerçekten boştu, `list_projects` → `[]`); `flow.css` oraya **birebir** kopyalandı
+(`shasum` iki tarafta da `62610ea1…`), örnek görseller `docs/flow-ui/assets/`'ten geldi.
+Kanonik kopya depoda; Open Design'daki eşi gözle inceleme içindir. Yerel servis:
+`.claude/launch.json` → **`flow-ui-mock`** (8801, `docs/flow-ui` kökü). Not: `.claude/`
+`.gitignore:26` ile hariç, yani bu giriş **yerel** — başka bir makinede elle eklenir.
+
+**Kapı maddelerinin durumu.** (1) ✅ tek satır içi blok, `library-assets.html:12-53`'ün portu;
+her sapma yorumla gerekçeli. (2) ✅ A9 zaten §0.9'da ölçümle kapandı — bu mock'un konusu değil.
+(3) ⏳ **karar sizde**, ölçümler aşağıda. (4) ✅ `flow-tokens.css` `flow.css`'in `:root`'unun
+birebir kopyası olduğundan mock'un kullandığı her token uygulamada var; yeni değer yok.
+
+**Ölçüm — kapının 2. sorusu (776×570'te orta sütun).**
+
+| Bölünme | Izgara | Sütun | Karo | Bir bakışta | Bedeli |
+|---|---|---|---|---|---|
+| **Sözleşme** 208 / 332 / 236 | 277px | **2** | 133px | ≈5 karo | tarama dar |
+| **Geniş ızgara** 208 / 388 / 180 | 333px | **3** | 103px | ≈9 karo | önizleme 203→147px; künyede "Kandil kapakları" iki satıra sarıyor |
+| **Dar gezinme** 168 / 400 / 208 | 345px | **3** | 107px | ≈9 karo | klasör adları **kırpık** ("Kandil ka…") |
+
+Mock üçünü canlı geziyor (`Bölünmeyi değiştir`), ölçüm modalın altında yazılı.
+Sol gezinme etiketleri yalnız **dar** seçeneğinde kırpılıyor (üçü de ölçüldü).
+**B-CSS'in `minmax(132px→96px)` değişikliği sözleşme bölünmesinde sütun sayısını
+DEĞİŞTİRMİYOR** (her ikisi de 2 veriyor); 96px yalnız dar bölünmede 3. sütunu açıyor.
+Dar bölünmenin bedeli: sol gezinmede klasör adları kırpılıyor ("Kandil ka…").
+
+**Mock'un çözdüğü, plana yazılmamış beş şey** (hepsi ölçüldü, port'a taşınacak):
+1. `.asset` `<button>`'ının UA `padding`'i (`1px 6px`) sıfırlanmalı — yoksa 133px'lik karo
+   121px'lik görsel taşıyor. Kütüphane'de `.thumb`'ın kendi boşluğu bunu gizliyor.
+2. Karo görselinde `.thumb` yerine flow.css'in kendi **`.media`** bileşeni kullanılıyor
+   (opak üretim görseli; dama deseni + `contain` şeffaf marka varlıkları içindi).
+   `display:block` gerekiyor: `.media` satır içi kutuda `aspect-ratio` çalışmıyor.
+3. `.side-preview img`'e `height: auto` — `max-height:100%` esnek kolonda çözülmüyor,
+   `height` özniteliği kazanıp önizlemeyi 1000px yapıyordu.
+4. **`#media-picker` sınıfla değil `hidden` ile kapanmalı.** Kapalı `.modal-wrap` yalnız
+   `opacity:0 + pointer-events:none`; ölçüldü: içindeki **25 kontrol sekme sırasında kalıyor**.
+   Planın markup'ı zaten `[hidden]` diyor — JS'in de sınıfın yanında özniteliği çevirmesi şart.
+5. `.btn-ghost`'un **kapalı hâli flow.css'te yok**; kapalı "Ek olarak ekle" açık görünüyordu.
+   Mock'ta token dışına çıkmadan tanımlandı (`--muted` metin, `--border` kenar, `not-allowed`).
+
+**Ayrıca:** `#picker-note` **`--danger` değil `--muted`** — bu bir hata değil karşılanmamış
+önkoşul; kırmızı okuyunca kullanıcı yanlış bir şey yaptığını sanıyor. Not iki düğmenin
+**altında** duruyor (gerekçe de sayaç da yalnız ikinci düğmeyi anlatıyor). 3/3'te sayaç
+gerekçeyi yeniyor: "Eklendi · 3/3", "En fazla 4 görsel gönderilebilir." değil.
+
+**Kanıtlar.** 1024×700 / 1280 / 1440 / 1920'de yatay taşma **0**, modal her yerde 776×570,
+1024'te ray 72px'e iniyor · tarayıcı konsolu **0 mesaj** · `impeccable detect` **1 uyarı**
+(`flat-type-hierarchy`, 11.5/12/13/14px) — **kardeş `library-assets.html` birebir aynı tek
+uyarıyı veriyor**, yani port edilen blokla geldi, mock eklemedi; sözleşmenin tip ölçeği
+kilitli olduğu için bilerek bırakıldı · klavye: karo `:focus-visible` halkasını alıyor
+(2px `--accent`, offset −2px) · B7'nin asimetrisi çalışıyor ("Referans yap" kapatıyor,
+"Ek olarak ekle" açık bırakıp 1/3 → 2/3 → 3/3 sayıyor, 4. denemede düğme kapanıyor).
+
+**İki soru karara bağlandı (8 Ağustos, kullanıcı) — kapı KAPANDI:**
+
+- **K25 · S1 → "geniş ızgara" `208 / 388 / 180`.** Seçicinin işi düzinelerce görsel
+  arasından birini bulmak; 2×133px (≈5 karo) tarama için dar. Dar gezinme (168px) 3.
+  sütunu daha ucuza alıyordu ama kapsamı daraltmanın **birincil aracını** — klasör
+  adlarını — kırpıyor, o yüzden reddedildi. Bedeli kabul edildi: yan önizleme 203→**147px**
+  (karo zaten 103px, yargıyı hâlâ o taşıyor) ve künyede uzun klasör adı sarıyor —
+  **port'ta `.picker-kv`'de etiket değerin üstüne alınarak çözülür**, `justify-content:
+  space-between` yerine iki satır. **`flow-redesign-plan.md:117`'deki "776×570 + kendi iç
+  navigasyonu" satırına bölünme yazılır** (ölçü değişmiyor, yalnız iç dağılım).
+  → Plan §"CSS"teki `ızgara 208px | 1fr | 236px` **`208px | 1fr | 180px`** olur;
+  `minmax(96px, 1fr)` aynen kalır (3 sütunu açan tam da o — 132px'te 2 sütunda kalırdı).
+
+- **K26 · S2 → ret cümlesi `"Önce ana görseli seç."`** Parantez (`Görsel ekle veya
+  galeriden Düzenle`) düşüyor: Adım 11'de galeri kartının "+Ek"i ölçümle kaldırıldığından
+  o kurtuluş yolu **artık yok**, yani cümle bugün bile yanlış yol tarif ediyor. Kısa hâli
+  her yüzeyde doğru; kurtuluş yolunu yüzeyin kendi bağlamı söylüyor. B6'nın "Türkçe
+  cümleler kodda bir kez geçer" kuralı korunuyor (`extraBlockReason` tek kaynak,
+  `canAddExtra` onu çağırır). `core.js:474`'ün metnini mandallayan test tek satırda
+  güncellenir — silinmez (§1.2).
+
+---
+
+## §0.11 Adım 12 — port bitti; doğrulama kapısının bulduğu iki kusur (8 Ağustos)
+
+**Süit tek başına yetmedi.** Port yazıldığında 22 yeni iddia ve tüm süit (1137) yeşildi.
+Kapının geri kalanı — mutasyon turu + canlı tur — **üç şey** buldu; üçü de yeşil süitin
+altından geçmişti. Kayıt, "hangi iddia türü neyi kaçırır" dersinin devamıdır (§0.6/§0.7/§0.9).
+
+**1 · `renderPicker` adı `palette.js` ile çarpışıyordu — seçici BOMBOŞ açılıyordu.**
+`static/palette.js:96` aynı adı çoktan kullanıyor (renk seçicinin render'ı) ve `index.html`'de
+folders.js'ten **sonra** yükleniyor. Klasik script'ler tek global kapsamı paylaştığı için
+sonraki tanım öncekini **sessizce** eziyordu: `openPicker()` medya seçicisini değil renk
+paletini çiziyordu. Konsolda tek satır hata yok, süit yeşil, ekran boş — çünkü hiçbir iddia
+"bu ad başka dosyada da tanımlı mı" diye sormuyordu. Ad `renderMediaPicker` oldu.
+**Mandal `test_id_contract.py`'ye yazıldı** (`test_hicbir_ust_duzey_ad_iki_dosyada_tanimli_degil`):
+yedi dosyanın üst düzey `function`/`const`/`let` adları taranır, çarpışma varsa kırmızı.
+Bu, yalnız seçiciyi değil **gelecekteki her adımı** koruyan bir mandal — Adım 13 aynı global
+kapsamda `setMode`/`showView` etrafında iş yapacak.
+
+**2 · `folderPath` bir etiket değil, klasör NESNELERİNDEN oluşan zincir döndürüyor.**
+Plan B4 "`folderPath` ile tam yol etiketi" diyordu; fonksiyon `path.unshift(node)` ile dizi
+döndürüyor. `textContent`e verilince sol gezinmedeki üç klasör de, künyedeki "Klasör" satırı
+da **"[object Object]"** yazıyordu. Süit yeşildi çünkü hiçbir iddia **değerin türünü**
+sormuyordu — kelime aramasının tuzağının tür hâli. Tek üretim yeri `pickerFolderLabel`
+oldu; ayraç kod tabanından alındı (`" / "`, `folders.js:106`'daki kırıntı başlığıyla aynı).
+
+**3 · Mutasyon turunda bir iddia hayatta kaldı** (`…reads_its_selection_from_state…`).
+`"aria-selected\"]" not in picker` yalnız TEK bir yazımı yakalıyordu; gerçek regresyon
+`querySelector('[aria-selected="true"]')` diye yazılır ve o dizede `aria-selected`'ın
+ardından `=` gelir, `"]` değil. İddia tırnak biçimine bakmayan hâle çevrildi: sorgunun
+**argümanı** taranıyor. Bu, kelime aramasının **dördüncüsü** (§0.6, §0.7, §0.9 CSS'te).
+
+**Mutasyon turu.** 22 iddianın her biri için üretim kodunda hedefli bir bozma yapıldı ve
+o testin kırmızıya döndüğü gösterildi: **23/23 kırmızı** (bir iddia iki farklı yazımla
+sınandı). Sonradan eklenen iki mandal da kendi regresyonlarıyla kırmızıya döndü.
+
+**Kanıtlar (8799, geliştiricinin verisine yazmadan).** Süit **1139 yeşil** ·
+konsol kendi kodumuzdan **0 mesaj** (tek giriş `favicon.ico` 404'ü — uygulamanın süregelen
+hâli, `index.html`'de de `app.py`'de de favicon yok, HEAD'de de yoktu) · **1024×700 / 1280 /
+1440 / 1920**'de yatay taşma **0**, modal her yerde **776×570** ve ekran içinde ·
+ızgara dördünde de **3 sütun × 103px** — §0.10'un ölçtüğü sayının **canlıda birebir doğrulanması**
+(kaydırma çubuğunun 15px'i dahil, ızgara 333px) · kapsam sayıları bölmeyi tutuyor
+(Tümü 25 = Klasörsüz 19 + 0 + 1 + 5; İçe aktarılanlar 1 **kesişiyor**) · B7 canlı doğrulandı:
+"Referans yap" kapatıp **sonra** odağı `#prompt`'a veriyor, "Ek olarak ekle" seçiciyi açık
+bırakıp 1/3 → 2/3 → 3/3 sayıyor ve dördüncü denemede kendi gerekçesiyle kapanıyor ·
+B10 canlı doğrulandı: seçim modu **açıkken** tek Escape yalnız seçiciyi kapatıyor, mod ayakta
+kalıyor · kapalı modalda **0** odaklanabilir kontrol (Faz 0 mock'unda 25'ti) ·
+manifest `mtime`'ları tur öncesi/sonrası **birebir aynı**.
+
+**Kapatılmayan, bilerek:** (a) `.picker-body`'nin kaydırma çubuğu platformun varsayılanı —
+depoda `scrollbar` için **tek kural yok** (0 eşleşme), yani seçici her yüzeyle aynı davranıyor;
+buraya özel kural yazmak "port bir **ad** eşlemesidir, **değer** icadı değil" kuralını çiğnerdi.
+(b) 208px'lik gezinmede **iç içe** klasörün tam yolu kırpılıyor ("Kandil kapakları / test" →
+"Kandil kapaklar…") ve ebeveyniyle neredeyse aynı görünüyor; `title` tam yolu veriyor.
+§0.10'un ölçümü **kök** adlarını ölçmüştü, iç içe yolu değil. Karar gerektirir (K27 adayı:
+yaprak adı + girinti mi, tam yol mu) — D10 turuna bırakıldı.
+
+---
+
 ## Doğrulama (her adımın sonunda)
 
 ```bash
@@ -418,7 +574,10 @@ iki temiz adım bankada olsun. 12 ile 13 gerçekten bağımsız: 13, 12'nin ekle
 değiştirmiyor (`setGallerySource`'un **adı** duruyor, yalnız iç yapısı sadeleşiyor). İstenirse
 13 öne alınabilir — bedeli seçicinin composer'ın son hâline karşı bir kez daha gözden geçirilmesi.
 
+**Durum (8 Ağustos):** 11 bitti (`c65fbb7`, PR #22), **12 bitti** (§0.11) — sıra **13**'te.
+
 Bu turdan sonra eski yol haritası devam eder: **Adım 9** (tema kalıcılığı → `prefs.json`,
 Kütüphane "Yüklemeler" + "Tümü") ve **Adım 10** (kozmetik süpürme; **D10 sıralaması burada hem
 Medya'ya hem seçiciye gelir**, bkz. B9). Karar bekleyenler: K14 (sonuç kartında "Düzenle"/"+ Ek"),
-D17 (klasör yeniden adlandırma), DM Sans bundle.
+D17 (klasör yeniden adlandırma), **K27 (seçicinin gezinmesinde iç içe klasör etiketi, §0.11)**,
+DM Sans bundle.

@@ -69,7 +69,7 @@ ileri, 0 geri olduğu için adım commit'leri ayrı ayrı korunabildi). Adım 7b
 | 7a · JS dokunuş noktaları — **PR 2'nin ekran payı** | **bitti** (7 Ağustos, §0.6) | `55b3356` (PR #19, squash) |
 | 7b · JS dokunuş noktaları — PR 1'in giydirme borcu (A1–A6) | **bitti** (7 Ağustos, §0.7) | `f9227de` (PR #21, rebase) |
 | 8 · §4.2'nin tamamlanması (devrin manşeti) | **bitti** (7 Ağustos, §0.8) | `f35b5c6` (PR #21, `APP_VERSION` → 2.1.0) |
-| 11 · Medya'da büyüteç + kart eylemleri | **bitti** (8 Ağustos, tek-döküm planı §0.9) | `b79dc17` (PR 4, `APP_VERSION` → 2.1.1) |
+| 11 · Medya'da büyüteç + kart eylemleri | **bitti** (8 Ağustos, tek-döküm planı §0.9) | `c65fbb7` (PR 4, `APP_VERSION` → 2.1.1) |
 | 12 · composer'dan Medya seçici (§4.2'nin (+) menüsü) | kullanıcı denemesinden geldi | — |
 | 13 · tek döküm + tek composer (`studio-session.html`) | kullanıcı denemesinden geldi | — |
 | 9 · tema kalıcılığı + Kütüphane yüklemeleri | §0.2 denetiminden geldi | — |

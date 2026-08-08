@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Medya seçici — GPT-Image Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="flow.css" />
+<style>
+  /* ══════════════════════════════════════════════════════════════════════════
+     Bu blok = library-assets.html'in satır içi 12-53'ünün portu.
+     Faz 0 onay kapısı (1): flow.css DIŞINDA başka bir CSS kaynağı yok.
+     Her delta aşağıda gerekçesiyle işaretli ve YALNIZ flow-tokens.css'te
+     var olan tokenları kullanıyor — ad eşlemesi, değer icadı değil (kapı 4).
+     ══════════════════════════════════════════════════════════════════════ */
+  /* DELTA · flow.css kaydırma çubuğunu giydirmiyor; siyah yüzeyde beyaz UA
+     çubuğu bozuk okunuyor. Tek satırlık UA ipucu, token/değer icadı değil —
+     port'ta flow.css'in kendi :root'una taşınmalı. */
+  html { color-scheme: dark; }
+
+  .modal.three {
+    grid-template-columns: var(--mnav) minmax(0, 1fr) var(--mside);
+    grid-template-areas: "mhead mhead mhead" "mnav mbody mside";
+  }
+  /* DELTA · sözleşme değeri 208/1fr/236 (flow-redesign-plan.md:117 → 776×570).
+     Değişken yapıldı ki onay kapısı üç bölünmeyi canlı karşılaştırsın; port
+     sabit değerle iner. ÖLÇÜLEN sonuçlar (776px, gap 12, minmax 96px):
+       sozlesme  208/332/236 → 2 sütun × 133px · gezinme etiketleri tam
+       genis     208/388/180 → 3 sütun × 103px · gezinme etiketleri tam
+       dar       168/400/208 → 3 sütun × 107px · gezinme etiketleri KIRPIK */
+  .modal.three { --mnav: 208px; --mside: 236px; }
+  .modal.three[data-split="genis"] { --mnav: 208px; --mside: 180px; }
+  .modal.three[data-split="dar"]   { --mnav: 168px; --mside: 208px; }
+
+  .modal-side {
+    grid-area: mside; border-left: 1px solid var(--border);
+    padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+    padding: 9px 12px; border-radius: 10px; color: var(--muted); font-size: 14px;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+  }
+  .nav-item:hover { background: var(--surface-2); color: var(--fg); }
+  .nav-item[aria-current="true"] { background: var(--selected); color: var(--fg); }
+  .nav-item em { margin-left: auto; font: 500 11px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--muted); }
+  .nav-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* İçe aktarılanlar bir BÖLME değil kesişen süzgeç (B4): Klasörsüz+Kandil+Blog
+     zaten Tümü'nü tüketiyor, bu satır onların içinden geçiyor. Toplam tutmaz;
+     ayıran hairline bunu gözle söylüyor. */
+  .nav-item.crossing { margin-top: 8px; padding-top: 15px; border-top: 1px solid var(--border); border-radius: 0 0 10px 10px; }
+
+  .asset-grid {
+    display: grid; gap: 12px;
+    /* DELTA · Kütüphane 132px; seçicide 96px (plan B-CSS). ÖLÇÜM: orta sütun
+       332−40 = 292px, gap 12 → floor((292+12)/(96+12)) = 2 sütun · 140px.
+       132px de 2 sütun veriyor; yani bu değişiklik 776px'te sütun sayısını
+       DEĞİŞTİRMİYOR, yalnız dar bölünmede (360px) 3 sütuna izin veriyor. */
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  }
+  .asset {
+    background: var(--surface-2); border-radius: var(--r-item); overflow: hidden;
+    text-align: left; transition: background var(--dur) var(--ease);
+    /* DELTA · flow.css'in button sıfırlaması padding'i almıyor; UA'nın 1px 6px'i
+       kalıyordu ve karo 133px yerine 121px'lik bir görsel taşıyordu (ölçüldü).
+       Kütüphane'de .thumb'ın kendi 14px'i bunu gizliyor, tam kanamalı karoda
+       gizlemiyor. */
+    padding: 0;
+  }
+  .asset:hover { background: var(--surface-3); }
+  /* DELTA · Kütüphane'nin .thumb'ı ŞEFFAF marka varlıkları için (dama deseni +
+     contain + 14px iç boşluk). Seçicideki içerik ÜRETİLEN görsel: opak ve
+     kırpılabilir. Yeni kural yazmak yerine flow.css'in kendi .media bileşeni
+     aynen kullanılıyor (cover + aspect-ratio 1 + .meta pill'leri). Tek fark
+     kartın dış yarıçapını tekrarlamaması. `display:block` gerekiyor çünkü
+     .media burada <span>; flow.css display yazmıyor ve satır içi kutuda
+     aspect-ratio çalışmıyor (ölçüldü: 121×194, kare değil). */
+  .asset .media { display: block; border-radius: 0; }
+  .asset figcaption {
+    padding: 8px 10px 10px; font-size: 12px; line-height: 1.45; color: var(--muted);
+    border-top: 1px solid var(--border);
+  }
+  .asset figcaption b {
+    display: block; font-weight: 450; color: var(--fg); margin-bottom: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .asset[aria-selected="true"] { background: var(--selected); outline: 2px solid var(--accent); outline-offset: -2px; }
+  .asset[aria-selected="true"] figcaption { color: var(--fg); }
+
+  .side-preview {
+    border-radius: var(--r-item); background: var(--surface-2); aspect-ratio: 1;
+    display: grid; place-items: center; padding: 16px;
+  }
+  /* DELTA · `height: auto`. Kütüphane'nin kuralı `max-height: 100%`e güveniyor;
+     ana ekseni belirsiz esnek kolonda o yüzde çözülmüyor ve görsel etiketinin
+     height özniteliği kazanıyor (ölçüldü: 156×1000, künye ekrandan taşıyordu).
+     height:auto önce oranı geri veriyor. */
+  .side-preview img { max-width: 100%; max-height: 100%; height: auto; object-fit: contain; }
+  /* DELTA · Kütüphane künyesi tek satırlık kısa adlar içindi ("KURUM Logo Beyaz").
+     Üretilen görselin adı prompt'tan geliyor ve uzun; mono 11.5px'te sıkışıyor.
+     Ad künyeden ÇIKARILDI, önizlemenin altında saran gövde metni oldu. Mono
+     yalnız ölçüme kaldı (boyut · tarih · biçim) — craft floor'un mono kuralı. */
+  .side-name { margin: 0; font-size: 13px; line-height: 1.5; color: var(--fg); }
+  .kv { display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+  .kv div { display: flex; justify-content: space-between; gap: 10px; }
+  .kv b { font-weight: 500; color: var(--fg); font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.04em; }
+
+  /* DELTA · flow.css'te .btn-ghost'un kapalı hâli YOK — kapalı düğme açık
+     görünüyordu. Bu mock'un cevaplaması istenen sorulardan biri tam buydu
+     ("kapalı 'Ek olarak ekle'nin okunabilirliği"). Token dışına çıkmadan:
+     metin --muted'a düşer, kenar --border'da kalır, imleç reddi söyler. */
+  .btn-ghost[disabled] { color: var(--muted); border-color: var(--border); cursor: not-allowed; }
+  .btn-ghost[disabled]:hover { background: none; border-color: var(--border); }
+  /* Tek geri bildirim yüzeyi (B8). #status seçicinin arkasında kalıyor.
+     Rengi --danger DEĞİL: bu bir hata değil, henüz karşılanmamış bir önkoşul;
+     kırmızı okuyunca kullanıcı yanlış bir şey yaptığını sanıyor. */
+  .picker-note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); min-height: 36px; }
+  .commit { margin-top: auto; display: grid; gap: 8px; }
+  .commit .btn-primary, .commit .btn-ghost { width: 100%; }
+
+  .backdrop-note { max-width: 560px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+  .gate { max-width: 560px; margin-top: 24px; font-size: 13px; line-height: 1.7; color: var(--muted); }
+  .gate b { color: var(--fg); font-weight: 500; }
+  .gate code { color: var(--fg); }
+</style>
+</head>
+<body data-theme="mono">
+
+<div class="app" data-od-id="app-shell">
+
+  <nav class="rail" data-od-id="rail" aria-label="Ana gezinme">
+    <a class="rail-item" href="studio-session.html" aria-current="page" data-od-id="rail-studio">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-5 4z"/><path d="M8.5 8.5h7M8.5 12h4"/></svg>
+      <span>Stüdyo</span>
+    </a>
+    <a class="rail-item" href="media-browser.html" data-od-id="rail-media">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15l4.5-4 3.5 3 3-2.5L21 17"/><circle cx="15.5" cy="8.5" r="1.4"/></svg>
+      <span>Medya</span><em class="rail-count">16</em>
+    </a>
+    <a class="rail-item" href="library-assets.html" data-od-id="rail-library">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5H9l1.8 2H18.5A1.5 1.5 0 0 1 20 8.5V17a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17z"/><path d="M9 12.5h6"/></svg>
+      <span>Kütüphane</span><em class="rail-count">7</em>
+    </a>
+    <hr />
+    <a class="rail-item" href="settings-panels.html" data-od-id="rail-tools">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M14.5 3.5l6 6-9 9H5.5v-6z"/><path d="M12 6l6 6"/></svg>
+      <span>Araçlar</span>
+    </a>
+    <div class="spacer"></div>
+    <button class="rail-item" data-od-id="rail-collapse">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M16 9l-2.5 3 2.5 3"/></svg>
+      <span>Daralt</span>
+    </button>
+  </nav>
+
+  <header class="topbar" data-od-id="topbar">
+    <a class="icon-btn" href="studio-session.html" aria-label="Oturuma dön">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>
+    </a>
+    <div class="session">
+      <h1>Kandil kapakları</h1>
+      <span class="stamp">composer'ın (+) menüsünden · Medya'dan seç</span>
+    </div>
+    <div class="right">
+      <button class="btn-ghost sm" id="reopen">Seçiciyi aç</button>
+      <div class="ver"><span>v2.2.0</span><i aria-hidden="true"></i></div>
+    </div>
+  </header>
+
+  <main class="canvas has-composer" data-od-id="canvas">
+    <div class="canvas-pad">
+      <p class="sec-label">Seçici üretim akışını kesmeden açılıyor</p>
+      <p class="backdrop-note">Composer'daki (+) menüsünün üçüncü maddesi
+        (<b>Medya'dan seç</b>) bu modalı açar. Kapsam <b>yalnız Medya</b>: üretilen ve içe
+        aktarılan görseller, klasörleriyle. Kütüphane'nin bindirme varlıkları bugünkü
+        kendi seçicisinde kalıyor — seçici onlara ikinci kapı olmuyor (B11).</p>
+
+      <div class="gate" data-od-id="gate-notes">
+        <p><b>Faz 0 onay kapısı — kapandı</b> (8 Ağustos, plan §0.10):</p>
+        <p>1 · <b>Bölünme → <code>208 / 1fr / 180</code></b> (K25): 3 sütun × 103px, klasör
+          adları kırpılmadan. Düğme diğer ikisini karşılaştırma için hâlâ geziyor.<br />
+          2 · <b>Orta sütunda kaç karo.</b> Ölçülen sayı modalın altında yazıyor.<br />
+          3 · <b>İki düğmeli commit alanı</b> onaylandı; kapalı "Ek olarak ekle" flow.css'te
+          tanımsızdı, burada token dışına çıkmadan tanımlandı.</p>
+        <div class="row" style="margin-top:14px">
+          <button class="btn-ghost sm" id="split-btn">Bölünmeyi değiştir</button>
+          <button class="btn-ghost sm" id="ref-btn" aria-pressed="false">Ana referansı kur / kaldır</button>
+          <a class="btn-text" href="media-browser.html">Medya görünümü</a>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ───────────────────────────── composer (bağlam) ───────────────────────── -->
+<div class="composer" data-od-id="composer">
+  <div class="refs" id="refs" hidden>
+    <span class="refchip" id="ref-chip">
+      <img src="assets/samples/ofis-masasi-yatay.jpg" alt="" width="22" height="22" />
+      Ofis · masa eklendi
+      <button aria-label="Referansı kaldır">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </span>
+  </div>
+  <textarea rows="1" placeholder="Bir görsel tarif et ya da yüklediğin görselde ne değişsin söyle">Kandil kapağı serisini aynı ornamental dille sürdür</textarea>
+  <div class="bar">
+    <div style="position:relative">
+      <button class="plus" id="plus-btn" aria-label="Görsel ekle" aria-expanded="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <div class="popover" id="plus-menu" data-od-id="plus-menu">
+        <button>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15l4.5-4 3.5 3 3-2.5L21 17"/></svg>
+          Referans görsel
+        </button>
+        <button>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="7" width="13" height="13" rx="2"/><path d="M8 4h13v13"/></svg>
+          Ek görsel
+        </button>
+        <hr />
+        <!-- Adım 12'nin eklediği tek madde. "Dosyadan yükle" bilerek EKLENMEDİ:
+             ilk iki madde zaten aynı #file-input'a gidiyor (plan, Markup). -->
+        <button id="media-pick-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15l4.5-4 3.5 3 3-2.5L21 17"/><circle cx="15.5" cy="8.5" r="1.4"/></svg>
+          Medya'dan seç
+        </button>
+      </div>
+    </div>
+    <div class="mode" role="group" aria-label="Mod">
+      <button aria-pressed="true">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15l4.5-4 3.5 3 3-2.5L21 17"/></svg>
+        Görsel
+      </button>
+      <button aria-pressed="false">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-5 4z"/></svg>
+        Yönetmen
+      </button>
+    </div>
+    <div class="right">
+      <span class="specs">1024² · 2</span>
+      <button class="send" aria-label="Üret">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ────────────────────────────── medya seçici ───────────────────────────── -->
+<div class="modal-wrap open" id="wrap" data-od-id="media-picker">
+  <!-- data-split="genis" = K25 ile seçilen bölünme (208/388/180). Diğer ikisi
+       karşılaştırma için duruyor; port yalnız bunu sabit değerle taşır. -->
+  <div class="modal three" role="dialog" aria-modal="true" aria-label="Medya'dan seç" data-split="genis">
+
+    <div class="modal-head">
+      <label class="search" style="flex:1 1 240px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+        <input id="q" type="search" placeholder="Görselleri arayın" autocomplete="off" />
+      </label>
+      <!-- SIRALAMA YOK — bilinçli erteleme (B9). #sort-btn hiçbir yerde ship
+           etmedi; arkasındaki Medya görünümünde olmayan bir kontrolü yalnız
+           modalda göstermek "çalışmayan arama kutusu konmadı" kuralının tersi
+           olurdu. D10 ile ikisine birlikte gelecek. -->
+      <button class="icon-btn" id="close" aria-label="Kapat">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+
+    <nav class="modal-nav" aria-label="Kapsam" id="kinds" data-od-id="picker-nav"></nav>
+
+    <div class="modal-body" data-od-id="picker-body">
+      <div class="asset-grid" id="grid"></div>
+      <div class="empty" id="empty" hidden style="padding:40px 20px">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15l4.5-4 3.5 3 3-2.5L21 17"/></svg>
+        <p id="empty-text">Sonuç bulunamadı</p>
+      </div>
+    </div>
+
+    <aside class="modal-side" data-od-id="picker-side">
+      <div class="side-preview">
+        <img id="pv-img" src="assets/samples/mevlid-kandili-kare.jpg" alt="Seçili görselin önizlemesi" width="1000" height="1000" />
+      </div>
+      <p class="side-name" id="pv-name">Mevlit kandili paylaşımı</p>
+      <div class="kv">
+        <div><span>Klasör</span><b id="pv-folder">Kandil kapakları</b></div>
+        <div><span>Boyut</span><b id="pv-px">1024²</b></div>
+        <div><span>Tarih</span><b id="pv-date">5 Ağu</b></div>
+      </div>
+      <!-- Not düğmelerin ALTINDA: gerekçe de sayaç da yalnız ikinci düğmeyi
+           anlatıyor, üstte dursa birinciyi de anlatıyormuş gibi okunuyor. -->
+      <div class="commit" data-od-id="picker-commit">
+        <button class="btn-primary" id="use-ref">Referans yap</button>
+        <button class="btn-ghost" id="use-extra">Ek olarak ekle</button>
+        <p class="picker-note" id="note" role="status"></p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  try { var t = localStorage.getItem('flow-theme'); if (t) document.body.dataset.theme = t; } catch (e) {}
+
+  var MAX_EXTRAS = 3;                       // core.js: MAX_EDIT_IMAGES(4) - 1
+  var BASE = [
+    { n: 'Mevlit kandili paylaşımı', f: 'kandil', px: '1024²',     img: 'mevlid-kandili-kare.jpg',   p: 'mevlit kandili paylaşım görseli sade okunaklı' },
+    { n: 'Cuma tebrik kartı',        f: 'kandil', px: '1024²',     img: 'cuma-tebrik-kare.jpg',      p: 'ornamental cuma tebrik kartı friday blessings' },
+    { n: 'Dondurma sunumu',          f: 'none',   px: '1024×1536', img: 'dondurma-dikey.jpg',        p: 'dondurma topları cam bardak sunumu dikey' },
+    { n: 'Eğitim desteği postu',     f: 'none',   px: '1024×1536', img: 'egitim-destegi-dikey.jpg',  p: 'eğitim desteği bağış kampanyası illustration' },
+    { n: 'Blog kapağı — editoryal',  f: 'blog',   px: '1536×1024', img: 'blog-kapagi-yatay.jpg',     p: 'minimal editorial blog kapağı illustration' },
+    { n: 'Namaz vakitleri görseli',  f: 'blog',   px: '1536×1024', img: 'namaz-vakitleri-yatay.jpg', p: 'namaz vakitleri blog yazısı görseli' },
+    { n: 'Ofis · masa eklendi',      f: 'none',   px: '1536×1024', img: 'ofis-masasi-yatay.jpg',     p: 'ofis fotoğrafına çalışma masası ekleme referanslı düzenleme', imported: true, edited: true },
+    { n: 'Korsan savaşı sahnesi',    f: 'none',   px: '1536×1024', img: 'korsan-yatay.jpg',          p: 'cinematic pirate naval battle korsan gemileri' }
+  ];
+  // Gerçek arşiv 8 karodan büyük; kaydırmanın ve sütun sayısının görülebilmesi
+  // için küme ikiye katlandı (16 kayıt) — Medya'nın ray sayacı da 16 diyor.
+  var RECS = BASE.concat(BASE).map(function (r, i) {
+    return {
+      id: 'r' + i, name: r.n + (i > 7 ? ' · v2' : ''), folder: r.f, px: r.px,
+      img: r.img, prompt: r.p, imported: !!r.imported, edited: !!r.edited,
+      date: i > 7 ? '6 Ağu' : '5 Ağu'
+    };
+  });
+  var FOLDER_TR = { none: 'Klasörsüz', kandil: 'Kandil kapakları', blog: 'Blog görselleri' };
+
+  var ICON = {
+    all:    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+    loose:  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15l4.5-4 3.5 3 3-2.5L21 17"/></svg>',
+    folder: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5H9l1.8 2H18.5A1.5 1.5 0 0 1 20 8.5V17a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17z"/></svg>',
+    up:     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 16V4"/><path d="M8 8l4-4 4 4"/><path d="M4 16v3.5h16V16"/></svg>'
+  };
+  // Sol gezinme (B4). "İçe aktarılanlar" kesişen süzgeç — .crossing ile ayrık.
+  var SCOPES = [
+    { key: '',         label: 'Tümü',              icon: ICON.all,    test: function () { return true; } },
+    { key: 'none',     label: 'Klasörsüz',         icon: ICON.loose,  test: function (r) { return r.folder === 'none'; } },
+    { key: 'kandil',   label: 'Kandil kapakları',  icon: ICON.folder, test: function (r) { return r.folder === 'kandil'; } },
+    { key: 'blog',     label: 'Blog görselleri',   icon: ICON.folder, test: function (r) { return r.folder === 'blog'; } },
+    { key: 'imported', label: 'İçe aktarılanlar',  icon: ICON.up,     test: function (r) { return r.imported; }, crossing: true }
+  ];
+
+  // Seçici KENDİ kopyasını tutar (B3): arkadaki Medya'nın durumu yazılmaz.
+  var pickerScope = '', pickerQuery = '', pickerSelectedId = RECS[0].id;
+  var hasSource = false, extras = 0;
+
+  function matches(r) {
+    var q = pickerQuery.trim().toLowerCase();
+    if (!q) return true;
+    return (r.name + ' ' + r.prompt + ' ' + (FOLDER_TR[r.folder] || '')).toLowerCase().indexOf(q) > -1;
+  }
+  function scopeOf(key) {
+    for (var i = 0; i < SCOPES.length; i++) if (SCOPES[i].key === key) return SCOPES[i];
+    return SCOPES[0];
+  }
+  function visible() {
+    var s = scopeOf(pickerScope);
+    return RECS.filter(function (r) { return s.test(r) && matches(r); });
+  }
+  function byId(id) {
+    for (var i = 0; i < RECS.length; i++) if (RECS[i].id === id) return RECS[i];
+    return null;
+  }
+
+  function renderNav() {
+    $('kinds').innerHTML = SCOPES.map(function (s) {
+      var n = RECS.filter(s.test).filter(matches).length;
+      return '<button class="nav-item' + (s.crossing ? ' crossing' : '') + '"' +
+        ' aria-current="' + (s.key === pickerScope) + '" data-key="' + s.key + '">' +
+        s.icon + '<span>' + s.label + '</span><em>' + n + '</em></button>';
+    }).join('');
+  }
+
+  function renderGrid() {
+    var list = visible();
+    $('grid').innerHTML = list.map(function (r) {
+      return '<button class="asset" aria-selected="' + (r.id === pickerSelectedId) + '" data-id="' + r.id + '">' +
+        '<span class="media">' +
+          '<img src="assets/samples/' + r.img + '" alt="' + r.name + '" width="600" height="600" loading="lazy" />' +
+          '<span class="meta"><span>' + r.px + '</span>' + (r.edited ? '<span>DÜZ.</span>' : '') + '</span>' +
+        '</span>' +
+        '<figcaption><b>' + r.name + '</b>' + r.date + ' · ' + (FOLDER_TR[r.folder] || '') + '</figcaption>' +
+      '</button>';
+    }).join('');
+    $('empty').hidden = list.length > 0;
+    $('empty-text').textContent = pickerQuery.trim()
+      ? 'Sonuç bulunamadı' : 'Bu kapsamda görsel yok';
+    measure();
+  }
+
+  // extraBlockReason(rec)'in mock karşılığı (B6). Türkçe cümleler tek yerde.
+  function extraBlockReason(rec) {
+    // K26: parantezli eski hâl düştü — işaret ettiği "galeriden Düzenle" yolu
+    // Adım 11'de zaten kalkmıştı, yani cümle bugün bile yanlış yol tarif ediyordu.
+    if (!hasSource) return 'Önce ana görseli seç.';
+    if (extras >= MAX_EXTRAS) return 'En fazla 4 görsel gönderilebilir.';
+    if (!rec) return 'Soldan bir görsel seç.';
+    return '';
+  }
+
+  function renderSide() {
+    var r = byId(pickerSelectedId);
+    if (r) {
+      $('pv-img').src = 'assets/samples/' + r.img;
+      $('pv-img').alt = r.name + ' önizlemesi';
+      $('pv-name').textContent = r.name;
+      $('pv-folder').textContent = FOLDER_TR[r.folder] || '—';
+      $('pv-px').textContent = r.px;
+      $('pv-date').textContent = r.date;
+    }
+    var why = extraBlockReason(r);
+    $('use-ref').disabled = !r;
+    $('use-extra').disabled = !!why;
+    // Sayaç gerekçeyi YENER: 3/3'te "En fazla 4 görsel gönderilebilir." demek,
+    // az önce olan şeyi (üçüncü ek eklendi) söylemeden reddi tekrarlamak olur.
+    // Paydası olan sayaç zaten kapalı düğmeyi açıklıyor.
+    $('note').textContent = extras ? ('Eklendi · ' + extras + '/' + MAX_EXTRAS) : why;
+  }
+
+  // Onay kapısının 2. sorusu ölçümle cevaplanıyor, gözle değil.
+  function measure() {
+    var grid = $('grid');
+    var cols = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean);
+    var w = cols.length ? Math.round(parseFloat(cols[0])) : 0;
+    var split = document.querySelector('.modal.three').dataset.split;
+    $('measure').textContent = split + ' · ızgara ' + grid.clientWidth + 'px · '
+      + cols.length + ' sütun × ' + w + 'px';
+  }
+
+  $('q').addEventListener('input', function () {
+    pickerQuery = this.value; renderNav(); renderGrid(); renderSide();
+  });
+  $('kinds').addEventListener('click', function (e) {
+    var b = e.target.closest('.nav-item'); if (!b) return;
+    pickerScope = b.dataset.key; renderNav(); renderGrid(); renderSide();
+  });
+  $('grid').addEventListener('click', function (e) {
+    var b = e.target.closest('.asset'); if (!b) return;
+    pickerSelectedId = b.dataset.id;                 // seçim pickerSelectedId'den
+    renderGrid(); renderSide();
+  });
+
+  // B7 · commit bilerek asimetrik.
+  $('use-ref').addEventListener('click', function () {
+    closePicker();                                   // ÖNCE kapat, SONRA odak ver
+    hasSource = true; syncComposer(); renderSide();
+  });
+  $('use-extra').addEventListener('click', function () {
+    if (extras >= MAX_EXTRAS) return;
+    extras++;                                        // seçici AÇIK kalır
+    syncComposer(); renderSide();
+  });
+
+  function syncComposer() {
+    $('refs').hidden = !hasSource;
+    $('ref-btn').setAttribute('aria-pressed', String(hasSource));
+    document.querySelector('.specs').textContent = '1024² · ' + (1 + extras);
+  }
+
+  // .modal-wrap'ın kapalı hâli yalnız `opacity:0 + pointer-events:none`;
+  // ÖLÇÜLDÜ: kapalıyken içindeki 25 kontrol sekme sırasında kalıyor. Sınıfın
+  // yanında `hidden` özniteliği de çevriliyor — flow.css'in
+  // `[hidden]{display:none!important}` kuralı onları sıradan çıkarıyor.
+  // Port'ta da böyle: #media-picker sınıfla DEĞİL, hidden ile kapanır.
+  function openPicker() {
+    var w = $('wrap');
+    w.hidden = false;
+    requestAnimationFrame(function () { w.classList.add('open'); });
+    renderSide(); $('q').focus();
+  }
+  function closePicker() { $('wrap').classList.remove('open'); $('wrap').hidden = true; }
+  $('close').addEventListener('click', closePicker);
+  $('reopen').addEventListener('click', openPicker);
+  $('media-pick-btn').addEventListener('click', openPicker);
+  $('wrap').addEventListener('click', function (e) { if (e.target === $('wrap')) closePicker(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePicker(); });
+
+  var SPLITS = ['sozlesme', 'genis', 'dar'];
+  $('split-btn').addEventListener('click', function () {
+    var m = document.querySelector('.modal.three');
+    m.dataset.split = SPLITS[(SPLITS.indexOf(m.dataset.split) + 1) % SPLITS.length];
+    measure();
+  });
+  $('ref-btn').addEventListener('click', function () {
+    hasSource = !hasSource; if (!hasSource) extras = 0;
+    syncComposer(); renderSide();
+  });
+  window.addEventListener('resize', measure);
+
+  var m = document.createElement('p');
+  m.className = 'sec-label';
+  m.id = 'measure';
+  m.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:8px;z-index:12;margin:0;font-family:var(--font-mono);letter-spacing:0.04em';
+  document.body.appendChild(m);
+
+  renderNav(); renderGrid(); syncComposer(); renderSide();
+})();
+</script>
+</body>
+</html>

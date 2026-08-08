@@ -1,8 +1,8 @@
 # Flow Stüdyo — tek döküm turu (Adım 11 · 12 · 13) — uygulama planı
 
 **Tarih:** 7 Ağustos 2026 (Adım 0 · commit ayrımı: 8 Ağustos)
-**Dal:** `feat/flow-ui-pr3` — Adım 7b (`0223a19`) + Adım 8 (`2d97d94`) burada, **PR [#21](https://github.com/Zenginby/gpt-image-studio/pull/21)**
-**Başlangıç:** `2d97d94` (`APP_VERSION` = **2.1.0**), `pytest` **1106 yeşil**, çalışma ağacı temiz
+**Dal:** `feat/flow-ui-pr4` — Adım 7b (`f9227de`) + Adım 8 (`f35b5c6`) **PR [#21](https://github.com/Zenginby/gpt-image-studio/pull/21)** ile `main`'e indi (rebase merge, 8 Ağustos)
+**Başlangıç:** `4375062` (`main` ucu · `APP_VERSION` = **2.1.0**), `pytest` **1106 yeşil**, çalışma ağacı temiz
 **Tasarım sözleşmesi:** `docs/flow-ui/flow-redesign-plan.md` (referans ekranlar `docs/flow-ui/*.html`)
 **Önceki plan:** `docs/superpowers/plans/2026-08-06-flow-arayuz-devri.md` (Adım 0–8 orada; §0.1 tablosu buraya işaret ediyor)
 
@@ -12,11 +12,12 @@
 
 Bu plan başka bir oturumda uygulanmak üzere yazıldı. Sırayla:
 
-1. **PR #21'in durumuna bak.** Adım 7b ve 8 artık commit'li ve `feat/flow-ui-pr3`
-   dalında duruyor; PR açıldı. Merge edildiyse `main`'e dön ve oradan dallan,
-   edilmediyse aynı dalın üstüne devam et — her iki hâlde de yeni tur **kendi
-   commit'ini** alır. (Planın ilk hâli bu turu "commit'lenmemiş 14 dosya" diye
-   tarif ediyordu; 8 Ağustos'ta ikiye ayrılıp commit'lendi.)
+1. ~~**PR #21'in durumuna bak.**~~ **Yapıldı (8 Ağustos).** PR #21 **rebase** ile
+   merge edildi; Adım 7b (`f9227de`) ve 8 (`f35b5c6`) `main`'de, ağaç hash'i dal
+   ucuyla birebir (`3e8756a`). Bu tur `main`'den dallanan **`feat/flow-ui-pr4`**
+   üstünde ilerliyor. Not: GitHub'ın rebase merge'ü fast-forward **değil**,
+   commit'leri yeniden yazar — dal üstündeki eski SHA'lara (`0223a19`,
+   `2d97d94`) atıf veren dokümanlar bu turun ilk commit'inde düzeltildi.
 2. **Kanıtı tazele.** `.venv/bin/python -m pytest tests/ -q` → 1106 yeşil olmalı.
    Değilse önce onu çöz; yeni tur yeşil tabandan başlar.
 3. **Adım 11'e geç** (aşağıda). 11 → 12 → 13 sırası bilinçli; gerekçesi en altta.

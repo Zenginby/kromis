@@ -32,23 +32,30 @@ JS'ten `$()` ile dokunulan id sayısı **145**; bunların **56'sı top-level ba�
 
 ---
 
-## 0.1 Durum — nerede kaldık (8 Ağustos: PR 1 ve PR 2 merge edildi, PR 3 açıldı)
+## 0.1 Durum — nerede kaldık (8 Ağustos: PR 1 · PR 2 · PR 3 merge edildi)
 
 **PR 1 bitti ve `main`'e indi.** [PR #16](https://github.com/Zenginby/gpt-image-studio/pull/16)
 squash ile merge edildi; `main`'e inen tek commit **`a1478d4`**. Merge sonrası
 ağaç hash'i dal ucuyla birebir aynı (`a717ef93`), yani squash'ta içerik kaybı yok.
 **PR 2 de indi:** [PR #19](https://github.com/Zenginby/gpt-image-studio/pull/19)
 → **`55b3356`**, Adım 5 + 6 + 7a'nın üçü birden (`APP_VERSION` 2.0.0).
-**PR 3** ([#21](https://github.com/Zenginby/gpt-image-studio/pull/21)) Adım 7b + 8'i
-taşıyor: `feat/flow-ui-pr3` dalında `0223a19` ve `2d97d94`
-(`APP_VERSION` 2.1.0).
+**PR 3 de indi:** [PR #21](https://github.com/Zenginby/gpt-image-studio/pull/21)
+**rebase** ile merge edildi (squash değil — dal `main`'in tepesinden 4 commit
+ileri, 0 geri olduğu için adım commit'leri ayrı ayrı korunabildi). Adım 7b →
+**`f9227de`**, Adım 8 → **`f35b5c6`** (`APP_VERSION` 2.1.0), dokümanlar
+`0d02072` + `4375062`.
 
 > **Adım commit'leri `main`'in geçmişinde YOK** (PR 1 ve PR 2 için). Squash her
 > ikisinde de tek commit bıraktı; aşağıdaki 0–4 SHA'ları `feat/flow-ui` dalının
 > geçmişine ait ve yalnızca PR #16 üzerinden erişilebilir (`git log main` içinde
 > bulunamazlar). Dal hem yerelde hem `origin`'de duruyor, silinmedi. 5 · 6 · 7a
-> tek satırda `55b3356`'ya işaret ediyor çünkü PR #19 üçünü birleştirdi; 7b ve 8
-> ise PR 3'te **ayrı ayrı** duruyor ve merge edilene kadar `main`'de yoklar.
+> tek satırda `55b3356`'ya işaret ediyor çünkü PR #19 üçünü birleştirdi.
+>
+> **PR 3 istisna:** rebase merge adım commit'lerini `main`'e ayrı ayrı taşıdı,
+> yani 7b ve 8 `git log main` içinde bulunur. Ama rebase SHA'ları **yeniden
+> yazdı**: dal üstündeki `0223a19`/`2d97d94` artık yalnız `feat/flow-ui-pr3`
+> dalında; `main`'deki karşılıkları `f9227de`/`f35b5c6`. İkisi de aynı ağacı
+> taşıyor, atıf verirken `main` SHA'ları kullanılır.
 
 | Adım | Durum | Commit (dal geçmişi) |
 |---|---|---|
@@ -60,8 +67,8 @@ taşıyor: `feat/flow-ui-pr3` dalında `0223a19` ve `2d97d94`
 | 5 · veri modeli (PR 2) | **bitti** (7 Ağustos, §0.4) | `55b3356` (PR #19, squash) |
 | 6 · otomatik kayıt (PR 2) | **bitti** (7 Ağustos, §0.5) | `55b3356` (PR #19, squash) |
 | 7a · JS dokunuş noktaları — **PR 2'nin ekran payı** | **bitti** (7 Ağustos, §0.6) | `55b3356` (PR #19, squash) |
-| 7b · JS dokunuş noktaları — PR 1'in giydirme borcu (A1–A6) | **bitti** (7 Ağustos, §0.7) | `0223a19` (PR 3, `feat/flow-ui-pr3`) |
-| 8 · §4.2'nin tamamlanması (devrin manşeti) | **bitti** (7 Ağustos, §0.8) | `2d97d94` (PR 3, `APP_VERSION` → 2.1.0) |
+| 7b · JS dokunuş noktaları — PR 1'in giydirme borcu (A1–A6) | **bitti** (7 Ağustos, §0.7) | `f9227de` (PR #21, rebase) |
+| 8 · §4.2'nin tamamlanması (devrin manşeti) | **bitti** (7 Ağustos, §0.8) | `f35b5c6` (PR #21, `APP_VERSION` → 2.1.0) |
 | **11 · Medya'da büyüteç + kart eylemleri** | **sırada** (kullanıcı denemesi, 7 Ağustos) | — |
 | 12 · composer'dan Medya seçici (§4.2'nin (+) menüsü) | kullanıcı denemesinden geldi | — |
 | 13 · tek döküm + tek composer (`studio-session.html`) | kullanıcı denemesinden geldi | — |
@@ -140,8 +147,8 @@ bloke eder — ilk ikisi kullanıcı kararı bekliyor:
   değişmez" diyor. Bkz. §0.2/D8.
 
 **Devam etmek için (yeni oturum).** Adım 5, 6, **7a**, **7b** ve **8** bitti
-(§0.4–§0.8) ve **commit'lendi**: 5-6-7a `55b3356` ile `main`'de, 7b ve 8
-`feat/flow-ui-pr3` dalında (`0223a19`, `2d97d94`; `pytest` **1106 yeşil**,
+(§0.4–§0.8) ve **commit'lendi**: 5-6-7a `55b3356` ile, 7b ve 8 `f9227de` +
+`f35b5c6` ile `main`'de (`pytest` **1106 yeşil**,
 `APP_VERSION` 2.1.0). PR 2 tamam, PR 1'in giydirme borcu (A1–A6) kapandı,
 §4.2'nin manşeti teslim edildi.
 

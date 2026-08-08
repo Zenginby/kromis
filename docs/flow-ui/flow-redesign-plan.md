@@ -533,13 +533,13 @@ geçildi.** Ekranlar onaylandı, taşıma başladı, PR 1 merge edildi.
   kapısının düzeltilmesi, başlıksız otomatik kayıt + anahtarın arayüzü + 409'un
   Türkçesi, "tüm oturumları sil", üretimin açık oturuma katılması, üst şeritteki
   oturum adı. `pytest` 1062 → **1080**; 18 mutasyonun hepsi kırmızı.
-- **Bitti (`0223a19`, PR #21):** Adım **7b** — PR 1'in giydirme borcu
+- **Bitti (`f9227de`, PR #21):** Adım **7b** — PR 1'in giydirme borcu
   (plan §0.2'nin A1–A6'sı): Kütüphane ve Araçlar kendi görünümleri, Medya'da
   arama (klasör sınırını aşan, künyeli), ızgara boyutu S/M/L, Azure/Tema
   panelleri slide-over, tema seçici (`data-theme` gerçekten yazılıyor; monokrom
   özniteliği siliyor). `pytest` 1080 → **1095**; iki id defterli kaldırıldı
   (`assets-modal`, `assets-close`). Kararlar K15–K18 ve kanıtlar plan §0.7'de.
-- **Bitti (`2d97d94`, PR #21 · `APP_VERSION` 2.1.0):** Adım **8** — §4.2'nin manşeti.
+- **Bitti (`f35b5c6`, PR #21 · `APP_VERSION` 2.1.0):** Adım **8** — §4.2'nin manşeti.
   Prompt bloğunun düğmesi "Görsel modunda üret" (eski etiket yorumlarda da
   kalmadı), Görsel modunda dolu kutuda çerçevesiz "Yönetmen'e sor" (metni taşır,
   yönetmenin yazılmış mesajının üstüne yazmaz, sığmazsa kırpmaz reddeder) ve

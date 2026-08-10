@@ -154,3 +154,37 @@ def test_toplevel_baglar_htmlde_duruyor():
         + "\n".join(f"  {i} → {', '.join(h)}" for i, h in eksik.items())
         + "\nBu, uygulama açılırken TypeError demek."
     )
+
+
+def test_hicbir_ust_duzey_ad_iki_dosyada_tanimli_degil():
+    """4. iddia: aynı üst düzey ad iki dosyada tanımlıysa SONRAKİ öncekini ezer.
+
+    `JS_FILES` klasik script (ES module değil) ve hepsi TEK global kapsamı
+    paylaşıyor — bu dosyanın başındaki sıra notu zaten bunu söylüyor. İki dosya
+    aynı adı `function`/`const`/`let` ile tanımlarsa index.html'de sonra
+    yüklenen kazanır ve önceki tanım **hata vermeden** kaybolur.
+
+    Bu test Adım 12'de gerçekten olan bir kusurdan doğdu: Medya seçicisinin
+    `renderPicker`'ı `palette.js`in aynı adlı (renk seçici) fonksiyonuyla
+    çarpıştı; palette.js sonra yüklendiği için `openPicker()` medya seçicisini
+    değil renk paletini çiziyordu. Seçici bomboş açılıyordu, konsolda tek satır
+    hata yoktu — süit yeşil, ekran boş. Yalnız canlı tur yakaladı; bir daha
+    yakalamak zorunda kalmasın.
+    """
+    # Yorumlar ayıklanıyor: gerekçe yorumları yasaklanan adı yazmak ZORUNDA
+    # ("Adı `renderPicker` DEĞİL: palette.js aynı adı …") ve ham metinde
+    # aranırsa iddia kendi açıklamasına takılır (§0.6/§0.7/§0.9'un dersi).
+    bildirim = re.compile(r"^(?:function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=)", re.M)
+    nerede = {}
+    for name, src in _js_sources().items():
+        src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+        src = "\n".join(l for l in src.splitlines() if not l.lstrip().startswith("//"))
+        for m in bildirim.finditer(src):
+            nerede.setdefault(m.group(1) or m.group(2), set()).add(name)
+
+    carpisan = {ad: sorted(fs) for ad, fs in nerede.items() if len(fs) > 1}
+    assert not carpisan, (
+        "Aynı üst düzey ad birden çok dosyada tanımlı:\n"
+        + "\n".join(f"  {ad} → {', '.join(fs)}" for ad, fs in sorted(carpisan.items()))
+        + "\nindex.html'de sonra yüklenen öncekini SESSİZCE ezer."
+    )

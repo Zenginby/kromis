@@ -2050,8 +2050,15 @@ def _balanced_body(src: str, anchor: str) -> str:
 
 
 def _css_block(selector: str) -> str:
-    """Tek bir CSS kuralının gövdesi."""
-    css = _css()
+    """Tek bir CSS kuralının gövdesi — YORUMLAR AYIKLANMIŞ.
+
+    Yorumların ayıklanması şart: gerekçe yorumları reddedilen değerleri de
+    yazıyor ("sözleşmenin 236px'lik yan bölmesi …") ve yorumlu gövdede
+    `assert "236px" not in block` kendi açıklamasına takılıyor. Depo bu tuzağa
+    kelime aramalarıyla üç kez düştü (§0.6, §0.7, §0.9); dördüncüsü CSS'te
+    çıktı, o yüzden düzeltme tek tek iddiada değil YARDIMCIDA.
+    """
+    css = re.sub(r"/\*.*?\*/", "", _css(), flags=re.S)
     match = re.search(re.escape(selector) + r"\s*\{([^}]*)\}", css)
     assert match, f"{selector} kuralı yok"
     return match.group(1)
@@ -2235,3 +2242,537 @@ def test_the_gallery_viewer_keeps_the_download_seam():
     assert 'path.startsWith("/output/")' in _viewer_js(), (
         "büyütecin dosya adı türetmesi değişmiş")
     assert "openViewer" in _folders_js(), "galeri büyüteci hiç açmıyor"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Adım 12 — Composer'ın (+) menüsünden açılan Medya seçici
+#
+# Plan: docs/superpowers/plans/2026-08-07-flow-studio-tek-dokum.md
+# Faz 0 mock'u: docs/flow-ui/media-picker-modal.html (kapı §0.10'da kapandı;
+# bölünme 208/1fr/180 = K25, ret cümlesi "Önce ana görseli seç." = K26).
+#
+# İddialar KOD DESENİ arıyor, kelime değil — depo bu tuzağa üç kez düştü
+# (§0.6, §0.7, §0.9).
+# ══════════════════════════════════════════════════════════════════════════
+
+PICKER_BANNER = "Medya seçici"
+
+
+def _strip_js_comments(src: str) -> str:
+    """Blok yorumları ve TAM SATIR `//` yorumlarını atar.
+
+    "Şu şey KODDA geçmesin" iddiaları gerekçe yorumlarına takılıyor: yorum
+    zaten yasaklanan adı yazmak ZORUNDA ("… `renderGallery()` buradan HİÇ
+    yazılmaz"). §0.6/§0.7/§0.9'un dersi "iddia kodu arar, kelimeyi değil" —
+    burada bunun mekanik hâli.
+
+    Satır SONU yorumları bilerek korunuyor: `"http://…"` gibi dize içi `//`
+    dizilerini kesmemek için yalnız satır başındakiler atılıyor.
+    """
+    src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+    return "\n".join(ln for ln in src.splitlines() if not ln.lstrip().startswith("//"))
+
+
+def _strip_html_comments(src: str) -> str:
+    return re.sub(r"<!--.*?-->", "", src, flags=re.S)
+
+
+def _picker_js_raw() -> str:
+    """folders.js'teki Medya seçici bölümü (iki banner arasındaki dilim).
+
+    Bölüm banner'la sınırlanıyor (plan B1) ki iddialar dosyanın geri kalanını
+    değil YALNIZ seçiciyi ölçsün: "seçici historyCache yazmıyor" iddiası tüm
+    folders.js'e bakarsa hep kırmızı kalır (galeri onu meşru olarak yazıyor).
+    """
+    js = _folders_js()
+    match = re.search(
+        r"//\s*═{10,}\s*\n//\s*" + PICKER_BANNER + r"\b(?! sonu)(.*?)"
+        r"\n//\s*═{10,}\s*\n//\s*" + PICKER_BANNER + r" sonu\b",
+        js, re.S)
+    assert match, "Medya seçici bölümü banner'la sınırlanmamış"
+    return match.group(1)
+
+
+def _picker_js() -> str:
+    """Seçici bölümünün KODU (yorumsuz) — "geçmesin" iddiaları bunu okur."""
+    return _strip_js_comments(_picker_js_raw())
+
+
+def _section_div(html: str, element_id: str) -> str:
+    """`id="…"` taşıyan `<div>`'in gövdesi, div derinliği sayılarak.
+
+    `_section` yalnız `</section>`/`</aside>` ile kapanan kapları kesiyor;
+    seçici ve (+) menüsü `<div>`. Derinlik saymak ilk `</div>`'te durmaktan
+    sağlam: ikisi de iç içe div taşıyor.
+    """
+    start = html.find(f'id="{element_id}"')
+    assert start > 0, f"#{element_id} servis edilmiyor"
+    start = html.rfind("<div", 0, start)
+    depth, i = 0, start
+    while i < len(html):
+        if html.startswith("<div", i):
+            depth += 1
+        elif html.startswith("</div>", i):
+            depth -= 1
+            if depth == 0:
+                return html[start:i + 6]
+        i += 1
+    raise AssertionError(f"#{element_id} kapanmıyor")
+
+
+def _picker_html_raw() -> str:
+    return _section_div(_html(), "media-picker")
+
+
+def _picker_html() -> str:
+    """Seçicinin MARKUP'ı (yorumsuz) — aynı gerekçe, bkz. `_strip_js_comments`."""
+    return _strip_html_comments(_picker_html_raw())
+
+
+def test_the_plus_menu_offers_choosing_from_media():
+    """B · (+) menüsü sözleşmenin üçüncü maddesini sunar.
+
+    `flow-redesign-plan.md:222` dört madde söz veriyor; uygulamada iki vardı ve
+    "Medya'dan seç" `static/` genelinde SIFIR eşleşmeydi — kullanıcının manşet
+    şikâyeti buydu. Dördüncü madde ("Dosyadan yükle") BİLEREK eklenmiyor:
+    #upload-btn zaten aynı #file-input'a giden dosya yolu, ikinci kapı olurdu.
+    """
+    menu = _section_div(_html(), "plus-menu")
+    assert 'id="media-pick-btn"' in menu, "menüde Medya'dan seç yok"
+    assert "Medya'dan seç" in menu, "maddenin etiketi yok"
+    assert "<hr" in menu, "dosya yolu ile Medya yolu ayrılmamış"
+    # Dördüncü madde eklenmedi: #file-input'a ikinci kapı yok.
+    assert menu.count('type="file"') == 0, "menüye dosya girdisi kaçmış"
+
+
+def test_the_media_picker_markup_is_served():
+    """B · Seçici 13 yeni id ile servis ediliyor ve .modal-card KULLANMIYOR.
+
+    `.modal-card label/input` kuralları (style.css:464-465) arama pill'ini blok
+    yapar ve girdiyi yeniden giydirir — #palette-hue için zaten yazılmış tuzağın
+    aynısı. Kart kendi sınıfını taşıyor.
+    """
+    picker = _picker_html()
+    for element_id in ("picker-search", "picker-close", "picker-kinds",
+                       "picker-grid", "picker-empty", "picker-empty-text",
+                       "picker-preview-img", "picker-meta", "picker-use-ref",
+                       "picker-use-extra", "picker-note"):
+        assert f'id="{element_id}"' in picker, f"{element_id} yok"
+    assert "modal-card" not in picker, ".modal-card kalıbı arama pill'ini bozar"
+    assert "picker-card" in picker, "kartın kendi sınıfı yok"
+    assert 'aria-modal="true"' in picker, "diyalog değil"
+    assert 'id="picker-note"' in picker and 'role="status"' in picker, (
+        "tek geri bildirim yüzeyi duyurulmuyor (B8)")
+
+
+def test_the_picker_never_sorts_because_media_cannot_sort_either():
+    """B9 · Sıralama bilinçli olarak ERTELENDİ (D10, Adım 10).
+
+    Yalnız modalda sıralama koymak, arkasındaki Medya görünümünde OLMAYAN bir
+    kontrol demek — "çalışmayan arama kutusu konmadı" kuralının tersi. Bu test
+    ertelemenin kaza değil karar olduğunu mandallıyor; D10 gelince silinmez,
+    iki yüzeyi birlikte soracak şekilde YENİDEN YAZILIR (§1.2).
+    """
+    assert "sort-btn" not in _picker_html(), "seçiciye tek başına sıralama gelmiş"
+    assert "sort-btn" not in _strip_html_comments(_html()), (
+        "Medya'ya sıralama gelmiş (D10 açıldıysa bu test yeniden yazılır)")
+
+
+def test_the_picker_collects_everything_through_load_all_images():
+    """B2 · "Tümü" `loadAllImages()` ile toplanır, satır içine kopyalanmaz.
+
+    `GET /api/history` klasör-DIŞLAYICI (klasörsüz VEYA tek klasör; "hepsi" ucu
+    yok). Seçici kendi fetch'ini yazarsa o incelik ikinci kez keşfedilmek
+    zorunda kalır ve ilk sürümü klasördeki görselleri kaçırır.
+    """
+    picker = _picker_js()
+    assert "loadAllImages(" in picker, "seçici toplayıcıyı kullanmıyor"
+    assert 'fetch("/api/history' not in picker, "seçici kendi fetch'ini yazmış"
+    assert "?folder_id=" not in picker, "seçici klasör ucunu satır içine kopyalamış"
+
+
+def test_the_picker_keeps_its_own_state_and_never_writes_medias():
+    """B3 · Seçici kendi kopyasını tutar; arkadaki Medya'nın durumu bozulmaz.
+
+    Seçici `historyCache`/`selected`/`searchQuery` yazarsa modal kapandığında
+    Medya görünümü başka bir yerde duruyor olur — kullanıcı seçiciyi kapatıp
+    galeriye döndüğünde filtresi değişmiş bir liste bulur.
+    """
+    picker = _picker_js()
+    for owned in ("pickerImages", "pickerScope", "pickerQuery",
+                  "pickerSelectedId", "pickerToken"):
+        assert owned in picker, f"{owned} yok"
+    for foreign in ("historyCache =", "selected =", "searchQuery =",
+                    "renderGallery(", "setSelectMode("):
+        assert foreign not in picker, f"seçici Medya'nın durumunu yazıyor: {foreign}"
+
+
+def test_the_picker_reads_its_selection_from_state_not_from_the_dom():
+    """B3 · Seçim `pickerSelectedId`'den okunur, DOM'dan sorulmaz.
+
+    `querySelector('[aria-selected="true"]')` ızgara yeniden çizildiğinde
+    (arama, kapsam değişimi) sessizce null döner ve commit düğmeleri "hiçbir şey
+    seçili değil" sanır. Kaynak durumdur, boyanan işaret değil.
+    """
+    picker = _picker_js()
+    assert "aria-selected" in picker, "seçili karo işaretlenmiyor"
+    # İddia sorgunun ARGÜMANINA bakıyor, "querySelector hiç geçmesin"e değil:
+    # seçicide meşru bir sorgu zaten var (`[data-picker-close]`). İlk yazım
+    # `"aria-selected\"]" not in picker` idi ve MUTASYON TURUNDA hayatta kaldı —
+    # gerçek regresyon `querySelector('[aria-selected="true"]')` diye yazılır,
+    # o dizede `aria-selected` hemen ardından `=` gelir, `"]` değil. Kelime
+    # aramasının dördüncü kurbanıydı (§0.6, §0.7, §0.9); burada tırnak biçimine
+    # bakmayan bir iddiaya çevrildi.
+    for arg in re.findall(r"querySelector(?:All)?\((.*?)\)", picker):
+        assert "aria-selected" not in arg, f"seçim DOM'dan okunuyor: {arg}"
+    assert "pickerById(pickerSelectedId)" in picker, (
+        "yan bölme seçimi durumdan almıyor")
+
+
+def test_the_picker_has_no_hidden_button_clicks():
+    """B11 · Gizli düğmeye programatik `.click()` YOK.
+
+    Adım 7b'de aynı hata temizlendi (ray öğeleri kapalı panellerin düğmelerine
+    tıklıyordu). Seçici de "Referans yap"ı #upload-btn'e devretmez; tek uygulama
+    `setGallerySource`.
+    """
+    assert ".click()" not in _picker_js(), "seçici gizli düğmeye tıklıyor"
+
+
+def test_the_picker_writes_only_to_its_own_note():
+    """B8 · Seçici `statusEl` yazmaz.
+
+    Yönetmen modunda #status `display:none`, Görsel modunda modalın ARKASINDA —
+    yani seçicinin oraya yazdığı her şey görünmez olur. Adım 11'in kök nedeni
+    (§0.9) tam olarak buydu; aynı hata ikinci kez yapılmıyor.
+    """
+    picker = _picker_js()
+    assert "statusEl" not in picker, "seçici görünmez bir yüzeye yazıyor"
+    assert "picker-note" in picker, "tek geri bildirim yüzeyi kullanılmıyor"
+
+
+def test_the_picker_note_shows_the_reason_not_just_the_counter():
+    """K28 · Kapalı "Ek olarak ekle" sebepsiz kalmaz (PR #23 incelemesi, H1).
+
+    İlk hâlde not `extras.length ? sayaç : gerekçe` idi. Yorumun savunduğu şey
+    ("3/3'te sayaç gerekçeyi yener") DOĞRU, ama yalnız KAPASİTE gerekçesi için;
+    koşul gerekçeye değil `extras.length`e bağlandığı için İLK ek eklendiği anda
+    diğer iki gerekçe de susuyordu. Canlı ölçüm (ana referans A, ek olarak B):
+
+        seçili B → "Bu görsel zaten ek referans listesinde." · düğme KAPALI,
+                   not "Eklendi · 1/3" — kullanıcı yer olduğunu okuyor, sebep yok
+        seçili A → "Bu görsel zaten ana referans."           · aynısı
+
+    §0.9'un kök nedeni (eylem çalışıyor, geri bildirimi görünmüyor) üçüncü
+    kılığında. Artık GEREKÇE varsayılan olarak kazanıyor; "Eklendi" onayı ise
+    ekleme ANINDA, çağrı yerinde veriliyor — çünkü ekleme başarılı olduğunda
+    seçili karo ARTIK ek listesindedir ve `why` o an da doludur, yani onay
+    `renderPickerSide`'a bırakılsa hiç görünmezdi.
+    """
+    picker = _picker_js()
+    # 1) Notun ifadesi GEREKÇEYLE başlıyor; sayaç yalnız gerekçe yokken.
+    assert re.search(r'"picker-note"\)\.textContent\s*=\s*why\s*\|\|', picker), (
+        "sayaç gerekçeyi eziyor: kapalı düğme açıklamasız kalır")
+    # 2) Onay çağrı yerinde: ekleme başarılıysa fiil O AN yazılıyor.
+    assert re.search(
+        r"addGalleryExtra\(rec\).*?renderPickerSide\(\);\s*"
+        r'\$\("picker-note"\)\.textContent\s*=\s*`Eklendi', picker, re.S), (
+        "ekleme onayı verilmiyor: gerekçe kazanınca 'Eklendi' hiç görünmez")
+    # 3) DURAN okuma ile EYLEM onayı ayrı cümleler. Aynı dize kullanılırsa
+    #    `why` boş olan HER karo "Eklendi" der — hiç eklenmemiş karoya geçen
+    #    kullanıcı onu eklemiş sanır. `renderPickerSide`'ın dalı fiil taşımaz.
+    yan = _balanced_body(picker, "function renderPickerSide()")
+    assert "`Eklendi" not in yan, (
+        "duran sayaç eylem onayıyla aynı cümleyi kullanıyor: hiç eklenmemiş "
+        "karoda 'Eklendi' yazar")
+    assert re.search(r"`Ek referans · \$\{extras\.length\}", yan), (
+        "duran sayaç yok: ek varken kullanıcı kaç ek olduğunu göremiyor")
+
+
+def test_the_picker_separates_loading_and_failure_from_emptiness():
+    """K29 · "Görselin yok" cümlesi YALNIZ gerçekten boşken kurulur (H2).
+
+    İlk hâlde `#picker-empty` üç durumu tek cümleyle anlatıyordu. Canlı ölçüm
+    (`window.fetch` reddedecek şekilde saplandı):
+
+        yakalanmamisRet:         ["TypeError: Failed to fetch"]
+        kullaniciyaGorunenMetin: "Bu kapsamda görsel yok"
+
+    Yükleme çökmüşken kullanıcıya YANLIŞ bir cümle söyleniyordu, üstüne
+    yakalanmamış promise reddi kalıyordu. Aynı kök neden ikinci belirtiyi de
+    veriyordu: `renderMediaPicker()` `await`'ten ÖNCE çağrıldığı için boş durum
+    HER açılışta bir an görünüyordu (açılışın ilk karesinde ölçüldü:
+    `picker-empty.hidden === false`, `await` sonrası 25 karo).
+
+    Arıza İKİ ayrı yoldan geliyor ve ilk düzeltme yalnız birini kapatmıştı:
+    ağ katmanı (`fetch` REDDEDER → `catch`) ve sunucu tarafı (500/404 —
+    `fetch` **reddetmez**, `res.ok` false olur ve `loadAllImages` onu yutar,
+    yani `catch` HİÇ çalışmaz, liste boş döner). İkincisinde kullanıcı gene
+    "görselin yok" okuyordu. `loadAllImages` artık düşen uç sayısını da
+    döndürüyor; boş liste **tek başına** "yok" anlamına gelmiyor.
+    """
+    picker = _picker_js()
+    govde = _balanced_body(picker, "async function openPicker()")
+    # 1) Redde bir karşılayıcı var: yakalanmamış promise reddi bırakılmıyor.
+    #    Sıraya bakılıyor, tek bir yazıma değil — try gövdesine küme parantezi
+    #    girse de iddia ayakta kalmalı.
+    i_try, i_cagri, i_catch = (govde.find("try {"),
+                               govde.find("await loadAllImages()"),
+                               govde.find("catch"))
+    assert -1 < i_try < i_cagri < i_catch, (
+        "openPicker ağ reddini yakalamıyor: yakalanmamış promise + yanlış cümle")
+    # 2) Sunucu tarafı arıza da ayırt ediliyor: boş liste tek başına yetmiyor.
+    assert "failed" in govde, (
+        "düşen uç sayısı hesaba katılmıyor: 500'de gene 'görselin yok' denir")
+    # 3) Durum AÇILIŞTA sıfırlanıyor. `picker` diliminin tamamına bakmak
+    #    yetmez: `let pickerState = "loading"` BİLDİRİMİ de o dilimde ve iddiayı
+    #    kendi başına karşılar — sıfırlama silinse test yeşil kalırdı (ölçüldü).
+    #    Sonuç: hatadan sonra tekrar açılışta ekranda "alınamadı" asılı kalır.
+    assert 'pickerState = "loading"' in govde, "açılışta durum sıfırlanmıyor"
+    # 4) Boş durum metni DURUMU biliyor, yalnız sorguyu değil.
+    metin = re.search(r'"picker-empty-text"\)\.textContent\s*=(.*?);', picker, re.S)
+    assert metin and "pickerState" in metin.group(1), (
+        "boş durum metni yükleme/hata durumunu bilmiyor: üç durum tek cümlede")
+    assert 'pickerState = "error"' in govde, "ağ reddi hata durumunu kurmuyor"
+    assert '"ready"' in govde, "başarılı yükleme durumu kurulmuyor"
+    # 5) Hata cümlesi ekran okuyucuya da ulaşıyor: kap canlı bölge.
+    assert re.search(r'id="picker-empty"[^>]*role="status"', _html()), (
+        "#picker-empty canlı bölge değil: hata cümlesi hiç duyurulmuyor")
+
+
+def test_the_extra_rejection_sentence_lives_in_exactly_one_place():
+    """B6 · Ret gerekçesi tek kaynakta: `extraBlockReason(rec)`.
+
+    Cümle K26 ile kısaldı: parantezli eski hâl ("… (Görsel ekle veya galeriden
+    Düzenle)") artık YANLIŞ yol tarif ediyordu — galeri kartının "+Ek"i Adım
+    11'de ölçümle kaldırılmıştı (§0.9), yani o kurtuluş yolu yok.
+    """
+    core = _strip_js_comments(_core_js())
+    assert "function extraBlockReason(" in core, "tek kaynak fonksiyon yok"
+    assert core.count("Önce ana görseli seç") == 1, (
+        "ret cümlesi birden çok yerde — biri güncellenince diğeri bayatlar")
+    assert "galeriden Düzenle" not in core, (
+        "K26: artık var olmayan bir kurtuluş yolu tarif ediliyor")
+    # canAddExtra ADIYLA yeniden kullanılıyor (silinip yeniden yazılmadı).
+    assert "function canAddExtra(" in core, "canAddExtra kaybolmuş"
+    assert re.search(r"function canAddExtra\([^)]*\)\s*\{[^}]*extraBlockReason\(",
+                     core, re.S), "canAddExtra tek kaynağı çağırmıyor"
+    assert "addGalleryExtra" in _picker_js(), (
+        "B6/B7: seçici addGalleryExtra'yı ADIYLA yeniden kullanmalı")
+
+
+def test_making_a_reference_closes_the_picker_before_focus_moves():
+    """B7 · "Referans yap" → `closePicker()` ÖNCE, `setGallerySource` SONRA.
+
+    `setGallerySource` `$("prompt").focus()` çağırıyor. Açık bir
+    `aria-modal="true"` diyaloğun ARKASINA odak verilirse ekran okuyucu
+    kullanıcısı diyalogda kilitli kalır, gören kullanıcı ise yazdığını göremez.
+    """
+    body = _balanced_body(_picker_js(), '$("picker-use-ref").addEventListener')
+    close_at = body.find("closePicker(")
+    source_at = body.find("setGallerySource(")
+    assert close_at >= 0 and source_at >= 0, "commit yolu eksik"
+    assert close_at < source_at, "odak açık modalın arkasına veriliyor"
+
+
+def test_adding_an_extra_keeps_the_picker_open():
+    """B7 · Commit bilerek ASİMETRİK: "Ek olarak ekle" seçiciyi kapatmaz.
+
+    Üç ek slotu var (MAX_EDIT_IMAGES 4 − ana referans). Her biri için menüden
+    tekrar dönmek saçma; sayaç #picker-note'ta işliyor, slot bitince düğme
+    kendi gerekçesiyle kapanıyor.
+    """
+    body = _balanced_body(_picker_js(), '$("picker-use-extra").addEventListener')
+    assert "closePicker(" not in body, "ek eklemek seçiciyi kapatıyor"
+    assert "addGalleryExtra(" in body, "ek ekleme tek uygulamayı kullanmıyor"
+
+
+def test_escape_closes_the_picker_without_leaving_select_mode():
+    """B10 · Katman düzeni: tek Escape tek şey kapatır.
+
+    Seçicinin Escape'i #confirm-modal muhafızlı (onay penceresi her zaman
+    üstte), ve `folders.js`'teki seçim modu Escape'ine `media-picker` muhafızı
+    ekleniyor — yoksa tek Escape hem seçiciyi kapatır hem seçim modundan çıkarır.
+    """
+    picker = _picker_js()
+    assert "Escape" in picker, "seçicinin Escape'i yok"
+    assert 'confirm-modal").hidden' in picker, "onay penceresi muhafızı yok"
+    assert "stopImmediatePropagation()" in picker, (
+        "aynı olay alttaki dinleyicilere de gidiyor")
+    # Koşul iki satıra yayılıyor ve içinde `$(…)` parantezleri var; kesim
+    # `setSelectMode(false)` çağrısına kadar okunuyor.
+    select_escape = re.search(
+        r'e\.key === "Escape" && selectMode(.*?)setSelectMode\(false\)',
+        _folders_js(), re.S)
+    assert select_escape, "seçim modu Escape'i bulunamadı"
+    assert 'media-picker").hidden' in select_escape.group(1), (
+        "tek Escape hem seçiciyi kapatıp hem seçim modundan çıkarıyor")
+
+
+def test_opening_the_picker_closes_the_sheets_and_the_plus_menu():
+    """B10 · `.sheet` ve `.modal` aynı z-index 50'yi paylaşıyor.
+
+    Açık kalan bir slide-over "Escape neyi kapatır" belirsizliği yaratır; açık
+    kalan (+) menüsü ise modalın ARKASINDA asılı kalır.
+    """
+    assert "closeSheets(" in _picker_js(), "seçici açılırken paneller kapanmıyor"
+    core = _core_js()
+    menu_loop = re.search(r'for \(const id of \[([^\]]*)\]\)\s*\{?\s*\$\(id\)'
+                          r'\.addEventListener\("click", closePlusMenu\)', core)
+    assert menu_loop, "menü kapanış dizisi bulunamadı"
+    assert "media-pick-btn" in menu_loop.group(1), (
+        "menü modalın arkasında açık kalıyor")
+
+
+def test_the_picker_is_not_a_second_door_to_the_library():
+    """B11 · Yasak olan kapı: seçici Kütüphane varlıklarına ikinci kapı OLMAZ.
+
+    Kapsam kilitli: yalnız Medya (üretilen + içe aktarılan). Bindirme varlıkları
+    bugünkü #overlay-picker'da kalıyor — iki farklı şeyi tek seçiciye toplamak
+    "hangisi bindirme, hangisi referans" sorusunu kullanıcıya bırakırdı.
+    """
+    picker = _picker_js() + _picker_html()
+    for foreign in ("overlay-picker", "assetCache", "logo-modal", "/assets/logos"):
+        assert foreign not in picker, f"seçici Kütüphane'ye ikinci kapı olmuş: {foreign}"
+
+
+def test_the_composer_still_has_exactly_two_primary_buttons():
+    """B11 · İki kapı olması yeni bir GÖRSEL ağırlık yaratmamalı.
+
+    Seçicinin "Referans yap"ı birincil; composer'ın kendi birincil sayısı
+    değişmemeli, yoksa ekranda üç eşit ağırlıklı eylem olur.
+    """
+    composer = _section_div(_html(), "composer")
+    count = composer.count('class="primary')
+    assert count == 2, f"composer'daki birincil sayısı değişmiş: {count}"
+    # Seçicinin kendi birincili composer'ın DIŞINDA — aynı anda ikisi görünmüyor.
+    assert 'id="picker-use-ref"' not in composer, "seçici composer'ın içine sızmış"
+    assert 'class="primary' in _picker_html(), "seçicide birincil eylem yok"
+
+
+def test_the_search_predicate_is_shared_not_duplicated():
+    """B5 · `matchesSearch(rec, q = searchQuery)` — tek yüklem, iki çağıran.
+
+    Seçici kendi eşleştirmesini yazarsa arama iki yerde ayrışır: Medya'da klasör
+    adı aranır, seçicide aranmaz (ya da tersi) ve fark sessizdir.
+    """
+    js = _folders_js()
+    assert re.search(r"function matchesSearch\(rec,\s*q\s*=\s*searchQuery\)", js), (
+        "yüklem ikinci çağıran için parametreleşmemiş")
+    assert "matchesSearch(" in _picker_js(), "seçici ortak yüklemi kullanmıyor"
+
+
+def test_the_imported_scope_is_a_crossing_filter_not_a_partition():
+    """B4 · "İçe aktarılanlar" bir BÖLME değil kesişen süzgeç.
+
+    Klasörsüz + klasörler zaten Tümü'nü tüketiyor; içe aktarılanlar onların
+    içinden geçiyor. Yorumda yazılı olmalı, yoksa biri "toplam tutmuyor" diye
+    düzeltmeye kalkar (ve bölmeyi bozar).
+    """
+    assert "imported" in _picker_js(), "içe aktarılanlar kapsamı yok"
+    # Bu iddia bilerek YORUMA bakıyor (ham metin): kesişen süzgeç olduğu
+    # yazılmazsa sonraki okuyucu "toplam tutmuyor" diye bölmeyi düzeltmeye
+    # kalkar. Kural "kodu ara" idi; burada belgelenmiş olmanın KENDİSİ şart.
+    assert re.search(r"kesişen süzgeç", _picker_js_raw()), (
+        "kesişen süzgeç olduğu yazılmamış — sonraki okuyucu bunu hata sanar")
+
+
+def test_the_picker_grid_geometry_matches_the_approved_split():
+    """K25 · Onaylanan bölünme 208 / 1fr / 180 (Faz 0 mock'unda ölçüldü).
+
+    Sözleşmedeki 236px yan bölme orta sütunu 277px'te bırakıyordu = 2 sütun ×
+    133px (bir bakışta ~5 karo). 180px ile ızgara 333px = 3 sütun × 103px (~9
+    karo) ve sol gezinmedeki klasör adları hâlâ kırpılmıyor.
+    `minmax(96px, 1fr)` 3. sütunu açan şey: 132px'lik eski min bu genişlikte de
+    2 sütunda kalırdı.
+    """
+    card = _css_block(".picker-card")
+    assert "208px" in card and "180px" in card, "onaylanan bölünme uygulanmamış"
+    assert "236px" not in card, "reddedilen sözleşme bölünmesi kalmış"
+    assert "min(776px" in card and "min(570px" in card, "modal ölçüsü sözleşme dışı"
+    grid = _css_block(".picker-grid")
+    assert "minmax(96px, 1fr)" in grid, "3. sütunu açan min kalkmış"
+
+
+def test_the_picker_tile_is_full_bleed():
+    """Faz 0 ölçümü · `<button>`'ın UA padding'i sıfırlanmazsa karo tam kanamaz.
+
+    Ölçüldü (mock, 1440×900): 133px'lik karo 121px'lik görsel taşıyordu —
+    UA'nın `padding: 1px 6px`'i. Kütüphane'de `.thumb`'ın kendi 14px'i bunu
+    gizliyor, tam kanamalı karoda gizlemiyor.
+    """
+    assert "padding: 0" in _css_block(".picker-tile"), "karo tam kanamıyor"
+    # Mock'un ikinci bulgusu (satır içi kabın aspect-ratio'yu yutması) burada
+    # YAPISAL olarak çözüldü: <img> doğrudan düğmenin çocuğu, ara kap yok —
+    # <button> zaten <div> taşıyamıyor, span kap ise satır içi olurdu.
+    img = _css_block(".picker-tile img")
+    assert "aspect-ratio: 1" in img, "karo kare değil"
+    assert "object-fit: cover" in img, "karışık oranlar satırları bozar"
+    assert "display: block" in img, "satır içi görsel altında hayalet boşluk kalır"
+
+
+def test_the_picker_preview_cannot_blow_past_its_box():
+    """Faz 0 ölçümü · `max-height: 100%` esnek kolonda çözülmüyor.
+
+    Ölçüldü: `height` ÖZNİTELİĞİ kazanıyor ve önizleme 156×1000 oluyor, künye
+    ekrandan taşıyor. `height: auto` önce oranı geri veriyor.
+    """
+    assert "height: auto" in _css_block(".picker-preview img"), (
+        "önizleme kutusunu taşırıyor")
+
+
+def test_the_disabled_secondary_action_reuses_the_existing_ghost_rule():
+    """Kapalı "Ek olarak ekle" MEVCUT `.btn-ghost:disabled`'ı devralır.
+
+    Faz 0'ın beşinci bulgusu (`.btn-ghost`'un kapalı hâli yok) `flow.css` için
+    doğruydu; `style.css`'te kural zaten var ve #extra-add-btn'i de o
+    giydiriyor. Port ikinci bir kural yazsaydı diğer ghost düğmelerin kapalı
+    hâlini de sessizce değiştirirdi. Bu test tekrarın geri gelmesini engelliyor.
+    """
+    css = _css()
+    assert css.count(".btn-ghost:disabled {") == 1, (
+        "kapalı ghost düğme kuralı çoğaltılmış — biri diğerini eziyor")
+    block = _css_block(".btn-ghost:disabled")
+    assert "not-allowed" in block, "imleç reddi söylemiyor"
+    assert "opacity" in block, "kapalı düğme sönmüyor"
+    # Seçicinin ikincili o kuralın kapsamında; kendi kapalı hâlini yazmıyor.
+    assert 'id="picker-use-extra" class="btn-ghost"' in _picker_html(), (
+        "ikincil eylem ghost değil — kapalı hâli tanımsız kalır")
+    assert ".picker-commit .btn-ghost:disabled" not in css, (
+        "seçici kendi kapalı hâlini yazmış")
+
+
+def test_the_picker_leaves_the_tab_order_when_it_closes():
+    """Faz 0 ölçümü · kapalı modal sekme sırasında kalmamalı.
+
+    Mock'ta ölçüldü: yalnız `opacity: 0 + pointer-events: none` ile kapatılan
+    bir kabın 25 kontrolü sekme sırasında kalıyordu. Uygulamanın `.modal`ı
+    `[hidden]` ile `display: none` oluyor — JS'in de sınıf değil ÖZNİTELİK
+    çevirmesi şart.
+    """
+    picker = _picker_js()
+    assert re.search(r'\$\("media-picker"\)\.hidden = true', picker), (
+        "kapanış hidden özniteliğini çevirmiyor")
+    assert re.search(r'\$\("media-picker"\)\.hidden = false', picker), (
+        "açılış hidden özniteliğini çevirmiyor")
+    assert "classList" not in picker or "media-picker" not in picker.split("classList")[1][:40], (
+        "modal sınıfla kapatılıyor — kapalıyken odaklanabilir kalır")
+
+
+def test_the_picker_labels_folders_with_a_string_not_the_breadcrumb_array():
+    """`folderPath` bir ETİKET değil, klasör NESNELERİNDEN oluşan zincir döndürür.
+
+    Doğrudan `textContent`e verilince "[object Object],[object Object]" yazıyor;
+    canlı turda sol gezinmedeki üç klasör adı da, künyedeki "Klasör" satırı da
+    böyle çıktı. Süit yeşildi çünkü hiçbir iddia DEĞERİN TÜRÜNÜ sormuyordu —
+    kelime araması gibi burada da tür sessizce yanlıştı.
+
+    İddia: seçicideki her `folderPath(...)` çağrısı sonucu ZİNCİR olarak işler
+    (`.map(...)`), ham hâliyle etiket yerine geçmez. Tek üretim yeri
+    `pickerFolderLabel`; ayraç kod tabanından ("A / B / C", folders.js:106).
+    """
+    picker = _picker_js()
+    assert "pickerFolderLabel" in picker, "klasör etiketi tek yerden üretilmiyor"
+    for m in re.finditer(r"folderPath\([^)]*\)(.{0,8})", picker):
+        assert m.group(1).lstrip().startswith(".map("), (
+            "folderPath'in DİZİSİ doğrudan etikete veriliyor → [object Object]")

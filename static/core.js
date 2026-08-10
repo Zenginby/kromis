@@ -192,7 +192,9 @@ document.addEventListener("click", (e) => {
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePlusMenu(); });
 // Menüdeki düğmeler kendi dinleyicilerini folders.js'te kuruyor; burada yalnız
 // menünün kapanması eklenir (aynı düğümde birden çok dinleyici sorun değil).
-for (const id of ["upload-btn", "extra-add-btn"]) {
+// media-pick-btn de burada: menü kapanmazsa modalın ARKASINDA açık kalıyor
+// (ikisi de position:fixed, popover z-index'i modalınkinin altında) — plan B10.
+for (const id of ["upload-btn", "extra-add-btn", "media-pick-btn"]) {
   $(id).addEventListener("click", closePlusMenu);
 }
 
@@ -469,15 +471,31 @@ function removeExtra(item) {
   renderSource();
 }
 
+// Ek referans reddinin TEK kaynağı (plan B6). İki çağıranı var ve ikisi
+// gerekçeyi FARKLI yüzeylerde gösteriyor: `canAddExtra` #status'a yazar,
+// Medya seçicisi #picker-note'a. Cümleler burada bir kez geçiyor — iki yere
+// kopyalansaydı biri güncellenip diğeri bayatlardı (test sayıyor).
+//
+// K26: "Önce ana görseli seç." parantezsiz. Eski hâli "(Görsel ekle veya
+// galeriden Düzenle)" diyordu; galeri kartının "+Ek" düğmesi Adım 11'de
+// ölçümle kaldırıldığı için (§0.9) o kurtuluş yolu ARTIK YOK — cümle var
+// olmayan bir kapıyı tarif ediyordu.
+//
+// Boş dize = engel yok. Çağıranlar `if (why)` ile okuyor.
+function extraBlockReason(rec) {
+  if (!source) return "Önce ana görseli seç.";
+  if (extraSlotsLeft() <= 0) return `En fazla ${MAX_EDIT_IMAGES} görsel gönderilebilir.`;
+  if (!rec) return "";
+  if (source.kind === "gallery" && source.id === rec.id) return "Bu görsel zaten ana referans.";
+  if (extras.some((it) => it.kind === "gallery" && it.id === rec.id)) {
+    return "Bu görsel zaten ek referans listesinde.";
+  }
+  return "";
+}
+
 function canAddExtra() {
-  if (!source) {
-    statusEl.textContent = "Önce ana görseli seç (Görsel ekle veya galeriden Düzenle).";
-    return false;
-  }
-  if (extraSlotsLeft() <= 0) {
-    statusEl.textContent = `En fazla ${MAX_EDIT_IMAGES} görsel gönderilebilir.`;
-    return false;
-  }
+  const why = extraBlockReason(null);
+  if (why) { statusEl.textContent = why; return false; }
   return true;
 }
 
@@ -492,30 +510,24 @@ function addExtraUpload(file) {
   renderSource();
 }
 
-// ŞU AN ÇAĞRISIZ — bilerek duruyor, ölü kod değil bekleyen dikiş.
-// Tek çağıranı galeri kartının "+Ek" düğmesiydi; o düğme Adım 11'de ÖLÇÜMLE
-// düştü (üç pill S'de karonun %89'unu kaplıyordu, bkz. folders.js'teki A9
-// notu). Yeni çağıranı Adım 12'nin Medya seçicisi olacak: plan B6/B7 bu
-// fonksiyonu ve `canAddExtra`'yı ADIYLA yeniden kullanmayı şart koşuyor —
-// silinip yeniden yazılırsa oradaki "ret gerekçesi tek kaynakta" kuralı
-// (Türkçe cümleler kodda bir kez geçer) kırılır.
+// Adım 11'den Adım 12'ye bekleyen dikişti; çağıranı artık Medya seçicisi
+// (folders.js, "Ek olarak ekle"). Adı korundu — plan B6/B7 bunu şart koşuyordu.
+//
+// Ret gerekçesini KENDİ yazmıyor, `extraBlockReason`'dan alıp DÖNDÜRÜYOR:
+// çağıran onu kendi görünür yüzeyine koyuyor. Eskiden buradan doğrudan
+// `statusEl`e yazılıyordu ve Medya görünümündeyken #status gizli bir kabın
+// içinde kalıyordu — eylem çalışıyor, geri bildirimi görünmüyordu (§0.9).
+// Dönüş: engel varsa gerekçe cümlesi, eklendiyse boş dize.
 function addGalleryExtra(rec) {
-  if (!canAddExtra()) return;
-  if (source.kind === "gallery" && source.id === rec.id) {
-    statusEl.textContent = "Bu görsel zaten ana referans.";
-    return;
-  }
-  if (extras.some((it) => it.kind === "gallery" && it.id === rec.id)) {
-    statusEl.textContent = "Bu görsel zaten ek referans listesinde.";
-    return;
-  }
+  const why = extraBlockReason(rec);
+  if (why) return why;
   extras = [...extras, {
     kind: "gallery", id: rec.id,
     label: (rec.prompt || rec.id).slice(0, 40),
     src: `/output/${rec.filename}`,
   }];
-  statusEl.textContent = "";
   renderSource();
+  return "";
 }
 
 function setUploadSource(file) {

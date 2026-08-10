@@ -545,7 +545,7 @@ geçildi.** Ekranlar onaylandı, taşıma başladı, PR 1 merge edildi.
   yönetmenin yazılmış mesajının üstüne yazmaz, sığmazsa kırpmaz reddeder) ve
   Görsel modu kendi oturumunu başlatıyor. `pytest` 1095 → **1106**; 9 mutasyonun
   hepsi kırmızı. Kararlar K19–K22 ve kanıtlar plan §0.8'de.
-- **Bitti (`b79dc17`, PR 4 · `APP_VERSION` 2.1.1):** Adım **11** — Medya'da karta
+- **Bitti (`c65fbb7`, PR 4 · `APP_VERSION` 2.1.1):** Adım **11** — Medya'da karta
   tıklamak büyüteci açıyor (bağ küçük resimden karta taşındı; küçük resmin gizli
   "düzenle" kısayolu yerine `.acts` şeridinde adı yazan **Referans** düğmesi) ve
   kart eylemlerinin **görünmez geri bildirimi** kapandı: durum değiştiren eylem

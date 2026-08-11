@@ -510,7 +510,6 @@ function setUploadSource(file) {
   clearUploadPreviewUrl();
   source = { kind: "upload", file, label: `Yüklendi: ${file.name}` };
   uploadPreviewUrl = URL.createObjectURL(file);
-  showPreviewSrc(uploadPreviewUrl, file.name);
   setCurrentImage(null); // henüz sunucuda kayıt yok → bindirme uygulanamaz
   renderSource();
 }

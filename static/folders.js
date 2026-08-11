@@ -119,7 +119,6 @@ function syncFolderView() {
   $("search-label").hidden = !searching;
   document.querySelector("#view-media .gallery-head").hidden = searching;
   $("images-title").hidden = searching;
-  $("folder-grid").hidden = searching;
   $("folder-back").hidden = !inFolder;
   // Silme yalnızca klasörün İÇİNDE (sağ üstte); seçim modunda şerit görsellere ayrılır
   $("folder-delete").hidden = !inFolder || selectMode;
@@ -268,9 +267,80 @@ function makeDropTarget(el, folderId, targetName) {
   });
 }
 
+function createFolderCell(f) {
+  const coverRec = historyCache ? historyCache.find((r) => r.folder_id === f.id) : null;
+  let icon;
+  if (coverRec && coverRec.filename) {
+    icon = document.createElement("img");
+    icon.className = "folder-thumb";
+    icon.src = `/output/${coverRec.filename}`;
+    icon.alt = "";
+  } else {
+    icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    icon.setAttribute("class", "folder-icon");
+    icon.setAttribute("viewBox", "0 0 24 24");
+    icon.setAttribute("width", "26");
+    icon.setAttribute("height", "26");
+    icon.setAttribute("fill", "none");
+    icon.setAttribute("stroke", "currentColor");
+    icon.setAttribute("stroke-width", "1.8");
+    icon.setAttribute("stroke-linecap", "round");
+    icon.setAttribute("stroke-linejoin", "round");
+    icon.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", "M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2z");
+    icon.appendChild(path);
+  }
+
+  const name = document.createElement("span");
+  name.className = "folder-name";
+  name.textContent = f.name;
+
+  const count = document.createElement("span");
+  count.className = "folder-count";
+  count.textContent = f.child_count
+    ? `${f.count} görsel · ${f.child_count} klasör`
+    : `${f.count} görsel`;
+
+  const open = document.createElement("button");
+  open.type = "button";
+  open.className = "folder-open";
+  open.title = `${f.name} klasörünü aç`;
+  open.appendChild(icon);
+  open.appendChild(name);
+  open.appendChild(count);
+  open.addEventListener("click", () => openFolder(f));
+
+  const cell = document.createElement("div");
+  cell.className = "folder-cell";
+  cell.appendChild(open);
+  makeDropTarget(cell, f.id, f.name);
+  return cell;
+}
+
 function renderFolders() {
   const grid = $("folder-grid");
   grid.innerHTML = "";
+  const searching = searchQuery.length > 0;
+
+  if (searching) {
+    const matching = folderCache.filter((f) => f.name.toLowerCase().includes(searchQuery));
+    if (!matching.length) {
+      grid.hidden = true;
+      return;
+    }
+    grid.hidden = false;
+    matching.sort((a, b) => {
+      if (mediaSortOrder === "name") return a.name.localeCompare(b.name, "tr");
+      return (b.created_at || "").localeCompare(a.created_at || "");
+    });
+    for (const f of matching) {
+      grid.appendChild(createFolderCell(f));
+    }
+    return;
+  }
+
+  grid.hidden = false;
 
   // Bir klasörün içindeyken "yukarı" kartı: bir seviye üstü gösterir (kökte "Klasörsüz"),
   // hem çıkış hem de o seviyeye taşıma hedefi.
@@ -316,57 +386,7 @@ function renderFolders() {
     return;
   }
   for (const f of children) {
-    // D12: Klasör kartında ilk görselin küçük resmi (thumbnail) varsa kapak yap
-    const coverRec = historyCache ? historyCache.find((r) => r.folder_id === f.id) : null;
-    let icon;
-    if (coverRec && coverRec.filename) {
-      icon = document.createElement("img");
-      icon.className = "folder-thumb";
-      icon.src = `/output/${coverRec.filename}`;
-      icon.alt = "";
-    } else {
-      // SVG: 🗀 gibi glyph'ler sistem fontunda eksik olabiliyor (tofu/yanlış render)
-      icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      icon.setAttribute("class", "folder-icon");
-      icon.setAttribute("viewBox", "0 0 24 24");
-      icon.setAttribute("width", "26");
-      icon.setAttribute("height", "26");
-      icon.setAttribute("fill", "none");
-      icon.setAttribute("stroke", "currentColor");
-      icon.setAttribute("stroke-width", "1.8");
-      icon.setAttribute("stroke-linecap", "round");
-      icon.setAttribute("stroke-linejoin", "round");
-      icon.setAttribute("aria-hidden", "true");
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.setAttribute("d", "M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2z");
-      icon.appendChild(path);
-    }
-
-    const name = document.createElement("span");
-    name.className = "folder-name";
-    name.textContent = f.name;
-
-    const count = document.createElement("span");
-    count.className = "folder-count";
-    count.textContent = f.child_count
-      ? `${f.count} görsel · ${f.child_count} klasör`
-      : `${f.count} görsel`;
-
-    const open = document.createElement("button");
-    open.type = "button";
-    open.className = "folder-open";
-    open.title = `${f.name} klasörünü aç`;
-    open.appendChild(icon);
-    open.appendChild(name);
-    open.appendChild(count);
-    open.addEventListener("click", () => openFolder(f));
-
-    // Silme butonu kartta DEĞİL: klasörün içine girilince başlık şeridinin sağ üstünde.
-    const cell = document.createElement("div");
-    cell.className = "folder-cell";
-    cell.appendChild(open);
-    makeDropTarget(cell, f.id, f.name);
-    grid.appendChild(cell);
+    grid.appendChild(createFolderCell(f));
   }
   updateMediaRailCount();
 }
@@ -1240,8 +1260,8 @@ function hasFiles(e) {
 // İki bölge kardeş (.stage ile .gallery-wrap iç içe değil), o yüzden çakışmaz.
 
 function clearDropHighlights() {
-  stageEl.classList.remove("dragover");
-  galleryWrapEl.classList.remove("dropzone");
+  if (stageEl) stageEl.classList.remove("dragover");
+  if (galleryWrapEl) galleryWrapEl.classList.remove("dropzone");
   document.querySelectorAll(".drop-hover")
     .forEach((el) => el.classList.remove("drop-hover"));
 }
@@ -1251,54 +1271,50 @@ function clearDropHighlights() {
   window.addEventListener(evt, (e) => e.preventDefault())
 );
 
-// Vurguların temizliği de pencere seviyesinde: `dragleave` çocuk öğeye
-// geçildiğinde tetiklenmediği için sürükleme iptal edilir ya da pencere
-// dışında bırakılırsa vurgu takılı kalıyordu.
-//
-// YAKALAMA fazı (üçüncü argüman `true`) ŞART ve ÖLÇÜLDÜ: klasör kartının
-// `drop` dinleyicisi çift aktarmayı önlemek için `stopPropagation` çağırıyor,
-// bu da pencereye BALONLANAN temizliği yutuyor — kartın üstüne bırakınca
-// galeri alanının kesikli çerçevesi ekranda takılı kalıyordu. Yakalama fazı
-// hedeften ÖNCE koştuğu için stopPropagation onu engelleyemez.
+// Vurguların temizliği de pencere seviyesinde
 ["drop", "dragend"].forEach((evt) =>
   window.addEventListener(evt, clearDropHighlights, true)
 );
 
-["dragenter", "dragover"].forEach((evt) =>
-  stageEl.addEventListener(evt, (e) => {
-    if (hasFiles(e)) stageEl.classList.add("dragover");
-  })
-);
+if (stageEl) {
+  ["dragenter", "dragover"].forEach((evt) =>
+    stageEl.addEventListener(evt, (e) => {
+      if (hasFiles(e)) stageEl.classList.add("dragover");
+    })
+  );
 
-stageEl.addEventListener("dragleave", (e) => {
-  if (e.target === stageEl) stageEl.classList.remove("dragover");
-});
+  stageEl.addEventListener("dragleave", (e) => {
+    if (e.target === stageEl) stageEl.classList.remove("dragover");
+  });
 
-stageEl.addEventListener("drop", (e) => {
-  stageEl.classList.remove("dragover");
-  if (hasFiles(e)) setUploadSource(e.dataTransfer.files[0]);
-});
+  stageEl.addEventListener("drop", (e) => {
+    stageEl.classList.remove("dragover");
+    if (hasFiles(e)) setUploadSource(e.dataTransfer.files[0]);
+  });
+}
 
-["dragenter", "dragover"].forEach((evt) =>
-  galleryWrapEl.addEventListener(evt, (e) => {
-    if (!hasFiles(e)) return;          // iç taşıma sürüklemesi bu bölgeyi ilgilendirmez
+if (galleryWrapEl) {
+  ["dragenter", "dragover"].forEach((evt) =>
+    galleryWrapEl.addEventListener(evt, (e) => {
+      if (!hasFiles(e)) return;          // iç taşıma sürüklemesi bu bölgeyi ilgilendirmez
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      galleryWrapEl.classList.add("dropzone");
+    })
+  );
+
+  galleryWrapEl.addEventListener("dragleave", (e) => {
+    if (e.target === galleryWrapEl) galleryWrapEl.classList.remove("dropzone");
+  });
+
+  galleryWrapEl.addEventListener("drop", (e) => {
+    galleryWrapEl.classList.remove("dropzone");
+    if (!hasFiles(e)) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
-    galleryWrapEl.classList.add("dropzone");
-  })
-);
-
-galleryWrapEl.addEventListener("dragleave", (e) => {
-  if (e.target === galleryWrapEl) galleryWrapEl.classList.remove("dropzone");
-});
-
-galleryWrapEl.addEventListener("drop", (e) => {
-  galleryWrapEl.classList.remove("dropzone");
-  if (!hasFiles(e)) return;
-  e.preventDefault();
-  importFiles(e.dataTransfer.files, currentFolder ? currentFolder.id : null,
-              currentFolder ? currentFolder.name : "Klasörsüz");
-});
+    importFiles(e.dataTransfer.files, currentFolder ? currentFolder.id : null,
+                currentFolder ? currentFolder.name : "Klasörsüz");
+  });
+}
 
 function selectInGroup(groupSel, btn) {
   document.querySelectorAll(groupSel + " button").forEach((b) => b.classList.remove("active"));

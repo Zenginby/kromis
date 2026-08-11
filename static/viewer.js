@@ -259,6 +259,7 @@
   $("viewer-fit").addEventListener("click", fit);
   $("viewer-close").addEventListener("click", close);
   viewer.querySelector("[data-viewer-close]").addEventListener("click", close);
+  stage.addEventListener("click", (e) => { if (e.target === stage) close(); });
 
   document.addEventListener("keydown", (e) => {
     if (viewer.hidden) return;

@@ -101,17 +101,19 @@ coll = COLLECT(
     upx=False,
     upx_exclude=[],
     name='GPT-Image Studio',
-)
-app = BUNDLE(
-    coll,
-    name='GPT-Image Studio.app',
-    icon=None,
-    bundle_identifier='org.zenginby.gptimagestudio',
-    info_plist={
-        'LSMultipleInstancesProhibited': True,   # iki kez çift tıklama ikinci sunucu doğurmaz
-        'NSHighResolutionCapable': True,
-        'CFBundleShortVersionString': APP_VERSION,
-        'CFBundleVersion': APP_VERSION,
-        'LSMinimumSystemVersion': '13.0',
-    },
-)
+import sys
+
+if sys.platform == "darwin":
+    app = BUNDLE(
+        coll,
+        name='GPT-Image Studio.app',
+        icon=None,
+        bundle_identifier='org.zenginby.gptimagestudio',
+        info_plist={
+            'LSMultipleInstancesProhibited': True,   # iki kez çift tıklama ikinci sunucu doğurmaz
+            'NSHighResolutionCapable': True,
+            'CFBundleShortVersionString': APP_VERSION,
+            'CFBundleVersion': APP_VERSION,
+            'LSMinimumSystemVersion': '13.0',
+        },
+    )

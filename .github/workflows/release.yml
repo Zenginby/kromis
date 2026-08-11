@@ -33,13 +33,10 @@ jobs:
         include:
           - os: macos-14
             artifact_name: GPT-Image-Studio-macOS-arm64
-            asset_name: gpt-image-studio-macOS-arm64.dmg
-          - os: macos-13
-            artifact_name: GPT-Image-Studio-macOS-x86_64
-            asset_name: gpt-image-studio-macOS-x86_64.dmg
+            asset_name: gpt-image-studio-macOS-arm64.zip
           - os: windows-latest
             artifact_name: GPT-Image-Studio-Windows-x64
-            asset_name: gpt-image-studio-Windows-x64.exe
+            asset_name: gpt-image-studio-Windows-x64.zip
 
     steps:
       - uses: actions/checkout@v4
@@ -51,15 +48,27 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install -r requirements-dev.txt
           pip install pyinstaller
-      - name: Build Desktop Application
+
+      - name: Build Desktop Application (macOS)
+        if: runner.os == 'macOS'
         run: |
-          ./build.sh || pyinstaller gpt-image-studio.spec --noconfirm
+          ./build.sh
+          cp "dist/GPT-Image Studio.zip" "dist/${{ matrix.asset_name }}"
+
+      - name: Build Desktop Application (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          pyinstaller gpt-image-studio.spec --noconfirm
+          Compress-Archive -Path "dist/GPT-Image Studio/*" -DestinationPath "dist/${{ matrix.asset_name }}"
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: dist/*
+          path: dist/${{ matrix.asset_name }}
 
   release:
     needs: build

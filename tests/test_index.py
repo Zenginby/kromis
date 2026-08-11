@@ -2723,7 +2723,8 @@ def test_set_gallery_source_by_id_switches_section_to_studio():
     `ReferenceError` fırlatır.
     """
     core = _core_js()
-    assert "function setGallerySourceById" in core, "setGallerySourceById fonksiyonu yok"
-    assert "showSection(\"studio\")" in core, "showSection(\"studio\") çağrısı eksik"
-    assert "showView(" not in core, "eski showView çağrısı kalmış"
+    fn_body = _balanced_body(core, "function setGallerySourceById")
+    assert 'showSection("studio")' in fn_body, "showSection(\"studio\") çağrısı eksik"
+    assert "showView(" not in fn_body, "eski showView çağrısı kalmış"
+
 

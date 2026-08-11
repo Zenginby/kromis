@@ -9,14 +9,18 @@ storage.py ile aynı desenler: bozuk JSON'a dayanıklı okuma, immutable-append,
 """
 from __future__ import annotations
 
+import io
 import json
 import os
 import re
 import uuid
+import zipfile
 
 import jsonstore
+import storage
 
 FOLDERS_FILE = "folders.json"
+
 
 # storage._SAFE_ID ile aynı: uuid4().hex[:12] üretimiyle uyumlu bare hex token.
 _SAFE_ID = re.compile(r"[0-9a-f]{8,32}")
@@ -151,4 +155,57 @@ def rename(folder_id: str, new_name: str, output_dir: str) -> dict | None:
             _write(output_dir, items)
             return target
     return None
+
+
+def export_zip(folder_id: str, output_dir: str) -> tuple[bytes, str]:
+    """Klasörü ve tüm alt ağacını görselleriyle birlikte ZIP arşivi olarak üretir."""
+    if not folder_id or not _SAFE_ID.fullmatch(folder_id):
+        raise ValueError("Geçersiz klasör id.")
+
+    root_folder = get(folder_id, output_dir)
+    if not root_folder:
+        raise ValueError("Klasör bulunamadı.")
+
+    root_name = root_folder.get("name", "klasor").strip()
+    all_folders = _read(output_dir)
+    folder_map = {f["id"]: f for f in all_folders if f.get("id")}
+
+    def get_rel_path(fid: str) -> str:
+        chain = []
+        curr = fid
+        while curr and curr in folder_map:
+            node = folder_map[curr]
+            chain.append(node.get("name", "klasor").strip())
+            if curr == folder_id:
+                break
+            curr = node.get("parent_id")
+        chain.reverse()
+        return "/".join(re.sub(r'[^\w\s-]', '', p).strip().replace(' ', '_') or "klasor" for p in chain)
+
+    tree_ids = set(descendants(folder_id, output_dir))
+    tree_ids.add(folder_id)
+
+    history = storage.list_history(output_dir)
+    matching_records = [rec for rec in history if rec.get("folder_id") in tree_ids]
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for fid in tree_ids:
+            rel = get_rel_path(fid)
+            if rel:
+                zf.writestr(f"{rel}/", b"")
+
+        for rec in matching_records:
+            fn = rec.get("filename")
+            if not fn:
+                continue
+            src_path = os.path.join(output_dir, fn)
+            if os.path.exists(src_path):
+                f_id = rec.get("folder_id")
+                rel_dir = get_rel_path(f_id) if f_id in tree_ids else get_rel_path(folder_id)
+                zip_path = f"{rel_dir}/{fn}"
+                zf.write(src_path, arcname=zip_path)
+
+    return buf.getvalue(), root_name
+
 

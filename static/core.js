@@ -540,6 +540,11 @@ async function run() {
   const prompt = $("prompt").value.trim();
   if (!prompt) { statusEl.textContent = "Önce bir prompt yaz."; return; }
 
+  $("prompt").value = "";
+  autoGrow($("prompt"));
+  syncAskDirector();
+
+
   const size = $("size").value;
   const quality = $("quality").value;
   const n = $("n").value;
@@ -643,6 +648,9 @@ async function run() {
     // cevapsız bir kullanıcı turu düşer, yeniden denemek onu ikinci kez
     // eklerdi. Prompt kutuda duruyor — core.js kutuyu hiç temizlemiyor.
     dropPendingTurn(pending);
+    $("prompt").value = prompt;
+    autoGrow($("prompt"));
+    syncAskDirector();
     statusEl.textContent = e.message;
   } finally {
     $("go").disabled = !configured; // yapılandırma kaybolduysa kapıyı yeniden açma

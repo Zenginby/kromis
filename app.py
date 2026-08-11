@@ -823,6 +823,23 @@ def delete_folder_route(folder_id: str) -> dict:
     return {"deleted": deleted, "folders": len(deleted), "unfiled": unfiled}
 
 
+@app.get("/api/folders/{folder_id}/download")
+def download_folder_route(folder_id: str):
+    """Klasörü ve alt klasörlerini görselleriyle birlikte ZIP olarak indirir."""
+    fid = os.path.basename(folder_id)
+    if not folders.exists(fid, OUTPUT_DIR):
+        raise HTTPException(status_code=404, detail="Klasör bulunamadı.")
+    try:
+        zip_bytes, folder_name = folders.export_zip(fid, OUTPUT_DIR)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    safe_name = re.sub(r"[^\w\s-]", "", folder_name).strip().replace(" ", "_") or "klasor"
+    headers = {"Content-Disposition": f'attachment; filename="{safe_name}.zip"'}
+    return Response(content=zip_bytes, media_type="application/zip", headers=headers)
+
+
+
 @app.patch("/api/folders/{folder_id}")
 def rename_folder_route(folder_id: str, req: FolderRequest) -> dict:
     """Klasör adını değiştirir."""

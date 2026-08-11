@@ -123,7 +123,10 @@ function syncFolderView() {
   $("folder-back").hidden = !inFolder;
   // Silme yalnızca klasörün İÇİNDE (sağ üstte); seçim modunda şerit görsellere ayrılır
   $("folder-delete").hidden = !inFolder || selectMode;
+  if ($("folder-rename")) $("folder-rename").hidden = !inFolder || selectMode;
+  if ($("folder-download")) $("folder-download").hidden = !inFolder || selectMode;
   $("folder-new").hidden = selectMode;
+
   const path = inFolder ? folderPath(currentFolder.id) : [];
   // kırıntı: "A / B / C" — cache henüz gelmediyse en azından klasörün adı
   $("gallery-title").textContent = inFolder
@@ -456,10 +459,20 @@ async function renameCurrentFolder() {
   }
 }
 
+async function downloadCurrentFolder() {
+  if (!currentFolder) return;
+  const target = currentFolder;
+  statusEl.textContent = `"${target.name}" klasörü ZIP olarak indiriliyor...`;
+  const url = `/api/folders/${target.id}/download`;
+  downloadViaAnchor(url, `${target.name}.zip`);
+}
+
 $("folder-back").addEventListener("click", goUp);
 $("folder-delete").addEventListener("click", deleteCurrentFolder);
 if ($("folder-rename")) $("folder-rename").addEventListener("click", renameCurrentFolder);
+if ($("folder-download")) $("folder-download").addEventListener("click", downloadCurrentFolder);
 $("folder-new").addEventListener("click", createFolder);
+
 
 // ── Çoklu seçim ──────────────────────────────────────────────────────
 

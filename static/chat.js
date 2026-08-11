@@ -13,7 +13,24 @@
 // akışı BOŞ DİZEYLE temizlemek için kullanılıyor. Yönetmenin seçenek etiketleri
 // de model metnidir — onlar da aynı kapıdan geçer.
 
+function makeSvgIcon(dPath) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "13");
+  svg.setAttribute("height", "13");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", dPath);
+  svg.appendChild(path);
+  return svg;
+}
+
 // Sunucudaki models.py sınırlarının aynası. İstemci kapısı olmadan sınır aşımı
+
 // pydantic'in İNGİLİZCE 422 metniyle geri dönerdi.
 const MAX_CHAT_MESSAGES = 24;        // models.MAX_CHAT_MESSAGES (yalnız KONUŞMA)
 const MAX_CHAT_MSG_CHARS = 6000;     // models.MAX_CHAT_MSG_CHARS (KULLANICI mesajı)
@@ -795,13 +812,60 @@ function appendUser(msg) {
     div.append(tag, text);
   } else {
     div.className = "chat-msg-user";
-    div.textContent = msg.content;
+    const textSpan = document.createElement("span");
+    textSpan.className = "chat-msg-text";
+    textSpan.textContent = msg.content;
+    div.appendChild(textSpan);
   }
+
+  const actions = document.createElement("div");
+  actions.className = "chat-bubble-actions";
+
+  const restoreBtn = document.createElement("button");
+  restoreBtn.type = "button";
+  restoreBtn.className = "chat-action-btn";
+  restoreBtn.title = "Metni düzenlemek üzere kutuya aktar";
+  const editLabel = document.createElement("span");
+  editLabel.textContent = "Düzenle";
+  restoreBtn.append(makeSvgIcon("M9 14L4 9l5-5M20 20v-7a4 4 0 0 0-4-4H4"), editLabel);
+  restoreBtn.addEventListener("click", () => {
+    $("prompt").value = msg.content;
+    autoGrow($("prompt"));
+    syncAskDirector();
+    $("prompt").focus();
+    chatStatus("Metin düzenlenmek üzere kutuya aktarıldı.");
+  });
+
+  const copyBtn = document.createElement("button");
+  copyBtn.type = "button";
+  copyBtn.className = "chat-action-btn";
+  copyBtn.title = "Metni panoya kopyala";
+  const copyIcon = makeSvgIcon("M9 9h13v13H9zM5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1");
+  const copyLabel = document.createElement("span");
+  copyLabel.textContent = "Kopyala";
+  copyBtn.append(copyIcon, copyLabel);
+  copyBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(msg.content);
+      copyLabel.textContent = "Kopyalandı";
+      setTimeout(() => {
+        copyLabel.textContent = "Kopyala";
+      }, 2000);
+    } catch {
+      chatStatus("Kopyalanamadı.");
+    }
+  });
+
+  actions.append(restoreBtn, copyBtn);
+  div.appendChild(actions);
+
+
   $("chat-log").appendChild(div);
   syncEmptyState();
   scrollMessageIntoView(div);
   return div;
 }
+
 
 // ── Sonuç kartı (üçüncü rol) ────────────────────────────────────────
 // Döküm konuşmayı VE üretilen görselleri aynı akışta gösteriyor: kayıt
@@ -948,10 +1012,36 @@ function appendBot(text) {
     if (panel) div.appendChild(panel);
   }
 
+  const actions = document.createElement("div");
+  actions.className = "chat-bubble-actions";
+  const copyBtn = document.createElement("button");
+  copyBtn.type = "button";
+  copyBtn.className = "chat-action-btn";
+  copyBtn.title = "Yönetmen yanıtını panoya kopyala";
+  const copyIcon = makeSvgIcon("M9 9h13v13H9zM5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1");
+  const copyLabel = document.createElement("span");
+  copyLabel.textContent = "Kopyala";
+  copyBtn.append(copyIcon, copyLabel);
+  copyBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      copyLabel.textContent = "Kopyalandı";
+      setTimeout(() => {
+        copyLabel.textContent = "Kopyala";
+      }, 2000);
+    } catch {
+      chatStatus("Kopyalanamadı.");
+    }
+  });
+  actions.appendChild(copyBtn);
+  div.appendChild(actions);
+
+
   $("chat-log").appendChild(div);
   syncEmptyState();
   scrollMessageIntoView(div);
   return div;
+
 }
 
 function syncEmptyState() {

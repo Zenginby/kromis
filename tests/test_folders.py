@@ -1,5 +1,7 @@
 import io
 import json
+import zipfile
+
 
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -169,6 +171,29 @@ def test_rename_folder_route(tmp_path, monkeypatch):
     assert c.patch("/api/folders/deadbeef0000", json={"name": "Test"}).status_code == 404
 
     assert items[0]["child_count"] == 0
+
+
+def test_export_zip_and_download_route(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    parent_id = _new_folder(c, "Ana Klasör")
+    child_id = c.post("/api/folders", json={"name": "Alt Klasör", "parent_id": parent_id}).json()["folder"]["id"]
+
+    rec = _generate(c, child_id).json()["images"][0]
+
+
+    res = c.get(f"/api/folders/{parent_id}/download")
+    assert res.status_code == 200
+    assert res.headers["content-type"] == "application/zip"
+    assert "attachment; filename=" in res.headers["content-disposition"]
+
+    zf = zipfile.ZipFile(io.BytesIO(res.content))
+    namelist = zf.namelist()
+    assert any("Ana_Klasor" in name for name in namelist)
+    assert any("Alt_Klasor" in name for name in namelist)
+    assert any(rec["filename"] in name for name in namelist)
+
+    assert c.get("/api/folders/deadbeef0000/download").status_code == 404
+
 
 
 # ── görselleri klasöre kaydetme ve filtreleme ──────────────────────────

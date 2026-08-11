@@ -1899,6 +1899,51 @@ body.viewer-open { overflow: hidden; }
   flex-shrink: 0;
 }
 
+/* Sohbet Balonu Aksiyon Butonları (Düzenle / Kopyala) */
+.chat-bubble-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  opacity: 0.85;
+  transition: opacity 0.15s ease;
+}
+
+.chat-msg-user .chat-bubble-actions {
+  justify-content: flex-end;
+}
+
+.chat-msg-bot .chat-bubble-actions {
+  justify-content: flex-start;
+}
+
+
+.chat-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--hairline, rgba(255, 255, 255, 0.1));
+  border-radius: 6px;
+  color: var(--fg-muted, #a1a1aa);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.chat-action-btn:hover {
+  background: var(--bg-active, rgba(255, 255, 255, 0.12));
+  color: var(--fg-bright, #ffffff);
+  border-color: var(--hairline-bright, rgba(255, 255, 255, 0.2));
+}
+
+.chat-action-btn svg {
+  flex-shrink: 0;
+}
+
+
 .media-count {
   font-size: 12px;
   color: var(--muted, #a1a1aa);

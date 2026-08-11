@@ -52,9 +52,19 @@ def to_hex(ns_color) -> str:
     bileşen okuması dönüşüm olmadan istisna fırlatır. Dönüşüm None dönerse
     (dönüştürülemeyen renk) çağıran taraf yakalar.
     """
-    import AppKit
+    try:
+        import AppKit
+        srgb_space = AppKit.NSColorSpace.sRGBColorSpace()
+    except (ImportError, ModuleNotFoundError):
+        srgb_space = None
 
-    srgb = ns_color.colorUsingColorSpace_(AppKit.NSColorSpace.sRGBColorSpace())
+    if srgb_space is not None:
+        srgb = ns_color.colorUsingColorSpace_(srgb_space)
+    elif hasattr(ns_color, "colorUsingColorSpace_"):
+        srgb = ns_color.colorUsingColorSpace_(None)
+    else:
+        srgb = ns_color
+
     if srgb is None:
         raise ValueError("renk sRGB'ye dönüştürülemedi")
     return "#{:02x}{:02x}{:02x}".format(
@@ -75,7 +85,11 @@ def show_sampler_on_main_thread(handler: Callable[[object | None], None]) -> Non
     kapanana kadar tutar ve zaman aşımını anlamsız kılardı — bekleme
     `pick()`'in Event'inde, tek yerde.
     """
-    import AppKit
+    try:
+        import AppKit
+    except (ImportError, ModuleNotFoundError):
+        handler(None)
+        return
 
     def _present() -> None:
         AppKit.NSColorSampler.alloc().init().showSamplerWithSelectionHandler_(handler)

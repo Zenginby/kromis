@@ -324,9 +324,11 @@ function renderFolders() {
   const searching = searchQuery.length > 0;
 
   if (searching) {
-    const matching = folderCache.filter((f) => f.name.toLowerCase().includes(searchQuery));
+    const q = searchQuery.toLowerCase();
+    const matching = folderCache.filter((f) => f.name.toLowerCase().includes(q));
     if (!matching.length) {
       grid.hidden = true;
+      updateMediaRailCount();
       return;
     }
     grid.hidden = false;
@@ -337,6 +339,7 @@ function renderFolders() {
     for (const f of matching) {
       grid.appendChild(createFolderCell(f));
     }
+    updateMediaRailCount();
     return;
   }
 

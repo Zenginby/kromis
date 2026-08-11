@@ -310,3 +310,25 @@ def test_chat_is_not_configured_without_any_credentials(tmp_path, monkeypatch):
     monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", str(tmp_path / "no.env"))
 
     assert ac.get_settings_status()["chat_configured"] is False
+
+
+def test_byok_settings_status_never_exposes_raw_keys(tmp_path, monkeypatch):
+    app_env = tmp_path / "app.env"
+    app_env.write_text(
+        "OPENAI_API_KEY=sk-testkey123456\n"
+        "FAL_KEY=fal-secret789\n"
+        "REPLICATE_API_TOKEN=r8-secret000\n"
+        "COMFYUI_URL=http://localhost:8188\n",
+        encoding="utf-8"
+    )
+    monkeypatch.setattr(ac, "APP_ENV_PATH", str(app_env))
+    monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", str(tmp_path / "no.env"))
+
+    status = ac.get_settings_status()
+    assert status["has_openai_key"] is True
+    assert status["has_fal_key"] is True
+    assert status["has_replicate_token"] is True
+    assert status["comfyui_url"] == "http://localhost:8188"
+    assert "sk-testkey123456" not in str(status)
+    assert "fal-secret789" not in str(status)
+

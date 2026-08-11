@@ -122,7 +122,10 @@ def test_palette_writer_still_writes_every_v18_field(tmp_path):
         f"v1.8 alanları kayboldu: {sorted(legacy - set(produced))}"
 
 
-@pytest.mark.parametrize("kind", assets_store.KINDS)
+LEGACY_ASSET_KINDS = ("logos", "banners", "mottos")
+
+
+@pytest.mark.parametrize("kind", LEGACY_ASSET_KINDS)
 def test_asset_writer_still_writes_every_v18_field(kind, tmp_path):
     legacy = _legacy_keys(("assets", kind, "index.json"))
     produced = assets_store.save_asset(kind, b"x", "ad", str(tmp_path),
@@ -225,7 +228,7 @@ def test_saved_palettes_are_listed_newest_first(tmp_path, monkeypatch):
         assert frozen[key] == EXPECT["palette"][key], key
 
 
-@pytest.mark.parametrize("kind", assets_store.KINDS)
+@pytest.mark.parametrize("kind", LEGACY_ASSET_KINDS)
 def test_assets_still_listed_and_served(kind, tmp_path, monkeypatch):
     c = _client(tmp_path, monkeypatch)
     items = c.get(f"/api/assets/{kind}").json()["items"]

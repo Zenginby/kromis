@@ -34,6 +34,15 @@ kaldırmak gerekir. Testin ikinci iddiası bunu zorunlu tutuyor.
 |---|---|---|---|
 | `assets-modal` | Kütüphane modal değil GÖRÜNÜM (tasarım §4.1, plan §0.2/A1 — Adım 7b). İçerik id'leri (`asset-tabs`, `asset-grid`…) `#view-library` bölümüne taşındı; giden yalnızca modal kabuğu. | `assets.js` — `openAssetsModal`/`closeAssetsModal` ve backdrop/Escape dinleyicileri silindi; `loadAssets` artık modal açıklığına bakmıyor | `test_index.py::test_library_is_a_rail_view_not_a_click_on_a_hidden_button` (yokluğunu doğruluyor) |
 | `assets-close` | Aynı karar: kapatılacak modal kalmadı, görünümden ray ile çıkılıyor. | `assets.js` — kapatma dinleyicisi `openAssetsModal` ile birlikte gitti | aynı test |
+| `view-image` | Tek döküm, tek composer (tasarım §2, Adım 13). `#view-image` ve `#view-chat` tek `#view-studio` bölümünde birleşti. | `core.js` — `VIEWS`, `VIEW_ORDER` ve `showView` silindi; `setMode` kullanılıyor | `test_index.py::test_single_studio_view_is_rendered` |
+| `view-chat` | Aynı karar (Adım 13): sohbet ve üretim akışı tek `#view-studio` bölümünde. | `core.js` — `showView` silindi; sohbet dökümü `#view-studio` içinde | aynı test |
+| `chat-input` | Tek composer (Adım 13). `#chat-input` metin kutusu `#prompt` ile birleşti. | `chat.js` — tüm `$("chat-input")` atıfları `$("prompt")` yapıldı | `test_index.py::test_submit_composer_routes_by_mode` |
+| `chat-send` | Tek composer (Adım 13). `#chat-send` düğmesi `#go` ile birleşti. | `chat.js`, `settings.js` — tüm `$("chat-send")` atıfları `$("go")` veya `submitComposer` yapıldı | aynı test |
+| `chat-status` | Tek composer (Adım 13). `#chat-status` durum metni `#status` (`statusEl`) ile birleşti. | `chat.js` — `chatStatus` artık `statusEl`'e yazıyor | `test_index.py::test_single_studio_view_is_rendered` |
+| `preview` | Tek döküm (Adım 13). Büyük önizleme sahnesi kalktı; görseller döküm kartlarında ve büyüteçte gösteriliyor. | `core.js` — `showPreviewSrc` ve `clearPreview` silindi | aynı test |
+| `preview-empty` | Aynı karar (Adım 13): önizleme sahnesi kalktı. | `core.js` — `clearPreview` silindi | aynı test |
+| `preview-img` | Aynı karar (Adım 13): önizleme sahnesi kalktı. | `viewer.js` — `previewImg` dinleyicisi silindi | `test_index.py::test_single_studio_view_is_rendered` |
+| `preview-clear` | Aynı karar (Adım 13): önizleme sahnesi kalktı. | `core.js` — `clearPreview` silindi | aynı test |
 
 <!-- Tablo biçimi bağlayıcı: ilk hücre backtick içinde id olmak zorunda,
      test satırları böyle ayıklıyor. Örnek:

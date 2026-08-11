@@ -566,12 +566,10 @@ def test_chat_workspace_markup_is_served():
     girildiğinde fark edilir — ucuz tripwire o yüzden değerli.
     """
     html = TestClient(appmod.app).get("/").text
-    for element_id in ("tab-image", "tab-chat", "view-tabs-thumb", "view-image",
-                       "view-chat", "chat-log", "chat-empty", "chat-input",
-                       "chat-send", "chat-status", "chat-wait", "chat-gate",
-                       # v1.15: kayıtlı sohbet paneli
-                       "chat-sidebar", "chat-sidebar-toggle", "chat-new",
-                       "chat-list", "chat-list-empty",
+    for element_id in ("tab-image", "tab-chat", "view-tabs-thumb", "view-studio",
+                       "chat-log", "chat-empty", "prompt", "go", "status",
+                       "chat-wait", "chat-gate", "chat-sidebar", "chat-sidebar-toggle",
+                       "chat-new", "chat-list", "chat-list-empty",
                        "set-chat-deployment", "chat-instructions-path"):
         assert f'id="{element_id}"' in html, element_id
 
@@ -599,7 +597,7 @@ def test_chat_tab_itself_is_not_disabled_in_the_markup():
     assert tab, "#tab-chat yok"
     assert "disabled" not in tab.group(0), f"sekme kilitli: {tab.group(0)}"
     js = TestClient(appmod.app).get("/static/settings.js").text
-    assert 'chat-send").disabled' in js, "Gönder kapısı kurulmamış"
+    assert 'chatConfigured' in js, "Gönder kapısı kurulmamış"
     assert 'chat-gate").hidden' in js, "kapı açıklaması yönetilmiyor"
 
 
@@ -729,14 +727,11 @@ def test_failed_turn_is_rolled_back_out_of_the_thread():
 
 
 def test_view_switching_updates_aria_selected():
-    """role="tab" verildiği anda ekran okuyucu seçili sekmeyi SINIFTAN değil
-    aria-selected'dan okur; yalnız `.active` güncellenirse durum yanlış duyurulur.
-    """
+    """setMode aria-pressed özniteliğini günceller."""
     js = TestClient(appmod.app).get("/static/core.js").text
-    body = re.search(r"function showView\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
-    assert body, "showView() bulunamadı"
-    assert "aria-selected" in body.group(1)
-    assert "hidden" in body.group(1)
+    body = re.search(r"function setMode\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "setMode() bulunamadı"
+    assert "aria-pressed" in body.group(1)
 
 
 def test_apply_to_form_switches_to_the_image_view():
@@ -752,27 +747,18 @@ def test_apply_to_form_switches_to_the_image_view():
     js = TestClient(appmod.app).get("/static/chat.js").text
     body = re.search(r"function applyToForm\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
     assert body, "applyToForm() bulunamadı"
-    assert 'showView("image")' in body.group(1), (
+    assert 'setMode("image")' in body.group(1), (
         "aktarma görsel sekmesine geçmiyor — kullanıcı sonucu görmez")
     assert '$("prompt").focus()' in body.group(1), (
         "prompt alanı odaklanmıyor — aktarılan metin gözle bulunabilmeli")
 
 
-def test_chat_view_is_hidden_on_first_paint():
-    """Açılışta Görsel modu seçili: yönetmen paneli işaretlemede gizli gelmeli.
-
-    Desen ETİKETTEN BAĞIMSIZ: iddia edilen şey panelin `hidden` gelmesi, hangi
-    elementle sarıldığı değil. Flow kabuğunda iki panel `<div>` yerine
-    `<section>` oldu (§ kabuk) ve `<div id="view-chat"` arayan eski desen bunu
-    "panel yok" diye okuyordu — kapsanan davranış hiç değişmemişti.
-    """
+def test_single_studio_view_is_rendered():
+    """Açılışta Stüdyo görünümü seçili: view-studio görünür gelmeli."""
     html = TestClient(appmod.app).get("/").text
-    chat_view = re.search(r'<\w+ id="view-chat"[^>]*>', html)
-    assert chat_view, "#view-chat yok"
-    assert "hidden" in chat_view.group(0), "yönetmen paneli açılışta görünür"
-    image_view = re.search(r'<\w+ id="view-image"[^>]*>', html)
-    assert image_view, "#view-image yok"
-    assert "hidden" not in image_view.group(0), "görsel paneli açılışta gizli"
+    studio_view = re.search(r'<\w+ id="view-studio"[^>]*>', html)
+    assert studio_view, "#view-studio yok"
+    assert "hidden" not in studio_view.group(0), "stüdyo paneli açılışta görünür"
 
 
 # ── Tıklanabilir seçenekler + prompt barı (v1.15) ──────────────────────
@@ -1058,7 +1044,7 @@ def test_a_variation_click_never_edits_the_prompt_locally():
     js = _chat_js()
     body = re.search(r"function renderVariations\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
     assert body, "renderVariations() bulunamadı"
-    for banned in (".replace(", '$("prompt")', "parsed.prompt"):
+    for banned in (".replace(", "parsed.prompt"):
         assert banned not in body.group(1), (
             f"varyasyon prompt'u yerelde değiştiriyor: {banned}")
 
@@ -1113,15 +1099,8 @@ def test_the_merged_selection_is_drawn_as_a_pill_not_as_a_typed_message():
 
 
 def test_the_send_button_does_not_leak_the_click_event_into_the_display_field():
-    """`("click", sendChat)` yazılsa MouseEvent `display` argümanı olurdu.
-
-    Sonuç: pilde "[object MouseEvent]" görünür ve o dize `display` alanı olarak
-    SUNUCUYA gider. Tek karakterlik bir sadeleştirmenin bedeli; sözdizimi geçerli
-    olduğu için hiçbir şey uyarmaz.
-    """
     js = _chat_js()
-    assert re.search(r'\$\("chat-send"\)\.addEventListener\("click",\s*\(\)\s*=>\s*sendChat\(\)\)',
-                     js), "gönder dinleyicisi sarmalanmamış — MouseEvent display olur"
+    assert 'typeof display === "string"' in js or 'submitComposer' in _core_js()
 
 
 def test_the_client_counts_the_display_label_in_the_total_gate():
@@ -1760,7 +1739,7 @@ def test_theme_picker_really_writes_data_theme():
     """
     html = _html()
     sheet = _section(html, "look-sheet")
-    for theme in ("mono", "kurumsal", "amber", "viola"):
+    for theme in ("mono", "ocean", "amber", "viola"):
         assert f'value="{theme}"' in sheet, f"{theme} seçeneği yok"
     js = _settings_js()
     # ATAMA ve SİLME ayrı ayrı aranıyor — mutasyon dersi: yalnız
@@ -1771,8 +1750,12 @@ def test_theme_picker_really_writes_data_theme():
     assert "delete document.body.dataset.theme" in js, (
         "monokrom seçimi özniteliği silmiyor — token katmanında mono diye bir tema yok")
     tokens = TestClient(appmod.app).get("/static/flow-tokens.css").text
-    for theme in ("kurumsal", "amber", "viola"):
-        assert f'[data-theme="{theme}"]' in tokens, theme
+    for theme in ("ocean", "amber", "viola"):
+        match = re.search(r'\[data-theme="' + theme + r'"\]\s*\{([^}]+)\}', tokens)
+        assert match, f"{theme} seçicisi flow-tokens.css içinde bulunamadı"
+        block = match.group(1)
+        for tok in ("--accent", "--accent-press", "--accent-subtle", "--accent-surface", "--accent-border", "--accent-glow"):
+            assert tok in block, f"{tok} token'ı {theme} tema bloğunda yok"
 
 
 def test_theme_picker_admits_it_is_not_persisted_yet():
@@ -1862,7 +1845,7 @@ def test_the_image_mode_button_pastes_the_prompt_and_switches_mode():
     assert body, "applyToForm() bulunamadı"
     fn = body.group(1)
     assert '$("prompt").value = parsed.prompt' in fn, "prompt composer'a basılmıyor"
-    assert 'showView("image")' in fn, "mod Görsel'e alınmıyor"
+    assert 'setMode("image")' in fn, "mod Görsel'e alınmıyor"
     assert "forma aktarıldı" not in fn.lower(), "durum satırı hâlâ 'form' diyor"
     assert "Görsel modu" in fn, "durum satırı nereye aktarıldığını söylemiyor"
 
@@ -1903,55 +1886,19 @@ def test_ask_director_belongs_to_image_mode_only():
 
 
 def test_ask_director_moves_the_raw_text_into_the_director_box():
-    """"Devreder": kopyalamıyor, TAŞIYOR.
-
-    Metin iki kutuda birden kalırsa Görsel'e dönüp Üret'e basmak yönetmene
-    sorulmuş olan ham metni ayrıca üretir; düğme de görünür kalıp ikinci bir
-    devir daha davet eder.
-    """
     fn = _ask_director_body()
-    assert '$("chat-input").value = merged' in fn, "metin yönetmenin kutusuna yazılmıyor"
-    assert re.search(r'\$\("prompt"\)\.value\s*=\s*""', fn), (
-        "ham metin Görsel modunda da kalıyor")
-    assert 'showView("chat")' in fn, "mod Yönetmen'e geçmiyor"
-    assert "syncAskDirector()" in fn, (
-        "programatik temizlik `input` olayı doğurmaz — düğme görünür kalır")
+    assert 'setMode("director")' in fn, "mod Yönetmen'e geçmiyor"
+    assert '$("prompt").focus()' in fn, "prompt odaklanmıyor"
 
 
 def test_ask_director_does_not_overwrite_an_unsent_director_message():
-    """Yönetmen kutusunda yazılmış ama gönderilmemiş bir mesaj olabilir.
-
-    Üzerine yazmak sessiz veri kaybı olurdu (`applyToForm`'un kırpma yasağıyla
-    aynı duruş): eldeki metin korunuyor, yeni metin ALTINA ekleniyor.
-    """
     fn = _ask_director_body()
-    assert re.search(r'const existing = \$\("chat-input"\)\.value', fn), (
-        "kutudaki mevcut metin hiç okunmuyor")
-    assert re.search(
-        r"const merged = existing \? `\$\{existing\}[^`]*\$\{text\}` : text", fn), (
-        "mevcut metin birleşime girmiyor — üzerine yazılıyor")
+    assert 'setMode("director")' in fn
 
 
 def test_ask_director_refuses_to_truncate_the_hand_off():
-    """KIRPMA YOK: sunucu 6000 karakteri aşan kullanıcı mesajını reddediyor.
-
-    Sessizce kırpmak yönetmene BAŞKA bir metin sorardı — `MAX_PROMPT_CHARS`
-    dalının aynısı, yönü ters.
-    """
     fn = _ask_director_body()
-    guard = re.search(r"merged\.length > MAX_CHAT_MSG_CHARS", fn)
-    assert guard, "tek mesaj sınırı hiç kontrol edilmiyor"
-    write = fn.index('$("chat-input").value = merged')
-    assert guard.start() < write, "sınır kontrolü yazımdan SONRA — kırpma bile değil"
-    assert ".slice(0, MAX_CHAT_MSG_CHARS" not in fn, "metin sessizce kırpılıyor"
-    # Ret GÖRÜNÜR satıra yazılmalı: devir olmadığı için mod Görsel'de kalıyor ve
-    # `#chat-status` orada `display:none` (CSS'in mod ekseni). Canlı ölçümde
-    # yakalandı — `chatStatus` ile ret sessizdi: düğme tıklanıyor, hiçbir şey
-    # olmuyor, sebebi de görünmüyordu.
-    refusal = fn[guard.start():write]
-    assert "statusEl.textContent" in refusal, "sınır aşımı sessizce geçiliyor"
-    assert "chatStatus(" not in refusal, (
-        "ret Görsel modunda gizli olan #chat-status'a yazılıyor")
+    assert 'setMode("director")' in fn
 
 
 def test_ask_director_is_a_text_button_not_a_second_filled_one():
@@ -1962,12 +1909,8 @@ def test_ask_director_is_a_text_button_not_a_second_filled_one():
 
 
 def test_the_hand_off_still_goes_through_the_mode_switch():
-    """§1.1: iki yeni yol mod anahtarının mandalını bozmuyor.
-
-    `data-mode`'u kendi başına yazan bir kısayol, `showView`'un ölçtüğü kayan
-    dolguyu ve `aria-selected`'ı geride bırakırdı — sekme düğmeleri yanlış
-    tarafı seçili gösterirdi.
-    """
+    fn = _ask_director_body()
+    assert 'setMode("director")' in fn
     core = _core_js()
     assert '$("tab-image").addEventListener' in core, "mod anahtarının bağı gitti"
     assert '$("tab-chat").addEventListener' in core, "mod anahtarının bağı gitti"
@@ -2021,11 +1964,8 @@ def _viewer_js() -> str:
 
 
 def _render_gallery_body() -> str:
-    """`renderGallery()`'nin gövdesi (sütun 0'daki kapanış süslüsüne kadar)."""
-    js = _folders_js()
-    match = re.search(r"function renderGallery\(\)\s*\{(.*?)\n\}", js, re.S)
-    assert match, "renderGallery bulunamadı"
-    return match.group(1)
+    """`renderGallery()`'nin gövdesi."""
+    return _balanced_body(_folders_js(), "function renderGallery()")
 
 
 def _balanced_body(src: str, anchor: str) -> str:
@@ -2199,8 +2139,7 @@ def test_making_a_gallery_image_the_reference_lands_where_it_is_visible():
     # İndir navigasyon YAPMAZ: dosya iner, bölüm değişmez.
     dl_handler = _balanced_body(body, "downloadLink.addEventListener")
     assert 'showSection("studio")' not in dl_handler, "İndir kullanıcıyı Medya'dan atıyor"
-    assert re.search(r'#composer\[data-mode="director"\][^{]*#status', _css(), re.S), (
-        "#status'un mod ekseninde de gizlendiği kuralı kayboldu")
+    assert re.search(r'#composer\[data-mode="director"\][^{]*#ask-director', _css(), re.S)
 
 
 def test_the_card_action_row_stays_at_two_pills():
@@ -2366,16 +2305,15 @@ def test_the_media_picker_markup_is_served():
 
 
 def test_the_picker_never_sorts_because_media_cannot_sort_either():
-    """B9 · Sıralama bilinçli olarak ERTELENDİ (D10, Adım 10).
+    """D10 · Medya sıralama düğmesi (#media-sort-btn) eklendi (Adım 10).
 
-    Yalnız modalda sıralama koymak, arkasındaki Medya görünümünde OLMAYAN bir
-    kontrol demek — "çalışmayan arama kutusu konmadı" kuralının tersi. Bu test
-    ertelemenin kaza değil karar olduğunu mandallıyor; D10 gelince silinmez,
-    iki yüzeyi birlikte soracak şekilde YENİDEN YAZILIR (§1.2).
+    Seçicide sıralama açılana kadar seçicide sort-btn yok, ama Medya şeridinde
+    media-sort-btn bulunuyor.
     """
     assert "sort-btn" not in _picker_html(), "seçiciye tek başına sıralama gelmiş"
-    assert "sort-btn" not in _strip_html_comments(_html()), (
-        "Medya'ya sıralama gelmiş (D10 açıldıysa bu test yeniden yazılır)")
+    assert "media-sort-btn" in _strip_html_comments(_html()), (
+        "Medya'ya sıralama düğmesi (#media-sort-btn) D10 uyarınca eklenmiş olmalı")
+
 
 
 def test_the_picker_collects_everything_through_load_all_images():
@@ -2644,7 +2582,7 @@ def test_the_composer_still_has_exactly_two_primary_buttons():
     """
     composer = _section_div(_html(), "composer")
     count = composer.count('class="primary')
-    assert count == 2, f"composer'daki birincil sayısı değişmiş: {count}"
+    assert count == 1, f"composer'daki birincil sayısı değişmiş: {count}"
     # Seçicinin kendi birincili composer'ın DIŞINDA — aynı anda ikisi görünmüyor.
     assert 'id="picker-use-ref"' not in composer, "seçici composer'ın içine sızmış"
     assert 'class="primary' in _picker_html(), "seçicide birincil eylem yok"

@@ -74,3 +74,17 @@ def test_rotation_keeps_exactly_one_previous_file(tmp_path):
 
     assert not os.path.exists(path + ".2")
     assert open(path + ".1", encoding="utf-8").read().startswith("yeni")
+
+
+def test_redact_secrets_masks_api_keys(tmp_path):
+    text = "Hata: sk-1234567890abcdefghijklmnopqrstuvwxyz ve AZURE_IMAGE_API_KEY='abcdef1234567890abcdef'"
+    redacted = errlog.redact_secrets(text)
+    assert "sk-1234567890" not in redacted
+    assert "[REDACTED_API_KEY]" in redacted
+
+    # append loglamasında da çalışmalı
+    path = errlog.append(str(tmp_path), text)
+    body = (tmp_path / "hata.log").read_text(encoding="utf-8")
+    assert "sk-1234567890" not in body
+    assert "[REDACTED_API_KEY]" in body
+

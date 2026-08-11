@@ -20,110 +20,69 @@ const MAX_PROMPT_CHARS = 4000;
 // Kabuk sorumluluğu, sohbete özel DEĞİL: bu yüzden chat.js'te değil burada.
 // chat.js yalnızca showView("image") çağırıyor, böylece sadece kendinden
 // önceki dosyalara bakan bir yaprak kalıyor ve yükleme sırası bozulmuyor.
-const VIEWS = { image: ["view-image", "tab-image"], chat: ["view-chat", "tab-chat"] };
-// Sekme SIRASI yönü belirliyor: sağdaki sekmeye geçerken panel sağdan, soldakine
-// dönerken soldan giriyor. Yön olmadan iki taraf aynı görünür ve hareket
-// "nereden nereye" bilgisini taşımaz.
-const VIEW_ORDER = ["image", "chat"];
-let currentView = "image";
-// Ray bölümü: "studio" (mod anahtarıyla iki panel) | "media" (galeri) |
-// "library" (bindirme varlıkları) | "tools" (görünüm + paletler).
-// Dördü de GÖRÜNÜM (tasarım §4.1) — Adım 7b'ye kadar son ikisi gizli
-// düğmelere programatik tıklıyordu ve ray grameri bozuktu.
+let currentMode = "image";
+// Ray bölümü: "studio" (tek döküm) | "media" (galeri) | "library" (bindirme varlıkları) | "tools" (görünüm + paletler).
 let currentSection = "studio";
 
-/** Bitişik segmentin kayan dolgusu: aktif düğmenin ölçüsünden okunuyor.
- *
- * Genişlik CSS'e SABİTLENEMEZ — "Görsel" ile "Prompt Yönetmeni" farklı
- * genişlikte ve etiketler çeviriyle/yazı tipiyle değişiyor.
- */
+/** Bitişik segmentin kayan dolgusu: aktif düğmenin ölçüsünden okunuyor. */
 function syncTabThumb() {
   const thumb = $("view-tabs-thumb");
-  const tab = $(VIEWS[currentView][1]);
+  const tab = currentMode === "image" ? $("tab-image") : $("tab-chat");
+  if (!thumb || !tab) return;
   thumb.style.width = `${tab.offsetWidth}px`;
   thumb.style.transform = `translateX(${tab.offsetLeft}px)`;
 }
 
-function showView(name) {
-  // Medya'dayken bir mod çağrısı gelirse (ör. chat.js prompt'u forma aktarıp
-  // showView("image") diyor) önce Stüdyo'ya dönülür. `fromShowView` bayrağı
-  // showSection'ın buraya geri dönmesini engelliyor.
-  if (currentSection !== "studio") showSection("studio", true);
-  const forward = VIEW_ORDER.indexOf(name) > VIEW_ORDER.indexOf(currentView);
-  const changed = name !== currentView;
-  currentView = name;
-  for (const [key, [viewId, tabId]] of Object.entries(VIEWS)) {
-    const active = key === name;
-    const view = $(viewId);
-    // `hidden` ANINDA çevriliyor (çift panelli cross-fade YOK): iki paneli
-    // birlikte görünür tutmak katman + çift odak + sıçrayan yerleşim demekti.
-    // Animasyon yalnızca GİREN panelde ve `hidden` kalkar kalkmaz başlıyor.
-    view.hidden = !active;
-    if (active && changed) {
-      view.classList.remove("view-in-left", "view-in-right");
-      // reflow: sınıf aynı karede kaldırılıp eklenirse animasyon yeniden başlamaz
-      void view.offsetWidth;
-      view.classList.add(forward ? "view-in-right" : "view-in-left");
+function setMode(modeName) {
+  const mode = modeName === "director" ? "director" : "image";
+  if (currentSection !== "studio") showSection("studio");
+  currentMode = mode;
+  $("composer").dataset.mode = mode;
+  $("tab-image").setAttribute("aria-pressed", mode === "image" ? "true" : "false");
+  $("tab-chat").setAttribute("aria-pressed", mode === "director" ? "true" : "false");
+  $("tab-image").classList.toggle("active", mode === "image");
+  $("tab-chat").classList.toggle("active", mode === "director");
+
+  const prompt = $("prompt");
+  if (prompt) {
+    if (mode === "image") {
+      prompt.placeholder = "Ne üretmek istiyorsun? Görsel tarifi, renk veya tarz yaz…";
+    } else {
+      prompt.placeholder = "Yönetmen'e sor veya fikir danış… (öğeleri değiştir, sahne ekle)";
     }
-    $(tabId).classList.toggle("active", active);
-    // aria-selected tel üzerinde güncellenmeli: role="tab" verildiği anda
-    // ekran okuyucu hangi sekmenin seçili olduğunu SINIFTAN değil bundan okur.
-    $(tabId).setAttribute("aria-selected", active ? "true" : "false");
   }
-  // Composer'ın hangi yarısı görünecek: karar CSS'te (`#composer[data-mode=…]`).
-  // Sebep: #chat-gate ve #chat-send'in `hidden`/`disabled`'ını settings.js ve
-  // chat.js yönetiyor (sohbet yapılandırma kapısı). Aynı öznitelikleri moda
-  // göre buradan da oynatmak iki sahip demekti; `display` ayrı bir eksen.
-  $("composer").dataset.mode = name === "image" ? "image" : "director";
+  renderSource();
   syncTabThumb();
 }
 
-$("tab-image").addEventListener("click", () => showView("image"));
-$("tab-chat").addEventListener("click", () => showView("chat"));
-// Yazı tipi geldiğinde ve pencere değiştiğinde dolgu kayar: ölçüm tazelenmeli.
+$("tab-image").addEventListener("click", () => setMode("image"));
+$("tab-chat").addEventListener("click", () => setMode("director"));
 window.addEventListener("resize", syncTabThumb);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(syncTabThumb);
-syncTabThumb();
 
 // ══ Flow kabuğu ══════════════════════════════════════════════════════
-// Ray gezinme, slide-over'lar, (+) menüsü, composer modu. Kabuk sorumluluğu
-// olduğu için BURADA (bkz. yukarıdaki sekme notu): chat.js bir yaprak dosya.
-//
-// Perde (#shell-scrim) JS ile YÖNETİLMİYOR: görünürlüğü CSS'te `:has()` ile
-// açık panelden türetiliyor. Sebebi somut — oturum listesini açan dinleyici
-// chat.js'te ve o dosya core.js'ten SONRA yükleniyor; perdeyi buradan
-// senkronlamak "diğer dinleyici çalıştıktan sonra oku" gibi kırılgan bir
-// sıralama numarası gerektirirdi. Türetilmiş durum o numarayı gereksiz kılıyor.
-
 const APP = document.querySelector(".app");
 
-// Ray bölümü → görünüm eşlemesi. "studio" burada null: onun iki paneli
-// (view-image / view-chat) showView'un işi, bölüm anahtarının değil.
-const SECTION_VIEWS = { studio: null, media: "view-media",
+// Ray bölümü → görünüm eşlemesi.
+const SECTION_VIEWS = { studio: "view-studio", media: "view-media",
                         library: "view-library", tools: "view-tools" };
 
-function showSection(name, fromShowView = false) {
+function showSection(name) {
   currentSection = name;
   const studio = name === "studio";
   for (const [key, viewId] of Object.entries(SECTION_VIEWS)) {
-    if (viewId) $(viewId).hidden = key !== name;
+    if (viewId && $(viewId)) $(viewId).hidden = key !== name;
   }
-  // Composer yalnız Stüdyo'da: prompt bir oturumun repliği (tasarım §4.2),
-  // Medya/Kütüphane/Araçlar'da gönderilecek bir döküm yok.
-  $("composer").hidden = !studio;
-  if (studio) {
-    // Panelleri ve mod anahtarını geri kur — showView'dan gelindiyse o zaten
-    // yapacak, ikinci kez çağırmak animasyonu boşa tetiklerdi.
-    if (!fromShowView) showView(currentView);
-  } else {
-    for (const [viewId] of Object.values(VIEWS)) $(viewId).hidden = true;
-  }
+  if ($("composer")) $("composer").hidden = !studio;
   for (const key of Object.keys(SECTION_VIEWS)) {
+    const el = $(`rail-${key}`);
+    if (!el) continue;
     const on = key === name;
-    $(`rail-${key}`).classList.toggle("active", on);
-    if (on) $(`rail-${key}`).setAttribute("aria-current", "page");
-    else $(`rail-${key}`).removeAttribute("aria-current");
+    el.classList.toggle("active", on);
+    if (on) el.setAttribute("aria-current", "page");
+    else el.removeAttribute("aria-current");
   }
+  if (studio) syncTabThumb();
 }
 
 $("rail-studio").addEventListener("click", () => showSection("studio"));
@@ -213,28 +172,46 @@ syncSpecs();
 // ── Composer: otomatik büyüyen kutu + ⌘Enter + ⌘J ──
 // Yükseklik satır sayısıyla büyür, `.composer-input`'un max-height'ı tavan.
 function autoGrow(el) {
+  if (!el) return;
   el.style.height = "auto";
   el.style.height = `${el.scrollHeight}px`;
 }
-for (const id of ["prompt", "chat-input"]) {
-  const el = $(id);
-  el.addEventListener("input", () => autoGrow(el));
+$("prompt").addEventListener("input", () => autoGrow($("prompt")));
+
+function submitComposer() {
+  const promptVal = $("prompt").value.trim();
+  if (currentMode === "image") {
+    if (promptVal.length > MAX_PROMPT_CHARS) {
+      statusEl.textContent = `İstem çok uzun (${promptVal.length}/${MAX_PROMPT_CHARS} karakter).`;
+      return;
+    }
+    run();
+  } else {
+    if (promptVal.length > 6000) {
+      statusEl.textContent = `Mesaj çok uzun (${promptVal.length}/6000 karakter).`;
+      return;
+    }
+    sendChat();
+  }
 }
 
-// Görsel modunda ⌘/Ctrl+Enter üretime gider. Sohbette bu davranış zaten vardı
-// (chat.js:1162); composer'ın altındaki ipucu iki modda da geçerli olduğu için
-// eksik taraf tamamlandı.
+$("go").addEventListener("click", submitComposer);
+
 $("prompt").addEventListener("keydown", (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); $("go").click(); }
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    submitComposer();
+  } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+    e.preventDefault();
+    submitComposer();
+  }
 });
 
 document.addEventListener("keydown", (e) => {
   if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "j") return;
   if (currentSection !== "studio") return;
   e.preventDefault();
-  // `.click()` çünkü chat.js'in kendi tab-chat dinleyicisi de var (taslağı
-  // sohbete taşıyıp kutuya odaklanıyor); showView'ı doğrudan çağırmak onu atlar.
-  $(currentView === "image" ? "tab-chat" : "tab-image").click();
+  setMode(currentMode === "image" ? "director" : "image");
 });
 
 // Ana referans görsel: null | { kind: "upload", file, label } | { kind: "gallery", id, label }
@@ -365,28 +342,6 @@ function clearUploadPreviewUrl() {
   }
 }
 
-function showPreviewSrc(src, alt = "") {
-  const img = $("preview-img");
-  img.src = src;
-  img.alt = alt;
-  img.hidden = false;
-  $("preview-empty").hidden = true;
-  $("preview-clear").hidden = false;
-  $("preview").classList.remove("empty");
-}
-
-// Görseli yalnızca ekrandan kaldırır (silme yok) ve boş duruma döner.
-function clearPreview() {
-  const img = $("preview-img");
-  img.hidden = true;
-  img.removeAttribute("src");
-  img.alt = "";
-  $("preview-empty").hidden = false;
-  $("preview-clear").hidden = true;
-  $("preview").classList.add("empty");
-  setCurrentImage(null);
-}
-
 // Merkez önizlemede görünen sunucu kaydı: logo/motto/banner bindirmesinin hedefi.
 // Yüklenmiş (henüz kaydedilmemiş) bir görsel gösterilirken null'dır.
 let currentImage = null;
@@ -397,20 +352,37 @@ function setCurrentImage(rec) {
 }
 
 function showPreview(rec) {
-  showPreviewSrc(`/output/${rec.filename}`, (rec.prompt || "").slice(0, 60));
   setCurrentImage(rec);
 }
 
 // Referans durumunu arayüze yansıt: chip + ana buton etiketi + ek görsel şeridi
 function renderSource() {
   const chip = $("ref-chip");
+  const chipImg = $("ref-chip-img");
+  const goBtn = $("go");
   if (source) {
     $("ref-label").textContent = source.label;
     chip.hidden = false;
-    $("go").textContent = extras.length ? "Görselleri birleştir" : "Görseli düzenle";
+    if (chipImg && uploadPreviewUrl) {
+      chipImg.src = uploadPreviewUrl;
+      chipImg.hidden = false;
+    } else if (chipImg) {
+      chipImg.hidden = true;
+      chipImg.removeAttribute("src");
+    }
+    if (currentMode === "image") {
+      goBtn.textContent = extras.length ? "Görselleri birleştir" : "Görseli düzenle";
+    } else {
+      goBtn.textContent = "Gönder";
+    }
   } else {
     chip.hidden = true;
-    $("go").textContent = "Üret";
+    if (chipImg) { chipImg.hidden = true; chipImg.removeAttribute("src"); }
+    if (currentMode === "image") {
+      goBtn.textContent = "Üret";
+    } else {
+      goBtn.textContent = "Gönder";
+    }
   }
   // Ek görsel yalnızca bir ana görsel varken anlamlı
   $("extra-row").hidden = !source;
@@ -765,7 +737,7 @@ async function deleteImage(rec) {
     }
     if (source && source.kind === "gallery" && source.id === rec.id) clearSource();
     extras = extras.filter((it) => !(it.kind === "gallery" && it.id === rec.id));
-    if (currentImage && currentImage.id === rec.id) clearPreview();
+    if (currentImage && currentImage.id === rec.id) setCurrentImage(null);
     renderSource();
     statusEl.textContent = "Silindi.";
     await loadHistory();

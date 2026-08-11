@@ -36,6 +36,10 @@ LEDGER = ROOT / "docs" / "flow-ui" / "id-defteri.md"
 JS_FILES = ("core.js", "folders.js", "assets.js", "palette.js", "settings.js",
             "viewer.js", "chat.js")
 
+_TOP_LEVEL_DECLARATION_RE = re.compile(
+    r"^(?:(?:async\s+)?function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=)", re.M
+)
+
 
 def _baseline_ids():
     """Dondurulmuş taban: 25713f8'deki 152 id. `#` ile başlayan satırlar not."""
@@ -156,6 +160,23 @@ def test_toplevel_baglar_htmlde_duruyor():
     )
 
 
+def test_clear_preview_is_not_called():
+    """Emekliye ayrılan clearPreview fonksiyonunun JS dosyalarında çağrısı olmamalı."""
+    for name, src in _js_sources().items():
+        assert "clearPreview(" not in src, f"{name} içinde silinen clearPreview() çağrısı kalmış"
+
+
+def test_go_button_has_single_listener():
+    """#go butonunun yalnızca tek bir addEventListener çağrısı olmalı (core.js:submitComposer)."""
+    hits = []
+    for name, src in _js_sources().items():
+        for lineno, line in enumerate(src.splitlines(), start=1):
+            if '$("go").addEventListener' in line:
+                hits.append(f"{name}:{lineno}")
+    assert len(hits) == 1, f"#go butonuna birden fazla addEventListener bağlı: {hits}"
+    assert hits[0].startswith("core.js"), f"#go listener'ı core.js dışında bağlı: {hits[0]}"
+
+
 def test_hicbir_ust_duzey_ad_iki_dosyada_tanimli_degil():
     """4. iddia: aynı üst düzey ad iki dosyada tanımlıysa SONRAKİ öncekini ezer.
 
@@ -174,12 +195,11 @@ def test_hicbir_ust_duzey_ad_iki_dosyada_tanimli_degil():
     # Yorumlar ayıklanıyor: gerekçe yorumları yasaklanan adı yazmak ZORUNDA
     # ("Adı `renderPicker` DEĞİL: palette.js aynı adı …") ve ham metinde
     # aranırsa iddia kendi açıklamasına takılır (§0.6/§0.7/§0.9'un dersi).
-    bildirim = re.compile(r"^(?:function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=)", re.M)
     nerede = {}
     for name, src in _js_sources().items():
         src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
         src = "\n".join(l for l in src.splitlines() if not l.lstrip().startswith("//"))
-        for m in bildirim.finditer(src):
+        for m in _TOP_LEVEL_DECLARATION_RE.finditer(src):
             nerede.setdefault(m.group(1) or m.group(2), set()).add(name)
 
     carpisan = {ad: sorted(fs) for ad, fs in nerede.items() if len(fs) > 1}
@@ -188,3 +208,26 @@ def test_hicbir_ust_duzey_ad_iki_dosyada_tanimli_degil():
         + "\n".join(f"  {ad} → {', '.join(fs)}" for ad, fs in sorted(carpisan.items()))
         + "\nindex.html'de sonra yüklenen öncekini SESSİZCE ezer."
     )
+
+
+def test_ust_duzey_ad_taramasi_async_fonksiyonlari_yakalar():
+    """`test_hicbir_ust_duzey_ad_iki_dosyada_tanimli_degil` regex'i async fonksiyonları da taramalı."""
+    folders_src = _js_sources()["folders.js"]
+    bulunanlar = {m.group(1) or m.group(2) for m in _TOP_LEVEL_DECLARATION_RE.finditer(folders_src)}
+    assert "openPicker" in bulunanlar
+    assert "loadFolders" in bulunanlar
+    assert "refreshSearch" in bulunanlar
+
+
+def test_refresh_search_matches_search_i_bare_referansla_cagirmadigi_mandallanir():
+    """`refreshSearch` `matchesSearch`'i `all.filter(matchesSearch)` biçiminde çağırmamalı.
+
+    `Array.prototype.filter` 2. parametre olarak `index` (0, 1, 2...) geçirir;
+    `matchesSearch(rec, q = searchQuery)` imzası `q = index` alarak varsayılan
+    sorguyu ezer ve Medya aramasını bozar.
+    """
+    folders_src = _js_sources()["folders.js"]
+    assert "all.filter(matchesSearch)" not in folders_src, (
+        "historyCache = all.filter(matchesSearch) kullanımı index parametresini q'ya zorlar!"
+    )
+

@@ -129,7 +129,6 @@ arm64 runner'ında (macos-14) aynı spec ve `build.sh` ile üretilir. Actions �
 - Sürüm değiştiğinde manifest yedeği: `backups/<eski sürüm>-<tarih>/` altına
   liste dosyalarının bayt kopyası (görsellerin kendisi kopyalanmaz)
 
-## Sonraya (v2)
-- Maske ile bölgesel düzenleme (inpainting)
-- Varlık kütüphanesinden AI'a referans verme (piksel bindirme yerine "bu logoyu
-  sahneye doğal biçimde yerleştir")
+## Lisans
+Bu proje **MIT Lisansı** altında lisanslanmıştır. Detaylar için [LICENSE](file:///Users/kullanici/Documents/Projects/Claude%20Code%20Projects/gpt-image-studio/LICENSE) dosyasına bakabilirsiniz.
+

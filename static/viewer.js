@@ -205,13 +205,6 @@
 
   // --- olaylar --------------------------------------------------------------
 
-  const previewImg = $("preview-img");
-  previewImg.addEventListener("click", () => {
-    if (previewImg.hidden || !previewImg.getAttribute("src")) return;
-    openerRect = previewImg.getBoundingClientRect();
-    open(previewImg.src, previewImg.alt);
-  });
-
   // preventDefault ZORUNLU: WKWebView'da ctrl'lü wheel (trackpad pinch)
   // engellenmezse TÜM sayfayı zoom'lar — uygulama arayüzü bozulur ve
   // kullanıcının bunu geri alması zor.

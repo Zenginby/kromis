@@ -25,14 +25,14 @@ def client(out_dir):
 
 
 def test_get_reports_the_defaults(client):
-    assert client.get("/api/prefs").json() == {"autosave_sessions": True}
+    assert client.get("/api/prefs").json() == {"autosave_sessions": True, "theme": "mono"}
 
 
 def test_post_turns_autosave_off_and_get_reflects_it(client, out_dir):
     r = client.post("/api/prefs", json={"autosave_sessions": False})
 
     assert r.status_code == 200
-    assert r.json() == {"autosave_sessions": False}
+    assert r.json() == {"autosave_sessions": False, "theme": "mono"}
     assert client.get("/api/prefs").json()["autosave_sessions"] is False
     assert prefs.read(out_dir)["autosave_sessions"] is False
 

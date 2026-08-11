@@ -25,8 +25,6 @@
   --text: var(--fg, oklch(94% 0.01 260));
   --muted: oklch(72% 0.02 260);
   --accent: oklch(72% 0.17 45);
-  /* Flow §8: beyaz birincil eylemin basılı/hover hâli #e8eaed. */
-  --accent-press: var(--fg, oklch(64% 0.17 45));
   --danger: oklch(62% 0.19 25);
   /* Basılı hâl --danger'dan TÜRETİLİYOR, sabit değil: üstündeki metin --text
      ve sabit `oklch(55% 0.2 25)` ile ölçüm 4.47:1 veriyordu — 4.5 kapısının
@@ -156,8 +154,26 @@ body {
 }
 .rail-item svg { width: 22px; height: 22px; flex: none; }
 .rail-item span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rail-item:hover { background: var(--panel-2); color: var(--text); }
-.rail-item.active { background: var(--selected, var(--panel-2)); color: var(--text); }
+.rail-item:hover {
+  background: var(--accent-subtle, var(--panel-2));
+  color: var(--fg, var(--text));
+}
+.rail-item:hover svg {
+  color: var(--accent);
+}
+.rail-item.active,
+.rail-item[aria-current="true"] {
+  background: var(--accent-subtle, var(--selected, var(--panel-2)));
+  color: var(--fg, var(--text));
+}
+.rail-item.active svg,
+.rail-item[aria-current="true"] svg {
+  color: var(--accent);
+}
+.rail-count {
+  margin-left: auto; font-family: var(--font-mono, monospace);
+  font-size: 0.72rem; font-weight: 500; color: var(--accent);
+}
 .rail-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .rail-sep { width: 100%; border: 0; border-top: 1px solid var(--hairline); margin: 12px 0; }
 .rail-spacer { flex: 1 1 auto; min-height: 8px; }
@@ -208,7 +224,10 @@ body {
   box-shadow: var(--shadow, 0 18px 48px rgba(0, 0, 0, 0.66));
   transition: border-color var(--dur) var(--ease);
 }
-.composer:focus-within { border-color: var(--accent); }
+.composer:focus-within {
+  border-color: var(--accent-border, var(--accent));
+  box-shadow: var(--shadow, 0 18px 48px rgba(0, 0, 0, 0.66)), var(--accent-glow, none);
+}
 .composer[hidden] { display: none; }
 .composer-refs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .composer-refs:empty { display: none; }
@@ -230,7 +249,12 @@ body {
   border-radius: 50%;
   transition: background var(--dur) var(--ease);
 }
-.plus:hover { background: var(--raised); }
+.plus:hover,
+.plus-wrap.open .plus {
+  background: var(--accent-subtle, var(--raised));
+  color: var(--accent);
+  border-color: var(--accent-border, var(--control-border));
+}
 .plus:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .popover {
   position: absolute; bottom: calc(100% + 10px); left: 0; z-index: 10;
@@ -277,15 +301,8 @@ body:has(.sheet.open) .scrim { display: block; }
    `display` kullanılıyor çünkü #chat-gate ve #chat-send'in `hidden`/`disabled`
    sahibi settings.js ve chat.js (sohbet yapılandırma kapısı) — iki sahip
    olmasın diye mod ekseni ayrı tutuldu. */
-#composer[data-mode="image"] #chat-input,
-#composer[data-mode="image"] #chat-send,
-#composer[data-mode="image"] #chat-gate,
-#composer[data-mode="image"] #chat-status { display: none; }
-#composer[data-mode="director"] #prompt,
-#composer[data-mode="director"] #go,
 #composer[data-mode="director"] #specs-btn,
 #composer[data-mode="director"] #ask-director,
-#composer[data-mode="director"] #status,
 #composer[data-mode="director"] #folder-target { display: none; }
 /* "Yönetmen'e sor" Görsel modunun kutusuna bağlı: Yönetmen modunda kendine
    sormak anlamsız olurdu. Doluluk ekseni chat.js'te (`hidden`), görünüşü
@@ -352,14 +369,20 @@ body:has(.sheet.open) .scrim { display: block; }
   padding: 18px; text-align: left; cursor: pointer; font: inherit; color: var(--text);
   transition: background var(--dur) var(--ease);
 }
-.tool:hover { background: var(--panel-2); }
+.tool:hover {
+  background: var(--accent-surface, var(--panel-2));
+  box-shadow: inset 0 0 0 1px var(--accent-border, transparent);
+}
 .tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .tool-ic {
   width: 36px; height: 36px; border-radius: 10px; background: var(--panel-2);
   display: grid; place-items: center; color: var(--muted); margin-bottom: 14px;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
-.tool:hover .tool-ic { background: var(--raised); color: var(--text); }
+.tool:hover .tool-ic {
+  background: var(--accent-subtle, var(--raised));
+  color: var(--accent);
+}
 .tool b { display: block; font-weight: 500; font-size: 15px; line-height: 1.4; }
 .tool > span:not(.tool-ic) {
   display: block; font-size: 13px; line-height: 1.55; color: var(--muted); margin-top: 4px;
@@ -411,8 +434,16 @@ body:has(.sheet.open) .scrim { display: block; }
   border: 0; border-radius: 50%;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
-.icon-btn:hover { background: var(--panel-2); color: var(--text); }
-.icon-btn[aria-expanded="true"] { background: var(--selected, var(--panel-2)); color: var(--text); }
+.icon-btn:hover {
+  background: var(--accent-subtle, var(--panel-2));
+  color: var(--accent);
+}
+.icon-btn[aria-expanded="true"],
+.icon-btn.active {
+  background: var(--accent-subtle, var(--selected, var(--panel-2)));
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-border, transparent);
+}
 .icon-btn svg { display: block; }
 
 /* Modal */
@@ -537,7 +568,11 @@ body:has(.sheet.open) .scrim { display: block; }
   transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 .seg button:hover { color: var(--text); background: var(--raised); }
-.seg button.active { background: var(--fill-selected); color: var(--on-fill-selected); }
+.seg button.active {
+  background: var(--accent-subtle, var(--fill-selected));
+  color: var(--fg, var(--on-fill-selected));
+  box-shadow: inset 0 0 0 1px var(--accent-border, transparent);
+}
 .seg button:disabled { opacity: 0.4; cursor: not-allowed; }
 .seg button:disabled:hover { color: var(--muted); background: none; }
 .field-note { color: var(--muted); font-size: 0.74rem; line-height: 1.4; margin: 0.3rem 0 0; }
@@ -806,14 +841,28 @@ button.palette-sw:focus-visible { outline: 2px solid var(--accent); outline-offs
    segmented'in #4d4e50'sinden bilinçli olarak ayrı. */
 .view-tabs button.active {
   background: none; border-color: transparent;
-  color: var(--on-accent); font-weight: 500;
+  color: var(--on-primary, #101011); font-weight: 500;
 }
 .view-tabs-thumb {
   position: absolute; top: 3px; bottom: 3px; left: 0;
-  background: var(--fill-primary); border-radius: 999px;
+  background: var(--accent); border-radius: 999px;
+  box-shadow: var(--accent-glow, none);
   transition: transform var(--dur) var(--ease), width var(--dur) var(--ease);
 }
-#view-image[hidden], #view-chat[hidden] { display: none; }
+#view-studio[hidden], #view-media[hidden], #view-library[hidden], #view-tools[hidden] { display: none; }
+
+.studio-flow {
+  position: relative; flex: 1; display: flex; flex-direction: column;
+  height: 100%; min-height: 0; overflow-y: auto; padding: 1rem;
+}
+.ref-chip-img {
+  width: 24px; height: 24px; object-fit: cover; border-radius: 4px;
+  display: inline-block; vertical-align: middle; margin-right: 4px;
+}
+.chat-result.is-pending {
+  min-height: 72px; display: flex; align-items: center; justify-content: center;
+  padding: 1rem; background: var(--panel-2); border-radius: 12px; margin: 0.5rem 0;
+}
 
 /* Görünüm geçişi: yalnızca GİREN panel canlanıyor (çift panelli cross-fade
    katman + çift odak + sıçrayan yerleşim demekti). Yön sekme sırasından
@@ -859,10 +908,13 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
    yükselme-transform'u yok (§8: metin sabit, yalnız dolgu döner). */
 .primary {
   margin-top: 1rem; width: 100%; padding: 0.7rem 1.4rem; border: 0; cursor: pointer;
-  background: var(--fill-primary); color: var(--on-accent); font-weight: 500;
-  border-radius: 999px; transition: background var(--dur) var(--ease);
+  background: var(--accent); color: var(--on-primary, #101011); font-weight: 500;
+  border-radius: 999px; transition: background var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
-.primary:hover, .primary:active { background: var(--accent-press); }
+.primary:hover, .primary:active {
+  background: var(--accent-press, color-mix(in oklab, var(--accent) 85%, black));
+  box-shadow: var(--accent-glow, none);
+}
 .primary:disabled {
   background: var(--raised); color: var(--muted); cursor: progress;
 }
@@ -1010,7 +1062,9 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 }
 .sizeseg button:hover { background: var(--raised); color: var(--text); }
 .sizeseg button[aria-pressed="true"] {
-  background: var(--fill-selected); color: var(--on-fill-selected); font-weight: 500;
+  background: var(--accent-subtle, var(--fill-selected));
+  color: var(--fg, var(--on-fill-selected));
+  box-shadow: inset 0 0 0 1px var(--accent-border, transparent);
 }
 
 /* Klasörler — başlık şeridi Flow'un crumb'ı: altında saç teli, başlık display
@@ -1061,8 +1115,26 @@ body.dnd-active .folder-cell .folder-open { border-style: dashed; border-color: 
   padding: 0.75rem 0.85rem; font: inherit;
   transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
-.folder-open:hover { background: var(--raised); }
-.folder-open:active { background: var(--panel-2); }
+.folder-open:hover {
+  background: var(--accent-surface, var(--raised));
+  border-color: var(--accent-border, var(--control-border));
+}
+.folder-open:hover .folder-icon,
+.folder-cell.active .folder-icon {
+  color: var(--accent);
+}
+body.select-mode #select-toggle,
+#select-toggle.active,
+#select-toggle[aria-pressed="true"] {
+  background: var(--accent-subtle, var(--panel-2));
+  color: var(--accent);
+  border-color: var(--accent-border, transparent);
+}
+#folder-new:hover {
+  color: var(--accent);
+  background: var(--accent-subtle, var(--panel-2));
+}
+.folder-open:active { background: var(--accent-subtle, var(--panel-2)); }
 /* İkon durum anlatmıyor → --accent değil (accent yalnızca durum, plan §2.1) */
 .folder-icon { grid-row: 1 / 3; display: block; color: var(--muted); }
 .folder-name { font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1187,7 +1259,22 @@ body.dnd-active .folder-cell .folder-open { border-style: dashed; border-color: 
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 .picker-nav-item:hover { background: var(--panel-2); color: var(--text); }
-.picker-nav-item[aria-current="true"] { background: var(--selected, var(--panel-2)); color: var(--text); }
+.picker-nav-item[aria-current="true"] {
+  background: var(--accent-subtle, var(--selected, var(--panel-2)));
+  color: var(--fg, var(--text));
+}
+.picker-nav-item[aria-current="true"] svg {
+  color: var(--accent);
+}
+.picker-tile:hover {
+  background: var(--accent-surface, var(--raised));
+  box-shadow: inset 0 0 0 1px var(--accent-border, transparent);
+}
+.picker-tile[aria-selected="true"] {
+  background: var(--accent-surface, var(--selected, var(--panel-2)));
+  outline: 2px solid var(--accent);
+  box-shadow: var(--accent-glow, none);
+}
 .picker-nav-item svg { flex: none; }
 .picker-nav-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-nav-item em {
@@ -1333,11 +1420,11 @@ body.dnd-active .folder-cell .folder-open { border-style: dashed; border-color: 
 /* Seçili kart: turuncu çerçeve + dışa yumuşak ışıma + üzerine ÇOK hafif turuncu perde.
    Perde bilerek düşük: açık zeminli görsellerde 0.15 üzeri görseli yutuyor. */
 .card.selected {
-  box-shadow: 0 0 0 2px var(--accent), 0 6px 20px var(--accent-glow);
+  box-shadow: 0 0 0 2px var(--accent), var(--accent-glow);
 }
 .card.selected::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: var(--accent-wash);
+  background: var(--accent-surface, var(--accent-wash));
 }
 body.select-mode .card, body.select-mode .card img { cursor: pointer; }
 
@@ -1735,3 +1822,111 @@ body.viewer-open { overflow: hidden; }
   .card .acts { transform: none; }
   .chat-media-act { transform: none; }
 }
+
+/* ==========================================================================
+   Adım 10 Kozmetik Cila Stilleri (Kebab Dropdown, Klasör Kapak, Boş Durum)
+   ========================================================================== */
+.kebab-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 200px;
+  padding: 6px;
+  background: var(--panel-2, #18181b);
+  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.12));
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropdown-menu[hidden] {
+  display: none !important;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--fg, #e4e4e7);
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus-visible {
+  background: var(--hover, rgba(255, 255, 255, 0.08));
+  color: var(--fg-bright, #ffffff);
+  outline: none;
+}
+
+.dropdown-item-danger {
+  color: var(--danger, #f87171);
+}
+
+.dropdown-item-danger:hover,
+.dropdown-item-danger:focus-visible {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.dropdown-divider {
+  border: none;
+  border-top: 1px solid var(--hairline, rgba(255, 255, 255, 0.08));
+  margin: 4px 0;
+}
+
+.folder-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.media-count {
+  font-size: 12px;
+  color: var(--muted, #a1a1aa);
+  margin-left: 8px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--muted, #a1a1aa);
+  gap: 12px;
+}
+
+.empty-state[hidden] {
+  display: none !important;
+}
+
+.empty-state svg {
+  color: var(--muted, #71717a);
+  opacity: 0.7;
+}
+
+.empty-state p {
+  font-size: 14px;
+  margin: 0;
+}
+

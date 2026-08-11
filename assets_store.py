@@ -16,7 +16,7 @@ import uuid
 import jsonstore
 
 MANIFEST_FILE = "index.json"
-KINDS = ("logos", "banners", "mottos")
+KINDS = ("logos", "banners", "mottos", "uploads")
 
 # storage._SAFE_ID ile aynı: uuid4().hex[:12] üretimiyle uyumlu bare hex token.
 _SAFE_ID = re.compile(r"[0-9a-f]{8,32}")

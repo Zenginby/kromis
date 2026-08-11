@@ -10,9 +10,30 @@ from __future__ import annotations
 import datetime as _dt
 import os
 
+import re
+
 LOG_FILENAME = "hata.log"
 MAX_LOG_BYTES = 1024 * 1024   # 1 MB — üstünde .1'e döndürülür
 ROTATED_SUFFIX = ".1"
+
+_KEY_PATTERNS = [
+    re.compile(r"sk-[a-zA-Z0-9_-]{20,}"),
+    re.compile(r"fal-[a-zA-Z0-9_-]{16,}", re.IGNORECASE),
+    re.compile(r"r8_[a-zA-Z0-9_-]{16,}", re.IGNORECASE),
+    re.compile(r"(OPENAI_API_KEY|FAL_KEY|REPLICATE_API_TOKEN|AZURE_[A-Z_]*KEY)=['\"]?[a-zA-Z0-9_-]{12,}['\"]?", re.IGNORECASE),
+    re.compile(r"(api-key|authorization):\s*(Bearer\s*)?[a-zA-Z0-9_.-]{16,}", re.IGNORECASE),
+]
+
+
+
+def redact_secrets(text: str) -> str:
+    """Metindeki hassas API anahtarlarını sansürler."""
+    if not text:
+        return ""
+    result = text
+    for pat in _KEY_PATTERNS:
+        result = pat.sub("[REDACTED_API_KEY]", result)
+    return result
 
 
 def log_path(data_dir: str) -> str:
@@ -45,10 +66,12 @@ def append(data_dir: str, text: str) -> str:
     path = log_path(data_dir)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     _rotate_if_large(path)
+    safe_text = redact_secrets(text)
     timestamp = _dt.datetime.now().isoformat(timespec="seconds")
     with open(path, "a", encoding="utf-8") as f:
-        f.write(f"\n--- {timestamp} ---\n{text}\n")
+        f.write(f"\n--- {timestamp} ---\n{safe_text}\n")
     return path
+
 
 
 def safe_append(data_dir: str, text: str) -> str:

@@ -292,20 +292,22 @@ def resolve_chat_credentials(env_path: str | None = None) -> tuple[str, str, str
 
 
 def get_settings_status(env_path: str | None = None) -> dict:
-    """Yapılandırma durumu — API key'i ASLA döndürmez, sadece endpoint'i açar.
-
-    Sohbet tarafından da yalnızca GİZLİ OLMAYAN iki alan çıkıyor: dağıtım adı
-    (kullanıcı formda görüyor) ve hazır olup olmadığı. `AZURE_CHAT_API_KEY`
-    buradan hiçbir koşulda dönmez.
-    """
+    """Yapılandırma durumu — API key'i ASLA döndürmez, sadece status/endpoint'i açar."""
     creds = _first_complete_credentials(env_path)
     chat_key, chat_url, chat_deployment = resolve_chat_credentials(env_path)
+    env_vals = read_env_values(env_path)
     return {
         "configured": creds is not None,
         "endpoint": creds[1] if creds is not None else None,
         "chat_deployment": chat_deployment,
         "chat_configured": bool(chat_deployment and chat_key and chat_url),
+        "has_openai_key": bool(env_vals.get("OPENAI_API_KEY")),
+        "has_fal_key": bool(env_vals.get("FAL_KEY")),
+        "has_replicate_token": bool(env_vals.get("REPLICATE_API_TOKEN")),
+        "comfyui_url": env_vals.get("COMFYUI_URL", ""),
+        "ollama_url": env_vals.get("OLLAMA_URL", ""),
     }
+
 
 
 def generate(prompt, size, quality, n, *, client=None, credentials=None) -> list[bytes]:

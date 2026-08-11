@@ -17,13 +17,37 @@
 // süzme burada yapılır, sunucuya seviye parametresi gitmez.
 let currentFolder = null;
 let folderCache = [];
-// Medya araması (A3 / Adım 7b). Boş dize = arama kapalı. Sorgu KÜÇÜK harfe
-// indirilmiş tutulur; eşleşme de öyle yapılır (Türkçe İ/ı tuzağına rağmen
-// toLowerCase iki tarafa da aynı biçimde uygulandığı için tutarlı).
 let searchQuery = "";
+let mediaSortOrder = "date"; // "date" (Yeni-Eski) veya "name" (A-Z)
+
+function updateMediaRailCount() {
+  const el = $("media-rail-count");
+  if (!el) return;
+  const imgCount = historyCache ? historyCache.length : 0;
+  const foldCount = folderCache ? folderCache.length : 0;
+  if (currentFolder) {
+    el.textContent = `${imgCount} görsel`;
+  } else {
+    el.textContent = `${foldCount} klasör · ${imgCount} görsel`;
+  }
+}
+
+function toggleMediaSort() {
+  mediaSortOrder = mediaSortOrder === "date" ? "name" : "date";
+  if ($("media-sort-label")) {
+    $("media-sort-label").textContent = mediaSortOrder === "date" ? "Tarih" : "İsim";
+  }
+  renderFolders();
+  renderGallery();
+}
+
+if ($("media-sort-btn")) {
+  $("media-sort-btn").addEventListener("click", toggleMediaSort);
+}
 
 const parentOf = (f) => (f && f.parent_id) || null;
 const folderById = (id) => (id ? folderCache.find((f) => f.id === id) || null : null);
+
 
 // Kökten bulunulan klasöre kadarki zincir (kırıntı başlığı için)
 function folderPath(id) {
@@ -273,6 +297,11 @@ function renderFolders() {
 
   // Yalnızca bulunulan seviyenin klasörleri: kökte kök klasörler, içeride alt klasörler
   const children = folderCache.filter((f) => parentOf(f) === (currentFolder ? currentFolder.id : null));
+  children.sort((a, b) => {
+    if (mediaSortOrder === "name") return a.name.localeCompare(b.name, "tr");
+    return (b.created_at || "").localeCompare(a.created_at || "");
+  });
+
   if (!children.length) {
     const empty = document.createElement("p");
     empty.className = "folder-empty";
@@ -280,24 +309,35 @@ function renderFolders() {
       ? "Bu klasörde alt klasör yok · + Yeni klasör ile oluştur"
       : "Henüz klasör yok · + Yeni klasör ile oluştur";
     grid.appendChild(empty);
+    updateMediaRailCount();
     return;
   }
   for (const f of children) {
-    // SVG: 🗀 gibi glyph'ler sistem fontunda eksik olabiliyor (tofu/yanlış render)
-    const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    icon.setAttribute("class", "folder-icon");
-    icon.setAttribute("viewBox", "0 0 24 24");
-    icon.setAttribute("width", "26");
-    icon.setAttribute("height", "26");
-    icon.setAttribute("fill", "none");
-    icon.setAttribute("stroke", "currentColor");
-    icon.setAttribute("stroke-width", "1.8");
-    icon.setAttribute("stroke-linecap", "round");
-    icon.setAttribute("stroke-linejoin", "round");
-    icon.setAttribute("aria-hidden", "true");
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", "M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2z");
-    icon.appendChild(path);
+    // D12: Klasör kartında ilk görselin küçük resmi (thumbnail) varsa kapak yap
+    const coverRec = historyCache ? historyCache.find((r) => r.folder_id === f.id) : null;
+    let icon;
+    if (coverRec && coverRec.filename) {
+      icon = document.createElement("img");
+      icon.className = "folder-thumb";
+      icon.src = `/output/${coverRec.filename}`;
+      icon.alt = "";
+    } else {
+      // SVG: 🗀 gibi glyph'ler sistem fontunda eksik olabiliyor (tofu/yanlış render)
+      icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon.setAttribute("class", "folder-icon");
+      icon.setAttribute("viewBox", "0 0 24 24");
+      icon.setAttribute("width", "26");
+      icon.setAttribute("height", "26");
+      icon.setAttribute("fill", "none");
+      icon.setAttribute("stroke", "currentColor");
+      icon.setAttribute("stroke-width", "1.8");
+      icon.setAttribute("stroke-linecap", "round");
+      icon.setAttribute("stroke-linejoin", "round");
+      icon.setAttribute("aria-hidden", "true");
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", "M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2z");
+      icon.appendChild(path);
+    }
 
     const name = document.createElement("span");
     name.className = "folder-name";
@@ -325,6 +365,7 @@ function renderFolders() {
     makeDropTarget(cell, f.id, f.name);
     grid.appendChild(cell);
   }
+  updateMediaRailCount();
 }
 
 async function openFolder(f) {
@@ -391,11 +432,37 @@ async function deleteCurrentFolder() {
   }
 }
 
+async function renameCurrentFolder() {
+  if (!currentFolder) return;
+  const target = currentFolder;
+  const newName = await promptDialog(`"${target.name}" klasörünü yeniden adlandır`,
+    "Yeni klasör adını girin.", { defaultValue: target.name, okLabel: "Kaydet" });
+  if (!newName || !newName.trim() || newName.trim() === target.name) return;
+  try {
+    const res = await fetch(`/api/folders/${target.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName.trim() }),
+    });
+    if (!res.ok) throw new Error(`Hata (${res.status})`);
+    const { folder } = await res.json();
+    currentFolder.name = folder.name;
+    const found = folderById(target.id);
+    if (found) found.name = folder.name;
+    statusEl.textContent = "Klasör yeniden adlandırıldı.";
+    syncFolderView();
+  } catch (e) {
+    statusEl.textContent = `Yeniden adlandırılamadı: ${e.message}`;
+  }
+}
+
 $("folder-back").addEventListener("click", goUp);
 $("folder-delete").addEventListener("click", deleteCurrentFolder);
+if ($("folder-rename")) $("folder-rename").addEventListener("click", renameCurrentFolder);
 $("folder-new").addEventListener("click", createFolder);
 
 // ── Çoklu seçim ──────────────────────────────────────────────────────
+
 // Seçim YALNIZCA görseller için: klasörler seçilmez, toplu klasör silme yok.
 // Seçim modunda kart tıklaması seçim değiştirir (düzenlemeye alma devre dışı),
 // eylemler üst şeritte toplanır ve seçili görseller birlikte sürüklenebilir.
@@ -487,7 +554,7 @@ async function deleteSelected() {
     // silinenler referans/önizlemede duruyorsa oradan da düşür
     if (source && source.kind === "gallery" && ids.includes(source.id)) clearSource();
     extras = extras.filter((it) => !(it.kind === "gallery" && ids.includes(it.id)));
-    if (currentImage && ids.includes(currentImage.id)) clearPreview();
+    if (currentImage && ids.includes(currentImage.id)) setCurrentImage(null);
     renderSource();
     selected.clear();
     statusEl.textContent = `${deleted} görsel silindi.`;
@@ -557,7 +624,7 @@ let searchToken = 0;
 async function refreshSearch(token = searchToken) {
   const { images: all } = await loadAllImages();
   if (token !== searchToken || !searchQuery) return;
-  historyCache = all.filter(matchesSearch);
+  historyCache = all.filter((r) => matchesSearch(r));
   selected = new Set([...selected].filter((id) => historyCache.some((r) => r.id === id)));
   renderGallery();
   syncSelectUI();
@@ -635,14 +702,17 @@ function pickerScopes() {
   ];
 }
 
-const pickerScopeOf = (key) =>
-  pickerScopes().find((s) => s.key === key) || pickerScopes()[0];
+const pickerScopeOf = (key, scopes = pickerScopes()) =>
+  scopes.find((s) => s.key === key) || scopes[0];
 
 const pickerById = (id) => pickerImages.find((r) => r.id === id) || null;
 
-function pickerVisible() {
-  const scope = pickerScopeOf(pickerScope);
-  return pickerImages.filter((r) => scope.test(r) && matchesSearch(r, pickerQuery));
+const pickerFilter = (scope, query = pickerQuery) =>
+  pickerImages.filter((r) => scope.test(r) && matchesSearch(r, query));
+
+function pickerVisible(scopes = pickerScopes()) {
+  const scope = pickerScopeOf(pickerScope, scopes);
+  return pickerFilter(scope);
 }
 
 // İkon SVG'si tek yerde kuruluyor: `innerHTML` bu dosyada YALNIZ boş dizeyle
@@ -667,11 +737,11 @@ function pickerIcon(paths, size = 18) {
   return svg;
 }
 
-function renderPickerNav() {
+function renderPickerNav(scopes = pickerScopes()) {
   const nav = $("picker-kinds");
   nav.innerHTML = "";
-  for (const s of pickerScopes()) {
-    const n = pickerImages.filter((r) => s.test(r) && matchesSearch(r, pickerQuery)).length;
+  for (const s of scopes) {
+    const n = pickerFilter(s).length;
 
     const label = document.createElement("span");
     label.textContent = s.label;
@@ -691,10 +761,10 @@ function renderPickerNav() {
   }
 }
 
-function renderPickerGrid() {
+function renderPickerGrid(scopes = pickerScopes()) {
   const grid = $("picker-grid");
   grid.innerHTML = "";
-  const list = pickerVisible();
+  const list = pickerVisible(scopes);
   for (const rec of list) {
     const title = rec.prompt || rec.filename || rec.id;
     const folder = folderById(rec.folder_id);
@@ -728,9 +798,6 @@ function renderPickerGrid() {
     grid.appendChild(tile);
   }
   $("picker-empty").hidden = list.length > 0;
-  // "Bu kapsamda görsel yok" YALNIZ gerçekten boşken kurulur. İlk hâl bu cümleyi
-  // yükleme sırasında ve ağ hatasında da söylüyordu: ölçümde `fetch` reddedilince
-  // kullanıcı "görselin yok" okuyordu (PR #23 incelemesi, H2).
   $("picker-empty-text").textContent =
     pickerState === "loading" ? "Görseller yükleniyor…"
     : pickerState === "error" ? "Görseller alınamadı."
@@ -739,9 +806,6 @@ function renderPickerGrid() {
 }
 
 function renderPickerSide() {
-  // Seçim `pickerSelectedId`'den okunuyor, DOM'dan SORULMUYOR: ızgara yeniden
-  // çizildiğinde (arama, kapsam değişimi) `querySelector('[aria-selected]')`
-  // sessizce null döner ve commit düğmeleri "hiçbir şey seçili" sanar.
   const rec = pickerById(pickerSelectedId);
   const img = $("picker-preview-img");
   img.src = rec ? `/output/${rec.filename}` : "";
@@ -792,8 +856,13 @@ function renderPickerSide() {
 // o yüzden yalnız canlı turda görüldü. Çarpışmayı `test_id_contract.py`
 // mandallıyor artık.
 function renderMediaPicker() {
-  renderPickerNav();
-  renderPickerGrid();
+  const scopes = pickerScopes();
+  const visible = pickerVisible(scopes);
+  if (!visible.some((r) => r.id === pickerSelectedId)) {
+    pickerSelectedId = visible.length ? visible[0].id : null;
+  }
+  renderPickerNav(scopes);
+  renderPickerGrid(scopes);
   renderPickerSide();
 }
 
@@ -955,7 +1024,32 @@ async function loadHistory() {
 function renderGallery() {
   const g = $("gallery");
   g.innerHTML = "";
-  for (const rec of historyCache) {
+
+  const sorted = [...historyCache].sort((a, b) => {
+    if (mediaSortOrder === "name") {
+      const nameA = a.prompt || a.filename || a.id;
+      const nameB = b.prompt || b.filename || b.id;
+      return nameA.localeCompare(nameB, "tr");
+    }
+    return (b.created_at || b.id || "").localeCompare(a.created_at || a.id || "");
+  });
+
+  const emptyEl = $("media-empty-state");
+  const emptyText = $("media-empty-text");
+  if (emptyEl) {
+    if (sorted.length === 0) {
+      emptyEl.hidden = false;
+      if (emptyText) {
+        emptyText.textContent = searchQuery
+          ? "Aramanızla eşleşen görsel bulunamadı."
+          : (currentFolder ? "Bu klasörde henüz görsel yok." : "Henüz görsel üretilmedi.");
+      }
+    } else {
+      emptyEl.hidden = true;
+    }
+  }
+
+  for (const rec of sorted) {
     const prompt = rec.prompt || "";
 
     // Karta tıklamak BÜYÜTECİ açar (tasarım §6 / media-browser.html). Küçük
@@ -1103,12 +1197,6 @@ function renderGallery() {
 }
 
 // Görsel ekle butonu + gizli dosya girişi
-// Önizlemeyi ekrandan kaldır (silmez): referansı da temizleyip "Üret" moduna döner
-$("preview-clear").addEventListener("click", () => {
-  clearSource();
-  clearPreview();
-  statusEl.textContent = "";
-});
 
 $("upload-btn").addEventListener("click", () => $("file-input").click());
 $("file-input").addEventListener("change", () => {

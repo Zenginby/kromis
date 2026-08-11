@@ -8,12 +8,14 @@
 // Açılış çağrılarının tamamı en sonda, settings.js'in dibinde toplanır.
 
 // ── Logo/banner kütüphanesi (prompt altı panel) ─────────────────────
-let assetCache = { logos: [], banners: [], mottos: [] };
-let assetPanelKind = "logos";
+let assetCache = { all: [], logos: [], banners: [], mottos: [], uploads: [] };
+let assetPanelKind = "all";
 const ASSET_EMPTY_TEXT = {
+  all: "Henüz varlık yok · + Yükle ile ekle",
   logos: "Henüz logo yok · + Yükle ile ekle",
   mottos: "Henüz motto yok · + Yükle ile ekle",
   banners: "Henüz banner yok · + Yükle ile ekle",
+  uploads: "Henüz yükleme yok · + Yükle ile ekle",
 };
 const OVERLAY_EMPTY_TEXT = {
   motto: "Önce Kütüphane'den bir motto yükle.",
@@ -38,7 +40,7 @@ async function loadAssets(kind) {
 function renderAssetPanel() {
   const grid = $("asset-grid");
   grid.innerHTML = "";
-  const items = assetCache[assetPanelKind];
+  const items = assetCache[assetPanelKind] || [];
   if (!items.length) {
     const empty = document.createElement("p");
     empty.className = "asset-empty";
@@ -47,8 +49,9 @@ function renderAssetPanel() {
     return;
   }
   for (const item of items) {
+    const itemKind = item.kind || assetPanelKind;
     const img = document.createElement("img");
-    img.src = `/assets/${assetPanelKind}/${item.filename}`;
+    img.src = `/assets/${itemKind}/${item.filename}`;
     img.alt = item.name;
     img.title = item.name;
 
@@ -57,7 +60,7 @@ function renderAssetPanel() {
     del.textContent = "×";
     del.title = "Sil";
     del.setAttribute("aria-label", `${item.name} sil`);
-    del.addEventListener("click", () => deleteAssetItem(assetPanelKind, item.id));
+    del.addEventListener("click", () => deleteAssetItem(itemKind, item.id));
 
     const name = document.createElement("span");
     name.className = "asset-name";
@@ -88,7 +91,7 @@ async function uploadAsset(kind, file) {
       throw new Error(typeof err.detail === "string" ? err.detail : `Hata (${res.status})`);
     }
     assetStatus("Eklendi.");
-    await loadAssets(kind);
+    await Promise.all([loadAssets(kind), loadAssets("all")]);
   } catch (e) {
     assetStatus(e.message);
   }
@@ -106,7 +109,7 @@ async function deleteAssetItem(kind, id) {
     if (kind === "mottos" && selectedAsset.motto === id) selectedAsset.motto = null;
     if (kind === "banners" && selectedAsset.banner === id) selectedAsset.banner = null;
     assetStatus("Silindi.");
-    await loadAssets(kind);
+    await Promise.all([loadAssets(kind), loadAssets("all")]);
     if (!$("logo-modal").hidden) { syncColorRow(); refreshLogoPreview(); }
   } catch {
     assetStatus("Silinemedi.");
@@ -125,7 +128,8 @@ $("asset-upload-btn").addEventListener("click", () => $("asset-file-input").clic
 $("asset-file-input").addEventListener("change", async () => {
   const files = [...$("asset-file-input").files];
   $("asset-file-input").value = "";
-  for (const file of files) await uploadAsset(assetPanelKind, file); // sırayla: manifest yazımı atomik
+  const targetKind = assetPanelKind === "all" ? "uploads" : assetPanelKind;
+  for (const file of files) await uploadAsset(targetKind, file); // sırayla: manifest yazımı atomik
 });
 
 // ── Kütüphane görünümü (logo/motto/banner yükle-sil) ─────────────────

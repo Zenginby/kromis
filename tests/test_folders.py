@@ -148,6 +148,26 @@ def test_delete_subfolder_keeps_parent(tmp_path, monkeypatch):
     c.delete(f"/api/folders/{child}")
     items = c.get("/api/folders").json()["items"]
     assert [f["id"] for f in items] == [parent]
+
+
+def test_rename_folder_route(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    fid = _new_folder(c, "Eski Ad")
+    r = c.patch(f"/api/folders/{fid}", json={"name": "Yeni Ad"})
+    assert r.status_code == 200
+    assert r.json()["folder"]["name"] == "Yeni Ad"
+
+    # GET ile doğrulama
+    items = c.get("/api/folders").json()["items"]
+    target = next((f for f in items if f["id"] == fid), None)
+    assert target is not None and target["name"] == "Yeni Ad"
+
+    # Boş isim reddedilmeli (422)
+    assert c.patch(f"/api/folders/{fid}", json={"name": "   "}).status_code == 422
+
+    # Olmayan klasör 404
+    assert c.patch("/api/folders/deadbeef0000", json={"name": "Test"}).status_code == 404
+
     assert items[0]["child_count"] == 0
 
 

@@ -54,7 +54,7 @@ let openMenuId = null;               // 3-nokta menüsü açık olan sohbet (yok
 const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 function chatStatus(text) {
-  $("chat-status").textContent = text;
+  statusEl.textContent = text;
 }
 
 // ── Güvenli markdown (innerHTML YOK) ────────────────────────────────
@@ -517,7 +517,7 @@ function renderOptions(parsed) {
     if (!content) { chatStatus("Bir seçenek seç ya da kendi fikrini yaz."); return; }
     // Gönderim TEK yoldan: sınır kapıları, hata geri alma ve kaydetme
     // sendChat'te yaşıyor; ikinci bir gönderim yolu yazılmıyor.
-    $("chat-input").value = content;
+    $("prompt").value = content;
     if (await sendChat(display)) lockOptions(group);
   };
   send.addEventListener("click", submit);
@@ -587,7 +587,7 @@ function renderVariations(parsed) {
     const ad = item.ad.trim();
     const chip = actionChip(ad);
     chip.addEventListener("click", async () => {
-      $("chat-input").value = `"${ad}" varyasyonunu uygula: ${item.istek.trim()}`;
+      $("prompt").value = `"${ad}" varyasyonunu uygula: ${item.istek.trim()}`;
       if (await sendChat(`Varyasyon: ${ad}`)) lockOptions(group);
     });
     chips.appendChild(chip);
@@ -650,7 +650,7 @@ function renderParameters(parsed) {
   const submit = async () => {
     const { content, display } = axesValue(group);
     if (!content) { chatStatus("Bir parametre seç ya da kendi fikrini yaz."); return; }
-    $("chat-input").value = content;
+    $("prompt").value = content;
     if (await sendChat(display)) lockOptions(group);
   };
   send.addEventListener("click", submit);
@@ -706,8 +706,11 @@ function applyToForm(parsed) {
     if (!applyIfSupported(selectId, value)) skipped.push(`${label} ${value}`);
   }
 
-  showView("image");
+  setMode("image");
   $("prompt").focus();
+  // Programatik `.value` ataması `change` olayını DOĞURMAZ: syncSpecs elle
+  // çağrılmazsa üretim ayarları çipi eski değerleri göstermeye devam eder.
+  syncSpecs();
   // SESSİZ SAPMA YASAK (palette applied:false ile aynı gerekçe): uygulanamayan
   // öneri açıkça söylenir, yoksa kullanıcı formda başka bir ayar görür ve
   // sonucu açıklayamaz.
@@ -717,45 +720,14 @@ function applyToForm(parsed) {
 }
 
 // ── Ters yön: "Yönetmen'e sor" (tasarım §4.2 · D13) ──────────────────
-// Görsel modunda kutuya yazılan HAM metni yönetmene devreder. İki yön aynı
-// dosyada duruyor çünkü ikisi de aynı devri anlatıyor; `showView` core.js'in
-// global fonksiyonu ve olay anında çağrılıyor (yaprak dosya kuralı bozulmuyor).
 
-/** Düğmenin DOLULUK ekseni. Mod ekseni CSS'te (`#composer[data-mode=…]`). */
 function syncAskDirector() {
   $("ask-director").hidden = !$("prompt").value.trim();
 }
 
 function askDirector() {
-  const text = $("prompt").value.trim();
-  if (!text) return;                       // düğme gizliyken ⏎/kod yolu
-  const existing = $("chat-input").value.trim();
-  // ÜZERİNE YAZMIYOR: yönetmen kutusunda yazılmış ama gönderilmemiş bir mesaj
-  // olabilir; onu silmek sessiz veri kaybı olurdu. Yeni metin ALTINA giriyor.
-  const merged = existing ? `${existing}\n\n${text}` : text;
-  // KIRPMA YOK (applyToForm'un kırpma yasağının ters yönü): kırpılmış metin
-  // yönetmene BAŞKA bir şey sorar. Sunucu tek kullanıcı mesajını da bu sınırla
-  // reddediyor, yani sığmayan devir zaten 422 dönerdi.
-  if (merged.length > MAX_CHAT_MSG_CHARS) {
-    // Ret GÖRSEL modunun satırına yazılıyor: devir olmadığı için mod değişmiyor
-    // ve `#chat-status` burada `display:none`. `chatStatus` kullanılsaydı düğme
-    // tıklanır, hiçbir şey olmaz, sebebi de görünmezdi — sessiz ret.
-    statusEl.textContent =
-      `Devredilecek metin ${MAX_CHAT_MSG_CHARS} karakter sınırını aşıyor `
-      + `(${merged.length}) — yönetmenin kutusunu boşalt ya da prompt'u kısalt.`;
-    return;
-  }
-  $("chat-input").value = merged;
-  $("prompt").value = "";
-  syncAskDirector();
-  // Mod anahtarının TEK kapısı: `data-mode`'u buradan yazmak `showView`'un
-  // ölçtüğü kayan dolguyu ve `aria-selected`'ı geride bırakırdı.
-  showView("chat");
-  autoGrow($("chat-input"));
-  $("chat-input").focus();
-  // Gönderilmedi ve gönderilmiş gibi de durmuyor: model çağrısı kullanıcının
-  // kararı (bir tur para ve zaman), üstelik metnine bağlam ekleyebilir.
-  chatStatus("Ham metin yönetmene devredildi — göndermeden önce ekleme yapabilirsin.");
+  setMode("director");
+  $("prompt").focus();
 }
 
 
@@ -989,9 +961,7 @@ function syncEmptyState() {
 function setChatBusy(busy) {
   chatBusy = busy;
   $("chat-wait").hidden = !busy;
-  // Kapı kapalıysa (dağıtım adı yok) düğme kilitli KALIR: settings.js'in
-  // kurduğu kilidi buradan geri açmıyoruz.
-  $("chat-send").disabled = busy || !chatConfigured;
+  if ($("go")) $("go").disabled = busy || !chatConfigured;
 }
 
 // ── Gönderim ────────────────────────────────────────────────────────
@@ -1004,11 +974,9 @@ function setChatBusy(busy) {
  */
 async function sendChat(display = "") {
   if (chatBusy) return false;
-  const input = $("chat-input");
-  const message = input.value.trim();
-  // Etiket de kapıdan geçiyor: sunucu `MAX_CHAT_DISPLAY_CHARS` ile reddeder ve
-  // hata İngilizce pydantic metni olurdu. Satır sonu pilde işe yaramaz.
-  const label = display
+  const input = $("prompt");
+  const message = input ? input.value.trim() : "";
+  const label = (typeof display === "string" && display)
     ? display.replace(/\s+/g, " ").trim().slice(0, MAX_CHAT_DISPLAY_CHARS) : "";
   if (!message) { chatStatus("Önce bir mesaj yaz."); return false; }
   if (message.length > MAX_CHAT_MSG_CHARS) {
@@ -1206,41 +1174,47 @@ function transcriptHasRoom(slots) {
  * (sendChat'in aynı sırası). Başarısızlıkta `dropPendingTurn` geri alıyor.
  */
 function beginResultTurn(prompt) {
-  // İKİ öğe için yer isteniyor: bu kullanıcı turu VE onu izleyecek sonuç kaydı.
-  // Bir öğe sorulsa tur açılır ama kapatılamazdı — dökümde cevapsız bir
-  // kullanıcı satırı kalırdı.
   if (!transcriptHasRoom(2)) return null;
   const turn = { role: "user", content: prompt.slice(0, MAX_CHAT_MSG_CHARS) };
   chatThread.push(turn);
-  return { turn, bubble: appendUser(turn) };
+  const bubble = appendUser(turn);
+
+  const pendingDiv = document.createElement("div");
+  pendingDiv.className = "chat-result is-pending";
+  const progressEl = $("progress");
+  if (progressEl) pendingDiv.appendChild(progressEl);
+  $("chat-log").appendChild(pendingDiv);
+
+  return { turn, bubble, pendingDiv };
 }
 
-/** BAŞARISIZ TUR GEÇMİŞTE KALMAZ (sendChat'in kuralı).
- *
- * Kalsaydı döküme cevapsız bir kullanıcı turu düşer, yeniden denemek onu ikinci
- * kez eklerdi ve oturum aynı prompt'un kopyalarıyla dolardı. Prompt kutuda
- * duruyor (core.js temizlemiyor), yani metin de kaybolmuyor.
- */
 function dropPendingTurn(pending) {
-  // `done` işareti ŞART: sonuç kaydı yazıldıktan SONRA bir hata bu yola düşerse
-  // (ör. `loadHistory` ağ hatası) kullanıcı turu silinir, sonuç kaydı KALIR ve
-  // döküme sahipsiz bir kart düşer. Kapanmış tur geri alınamaz.
   if (!pending || pending.done) return;
   chatThread = chatThread.filter((m) => m !== pending.turn);
-  pending.bubble.remove();
+  if (pending.bubble) pending.bubble.remove();
+  if (pending.pendingDiv) {
+    const progressEl = $("progress");
+    if (progressEl && pending.pendingDiv.contains(progressEl)) {
+      const flow = document.querySelector(".studio-flow");
+      if (flow) flow.appendChild(progressEl);
+    }
+    pending.pendingDiv.remove();
+  }
   syncEmptyState();
 }
 
-/** Sonuç kaydını döküme ekler ve oturumu diske yazar. */
 async function appendResultTurn(pending, imageIds, params) {
-  // Yeniden sorulUYOR: üretim sürerken kullanıcı sohbet etmeye devam edebilir
-  // (`#go` kilitli ama "Gönder" değil), yani döküm arada büyümüş olabilir.
   if (!pending || !transcriptHasRoom(1)) return;
-  // Boş `image_ids` sunucuda 422 (`min_length=1`) ve kullanıcının açıklayamadığı
-  // bir hata olurdu: görsel dönmediyse yazılacak bir sonuç da yok. Kullanıcı
-  // turu da düşüyor — cevapsız kalmasın.
   if (!imageIds.length) { dropPendingTurn(pending); return; }
   pending.done = true;
+  if (pending.pendingDiv) {
+    const progressEl = $("progress");
+    if (progressEl && pending.pendingDiv.contains(progressEl)) {
+      const flow = document.querySelector(".studio-flow");
+      if (flow) flow.appendChild(progressEl);
+    }
+    pending.pendingDiv.remove();
+  }
   const record = { role: RESULT_ROLE, image_ids: imageIds, params };
   chatThread.push(record);
   appendResult(record);
@@ -1407,6 +1381,11 @@ async function loadPrefs() {
   try {
     const p = await chatApi("/api/prefs");
     $("pref-autosave").checked = p.autosave_sessions !== false;
+    if (p.theme) {
+      applyTheme(p.theme);
+      const radio = document.querySelector(`input[name="theme"][value="${p.theme}"]`);
+      if (radio) radio.checked = true;
+    }
   } catch {
     // Tercih alınamadı: anahtarın GÖRÜNEN hâli varsayılana (açık) düşüyor,
     // ama yazımı sunucu zaten kendisi kapıyor — burada fail-open yok.
@@ -1459,7 +1438,7 @@ function newChat() {
   resetThread();
   renderChatList();                   // seçili işaret kalkar
   closeSidebarOnMobile();
-  $("chat-input").focus();
+  $("prompt").focus();
 }
 
 async function openChat(chatId) {
@@ -1472,22 +1451,16 @@ async function openChat(chatId) {
     currentChatId = chat.id;
     chatThread = chat.messages || [];
     for (const m of chatThread) {
-      // Mesaj NESNESİ geçiliyor, `content` değil: pil/baloncuk ayrımı
-      // `m.display`'de yaşıyor ve yeniden açılışta da aynı kalması gerekiyor.
-      //
-      // Üç dal ZORUNLU: sonuç kaydında `content` hiç yok, iki dallı hâlinde
-      // `appendBot(undefined)` çağrılır ve `text.split` ile döküm çökerdi.
       if (m.role === RESULT_ROLE) appendResult(m);
       else if (m.role === "user") appendUser(m);
       else appendBot(m.content);
     }
-    // Eski turların seçenekleri BAYAT: yalnız son grup canlı kalır.
     lockStaleOptions();
     syncEmptyState();
     renderChatList();
     syncSessionHeader(chat);
     closeSidebarOnMobile();
-    $("chat-input").focus();
+    $("prompt").focus();
   } catch (e) {
     chatStatus(`Sohbet açılamadı: ${e.message}`);
   }
@@ -1501,8 +1474,6 @@ async function renameChat(summary) {
     const { chat } = await chatApi(`/api/chats/${summary.id}`,
                                    { method: "PUT", body: { title: name } });
     upsertSummary(chat);              // dönen kayıt yeter, listeyi baştan çekme
-    // Üst şerit yalnız AÇIK oturumu gösteriyor: listeden başka bir oturumu
-    // yeniden adlandırmak başlığı değiştirmemeli.
     if (chat.id === currentChatId) syncSessionHeader(chat);
   } catch (e) {
     chatStatus(`Yeniden adlandırılamadı: ${e.message}`);
@@ -1516,8 +1487,6 @@ async function deleteChat(summary) {
   if (!ok) return;
   try {
     await chatApi(`/api/chats/${summary.id}`, { method: "DELETE" });
-    // Açık sohbet silindiyse ekranda bırakmak yanıltıcı olurdu: bir sonraki tur
-    // 404 alır ve kullanıcı "kaydedilmiyor" sanır.
     if (summary.id === currentChatId) resetThread();
     dropSummary(summary.id);
   } catch (e) {
@@ -1533,24 +1502,13 @@ function closeSidebarOnMobile() {
 
 // ── Dinleyiciler ────────────────────────────────────────────────────
 
-// ⚠️ SARMALAYICI ZORUNLU. `("click", sendChat)` yazılsa tarayıcı `MouseEvent`'i
-// birinci argüman olarak geçirir ve o da `sendChat(display)` olur: pilde
-// "[object MouseEvent]" görünür ve o dize `display` alanı olarak SUNUCUYA gider.
-// Tek karakterlik bir sadeleştirmenin bedeli bu; tripwire testi de var.
-$("chat-send").addEventListener("click", () => sendChat());
 $("chat-new").addEventListener("click", newChat);
-$("chat-input").addEventListener("keydown", (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); sendChat(); }
-});
 
 $("chat-sidebar-toggle").addEventListener("click", () => {
   const open = $("chat-sidebar").classList.toggle("open");
   $("chat-sidebar-toggle").setAttribute("aria-expanded", open ? "true" : "false");
 });
 
-// Menü dışına tıklama ve Escape kapatır. `#confirm-modal` açıkken core.js'in
-// Escape dinleyicisi stopImmediatePropagation çağırıyor — bu handler o
-// dosyadan SONRA kayıtlı olduğu için diyalogun Escape'i buraya sızmıyor.
 document.addEventListener("click", (e) => {
   if (openMenuId && !e.target.closest(".chat-item")) closeMenus();
 });
@@ -1560,20 +1518,13 @@ document.addEventListener("keydown", (e) => {
 
 for (const chip of document.querySelectorAll(".chat-chip")) {
   chip.addEventListener("click", () => {
-    $("chat-input").value = chip.textContent.trim();
-    $("chat-input").focus();
+    $("prompt").value = chip.textContent.trim();
+    $("prompt").focus();
   });
 }
 
-// core.js'in sekme dinleyicisi ÖNCE kayıtlı → buraya gelindiğinde görünüm
-// zaten değişmiş oluyor. Burada yalnızca sohbete özel açılış işi var: eldeki
-// prompt taslağını brainstorm'a çevirmek.
 $("tab-chat").addEventListener("click", () => {
-  if (!chatThread.length && !$("chat-input").value.trim()) {
-    const draft = $("prompt").value.trim();
-    if (draft) $("chat-input").value = draft;
-  }
-  $("chat-input").focus();
+  $("prompt").focus();
 });
 
 // Ters yönün düğmesi (§4.2/D13). Yukarıdaki dinleyici bir NEZAKET (boş kutuya
@@ -1584,9 +1535,103 @@ $("ask-director").addEventListener("click", askDirector);
 $("prompt").addEventListener("input", syncAskDirector);
 syncAskDirector();
 
-$("chats-delete-all").addEventListener("click", deleteAllChats);
+// ── D15: Üst Şeritte Kebap Menüsü (Oturum seçenekleri) ─────────────
+function toggleKebabMenu(show) {
+  const kebab = $("chats-kebab");
+  const menu = $("chats-kebab-menu");
+  if (!kebab || !menu) return;
+  const isHidden = show !== undefined ? !show : !menu.hidden;
+  menu.hidden = isHidden;
+  kebab.setAttribute("aria-expanded", String(!isHidden));
+}
+
+function closeKebabMenu() {
+  toggleKebabMenu(false);
+}
+
+if ($("chats-kebab")) {
+  $("chats-kebab").addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleKebabMenu();
+  });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".kebab-wrap")) {
+      closeKebabMenu();
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeKebabMenu();
+  });
+}
+
+if ($("chats-rename")) {
+  $("chats-rename").addEventListener("click", async () => {
+    closeKebabMenu();
+    if (!currentChatId) {
+      chatStatus("Yeniden adlandırılacak açık oturum yok.");
+      return;
+    }
+    const cur = chatSummaries.find((c) => c.id === currentChatId);
+    const title = await promptDialog("Oturumu yeniden adlandır",
+      "Yeni oturum başlığını girin.", { defaultValue: cur ? cur.title : "Yeni oturum", okLabel: "Kaydet" });
+    if (!title || !title.trim()) return;
+    try {
+      await chatApi(`/api/chats/${currentChatId}`, {
+        method: "PUT",
+        body: { title: title.trim() },
+      });
+      if (cur) cur.title = title.trim();
+      $("session-title").textContent = title.trim();
+      renderChatList();
+      chatStatus("Oturum yeniden adlandırıldı.");
+    } catch (e) {
+      chatStatus(`Adlandırılamadı: ${e.message}`);
+    }
+  });
+}
+
+if ($("chats-clear-current")) {
+  $("chats-clear-current").addEventListener("click", async () => {
+    closeKebabMenu();
+    if (!chatThread.length) {
+      chatStatus("Temizlenecek mesaj yok.");
+      return;
+    }
+    const ok = await confirmDialog("Sohbeti temizle",
+      "Açık oturumdaki tüm mesaj dökümü temizlenecek. Üretilen görseller SİLİNMEZ.",
+      { okLabel: "Temizle" });
+    if (!ok) return;
+    resetThread();
+    if (currentChatId) {
+      try {
+        await chatApi(`/api/chats/${currentChatId}`, {
+          method: "PUT",
+          body: { messages: [] },
+        });
+      } catch (e) {
+        console.error("Clearing thread failed:", e);
+      }
+    }
+    chatStatus("Sohbet dökümü temizlendi.");
+  });
+}
+
+if ($("chats-delete-all")) {
+  $("chats-delete-all").addEventListener("click", () => {
+    closeKebabMenu();
+    deleteAllChats();
+  });
+}
+if ($("chats-kebab-delete-all")) {
+  $("chats-kebab-delete-all").addEventListener("click", () => {
+    closeKebabMenu();
+    deleteAllChats();
+  });
+}
 $("pref-autosave").addEventListener("change", saveAutosavePref);
+
 
 syncEmptyState();
 loadChats();
 loadPrefs();
+

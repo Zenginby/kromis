@@ -145,3 +145,23 @@ def test_write_leaves_no_temp_file(tmp_path):
     prefs.update({"autosave_sessions": False}, out)
 
     assert os.listdir(out) == [prefs.PREFS_FILE]
+
+
+def test_theme_preference_persistence(tmp_path):
+    out = str(tmp_path / "output")
+    merged = prefs.update({"theme": "ocean"}, out)
+    assert merged["theme"] == "ocean"
+    assert prefs.read(out)["theme"] == "ocean"
+
+
+def test_theme_validation_in_models():
+    from models import PrefsRequest, ALLOWED_THEMES
+    assert "ocean" in ALLOWED_THEMES
+    req = PrefsRequest(theme="ocean")
+    assert req.theme == "ocean"
+    try:
+        PrefsRequest(theme="gecersiz_tema")
+    except ValueError as exc:
+        assert "geçersiz theme" in str(exc)
+    else:
+        raise AssertionError("geçersiz theme kabul edildi")

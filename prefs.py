@@ -42,6 +42,7 @@ PREFS_FILE = "prefs.json"
 # olurdu (bkz. tasarım §5/D1).
 _SCHEMA: dict[str, tuple[object, type]] = {
     "autosave_sessions": (True, bool),
+    "theme": ("mono", str),
 }
 
 DEFAULTS = {name: default for name, (default, _) in _SCHEMA.items()}
@@ -106,6 +107,8 @@ def update(values: dict, output_dir: str) -> dict:
             raise ValueError(f"bilinmeyen tercih: {name}")
         if not isinstance(value, _SCHEMA[name][1]):
             raise ValueError(f"tercih için geçersiz değer: {name}")
+        if name == "theme" and value not in ("mono", "ocean", "amber", "viola"):
+            raise ValueError(f"tercih için geçersiz tema değeri: {value}")
     if not values:
         return read(output_dir)
     with jsonstore.lock_for(_prefs_path(output_dir)):

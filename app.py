@@ -543,19 +543,43 @@ def post_settings(req: SettingsRequest) -> dict:
     422 dönmeli.
     """
     api_key = req.api_key.strip()
-    if not api_key:
+    base_url = (req.base_url or "").strip()
+    if not base_url or not api_key:
         try:
-            api_key, _ = ac.load_credentials()
+            existing_key, existing_url = ac.load_credentials()
+            if not api_key:
+                api_key = existing_key
+            if not base_url:
+                base_url = existing_url
         except ac.AzureImageError:
-            raise HTTPException(status_code=422, detail="İlk kurulumda API key gerekli.")
+            if not api_key:
+                raise HTTPException(status_code=422, detail="İlk kurulumda API key gerekli.")
+            if not base_url:
+                raise HTTPException(status_code=422, detail="İlk kurulumda base_url gerekli.")
     try:
-        ac.save_credentials(api_key, req.base_url)
-        # None = alan hiç gönderilmedi → dokunma (bkz. models.SettingsRequest).
+        if api_key and base_url:
+            ac.save_credentials(api_key, base_url)
+        updates = {}
+
         if req.chat_deployment is not None:
-            ac.save_env({ac.CHAT_DEPLOYMENT: req.chat_deployment.strip()})
+            updates[ac.CHAT_DEPLOYMENT] = req.chat_deployment.strip()
+        if req.openai_api_key is not None and req.openai_api_key.strip():
+            updates["OPENAI_API_KEY"] = req.openai_api_key.strip()
+        if req.fal_key is not None and req.fal_key.strip():
+            updates["FAL_KEY"] = req.fal_key.strip()
+        if req.replicate_api_token is not None and req.replicate_api_token.strip():
+            updates["REPLICATE_API_TOKEN"] = req.replicate_api_token.strip()
+        if req.comfyui_url is not None:
+            updates["COMFYUI_URL"] = req.comfyui_url.strip()
+        if req.ollama_url is not None:
+            updates["OLLAMA_URL"] = req.ollama_url.strip()
+
+        if updates:
+            ac.save_env(updates)
     except ac.AzureImageError as e:
         raise HTTPException(status_code=422, detail=str(e))
     return ac.get_settings_status()
+
 
 
 @app.post("/api/chat")
@@ -797,6 +821,20 @@ def delete_folder_route(folder_id: str) -> dict:
     unfiled = storage.unfile_folders(doomed, OUTPUT_DIR)
     deleted = folders.delete_tree(fid, OUTPUT_DIR)
     return {"deleted": deleted, "folders": len(deleted), "unfiled": unfiled}
+
+
+@app.patch("/api/folders/{folder_id}")
+def rename_folder_route(folder_id: str, req: FolderRequest) -> dict:
+    """Klasör adını değiştirir."""
+    fid = os.path.basename(folder_id)
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Klasör adı gerekli.")
+    updated = folders.rename(fid, name, OUTPUT_DIR)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Klasör bulunamadı.")
+    return {"folder": updated}
+
 
 
 @app.get("/api/history")
@@ -1092,7 +1130,9 @@ def add_banner(req: BannerRequest) -> dict:
     return {"image": record}
 
 
-def _check_asset_kind(kind: str) -> None:
+def _check_asset_kind(kind: str, *, allow_all: bool = False) -> None:
+    if allow_all and kind == "all":
+        return
     if kind not in assets_store.KINDS:
         raise HTTPException(status_code=404, detail="bilinmeyen tür")
 
@@ -1121,7 +1161,13 @@ async def upload_asset(
 
 @app.get("/api/assets/{kind}")
 def list_assets_route(kind: str) -> dict:
-    _check_asset_kind(kind)
+    _check_asset_kind(kind, allow_all=True)
+    if kind == "all":
+        all_items = []
+        for k in assets_store.KINDS:
+            all_items.extend(assets_store.list_assets(k, ASSETS_DIR))
+        all_items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        return {"items": all_items}
     return {"items": assets_store.list_assets(kind, ASSETS_DIR)}
 
 

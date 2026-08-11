@@ -75,3 +75,30 @@ def test_serve_rejects_traversal_and_manifest(tmp_path, monkeypatch):
     assert c.get(f"/assets/logos/{astore.MANIFEST_FILE}").status_code == 404
     # bilinmeyen dosya
     assert c.get("/assets/logos/deadbeef.png").status_code == 404
+
+
+def test_upload_and_list_uploads_kind(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    r = c.post("/api/assets/uploads",
+               files={"file": ("user_upload.png", _png(), "image/png")},
+               data={"name": "Özel Yükleme"})
+    assert r.status_code == 200
+    rec = r.json()["asset"]
+    assert rec["kind"] == "uploads"
+    assert rec["name"] == "Özel Yükleme"
+
+    items = c.get("/api/assets/uploads").json()["items"]
+    assert len(items) == 1
+    assert items[0]["id"] == rec["id"]
+
+
+def test_list_all_assets_combines_kinds(tmp_path, monkeypatch):
+    c = _client(tmp_path, monkeypatch)
+    r1 = c.post("/api/assets/logos", files={"file": ("l.png", _png(), "image/png")}).json()["asset"]
+    r2 = c.post("/api/assets/uploads", files={"file": ("u.png", _png(), "image/png")}).json()["asset"]
+
+    all_items = c.get("/api/assets/all").json()["items"]
+    ids = [item["id"] for item in all_items]
+    assert r1["id"] in ids
+    assert r2["id"] in ids
+    assert len(all_items) >= 2

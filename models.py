@@ -152,21 +152,22 @@ class GenerateRequest(BaseModel):
 
 
 class SettingsRequest(BaseModel):
-    # api_key boş bırakılabilir: mevcut key korunur (endpoint'i tek başına güncelleme).
+    # api_key ve base_url boş/None bırakılabilir: mevcut değerler korunur.
     api_key: str = Field(default="", max_length=500)
-    base_url: str = Field(min_length=1, max_length=500)
+    base_url: str | None = Field(default=None, max_length=500)
+
     # Prompt Yönetmeni'nin Azure DAĞITIM adı (model ailesi adı değil).
-    #
-    # `None` ile `""` BİLEREK ayrı anlam taşıyor — api_key'in aksine burada üç
-    # durum var, iki değil:
-    #   None : alan hiç gönderilmedi → DOKUNMA. Bayat bir settings.js (cache-
-    #          buster'ı atlatmış bir kopya) endpoint kaydettiğinde Prompt
-    #          Yönetmeni'ni sessizce kapatmasın diye.
-    #   ""   : kullanıcı alanı boşalttı → TEMİZLE (sohbeti kapat).
-    #   dolu : kaydet.
-    # Gizli bilgi olmadığı için `GET /api/settings` bu alanı geri döndürüyor ve
-    # form önceden dolu geliyor; o yüzden write-only değil.
     chat_deployment: str | None = Field(default=None, max_length=200)
+    # BYOK Sağlayıcı Ayarları (v0.2.0)
+    openai_api_key: str | None = Field(default=None, max_length=500)
+    fal_key: str | None = Field(default=None, max_length=500)
+    replicate_api_token: str | None = Field(default=None, max_length=500)
+    comfyui_url: str | None = Field(default=None, max_length=500)
+    ollama_url: str | None = Field(default=None, max_length=500)
+
+
+
+ALLOWED_THEMES = ("mono", "ocean", "amber", "viola")
 
 
 class PrefsRequest(BaseModel):
@@ -184,6 +185,14 @@ class PrefsRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     autosave_sessions: bool | None = None
+    theme: str | None = None
+
+    @field_validator("theme")
+    @classmethod
+    def _theme_ok(cls, v: str | None) -> str | None:
+        if v is not None and v not in ALLOWED_THEMES:
+            raise ValueError("geçersiz theme")
+        return v
 
 
 class FolderRequest(BaseModel):

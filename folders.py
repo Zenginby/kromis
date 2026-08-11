@@ -130,3 +130,25 @@ def delete_tree(folder_id: str, output_dir: str) -> list[str]:
         targets = set(doomed)
         _write(output_dir, [f for f in _read(output_dir) if f.get("id") not in targets])
     return doomed
+
+
+def rename(folder_id: str, new_name: str, output_dir: str) -> dict | None:
+    """Klasör adını günceller. Klasör yoksa veya adı boşsa None döner."""
+    if not folder_id or not _SAFE_ID.fullmatch(folder_id):
+        return None
+    name = new_name.strip()
+    if not name:
+        return None
+    with jsonstore.lock_for(_folders_path(output_dir)):
+        items = _read(output_dir)
+        target = None
+        for f in items:
+            if f.get("id") == folder_id:
+                f["name"] = name
+                target = f
+                break
+        if target:
+            _write(output_dir, items)
+            return target
+    return None
+

@@ -36,7 +36,7 @@ function applyConfigured(s) {
   // Sekmenin KENDİSİ kilitlenmiyor: kilitli bir sekme "neden kapalı" bilgisini
   // de saklar. Yalnızca "Gönder" kilitli ve panelde açıklama görünüyor.
   chatConfigured = !!(s && s.chat_configured);
-  $("chat-send").disabled = !chatConfigured;
+  if (typeof syncSendButton === "function") syncSendButton();
   $("chat-gate").hidden = chatConfigured;
   // `!== undefined`: boş dize "temizlendi" demek ve forma YANSIMASI gerekir.
   if (s && s.chat_deployment !== undefined) {
@@ -127,20 +127,33 @@ function applyTheme(theme) {
   else document.body.dataset.theme = theme;
 }
 
+async function saveThemePref(theme) {
+  try {
+    await chatApi("/api/prefs", { method: "POST", body: { theme } });
+  } catch (e) {
+    console.warn("Tema tercihi kaydedilemedi:", e);
+  }
+}
+
 $("tool-look").addEventListener("click", () => openSheet("look-sheet"));
 $("look-close").addEventListener("click", closeSheets);
 $("theme-picker").addEventListener("change", (e) => {
-  if (e.target.name === "theme") applyTheme(e.target.value);
+  if (e.target.name === "theme") {
+    const theme = e.target.value;
+    applyTheme(theme);
+    saveThemePref(theme);
+  }
 });
 
-$("go").addEventListener("click", run);
 syncFolderView();
 loadFolders();
 loadHistory();
 loadSettings(true);
+loadAssets("all");
 loadAssets("logos");
 loadAssets("mottos");
 loadAssets("banners");
+loadAssets("uploads");
 // Palet varsayılan olarak KAPALI: açılışta öneri istenmez, prompt'a hiçbir
 // şey eklenmez. Yalnızca kütüphane çekilir ki "Kayıtlı paletler" hazır olsun.
 loadPalettes();

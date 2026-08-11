@@ -98,6 +98,24 @@
       </div>
 
       <div class="topbar-right">
+        <div class="kebab-wrap">
+          <button id="chats-kebab" class="icon-btn" type="button"
+                  aria-label="Oturum seçenekleri" title="Oturum seçenekleri"
+                  aria-expanded="false" aria-haspopup="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="1.5"></circle>
+              <circle cx="12" cy="5" r="1.5"></circle>
+              <circle cx="12" cy="19" r="1.5"></circle>
+            </svg>
+          </button>
+          <div id="chats-kebab-menu" class="dropdown-menu" hidden role="menu" aria-label="Oturum seçenekleri">
+            <button type="button" id="chats-rename" class="dropdown-item" role="menuitem">Oturumu yeniden adlandır</button>
+            <button type="button" id="chats-clear-current" class="dropdown-item" role="menuitem">Sohbeti temizle</button>
+            <hr class="dropdown-divider" />
+            <button type="button" id="chats-kebab-delete-all" class="dropdown-item dropdown-item-danger" role="menuitem">Tüm oturumları sil…</button>
+          </div>
+        </div>
         <button id="chat-new" class="icon-btn" type="button"
                 aria-label="Yeni oturum" title="Yeni oturum">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -126,53 +144,38 @@
            "referans olarak yükle" akışına sokuyor. `.gallery-wrap` ile KARDEŞ
            kalmak zorunda (folders.js:644): iç içe olsalar galeriye bırakma
            merkez alana da düşer ve iki akış çakışır. -->
-      <section id="view-image" class="section" role="tabpanel" aria-labelledby="tab-image">
-        <div class="stage" aria-label="Önizleme">
+      <!-- Stüdyo · Tek döküm (görsel üretimi + Yönetmen sohbeti aynı akışta).
+           Referans tasarım: docs/flow-ui/studio-session.html -->
+      <section id="view-studio" class="section" role="tabpanel" aria-labelledby="tab-studio">
+        <div class="studio-flow">
+          <div id="chat-empty" class="chat-empty">
+            <h2>Fikri anlat, prompt'u o yazsın.</h2>
+            <p>
+              Türkçe anlatman yeterli. Yönetmen eksik kalan yerleri sorar, sonra
+              İngilizce bir <code>gpt-image-2</code> prompt'u ve teknik ayarları
+              üretir — tek tıkla üretim formuna geçer.
+            </p>
+            <div class="chat-chips" role="group" aria-label="Başlangıç önerileri">
+              <button type="button" class="chat-chip">Kurban Bayramı için kare Instagram görseli</button>
+              <button type="button" class="chat-chip">Blog kapağı — sıcak editoryal fotoğraf</button>
+              <button type="button" class="chat-chip">Üç renkli düz vektör illüstrasyon</button>
+              <button type="button" class="chat-chip">Bağış kampanyası için dikey afiş</button>
+            </div>
+          </div>
+
+          <div id="chat-log" class="chat-log" aria-live="polite" aria-label="Sohbet ve üretim akışı"></div>
+
+          <div id="chat-wait" class="chat-wait" hidden>
+            <div class="spinner"></div>
+            <span>Yönetmen düşünüyor… ilk yanıt yarım dakikayı bulabilir.</span>
+          </div>
+
+          <!-- Taşınabilir ilerleme çubuğu: üretim sırasında pending kartın içine appendChild edilir -->
           <div id="progress" class="progress" hidden aria-hidden="true">
             <div class="spinner"></div>
             <div class="bar"><div id="progress-fill" class="bar-fill"></div></div>
             <span id="progress-pct" class="pct">0%</span>
           </div>
-          <div id="preview" class="preview empty">
-            <span id="preview-empty" class="preview-empty">Henüz görsel yok · bir görseli buraya sürükle-bırak</span>
-            <img id="preview-img" class="preview-img" alt="" hidden />
-            <button id="preview-clear" class="preview-clear" type="button" hidden
-                    aria-label="Görseli ekrandan kaldır" title="Ekrandan kaldır">×</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- Stüdyo · Yönetmen modu: Türkçe sohbet → İngilizce prompt + teknik
-           ayarlar. Açık sohbet istemcide (JS dizisi) yaşar; her tur sonunda
-           /api/chats ile output/chats.json'a yazılır (v1.15). Kalıcılık
-           SUNUCUDA çünkü paketli .app pencereyi pywebview'ın private mode
-           varsayılanıyla açıyor ve orada localStorage her kapanışta siliniyor.
-
-           Tek döküm (konuşma + üretilen görseller aynı akışta) PR 2'nin işi;
-           şimdilik iki panel mod anahtarıyla yer değiştiriyor. -->
-      <section id="view-chat" class="section" role="tabpanel" aria-labelledby="tab-chat" hidden>
-        <div id="chat-empty" class="chat-empty">
-          <h2>Fikri anlat, prompt'u o yazsın.</h2>
-          <p>
-            Türkçe anlatman yeterli. Yönetmen eksik kalan yerleri sorar, sonra
-            İngilizce bir <code>gpt-image-2</code> prompt'u ve teknik ayarları
-            üretir — tek tıkla üretim formuna geçer.
-          </p>
-          <div class="chat-chips" role="group" aria-label="Başlangıç önerileri">
-            <button type="button" class="chat-chip">Kurban Bayramı için kare Instagram görseli</button>
-            <button type="button" class="chat-chip">Blog kapağı — sıcak editoryal fotoğraf</button>
-            <button type="button" class="chat-chip">Üç renkli düz vektör illüstrasyon</button>
-            <button type="button" class="chat-chip">Bağış kampanyası için dikey afiş</button>
-          </div>
-        </div>
-
-        <div id="chat-log" class="chat-log" aria-live="polite" aria-label="Sohbet akışı"></div>
-
-        <!-- Bekleme göstergesi BURADA, .stage'deki #progress'te DEĞİL: o
-             düğümler diğer panelde yaşıyor ve startProgress() onlara dokunuyor. -->
-        <div id="chat-wait" class="chat-wait" hidden>
-          <div class="spinner"></div>
-          <span>Yönetmen düşünüyor… ilk yanıt yarım dakikayı bulabilir.</span>
         </div>
       </section>
 
@@ -194,6 +197,15 @@
             <input id="media-search" type="search" autocomplete="off" spellcheck="false"
                    placeholder="Prompt, klasör veya boyutta ara" />
           </label>
+
+          <!-- D10: Medya Sıralama Düğmesi -->
+          <button type="button" id="media-sort-btn" class="btn-ghost" title="Görselleri sırala" aria-label="Görselleri sırala">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m3 16 4 4 4-4"></path><path d="M7 20V4"></path><path d="m21 8-4-4-4 4"></path><path d="M17 4v16"></path>
+            </svg>
+            <span id="media-sort-label">Tarih</span>
+          </button>
 
           <!-- Izgara boyutu: kutucuk ölçüsünü CSS'teki --tile üzerinden
                değiştiriyor. JS'ten grid-template-columns yazmak duyarlılık
@@ -235,6 +247,15 @@
             </svg>
           </button>
           <h2 id="gallery-title">Klasörler</h2>
+          <span id="media-rail-count" class="media-count" role="status"></span>
+          <!-- D17: Klasör Yeniden Adlandır -->
+          <button type="button" id="folder-rename" class="icon-btn" hidden
+                  aria-label="Klasörü yeniden adlandır" title="Klasörü yeniden adlandır">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+            </svg>
+          </button>
           <button type="button" id="folder-delete" class="icon-btn danger-btn" hidden
                   aria-label="Bu klasörü sil" title="Bu klasörü sil">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -263,6 +284,15 @@
 
         <h3 id="images-title" class="images-title">Klasörsüz görseller</h3>
         <div id="gallery" class="gallery" data-size="m"></div>
+        <!-- D16: Medya Boş Durum Glifi ve Bilgilendirme -->
+        <div id="media-empty-state" class="empty-state" hidden>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="2.5"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <path d="m21 15-5-5L5 21"></path>
+          </svg>
+          <p id="media-empty-text">Henüz üretilmiş bir görsel bulunmuyor.</p>
+        </div>
       </section>
 
       <!-- Kütüphane: A1 — modal değil GÖRÜNÜM (tasarım §4.1). İşaretleme eski
@@ -282,9 +312,11 @@
           şeffaflık korunur (PNG olarak yeniden kodlanır).
         </p>
         <div id="asset-tabs" class="seg" role="group" aria-label="Varlık türü">
-          <button type="button" data-akind="logos" class="active">Logolar</button>
+          <button type="button" data-akind="all" class="active">Tümü</button>
+          <button type="button" data-akind="logos">Logolar</button>
           <button type="button" data-akind="mottos">Mottolar</button>
           <button type="button" data-akind="banners">Bannerlar</button>
+          <button type="button" data-akind="uploads">Yüklemeler</button>
         </div>
         <input type="file" id="asset-file-input" accept="image/png,image/jpeg,image/webp" multiple hidden />
         <div id="asset-grid" class="asset-grid" aria-live="polite"></div>
@@ -333,16 +365,11 @@
       </section>
     </main>
 
-  <!-- ── Yüzen composer ──────────────────────────────────────────────────
-       Prompt her zaman burada; panel içine gömülmüyor (tasarım §2.4/2).
-       İki metin alanı da BURADA yaşıyor ve mod anahtarı hangisinin görüneceğine
-       karar veriyor: #prompt üretime (POST /api/generate), #chat-input sohbete
-       (POST /api/chat) gidiyor. İki gönder düğmesi de aynı sebeple duruyor —
-       #go ve #chat-send ayrı dosyalarda top-level bağlı (settings.js:124,
-       chat.js:1160). Tek döküme geçince (PR 2) bu çift sadeleşecek. -->
+  <!-- ── Yüzen composer ────────────────────────────────────────────────── -->
   <div id="composer" class="composer" data-mode="image">
     <div id="composer-refs" class="composer-refs">
       <span id="ref-chip" class="ref-chip" hidden>
+        <img id="ref-chip-img" class="ref-chip-img" alt="" hidden />
         <span id="ref-label"></span>
         <button type="button" id="ref-clear" aria-label="Referansı kaldır">×</button>
       </span>
@@ -354,13 +381,9 @@
       </div>
     </div>
 
-    <label class="sr-only" for="prompt">Prompt</label>
+    <label class="sr-only" for="prompt">Prompt veya Mesajın</label>
     <textarea id="prompt" class="composer-input" rows="2"
-              placeholder="Ne üretmek istersin? Bir görsel eklersen prompt onun üzerinde çalışır."></textarea>
-
-    <label class="sr-only" for="chat-input">Mesajın</label>
-    <textarea id="chat-input" class="composer-input" rows="2" maxlength="6000"
-              placeholder="Ne üretmek istiyorsun? Amaç ve mecrayı söylersen (Instagram, blog kapağı, afiş…) daha isabetli olur."></textarea>
+              placeholder="Ne üretmek istiyorsun? Görsel tarifi, renk veya tarz yaz…"></textarea>
 
     <!-- Kapı açıklaması: mod anahtarının KENDİSİ kilitlenmiyor. Kilitli bir
          anahtar "neden kapalı" bilgisini de saklardı; burada kullanıcı geçip ne
@@ -389,9 +412,7 @@
             <span class="btn-ghost-plus" aria-hidden="true">+</span> Ek görsel
           </button>
           <!-- Hairline dosya yolunu (yukarısı #file-input'a gider) Medya
-               yolundan ayırıyor. Sözleşmenin dördüncü maddesi "Dosyadan yükle"
-               BİLEREK eklenmedi: üstteki iki madde zaten o yol, dördüncüsü aynı
-               girdiye ikinci kapı olurdu (plan, Markup). -->
+               yolundan ayırıyor. -->
           <hr class="popover-sep" />
           <button type="button" id="media-pick-btn" class="btn-ghost">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -407,31 +428,21 @@
         <input type="file" id="extra-file-input" accept="image/png,image/jpeg,image/webp" multiple hidden />
       </div>
 
-      <!-- Mod anahtarı: (+) işaretinin yanında, tasarım §4.2. Sekme kabuğunun
-           id'lerini DEVRALDI — core.js:showView/syncTabThumb bu düğümleri
-           ölçüyor ve #view-tabs-thumb'ı kaydırıyor, mekanik değişmedi.
-           role="tab" korunuyor: iki panel hâlâ ayrı tabpanel (PR 2'de tek
-           döküme dönüşünce mod grubuna çevrilecek). -->
-      <div class="seg view-tabs mode" role="tablist" aria-label="Mod">
+      <!-- Mod anahtarı: (+) işaretinin yanında, tasarım §4.2. -->
+      <div class="seg view-tabs mode" role="group" aria-label="Mod">
         <span id="view-tabs-thumb" class="view-tabs-thumb" aria-hidden="true"></span>
-        <button id="tab-image" type="button" class="active" role="tab"
-                aria-selected="true" aria-controls="view-image">Görsel</button>
-        <button id="tab-chat" type="button" role="tab"
-                aria-selected="false" aria-controls="view-chat">Yönetmen</button>
+        <button id="tab-image" type="button" class="active" aria-pressed="true">Görsel</button>
+        <button id="tab-chat" type="button" aria-pressed="false">Yönetmen</button>
       </div>
 
       <div class="composer-right">
         <!-- Ters yön (tasarım §4.2): Görsel modunda kutuya bir şey yazdığın an
              belirir, yazdığın ham metni yönetmene devreder. METİN düğmesi ve
-             `hidden` başlıyor — §4.2'nin kendi cümlesi "ekranda ikinci bir dolu
-             düğme oluşmaz". Görünürlüğün iki ekseni var, iki sahibi: doluluk
-             chat.js'te (`hidden`), mod CSS'te (`display`) — composer'ın
-             yukarıdaki notuyla aynı gerekçe. -->
+             `hidden` başlıyor. -->
         <button type="button" id="ask-director" class="btn-ghost composer-ask" hidden>
           Yönetmen'e sor
         </button>
-        <!-- Üretim ayarları çipi: boyut · kalite · adet özetini gösterir,
-             tıklayınca sağdan slide-over açar. Etiketi core.js tazeliyor. -->
+        <!-- Üretim ayarları çipi: boyut · kalite · adet özetini gösterir -->
         <button type="button" id="specs-btn" class="specs" aria-controls="specs-sheet"
                 aria-expanded="false" title="Üretim ayarları">
           <span id="specs-label">1:1 · ORTA · x1</span>
@@ -441,7 +452,6 @@
           </svg>
         </button>
         <button id="go" class="primary composer-send" type="button">Üret</button>
-        <button type="button" id="chat-send" class="primary composer-send">Gönder</button>
       </div>
     </div>
 
@@ -449,8 +459,6 @@
       <span class="chat-hint">⌘/Ctrl + Enter gönderir · ⌘/Ctrl + J mod değiştirir</span>
       <p id="folder-target" class="folder-target" hidden></p>
       <p id="status" class="status" role="status"></p>
-      <p id="chat-status" class="chat-status" role="status"></p>
-    </div>
     </div>
   </div>
 
@@ -671,9 +679,8 @@
             Flow'un varsayılanı.</span></span>
         </label>
         <label class="radio-row">
-          <input type="radio" name="theme" value="kurumsal" />
-          <span><b>KURUM mavisi</b><span>Logo varlıklarından ölçülen
-            <code>#085888</code>'in koyu zeminde okunabilir türevi.</span></span>
+          <input type="radio" name="theme" value="ocean" />
+          <span><b>Okyanus mavisi</b><span>Sakin ve okunabilir derin mavi tonu.</span></span>
         </label>
         <label class="radio-row">
           <input type="radio" name="theme" value="amber" />

@@ -5,6 +5,7 @@ import base64
 import datetime as _dt
 import io
 import os
+import re
 import traceback
 from collections.abc import Sequence
 from contextlib import asynccontextmanager
@@ -12,7 +13,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 # Ham form değerleri Starlette'in UploadFile'ıdır; fastapi.UploadFile onun ALT
@@ -834,8 +836,10 @@ def download_folder_route(folder_id: str):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    safe_name = re.sub(r"[^\w\s-]", "", folder_name).strip().replace(" ", "_") or "klasor"
+    safe_name = re.sub(r"[^\w\s-]", "", folder_name).strip().replace(" ", "_")
+    safe_name = safe_name.encode("ascii", "ignore").decode("ascii") or "klasor"
     headers = {"Content-Disposition": f'attachment; filename="{safe_name}.zip"'}
+
     return Response(content=zip_bytes, media_type="application/zip", headers=headers)
 
 

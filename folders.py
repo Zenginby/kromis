@@ -162,13 +162,14 @@ def export_zip(folder_id: str, output_dir: str) -> tuple[bytes, str]:
     if not folder_id or not _SAFE_ID.fullmatch(folder_id):
         raise ValueError("Geçersiz klasör id.")
 
-    root_folder = get(folder_id, output_dir)
+    all_folders = _read(output_dir)
+    folder_map = {f["id"]: f for f in all_folders if f.get("id")}
+    root_folder = folder_map.get(folder_id)
     if not root_folder:
         raise ValueError("Klasör bulunamadı.")
 
     root_name = root_folder.get("name", "klasor").strip()
-    all_folders = _read(output_dir)
-    folder_map = {f["id"]: f for f in all_folders if f.get("id")}
+
 
     def get_rel_path(fid: str) -> str:
         chain = []

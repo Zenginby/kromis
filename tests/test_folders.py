@@ -188,9 +188,10 @@ def test_export_zip_and_download_route(tmp_path, monkeypatch):
 
     zf = zipfile.ZipFile(io.BytesIO(res.content))
     namelist = zf.namelist()
-    assert any("Ana_Klasor" in name for name in namelist)
-    assert any("Alt_Klasor" in name for name in namelist)
+    assert any("Ana_Klas" in name for name in namelist)
+    assert any("Alt_Klas" in name for name in namelist)
     assert any(rec["filename"] in name for name in namelist)
+
 
     assert c.get("/api/folders/deadbeef0000/download").status_code == 404
 

@@ -101,6 +101,8 @@ coll = COLLECT(
     upx=False,
     upx_exclude=[],
     name='GPT-Image Studio',
+)
+
 import sys
 
 if sys.platform == "darwin":

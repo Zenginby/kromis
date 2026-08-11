@@ -9,6 +9,8 @@ import re
 import traceback
 from collections.abc import Sequence
 from contextlib import asynccontextmanager
+from urllib.parse import quote
+
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
@@ -836,11 +838,15 @@ def download_folder_route(folder_id: str):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    safe_name = re.sub(r"[^\w\s-]", "", folder_name).strip().replace(" ", "_")
-    safe_name = safe_name.encode("ascii", "ignore").decode("ascii") or "klasor"
-    headers = {"Content-Disposition": f'attachment; filename="{safe_name}.zip"'}
+    safe_ascii = re.sub(r"[^\w\s-]", "", folder_name).strip().replace(" ", "_")
+    safe_ascii = safe_ascii.encode("ascii", "ignore").decode("ascii") or "klasor"
+    encoded_utf8 = quote(folder_name)
+    headers = {
+        "Content-Disposition": f'attachment; filename="{safe_ascii}.zip"; filename*=UTF-8\'\'{encoded_utf8}.zip'
+    }
 
     return Response(content=zip_bytes, media_type="application/zip", headers=headers)
+
 
 
 

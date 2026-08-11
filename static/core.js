@@ -527,6 +527,21 @@ function setGallerySource(rec) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function setGallerySourceById(id, prompt) {
+  const rec = (typeof historyCache !== "undefined" && historyCache)
+    ? historyCache.find((r) => r.id === id)
+    : null;
+  if (rec) {
+    setGallerySource(rec);
+  } else {
+    setGallerySource({ id, prompt: prompt || id, filename: `${id}.png` });
+  }
+  showSection("studio");
+  statusEl.textContent = "Görsel ana referans olarak ayarlandı.";
+}
+
+
+
 function clearSource() {
   clearUploadPreviewUrl();
   clearExtras();

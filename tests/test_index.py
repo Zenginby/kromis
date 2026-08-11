@@ -2714,3 +2714,16 @@ def test_the_picker_labels_folders_with_a_string_not_the_breadcrumb_array():
     for m in re.finditer(r"folderPath\([^)]*\)(.{0,8})", picker):
         assert m.group(1).lstrip().startswith(".map("), (
             "folderPath'in DİZİSİ doğrudan etikete veriliyor → [object Object]")
+
+
+def test_set_gallery_source_by_id_switches_section_to_studio():
+    """`setGallerySourceById` rotası `showSection("studio")` kullanmalı.
+
+    Eski `showView("studio")` refactoring ile kaldırılmıştı — çağrılırsa
+    `ReferenceError` fırlatır.
+    """
+    core = _core_js()
+    assert "function setGallerySourceById" in core, "setGallerySourceById fonksiyonu yok"
+    assert "showSection(\"studio\")" in core, "showSection(\"studio\") çağrısı eksik"
+    assert "showView(" not in core, "eski showView çağrısı kalmış"
+

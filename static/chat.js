@@ -945,6 +945,9 @@ function resultThumb(imageId, index, caption) {
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); zoom(); }
   });
 
+  const actionsContainer = document.createElement("div");
+  actionsContainer.className = "chat-media-actions";
+
   const dl = document.createElement("button");
   dl.type = "button";
   dl.className = "chat-media-act";
@@ -953,12 +956,29 @@ function resultThumb(imageId, index, caption) {
     e.stopPropagation();               // indirme büyüteci açmasın
     downloadImage(src, `${imageId}.png`);
   });
+  dl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+  });
 
-  // "Düzenle" ve "+ Ek" BİLEREK yok: ikisi de tam bir geçmiş KAYDI istiyor
-  // (prompt, boyut, klasör), döküm ise yalnız id taşıyor. Çalışmayan bir düğme
-  // çizmek yerine composer turuna (Adım 8) bırakıldı.
-  fig.append(img, num, dl);
+  const refBtn = document.createElement("button");
+  refBtn.type = "button";
+  refBtn.className = "chat-media-act";
+  refBtn.textContent = "Referans Al";
+  refBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (typeof setGallerySourceById === "function") {
+      setGallerySourceById(imageId, caption);
+    }
+  });
+  refBtn.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+  });
+
+  actionsContainer.append(dl, refBtn);
+  fig.append(img, num, actionsContainer);
   return fig;
+
+
 }
 
 function appendResult(msg) {

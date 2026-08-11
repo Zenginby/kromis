@@ -174,7 +174,9 @@ def export_zip(folder_id: str, output_dir: str) -> tuple[bytes, str]:
     def get_rel_path(fid: str) -> str:
         chain = []
         curr = fid
-        while curr and curr in folder_map:
+        seen = set()
+        while curr and curr in folder_map and curr not in seen:
+            seen.add(curr)
             node = folder_map[curr]
             chain.append(node.get("name", "klasor").strip())
             if curr == folder_id:
@@ -182,6 +184,7 @@ def export_zip(folder_id: str, output_dir: str) -> tuple[bytes, str]:
             curr = node.get("parent_id")
         chain.reverse()
         return "/".join(re.sub(r'[^\w\s-]', '', p).strip().replace(' ', '_') or "klasor" for p in chain)
+
 
     tree_ids = set(descendants(folder_id, output_dir))
     tree_ids.add(folder_id)

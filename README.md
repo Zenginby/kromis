@@ -11,12 +11,11 @@
 
 ## 🚀 Masaüstü Uygulamasını İndir
 
-Son kullanıcılar için hazırlanmış **macOS** ve **Windows** hazır derleme paketlerini doğrudan indirebilirsiniz:
+Son kullanıcılar için hazırlanmış **macOS Apple Silicon (ARM64)** hazır derleme paketini doğrudan indirebilirsiniz:
 
 | Platform | Mimari | İndirme Bağlantısı |
 |---|---|---|
 | 🍏 **macOS** | Apple Silicon (M1 / M2 / M3 / M4) | [İndir (ZIP / ARM64)](https://github.com/Zenginby/gpt-image-studio/releases/latest/download/gpt-image-studio-macOS-arm64.zip) |
-| 🪟 **Windows** | 64-bit (x64) | [İndir (ZIP / Windows)](https://github.com/Zenginby/gpt-image-studio/releases/latest/download/gpt-image-studio-Windows-x64.zip) |
 
 > [!TIP]
 > Paketleme hakkında detaylı bilgi ve kurulum talimatları için [KURULUM.md](file:///Users/kullanici/Documents/Projects/Claude%20Code%20Projects/gpt-image-studio/KURULUM.md) rehberini inceleyebilirsiniz.

@@ -5,84 +5,92 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   test:
     name: Run Pytest Suite
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.14'
+
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
+
       - name: Run Pytest
         run: |
           pytest tests/ -v
 
-  build:
+  build-release:
     needs: test
-    name: Build Packages (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: macos-14
-            artifact_name: GPT-Image-Studio-macOS-arm64
-            asset_name: gpt-image-studio-macOS-arm64.zip
-          - os: windows-latest
-            artifact_name: GPT-Image-Studio-Windows-x64
-            asset_name: gpt-image-studio-Windows-x64.zip
+    name: Build macOS arm64 Package & Publish Release
+    runs-on: macos-14
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-          pip install pyinstaller
+          python-version: '3.14'
 
-      - name: Build Desktop Application (macOS)
-        if: runner.os == 'macOS'
+      - name: Mimariyi doğrula (arm64)
         run: |
-          ./build.sh
-          cp "dist/GPT-Image Studio.zip" "dist/${{ matrix.asset_name }}"
+          set -euo pipefail
+          ARCH="$(uname -m)"
+          echo "runner mimarisi: $ARCH"
+          test "$ARCH" = "arm64" || { echo "HATA: arm64 bekleniyordu, $ARCH bulundu"; exit 1; }
+          python -c "import platform; plat=platform.machine(); print('python mimarisi:', plat); plat=='arm64' or exit(1)"
 
-      - name: Build Desktop Application (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
+      - name: pip'i tazele
         run: |
-          pyinstaller gpt-image-studio.spec --noconfirm
-          Compress-Archive -Path "dist/GPT-Image Studio/*" -DestinationPath "dist/${{ matrix.asset_name }}"
+          set -euo pipefail
+          python -m venv .venv
+          .venv/bin/pip install -q --upgrade pip
+
+      - name: Derle (build.sh)
+        run: ./build.sh
+
+      - name: Paketi doğrula
+        run: |
+          set -euo pipefail
+          APP="dist/GPT-Image Studio.app"
+          lipo -archs "$APP/Contents/MacOS/GPT-Image Studio" | tee /dev/stderr | grep -qx arm64
+          codesign --verify --strict "$APP"
+          for f in static/index.html static/core.js static/viewer.js \
+                   bundled/logos/kurum-logo-blue.png bundled/logos/kurum-logo-white.png; do
+            test -f "$APP/Contents/Resources/$f" || { echo "EKSİK: $f"; exit 1; }
+          done
+          EXPECTED="$(python -c 'import version; print(version.APP_VERSION)')"
+          for k in CFBundleShortVersionString CFBundleVersion; do
+            GOT="$(/usr/bin/plutil -extract "$k" raw -o - "$APP/Contents/Info.plist")"
+            test "$GOT" = "$EXPECTED" || { echo "HATA: $k=$GOT, beklenen $EXPECTED"; exit 1; }
+          done
+          echo "Info.plist sürümü: $EXPECTED"
+          cp "dist/GPT-Image Studio.zip" "dist/gpt-image-studio-macOS-arm64.zip"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: dist/${{ matrix.asset_name }}
+          name: gpt-image-studio-macos-arm64
+          path: dist/gpt-image-studio-macOS-arm64.zip
+          retention-days: 30
 
-  release:
-    needs: build
-    name: Create GitHub Release
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Download Build Artifacts
-        uses: actions/download-artifact@v4
-      - name: Create Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            */*
+            dist/gpt-image-studio-macOS-arm64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

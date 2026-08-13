@@ -8,6 +8,7 @@ CI'daki `plutil` adımıyla kanıtlanır.
 """
 import os
 import re
+import warnings
 
 import version
 
@@ -47,6 +48,53 @@ def test_spec_anchors_the_version_load_on_specpath():
     assert "SPECPATH" in text, "sürüm yüklemesi SPECPATH'e çapalanmalı"
     assert not re.search(r"^\s*import\s+version\s*$", text, re.M), \
         "spec'te düz `import version` çalışmaz (bkz. docstring)"
+
+
+def test_spec_has_no_syntax_warnings():
+    """Yorumlara/docstring'e giren Windows yolları geçersiz kaçış dizisi doğurur.
+
+    `%LOCALAPPDATA%\\GPT-Image Studio` yazmak `\\G`'yi geçersiz bir kaçış dizisi
+    yapar ve Python SyntaxWarning basar (v0.3.0'da gerçekten oldu). Bu uyarı
+    ancak DERLEME sırasında, pyinstaller'ın onlarca INFO satırı arasında
+    görünür — kaybolmaya birebir uygun; ayrıca Python 3.15'te bu sınıf uyarı
+    SyntaxError'a dönüyor, yani sessiz bir zaman bombası. Windows paketleme
+    işi spec'e daha çok yol yazacağı için burada hataya çevriliyor.
+
+    `compile` sadece derler, ÇALIŞTIRMAZ: spec'in Analysis/EXE çağrıları ve
+    SPECPATH globali burada sorun etmez.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", SyntaxWarning)
+        compile(_spec_text(), SPEC, "exec")
+
+
+def test_spec_windows_version_resource_derives_the_version():
+    """VERSIONINFO'ya elle sürüm yazılırsa Windows tarafı sessizce ayrışır.
+
+    Yukarıdaki CFBundle testinin birebir eşi: Info.plist'in Windows karşılığı
+    bu kaynak ve aynı tek-kaynak kuralına tabi. Ayrışması özellikle sinsi,
+    çünkü hatalı sürüm yalnızca exe'nin Özellikler sekmesinde görünür —
+    hiçbir test, hiçbir çalışma zamanı davranışı bunu ele vermez.
+    """
+    text = _spec_text()
+    for alan in ("FileVersion", "ProductVersion"):
+        assert not re.search(rf'StringStruct\(\s*"{alan}"\s*,\s*["\']\d', text), \
+            f"VERSIONINFO'da {alan} elle yazılmış — tek kaynak bozuldu"
+        assert re.search(rf'StringStruct\(\s*"{alan}"\s*,\s*APP_VERSION\s*\)', text), \
+            f"VERSIONINFO'daki {alan} APP_VERSION'dan gelmeli"
+
+
+def test_spec_builds_the_version_resource_only_on_windows():
+    """macOS derlemesinde üretmek yalnızca "Ignoring version information" gürültüsü.
+
+    Kapı kaldırılırsa macOS hattı her derlemede uyarı basar; uyarı gürültüsü de
+    zamanla gerçek uyarıların görülmemesine yol açar.
+    """
+    text = _spec_text()
+    assert 'sys.platform == "win32"' in text, \
+        "VERSIONINFO üretimi win32 kapısının arkasında olmalı"
+    assert "version=_version_resource" in text, \
+        "kaynak EXE'ye version=_version_resource ile geçmeli"
 
 
 def test_version_module_imports_nothing_from_the_project():

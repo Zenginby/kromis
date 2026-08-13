@@ -1,5 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec: GPT-Image Studio -> macOS .app.
+"""PyInstaller spec: GPT-Image Studio -> macOS .app + Windows klasörü.
+
+TEK spec, İKİ platform: build.sh (macOS) ve build.ps1 (Windows) aynı dosyayı
+çağırır. Platforma göre dallanan yalnızca İKİ şey var: sürüm kaynağı
+(macOS'ta Info.plist, Windows'ta VERSIONINFO kaynağı) ve BUNDLE adımı (yalnız
+macOS). Geri kalan her şey ORTAK — `hiddenimports` dahil, bu ölçüldü (aşağıda).
 
 `target_arch` kasıtlı olarak verilmiyor: PyInstaller o zaman derlemeyi
 çalıştıran yorumlayıcının mimarisini hedefler. Bu, iki hattın da AYNI spec ve
@@ -18,6 +23,28 @@ palette_store/color_names/version)` zinciri de düz `import` ifadeleri
 olduğundan statik analiz zaten buluyor. Bu yüzden `hiddenimports` burada boş —
 bu makinede üretilen bitmiş `.app` bundle'ı üzerinde doğrulandı (bkz. task-6
 raporu); arm64 runner'da farklı çıkarsa orada yeniden doğrulanmalı.
+
+WINDOWS'TA DA BOŞ — VARSAYIM DEĞİL, ÖLÇÜM (v0.3.0, bu makinede):
+pywebview'ın Windows arka ucu endişe kaynağıydı çünkü backend seçimi çalışma
+anında yapılıyor. Ama zincirin her halkası STATİK `import` ifadesi:
+`webview/guilib.py` fonksiyon içinde `import webview.platforms.winforms`,
+`winforms.py` ise modül düzeyinde `from . import edgechromium` / `mshtml`
+yapıyor — PyInstaller bunları bytecode'dan buluyor. Üretilen paketin PYZ
+arşivi açılıp doğrulandı: `webview.platforms.{winforms,edgechromium,mshtml,
+win32}` ve `clr` içeride. WebView2 DLL'lerini (`webview/lib/`) ve pythonnet
+çalışma zamanını (`Python.Runtime.dll`) hooks-contrib'in kendi
+`hook-webview.py`/`hook-clr*.py`'si topluyor.
+`warn-*.txt`'teki `System`, `System.Drawing`, `Microsoft.Web` gibi "missing
+module" satırları YANILTICI: bunlar Python modülü değil .NET assembly'leri,
+`clr.AddReference` ile çalışma anında yükleniyorlar. Aynı biçimde `objc`,
+`WebKit`, `AppKit` da Windows'ta eksik görünür — macOS arka ucuna ait, bu
+platformda hiç çalışmıyor (`screencolor` v0.3.0'dan beri macOS dışında
+`AppKit`'e hiç dokunmuyor).
+Kanıt derlemenin ötesinde: paket ÇALIŞTIRILDI — pencere açıldı, `hata.log`
+yazılmadı, veri dizini `%LOCALAPPDATA%\\GPT-Image Studio` altında doğdu,
+pencere kapanınca süreç temiz çıktı. Bir gün paket "açılmıyor" hâline gelirse
+ilk bakılacak yer budur: `hiddenimports` eklemek gerekiyorsa hangi modülün
+eksik olduğunu `hata.log`'daki traceback söyler.
 
 `screencolor` (v1.11, damlalık köprüsü) `AppKit`'i FONKSİYON İÇİNDE import
 ediyor. PyInstaller bunu bytecode'dan bulur, ayrıca `AppKit` pywebview'ın
@@ -42,6 +69,7 @@ plist için değeri okur. O import "kullanılmıyor" diye silinirse paket
 # tek doğru çapa o. importlib ile yükleme sys.path'i de kirletmez.
 import importlib.util
 import os
+import sys
 
 _version_spec = importlib.util.spec_from_file_location(
     "_gis_version", os.path.join(SPECPATH, "version.py"))
@@ -75,7 +103,50 @@ a = Analysis(
 # yani bugün sessiz bir no-op; ama PATH'e bir gün eklenirse UPX'in
 # Mach-O ikilisini paketlemesi ad-hoc imzayı bozar ve açılmayan bir .app
 # üretebilir. Sıfır kazanç için gizli bir kırılma noktası tutmaya değmez.
+#
+# Windows'ta bu satır DAHA çok önemli, iki sebeple: (1) UPX Windows
+# makinelerinde PATH'e girmeye çok daha yatkın (chocolatey/scoop paketi),
+# yani no-op kalacağının garantisi yok; (2) UPX ile paketlenmiş bir exe
+# antivirüs ve SmartScreen için klasik bir şüphe işaretidir — imzasız zaten
+# uyarı alan bir uygulamada bunu üstüne eklemek kurulumu iyice zorlaştırır.
 pyz = PYZ(a.pure)
+
+# Windows'ta Info.plist'in KARŞILIĞI: VERSIONINFO kaynağı. Olmadan exe'nin
+# Özellikler → Ayrıntılar sekmesi boş kalır ve Görev Yöneticisi'nde süreç
+# adsız görünür — kullanıcıya "hangi sürümü kullanıyorsun?" diye sorulduğunda
+# cevabı bulacağı yer yok. Sürüm yine version.py'den akıyor; buraya literal
+# YAZILMAZ (macOS dalındaki CFBundleVersion ile aynı kural).
+#
+# macOS'ta bilerek üretilmiyor: PyInstaller Windows dışında bu argümanı
+# "Ignoring version information" uyarısıyla atıyor, yani üretmek derlemeye
+# gürültüden başka bir şey katmazdı.
+_version_resource = None
+if sys.platform == "win32":
+    from PyInstaller.utils.win32 import versioninfo as _vi
+
+    # VERSIONINFO DÖRT parçalı bir sayı ister; APP_VERSION üç parçalı
+    # (MAJOR.MINOR.PATCH, bkz. version.py). Dördüncü hane build numarası —
+    # sürüm şemasında karşılığı olmadığı için 0.
+    _v = tuple(int(p) for p in APP_VERSION.split(".")) + (0,)
+    # 0x041F/1200 = Türkçe + Unicode. Uygulama tek dilli olduğu için tek
+    # çeviri bloğu var; Explorer eldeki bloğu gösterir.
+    _version_resource = _vi.VSVersionInfo(
+        ffi=_vi.FixedFileInfo(filevers=_v, prodvers=_v),
+        kids=[
+            _vi.StringFileInfo([
+                _vi.StringTable("041F04B0", [
+                    _vi.StringStruct("CompanyName", "Kurum Derneği"),
+                    _vi.StringStruct("FileDescription", "GPT-Image Studio"),
+                    _vi.StringStruct("FileVersion", APP_VERSION),
+                    _vi.StringStruct("InternalName", "GPT-Image Studio"),
+                    _vi.StringStruct("OriginalFilename", "GPT-Image Studio.exe"),
+                    _vi.StringStruct("ProductName", "GPT-Image Studio"),
+                    _vi.StringStruct("ProductVersion", APP_VERSION),
+                ]),
+            ]),
+            _vi.VarFileInfo([_vi.VarStruct("Translation", [0x041F, 1200])]),
+        ],
+    )
 
 exe = EXE(
     pyz,
@@ -87,11 +158,15 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
+    # console=False iki platformda da ŞART: desktop.py'nin bütün hata yolu
+    # (errlog + sistem uyarısı) "stderr yok, konsol yok" varsayımı üzerine
+    # kurulu. True yapmak Windows'ta her açılışta boş bir siyah pencere açar.
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     codesign_identity=None,
     entitlements_file=None,
+    version=_version_resource,  # Windows'ta VERSIONINFO, macOS'ta None
 )
 coll = COLLECT(
     exe,
@@ -102,8 +177,6 @@ coll = COLLECT(
     upx_exclude=[],
     name='GPT-Image Studio',
 )
-
-import sys
 
 if sys.platform == "darwin":
     app = BUNDLE(

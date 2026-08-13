@@ -1,17 +1,44 @@
-# GPT-Image Studio — Kurulum (macOS)
+# GPT-Image Studio — Kurulum (macOS ve Windows)
 
 Bilgisayarına Python veya başka bir şey kurman gerekmiyor. 5 dakika sürer.
 
-Not: Bu belge, sana ulaşan `.zip`'in Apple Silicon Mac'in için ayrıca (GitHub
-Actions'ın arm64 runner'ında) üretildiğini varsayar — geliştirme makinesinde
-yerel olarak alınan x86_64 derlemesi yalnızca paketleme yolunu sınamak için,
-sana gönderilen paket değildir.
+**Hangi bölümü okuyacaksın:** 1., 2. ve 5. adımların işletim sistemine göre iki
+dalı var — kendi dalını oku, ötekini atla. 3. ve 4. adımlar (Azure kimliği,
+Prompt Yönetmeni) iki sistemde aynıdır.
+
+| Sistem | Dosya |
+|---|---|
+| macOS (Apple Silicon) | `gpt-image-studio-macOS-arm64.zip` |
+| Windows 10/11 (64-bit) | `gpt-image-studio-windows-x64.zip` |
+
+Not: Bu belge, sana ulaşan `.zip`'in kendi sistemin için ayrıca (GitHub
+Actions'ın arm64 / windows runner'ında) üretildiğini varsayar — geliştirme
+makinesinde yerel olarak alınan derlemeler yalnızca paketleme yolunu sınamak
+için, sana gönderilen paket değildir.
 
 ## 1. Uygulamayı yerine koy
+
+### macOS
 1. `GPT-Image Studio.zip` dosyasına çift tıkla — yanında `GPT-Image Studio` uygulaması çıkar.
 2. Çıkan uygulamayı **Programlar (Applications)** klasörüne sürükle.
 
+### Windows
+1. Zip dosyasına sağ tıkla → **Tümünü ayıkla** (Extract All).
+2. Çıkan `GPT-Image Studio` klasörünü kalıcı bir yere taşı — ör.
+   `C:\Users\<kullanıcı adın>\Programlar\GPT-Image Studio`.
+   **Klasörü olduğu gibi taşı, içinden yalnız `.exe`'yi çekip almaya çalışma:**
+   uygulama yanındaki `_internal` klasörüne ihtiyaç duyar, `.exe` tek başına
+   çalışmaz.
+3. Uygulamayı `GPT-Image Studio.exe` ile açarsın. İstersen ona sağ tıklayıp
+   **Başlat'a sabitle** / **Kısayol oluştur** diyebilirsin.
+
+> **Zip'i doğrudan içinden çalıştırma.** Windows zip'in içeriğini geçici bir
+> klasöre açar; uygulama oradan açılırsa ürettiğin görseller kaybolabilir.
+> Önce ayıkla, sonra çalıştır.
+
 ## 2. İlk açılış — bir kerelik güvenlik izni
+
+### macOS
 Uygulama Apple'a ücretli geliştirici kaydıyla imzalanmadığı için (ad-hoc imza —
 bkz. altta), macOS ilk açılışta soru soruyor. Bir kez izin verirsin, sonraki
 açılışlarda sormaz. *Not:* Bu zip Apple Silicon Mac'in için derlendiğinden (arm64
@@ -55,14 +82,65 @@ ekran görüntüsüyle teyit edildi — adım 1'deki uyarı bu yüzden var.
 TODO(insan): Türkçe sistemdeki birebir metin (henüz Türkçe bir macOS'te
 denenmedi) ve adımların ekran görüntüleri. -->
 
+### Windows — SmartScreen uyarısı
+Uygulama ücretli bir kod imzalama sertifikasıyla imzalanmadığı için Windows
+**SmartScreen** ilk açılışta araya giriyor. Bir kez izin verirsin, sonraki
+açılışlarda sormaz.
+
+1. `GPT-Image Studio.exe`'ye çift tıkla. Uygulama **açılmayacak** ve mavi bir
+   pencere çıkacak:
+
+   > **Windows bilgisayarınızı korudu**
+   > Microsoft Defender SmartScreen tanınmayan bir uygulamanın başlatılmasını
+   > engelledi. Bu uygulamayı çalıştırmak bilgisayarınızı riske atabilir.
+   >
+   > *(İngilizce sistemde: "Windows protected your PC".)*
+
+2. **Daha fazla bilgi** (More info) yazısına tıkla — pencere genişler,
+   "Yayımcı: Bilinmiyor" satırı ve yeni bir düğme çıkar.
+3. **Yine de çalıştır** (Run anyway) düğmesine bas. Uygulama açılır ve bir daha
+   sormaz.
+
+   #### ✅ Burada YIKICI bir düğme YOK
+   macOS'taki uyarının aksine (yukarıda: orada varsayılan düğme uygulamayı
+   **siler**), SmartScreen penceresindeki düğmelerin hiçbiri dosyayı silmez,
+   taşımaz veya karantinaya almaz:
+
+   - **Çalıştırma** (Don't run) → yalnızca pencereyi kapatır. Uygulama yerinde
+     kalır, tekrar çift tıklayıp baştan başlayabilirsin.
+   - **Enter'a basmak** da güvenli — en kötüsü açılışı iptal eder.
+   - Tek yapman gereken **Daha fazla bilgi** → **Yine de çalıştır**.
+
+   Bu uyarı normaldir ve bir sorun olduğunu göstermez: uygulama henüz yeterince
+   yaygın indirilmediği ve ücretli sertifikayla imzalanmadığı için SmartScreen
+   onu "tanınmayan" sayıyor.
+
+<!-- TODO(insan): Windows adımları 2026-08-13'te Faz 4'te paketlenmiş uygulamayla
+doğrulandı, ANCAK SmartScreen penceresi bu makinede tetiklenmedi (dosya
+internetten indirilmediği için Mark-of-the-Web bayrağı yok). Yukarıdaki metin
+Microsoft'un standart uyarı metnine dayanıyor; gerçekten indirilen bir zip'le
+birebir metin + ekran görüntüsü hâlâ alınmalı. -->
 
 ## 3. Azure kimliğini gir
 İlk açılışta Ayarlar penceresi kendiliğinden açılır ve "Üret" düğmesi kilitlidir.
 1. **Endpoint** ve **API key** alanlarını Kurum'dan aldığın bilgilerle doldur.
 2. **Kaydet**. Kilit açılır.
 
-Key bilgisayarında `~/.config/gpt-image-studio/credentials.env` dosyasında, yalnız
-senin okuyabileceğin izinle saklanır ve bir daha ekranda gösterilmez.
+Key bilgisayarında yalnız senin okuyabileceğin izinle saklanır ve bir daha
+ekranda gösterilmez. Dosyanın yeri iki sistemde de aynı mantıkta:
+
+| Sistem | Dosya |
+|---|---|
+| macOS | `~/.config/gpt-image-studio/credentials.env` (izin `0600`) |
+| Windows | `C:\Users\<kullanıcı adın>\.config\gpt-image-studio\credentials.env` |
+
+Windows'ta POSIX izin bitleri işlemediği için dosyaya erişim listesi (DACL)
+sıkılaştırılıyor: kalıtım kesilir ve listede **yalnız senin hesabın** kalır.
+Kendin görmek istersen:
+
+```powershell
+icacls "$env:USERPROFILE\.config\gpt-image-studio\credentials.env"
+```
 
 ## 4. Prompt Yönetmeni'ni aç (istersen)
 Aynı Ayarlar penceresinde, **Prompt Yönetmeni (sohbet modeli)** başlığının altındaki
@@ -74,22 +152,46 @@ kalır ve nedenini panelde yazar. Sohbet, görselinkiyle aynı endpoint ve API
 anahtarını kullanır — ikinci bir anahtar girmen gerekmez.
 
 ## 5. Kullan
-Prompt yaz → **Üret**. Ürettiğin görseller bilgisayarında
-`~/Library/Application Support/GPT-Image Studio/output/` altında saklanır;
-uygulamayı kapatıp açsan da geçmişin durur.
+Prompt yaz → **Üret**. Ürettiğin görseller bilgisayarında saklanır; uygulamayı
+kapatıp açsan da geçmişin durur.
+
+| Sistem | Görsellerin yeri |
+|---|---|
+| macOS | `~/Library/Application Support/GPT-Image Studio/output/` |
+| Windows | `%LOCALAPPDATA%\GPT-Image Studio\output\` — yani `C:\Users\<kullanıcı adın>\AppData\Local\GPT-Image Studio\output\` |
+
+Windows'ta klasörü hızlı açmak için Dosya Gezgini'nin adres çubuğuna
+`%LOCALAPPDATA%\GPT-Image Studio` yazıp Enter'a basabilirsin. (Bu klasör
+bilerek `AppData\Local` altında — `Roaming` olsaydı ürettiğin bütün görseller
+kurumsal profille birlikte ağ üzerinden taşınmaya çalışırdı.)
 
 Hangi sürümü kullandığını **⚙ Ayarlar** penceresinin altındaki **Sürüm**
 satırından görebilirsin.
 
 ## Sonra: yeni sürüm gelirse
 Kurum yeni bir `.zip` gönderdiğinde [GUNCELLEME.md](GUNCELLEME.md) sayfasını izle.
-Kısaca: uygulamayı kapat → yenisini Programlar'a sürükleyip **Değiştir** → güvenlik
-iznini bir kez daha ver. **Verin kaybolmaz** ve Azure anahtarını yeniden girmen
-gerekmez — ama `Application Support` klasörünü SİLME, geçmişin orada.
+
+- **macOS:** uygulamayı kapat → yenisini Programlar'a sürükleyip **Değiştir** →
+  güvenlik iznini bir kez daha ver. `Application Support` klasörünü SİLME.
+- **Windows:** uygulamayı kapat → yeni zip'i ayıkla → eski `GPT-Image Studio`
+  klasörünün **yerine** koy (Windows "Hedefteki dosyaları değiştir" diye sorar,
+  onayla) → SmartScreen izni bir kez daha gerekebilir.
+  `AppData\Local\GPT-Image Studio` klasörünü SİLME.
+
+İki sistemde de **verin kaybolmaz** ve Azure anahtarını yeniden girmen gerekmez:
+görseller ve ayarlar uygulama klasörünün DIŞINDA duruyor (yerleri için 3. ve 5.
+adım), yani uygulamayı silip yenisini koymak geçmişine dokunmaz.
 
 ## Sorun çıkarsa
 - **Pencere boş açılıyor:** uygulamayı kapat, tekrar aç.
 - **"Üret" kilitli:** Ayarlar (dişli) → endpoint + key girilmiş mi?
+- **(Windows) Uygulama hiç açılmıyor, pencere gelmiyor:** `.exe`'yi `_internal`
+  klasöründen ayırmış olabilirsin — ikisi aynı klasörde olmalı (1. adım). Ayrıca
+  `%LOCALAPPDATA%\GPT-Image Studio\hata.log` dosyasına bak; varsa içeriğini
+  Kurum'ya gönder.
+- **(Windows) Antivirüs uygulamayı karantinaya aldı:** paket imzalanmadığı için
+  bazı kurumsal antivirüsler yanlış-pozitif verebiliyor. Klasörü silme, Kurum'ya
+  yaz.
 - **Görsel üretilmiyor, hata mesajı çıkıyor:** key süresi/rotasyonu için Kurum'ya yaz.
 - **Prompt Yönetmeni'nde "Gönder" kilitli:** Ayarlar → **Dağıtım adı** boş.
 - **"Sohbet dağıtımı bulunamadı (404)":** yazdığın dağıtım adı Azure'daki adla

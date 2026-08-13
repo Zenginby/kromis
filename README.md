@@ -1,6 +1,6 @@
 # 🎨 GPT-Image Studio
 
-[![Release](https://img.shields.io/badge/version-v0.2.1-blue.svg)](https://github.com/Zenginby/gpt-image-studio/releases/latest)
+[![Release](https://img.shields.io/badge/version-v0.3.0-blue.svg)](https://github.com/Zenginby/gpt-image-studio/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![Build & Test](https://github.com/Zenginby/gpt-image-studio/actions/workflows/release.yml/badge.svg)](https://github.com/Zenginby/gpt-image-studio/actions)
@@ -11,18 +11,19 @@
 
 ## 🚀 Masaüstü Uygulamasını İndir
 
-Son kullanıcılar için hazırlanmış **macOS Apple Silicon (ARM64)** hazır derleme paketini doğrudan indirebilirsiniz:
+Son kullanıcılar için hazırlanmış hazır derleme paketlerini doğrudan indirebilirsiniz:
 
 | Platform | Mimari | İndirme Bağlantısı |
 |---|---|---|
 | 🍏 **macOS** | Apple Silicon (M1 / M2 / M3 / M4) | [İndir (ZIP / ARM64)](https://github.com/Zenginby/gpt-image-studio/releases/latest/download/gpt-image-studio-macOS-arm64.zip) |
+| 🪟 **Windows** | x64 (Windows 10 / 11) | [İndir (ZIP / x64)](https://github.com/Zenginby/gpt-image-studio/releases/latest/download/gpt-image-studio-windows-x64.zip) |
 
 > [!TIP]
-> Paketleme hakkında detaylı bilgi ve kurulum talimatları için [KURULUM.md](file:///Users/kullanici/Documents/Projects/Claude%20Code%20Projects/gpt-image-studio/KURULUM.md) rehberini inceleyebilirsiniz.
+> Paketleme hakkında detaylı bilgi ve kurulum talimatları için [KURULUM.md](KURULUM.md) rehberini inceleyebilirsiniz — belge iki sistemi de kapsıyor (macOS Gatekeeper ve Windows SmartScreen adımları dahil).
 
 ---
 
-## ✨ Güncel Özellikler (v0.2.1 & Flow-UI)
+## ✨ Güncel Özellikler (v0.3.0 & Flow-UI)
 
 ### 🎬 1. Stüdyo Tek Döküm & Prompt Yönetmeni
 * **Türkçe Diyalogdan İngilizce Prompt:** Türkçe fikir anlatımını otomatik olarak optimizasyonu yapılmış İngilizce `gpt-image-2` prompt'una ve teknik ayarlara (`size`, `quality`, `n`) çevirir.

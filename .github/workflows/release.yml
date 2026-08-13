@@ -94,3 +94,210 @@ jobs:
             dist/gpt-image-studio-macOS-arm64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # macOS işine DOKUNULMADI: bu iş ayrı bir runner'da, ayrı betikle (build.ps1)
+  # ve ayrı doğrulamayla çalışır. İkisi yalnızca `test` işini paylaşır.
+  #
+  # NEDEN BU KADAR SERT DOĞRULAMA: 2026-08-11'de bu depoda "CI Windows paketi
+  # üretti" sanıldı; koşu (31492697516) YEŞİLDİ ama çıktı BOŞTU. Yeşil bir koşu
+  # tek başına kanıt değildir — aşağıdaki her adım o yanılgının bir kapısını
+  # kapatıyor: paket dosyası var mı, İÇİNDE beklenen dosyalar var mı, exe'nin
+  # sürümü version.py ile aynı mı, artifact adımı boş bir yükleme yaptı mı.
+  build-windows:
+    needs: test
+    name: Windows x64 paketi
+    runs-on: windows-latest
+    # macOS işi 30 dakikada bitiyor; Windows runner'ı daha yavaş ve build.ps1
+    # pip + tam pytest takımı (1171 test) + pyinstaller'ı sırayla koşuyor.
+    timeout-minutes: 45
+    # Bu iş yayın oluşturmuyor (onu macOS işi yapıyor), yalnızca artifact
+    # yüklüyor — workflow düzeyindeki contents:write'ı devralmasına gerek yok.
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: Mimariyi doğrula (yanlış runner'da sessizce arm64 üretmesin)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Write-Host "runner mimarisi: $env:PROCESSOR_ARCHITECTURE"
+          if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') {
+            Write-Host "HATA: AMD64 bekleniyordu, $env:PROCESSOR_ARCHITECTURE bulundu"
+            exit 1
+          }
+          # macOS işindeki ikili kontrolün eşi: runner donanımı (env değişkeni) ve
+          # PyInstaller'ın embed edeceği Python binary'si (platform) AYRI şeyler.
+          # GitHub bir gün windows-latest'i arm64'e taşırsa bu adım olmadan paket
+          # "windows-x64" adıyla arm64 çıkar ve kimse fark etmez.
+          $plat = python -c "import platform; print(platform.machine())"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Write-Host "python mimarisi: $plat"
+          if ("$plat".Trim() -ne 'AMD64') { exit 1 }
+
+      # macOS'taki "pip'i tazele" adımının karşılığı, ama İKİNCİ bir gerekçesi de
+      # var: build.ps1 yorumlayıcıyı `py -3` ile arıyor ve runner imajında
+      # setup-python'ın seçtiğinden BAŞKA sürümlere işaret eden bir `py`
+      # başlatıcısı bulunabilir. .venv hazır bulunduğunda build.ps1 aramayı hiç
+      # çalıştırmıyor, doğrudan onu kullanıyor — böylece paketin yukarıda seçilen
+      # yorumlayıcıyla üretildiği garanti (build.ps1'e dokunmadan).
+      - name: .venv oluştur + pip'i tazele
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m venv .venv
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          .venv\Scripts\python.exe -m pip install -q --upgrade pip
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      # `shell: powershell` = Windows PowerShell 5.1, pwsh DEĞİL: build.ps1
+      # bilinçle 5.1'e göre yazıldı (BOM'lu UTF-8, Compress-Archive yerine .NET
+      # ZipFile, Activate.ps1'den kaçınma) ve hem geliştirici makinesinde hem
+      # kullanıcıda çalışacak kabuk o. pwsh'te derlemek betiğin asıl hedef
+      # kabuğunu hiç sınamazdı.
+      - name: Derle (yerelde doğrulanan build.ps1 ile, değiştirmeden)
+        shell: powershell
+        run: .\build.ps1
+
+      # Derleme adımı bilerek 5.1'de, bu adım runner'ın varsayılanı pwsh'te —
+      # ama doğrulamanın SONUCU kabuk seçiminden bağımsız olacak biçimde yazıldı,
+      # iki yerde: (a) zip girdi adları normalize ediliyor (5.1 ile pwsh aynı
+      # zip'i farklı ayırıcıyla gösteriyor, aşağıda), (b) Türkçe iddia kod
+      # noktalarından kuruluyor. Gerekçe: GitHub `run:` içeriğini BOM'SUZ UTF-8
+      # dosyaya yazar, 5.1 ise BOM'suzu cp1254 sanır — yani kabuk değişince
+      # bozulacak bir doğrulama, doğrulama değildir. Betik yerelde 5.1 ile
+      # koşturularak sınandı.
+      - name: Paketi doğrula (iddiaların hepsi zip'in İÇİ hakkında)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zipYol = 'dist\GPT-Image Studio-windows.zip'
+
+          # (1) Paket GERÇEKTEN var mı? "Yeşil ama boş" koşusunun birinci kapısı.
+          if (-not (Test-Path -LiteralPath $zipYol)) {
+            Write-Host "HATA: paket üretilmemiş: $zipYol"
+            Write-Host '--- dist/ içeriği ---'
+            if (Test-Path -LiteralPath 'dist') { Get-ChildItem -LiteralPath 'dist' -Recurse -Depth 1 | Select-Object -First 40 }
+            exit 1
+          }
+          $zip = (Resolve-Path -LiteralPath $zipYol).Path
+          $mb = [math]::Round((Get-Item -LiteralPath $zip).Length / 1MB, 1)
+          Write-Host "paket: $zipYol ($mb MB)"
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $arsiv = [System.IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            # Girdi adları normalize ediliyor. Zip'in İÇİNDE ayırıcı '/' (bayt
+            # düzeyinde doğrulandı, Python zipfile ile: 219/219 girdi '/'), ama
+            # .NET Framework'ün ZipArchiveEntry.FullName'i onu okurken platform
+            # ayırıcısına çeviriyor — yani AYNI zip, Windows PowerShell 5.1'de
+            # '\', pwsh'te '/' görünüyor. Normalizasyon olmadan bu adım kabuk
+            # sürümü değişince sessizce "dosya eksik" derdi.
+            $girdiler = @($arsiv.Entries | ForEach-Object { $_.FullName -replace '\\', '/' })
+          } finally { $arsiv.Dispose() }
+          Write-Host "zip girdi sayısı: $($girdiler.Count)"
+
+          # (2) Kısmi/boş zip. onedir paketi 200+ dosya taşıyor; eşik bilinçle
+          # gevşek (Python sürümü değişince DLL sayısı oynar) — burada aranan
+          # "tam sayı" değil, "zip'in içi boş değil" kanıtı.
+          if ($girdiler.Count -lt 100) {
+            Write-Host "HATA: zip beklenenden az girdi taşıyor ($($girdiler.Count))"
+            exit 1
+          }
+
+          # (3) exe. Ada göre TEK eşleşme aranıyor: spec'teki `name` değişirse
+          # build.ps1'in kendi kontrolü de bu da kırmızıya düşer.
+          $exeGirdi = @($girdiler | Where-Object { $_ -like '*/GPT-Image Studio.exe' })
+          if ($exeGirdi.Count -ne 1) {
+            Write-Host "HATA: zip'te 'GPT-Image Studio.exe' beklendi, $($exeGirdi.Count) eşleşme bulundu"
+            exit 1
+          }
+          Write-Host "exe girdisi: $($exeGirdi[0])"
+
+          # (4) Veri dosyaları — macOS işinin Contents/Resources kontrolünün eşi.
+          # Yol SONEKİ ile aranıyor, tam yolla DEĞİL: PyInstaller 6 datas'ı
+          # `_internal/` altına koyuyor ve o yerleşim PyInstaller'ın kendi
+          # meselesi. Burada iddia edilen tek şey dosyaların pakette OLDUĞU;
+          # nerede durduklarını ürün kodu (paths.py) çözüyor ve o Faz 1'de
+          # frozen uygulamada ayrıca doğrulandı.
+          $beklenenler = @(
+            'static/index.html', 'static/core.js', 'static/viewer.js',
+            'static/palette.js',
+            'bundled/logos/kurum-logo-blue.png', 'bundled/logos/kurum-logo-white.png'
+          )
+          $eksik = @()
+          foreach ($f in $beklenenler) {
+            if (-not ($girdiler | Where-Object { $_ -like "*/$f" })) { $eksik += $f }
+          }
+          if ($eksik.Count -gt 0) {
+            Write-Host "HATA: pakette EKSİK: $($eksik -join ', ')"
+            exit 1
+          }
+          Write-Host "veri dosyaları tam: $($beklenenler -join ', ')"
+
+          # (5) Sürüm. exe zip'ten ÇIKARILIP okunuyor, dist/ içindeki kopyadan
+          # değil: doğrulanan şey gönderilen dosyanın kendisi olmalı.
+          # Bu adım aynı zamanda spec'in derleme-zamanı version.py yüklemesinin
+          # GERÇEKTEN koştuğunun tek kanıtı — VERSIONINFO'yu PyInstaller üretiyor,
+          # hiçbir pytest onu görmüyor (macOS'ta Info.plist için de böyle).
+          $gecici = Join-Path $env:RUNNER_TEMP 'surum-denetimi'
+          New-Item -ItemType Directory -Force -Path $gecici | Out-Null
+          $hedef = Join-Path $gecici 'GPT-Image Studio.exe'
+          $arsiv = [System.IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            # GetEntry zip'teki HAM adı ister — normalize edilmiş hâli değil.
+            $ham = ($arsiv.Entries | Where-Object { ($_.FullName -replace '\\', '/') -eq $exeGirdi[0] })[0]
+            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($ham, $hedef, $true)
+          } finally { $arsiv.Dispose() }
+
+          $beklenen = (python -c "import version; print(version.APP_VERSION)")
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $beklenen = "$beklenen".Trim()
+          $bilgi = (Get-Item -LiteralPath $hedef).VersionInfo
+          # FixedFileInfo DÖRT haneli (spec dördüncüyü 0 yapıyor); StringFileInfo
+          # üç haneli. İkisi de ayrı ayrı denetleniyor: biri elle yazılırsa öteki
+          # yakalar.
+          $dortlu = "$($bilgi.FileMajorPart).$($bilgi.FileMinorPart).$($bilgi.FileBuildPart).$($bilgi.FilePrivatePart)"
+          # CompanyName kodlama kapısı: bu proje Türkçe karakter kodlamasından iki
+          # kez yandı (cp1254'e düşen geçmiş okuması; PS 5.1'in BOM'suz dosyayı
+          # cp1254 sanması). Beklenti "Kurum Derneği" diye YAZILMIYOR, KOD
+          # NOKTALARINDAN kuruluyor — çünkü bu betiği kabuk BOM'suz bir dosyadan
+          # okuyor ve literal yazılsaydı iddia kabuğun dosya kodlamasına bağlı
+          # olurdu: doğrulamanın kendisi kodlama kusuruna açık olamaz. 0x130='İ',
+          # 0x11F='ğ' (Faz 2'de exe'den bayt düzeyinde okunan değerler).
+          $sirket = -join (@(0x130,0x6C,0x61,0x20,0x44,0x65,0x72,0x6E,0x65,0x11F,0x69) | ForEach-Object { [char]$_ })
+          $iddialar = @(
+            @{ ad = 'FileVersion';    got = "$($bilgi.FileVersion)";    bek = $beklenen },
+            @{ ad = 'ProductVersion'; got = "$($bilgi.ProductVersion)"; bek = $beklenen },
+            @{ ad = 'FixedFileInfo';  got = $dortlu;                    bek = "$beklenen.0" },
+            @{ ad = 'CompanyName';    got = "$($bilgi.CompanyName)";    bek = $sirket }
+          )
+          $hataVar = $false
+          foreach ($i in $iddialar) {
+            if ($i.got -ne $i.bek) {
+              Write-Host "HATA: $($i.ad)=[$($i.got)], beklenen [$($i.bek)]"
+              $hataVar = $true
+            } else {
+              Write-Host "$($i.ad): $($i.got)"
+            }
+          }
+          if ($hataVar) { exit 1 }
+
+          # Yayın varlığı adı macOS ile simetrik (gpt-image-studio-macOS-arm64.zip).
+          Copy-Item -LiteralPath $zip -Destination 'dist\gpt-image-studio-windows-x64.zip' -Force
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpt-image-studio-windows-x64
+          path: dist/gpt-image-studio-windows-x64.zip
+          # "Yeşil ama boş"un SON kapısı: bu bayrak olmadan upload-artifact
+          # eşleşen dosya bulamayınca yalnızca UYARI basar ve iş yeşil kalır —
+          # 2026-08-11'de tam olarak bu oldu.
+          if-no-files-found: error
+          retention-days: 30

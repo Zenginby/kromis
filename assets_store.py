@@ -40,7 +40,10 @@ def _read_manifest(kind_dir: str) -> list[dict]:
     path = _manifest_path(kind_dir)
     if not os.path.exists(path):
         return []
-    with open(path) as f:
+    # encoding="utf-8" AÇIKÇA — gerekçe storage._read_history'deki ile aynı:
+    # manifest utf-8 yazılıyor, okuma platform varsayılanına düşerse Türkçe
+    # varlık adları ("KURUM Logo Mavi") Türkçe Windows'ta cp1254 ile bozulur.
+    with open(path, encoding="utf-8") as f:
         try:
             data = json.load(f)
         except json.JSONDecodeError:

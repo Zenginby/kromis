@@ -1,4 +1,5 @@
 import io
+import os
 
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -111,8 +112,10 @@ def test_logo_builtin_uses_bundled_ila_logos(tmp_path, monkeypatch):
     src_id = _make_source(c)
     assert c.post("/api/logo", json={"id": src_id}).status_code == 200
     kw = calls[-1]
-    assert kw["logo_blue"].endswith("bundled/logos/kurum-logo-blue.png")
-    assert kw["logo_white"].endswith("bundled/logos/kurum-logo-white.png")
+    # Kuyruk os.path.join ile: Windows'ta ayraç "\" (bkz. test_paths.py'deki not).
+    tail = os.path.join("bundled", "logos", "kurum-logo-{}.png")
+    assert kw["logo_blue"].endswith(tail.format("blue"))
+    assert kw["logo_white"].endswith(tail.format("white"))
     assert kw["logo_blue"] != kw["logo_white"]
 
 

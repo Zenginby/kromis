@@ -130,7 +130,9 @@ def test_override_path_is_writable_user_data_not_read_only_resources(monkeypatch
     override = paths.chat_instructions_override()
     assert override.startswith(paths.data_dir())
     assert not override.startswith(paths.resource_dir())
-    assert paths.bundled_prompts_dir() == "/tmp/meipass-test/bundled/prompts"
+    # os.path.join ile: Windows'ta ayraç "\" (bkz. test_paths.py'deki aynı not).
+    assert paths.bundled_prompts_dir() == os.path.join(
+        "/tmp/meipass-test", "bundled", "prompts")
 
 
 def test_the_persona_teaches_the_clickable_options_contract():

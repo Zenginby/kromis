@@ -30,7 +30,13 @@ def _read_history(output_dir: str) -> list[dict]:
     path = _history_path(output_dir)
     if not os.path.exists(path):
         return []
-    with open(path) as f:
+    # encoding="utf-8" AÇIKÇA: yazma yolu (jsonstore.write_atomic) utf-8 yazıyor,
+    # okuma yolu ise bunu vermediği sürece platformun varsayılanına düşer. Türkçe
+    # Windows'ta o varsayılan cp1254'tür → Türkçe promptlu bir geçmiş ya mojibake
+    # olur ("Zümrüt" → "ZÃ¼mrÃ¼t") ya da UnicodeDecodeError ile listelemeyi
+    # çökertir. macOS/Linux'ta varsayılan zaten utf-8 olduğu için kusur uzun süre
+    # görünmedi; Windows paketlemesinin ilk test turunda ortaya çıktı.
+    with open(path, encoding="utf-8") as f:
         try:
             data = json.load(f)
         except json.JSONDecodeError:

@@ -42,14 +42,20 @@ def test_frozen_mode_reads_resources_from_meipass(monkeypatch):
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "_MEIPASS", "/tmp/meipass-test", raising=False)
 
+    # Beklenti os.path.join ile kurulur, elle "/" ile DEĞİL: kod zaten
+    # os.path.join kullanıyor, yani Windows'ta ayraç "\" olur ve elle yazılmış
+    # bir POSIX yolu testi üründe hiçbir kusur yokken kırmızıya düşürür
+    # (Windows paketleme turunda birebir bu oldu).
     assert paths.resource_dir() == "/tmp/meipass-test"
-    assert paths.static_dir() == "/tmp/meipass-test/static"
-    assert paths.bundled_logos_dir() == "/tmp/meipass-test/bundled/logos"
+    assert paths.static_dir() == os.path.join("/tmp/meipass-test", "static")
+    assert paths.bundled_logos_dir() == os.path.join(
+        "/tmp/meipass-test", "bundled", "logos")
 
 
 def test_builtin_logo_resolves_both_variants():
-    assert paths.builtin_logo("blue").endswith("bundled/logos/kurum-logo-blue.png")
-    assert paths.builtin_logo("white").endswith("bundled/logos/kurum-logo-white.png")
+    tail = os.path.join("bundled", "logos", "kurum-logo-{}.png")
+    assert paths.builtin_logo("blue").endswith(tail.format("blue"))
+    assert paths.builtin_logo("white").endswith(tail.format("white"))
 
 
 def test_builtin_logo_rejects_unknown_variant():

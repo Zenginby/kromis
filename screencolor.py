@@ -24,6 +24,7 @@ dokunan tek fonksiyon `show_sampler_on_main_thread` ve o elle doğrulanıyor.
 """
 from __future__ import annotations
 
+import sys
 import threading
 from typing import Callable
 
@@ -84,7 +85,18 @@ def show_sampler_on_main_thread(handler: Callable[[object | None], None]) -> Non
     `waitUntilFinished` YOK: burada beklemek çağıran thread'i sampler
     kapanana kadar tutar ve zaman aşımını anlamsız kılardı — bekleme
     `pick()`'in Event'inde, tek yerde.
+
+    macOS DIŞINDA hemen `handler(None)`: Windows'ta bu köprü hiç gerekmiyor,
+    çünkü WebView2 Chromium tabanlı ve `window.EyeDropper` orada VAR — damlalık
+    tarayıcı API'siyle çalışıyor (bkz. static/palette.js). Kapı `import AppKit`
+    hatasına bırakılmadı: platform kontrolü açıkça yazılınca niyet okunuyor ve
+    AppKit'i başka bir sebeple import edilebilir kılan bir ortam sessizce yanlış
+    yola girmiyor.
     """
+    if sys.platform != "darwin":
+        handler(None)
+        return
+
     try:
         import AppKit
     except (ImportError, ModuleNotFoundError):

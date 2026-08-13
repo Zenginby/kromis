@@ -27,6 +27,10 @@ def test_dev_mode_matches_app_module_constants():
 
 
 def test_frozen_mode_writes_under_application_support(monkeypatch):
+    """macOS dalı. `sys.platform` SAHTELENİYOR: bu iddia macOS'un yerleşimini
+    ölçüyor, koşan makinenin yerleşimini değil — aksi halde aynı test Windows'ta
+    kırmızıya düşer ve iki platformun yerleşimi tek testte karışırdı."""
+    monkeypatch.setattr(sys, "platform", "darwin")
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "_MEIPASS", "/tmp/meipass-test", raising=False)
 
@@ -36,6 +40,41 @@ def test_frozen_mode_writes_under_application_support(monkeypatch):
     assert paths.data_dir() == expected_data
     assert paths.output_dir() == os.path.join(expected_data, "output")
     assert paths.assets_dir() == os.path.join(expected_data, "assets")
+
+
+def test_frozen_mode_writes_under_local_appdata_on_windows(monkeypatch):
+    """Windows dalı: veri `%LOCALAPPDATA%\\GPT-Image Studio` altına gider.
+
+    Roaming (`%APPDATA%`) DEĞİL: bu dizin üretilen görselleri tutuyor ve etki
+    alanı profilinde ağ üzerinden taşınması istenmez.
+    """
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", r"C:\Kullanicilar\test\AppData\Local")
+
+    expected_data = os.path.join(r"C:\Kullanicilar\test\AppData\Local",
+                                 "GPT-Image Studio")
+    assert paths.data_dir() == expected_data
+    assert paths.output_dir() == os.path.join(expected_data, "output")
+    assert paths.assets_dir() == os.path.join(expected_data, "assets")
+
+
+def test_frozen_windows_falls_back_when_localappdata_is_missing(monkeypatch):
+    """Ortam değişkeni yoksa yol yine çözülmeli — uygulama hiç açılmamaktansa."""
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+
+    expected = os.path.join(os.path.expanduser("~"), "AppData", "Local",
+                            "GPT-Image Studio")
+    assert paths.data_dir() == expected
+
+
+def test_dev_mode_ignores_the_platform(monkeypatch):
+    """Geliştirmede iki platformda da kök repo dizini — 1150+ testin dayandığı
+    varsayım, platform dalı eklenirken kazara değişmemeli."""
+    monkeypatch.setattr(sys, "platform", "win32")
+    assert paths.data_dir() == paths.REPO_DIR
 
 
 def test_frozen_mode_reads_resources_from_meipass(monkeypatch):

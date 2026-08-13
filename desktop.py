@@ -90,26 +90,60 @@ def _escape_applescript(text: str) -> str:
     return text.replace("\\", "\\\\").replace('"', '\\"')
 
 
+def _alert_macos(title: str, message: str) -> None:
+    """`osascript` ile kritik uyarı.
+
+    AppKit.NSAlert yerine subprocess tercih edildi: bu noktada pywebview'ın
+    NSApplication çalışma döngüsünü başlatıp başlatmadığı belirsiz (hata
+    `webview.start()` öncesinde de, sırasında da oluşabilir); osascript kendi
+    ayrı sürecinde çalıştığından ana uygulamanın Cocoa durumuna hiç bağımlı
+    değil — daha basit ve daha güvenilir.
+    """
+    script = (f'display alert "{_escape_applescript(title)}" '
+             f'message "{_escape_applescript(message)}" as critical')
+    subprocess.run(["osascript", "-e", script], check=False,
+                   timeout=30, capture_output=True)
+
+
+def _alert_windows(title: str, message: str) -> None:
+    """`MessageBoxW` ile kritik uyarı — ctypes, subprocess DEĞİL.
+
+    Burada osascript'in karşılığı `msg.exe`/PowerShell olurdu ama ikisi de yeni
+    bir süreç açar: `--windowed` pakette bu bir konsol penceresi çaktırır ve
+    `msg.exe` Home sürümlerinde hiç bulunmaz. `user32.MessageBoxW` çekirdeğin
+    kendi diyaloğu — ek bağımlılık yok, konsol yok.
+
+    MB_SYSTEMMODAL (0x1000) + MB_SETFOREGROUND (0x10000): pencere hiç açılmadığı
+    için uyarı sahipsiz doğuyor ve bu bayraklar olmadan diğer pencerelerin
+    ARKASINDA kalabiliyor — kullanıcı yine hiçbir şey görmeden uygulamanın
+    öldüğünü sanardı, yani fonksiyonun var oluş sebebi boşa giderdi.
+    """
+    import ctypes  # yalnız bu dalda gerekli
+
+    MB_ICONERROR = 0x10
+    MB_SYSTEMMODAL = 0x1000
+    MB_SETFOREGROUND = 0x10000
+    ctypes.windll.user32.MessageBoxW(
+        None, message, title, MB_ICONERROR | MB_SYSTEMMODAL | MB_SETFOREGROUND)
+
+
 def _show_fatal_alert(log_path: str) -> None:
     """Kullanıcıya Türkçe, kritik bir sistem uyarısı gösterir.
 
-    `subprocess.run(["osascript", ...])` tercih edildi (AppKit.NSAlert
-    yerine): bu noktada pywebview'ın NSApplication çalışma döngüsünü
-    başlatıp başlatmadığı belirsiz (hata `webview.start()` öncesinde de,
-    sırasında da oluşabilir); osascript kendi ayrı sürecinde çalıştığından
-    ana uygulamanın Cocoa durumuna hiç bağımlı değil — daha basit ve daha
-    güvenilir. Bu fonksiyon KENDİSİ asla patlamamalı: bir uyarı gösterme
-    denemesi başarısız olursa süreç yine de (main() içindeki) sys.exit(1)
-    ile temiz çıkmalı.
+    Bu fonksiyon KENDİSİ asla patlamamalı: bir uyarı gösterme denemesi
+    başarısız olursa süreç yine de (main() içindeki) sys.exit(1) ile temiz
+    çıkmalı.
+
+    Windows'ta ayrı bir dal ŞART, çünkü `--windowed` pakette stderr yok:
+    osascript orada bulunamaz, uyarı hiç çıkmaz ve açılış hatası tamamen
+    sessiz kalırdı (v1.8'de `errlog`'u doğuran gerekçenin birebir aynısı).
     """
     title = "GPT-Image Studio başlatılamadı"
     message = (f"Uygulama açılamadı. Hata kaydı: {log_path} "
               "— lütfen bu dosyayı Kurum'ya iletin.")
-    script = (f'display alert "{_escape_applescript(title)}" '
-             f'message "{_escape_applescript(message)}" as critical')
+    alert = _alert_windows if sys.platform == "win32" else _alert_macos
     try:
-        subprocess.run(["osascript", "-e", script], check=False,
-                       timeout=30, capture_output=True)
+        alert(title, message)
     except Exception:
         pass
 

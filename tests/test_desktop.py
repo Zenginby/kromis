@@ -366,6 +366,9 @@ def test_main_logs_and_shows_alert_when_startup_fails(monkeypatch, tmp_path):
 
     monkeypatch.setattr(desktop, "_run", boom)
 
+    # Platform SAHTELENİYOR: ölçülen şey main()'in sarmalayıcı davranışı, koşan
+    # makinenin işletim sistemi değil. Dal seçiminin kendisi ayrı testlerde.
+    monkeypatch.setattr(desktop.sys, "platform", "darwin")
     alert_calls: list[tuple] = []
     monkeypatch.setattr(desktop.subprocess, "run",
                         lambda *a, **k: alert_calls.append((a, k)))
@@ -385,17 +388,53 @@ def test_main_logs_and_shows_alert_when_startup_fails(monkeypatch, tmp_path):
     assert args[0][0] == "osascript"
 
 
-def test_alert_failure_does_not_crash_main(monkeypatch, tmp_path):
+def test_fatal_alert_uses_osascript_on_macos(monkeypatch):
+    monkeypatch.setattr(desktop.sys, "platform", "darwin")
+    calls: list[tuple] = []
+    monkeypatch.setattr(desktop.subprocess, "run",
+                        lambda *a, **k: calls.append((a, k)))
+
+    desktop._show_fatal_alert("/tmp/hata.log")
+
+    assert len(calls) == 1
+    assert calls[0][0][0][0] == "osascript"
+    assert "/tmp/hata.log" in calls[0][0][0][2]
+
+
+def test_fatal_alert_uses_messagebox_on_windows(monkeypatch):
+    """Windows'ta osascript YOK. Dal seçilmezse uyarı hiç çıkmaz ve `--windowed`
+    pakette stderr de olmadığı için açılış hatası tamamen sessiz kalır."""
+    monkeypatch.setattr(desktop.sys, "platform", "win32")
+    subprocess_calls: list[tuple] = []
+    monkeypatch.setattr(desktop.subprocess, "run",
+                        lambda *a, **k: subprocess_calls.append((a, k)))
+    alerts: list[tuple[str, str]] = []
+    monkeypatch.setattr(desktop, "_alert_windows",
+                        lambda title, message: alerts.append((title, message)))
+
+    desktop._show_fatal_alert(r"C:\Users\x\hata.log")
+
+    assert not subprocess_calls, "Windows'ta subprocess'e düşmemeli (konsol çakar)"
+    assert len(alerts) == 1
+    title, message = alerts[0]
+    assert "GPT-Image Studio" in title
+    assert r"C:\Users\x\hata.log" in message
+
+
+@pytest.mark.parametrize("platform", ["darwin", "win32"])
+def test_alert_failure_does_not_crash_main(monkeypatch, tmp_path, platform):
     """I1: uyarı gösterme denemesinin kendisi patlarsa bile main() yine de
     (loglanmış, non-zero) temiz çıkmalı — kullanıcı hâlâ hiçbir şey görmese
-    de süreç asılı kalmamalı."""
+    de süreç asılı kalmamalı. İki dalda da geçerli."""
     monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
     monkeypatch.setattr(desktop, "_run", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(desktop.sys, "platform", platform)
 
-    def boom_subprocess(*args, **kwargs):
-        raise OSError("osascript bulunamadı (simüle)")
+    def boom_alert(*args, **kwargs):
+        raise OSError("uyarı gösterilemedi (simüle)")
 
-    monkeypatch.setattr(desktop.subprocess, "run", boom_subprocess)
+    monkeypatch.setattr(desktop.subprocess, "run", boom_alert)
+    monkeypatch.setattr(desktop, "_alert_windows", boom_alert)
 
     with pytest.raises(SystemExit) as exc_info:
         desktop.main()

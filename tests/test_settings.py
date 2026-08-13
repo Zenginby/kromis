@@ -5,18 +5,33 @@ import stat
 import pytest
 
 import azure_client as ac
+import winsec
 
 
 def _read_env(path):
     return path.read_text()
 
 
+def _assert_yalniz_sahibine(path) -> None:
+    """"Bu dosyayı yalnız sahibi okuyabilir" — platforma göre iki ayrı ölçüm.
+
+    POSIX'te bu 0600 demek. Windows'ta `os.chmod` POSIX bitlerini uygulamıyor
+    (Faz 0: 0o600 istenince dosya 0o666 kalıyor), güvence DACL ile kuruluyor —
+    bu yüzden iddia orada `winsec.is_owner_only` ile ölçülüyor. Mod iddiasını
+    Windows'ta ATLAMAK değil, karşılığıyla DEĞİŞTİRMEK: dosya Azure API
+    anahtarını tutuyor, ölçülmeyen bir güvence yok sayılmış güvencedir.
+    """
+    if winsec.is_supported():
+        assert winsec.is_owner_only(str(path)), winsec.dacl_sddl(str(path))
+    else:
+        assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
+
+
 def test_save_credentials_writes_file_0600(tmp_path):
     envp = tmp_path / "cfg" / "credentials.env"
     ac.save_credentials("KEY123", "https://x/openai/v1/", env_path=str(envp))
     assert envp.exists()
-    mode = stat.S_IMODE(os.stat(envp).st_mode)
-    assert mode == 0o600
+    _assert_yalniz_sahibine(envp)
     key, url = ac.load_credentials(env_path=str(envp))
     assert key == "KEY123"
     assert url == "https://x/openai/v1/"
@@ -28,7 +43,7 @@ def test_save_credentials_overwrite_keeps_0600(tmp_path):
     ac.save_credentials("B", "https://b/", env_path=str(envp))
     key, url = ac.load_credentials(env_path=str(envp))
     assert (key, url) == ("B", "https://b/")
-    assert stat.S_IMODE(os.stat(envp).st_mode) == 0o600
+    _assert_yalniz_sahibine(envp)
 
 
 def test_save_credentials_rejects_empty(tmp_path):
@@ -184,8 +199,15 @@ def test_save_env_keeps_the_file_0600_and_the_directory_0700(tmp_path):
     envp = tmp_path / "cfg" / "credentials.env"
     ac.save_env({"AZURE_CHAT_DEPLOYMENT": "d"}, env_path=str(envp))
 
-    assert stat.S_IMODE(os.stat(envp).st_mode) == 0o600
-    assert stat.S_IMODE(os.stat(envp.parent).st_mode) == 0o700
+    _assert_yalniz_sahibine(envp)
+    if winsec.is_supported():
+        # 0700'ün karşılığı: dizin de yalnız sahibine ait olmalı. Dizindeki ACE
+        # ayrıca KALITILABİLİR — geçici dosyanın yazımdan önceki korumasını
+        # sağlayan şey bu (bkz. tests/test_winsec.py).
+        assert winsec.is_owner_only(str(envp.parent)), \
+            winsec.dacl_sddl(str(envp.parent))
+    else:
+        assert stat.S_IMODE(os.stat(envp.parent).st_mode) == 0o700
 
 
 def test_save_env_rejects_newlines_in_values(tmp_path):

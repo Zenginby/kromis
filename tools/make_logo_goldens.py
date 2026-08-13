@@ -61,7 +61,10 @@ def write_cases_manifest() -> None:
     """
     keys = ("name", "base", "position", "color", "scale",
             "shadow_alpha", "shadow_blur", "overlay")
-    with open(os.path.join(FIXTURES, "cases.json"), "w") as f:
+    # encoding AÇIKÇA veriliyor: `ensure_ascii=False` ile birlikte varsayılan
+    # kodlamaya bırakmak, Türkçe Windows'ta (cp1254) manifest'i bozar — aynı
+    # kusur storage/assets_store'un OKUMA yolunda gerçekten patladı (v0.3.0).
+    with open(os.path.join(FIXTURES, "cases.json"), "w", encoding="utf-8") as f:
         json.dump([dict(zip(keys, case)) for case in CASES], f,
                   ensure_ascii=False, indent=2)
         f.write("\n")

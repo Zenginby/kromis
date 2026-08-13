@@ -10,6 +10,8 @@ import base64
 import os
 import tempfile
 
+import winsec
+
 MODEL_NAME = "gpt-image-2"
 ALLOWED_SIZES = {"1024x1024", "1024x1536", "1536x1024"}
 ALLOWED_QUALITIES = {"low", "medium", "high"}
@@ -205,17 +207,24 @@ def _atomic_write(path: str, content: str) -> str:
 
     Aynı dizinde geçici dosyaya (mkstemp → 0o600) yazıp atomik os.replace ile
     taşı: kısmi/boş dosya penceresi ve pre-existing gevşek izin (TOCTOU) kapanır.
+
+    Windows'ta `chmod`/`fchmod` POSIX bitlerini UYGULAMIYOR (Faz 0'da ölçüldü:
+    0o600 istendiği halde dosya 0o666 kalıyor). Aynı güvence orada DACL ile
+    kuruluyor — bkz. winsec. İki çağrı POSIX'te no-op, yani bu fonksiyonun
+    macOS davranışı birebir aynı kalıyor.
     """
     parent = os.path.dirname(path) or "."
     os.makedirs(parent, mode=0o700, exist_ok=True)
     try:
         os.chmod(parent, 0o700)  # dizin önceden varsa da daralt
+        winsec.restrict_to_current_user(parent)
     except OSError:
         pass
 
     fd, tmp = tempfile.mkstemp(dir=parent, prefix=".cred-", suffix=".tmp")
     try:
         os.fchmod(fd, 0o600)  # yazımdan ÖNCE izinleri sıkılaştır
+        winsec.restrict_to_current_user(tmp)  # aynı disiplin, Windows karşılığı
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(content)
         os.replace(tmp, path)

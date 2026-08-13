@@ -566,13 +566,20 @@ $("palette-seed-hex").addEventListener("blur", () => renderPicker());
 
 // ── Damlalık: iki ortam, iki API, AYNI davranış ─────────────────────
 //
-// Tarayıcı → EyeDropper (Chromium'a özel)
-// Paket    → window.pywebview.api.pick_screen_color (macOS NSColorSampler)
+// Tarayıcı        → EyeDropper (Chromium'a özel)
+// Paket (macOS)    → window.pywebview.api.pick_screen_color (NSColorSampler)
+// Paket (Windows)  → EyeDropper: WebView2 Chromium tabanlı, API orada VAR
 //
-// İkisi de EKRAN GENELİ seçim yapıyor, yani kullanıcı ortam farkını görmüyor.
+// Üçü de EKRAN GENELİ seçim yapıyor, yani kullanıcı ortam farkını görmüyor.
 // Köprü v1.11'de eklendi: pywebview'ın macOS arka ucu WKWebView (WebKit) ve
 // WebKit EyeDropper'ı hiç uygulamadı — o yüzden düğme v1.10'a kadar app'te
 // gizli kalıyordu (bug değil, motor farkıydı).
+//
+// SIRA ÖNEMLİ — EyeDropper ÖNCE denenir. Köprü platformdan bağımsız enjekte
+// ediliyor, yani Windows paketinde `pick_screen_color` DA var ama orada
+// bilinçli olarak hep null dönüyor (screencolor: NSColorSampler yalnız macOS).
+// Native yol önce sorulursa Windows'ta çalışan EyeDropper hiç denenmez ve
+// düğme "tıklıyorum, hiçbir şey olmuyor" durumuna düşer.
 
 function nativeScreenPicker() {
   return window.pywebview && window.pywebview.api
@@ -580,10 +587,11 @@ function nativeScreenPicker() {
 }
 
 async function pickScreenColor() {
-  const native = nativeScreenPicker();
-  if (native) return await native();
-  const { sRGBHex } = await new EyeDropper().open();
-  return sRGBHex;
+  if (window.EyeDropper) {
+    const { sRGBHex } = await new EyeDropper().open();
+    return sRGBHex;
+  }
+  return await nativeScreenPicker()();
 }
 
 function enableEyedropper() {

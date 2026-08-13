@@ -31,10 +31,24 @@ def resource_dir() -> str:
 
 
 def data_dir() -> str:
-    """Yazılabilir kullanıcı verisinin kökü (output/, assets/, manifest'ler)."""
-    if is_frozen():
-        return os.path.join(os.path.expanduser("~/Library/Application Support"), APP_NAME)
-    return REPO_DIR
+    """Yazılabilir kullanıcı verisinin kökü (output/, assets/, manifest'ler).
+
+    Windows'ta `%LOCALAPPDATA%`, `%APPDATA%` DEĞİL: burada üretilen görseller
+    duruyor ve dizin yüzlerce MB'a çıkıyor — Roaming profil bunu etki alanı
+    oturum açmalarında ağ üzerinden taşımaya çalışırdı. `%LOCALAPPDATA%`,
+    macOS'taki `~/Library/Application Support`'un doğru karşılığı.
+
+    Ortam değişkeni tanımsızsa (hizmet hesabı, soyulmuş ortam) yol elle
+    `~\\AppData\\Local` olarak kuruluyor: kökün çözülememesi uygulamanın hiç
+    açılmaması demek olurdu.
+    """
+    if not is_frozen():
+        return REPO_DIR
+    if sys.platform == "win32":
+        local = os.environ.get("LOCALAPPDATA") or os.path.join(
+            os.path.expanduser("~"), "AppData", "Local")
+        return os.path.join(local, APP_NAME)
+    return os.path.join(os.path.expanduser("~/Library/Application Support"), APP_NAME)
 
 
 def output_dir() -> str:

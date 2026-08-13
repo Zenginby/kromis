@@ -10,6 +10,7 @@ Ana thread'e gönderim (`show_sampler_on_main_thread`) burada test EDİLMİYOR:
 o gerçekten NSApplication çalışma döngüsü ister, paketin içinde elle
 doğrulanıyor.
 """
+import builtins
 import threading
 
 import pytest
@@ -117,6 +118,42 @@ def test_pick_propagates_nothing_when_the_sampler_itself_explodes():
         raise RuntimeError("sampler gösterilemedi")
 
     assert screencolor.pick(show_sampler=boom, timeout=0.05) is None
+
+
+# ── Platform kapısı ─────────────────────────────────────────────────
+#
+# Modül başlığı "ana thread'e gönderim burada test EDİLMİYOR" diyor ve bu doğru
+# kalıyor: aşağıda AppKit'e giden yol değil, ona HİÇ GİRMEYEN yol ölçülüyor.
+# Windows'ta NSColorSampler yok; damlalık orada WebView2'nin EyeDropper'ıyla
+# çalışıyor (static/palette.js) ve bu köprünün sessizce None dönmesi ŞART —
+# fırlatırsa desktop.Api her tıklamada hata.log'a yazar.
+
+def test_sampler_on_non_darwin_reports_no_selection(monkeypatch):
+    monkeypatch.setattr(screencolor.sys, "platform", "win32")
+    calls = []
+
+    screencolor.show_sampler_on_main_thread(calls.append)
+
+    assert calls == [None]
+
+
+def test_pick_returns_none_on_windows_without_touching_appkit(monkeypatch):
+    """Varsayılan sampler'la, yani gerçek üretim yoluyla ölçülüyor.
+
+    `import AppKit` denemesine hiç girilmemeli: kapı platform kontrolünde,
+    import hatasında değil.
+    """
+    monkeypatch.setattr(screencolor.sys, "platform", "win32")
+
+    def patlayan_import(name, *args, **kwargs):
+        if name == "AppKit":
+            raise AssertionError("Windows'ta AppKit import'u denenmemeli")
+        return original_import(name, *args, **kwargs)
+
+    original_import = builtins.__import__
+    monkeypatch.setattr(builtins, "__import__", patlayan_import)
+
+    assert screencolor.pick(timeout=0.05) is None
 
 
 def test_pick_survives_a_color_that_cannot_be_converted():

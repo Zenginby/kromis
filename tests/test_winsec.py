@@ -82,6 +82,84 @@ def test_os_replace_dacli_tasir(tmp_path):
     assert winsec.is_owner_only(str(hedef))
 
 
+# ── SID TEMSİLİ (CI Windows'un 6 yanlış kırmızısının sınıfı) ────────────
+#
+# CI runner'ı yerleşik Administrator (RID 500) hesabıyla koşuyor. Yazılan DACL
+# sayısal SID içeriyor ama Windows geri okurken SDDL'in takma adını yazıyor:
+# `D:PAI(A;;FA;;;LA)`. Metin karşılaştıran sürüm bu yüzden DOĞRU bir DACL'i
+# yanlış sayıyordu. Aşağıdaki testler o mekanizmayı kullanıcının makinesinde de
+# üretiyor (hesap RID 1001 olsa bile), yani düzeltme yalnız runner'da değil HER
+# YERDE ölçülüyor. Eski kodda ilk ikisi kırmızıya düşer.
+
+
+def _sid_ile_dacl_kur(path: str, sid_ifadesi: str) -> None:
+    """DACL'i verilen SID İFADESİYLE kurar (takma ad olabilir).
+
+    `restrict_to_current_user` her zaman sayısal SID yazıyor, yani takma adlı
+    hâli üretmenin başka yolu yok — runner'daki durum burada elle kuruluyor.
+    """
+    winsec._set_dacl(path, f"D:P(A;;FA;;;{sid_ifadesi})")
+
+
+def test_takma_adli_sid_ayni_hesabi_gosterirse_owner_only_sayilir(tmp_path):
+    """`LA` ile yazılmış DACL, çözülmüş SID mevcut kullanıcıyla aynıysa geçmeli.
+
+    CI'daki 6 kırmızının birebir mekanizması: DACL'de takma ad, beklentide
+    sayısal SID. Eski kod `"LA" != "S-1-5-21-…-500"` diye False dönüyordu.
+    """
+    path = _yaz(tmp_path / "takma.env")
+    gercek_sid = winsec._current_user_sid()
+    la_sid = winsec._resolve_sid("LA")
+    assert la_sid and la_sid.endswith("-500"), la_sid
+
+    try:
+        _sid_ile_dacl_kur(path, "LA")
+        # Windows'un GERÇEKTEN takma adla geri okuduğunu doğrula — bu satır
+        # düşerse testin öncülü çürür ve asıl iddia anlamsızlaşır.
+        assert "LA)" in winsec.dacl_sddl(path), winsec.dacl_sddl(path)
+
+        # Mevcut kullanıcı "LA"nın çözüldüğü hesapmış gibi ölç.
+        orig = winsec._current_user_sid
+        winsec._current_user_sid = lambda: la_sid
+        try:
+            assert winsec.is_owner_only(path), winsec.dacl_sddl(path)
+        finally:
+            winsec._current_user_sid = orig
+    finally:
+        # DACL yalnız LA'ya izin veriyor; tmp'de erişilemez dosya bırakmayalım.
+        _sid_ile_dacl_kur(path, gercek_sid)
+
+
+def test_baska_hesabin_takma_adi_owner_only_sayilmaz(tmp_path):
+    """Negatif kutup: düzeltme "her SID'i eşleştir" DEMEK DEĞİL.
+
+    Bu test olmadan `_resolve_sid`'i hep mevcut kullanıcıya eşitleyen bir sürüm
+    de yeşil kalırdı — güvence sessizce boşalırdı, üstelik dosya API anahtarını
+    tutuyor. `BA` (Administrators, S-1-5-32-544) mevcut kullanıcının SID'i değil.
+    """
+    path = _yaz(tmp_path / "baskasi.env")
+    gercek_sid = winsec._current_user_sid()
+    try:
+        _sid_ile_dacl_kur(path, "BA")
+        assert not winsec.is_owner_only(path), winsec.dacl_sddl(path)
+    finally:
+        _sid_ile_dacl_kur(path, gercek_sid)
+
+
+def test_resolve_sid_bicimden_bagimsizdir():
+    """Çözücünün sözleşmesi: takma ad ve sayısal biçim aynı SID'e inmeli.
+
+    `BA` sabit ve makineden bağımsız (S-1-5-32-544) — iddia bu yüzden bu
+    makineye özgü bir değere dayanmıyor. Geçersiz girdi None dönmeli: hatanın
+    yutulup "eşleşti" sayılması güvenceyi boşaltan sessiz başarısızlık olurdu.
+    """
+    assert winsec._resolve_sid("BA") == "S-1-5-32-544"
+    assert winsec._resolve_sid("S-1-5-32-544") == "S-1-5-32-544"
+    assert winsec._resolve_sid("SY") == "S-1-5-18"
+    assert winsec._resolve_sid("ZZZ") is None
+    assert winsec._resolve_sid("") is None
+
+
 def test_acik_dosyanin_daclini_degistirebiliriz(tmp_path):
     """`_atomic_write` dosyayı AÇIK tutarken sıkılaştırıyor (mkstemp'in fd'si).
 

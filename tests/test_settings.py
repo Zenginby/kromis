@@ -9,7 +9,7 @@ import winsec
 
 
 def _read_env(path):
-    return path.read_text()
+    return path.read_text(encoding="utf-8")
 
 
 def _assert_yalniz_sahibine(path) -> None:
@@ -94,8 +94,8 @@ def test_parse_env_file_missing_raises_oserror(tmp_path):
 def test_load_prefers_app_over_default(tmp_path, monkeypatch):
     app_env = tmp_path / "app.env"
     default_env = tmp_path / "default.env"
-    default_env.write_text("AZURE_IMAGE_API_KEY=OLD\nAZURE_IMAGE_BASE_URL=https://old/\n")
-    app_env.write_text("AZURE_IMAGE_API_KEY=NEW\nAZURE_IMAGE_BASE_URL=https://new/\n")
+    default_env.write_text("AZURE_IMAGE_API_KEY=OLD\nAZURE_IMAGE_BASE_URL=https://old/\n", encoding="utf-8")
+    app_env.write_text("AZURE_IMAGE_API_KEY=NEW\nAZURE_IMAGE_BASE_URL=https://new/\n", encoding="utf-8")
     monkeypatch.setattr(ac, "APP_ENV_PATH", str(app_env))
     monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", str(default_env))
     key, url = ac.load_credentials()
@@ -105,7 +105,7 @@ def test_load_prefers_app_over_default(tmp_path, monkeypatch):
 def test_load_falls_back_to_default_when_app_missing(tmp_path, monkeypatch):
     app_env = tmp_path / "missing.env"  # yazılmadı
     default_env = tmp_path / "default.env"
-    default_env.write_text("AZURE_IMAGE_API_KEY=SHARED\nAZURE_IMAGE_BASE_URL=https://shared/\n")
+    default_env.write_text("AZURE_IMAGE_API_KEY=SHARED\nAZURE_IMAGE_BASE_URL=https://shared/\n", encoding="utf-8")
     monkeypatch.setattr(ac, "APP_ENV_PATH", str(app_env))
     monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", str(default_env))
     key, url = ac.load_credentials()
@@ -115,8 +115,8 @@ def test_load_falls_back_to_default_when_app_missing(tmp_path, monkeypatch):
 def test_load_falls_back_when_app_incomplete(tmp_path, monkeypatch):
     app_env = tmp_path / "app.env"
     default_env = tmp_path / "default.env"
-    app_env.write_text("AZURE_IMAGE_API_KEY=ONLYKEY\n")  # url eksik
-    default_env.write_text("AZURE_IMAGE_API_KEY=SHARED\nAZURE_IMAGE_BASE_URL=https://shared/\n")
+    app_env.write_text("AZURE_IMAGE_API_KEY=ONLYKEY\n", encoding="utf-8")  # url eksik
+    default_env.write_text("AZURE_IMAGE_API_KEY=SHARED\nAZURE_IMAGE_BASE_URL=https://shared/\n", encoding="utf-8")
     monkeypatch.setattr(ac, "APP_ENV_PATH", str(app_env))
     monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", str(default_env))
     key, url = ac.load_credentials()
@@ -132,7 +132,7 @@ def test_load_raises_when_none_configured(tmp_path, monkeypatch):
 
 def test_get_settings_status_configured(tmp_path, monkeypatch):
     app_env = tmp_path / "app.env"
-    app_env.write_text("AZURE_IMAGE_API_KEY=SECRET\nAZURE_IMAGE_BASE_URL=https://ep/openai/v1/\n")
+    app_env.write_text("AZURE_IMAGE_API_KEY=SECRET\nAZURE_IMAGE_BASE_URL=https://ep/openai/v1/\n", encoding="utf-8")
     monkeypatch.setattr(ac, "APP_ENV_PATH", str(app_env))
     monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", str(tmp_path / "no.env"))
     status = ac.get_settings_status()

@@ -124,9 +124,9 @@ def test_ensure_data_dirs_is_idempotent(monkeypatch, tmp_path):
     monkeypatch.setattr(paths, "data_dir", lambda: str(tmp_path / "veri"))
 
     paths.ensure_data_dirs()
-    (tmp_path / "veri" / "output" / "dokunma.txt").write_text("kalmalı")
+    (tmp_path / "veri" / "output" / "dokunma.txt").write_text("kalmalı", encoding="utf-8")
     paths.ensure_data_dirs()  # ikinci çağrı hiçbir şeyi silmemeli
 
     assert (tmp_path / "veri" / "output").is_dir()
     assert (tmp_path / "veri" / "assets").is_dir()
-    assert (tmp_path / "veri" / "output" / "dokunma.txt").read_text() == "kalmalı"
+    assert (tmp_path / "veri" / "output" / "dokunma.txt").read_text(encoding="utf-8") == "kalmalı"

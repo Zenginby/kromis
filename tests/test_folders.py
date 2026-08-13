@@ -574,7 +574,7 @@ def test_depth_survives_a_broken_parent_chain(tmp_path, monkeypatch):
     root = _new_folder(c)
     out = str(tmp_path / "output")
     path = tmp_path / "output" / "folders.json"
-    items = json.loads(path.read_text())
+    items = json.loads(path.read_text(encoding="utf-8"))
     items[0]["parent_id"] = items[0]["id"]  # kendi kendinin ebeveyni
     path.write_text(json.dumps(items), encoding="utf-8")
     assert folders.depth(root, out) >= 1  # dönmeli, asılmamalı

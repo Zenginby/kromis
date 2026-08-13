@@ -15,7 +15,7 @@ def test_save_writes_file_and_manifest(tmp_path):
     assert rec["kind"] == "logos"
     assert rec["created_at"] == "2026-07-23T10:00:00"
     assert rec["id"] == rec["filename"].rsplit(".", 1)[0]
-    manifest = json.loads((kind_dir / "index.json").read_text())
+    manifest = json.loads((kind_dir / "index.json").read_text(encoding="utf-8"))
     assert manifest[0]["id"] == rec["id"]
 
 
@@ -73,5 +73,5 @@ def test_delete_rejects_bad_id(tmp_path):
 def test_manifest_tolerates_corrupt_file(tmp_path):
     kind_dir = tmp_path / "logos"
     kind_dir.mkdir()
-    (kind_dir / "index.json").write_text("{not json")
+    (kind_dir / "index.json").write_text("{not json", encoding="utf-8")
     assert astore.list_assets("logos", str(tmp_path)) == []

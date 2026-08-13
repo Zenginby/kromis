@@ -1,0 +1,26 @@
+# Satır sonları DEPO düzeyinde sabit: LF.
+#
+# NEDEN VAR — iki ayrı kusur bu dosyanın yokluğundan doğdu:
+#
+#   • `build.sh` CRLF'e çevrilirse macOS/Linux paketleme hattı bozulur:
+#     shebang'a takılan `\r` "bad interpreter" üretir ve hata mesajı sebebi
+#     GÖSTERMEZ. Bugüne kadar bu güvence yalnızca klonun `core.autocrlf=false`
+#     ile alınmasına dayanıyordu — yani garanti değil GELENEKti; üstelik Git for
+#     Windows'un varsayılanı `true`, yani sonraki klon sessizce bozuk gelirdi.
+#
+#   • CI Windows checkout'u tam bu yüzden CRLF verdi ve `tests/test_index.py`'nin
+#     `;\n` çapalı deseni hiçbir şey bulamadı (Faz 5, koşu 31727509717 —
+#     "toplam kapısının hesabı bulunamadı"). Yerelde 1171 yeşil, CI'da kırmızı.
+#
+# İÇERİK DEĞİŞMİYOR: deponun metin dosyalarının HEPSİ hâlihazırda LF (ölçüldü,
+# `git ls-files --eol` → 120 × i/lf, 35 × i/-text ikili, 0 × CRLF). Bu dosya var
+# olan durumu sözleşmeye bağlıyor, yeni bir normalleştirme başlatmıyor.
+#
+# Not: testin kendisi de temsilden bağımsız hâle getirildi (LF + CRLF ikisiyle
+# birlikte ölçülüyor). Kapı ile kök düzeltme AYRI işler — biri ötekinin yerine
+# geçmez, çünkü bu dosya bir gün kaldırılsa test yine yakalar.
+* text=auto eol=lf
+
+# Kabuk betikleri için niyet ayrıca yazılı: yukarıdaki genel kural değişse bile
+# `build.sh` / `run.sh` LF kalmalı.
+*.sh text eol=lf

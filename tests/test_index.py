@@ -1265,14 +1265,24 @@ def test_the_total_char_gate_skips_result_records():
     gönderim tümden ölür — kapı bu yüzden hem rolü süzmek hem de eksik
     `content`'e dayanıklı olmak zorunda.
     """
-    js = _chat_js()
-    body = re.search(r"async function sendChat\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
-    used = re.search(r"const used = chatThread(.*?);\n", body.group(1), re.S)
-    assert used, "toplam kapısının hesabı bulunamadı"
-    assert "m.content.length" not in used.group(1), (
-        "sonuç kaydında content yok — TypeError ile gönderim ölür")
-    assert "RESULT_ROLE" in used.group(1), (
-        "toplam kapısı sonuç kayıtlarını da sayıyor")
+    lf = _chat_js().replace("\r\n", "\n")
+    # Satır sonu TEMSİLİ bu iddiayı etkilemEMEli. CI Windows checkout'u CRLF
+    # veriyor (Git for Windows'un `core.autocrlf` varsayılanı `true`) ve eski
+    # `;\n` çapalı desen orada HİÇ eşleşmiyordu: yerelde 1171 yeşilken CI'da
+    # kırmızı, koşu 31727509717. Depo tarafındaki kök düzeltme `.gitattributes`
+    # (eol=lf); bu döngü ise iddianın KENDİSİNİ temsile bağımlı olmaktan
+    # kurtarıyor — ikisi ayrı iş, biri ötekinin yerine geçmez.
+    for etiket, js in (("LF", lf), ("CRLF", lf.replace("\n", "\r\n"))):
+        body = re.search(r"async function sendChat\([^)]*\)\s*\{(.*?)\n\}",
+                         js, re.S)
+        assert body, f"{etiket}: sendChat() bulunamadı"
+        used = re.search(r"const used = chatThread(.*?);\r?\n", body.group(1),
+                         re.S)
+        assert used, f"{etiket}: toplam kapısının hesabı bulunamadı"
+        assert "m.content.length" not in used.group(1), (
+            f"{etiket}: sonuç kaydında content yok — TypeError ile gönderim ölür")
+        assert "RESULT_ROLE" in used.group(1), (
+            f"{etiket}: toplam kapısı sonuç kayıtlarını da sayıyor")
 
 
 def test_the_result_turn_reserves_room_for_both_of_its_records():

@@ -11,7 +11,7 @@ def test_save_writes_file_and_appends_history(tmp_path):
     assert rec["prompt"] == "cat"
     assert rec["created_at"] == "2026-07-23T10:00:00"
     assert rec["id"] == rec["filename"].rsplit(".", 1)[0]
-    history = json.loads((tmp_path / "history.json").read_text())
+    history = json.loads((tmp_path / "history.json").read_text(encoding="utf-8"))
     assert history[0]["id"] == rec["id"]
 
 
@@ -30,7 +30,7 @@ def test_list_history_empty_when_no_file(tmp_path):
 
 
 def test_list_history_tolerates_corrupt_file(tmp_path):
-    (tmp_path / "history.json").write_text("{not json")
+    (tmp_path / "history.json").write_text("{not json", encoding="utf-8")
     assert storage.list_history(str(tmp_path)) == []
 
 
@@ -40,7 +40,7 @@ def test_save_produces_valid_json_after_multiple_writes(tmp_path):
                         "parent_id": None}, out, now="2026-07-23T10:00:00")
     storage.save(b"b", {"prompt": "2", "size": "1024x1024", "quality": "low",
                         "parent_id": None}, out, now="2026-07-23T11:00:00")
-    history = json.loads((tmp_path / "history.json").read_text())
+    history = json.loads((tmp_path / "history.json").read_text(encoding="utf-8"))
     assert isinstance(history, list)
     assert len(history) == 2
 
@@ -57,7 +57,7 @@ def test_generated_record_has_no_imported_key(tmp_path):
                                     "quality": "low", "parent_id": None},
                        str(tmp_path), now="2026-08-04T10:00:00")
     assert "imported" not in rec
-    history = json.loads((tmp_path / "history.json").read_text())
+    history = json.loads((tmp_path / "history.json").read_text(encoding="utf-8"))
     assert "imported" not in history[0]
 
 
@@ -67,7 +67,7 @@ def test_imported_flag_is_written_when_asked(tmp_path):
                                     "imported": True},
                        str(tmp_path), now="2026-08-04T10:00:00")
     assert rec["imported"] is True
-    assert json.loads((tmp_path / "history.json").read_text())[0]["imported"] is True
+    assert json.loads((tmp_path / "history.json").read_text(encoding="utf-8"))[0]["imported"] is True
 
 
 # ── v2.0: oturum etiketi (birleşik döküm) ───────────────────────────────
@@ -87,7 +87,7 @@ def test_record_made_outside_a_session_has_no_session_id_key(tmp_path):
                        str(tmp_path), now="2026-08-07T10:00:00")
 
     assert "session_id" not in rec
-    assert "session_id" not in json.loads((tmp_path / "history.json").read_text())[0]
+    assert "session_id" not in json.loads((tmp_path / "history.json").read_text(encoding="utf-8"))[0]
 
 
 def test_session_id_is_written_when_the_image_is_born_in_a_session(tmp_path):
@@ -98,5 +98,5 @@ def test_session_id_is_written_when_the_image_is_born_in_a_session(tmp_path):
                        str(tmp_path), now="2026-08-07T10:00:00")
 
     assert rec["session_id"] == "beef1234beef"
-    raw = json.loads((tmp_path / "history.json").read_text())
+    raw = json.loads((tmp_path / "history.json").read_text(encoding="utf-8"))
     assert raw[0]["session_id"] == "beef1234beef"

@@ -16,7 +16,7 @@ def test_delete_removes_record_and_file(tmp_path):
     result = storage.delete(rec["id"], out)
     assert result is True
     assert not (tmp_path / rec["filename"]).exists()
-    hist = json.loads((tmp_path / "history.json").read_text())
+    hist = json.loads((tmp_path / "history.json").read_text(encoding="utf-8"))
     assert all(r["id"] != rec["id"] for r in hist)
 
 
@@ -44,13 +44,13 @@ def test_delete_rejects_path_traversal(tmp_path):
     out_subdir = tmp_path / "output"
     out_subdir.mkdir()
     victim = tmp_path / "victim.png"
-    victim.write_text("do not delete me")
+    victim.write_text("do not delete me", encoding="utf-8")
 
     result = storage.delete("../victim", str(out_subdir))
 
     assert result is False
     assert victim.exists()
-    assert victim.read_text() == "do not delete me"
+    assert victim.read_text(encoding="utf-8") == "do not delete me"
 
 
 def test_delete_rejects_slash_and_dots(tmp_path):
@@ -90,4 +90,4 @@ def test_delete_many_survives_a_file_that_vanishes_mid_flight(tmp_path, monkeypa
 
     monkeypatch.setattr(os, "remove", racing_remove)
     assert storage.delete_many([a["id"], b["id"]], out) == 2
-    assert json.loads((tmp_path / "history.json").read_text()) == []
+    assert json.loads((tmp_path / "history.json").read_text(encoding="utf-8")) == []

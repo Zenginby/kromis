@@ -22,6 +22,11 @@ NEDEN ctypes, `icacls` DEĞİL:
 SDDL dizesi (`D:P(A;;FA;;;S-1-5-…)`) dilden bağımsız ve SID tabanlı; hem
 uygulama hem testler aynı biçimi okuyor.
 
+⚠️ Ama SDDL dilden bağımsız olsa da **TEMSİLDEN bağımsız değil**: Windows aynı
+hesabı geri okurken sayısal SID yerine iki harfli takma ad yazabiliyor
+(`LA`, `BA`, `SY`). Bu yüzden SID karşılaştırması metin üzerinde YAPILMAZ,
+`_resolve_sid` ile çözülmüş SID üzerinde yapılır — nedeni orada ölçümle yazılı.
+
 POSIX'te bu modül hiçbir şey yapmaz: `restrict_to_current_user` sessizce döner,
 çağıran taraf işi `os.chmod`/`os.fchmod` ile zaten yapmış olur.
 """
@@ -90,6 +95,13 @@ if sys.platform == "win32":  # pragma: no cover - platforma bağlı dal
         ctypes.c_void_p, ctypes.POINTER(wintypes.LPWSTR)]
     _advapi32.ConvertSidToStringSidW.restype = wintypes.BOOL
 
+    # Ters yön: SDDL'in SID alanını (sayısal YA DA takma adlı) gerçek SID'e
+    # çevirir. `is_owner_only`'nin temsilden bağımsız olmasını sağlayan çağrı;
+    # gerekçe modül docstring'inde ("dilden bağımsız, temsilden DEĞİL").
+    _advapi32.ConvertStringSidToSidW.argtypes = [
+        wintypes.LPCWSTR, ctypes.POINTER(ctypes.c_void_p)]
+    _advapi32.ConvertStringSidToSidW.restype = wintypes.BOOL
+
     _advapi32.ConvertStringSecurityDescriptorToSecurityDescriptorW.argtypes = [
         wintypes.LPCWSTR, wintypes.DWORD, ctypes.POINTER(ctypes.c_void_p),
         ctypes.POINTER(wintypes.DWORD)]
@@ -154,6 +166,37 @@ if sys.platform == "win32":  # pragma: no cover - platforma bağlı dal
                 _kernel32.LocalFree(text)
         finally:
             _kernel32.CloseHandle(token)
+
+    def _resolve_sid(text: str) -> str | None:
+        """SDDL'in SID alanını kanonik sayısal SID'e çevirir; çözülemezse None.
+
+        NEDEN VAR: Windows DACL'i GERİ OKURKEN SID'i sayısal yazmak zorunda
+        değil — yerleşik bir hesaba denk gelirse SDDL'in iki harfli TAKMA ADINI
+        yazıyor. CI Windows koşusunda birebir ölçüldü: yazılan
+        `D:P(A;;FA;;;S-1-5-21-…-500)` geri okunurken `D:PAI(A;;FA;;;LA)` oldu
+        (`LA` = yerleşik Administrator, RID 500; runner o hesapla koşuyor).
+        Metin karşılaştıran eski sürüm bu yüzden 6 testi YANLIŞ kırmızıya
+        düşürdü — DACL doğruydu, okuyan taraf yanlıştı.
+
+        `ConvertStringSidToSidW` iki biçimi de kabul ediyor (ölçüldü:
+        `LA`/`BA`/`SY`/`WD` çözülüyor, sayısal SID aynen dönüyor, geçersiz
+        girdide ERROR_INVALID_SID=1337). Geçersiz girdide None dönmek bilinçli:
+        çözülemeyen bir SID "sahibi" SAYILMAMALI — hata yutulup True dönmesi
+        güvenceyi sessizce boşaltırdı.
+        """
+        psid = ctypes.c_void_p()
+        if not _advapi32.ConvertStringSidToSidW(text, ctypes.byref(psid)):
+            return None
+        try:
+            out = wintypes.LPWSTR()
+            if not _advapi32.ConvertSidToStringSidW(psid, ctypes.byref(out)):
+                return None
+            try:
+                return str(out.value)
+            finally:
+                _kernel32.LocalFree(out)
+        finally:
+            _kernel32.LocalFree(psid)
 
     def _set_dacl(path: str, sddl: str) -> None:
         psd = ctypes.c_void_p()
@@ -254,6 +297,9 @@ def is_owner_only(path: str) -> bool:
         if len(fields) != 6:
             return False
         ace_type, _flags, _rights, _obj_guid, _inherit_guid, ace_sid = fields
-        if ace_type != "A" or ace_sid != sid:
+        # SID'ler METİN olarak DEĞİL, çözülmüş hâlleriyle karşılaştırılıyor:
+        # aynı hesabı `S-1-5-21-…-500` ve `LA` diye iki biçimde yazan Windows
+        # yüzünden metin karşılaştırması temsile bağımlıydı (bkz. _resolve_sid).
+        if ace_type != "A" or _resolve_sid(ace_sid) != sid:
             return False
     return True

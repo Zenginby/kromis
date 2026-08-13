@@ -29,7 +29,7 @@ OVERLAY = os.path.join(FIXTURES, "overlay.png")
 
 # Vakaların tek kaynağı üreticinin yazdığı manifest — elle ikinci bir liste
 # tutulsa golden'lar sessizce yanlış vakayla eşleşebilirdi.
-with open(os.path.join(FIXTURES, "cases.json")) as _f:
+with open(os.path.join(FIXTURES, "cases.json"), encoding="utf-8") as _f:
     CASES = json.load(_f)
 
 

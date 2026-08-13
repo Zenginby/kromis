@@ -125,7 +125,7 @@ def test_connect_timeout_is_short_and_separate_from_read():
 
 def test_load_credentials_reads_env(tmp_path):
     env = tmp_path / "creds.env"
-    env.write_text('AZURE_IMAGE_API_KEY=abc123\nAZURE_IMAGE_BASE_URL=https://x/openai/v1/\n')
+    env.write_text('AZURE_IMAGE_API_KEY=abc123\nAZURE_IMAGE_BASE_URL=https://x/openai/v1/\n', encoding="utf-8")
     key, url = ac.load_credentials(str(env))
     assert key == "abc123"
     assert url == "https://x/openai/v1/"

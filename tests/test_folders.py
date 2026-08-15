@@ -1,6 +1,7 @@
 import io
 import json
 import zipfile
+from urllib.parse import quote
 
 
 from fastapi.testclient import TestClient
@@ -195,6 +196,64 @@ def test_export_zip_and_download_route(tmp_path, monkeypatch):
 
     assert c.get("/api/folders/deadbeef0000/download").status_code == 404
 
+
+def test_download_header_keeps_turkish_name(tmp_path, monkeypatch):
+    """Türkçe klasör adı `filename*` ile korunuyor; ASCII yedeği de duruyor.
+
+    ASCII yedeği TEK BAŞINA yetmiyor: `encode("ascii", "ignore")` Türkçe
+    harfleri atıyor, yani "Bağış Görselleri" diskte "Ba_Grselleri.zip" olarak
+    beliriyor ve kullanıcı kendi klasörünü tanıyamıyor. Üstteki test yalnız
+    `attachment; filename=` arıyor, yani RFC 5987 alanı silinse de yeşil
+    kalırdı — bu test onun için var.
+
+    Yedek yine de ZORUNLU: `filename*` okumayan bir istemci hiç ad görmemek
+    yerine kırpılmış adı görsün.
+    """
+    c = _client(tmp_path, monkeypatch)
+    fid = _new_folder(c, "Bağış Görselleri")
+
+    cd = c.get(f"/api/folders/{fid}/download").headers["content-disposition"]
+    assert "filename*=UTF-8''" in cd
+    assert quote("Bağış Görselleri") + ".zip" in cd
+    assert 'filename="Ba_Grselleri.zip"' in cd   # kaybın kendisi de mandallı
+
+
+def test_export_zip_survives_corrupt_parent_cycle(tmp_path, monkeypatch):
+    """Elle bozulmuş `folders.json`'daki `parent_id` döngüsü asılı bırakmıyor.
+
+    `depth()` ve `descendants()` aynı korumayı gerekçesiyle taşıyor
+    (`folders.py:83`, `folders.py:101`) ve `test_depth_survives_a_broken_parent_chain`
+    onu aynı duruşla ölçüyor: dönmeli, asılmamalı. Bu, `export_zip`'in payı.
+
+    Dosya ELLE yazılıyor, çünkü rotadan bu hâl üretilemez: `descendants()` yalnız
+    ebeveyn→çocuk kenarını izlediğinden ağaçtaki her düğümün zinciri normalde
+    `folder_id`'ye çıkar ve `get_rel_path` orada kırılır. Buradaki bozulma aynı
+    id'nin İKİ kaydı: BFS ilkini (`parent=root`) görüyor, `folder_map` ise
+    sonuncuyu tutuyor — yani aşağı inen kenar ile yukarı yürüyen kenar ayrışıyor.
+    Korumanın var oluş sebebi tam olarak bu sınıf.
+
+    Dürüst sınır (emsalle aynı): koruma kaldırılırsa bu test kırmızıya düşmez,
+    ASILIR — döngü sonsuz. Zaman aşımlı bir bekçi denendi ve geri alındı, çünkü
+    kaçak iş parçacığı yorumlayıcıyı çıkışta bekletip asılmayı testin dışına
+    taşıyordu; süreç sınırlamak da bu takımın hiçbir yerinde yok.
+    """
+    out = tmp_path / "output"
+    out.mkdir(parents=True)
+    root, mid, leaf = "aaaaaaaaaaaa", "bbbbbbbbbbbb", "cccccccccccc"
+    (out / "folders.json").write_text(json.dumps([
+        {"id": root, "name": "Kok", "parent_id": None, "created_at": "2026-01-01T00:00:00"},
+        {"id": mid, "name": "Orta", "parent_id": root, "created_at": "2026-01-01T00:00:00"},
+        {"id": leaf, "name": "Yaprak", "parent_id": mid, "created_at": "2026-01-01T00:00:00"},
+        {"id": mid, "name": "Orta", "parent_id": leaf, "created_at": "2026-01-01T00:00:00"},
+    ], ensure_ascii=False), encoding="utf-8")
+
+    zip_bytes, name = folders.export_zip(root, str(out))
+
+    assert name == "Kok"
+    # Sınırlı: hiçbir yol aynı klasör adını iki kez taşımıyor.
+    for entry in zipfile.ZipFile(io.BytesIO(zip_bytes)).namelist():
+        parts = [p for p in entry.split("/") if p]
+        assert len(parts) == len(set(parts)), entry
 
 
 # ── görselleri klasöre kaydetme ve filtreleme ──────────────────────────

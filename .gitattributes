@@ -24,3 +24,13 @@
 # Kabuk betikleri için niyet ayrıca yazılı: yukarıdaki genel kural değişse bile
 # `build.sh` / `run.sh` LF kalmalı.
 *.sh text eol=lf
+
+# Yazı tipleri AÇIKÇA ikili. `text=auto` bugün doğru karar veriyor — ölçüldü:
+# commit'lenen bloblar diskle bayt bayt aynı (36.980 / 18.192, sha256 eşleşti).
+# Ama bu, Git'in içerik SEZGİSİNE dayanıyor; sezgi bir gün bir font dosyasını
+# metin sanırsa satır sonu dönüşümü woff2'yi sessizce bozar ve kusur ancak
+# "harfler yanlış çiziliyor" olarak görünür. Niyet burada yazılı olsun.
+*.woff2 binary
+*.woff  binary
+*.ttf   binary
+*.otf   binary

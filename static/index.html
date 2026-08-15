@@ -4,6 +4,24 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GPT-Image Studio</title>
+  <!-- Yalnız latin altkümesi preload ediliyor (plan §0.2: "tek kritik ağırlık").
+       latin-ext BİLEREK dışarıda: Türkçe harfleri taşıyor ama metnin gövdesi
+       latin'de ve preload edilen her dosya kritik yolu uzatır. `crossorigin`
+       zorunlu — aynı kökten gelse bile font isteği CORS kipinde yapılır ve
+       özniteliksiz preload eşleşmez, dosya İKİ KEZ inerdi.
+
+       Sürüm sorgu eki (v=… biçimindeki cache-buster) BİLEREK yok: bu URL
+       fonts.css'in `src:`'iyle BİREBİR aynı olmak zorunda, yoksa preload
+       eşleşmez ve dosya iki kez iner. fonts.css statik servis edildiği için
+       oraya __APP_VERSION__ yazılamaz — yer tutucuyu yalnız index.html'de
+       app.py:1273 çeviriyor. Bayat kopya riski dosya ADIYLA kapatıldı: adda
+       yukarı akış sürümü var (v17), yani font değişirse URL de değişir.
+       (Not: buraya o sorgu ekini literal yazmak bile
+       test_static_cache_busters_all_equal_the_app_version'ı düşürüyor —
+       desen HTML'in tamamını tarıyor, yorumları ayırmıyor.) -->
+  <link rel="preload" href="/static/fonts/dm-sans-v17-latin.woff2"
+        as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/static/fonts.css?v=__APP_VERSION__" />
   <link rel="stylesheet" href="/static/style.css?v=__APP_VERSION__" />
   <!-- Flow token katmanı. style.css'ten SONRA gelmek zorunda: aynı adı taşıyan
        altı tokenı (--bg --muted --accent --danger --dur --ease) o sırayla

@@ -80,6 +80,9 @@ jobs:
           lipo -archs "$APP/Contents/MacOS/GPT-Image Studio" | tee /dev/stderr | grep -qx arm64
           codesign --verify --strict "$APP"
           for f in static/index.html static/core.js static/viewer.js \
+                   static/fonts.css \
+                   static/fonts/dm-sans-v17-latin.woff2 \
+                   static/fonts/dm-sans-v17-latin-ext.woff2 \
                    bundled/logos/kurum-logo-blue.png bundled/logos/kurum-logo-white.png; do
             test -f "$APP/Contents/Resources/$f" || { echo "EKSİK: $f"; exit 1; }
           done
@@ -235,7 +238,11 @@ jobs:
           # frozen uygulamada ayrıca doğrulandı.
           $beklenenler = @(
             'static/index.html', 'static/core.js', 'static/viewer.js',
-            'static/palette.js',
+            'static/palette.js', 'static/fonts.css',
+            # Font ikili dosya: eksikliği hiçbir hata üretmez, yalnız harfler
+            # yedek yazı tipiyle çizilir. O yüzden kapıya girdi.
+            'static/fonts/dm-sans-v17-latin.woff2',
+            'static/fonts/dm-sans-v17-latin-ext.woff2',
             'bundled/logos/kurum-logo-blue.png', 'bundled/logos/kurum-logo-white.png'
           )
           $eksik = @()

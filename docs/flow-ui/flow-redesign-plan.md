@@ -569,17 +569,24 @@ geçildi.** Ekranlar onaylandı, taşıma başladı, PR 1 merge edildi.
   (`#sort-btn`), klasör kapağı (`.folder-thumb`), `rail-count`, boş durum glifi
   (`#media-empty-state`), klasör "Yeniden adlandır" (`#folder-rename` +
   `PATCH /api/folders/{id}`) — yani **D17 kararı "girsin" yönünde kapandı**.
-- **Sırada:** Flow-UI'dan geriye **tek madde** kaldı — **DM Sans bundle**
-  (aşağıda). Uygulamanın sıradaki turu Flow-UI değil, SaaS master planının
+- **Bitti (2026-08-15):** **DM Sans bundle** — Flow-UI'ın son maddesi.
+  `static/fonts/dm-sans-v17-latin.woff2` (36.980 B) +
+  `dm-sans-v17-latin-ext.woff2` (18.192 B) + `OFL.txt`; `@font-face`'ler
+  `static/fonts.css`'te, `latin` preload'lu. **Planın iki varsayımı ölçümle
+  düzeldi:** (1) ağırlık 400+500 değil — `--font-display` 400'ü hiç
+  kullanmıyor, kullanılanlar 500 (altı yer) ve 600 (`style.css:617`); dosya
+  değişken font olduğu için tek `@font-face` `font-weight: 100 1000` ile ikisini
+  de gerçek çizimle veriyor, "her ağırlık ayrı istek" bütçe kaygısı geçersiz.
+  (2) `opsz` ekseni ALINMADI: opsz'li sürüm 92 KB, alınan 54 KB. Altkümelerin
+  tamamlayıcılığı fontTools ile ölçüldü — `latin` → `ı ç Ç ö Ö ü Ü`,
+  `latin-ext` → `ğ Ğ ş Ş İ`. `tests/test_fonts.py` (10 test) ve iki CI kapısı
+  eklendi; iki mutasyon (preload'a `?v=`, latin-ext'in silinmesi) kırmızı.
+- **Sırada:** Flow-UI **bitti**. Uygulamanın sıradaki turu SaaS master planının
   fazları: `docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md`.
 - **Ertelendi:** Yedekler paneli (v4/V3).
-- **Karar bekleyen:** DM Sans bundle (§3 · plan §4) — indirme izni alındı, dosya
-  adı ve boyutu söylenip son onay alınacak. **Hâlâ açık ve artık tek başına:**
-  `flow-tokens.css:53` `--font-display: "DM Sans", …` diyor ama `static/fonts/`
-  yok, yani paket font'u taşımıyor ve DM Sans kurulu olmayan makinede sessizce
-  sistem yazı tipine düşülüyor. Sonuç kartındaki "Düzenle" dökümden yeniden mi
-  kurulacak, tek kayıt döndüren rotayı mı bekleyecek (plan §0.8 · K14) —
-  **hâlâ açık** (`chat.js:829`'daki "Düzenle" sohbet mesajınınki, başka şey).
+- **Karar bekleyen:** Sonuç kartındaki "Düzenle" dökümden yeniden mi kurulacak,
+  tek kayıt döndüren rotayı mı bekleyecek (plan §0.8 · K14) — **hâlâ açık**
+  (`chat.js:829`'daki "Düzenle" sohbet mesajınınki, başka şey).
 
 > **Kayıt düzeltmesi (2026-08-15).** Yukarıdaki "Bitti" satırları belgeden değil
 > depodan çıkarıldı: 11 Ağustos'ta yapılan Adım 9 ve 10, hem bu dosyada hem

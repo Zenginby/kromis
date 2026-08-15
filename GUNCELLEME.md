@@ -126,10 +126,15 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 paketleniyor — aynı uygulama, aynı özellikler. Kurulum için
 [KURULUM.md](KURULUM.md)'nin Windows dallarını izle.
 
-**macOS kullanıyorsan:** bu sürümde senin göreceğin yeni bir özellik **yok**.
-0.3.0'ın tamamı Windows'u ayağa kaldırmakla ilgili; macOS tarafında değişen
-şeyler perde arkasında kaldı. Yani acele etmen gerekmiyor, ama güncellemek de
-bir şeyi bozmaz.
+**İki sistemde de göreceğin tek değişiklik: yazı tipi.** Arayüzün başlıkları
+artık uygulamanın kendi içinde taşıdığı **DM Sans** ile çiziliyor. Öncesinde
+arayüz o yazı tipini istiyordu ama paket onu taşımıyordu, yani senin makinende
+kurulu değilse sessizce sistemin yazı tipine düşülüyordu — başlıklar tasarımda
+göründüğü gibi değildi ve hangi Mac'te açtığına göre değişebiliyordu. Font
+pakete girdiği için artık internet de gerekmiyor.
+
+Bunun dışında **macOS kullanıyorsan** bu sürümde yeni bir özellik yok: 0.3.0'ın
+geri kalanı tamamen Windows'u ayağa kaldırmakla ilgili.
 
 **Windows tarafında neler var:**
 

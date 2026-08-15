@@ -1,0 +1,63 @@
+/* Paketlenmiş yazı tipi — DM Sans (SIL OFL 1.1, bkz. fonts/OFL.txt).
+ *
+ * NEDEN AYRI DOSYA: flow-tokens.css kendi başlığında "bu dosyada sınıf seçici
+ * YOK, yalnız :root" diye sözleşme yazıyor; style.css ise bileşen katmanı.
+ * @font-face ikisinin de tanımına girmiyor, o yüzden kendi dosyasında.
+ *
+ * NEDEN PAKETLİ: uygulama paketlenmiş bir .app / .exe. Google Fonts <link>'i
+ * ağa bağımlılık demek — referans ekranlardaki o satır depoya BİLEREK girmedi
+ * (plan §0.2). Font dosyaları `static/` altında olduğu için spec'in
+ * datas=[('static','static')] girdisiyle pakete kendiliğinden giriyor; ayrı
+ * bir spec satırı gereksiz olurdu, CI bunun yerine zip'in İÇİNDE arıyor.
+ *
+ * İKİ ALTKÜME DE ŞART — ölçüldü, varsayılmadı (fontTools ile cmap taraması):
+ *   latin     → ı ç Ç ö Ö ü Ü   (222 glif)
+ *   latin-ext → ğ Ğ ş Ş İ       (149 glif)
+ * Yani latin-ext olmadan arayüzdeki "Değiştir", "Bağış", "İndir" gibi her
+ * kelime yedek yazı tipine düşer ve satır ortasında karakter değiştirir.
+ *
+ * TEK @font-face, ARALIKLI AĞIRLIK: dosya değişken (variable) font ve `fvar`
+ * ekseni wght 100–1000 (ölçüldü). Ağırlık başına ayrı kural yazmak yanlış
+ * olurdu — tarayıcı tek dosyadan istenen ağırlığı kendisi örnekliyor. Bugün
+ * kullanılanlar 500 (altı yer) ve 600 (style.css:617), ikisi de gerçek çizim;
+ * sentetik kalınlaştırma yok.
+ *
+ * Google'ın sunduğu iki eksenden yalnız `wght` alındı, `opsz` (optik boyut)
+ * ALINMADI: opsz'li sürüm 92 KB, bu 54 KB. Fark tek bir görsel kazanç için
+ * paketin her kullanıcıya taşıdığı 38 KB'lık sabit yük olurdu.
+ *
+ * DOSYA ADINDA `v17`: yukarı akış sürümü. Font bir gün değişirse URL de değişir
+ * ve kimse bayat kopya yiyemez. `?v=` KOYULAMAZ — bu dosya statik servis
+ * ediliyor, __APP_VERSION__ yer tutucusu yalnız index.html'de çevriliyor
+ * (app.py:1273); üstelik index.html'deki preload URL'siyle birebir eşleşmesi
+ * gerekiyor, ayrışırsa font iki kez iner.
+ *
+ * unicode-range değerleri Google Fonts CSS API'sinden birebir alındı; elle
+ * yazılmadı, çünkü aralığı daraltmak dosyada VAR OLAN bir glifi erişilemez
+ * yapar ve teşhisi zor bir "bazı harfler farklı" kusuru üretir.
+ */
+
+/* latin-ext — Türkçe'nin ğ Ğ ş Ş İ harfleri BURADA. */
+@font-face {
+  font-family: "DM Sans";
+  font-style: normal;
+  font-weight: 100 1000;
+  font-display: swap;
+  src: url("/static/fonts/dm-sans-v17-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* latin — metnin gövdesi; ı ç ö ü de burada. index.html yalnız BUNU preload
+ * ediyor (plan §0.2: "en fazla iki aile, tek kritik ağırlık"). */
+@font-face {
+  font-family: "DM Sans";
+  font-style: normal;
+  font-weight: 100 1000;
+  font-display: swap;
+  src: url("/static/fonts/dm-sans-v17-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}

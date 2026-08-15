@@ -48,8 +48,10 @@
   (`#chats-kebab`, `#sort-btn`, `.folder-thumb`, `rail-count`,
   `#media-empty-state`, `#folder-rename`).
 
-**Gerçekten kalan tek Flow-UI maddesi: DM Sans bundle.** `flow-tokens.css:53`
-`--font-display: "DM Sans", …` diyor ama depoda `static/fonts/` yok — yani
-paketlenmiş uygulama font'u taşımıyor ve DM Sans kurulu olmayan makinede
-sessizce sistem yazı tipine düşülüyor. Türkçe için `latin-ext` altkümesi şart.
-Karar (dosya adı + boyut onayı) hâlâ bekliyor.
+~~**Gerçekten kalan tek Flow-UI maddesi: DM Sans bundle.**~~ → **bitti
+(2026-08-15).** `static/fonts/` kuruldu: iki woff2 (36.980 + 18.192 bayt) +
+`OFL.txt`, `@font-face`'ler `static/fonts.css`'te, `latin` altkümesi preload'lu,
+`tests/test_fonts.py` ile mandallı. Ayrıntı ve ölçümle düzelen iki plan
+varsayımı `flow-redesign-plan.md`'nin durum listesinde.
+
+**Flow-UI'da kalan madde yok.** Sıradaki tur SaaS master planının fazları.

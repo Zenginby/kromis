@@ -137,9 +137,13 @@ bloke eder — ilk ikisi kullanıcı kararı bekliyor:
   > `/static/style.css?v=1.16.0` aynı URL altında bambaşka içerik servis etti,
   > yani 1.16.0'ı bir kez yüklemiş kullanıcı ESKİ stil dosyasını önbellekten
   > alıyordu. 2.0.0 bunu da kapatıyor.
-- **DM Sans bundle** (§4). İndirme izni alındı; **indirmeden önce dosya adı ve
-  boyutu söylenip son onay alınacak.** `latin` + `latin-ext` şart (Türkçe),
-  400 + 500.
+- **DM Sans bundle** (§4) — **bitti (2026-08-15).** Onay ölçümle alındı: üç
+  seçenek (tam değişken 92 KB · wght-yalnız 54 KB · tek statik ağırlık 21 KB)
+  boyutlarıyla sunuldu, ortadaki seçildi. `latin` + `latin-ext` şartı ölçümle
+  doğrulandı (fontTools cmap: `ğ Ğ ş Ş İ` yalnız latin-ext'te). **Ağırlık
+  varsayımı düzeldi:** 400 kullanılmıyor, kullanılanlar 500 ve 600; dosya
+  değişken olduğu için tek `@font-face` `font-weight: 100 1000` ikisini de
+  karşılıyor.
 - **Tema seçici arayüzü** — dört tema (`kurumsal` / `amber` / `viola` / monokrom)
   token katmanında hazır, seçici yok. Yeri sözleşmede belli: Araçlar → Görünüm.
   **Artık adıma bağlandı:** JS tarafı Adım 7 (`settings.js (tema…)`), kalıcılık

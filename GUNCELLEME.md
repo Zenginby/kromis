@@ -1,35 +1,70 @@
-# GPT-Image Studio — Güncelleme (macOS)
+# GPT-Image Studio — Güncelleme (macOS ve Windows)
 
-Kurum sana yeni bir `GPT-Image Studio.zip` gönderdiğinde bu sayfayı izle. 3 dakika sürer.
+Kurum sana yeni bir `.zip` gönderdiğinde bu sayfayı izle. 3 dakika sürer.
+İlk kurulum için değil, **elindeki uygulamayı yenisiyle değiştirmek** için.
+(İlk kez kuruyorsan: [KURULUM.md](KURULUM.md).)
+
+| Sistem | Dosya |
+|---|---|
+| macOS (Apple Silicon) | `gpt-image-studio-macOS-arm64.zip` |
+| Windows 10/11 (64-bit) | `gpt-image-studio-windows-x64.zip` |
+
+**Hangi bölümü okuyacaksın:** 2. ve 3. adımların işletim sistemine göre iki dalı
+var — kendi dalını oku, ötekini atla. 1., 4. ve 5. adımlar iki sistemde aynıdır.
 
 > ## 🛑 En önemli iki şey
 >
-> 1. **`Application Support` klasörünü SİLME.** Ürettiğin bütün görseller, geçmiş,
->    klasörler, paletler ve logo kütüphanen orada duruyor. Uygulamayı değiştirmek
->    onlara dokunmaz — ama "uygulamayla ilgili her şeyi silelim" diyip o klasörü
+> 1. **Veri klasörünü SİLME.** Ürettiğin bütün görseller, geçmiş, klasörler,
+>    paletler ve logo kütüphanen orada duruyor. Uygulamayı değiştirmek onlara
+>    dokunmaz — ama "uygulamayla ilgili her şeyi silelim" diyip o klasörü
 >    silersen **hepsi gider.** Uygulamayı değiştirmek için o klasöre hiç girmen
 >    gerekmiyor.
-> 2. **Güvenlik uyarısında "Çöp Sepetine Taşı"ya ve Enter'a BASMA** (aşağıda 3. adım).
->    O düğme mavi/varsayılan olduğu için Enter uygulamayı siler.
+>
+>    | Sistem | Silinmemesi gereken klasör |
+>    |---|---|
+>    | macOS | `~/Library/Application Support/GPT-Image Studio/` |
+>    | Windows | `%LOCALAPPDATA%\GPT-Image Studio\` |
+>
+> 2. **(Yalnız macOS) Güvenlik uyarısında "Çöp Sepetine Taşı"ya ve Enter'a
+>    BASMA** (aşağıda 3. adım). O düğme mavi/varsayılan olduğu için Enter
+>    uygulamayı siler. **Windows'ta böyle bir tehlike yok** — SmartScreen
+>    penceresindeki hiçbir düğme dosyayı silmez.
 
 ## 1. Uygulamayı kapat
 
-Uygulama açıksa **kapat** (⌘Q ya da pencereyi kapat). Çalışırken değiştirmeye
-çalışmak yarım kurulmuş bir uygulama bırakabilir.
+Uygulama açıksa **kapat** (macOS'ta ⌘Q, Windows'ta pencereyi kapat). Çalışırken
+değiştirmeye çalışmak yarım kurulmuş bir uygulama bırakabilir.
 
 ## 2. Yenisini yerine koy
 
-1. Yeni `GPT-Image Studio.zip` dosyasına çift tıkla — yanında uygulama çıkar.
+### macOS
+
+1. Yeni `gpt-image-studio-macOS-arm64.zip` dosyasına çift tıkla — yanında
+   uygulama çıkar.
 2. Çıkan uygulamayı **Programlar (Applications)** klasörüne sürükle.
 3. macOS *"Aynı adda bir öge var"* diye soracak → **Değiştir** (Replace) de.
 
 Eski sürümü önceden silmen gerekmiyor; değiştirmek yeterli.
 
+### Windows
+
+1. Yeni `gpt-image-studio-windows-x64.zip` dosyasına sağ tıkla → **Tümünü
+   ayıkla** (Extract All).
+2. Çıkan `GPT-Image Studio` klasörünü, eski klasörünün **bulunduğu yere** taşı.
+3. Windows *"Hedefte aynı adda dosyalar var"* diye soracak → **Hedefteki
+   dosyaları değiştir** de.
+
+**Klasörü olduğu gibi taşı, içinden yalnız `.exe`'yi çekip almaya çalışma:**
+uygulama yanındaki `_internal` klasörüne ihtiyaç duyar. Ayrıca zip'in **içinden**
+çalıştırma — önce ayıkla, sonra çalıştır.
+
 ## 3. Güvenlik izni — her güncellemede TEKRAR gerekiyor
 
-Bu bir hata değil, beklenen davranış: uygulama Apple'a ücretli geliştirici
-kaydıyla imzalanmadığı için (imza geçerli, yalnız Apple onayı yok), macOS her
-**yeni** dosyayı ilk açılışta yeniden soruyor. Kurulumdaki adımların aynısı:
+Bu bir hata değil, beklenen davranış: uygulama ücretli bir geliştirici
+sertifikasıyla imzalanmadığı için işletim sistemi her **yeni** dosyayı ilk
+açılışta yeniden soruyor. Kurulumdaki adımların aynısı.
+
+### macOS
 
 1. Uygulamaya çift tıkla. Uygulama **açılmayacak** ve şu uyarı çıkacak:
 
@@ -56,6 +91,17 @@ kaydıyla imzalanmadığı için (imza geçerli, yalnız Apple onayı yok), macO
 4. Çıkan onayda tekrar **Yine de Aç** → Mac şifreni gir (ya da Touch ID).
 5. Uygulama açılır. Bu sürüm için bir daha sormaz.
 
+### Windows
+
+1. `GPT-Image Studio.exe`'ye çift tıkla. Mavi **SmartScreen** penceresi
+   çıkabilir ("Windows bilgisayarınızı korudu").
+2. **Daha fazla bilgi** (More info) → **Yine de çalıştır** (Run anyway).
+
+   #### ✅ Burada YIKICI bir düğme YOK
+   macOS'un aksine SmartScreen'deki düğmelerin hiçbiri dosyayı silmez veya
+   karantinaya almaz. **Çalıştırma** yalnızca pencereyi kapatır, Enter'a basmak
+   da güvenli — en kötüsü açılışı iptal eder.
+
 ## 4. Güncellendiğini doğrula
 
 Sağ üstteki **⚙ (dişli)** düğmesine bas — pencerenin altında **Sürüm** yazıyor.
@@ -71,6 +117,103 @@ de bu numarayı söyle.
 
 Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya yaz
 (aşağıdaki yedek işine yarayabilir).
+
+---
+
+## Sürüm 0.3.0'da ne değişti
+
+**Manşet: Windows sürümü geldi.** Uygulama artık Windows 10/11 (64-bit) için de
+paketleniyor — aynı uygulama, aynı özellikler. Kurulum için
+[KURULUM.md](KURULUM.md)'nin Windows dallarını izle.
+
+**macOS kullanıyorsan:** bu sürümde senin göreceğin yeni bir özellik **yok**.
+0.3.0'ın tamamı Windows'u ayağa kaldırmakla ilgili; macOS tarafında değişen
+şeyler perde arkasında kaldı. Yani acele etmen gerekmiyor, ama güncellemek de
+bir şeyi bozmaz.
+
+**Windows tarafında neler var:**
+
+- **Görsellerin `%LOCALAPPDATA%\GPT-Image Studio\` altında** duruyor (yani
+  `C:\Users\<kullanıcı adın>\AppData\Local\...`). Bilerek `Local`, `Roaming`
+  değil: `Roaming` olsaydı ürettiğin bütün görseller kurumsal profille birlikte
+  ağ üzerinden taşınmaya çalışırdı.
+- **Azure anahtarın yalnız senin hesabına açık.** Windows, macOS'taki `0600`
+  izin bitlerini uygulamıyor; onun yerine dosyanın erişim listesi (DACL)
+  sıkılaştırılıyor — kalıtım kesiliyor ve listede yalnız senin hesabın kalıyor.
+  Kendin görmek istersen KURULUM.md'de `icacls` komutu yazılı.
+- **Türkçe karakterler bozulmuyor.** "Zümrüt" gibi bir klasör ya da prompt adı,
+  geçmiş listelenirken bozuk karakterlere dönüşüp listeyi çökertebilirdi
+  (Türkçe Windows'un varsayılan kodlaması cp1254). Okuma yolu utf-8'e sabitlendi
+  ve bu bir daha olmasın diye kodun tamamını tarayan bir test eklendi.
+- **Damlalık çalışıyor.** Renk seçici, Windows'ta tarayıcının kendi damlalığını
+  kullanıyor.
+- **Açılışta bir şey ters giderse artık sessiz kalmıyor**, ne olduğunu söyleyen
+  bir pencere gösteriyor. (Öncesinde paketlenmiş uygulamanın yazacak bir yeri
+  olmadığı için hata hiç görünmeden kayboluyordu.)
+
+> **Not:** Sana ulaşan `.zip`, kendi sistemin için ayrı ayrı üretiliyor ve
+> ikisinden **biri bile** üretilemezse yayın hiç oluşmuyor — yani elinde
+> "yarım" bir sürüm kalmıyor.
+
+## Sürüm numarası neden 1.16'dan 0.3'e "düştü"?
+
+Uygulaman geri gitmedi: **0.3.0, elindeki 1.16.0'dan yenidir.**
+
+Numaralandırma bir kez sıfırlandı. 1.x sayaçları iç geliştirme sayaçlarıydı;
+uygulama GitHub'da açık kaynak (MIT lisanslı) hâle gelirken sürüm numarası
+ürünün gerçek olgunluğunu gösterecek şekilde **0.2.0**'dan yeniden başlatıldı.
+Arada arayüz turları için 2.x'e kadar çıkmış numaralar da vardı; onlar da aynı
+sıfırlamaya girdi.
+
+Kısacası doğru sıra şu: `1.16.0` → **`0.2.0`** → `0.2.1` → **`0.3.0`** (bugün).
+Hangi sürümde olduğunu ⚙ Ayarlar'ın altındaki **Sürüm** satırından görürsün;
+Kurum'nın söylediği numarayla karşılaştır, büyüklük-küçüklük kıyaslama.
+
+## Sürüm 0.2.1'de ne değişti
+
+Hepsi **Medya** ve **sohbet** tarafında, gündelik kullanımı hızlandıran şeyler:
+
+- **Klasörde arama.** Prompt, boyut ya da klasör adına göre anında süzüyorsun.
+- **Izgara boyutu S / M / L.** Küçük karolarla çok görsel, büyük karolarla
+  detay.
+- **Klasörü ZIP olarak indir.** Klasör başlığındaki indirme düğmesi, alt
+  klasörleriyle birlikte hepsini tek dosyada veriyor. Türkçe klasör adları da
+  dosya adında doğru çıkıyor.
+- **Sürükle-bırak.** Görselleri klasör kartlarının üstüne sürükleyerek
+  taşıyorsun; bilgisayarından bir dosya bırakarak içe aktarıyorsun.
+- **Ürettiğin görselden referans alma.** Bir sonuca "Referans" deyip onun
+  üstünden yeni görsel üretiyorsun.
+- **Sohbette mesaj düzenleme ve kopyalama.** Gönderdiğin bir mesajı yazı
+  kutusuna geri alıp düzeltebiliyor, herhangi bir mesajı tek tıkla
+  kopyalayabiliyorsun. Gönderdiğin an kutu kendiliğinden temizleniyor (ağ
+  hatasında yazdığın geri geliyor).
+- **Büyüteç dışına tıklayınca kapanıyor.**
+
+## Sürüm 0.2.0'da ne değişti
+
+Bu sürüm, 1.16.0'dan sonraki **arayüz devrini** getiriyor — uygulamayı açtığında
+göreceğin en büyük fark burada.
+
+- **Sekmeler kalktı, tek pencere kaldı.** Eskiden "Görsel" ve "Prompt Yönetmeni"
+  diye iki sekme vardı ve prompt'u birinden ötekine taşıyordun. Artık **tek bir
+  yazı kutusu** var; modu değiştiriyorsun, kutuda yazdığın metin yerinde
+  kalıyor. Yönetmenin yazdığı prompt'u "Görsel modunda üret" ile doğrudan
+  üretiyorsun, sekme yolculuğu yok.
+- **Sohbet ve üretilen görseller aynı dökümde.** Konuşma ve sonuçlar tek bir
+  akışta, sırayla akıyor.
+- **Sol şerit:** Stüdyo · Medya · Kütüphane · Araçlar.
+- **Medya görünümü:** iç içe klasörler, kırıntı gezintisi, klasör kartlarında
+  kapak görseli, sıralama ve klasör yeniden adlandırma.
+- **Kütüphane:** logolar, mottolar, bannerlar ve **yüklemeler**.
+- **Tema seçici ve teması artık kalıcı:** Mono, Ocean, Amber, Viola. Seçtiğin
+  tema uygulamayı kapatıp açtığında da duruyor.
+- **Güvenlik:** API anahtarların hiçbir ekran yanıtında ve hiçbir hata kaydında
+  görünmüyor — hata günlüğüne düşse bile otomatik sansürleniyor.
+- **Uygulama açık kaynak oldu** (MIT lisansı, GitHub).
+
+---
+
+# Daha eski sürümler
 
 ## Sürüm 1.16.0'da ne değişti
 
@@ -199,13 +342,16 @@ Hepsi **Prompt Yönetmeni** sekmesinde:
   - alttaki şeritten **Sığdır** ile başa dön, **İndir** ile kaydet,
   - **Esc** ya da **×** ile kapat.
 
+---
+
 ## Yedek nerede
 
 Uygulama, sürüm değiştiğinde listelerinin bir kopyasını kendiliğinden alıyor:
 
-```
-~/Library/Application Support/GPT-Image Studio/backups/<sürüm>-<tarih>/
-```
+| Sistem | Yedek klasörü |
+|---|---|
+| macOS | `~/Library/Application Support/GPT-Image Studio/backups/<sürüm>-<tarih>/` |
+| Windows | `%LOCALAPPDATA%\GPT-Image Studio\backups\<sürüm>-<tarih>\` |
 
 İçinde yalnızca küçük liste dosyaları var (geçmiş, klasörler, paletler, kayıtlı
 sohbetler, logo kütüphanesi) — **görseller kopyalanmıyor**, onlar zaten
@@ -219,8 +365,12 @@ klasörlerini bir üstteki `GPT-Image Studio` klasöründeki aynı adlı klasör
 ## Sorun çıkarsa
 
 - **Pencere boş açılıyor:** uygulamayı kapat, tekrar aç.
-- **Uygulama hiç açılmıyor:** `~/Library/Application Support/GPT-Image Studio/`
-  içindeki `hata.log` dosyasını Kurum'ya gönder.
-- **Eski arayüzü görüyorum gibi:** uygulamayı tamamen kapat (⌘Q) ve yeniden aç.
+- **Uygulama hiç açılmıyor:** hata kaydını Kurum'ya gönder —
+  macOS'ta `~/Library/Application Support/GPT-Image Studio/hata.log`,
+  Windows'ta `%LOCALAPPDATA%\GPT-Image Studio\hata.log`.
+- **(Windows) Pencere hiç gelmiyor:** `.exe`'yi `_internal` klasöründen ayırmış
+  olabilirsin — ikisi aynı klasörde olmalı (2. adım).
+- **Eski arayüzü görüyorum gibi:** uygulamayı tamamen kapat (macOS'ta ⌘Q) ve
+  yeniden aç.
 - **Geçmişim boş görünüyor:** hiçbir şey silme, Kurum'ya yaz — yukarıdaki yedek
   klasörü duruyor.

@@ -673,8 +673,10 @@
   </aside>
 
   <!-- Görünüm: A6 — tema seçici (tasarım §2.1). Dört tema; seçim body'ye
-       data-theme yazar (settings.js). KALICILIK YOK: SettingsRequest'te tema
-       alanı yok, o Adım 9'un arka uç işi — panel bunu saklamıyor, söylüyor. -->
+       data-theme yazar (settings.js). KALICI: Adım 9 ile geldi — seçim
+       `POST /api/prefs` ile prefs.json'a yazılıyor (settings.js:132) ve
+       açılışta geri okunuyor (chat.js:1492). Uç bilerek `/api/settings`
+       DEĞİL: gerekçe §0.5/K6-K7. -->
   <aside id="look-sheet" class="sheet sheet-right" aria-label="Görünüm">
     <div class="sheet-head">
       <h2>Görünüm</h2>

@@ -34,5 +34,22 @@
 
 ## Gelecek Görevler (Kalan Flow-UI Adımları)
 
-- **Adım 9:** Tema kalıcılığı + Kütüphane Yüklemeleri (`docs/flow-ui/library-view.html`)
-- **Adım 10:** Kozmetik cila + D10 Medya sıralaması + M1 listbox accessibility + DM Sans font bundle (`docs/flow-ui/app-shell.html`)
+> **Güncelleme (2026-08-15) — bu bölüm artık geçerli değil.** Aşağıdaki iki adım
+> da aynı turda, PR #25 (`b7b323c`) ile tamamlandı; liste güncellenmeden kaldı.
+> Depodaki karşılıkları tek tek arandı, kanıtlar `flow-redesign-plan.md`'nin
+> durum listesinde ve `2026-08-06-flow-arayuz-devri.md`'nin kutularında.
+
+- ~~**Adım 9:** Tema kalıcılığı + Kütüphane Yüklemeleri~~ → **bitti**: tema
+  `prefs.json`'a yazılıyor (`settings.js:132` → `chat.js:1492`),
+  `assets_store.KINDS` dördüncü tür `uploads` ile genişledi, "Tümü" filtresi
+  `index.html:325`'te.
+- ~~**Adım 10:** Kozmetik cila + D10 Medya sıralaması + M1 listbox
+  accessibility + DM Sans font bundle~~ → **kozmetik kısmı bitti**
+  (`#chats-kebab`, `#sort-btn`, `.folder-thumb`, `rail-count`,
+  `#media-empty-state`, `#folder-rename`).
+
+**Gerçekten kalan tek Flow-UI maddesi: DM Sans bundle.** `flow-tokens.css:53`
+`--font-display: "DM Sans", …` diyor ama depoda `static/fonts/` yok — yani
+paketlenmiş uygulama font'u taşımıyor ve DM Sans kurulu olmayan makinede
+sessizce sistem yazı tipine düşülüyor. Türkçe için `latin-ext` altkümesi şart.
+Karar (dosya adı + boyut onayı) hâlâ bekliyor.

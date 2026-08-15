@@ -555,21 +555,35 @@ geçildi.** Ekranlar onaylandı, taşıma başladı, PR 1 merge edildi.
   — üçüncü pill S'de karonun %89'unu kaplıyordu; "+Ek"in yeri Adım 12'nin
   seçicisi. `pytest` 1106 → **1115**; 12 mutasyonun hepsi kırmızı. Kararlar ve
   kanıtlar tek-döküm planı §0.9'da.
-- **Sırada:** Adım **12 · 13** — 7 Ağustos kullanıcı denemesinin kalan iki
-  açığı, kendi planında: `docs/superpowers/plans/2026-08-07-flow-studio-tek-dokum.md`.
-  12: (+) menüsünün dördüncü maddesi — bu dosyanın §4.2'de söz verdiği
-  "Medya'dan seç" seçicisi (ölçüsü §2'de: 776×570). 13: `studio-session.html`'in
-  kendisi — tek döküm, tek composer; mod değişince pencere de yazılan metin de
-  değişmez.
-- **Sonra:** Adım 9 (tema kalıcılığı — yeri `prefs.json`, bkz. §11 · Kütüphane
-  "Yüklemeler" + "Tümü"), ardından Adım 10 (kozmetik süpürme; kebap menüsü ve
-  **Medya sıralaması/D10** burada — sıralama Medya görünümüyle aynı turda gelsin
-  diye Adım 12'nin seçicisine bilerek konmadı).
+- **Bitti (`a099aa1`, `APP_VERSION` 2.2.0):** Adım **12** — (+) menüsünün
+  dördüncü maddesi, §4.2'nin söz verdiği "Medya'dan seç" seçicisi.
+- **Bitti (`b7b323c`, PR #25 · sürüm sıfırlamasıyla `APP_VERSION` 0.2.0):**
+  Adım **13** (`studio-session.html`: tek döküm, tek composer; `#view-image` ve
+  `#view-chat` tek `#view-studio` altında birleşti, 9 baseline id deftere
+  emekli yazıldı) ve aynı turda Adım **9** ile **10**.
+- **Bitti — Adım 9:** tema kalıcı (`prefs.json`; `POST /api/prefs` →
+  `settings.js:132`, açılışta `chat.js:1492`), Kütüphane'de "Yüklemeler" +
+  "Tümü" (`assets_store.py:19 KINDS`, `index.html:325,329`). Tema adı `kurumsal`
+  değil **`ocean`** oldu.
+- **Bitti — Adım 10:** kebap (`#chats-kebab`), Medya sıralaması/D10
+  (`#sort-btn`), klasör kapağı (`.folder-thumb`), `rail-count`, boş durum glifi
+  (`#media-empty-state`), klasör "Yeniden adlandır" (`#folder-rename` +
+  `PATCH /api/folders/{id}`) — yani **D17 kararı "girsin" yönünde kapandı**.
+- **Sırada:** Flow-UI'dan geriye **tek madde** kaldı — **DM Sans bundle**
+  (aşağıda). Uygulamanın sıradaki turu Flow-UI değil, SaaS master planının
+  fazları: `docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md`.
 - **Ertelendi:** Yedekler paneli (v4/V3).
 - **Karar bekleyen:** DM Sans bundle (§3 · plan §4) — indirme izni alındı, dosya
-  adı ve boyutu söylenip son onay alınacak. Klasör "Yeniden adlandır" sözleşmeye
-  girecek mi (plan §0.2/D17). Sonuç kartındaki "Düzenle" dökümden yeniden mi
-  kurulacak, tek kayıt döndüren rotayı mı bekleyecek (plan §0.8 · K14).
+  adı ve boyutu söylenip son onay alınacak. **Hâlâ açık ve artık tek başına:**
+  `flow-tokens.css:53` `--font-display: "DM Sans", …` diyor ama `static/fonts/`
+  yok, yani paket font'u taşımıyor ve DM Sans kurulu olmayan makinede sessizce
+  sistem yazı tipine düşülüyor. Sonuç kartındaki "Düzenle" dökümden yeniden mi
+  kurulacak, tek kayıt döndüren rotayı mı bekleyecek (plan §0.8 · K14) —
+  **hâlâ açık** (`chat.js:829`'daki "Düzenle" sohbet mesajınınki, başka şey).
+
+> **Kayıt düzeltmesi (2026-08-15).** Yukarıdaki "Bitti" satırları belgeden değil
+> depodan çıkarıldı: 11 Ağustos'ta yapılan Adım 9 ve 10, hem bu dosyada hem
+> `flow_ui_step13_handoff.md`'de "sırada"/"gelecek görev" olarak duruyordu.
 
 **Sıra, adım ataması ve madde-madde mandal:**
 `docs/superpowers/plans/2026-08-06-flow-arayuz-devri.md` — §0.1 (durum),

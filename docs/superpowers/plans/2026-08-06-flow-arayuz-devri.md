@@ -1062,16 +1062,30 @@ Adım 8 — §4.2'nin manşeti:
       döküm turu koşulsuz açılıyor, oturumu `persistThread` üretimden SONRA
       yazıyor. Uydurma `session_id` yok — bedeli K20'de yazılı
 
-Adım 9 — arka uç:
+Adım 9 — arka uç (**bitti**, v0.2.0 · `b7b323c`):
 
-- [ ] Tema `settings`'e yazılıyor (allowlist: `kurumsal`/`amber`/`viola`/monokrom), `0600`
-- [ ] Kütüphane'de "Yüklemeler" türü + "Tümü" filtresi (`KINDS` testle genişletildi)
+- [x] Tema kalıcı — ama **yeri ve adları sözleşmeden saptı**, ikisi de bilerek:
+      `settings`/`credentials.env` yerine `prefs.json` (§0.5/K6'nın gerekçesi:
+      bir tema adının `0600` olması anlamsız, üstelik Azure hiç yapılandırılmamışken
+      tema çevrilemez olurdu) ve allowlist `kurumsal` değil `ocean`
+      (`models.py:170 ALLOWED_THEMES`, `prefs.py:45`). Uçtan uca: seçim
+      `POST /api/prefs` (`settings.js:132`) → açılışta geri okuma (`chat.js:1492`)
+- [x] Kütüphane'de "Yüklemeler" türü + "Tümü" filtresi
+      (`assets_store.py:19 KINDS` → `uploads`; `index.html:325,329`)
 
-Adım 10 — kozmetik:
+Adım 10 — kozmetik (**bitti**, v0.2.0–v0.2.1):
 
-- [ ] Üst şeritte kebab (oturum menüsü) — Adım 6'dan sonra
-- [ ] Medya'da sıralama düğmesi
-- [ ] Klasör kartında kapak görseli (glif değil)
-- [ ] Medya'da `rail-count` sayacı
-- [ ] Boş durumda glif + tek satır metin
-- [ ] Klasör "Yeniden adlandır" **veya** sözleşmeden düşürüldüğü yazılı (D17 kararı)
+- [x] Üst şeritte kebab (oturum menüsü) — `#chats-kebab` (`index.html`, `chat.js`)
+- [x] Medya'da sıralama düğmesi — `#sort-btn` (`index.html`, `folders.js`)
+- [x] Klasör kartında kapak görseli (glif değil) — `.folder-thumb` (`folders.js`, `style.css`)
+- [x] Medya'da `rail-count` sayacı — `index.html`, `folders.js`
+- [x] Boş durumda glif + tek satır metin — `#media-empty-state` (`index.html:298`, D16 glifi)
+- [x] Klasör "Yeniden adlandır" — sözleşmeye **girdi** (D17 kararı): `#folder-rename`
+      (`index.html`, `folders.js`) + `PATCH /api/folders/{id}`
+
+> **Kayıt düzeltmesi (2026-08-15).** Bu iki blok 11 Ağustos'ta yapıldığı hâlde
+> işaretsiz kalmıştı; `flow_ui_step13_handoff.md` de "Gelecek Görevler" diye
+> ikisini sayıyordu. Yukarıdaki her satır bugün depoda tek tek arandı ve
+> karşılığı yazıldı — belgeye değil koda bakılarak. Flow-UI'dan geriye **yalnız
+> DM Sans bundle** kalıyor (§4; `--font-display` "DM Sans" diyor ama
+> `static/fonts/` yok, yani paket font'u taşımıyor).

@@ -136,9 +136,9 @@ keytool -genkeypair -v -keystore gis.keystore -alias gis \
 
 ## Beklenen boyut ve ilk açılış
 
-- APK: **~45–70 MB** (Python 3.13 çalışma zamanı + stdlib ~25 MB, Pillow +
-  libjpeg/freetype ~8 MB, saf Python bağımlılıklar ~10 MB, `static/` +
-  `bundled/` ~1.1 MB, Chaquopy çalışma zamanı).
+- APK: **28 MB** (ölçüldü, run 31968594609 · 482 girdi). İlk tahmin 45–70 MB'ydı;
+  fark, Chaquopy'nin stdlib'i ve bağımlılıkları sıkıştırılmış `.imy` arşivleri
+  olarak paketlemesinden — cihazdaki açılmış boyut tahmine daha yakın.
 - Tek ABI (`arm64-v8a`) **şart**: ikinci bir ABI boyutu neredeyse ikiye katlar.
 - İlk açılış **2–5 sn**: Chaquopy stdlib'i açıyor, `PythonServer` assets'i
   `filesDir/resources/`'a kopyalıyor. Sonraki açılışlar hızlı; kopyalama

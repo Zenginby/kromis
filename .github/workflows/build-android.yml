@@ -216,17 +216,59 @@ jobs:
 
       # `import pydantic` KAPISI — Faz 0'ın karar kuralının ikinci yarısı
       # (docs/android/pydantic-karari.md). Wheel'in üretilmiş olması yetmez;
-      # Chaquopy'nin onu GERÇEKTEN kurmuş olması gerekiyor. Kurulum kaydı
-      # APK'nın içindeki requirements ağacında görünür.
+      # Chaquopy'nin onu GERÇEKTEN kurmuş olması gerekiyor.
+      #
+      # NEREDE ARANIR: Chaquopy paketleri APK'ya ayrı girdi olarak KOYMUYOR —
+      # hepsi `assets/chaquopy/*.imy` arşivlerinin içinde (`.imy`, aapt'ın
+      # sıkıştırmaması için başka adlandırılmış bir ZIP). run 31968594609 bunu
+      # APK girdi ADLARINDA aradı; pip kaydında "Successfully installed …
+      # pydantic-2.13.4 pydantic-core-2.46.4" yazdığı hâlde eşleşme yoktu ve
+      # kapı, ölçmesi gereken şeyi hiç ölçemeden düştü.
       - name: pydantic APK'ya girdi mi
         run: |
           set -euo pipefail
           APK="${{ steps.dogrula.outputs.apk }}"
-          GIRDILER="$(unzip -Z1 "$APK")"
+
+          KLASOR="$(mktemp -d)"
+          # `|| true`: eşleşme yoksa unzip 11 ile çıkıp `set -e`'yi tetikliyor ve
+          # asıl teşhis ("chaquopy yok") yerine "filename not matched" görünüyor.
+          # Kapıyı bir alttaki `test -d` kapatıyor.
+          unzip -qo "$APK" 'assets/chaquopy/*' -d "$KLASOR" || true
+          KOK="$KLASOR/assets/chaquopy"
+          test -d "$KOK" || {
+            echo "HATA: APK'da assets/chaquopy/ yok — Chaquopy hiç çalışmamış"
+            exit 1
+          }
+
+          # Varlıkların dökümü her koşuda basılıyor: bu kapı bir daha yanlış
+          # yere bakarsa hangi dosyaların orada olduğu logda hazır dursun.
+          echo "chaquopy varlıkları:"
+          (cd "$KOK" && find . -type f -printf '  %p (%s bayt)\n' | sort)
+
+          ara() {
+            modul="$1"
+            while IFS= read -r dosya; do
+              # (a) Dosya ZIP olarak okunabiliyorsa paket dizinini girdi
+              #     adlarında ara — en kesin kanıt.
+              if unzip -Z1 "$dosya" 2>/dev/null | grep -q "^$modul/"; then
+                echo "  $modul -> ${dosya#"$KOK"/}"
+                return 0
+              fi
+              # (b) Okunamıyorsa: ZIP girdi adları arşivin içinde SIKIŞTIRILMADAN
+              #     durur, yani düz metin araması hâlâ geçerli bir kanıt.
+              if grep -qa "$modul/__init__" "$dosya"; then
+                echo "  $modul -> ${dosya#"$KOK"/} (düz metin eşleşmesi)"
+                return 0
+              fi
+            done < <(find "$KOK" -type f)
+            return 1
+          }
+
           for modul in pydantic pydantic_core; do
-            echo "$GIRDILER" | grep -q "chaquopy/pkg/$modul" \
-              || echo "$GIRDILER" | grep -q "$modul" \
-              || { echo "HATA: APK'da $modul izi yok — Chaquopy pip adımı onu kurmamış"; exit 1; }
+            ara "$modul" || {
+              echo "HATA: $modul APK'daki chaquopy varlıklarında yok — pip adımı onu kurmamış"
+              exit 1
+            }
           done
           echo "pydantic + pydantic_core APK'da"
 

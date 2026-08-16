@@ -2,7 +2,12 @@
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- viewport-fit=cover ŞART: onsuz Android'de sayfa jest çubuğunun ÜSTÜNDE
+       durur ve `env(safe-area-inset-bottom)` her zaman 0 döner — yani mobile.css'in
+       güvenli alan hesapları sessizce etkisiz kalırdı. Bu bayrakla sayfa tüm
+       ekranı kaplıyor ve alt boşluğu kendimiz yönetiyoruz (büyüteç şeridi ve
+       alt gezinme çubuğu için). -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>GPT-Image Studio</title>
   <!-- Yalnız latin altkümesi preload ediliyor (plan §0.2: "tek kritik ağırlık").
        latin-ext BİLEREK dışarıda: Türkçe harfleri taşıyor ama metnin gövdesi
@@ -28,6 +33,12 @@
        devralıyor. Sınıf seçici içermez, bu yüzden BU SATIRI SİLMEK uygulamayı
        bugünkü paletine döndürür — geri alma yolu tek satır. -->
   <link rel="stylesheet" href="/static/flow-tokens.css?v=__APP_VERSION__" />
+  <!-- Mobil katman. EN SON gelmek zorunda: kuralları style.css ile aynı
+       özgüllükte ve kaynak sırasıyla kazanıyor, bu yüzden hiç `!important`
+       kullanmıyor. BU SATIRI SİLMEK uygulamayı bugünkü masaüstü davranışına
+       birebir döndürür — geri alma yolu tek satır (flow-tokens.css ile aynı
+       disiplin). -->
+  <link rel="stylesheet" href="/static/mobile.css?v=__APP_VERSION__" />
 </head>
 <body>
   <!-- Flow kabuğu: sol ray · üst şerit · tuval · yüzen composer.
@@ -251,6 +262,9 @@
           <div id="select-bar" class="select-bar" hidden>
             <span id="select-count" class="select-count" role="status">0 seçili</span>
             <button type="button" id="select-all" class="btn-ghost">Tümünü seç</button>
+            <!-- Sürükle-bırakın erişilebilir karşılığı: dokunmatikte sürükleme
+                 HİÇ çalışmıyor, klavyeyle de zaten çalışmıyordu. -->
+            <button type="button" id="select-move" class="btn-ghost" disabled>Taşı…</button>
             <button type="button" id="select-delete" class="btn-ghost btn-ghost-danger">Sil</button>
             <button type="button" id="select-cancel" class="btn-ghost">Vazgeç</button>
           </div>
@@ -617,6 +631,28 @@
       <div class="dialog-actions">
         <button id="confirm-cancel" class="btn-ghost" type="button">Vazgeç</button>
         <button id="confirm-ok" class="primary" type="button">Onayla</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Taşıma penceresi: seçili görselleri bir klasöre taşır.
+       Sürükle-bırakın ERİŞİLEBİLİR karşılığı — o yol dokunmatikte hiç, klavyeyle
+       de hiç çalışmıyor. Hedef seçici native <select>: Android'de sistemin kendi
+       seçicisi olarak açılıyor, masaüstünde de tanıdık. -->
+  <div id="move-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-move-close></div>
+    <div class="modal-card move-card" role="dialog" aria-modal="true" aria-labelledby="move-title">
+      <div class="modal-head">
+        <h2 id="move-title">Klasöre taşı</h2>
+      </div>
+      <p id="move-desc" class="modal-desc"></p>
+
+      <label for="move-target">Hedef klasör</label>
+      <select id="move-target"></select>
+
+      <div class="dialog-actions">
+        <button id="move-cancel" class="btn-ghost" type="button">Vazgeç</button>
+        <button id="move-ok" class="primary" type="button">Taşı</button>
       </div>
     </div>
   </div>
@@ -1033,5 +1069,9 @@
   <script src="/static/settings.js?v=__APP_VERSION__"></script>
   <script src="/static/viewer.js?v=__APP_VERSION__"></script>
   <script src="/static/chat.js?v=__APP_VERSION__"></script>
+  <!-- Ölçüm katmanı: composer'ın gerçek yüksekliğini bir CSS değişkenine
+       yazar (mobile.css onu tuvalin alt boşluğunda kullanıyor). En sonda,
+       çünkü #composer'ın DOM'da hazır olması gerekiyor. -->
+  <script src="/static/mobile.js?v=__APP_VERSION__"></script>
 </body>
 </html>

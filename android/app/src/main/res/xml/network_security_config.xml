@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Düz HTTP YALNIZCA loopback'e açık.
+     Uygulamanın kendi sunucusu 127.0.0.1'de TLS'siz konuşuyor (sertifika
+     üretmenin bir anlamı yok, trafik cihazdan hiç çıkmıyor). Bunu
+     `android:usesCleartextTraffic="true"` ile açmak KOLAY ama yanlış olurdu:
+     o bayrak Azure'a giden istekler dahil HER adrese düz HTTP'yi açar ve bir
+     gün yanlış yazılmış bir `http://` base_url sessizce şifresiz gider.
+     Burada istisna tek bir adrese çivili; geri kalan her şey `false`. -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

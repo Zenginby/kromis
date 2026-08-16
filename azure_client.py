@@ -10,6 +10,7 @@ import base64
 import os
 import tempfile
 
+import paths
 import winsec
 
 MODEL_NAME = "gpt-image-2"
@@ -50,8 +51,14 @@ def map_error(status_code: int, body: dict | None) -> str:
 
 # Uygulamaya özel kimlik dosyası (admin buradan yazar). Yoksa paylaşılan
 # claude-tools dosyasına düşer — böylece mevcut kurulumda kutudan çıktığı gibi çalışır.
-APP_ENV_PATH = os.path.expanduser("~/.config/gpt-image-studio/credentials.env")
-DEFAULT_ENV_PATH = os.path.expanduser("~/.config/claude-tools/azure-gpt-image2.env")
+#
+# Yollar artık `paths` üzerinden çözülüyor: Android'de `~` güvenilir değil ve
+# paylaşılan dosyanın karşılığı hiç yok (bkz. paths.credentials_path). Masaüstü
+# değerleri BİREBİR aynı kaldı. İkisi de modül düzeyinde SABİT kalmaya devam
+# ediyor — testler bunları `monkeypatch.setattr(ac, "APP_ENV_PATH", …)` ile
+# değiştiriyor ve fonksiyona çevirmek o desenin tamamını kırardı.
+APP_ENV_PATH = paths.credentials_path()
+DEFAULT_ENV_PATH = paths.shared_credentials_path()
 # ── Zaman aşımları ──────────────────────────────────────────────────
 # Tek sabit 120 s ilk commit'ten (e9748da) beri hiç ayarlanmamıştı ve
 # 2026-08-04'te canlıda yüksek kalite bir üretimde ReadTimeout'a düştü.
@@ -156,10 +163,15 @@ def _parse_env_file(path: str) -> tuple[str, str]:
 
 
 def _candidate_paths(env_path: str | None) -> list[str]:
-    """Açık env_path verilirse sadece o; yoksa app dosyası → paylaşılan dosya sırası."""
+    """Açık env_path verilirse sadece o; yoksa app dosyası → paylaşılan dosya sırası.
+
+    `None` olan aday ELENİYOR: Android'de paylaşılan dosyanın karşılığı yok ve
+    `DEFAULT_ENV_PATH` orada `None` oluyor (bkz. paths.shared_credentials_path).
+    Masaüstünde iki değer de dolu, yani liste ve sıra bugünküyle birebir aynı.
+    """
     if env_path is not None:
         return [env_path]
-    return [APP_ENV_PATH, DEFAULT_ENV_PATH]
+    return [p for p in (APP_ENV_PATH, DEFAULT_ENV_PATH) if p]
 
 
 def _first_complete_credentials(env_path: str | None) -> tuple[str, str] | None:

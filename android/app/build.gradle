@@ -1,0 +1,207 @@
+plugins {
+    id "com.android.application"
+    id "org.jetbrains.kotlin.android"
+    id "com.chaquo.python"
+}
+
+// ── Tek kaynaktan okunan değerler ───────────────────────────────────
+// Sürüm ve bağımlılık çivileri BURADA YAZILMIYOR, repo kökündeki dosyalardan
+// okunuyor. Gerekçe version.py'nin kendi başlığında yazılı: elle bakımı gereken
+// İKİNCİ bir sürüm literali bırakılmamalı. macOS'ta Info.plist, Windows'ta
+// VERSIONINFO aynı disiplinle besleniyor; Android'in versionName'i de öyle.
+
+def civiler = new Properties()
+file("../pins.properties").withInputStream { civiler.load(it) }
+
+def surumEslesme = (file("../../version.py").getText("UTF-8")
+        =~ /APP_VERSION\s*=\s*"(\d+)\.(\d+)\.(\d+)"/)
+if (!surumEslesme) {
+    throw new GradleException("version.py'den APP_VERSION okunamadı — biçim MAJOR.MINOR.PATCH olmalı")
+}
+def (major, minor, yama) = [surumEslesme[0][1] as int, surumEslesme[0][2] as int,
+                            surumEslesme[0][3] as int]
+def uygulamaSurumu = "${major}.${minor}.${yama}"
+// versionCode MONOTON artmak zorunda (Android kuralı) ve tek sayı olmalı.
+// 10000/100 tabanı: minör ve yama 99'a kadar çıkabilir, o aralıkta sıralama
+// sürüm sırasıyla birebir aynı kalıyor.
+def uygulamaSurumKodu = major * 10000 + minor * 100 + yama
+
+def pyEtiket = "cp" + civiler.pythonVersion.replace(".", "")
+def pydanticCoreWheel = file("../wheels/pydantic_core-${civiler.pydanticCoreVersion}" +
+        "-${pyEtiket}-${pyEtiket}-android_${civiler.wheelAndroidApi}_arm64_v8a.whl")
+
+// Wheel yoksa derleme BURADA, anlaşılır bir Türkçe mesajla dursun. Aksi halde
+// hata Chaquopy'nin pip çıktısının içinde "No matching distribution found for
+// pydantic-core" olarak görünür ve sebebi (wheel'i biz üretiyoruz) görünmez.
+if (!pydanticCoreWheel.exists()) {
+    throw new GradleException(
+        "pydantic-core wheel'i yok: ${pydanticCoreWheel}\n" +
+        "  Üretmek için: Actions → 'pydantic-core Android wheel' workflow'unu elle tetikle,\n" +
+        "  çıkan varlığı android/wheels/ altına koy. Ayrıntı: android/wheels/README.md")
+}
+
+android {
+    namespace "org.zenginby.gptimagestudio"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "org.zenginby.gptimagestudio"
+        // minSdk 26 (Android 8.0): arm64-v8a taşıyan tüm telefonlar bunun
+        // üstünde. Wheel etiketindeki API seviyesi de bununla aynı olmalı —
+        // büyük olursa pip cihazda wheel'i uyumsuz sayar (bkz. pins.properties).
+        minSdk 26
+        targetSdk 35
+        versionCode uygulamaSurumKodu
+        versionName uygulamaSurumu
+
+        ndk {
+            // TEK ABI. İki ABI (arm64-v8a + x86_64) APK'yı neredeyse ikiye
+            // katlıyor çünkü CPython çalışma zamanı ve Pillow'un native
+            // kitaplıkları her mimari için ayrı gömülüyor. Emülatör gerekirse
+            // ayrı bir debug varyantına x86_64 eklenir, release'e DEĞİL.
+            abiFilters "arm64-v8a"
+        }
+
+        python {
+            version civiler.pythonVersion
+
+            // Chaquopy pip'i çalıştırmak için yerel bir Python istiyor ve
+            // sürümünün hedefle aynı olması önerilir. CI bunu
+            // `-PgisBuildPython=python3.13` ile veriyor; yerelde ayarlanmazsa
+            // Chaquopy kendi araması yapar.
+            if (project.hasProperty("gisBuildPython")) {
+                buildPython project.property("gisBuildPython")
+            }
+
+            pip {
+                // requirements.txt'in Android karşılığı. AYNEN kopya DEĞİL,
+                // üç bilinçli fark var:
+                //   1. `uvicorn` SADE — `[standard]` değil. O ekstra uvloop ve
+                //      httptools çeker; ikisi de native ve Android wheel'leri
+                //      yok. Sadesi asyncio + h11 ile saf Python ve bu zaten
+                //      kanıtlı: gpt-image-studio.spec:97 masaüstü paketinde de
+                //      aynı dördünü dışarıda bırakıyor.
+                //   2. `pytest` YOK — çalışma zamanı bağımlılığı değil.
+                //   3. `pywebview` YOK — pencereyi Android tarafı açıyor;
+                //      desktop.py onu yalnız `_run()` içinde import ediyor,
+                //      yani modül APK'da bulunmasa da import zinciri kırılmıyor.
+                install "fastapi==0.115.*"
+                install "uvicorn==0.32.*"
+                install "httpx==0.27.*"
+                install "Pillow==11.*"
+                install "python-multipart==0.0.*"
+
+                // pydantic ÇİVİLİ ve pydantic-core ELDEKİ wheel'den. İkisi
+                // birbirine sıkı bağlı; serbest bırakılan bir pydantic bir gün
+                // wheel'imizle eşleşmeyen bir core ister ve bu ancak TELEFONDA
+                // görülürdü (bkz. android/pins.properties).
+                install "pydantic==${civiler.pydanticVersion}"
+                install pydanticCoreWheel.absolutePath
+            }
+        }
+    }
+
+    sourceSets {
+        main {
+            // Python kaynakları repo KÖKÜNDEN okunuyor — kopya yok, tek kaynak.
+            python {
+                srcDirs = ["../.."]
+                // Yalnız KÖK düzeyindeki .py dosyaları. Bu desen `tests/`,
+                // `tools/`, `docs/`, `.venv/` ve `android/` altındaki her şeyi
+                // kendiliğinden dışarıda bırakıyor — büyüyen bir `exclude`
+                // listesi tutmaktan sağlam, çünkü yeni bir dizin eklendiğinde
+                // kimsenin bir şeyi hatırlaması gerekmiyor.
+                //
+                // desktop.py ve screencolor.py BİLEREK İÇERDE: android_main
+                // `desktop.start_server`'ı yeniden kullanıyor ve desktop.py
+                // modül düzeyinde screencolor'ı import ediyor. İkisi de AppKit /
+                // pywebview'a modül düzeyinde DOKUNMUYOR (o import'lar
+                // fonksiyon içinde), yani Android'de sorunsuz yükleniyorlar.
+                include "*.py"
+            }
+
+            // static/ ve bundled/ APK assets'ine `resources/` altında giriyor;
+            // ilk açılışta oradan filesDir'e KOPYALANIYOR (bkz. PythonServer).
+            // Neden kopya: app.py hem StaticFiles(directory=…) hem FileResponse
+            // ile gerçek bir dosya yolu istiyor, Android'in asset yöneticisi ise
+            // yalnız akış veriyor.
+            // `asFile` AÇIKÇA: dize interpolasyonu `Directory.toString()`'e
+            // güvenirdi ve o sözleşmenin parçası değil.
+            assets.srcDirs += [layout.buildDirectory.dir("gis-resources").get().asFile]
+        }
+    }
+
+    signingConfigs {
+        release {
+            // Değerler ortamdan okunuyor: keystore ve parolalar repoya HİÇ
+            // girmiyor (CI'da GitHub Secret, yerelde kabuk değişkeni).
+            // Tanımsızlarsa blok boş kalır ve aşağıdaki buildType imzasız
+            // derler — yerelde `assembleDebug` çalışmaya devam etsin diye.
+            if (System.getenv("ANDROID_KEYSTORE_PATH")) {
+                storeFile file(System.getenv("ANDROID_KEYSTORE_PATH"))
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // minify KAPALI. R8 Chaquopy'nin yansıma (reflection) ile bulduğu
+            // sınıfları budayabiliyor ve sonuç ancak cihazda, açılışta
+            // ClassNotFoundException olarak görünürdü. Kazanç (birkaç yüz KB)
+            // 45–70 MB'lık bir pakette ölçülemez.
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"),
+                    "proguard-rules.pro"
+            if (System.getenv("ANDROID_KEYSTORE_PATH")) {
+                signingConfig signingConfigs.release
+            }
+        }
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    buildFeatures {
+        buildConfig true
+        viewBinding false
+    }
+
+    // Paket adı APK dosya adında görünsün: doğrulama adımları ve kullanıcıya
+    // gönderilen dosya aynı adı taşısın.
+    applicationVariants.configureEach { variant ->
+        variant.outputs.configureEach { output ->
+            output.outputFileName = "gpt-image-studio-android-arm64-${variant.buildType.name}.apk"
+        }
+    }
+}
+
+// static/ ve bundled/ dizinlerini assets'e sahneleyen görev. Kopyalama Gradle
+// tarafında yapılıyor ki APK'nın içindeki yerleşim (resources/static,
+// resources/bundled) paths.py'nin beklediğiyle BİREBİR aynı olsun.
+def kaynakSahneleme = tasks.register("gisKaynaklariSahnele", Copy) {
+    into layout.buildDirectory.dir("gis-resources")
+    into("resources/static") { from("../../static") }
+    into("resources/bundled") { from("../../bundled") }
+}
+
+tasks.named("preBuild").configure { dependsOn(kaynakSahneleme) }
+
+dependencies {
+    implementation "androidx.core:core-ktx:1.13.1"
+    implementation "androidx.appcompat:appcompat:1.7.0"
+    implementation "androidx.activity:activity-ktx:1.9.3"
+    implementation "androidx.webkit:webkit:1.12.1"
+}

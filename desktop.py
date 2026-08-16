@@ -35,9 +35,19 @@ _JOIN_TIMEOUT = 5.0  # saniye — kapanışta uvicorn thread'inin ölmesini bekl
 
 
 def start_server(fastapi_app: FastAPI, host: str = "127.0.0.1",
-                 timeout: float = 15.0) -> tuple[uvicorn.Server, threading.Thread, int]:
-    """Sunucuyu boş bir portta daemon thread'de başlatır; (sunucu, thread, port) döner."""
-    config = uvicorn.Config(fastapi_app, host=host, port=0, log_level="warning")
+                 timeout: float = 15.0, *, loop: str = "auto",
+                 http: str = "auto") -> tuple[uvicorn.Server, threading.Thread, int]:
+    """Sunucuyu boş bir portta daemon thread'de başlatır; (sunucu, thread, port) döner.
+
+    `loop`/`http` uvicorn'un kendi varsayılanlarıyla ("auto") aynı — yani bu iki
+    parametre masaüstü davranışını HİÇ değiştirmiyor. Android girişi (bkz.
+    android_main) bunları "asyncio"/"h11" olarak AÇIKÇA veriyor: Chaquopy'de
+    uvloop ve httptools kurulu değil ve "auto" onları önce import etmeye
+    çalışıp ImportError'a düşerek her açılışta gereksiz iş yapıyor. Seçimi
+    çağıran tarafa bırakmak, bu bilgiyi desktop.py'ye gömmekten temiz.
+    """
+    config = uvicorn.Config(fastapi_app, host=host, port=0, log_level="warning",
+                            loop=loop, http=http)
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, daemon=True, name="uvicorn")
 

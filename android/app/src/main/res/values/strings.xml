@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GPT-Image Studio</string>
+
+    <!-- Açılış ekranı. Chaquopy ilk çalıştırmada Python stdlib'ini açıyor
+         (2–5 sn) ve assets kopyalanıyor; bu metin olmadan kullanıcı boş siyah
+         bir ekrana bakıp uygulamanın donduğunu sanardı. -->
+    <string name="baslatiliyor">Başlatılıyor…</string>
+    <string name="ilk_acilis_uyarisi">İlk açılış birkaç saniye sürebilir.</string>
+
+    <!-- Foreground service bildirimi -->
+    <string name="bildirim_kanali_adi">Görsel üretimi</string>
+    <string name="bildirim_kanali_aciklama">Üretim sürerken uygulamanın arka planda çalışmasını sağlar.</string>
+    <string name="bildirim_basligi">GPT-Image Studio çalışıyor</string>
+    <string name="bildirim_metni">Üretim sürerken uygulamadan çıksanız da işlem tamamlanır.</string>
+
+    <!-- Hatalar -->
+    <string name="sunucu_baslatilamadi">Uygulama başlatılamadı</string>
+    <string name="sunucu_baslatilamadi_detay">Hata kaydı: %1$s — lütfen bu dosyayı Kurum\'ya iletin.</string>
+    <string name="tamam">Tamam</string>
+    <string name="cikis">Çık</string>
+
+    <!-- İndirme -->
+    <string name="indiriliyor">İndiriliyor: %1$s</string>
+    <string name="indirildi">Kaydedildi: %1$s</string>
+    <string name="indirilemedi">İndirilemedi: %1$s</string>
+    <string name="depolama_izni_gerekli">Kaydetmek için depolama izni gerekiyor.</string>
+</resources>

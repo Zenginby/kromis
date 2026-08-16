@@ -1,4 +1,4 @@
-# GPT-Image Studio — Güncelleme (macOS ve Windows)
+# GPT-Image Studio — Güncelleme (macOS, Windows ve Android)
 
 Kurum sana yeni bir `.zip` gönderdiğinde bu sayfayı izle. 3 dakika sürer.
 İlk kurulum için değil, **elindeki uygulamayı yenisiyle değiştirmek** için.
@@ -8,6 +8,11 @@ Kurum sana yeni bir `.zip` gönderdiğinde bu sayfayı izle. 3 dakika sürer.
 |---|---|
 | macOS (Apple Silicon) | `gpt-image-studio-macOS-arm64.zip` |
 | Windows 10/11 (64-bit) | `gpt-image-studio-windows-x64.zip` |
+| Android 8.0+ (arm64) | `gpt-image-studio-android-arm64.apk` |
+
+**Telefondaysan** 1.–3. adımları atla, doğrudan
+[Android'i güncelleme](#androidi-güncelleme) bölümüne git. 4. ve 5. adımlar
+(doğrulama, kontrol) üç sistemde de aynıdır.
 
 **Hangi bölümü okuyacaksın:** 2. ve 3. adımların işletim sistemine göre iki dalı
 var — kendi dalını oku, ötekini atla. 1., 4. ve 5. adımlar iki sistemde aynıdır.
@@ -24,6 +29,7 @@ var — kendi dalını oku, ötekini atla. 1., 4. ve 5. adımlar iki sistemde ay
 >    |---|---|
 >    | macOS | `~/Library/Application Support/GPT-Image Studio/` |
 >    | Windows | `%LOCALAPPDATA%\GPT-Image Studio\` |
+>    | Android | Uygulamanın kendi klasörü — **uygulamayı KALDIRMA**, üzerine kur |
 >
 > 2. **(Yalnız macOS) Güvenlik uyarısında "Çöp Sepetine Taşı"ya ve Enter'a
 >    BASMA** (aşağıda 3. adım). O düğme mavi/varsayılan olduğu için Enter
@@ -102,6 +108,25 @@ açılışta yeniden soruyor. Kurulumdaki adımların aynısı.
    karantinaya almaz. **Çalıştırma** yalnızca pencereyi kapatır, Enter'a basmak
    da güvenli — en kötüsü açılışı iptal eder.
 
+## Android'i güncelleme
+
+**Uygulamayı KALDIRMA.** Yeni APK'yı doğrudan eskisinin üzerine kur:
+
+1. Yeni `gpt-image-studio-android-arm64.apk` dosyasını telefona indir.
+2. Dosyaya dokun → **Yükle**. Android *"Bu uygulamanın yeni bir sürümünü
+   yüklemek ister misiniz?"* diye sorar → **Yükle**.
+3. İlk açılış yine **2–5 saniye** sürer: uygulama yeni sürümün arayüz
+   dosyalarını telefonun içine yeniden açıyor. Bu normal ve yalnız
+   güncellemeden sonraki ilk açılışta olur.
+
+**Neden kaldırmamalısın:** Android bir uygulamayı kaldırdığında onun veri
+klasörünü de siler — ürettiğin bütün görseller, klasörler, paletler ve Azure
+anahtarın orada. Üzerine kurmak (aynı imzayla imzalandığı için sorunsuz
+çalışır) verine hiç dokunmaz.
+
+*"Uygulama yüklenmedi"* diyorsa çoğunlukla dosya yarım inmiştir: APK'yı sil,
+yeniden indir. Sürerse Kurum'ya yaz — **kaldırıp yeniden kurma**, önce sor.
+
 ## 4. Güncellendiğini doğrula
 
 Sağ üstteki **⚙ (dişli)** düğmesine bas — pencerenin altında **Sürüm** yazıyor.
@@ -117,6 +142,40 @@ de bu numarayı söyle.
 
 Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya yaz
 (aşağıdaki yedek işine yarayabilir).
+
+---
+
+## Sürüm 0.4.0'da ne değişti
+
+**Manşet: Android sürümü geldi.** Uygulama artık telefonda da çalışıyor —
+Android 8.0+ ve 64-bit (arm64) cihazlar için. Play Store'da değil; APK'yı
+doğrudan kuruyorsun (kurulum adımları: [KURULUM.md](KURULUM.md) →
+*Android (sideload)*).
+
+Telefondaki sürüm **eksiksiz**: üretim, düzenleme, Prompt Yönetmeni, palet
+motoru, klasörler ve logo/banner bindirmesinin hepsi telefonun kendi içinde
+koşuyor. Bilgisayara ya da ayrı bir sunucuya bağlanmıyor; internet yalnızca
+Azure çağrıları için gerekli.
+
+**Masaüstünde de göreceğin değişiklikler:**
+
+- **Arayüz artık dar pencerelerde de kullanılabiliyor.** Pencereyi
+  daralttığında sol ray alta iner, paneller tam ekrana geçer. Geniş pencerede
+  hiçbir şey değişmedi.
+- **Yeni "Taşı…" düğmesi.** Seçim modunda (Medya → *Seç*) görselleri klasöre
+  taşımanın sürükle-bırak dışında bir yolu daha var. Sürükle-bırak duruyor;
+  bu, klavyeyle ve dokunmatikle de çalışan ikinci yol.
+
+**Telefonda masaüstünden farklı iki davranış** (ikisi de bilerek):
+
+- **Enter satır atlar, göndermez** — göndermek için **Üret** düğmesi. Telefon
+  klavyesinde Shift+Enter'a basmak pratikte mümkün değil; kural aynı kalsaydı
+  çok satırlı bir prompt hiç yazılamazdı.
+- **Sürükle-bırak yok** — dokunmatik ekranda hiç çalışmıyor. Yerine *Seç* →
+  *Taşı…*, içe aktarma için *Yükle*.
+
+**Damlalık (ekrandan renk seçme) telefonda yok:** Android'de karşılığı olan bir
+sistem servisi bulunmuyor, düğme orada hiç görünmüyor. Masaüstünde aynen duruyor.
 
 ---
 

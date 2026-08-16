@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Arka katman DÜZ RENK olmak zorunda değil ama olması iyi: uyarlanabilir
+         simgenin arka katmanı cihaz tarafından kaydırılıp ölçekleniyor ve
+         desenli bir katman o hareket sırasında titriyor. Değer
+         flow-tokens.css'teki surface tokenıyla aynı. -->
+    <color name="ic_launcher_background">#141415</color>
+</resources>

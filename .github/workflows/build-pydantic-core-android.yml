@@ -1,0 +1,193 @@
+# pydantic-core'un Android (arm64-v8a) wheel'ini üretir — Faz 0 / Yol A.
+#
+# NEDEN AYRI BİR WORKFLOW: bu iş her APK derlemesinde koşmamalı. Çıktısı bir
+# İKİLİ VARLIK (android/wheels/*.whl) ve repoya elle işleniyor; pydantic sürümü
+# değişmedikçe yeniden üretmeye gerek yok. Rust cross-compile'ı APK işine
+# gömülseydi her derleme 10+ dakika uzar ve Android SDK/NDK + Rust toolchain
+# zincirinin her kırılması APK'yı da kırardı.
+#
+# NEDEN HİÇ OLMASI GEREKTİĞİ: pydantic-core Rust'la yazılmış tek native
+# bağımlılığımız ve PyPI'de Android wheel'i YOK, Chaquopy deposunda da yok.
+# Chaquopy 17 sdist kurmuyor (`--only-binary` zorunlu), yani bu wheel olmadan
+# `import pydantic` cihazda hiç çalışmaz — FastAPI'nin tamamı buna bağlı.
+# Gerekçenin tamamı ve reddedilen alternatif: docs/android/pydantic-karari.md
+name: pydantic-core Android wheel
+
+on:
+  # YALNIZ elle. Bu workflow repoya işlenecek bir ikili üretiyor; push/tag
+  # üzerine kendiliğinden koşması yalnızca runner dakikası harcardı.
+  workflow_dispatch:
+    inputs:
+      pydantic_core_version:
+        description: 'pydantic-core sürümü (boş bırakılırsa android/pins.properties okunur)'
+        required: false
+        default: ''
+      python_version:
+        description: 'Chaquopy çalışma zamanı Python sürümü (boş → pins.properties)'
+        required: false
+        default: ''
+      android_api:
+        description: 'Wheel etiketindeki API seviyesi (boş → pins.properties)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  build-wheel:
+    name: pydantic-core → android_arm64_v8a
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Girdiler boşsa çivi dosyası kazanır: workflow'u elle tetikleyen kişi
+      # sürümü ikinci bir yere yazmak zorunda kalmasın. pins.properties zaten
+      # build.gradle'ın da okuduğu dosya, yani üretilen wheel ile onu KURACAK
+      # yapılandırma tek kaynaktan besleniyor.
+      - name: Çivileri çöz (girdi > pins.properties)
+        id: pin
+        run: |
+          set -euo pipefail
+          oku() { grep -E "^$1=" android/pins.properties | cut -d= -f2- | tr -d '[:space:]'; }
+          CORE="${{ inputs.pydantic_core_version }}"
+          PY="${{ inputs.python_version }}"
+          API="${{ inputs.android_api }}"
+          [ -n "$CORE" ] || CORE="$(oku pydanticCoreVersion)"
+          [ -n "$PY" ]   || PY="$(oku pythonVersion)"
+          [ -n "$API" ]  || API="$(oku wheelAndroidApi)"
+          for d in "$CORE" "$PY" "$API"; do
+            test -n "$d" || { echo "HATA: çivi çözülemedi (CORE=$CORE PY=$PY API=$API)"; exit 1; }
+          done
+          # cp313 gibi bir etiket: cibuildwheel'in CIBW_BUILD deseni bunu ister.
+          CP="cp$(echo "$PY" | tr -d '.')"
+          echo "core=$CORE"  >> "$GITHUB_OUTPUT"
+          echo "python=$PY"  >> "$GITHUB_OUTPUT"
+          echo "api=$API"    >> "$GITHUB_OUTPUT"
+          echo "cp=$CP"      >> "$GITHUB_OUTPUT"
+          echo "pydantic-core=$CORE, python=$PY ($CP), android API=$API"
+
+      - name: Set up Python (cibuildwheel sürücüsü)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # NDK ŞART: pydantic-core Rust ve `aarch64-linux-android` hedefi linker
+      # olarak NDK'nın clang'ını kullanıyor. `ndk-version` AÇIKÇA yazılıyor —
+      # runner imajındaki varsayılan NDK bir gün değişirse sessizce başka bir
+      # libc sürümüne bağlanmış bir wheel üretilirdi.
+      - name: Android SDK + NDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35 ndk;27.0.12077973'
+
+      - name: NDK yolunu doğrula
+        id: ndk
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/27.0.12077973"
+          test -d "$NDK" || { echo "HATA: NDK bulunamadı: $NDK"; ls -la "$ANDROID_HOME/ndk" || true; exit 1; }
+          echo "ANDROID_NDK_ROOT=$NDK" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
+          echo "NDK: $NDK"
+
+      # Rust hedefi cibuildwheel'den ÖNCE ekleniyor: maturin hedefi kendisi
+      # kurmuyor, yoksa derleme "target may not be installed" ile düşer.
+      - name: Rust + aarch64-linux-android hedefi
+        run: |
+          set -euo pipefail
+          rustup update stable
+          rustup default stable
+          rustup target add aarch64-linux-android
+          rustc -vV
+
+      - name: cibuildwheel
+        run: python -m pip install --upgrade "cibuildwheel>=3.1"
+
+      # Kaynak olarak sdist: pydantic-core'un git deposunu klonlamak yerine
+      # PyPI'deki sdist alınıyor. Gerekçe: kurulacak sürüm ile derlenen sürüm
+      # AYNI paket dosyasından gelsin — git tag'i ile PyPI yayını teoride
+      # ayrışabilir ve bu ayrışma yalnız cihazda görünürdü.
+      - name: pydantic-core sdist'ini indir ve aç
+        run: |
+          set -euo pipefail
+          mkdir -p kaynak
+          pip download --no-binary :all: --no-deps --no-build-isolation \
+            "pydantic-core==${{ steps.pin.outputs.core }}" -d kaynak
+          ls -l kaynak
+          tar -xzf "kaynak/pydantic_core-${{ steps.pin.outputs.core }}.tar.gz" -C kaynak
+          test -d "kaynak/pydantic_core-${{ steps.pin.outputs.core }}" \
+            || { echo "HATA: sdist beklenen dizine açılmadı"; ls -R kaynak | head -40; exit 1; }
+
+      - name: Wheel'i derle (cibuildwheel, android/arm64_v8a)
+        env:
+          CIBW_PLATFORM: android
+          CIBW_BUILD: '${{ steps.pin.outputs.cp }}-*'
+          CIBW_ARCHS: arm64_v8a
+          # Wheel etiketindeki API seviyesi = minSdk. Daha yükseğe kurulan bir
+          # wheel pip tarafından cihazda "uyumsuz" sayılırdı (bkz. pins.properties).
+          ANDROID_API_LEVEL: '${{ steps.pin.outputs.api }}'
+          # Android'de test koşturmak emülatör ister; bu iş yalnızca DERLİYOR.
+          # Gerçek doğrulama APK işinde `import pydantic` ile yapılıyor.
+          CIBW_TEST_COMMAND: ''
+        run: |
+          set -euo pipefail
+          python -m cibuildwheel --output-dir cikti \
+            "kaynak/pydantic_core-${{ steps.pin.outputs.core }}"
+
+      # "Yeşil ama boş" kapısı — release.yml'de bu dersin bedeli ödendi:
+      # yeşil bir koşu tek başına kanıt değil. Aşağıdaki her satır bir yanılgıyı
+      # kapatıyor: dosya var mı, boş değil mi, ETİKETİ doğru mu, API seviyesi
+      # minSdk'yı aşmıyor mu, içinde gerçekten arm64 bir .so var mı.
+      - name: Wheel'i doğrula (dosya, etiket, API, .so)
+        run: |
+          set -euo pipefail
+          CP="${{ steps.pin.outputs.cp }}"
+          API="${{ steps.pin.outputs.api }}"
+          shopt -s nullglob
+          WHEELS=(cikti/*.whl)
+          test "${#WHEELS[@]}" -eq 1 \
+            || { echo "HATA: tam 1 wheel bekleniyordu, ${#WHEELS[@]} bulundu"; ls -l cikti || true; exit 1; }
+          W="${WHEELS[0]}"
+          test -s "$W" || { echo "HATA: wheel boş: $W"; exit 1; }
+          AD="$(basename "$W")"
+          echo "wheel: $AD ($(du -h "$W" | cut -f1))"
+
+          case "$AD" in
+            pydantic_core-${{ steps.pin.outputs.core }}-$CP-$CP-android_*_arm64_v8a.whl) ;;
+            *) echo "HATA: beklenmeyen wheel etiketi: $AD"; exit 1 ;;
+          esac
+
+          # Etiketteki API sayısını çek ve minSdk ile karşılaştır.
+          ETIKET_API="$(echo "$AD" | sed -E 's/.*-android_([0-9]+)_arm64_v8a\.whl/\1/')"
+          echo "etiket API: $ETIKET_API (minSdk: $API)"
+          test "$ETIKET_API" -le "$API" \
+            || { echo "HATA: wheel API $ETIKET_API > minSdk $API — pip cihazda bu wheel'i kurmaz"; exit 1; }
+
+          # Wheel gerçekten bir arm64 paylaşımlı kitaplık taşıyor mu? Etiket
+          # doğru ama içi boş bir wheel de bu noktaya kadar gelirdi.
+          python - "$W" <<'PY'
+          import sys, zipfile
+          w = zipfile.ZipFile(sys.argv[1])
+          sos = [n for n in w.namelist() if n.endswith(".so")]
+          if not sos:
+              print("HATA: wheel içinde hiç .so yok:", w.namelist()[:20]); raise SystemExit(1)
+          print("paylaşımlı kitaplıklar:", sos)
+          PY
+
+      - name: Wheel'i yükle (repoya elle işlenecek)
+        uses: actions/upload-artifact@v4
+        with:
+          name: pydantic-core-android-arm64
+          path: cikti/*.whl
+          # release.yml'deki aynı kapı: bu bayrak olmadan eşleşen dosya
+          # bulunmadığında adım yalnız UYARI basar ve iş yeşil kalır.
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Sonraki adım
+        run: |
+          echo "Varlığı indir, android/wheels/ altına koy ve commit'le."
+          echo "android/app/build.gradle bu dosyayı adıyla kuruyor — ad değişirse orayı da güncelle."

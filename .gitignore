@@ -28,3 +28,22 @@ graphify-out/
 # Tasarım aracı artıkları (oturuma özel, proje içeriği değil)
 .impeccable/
 .playwright-mcp/
+
+# ── Android ──────────────────────────────────────────────────────────
+# `android/` dizininin KENDİSİ kaynak ve izleniyor; burada yalnız Gradle'ın
+# ürettiği çıktılar ve makineye özel dosyalar var.
+#
+# DİKKAT — `android/wheels/*.whl` BİLEREK dışarıda BIRAKILMADI: pydantic-core
+# wheel'ini biz derleyip repoya işliyoruz (bkz. docs/android/pydantic-karari.md).
+# O dosya bir derleme çıktısı değil, Chaquopy'nin kurabildiği TEK kaynak.
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
+android/.cxx/
+*.apk
+*.aab
+# İmzalama anahtarı repoya ASLA girmemeli: APK'nın kimliğini o dosya taşıyor
+# ve sızması, bizim adımıza imzalanmış sahte bir paket üretilmesi demek.
+*.keystore
+*.jks

@@ -1,4 +1,4 @@
-# GPT-Image Studio — Kurulum (macOS ve Windows)
+# GPT-Image Studio — Kurulum (macOS, Windows ve Android)
 
 Bilgisayarına Python veya başka bir şey kurman gerekmiyor. 5 dakika sürer.
 
@@ -10,6 +10,11 @@ Prompt Yönetmeni) iki sistemde aynıdır.
 |---|---|
 | macOS (Apple Silicon) | `gpt-image-studio-macOS-arm64.zip` |
 | Windows 10/11 (64-bit) | `gpt-image-studio-windows-x64.zip` |
+| Android 8.0+ (arm64) | `gpt-image-studio-android-arm64.apk` |
+
+**Telefona kuruyorsan** aşağıdaki 1. ve 2. adımları atla, doğrudan
+[Android (sideload)](#android-sideload) bölümüne git — 3., 4. ve 5. adımlar
+(Azure kimliği, Prompt Yönetmeni, kullanım) üç sistemde de aynıdır.
 
 Not: Bu belge, sana ulaşan `.zip`'in kendi sistemin için ayrıca (GitHub
 Actions'ın arm64 / windows runner'ında) üretildiğini varsayar — geliştirme
@@ -159,6 +164,7 @@ kapatıp açsan da geçmişin durur.
 |---|---|
 | macOS | `~/Library/Application Support/GPT-Image Studio/output/` |
 | Windows | `%LOCALAPPDATA%\GPT-Image Studio\output\` — yani `C:\Users\<kullanıcı adın>\AppData\Local\GPT-Image Studio\output\` |
+| Android | Uygulamanın kendi özel klasörü (dosya yöneticisinden görünmez). Telefona indirdiklerin ise `Resimler/GPT-Image Studio/` altında. |
 
 Windows'ta klasörü hızlı açmak için Dosya Gezgini'nin adres çubuğuna
 `%LOCALAPPDATA%\GPT-Image Studio` yazıp Enter'a basabilirsin. (Bu klasör
@@ -167,6 +173,79 @@ kurumsal profille birlikte ağ üzerinden taşınmaya çalışırdı.)
 
 Hangi sürümü kullandığını **⚙ Ayarlar** penceresinin altındaki **Sürüm**
 satırından görebilirsin.
+
+---
+
+## Android (sideload)
+
+Android sürümü **Play Store'da değil**: APK'yı doğrudan kuruyorsun. Uygulama
+telefonda tam olarak çalışıyor — üretim, düzenleme, palet ve logo bindirme
+işlemlerinin hepsi telefonun kendi içinde koşuyor. Bilgisayarına ya da ayrı bir
+sunucuya bağlanmıyor; internet yalnızca Azure çağrıları için gerekli.
+
+**Gereken:** Android 8.0 veya üstü, 64-bit (arm64) telefon — 2017 sonrası
+neredeyse her telefon. Yaklaşık **300 MB** boş alan (APK ~50–70 MB, kurulduktan
+sonra açılan Python çalışma zamanı ve ürettiğin görseller için pay).
+
+### A1. APK'yı indir
+Telefonun tarayıcısından `gpt-image-studio-android-arm64.apk` dosyasını indir.
+Tarayıcı *"Bu dosya türü cihazına zarar verebilir"* diye sorabilir → **Yine de
+indir**. (Bu uyarı her APK için çıkar, dosyayla ilgili bir şey söylemiyor.)
+
+### A2. Bilinmeyen kaynaklara izin ver — bir kerelik
+İndirilen dosyaya dokun. Android *"Bu kaynaktan uygulama yüklenemiyor"* diyecek.
+
+1. Çıkan uyarıda **Ayarlar**'a dokun.
+2. **Bu kaynaktan yükle** (ya da "Bilinmeyen uygulamalara izin ver") anahtarını aç.
+3. Geri dön ve **Yükle**'ye dokun.
+
+> İzin, dosyayı indirdiğin uygulamaya (Chrome, Dosyalar…) veriliyor — telefonun
+> tamamına değil. Kurulum bitince istersen aynı yerden kapatabilirsin.
+
+Google Play Protect *"Bilinmeyen bir uygulama gönderildi"* diye sorarsa
+**Yine de yükle** de. Paket bizim kendi anahtarımızla imzalı; Play Protect
+yalnızca Play Store dışından geldiğini söylüyor.
+
+### A3. İlk açılış — biraz bekle
+İlk açılışta ekranda **"Başlatılıyor…"** yazar ve **2–5 saniye** sürer:
+uygulama Python çalışma zamanını telefonun içine açıyor. Bu yalnız ilk açılışta
+(ve her güncellemeden sonra bir kez) olur; sonraki açılışlar hızlıdır.
+
+Uygulama açılınca kalıcı bir bildirim görürsün: *"GPT-Image Studio çalışıyor"*.
+Bu bildirim **gerekli, kapatma**: sayesinde uzun süren bir üretim sırasında
+uygulamadan çıksan bile Android işlemi öldürmez ve ücretli istek boşa gitmez.
+
+Android 13+ ise bildirim izni sorulur → **İzin ver**. Vermezsen uygulama yine
+çalışır, yalnız bildirim görünmez.
+
+### A4. Sonra
+3. adımdan (Azure kimliğini gir) devam et — arayüz telefonda da aynı.
+
+Telefona özgü iki fark:
+
+- **Enter satır atlar, göndermez.** Prompt'u yazdıktan sonra **Üret** düğmesine
+  dokun. (Masaüstünde Enter gönderir; telefonda öyle olsaydı çok satırlı bir
+  prompt hiç yazılamazdı.)
+- **Görselleri klasöre taşımak için "Seç" → "Taşı…"** kullan. Masaüstündeki
+  sürükle-bırak dokunmatik ekranda çalışmıyor.
+
+### A5. İndirdiklerin nereye gidiyor
+- Görseller (PNG): **Resimler → GPT-Image Studio**
+- Klasör ZIP'leri: **İndirilenler → GPT-Image Studio**
+
+### Android'de sorun çıkarsa
+- **"Uygulama yüklenmedi" / "Paket geçersiz":** dosya yarım inmiş olabilir —
+  APK'yı sil ve yeniden indir.
+- **"Uygulamanız bu cihazla uyumlu değil":** telefon 32-bit ya da Android 8'in
+  altında. Bu pakete uygun değil, Kurum'ya yaz.
+- **Ekranda sürekli "Başlatılıyor…" yazıyor:** uygulamayı tamamen kapat
+  (son uygulamalardan kaydır) ve yeniden aç. Sürerse Kurum'ya yaz.
+- **"Üret" kilitli:** Ayarlar (dişli) → endpoint + key girilmiş mi? (3. adım)
+- **İndirdiğim görseli galeride bulamıyorum:** Galeri uygulaması yeni klasörü
+  görmek için biraz gecikebilir; Dosyalar uygulamasından
+  `Resimler/GPT-Image Studio` klasörüne bak.
+
+---
 
 ## Sonra: yeni sürüm gelirse
 Kurum yeni bir `.zip` gönderdiğinde [GUNCELLEME.md](GUNCELLEME.md) sayfasını izle.
@@ -177,6 +256,9 @@ Kurum yeni bir `.zip` gönderdiğinde [GUNCELLEME.md](GUNCELLEME.md) sayfasını
   klasörünün **yerine** koy (Windows "Hedefteki dosyaları değiştir" diye sorar,
   onayla) → SmartScreen izni bir kez daha gerekebilir.
   `AppData\Local\GPT-Image Studio` klasörünü SİLME.
+- **Android:** yeni APK'yı indir ve üzerine kur — **uygulamayı SİLME.**
+  Android eskisinin üzerine yazar ve verin (görseller, klasörler, Azure anahtarı)
+  yerinde kalır. Uygulamayı kaldırıp yeniden kurarsan hepsi silinir.
 
 İki sistemde de **verin kaybolmaz** ve Azure anahtarını yeniden girmen gerekmez:
 görseller ve ayarlar uygulama klasörünün DIŞINDA duruyor (yerleri için 3. ve 5.

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Arayüz koyu ve TEK temalı (web tarafında açık tema yok), bu yüzden
+         native kabuk da DayNight değil, doğrudan koyu. Bir `values-night`
+         varyantı eklemek WebView'in içeriğiyle çelişen bir çerçeve üretirdi.
+
+         windowLightStatusBar=false: durum çubuğu simgeleri açık renk kalsın,
+         siyah zeminde görünür olsunlar. -->
+    <style name="Theme.Studio" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/gis_bg</item>
+        <item name="android:statusBarColor">@color/gis_bg</item>
+        <item name="android:navigationBarColor">@color/gis_bg</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="23">false</item>
+        <item name="android:colorBackground">@color/gis_bg</item>
+        <item name="android:textColorPrimary">@color/gis_fg</item>
+    </style>
+</resources>

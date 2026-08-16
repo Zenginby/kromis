@@ -1,0 +1,25 @@
+// Android projesi repo KÖKÜNDEN ayrı bir Gradle derlemesi: `android/` dizininde
+// duruyor ve mevcut hiçbir dosyayı taşımıyor. Python kaynakları oraya
+// KOPYALANMIYOR, `sourceSets` ile repo kökü doğrudan gösteriliyor (bkz.
+// app/build.gradle) — tek kaynak korunuyor.
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        google()
+        mavenCentral()
+        // Chaquopy Maven Central'da DEĞİL, kendi deposunda yayınlanıyor.
+        maven { url = "https://chaquo.com/maven" }
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = "https://chaquo.com/maven" }
+    }
+}
+
+rootProject.name = "gpt-image-studio-android"
+include ":app"

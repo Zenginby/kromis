@@ -35,10 +35,33 @@ import os
 import pytest
 
 import backup as backup_module
+import paths as paths_module
 import seed as seed_module
 
 _UNGUARDED_FILENAME = "test_seed.py"
 _UNGUARDED_BACKUP_FILENAME = "test_backup.py"
+
+
+@pytest.fixture(autouse=True)
+def _guard_against_leaking_android_env():
+    """Android dalını açan ortam değişkenleri testler arasında SIZMASIN.
+
+    Üçüncü guard, aynı sınıf bir tehdide karşı: `paths.py`'nin Android dalı
+    `GIS_ANDROID_DATA_DIR` ortam değişkenine bakıyor ve o değişken KÜRESEL —
+    `monkeypatch` yalnız KENDİ yazdığı değerleri geri alıyor. Ortam değişkenine
+    doğrudan yazan bir üretim fonksiyonu (`android_main._prepare_environment`,
+    Kotlin'in yaptığı işi taklit ederken) değeri geride bırakırsa, o noktadan
+    SONRAKİ her test `paths.data_dir()`'i repo kökü yerine sahte bir Android
+    dizini sanır.
+
+    Bu teorik değil, ölçüldü: guard yazılmadan önce tek bir sızıntı
+    test_chat_prompt / test_logo / test_paths'te 27 testi birden düşürdü —
+    üstelik hata mesajları kaynağa hiç işaret etmiyordu. Guard, teşhisi zor bu
+    kırılma sınıfını tümden kapatıyor.
+    """
+    yield
+    for ad in (paths_module.ANDROID_DATA_ENV, paths_module.ANDROID_RESOURCE_ENV):
+        os.environ.pop(ad, None)
 
 
 @pytest.fixture(autouse=True)

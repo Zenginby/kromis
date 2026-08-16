@@ -197,7 +197,23 @@ function submitComposer() {
 
 $("go").addEventListener("click", submitComposer);
 
+// Dokunmatik girdi: hover'ı VE ince imleci olmayan cihaz. İki koşul birlikte
+// aranıyor — tek başına `hover: none` bazı televizyon tarayıcılarında da
+// doğru, `pointer: coarse` ise dokunmatik ekranlı bir dizüstüde fare
+// takılıyken de doğru kalabiliyor.
+const IS_TOUCH = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
 $("prompt").addEventListener("keydown", (e) => {
+  // DOKUNMATİKTE Enter GÖNDERMEZ, satır atlar.
+  //
+  // Masaüstünde "Enter = gönder" doğru kısayol. Telefonda ise sanal klavyenin
+  // Enter tuşu SATIR ATLAMANIN TEK YOLU: Shift+Enter'ı Android klavyesinde
+  // basmak pratikte mümkün değil. Kural aynı bırakılsaydı çok satırlı bir
+  // prompt telefonda hiç yazılamaz, her satır denemesi yarım bir üretim
+  // isteği gönderirdi — üstelik üretim ÜCRETLİ. Gönderme yolu #go düğmesi
+  // (composer'da, her zaman görünür).
+  if (IS_TOUCH && !e.metaKey && !e.ctrlKey) return;
+
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
     submitComposer();

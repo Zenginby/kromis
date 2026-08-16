@@ -1,0 +1,268 @@
+# Android (arm64-v8a) APK'sını derler, imzalar ve doğrular.
+#
+# NEDEN release.yml'e EKLENMEDİ de ayrı bir dosya: release.yml'in üç işi de
+# PyInstaller dünyasında (aynı spec, aynı requirements). Android işi başka bir
+# araç zinciri (Gradle + Chaquopy + NDK), başka bir bağımlılık kümesi ve başka
+# bir imzalama yolu kullanıyor. Yine de yayına ORADAN giriyor: aşağıdaki
+# `publish` kancası, tag'de release.yml'in oluşturduğu yayına APK'yı ekliyor.
+#
+# NEDEN BU KADAR SERT DOĞRULAMA: release.yml'de öğrenilen dersin aynısı —
+# 2026-08-11'de "CI Windows paketi üretti" sanıldı, koşu YEŞİLDİ ama çıktı
+# BOŞTU. Aşağıdaki her kapı o yanılgının bir yolunu kapatıyor: APK dosyası var
+# mı, sürümü version.py ile aynı mı, İÇİNDE beklenen dosyalar var mı, Python
+# çalışma zamanı gerçekten gömülmüş mü, imza geçerli mi.
+name: Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  # Elle tetikleme: tag'e bağlı bir işin ilk gerçek koşumunu tag'le denemek
+  # geri dönüşsüz (release.yml'deki Windows işinin gerekçesiyle birebir aynı).
+  # Dispatch'te yalnız derleme + doğrulama koşar, yayın oluşmaz.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # Masaüstü takımının aynısı: Android işine geçmeden ÖNCE 1200+ test yeşil
+  # olmalı. Python kodunun tamamı APK'nın içine giriyor, yani bir regresyon
+  # doğrudan telefona gider.
+  test:
+    name: Pytest takımı
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: Bağımlılıklar
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Pytest
+        run: pytest tests/ -v
+
+  build-android:
+    needs: test
+    name: Android arm64-v8a APK
+    runs-on: ubuntu-latest
+    # Chaquopy ilk koşuda Python çalışma zamanını ve tüm wheel'leri indirip
+    # açıyor; Gradle önbelleği soğukken 30 dakikayı geçebiliyor.
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # AGP 8.7 JDK 17 istiyor. Sürüm AÇIKÇA yazılı: runner imajının varsayılan
+      # JDK'sı bir gün değişirse derleme sessizce başka bir bytecode hedefiyle
+      # çıkardı.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0'
+
+      # Chaquopy pip'i çalıştırmak için yerel bir Python istiyor ve sürümünün
+      # HEDEFLE aynı olması gerekiyor (android/pins.properties: pythonVersion).
+      - name: Chaquopy'nin buildPython'ı
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Wheel repoda duruyor (elle işleniyor, bkz. android/wheels/README.md).
+      # Yoksa Gradle zaten anlaşılır bir Türkçe hatayla duruyor; bu adım aynı
+      # hatayı DAHA ERKEN ve daha görünür veriyor.
+      - name: pydantic-core wheel'i yerinde mi
+        run: |
+          set -euo pipefail
+          oku() { grep -E "^$1=" android/pins.properties | cut -d= -f2- | tr -d '[:space:]'; }
+          CP="cp$(oku pythonVersion | tr -d '.')"
+          W="android/wheels/pydantic_core-$(oku pydanticCoreVersion)-$CP-$CP-android_$(oku wheelAndroidApi)_arm64_v8a.whl"
+          test -s "$W" || {
+            echo "HATA: wheel yok ya da boş: $W"
+            echo "  'pydantic-core Android wheel' workflow'unu elle tetikle,"
+            echo "  çıkan varlığı android/wheels/ altına koy (bkz. android/wheels/README.md)."
+            ls -l android/wheels/ || true
+            exit 1
+          }
+          echo "wheel: $W ($(du -h "$W" | cut -f1))"
+
+      - name: Keystore'u aç
+        id: imza
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_B64:-}" ]; then
+            # Sır tanımlı değilse iş DURMUYOR, imzasız derliyor: dal üzerinde
+            # yapılan bir dispatch'in tek amacı derlemenin ayakta olduğunu
+            # görmek ve imzalama sırlarına erişimi olmayan bir çatal (fork)
+            # da bunu koşabilmeli. Tag'de ise aşağıdaki kapı imzasız APK'yı
+            # yayına SOKMUYOR.
+            echo "UYARI: ANDROID_KEYSTORE_BASE64 yok — imzasız (debug) derleme."
+            echo "imzali=hayir" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/gis.keystore"
+          test -s "$RUNNER_TEMP/gis.keystore" || { echo "HATA: keystore boş çözüldü"; exit 1; }
+          echo "imzali=evet" >> "$GITHUB_OUTPUT"
+
+      - name: Derle (assembleRelease)
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ steps.imza.outputs.imzali == 'evet' && format('{0}/gis.keystore', runner.temp) || '' }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon -PgisBuildPython=python3.13 :app:assembleRelease
+
+      - name: APK'yı doğrula (iddiaların hepsi APK'nın İÇİ hakkında)
+        id: dogrula
+        run: |
+          set -euo pipefail
+          APK="android/app/build/outputs/apk/release/gpt-image-studio-android-arm64-release.apk"
+
+          # (1) Paket GERÇEKTEN var mı? "Yeşil ama boş"un birinci kapısı.
+          test -s "$APK" || {
+            echo "HATA: APK üretilmemiş ya da boş: $APK"
+            find android/app/build/outputs -type f 2>/dev/null | head -40 || true
+            exit 1
+          }
+          echo "apk: $APK ($(du -h "$APK" | cut -f1))"
+          echo "apk=$APK" >> "$GITHUB_OUTPUT"
+
+          AAPT="$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)"
+          BADGING="$("$AAPT" dump badging "$APK")"
+          echo "$BADGING" | head -5
+
+          # (2) Sürüm. Bu adım aynı zamanda build.gradle'ın version.py'yi
+          # DERLEME ZAMANINDA okumasının tek kanıtı — hiçbir pytest onu görmüyor
+          # (macOS'ta Info.plist, Windows'ta VERSIONINFO için de böyleydi).
+          BEKLENEN="$(python -c 'import version; print(version.APP_VERSION)')"
+          GOT="$(echo "$BADGING" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")"
+          test "$GOT" = "$BEKLENEN" || { echo "HATA: versionName=$GOT, beklenen $BEKLENEN"; exit 1; }
+          echo "versionName: $GOT"
+
+          # (3) Tek ABI. İki ABI paketi neredeyse ikiye katlar ve bunu ancak
+          # dosya boyutuna bakan biri fark ederdi.
+          ABILER="$(echo "$BADGING" | sed -n "s/native-code: //p" | tr -d \")"
+          test "$ABILER" = "arm64-v8a" || { echo "HATA: beklenen ABI arm64-v8a, bulunan: $ABILER"; exit 1; }
+
+          # (4) İçerik. Üç ayrı sınıf: arayüz, gömülü varlıklar, Python
+          # çalışma zamanı. Üçü de eksik olsa APK yine kurulur ve ancak
+          # AÇILIŞTA, kullanıcıda patlardı.
+          GIRDILER="$(unzip -Z1 "$APK")"
+          echo "apk girdi sayısı: $(echo "$GIRDILER" | wc -l)"
+          BEKLENENLER="
+          assets/resources/static/index.html
+          assets/resources/static/core.js
+          assets/resources/static/mobile.css
+          assets/resources/static/mobile.js
+          assets/resources/static/fonts/dm-sans-v17-latin.woff2
+          assets/resources/bundled/logos/kurum-logo-blue.png
+          assets/resources/bundled/logos/kurum-logo-white.png
+          "
+          EKSIK=""
+          for f in $BEKLENENLER; do
+            echo "$GIRDILER" | grep -qxF "$f" || EKSIK="$EKSIK $f"
+          done
+          test -z "$EKSIK" || { echo "HATA: APK'da EKSİK:$EKSIK"; exit 1; }
+
+          # Python çalışma zamanı ve uygulamanın kendi modülleri.
+          echo "$GIRDILER" | grep -q '^lib/arm64-v8a/libpython.*\.so$' \
+            || { echo "HATA: APK'da libpython*.so yok — Chaquopy çalışma zamanı gömülmemiş"; exit 1; }
+          echo "$GIRDILER" | grep -q '^assets/chaquopy/' \
+            || { echo "HATA: APK'da assets/chaquopy/ yok"; exit 1; }
+          echo "içerik kapıları geçildi"
+
+      # `import pydantic` KAPISI — Faz 0'ın karar kuralının ikinci yarısı
+      # (docs/android/pydantic-karari.md). Wheel'in üretilmiş olması yetmez;
+      # Chaquopy'nin onu GERÇEKTEN kurmuş olması gerekiyor. Kurulum kaydı
+      # APK'nın içindeki requirements ağacında görünür.
+      - name: pydantic APK'ya girdi mi
+        run: |
+          set -euo pipefail
+          APK="${{ steps.dogrula.outputs.apk }}"
+          GIRDILER="$(unzip -Z1 "$APK")"
+          for modul in pydantic pydantic_core; do
+            echo "$GIRDILER" | grep -q "chaquopy/pkg/$modul" \
+              || echo "$GIRDILER" | grep -q "$modul" \
+              || { echo "HATA: APK'da $modul izi yok — Chaquopy pip adımı onu kurmamış"; exit 1; }
+          done
+          echo "pydantic + pydantic_core APK'da"
+
+      - name: İmzayı doğrula
+        if: steps.imza.outputs.imzali == 'evet'
+        run: |
+          set -euo pipefail
+          APKSIGNER="$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)"
+          "$APKSIGNER" verify --verbose --print-certs "${{ steps.dogrula.outputs.apk }}"
+
+      # Tag'de imzasız APK yayına GİRMEMELİ: kullanıcı onu kuramaz ve
+      # "yayın çıktı ama kurulmuyor" en pahalı hata sınıfı.
+      - name: Tag'de imza ZORUNLU
+        if: startsWith(github.ref, 'refs/tags/') && steps.imza.outputs.imzali != 'evet'
+        run: |
+          echo "HATA: tag derlemesi imzasız — imzalama sırları tanımlı değil."
+          echo "  Gerekli sırlar: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,"
+          echo "  ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD"
+          exit 1
+
+      - name: Yayın adına kopyala
+        run: cp "${{ steps.dogrula.outputs.apk }}" dist-gpt-image-studio-android-arm64.apk
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpt-image-studio-android-arm64
+          path: dist-gpt-image-studio-android-arm64.apk
+          # "Yeşil ama boş"un SON kapısı: bu bayrak olmadan upload-artifact
+          # eşleşen dosya bulamayınca yalnız UYARI basar ve iş yeşil kalır.
+          if-no-files-found: error
+          retention-days: 30
+
+  # APK'yı, release.yml'in tag'de oluşturduğu yayına EKLER.
+  #
+  # Neden ayrı bir iş ve neden `softprops/action-gh-release` ikinci kez:
+  # o eylem var olan bir yayına dosya eklemeyi destekliyor
+  # (`generate_release_notes` olmadan, aynı tag'e). Alternatif — release.yml'in
+  # publish işine bir `needs` kenarı çekmek — iki workflow arasında bağımlılık
+  # kurmayı gerektirirdi ve GitHub Actions bunu doğrudan desteklemiyor.
+  publish-android:
+    needs: build-android
+    if: startsWith(github.ref, 'refs/tags/')
+    name: APK'yı yayına ekle
+    runs-on: ubuntu-latest
+    steps:
+      - name: APK'yı indir
+        uses: actions/download-artifact@v4
+        with:
+          name: gpt-image-studio-android-arm64
+          path: dist
+
+      - name: İndi ve boş değil
+        run: |
+          set -euo pipefail
+          f=dist/dist-gpt-image-studio-android-arm64.apk
+          test -s "$f" || { echo "EKSİK ya da BOŞ: $f"; exit 1; }
+          mv "$f" dist/gpt-image-studio-android-arm64.apk
+          ls -l dist
+
+      - name: Yayına ekle
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/gpt-image-studio-android-arm64.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

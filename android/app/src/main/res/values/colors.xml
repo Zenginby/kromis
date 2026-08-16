@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Değerler static/flow-tokens.css'ten BİREBİR alındı (bg, surface, fg, muted
+     tokenları). Native kabuk ile web arayüzü aynı paleti taşımak zorunda —
+     aksi halde WebView yüklenene kadar beyaz bir çerçeve çakar ve durum
+     çubuğu arayüzden ayrık görünür.
+
+     Not: XML yorumunda iki tireyi yan yana yazmak yasak, o yüzden token
+     adları CSS'teki gibi tire önekiyle yazılamıyor. -->
+<resources>
+    <color name="gis_bg">#FF000000</color>
+    <color name="gis_surface">#FF141415</color>
+    <color name="gis_fg">#FFE8EAED</color>
+    <color name="gis_muted">#FF9AA0A6</color>
+</resources>

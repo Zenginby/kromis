@@ -34,3 +34,21 @@
 *.woff  binary
 *.ttf   binary
 *.otf   binary
+
+# ── Gradle sarmalayıcısı (android/) ──────────────────────────────────
+# Üç dosya, üç ayrı gerekçe — üçü de yukarıdaki `* text=auto eol=lf` genel
+# kuralının BU dosyalar için yanlış olmasından doğuyor:
+#
+#   • `gradlew.bat` bir Windows toplu iş dosyası ve CRLF ister. LF'e
+#     çevrilirse `cmd.exe` bazı satırları yanlış ayrıştırır; hata mesajı
+#     yine sebebi göstermez (build.sh'ın shebang kusurunun Windows'taki eşi).
+#   • `gradlew` bir kabuk betiği: LF kalmalı, aynı shebang gerekçesi.
+#   • `gradle-wrapper.jar` İKİLİ. `text=auto` sezgisine bırakılırsa bir gün
+#     metin sanılıp satır sonu dönüşümüyle bozulabilir ve sonuç "Gradle hiç
+#     başlamıyor" olur — font dosyalarıyla birebir aynı sınıf kusur.
+gradlew      text eol=lf
+gradlew.bat  text eol=crlf
+*.jar        binary
+# Wheel de ikili: pydantic-core wheel'i repoda duruyor (bkz.
+# docs/android/pydantic-karari.md) ve bozulması ancak telefonda görünürdü.
+*.whl        binary

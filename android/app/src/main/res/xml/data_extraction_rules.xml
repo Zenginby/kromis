@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ yedekleme/cihaz aktarımı kuralları.
+     `allowBackup="false"` zaten bulut yedeklemesini kapatıyor; bu dosya
+     cihazdan cihaza aktarımı da kapatıyor. Gerekçe aynı:
+     filesDir/credentials.env Azure anahtarını tutuyor ve uygulamanın veri
+     dizini yüzlerce MB görsel taşıyor. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

@@ -1,0 +1,293 @@
+/* Mobil katman — telefon genişlikleri ve dokunmatik girdi.
+ *
+ * NEDEN AYRI DOSYA, style.css'in içinde değil:
+ *   style.css 1988 satır ve masaüstü varsayımıyla yazılmış (satır 417'deki
+ *   yorum bunu açıkça söylüyor: "En küçük pencere 1024×700"). Mobil kurallar
+ *   oraya serpiştirilseydi her biri bir masaüstü kuralının yanında dururdu ve
+ *   ikisinin birbirini ezmesi ancak gözle fark edilirdi. Ayrı ve SON yüklenen
+ *   bir dosya iki güvence veriyor: (a) buradaki kurallar aynı özgüllükte bile
+ *   kaynak sırasıyla kazanıyor, yani `!important` hiç gerekmiyor,
+ *   (b) index.html'deki tek <link> satırı silinince uygulama bugünkü masaüstü
+ *   davranışına BİREBİR dönüyor — geri alma yolu tek satır.
+ *   (Aynı gerekçeyle flow-tokens.css de ayrı duruyor.)
+ *
+ * İKİ AYRI EKSEN, bilerek karıştırılmadı:
+ *   • `max-width: 768px`  → YERLEŞİM. Dar ekranda ray alta iner, paneller tam
+ *     ekran olur. Masaüstü tarayıcısını daraltmak da bunu tetikler; doğru olan
+ *     bu, çünkü sorun genişliğin kendisi.
+ *   • `hover: none`       → ETKİLEŞİM. Hover'da beliren kontroller kalıcı
+ *     görünür olur, dokunma hedefleri büyür. Bu, ekran GENİŞ olsa bile
+ *     (tablet, dokunmatik dizüstü) geçerli olmalı — orada da hover yok.
+ *   Tek bir sorguya bağlansalardı ya geniş dokunmatik ekranda silme düğmeleri
+ *   hiç görünmezdi ya da dar masaüstü penceresinde gereksizce görünürdü.
+ */
+
+:root {
+  /* Dokunma hedefi alt sınırı. 11 kontrol bugün bunun altında (18–40px);
+     hiçbiri KÜÇÜLTÜLMÜYOR — görünen boyut korunup TIKLAMA ALANI ::after ile
+     büyütülüyor (aşağıya bkz.). 105px'lik bir karonun üstüne 44px'lik bir
+     silme düğmesi çizmek karonun %40'ını yerdi. */
+  --tap: 44px;
+
+  /* Composer'ın gerçek yüksekliği — mobile.js bir ResizeObserver ile yazıyor.
+     Buradaki 260px, style.css:211'deki sabit alt boşluğun aynısı: JS hiç
+     çalışmasa da (dosya yüklenemedi, hata verdi) yerleşim bugünkü hâlinde
+     kalır, bozulmaz. */
+  --composer-h: 260px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   1. Güvenli alan — her genişlikte geçerli
+   ═══════════════════════════════════════════════════════════════════
+   `env(safe-area-inset-*)` masaüstünde ve çentiksiz ekranlarda 0 döner, yani
+   bu kurallar orada hiçbir şeyi değiştirmiyor. Android'de ise jest çubuğu
+   ekranın ALT kenarını kaplıyor ve bu iki öğe (büyüteç şeridi, composer) tam
+   oraya oturuyordu: düğmeler görünüyor ama basılamıyordu. */
+
+.viewer-bar {
+  bottom: calc(1.1rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   2. Yerleşim — telefon genişliği
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+  /* Ray SOLDAN ALTA taşınıyor. Izgara alanı kullanılıyor, `position: fixed`
+     DEĞİL: composer da tuvalle aynı hücrede (`grid-area: canvas`) duruyor ve
+     sabit konumlu bir çubuk onun altında kalır, üstelik yüksekliğini ikinci
+     bir değişkenle kovalamak gerekirdi. Izgara satırı ikisini kendiliğinden
+     hizalıyor. */
+  .app {
+    --rail-w: 0px;
+    --topbar-h: 56px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: var(--topbar-h) minmax(0, 1fr) auto;
+    grid-template-areas: "topbar" "canvas" "rail";
+  }
+
+  .rail {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+    border-right: 0;
+    border-top: 1px solid var(--hairline);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  /* Alt çubukta ikon ÜSTTE, etiket ALTTA. Etiket geri geliyor: `max-width:
+     1200px` kuralı onu gizliyor ve o durumda tek bilgi kaynağı `title`
+     ipucu kalıyordu — dokunmatikte `title` HİÇ görünmez, yani düğmeler
+     isimsiz ikonlara dönerdi. */
+  .rail-item {
+    flex: 1 1 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+    min-height: var(--tap);
+    padding: 4px 2px;
+  }
+  .rail-item span {
+    display: block;
+    font-size: 0.62rem;
+    line-height: 1.2;
+    text-align: center;
+    max-width: 100%;
+  }
+  .rail-item svg { width: 20px; height: 20px; }
+  .rail-count { margin-left: 0; font-size: 0.62rem; }
+
+  /* Ayraç, esneme boşluğu ve "Rayı daralt" alt çubukta anlamsız: daraltacak
+     bir ray kalmadı. */
+  .rail-sep,
+  .rail-spacer,
+  #rail-collapse { display: none; }
+
+  /* Tuvalin alt boşluğu composer'ın GERÇEK yüksekliğine bağlandı.
+     260px sabiti 390×844'lük bir telefonda viewport'un ~%31'i; referans
+     görselleri eklenince composer daha da uzuyor ve son satır onun altında
+     kalıyordu. Değeri mobile.js ölçüyor. */
+  .canvas {
+    padding: 16px var(--space) calc(var(--composer-h) + 16px);
+  }
+  .composer { margin-bottom: 12px; }
+
+  /* Üst şerit: 360px'de #session-title sıfıra eziliyordu. Sürüm rozeti ve
+     oturum damgası ikincil bilgi — ikisi de Ayarlar panelinde zaten var. */
+  .topbar { gap: 8px; padding: 0 12px; }
+  .topbar h1 { font-size: 17px; }
+  .ver,
+  #session-stamp { display: none; }
+
+  /* Composer şeridi taşıyordu: .plus(34) + .view-tabs(~150) + #specs-btn(~110)
+     + #go(~70) ≈ 380px > 360px. Sarma, düğmeleri küçültmekten iyi — küçültmek
+     dokunma hedeflerini daha da bozardı. */
+  .composer-bar { flex-wrap: wrap; row-gap: 8px; }
+  .composer-bar #go { margin-left: auto; }
+  .composer-input { max-height: 30vh; }
+
+  /* Klavye açıkken ipucu satırı yer kaplıyor; üstelik "⌘/Ctrl + Enter"
+     telefonda yanlış bilgi (bkz. core.js: dokunmatikte Enter satır atlar). */
+  .chat-hint { display: none; }
+
+  /* Izgaralar: tek sütuna düşmeden 2 sütun kalsın. 268px'lik araç kartı
+     360px'lik ekranda tek sütun oluyordu ve iki kart alt alta uzayıp
+     gidiyordu. */
+  .tools { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .gallery { --tile: 105px; gap: 0.5rem; }
+  .gallery[data-size="s"] { --tile: 84px; }
+  .gallery[data-size="l"] { --tile: 148px; }
+
+  /* ── Tam ekran yüzeyler ───────────────────────────────────────────
+     11 katman var: 4 .modal + 5 .sheet + 2 popover. Telefonda "yanda açılan
+     panel" diye bir şey yok — 320px'lik bir panel 360px'lik ekranın tamamına
+     yakınını kaplayıp arkada 40px'lik anlamsız bir şerit bırakıyordu. */
+  .sheet { width: 100%; max-width: 100%; }
+  /* Palet paneli kendi genişliğini yazıyor (style.css:715), o yüzden ayrıca. */
+  #palette-modal { width: 100%; max-width: 100%; }
+
+  .modal { padding: 0; }
+  .modal-card {
+    width: 100%;
+    max-width: 100%;
+    min-height: 100%;
+    margin: 0;
+    border-radius: 0;
+    padding: calc(var(--space) * 0.9) var(--space)
+             calc(var(--space) + env(safe-area-inset-bottom, 0px));
+  }
+  .logo-card { width: 100%; }
+  .logo-preview-wrap { min-height: 240px; }
+
+  /* Onay penceresi BİLEREK diyalog kalıyor: tek bir soru için tam ekrana
+     geçmek, arkadaki bağlamı (hangi görselin silineceğini) gizler. */
+  .modal-card.confirm-card {
+    width: min(420px, calc(100% - 2rem));
+    min-height: 0;
+    margin: auto;
+    border-radius: var(--r-panel, 24px);
+    padding: calc(var(--space) * 1.1);
+  }
+
+  /* Medya seçici — en sert bozulma. Üç sütunlu ızgara en az 388px'lik bir
+     iz istiyor (208 + 0 + 180), kartın kendisi ise 94vw = 338px: 50px taşma
+     ve yatay kaydırma. Tek sütuna iniyor; sol gezinme yatay bir şeride,
+     sağ bölme kartın altına düşüyor. */
+  .picker-card {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    border-radius: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 56px auto minmax(0, 1fr) auto;
+    grid-template-areas: "phead" "pnav" "pbody" "pside";
+  }
+  .picker-nav {
+    display: flex;
+    gap: 6px;
+    padding: 0 12px 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .picker-nav-item { width: auto; flex: none; white-space: nowrap; }
+  .picker-nav-item.crossing {
+    margin-top: 0;
+    padding-top: 9px;
+    border-top: 0;
+    border-left: 1px solid var(--hairline);
+    border-radius: 10px;
+  }
+  .picker-body { padding: 4px 12px 12px; }
+  .picker-head { padding: 0 12px; }
+
+  /* Büyüteç şeridi 6 düğmeyle ~310px; 360px'lik ekranda kenarlara yapışıyor.
+     Sarma + kenar boşluğu ile hem sığıyor hem basılabiliyor. */
+  .viewer-bar {
+    left: 12px; right: 12px; transform: none;
+    justify-content: center; flex-wrap: wrap;
+    border-radius: 20px;
+  }
+  .viewer-img { max-width: 100vw; max-height: 72vh; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   3. Dokunmatik — hover'ı olmayan her cihaz
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (hover: none) {
+
+  /* ── Hover'da beliren 7 kontrol grubu ──────────────────────────────
+     Bunlar dekorasyon DEĞİL, tek erişim yolu: kullanıcı bunlar görünmeden
+     görseli silemez, indiremez, referans alamaz, sohbeti yeniden
+     adlandıramaz. Dokunmatikte `:hover` hiç tetiklenmediği için kalıcı
+     görünür olmaları gerekiyor. */
+  .card .acts { opacity: 1; transform: none; }
+  .card .card-del { opacity: 1; transform: none; }
+  .asset-cell .asset-del { opacity: 1; transform: scale(1); }
+  .palette-lib-cell .palette-lib-del { opacity: 1; transform: scale(1); }
+  .extra-chip .extra-del { opacity: 1; }
+  .chat-item .chat-item-menu { opacity: 1; }
+  .chat-media .chat-media-act { opacity: 1; transform: none; }
+
+  /* ── Dokunma hedefleri ────────────────────────────────────────────
+     Görünen boyutlar KORUNUYOR; büyüyen yalnız tıklama alanı. Görünmez bir
+     ::after kontrolün merkezine 44×44'lük bir alan seriyor. Alternatif
+     (düğmeleri gerçekten 44px yapmak) 105px'lik bir karonun görselini
+     yutardı — yani silme düğmesi için galeriyi bozmuş olurduk. */
+  .extra-del, .asset-del, .palette-lib-del,
+  .card-check, .card-del, .chat-item-menu, .plus {
+    position: relative;
+  }
+  .extra-del::after, .asset-del::after, .palette-lib-del::after,
+  .card-check::after, .card-del::after, .chat-item-menu::after,
+  .plus::after {
+    content: "";
+    position: absolute;
+    top: 50%; left: 50%;
+    width: var(--tap); height: var(--tap);
+    transform: translate(-50%, -50%);
+    /* Yalnız hedef büyütme: görünürde hiçbir şey değişmiyor. */
+  }
+
+  /* Bu ikisi zaten kare ve büyütülmeleri düzeni bozmuyor. */
+  .icon-btn { min-width: var(--tap); min-height: var(--tap); }
+  .viewer-btn { min-height: var(--tap); }
+  .modal-x { min-width: var(--tap); min-height: var(--tap); }
+
+  /* ── Sürükle-bırak yerine geçen yol ───────────────────────────────
+     HTML5 sürükle-bırak dokunmatikte HİÇ çalışmıyor. Bugün bir görseli
+     klasöre taşımanın tek yolu o: folders.js:242-268 (klasör kartına
+     bırakma), 1164-1174 (kart sürükleme), 1282-1320 (dosya bırakma
+     alanları). Karşılığı seçim modundaki "Taşı…" düğmesi (mobile.js);
+     sürükleme imleci ise dokunmatikte yanlış bilgi veriyor. */
+  .card[draggable="true"] { cursor: default; }
+}
+
+/* Dokunmatik + dar ekran: seçim şeridi sarılabilir olmalı, "Taşı…" düğmesi
+   dahil dört düğme 360px'e sığmıyor. */
+@media (max-width: 768px) {
+  .select-bar { border-radius: 18px; padding: 6px 10px; }
+  .select-bar .btn-ghost { min-height: var(--tap); }
+}
+
+/* Taşıma penceresi — seçim modundaki "Taşı…" düğmesinin açtığı diyalog.
+   `.modal-card` üzerinde kuruluyor, kendi yüzeyi yok. */
+.move-card { width: min(420px, 100%); }
+.move-card select {
+  width: 100%; margin-top: 0.35rem;
+  background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--control-border); border-radius: 10px;
+  padding: 0.6rem 0.7rem; font: inherit;
+}
+@media (max-width: 768px) {
+  .modal-card.move-card {
+    width: min(420px, calc(100% - 2rem));
+    min-height: 0; margin: auto;
+    border-radius: var(--r-panel, 24px);
+    padding: calc(var(--space) * 1.1);
+  }
+}

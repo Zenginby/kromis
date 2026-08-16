@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WebView + üstünde açılış perdesi.
+     Perde ayrı bir Activity DEĞİL, aynı düzende bir katman: Chaquopy'nin ilk
+     açılışta stdlib'i açması ve assets kopyalaması 2–5 sn sürüyor, ama SONRAKİ
+     açılışlar hızlı. Ayrı bir splash Activity o hızlı açılışlarda da bir kare
+     çakardı; buradaki katman sunucu hazır olunca yerinde kayboluyor. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/kok"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/gis_bg">
+
+    <WebView
+        android:id="@+id/webview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/gis_bg" />
+
+    <LinearLayout
+        android:id="@+id/perde"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/gis_bg"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="32dp">
+
+        <ProgressBar
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:indeterminateTint="@color/gis_fg" />
+
+        <TextView
+            android:id="@+id/perde_baslik"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/baslatiliyor"
+            android:textColor="@color/gis_fg"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:text="@string/ilk_acilis_uyarisi"
+            android:textColor="@color/gis_muted"
+            android:textSize="13sp" />
+    </LinearLayout>
+</FrameLayout>

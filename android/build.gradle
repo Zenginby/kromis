@@ -1,0 +1,15 @@
+// Eklenti sürümleri BURADA çivili; `apply false` ile yalnız çözülüyorlar,
+// uygulanmaları app/build.gradle'da.
+//
+// NEDEN ÇİVİLİ: bu üçlü birbirine sıkı bağlı (AGP ↔ Kotlin ↔ Chaquopy) ve
+// serbest bırakılan bir sürüm bir gün CI'ı, hiçbir kod değişmeden, kırar.
+// Aynı disiplin masaüstünde de var: requirements.txt'te pyinstaller da çivili.
+plugins {
+    id "com.android.application" version "8.7.3" apply false
+    id "org.jetbrains.kotlin.android" version "2.0.21" apply false
+    // Chaquopy 17.0: cihazda tam CPython (3.10–3.14). Bu sürümden itibaren pip
+    // `--only-binary` ile çalışıyor, yani sdist kurulmuyor — projedeki tek
+    // native bağımlılığın (pydantic-core) wheel'ini bu yüzden kendimiz
+    // derliyoruz (bkz. docs/android/pydantic-karari.md).
+    id "com.chaquo.python" version "17.0.0" apply false
+}

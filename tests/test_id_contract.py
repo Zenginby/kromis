@@ -33,8 +33,10 @@ BASELINE = ROOT / "docs" / "flow-ui" / "id-baseline.txt"
 LEDGER = ROOT / "docs" / "flow-ui" / "id-defteri.md"
 
 # index.html'e yüklenme sırasıyla; sıra bağlayıcı (core.js başta $ tanımlıyor).
+# mobile.js EN SONDA: o da `$()` ile bir id'ye (#composer) bağlanıyor, yani
+# aynı sarkma riskini taşıyor ve bu dosyanın kapsamı dışında kalmamalı.
 JS_FILES = ("core.js", "folders.js", "assets.js", "palette.js", "settings.js",
-            "viewer.js", "chat.js")
+            "viewer.js", "chat.js", "mobile.js")
 
 _TOP_LEVEL_DECLARATION_RE = re.compile(
     r"^(?:(?:async\s+)?function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=)", re.M

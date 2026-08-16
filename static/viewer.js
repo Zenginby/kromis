@@ -254,12 +254,96 @@
   vimg.addEventListener("pointerup", endPan);
   vimg.addEventListener("pointercancel", endPan);
 
+  // --- iki parmak yakınlaştırma (dokunmatik) --------------------------------
+  //
+  // NEDEN GEREKLİ: bu dosyadaki yakınlaştırma yolları masaüstüne göre kurulmuş
+  // — `wheel` (fare/trackpad) ve `dblclick`. Telefonda ikisi de yok; üstelik
+  // `.viewer-stage`de `touch-action: none` (style.css:1448) tarayıcının KENDİ
+  // pinch'ini de kapatıyor ve tek parmak kaydırma `if (scale <= 1) return`
+  // ile korunuyor. Sonuç: telefonda büyüteçte yakınlaştırmanın tek yolu −/+
+  // düğmeleriydi. Bu, bir görsel üretim uygulamasında üretilen görseli
+  // inceleyememek demek.
+  //
+  // Dinleyiciler YAKALAMA (capture) evresinde ve `stage` üzerinde: ikinci
+  // parmak `vimg`in dışına da düşebiliyor ve tek parmak kaydırmasının
+  // `setPointerCapture`'ı araya girmeden iptal edilmesi gerekiyor.
+  const dokunuslar = new Map();
+  let pinchUzaklik = 0;
+  let pinchX = 0;
+  let pinchY = 0;
+  let pinchBitis = 0;
+
+  function pinchOlc() {
+    const [a, b] = [...dokunuslar.values()];
+    return {
+      d: Math.hypot(a.x - b.x, a.y - b.y),
+      x: (a.x + b.x) / 2,
+      y: (a.y + b.y) / 2,
+    };
+  }
+
+  stage.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "touch") return;
+    dokunuslar.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (dokunuslar.size !== 2) return;
+    endPan();                       // tek parmak kaydırması pinch'e devrediyor
+    const m = pinchOlc();
+    pinchUzaklik = m.d;
+    pinchX = m.x;
+    pinchY = m.y;
+  }, true);
+
+  stage.addEventListener("pointermove", (e) => {
+    if (e.pointerType !== "touch" || !dokunuslar.has(e.pointerId)) return;
+    dokunuslar.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (dokunuslar.size !== 2) return;
+    e.preventDefault();
+
+    const m = pinchOlc();
+    // İki parmağın ORTASI sabit kalacak şekilde ölçekle — `zoomAt`in imleç
+    // altındaki noktayı sabitleyen mantığının birebir aynısı.
+    if (pinchUzaklik > 0 && m.d > 0) zoomAt(m.x, m.y, m.d / pinchUzaklik);
+
+    // Parmakların ORTAK kayması = kaydırma. Ayrı bir jest değil: gerçek
+    // nesnelerde de iki parmakla hem ölçekleyip hem sürüklenir.
+    if (scale > 1) {
+      const b = panBounds();
+      tx = clamp(tx + (m.x - pinchX), -b.x, b.x);
+      ty = clamp(ty + (m.y - pinchY), -b.y, b.y);
+      schedule();
+    }
+
+    pinchUzaklik = m.d;
+    pinchX = m.x;
+    pinchY = m.y;
+  }, true);
+
+  function dokunusBitti(e) {
+    if (!dokunuslar.has(e.pointerId)) return;
+    dokunuslar.delete(e.pointerId);
+    if (dokunuslar.size >= 2) return;
+    if (pinchUzaklik > 0) {
+      pinchUzaklik = 0;
+      pinchBitis = Date.now();      // aşağıdaki kapatma muhafızı için
+      settle();
+    }
+  }
+  stage.addEventListener("pointerup", dokunusBitti, true);
+  stage.addEventListener("pointercancel", dokunusBitti, true);
+
   $("viewer-zoom-in").addEventListener("click", () => zoomCentered(1.4));
   $("viewer-zoom-out").addEventListener("click", () => zoomCentered(1 / 1.4));
   $("viewer-fit").addEventListener("click", fit);
   $("viewer-close").addEventListener("click", close);
   viewer.querySelector("[data-viewer-close]").addEventListener("click", close);
-  stage.addEventListener("click", (e) => { if (e.target === stage) close(); });
+  stage.addEventListener("click", (e) => {
+    if (e.target !== stage) return;
+    // Pinch'ten HEMEN SONRAKİ tıklamayı yut. İki parmak kalkarken tarayıcı
+    // sentetik bir `click` üretebiliyor ve hedefi çoğu kez sahnenin kendisi
+    // oluyor — muhafızsız her yakınlaştırma jesti büyüteci KAPATIRDI.
+    if (Date.now() - pinchBitis < 350) return;
+    close();
+  });
 
   document.addEventListener("keydown", (e) => {
     if (viewer.hidden) return;

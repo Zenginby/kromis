@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Azure çağrıları uygulamanın TEK dış bağımlılığı. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Kalıcı bildirim (Android 13+ artık izin istiyor). İzin verilmezse
+         servis yine çalışır, yalnız bildirim görünmez — akış kırılmıyor. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- FOREGROUND SERVICE ŞART, süs değil: azure_client'ta
+         READ_TIMEOUT_FIRST = 180 s ve n=4 üretimde toplam süre
+         180 + 3×120 = 540 s'ye çıkıyor. Kullanıcı üretim sırasında
+         uygulamadan çıkarsa Android arka plandaki süreci öldürür; ÜCRETLİ bir
+         Azure isteği yanıtı hiç görülmeden boşa gider. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!-- YALNIZ Android 8.0–9 (API 26–28) için. API 29'dan itibaren indirmeler
+         MediaStore üzerinden yazılıyor ve hiçbir izin gerekmiyor; eski
+         sürümlerde ise herkese açık Downloads/Pictures dizinine yazmanın
+         başka yolu yok. `maxSdkVersion` olmadan izin yeni cihazlarda da
+         istenirdi — gereksiz ve kullanıcıyı ürküten bir istek. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
+    <!-- YEDEKLEME KAPALI (allowBackup=false, fullBackupContent=false).
+         filesDir/credentials.env kullanıcının Azure anahtarını tutuyor;
+         otomatik yedekleme açık olsaydı o dosya kullanıcının Google hesabına
+         yüklenirdi. Aynı dizinde ayrıca yüzlerce MB üretilmiş görsel birikiyor
+         — yedeklemenin boyut sınırını da aşardı.
+
+         networkSecurityConfig: cleartext YALNIZCA 127.0.0.1 için açılıyor.
+         `usesCleartextTraffic="true"` bayrağı bilerek KULLANILMIYOR — o,
+         Azure'a giden istekler dahil her adrese düz HTTP'yi açardı. -->
+    <application
+        android:name=".StudioApplication"
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:theme="@style/Theme.Studio"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:supportsRtl="true"
+        android:enableOnBackInvokedCallback="false"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        tools:targetApi="33">
+
+        <!-- configChanges: ekran döndürme / klavye açılması Activity'yi YENİDEN
+             YARATMASIN. Yeniden yaratılırsa kullanıcının yazdığı prompt, açık
+             modal ve galeri kaydırma konumu sıfırlanır. Sunucu ayrı serviste
+             yaşadığı için yalnız arayüz korunuyor.
+
+             windowSoftInputMode=adjustResize: klavye açılınca composer yukarı
+             itilsin, içeriğin üstüne binmesin.
+
+             enableOnBackInvokedCallback=false (application'da): geri tuşu
+             uygulama İÇİ gezinmeye bağlı (açık modal varsa onu kapatır) ve bu
+             mantık `onBackPressed` üzerinden yürüyor. Yeni geri API'sine
+             geçiş ayrı bir iş; yarım geçiş "geri tuşu bazen uygulamayı
+             kapatıyor" demek olurdu. -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode|density"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".ServerService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+    </application>
+</manifest>

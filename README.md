@@ -9,7 +9,7 @@
 
 ---
 
-## 🚀 Masaüstü Uygulamasını İndir
+## 🚀 Uygulamayı İndir
 
 Son kullanıcılar için hazırlanmış hazır derleme paketlerini doğrudan indirebilirsiniz:
 
@@ -17,13 +17,16 @@ Son kullanıcılar için hazırlanmış hazır derleme paketlerini doğrudan ind
 |---|---|---|
 | 🍏 **macOS** | Apple Silicon (M1 / M2 / M3 / M4) | [İndir (ZIP / ARM64)](https://github.com/Zenginby/gpt-image-studio/releases/latest/download/gpt-image-studio-macOS-arm64.zip) |
 | 🪟 **Windows** | x64 (Windows 10 / 11) | [İndir (ZIP / x64)](https://github.com/Zenginby/gpt-image-studio/releases/latest/download/gpt-image-studio-windows-x64.zip) |
+| 🤖 **Android** | arm64-v8a (Android 8.0+) | [İndir (APK / arm64)](https://github.com/Zenginby/gpt-image-studio/releases/latest/download/gpt-image-studio-android-arm64.apk) |
 
 > [!TIP]
-> Paketleme hakkında detaylı bilgi ve kurulum talimatları için [KURULUM.md](KURULUM.md) rehberini inceleyebilirsiniz — belge iki sistemi de kapsıyor (macOS Gatekeeper ve Windows SmartScreen adımları dahil).
+> Paketleme hakkında detaylı bilgi ve kurulum talimatları için [KURULUM.md](KURULUM.md) rehberini inceleyebilirsiniz — belge üç sistemi de kapsıyor (macOS Gatekeeper, Windows SmartScreen ve Android "bilinmeyen kaynak" adımları dahil).
+>
+> **Android sürümü Play Store'da değil.** APK doğrudan kurulur (sideload) ve uygulama telefonda TAM olarak çalışır: üretim, düzenleme, palet ve bindirme işlemlerinin hepsi cihazdaki Python çalışma zamanında koşuyor — bilgisayara ya da ayrı bir sunucuya bağlı değil. İnternet yalnızca Azure çağrıları için gerekiyor.
 
 ---
 
-## ✨ Güncel Özellikler (v0.3.0 & Flow-UI)
+## ✨ Güncel Özellikler (v0.4.0 & Flow-UI)
 
 ### 🎬 1. Stüdyo Tek Döküm & Prompt Yönetmeni
 * **Türkçe Diyalogdan İngilizce Prompt:** Türkçe fikir anlatımını otomatik olarak optimizasyonu yapılmış İngilizce `gpt-image-2` prompt'una ve teknik ayarlara (`size`, `quality`, `n`) çevirir.
@@ -92,7 +95,7 @@ Son kullanıcılar için hazırlanmış hazır derleme paketlerini doğrudan ind
 
 ### 1. Gereksinimler
 - Python 3.10+
-- macOS veya Windows OS
+- macOS veya Windows OS (Android paketi için ayrıca JDK 17 + Android SDK — bkz. `android/`)
 
 ### 2. Yerel Sunucuyu Çalıştırma
 ```bash

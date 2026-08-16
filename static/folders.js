@@ -85,9 +85,18 @@ const IMAGE_DND_TYPE = "application/x-gpt-image-id";
 // AKTARMA her zaman geçerli (klasör hiç yokken de görseller alanına bırakılabilir).
 // v1.11'e kadar ipucu klasör yokken hiç görünmüyordu; bırakma özelliği o yüzden
 // yeni kullanıcı için keşfedilemez kalırdı.
-const FOLDER_HINT_DEFAULT = "Bir görseli klasör kartına sürükleyip bırakarak taşıyabilirsin.";
-const FOLDER_HINT_IMPORT =
-  "Bilgisayarındaki bir görseli klasör kartına ya da bu alana bırakarak içe aktarabilirsin.";
+// DOKUNMATİKTE İPUÇLARI BAŞKA: HTML5 sürükle-bırak dokunmatik ekranda HİÇ
+// çalışmıyor (bu dosyadaki üç yol da: klasör kartına bırakma 242-268, kart
+// sürükleme 1164-1174, dosya bırakma alanları 1282-1320). Telefonda "sürükleyip
+// bırak" yazan bir ipucu, çalışmayan bir yolu tarif etmek olurdu — yani
+// yardımcı değil, yanıltıcı. Taşımanın dokunmatikteki yolu seçim modundaki
+// "Taşı…" düğmesi, içe aktarmanınki ise "Yükle" düğmesi.
+const FOLDER_HINT_DEFAULT = IS_TOUCH
+  ? 'Görselleri taşımak için "Seç" ile işaretleyip "Taşı…" düğmesini kullan.'
+  : "Bir görseli klasör kartına sürükleyip bırakarak taşıyabilirsin.";
+const FOLDER_HINT_IMPORT = IS_TOUCH
+  ? 'Cihazındaki bir görseli "Yükle" düğmesiyle içe aktarabilirsin.'
+  : "Bilgisayarındaki bir görseli klasör kartına ya da bu alana bırakarak içe aktarabilirsin.";
 
 function renderFolderHint() {
   const el = $("folder-hint");
@@ -554,8 +563,12 @@ function syncSelectUI() {
   $("select-toggle").hidden = selectMode;
   if (selectMode) {
     $("folder-hint").textContent = selected.size
-      ? "Seçili görselleri taşımak için birini klasör kartına sürükle."
-      : "Görselleri seç, sonra taşımak için birini klasör kartına sürükle.";
+      ? (IS_TOUCH
+        ? 'Seçili görselleri taşımak için "Taşı…" düğmesine dokun.'
+        : "Seçili görselleri taşımak için birini klasör kartına sürükle.")
+      : (IS_TOUCH
+        ? 'Görselleri seç, sonra "Taşı…" düğmesine dokun.'
+        : "Görselleri seç, sonra taşımak için birini klasör kartına sürükle.");
   } else {
     renderFolderHint();   // seçim dışı metnin TEK kaynağı (taşıma + içe aktarma)
   }
@@ -567,6 +580,68 @@ function syncSelectUI() {
   $("select-all").textContent = allSelected ? "Seçimi temizle" : "Tümünü seç";
   $("select-all").disabled = total === 0;
   $("select-delete").disabled = selected.size === 0;
+  $("select-move").disabled = selected.size === 0;
+}
+
+// ── Taşıma penceresi ────────────────────────────────────────────────
+//
+// Sürükle-bırakın DOKUNMATİK KARŞILIĞI. Dokunmatikte sürükleme hiç çalışmıyor
+// (bkz. FOLDER_HINT_DEFAULT) ve taşıma bu uygulamada ikincil bir özellik
+// değil: klasörler tüm medya düzeninin belkemiği.
+//
+// Düğme her cihazda görünüyor, yalnız dokunmatikte DEĞİL: klavye kullanan biri
+// için de sürükle-bırak erişilebilir bir yol değildi — yani bu, mobil için
+// eklenip masaüstünde de eksiği kapatan bir yol.
+//
+// Hedef seçici NATIVE `<select>`: Android'de sistemin kendi seçicisi olarak
+// açılıyor (uzun listede kaydırma, arama, geri tuşu — hepsi bedava) ve
+// masaüstünde de tanıdık. Kendi listemizi çizmek, `.picker-card`ın telefonda
+// yaşadığı yerleşim sorunlarının aynısını yeni bir yüzeyde tekrarlardı.
+function openMoveDialog() {
+  if (!selected.size) return;
+  const modal = $("move-modal");
+  const sec = $("move-target");
+  const sayi = selected.size;
+
+  $("move-desc").textContent = sayi > 1
+    ? `${sayi} görsel seçili hedefe taşınacak.`
+    : "Seçili görsel hedefe taşınacak.";
+
+  sec.replaceChildren();
+  const kok = document.createElement("option");
+  kok.value = "";
+  kok.textContent = "Klasörsüz (kök)";
+  sec.appendChild(kok);
+  // Tam yol yazılıyor: iç içe klasörlerde yalnız ad ("Ağustos") iki farklı
+  // klasörde de aynı olabiliyor ve kullanıcı hangisini seçtiğini bilemezdi.
+  for (const f of folderCache) {
+    const o = document.createElement("option");
+    o.value = f.id;
+    o.textContent = folderPath(f.id).map((x) => x.name).join(" / ") || f.name;
+    sec.appendChild(o);
+  }
+  // Bulunulan klasör hedef olarak anlamsız (görseller zaten orada).
+  if (currentFolder) sec.value = "";
+
+  modal.hidden = false;
+  sec.focus();
+}
+
+function closeMoveDialog() {
+  $("move-modal").hidden = true;
+}
+
+async function confirmMove() {
+  const sec = $("move-target");
+  const folderId = sec.value || null;
+  const ad = sec.options[sec.selectedIndex]?.textContent || "kök";
+  // `moveImages` seçim modunda TÜM seçimi taşıyor (ids'i kendisi kuruyor);
+  // buradan tek bir id vermek yeterli ve taşıma mantığı tek yerde kalıyor.
+  const ilk = [...selected][0];
+  closeMoveDialog();
+  if (!ilk) return;
+  await moveImages(ilk, folderId, ad);
+  setSelectMode(false);
 }
 
 async function deleteSelected() {
@@ -603,6 +678,18 @@ async function deleteSelected() {
 $("select-toggle").addEventListener("click", () => setSelectMode(true));
 $("select-cancel").addEventListener("click", () => setSelectMode(false));
 $("select-delete").addEventListener("click", deleteSelected);
+$("select-move").addEventListener("click", openMoveDialog);
+$("move-cancel").addEventListener("click", closeMoveDialog);
+$("move-ok").addEventListener("click", confirmMove);
+$("move-modal").querySelector("[data-move-close]").addEventListener("click", closeMoveDialog);
+// Escape muhafızı: taşıma penceresi AÇIKKEN Escape onu kapatmalı, arkadaki
+// seçim modunu değil. Aynı desen `media-picker` için de kurulu (aşağıda) —
+// muhafızsız tek Escape iki katmanı birden kapatırdı.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || $("move-modal").hidden) return;
+  e.stopImmediatePropagation();
+  closeMoveDialog();
+}, true);
 $("select-all").addEventListener("click", () => {
   const allSelected = historyCache.length > 0 && selected.size === historyCache.length;
   selected = allSelected ? new Set() : new Set(historyCache.map((r) => r.id));
@@ -1094,11 +1181,17 @@ function renderGallery() {
     const img = document.createElement("img");
     img.src = `/output/${rec.filename}`;
     img.alt = prompt.slice(0, 60);
+    // Taşıma cümlesi girdi türüne göre değişiyor: dokunmatikte sürükleme yok
+    // (bkz. FOLDER_HINT_DEFAULT). `title` zaten dokunmatikte hiç GÖRÜNMÜYOR,
+    // ama ekran okuyucular okuyor — yanlış yönerge orada da yanlış.
+    const tasimaIpucu = IS_TOUCH
+      ? '"Taşı…" ile klasöre taşı'
+      : "taşımak için klasöre sürükle";
     img.title = selectMode
-      ? "Seçmek için tıkla · seçili görselleri taşımak için klasöre sürükle"
+      ? `Seçmek için tıkla · seçili görselleri ${tasimaIpucu}`
       : prompt
-        ? `${prompt}\n\nBüyütmek için tıkla · taşımak için klasöre sürükle`
-        : "Büyütmek için tıkla · taşımak için klasöre sürükle";
+        ? `${prompt}\n\nBüyütmek için tıkla · ${tasimaIpucu}`
+        : `Büyütmek için tıkla · ${tasimaIpucu}`;
     // img'in yerel sürüklemesi kapatılır ki sürükleme kartın kendisinden başlasın
     // (aksi halde dataTransfer'a görsel URL'i düşer ve sürükleme hayaleti bozulur)
     img.draggable = false;

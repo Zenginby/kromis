@@ -91,6 +91,124 @@ def test_frozen_mode_reads_resources_from_meipass(monkeypatch):
         "/tmp/meipass-test", "bundled", "logos")
 
 
+# ── Android dalı ────────────────────────────────────────────────────
+# Desen yukarıdakilerle aynı: platform SAHTELENİYOR (burada ortam değişkeniyle),
+# böylece iddialar Android'in yerleşimini ölçüyor, koşan makinenin değil.
+
+
+def test_android_branch_opens_only_with_the_env_var(monkeypatch):
+    """Ortam değişkeni yoksa Android dalı KAPALI kalmalı.
+
+    Bu testin var oluş sebebi: Chaquopy'de `sys.platform` "linux" döner. Dal
+    platforma bakarak açılsaydı Linux'ta geliştiren biri sessizce Android
+    yoluna düşerdi — dalı ortam değişkenine bağlama kararının tek koruması bu.
+    """
+    monkeypatch.delenv(paths.ANDROID_DATA_ENV, raising=False)
+    monkeypatch.setattr(sys, "platform", "linux")
+    assert not paths.is_android()
+    assert paths.data_dir() == paths.REPO_DIR
+
+
+def test_android_writes_under_the_app_private_dir(monkeypatch):
+    """Yazılabilir kök Kotlin'in bildirdiği `filesDir`; `~` HİÇ kullanılmıyor."""
+    monkeypatch.setenv(paths.ANDROID_DATA_ENV, "/data/user/0/org.kurum.gpt_image_studio/files")
+    # `~`'ı bilerek saçma bir yere çekiyoruz: bir yol expanduser'a uğrarsa
+    # iddia kırmızıya düşsün. Android'de HOME'un tanımsız/"/" olması tam olarak
+    # bu sınıf bir hatayı üretirdi.
+    monkeypatch.setenv("HOME", "/olmayan-ev")
+
+    kok = "/data/user/0/org.kurum.gpt_image_studio/files"
+    assert paths.is_android()
+    assert paths.data_dir() == kok
+    assert paths.output_dir() == os.path.join(kok, "output")
+    assert paths.assets_dir() == os.path.join(kok, "assets")
+    assert paths.chat_instructions_override() == os.path.join(kok, "chat-instructions.md")
+
+
+def test_android_beats_the_frozen_branch(monkeypatch):
+    """Android dalı frozen dallarının ÖNÜNDE olmalı.
+
+    Chaquopy'de `sys.frozen` yok, ama sıra tersine kurulsaydı bir gün
+    eklenecek bir işaret uygulamayı APK'nın salt-okunur içine yazmaya
+    çalıştırırdı. Sıra bir davranış, yorum değil — bu yüzden teste bağlandı.
+    """
+    monkeypatch.setenv(paths.ANDROID_DATA_ENV, "/data/veri")
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "_MEIPASS", "/tmp/meipass-test", raising=False)
+    monkeypatch.setattr(sys, "platform", "darwin")
+
+    assert paths.data_dir() == "/data/veri"
+
+
+def test_android_resources_come_from_the_copied_dir(monkeypatch):
+    """static/ ve bundled/ APK assets'inden değil, kopyalandıkları dizinden okunur."""
+    monkeypatch.setenv(paths.ANDROID_DATA_ENV, "/data/veri")
+    monkeypatch.setenv(paths.ANDROID_RESOURCE_ENV, "/data/veri/resources")
+
+    assert paths.resource_dir() == "/data/veri/resources"
+    assert paths.static_dir() == os.path.join("/data/veri/resources", "static")
+    assert paths.bundled_logos_dir() == os.path.join(
+        "/data/veri/resources", "bundled", "logos")
+
+
+def test_android_resource_dir_falls_back_under_data_dir(monkeypatch):
+    """Kaynak değişkeni bildirilmezse yerleşim yine çözülmeli.
+
+    Kotlin tarafı kopyalamayı `filesDir/resources/` altına yapıyor; iki taraftan
+    biri unutulduğunda uygulama hiç açılmamaktansa doğru yere baksın.
+    """
+    monkeypatch.setenv(paths.ANDROID_DATA_ENV, "/data/veri")
+    monkeypatch.delenv(paths.ANDROID_RESOURCE_ENV, raising=False)
+
+    assert paths.resource_dir() == os.path.join("/data/veri", "resources")
+
+
+def test_desktop_credential_paths_are_unchanged(monkeypatch):
+    """Kimlik yolları `paths`'e taşındı — masaüstü değerleri BİREBİR aynı kalmalı.
+
+    Bu iki yol mevcut kurulumlardaki dosyaları gösteriyor; değişmesi
+    kullanıcının Azure anahtarının "kaybolması" demek olurdu.
+    """
+    monkeypatch.delenv(paths.ANDROID_DATA_ENV, raising=False)
+
+    assert paths.credentials_path() == os.path.expanduser(
+        "~/.config/gpt-image-studio/credentials.env")
+    assert paths.shared_credentials_path() == os.path.expanduser(
+        "~/.config/claude-tools/azure-gpt-image2.env")
+
+
+def test_android_credentials_live_in_the_app_private_dir(monkeypatch):
+    monkeypatch.setenv(paths.ANDROID_DATA_ENV, "/data/veri")
+
+    assert paths.credentials_path() == os.path.join("/data/veri", "credentials.env")
+    # Paylaşılan claude-tools dosyasının telefonda karşılığı yok.
+    assert paths.shared_credentials_path() is None
+
+
+def test_azure_client_reads_the_paths_module(monkeypatch):
+    """`azure_client`'ın sabitleri `paths` ile aynı yeri göstermeli."""
+    import azure_client as ac
+    assert ac.APP_ENV_PATH == paths.credentials_path()
+    assert ac.DEFAULT_ENV_PATH == paths.shared_credentials_path()
+
+
+def test_candidate_paths_drop_the_missing_shared_file(monkeypatch):
+    """Aday listesi `None`'ı elemeli — Android'de paylaşılan dosya yok.
+
+    Elenmeseydi `_parse_env_file(None)` TypeError verirdi: kimlik okumanın
+    tamamı, yani uygulamanın açılışı, telefonda patlardı.
+    """
+    import azure_client as ac
+    monkeypatch.setattr(ac, "APP_ENV_PATH", "/data/veri/credentials.env")
+    monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", None)
+
+    assert ac._candidate_paths(None) == ["/data/veri/credentials.env"]
+    # Masaüstündeki sıra ve içerik korunuyor.
+    monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", "/ev/paylasilan.env")
+    assert ac._candidate_paths(None) == [
+        "/data/veri/credentials.env", "/ev/paylasilan.env"]
+
+
 def test_builtin_logo_resolves_both_variants():
     tail = os.path.join("bundled", "logos", "kurum-logo-{}.png")
     assert paths.builtin_logo("blue").endswith(tail.format("blue"))

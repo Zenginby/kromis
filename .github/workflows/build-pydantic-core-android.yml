@@ -199,13 +199,54 @@ jobs:
       # PyPI'deki sdist alınıyor. Gerekçe: kurulacak sürüm ile derlenen sürüm
       # AYNI paket dosyasından gelsin — git tag'i ile PyPI yayını teoride
       # ayrışabilir ve bu ayrışma yalnız cihazda görünürdü.
+      #
+      # `pip download` İLE DEĞİL, PyPI'nin JSON API'siyle. İlk kurgu
+      # `pip download --no-binary :all: --no-deps --no-build-isolation`
+      # kullanıyordu ve koşunun ilk gerçek denemesinde şununla düştü:
+      #
+      #     BackendUnavailable: Cannot import 'maturin'
+      #
+      # Sebep: pip bir sdist'i indirirken onu yalnızca KOPYALAMIYOR, PEP 517
+      # arka ucunu (pydantic-core'da maturin) çağırıp metadata üretmeye
+      # çalışıyor. `--no-build-isolation` bunu kurulu OLMAYAN maturin'e
+      # yönlendiriyordu. İzolasyonu açmak da doğru cevap değil: yalnızca
+      # metadata için maturin + Rust kuran ikinci bir derleme ortamı doğardı
+      # ve gerçek derlemeyi zaten cibuildwheel yapıyor.
+      #
+      # Bize gereken tek şey tarball, yani arka ucu HİÇ çalıştırmamak hem
+      # doğru hem hızlı. sha256 PyPI'nin bildirdiği değerle karşılaştırılıyor:
+      # bu tarball telefona giren native kodun kaynağı ve yarım inmiş bir
+      # dosya ancak cihazda, açılışta görünürdü.
       - name: pydantic-core sdist'ini indir ve aç
         if: steps.gerek.outputs.derle == 'evet'
         run: |
           set -euo pipefail
           mkdir -p kaynak
-          pip download --no-binary :all: --no-deps --no-build-isolation \
-            "pydantic-core==${{ steps.pin.outputs.core }}" -d kaynak
+          python - "${{ steps.pin.outputs.core }}" <<'PY'
+          import hashlib, json, pathlib, sys, urllib.request
+
+          surum = sys.argv[1]
+          adres = f"https://pypi.org/pypi/pydantic-core/{surum}/json"
+          with urllib.request.urlopen(adres, timeout=60) as yanit:
+              veri = json.load(yanit)
+
+          sdistler = [d for d in veri["urls"] if d["packagetype"] == "sdist"]
+          if len(sdistler) != 1:
+              sys.exit(f"HATA: tam 1 sdist bekleniyordu, {len(sdistler)} bulundu")
+          s = sdistler[0]
+
+          hedef = pathlib.Path("kaynak") / s["filename"]
+          with urllib.request.urlopen(s["url"], timeout=300) as yanit:
+              hedef.write_bytes(yanit.read())
+
+          bulunan = hashlib.sha256(hedef.read_bytes()).hexdigest()
+          beklenen = s["digests"]["sha256"]
+          if bulunan != beklenen:
+              sys.exit(f"HATA: sha256 uyuşmuyor\n  beklenen: {beklenen}\n  bulunan : {bulunan}")
+
+          print(f"{s['filename']} ({hedef.stat().st_size} bayt), sha256 doğrulandı")
+          PY
+
           ls -l kaynak
           tar -xzf "kaynak/pydantic_core-${{ steps.pin.outputs.core }}.tar.gz" -C kaynak
           test -d "kaynak/pydantic_core-${{ steps.pin.outputs.core }}" \

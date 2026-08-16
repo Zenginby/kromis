@@ -85,8 +85,29 @@ cd android
 ./gradlew -PgisBuildPython=python3.13 :app:assembleRelease
 ```
 
-Önce `android/wheels/` altında pydantic-core wheel'i olmalı; yoksa Gradle
-anlaşılır bir Türkçe hatayla durur (bkz. `android/wheels/README.md`).
+**Yerelde** `android/wheels/` altında pydantic-core wheel'i olmalı; yoksa Gradle
+anlaşılır bir Türkçe hatayla durur (bkz. `android/wheels/README.md`). **CI'da**
+gerekmiyor: `build-android.yml`'deki `wheel` işi onu repo → önbellek → derleme
+sırasıyla kendisi buluyor.
+
+### APK'yı telefona ulaştırmak
+
+Kullanıcının gördüğü tarafı `KURULUM.md` → *Android (sideload)* anlatıyor.
+Bakımcı tarafı iki yol:
+
+**Deneme paketi (yayın oluşmaz).** Actions → *Android APK* → **Run workflow** →
+dalı seç. Koşu bitince sayfanın altındaki `gpt-image-studio-android-arm64`
+varlığını indir, ZIP'ten çıkan APK'yı telefona at. İlk koşuda wheel de
+derlendiği için 30–40 dakika sürebilir; sonraki koşular önbellekten okur.
+
+**Yayın.** `v*` biçiminde bir tag at. `release.yml` masaüstü paketlerini,
+`build-android.yml` APK'yı üretir ve `publish-android` işi APK'yı aynı yayına
+ekler. Kullanıcı doğrudan Releases sayfasından indirir.
+
+> **Elle tetikleme yalnız `main`'de çalışır.** GitHub `workflow_dispatch`'i
+> sadece varsayılan dalda bulunan workflow dosyaları için gösteriyor — bu iki
+> workflow `main`'e girmeden bir dal üzerinde tetiklenemez (API 404 döner).
+> Yani ilk APK, bu çalışma `main`'e merge edildikten sonra alınabilir.
 
 ### İmzalama
 

@@ -1,10 +1,21 @@
 # pydantic-core'un Android (arm64-v8a) wheel'ini üretir — Faz 0 / Yol A.
 #
-# NEDEN AYRI BİR WORKFLOW: bu iş her APK derlemesinde koşmamalı. Çıktısı bir
-# İKİLİ VARLIK (android/wheels/*.whl) ve repoya elle işleniyor; pydantic sürümü
-# değişmedikçe yeniden üretmeye gerek yok. Rust cross-compile'ı APK işine
-# gömülseydi her derleme 10+ dakika uzar ve Android SDK/NDK + Rust toolchain
-# zincirinin her kırılması APK'yı da kırardı.
+# NEDEN AYRI BİR WORKFLOW: Rust cross-compile'ı 10–20 dakika sürüyor ve Android
+# SDK/NDK + Rust toolchain zinciri, Gradle zincirinden bağımsız olarak kırılıyor.
+# Ayrı tutmak, hangi zincirin kırıldığını koşuya bakar bakmaz gösteriyor.
+#
+# ÜÇ KAYNAK, TEK ÇIKTI. Wheel şu sırayla aranıyor, ilk bulunan kazanıyor:
+#   1. `android/wheels/` altına ELLE İŞLENMİŞ dosya (Yol A'nın özgün akışı,
+#      bakımcının bilerek seçtiği ikili — bu yüzden önceliği var),
+#   2. çivilerden kurulan anahtarla ÖNBELLEK,
+#   3. yeni DERLEME.
+# Kaynağı ne olursa olsun aynı doğrulama kapısından geçiyor ve aynı varlık adıyla
+# yükleniyor, yani çağıran taraf farkı hiç görmüyor.
+#
+# NEDEN ÇAĞRILABİLİR (workflow_call): önceden wheel repoya işlenene kadar APK
+# HİÇ derlenemiyordu — tek bir elle adım, telefona kurulacak paketin tamamını
+# rehin alıyordu. Karar belgesindeki "her APK derlemesinde koşmasın" kaygısı
+# önbellekle karşılanıyor: çivi başına bir kez derleniyor.
 #
 # NEDEN HİÇ OLMASI GEREKTİĞİ: pydantic-core Rust'la yazılmış tek native
 # bağımlılığımız ve PyPI'de Android wheel'i YOK, Chaquopy deposunda da yok.
@@ -14,8 +25,8 @@
 name: pydantic-core Android wheel
 
 on:
-  # YALNIZ elle. Bu workflow repoya işlenecek bir ikili üretiyor; push/tag
-  # üzerine kendiliğinden koşması yalnızca runner dakikası harcardı.
+  # Elle: wheel'i repoya işlemek için (Yol A'nın özgün akışı).
+  # push/tag üzerine KOŞMUYOR — yalnızca runner dakikası harcardı.
   workflow_dispatch:
     inputs:
       pydantic_core_version:
@@ -28,6 +39,32 @@ on:
         default: ''
       android_api:
         description: 'Wheel etiketindeki API seviyesi (boş → pins.properties)'
+        required: false
+        default: ''
+
+  # build-android.yml bu workflow'u bir iş olarak çağırıyor.
+  #
+  # NEDEN: wheel'in repoya elle işlenmesi Yol A'nın kararıydı ve öyle KALIYOR
+  # (aşağıdaki "repoda var mı" kapısı ona öncelik veriyor). Ama o dosya
+  # gelmeden APK hiç derlenemiyordu — yani tek bir elle adım, telefona kurulacak
+  # paketin tamamını rehin alıyordu. Çağrılabilir olmak bu kilidi açıyor:
+  # wheel repoda yoksa APK işi onu kendisi üretir.
+  #
+  # Karar belgesindeki "her APK derlemesinde koşmasın" kaygısı geçerliliğini
+  # koruyor ve aşağıdaki ÖNBELLEK ile karşılanıyor: wheel çivi başına bir kez
+  # derleniyor, sonraki koşular onu saniyeler içinde geri yüklüyor.
+  workflow_call:
+    inputs:
+      pydantic_core_version:
+        type: string
+        required: false
+        default: ''
+      python_version:
+        type: string
+        required: false
+        default: ''
+      android_api:
+        type: string
         required: false
         default: ''
 
@@ -67,9 +104,57 @@ jobs:
           echo "python=$PY"  >> "$GITHUB_OUTPUT"
           echo "api=$API"    >> "$GITHUB_OUTPUT"
           echo "cp=$CP"      >> "$GITHUB_OUTPUT"
+          echo "ad=pydantic_core-$CORE-$CP-$CP-android_${API}_arm64_v8a.whl" >> "$GITHUB_OUTPUT"
           echo "pydantic-core=$CORE, python=$PY ($CP), android API=$API"
 
-      - name: Set up Python (cibuildwheel sürücüsü)
+      # ── Derlemeden KAÇINMANIN iki yolu ──────────────────────────────
+      # Rust cross-compile'ı 10–20 dakika sürüyor. Aşağıdaki iki kapı onu
+      # gereksiz yere koşturmamak için; ikisi de boş geçilirse derlenir.
+
+      # (1) Wheel repoya İŞLENMİŞ mi? Yol A'nın özgün akışı bu ve önceliği
+      # var: repodaki dosya, bakımcının bilerek seçtiği ikilidir.
+      - name: Repoda hazır wheel var mı
+        id: repo
+        run: |
+          set -euo pipefail
+          mkdir -p cikti
+          W="android/wheels/${{ steps.pin.outputs.ad }}"
+          if [ -s "$W" ]; then
+            cp "$W" cikti/
+            echo "hazir=evet" >> "$GITHUB_OUTPUT"
+            echo "repodaki wheel kullanılıyor: $W"
+          else
+            echo "hazir=hayir" >> "$GITHUB_OUTPUT"
+            echo "repoda wheel yok — önbelleğe, sonra derlemeye bakılacak."
+          fi
+
+      # (2) Önbellek. Anahtar ÇİVİLERDEN kuruluyor: pydantic-core sürümü,
+      # Python etiketi ya da API seviyesi değiştiği an anahtar da değişiyor ve
+      # bayat bir wheel geri yüklenemiyor — `pins.properties`'in "uyuşmazlık
+      # ancak telefonda görünür" uyarısının önbellekteki karşılığı.
+      - name: Önbellekten geri yükle
+        id: onbellek
+        if: steps.repo.outputs.hazir != 'evet'
+        uses: actions/cache/restore@v4
+        with:
+          path: cikti
+          key: pydantic-core-${{ steps.pin.outputs.core }}-${{ steps.pin.outputs.cp }}-android${{ steps.pin.outputs.api }}-arm64_v8a
+
+      - name: Derleme gerekiyor mu
+        id: gerek
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.repo.outputs.hazir }}" = "evet" ]; then
+            echo "derle=hayir" >> "$GITHUB_OUTPUT"; echo "kaynak=repo" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.onbellek.outputs.cache-hit }}" = "true" ]; then
+            echo "derle=hayir" >> "$GITHUB_OUTPUT"; echo "kaynak=önbellek" >> "$GITHUB_OUTPUT"
+          else
+            echo "derle=evet" >> "$GITHUB_OUTPUT"; echo "kaynak=derleme" >> "$GITHUB_OUTPUT"
+          fi
+
+      # KOŞULSUZ: aşağıdaki doğrulama adımı da `python` kullanıyor ve o adım
+      # wheel repodan da, önbellekten de gelse koşuyor.
+      - name: Set up Python (cibuildwheel sürücüsü + doğrulama)
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -79,11 +164,13 @@ jobs:
       # runner imajındaki varsayılan NDK bir gün değişirse sessizce başka bir
       # libc sürümüne bağlanmış bir wheel üretilirdi.
       - name: Android SDK + NDK
+        if: steps.gerek.outputs.derle == 'evet'
         uses: android-actions/setup-android@v3
         with:
           packages: 'platforms;android-35 ndk;27.0.12077973'
 
       - name: NDK yolunu doğrula
+        if: steps.gerek.outputs.derle == 'evet'
         id: ndk
         run: |
           set -euo pipefail
@@ -96,6 +183,7 @@ jobs:
       # Rust hedefi cibuildwheel'den ÖNCE ekleniyor: maturin hedefi kendisi
       # kurmuyor, yoksa derleme "target may not be installed" ile düşer.
       - name: Rust + aarch64-linux-android hedefi
+        if: steps.gerek.outputs.derle == 'evet'
         run: |
           set -euo pipefail
           rustup update stable
@@ -104,6 +192,7 @@ jobs:
           rustc -vV
 
       - name: cibuildwheel
+        if: steps.gerek.outputs.derle == 'evet'
         run: python -m pip install --upgrade "cibuildwheel>=3.1"
 
       # Kaynak olarak sdist: pydantic-core'un git deposunu klonlamak yerine
@@ -111,6 +200,7 @@ jobs:
       # AYNI paket dosyasından gelsin — git tag'i ile PyPI yayını teoride
       # ayrışabilir ve bu ayrışma yalnız cihazda görünürdü.
       - name: pydantic-core sdist'ini indir ve aç
+        if: steps.gerek.outputs.derle == 'evet'
         run: |
           set -euo pipefail
           mkdir -p kaynak
@@ -122,6 +212,7 @@ jobs:
             || { echo "HATA: sdist beklenen dizine açılmadı"; ls -R kaynak | head -40; exit 1; }
 
       - name: Wheel'i derle (cibuildwheel, android/arm64_v8a)
+        if: steps.gerek.outputs.derle == 'evet'
         env:
           CIBW_PLATFORM: android
           CIBW_BUILD: '${{ steps.pin.outputs.cp }}-*'
@@ -177,7 +268,20 @@ jobs:
           print("paylaşımlı kitaplıklar:", sos)
           PY
 
-      - name: Wheel'i yükle (repoya elle işlenecek)
+      # Önbelleğe ancak DOĞRULAMADAN GEÇTİKTEN sonra yazılıyor: bozuk bir
+      # wheel önbelleğe girseydi, anahtar değişene kadar her koşu onu geri
+      # yükler ve hata çivi güncellenene dek yaşardı.
+      - name: Önbelleğe yaz
+        if: steps.gerek.outputs.derle == 'evet'
+        uses: actions/cache/save@v4
+        with:
+          path: cikti
+          key: ${{ steps.onbellek.outputs.cache-primary-key }}
+
+      # Varlık HER durumda yükleniyor — kaynağı repo, önbellek ya da yeni
+      # derleme olsun. build-android.yml bu workflow'u bir iş olarak çağırıp
+      # varlığı indiriyor, yani yükleme onun için de tek teslim yolu.
+      - name: Wheel'i yükle (varlık olarak)
         uses: actions/upload-artifact@v4
         with:
           name: pydantic-core-android-arm64
@@ -187,7 +291,13 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      - name: Sonraki adım
+      - name: Özet
         run: |
-          echo "Varlığı indir, android/wheels/ altına koy ve commit'le."
-          echo "android/app/build.gradle bu dosyayı adıyla kuruyor — ad değişirse orayı da güncelle."
+          echo "wheel kaynağı: ${{ steps.gerek.outputs.kaynak }}"
+          if [ "${{ steps.gerek.outputs.derle }}" = "evet" ]; then
+            echo
+            echo "Bu wheel YENİ derlendi ve önbelleğe alındı; APK işi onu kendisi kullanabilir."
+            echo "Kalıcı kılmak istersen (önbellek 7 gün dokunulmazsa düşer):"
+            echo "  varlığı indir, android/wheels/ altına koy ve commit'le."
+            echo "  android/app/build.gradle dosyayı ADIYLA kuruyor — ad değişirse pins.properties'i de güncelle."
+          fi

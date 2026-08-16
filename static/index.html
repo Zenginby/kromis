@@ -1062,6 +1062,9 @@
        Not: bu yorumda örnek olarak tam sorgu dizesi YAZILMAZ — yer tutucu
        burada da değiştirilir ve cache-buster testi onu gerçek bir varlık
        sürümü sanar (bir kez öyle oldu). -->
+  <!-- core.js folders.js'ten ÖNCE gelmek zorunda: folders.js `IS_TOUCH`i kendi
+       üst düzeyinde okuyor ve o bir `const` — sıra ters çevrilirse TDZ
+       ReferenceError'ı folders.js'in tamamını düşürür (bkz. core.js:204). -->
   <script src="/static/core.js?v=__APP_VERSION__"></script>
   <script src="/static/folders.js?v=__APP_VERSION__"></script>
   <script src="/static/assets.js?v=__APP_VERSION__"></script>

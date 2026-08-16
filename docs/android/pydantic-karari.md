@@ -29,9 +29,26 @@ etmediğini yazmış — yani "bekleyip depoya girmesini ummak" bir yol değil.
 `pydantic-core` maturin ile `aarch64-linux-android` hedefine cross-compile
 ediliyor.
 
-- Workflow: `.github/workflows/build-pydantic-core-android.yml` (yalnız elle tetiklenir)
-- Çıktı: `android/wheels/pydantic_core-<sürüm>-cp313-cp313-android_<API>_arm64_v8a.whl`, repoya işlenir
+- Workflow: `.github/workflows/build-pydantic-core-android.yml`
+- Çıktı: `pydantic_core-<sürüm>-cp313-cp313-android_<API>_arm64_v8a.whl`
 - Kurulum: `android/app/build.gradle` → `pip { install "./wheels/<dosya>" }`
+
+### Düzeltme (2026-08-16) — wheel artık APK'nın önkoşulu değil
+
+İlk kurgu wheel'i **yalnız elle** üretiyor ve repoya işlenmesini bekliyordu.
+Sonuç, PR #28 incelemesinde çıktı: wheel repoya girmediği için `build.gradle`
+her ortamda `GradleException` atıyordu ve APK **hiçbir yerde** derlenemiyordu.
+Tek bir elle adım, telefona kurulacak paketin tamamını rehin alıyordu — üstelik
+bir `v*` tag'i atıldığında bu, "yayın çıktı ama Android yok" olarak görünecekti.
+
+Wheel workflow'u artık `workflow_call` ile de çağrılabiliyor ve
+`build-android.yml` onu bir iş olarak koşturuyor. Wheel üç kaynaktan gelebiliyor
+— repo > önbellek > derleme — ve üçü de aynı doğrulama kapısından geçiyor.
+
+Karar DEĞİŞMEDİ, yalnız zorunluluktan çıktı: repodaki dosya hâlâ önceliklidir
+ve yayın tekrarlanabilirliği için hâlâ önerilir (bkz. `android/wheels/README.md`).
+"Her APK derlemesinde koşmasın" kaygısı önbellekle karşılanıyor: çivi başına
+bir kez derleniyor, sonraki koşular saniyeler içinde geri yüklüyor.
 
 **Ürün kodunda değişiklik: SIFIR.** `models.py` (588 satır, 14 `BaseModel`,
 22 `field_validator`) ve masaüstü tarafı aynen kalıyor. Bu yüzden ilk denenen

@@ -48,8 +48,18 @@ jobs:
       - name: Pytest
         run: pytest tests/ -v
 
+  # pydantic-core wheel'i — Chaquopy'nin kurabildiği TEK kaynak.
+  #
+  # Bu iş, wheel repoya işlenmişse onu olduğu gibi geçiriyor; işlenmemişse
+  # önbellekten alıyor, o da yoksa derliyor. Yani APK derlemesi artık elle
+  # atılmış bir adıma bağlı DEĞİL — eskiden wheel gelene kadar aşağıdaki iş
+  # "wheel yok" diyerek duruyordu ve telefona kurulacak paket hiç üretilemiyordu.
+  wheel:
+    name: pydantic-core wheel
+    uses: ./.github/workflows/build-pydantic-core-android.yml
+
   build-android:
-    needs: test
+    needs: [test, wheel]
     name: Android arm64-v8a APK
     runs-on: ubuntu-latest
     # Chaquopy ilk koşuda Python çalışma zamanını ve tüm wheel'leri indirip
@@ -81,9 +91,22 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # Wheel repoda duruyor (elle işleniyor, bkz. android/wheels/README.md).
-      # Yoksa Gradle zaten anlaşılır bir Türkçe hatayla duruyor; bu adım aynı
-      # hatayı DAHA ERKEN ve daha görünür veriyor.
+      # Wheel'i `wheel` işinden al. O iş üç kaynağı da (repo / önbellek /
+      # derleme) tek bir varlığa indirgiyor, yani burada ayrım yapmaya gerek yok.
+      #
+      # `android/wheels/` içine iniyor çünkü `build.gradle` dosyayı ORADA, çivi
+      # dosyasından kurduğu adla arıyor. Repoda zaten aynı ad varsa üzerine
+      # aynı içerik yazılıyor — `wheel` işi o durumda repodaki dosyayı geçirmişti.
+      - name: Wheel'i indir
+        uses: actions/download-artifact@v4
+        with:
+          name: pydantic-core-android-arm64
+          path: android/wheels
+
+      # Kapı DURUYOR, yalnız artık elle atılmış bir adımı değil, bir önceki işin
+      # teslimatını denetliyor: `wheel` işi yeşil olup da varlığı boş bırakırsa
+      # (release.yml'de bedeli ödenen "yeşil ama boş" sınıfı) Gradle'ın hatası
+      # Chaquopy pip çıktısının içinde kaybolurdu.
       - name: pydantic-core wheel'i yerinde mi
         run: |
           set -euo pipefail
@@ -92,8 +115,7 @@ jobs:
           W="android/wheels/pydantic_core-$(oku pydanticCoreVersion)-$CP-$CP-android_$(oku wheelAndroidApi)_arm64_v8a.whl"
           test -s "$W" || {
             echo "HATA: wheel yok ya da boş: $W"
-            echo "  'pydantic-core Android wheel' workflow'unu elle tetikle,"
-            echo "  çıkan varlığı android/wheels/ altına koy (bkz. android/wheels/README.md)."
+            echo "  'wheel' işinin kaydına bak — varlığı o üretiyor."
             ls -l android/wheels/ || true
             exit 1
           }

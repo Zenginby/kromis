@@ -75,16 +75,32 @@ object Downloader {
         }
     }
 
+    /** Adres uygulamanın KENDİ sunucusunu mu gösteriyor? */
+    private fun yerelMi(url: URL): Boolean =
+        url.host == "127.0.0.1" || url.host == "localhost"
+
     private fun indir(context: Context, istek: Istek, cerez: String?) {
-        val baglanti = (URL(istek.url).openConnection() as HttpURLConnection).apply {
+        val adres = URL(istek.url)
+        val baglanti = (adres.openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 15_000
             // Klasör ZIP'i sunucuda bellekte üretiliyor ve yüzlerce görsel
             // içerebiliyor; okuma zaman aşımı buna göre cömert.
             readTimeout = 120_000
+            // YÖNLENDİRME İZLENMİYOR. Varsayılan davranış `setRequestProperty`
+            // ile konan başlıkları yönlendirilen isteğe de taşıyor — yani
+            // 127.0.0.1'den dışarı bir yönlendirme oturum çerezini yabancı bir
+            // sunucuya götürürdü. Kendi sunucumuz indirme yollarında hiç
+            // yönlendirme üretmiyor, yani kapatmanın bir bedeli yok.
+            instanceFollowRedirects = false
             // Oturum çerezi ŞART: android_main'deki kapı çerezsiz her isteği
             // 403 ile kesiyor — kendi indirmemiz de bu kuralın istisnası değil.
-            if (!cerez.isNullOrBlank()) setRequestProperty("Cookie", cerez)
+            //
+            // Ama YALNIZ loopback'e: `istek.url` WebView'in DownloadListener'ından
+            // olduğu gibi geliyor ve bu çerez Azure anahtarını koruyan şeyin
+            // kendisi. Host denetimi, o anahtarın cihaz dışına çıkmasının önündeki
+            // son kapı — `DownloadManager`'ı kullanmama gerekçesiyle aynı disiplin.
+            if (yerelMi(adres) && !cerez.isNullOrBlank()) setRequestProperty("Cookie", cerez)
         }
         try {
             val kod = baglanti.responseCode

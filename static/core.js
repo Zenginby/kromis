@@ -201,6 +201,14 @@ $("go").addEventListener("click", submitComposer);
 // aranıyor — tek başına `hover: none` bazı televizyon tarayıcılarında da
 // doğru, `pointer: coarse` ise dokunmatik ekranlı bir dizüstüde fare
 // takılıyken de doğru kalabiliyor.
+//
+// SIRA BAĞIMLILIĞI — core.js `folders.js`'ten ÖNCE yüklenmek zorunda:
+// `folders.js` bu değeri KENDİ üst düzeyinde okuyor (FOLDER_HINT_DEFAULT /
+// FOLDER_HINT_IMPORT). Üst düzey `const` küresel sözlüksel kapsamda duruyor,
+// yani sıra bir gün ters çevrilirse sonuç sessiz bir `undefined` değil, TDZ
+// `ReferenceError`'ı olur ve `folders.js`'in TAMAMI (klasörler, galeri, seçim
+// modu, taşıma) hiç yüklenmez. index.html'deki script sırası bu yüzden
+// gelişigüzel değil.
 const IS_TOUCH = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 
 $("prompt").addEventListener("keydown", (e) => {

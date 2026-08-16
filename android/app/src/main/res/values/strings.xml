@@ -17,7 +17,10 @@
     <!-- Hatalar -->
     <string name="sunucu_baslatilamadi">Uygulama başlatılamadı</string>
     <string name="sunucu_baslatilamadi_detay">Hata kaydı: %1$s — lütfen bu dosyayı Kurum\'ya iletin.</string>
-    <string name="tamam">Tamam</string>
+    <!-- Sunucu AYAKTA ama arayüz yüklenemedi (ağ hatası ya da oturum kapısının
+         403'ü). Ayrı bir metin: "başlatılamadı" ile aynı diyalogda gösteriliyor
+         ama sebep farklı ve hata kaydında aranacak iz de farklı. -->
+    <string name="arayuz_yuklenemedi_detay">Arayüz yüklenemedi: %1$s</string>
     <string name="cikis">Çık</string>
 
     <!-- İndirme -->

@@ -11,7 +11,9 @@ import android.view.View
 import android.webkit.CookieManager
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.URLUtil
@@ -52,6 +54,9 @@ class MainActivity : AppCompatActivity() {
 
     /** İzin istenirken bekleyen indirme; izin verilince buradan sürüyor. */
     private var bekleyenIndirme: Downloader.Istek? = null
+
+    /** Açılış hatası diyaloğu bir kez gösterilsin (bkz. `acilisHatasi`). */
+    private var acilisHatasiGosterildi = false
 
     private var uc: PythonServer.Uc? = null
 
@@ -159,14 +164,28 @@ class MainActivity : AppCompatActivity() {
      * olmasaydı ekranda yalnız sonsuza kadar dönen bir çember kalırdı.
      */
     private fun acilisHatasi(hata: Throwable) {
+        acilisHatasi(hata.message ?: hata.javaClass.simpleName)
+    }
+
+    /**
+     * İki çağrı yolu var — sunucu HİÇ başlamadı (`sunucuyuBaslat`'ın yakalama
+     * dalı) ve sunucu başladı ama arayüz yüklenemedi (`WebViewClient`'ın hata
+     * geri çağrıları). Kullanıcı açısından ikisi de aynı: uygulama açılmadı.
+     *
+     * `acilisHatasiGosterildi` muhafızı: tek bir başarısız yükleme hem
+     * `onReceivedError` hem `onReceivedHttpError` tetikleyebiliyor ve üst üste
+     * iki diyalog, ilkini okunamadan gömerdi.
+     */
+    private fun acilisHatasi(detay: String) {
+        if (acilisHatasiGosterildi) return
+        acilisHatasiGosterildi = true
+
         val kayit = File(filesDir, "hata.log").absolutePath
+        perde.visibility = View.VISIBLE
         perdeBaslik.text = getString(R.string.sunucu_baslatilamadi)
         AlertDialog.Builder(this)
             .setTitle(R.string.sunucu_baslatilamadi)
-            .setMessage(
-                getString(R.string.sunucu_baslatilamadi_detay, kayit) +
-                    "\n\n" + (hata.message ?: hata.javaClass.simpleName)
-            )
+            .setMessage(getString(R.string.sunucu_baslatilamadi_detay, kayit) + "\n\n" + detay)
             .setCancelable(false)
             .setPositiveButton(R.string.cikis) { _, _ -> finish() }
             .show()
@@ -217,7 +236,45 @@ class MainActivity : AppCompatActivity() {
                 // Perde ancak arayüz GERÇEKTEN çizildiğinde kalkıyor. Sunucu
                 // hazır olur olmaz kaldırılsaydı kullanıcı bir an boş beyaz
                 // bir WebView görürdü.
-                perde.visibility = View.GONE
+                //
+                // Hata varsa perde KALIYOR: `onPageFinished` başarısız bir
+                // yüklemeden sonra da çağrılıyor ve perdeyi koşulsuz kaldırmak,
+                // kullanıcıyı açıklamasız boş bir WebView'de bırakırdı.
+                if (!acilisHatasiGosterildi) perde.visibility = View.GONE
+            }
+
+            /**
+             * Ağ düzeyi hata (bağlantı kurulamadı, sunucu düştü).
+             *
+             * `isForMainFrame` SÜZGECİ ŞART: bir görselin ya da JS dosyasının
+             * tek başına başarısız olması uygulamayı açılamaz yapmaz, ama bu
+             * geri çağrı onlar için de tetikleniyor — süzgeçsiz bir uyarı,
+             * çalışan bir uygulamada yanlış alarm verirdi.
+             */
+            override fun onReceivedError(
+                view: WebView, request: WebResourceRequest, error: WebResourceError,
+            ) {
+                if (!request.isForMainFrame) return
+                acilisHatasi(getString(R.string.arayuz_yuklenemedi_detay, error.description))
+            }
+
+            /**
+             * HTTP düzeyi hata — asıl beklenen durum 403.
+             *
+             * Sunucu AYAKTA ama oturum kapısı isteği reddetti (bkz.
+             * `android_main.SessionCookieGuard`): çerez bayatlamış ya da hiç
+             * yazılamamış olabilir. `PythonServer.baslat` fırlatmadığı için
+             * `sunucuyuBaslat`'ın yakalama dalı bu durumu HİÇ görmüyordu.
+             */
+            override fun onReceivedHttpError(
+                view: WebView, request: WebResourceRequest,
+                errorResponse: WebResourceResponse,
+            ) {
+                if (!request.isForMainFrame) return
+                acilisHatasi(
+                    getString(R.string.arayuz_yuklenemedi_detay,
+                        "HTTP ${errorResponse.statusCode}")
+                )
             }
         }
 

@@ -184,8 +184,9 @@ işlemlerinin hepsi telefonun kendi içinde koşuyor. Bilgisayarına ya da ayrı
 sunucuya bağlanmıyor; internet yalnızca Azure çağrıları için gerekli.
 
 **Gereken:** Android 8.0 veya üstü, 64-bit (arm64) telefon — 2017 sonrası
-neredeyse her telefon. Yaklaşık **300 MB** boş alan (APK ~50–70 MB, kurulduktan
-sonra açılan Python çalışma zamanı ve ürettiğin görseller için pay).
+neredeyse her telefon. Yaklaşık **300 MB** boş alan (APK **28 MB**; kurulumdan
+sonra Python çalışma zamanı açılıyor ve ürettiğin görseller de telefonda
+duruyor — pay bunun için).
 
 ### A1. APK'yı indir
 Telefonun tarayıcısından `gpt-image-studio-android-arm64.apk` dosyasını indir.

@@ -137,6 +137,12 @@ android {
             // girmiyor (CI'da GitHub Secret, yerelde kabuk değişkeni).
             // Tanımsızlarsa blok boş kalır ve aşağıdaki buildType imzasız
             // derler — yerelde `assembleDebug` çalışmaya devam etsin diye.
+            //
+            // İmzasız çıktı KURULAMAZ: Android imzasız paketi reddediyor
+            // ("paket geçersiz görünüyor"). Yani buradan çıkan release APK'sı
+            // sırlar tanımlı değilken yalnız derlemenin ayakta olduğunu
+            // gösterir, telefona atılacak paket değildir.
+            // Ayrıntı: docs/android/mimari.md → İmzalama.
             if (System.getenv("ANDROID_KEYSTORE_PATH")) {
                 storeFile file(System.getenv("ANDROID_KEYSTORE_PATH"))
                 storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")

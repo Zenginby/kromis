@@ -100,6 +100,12 @@ dalı seç. Koşu bitince sayfanın altındaki `gpt-image-studio-android-arm64`
 varlığını indir, ZIP'ten çıkan APK'yı telefona at. İlk koşuda wheel de
 derlendiği için 30–40 dakika sürebilir; sonraki koşular önbellekten okur.
 
+> **Bu paket ancak imzalıysa kurulabilir.** İmzalama sırları tanımlı değilse
+> koşu yine yeşil olur ve varlığı üretir, ama APK **imzasızdır** ve Android onu
+> kurmaz — telefonda *"paket geçersiz görünüyor"* der. Koşu sayfasının başındaki
+> özet bunu yazıyor; `İmzayı doğrula` adımının atlanmış olması da aynı işaret.
+> Aşağıdaki *İmzalama* bölümü tek seferlik kurulumu anlatıyor.
+
 **Yayın.** `v*` biçiminde bir tag at. `release.yml` masaüstü paketlerini,
 `build-android.yml` APK'yı üretir ve `publish-android` işi APK'yı aynı yayına
 ekler. Kullanıcı doğrudan Releases sayfasından indirir.
@@ -121,22 +127,41 @@ Anahtar repoya **girmiyor**. CI dört GitHub Secret okuyor:
 | `ANDROID_KEY_PASSWORD` | Anahtar parolası |
 
 Yerelde aynı değerler ortam değişkeni olarak veriliyor
-(`ANDROID_KEYSTORE_PATH` + üçü). Tanımlı değilse `assembleRelease` **imzasız**
-üretir — dal üzerinde derlemenin ayakta olduğunu görmek için yeterli, ama
-tag'de CI imzasız APK'yı yayına sokmuyor.
+(`ANDROID_KEYSTORE_PATH` + üçü). Tanımlı değilse `build.gradle` `release`
+buildType'ına hiçbir `signingConfig` bağlamıyor ve `assembleRelease`
+**imzasız** bir paket üretir.
+
+> **İmzasız APK KURULMAZ.** Android imzasız paketi reddeder: telefonda
+> *"Uygulama yüklenmedi — paket geçersiz görünüyor"*. Bu bir Xiaomi/MIUI ayarı
+> ya da "bilinmeyen kaynaklar" izni sorunu **değil**; izni versen de kurulmaz.
+> Dosya adı da yardımcı olmuyor: AGP normalde `app-release-unsigned.apk` derdi,
+> ama workflow çıktı adını `…-release.apk` olarak sabitliyor. Tek güvenilir
+> işaret koşudaki `İmzayı doğrula` adımı — atlandıysa paket imzasızdır.
+> İmzasız derleme yine de bir işe yarıyor: derlemenin ayakta olduğunu gösteriyor
+> ve imzalama sırlarına erişimi olmayan bir çatal da koşabiliyor. Tag'de ise CI
+> imzasız APK'yı yayına sokmuyor.
 
 Anahtar bir kez üretilir ve **kaybedilmemelidir**: aynı anahtarla imzalanmayan
 bir APK, kullanıcının telefonundaki kurulumun üzerine yazamaz — kullanıcı
-uygulamayı kaldırmak zorunda kalır ve kaldırma tüm verisini siler.
+uygulamayı kaldırmak zorunda kalır ve kaldırma tüm verisini siler. Anahtar repo
+dışında, parola yöneticisinde ya da şifreli bir yedekte durmalı.
 
 ```bash
 keytool -genkeypair -v -keystore gis.keystore -alias gis \
-        -keyalg RSA -keysize 4096 -validity 10000
+        -keyalg RSA -keysize 4096 -validity 10000 -storetype PKCS12
 ```
+
+PKCS12'de **anahtar parolası = depo parolası**; `keytool` ayrı bir anahtar
+parolası sormuyor. `ANDROID_KEYSTORE_PASSWORD` ve `ANDROID_KEY_PASSWORD`
+sırlarına aynı değer yazılır — farklı yazılırsa Gradle parola hatasıyla düşer.
+
+Sırları tanımladıktan sonra Actions → *Android APK* → **Run workflow**. Bu kez
+`İmzayı doğrula` atlanmaz; `apksigner verify --print-certs` sertifikayı basar ve
+o adım yeşilse paket telefona kurulur.
 
 ## Beklenen boyut ve ilk açılış
 
-- APK: **28 MB** (ölçüldü, run 31968594609 · 482 girdi). İlk tahmin 45–70 MB'ydı;
+- APK: **28 MB** (ölçüldü, run 31969129034 · 482 girdi). İlk tahmin 45–70 MB'ydı;
   fark, Chaquopy'nin stdlib'i ve bağımlılıkları sıkıştırılmış `.imy` arşivleri
   olarak paketlemesinden — cihazdaki açılmış boyut tahmine daha yakın.
 - Tek ABI (`arm64-v8a`) **şart**: ikinci bir ABI boyutu neredeyse ikiye katlar.

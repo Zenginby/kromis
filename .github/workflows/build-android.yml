@@ -128,12 +128,33 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${KEYSTORE_B64:-}" ]; then
-            # Sır tanımlı değilse iş DURMUYOR, imzasız derliyor: dal üzerinde
-            # yapılan bir dispatch'in tek amacı derlemenin ayakta olduğunu
-            # görmek ve imzalama sırlarına erişimi olmayan bir çatal (fork)
-            # da bunu koşabilmeli. Tag'de ise aşağıdaki kapı imzasız APK'yı
-            # yayına SOKMUYOR.
-            echo "UYARI: ANDROID_KEYSTORE_BASE64 yok — imzasız (debug) derleme."
+            # Sır tanımlı değilse iş DURMUYOR: dal üzerinde yapılan bir
+            # dispatch'in amacı derlemenin ayakta olduğunu görmek ve imzalama
+            # sırlarına erişimi olmayan bir çatal (fork) da bunu koşabilmeli.
+            # Tag'de ise aşağıdaki kapı imzasız APK'yı yayına SOKMUYOR.
+            #
+            # BU BİR "DEBUG DERLEMESİ" DEĞİL: paket hiçbir anahtarla
+            # imzalanmıyor ve Android imzasız paketi KURMAZ — telefonda
+            # "paket geçersiz görünüyor" der. Eski metin "imzasız (debug)"
+            # diyordu; "debug" kelimesi kurulabilir olduğunu ima ettiği için
+            # imzasız bir APK telefona atıldı ve ancak orada anlaşıldı.
+            # Uyarı artık hem loga hem koşu ÖZETİNE yazılıyor: varlığı indiren
+            # kişi log satırlarını değil, koşu sayfasını görüyor.
+            echo "UYARI: ANDROID_KEYSTORE_BASE64 yok — APK İMZASIZ derlenecek."
+            echo "  İmzasız APK telefona KURULAMAZ ('paket geçersiz görünüyor')."
+            echo "  Gerekli sırlar: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,"
+            echo "  ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD (docs/android/mimari.md → İmzalama)."
+            {
+              echo "### ⚠️ Bu APK İMZASIZ — telefona kurulamaz"
+              echo
+              echo "Android imzasız paketi kurmaz; \`Paket geçersiz görünüyor\` hatası verir."
+              echo "Aşağıdaki varlık yalnızca **derlemenin ayakta olduğunu** gösterir."
+              echo
+              echo "Kurulabilir paket için dört GitHub Secret gerekiyor —"
+              echo "\`ANDROID_KEYSTORE_BASE64\`, \`ANDROID_KEYSTORE_PASSWORD\`,"
+              echo "\`ANDROID_KEY_ALIAS\`, \`ANDROID_KEY_PASSWORD\`."
+              echo "Anahtarın nasıl üretileceği: \`docs/android/mimari.md\` → İmzalama."
+            } >> "$GITHUB_STEP_SUMMARY"
             echo "imzali=hayir" >> "$GITHUB_OUTPUT"
             exit 0
           fi

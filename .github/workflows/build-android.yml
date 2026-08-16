@@ -179,7 +179,12 @@ jobs:
 
           # (3) Tek ABI. İki ABI paketi neredeyse ikiye katlar ve bunu ancak
           # dosya boyutuna bakan biri fark ederdi.
-          ABILER="$(echo "$BADGING" | sed -n "s/native-code: //p" | tr -d \")"
+          #
+          # `aapt2` bu satırı TEK tırnakla yazıyor: native-code: 'arm64-v8a'
+          # (run 31967618693 bunu yalnız çift tırnak silerek okudu ve "beklenen
+          # arm64-v8a, bulunan: 'arm64-v8a'" diye düştü). İkisini de siliyoruz:
+          # biçim aapt2 sürümüne göre değişse de kapı ABI'yi ölçmeye devam etsin.
+          ABILER="$(echo "$BADGING" | sed -n "s/^native-code: //p" | tr -d "\"'")"
           test "$ABILER" = "arm64-v8a" || { echo "HATA: beklenen ABI arm64-v8a, bulunan: $ABILER"; exit 1; }
 
           # (4) İçerik. Üç ayrı sınıf: arayüz, gömülü varlıklar, Python

@@ -10,6 +10,8 @@ yalnızca telefonda "düğme çalışmıyor" olarak görünür — ve o telefon 
 """
 from __future__ import annotations
 
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -103,6 +105,166 @@ def test_tap_targets_grow_without_resizing_the_controls(istemci):
     css = _metin(istemci, "/static/mobile.css")
     assert "--tap: 44px" in css
     assert "width: var(--tap); height: var(--tap);" in css
+
+
+def test_the_top_edge_is_inset_like_the_bottom_edge(istemci):
+    """Güvenli alan İKİ kenarlı; üst kenar atlanmıştı.
+
+    `viewport-fit=cover` sayfayı bilerek durum çubuğunun altına da yayıyor. Üst
+    şerit 56px, Android durum çubuğu ~24-28dp — yani hamburger ile ⚙'nin üst
+    yarısını sistem çubuğu yutuyor: düğmeler GÖRÜNÜYOR ama dokunuş onlara
+    ulaşmıyor. Tam olarak bu dosyanın başındaki "telefonda düğme çalışmıyor"
+    sınıfından bir kırılma ve CI'daki hiçbir tarayıcı bunu göstermiyor
+    (masaüstü Chromium'da `env(safe-area-inset-top)` her zaman 0).
+
+    Dolgu .app'e veriliyor, .topbar'a değil: .topbar bir ızgara satırı ve tam
+    `var(--topbar-h)` yüksekliğinde, içine dolgu koymak içeriği ezer.
+    """
+    css = _metin(istemci, "/static/mobile.css")
+    ust = "env(safe-area-inset-top, 0px)"
+    # .app: üst şerit. Ölçü satırın kendisinde aranıyor ki kural başka bir
+    # seçiciye kayarsa test düşsün.
+    assert f".app {{\n  padding-top: {ust};" in css
+    # Slide-over'lar `position: fixed` — .app'in dolgusunun dışında kalıyorlar.
+    # İki kenar birden: panel tam ekran, dibindeki "Kaydet" ve "Kurulu sürüm"
+    # satırı jest çubuğunun altında kalıyordu.
+    assert f".sheet {{\n  padding-top: {ust};\n" \
+           f"  padding-bottom: env(safe-area-inset-bottom, 0px);" in css
+    # Tam ekran yüzeylerin başlığı da tepede.
+    for secici in (".modal-card", ".picker-card"):
+        blok = css.split(secici, 1)[1].split("}", 1)[0]
+        assert ust in blok, secici
+
+
+def test_the_installed_version_is_readable_on_a_phone(istemci):
+    """Telefonda kurulu sürümü görmenin BİR yolu olmak zorunda.
+
+    Üst şeritteki `.ver` pill'i mobile.css'te gizli (360px'de #session-title'ı
+    eziyordu) ve index.html'in kendi yorumu o pill'in "Ayarlar modalının dibinden
+    üst şeride TAŞINDIĞINI" söylüyor — yani gizlendiği an telefonda sürümü
+    görmenin hiçbir yolu kalmıyordu. Bu, APK'nın güncel olup olmadığına karar
+    vermenin tek yolu (README'nin indirme bölümü buraya yönlendiriyor) ve
+    kaybolması hiçbir hata üretmez: rozet zaten gizli, kimse fark etmez.
+
+    Kaynak TEK: settings.js `[data-app-version]` ile hepsini birden yazıyor.
+    """
+    css = _metin(istemci, "/static/mobile.css")
+    html = _metin(istemci, "/")
+    js = _metin(istemci, "/static/settings.js")
+
+    # Öncül: pill gerçekten gizli. Gizlenmesi bırakılırsa bu testin gerekçesi
+    # düşer, o yüzden iddia burada duruyor.
+    assert ".ver," in css and "display: none" in css.split(".ver,")[1][:80]
+
+    # Sürüm satırı bir .sheet'in içinde — .sheet telefonda tam ekran, görünür.
+    # Yorumlar ayıklanıyor: seçici yorumlarda da anlatılıyor, sayılmamalı.
+    ayarlar = re.sub(r"<!--.*?-->", "", html, flags=re.S) \
+        .split('id="settings-modal"', 1)[1].split("</aside>", 1)[0]
+    assert "settings-version-row" in ayarlar, "Ayarlar'da kurulu sürüm satırı yok"
+    assert "data-app-version" in ayarlar, "satır tek kaynağa bağlı değil"
+
+    # Yazan taraf: tek id yerine seçici, yoksa iki yerden biri "—" kalır.
+    assert 'querySelectorAll("[data-app-version]")' in js
+    # Stili olmayan bir satır panelin dibinde forma ait bir not gibi okunur.
+    assert ".settings-version-row" in _metin(istemci, "/static/style.css")
+
+
+def test_the_image_mode_composer_row_wraps_by_rule_not_by_measurement(istemci):
+    """Sarma ÖLÇÜYE bağlı kalamaz: Android WebView sistem yazı ölçeğini uyguluyor.
+
+    Görsel modunda çubuk dört kontrol taşıyor (.plus + .view-tabs +
+    .composer-right, ölçüm 393px'te 446px > 369px) ve sarma kaçınılmaz. Ölçüye
+    bağlı sarma, yazı ölçeğini büyütmüş bir telefonda iki satır, küçültmüş bir
+    telefonda tek satır veriyordu — yani yerleşim cihazdan cihaza değişiyordu.
+    `flex-basis: 100%` onu kurala bağlıyor.
+
+    Yalnızca Görsel modu: Yönetmen modunda #specs-btn gizli ve tek "Gönder"
+    düğmesi için ikinci satır açmak composer'ı 40px boşuna uzatırdı — telefonda
+    composer zaten tuvalin ~%25'i.
+    """
+    css = _metin(istemci, "/static/mobile.css")
+    blok = css.split('#composer[data-mode="image"] .composer-right', 1)
+    assert len(blok) == 2, "Görsel modu kuralı yok"
+    govde = blok[1].split("}", 1)[0]
+    assert "flex: 1 1 100%" in govde, "sarma ölçüye bırakılmış"
+    # style.css:273'ün `margin-left: auto`'su ikinci satırda da geçerli kalıyor
+    # ve satırı sağa yapıştırıyordu: solda kocaman boşluk, çip ortada asılı.
+    assert "margin-left: 0" in govde
+
+
+def test_the_primary_button_is_not_full_width_inside_the_composer(istemci):
+    """`.composer-send` iki sınıflı seçici olmak ZORUNDA.
+
+    `.primary { width: 100% }` bu kuraldan 627 satır SONRA tanımlı ve eşit
+    özgüllükte kaynak sırası onu kazandırıyor. Tek sınıflı hâli yıllardır hiç
+    uygulanmıyordu; görünmemesinin nedeni `flex-shrink`ti — #go satırı taşırıyor,
+    esneme onu içerik boyuna geri büzüyordu. Satırın SARMASI gereken her yerde
+    (telefon) esneme payı kalmıyor ve kaza bozuluyor: #go tam satır genişliğine
+    açılıp alt satıra düşüyor, composer 40px uzuyor.
+    """
+    css = _metin(istemci, "/static/style.css")
+    assert ".composer .composer-send { width: auto;" in css
+    assert "\n.composer-send { width: auto;" not in css, "tek sınıflı hâli geri geldi"
+
+
+def test_the_selection_pill_actions_drop_to_their_own_row_as_icons(istemci):
+    """Eylem satırı pilin İÇİNDE üçüncü bir sütun olarak sıkışıyordu.
+
+    .chat-pick bir flex SATIRI, .chat-bubble-actions ise .chat-msg-user'ın BLOK
+    akışı için yazılmış — orada kendiliğinden alt satıra düşüyor. Pil
+    `max-width: 76%` ile sınırlı olduğu için iki etiketli düğme kalan yeri
+    paylaşıp 44px'e iniyor ve etiketler HARF HARF sarıyordu: telefonda "Düzenle"
+    dikey bir harf sütunu oluyordu (ölçüm: düğme 44×80px).
+
+    `flex-basis: 100%` satırı kesin olarak alta indiriyor — yine ölçüye değil
+    kurala bağlı, yazı ölçeği ne olursa olsun aynı.
+    """
+    css = _metin(istemci, "/static/style.css")
+    govde = css.split(".chat-pick .chat-bubble-actions", 1)
+    assert len(govde) == 2, "eylem satırı kuralı yok"
+    assert "flex: 0 0 100%" in govde[1].split("}", 1)[0]
+    # Etiketler kalkıyor; erişilebilir ad `title`'dan geliyor (chat.js).
+    assert ".chat-pick .chat-action-btn span { display: none; }" in css
+    js = _metin(istemci, "/static/chat.js")
+    assert 'copyBtn.title = "Metni panoya kopyala"' in js
+    assert 'restoreBtn.title = "Metni düzenlemek üzere kutuya aktar"' in js
+
+
+def test_copy_feedback_survives_the_label_being_hidden(istemci):
+    """Onay etikete bağlıydı; seçim pilinde etiket gizli.
+
+    "Kopyalandı" tek geri bildirim olsaydı bir seçimi kopyalayan telefon
+    kullanıcısı hiçbir şey görmezdi — pano işlemi sessizce başarılı olur ve
+    kullanıcı tekrar basardı. chatStatus() composer'ın alt satırında görünüyor.
+    """
+    js = _metin(istemci, "/static/chat.js")
+    govde = js.split("copyBtn.addEventListener", 1)[1].split("\n  });", 1)[0]
+    assert 'copyLabel.textContent = "Kopyalandı"' in govde
+    assert 'chatStatus("Panoya kopyalandı.")' in govde
+
+
+def test_the_selection_pill_tap_targets_do_not_overlap(istemci):
+    """İki ikon düğmesi 8px arayla duruyor — KARE hedef büyütme burada yanlış.
+
+    Yukarıdaki `width/height: var(--tap)` kalıbı uygulansaydı iki 44px'lik
+    görünmez kare birbirine 14px girerdi ve çakışmada DOM'da sonra gelen
+    (Kopyala) kazanırdı: Düzenle'nin sağ yarısına basmak prompt kutusunu
+    doldurmak yerine kopyalardı — yani hedef büyütmek yanlış eylemi tetikleyen
+    bir hata üretirdi.
+
+    Şerit kalıbı: dikeyde 44px, yatayda düğme + iki yana 4px. 4+4 = 8px, yani
+    boşluğu tam paylaşıyorlar ve sınırları değiyor ama çakışmıyor.
+    """
+    css = _metin(istemci, "/static/mobile.css")
+    blok = css.split(".chat-pick .chat-action-btn::after", 1)
+    assert len(blok) == 2, "şerit kuralı yok"
+    govde = blok[1].split("}", 1)[0]
+    assert "height: var(--tap);" in govde
+    assert "left: -4px; right: -4px;" in govde
+    assert "width: var(--tap)" not in govde, "kare kalıba dönülmüş — hedefler çakışır"
+    # Ara 8px olmak zorunda: küçülürse şeritler çakışmaya başlar.
+    ara = css.split(".chat-pick .chat-bubble-actions {", 1)[1].split("}", 1)[0]
+    assert "gap: 8px" in ara
 
 
 # ── Dokunmatik etkileşim ────────────────────────────────────────────

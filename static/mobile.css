@@ -48,6 +48,32 @@
   bottom: calc(1.1rem + env(safe-area-inset-bottom, 0px));
 }
 
+/* ÜST kenar da aynı sorunun ikinci yarısıydı ve atlanmıştı: `viewport-fit=cover`
+   sayfayı durum çubuğunun (saat, pil, sinyal) ALTINA da yayıyor. Üst şerit
+   56px, Android durum çubuğu ~24-28dp — yani hamburger ile ⚙'nin üst yarısını
+   sistem çubuğu yutuyordu. Düğmeler görünüyor ama dokunuş onlara ulaşmıyor.
+
+   Boşluk .app'in KENDİSİNE veriliyor, .topbar'a değil: .topbar bir ızgara
+   satırı ve tam `var(--topbar-h)` yüksekliğinde; içine dolgu koymak içeriği
+   ezerdi, satırı büyütmek ise --topbar-h'nin üç ayrı yerdeki değerini
+   (style.css:118, style.css:434, aşağıda satır 87) tek tek sarmalamak demekti.
+   .app zaten `height: 100%` + `box-sizing: border-box`, o yüzden dolgu ızgarayı
+   kendiliğinden kısaltıyor. Şeridin arkasında body'nin `var(--bg)`si kalıyor —
+   .topbar'ın zemininin aynısı, yani görünürde ek bir çizgi oluşmuyor. */
+.app {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Slide-over'lar `position: fixed; top: 0; bottom: 0` — .app'in dolgusunun
+   DIŞINDA kalıyorlar, o yüzden ayrıca. Beşinin de (#chat-sidebar, #specs-sheet,
+   #settings-modal, #look-sheet, #palette-modal) başlığı ve × düğmesi tepede.
+   İKİ kenar birden: panel ekranın tamamını kaplıyor, yani dibindeki "Kaydet"
+   düğmesi ve "Kurulu sürüm" satırı jest çubuğunun altında kalıyordu. */
+.sheet {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    2. Yerleşim — telefon genişliği
    ═══════════════════════════════════════════════════════════════════ */
@@ -130,6 +156,31 @@
   .composer-bar #go { margin-left: auto; }
   .composer-input { max-height: 30vh; }
 
+  /* Sarma DOĞRU ama nereye sardığı yanlıştı: .composer-right'ın
+     `margin-left: auto`'su (style.css:273) ikinci satırda da geçerli kalıyor ve
+     satırı sağa yapıştırıyordu — solda kocaman bir boşluk, ayarlar çipi ortada
+     asılı. Ölçülen hâli 393px'lik telefonda: .plus 34 + .view-tabs 172 +
+     .composer-right 224 + iki boşluk = 446px, kullanılabilir genişlik 369px.
+
+     `flex-basis: 100%` sarmayı ÖLÇÜYE değil KURALA bağlıyor. Bu, hizadan daha
+     önemli: Android WebView sistem yazı ölçeğini uyguluyor, yani o 446px
+     kullanıcının yazı boyutuyla değişiyor ve ölçüye bağlı sarma bir telefonda
+     tek satır, diğerinde iki satır veriyordu. Artık her ölçekte iki satır.
+
+     Yalnızca Görsel modu: Yönetmen modunda #specs-btn gizli (style.css:305) ve
+     geriye tek "Gönder" düğmesi kalıyor — ona ikinci satır açmak composer'ı
+     40px boşuna uzatırdı (ölçüm, 393×873: Yönetmen 149px, Görsel 189px).
+
+     `flex-wrap` de burada: kutuya yazınca #ask-director beliriyor ve satır üç
+     düğmeye çıkıyor; sarmasa 360px'de taşardı. */
+  #composer[data-mode="image"] .composer-right {
+    flex: 1 1 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+    row-gap: 8px;
+    justify-content: space-between;
+  }
+
   /* Klavye açıkken ipucu satırı yer kaplıyor; üstelik "⌘/Ctrl + Enter"
      telefonda yanlış bilgi (bkz. core.js: dokunmatikte Enter satır atlar). */
   .chat-hint { display: none; }
@@ -157,7 +208,10 @@
     min-height: 100%;
     margin: 0;
     border-radius: 0;
-    padding: calc(var(--space) * 0.9) var(--space)
+    /* Üst dolguya durum çubuğu payı ekli: kart tam ekran ve `min-height: 100%`,
+       yani başlığı ile × düğmesi tepeye dayanıyor. .app'in dolgusu bunu
+       kapsamıyor (.modal `position: fixed`). */
+    padding: calc(var(--space) * 0.9 + env(safe-area-inset-top, 0px)) var(--space)
              calc(var(--space) + env(safe-area-inset-bottom, 0px));
   }
   .logo-card { width: 100%; }
@@ -181,6 +235,9 @@
     width: 100%;
     height: 100%;
     max-width: 100%;
+    /* .modal-card DEĞİL (kendi sınıfı, index.html:968) — durum çubuğu payını
+       ayrıca alması gerekiyor; `.phead` satırı tam tepede. */
+    padding-top: env(safe-area-inset-top, 0px);
     border-radius: 0;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: 56px auto minmax(0, 1fr) auto;
@@ -251,6 +308,22 @@
     width: var(--tap); height: var(--tap);
     transform: translate(-50%, -50%);
     /* Yalnız hedef büyütme: görünürde hiçbir şey değişmiyor. */
+  }
+
+  /* Seçim pilindeki iki ikon düğmesi (style.css .chat-pick) — görünen boyut
+     30×26px'te kalıyor, hedef 44px'e çıkıyor. Yukarıdaki KARE ::after kalıbı
+     burada kullanılamaz: iki düğme 8px arayla duruyor, iki 44px'lik kare
+     birbirine 14px girer ve çakışmada DOM'da sonra gelen (Kopyala) kazanırdı —
+     yani Düzenle'nin sağ yarısına basmak prompt kutusunu ezmek yerine
+     kopyalardı. Bunun yerine ŞERİT: yalnız dikeyde 44px, yatayda düğme + iki
+     yana 4px, yani 8px'lik boşluğu tam paylaşıyorlar ve hiç çakışmıyorlar. */
+  .chat-pick .chat-bubble-actions { gap: 8px; }
+  .chat-pick .chat-action-btn::after {
+    content: "";
+    position: absolute;
+    top: 50%; left: -4px; right: -4px;
+    height: var(--tap);
+    transform: translateY(-50%);
   }
 
   /* Bu ikisi zaten kare ve büyütülmeleri düzeni bozmuyor. */

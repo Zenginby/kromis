@@ -281,8 +281,21 @@ body {
 }
 .specs:hover { background: var(--raised); color: var(--text); }
 .specs:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* `.primary` tam genişlik ve üstten boşluklu — composer'da ikisi de yanlış. */
-.composer-send { width: auto; margin-top: 0; padding: 0.55rem 1.1rem; border-radius: 999px; }
+/* `.primary` tam genişlik ve üstten boşluklu — composer'da ikisi de yanlış.
+   SEÇİCİ İKİ SINIFLI, tek değil: `.primary` bu satırdan 627 satır SONRA (:921)
+   tanımlı ve eşit özgüllükte kaynak sırası onu kazandırıyordu, yani bu kural
+   hiç uygulanmıyordu — ölçüldü: #go'nun `margin-top`u 16px, `width`i 100%.
+
+   İkisinden yalnız biri görünüyordu, o da `flex-shrink` sayesinde: #go
+   `width: 100%` ile satırı taşırıyor, esneme onu tekrar içerik boyuna (70px)
+   büzüyordu — sonuç doğru, mekanizma kaza. `margin-top: 1rem` ise büzülmediği
+   için gerçekten uyguluyordu: telefonda sarmış satırda #specs-btn'in merkezi
+   756, #go'nun merkezi 764.5 — aynı satırdaki iki düğme 8px kaymış duruyordu.
+
+   Satırın SARMASI gereken her yerde (bkz. mobile.css) esneme payı da kalmıyor
+   ve kaza bozuluyor: #go 367px'e, yani tam satır genişliğine açılıp kendi alt
+   satırına düşüyor, composer 40px uzuyor. */
+.composer .composer-send { width: auto; margin-top: 0; padding: 0.55rem 1.1rem; border-radius: 999px; }
 .composer-send[hidden] { display: none; }
 .composer-foot {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
@@ -580,6 +593,9 @@ body:has(.sheet.open) .scrim { display: block; }
 .seg button:disabled:hover { color: var(--muted); background: none; }
 .field-note { color: var(--muted); font-size: 0.74rem; line-height: 1.4; margin: 0.3rem 0 0; }
 .field-note[hidden] { display: none; }
+/* Sürüm künyesi "Kaydet"ten SONRA geliyor: bir alan değil, panelin dibindeki
+   bilgi. Ortalanıyor ki forma ait bir açıklama gibi okunmasın. */
+.settings-version-row { margin-top: 1rem; text-align: center; }
 
 .range-val { color: var(--text); font-variant-numeric: tabular-nums; font-size: 0.78rem; }
 .logo-controls input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; margin: 0.1rem 0 0.2rem; }
@@ -1703,9 +1719,13 @@ body.viewer-open { overflow: hidden; }
    grameri. Ayrım mesajın kendisinde taşınıyor (models.ChatMessage.display), o
    yüzden yeniden açılan sohbette de pil pil kalıyor. */
 .chat-pick {
-  align-self: flex-end; display: flex; align-items: baseline; gap: 0.45rem;
-  max-width: 76%; padding: 0.3rem 0.7rem;
-  border: 1px dashed var(--control-border); border-radius: 999px;
+  align-self: flex-end; display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: 0.45rem;
+  max-width: 76%; padding: 0.4rem 0.75rem;
+  /* 999px İKİ satıra çıkınca pili bir yumurtaya çeviriyordu (eylem satırı her
+     zaman var, yani pil her zaman iki satır). 18px, .chat-msg-user'ın 20px'lik
+     dilinden — kuyruk yok, yani balonla karışmıyor. */
+  border: 1px dashed var(--control-border); border-radius: 18px;
   color: var(--muted); font-size: 0.8rem; line-height: 1.45;
   overflow-wrap: anywhere;
 }
@@ -1713,6 +1733,34 @@ body.viewer-open { overflow: hidden; }
   flex: 0 0 auto; color: var(--muted);
   font-size: 11px; font-weight: 500; letter-spacing: 0.02em;
 }
+
+/* Eylem satırı pilin İÇİNDE üçüncü bir sütun olarak sıkışıyordu: .chat-pick bir
+   flex SATIRI, .chat-bubble-actions ise .chat-msg-user/.chat-msg-bot'un BLOK
+   akışı için yazılmış (orada kendiliğinden alt satıra düşüyor). Pil `max-width:
+   76%` ile sınırlı olduğu için iki düğme kalan yeri paylaşıp 44px'e iniyor ve
+   etiketler harf harf sarıyordu — telefonda "Düzenle" dikey bir harf sütununa
+   dönüyordu (ölçüm: düğme 44×80px).
+
+   `flex-basis: 100%` satırı KESİN olarak alta indiriyor: ölçüye değil kurala
+   bağlı, yani sistem yazı ölçeği ne olursa olsun aynı kalıyor.
+
+   Etiketler kalkıyor, ikonlar kalıyor: küçük ve dolgusuz bir pilde iki etiketli
+   düğme içeriğin kendisinden görsel olarak daha ağırdı. Erişilebilir ad
+   kaybolmuyor — iki düğmenin de `title`'ı var (chat.js) ve ad oradan geliyor.
+   Kopyalama geri bildirimi de etikete bağlıydı; chat.js artık ayrıca
+   chatStatus() yazıyor, yoksa dokunmatikte hiçbir onay kalmazdı. */
+.chat-pick .chat-bubble-actions {
+  flex: 0 0 100%;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+.chat-pick .chat-action-btn {
+  position: relative;   /* dokunma hedefi mobile.css'te ::after ile büyüyor */
+  min-width: 30px; min-height: 26px;
+  justify-content: center;
+  padding: 0;
+}
+.chat-pick .chat-action-btn span { display: none; }
 
 /* ── Sonuç kartı (üçüncü rol) ─────────────────────────────────────────
    Döküm konuşmayı VE üretilen görselleri aynı akışta gösteriyor (tasarım §5).

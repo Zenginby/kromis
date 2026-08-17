@@ -1,6 +1,6 @@
 # 🎨 GPT-Image Studio
 
-[![Release](https://img.shields.io/badge/version-v0.3.0-blue.svg)](https://github.com/Zenginby/gpt-image-studio/releases/latest)
+[![Release](https://img.shields.io/badge/version-v0.4.1-blue.svg)](https://github.com/Zenginby/gpt-image-studio/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![Build & Test](https://github.com/Zenginby/gpt-image-studio/actions/workflows/release.yml/badge.svg)](https://github.com/Zenginby/gpt-image-studio/actions)
@@ -24,9 +24,20 @@ Son kullanıcılar için hazırlanmış hazır derleme paketlerini doğrudan ind
 >
 > **Android sürümü Play Store'da değil.** APK doğrudan kurulur (sideload) ve uygulama telefonda TAM olarak çalışır: üretim, düzenleme, palet ve bindirme işlemlerinin hepsi cihazdaki Python çalışma zamanında koşuyor — bilgisayara ya da ayrı bir sunucuya bağlı değil. İnternet yalnızca Azure çağrıları için gerekiyor.
 
+### Android'de güncel sürüme geçmek
+
+Yukarıdaki üç bağlantı **her zaman en son yayına** işaret ediyor (`releases/latest/download/…`), yani adres sabit — sürüm yükseldiğinde bağlantıyı değiştirmek gerekmiyor. Rozetteki sürüm o yayının sürümü.
+
+1. **Kurulu sürümünü öğren:** uygulamada **⚙ Ayarlar**'ı aç, panelin en altındaki *"Kurulu sürüm"* satırına bak. (Üst şeritteki sürüm rozeti telefonda gizli — dar ekranda oturum başlığını eziyor.)
+2. Rozetteki sürümden düşükse APK'yı telefonun tarayıcısından indir.
+3. **Üzerine kur, uygulamayı SİLME.** Paketler aynı anahtarla imzalandığı için Android eskisinin üzerine yazar ve verin (görseller, klasörler, Azure anahtarı) yerinde kalır. Silip yeniden kurmak veriyi de siler.
+4. Güncellemeden sonraki ilk açılış yine **2–5 saniye** sürer (Python çalışma zamanı yeniden açılıyor); sonrakiler hızlı.
+
+Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Android (sideload)](KURULUM.md#android-sideload).
+
 ---
 
-## ✨ Güncel Özellikler (v0.4.0 & Flow-UI)
+## ✨ Güncel Özellikler (v0.4.1 & Flow-UI)
 
 ### 🎬 1. Stüdyo Tek Döküm & Prompt Yönetmeni
 * **Türkçe Diyalogdan İngilizce Prompt:** Türkçe fikir anlatımını otomatik olarak optimizasyonu yapılmış İngilizce `gpt-image-2` prompt'una ve teknik ayarlara (`size`, `quality`, `n`) çevirir.

@@ -847,7 +847,11 @@ function appendUser(msg) {
   copyBtn.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(msg.content);
+      // İKİ geri bildirim, biri yedek değil: seçim pilinde (.chat-pick) etiket
+      // gizli — iki düğme oraya sığmadığı için ikon-only (style.css). Etiket tek
+      // onay olsaydı bir seçimi kopyalayan kullanıcı hiçbir şey görmezdi.
       copyLabel.textContent = "Kopyalandı";
+      chatStatus("Panoya kopyalandı.");
       setTimeout(() => {
         copyLabel.textContent = "Kopyala";
       }, 2000);

@@ -163,7 +163,8 @@
              geçtiğinin tek gözle görülür kanıtı. Ayarlar modalının dibinden
              üst şeride taşındı (tasarım §6) — daha görünür, aynı id, aynı
              GET /api/settings kaynağı. -->
-        <span class="ver" title="Uygulama sürümü">v<span id="settings-version">—</span></span>
+        <span class="ver" title="Uygulama sürümü">v<span id="settings-version"
+              data-app-version>—</span></span>
       </div>
     </header>
 
@@ -723,6 +724,19 @@
       <div class="modal-actions">
         <button id="settings-save" class="primary" type="button">Kaydet</button>
       </div>
+
+      <!-- Sürüm, üst şeritteki .ver pill'inin İKİNCİ kopyası. Çoğaltma bilerek:
+           o pill mobile.css'te `display: none` (360px'de #session-title'ı
+           eziyordu) ve yukarıdaki yorumun "Ayarlar modalının dibinden üst şeride
+           taşındı" dediği yer de kendisi — yani telefonda kurulu sürümü görmenin
+           HİÇBİR yolu kalmamıştı. "Güncel APK'yı indirdim mi?" sorusu tam olarak
+           bununla cevaplanıyor (README'nin indirme tablosu buraya yönlendiriyor).
+           İki eleman tek kaynaktan besleniyor: settings.js `[data-app-version]`
+           seçicisiyle hepsini birden yazıyor, yani üçüncü bir kopya da bedava. -->
+      <p class="field-note settings-version-row">
+        Kurulu sürüm: <strong>v<span id="settings-version-foot"
+                                     data-app-version>—</span></strong>
+      </p>
     </div>
   </aside>
 

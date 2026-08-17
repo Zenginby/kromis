@@ -504,10 +504,26 @@ def test_index_read_failure_is_reported_in_turkish(monkeypatch, tmp_path):
 
 
 def test_settings_modal_shows_the_app_version():
-    """Destek sorusu "hangi sürümdesiniz?" — cevabı arayüzde OLMALI."""
+    """Destek sorusu "hangi sürümdesiniz?" — cevabı arayüzde OLMALI.
+
+    Yazan taraf artık `settings-version` id'siyle DEĞİL, `[data-app-version]`
+    seçicisiyle çalışıyor: sürüm iki yerde görünüyor (üst şeritteki pill +
+    Ayarlar'ın dibindeki satır) çünkü pill telefonda gizli. Bu iddia
+    mekanizmayla birlikte güncellendi ama gevşemedi — id'nin varlığını da,
+    yazımın gerçekten bağlandığını da hâlâ ölçüyor, üstüne İKİ hedefin de
+    işaretli olduğunu ekliyor.
+    """
     client = TestClient(appmod.app)
-    assert 'id="settings-version"' in client.get("/").text
-    assert "settings-version" in client.get("/static/settings.js").text
+    html = client.get("/").text
+    assert 'id="settings-version"' in html
+    # HTML yorumları AYIKLANIYOR: seçici yorumlarda da anlatılıyor ve onları
+    # sayan bir iddia işaretin gerçekten öznitelik olarak durduğunu ölçmezdi.
+    isaretsiz = re.sub(r"<!--.*?-->", "", html, flags=re.S)
+    # İki görünür hedef: üst şerit pill'i ve Ayarlar'ın dibi.
+    assert isaretsiz.count("data-app-version") == 2, \
+        "sürüm hedeflerinden biri işaretsiz — orada '—' olarak kalır"
+    assert 'querySelectorAll("[data-app-version]")' in \
+        client.get("/static/settings.js").text
 
 
 def test_edit_request_forwards_every_palette_option():

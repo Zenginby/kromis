@@ -30,7 +30,15 @@ function applyConfigured(s) {
   // değişmediği için orada gereksiz). Bu fonksiyon hem GET hem POST yanıtı
   // için çağrılıyor; guard MEKANİZMANIN PARÇASI — olmadan "Kaydet"ten sonra
   // sürüm satırı silinirdi.
-  if (s && s.version) $("settings-version").textContent = s.version;
+  // Tek id yerine `[data-app-version]`: sürüm İKİ yerde görünüyor (üst şeritteki
+  // pill + Ayarlar'ın dibindeki satır) çünkü pill telefonda gizli ve orada başka
+  // kaynak yok. İkisini iki ayrı satırla yazmak, birini eklerken diğerini
+  // unutmanın kapısıydı — sürüm de sessizce "—" kalırdı.
+  if (s && s.version) {
+    for (const el of document.querySelectorAll("[data-app-version]")) {
+      el.textContent = s.version;
+    }
+  }
 
   // ── Prompt Yönetmeni kapısı ──
   // Sekmenin KENDİSİ kilitlenmiyor: kilitli bir sekme "neden kapalı" bilgisini

@@ -1,7 +1,7 @@
 """Sürüm değiştiğinde manifest'lerin BİR KEZ yedeklenmesi.
 
 Neden: ofis çalışanı yükseltmeyi `.app`'i değiştirerek yapıyor. Verisi
-`~/Library/Application Support/GPT-Image Studio/` altında kalıyor ve bugün de
+`~/Library/Application Support/Lumeo/` altında kalıyor ve bugün de
 kaybolmuyor — ama yeni sürümdeki bir veri biçimi hatası (yeniden adlandırılmış
 bir alan, bozulmuş bir yazım) kütüphaneyi okunamaz hale getirebilir ve bunu
 ilk fark eden çalışan olur. Yedek o hatanın geri dönüşünü mümkün kılıyor.
@@ -27,8 +27,9 @@ dizininden dizin kaldıran tek kod olurdu ve arıza modu tam olarak bu özelliğ
 korumak için var olduğu şeyi yok etmek. Gerekirse ayrı ve tek başına geri
 alınabilir bir iş olarak eklenir.
 
-Şekil olarak seed.py'nin kardeşi: kökler dışarıdan geçer (modül düzeyinde yol
-durumu yok), `now` enjekte edilir, iş bir marker dosyasıyla bir kez yapılır.
+Şekil olarak kaldırılmış seed.py'nin kardeşiydi ve o kalıbı sürdürüyor: kökler
+dışarıdan geçer (modül düzeyinde yol durumu yok), `now` enjekte edilir, iş bir
+marker dosyasıyla bir kez yapılır.
 """
 from __future__ import annotations
 
@@ -143,8 +144,8 @@ def backup_manifests_if_version_changed(data_dir: str, output_dir: str,
 
     sources = _existing_sources(output_dir, assets_dir)
     if not sources:
-        # TAZE KURULUM — seed.py'deki "kopyalamadan damgala" ile birebir.
-        # Kullanıcının hiç verisi yok; boş bir backups/ dizini açmak anlamsız.
+        # TAZE KURULUM — "kopyalamadan damgala": kullanıcının hiç verisi yok,
+        # boş bir backups/ dizini açmak anlamsız.
         write_stamp(data_dir, version)
         return None
 

@@ -1,4 +1,4 @@
-"""GPT-Image Studio — yerel FastAPI arayüzü."""
+"""Lumeo — yerel FastAPI arayüzü."""
 from __future__ import annotations
 
 import base64
@@ -36,7 +36,6 @@ import palette
 import palette_store
 import paths
 import prefs
-import seed
 import storage
 import version
 from models import (MAX_CHAT_TITLE_CHARS, MAX_PROMPT_CHARS, WIRE_CHAT_ROLES,
@@ -62,35 +61,28 @@ Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 async def _lifespan(app: FastAPI):
     """Sunucu başlarken çalışır — import anında DEĞİL.
 
-    Hem dizin açma hem tohumlama gerçek dosya sistemine dokunduğu için modül
-    kapsamında çalışmamalı: app'i yalnızca import eden bir test ya da betik
-    kullanıcının gerçek veri dizinini (frozen'da ~/Library/Application
-    Support/...) yaratmasın, assets/'ine yazmasın.
+    Dizin açma ve yedek gerçek dosya sistemine dokunduğu için modül kapsamında
+    çalışmamalı: app'i yalnızca import eden bir test ya da betik kullanıcının
+    gerçek veri dizinini (frozen'da ~/Library/Application Support/...)
+    yaratmasın, assets/'ine yazmasın.
 
-    Tohumlama kozmetik bir kolaylıktır (logo seçiciyi önceden doldurur) —
-    başarısız olması (dolu disk, kısıtlı Application Support, okunamayan
-    gömülü PNG) uygulamanın TAMAMINI düşürmemeli: guard olmadan uvicorn'un
-    startup()'ı asla bitmez, desktop.py 15 sn sonra hata verir ve kullanıcı
-    hiçbir pencere görmez. Hata hata.log'a yazılır, uygulama yine de açılır.
+    Guard'ın gerekçesi: patlarsa (izinsiz Application Support, dolu disk) tek
+    başına pencereyi engellememeli — guard olmadan uvicorn'un startup()'ı asla
+    bitmez, desktop.py 15 sn sonra hata verir ve kullanıcı hiçbir pencere
+    görmez. Yazma yollarının hepsi (storage, assets_store, folders,
+    palette_store) kendi `makedirs`'ini zaten yapıyor, yani hata gerçekten
+    kalıcıysa kullanıcı istek başına anlaşılır bir hata görür; açılmayan bir
+    uygulamadan iyidir. Hata hata.log'a yazılır, uygulama yine de açılır.
 
-    Dizin açma da aynı guard'ın içinde: patlarsa (izinsiz Application Support)
-    tek başına pencereyi engellememeli — yazma yollarının hepsi (storage,
-    assets_store, folders, palette_store) kendi `makedirs`'ini zaten yapıyor,
-    yani hata gerçekten kalıcıysa kullanıcı istek başına anlaşılır bir hata
-    görür; açılmayan bir uygulamadan iyidir.
+    Yedek bir EMNİYET özelliği olduğu için "başarısızsa durdur" cazibesi var;
+    YAPILMIYOR — yedek yüzünden uygulamaya giremeyen kullanıcının verisine
+    arayüzden hiçbir yolu kalmaz, bu loglanmış-ama-alınmamış bir yedekten
+    kesinlikle kötüdür.
 
-    SIRA YÜK TAŞIYOR: yedek, tohumlamadan ÖNCE koşar. `seed` yazan bir işlem
-    (assets/logos/index.json); tohumlama önce koşsa taze bir makinede yedek
-    "kullanıcının verisi var" diye taze tohum verisinin işe yaramaz yedeğini
-    alırdı. Yükseltmede sıra fark etmez (seed marker yüzünden no-op) — yani bu
-    hata YALNIZCA taze kurulumda görünür, yani ofiste, asla geliştirmede. Bu
-    yüzden yoruma değil teste bağlandı (tests/test_backup.py).
-
-    İKİ AYRI guard: yedek hatası kullanıcının tohumlanmış logolarına mal
-    olmasın. Yedek bir EMNİYET özelliği olduğu için "başarısızsa durdur"
-    cazibesi var; YAPILMIYOR — yedek yüzünden uygulamaya giremeyen kullanıcının
-    verisine arayüzden hiçbir yolu kalmaz, bu loglanmış-ama-alınmamış bir
-    yedekten kesinlikle kötüdür.
+    NOT: Burada bir İKİNCİ adım vardı — `seed.seed_builtin_logos`
+    pakete gömülü KURUM logo çiftini kullanıcının kütüphanesine kopyalardı.
+    Uygulama marka-nötr olduğundan o modül tamamen kaldırıldı; kütüphane artık
+    boş başlar ve kullanıcı kendi logosunu yükler.
     """
     now = _now()
     try:
@@ -100,15 +92,10 @@ async def _lifespan(app: FastAPI):
             version=version.APP_VERSION, now=now)
     except Exception:
         errlog.safe_append(paths.data_dir(), traceback.format_exc())
-    try:
-        seed.seed_builtin_logos(ASSETS_DIR, paths.bundled_logos_dir(),
-                                paths.data_dir(), now=now)
-    except Exception:
-        errlog.safe_append(paths.data_dir(), traceback.format_exc())
     yield
 
 
-app = FastAPI(title="GPT-Image Studio", lifespan=_lifespan)
+app = FastAPI(title="Lumeo", lifespan=_lifespan)
 
 
 @app.exception_handler(RequestValidationError)
@@ -1022,21 +1009,21 @@ def delete_palette_route(palette_id: str) -> dict:
 def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
     """Logo/motto filigranını süreç içinde bindirir (composite.py).
 
-    asset_id verilirse seçilen tek görsel her iki varyant olarak geçilir: renk
-    seçimi (auto/blue/white) hangisine düşerse düşsün aynı görsel kullanılır.
+    Bindirilecek görsel HER ZAMAN kullanıcının kütüphanesinden gelir. Eskiden
+    `asset_id` boş bırakılabilir ve pakete gömülü KURUM logo çiftine düşülürdü;
+    uygulama marka-nötr olduğundan o varsayılan yok — seçim yapılmadıysa istek
+    422 ile reddedilir (modelde `asset_id` zorunlu), bulunamazsa 404.
     """
-    logo_blue = paths.builtin_logo("blue")
-    logo_white = paths.builtin_logo("white")
-    if req.asset_id:
-        overlay_path = assets_store.asset_path(req.asset_kind, req.asset_id, ASSETS_DIR)
-        if overlay_path is None:
-            raise HTTPException(status_code=404, detail="görsel bulunamadı")
-        logo_blue = logo_white = overlay_path
+    if not req.asset_id:
+        raise HTTPException(status_code=422, detail="Bindirilecek bir görsel seç.")
+    overlay_path = assets_store.asset_path(req.asset_kind, req.asset_id, ASSETS_DIR)
+    if overlay_path is None:
+        raise HTTPException(status_code=404, detail="görsel bulunamadı")
     try:
         return composite.composite_logo(
             src_path,
-            logo_blue=logo_blue, logo_white=logo_white,
-            position=req.position, color=req.color, scale=req.size,
+            logo_path=overlay_path,
+            position=req.position, scale=req.size,
             shadow_alpha=req.shadow_alpha, shadow_blur=req.shadow_blur,
             offset_x=req.offset_x, offset_y=req.offset_y,
         )

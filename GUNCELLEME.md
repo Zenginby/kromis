@@ -1,4 +1,4 @@
-# GPT-Image Studio — Güncelleme (macOS, Windows ve Android)
+# Lumeo — Güncelleme (macOS, Windows ve Android)
 
 Kurum sana yeni bir `.zip` gönderdiğinde bu sayfayı izle. 3 dakika sürer.
 İlk kurulum için değil, **elindeki uygulamayı yenisiyle değiştirmek** için.
@@ -6,9 +6,9 @@ Kurum sana yeni bir `.zip` gönderdiğinde bu sayfayı izle. 3 dakika sürer.
 
 | Sistem | Dosya |
 |---|---|
-| macOS (Apple Silicon) | `gpt-image-studio-macOS-arm64.zip` |
-| Windows 10/11 (64-bit) | `gpt-image-studio-windows-x64.zip` |
-| Android 8.0+ (arm64) | `gpt-image-studio-android-arm64.apk` |
+| macOS (Apple Silicon) | `lumeo-macOS-arm64.zip` |
+| Windows 10/11 (64-bit) | `lumeo-windows-x64.zip` |
+| Android 8.0+ (arm64) | `lumeo-android-arm64.apk` |
 
 **Telefondaysan** 1.–3. adımları atla, doğrudan
 [Android'i güncelleme](#androidi-güncelleme) bölümüne git. 4. ve 5. adımlar
@@ -27,8 +27,8 @@ var — kendi dalını oku, ötekini atla. 1., 4. ve 5. adımlar iki sistemde ay
 >
 >    | Sistem | Silinmemesi gereken klasör |
 >    |---|---|
->    | macOS | `~/Library/Application Support/GPT-Image Studio/` |
->    | Windows | `%LOCALAPPDATA%\GPT-Image Studio\` |
+>    | macOS | `~/Library/Application Support/Lumeo/` |
+>    | Windows | `%LOCALAPPDATA%\Lumeo\` |
 >    | Android | Uygulamanın kendi klasörü — **uygulamayı KALDIRMA**, üzerine kur |
 >
 > 2. **(Yalnız macOS) Güvenlik uyarısında "Çöp Sepetine Taşı"ya ve Enter'a
@@ -45,7 +45,7 @@ değiştirmeye çalışmak yarım kurulmuş bir uygulama bırakabilir.
 
 ### macOS
 
-1. Yeni `gpt-image-studio-macOS-arm64.zip` dosyasına çift tıkla — yanında
+1. Yeni `lumeo-macOS-arm64.zip` dosyasına çift tıkla — yanında
    uygulama çıkar.
 2. Çıkan uygulamayı **Programlar (Applications)** klasörüne sürükle.
 3. macOS *"Aynı adda bir öge var"* diye soracak → **Değiştir** (Replace) de.
@@ -54,9 +54,9 @@ Eski sürümü önceden silmen gerekmiyor; değiştirmek yeterli.
 
 ### Windows
 
-1. Yeni `gpt-image-studio-windows-x64.zip` dosyasına sağ tıkla → **Tümünü
+1. Yeni `lumeo-windows-x64.zip` dosyasına sağ tıkla → **Tümünü
    ayıkla** (Extract All).
-2. Çıkan `GPT-Image Studio` klasörünü, eski klasörünün **bulunduğu yere** taşı.
+2. Çıkan `Lumeo` klasörünü, eski klasörünün **bulunduğu yere** taşı.
 3. Windows *"Hedefte aynı adda dosyalar var"* diye soracak → **Hedefteki
    dosyaları değiştir** de.
 
@@ -74,8 +74,8 @@ açılışta yeniden soruyor. Kurulumdaki adımların aynısı.
 
 1. Uygulamaya çift tıkla. Uygulama **açılmayacak** ve şu uyarı çıkacak:
 
-   > **"GPT-Image Studio" Not Opened**
-   > Apple could not verify "GPT-Image Studio" is free of malware that may harm
+   > **"Lumeo" Not Opened**
+   > Apple could not verify "Lumeo" is free of malware that may harm
    > your Mac or compromise your privacy.
    >
    > *(Türkçe sistemde aynı uyarı "…Açılmadı / Apple … doğrulayamadı" biçiminde
@@ -92,14 +92,14 @@ açılışta yeniden soruyor. Kurulumdaki adımların aynısı.
 
 2. **Apple menüsü** → **Sistem Ayarları** (System Settings) → **Gizlilik ve
    Güvenlik** (Privacy & Security).
-3. Sayfayı aşağı kaydır: *"GPT-Image Studio engellendi"* / *"was blocked"*
+3. Sayfayı aşağı kaydır: *"Lumeo engellendi"* / *"was blocked"*
    satırını bul → **Yine de Aç** (**Open Anyway**).
 4. Çıkan onayda tekrar **Yine de Aç** → Mac şifreni gir (ya da Touch ID).
 5. Uygulama açılır. Bu sürüm için bir daha sormaz.
 
 ### Windows
 
-1. `GPT-Image Studio.exe`'ye çift tıkla. Mavi **SmartScreen** penceresi
+1. `Lumeo.exe`'ye çift tıkla. Mavi **SmartScreen** penceresi
    çıkabilir ("Windows bilgisayarınızı korudu").
 2. **Daha fazla bilgi** (More info) → **Yine de çalıştır** (Run anyway).
 
@@ -112,7 +112,7 @@ açılışta yeniden soruyor. Kurulumdaki adımların aynısı.
 
 **Uygulamayı KALDIRMA.** Yeni APK'yı doğrudan eskisinin üzerine kur:
 
-1. Yeni `gpt-image-studio-android-arm64.apk` dosyasını telefona indir.
+1. Yeni `lumeo-android-arm64.apk` dosyasını telefona indir.
 2. Dosyaya dokun → **Yükle**. Android *"Bu uygulamanın yeni bir sürümünü
    yüklemek ister misiniz?"* diye sorar → **Yükle**.
 3. İlk açılış yine **2–5 saniye** sürer: uygulama yeni sürümün arayüz
@@ -197,7 +197,7 @@ geri kalanı tamamen Windows'u ayağa kaldırmakla ilgili.
 
 **Windows tarafında neler var:**
 
-- **Görsellerin `%LOCALAPPDATA%\GPT-Image Studio\` altında** duruyor (yani
+- **Görsellerin `%LOCALAPPDATA%\Lumeo\` altında** duruyor (yani
   `C:\Users\<kullanıcı adın>\AppData\Local\...`). Bilerek `Local`, `Roaming`
   değil: `Roaming` olsaydı ürettiğin bütün görseller kurumsal profille birlikte
   ağ üzerinden taşınmaya çalışırdı.
@@ -414,8 +414,8 @@ Uygulama, sürüm değiştiğinde listelerinin bir kopyasını kendiliğinden al
 
 | Sistem | Yedek klasörü |
 |---|---|
-| macOS | `~/Library/Application Support/GPT-Image Studio/backups/<sürüm>-<tarih>/` |
-| Windows | `%LOCALAPPDATA%\GPT-Image Studio\backups\<sürüm>-<tarih>\` |
+| macOS | `~/Library/Application Support/Lumeo/backups/<sürüm>-<tarih>/` |
+| Windows | `%LOCALAPPDATA%\Lumeo\backups\<sürüm>-<tarih>\` |
 
 İçinde yalnızca küçük liste dosyaları var (geçmiş, klasörler, paletler, kayıtlı
 sohbetler, logo kütüphanesi) — **görseller kopyalanmıyor**, onlar zaten
@@ -423,15 +423,15 @@ yerlerinde duruyor.
 Birkaç KB tutar, silmen gerekmez.
 
 Geri yüklemek gerekirse (Kurum söylerse): o klasörün içindeki `output` ve `assets`
-klasörlerini bir üstteki `GPT-Image Studio` klasöründeki aynı adlı klasörlerin
+klasörlerini bir üstteki `Lumeo` klasöründeki aynı adlı klasörlerin
 üstüne sürükle.
 
 ## Sorun çıkarsa
 
 - **Pencere boş açılıyor:** uygulamayı kapat, tekrar aç.
 - **Uygulama hiç açılmıyor:** hata kaydını Kurum'ya gönder —
-  macOS'ta `~/Library/Application Support/GPT-Image Studio/hata.log`,
-  Windows'ta `%LOCALAPPDATA%\GPT-Image Studio\hata.log`.
+  macOS'ta `~/Library/Application Support/Lumeo/hata.log`,
+  Windows'ta `%LOCALAPPDATA%\Lumeo\hata.log`.
 - **(Windows) Pencere hiç gelmiyor:** `.exe`'yi `_internal` klasöründen ayırmış
   olabilirsin — ikisi aynı klasörde olmalı (2. adım).
 - **Eski arayüzü görüyorum gibi:** uygulamayı tamamen kapat (macOS'ta ⌘Q) ve

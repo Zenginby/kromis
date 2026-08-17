@@ -36,7 +36,7 @@ import java.util.concurrent.Executors
 object Downloader {
 
     private const val ETIKET = "GIS"
-    private const val ALT_KLASOR = "GPT-Image Studio"
+    private const val ALT_KLASOR = "Lumeo"
 
     private val havuz = Executors.newSingleThreadExecutor()
     private val anaThread = Handler(Looper.getMainLooper())

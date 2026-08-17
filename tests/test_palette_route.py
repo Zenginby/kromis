@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 import app as appmod
+import assets_store as astore
 import azure_client as ac
 import color_names as cn
 import palette
@@ -464,7 +465,10 @@ def test_logo_derivative_inherits_the_palette(tmp_path, monkeypatch, fake_compos
     monkeypatch.setattr(appmod.composite, "composite_logo", fake_composite)
 
     src = _gen(client, palette_hex=SEED, palette_mode="triad").json()["images"][0]
-    r = client.post("/api/logo", json={"id": src["id"]})
+    # Yerleşik logo kaldırıldı: bindirme artık kütüphaneden bir varlık istiyor.
+    asset = astore.save_asset("logos", b"\x89PNG-logo", "logo",
+                              str(tmp_path / "assets"), now="2026-07-23T10:00:00")
+    r = client.post("/api/logo", json={"id": src["id"], "asset_id": asset["id"]})
     assert r.status_code == 200, r.text
     assert r.json()["image"]["palette"]["seed"] == SEED
 

@@ -175,7 +175,7 @@ jobs:
         id: dogrula
         run: |
           set -euo pipefail
-          APK="android/app/build/outputs/apk/release/gpt-image-studio-android-arm64-release.apk"
+          APK="android/app/build/outputs/apk/release/lumeo-android-arm64-release.apk"
 
           # (1) Paket GERÇEKTEN var mı? "Yeşil ama boş"un birinci kapısı.
           test -s "$APK" || {
@@ -219,8 +219,7 @@ jobs:
           assets/resources/static/mobile.css
           assets/resources/static/mobile.js
           assets/resources/static/fonts/dm-sans-v17-latin.woff2
-          assets/resources/bundled/logos/kurum-logo-blue.png
-          assets/resources/bundled/logos/kurum-logo-white.png
+          assets/resources/bundled/prompts/prompt-yonetmeni.md
           "
           EKSIK=""
           for f in $BEKLENENLER; do
@@ -311,13 +310,13 @@ jobs:
           exit 1
 
       - name: Yayın adına kopyala
-        run: cp "${{ steps.dogrula.outputs.apk }}" dist-gpt-image-studio-android-arm64.apk
+        run: cp "${{ steps.dogrula.outputs.apk }}" dist-lumeo-android-arm64.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gpt-image-studio-android-arm64
-          path: dist-gpt-image-studio-android-arm64.apk
+          name: lumeo-android-arm64
+          path: dist-lumeo-android-arm64.apk
           # "Yeşil ama boş"un SON kapısı: bu bayrak olmadan upload-artifact
           # eşleşen dosya bulamayınca yalnız UYARI basar ve iş yeşil kalır.
           if-no-files-found: error
@@ -339,20 +338,20 @@ jobs:
       - name: APK'yı indir
         uses: actions/download-artifact@v4
         with:
-          name: gpt-image-studio-android-arm64
+          name: lumeo-android-arm64
           path: dist
 
       - name: İndi ve boş değil
         run: |
           set -euo pipefail
-          f=dist/dist-gpt-image-studio-android-arm64.apk
+          f=dist/dist-lumeo-android-arm64.apk
           test -s "$f" || { echo "EKSİK ya da BOŞ: $f"; exit 1; }
-          mv "$f" dist/gpt-image-studio-android-arm64.apk
+          mv "$f" dist/lumeo-android-arm64.apk
           ls -l dist
 
       - name: Yayına ekle
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/gpt-image-studio-android-arm64.apk
+          files: dist/lumeo-android-arm64.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

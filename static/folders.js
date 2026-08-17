@@ -1,4 +1,4 @@
-// GPT-Image Studio — klasörler (iç içe) ve galeri çoklu seçimi.
+// Lumeo — klasörler (iç içe) ve galeri çoklu seçimi.
 //
 // Klasik script (ES module DEĞİL): bütün parçalar TEK global kapsamı paylaşır
 // ve index.html'deki yükleme SIRASI bağlayıcıdır:

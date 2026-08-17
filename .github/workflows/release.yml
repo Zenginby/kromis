@@ -76,14 +76,14 @@ jobs:
       - name: Paketi doğrula
         run: |
           set -euo pipefail
-          APP="dist/GPT-Image Studio.app"
-          lipo -archs "$APP/Contents/MacOS/GPT-Image Studio" | tee /dev/stderr | grep -qx arm64
+          APP="dist/Lumeo.app"
+          lipo -archs "$APP/Contents/MacOS/Lumeo" | tee /dev/stderr | grep -qx arm64
           codesign --verify --strict "$APP"
           for f in static/index.html static/core.js static/viewer.js \
                    static/fonts.css static/mobile.css static/mobile.js \
                    static/fonts/dm-sans-v17-latin.woff2 \
                    static/fonts/dm-sans-v17-latin-ext.woff2 \
-                   bundled/logos/kurum-logo-blue.png bundled/logos/kurum-logo-white.png; do
+                   bundled/prompts/prompt-yonetmeni.md; do
             test -f "$APP/Contents/Resources/$f" || { echo "EKSİK: $f"; exit 1; }
           done
           EXPECTED="$(python -c 'import version; print(version.APP_VERSION)')"
@@ -92,13 +92,13 @@ jobs:
             test "$GOT" = "$EXPECTED" || { echo "HATA: $k=$GOT, beklenen $EXPECTED"; exit 1; }
           done
           echo "Info.plist sürümü: $EXPECTED"
-          cp "dist/GPT-Image Studio.zip" "dist/gpt-image-studio-macOS-arm64.zip"
+          cp "dist/Lumeo.zip" "dist/lumeo-macOS-arm64.zip"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gpt-image-studio-macos-arm64
-          path: dist/gpt-image-studio-macOS-arm64.zip
+          name: lumeo-macos-arm64
+          path: dist/lumeo-macOS-arm64.zip
           retention-days: 30
 
       # Yayın oluşturma buradan ÇIKARILDI → aşağıdaki `publish` işi. Gerekçe: bu iş
@@ -187,7 +187,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $zipYol = 'dist\GPT-Image Studio-windows.zip'
+          $zipYol = 'dist\Lumeo-windows.zip'
 
           # (1) Paket GERÇEKTEN var mı? "Yeşil ama boş" koşusunun birinci kapısı.
           if (-not (Test-Path -LiteralPath $zipYol)) {
@@ -223,9 +223,9 @@ jobs:
 
           # (3) exe. Ada göre TEK eşleşme aranıyor: spec'teki `name` değişirse
           # build.ps1'in kendi kontrolü de bu da kırmızıya düşer.
-          $exeGirdi = @($girdiler | Where-Object { $_ -like '*/GPT-Image Studio.exe' })
+          $exeGirdi = @($girdiler | Where-Object { $_ -like '*/Lumeo.exe' })
           if ($exeGirdi.Count -ne 1) {
-            Write-Host "HATA: zip'te 'GPT-Image Studio.exe' beklendi, $($exeGirdi.Count) eşleşme bulundu"
+            Write-Host "HATA: zip'te 'Lumeo.exe' beklendi, $($exeGirdi.Count) eşleşme bulundu"
             exit 1
           }
           Write-Host "exe girdisi: $($exeGirdi[0])"
@@ -247,7 +247,7 @@ jobs:
             # yedek yazı tipiyle çizilir. O yüzden kapıya girdi.
             'static/fonts/dm-sans-v17-latin.woff2',
             'static/fonts/dm-sans-v17-latin-ext.woff2',
-            'bundled/logos/kurum-logo-blue.png', 'bundled/logos/kurum-logo-white.png'
+            'bundled/prompts/prompt-yonetmeni.md'
           )
           $eksik = @()
           foreach ($f in $beklenenler) {
@@ -266,7 +266,7 @@ jobs:
           # hiçbir pytest onu görmüyor (macOS'ta Info.plist için de böyle).
           $gecici = Join-Path $env:RUNNER_TEMP 'surum-denetimi'
           New-Item -ItemType Directory -Force -Path $gecici | Out-Null
-          $hedef = Join-Path $gecici 'GPT-Image Studio.exe'
+          $hedef = Join-Path $gecici 'Lumeo.exe'
           $arsiv = [System.IO.Compression.ZipFile]::OpenRead($zip)
           try {
             # GetEntry zip'teki HAM adı ister — normalize edilmiş hâli değil.
@@ -307,14 +307,14 @@ jobs:
           }
           if ($hataVar) { exit 1 }
 
-          # Yayın varlığı adı macOS ile simetrik (gpt-image-studio-macOS-arm64.zip).
-          Copy-Item -LiteralPath $zip -Destination 'dist\gpt-image-studio-windows-x64.zip' -Force
+          # Yayın varlığı adı macOS ile simetrik (lumeo-macOS-arm64.zip).
+          Copy-Item -LiteralPath $zip -Destination 'dist\lumeo-windows-x64.zip' -Force
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gpt-image-studio-windows-x64
-          path: dist/gpt-image-studio-windows-x64.zip
+          name: lumeo-windows-x64
+          path: dist/lumeo-windows-x64.zip
           # "Yeşil ama boş"un SON kapısı: bu bayrak olmadan upload-artifact
           # eşleşen dosya bulamayınca yalnızca UYARI basar ve iş yeşil kalır —
           # 2026-08-11'de tam olarak bu oldu.
@@ -337,13 +337,13 @@ jobs:
       - name: macOS paketini indir
         uses: actions/download-artifact@v4
         with:
-          name: gpt-image-studio-macos-arm64
+          name: lumeo-macos-arm64
           path: dist
 
       - name: Windows paketini indir
         uses: actions/download-artifact@v4
         with:
-          name: gpt-image-studio-windows-x64
+          name: lumeo-windows-x64
           path: dist
 
       # download-artifact eksik varlıkta zaten hata verir, ama yayına GİDEN
@@ -352,8 +352,8 @@ jobs:
       - name: İki paket de indi ve boş değil
         run: |
           set -euo pipefail
-          for f in dist/gpt-image-studio-macOS-arm64.zip \
-                   dist/gpt-image-studio-windows-x64.zip; do
+          for f in dist/lumeo-macOS-arm64.zip \
+                   dist/lumeo-windows-x64.zip; do
             test -s "$f" || { echo "EKSİK ya da BOŞ: $f"; exit 1; }
           done
           ls -l dist
@@ -363,7 +363,7 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            dist/gpt-image-studio-macOS-arm64.zip
-            dist/gpt-image-studio-windows-x64.zip
+            dist/lumeo-macOS-arm64.zip
+            dist/lumeo-windows-x64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

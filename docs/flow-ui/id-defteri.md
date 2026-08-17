@@ -43,6 +43,8 @@ kaldırmak gerekir. Testin ikinci iddiası bunu zorunlu tutuyor.
 | `preview-empty` | Aynı karar (Adım 13): önizleme sahnesi kalktı. | `core.js` — `clearPreview` silindi | aynı test |
 | `preview-img` | Aynı karar (Adım 13): önizleme sahnesi kalktı. | `viewer.js` — `previewImg` dinleyicisi silindi | `test_index.py::test_single_studio_view_is_rendered` |
 | `preview-clear` | Aynı karar (Adım 13): önizleme sahnesi kalktı. | `core.js` — `clearPreview` silindi | aynı test |
+| `logo-color-row` | Marka-nötr ürün kararı: pakete gömülü KURUM logo çifti (mavi + beyaz) kaldırıldı. Oto/Mavi/Beyaz satırı YALNIZCA o çift için görünüyordu (`syncColorRow` onu `selectedAsset.logo === "builtin"` koşuluna bağlıyordu) — kullanıcının yüklediği tek dosyalık logolarda hiçbir işlevi yoktu. | `assets.js` — `syncColorRow` ve tüm çağrıları silindi; `style.css`'ten `#logo-color-row[hidden]` kuralı kalktı | `test_composite.py` (oto-renk/`pick_logo`/`region_box` testleri kaldırıldı), `test_logo.py::test_logo_without_asset_id_is_rejected` (yerleşik logo testinin yerini aldı) |
+| `logo-color` | Aynı karar: seçilecek varyant kalmadı. Sunucu tarafında `LogoRequest.color` alanı ve `composite.pick_logo` da bu commit'te gitti; `composite_logo` artık tek `logo_path` alıyor. | `assets.js` — `#logo-color` click dinleyicisi ve `readLogoOpts`'taki `color` okuması silindi | aynı testler |
 
 <!-- Tablo biçimi bağlayıcı: ilk hücre backtick içinde id olmak zorunda,
      test satırları böyle ayıklıyor. Örnek:

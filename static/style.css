@@ -616,7 +616,7 @@ body:has(.sheet.open) .scrim { display: block; }
   padding: 0.2rem 0.5rem; font-size: 0.74rem; margin-left: 0.35rem;
   vertical-align: baseline;
 }
-#logo-color-row[hidden], #logo-only[hidden], #banner-only[hidden] { display: none; }
+#logo-only[hidden], #banner-only[hidden] { display: none; }
 
 /* Modal içi varlık seçici (logo/banner) */
 .overlay-picker { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -629,10 +629,6 @@ body:has(.sheet.open) .scrim { display: block; }
 .overlay-chip:hover { background: var(--raised); }
 .overlay-chip.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring); }
 .overlay-chip img { width: 100%; height: 100%; object-fit: contain; }
-.overlay-builtin {
-  font-family: var(--font-display, system-ui, sans-serif); font-weight: 600;
-  font-size: 0.85rem; color: var(--text); letter-spacing: 0.02em;
-}
 .overlay-empty { color: var(--muted); font-size: 0.82rem; margin: 0.2rem 0; }
 
 /* Prompt altı varlık kütüphanesi paneli */

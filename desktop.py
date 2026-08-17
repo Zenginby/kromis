@@ -27,7 +27,7 @@ import errlog
 import paths
 import screencolor
 
-WINDOW_TITLE = "GPT-Image Studio"
+WINDOW_TITLE = "Lumeo"
 WINDOW_SIZE = (1440, 900)
 MIN_WINDOW_SIZE = (1024, 700)
 _POLL_INTERVAL = 0.02
@@ -148,7 +148,7 @@ def _show_fatal_alert(log_path: str) -> None:
     osascript orada bulunamaz, uyarı hiç çıkmaz ve açılış hatası tamamen
     sessiz kalırdı (v1.8'de `errlog`'u doğuran gerekçenin birebir aynısı).
     """
-    title = "GPT-Image Studio başlatılamadı"
+    title = "Lumeo başlatılamadı"
     message = (f"Uygulama açılamadı. Hata kaydı: {log_path} "
               "— lütfen bu dosyayı Kurum'ya iletin.")
     alert = _alert_windows if sys.platform == "win32" else _alert_macos

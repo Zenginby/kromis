@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">GPT-Image Studio</string>
+    <string name="app_name">Lumeo</string>
 
     <!-- Açılış ekranı. Chaquopy ilk çalıştırmada Python stdlib'ini açıyor
          (2–5 sn) ve assets kopyalanıyor; bu metin olmadan kullanıcı boş siyah
@@ -11,7 +11,7 @@
     <!-- Foreground service bildirimi -->
     <string name="bildirim_kanali_adi">Görsel üretimi</string>
     <string name="bildirim_kanali_aciklama">Üretim sürerken uygulamanın arka planda çalışmasını sağlar.</string>
-    <string name="bildirim_basligi">GPT-Image Studio çalışıyor</string>
+    <string name="bildirim_basligi">Lumeo çalışıyor</string>
     <string name="bildirim_metni">Üretim sürerken uygulamadan çıksanız da işlem tamamlanır.</string>
 
     <!-- Hatalar -->

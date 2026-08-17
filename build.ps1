@@ -1,4 +1,4 @@
-﻿# GPT-Image Studio'yu Windows uygulaması olarak derler ve zip'ler.
+﻿# Lumeo'yu Windows uygulaması olarak derler ve zip'ler.
 #
 # build.sh'in Windows karşılığıdır; o dosyaya DOKUNULMAZ — macOS hattı kendi
 # akışıyla (ad-hoc imza + ditto) çalışmaya devam eder. Ortak olan tek şey
@@ -25,7 +25,7 @@ $ErrorActionPreference = 'Stop'
 # yollar (spec, requirements, tests) çözülsün.
 Set-Location -LiteralPath $PSScriptRoot
 
-$AppName = 'GPT-Image Studio'
+$AppName = 'Lumeo'
 $AppDir  = Join-Path 'dist' $AppName
 $Exe     = Join-Path $AppDir "$AppName.exe"
 $Zip     = Join-Path 'dist' "$AppName-windows.zip"

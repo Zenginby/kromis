@@ -1,4 +1,4 @@
-// GPT-Image Studio — tema rengi, renk seçici, palet önerileri ve kütüphanesi.
+// Lumeo — tema rengi, renk seçici, palet önerileri ve kütüphanesi.
 //
 // Klasik script (ES module DEĞİL): bütün parçalar TEK global kapsamı paylaşır
 // ve index.html'deki yükleme SIRASI bağlayıcıdır:

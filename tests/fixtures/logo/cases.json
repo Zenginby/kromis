@@ -7,7 +7,8 @@
     "scale": 0.14,
     "shadow_alpha": 120,
     "shadow_blur": 6,
-    "overlay": null
+    "overlay": null,
+    "logo": "blue"
   },
   {
     "name": "topleft-blue-lg",
@@ -17,7 +18,8 @@
     "scale": 0.3,
     "shadow_alpha": 0,
     "shadow_blur": 0,
-    "overlay": null
+    "overlay": null,
+    "logo": "blue"
   },
   {
     "name": "center-white",
@@ -27,7 +29,8 @@
     "scale": 0.14,
     "shadow_alpha": 200,
     "shadow_blur": 12,
-    "overlay": null
+    "overlay": null,
+    "logo": "white"
   },
   {
     "name": "auto-on-light",
@@ -37,7 +40,8 @@
     "scale": 0.14,
     "shadow_alpha": 120,
     "shadow_blur": 6,
-    "overlay": null
+    "overlay": null,
+    "logo": "blue"
   },
   {
     "name": "auto-on-dark",
@@ -47,7 +51,8 @@
     "scale": 0.14,
     "shadow_alpha": 120,
     "shadow_blur": 6,
-    "overlay": null
+    "overlay": null,
+    "logo": "white"
   },
   {
     "name": "custom-overlay",
@@ -57,6 +62,7 @@
     "scale": 0.2,
     "shadow_alpha": 60,
     "shadow_blur": 4,
-    "overlay": "overlay"
+    "overlay": "overlay",
+    "logo": "overlay"
   }
 ]

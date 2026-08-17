@@ -1,4 +1,4 @@
-// GPT-Image Studio — Prompt Yönetmeni: Türkçe sohbet → İngilizce gpt-image-2 prompt'u.
+// Lumeo — Prompt Yönetmeni: Türkçe sohbet → İngilizce gpt-image-2 prompt'u.
 //
 // Klasik script (ES module DEĞİL): bütün parçalar TEK global kapsamı paylaşır
 // ve index.html'deki yükleme SIRASI bağlayıcıdır:

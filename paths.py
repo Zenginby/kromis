@@ -18,9 +18,8 @@ from __future__ import annotations
 import os
 import sys
 
-APP_NAME = "GPT-Image Studio"
+APP_NAME = "Lumeo"
 REPO_DIR = os.path.dirname(os.path.abspath(__file__))
-_LOGO_VARIANTS = ("blue", "white")
 
 # Android dalını AÇAN ortam değişkenleri. Kotlin tarafı (ServerService) Python'u
 # başlatmadan ÖNCE ikisini de `os.environ`'a yazar.
@@ -110,10 +109,6 @@ def static_dir() -> str:
     return os.path.join(resource_dir(), "static")
 
 
-def bundled_logos_dir() -> str:
-    return os.path.join(resource_dir(), "bundled", "logos")
-
-
 def bundled_prompts_dir() -> str:
     """Gömülü sistem talimatlarının dizini (Prompt Yönetmeni personası)."""
     return os.path.join(resource_dir(), "bundled", "prompts")
@@ -146,7 +141,7 @@ def credentials_path() -> str:
     """
     if is_android():
         return os.path.join(data_dir(), "credentials.env")
-    return os.path.expanduser("~/.config/gpt-image-studio/credentials.env")
+    return os.path.expanduser("~/.config/lumeo/credentials.env")
 
 
 def shared_credentials_path() -> str | None:
@@ -163,13 +158,6 @@ def shared_credentials_path() -> str | None:
     if is_android():
         return None
     return os.path.expanduser("~/.config/claude-tools/azure-gpt-image2.env")
-
-
-def builtin_logo(variant: str) -> str:
-    """Gömülü KURUM logosunun yolu. variant: "blue" | "white"."""
-    if variant not in _LOGO_VARIANTS:
-        raise ValueError(f"geçersiz logo varyantı: {variant!r}")
-    return os.path.join(bundled_logos_dir(), f"kurum-logo-{variant}.png")
 
 
 def ensure_data_dirs() -> None:

@@ -18,6 +18,10 @@ hata.log
 build/
 dist/
 
+# `iconutil` ile branding/lumeo.iconset'ten build.sh içinde üretilir; kaynak
+# PNG'ler izleniyor, bu türetilmiş .icns değil (yalnız macOS'ta üretilebilir).
+/branding/lumeo.icns
+
 # graphify generated artifacts
 graphify-out/
 .superpowers/

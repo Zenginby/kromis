@@ -29,6 +29,16 @@ def _client(tmp_path, monkeypatch, *, real_png=False):
     return TestClient(appmod.app)
 
 
+def _logo_asset(tmp_path):
+    """Bindirme için kütüphaneye bir logo koyar (yerleşik logo kaldırıldı).
+
+    `_client` ASSETS_DIR'i tmp_path/assets'e yönlendiriyor; kayıt oraya yazılıyor.
+    """
+    return astore.save_asset("logos", b"\x89PNG-logo", "logo",
+                             str(tmp_path / "assets"),
+                             now="2026-07-23T10:00:00")["id"]
+
+
 def _new_folder(c, name="Kurban"):
     r = c.post("/api/folders", json={"name": name})
     assert r.status_code == 200, r.text
@@ -313,7 +323,8 @@ def test_logo_derivative_inherits_source_folder(tmp_path, monkeypatch, fake_comp
     monkeypatch.setattr(appmod.composite, "composite_logo", fake_composite)
     fid = _new_folder(c)
     src_id = _generate(c, fid).json()["images"][0]["id"]
-    rec = c.post("/api/logo", json={"id": src_id}).json()["image"]
+    rec = c.post("/api/logo", json={"id": src_id,
+                                    "asset_id": _logo_asset(tmp_path)}).json()["image"]
     assert rec["folder_id"] == fid
     # ve klasör görünümünde çıkar
     ids = [r["id"] for r in c.get(f"/api/history?folder_id={fid}").json()["images"]]
@@ -373,7 +384,8 @@ def test_move_does_not_touch_the_file_or_provenance(tmp_path, monkeypatch, fake_
     monkeypatch.setattr(appmod.composite, "composite_logo", fake_composite)
     fid = _new_folder(c)
     src_id = _generate(c).json()["images"][0]["id"]
-    derived = c.post("/api/logo", json={"id": src_id}).json()["image"]
+    derived = c.post("/api/logo", json={"id": src_id,
+                                        "asset_id": _logo_asset(tmp_path)}).json()["image"]
 
     c.patch(f"/api/image/{derived['id']}", json={"folder_id": fid})
     moved = c.get(f"/api/history?folder_id={fid}").json()["images"][0]

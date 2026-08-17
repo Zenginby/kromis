@@ -1,4 +1,4 @@
-"""KURUM logo/motto filigranı bindirme — composite-logo.py'nin süreç içi port'u.
+"""Logo/motto filigranı bindirme — composite-logo.py'nin süreç içi port'u.
 
 Neden port: paket içinde ne `python3` ne de o script bulunur; subprocess çağrısı
 Logo ve Banner uçlarını 500'e düşürürdü. Yan fayda: her canlı önizlemede bir
@@ -7,14 +7,21 @@ Python süreci başlatma maliyeti kalkar.
 Dış script (~/.config/claude-tools/composite-logo.py) blog routine'i tarafından
 bağımsız kullanıldığı için YERİNDE KALIR. Bu modül uygulamanın kaynağıdır; ikisi
 arasındaki kayma riski tests/test_composite.py'deki golden fixture'larla ölçülür.
+
+BİNDİRİLEN GÖRSEL TEK: çağıran `logo_path` verir. Eskiden mavi/beyaz bir ÇİFT
+geçilir ve `color="auto"` zemin parlaklığına göre birini seçerdi; o mekanizma
+(pick_logo + region_box + parlaklık örneklemesi) yalnızca pakete gömülü KURUM
+logo çifti için vardı. Uygulama marka-nötr — kullanıcının kütüphanesinden
+gelen logolar tek dosya — ve varyant seçimi karşılıksız kalmıştı. Golden
+fixture'lar korunuyor: aynı dosya doğrudan geçildiğinde pikseller birebir aynı
+(bkz. tests/fixtures/logo/cases.json'daki `logo` alanı).
 """
 from __future__ import annotations
 
 import io
 
-from PIL import Image, ImageFilter, ImageStat
+from PIL import Image, ImageFilter
 
-BRIGHTNESS_THRESHOLD = 140  # 0-255; üstü "açık zemin" sayılır
 # Gölgenin logoya göre kaydırması (px) — dış script'ten birebir taşındı;
 # golden fixture'lar bu iki sayıya bağlı, değiştirilirse yeniden üretilmeli.
 SHADOW_OFFSET = (4, 6)
@@ -24,8 +31,6 @@ POSITIONS = [
     "center-left", "center", "center-right",
     "bottom-left", "bottom-center", "bottom-right",
 ]
-
-LOGO_COLORS = {"auto", "blue", "white"}
 
 # Kaydırmanın ± sınırı, görsel kenarının oranı olarak. models.LogoRequest'teki
 # alan sınırıyla AYNI olmak zorunda — ikisi ayrışırsa uç bir değer uçta geçip
@@ -54,23 +59,13 @@ def _check_position(position: str) -> None:
         raise ValueError(f"geçersiz konum: {position!r}")
 
 
-def _check_color(color: str) -> None:
-    """color auto/blue/white dışındaysa ValueError fırlatır.
-
-    Dış scriptte argparse `choices` ile sınırlıydı; port'ta beklenmeyen bir
-    değer sessizce "auto" gibi davranıyordu.
-    """
-    if color not in LOGO_COLORS:
-        raise ValueError(f"geçersiz renk: {color!r}")
-
-
 def _check_offset(value: float) -> None:
     """Kaydırma oranı ±OFFSET_LIMIT dışındaysa ValueError fırlatır.
 
-    _check_position/_check_color ile aynı gerekçe: uçtaki Pydantic sınırı tek
-    kapı olsaydı, bu modülü doğrudan çağıran bir yol (blog routine'i bir gün
-    dış script yerine bunu import ederse) sessizce clamp'lenmiş bir sonuç
-    alırdı. NaN de reddedilir — karşılaştırmalar False dönüyor.
+    _check_position ile aynı gerekçe: uçtaki Pydantic sınırı tek kapı olsaydı,
+    bu modülü doğrudan çağıran bir yol (blog routine'i bir gün dış script
+    yerine bunu import ederse) sessizce clamp'lenmiş bir sonuç alırdı. NaN de
+    reddedilir — karşılaştırmalar False dönüyor.
     """
     if not -OFFSET_LIMIT <= value <= OFFSET_LIMIT:
         raise ValueError(f"geçersiz kaydırma: {value!r}")
@@ -82,46 +77,6 @@ def _vh(position: str) -> tuple[str, str]:
         return ("center", "center")
     v, _, h = position.partition("-")
     return (v, h or "center")
-
-
-def region_box(img_w: int, img_h: int, position: str,
-               frac: float = 0.22,
-               offset_x_px: int = 0, offset_y_px: int = 0) -> tuple[int, int, int, int]:
-    """Logonun düşeceği alanın kutusu — parlaklık örneklemesi için.
-
-    Kenar en az 1 px: `frac * kenar` 1'in altına düşen çok küçük görsellerde
-    kutu boşalır ve boş bir crop'ta ImageStat ortalama alırken sıfıra bölerdi.
-
-    `offset_*_px` kutuyu logoyla BİRLİKTE kaydırır. Kaydırmasa `color="auto"`
-    kaydırılmış logonun altındaki zemini değil çapadaki zemini örnekler; açık
-    zemine taşınmış bir logo koyu zeminin parlaklığına göre beyaz seçilir ve
-    okunmaz çıkardı.
-    """
-    rw, rh = max(1, int(img_w * frac)), max(1, int(img_h * frac))
-    v, h = _vh(position)
-    x0 = 0 if h == "left" else (img_w - rw if h == "right" else (img_w - rw) // 2)
-    y0 = 0 if v == "top" else (img_h - rh if v == "bottom" else (img_h - rh) // 2)
-    x0 = _clamp_px(x0 + offset_x_px, img_w - rw)
-    y0 = _clamp_px(y0 + offset_y_px, img_h - rh)
-    return (x0, y0, x0 + rw, y0 + rh)
-
-
-def pick_logo(base: Image.Image, position: str, color: str,
-              logo_blue: str, logo_white: str,
-              offset_x_px: int = 0, offset_y_px: int = 0) -> str:
-    """color=auto ise zemin parlaklığına göre mavi/beyaz varyantı seçer."""
-    _check_position(position)
-    _check_color(color)
-    if color == "blue":
-        return logo_blue
-    if color == "white":
-        return logo_white
-    box = region_box(*base.size, position,
-                     offset_x_px=offset_x_px, offset_y_px=offset_y_px)
-    region = base.convert("RGB").crop(box)
-    brightness = ImageStat.Stat(region).mean  # [R, G, B]
-    luminance = 0.299 * brightness[0] + 0.587 * brightness[1] + 0.114 * brightness[2]
-    return logo_blue if luminance > BRIGHTNESS_THRESHOLD else logo_white
 
 
 def paste_position(img_w: int, img_h: int, logo_w: int, logo_h: int,
@@ -148,8 +103,8 @@ def paste_position(img_w: int, img_h: int, logo_w: int, logo_h: int,
             _clamp_px(y + offset_y_px, img_h - logo_h))
 
 
-def composite_logo(base_path: str, *, logo_blue: str, logo_white: str,
-                   position: str = "bottom-right", color: str = "auto",
+def composite_logo(base_path: str, *, logo_path: str,
+                   position: str = "bottom-right",
                    scale: float = 0.14, margin: float = 0.03,
                    shadow_alpha: int = 120, shadow_blur: int = 6,
                    offset_x: float = 0.0, offset_y: float = 0.0) -> bytes:
@@ -161,7 +116,6 @@ def composite_logo(base_path: str, *, logo_blue: str, logo_white: str,
     gelenek. Varsayılan 0 ⇒ bu fonksiyonun çıktısı birebir eskisi gibi.
     """
     _check_position(position)
-    _check_color(color)
     _check_offset(offset_x)
     _check_offset(offset_y)
     base = Image.open(base_path).convert("RGBA")
@@ -174,8 +128,6 @@ def composite_logo(base_path: str, *, logo_blue: str, logo_white: str,
     off_x_px = round(base.width * offset_x)
     off_y_px = round(base.height * offset_y)
 
-    logo_path = pick_logo(base, position, color, logo_blue, logo_white,
-                          off_x_px, off_y_px)
     logo = Image.open(logo_path).convert("RGBA")
 
     logo_w = int(base.width * scale)

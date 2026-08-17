@@ -20,17 +20,27 @@ from PIL import Image, ImageDraw
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES = os.path.join(REPO, "tests", "fixtures", "logo")
 SCRIPT = os.path.expanduser("~/.config/claude-tools/composite-logo.py")
-LOGO_BLUE = os.path.join(REPO, "bundled", "logos", "kurum-logo-blue.png")
-LOGO_WHITE = os.path.join(REPO, "bundled", "logos", "kurum-logo-white.png")
+# Logo çifti FIXTURES altında: bunlar bir zamanlar pakete gömülü KURUM logolarıydı,
+# uygulama marka-nötr olunca paketten çıkıp yalnızca bu golden'ların
+# girdisi olarak testlerde kaldılar.
+LOGO_BLUE = os.path.join(FIXTURES, "kurum-logo-blue.png")
+LOGO_WHITE = os.path.join(FIXTURES, "kurum-logo-white.png")
 
-# (ad, base, position, color, scale, shadow_alpha, shadow_blur, overlay_or_None)
+# (ad, base, position, color, scale, shadow_alpha, shadow_blur, overlay_or_None, logo)
+#
+# `color` DIŞ SCRIPT'e geçen argüman; dış script auto'da zemin parlaklığına göre
+# mavi/beyaz seçiyor. `logo` ise o seçimin SONUCU — dış script'in her vakada
+# fiilen hangi dosyayı bindirdiği. İkisi ayrı tutuluyor çünkü composite.py artık
+# tek bir `logo_path` alıyor (varyant seçimi uygulamadan kaldırıldı) ve test
+# golden'ı üretmek için sonucu bilmek zorunda. Değerler dış script'in kendi
+# davranışından ölçüldü; golden PNG'ler gibi bunlar da donmuş veridir.
 CASES = [
-    ("defaults",        "base-light", "bottom-right", "auto",  0.14, 120, 6,  None),
-    ("topleft-blue-lg", "base-light", "top-left",     "blue",  0.30, 0,   0,  None),
-    ("center-white",    "base-dark",  "center",       "white", 0.14, 200, 12, None),
-    ("auto-on-light",   "base-light", "bottom-center", "auto", 0.14, 120, 6,  None),
-    ("auto-on-dark",    "base-dark",  "top-right",    "auto",  0.14, 120, 6,  None),
-    ("custom-overlay",  "base-dark",  "center",       "auto",  0.20, 60,  4,  "overlay"),
+    ("defaults",        "base-light", "bottom-right", "auto",  0.14, 120, 6,  None, "blue"),
+    ("topleft-blue-lg", "base-light", "top-left",     "blue",  0.30, 0,   0,  None, "blue"),
+    ("center-white",    "base-dark",  "center",       "white", 0.14, 200, 12, None, "white"),
+    ("auto-on-light",   "base-light", "bottom-center", "auto", 0.14, 120, 6,  None, "blue"),
+    ("auto-on-dark",    "base-dark",  "top-right",    "auto",  0.14, 120, 6,  None, "white"),
+    ("custom-overlay",  "base-dark",  "center",       "auto",  0.20, 60,  4,  "overlay", "overlay"),
 ]
 
 
@@ -60,7 +70,7 @@ def write_cases_manifest() -> None:
     yanlış vakayla karşılaştırılır. Tek kaynak burada.
     """
     keys = ("name", "base", "position", "color", "scale",
-            "shadow_alpha", "shadow_blur", "overlay")
+            "shadow_alpha", "shadow_blur", "overlay", "logo")
     # encoding AÇIKÇA veriliyor: `ensure_ascii=False` ile birlikte varsayılan
     # kodlamaya bırakmak, Türkçe Windows'ta (cp1254) manifest'i bozar — aynı
     # kusur storage/assets_store'un OKUMA yolunda gerçekten patladı (v0.3.0).
@@ -76,7 +86,7 @@ def main() -> int:
         return 1
     make_bases()
     write_cases_manifest()
-    for (name, base, position, color, scale, sa, sb, overlay) in CASES:
+    for (name, base, position, color, scale, sa, sb, overlay, _logo) in CASES:
         out = os.path.join(FIXTURES, f"golden-{name}.png")
         blue, white = LOGO_BLUE, LOGO_WHITE
         if overlay:

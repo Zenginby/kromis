@@ -40,11 +40,10 @@ LOGO_POSITIONS = {
     "center-left", "center", "center-right",
     "bottom-left", "bottom-center", "bottom-right",
 }
-LOGO_COLORS = {"auto", "blue", "white"}
 # Izgara noktasından kaydırmanın ± sınırı (görsel kenarının oranı).
 # `composite.OFFSET_LIMIT` ile AYNI olmak zorunda: uçta geçen bir değer orada
 # ValueError'a düşerse kullanıcı Türkçe 500 görür. composite import EDİLMİYOR —
-# yukarıdaki konum/renk kümelerindeki gerekçenin aynısı; kayma
+# yukarıdaki konum kümesindeki gerekçenin aynısı; kayma
 # tests/test_composite.py'deki tripwire ile ölçülüyor.
 LOGO_OFFSET_LIMIT = 0.5
 # Konumlanabilir (logo tarzı) bindirmenin varlığı hangi kütüphaneden gelebilir.
@@ -283,12 +282,14 @@ class LogoRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(min_length=1, max_length=64)
-    # asset_id boş/None => yerleşik KURUM logosu (mavi/beyaz auto). Doluysa
-    # asset_kind kütüphanesinden seçilen özel görsel (tek görsel) kullanılır.
-    asset_id: str | None = Field(default=None, max_length=64)
+    # asset_id ZORUNLU (min_length=1): bindirilecek görsel her zaman kullanıcının
+    # kütüphanesinden gelir. Eskiden None geçilebilirdi ve sunucu pakete gömülü
+    # KURUM logo çiftine düşerdi; uygulama marka-nötr olduğundan o varsayılan yok.
+    # Tip `str | None` KALIYOR: alan hiç gönderilmediğinde Pydantic'in ürettiği
+    # hata "asset_id zorunlu" olarak okunsun, `extra="forbid"` ile karışmasın.
+    asset_id: str | None = Field(default=None, min_length=1, max_length=64)
     asset_kind: str = "logos"                                # "logos" | "mottos"
     position: str = "bottom-right"
-    color: str = "auto"
     size: float = Field(default=0.14, ge=0.04, le=0.5)       # logo genişliği / görsel genişliği
     shadow_alpha: int = Field(default=120, ge=0, le=255)     # 0 = gölge yok
     shadow_blur: int = Field(default=6, ge=0, le=50)
@@ -303,13 +304,6 @@ class LogoRequest(BaseModel):
     def _position_ok(cls, v):
         if v not in LOGO_POSITIONS:
             raise ValueError("geçersiz position")
-        return v
-
-    @field_validator("color")
-    @classmethod
-    def _color_ok(cls, v):
-        if v not in LOGO_COLORS:
-            raise ValueError("geçersiz color")
         return v
 
     @field_validator("asset_kind")

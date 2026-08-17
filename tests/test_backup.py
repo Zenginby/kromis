@@ -99,9 +99,7 @@ def test_second_launch_with_the_same_version_is_a_no_op(tmp_path):
 
 
 def test_fresh_install_stamps_without_creating_a_backup_dir(tmp_path):
-    """seed.py'nin "kopyalamadan damgala" mantığının aynısı.
-
-    Taze bir makinede kullanıcının hiç verisi yok; boş bir backups/ dizini
+    """"Kopyalamadan damgala": taze bir makinede kullanıcının hiç verisi yok; boş bir backups/ dizini
     açmak anlamsız olurdu (ve kullanıcıya "bir şey yedeklendi" diye yalan söyler).
     """
     data_dir, output_dir, assets_dir = _dirs(tmp_path)
@@ -284,46 +282,29 @@ def test_backup_fires_once_on_lifespan_startup(monkeypatch, tmp_path):
     assert kwargs["now"]
 
 
-def test_backup_runs_before_seeding(monkeypatch, tmp_path):
-    """SIRA YÜK TAŞIYOR: seed assets/logos/index.json YAZIYOR.
-
-    Tohumlama önce koşsa taze bir makinede yedek "kullanıcının verisi var" diye
-    taze tohum verisinin işe yaramaz yedeğini alırdı. Yükseltmede sıra fark
-    etmez (seed marker yüzünden no-op) — yani bu hata YALNIZCA taze kurulumda,
-    yani ofiste görünürdü, asla geliştirmede. Bu yüzden yorum değil test.
-    """
-    _isolate_lifespan(monkeypatch, tmp_path)
-    order = []
-    monkeypatch.setattr(appmod.backup, "backup_manifests_if_version_changed",
-                        lambda *a, **k: order.append("backup"))
-    monkeypatch.setattr(appmod.seed, "seed_builtin_logos",
-                        lambda *a, **k: order.append("seed") or [])
-    with TestClient(appmod.app):
-        pass
-    assert order == ["backup", "seed"]
-
-
-def test_lifespan_survives_a_backup_error_and_still_seeds(monkeypatch, tmp_path):
+def test_lifespan_survives_a_backup_error(monkeypatch, tmp_path):
     """Yedek bir EMNİYET özelliği — patlaması uygulamayı KİLİTLEMEMELİ.
 
     Yedek yüzünden uygulamaya giremeyen kullanıcının verisine arayüzden hiçbir
     yolu kalmaz; bu, loglanmış-ama-alınmamış bir yedekten kesinlikle kötüdür.
-    Ayrı guard'lar sayesinde tohumlama da yedek hatasından etkilenmiyor.
+    Guard olmadan uvicorn'un startup()'ı hiç bitmez ve kullanıcı boş bir pencere
+    görür. Hata hata.log'a düşer, uygulama yine de servis verir.
+
+    (Buranın bir kardeşi vardı: yedek hatasının TOHUMLAMAYI düşürmediğini
+    ölçen test. Tohumlama — pakete gömülü KURUM logolarının kullanıcı
+    kütüphanesine kopyalanması — ürün marka-nötr olunca kaldırıldı, o test de
+    lifespan'daki sıra testiyle birlikte gitti.)
     """
     _isolate_lifespan(monkeypatch, tmp_path)
-    seeded = []
 
     def boom(*args, **kwargs):
         raise OSError("disk dolu (simüle)")
 
     monkeypatch.setattr(appmod.backup, "backup_manifests_if_version_changed", boom)
-    monkeypatch.setattr(appmod.seed, "seed_builtin_logos",
-                        lambda *a, **k: seeded.append(True) or [])
 
     with TestClient(appmod.app) as client:
         assert client.get("/api/settings").status_code == 200
 
-    assert seeded, "yedek hatası tohumlamayı da düşürmüş"
     log = tmp_path / "hata.log"
     assert log.is_file()
     assert "disk dolu" in log.read_text(encoding="utf-8")

@@ -1,4 +1,4 @@
-// GPT-Image Studio — görsel büyüteci (lightbox): yakınlaştırma + kaydırma.
+// Lumeo — görsel büyüteci (lightbox): yakınlaştırma + kaydırma.
 //
 // Klasik script (bkz. core.js başlığı) ve SON yüklenen dosya: yalnızca HTML'de
 // zaten var olan öğelere dinleyici bağlar, hiçbir açılış çağrısı yapmaz — bu

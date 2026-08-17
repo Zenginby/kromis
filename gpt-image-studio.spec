@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec: GPT-Image Studio -> macOS .app + Windows klasörü.
+"""PyInstaller spec: Lumeo -> macOS .app + Windows klasörü.
 
 TEK spec, İKİ platform: build.sh (macOS) ve build.ps1 (Windows) aynı dosyayı
 çağırır. Platforma göre dallanan yalnızca İKİ şey var: sürüm kaynağı
@@ -41,7 +41,7 @@ module" satırları YANILTICI: bunlar Python modülü değil .NET assembly'leri,
 platformda hiç çalışmıyor (`screencolor` v0.3.0'dan beri macOS dışında
 `AppKit`'e hiç dokunmuyor).
 Kanıt derlemenin ötesinde: paket ÇALIŞTIRILDI — pencere açıldı, `hata.log`
-yazılmadı, veri dizini `%LOCALAPPDATA%\\GPT-Image Studio` altında doğdu,
+yazılmadı, veri dizini `%LOCALAPPDATA%\\Lumeo` altında doğdu,
 pencere kapanınca süreç temiz çıktı. Bir gün paket "açılmıyor" hâline gelirse
 ilk bakılacak yer budur: `hiddenimports` eklemek gerekiyorsa hangi modülün
 eksik olduğunu `hata.log`'daki traceback söyler.
@@ -136,11 +136,11 @@ if sys.platform == "win32":
             _vi.StringFileInfo([
                 _vi.StringTable("041F04B0", [
                     _vi.StringStruct("CompanyName", "Kurum Derneği"),
-                    _vi.StringStruct("FileDescription", "GPT-Image Studio"),
+                    _vi.StringStruct("FileDescription", "Lumeo"),
                     _vi.StringStruct("FileVersion", APP_VERSION),
-                    _vi.StringStruct("InternalName", "GPT-Image Studio"),
-                    _vi.StringStruct("OriginalFilename", "GPT-Image Studio.exe"),
-                    _vi.StringStruct("ProductName", "GPT-Image Studio"),
+                    _vi.StringStruct("InternalName", "Lumeo"),
+                    _vi.StringStruct("OriginalFilename", "Lumeo.exe"),
+                    _vi.StringStruct("ProductName", "Lumeo"),
                     _vi.StringStruct("ProductVersion", APP_VERSION),
                 ]),
             ]),
@@ -148,12 +148,17 @@ if sys.platform == "win32":
         ],
     )
 
+# Windows exe'nin simgesi. macOS'ta EXE seviyesindeki icon PyInstaller
+# tarafından yok sayılır (asıl .icns BUNDLE'a veriliyor, aşağıda) — burada da
+# yalnızca win32'de doldurulur ki gereksiz bir "icon ignored" uyarısı eklenmesin.
+_exe_icon = os.path.join(SPECPATH, 'branding', 'lumeo.ico') if sys.platform == "win32" else None
+
 exe = EXE(
     pyz,
     a.scripts,
     [],
     exclude_binaries=True,
-    name='GPT-Image Studio',
+    name='Lumeo',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -166,6 +171,7 @@ exe = EXE(
     argv_emulation=False,
     codesign_identity=None,
     entitlements_file=None,
+    icon=_exe_icon,
     version=_version_resource,  # Windows'ta VERSIONINFO, macOS'ta None
 )
 coll = COLLECT(
@@ -175,14 +181,19 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name='GPT-Image Studio',
+    name='Lumeo',
 )
 
 if sys.platform == "darwin":
+    # build.sh, pyinstaller'dan ÖNCE `iconutil` ile branding/lumeo.iconset'ten
+    # bu .icns'i üretir (iconutil yalnız macOS'ta var, o yüzden burada
+    # commit edilmiş bir dosya değil — bkz. build.sh). Henüz üretilmemişse
+    # (ör. spec'i build.sh'siz doğrudan çalıştırmak) sessizce simgesiz derler.
+    _icns_path = os.path.join(SPECPATH, 'branding', 'lumeo.icns')
     app = BUNDLE(
         coll,
-        name='GPT-Image Studio.app',
-        icon=None,
+        name='Lumeo.app',
+        icon=_icns_path if os.path.isfile(_icns_path) else None,
         bundle_identifier='org.zenginby.gptimagestudio',
         info_plist={
             'LSMultipleInstancesProhibited': True,   # iki kez çift tıklama ikinci sunucu doğurmaz

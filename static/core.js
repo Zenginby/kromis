@@ -1,4 +1,4 @@
-// GPT-Image Studio — üretim akışı: prompt, referans görseller, ilerleme, onay penceresi.
+// Lumeo — üretim akışı: prompt, referans görseller, ilerleme, onay penceresi.
 //
 // Klasik script (ES module DEĞİL): bütün parçalar TEK global kapsamı paylaşır
 // ve index.html'deki yükleme SIRASI bağlayıcıdır:

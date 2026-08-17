@@ -10,7 +10,6 @@ import uvicorn
 from fastapi import FastAPI
 
 import desktop
-import seed
 
 
 def _probe_app() -> FastAPI:
@@ -203,7 +202,6 @@ def test_window_is_created_with_the_color_picker_api(monkeypatch):
     fake_webview.start = lambda: None
     monkeypatch.setitem(sys.modules, "webview", fake_webview)
     monkeypatch.setattr("paths.ensure_data_dirs", lambda: None)
-    monkeypatch.setattr(seed, "seed_builtin_logos", lambda *a, **k: [])
 
     desktop._run()
 
@@ -247,10 +245,11 @@ def test_main_wires_real_port_into_window_and_shuts_down_cleanly(monkeypatch):
     monkeypatch.setitem(sys.modules, "webview", fake_webview)
 
     monkeypatch.setattr("paths.ensure_data_dirs", lambda: None)
-    # app.app'in lifespan'ı gerçekten çalışıyor (bu testin amacı budur) ama
-    # seed.seed_builtin_logos gerçek dosya sistemine (repo kökündeki .logos-seeded
-    # ve assets/logos/) yazar — testler kullanıcının gerçek kütüphanesine dokunmamalı.
-    monkeypatch.setattr(seed, "seed_builtin_logos", lambda *args, **kwargs: [])
+    # app.app'in lifespan'ı gerçekten çalışıyor (bu testin amacı budur).
+    # Lifespan'ın tek yan etkisi olan sürüm yedeği conftest'teki autouse guard
+    # tarafından no-op'a çevriliyor — testler geliştiricinin gerçek verisine
+    # dokunmamalı. (Buradaki üçüncü satır eskiden seed tohumlamasını da
+    # susturuyordu; seed.py kaldırıldı.)
 
     real_start_server = desktop.start_server
 
@@ -310,7 +309,6 @@ def test_downloads_are_enabled_before_the_window_opens(monkeypatch):
     fake_webview.start = fake_start
     monkeypatch.setitem(sys.modules, "webview", fake_webview)
     monkeypatch.setattr("paths.ensure_data_dirs", lambda: None)
-    monkeypatch.setattr(seed, "seed_builtin_logos", lambda *args, **kwargs: [])
 
     desktop._run()
 
@@ -417,7 +415,7 @@ def test_fatal_alert_uses_messagebox_on_windows(monkeypatch):
     assert not subprocess_calls, "Windows'ta subprocess'e düşmemeli (konsol çakar)"
     assert len(alerts) == 1
     title, message = alerts[0]
-    assert "GPT-Image Studio" in title
+    assert "Lumeo" in title
     assert r"C:\Users\x\hata.log" in message
 
 

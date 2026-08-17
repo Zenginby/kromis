@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GPT-Image Studio'yu macOS uygulaması olarak derler, ad-hoc imzalar, zip'ler.
+# Lumeo'yu macOS uygulaması olarak derler, ad-hoc imzalar, zip'ler.
 # İki hat var: bu makinede (host mimarisi neyse) yerel doğrulama derlemesi —
 # paketleme yolunu uçtan uca sınamak için; Apple Silicon'a gönderilecek gerçek
 # paket GitHub Actions'ın arm64 runner'ında ayrı bir işle üretilir (bkz.
@@ -8,8 +8,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP="dist/GPT-Image Studio.app"
-ZIP="dist/GPT-Image Studio.zip"
+APP="dist/Lumeo.app"
+ZIP="dist/Lumeo.zip"
 
 # python3, python DEĞİL: macOS'te `python` diye bir komut yok. Erken ve
 # anlaşılır başarısız ol — yoksa hata "command not found" olarak çıkıp
@@ -36,6 +36,12 @@ python3 -m pytest tests/ -q
 
 echo "→ temizlik"
 rm -rf build dist
+
+# `.icns` PNG kaynağından (branding/lumeo.iconset/) burada üretiliyor:
+# `iconutil` yalnız macOS'ta var, o yüzden commit edilmiş bir dosya değil —
+# spec bunu bulamazsa (bu adım atlanmışsa) sessizce simgesiz derler.
+echo "→ simge (.icns)"
+iconutil -c icns branding/lumeo.iconset -o branding/lumeo.icns
 
 echo "→ derleme"
 pyinstaller gpt-image-studio.spec --noconfirm

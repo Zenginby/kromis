@@ -53,7 +53,7 @@ def test_spec_anchors_the_version_load_on_specpath():
 def test_spec_has_no_syntax_warnings():
     """Yorumlara/docstring'e giren Windows yolları geçersiz kaçış dizisi doğurur.
 
-    `%LOCALAPPDATA%\\GPT-Image Studio` yazmak `\\G`'yi geçersiz bir kaçış dizisi
+    `%LOCALAPPDATA%\\Lumeo` yazmak `\\G`'yi geçersiz bir kaçış dizisi
     yapar ve Python SyntaxWarning basar (v0.3.0'da gerçekten oldu). Bu uyarı
     ancak DERLEME sırasında, pyinstaller'ın onlarca INFO satırı arasında
     görünür — kaybolmaya birebir uygun; ayrıca Python 3.15'te bu sınıf uyarı
@@ -151,9 +151,9 @@ def test_readme_download_links_match_what_the_release_publishes():
         release_yml = f.read()
 
     for dosya, yml, nerede in (
-        ("gpt-image-studio-macOS-arm64.zip", release_yml, "release.yml"),
-        ("gpt-image-studio-windows-x64.zip", release_yml, "release.yml"),
-        ("gpt-image-studio-android-arm64.apk", android_yml, "build-android.yml"),
+        ("lumeo-macOS-arm64.zip", release_yml, "release.yml"),
+        ("lumeo-windows-x64.zip", release_yml, "release.yml"),
+        ("lumeo-android-arm64.apk", android_yml, "build-android.yml"),
     ):
         assert f"releases/latest/download/{dosya}" in text, \
             f"README'de {dosya} indirme bağlantısı yok"

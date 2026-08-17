@@ -35,7 +35,7 @@ def test_frozen_mode_writes_under_application_support(monkeypatch):
     monkeypatch.setattr(sys, "_MEIPASS", "/tmp/meipass-test", raising=False)
 
     expected_data = os.path.join(
-        os.path.expanduser("~/Library/Application Support"), "GPT-Image Studio")
+        os.path.expanduser("~/Library/Application Support"), "Lumeo")
     assert paths.is_frozen()
     assert paths.data_dir() == expected_data
     assert paths.output_dir() == os.path.join(expected_data, "output")
@@ -43,7 +43,7 @@ def test_frozen_mode_writes_under_application_support(monkeypatch):
 
 
 def test_frozen_mode_writes_under_local_appdata_on_windows(monkeypatch):
-    """Windows dalı: veri `%LOCALAPPDATA%\\GPT-Image Studio` altına gider.
+    """Windows dalı: veri `%LOCALAPPDATA%\\Lumeo` altına gider.
 
     Roaming (`%APPDATA%`) DEĞİL: bu dizin üretilen görselleri tutuyor ve etki
     alanı profilinde ağ üzerinden taşınması istenmez.
@@ -53,7 +53,7 @@ def test_frozen_mode_writes_under_local_appdata_on_windows(monkeypatch):
     monkeypatch.setenv("LOCALAPPDATA", r"C:\Kullanicilar\test\AppData\Local")
 
     expected_data = os.path.join(r"C:\Kullanicilar\test\AppData\Local",
-                                 "GPT-Image Studio")
+                                 "Lumeo")
     assert paths.data_dir() == expected_data
     assert paths.output_dir() == os.path.join(expected_data, "output")
     assert paths.assets_dir() == os.path.join(expected_data, "assets")
@@ -66,7 +66,7 @@ def test_frozen_windows_falls_back_when_localappdata_is_missing(monkeypatch):
     monkeypatch.delenv("LOCALAPPDATA", raising=False)
 
     expected = os.path.join(os.path.expanduser("~"), "AppData", "Local",
-                            "GPT-Image Studio")
+                            "Lumeo")
     assert paths.data_dir() == expected
 
 
@@ -87,8 +87,8 @@ def test_frozen_mode_reads_resources_from_meipass(monkeypatch):
     # (Windows paketleme turunda birebir bu oldu).
     assert paths.resource_dir() == "/tmp/meipass-test"
     assert paths.static_dir() == os.path.join("/tmp/meipass-test", "static")
-    assert paths.bundled_logos_dir() == os.path.join(
-        "/tmp/meipass-test", "bundled", "logos")
+    assert paths.bundled_prompts_dir() == os.path.join(
+        "/tmp/meipass-test", "bundled", "prompts")
 
 
 # ── Android dalı ────────────────────────────────────────────────────
@@ -147,8 +147,8 @@ def test_android_resources_come_from_the_copied_dir(monkeypatch):
 
     assert paths.resource_dir() == "/data/veri/resources"
     assert paths.static_dir() == os.path.join("/data/veri/resources", "static")
-    assert paths.bundled_logos_dir() == os.path.join(
-        "/data/veri/resources", "bundled", "logos")
+    assert paths.bundled_prompts_dir() == os.path.join(
+        "/data/veri/resources", "bundled", "prompts")
 
 
 def test_android_resource_dir_falls_back_under_data_dir(monkeypatch):
@@ -172,7 +172,7 @@ def test_desktop_credential_paths_are_unchanged(monkeypatch):
     monkeypatch.delenv(paths.ANDROID_DATA_ENV, raising=False)
 
     assert paths.credentials_path() == os.path.expanduser(
-        "~/.config/gpt-image-studio/credentials.env")
+        "~/.config/lumeo/credentials.env")
     assert paths.shared_credentials_path() == os.path.expanduser(
         "~/.config/claude-tools/azure-gpt-image2.env")
 
@@ -207,17 +207,6 @@ def test_candidate_paths_drop_the_missing_shared_file(monkeypatch):
     monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", "/ev/paylasilan.env")
     assert ac._candidate_paths(None) == [
         "/data/veri/credentials.env", "/ev/paylasilan.env"]
-
-
-def test_builtin_logo_resolves_both_variants():
-    tail = os.path.join("bundled", "logos", "kurum-logo-{}.png")
-    assert paths.builtin_logo("blue").endswith(tail.format("blue"))
-    assert paths.builtin_logo("white").endswith(tail.format("white"))
-
-
-def test_builtin_logo_rejects_unknown_variant():
-    with pytest.raises(ValueError):
-        paths.builtin_logo("kirmizi")
 
 
 def test_ensure_data_dirs_runs_on_startup_not_on_import(monkeypatch):

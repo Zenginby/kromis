@@ -1,4 +1,4 @@
-# GPT-Image Studio — Kurulum (macOS, Windows ve Android)
+# Lumeo — Kurulum (macOS, Windows ve Android)
 
 Bilgisayarına Python veya başka bir şey kurman gerekmiyor. 5 dakika sürer.
 
@@ -8,9 +8,9 @@ Prompt Yönetmeni) iki sistemde aynıdır.
 
 | Sistem | Dosya |
 |---|---|
-| macOS (Apple Silicon) | `gpt-image-studio-macOS-arm64.zip` |
-| Windows 10/11 (64-bit) | `gpt-image-studio-windows-x64.zip` |
-| Android 8.0+ (arm64) | `gpt-image-studio-android-arm64.apk` |
+| macOS (Apple Silicon) | `lumeo-macOS-arm64.zip` |
+| Windows 10/11 (64-bit) | `lumeo-windows-x64.zip` |
+| Android 8.0+ (arm64) | `lumeo-android-arm64.apk` |
 
 **Telefona kuruyorsan** aşağıdaki 1. ve 2. adımları atla, doğrudan
 [Android (sideload)](#android-sideload) bölümüne git — 3., 4. ve 5. adımlar
@@ -24,17 +24,17 @@ için, sana gönderilen paket değildir.
 ## 1. Uygulamayı yerine koy
 
 ### macOS
-1. `GPT-Image Studio.zip` dosyasına çift tıkla — yanında `GPT-Image Studio` uygulaması çıkar.
+1. `Lumeo.zip` dosyasına çift tıkla — yanında `Lumeo` uygulaması çıkar.
 2. Çıkan uygulamayı **Programlar (Applications)** klasörüne sürükle.
 
 ### Windows
 1. Zip dosyasına sağ tıkla → **Tümünü ayıkla** (Extract All).
-2. Çıkan `GPT-Image Studio` klasörünü kalıcı bir yere taşı — ör.
-   `C:\Users\<kullanıcı adın>\Programlar\GPT-Image Studio`.
+2. Çıkan `Lumeo` klasörünü kalıcı bir yere taşı — ör.
+   `C:\Users\<kullanıcı adın>\Programlar\Lumeo`.
    **Klasörü olduğu gibi taşı, içinden yalnız `.exe`'yi çekip almaya çalışma:**
    uygulama yanındaki `_internal` klasörüne ihtiyaç duyar, `.exe` tek başına
    çalışmaz.
-3. Uygulamayı `GPT-Image Studio.exe` ile açarsın. İstersen ona sağ tıklayıp
+3. Uygulamayı `Lumeo.exe` ile açarsın. İstersen ona sağ tıklayıp
    **Başlat'a sabitle** / **Kısayol oluştur** diyebilirsin.
 
 > **Zip'i doğrudan içinden çalıştırma.** Windows zip'in içeriğini geçici bir
@@ -51,8 +51,8 @@ native), Rosetta çevirisi yapılmaz.
 
 1. Uygulamaya çift tıkla. Uygulama **açılmayacak** ve şu uyarı çıkacak:
 
-   > **"GPT-Image Studio" Not Opened**
-   > Apple could not verify "GPT-Image Studio" is free of malware that may harm
+   > **"Lumeo" Not Opened**
+   > Apple could not verify "Lumeo" is free of malware that may harm
    > your Mac or compromise your privacy.
    >
    > *(Türkçe sistemde aynı uyarı "…Açılmadı / Apple … doğrulayamadı" biçiminde
@@ -72,7 +72,7 @@ native), Rosetta çevirisi yapılmaz.
    yalnızca Apple onayı (notarization) yok.
 2. Ekranın sol üstündeki **Apple menüsü** → **Sistem Ayarları** (System Settings)
    → **Gizlilik ve Güvenlik** (Privacy & Security).
-3. Sayfayı aşağı kaydır: *"GPT-Image Studio engellendi"* / *"was blocked"* satırını
+3. Sayfayı aşağı kaydır: *"Lumeo engellendi"* / *"was blocked"* satırını
    bul → **Yine de Aç** (**Open Anyway**).
 4. Çıkan onayda tekrar **Yine de Aç** → Mac şifreni gir (ya da Touch ID).
 5. Uygulama açılır. Bir daha sormaz.
@@ -92,7 +92,7 @@ Uygulama ücretli bir kod imzalama sertifikasıyla imzalanmadığı için Window
 **SmartScreen** ilk açılışta araya giriyor. Bir kez izin verirsin, sonraki
 açılışlarda sormaz.
 
-1. `GPT-Image Studio.exe`'ye çift tıkla. Uygulama **açılmayacak** ve mavi bir
+1. `Lumeo.exe`'ye çift tıkla. Uygulama **açılmayacak** ve mavi bir
    pencere çıkacak:
 
    > **Windows bilgisayarınızı korudu**
@@ -136,15 +136,15 @@ ekranda gösterilmez. Dosyanın yeri iki sistemde de aynı mantıkta:
 
 | Sistem | Dosya |
 |---|---|
-| macOS | `~/.config/gpt-image-studio/credentials.env` (izin `0600`) |
-| Windows | `C:\Users\<kullanıcı adın>\.config\gpt-image-studio\credentials.env` |
+| macOS | `~/.config/lumeo/credentials.env` (izin `0600`) |
+| Windows | `C:\Users\<kullanıcı adın>\.config\lumeo\credentials.env` |
 
 Windows'ta POSIX izin bitleri işlemediği için dosyaya erişim listesi (DACL)
 sıkılaştırılıyor: kalıtım kesilir ve listede **yalnız senin hesabın** kalır.
 Kendin görmek istersen:
 
 ```powershell
-icacls "$env:USERPROFILE\.config\gpt-image-studio\credentials.env"
+icacls "$env:USERPROFILE\.config\lumeo\credentials.env"
 ```
 
 ## 4. Prompt Yönetmeni'ni aç (istersen)
@@ -162,12 +162,12 @@ kapatıp açsan da geçmişin durur.
 
 | Sistem | Görsellerin yeri |
 |---|---|
-| macOS | `~/Library/Application Support/GPT-Image Studio/output/` |
-| Windows | `%LOCALAPPDATA%\GPT-Image Studio\output\` — yani `C:\Users\<kullanıcı adın>\AppData\Local\GPT-Image Studio\output\` |
-| Android | Uygulamanın kendi özel klasörü (dosya yöneticisinden görünmez). Telefona indirdiklerin ise `Resimler/GPT-Image Studio/` altında. |
+| macOS | `~/Library/Application Support/Lumeo/output/` |
+| Windows | `%LOCALAPPDATA%\Lumeo\output\` — yani `C:\Users\<kullanıcı adın>\AppData\Local\Lumeo\output\` |
+| Android | Uygulamanın kendi özel klasörü (dosya yöneticisinden görünmez). Telefona indirdiklerin ise `Resimler/Lumeo/` altında. |
 
 Windows'ta klasörü hızlı açmak için Dosya Gezgini'nin adres çubuğuna
-`%LOCALAPPDATA%\GPT-Image Studio` yazıp Enter'a basabilirsin. (Bu klasör
+`%LOCALAPPDATA%\Lumeo` yazıp Enter'a basabilirsin. (Bu klasör
 bilerek `AppData\Local` altında — `Roaming` olsaydı ürettiğin bütün görseller
 kurumsal profille birlikte ağ üzerinden taşınmaya çalışırdı.)
 
@@ -189,7 +189,7 @@ sonra Python çalışma zamanı açılıyor ve ürettiğin görseller de telefon
 duruyor — pay bunun için).
 
 ### A1. APK'yı indir
-Telefonun tarayıcısından `gpt-image-studio-android-arm64.apk` dosyasını indir.
+Telefonun tarayıcısından `lumeo-android-arm64.apk` dosyasını indir.
 Tarayıcı *"Bu dosya türü cihazına zarar verebilir"* diye sorabilir → **Yine de
 indir**. (Bu uyarı her APK için çıkar, dosyayla ilgili bir şey söylemiyor.)
 
@@ -212,7 +212,7 @@ yalnızca Play Store dışından geldiğini söylüyor.
 uygulama Python çalışma zamanını telefonun içine açıyor. Bu yalnız ilk açılışta
 (ve her güncellemeden sonra bir kez) olur; sonraki açılışlar hızlıdır.
 
-Uygulama açılınca kalıcı bir bildirim görürsün: *"GPT-Image Studio çalışıyor"*.
+Uygulama açılınca kalıcı bir bildirim görürsün: *"Lumeo çalışıyor"*.
 Bu bildirim **gerekli, kapatma**: sayesinde uzun süren bir üretim sırasında
 uygulamadan çıksan bile Android işlemi öldürmez ve ücretli istek boşa gitmez.
 
@@ -231,8 +231,8 @@ Telefona özgü iki fark:
   sürükle-bırak dokunmatik ekranda çalışmıyor.
 
 ### A5. İndirdiklerin nereye gidiyor
-- Görseller (PNG): **Resimler → GPT-Image Studio**
-- Klasör ZIP'leri: **İndirilenler → GPT-Image Studio**
+- Görseller (PNG): **Resimler → Lumeo**
+- Klasör ZIP'leri: **İndirilenler → Lumeo**
 
 ### Android'de sorun çıkarsa
 - **"Uygulama yüklenmedi" / "Paket geçersiz":** dosya yarım inmiş olabilir —
@@ -244,7 +244,7 @@ Telefona özgü iki fark:
 - **"Üret" kilitli:** Ayarlar (dişli) → endpoint + key girilmiş mi? (3. adım)
 - **İndirdiğim görseli galeride bulamıyorum:** Galeri uygulaması yeni klasörü
   görmek için biraz gecikebilir; Dosyalar uygulamasından
-  `Resimler/GPT-Image Studio` klasörüne bak.
+  `Resimler/Lumeo` klasörüne bak.
 
 ---
 
@@ -253,10 +253,10 @@ Kurum yeni bir `.zip` gönderdiğinde [GUNCELLEME.md](GUNCELLEME.md) sayfasını
 
 - **macOS:** uygulamayı kapat → yenisini Programlar'a sürükleyip **Değiştir** →
   güvenlik iznini bir kez daha ver. `Application Support` klasörünü SİLME.
-- **Windows:** uygulamayı kapat → yeni zip'i ayıkla → eski `GPT-Image Studio`
+- **Windows:** uygulamayı kapat → yeni zip'i ayıkla → eski `Lumeo`
   klasörünün **yerine** koy (Windows "Hedefteki dosyaları değiştir" diye sorar,
   onayla) → SmartScreen izni bir kez daha gerekebilir.
-  `AppData\Local\GPT-Image Studio` klasörünü SİLME.
+  `AppData\Local\Lumeo` klasörünü SİLME.
 - **Android:** yeni APK'yı indir ve üzerine kur — **uygulamayı SİLME.**
   Android eskisinin üzerine yazar ve verin (görseller, klasörler, Azure anahtarı)
   yerinde kalır. Uygulamayı kaldırıp yeniden kurarsan hepsi silinir.
@@ -270,7 +270,7 @@ adım), yani uygulamayı silip yenisini koymak geçmişine dokunmaz.
 - **"Üret" kilitli:** Ayarlar (dişli) → endpoint + key girilmiş mi?
 - **(Windows) Uygulama hiç açılmıyor, pencere gelmiyor:** `.exe`'yi `_internal`
   klasöründen ayırmış olabilirsin — ikisi aynı klasörde olmalı (1. adım). Ayrıca
-  `%LOCALAPPDATA%\GPT-Image Studio\hata.log` dosyasına bak; varsa içeriğini
+  `%LOCALAPPDATA%\Lumeo\hata.log` dosyasına bak; varsa içeriğini
   Kurum'ya gönder.
 - **(Windows) Antivirüs uygulamayı karantinaya aldı:** paket imzalanmadığı için
   bazı kurumsal antivirüsler yanlış-pozitif verebiliyor. Klasörü silme, Kurum'ya

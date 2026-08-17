@@ -2,31 +2,23 @@
 
 I3 bulgusu: "import'un yan etkisi yok" sözleşmesi yalnızca KURAL olarak
 duruyordu — hiçbir mekanizma zorlamıyordu. `with TestClient(app)` FastAPI'nin
-belgelediği ve tests/test_seed.py'nin de kullandığı standart bir kalıptır;
-bunu kullanan HERHANGİ bir yeni test dosyası lifespan'ı tetikler ve
-`seed.seed_builtin_logos` GERÇEK dosya sistemine (geliştiricinin assets/
-dizinine) yazar, `.logos-seeded`'i repo kökünde bırakır.
+belgelediği standart kalıptır; bunu kullanan HERHANGİ bir test dosyası
+lifespan'ı tetikler ve lifespan'daki yan etkiler GERÇEK dosya sistemine
+(geliştiricinin repo kökündeki assets/ ve output/ dizinlerine) yazar.
 
-Bu autouse fixture varsayılanı güvenli yapar: `seed.seed_builtin_logos`
-her testte no-op'a çevrilir. Tohumlamanın KENDİSİNİ test eden tek dosya
-(tests/test_seed.py) — hem davranış testleri hem de lifespan-kanıt testleri —
-kasıtlı olarak muaf tutulur: onlar ya gerçek fonksiyonu doğrudan çağırıyor
-ya da kendi casus'larını (spy) kuruyor; ikisi de bu guard'ın no-op'uyla
-ezilirse test vacuous (anlamsız) hale gelir.
+Bugün lifespan'da tek yan etki var: backup.py'nin sürüm-değişimi yedeği.
+Geliştiricinin repo kökünde gerçek `output/history.json` ve `assets/*/index.json`
+dosyaları VAR, yani `with TestClient(app)` kullanan tek bir test
+`<repo>/backups/bilinmeyen-<bugün>/` ve `<repo>/.last-version` bırakırdı. O
+kaçak damga, geliştiricinin KENDİ uygulamasının bir sonraki sürüm yedeğini bir
+daha hiç almamasına yol açar. Aşağıdaki autouse fixture varsayılanı güvenli
+yapıyor; yedeğin KENDİSİNİ test eden dosya (tests/test_backup.py) muaf tutuluyor
+çünkü gerçek fonksiyonu koşturmak zorunda.
 
-v1.9'da lifespan'a İKİNCİ bir yan etki eklendi (backup.py, sürüm değişiminde
-manifest yedeği) ve aynı tehdide açık — hatta sonucu daha kötü: geliştiricinin
-repo kökünde gerçek `output/history.json` ve `assets/*/index.json` dosyaları
-VAR (`.logos-seeded`'ın repo kökünde durması bunun kanıtı), yani `with
-TestClient(app)` kullanan tek bir test `<repo>/backups/bilinmeyen-<bugün>/` ve
-`<repo>/.last-version` bırakırdı. O kaçak damga, geliştiricinin KENDİ
-uygulamasının v1.8→v1.9 yedeğini bir daha hiç almamasına yol açar.
-
-İkinci guard AYRI tutuldu (mevcut olanı bir muafiyet tablosuna çevirmek yerine)
-çünkü muafiyetler kesişmiyor: tests/test_seed.py seed guard'ından muaf ama
-yedek guard'ına TABİ kalmalı (lifespan testleri repoya yedek yazmasın);
-simetrik olarak tests/test_backup.py gerçek yedeği koşarken tohumlama no-op
-kalmalı (yedek testleri tohum verisiyle kirlenmesin).
+TARİHÇE: burada İKİNCİ bir guard vardı — `seed.seed_builtin_logos` pakete gömülü
+KURUM logolarını kullanıcı kütüphanesine kopyalıyor ve `.logos-seeded`'i repo
+kökünde bırakıyordu. Uygulama marka-nötr olunca seed.py tümüyle kaldırıldı, o
+guard da onunla birlikte gitti.
 """
 from __future__ import annotations
 
@@ -36,9 +28,7 @@ import pytest
 
 import backup as backup_module
 import paths as paths_module
-import seed as seed_module
 
-_UNGUARDED_FILENAME = "test_seed.py"
 _UNGUARDED_BACKUP_FILENAME = "test_backup.py"
 
 
@@ -62,17 +52,6 @@ def _guard_against_leaking_android_env():
     yield
     for ad in (paths_module.ANDROID_DATA_ENV, paths_module.ANDROID_RESOURCE_ENV):
         os.environ.pop(ad, None)
-
-
-@pytest.fixture(autouse=True)
-def _guard_against_real_seeding(request: pytest.FixtureRequest,
-                                monkeypatch: pytest.MonkeyPatch):
-    """Varsayılan olarak seed.seed_builtin_logos'u no-op yapar (bkz. modül docstring'i)."""
-    if os.path.basename(str(request.node.fspath)) == _UNGUARDED_FILENAME:
-        yield
-        return
-    monkeypatch.setattr(seed_module, "seed_builtin_logos", lambda *a, **k: [])
-    yield
 
 
 @pytest.fixture(autouse=True)

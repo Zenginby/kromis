@@ -44,11 +44,11 @@ jobs:
       - name: Paketi doğrula
         run: |
           set -euo pipefail
-          APP="dist/GPT-Image Studio.app"
-          lipo -archs "$APP/Contents/MacOS/GPT-Image Studio" | tee /dev/stderr | grep -qx arm64
+          APP="dist/Lumeo.app"
+          lipo -archs "$APP/Contents/MacOS/Lumeo" | tee /dev/stderr | grep -qx arm64
           codesign --verify --strict "$APP"
           for f in static/index.html static/core.js static/viewer.js \
-                   bundled/logos/kurum-logo-blue.png bundled/logos/kurum-logo-white.png; do
+                   bundled/prompts/prompt-yonetmeni.md; do
             test -f "$APP/Contents/Resources/$f" || { echo "EKSİK: $f"; exit 1; }
           done
           # Info.plist'teki sürüm version.py ile aynı mı? Spec sürümü SPECPATH +
@@ -64,6 +64,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: gpt-image-studio-macos-arm64
-          path: dist/GPT-Image Studio.zip
+          name: lumeo-macos-arm64
+          path: dist/Lumeo.zip
           retention-days: 30

@@ -8,7 +8,10 @@
        ekranı kaplıyor ve alt boşluğu kendimiz yönetiyoruz (büyüteç şeridi ve
        alt gezinme çubuğu için). -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>GPT-Image Studio</title>
+  <title>Lumeo</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=__APP_VERSION__" />
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico?v=__APP_VERSION__" />
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png?v=__APP_VERSION__" />
   <!-- Yalnız latin altkümesi preload ediliyor (plan §0.2: "tek kritik ağırlık").
        latin-ext BİLEREK dışarıda: Türkçe harfleri taşıyor ama metnin gövdesi
        latin'de ve preload edilen her dosya kritik yolu uzatır. `crossorigin`
@@ -895,15 +898,6 @@
               <button type="button" data-pos="bottom-left"   aria-label="Sol alt">↙</button>
               <button type="button" data-pos="bottom-center" aria-label="Alt orta">↓</button>
               <button type="button" data-pos="bottom-right"  aria-label="Sağ alt">↘</button>
-            </div>
-
-            <div id="logo-color-row">
-              <label>Renk</label>
-              <div id="logo-color" class="seg" role="group" aria-label="Logo rengi">
-                <button type="button" data-color="auto">Oto</button>
-                <button type="button" data-color="blue">Mavi</button>
-                <button type="button" data-color="white">Beyaz</button>
-              </div>
             </div>
 
             <label for="logo-size">Boyut <span id="logo-size-val" class="range-val">14%</span></label>

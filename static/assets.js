@@ -1,4 +1,4 @@
-// GPT-Image Studio — logo/motto/banner kütüphanesi ve bindirme modalı.
+// Lumeo — logo/motto/banner kütüphanesi ve bindirme modalı.
 //
 // Klasik script (ES module DEĞİL): bütün parçalar TEK global kapsamı paylaşır
 // ve index.html'deki yükleme SIRASI bağlayıcıdır:
@@ -18,8 +18,20 @@ const ASSET_EMPTY_TEXT = {
   uploads: "Henüz yükleme yok · + Yükle ile ekle",
 };
 const OVERLAY_EMPTY_TEXT = {
+  // `logo` girdisi, yerleşik KURUM logosu kaldırıldığında eklendi: o seçenek
+  // listeyi hiç boş bırakmadığı için logo modunun boş hâli daha önce YOKTU.
+  logo: "Önce Kütüphane'den bir logo yükle.",
   motto: "Önce Kütüphane'den bir motto yükle.",
   banner: "Önce Kütüphane'den bir banner yükle.",
+};
+
+// Kütüphane DOLU ama seçim yapılmamış hâli (OVERLAY_EMPTY_TEXT'ten farklı: orada
+// yüklenecek bir şey yok, burada seçilecek). `logo` girdisi de üç modun üçünün
+// de seçim gerektirmesiyle birlikte eklendi — bkz. overlayNeedsAsset.
+const OVERLAY_PICK_TEXT = {
+  logo: "Bir logo seç.",
+  motto: "Bir motto seç.",
+  banner: "Bir banner seç.",
 };
 
 function assetStatus(msg) { $("asset-status").textContent = msg || ""; }
@@ -105,12 +117,12 @@ async function deleteAssetItem(kind, id) {
     const res = await fetch(`/api/assets/${kind}/${id}`, { method: "DELETE" });
     if (!res.ok) throw new Error(`Hata (${res.status})`);
     // modalda seçili öğe silindiyse seçimi güvenli varsayılana düşür
-    if (kind === "logos" && selectedAsset.logo === id) selectedAsset.logo = "builtin";
+    if (kind === "logos" && selectedAsset.logo === id) selectedAsset.logo = null;
     if (kind === "mottos" && selectedAsset.motto === id) selectedAsset.motto = null;
     if (kind === "banners" && selectedAsset.banner === id) selectedAsset.banner = null;
     assetStatus("Silindi.");
     await Promise.all([loadAssets(kind), loadAssets("all")]);
-    if (!$("logo-modal").hidden) { syncColorRow(); refreshLogoPreview(); }
+    if (!$("logo-modal").hidden) refreshLogoPreview();
   } catch {
     assetStatus("Silinemedi.");
   }
@@ -154,8 +166,10 @@ $("library-btn").addEventListener("click", () => {
 let logoId = null;
 let rawPreviewSrc = "";                                 // ham (bindirmesiz) görsel URL'i
 let overlayMode = "logo";                               // "logo" | "motto" | "banner"
-// logo: "builtin"|id · motto: id|null · banner: id|null
-let selectedAsset = { logo: "builtin", motto: null, banner: null };
+// logo/motto/banner: id|null — üçü de kullanıcı kütüphanesinden gelir.
+// Logonun eskiden "builtin" adlı bir dördüncü hâli vardı (pakete gömülü KURUM
+// çifti); uygulama marka-nötr olduğundan kaldırıldı.
+let selectedAsset = { logo: null, motto: null, banner: null };
 // Kaydırma, boyut/gölgenin AKSİNE mod başına hatırlanır: motto genelde logodan
 // farklı bir noktaya konur, ortak tutulsa tür değiştirmek diğerinin ince
 // ayarını sessizce devralırdı (kullanıcı kararı). Banner burada yok — onun
@@ -184,12 +198,11 @@ function writeOffsetSliders({ x, y }) {
   $("logo-offset-y").value = y;
 }
 
-// Logo ve motto aynı (konumlanabilir, 9-grid) yerleşimi paylaşır; yalnızca
-// varlık hangi kütüphaneden geldiği ve renk varyantı (yalnız yerleşik logo) farklıdır.
+// Logo ve motto aynı (konumlanabilir, 9-grid) yerleşimi paylaşır; tek fark
+// varlığın hangi kütüphaneden geldiği.
 function readLogoOpts() {
   const active = (sel) => document.querySelector(sel + " button.active");
   const pos = active("#logo-grid");
-  const col = active("#logo-color");
   const sizePct = parseInt($("logo-size").value, 10);
   const shadowPct = parseInt($("logo-shadow").value, 10);
   const blur = parseInt($("logo-blur").value, 10);
@@ -200,9 +213,8 @@ function readLogoOpts() {
   return {
     id: logoId,
     asset_kind: isMotto ? "mottos" : "logos",
-    asset_id: isMotto ? selectedAsset.motto : (selectedAsset.logo === "builtin" ? null : selectedAsset.logo),
+    asset_id: isMotto ? selectedAsset.motto : selectedAsset.logo,
     position: pos ? pos.dataset.pos : "bottom-right",
-    color: col ? col.dataset.color : "auto",
     size: +(sizePct / 100).toFixed(3),
     shadow_alpha: Math.round((shadowPct / 100) * 255),
     shadow_blur: blur,
@@ -244,17 +256,11 @@ function syncBannerLabels() {
   $("banner-align-note").hidden = !fullWidth;
 }
 
-// Renk (Oto/Mavi/Beyaz) yalnızca yerleşik KURUM logosu için anlamlı
-function syncColorRow() {
-  $("logo-color-row").hidden = !(overlayMode === "logo" && selectedAsset.logo === "builtin");
-}
-
 function renderOverlayPicker() {
   const wrap = $("overlay-picker");
   wrap.innerHTML = "";
   const options = [];
   if (overlayMode === "logo") {
-    options.push({ id: "builtin", name: "Yerleşik KURUM", src: null });
     for (const it of assetCache.logos) options.push({ id: it.id, name: it.name, src: `/assets/logos/${it.filename}` });
   } else if (overlayMode === "motto") {
     for (const it of assetCache.mottos) options.push({ id: it.id, name: it.name, src: `/assets/mottos/${it.filename}` });
@@ -275,21 +281,13 @@ function renderOverlayPicker() {
     btn.className = "overlay-chip" + (opt.id === current ? " active" : "");
     btn.dataset.asset = opt.id;
     btn.title = opt.name;
-    if (opt.src) {
-      const img = document.createElement("img");
-      img.src = opt.src;
-      img.alt = opt.name;
-      btn.appendChild(img);
-    } else {
-      const badge = document.createElement("span");
-      badge.className = "overlay-builtin";
-      badge.textContent = "KURUM";
-      btn.appendChild(badge);
-    }
+    const img = document.createElement("img");
+    img.src = opt.src;
+    img.alt = opt.name;
+    btn.appendChild(img);
     btn.addEventListener("click", () => {
       selectedAsset[overlayMode] = opt.id;
       renderOverlayPicker();
-      syncColorRow();
       refreshLogoPreview();
     });
     wrap.appendChild(btn);
@@ -310,7 +308,6 @@ function setOverlayMode(mode) {
     syncLogoLabels();
   }
   renderOverlayPicker();
-  syncColorRow();
   refreshLogoPreview();
 }
 
@@ -320,7 +317,7 @@ function openLogoModal(rec) {
   // varsayılanlara sıfırla
   overlayMode = "logo";
   selectedAsset = {
-    logo: "builtin",
+    logo: assetCache.logos[0] ? assetCache.logos[0].id : null,
     motto: assetCache.mottos[0] ? assetCache.mottos[0].id : null,
     banner: assetCache.banners[0] ? assetCache.banners[0].id : null,
   };
@@ -328,7 +325,6 @@ function openLogoModal(rec) {
   $("logo-only").hidden = false;
   $("banner-only").hidden = true;
   selectInGroup("#logo-grid", document.querySelector('#logo-grid button[data-pos="bottom-right"]'));
-  selectInGroup("#logo-color", document.querySelector('#logo-color button[data-color="auto"]'));
   selectInGroup("#banner-edge", document.querySelector('#banner-edge button[data-edge="bottom"]'));
   selectInGroup("#banner-align", document.querySelector('#banner-align button[data-align="center"]'));
   $("logo-size").value = 14;
@@ -343,7 +339,6 @@ function openLogoModal(rec) {
   $("logo-status").textContent = "";
   $("logo-preview-img").src = rawPreviewSrc; // önce ham görsel
   renderOverlayPicker();
-  syncColorRow();
   $("logo-modal").hidden = false;
   refreshLogoPreview();
 }
@@ -359,14 +354,14 @@ function closeLogoModal() {
 function overlayNeedsAsset() {
   if (overlayMode === "motto") return !selectedAsset.motto;
   if (overlayMode === "banner") return !selectedAsset.banner;
-  return false; // logo modunda her zaman yerleşik KURUM vardır
+  return !selectedAsset.logo;   // yerleşik logo yok: kütüphaneden seçim şart
 }
 
 async function fetchOverlayPreview() {
   if (!logoId) return;
   if (overlayNeedsAsset()) {
     $("logo-preview-img").src = rawPreviewSrc;
-    $("logo-status").textContent = overlayMode === "banner" ? "Bir banner seç." : "Bir motto seç.";
+    $("logo-status").textContent = OVERLAY_PICK_TEXT[overlayMode] || "Bir görsel seç.";
     return;
   }
   const token = ++logoPreviewToken;
@@ -405,7 +400,7 @@ const OVERLAY_DONE_TEXT = { logo: "Logo eklendi.", motto: "Motto eklendi.", bann
 async function applyOverlay() {
   if (!logoId) return;
   if (overlayNeedsAsset()) {
-    $("logo-status").textContent = overlayMode === "banner" ? "Bir banner seç." : "Bir motto seç.";
+    $("logo-status").textContent = OVERLAY_PICK_TEXT[overlayMode] || "Bir görsel seç.";
     return;
   }
   $("logo-apply").disabled = true;
@@ -443,12 +438,6 @@ $("logo-grid").addEventListener("click", (e) => {
   const btn = e.target.closest("button[data-pos]");
   if (!btn) return;
   selectInGroup("#logo-grid", btn);
-  refreshLogoPreview();
-});
-$("logo-color").addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-color]");
-  if (!btn) return;
-  selectInGroup("#logo-color", btn);
   refreshLogoPreview();
 });
 $("banner-edge").addEventListener("click", (e) => {

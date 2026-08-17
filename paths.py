@@ -127,9 +127,10 @@ def chat_instructions_override() -> str:
 def credentials_path() -> str:
     """Uygulamanın KENDİ kimlik dosyası — Ayarlar penceresi buraya yazar.
 
-    Masaüstünde bugünkü yol birebir korunuyor (`~/.config/gpt-image-studio/`);
-    bu fonksiyon yalnızca kararı `azure_client`'tan buraya taşıyor ki Android
-    dalı tek bir yerde açılabilsin.
+    Masaüstünde `~/.config/lumeo/`; karar `azure_client`'tan buraya taşındı ki
+    Android dalı tek bir yerde açılabilsin. (Dizin adı yeniden adlandırmada
+    `gpt-image-studio` → `lumeo` oldu; uygulama henüz kullanımda olmadığı için
+    veri taşıma adımı gerekmedi.)
 
     Android'de `~` KULLANILAMAZ (bkz. `data_dir`), bu yüzden dosya app-private
     kökün altına iniyor. Dizin zaten yalnız bu uygulamaya açık; üstelik

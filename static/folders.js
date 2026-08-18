@@ -1199,13 +1199,18 @@ function renderGallery() {
     // download'a dosya adı AÇIKÇA veriliyor: boş bırakılırsa macOS kayıt
     // panelinin ad alanını WebKit'in URL'den türetmesine kalıyoruz.
     const downloadLink = document.createElement("a");
-    downloadLink.setAttribute("href", `/output/${rec.filename}`);
+    // href ÇİZİM adresi değil İNDİRME adresi (core.js `indirmeAdresi`): sağ tık →
+    // "Bağlantıyı kaydet" ve dinleyicinin hiç çalışmadığı durum da doğru dosyayı
+    // vermeli.
+    downloadLink.setAttribute("href", indirmeAdresi(`/output/${rec.filename}`));
     downloadLink.setAttribute("download", rec.filename);
     downloadLink.textContent = "İndir";
-    // Kayıt paneli olan tarayıcıda konumu KULLANICI seçsin (core.js). Panel
-    // yoksa hiç araya girilmiyor: <a download> zaten pakette doğru davranıyor.
+    // HER ZAMAN araya giriliyor, `SUPPORTS_SAVE_PICKER` kontrolü YOK: eskiden
+    // panel olmayan ortamda çıpanın kendi gezinmesine bırakılıyordu ve Android
+    // WebView'de bu, indirmenin hiç olmaması demekti (app.py `output_download`).
+    // `downloadImage` panel yokken kendisi `downloadViaAnchor`'a düşüyor
+    // (core.js) — yani pakette mekanizma AYNI, sadece karar tek yerde.
     downloadLink.addEventListener("click", (e) => {
-      if (!SUPPORTS_SAVE_PICKER) return;
       e.preventDefault();
       downloadImage(`/output/${rec.filename}`, rec.filename);
     });

@@ -195,7 +195,12 @@ def test_export_zip_and_download_route(tmp_path, monkeypatch):
     res = c.get(f"/api/folders/{parent_id}/download")
     assert res.status_code == 200
     assert res.headers["content-type"] == "application/zip"
-    assert "attachment; filename=" in res.headers["content-disposition"]
+    # `attachment` ARANIYOR, tam dize değil: parametrelerin SIRASI bilinçli
+    # olarak değişti (bkz. test_download_header_keeps_turkish_name) ve buradaki
+    # iddianın ölçtüğü şey sıra değil, indirmenin indirme olarak işaretlenmesi.
+    cd = res.headers["content-disposition"]
+    assert cd.startswith("attachment;"), cd
+    assert "filename" in cd, cd
 
     zf = zipfile.ZipFile(io.BytesIO(res.content))
     namelist = zf.namelist()
@@ -226,6 +231,16 @@ def test_download_header_keeps_turkish_name(tmp_path, monkeypatch):
     assert "filename*=UTF-8''" in cd
     assert quote("Bağış Görselleri") + ".zip" in cd
     assert 'filename="Ba_Grselleri.zip"' in cd   # kaybın kendisi de mandallı
+
+    # SIRA: `filename*` tırnaklı `filename`'den ÖNCE gelmek zorunda.
+    #
+    # RFC 6266'ya göre öncelik parametreyle belirlendiği için tarayıcılar sıradan
+    # etkilenmiyor — ama Android WebView'in indirme adını üreten
+    # `URLUtil.guessFileName`'inin regex'i tırnaklı biçimden SONRA bir şey gelince
+    # boşa düşüyor ve adı URL yolundan türetiyor: her klasör ZIP'i telefona
+    # `download.zip` diye iniyordu. Sıra masaüstünde HİÇBİR fark yaratmadığı için
+    # geri çevrilmesi de hiçbir yerde fark edilmezdi — mandal bu yüzden var.
+    assert cd.index("filename*=") < cd.index('filename="'), cd
 
 
 def test_export_zip_survives_corrupt_parent_cycle(tmp_path, monkeypatch):

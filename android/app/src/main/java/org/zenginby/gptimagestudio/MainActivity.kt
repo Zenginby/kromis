@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.ValueCallback
@@ -59,6 +60,12 @@ class MainActivity : AppCompatActivity() {
     private var acilisHatasiGosterildi = false
 
     private var uc: PythonServer.Uc? = null
+
+    /**
+     * Son geri basışının anı (`SystemClock.elapsedRealtime`); 0 = hiç basılmadı.
+     * `cikisiOnayla` bunun üstünde "bir daha bas" penceresini ölçüyor.
+     */
+    private var sonGeriAni = 0L
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -345,29 +352,54 @@ class MainActivity : AppCompatActivity() {
     // ── Geri tuşu ───────────────────────────────────────────────────
 
     /**
-     * Geri tuşu ÖNCE arayüzdeki katmanı kapatır, sonra uygulamadan çıkar.
+     * Geri tuşu ÖNCE arayüzde geri gider, sonra UYARIR, ancak ikinci basışta çıkar.
      *
-     * `webView.canGoBack()` KULLANILMIYOR: bu tek sayfalık bir uygulama, modal
-     * ve paneller gezinme geçmişine hiç girmiyor — yani geçmişe bakan bir geri
-     * tuşu, üstünde açık bir panel varken doğrudan uygulamayı kapatırdı.
+     * Sıralamanın tamamı frontend'de (`window.geriTusu`, core.js): açık katmanı
+     * kapat → klasörden bir üste çık → Stüdyo'ya dön → `false`. Buraya taşınmadan
+     * önce sıralama bu dosyadaki üç CSS seçicisiydi ve iki şey kırılıyordu:
+     * sohbet menüleri hiçbirine uymuyordu, bölüm/klasör gezintisi ise geri
+     * yığınında hiç yoktu — Medya'dayken geri DOĞRUDAN uygulamayı kapatıyordu.
+     * Kotlin artık DOM yapısını hiç bilmiyor.
      *
-     * Kapatma işini frontend'in KENDİ `Escape` şelalesi yapıyor
-     * (core.js:134/151/743, folders.js:616/1013, assets.js:501, viewer.js:266).
-     * O şelale hangi katmanın önce kapanacağını `stopImmediatePropagation` ile
-     * zaten çözüyor; burada ikinci bir öncelik sırası kurmak iki mantığın
-     * ayrışmasına ve "geri bazen yanlış paneli kapatıyor" hatasına açık olurdu.
+     * `webView.canGoBack()` hâlâ KULLANILMIYOR: bu tek sayfalık bir uygulama,
+     * modal ve paneller gezinme geçmişine hiç girmiyor.
      */
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
         if (perde.visibility == View.VISIBLE) {
-            sistemGerisi()
+            // Açılış perdesi de aynı kapıdan geçiyor: Python çalışma zamanı 2–5 sn
+            // açılırken yanlışlıkla çıkmak, kullanıcının en pahalıya ödediği hâli.
+            cikisiOnayla()
             return
         }
         webView.evaluateJavascript(GERI_TUSU_JS) { sonuc ->
             // `evaluateJavascript` sonucu JSON olarak veriyor: boolean'lar
             // tırnaksız "true"/"false" dizeleri olarak geliyor.
-            if (sonuc != "true") sistemGerisi()
+            if (sonuc != "true") cikisiOnayla()
         }
+    }
+
+    /**
+     * `sistemGerisi()`ye giden TEK yol: ilk geri uyarır, ikincisi çıkarır.
+     *
+     * NEDEN VAR: arayüzde kapatılacak bir şey kalmadığında tek bir geri basışı
+     * (ya da kenardan tek bir kaydırma) oturumu kapatıyordu — süren bir üretimin
+     * ortasında bile. Jest gezinmesinde ekranın kenarına değmek kolay, yani
+     * kazayla çıkmak sık ve bedeli yüksekti.
+     *
+     * `System.currentTimeMillis()` DEĞİL `SystemClock.elapsedRealtime()`: duvar
+     * saati kullanıcı ya da ağ tarafından geriye alınabilir; o an fark negatife
+     * düşer ve pencere bir daha hiç açılmaz — yani "iki kez bastım, çıkmıyor".
+     * `elapsedRealtime` açılıştan beri monoton artıyor.
+     */
+    private fun cikisiOnayla() {
+        val simdi = SystemClock.elapsedRealtime()
+        if (simdi - sonGeriAni < CIKIS_PENCERESI_MS) {
+            sistemGerisi()
+            return
+        }
+        sonGeriAni = simdi
+        bildir(getString(R.string.cikmak_icin_tekrar_geri))
     }
 
     /**
@@ -403,23 +435,29 @@ class MainActivity : AppCompatActivity() {
         private const val OTURUM_CEREZI = "gis_session"
 
         /**
-         * Açık bir katman varsa `Escape` gönderir ve "true" döner.
+         * Geri basışının uygulama İÇİNDE karşılığı varsa "true" döner.
          *
-         * Seçiciler index.html'deki yapıya bağlı: `.sheet.open` (5 panel),
-         * `.modal:not([hidden])` (confirm/logo/media-picker/viewer),
-         * `.popover:not([hidden])` (artı menüsü).
+         * Sıralamanın tamamı frontend'de (`window.geriTusu`, core.js): açık
+         * katmanı kapat → klasörden bir üste çık → Stüdyo'ya dön → "false".
+         * Buraya arayüzün yapısına dair HİÇBİR bilgi yazılmıyor; eskiden üç CSS
+         * seçicisi buradaydı ve index.html'e dizeyle bağlıydı — sohbet menüleri
+         * hiçbirine uymadığı için menü açıkken geri uygulamayı kapatıyordu.
+         *
+         * `typeof` muhafızı: çok eski bir `filesDir/resources/` sürümünde
+         * `geriTusu` tanımsız olabilir. O durumda davranış "hiçbir katman
+         * kapanmaz"a düşüyor — çökme değil, iyileştirmenin yokluğu.
          */
-        private const val GERI_TUSU_JS = """
-            (function () {
-              var acik = document.querySelector('.sheet.open')
-                      || document.querySelector('.modal:not([hidden])')
-                      || document.querySelector('.popover:not([hidden])');
-              if (!acik) return false;
-              document.dispatchEvent(new KeyboardEvent('keydown', {
-                key: 'Escape', bubbles: true, cancelable: true
-              }));
-              return true;
-            })();
-        """
+        private const val GERI_TUSU_JS =
+            """typeof window.geriTusu === "function" ? window.geriTusu() : false"""
+
+        /**
+         * "Çıkmak için tekrar geri gelin" uyarısının geçerlilik süresi.
+         *
+         * `Toast.LENGTH_SHORT` (~2 sn) ile AYNI ölçekte olmak zorunda: uyarı
+         * ekrandayken ikinci basış çıkarıyor, uyarı söndükten sonraki basış
+         * yeniden uyarıyor. Pencere daha uzun olsa uyarı sönmüş olduğu hâlde
+         * "ikinci basış" sayılırdı — kullanıcı için sebepsiz bir çıkış.
+         */
+        private const val CIKIS_PENCERESI_MS = 2_000L
     }
 }

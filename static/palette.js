@@ -14,6 +14,16 @@
 // için CORS yok, ve repodaki tek test altyapısıyla (pytest) test edilebilir.
 // dropped: bu üretimde paletten çıkarılan renklerin indeks kümesi (Set<number>).
 // activePalette YALNIZCA applyPalette ile kurulur, o yüzden dropped hep var.
+// Seçili ÖNERİ kartından çıkarılan renk indeksleri — "Bu paleti kullan"a
+// basılana kadar yalnız önizleme durumu.
+//
+// NEDEN TEK KÜME, kart başına küme değil: kullanıcı sonunda yalnız BİR paleti
+// uygulayacak. Uygulanmayacak kartlarda hazırlanmış çıkarmalar taşınacak bir
+// bilgi değil, ama her biri için ayrı temizleme kuralı gerektirirdi. Tek küme +
+// "seçim değişince sıfırla" hem daha az durum hem `applyPalette`'teki "çıkarma o
+// üretime özel" duruşuyla tutarlı.
+let onizlemeCikarilan = new Set();
+
 let activePalette = null;      // { seed, mode, colors:[{hex,name}], name, id, dropped } | null
 let paletteStrength = "balanced";
 let paletteCache = [];         // GET /api/palettes
@@ -139,10 +149,22 @@ function detailText(err) {
 
 /** Renk örneği şeridi. Örneklerin ÜSTÜNE metin yazılmaz — bkz. style.css notu. */
 // `interactive`: her swatch bir <button> olur ve tıklanınca renk paletten
-// çıkarılır/geri alınır. YALNIZCA çipte açılıyor — öneri kartları
-// makeChoiceButton içinde bir <button>'ın içinde duruyor ve iç içe buton
-// geçersiz HTML.
-function swatchRow(colors, { interactive = false, dropped = null, onToggle = null } = {}) {
+// çıkarılır/geri alınır. YALNIZCA ÖNERİ KARTLARINDA açılıyor — çipte değil.
+//
+// Eskiden tam tersiydi ve sebebi şuydu: öneri kartının kendisi bir <button>'dı,
+// iç içe buton da geçersiz HTML. Ama çipteki kutucuklar 14×14px ve 2px aralıklı
+// (style.css) — telefonda kullanıcı sürekli yanlış renge basıyordu ve
+// mobile.css'teki 44px'lik ::after hedef büyütme kalıbı burada KULLANILAMIYOR
+// (2px aralıkta iki 44px'lik kare birbirine girer; gerekçesi mobile.css'te
+// .chat-pick notunda yazılı). Kart artık <div> + gerilmiş seçim düğmesi, yani
+// kutucuklar kartın içinde meşru birer <button> olabiliyor ve orada zaten
+// `flex: 1` ile ~60px genişlikte duruyorlar.
+//
+// `secili`: kart seçili DEĞİLSE kutucuğa dokunmak rengi çıkarmaz, o paleti
+// SEÇER (bkz. `onizlemeCikarmayiCevir`). Etiket bunu söylemek zorunda, yoksa
+// ekran okuyucu kullanıcısına "paletten çıkar" vaat edilip palet seçilirdi.
+function swatchRow(colors, { interactive = false, dropped = null, onToggle = null,
+                             secili = true } = {}) {
   const row = document.createElement("span");
   row.className = "palette-sw-row";
   (colors || []).forEach((c, index) => {
@@ -161,9 +183,17 @@ function swatchRow(colors, { interactive = false, dropped = null, onToggle = nul
       sw.type = "button";
       // Bilgi renk algısına bağlı olmasın: durum hem aria-pressed hem metinde.
       sw.setAttribute("aria-pressed", String(isDropped));
-      sw.setAttribute("aria-label",
-        `${c.name} ${c.hex} — ${isDropped ? "geri ekle" : "paletten çıkar"}`);
-      sw.addEventListener("click", () => onToggle(index));
+      sw.setAttribute("aria-label", `${c.name} ${c.hex} — ` + (
+        !secili ? "bu paleti seç" : (isDropped ? "geri ekle" : "paletten çıkar")));
+      // `stopPropagation` ŞART: seçim tıklaması sarmalayıcı <div>'de dinleniyor
+      // (renderSuggestions / renderPaletteLibrary) ve kutucuk tıklaması oraya
+      // baloncuklanırsa her çıkarma aynı anda bir "seçim" olarak da sayılırdı.
+      // Seçili olmayan kartta seçme işini `onToggle`ın kendisi yapıyor.
+      // (.palette-lib-del aynı kalıbı zaten kullanıyor.)
+      sw.addEventListener("click", (e) => {
+        e.stopPropagation();
+        onToggle(index);
+      });
     }
     row.appendChild(sw);
   });
@@ -185,10 +215,12 @@ function renderPalettePanel() {
   chip.hidden = false;
   const holder = $("palette-chip-sw");
   holder.innerHTML = "";
+  // SALT GÖRÜNTÜ: çıkarma artık palet panelindeki öneri kartlarında
+  // (swatchRow notu). `dropped` yine geçiliyor — üstü çizili kutucuklar hangi
+  // rengin çıktığını göstermeye devam ediyor, aşağıdaki `4/5 renk` sayacıyla
+  // birlikte.
   holder.appendChild(swatchRow(activePalette.colors, {
-    interactive: true,
     dropped: activePalette.dropped,
-    onToggle: toggleDroppedColor,
   }));
 
   const total = (activePalette.colors || []).length;
@@ -239,27 +271,36 @@ function readPaletteOpts() {
 // Çıkarma O ÜRETİME özel: yeni palet seçilince sıfırlanır. Kalıcı olarak daha
 // az renkli bir palet isteyen kullanıcı çıkarıp KAYDEDİYOR — kayıt donmuş renk
 // listesi tuttuğu için o palet 4 renkle donar (bkz. sunucudaki SavePaletteRequest.drop).
-function applyPalette({ seed, mode, colors, name = "", strength = null, id = null }) {
-  activePalette = { seed, mode, colors, name, id, dropped: new Set() };
+function applyPalette({ seed, mode, colors, name = "", strength = null, id = null,
+                       dropped = null }) {
+  // KOPYA, referans DEĞİL: `dropped` olarak önizleme kümesi geliyor ve o küme
+  // panel yeniden açıldığında değişmeye devam ediyor. Referans tutulsa panelde
+  // bir renge dokunmak, uygulanmış paleti sessizce değiştirirdi.
+  activePalette = { seed, mode, colors, name, id, dropped: new Set(dropped || []) };
   if (strength) paletteStrength = strength;
   renderPalettePanel();
   paletteStatus(`Palet uygulandı: ${paletteTitleOf(activePalette)}`);
 }
 
-function toggleDroppedColor(index) {
-  if (!activePalette) return;
-  const dropped = activePalette.dropped;
-  if (!dropped.has(index) && dropped.size + 1 >= activePalette.colors.length) {
-    // Son rengi de çıkarmak paleti anlamsız kılar (sunucu da 422 verir).
-    // Kapıyı burada tutmak kullanıcıya nedenini söylüyor; sunucuya bırakmak
-    // "üret" anında patlayan bir hata olurdu.
+/**
+ * Bir indeksi çıkarılanlara ekler/çıkarır. Değişiklik olduysa `true`.
+ *
+ * Uygulanmış palet ile önizleme paletinin PAYLAŞTIĞI kapı: son rengi de çıkarmak
+ * paleti anlamsız kılar (sunucu da 422 verir, models.py `check_drop_indices`).
+ * Kapıyı burada tutmak kullanıcıya nedenini SÖYLÜYOR; sunucuya bırakmak "üret"
+ * anında patlayan bir hata olurdu.
+ */
+function cikarmayiCevir(dropped, toplam, index) {
+  if (!dropped.has(index) && dropped.size + 1 >= toplam) {
     paletteStatus("En az bir renk kalmalı.");
-    return;
+    paletteModalStatus("En az bir renk kalmalı.");
+    return false;
   }
   if (dropped.has(index)) dropped.delete(index);
   else dropped.add(index);
-  renderPalettePanel();
   paletteStatus("");
+  paletteModalStatus("");
+  return true;
 }
 
 function clearPalette() {
@@ -295,6 +336,9 @@ async function fetchSuggestions() {
     suggestions = body.items || [];
     suggestSeed = body.seed;
     selectedSuggestion = null;
+    // Tohum değişti → renkler de değişti. Önizleme çıkarmaları indekse göre
+    // tutuluyor, yani taşınsalardı yeni palette BAŞKA bir rengi düşürürlerdi.
+    onizlemeCikarilan = new Set();
     renderSuggestions();
     paletteModalStatus("");
   } catch (e) {
@@ -302,30 +346,72 @@ async function fetchSuggestions() {
     suggestions = [];
     suggestSeed = "";
     selectedSuggestion = null;
+    onizlemeCikarilan = new Set();
     renderSuggestions();
     paletteModalStatus(e.message);
   }
 }
 
-function makeChoiceButton({ title, colors, subtitle }) {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "palette-choice";
+/**
+ * Palet kartı: <div> sarmalayıcı + GERİLMİŞ görünmez seçim düğmesi.
+ *
+ * NEDEN <button> DEĞİL: kartın içindeki renk kutucukları da birer <button> olmak
+ * zorunda (renk çıkarma oraya taşındı, bkz. swatchRow notu) ve iç içe buton
+ * geçersiz HTML. Çözüm, kartı bir <div> yapıp seçim hedefini `inset: 0` ile
+ * gerilmiş görünmez bir düğmeye vermek: kartın HER YERİ yine seçiyor, kutucuklar
+ * ise onun ÜSTÜNDE kendi hedeflerini koruyor (z-index, style.css).
+ *
+ * Klavye ve ekran okuyucu bundan zarar görmüyor: odaklanabilir tek şey
+ * `.palette-choice-pick` (görünmez ama gerilmiş olduğu için odak halkası kartın
+ * kenarında beliriyor) ve varsa kutucuk düğmeleri. `aria-pressed`/`aria-label`
+ * <div>'e DEĞİL o düğmeye yazılıyor — `aria-pressed` yalnız düğme rolünde
+ * geçerli.
+ *
+ * `cikarilabilir` yalnız öneri kartlarında true: kayıtlı paletin renkleri kayıt
+ * anında donduruluyor (palette_store.py), oradan renk çıkarmak anlamsız olurdu.
+ */
+function makeChoiceButton({ title, colors, subtitle, cikarilabilir = false,
+                            dropped = null, secili = false, onToggle = null }) {
+  const kart = document.createElement("div");
+  kart.className = "palette-choice";
   const names = (colors || []).map((c) => c.name).join(", ");
+
+  const pick = document.createElement("button");
+  pick.type = "button";
+  pick.className = "palette-choice-pick";
   // Bilgi hiçbir zaman renk algısına bağlı olmasın: ad + hex her zaman metinde.
-  btn.setAttribute("aria-label", `${title}: ${names}`);
+  pick.setAttribute("aria-label", `${title}: ${names}`);
+  kart.appendChild(pick);
 
   const titleEl = document.createElement("span");
   titleEl.className = "palette-choice-title";
   titleEl.textContent = title;
-  btn.appendChild(titleEl);
-  btn.appendChild(swatchRow(colors));
+  kart.appendChild(titleEl);
+  kart.appendChild(swatchRow(colors, cikarilabilir
+    ? { interactive: true, dropped, onToggle, secili }
+    : {}));
 
   const sub = document.createElement("span");
   sub.className = "palette-choice-names";
   sub.textContent = subtitle === undefined ? names : subtitle;
-  btn.appendChild(sub);
-  return btn;
+  kart.appendChild(sub);
+  return kart;
+}
+
+/**
+ * Kartın seçili görünümü: hem `aria-pressed` hem `.is-secili` sınıfı.
+ *
+ * NEDEN İKİ KANAL: `aria-pressed` artık iç düğmede, yani stilin doğal karşılığı
+ * `.palette-choice:has(> .palette-choice-pick[aria-pressed="true"])` olurdu.
+ * `:has()` KULLANILMIYOR: APK `minSdk 26` ile yan yükleniyor ve o telefonlarda
+ * WebView çok eski olabilir — `:has()` desteklenmediğinde seçili palet hiç
+ * işaretlenmez, kullanıcı hangi paleti seçtiğini göremez. Sınıf her yerde
+ * çalışıyor; iki öznitelik tek yerden yazıldığı için ayrışmıyorlar.
+ */
+function kartSeciminiYaz(kart, secili) {
+  kart.classList.toggle("is-secili", secili);
+  const pick = kart.querySelector(".palette-choice-pick");
+  if (pick) pick.setAttribute("aria-pressed", String(secili));
 }
 
 function emptyNote(grid, text) {
@@ -342,16 +428,21 @@ function renderSuggestions() {
     emptyNote(grid, "Palet önerisi yok — bir tema rengi seç.");
   } else {
     for (const item of suggestions) {
-      const btn = makeChoiceButton({
+      const secili = selectedSuggestion === item.mode;
+      const kart = makeChoiceButton({
         title: HARMONY_LABELS[item.mode] || item.mode,
         colors: item.colors,
+        cikarilabilir: true,
+        dropped: secili ? onizlemeCikarilan : null,
+        secili,
+        onToggle: (index) => onizlemeCikarmayiCevir(item, index),
       });
-      btn.setAttribute("aria-pressed", String(selectedSuggestion === item.mode));
-      btn.addEventListener("click", () => {
-        selectedSuggestion = item.mode;
+      kartSeciminiYaz(kart, secili);
+      kart.addEventListener("click", () => {
+        secimiDegistir(item.mode);
         renderSuggestions();
       });
-      grid.appendChild(btn);
+      grid.appendChild(kart);
     }
   }
   const ready = currentSuggestion() !== null;
@@ -361,6 +452,38 @@ function renderSuggestions() {
 
 function currentSuggestion() {
   return suggestions.find((s) => s.mode === selectedSuggestion) || null;
+}
+
+/**
+ * Öneri seçimini değiştirir ve önizleme çıkarmalarını SIFIRLAR.
+ *
+ * Sıfırlama şart: indeksler palete göre anlamlı. "2. rengi çıkar" bir palette
+ * turkuazı, ötekinde bordoyu çıkarır — taşınan çıkarma, kullanıcının hiç
+ * istemediği bir rengi sessizce düşürürdü.
+ */
+function secimiDegistir(mode) {
+  if (selectedSuggestion === mode) return;
+  selectedSuggestion = mode;
+  onizlemeCikarilan = new Set();
+}
+
+/**
+ * Öneri kartındaki bir kutucuğa dokunulduğunda: önce SEÇ, sonra ÇIKAR.
+ *
+ * İki adımlı olmasının sebebi belirsizliği kaldırmak: seçili olmayan bir kartın
+ * rengine dokunmak "bu paleti mi seçtim, rengini mi çıkardım?" sorusunu doğurur.
+ * Bu yüzden ilk dokunuş paleti seçiyor, sonraki dokunuşlar renk çıkarıyor —
+ * kullanıcının tarifi de bu ("bir palet seçtiğimizde o paletin üstündeki
+ * renklere tıkladığımızda").
+ */
+function onizlemeCikarmayiCevir(item, index) {
+  if (selectedSuggestion !== item.mode) {
+    secimiDegistir(item.mode);
+    renderSuggestions();
+    return;
+  }
+  if (!cikarmayiCevir(onizlemeCikarilan, (item.colors || []).length, index)) return;
+  renderSuggestions();
 }
 
 // ── Kütüphane ───────────────────────────────────────────────────────
@@ -480,6 +603,7 @@ function openPaletteModal() {
   suggestions = [];
   suggestSeed = "";
   selectedSuggestion = null;
+  onizlemeCikarilan = new Set();
   renderSuggestions();
   paletteModalStatus("");
   setPaletteTab("new");
@@ -502,7 +626,8 @@ $("palette-apply").addEventListener("click", () => {
   if (!item) return;
   // Tohum sunucunun döndürdüğü normalize edilmiş değer — arada input
   // değiştiyse önerilerle tutarsız bir palet uygulanmasın.
-  applyPalette({ seed: suggestSeed, mode: item.mode, colors: item.colors });
+  applyPalette({ seed: suggestSeed, mode: item.mode, colors: item.colors,
+                 dropped: onizlemeCikarilan });
   closePaletteModal();
 });
 

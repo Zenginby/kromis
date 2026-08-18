@@ -23,6 +23,10 @@
     <string name="arayuz_yuklenemedi_detay">Arayüz yüklenemedi: %1$s</string>
     <string name="cikis">Çık</string>
 
+    <!-- Geri tuşu. "gelin", "basın" DEĞİL: jest gezinmesinde kullanıcı tuşa
+         basmıyor, kenardan kaydırıyor — tek metin ikisini de kapsamalı. -->
+    <string name="cikmak_icin_tekrar_geri">Çıkmak için tekrar geri gelin</string>
+
     <!-- İndirme -->
     <string name="indiriliyor">İndiriliyor: %1$s</string>
     <string name="indirildi">Kaydedildi: %1$s</string>

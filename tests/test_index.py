@@ -86,17 +86,108 @@ def test_overlay_offset_is_restored_per_mode():
 
 
 def test_palette_chip_swatches_are_not_hidden_from_screen_readers():
-    """Çip swatch'ları v1.11'den beri tıklanabilir düğme (renk çıkarma).
+    """Çip swatch'ları artık SALT GÖRÜNTÜ, ama gizlenmemeleri hâlâ zorunlu.
 
-    `aria-hidden="true"` içinde odaklanabilir bir kontrol bırakmak onu ekran
-    okuyucudan TAMAMEN saklar: klavyeyle ulaşılan ama hiç duyurulmayan bir
-    düğme kalır. Öznitelik geri eklenirse bu test düşer.
+    v1.11'de tıklanabilir düğmelerdi ve `aria-hidden` içinde odaklanabilir bir
+    kontrol bırakmak onları ekran okuyucudan TAMAMEN saklardı. Çıkarma öneri
+    kartlarına taşındığında (14×14px'lik hedefler telefonda yanlış dokunma
+    üretiyordu, palette.js `swatchRow` notu) düğme olmaktan çıktılar — ama
+    iddia AYNEN duruyor: çip artık "hangi renkler geçerli, hangisi çıkarıldı"
+    bilgisinin TEK okunabilir yeri, yani gizlenmesi o bilgiyi ekran okuyucu
+    kullanıcısından tümüyle almak olurdu.
     """
     html = TestClient(appmod.app).get("/").text
     chip = re.search(r'id="palette-chip-sw"[^>]*', html)
     assert chip, "palet çipi swatch kabı bulunamadı"
     assert "aria-hidden" not in chip.group(0), (
-        f"tıklanabilir swatch'lar aria-hidden içinde: {chip.group(0)}")
+        f"palet durumu aria-hidden içinde: {chip.group(0)}")
+
+
+def test_the_palette_card_is_not_a_button_so_its_swatches_can_be():
+    """Öneri kartı <div> + gerilmiş seçim düğmesi olmak ZORUNDA.
+
+    Renk çıkarma çipten (14×14px, 2px aralıklı — telefonda yanlış dokunma
+    kaynağı) öneri kartlarındaki büyük kutucuklara taşındı. Bunun bedeli yapısal:
+    kutucuklar birer <button> ve kart da <button> KALIRSA iç içe buton çıkar —
+    geçersiz HTML, ve tarayıcı iç düğmeyi kartın dışına taşıyarak "düzeltir",
+    yani düzen sessizce dağılır.
+
+    Kart <button>'a geri döndürülürse hiçbir hata çıkmaz: kutucuklar görünür,
+    hatta tıklanır gibi durur. Bu yüzden mandal burada.
+    """
+    js = TestClient(appmod.app).get("/static/palette.js").text
+    govde = re.search(r"function makeChoiceButton\(\{(.*?)\n\}", js, re.S)
+    assert govde, "makeChoiceButton() bulunamadı"
+    assert 'createElement("div")' in govde.group(1), "kart hâlâ <button>"
+    assert "palette-choice-pick" in govde.group(1), "gerilmiş seçim düğmesi yok"
+
+
+def test_the_stretched_palette_pick_button_is_focusable_and_ringed():
+    """Gerilmiş seçim düğmesi görünmez; odak halkası AÇIKÇA yazılmalı.
+
+    `.palette-choice-pick`in kendi zemini ve kenarlığı yok (`background: none;
+    border: 0`), yani tarayıcı varsayılan halkası keyfi palet zemininde
+    kaybolabiliyor — `.chat-item-open` ve `button.palette-sw` geleneğinin aynısı.
+    Halka düşerse kart klavyeyle hâlâ seçilir ama kullanıcı NEREDE olduğunu
+    göremez.
+
+    `inset: 0` da iddiada: düğme gerilmezse kartın yalnız bir köşesi tıklanır
+    hâle gelir ve "karta bastım, seçilmedi" olarak görünür.
+    """
+    css = TestClient(appmod.app).get("/static/style.css").text
+    kural = re.search(r"\.palette-choice-pick \{(.*?)\n\}", css, re.S)
+    assert kural, ".palette-choice-pick kuralı yok"
+    assert "position: absolute" in kural.group(1)
+    assert "inset: 0" in kural.group(1)
+    assert re.search(r"\.palette-choice-pick:focus-visible", css), "odak halkası yok"
+
+    # Kart konumlandırma bağlamı olmadan `inset: 0` viewport'a gerilirdi.
+    kart = re.search(r"\n\.palette-choice \{(.*?)\n\}", css, re.S)
+    assert kart, ".palette-choice kuralı yok"
+    assert "position: relative" in kart.group(1)
+
+
+def test_the_selected_palette_is_marked_by_a_class_not_by_has():
+    """Seçili kart `.is-secili` ile işaretlenmeli, `:has()` ile DEĞİL.
+
+    `aria-pressed` artık iç düğmede olduğu için stilin doğal karşılığı
+    `.palette-choice:has(> .palette-choice-pick[aria-pressed="true"])` olurdu.
+    APK yan yükleniyor (`minSdk 26`) ve o telefonlardaki WebView `:has()`
+    desteklemeyebilir — desteklemediğinde kural TÜMÜYLE düşer ve kullanıcı hangi
+    paleti seçtiğini hiç göremez. Sınıf her yerde çalışıyor.
+
+    İki kanalın da yazılması şart: sınıf stil için, `aria-pressed` yardımcı
+    teknoloji için. Biri düşerse öteki sessizce yeterli görünür.
+    """
+    css = TestClient(appmod.app).get("/static/style.css").text
+    js = TestClient(appmod.app).get("/static/palette.js").text
+    assert ".palette-choice.is-secili" in css, "seçili kart kuralı sınıfla yazılmamış"
+    assert ":has(" not in css.split(".palette-choice")[1][:400], (
+        "seçili kart `:has()`e bağlanmış — eski WebView'da işaretsiz kalır")
+    govde = re.search(r"function kartSeciminiYaz\(.*?\n\}", js, re.S)
+    assert govde, "kartSeciminiYaz() bulunamadı"
+    assert "is-secili" in govde.group(0) and "aria-pressed" in govde.group(0), (
+        "seçim iki kanaldan birine yazılmıyor")
+
+
+def test_dropping_a_colour_survives_until_the_palette_is_applied():
+    """Önizlemede çıkarılan renk "Bu paleti kullan"a AKTARILMALI.
+
+    Kullanıcının gördüğü akış: paleti seç → rengine dokun (üstü çizilir) → uygula.
+    `applyPalette` eskiden koşulsuz `dropped: new Set()` yazıyordu; o satır geri
+    gelirse çıkarma sessizce KAYBOLUR — arayüz rengi çıkarılmış gösterir, üretim
+    ise beş renkle gider. Sessiz, çünkü hiçbir hata çıkmaz.
+
+    Kopya olması da iddiada: küme referansla tutulsa panelde sonradan bir renge
+    dokunmak, uygulanmış paleti kullanıcının haberi olmadan değiştirirdi.
+    """
+    js = TestClient(appmod.app).get("/static/palette.js").text
+    uygula = re.search(r"function applyPalette\(\{(.*?)\n\}", js, re.S)
+    assert uygula, "applyPalette() bulunamadı"
+    assert "new Set(dropped || [])" in uygula.group(1), (
+        "önizleme çıkarmaları uygulamaya taşınmıyor ya da referansla taşınıyor")
+    assert "dropped: onizlemeCikarilan" in js, (
+        "\"Bu paleti kullan\" önizleme kümesini geçirmiyor")
 
 
 def test_dropped_swatch_is_marked_by_more_than_colour():

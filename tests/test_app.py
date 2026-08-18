@@ -117,3 +117,67 @@ def test_output_missing_file_returns_404(tmp_path, monkeypatch):
     c = _client(tmp_path, monkeypatch)
     r = c.get("/output/nope.png")
     assert r.status_code == 404
+
+
+# ── İndirme ucu ─────────────────────────────────────────────────────
+#
+# Bu üç iddianın ortak yanı: koruduğu kırılma YALNIZCA telefonda görünüyor ve
+# CI'da telefon yok. Android WebView, HTML'in `download` özniteliğini YOK
+# SAYIYOR; `Content-Disposition` taşımayan bir `image/png` adresi onun
+# çizebileceği bir şey olduğu için kayıt dinleyicisi hiç tetiklenmiyor ve
+# indirme SESSİZCE hiç olmuyor. Masaüstünde ve tarayıcıda aynı kod kusursuz
+# çalıştığı için başlığın düşmesi hiçbir yerde fark edilmezdi.
+
+
+def test_the_download_endpoint_marks_the_png_as_an_attachment(tmp_path, monkeypatch):
+    """`/api/output/{id}/download` indirmeyi İNDİRME olarak işaretlemek zorunda.
+
+    Dosya adı da buradan geliyor: Android tarafı adı
+    `URLUtil.guessFileName(url, contentDisposition, mimeType)` ile üretiyor, yani
+    çıpanın `download=` değerinden DEĞİL bu başlıktan okuyor. Başlık düşerse
+    telefonda indirme hiç olmaz; ad düşerse dosya URL yolundan türetilmiş
+    anlamsız bir adla iner.
+    """
+    monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG"])
+    c = _client(tmp_path, monkeypatch)
+    rec = c.post("/api/generate", json={"prompt": "cat", "size": "1024x1024",
+                                        "quality": "medium", "n": 1}).json()["images"][0]
+
+    r = c.get(f"/api/output/{rec['id']}/download")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "image/png"
+    cd = r.headers["content-disposition"]
+    assert cd.startswith("attachment;"), cd
+    assert f'filename="{rec["id"]}.png"' in cd, cd
+    assert r.content == b"\x89PNG"
+
+
+def test_the_drawing_route_stays_inline(tmp_path, monkeypatch):
+    """`/output/{filename}` `attachment` DEMEMELİ — o adres bir ÇİZİM adresi.
+
+    Aynı adres her galeri küçük resminin ve büyüteç görselinin `<img src>`'i.
+    İndirme başlığını oraya eklemek, görsellerin ÇİZİLMESİNİ bir indirme
+    başlığına bağlamak olurdu: kazanılacak şeyin bedeli, kaybetmeye hiç razı
+    olunmayacak şey. İndirme bu yüzden AYRI bir uçta.
+    """
+    monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG"])
+    c = _client(tmp_path, monkeypatch)
+    rec = c.post("/api/generate", json={"prompt": "cat", "size": "1024x1024",
+                                        "quality": "medium", "n": 1}).json()["images"][0]
+
+    r = c.get(f"/output/{rec['filename']}")
+    assert r.status_code == 200
+    assert "attachment" not in r.headers.get("content-disposition", "")
+
+
+def test_the_download_endpoint_reuses_the_single_traversal_guard(tmp_path, monkeypatch):
+    """Uydurma ve yol kaçışlı id'ler 404 — kendi guard'ını yazmıyor.
+
+    Koruma `_output_png_path`ten geliyor (deponun tek kapısı). Yeni uç kendi
+    `os.path.basename`ini yazmaya kalkarsa bu iddia onu yakalamaz — ama guard'ın
+    HİÇ olmadığı hâli yakalar, ki tehlikeli olan o.
+    """
+    c = _client(tmp_path, monkeypatch)
+    assert c.get("/api/output/deadbeef0000/download").status_code == 404
+    # `..%2F..%2Fetc%2Fpasswd` — kodlanmış yol kaçışı
+    assert c.get("/api/output/..%2F..%2Fetc%2Fpasswd/download").status_code == 404

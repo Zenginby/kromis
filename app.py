@@ -840,8 +840,14 @@ def download_folder_route(folder_id: str):
     safe_ascii = re.sub(r"[^\w\s-]", "", folder_name).strip().replace(" ", "_")
     safe_ascii = safe_ascii.encode("ascii", "ignore").decode("ascii") or "klasor"
     encoded_utf8 = quote(folder_name)
+    # `filename*` ÖNCE, tırnaklı `filename` SONRA. RFC 6266'ya göre öncelik
+    # sırayla değil parametreyle belirlendiği için tarayıcı davranışı bundan
+    # etkilenmiyor — ama Android WebView'in indirme adını üreten
+    # `URLUtil.guessFileName`'inin regex'i tırnaklı biçimden SONRA bir şey
+    # gelince boşa düşüyor ve ad URL yolundan türetiliyordu: her klasör ZIP'i
+    # telefona `download.zip` diye iniyordu.
     headers = {
-        "Content-Disposition": f'attachment; filename="{safe_ascii}.zip"; filename*=UTF-8\'\'{encoded_utf8}.zip'
+        "Content-Disposition": f'attachment; filename*=UTF-8\'\'{encoded_utf8}.zip; filename="{safe_ascii}.zip"'
     }
 
     return Response(content=zip_bytes, media_type="application/zip", headers=headers)
@@ -1227,6 +1233,34 @@ def output_file(filename: str) -> FileResponse:
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="bulunamadı")
     return FileResponse(path, media_type="image/png")
+
+
+@app.get("/api/output/{image_id}/download")
+def output_download(image_id: str) -> FileResponse:
+    """Aynı PNG, ama `Content-Disposition: attachment` ile — İNDİRME yolu.
+
+    NEDEN AYRI BİR UÇ, `/output/{filename}`e başlık eklemek yerine: o adres aynı
+    zamanda her galeri küçük resminin ve büyüteç görselinin `<img src>`'i. Onu
+    "attachment" demeye zorlamak, görsellerin ÇİZİLMESİNİ bir indirme başlığına
+    bağlardı — kazanacağımız şeyin bedeli, kaybetmeye hiç razı olmayacağımız şey.
+    Kalıp `/api/folders/{folder_id}/download`'un aynısı (yukarısı).
+
+    NEDEN VAR: Android WebView, HTML'in `download` özniteliğini YOK SAYIYOR.
+    `Content-Disposition` taşımayan bir `image/png` adresi WebView'in
+    çizebileceği bir şey, o yüzden kayıt dinleyicisi (MainActivity.kt:305) hiç
+    tetiklenmiyor; WebView düz görsele gidiyor ve indirme SESSİZCE hiç olmuyordu.
+    Telefonda "indirme çalışmıyor" olarak görünen tek şey buydu.
+
+    Dosya adı da buradan geliyor: `Downloader` adı
+    `URLUtil.guessFileName(url, contentDisposition, mimeType)` ile üretiyor, yani
+    çıpanın `download=` değerinden DEĞİL bu başlıktan okuyor.
+
+    Path-traversal guard'ı yeniden yazılmıyor: `_output_png_path` deponun tek
+    kapısı ve 404'ü de o veriyor.
+    """
+    path = _output_png_path(image_id)
+    return FileResponse(path, media_type="image/png",
+                        filename=f"{os.path.basename(image_id)}.png")
 
 
 @app.get("/")

@@ -10,6 +10,7 @@ yalnızca telefonda "düğme çalışmıyor" olarak görünür — ve o telefon 
 """
 from __future__ import annotations
 
+import os
 import re
 
 import pytest
@@ -27,6 +28,23 @@ def _metin(istemci, yol: str) -> str:
     yanit = istemci.get(yol)
     assert yanit.status_code == 200, yol
     return yanit.text
+
+
+# Kotlin kaynağı SERVİS EDİLMİYOR (APK'nın içinde derleniyor), o yüzden dosyadan
+# okunuyor — dosyanın kendisini okuyan `test_android_apk_name.py` ile aynı
+# gerekçe: kırılma iki dosyanın BİRLEŞTİĞİ yerde ve yalnız Android runner'ında
+# (dakikalar süren bir NDK + Gradle işi) görünüyor. Yerelde koşan ucuz bir iddia
+# aynı kaymayı saniyede yakalıyor.
+_KOTLIN = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "android", "app", "src", "main", "java", "org", "zenginby", "gptimagestudio",
+    "MainActivity.kt",
+)
+
+
+def _kotlin_kaynagi() -> str:
+    with open(_KOTLIN, encoding="utf-8") as f:
+        return f.read()
 
 
 # ── Bağlanma ────────────────────────────────────────────────────────
@@ -332,3 +350,167 @@ def test_touch_hints_do_not_teach_drag_and_drop(istemci):
     js = _metin(istemci, "/static/folders.js")
     assert "const FOLDER_HINT_DEFAULT = IS_TOUCH" in js
     assert "const FOLDER_HINT_IMPORT = IS_TOUCH" in js
+
+# ── Izgara boyutu ───────────────────────────────────────────────────
+
+
+def test_the_three_grid_sizes_really_differ_on_a_phone(istemci):
+    """S, M ve L telefonda FARKLI sütun sayısı vermek zorunda.
+
+    Kırılma buydu: `.gallery` `repeat(auto-fill, minmax(var(--tile), 1fr))`
+    kullanıyor ve `minmax` bir ALT SINIR — tarayıcı sütun sayısını
+    `floor((W + gap) / (tile + gap))` ile buluyor, sonra sütunları `1fr` ile
+    geriyor. Aynı sütun sayısına düşen iki farklı `--tile` PİKSEL PİKSEL aynı
+    çiziliyordu: 375px ve 390px genişlikte (en yaygın telefon ölçüleri) S (84px)
+    de M (105px) de 3 sütun veriyordu, yani kullanıcı için "S ile M aynı".
+
+    Bu yüzden dar ekranda sütun sayısı tahmin EDİLMİYOR, yazılıyor. Üç değerin
+    farklı olması iddianın kendisi: `--tile`a geri dönülürse ya da ikisi eşitlenirse
+    kusur aynen geri gelir ve yine hiçbir hata üretmez.
+    """
+    css = _metin(istemci, "/static/mobile.css")
+    blok = css.split("@media (max-width: 560px)")
+    assert len(blok) == 2, "telefon ızgara bloğu yok"
+    govde = blok[1]
+
+    sutunlar = {}
+    for ad, desen in (("m", r"\.gallery \{[^}]*?--sutun:\s*(\d+)"),
+                      ("s", r'\.gallery\[data-size="s"\] \{[^}]*?--sutun:\s*(\d+)'),
+                      ("l", r'\.gallery\[data-size="l"\] \{[^}]*?--sutun:\s*(\d+)')):
+        m = re.search(desen, govde, re.S)
+        assert m, f"{ad} için sütun sayısı yazılmamış"
+        sutunlar[ad] = int(m.group(1))
+
+    assert len(set(sutunlar.values())) == 3, f"boyutlar ayrışmıyor: {sutunlar}"
+    # Sıra da anlamlı: S en çok sütun (en küçük kutucuk), L en az.
+    assert sutunlar["s"] > sutunlar["m"] > sutunlar["l"], sutunlar
+
+    # `1fr` tek başına asgari İÇERİK boyutuna takılır ve kutucuk taşar.
+    assert "minmax(0, 1fr)" in govde, "sütunlar 0'a inebilir değil — taşma riski"
+
+
+# ── Logo bindirme önizlemesi ────────────────────────────────────────
+
+
+def test_the_logo_preview_sticks_with_a_fixed_height(istemci):
+    """Önizleme telefonda SABİT kalmalı — ve yüksekliği DEĞİŞMEMELİ.
+
+    İki ayrı kusur, tek kural:
+
+    1. `.logo-body` 760px altında tek sütuna iniyor ve DOM sırası önizlemeyi
+       kontrollerin önüne koyuyor; "Boyut" ya da "Dikey kaydırma"ya uzanmak
+       önizlemeyi ekrandan çıkarıyordu. Çözüm `position: sticky`.
+
+    2. `height` — `min-height` DEĞİL. Her kaydırıcı hareketi 220ms gecikmeyle
+       sunucudan yeni bir önizleme çekip `#logo-preview-img.src`'i base64 ile
+       değiştiriyor (assets.js). Kutu yüksekliğini görselden alsa her tazelemede
+       değişir ve KONTROLLER KULLANICININ PARMAĞININ ALTINDA KAYARDI — sticky
+       sorunu çözmek yerine yenisini üretmiş olurdu. `min-height`a dönmek
+       masaüstünde hiçbir fark yaratmaz, o yüzden mandal burada.
+    """
+    css = _metin(istemci, "/static/mobile.css")
+    kural = re.search(r"\.logo-preview-wrap \{(.*?)\n  \}", css, re.S)
+    assert kural, "mobil .logo-preview-wrap kuralı yok"
+    govde = kural.group(1)
+    assert "position: sticky" in govde
+    assert re.search(r"\n\s*height:", govde), "sabit yükseklik yok"
+    # `top: 0` durum çubuğunun ALTINA sokardı: .modal telefonda `inset: 0`.
+    assert "safe-area-inset-top" in govde, "güvenli alan payı yok"
+
+
+# ── İndirme ─────────────────────────────────────────────────────────
+
+
+def test_downloads_go_through_the_attachment_route(istemci):
+    """`/output/…` çizim adresi indirme adresine ÇEVRİLMEK zorunda.
+
+    Android WebView HTML'in `download` özniteliğini yok sayıyor; başlıksız bir
+    `image/png`'ye gitmek onun çizebileceği bir şey olduğu için kayıt dinleyicisi
+    hiç tetiklenmiyor ve indirme SESSİZCE hiç olmuyordu. Çevirme TEK yerde
+    (`indirmeAdresi`), üç indirme yolu da oradan geçiyor.
+    """
+    js = _metin(istemci, "/static/core.js")
+    assert "function indirmeAdresi(" in js, "çevirme işlevi yok"
+    assert "/api/output/" in js, "indirme ucu hiç kullanılmıyor"
+    # Çıpanın href'i ve panelin fetch'i AYNI adresi kullanmalı; biri atlanırsa
+    # kırılma "bazen çalışıyor" olarak geri döner.
+    assert "a.href = indirmeAdresi(url)" in js
+    assert "fetch(indirmeAdresi(url))" in js
+
+
+def test_the_download_listeners_no_longer_defer_to_the_bare_anchor(istemci):
+    """Kayıt paneli yoksa çıpanın KENDİ gezinmesine bırakılmamalı.
+
+    Galeri kartı ve büyüteç eskiden `if (!SUPPORTS_SAVE_PICKER) return;` diyerek
+    araya hiç girmiyordu — masaüstü paketinde doğru, Android'de ise indirmenin hiç
+    olmaması demekti. `downloadImage` panel yokken kendisi `downloadViaAnchor`'a
+    düşüyor, yani pakette mekanizma değişmedi; değişen tek şey kararın TEK yerde
+    olması.
+    """
+    for yol in ("/static/folders.js", "/static/viewer.js"):
+        js = _metin(istemci, yol)
+        # Yorumlarda adı geçmesi serbest; ARANAN erken dönüşün kendisi.
+        assert "!SUPPORTS_SAVE_PICKER) return" not in js, yol
+
+
+# ── Geri tuşu ───────────────────────────────────────────────────────
+
+
+def test_the_back_button_has_a_single_gate_in_the_frontend(istemci):
+    """Geri sıralaması JS'te olmak zorunda — Kotlin'in içine gömülü değil.
+
+    Sıralama eskiden MainActivity.kt'nin içinde ÜÇ CSS seçicisiydi ve
+    index.html'in yapısına dizeyle bağlıydı; koruyan hiçbir test yoktu. İki somut
+    kırılma üretmişti: sohbet menüleri üç seçicinin hiçbirine uymuyordu (menü
+    açıkken geri uygulamayı KAPATIYORDU) ve bölüm/klasör gezintisi geri yığınında
+    hiç yoktu (Medya'dayken geri doğrudan çıkışa gidiyordu).
+
+    Kotlin tarafı bu dosyadan okunuyor, servis edilen artefakttan değil: APK'nın
+    içinde ama aynı depoda — kırılma iki dosyanın BİRLEŞTİĞİ yerde
+    (test_android_apk_name.py ile aynı gerekçe).
+    """
+    js = _metin(istemci, "/static/core.js")
+    assert "window.geriTusu" in js, "geri kapısı yok"
+    govde = js.split("window.geriTusu = function ()")[1].split("\n};")[0]
+    # Dört adım: katman → klasör → bölüm → çıkış.
+    for beklenen in (".sheet.open", ".modal:not([hidden])", ".popover:not([hidden])",
+                     ".chat-menu:not([hidden])", "#chats-kebab-menu:not([hidden])",
+                     "folder-back", 'currentSection !== "studio"'):
+        assert beklenen in govde, beklenen
+    assert "return false" in govde, "çıkışa hiç düşmüyor"
+
+    kt = _kotlin_kaynagi()
+    assert "window.geriTusu" in kt, "Kotlin frontend kapısını çağırmıyor"
+    assert ".sheet.open" not in kt, "Kotlin hâlâ kendi CSS seçicilerini taşıyor"
+
+
+def test_leaving_the_app_needs_two_back_presses(istemci):
+    """Tek geri basışı uygulamayı KAPATMAMALI.
+
+    Arayüzde kapatılacak bir şey kalmadığında tek bir basış (ya da kenardan tek
+    bir kaydırma) oturumu kapatıyordu — süren bir üretimin ortasında bile. Jest
+    gezinmesinde ekranın kenarına değmek kolay, yani kazayla çıkmak sıktı.
+
+    `sistemGerisi()`ye giden TEK yol `cikisiOnayla()`: ikinci bir doğrudan çağrı
+    eklenirse kapı sessizce baypas edilir ve kusur geri gelir.
+    """
+    kt = _kotlin_kaynagi()
+    assert "private fun cikisiOnayla()" in kt, "çıkış kapısı yok"
+    # `System.currentTimeMillis()` DEĞİL: duvar saati kullanıcı ya da ağ
+    # tarafından geriye alınabilir, fark negatife düşer ve pencere bir daha hiç
+    # açılmaz — "iki kez bastım, çıkmıyor". `= System.currentTimeMillis()`
+    # ARANIYOR, çıplak ad değil: ad kararın gerekçesinde de geçiyor ve orayı
+    # yakalayan bir iddia yorumu silmeye zorlardı.
+    assert "SystemClock.elapsedRealtime()" in kt
+    assert "= System.currentTimeMillis()" not in kt
+
+    # `onBackPressed` çıkışa DOĞRUDAN gitmemeli — iki dalı da (perde görünürken
+    # ve JS "false" dönerken) kapıdan geçmek zorunda. Doğrudan çağrı geri
+    # eklenirse uyarı sessizce baypas edilir: hiçbir hata çıkmaz, uygulama yine
+    # tek basışta kapanır.
+    geri = kt.split("override fun onBackPressed()")[1].split("\n    }")[0]
+    assert "sistemGerisi()" not in geri, "onBackPressed çıkışa doğrudan gidiyor"
+    assert geri.count("cikisiOnayla()") == 2, geri
+
+    kapi = kt.split("private fun cikisiOnayla()")[1].split("\n    }")[0]
+    assert "sistemGerisi()" in kapi, "kapı çıkışa hiç düşmüyor"

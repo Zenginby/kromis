@@ -215,7 +215,42 @@
              calc(var(--space) + env(safe-area-inset-bottom, 0px));
   }
   .logo-card { width: 100%; }
-  .logo-preview-wrap { min-height: 240px; }
+
+  /* Önizleme SABİT kalıyor — depodaki ilk `position: sticky` kullanımı.
+     .logo-body 760px altında tek sütuna iniyor (style.css:550) ve DOM sırası
+     önizlemeyi (index.html:908) kontrollerin (index.html:913) önüne koyuyor:
+     telefonda "Boyut" ya da "Dikey kaydırma"ya uzanmak önizlemeyi ekrandan
+     çıkarıyordu ve kullanıcı her hareketten sonra yukarı kaydırıp bakmak
+     zorunda kalıyordu.
+
+     Kaydıran kap `.modal-card` DEĞİL `.modal` (style.css:466-471,
+     `overflow-y: auto`); .modal-card ile .logo-body `overflow: visible`, yani
+     sticky kırpılmıyor.
+
+     `top: 0` DEĞİL `env(safe-area-inset-top)`: `.modal` telefonda `padding: 0`
+     ve `position: fixed; inset: 0` (yukarıdaki .modal kuralı), yani `top: 0`
+     önizlemeyi durum çubuğunun ALTINA sokardı.
+
+     `min-height` DEĞİL sabit `height` — sticky'yi işe yarar kılan asıl satır:
+     her kaydırıcı hareketi 220ms gecikmeyle sunucudan yeni bir önizleme çekip
+     #logo-preview-img.src'i base64 ile değiştiriyor (assets.js:392-396). Kutu
+     yüksekliğini görselden alsa her tazelemede değişir ve KONTROLLER
+     KULLANICININ PARMAĞININ ALTINDA KAYARDI — sticky sorunu çözmek yerine
+     yenisini üretmiş olurdu. Sabit yükseklik bunu tümden kesiyor; görsel
+     kutunun içinde ortalanmaya devam ediyor (style.css:556 `place-items`).
+
+     `z-index: 1`: kontroller önizlemenin ARKASINDAN kaysın. Kutunun zemini
+     zaten opak (dama deseni + var(--panel-2), style.css:551-557), ek arka plan
+     gerekmiyor. */
+  .logo-preview-wrap {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 1;
+    height: 38vh;
+    min-height: 0;   /* style.css:556'daki 420px tabanı eziliyor */
+  }
+  /* style.css:558'deki `min(72vh, 680px)` 38vh'lik kutuyu taşırırdı. */
+  .logo-preview-img { max-height: 100%; }
 
   /* Onay penceresi BİLEREK diyalog kalıyor: tek bir soru için tam ekrana
      geçmek, arkadaki bağlamı (hangi görselin silineceğini) gizler. */
@@ -326,6 +361,16 @@
     transform: translateY(-50%);
   }
 
+  /* Öneri kartındaki renk kutucukları — YANLIŞ DOKUNMANIN asıl kaynağı burasıydı.
+     Çıkarma eskiden çipteki 14×14px, 2px aralıklı kutucuklardaydı ve kullanıcı
+     sürekli yanlış renge basıyordu. Yukarıdaki kare ::after kalıbı orada
+     kullanılamıyordu (2px aralıkta iki 44px'lik kare birbirine girer, bkz.
+     .chat-pick notu), o yüzden çıkarma bu kartlara taşındı — ve BURADA hedefi
+     büyütmek için hileye hiç gerek yok: kutucuk `flex: 1` ile zaten ~60px
+     genişlikte, tek eksiği yükseklik. Düğmeyi gerçekten 44px yapmak düzeni
+     bozmuyor, çünkü kart yalnız bu şerit için var. */
+  .palette-choice button.palette-sw { height: var(--tap); }
+
   /* Bu ikisi zaten kare ve büyütülmeleri düzeni bozmuyor. */
   .icon-btn { min-width: var(--tap); min-height: var(--tap); }
   .viewer-btn { min-height: var(--tap); }
@@ -363,4 +408,39 @@
     border-radius: var(--r-panel, 24px);
     padding: calc(var(--space) * 1.1);
   }
+}
+
+/* ── Izgara boyutu S/M/L: telefonda sütun SAYISI yazılıyor ──────────
+   S ile M telefonda AYNI görünüyordu ve sebebi `--tile` değerleri değil,
+   `minmax`ın ne olduğu: `.gallery` `repeat(auto-fill, minmax(var(--tile), 1fr))`
+   kullanıyor (style.css:1171) ve `minmax` bir ALT SINIR. Tarayıcı önce
+   `floor((W + gap) / (tile + gap))` ile sütun sayısını buluyor, sonra sütunları
+   `1fr` ile geriyor — yani aynı sütun sayısına düşen iki farklı `--tile`
+   piksel piksel aynı çiziliyor:
+
+     viewport  içerik W   S(84px)   M(105px)   sonuç
+     375px     343px      3 sütun   3 sütun    AYNI (109px)
+     390px     358px      3 sütun   3 sütun    AYNI (114px)
+     412px     380px      4 sütun   3 sütun    farklı
+
+   375–390px en yaygın telefon genişlikleri, yani kusur tam da oradaki
+   kullanıcıya görünüyordu. L (148px) o bantta hep 2 sütuna düştüğü için
+   yalnız S/M bozuk görünüyordu.
+
+   NEDEN AYRI VE DAHA DAR BİR SORGU (560px, dosyanın 768px'i değil): 768px'in
+   altındaki geniş yarıda (küçük tabletler) mevcut `--tile` değerleri üç boyutu
+   zaten ayırıyor — 600px'lik bir izde 6/5/3 sütun çıkıyor. `auto-fill`in
+   duyarlılığını orada bozmanın karşılığı yok; sorun yalnız dar bantta.
+
+   `minmax(0, 1fr)` şart: yalnız `1fr` asgari İÇERİK boyutuna takılır ve
+   kutucuk taşar. Masaüstü kuralları (style.css:1171-1176) ve yukarıdaki
+   `--tile` değerleri hiç değişmiyor — 560px altında `--tile` yalnızca
+   kullanılmıyor. */
+@media (max-width: 560px) {
+  .gallery {
+    --sutun: 3;
+    grid-template-columns: repeat(var(--sutun), minmax(0, 1fr));
+  }
+  .gallery[data-size="s"] { --sutun: 4; }
+  .gallery[data-size="l"] { --sutun: 2; }
 }

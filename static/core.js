@@ -85,6 +85,63 @@ function showSection(name) {
   if (studio) syncTabThumb();
 }
 
+// ══ Android donanım/jest geri tuşu ══════════════════════════════════
+//
+// MainActivity.kt'nin `onBackPressed`i YALNIZ bunu çağırıyor. `true` = "ele
+// aldım", `false` = "uygulamadan çıkılabilir" (Kotlin o noktada çıkış uyarısını
+// gösteriyor).
+//
+// NEDEN BURADA, Kotlin'de değil: sıralama eskiden Kotlin'in içine gömülü ÜÇ CSS
+// seçicisiydi (`.sheet.open`, `.modal:not([hidden])`, `.popover:not([hidden])`)
+// ve index.html'in yapısına dizeyle bağlıydı — koruyan hiçbir test yoktu. İki
+// somut kırılma üretmişti:
+//   • sohbet menüleri (`.chat-menu`, `#chats-kebab-menu`) üç seçicinin
+//     HİÇBİRİNE uymuyor, yani menü açıkken geri uygulamayı kapatıyordu,
+//   • bölüm ve klasör gezintisi geri yığınında hiç yok (showSection ve
+//     folders.js `goUp` geçmişe girmiyor), yani Medya'dayken ya da iç içe bir
+//     klasördeyken geri DOĞRUDAN çıkışa gidiyordu.
+// Karar JS'e taşınınca hem ikisi de kapandı hem sözleşme test edilebilir bir
+// yere geldi (tests/test_mobile.py).
+//
+// `webView.canGoBack()` hâlâ KULLANILMIYOR: bu tek sayfalık bir uygulama,
+// modal ve paneller gezinme geçmişine hiç girmiyor.
+window.geriTusu = function () {
+  // 1) Açık katman. Hangisinin kapanacağına KARIŞILMIYOR: var olan Escape
+  //    şelalesi (core.js aşağısı, folders.js, assets.js, viewer.js) önceliği
+  //    `stopImmediatePropagation` ile zaten çözüyor. Burada ikinci bir öncelik
+  //    sırası kurmak iki mantığın ayrışmasına ve "geri bazen yanlış paneli
+  //    kapatıyor" hatasına açık olurdu.
+  const acik = document.querySelector(".sheet.open")
+            || document.querySelector(".modal:not([hidden])")
+            || document.querySelector(".popover:not([hidden])")
+            || document.querySelector(".chat-menu:not([hidden])")
+            || document.querySelector("#chats-kebab-menu:not([hidden])");
+  if (acik) {
+    document.dispatchEvent(new KeyboardEvent("keydown", {
+      key: "Escape", bubbles: true, cancelable: true,
+    }));
+    return true;
+  }
+
+  // 2) Klasörden bir üste. `goUp()`u ikinci bir çağrandan çağırmak yerine var
+  //    olan düğme tıklanıyor (folders.js): kırıntı ve başlık tazelemesi böylece
+  //    bedava geliyor ve tek yol kalıyor. Düğmenin `hidden`i klasörde olup
+  //    olmamanın zaten tek göstergesi (folders.js `syncFolderView`).
+  const klasorGeri = $("folder-back");
+  if (klasorGeri && !klasorGeri.hidden) {
+    klasorGeri.click();
+    return true;
+  }
+
+  // 3) Stüdyo dışı bir bölüm → Stüdyo.
+  if (currentSection !== "studio") {
+    showSection("studio");
+    return true;
+  }
+
+  return false;
+};
+
 $("rail-studio").addEventListener("click", () => showSection("studio"));
 $("rail-media").addEventListener("click", () => showSection("media"));
 // A1/A2 (Adım 7b): Kütüphane ve Araçlar artık kendi görünümleri. Eskiden
@@ -313,9 +370,34 @@ function stopProgress(complete, gen) {
 // pakette davranış değişmiyor.
 const SUPPORTS_SAVE_PICKER = typeof window.showSaveFilePicker === "function";
 
+// `/output/<id>.png` → `/api/output/<id>/download`.
+//
+// NEDEN VAR: `/output/…` bir ÇİZİM adresi (galeri küçük resimleri ve büyütecin
+// `<img src>`'i), indirme adresi değil — `Content-Disposition` taşımıyor.
+// Android WebView ise HTML'in `download` özniteliğini yok sayıyor: başlıksız bir
+// `image/png`'ye gitmek onun çizebileceği bir şey olduğu için kayıt dinleyicisi
+// hiç tetiklenmiyor ve indirme sessizce hiç olmuyordu (app.py'deki
+// `output_download` notu). Çevirme TEK yerde: üç indirme yolunun hepsi
+// `downloadImage`/`downloadViaAnchor`'dan geçiyor.
+//
+// ETKİSİZ-TEKRARLI: zaten indirme adresi verilirse aynısı dönüyor, yani iki kez
+// uygulanması zararsız. Çevrilemeyen adres (blob:, data:, /assets/…) olduğu gibi
+// dönüyor — bu işlev bir yönlendirme tablosu, bir doğrulayıcı değil.
+const OUTPUT_ONEKI = "/output/";
+
+function indirmeAdresi(url) {
+  if (typeof url !== "string" || !url.startsWith(OUTPUT_ONEKI)) return url;
+  const ad = url.slice(OUTPUT_ONEKI.length);
+  if (!ad.endsWith(".png")) return url;
+  // Ad zaten kodlanmış olarak geliyor (chat.js:920 `encodeURIComponent`,
+  // folders.js kayıt adını olduğu gibi yazıyor); yeniden kodlamak `%` işaretini
+  // ikinci kez kaçırıp adresi bozardı.
+  return `/api/output/${ad.slice(0, -".png".length)}/download`;
+}
+
 function downloadViaAnchor(url, filename) {
   const a = document.createElement("a");
-  a.href = url;
+  a.href = indirmeAdresi(url);
   // Ad AÇIKÇA veriliyor: boş bırakılırsa macOS kayıt panelinin ad alanını
   // WebKit'in URL'den türetmesine kalıyoruz.
   a.download = filename;
@@ -343,7 +425,7 @@ async function downloadImage(url, filename) {
   }
 
   try {
-    const res = await fetch(url);
+    const res = await fetch(indirmeAdresi(url));
     if (!res.ok) throw new Error(`sunucu ${res.status}`);
     const stream = await handle.createWritable();
     await stream.write(await res.blob());

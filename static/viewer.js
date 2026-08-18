@@ -135,18 +135,23 @@
     } catch { name = ""; }
     dlLink.hidden = !name;
     if (name) {
-      dlLink.setAttribute("href", src);
+      // Çizim adresi `src`te kalıyor, bağlantıya İNDİRME adresi yazılıyor
+      // (core.js `indirmeAdresi`) — sağ tık → "Bağlantıyı kaydet" de doğru
+      // dosyayı vermeli.
+      dlLink.setAttribute("href", indirmeAdresi(src));
       dlLink.setAttribute("download", name);
     } else {
       dlLink.removeAttribute("href");
     }
   }
 
-  // Kayıt paneli olan tarayıcıda konumu KULLANICI seçsin (core.js). Panel
-  // yoksa hiç araya girilmiyor: <a download> zaten pakette doğru davranıyor.
+  // HER ZAMAN araya giriliyor, `SUPPORTS_SAVE_PICKER` kontrolü YOK: eskiden panel
+  // olmayan ortamda çıpanın kendi gezinmesine bırakılıyordu ve Android WebView'de
+  // bu, indirmenin hiç olmaması demekti (app.py `output_download`).
+  // `downloadImage` panel yokken kendisi `downloadViaAnchor`'a düşüyor.
   dlLink.addEventListener("click", (e) => {
     const href = dlLink.getAttribute("href");
-    if (!href || !SUPPORTS_SAVE_PICKER) return;
+    if (!href) return;
     e.preventDefault();
     downloadImage(href, dlLink.getAttribute("download"));
   });

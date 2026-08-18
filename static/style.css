@@ -787,22 +787,38 @@ button.palette-sw:focus-visible { outline: 2px solid var(--accent); outline-offs
   display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr));
   gap: 0.5rem; margin-top: 0.8rem;
 }
-/* Öneri kartı <button>: klavye gezinmesi ve odak halkası bedava gelir. */
+/* Öneri kartı bir <div>, <button> DEĞİL: içindeki renk kutucukları da birer
+   <button> (renk çıkarma oraya taşındı) ve iç içe buton geçersiz HTML.
+   Seçim hedefi, kartı kaplayan görünmez .palette-choice-pick. */
 .palette-choice {
+  position: relative;
   display: block; width: 100%; text-align: left; cursor: pointer; font: inherit;
   padding: 0.55rem 0.6rem 0.6rem; border-radius: 10px;
   border: 2px solid var(--control-border); background: var(--panel-2); color: var(--muted);
   transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 .palette-choice:hover { background: var(--raised); }
-.palette-choice[aria-pressed="true"] {
+/* Sınıf, `:has(> .palette-choice-pick[aria-pressed="true"])` DEĞİL: APK yan
+   yüklenen eski WebView'larda `:has()` desteklenmeyebilir ve o durumda seçili
+   palet hiç işaretlenmezdi (gerekçe palette.js `kartSeciminiYaz`da). */
+.palette-choice.is-secili {
   border-color: var(--accent); color: var(--text);
   box-shadow: 0 0 0 2px var(--accent-ring);
+}
+/* Gerilmiş seçim düğmesi: kartın her yeri seçiyor. Kendi zemini/kenarlığı
+   olmadığı için odak halkası AÇIKÇA yazılıyor (.chat-item-open geleneği) —
+   `inset: 0` sayesinde halka kartın kenarında beliriyor. */
+.palette-choice-pick {
+  position: absolute; inset: 0; z-index: 0;
+  padding: 0; border: 0; background: none; border-radius: inherit;
+  cursor: pointer; appearance: none;
 }
 .palette-choice-title {
   display: block; font-size: 0.8rem; color: var(--text); margin-bottom: 0.4rem;
 }
-.palette-choice .palette-sw-row { display: flex; gap: 3px; }
+/* `position/z-index`: kutucuklar gerilmiş seçim düğmesinin ÜSTÜNDE duruyor —
+   kart seçilebilir kalırken kendi dokunma hedeflerini koruyorlar. */
+.palette-choice .palette-sw-row { display: flex; gap: 3px; position: relative; z-index: 1; }
 .palette-choice .palette-sw { width: auto; flex: 1; height: 26px; border-radius: 5px; }
 .palette-choice-names {
   display: block; font-size: 0.68rem; line-height: 1.35; margin-top: 0.4rem;
@@ -832,7 +848,7 @@ button.palette-sw:focus-visible { outline: 2px solid var(--accent); outline-offs
 
 /* Keyfi renk zeminde tarayıcı varsayılan odak halkası kaybolabiliyor;
    accent halka panel zemininde her zaman görünür. */
-.palette-choice:focus-visible, .palette-lib-del:focus-visible {
+.palette-choice-pick:focus-visible, .palette-lib-del:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
 

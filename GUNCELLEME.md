@@ -150,6 +150,12 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.5.0 — ne değişti
+
+- Yeni sürüm çıktığında uygulama artık kendisi haber veriyor — ⚙ Ayarlar'da, kurulu sürümün hemen altında.
+
+---
+
 ## Sürüm 0.4.2 — ne değişti
 
 **Manşet: uygulamanın adı artık Lumeo.** Simge de yenilendi. Adı değişti diye

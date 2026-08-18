@@ -1,0 +1,190 @@
+"""Yeni bir sürüm çıktı mı? — GitHub'ın son yayınına bakan, sessiz kontrol.
+
+NEDEN VAR: paketler artık main'e giren her değişiklikte otomatik üretiliyor,
+yani yayınlar eskisinden çok daha sık çıkıyor. Kullanıcının bunu öğrenmesinin
+tek yolu GUNCELLEME.md'yi kendiliğinden açıp bakmaktı — pratikte hiç olmayan
+bir şey. Uygulama artık kendisi söylüyor.
+
+BİLDİRİM, GÜNCELLEYİCİ DEĞİL: burada indirme, kurma ya da kendini değiştirme
+YOK. Kullanıcıya yalnız "yeni sürüm var, bağlantı burada" deniyor. Otomatik
+güncelleme üç platformda üç ayrı imzalama/notarization zinciri gerektirir ve
+imzasız bir kendi kendini değiştirme yolu, uygulamaya açılmış bir kapıdır.
+
+ÜÇ SÖZLEŞME — üçü de ihlal edilirse zarar sessiz olur, o yüzden testte:
+
+  1. **Asla exception sızdırmaz.** Ağ yoksa, GitHub 500 dönerse, JSON bozuksa:
+     `None`. Bu uygulama çevrimdışı da kullanılabiliyor (üretim dışında her şey
+     yerelde koşuyor) ve bir sürüm kontrolünün ayarlar panelini açılamaz hâle
+     getirmesi kabul edilemez.
+  2. **İstek yolunu HİÇ bekletmez.** `/api/settings` senkron bir rota ve
+     Starlette onu threadpool'da koşturuyor; oraya 5 saniyelik bir ağ çağrısı
+     koymak paneli her açılışta bekletirdi. Kontrol arka planda koşuyor, rota
+     yalnız ÖNBELLEĞE bakıyor: ilk açılışta cevap "bilmiyorum" (None) olur,
+     birkaç saniye sonrakinde gerçek cevap gelir.
+  3. **Kullanıcı kapatabilir.** `prefs.guncelleme_kontrolu` kapalıysa ağa hiç
+     çıkılmaz. Uygulamanın kullanıcının haberi olmadan dışarıya bağlanması,
+     kapatılabilir olmadığı sürece savunulamaz.
+
+Depo public olduğu için uç nokta anonim çalışıyor — pakete gömülmüş bir token
+YOK ve olmamalı.
+"""
+from __future__ import annotations
+
+import json
+import os
+import threading
+import time
+import traceback
+
+import errlog
+import jsonstore
+import paths
+import version
+
+# Yayınların okunduğu depo. Sabit: uygulama kendi kaynağını biliyor.
+DEPO = "Zenginby/gpt-image-studio"
+API = f"https://api.github.com/repos/{DEPO}/releases/latest"
+YAYIN_SAYFASI = f"https://github.com/{DEPO}/releases/latest"
+
+ONBELLEK_DOSYASI = "guncelleme.json"
+
+# 24 saat. Daha sık kontrol etmenin kullanıcıya hiçbir faydası yok (yayın günde
+# birkaç kez çıksa bile "yarın görürsün" yeterli), GitHub'a gereksiz istek
+# göndermenin ise bir maliyeti var: anonim API saatte 60 istekle sınırlı ve o
+# sınır IP başına — aynı ağdaki birkaç kullanıcı onu paylaşıyor.
+TTL_SANIYE = 24 * 60 * 60
+
+# Zaman aşımı bilinçle kısa: bu çağrı hiçbir şeyi bloke etmiyor, ama bir
+# iş parçacığını dakikalarca asılı bırakmasının da anlamı yok.
+ZAMAN_ASIMI_SANIYE = 5.0
+
+_KILIT = threading.Lock()
+_KOSUYOR = False
+
+
+def _onbellek_yolu(output_dir: str) -> str:
+    return os.path.join(output_dir, ONBELLEK_DOSYASI)
+
+
+def _oku(output_dir: str) -> dict:
+    """Önbellek. Bozuksa boş — okuma yolu HOŞGÖRÜLÜ (prefs.py ile aynı duruş)."""
+    yol = _onbellek_yolu(output_dir)
+    if not os.path.exists(yol):
+        return {}
+    try:
+        with open(yol, encoding="utf-8") as f:
+            veri = json.load(f)
+        return veri if isinstance(veri, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _yaz(output_dir: str, veri: dict) -> None:
+    try:
+        jsonstore.write_atomic(_onbellek_yolu(output_dir), veri)
+    except OSError:
+        # Önbellek yazılamıyorsa (disk dolu, salt-okunur dizin) kontrol yine de
+        # çalışmış olur; yalnız her seferinde yeniden sorulur. Kullanıcıya
+        # gösterilecek bir hata yok.
+        pass
+
+
+def surum_daha_yeni(uzak: str, yerel: str) -> bool:
+    """'0.10.0' > '0.9.0' — SAYISAL karşılaştırma.
+
+    Sözlük sırası burada gerçek bir tuzak: '0.10.0' < '0.9.0' derdi ve onuncu
+    yama sürümünden sonra uygulama güncellemeleri görmeyi bırakırdı. Kırılma
+    sessiz: hiçbir hata çıkmaz, yalnız bildirim bir daha hiç gelmez.
+    """
+    def parcala(s: str) -> tuple[int, ...]:
+        return tuple(int(p) for p in s.strip().lstrip("v").split("."))
+
+    try:
+        return parcala(uzak) > parcala(yerel)
+    except (ValueError, AttributeError):
+        return False
+
+
+def _sor() -> dict | None:
+    """GitHub'a sorar. Her hatada None — birinci sözleşme.
+
+    `httpx` burada, modül düzeyinde DEĞİL fonksiyon içinde import ediliyor:
+    modül `paths`/`prefs` gibi erken yüklenen bir zincire girse bile import
+    maliyeti ödenmesin ve httpx bulunmayan bir ortamda (ör. yalnız bu modülü
+    içe aktaran bir test) import zinciri kırılmasın.
+    """
+    try:
+        import httpx
+
+        yanit = httpx.get(
+            API,
+            timeout=ZAMAN_ASIMI_SANIYE,
+            headers={"Accept": "application/vnd.github+json"},
+            follow_redirects=True,
+        )
+        yanit.raise_for_status()
+        veri = yanit.json()
+        etiket = str(veri.get("tag_name") or "").strip()
+        if not etiket:
+            return None
+        return {"surum": etiket.lstrip("v"), "url": str(veri.get("html_url") or YAYIN_SAYFASI)}
+    except Exception:                             # bilinçle geniş: bkz. 1. sözleşme
+        # Sessiz ama İZSİZ değil: kullanıcı bir şey görmüyor, ama sürekli
+        # başarısız olan bir kontrolün teşhis edilebilir olması gerekiyor.
+        # `safe_append` loglama hatasında da patlamıyor — app.py'deki desenin
+        # aynısı.
+        errlog.safe_append(paths.data_dir(), "güncelleme kontrolü:\n" + traceback.format_exc())
+        return None
+
+
+def _tazele(output_dir: str) -> None:
+    global _KOSUYOR
+    try:
+        sonuc = _sor()
+        if sonuc is not None:
+            _yaz(output_dir, {"zaman": time.time(), **sonuc})
+        else:
+            # Başarısız kontrol de damgalanıyor: yoksa ağı olmayan bir makinede
+            # her `/api/settings` çağrısı yeni bir iş parçacığı başlatırdı.
+            mevcut = _oku(output_dir)
+            mevcut["zaman"] = time.time()
+            _yaz(output_dir, mevcut)
+    finally:
+        with _KILIT:
+            _KOSUYOR = False
+
+
+def _tazeleme_baslat(output_dir: str) -> None:
+    """Arka planda tek bir tazeleme koşsun — ikinci sözleşme.
+
+    Bayrak olmadan, ayarlar panelini üst üste açan bir kullanıcı her açılışta
+    yeni bir iş parçacığı doğururdu.
+    """
+    global _KOSUYOR
+    with _KILIT:
+        if _KOSUYOR:
+            return
+        _KOSUYOR = True
+    threading.Thread(
+        target=_tazele, args=(output_dir,), name="guncelleme-kontrolu", daemon=True
+    ).start()
+
+
+def bilgi(output_dir: str, *, izin: bool = True) -> dict | None:
+    """Kullanıcıya gösterilecek güncelleme bilgisi ya da None.
+
+    None üç ayrı durumu birden anlatıyor ve arayüz için üçü de aynı: "gösterecek
+    bir şey yok." (a) kontrol kapalı, (b) henüz cevap yok, (c) elimizdeki sürüm
+    zaten en yenisi.
+    """
+    if not izin:
+        return None                       # üçüncü sözleşme: ağa hiç çıkma
+
+    onbellek = _oku(output_dir)
+    if time.time() - float(onbellek.get("zaman") or 0) > TTL_SANIYE:
+        _tazeleme_baslat(output_dir)
+
+    uzak = str(onbellek.get("surum") or "")
+    if uzak and surum_daha_yeni(uzak, version.APP_VERSION):
+        return {"surum": uzak, "url": str(onbellek.get("url") or YAYIN_SAYFASI)}
+    return None

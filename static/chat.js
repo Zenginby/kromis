@@ -1495,6 +1495,7 @@ async function loadPrefs() {
   try {
     const p = await chatApi("/api/prefs");
     $("pref-autosave").checked = p.autosave_sessions !== false;
+    $("pref-guncelleme").checked = p.guncelleme_kontrolu !== false;
     if (p.theme) {
       applyTheme(p.theme);
       const radio = document.querySelector(`input[name="theme"][value="${p.theme}"]`);
@@ -1504,6 +1505,7 @@ async function loadPrefs() {
     // Tercih alınamadı: anahtarın GÖRÜNEN hâli varsayılana (açık) düşüyor,
     // ama yazımı sunucu zaten kendisi kapıyor — burada fail-open yok.
     $("pref-autosave").checked = true;
+    $("pref-guncelleme").checked = true;
   }
 }
 
@@ -1520,6 +1522,28 @@ async function saveAutosavePref() {
       : "Otomatik kayıt kapatıldı — yalnızca elle kaydedilen oturumlar yazılır.";
   } catch (e) {
     $("pref-autosave").checked = !on;   // gerçekleşmeyen değişikliği geri al
+    $("settings-status").textContent = `Tercih kaydedilemedi: ${e.message}`;
+  }
+}
+
+// "Yeni sürüm çıkınca haber ver" anahtarı — yukarıdaki desenin birebir eşi.
+// Ayrı bir fonksiyon çünkü geri bildirim metni farklı: kullanıcının kapattığı
+// şey bir kayıt davranışı değil, uygulamanın AĞA ÇIKMASI ve onayın karşılığını
+// görmesi gerekiyor.
+async function saveGuncellemePref() {
+  const on = $("pref-guncelleme").checked;
+  try {
+    const p = await chatApi("/api/prefs",
+      { method: "POST", body: { guncelleme_kontrolu: on } });
+    $("pref-guncelleme").checked = p.guncelleme_kontrolu !== false;
+    $("settings-status").textContent = p.guncelleme_kontrolu
+      ? "Yeni sürüm çıkınca haber verilecek."
+      : "Sürüm kontrolü kapatıldı — uygulama bu iş için ağa çıkmayacak.";
+    // Satır ANINDA gizlensin: kontrolü kapatıp açık kalan bir bildirim,
+    // anahtarın işe yaramadığı izlenimi verir.
+    if (!p.guncelleme_kontrolu) $("settings-update").hidden = true;
+  } catch (e) {
+    $("pref-guncelleme").checked = !on;   // gerçekleşmeyen değişikliği geri al
     $("settings-status").textContent = `Tercih kaydedilemedi: ${e.message}`;
   }
 }
@@ -1743,6 +1767,7 @@ if ($("chats-kebab-delete-all")) {
   });
 }
 $("pref-autosave").addEventListener("change", saveAutosavePref);
+$("pref-guncelleme").addEventListener("change", saveGuncellemePref);
 
 
 syncEmptyState();

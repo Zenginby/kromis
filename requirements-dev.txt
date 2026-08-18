@@ -1,2 +1,12 @@
 # Yalnız paket derlemek için gerekir; uygulamanın çalışma zamanı bağımlılığı DEĞİL.
 pyinstaller==6.21.*
+
+# tests/test_release_manifest.py workflow'ları GERÇEKTEN ayrıştırıyor (regex ile
+# değil): `needs:` listesi ve `uses:` yolu hakkındaki iddialar YAML'daki bir
+# satır kaydırmasından etkilenmemeli, yoksa test sessizce anlamsızlaşır.
+#
+# AÇIKÇA YAZILI olmasının sebebi: PyYAML bugün zaten `uvicorn[standard]` ile
+# dolaylı geliyor. Dolaylı bir bağımlılığa dayanan test, o extra bir gün
+# değişince kırılır ve kırılma "yayın kapısı çalışmıyor" biçiminde görünür.
+PyYAML>=6.0
+

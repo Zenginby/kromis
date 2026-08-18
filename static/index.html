@@ -740,6 +740,41 @@
         Kurulu sürüm: <strong>v<span id="settings-version-foot"
                                      data-app-version>—</span></strong>
       </p>
+
+      <!-- "Güncel miyim?" — kullanıcının kurulu sürümü görünce sorduğu ASIL
+           soru bu, o yüzden cevabı da tam buranın altında.
+
+           Satır varsayılan olarak GİZLİ ve yalnızca gerçekten yeni bir sürüm
+           varken açılıyor: her açılışta "güncelsin" yazan bir satır, üçüncü
+           görüşte okunmaz hâle gelir ve gerçekten bir şey söylediğinde de
+           okunmaz.
+
+           Bağlantı yayının KENDİ sayfasına gidiyor (paket dosyasına değil):
+           kullanıcı orada üç platformun paketini birden ve sürüm notlarını
+           görüyor — telefondaki kullanıcı APK'yı, masaüstündeki zip'i seçiyor.
+           Doğrudan bir dosyaya indirmek, yanlış platformun paketini indirmeyi
+           tek tıka indirgerdi. -->
+      <p class="field-note settings-update-row" id="settings-update" hidden>
+        🎉 Yeni sürüm çıktı:
+        <a id="settings-update-link" href="https://github.com/Zenginby/gpt-image-studio/releases/latest"
+           target="_blank" rel="noopener noreferrer">
+          <strong>v<span id="settings-update-version">—</span></strong> — indir
+        </a>
+        <br />
+        Güncelleme adımları: <a href="https://github.com/Zenginby/gpt-image-studio/blob/main/GUNCELLEME.md"
+                                target="_blank" rel="noopener noreferrer">GUNCELLEME.md</a>
+      </p>
+
+      <label class="switch-row" for="pref-guncelleme">
+        <input type="checkbox" id="pref-guncelleme" checked />
+        <span>Yeni sürüm çıkınca haber ver</span>
+      </label>
+      <p class="field-note">
+        Açıkken uygulama günde bir kez GitHub'a sorup yeni bir sürüm olup
+        olmadığına bakar — <strong>başka hiçbir şey göndermez</strong>, ne
+        görsellerin ne de anahtarın. Kapatırsan uygulama bu iş için ağa hiç
+        çıkmaz.
+      </p>
     </div>
   </aside>
 

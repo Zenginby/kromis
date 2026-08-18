@@ -40,6 +40,25 @@ function applyConfigured(s) {
     }
   }
 
+  // ── "Yeni sürüm çıktı" satırı ──
+  // `!== undefined` guard'ı, hemen yukarıdaki `version` guard'ıyla AYNI
+  // gerekçeye sahip: POST /api/settings yanıtında `guncelleme` alanı YOK.
+  // Guard olmadan "Kaydet"e basmak satırı sessizce gizlerdi.
+  //
+  // GET'te alan HER ZAMAN var ama `null` olabilir — üç ayrı durumu birden
+  // anlatıyor ve arayüz için üçü de aynı: kontrol kapalı, henüz cevap yok,
+  // ya da zaten en yeni sürümdeyiz (bkz. guncelleme.py → bilgi()).
+  if (s && s.guncelleme !== undefined) {
+    const satir = $("settings-update");
+    if (s.guncelleme && s.guncelleme.surum) {
+      $("settings-update-version").textContent = s.guncelleme.surum;
+      if (s.guncelleme.url) $("settings-update-link").href = s.guncelleme.url;
+      satir.hidden = false;
+    } else {
+      satir.hidden = true;
+    }
+  }
+
   // ── Prompt Yönetmeni kapısı ──
   // Sekmenin KENDİSİ kilitlenmiyor: kilitli bir sekme "neden kapalı" bilgisini
   // de saklar. Yalnızca "Gönder" kilitli ve panelde açıklama görünüyor.

@@ -1,8 +1,13 @@
 # Lumeo — Güncelleme (macOS, Windows ve Android)
 
-Kurum sana yeni bir `.zip` gönderdiğinde bu sayfayı izle. 3 dakika sürer.
-İlk kurulum için değil, **elindeki uygulamayı yenisiyle değiştirmek** için.
+Elindeki uygulamayı yenisiyle değiştirmek için bu sayfayı izle. 3 dakika sürer.
 (İlk kez kuruyorsan: [KURULUM.md](KURULUM.md).)
+
+**Yeni sürüm çıktığını uygulama sana söylüyor:** ⚙ **Ayarlar**'ı açtığında,
+kurulu sürümün hemen altında *"Yeni sürüm çıktı"* satırı belirir. Aynı yerdeki
+anahtarla bu kontrolü kapatabilirsin. Paketleri her zaman
+[son yayın sayfasından](https://github.com/Zenginby/gpt-image-studio/releases/latest)
+da indirebilirsin — adres sabit, sürüm yükseldiğinde değişmiyor.
 
 | Sistem | Dosya |
 |---|---|
@@ -145,7 +150,25 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
-## Sürüm 0.4.0'da ne değişti
+## Sürüm 0.4.2 — ne değişti
+
+**Manşet: uygulamanın adı artık Lumeo.** Simge de yenilendi. Adı değişti diye
+hiçbir şeyini kaybetmiyorsun — görsellerin, geçmişin, klasörlerin ve paletlerin
+olduğu gibi duruyor.
+
+- **Telefonda üç arayüz kusuru düzeltildi.** Dar ekranda bozulan yerleşim ve
+  dokunmayla ulaşılamayan iki düğme çalışır hâle geldi.
+- **README'deki indirme bağlantıları çalışıyor.** Üç bağlantı da her zaman en
+  son yayına işaret ediyor; sürüm yükseldiğinde adresi değiştirmek gerekmiyor.
+- **Android paketinin adı düzeltildi.** Telefona kurulacak dosya artık
+  `lumeo-android-arm64.apk` adıyla geliyor.
+
+> Bu bölümü artık yayın hattı otomatik yazıyor (`tools/surum_yaz.py`). Her
+> yayında en üste yeni bir bölüm ekleniyor, eskiler aşağıda duruyor.
+
+---
+
+## Sürüm 0.4.0 — ne değişti
 
 **Manşet: Android sürümü geldi.** Uygulama artık telefonda da çalışıyor —
 Android 8.0+ ve 64-bit (arm64) cihazlar için. Play Store'da değil; APK'yı

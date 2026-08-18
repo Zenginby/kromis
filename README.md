@@ -126,6 +126,19 @@ Tarayıcıda `http://127.0.0.1:8765` (veya `http://localhost:8000`) adresi açı
 ```
 Derleme çıktısı `dist/` klasörüne yerleşir.
 
+### 5. Yayın Almak
+
+**Elle yapılacak hiçbir şey yok.** `main`'e bir PR birleştir; sürüm otomatik
+artar, macOS + Windows + Android paketlerinin üçü birden derlenir ve **hepsi
+yeşilse** yayın tek seferde oluşur. Bir platform düşerse ne tag ne yayın oluşur —
+eksik yayın diye bir ara durum yok.
+
+- Sürüm seviyesini commit başlığı belirler (`feat:` → minör, ötekiler → yama).
+- Yalnız belge/test/CI değiştiyse yayın çıkmaz.
+- `[yayin: yok]`, `[surum: minor]` ve `[not] …` ile hatta elle müdahale edilir.
+
+Ayrıntı, kuru prova ve sorun giderme: **[docs/yayin-hatti.md](docs/yayin-hatti.md)**.
+
 ---
 
 ## 📜 Lisans

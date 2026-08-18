@@ -1,7 +1,7 @@
 """Gradle'ın ürettiği APK adı ile workflow'un aradığı ad AYNI olmak zorunda.
 
-Bu test var, çünkü hata gerçekten oldu: Lumeo yeniden adlandırmasında
-`build-android.yml` `lumeo-android-arm64-release.apk`'yı ararken
+Bu test var, çünkü hata gerçekten oldu: Lumeo yeniden adlandırmasında Android
+workflow'u `lumeo-android-arm64-release.apk`'yı ararken
 `android/app/build.gradle`'ın `outputFileName`'i `gpt-image-studio-...` olarak
 kaldı. Gradle APK'yı sorunsuz üretti, workflow onu bulamadı ve iş "APK yok"
 diyerek düştü.
@@ -9,17 +9,24 @@ diyerek düştü.
 Kırılma sınıfı sinsi: iki dosya da kendi içinde tutarlı, hata yalnızca
 BİRLEŞTİKLERİ yerde var ve ancak Android runner'ında (NDK + Gradle, dakikalar
 süren bir iş) görünüyor. Yerelde koşan bu ucuz iddia aynı kaymayı saniyede
-yakalıyor — `test_version.py::test_readme_download_links_match_what_the_release_publishes`
-ile birebir aynı gerekçe.
+yakalıyor — `tests/test_release_manifest.py` ile birebir aynı gerekçe.
 """
 from __future__ import annotations
 
 import os
 import re
 
+import release_manifest
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GRADLE = os.path.join(REPO, "android", "app", "build.gradle")
-WORKFLOW = os.path.join(REPO, ".github", "workflows", "build-android.yml")
+# APK'yı üreten workflow'un adı manifestten okunuyor, buraya sabit yazılmıyor:
+# dosya yeniden adlandırılırsa (build-android.yml → _paket-android.yml'de tam
+# olarak bu oldu) test kırmızı değil, DOĞRU yere bakıyor olmalı.
+_APK = "lumeo-android-arm64.apk"
+WORKFLOW = os.path.join(
+    REPO, ".github", "workflows", release_manifest.PAKETLER[_APK]["workflow"]
+)
 
 
 def _read(path: str) -> str:
@@ -51,7 +58,7 @@ def test_workflow_looks_for_the_apk_gradle_actually_writes():
     workflow = _read(WORKFLOW)
 
     m = re.search(r'APK="(android/app/build/outputs/apk/release/[^"]+)"', workflow)
-    assert m, "build-android.yml'de release APK yolu bulunamadı"
+    assert m, f"{os.path.basename(WORKFLOW)}'de release APK yolu bulunamadı"
     aranan = os.path.basename(m.group(1))
 
     assert aranan == expected, (
@@ -60,21 +67,24 @@ def test_workflow_looks_for_the_apk_gradle_actually_writes():
     )
 
 
-def test_published_asset_name_matches_the_readme_download_link():
-    """Yayına giren APK adı README'nin indirme bağlantısıyla aynı olmalı.
+def test_yayin_adina_kopyalanan_dosya_manifestteki_ad():
+    """Gradle'ın adıyla yayının adı arasındaki SON halka.
 
-    `test_version.py` bunu `files:` listesi üzerinden zaten çiviliyor; buradaki
-    iddia zinciri bir halka geriye götürüyor: `files:`e giren dosya, artifact'ten
-    `mv` ile üretiliyor. O iki ad ayrışırsa `mv` hedefi yayına hiç eklenmez.
+    Zincir şu: Gradle `lumeo-android-arm64-release.apk` yazar → workflow onu
+    yayın adına kopyalar → o ad manifeste (ve README'ye, GUNCELLEME'ye) girer.
+    Yukarıdaki test zincirin ilk halkasını, `test_release_manifest.py` son
+    halkasını çiviliyor; bu iddia ortadaki `cp`'yi kolluyor.
+
+    Eskiden burada üçüncü bir ad daha vardı (`dist-lumeo-android-arm64.apk`) ve
+    yayın işi onu `mv` ile düzeltiyordu — ayrışabilecek fazladan bir isim. O ara
+    ad kaldırıldı; workflow doğrudan yayın adına kopyalıyor.
     """
     workflow = _read(WORKFLOW)
 
-    mv = re.search(r'mv "\$f" (dist/[\w.-]+\.apk)', workflow)
-    assert mv, "build-android.yml'de APK'yı yayın adına taşıyan mv bulunamadı"
-    yayin = re.search(r'files:\s*(dist/[\w.-]+\.apk)', workflow)
-    assert yayin, "build-android.yml'de yayına eklenen APK yolu bulunamadı"
+    cp = re.search(r'cp "\$\{\{ steps\.dogrula\.outputs\.apk \}\}" (dist/[\w.-]+\.apk)', workflow)
+    assert cp, f"{os.path.basename(WORKFLOW)}'de APK'yı yayın adına kopyalayan cp bulunamadı"
 
-    assert mv.group(1) == yayin.group(1), (
-        f"mv {mv.group(1)!r} üretiyor ama yayına {yayin.group(1)!r} ekleniyor — "
-        "varlık yayında hiç görünmez"
+    assert cp.group(1) == f"dist/{_APK}", (
+        f"workflow {cp.group(1)!r} üretiyor, manifest {_APK!r} bekliyor — "
+        "varlık yayının küme denetiminden geçemez"
     )

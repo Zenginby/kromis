@@ -1,369 +1,328 @@
-name: Release Build & Publish
+# Yayın hattı — main'e giren her değişiklik için üç paketi de üretir ve TEK
+# seferde yayımlar.
+#
+# NE DEĞİŞTİ VE NEDEN
+# -------------------
+# 1) TETİK ARTIK TAG DEĞİL, main'e merge. Eskiden yayının tek yolu elle tag
+#    atmaktı; tag'e bağlı bir işin ilk gerçek koşumu ise geri dönüşsüz —
+#    v0.2.1'de üç başarısız/iptal koşudan sonra ancak dördüncüsü yeşil oldu ve
+#    tag çoktan atılmıştı. Şimdi tag'i, HER ŞEY yeşil olduktan SONRA yayın işi
+#    atıyor: kırmızı bir koşu ortada ne tag ne yayın bırakıyor.
+#
+# 2) YAYINI TEK İŞ YAZIYOR. v0.4.2'de yayını iki ayrı workflow yazdı:
+#    build-android.yml onu 16:15:29'da APK ile oluşturup YAYIMLADI, masaüstü
+#    zip'leri 16:17:04'te eklendi — arada ~95 saniye boyunca yayın sayfasında
+#    yalnız APK vardı. Masaüstü işi kırmızıya düşseydi o eksik yayın öylece
+#    kalırdı. Artık paket işleri yalnız varlık yüklüyor; `yayinla` işi üçünü de
+#    indirip tek `action-gh-release` çağrısıyla yayını oluşturuyor.
+#
+# 3) SÜRÜM ELLE ARTIRILMIYOR. version.py + README + GUNCELLEME.md'yi
+#    `tools/surum_yaz.py` yazıyor, kararı `tools/surum_karari.py` veriyor.
+#    İkisi de saf Python ve `tests/` altında sınanıyor — yayın yolundaki bir
+#    kuralı denemek için artık sürüm numarası harcamak gerekmiyor.
+#
+# KURU PROVA: `workflow_dispatch` + `kuru_prova: true` → karar basılır, üç paket
+# de derlenir, ama sürüm commit'i atılmaz ve yayın oluşmaz. Yeni bir kapıyı
+# denemenin ücretsiz yolu bu.
+name: Yayın
 
 on:
   push:
-    tags:
-      - 'v*'
-  # Faz 4: `build-windows` işi bugüne kadar HİÇ koşmadı ve tag'e bağlı bir işin
-  # ilk gerçek koşumunu tag'le denemek geri dönüşsüz — yayını macOS işi
-  # oluşturuyordu, yani Windows işi ilk denemede patlarsa ortada yalnız macOS
-  # varlığı taşıyan bir yayın kalırdı. Elle tetikleme bu riski kaldırıyor:
-  # aşağıdaki iki iş `refs/tags/` kapısında olduğu için dal üzerinde yapılan bir
-  # dispatch YALNIZCA test + Windows paketini koşar (macOS dakikası 10x sayılıyor,
-  # harcanmaz) ve hiçbir yayın oluşmaz.
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      surum:
+        description: "Elle sürüm (ör. 0.5.0). Boşsa otomatik karar verilir."
+        type: string
+        required: false
+        default: ""
+      kuru_prova:
+        description: "Paketleri üret ama yayın oluşturma"
+        type: boolean
+        required: false
+        default: false
+
+# Yayın yarı yolda kesilirse (sürüm commit'i atılmış, tag atılmamış) hat kendini
+# bir sonraki koşuda onarıyor — ama önce o koşunun BAŞLAMASI gerekiyor. Arka
+# arkaya iki merge'in aynı sürüm numarasına yazmasını engelleyen kapı bu;
+# `cancel-in-progress` bilerek KAPALI: yarım kalmış bir yayın en kötü sonuç.
+concurrency:
+  group: yayin
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
-  test:
-    name: Run Pytest Suite
+  # Sürüm ne olacak, yayın gerekiyor mu? Bütün mantık tools/surum_karari.py'de.
+  karar:
+    name: Sürüm kararı
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # SONSUZ DÖNGÜ KORUMASI (ikinci kat). `surum-yaz` commit mesajına
+    # `[skip ci]` yazıyor ve GitHub o push'ta hiçbir workflow'u tetiklemiyor —
+    # ama o davranışa tek başına güvenmiyoruz: botun kendi commit'i buraya
+    # ulaşsa bile iş burada duruyor. (Üçüncü kat: `karar`ın kendisi idempotent,
+    # bkz. tools/surum_karari.py'deki 1. kural.)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.head_commit.author.name != 'github-actions[bot]'
+    outputs:
+      yayinla: ${{ steps.karar.outputs.yayinla }}
+      surum: ${{ steps.karar.outputs.surum }}
+      artir: ${{ steps.karar.outputs.artir }}
     steps:
+      # fetch-depth: 0 ŞART — karar tag'lere bakıyor ve sığ bir klonda hiç tag
+      # olmaz. Olmadığında hat "hiç tag yok" dalına düşer ve version.py'deki
+      # sürümü yeniden yayınlamaya çalışırdı.
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
-
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-
-      - name: Run Pytest
-        run: |
-          pytest tests/ -v
-
-  build-release:
-    needs: test
-    # Yalnız tag'de: elle tetiklenen dry-run macOS runner'ı (10x faturalanır)
-    # hiç ayağa kaldırmasın. `publish` bu işe bağlı olduğu için dispatch'te o da
-    # atlanır — yayın oluşturmanın tek yolu tag kalır.
-    if: startsWith(github.ref, 'refs/tags/')
-    name: Build macOS arm64 Package
-    runs-on: macos-14
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.14'
-
-      - name: Mimariyi doğrula (arm64)
-        run: |
-          set -euo pipefail
-          ARCH="$(uname -m)"
-          echo "runner mimarisi: $ARCH"
-          test "$ARCH" = "arm64" || { echo "HATA: arm64 bekleniyordu, $ARCH bulundu"; exit 1; }
-          python -c "import platform; plat=platform.machine(); print('python mimarisi:', plat); plat=='arm64' or exit(1)"
-
-      - name: pip'i tazele
-        run: |
-          set -euo pipefail
-          python -m venv .venv
-          .venv/bin/pip install -q --upgrade pip
-
-      - name: Derle (build.sh)
-        run: ./build.sh
-
-      - name: Paketi doğrula
-        run: |
-          set -euo pipefail
-          APP="dist/Lumeo.app"
-          lipo -archs "$APP/Contents/MacOS/Lumeo" | tee /dev/stderr | grep -qx arm64
-          codesign --verify --strict "$APP"
-          for f in static/index.html static/core.js static/viewer.js \
-                   static/fonts.css static/mobile.css static/mobile.js \
-                   static/fonts/dm-sans-v17-latin.woff2 \
-                   static/fonts/dm-sans-v17-latin-ext.woff2 \
-                   bundled/prompts/prompt-yonetmeni.md; do
-            test -f "$APP/Contents/Resources/$f" || { echo "EKSİK: $f"; exit 1; }
-          done
-          EXPECTED="$(python -c 'import version; print(version.APP_VERSION)')"
-          for k in CFBundleShortVersionString CFBundleVersion; do
-            GOT="$(/usr/bin/plutil -extract "$k" raw -o - "$APP/Contents/Info.plist")"
-            test "$GOT" = "$EXPECTED" || { echo "HATA: $k=$GOT, beklenen $EXPECTED"; exit 1; }
-          done
-          echo "Info.plist sürümü: $EXPECTED"
-          cp "dist/Lumeo.zip" "dist/lumeo-macOS-arm64.zip"
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: lumeo-macos-arm64
-          path: dist/lumeo-macOS-arm64.zip
-          retention-days: 30
-
-      # Yayın oluşturma buradan ÇIKARILDI → aşağıdaki `publish` işi. Gerekçe: bu iş
-      # yayını tek başına oluşturduğu sürece Windows paketi yayına hiç giremiyordu
-      # (ayrı runner'da duruyor) ve macOS yeşilse yayın doğuyordu — Windows işi
-      # kırmızı olsa bile. Derleme ve doğrulama adımları BİREBİR korundu.
-
-  # macOS işine DOKUNULMADI: bu iş ayrı bir runner'da, ayrı betikle (build.ps1)
-  # ve ayrı doğrulamayla çalışır. İkisi yalnızca `test` işini paylaşır.
-  #
-  # NEDEN BU KADAR SERT DOĞRULAMA: 2026-08-11'de bu depoda "CI Windows paketi
-  # üretti" sanıldı; koşu (31492697516) YEŞİLDİ ama çıktı BOŞTU. Yeşil bir koşu
-  # tek başına kanıt değildir — aşağıdaki her adım o yanılgının bir kapısını
-  # kapatıyor: paket dosyası var mı, İÇİNDE beklenen dosyalar var mı, exe'nin
-  # sürümü version.py ile aynı mı, artifact adımı boş bir yükleme yaptı mı.
-  build-windows:
-    needs: test
-    name: Windows x64 paketi
-    runs-on: windows-latest
-    # macOS işi 30 dakikada bitiyor; Windows runner'ı daha yavaş ve build.ps1
-    # pip + tam pytest takımı (1171 test) + pyinstaller'ı sırayla koşuyor.
-    timeout-minutes: 45
-    # Bu iş yayın oluşturmuyor (onu macOS işi yapıyor), yalnızca artifact
-    # yüklüyor — workflow düzeyindeki contents:write'ı devralmasına gerek yok.
-    permissions:
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v4
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
 
-      - name: Mimariyi doğrula (yanlış runner'da sessizce arm64 üretmesin)
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          Write-Host "runner mimarisi: $env:PROCESSOR_ARCHITECTURE"
-          if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') {
-            Write-Host "HATA: AMD64 bekleniyordu, $env:PROCESSOR_ARCHITECTURE bulundu"
-            exit 1
-          }
-          # macOS işindeki ikili kontrolün eşi: runner donanımı (env değişkeni) ve
-          # PyInstaller'ın embed edeceği Python binary'si (platform) AYRI şeyler.
-          # GitHub bir gün windows-latest'i arm64'e taşırsa bu adım olmadan paket
-          # "windows-x64" adıyla arm64 çıkar ve kimse fark etmez.
-          $plat = python -c "import platform; print(platform.machine())"
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          Write-Host "python mimarisi: $plat"
-          if ("$plat".Trim() -ne 'AMD64') { exit 1 }
+      - name: Karar ver
+        id: karar
+        env:
+          ELLE_SURUM: ${{ inputs.surum }}
+        run: python tools/surum_karari.py
 
-      # macOS'taki "pip'i tazele" adımının karşılığı, ama İKİNCİ bir gerekçesi de
-      # var: build.ps1 yorumlayıcıyı `py -3` ile arıyor ve runner imajında
-      # setup-python'ın seçtiğinden BAŞKA sürümlere işaret eden bir `py`
-      # başlatıcısı bulunabilir. .venv hazır bulunduğunda build.ps1 aramayı hiç
-      # çalıştırmıyor, doğrudan onu kullanıyor — böylece paketin yukarıda seçilen
-      # yorumlayıcıyla üretildiği garanti (build.ps1'e dokunmadan).
-      - name: .venv oluştur + pip'i tazele
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          python -m venv .venv
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          .venv\Scripts\python.exe -m pip install -q --upgrade pip
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-
-      # `shell: powershell` = Windows PowerShell 5.1, pwsh DEĞİL: build.ps1
-      # bilinçle 5.1'e göre yazıldı (BOM'lu UTF-8, Compress-Archive yerine .NET
-      # ZipFile, Activate.ps1'den kaçınma) ve hem geliştirici makinesinde hem
-      # kullanıcıda çalışacak kabuk o. pwsh'te derlemek betiğin asıl hedef
-      # kabuğunu hiç sınamazdı.
-      - name: Derle (yerelde doğrulanan build.ps1 ile, değiştirmeden)
-        shell: powershell
-        run: .\build.ps1
-
-      # Derleme adımı bilerek 5.1'de, bu adım runner'ın varsayılanı pwsh'te —
-      # ama doğrulamanın SONUCU kabuk seçiminden bağımsız olacak biçimde yazıldı,
-      # iki yerde: (a) zip girdi adları normalize ediliyor (5.1 ile pwsh aynı
-      # zip'i farklı ayırıcıyla gösteriyor, aşağıda), (b) Türkçe iddia kod
-      # noktalarından kuruluyor. Gerekçe: GitHub `run:` içeriğini BOM'SUZ UTF-8
-      # dosyaya yazar, 5.1 ise BOM'suzu cp1254 sanır — yani kabuk değişince
-      # bozulacak bir doğrulama, doğrulama değildir. Betik yerelde 5.1 ile
-      # koşturularak sınandı.
-      - name: Paketi doğrula (iddiaların hepsi zip'in İÇİ hakkında)
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $zipYol = 'dist\Lumeo-windows.zip'
-
-          # (1) Paket GERÇEKTEN var mı? "Yeşil ama boş" koşusunun birinci kapısı.
-          if (-not (Test-Path -LiteralPath $zipYol)) {
-            Write-Host "HATA: paket üretilmemiş: $zipYol"
-            Write-Host '--- dist/ içeriği ---'
-            if (Test-Path -LiteralPath 'dist') { Get-ChildItem -LiteralPath 'dist' -Recurse -Depth 1 | Select-Object -First 40 }
-            exit 1
-          }
-          $zip = (Resolve-Path -LiteralPath $zipYol).Path
-          $mb = [math]::Round((Get-Item -LiteralPath $zip).Length / 1MB, 1)
-          Write-Host "paket: $zipYol ($mb MB)"
-
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $arsiv = [System.IO.Compression.ZipFile]::OpenRead($zip)
-          try {
-            # Girdi adları normalize ediliyor. Zip'in İÇİNDE ayırıcı '/' (bayt
-            # düzeyinde doğrulandı, Python zipfile ile: 219/219 girdi '/'), ama
-            # .NET Framework'ün ZipArchiveEntry.FullName'i onu okurken platform
-            # ayırıcısına çeviriyor — yani AYNI zip, Windows PowerShell 5.1'de
-            # '\', pwsh'te '/' görünüyor. Normalizasyon olmadan bu adım kabuk
-            # sürümü değişince sessizce "dosya eksik" derdi.
-            $girdiler = @($arsiv.Entries | ForEach-Object { $_.FullName -replace '\\', '/' })
-          } finally { $arsiv.Dispose() }
-          Write-Host "zip girdi sayısı: $($girdiler.Count)"
-
-          # (2) Kısmi/boş zip. onedir paketi 200+ dosya taşıyor; eşik bilinçle
-          # gevşek (Python sürümü değişince DLL sayısı oynar) — burada aranan
-          # "tam sayı" değil, "zip'in içi boş değil" kanıtı.
-          if ($girdiler.Count -lt 100) {
-            Write-Host "HATA: zip beklenenden az girdi taşıyor ($($girdiler.Count))"
-            exit 1
-          }
-
-          # (3) exe. Ada göre TEK eşleşme aranıyor: spec'teki `name` değişirse
-          # build.ps1'in kendi kontrolü de bu da kırmızıya düşer.
-          $exeGirdi = @($girdiler | Where-Object { $_ -like '*/Lumeo.exe' })
-          if ($exeGirdi.Count -ne 1) {
-            Write-Host "HATA: zip'te 'Lumeo.exe' beklendi, $($exeGirdi.Count) eşleşme bulundu"
-            exit 1
-          }
-          Write-Host "exe girdisi: $($exeGirdi[0])"
-
-          # (4) Veri dosyaları — macOS işinin Contents/Resources kontrolünün eşi.
-          # Yol SONEKİ ile aranıyor, tam yolla DEĞİL: PyInstaller 6 datas'ı
-          # `_internal/` altına koyuyor ve o yerleşim PyInstaller'ın kendi
-          # meselesi. Burada iddia edilen tek şey dosyaların pakette OLDUĞU;
-          # nerede durduklarını ürün kodu (paths.py) çözüyor ve o Faz 1'de
-          # frozen uygulamada ayrıca doğrulandı.
-          $beklenenler = @(
-            'static/index.html', 'static/core.js', 'static/viewer.js',
-            'static/palette.js', 'static/fonts.css',
-            # Mobil katman: masaüstü paketinde de DURMALI. Dosya eksikse
-            # uygulama hata vermez, yalnız dar pencerede yerleşim bozulur —
-            # tam olarak sessiz kırılma sınıfı.
-            'static/mobile.css', 'static/mobile.js',
-            # Font ikili dosya: eksikliği hiçbir hata üretmez, yalnız harfler
-            # yedek yazı tipiyle çizilir. O yüzden kapıya girdi.
-            'static/fonts/dm-sans-v17-latin.woff2',
-            'static/fonts/dm-sans-v17-latin-ext.woff2',
-            'bundled/prompts/prompt-yonetmeni.md'
-          )
-          $eksik = @()
-          foreach ($f in $beklenenler) {
-            if (-not ($girdiler | Where-Object { $_ -like "*/$f" })) { $eksik += $f }
-          }
-          if ($eksik.Count -gt 0) {
-            Write-Host "HATA: pakette EKSİK: $($eksik -join ', ')"
-            exit 1
-          }
-          Write-Host "veri dosyaları tam: $($beklenenler -join ', ')"
-
-          # (5) Sürüm. exe zip'ten ÇIKARILIP okunuyor, dist/ içindeki kopyadan
-          # değil: doğrulanan şey gönderilen dosyanın kendisi olmalı.
-          # Bu adım aynı zamanda spec'in derleme-zamanı version.py yüklemesinin
-          # GERÇEKTEN koştuğunun tek kanıtı — VERSIONINFO'yu PyInstaller üretiyor,
-          # hiçbir pytest onu görmüyor (macOS'ta Info.plist için de böyle).
-          $gecici = Join-Path $env:RUNNER_TEMP 'surum-denetimi'
-          New-Item -ItemType Directory -Force -Path $gecici | Out-Null
-          $hedef = Join-Path $gecici 'Lumeo.exe'
-          $arsiv = [System.IO.Compression.ZipFile]::OpenRead($zip)
-          try {
-            # GetEntry zip'teki HAM adı ister — normalize edilmiş hâli değil.
-            $ham = ($arsiv.Entries | Where-Object { ($_.FullName -replace '\\', '/') -eq $exeGirdi[0] })[0]
-            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($ham, $hedef, $true)
-          } finally { $arsiv.Dispose() }
-
-          $beklenen = (python -c "import version; print(version.APP_VERSION)")
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          $beklenen = "$beklenen".Trim()
-          $bilgi = (Get-Item -LiteralPath $hedef).VersionInfo
-          # FixedFileInfo DÖRT haneli (spec dördüncüyü 0 yapıyor); StringFileInfo
-          # üç haneli. İkisi de ayrı ayrı denetleniyor: biri elle yazılırsa öteki
-          # yakalar.
-          $dortlu = "$($bilgi.FileMajorPart).$($bilgi.FileMinorPart).$($bilgi.FileBuildPart).$($bilgi.FilePrivatePart)"
-          # CompanyName kodlama kapısı: bu proje Türkçe karakter kodlamasından iki
-          # kez yandı (cp1254'e düşen geçmiş okuması; PS 5.1'in BOM'suz dosyayı
-          # cp1254 sanması). Beklenti "Kurum Derneği" diye YAZILMIYOR, KOD
-          # NOKTALARINDAN kuruluyor — çünkü bu betiği kabuk BOM'suz bir dosyadan
-          # okuyor ve literal yazılsaydı iddia kabuğun dosya kodlamasına bağlı
-          # olurdu: doğrulamanın kendisi kodlama kusuruna açık olamaz. 0x130='İ',
-          # 0x11F='ğ' (Faz 2'de exe'den bayt düzeyinde okunan değerler).
-          $sirket = -join (@(0x130,0x6C,0x61,0x20,0x44,0x65,0x72,0x6E,0x65,0x11F,0x69) | ForEach-Object { [char]$_ })
-          $iddialar = @(
-            @{ ad = 'FileVersion';    got = "$($bilgi.FileVersion)";    bek = $beklenen },
-            @{ ad = 'ProductVersion'; got = "$($bilgi.ProductVersion)"; bek = $beklenen },
-            @{ ad = 'FixedFileInfo';  got = $dortlu;                    bek = "$beklenen.0" },
-            @{ ad = 'CompanyName';    got = "$($bilgi.CompanyName)";    bek = $sirket }
-          )
-          $hataVar = $false
-          foreach ($i in $iddialar) {
-            if ($i.got -ne $i.bek) {
-              Write-Host "HATA: $($i.ad)=[$($i.got)], beklenen [$($i.bek)]"
-              $hataVar = $true
-            } else {
-              Write-Host "$($i.ad): $($i.got)"
-            }
-          }
-          if ($hataVar) { exit 1 }
-
-          # Yayın varlığı adı macOS ile simetrik (lumeo-macOS-arm64.zip).
-          Copy-Item -LiteralPath $zip -Destination 'dist\lumeo-windows-x64.zip' -Force
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: lumeo-windows-x64
-          path: dist/lumeo-windows-x64.zip
-          # "Yeşil ama boş"un SON kapısı: bu bayrak olmadan upload-artifact
-          # eşleşen dosya bulamayınca yalnızca UYARI basar ve iş yeşil kalır —
-          # 2026-08-11'de tam olarak bu oldu.
-          if-no-files-found: error
-          retention-days: 30
-
-  # Yayını İKİ paket de yeşil olduktan SONRA tek yazıcı oluşturur.
-  # Reddedilen iki alternatif: (a) Windows işine ikinci bir action-gh-release
-  # adımı — aynı yayına iki işten eşzamanlı yazma, yarış; (b) macOS işinin
-  # `files:` listesine eklemek — Windows zip'i başka runner'da olduğu için
-  # yine download-artifact + `needs` kenarı gerektiriyor ve iki derlemeyi
-  # gereksizce sıraya diziyordu.
-  publish:
-    needs: [build-release, build-windows]
-    # Elle dispatch'te `build-release` atlandığı için bu iş de atlanır.
-    if: startsWith(github.ref, 'refs/tags/')
-    name: Yayını oluştur (macOS + Windows)
+  # Sürümü tek kaynağa ve ona bağlı belgelere yazar, main'e işler.
+  #
+  # Paket işleri BU commit'i derliyor: paketin içindeki Info.plist /
+  # VERSIONINFO / versionName yeni sürümü göstermeli, yoksa paket işlerinin
+  # kendi sürüm kapıları (haklı olarak) kırmızıya düşerdi.
+  surum-yaz:
+    name: Sürümü yaz
+    needs: karar
+    if: needs.karar.outputs.yayinla == 'evet'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.yaz.outputs.sha }}
     steps:
-      - name: macOS paketini indir
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
         with:
-          name: lumeo-macos-arm64
-          path: dist
+          fetch-depth: 0
 
-      - name: Windows paketini indir
-        uses: actions/download-artifact@v4
+      - uses: actions/setup-python@v5
         with:
-          name: lumeo-windows-x64
-          path: dist
+          python-version: '3.14'
 
-      # download-artifact eksik varlıkta zaten hata verir, ama yayına GİDEN
-      # dosyanın boyutu hakkındaki iddia burada kurulur: 0 baytlık bir zip de
-      # "indi" sayılırdı.
-      - name: İki paket de indi ve boş değil
+      - name: Sürümü yaz ve işle
+        id: yaz
+        env:
+          SURUM: ${{ needs.karar.outputs.surum }}
+          ARTIR: ${{ needs.karar.outputs.artir }}
+          KURU: ${{ inputs.kuru_prova }}
+          DAL: ${{ github.ref }}
         run: |
           set -euo pipefail
-          for f in dist/lumeo-macOS-arm64.zip \
-                   dist/lumeo-windows-x64.zip; do
-            test -s "$f" || { echo "EKSİK ya da BOŞ: $f"; exit 1; }
-          done
-          ls -l dist
 
-      - name: Create GitHub Release
+          # DAL KAPISI — bu iş `git push origin HEAD:main` yapıyor.
+          # `workflow_dispatch` herhangi bir daldan çalıştırılabilir; kapı
+          # olmadan bir dal üzerinden (kuru prova işaretlenmeyi UNUTARAK)
+          # tetiklenen tek bir koşu, o dalın içeriğini main'e iterdi. Yayın
+          # yolundaki en pahalı kaza sınıfı bu: geri alması bir force-push
+          # gerektirir ve o sırada yayın da çıkmış olur.
+          #
+          # Kapı "hata" değil "kuru provaya düş" biçiminde: daldan koşturmanın
+          # meşru amacı zaten paketlemeyi denemek ve o amaç bozulmamalı.
+          if [ "$DAL" != "refs/heads/main" ]; then
+            echo "DAL KAPISI: koşu $DAL üzerinde — main değil."
+            echo "  Sürüm commit'i atılmayacak ve yayın oluşmayacak (kuru prova)."
+            {
+              echo "### 🧪 Kuru prova (dal: \`$DAL\`)"
+              echo
+              echo "Yayın YALNIZCA \`main\` üzerinde oluşur. Bu koşu paketlemeyi"
+              echo "sınıyor; sürüm commit'i atılmadı, yayın oluşmadı."
+            } >> "$GITHUB_STEP_SUMMARY"
+            KURU=true
+          fi
+
+          if [ "$ARTIR" != "evet" ]; then
+            # Kendi kendini onarma dalı: version.py zaten bu sürümde
+            # (bir önceki koşu paket aşamasında düşmüştü). Yazacak bir şey yok.
+            echo "version.py zaten $SURUM — yazma adımı atlandı."
+            echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Notlar da karar modülünden geliyor: not üretimi ile sürüm kararı
+          # aynı yerde, aynı testlerin altında.
+          mapfile -t NOTLAR < <(python tools/surum_karari.py --notlar)
+          echo "GUNCELLEME.md'ye girecek ${#NOTLAR[@]} madde:"
+          # `${NOTLAR[@]+…}`: dizi BOŞ olabilir (bütün commit'ler `chore`/`ci`
+          # tipindeyse hiç not üretilmez) ve `set -u` altında boş bir dizinin
+          # düz genişletilmesi eski bash'lerde hata verir. surum_yaz.py notsuz
+          # çağrıyı zaten karşılıyor ("Küçük düzeltmeler ve iyileştirmeler").
+          printf '  - %s\n' ${NOTLAR[@]+"${NOTLAR[@]}"}
+
+          python tools/surum_yaz.py "$SURUM" ${NOTLAR[@]+"${NOTLAR[@]}"}
+
+          if [ "$KURU" = "true" ]; then
+            # Değişiklikler işlenmiyor, dolayısıyla paket işleri BUMP'SIZ
+            # commit'i derliyor: üretilen paketler eski sürüm numarasını taşır.
+            # Kuru provanın sorusu "paketleme ayakta mı", "sürüm doğru mu"
+            # değil — ikincisini paket işlerinin kendi sürüm kapıları zaten
+            # her koşuda kanıtlıyor.
+            echo "KURU PROVA: değişiklikler işlenmiyor; paketler $GITHUB_SHA ile derlenecek."
+            git --no-pager diff --stat
+            echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add version.py README.md GUNCELLEME.md
+          # `[skip ci]`: bu push kendi kendini yeniden tetiklemesin (birinci kat
+          # koruma; ikincisi `karar` işindeki yazar kapısı).
+          git commit -m "chore(surum): v$SURUM [skip ci]"
+
+          # Push BAŞARILI olmak ZORUNDA. Denemeler tükendiğinde iş kırmızıya
+          # düşmeli: yayın işi bu SHA'yı `target_commitish` olarak kullanıyor ve
+          # uzakta olmayan bir commit'e tag atılamaz. Döngü sessizce bitip
+          # devam etseydi hata çok daha ileride, anlaşılmaz bir biçimde çıkardı.
+          BASARILI=hayir
+          for deneme in 1 2 3 4; do
+            if git push origin HEAD:main; then BASARILI=evet; break; fi
+            echo "push başarısız (deneme $deneme) — bekleniyor"
+            sleep $((2 ** deneme))
+          done
+          if [ "$BASARILI" != "evet" ]; then
+            echo "HATA: sürüm commit'i main'e gönderilemedi."
+            echo "  main korumaya alınmış olabilir; o durumda GITHUB_TOKEN'ın"
+            echo "  doğrudan push'u reddedilir (docs/yayin-hatti.md)."
+            exit 1
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  # Hızlı kapı: paket işleri (macOS ~25 dk, Android ~40 dk) başlamadan önce
+  # takım Linux'ta ~3 dakikada koşuyor. build.sh/build.ps1 testi zaten kendi
+  # içlerinde koşturuyor; buradaki kazanç erken kırmızı.
+  test:
+    name: Testler
+    needs: surum-yaz
+    uses: ./.github/workflows/_test.yml
+    with:
+      ref: ${{ needs.surum-yaz.outputs.sha }}
+
+  paket-macos:
+    name: macOS paketi
+    needs: [surum-yaz, test]
+    uses: ./.github/workflows/_paket-macos.yml
+    with:
+      ref: ${{ needs.surum-yaz.outputs.sha }}
+
+  paket-windows:
+    name: Windows paketi
+    needs: [surum-yaz, test]
+    uses: ./.github/workflows/_paket-windows.yml
+    with:
+      ref: ${{ needs.surum-yaz.outputs.sha }}
+
+  paket-android:
+    name: Android paketi
+    needs: [surum-yaz, test]
+    uses: ./.github/workflows/_paket-android.yml
+    with:
+      ref: ${{ needs.surum-yaz.outputs.sha }}
+      # Yayın yolundayız: imzasız APK geçmesin. Kuru provada gevşiyor ki
+      # imzalama sırlarına erişimi olmayan bir çatal da provayı koşabilsin.
+      imza_zorunlu: ${{ inputs.kuru_prova != true }}
+    # ŞART: reusable workflow sırları kendiliğinden devralmaz. Bu satır
+    # olmadan keystore çözülemez ve yukarıdaki kapı işi kırmızıya düşürür.
+    secrets: inherit
+
+  # TEK YAZICI. Yayın burada, hepsi yeşil olduktan sonra, tek çağrıyla doğuyor.
+  yayinla:
+    name: Yayını oluştur
+    # `needs` listesi release_manifest.py ile BİREBİR olmak zorunda; bunu
+    # tests/test_release_manifest.py her PR'da denetliyor. Bir paket işini
+    # buradan düşürmek, o paketsiz bir yayın demek olurdu.
+    needs: [karar, surum-yaz, paket-macos, paket-windows, paket-android]
+    # `github.ref == 'refs/heads/main'` — dal kapısının ikinci yarısı ve asıl
+    # olanı. `surum-yaz` daldan koşulduğunda kuru provaya düşüyor (orada
+    # gerekçesi yazılı), ama yayın oluşturmayı ENGELLEYEN şey bu satır: yoksa
+    # bir daldan tetiklenen koşu, o dalın paketleriyle gerçek bir yayın
+    # yayımlayabilirdi. tests/test_release_manifest.py bu kapıyı denetliyor.
+    if: >-
+      needs.karar.outputs.yayinla == 'evet'
+      && inputs.kuru_prova != true
+      && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # release_manifest.py için: küme denetimi onu okuyor.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.surum-yaz.outputs.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      # Üç varlık tek dizine. `merge-multiple` olmadan her artifact kendi alt
+      # dizinine iniyor ve aşağıdaki küme denetimi hiçbir şey bulamazdı.
+      - name: Paketleri indir
+        uses: actions/download-artifact@v4
+        with:
+          pattern: lumeo-*
+          merge-multiple: true
+          path: dist
+
+      # EKSİKSİZLİK KAPISI — bu hattın asıl vaadi burada mandallanıyor.
+      # download-artifact eksik varlıkta zaten hata verir, ama bu adım başka bir
+      # şey iddia ediyor: yayına giden küme, manifestin TAM KENDİSİ. Sessizce
+      # atlanmış bir iş, yanlış adla yüklenmiş bir varlık ve bayatlamış bir
+      # manifest — üçü de buradan geçemiyor. Boyut denetimi ayrıca 0 baytlık bir
+      # "indi" durumunu eliyor.
+      - name: Yayına giden küme manifestle birebir mi
+        run: |
+          set -euo pipefail
+          ls -l dist
+          python - <<'PY'
+          import os, sys
+          import release_manifest as m
+
+          bulunan = sorted(
+              f for f in os.listdir("dist")
+              if os.path.isfile(os.path.join("dist", f))
+          )
+          eksik, fazla = m.eksikler(bulunan)
+          if eksik:
+              print(f"HATA: yayına girmesi gereken paket YOK: {', '.join(eksik)}")
+              print("  İlgili paket işinin kaydına bak — varlığı o yüklüyor.")
+          if fazla:
+              print(f"HATA: yayına beklenmeyen dosya geliyor: {', '.join(fazla)}")
+              print("  release_manifest.py bayatlamış olabilir.")
+          bos = [f for f in bulunan if os.path.getsize(os.path.join("dist", f)) == 0]
+          if bos:
+              print(f"HATA: 0 baytlık paket: {', '.join(bos)}")
+          if eksik or fazla or bos:
+              sys.exit(1)
+          for f in bulunan:
+              mb = os.path.getsize(os.path.join("dist", f)) / 1024 / 1024
+              print(f"  {f}  ({mb:.1f} MB)")
+          print(f"küme manifestle birebir: {len(bulunan)} paket")
+          PY
+
+      # Tag da yayın da BURADA doğuyor. Bir üstteki kapı geçilmeden buraya
+      # gelinmiyor, yani "eksik yayın" diye bir ara durum yok.
+      #
+      # `files: dist/*` güvenli: bir önceki adım dist/ içeriğinin manifestle
+      # KÜME OLARAK eşit olduğunu kanıtladı, yani buraya fazladan bir dosya
+      # sızamaz. Glob olması dördüncü bir platform eklendiğinde bu satırın
+      # güncellenmesi gerekmediği anlamına da geliyor.
+      - name: Yayını oluştur (tag + üç paket, tek çağrı)
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ needs.karar.outputs.surum }}
+          target_commitish: ${{ needs.surum-yaz.outputs.sha }}
+          name: v${{ needs.karar.outputs.surum }}
           generate_release_notes: true
-          files: |
-            dist/lumeo-macOS-arm64.zip
-            dist/lumeo-windows-x64.zip
+          files: dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

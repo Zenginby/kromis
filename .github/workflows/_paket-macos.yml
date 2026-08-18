@@ -1,20 +1,39 @@
-name: macOS arm64 paketi
+# macOS arm64 paketi — çağrılabilir iş.
+#
+# NEDEN AYRI DOSYA: bu iş release.yml ile build-macos-arm64.yml'de neredeyse
+# birebir iki kez duruyordu ve doğrulama listeleri ZATEN ayrışmıştı (dispatch
+# kopyası `static/mobile.css` ile yazı tiplerini hiç kontrol etmiyordu). İki
+# kopyadan biri gevşediğinde ötekinin sertliği kimseyi korumaz; tek tanım o
+# ayrışmayı yapısal olarak imkânsız kılıyor. Burada kalan liste iki kopyanın
+# BİRLEŞİMİ — hiçbir kapı gevşetilmedi.
+#
+# Bu iş yayına DOKUNMAZ, yalnızca varlık yükler. Yayını `release.yml`'deki tek
+# yazıcı oluşturuyor (gerekçe orada yazılı: iki ayrı yazıcı v0.4.2'de yayını
+# ~95 saniye boyunca eksik gösterdi).
+name: macOS paketi
 
-# Elle tetiklenir: her push'ta 25 MB artifact üretmek gereksiz ve private repo'da
-# macOS dakikaları 10x sayılıyor.
 on:
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Derlenecek commit (boşsa çağıranın ref'i)"
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
 
 jobs:
-  build:
+  paket:
+    name: macOS arm64 paketi
     runs-on: macos-14          # arm64 (Apple Silicon) runner
     timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
       - uses: actions/setup-python@v5
         with:
@@ -30,8 +49,8 @@ jobs:
           # çalışabilir. İkisi ayrı kontrol edilir: runner donanımı (uname) ve Python binary'si (platform).
           python -c "import platform; plat=platform.machine(); print('python mimarisi:', plat); plat=='arm64' or exit(1)"
 
-      # build.sh artık .venv'i kendisi oluşturuyor; bu adım yalnızca pip'i
-      # tazeliyor (runner imajındaki pip eski olabilir).
+      # build.sh .venv'i kendisi oluşturuyor; bu adım yalnızca pip'i tazeliyor
+      # (runner imajındaki pip eski olabilir).
       - name: pip'i tazele
         run: |
           set -euo pipefail
@@ -48,6 +67,9 @@ jobs:
           lipo -archs "$APP/Contents/MacOS/Lumeo" | tee /dev/stderr | grep -qx arm64
           codesign --verify --strict "$APP"
           for f in static/index.html static/core.js static/viewer.js \
+                   static/fonts.css static/mobile.css static/mobile.js \
+                   static/fonts/dm-sans-v17-latin.woff2 \
+                   static/fonts/dm-sans-v17-latin-ext.woff2 \
                    bundled/prompts/prompt-yonetmeni.md; do
             test -f "$APP/Contents/Resources/$f" || { echo "EKSİK: $f"; exit 1; }
           done
@@ -61,9 +83,16 @@ jobs:
           done
           echo "Info.plist sürümü: $EXPECTED"
           du -sh "$APP" dist/*.zip
+          # Yayın varlığının adı: release_manifest.py'deki anahtarla BİREBİR.
+          # Ad kayarsa tests/test_release_manifest.py PR'da kırmızıya düşer.
+          cp "dist/Lumeo.zip" "dist/lumeo-macOS-arm64.zip"
 
       - uses: actions/upload-artifact@v4
         with:
           name: lumeo-macos-arm64
-          path: dist/Lumeo.zip
+          path: dist/lumeo-macOS-arm64.zip
+          # "Yeşil ama boş"un SON kapısı: bu bayrak olmadan upload-artifact
+          # eşleşen dosya bulamayınca yalnızca UYARI basar ve iş yeşil kalır —
+          # 2026-08-11'de tam olarak bu oldu.
+          if-no-files-found: error
           retention-days: 30

@@ -135,31 +135,19 @@ def test_readme_version_literals_match_the_single_source():
     assert not kacak, f"README'de bayat sürüm literali: {sorted(kacak)}"
 
 
-def test_readme_download_links_match_what_the_release_publishes():
-    """İndirme tablosundaki dosya adları yayına EKLENEN adlarla birebir olmalı.
-
-    Ad ayrışırsa bağlantı 404 verir ve bunu hiçbir şey haber vermez: workflow
-    yeşil kalır, yayın oluşur, yalnız README'deki bağlantı ölür. Üç platformun
-    üçü de aynı riski taşıyor, o yüzden üçü birden kontrol ediliyor.
-    """
-    text = _readme_text()
-    android = os.path.join(REPO, ".github", "workflows", "build-android.yml")
-    masaustu = os.path.join(REPO, ".github", "workflows", "release.yml")
-    with open(android, encoding="utf-8") as f:
-        android_yml = f.read()
-    with open(masaustu, encoding="utf-8") as f:
-        release_yml = f.read()
-
-    for dosya, yml, nerede in (
-        ("lumeo-macOS-arm64.zip", release_yml, "release.yml"),
-        ("lumeo-windows-x64.zip", release_yml, "release.yml"),
-        ("lumeo-android-arm64.apk", android_yml, "build-android.yml"),
-    ):
-        assert f"releases/latest/download/{dosya}" in text, \
-            f"README'de {dosya} indirme bağlantısı yok"
-        # `files:` listesine giren ad — yayın varlığının adı bu.
-        assert re.search(rf"files:.*?{re.escape(dosya)}", yml, re.S), \
-            f"{nerede} yayına {dosya} adıyla eklemiyor — README bağlantısı 404 olur"
+# NOT — buradaki "README indirme bağlantıları yayına eklenen adlarla aynı mı"
+# testi tests/test_release_manifest.py'ye TAŞINDI.
+#
+# Gerekçe: o iddia dosya adlarını üç yerde birden (README, iki workflow'un
+# `files:` listesi) sabit yazıyordu, yani dördüncü bir platform eklendiğinde
+# testin KENDİSİ de elle güncellenmesi gereken bir yer oluyordu — koruduğu
+# ayrışmanın aynısına açık. Artık tek kaynak `release_manifest.py` ve zincirin
+# her halkası oradan türetiliyor:
+#   README      ↔ manifest  →  test_readme_indirme_baglantilari_manifestle_birebir
+#   manifest    ↔ workflow  →  test_workflow_varligi_manifestteki_adla_yukluyor
+#   manifest    ↔ yayın işi →  test_yayin_isi_her_paketi_bekliyor
+# Yayına yazan tek bir iş kaldığı için `files:` listesini ayrıca aramaya da
+# gerek kalmadı (bkz. test_yayini_yalnizca_tek_is_olusturuyor).
 
 
 def test_version_module_imports_nothing_from_the_project():

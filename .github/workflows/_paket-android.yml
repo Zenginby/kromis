@@ -1,66 +1,62 @@
-# Android (arm64-v8a) APK'sını derler, imzalar ve doğrular.
+# Android (arm64-v8a) APK'sını derler, imzalar ve doğrular — çağrılabilir iş.
 #
-# NEDEN release.yml'e EKLENMEDİ de ayrı bir dosya: release.yml'in üç işi de
-# PyInstaller dünyasında (aynı spec, aynı requirements). Android işi başka bir
-# araç zinciri (Gradle + Chaquopy + NDK), başka bir bağımlılık kümesi ve başka
-# bir imzalama yolu kullanıyor. Yine de yayına ORADAN giriyor: aşağıdaki
-# `publish` kancası, tag'de release.yml'in oluşturduğu yayına APK'yı ekliyor.
+# NEDEN masaüstü paketlerinden ayrı dosya: onların ikisi de PyInstaller
+# dünyasında (aynı spec, aynı requirements). Bu iş başka bir araç zinciri
+# (Gradle + Chaquopy + NDK), başka bir bağımlılık kümesi ve başka bir imzalama
+# yolu kullanıyor.
+#
+# NE DEĞİŞTİ (eski build-android.yml'e göre): kendi `test` işi ve kendi
+# `publish-android` işi KALKTI. Testi çağıran koşuyor (`_test.yml`, tek tanım);
+# yayını da tek yazıcı oluşturuyor. İkinci yazıcı bilinçle silindi: v0.4.2'de
+# yayını bu workflow 16:15:29'da APK ile oluşturup YAYIMLADI, masaüstü zip'leri
+# 16:17:04'te eklendi — arada ~95 saniye boyunca yayın sayfasında yalnız APK
+# vardı ve masaüstü işi kırmızıya düşseydi o eksik yayın öylece kalırdı.
 #
 # NEDEN BU KADAR SERT DOĞRULAMA: release.yml'de öğrenilen dersin aynısı —
 # 2026-08-11'de "CI Windows paketi üretti" sanıldı, koşu YEŞİLDİ ama çıktı
 # BOŞTU. Aşağıdaki her kapı o yanılgının bir yolunu kapatıyor: APK dosyası var
 # mı, sürümü version.py ile aynı mı, İÇİNDE beklenen dosyalar var mı, Python
 # çalışma zamanı gerçekten gömülmüş mü, imza geçerli mi.
-name: Android APK
+#
+# SIRLAR: çağıranın `secrets: inherit` demesi ŞART. Reusable workflow sırları
+# kendiliğinden devralmaz; unutulursa keystore çözülemez ve `imza_zorunlu`
+# açıkken iş (doğru biçimde) kırmızıya düşer.
+name: Android paketi
 
 on:
-  push:
-    tags:
-      - 'v*'
-  # Elle tetikleme: tag'e bağlı bir işin ilk gerçek koşumunu tag'le denemek
-  # geri dönüşsüz (release.yml'deki Windows işinin gerekçesiyle birebir aynı).
-  # Dispatch'te yalnız derleme + doğrulama koşar, yayın oluşmaz.
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Derlenecek commit (boşsa çağıranın ref'i)"
+        type: string
+        required: false
+        default: ""
+      imza_zorunlu:
+        description: "true → imzasız APK işi kırmızıya düşürür (yayın yolu)"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  # Masaüstü takımının aynısı: Android işine geçmeden ÖNCE 1200+ test yeşil
-  # olmalı. Python kodunun tamamı APK'nın içine giriyor, yani bir regresyon
-  # doğrudan telefona gider.
-  test:
-    name: Pytest takımı
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.14'
-
-      - name: Bağımlılıklar
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-
-      - name: Pytest
-        run: pytest tests/ -v
-
   # pydantic-core wheel'i — Chaquopy'nin kurabildiği TEK kaynak.
   #
   # Bu iş, wheel repoya işlenmişse onu olduğu gibi geçiriyor; işlenmemişse
-  # önbellekten alıyor, o da yoksa derliyor. Yani APK derlemesi artık elle
-  # atılmış bir adıma bağlı DEĞİL — eskiden wheel gelene kadar aşağıdaki iş
-  # "wheel yok" diyerek duruyordu ve telefona kurulacak paket hiç üretilemiyordu.
+  # önbellekten alıyor, o da yoksa derliyor. Yani APK derlemesi elle atılmış bir
+  # adıma bağlı DEĞİL.
+  #
+  # `ref` GEÇİLMİYOR: wheel yalnızca android/pins.properties'e bağlı ve sürüm
+  # commit'i o dosyaya dokunmuyor. Çiviler değişirse zaten wheel'in kendi
+  # önbellek anahtarı ıskalar ve yeniden derlenir.
   wheel:
     name: pydantic-core wheel
     uses: ./.github/workflows/build-pydantic-core-android.yml
 
-  build-android:
-    needs: [test, wheel]
-    name: Android arm64-v8a APK
+  paket:
+    needs: wheel
+    name: Android arm64-v8a paketi
     runs-on: ubuntu-latest
     # Chaquopy ilk koşuda Python çalışma zamanını ve tüm wheel'leri indirip
     # açıyor; Gradle önbelleği soğukken 30 dakikayı geçebiliyor.
@@ -68,6 +64,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
       # AGP 8.7 JDK 17 istiyor. Sürüm AÇIKÇA yazılı: runner imajının varsayılan
       # JDK'sı bir gün değişirse derleme sessizce başka bir bytecode hedefiyle
@@ -128,17 +126,17 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${KEYSTORE_B64:-}" ]; then
-            # Sır tanımlı değilse iş DURMUYOR: dal üzerinde yapılan bir
-            # dispatch'in amacı derlemenin ayakta olduğunu görmek ve imzalama
-            # sırlarına erişimi olmayan bir çatal (fork) da bunu koşabilmeli.
-            # Tag'de ise aşağıdaki kapı imzasız APK'yı yayına SOKMUYOR.
+            # Sır tanımlı değilse iş DURMUYOR: bir dal derlemesinin amacı
+            # derlemenin ayakta olduğunu görmek ve imzalama sırlarına erişimi
+            # olmayan bir çatal (fork) da bunu koşabilmeli. Yayın yolunda ise
+            # aşağıdaki kapı (imza_zorunlu) imzasız APK'yı geçirmiyor.
             #
             # BU BİR "DEBUG DERLEMESİ" DEĞİL: paket hiçbir anahtarla
             # imzalanmıyor ve Android imzasız paketi KURMAZ — telefonda
             # "paket geçersiz görünüyor" der. Eski metin "imzasız (debug)"
             # diyordu; "debug" kelimesi kurulabilir olduğunu ima ettiği için
             # imzasız bir APK telefona atıldı ve ancak orada anlaşıldı.
-            # Uyarı artık hem loga hem koşu ÖZETİNE yazılıyor: varlığı indiren
+            # Uyarı hem loga hem koşu ÖZETİNE yazılıyor: varlığı indiren
             # kişi log satırlarını değil, koşu sayfasını görüyor.
             echo "UYARI: ANDROID_KEYSTORE_BASE64 yok — APK İMZASIZ derlenecek."
             echo "  İmzasız APK telefona KURULAMAZ ('paket geçersiz görünüyor')."
@@ -299,59 +297,38 @@ jobs:
           APKSIGNER="$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)"
           "$APKSIGNER" verify --verbose --print-certs "${{ steps.dogrula.outputs.apk }}"
 
-      # Tag'de imzasız APK yayına GİRMEMELİ: kullanıcı onu kuramaz ve
+      # Yayın yolunda imzasız APK'ya izin YOK: kullanıcı onu kuramaz ve
       # "yayın çıktı ama kurulmuyor" en pahalı hata sınıfı.
-      - name: Tag'de imza ZORUNLU
-        if: startsWith(github.ref, 'refs/tags/') && steps.imza.outputs.imzali != 'evet'
+      #
+      # Kapı eskiden `startsWith(github.ref, 'refs/tags/')` bakıyordu. Artık
+      # yayın tag'le değil main'e merge'le tetikleniyor, yani "yayın yolunda
+      # mıyız" bilgisi ref'ten okunamaz — çağıran açıkça söylüyor.
+      - name: Yayın yolunda imza ZORUNLU
+        if: inputs.imza_zorunlu && steps.imza.outputs.imzali != 'evet'
         run: |
-          echo "HATA: tag derlemesi imzasız — imzalama sırları tanımlı değil."
+          echo "HATA: yayın derlemesi imzasız — imzalama sırları tanımlı değil."
           echo "  Gerekli sırlar: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,"
           echo "  ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD"
+          echo "  Çağıran workflow'da 'secrets: inherit' var mı? Reusable workflow"
+          echo "  sırları kendiliğinden devralmaz."
           exit 1
 
+      # Varlığın adı = yayın varlığının adı = release_manifest.py'deki anahtar.
+      # Eskiden burada `dist-` önekli bir ad vardı ve yayın işi onu `mv` ile
+      # düzeltiyordu; o ara ad ayrışabilecek üçüncü bir isimdi (ve
+      # tests/test_android_apk_name.py'nin ikinci testi tam olarak onu
+      # kolluyordu). Tek ad, ayrışacak yer bırakmıyor.
       - name: Yayın adına kopyala
-        run: cp "${{ steps.dogrula.outputs.apk }}" dist-lumeo-android-arm64.apk
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp "${{ steps.dogrula.outputs.apk }}" dist/lumeo-android-arm64.apk
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: lumeo-android-arm64
-          path: dist-lumeo-android-arm64.apk
+          path: dist/lumeo-android-arm64.apk
           # "Yeşil ama boş"un SON kapısı: bu bayrak olmadan upload-artifact
           # eşleşen dosya bulamayınca yalnız UYARI basar ve iş yeşil kalır.
           if-no-files-found: error
           retention-days: 30
-
-  # APK'yı, release.yml'in tag'de oluşturduğu yayına EKLER.
-  #
-  # Neden ayrı bir iş ve neden `softprops/action-gh-release` ikinci kez:
-  # o eylem var olan bir yayına dosya eklemeyi destekliyor
-  # (`generate_release_notes` olmadan, aynı tag'e). Alternatif — release.yml'in
-  # publish işine bir `needs` kenarı çekmek — iki workflow arasında bağımlılık
-  # kurmayı gerektirirdi ve GitHub Actions bunu doğrudan desteklemiyor.
-  publish-android:
-    needs: build-android
-    if: startsWith(github.ref, 'refs/tags/')
-    name: APK'yı yayına ekle
-    runs-on: ubuntu-latest
-    steps:
-      - name: APK'yı indir
-        uses: actions/download-artifact@v4
-        with:
-          name: lumeo-android-arm64
-          path: dist
-
-      - name: İndi ve boş değil
-        run: |
-          set -euo pipefail
-          f=dist/dist-lumeo-android-arm64.apk
-          test -s "$f" || { echo "EKSİK ya da BOŞ: $f"; exit 1; }
-          mv "$f" dist/lumeo-android-arm64.apk
-          ls -l dist
-
-      - name: Yayına ekle
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/lumeo-android-arm64.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -40,9 +40,17 @@ PREFS_FILE = "prefs.json"
 # `autosave_sessions` varsayılanı True: karar D1 oturumların kaydedilmesinden
 # yana ve yeni bir kurulumda geçmişin boş kalması o kararın tersini uygulamak
 # olurdu (bkz. tasarım §5/D1).
+#
+# `guncelleme_kontrolu` varsayılanı True: paketler artık main'e giren her
+# değişiklikte otomatik üretiliyor, yani yayınlar sık çıkıyor ve kullanıcının
+# bunu öğrenmesinin başka bir yolu yok (GUNCELLEME.md'yi kendiliğinden açıp
+# bakması gerekirdi). Ama KAPATILABİLİR olması şart: uygulamanın kullanıcının
+# haberi olmadan dışarıya bağlanması, kapatma düğmesi olmadan savunulamaz —
+# üstelik bu uygulama üretim dışında tümüyle çevrimdışı çalışıyor.
 _SCHEMA: dict[str, tuple[object, type]] = {
     "autosave_sessions": (True, bool),
     "theme": ("mono", str),
+    "guncelleme_kontrolu": (True, bool),
 }
 
 DEFAULTS = {name: default for name, (default, _) in _SCHEMA.items()}

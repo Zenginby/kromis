@@ -32,6 +32,7 @@ import color_names
 import composite
 import errlog
 import folders
+import guncelleme
 import palette
 import palette_store
 import paths
@@ -517,9 +518,20 @@ def get_settings() -> dict:
 
     `chat_instructions_path` da burada birleşiyor: talimatı ezme özelliği
     keşfedilebilir olmasa var olmakla olmamak arasında bir fark kalmaz.
+
+    `guncelleme` de burada: kullanılan sürümün YANINDA durması gerekiyor, çünkü
+    kullanıcının sorduğu şey "hangi sürümdeyim" değil "güncel miyim". Ayrı bir
+    uç nokta arayüze ikinci bir istek ekler ve ikisi ayrı zamanlarda gelirse
+    panel bir an "0.4.2 — güncel" deyip sonra fikir değiştirirdi.
+
+    Bu alan istek yolunu BEKLETMEZ: `guncelleme.bilgi()` yalnız önbelleğe
+    bakıyor, ağ çağrısı arka planda koşuyor (bkz. guncelleme.py'deki 2.
+    sözleşme). İlk açılışta değeri `null` olur, sonrakinde dolar.
     """
     return {**ac.get_settings_status(),
             "version": version.APP_VERSION,
+            "guncelleme": guncelleme.bilgi(
+                OUTPUT_DIR, izin=prefs.read(OUTPUT_DIR)["guncelleme_kontrolu"]),
             "chat_instructions_path": paths.chat_instructions_override()}
 
 

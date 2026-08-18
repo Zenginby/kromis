@@ -1,0 +1,51 @@
+# Pytest takımı — TEK tanım.
+#
+# NEDEN AYRI DOSYA: bu iş daha önce ÜÇ workflow'da (ci.yml, release.yml,
+# build-android.yml) birebir kopyalanmıştı. Kopyalar sessizce ayrışır: Python
+# sürümünü ya da kurulum adımını birinde güncelleyip ötekini unutmak, "yayın
+# yolunda kırmızıya dönen ama PR'da yeşil olan takım" demektir — release.yml'in
+# kendi yorumunun uyardığı kırılma sınıfının ta kendisi.
+#
+# Alt çizgiyle başlıyor (`_test.yml`): bu dosya kendi başına tetiklenmez,
+# yalnızca `uses:` ile çağrılır. Actions sekmesinde de o yüzden ayrı bir giriş
+# gibi durmuyor.
+name: Pytest
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Denetlenecek commit (boşsa çağıranın ref'i)"
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Pytest takımı
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      # Sürüm paket işleriyle AYNI: farklı bir Python'da yeşil olan bir takım,
+      # yayın yolunda kırmızıya dönebilirdi.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+
+      - name: Bağımlılıklar
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Pytest
+        run: pytest tests/ -q

@@ -25,14 +25,22 @@ def client(out_dir):
 
 
 def test_get_reports_the_defaults(client):
-    assert client.get("/api/prefs").json() == {"autosave_sessions": True, "theme": "mono"}
+    """Beklenti `prefs.DEFAULTS`'tan TÜRETİLİYOR, elle sayılmıyor.
+
+    Sabit yazılmış bir sözlük, yeni bir tercih eklendiğinde bu testi de elle
+    güncellenmesi gereken bir yer yapıyordu — yani koruduğu "tek kaynak"
+    kuralının kendisini ihlal ediyordu. Kalan iddia asıl olan: uç, şemadaki
+    varsayılanların TAMAMINI döndürmeli (bir tercihin uçtan hiç görünmemesi,
+    arayüzde sessizce kaybolması demek).
+    """
+    assert client.get("/api/prefs").json() == prefs.DEFAULTS
 
 
 def test_post_turns_autosave_off_and_get_reflects_it(client, out_dir):
     r = client.post("/api/prefs", json={"autosave_sessions": False})
 
     assert r.status_code == 200
-    assert r.json() == {"autosave_sessions": False, "theme": "mono"}
+    assert r.json() == {**prefs.DEFAULTS, "autosave_sessions": False}
     assert client.get("/api/prefs").json()["autosave_sessions"] is False
     assert prefs.read(out_dir)["autosave_sessions"] is False
 

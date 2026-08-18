@@ -1,23 +1,24 @@
-# Her pull request'te test takımını koşturur.
+# Her pull request'te testleri, paketlemeye dokunan PR'larda ÜÇ PAKETİ DE koşturur.
 #
-# NEDEN VAR: bu repodaki diğer üç workflow tag'e (`push: tags: v*`) ya da elle
-# tetiklemeye bağlı. Yani bir PR'ın içeriği, TAG ATILANA kadar hiçbir kapıdan
-# geçmiyordu — ve tag atıldığı an ilk gerçek koşu doğrudan yayın yolunda
-# oluyordu. `build-android.yml`'nin başındaki "tag'e bağlı bir işin ilk gerçek
-# koşumunu tag'le denemek geri dönüşsüz" gerekçesi tam olarak bunu anlatıyor;
-# aynı gerekçe pytest takımı için de geçerli, üstelik daha ucuz.
+# NEDEN VAR: bu depodaki paketleme işleri eskiden yalnız tag'e ya da elle
+# tetiklemeye bağlıydı. Bir PR'ın içeriği TAG ATILANA kadar hiçbir kapıdan
+# geçmiyordu ve tag atıldığı an ilk gerçek koşu doğrudan yayın yolunda oluyordu.
 #
-# NEDEN YALNIZ PYTEST: paketleme işleri (PyInstaller, Gradle + NDK) on
-# dakikalarca sürüyor ve her PR'da koşmaları runner dakikasını hızla yakardı.
-# Regresyonların ezici çoğunluğunu 1200+ testlik takım zaten yakalıyor;
-# paketleme kapıları tag'de ve elle tetiklemede yerinde duruyor.
+# NEDEN ARTIK PAKETLER DE KOŞUYOR (ve neden yalnız bazı PR'larda):
+# `.spec`, `build.sh`, `build.ps1` ya da `android/` altına dokunan bir
+# değişikliğin kırdığı şey testlerde HİÇ görünmüyor — yalnız paketleme
+# aşamasında, dakikalarca süren bir işin sonunda görünüyor. Yayın artık main'e
+# merge ile tetiklendiği için o kırılmayı merge'den SONRA öğrenmek geç kalmak
+# demek. Depo public olduğundan GitHub-hosted runner dakikaları faturalanmıyor;
+# workflow'lardaki eski "macOS dakikası 10x sayılıyor" gerekçesi artık geçerli
+# değil. Yine de her PR'da koşmuyor: ilgisiz bir PR'ı 40 dakika bekletmenin
+# kimseye faydası yok.
 name: CI
 
 on:
   pull_request:
   # `main`'e doğrudan giden commit'ler de kapsansın: PR'dan geçmeyen bir
-  # düzeltme (ya da squash sonrası main'in kendisi) sessizce test edilmemiş
-  # kalmasın.
+  # düzeltme sessizce test edilmemiş kalmasın.
   push:
     branches:
       - main
@@ -34,26 +35,75 @@ permissions:
 
 jobs:
   test:
-    name: Pytest takımı
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    name: Testler
+    uses: ./.github/workflows/_test.yml
 
+  # PR paketlemeye dokunuyor mu? Cevabı tek yerde üretip üç işe dağıtıyoruz.
+  kapsam:
+    name: Paketleme kapsamı
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      paketle: ${{ steps.bak.outputs.paketle }}
     steps:
       - uses: actions/checkout@v4
-
-      # Sürüm, release.yml ve build-android.yml'deki test işleriyle AYNI:
-      # farklı bir Python'da yeşil olan bir takım, yayın yolunda kırmızıya
-      # dönebilirdi.
-      - uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
-          cache: pip
+          fetch-depth: 0
 
-      - name: Bağımlılıklar
+      - name: Değişen yollara bak
+        id: bak
+        env:
+          TABAN: ${{ github.base_ref }}
+          ETIKETLER: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          set -euo pipefail
 
-      - name: Pytest
-        run: pytest tests/ -q
+          # Elle kaçış kapısı: paketlemeye dokunmayan ama yine de tam matris
+          # istenen PR'lar için.
+          if printf '%s' "$ETIKETLER" | grep -q 'tam-paket'; then
+            echo "tam-paket etiketi var — üç paket de koşacak"
+            echo "paketle=evet" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git fetch --no-tags --depth=1 origin "$TABAN"
+          YOLLAR="$(git diff --name-only "origin/$TABAN...HEAD")"
+          echo "--- değişen yollar ---"
+          echo "$YOLLAR"
+
+          # Paketlemenin sonucunu değiştirebilecek her şey. Liste bilinçle
+          # GENİŞ: bir paketleme koşusunu gereksiz yere başlatmanın bedeli
+          # bedava runner dakikası, atlamanın bedeli kırık bir yayın.
+          if echo "$YOLLAR" | grep -qE '^(gpt-image-studio\.spec|build\.sh|build\.ps1|requirements\.txt|android/|\.github/workflows/|static/|bundled/|branding/)'; then
+            KARAR=evet
+          else
+            KARAR=hayir
+          fi
+          echo "paketle=$KARAR" >> "$GITHUB_OUTPUT"
+          echo "karar: paketle=$KARAR"
+
+  # Üç paket de yayın yolundakiyle AYNI çağrılabilir workflow'u kullanıyor —
+  # yani PR'da yeşil olan şey, yayında koşacak şeyin ta kendisi. Ayrı bir
+  # "PR sürümü" olsaydı ikisi ayrışır ve bu kapı hiçbir şey kanıtlamazdı.
+  paket-macos:
+    name: macOS paketi
+    needs: [test, kapsam]
+    if: needs.kapsam.outputs.paketle == 'evet'
+    uses: ./.github/workflows/_paket-macos.yml
+
+  paket-windows:
+    name: Windows paketi
+    needs: [test, kapsam]
+    if: needs.kapsam.outputs.paketle == 'evet'
+    uses: ./.github/workflows/_paket-windows.yml
+
+  paket-android:
+    name: Android paketi
+    needs: [test, kapsam]
+    if: needs.kapsam.outputs.paketle == 'evet'
+    uses: ./.github/workflows/_paket-android.yml
+    # `imza_zorunlu` VERİLMİYOR (varsayılan false): imzalama sırlarına erişimi
+    # olmayan bir çatalın PR'ı da bu kapıdan geçebilmeli. İmza zorunluluğu
+    # yayın yolunda, release.yml'de duruyor.
+    secrets: inherit

@@ -150,6 +150,12 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.5.2 — ne değişti
+
+- indirme Android'de köprüden geçsin + geri tuşu bulguları
+
+---
+
 ## Sürüm 0.5.1 — ne değişti
 
 - telefonda S ile M ızgara boyutu aynı görünmesin

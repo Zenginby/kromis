@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.os.SystemClock
 import android.view.View
 import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -25,6 +26,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import java.io.File
+import java.net.URL
 import kotlin.concurrent.thread
 
 /**
@@ -39,8 +41,10 @@ import kotlin.concurrent.thread
  *   2. **Dosya seçici.** `<input type="file">` WebView'de VARSAYILAN OLARAK
  *      ÇALIŞMAZ; `onShowFileChooser` uygulanmazsa görsel içe aktarma, referans
  *      görsel ekleme ve logo/banner yükleme düğmeleri hiçbir şey yapmaz.
- *   3. **İndirme.** WebView `<a download>`'u kendiliğinden indirmez;
- *      `DownloadListener` olmadan PNG indirme ve klasör ZIP'i sessizce ölür.
+ *   3. **İndirme.** WebView'in indirme sistemi YOK: bir indirmeyi tanır tanımaz
+ *      iptal ediyor. Uygulama devralmazsa PNG indirme ve klasör ZIP'i sessizce
+ *      ölür. Devralmanın İKİ yolu var ve ikisi de burada — sayfanın doğrudan
+ *      çağırdığı `IndirmeKoprusu` (asıl yol) ve `DownloadListener` (yedek).
  */
 class MainActivity : AppCompatActivity() {
 
@@ -144,10 +148,12 @@ class MainActivity : AppCompatActivity() {
      * çerez kendiliğinden gidiyor) ve okuyamaması, arayüze sızan herhangi bir
      * üçüncü taraf içeriğin token'ı çalmasını engelliyor.
      *
-     * `SameSite=Lax`, `Strict` DEĞİL: `<a download>` tıklaması bir GEZİNME
-     * sayılıyor ve Strict altında ilk isteğe çerez eklenmeyebilir — indirme
-     * 403 dönerdi. Lax bu gezinmeye izin verirken çapraz site POST'larını yine
-     * kesiyor (zaten çapraz site bir bağlam da yok).
+     * `SameSite=Lax`, `Strict` DEĞİL: indirme ve `<a download>` istekleri
+     * gezinme sınıfında değerlendiriliyor ve Strict altında çerezin ilk isteğe
+     * eklenmemesi mümkün — indirme 403 dönerdi. Lax bunlara izin verirken
+     * çapraz site POST'larını yine kesiyor (zaten çapraz site bir bağlam da
+     * yok). İndirmenin ASIL yolu artık `IndirmeKoprusu` ve orada çerez elle
+     * konuyor, ama yedek yol hâlâ tarayıcının çerezine bağlı.
      *
      * Port YAZILMIYOR: çerezler porta göre ayrılmaz, `http://127.0.0.1` alanı
      * yeterli — üstelik port her açılışta değişiyor (port=0).
@@ -309,6 +315,15 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // KÖPRÜ `loadUrl`den ÖNCE takılmak zorunda: enjeksiyon sayfa yüklenirken
+        // yapılıyor, sonradan eklenen bir arayüz ancak bir sonraki yüklemede
+        // görünür — yani ilk oturumda indirme yine sessizce ölürdü.
+        webView.addJavascriptInterface(IndirmeKoprusu(), KOPRU_ADI)
+
+        // YEDEK YOL. Sayfanın kendi indirmeleri köprüden geçiyor; buraya yalnız
+        // BİZİM başlatmadığımız indirmeler düşüyor (uzun basıp "bağlantıyı
+        // kaydet"). Adı burada tahmin etmekten başka çare yok, o yüzden
+        // `guessFileName` yalnız bu dalda kaldı.
         webView.setDownloadListener { url, _, contentDisposition, mimeTur, _ ->
             val ad = URLUtil.guessFileName(url, contentDisposition, mimeTur)
             indirmeyiIste(Downloader.Istek(url, ad, mimeTur ?: "application/octet-stream"))
@@ -316,6 +331,68 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ── İndirme ─────────────────────────────────────────────────────
+
+    /**
+     * Sayfanın doğrudan çağırdığı indirme kapısı (`core.js` `downloadViaAnchor`).
+     *
+     * NEDEN ASIL YOL BU, `DownloadListener` değil: `<a download>` tıklaması
+     * Chromium'da bir gezinme DEĞİL, "renderer kaynaklı indirme" üretiyor.
+     * WebView'in indirme sistemi hiç yok — isteği tanır tanımaz iptal edip olayı
+     * `AwDownloadManagerDelegate` üzerinden uygulamaya devrediyor. O zincirin
+     * herhangi bir halkası kopunca (WebView sürümü, OEM yaması, `WebContents`
+     * eşleşmemesi) hiçbir hata çıkmıyor: tıklama SESSİZCE hiçbir şey yapmıyor.
+     * Telefonda "indirme çalışmıyor"un tarifi buydu ve tek bir başlık eklemek
+     * onu kapatmıyor — zincirin kendisi çıkarılmak zorundaydı.
+     *
+     * GÜVENLİK. `addJavascriptInterface` bu nesneyi WebView'deki HER sayfaya
+     * açıyor, o yüzden yüzey bilerek TEK bir çağrıya indirildi ve
+     * `koprudenIndir` adresi KENDİ sunucumuza çiviliyor. Bu WebView'e yabancı
+     * içerik zaten hiç girmiyor (dış bağlantılar `shouldOverrideUrlLoading` ile
+     * tarayıcıya çıkıyor); çivi, o kuralın bir gün gevşemesine karşı duran
+     * ikinci kapı — `Downloader`ın çerezi yalnız loopback'e vermesiyle aynı
+     * disiplin.
+     */
+    private inner class IndirmeKoprusu {
+        /**
+         * `@JavascriptInterface` ŞART (API 17+): işaretsiz bir yöntem JS'ten
+         * hiç görünmez — yani köprü sessizce yok sayılırdı.
+         *
+         * Gövde ANA THREAD'e taşınıyor: bu çağrı WebView'in "JavaBridge"
+         * thread'inde geliyor ve hem `Toast` hem izin isteği ana thread ister.
+         */
+        @JavascriptInterface
+        fun indir(adres: String, dosyaAdi: String) {
+            runOnUiThread { koprudenIndir(adres, dosyaAdi) }
+        }
+    }
+
+    /**
+     * Köprüden gelen isteği doğrular ve indirmeye verir.
+     *
+     * Adres KENDİ sunucumuzu göstermek zorunda: host + port birlikte
+     * denetleniyor. Yalnız host yetmezdi — cihazdaki başka bir yerel sunucuyu
+     * (127.0.0.1:başka_port) uygulamanın galerisine yazdırmanın yolu açık
+     * kalırdı.
+     *
+     * Dosya adı `guvenliAd`den geçiyor: adı artık frontend veriyor ve klasör
+     * ZIP'inde o ad KULLANICI metni (`<klasör adı>.zip`), yani içinde yol
+     * ayırıcı olabilir.
+     */
+    private fun koprudenIndir(adres: String, dosyaAdi: String) {
+        val sunucu = uc ?: return
+        val hedef = runCatching { URL(adres) }.getOrNull() ?: return
+        val yerel = hedef.protocol == "http" &&
+            (hedef.host == "127.0.0.1" || hedef.host == "localhost") &&
+            hedef.port == sunucu.port
+        if (!yerel) {
+            // Sessiz dönmüyor: yabancı bir adres bir kusurun işareti ve
+            // kullanıcı en azından indirmenin OLMADIĞINI bilmeli.
+            bildir(getString(R.string.indirilemedi, hedef.host ?: adres))
+            return
+        }
+        val ad = Downloader.guvenliAd(dosyaAdi, adres)
+        indirmeyiIste(Downloader.Istek(adres, ad, Downloader.mimeTuru(ad)))
+    }
 
     private fun indirmeyiIste(istek: Downloader.Istek) {
         if (Downloader.izinGerekiyorMu(this)) {
@@ -433,6 +510,14 @@ class MainActivity : AppCompatActivity() {
     companion object {
         /** `android_main.SESSION_COOKIE` ile AYNI olmak zorunda. */
         private const val OTURUM_CEREZI = "gis_session"
+
+        /**
+         * Köprünün JS'teki adı — `core.js` `androidKoprusu()` ile AYNI olmak
+         * zorunda. Ayrışırsa hiçbir hata çıkmaz: `window.LumeoIndirme` tanımsız
+         * kalır, frontend sessizce `<a download>` yoluna düşer ve indirme
+         * telefonda yine ölür. Bekçisi `tests/test_mobile.py`.
+         */
+        private const val KOPRU_ADI = "LumeoIndirme"
 
         /**
          * Geri basışının uygulama İÇİNDE karşılığı varsa "true" döner.

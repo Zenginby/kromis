@@ -125,10 +125,17 @@ window.geriTusu = function () {
 
   // 2) Klasörden bir üste. `goUp()`u ikinci bir çağrandan çağırmak yerine var
   //    olan düğme tıklanıyor (folders.js): kırıntı ve başlık tazelemesi böylece
-  //    bedava geliyor ve tek yol kalıyor. Düğmenin `hidden`i klasörde olup
-  //    olmamanın zaten tek göstergesi (folders.js `syncFolderView`).
+  //    bedava geliyor ve tek yol kalıyor.
+  //
+  //    `currentSection === "media"` MUHAFAZASI ŞART, süs değil. Düğmenin
+  //    `hidden`i yalnız `currentFolder`ı anlatıyor (folders.js `syncFolderView`)
+  //    ve `showSection` onu HİÇ temizlemiyor: bir alt klasördeyken Stüdyo'ya
+  //    geçip geri basmak, GÖRÜNMEYEN bir düğmeyi tıklayıp `true` döndürüyordu —
+  //    ekranda hiçbir şey olmuyor, üstelik çıkış yolu klasör yığını boşalana
+  //    kadar erişilemez kalıyordu. Arama açıkken de aynısı: `.gallery-head`
+  //    tümden gizli ama düğmenin kendi `hidden`i hâlâ `false`.
   const klasorGeri = $("folder-back");
-  if (klasorGeri && !klasorGeri.hidden) {
+  if (currentSection === "media" && klasorGeri && !klasorGeri.hidden) {
     klasorGeri.click();
     return true;
   }
@@ -395,9 +402,41 @@ function indirmeAdresi(url) {
   return `/api/output/${ad.slice(0, -".png".length)}/download`;
 }
 
+// Android APK'nın enjekte ettiği indirme köprüsü (MainActivity `IndirmeKoprusu`).
+//
+// NEDEN VAR — `<a download>` Android'de HİÇBİR GARANTİ TAŞIMIYOR. Chromium'da o
+// tıklama bir gezinme değil, "renderer kaynaklı indirme" üretiyor; WebView'in
+// indirme sistemi yok, isteği tanır tanımaz İPTAL ediyor ve olayı uygulamaya
+// `DownloadListener` ile veriyor (AwDownloadManagerDelegate). O halkanın
+// kopması — WebView sürümü, bir OEM yaması, `AwContentsClientBridge`in
+// bulunamaması — hiçbir hata üretmiyor: tıklama sessizce hiçbir şey yapmıyor.
+// Telefonda "indirme çalışmıyor"un tarifi tam olarak bu.
+//
+// Köprü o halkayı tümden çıkarıyor: adres ve dosya adı doğrudan Kotlin'e
+// geçiyor. Yan kazanç, `URLUtil.guessFileName`in de devreden çıkması — adı
+// zaten BİLEN taraf frontend, tahmin etmesi gereken bir regex kalmıyor
+// (klasör ZIP'lerinin telefona `download.zip` diye inmesinin sebebi oydu).
+//
+// Köprü YOKSA (tarayıcı, masaüstü paketi) hiçbir şey değişmiyor: eski
+// `<a download>` yolu aynen duruyor.
+function androidKoprusu() {
+  const kopru = window.LumeoIndirme;
+  return kopru && typeof kopru.indir === "function" ? kopru : null;
+}
+
 function downloadViaAnchor(url, filename) {
+  const adres = indirmeAdresi(url);
+
+  const kopru = androidKoprusu();
+  if (kopru) {
+    // MUTLAK adres: köprünün öbür ucu Kotlin, `location`ı yok. Kotlin ayrıca
+    // adresin KENDİ sunucumuzu gösterdiğini doğruluyor.
+    kopru.indir(new URL(adres, location.href).href, filename || "");
+    return;
+  }
+
   const a = document.createElement("a");
-  a.href = indirmeAdresi(url);
+  a.href = adres;
   // Ad AÇIKÇA veriliyor: boş bırakılırsa macOS kayıt panelinin ad alanını
   // WebKit'in URL'den türetmesine kalıyoruz.
   a.download = filename;
@@ -408,7 +447,10 @@ function downloadViaAnchor(url, filename) {
 
 // Kayıt panelini açar, seçilen dosyaya görselin baytlarını yazar.
 async function downloadImage(url, filename) {
-  if (!SUPPORTS_SAVE_PICKER) { downloadViaAnchor(url, filename); return; }
+  // Köprü varsa panel HİÇ denenmiyor: Android'de `showSaveFilePicker` zaten yok,
+  // ama bir gün gelirse kayıt paneli köprünün sessizce devre dışı kalması demek
+  // olurdu — indirmenin telefonda çalışmasının tek garantisi köprü.
+  if (!SUPPORTS_SAVE_PICKER || androidKoprusu()) { downloadViaAnchor(url, filename); return; }
 
   let handle;
   try {

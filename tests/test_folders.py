@@ -232,15 +232,16 @@ def test_download_header_keeps_turkish_name(tmp_path, monkeypatch):
     assert quote("Bağış Görselleri") + ".zip" in cd
     assert 'filename="Ba_Grselleri.zip"' in cd   # kaybın kendisi de mandallı
 
-    # SIRA: `filename*` tırnaklı `filename`'den ÖNCE gelmek zorunda.
+    # SIRA: tırnaklı `filename` ÖNCE, `filename*` SONRA — RFC 6266'nın önerdiği
+    # sıra (ilk parametreyi okuyup duran eski istemciler hiç olmazsa kırpılmış
+    # adı görsün).
     #
-    # RFC 6266'ya göre öncelik parametreyle belirlendiği için tarayıcılar sıradan
-    # etkilenmiyor — ama Android WebView'in indirme adını üreten
-    # `URLUtil.guessFileName`'inin regex'i tırnaklı biçimden SONRA bir şey gelince
-    # boşa düşüyor ve adı URL yolundan türetiyor: her klasör ZIP'i telefona
-    # `download.zip` diye iniyordu. Sıra masaüstünde HİÇBİR fark yaratmadığı için
-    # geri çevrilmesi de hiçbir yerde fark edilmezdi — mandal bu yüzden var.
-    assert cd.index("filename*=") < cd.index('filename="'), cd
+    # Bu sıra bir kez tersine çevrilmişti; gerekçe Android WebView'in
+    # `URLUtil.guessFileName`'iydi ve YANLIŞTI: onun Android 14 öncesi regex'i
+    # `attachment;\s*filename\s*=…$` ile çapalı, yani İKİ sırada da eşleşmiyor.
+    # Android 14+ ise `filename*`i sıradan bağımsız zaten tercih ediyor. Mandal
+    # şimdi spec'in sırasını tutuyor — ve o yanlış gerekçenin geri gelmesini.
+    assert cd.index('filename="') < cd.index("filename*="), cd
 
 
 def test_export_zip_survives_corrupt_parent_cycle(tmp_path, monkeypatch):

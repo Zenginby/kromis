@@ -432,10 +432,70 @@ def test_downloads_go_through_the_attachment_route(istemci):
     js = _metin(istemci, "/static/core.js")
     assert "function indirmeAdresi(" in js, "çevirme işlevi yok"
     assert "/api/output/" in js, "indirme ucu hiç kullanılmıyor"
-    # Çıpanın href'i ve panelin fetch'i AYNI adresi kullanmalı; biri atlanırsa
+    # Çıpa/köprü ile panelin fetch'i AYNI adresi kullanmalı; biri atlanırsa
     # kırılma "bazen çalışıyor" olarak geri döner.
-    assert "a.href = indirmeAdresi(url)" in js
+    assert "const adres = indirmeAdresi(url)" in js
+    assert "a.href = adres" in js
     assert "fetch(indirmeAdresi(url))" in js
+
+
+def test_the_android_download_bridge_is_wired_on_both_sides(istemci):
+    """İndirme köprüsünün adı JS ile Kotlin'de AYNI olmak zorunda.
+
+    Telefonda indirmenin çalışmasının tek garantisi bu köprü: `<a download>`
+    Android'de bir gezinme değil "renderer kaynaklı indirme" üretiyor, WebView'in
+    indirme sistemi hiç yok ve devralma zinciri koptuğunda tıklama SESSİZCE
+    hiçbir şey yapmıyor — hata da çıkmıyor.
+
+    Ad ayrışırsa aynı sessizlik geri geliyor: `window.LumeoIndirme` tanımsız
+    kalır, frontend eski çıpa yoluna düşer ve kimse bir şey fark etmez. Kırılma
+    yine iki dosyanın BİRLEŞTİĞİ yerde — bu dosyadaki diğer mandallarla aynı
+    sınıf.
+    """
+    js = _metin(istemci, "/static/core.js")
+    kt = _kotlin_kaynagi()
+
+    ad = re.search(r'window\.(\w+);', js.split("function androidKoprusu()")[1])
+    assert ad, "core.js köprüyü `window.<ad>` ile hiç aramıyor"
+    assert f'"{ad.group(1)}"' in kt, (
+        f"Kotlin köprüyü `{ad.group(1)}` adıyla enjekte etmiyor")
+
+    assert "addJavascriptInterface" in kt, "köprü WebView'e hiç takılmıyor"
+    # `@JavascriptInterface` İŞARETİ ŞART (API 17+): işaretsiz yöntem JS'ten hiç
+    # görünmez, yani köprü derlenir ama sessizce yok sayılırdı.
+    assert "@JavascriptInterface" in kt, "köprü yöntemi JS'e açık değil"
+
+    # SIRA: köprü sayfa YÜKLENMEDEN takılmak zorunda — enjeksiyon yükleme
+    # sırasında yapılıyor, sonradan eklenen bir arayüz ancak bir SONRAKİ
+    # yüklemede görünür ve ilk oturumda indirme yine ölürdü. Ölçülen şey metin
+    # sırası değil ÇAĞRI sırası: `onCreate` önce `webViewiKur()`, sonra
+    # `sunucuyuBaslat()` diyor; `loadUrl` ise ancak sunucu hazır olunca
+    # (`sunucuHazir`) çalışıyor.
+    kurulum = kt.split("private fun webViewiKur()")[1]
+    assert "addJavascriptInterface" in kurulum, "köprü webViewiKur() dışında takılıyor"
+    acilis = kt.split("override fun onCreate(")[1].split("\n    }")[0]
+    assert acilis.index("webViewiKur()") < acilis.index("sunucuyuBaslat()"), \
+        "WebView sunucudan sonra kuruluyor: köprü ilk yüklemeyi kaçırır"
+    assert "webView.loadUrl" in kt.split("private fun sunucuHazir(")[1], \
+        "sayfa artık başka bir yerden yükleniyor: sıra iddiası anlamsızlaştı"
+
+
+def test_the_bridge_only_accepts_our_own_server(istemci):
+    """Köprü, adresi KENDİ sunucumuza çivilemek zorunda.
+
+    `addJavascriptInterface` nesneyi WebView'deki her sayfaya açıyor. Host
+    denetimi olmasa sayfaya sızan herhangi bir içerik uygulamaya internetten
+    dosya indirtebilirdi; port denetimi olmasa cihazdaki BAŞKA bir yerel sunucu
+    aynı şeyi yapardı. `Downloader`ın çerezi yalnız loopback'e vermesiyle aynı
+    disiplin.
+    """
+    kt = _kotlin_kaynagi()
+    govde = kt.split("private fun koprudenIndir(")[1].split("\n    }")[0]
+    assert '"127.0.0.1"' in govde, "host denetimi yok"
+    assert "hedef.port == sunucu.port" in govde, "port denetimi yok"
+    # Ad frontend'den geliyor ve klasör ZIP'inde KULLANICI metni — yol ayırıcı
+    # taşıyabilir. Kırpmayı eskiden `guessFileName` yapıyordu.
+    assert "guvenliAd" in govde, "dosya adı sanitasyonu atlanmış"
 
 
 def test_the_download_listeners_no_longer_defer_to_the_bare_anchor(istemci):
@@ -482,6 +542,24 @@ def test_the_back_button_has_a_single_gate_in_the_frontend(istemci):
     kt = _kotlin_kaynagi()
     assert "window.geriTusu" in kt, "Kotlin frontend kapısını çağırmıyor"
     assert ".sheet.open" not in kt, "Kotlin hâlâ kendi CSS seçicilerini taşıyor"
+
+
+def test_the_folder_step_only_runs_inside_media(istemci):
+    """Klasör basamağı YALNIZ Medya'dayken çalışmalı.
+
+    `#folder-back`ın `hidden`i tek başına "klasördeyiz" demiyor: onu
+    `syncFolderView` yalnız `currentFolder`a bakarak yazıyor ve `showSection`
+    `currentFolder`ı HİÇ temizlemiyor. Bir alt klasördeyken Stüdyo'ya geçip geri
+    basmak, GÖRÜNMEYEN düğmeyi tıklayıp `true` döndürüyordu: ekranda hiçbir şey
+    olmuyor, üstelik çıkış yolu klasör yığını boşalana kadar erişilemez kalıyor —
+    kullanıcı için "geri tuşu takıldı". Arama açıkken de aynısı (`.gallery-head`
+    tümden gizli, düğmenin kendi `hidden`i hâlâ `false`).
+    """
+    js = _metin(istemci, "/static/core.js")
+    govde = js.split("window.geriTusu = function ()")[1].split("\n};")[0]
+    klasor_adimi = govde.split("folder-back")[1].split("return true")[0]
+    assert 'currentSection === "media"' in klasor_adimi, (
+        "klasör basamağı bölümden bağımsız çalışıyor")
 
 
 def test_leaving_the_app_needs_two_back_presses(istemci):

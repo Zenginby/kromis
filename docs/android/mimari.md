@@ -38,7 +38,7 @@ Tek kaynak korunuyor — masaüstünde düzeltilen bir hata telefonda da düzeli
 | `…/StudioApplication.kt` | `Python.start()` — süreç başına bir kez |
 | `…/PythonServer.kt` | assets kopyalama + `android_main` köprüsü |
 | `…/ServerService.kt` | Foreground service (kalıcı bildirim) |
-| `…/MainActivity.kt` | WebView, çerez, dosya seçici, indirme, geri tuşu |
+| `…/MainActivity.kt` | WebView, çerez, dosya seçici, indirme köprüsü, geri tuşu |
 | `…/Downloader.kt` | MediaStore'a indirme (PNG → Resimler, ZIP → İndirilenler) |
 | `static/mobile.css` | Mobil yerleşim + dokunmatik kuralları |
 | `static/mobile.js` | Composer yüksekliğini ölçer (`--composer-h`) |
@@ -69,7 +69,32 @@ masaüstü ve 1213 testin hiçbiri onu görmüyor.
 Doğrulama: cihazdaki başka bir tarayıcıdan `http://127.0.0.1:<port>/api/history`
 **403** dönmeli.
 
-### 4. Foreground service zorunlu
+### 4. İndirme JS köprüsünden geçiyor, `<a download>`'dan değil
+Android WebView'in **indirme sistemi yok**: bir indirmeyi tanır tanımaz iptal
+edip olayı uygulamaya devrediyor (`AwDownloadManagerDelegate` →
+`DownloadListener`). Üstelik `<a download>` tıklaması orada bir gezinme değil,
+"renderer kaynaklı indirme". Zincirin herhangi bir halkası koptuğunda hiçbir
+hata çıkmıyor — tıklama **sessizce hiçbir şey yapmıyor**. Telefonda "indirme
+çalışmıyor"un tarifi tam olarak bu ve tek bir `Content-Disposition` başlığı onu
+kapatmıyor.
+
+Bu yüzden `MainActivity` sayfaya `LumeoIndirme` adında bir arayüz enjekte
+ediyor (`addJavascriptInterface`, `loadUrl`'den **önce**) ve `core.js`
+`downloadViaAnchor` köprü varsa doğrudan onu çağırıyor. Zincirden çıkanlar:
+WebView'in indirme devralması, `<a download>`, ve `URLUtil.guessFileName` —
+dosya adını artık **adı zaten bilen** taraf, frontend veriyor. Klasör
+ZIP'lerinin telefona `download.zip` diye inmesinin sebebi o tahmin regex'iydi.
+
+Köprü yoksa (tarayıcı, masaüstü paketi) hiçbir şey değişmiyor: eski
+`<a download>` yolu duruyor. `DownloadListener` de duruyor, ama artık yalnız
+**bizim başlatmadığımız** indirmeler için (uzun basıp "bağlantıyı kaydet").
+
+Yüzeyin bedeli ödendi: `addJavascriptInterface` nesneyi WebView'deki her sayfaya
+açıyor, o yüzden köprü tek çağrı ve adresi **kendi sunucumuza** çiviliyor (host
++ port). Dosya adı da `Downloader.guvenliAd`den geçiyor — klasör ZIP'inde o ad
+kullanıcı metni. Mandalları: `tests/test_mobile.py`.
+
+### 5. Foreground service zorunlu
 `azure_client.READ_TIMEOUT_FIRST = 180 s`; n=4 üretimde toplam
 `180 + 3×120 = 540 s`. Kullanıcı üretim sürerken uygulamadan çıkarsa Android
 arka plandaki süreci öldürebilir ve **ücretlendirilmiş** bir istek yanıtsız
@@ -188,7 +213,7 @@ gerçek cihazda ölçülebilir.
 | `import pydantic` | CI kapısı yeşil (`build-android.yml`) |
 | Uçtan uca üretim | Azure kimliğini gir → görsel üret → galeride gör → logo bindir → indir |
 | Dosya yükleme | Referans görsel ekle (`onShowFileChooser`) |
-| İndirme | PNG → Resimler/GPT-Image Studio, klasör ZIP → İndirilenler/GPT-Image Studio |
+| İndirme | PNG → `Resimler/Lumeo`, klasör ZIP → `İndirilenler/Lumeo`; ZIP adı klasörün ADI olmalı (`download.zip` değil) |
 | Güvenlik | Başka bir tarayıcıdan `127.0.0.1:<port>/api/history` → **403** |
 | Uzun üretim arka planda | n=4 başlat → uygulamadan çık → 5 dk sonra dön → sonuç kayıpsız |
 | Responsive | Gerçek telefonda ve Chrome DevTools 390×844'te yatay kaydırma **olmamalı** |

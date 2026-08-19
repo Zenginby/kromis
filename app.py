@@ -840,14 +840,24 @@ def download_folder_route(folder_id: str):
     safe_ascii = re.sub(r"[^\w\s-]", "", folder_name).strip().replace(" ", "_")
     safe_ascii = safe_ascii.encode("ascii", "ignore").decode("ascii") or "klasor"
     encoded_utf8 = quote(folder_name)
-    # `filename*` ÖNCE, tırnaklı `filename` SONRA. RFC 6266'ya göre öncelik
-    # sırayla değil parametreyle belirlendiği için tarayıcı davranışı bundan
-    # etkilenmiyor — ama Android WebView'in indirme adını üreten
-    # `URLUtil.guessFileName`'inin regex'i tırnaklı biçimden SONRA bir şey
-    # gelince boşa düşüyor ve ad URL yolundan türetiliyordu: her klasör ZIP'i
-    # telefona `download.zip` diye iniyordu.
+    # SIRA RFC 6266'nın ÖNERDİĞİ gibi: tırnaklı `filename` önce, `filename*`
+    # sonra. Öncelik parametreyle belirleniyor (ikisini de anlayan istemci
+    # `filename*`i seçer), ama eski istemciler ilk parametreyi okuyup durabildiği
+    # için spec bu sırayı öneriyor.
+    #
+    # BU SIRA BİR KEZ TERSİNE ÇEVRİLMİŞTİ ve gerekçesi yanlıştı: Android
+    # WebView'in `URLUtil.guessFileName`'i sırayla düzelmiyor. Android 14
+    # ÖNCESİNDEKİ regex `attachment;\s*filename\s*=…$` ile ÇAPALI — yani
+    # tırnaklı `filename`den sonra `filename*` gelince de, `filename*` başa
+    # alınınca da eşleşme olmuyor; iki sırada da ad URL yolundan türetiliyor.
+    # Android 14+ ise RFC 6266 ayrıştırıcısını kullanıyor ve `filename*`i sıradan
+    # bağımsız zaten tercih ediyor. Yani o çevirme hiçbir şey düzeltmiyordu.
+    #
+    # Adın telefonda doğru inmesi artık bu başlığa hiç bağlı değil: APK'da adı
+    # frontend veriyor (`core.js` → `MainActivity.IndirmeKoprusu`), tahmin eden
+    # bir regex zincirde yok. Başlık masaüstü ve tarayıcı için duruyor.
     headers = {
-        "Content-Disposition": f'attachment; filename*=UTF-8\'\'{encoded_utf8}.zip; filename="{safe_ascii}.zip"'
+        "Content-Disposition": f'attachment; filename="{safe_ascii}.zip"; filename*=UTF-8\'\'{encoded_utf8}.zip'
     }
 
     return Response(content=zip_bytes, media_type="application/zip", headers=headers)
@@ -1245,15 +1255,18 @@ def output_download(image_id: str) -> FileResponse:
     bağlardı — kazanacağımız şeyin bedeli, kaybetmeye hiç razı olmayacağımız şey.
     Kalıp `/api/folders/{folder_id}/download`'un aynısı (yukarısı).
 
-    NEDEN VAR: Android WebView, HTML'in `download` özniteliğini YOK SAYIYOR.
-    `Content-Disposition` taşımayan bir `image/png` adresi WebView'in
-    çizebileceği bir şey, o yüzden kayıt dinleyicisi (MainActivity.kt:305) hiç
-    tetiklenmiyor; WebView düz görsele gidiyor ve indirme SESSİZCE hiç olmuyordu.
-    Telefonda "indirme çalışmıyor" olarak görünen tek şey buydu.
+    NEDEN VAR: `Content-Disposition` taşımayan bir `image/png`, ona giden her
+    istemci için "çizilecek bir şey" — indirilecek bir şey değil. Sağ tık /
+    uzun basıp "bağlantıyı kaydet", tarayıcıda indirme ve `.app` paketindeki
+    WKWebView kayıt paneli bu başlığa bakıyor; başlıksız adres hepsinde
+    "görseli aç"a dönüyordu.
 
-    Dosya adı da buradan geliyor: `Downloader` adı
-    `URLUtil.guessFileName(url, contentDisposition, mimeType)` ile üretiyor, yani
-    çıpanın `download=` değerinden DEĞİL bu başlıktan okuyor.
+    ANDROID'İN TEK ÇARESİ BU DEĞİL, bilerek: WebView'in indirme sistemi hiç yok
+    ve `<a download>` tıklaması orada bir gezinme değil "renderer kaynaklı
+    indirme" — yani başlık doğru olsa da devralma zinciri sessizce kopabiliyor.
+    APK'da indirme bu yüzden `MainActivity.IndirmeKoprusu` üzerinden gidiyor ve
+    dosya adını da frontend veriyor. Bu uç orada yalnız köprünün indirdiği adres
+    olarak kalıyor.
 
     Path-traversal guard'ı yeniden yazılmıyor: `_output_png_path` deponun tek
     kapısı ve 404'ü de o veriyor.

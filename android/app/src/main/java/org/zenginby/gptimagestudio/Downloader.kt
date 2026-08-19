@@ -11,10 +11,13 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
+import android.webkit.MimeTypeMap
+import android.webkit.URLUtil
 import androidx.core.content.ContextCompat
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Locale
 import java.util.concurrent.Executors
 
 /**
@@ -28,10 +31,10 @@ import java.util.concurrent.Executors
  * oturum çerezini o sürece elden vermek, anahtarı koruyan kapıyı gevşetmek
  * demek. Kendi indiricimiz her iki sorunu da ortadan kaldırıyor.
  *
- * Frontend'in indirme yollarının HEPSİ buraya düşüyor: `core.js:290`
- * `SUPPORTS_SAVE_PICKER` Android WebView'de `false` (File System Access API
- * yok), yani `downloadImage` de, klasör ZIP'i de `downloadViaAnchor`'a iniyor
- * ve `<a download>` DownloadListener'ı tetikliyor. Tek nokta, tek uygulama.
+ * Frontend'in indirme yollarının HEPSİ buraya düşüyor: `SUPPORTS_SAVE_PICKER`
+ * Android WebView'de `false` (File System Access API yok), yani `downloadImage`
+ * de, klasör ZIP'i de `downloadViaAnchor`'a iniyor — o da köprüyü çağırıyor
+ * (`MainActivity.IndirmeKoprusu`). Tek nokta, tek uygulama.
  */
 object Downloader {
 
@@ -56,6 +59,39 @@ object Downloader {
             ContextCompat.checkSelfPermission(
                 context, Manifest.permission.WRITE_EXTERNAL_STORAGE,
             ) != PackageManager.PERMISSION_GRANTED
+
+    /**
+     * Frontend'in verdiği adı TEK bir dosya adına indirir.
+     *
+     * Ad artık köprüden geliyor ve klasör ZIP'inde o ad KULLANICI metni
+     * (`<klasör adı>.zip`) — içinde `/` ya da `\` olabilir. Eskiden bu
+     * kırpmayı `URLUtil.guessFileName` yapıyordu (`lastIndexOf('/')`); köprü onu
+     * devreden çıkardığı için kırpma buraya taşındı, düşürülmedi.
+     *
+     * Boş ya da yalnız noktalardan oluşan bir ad kalırsa adres üzerinden tahmine
+     * dönülüyor: adsız bir MediaStore kaydı hiç açılmaz.
+     */
+    fun guvenliAd(ad: String, adres: String): String {
+        val temiz = ad.substringAfterLast('/').substringAfterLast('\\').trim()
+        if (temiz.isEmpty() || temiz.all { it == '.' }) {
+            return URLUtil.guessFileName(adres, null, null)
+        }
+        return temiz
+    }
+
+    /**
+     * Dosya adının uzantısından MIME türü.
+     *
+     * Bu değer SÜS DEĞİL, hedefi seçiyor: `image/` ile başlayanlar Resimler'e,
+     * geri kalanı İndirilenler'e gidiyor (`yazMediaStore`). Bilinmeyen uzantı
+     * `application/octet-stream`'e düşüyor — yani en kötü ihtimalle görsel
+     * İndirilenler'e iner, hiçbir yere inmemesindense.
+     */
+    fun mimeTuru(ad: String): String {
+        val uzanti = ad.substringAfterLast('.', "").lowercase(Locale.US)
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(uzanti)
+            ?: "application/octet-stream"
+    }
 
     fun kaydet(context: Context, istek: Istek, cerez: String?, geriCagri: (Sonuc) -> Unit) {
         if (izinGerekiyorMu(context)) {
@@ -96,10 +132,12 @@ object Downloader {
             // Oturum çerezi ŞART: android_main'deki kapı çerezsiz her isteği
             // 403 ile kesiyor — kendi indirmemiz de bu kuralın istisnası değil.
             //
-            // Ama YALNIZ loopback'e: `istek.url` WebView'in DownloadListener'ından
-            // olduğu gibi geliyor ve bu çerez Azure anahtarını koruyan şeyin
-            // kendisi. Host denetimi, o anahtarın cihaz dışına çıkmasının önündeki
-            // son kapı — `DownloadManager`'ı kullanmama gerekçesiyle aynı disiplin.
+            // Ama YALNIZ loopback'e: `istek.url` dışarıdan (köprü ya da
+            // DownloadListener) olduğu gibi geliyor ve bu çerez Azure anahtarını
+            // koruyan şeyin kendisi. Host denetimi, o anahtarın cihaz dışına
+            // çıkmasının önündeki son kapı — `DownloadManager`'ı kullanmama
+            // gerekçesiyle aynı disiplin. (Köprü ayrıca portu da denetliyor;
+            // buradaki denetim yedek yolu da kapsıyor.)
             if (yerelMi(adres) && !cerez.isNullOrBlank()) setRequestProperty("Cookie", cerez)
         }
         try {

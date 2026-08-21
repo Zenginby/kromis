@@ -188,7 +188,7 @@ android {
     // Paket adı APK dosya adında görünsün: doğrulama adımları ve kullanıcıya
     // gönderilen dosya aynı adı taşısın.
     //
-    // DİKKAT: bu ad .github/workflows/build-android.yml'in aradığı yolla BİREBİR
+    // DİKKAT: bu ad .github/workflows/_paket-android.yml'in aradığı yolla BİREBİR
     // aynı olmak zorunda. Ayrışırsa Gradle APK'yı üretir, workflow bulamaz ve iş
     // "APK yok" diye düşer — yeniden adlandırmada gerçekten oldu. Bekçisi
     // tests/test_android_apk_name.py.

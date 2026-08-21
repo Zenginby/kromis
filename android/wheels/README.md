@@ -11,7 +11,7 @@ pydantic_core-<sürüm>-cp313-cp313-android_26_arm64_v8a.whl
 
 ## Bu dizin BOŞ olabilir — APK yine derlenir
 
-`build-android.yml`'deki `wheel` işi wheel'i şu sırayla arıyor:
+`_paket-android.yml`'deki `wheel` işi wheel'i şu sırayla arıyor:
 
 1. **bu dizindeki dosya** (varsa hep o kazanır),
 2. çivilerden kurulan anahtarla **önbellek**,

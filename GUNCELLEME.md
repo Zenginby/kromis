@@ -150,6 +150,13 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.5.3 — ne değişti
+
+- Merge pull request #40 from Zenginby/claude/gis-keystore-mobile-app-mgakyw
+- depo adresi yeni hesaba çevrildi (Zenginby → Zenginby)
+
+---
+
 ## Sürüm 0.5.2 — ne değişti
 
 - indirme Android'de köprüden geçsin + geri tuşu bulguları

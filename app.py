@@ -25,6 +25,7 @@ from starlette.datastructures import UploadFile as FormUploadFile
 
 import assets_store
 import azure_client as ac
+import catalog
 import backup
 import chat_client as cc
 import chat_store
@@ -99,13 +100,50 @@ async def _lifespan(app: FastAPI):
 app = FastAPI(title="Lumeo", lifespan=_lifespan)
 
 
+# Kimlik FORMU olan rotalar: yanıtta hiçbir alanın değeri yankılanmak zorunda
+# değil, o yüzden kapı alan adına değil ROTAYA bakıyor. Üç kapının en GÜÇLÜSÜ bu —
+# yarın forma eklenen bir alan hiçbir şey hatırlanmadan kapsanıyor.
+_CREDENTIAL_ROUTES = frozenset({"/api/settings"})
+
+# İkinci kapı: BAŞKA bir rotada geçebilecek gizli alan adları. Katalogdan
+# TÜRETİLİYOR, elle sayılmıyor.
+_SECRET_FIELDS = frozenset({"api_key"}) | catalog.secret_field_names()
+# Üçüncü kapı: kataloğa hiç girmemiş alan da adının BİÇİMİNDEN yakalanıyor
+# (bugünkü `fal_key` / `replicate_api_token` tam olarak bu kapıdan geçiyor).
+_SECRET_SUFFIXES = ("_api_key", "_key", "_token", "_secret")
+
+
+def _is_secret_loc(loc) -> bool:
+    return any(str(p) in _SECRET_FIELDS or str(p).endswith(_SECRET_SUFFIXES)
+               for p in loc)
+
+
 @app.exception_handler(RequestValidationError)
 async def _redact_validation_errors(request: Request, exc: RequestValidationError):
-    """Doğrulama hatası gövdesinde API key'i yankılama (FastAPI varsayılanı 'input' döner)."""
+    """Doğrulama hatası gövdesinde gizli değeri yankılama (FastAPI 'input' döner).
+
+    v0.6'da GENELLEŞTİ ve sebebi ÖLÇÜLDÜ: kapı `loc` içinde birebir `"api_key"`
+    arıyordu, yani BYOK alanları (`openai_api_key`, `fal_key`,
+    `replicate_api_token` — üçü de v0.2.0'dan beri kabul ediliyor) kapsam
+    DIŞINDAYDI. 500 karakteri aşan bir değer 422 alıyor ve anahtar `input`
+    alanında istemciye AYNEN dönüyordu. `azure_client.py`'nin başındaki
+    "bu yüzden ikinci bir gizli form alanı eklenmedi" notu tam olarak bu boşluğu
+    tarif ediyor; boşluk kapandığı için o notun dayattığı kısıt da kalktı —
+    çoklu sağlayıcı formu ancak bundan sonra eklenebilir.
+
+    Üç kapı birlikte çünkü her biri diğerinin kaçırdığını yakalıyor:
+      1. ROTA: /api/settings bir kimlik formu, hiçbir alanı yankılanmamalı.
+      2. AD: katalogda gizli olarak beyan edilmiş alanlar (başka rotalarda da).
+      3. SONEK: kataloğa girmemiş ama adı `_key`/`_token`/`_secret` ile bitenler.
+
+    `ctx` de siliniyor, `input` gibi: pydantic uzunluk hatalarında bağlamda
+    değerin kendisi ya da uzunluğu geçebiliyor.
+    """
+    kimlik_rotasi = request.url.path in _CREDENTIAL_ROUTES
     safe = []
     for err in exc.errors():
         err = dict(err)
-        if any(str(p) == "api_key" for p in (err.get("loc") or ())):
+        if kimlik_rotasi or _is_secret_loc(err.get("loc") or ()):
             err.pop("input", None)
             err.pop("ctx", None)
         safe.append(err)

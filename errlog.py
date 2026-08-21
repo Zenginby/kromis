@@ -16,12 +16,39 @@ LOG_FILENAME = "hata.log"
 MAX_LOG_BYTES = 1024 * 1024   # 1 MB — üstünde .1'e döndürülür
 ROTATED_SUFFIX = ".1"
 
+# Desenlerin İKİ ailesi var ve ikisi de gerekli:
+#   (a) DEĞERİN kendi biçimi (`sk-…`, `fal-…`, `AIza…`) — anahtar adsız,
+#       çıplak bir traceback parçasında geçtiğinde yakalar,
+#   (b) `AD=değer` ve başlık biçimleri — değerin biçimi tanınmadığında yakalar.
+# Bir sağlayıcı yalnız (a) ile korunuyorsa kısa/atipik bir anahtar sızar; yalnız
+# (b) ile korunuyorsa httpx'in URL/repr çıktısındaki çıplak değer sızar.
+#
+# 4. desen v0.6'da GENELLEŞTİ ve sebebi ölçüldü: adı birebir sayan alternasyon
+# (`OPENAI_API_KEY|FAL_KEY|REPLICATE_API_TOKEN|AZURE_[A-Z_]*KEY`) yeni bir
+# sağlayıcı eklendiğinde SESSİZCE kapsam dışı bırakıyordu —
+# `GEMINI_API_KEY=AIza…` satırı sansürsüz loglanıyordu, üstelik Google'ın
+# biçimi (a) ailesinde de yoktu, yani anahtar iki kapıdan birden kaçıyordu.
+# Artık kural adın BİÇİMİ: KEY/TOKEN/SECRET ile biten her BÜYÜK_HARF adı.
+# Böylece kataloğa bir sağlayıcı eklemek log sansürlemesini de kendiliğinden
+# kapsıyor (mandal: tests/test_errlog.py, catalog.secret_env_names() üzerinde
+# dönen mekanik test).
 _KEY_PATTERNS = [
     re.compile(r"sk-[a-zA-Z0-9_-]{20,}"),
     re.compile(r"fal-[a-zA-Z0-9_-]{16,}", re.IGNORECASE),
     re.compile(r"r8_[a-zA-Z0-9_-]{16,}", re.IGNORECASE),
-    re.compile(r"(OPENAI_API_KEY|FAL_KEY|REPLICATE_API_TOKEN|AZURE_[A-Z_]*KEY)=['\"]?[a-zA-Z0-9_-]{12,}['\"]?", re.IGNORECASE),
-    re.compile(r"(api-key|authorization):\s*(Bearer\s*)?[a-zA-Z0-9_.-]{16,}", re.IGNORECASE),
+    # Google (Gemini) anahtar biçimi. BÜYÜK/küçük harf duyarlı BİLEREK: `AIza`
+    # önekinin harf düzeni sabit ve `re.IGNORECASE` "aiza" ile başlayan sıradan
+    # Türkçe metni de sansürleyebilirdi.
+    re.compile(r"AIza[0-9A-Za-z_-]{30,}"),
+    # AD=değer. `[A-Z][A-Z0-9_]*` + KEY/TOKEN/SECRET: ad biçimine bağlı, listeye
+    # değil. IGNORECASE YOK — küçük harf bir `key=` sıradan bir sorgu dizesi
+    # olabilir ve ad kuralının anlamı BÜYÜK HARF env adı olmasıydı.
+    re.compile(r"\b[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)\s*=\s*['\"]?[a-zA-Z0-9_.-]{8,}['\"]?"),
+    # Başlıklar. `x-goog-api-key` ve `x-api-key` AÇIKÇA yazılı: ikisi de bugün
+    # `api-key` alt dizesi sayesinde tesadüfen eşleşiyor, ama tesadüf sözleşme
+    # değil — `anthropic-version` gibi bir komşu bir gün deseni daraltırsa
+    # sessizce açık kalırlardı.
+    re.compile(r"(x-goog-api-key|x-api-key|api-key|authorization):\s*(Bearer\s*)?[a-zA-Z0-9_.-]{16,}", re.IGNORECASE),
 ]
 
 

@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 import azure_client as ac
 import app as appmod
+import models
 import version
 
 
@@ -191,3 +192,67 @@ def test_chat_deployment_with_a_newline_is_rejected(client):
         "chat_deployment": "d\nAZURE_IMAGE_API_KEY=kotu"})
 
     assert r.status_code == 422
+
+
+# ── Doğrulama hatası gövdesi: MEKANİK sızıntı kapısı ───────────────────
+#
+# Bu blok v0.6'da eklendi ve gerekçesi ölçülmüş bir sızıntı: redaksiyon kapısı
+# `loc` içinde birebir `"api_key"` arıyordu, yani `openai_api_key`, `fal_key` ve
+# `replicate_api_token` (üçü de v0.2.0'dan beri KABUL EDİLİYOR) kapsam dışıydı.
+# 500 karakteri aşan bir değer 422 alıyor ve anahtar `input` alanında istemciye
+# aynen dönüyordu.
+#
+# Test ELLE SAYMIYOR, `SettingsRequest.model_fields` üzerinde dönüyor. Ayrım
+# önemli: elle sayılan bir liste tam olarak yukarıdaki üç alanı kaçırmıştı.
+# Bundan sonra forma eklenen her alan, eklendiği gün bu testin kapsamına giriyor.
+
+
+@pytest.mark.parametrize("field", sorted(models.SettingsRequest.model_fields))
+def test_dogrulama_hatasi_hicbir_alanin_degerini_yankilamiyor(client, field):
+    """Sınırı aşan bir değer 422 döndürüyor ama gövdede GEÇMİYOR.
+
+    `/api/settings` bir kimlik formu: gizli olmayan alanlar (`base_url`,
+    `comfyui_url`) da yankılanmıyor. Bu bilinçli — bir alanın "gizli mi"
+    olduğunu her seferinde yeniden karara bağlamak, tam olarak üç alanın
+    kaçmasına yol açan mekanizmaydı.
+    """
+    isaret = "SIZINTI-ISARETI-" + "G" * 600      # her alanın max_length'i 500
+    r = client.post("/api/settings", json={"api_key": "k",
+                                          "base_url": "https://ep/openai/v1/",
+                                          field: isaret})
+
+    assert r.status_code == 422, "sınır aşımı 422 dönmeli"
+    assert isaret not in r.text, f"{field} değeri doğrulama hatasında sızdı"
+    assert "SIZINTI-ISARETI" not in r.text, f"{field} değeri kırpılmış olarak sızdı"
+
+
+def test_gizli_alan_adi_gizli_OLMAYAN_bir_rotada_da_redakte_ediliyor():
+    """İkinci/üçüncü kapı: rota kimlik formu olmasa da ad/sonek yakalıyor.
+
+    `/api/settings` kapısı rotaya bakıyor; ama gizli bir alan bir gün başka bir
+    uca taşınırsa (ya da eklenirse) korumanın onunla birlikte gitmesi gerekiyor.
+    Burada `app._is_secret_loc` doğrudan ölçülüyor: rota kapısına GÜVENMEDEN.
+    """
+    assert appmod._is_secret_loc(["body", "api_key"])
+    assert appmod._is_secret_loc(["body", "openai_api_key"])
+    assert appmod._is_secret_loc(["body", "fal_key"])
+    assert appmod._is_secret_loc(["body", "replicate_api_token"])
+    assert appmod._is_secret_loc(["body", "yarin_eklenen_bir_secret"])
+    # Gizli OLMAYAN alan redakte EDİLMEMELİ: aşırı sansür teşhisi öldürür ve
+    # `prompt`/`size` gibi alanların hatalı değerini görmek kullanıcının tek
+    # ipucu (bkz. /api/generate'in 422'leri).
+    assert not appmod._is_secret_loc(["body", "prompt"])
+    assert not appmod._is_secret_loc(["body", "size"])
+    assert not appmod._is_secret_loc(["body", "comfyui_url"])
+
+
+def test_generate_422_si_hatali_degeri_HALA_gosteriyor(client):
+    """Redaksiyonun genelleşmesi gizli olmayan rotaları ETKİLEMEMELİ.
+
+    Kapı rotaya bakıyor ve `/api/generate` o listede değil; kullanıcının
+    "hangi boyutu yanlış yazdım" sorusunun cevabı bu gövdede yaşıyor.
+    """
+    r = client.post("/api/generate", json={"prompt": "kedi", "size": "yok-boyle-boyut",
+                                           "quality": "medium", "n": 1})
+    assert r.status_code == 422
+    assert "yok-boyle-boyut" in r.text, "geçersiz değer teşhis için gövdede kalmalı"

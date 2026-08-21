@@ -90,9 +90,16 @@ def request_timeout(read: float):
 # Prompt Yönetmeni (v1.13) aynı dosyada yaşıyor. Sohbetin key/url'si BOŞ
 # bırakılabilir: o zaman görselin kimliğine düşer — canlı doğrulandı, iki dağıtım
 # aynı Azure kaynağında ve aynı anahtarla çalışıyor. Ayrı bir kaynak gerekiyorsa
-# bu iki değişken dosyaya ELLE yazılır; forma ikinci bir gizli alan eklenmiyor
-# (app.py'deki doğrulama redaksiyonu `loc`'ta yalnızca `api_key` arıyor, başka
-# adlı bir gizli alan o redaksiyonu sessizce atlatırdı).
+# bu iki değişken dosyaya ELLE yazılabilir.
+#
+# TARİHÇE: burada "forma ikinci bir gizli alan EKLENMİYOR" yazıyordu ve gerekçesi
+# `app.py`'deki doğrulama redaksiyonunun `loc`'ta yalnızca `api_key` aramasıydı —
+# başka adlı bir gizli alan o redaksiyonu sessizce atlatırdı. Kısıt v0.6'da
+# KALKTI: redaksiyon artık üç kapıdan geçiyor (rota + katalogdan türetilen ad +
+# ad soneki) ve `tests/test_settings_route.py` bunu `SettingsRequest`'in TÜM
+# alanları üzerinde mekanik olarak ölçüyor. Yani kısıt kalkarken yerine onu
+# gereksiz kılan mandal kuruldu; not korunuyor çünkü o boşluk gerçekten vardı
+# ve üç BYOK alanı bir süre onun içinde yaşadı.
 CHAT_KEY = "AZURE_CHAT_API_KEY"
 CHAT_URL = "AZURE_CHAT_BASE_URL"
 CHAT_DEPLOYMENT = "AZURE_CHAT_DEPLOYMENT"

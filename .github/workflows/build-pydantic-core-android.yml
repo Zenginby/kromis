@@ -42,7 +42,7 @@ on:
         required: false
         default: ''
 
-  # build-android.yml bu workflow'u bir iş olarak çağırıyor.
+  # _paket-android.yml bu workflow'u bir iş olarak çağırıyor.
   #
   # NEDEN: wheel'in repoya elle işlenmesi Yol A'nın kararıydı ve öyle KALIYOR
   # (aşağıdaki "repoda var mı" kapısı ona öncelik veriyor). Ama o dosya
@@ -320,7 +320,7 @@ jobs:
           key: ${{ steps.onbellek.outputs.cache-primary-key }}
 
       # Varlık HER durumda yükleniyor — kaynağı repo, önbellek ya da yeni
-      # derleme olsun. build-android.yml bu workflow'u bir iş olarak çağırıp
+      # derleme olsun. _paket-android.yml bu workflow'u bir iş olarak çağırıp
       # varlığı indiriyor, yani yükleme onun için de tek teslim yolu.
       - name: Wheel'i yükle (varlık olarak)
         uses: actions/upload-artifact@v4

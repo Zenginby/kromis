@@ -42,7 +42,7 @@ Tek bir elle adım, telefona kurulacak paketin tamamını rehin alıyordu — ü
 bir `v*` tag'i atıldığında bu, "yayın çıktı ama Android yok" olarak görünecekti.
 
 Wheel workflow'u artık `workflow_call` ile de çağrılabiliyor ve
-`build-android.yml` onu bir iş olarak koşturuyor. Wheel üç kaynaktan gelebiliyor
+`_paket-android.yml` onu bir iş olarak koşturuyor. Wheel üç kaynaktan gelebiliyor
 — repo > önbellek > derleme — ve üçü de aynı doğrulama kapısından geçiyor.
 
 Karar DEĞİŞMEDİ, yalnız zorunluluktan çıktı: repodaki dosya hâlâ önceliklidir
@@ -92,7 +92,7 @@ ve masaüstü ile Android'in doğrulama davranışını sessizce ayrıştırır.
 > gerekçesiyle yaz.
 
 Doğrulama ikili ve hızlı: (1) wheel dosyası üretildi mi, (2) APK işindeki
-`import pydantic` kapısı yeşil mi (`.github/workflows/build-android.yml`).
+`import pydantic` kapısı yeşil mi (`.github/workflows/_paket-android.yml`).
 
 ## Yol B'ye düşülürse
 

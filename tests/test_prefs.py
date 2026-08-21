@@ -14,6 +14,10 @@ mekanikler jsonstore'dan (atomik yazım + yazma kilidi) geliyor.
 import json
 import os
 
+import pytest
+
+import catalog
+import models
 import prefs
 
 
@@ -165,3 +169,90 @@ def test_theme_validation_in_models():
         assert "geçersiz theme" in str(exc)
     else:
         raise AssertionError("geçersiz theme kabul edildi")
+
+
+# ── Enum tablosu ve model tercihi (v0.6) ───────────────────────────────
+
+
+def test_bilinmeyen_enum_DEGERI_okurken_varsayilana_dusuyor(tmp_path):
+    """v0.6'ya kadar yalnız TÜR kontrol ediliyordu, DEĞER değil.
+
+    Elle yazılmış `theme: "neon"` `read()`'ten geçip arayüze ulaşıyor ve
+    karşılığı olmayan bir CSS sınıfına dönüşüyordu — sessiz ve teşhisi zor.
+    Bayat bir `image_model` bundan kesinlikle daha kötü: arayüz var olmayan bir
+    modeli seçili gösterir, üretim "bilinmeyen model" der.
+    """
+    (tmp_path / "prefs.json").write_text(
+        json.dumps({"theme": "neon", "image_model": "yok-boyle-model",
+                    "chat_provider": "yok"}), encoding="utf-8")
+
+    okunan = prefs.read(str(tmp_path))
+
+    assert okunan["theme"] == "mono"
+    assert okunan["image_model"] == catalog.DEFAULT_IMAGE_MODEL
+    assert okunan["chat_provider"] == catalog.DEFAULT_CHAT_PROVIDER
+
+
+def test_bozuk_deger_okurken_diske_YAZILMIYOR(tmp_path):
+    """`read()`'in yan etkisiz olma sözü korunuyor (kendi docstring'i).
+
+    Düzeltme bir sonraki `update()`'te kendiliğinden diske iniyor.
+    """
+    bozuk = {"theme": "neon"}
+    (tmp_path / "prefs.json").write_text(json.dumps(bozuk), encoding="utf-8")
+
+    prefs.read(str(tmp_path))
+
+    assert json.loads((tmp_path / "prefs.json").read_text(encoding="utf-8")) == bozuk
+
+
+def test_yapilandirilmamis_model_secili_KALIYOR(tmp_path):
+    """"Var mı?" katalogdan, "ulaşılabilir mi?" credstore'dan — ayrı sorular.
+
+    Anahtarı girilmemiş bir modeli tercihten DÜŞÜRMEK, kullanıcı Gemini'yi
+    seçip anahtarı sonra kaydettiğinde seçimini sessizce Azure'a döndürürdü.
+    Bu kurulumda hiçbir anahtar yok, yani varsayılan modelin kendisi de
+    "yapılandırılmamış" — ve yine de korunuyor olmalı.
+    """
+    import credstore
+
+    prefs.update({"image_model": catalog.DEFAULT_IMAGE_MODEL}, str(tmp_path))
+
+    spec = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
+    assert credstore.is_configured(spec.credential) is False
+    assert prefs.read(str(tmp_path))["image_model"] == catalog.DEFAULT_IMAGE_MODEL
+
+
+def test_bilinmeyen_model_YAZILIRKEN_reddediliyor(tmp_path):
+    with pytest.raises(ValueError, match="image_model"):
+        prefs.update({"image_model": "yok-boyle-model"}, str(tmp_path))
+
+
+def test_chat_model_SAGLAYICIYA_gore_dogrulaniyor(tmp_path):
+    """Çapraz kural: geçerlilik `chat_provider`'a bağlı, yani anahtar-başına
+    bir tablo onu ifade edemiyor."""
+    gecerli = catalog.chat_models_for(catalog.DEFAULT_CHAT_PROVIDER)[0].id
+
+    prefs.update({"chat_provider": catalog.DEFAULT_CHAT_PROVIDER,
+                  "chat_model": gecerli}, str(tmp_path))
+    assert prefs.read(str(tmp_path))["chat_model"] == gecerli
+
+    with pytest.raises(ValueError, match="chat_model"):
+        prefs.update({"chat_model": "yok-boyle-model"}, str(tmp_path))
+
+
+def test_chat_model_tek_basina_gonderilirse_saglayici_DISKTEN_okunuyor(tmp_path):
+    """İstek yalnız modeli gönderiyorsa sağlayıcı diskteki değerden okunmalı,
+    yoksa geçerli bir çift reddedilirdi."""
+    prefs.update({"chat_provider": catalog.DEFAULT_CHAT_PROVIDER}, str(tmp_path))
+    gecerli = catalog.chat_models_for(catalog.DEFAULT_CHAT_PROVIDER)[0].id
+
+    prefs.update({"chat_model": gecerli}, str(tmp_path))
+
+    assert prefs.read(str(tmp_path))["chat_model"] == gecerli
+
+
+def test_tema_listesi_models_ten_geliyor_KOPYA_degil():
+    """prefs.py tema listesini LİTERAL olarak tekrarlıyordu (models.ALLOWED_THEMES
+    varken). Tek örnek kazaydı; ikinci bir enum eklenirken desen olurdu."""
+    assert prefs._ENUMS["theme"] is models.ALLOWED_THEMES

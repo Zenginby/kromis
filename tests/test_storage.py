@@ -100,3 +100,53 @@ def test_session_id_is_written_when_the_image_is_born_in_a_session(tmp_path):
     assert rec["session_id"] == "beef1234beef"
     raw = json.loads((tmp_path / "history.json").read_text(encoding="utf-8"))
     assert raw[0]["session_id"] == "beef1234beef"
+
+
+def test_kayit_ureten_modeli_ve_kredi_maliyetini_tasiyor(tmp_path):
+    """`imported`/`session_id`'nin KOŞULLU deseni burada BİLEREK kullanılmıyor.
+
+    Ayrım şu: o iki alan gerçek bir YOKLUK hâlini anlatıyor (kayıt içe
+    aktarılmadıysa `imported` hiç olmaz, oturum dışı üretimin `session_id`'si
+    hiç olmaz). Model ise HER üretilen kayıtta vardır; alanın yokluğu ancak
+    "o günün varsayılanı" demek olurdu ve varsayılan DEĞİŞECEK.
+    """
+    rec = storage.save(b"x", {"prompt": "k", "size": "1024x1024", "quality": "low",
+                              "parent_id": None, "model": "azure-gpt-image-2",
+                              "credits": 7},
+                       str(tmp_path), now="2026-01-01T00:00:00")
+
+    assert rec["model"] == "azure-gpt-image-2"
+    assert rec["credits"] == 7
+    diskte = json.loads((tmp_path / "history.json").read_text(encoding="utf-8"))[0]
+    assert diskte["model"] == "azure-gpt-image-2"
+    assert diskte["credits"] == 7
+
+
+def test_model_verilmezse_varsayilana_dusuyor(tmp_path):
+    """Doğrudan `storage.save` çağıran (rota olmayan) yollar da kayıt bırakabiliyor."""
+    import catalog
+
+    rec = storage.save(b"x", {"prompt": "k", "size": "1024x1024", "quality": "low",
+                              "parent_id": None},
+                       str(tmp_path), now="2026-01-01T00:00:00")
+
+    assert rec["model"] == catalog.DEFAULT_IMAGE_MODEL
+    assert rec["credits"] == 0
+
+
+def test_ESKI_kayitlar_model_alani_olmadan_da_okunuyor(tmp_path):
+    """Göç YOK: eski `history.json` dokunulmadan kalıyor.
+
+    Okuyan taraf `.get("model") or DEFAULT` diyor — folder_id/palette ile aynı
+    "yokluğun tanımlı anlamı var" disiplini.
+    """
+    eski = [{"id": "aaaa1111aaaa", "filename": "aaaa1111aaaa.png", "prompt": "k",
+             "size": "1024x1024", "quality": "low", "created_at": "2026-01-01",
+             "parent_id": None}]
+    (tmp_path / "history.json").write_text(json.dumps(eski), encoding="utf-8")
+
+    okunan = storage.list_history(str(tmp_path))
+
+    assert len(okunan) == 1
+    assert "model" not in okunan[0], "eski kayıt YENİDEN YAZILMIŞ"
+    assert okunan[0].get("model") is None

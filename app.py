@@ -27,6 +27,7 @@ import assets_store
 import azure_client as ac
 import catalog
 import credstore
+import providers
 import backup
 import chat_client as cc
 import chat_store
@@ -41,11 +42,12 @@ import paths
 import prefs
 import storage
 import version
-from models import (MAX_CHAT_TITLE_CHARS, MAX_PROMPT_CHARS, WIRE_CHAT_ROLES,
-                    WIRE_MESSAGE_FIELDS, BannerRequest, BulkImagesRequest,
-                    BulkMoveRequest, ChatRequest, ChatSaveRequest, FolderRequest,
-                    GenerateRequest, LogoRequest, MoveImageRequest, PrefsRequest,
-                    SavePaletteRequest, SettingsRequest, SuggestRequest,
+from models import (MAX_CHAT_TITLE_CHARS, MAX_IMAGES_PER_RUN, MAX_PROMPT_CHARS,
+                    WIRE_CHAT_ROLES, WIRE_MESSAGE_FIELDS, BannerRequest,
+                    BulkImagesRequest, BulkMoveRequest, ChatRequest,
+                    ChatSaveRequest, FolderRequest, GenerateRequest, LogoRequest,
+                    MoveImageRequest, PrefsRequest, SavePaletteRequest,
+                    SettingsRequest, SuggestRequest, check_capabilities,
                     check_drop_indices)
 
 BASE_DIR = paths.REPO_DIR                    # geriye uyum: mevcut kullanımlar bozulmasın
@@ -367,15 +369,23 @@ def generate(req: GenerateRequest) -> dict:
                                        req.palette_strength, req.palette_id,
                                        drop=req.palette_drop,
                                        task="generate")
+    # `req.model` doğrulayıcıda NORMALLEŞTİRİLDİ (None → varsayılanın gerçek
+    # id'si), yani doğrulanan değer ile kaydedilen değer ayrışamıyor.
+    spec = catalog.image_model(req.model)
     try:
-        images = ac.generate(prompt_sent, req.size, req.quality, req.n)
-    except ac.AzureImageError as e:
+        images = providers.generate(req.model, prompt_sent, req.size,
+                                    req.quality, req.n)
+    except ac.ImageError as e:
         raise HTTPException(status_code=502, detail=str(e))
+    # Maliyet GÖRSEL BAŞINA yazılıyor: kayıt tek bir görselin kaydı ve n=4'lük
+    # bir turun tamamını her satıra yazmak toplamı dörde katlardı.
+    kredi = catalog.cost_for(spec, req.quality)
     records = [
         storage.save(img, {"prompt": req.prompt, "size": req.size,
                            "quality": req.quality, "parent_id": None,
                            "folder_id": folder_id, "palette": pal,
                            "session_id": session_id,
+                           "model": req.model, "credits": kredi,
                            # Ek düştüyse metin prompt'un birebir aynısı; storage
                            # sözleşmesi "yalnızca farklıysa" diyor (bkz. save).
                            "prompt_sent": prompt_sent if pal and pal["applied"] else None},
@@ -387,19 +397,43 @@ def generate(req: GenerateRequest) -> dict:
 
 def _check_edit_form(prompt: str, size: str, quality: str, n: int,
                      file: UploadFile | None, source_id: str | None,
-                     palette_mode: str, palette_strength: str) -> None:
+                     palette_mode: str, palette_strength: str,
+                     model: str = "") -> str:
     """`/api/edit` form alanlarını doğrular; geçersizse HTTPException(422).
+
+    NORMALLEŞTİRİLMİŞ model id'sini döndürüyor (boş girdi → varsayılan), tıpkı
+    `models.check_capabilities` gibi: kaydedilen değer ile doğrulanan değer
+    ayrışmasın.
 
     Doğrulama neden elle: uç multipart olduğu için GenerateRequest gibi tek bir
     Pydantic modeli yok. Not: multipart'ta `extra="forbid"` karşılığı YOK —
     Starlette bilinmeyen form alanını sessizce atar. Bayat sunucu tespiti bu
-    yüzden arayüz tarafında, yanıtın paleti geri yansıtıp yansıtmadığına
-    bakılarak yapılıyor.
+    yüzden arayüz tarafında, yanıtın alanı geri yansıtıp yansıtmadığına
+    bakılarak yapılıyor (palet için v1.10'dan beri; `model` için de aynı desen,
+    ama orada karşılaştırma DEĞERİN kendisi üzerinden — yanlış model sessizce
+    geçerse kullanıcı hem beklediği estetiği hem doğru faturayı kaybeder).
+
+    Yetenek kapısı `models.check_capabilities` ile PAYLAŞILIYOR: JSON ucu onu
+    pydantic içinden çağırıyor, bu uç buradan. İki kopya, iki ucun sessizce
+    ayrışması demek olurdu.
     """
-    if size not in ac.ALLOWED_SIZES or quality not in ac.ALLOWED_QUALITIES:
-        raise HTTPException(status_code=422, detail="Geçersiz size veya quality.")
-    if not (1 <= n <= 4):
-        raise HTTPException(status_code=422, detail="n 1-4 arasında olmalı.")
+    try:
+        model_id = check_capabilities(model, size, quality, n)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    spec = catalog.image_model(model_id)
+    if not spec.supports_edit:
+        raise HTTPException(status_code=422,
+                            detail=f"{spec.label} referans görselle çalışmıyor.")
+    # Küresel tavan, model tavanının ÜSTÜNDE: `MAX_IMAGES_PER_RUN` aynı zamanda
+    # bir sonuç kaydının azami `image_ids` uzunluğu (bkz. models.py), yani onu
+    # aşan bir değer dökümü bozar. Buradaki sayı v0.6'ya kadar ELLE yazılmış
+    # `4` idi — `MAX_IMAGES_PER_RUN` için ikinci bir literal, yani sessiz bir
+    # kayma kaynağı; model tavanı devreye girerken sabite bağlandı.
+    if not (1 <= n <= min(spec.max_n, MAX_IMAGES_PER_RUN)):
+        raise HTTPException(
+            status_code=422,
+            detail=f"n 1-{min(spec.max_n, MAX_IMAGES_PER_RUN)} arasında olmalı.")
     if not prompt or len(prompt) > MAX_PROMPT_CHARS:
         raise HTTPException(status_code=422,
                             detail=f"prompt 1-{MAX_PROMPT_CHARS} karakter olmalı.")
@@ -410,6 +444,7 @@ def _check_edit_form(prompt: str, size: str, quality: str, n: int,
     if (file is None) == (source_id is None):
         raise HTTPException(status_code=422,
                             detail="Tam olarak biri gerekli: file veya source_id.")
+    return model_id
 
 
 def _check_palette_hex(palette_hex: str | None) -> str | None:
@@ -511,11 +546,18 @@ async def edit(
     palette_drop: str = Form(""),
     # Düzenlemenin doğduğu oturum; boş = oturum dışı (bkz. _check_session).
     session_id: str | None = Form(None),
+    # Boş = varsayılan model. `Form("")` ve zorunlu DEĞİL: bugünkü arayüz alanı
+    # hiç göndermiyor ve göndermeyen bir istemci bugünkü davranışı aynen
+    # almalı. Bayat SUNUCU tarafı bu uçta pydantic ile korunamıyor (Starlette
+    # bilinmeyen form alanını sessizce atıyor), o yüzden koruma yanıtın alanı
+    # geri yankılamasıyla kuruluyor — bkz. _check_edit_form'un docstring'i.
+    model: str = Form(""),
 ) -> dict:
     """Ek referans görselleri (`extra_files` yüklemeleri, `extra_source_ids`
     galeri id'leri) form verisinden okunur — bkz. _extra_refs."""
-    _check_edit_form(prompt, size, quality, n, file, source_id,
-                     palette_mode, palette_strength)
+    model_id = _check_edit_form(prompt, size, quality, n, file, source_id,
+                                palette_mode, palette_strength, model)
+    spec = catalog.image_model(model_id)
     palette_hex = _check_palette_hex(palette_hex)
     drop = _check_palette_drop(palette_drop)
 
@@ -529,14 +571,16 @@ async def edit(
                                        palette_strength, palette_id, task="edit",
                                        drop=drop)
     try:
-        images = ac.edit(prompt_sent, refs, size, quality, n)
-    except ac.AzureImageError as e:
+        images = providers.edit(model_id, prompt_sent, refs, size, quality, n)
+    except ac.ImageError as e:
         raise HTTPException(status_code=502, detail=str(e))
 
+    kredi = catalog.cost_for(spec, quality)
     records = [
         storage.save(img, {"prompt": prompt, "size": size, "quality": quality,
                            "parent_id": parent_id, "folder_id": target_folder,
                            "palette": pal, "session_id": session,
+                           "model": model_id, "credits": kredi,
                            "prompt_sent": prompt_sent if pal and pal["applied"] else None},
                      OUTPUT_DIR, now=_now())
         for img in images

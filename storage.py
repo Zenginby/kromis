@@ -12,6 +12,7 @@ import re
 import uuid
 from collections.abc import Iterable
 
+import catalog
 import jsonstore
 
 HISTORY_FILE = "history.json"
@@ -95,6 +96,29 @@ def save(image_bytes: bytes, meta: dict, output_dir: str, *, now: str) -> dict:
         # doğrudan ya da otomatik kayıt kapalıyken) kalıcı bir hâl, o kayıtlara
         # `"session_id": null` yazmak history.json'ın tamamını değiştirirdi.
         **({"session_id": meta["session_id"]} if meta.get("session_id") else {}),
+        # ÜRETEN MODEL (v0.6) ve o üretimin KREDİ maliyeti.
+        #
+        # İkisi de KOŞULSUZ — `imported`/`session_id`'nin koşullu deseni burada
+        # BİLEREK kullanılmıyor. Ayrım şu: o iki alan gerçek bir YOKLUK hâlini
+        # anlatıyor (kayıt içe aktarılmadıysa `imported` hiç olmaz, oturum dışı
+        # üretimin `session_id`'si hiç olmaz). Model ise HER üretilen kayıtta
+        # vardır; alanın yokluğu ancak "o günün varsayılanı" demek olurdu ve
+        # varsayılan DEĞİŞECEK — yani tam olarak bu deponun sevmediği sessiz
+        # belirsizlik. Üstelik /api/edit'in bayat-sunucu yankı kontrolü
+        # (core.js) alan yokken varsayılan modelde kör kalırdı.
+        #
+        # Eski kayıtlar DOKUNULMADAN kalıyor: okuyan taraf
+        # `.get("model") or catalog.DEFAULT_IMAGE_MODEL` diyor —
+        # folder_id/palette ile aynı "yokluğun tanımlı anlamı var" disiplini,
+        # göç YOK. Ölçüldü: tests/test_legacy_formats.py yalnız alan KAYBINI
+        # kovalıyor (`legacy - set(produced)`), alan eklemek testi kırmıyor.
+        "model": meta.get("model") or catalog.DEFAULT_IMAGE_MODEL,
+        # ÜRETİM ANINDAKİ çözülmüş tam sayı, katalog işaretçisi DEĞİL: bir
+        # modelin tarifesi değişince geçmiş retroaktif olarak yeniden yazılmış
+        # olurdu (palette_store'un dondurulmuş `colors` disiplini). İleride
+        # gelecek kredi ledger'ının ihtiyacı olan tek şey bu alan; bugün
+        # hiçbir yerde bakiye düşülmüyor, hiçbir üretim engellenmiyor.
+        "credits": int(meta.get("credits") or 0),
     }
     # immutable append: yeni liste yaz
     with _lock(output_dir):

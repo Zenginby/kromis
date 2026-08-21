@@ -73,3 +73,53 @@ def test_a_non_boolean_value_is_rejected(client):
 def test_the_settings_route_does_not_carry_the_switch(client):
     """Tek kaynak kuralı: aynı değer iki uçtan da okunsa ayrışabilirdi."""
     assert "autosave" not in client.get("/api/settings").text
+
+
+def test_guncelleme_kontrolu_anahtari_KAYDEDILEBILIYOR(client):
+    """Bu alan `PrefsRequest`'te EKSİKTİ ve `extra="forbid"` yüzünden uç 422
+    dönüyordu.
+
+    Kırılma sessiz değil GÜRÜLTÜLÜ ama yine de teşhis edilmemişti:
+    `static/chat.js`'in "yeni sürüm çıkınca haber ver" anahtarı
+    `{guncelleme_kontrolu: …}` POST ediyor, 422 alıyor, onay kutusunu geri alıp
+    "Tercih kaydedilemedi" yazıyordu — yani anahtar HİÇ KAPATILAMIYORDU.
+    `prefs._SCHEMA` alanı zaten tanıyordu; eksik olan yalnız istek modeliydi.
+    """
+    r = client.post("/api/prefs", json={"guncelleme_kontrolu": False})
+
+    assert r.status_code == 200, r.text
+    assert r.json()["guncelleme_kontrolu"] is False
+    assert client.get("/api/prefs").json()["guncelleme_kontrolu"] is False
+
+    # Geri açılabiliyor da olmalı: tek yönlü bir anahtar da kırık sayılır.
+    assert client.post("/api/prefs", json={"guncelleme_kontrolu": True}
+                       ).json()["guncelleme_kontrolu"] is True
+
+
+def test_istek_modeli_ile_prefs_semasi_AYRISMIYOR(client):
+    """`prefs._SCHEMA`'daki her tercih `/api/prefs`'ten yazılabilir olmalı.
+
+    Rotanın notu "buraya düşmek pydantic ile prefs şemasının ayrışması demek
+    olur" diyor — `guncelleme_kontrolu` tam olarak o ayrışmaydı ve bir yıl
+    boyunca kimse fark etmedi. Bu iddia mekanik: yeni bir tercih eklerken
+    istek modelini unutmak artık testte düşüyor.
+    """
+    import models
+    import prefs as prefs_mod
+
+    eksik = set(prefs_mod._SCHEMA) - set(models.PrefsRequest.model_fields)
+    assert not eksik, f"prefs şemasında olup PrefsRequest'te olmayan: {sorted(eksik)}"
+
+
+def test_secili_model_tercihi_gidip_geliyor(client):
+    import catalog
+
+    r = client.post("/api/prefs", json={"image_model": catalog.DEFAULT_IMAGE_MODEL})
+
+    assert r.status_code == 200, r.text
+    assert r.json()["image_model"] == catalog.DEFAULT_IMAGE_MODEL
+
+
+def test_bilinmeyen_model_tercihi_422(client):
+    r = client.post("/api/prefs", json={"image_model": "yok-boyle-model"})
+    assert r.status_code == 422

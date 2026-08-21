@@ -206,13 +206,14 @@ def test_basarisiz_kontrol_de_damgalanir(veri_dizini, monkeypatch):
 
 def test_yeni_surum_varsa_bilgi_doner(veri_dizini, monkeypatch):
     monkeypatch.setattr(guncelleme, "_tazeleme_baslat", lambda d: None)
+    yayin = guncelleme.GECERLI_URL_ONEKI + "releases/tag/v99.0.0"
     _onbellek_yaz(veri_dizini, {
-        "zaman": time.time(), "surum": "99.0.0", "url": "https://ornek/yayin",
+        "zaman": time.time(), "surum": "99.0.0", "url": yayin,
     })
 
     sonuc = guncelleme.bilgi(veri_dizini)
 
-    assert sonuc == {"surum": "99.0.0", "url": "https://ornek/yayin"}
+    assert sonuc == {"surum": "99.0.0", "url": yayin}
 
 
 def test_guncel_surumde_bilgi_yok(veri_dizini, monkeypatch):
@@ -227,5 +228,64 @@ def test_url_yoksa_yayin_sayfasina_dusulur(veri_dizini, monkeypatch):
     ama nereden alacağını söylemez."""
     monkeypatch.setattr(guncelleme, "_tazeleme_baslat", lambda d: None)
     _onbellek_yaz(veri_dizini, {"zaman": time.time(), "surum": "99.0.0"})
+
+    assert guncelleme.bilgi(veri_dizini)["url"] == guncelleme.YAYIN_SAYFASI
+
+
+# --------------------------------------------------------------------------
+# Bağlantının doğrulanması
+# --------------------------------------------------------------------------
+
+def test_yabanci_url_reddedilir(monkeypatch, tmp_path):
+    """Cevaptaki `html_url` arayüzde tıklanabilir bir bağlantı oluyor
+    (`static/settings.js` → `#settings-update-link.href`).
+
+    Risk soyut değil: `follow_redirects=True` bilinçle açık ve v0.5.3'te depo
+    taşındığında `Zenginby` adı boşaldı. O adı alan biri isteği kendi
+    `releases/latest`ine yönlendirebilir; doğrulama olmadan uygulamanın "indir"
+    bağlantısı yabancı bir yayın sayfasını gösterirdi.
+    """
+    import httpx
+
+    class SahteYanit:
+        def raise_for_status(self): pass
+        def json(self): return {
+            "tag_name": "v99.0.0",
+            "html_url": "https://github.com/saldirgan/gpt-image-studio/releases/tag/v99.0.0",
+        }
+
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: SahteYanit())
+    monkeypatch.setattr(guncelleme.paths, "data_dir", lambda: str(tmp_path))
+
+    assert guncelleme._sor() == {"surum": "99.0.0", "url": guncelleme.YAYIN_SAYFASI}
+
+
+def test_kendi_deponun_urli_oldugu_gibi_gecer(monkeypatch, tmp_path):
+    """Doğrulama, işe yarayan hâli de geçirmek ZORUNDA: yoksa bağlantı her
+    sürümde `releases/latest`e düşer ve kullanıcı çıkan sürümün notlarını
+    değil, en yenisinin sayfasını görür."""
+    import httpx
+
+    dogru = guncelleme.GECERLI_URL_ONEKI + "releases/tag/v99.0.0"
+
+    class SahteYanit:
+        def raise_for_status(self): pass
+        def json(self): return {"tag_name": "v99.0.0", "html_url": dogru}
+
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: SahteYanit())
+    monkeypatch.setattr(guncelleme.paths, "data_dir", lambda: str(tmp_path))
+
+    assert guncelleme._sor()["url"] == dogru
+
+
+def test_onbellekteki_yabanci_url_de_reddedilir(veri_dizini, monkeypatch):
+    """Önbellek dosyası sürüm yükseltmelerini AŞARAK kalıyor: doğrulama
+    eklenmeden önce yazılmış (ya da elle bozulmuş) bir kayıt okuma yolundan
+    girebilir."""
+    monkeypatch.setattr(guncelleme, "_tazeleme_baslat", lambda d: None)
+    _onbellek_yaz(veri_dizini, {
+        "zaman": time.time(), "surum": "99.0.0",
+        "url": "https://github.com/saldirgan/gpt-image-studio/releases/latest",
+    })
 
     assert guncelleme.bilgi(veri_dizini)["url"] == guncelleme.YAYIN_SAYFASI

@@ -213,3 +213,20 @@ def test_kullaniciya_bir_sey_soylemeyen_tipler_nota_girmez():
 def test_tipsiz_baslik_nota_oldugu_gibi_girer():
     notlar = sk.degisiklik_notlari(["Telefondaki üç arayüz kusurunu düzelt (#34)"])
     assert notlar == ["Telefondaki üç arayüz kusurunu düzelt"]
+
+
+def test_birlestirme_basligi_nota_girmez():
+    """v0.5.3'te GUNCELLEME.md'ye "Merge pull request #40 from Zenginby/claude/…"
+    satırı yazıldı: kullanıcıya yazılmış bir belgeye ham dal adı girdi.
+
+    Sebep, tipsiz başlığın olduğu gibi geçmesi (bir üstteki test) ile
+    birleştirme commit'inin Conventional Commits öneki taşımaması. Squash-merge
+    edilen sürümlerde bu commit hiç oluşmadığı için hata görünmedi; merge
+    commit'iyle birleşen ilk sürümde ortaya çıktı ve her merge'de yinelerdi.
+    """
+    notlar = sk.degisiklik_notlari([
+        "Merge pull request #40 from Zenginby/claude/gis-keystore-mobile-app-mgakyw",
+        "Merge branch 'main' into ozellik",
+        "fix: depo adresi yeni hesaba çevrildi",
+    ])
+    assert notlar == ["depo adresi yeni hesaba çevrildi"]

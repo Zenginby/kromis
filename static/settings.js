@@ -106,7 +106,15 @@ async function loadSettings(openIfMissing) {
     const res = await fetch("/api/settings");
     const s = await res.json();
     applyConfigured(s);
-    if (!configured && openIfMissing) openSettings();
+    // Kapı `configured`e BAKMIYOR: o bayrak yalnız AZURE'u ölçüyor ve
+    // yalnızca OpenAI anahtarı olan kullanıcıya her açılışta Ayarlar
+    // panelini zorla açıyordu — tam olarak 180342a'nın kapatmaya çalıştığı
+    // durum. Ölçüt "hiçbir modelin anahtarı yok", yani ilk kurulum.
+    //
+    // `goBlockReason()` BİLEREK kullanılmıyor: o SEÇİLİ modeli ölçüyor ve
+    // başka bir modeli yapılandırmış kullanıcı sırf anahtarsız bir model
+    // seçtiği için paneli yüzünde bulurdu.
+    if (openIfMissing && !imageModels.some((m) => m.configured)) openSettings();
   } catch {
     // durum alınamadıysa fail-closed: butonu kilitle, kullanıcıyı ayarlara yönlendir
     configured = false;

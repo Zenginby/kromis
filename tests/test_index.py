@@ -2912,3 +2912,97 @@ def test_kredi_satiri_ve_model_notu_var():
     for eid in ("run-cost", "model-note", "model-note-text",
                 "model-settings-link"):
         assert f'id="{eid}"' in html, eid
+
+
+def _js(ad: str) -> str:
+    return TestClient(appmod.app).get(f"/static/{ad}").text
+
+
+def test_sohbet_modeli_secicisi_YONLENDIRME_gelmeden_gizli():
+    """Boş ve GÖRÜNÜR bir açılır liste, #model-note'un reddettiği şeyin aynısı.
+
+    `#chat-model` PR #41'de eklendi ama seçeneklerini dolduran hiçbir kod yok
+    (`/api/settings` → `chat_models` sunuluyor, okuyan yok) ve `ChatRequest`
+    bir model alanı KABUL ETMİYOR (`extra="forbid"`), yani seçim tel üzerine
+    çıkamıyor. Yönetmen modunda kullanıcı tıklanabilir, boş bir liste
+    görüyordu.
+
+    İDDİA KOŞULLU: yönlendirme geldiği gün (ChatRequest bir `model` alanı
+    kabul ettiğinde) bu test seçicinin AÇILMASINI istiyor. Yani bekçi hem
+    bugünü kilitliyor hem de yarın kendini iptal ediyor — "gizle ve unut"
+    olmasın diye.
+    """
+    html = _served()
+    yonlendirme_var = "model" in models.ChatRequest.model_fields
+    isaretsiz = re.sub(r"<!--.*?-->", "", html, flags=re.S)
+    secici = re.search(r"<select id=\"chat-model\"[^>]*>", isaretsiz)
+    assert secici, "#chat-model kayboldu (152 id sözleşmesi)"
+
+    if yonlendirme_var:
+        assert "hidden" not in secici.group(0), (
+            "ChatRequest artık model alıyor — seçici görünür olmalı ve "
+            "seçenekleri doldurulmalı")
+    else:
+        assert "hidden" in secici.group(0), (
+            "seçim tel üzerine çıkamıyor ama liste görünür — kullanıcıya "
+            "tutulmayan bir seçim sözü veriliyor")
+
+
+def test_model_tercihi_secimle_AYNI_ANDA_bellekte_de_tazeleniyor():
+    """`savePref` diske yazıyor; `seciliModelTercihi` de tazelenmek ZORUNDA.
+
+    `applyModels` her çağrıldığında o değişkeni okuyor ve o yalnızca açılışta
+    (`loadModelPref`) yazılıyordu. "Kaydet"e basmak `applyConfigured`i
+    yeniden çalıştırdığı için kullanıcının bu turda seçtiği model AÇILIŞTAKİ
+    değere geri sıçrıyordu — yani PR #41'in ana akışı ("OpenAI modelini seç →
+    anahtarını gir → kaydet") kendi seçimini geri alıyordu.
+    """
+    js = _js("core.js")
+    blok = re.search(r"\$\(\"model\"\)\.addEventListener\(\"change\".*?\n\}\);",
+                     js, flags=re.S)
+    assert blok, "#model change dinleyicisi bulunamadı — kalıp bayatladı mı?"
+    assert "savePref(" in blok.group(0)
+    assert "seciliModelTercihi" in blok.group(0), (
+        "tercih diske yazılıyor ama bellekteki kopya eski kalıyor — sonraki "
+        "applyModels seçimi geri alır")
+
+
+def test_acilista_ayarlari_zorla_acan_kapi_SAGLAYICI_NOTR():
+    """`configured` yalnız AZURE'u ölçüyor; açılış kapısı ona bakmamalı.
+
+    Yalnızca OpenAI anahtarı olan kullanıcı her açılışta Ayarlar panelini
+    yüzünde buluyordu — tam olarak 180342a'nın kapatmaya çalıştığı durum.
+    `#go`nun kapısı `goBlockReason()`e taşınmıştı, bu satır taşınmamıştı.
+    """
+    blok = re.search(r"async function loadSettings\(openIfMissing\) \{.*?\n\}",
+                     _js("settings.js"), flags=re.S)
+    assert blok, "loadSettings bulunamadı — kalıp bayatladı mı?"
+    govde = blok.group(0)
+    assert "openSettings()" in govde, "açılış kapısı kayboldu"
+    assert "!configured && openIfMissing" not in govde, (
+        "kapı Azure'a özel bayrağa bakıyor — OpenAI kullanıcısında panel "
+        "her açılışta zorla açılır")
+    assert "imageModels.some" in govde, (
+        "ölçüt 'hiçbir modelin anahtarı yok' olmalı (ilk kurulum)")
+    # `catch` dalındaki KOŞULSUZ `openSettings()` bilerek duruyor: durum hiç
+    # okunamadıysa fail-closed davranmak doğru — orada ölçülecek bir katalog
+    # da yok. Bu iddia onu yanlışlıkla silmeye karşı.
+    assert govde.count("openSettings()") == 2, (
+        "fail-closed dalı (catch) kayboldu ya da üçüncü bir kapı eklendi")
+
+
+def test_yonetmenin_onerisi_KREDI_tahminini_de_tazeliyor():
+    """`applyToForm` programatik `.value` yazıyor: `change` DOĞMUYOR.
+
+    `syncSpecs` bu yüzden elle çağrılıyordu, ama PR #41'de eklenen
+    `syncRunCost` çağrılmıyordu — yönetmenin önerisi adet/kalite
+    değiştirdiğinde `#run-cost` eski tahmini göstermeye devam ediyordu.
+    Bu ikisi core.js'teki `change` dinleyicisinde TEK çift olarak koşuyor;
+    ayrışması sessiz.
+    """
+    blok = re.search(r"function applyToForm\(parsed\) \{.*?\n\}",
+                     _js("chat.js"), flags=re.S)
+    assert blok, "applyToForm bulunamadı — kalıp bayatladı mı?"
+    assert "syncSpecs()" in blok.group(0)
+    assert "syncRunCost()" in blok.group(0), (
+        "üretim ayarları çipi tazeleniyor ama kredi tahmini eski kalıyor")

@@ -727,7 +727,11 @@ function applyToForm(parsed) {
   $("prompt").focus();
   // Programatik `.value` ataması `change` olayını DOĞURMAZ: syncSpecs elle
   // çağrılmazsa üretim ayarları çipi eski değerleri göstermeye devam eder.
+  // `syncRunCost` de aynı sebeple burada: ikisi `change` dinleyicisinde TEK
+  // çift olarak koşuyor (core.js → size/quality/n) ve yönetmenin önerisi
+  // adet/kalite değiştirdiğinde kredi tahmini eskisinde kalıyordu.
   syncSpecs();
+  syncRunCost();
   // SESSİZ SAPMA YASAK (palette applied:false ile aynı gerekçe): uygulanamayan
   // öneri açıkça söylenir, yoksa kullanıcı formda başka bir ayar görür ve
   // sonucu açıklayamaz.

@@ -150,3 +150,21 @@ def test_ESKI_kayitlar_model_alani_olmadan_da_okunuyor(tmp_path):
     assert len(okunan) == 1
     assert "model" not in okunan[0], "eski kayıt YENİDEN YAZILMIŞ"
     assert okunan[0].get("model") is None
+
+
+def test_bos_model_GECIYOR_varsayilana_cevrilmiyor(tmp_path):
+    """Çağıran alanı GÖNDERDİYSE değer onun sözü — boş dize dahil.
+
+    Ayrım `in` ile kuruluyor, `or` ile değil. `or` her boş değeri varsayılana
+    çeviriyordu ve ÜRETİM OLMAYAN üç yol (`/api/import` içe aktarımı, logo ve
+    afiş bindirmeleri) modeli hiç geçmediği için kayda "azure-gpt-image-2
+    üretti" yazılıyordu. Bu alanın tek müşterisi ileride gelecek kredi
+    ledger'ı; oraya uydurma bir üretici girmemesi gerekiyor.
+    """
+    rec = storage.save(b"x", {"prompt": "k", "size": "1024x1024", "quality": "",
+                              "parent_id": None, "model": ""},
+                       str(tmp_path), now="2026-01-01T00:00:00")
+
+    assert rec["model"] == "", "boş model varsayılana çevrildi — uydurma üretici"
+    assert "model" in rec, "alan tümden düştü (sözleşme: alan HER kayıtta var)"
+    assert rec["credits"] == 0

@@ -112,7 +112,21 @@ def save(image_bytes: bytes, meta: dict, output_dir: str, *, now: str) -> dict:
         # folder_id/palette ile aynı "yokluğun tanımlı anlamı var" disiplini,
         # göç YOK. Ölçüldü: tests/test_legacy_formats.py yalnız alan KAYBINI
         # kovalıyor (`legacy - set(produced)`), alan eklemek testi kırmıyor.
-        "model": meta.get("model") or catalog.DEFAULT_IMAGE_MODEL,
+        #
+        # AYRIM `in` ile, `or` ile DEĞİL: çağıran alanı GÖNDERDİYSE değer
+        # onun sözü — boş dize dahil. `or` her boş değeri varsayılana
+        # çeviriyordu ve ÜRETİM OLMAYAN üç yol (`/api/import` içe aktarımı,
+        # logo ve afiş bindirmeleri) modeli hiç geçmediği için kayda
+        # "azure-gpt-image-2 üretti" yazılıyordu. Bindirmeler artık KAYNAĞIN
+        # modelini devralıyor (türev kendi başına bir üretim değil), içe
+        # aktarım ise boş dize geçiyor: "üreteni yok", `credits: 0`ın
+        # ("bedeli yok") tam karşılığı. İkisi de uydurma değil ölçülmüş olgu
+        # — bu alanın tek müşterisi ileride gelecek kredi ledger'ı.
+        #
+        # Alanı HİÇ göndermeyen çağıran eski üretim yolu; orada varsayılan
+        # doğru cevap olmaya devam ediyor.
+        "model": (str(meta["model"] or "") if "model" in meta
+                  else catalog.DEFAULT_IMAGE_MODEL),
         # ÜRETİM ANINDAKİ çözülmüş tam sayı, katalog işaretçisi DEĞİL: bir
         # modelin tarifesi değişince geçmiş retroaktif olarak yeniden yazılmış
         # olurdu (palette_store'un dondurulmuş `colors` disiplini). İleride

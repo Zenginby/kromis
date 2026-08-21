@@ -442,7 +442,15 @@
       <!-- Yönetmen modunun karşılığı AYNI YUVADA: ikisi #composer[data-mode]
            ekseniyle birbirini dışlıyor, yani genişlik bedeli SIFIR. -->
       <label class="sr-only" for="chat-model">Sohbet modeli</label>
-      <select id="chat-model" class="model-chip" title="Prompt Yönetmeni modeli">
+      <!-- HENÜZ GİZLİ ve bu bilinçli: seçeneklerini dolduran hiçbir kod yok
+           (`/api/settings` → `chat_models` sunuluyor ama okunmuyor) ve
+           `ChatRequest` bir model alanı KABUL ETMİYOR (extra="forbid"), yani
+           seçim tel üzerine çıkamıyor. Görünür ve boş bir açılır liste,
+           #model-note'un reddettiği şeyin aynısı: kullanıcıya bir seçim
+           sözü verip hiçbir şey söylememek. Yönlendirme gelince açılacak —
+           bekçisi tests/test_index.py'de, ChatRequest'e model alanı
+           eklendiği gün kırmızıya düşüyor. -->
+      <select id="chat-model" class="model-chip" title="Prompt Yönetmeni modeli" hidden>
       </select>
 
       <!-- Kapı açıklaması #chat-gate ile AYNI duruş: kontrolün KENDİSİ

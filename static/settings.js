@@ -31,9 +31,25 @@ function applyConfigured(s) {
   $("set-key").placeholder = configured
     ? "Kayıtlı · değiştirmek için yeni anahtar yaz"
     : "Azure API anahtarını yapıştır";
-  if (!configured) {
-    statusEl.textContent = "Başlamak için Azure ayarlarını gir (sağ üstteki ⚙).";
-  } else if (statusEl.textContent.startsWith("Başlamak için")) {
+
+  // Sağlayıcı başına "Kayıtlı" durumu. `!== undefined` guard'ı `version` ve
+  // `guncelleme` ile AYNI gerekçeye sahip: POST /api/settings yanıtı GET'ten
+  // daha dar olabilir ve guard olmadan "Kaydet"ten sonra durumlar silinirdi.
+  if (s && s.providers !== undefined) {
+    $("set-openai-key").placeholder = s.providers.openai
+      ? "Kayıtlı · değiştirmek için yeni anahtar yaz"
+      : "sk-…";
+    renderProviderStatus(s.providers);
+  }
+
+  // Açılış mesajı artık SEÇİLİ MODELE bakıyor, Azure'a değil: yalnızca OpenAI
+  // anahtarı olan bir kullanıcıya "Azure ayarlarını gir" demek onu hiç
+  // ihtiyacı olmayan bir forma yönlendirirdi.
+  const kapali = goBlockReason();
+  if (kapali) {
+    statusEl.textContent = `${kapali} (sağ üstteki ⚙)`;
+  } else if (statusEl.textContent.includes("(sağ üstteki ⚙)")
+             || statusEl.textContent.startsWith("Başlamak için")) {
     statusEl.textContent = "";
   }
   // POST /api/settings yanıtında `version` YOK (sürüm çalışma anında
@@ -104,7 +120,40 @@ async function loadSettings(openIfMissing) {
   }
 }
 
-function openSettings() {
+/** Sağlayıcı durum satırları. Seçici + tek alan grubu deseninin bedeli olan
+ *  "hangisi kurulu?" görünümünü geri veriyor; kaynak `providers` bayrakları. */
+function renderProviderStatus(providers) {
+  const satirlar = [
+    ["azure_image", "Azure OpenAI"],
+    ["openai", "OpenAI"],
+  ];
+  $("provider-status").replaceChildren(...satirlar.map(([id, ad]) => {
+    const li = document.createElement("li");
+    // `textContent`: sunucudan gelen hiçbir şey innerHTML'e girmiyor.
+    li.textContent = `${ad}: ${providers[id] ? "kayıtlı" : "kayıtlı değil"}`;
+    li.classList.toggle("ok", !!providers[id]);
+    return li;
+  }));
+}
+
+/** Seçilen sağlayıcının alan grubunu gösterir, ötekileri gizler. */
+function syncProviderFields() {
+  const secili = $("set-provider").value;
+  for (const p of ["azure", "openai"]) {
+    $(`prov-${p}`).hidden = p !== secili;
+  }
+}
+
+$("set-provider").addEventListener("change", syncProviderFields);
+
+function openSettings(provider) {
+  // Gizli alanların HEPSİ temizleniyor (write-only): kayıtlı anahtar hiçbir
+  // zaman forma dolmuyor, o yüzden boş kutu "sildim" değil "dokunmadım"dır.
+  $("set-openai-key").value = "";
+  // Belirli bir sağlayıcıya derin bağlantı: #model-settings-link buradan
+  // geliyor, "anahtar yok" uyarısı doğrudan doğru gruba açsın.
+  if (provider) $("set-provider").value = provider;
+  syncProviderFields();
   $("set-key").value = ""; // her açılışta boş (write-only)
   // #set-chat-deployment BİLEREK temizlenmiyor: write-only değil, GET'ten dolu
   // geliyor. Temizlenirse kullanıcı endpoint'ini güncellemek için paneli açıp
@@ -122,8 +171,15 @@ async function saveSettings() {
   const base_url = $("set-endpoint").value.trim();
   const api_key = $("set-key").value;
   const st = $("settings-status");
-  if (!base_url) { st.textContent = "Endpoint gerekli."; return; }
-  if (!configured && !api_key.trim()) { st.textContent = "İlk kurulumda API key gerekli."; return; }
+  // Kapı SAĞLAYICIYA BAĞLI. Öncesinde koşulsuzdu ve "Endpoint gerekli" hatası
+  // OpenAI anahtarı eklemeye çalışan kullanıcıya BAŞKA bir sağlayıcı hakkında
+  // konuşuyordu — sunucu tarafındaki aynı kilidin istemci yarısı.
+  if ($("set-provider").value === "azure") {
+    if (!base_url) { st.textContent = "Endpoint gerekli."; return; }
+    if (!configured && !api_key.trim()) {
+      st.textContent = "İlk kurulumda API key gerekli."; return;
+    }
+  }
 
   $("settings-save").disabled = true;
   st.textContent = "Kaydediliyor…";
@@ -134,8 +190,12 @@ async function saveSettings() {
       // chat_deployment HER ZAMAN gönderiliyor: sunucu "alan yok" ile "boş"
       // arasında ayrım yapıyor (bkz. models.SettingsRequest) ve boş dize
       // "Prompt Yönetmeni'ni kapat" demek.
+      // Boş gizli alan "mevcut korunur" demek (sunucunun kuralı), o yüzden
+      // her sağlayıcının alanı KOŞULSUZ gönderilebiliyor — istemcinin hangi
+      // grubun açık olduğuna göre dallanmasına gerek yok.
       body: JSON.stringify({ api_key, base_url,
-                             chat_deployment: $("set-chat-deployment").value.trim() }),
+                             chat_deployment: $("set-chat-deployment").value.trim(),
+                             openai_api_key: $("set-openai-key").value }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -143,6 +203,7 @@ async function saveSettings() {
     }
     applyConfigured(await res.json());
     $("set-key").value = "";
+    $("set-openai-key").value = "";
     st.textContent = "Kaydedildi.";
     setTimeout(closeSettings, 550);
   } catch (e) {

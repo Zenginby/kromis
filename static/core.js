@@ -464,9 +464,11 @@ $("model").addEventListener("change", () => {
 });
 
 $("model-settings-link").addEventListener("click", () => {
+  // Doğrudan seçili modelin SAĞLAYICI grubunu açıyor: "anahtar yok" uyarısının
+  // düğmesi kullanıcıyı doğru kutuya götürmezse uyarı yarım kalır.
   // settings.js'in adına OLAY ANINDA dokunuluyor — yükleme sırası kuralının
   // izin verdiği tek yol (settings.js core.js'ten SONRA yükleniyor).
-  openSettings();
+  openSettings(currentModel ? currentModel.provider : undefined);
 });
 
 // ── Üretim ayarları çipi ──

@@ -738,19 +738,62 @@
       <button id="settings-close" class="modal-x" type="button" aria-label="Kapat">×</button>
     </div>
     <div class="sheet-body">
-      <h3 class="modal-subhead modal-subhead-first">Azure · gpt-image-2</h3>
+      <h3 class="modal-subhead modal-subhead-first">Görsel modelleri · erişim</h3>
       <p class="modal-desc">
-        gpt-image-2 erişim bilgileri. Yalnızca bu makineye kaydedilir (izin 0600).
-        API anahtarı ekranda hiçbir zaman gösterilmez.
+        Anahtarlar yalnızca bu makineye kaydedilir (izin 0600) ve ekranda
+        hiçbir zaman gösterilmez. Sağlayıcıyı seç, alanlarını doldur, Kaydet'e bas.
       </p>
 
-      <label for="set-endpoint">Endpoint (Base URL)</label>
-      <input id="set-endpoint" type="url" autocomplete="off" spellcheck="false"
-             placeholder="https://…/openai/v1/" />
+      <!-- SEÇİCİ + TEK ALAN GRUBU deseni. Alternatifler ve neden değil:
+             · Her sağlayıcıya bir .modal-subhead bölümü → 360px'de tam
+               genişlik bir slide-over'da onlarca alanlık bir kaydırma olur ve
+               istek "10+ modele ölçeklenirken alan duvarına dönüşmesin" idi.
+             · <details> akordeon → index.html'de HİÇ <details> yok. Bir
+               slide-over'ın içinde, Android'de, ayarlar panelinde hiç
+               kullanılmamış bir etkileşim ilkeli açmanın yeri burası değil.
+           Seçicinin bedeli "hangisi kurulu?" sorusunu bir bakışta
+           cevaplayamamak; o bedel aşağıdaki #provider-status satırıyla
+           METİNLE geri alınıyor ve kaynağı GET /api/settings'in `providers`
+           bayrakları, yani ikinci bir doğruluk kaynağı doğmuyor. -->
+      <ul id="provider-status" class="provider-status" aria-live="polite"></ul>
 
-      <label for="set-key">API Key</label>
-      <input id="set-key" type="password" autocomplete="off" spellcheck="false"
-             placeholder="Azure API anahtarını yapıştır" />
+      <label for="set-provider">Sağlayıcı</label>
+      <select id="set-provider">
+        <option value="azure" selected>Azure OpenAI (varsayılan)</option>
+        <option value="openai">OpenAI · gpt-image-1, DALL·E 3</option>
+      </select>
+
+      <!-- Her sağlayıcı AYRI blok, paylaşılan tek bir <input> DEĞİL: paylaşılan
+           bir alan sağlayıcı değişince ya yazılanı TAŞIR (yanlış sağlayıcıya
+           kaydedilir) ya da TEMİZLER (kullanıcı yazdığını kaybeder). Ayrı
+           bloklar bu ikilemi hiç doğurmuyor.
+           #set-endpoint ve #set-key id'leri KALIYOR — 152 id sözleşmesinin
+           parçası ve applyConfigured onları dolduruyor; yalnızca yerleri
+           değişti, yani id defterine kayıt GEREKMİYOR. -->
+      <div id="prov-azure" class="prov-fields">
+        <label for="set-endpoint">Endpoint (Base URL)</label>
+        <input id="set-endpoint" type="url" autocomplete="off" spellcheck="false"
+               placeholder="https://…/openai/v1/" />
+
+        <label for="set-key">API Key</label>
+        <input id="set-key" type="password" autocomplete="off" spellcheck="false"
+               placeholder="Azure API anahtarını yapıştır" />
+        <p class="field-note">
+          Azure AI Foundry'deki kaynak adresi ve anahtarı. Adres her kullanıcıda
+          farklı olduğu için burada soruluyor — OpenAI'de sabit.
+        </p>
+      </div>
+
+      <div id="prov-openai" class="prov-fields" hidden>
+        <label for="set-openai-key">OpenAI API Key</label>
+        <input id="set-openai-key" type="password" autocomplete="off"
+               spellcheck="false" placeholder="sk-…" />
+        <p class="field-note">
+          platform.openai.com → API keys. <strong>DALL·E 3</strong> tek görsel
+          üretir ve referans görselle çalışmaz; <strong>gpt-image-1</strong>
+          ikisini de yapar.
+        </p>
+      </div>
 
       <h3 class="modal-subhead">Prompt Yönetmeni (sohbet modeli)</h3>
       <label for="set-chat-deployment">Dağıtım adı</label>

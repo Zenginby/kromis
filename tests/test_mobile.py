@@ -592,3 +592,36 @@ def test_leaving_the_app_needs_two_back_presses(istemci):
 
     kapi = kt.split("private fun cikisiOnayla()")[1].split("\n    }")[0]
     assert "sistemGerisi()" in kapi, "kapı çıkışa hiç düşmüyor"
+
+
+def test_model_seridi_kapsayiciyi_genisletemiyor(istemci):
+    """`.composer-head` `min-width: 0` taşımak ZORUNDA.
+
+    Bu iddia ölçülmüş bir regresyonun mandalı. `#composer` bir flex kolon;
+    `.composer-head` onun bir flex ÖĞESİ ve öğenin varsayılan `min-width: auto`
+    değeri kendi min-content genişliğine çözülüyor. İçindeki `<select id="model">`
+    öğesinin min-content'i EN UZUN SEÇENEĞİNİN metni kadar ("OpenAI · DALL·E 3
+    — 10–20 kredi · kurulum gerekli"), yani satır kapsayıcının içerik
+    kutusundan taşıyor VE kardeşlerini de kendisiyle birlikte genişletiyor.
+
+    Somut ölçüm (Chromium, 360×780): taşma varken composer'ın BÜTÜN çocukları
+    334px'ten 357px'e çıkıyor ve sayfa 10px yatay kayıyor (`scrollWidth` 370,
+    `clientWidth` 360). `main`'de taşma YOK, yani bu tümüyle model şeridinin
+    getirdiği bir bedel.
+
+    Neden mekanik bir CSS iddiası: kırılma yalnız DAR ekranda ve yalnız GERÇEK
+    bir tarayıcıda görünüyor — pytest CSS'i çalıştırmıyor, masaüstü genişliğinde
+    de hiç belirmiyor. Zayıf ama doğru yerde duran bir mandal; kuralı silen
+    kişiye nedenini söylüyor.
+
+    DİKKAT: `.model-chip`e (yani `<select>`in kendisine) `min-width: 0` vermek
+    YETMİYOR — denendi ve taşma sürdü. Kısıt öğenin kendisinde değil, onu tutan
+    SATIRDA.
+    """
+    css = _metin(istemci, "/static/style.css")
+    blok = css.split(".composer-head {", 1)
+    assert len(blok) == 2, ".composer-head kuralı kaybolmuş"
+    govde = blok[1].split("}", 1)[0]
+    assert "min-width: 0" in govde, (
+        ".composer-head'in `min-width: 0`ı silinmiş — 360px'de model şeridi "
+        "composer'ın bütün çocuklarını genişletir ve sayfa yatay kayar")

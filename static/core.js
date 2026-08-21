@@ -358,8 +358,12 @@ function applyModel(id, { announce = true } = {}) {
   const nn = fillAxis("n", adetler, undefined, "1");
   if (nn) dusenler.push(`${axisLabel("n")} ${nn}`);
 
-  // Kalite ekseni OLMAYAN model (Gemini): satır tümden gizleniyor. Tel üzerinde
+  // `quality_hidden` beyan eden model: satır tümden gizleniyor. Tel üzerinde
   // yine geçerli bir jeton gidiyor — katalogdaki sentetik "standard".
+  // Örnek olarak burada "Gemini" yazıyordu ve YANLIŞTI: Nano Banana'nın
+  // çözünürlük ekseni var (1K/2K/4K) ve fiyatı da onunla değişiyor, yani
+  // gizlenmesi gereken bir eksen değil — `image_size` jetonları `qualities`
+  // olarak geliyor ve satır GÖRÜNÜYOR.
   $("spec-quality").hidden = !!model.quality_hidden;
   // Eksenin ADI modele göre değişiyor: piksel boyutu seçen model "Boyut",
   // oran seçen model "Oran" diyor. chat.js'in atlanan-öneri metni buradan okuyor.

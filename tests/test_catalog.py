@@ -190,3 +190,81 @@ def test_adressiz_kimligin_varsayilan_adresi_var():
         if cred.id.startswith("azure"):
             continue    # Azure'da adres FORMDA sorulur, varsayılanı yok
         assert cred.default_base_url, f"{cred.id}: ne varsayılan adres ne form alanı"
+
+
+# ── Varsayılan jetonlar ve etiketler ───────────────────────────────────
+
+
+@pytest.mark.parametrize("m", catalog.IMAGE_MODELS, ids=lambda m: m.id)
+def test_varsayilan_jetonlar_MODELIN_kumesinde(m):
+    """`default_size`/`default_quality` beyan edilen kümeden OLMAK zorunda.
+
+    v0.6'ya kadar ölçülmeyen bir boşluktu ve bedeli sessiz: arayüz `fillAxis`
+    ile o değeri arıyor, bulamıyor ve "model bu ayarları desteklemiyor,
+    varsayılana düşüldü" diyor — yani modelin KENDİ varsayılanı için düşme
+    uyarısı basıyor. Gemini girdileri `default_size`ı açıkça yazan ilk
+    girdiler olduğu için kapı burada kuruldu.
+    """
+    assert catalog.default_size_of(m) in m.sizes, (
+        f"{m.id}: varsayılan boyut kümesinde yok")
+    assert catalog.default_quality_of(m) in m.qualities, (
+        f"{m.id}: varsayılan kalite kümesinde yok")
+
+
+@pytest.mark.parametrize("m", catalog.IMAGE_MODELS, ids=lambda m: m.id)
+def test_beyan_edilen_her_jetonun_TURKCE_etiketi_var(m):
+    """Bilinmeyen jetonun etiketi kendisi olur (`geometry_of`) ve bu bilinçli
+    bir SAĞLAMLIK kararı — ama KENDİ katalogumuzdaki bir jetonun etiketsiz
+    kalması ayrı bir şey: seçicide "9:16" satırı Azure'ın "◼ 1:1" satırıyla
+    aynı hizada durmuyor ve kalite ekseninde çıplak jeton ("2K") Türkçe
+    listenin ortasında yabancı görünüyor.
+    """
+    for jeton in m.sizes:
+        assert jeton in catalog.GEOMETRY_LABELS, (
+            f"{m.id}: `{jeton}` GEOMETRY_LABELS'ta yok")
+    for jeton in m.qualities:
+        assert jeton in catalog.QUALITY_LABELS, (
+            f"{m.id}: `{jeton}` QUALITY_LABELS'ta yok")
+
+
+def test_gemini_oranlari_AZURE_nun_uc_boyutunun_karsiligini_tasiyor():
+    """Model değiştirmek ORANI TAŞIMALI, varsayılana düşmemeli.
+
+    core.js'in `fillAxis` fonksiyonunun ikinci kademesi `ratio` üzerinden
+    çalışıyor: Azure'ın `1024x1536`ı da Gemini'nin `2:3`ü de aynı oranı
+    bildiriyorsa geçiş SESSİZ oluyor. Bir oran eksik kalırsa kullanıcı model
+    değiştirdiğinde sebepsiz bir "varsayılana düşüldü" uyarısı görür.
+    """
+    azure = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
+    azure_oranlari = {catalog.geometry_of(s)[1] for s in azure.sizes}
+    gemini_oranlari = {catalog.geometry_of(s)[1] for s in catalog.ASPECT_RATIOS}
+
+    assert azure_oranlari <= gemini_oranlari, (
+        "Azure'dan Gemini'ye geçişte karşılığı olmayan oran: "
+        f"{sorted(azure_oranlari - gemini_oranlari)}")
+
+
+def test_oran_jetonlari_TEK_kaynaktan_geliyor():
+    """İki Gemini girdisi aynı demeti paylaşıyor: elle iki kez yazmak, birine
+    oran ekleyip diğerini unutmanın kapısı olurdu."""
+    gemini = [m for m in catalog.IMAGE_MODELS if m.provider == "gemini"]
+    assert gemini, "katalogda Gemini modeli yok"
+    for m in gemini:
+        assert m.sizes is catalog.ASPECT_RATIOS, (
+            f"{m.id}: oranları kopyalamış, ASPECT_RATIOS'u paylaşmıyor")
+
+
+# ── Kalkmış modeller ───────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("olu", ["dall-e-3", "dall-e-2"])
+def test_KALKMIS_model_adlari_katalogda_yok(olu):
+    """Ölmüş bir girdiyi katalogda tutmanın bedeli ÖLÇÜLDÜ: kullanıcı
+    seçebiliyor, üretim 404 alıyor ve hata "model bulunamadı" diyor — yani
+    kullanıcı hatayı kendi anahtarında arıyor.
+
+    `dall-e-2`/`dall-e-3` 12 Mayıs 2026'da OpenAI API'sinden kalktı. Bu test
+    girdinin geri EKLENMESİNE karşı bir tripwire; `wire_model`e bakıyor çünkü
+    kimliği (`openai-dall-e-3`) yeniden adlandırmak kapıyı açık bırakırdı.
+    """
+    assert olu not in {m.wire_model for m in catalog.IMAGE_MODELS}

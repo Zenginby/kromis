@@ -224,8 +224,33 @@ CREDENTIALS: tuple[Credential, ...] = (
 # sayı yazılıyor (bkz. cost_for ve storage.save), katalog işaretçisi değil:
 # tarife değişince geçmiş retroaktif olarak yeniden yazılmasın. İleride gelecek
 # ledger'ın ihtiyacı olan tek şey o alan.
+#
+# ORANTI yine de keyfi değil, tek bir çapaya bağlı: Azure'ın `medium` kalitesi
+# 8 kredi ve o üretim sağlayıcıda ~0,04 USD. Yeni girdilerin kredisi kendi
+# yayınlanmış görsel-başı fiyatının bu çapaya bölünmesiyle yazıldı (Nano Banana
+# Pro 1K/2K ≈ 0,134 USD → 27, 4K ≈ 0,24 USD → 48). Böylece seçicideki kredi
+# etiketi kullanıcıya GERÇEK bir karşılaştırma veriyor: "27 kredi" gerçekten
+# "8 kredi"nin üç katı kadar pahalı.
 
 DEFAULT_IMAGE_MODEL = "azure-gpt-image-2"
+
+# Gemini'nin belgelenmiş ON oranı — `response_format.aspect_ratio` jetonları.
+# İKİ Gemini girdisi de aynı demeti paylaşıyor: elle iki kez yazmak, birine
+# oran ekleyip diğerini unutmanın kapısı olurdu.
+#
+# SIRA arayüzdeki seçicinin sırası: kare → dikey → yatay, her biri artan
+# genişlikte. `default_size="1:1"` bilerek AÇIKÇA yazılı (demetin ilk öğesine
+# güvenmek yerine): sıra bir gün estetik bir kararla değişirse varsayılan
+# üretim oranı sessizce değişmesin.
+#
+# Bilinmeyen bir jeton buraya girerse sağlayıcı 400 döner ve hata Türkçeye
+# çevrilerek görünür — sessiz bir düşme YOK. Bu yüzden liste yalnız
+# BELGELENMİŞ oranları taşıyor, "muhtemelen çalışır" olanları değil.
+ASPECT_RATIOS: tuple[str, ...] = (
+    "1:1",
+    "9:16", "2:3", "3:4", "4:5",
+    "5:4", "4:3", "3:2", "16:9", "21:9",
+)
 
 IMAGE_MODELS: tuple[ImageModel, ...] = (
     ImageModel(
@@ -251,6 +276,40 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
     ),
     # OpenAI DOĞRUDAN (Azure üzerinden değil). Tel formatı Azure'ın aynısı, o
     # yüzden adaptör onun bilinçli ikizi (bkz. openai_client.py'nin başlığı).
+    #
+    # `gpt-image-2` OpenAI tarafının BAŞINDA duruyor çünkü OpenAI'nin görsel
+    # ailesinde bugün tek KALICI ad o: `gpt-image-1` 23 Ekim 2026'da,
+    # `gpt-image-1.5` ve `gpt-image-1-mini` 1 Aralık 2026'da API'den kalkıyor.
+    # Yetenek jetonları Azure ikizinden KOPYALANDI ve bu bilinçli bir alt
+    # sınır: `gpt-image-2` 2K'ya kadar çıkabiliyor ve tek istekte 8 görsel
+    # döndürebiliyor, ama o jetonların OpenAI ucundaki karşılıkları bu depoda
+    # canlı DOĞRULANMADI. Doğrulanmamış bir boyut jetonu beyan etmek arayüzde
+    # seçilebilir bir 400 üretir; eksik beyan etmek yalnızca bir yeteneği
+    # kullanmamak. `max_n` ayrıca `models.MAX_IMAGES_PER_RUN` (4) ile de
+    # sınırlı — 8'e çıkmak o sabiti ve sonuç kaydının `image_ids` tavanını
+    # birden değiştirmek olurdu.
+    ImageModel(
+        id="openai-gpt-image-2",
+        label="OpenAI · gpt-image-2",
+        provider="openai",
+        wire_model="gpt-image-2",
+        credential="openai",
+        sizes=("1024x1024", "1024x1536", "1536x1024"),
+        qualities=("low", "medium", "high"),
+        default_quality="medium",
+        max_n=4,
+        images_per_request=4,
+        supports_edit=True,
+        max_refs=4,
+        credits=8,
+        credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
+        note="Azure'daki modelin aynısı, kendi OpenAI anahtarınla.",
+    ),
+    # KATALOGDA KALIYOR ama ÖMÜRLÜ: 23 Ekim 2026'da OpenAI API'sinden kalkıyor.
+    # Bugün çalışıyor ve anahtarı yalnız bu modele erişen hesaplar var, o yüzden
+    # silmek erken; notu uyarıyor. O tarihte girdi silinir — `openai-dall-e-3`
+    # gibi ölmüş bir girdinin katalogda kalmasının bedeli ölçüldü: kullanıcı
+    # seçebiliyor, üretim 404 alıyor ve hata "model bulunamadı" diyor.
     ImageModel(
         id="openai-gpt-image-1",
         label="OpenAI · gpt-image-1",
@@ -266,26 +325,69 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=8,
         credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
-        note="gpt-image-2'ye en yakın davranış; referans görselle çalışıyor.",
+        note="23 Ekim 2026'da API'den kalkıyor — gpt-image-2'ye geç.",
     ),
-    # DALL·E 3'ün İKİ kısıtı yetenek sistemini gerçekten sınıyor: tek görsel
-    # üretiyor (max_n=1) ve referans görselle ÇALIŞMIYOR (supports_edit=False).
-    # Kalite sözlüğü de farklı: low/medium/high değil standard/hd.
+    # ── Gemini · Nano Banana ────────────────────────────────────────────
+    #
+    # KATALOGDA İLK KEZ "BOYUT" YERİNE "ORAN" SEÇEN MODEL. `sizes` alanının
+    # docstring'i bu günü tarif ediyordu: jetonlar `WxH` değil `16:9`, ikinci
+    # bir `aspect_ratio` alanı AÇILMIYOR ve `ResultParams.size`ın allowlist'siz
+    # olması sayesinde bu oturumlar kaydedilebilir kalıyor.
+    #
+    # `ratio` alanı sayesinde model değiştirmek ORANI TAŞIYOR: Azure'ın
+    # `1024x1536`ı da Gemini'nin `2:3`ü de aynı `ratio`yu bildiriyor, yani
+    # core.js'in ikinci kademesi sessizce doğru jetona geçiyor. Azure'ın üç
+    # boyutunun ÜÇÜNÜN DE burada karşılığı var (1:1, 2:3, 3:2) — yani model
+    # değiştiren kullanıcı hiçbir zaman "varsayılana düşüldü" uyarısı almıyor.
+    #
+    # KALİTE EKSENİ VAR ve `quality_hidden=False`: eski `gemini-2.5-flash-image`
+    # döneminde bu modelin çözünürlük knob'u yoktu (core.js ve index.html'deki
+    # yorumlar hâlâ o günü anlatıyordu, bu turda düzeltildi). Interactions ucu
+    # `response_format.image_size` alıyor ve 1K/2K/4K GERÇEK bir eksen —
+    # üstelik faturaya dokunuyor, yani `credits_by_quality` tam yerinde.
+    #
+    # `images_per_request=1`: Interactions ucunun görsel tarafında `n` YOK, tek
+    # çağrı tek görsel döndürüyor. `providers.read_timeout_for`ın adet-başına-
+    # ayrı-istek dalı bu modelle ilk gerçek kullanıcısını buluyor (öncesinde
+    # yalnız sentetik testler ölçüyordu).
     ImageModel(
-        id="openai-dall-e-3",
-        label="OpenAI · DALL·E 3",
-        provider="openai",
-        wire_model="dall-e-3",
-        credential="openai",
-        sizes=("1024x1024", "1024x1792", "1792x1024"),
-        qualities=("standard", "hd"),
-        default_quality="standard",
-        max_n=1,
+        id="gemini-nano-banana-2",
+        label="Gemini · Nano Banana 2",
+        provider="gemini",
+        wire_model="gemini-3.1-flash-image",
+        credential="gemini",
+        sizes=ASPECT_RATIOS,
+        default_size="1:1",
+        qualities=("1K", "2K", "4K"),
+        # 2K, 1K ile AYNI fiyatta (ikisi de 1120 jeton) — yani varsayılanı 1K
+        # yapmak bedava çözünürlüğü çöpe atmak olurdu.
+        default_quality="2K",
+        max_n=4,
         images_per_request=1,
-        supports_edit=False,
-        credits=10,
-        credits_by_quality=(("standard", 10), ("hd", 20)),
-        note="Tek görsel üretir ve referans görselle çalışmaz.",
+        supports_edit=True,
+        # Model daha fazlasını kabul ediyor; tavan `app.MAX_EDIT_IMAGES`.
+        max_refs=4,
+        credits=6,
+        credits_by_quality=(("1K", 6), ("2K", 6), ("4K", 12)),
+        note="Oran seçiliyor (piksel değil). Hızlı ve ucuz; düzenleme yapıyor.",
+    ),
+    ImageModel(
+        id="gemini-nano-banana-pro",
+        label="Gemini · Nano Banana Pro",
+        provider="gemini",
+        wire_model="gemini-3-pro-image",
+        credential="gemini",
+        sizes=ASPECT_RATIOS,
+        default_size="1:1",
+        qualities=("1K", "2K", "4K"),
+        default_quality="2K",
+        max_n=4,
+        images_per_request=1,
+        supports_edit=True,
+        max_refs=4,
+        credits=27,
+        credits_by_quality=(("1K", 27), ("2K", 27), ("4K", 48)),
+        note="Metin ve marka tutarlılığında en güçlü Gemini; pahalı.",
     ),
 )
 
@@ -309,22 +411,41 @@ GEOMETRY_LABELS: dict[str, tuple[str, str]] = {
     "1024x1024": ("◼ 1:1", "1:1"),
     "1024x1536": ("▮ 2:3", "2:3"),
     "1536x1024": ("▬ 3:2", "3:2"),
-    # DALL·E 3'ün kendi oranları — 2:3/3:2'ye YAKIN ama aynı değil, o yüzden
-    # ayrı jetonlar. Aynı orana yuvarlamak, core.js'in "aynı oranı taşı"
-    # kademesinde piksel boyutunu sessizce değiştirmek olurdu.
-    "1024x1792": ("▮ 4:7", "4:7"),
-    "1792x1024": ("▬ 7:4", "7:4"),
+    # Gemini'nin oran jetonları (bkz. ASPECT_RATIOS). `ratio` sütunu jetonun
+    # KENDİSİ — `geometry_of`un varsayılanı da bunu verirdi, ama o zaman
+    # `label` da çıplak jeton olurdu ve seçicide Azure'ın glif'li satırlarıyla
+    # aynı hizada durmazdı. Glif YÖNÜ söylüyor: ◼ kare, ▮ dikey, ▬ yatay.
+    #
+    # 1:1 / 2:3 / 3:2 burada AYRICA yazılmıyor: Azure'ın `1024x1024`ü zaten
+    # `ratio="1:1"` bildiriyor, ama JETON farklı ("1024x1024" ≠ "1:1"), yani
+    # ikisi de kendi satırına ihtiyaç duyuyor.
+    "2:3": ("▮ 2:3", "2:3"),
+    "3:2": ("▬ 3:2", "3:2"),
+    "1:1": ("◼ 1:1", "1:1"),
+    "3:4": ("▮ 3:4", "3:4"),
+    "4:3": ("▬ 4:3", "4:3"),
+    "4:5": ("▮ 4:5", "4:5"),
+    "5:4": ("▬ 5:4", "5:4"),
+    "9:16": ("▮ 9:16", "9:16"),
+    "16:9": ("▬ 16:9", "16:9"),
+    "21:9": ("▬ 21:9", "21:9"),
 }
 
 QUALITY_LABELS: dict[str, str] = {
     "low": "Düşük",
     "medium": "Orta",
     "high": "Yüksek",
-    # Kalite ekseni OLMAYAN modellerin sentetik jetonu (bkz. karar Q1) ve
-    # DALL·E 3'ün GERÇEK alt kademesi — aynı jeton iki anlamı birden taşıyor,
-    # ama ikisinde de kullanıcıya "Standart" olarak görünüyor.
+    # Kalite ekseni OLMAYAN modellerin sentetik jetonu (bkz. karar Q1).
+    # Bugün onu taşıyan GERÇEK bir model yok (DALL·E 3 gitti, Gemini'nin
+    # çözünürlük ekseni var); jeton yine de duruyor çünkü `quality_hidden`
+    # sözleşmesinin belgelenmiş karşılığı bu ve testler onu kullanıyor.
     "standard": "Standart",
-    "hd": "HD",
+    # Gemini'nin `image_size` jetonları. Piksel yerine MEGAPİKSEL yazılı:
+    # oran seçen bir modelde "2048x2048" demek yanlış olurdu (2K, seçilen
+    # orana göre farklı piksel boyutlarına çözülüyor).
+    "1K": "1K · 1 MP",
+    "2K": "2K · 4 MP",
+    "4K": "4K · 16 MP",
 }
 
 

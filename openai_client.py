@@ -62,9 +62,10 @@ def build_payload(prompt: str, size: str, quality: str, n: int, *,
     """`/images/generations` gövdesi.
 
     `ac.build_payload`'ın aynısı, tek farkla: `model` sabit değil PARAMETRE.
-    `response_format` BİLEREK gönderilmiyor — `gpt-image-1` onu kabul etmiyor
-    ve zaten b64 döndürüyor; `dall-e-3` için varsayılan URL olurdu ama
-    `decode_images` her iki şekli de karşılıyor (bkz. aşağısı).
+    `response_format` BİLEREK gönderilmiyor — `gpt-image-*` ailesi onu kabul
+    etmiyor ve zaten b64 döndürüyor. (Bu satır bir zamanlar `dall-e-3`'ün URL
+    dönen varsayılanından söz ediyordu; o model 12 Mayıs 2026'da API'den
+    kalktı ve katalogdan çıkarıldı.)
     """
     return {"model": api_model, "prompt": prompt, "size": size,
             "quality": quality, "n": n}
@@ -74,10 +75,18 @@ def decode_images(response_json: dict, *, client=None) -> list[bytes]:
     """`data[]` içindeki her öğeyi PNG baytına çevirir.
 
     `ac.decode_images`'tan AYRILDIĞI tek nokta: orada `b64_json` KOŞULSUZ
-    varsayılıyor (Azure her zaman öyle döndürüyor). Burada `url` de karşılanıyor
-    çünkü `dall-e-3` varsayılan olarak URL döndürüyor ve `response_format`
-    göndermemeyi tercih ettik. URL dalı ikinci bir HTTP isteği demek — o yüzden
-    `client` buraya kadar taşınıyor.
+    varsayılıyor (Azure her zaman öyle döndürüyor). Burada `url` de karşılanıyor.
+    URL dalı ikinci bir HTTP isteği demek — o yüzden `client` buraya kadar
+    taşınıyor.
+
+    URL DALI NEDEN DURUYOR: onu getiren model (`dall-e-3`, tek görselini URL
+    olarak döndürüyordu) 12 Mayıs 2026'da API'den kalktı, yani bugün katalogdaki
+    hiçbir OpenAI modeli o şekli üretmiyor. Dal yine de silinmedi ve gerekçe
+    kataloğun kendisinde yazılı: `openai` kimliğinin `url_env`i var, yani
+    kullanıcı uyumlu bir vekilin (proxy/gateway) arkasına geçebiliyor ve o
+    vekillerin bir kısmı b64 yerine URL döndürüyor. Silmek, çalışan bir
+    kurulumu "ne b64_json ne url var" hatasına çevirirdi — kazancı ise
+    ölçülmemiş bir sadelik.
 
     Adaptör sözleşmesi "çözülmüş PNG baytları döndür" diyor; bu fonksiyon o
     sözleşmenin OpenAI tarafındaki bedeli. Çağıran taraf hangi şeklin geldiğini

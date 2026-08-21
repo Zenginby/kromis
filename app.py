@@ -1323,7 +1323,7 @@ def add_logo(req: LogoRequest) -> dict:
          "palette": src_meta.get("palette"),
          "prompt_sent": src_meta.get("prompt_sent"),
          # Model de devralınıyor: bindirme TÜREV, kendi başına bir üretim
-         # değil. Geçilmezse kayda varsayılan model yazılırdı — DALL·E 3 ile
+         # değil. Geçilmezse kayda varsayılan model yazılırdı — Nano Banana ile
          # üretilmiş bir görselin logolu hâli "azure-gpt-image-2" görünürdü.
          "model": src_meta.get("model")},
         OUTPUT_DIR, now=_now(),
@@ -1395,7 +1395,7 @@ def add_banner(req: BannerRequest) -> dict:
          "palette": src_meta.get("palette"),
          "prompt_sent": src_meta.get("prompt_sent"),
          # Model de devralınıyor: bindirme TÜREV, kendi başına bir üretim
-         # değil. Geçilmezse kayda varsayılan model yazılırdı — DALL·E 3 ile
+         # değil. Geçilmezse kayda varsayılan model yazılırdı — Nano Banana ile
          # üretilmiş bir görselin logolu hâli "azure-gpt-image-2" görünürdü.
          "model": src_meta.get("model")},
         OUTPUT_DIR, now=_now(),

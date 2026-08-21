@@ -3006,3 +3006,80 @@ def test_yonetmenin_onerisi_KREDI_tahminini_de_tazeliyor():
     assert "syncSpecs()" in blok.group(0)
     assert "syncRunCost()" in blok.group(0), (
         "üretim ayarları çipi tazeleniyor ama kredi tahmini eski kalıyor")
+
+
+# ── Gemini · Ayarlar formunun sağlayıcı grubu ───────────────────────────
+
+
+def test_katalogdaki_her_GORSEL_saglayicisinin_ayarlar_formunda_grubu_var():
+    """En sessiz kırılma bu olurdu: katalog modeli sunar, arayüz anahtarı
+    ALAMAZ.
+
+    Gemini kimliği `catalog.CREDENTIALS`'ta v0.6'dan beri duruyor ve
+    `models.SettingsRequest` alanı da vardı, ama Ayarlar formunda ne seçenek ne
+    kutu vardı — yani model eklendiği gün seçilebilir olur, "kurulum gerekli"
+    yazar ve kullanıcı anahtarını gireceği yeri HİÇ bulamazdı. Kapı katalogdan
+    türetiliyor, elle sayılmıyor.
+    """
+    import catalog
+
+    html = _html()
+    for cred in {catalog.credential(m.credential) for m in catalog.IMAGE_MODELS}:
+        if not cred.secret_field:
+            continue
+        # Azure'ın grubu `prov-azure`, kimliği `azure_image` — grup adı
+        # SAĞLAYICI seçicisinin değeri, kimlik id'si değil.
+        p = "azure" if cred.id.startswith("azure") else cred.id
+        assert f'id="prov-{p}"' in html, f"{cred.id}: Ayarlar'da alan grubu yok"
+        assert f'value="{p}"' in html, f"{cred.id}: sağlayıcı seçicisinde yok"
+
+
+def test_saglayici_secicisindeki_her_deger_bir_ALAN_GRUBUNA_karsilik_geliyor():
+    """`syncProviderFields` listedeki adlarla `$(\"prov-…\")` kuruyor: seçicide
+    olup listede olmayan bir değer seçilince HİÇBİR grup görünmez (ya da
+    öncekinin üstünde kalır), listede olup HTML'de olmayan bir ad ise
+    `$()` null döndürüp `hidden` atamasında TypeError atar."""
+    html = _html()
+    secici = html.split('<select id="set-provider">', 1)[1].split("</select>", 1)[0]
+    secenekler = set(re.findall(r'value="([a-z-]+)"', secici))
+    gruplar = set(re.findall(r'id="prov-([a-z-]+)"', html))
+    assert secenekler == gruplar, (
+        f"seçici {sorted(secenekler)}, gruplar {sorted(gruplar)}")
+
+    js = _js("settings.js")
+    dongu = re.search(r'for \(const p of \[([^\]]+)\]\)', js)
+    assert dongu, "syncProviderFields'in sağlayıcı listesi bulunamadı"
+    assert set(re.findall(r'"([a-z-]+)"', dongu.group(1))) == gruplar
+
+
+def test_form_alani_olan_her_gizli_ALAN_kaydetme_govdesine_giriyor():
+    """Bağlanmamış bir kutu, kutunun HİÇ olmamasından KÖTÜ: kullanıcı anahtarı
+    yazıyor, "Kaydedildi." okuyor ve hiçbir şey kaydedilmemiş oluyor.
+
+    Gövde `saveSettings` içinde elle yazılıyor (tek bir POST, katalog döngüsü
+    yok) — o yüzden kapı burada, testte.
+
+    İddia FONKSİYONUN TAMAMINA bakıyor, yalnız JSON literaline değil: Azure'ın
+    kutusu (`set-key`) fonksiyonun başında bir `const`a okunuyor ve literalde
+    kısa adıyla (`api_key`) görünüyor. Literale bakan bir test o meşru dolaylığı
+    hata sanardı.
+    """
+    js = _js("settings.js")
+    govde = js.split("async function saveSettings()", 1)[1].split("\n}", 1)[0]
+    assert "JSON.stringify({" in govde, "saveSettings gövdesi ayıklanamadı"
+    html = _html()
+    for alan in re.findall(r'id="(set-[a-z-]*key)"', html):
+        assert f'$("{alan}")' in govde, f"{alan} POST gövdesine hiç girmiyor"
+
+
+def test_yeni_anahtar_kutulari_ACILISTA_ve_KAYITTAN_SONRA_temizleniyor():
+    """Yalnızca-yazılır formun kuralı: kayıtlı anahtar hiçbir zaman forma
+    dolmuyor, o yüzden boş kutu "sildim" değil "dokunmadım"dır. Bir kutu
+    temizlenmezse önceki oturumun anahtarı ekranda kalır."""
+    js = _js("settings.js")
+    html = _html()
+    ac = js.split("function openSettings(", 1)[1].split("\n}", 1)[0]
+    kayit = js.split("st.textContent = \"Kaydedildi.\"", 1)[0]
+    for alan in re.findall(r'id="(set-[a-z-]*key)"', html):
+        assert f'$("{alan}").value = ""' in ac, f"{alan} açılışta temizlenmiyor"
+        assert f'$("{alan}").value = ""' in kayit, f"{alan} kayıttan sonra kalıyor"

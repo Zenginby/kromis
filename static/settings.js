@@ -36,9 +36,17 @@ function applyConfigured(s) {
   // `guncelleme` ile AYNI gerekçeye sahip: POST /api/settings yanıtı GET'ten
   // daha dar olabilir ve guard olmadan "Kaydet"ten sonra durumlar silinirdi.
   if (s && s.providers !== undefined) {
-    $("set-openai-key").placeholder = s.providers.openai
-      ? "Kayıtlı · değiştirmek için yeni anahtar yaz"
-      : "sk-…";
+    // Yer tutucu "kayıtlı mı"yı SÖYLÜYOR, anahtarı göstermiyor: yalnızca-yazılır
+    // formda boş bir kutu yoksa kullanıcı anahtarını hiç kaydetmediğini sanır.
+    // Tablo halinde: her sağlayıcının kimlik id'si + boş hâlin yer tutucusu.
+    for (const [alan, kimlik, bos] of [
+      ["set-openai-key", "openai", "sk-…"],
+      ["set-gemini-key", "gemini", "AIza…"],
+    ]) {
+      $(alan).placeholder = s.providers[kimlik]
+        ? "Kayıtlı · değiştirmek için yeni anahtar yaz"
+        : bos;
+    }
     renderProviderStatus(s.providers);
   }
 
@@ -134,6 +142,7 @@ function renderProviderStatus(providers) {
   const satirlar = [
     ["azure_image", "Azure OpenAI"],
     ["openai", "OpenAI"],
+    ["gemini", "Google Gemini"],
   ];
   $("provider-status").replaceChildren(...satirlar.map(([id, ad]) => {
     const li = document.createElement("li");
@@ -147,7 +156,7 @@ function renderProviderStatus(providers) {
 /** Seçilen sağlayıcının alan grubunu gösterir, ötekileri gizler. */
 function syncProviderFields() {
   const secili = $("set-provider").value;
-  for (const p of ["azure", "openai"]) {
+  for (const p of ["azure", "openai", "gemini"]) {
     $(`prov-${p}`).hidden = p !== secili;
   }
 }
@@ -158,6 +167,7 @@ function openSettings(provider) {
   // Gizli alanların HEPSİ temizleniyor (write-only): kayıtlı anahtar hiçbir
   // zaman forma dolmuyor, o yüzden boş kutu "sildim" değil "dokunmadım"dır.
   $("set-openai-key").value = "";
+  $("set-gemini-key").value = "";
   // Belirli bir sağlayıcıya derin bağlantı: #model-settings-link buradan
   // geliyor, "anahtar yok" uyarısı doğrudan doğru gruba açsın.
   if (provider) $("set-provider").value = provider;
@@ -203,7 +213,8 @@ async function saveSettings() {
       // grubun açık olduğuna göre dallanmasına gerek yok.
       body: JSON.stringify({ api_key, base_url,
                              chat_deployment: $("set-chat-deployment").value.trim(),
-                             openai_api_key: $("set-openai-key").value }),
+                             openai_api_key: $("set-openai-key").value,
+                             gemini_api_key: $("set-gemini-key").value }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -212,6 +223,7 @@ async function saveSettings() {
     applyConfigured(await res.json());
     $("set-key").value = "";
     $("set-openai-key").value = "";
+    $("set-gemini-key").value = "";
     st.textContent = "Kaydedildi.";
     setTimeout(closeSettings, 550);
   } catch (e) {

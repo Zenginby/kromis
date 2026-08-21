@@ -48,7 +48,7 @@ Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Andr
 * **Oturum Yönetimi & Kebap Menüsü:** Sohbet geçmişleri diske saklanır (`output/chats.json`), kenar panelinde listelenir. Üst şeritteki kebap menüsü (`#chats-kebab`) ile oturumlar yeniden adlandırılabilir, temizlenebilir veya toplu olarak silinebilir.
 
 ### 🖼️ 2. Görsel Üretimi & Çoklu Referans Düzenleme
-* **OpenAI & Azure Entegrasyonu:** `gpt-image-2` ve DALL-E 3 üretimi (1-4 görsel).
+* **Çoklu Sağlayıcı Entegrasyonu:** Azure OpenAI (`gpt-image-2`), OpenAI (`gpt-image-2`, `gpt-image-1`) ve Google Gemini (Nano Banana 2 / Nano Banana Pro) üretimi (1-4 görsel). Gemini'de piksel boyutu yerine oran (1:1 … 21:9) ve 1K/2K/4K çözünürlük seçiliyor. *DALL-E 3 12 Mayıs 2026'da OpenAI API'sinden kalktığı için katalogdan çıkarıldı.*
 * **Çoklu Referans Görsel Bindirme:** Düzenleme (Inpainting / Edits) modunda ana referans görselin yanına en fazla 3 ek referans görsel eklenebilir.
 
 ### 📁 3. Klasörler & Medya Yönetimi
@@ -86,7 +86,7 @@ Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Andr
 ## 🔮 Gelecek Yol Haritası (SaaS Transformation Master Plan)
 
 * **Faz 2: BYOK Çoklu Sağlayıcı Arayüzü**
-  - Ayarlar modalında OpenAI DALL-E 3, Fal.ai, Replicate, ComfyUI ve Ollama form sekmeleri.
+  - Ayarlar panelinde Fal.ai, Replicate, ComfyUI ve Ollama form sekmeleri (OpenAI ve Gemini tamamlandı).
   - Model sağlayıcısı seçimi ve canlı bağlantı test düğmeleri.
 * **Faz 3: E-Ticaret Ürün Araçları**
   - Elde Ürün Görselleştirme (Product-in-Hand).

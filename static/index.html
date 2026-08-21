@@ -599,9 +599,13 @@
     </div>
     <div class="sheet-body controls">
       <!-- Üç sarmalayıcı ARTIK ADRESLENEBİLİR (#spec-*): eksen modele göre
-           gizlenebiliyor. Gemini'nin kalite knob'u yok — o modelde satır
-           tümden gizleniyor, ama tel üzerinde yine geçerli bir jeton gidiyor
-           (katalogdaki sentetik "standard"; bkz. karar Q1).
+           gizlenebiliyor. `quality_hidden` beyan eden bir model kalite
+           satırını tümden gizliyor, ama tel üzerinde yine geçerli bir jeton
+           gidiyor (katalogdaki sentetik "standard"; bkz. karar Q1). Burada
+           örnek olarak Gemini yazıyordu ve BU YANLIŞTI: Nano Banana'nın
+           çözünürlük ekseni var (1K/2K/4K) ve o eksen faturaya dokunuyor,
+           yani gizlenmesi gereken şey değil. Bugün mekanizmayı taşıyan
+           gerçek bir model yok — sözleşme ve testleri duruyor.
            Etiket de adreslenebilir: aynı eksenin adı modele göre değişiyor
            ("Boyut" ↔ "Oran") ve Prompt Yönetmeni'nin atlanan-öneri metni o adı
            kullanıyor.
@@ -768,7 +772,8 @@
       <label for="set-provider">Sağlayıcı</label>
       <select id="set-provider">
         <option value="azure" selected>Azure OpenAI (varsayılan)</option>
-        <option value="openai">OpenAI · gpt-image-1, DALL·E 3</option>
+        <option value="openai">OpenAI · gpt-image-2</option>
+        <option value="gemini">Google Gemini · Nano Banana</option>
       </select>
 
       <!-- Her sağlayıcı AYRI blok, paylaşılan tek bir <input> DEĞİL: paylaşılan
@@ -797,9 +802,27 @@
         <input id="set-openai-key" type="password" autocomplete="off"
                spellcheck="false" placeholder="sk-…" />
         <p class="field-note">
-          platform.openai.com → API keys. <strong>DALL·E 3</strong> tek görsel
-          üretir ve referans görselle çalışmaz; <strong>gpt-image-1</strong>
-          ikisini de yapar.
+          platform.openai.com → API keys. <strong>gpt-image-2</strong> Azure'daki
+          modelin aynısı. <strong>gpt-image-1</strong> hâlâ seçilebiliyor ama
+          23 Ekim 2026'da API'den kalkıyor; <strong>DALL·E 3</strong> 12 Mayıs
+          2026'da kalktı ve katalogdan çıkarıldı.
+        </p>
+      </div>
+
+      <!-- Gemini'nin ADRES alanı YOK, OpenAI ile aynı gerekçeyle: adres her
+           kullanıcıda aynı (`catalog` girdisindeki `default_base_url`) ve
+           vekil arkasına almak isteyen kullanıcı `GEMINI_BASE_URL`i dosyaya
+           elle yazabiliyor. Forma alan eklemek, hiç kimsenin dolduramadığı
+           bir kutuyu 360px'de yer kaplatmak olurdu. -->
+      <div id="prov-gemini" class="prov-fields" hidden>
+        <label for="set-gemini-key">Gemini API Key</label>
+        <input id="set-gemini-key" type="password" autocomplete="off"
+               spellcheck="false" placeholder="AIza…" />
+        <p class="field-note">
+          aistudio.google.com → API keys. <strong>Nano Banana</strong>
+          modellerinde piksel boyutu değil <strong>oran</strong> seçiliyor
+          (1:1, 16:9, 9:16 …) ve çözünürlük 1K/2K/4K olarak ayrı bir eksen.
+          Görsel üretimi ücretsiz kademede kapalı.
         </p>
       </div>
 

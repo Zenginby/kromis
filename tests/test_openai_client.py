@@ -8,8 +8,9 @@ riski ölçülebilir kılıyor.
 DİKKAT — canlı doğrulama YAPILMADI: buradaki iddialar tel formatının
 BELGELENEN hâlini sabitliyor, gerçek bir OpenAI anahtarıyla çağrı yapılmadı.
 Uç, endpoint ve alan adları Azure ikiziyle aynı olduğu için risk düşük
-(o yol canlı doğrulanmış), ama `dall-e-3`'ün URL dönen dalı gerçek bir
-anahtarla bir kez sınanmalı.
+(o yol canlı doğrulanmış), ama URL dönen dal gerçek bir kurulumla bir kez
+sınanmalı — o dalın tek kullanıcısı artık uyumlu bir vekil (proxy/gateway),
+çünkü onu getiren `dall-e-3` 12 Mayıs 2026'da API'den kalktı.
 """
 import base64
 
@@ -20,7 +21,10 @@ import catalog
 import openai_client as oc
 
 MODEL = catalog.image_model("openai-gpt-image-1")
-DALLE = catalog.image_model("openai-dall-e-3")
+# İKİNCİ OpenAI modeli: "model KATALOGDAN geliyor, sabit değil" iddiasının
+# ölçülebilir olması için gereken şey iki AYRI ad. Eskiden bu rolde
+# `openai-dall-e-3` vardı; kalktığı için yerine kataloğun yeni mainline'ı geçti.
+IKINCI = catalog.image_model("openai-gpt-image-2")
 CREDS = ("sk-test-key", "https://api.openai.com/v1")
 
 
@@ -81,14 +85,15 @@ def test_generate_dogru_uca_gidiyor_ve_cozuyor():
     assert c.last_call["json"]["model"] == "gpt-image-1"
 
 
-def test_dalle_ayni_adaptorden_KENDI_adiyla_gidiyor():
+def test_ikinci_model_ayni_adaptorden_KENDI_adiyla_gidiyor():
+    """Aynı adaptör, aynı uç, FARKLI ad — ayrımı yalnız `wire_model` taşıyor."""
     c = FakeClient(FakeResponse(200, {"data": [{"b64_json": _b64(b"X")}]}))
 
-    oc.generate(DALLE, "kedi", "1024x1024", "standard", 1,
+    oc.generate(IKINCI, "kedi", "1024x1024", "high", 1,
                 client=c, credentials=CREDS)
 
-    assert c.last_call["json"]["model"] == "dall-e-3"
-    assert c.last_call["json"]["quality"] == "standard"
+    assert c.last_call["json"]["model"] == "gpt-image-2"
+    assert c.last_call["json"]["quality"] == "high"
 
 
 def test_adres_sonundaki_egik_cizgi_ucu_bozmuyor():
@@ -101,8 +106,9 @@ def test_adres_sonundaki_egik_cizgi_ucu_bozmuyor():
 
 
 def test_URL_donen_yanit_ikinci_bir_istekle_indiriliyor():
-    """`dall-e-3` varsayılan olarak URL döndürüyor ve `response_format`
-    göndermemeyi tercih ettik (gpt-image-1 onu kabul etmiyor).
+    """Uyumlu bir vekil b64 yerine URL döndürebiliyor (`openai` kimliğinin
+    `url_env`i tam olarak bunu mümkün kılıyor); `response_format` göndermemeyi
+    tercih ettik çünkü `gpt-image-*` ailesi onu kabul etmiyor.
 
     Adaptör sözleşmesi "çözülmüş PNG baytları döndür" diyor — URL dalı o
     sözleşmenin OpenAI tarafındaki bedeli. Çağıran taraf hangi şeklin geldiğini
@@ -112,7 +118,7 @@ def test_URL_donen_yanit_ikinci_bir_istekle_indiriliyor():
     c = FakeClient(FakeResponse(200, {"data": [{"url": "https://cdn/x.png"}]}),
                    get_response=FakeResponse(200, content=b"INDIRILEN"))
 
-    out = oc.generate(DALLE, "k", "1024x1024", "standard", 1,
+    out = oc.generate(MODEL, "k", "1024x1024", "low", 1,
                       client=c, credentials=CREDS)
 
     assert out == [b"INDIRILEN"]
@@ -139,7 +145,7 @@ def test_indirme_basarisiz_olursa_TURKCE_hata():
                    get_response=FakeResponse(404))
 
     with pytest.raises(ac.ImageError, match="indirilemedi"):
-        oc.generate(DALLE, "k", "1024x1024", "standard", 1,
+        oc.generate(MODEL, "k", "1024x1024", "low", 1,
                     client=c, credentials=CREDS)
 
 

@@ -91,11 +91,21 @@ def _openai_adapter():
     return (openai_client.generate, openai_client.edit)
 
 
+def _gemini_adapter():
+    """`_openai_adapter`ın aynı gerekçesi: `gemini_client` bu modülü import
+    ediyor (`read_timeout_for` ve `detail_of` için), yani modül düzeyinde
+    import etmek DÖNGÜ olurdu. Düz `import` ifadesi, yalnız fonksiyon içinde —
+    PyInstaller'ın statik analizi onu da görüyor."""
+    import gemini_client
+    return (gemini_client.generate, gemini_client.edit)
+
+
 _ADAPTERS: dict[str, tuple] = {
     "azure": (_azure_generate, _azure_edit),
     # Değer bir ÇAĞRILABİLİR döndürücü olabiliyor (döngüyü kıran geç bağlama);
     # `_pair` ikisini de karşılıyor.
     "openai": _openai_adapter,
+    "gemini": _gemini_adapter,
 }
 
 

@@ -107,6 +107,13 @@ class ImageModel:
     supports_edit: bool = False
     max_refs: int = 1
     quality_hidden: bool = False
+    # Arayüzün ilk seçtiği değerler. BOŞ = listenin ilk öğesi. Azure'da
+    # `default_quality="medium"` bilerek yazılı: index.html'de `medium`
+    # `selected` durumunda ve model seçicisi eklendiğinde o davranışın
+    # değişmemesi gerekiyor (bir üretimin varsayılan kalitesini sessizce
+    # düşürmek ya da yükseltmek doğrudan faturaya dokunurdu).
+    default_size: str = ""
+    default_quality: str = ""
     # Kalite → maliyet; verilen kaliteler `credits` tabanını EZER.
     credits_by_quality: tuple[tuple[str, int], ...] = ()
     # Kuyruklu sağlayıcı (fal/Replicate) için tek isteğin süresi. None = tek vuruş.
@@ -232,6 +239,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         sizes=("1024x1024", "1024x1536", "1536x1024"),
         qualities=("low", "medium", "high"),
         max_n=4,
+        default_quality="medium",
         # Tek POST n görsel döndürüyor (build_payload `n`'i gövdeye koyuyor).
         images_per_request=4,
         supports_edit=True,
@@ -242,6 +250,53 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         note="Metin ve düzenlemede en güçlü. Uygulamanın varsayılanı.",
     ),
 )
+
+
+# ── Arayüz etiketleri ───────────────────────────────────────────────────
+#
+# Jeton → (etiket, oran). MODEL BAŞINA değil ORTAK: jetonlar sağlayıcılar
+# arasında büyük ölçüde tekrar ediyor (`1024x1024` üçünde de var) ve her modele
+# kendi etiket listesini yazdırmak aynı Türkçe dizeyi N kez bakıma sokardı.
+#
+# Etiketler burada, `static/core.js`'te DEĞİL. Öncesinde core.js'te `SIZE_RATIO`
+# adında `ALLOWED_SIZES`'ın elle tutulan bir AYNASI vardı; çoklu modelde o ayna
+# kaçınılmaz olarak bayatlardı — arayüz bir oranı gösterirken sunucu başka bir
+# jeton beklerdi. Şimdi tek kaynak burası ve `/api/settings` etiketi de
+# yetenekle BİRLİKTE gönderiyor.
+#
+# Bilinmeyen jeton HATA DEĞİL: etiketi kendisi olur (bkz. geometry_of). Yeni bir
+# sağlayıcı eklerken etiketi unutmak, o modelin arayüzde HİÇ görünmemesine yol
+# açmamalı — ham jeton çirkin ama çalışır.
+GEOMETRY_LABELS: dict[str, tuple[str, str]] = {
+    "1024x1024": ("◼ 1:1", "1:1"),
+    "1024x1536": ("▮ 2:3", "2:3"),
+    "1536x1024": ("▬ 3:2", "3:2"),
+}
+
+QUALITY_LABELS: dict[str, str] = {
+    "low": "Düşük",
+    "medium": "Orta",
+    "high": "Yüksek",
+    # Kalite ekseni OLMAYAN modellerin sentetik jetonu (bkz. karar Q1).
+    "standard": "Standart",
+}
+
+
+def geometry_of(token: str) -> tuple[str, str]:
+    """(etiket, oran). Bilinmeyen jetonda ikisi de jetonun kendisi."""
+    return GEOMETRY_LABELS.get(token, (token, token))
+
+
+def quality_label(token: str) -> str:
+    return QUALITY_LABELS.get(token, token)
+
+
+def default_size_of(m: ImageModel) -> str:
+    return m.default_size or m.sizes[0]
+
+
+def default_quality_of(m: ImageModel) -> str:
+    return m.default_quality or m.qualities[0]
 
 
 # ── Sohbet modelleri ────────────────────────────────────────────────────

@@ -413,6 +413,48 @@
 
   <!-- ── Yüzen composer ────────────────────────────────────────────────── -->
   <div id="composer" class="composer" data-mode="image">
+    <!-- Model şeridi: composer'ın BAŞINDA, .composer-bar'da DEĞİL.
+         Gerekçe ölçülü — mobile.css:152 o şeridin 360px'de zaten taştığını
+         yazıyor (.plus 34 + .view-tabs ~150 + #specs-btn ~110 + #go ~70 ≈
+         380px) ve .composer-right mobile.css:176'da kendi satırına düşürülmüş
+         durumda. Dördüncü bir kontrol oraya konursa ÜÇÜNCÜ satır açılır,
+         composer ~40px uzar ve --composer-h (mobile.css:36) tuvalin alt
+         boşluğunu yer. Buranın anlamı da doğru: .composer-bar EYLEM şeridi,
+         bu satır "neyle üretiyorum" bağlamı.
+
+         Seçici native <select>: #move-target'ın gerekçesinin aynısı
+         (index.html'de aşağıda) — Android'de sistemin kendi seçicisi olarak
+         açılıyor, yani tek dokunuşta onlarca model arasında geçiş. Özel bir
+         popover listbox odak tuzağını, klavye gezintisini ve ARIA listbox'ı
+         sıfırdan getirirdi; uygulamadaki iki popover (#plus-menu,
+         #chats-kebab-menu) DÜĞME menüsü, seçili değeri olan bir değer
+         seçicisi değil.
+
+         Seçenekleri core.js dolduruyor (GET /api/settings → image_models);
+         HTML'de tek bir yer tutucu var, çünkü boş bir <select> Ayarlar
+         gelmeden bir an "model yok" gibi görünürdü. -->
+    <div class="composer-head">
+      <label class="sr-only" for="model">Görsel modeli</label>
+      <select id="model" class="model-chip" title="Görsel modeli">
+        <option value="">Modeller yükleniyor…</option>
+      </select>
+
+      <!-- Yönetmen modunun karşılığı AYNI YUVADA: ikisi #composer[data-mode]
+           ekseniyle birbirini dışlıyor, yani genişlik bedeli SIFIR. -->
+      <label class="sr-only" for="chat-model">Sohbet modeli</label>
+      <select id="chat-model" class="model-chip" title="Prompt Yönetmeni modeli">
+      </select>
+
+      <!-- Kapı açıklaması #chat-gate ile AYNI duruş: kontrolün KENDİSİ
+           kilitlenmiyor, çünkü kilitli bir kontrol "neden kapalı" bilgisini de
+           saklar. Kullanıcı anahtarı olmayan modeli seçebiliyor, burada eksik
+           olanı okuyor ve düğmeyle doğrudan Ayarlar'a gidiyor. -->
+      <p id="model-note" class="model-note" hidden>
+        <span id="model-note-text"></span>
+        <button type="button" id="model-settings-link" class="btn-link">Ayarlar'ı aç</button>
+      </p>
+    </div>
+
     <div id="composer-refs" class="composer-refs">
       <span id="ref-chip" class="ref-chip" hidden>
         <img id="ref-chip-img" class="ref-chip-img" alt="" hidden />
@@ -503,6 +545,12 @@
 
     <div class="composer-foot">
       <span class="chat-hint">⌘/Ctrl + Enter gönderir · ⌘/Ctrl + J mod değiştirir</span>
+      <!-- Bu turun kredi maliyeti: model × boyut × kalite × adet.
+           .composer-right'ta DEĞİL, burada — o şeridin ölçülmüş 360px bütçesi
+           (mobile.css:152) dolu ve .chat-hint telefonda display:none
+           (mobile.css:184), yani bu satırda tam olarak bu kadar yer boşalıyor.
+           Bugün yalnız METADATA: bakiye yok, satın alma yok, zorlama yok. -->
+      <span id="run-cost" class="run-cost" hidden></span>
       <p id="folder-target" class="folder-target" hidden></p>
       <p id="status" class="status" role="status"></p>
     </div>
@@ -542,26 +590,40 @@
       <button type="button" id="specs-close" class="modal-x" aria-label="Kapat">×</button>
     </div>
     <div class="sheet-body controls">
+      <!-- Üç sarmalayıcı ARTIK ADRESLENEBİLİR (#spec-*): eksen modele göre
+           gizlenebiliyor. Gemini'nin kalite knob'u yok — o modelde satır
+           tümden gizleniyor, ama tel üzerinde yine geçerli bir jeton gidiyor
+           (katalogdaki sentetik "standard"; bkz. karar Q1).
+           Etiket de adreslenebilir: aynı eksenin adı modele göre değişiyor
+           ("Boyut" ↔ "Oran") ve Prompt Yönetmeni'nin atlanan-öneri metni o adı
+           kullanıyor.
+           <option> listelerini core.js dolduruyor; buradaki üçlü, Ayarlar
+           gelmeden önceki ilk çizim için yer tutucu. -->
       <div class="row">
-        <div>
-          <label for="size">Boyut</label>
+        <div id="spec-size">
+          <label for="size" id="label-size">Boyut</label>
           <select id="size">
             <option value="1024x1024">◼ 1:1</option>
             <option value="1024x1536">▮ 2:3</option>
             <option value="1536x1024">▬ 3:2</option>
           </select>
         </div>
-        <div>
-          <label for="quality">Kalite</label>
+        <div id="spec-quality">
+          <label for="quality" id="label-quality">Kalite</label>
           <select id="quality">
             <option value="low">Düşük</option>
             <option value="medium" selected>Orta</option>
             <option value="high">Yüksek</option>
           </select>
         </div>
-        <div>
-          <label for="n">Adet</label>
-          <select id="n"><option>1</option><option>2</option><option>3</option><option>4</option></select>
+        <div id="spec-n">
+          <label for="n" id="label-n">Adet</label>
+          <select id="n">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
         </div>
       </div>
 

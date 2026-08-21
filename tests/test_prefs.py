@@ -206,15 +206,26 @@ def test_bozuk_deger_okurken_diske_YAZILMIYOR(tmp_path):
     assert json.loads((tmp_path / "prefs.json").read_text(encoding="utf-8")) == bozuk
 
 
-def test_yapilandirilmamis_model_secili_KALIYOR(tmp_path):
+def test_yapilandirilmamis_model_secili_KALIYOR(tmp_path, monkeypatch):
     """"Var mı?" katalogdan, "ulaşılabilir mi?" credstore'dan — ayrı sorular.
 
     Anahtarı girilmemiş bir modeli tercihten DÜŞÜRMEK, kullanıcı Gemini'yi
     seçip anahtarı sonra kaydettiğinde seçimini sessizce Azure'a döndürürdü.
-    Bu kurulumda hiçbir anahtar yok, yani varsayılan modelin kendisi de
-    "yapılandırılmamış" — ve yine de korunuyor olmalı.
+
+    KİMLİK YOLLARI İZOLE EDİLİYOR ve bu satırlar bedava değil: ilk yazımda
+    yoktular ve test, geliştiricinin makinesinde GERÇEK bir
+    `~/.config/lumeo/credentials.env` oluştuğu anda düştü (tarayıcıda elle
+    doğrulama yapılırken tam bu oldu). O hâliyle iddia "anahtar yokken" değil
+    "geliştiricinin makinesinde anahtar yokken" diyordu — conftest.py'nin
+    "kaçak damga" guard'larıyla aynı sınıf sızıntı. `DEFAULT_ENV_PATH` de
+    kapatılıyor: paylaşılan `claude-tools` dosyası varsa Azure oradan
+    yapılandırılmış görünürdü.
     """
+    import azure_client as ac
     import credstore
+
+    monkeypatch.setattr(ac, "APP_ENV_PATH", str(tmp_path / "kimlik" / "credentials.env"))
+    monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", str(tmp_path / "yok.env"))
 
     prefs.update({"image_model": catalog.DEFAULT_IMAGE_MODEL}, str(tmp_path))
 

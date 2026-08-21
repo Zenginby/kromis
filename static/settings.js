@@ -16,7 +16,17 @@ let chatConfigured = false;   // chat.js okuyor (o dosya BUNDAN SONRA yükleniyo
 
 function applyConfigured(s) {
   configured = !!(s && s.configured);
-  $("go").disabled = !configured;
+  // Model kataloğu AYNI yanıttan okunuyor: ayrı bir uçtan çekilse ikisi ayrı
+  // zamanlarda gelir ve seçici bir an "hepsi kullanılabilir" gösterip sonra
+  // fikir değiştirirdi (`guncelleme` alanı için yazılı olan gerekçe).
+  // `prefs` HENÜZ okunmadıysa (ilk çizim) sunucunun varsayılanı kullanılıyor;
+  // loadPrefs sonra gelip kullanıcının tercihini uyguluyor.
+  applyModels(s, seciliModelTercihi);
+  // `#go` artık BURADA yazılmıyor: tek yazar core.js'teki syncGoGate ve o,
+  // yapılandırma + mod + seçili modelin durumunu BİRLİKTE görüyor. Öncesinde
+  // dört ayrı yerden yazılıyordu ve `!configured` yalnız AZURE'u ölçtüğü için
+  // yalnızca OpenAI anahtarı olan bir kullanıcıda ölü bir düğme bırakırdı.
+  syncGoGate();
   if (s && s.endpoint) $("set-endpoint").value = s.endpoint;
   $("set-key").placeholder = configured
     ? "Kayıtlı · değiştirmek için yeni anahtar yaz"
@@ -84,8 +94,12 @@ async function loadSettings(openIfMissing) {
   } catch {
     // durum alınamadıysa fail-closed: butonu kilitle, kullanıcıyı ayarlara yönlendir
     configured = false;
-    $("go").disabled = true;
-    statusEl.textContent = "Ayar durumu alınamadı. Azure ayarlarını kontrol et (sağ üstteki ⚙).";
+    // Katalog da boşaltılıyor: eski bir listeyle kapı açık kalırsa kullanıcı
+    // artık geçerli olmayan bir modelle üretmeye çalışır.
+    imageModels = [];
+    currentModel = null;
+    syncGoGate();
+    statusEl.textContent = "Ayar durumu alınamadı. Sağlayıcı ayarlarını kontrol et (sağ üstteki ⚙).";
     if (openIfMissing) openSettings();
   }
 }
@@ -172,10 +186,36 @@ $("theme-picker").addEventListener("change", (e) => {
   }
 });
 
+/** Kullanıcının kayıtlı model tercihi. `applyModels` bunu okuyor.
+ *
+ * Ayrı bir değişken çünkü İKİ uç iki farklı zamanda dönüyor: `/api/settings`
+ * kataloğu, `/api/prefs` tercihi getiriyor. Hangisi önce gelirse gelsin doğru
+ * sonuç çıkmalı — katalog önce gelirse sunucunun varsayılanı çiziliyor ve
+ * tercih gelince düzeltiliyor; tercih önce gelirse burada bekliyor.
+ */
+let seciliModelTercihi = "";
+
+async function loadModelPref() {
+  try {
+    const res = await fetch("/api/prefs");
+    if (!res.ok) return;
+    const p = await res.json();
+    if (!p.image_model) return;
+    seciliModelTercihi = p.image_model;
+    // Katalog zaten geldiyse tercihi ŞİMDİ uygula; gelmediyse applyModels
+    // yukarıdaki değişkeni okuyacak.
+    if (imageModels.length) applyModel(seciliModelTercihi, { announce: false });
+  } catch {
+    // Tercih okunamadı: sunucunun varsayılan modeli geçerli kalıyor. Sessiz —
+    // kullanıcı üretebiliyor, yalnız seçimi hatırlanmamış oluyor.
+  }
+}
+
 syncFolderView();
 loadFolders();
 loadHistory();
 loadSettings(true);
+loadModelPref();
 loadAssets("all");
 loadAssets("logos");
 loadAssets("mottos");

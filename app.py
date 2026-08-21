@@ -621,9 +621,18 @@ def _settings_payload() -> dict:
                 "id": m.id,
                 "label": m.label,
                 "provider": m.provider,
-                "sizes": list(m.sizes),
-                "qualities": list(m.qualities),
+                # Jetonlar ETİKETLERİYLE gönderiliyor, çıplak dize değil:
+                # arayüz `<option>` listelerini bunlardan kuruyor ve etiketi
+                # istemcide tutmak `SIZE_RATIO`'nun bayatlayan aynası olurdu.
+                # `ratio` de sunucudan geliyor çünkü Gemini'nin jetonları
+                # `WxH` biçiminde DEĞİL — istemci ayrıştırma yapmamalı.
+                "sizes": [{"value": s, "label": catalog.geometry_of(s)[0],
+                           "ratio": catalog.geometry_of(s)[1]} for s in m.sizes],
+                "qualities": [{"value": q, "label": catalog.quality_label(q)}
+                              for q in m.qualities],
                 "quality_hidden": m.quality_hidden,
+                "default_size": catalog.default_size_of(m),
+                "default_quality": catalog.default_quality_of(m),
                 "max_n": m.max_n,
                 "supports_edit": m.supports_edit,
                 "max_refs": m.max_refs,

@@ -150,6 +150,12 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.5.4 — ne değişti
+
+- birleştirme başlığı GUNCELLEME.md'ye girmesin + güncelleme bağlantısı doğrulanıyor
+
+---
+
 ## Sürüm 0.5.3 — ne değişti
 
 - depo adresi yeni hesaba çevrildi (Zenginby → Zenginby)

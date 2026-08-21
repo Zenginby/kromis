@@ -6,6 +6,8 @@ loglamanın kendisi asla asıl uyarının önüne geçmemeli.
 """
 import os
 
+import pytest
+
 import errlog
 
 
@@ -88,3 +90,64 @@ def test_redact_secrets_masks_api_keys(tmp_path):
     assert "sk-1234567890" not in body
     assert "[REDACTED_API_KEY]" in body
 
+
+
+# ── Sansürleme kapsamı: elle tutulan liste yerine MEKANİK kapı ──────────
+#
+# Bu blok v0.6'da eklendi, çünkü elle tutulan bir alternasyonun sessizce
+# bayatladığı ÖLÇÜLDÜ: `_KEY_PATTERNS`'in 4. deseni sağlayıcı adlarını birebir
+# sayıyordu ve `GEMINI_API_KEY=AIza…` hiçbir desene uymuyordu — üstelik
+# Google'ın değer biçimi de listede olmadığı için anahtar iki kapıdan birden
+# kaçıyor, `hata.log`'a düz metin olarak düşüyordu.
+#
+# Bundan sonraki koruma kataloğa BAĞLI: bir sağlayıcı `catalog.CREDENTIALS`'a
+# girdiği gün aşağıdaki döngü onu da ölçüyor, yani "yeni sağlayıcı ekledim,
+# log sansürünü de güncellemeliydim" diye hatırlanacak bir şey kalmıyor.
+
+import catalog
+
+
+@pytest.mark.parametrize("env_name", sorted(catalog.secret_env_names()))
+def test_katalogdaki_her_gizli_env_adi_sansurleniyor(env_name):
+    gizli = "COKGIZLIANAHTARDEGERI1234567890"
+    redacted = errlog.redact_secrets(f"{env_name}={gizli}")
+    assert gizli not in redacted, f"{env_name} değeri sansürlenmedi"
+
+
+@pytest.mark.parametrize("ornek", [
+    # (a) ailesi: DEĞERİN biçimi, anahtar adı olmadan. httpx'in URL'i ya da
+    # repr'i traceback'e çıplak bir anahtar bırakabiliyor.
+    "AIzaSyDUMMYgoogleKEY_1234567890abcdefghij",   # Google / Gemini
+    "sk-ant-api03-DUMMYanthropicKEY1234567890",    # Anthropic
+    "sk-proj-DUMMYopenaiKEY1234567890abcd",        # OpenAI
+    "fal-DUMMYfalKEY1234567890",                   # fal.ai
+    "r8_DUMMYreplicateTOKEN1234",                  # Replicate
+])
+def test_ciplak_anahtar_bicimleri_sansurleniyor(ornek):
+    assert ornek not in errlog.redact_secrets(f"istek başarısız: {ornek}")
+
+
+@pytest.mark.parametrize("header", [
+    "authorization: Bearer DUMMYbearerTOKEN1234567890",
+    "api-key: DUMMYazureKEY1234567890",
+    "x-api-key: DUMMYanthropicHEADER1234567890",      # Anthropic
+    "x-goog-api-key: AIzaSyDUMMY1234567890abcdefghij",  # Gemini
+])
+def test_baslik_bicimleri_sansurleniyor(header):
+    """Anthropic `x-api-key`, Gemini `x-goog-api-key` kullanıyor.
+
+    İkisi de bugün `api-key` alt dizesi sayesinde eşleşiyor; desende AÇIKÇA
+    yazılı olmalarının sebebi o tesadüfü sözleşmeye çevirmek.
+    """
+    redacted = errlog.redact_secrets(header)
+    assert "DUMMY" not in redacted and "AIzaSy" not in redacted
+
+
+def test_sansur_masum_metni_bozmuyor():
+    """Aşırı sansürleme de bir hata: traceback teşhis edilemez hale gelir.
+
+    `KEY=ok` gibi kısa değerler ve sıradan Türkçe hata metni geçmeli — desenin
+    8 karakter alt sınırı ve BÜYÜK HARF ad kuralı tam bunun için var.
+    """
+    masum = "Görsel kaydedilemedi: dosya yok (boyut=12), KEY=ok, adres=/output"
+    assert errlog.redact_secrets(masum) == masum

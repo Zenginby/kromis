@@ -436,8 +436,12 @@ def test_a_result_record_round_trips_through_the_store(client, out_dir):
     got = client.get(f"/api/chats/{cid}").json()["chat"]["messages"]
     assert got[-1] == {"role": "result",
                        "image_ids": ["aaaa1111aaaa", "bbbb2222bbbb"],
+                       # `model` v0.6'da eklendi, varsayılanı BOŞ dize: alanı hiç
+                       # göndermeyen bir istemcinin kaydı geçerli kalmak zorunda —
+                       # v0.6'dan önce kaydedilmiş bütün oturumlar tam olarak
+                       # öyle (bkz. models.ResultParams'ın gerekçesi).
                        "params": {"kind": "generate", "size": "1024x1024",
-                                  "quality": "medium"}}
+                                  "quality": "medium", "model": ""}}
     assert "content" not in got[-1], "sonuç kaydına None content yazılmış"
 
 

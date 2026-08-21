@@ -22,6 +22,7 @@ from pydantic import (BaseModel, ConfigDict, Field, field_validator,
                       model_validator)
 
 import azure_client as ac
+import catalog
 import palette
 
 MAX_PROMPT_CHARS = 4000    # kullanıcı prompt'u + palet eki
@@ -78,6 +79,37 @@ def check_drop_indices(values: list[int]) -> list[int]:
     return unique
 
 
+def check_capabilities(model_id: str, size: str, quality: str, n: int) -> str:
+    """Seçili modelin `size`/`quality`/`n`'i kabul ettiğini doğrular.
+
+    Dönen değer NORMALLEŞTİRİLMİŞ model id'si (boş girdi varsayılana düşüyor);
+    geçersizse Türkçe `ValueError`.
+
+    FONKSİYON olarak burada, `GenerateRequest`'in içinde DEĞİL: aynı kapı iki
+    ayrı yerden geçilmek zorunda — JSON ucu pydantic ile, `/api/edit` ise
+    multipart olduğu için ELLE (`app._check_edit_form`). İki kopya yazmak, iki
+    ucun sessizce ayrışması demek olurdu: arayüz bir boyutu sunar, bir uçta
+    geçer, diğerinde 422 döner.
+
+    Mesajlar hangi değerlerin GEÇERLİ olduğunu söylüyor. "Geçersiz size" demek
+    yetmiyor, çünkü artık geçerli küme modele göre değişiyor ve kullanıcı
+    arayüzde göremediği bir kısıtla karşılaşabiliyor (bayat bir sekme, ya da
+    Prompt Yönetmeni'nin önerdiği bir değer).
+    """
+    m = catalog.image_model(model_id or catalog.DEFAULT_IMAGE_MODEL)
+    if m is None:
+        raise ValueError(f"bilinmeyen model: {model_id}")
+    if size not in m.sizes:
+        raise ValueError(f"{m.label} bu boyutu desteklemiyor: {size} "
+                         f"(geçerli: {', '.join(m.sizes)})")
+    if quality not in m.qualities:
+        raise ValueError(f"{m.label} bu kaliteyi desteklemiyor: {quality} "
+                         f"(geçerli: {', '.join(m.qualities)})")
+    if n > m.max_n:
+        raise ValueError(f"{m.label} tek turda en fazla {m.max_n} görsel üretiyor")
+    return m.id
+
+
 class GenerateRequest(BaseModel):
     # Bilinmeyen alanı reddet — palet için bu özellikle kritik: eski bir sunucu
     # süreci `palette_hex`'i sessizce yok sayıp 200 ile renksiz görsel
@@ -85,6 +117,16 @@ class GenerateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     prompt: str = Field(min_length=1, max_length=MAX_PROMPT_CHARS)
+    # None = VARSAYILAN model. Alanı hiç göndermeyen (bugünkü) bir istemcinin
+    # gövdesi bayt bayt aynı kalıyor ve aynı modele gidiyor — "kayıtlı Azure
+    # kullanıcısı için sıfır davranış değişikliği" bu varsayılanla sağlanıyor.
+    #
+    # `extra="forbid"` bu alanın İKİNCİ faydalanıcısı: yeni bir arayüz bayat bir
+    # sunucuya `model` gönderdiğinde istek sessizce varsayılana düşmüyor,
+    # YÜKSEK SESLE 422 dönüyor. (Multipart uçta bu koruma YOK — Starlette
+    # bilinmeyen form alanını atıyor; bkz. app._check_edit_form ve core.js'in
+    # yanıt yankısı kontrolü.)
+    model: str | None = Field(default=None, max_length=100)
     size: str
     quality: str
     n: int = Field(ge=1, le=MAX_IMAGES_PER_RUN)
@@ -135,19 +177,29 @@ class GenerateRequest(BaseModel):
     def _palette_drop_ok(cls, v):
         return check_drop_indices(v)
 
-    @field_validator("size")
-    @classmethod
-    def _size_ok(cls, v):
-        if v not in ac.ALLOWED_SIZES:
-            raise ValueError("geçersiz size")
-        return v
+    @model_validator(mode="after")
+    def _capabilities_fit_the_model(self):
+        """`size`/`quality`/`n` artık SEÇİLİ MODELE göre doğrulanıyor.
 
-    @field_validator("quality")
-    @classmethod
-    def _quality_ok(cls, v):
-        if v not in ac.ALLOWED_QUALITIES:
-            raise ValueError("geçersiz quality")
-        return v
+        `field_validator` DEĞİL `model_validator`: geçerli boyut kümesi artık
+        kardeş bir alana (`model`) bağlı ve alan doğrulayıcısı kardeşini
+        göremiyor. İki genel küme (`ac.ALLOWED_SIZES`/`ALLOWED_QUALITIES`)
+        aslında hep Azure'ın yetenekleriydi; katalog her modelin kendi kümesini
+        taşıyor.
+
+        Doğrulama ROTAYA taşınmadı, burada kaldı: `extra="forbid"` ile aynı
+        sözleşme — ayrışma 200 değil gürültülü 422 olmalı, ve mesajlar Türkçe
+        (pydantic'in İngilizce metni kullanıcıya doğrudan görünüyor).
+
+        `model` alanı NORMALLEŞTİRİLİYOR: None geldiyse varsayılanın gerçek
+        id'si yazılıyor. Rota bundan sonra `req.model`'i doğrudan kullanabiliyor
+        ve `storage.save`'e giden değer ile doğrulanan değer ayrışamıyor.
+        """
+        try:
+            self.model = check_capabilities(self.model, self.size, self.quality, self.n)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+        return self
 
 
 class SettingsRequest(BaseModel):
@@ -163,6 +215,20 @@ class SettingsRequest(BaseModel):
     replicate_api_token: str | None = Field(default=None, max_length=500)
     comfyui_url: str | None = Field(default=None, max_length=500)
     ollama_url: str | None = Field(default=None, max_length=500)
+
+    # Çoklu model sağlayıcıları (v0.6). Adlar `catalog.CREDENTIALS`'taki
+    # `secret_field` / `url_field` ile BİREBİR eşleşmek zorunda: redaksiyon ve
+    # yazma yolu o eşlemeden besleniyor (mandal: tests/test_catalog.py).
+    #
+    # `*_base_url` alanları GİZLİ DEĞİL ve varsayılanı olan bir adresi ezmek
+    # için var (uyumlu bir vekil arkasına almak isteyen kullanıcı). Boş
+    # gönderilmesi "varsayılana dön" demek — bu yüzden gizli anahtarların
+    # "boş = mevcut korunur" kuralına DAHİL DEĞİL (bkz. app.post_settings).
+    gemini_api_key: str | None = Field(default=None, max_length=500)
+    anthropic_api_key: str | None = Field(default=None, max_length=500)
+    openai_base_url: str | None = Field(default=None, max_length=500)
+    gemini_base_url: str | None = Field(default=None, max_length=500)
+    anthropic_base_url: str | None = Field(default=None, max_length=500)
 
 
 
@@ -185,12 +251,54 @@ class PrefsRequest(BaseModel):
 
     autosave_sessions: bool | None = None
     theme: str | None = None
+    # EKSİKTİ ve `extra="forbid"` yüzünden sessiz değil GÜRÜLTÜLÜ bir kırılma
+    # üretiyordu: `static/chat.js`'in "yeni sürüm çıkınca haber ver" anahtarı
+    # `{guncelleme_kontrolu: …}` POST ediyor, uç 422 dönüyor, arayüz onay
+    # kutusunu geri alıp "Tercih kaydedilemedi" yazıyordu — yani anahtar
+    # HİÇ KAPATILAMIYORDU. `prefs._SCHEMA` alanı v0.4'ten beri tanıyor; eksik
+    # olan yalnızca bu satırdı. Rotanın "buraya düşmek pydantic ile prefs
+    # şemasının ayrışması demek olur" notu tam olarak bu durumu tarif ediyor.
+    guncelleme_kontrolu: bool | None = None
+    # Seçili görsel modeli ve Prompt Yönetmeni sağlayıcı/modeli (v0.6).
+    image_model: str | None = Field(default=None, max_length=100)
+    chat_provider: str | None = Field(default=None, max_length=50)
+    chat_model: str | None = Field(default=None, max_length=100)
 
     @field_validator("theme")
     @classmethod
     def _theme_ok(cls, v: str | None) -> str | None:
         if v is not None and v not in ALLOWED_THEMES:
             raise ValueError("geçersiz theme")
+        return v
+
+    @field_validator("image_model")
+    @classmethod
+    def _image_model_ok(cls, v: str | None) -> str | None:
+        """Katalog üyeliği. `prefs.update` de aynı kapıyı tutuyor ve bu ÇİFT
+        kapı bilinçli: rotanın notu ("buraya düşmek pydantic ile prefs
+        şemasının ayrışması demek olur") ikisinin birden var olmasını istiyor."""
+        if v is not None and catalog.image_model(v) is None:
+            raise ValueError(f"geçersiz image_model: {v}")
+        return v
+
+    @field_validator("chat_provider")
+    @classmethod
+    def _chat_provider_ok(cls, v: str | None) -> str | None:
+        if v is not None and v not in catalog.chat_provider_ids():
+            raise ValueError(f"geçersiz chat_provider: {v}")
+        return v
+
+    @field_validator("chat_model")
+    @classmethod
+    def _chat_model_ok(cls, v: str | None) -> str | None:
+        """Yalnız VARLIK kontrolü; sağlayıcıyla UYUM `prefs.update`'te.
+
+        Uyum çapraz bir kural (`chat_provider`'a bağlı) ve isteğin yalnız modeli
+        göndermesi geçerli bir durum — o zaman sağlayıcı DİSKTEN okunmak
+        zorunda, yani karar depoya erişimi olan katmanda verilmeli.
+        """
+        if v not in (None, "") and catalog.chat_model(v) is None:
+            raise ValueError(f"geçersiz chat_model: {v}")
         return v
 
 
@@ -421,6 +529,16 @@ class ResultParams(BaseModel):
     kind: str
     size: str = Field(min_length=1, max_length=32)
     quality: str = Field(min_length=1, max_length=32)
+    # ÜRETEN MODEL (v0.6). Varsayılanı BOŞ dize: bu sınıf `extra="forbid"`
+    # taşıyor, yani alanı hiç göndermeyen bir istemcinin kaydı geçerli kalmalı —
+    # v0.6'dan ÖNCE kaydedilmiş bütün oturumlar tam olarak öyle.
+    #
+    # Katalog üyeliğine karşı DOĞRULANMIYOR, yalnız uzunlukla sınırlı: yukarıdaki
+    # docstring'in `size`/`quality` için anlattığı tuzağın aynısı. Bir model
+    # katalogdan çıkarsa (sağlayıcı kapatır, biz kaldırırız) o modelle üretilmiş
+    # eski oturumlar bir daha KAYDEDİLEMEZ olurdu — PUT /api/chats/{id} 422
+    # döner ve kullanıcı sessizce donmuş bir oturumla kalır.
+    model: str = Field(default="", max_length=100)
 
     @field_validator("kind")
     @classmethod

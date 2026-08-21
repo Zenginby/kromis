@@ -30,7 +30,9 @@ from __future__ import annotations
 import json
 import os
 
+import catalog
 import jsonstore
+from models import ALLOWED_THEMES
 
 PREFS_FILE = "prefs.json"
 
@@ -47,13 +49,41 @@ PREFS_FILE = "prefs.json"
 # bakması gerekirdi). Ama KAPATILABİLİR olması şart: uygulamanın kullanıcının
 # haberi olmadan dışarıya bağlanması, kapatma düğmesi olmadan savunulamaz —
 # üstelik bu uygulama üretim dışında tümüyle çevrimdışı çalışıyor.
+#
+# `image_model` (v0.6): seçili görsel modeli. Burada, `credentials.env`'de DEĞİL —
+# dosyanın başındaki iki gerekçenin ikisi de birebir geçerli: bir model adı gizli
+# değil (0600 olmasının anlamı yok) ve `POST /api/settings` api_key + base_url
+# istediği için modeli çevirmek Azure kimliğini yeniden yazmaya bağlanırdı, yani
+# Azure hiç yapılandırılmamışken model DEĞİŞTİRİLEMEZ olurdu.
+#
+# Kural şöyle okunuyor: "hangi modeli İSTİYORUM" → prefs.json,
+# "ona NASIL ULAŞIYORUM" → credentials.env. `AZURE_CHAT_DEPLOYMENT` bu yüzden
+# taşınmıyor: o bir model adı değil, adresin parçası.
 _SCHEMA: dict[str, tuple[object, type]] = {
     "autosave_sessions": (True, bool),
     "theme": ("mono", str),
     "guncelleme_kontrolu": (True, bool),
+    "image_model": (catalog.DEFAULT_IMAGE_MODEL, str),
+    "chat_provider": (catalog.DEFAULT_CHAT_PROVIDER, str),
+    # "" = sağlayıcının ilk modeli. Boş bir varsayılan, "kullanıcı henüz
+    # seçmedi" ile "şu modeli seçti" ayrımını korumak için — sağlayıcı
+    # değiştiğinde eski sağlayıcının modeli yapışıp kalmasın.
+    "chat_model": ("", str),
 }
 
 DEFAULTS = {name: default for name, (default, _) in _SCHEMA.items()}
+
+# Değer kümesi SINIRLI olan tercihler. Tablo v0.6'da açıldı; öncesinde tema
+# kontrolü `update()` içinde tek bir `if` idi ve listeyi `models.ALLOWED_THEMES`
+# varken LİTERAL olarak tekrarlıyordu. Tek örnek kazaydı, ikincisi desen olurdu.
+#
+# `chat_model` bu tabloda YOK ve olamaz: geçerliliği `chat_provider`'a bağlı,
+# yani anahtar BAŞINA bir kural onu ifade edemiyor (bkz. update()).
+_ENUMS: dict[str, tuple[str, ...]] = {
+    "theme": ALLOWED_THEMES,
+    "image_model": catalog.image_model_ids(),
+    "chat_provider": catalog.chat_provider_ids(),
+}
 
 
 def _prefs_path(output_dir: str) -> str:
@@ -87,12 +117,36 @@ def read(output_dir: str) -> dict:
     Türü yanlış olan bir değer TAHMİN EDİLMEZ, varsayılana düşer: elle yazılmış
     `"false"` dizesini bool'a çevirmeye çalışmak (`bool("false") is True`)
     kullanıcının "kapat" niyetini tam tersine döndürebilirdi.
+
+    v0.6'da kapı DEĞERE de indi. Öncesinde yalnız TÜR kontrol ediliyordu, yani
+    elle yazılmış `theme: "neon"` buradan geçip arayüze ulaşıyor ve karşılığı
+    olmayan bir CSS sınıfına dönüşüyordu — sessiz ve teşhisi zor. Bayat bir
+    `image_model` bundan kesinlikle daha kötü: arayüz var olmayan bir modeli
+    seçili gösterir, üretim "bilinmeyen model" der.
+
+    Bilinmeyen DEĞER, yanlış TÜR ile aynı sınıf çöp sayılıyor ve aynı yere
+    düşüyor: varsayılana. Dosya YAZILMIYOR — bu fonksiyonun yan etkisiz olma
+    sözü korunuyor; düzeltme bir sonraki `update()`'te kendiliğinden diske iner.
+
+    DİKKAT — "yapılandırılmamış" bir model geçerli SAYILIYOR: katalogda var olan
+    ama anahtarı henüz girilmemiş bir model seçili KALIR. Aksi hâlde kullanıcı
+    Gemini'yi seçip anahtarı sonra kaydettiğinde seçimi sessizce Azure'a dönmüş
+    olurdu. "Var mı?" katalogdan, "ulaşılabilir mi?" credstore'dan — ikisi ayrı
+    soru ve yalnız ilki bir tercihi geçersiz kılıyor.
     """
     stored = _read_raw(output_dir)
-    return {
-        name: stored[name] if isinstance(stored.get(name), expected) else default
-        for name, (default, expected) in _SCHEMA.items()
-    }
+
+    def _cozumle(name, default, expected):
+        value = stored.get(name)
+        if not isinstance(value, expected):
+            return default
+        allowed = _ENUMS.get(name)
+        if allowed is not None and value not in allowed:
+            return default
+        return value
+
+    return {name: _cozumle(name, default, expected)
+            for name, (default, expected) in _SCHEMA.items()}
 
 
 def update(values: dict, output_dir: str) -> dict:
@@ -115,8 +169,24 @@ def update(values: dict, output_dir: str) -> dict:
             raise ValueError(f"bilinmeyen tercih: {name}")
         if not isinstance(value, _SCHEMA[name][1]):
             raise ValueError(f"tercih için geçersiz değer: {name}")
-        if name == "theme" and value not in ("mono", "ocean", "amber", "viola"):
-            raise ValueError(f"tercih için geçersiz tema değeri: {value}")
+        allowed = _ENUMS.get(name)
+        if allowed is not None and value not in allowed:
+            raise ValueError(f"tercih için geçersiz {name} değeri: {value}")
+
+    # `chat_model` ÇAPRAZ bir kural: geçerliliği `chat_provider`'a bağlı, yani
+    # `_ENUMS` gibi anahtar-başına bir tablo onu ifade edemiyor. Kontrol
+    # döngüden SONRA ve BİRLEŞİK görünüm üzerinde: istek yalnız modeli
+    # gönderiyorsa sağlayıcı diskteki değerden okunmak zorunda, yoksa geçerli
+    # bir çift reddedilirdi. Şeklen `GenerateRequest`'in alan doğrulayıcısından
+    # model doğrulayıcısına geçişiyle aynı sebep.
+    if values.get("chat_model"):
+        provider = values.get("chat_provider") or read(output_dir)["chat_provider"]
+        gecerli = [m.id for m in catalog.chat_models_for(provider)]
+        if values["chat_model"] not in gecerli:
+            raise ValueError(
+                f"tercih için geçersiz chat_model değeri: {values['chat_model']} "
+                f"({provider} sağlayıcısında yok)")
+
     if not values:
         return read(output_dir)
     with jsonstore.lock_for(_prefs_path(output_dir)):

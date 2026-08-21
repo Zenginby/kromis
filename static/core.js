@@ -53,6 +53,12 @@ function setMode(modeName) {
   }
   renderSource();
   syncTabThumb();
+  // Kapı MODA bağlı: Yönetmen modunda sohbet yapılandırması, Görsel modunda
+  // seçili modelin durumu karar veriyor. Mod değişince yeniden sorulmalı.
+  // `typeof` guard'ı SIRA yüzünden: setMode bu dosyanın üst düzeyinde de
+  // çağrılabiliyor ve syncGoGate aşağıda tanımlı (function bildirimi hoisted
+  // ama `currentModel` gibi `let`ler değil) — bkz. dosya başındaki not.
+  if (typeof syncGoGate === "function") syncGoGate();
 }
 
 $("tab-image").addEventListener("click", () => setMode("image"));
@@ -221,16 +227,266 @@ for (const id of ["upload-btn", "extra-add-btn", "media-pick-btn"]) {
   $(id).addEventListener("click", closePlusMenu);
 }
 
-// ── Üretim ayarları çipi ──
-// Oranlar azure_client.ALLOWED_SIZES ile birebir: başka boyut sunucudan geçmez.
-const SIZE_RATIO = { "1024x1024": "1:1", "1024x1536": "2:3", "1536x1024": "3:2" };
-function syncSpecs() {
-  const size = $("size").value;
-  const quality = $("quality").selectedOptions[0].textContent.trim().toUpperCase();
-  $("specs-label").textContent =
-    `${SIZE_RATIO[size] || size} · ${quality} · x${$("n").value}`;
+// ── Model kaydı ve yeteneğe göre kontroller ──
+//
+// Buradaki durum core.js'te yaşamak ZORUNDA: `syncSpecs()` bu dosyanın en
+// üst düzeyinde çağrılıyor, yani aşağıdaki fonksiyonlar core.js YÜKLENİRKEN
+// tanımlı olmalı. Ayrı bir dosyaya konsa ve core.js'ten SONRA yüklense
+// üst düzey çağrı `const` bir tanıma çarpıp TDZ ReferenceError verirdi —
+// dosyanın başındaki yükleme-sırası notunun tam olarak uyardığı kırılma.
+// ÖNCE yüklenmesi de olmaz: orada `$` henüz tanımlı değil.
+//
+// TARİHÇE: burada `SIZE_RATIO` adında bir sabit vardı ve
+// `azure_client.ALLOWED_SIZES`'ın elle tutulan bir AYNASIYDI. Çoklu modelde o
+// ayna kaçınılmaz olarak bayatlar (Gemini'nin jetonları `WxH` biçiminde bile
+// değil, doğrudan `16:9`). Artık oran da etiket de sunucudan geliyor:
+// GET /api/settings → image_models[].sizes[].{value,label,ratio}.
+let imageModels = [];      // sunucudan gelen katalog
+let currentModel = null;   // seçili tanım (imageModels'ten bir öğe)
+let runBusy = false;       // üretim sürüyor mu — #go kapısının bir girdisi
+
+/** `<select>`i sunucudan gelen seçeneklerle yeniden kurar ve DEĞERİ TAŞIR.
+ *
+ * Taşıma sırası önemli ve üç kademeli:
+ *   1. Birebir aynı `value` yeni modelde de varsa korunur — sessiz, çünkü
+ *      kullanıcı için hiçbir şey değişmedi.
+ *   2. Aynı `ratio` varsa ona geçilir (1024x1536 → 896x1344 gibi): kullanıcının
+ *      seçtiği şey ORAN'dı, piksel sayısı sağlayıcının işi. Bu da sessiz.
+ *   3. Hiçbiri yoksa modelin varsayılanına düşülür ve bu YÜKSEK SESLE söylenir.
+ *
+ * 3. kademe "sessiz sapma yasak" duruşunun devamı: palet sığmadığında
+ * (`applied:false`) ve yönetmenin önerisi uygulanamadığında da aynısı yapılıyor.
+ * Söylenmezse kullanıcı formda başka bir ayar görür ve sonucu açıklayamaz.
+ */
+function fillAxis(selectId, options, desired, fallback) {
+  const el = $(selectId);
+  const onceki = desired !== undefined ? desired : el.value;
+  const oncekiRatio = [...el.options].find((o) => o.value === onceki)?.dataset.ratio;
+
+  el.replaceChildren(...options.map((opt) => {
+    const o = document.createElement("option");
+    o.value = opt.value;
+    // `textContent`: etiket sunucudan geliyor ve sunucu metni DOM'a yalnız bu
+    // kapıdan giriyor (dosya genelindeki duruş).
+    o.textContent = opt.label;
+    if (opt.ratio) o.dataset.ratio = opt.ratio;
+    return o;
+  }));
+
+  if (options.some((o) => o.value === onceki)) { el.value = onceki; return null; }
+  const ayniOran = oncekiRatio && options.find((o) => o.ratio === oncekiRatio);
+  if (ayniOran) { el.value = ayniOran.value; return null; }
+  el.value = fallback;
+  // Eski değer zaten boşsa (ilk çizim) bildirilecek bir sapma yok.
+  return onceki ? onceki : null;
 }
-for (const id of ["size", "quality", "n"]) $(id).addEventListener("change", syncSpecs);
+
+/** Bir eksenin kullanıcıya görünen adı. chat.js'in atlanan-öneri metni bunu
+ * kullanıyor: aynı eksen bir modelde "Boyut", başkasında "Oran". */
+function axisLabel(key) {
+  const el = $(`label-${key}`);
+  return el ? el.textContent.trim() : key;
+}
+
+/** Seçili modelin kredi maliyeti: model × boyut/kalite × adet.
+ *
+ * Kredi bilgisi ŞİMDİLİK yalnız METADATA — bakiye yok, satın alma yok,
+ * zorlama yok. Gerçek bakiye geldiğinde değişecek yer TEK: aşağıdaki metne
+ * " · N kalan" ekleniyor ve goBlockReason'a bir satır giriyor.
+ *
+ * Tarife SUNUCUDAN geliyor; istemci yalnız anahtar kuruyor, fiyat mantığı
+ * kurmuyor — yoksa aynı hesap iki yerde birden yaşardı.
+ */
+function syncRunCost() {
+  const el = $("run-cost");
+  if (!currentModel) { el.hidden = true; return; }
+  const tarife = currentModel.credits_by_quality || {};
+  const birim = tarife[$("quality").value] ?? currentModel.credits;
+  if (birim === undefined || birim === null) { el.hidden = true; return; }
+  // `≈` bilerek: bu bir fatura değil, metadata — tilde bunu bir paragraf
+  // açıklama yazmadan söylüyor.
+  el.textContent = `≈ ${birim * Number($("n").value || 1)} kredi`;
+  el.hidden = false;
+}
+
+/** #go'nun engel SEBEBİ — boş dize "engel yok".
+ *
+ * Bu fonksiyon `#go.disabled`ın TEK yazarı olmak için var. Öncesinde dört ayrı
+ * yerden yazılıyordu (core.js iki, settings.js iki) ve chat.js beşinci bir
+ * mantık taşıyordu; yani şimdiden iki çelişen sahip vardı. N sağlayıcıda bu
+ * sürdürülemez.
+ *
+ * Sebep `title`'a da yazılıyor: kilitli bir düğmenin neden kilitli olduğunu
+ * saklamak, #chat-gate'in reddettiği şeyin aynısı.
+ */
+function goBlockReason() {
+  if (runBusy) return "Üretim sürüyor…";
+  if (currentMode === "director") {
+    return chatConfigured ? "" : "Sohbet modeli yapılandırılmadı.";
+  }
+  if (!imageModels.length) return "Model listesi alınamadı.";
+  if (!currentModel) return "Model seçilmedi.";
+  if (!currentModel.configured) {
+    return `${currentModel.label} için anahtar yok — Ayarlar'dan ekle.`;
+  }
+  if (source && !currentModel.supports_edit) {
+    return `${currentModel.label} referans görselle çalışmıyor.`;
+  }
+  return "";
+}
+
+function syncGoGate() {
+  const sebep = goBlockReason();
+  $("go").disabled = !!sebep;
+  $("go").title = sebep || "Üret";
+}
+
+/** Seçili modeli uygular: eksenleri doldurur, notu yazar, tercihi kaydeder. */
+function applyModel(id, { announce = true } = {}) {
+  const model = imageModels.find((m) => m.id === id);
+  if (!model) return;
+  currentModel = model;
+  $("model").value = model.id;
+
+  const dusenler = [];
+  const s = fillAxis("size", model.sizes, undefined, model.default_size);
+  if (s) dusenler.push(`${axisLabel("size")} ${s}`);
+  const q = fillAxis("quality", model.qualities, undefined, model.default_quality);
+  if (q) dusenler.push(`${axisLabel("quality")} ${q}`);
+  const adetler = Array.from({ length: model.max_n },
+                             (_, i) => ({ value: String(i + 1), label: String(i + 1) }));
+  const nn = fillAxis("n", adetler, undefined, "1");
+  if (nn) dusenler.push(`${axisLabel("n")} ${nn}`);
+
+  // Kalite ekseni OLMAYAN model (Gemini): satır tümden gizleniyor. Tel üzerinde
+  // yine geçerli bir jeton gidiyor — katalogdaki sentetik "standard".
+  $("spec-quality").hidden = !!model.quality_hidden;
+  // Eksenin ADI modele göre değişiyor: piksel boyutu seçen model "Boyut",
+  // oran seçen model "Oran" diyor. chat.js'in atlanan-öneri metni buradan okuyor.
+  $("label-size").textContent =
+    model.sizes.some((o) => o.value.includes("x")) ? "Boyut" : "Oran";
+
+  // Şerit YALNIZCA EYLEM GEREKTİĞİNDE açılıyor: anahtar eksikse.
+  //
+  // Modelin tanıtım notu (`model.note`) buraya KONMUYOR ve bu ölçülmüş bir
+  // karar: 360px'de o not 36px yer kaplıyor ve `--composer-h` üzerinden
+  // tuvalin alt boşluğunu KALICI olarak yiyor — üstelik varsayılan modelde,
+  // yani kullanıcının hiçbir şey yapmasını gerektirmeyen durumda. Bilgi
+  // seçicinin `title`ında yaşıyor (aşağıda, renderModelOptions); eylem
+  // gerektiren tek durum burada.
+  const not = $("model-note");
+  if (model.configured) {
+    not.hidden = true;
+  } else {
+    $("model-note-text").textContent =
+      `${model.label} için API anahtarı kayıtlı değil.`;
+    not.hidden = false;
+  }
+
+  syncSpecs();
+  syncRunCost();
+  syncGoGate();
+  if (announce && dusenler.length) {
+    statusEl.textContent = `${model.label} bu ayarları desteklemiyor, `
+      + `varsayılana düşüldü: ${dusenler.join(", ")}.`;
+  }
+}
+
+function renderModelOptions() {
+  const el = $("model");
+  el.replaceChildren(...imageModels.map((m) => {
+    const o = document.createElement("option");
+    o.value = m.id;
+    // Maliyet ve kurulum durumu ETİKETTE: karşılaştırma ("hangisi ucuz?")
+    // burada yapılıyor ve native bir <option> yalnız metin taşıyabiliyor.
+    const tarife = Object.values(m.credits_by_quality || {});
+    const aralik = tarife.length
+      ? `${Math.min(...tarife)}–${Math.max(...tarife)} kredi`
+      : `${m.credits} kredi`;
+    o.textContent = `${m.label} — ${aralik}`
+      + (m.configured ? "" : " · kurulum gerekli");
+    // Tanıtım notu `title`da: bilgi kaybolmuyor ama composer'ın yüksekliğine
+    // bedel ödemiyor (bkz. applyModel'deki gerekçe).
+    if (m.note) o.title = m.note;
+    return o;
+  }));
+}
+
+/** Katalog + hangi modellerin kullanılabilir olduğunu sunucudan çeker.
+ *
+ * `/api/settings` ile AYNI yanıttan okunuyor, ayrı bir uçtan değil: ikisi ayrı
+ * zamanlarda gelirse seçici bir an "hepsi kullanılabilir" gösterip sonra fikir
+ * değiştirirdi (GET /api/settings'in `guncelleme` alanı için yazılı olan
+ * gerekçenin aynısı).
+ */
+function applyModels(s, tercih) {
+  if (!s || !Array.isArray(s.image_models)) return;
+  imageModels = s.image_models;
+  renderModelOptions();
+  const istenen = tercih || s.default_image_model;
+  // Kayıtlı tercih artık katalogda olmayabilir (model kaldırıldı): varsayılana
+  // düşülüyor. YAPILANDIRILMAMIŞ olması ise geçerli bir durum — seçili kalıyor,
+  // yoksa anahtarı kaydetmek kullanıcının seçimini geri getirmezdi.
+  const id = imageModels.some((m) => m.id === istenen)
+    ? istenen : s.default_image_model;
+  applyModel(id, { announce: false });
+}
+
+/** Tercihi diske yazar. Hata SESSİZ yutulmuyor ama üretimi de engellemiyor.
+ *
+ * `chatApi` KULLANILMIYOR: o chat.js'te ve bu dosya ondan ÖNCE yükleniyor —
+ * olay anında erişilebilir olsa da tercih yazımı için üç satırlık bir fetch
+ * yeterli, ve bağ ne kadar az olursa yükleme sırası o kadar az kırılgan.
+ *
+ * Yazım BAŞARISIZ olsa bile seçim ekranda kalıyor: kullanıcı bu turda seçtiği
+ * modelle üretebiliyor, yalnız seçim bir sonraki açılışa taşınmıyor. Tersi
+ * (seçimi geri almak) çalışan bir şeyi bozardı.
+ */
+async function savePref(body) {
+  try {
+    const res = await fetch("/api/prefs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch (e) {
+    statusEl.textContent = `Tercih kaydedilemedi (seçim bu oturumda geçerli): ${e.message}`;
+  }
+}
+
+$("model").addEventListener("change", () => {
+  applyModel($("model").value);
+  // Tercih ANINDA yazılıyor, "Kaydet" düğmesine bağlı DEĞİL: #pref-autosave ve
+  // tema seçicisinin deseni. O düğme kimlik formuna ait ve Azure hiç
+  // yapılandırılmamışken basılamıyor.
+  savePref({ image_model: $("model").value });
+});
+
+$("model-settings-link").addEventListener("click", () => {
+  // Doğrudan seçili modelin SAĞLAYICI grubunu açıyor: "anahtar yok" uyarısının
+  // düğmesi kullanıcıyı doğru kutuya götürmezse uyarı yarım kalır.
+  // settings.js'in adına OLAY ANINDA dokunuluyor — yükleme sırası kuralının
+  // izin verdiği tek yol (settings.js core.js'ten SONRA yükleniyor).
+  openSettings(currentModel ? currentModel.provider : undefined);
+});
+
+// ── Üretim ayarları çipi ──
+function syncSpecs() {
+  const parts = [];
+  const size = $("size").selectedOptions[0];
+  if (size) parts.push(size.dataset.ratio || $("size").value);
+  // Kalite ekseni olmayan modelde çipte de yazmıyor: boş bir "·" bırakmak
+  // "kalite kayboldu" gibi okunurdu.
+  if (!$("spec-quality").hidden && $("quality").selectedOptions[0]) {
+    parts.push($("quality").selectedOptions[0].textContent.trim().toUpperCase());
+  }
+  parts.push(`x${$("n").value}`);
+  $("specs-label").textContent = parts.join(" · ");
+}
+for (const id of ["size", "quality", "n"]) {
+  $(id).addEventListener("change", () => { syncSpecs(); syncRunCost(); });
+}
 syncSpecs();
 
 // ── Composer: otomatik büyüyen kutu + ⌘Enter + ⌘J ──
@@ -537,6 +793,10 @@ function renderSource() {
   renderExtras();
   // Palet notu referans görsel varken değişir (üretim ≠ düzenleme ifadesi)
   renderPalettePanel();
+  // Referans görsel eklenip kaldırıldığında kapı yeniden sorulmalı:
+  // düzenlemeyi desteklemeyen bir model seçiliyken referans varsa üretim
+  // engelli olmak zorunda (bkz. goBlockReason).
+  if (typeof syncGoGate === "function") syncGoGate();
 }
 
 // ── Ek referans görselleri ──────────────────────────────────────────
@@ -710,6 +970,10 @@ async function run() {
   const size = $("size").value;
   const quality = $("quality").value;
   const n = $("n").value;
+  // TEK yerde okunup İKİ dala aynı değişkenden veriliyor. Paletin dersi
+  // (aşağıda, FormData döngüsünün yorumu): alanları elle saymak bir kez
+  // `palette_id`'yi düşürmüştü.
+  const model = $("model").value;
   const editing = source !== null;
   // Palet İKİ dalın da payload'ına eklenmeli — biri atlanırsa o yolda renk
   // sessizce kaybolur. Palet kapalıyken {} döner, böylece gövde bugünküyle
@@ -740,6 +1004,7 @@ async function run() {
     fd.append("size", size);
     fd.append("quality", quality);
     fd.append("n", n);
+    fd.append("model", model);
     if (source.kind === "upload") fd.append("file", source.file);
     else fd.append("source_id", source.id);
     if (currentFolder) fd.append("folder_id", currentFolder.id);
@@ -762,14 +1027,15 @@ async function run() {
       headers: { "Content-Type": "application/json" },
       // `session_id` KOŞULLU: oturum yoksa alan hiç gönderilmiyor, böylece
       // gövde bugünküyle bayt bayt aynı kalıyor (palet dalının gerekçesi).
-      body: JSON.stringify({ prompt, size, quality, n: parseInt(n, 10),
+      body: JSON.stringify({ prompt, size, quality, n: parseInt(n, 10), model,
                              folder_id: currentFolder ? currentFolder.id : null,
                              ...(sessionId ? { session_id: sessionId } : {}),
                              ...pal }),
     });
   }
 
-  $("go").disabled = true;
+  runBusy = true;
+  syncGoGate();
   const gen = startProgress();
   statusEl.textContent = !editing ? "Üretiliyor…"
     : extras.length ? "Görseller birleştiriliyor…" : "Düzenleniyor…";
@@ -786,24 +1052,43 @@ async function run() {
     statusEl.textContent = editing ? "Düzenleme tamam." : `${images.length} görsel üretildi.`;
     // Bayat sunucu tespiti — /api/edit multipart olduğu için orada
     // extra="forbid" karşılığı YOK: Starlette bilinmeyen form alanını sessizce
-    // atar ve 200 döner. Yanıtta palet yankılanmıyorsa sunucu eskidir.
+    // atar ve 200 döner. Tek savunma yanıtın alanı geri YANKILAMASI.
+    //
+    // Uyarılar bir LİSTEDE toplanıyor, if/else zincirinde değil: zincir, ikisi
+    // birden düştüğünde yalnızca birini söylüyordu. Model ilk sırada çünkü
+    // sonucu İKİ yönden bozuyor — yanlış estetik VE yanlış fatura.
+    const warnings = [];
+    if (images[0] && images[0].model !== model) {
+      // `undefined !== "azure-gpt-image-2"` eski bir sunucuda DOĞRU sonuç:
+      // alanı hiç yankılamayan sunucu gerçekten de alanı yok saymıştır.
+      warnings.push(`Model uygulanmadı: "${model}" istendi, sunucu `
+        + `"${images[0].model || "bilinmiyor"}" ile üretti — sunucu eski sürüm `
+        + "görünüyor, ./run.sh ile yeniden başlat.");
+    }
     if (pal.palette_hex && images[0] && !images[0].palette) {
-      statusEl.textContent =
-        "Palet uygulanmadı: sunucu eski sürüm görünüyor — ./run.sh ile yeniden başlat.";
+      warnings.push(
+        "Palet uygulanmadı: sunucu eski sürüm görünüyor — ./run.sh ile yeniden başlat.");
     } else if (images[0] && images[0].palette && images[0].palette.applied === false) {
       // Ek, prompt karakter sınırına sığmadığı için düşürüldü. Kayıtta palet
       // görünür ama prompt'a girmedi; söylenmezse kullanıcı renksiz sonucu
       // açıklayamaz. Eski kayıtlarda alan yok → `=== false` bilinçli.
-      statusEl.textContent =
+      warnings.push(
         "Palet prompt'a sığmadı (4000 karakter sınırı): görsel renk " +
-        "yönlendirmesi olmadan üretildi. Prompt'u kısaltıp tekrar dene.";
+        "yönlendirmesi olmadan üretildi. Prompt'u kısaltıp tekrar dene.");
     }
+    if (warnings.length) statusEl.textContent = warnings.join(" · ");
     ok = true;
     // Sonuç kaydı döküme: konuşma ve üretilen görseller aynı akışta (tasarım §5).
     // `image_ids` sunucunun döndürdüğü kayıtlardan geliyor; adet ayrı
     // taşınmıyor, dizinin uzunluğundan okunuyor.
+    // `model` de params'a: sonuç kartı hangi modelin ürettiğini söyleyebilmeli
+    // ve döküm kaydı üretimin tam bağlamını taşımalı. Sunucu tarafı
+    // (`models.ResultParams`) alanı v0.6'da öğrendi — bu iki taraf AYNI
+    // sürümde inmek zorunda, yoksa `extra="forbid"` kaydı 422 yapar ve
+    // görsel diske düşerken oturum turu sessizce kaybolur.
     await appendResultTurn(pending, images.map((r) => r.id),
-                           { kind: editing ? "edit" : "generate", size, quality });
+                           { kind: editing ? "edit" : "generate", size, quality,
+                             model });
     await loadHistory();
   } catch (e) {
     // BAŞARISIZ TUR GEÇMİŞTE KALMAZ (sendChat'in kuralı): kalsaydı döküme
@@ -815,7 +1100,8 @@ async function run() {
     syncAskDirector();
     statusEl.textContent = e.message;
   } finally {
-    $("go").disabled = !configured; // yapılandırma kaybolduysa kapıyı yeniden açma
+    runBusy = false;
+    syncGoGate();   // kapının tek yazarı — yapılandırma/mod/model hepsini birden görüyor
     stopProgress(ok, gen);
   }
 }

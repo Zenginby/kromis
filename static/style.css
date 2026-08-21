@@ -304,6 +304,73 @@ body {
 .composer-foot p { margin: 0; }
 .composer-foot p:empty { display: none; }
 
+/* ── Model şeridi ── */
+/* Kendi satırı: .composer-bar'ın ölçülmüş 360px bütçesine dokunmuyor
+   (bkz. index.html'deki gerekçe ve mobile.css:152). `flex-wrap` çünkü
+   #model-note tam genişlik isteyip alta düşüyor. */
+.composer-head {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 0 6px 6px;
+  /* `min-width: 0` — ÇOCUKTA değil BURADA, ve bu ayrım ölçüldü.
+     `#composer` bir flex kolon; bu satır onun bir flex ÖĞESİ ve öğenin
+     varsayılan `min-width: auto` değeri kendi min-content genişliğine
+     çözülüyor. İçindeki `<select>`in min-content'i en uzun seçeneğinin metni
+     kadar ("OpenAI · DALL·E 3 — 10–20 kredi · kurulum gerekli"), yani satır
+     kapsayıcının içerik kutusundan taşıyor VE kardeşlerini de kendisiyle
+     birlikte genişletiyor: 360px'de composer'ın bütün çocukları 334px'ten
+     357px'e çıkıyor ve sayfa 10px yatay kayıyor.
+
+     Tarayıcıda main ile karşılaştırılarak ölçüldü (main'de taşma YOK) ve
+     eleyerek bulundu: `#model`i gizlemek taşmayı bitiriyor, `.model-chip`e
+     `min-width: 0` vermek YETMİYOR — kısıt öğenin kendisinde değil, onu
+     tutan satırda. Mandal: tests/test_mobile.py. */
+  min-width: 0;
+}
+/* Çip görünümü ama native <select>: oku tarayıcı çiziyor, o yüzden
+   `.specs`in chevron SVG'si ve sabit `gap`i burada yok. `max-width` uzun
+   model adının 360px'de satırı taşırmasını engelliyor. */
+.model-chip {
+  /* `min-width: 0` ŞART ve ölçüldü: `<select>`in İÇSEL genişliği en uzun
+     seçeneğinin metni kadar ("OpenAI · DALL·E 3 — 10–20 kredi · kurulum
+     gerekli"). Flex öğesinin varsayılan `min-width: auto` değeri o içsel
+     genişliğin altına inmeyi YASAKLIYOR, dolayısıyla `max-width: 100%` tek
+     başına yetmiyor — öğe küçülmüyor, KAPSAYICIYI büyütüyor. Bedeli somut:
+     360px'de composer 348px'ten 357px'e çıkıyor ve sayfa 10px yatay kayıyor
+     (tarayıcıda main ile karşılaştırılarak ölçüldü; main'de taşma YOK).
+     `text-overflow` gerekmiyor: native select metnini kendisi kırpıyor. */
+  flex: 0 1 auto; width: auto; max-width: 100%; min-width: 0; margin: 0;
+  padding: 6px 10px; cursor: pointer;
+  background: var(--panel-2); color: var(--muted);
+  border: 1px solid var(--control-border); border-radius: 999px;
+  font-size: 0.74rem;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.model-chip:hover { background: var(--raised); color: var(--text); }
+.model-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Yapılandırılmamış model seçiliyken şerit sessiz kalmıyor: kontrolün kendisi
+   kilitlenmediği için (bkz. #chat-gate duruşu) açıklama BURADA yaşıyor. */
+.model-note {
+  flex: 1 1 100%; margin: 0;
+  font-size: 0.74rem; color: var(--muted);
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+/* `display: flex` UA stylesheet'inin `[hidden] { display: none }` kuralını
+   EZİYOR — yazar kuralı kazanıyor. Bu satır olmadan gizli şerit 18px yer
+   kaplamaya devam ediyordu (tarayıcıda ölçüldü). `.popover[hidden]` için de
+   aynı satır aynı sebeple var (yukarıda); `display` atayan her kural bu
+   bedeli ödemek zorunda. */
+.model-note[hidden] { display: none; }
+.btn-link {
+  padding: 0; border: 0; background: none; cursor: pointer;
+  color: var(--accent); font: inherit; text-decoration: underline;
+}
+.btn-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Kredi satırı: metadata, fatura değil — tonu da o yüzden ikincil. */
+.run-cost {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem; color: var(--muted); flex: none;
+}
+
 /* ── Slide-over'lar ── */
 .scrim { position: fixed; inset: 0; z-index: 40; background: var(--scrim); display: none; }
 /* Perde TÜRETİLMİŞ durum: açık bir slide-over varsa görünür. JS'ten
@@ -318,6 +385,12 @@ body:has(.sheet.open) .scrim { display: block; }
 #composer[data-mode="director"] #specs-btn,
 #composer[data-mode="director"] #ask-director,
 #composer[data-mode="director"] #folder-target { display: none; }
+/* Model seçicileri de aynı eksende ve BİRBİRİNİ dışlıyor: aynı yuvada
+   durdukları için genişlik bedeli sıfır. #run-cost yalnız Görsel modunda
+   anlamlı — sohbetin kredi maliyeti üretimin maliyeti değil. */
+#composer[data-mode="image"] #chat-model,
+#composer[data-mode="director"] #model,
+#composer[data-mode="director"] #run-cost { display: none; }
 /* "Yönetmen'e sor" Görsel modunun kutusuna bağlı: Yönetmen modunda kendine
    sormak anlamsız olurdu. Doluluk ekseni chat.js'te (`hidden`), görünüşü
    `.btn-ghost` varyantlarının yanında (aynı özgüllük — sıra belirleyici). */
@@ -2046,3 +2119,12 @@ body.viewer-open { overflow: hidden; }
   margin: 0;
 }
 
+
+/* Sağlayıcı durum listesi: seçici + tek alan grubu deseninin bedeli olan
+   "hangisi kurulu?" görünümünü geri veriyor (bkz. index.html'deki gerekçe). */
+.provider-status { list-style: none; margin: 0 0 12px; padding: 0; }
+.provider-status li {
+  font-size: 0.74rem; color: var(--muted);
+  padding: 2px 0;
+}
+.provider-status li.ok { color: var(--text); }

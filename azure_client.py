@@ -90,9 +90,16 @@ def request_timeout(read: float):
 # Prompt Yönetmeni (v1.13) aynı dosyada yaşıyor. Sohbetin key/url'si BOŞ
 # bırakılabilir: o zaman görselin kimliğine düşer — canlı doğrulandı, iki dağıtım
 # aynı Azure kaynağında ve aynı anahtarla çalışıyor. Ayrı bir kaynak gerekiyorsa
-# bu iki değişken dosyaya ELLE yazılır; forma ikinci bir gizli alan eklenmiyor
-# (app.py'deki doğrulama redaksiyonu `loc`'ta yalnızca `api_key` arıyor, başka
-# adlı bir gizli alan o redaksiyonu sessizce atlatırdı).
+# bu iki değişken dosyaya ELLE yazılabilir.
+#
+# TARİHÇE: burada "forma ikinci bir gizli alan EKLENMİYOR" yazıyordu ve gerekçesi
+# `app.py`'deki doğrulama redaksiyonunun `loc`'ta yalnızca `api_key` aramasıydı —
+# başka adlı bir gizli alan o redaksiyonu sessizce atlatırdı. Kısıt v0.6'da
+# KALKTI: redaksiyon artık üç kapıdan geçiyor (rota + katalogdan türetilen ad +
+# ad soneki) ve `tests/test_settings_route.py` bunu `SettingsRequest`'in TÜM
+# alanları üzerinde mekanik olarak ölçüyor. Yani kısıt kalkarken yerine onu
+# gereksiz kılan mandal kuruldu; not korunuyor çünkü o boşluk gerçekten vardı
+# ve üç BYOK alanı bir süre onun içinde yaşadı.
 CHAT_KEY = "AZURE_CHAT_API_KEY"
 CHAT_URL = "AZURE_CHAT_BASE_URL"
 CHAT_DEPLOYMENT = "AZURE_CHAT_DEPLOYMENT"
@@ -100,8 +107,25 @@ IMAGE_KEY = "AZURE_IMAGE_API_KEY"
 IMAGE_URL = "AZURE_IMAGE_BASE_URL"
 
 
-class AzureImageError(Exception):
-    """Kullanıcıya gösterilebilir Azure hatası (mesajı map_error çıktısıdır)."""
+class ImageError(Exception):
+    """Kullanıcıya gösterilebilir GÖRSEL SAĞLAYICI hatası (Türkçe).
+
+    Tür TEK, ad İKİ: `AzureImageError` bu sınıfın alias'ı. Sebep, çoklu
+    sağlayıcıya geçerken `except` bloklarına hiç dokunmamak — `app.py` Azure
+    çağrılarını `except ac.AzureImageError` ile süzüyor ve o süzgeç AYNI NESNE
+    olduğu için yeni adaptörlerin hatalarını da yakalıyor. Alt sınıf DEĞİL
+    alias: alt sınıf olsaydı hangi tarafın yakalandığı sıraya bağlı hale
+    gelirdi ve testlerin yarısı ikinci adı öğrenmek zorunda kalırdı.
+
+    Bunun kapattığı tuzak `transport_error_message`'ın docstring'inde uzun uzun
+    yazılı: sarmalanmayan bir httpx hatası bu süzgeçten GEÇER, ham 500 olur,
+    arayüz gövdeyi JSON olarak ayrıştıramaz ve kullanıcı beklemenin sonunda
+    yalnızca "Hata (500)" görür. Tek tür, bütün sağlayıcılar için tek kapı.
+    """
+
+
+# Geriye uyum: app.py'nin süzgeci ve mevcut testlerin tamamı bu adı kullanıyor.
+AzureImageError = ImageError
 
 
 def transport_error_message(exc: Exception, timeout: float) -> str:

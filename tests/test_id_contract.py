@@ -233,3 +233,31 @@ def test_refresh_search_matches_search_i_bare_referansla_cagirmadigi_mandallanir
         "historyCache = all.filter(matchesSearch) kullanımı index parametresini q'ya zorlar!"
     )
 
+
+
+def test_go_disabled_tek_yerden_yaziliyor():
+    """`#go.disabled`ın TEK yazarı olmalı ve o core.js'teki `syncGoGate`.
+
+    Öncesinde dört ayrı yerden yazılıyordu (core.js iki, settings.js iki) ve
+    chat.js beşinci bir mantık taşıyordu — yani şimdiden iki çelişen sahip
+    vardı ve hangisinin son sözü söylediği çağrı SIRASINA kalıyordu. Kapı artık
+    modu, meşguliyeti, sohbet yapılandırmasını ve seçili görsel modelinin
+    durumunu BİRLİKTE görmek zorunda; ikinci bir yazar o bütünlüğü bozar.
+
+    Ölçülen somut hata: `!configured` yalnız AZURE'u sınıyordu, yani yalnızca
+    OpenAI anahtarı olan bir kullanıcıda "Üret" düğmesi kalıcı olarak ölüydü.
+    """
+    yazanlar = []
+    for name, kaynak in _js_sources().items():
+        for lineno, line in enumerate(kaynak.splitlines(), 1):
+            if '("go").disabled' not in line:
+                continue
+            # OKUMA değil YAZMA arıyoruz: `= ` atamanın işareti.
+            sag = line.split('("go").disabled', 1)[1].lstrip()
+            if sag.startswith("=") and not sag.startswith("=="):
+                yazanlar.append(f"{name}:{lineno}")
+
+    assert len(yazanlar) == 1, (
+        f"#go.disabled birden fazla yerden yazılıyor: {yazanlar}")
+    assert yazanlar[0].startswith("core.js"), (
+        f"tek yazar core.js olmalı (syncGoGate), bulunan: {yazanlar[0]}")

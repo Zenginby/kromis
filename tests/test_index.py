@@ -2845,3 +2845,70 @@ def test_set_gallery_source_by_id_switches_section_to_studio():
     assert "showView(" not in fn_body, "eski showView çağrısı kalmış"
 
 
+
+
+# ── Model seçici (v0.6) ────────────────────────────────────────────────
+#
+# Dosyada fixture yok (her test kendi client'ını kuruyor); bu blok tek satırlık
+# bir yardımcı paylaşıyor çünkü beş iddia aynı HTML'e bakıyor.
+
+
+def _served() -> str:
+    return TestClient(appmod.app).get("/").text
+
+
+def test_model_secici_native_select_ozel_bir_popover_DEGIL():
+    """Native `<select>`: Android'de sistemin kendi seçicisi olarak açılıyor.
+
+    Bu tercih `#move-target` için index.html'de yazılı olarak verilmiş ve aynı
+    gerekçe burada da geçerli — tek dokunuşta onlarca model arasında geçiş.
+    Özel bir popover listbox odak tuzağını, klavye gezintisini ve ARIA listbox
+    semantiğini sıfırdan getirirdi. İddia "daha güzel" bir popover'a dönüşü
+    yakalıyor.
+    """
+    html = _served()
+    assert '<select id="model"' in html
+    assert '<select id="chat-model"' in html
+
+
+def test_model_secici_composer_bar_da_DEGIL():
+    """360px genişlik bütçesinin mandalı.
+
+    `mobile.css` ölçümü yazıyor: `.composer-bar` zaten ~380px > 360px ve
+    `.composer-right` kendi satırına düşürülmüş durumda. Dördüncü bir kontrol
+    oraya konursa ÜÇÜNCÜ satır açılır ve `--composer-h` tuvalin alt boşluğunu
+    yer. Regresyon masaüstü tarayıcıda GÖRÜNMEZ — bu yüzden mekanik iddia.
+    """
+    html = _served()
+    model_at = html.index('<select id="model"')
+    bar_at = html.index('class="composer-bar"')
+    assert model_at < bar_at, (
+        "model seçici .composer-bar'ın içine/sonrasına taşınmış — 360px "
+        "genişlik bütçesi (mobile.css) yeniden ölçülmeli")
+
+
+def test_eksen_satirlari_adreslenebilir():
+    """Kalite ekseni OLMAYAN model var: satır gizlenebilmeli.
+
+    Etiket de adreslenebilir çünkü aynı eksenin adı modele göre değişiyor
+    ("Boyut" ↔ "Oran") ve Prompt Yönetmeni'nin atlanan-öneri metni o adı okuyor.
+    """
+    html = _served()
+    for eid in ("spec-size", "spec-quality", "spec-n",
+                "label-size", "label-quality", "label-n"):
+        assert f'id="{eid}"' in html, eid
+
+
+def test_adet_secenekleri_value_ozniteligi_TASIYOR():
+    """`#n` seçenekleri eskiden `value` taşımıyordu ve `option.value` metne
+    düşüyordu — chat.js'teki uyarının konusu. Seçenekler artık core.js
+    tarafından da kuruluyor, ama HTML'deki ilk çizim aynı sözleşmeyi tutmalı:
+    yoksa Ayarlar gelmeden atılan tek turda değer ayrışırdı."""
+    assert '<option value="1">1</option>' in _served()
+
+
+def test_kredi_satiri_ve_model_notu_var():
+    html = _served()
+    for eid in ("run-cost", "model-note", "model-note-text",
+                "model-settings-link"):
+        assert f'id="{eid}"' in html, eid

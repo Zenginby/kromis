@@ -25,6 +25,9 @@ from starlette.datastructures import UploadFile as FormUploadFile
 
 import assets_store
 import azure_client as ac
+import catalog
+import credstore
+import providers
 import backup
 import chat_client as cc
 import chat_store
@@ -39,11 +42,12 @@ import paths
 import prefs
 import storage
 import version
-from models import (MAX_CHAT_TITLE_CHARS, MAX_PROMPT_CHARS, WIRE_CHAT_ROLES,
-                    WIRE_MESSAGE_FIELDS, BannerRequest, BulkImagesRequest,
-                    BulkMoveRequest, ChatRequest, ChatSaveRequest, FolderRequest,
-                    GenerateRequest, LogoRequest, MoveImageRequest, PrefsRequest,
-                    SavePaletteRequest, SettingsRequest, SuggestRequest,
+from models import (MAX_CHAT_TITLE_CHARS, MAX_IMAGES_PER_RUN, MAX_PROMPT_CHARS,
+                    WIRE_CHAT_ROLES, WIRE_MESSAGE_FIELDS, BannerRequest,
+                    BulkImagesRequest, BulkMoveRequest, ChatRequest,
+                    ChatSaveRequest, FolderRequest, GenerateRequest, LogoRequest,
+                    MoveImageRequest, PrefsRequest, SavePaletteRequest,
+                    SettingsRequest, SuggestRequest, check_capabilities,
                     check_drop_indices)
 
 BASE_DIR = paths.REPO_DIR                    # geriye uyum: mevcut kullanımlar bozulmasın
@@ -99,13 +103,50 @@ async def _lifespan(app: FastAPI):
 app = FastAPI(title="Lumeo", lifespan=_lifespan)
 
 
+# Kimlik FORMU olan rotalar: yanıtta hiçbir alanın değeri yankılanmak zorunda
+# değil, o yüzden kapı alan adına değil ROTAYA bakıyor. Üç kapının en GÜÇLÜSÜ bu —
+# yarın forma eklenen bir alan hiçbir şey hatırlanmadan kapsanıyor.
+_CREDENTIAL_ROUTES = frozenset({"/api/settings"})
+
+# İkinci kapı: BAŞKA bir rotada geçebilecek gizli alan adları. Katalogdan
+# TÜRETİLİYOR, elle sayılmıyor.
+_SECRET_FIELDS = frozenset({"api_key"}) | catalog.secret_field_names()
+# Üçüncü kapı: kataloğa hiç girmemiş alan da adının BİÇİMİNDEN yakalanıyor
+# (bugünkü `fal_key` / `replicate_api_token` tam olarak bu kapıdan geçiyor).
+_SECRET_SUFFIXES = ("_api_key", "_key", "_token", "_secret")
+
+
+def _is_secret_loc(loc) -> bool:
+    return any(str(p) in _SECRET_FIELDS or str(p).endswith(_SECRET_SUFFIXES)
+               for p in loc)
+
+
 @app.exception_handler(RequestValidationError)
 async def _redact_validation_errors(request: Request, exc: RequestValidationError):
-    """Doğrulama hatası gövdesinde API key'i yankılama (FastAPI varsayılanı 'input' döner)."""
+    """Doğrulama hatası gövdesinde gizli değeri yankılama (FastAPI 'input' döner).
+
+    v0.6'da GENELLEŞTİ ve sebebi ÖLÇÜLDÜ: kapı `loc` içinde birebir `"api_key"`
+    arıyordu, yani BYOK alanları (`openai_api_key`, `fal_key`,
+    `replicate_api_token` — üçü de v0.2.0'dan beri kabul ediliyor) kapsam
+    DIŞINDAYDI. 500 karakteri aşan bir değer 422 alıyor ve anahtar `input`
+    alanında istemciye AYNEN dönüyordu. `azure_client.py`'nin başındaki
+    "bu yüzden ikinci bir gizli form alanı eklenmedi" notu tam olarak bu boşluğu
+    tarif ediyor; boşluk kapandığı için o notun dayattığı kısıt da kalktı —
+    çoklu sağlayıcı formu ancak bundan sonra eklenebilir.
+
+    Üç kapı birlikte çünkü her biri diğerinin kaçırdığını yakalıyor:
+      1. ROTA: /api/settings bir kimlik formu, hiçbir alanı yankılanmamalı.
+      2. AD: katalogda gizli olarak beyan edilmiş alanlar (başka rotalarda da).
+      3. SONEK: kataloğa girmemiş ama adı `_key`/`_token`/`_secret` ile bitenler.
+
+    `ctx` de siliniyor, `input` gibi: pydantic uzunluk hatalarında bağlamda
+    değerin kendisi ya da uzunluğu geçebiliyor.
+    """
+    kimlik_rotasi = request.url.path in _CREDENTIAL_ROUTES
     safe = []
     for err in exc.errors():
         err = dict(err)
-        if any(str(p) == "api_key" for p in (err.get("loc") or ())):
+        if kimlik_rotasi or _is_secret_loc(err.get("loc") or ()):
             err.pop("input", None)
             err.pop("ctx", None)
         safe.append(err)
@@ -328,15 +369,23 @@ def generate(req: GenerateRequest) -> dict:
                                        req.palette_strength, req.palette_id,
                                        drop=req.palette_drop,
                                        task="generate")
+    # `req.model` doğrulayıcıda NORMALLEŞTİRİLDİ (None → varsayılanın gerçek
+    # id'si), yani doğrulanan değer ile kaydedilen değer ayrışamıyor.
+    spec = catalog.image_model(req.model)
     try:
-        images = ac.generate(prompt_sent, req.size, req.quality, req.n)
-    except ac.AzureImageError as e:
+        images = providers.generate(req.model, prompt_sent, req.size,
+                                    req.quality, req.n)
+    except ac.ImageError as e:
         raise HTTPException(status_code=502, detail=str(e))
+    # Maliyet GÖRSEL BAŞINA yazılıyor: kayıt tek bir görselin kaydı ve n=4'lük
+    # bir turun tamamını her satıra yazmak toplamı dörde katlardı.
+    kredi = catalog.cost_for(spec, req.quality)
     records = [
         storage.save(img, {"prompt": req.prompt, "size": req.size,
                            "quality": req.quality, "parent_id": None,
                            "folder_id": folder_id, "palette": pal,
                            "session_id": session_id,
+                           "model": req.model, "credits": kredi,
                            # Ek düştüyse metin prompt'un birebir aynısı; storage
                            # sözleşmesi "yalnızca farklıysa" diyor (bkz. save).
                            "prompt_sent": prompt_sent if pal and pal["applied"] else None},
@@ -348,19 +397,43 @@ def generate(req: GenerateRequest) -> dict:
 
 def _check_edit_form(prompt: str, size: str, quality: str, n: int,
                      file: UploadFile | None, source_id: str | None,
-                     palette_mode: str, palette_strength: str) -> None:
+                     palette_mode: str, palette_strength: str,
+                     model: str = "") -> str:
     """`/api/edit` form alanlarını doğrular; geçersizse HTTPException(422).
+
+    NORMALLEŞTİRİLMİŞ model id'sini döndürüyor (boş girdi → varsayılan), tıpkı
+    `models.check_capabilities` gibi: kaydedilen değer ile doğrulanan değer
+    ayrışmasın.
 
     Doğrulama neden elle: uç multipart olduğu için GenerateRequest gibi tek bir
     Pydantic modeli yok. Not: multipart'ta `extra="forbid"` karşılığı YOK —
     Starlette bilinmeyen form alanını sessizce atar. Bayat sunucu tespiti bu
-    yüzden arayüz tarafında, yanıtın paleti geri yansıtıp yansıtmadığına
-    bakılarak yapılıyor.
+    yüzden arayüz tarafında, yanıtın alanı geri yansıtıp yansıtmadığına
+    bakılarak yapılıyor (palet için v1.10'dan beri; `model` için de aynı desen,
+    ama orada karşılaştırma DEĞERİN kendisi üzerinden — yanlış model sessizce
+    geçerse kullanıcı hem beklediği estetiği hem doğru faturayı kaybeder).
+
+    Yetenek kapısı `models.check_capabilities` ile PAYLAŞILIYOR: JSON ucu onu
+    pydantic içinden çağırıyor, bu uç buradan. İki kopya, iki ucun sessizce
+    ayrışması demek olurdu.
     """
-    if size not in ac.ALLOWED_SIZES or quality not in ac.ALLOWED_QUALITIES:
-        raise HTTPException(status_code=422, detail="Geçersiz size veya quality.")
-    if not (1 <= n <= 4):
-        raise HTTPException(status_code=422, detail="n 1-4 arasında olmalı.")
+    try:
+        model_id = check_capabilities(model, size, quality, n)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    spec = catalog.image_model(model_id)
+    if not spec.supports_edit:
+        raise HTTPException(status_code=422,
+                            detail=f"{spec.label} referans görselle çalışmıyor.")
+    # Küresel tavan, model tavanının ÜSTÜNDE: `MAX_IMAGES_PER_RUN` aynı zamanda
+    # bir sonuç kaydının azami `image_ids` uzunluğu (bkz. models.py), yani onu
+    # aşan bir değer dökümü bozar. Buradaki sayı v0.6'ya kadar ELLE yazılmış
+    # `4` idi — `MAX_IMAGES_PER_RUN` için ikinci bir literal, yani sessiz bir
+    # kayma kaynağı; model tavanı devreye girerken sabite bağlandı.
+    if not (1 <= n <= min(spec.max_n, MAX_IMAGES_PER_RUN)):
+        raise HTTPException(
+            status_code=422,
+            detail=f"n 1-{min(spec.max_n, MAX_IMAGES_PER_RUN)} arasında olmalı.")
     if not prompt or len(prompt) > MAX_PROMPT_CHARS:
         raise HTTPException(status_code=422,
                             detail=f"prompt 1-{MAX_PROMPT_CHARS} karakter olmalı.")
@@ -371,6 +444,7 @@ def _check_edit_form(prompt: str, size: str, quality: str, n: int,
     if (file is None) == (source_id is None):
         raise HTTPException(status_code=422,
                             detail="Tam olarak biri gerekli: file veya source_id.")
+    return model_id
 
 
 def _check_palette_hex(palette_hex: str | None) -> str | None:
@@ -472,11 +546,18 @@ async def edit(
     palette_drop: str = Form(""),
     # Düzenlemenin doğduğu oturum; boş = oturum dışı (bkz. _check_session).
     session_id: str | None = Form(None),
+    # Boş = varsayılan model. `Form("")` ve zorunlu DEĞİL: bugünkü arayüz alanı
+    # hiç göndermiyor ve göndermeyen bir istemci bugünkü davranışı aynen
+    # almalı. Bayat SUNUCU tarafı bu uçta pydantic ile korunamıyor (Starlette
+    # bilinmeyen form alanını sessizce atıyor), o yüzden koruma yanıtın alanı
+    # geri yankılamasıyla kuruluyor — bkz. _check_edit_form'un docstring'i.
+    model: str = Form(""),
 ) -> dict:
     """Ek referans görselleri (`extra_files` yüklemeleri, `extra_source_ids`
     galeri id'leri) form verisinden okunur — bkz. _extra_refs."""
-    _check_edit_form(prompt, size, quality, n, file, source_id,
-                     palette_mode, palette_strength)
+    model_id = _check_edit_form(prompt, size, quality, n, file, source_id,
+                                palette_mode, palette_strength, model)
+    spec = catalog.image_model(model_id)
     palette_hex = _check_palette_hex(palette_hex)
     drop = _check_palette_drop(palette_drop)
 
@@ -490,19 +571,88 @@ async def edit(
                                        palette_strength, palette_id, task="edit",
                                        drop=drop)
     try:
-        images = ac.edit(prompt_sent, refs, size, quality, n)
-    except ac.AzureImageError as e:
+        images = providers.edit(model_id, prompt_sent, refs, size, quality, n)
+    except ac.ImageError as e:
         raise HTTPException(status_code=502, detail=str(e))
 
+    kredi = catalog.cost_for(spec, quality)
     records = [
         storage.save(img, {"prompt": prompt, "size": size, "quality": quality,
                            "parent_id": parent_id, "folder_id": target_folder,
                            "palette": pal, "session_id": session,
+                           "model": model_id, "credits": kredi,
                            "prompt_sent": prompt_sent if pal and pal["applied"] else None},
                      OUTPUT_DIR, now=_now())
         for img in images
     ]
     return {"images": records}
+
+
+def _settings_payload() -> dict:
+    """Kimlik DURUMU + hangi modeller var + hangileri kullanılabilir.
+
+    `ac.get_settings_status()` GENİŞLETİLMEDİ, üzerine BURADA ekleniyor —
+    `version`'ın aynı gerekçesi (o fonksiyonun docstring'i): `azure_client`'ın
+    işi kimlik bilgisi, hangi modellerin var olduğunu bilmesi gereksiz bir bağ
+    olurdu ve tests/test_settings.py'deki sözleşmesini genişletirdi. Mevcut
+    anahtarların HEPSİ adıyla ve anlamıyla korunuyor, yani `settings.js` ve
+    tests/test_settings_route.py etkilenmiyor.
+
+    Bu fonksiyon GET ve POST'un PAYLAŞTIĞI gövde. `version`/`guncelleme`/
+    `chat_instructions_path` bilerek DIŞINDA: onlar yalnız GET'te var (sürüm
+    çalışma anında değişmiyor, mutasyon ucundan yansıtmak gürültü olurdu) ve
+    settings.js'in `!== undefined` guard'ları tam olarak o daha dar POST
+    gövdesine dayanıyor.
+
+    ANAHTAR TAŞIMIYOR. `providers` yalnız boolean, `image_models[].configured`
+    de öyle. Anahtarın son dört hanesi, uzunluğu ya da maskelenmiş hâli DE
+    dönmüyor: `get_settings_status`'un sözleşmesi "API key'i ASLA döndürmez" ve
+    "sadece son dört hane" o sözleşmenin öldüğü yerdir.
+    """
+    cfg = credstore.configured_map()
+    return {
+        **ac.get_settings_status(),
+        # {kimlik_id: bool}. Arayüz Ayarlar'daki sağlayıcı gruplarının
+        # "Kayıtlı" durumunu buradan okuyor.
+        "providers": cfg,
+        "default_image_model": catalog.DEFAULT_IMAGE_MODEL,
+        "image_models": [
+            {
+                "id": m.id,
+                "label": m.label,
+                "provider": m.provider,
+                # Jetonlar ETİKETLERİYLE gönderiliyor, çıplak dize değil:
+                # arayüz `<option>` listelerini bunlardan kuruyor ve etiketi
+                # istemcide tutmak `SIZE_RATIO`'nun bayatlayan aynası olurdu.
+                # `ratio` de sunucudan geliyor çünkü Gemini'nin jetonları
+                # `WxH` biçiminde DEĞİL — istemci ayrıştırma yapmamalı.
+                "sizes": [{"value": s, "label": catalog.geometry_of(s)[0],
+                           "ratio": catalog.geometry_of(s)[1]} for s in m.sizes],
+                "qualities": [{"value": q, "label": catalog.quality_label(q)}
+                              for q in m.qualities],
+                "quality_hidden": m.quality_hidden,
+                "default_size": catalog.default_size_of(m),
+                "default_quality": catalog.default_quality_of(m),
+                "max_n": m.max_n,
+                "supports_edit": m.supports_edit,
+                "max_refs": m.max_refs,
+                "credits": m.credits,
+                "credits_by_quality": dict(m.credits_by_quality),
+                "note": m.note,
+                # TEK türetilmiş alan: modelin anahtarı GİRİLMİŞ mi. Arayüzün
+                # "#go kilitli mi" kararı ve "anahtar gerekli" etiketi bundan
+                # geliyor — bugün o karar tek bir Azure boolean'ına bağlı ve
+                # yalnızca OpenAI'si olan bir kullanıcıda ölü bir düğme üretirdi.
+                "configured": cfg.get(m.credential, False),
+            }
+            for m in catalog.IMAGE_MODELS
+        ],
+        "chat_models": [
+            {"id": m.id, "label": m.label, "provider": m.provider,
+             "configured": cfg.get(m.credential, False)}
+            for m in catalog.CHAT_MODELS
+        ],
+    }
 
 
 @app.get("/api/settings")
@@ -528,7 +678,7 @@ def get_settings() -> dict:
     bakıyor, ağ çağrısı arka planda koşuyor (bkz. guncelleme.py'deki 2.
     sözleşme). İlk açılışta değeri `null` olur, sonrakinde dolar.
     """
-    return {**ac.get_settings_status(),
+    return {**_settings_payload(),
             "version": version.APP_VERSION,
             "guncelleme": guncelleme.bilgi(
                 OUTPUT_DIR, izin=prefs.read(OUTPUT_DIR)["guncelleme_kontrolu"]),
@@ -537,37 +687,86 @@ def get_settings() -> dict:
 
 @app.post("/api/settings")
 def post_settings(req: SettingsRequest) -> dict:
-    """Admin kimlik bilgilerini yalnızca-yazılır kaydeder; durumu döndürür (key'siz).
+    """Sağlayıcı kimliklerini yalnızca-yazılır kaydeder; durumu döndürür (key'siz).
 
-    api_key boşsa mevcut key korunur — ilk kurulumda ise key zorunludur.
+    Gizli alanda boş değer "mevcut korunur" demek — istemci kayıtlı anahtarı hiç
+    görmediği için boş bir kutu "sildim" değil "dokunmadım"dır. Adres
+    alanlarında boş "varsayılana dön" demek; ayrım her ikisinin de yazıldığı
+    döngülerde yorumlu.
 
-    Sohbet dağıtımı AYRI bir çağrıyla ve görsel kimliği doğrulamadan GEÇTİKTEN
+    Azure kimliği artık YALNIZ istek onu hedeflediğinde zorunlu (bkz. gövdedeki
+    `azure_hedefli`): eskiden ilk kurulumda koşulsuz zorunluydu ve yalnızca
+    başka bir sağlayıcının anahtarını girmek isteyen kullanıcı hiçbir şey
+    kaydedemiyordu.
+
+    Sohbet dağıtımı ve öteki sağlayıcılar, görsel kimliği doğrulamadan GEÇTİKTEN
     SONRA yazılıyor: geçersiz bir endpoint'le gelen istek hiçbir şey yazmadan
     422 dönmeli.
     """
     api_key = req.api_key.strip()
     base_url = (req.base_url or "").strip()
-    if not base_url or not api_key:
-        try:
-            existing_key, existing_url = ac.load_credentials()
-            if not api_key:
-                api_key = existing_key
-            if not base_url:
-                base_url = existing_url
-        except ac.AzureImageError:
-            if not api_key:
-                raise HTTPException(status_code=422, detail="İlk kurulumda API key gerekli.")
-            if not base_url:
-                raise HTTPException(status_code=422, detail="İlk kurulumda base_url gerekli.")
+    # İSTEK AZURE'U HEDEFLİYOR MU: iki alandan biri doluysa evet. Bu ayrım
+    # v0.6'da açıldı ve sebebi somut bir kilitti — kural "ilk kurulumda Azure
+    # api_key + base_url ZORUNLU" biçimindeydi, yani yalnızca Gemini anahtarı
+    # olan bir kullanıcı HİÇBİR ŞEY kaydedemiyordu ve aldığı 422 bambaşka bir
+    # sağlayıcıdan söz ediyordu ("İlk kurulumda API key gerekli"). Çoklu
+    # sağlayıcının önündeki en somut engel buydu.
+    azure_hedefli = bool(api_key or base_url)
+
+    # Mevcut Azure kimliği. Hata YÜKSELTİLMİYOR: Azure'ın hiç yapılandırılmamış
+    # olması artık bir hata durumu değil, sıradan bir başlangıç hâli.
     try:
-        if api_key and base_url:
+        mevcut_key, mevcut_url = ac.load_credentials()
+    except ac.ImageError:
+        mevcut_key, mevcut_url = "", ""
+    # "Boş = mevcut korunur" kuralı KORUNUYOR (v1.x davranışı).
+    api_key = api_key or mevcut_key
+    base_url = base_url or mevcut_url
+
+    if azure_hedefli:
+        # Azure hedefleniyorsa İKİSİ de gerekli. Mesajlar bilerek ayrı: hangi
+        # alanın eksik olduğunu söylemeyen bir hata kullanıcıyı formda arattırır.
+        if not api_key:
+            raise HTTPException(status_code=422, detail="İlk kurulumda API key gerekli.")
+        if not base_url:
+            raise HTTPException(status_code=422, detail="İlk kurulumda base_url gerekli.")
+
+    try:
+        # Kimlik doğrulaması DİĞER alanların yazımından ÖNCE: geçersiz bir
+        # endpoint'le gelen istek hiçbir şey yazmadan 422 dönmeli
+        # (tests/test_settings_route.py bu sırayı sabitliyor).
+        if azure_hedefli and api_key and base_url:
             ac.save_credentials(api_key, base_url)
         updates = {}
 
         if req.chat_deployment is not None:
             updates[ac.CHAT_DEPLOYMENT] = req.chat_deployment.strip()
-        if req.openai_api_key is not None and req.openai_api_key.strip():
-            updates["OPENAI_API_KEY"] = req.openai_api_key.strip()
+
+        # GİZLİ alanlar: boş gönderim "mevcut korunur" demek, silme DEĞİL.
+        # (Yalnızca-yazılır formun kuralı: istemci kayıtlı anahtarı hiç
+        # görmüyor, o yüzden boş bir kutu "sildim" değil "dokunmadım"dır.)
+        # Alan adı → env adı eşlemesi KATALOGDAN geliyor, elle sayılmıyor:
+        # elle sayılan liste tam olarak redaksiyonun kaçırdığı hataydı.
+        for cred in catalog.CREDENTIALS:
+            if not cred.secret_field or cred.secret_field == "api_key":
+                continue    # api_key yukarıda, kendi doğrulama yolundan geçiyor
+            deger = getattr(req, cred.secret_field, None)
+            if deger is not None and deger.strip():
+                updates[cred.key_env] = deger.strip()
+
+        # ADRES alanları: gizli DEĞİL ve boş gönderim "varsayılana dön" demek,
+        # o yüzden `is not None` yeterli (gizli alanların aksine).
+        for cred in catalog.CREDENTIALS:
+            if not cred.url_field:
+                continue
+            deger = getattr(req, cred.url_field, None)
+            if deger is not None:
+                updates[cred.url_env] = deger.strip()
+
+        # Kataloğa girmemiş eski BYOK alanları. Katalog döngüsünün DIŞINDA
+        # bilerek: bunların henüz bir modeli ve adaptörü yok, kataloğa yazmak
+        # "bağlı" gibi görünmelerine yol açardı. Yazma yolu korunuyor çünkü
+        # v0.2.0'dan beri kaydediliyorlar ve veri kaybı olmamalı.
         if req.fal_key is not None and req.fal_key.strip():
             updates["FAL_KEY"] = req.fal_key.strip()
         if req.replicate_api_token is not None and req.replicate_api_token.strip():
@@ -579,9 +778,9 @@ def post_settings(req: SettingsRequest) -> dict:
 
         if updates:
             ac.save_env(updates)
-    except ac.AzureImageError as e:
+    except ac.ImageError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    return ac.get_settings_status()
+    return _settings_payload()
 
 
 

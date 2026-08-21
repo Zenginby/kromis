@@ -1075,7 +1075,11 @@ function syncEmptyState() {
 function setChatBusy(busy) {
   chatBusy = busy;
   $("chat-wait").hidden = !busy;
-  if ($("go")) $("go").disabled = busy || !chatConfigured;
+  // `#go`nun tek yazarı core.js'teki syncGoGate: mod, meşguliyet, sohbet
+  // yapılandırması ve seçili görsel modelini BİRLİKTE görüyor. Burada ayrı
+  // yazılsa iki sahip olurdu ve hangisinin son sözü söylediği çağrı sırasına
+  // kalırdı — Yönetmen modunda kapı bir an açılıp kapanıyordu.
+  if ($("go")) { runBusy = busy; syncGoGate(); }
 }
 
 // ── Gönderim ────────────────────────────────────────────────────────

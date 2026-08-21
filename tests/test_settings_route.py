@@ -382,3 +382,47 @@ def test_POST_yaniti_da_model_listesini_tasiyor(client):
     assert "image_models" in r.json() and "providers" in r.json()
     assert "version" not in r.json()
     assert "guncelleme" not in r.json()
+
+
+def test_bos_adres_kayitli_endpointi_SILMIYOR(client):
+    """Boş `base_url` ile gelen bir kayıt, çalışan Azure kurulumunu bozmamalı.
+
+    ÖLÇÜLEN veri kaybıydı: rota `api_key` ve `base_url`den biri boşken
+    `save_credentials`ı bilerek atlayıp mevcut endpoint'i KORUYOR, ama hemen
+    ardından gelen adres döngüsü aynı env anahtarını "" ile eziyordu — tek
+    istekte biri koruyup öteki siliyordu ve cevap 200'dü.
+
+    İstemci tarafında soyut değil: `saveSettings` `base_url`i KOŞULSUZ
+    gönderiyor ve boş-adres kapısı yalnız sağlayıcı "azure" seçiliyken
+    kuruluyor. Yani `/api/settings` bir kez okunamayıp endpoint kutusu boş
+    kaldıysa, yalnızca OpenAI anahtarını kaydeden kullanıcı Azure kurulumunu
+    kaybediyordu.
+    """
+    client.post("/api/settings", json={
+        "api_key": "K1", "base_url": "https://ep/openai/v1/"})
+
+    r = client.post("/api/settings", json={"api_key": "K2", "base_url": ""})
+
+    assert r.status_code == 200, r.text
+    assert r.json()["configured"] is True, "endpoint silindi — kurulum koptu"
+    assert r.json()["endpoint"] == "https://ep/openai/v1/"
+    assert client.get("/api/settings").json()["endpoint"] == "https://ep/openai/v1/"
+
+
+def test_varsayilani_OLAN_saglayicida_bos_adres_hala_varsayilana_donuyor(client):
+    """Üstteki kapı adres alanlarının tamamını dondurmamalı.
+
+    Ayrım kataloğun kendisinden okunuyor: `default_base_url`ü olan kimlikte
+    (openai/gemini/anthropic) düşülecek bir varsayılan VAR, o yüzden boş
+    gönderim hâlâ "varsayılana dön" demek. Yalnız azure_image'de öyle bir
+    varsayılan yok ve boş adres "bağlantıyı kopar" demek olurdu.
+    """
+    client.post("/api/settings", json={
+        "openai_api_key": "sk-K", "openai_base_url": "https://vekil.ornek/v1"})
+    assert ac.read_env_values().get("OPENAI_BASE_URL") == "https://vekil.ornek/v1"
+
+    r = client.post("/api/settings", json={"openai_base_url": ""})
+
+    assert r.status_code == 200, r.text
+    assert ac.read_env_values().get("OPENAI_BASE_URL") == "", \
+        "boş adres varsayılana dönmedi — vekil ayarı silinemez hâle geldi"

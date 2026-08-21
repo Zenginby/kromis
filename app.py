@@ -756,12 +756,33 @@ def post_settings(req: SettingsRequest) -> dict:
 
         # ADRES alanları: gizli DEĞİL ve boş gönderim "varsayılana dön" demek,
         # o yüzden `is not None` yeterli (gizli alanların aksine).
+        #
+        # TEK İSTİSNA ve gerekçesi kataloğun KENDİSİNDEN okunuyor:
+        # `default_base_url`ü OLMAYAN kimlikte (bugün yalnız azure_image)
+        # düşülecek bir varsayılan yok — orada boş adres "varsayılana dön"
+        # değil "bağlantıyı kopar" demek olurdu. O yüzden boş kutu, gizli
+        # alanlarla AYNI kuralı izliyor: "dokunmadım".
+        #
+        # Gerekçe simetri değil, ÖLÇÜLEN veri kaybı: yukarıdaki
+        # `save_credentials` boş `base_url`de bilerek atlanıp mevcut
+        # endpoint'i KORUYOR, ama bu döngü hemen ardından onu "" ile
+        # eziyordu — tek istekte biri koruyup öteki siliyordu. İstemci
+        # `base_url`i KOŞULSUZ gönderiyor (static/settings.js → saveSettings)
+        # ve boş-adres kapısı yalnız sağlayıcı "azure" seçiliyken kuruluyor,
+        # yani yalnızca OpenAI anahtarı kaydeden bir kullanıcı çalışan Azure
+        # kurulumunu 200 alarak siliyordu.
+        #
+        # Yetenek KAYBI yok: boş endpoint hiçbir zaman "bağlantıyı kes"
+        # gestürü değildi — istemci onu "Endpoint gerekli." ile reddediyor.
         for cred in catalog.CREDENTIALS:
             if not cred.url_field:
                 continue
             deger = getattr(req, cred.url_field, None)
-            if deger is not None:
-                updates[cred.url_env] = deger.strip()
+            if deger is None:
+                continue
+            if not deger.strip() and not cred.default_base_url:
+                continue
+            updates[cred.url_env] = deger.strip()
 
         # Kataloğa girmemiş eski BYOK alanları. Katalog döngüsünün DIŞINDA
         # bilerek: bunların henüz bir modeli ve adaptörü yok, kataloğa yazmak
@@ -1162,7 +1183,10 @@ async def import_image(request: Request,
         png,
         {"prompt": label, "size": _png_dimensions(png), "quality": "",
          "parent_id": None, "folder_id": target_folder,
-         "palette": None, "prompt_sent": None, "imported": True},
+         "palette": None, "prompt_sent": None, "imported": True,
+         # BOŞ bilerek: bu görsel başka bir araçta üretildi, bir modeli yok.
+         # (bkz. storage.save → "model")
+         "model": ""},
         OUTPUT_DIR, now=_now(),
     )
     return {"image": record}
@@ -1297,7 +1321,11 @@ def add_logo(req: LogoRequest) -> dict:
          "folder_id": src_meta.get("folder_id"),
          # palet de devralınır: logo bindirince renk şeridi kaybolmasın
          "palette": src_meta.get("palette"),
-         "prompt_sent": src_meta.get("prompt_sent")},
+         "prompt_sent": src_meta.get("prompt_sent"),
+         # Model de devralınıyor: bindirme TÜREV, kendi başına bir üretim
+         # değil. Geçilmezse kayda varsayılan model yazılırdı — DALL·E 3 ile
+         # üretilmiş bir görselin logolu hâli "azure-gpt-image-2" görünürdü.
+         "model": src_meta.get("model")},
         OUTPUT_DIR, now=_now(),
     )
     return {"image": record}
@@ -1365,7 +1393,11 @@ def add_banner(req: BannerRequest) -> dict:
          "quality": src_meta.get("quality", ""), "parent_id": src_id,
          "folder_id": src_meta.get("folder_id"),  # türev, kaynağın klasöründe kalır
          "palette": src_meta.get("palette"),
-         "prompt_sent": src_meta.get("prompt_sent")},
+         "prompt_sent": src_meta.get("prompt_sent"),
+         # Model de devralınıyor: bindirme TÜREV, kendi başına bir üretim
+         # değil. Geçilmezse kayda varsayılan model yazılırdı — DALL·E 3 ile
+         # üretilmiş bir görselin logolu hâli "azure-gpt-image-2" görünürdü.
+         "model": src_meta.get("model")},
         OUTPUT_DIR, now=_now(),
     )
     return {"image": record}

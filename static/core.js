@@ -461,6 +461,15 @@ $("model").addEventListener("change", () => {
   // tema seçicisinin deseni. O düğme kimlik formuna ait ve Azure hiç
   // yapılandırılmamışken basılamıyor.
   savePref({ image_model: $("model").value });
+  // Diske YAZMAK yetmiyor, BELLEKTEKİ tercih de tazelenmeli: `applyModels`
+  // her çağrıldığında `seciliModelTercihi`yi okuyor ve o değişken yalnızca
+  // açılışta (`loadModelPref`) yazılıyordu. Ayarlar'ı kaydetmek
+  // `applyConfigured`i yeniden çalıştırdığı için, kullanıcının bu turda
+  // seçtiği model AÇILIŞTAKİ değere geri sıçrıyordu — yani PR #41'in ana
+  // akışı ("OpenAI modelini seç → anahtarını gir → kaydet") seçimi geri
+  // alıyordu. settings.js'in adına OLAY ANINDA dokunuluyor: yükleme sırası
+  // kuralının izin verdiği tek yol (#model-settings-link ile aynı desen).
+  seciliModelTercihi = $("model").value;
 });
 
 $("model-settings-link").addEventListener("click", () => {

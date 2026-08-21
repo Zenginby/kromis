@@ -176,3 +176,19 @@ def test_two_imports_both_survive_in_history(tmp_path, monkeypatch):
     second = _import(c, filename="iki.png").json()["image"]["id"]
     ids = {h["id"] for h in c.get("/api/history").json()["images"]}
     assert ids == {first, second}
+
+
+def test_ice_aktarilan_gorsel_bir_MODEL_iddia_ETMIYOR(tmp_path, monkeypatch):
+    """İçe aktarım bir üretim değil: görsel başka bir araçta yapıldı.
+
+    `credits: 0` ("bedeli yok") ile aynı duruş — alan var, değeri boş. Önce
+    varsayılan model yazılıyordu, yani kullanıcının Photoshop'tan attığı bir
+    PNG geçmişte "azure-gpt-image-2 üretti" diye duruyordu.
+    """
+    r = _import(_client(tmp_path, monkeypatch))
+
+    assert r.status_code == 200, r.text
+    kayit = r.json()["image"]
+    assert kayit["imported"] is True
+    assert kayit["model"] == "", "içe aktarılan görsele üretici modeli yazıldı"
+    assert kayit["credits"] == 0

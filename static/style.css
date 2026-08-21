@@ -391,6 +391,13 @@ body:has(.sheet.open) .scrim { display: block; }
 #composer[data-mode="image"] #chat-model,
 #composer[data-mode="director"] #model,
 #composer[data-mode="director"] #run-cost { display: none; }
+/* `#chat-model` bugün HTML'de `hidden`: seçeneklerini dolduran kod ve onu tel
+   üzerine çıkaracak yönlendirme henüz yok (bkz. static/index.html'deki not).
+   Bu satır `.model-note[hidden]` ile AYNI derse dayanıyor: `display` atayan
+   bir yazar kuralı UA'nın `[hidden] { display: none }` kuralını eziyor.
+   Bugün `.model-chip` `display` atamıyor, yani `hidden` tek başına çalışıyor —
+   ama o gün geldiğinde gizli seçici Yönetmen modunda sessizce geri gelirdi. */
+#chat-model[hidden] { display: none; }
 /* "Yönetmen'e sor" Görsel modunun kutusuna bağlı: Yönetmen modunda kendine
    sormak anlamsız olurdu. Doluluk ekseni chat.js'te (`hidden`), görünüşü
    `.btn-ghost` varyantlarının yanında (aynı özgüllük — sıra belirleyici). */

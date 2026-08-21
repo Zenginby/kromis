@@ -373,3 +373,38 @@ def test_logo_end_to_end_with_real_compositing(tmp_path, monkeypatch):
         assert out_img.size == src_img.size
 
     assert out_bytes != src_bytes
+
+
+def test_bindirme_KAYNAGIN_modelini_devraliyor(tmp_path, monkeypatch):
+    """Bindirme TÜREV: kendi başına bir üretim değil.
+
+    `folder_id`, `palette` ve `prompt_sent` gibi model de kaynaktan
+    devralınmalı. Geçilmediğinde kayda VARSAYILAN model yazılıyordu — yani
+    dall-e-3 ile üretilmiş bir görselin logolu hâli geçmişte
+    "azure-gpt-image-2" olarak duruyordu ve kredi ledger'ı onu yanlış
+    sağlayıcıya yazacaktı.
+    """
+    import catalog
+
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
+    monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
+    monkeypatch.setattr(appmod.composite, "composite_logo", _fake_composite_factory())
+    # Kataloğun İKİNCİ modeli: varsayılanla aynı olsa iddia hiçbir şey ölçmezdi.
+    baska = catalog.ImageModel(
+        id="test-baska-model", label="Test · başka", provider="azure",
+        wire_model="test-model", credential="azure_image",
+        sizes=("1024x1024",), qualities=("medium",), max_n=1,
+        credits=7, images_per_request=1, supports_edit=True)
+    monkeypatch.setattr(catalog, "IMAGE_MODELS", catalog.IMAGE_MODELS + (baska,))
+
+    asset_id = _logo_asset(tmp_path, monkeypatch)
+    c = TestClient(appmod.app)
+    src = c.post("/api/generate", json={"prompt": "cat", "size": "1024x1024",
+                                        "quality": "medium", "n": 1,
+                                        "model": baska.id}).json()["images"][0]
+    assert src["model"] == baska.id, "kaynak zaten varsayılana düştü"
+
+    rec = c.post("/api/logo", json={"id": src["id"], "asset_id": asset_id}).json()["image"]
+
+    assert rec["model"] == baska.id, (
+        f"türev kaynağın modelini kaybetti: {rec['model']!r}")

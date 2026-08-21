@@ -150,6 +150,12 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.6.1 — ne değişti
+
+- boş endpoint kayıtlı Azure kurulumunu siliyordu + beş inceleme bulgusu
+
+---
+
 ## Sürüm 0.6.0 — ne değişti
 
 - sağlayıcı grupları ve yalnız-OpenAI kurulumu

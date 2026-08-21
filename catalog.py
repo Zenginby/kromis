@@ -249,6 +249,44 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
         note="Metin ve düzenlemede en güçlü. Uygulamanın varsayılanı.",
     ),
+    # OpenAI DOĞRUDAN (Azure üzerinden değil). Tel formatı Azure'ın aynısı, o
+    # yüzden adaptör onun bilinçli ikizi (bkz. openai_client.py'nin başlığı).
+    ImageModel(
+        id="openai-gpt-image-1",
+        label="OpenAI · gpt-image-1",
+        provider="openai",
+        wire_model="gpt-image-1",
+        credential="openai",
+        sizes=("1024x1024", "1024x1536", "1536x1024"),
+        qualities=("low", "medium", "high"),
+        default_quality="medium",
+        max_n=4,
+        images_per_request=4,
+        supports_edit=True,
+        max_refs=4,
+        credits=8,
+        credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
+        note="gpt-image-2'ye en yakın davranış; referans görselle çalışıyor.",
+    ),
+    # DALL·E 3'ün İKİ kısıtı yetenek sistemini gerçekten sınıyor: tek görsel
+    # üretiyor (max_n=1) ve referans görselle ÇALIŞMIYOR (supports_edit=False).
+    # Kalite sözlüğü de farklı: low/medium/high değil standard/hd.
+    ImageModel(
+        id="openai-dall-e-3",
+        label="OpenAI · DALL·E 3",
+        provider="openai",
+        wire_model="dall-e-3",
+        credential="openai",
+        sizes=("1024x1024", "1024x1792", "1792x1024"),
+        qualities=("standard", "hd"),
+        default_quality="standard",
+        max_n=1,
+        images_per_request=1,
+        supports_edit=False,
+        credits=10,
+        credits_by_quality=(("standard", 10), ("hd", 20)),
+        note="Tek görsel üretir ve referans görselle çalışmaz.",
+    ),
 )
 
 
@@ -271,14 +309,22 @@ GEOMETRY_LABELS: dict[str, tuple[str, str]] = {
     "1024x1024": ("◼ 1:1", "1:1"),
     "1024x1536": ("▮ 2:3", "2:3"),
     "1536x1024": ("▬ 3:2", "3:2"),
+    # DALL·E 3'ün kendi oranları — 2:3/3:2'ye YAKIN ama aynı değil, o yüzden
+    # ayrı jetonlar. Aynı orana yuvarlamak, core.js'in "aynı oranı taşı"
+    # kademesinde piksel boyutunu sessizce değiştirmek olurdu.
+    "1024x1792": ("▮ 4:7", "4:7"),
+    "1792x1024": ("▬ 7:4", "7:4"),
 }
 
 QUALITY_LABELS: dict[str, str] = {
     "low": "Düşük",
     "medium": "Orta",
     "high": "Yüksek",
-    # Kalite ekseni OLMAYAN modellerin sentetik jetonu (bkz. karar Q1).
+    # Kalite ekseni OLMAYAN modellerin sentetik jetonu (bkz. karar Q1) ve
+    # DALL·E 3'ün GERÇEK alt kademesi — aynı jeton iki anlamı birden taşıyor,
+    # ama ikisinde de kullanıcıya "Standart" olarak görünüyor.
     "standard": "Standart",
+    "hd": "HD",
 }
 
 

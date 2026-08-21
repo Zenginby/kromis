@@ -77,9 +77,32 @@ def _azure_edit(m, prompt, images, size, quality, n, *, client=None, credentials
 # provider → (generate, edit). Yeni bir adaptör buraya girmediği sürece
 # kataloğa eklenen model çalışma anında "bilinmeyen sağlayıcı" hatası verir —
 # sessizce Azure'a düşmez. Mandal: tests/test_providers.py.
+def _openai_adapter():
+    """Geç bağlama: `openai_client` bu modülü import ediyor (paylaşılan zaman
+    aşımı ve hata gövdesi çözümlemesi için), yani modül düzeyinde import etmek
+    DÖNGÜ olurdu.
+
+    `importlib` KULLANILMIYOR — düz `import` ifadesi, yalnız fonksiyonun
+    içinde. PyInstaller'ın statik analizi fonksiyon içindeki import'u da
+    görüyor (`azure_client`'ın httpx'i tam olarak böyle alıyor), yani
+    `hiddenimports=[]` korunuyor.
+    """
+    import openai_client
+    return (openai_client.generate, openai_client.edit)
+
+
 _ADAPTERS: dict[str, tuple] = {
     "azure": (_azure_generate, _azure_edit),
+    # Değer bir ÇAĞRILABİLİR döndürücü olabiliyor (döngüyü kıran geç bağlama);
+    # `_pair` ikisini de karşılıyor.
+    "openai": _openai_adapter,
 }
+
+
+def _pair(provider: str) -> tuple:
+    """Adaptör çiftini çözer: ya doğrudan demet, ya geç bağlayan fonksiyon."""
+    girdi = _ADAPTERS[provider]
+    return girdi() if callable(girdi) else girdi
 
 
 def adapter_ids() -> frozenset[str]:
@@ -149,8 +172,8 @@ def is_configured(model_id: str) -> bool:
 def generate(model_id: str, prompt: str, size: str, quality: str, n: int,
              *, client=None, credentials=None) -> list[bytes]:
     m = _resolve(model_id)
-    return _ADAPTERS[m.provider][0](m, prompt, size, quality, n,
-                                    client=client, credentials=credentials)
+    return _pair(m.provider)[0](m, prompt, size, quality, n,
+                                client=client, credentials=credentials)
 
 
 def edit(model_id: str, prompt: str, images, size: str, quality: str, n: int,
@@ -160,5 +183,5 @@ def edit(model_id: str, prompt: str, images, size: str, quality: str, n: int,
         # Katalog kapısı rotada da var (app._check_edit_form); buradaki ikinci
         # kapı `providers.edit`'in başka bir çağıranı olduğu gün de korur.
         raise ac.ImageError(f"{m.label} referans görselle çalışmıyor.")
-    return _ADAPTERS[m.provider][1](m, prompt, images, size, quality, n,
-                                    client=client, credentials=credentials)
+    return _pair(m.provider)[1](m, prompt, images, size, quality, n,
+                                client=client, credentials=credentials)

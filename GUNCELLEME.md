@@ -150,6 +150,18 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.6.0 — ne değişti
+
+- sağlayıcı grupları ve yalnız-OpenAI kurulumu
+- doğrudan OpenAI adaptörü, gpt-image-1 ve DALL·E 3
+- model seçici, yeteneğe göre kontroller ve tek kapı
+- adapter katmanı, yetenek doğrulaması ve model/kredi kaydı
+- kimlik çözümü, çoklu sağlayıcı ayarları ve model yayını
+- gizli alanlar doğrulama hatasında ve logda sızıyordu
+- model kataloğu ve Android paketleme mandalı
+
+---
+
 ## Sürüm 0.5.4 — ne değişti
 
 - birleştirme başlığı GUNCELLEME.md'ye girmesin + güncelleme bağlantısı doğrulanıyor

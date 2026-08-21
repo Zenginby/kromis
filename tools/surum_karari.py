@@ -77,6 +77,13 @@ _SEVIYE = re.compile(r"\[surum:\s*(major|minor|yama|patch)\]", re.I)
 _BASLIK = re.compile(r"^(?P<tip>[a-zA-Z]+)(?:\([^)]*\))?(?P<kir>!)?:", re.M)
 _KIRICI = re.compile(r"^BREAKING[ -]CHANGE:", re.M | re.I)
 _NOT = re.compile(r"^\s*\[not\]\s*(.+)$", re.M)
+# Birleştirme commit'inin başlığı: "Merge pull request #40 from Zenginby/claude/…",
+# "Merge branch 'main' into …". Conventional Commits öneki YOK, o yüzden
+# `degisiklik_notlari` içindeki tip süzgeci bunları eleyemiyor ve başlık ham
+# hâliyle GUNCELLEME.md'ye düşüyor (v0.5.3'te gerçekten oldu: kullanıcıya
+# yazılmış bir belgeye ham dal adı girdi). Squash-merge edilen sürümlerde bu
+# commit hiç oluşmadığı için hata o güne kadar görünmedi.
+_BIRLESTIRME = re.compile(r"^Merge\s+(?:pull request|branch|remote-tracking|commit|tag)\b", re.I)
 
 _SURUM = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 
@@ -282,7 +289,8 @@ def degisiklik_notlari(commitler: list[str]) -> list[str]:
 
     `[not]` hiç yoksa commit başlıkları kullanılır; Conventional Commits tipi
     varsa atılır (kullanıcı 'feat(android):' önekini okumak zorunda değil) ve
-    yalnızca gerçekten kullanıcıya bir şey söyleyen tipler alınır.
+    yalnızca gerçekten kullanıcıya bir şey söyleyen tipler alınır. Birleştirme
+    commit'leri de atılır — bkz. `_BIRLESTIRME`.
     """
     notlar: list[str] = []
     for metin in commitler:
@@ -297,6 +305,10 @@ def degisiklik_notlari(commitler: list[str]) -> list[str]:
             continue
         # Squash-merge başlığındaki "(#36)" numarası kullanıcıya bir şey demiyor.
         baslik = re.sub(r"\s*\(#\d+\)\s*$", "", baslik)
+        # Birleştirme başlığı kullanıcıya hiçbir şey söylemiyor; dalın kendi
+        # commit'leri zaten aynı `git log` çıktısında, notlar oradan geliyor.
+        if _BIRLESTIRME.match(baslik):
+            continue
         m = _BASLIK.match(baslik)
         if m:
             if m.group("tip").lower() in atilacak:

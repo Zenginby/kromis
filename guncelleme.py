@@ -46,6 +46,9 @@ DEPO = "Zenginby/gpt-image-studio"
 API = f"https://api.github.com/repos/{DEPO}/releases/latest"
 YAYIN_SAYFASI = f"https://github.com/{DEPO}/releases/latest"
 
+# Cevaptan gelen `html_url`in taşımak ZORUNDA olduğu önek. Bkz. `_guvenli_url`.
+GECERLI_URL_ONEKI = f"https://github.com/{DEPO}/"
+
 ONBELLEK_DOSYASI = "guncelleme.json"
 
 # 24 saat. Daha sık kontrol etmenin kullanıcıya hiçbir faydası yok (yayın günde
@@ -105,6 +108,28 @@ def surum_daha_yeni(uzak: str, yerel: str) -> bool:
         return False
 
 
+def _guvenli_url(ham: object) -> str:
+    """`html_url` KENDİ depomuzu göstermiyorsa sabit yayın sayfasına düşülür.
+
+    Bu adres arayüzde tıklanabilir bir "indir" bağlantısına dönüşüyor
+    (`static/settings.js` → `#settings-update-link.href`), yani gövdeden gelen
+    bir dizeyi doğrulamadan geçirmek kullanıcıyı tek tıkla yabancı bir adrese
+    götürebilir.
+
+    Risk soyut değil: `follow_redirects=True` bilinçli olarak açık (depo bir
+    gün yeniden adlandırılırsa kontrol sessizce ölmesin diye) ve v0.5.3'te depo
+    gerçekten taşındı — `Zenginby` adı boşaldı. Yayınlanmış eski istemciler
+    hâlâ o yolu istiyor; o adı alan biri isteği kendi `releases/latest`ine
+    yönlendirebilir. Bu doğrulamayla en kötü sonuç sahte bir "yeni sürüm var"
+    satırı olur; bağlantı her hâlde bizim yayın sayfamıza gider.
+
+    Yeniden adlandırma gerçekten olursa bu kapı yolu kırmıyor: sabit adres de
+    aynı yönlendirmeyi izleyip yeni depoya varıyor.
+    """
+    url = str(ham or "")
+    return url if url.startswith(GECERLI_URL_ONEKI) else YAYIN_SAYFASI
+
+
 def _sor() -> dict | None:
     """GitHub'a sorar. Her hatada None — birinci sözleşme.
 
@@ -127,7 +152,7 @@ def _sor() -> dict | None:
         etiket = str(veri.get("tag_name") or "").strip()
         if not etiket:
             return None
-        return {"surum": etiket.lstrip("v"), "url": str(veri.get("html_url") or YAYIN_SAYFASI)}
+        return {"surum": etiket.lstrip("v"), "url": _guvenli_url(veri.get("html_url"))}
     except Exception:                             # bilinçle geniş: bkz. 1. sözleşme
         # Sessiz ama İZSİZ değil: kullanıcı bir şey görmüyor, ama sürekli
         # başarısız olan bir kontrolün teşhis edilebilir olması gerekiyor.
@@ -186,5 +211,9 @@ def bilgi(output_dir: str, *, izin: bool = True) -> dict | None:
 
     uzak = str(onbellek.get("surum") or "")
     if uzak and surum_daha_yeni(uzak, version.APP_VERSION):
-        return {"surum": uzak, "url": str(onbellek.get("url") or YAYIN_SAYFASI)}
+        # Önbellekteki adres de doğrulanıyor, yalnız yazma anında değil: bu
+        # dosya sürüm yükseltmelerini AŞARAK kalıyor, yani `_guvenli_url`
+        # eklenmeden önce yazılmış (ya da elle bozulmuş) bir kayıt buraya
+        # doğrulanmamış bir adresle girebilir.
+        return {"surum": uzak, "url": _guvenli_url(onbellek.get("url"))}
     return None

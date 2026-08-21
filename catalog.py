@@ -143,12 +143,20 @@ class ChatModel:
     credential: str
     wire_model: str = ""
     wire_from_env: str | None = None
+    # Kimliğin `base_url`üne EKLENEN yol. Varsayılan üç girdiden ikisinde
+    # doğru (`https://api.openai.com/v1` + `/chat/completions`, Azure'ın
+    # `…/openai/v1/`si + aynısı); Gemini'de değil — onun OpenAI-uyumlu ucu
+    # `/v1beta/openai/` altında yaşıyor ve kimliğin `base_url`ü görsel
+    # tarafıyla PAYLAŞILIYOR (`/v1beta/interactions`). İki `Credential`
+    # açmak, kullanıcıdan aynı anahtarı iki kez istemek olurdu.
+    endpoint_path: str = "/chat/completions"
     # Anthropic `max_tokens`'ı ZORUNLU tutuyor (yoksa 400). Bu bir ayar değil TEL
     # ZORUNLULUĞU, o yüzden `chat_client.build_payload`'ın "hiç sampling
     # parametresi göndermeme" duruşunun gevşetilmesi DEĞİL — sağlayıcı başına
     # ayrı bir olgu. Minimal-gövde tripwire'ı bu yüzden adaptör BAŞINA yazılıyor,
     # yoksa buradaki meşru `max_tokens` bir gün Azure gövdesine kopyalanır.
     needs_max_tokens: bool = False
+    note: str | None = None       # seçicide gösterilen kısa Türkçe uyarı
     kind: str = "chat"
 
 
@@ -471,6 +479,34 @@ def default_quality_of(m: ImageModel) -> str:
 DEFAULT_CHAT_PROVIDER = "azure"
 DEFAULT_CHAT_MODEL = "azure-deployment"
 
+# SIRA ANLAMLI, görsel modellerindeki gibi: seçicinin sırası bu ve ilk girdi
+# varsayılan. Azure BAŞTA KALIYOR — `DEFAULT_CHAT_MODEL` ve
+# `prefs.DEFAULTS["chat_provider"]` onu gösteriyor; varsayılanı değiştirmek
+# kayıtlı bir kullanıcının yönetmenini sessizce başka bir sağlayıcıya, yani
+# başka bir faturaya taşımak olurdu.
+#
+# ÜÇ SAĞLAYICININ TELİ AYNI: `POST …/chat/completions`, `{"model","messages"}`
+# gövdesi, `choices[0].message.content` yanıtı, `Authorization: Bearer`
+# başlığı. Azure'ın kendi istemcisi (`chat_client`) DURUYOR ve baytları
+# değişmiyor; OpenAI ile Gemini `openai_chat` üzerinden gidiyor (bkz. o
+# dosyanın başlığı: `openai_client`'ın `azure_client`'a duruşunun aynısı).
+# Gemini'nin tek farkı YOL: OpenAI-uyumlu ucu `/v1beta/openai/` altında
+# yaşıyor, `endpoint_path` alanı tam olarak bu yüzden var.
+#
+# ANTHROPIC BİLEREK YOK. Kimliği (`anthropic`) katalogda duruyor ama Ayarlar
+# formunda anahtarını girecek bir kutu yok, yani "anahtarı olan modelleri
+# göster" kuralı onu HER koşulda gizlerdi: girdiyi eklemek, hiç seçilemeyecek
+# bir satır eklemek olurdu. Teli de bu üçünün aynısı değil — `/v1/messages`,
+# `system` ayrı alan, `max_tokens` ZORUNLU (`needs_max_tokens` alanı tam olarak
+# o günü bekliyor) — yani `openai_chat`a da düşmüyor. Sırası: forma anahtar
+# kutusu + kendi adaptörü, birlikte.
+#
+# MODEL ADLARI (`wire_model`) 21 Ağustos 2026'da belgeden doğrulandı:
+# `gpt-5.6-sol` / `-terra` / `-luna` üçlüsü 9 Temmuz 2026'da GA oldu (çıplak
+# `gpt-5.6` alias'ı sol'a gidiyor), `gemini-3.7-flash` 13 Ağustos 2026'da.
+# Gemini'nin Pro'su BİLEREK yok: bugün yalnız `gemini-3.1-pro-preview` var ve
+# bu depoda "preview" jetonu beyan etmiyoruz — kalkmış bir ad, arayüzde
+# seçilebilir bir 404 demek (bkz. DALL·E 3'ün katalogdan çıkarılma gerekçesi).
 CHAT_MODELS: tuple[ChatModel, ...] = (
     ChatModel(
         id=DEFAULT_CHAT_MODEL,
@@ -479,6 +515,46 @@ CHAT_MODELS: tuple[ChatModel, ...] = (
         credential="azure_chat",
         wire_model="",                          # ORTAMDAN okunuyor
         wire_from_env="AZURE_CHAT_DEPLOYMENT",
+        note="Adı Ayarlar'dan giriliyor: Azure'da model değil DAĞITIM var.",
+    ),
+    # GPT-5.6 ailesinin üç kademesi. Üçü de AYNI tel, yalnız `wire_model`
+    # farklı — o yüzden üçü de tek adaptörden geçiyor ve yeni bir kademe
+    # eklemek tek satır. Sıra ucuzdan pahalıya DEĞİL, "önce dengeli olan":
+    # varsayılan seçim faturayı yönetmenin en pahalı kademesine bağlamamalı.
+    ChatModel(
+        id="openai-gpt-5.6-terra",
+        label="OpenAI · GPT-5.6 Terra",
+        provider="openai",
+        credential="openai",
+        wire_model="gpt-5.6-terra",
+        note="Dengeli kademe — günlük brief'ler için varsayılan.",
+    ),
+    ChatModel(
+        id="openai-gpt-5.6-luna",
+        label="OpenAI · GPT-5.6 Luna",
+        provider="openai",
+        credential="openai",
+        wire_model="gpt-5.6-luna",
+        note="En ucuz ve en hızlı kademe; kısa turlar için.",
+    ),
+    ChatModel(
+        id="openai-gpt-5.6-sol",
+        label="OpenAI · GPT-5.6 Sol",
+        provider="openai",
+        credential="openai",
+        wire_model="gpt-5.6-sol",
+        note="Ailenin en güçlüsü ve en pahalısı; uzun, çok kısıtlı brief'ler için.",
+    ),
+    ChatModel(
+        id="gemini-3.7-flash",
+        label="Gemini · 3.7 Flash",
+        provider="gemini",
+        credential="gemini",
+        wire_model="gemini-3.7-flash",
+        # Görsel tarafı `/v1beta/interactions` konuşuyor; sohbet tarafı
+        # OpenAI-uyumlu uçtan gidiyor. Aynı kimlik, iki ayrı yol.
+        endpoint_path="/v1beta/openai/chat/completions",
+        note="Gemini'nin OpenAI-uyumlu ucundan konuşuyor; hızlı ve ucuz.",
     ),
 )
 
@@ -514,6 +590,18 @@ def chat_models_for(provider: str) -> tuple[ChatModel, ...]:
 
 def chat_model_ids() -> tuple[str, ...]:
     return tuple(m.id for m in CHAT_MODELS)
+
+
+def chat_needs_deployment(m: ChatModel) -> bool:
+    """Adı kullanıcının GİRMESİ gereken model mi (Ayarlar'daki dağıtım kutusu).
+
+    Tek ölçüt `wire_from_env`: adı katalogda yazamıyorsak kullanıcıdan almak
+    zorundayız. Ayarlar formu bu bayrağı `/api/settings` → `chat_models[]`
+    üzerinden okuyor ve dağıtım alanını YALNIZCA onu isteyen sağlayıcı
+    seçiliyken gösteriyor — OpenAI/Gemini kullanıcısına doldurulamayan bir
+    kutu göstermek, 360px'lik bir panelde ödenmiş boş yer demekti.
+    """
+    return bool(m.wire_from_env)
 
 
 def chat_provider_ids() -> tuple[str, ...]:

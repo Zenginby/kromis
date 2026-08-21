@@ -1137,7 +1137,14 @@ async function sendChat(display = "") {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: chatThread }),
+      // MODEL TEL ÜZERİNE ÇIKIYOR (v0.7): şerit gerçek bir seçim ve sunucu
+      // onu `chat_providers`e veriyor. `undefined` alan `JSON.stringify`
+      // tarafından ATILIYOR, yani katalog henüz gelmemişse gövde eskisiyle
+      // bayt bayt aynı kalıyor ve sunucu varsayılana düşüyor — `extra="forbid"`
+      // altında `null` göndermek de geçerli, ama alanı hiç göndermemek bayat
+      // bir sunucuyla da çalışıyor.
+      body: JSON.stringify({ messages: chatThread,
+                             model: currentChatModel ? currentChatModel.id : undefined }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

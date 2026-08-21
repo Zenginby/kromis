@@ -268,3 +268,74 @@ def test_KALKMIS_model_adlari_katalogda_yok(olu):
     kimliği (`openai-dall-e-3`) yeniden adlandırmak kapıyı açık bırakırdı.
     """
     assert olu not in {m.wire_model for m in catalog.IMAGE_MODELS}
+
+
+# ── Sohbet modelleri (v0.7: yönetmen çoklu sağlayıcı) ──────────────────
+
+
+def test_varsayilan_sohbet_modeli_listenin_basinda():
+    """Sıra seçicinin sırası ve varsayılan başta durmalı — görsel tarafın kuralı.
+
+    Ayrıca somut bir güvence: varsayılanı listenin ortasına almak, kayıtlı
+    Azure kullanıcısının yönetmenini sessizce başka bir sağlayıcıya (yani başka
+    bir faturaya) taşımanın en sessiz yolu.
+    """
+    assert catalog.CHAT_MODELS[0].id == catalog.DEFAULT_CHAT_MODEL
+    assert catalog.CHAT_MODELS[0].provider == catalog.DEFAULT_CHAT_PROVIDER
+
+
+@pytest.mark.parametrize("m", catalog.CHAT_MODELS, ids=lambda m: m.id)
+def test_sohbet_modelinin_adi_TEK_kaynaktan_geliyor(m):
+    """`wire_model` ile `wire_from_env` AYNI ANDA dolu olamaz.
+
+    İkisi de doluysa hangisinin kazandığı `chat_providers.wire_model_of`'un
+    satır sırasına kalır ve o sıra bir gün değişirse kullanıcının Ayarlar'a
+    yazdığı dağıtım adı sessizce yok sayılır — istek 404 döner ve sebebi
+    görünmez olur. Kural tek cümle: adı ya katalog bilir ya kullanıcı.
+    """
+    assert bool(m.wire_model) != bool(m.wire_from_env), (
+        f"{m.id}: adın kaynağı belirsiz "
+        f"(wire_model={m.wire_model!r}, wire_from_env={m.wire_from_env!r})")
+
+
+@pytest.mark.parametrize("m", catalog.CHAT_MODELS, ids=lambda m: m.id)
+def test_dagitim_adi_KAPISI_ortamdan_okumayla_ayni_sey(m):
+    """`chat_needs_deployment` tek bir olguya bakıyor: ad ortamdan mı okunuyor.
+
+    Ayarlar formundaki dağıtım kutusunun kapısı bu bayrak (bkz. settings.js
+    `syncChatDeployField`). İkinci bir ölçüte (sağlayıcı adı, bir `needs_*`
+    alanı) kaymak, kutuyu adı ortamdan okuyan İKİNCİ bir sağlayıcıda sessizce
+    görünmez bırakırdı — yani o sağlayıcı hiç yapılandırılamazdı.
+    """
+    assert catalog.chat_needs_deployment(m) is bool(m.wire_from_env)
+
+
+@pytest.mark.parametrize("m", catalog.CHAT_MODELS, ids=lambda m: m.id)
+def test_sohbet_yolu_CHAT_COMPLETIONS_ucuna_cikiyor(m):
+    """Üç sağlayıcının teli AYNI ve adaptör bunu VARSAYIYOR.
+
+    `openai_chat.complete` gövdeyi `chat_client.build_payload` ile kuruyor ve
+    yanıtı `extract_content` ile okuyor: ikisi de `/chat/completions`
+    sözleşmesi. Başka bir uç (`/v1/messages`, `/v1beta/interactions`) o
+    fonksiyonlarla konuşamaz — Anthropic'in katalogda olmama gerekçesi tam
+    olarak bu. Yol buraya girerse adaptör de yazılmış olmalı.
+    """
+    assert m.endpoint_path.startswith("/"), "yol göreli olamaz (base_url'e ekleniyor)"
+    assert m.endpoint_path.endswith("/chat/completions"), (
+        f"{m.id}: {m.endpoint_path} — OpenAI-uyumlu olmayan bir uç için "
+        "`openai_chat` yerine kendi adaptörü gerekiyor")
+
+
+@pytest.mark.parametrize(
+    "m", catalog.IMAGE_MODELS + catalog.CHAT_MODELS, ids=lambda m: m.id)
+def test_PREVIEW_jetonu_beyan_edilmiyor(m):
+    """"preview" adları geçici: GA olurken kalkıyorlar ve arayüzde seçilebilir
+    bir 404 bırakıyorlar — DALL·E 3'ün katalogdan çıkarılma gerekçesinin
+    aynısı, yalnız daha hızlı olanı.
+
+    Somut örnek bu turda ölçüldü: Gemini'nin Pro sohbet modeli bugün yalnız
+    `gemini-3.1-pro-preview` olarak var, o yüzden katalogda YOK. Kural yazılı
+    olmasa bir sonraki tur onu "en güçlü Gemini" diye eklerdi.
+    """
+    assert "preview" not in (m.wire_model or "").lower(), (
+        f"{m.id}: preview jetonu beyan edilmiş ({m.wire_model})")

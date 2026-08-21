@@ -442,15 +442,15 @@
       <!-- Yönetmen modunun karşılığı AYNI YUVADA: ikisi #composer[data-mode]
            ekseniyle birbirini dışlıyor, yani genişlik bedeli SIFIR. -->
       <label class="sr-only" for="chat-model">Sohbet modeli</label>
-      <!-- HENÜZ GİZLİ ve bu bilinçli: seçeneklerini dolduran hiçbir kod yok
-           (`/api/settings` → `chat_models` sunuluyor ama okunmuyor) ve
-           `ChatRequest` bir model alanı KABUL ETMİYOR (extra="forbid"), yani
-           seçim tel üzerine çıkamıyor. Görünür ve boş bir açılır liste,
-           #model-note'un reddettiği şeyin aynısı: kullanıcıya bir seçim
-           sözü verip hiçbir şey söylememek. Yönlendirme gelince açılacak —
-           bekçisi tests/test_index.py'de, ChatRequest'e model alanı
-           eklendiği gün kırmızıya düşüyor. -->
-      <select id="chat-model" class="model-chip" title="Prompt Yönetmeni modeli" hidden>
+      <!-- ARTIK AÇIK: `ChatRequest` bir `model` alanı kabul ediyor, yani seçim
+           gerçekten tel üzerine çıkıyor, ve seçenekleri core.js dolduruyor
+           (GET /api/settings → chat_models). Bekçisi tests/test_index.py'de:
+           o test alanı yoksa seçicinin GİZLİ kalmasını, varsa AÇILMASINI şart
+           koşuyor — yani "gizle ve unut" olamıyordu.
+           Yer tutucu #model ile aynı gerekçeyle var: boş bir <select> Ayarlar
+           gelmeden bir an "model yok" gibi görünürdü. -->
+      <select id="chat-model" class="model-chip" title="Prompt Yönetmeni modeli">
+        <option value="">Modeller yükleniyor…</option>
       </select>
 
       <!-- Kapı açıklaması #chat-gate ile AYNI duruş: kontrolün KENDİSİ
@@ -484,9 +484,14 @@
     <!-- Kapı açıklaması: mod anahtarının KENDİSİ kilitlenmiyor. Kilitli bir
          anahtar "neden kapalı" bilgisini de saklardı; burada kullanıcı geçip ne
          yapması gerektiğini okuyor. settings.js chat_configured ile yönetir. -->
+    <!-- Metin ARTIK TEK YOLU EMRETMİYOR: yönetmen üç sağlayıcı konuşuyor ve
+         "dağıtım adını gir" yalnızca Azure'ın cevabı. Yalnızca OpenAI ya da
+         Gemini anahtarı olan kullanıcıyı Azure'ın alanına yönlendirmek, tam
+         olarak #model-note'un görsel tarafında düzelttiği hataydı. -->
     <p id="chat-gate" class="chat-gate" hidden>
-      Prompt Yönetmeni kapalı: Ayarlar'dan (sağ üstteki dişli) sohbet modelinin
-      <strong>dağıtım adını</strong> gir.
+      Prompt Yönetmeni kapalı: Ayarlar'dan (sağ üstteki dişli) bir sohbet
+      sağlayıcısının anahtarını kaydet — Azure'da ayrıca
+      <strong>dağıtım adı</strong> gerekiyor.
     </p>
 
     <div class="composer-bar">
@@ -827,13 +832,29 @@
       </div>
 
       <h3 class="modal-subhead">Prompt Yönetmeni (sohbet modeli)</h3>
-      <label for="set-chat-deployment">Dağıtım adı</label>
-      <input id="set-chat-deployment" type="text" autocomplete="off" spellcheck="false"
-             maxlength="200" placeholder="ör. gpt-5.6-luna" />
-      <p class="field-note">
-        Azure AI Foundry'deki <strong>deployment</strong> adı — model ailesi adı değil.
-        Boş bırakılırsa Prompt Yönetmeni kapalı kalır. Sohbet, görselin endpoint ve
-        API anahtarını paylaşır.
+      <!-- DAĞITIM ADI YALNIZCA ONU İSTEYEN SAĞLAYICIDA görünüyor. Kutu
+           öncesinde koşulsuzdu ve yalnızca OpenAI ya da Gemini anahtarı olan
+           bir kullanıcıya doldurulamayan bir alan gösteriyordu: o sağlayıcılarda
+           "dağıtım" diye bir şey yok, model adı katalogda yazılı. 360px'lik bir
+           slide-over'da bu, ödenmiş boş yer + yanlış bir soru demekti.
+           Kapı KATALOGDAN türetiliyor (`chat_models[].needs_deployment`),
+           istemcide sağlayıcı adı sayılmıyor — bkz. settings.js
+           syncProviderFields. -->
+      <div id="chat-deploy-group" class="prov-fields">
+        <label for="set-chat-deployment">Dağıtım adı</label>
+        <input id="set-chat-deployment" type="text" autocomplete="off" spellcheck="false"
+               maxlength="200" placeholder="ör. gpt-5.6-luna" />
+        <p class="field-note">
+          Azure AI Foundry'deki <strong>deployment</strong> adı — model ailesi adı değil.
+          Boş bırakılırsa Prompt Yönetmeni'nin Azure girdisi kapalı kalır. Sohbet,
+          görselin endpoint ve API anahtarını paylaşır.
+        </p>
+      </div>
+      <!-- Kutu gizlendiğinde başlık boş kalmıyor: kullanıcının sorusu
+           ("bu sağlayıcıda yönetmeni nasıl seçiyorum?") burada cevaplanıyor. -->
+      <p id="chat-no-deploy-note" class="field-note" hidden>
+        Bu sağlayıcıda girilecek bir dağıtım adı yok — sohbet modelini
+        composer'ın üstündeki şeritten seçiyorsun. Anahtarı kaydetmek yeterli.
       </p>
       <!-- Talimatı ezme yolu: keşfedilebilir olmasa özellik var olmakla olmamak
            arasında bir fark taşımaz. GET /api/settings dolduruyor. -->

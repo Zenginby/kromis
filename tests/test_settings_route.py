@@ -426,3 +426,76 @@ def test_varsayilani_OLAN_saglayicida_bos_adres_hala_varsayilana_donuyor(client)
     assert r.status_code == 200, r.text
     assert ac.read_env_values().get("OPENAI_BASE_URL") == "", \
         "boş adres varsayılana dönmedi — vekil ayarı silinemez hâle geldi"
+
+
+# ── Sohbet model kataloğu (v0.7) ───────────────────────────────────────
+#
+# `#chat-model` şeridi bu alanlardan çiziliyor. Eksik bir alan arayüzde SESSİZ
+# bir bozulma demek: `needs_deployment` yoksa dağıtım kutusu hiç görünmez,
+# `configured` yoksa her model kurulu sanılır.
+
+
+def _sohbet(body, model_id):
+    return next(m for m in body["chat_models"] if m["id"] == model_id)
+
+
+def test_sohbet_kataloğu_arayuzun_ihtiyaci_olan_ALANLARI_tasiyor(client):
+    body = client.get("/api/settings").json()
+    assert body["default_chat_model"] in {m["id"] for m in body["chat_models"]}
+    for m in body["chat_models"]:
+        assert set(m) == {"id", "label", "provider", "configured",
+                          "needs_deployment", "note"}, m["id"]
+
+
+def test_DAGITIM_ADI_bayragi_yalnizca_ADI_ORTAMDAN_okunan_modelde(client):
+    """Ayarlar formundaki dağıtım kutusunun kapısı. Bayrak katalogdan türetiliyor
+    (`catalog.chat_needs_deployment`), istemcide sağlayıcı adı sayılmıyor."""
+    body = client.get("/api/settings").json()
+    assert _sohbet(body, "azure-deployment")["needs_deployment"] is True
+    assert _sohbet(body, "gemini-3.7-flash")["needs_deployment"] is False
+
+
+def test_AZURE_modeli_ANAHTAR_VARKEN_DAGITIM_YOKKEN_kurulu_gorunmuyor(client):
+    """Kimliği tam, dağıtımı boş: istek 404 döner. Arayüz "kurulu" gösterirse
+    kullanıcı yönetmeni açar, ilk mesaj 502 olur ve sebebi görünmez.
+
+    `providers` (KİMLİK tablosu) bu ayrımı ifade EDEMİYOR — `azure_chat` orada
+    `true` olur; `chat_models[].configured` MODEL tablosundan geliyor.
+    """
+    client.post("/api/settings", json={
+        "api_key": "K", "base_url": "https://ep/openai/v1/"})
+    body = client.get("/api/settings").json()
+
+    assert body["providers"]["azure_chat"] is True
+    assert _sohbet(body, "azure-deployment")["configured"] is False
+    assert body["chat_configured"] is False
+
+
+def test_YALNIZCA_GEMINI_anahtari_olan_kullanicida_yonetmen_ACIK(client):
+    """Ölçütün değiştiği yer. `chat_configured` eskiden yalnız Azure'ı ölçüyordu
+    ve tek sağlayıcı varken doğruydu; bugün yalnızca Gemini anahtarı olan bir
+    kullanıcıda Prompt Yönetmeni'ni kapalı gösterirdi — yani #chat-gate
+    kullanıcıya girmesi gerekmeyen bir Azure alanını işaret ederdi.
+    """
+    client.post("/api/settings", json={
+        "api_key": "", "base_url": "", "gemini_api_key": "AIza-x"})
+    body = client.get("/api/settings").json()
+
+    assert body["configured"] is False, "Azure hiç yapılandırılmadı"
+    assert body["chat_configured"] is True
+    assert _sohbet(body, "gemini-3.7-flash")["configured"] is True
+    assert _sohbet(body, "openai-gpt-5.6-terra")["configured"] is False
+
+
+def test_AZURE_CLIENT_in_kendi_bayragi_DEGISMEDI(client):
+    """`ac.get_settings_status()`'in `chat_configured` alanı hâlâ "AZURE sohbeti
+    hazır mı" sorusunu cevaplıyor; rota onu bilerek eziyor.
+
+    İkisi karışırsa tests/test_settings.py'deki donmuş sözleşme ile rotanın
+    yanıtı aynı adı iki farklı anlamda kullanır ve hangisinin okunduğu
+    çağıranın şansına kalır.
+    """
+    client.post("/api/settings", json={
+        "api_key": "", "base_url": "", "gemini_api_key": "AIza-x"})
+    assert ac.get_settings_status()["chat_configured"] is False
+    assert client.get("/api/settings").json()["chat_configured"] is True

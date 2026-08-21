@@ -3083,3 +3083,159 @@ def test_yeni_anahtar_kutulari_ACILISTA_ve_KAYITTAN_SONRA_temizleniyor():
     for alan in re.findall(r'id="(set-[a-z-]*key)"', html):
         assert f'$("{alan}").value = ""' in ac, f"{alan} açılışta temizlenmiyor"
         assert f'$("{alan}").value = ""' in kayit, f"{alan} kayıttan sonra kalıyor"
+
+
+# ── Prompt Yönetmeni: model şeridi + dağıtım adı kapısı (v0.7) ──────────
+
+
+def test_DAGITIM_ADI_kutusu_adreslenebilir_bir_GRUPTA():
+    """Kutu koşulsuz görünürken OpenAI/Gemini kullanıcısına karşılığı OLMAYAN
+    bir alan gösteriyordu ("dağıtım" Azure'a özgü). Gizlenebilmesi için
+    etiketi + notuyla birlikte tek bir kapsayıcıda olmak zorunda: yalnız
+    `<input>`u gizlemek etiketi ve altındaki açıklamayı ekranda bırakırdı.
+    """
+    html = _html()
+    assert 'id="chat-deploy-group"' in html
+    assert 'id="chat-no-deploy-note"' in html
+    grup = html.split('id="chat-deploy-group"', 1)[1].split("</div>", 1)[0]
+    assert 'id="set-chat-deployment"' in grup, "kutu grubun DIŞINDA kalmış"
+    assert 'for="set-chat-deployment"' in grup, "etiket grubun dışında"
+
+
+def test_DAGITIM_ADI_kapisi_KATALOGDAN_turetiliyor():
+    """Kapı `chat_models[].needs_deployment` bayrağına bakıyor, sağlayıcı adına
+    DEĞİL.
+
+    `"azure"` literaline bakan bir kapı, adı ortamdan okunan İKİNCİ bir
+    sağlayıcı eklendiği gün kutuyu sessizce görünmez bırakırdı — yani o
+    sağlayıcı hiç yapılandırılamazdı. Bayrağın sunucu yarısı
+    tests/test_settings_route.py'de ölçülüyor.
+    """
+    js = _js("settings.js")
+    govde = js.split("function syncChatDeployField(", 1)[1].split("\n}", 1)[0]
+    assert "needs_deployment" in govde, "kapı katalog bayrağını okumuyor"
+    assert '"azure"' not in govde, "sağlayıcı adı literal olarak sayılmış"
+    assert '$("chat-deploy-group").hidden' in govde
+    assert '$("chat-no-deploy-note").hidden' in govde
+    # Sağlayıcı değiştiğinde çalışmak ZORUNDA: kapı yalnız açılışta kurulsa
+    # seçiciyi çevirmek kutuyu yanlış sağlayıcıda bırakırdı.
+    assert "syncChatDeployField(" in js.split(
+        "function syncProviderFields()", 1)[1].split("\n}", 1)[0]
+
+
+def test_SOHBET_MODELI_secenekleri_sunucudan_kuruluyor():
+    """`/api/settings` → `chat_models` v0.6'dan beri sunuluyordu ve HİÇ
+    okunmuyordu; seçici de bu yüzden gizliydi. Şerit artık gerçek bir seçim,
+    yani listeyi kuran kod da var olmak zorunda."""
+    js = _js("core.js")
+    assert "function applyChatModels(" in js
+    assert "s.chat_models" in js
+    assert "s.default_chat_model" in js
+    govde = js.split("function renderChatModelOptions(", 1)[1].split("\n}\n", 1)[0]
+    # Etiket `textContent` ile yazılıyor: sunucudan gelen hiçbir şey innerHTML'e
+    # girmiyor (dosya genelindeki duruş). İddia ATAMA biçimine bakıyor, ham
+    # metne değil: kuralı ANLATAN yorumun o kuralı ihlal etmiş sayılması testi
+    # gürültüye çevirir (tests/test_providers.py'de ölçülmüş tuzak).
+    assert "o.textContent =" in govde
+    assert "innerHTML =" not in govde
+    # Şerit Ayarlar ile AYNI yanıttan besleniyor: ayrı bir uçtan çekilse ikisi
+    # ayrı zamanlarda gelir ve seçici bir an "hepsi kullanılabilir" gösterirdi.
+    assert "applyChatModels(s" in _js("settings.js")
+
+
+def test_SOHBET_MODELI_secimi_TEL_uzerine_cikiyor():
+    """Seçici olup isteğin modeli taşımaması, kullanıcıya tutulmayan bir seçim
+    sözü vermek olurdu — `#chat-model`in v0.6'da gizli tutulma gerekçesi."""
+    govde = _js("chat.js").split("async function sendChat(", 1)[1]
+    istek = govde.split('fetch("/api/chat"', 1)[1].split("});", 1)[0]
+    assert "currentChatModel" in istek, "/api/chat gövdesi modeli taşımıyor"
+    assert "model" in models.ChatRequest.model_fields, (
+        "sunucu tarafı alanı kabul etmiyor — seçim sessizce yok sayılırdı")
+
+
+def test_SOHBET_MODELI_tercihi_SAGLAYICIYLA_BIRLIKTE_yazILIYOR():
+    """`prefs.update` `chat_model`i `chat_provider`a göre doğruluyor (çapraz
+    kural). Yalnız modeli göndermek 422 dönerdi: kullanıcı OpenAI modeline
+    geçtiğinde diskteki sağlayıcı hâlâ "azure" olurdu ve tercih hiç kaydedilmezdi.
+    """
+    js = _js("core.js")
+    blok = js.split('$("chat-model").addEventListener', 1)[1].split("});", 1)[0]
+    cagri = blok.split("savePref(", 1)[1]
+    assert "chat_provider" in cagri and "chat_model" in cagri, (
+        "tercih çifti eksik — prefs çapraz kuralı 422 döndürür")
+    import prefs
+    assert {"chat_provider", "chat_model"} <= set(prefs.DEFAULTS), (
+        "prefs şeması bu çifti tanımıyor")
+
+
+def test_ANAHTARI_OLMAYAN_modeller_seride_GIRMIYOR():
+    """İstek: "API key hangilerini destekliyorsa o modeller gözüksün."
+
+    Kullanıcı Azure anahtarıyla çalışıyorsa OpenAI ve Gemini satırlarının hepsi
+    seçilebilir bir 502'den başka bir şey değil. Filtre TEK yerde (`secilebilirler`)
+    ve iki şerit de ondan geçiyor — ikinci bir kopya, birini süzüp diğerini
+    unutmanın kapısı olurdu.
+    """
+    js = _js("core.js")
+    assert "function secilebilirler(" in js
+    for fn in ("function renderModelOptions(", "function renderChatModelOptions("):
+        govde = js.split(fn, 1)[1].split("\n}\n", 1)[0]
+        assert "secilebilirler(" in govde, f"{fn} filtreden geçmiyor"
+    filtre = js.split("function secilebilirler(", 1)[1].split("\n}\n", 1)[0]
+    # İLK KURULUM KAPISI: hiçbiri kurulu değilse HEPSİ görünüyor — ve bu dal
+    # `zorunluId`den ÖNCE geliyor. Gerçek chromium koşumunda ölçüldü: zorunlu
+    # id filtreye dahil edilirse hiç anahtarı olmayan kullanıcı TEK satırlık
+    # bir şerit görüyor (yalnız seçili varsayılan), yani "hangi modeller var"
+    # sorusunun cevabı da kayboluyor. Boş ya da tek satırlık bir şerit,
+    # #model-note → "Ayarlar'ı aç" yolunun tek keşfedilebilir kapısını kapatır.
+    assert "if (!kurulu.length) return liste;" in filtre, (
+        "ilk kurulumda tüm modeller listelenmiyor — kullanıcı neyin var "
+        "olduğunu hiç göremez")
+    kurulu_tanimi = filtre.split("const kurulu =", 1)[1].split("\n", 1)[0]
+    assert "zorunluId" not in kurulu_tanimi, (
+        "zorunlu id `kurulu` kümesine karışmış: ilk kurulum dalı yanlış "
+        "tarafa düşer ve şerit tek satıra iner")
+
+
+def test_SECILI_model_seritte_HER_ZAMAN_duruyor():
+    """`select.value` seçenekler arasında yoksa <select> BOŞ görünür: şerit
+    "model yok" der ama üretim çalışır. `loadModelPref` katalogdan SONRA
+    dönüyor ve tercih filtrelenmiş olabilir (anahtarı yok), yani bu yalnız
+    `applyModels`'in sırasıyla çözülmüyor."""
+    js = _js("core.js")
+    for fn, secici in (("function applyModel(", "model"),
+                       ("function applyChatModel(", "chat-model")):
+        govde = js.split(fn, 1)[1].split("\n}\n", 1)[0]
+        assert f'$("{secici}").options' in govde, (
+            f"{fn}: seçili id'nin şeritte olduğu doğrulanmıyor")
+
+
+def test_YONETMEN_kapisi_SECILI_sohbet_modelini_olcuyor():
+    """`#go` kapısı eskiden tek bir `chatConfigured` boolean'ına bakıyordu ve o
+    yalnız AZURE'u ölçüyordu: yalnızca Gemini anahtarı olan bir kullanıcıda
+    yönetmen ölü bir düğmeyle açılırdı — görsel tarafında v0.6'da düzeltilen
+    kırılmanın aynısı."""
+    dal = _js("core.js").split('if (currentMode === "director")', 1)[1] \
+                        .split("\n  }", 1)[0]
+    assert "currentChatModel" in dal, "kapı seçili modeli hiç görmüyor"
+    assert "configured" in dal
+
+
+def test_TERCIH_okuma_yolu_da_FILTREDEN_geciyor():
+    """`/api/prefs` ile `/api/settings` YARIŞIYOR: tercih sonra gelirse
+    filtrenin kararını sessizce iptal edebilir.
+
+    Gerçek chromium koşumunda ölçüldü: `prefs`in `image_model` VARSAYILANI
+    Azure'ın id'si (`chat_model`in aksine boş dize DEĞİL), yani "hiç seçmedim"
+    ile "Azure'ı seçtim" istemcide ayırt edilemiyor. `loadModelPref` tercihi
+    doğrudan uygularsa, yalnızca Gemini anahtarı olan kullanıcı açılışta ölü
+    bir #go düğmesiyle karşılanıyor — üstelik şeritte anahtarı olan iki model
+    dururken.
+    """
+    govde = _js("settings.js").split("async function loadModelPref()", 1)[1] \
+                              .split("\n}", 1)[0]
+    assert govde.count("secilecek(") == 2, (
+        "tercih uygulaması filtreyi atlıyor (görsel ve sohbet şeridi için "
+        "birer `secilecek` çağrısı bekleniyor)")
+    assert "applyModel(secilecek(" in govde
+    assert "applyChatModel(secilecek(" in govde

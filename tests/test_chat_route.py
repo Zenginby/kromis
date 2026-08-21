@@ -371,3 +371,85 @@ def test_results_get_their_own_headroom_on_top_of_the_message_count(client, fake
 
     assert _post(client, with_results).status_code == 200
     assert len(fake_complete[0]) == models.MAX_CHAT_MESSAGES
+
+
+# ── Model seçimi (v0.7) ────────────────────────────────────────────────
+#
+# `#chat-model` şeridinin sunucu yarısı. Bu bölüm olmadan seçici "tutulmayan
+# bir seçim sözü" olurdu — tests/test_index.py'deki bekçinin tam olarak
+# reddettiği durum.
+
+
+@pytest.fixture
+def fake_openai_chat(monkeypatch):
+    """`openai_chat.complete`'i MODÜL NİTELİĞİ olarak yamalıyor (dosya başındaki
+    uyarının aynısı). Model tanımını topluyor: rotanın hangi modeli sevk ettiği
+    ancak burada ölçülebilir."""
+    import openai_chat
+
+    gorulen = []
+
+    def _complete(m, messages, **kwargs):
+        gorulen.append(m)
+        return {"content": "pong", "finish_reason": "stop"}
+
+    monkeypatch.setattr(openai_chat, "complete", _complete)
+    return gorulen
+
+
+def test_ALAN_HIC_gonderilmezse_VARSAYILAN_modele_gidiyor(client, fake_complete,
+                                                          fake_openai_chat):
+    """Bayat bir istemcinin gövdesi bayt bayt aynı kalıyor ve AYNI modele
+    gidiyor — "kayıtlı Azure kullanıcısı için sıfır davranış değişikliği"nin
+    somut karşılığı."""
+    r = _post(client, [{"role": "user", "content": "merhaba"}])
+    assert r.status_code == 200
+    assert fake_complete, "varsayılan yol chat_client'a gitmedi"
+    assert not fake_openai_chat, "varsayılan istek uyumlu adaptöre sapmış"
+
+
+def test_SECILEN_model_dogru_adaptore_sevk_ediliyor(client, fake_complete,
+                                                    fake_openai_chat):
+    r = client.post("/api/chat", json={
+        "messages": [{"role": "user", "content": "merhaba"}],
+        "model": "gemini-3.7-flash"})
+
+    assert r.status_code == 200
+    assert [m.id for m in fake_openai_chat] == ["gemini-3.7-flash"]
+    assert not fake_complete, "Gemini isteği Azure istemcisine gitmiş"
+
+
+def test_BOS_model_alani_varsayilana_dusuyor(client, fake_complete, fake_openai_chat):
+    """`JSON.stringify` bir seçici henüz dolmadan boş `value` gönderebilir ve o
+    istek 422 ile ölmemeli."""
+    r = client.post("/api/chat", json={
+        "messages": [{"role": "user", "content": "merhaba"}], "model": ""})
+    assert r.status_code == 200
+    assert fake_complete
+
+
+def test_KATALOGDA_OLMAYAN_model_422_donuyor(client, fake_complete, fake_openai_chat):
+    """Şema kapısı: bayat bir istemci ya da elle atılmış bir istek sessizce
+    varsayılana DÜŞMÜYOR."""
+    r = client.post("/api/chat", json={
+        "messages": [{"role": "user", "content": "merhaba"}], "model": "yok"})
+    assert r.status_code == 422
+    assert not fake_complete and not fake_openai_chat
+
+
+def test_UYUMLU_adaptorun_hatasi_da_502_ve_TURKCE(client, monkeypatch):
+    """Hata türü PAYLAŞILIYOR (`cc.ChatError`): rotanın tek `except` bloğu üç
+    sağlayıcıyı birden süzüyor. İkinci bir tür açılsaydı ham 500 olurdu ve
+    arayüz gövdeyi ayrıştıramazdı."""
+    import openai_chat
+
+    def _boom(m, messages, **kwargs):
+        raise appmod.cc.ChatError("OpenAI bu modeli tanımıyor (404): gpt-5.6-terra.")
+
+    monkeypatch.setattr(openai_chat, "complete", _boom)
+    r = client.post("/api/chat", json={
+        "messages": [{"role": "user", "content": "merhaba"}],
+        "model": "openai-gpt-5.6-terra"})
+
+    assert r.status_code == 502
+    assert "gpt-5.6-terra" in r.json()["detail"]

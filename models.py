@@ -632,6 +632,30 @@ class ChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     messages: list[ChatMessage] = Field(min_length=1, max_length=MAX_CHAT_ITEMS)
+    # None = VARSAYILAN sohbet modeli (`catalog.DEFAULT_CHAT_MODEL`, yani
+    # Azure dağıtımı). `GenerateRequest.model`'ın gerekçesinin AYNISI: alanı hiç
+    # göndermeyen bayat bir istemcinin gövdesi bayt bayt aynı kalıyor ve aynı
+    # modele gidiyor. Kayıtlı Azure kullanıcısı için sıfır davranış değişikliği.
+    #
+    # Alanın AÇILMASI arayüzdeki `#chat-model` seçicisinin ön koşuluydu ve bu
+    # bağ mekanik: tests/test_index.py::test_sohbet_modeli_secicisi_… bu alanın
+    # varlığına bakıyor ve YOKSA seçicinin gizli KALMASINI şart koşuyor —
+    # "seçim tel üzerine çıkamıyorsa kullanıcıya seçim sözü verme" kuralı.
+    #
+    # Doğrulama SAĞLAYICIYA bakmıyor, yalnız kataloğa: hangi sağlayıcının
+    # anahtarı var sorusu G/Ç gerektiriyor (`credstore`) ve şema katmanı dosya
+    # okumuyor. Anahtarsız bir model isteği zaten adaptörde Türkçe bir 502'ye
+    # dönüşüyor — burada 422 vermek aynı şeyi iki kez söylemek olurdu.
+    model: str | None = Field(default=None, max_length=100)
+
+    @field_validator("model")
+    @classmethod
+    def _model_ok(cls, v: str | None) -> str | None:
+        # Boş dize de None gibi "varsayılan" demek: `JSON.stringify` bir seçici
+        # henüz dolmadan boş `value` gönderebilir ve o istek 422 ile ölmemeli.
+        if v not in (None, "") and catalog.chat_model(v) is None:
+            raise ValueError(f"geçersiz model: {v}")
+        return v
 
     @field_validator("messages")
     @classmethod

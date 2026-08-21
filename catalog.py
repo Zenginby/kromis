@@ -170,6 +170,40 @@ CREDENTIALS: tuple[Credential, ...] = (
         secret_field=None,
         url_field=None,
     ),
+    # OpenAI anahtarı v0.2.0'dan beri KAYDEDİLİYOR ama hiçbir kod onu okuyup
+    # çağrı yapmıyordu; buradan itibaren `credstore` üzerinden okunabilir.
+    Credential(
+        id="openai",
+        label="OpenAI",
+        key_env="OPENAI_API_KEY",
+        url_env="OPENAI_BASE_URL",
+        # Adres SABİT bir varsayılana sahip: Azure'ın aksine OpenAI'de her
+        # kullanıcının kendi endpoint'i yok. `url_env` yine de var, çünkü
+        # uyumlu bir vekil (proxy/gateway) arkasına almak isteyen kullanıcı
+        # dosyaya elle yazabilsin — forma alan eklemeden.
+        default_base_url="https://api.openai.com/v1",
+        secret_field="openai_api_key",
+        url_field="openai_base_url",
+    ),
+    Credential(
+        id="gemini",
+        label="Google Gemini",
+        key_env="GEMINI_API_KEY",
+        url_env="GEMINI_BASE_URL",
+        default_base_url="https://generativelanguage.googleapis.com",
+        secret_field="gemini_api_key",
+        url_field="gemini_base_url",
+    ),
+    # Yalnız SOHBET tarafında kullanılıyor: Anthropic'in görsel üretme ucu yok.
+    Credential(
+        id="anthropic",
+        label="Anthropic",
+        key_env="ANTHROPIC_API_KEY",
+        url_env="ANTHROPIC_BASE_URL",
+        default_base_url="https://api.anthropic.com",
+        secret_field="anthropic_api_key",
+        url_field="anthropic_base_url",
+    ),
 )
 
 

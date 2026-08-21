@@ -256,3 +256,129 @@ def test_generate_422_si_hatali_degeri_HALA_gosteriyor(client):
                                            "quality": "medium", "n": 1})
     assert r.status_code == 422
     assert "yok-boyle-boyut" in r.text, "geçersiz değer teşhis için gövdede kalmalı"
+
+
+# ── Çoklu sağlayıcı (v0.6) ─────────────────────────────────────────────
+
+
+def test_azure_YOKKEN_baska_bir_saglayicinin_anahtari_kaydedilebiliyor(client):
+    """Çoklu sağlayıcının önündeki en somut engel buydu.
+
+    Kural "ilk kurulumda Azure api_key + base_url ZORUNLU" biçimindeydi, yani
+    yalnızca Gemini anahtarı olan kullanıcı HİÇBİR ŞEY kaydedemiyordu — üstelik
+    aldığı 422 bambaşka bir sağlayıcıdan söz ediyordu ("İlk kurulumda API key
+    gerekli"), yani hata mesajı da yanlış tarafı işaret ediyordu.
+    """
+    r = client.post("/api/settings",
+                    json={"gemini_api_key": "AIzaSyDUMMY1234567890abcdefghij"})
+
+    assert r.status_code == 200, r.text
+    assert r.json()["providers"]["gemini"] is True
+    # Azure hâlâ yapılandırılmamış olmalı: istek onu hedeflemiyordu.
+    assert r.json()["configured"] is False
+    assert "AIzaSyDUMMY" not in r.text
+
+
+def test_azure_hedefli_istek_HALA_iki_alani_da_zorunlu_tutuyor(client):
+    """Gevşetme yalnız Azure'u HEDEFLEMEYEN isteğe: kural kaybolmadı, daraldı."""
+    r = client.post("/api/settings", json={"api_key": "", "base_url": "https://x/"})
+    assert r.status_code == 422
+    assert "API key" in r.json()["detail"]
+
+
+def test_saglayici_anahtari_bos_gelirse_mevcut_KORUNUYOR(client):
+    """Yalnızca-yazılır formun kuralı: istemci kayıtlı anahtarı hiç görmüyor,
+    o yüzden boş bir kutu "sildim" değil "dokunmadım"dır."""
+    client.post("/api/settings", json={"openai_api_key": "sk-proj-KALICI123456"})
+    assert client.get("/api/settings").json()["providers"]["openai"] is True
+
+    # İkinci kayıt anahtarı hiç göndermiyor (bayat/kısmi istemci).
+    client.post("/api/settings", json={"gemini_api_key": "AIzaSyDUMMY1234567890abcdefghij"})
+
+    body = client.get("/api/settings").json()
+    assert body["providers"]["openai"] is True, "boş gönderim anahtarı sildi"
+    assert body["providers"]["gemini"] is True
+
+
+def test_adres_alani_bos_gelirse_varsayilana_donuyor(client):
+    """Adres GİZLİ DEĞİL, o yüzden boş "varsayılana dön" demek — gizli
+    anahtarların "boş = korunur" kuralının bilinçli tersi."""
+    client.post("/api/settings", json={"openai_api_key": "sk-proj-DUMMY1234567890",
+                                       "openai_base_url": "https://vekil.ornek/v1"})
+    import credstore
+    assert credstore.resolve("openai")[1] == "https://vekil.ornek/v1"
+
+    client.post("/api/settings", json={"openai_base_url": ""})
+
+    import catalog
+    assert (credstore.resolve("openai")[1]
+            == catalog.credential("openai").default_base_url)
+
+
+def test_ayarlar_hangi_modellerin_var_oldugunu_yayinliyor(client):
+    """Arayüz model seçicisini bu listeden kuruyor.
+
+    `configured` TEK türetilmiş alan ve `#go` kapısının girdisi: bugün o karar
+    tek bir Azure boolean'ına bağlı ve yalnızca OpenAI'si olan bir kullanıcıda
+    ölü bir düğme üretirdi.
+    """
+    body = client.get("/api/settings").json()
+
+    assert body["default_image_model"]
+    ids = [m["id"] for m in body["image_models"]]
+    assert body["default_image_model"] in ids
+    varsayilan = next(m for m in body["image_models"]
+                      if m["id"] == body["default_image_model"])
+    assert varsayilan["configured"] is False       # bu kurulumda Azure yok
+    # Yetenekler arayüzün seçenek listelerini kurabilmesi için TAM olmalı.
+    assert varsayilan["sizes"] and varsayilan["qualities"]
+    assert varsayilan["max_n"] >= 1
+    assert "supports_edit" in varsayilan and "quality_hidden" in varsayilan
+
+
+def test_anahtar_kaydedilince_model_kullanilabilir_oluyor(client):
+    """Kapının GERÇEKTEN kimliğe bağlı olduğunun kanıtı."""
+    def azure_modeli():
+        body = client.get("/api/settings").json()
+        return next(m for m in body["image_models"]
+                    if m["id"] == body["default_image_model"])
+
+    assert azure_modeli()["configured"] is False
+
+    client.post("/api/settings", json={"api_key": "K", "base_url": "https://ep/openai/v1/"})
+
+    assert azure_modeli()["configured"] is True
+
+
+def test_model_listesi_HICBIR_anahtar_tasimiyor(client):
+    """Son dört hane, uzunluk ya da maskelenmiş hâl DE dönmüyor.
+
+    `get_settings_status`'un sözleşmesi "API key'i ASLA döndürmez"; "sadece
+    son dört hane" o sözleşmenin öldüğü yerdir.
+    """
+    client.post("/api/settings", json={
+        "api_key": "COKGIZLIAZURE", "base_url": "https://ep/openai/v1/",
+        "openai_api_key": "sk-proj-COKGIZLIOPENAI",
+        "gemini_api_key": "AIzaSyCOKGIZLIGEMINI1234567890",
+        "anthropic_api_key": "sk-ant-COKGIZLIANTHROPIC"})
+
+    g = client.get("/api/settings")
+    for gizli in ("COKGIZLIAZURE", "COKGIZLIOPENAI", "COKGIZLIGEMINI",
+                  "COKGIZLIANTHROPIC"):
+        assert gizli not in g.text, gizli
+    # Ama durum bayrakları DOLU olmalı, yoksa arayüz hiçbir şeyi açamaz.
+    assert all(g.json()["providers"][p] for p in ("azure_image", "openai",
+                                                 "gemini", "anthropic"))
+
+
+def test_POST_yaniti_da_model_listesini_tasiyor(client):
+    """"Kaydet"ten sonra arayüz listeyi YENİDEN çekmek zorunda kalmamalı.
+
+    Ama `version` yine YOK: POST gövdesi bilerek daha dar ve settings.js'in
+    `!== undefined` guard'ları tam olarak buna dayanıyor.
+    """
+    r = client.post("/api/settings", json={"api_key": "K", "base_url": "https://ep/v1/"})
+
+    assert "image_models" in r.json() and "providers" in r.json()
+    assert "version" not in r.json()
+    assert "guncelleme" not in r.json()

@@ -164,6 +164,20 @@ class SettingsRequest(BaseModel):
     comfyui_url: str | None = Field(default=None, max_length=500)
     ollama_url: str | None = Field(default=None, max_length=500)
 
+    # Çoklu model sağlayıcıları (v0.6). Adlar `catalog.CREDENTIALS`'taki
+    # `secret_field` / `url_field` ile BİREBİR eşleşmek zorunda: redaksiyon ve
+    # yazma yolu o eşlemeden besleniyor (mandal: tests/test_catalog.py).
+    #
+    # `*_base_url` alanları GİZLİ DEĞİL ve varsayılanı olan bir adresi ezmek
+    # için var (uyumlu bir vekil arkasına almak isteyen kullanıcı). Boş
+    # gönderilmesi "varsayılana dön" demek — bu yüzden gizli anahtarların
+    # "boş = mevcut korunur" kuralına DAHİL DEĞİL (bkz. app.post_settings).
+    gemini_api_key: str | None = Field(default=None, max_length=500)
+    anthropic_api_key: str | None = Field(default=None, max_length=500)
+    openai_base_url: str | None = Field(default=None, max_length=500)
+    gemini_base_url: str | None = Field(default=None, max_length=500)
+    anthropic_base_url: str | None = Field(default=None, max_length=500)
+
 
 
 ALLOWED_THEMES = ("mono", "ocean", "amber", "viola")

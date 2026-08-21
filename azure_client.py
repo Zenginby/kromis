@@ -107,8 +107,25 @@ IMAGE_KEY = "AZURE_IMAGE_API_KEY"
 IMAGE_URL = "AZURE_IMAGE_BASE_URL"
 
 
-class AzureImageError(Exception):
-    """Kullanıcıya gösterilebilir Azure hatası (mesajı map_error çıktısıdır)."""
+class ImageError(Exception):
+    """Kullanıcıya gösterilebilir GÖRSEL SAĞLAYICI hatası (Türkçe).
+
+    Tür TEK, ad İKİ: `AzureImageError` bu sınıfın alias'ı. Sebep, çoklu
+    sağlayıcıya geçerken `except` bloklarına hiç dokunmamak — `app.py` Azure
+    çağrılarını `except ac.AzureImageError` ile süzüyor ve o süzgeç AYNI NESNE
+    olduğu için yeni adaptörlerin hatalarını da yakalıyor. Alt sınıf DEĞİL
+    alias: alt sınıf olsaydı hangi tarafın yakalandığı sıraya bağlı hale
+    gelirdi ve testlerin yarısı ikinci adı öğrenmek zorunda kalırdı.
+
+    Bunun kapattığı tuzak `transport_error_message`'ın docstring'inde uzun uzun
+    yazılı: sarmalanmayan bir httpx hatası bu süzgeçten GEÇER, ham 500 olur,
+    arayüz gövdeyi JSON olarak ayrıştıramaz ve kullanıcı beklemenin sonunda
+    yalnızca "Hata (500)" görür. Tek tür, bütün sağlayıcılar için tek kapı.
+    """
+
+
+# Geriye uyum: app.py'nin süzgeci ve mevcut testlerin tamamı bu adı kullanıyor.
+AzureImageError = ImageError
 
 
 def transport_error_message(exc: Exception, timeout: float) -> str:

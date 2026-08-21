@@ -26,6 +26,7 @@ from starlette.datastructures import UploadFile as FormUploadFile
 import assets_store
 import azure_client as ac
 import catalog
+import credstore
 import backup
 import chat_client as cc
 import chat_store
@@ -543,6 +544,64 @@ async def edit(
     return {"images": records}
 
 
+def _settings_payload() -> dict:
+    """Kimlik DURUMU + hangi modeller var + hangileri kullanılabilir.
+
+    `ac.get_settings_status()` GENİŞLETİLMEDİ, üzerine BURADA ekleniyor —
+    `version`'ın aynı gerekçesi (o fonksiyonun docstring'i): `azure_client`'ın
+    işi kimlik bilgisi, hangi modellerin var olduğunu bilmesi gereksiz bir bağ
+    olurdu ve tests/test_settings.py'deki sözleşmesini genişletirdi. Mevcut
+    anahtarların HEPSİ adıyla ve anlamıyla korunuyor, yani `settings.js` ve
+    tests/test_settings_route.py etkilenmiyor.
+
+    Bu fonksiyon GET ve POST'un PAYLAŞTIĞI gövde. `version`/`guncelleme`/
+    `chat_instructions_path` bilerek DIŞINDA: onlar yalnız GET'te var (sürüm
+    çalışma anında değişmiyor, mutasyon ucundan yansıtmak gürültü olurdu) ve
+    settings.js'in `!== undefined` guard'ları tam olarak o daha dar POST
+    gövdesine dayanıyor.
+
+    ANAHTAR TAŞIMIYOR. `providers` yalnız boolean, `image_models[].configured`
+    de öyle. Anahtarın son dört hanesi, uzunluğu ya da maskelenmiş hâli DE
+    dönmüyor: `get_settings_status`'un sözleşmesi "API key'i ASLA döndürmez" ve
+    "sadece son dört hane" o sözleşmenin öldüğü yerdir.
+    """
+    cfg = credstore.configured_map()
+    return {
+        **ac.get_settings_status(),
+        # {kimlik_id: bool}. Arayüz Ayarlar'daki sağlayıcı gruplarının
+        # "Kayıtlı" durumunu buradan okuyor.
+        "providers": cfg,
+        "default_image_model": catalog.DEFAULT_IMAGE_MODEL,
+        "image_models": [
+            {
+                "id": m.id,
+                "label": m.label,
+                "provider": m.provider,
+                "sizes": list(m.sizes),
+                "qualities": list(m.qualities),
+                "quality_hidden": m.quality_hidden,
+                "max_n": m.max_n,
+                "supports_edit": m.supports_edit,
+                "max_refs": m.max_refs,
+                "credits": m.credits,
+                "credits_by_quality": dict(m.credits_by_quality),
+                "note": m.note,
+                # TEK türetilmiş alan: modelin anahtarı GİRİLMİŞ mi. Arayüzün
+                # "#go kilitli mi" kararı ve "anahtar gerekli" etiketi bundan
+                # geliyor — bugün o karar tek bir Azure boolean'ına bağlı ve
+                # yalnızca OpenAI'si olan bir kullanıcıda ölü bir düğme üretirdi.
+                "configured": cfg.get(m.credential, False),
+            }
+            for m in catalog.IMAGE_MODELS
+        ],
+        "chat_models": [
+            {"id": m.id, "label": m.label, "provider": m.provider,
+             "configured": cfg.get(m.credential, False)}
+            for m in catalog.CHAT_MODELS
+        ],
+    }
+
+
 @app.get("/api/settings")
 def get_settings() -> dict:
     """Yapılandırma durumu + uygulama sürümü. API key asla dönmez.
@@ -566,7 +625,7 @@ def get_settings() -> dict:
     bakıyor, ağ çağrısı arka planda koşuyor (bkz. guncelleme.py'deki 2.
     sözleşme). İlk açılışta değeri `null` olur, sonrakinde dolar.
     """
-    return {**ac.get_settings_status(),
+    return {**_settings_payload(),
             "version": version.APP_VERSION,
             "guncelleme": guncelleme.bilgi(
                 OUTPUT_DIR, izin=prefs.read(OUTPUT_DIR)["guncelleme_kontrolu"]),
@@ -575,37 +634,86 @@ def get_settings() -> dict:
 
 @app.post("/api/settings")
 def post_settings(req: SettingsRequest) -> dict:
-    """Admin kimlik bilgilerini yalnızca-yazılır kaydeder; durumu döndürür (key'siz).
+    """Sağlayıcı kimliklerini yalnızca-yazılır kaydeder; durumu döndürür (key'siz).
 
-    api_key boşsa mevcut key korunur — ilk kurulumda ise key zorunludur.
+    Gizli alanda boş değer "mevcut korunur" demek — istemci kayıtlı anahtarı hiç
+    görmediği için boş bir kutu "sildim" değil "dokunmadım"dır. Adres
+    alanlarında boş "varsayılana dön" demek; ayrım her ikisinin de yazıldığı
+    döngülerde yorumlu.
 
-    Sohbet dağıtımı AYRI bir çağrıyla ve görsel kimliği doğrulamadan GEÇTİKTEN
+    Azure kimliği artık YALNIZ istek onu hedeflediğinde zorunlu (bkz. gövdedeki
+    `azure_hedefli`): eskiden ilk kurulumda koşulsuz zorunluydu ve yalnızca
+    başka bir sağlayıcının anahtarını girmek isteyen kullanıcı hiçbir şey
+    kaydedemiyordu.
+
+    Sohbet dağıtımı ve öteki sağlayıcılar, görsel kimliği doğrulamadan GEÇTİKTEN
     SONRA yazılıyor: geçersiz bir endpoint'le gelen istek hiçbir şey yazmadan
     422 dönmeli.
     """
     api_key = req.api_key.strip()
     base_url = (req.base_url or "").strip()
-    if not base_url or not api_key:
-        try:
-            existing_key, existing_url = ac.load_credentials()
-            if not api_key:
-                api_key = existing_key
-            if not base_url:
-                base_url = existing_url
-        except ac.AzureImageError:
-            if not api_key:
-                raise HTTPException(status_code=422, detail="İlk kurulumda API key gerekli.")
-            if not base_url:
-                raise HTTPException(status_code=422, detail="İlk kurulumda base_url gerekli.")
+    # İSTEK AZURE'U HEDEFLİYOR MU: iki alandan biri doluysa evet. Bu ayrım
+    # v0.6'da açıldı ve sebebi somut bir kilitti — kural "ilk kurulumda Azure
+    # api_key + base_url ZORUNLU" biçimindeydi, yani yalnızca Gemini anahtarı
+    # olan bir kullanıcı HİÇBİR ŞEY kaydedemiyordu ve aldığı 422 bambaşka bir
+    # sağlayıcıdan söz ediyordu ("İlk kurulumda API key gerekli"). Çoklu
+    # sağlayıcının önündeki en somut engel buydu.
+    azure_hedefli = bool(api_key or base_url)
+
+    # Mevcut Azure kimliği. Hata YÜKSELTİLMİYOR: Azure'ın hiç yapılandırılmamış
+    # olması artık bir hata durumu değil, sıradan bir başlangıç hâli.
     try:
-        if api_key and base_url:
+        mevcut_key, mevcut_url = ac.load_credentials()
+    except ac.ImageError:
+        mevcut_key, mevcut_url = "", ""
+    # "Boş = mevcut korunur" kuralı KORUNUYOR (v1.x davranışı).
+    api_key = api_key or mevcut_key
+    base_url = base_url or mevcut_url
+
+    if azure_hedefli:
+        # Azure hedefleniyorsa İKİSİ de gerekli. Mesajlar bilerek ayrı: hangi
+        # alanın eksik olduğunu söylemeyen bir hata kullanıcıyı formda arattırır.
+        if not api_key:
+            raise HTTPException(status_code=422, detail="İlk kurulumda API key gerekli.")
+        if not base_url:
+            raise HTTPException(status_code=422, detail="İlk kurulumda base_url gerekli.")
+
+    try:
+        # Kimlik doğrulaması DİĞER alanların yazımından ÖNCE: geçersiz bir
+        # endpoint'le gelen istek hiçbir şey yazmadan 422 dönmeli
+        # (tests/test_settings_route.py bu sırayı sabitliyor).
+        if azure_hedefli and api_key and base_url:
             ac.save_credentials(api_key, base_url)
         updates = {}
 
         if req.chat_deployment is not None:
             updates[ac.CHAT_DEPLOYMENT] = req.chat_deployment.strip()
-        if req.openai_api_key is not None and req.openai_api_key.strip():
-            updates["OPENAI_API_KEY"] = req.openai_api_key.strip()
+
+        # GİZLİ alanlar: boş gönderim "mevcut korunur" demek, silme DEĞİL.
+        # (Yalnızca-yazılır formun kuralı: istemci kayıtlı anahtarı hiç
+        # görmüyor, o yüzden boş bir kutu "sildim" değil "dokunmadım"dır.)
+        # Alan adı → env adı eşlemesi KATALOGDAN geliyor, elle sayılmıyor:
+        # elle sayılan liste tam olarak redaksiyonun kaçırdığı hataydı.
+        for cred in catalog.CREDENTIALS:
+            if not cred.secret_field or cred.secret_field == "api_key":
+                continue    # api_key yukarıda, kendi doğrulama yolundan geçiyor
+            deger = getattr(req, cred.secret_field, None)
+            if deger is not None and deger.strip():
+                updates[cred.key_env] = deger.strip()
+
+        # ADRES alanları: gizli DEĞİL ve boş gönderim "varsayılana dön" demek,
+        # o yüzden `is not None` yeterli (gizli alanların aksine).
+        for cred in catalog.CREDENTIALS:
+            if not cred.url_field:
+                continue
+            deger = getattr(req, cred.url_field, None)
+            if deger is not None:
+                updates[cred.url_env] = deger.strip()
+
+        # Kataloğa girmemiş eski BYOK alanları. Katalog döngüsünün DIŞINDA
+        # bilerek: bunların henüz bir modeli ve adaptörü yok, kataloğa yazmak
+        # "bağlı" gibi görünmelerine yol açardı. Yazma yolu korunuyor çünkü
+        # v0.2.0'dan beri kaydediliyorlar ve veri kaybı olmamalı.
         if req.fal_key is not None and req.fal_key.strip():
             updates["FAL_KEY"] = req.fal_key.strip()
         if req.replicate_api_token is not None and req.replicate_api_token.strip():
@@ -617,9 +725,9 @@ def post_settings(req: SettingsRequest) -> dict:
 
         if updates:
             ac.save_env(updates)
-    except ac.AzureImageError as e:
+    except ac.ImageError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    return ac.get_settings_status()
+    return _settings_payload()
 
 
 

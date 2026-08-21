@@ -147,3 +147,46 @@ def test_gizli_alan_ve_env_adlari_turetiliyor():
     assert "api_key" in catalog.secret_field_names()
     assert catalog.secret_env_names() >= {ac.IMAGE_KEY, ac.CHAT_KEY}
     assert ac.IMAGE_URL not in catalog.secret_env_names()
+
+
+def test_katalogdaki_her_alan_adi_ayarlar_formunda_var():
+    """Katalog ↔ `SettingsRequest` eşlemesi tripwire.
+
+    `app.post_settings` yazma yolunu `cred.secret_field` / `cred.url_field`
+    üzerinden kuruyor ve `getattr(req, ...)` ile okuyor. Katalogda var olup
+    formda olmayan bir ad SESSİZCE hiç yazılmaz — anahtar kaydedildi sanılır,
+    üretim "anahtar yok" der ve ikisi arasındaki bağ görünmez.
+    """
+    from models import SettingsRequest
+
+    alanlar = set(SettingsRequest.model_fields)
+    for cred in catalog.CREDENTIALS:
+        if cred.secret_field:
+            assert cred.secret_field in alanlar, (
+                f"{cred.id}: `{cred.secret_field}` SettingsRequest'te yok")
+        if cred.url_field:
+            assert cred.url_field in alanlar, (
+                f"{cred.id}: `{cred.url_field}` SettingsRequest'te yok")
+
+
+def test_adres_alani_beyan_eden_kimligin_url_env_i_de_var():
+    """`url_field` varsa yazılacak bir env adı da olmalı.
+
+    Biri olmadan diğeri: `post_settings` `updates[None] = ...` yazar ve
+    `save_env` çağrısı anlamsız bir anahtar üretir.
+    """
+    for cred in catalog.CREDENTIALS:
+        if cred.url_field:
+            assert cred.url_env, f"{cred.id}: url_field var, url_env yok"
+
+
+def test_adressiz_kimligin_varsayilan_adresi_var():
+    """Kullanıcı adres giremiyorsa katalog bir adres SAĞLAMAK zorunda.
+
+    Yoksa anahtarı kaydeden kullanıcı "adres yok" hatası alır ve formda
+    dolduracak bir kutu bulamaz — çıkışı olmayan bir hata.
+    """
+    for cred in catalog.CREDENTIALS:
+        if cred.id.startswith("azure"):
+            continue    # Azure'da adres FORMDA sorulur, varsayılanı yok
+        assert cred.default_base_url, f"{cred.id}: ne varsayılan adres ne form alanı"

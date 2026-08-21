@@ -102,7 +102,8 @@ kalır. Kalıcı bildirim bunun bedeli.
 
 ## Derleme
 
-Bu depoda APK **CI'da** derleniyor: `.github/workflows/build-android.yml`.
+Bu depoda APK **CI'da** derleniyor: `.github/workflows/_paket-android.yml`
+(çağıranlar: PR'da `ci.yml`, yayında `release.yml`).
 Yerelde derlemek için Android SDK + JDK 17 gerekiyor.
 
 ```bash
@@ -112,18 +113,23 @@ cd android
 
 **Yerelde** `android/wheels/` altında pydantic-core wheel'i olmalı; yoksa Gradle
 anlaşılır bir Türkçe hatayla durur (bkz. `android/wheels/README.md`). **CI'da**
-gerekmiyor: `build-android.yml`'deki `wheel` işi onu repo → önbellek → derleme
-sırasıyla kendisi buluyor.
+gerekmiyor: `_paket-android.yml`'in `wheel` işi
+(`build-pydantic-core-android.yml`) onu repo → önbellek → derleme sırasıyla
+kendisi buluyor.
 
 ### APK'yı telefona ulaştırmak
 
 Kullanıcının gördüğü tarafı `KURULUM.md` → *Android (sideload)* anlatıyor.
 Bakımcı tarafı iki yol:
 
-**Deneme paketi (yayın oluşmaz).** Actions → *Android APK* → **Run workflow** →
-dalı seç. Koşu bitince sayfanın altındaki `gpt-image-studio-android-arm64`
-varlığını indir, ZIP'ten çıkan APK'yı telefona at. İlk koşuda wheel de
-derlendiği için 30–40 dakika sürebilir; sonraki koşular önbellekten okur.
+**Deneme paketi (yayın oluşmaz).** Actions → *Yayın* → **Run workflow**; dalı
+seç, `surum` alanına bir sonraki sürümü yaz, `kuru_prova`yı işaretle. Dal
+kapısı sürüm commit'ini ve yayını engelliyor (`release.yml` → DAL KAPISI), ama
+Android işi tam olarak koşuyor. Koşu bitince `lumeo-android-arm64` varlığını
+indir, ZIP'ten çıkan APK'yı telefona at. `android/` altına dokunan bir PR'da
+aynı iş kendiliğinden koşuyor (`docs/yayin-hatti.md` → "PR'da ne koşuyor") —
+orada ayrıca tetiklemek gerekmiyor. Wheel önbellekte olduğu sürece koşu
+~2 dakika; önbellek boşsa wheel derlemesi 30–40 dakika sürebilir.
 
 > **Bu paket ancak imzalıysa kurulabilir.** İmzalama sırları tanımlı değilse
 > koşu yine yeşil olur ve varlığı üretir, ama APK **imzasızdır** ve Android onu
@@ -131,14 +137,17 @@ derlendiği için 30–40 dakika sürebilir; sonraki koşular önbellekten okur.
 > özet bunu yazıyor; `İmzayı doğrula` adımının atlanmış olması da aynı işaret.
 > Aşağıdaki *İmzalama* bölümü tek seferlik kurulumu anlatıyor.
 
-**Yayın.** `v*` biçiminde bir tag at. `release.yml` masaüstü paketlerini,
-`build-android.yml` APK'yı üretir ve `publish-android` işi APK'yı aynı yayına
-ekler. Kullanıcı doğrudan Releases sayfasından indirir.
+**Yayın.** Tag atmak gerekmiyor: `main`'e her merge `release.yml`'i çalıştırıyor,
+sürüm kararını `tools/surum_karari.py` veriyor ve APK üç paketle birlikte tek
+yayına giriyor (`docs/yayin-hatti.md`). Kullanıcı doğrudan Releases sayfasından
+indiriyor.
 
-> **Elle tetikleme yalnız `main`'de çalışır.** GitHub `workflow_dispatch`'i
-> sadece varsayılan dalda bulunan workflow dosyaları için gösteriyor — bu iki
-> workflow `main`'e girmeden bir dal üzerinde tetiklenemez (API 404 döner).
-> Yani ilk APK, bu çalışma `main`'e merge edildikten sonra alınabilir.
+> **Dalda tetiklemek çalışıyor.** GitHub `workflow_dispatch`'i yalnız
+> varsayılan dalda **bulunan** workflow dosyaları için gösteriyor; `release.yml`
+> `main`'de olduğu için herhangi bir dal seçilerek koşturulabiliyor ve koşu o
+> dalın içeriğini derliyor. Ölçüldü: koşu 32478330228, dal
+> `claude/gis-keystore-mobile-app-mgakyw`. (`main`'de HİÇ bulunmayan bir
+> workflow dalda tetiklenemez — API 404 döner.)
 
 ### İmzalama
 
@@ -180,9 +189,47 @@ PKCS12'de **anahtar parolası = depo parolası**; `keytool` ayrı bir anahtar
 parolası sormuyor. `ANDROID_KEYSTORE_PASSWORD` ve `ANDROID_KEY_PASSWORD`
 sırlarına aynı değer yazılır — farklı yazılırsa Gradle parola hatasıyla düşer.
 
-Sırları tanımladıktan sonra Actions → *Android APK* → **Run workflow**. Bu kez
+Sırları tanımladıktan sonra yukarıdaki *deneme paketi* koşusunu tetikle. Bu kez
 `İmzayı doğrula` atlanmaz; `apksigner verify --print-certs` sertifikayı basar ve
 o adım yeşilse paket telefona kurulur.
+
+#### Yayındaki anahtarın kimliği
+
+`apksigner verify --print-certs` ile ölçüldü (koşu 32478330228, 2026-08-21):
+
+| Alan | Değer |
+|---|---|
+| Sertifika DN | `CN=GPT-Image Studio, OU=Unknown, O=Unknown, L=İstanbul, ST=Unknown, C=Unknown` |
+| Sertifika SHA-256 | `b24743de4456ad092563678aea48cdb13d05ff848746bef534be1eeb7cf7768b` |
+| Sertifika SHA-1 | `c2a4349e1b096b8d9ec422e0df0a7dfc6fdf57b0` |
+| Anahtar | RSA 4096 |
+| İmza şeması | yalnız v2 (APK Signature Scheme v2) |
+
+Bu parmak izleri **sır değil**: imzalı her APK'nın içinden okunabiliyorlar.
+Burada durmalarının sebebi, bir sonraki imzalı derlemenin AYNI anahtarla
+imzalandığını kanıtlayacak referans olmaları. Parmak izi değiştiyse anahtar da
+değişmiştir ve o paket telefondaki kurulumun üzerine yazamaz — kullanıcı
+uygulamayı kaldırmak zorunda kalır.
+
+#### Depo başka bir hesaba taşındığında
+
+Sırlar depo **ayarlarında** yaşıyor, git ağacında değil: `git clone` onları
+getirmiyor, depoya bakarak varlıkları anlaşılmıyor. Hesap değişikliğinden sonra
+ilk soru her zaman "dört sır hâlâ orada mı" oluyor.
+
+Ölçüldü: depo `Zenginby`'dan `Zenginby`'ye taşındıktan sonra (2026-08-21,
+koşu 32478330228) dördü de yerindeydi — GitHub taşımada depo sırlarını
+düşürmedi ve APK yukarıdaki parmak iziyle imzalandı. Yine de her taşımadan
+sonra ölçülmeli; tek güvenilir işaret `İmzayı doğrula` adımının ATLANMAMIŞ
+olması.
+
+Sürüm harcamadan ölçmek: Actions → *Yayın* → *Run workflow*; dal olarak bir
+çalışma dalı, `surum` alanına bir sonraki sürüm, `kuru_prova` işaretli
+(ayrıntı: `docs/yayin-hatti.md` → "Yeni bir kapıyı sürüm harcamadan denemek").
+
+`surum` alanını **boş bırakmak bu ölçümü yapmıyor**: `karar` işi "pakete
+girmiyor" deyip bütün paket işlerini atlıyor, koşu yeşil biter ve imza hakkında
+hiçbir şey söylemez. Ölçüldü — koşu 32478178747 tam olarak böyle bitti.
 
 ## Beklenen boyut ve ilk açılış
 
@@ -210,7 +257,7 @@ gerçek cihazda ölçülebilir.
 | Ne | Nasıl |
 |---|---|
 | Sunucu ayağa kalkıyor mu | Logcat'te `uvicorn hazır: port=…`, WebView'de arayüz |
-| `import pydantic` | CI kapısı yeşil (`build-android.yml`) |
+| `import pydantic` | CI kapısı yeşil (`_paket-android.yml` → *pydantic APK'ya girdi mi*) |
 | Uçtan uca üretim | Azure kimliğini gir → görsel üret → galeride gör → logo bindir → indir |
 | Dosya yükleme | Referans görsel ekle (`onShowFileChooser`) |
 | İndirme | PNG → `Resimler/Lumeo`, klasör ZIP → `İndirilenler/Lumeo`; ZIP adı klasörün ADI olmalı (`download.zip` değil) |

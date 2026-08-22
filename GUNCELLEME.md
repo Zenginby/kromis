@@ -150,6 +150,13 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.8.0 — ne değişti
+
+- şerit satırlarında sağlayıcı markası tekrarlanmıyor
+- model şeridinde sağlayıcı işareti + koşullu Yönetmen bölümü
+
+---
+
 ## Sürüm 0.7.0 — ne değişti
 
 - 400'ün iki anlamı sohbette de, 404 modelin adını söylüyor

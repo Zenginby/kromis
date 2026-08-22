@@ -150,6 +150,15 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.7.0 — ne değişti
+
+- 400'ün iki anlamı sohbette de, 404 modelin adını söylüyor
+- Google hata gövdesi tek öğelik DİZİ — detail_of onu açmıyordu
+- Prompt Yönetmeni'ne model seçimi + şeritler anahtara göre süzülüyor
+- Nano Banana adaptörü + kalkmış DALL·E 3 katalogdan çıkarıldı
+
+---
+
 ## Sürüm 0.6.1 — ne değişti
 
 - boş endpoint kayıtlı Azure kurulumunu siliyordu + beş inceleme bulgusu

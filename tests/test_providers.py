@@ -215,3 +215,65 @@ def test_azure_yolu_kimligi_ONCEDEN_cozmuyor():
     assert out == [b"PNG"]
     assert cagrildi["credentials"] is None, (
         "shim kimliği önceden çözdü: stub'lanmış çağrı gerçek credentials.env ister")
+
+
+# ── Gövdenin ANLAMI: iki paylaşılan yüklem ─────────────────────────────
+
+
+@pytest.mark.parametrize("detail", [
+    "API key not valid. Please pass a valid API key.",
+    "API_KEY_INVALID",
+    "Incorrect API key provided: sk-***",
+])
+def test_is_invalid_key_ANAHTAR_metinlerini_taniyor(detail):
+    """400'ün iki anlamı bu yüklemle ayrılıyor. Tanımazsa geçersiz anahtar
+    çıplak bir "HTTP 400" olur ve kullanıcı sebebi hiçbir yerde okumaz."""
+    assert providers.is_invalid_key(detail)
+
+
+@pytest.mark.parametrize("detail", [
+    "Unsupported aspect_ratio: 7:3",
+    "Unknown name \"content\": Cannot find field.",
+    "",
+])
+def test_is_invalid_key_BASKA_hatalari_anahtar_SANMIYOR(detail):
+    """Yanlış pozitif buradaki en pahalı hata: anahtarı DOĞRU olan kullanıcıya
+    "anahtarını yeniden kaydet" demek, onu çalışan kurulumunu bozmaya davet
+    etmek olurdu (`gemini_client.map_error`ın 400 dalının gerekçesi)."""
+    assert not providers.is_invalid_key(detail)
+
+
+@pytest.mark.parametrize("detail", [
+    "content policy violation",                      # OpenAI
+    "Your request was rejected as a result of our safety system.",
+    "content filter triggered",                      # Azure sohbet
+    "The response was filtered due to the prompt triggering Azure "
+    "OpenAI's content management policy.",
+    "Candidate was blocked due to safety",           # Google
+    "PROHIBITED_CONTENT",
+])
+def test_is_content_policy_GERCEK_reddi_taniyor(detail):
+    """Dört sağlayıcının ölçülmüş metinleri. Biri tanınmazsa kullanıcı
+    "istek başarısız (HTTP 400)" okuyor ve prompt'unu değiştirmesi
+    gerektiğini hiçbir yerden anlamıyor."""
+    assert providers.is_content_policy(detail)
+
+
+def test_is_content_policy_SEMA_hatasini_icerik_reddi_SANMIYOR():
+    """ÖLÇÜLMÜŞ YANLIŞ POZİTİF ve bu testin varlık sebebi bu.
+
+    Öncesinde beş `map_error`ın üçünde ölçüt çıplak `"content" in detail`
+    idi. Google şema hatasını `Unknown name "content": Cannot find field.`
+    diye anlatıyor — yani GÖVDEDEKİ BİR ALAN ADINDAN söz ediyor, kullanıcının
+    mesajından değil — ve o dize "İçerik politikası reddi: mesaj engellendi"
+    olarak gösteriliyordu. Kullanıcı hiç engellenmemiş bir mesajı yeniden
+    yazmaya çalışıyor, gerçek sebep (istemcinin yanlış alan göndermesi)
+    hiçbir yerde görünmüyordu.
+    """
+    assert not providers.is_content_policy(
+        'Unknown name "content": Cannot find field.')
+    assert not providers.is_content_policy(
+        "Invalid value for 'content': expected a string")
+    assert not providers.is_content_policy(
+        "messages[0].content is required")
+    assert not providers.is_content_policy("")

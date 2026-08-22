@@ -10,12 +10,21 @@ Bu dosyanın en değerli iki iddiası:
      200 ile geri dönüyor ve gerekçeyi metin bloğu olarak yazıyor; o metni
      yutmak kullanıcıya sebebi olmayan bir 502 vermek olurdu.
 
-DİKKAT — canlı doğrulama YAPILMADI: iddialar tel formatının BELGELENEN hâlini
-sabitliyor (ai.google.dev/gemini-api → image generation), gerçek bir Gemini
-anahtarıyla çağrı yapılmadı. Şekil `openai_client`'ın aksine Azure ikiziyle
-AYNI DEĞİL, yani buradaki risk daha yüksek ve bilinçli olarak kaydediliyor:
-uç, başlık adı, `response_format` alanları ve `steps[].content[]` yanıtı ilk
-gerçek anahtarla bir kez sınanmalı.
+CANLI DOĞRULAMANIN SINIRI (22 Ağustos 2026): `generativelanguage.googleapis.com`
+gerçekten çağrıldı ama GEÇERLİ ANAHTAR OLMADAN, yani doğrulanan taraf
+KİMLİKTEN ÖNCE gelen her şey:
+
+  • uç yolu (`/v1beta/interactions`) ve `x-goog-api-key` başlığı — 404 değil
+    400 dönüyor, yani yol ve başlık tanınıyor;
+  • hata gövdesinin ŞEKLİ: tek öğelik DİZİ, `[{"error": {…}}]`. Bu ölçüm
+    `providers.detail_of`ta bir hata buldu (bkz. tests/test_providers.py) —
+    elle yazılmış sözlük gövdeleri onu kaçırıyordu.
+
+DOĞRULANMAYAN taraf: 200 yanıtının şekli (`steps[].content[]`), tel adları ve
+`response_format` alanlarının KABUL edilip edilmediği. Bunlar hâlâ belgeye
+dayanıyor (ai.google.dev/gemini-api → image generation) ve ilk gerçek
+anahtarla bir kez sınanmalı. Şekil `openai_client`'ın aksine Azure ikiziyle
+AYNI DEĞİL, yani buradaki risk daha yüksek ve bilinçli kaydediliyor.
 """
 import base64
 
@@ -308,3 +317,78 @@ def test_tasima_hatasinin_mesaji_AZURE_demiyor():
 
     assert "Azure" not in str(exc.value)
     assert "Gemini" in str(exc.value)
+
+
+def test_404_metni_GOVDE_BOS_gelse_de_adi_soyluyor():
+    """`test_404_MODEL_adini_soyluyor` yeşildi ama YANLIŞ SEBEPTEN: adı taşıyan
+    şey metin değil, gövdeden gelen `detail` idi (`models/eski-ad is not
+    found`). Google 404'ü gövdesiz de dönebiliyor ve o hâlde kullanıcı hangi
+    modelin kalktığını hiçbir yerde okumuyordu — hem de yorumda "metin MODELİ
+    söylüyor" yazarken.
+
+    Ad `payload["model"]`den geliyor, yani telin GERÇEKTEN gönderdiği değer.
+    """
+    c = FakeClient(FakeResponse(404, None))
+
+    with pytest.raises(ac.ImageError) as e:
+        gc.generate(PRO, "k", "1:1", "2K", 1, client=c, credentials=CREDS)
+
+    mesaj = str(e.value)
+    assert PRO.wire_model in mesaj, "hangi model tanınmadı, okunmuyor"
+    assert "anahtar" not in mesaj.lower(), (
+        "404'te anahtardan söz etmek kullanıcıyı çalışan kurulumunu bozmaya iter")
+
+
+# ── Adet TAVANI: yanıt birden çok görsel döndürebiliyor ────────────────
+
+
+def _cok_gorselli_yanit(*hamlar):
+    """Tek yanıt, birden çok görsel bloğu. `steps[].content[]` bunu yapabiliyor
+    ve `decode_images` hepsini ayıklıyor — döngü de üstüne ekliyor."""
+    return FakeResponse(200, {"status": "completed", "steps": [
+        {"type": "model_output",
+         "content": [{"type": "image", "data": _b64(h), "mime_type": "image/png"}
+                     for h in hamlar]}]})
+
+
+def test_TEK_yanit_COK_gorsel_dondurunce_adet_ASILMIYOR():
+    """`out` istenen adedi AŞARSA fazlalık sessizce ilerlemiyor, ilerideki bir
+    doğrulamada patlıyor: `models.MAX_IMAGES_PER_RUN` 4 ve
+    `ChatMessage.image_ids` `max_length=4`. Yani n=4 isteyip 5 görsel almak
+    kullanıcıya "üretim başarısız" diyen bir 500 olurdu — hem de görseller
+    ÜRETİLDİKTEN ve ücret ödendikten sonra.
+
+    Kesme sessiz sapma DEĞİL: kullanıcı ne istediyse onu alıyor. `_uret`in
+    "kısmi sonuç yok" kuralının tersi değil tamamlayıcısı — orada EKSİK
+    teslim yasak, burada FAZLASI atılıyor.
+    """
+    c = FakeClient(_cok_gorselli_yanit(b"BIR", b"IKI"))
+
+    out = gc.generate(MODEL, "k", "1:1", "2K", 1, client=c, credentials=CREDS)
+
+    assert out == [b"BIR"], f"adet aşıldı: {len(out)} görsel döndü"
+    assert len(c.calls) == 1
+
+
+def test_ELDE_YETERI_KADAR_gorsel_varsa_FAZLA_ISTEK_atilmiyor():
+    """Döngü adede göre değil ELDEKİNE göre dönüyor: ilk yanıt 2 görselle
+    döndüyse n=2'de ikinci istek hiç atılmıyor. Atılsaydı ödenen ücret ve
+    beklenen süre kullanıcının hiç almadığı iki görsele giderdi."""
+    c = FakeClient(_cok_gorselli_yanit(b"BIR", b"IKI"))
+
+    out = gc.generate(MODEL, "k", "1:1", "2K", 2, client=c, credentials=CREDS)
+
+    assert out == [b"BIR", b"IKI"]
+    assert len(c.calls) == 1, "gereksiz ikinci istek atıldı (ücret + süre)"
+
+
+def test_TEK_gorselli_yanitta_dongu_AYNEN_calisiyor():
+    """Tavan mandalı, ölçülmüş asıl davranışı (n istek, n görsel)
+    değiştirmemeli — `while` dönüşümünün tripwire'ı."""
+    c = FakeClient(_gorsel_yanit(b"BIR"), _gorsel_yanit(b"IKI"),
+                   _gorsel_yanit(b"UC"), _gorsel_yanit(b"DORT"))
+
+    out = gc.generate(MODEL, "k", "1:1", "2K", 4, client=c, credentials=CREDS)
+
+    assert out == [b"BIR", b"IKI", b"UC", b"DORT"]
+    assert len(c.calls) == 4

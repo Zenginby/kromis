@@ -50,7 +50,8 @@ ENDPOINT_PATH = "/v1beta/interactions"
 PNG_MIME = "image/png"
 
 
-def map_error(status_code: int, body: dict | None) -> str:
+def map_error(status_code: int, body: dict | list | None, *,
+              wire_model: str | None = None) -> str:
     """HTTP durumunu Türkçe mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
 
     `openai_client.map_error`'ın duruşunun aynısı ve aynı gerekçeyle: "OpenAI
@@ -61,10 +62,15 @@ def map_error(status_code: int, body: dict | None) -> str:
     (`API_KEY_INVALID`) desteklenmeyen bir jetonu da 400 ile döndürüyor.
     Ayrımı yapmamak, anahtarı doğru olan kullanıcıya "anahtarını kontrol et"
     demek olurdu — yani onu çalışan kurulumunu bozmaya davet etmek.
+
+    İKİ YÜKLEM PAYLAŞILIYOR (`providers.is_invalid_key`,
+    `providers.is_content_policy`): aynı iki soruyu `openai_chat` de soruyor ve
+    Gemini'nin sohbet ucu AYNI gövdeyi döndürüyor. Alt dizeleri iki dosyada
+    ayrı tutmak, birini düzeltip diğerini unutmanın kapısıydı — nitekim öyle
+    oldu (bkz. o dosyanın 400 dalı).
     """
     detail = providers.detail_of(body)
-    alt = detail.lower()
-    if status_code == 400 and ("api key" in alt or "api_key" in alt):
+    if status_code == 400 and providers.is_invalid_key(detail):
         return ("Gemini API anahtarı geçersiz (400): Ayarlar'dan yeniden "
                 "kaydet." + (f" {detail}" if detail else ""))
     if status_code in (401, 403):
@@ -79,10 +85,20 @@ def map_error(status_code: int, body: dict | None) -> str:
         # söylüyor: `openai-dall-e-3` deneyimi tam olarak bunu öğretti —
         # "model bulunamadı" diyen ama hangi model olduğunu söylemeyen bir
         # hata, kullanıcıyı anahtarını kurcalamaya iter.
-        return ("Gemini bu modeli tanımıyor (404): katalogdaki ad artık "
-                "geçerli olmayabilir." + (f" {detail}" if detail else ""))
-    if status_code == 400 and ("safety" in alt or "block" in alt
-                               or "prohibited" in alt):
+        #
+        # ADI ARTIK GERÇEKTEN YAZIYOR: bu satırın yorumu "metin MODELİ
+        # söylüyor" diyordu ama metinde ad YOKTU — yalnız gövdeden gelen
+        # `detail` içinde geçtiği için testte görünüyordu. `detail` boş
+        # gelirse (Google 404'te gövdesiz de dönebiliyor) kullanıcı hangi
+        # modelin kalktığını okuyamıyordu. Ad `payload["model"]`den geliyor,
+        # yani telin GERÇEKTEN gönderdiği değer — katalogdan ikinci bir
+        # okuma değil.
+        return ("Gemini bu modeli tanımıyor (404)"
+                + (f": {wire_model}." if wire_model else ": katalogdaki ad "
+                   "artık geçerli olmayabilir.")
+                + " Composer'daki şeritten başka bir model seç."
+                + (f" {detail}" if detail else ""))
+    if status_code == 400 and providers.is_content_policy(detail):
         return "İçerik politikası reddi: prompt Gemini tarafından engellendi."
     return f"Gemini isteği başarısız (HTTP {status_code})." + (f" {detail}" if detail else "")
 
@@ -194,7 +210,13 @@ def _post(endpoint: str, key: str, payload: dict, *, client, read: float) -> dic
             body = resp.json()
         except Exception:
             body = None
-        raise ac.ImageError(map_error(resp.status_code, body))
+        # `wire_model` GÖVDEDEN okunuyor, imzaya eklenmiyor: Interactions
+        # ucunda model gövdede duruyor (`build_payload`), yani burada telin
+        # gönderdiği değerin ta kendisi var. Parametre olarak geçirmek aynı
+        # değeri iki yoldan taşımak, yani ayrışabilecek bir ikinci kaynak
+        # olurdu.
+        raise ac.ImageError(map_error(resp.status_code, body,
+                                      wire_model=payload.get("model")))
     return resp.json()
 
 
@@ -217,6 +239,21 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str, n: int,
     teslim etmek) bu deponun "sessiz sapma yasak" duruşuna aykırı — kullanıcı
     4 istedi, 3 aldı ve bunu hiçbir yerde okumadı olurdu. Adedi kısan tek
     yerin `fillAxis`in yüksek sesle söylediği kademe olması gerekiyor.
+
+    n TAVANI DÖNGÜNÜN İÇİNDE ve bu bir süsleme değil: `decode_images` tek
+    yanıttan BİRDEN ÇOK görsel döndürebiliyor (`steps[].content[]` çoklu
+    görsel bloğu taşıyabiliyor ve ölçümde iki blokla dönen bir yanıt görüldü).
+    Tavan olmadan `out` istenen adedi AŞIYOR ve fazlalık sessizce ilerlemiyor,
+    ilerideki bir doğrulamada patlıyor: `models.MAX_IMAGES_PER_RUN` 4 ve
+    `ChatMessage.image_ids` `max_length=4` — yani n=4 isteyip 5 görsel almak
+    kullanıcıya "üretim başarısız" diyen bir 500 olurdu, hem de görseller
+    ÜRETİLDİKTEN ve ücret ödendikten sonra.
+
+    KESME SESSİZ SAPMA DEĞİL çünkü kullanıcı ne istediyse onu alıyor: n=2
+    isteyen 2 görsel görüyor. Yukarıdaki "4 istedi 3 aldı" durumunun tersi —
+    orada EKSİK teslim ediliyordu, burada FAZLASI atılıyor. Üstelik döngü
+    erken de kesiliyor: ilk yanıt zaten n görsel döndürdüyse ikinci istek hiç
+    atılmıyor, yani ödenmeyen bir ücret ve beklenmeyen bir süre kazancı var.
     """
     key, base_url = (credentials if credentials is not None
                      else credstore.resolve(m.credential))
@@ -234,10 +271,10 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str, n: int,
         client = httpx.Client()
     try:
         out: list[bytes] = []
-        for _ in range(n):
+        while len(out) < n:
             out.extend(decode_images(
                 _post(endpoint, key, payload, client=client, read=read)))
-        return out
+        return out[:n]
     finally:
         if owns:
             client.close()

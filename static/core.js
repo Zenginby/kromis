@@ -544,10 +544,24 @@ function renderChatModelOptions(zorunluId) {
   }));
 }
 
-/** Seçili sohbet modelini uygular. `applyModel`in yönetmen karşılığı. */
+/** Seçili sohbet modelini uygular. `applyModel`in yönetmen karşılığı.
+ *
+ * UYGULANAN MODELİ DÖNDÜRÜYOR (yoksa `null`) ve bu dönüş değeri bir kolaylık
+ * değil, `change` dinleyicisinin gereği: erken çıkış `currentChatModel`i
+ * OLDUĞU GİBİ bırakıyor — ilk çizimden önce `null`, sonrasında ESKİ model.
+ * Dinleyici o küresel değişkeni okuyup `.provider`ına eriştiği için, erken
+ * çıkışta ya `TypeError` atardı (konsolda kırmızı, tercih yazılmaz) ya da
+ * kullanıcının SEÇMEDİĞİ bir modeli diske tercih olarak yazardı — ikincisi
+ * daha sessiz ve daha kötü. `applyModel`de bu tuzak yok çünkü onun
+ * dinleyicisi `$("model").value`yu okuyor, küresel değişkeni değil.
+ *
+ * `id` katalogda YOKKEN çağrılmak gerçek bir yol: `secilecek` liste boşken
+ * (`chat_models: []`) boş dize döndürüyor ve settings.js onu doğrudan buraya
+ * veriyor.
+ */
 function applyChatModel(id) {
   const model = chatModels.find((m) => m.id === id);
-  if (!model) return;
+  if (!model) return null;
   currentChatModel = model;
   // `applyModel`in aynı gerekçesi: seçili id şeritte yoksa şerit boş görünür.
   if (![...$("chat-model").options].some((o) => o.value === id)) {
@@ -555,6 +569,13 @@ function applyChatModel(id) {
   }
   $("chat-model").value = model.id;
   syncGoGate();
+  // SON SATIR ve gerçek bir kırılmanın bekçisi: dönüş eklenirken bu satır
+  // unutulduğunda fonksiyon `undefined` döndürdü, dinleyici de her seferinde
+  // erken çıktı — yani şerit doğru modeli GÖSTERİYOR, tercih diske HİÇ
+  // yazılmıyordu ve konsolda tek bir hata bile yoktu. Kaynak taraması
+  // ("`return null` var mı?") bunu yeşil geçti; yalnız gerçek Chromium'da
+  // görüldü (POST /api/prefs hiç gitmiyor).
+  return model;
 }
 
 function applyChatModels(s, tercih) {
@@ -606,18 +627,20 @@ $("model").addEventListener("change", () => {
 });
 
 $("chat-model").addEventListener("change", () => {
-  applyChatModel($("chat-model").value);
+  // Dönüş değeri KÜRESEL DEĞİŞKEN YERİNE kullanılıyor: `applyChatModel`
+  // uygulamadıysa yazılacak bir tercih de yok (bkz. o fonksiyonun notu).
+  const model = applyChatModel($("chat-model").value);
+  if (!model) return;
   // TERCİH ÇİFT YAZILIYOR ve bu zorunlu: `prefs.update` `chat_model`i
   // `chat_provider`a göre doğruluyor (çapraz kural, bkz. prefs.py) ve yalnız
   // modeli göndermek "bu sağlayıcıda yok" hatasıyla 422 dönerdi — kullanıcı
   // OpenAI modeline geçtiğinde diskteki sağlayıcı hâlâ "azure" olurdu.
-  savePref({ chat_provider: currentChatModel.provider,
-             chat_model: currentChatModel.id });
+  savePref({ chat_provider: model.provider, chat_model: model.id });
   // Bellekteki tercih de tazeleniyor: `applyChatModels` her Ayarlar
   // kaydedişinde yeniden koşuyor ve o değişkeni okuyor — yazılmazsa
   // kullanıcının bu turda seçtiği model AÇILIŞTAKİ değere geri sıçrardı
   // (görsel tarafında ölçülmüş kırılmanın aynısı).
-  seciliSohbetModeliTercihi = currentChatModel.id;
+  seciliSohbetModeliTercihi = model.id;
 });
 
 $("model-settings-link").addEventListener("click", () => {

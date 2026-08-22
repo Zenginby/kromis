@@ -296,6 +296,23 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
     # kullanmamak. `max_n` ayrıca `models.MAX_IMAGES_PER_RUN` (4) ile de
     # sınırlı — 8'e çıkmak o sabiti ve sonuç kaydının `image_ids` tavanını
     # birden değiştirmek olurdu.
+    #
+    # TEL ADI belgeden doğrulandı (22 Ağustos 2026): `gpt-image-2` API'de bu
+    # adla duruyor. CANLI çağrı YOK ve bu depoda yapılamıyor — sohbet
+    # adlarının notunda yazılı gerekçenin aynısı.
+    #
+    # AYNI BELGE yukarıdaki "alt sınır" kararını da DOĞRULUYOR ve jetonların
+    # uyuşmadığını söylüyor: modelin gerçek ekseni 1K/2K/4K fiyatlanıyor ve
+    # boyut olarak 16'nın katı her `WxH` kabul ediliyor, buradaki
+    # `low/medium/high` + üç sabit boyut ise Azure ikizinden kopyalandı. Yani
+    # beyan edilen küme modelin YAPABİLDİĞİNDEN küçük — eksik beyan yalnızca
+    # bir yeteneği kullanmamak, doğrulanmamış jeton beyan etmek ise arayüzde
+    # seçilebilir bir 400. Genişletme, jetonlar canlı bir anahtarla
+    # sınandığında yapılacak iş.
+    #
+    # Ad bir gün kalktığında maliyet artık bir cümle: 404 metni MODELİN ADINI
+    # söylüyor (`openai_client.map_error`), yani kullanıcı anahtarını
+    # kurcalamak yerine şeritten başka bir model seçiyor.
     ImageModel(
         id="openai-gpt-image-2",
         label="OpenAI · gpt-image-2",
@@ -358,6 +375,13 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
     # çağrı tek görsel döndürüyor. `providers.read_timeout_for`ın adet-başına-
     # ayrı-istek dalı bu modelle ilk gerçek kullanıcısını buluyor (öncesinde
     # yalnız sentetik testler ölçüyordu).
+    #
+    # TEL ADLARI belgeden doğrulandı (22 Ağustos 2026): `gemini-3.1-flash-image`
+    # (Nano Banana 2) ve `gemini-3-pro-image` (Nano Banana Pro) — ikisi de
+    # "preview" jetonu TAŞIMIYOR, yani sohbet tarafında Pro'yu dışarıda
+    # bırakan kural burada tetiklenmiyor. Uç ve başlık CANLI doğrulandı
+    # (anahtarsız çağrı 404 değil 400 dönüyor); 200 yanıtının şekli
+    # doğrulanmadı (bkz. tests/test_gemini_client.py'nin başlığı).
     ImageModel(
         id="gemini-nano-banana-2",
         label="Gemini · Nano Banana 2",

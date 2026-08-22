@@ -207,6 +207,23 @@ def test_icerik_politikasi_reddi_ayri_mesaj():
     assert "İçerik politikası" in mesaj
 
 
+def test_SEMA_hatasi_ICERIK_reddi_olarak_gosterilmiyor():
+    """ÖLÇÜLMÜŞ YANLIŞ POZİTİF: ölçüt çıplak `"content" in detail` iken
+    şema hataları da "İçerik politikası reddi" diye gösteriliyordu.
+
+    Bedeli en pahalı yanlış yönlendirme: kullanıcı hiç engellenmemiş bir
+    prompt'u yeniden yazmaya çalışıyor, gerçek sebep (istemcinin gönderdiği
+    alan) hiçbir yerde görünmüyor. Yüklem `providers.is_content_policy`te
+    paylaşılıyor — aynı gövde `openai_chat` üzerinden de geliyor.
+    """
+    mesaj = oc.map_error(400, {"error": {
+        "message": "Invalid value for 'content': expected a string"}})
+
+    assert "İçerik politikası" not in mesaj
+    # Gerçek sebep KAYBOLMUYOR.
+    assert "expected a string" in mesaj
+
+
 def test_bilinmeyen_durum_detayi_TASIYOR():
     mesaj = oc.map_error(500, {"error": {"message": "iç hata"}})
     assert "500" in mesaj and "iç hata" in mesaj
@@ -253,3 +270,40 @@ def test_gövde_azure_ikizi_ile_AYRISMIYOR():
         assert azure[anahtar] == openai[anahtar], anahtar
     assert azure["model"] == ac.MODEL_NAME
     assert openai["model"] == "gpt-image-1"
+
+
+def test_404_MODELIN_adini_soyluyor():
+    """`dall-e-3`ün API'den kalktığı gün kullanıcının gördüğü metin
+    "OpenAI isteği başarısız (HTTP 404)" idi: hangi modelin kalktığını
+    söylemeyen, dolayısıyla kullanıcıyı ANAHTARINI kurcalamaya iten bir hata.
+    Katalogdaki her tel adı bir gün kalkacak — o günün maliyeti, adı yazmakla
+    bir cümleye düşüyor.
+
+    Ad GÖVDEDEN okunuyor (`json["model"]`), yani telin GERÇEKTEN gönderdiği
+    değer: kataloğu ikinci kez okumak, ayrışabilecek bir ikinci kaynak olurdu.
+    """
+    c = FakeClient(FakeResponse(404, None))
+
+    with pytest.raises(ac.ImageError) as e:
+        oc.generate(IKINCI, "k", "1024x1024", "low", 1, client=c,
+                    credentials=CREDS)
+
+    mesaj = str(e.value)
+    assert IKINCI.wire_model in mesaj, "hangi model kalktı, okunmuyor"
+    assert "tanımıyor" in mesaj
+    # Kullanıcıya YAPACAĞI İŞ söyleniyor: anahtar değil, model değiştirmek.
+    assert "şerit" in mesaj
+    assert "anahtar" not in mesaj.lower()
+
+
+def test_404_DUZENLEME_yolunda_da_adi_soyluyor():
+    """`edit` multipart gönderiyor: ad `json`da değil `data`da. İki yoldan
+    birini kapatmak, kullanıcının hangi düğmeye bastığına göre değişen bir
+    hata metni demekti."""
+    c = FakeClient(FakeResponse(404, None))
+
+    with pytest.raises(ac.ImageError) as e:
+        oc.edit(IKINCI, "k", [("a.png", b"x")], "1024x1024", "low", 1,
+                client=c, credentials=CREDS)
+
+    assert IKINCI.wire_model in str(e.value)

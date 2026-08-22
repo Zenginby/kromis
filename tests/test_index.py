@@ -3239,3 +3239,42 @@ def test_TERCIH_okuma_yolu_da_FILTREDEN_geciyor():
         "birer `secilecek` çağrısı bekleniyor)")
     assert "applyModel(secilecek(" in govde
     assert "applyChatModel(secilecek(" in govde
+
+
+def test_SOHBET_MODELI_dinleyicisi_KURESEL_degiskeni_DEREFERANS_etmiyor():
+    """`applyChatModel` uygulamadığında (id katalogda yok) `currentChatModel`
+    OLDUĞU GİBİ kalıyor: ilk çizimden önce `null`, sonrasında ESKİ model.
+    Dinleyici o küresel değişkenin `.provider`ına eriştiği için erken çıkışta
+    ya `TypeError` atıyordu (konsolda kırmızı, tercih hiç yazılmaz) ya da
+    kullanıcının SEÇMEDİĞİ modeli diske tercih olarak yazıyordu — ikincisi
+    daha sessiz ve daha kötü.
+
+    `id` katalogda yokken çağrılmak gerçek bir yol: `secilecek` liste boşken
+    boş dize döndürüyor ve settings.js onu doğrudan `applyChatModel`e veriyor.
+
+    Görsel şeridinde bu tuzak YOK çünkü onun dinleyicisi `$("model").value`yu
+    okuyor — yani mandal simetri değil, iki dinleyicinin ayrıştığı yer.
+    """
+    js = _js("core.js")
+    govde = js.split("function applyChatModel(", 1)[1].split("\n}\n", 1)[0]
+    assert "return null" in govde, (
+        "applyChatModel uygulanan modeli döndürmüyor — dinleyici erken "
+        "çıkışı ayırt edemez")
+    # İKİNCİ YARI ve BU İDDİA ÖLÇÜLMÜŞ BİR KIRILMADAN GELİYOR: dönüş
+    # eklenirken başarı yolundaki `return model;` unutuldu, fonksiyon
+    # `undefined` döndürdü ve dinleyici HER SEFERİNDE erken çıktı — şerit
+    # doğru modeli gösteriyor, tercih diske hiç yazılmıyor, konsolda tek hata
+    # yok. Yalnız `return null`ı aramak bunu yeşil geçiyordu; kırılma gerçek
+    # Chromium koşumunda görüldü (POST /api/prefs hiç gitmiyor).
+    assert "return model;" in govde, (
+        "applyChatModel başarı yolunda modeli döndürmüyor — dinleyici her "
+        "çağrıda erken çıkar ve tercih SESSİZCE yazılmaz")
+    blok = js.split('$("chat-model").addEventListener', 1)[1].split("});", 1)[0]
+    assert "if (!model) return;" in blok, "dinleyicide erken çıkış kapısı yok"
+    # İDDİA DİNLEYİCİYE ÖZGÜ, dosyanın tamamına DEĞİL: `goBlockReason` aynı
+    # küresel değişkeni okuyor ve orada bu doğru — kendi `null` kapısı var
+    # ("Sohbet modeli seçilmedi."). Dosya genelinde yasaklamak o kapıyı da
+    # kırardı, yani mandal gürültüye dönüşürdü.
+    assert "currentChatModel." not in blok, (
+        "dinleyici küresel değişkeni dereferans ediyor: erken çıkışta "
+        "TypeError ya da kullanıcının seçmediği modelin diske yazılması")

@@ -34,13 +34,22 @@ import providers
 # ayarlayıp diğerini unutmanın kapısı olurdu.
 
 
-def map_error(status_code: int, body: dict | None) -> str:
+def map_error(status_code: int, body: dict | list | None, *,
+              wire_model: str | None = None) -> str:
     """HTTP durumunu Türkçe mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
 
     `providers.detail_of` gövde şeklini çözüyor (dört sağlayıcı da
     `{"error": {"message": …}}` kullanıyor), ama metinler sağlayıcıya özgü
     kalmak zorunda: "Azure yetkilendirme hatası" diyen bir mesaj OpenAI
     anahtarını kurcalayan kullanıcıyı yanlış forma yönlendirir.
+
+    404 ARTIK MODELİ SÖYLÜYOR ve bu dal bu dosyanın en çok işe yarayan yeri
+    olabilir: `dall-e-3`'ün API'den kalkması tam olarak burada görünüyordu ve
+    o gün kullanıcı "OpenAI isteği başarısız (HTTP 404)" okuyordu — hangi
+    modelin kalktığını söylemeyen, dolayısıyla kullanıcıyı anahtarını
+    kurcalamaya iten bir metin. Katalogdaki her tel adı bir gün kalkacak
+    (`openai_chat.map_error`ın ve `gemini_client.map_error`ın 404 dallarının
+    aynı gerekçesi); o günün maliyeti, adı yazmakla bir cümleye düşüyor.
     """
     detail = providers.detail_of(body)
     if status_code == 401:
@@ -52,7 +61,14 @@ def map_error(status_code: int, body: dict | None) -> str:
     if status_code == 429:
         return ("OpenAI istek limiti aşıldı (429): biraz bekleyip tekrar dene. "
                 "Faturalandırma limitin de dolmuş olabilir.")
-    if status_code == 400 and "content" in detail.lower():
+    if status_code == 404:
+        return ("OpenAI bu modeli tanımıyor (404)"
+                + (f": {wire_model}." if wire_model else ".")
+                + " Model kalkmış olabilir — composer'daki şeritten başka bir "
+                "model seç." + (f" {detail}" if detail else ""))
+    # ÇIPLAK `"content" in detail` DEĞİL: `Invalid value for 'content'` de 400
+    # ve o bir şema hatası — bkz. providers.is_content_policy.
+    if status_code == 400 and providers.is_content_policy(detail):
         return "İçerik politikası reddi: prompt OpenAI tarafından engellendi."
     return f"OpenAI isteği başarısız (HTTP {status_code})." + (f" {detail}" if detail else "")
 
@@ -157,7 +173,13 @@ def _post(endpoint, headers, *, client, read, json=None, data=None, files=None):
             body = resp.json()
         except Exception:
             body = None
-        raise ac.ImageError(map_error(resp.status_code, body))
+        # Tel adı GÖVDEDEN: `generate` JSON, `edit` multipart `data`
+        # gönderiyor ve ikisinde de `model` alanı var. İmzaya eklemek aynı
+        # değeri iki yoldan taşımak olurdu (`gemini_client._post`un aynı
+        # gerekçesi).
+        raise ac.ImageError(map_error(
+            resp.status_code, body,
+            wire_model=(json or data or {}).get("model")))
     return resp.json()
 
 

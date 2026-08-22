@@ -207,3 +207,54 @@ def test_HATA_TURU_chat_client_ile_AYNI_SINIF():
     gövdeyi JSON olarak ayrıştıramaz ve kullanıcı yalnızca "Hata (500)" görür."""
     with pytest.raises(cc.ChatError):
         _cagir(OPENAI, CREDS, FakeResponse(500, None))
+
+
+# ── 400'ün iki anlamı SOHBET tarafında da ──────────────────────────────
+
+
+def test_GEMININ_gecersiz_anahtari_400_ile_geliyor_ve_ANLAŞILIYOR():
+    """ÖLÇÜLDÜ, canlı uçtan: `/v1beta/openai/chat/completions` geçersiz
+    anahtara 401 DEĞİL 400 döndürüyor ve gövdesi TEK ÖĞELİK DİZİ.
+
+    Anahtar metni yalnız 401 dalındayken Gemini sohbeti çıplak bir
+    "HTTP 400" ile bitiyordu: `gemini_client`in GÖRSEL tarafında bilerek
+    yazılan ayrım (geçersiz anahtar ↔ desteklenmeyen jeton) SOHBET tarafında
+    yoktu — yani kullanıcı yanlış anahtarı yeniden kaydetmesi gerektiğini
+    hiçbir yerden okumuyordu.
+    """
+    govde = [{"error": {"code": 400, "status": "INVALID_ARGUMENT",
+                        "message": "API key not valid. Please pass a valid "
+                                   "API key."}}]
+    with pytest.raises(cc.ChatError) as e:
+        _cagir(GEMINI, GEMINI_CREDS, FakeResponse(400, govde))
+    mesaj = str(e.value)
+    assert "anahtarı geçersiz" in mesaj
+    assert "Ayarlar" in mesaj, "kullanıcıya yapacağı iş söylenmiyor"
+    # Sağlayıcı adı KATALOGDAN: "OpenAI anahtarı geçersiz" diyen bir metin
+    # Gemini kutusunu arayan kullanıcıyı yanlış forma yönlendirirdi.
+    assert "OpenAI" not in mesaj and "Azure" not in mesaj
+
+
+def test_ANAHTAR_hatasi_ICERIK_reddi_olarak_okunmuyor():
+    """SIRA mandalı: anahtar dalı içerik dalından ÖNCE. Ters sırada kullanıcı
+    "mesajın engellendi" okur ve çalışan promptunu değiştirmeye çalışır."""
+    govde = {"error": {"message": "API key not valid; content field ignored"}}
+    with pytest.raises(cc.ChatError) as e:
+        _cagir(GEMINI, GEMINI_CREDS, FakeResponse(400, govde))
+    assert "anahtarı geçersiz" in str(e.value)
+    assert "İçerik politikası" not in str(e.value)
+
+
+def test_SEMA_hatasi_ICERIK_reddi_olarak_gosterilmiyor():
+    """ÖLÇÜLMÜŞ YANLIŞ POZİTİF: ölçüt çıplak `"content" in detail` iken
+    Google'ın alan adı hatası (`Unknown name "content"`) "İçerik politikası
+    reddi" diye gösteriliyordu — kullanıcı engellenmemiş bir mesajı yeniden
+    yazmaya çalışıyor, gerçek sebep hiçbir yerde görünmüyordu."""
+    govde = [{"error": {"code": 400, "status": "INVALID_ARGUMENT",
+                        "message": 'Unknown name "content": Cannot find field.'}}]
+    with pytest.raises(cc.ChatError) as e:
+        _cagir(GEMINI, GEMINI_CREDS, FakeResponse(400, govde))
+    mesaj = str(e.value)
+    assert "İçerik politikası" not in mesaj
+    # Gerçek sebep KAYBOLMUYOR: geliştirici de kullanıcı da metni okuyabiliyor.
+    assert "Cannot find field" in mesaj

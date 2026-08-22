@@ -68,7 +68,7 @@ def _label(m: catalog.ChatModel) -> str:
     return cred.label if cred else m.provider
 
 
-def map_error(status_code: int, body: dict | None, *, label: str,
+def map_error(status_code: int, body: dict | list | None, *, label: str,
               wire_model: str) -> str:
     """HTTP durumunu Türkçe mesaja çevirir. `chat_client.map_error`'ın ikizi.
 
@@ -79,6 +79,15 @@ def map_error(status_code: int, body: dict | None, *, label: str,
     yok" ve o durumun tek çözümü Ayarlar'dan başka bir model seçmek. Azure'ın
     404'ü ise dağıtım adı ayrışmasını anlatıyor — iki metnin birleşmesi
     kullanıcıyı yanlış yere yönlendirirdi.
+
+    GEÇERSİZ ANAHTAR BU UÇTA 401 DEĞİL 400 OLABİLİR ve bu ölçülmüş bir olgu:
+    Gemini'nin OpenAI-uyumlu ucu (`/v1beta/openai/chat/completions`) geçersiz
+    anahtara `[{"error": {"code": 400, "status": "INVALID_ARGUMENT",
+    "message": "API key not valid…"}}]` döndürüyor — canlı çağrıyla
+    doğrulandı. Anahtar metni yalnız 401 dalındayken Gemini sohbeti çıplak bir
+    "HTTP 400" ile bitiyordu: `gemini_client`in GÖRSEL tarafında bilerek
+    yazılan ayrım, SOHBET tarafında yoktu. Yüklem paylaşılıyor
+    (`providers.is_invalid_key`) çünkü ayrışan tek şey buradaki `label`.
     """
     detail = providers.detail_of(body)
     if status_code == 401:
@@ -94,7 +103,20 @@ def map_error(status_code: int, body: dict | None, *, label: str,
     if status_code == 429:
         return (f"{label} istek limiti aşıldı (429): biraz bekleyip tekrar "
                 "dene. Faturalandırma limitin de dolmuş olabilir.")
-    if status_code == 400 and "content" in detail.lower():
+    if status_code == 400 and providers.is_invalid_key(detail):
+        # SIRA ÖNEMLİ: içerik dalından ÖNCE. Google'ın anahtar hatası
+        # `INVALID_ARGUMENT` durumuyla geliyor ve aynı gövdede "content"
+        # geçen bir alan adı da bulunabiliyor — ters sırada anahtar hatası
+        # "içerik reddi" diye okunurdu, yani kullanıcı çalışan promptunu
+        # değiştirmeye çalışırdı.
+        return (f"{label} API anahtarı geçersiz (400): Ayarlar'dan yeniden "
+                "kaydet." + (f" {detail}" if detail else ""))
+    # ÇIPLAK `"content" in detail` DEĞİL ve bu ölçülmüş bir yanlış pozitif:
+    # Google şema hatasını `Unknown name "content": Cannot find field.` diye
+    # anlatıyor ve o dize "İçerik politikası reddi" olarak gösteriliyordu —
+    # kullanıcı engellenmeyen bir mesajı yeniden yazmaya çalışırdı
+    # (bkz. providers.is_content_policy).
+    if status_code == 400 and providers.is_content_policy(detail):
         return f"İçerik politikası reddi: mesaj {label} tarafından engellendi."
     return (f"{label} sohbet isteği başarısız (HTTP {status_code})."
             + (f" {detail}" if detail else ""))

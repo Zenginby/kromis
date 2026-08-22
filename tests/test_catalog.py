@@ -412,3 +412,21 @@ def test_KISA_adlar_LISTE_ICINDE_tekil(models):
     """
     adlar = list(catalog.short_labels(models).values())
     assert len(adlar) == len(set(adlar)), f"eşadlı satır: {adlar}"
+
+
+@pytest.mark.parametrize(
+    "models", [catalog.IMAGE_MODELS, catalog.CHAT_MODELS],
+    ids=["gorsel", "sohbet"])
+def test_KATALOGDAKI_her_saglayicinin_MARKA_ADI_yazili(models):
+    """`PROVIDER_LOGOS` mandalının kardeşi ve aynı sessizliği kapatıyor.
+
+    Marka adı eksik olan bir sağlayıcı hata vermiyor — etiket AYNEN dönüyor,
+    yani önek ekranda kalıyor ve satır işaretin yanında markayı ikinci kez
+    yazıyor. Tam olarak bu turun düzelttiği kusur, yalnız bir sonraki
+    sağlayıcıda. Görülebilir tek yer burası.
+    """
+    eksik = {m.provider for m in models if m.provider not in catalog.PROVIDER_BRANDS}
+    assert not eksik, (
+        "marka adı yazılmayan sağlayıcı: " + ", ".join(sorted(eksik))
+        + ". catalog.PROVIDER_BRANDS'e bir satır gerekiyor, yoksa şerit "
+          "satırında marka öneki ekranda kalır.")

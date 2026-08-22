@@ -35,6 +35,7 @@ tests/test_android_packaging.py.
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 
@@ -679,12 +680,23 @@ def provider_logo(provider: str) -> str | None:
     return PROVIDER_LOGOS.get(provider)
 
 
+# Marka ile adın arasındaki ayraç. Etiketlerin yazım kuralı bu ve `_drop_brand`
+# aynı dizeyi hem ARIYOR hem UZUNLUĞUNU kullanıyor: iki yerde ayrı yazılmış
+# olsaydı ("· " ile " · ") kırpma bir karakter kayar ve ad boşlukla başlardı.
+_BRAND_SEP = " · "
+
+
 def _drop_brand(label: str, provider: str) -> str:
-    onek = PROVIDER_BRANDS.get(provider)
-    return label[len(onek) + 3:] if onek and label.startswith(f"{onek} · ") else label
+    marka = PROVIDER_BRANDS.get(provider)
+    if not marka:
+        return label
+    onek = f"{marka}{_BRAND_SEP}"
+    return label[len(onek):] if label.startswith(onek) else label
 
 
-def short_labels(models) -> dict[str, str]:
+def short_labels(
+    models: Sequence[ImageModel] | Sequence[ChatModel],
+) -> dict[str, str]:
     """Model id → ŞERİTTE gösterilecek ad: marka öneki düşürülmüş `label`.
 
     ÇAKIŞMA KURALI tek istisna ve ölçülmüş bir kırılmayı kapatıyor: önek

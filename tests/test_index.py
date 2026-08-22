@@ -3171,6 +3171,19 @@ def test_ISARET_cipin_tiklamasini_YUTMUYOR():
         ".model-chip'in sol dolgusu işaret için açılmamış — metin üstüne biner")
 
 
+def test_SARMALAYICI_hidden_yazildiginda_GERCEKTEN_gizleniyor():
+    """`display` atayan bir yazar kuralı UA'nın `[hidden]`ını EZİYOR.
+
+    `.model-pick` `display: inline-flex` atıyor, yani sarmalayıcıya `hidden`
+    yazan bir sonraki tur şeridi gizlediğini SANIR ve şerit yerinde kalır.
+    Depoda bu dersin iki kez ödenmiş hâli var (`#chat-model[hidden]`,
+    `.model-note[hidden]`); üçüncüsü tek satır.
+    """
+    css = _js("style.css")
+    assert ".model-pick[hidden] { display: none; }" in css, (
+        "sarmalayıcının [hidden] mandalı yok — `hidden` sessizce işlemez")
+
+
 def test_SERIT_SATIRI_marka_onekini_TEKRARLAMIYOR():
     """İşaret markayı söylüyorsa etiket de söylememeli: satır `short_label` yazıyor.
 

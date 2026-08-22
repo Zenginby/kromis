@@ -361,6 +361,12 @@ body {
    bütün çocukları birlikte genişler ve sayfa yatay kayar (ölçüldü; mandal
    tests/test_mobile.py). */
 .model-pick { position: relative; display: inline-flex; min-width: 0; max-width: 100%; }
+/* `display` ATAYAN her yazar kuralının ödediği bedel: UA'nın
+   `[hidden] { display: none }` kuralını eziyor, yani `hidden` yazılan
+   sarmalayıcı GİZLENMEZDİ. Bugün kimse buraya `hidden` yazmıyor — ama
+   `#chat-model[hidden]` ve `.model-note[hidden]` satırları tam olarak bu dersin
+   iki kez ödenmiş hâli, üçüncüsü bir satır. */
+.model-pick[hidden] { display: none; }
 /* Sol dolgunun İÇİNE oturuyor: `.model-chip`in `padding-left`i işaret için
    açıldı (10px → 30px), yani metin işaretin üstüne binmiyor. Dikey ortalama
    `translateY` ile — satır yüksekliği yazı ölçeğiyle değişiyor (Android WebView
@@ -419,9 +425,10 @@ body:has(.sheet.open) .scrim { display: block; }
 #composer[data-mode="image"] #chat-model-pick,
 #composer[data-mode="director"] #model-pick,
 #composer[data-mode="director"] #run-cost { display: none; }
-/* `#chat-model` bugün HTML'de `hidden`: seçeneklerini dolduran kod ve onu tel
-   üzerine çıkaracak yönlendirme henüz yok (bkz. static/index.html'deki not).
-   Bu satır `.model-note[hidden]` ile AYNI derse dayanıyor: `display` atayan
+/* `#chat-model` ARTIK HTML'de `hidden` DEĞİL (seçeneklerini dolduran kod v0.7'de
+   geldi; bu gerekçe onunla birlikte güncellenmemişti). Satır yine de duruyor:
+   şerit bir gün mod ekseninin dışında da gizlenebilir ve o gün
+   `.model-note[hidden]` ile AYNI ders geçerli — `display` atayan
    bir yazar kuralı UA'nın `[hidden] { display: none }` kuralını eziyor.
    Bugün `.model-chip` `display` atamıyor, yani `hidden` tek başına çalışıyor —
    ama o gün geldiğinde gizli seçici Yönetmen modunda sessizce geri gelirdi. */

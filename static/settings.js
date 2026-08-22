@@ -22,6 +22,10 @@ function applyConfigured(s) {
   // `prefs` HENÜZ okunmadıysa (ilk çizim) sunucunun varsayılanı kullanılıyor;
   // loadPrefs sonra gelip kullanıcının tercihini uyguluyor.
   applyModels(s, seciliModelTercihi);
+  // Yönetmenin şeridi AYNI yanıttan: ayrı bir uçtan çekilse ikisi ayrı
+  // zamanlarda gelir ve seçici bir an "hepsi kullanılabilir" gösterip sonra
+  // fikir değiştirirdi (`guncelleme` alanı için yazılı olan gerekçe).
+  applyChatModels(s, seciliSohbetModeliTercihi);
   // `#go` artık BURADA yazılmıyor: tek yazar core.js'teki syncGoGate ve o,
   // yapılandırma + mod + seçili modelin durumunu BİRLİKTE görüyor. Öncesinde
   // dört ayrı yerden yazılıyordu ve `!configured` yalnız AZURE'u ölçtüğü için
@@ -36,9 +40,17 @@ function applyConfigured(s) {
   // `guncelleme` ile AYNI gerekçeye sahip: POST /api/settings yanıtı GET'ten
   // daha dar olabilir ve guard olmadan "Kaydet"ten sonra durumlar silinirdi.
   if (s && s.providers !== undefined) {
-    $("set-openai-key").placeholder = s.providers.openai
-      ? "Kayıtlı · değiştirmek için yeni anahtar yaz"
-      : "sk-…";
+    // Yer tutucu "kayıtlı mı"yı SÖYLÜYOR, anahtarı göstermiyor: yalnızca-yazılır
+    // formda boş bir kutu yoksa kullanıcı anahtarını hiç kaydetmediğini sanır.
+    // Tablo halinde: her sağlayıcının kimlik id'si + boş hâlin yer tutucusu.
+    for (const [alan, kimlik, bos] of [
+      ["set-openai-key", "openai", "sk-…"],
+      ["set-gemini-key", "gemini", "AIza…"],
+    ]) {
+      $(alan).placeholder = s.providers[kimlik]
+        ? "Kayıtlı · değiştirmek için yeni anahtar yaz"
+        : bos;
+    }
     renderProviderStatus(s.providers);
   }
 
@@ -134,6 +146,7 @@ function renderProviderStatus(providers) {
   const satirlar = [
     ["azure_image", "Azure OpenAI"],
     ["openai", "OpenAI"],
+    ["gemini", "Google Gemini"],
   ];
   $("provider-status").replaceChildren(...satirlar.map(([id, ad]) => {
     const li = document.createElement("li");
@@ -147,9 +160,36 @@ function renderProviderStatus(providers) {
 /** Seçilen sağlayıcının alan grubunu gösterir, ötekileri gizler. */
 function syncProviderFields() {
   const secili = $("set-provider").value;
-  for (const p of ["azure", "openai"]) {
+  for (const p of ["azure", "openai", "gemini"]) {
     $(`prov-${p}`).hidden = p !== secili;
   }
+  syncChatDeployField(secili);
+}
+
+/** Dağıtım adı kutusu YALNIZCA onu isteyen sağlayıcıda görünüyor.
+ *
+ * Kutu öncesinde koşulsuzdu: OpenAI ya da Gemini anahtarı girmeye gelen
+ * kullanıcı, o sağlayıcılarda karşılığı OLMAYAN bir alan görüyordu ("dağıtım"
+ * Azure'a özgü — ötekilerde model adı katalogda yazılı). Yanlış bir soru,
+ * üstelik 360px'lik bir slide-over'da ödenmiş yer.
+ *
+ * KAPI KATALOGDAN türetiliyor: `chat_models[].needs_deployment` bayrağı
+ * `catalog.chat_needs_deployment`ten geliyor ve o da tek bir olguya bakıyor —
+ * modelin adı ortamdan mı okunuyor. Sağlayıcı adını burada LİTERAL saymak,
+ * adı ortamdan okunan ikinci bir sağlayıcı eklendiği gün kutunun sessizce
+ * görünmez kalması demekti.
+ *
+ * FAIL-OPEN: katalog henüz gelmediyse (ilk çizim, ya da `/api/settings`
+ * başarısız) kutu GÖRÜNÜYOR. Tersi, ayar durumu alınamayan bir kullanıcının
+ * dağıtım adını hiç giremeyeceği anlamına gelirdi — yani bugün çalışan tek
+ * sağlayıcı kurtarılamaz olurdu.
+ */
+function syncChatDeployField(provider) {
+  const isteyen = chatModels.length
+    ? chatModels.some((m) => m.needs_deployment && m.provider === provider)
+    : true;
+  $("chat-deploy-group").hidden = !isteyen;
+  $("chat-no-deploy-note").hidden = isteyen;
 }
 
 $("set-provider").addEventListener("change", syncProviderFields);
@@ -158,6 +198,7 @@ function openSettings(provider) {
   // Gizli alanların HEPSİ temizleniyor (write-only): kayıtlı anahtar hiçbir
   // zaman forma dolmuyor, o yüzden boş kutu "sildim" değil "dokunmadım"dır.
   $("set-openai-key").value = "";
+  $("set-gemini-key").value = "";
   // Belirli bir sağlayıcıya derin bağlantı: #model-settings-link buradan
   // geliyor, "anahtar yok" uyarısı doğrudan doğru gruba açsın.
   if (provider) $("set-provider").value = provider;
@@ -203,7 +244,8 @@ async function saveSettings() {
       // grubun açık olduğuna göre dallanmasına gerek yok.
       body: JSON.stringify({ api_key, base_url,
                              chat_deployment: $("set-chat-deployment").value.trim(),
-                             openai_api_key: $("set-openai-key").value }),
+                             openai_api_key: $("set-openai-key").value,
+                             gemini_api_key: $("set-gemini-key").value }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -212,6 +254,7 @@ async function saveSettings() {
     applyConfigured(await res.json());
     $("set-key").value = "";
     $("set-openai-key").value = "";
+    $("set-gemini-key").value = "";
     st.textContent = "Kaydedildi.";
     setTimeout(closeSettings, 550);
   } catch (e) {
@@ -263,17 +306,44 @@ $("theme-picker").addEventListener("change", (e) => {
  * tercih gelince düzeltiliyor; tercih önce gelirse burada bekliyor.
  */
 let seciliModelTercihi = "";
+/** Yönetmenin karşılığı. AYRI değişken, aynı gerekçe: iki uç iki farklı
+ *  zamanda dönüyor ve hangisi önce gelirse gelsin doğru sonuç çıkmalı.
+ *
+ *  `chat_provider` BURADA TUTULMUYOR: model id'si sağlayıcıyı zaten belirliyor
+ *  (`chat_models[].provider`) ve ikinci bir değişken ikisinin ayrışmasına kapı
+ *  açardı — diskte "azure" + OpenAI modeli gibi bir çift `prefs.update`
+ *  tarafından zaten reddediliyor. */
+let seciliSohbetModeliTercihi = "";
 
 async function loadModelPref() {
   try {
     const res = await fetch("/api/prefs");
     if (!res.ok) return;
     const p = await res.json();
+    // Sohbet tercihi GÖRSELDEN BAĞIMSIZ okunuyor: `image_model` boşsa erken
+    // dönmek, sohbet seçimini de sessizce yutardı.
+    if (p.chat_model) {
+      seciliSohbetModeliTercihi = p.chat_model;
+      if (chatModels.length) {
+        applyChatModel(secilecek(chatModels, seciliSohbetModeliTercihi, ""));
+      }
+    }
     if (!p.image_model) return;
     seciliModelTercihi = p.image_model;
     // Katalog zaten geldiyse tercihi ŞİMDİ uygula; gelmediyse applyModels
     // yukarıdaki değişkeni okuyacak.
-    if (imageModels.length) applyModel(seciliModelTercihi, { announce: false });
+    //
+    // TERCİH DOĞRUDAN UYGULANMIYOR, `secilecek`ten geçiyor: bu uç `/api/settings`
+    // ile YARIŞIYOR ve buraya `applyModels`ten SONRA gelirse anahtarı olmayan
+    // bir tercihi geri yazardı — yani filtrenin kararını sessizce iptal
+    // ederdi. Gerçek chromium koşumunda ölçüldü: yalnız Gemini anahtarı olan
+    // kullanıcı, `prefs`in Azure olan VARSAYILANI yüzünden ölü bir #go
+    // düğmesiyle karşılanıyordu. Varsayılan argüman boş: bu çağrının
+    // varsayılan modeli dayatacak bir işi yok, sunucunun kararı zaten
+    // uygulanmış durumda.
+    if (imageModels.length) {
+      applyModel(secilecek(imageModels, seciliModelTercihi, ""), { announce: false });
+    }
   } catch {
     // Tercih okunamadı: sunucunun varsayılan modeli geçerli kalıyor. Sessiz —
     // kullanıcı üretebiliyor, yalnız seçimi hatırlanmamış oluyor.

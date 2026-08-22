@@ -190,3 +190,152 @@ def test_adressiz_kimligin_varsayilan_adresi_var():
         if cred.id.startswith("azure"):
             continue    # Azure'da adres FORMDA sorulur, varsayılanı yok
         assert cred.default_base_url, f"{cred.id}: ne varsayılan adres ne form alanı"
+
+
+# ── Varsayılan jetonlar ve etiketler ───────────────────────────────────
+
+
+@pytest.mark.parametrize("m", catalog.IMAGE_MODELS, ids=lambda m: m.id)
+def test_varsayilan_jetonlar_MODELIN_kumesinde(m):
+    """`default_size`/`default_quality` beyan edilen kümeden OLMAK zorunda.
+
+    v0.6'ya kadar ölçülmeyen bir boşluktu ve bedeli sessiz: arayüz `fillAxis`
+    ile o değeri arıyor, bulamıyor ve "model bu ayarları desteklemiyor,
+    varsayılana düşüldü" diyor — yani modelin KENDİ varsayılanı için düşme
+    uyarısı basıyor. Gemini girdileri `default_size`ı açıkça yazan ilk
+    girdiler olduğu için kapı burada kuruldu.
+    """
+    assert catalog.default_size_of(m) in m.sizes, (
+        f"{m.id}: varsayılan boyut kümesinde yok")
+    assert catalog.default_quality_of(m) in m.qualities, (
+        f"{m.id}: varsayılan kalite kümesinde yok")
+
+
+@pytest.mark.parametrize("m", catalog.IMAGE_MODELS, ids=lambda m: m.id)
+def test_beyan_edilen_her_jetonun_TURKCE_etiketi_var(m):
+    """Bilinmeyen jetonun etiketi kendisi olur (`geometry_of`) ve bu bilinçli
+    bir SAĞLAMLIK kararı — ama KENDİ katalogumuzdaki bir jetonun etiketsiz
+    kalması ayrı bir şey: seçicide "9:16" satırı Azure'ın "◼ 1:1" satırıyla
+    aynı hizada durmuyor ve kalite ekseninde çıplak jeton ("2K") Türkçe
+    listenin ortasında yabancı görünüyor.
+    """
+    for jeton in m.sizes:
+        assert jeton in catalog.GEOMETRY_LABELS, (
+            f"{m.id}: `{jeton}` GEOMETRY_LABELS'ta yok")
+    for jeton in m.qualities:
+        assert jeton in catalog.QUALITY_LABELS, (
+            f"{m.id}: `{jeton}` QUALITY_LABELS'ta yok")
+
+
+def test_gemini_oranlari_AZURE_nun_uc_boyutunun_karsiligini_tasiyor():
+    """Model değiştirmek ORANI TAŞIMALI, varsayılana düşmemeli.
+
+    core.js'in `fillAxis` fonksiyonunun ikinci kademesi `ratio` üzerinden
+    çalışıyor: Azure'ın `1024x1536`ı da Gemini'nin `2:3`ü de aynı oranı
+    bildiriyorsa geçiş SESSİZ oluyor. Bir oran eksik kalırsa kullanıcı model
+    değiştirdiğinde sebepsiz bir "varsayılana düşüldü" uyarısı görür.
+    """
+    azure = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
+    azure_oranlari = {catalog.geometry_of(s)[1] for s in azure.sizes}
+    gemini_oranlari = {catalog.geometry_of(s)[1] for s in catalog.ASPECT_RATIOS}
+
+    assert azure_oranlari <= gemini_oranlari, (
+        "Azure'dan Gemini'ye geçişte karşılığı olmayan oran: "
+        f"{sorted(azure_oranlari - gemini_oranlari)}")
+
+
+def test_oran_jetonlari_TEK_kaynaktan_geliyor():
+    """İki Gemini girdisi aynı demeti paylaşıyor: elle iki kez yazmak, birine
+    oran ekleyip diğerini unutmanın kapısı olurdu."""
+    gemini = [m for m in catalog.IMAGE_MODELS if m.provider == "gemini"]
+    assert gemini, "katalogda Gemini modeli yok"
+    for m in gemini:
+        assert m.sizes is catalog.ASPECT_RATIOS, (
+            f"{m.id}: oranları kopyalamış, ASPECT_RATIOS'u paylaşmıyor")
+
+
+# ── Kalkmış modeller ───────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("olu", ["dall-e-3", "dall-e-2"])
+def test_KALKMIS_model_adlari_katalogda_yok(olu):
+    """Ölmüş bir girdiyi katalogda tutmanın bedeli ÖLÇÜLDÜ: kullanıcı
+    seçebiliyor, üretim 404 alıyor ve hata "model bulunamadı" diyor — yani
+    kullanıcı hatayı kendi anahtarında arıyor.
+
+    `dall-e-2`/`dall-e-3` 12 Mayıs 2026'da OpenAI API'sinden kalktı. Bu test
+    girdinin geri EKLENMESİNE karşı bir tripwire; `wire_model`e bakıyor çünkü
+    kimliği (`openai-dall-e-3`) yeniden adlandırmak kapıyı açık bırakırdı.
+    """
+    assert olu not in {m.wire_model for m in catalog.IMAGE_MODELS}
+
+
+# ── Sohbet modelleri (v0.7: yönetmen çoklu sağlayıcı) ──────────────────
+
+
+def test_varsayilan_sohbet_modeli_listenin_basinda():
+    """Sıra seçicinin sırası ve varsayılan başta durmalı — görsel tarafın kuralı.
+
+    Ayrıca somut bir güvence: varsayılanı listenin ortasına almak, kayıtlı
+    Azure kullanıcısının yönetmenini sessizce başka bir sağlayıcıya (yani başka
+    bir faturaya) taşımanın en sessiz yolu.
+    """
+    assert catalog.CHAT_MODELS[0].id == catalog.DEFAULT_CHAT_MODEL
+    assert catalog.CHAT_MODELS[0].provider == catalog.DEFAULT_CHAT_PROVIDER
+
+
+@pytest.mark.parametrize("m", catalog.CHAT_MODELS, ids=lambda m: m.id)
+def test_sohbet_modelinin_adi_TEK_kaynaktan_geliyor(m):
+    """`wire_model` ile `wire_from_env` AYNI ANDA dolu olamaz.
+
+    İkisi de doluysa hangisinin kazandığı `chat_providers.wire_model_of`'un
+    satır sırasına kalır ve o sıra bir gün değişirse kullanıcının Ayarlar'a
+    yazdığı dağıtım adı sessizce yok sayılır — istek 404 döner ve sebebi
+    görünmez olur. Kural tek cümle: adı ya katalog bilir ya kullanıcı.
+    """
+    assert bool(m.wire_model) != bool(m.wire_from_env), (
+        f"{m.id}: adın kaynağı belirsiz "
+        f"(wire_model={m.wire_model!r}, wire_from_env={m.wire_from_env!r})")
+
+
+@pytest.mark.parametrize("m", catalog.CHAT_MODELS, ids=lambda m: m.id)
+def test_dagitim_adi_KAPISI_ortamdan_okumayla_ayni_sey(m):
+    """`chat_needs_deployment` tek bir olguya bakıyor: ad ortamdan mı okunuyor.
+
+    Ayarlar formundaki dağıtım kutusunun kapısı bu bayrak (bkz. settings.js
+    `syncChatDeployField`). İkinci bir ölçüte (sağlayıcı adı, bir `needs_*`
+    alanı) kaymak, kutuyu adı ortamdan okuyan İKİNCİ bir sağlayıcıda sessizce
+    görünmez bırakırdı — yani o sağlayıcı hiç yapılandırılamazdı.
+    """
+    assert catalog.chat_needs_deployment(m) is bool(m.wire_from_env)
+
+
+@pytest.mark.parametrize("m", catalog.CHAT_MODELS, ids=lambda m: m.id)
+def test_sohbet_yolu_CHAT_COMPLETIONS_ucuna_cikiyor(m):
+    """Üç sağlayıcının teli AYNI ve adaptör bunu VARSAYIYOR.
+
+    `openai_chat.complete` gövdeyi `chat_client.build_payload` ile kuruyor ve
+    yanıtı `extract_content` ile okuyor: ikisi de `/chat/completions`
+    sözleşmesi. Başka bir uç (`/v1/messages`, `/v1beta/interactions`) o
+    fonksiyonlarla konuşamaz — Anthropic'in katalogda olmama gerekçesi tam
+    olarak bu. Yol buraya girerse adaptör de yazılmış olmalı.
+    """
+    assert m.endpoint_path.startswith("/"), "yol göreli olamaz (base_url'e ekleniyor)"
+    assert m.endpoint_path.endswith("/chat/completions"), (
+        f"{m.id}: {m.endpoint_path} — OpenAI-uyumlu olmayan bir uç için "
+        "`openai_chat` yerine kendi adaptörü gerekiyor")
+
+
+@pytest.mark.parametrize(
+    "m", catalog.IMAGE_MODELS + catalog.CHAT_MODELS, ids=lambda m: m.id)
+def test_PREVIEW_jetonu_beyan_edilmiyor(m):
+    """"preview" adları geçici: GA olurken kalkıyorlar ve arayüzde seçilebilir
+    bir 404 bırakıyorlar — DALL·E 3'ün katalogdan çıkarılma gerekçesinin
+    aynısı, yalnız daha hızlı olanı.
+
+    Somut örnek bu turda ölçüldü: Gemini'nin Pro sohbet modeli bugün yalnız
+    `gemini-3.1-pro-preview` olarak var, o yüzden katalogda YOK. Kural yazılı
+    olmasa bir sonraki tur onu "en güçlü Gemini" diye eklerdi.
+    """
+    assert "preview" not in (m.wire_model or "").lower(), (
+        f"{m.id}: preview jetonu beyan edilmiş ({m.wire_model})")

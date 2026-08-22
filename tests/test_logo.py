@@ -380,7 +380,7 @@ def test_bindirme_KAYNAGIN_modelini_devraliyor(tmp_path, monkeypatch):
 
     `folder_id`, `palette` ve `prompt_sent` gibi model de kaynaktan
     devralınmalı. Geçilmediğinde kayda VARSAYILAN model yazılıyordu — yani
-    dall-e-3 ile üretilmiş bir görselin logolu hâli geçmişte
+    Nano Banana ile üretilmiş bir görselin logolu hâli geçmişte
     "azure-gpt-image-2" olarak duruyordu ve kredi ledger'ı onu yanlış
     sağlayıcıya yazacaktı.
     """

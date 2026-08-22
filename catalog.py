@@ -143,12 +143,20 @@ class ChatModel:
     credential: str
     wire_model: str = ""
     wire_from_env: str | None = None
+    # Kimliğin `base_url`üne EKLENEN yol. Varsayılan üç girdiden ikisinde
+    # doğru (`https://api.openai.com/v1` + `/chat/completions`, Azure'ın
+    # `…/openai/v1/`si + aynısı); Gemini'de değil — onun OpenAI-uyumlu ucu
+    # `/v1beta/openai/` altında yaşıyor ve kimliğin `base_url`ü görsel
+    # tarafıyla PAYLAŞILIYOR (`/v1beta/interactions`). İki `Credential`
+    # açmak, kullanıcıdan aynı anahtarı iki kez istemek olurdu.
+    endpoint_path: str = "/chat/completions"
     # Anthropic `max_tokens`'ı ZORUNLU tutuyor (yoksa 400). Bu bir ayar değil TEL
     # ZORUNLULUĞU, o yüzden `chat_client.build_payload`'ın "hiç sampling
     # parametresi göndermeme" duruşunun gevşetilmesi DEĞİL — sağlayıcı başına
     # ayrı bir olgu. Minimal-gövde tripwire'ı bu yüzden adaptör BAŞINA yazılıyor,
     # yoksa buradaki meşru `max_tokens` bir gün Azure gövdesine kopyalanır.
     needs_max_tokens: bool = False
+    note: str | None = None       # seçicide gösterilen kısa Türkçe uyarı
     kind: str = "chat"
 
 
@@ -224,8 +232,33 @@ CREDENTIALS: tuple[Credential, ...] = (
 # sayı yazılıyor (bkz. cost_for ve storage.save), katalog işaretçisi değil:
 # tarife değişince geçmiş retroaktif olarak yeniden yazılmasın. İleride gelecek
 # ledger'ın ihtiyacı olan tek şey o alan.
+#
+# ORANTI yine de keyfi değil, tek bir çapaya bağlı: Azure'ın `medium` kalitesi
+# 8 kredi ve o üretim sağlayıcıda ~0,04 USD. Yeni girdilerin kredisi kendi
+# yayınlanmış görsel-başı fiyatının bu çapaya bölünmesiyle yazıldı (Nano Banana
+# Pro 1K/2K ≈ 0,134 USD → 27, 4K ≈ 0,24 USD → 48). Böylece seçicideki kredi
+# etiketi kullanıcıya GERÇEK bir karşılaştırma veriyor: "27 kredi" gerçekten
+# "8 kredi"nin üç katı kadar pahalı.
 
 DEFAULT_IMAGE_MODEL = "azure-gpt-image-2"
+
+# Gemini'nin belgelenmiş ON oranı — `response_format.aspect_ratio` jetonları.
+# İKİ Gemini girdisi de aynı demeti paylaşıyor: elle iki kez yazmak, birine
+# oran ekleyip diğerini unutmanın kapısı olurdu.
+#
+# SIRA arayüzdeki seçicinin sırası: kare → dikey → yatay, her biri artan
+# genişlikte. `default_size="1:1"` bilerek AÇIKÇA yazılı (demetin ilk öğesine
+# güvenmek yerine): sıra bir gün estetik bir kararla değişirse varsayılan
+# üretim oranı sessizce değişmesin.
+#
+# Bilinmeyen bir jeton buraya girerse sağlayıcı 400 döner ve hata Türkçeye
+# çevrilerek görünür — sessiz bir düşme YOK. Bu yüzden liste yalnız
+# BELGELENMİŞ oranları taşıyor, "muhtemelen çalışır" olanları değil.
+ASPECT_RATIOS: tuple[str, ...] = (
+    "1:1",
+    "9:16", "2:3", "3:4", "4:5",
+    "5:4", "4:3", "3:2", "16:9", "21:9",
+)
 
 IMAGE_MODELS: tuple[ImageModel, ...] = (
     ImageModel(
@@ -251,6 +284,57 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
     ),
     # OpenAI DOĞRUDAN (Azure üzerinden değil). Tel formatı Azure'ın aynısı, o
     # yüzden adaptör onun bilinçli ikizi (bkz. openai_client.py'nin başlığı).
+    #
+    # `gpt-image-2` OpenAI tarafının BAŞINDA duruyor çünkü OpenAI'nin görsel
+    # ailesinde bugün tek KALICI ad o: `gpt-image-1` 23 Ekim 2026'da,
+    # `gpt-image-1.5` ve `gpt-image-1-mini` 1 Aralık 2026'da API'den kalkıyor.
+    # Yetenek jetonları Azure ikizinden KOPYALANDI ve bu bilinçli bir alt
+    # sınır: `gpt-image-2` 2K'ya kadar çıkabiliyor ve tek istekte 8 görsel
+    # döndürebiliyor, ama o jetonların OpenAI ucundaki karşılıkları bu depoda
+    # canlı DOĞRULANMADI. Doğrulanmamış bir boyut jetonu beyan etmek arayüzde
+    # seçilebilir bir 400 üretir; eksik beyan etmek yalnızca bir yeteneği
+    # kullanmamak. `max_n` ayrıca `models.MAX_IMAGES_PER_RUN` (4) ile de
+    # sınırlı — 8'e çıkmak o sabiti ve sonuç kaydının `image_ids` tavanını
+    # birden değiştirmek olurdu.
+    #
+    # TEL ADI belgeden doğrulandı (22 Ağustos 2026): `gpt-image-2` API'de bu
+    # adla duruyor. CANLI çağrı YOK ve bu depoda yapılamıyor — sohbet
+    # adlarının notunda yazılı gerekçenin aynısı.
+    #
+    # AYNI BELGE yukarıdaki "alt sınır" kararını da DOĞRULUYOR ve jetonların
+    # uyuşmadığını söylüyor: modelin gerçek ekseni 1K/2K/4K fiyatlanıyor ve
+    # boyut olarak 16'nın katı her `WxH` kabul ediliyor, buradaki
+    # `low/medium/high` + üç sabit boyut ise Azure ikizinden kopyalandı. Yani
+    # beyan edilen küme modelin YAPABİLDİĞİNDEN küçük — eksik beyan yalnızca
+    # bir yeteneği kullanmamak, doğrulanmamış jeton beyan etmek ise arayüzde
+    # seçilebilir bir 400. Genişletme, jetonlar canlı bir anahtarla
+    # sınandığında yapılacak iş.
+    #
+    # Ad bir gün kalktığında maliyet artık bir cümle: 404 metni MODELİN ADINI
+    # söylüyor (`openai_client.map_error`), yani kullanıcı anahtarını
+    # kurcalamak yerine şeritten başka bir model seçiyor.
+    ImageModel(
+        id="openai-gpt-image-2",
+        label="OpenAI · gpt-image-2",
+        provider="openai",
+        wire_model="gpt-image-2",
+        credential="openai",
+        sizes=("1024x1024", "1024x1536", "1536x1024"),
+        qualities=("low", "medium", "high"),
+        default_quality="medium",
+        max_n=4,
+        images_per_request=4,
+        supports_edit=True,
+        max_refs=4,
+        credits=8,
+        credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
+        note="Azure'daki modelin aynısı, kendi OpenAI anahtarınla.",
+    ),
+    # KATALOGDA KALIYOR ama ÖMÜRLÜ: 23 Ekim 2026'da OpenAI API'sinden kalkıyor.
+    # Bugün çalışıyor ve anahtarı yalnız bu modele erişen hesaplar var, o yüzden
+    # silmek erken; notu uyarıyor. O tarihte girdi silinir — `openai-dall-e-3`
+    # gibi ölmüş bir girdinin katalogda kalmasının bedeli ölçüldü: kullanıcı
+    # seçebiliyor, üretim 404 alıyor ve hata "model bulunamadı" diyor.
     ImageModel(
         id="openai-gpt-image-1",
         label="OpenAI · gpt-image-1",
@@ -266,26 +350,76 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=8,
         credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
-        note="gpt-image-2'ye en yakın davranış; referans görselle çalışıyor.",
+        note="23 Ekim 2026'da API'den kalkıyor — gpt-image-2'ye geç.",
     ),
-    # DALL·E 3'ün İKİ kısıtı yetenek sistemini gerçekten sınıyor: tek görsel
-    # üretiyor (max_n=1) ve referans görselle ÇALIŞMIYOR (supports_edit=False).
-    # Kalite sözlüğü de farklı: low/medium/high değil standard/hd.
+    # ── Gemini · Nano Banana ────────────────────────────────────────────
+    #
+    # KATALOGDA İLK KEZ "BOYUT" YERİNE "ORAN" SEÇEN MODEL. `sizes` alanının
+    # docstring'i bu günü tarif ediyordu: jetonlar `WxH` değil `16:9`, ikinci
+    # bir `aspect_ratio` alanı AÇILMIYOR ve `ResultParams.size`ın allowlist'siz
+    # olması sayesinde bu oturumlar kaydedilebilir kalıyor.
+    #
+    # `ratio` alanı sayesinde model değiştirmek ORANI TAŞIYOR: Azure'ın
+    # `1024x1536`ı da Gemini'nin `2:3`ü de aynı `ratio`yu bildiriyor, yani
+    # core.js'in ikinci kademesi sessizce doğru jetona geçiyor. Azure'ın üç
+    # boyutunun ÜÇÜNÜN DE burada karşılığı var (1:1, 2:3, 3:2) — yani model
+    # değiştiren kullanıcı hiçbir zaman "varsayılana düşüldü" uyarısı almıyor.
+    #
+    # KALİTE EKSENİ VAR ve `quality_hidden=False`: eski `gemini-2.5-flash-image`
+    # döneminde bu modelin çözünürlük knob'u yoktu (core.js ve index.html'deki
+    # yorumlar hâlâ o günü anlatıyordu, bu turda düzeltildi). Interactions ucu
+    # `response_format.image_size` alıyor ve 1K/2K/4K GERÇEK bir eksen —
+    # üstelik faturaya dokunuyor, yani `credits_by_quality` tam yerinde.
+    #
+    # `images_per_request=1`: Interactions ucunun görsel tarafında `n` YOK, tek
+    # çağrı tek görsel döndürüyor. `providers.read_timeout_for`ın adet-başına-
+    # ayrı-istek dalı bu modelle ilk gerçek kullanıcısını buluyor (öncesinde
+    # yalnız sentetik testler ölçüyordu).
+    #
+    # TEL ADLARI belgeden doğrulandı (22 Ağustos 2026): `gemini-3.1-flash-image`
+    # (Nano Banana 2) ve `gemini-3-pro-image` (Nano Banana Pro) — ikisi de
+    # "preview" jetonu TAŞIMIYOR, yani sohbet tarafında Pro'yu dışarıda
+    # bırakan kural burada tetiklenmiyor. Uç ve başlık CANLI doğrulandı
+    # (anahtarsız çağrı 404 değil 400 dönüyor); 200 yanıtının şekli
+    # doğrulanmadı (bkz. tests/test_gemini_client.py'nin başlığı).
     ImageModel(
-        id="openai-dall-e-3",
-        label="OpenAI · DALL·E 3",
-        provider="openai",
-        wire_model="dall-e-3",
-        credential="openai",
-        sizes=("1024x1024", "1024x1792", "1792x1024"),
-        qualities=("standard", "hd"),
-        default_quality="standard",
-        max_n=1,
+        id="gemini-nano-banana-2",
+        label="Gemini · Nano Banana 2",
+        provider="gemini",
+        wire_model="gemini-3.1-flash-image",
+        credential="gemini",
+        sizes=ASPECT_RATIOS,
+        default_size="1:1",
+        qualities=("1K", "2K", "4K"),
+        # 2K, 1K ile AYNI fiyatta (ikisi de 1120 jeton) — yani varsayılanı 1K
+        # yapmak bedava çözünürlüğü çöpe atmak olurdu.
+        default_quality="2K",
+        max_n=4,
         images_per_request=1,
-        supports_edit=False,
-        credits=10,
-        credits_by_quality=(("standard", 10), ("hd", 20)),
-        note="Tek görsel üretir ve referans görselle çalışmaz.",
+        supports_edit=True,
+        # Model daha fazlasını kabul ediyor; tavan `app.MAX_EDIT_IMAGES`.
+        max_refs=4,
+        credits=6,
+        credits_by_quality=(("1K", 6), ("2K", 6), ("4K", 12)),
+        note="Oran seçiliyor (piksel değil). Hızlı ve ucuz; düzenleme yapıyor.",
+    ),
+    ImageModel(
+        id="gemini-nano-banana-pro",
+        label="Gemini · Nano Banana Pro",
+        provider="gemini",
+        wire_model="gemini-3-pro-image",
+        credential="gemini",
+        sizes=ASPECT_RATIOS,
+        default_size="1:1",
+        qualities=("1K", "2K", "4K"),
+        default_quality="2K",
+        max_n=4,
+        images_per_request=1,
+        supports_edit=True,
+        max_refs=4,
+        credits=27,
+        credits_by_quality=(("1K", 27), ("2K", 27), ("4K", 48)),
+        note="Metin ve marka tutarlılığında en güçlü Gemini; pahalı.",
     ),
 )
 
@@ -309,22 +443,41 @@ GEOMETRY_LABELS: dict[str, tuple[str, str]] = {
     "1024x1024": ("◼ 1:1", "1:1"),
     "1024x1536": ("▮ 2:3", "2:3"),
     "1536x1024": ("▬ 3:2", "3:2"),
-    # DALL·E 3'ün kendi oranları — 2:3/3:2'ye YAKIN ama aynı değil, o yüzden
-    # ayrı jetonlar. Aynı orana yuvarlamak, core.js'in "aynı oranı taşı"
-    # kademesinde piksel boyutunu sessizce değiştirmek olurdu.
-    "1024x1792": ("▮ 4:7", "4:7"),
-    "1792x1024": ("▬ 7:4", "7:4"),
+    # Gemini'nin oran jetonları (bkz. ASPECT_RATIOS). `ratio` sütunu jetonun
+    # KENDİSİ — `geometry_of`un varsayılanı da bunu verirdi, ama o zaman
+    # `label` da çıplak jeton olurdu ve seçicide Azure'ın glif'li satırlarıyla
+    # aynı hizada durmazdı. Glif YÖNÜ söylüyor: ◼ kare, ▮ dikey, ▬ yatay.
+    #
+    # 1:1 / 2:3 / 3:2 burada AYRICA yazılmıyor: Azure'ın `1024x1024`ü zaten
+    # `ratio="1:1"` bildiriyor, ama JETON farklı ("1024x1024" ≠ "1:1"), yani
+    # ikisi de kendi satırına ihtiyaç duyuyor.
+    "2:3": ("▮ 2:3", "2:3"),
+    "3:2": ("▬ 3:2", "3:2"),
+    "1:1": ("◼ 1:1", "1:1"),
+    "3:4": ("▮ 3:4", "3:4"),
+    "4:3": ("▬ 4:3", "4:3"),
+    "4:5": ("▮ 4:5", "4:5"),
+    "5:4": ("▬ 5:4", "5:4"),
+    "9:16": ("▮ 9:16", "9:16"),
+    "16:9": ("▬ 16:9", "16:9"),
+    "21:9": ("▬ 21:9", "21:9"),
 }
 
 QUALITY_LABELS: dict[str, str] = {
     "low": "Düşük",
     "medium": "Orta",
     "high": "Yüksek",
-    # Kalite ekseni OLMAYAN modellerin sentetik jetonu (bkz. karar Q1) ve
-    # DALL·E 3'ün GERÇEK alt kademesi — aynı jeton iki anlamı birden taşıyor,
-    # ama ikisinde de kullanıcıya "Standart" olarak görünüyor.
+    # Kalite ekseni OLMAYAN modellerin sentetik jetonu (bkz. karar Q1).
+    # Bugün onu taşıyan GERÇEK bir model yok (DALL·E 3 gitti, Gemini'nin
+    # çözünürlük ekseni var); jeton yine de duruyor çünkü `quality_hidden`
+    # sözleşmesinin belgelenmiş karşılığı bu ve testler onu kullanıyor.
     "standard": "Standart",
-    "hd": "HD",
+    # Gemini'nin `image_size` jetonları. Piksel yerine MEGAPİKSEL yazılı:
+    # oran seçen bir modelde "2048x2048" demek yanlış olurdu (2K, seçilen
+    # orana göre farklı piksel boyutlarına çözülüyor).
+    "1K": "1K · 1 MP",
+    "2K": "2K · 4 MP",
+    "4K": "4K · 16 MP",
 }
 
 
@@ -350,6 +503,34 @@ def default_quality_of(m: ImageModel) -> str:
 DEFAULT_CHAT_PROVIDER = "azure"
 DEFAULT_CHAT_MODEL = "azure-deployment"
 
+# SIRA ANLAMLI, görsel modellerindeki gibi: seçicinin sırası bu ve ilk girdi
+# varsayılan. Azure BAŞTA KALIYOR — `DEFAULT_CHAT_MODEL` ve
+# `prefs.DEFAULTS["chat_provider"]` onu gösteriyor; varsayılanı değiştirmek
+# kayıtlı bir kullanıcının yönetmenini sessizce başka bir sağlayıcıya, yani
+# başka bir faturaya taşımak olurdu.
+#
+# ÜÇ SAĞLAYICININ TELİ AYNI: `POST …/chat/completions`, `{"model","messages"}`
+# gövdesi, `choices[0].message.content` yanıtı, `Authorization: Bearer`
+# başlığı. Azure'ın kendi istemcisi (`chat_client`) DURUYOR ve baytları
+# değişmiyor; OpenAI ile Gemini `openai_chat` üzerinden gidiyor (bkz. o
+# dosyanın başlığı: `openai_client`'ın `azure_client`'a duruşunun aynısı).
+# Gemini'nin tek farkı YOL: OpenAI-uyumlu ucu `/v1beta/openai/` altında
+# yaşıyor, `endpoint_path` alanı tam olarak bu yüzden var.
+#
+# ANTHROPIC BİLEREK YOK. Kimliği (`anthropic`) katalogda duruyor ama Ayarlar
+# formunda anahtarını girecek bir kutu yok, yani "anahtarı olan modelleri
+# göster" kuralı onu HER koşulda gizlerdi: girdiyi eklemek, hiç seçilemeyecek
+# bir satır eklemek olurdu. Teli de bu üçünün aynısı değil — `/v1/messages`,
+# `system` ayrı alan, `max_tokens` ZORUNLU (`needs_max_tokens` alanı tam olarak
+# o günü bekliyor) — yani `openai_chat`a da düşmüyor. Sırası: forma anahtar
+# kutusu + kendi adaptörü, birlikte.
+#
+# MODEL ADLARI (`wire_model`) 21 Ağustos 2026'da belgeden doğrulandı:
+# `gpt-5.6-sol` / `-terra` / `-luna` üçlüsü 9 Temmuz 2026'da GA oldu (çıplak
+# `gpt-5.6` alias'ı sol'a gidiyor), `gemini-3.7-flash` 13 Ağustos 2026'da.
+# Gemini'nin Pro'su BİLEREK yok: bugün yalnız `gemini-3.1-pro-preview` var ve
+# bu depoda "preview" jetonu beyan etmiyoruz — kalkmış bir ad, arayüzde
+# seçilebilir bir 404 demek (bkz. DALL·E 3'ün katalogdan çıkarılma gerekçesi).
 CHAT_MODELS: tuple[ChatModel, ...] = (
     ChatModel(
         id=DEFAULT_CHAT_MODEL,
@@ -358,6 +539,46 @@ CHAT_MODELS: tuple[ChatModel, ...] = (
         credential="azure_chat",
         wire_model="",                          # ORTAMDAN okunuyor
         wire_from_env="AZURE_CHAT_DEPLOYMENT",
+        note="Adı Ayarlar'dan giriliyor: Azure'da model değil DAĞITIM var.",
+    ),
+    # GPT-5.6 ailesinin üç kademesi. Üçü de AYNI tel, yalnız `wire_model`
+    # farklı — o yüzden üçü de tek adaptörden geçiyor ve yeni bir kademe
+    # eklemek tek satır. Sıra ucuzdan pahalıya DEĞİL, "önce dengeli olan":
+    # varsayılan seçim faturayı yönetmenin en pahalı kademesine bağlamamalı.
+    ChatModel(
+        id="openai-gpt-5.6-terra",
+        label="OpenAI · GPT-5.6 Terra",
+        provider="openai",
+        credential="openai",
+        wire_model="gpt-5.6-terra",
+        note="Dengeli kademe — günlük brief'ler için varsayılan.",
+    ),
+    ChatModel(
+        id="openai-gpt-5.6-luna",
+        label="OpenAI · GPT-5.6 Luna",
+        provider="openai",
+        credential="openai",
+        wire_model="gpt-5.6-luna",
+        note="En ucuz ve en hızlı kademe; kısa turlar için.",
+    ),
+    ChatModel(
+        id="openai-gpt-5.6-sol",
+        label="OpenAI · GPT-5.6 Sol",
+        provider="openai",
+        credential="openai",
+        wire_model="gpt-5.6-sol",
+        note="Ailenin en güçlüsü ve en pahalısı; uzun, çok kısıtlı brief'ler için.",
+    ),
+    ChatModel(
+        id="gemini-3.7-flash",
+        label="Gemini · 3.7 Flash",
+        provider="gemini",
+        credential="gemini",
+        wire_model="gemini-3.7-flash",
+        # Görsel tarafı `/v1beta/interactions` konuşuyor; sohbet tarafı
+        # OpenAI-uyumlu uçtan gidiyor. Aynı kimlik, iki ayrı yol.
+        endpoint_path="/v1beta/openai/chat/completions",
+        note="Gemini'nin OpenAI-uyumlu ucundan konuşuyor; hızlı ve ucuz.",
     ),
 )
 
@@ -393,6 +614,18 @@ def chat_models_for(provider: str) -> tuple[ChatModel, ...]:
 
 def chat_model_ids() -> tuple[str, ...]:
     return tuple(m.id for m in CHAT_MODELS)
+
+
+def chat_needs_deployment(m: ChatModel) -> bool:
+    """Adı kullanıcının GİRMESİ gereken model mi (Ayarlar'daki dağıtım kutusu).
+
+    Tek ölçüt `wire_from_env`: adı katalogda yazamıyorsak kullanıcıdan almak
+    zorundayız. Ayarlar formu bu bayrağı `/api/settings` → `chat_models[]`
+    üzerinden okuyor ve dağıtım alanını YALNIZCA onu isteyen sağlayıcı
+    seçiliyken gösteriyor — OpenAI/Gemini kullanıcısına doldurulamayan bir
+    kutu göstermek, 360px'lik bir panelde ödenmiş boş yer demekti.
+    """
+    return bool(m.wire_from_env)
 
 
 def chat_provider_ids() -> tuple[str, ...]:

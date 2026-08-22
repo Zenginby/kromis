@@ -41,6 +41,7 @@ Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Andr
 
 ### 🎬 1. Stüdyo Tek Döküm & Prompt Yönetmeni
 * **Türkçe Diyalogdan İngilizce Prompt:** Türkçe fikir anlatımını otomatik olarak optimizasyonu yapılmış İngilizce `gpt-image-2` prompt'una ve teknik ayarlara (`size`, `quality`, `n`) çevirir.
+* **Çoklu Sohbet Sağlayıcısı:** Yönetmen artık Azure AI Foundry dağıtımının yanında OpenAI (GPT-5.6 Terra / Luna / Sol) ve Google Gemini (3.7 Flash) ile de konuşuyor. Model, composer'ın üstündeki şeritten seçiliyor ve seçim `prefs.json`'a yazılıyor. **Şeritler anahtarına göre süzülüyor:** yalnızca kimliği kayıtlı sağlayıcıların modelleri listeleniyor (hiçbiri kayıtlı değilse ilk kurulum için hepsi görünür). "Dağıtım adı" alanı da yalnızca onu isteyen sağlayıcıda (Azure) çıkıyor.
 * **Tıklanabilir Çip Menüleri:**
   - `options`: Yönetmenin sorduğu sorular için tıklanabilir yanıt önerileri.
   - `variations`: Fikirden türetilen tek tıkla uygulanabilir varyasyonlar.
@@ -48,7 +49,7 @@ Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Andr
 * **Oturum Yönetimi & Kebap Menüsü:** Sohbet geçmişleri diske saklanır (`output/chats.json`), kenar panelinde listelenir. Üst şeritteki kebap menüsü (`#chats-kebab`) ile oturumlar yeniden adlandırılabilir, temizlenebilir veya toplu olarak silinebilir.
 
 ### 🖼️ 2. Görsel Üretimi & Çoklu Referans Düzenleme
-* **OpenAI & Azure Entegrasyonu:** `gpt-image-2` ve DALL-E 3 üretimi (1-4 görsel).
+* **Çoklu Sağlayıcı Entegrasyonu:** Azure OpenAI (`gpt-image-2`), OpenAI (`gpt-image-2`, `gpt-image-1`) ve Google Gemini (Nano Banana 2 / Nano Banana Pro) üretimi (1-4 görsel). Gemini'de piksel boyutu yerine oran (1:1 … 21:9) ve 1K/2K/4K çözünürlük seçiliyor. *DALL-E 3 12 Mayıs 2026'da OpenAI API'sinden kalktığı için katalogdan çıkarıldı.*
 * **Çoklu Referans Görsel Bindirme:** Düzenleme (Inpainting / Edits) modunda ana referans görselin yanına en fazla 3 ek referans görsel eklenebilir.
 
 ### 📁 3. Klasörler & Medya Yönetimi
@@ -86,7 +87,7 @@ Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Andr
 ## 🔮 Gelecek Yol Haritası (SaaS Transformation Master Plan)
 
 * **Faz 2: BYOK Çoklu Sağlayıcı Arayüzü**
-  - Ayarlar modalında OpenAI DALL-E 3, Fal.ai, Replicate, ComfyUI ve Ollama form sekmeleri.
+  - Ayarlar panelinde Fal.ai, Replicate, ComfyUI ve Ollama form sekmeleri (OpenAI ve Gemini tamamlandı).
   - Model sağlayıcısı seçimi ve canlı bağlantı test düğmeleri.
 * **Faz 3: E-Ticaret Ürün Araçları**
   - Elde Ürün Görselleştirme (Product-in-Hand).

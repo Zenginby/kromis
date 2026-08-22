@@ -30,6 +30,7 @@ import credstore
 import providers
 import backup
 import chat_client as cc
+import chat_providers
 import chat_store
 import color_names
 import composite
@@ -610,6 +611,7 @@ def _settings_payload() -> dict:
     "sadece son dört hane" o sözleşmenin öldüğü yerdir.
     """
     cfg = credstore.configured_map()
+    chat_cfg = credstore.chat_configured_map()
     return {
         **ac.get_settings_status(),
         # {kimlik_id: bool}. Arayüz Ayarlar'daki sağlayıcı gruplarının
@@ -647,11 +649,33 @@ def _settings_payload() -> dict:
             }
             for m in catalog.IMAGE_MODELS
         ],
+        "default_chat_model": catalog.DEFAULT_CHAT_MODEL,
         "chat_models": [
             {"id": m.id, "label": m.label, "provider": m.provider,
-             "configured": cfg.get(m.credential, False)}
+             # `cfg` (KİMLİK tablosu) DEĞİL `chat_cfg` (MODEL tablosu):
+             # Azure'ın dağıtım adı model düzeyinde bir koşul ve kimlik
+             # tablosu onu ifade edemiyor — kimliği tam, dağıtımı boş bir
+             # kurulumda arayüz modeli "kurulu" gösterir ve ilk mesaj 404
+             # dönerdi (bkz. credstore.chat_is_configured).
+             "configured": chat_cfg.get(m.id, False),
+             # Ayarlar formunun dağıtım adı kutusunun kapısı: KATALOGDAN
+             # türetiliyor, istemcide sağlayıcı adı literal olarak
+             # sayılmıyor. Sayılsaydı, adı ortamdan okunan ikinci bir
+             # sağlayıcı eklendiği gün kutu sessizce görünmez kalırdı.
+             "needs_deployment": catalog.chat_needs_deployment(m),
+             "note": m.note}
             for m in catalog.CHAT_MODELS
         ],
+        # `ac.get_settings_status()`in AYNI ADLI alanını BİLEREK eziyor (bu
+        # anahtar `**`ın sonrasında). O alan yalnız Azure'ı ölçüyor ve tek
+        # sağlayıcı varken doğruydu; bugün yalnızca Gemini anahtarı olan bir
+        # kullanıcıda Prompt Yönetmeni'ni kapalı gösterirdi. Ölçüt artık
+        # "konuşulabilir EN AZ BİR sohbet modeli var mı".
+        #
+        # `azure_client` tarafındaki alan KALDIRILMADI: onun sözleşmesi
+        # tests/test_settings.py'de donmuş ve orada "Azure sohbeti hazır mı"
+        # sorusunun doğru cevabı hâlâ o.
+        "chat_configured": any(chat_cfg.values()),
     }
 
 
@@ -829,10 +853,29 @@ def chat(req: ChatRequest) -> dict:
     kayıtlarını konuşmanın içinde tutuyor, Azure ise yalnız `user`/`assistant`
     biliyor. Alan allowlist'i onları tek başına çıkaramaz — `{"role": "result"}`
     geride kalır ve istek 400 döner.
+
+    ÇAĞRI ARTIK SEVK MEMURUNDAN geçiyor (`chat_providers`), doğrudan
+    `chat_client`'tan değil: yönetmen üç sağlayıcı konuşabiliyor ve hangisinin
+    konuşulacağı `req.model`'da. Azure yolunun tel üzerindeki baytları
+    DEĞİŞMEDİ — sevk memuru model tanımını düşürüp `cc.complete`'e aynen
+    devrediyor (bkz. chat_providers._azure_complete).
     """
     try:
-        return cc.complete([m.model_dump(include=WIRE_MESSAGE_FIELDS)
-                            for m in req.messages if m.role in WIRE_CHAT_ROLES])
+        # MODEL İSTEKTEN, tercihlerden DEĞİL. `/api/generate`'in aynı duruşu:
+        # seçim ekranda yaşıyor ve tel üzerinde geliyor. `prefs.json`'ı ikinci
+        # bir kaynak yapmak, kullanıcının bu turda seçtiği modelle sunucunun
+        # kullandığı modelin ayrışmasına kapı açardı (tercih yazımı ağ üstünden
+        # ve başarısız olabiliyor — bkz. core.js savePref).
+        #
+        # `or DEFAULT_CHAT_MODEL`: alanı hiç göndermeyen bayat bir istemci
+        # bugünkü modele gidiyor. Geçerlilik `ChatRequest`'te ölçüldü, burada
+        # ikinci bir kapı yok — `chat_providers._resolve` yine de bilinmeyen
+        # id'yi Türkçe bir 502'ye çeviriyor (bayat istemci + katalogdan kalkmış
+        # model).
+        return chat_providers.complete(
+            req.model or catalog.DEFAULT_CHAT_MODEL,
+            [m.model_dump(include=WIRE_MESSAGE_FIELDS)
+             for m in req.messages if m.role in WIRE_CHAT_ROLES])
     except cc.ChatError as e:
         raise HTTPException(status_code=502, detail=str(e))
 
@@ -1323,7 +1366,7 @@ def add_logo(req: LogoRequest) -> dict:
          "palette": src_meta.get("palette"),
          "prompt_sent": src_meta.get("prompt_sent"),
          # Model de devralınıyor: bindirme TÜREV, kendi başına bir üretim
-         # değil. Geçilmezse kayda varsayılan model yazılırdı — DALL·E 3 ile
+         # değil. Geçilmezse kayda varsayılan model yazılırdı — Nano Banana ile
          # üretilmiş bir görselin logolu hâli "azure-gpt-image-2" görünürdü.
          "model": src_meta.get("model")},
         OUTPUT_DIR, now=_now(),
@@ -1395,7 +1438,7 @@ def add_banner(req: BannerRequest) -> dict:
          "palette": src_meta.get("palette"),
          "prompt_sent": src_meta.get("prompt_sent"),
          # Model de devralınıyor: bindirme TÜREV, kendi başına bir üretim
-         # değil. Geçilmezse kayda varsayılan model yazılırdı — DALL·E 3 ile
+         # değil. Geçilmezse kayda varsayılan model yazılırdı — Nano Banana ile
          # üretilmiş bir görselin logolu hâli "azure-gpt-image-2" görünürdü.
          "model": src_meta.get("model")},
         OUTPUT_DIR, now=_now(),

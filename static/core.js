@@ -244,6 +244,12 @@ for (const id of ["upload-btn", "extra-add-btn", "media-pick-btn"]) {
 let imageModels = [];      // sunucudan gelen katalog
 let currentModel = null;   // seçili tanım (imageModels'ten bir öğe)
 let runBusy = false;       // üretim sürüyor mu — #go kapısının bir girdisi
+// Yönetmenin karşılığı: aynı yuvada, aynı desende (bkz. applyChatModels).
+// Burada yaşamak ZORUNDA çünkü `goBlockReason` bu dosyanın üst düzeyinde
+// çağrılan `syncGoGate` üzerinden ikisini de okuyor ve chat.js EN SONDA
+// yükleniyor — orada tanımlansa açılıştaki ilk çağrı TDZ hatası verirdi.
+let chatModels = [];       // sunucudan gelen sohbet kataloğu
+let currentChatModel = null;
 
 /** `<select>`i sunucudan gelen seçeneklerle yeniden kurar ve DEĞERİ TAŞIR.
  *
@@ -322,7 +328,16 @@ function syncRunCost() {
 function goBlockReason() {
   if (runBusy) return "Üretim sürüyor…";
   if (currentMode === "director") {
-    return chatConfigured ? "" : "Sohbet modeli yapılandırılmadı.";
+    // Görsel dalının AYNI kademeleri. Öncesinde tek bir `chatConfigured`
+    // boolean'ı vardı ve o yalnız AZURE'u ölçüyordu: yalnızca Gemini anahtarı
+    // olan bir kullanıcıda yönetmen ölü bir düğmeyle açılırdı — `#go` kapısının
+    // görsel tarafında v0.6'da düzeltilen kırılmanın aynısı.
+    if (!chatModels.length) return "Sohbet modeli listesi alınamadı.";
+    if (!currentChatModel) return "Sohbet modeli seçilmedi.";
+    if (!currentChatModel.configured) {
+      return `${currentChatModel.label} için kimlik yok — Ayarlar'dan ekle.`;
+    }
+    return "";
   }
   if (!imageModels.length) return "Model listesi alınamadı.";
   if (!currentModel) return "Model seçilmedi.";
@@ -346,6 +361,14 @@ function applyModel(id, { announce = true } = {}) {
   const model = imageModels.find((m) => m.id === id);
   if (!model) return;
   currentModel = model;
+  // ŞERİT SEÇİLİ MODELİ HER ZAMAN İÇERİYOR. Bu satır `applyModels` dışındaki
+  // çağıranlar için: `loadModelPref` katalog geldikten sonra tercihi uyguluyor
+  // ve o tercih filtrelenmiş olabilir (anahtarı yok). O durumda `select.value`
+  // seçenekler arasında bulunmaz, <select> BOŞ görünür ve şerit "model yok"
+  // der — üretim ise çalışır. Yeniden çizim id'yi zorunlu tutuyor.
+  if (![...$("model").options].some((o) => o.value === id)) {
+    renderModelOptions(id);
+  }
   $("model").value = model.id;
 
   const dusenler = [];
@@ -358,8 +381,12 @@ function applyModel(id, { announce = true } = {}) {
   const nn = fillAxis("n", adetler, undefined, "1");
   if (nn) dusenler.push(`${axisLabel("n")} ${nn}`);
 
-  // Kalite ekseni OLMAYAN model (Gemini): satır tümden gizleniyor. Tel üzerinde
+  // `quality_hidden` beyan eden model: satır tümden gizleniyor. Tel üzerinde
   // yine geçerli bir jeton gidiyor — katalogdaki sentetik "standard".
+  // Örnek olarak burada "Gemini" yazıyordu ve YANLIŞTI: Nano Banana'nın
+  // çözünürlük ekseni var (1K/2K/4K) ve fiyatı da onunla değişiyor, yani
+  // gizlenmesi gereken bir eksen değil — `image_size` jetonları `qualities`
+  // olarak geliyor ve satır GÖRÜNÜYOR.
   $("spec-quality").hidden = !!model.quality_hidden;
   // Eksenin ADI modele göre değişiyor: piksel boyutu seçen model "Boyut",
   // oran seçen model "Oran" diyor. chat.js'in atlanan-öneri metni buradan okuyor.
@@ -392,9 +419,72 @@ function applyModel(id, { announce = true } = {}) {
   }
 }
 
-function renderModelOptions() {
+/** Seçiciye GİRECEK modeller: kurulu olanlar (+ zorunlu tutulan id).
+ *
+ * FİLTRE, "10+ modele ölçeklenirken alan duvarına dönüşmesin" isteğinin model
+ * şeridindeki karşılığı: kullanıcı Azure anahtarıyla çalışıyorsa OpenAI ve
+ * Gemini satırlarının hepsi seçilebilir bir 502'den başka bir şey değil.
+ *
+ * İKİ KAÇIŞ KAPISI VAR ve ikisi de ölçülmüş bir kırılmayı kapatıyor:
+ *
+ *   1. HİÇBİRİ KURULU DEĞİLSE HEPSİ görünüyor. İlk kurulumda boş bir <select>
+ *      kullanıcıya hiçbir şey söylemez, üstelik #model-note → "Ayarlar'ı aç"
+ *      yolunu da kapatır — o yol ilk kurulumun tek keşfedilebilir kapısı.
+ *   2. `zorunluId` her zaman listede kalıyor: `applyModel` seçili id'yi
+ *      `select.value`'ya yazıyor ve o id seçenekler arasında yoksa <select>
+ *      BOŞ görünür — model şeridi "model yok" der ama üretim çalışır.
+ *
+ * KEŞFEDİLEBİLİRLİK kaybı yok: Ayarlar'daki #provider-status her sağlayıcıyı
+ * "kayıtlı / kayıtlı değil" diye tek tek sayıyor, yani hangi sağlayıcıların
+ * VAR OLDUĞU sorusunun cevabı orada duruyor.
+ */
+function secilebilirler(liste, zorunluId) {
+  const kurulu = liste.filter((m) => m.configured);
+  // İLK KURULUM: `zorunluId` DIŞARIDA bırakılarak ölçülüyor. İlk yazımda
+  // zorunlu id filtreye dahildi ve sonuç gerçek chromium koşumunda görüldü —
+  // hiç anahtarı olmayan kullanıcı TEK satırlık bir şerit görüyordu (seçili
+  // varsayılan), yani "hangi modeller var" sorusunun cevabı da kayboluyordu.
+  if (!kurulu.length) return liste;
+  return liste.filter((m) => m.configured || m.id === zorunluId);
+}
+
+/** Hangi model SEÇİLİ olacak: tercih → varsayılan → ilk kurulu.
+ *
+ * Üç kademe, hepsi "ANAHTARI OLAN kazanır" kuralına tabi:
+ *
+ *   1. Kullanıcının TERCİHİ — kurulu ise.
+ *   2. Sunucunun varsayılanı — kurulu ise.
+ *   3. İlk kurulu model. Hiçbiri kurulu değilse (ilk kurulum) kademe 1-2 yine
+ *      geçerli ve son çare listenin ilki: orada her model eşit derecede
+ *      kullanılamaz ve boş bir şerit kullanıcıya hiçbir şey söylemez.
+ *
+ * KURULU OLMAYAN TERCİH ARTIK YAPIŞMIYOR ve bu bilinçli bir değişiklik.
+ * v0.6'da tersi yazılıydı ("seçili kalıyor, yoksa anahtarı kaydetmek
+ * kullanıcının seçimini geri getirmezdi") ve o gerekçe o gün doğruydu; bugün
+ * karşılığı kalmadı çünkü tercihi TAŞIYAN yer değişti: `seciliModelTercihi`
+ * burada YAZILMIYOR ve diskteki değere hiç dokunulmuyor, yani kullanıcı
+ * anahtarı sonradan girdiğinde `applyModels` yeniden koşuyor ve ESKİ SEÇİM
+ * kendiliğinden geri geliyor. Yapışmanın bedeli ise gerçek chromium
+ * koşumunda ölçüldü: `prefs`in `image_model` VARSAYILANI Azure'ın id'si
+ * (`chat_model`in aksine boş dize değil), yani "hiç seçmedim" ile "Azure'ı
+ * seçtim" istemcide ayırt edilemiyor — sonuç, yalnızca Gemini anahtarı olan
+ * kullanıcının açılışta ölü bir #go düğmesiyle karşılanmasıydı.
+ */
+function secilecek(liste, tercih, varsayilan) {
+  const kurulu = liste.filter((m) => m.configured);
+  // "Seçilebilir": katalogda var VE (kurulu, ya da hiçbiri kurulu değil).
+  // İkinci koşul ilk kurulumun kapısı: orada her model eşit derecede
+  // kullanılamaz durumda ve birini seçmek gerekiyor.
+  const uygun = (id) => liste.some((m) => m.id === id)
+    && (!kurulu.length || kurulu.some((m) => m.id === id));
+  if (tercih && uygun(tercih)) return tercih;
+  if (uygun(varsayilan)) return varsayilan;
+  return (kurulu[0] || liste[0] || {}).id || "";
+}
+
+function renderModelOptions(zorunluId) {
   const el = $("model");
-  el.replaceChildren(...imageModels.map((m) => {
+  el.replaceChildren(...secilebilirler(imageModels, zorunluId).map((m) => {
     const o = document.createElement("option");
     o.value = m.id;
     // Maliyet ve kurulum durumu ETİKETTE: karşılaştırma ("hangisi ucuz?")
@@ -422,14 +512,78 @@ function renderModelOptions() {
 function applyModels(s, tercih) {
   if (!s || !Array.isArray(s.image_models)) return;
   imageModels = s.image_models;
-  renderModelOptions();
-  const istenen = tercih || s.default_image_model;
-  // Kayıtlı tercih artık katalogda olmayabilir (model kaldırıldı): varsayılana
-  // düşülüyor. YAPILANDIRILMAMIŞ olması ise geçerli bir durum — seçili kalıyor,
-  // yoksa anahtarı kaydetmek kullanıcının seçimini geri getirmezdi.
-  const id = imageModels.some((m) => m.id === istenen)
-    ? istenen : s.default_image_model;
+  // SIRA: önce seçilecek id, SONRA çizim. Ters olsaydı filtre seçili modeli
+  // listeden atabilirdi ve <select> boş görünürdü (bkz. secilebilirler).
+  // Kayıtlı tercih artık katalogda olmayabilir (model kaldırıldı) ya da
+  // anahtarı olmayabilir; ikisinin de cevabı `secilecek`te.
+  const id = secilecek(imageModels, tercih, s.default_image_model);
+  renderModelOptions(id);
   applyModel(id, { announce: false });
+}
+
+// ── Prompt Yönetmeni'nin model şeridi ────────────────────────────────
+//
+// Görsel şeridinin AYNI deseni, üç bilinçli farkla:
+//   · Etikette kredi YOK: sohbetin kredi tarifesi yok (`ChatModel`'de `credits`
+//     alanı bile yok) ve uydurma bir aralık yazmak yanlış bir karşılaştırma
+//     sunardı. Bilgi yine `title`da (`note`).
+//   · Eksen (boyut/kalite/adet) YOK: sohbetin ayarı yok.
+//   · "kurulu" ölçütü MODEL BAŞINA geliyor, kimlik başına değil: Azure'ın
+//     dağıtım adı boşken kimliği tamdır ama model konuşulamaz
+//     (bkz. credstore.chat_is_configured).
+
+function renderChatModelOptions(zorunluId) {
+  const el = $("chat-model");
+  el.replaceChildren(...secilebilirler(chatModels, zorunluId).map((m) => {
+    const o = document.createElement("option");
+    o.value = m.id;
+    // `textContent`: sunucudan gelen hiçbir şey innerHTML'e girmiyor.
+    o.textContent = m.label + (m.configured ? "" : " · kurulum gerekli");
+    if (m.note) o.title = m.note;
+    return o;
+  }));
+}
+
+/** Seçili sohbet modelini uygular. `applyModel`in yönetmen karşılığı.
+ *
+ * UYGULANAN MODELİ DÖNDÜRÜYOR (yoksa `null`) ve bu dönüş değeri bir kolaylık
+ * değil, `change` dinleyicisinin gereği: erken çıkış `currentChatModel`i
+ * OLDUĞU GİBİ bırakıyor — ilk çizimden önce `null`, sonrasında ESKİ model.
+ * Dinleyici o küresel değişkeni okuyup `.provider`ına eriştiği için, erken
+ * çıkışta ya `TypeError` atardı (konsolda kırmızı, tercih yazılmaz) ya da
+ * kullanıcının SEÇMEDİĞİ bir modeli diske tercih olarak yazardı — ikincisi
+ * daha sessiz ve daha kötü. `applyModel`de bu tuzak yok çünkü onun
+ * dinleyicisi `$("model").value`yu okuyor, küresel değişkeni değil.
+ *
+ * `id` katalogda YOKKEN çağrılmak gerçek bir yol: `secilecek` liste boşken
+ * (`chat_models: []`) boş dize döndürüyor ve settings.js onu doğrudan buraya
+ * veriyor.
+ */
+function applyChatModel(id) {
+  const model = chatModels.find((m) => m.id === id);
+  if (!model) return null;
+  currentChatModel = model;
+  // `applyModel`in aynı gerekçesi: seçili id şeritte yoksa şerit boş görünür.
+  if (![...$("chat-model").options].some((o) => o.value === id)) {
+    renderChatModelOptions(id);
+  }
+  $("chat-model").value = model.id;
+  syncGoGate();
+  // SON SATIR ve gerçek bir kırılmanın bekçisi: dönüş eklenirken bu satır
+  // unutulduğunda fonksiyon `undefined` döndürdü, dinleyici de her seferinde
+  // erken çıktı — yani şerit doğru modeli GÖSTERİYOR, tercih diske HİÇ
+  // yazılmıyordu ve konsolda tek bir hata bile yoktu. Kaynak taraması
+  // ("`return null` var mı?") bunu yeşil geçti; yalnız gerçek Chromium'da
+  // görüldü (POST /api/prefs hiç gitmiyor).
+  return model;
+}
+
+function applyChatModels(s, tercih) {
+  if (!s || !Array.isArray(s.chat_models)) return;
+  chatModels = s.chat_models;
+  const id = secilecek(chatModels, tercih, s.default_chat_model);
+  renderChatModelOptions(id);
+  applyChatModel(id);
 }
 
 /** Tercihi diske yazar. Hata SESSİZ yutulmuyor ama üretimi de engellemiyor.
@@ -470,6 +624,23 @@ $("model").addEventListener("change", () => {
   // alıyordu. settings.js'in adına OLAY ANINDA dokunuluyor: yükleme sırası
   // kuralının izin verdiği tek yol (#model-settings-link ile aynı desen).
   seciliModelTercihi = $("model").value;
+});
+
+$("chat-model").addEventListener("change", () => {
+  // Dönüş değeri KÜRESEL DEĞİŞKEN YERİNE kullanılıyor: `applyChatModel`
+  // uygulamadıysa yazılacak bir tercih de yok (bkz. o fonksiyonun notu).
+  const model = applyChatModel($("chat-model").value);
+  if (!model) return;
+  // TERCİH ÇİFT YAZILIYOR ve bu zorunlu: `prefs.update` `chat_model`i
+  // `chat_provider`a göre doğruluyor (çapraz kural, bkz. prefs.py) ve yalnız
+  // modeli göndermek "bu sağlayıcıda yok" hatasıyla 422 dönerdi — kullanıcı
+  // OpenAI modeline geçtiğinde diskteki sağlayıcı hâlâ "azure" olurdu.
+  savePref({ chat_provider: model.provider, chat_model: model.id });
+  // Bellekteki tercih de tazeleniyor: `applyChatModels` her Ayarlar
+  // kaydedişinde yeniden koşuyor ve o değişkeni okuyor — yazılmazsa
+  // kullanıcının bu turda seçtiği model AÇILIŞTAKİ değere geri sıçrardı
+  // (görsel tarafında ölçülmüş kırılmanın aynısı).
+  seciliSohbetModeliTercihi = model.id;
 });
 
 $("model-settings-link").addEventListener("click", () => {

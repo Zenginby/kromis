@@ -88,6 +88,35 @@ def is_configured(cred_id: str, env_path: str | None = None) -> bool:
     return True
 
 
+def chat_is_configured(m: catalog.ChatModel, env_path: str | None = None) -> bool:
+    """Bu SOHBET modeliyle konuşulabilir mi — kimlik + (gerekiyorsa) dağıtım adı.
+
+    `is_configured` tek başına yetmiyor ve sebebi Azure: kimliği tam olsa bile
+    dağıtım adı boşken istek 404 döner (`chat_client.map_error`'ın en sık
+    hatası). Arayüz o modeli "kurulu" gösterirse kullanıcı yönetmeni açar, ilk
+    mesaj 502 döner ve sebebi görünmez olur — bu modülün var olma sebebinin tam
+    tersi.
+
+    Ad ORTAMDAN okunuyor ama `wire_model` katalogda yazılıysa ortama HİÇ
+    bakılmıyor: OpenAI/Gemini'de girilecek bir ad yok, aranan bir env
+    değişkeninin yokluğu onları sessizce kapatırdı.
+    """
+    if not is_configured(m.credential, env_path):
+        return False
+    if m.wire_from_env:
+        return bool(_values(env_path).get(m.wire_from_env, "").strip())
+    return True
+
+
+def chat_configured_map(env_path: str | None = None) -> dict[str, bool]:
+    """{sohbet_model_id: konuşulabilir mi} — `GET /api/settings` bunu yayınlıyor.
+
+    KİMLİK BAŞINA değil MODEL BAŞINA: Azure'ın dağıtım adı model düzeyinde bir
+    koşul ve `configured_map`'in kimlik tablosu onu ifade edemiyor.
+    """
+    return {m.id: chat_is_configured(m, env_path) for m in catalog.CHAT_MODELS}
+
+
 def configured_map(env_path: str | None = None) -> dict[str, bool]:
     """{kimlik_id: yapılandırılmış mı} — `GET /api/settings` bunu yayınlıyor.
 

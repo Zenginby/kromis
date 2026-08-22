@@ -91,11 +91,21 @@ def _openai_adapter():
     return (openai_client.generate, openai_client.edit)
 
 
+def _gemini_adapter():
+    """`_openai_adapter`ın aynı gerekçesi: `gemini_client` bu modülü import
+    ediyor (`read_timeout_for` ve `detail_of` için), yani modül düzeyinde
+    import etmek DÖNGÜ olurdu. Düz `import` ifadesi, yalnız fonksiyon içinde —
+    PyInstaller'ın statik analizi onu da görüyor."""
+    import gemini_client
+    return (gemini_client.generate, gemini_client.edit)
+
+
 _ADAPTERS: dict[str, tuple] = {
     "azure": (_azure_generate, _azure_edit),
     # Değer bir ÇAĞRILABİLİR döndürücü olabiliyor (döngüyü kıran geç bağlama);
     # `_pair` ikisini de karşılıyor.
     "openai": _openai_adapter,
+    "gemini": _gemini_adapter,
 }
 
 
@@ -144,7 +154,7 @@ def total_budget(m: catalog.ImageModel, n: int) -> float:
     return read_timeout_for(m, n) * tur
 
 
-def detail_of(body: dict | None) -> str:
+def detail_of(body: dict | list | None) -> str:
     """Sağlayıcı hata gövdesinden kullanıcıya gösterilebilir açıklama.
 
     ŞEKİL paylaşılıyor, MESAJ paylaşılmıyor: `{"error": {"message": …}}`
@@ -152,7 +162,29 @@ def detail_of(body: dict | None) -> str:
     Türkçe metinler sağlayıcıya özgü kalmak zorunda (`chat_client.map_error`'ın
     404 metni Azure AI Foundry'nin dağıtım alanından söz ediyor — o metni
     Gemini'ye göstermek kullanıcıyı olmayan bir forma yönlendirir).
+
+    TEK ÖĞELİK DİZİ DE AÇILIYOR ve bu bir hoşgörü değil ÖLÇÜLMÜŞ bir olgu:
+    `generativelanguage.googleapis.com` hata gövdesini nesne olarak DEĞİL,
+    tek öğelik bir JSON DİZİSİ olarak döndürüyor —
+
+        [{"error": {"code": 400, "message": "API key not valid. …",
+                    "status": "INVALID_ARGUMENT"}}]
+
+    Gerçek uca yapılan çağrıyla doğrulandı (görsel tarafı
+    `/v1beta/interactions`, sohbet tarafı `/v1beta/openai/chat/completions`;
+    ikisi de aynı sarmalı kullanıyor). Dizi açılmazsa `isinstance(body, dict)`
+    kapısı boş dize döndürüyor ve BÜTÜN Gemini hataları çıplak bir
+    "HTTP 400"a çöküyor: `gemini_client.map_error`'ın 400'ü ikiye ayıran dalı
+    (geçersiz anahtar ↔ desteklenmeyen jeton) hiç tetiklenmiyor, yani anahtarı
+    doğru olan kullanıcı sebebi hiçbir yerde okumuyor.
+
+    ÇOK ÖĞELİ dizi BİLEREK açılmıyor: ilkini seçmek, geri kalanını sessizce
+    yutmak olurdu. Azure ve OpenAI düz nesne döndürüyor, o yüzden onların yolu
+    bayt bayt aynı kalıyor.
     """
+    # `list` kapısı `dict` kapısından ÖNCE: aksi hâlde dizi zaten elenmiş olur.
+    if isinstance(body, list) and len(body) == 1:
+        body = body[0]
     if not isinstance(body, dict):
         return ""
     err = body.get("error")
@@ -161,6 +193,68 @@ def detail_of(body: dict | None) -> str:
     if isinstance(err, str):
         return err
     return ""
+
+
+# ── Hata GÖVDESİNİN ANLAMI: iki paylaşılan yüklem ──────────────────────
+#
+# `detail_of` gövdenin ŞEKLİNİ çözüyor; aşağıdaki ikisi o metnin ANLAMINI
+# okuyor. Aynı iki soru üç `map_error`da birden geçiyor — "anahtar mı
+# geçersiz?", "içerik mi reddedildi?" — ve her biri kendi alt dizesini elle
+# arıyordu. Şekil paylaşımının gerekçesinin aynısı burada da geçerli: SORU
+# sağlayıcıdan bağımsız, cevabın TÜRKÇE METNİ değil.
+#
+# İKİ AZURE İKİZİ BİLEREK DIŞARIDA: `azure_client.map_error` bu modülü import
+# EDEMEZ (`providers` onu import ediyor, döngü olurdu) ve o dosyaya dokunmama
+# kararı `openai_client._post`un yorumunda yazılı; `chat_client` ise yalnız
+# Azure'ı konuşuyor, yani aşağıda anlatılan yanlış pozitifi üreten gövde
+# (Google'ın şema hatası) oraya hiç ulaşmıyor. İkisi de gövdeyi kendi içinde
+# ayrıştırmaya devam ediyor.
+
+
+def is_invalid_key(detail: str) -> bool:
+    """Hata metni "anahtar geçersiz" mi diyor.
+
+    400 İKİ ANLAMLI ve bu yüklem o ayrımın taşıyıcısı: Google geçersiz
+    anahtarı da (`API key not valid` / `API_KEY_INVALID`) desteklenmeyen bir
+    jetonu da 400 ile döndürüyor — canlı uçtan ölçüldü. Ayrımı yapmamak,
+    anahtarı doğru olan kullanıcıya "anahtarını kontrol et" demek olurdu.
+
+    Yüklem `gemini_client`ten ÇIKARILDI çünkü aynı gövde `openai_chat`
+    üzerinden de geliyor: Gemini'nin sohbet ucu (`/v1beta/openai/…`) geçersiz
+    anahtara 401 DEĞİL 400 döndürüyor ve o dosyanın anahtar metni yalnız 401
+    dalındaydı — yani Gemini sohbeti çıplak bir "HTTP 400" ile bitiyordu.
+    """
+    alt = detail.lower()
+    return "api key" in alt or "api_key" in alt
+
+
+# İçerik reddinin GERÇEK işaretleri. Liste uzun ama her öğesi bir sağlayıcının
+# ölçülmüş metninden: OpenAI "content policy" ve "safety system", Azure
+# "content management policy" ve "content filter", Google "safety" /
+# "blocked" / "prohibited".
+_ICERIK_REDDI = ("content policy", "content_policy", "content filter",
+                 "content_filter", "content filtering",
+                 "content management policy", "safety", "moderation",
+                 "prohibited", "block", "responsible ai", "flagged")
+
+
+def is_content_policy(detail: str) -> bool:
+    """Hata metni içerik reddi mi anlatıyor.
+
+    ÇIPLAK `"content" in detail` YETMİYOR ve bu ölçülmüş bir yanlış pozitif:
+    Google şema hatalarını da 400 ile döndürüyor ve metni
+
+        Unknown name "content": Cannot find field.
+
+    — yani gövdedeki bir ALAN ADINDAN söz ediyor, kullanıcının mesajından
+    değil. O dizeyi içerik reddi saymak kullanıcıya "mesajın engellendi"
+    diyordu; gerçek sebep (istemcinin göndermediği/yanlış gönderdiği alan)
+    hiçbir yerde okunmuyordu — ve bu, hata metinlerini eyleme dönüştürme
+    çabasının tam tersi. Aynı tuzak OpenAI'de de var:
+    `Invalid value for 'content'` de 400 ve o da bir şema hatası.
+    """
+    alt = detail.lower()
+    return any(isaret in alt for isaret in _ICERIK_REDDI)
 
 
 def is_configured(model_id: str) -> bool:

@@ -267,3 +267,22 @@ def test_tema_listesi_models_ten_geliyor_KOPYA_degil():
     """prefs.py tema listesini LİTERAL olarak tekrarlıyordu (models.ALLOWED_THEMES
     varken). Tek örnek kazaydı; ikinci bir enum eklenirken desen olurdu."""
     assert prefs._ENUMS["theme"] is models.ALLOWED_THEMES
+
+
+def test_SOHBET_modeli_saglayicisiyla_BIRLIKTE_yazilabiliyor(tmp_path):
+    """Çoklu sağlayıcının tercih tarafındaki karşılığı.
+
+    `chat_model` ÇAPRAZ bir kural: geçerliliği `chat_provider`'a bağlı. Arayüz
+    ikisini TEK çağrıda yazıyor (core.js'teki `#chat-model` dinleyicisi) çünkü
+    yalnız modeli göndermek diskteki eski sağlayıcıya karşı doğrulanır ve 422
+    döner — yani kullanıcının seçimi sessizce hiç kaydedilmez.
+    """
+    m = next(m for m in catalog.CHAT_MODELS if m.provider != catalog.DEFAULT_CHAT_PROVIDER)
+
+    with pytest.raises(ValueError) as e:
+        prefs.update({"chat_model": m.id}, str(tmp_path))
+    assert "geçersiz chat_model" in str(e.value)
+
+    out = prefs.update({"chat_provider": m.provider, "chat_model": m.id},
+                       str(tmp_path))
+    assert (out["chat_provider"], out["chat_model"]) == (m.provider, m.id)

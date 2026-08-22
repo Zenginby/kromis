@@ -8,8 +8,9 @@ riski ölçülebilir kılıyor.
 DİKKAT — canlı doğrulama YAPILMADI: buradaki iddialar tel formatının
 BELGELENEN hâlini sabitliyor, gerçek bir OpenAI anahtarıyla çağrı yapılmadı.
 Uç, endpoint ve alan adları Azure ikiziyle aynı olduğu için risk düşük
-(o yol canlı doğrulanmış), ama `dall-e-3`'ün URL dönen dalı gerçek bir
-anahtarla bir kez sınanmalı.
+(o yol canlı doğrulanmış), ama URL dönen dal gerçek bir kurulumla bir kez
+sınanmalı — o dalın tek kullanıcısı artık uyumlu bir vekil (proxy/gateway),
+çünkü onu getiren `dall-e-3` 12 Mayıs 2026'da API'den kalktı.
 """
 import base64
 
@@ -20,7 +21,10 @@ import catalog
 import openai_client as oc
 
 MODEL = catalog.image_model("openai-gpt-image-1")
-DALLE = catalog.image_model("openai-dall-e-3")
+# İKİNCİ OpenAI modeli: "model KATALOGDAN geliyor, sabit değil" iddiasının
+# ölçülebilir olması için gereken şey iki AYRI ad. Eskiden bu rolde
+# `openai-dall-e-3` vardı; kalktığı için yerine kataloğun yeni mainline'ı geçti.
+IKINCI = catalog.image_model("openai-gpt-image-2")
 CREDS = ("sk-test-key", "https://api.openai.com/v1")
 
 
@@ -81,14 +85,15 @@ def test_generate_dogru_uca_gidiyor_ve_cozuyor():
     assert c.last_call["json"]["model"] == "gpt-image-1"
 
 
-def test_dalle_ayni_adaptorden_KENDI_adiyla_gidiyor():
+def test_ikinci_model_ayni_adaptorden_KENDI_adiyla_gidiyor():
+    """Aynı adaptör, aynı uç, FARKLI ad — ayrımı yalnız `wire_model` taşıyor."""
     c = FakeClient(FakeResponse(200, {"data": [{"b64_json": _b64(b"X")}]}))
 
-    oc.generate(DALLE, "kedi", "1024x1024", "standard", 1,
+    oc.generate(IKINCI, "kedi", "1024x1024", "high", 1,
                 client=c, credentials=CREDS)
 
-    assert c.last_call["json"]["model"] == "dall-e-3"
-    assert c.last_call["json"]["quality"] == "standard"
+    assert c.last_call["json"]["model"] == "gpt-image-2"
+    assert c.last_call["json"]["quality"] == "high"
 
 
 def test_adres_sonundaki_egik_cizgi_ucu_bozmuyor():
@@ -101,8 +106,9 @@ def test_adres_sonundaki_egik_cizgi_ucu_bozmuyor():
 
 
 def test_URL_donen_yanit_ikinci_bir_istekle_indiriliyor():
-    """`dall-e-3` varsayılan olarak URL döndürüyor ve `response_format`
-    göndermemeyi tercih ettik (gpt-image-1 onu kabul etmiyor).
+    """Uyumlu bir vekil b64 yerine URL döndürebiliyor (`openai` kimliğinin
+    `url_env`i tam olarak bunu mümkün kılıyor); `response_format` göndermemeyi
+    tercih ettik çünkü `gpt-image-*` ailesi onu kabul etmiyor.
 
     Adaptör sözleşmesi "çözülmüş PNG baytları döndür" diyor — URL dalı o
     sözleşmenin OpenAI tarafındaki bedeli. Çağıran taraf hangi şeklin geldiğini
@@ -112,7 +118,7 @@ def test_URL_donen_yanit_ikinci_bir_istekle_indiriliyor():
     c = FakeClient(FakeResponse(200, {"data": [{"url": "https://cdn/x.png"}]}),
                    get_response=FakeResponse(200, content=b"INDIRILEN"))
 
-    out = oc.generate(DALLE, "k", "1024x1024", "standard", 1,
+    out = oc.generate(MODEL, "k", "1024x1024", "low", 1,
                       client=c, credentials=CREDS)
 
     assert out == [b"INDIRILEN"]
@@ -139,7 +145,7 @@ def test_indirme_basarisiz_olursa_TURKCE_hata():
                    get_response=FakeResponse(404))
 
     with pytest.raises(ac.ImageError, match="indirilemedi"):
-        oc.generate(DALLE, "k", "1024x1024", "standard", 1,
+        oc.generate(MODEL, "k", "1024x1024", "low", 1,
                     client=c, credentials=CREDS)
 
 
@@ -201,6 +207,23 @@ def test_icerik_politikasi_reddi_ayri_mesaj():
     assert "İçerik politikası" in mesaj
 
 
+def test_SEMA_hatasi_ICERIK_reddi_olarak_gosterilmiyor():
+    """ÖLÇÜLMÜŞ YANLIŞ POZİTİF: ölçüt çıplak `"content" in detail` iken
+    şema hataları da "İçerik politikası reddi" diye gösteriliyordu.
+
+    Bedeli en pahalı yanlış yönlendirme: kullanıcı hiç engellenmemiş bir
+    prompt'u yeniden yazmaya çalışıyor, gerçek sebep (istemcinin gönderdiği
+    alan) hiçbir yerde görünmüyor. Yüklem `providers.is_content_policy`te
+    paylaşılıyor — aynı gövde `openai_chat` üzerinden de geliyor.
+    """
+    mesaj = oc.map_error(400, {"error": {
+        "message": "Invalid value for 'content': expected a string"}})
+
+    assert "İçerik politikası" not in mesaj
+    # Gerçek sebep KAYBOLMUYOR.
+    assert "expected a string" in mesaj
+
+
 def test_bilinmeyen_durum_detayi_TASIYOR():
     mesaj = oc.map_error(500, {"error": {"message": "iç hata"}})
     assert "500" in mesaj and "iç hata" in mesaj
@@ -247,3 +270,40 @@ def test_gövde_azure_ikizi_ile_AYRISMIYOR():
         assert azure[anahtar] == openai[anahtar], anahtar
     assert azure["model"] == ac.MODEL_NAME
     assert openai["model"] == "gpt-image-1"
+
+
+def test_404_MODELIN_adini_soyluyor():
+    """`dall-e-3`ün API'den kalktığı gün kullanıcının gördüğü metin
+    "OpenAI isteği başarısız (HTTP 404)" idi: hangi modelin kalktığını
+    söylemeyen, dolayısıyla kullanıcıyı ANAHTARINI kurcalamaya iten bir hata.
+    Katalogdaki her tel adı bir gün kalkacak — o günün maliyeti, adı yazmakla
+    bir cümleye düşüyor.
+
+    Ad GÖVDEDEN okunuyor (`json["model"]`), yani telin GERÇEKTEN gönderdiği
+    değer: kataloğu ikinci kez okumak, ayrışabilecek bir ikinci kaynak olurdu.
+    """
+    c = FakeClient(FakeResponse(404, None))
+
+    with pytest.raises(ac.ImageError) as e:
+        oc.generate(IKINCI, "k", "1024x1024", "low", 1, client=c,
+                    credentials=CREDS)
+
+    mesaj = str(e.value)
+    assert IKINCI.wire_model in mesaj, "hangi model kalktı, okunmuyor"
+    assert "tanımıyor" in mesaj
+    # Kullanıcıya YAPACAĞI İŞ söyleniyor: anahtar değil, model değiştirmek.
+    assert "şerit" in mesaj
+    assert "anahtar" not in mesaj.lower()
+
+
+def test_404_DUZENLEME_yolunda_da_adi_soyluyor():
+    """`edit` multipart gönderiyor: ad `json`da değil `data`da. İki yoldan
+    birini kapatmak, kullanıcının hangi düğmeye bastığına göre değişen bir
+    hata metni demekti."""
+    c = FakeClient(FakeResponse(404, None))
+
+    with pytest.raises(ac.ImageError) as e:
+        oc.edit(IKINCI, "k", [("a.png", b"x")], "1024x1024", "low", 1,
+                client=c, credentials=CREDS)
+
+    assert IKINCI.wire_model in str(e.value)

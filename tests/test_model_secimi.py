@@ -28,8 +28,11 @@ def client(tmp_path, monkeypatch):
 def genis_katalog(monkeypatch):
     """Kataloğa ikinci bir model ekler: farklı boyut kümesi, n=1, düzenleme YOK.
 
-    `dall-e-3`'ün gerçek kısıtlarının şekli — yetenek sisteminin tek modelle
-    ölçülemeyen tarafını (kümelerin GERÇEKTEN modele bağlı olması) sınıyor.
+    Yetenek sisteminin tek modelle ölçülemeyen tarafını (kümelerin GERÇEKTEN
+    modele bağlı olması) sınıyor. Şekil bir zamanlar `dall-e-3`ün gerçek
+    kısıtlarıydı; o model kalktıktan sonra kısıtlar SENTETİK kaldı ve fikstür
+    bu yüzden daha da gerekli — mekanizmayı taşıyan gerçek bir model yoksa
+    onu ölçen tek şey burası.
     """
     tek = catalog.ImageModel(
         id="test-tek-atis", label="Test · tek atış", provider="azure",
@@ -172,7 +175,8 @@ def test_edit_model_alani_YOKKEN_varsayilana_dusuyor(client, monkeypatch):
 
 def test_edit_duzenlemeyi_desteklemeyen_modeli_reddediyor(client, genis_katalog,
                                                          monkeypatch):
-    """`dall-e-3` gerçekten böyle bir model, yani bu ilk günden canlı bir yol."""
+    """Kataloğa `supports_edit=False` bir model girdiği gün canlı olacak yol;
+    bugün fikstürle ölçülüyor (bkz. `genis_katalog`)."""
     monkeypatch.setattr(appmod, "_to_png", lambda raw: b"\x89PNG")
 
     r = client.post("/api/edit",
@@ -245,3 +249,47 @@ def test_iki_ucun_yetenek_karari_AYRISMIYOR(client, monkeypatch, size, quality, 
 
     assert json_ok is gecerli
     assert form_ok is gecerli, "multipart uç JSON ucundan ayrıştı"
+
+
+# ── ORAN jetonu: uçtan uca ─────────────────────────────────────────────
+
+
+def test_ORAN_jetonu_dogrulamadan_gecip_KAYDA_yazilabiliyor(client, monkeypatch):
+    """`sizes` alanının docstring'i bu günü tarif ediyordu: jeton `WxH` değil.
+
+    Zincirin tamamı ölçülüyor çünkü kırılabilecek yer bir tane değil:
+    `check_capabilities` (kümede mi), `storage.save` (alanı koşulsuz yazıyor) ve
+    `ResultParams.size` (allowlist'siz olması BU yüzden). İkinci bir
+    `aspect_ratio` alanı açmamanın bedeli tam olarak bu testin ölçtüğü şey.
+    """
+    monkeypatch.setattr(appmod.providers, "generate",
+                        lambda *a, **k: [b"\x89PNG"])
+    m = catalog.image_model("gemini-nano-banana-2")
+
+    r = client.post("/api/generate", json={"prompt": "kedi", "size": "21:9",
+                                           "quality": "4K", "n": 1,
+                                           "model": m.id})
+
+    assert r.status_code == 200, r.text
+    kayit = r.json()["images"][0]
+    assert kayit["size"] == "21:9"
+    assert kayit["model"] == m.id
+    # Kredi ÜRETİM ANINDA çözülüyor: 4K'nın kendi tarifesi var, tabana düşmüyor.
+    assert kayit["credits"] == catalog.cost_for(m, "4K") == 12
+
+
+def test_ORAN_secen_modelde_PIKSEL_jetonu_reddediliyor(client, monkeypatch):
+    """Kümeler GERÇEKTEN modele bağlı: Azure'ın jetonu Gemini'de geçmiyor.
+
+    Geçse sağlayıcıya `aspect_ratio: "1024x1024"` giderdi ve kullanıcı 400'ün
+    sebebini Ayarlar'da arardı.
+    """
+    monkeypatch.setattr(appmod.providers, "generate",
+                        lambda *a, **k: [b"\x89PNG"])
+
+    r = client.post("/api/generate", json={"prompt": "k", "size": "1024x1024",
+                                           "quality": "2K", "n": 1,
+                                           "model": "gemini-nano-banana-2"})
+
+    assert r.status_code == 422
+    assert "bu boyutu desteklemiyor" in r.text

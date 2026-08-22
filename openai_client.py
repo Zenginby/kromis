@@ -34,13 +34,22 @@ import providers
 # ayarlayıp diğerini unutmanın kapısı olurdu.
 
 
-def map_error(status_code: int, body: dict | None) -> str:
+def map_error(status_code: int, body: dict | list | None, *,
+              wire_model: str | None = None) -> str:
     """HTTP durumunu Türkçe mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
 
     `providers.detail_of` gövde şeklini çözüyor (dört sağlayıcı da
     `{"error": {"message": …}}` kullanıyor), ama metinler sağlayıcıya özgü
     kalmak zorunda: "Azure yetkilendirme hatası" diyen bir mesaj OpenAI
     anahtarını kurcalayan kullanıcıyı yanlış forma yönlendirir.
+
+    404 ARTIK MODELİ SÖYLÜYOR ve bu dal bu dosyanın en çok işe yarayan yeri
+    olabilir: `dall-e-3`'ün API'den kalkması tam olarak burada görünüyordu ve
+    o gün kullanıcı "OpenAI isteği başarısız (HTTP 404)" okuyordu — hangi
+    modelin kalktığını söylemeyen, dolayısıyla kullanıcıyı anahtarını
+    kurcalamaya iten bir metin. Katalogdaki her tel adı bir gün kalkacak
+    (`openai_chat.map_error`ın ve `gemini_client.map_error`ın 404 dallarının
+    aynı gerekçesi); o günün maliyeti, adı yazmakla bir cümleye düşüyor.
     """
     detail = providers.detail_of(body)
     if status_code == 401:
@@ -52,7 +61,14 @@ def map_error(status_code: int, body: dict | None) -> str:
     if status_code == 429:
         return ("OpenAI istek limiti aşıldı (429): biraz bekleyip tekrar dene. "
                 "Faturalandırma limitin de dolmuş olabilir.")
-    if status_code == 400 and "content" in detail.lower():
+    if status_code == 404:
+        return ("OpenAI bu modeli tanımıyor (404)"
+                + (f": {wire_model}." if wire_model else ".")
+                + " Model kalkmış olabilir — composer'daki şeritten başka bir "
+                "model seç." + (f" {detail}" if detail else ""))
+    # ÇIPLAK `"content" in detail` DEĞİL: `Invalid value for 'content'` de 400
+    # ve o bir şema hatası — bkz. providers.is_content_policy.
+    if status_code == 400 and providers.is_content_policy(detail):
         return "İçerik politikası reddi: prompt OpenAI tarafından engellendi."
     return f"OpenAI isteği başarısız (HTTP {status_code})." + (f" {detail}" if detail else "")
 
@@ -62,9 +78,10 @@ def build_payload(prompt: str, size: str, quality: str, n: int, *,
     """`/images/generations` gövdesi.
 
     `ac.build_payload`'ın aynısı, tek farkla: `model` sabit değil PARAMETRE.
-    `response_format` BİLEREK gönderilmiyor — `gpt-image-1` onu kabul etmiyor
-    ve zaten b64 döndürüyor; `dall-e-3` için varsayılan URL olurdu ama
-    `decode_images` her iki şekli de karşılıyor (bkz. aşağısı).
+    `response_format` BİLEREK gönderilmiyor — `gpt-image-*` ailesi onu kabul
+    etmiyor ve zaten b64 döndürüyor. (Bu satır bir zamanlar `dall-e-3`'ün URL
+    dönen varsayılanından söz ediyordu; o model 12 Mayıs 2026'da API'den
+    kalktı ve katalogdan çıkarıldı.)
     """
     return {"model": api_model, "prompt": prompt, "size": size,
             "quality": quality, "n": n}
@@ -74,10 +91,18 @@ def decode_images(response_json: dict, *, client=None) -> list[bytes]:
     """`data[]` içindeki her öğeyi PNG baytına çevirir.
 
     `ac.decode_images`'tan AYRILDIĞI tek nokta: orada `b64_json` KOŞULSUZ
-    varsayılıyor (Azure her zaman öyle döndürüyor). Burada `url` de karşılanıyor
-    çünkü `dall-e-3` varsayılan olarak URL döndürüyor ve `response_format`
-    göndermemeyi tercih ettik. URL dalı ikinci bir HTTP isteği demek — o yüzden
-    `client` buraya kadar taşınıyor.
+    varsayılıyor (Azure her zaman öyle döndürüyor). Burada `url` de karşılanıyor.
+    URL dalı ikinci bir HTTP isteği demek — o yüzden `client` buraya kadar
+    taşınıyor.
+
+    URL DALI NEDEN DURUYOR: onu getiren model (`dall-e-3`, tek görselini URL
+    olarak döndürüyordu) 12 Mayıs 2026'da API'den kalktı, yani bugün katalogdaki
+    hiçbir OpenAI modeli o şekli üretmiyor. Dal yine de silinmedi ve gerekçe
+    kataloğun kendisinde yazılı: `openai` kimliğinin `url_env`i var, yani
+    kullanıcı uyumlu bir vekilin (proxy/gateway) arkasına geçebiliyor ve o
+    vekillerin bir kısmı b64 yerine URL döndürüyor. Silmek, çalışan bir
+    kurulumu "ne b64_json ne url var" hatasına çevirirdi — kazancı ise
+    ölçülmemiş bir sadelik.
 
     Adaptör sözleşmesi "çözülmüş PNG baytları döndür" diyor; bu fonksiyon o
     sözleşmenin OpenAI tarafındaki bedeli. Çağıran taraf hangi şeklin geldiğini
@@ -148,7 +173,13 @@ def _post(endpoint, headers, *, client, read, json=None, data=None, files=None):
             body = resp.json()
         except Exception:
             body = None
-        raise ac.ImageError(map_error(resp.status_code, body))
+        # Tel adı GÖVDEDEN: `generate` JSON, `edit` multipart `data`
+        # gönderiyor ve ikisinde de `model` alanı var. İmzaya eklemek aynı
+        # değeri iki yoldan taşımak olurdu (`gemini_client._post`un aynı
+        # gerekçesi).
+        raise ac.ImageError(map_error(
+            resp.status_code, body,
+            wire_model=(json or data or {}).get("model")))
     return resp.json()
 
 

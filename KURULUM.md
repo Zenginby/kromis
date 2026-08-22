@@ -148,13 +148,24 @@ icacls "$env:USERPROFILE\.config\lumeo\credentials.env"
 ```
 
 ## 4. Prompt Yönetmeni'ni aç (istersen)
-Aynı Ayarlar penceresinde, **Prompt Yönetmeni (sohbet modeli)** başlığının altındaki
-**Dağıtım adı** alanına Kurum'dan aldığın adı yaz (ör. `gpt-5.6-luna`) → **Kaydet**.
+Yönetmen üç sağlayıcı ile konuşabiliyor; hangisini kullandığına göre yapılacak
+şey değişiyor.
 
-Bu, Azure AI Foundry'deki **deployment** adıdır; model ailesi adı değil. Boş
-bırakırsan üst bardaki "Prompt Yönetmeni" sekmesi açılır ama **Gönder** kilitli
-kalır ve nedenini panelde yazar. Sohbet, görselinkiyle aynı endpoint ve API
-anahtarını kullanır — ikinci bir anahtar girmen gerekmez.
+**Azure kullanacaksan:** Ayarlar penceresinde sağlayıcı **Azure OpenAI** seçili
+dururken, **Prompt Yönetmeni (sohbet modeli)** başlığının altındaki
+**Dağıtım adı** alanına Kurum'dan aldığın adı yaz (ör. `gpt-5.6-luna`) →
+**Kaydet**. Bu, Azure AI Foundry'deki **deployment** adıdır; model ailesi adı
+değil. Sohbet, görselinkiyle aynı endpoint ve API anahtarını kullanır — ikinci
+bir anahtar girmen gerekmez.
+
+**OpenAI ya da Gemini kullanacaksan:** girilecek bir dağıtım adı yok (o alan
+zaten görünmüyor). Sağlayıcının API anahtarını kaydetmen yeterli; model adı
+uygulamanın içinde yazılı.
+
+Sohbet modelini composer'ın üstündeki şeritten seçiyorsun ve şerit
+**anahtarı kayıtlı olan** modelleri gösteriyor. Hiçbir sohbet sağlayıcısı
+yapılandırılmamışsa "Prompt Yönetmeni" sekmesi yine açılır ama **Gönder**
+kilitli kalır ve nedenini panelde yazar.
 
 ## 5. Kullan
 Prompt yaz → **Üret**. Ürettiğin görseller bilgisayarında saklanır; uygulamayı
@@ -276,6 +287,10 @@ adım), yani uygulamayı silip yenisini koymak geçmişine dokunmaz.
   bazı kurumsal antivirüsler yanlış-pozitif verebiliyor. Klasörü silme, Kurum'ya
   yaz.
 - **Görsel üretilmiyor, hata mesajı çıkıyor:** key süresi/rotasyonu için Kurum'ya yaz.
-- **Prompt Yönetmeni'nde "Gönder" kilitli:** Ayarlar → **Dağıtım adı** boş.
+- **Prompt Yönetmeni'nde "Gönder" kilitli:** hiçbir sohbet sağlayıcısı
+  yapılandırılmamış. Azure'da **Dağıtım adı** boştur; OpenAI/Gemini'de anahtar
+  kaydedilmemiştir. Düğmenin üzerine gelince hangi modelin eksik olduğunu yazar.
 - **"Sohbet dağıtımı bulunamadı (404)":** yazdığın dağıtım adı Azure'daki adla
   birebir aynı değil. Kurum'ya doğru adı sor.
+- **"… bu modeli tanımıyor (404)":** OpenAI/Gemini tarafında seçtiğin model
+  kalkmış olabilir — şeritten başka bir sohbet modeli seç.

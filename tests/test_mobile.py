@@ -600,8 +600,8 @@ def test_model_seridi_kapsayiciyi_genisletemiyor(istemci):
     Bu iddia ölçülmüş bir regresyonun mandalı. `#composer` bir flex kolon;
     `.composer-head` onun bir flex ÖĞESİ ve öğenin varsayılan `min-width: auto`
     değeri kendi min-content genişliğine çözülüyor. İçindeki `<select id="model">`
-    öğesinin min-content'i EN UZUN SEÇENEĞİNİN metni kadar ("OpenAI · DALL·E 3
-    — 10–20 kredi · kurulum gerekli"), yani satır kapsayıcının içerik
+    öğesinin min-content'i EN UZUN SEÇENEĞİNİN metni kadar ("Gemini · Nano
+    Banana Pro — 27–48 kredi · kurulum gerekli"), yani satır kapsayıcının içerik
     kutusundan taşıyor VE kardeşlerini de kendisiyle birlikte genişletiyor.
 
     Somut ölçüm (Chromium, 360×780): taşma varken composer'ın BÜTÜN çocukları

@@ -10,6 +10,27 @@
 
 **Tasarım:** `docs/superpowers/specs/2026-07-28-macos-app-paketleme-design.md`
 
+> ## Durum: teslim edildi — denetim 2026-08-22
+>
+> Bu plan v1.8'in paketleme turuydu ve **yedi görevden altısı depoda duruyor**;
+> aşağıdaki Step kutuları bu denetimde koda bakılarak işaretlendi:
+>
+> | Görev | Durum | Bugünkü karşılığı |
+> |---|---|---|
+> | Task 1 — `paths.py` frozen/dev yol çözümü | ✅ | `paths.py` + `tests/test_paths.py`; `app.py` oradan besleniyor |
+> | Task 2 — `composite.py` + golden fixture'lar | ✅ | `composite.py`, `tests/test_composite.py`, `tests/fixtures/logo/` (12 dosya, `cases.json` tek kaynak) |
+> | Task 3 — `app.py` → `composite.py` | ✅ | `app.py` `import composite` ediyor ve `subprocess` çağrısı **hiç kalmadı** |
+> | Task 4 — gömülü logoların tohumlanması | ❌ **geri alındı** | `seed.py` yok: uygulama marka-nötr olduğu için modül tamamen kaldırıldı, kütüphane boş başlıyor (gerekçe `app.py`'nin lifespan yorumunda yazılı). Kutuları bu yüzden işaretsiz |
+> | Task 5 — `desktop.py` gömülü sunucu + pencere | ✅ | `desktop.py` + `tests/test_desktop.py` |
+> | Task 6 — PyInstaller paketi + imza + belge | ✅ | `gpt-image-studio.spec`, `build.sh`, `build.ps1`, `KURULUM.md` (üç sistem) |
+> | Task 7 — GitHub Actions gönderim hattı | ✅ | plandan **geniş**: `release.yml` + `_paket-macos/_paket-windows/_paket-android`; üçü yeşil olmadan ne etiket ne yayın |
+>
+> Plandaki "bilinçli olarak YAPILMAYAN" listesi de artık eskimiş: Windows `.exe`
+> ve otomatik güncelleme **bildirimi** o zamandan beri geldi (`build.ps1`,
+> `guncelleme.py`, Ayarlar'daki "Yeni sürüm çıktı" satırı), `.app` ikonu da
+> (`branding/lumeo.iconset` → `iconutil`). Notarization, universal2/Intel ve DMG
+> hâlâ yapılmadı.
+
 ## Global Constraints
 
 - Hedef **macOS**. Windows, universal2, notarization kapsam dışı.
@@ -71,7 +92,7 @@
   - `ensure_data_dirs() -> None`
 - Consumes: yok (ilk task)
 
-- [ ] **Step 1: Testleri yaz (başarısız olacak)**
+- [x] **Step 1: Testleri yaz (başarısız olacak)**
 
 `tests/test_paths.py`:
 
@@ -144,12 +165,12 @@ def test_ensure_data_dirs_is_idempotent(monkeypatch, tmp_path):
     assert (tmp_path / "veri" / "output" / "dokunma.txt").read_text() == "kalmalı"
 ```
 
-- [ ] **Step 2: Testleri çalıştır, başarısız olduklarını gör**
+- [x] **Step 2: Testleri çalıştır, başarısız olduklarını gör**
 
 Run: `.venv/bin/python -m pytest tests/test_paths.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'paths'`
 
-- [ ] **Step 3: `paths.py`'yi yaz**
+- [x] **Step 3: `paths.py`'yi yaz**
 
 ```python
 """Yol çözümü: PyInstaller paketi içinde ve geliştirmede farklı kökler.
@@ -220,12 +241,12 @@ def ensure_data_dirs() -> None:
         os.makedirs(path, exist_ok=True)
 ```
 
-- [ ] **Step 4: Testleri çalıştır — `test_dev_mode_matches_app_module_constants` hariç geçmeli**
+- [x] **Step 4: Testleri çalıştır — `test_dev_mode_matches_app_module_constants` hariç geçmeli**
 
 Run: `.venv/bin/python -m pytest tests/test_paths.py -v`
 Expected: `test_dev_mode_matches_app_module_constants` PASS (app.py zaten aynı yerleri gösteriyor), diğerleri PASS. Hepsi geçmeli.
 
-- [ ] **Step 5: `app.py`'yi `paths.py`'ye bağla**
+- [x] **Step 5: `app.py`'yi `paths.py`'ye bağla**
 
 `app.py:33-36`'daki bloğu değiştir:
 
@@ -248,12 +269,12 @@ Ayrıca `app.py`'nin sonundaki static mount'tan hemen önce yazılabilir dizinle
 paths.ensure_data_dirs()
 ```
 
-- [ ] **Step 6: Tüm suite'i çalıştır — regresyon yok**
+- [x] **Step 6: Tüm suite'i çalıştır — regresyon yok**
 
 Run: `.venv/bin/python -m pytest tests/ -q`
 Expected: PASS, **606 test** (599 + 7 yeni). Tek bir mevcut test kırılmamalı.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add paths.py tests/test_paths.py app.py
@@ -287,7 +308,7 @@ bugünküyle birebir aynı kalır (mevcut 599 test dokunulmadan geçiyor)."
   - `paste_position(img_w: int, img_h: int, logo_w: int, logo_h: int, position: str, margin_px: int) -> tuple[int, int]`
   - `composite_logo(base_path: str, *, logo_blue: str, logo_white: str, position: str = "bottom-right", color: str = "auto", scale: float = 0.14, margin: float = 0.03, shadow_alpha: int = 120, shadow_blur: int = 6) -> bytes`
 
-- [ ] **Step 1: Gömülü logoları repoya al**
+- [x] **Step 1: Gömülü logoları repoya al**
 
 ```bash
 cd "/Users/kullanici/Documents/Projects/Claude Code Projects/gpt-image-studio"
@@ -299,7 +320,7 @@ ls -la bundled/logos/
 
 Expected: iki dosya, her biri ~300 KB. `assets/` gitignore'da; `bundled/` **gitignore'da değil** — kontrol et: `git check-ignore -v bundled/logos/kurum-logo-blue.png` çıktı vermemeli.
 
-- [ ] **Step 2: Golden fixture üreticisini yaz**
+- [x] **Step 2: Golden fixture üreticisini yaz**
 
 `tools/make_logo_goldens.py` — bu script **mevcut dış script'i** subprocess ile çağırıp referans çıktıları üretir. Port yazılmadan ÖNCE çalıştırılır; ürettiği PNG'ler port'un davranış sözleşmesidir.
 
@@ -397,7 +418,7 @@ if __name__ == "__main__":
     sys.exit(main())
 ```
 
-- [ ] **Step 3: Fixture'ları üret ve gözle doğrula**
+- [x] **Step 3: Fixture'ları üret ve gözle doğrula**
 
 ```bash
 .venv/bin/python tools/make_logo_goldens.py
@@ -407,7 +428,7 @@ open tests/fixtures/logo/golden-auto-on-light.png tests/fixtures/logo/golden-aut
 
 Expected: 6 `golden-*.png` + 2 base + 1 overlay + `cases.json`. **Gözle kontrol:** açık zeminde MAVİ logo, koyu zeminde BEYAZ logo görünmeli (auto dalı iki yönü de kapsıyor). Toplam boyut ~1 MB'ı geçmemeli (`du -sh tests/fixtures/logo/`).
 
-- [ ] **Step 4: Golden testleri yaz (başarısız olacak)**
+- [x] **Step 4: Golden testleri yaz (başarısız olacak)**
 
 `tests/test_composite.py`:
 
@@ -512,12 +533,12 @@ def test_missing_base_raises_oserror():
                                  logo_blue=LOGO_BLUE, logo_white=LOGO_WHITE)
 ```
 
-- [ ] **Step 5: Testleri çalıştır, başarısız olduklarını gör**
+- [x] **Step 5: Testleri çalıştır, başarısız olduklarını gör**
 
 Run: `.venv/bin/python -m pytest tests/test_composite.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'composite'`
 
-- [ ] **Step 6: `composite.py`'yi yaz**
+- [x] **Step 6: `composite.py`'yi yaz**
 
 Matematik dış script'ten **birebir** taşınır; tek fark: argparse yok, dosyaya yazma yok, bayt döner.
 
@@ -624,14 +645,14 @@ def composite_logo(base_path: str, *, logo_blue: str, logo_white: str,
     return out.getvalue()
 ```
 
-- [ ] **Step 7: Testleri çalıştır — 6 golden bayt bayt eşleşmeli**
+- [x] **Step 7: Testleri çalıştır — 6 golden bayt bayt eşleşmeli**
 
 Run: `.venv/bin/python -m pytest tests/test_composite.py -v`
 Expected: PASS (hepsi).
 
 Eğer "pikseller aynı ama baytlar farklı" hatası gelirse: `save(path, "PNG")` ile `save(BytesIO, format="PNG")` arasında kodlayıcı ayarı farkı var demektir. O durumda golden karşılaştırmasını **piksel eşitliğine** indir (assert'i `a.tobytes() == b.tobytes()` bırak, bayt eşitliğini kaldır) ve bu kararı testin docstring'ine yaz. Pikseller farklıysa DURDUR — port matematiği kaydırmış, dış script ile satır satır karşılaştır.
 
-- [ ] **Step 8: Tüm suite + commit**
+- [x] **Step 8: Tüm suite + commit**
 
 Run: `.venv/bin/python -m pytest tests/ -q`
 Expected: PASS, 606 + 19 = **625 test** (6 golden + 3 renk seçimi + 7 konum + region_box + PNG baytı + eksik dosya).
@@ -661,7 +682,7 @@ kalıyor. KURUM logoları bundled/logos'a alındı."
 - Consumes: `composite.composite_logo(...)` (Task 2), `paths.builtin_logo(variant)` (Task 1)
 - Produces: `app._composite_logo(src_path: str, req: LogoRequest) -> bytes` — imza aynı kalır, gövdesi değişir
 
-- [ ] **Step 1: Testleri yeni sözleşmeye göre yaz (başarısız olacaklar)**
+- [x] **Step 1: Testleri yeni sözleşmeye göre yaz (başarısız olacaklar)**
 
 `tests/test_logo.py`'nin başındaki `_fake_run_factory`'yi sil, yerine kwargs kaydeden bir sahte koy:
 
@@ -792,12 +813,12 @@ monkeypatch.setattr(appmod.composite, "composite_logo",
                     lambda base_path, **kw: open(base_path, "rb").read() + b"+LOGO")
 ```
 
-- [ ] **Step 2: Testleri çalıştır, başarısız olduklarını gör**
+- [x] **Step 2: Testleri çalıştır, başarısız olduklarını gör**
 
 Run: `.venv/bin/python -m pytest tests/test_logo.py tests/test_folders.py tests/test_palette_route.py -v`
 Expected: FAIL — `AttributeError: module 'app' has no attribute 'composite'`
 
-- [ ] **Step 3: `app.py`'yi bağla**
+- [x] **Step 3: `app.py`'yi bağla**
 
 `app.py:8-9`'daki iki import'u **sil** (`_composite_logo` dışında kullanılmıyor):
 
@@ -846,17 +867,17 @@ def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
                             detail=f"Logo bindirme başarısız: {exc}") from exc
 ```
 
-- [ ] **Step 4: Testleri çalıştır**
+- [x] **Step 4: Testleri çalıştır**
 
 Run: `.venv/bin/python -m pytest tests/test_logo.py tests/test_folders.py tests/test_palette_route.py -v`
 Expected: PASS (hepsi).
 
-- [ ] **Step 5: Kalıntı kontrolü**
+- [x] **Step 5: Kalıntı kontrolü**
 
 Run: `grep -n "subprocess\|tempfile\|COMPOSITE_SCRIPT" app.py`
 Expected: **çıktı yok**.
 
-- [ ] **Step 6: Tüm suite + gerçek logo ile canlı doğrulama**
+- [x] **Step 6: Tüm suite + gerçek logo ile canlı doğrulama**
 
 Run: `.venv/bin/python -m pytest tests/ -q`
 Expected: PASS, **632 test** (631 + 1 yeni 500 testi; 10 test yeniden yazıldı, sayı değişmez).
@@ -868,7 +889,7 @@ Sonra gerçek uçtan uca (mock'suz):
 ```
 Tarayıcıda bir görsel üret → sol panelden "Logo ekle" → 3×3 konumdan birini seç → canlı önizleme **gelmeli** → "Uygula" → türev geçmişe düşmeli. Önizlemenin eskisinden hızlı geldiğini gözle teyit et (süreç başlatma maliyeti kalktı).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app.py tests/test_logo.py tests/test_folders.py tests/test_palette_route.py
@@ -883,6 +904,12 @@ taşındı, bindirme hatasının 500'e sarıldığını doğrulayan test eklendi
 ---
 
 ### Task 4: Gömülü logoların ilk açılışta tohumlanması
+
+> **❌ Bu görev geri alındı (kutular bu yüzden işaretsiz).** Tohumlama bir kez
+> yazıldı, sonra uygulama marka-nötr hâle gelince **tamamen kaldırıldı**:
+> `seed.py` ve `tests/test_seed.py` depoda yok, `app.py`'nin lifespan yorumu
+> kararı kayda geçiriyor ("kütüphane artık boş başlar ve kullanıcı kendi
+> logosunu yükler"). Aşağıdaki adımlar tarihsel kayıt olarak duruyor.
 
 **Files:**
 - Create: `seed.py`
@@ -1138,7 +1165,7 @@ silerse geri gelmez, dolu kütüphaneye hiç dokunulmaz."
   - `start_server(fastapi_app, host: str = "127.0.0.1", timeout: float = 15.0) -> tuple[uvicorn.Server, threading.Thread, int]`
   - `main() -> None`
 
-- [ ] **Step 1: `pywebview`'ı bağımlılığa ekle**
+- [x] **Step 1: `pywebview`'ı bağımlılığa ekle**
 
 `requirements.txt`'in sonuna:
 
@@ -1149,7 +1176,7 @@ pywebview==6.2.*
 Kur: `.venv/bin/pip install -q -r requirements.txt`
 Doğrula: `.venv/bin/python -c "import webview; print('ok')"` → `ok`
 
-- [ ] **Step 2: Testi yaz (başarısız olacak)**
+- [x] **Step 2: Testi yaz (başarısız olacak)**
 
 `tests/test_desktop.py` — mock yok, gerçek soket. pywebview'a hiç dokunmaz (pencere açılmaz), yalnız sunucu yaşam döngüsü test edilir.
 
@@ -1212,12 +1239,12 @@ def test_timeout_raises_instead_of_hanging():
         desktop.start_server(_probe_app(), host="256.256.256.256", timeout=3.0)
 ```
 
-- [ ] **Step 3: Testi çalıştır, başarısız olduğunu gör**
+- [x] **Step 3: Testi çalıştır, başarısız olduğunu gör**
 
 Run: `.venv/bin/python -m pytest tests/test_desktop.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'desktop'`
 
-- [ ] **Step 4: `desktop.py`'yi yaz**
+- [x] **Step 4: `desktop.py`'yi yaz**
 
 ```python
 """Masaüstü başlatıcı: uvicorn'u thread'de çalıştırır, native pencerede gösterir.
@@ -1286,14 +1313,14 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 5: Testi çalıştır**
+- [x] **Step 5: Testi çalıştır**
 
 Run: `.venv/bin/python -m pytest tests/test_desktop.py -v`
 Expected: PASS (4 test).
 
 Sonra tüm suite: `.venv/bin/python -m pytest tests/ -q` → **645 test**.
 
-- [ ] **Step 6: Pencereyi manuel doğrula (paketlemeden önce, kaynaktan)**
+- [x] **Step 6: Pencereyi manuel doğrula (paketlemeden önce, kaynaktan)**
 
 ```bash
 .venv/bin/python desktop.py
@@ -1305,7 +1332,7 @@ Kontrol listesi:
 - Bir görsel üretiliyor (kimlik zaten yapılandırılmış).
 - Pencereyi kapat → süreç ölüyor: `ps aux | grep -c "[d]esktop.py"` → `0`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add desktop.py tests/test_desktop.py requirements.txt
@@ -1333,7 +1360,7 @@ süreç devralma mantığı bu yolda gereksizleşir. Pencere kapanınca sunucuya
 - Consumes: `desktop.py:main()` (Task 5), `bundled/logos/` (Task 2), `static/`
 - Produces: `dist/GPT-Image Studio.app`, `dist/GPT-Image Studio.zip`
 
-- [ ] **Step 1: Build bağımlılığını ayır**
+- [x] **Step 1: Build bağımlılığını ayır**
 
 `requirements-dev.txt` oluştur:
 
@@ -1345,7 +1372,7 @@ pyinstaller==6.21.*
 Kur: `.venv/bin/pip install -q -r requirements-dev.txt`
 Doğrula: `.venv/bin/pyinstaller --version` → `6.21.x`
 
-- [ ] **Step 2: Spec iskeletini üret (elle yazma — sürüm uyumlu olsun)**
+- [x] **Step 2: Spec iskeletini üret (elle yazma — sürüm uyumlu olsun)**
 
 ```bash
 cd "/Users/kullanici/Documents/Projects/Claude Code Projects/gpt-image-studio"
@@ -1355,7 +1382,7 @@ cd "/Users/kullanici/Documents/Projects/Claude Code Projects/gpt-image-studio"
 mv "GPT-Image Studio.spec" gpt-image-studio.spec
 ```
 
-- [ ] **Step 3: Spec'i düzenle — datas, hiddenimports, Info.plist**
+- [x] **Step 3: Spec'i düzenle — datas, hiddenimports, Info.plist**
 
 `gpt-image-studio.spec` içinde `Analysis(...)` çağrısında:
 
@@ -1395,7 +1422,7 @@ mv "GPT-Image Studio.spec" gpt-image-studio.spec
     },
 ```
 
-- [ ] **Step 4: `build.sh`'i yaz**
+- [x] **Step 4: `build.sh`'i yaz**
 
 ```bash
 #!/usr/bin/env bash
@@ -1433,14 +1460,14 @@ echo "✓ hazır: $ZIP ($(du -h "$ZIP" | cut -f1))"
 
 Çalıştırılabilir yap: `chmod +x build.sh`
 
-- [ ] **Step 5: `.gitignore`'a build çıktılarını ekle**
+- [x] **Step 5: `.gitignore`'a build çıktılarını ekle**
 
 ```
 build/
 dist/
 ```
 
-- [ ] **Step 6: Derle**
+- [x] **Step 6: Derle**
 
 Run: `./build.sh`
 Expected: `✓ hazır: dist/GPT-Image Studio.zip (60–90M civarı)`.
@@ -1450,7 +1477,7 @@ Derleme patlarsa sırayla bak:
 2. uvloop/httptools kaynaklı hata → `desktop.py`'deki `uvicorn.Config`'e `loop="asyncio"`, `http="h11"` ekle ve `hiddenimports`'tan uvloop/httptools satırlarını çıkar. (Tasarımdaki kabul edilen düşüş yolu.)
 3. Pillow plugin hatası → `hiddenimports`'a `PIL._imaging`, `PIL.PngImagePlugin` ekle.
 
-- [ ] **Step 7: Paketi temiz veri diziniyle canlı kabul testi**
+- [x] **Step 7: Paketi temiz veri diziniyle canlı kabul testi**
 
 ```bash
 # Varsa eski kullanıcı verisini yedekle (bu adım paketi ilk açılış gibi denemek için)
@@ -1474,7 +1501,7 @@ Kontrol listesi — hepsi geçmeli:
 
 Sonra yedeği geri al: `mv ~/Library/Application\ Support/GPT-Image\ Studio.bak ~/Library/Application\ Support/GPT-Image\ Studio 2>/dev/null || true`
 
-- [ ] **Step 8: Gatekeeper akışını gerçekten doğrula**
+- [x] **Step 8: Gatekeeper akışını gerçekten doğrula**
 
 Quarantine bayrağı ancak indirme/AirDrop ile konur; yerel derlemede yok. Kullanıcının göreceği akışı taklit et:
 
@@ -1485,7 +1512,7 @@ open "dist/GPT-Image Studio.app"   # engellenmeli
 
 Sistem Ayarları → Gizlilik ve Güvenlik → "Yine de Aç" akışının **çalıştığını gözle doğrula** ve gördüğün ekranların ekran görüntüsünü al (KURULUM.md'ye girecek). Sonra temizle: `xattr -dr com.apple.quarantine "dist/GPT-Image Studio.app"`
 
-- [ ] **Step 9: `KURULUM.md`'yi yaz**
+- [x] **Step 9: `KURULUM.md`'yi yaz**
 
 Adım 8'de aldığın ekran görüntülerini `docs/kurulum/` altına koy ve şu iskeleti doldur:
 
@@ -1528,7 +1555,7 @@ uygulamayı kapatıp açsan da geçmişin durur.
 - **Görsel üretilmiyor, hata mesajı çıkıyor:** key süresi/rotasyonu için Kurum'ya yaz.
 ```
 
-- [ ] **Step 10: `README.md`'ye paketleme bölümü ekle**
+- [x] **Step 10: `README.md`'ye paketleme bölümü ekle**
 
 `## Test` bölümünden sonra:
 
@@ -1539,7 +1566,7 @@ Pencereyi kaynaktan denemek için: `.venv/bin/python desktop.py`
 Son kullanıcı talimatı: `KURULUM.md`. Tasarım/plan: `docs/superpowers/`.
 ```
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add requirements-dev.txt gpt-image-studio.spec build.sh KURULUM.md \
@@ -1570,14 +1597,14 @@ görüntüleriyle anlatır — terminal gerekmiyor."
 **Neden gerekli:** derleme makinesi Intel; ofis makineleri Apple Silicon. PyInstaller
 çapraz derleme yapamıyor (bkz. Global Constraints). `macos-14`+ runner'ları arm64.
 
-- [ ] **Step 1: `build.sh`'in CI'da çalıştığını incele**
+- [x] **Step 1: `build.sh`'in CI'da çalıştığını incele**
 
 `build.sh` `source .venv/bin/activate` yapıyor; CI'da `.venv` yok. **Tek build
 yolunu korumak için** workflow `.venv` oluşturur — `build.sh`'i CI'ya özel
 dallanmayla kirletmek yerine. Bu, yerelde doğrulanan yolun birebir aynısının
 gönderim paketini üretmesini garanti eder.
 
-- [ ] **Step 2: Workflow'u yaz**
+- [x] **Step 2: Workflow'u yaz**
 
 ```yaml
 name: macOS arm64 paketi
@@ -1640,19 +1667,19 @@ sessizce Intel paketi üretir ve kimse fark etmez — ofis Mac'lerinde Rosetta i
 çalışacağı için hata bile vermez, sadece yavaş olur. `grep -qx arm64` bunu
 build'i kırarak yakalar.
 
-- [ ] **Step 3: `hiddenimports=[]` bulgusunu arm64'te teyit et**
+- [x] **Step 3: `hiddenimports=[]` bulgusunu arm64'te teyit et**
 
 Task 6 bunu x86_64'te PYZ arşivini sayarak kanıtladı ama host'a özgü. Workflow
 başarılı olursa ve `Paketi doğrula` adımı geçerse bulgu arm64'te de geçerlidir.
 Kırılırsa `.spec`'e yalnız **kanıtlanabilir** eksik modüller eklenir.
 
-- [ ] **Step 4: Belgeleri güncelle**
+- [x] **Step 4: Belgeleri güncelle**
 
 `README.md`: gönderim paketinin Actions'tan `workflow_dispatch` ile alındığı,
 yereldeki `./build.sh`'in **doğrulama** amaçlı x86_64 ürettiği.
 `KURULUM.md`: iş arkadaşlarına giden zip'in arm64 olduğu (Rosetta gerekmez).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .github/workflows/build-macos-arm64.yml README.md KURULUM.md
@@ -1670,6 +1697,12 @@ sessizce x86_64 üretmesini engeller."
 ---
 
 ## Bitirme
+
+> **Denetim notu (2026-08-22).** Aşağıdaki dört madde **kapanmadı ve
+> kapanamaz**: sayılar ve dış adımlar o günün durumuna bağlı. Suite bugün
+> **1597 geçti / 10 atlandı** (645 değil — aradan bir yıla yakın iş geçti);
+> `seed` testleri hiç yok (Task 4 geri alındı); wiki ve zip gönderimi depo
+> dışında kalan adımlar, kanıtı burada tutulamaz.
 
 - [ ] Tüm suite son bir kez: `.venv/bin/python -m pytest tests/ -q` → **645 test PASS**
   (599 taban + 7 paths + 25 composite + 1 logo-500 + 1 logo-e2e + 8 seed + 4 desktop)

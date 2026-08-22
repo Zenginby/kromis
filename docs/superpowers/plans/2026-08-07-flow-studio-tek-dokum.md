@@ -723,3 +723,26 @@ Kütüphane "Yüklemeler" + "Tümü") ve **Adım 10** (kozmetik süpürme; **D10
 Medya'ya hem seçiciye gelir**, bkz. B9). Karar bekleyenler: K14 (sonuç kartında "Düzenle"/"+ Ek"),
 D17 (klasör yeniden adlandırma), **K27 (seçicinin gezinmesinde iç içe klasör etiketi, §0.11)**,
 DM Sans bundle.
+
+> ## Durum denetimi (2026-08-22) — bu turun tamamı bitti
+>
+> Yukarıdaki "sıra 13'te" satırı eskidi. Bugün depoda:
+>
+> - **Adım 13 bitti** — tek döküm/tek composer yerinde: tek `#prompt`, tek `#go`,
+>   mod anahtarı `#plus-btn`'in yanında; `tests/test_playwright_studio.py` bu akışın
+>   E2E mandalı (Playwright kurulu olmayan koşumda temiz SKIP veriyor).
+> - **Adım 9 ve 10 bitti** (11 Ağustos, PR #25) — tema `prefs.json`'a yazılıyor,
+>   Kütüphane'de "Yüklemeler" + "Tümü", kozmetik süpürmenin altı maddesi
+>   (`#chats-kebab`, `#media-sort-btn`, `.folder-thumb`, `#media-rail-count`,
+>   `#media-empty-state`, `#folder-rename`).
+> - **D17 bitti** — `#folder-rename` + `PATCH /api/folders/{id}`.
+> - **DM Sans bundle bitti** (15 Ağustos) — `static/fonts/` iki woff2 + `OFL.txt`,
+>   mandalı `tests/test_fonts.py`.
+>
+> **Hâlâ açık üç madde** (bugün koda bakılarak doğrulandı, hiçbiri kapanmadı):
+>
+> | Madde | Bugünkü hâli |
+> |---|---|
+> | **K14** — sonuç kartında "Düzenle" / "+ Ek" | Kartta yalnız "İndir" var (`chat.js`), ikisi de gelmedi — kararın kendisi "tam geçmiş kaydı ister" diyordu, o kayıt hâlâ yok |
+> | **K27** — seçicide iç içe klasör etiketi | `picker-tile` künyesi yalnız en yakın klasörün adını yazıyor (`folders.js`), kök→klasör zinciri yok |
+> | **M1** — `aria-selected` düz `<button>`da geçersiz | Hâlâ öyle: `picker-tile` düz `<button>`, kapsayıcı `#picker-grid` düz `<div>`; ne `role="listbox"` ne `role="option"` var (`folders.js`) |

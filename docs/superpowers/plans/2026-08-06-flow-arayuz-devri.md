@@ -989,21 +989,48 @@ görüntüsü. Hepsi temiz olmadan commit yok.
 
 ## 7. Bitti sayılma ölçütü
 
-- [ ] Sekme yok: tek ray + tek composer; mod anahtarı (+) yanında, klavyeyle erişilebilir
+> **Durum denetimi (2026-08-22).** Aşağıdaki on kutunun **onu da** artık
+> işaretli; bu turda yedisi ölçülerek kapandı ve ölçüm belgeye değil
+> koda/tarayıcıya bakılarak yapıldı: `pytest tests/ -q` → **1597 geçti, 10
+> atlandı** (atlananlar yalnız Windows DACL testleri + kurulu olmayan
+> Playwright), `test_id_contract.py` → **12 geçti**; Chromium 1024×700'de
+> **yatay ve dikey taşma 0px**, **konsolda tek hata/uyarı yok**, dört temada
+> kontrast kapısının altında kalan görünür metin yok. **Açık kalan:** dört
+> sağlayıcının (fal.ai · Replicate · ComfyUI · Ollama) arayüzü ve `gitleaks`
+> kaydı bu listeye değil, master yol haritasına ait — buradan geriye yalnız
+> "aynı ekranda ikinci dolu düğme/emoji yok" ölçütü kalıyor ve o
+> `flow-redesign-plan.md` §11'de iki somut bulgusuyla açık duruyor.
+
+- [x] Sekme yok: tek ray + tek composer; mod anahtarı (+) yanında, klavyeyle erişilebilir
+      — `index.html`'de anahtar `.composer-bar` içinde `#plus-btn`'in yanında; eski
+      sekme id'leri o iki gerçek `<button>`a devredildi (§10/1'in birinci yolu)
 - [x] Döküm konuşmayı ve üretilen görselleri aynı akışta gösteriyor — Adım 7a
       (§0.6): `result` kartı + silinmiş görsel yer tutucusu + üretimin açık
       oturuma katılması
-- [ ] Arama yalnızca Medya'da; klasörler gezinme (kökte klasör kartları + klasörsüzler)
-- [ ] Dört tema da kontrast kapılarını geçiyor; monokrom varsayılan
-- [ ] Bugünkü tüm yetenekler yerinde: prompt, boyut/kalite/adet, referans + ek görsel,
+- [x] Arama yalnızca Medya'da; klasörler gezinme (kökte klasör kartları + klasörsüzler)
+      — `#media-search` yalnız Medya görünümünde; üst şeritte arama alanı yok; kök
+      `#folder-grid` + kırıntı gezinti (`folders.js`)
+- [x] Dört tema da kontrast kapılarını geçiyor; monokrom varsayılan — 22 Ağustos'ta
+      tarayıcıda her görünür metnin gerçek zemine karşı oranı ölçüldü, dört temada
+      ayrı ayrı: kapı altında öğe yok (ayrıntı ve tek ölçüm yapaylığı
+      `flow-redesign-plan.md` §11'de). Monokrom `:root`'ta varsayılan
+- [x] Bugünkü tüm yetenekler yerinde: prompt, boyut/kalite/adet, referans + ek görsel,
       tema rengi/palet, logo/motto/banner + offset, klasörler, çoklu seçim, indirme,
       büyüteç, Azure ayarları, yönetmen sohbeti, içe aktarma
       (**yedekler bilerek düştü** — bkz. §0.2 ertelenen D7)
-- [ ] 1024×700'de taşma yok
-- [ ] `pytest` tamamen yeşil (994'ten düşen her test id defterinde gerekçeli)
-- [ ] `test_id_contract.py` yeşil: kayıp id yok, sarkan JS bağı yok, defter dürüst
-- [ ] Tarayıcı konsolu 0 hata
-- [ ] DM Sans `latin-ext` ile paketli; `.app` içinde font dosyası doğrulandı
+      — hepsi id id arandı; Ayarlar artık üç sağlayıcı grubunu (Azure · OpenAI ·
+      Gemini) taşıyor, içe aktarma dosya bırakmayla duruyor
+- [x] 1024×700'de taşma yok — Chromium ölçümü: `scrollWidth - clientWidth = 0`,
+      `scrollHeight - clientHeight = 0` (gövde yüksekliği tam 700px)
+- [x] `pytest` tamamen yeşil (994'ten düşen her test id defterinde gerekçeli) — **1597 geçti / 10 atlandı** (22 Ağustos)
+- [x] `test_id_contract.py` yeşil: kayıp id yok, sarkan JS bağı yok, defter dürüst — **12 geçti** (22 Ağustos)
+- [x] Tarayıcı konsolu 0 hata — Chromium'da sayfa yüklenirken `pageerror` yok, konsolda error/warning yok
+- [x] DM Sans `latin-ext` ile paketli — `static/fonts/dm-sans-v17-latin.woff2` +
+      `…-latin-ext.woff2` depoda; `tests/test_fonts.py` dosyaların gerçek woff2 olduğunu,
+      `fonts.css`'in iki altkümeyi doğru `unicode-range` ile bağladığını ve Türkçe
+      harflerin (ğĞşŞİ latin-ext, ıçÇöÖüÜ latin) kapsandığını ölçüyor. Paket payı:
+      `gpt-image-studio.spec` `('static', 'static')` ile tüm dizini alıyor —
+      `.app`'in içi bu denetimde ayrıca elle açılmadı, mandal testtir
 
 ### §0.2 denetiminin maddeleri — mandal
 
@@ -1093,3 +1120,8 @@ Adım 10 — kozmetik (**bitti**, v0.2.0–v0.2.1):
 > karşılığı yazıldı — belgeye değil koda bakılarak. Flow-UI'dan geriye **yalnız
 > DM Sans bundle** kalıyor (§4; `--font-display` "DM Sans" diyor ama
 > `static/fonts/` yok, yani paket font'u taşımıyor).
+>
+> **Ek kayıt (2026-08-22).** O son madde de kapandı: `static/fonts/` iki woff2
+> altkümesiyle (latin + latin-ext) depoda ve `tests/test_fonts.py` bağlantıyı
+> ölçüyor. Flow-UI listesinden geriye ölçüt olarak yalnız "emoji/dekor yok"
+> maddesi kalıyor ve iki ihlali `flow-redesign-plan.md` §11'de yazılı.

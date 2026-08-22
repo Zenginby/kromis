@@ -86,20 +86,39 @@ Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Andr
 
 ## 🔮 Gelecek Yol Haritası (SaaS Transformation Master Plan)
 
-* **Faz 2: BYOK Çoklu Sağlayıcı Arayüzü**
-  - Ayarlar panelinde Fal.ai, Replicate, ComfyUI ve Ollama form sekmeleri (OpenAI ve Gemini tamamlandı).
-  - Model sağlayıcısı seçimi ve canlı bağlantı test düğmeleri.
-* **Faz 3: E-Ticaret Ürün Araçları**
-  - Elde Ürün Görselleştirme (Product-in-Hand).
-  - Otomatik Arka Plan Kaldırma & Konu Gölgeleme.
-  - Görsel İçi Metin & Banner Sihirbazı (E-ticaret duyuruları için).
-* **Faz 4: Image-to-Video Animasyon Motoru**
-  - Üretilen görselleri tek tıkla animasyona çevirme (Kling, Luma Dream Machine, Runway Gen-3 entegrasyonları).
-* **Faz 5: SaaS & Bulut Altyapısı**
-  - Kullanıcı hesapları ve çoklu çalışma alanları (Workspaces).
-  - Cloudinary CDN ve medya yönetimi entegrasyonu.
-  - Model kredi matrisi ve üyelik paketleri (Free, Basic, Pro, Max).
-  - Ücretsiz pakette filigran (watermark) kuralı.
+> **Durum denetimi (2026-08-22).** 21–22 Ağustos'taki çoklu sağlayıcı turundan
+> (model kataloğu → sağlayıcı adaptörleri → Gemini) sonra her madde **koda
+> bakılarak** işaretlendi, belgeye bakılarak değil. Faz faz tam döküm ve kanıtlar:
+> [master yol haritası](docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md).
+
+* **Faz 2: BYOK Çoklu Sağlayıcı Arayüzü** — 🟡 kısmen teslim
+  - [x] **Model ve sağlayıcı seçimi:** üst şeritte görsel modeli seçici, composer'da
+        sohbet modeli şeridi; ikisi de kayıtlı anahtara göre süzülüyor ve seçim
+        `prefs.json`'a yazılıyor.
+  - [x] **Ayarlar panelinde sağlayıcı grupları:** Azure OpenAI, OpenAI ve Google Gemini
+        (yalnız-OpenAI ya da yalnız-Gemini kurulumu da geçerli).
+  - [x] **Sağlayıcı adaptör katmanı:** görselde `providers.py`, sohbette
+        `chat_providers.py`; kataloğa girmemiş bir sağlayıcı sessizce Azure'a düşmüyor.
+  - [ ] Fal.ai, Replicate, ComfyUI ve Ollama sekmeleri — bugün yalnızca
+        `credentials.env` alanları ve durum bayrakları var; adaptör ve arayüz yok.
+  - [ ] Canlı bağlantı testi düğmeleri — bugünkü karşılık yalnız "anahtar kayıtlı mı"
+        listesi, gerçek bir çağrı denemesi değil.
+* **Faz 3: E-Ticaret Ürün Araçları** — ⬜ açık
+  - [ ] Elde Ürün Görselleştirme (Product-in-Hand).
+  - [ ] Otomatik Arka Plan Kaldırma & Konu Gölgeleme.
+  - [ ] Görsel İçi Metin & Banner Sihirbazı (E-ticaret duyuruları için).
+* **Faz 4: Image-to-Video Animasyon Motoru** — ⬜ açık
+  - [ ] Üretilen görselleri tek tıkla animasyona çevirme (Kling, Luma Dream Machine,
+        Runway Gen-3 entegrasyonları).
+* **Faz 5: SaaS & Bulut Altyapısı** — 🟡 yalnız kredi metadata'sı hazır
+  - [x] **Model bazlı kredi tarifesi:** katalogda her modelin kredisi yazılı ve üretim
+        anındaki değer kayda geçiyor. **Bugün YALNIZ metadata:** hiçbir bakiye
+        düşülmüyor, hiçbir üretim engellenmiyor — gelecek ledger'ın ihtiyacı olan alan
+        şimdiden dolu.
+  - [ ] Kullanıcı hesapları ve çoklu çalışma alanları (Workspaces).
+  - [ ] Nesne depolama + CDN (Cloudflare R2 / MinIO) ve medya yönetimi.
+  - [ ] Üyelik paketleri (Free, Basic, Pro, Max) ve atomik kredi ledger'ı.
+  - [ ] Ücretsiz pakette filigran (watermark) kuralı.
 
 ---
 

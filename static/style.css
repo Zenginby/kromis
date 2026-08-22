@@ -1290,9 +1290,17 @@ body.select-mode #select-toggle,
 .danger-btn[hidden] { display: none; }
 /* Yıkıcı eylem rengi SEMANTİK — accent yasağının dışında */
 .danger-btn:hover { color: var(--danger); background: var(--panel-2); }
+/* Sol kenar NÖTR, vurgu renkli DEĞİL: `--accent` bu kod tabanında yalnız DURUM
+   anlatıyor (flow-tokens.css:22-25; bir üstteki `.folder-icon`'un gerekçesi de
+   aynı), bu satır ise durum değil — "bulunduğun klasöre eklenecek" diye statik
+   bir ipucu (folders.js:112-119; tetikleyici sürükleme DEĞİL, klasörün İÇİNDE
+   olmak). Vurgu renkli hâli "sol kenarı renkli yuvarlak kart yok" ölçütünün
+   tek ihlaliydi (flow-redesign §11). Token zinciri kardeş `.chat-gate`'ten
+   ("Kapı açıklaması" kuralı) birebir alındı — hedef hâl elde vardı, yeni bir
+   değer uydurulmadı. */
 .folder-target {
   margin: 1rem 0 0; padding: 0.5rem 0.7rem; border-radius: 10px;
-  background: var(--panel-2); border-left: 3px solid var(--accent);
+  background: var(--panel-2); border-left: 3px solid var(--border-strong, var(--control-border));
   color: var(--muted); font-size: 0.78rem; line-height: 1.4;
 }
 .folder-target[hidden] { display: none; }

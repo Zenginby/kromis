@@ -440,11 +440,14 @@ def _sohbet(body, model_id):
 
 
 def test_sohbet_kataloğu_arayuzun_ihtiyaci_olan_ALANLARI_tasiyor(client):
+    """Alan kümesi TAM eşitlikle donmuş: eksik alan sessiz bir bozulma, fazla
+    alan ise ölçülmemiş bir sözleşme genişlemesi. `logo` v0.8'de eklendi —
+    şeridin sağlayıcı işareti (bkz. tests/test_provider_logos.py)."""
     body = client.get("/api/settings").json()
     assert body["default_chat_model"] in {m["id"] for m in body["chat_models"]}
     for m in body["chat_models"]:
         assert set(m) == {"id", "label", "provider", "configured",
-                          "needs_deployment", "note"}, m["id"]
+                          "needs_deployment", "note", "logo"}, m["id"]
 
 
 def test_DAGITIM_ADI_bayragi_yalnizca_ADI_ORTAMDAN_okunan_modelde(client):

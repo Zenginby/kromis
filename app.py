@@ -589,6 +589,23 @@ async def edit(
     return {"images": records}
 
 
+def _provider_logo_url(provider: str) -> str | None:
+    """Sağlayıcı işaretinin ADRESİ — katalogdaki dosya adı + sürüm damgası.
+
+    `?v=` cache-buster'ı `index()`in desenini tekrarlıyor ve gerekçesi de aynı:
+    işaretin çizimi bir gün değişirse kullanıcının tarayıcısı eski dosyayı
+    sunmasın. Adresi SUNUCU kuruyor, istemci değil — `settings.js`in sürüm
+    alanını okuyup ikinci bir yerde dize birleştirmesi, aynı bilginin iki
+    kopyası olurdu (core.js ile settings.js arasında da üst düzey ad çakışması
+    üretirdi, bkz. tests/test_id_contract.py).
+
+    Tanımsız sağlayıcıda None: katalogdaki `provider_logo`'nun sessiz yolu
+    burada da korunuyor, istemci `logo` boşsa işareti hiç çizmiyor.
+    """
+    ad = catalog.provider_logo(provider)
+    return f"/static/img/providers/{ad}?v={version.APP_VERSION}" if ad else None
+
+
 def _settings_payload() -> dict:
     """Kimlik DURUMU + hangi modeller var + hangileri kullanılabilir.
 
@@ -641,6 +658,10 @@ def _settings_payload() -> dict:
                 "credits": m.credits,
                 "credits_by_quality": dict(m.credits_by_quality),
                 "note": m.note,
+                # Sağlayıcı işaretinin adresi (yoksa None). Şerit yalnız SEÇİLİ
+                # modelin işaretini çiziyor: native <option> görsel taşımıyor
+                # (bkz. core.js renderModelOptions).
+                "logo": _provider_logo_url(m.provider),
                 # TEK türetilmiş alan: modelin anahtarı GİRİLMİŞ mi. Arayüzün
                 # "#go kilitli mi" kararı ve "anahtar gerekli" etiketi bundan
                 # geliyor — bugün o karar tek bir Azure boolean'ına bağlı ve
@@ -663,6 +684,8 @@ def _settings_payload() -> dict:
              # sayılmıyor. Sayılsaydı, adı ortamdan okunan ikinci bir
              # sağlayıcı eklendiği gün kutu sessizce görünmez kalırdı.
              "needs_deployment": catalog.chat_needs_deployment(m),
+             # Görsel şeridiyle AYNI alan adı ve aynı gerekçe.
+             "logo": _provider_logo_url(m.provider),
              "note": m.note}
             for m in catalog.CHAT_MODELS
         ],

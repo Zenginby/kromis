@@ -166,21 +166,30 @@ function syncProviderFields() {
   syncChatDeployField(secili);
 }
 
-/** Dağıtım adı kutusu YALNIZCA onu isteyen sağlayıcıda görünüyor.
+/** Dağıtım adı bölümü — BAŞLIK DAHİL — yalnızca onu isteyen sağlayıcıda.
  *
- * Kutu öncesinde koşulsuzdu: OpenAI ya da Gemini anahtarı girmeye gelen
+ * Kutu bir zamanlar koşulsuzdu: OpenAI ya da Gemini anahtarı girmeye gelen
  * kullanıcı, o sağlayıcılarda karşılığı OLMAYAN bir alan görüyordu ("dağıtım"
  * Azure'a özgü — ötekilerde model adı katalogda yazılı). Yanlış bir soru,
  * üstelik 360px'lik bir slide-over'da ödenmiş yer.
  *
+ * SONRAKİ TUR BAŞLIĞI DA ALDI: kutu gizlenince yerine "bu sağlayıcıda dağıtım
+ * adı yok" cümlesi geliyordu, yani kullanıcının yapacağı bir şey olmadığı hâlde
+ * bölüm iki satır yer tutmaya devam ediyordu. Şimdi başlık (`chat-deploy-head`)
+ * ve grup BİRLİKTE gizleniyor; o cümlenin elemanı (`chat-no-deploy-note`)
+ * tümden kaldırıldı — gizli bir başlığın altında hiç görünemeyecek bir
+ * paragraftı. Kaybolan bilgi yok: talimat dosyası yolu Ayarlar'da koşulsuz
+ * duruyor ve sohbet modelinin nereden seçildiğini composer'ın üstündeki şerit
+ * kendisi söylüyor.
+ *
  * KAPI KATALOGDAN türetiliyor: `chat_models[].needs_deployment` bayrağı
  * `catalog.chat_needs_deployment`ten geliyor ve o da tek bir olguya bakıyor —
  * modelin adı ortamdan mı okunuyor. Sağlayıcı adını burada LİTERAL saymak,
- * adı ortamdan okunan ikinci bir sağlayıcı eklendiği gün kutunun sessizce
+ * adı ortamdan okunan ikinci bir sağlayıcı eklendiği gün bölümün sessizce
  * görünmez kalması demekti.
  *
  * FAIL-OPEN: katalog henüz gelmediyse (ilk çizim, ya da `/api/settings`
- * başarısız) kutu GÖRÜNÜYOR. Tersi, ayar durumu alınamayan bir kullanıcının
+ * başarısız) bölüm GÖRÜNÜYOR. Tersi, ayar durumu alınamayan bir kullanıcının
  * dağıtım adını hiç giremeyeceği anlamına gelirdi — yani bugün çalışan tek
  * sağlayıcı kurtarılamaz olurdu.
  */
@@ -188,8 +197,8 @@ function syncChatDeployField(provider) {
   const isteyen = chatModels.length
     ? chatModels.some((m) => m.needs_deployment && m.provider === provider)
     : true;
+  $("chat-deploy-head").hidden = !isteyen;
   $("chat-deploy-group").hidden = !isteyen;
-  $("chat-no-deploy-note").hidden = isteyen;
 }
 
 $("set-provider").addEventListener("change", syncProviderFields);

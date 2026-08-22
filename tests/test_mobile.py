@@ -625,3 +625,41 @@ def test_model_seridi_kapsayiciyi_genisletemiyor(istemci):
     assert "min-width: 0" in govde, (
         ".composer-head'in `min-width: 0`ı silinmiş — 360px'de model şeridi "
         "composer'ın bütün çocuklarını genişletir ve sayfa yatay kayar")
+
+
+def test_model_seridinin_SARMALAYICISI_da_kucultulebilir(istemci):
+    """Sağlayıcı işareti gelince flex öğesi `.model-pick` oldu — kısıt ona taşındı.
+
+    `.composer-head`in `min-width: 0`ı zinciri kapsayıcı tarafında açıyor, ama
+    sarmalayıcının KENDİSİ varsayılan `min-width: auto` ile kalırsa içindeki
+    `<select>`in min-content genişliğinin altına inmiyor ve aynı 360px taşmasını
+    bir katman aşağıda yeniden üretiyor. İki kural birlikte gerekiyor: biri
+    satırda, biri sarmalayıcıda.
+
+    Aynı blok `max-width: 100%` de taşımak zorunda: `.model-chip`in `max-width`i
+    artık sarmalayıcının genişliğine göre çözülüyor.
+    """
+    css = _metin(istemci, "/static/style.css")
+    blok = css.split(".model-pick {", 1)
+    assert len(blok) == 2, ".model-pick kuralı kaybolmuş (işaret sarmalayıcısı)"
+    govde = blok[1].split("}", 1)[0]
+    assert "min-width: 0" in govde, (
+        ".model-pick'in `min-width: 0`ı silinmiş — sarmalayıcı içindeki "
+        "<select>in min-content genişliğinin altına inmez, 360px'de taşma döner")
+    assert "max-width: 100%" in govde, ".model-pick genişlik tavanı taşımıyor"
+
+
+def test_gizlenen_model_seridinin_KABUGU_da_gizleniyor(istemci):
+    """Mod ekseni SARMALAYICIYI gizlemek zorunda, `<select>`i değil.
+
+    İşaret şeridin içine girdiğinde `<select>` artık en dış öğe değil. Kural
+    eski hâlinde kalsa (`#composer[data-mode="image"] #chat-model`) gizli
+    şeridin kabuğu — sarmalayıcı + işaret — ekranda yer kaplamaya devam ederdi:
+    Yönetmen modunda iki şerit birbirini dışlıyor ve "genişlik bedeli sıfır"
+    güvencesi tam olarak buna dayanıyor.
+    """
+    css = _metin(istemci, "/static/style.css")
+    assert '#composer[data-mode="image"] #chat-model-pick' in css, (
+        "Görsel modunda sohbet şeridinin SARMALAYICISI gizlenmiyor")
+    assert '#composer[data-mode="director"] #model-pick' in css, (
+        "Yönetmen modunda görsel şeridinin SARMALAYICISI gizlenmiyor")

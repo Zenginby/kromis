@@ -222,6 +222,29 @@ CREDENTIALS: tuple[Credential, ...] = (
 )
 
 
+# ── Sağlayıcı işaretleri (logo) ──────────────────────────────────────────
+#
+# Model şeritleri seçili modelin sağlayıcısını bir işaretle de gösteriyor.
+# Eşleme BURADA, istemcide DEĞİL: `settings.js`in dağıtım kutusu kapısı için
+# yazılmış gerekçenin aynısı geçerli — sağlayıcı adını istemcide literal saymak,
+# yeni bir sağlayıcı eklendiği gün işaretin SESSİZCE kaybolması demekti. Burada
+# duruyorsa tests/test_provider_logos.py adaptörü olan her sağlayıcı için dosya
+# arıyor ve logosuz bir adaptör suite'i kırıyor.
+#
+# DEĞER dosya adı, tam adres DEĞİL: `?v=` cache-buster'ı `app.py`'nin
+# `index()`indeki tek desenden geliyor ve katalog yaprak kalıyor (`version`
+# import etmiyor).
+#
+# Dosyalar `static/img/providers/` altında ve `gpt-image-studio.spec` `static`
+# dizininin tamamını aldığı için paketleme bedeli SIFIR.
+
+PROVIDER_LOGOS: dict[str, str] = {
+    "azure": "azure.svg",
+    "openai": "openai.svg",
+    "gemini": "gemini.svg",
+}
+
+
 # ── Görsel modelleri ────────────────────────────────────────────────────
 #
 # SIRA ANLAMLI: arayüzdeki seçicinin sırası bu ve ilk girdi varsayılan.
@@ -626,6 +649,17 @@ def chat_needs_deployment(m: ChatModel) -> bool:
     kutu göstermek, 360px'lik bir panelde ödenmiş boş yer demekti.
     """
     return bool(m.wire_from_env)
+
+
+def provider_logo(provider: str) -> str | None:
+    """Sağlayıcının işaret dosyasının ADI; tanımsızsa None.
+
+    None SESSİZ bir yol ve bilinçli: işareti olmayan bir sağlayıcı eklendiğinde
+    şerit işaretsiz çiziliyor, hata vermiyor — bir logo eksikliği üretimi
+    engellememeli. Eksikliği yüksek sesle söyleyen yer TEST
+    (tests/test_provider_logos.py), çalışma zamanı değil.
+    """
+    return PROVIDER_LOGOS.get(provider)
 
 
 def chat_provider_ids() -> tuple[str, ...]:

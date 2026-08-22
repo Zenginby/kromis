@@ -41,7 +41,7 @@ Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Andr
 
 ### 🎬 1. Stüdyo Tek Döküm & Prompt Yönetmeni
 * **Türkçe Diyalogdan İngilizce Prompt:** Türkçe fikir anlatımını otomatik olarak optimizasyonu yapılmış İngilizce `gpt-image-2` prompt'una ve teknik ayarlara (`size`, `quality`, `n`) çevirir.
-* **Çoklu Sohbet Sağlayıcısı:** Yönetmen artık Azure AI Foundry dağıtımının yanında OpenAI (GPT-5.6 Terra / Luna / Sol) ve Google Gemini (3.7 Flash) ile de konuşuyor. Model, composer'ın üstündeki şeritten seçiliyor ve seçim `prefs.json`'a yazılıyor. **Şeritler anahtarına göre süzülüyor:** yalnızca kimliği kayıtlı sağlayıcıların modelleri listeleniyor (hiçbiri kayıtlı değilse ilk kurulum için hepsi görünür). "Dağıtım adı" alanı da yalnızca onu isteyen sağlayıcıda (Azure) çıkıyor.
+* **Çoklu Sohbet Sağlayıcısı:** Yönetmen artık Azure AI Foundry dağıtımının yanında OpenAI (GPT-5.6 Terra / Luna / Sol) ve Google Gemini (3.7 Flash) ile de konuşuyor. Model, composer'ın üstündeki şeritten seçiliyor ve seçim `prefs.json`'a yazılıyor. **Şeritler anahtarına göre süzülüyor:** yalnızca kimliği kayıtlı sağlayıcıların modelleri listeleniyor (hiçbiri kayıtlı değilse ilk kurulum için hepsi görünür). Ayarlar'daki **"Prompt Yönetmeni (sohbet modeli)" bölümü de yalnızca onu isteyen sağlayıcıda** (Azure) görünüyor: dağıtım adı istemeyen bir sağlayıcıda başlık dahil hiçbir şey çıkmıyor, yönetmenin talimat dosyası yolu ise her sağlayıcıda duruyor.
 * **Tıklanabilir Çip Menüleri:**
   - `options`: Yönetmenin sorduğu sorular için tıklanabilir yanıt önerileri.
   - `variations`: Fikirden türetilen tek tıkla uygulanabilir varyasyonlar.
@@ -50,6 +50,7 @@ Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Andr
 
 ### 🖼️ 2. Görsel Üretimi & Çoklu Referans Düzenleme
 * **Çoklu Sağlayıcı Entegrasyonu:** Azure OpenAI (`gpt-image-2`), OpenAI (`gpt-image-2`, `gpt-image-1`) ve Google Gemini (Nano Banana 2 / Nano Banana Pro) üretimi (1-4 görsel). Gemini'de piksel boyutu yerine oran (1:1 … 21:9) ve 1K/2K/4K çözünürlük seçiliyor. *DALL-E 3 12 Mayıs 2026'da OpenAI API'sinden kalktığı için katalogdan çıkarıldı.*
+* **Sağlayıcı İşareti:** Her iki model şeridi (görsel ve Prompt Yönetmeni) seçili modelin sağlayıcısını bir işaretle de gösteriyor — Gemini modelinde Gemini, OpenAI'de OpenAI, Azure'da Azure. Model değişince işaret de değişiyor.
 * **Çoklu Referans Görsel Bindirme:** Düzenleme (Inpainting / Edits) modunda ana referans görselin yanına en fazla 3 ek referans görsel eklenebilir.
 
 ### 📁 3. Klasörler & Medya Yönetimi
@@ -90,6 +91,9 @@ Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Andr
 > (model kataloğu → sağlayıcı adaptörleri → Gemini) sonra her madde **koda
 > bakılarak** işaretlendi, belgeye bakılarak değil. Faz faz tam döküm ve kanıtlar:
 > [master yol haritası](docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md).
+> **Sıradaki iş ve öncelik sıralı kuyruk:**
+> [görev defteri](docs/superpowers/plans/2026-08-22-gorev-defteri.md) — hangi
+> maddenin neden beklediği, kabul ölçütüyle birlikte orada yazılı.
 
 * **Faz 2: BYOK Çoklu Sağlayıcı Arayüzü** — 🟡 kısmen teslim
   - [x] **Model ve sağlayıcı seçimi:** üst şeritte görsel modeli seçici, composer'da

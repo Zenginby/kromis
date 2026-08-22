@@ -356,6 +356,30 @@ function syncGoGate() {
   $("go").title = sebep || "Üret";
 }
 
+/** Şeridin sağlayıcı işaretini seçili modele göre çizer.
+ *
+ * TEK yardımcı, iki şerit: görsel ve sohbet aynı alanı (`logo`) okuyor ve adres
+ * SUNUCUDAN geliyor (`app._provider_logo_url`) — istemcide sağlayıcı adı
+ * sayılmıyor, dize birleştirilmiyor. Gerekçe `settings.js`in dağıtım kutusu
+ * kapısıyla aynı: yarın yeni bir sağlayıcı eklendiğinde işaret kendiliğinden
+ * geliyor, kimsenin burada bir liste güncellemesi gerekmiyor.
+ *
+ * `src` YALNIZ DEĞİŞİNCE yazılıyor: aynı adresi yeniden atamak Chromium'da
+ * yeni bir istek doğurmuyor ama `hidden`ı her `applyModel` çağrısında (eksen
+ * doldurma, tercih yükleme, katalog tazeleme) oynatmak gereksiz bir yeniden
+ * çizim demekti.
+ *
+ * İşareti OLMAYAN model sessizce işaretsiz çiziliyor: `catalog.provider_logo`
+ * None döndürebiliyor ve bir logo eksikliği şeridi bozmamalı. Eksikliği
+ * yüksek sesle söyleyen yer test (tests/test_provider_logos.py).
+ */
+function setModelLogo(imgId, model) {
+  const img = $(imgId);
+  const src = (model && model.logo) || "";
+  if (src && img.getAttribute("src") !== src) img.setAttribute("src", src);
+  img.hidden = !src;
+}
+
 /** Seçili modeli uygular: eksenleri doldurur, notu yazar, tercihi kaydeder. */
 function applyModel(id, { announce = true } = {}) {
   const model = imageModels.find((m) => m.id === id);
@@ -370,6 +394,7 @@ function applyModel(id, { announce = true } = {}) {
     renderModelOptions(id);
   }
   $("model").value = model.id;
+  setModelLogo("model-logo", model);
 
   const dusenler = [];
   const s = fillAxis("size", model.sizes, undefined, model.default_size);
@@ -568,6 +593,7 @@ function applyChatModel(id) {
     renderChatModelOptions(id);
   }
   $("chat-model").value = model.id;
+  setModelLogo("chat-model-logo", model);
   syncGoGate();
   // SON SATIR ve gerçek bir kırılmanın bekçisi: dönüş eklenirken bu satır
   // unutulduğunda fonksiyon `undefined` döndürdü, dinleyici de her seferinde

@@ -150,6 +150,14 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.8.1 — ne değişti
+
+- §11 mandallarının delikleri kapandı, Ayarlar düğmesi tek adla anlatılıyor
+- composer alt satırında ipucu tek satırda kalıyor
+- tasarım ölçütünün iki ihlali kapandı — emoji ve vurgu renkli sol kenar
+
+---
+
 ## Sürüm 0.8.0 — ne değişti
 
 - şerit satırlarında sağlayıcı markası tekrarlanmıyor

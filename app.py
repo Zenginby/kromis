@@ -629,6 +629,11 @@ def _settings_payload() -> dict:
     """
     cfg = credstore.configured_map()
     chat_cfg = credstore.chat_configured_map()
+    # Şeritte gösterilecek KISA adlar: sağlayıcı markası işaretle geldiği için
+    # etiketten düşüyor. Liste bütününden hesaplanıyor (çakışma kuralı için),
+    # o yüzden model başına değil bir kez (bkz. catalog.short_labels).
+    kisa_gorsel = catalog.short_labels(catalog.IMAGE_MODELS)
+    kisa_sohbet = catalog.short_labels(catalog.CHAT_MODELS)
     return {
         **ac.get_settings_status(),
         # {kimlik_id: bool}. Arayüz Ayarlar'daki sağlayıcı gruplarının
@@ -639,6 +644,10 @@ def _settings_payload() -> dict:
             {
                 "id": m.id,
                 "label": m.label,
+                # ŞERİDİN adı ayrı bir alan: `label` hata metinlerinin ve
+                # `#model-note`un okuduğu TAM ad ve orada marka ayırt edici
+                # kalıyor (katalogda iki `gpt-image-2` var).
+                "short_label": kisa_gorsel[m.id],
                 "provider": m.provider,
                 # Jetonlar ETİKETLERİYLE gönderiliyor, çıplak dize değil:
                 # arayüz `<option>` listelerini bunlardan kuruyor ve etiketi
@@ -672,7 +681,9 @@ def _settings_payload() -> dict:
         ],
         "default_chat_model": catalog.DEFAULT_CHAT_MODEL,
         "chat_models": [
-            {"id": m.id, "label": m.label, "provider": m.provider,
+            {"id": m.id, "label": m.label,
+             # Görsel şeridiyle AYNI ayrım (bkz. yukarısı).
+             "short_label": kisa_sohbet[m.id], "provider": m.provider,
              # `cfg` (KİMLİK tablosu) DEĞİL `chat_cfg` (MODEL tablosu):
              # Azure'ın dağıtım adı model düzeyinde bir koşul ve kimlik
              # tablosu onu ifade edemiyor — kimliği tam, dağıtımı boş bir

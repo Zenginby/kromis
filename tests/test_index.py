@@ -3171,6 +3171,25 @@ def test_ISARET_cipin_tiklamasini_YUTMUYOR():
         ".model-chip'in sol dolgusu işaret için açılmamış — metin üstüne biner")
 
 
+def test_SERIT_SATIRI_marka_onekini_TEKRARLAMIYOR():
+    """İşaret markayı söylüyorsa etiket de söylememeli: satır `short_label` yazıyor.
+
+    Kısaltma SUNUCUDA (`catalog.short_labels`): istemci ne marka adı sayıyor ne
+    de dize kırpıyor — `logo` adresinin sunucuda kurulmasıyla aynı gerekçe. Geri
+    düşüş (`|| m.label`) bilinçli: alanı taşımayan eski bir yanıtta şerit adsız
+    kalmasın.
+    """
+    js = _js("core.js")
+    for fn in ("function renderModelOptions(", "function renderChatModelOptions("):
+        govde = js.split(fn, 1)[1].split("\n}", 1)[0]
+        assert "short_label" in govde, f"{fn} şerit adını okumuyor"
+        assert "m.label" in govde, f"{fn} geri düşüşü yok"
+        assert ".split(" not in govde and ".replace(" not in govde, (
+            f"{fn} etiketi İSTEMCİDE kırpıyor — kısaltma sunucunun işi")
+        for ad in ("Azure", "OpenAI", "Gemini"):
+            assert f'"{ad}' not in govde, f"{fn}: marka adı ({ad}) literal sayılmış"
+
+
 # ── Prompt Yönetmeni: model şeridi + dağıtım adı kapısı (v0.7) ──────────
 
 

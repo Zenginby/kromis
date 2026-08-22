@@ -244,6 +244,23 @@ PROVIDER_LOGOS: dict[str, str] = {
     "gemini": "gemini.svg",
 }
 
+# İşaret ARTIK MARKAYI SÖYLÜYOR, o yüzden etiketin de söylemesi gereksiz: şeritte
+# "Gemini · Nano Banana 2" yazan satır Gemini işaretinin YANINDA duruyordu.
+# Marka adları BURADA, `PROVIDER_LOGOS`la aynı gerekçeyle — istemcide sağlayıcı
+# adını literal saymak yeni bir sağlayıcı eklendiği gün önekin sessizce ekranda
+# kalması demekti (bkz. settings.js `syncChatDeployField`in gerekçesi).
+#
+# `label` DEĞİŞMİYOR ve bu bilinçli: hata metinleri ("… referans görselle
+# çalışmıyor", "… anahtarı yok"), `#model-note` ve durum satırı hepsi ondan
+# okuyor ve orada marka AYIRT EDİCİ — katalogda `gpt-image-2` adını taşıyan İKİ
+# model var (Azure ve OpenAI). Kısa ad yalnız şeridin satırları için.
+PROVIDER_BRANDS: dict[str, str] = {
+    "azure": "Azure",
+    "openai": "OpenAI",
+    "gemini": "Gemini",
+    "anthropic": "Anthropic",
+}
+
 
 # ── Görsel modelleri ────────────────────────────────────────────────────
 #
@@ -660,6 +677,39 @@ def provider_logo(provider: str) -> str | None:
     (tests/test_provider_logos.py), çalışma zamanı değil.
     """
     return PROVIDER_LOGOS.get(provider)
+
+
+def _drop_brand(label: str, provider: str) -> str:
+    onek = PROVIDER_BRANDS.get(provider)
+    return label[len(onek) + 3:] if onek and label.startswith(f"{onek} · ") else label
+
+
+def short_labels(models) -> dict[str, str]:
+    """Model id → ŞERİTTE gösterilecek ad: marka öneki düşürülmüş `label`.
+
+    ÇAKIŞMA KURALI tek istisna ve ölçülmüş bir kırılmayı kapatıyor: önek
+    düşünce `Azure · gpt-image-2` ile `OpenAI · gpt-image-2` AYNI satıra
+    dönüşüyor — ikisinin de anahtarı olan kullanıcı açılan listede hangisini
+    seçtiğini bilemez ve native bir `<option>` işaret taşıyamıyor, yani logo o
+    satırları ayırmıyor. O yüzden kısa adı bir başkasıyla çakışan model TAM
+    etiketini koruyor. Kullanıcının gördüğü fark şu: markası tekil olan her
+    model (Gemini'nin ikisi, OpenAI'nin sohbet kademeleri) önekini bırakıyor,
+    yalnız gerçekten iki yerde birden bulunan ad markasını taşımaya devam
+    ediyor.
+
+    Önek `f"{marka} · "` deseniyle aranıyor, "içinde marka geçiyor mu" diye
+    DEĞİL: Azure'ın sohbet girdisi `Azure AI Foundry dağıtımı` ve orada marka
+    adın PARÇASI (Azure'da model yok, dağıtım var) — kırpılırsa etiket
+    anlamsızlaşır.
+
+    `models` iki tür alıyor (`ImageModel` ve `ChatModel`); ortak alan olarak
+    yalnız `id`, `label` ve `provider` okunuyor.
+    """
+    kisa = {m.id: _drop_brand(m.label, m.provider) for m in models}
+    adlar = list(kisa.values())
+    cakisan = {ad for ad in adlar if adlar.count(ad) > 1}
+    return {m.id: (m.label if kisa[m.id] in cakisan else kisa[m.id])
+            for m in models}
 
 
 def chat_provider_ids() -> tuple[str, ...]:

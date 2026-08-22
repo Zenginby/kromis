@@ -339,3 +339,76 @@ def test_PREVIEW_jetonu_beyan_edilmiyor(m):
     """
     assert "preview" not in (m.wire_model or "").lower(), (
         f"{m.id}: preview jetonu beyan edilmiş ({m.wire_model})")
+
+
+# ── Şeritte gösterilen KISA ad ──────────────────────────────────────────
+#
+# Sağlayıcı markası artık çipin solundaki işaretle geliyor (v0.8), yani etikette
+# ikinci kez yazması gereksiz bir tekrar. Kısaltma SUNUCUDA yapılıyor; buradaki
+# iddialar hem kuralı hem de tek istisnasını (çakışma) sabitliyor.
+
+
+def test_KISA_ad_marka_onekini_dusuruyor():
+    """Kural: `"{marka} · "` öneki düşüyor, geri kalanı aynen kalıyor."""
+    kisa = catalog.short_labels(catalog.IMAGE_MODELS)
+    assert kisa["gemini-nano-banana-2"] == "Nano Banana 2"
+    assert kisa["gemini-nano-banana-pro"] == "Nano Banana Pro"
+    sohbet = catalog.short_labels(catalog.CHAT_MODELS)
+    assert sohbet["openai-gpt-5.6-terra"] == "GPT-5.6 Terra"
+    assert sohbet["gemini-3.7-flash"] == "3.7 Flash"
+
+
+def test_CAKISAN_ad_tam_etiketini_KORUYOR():
+    """Tek istisna ve ölçülmüş bir kırılma: katalogda iki `gpt-image-2` var.
+
+    Önek ikisinden de düşerse açılan listede AYNI iki satır oluşuyor ve native
+    bir `<option>` işaret taşıyamadığı için logo onları ayırmıyor — yani ikisinin
+    de anahtarı olan kullanıcı hangisini seçtiğini bilemez. Bu iddia, "önek her
+    yerden düşsün" diye sadeleştiren bir sonraki turu kırmızıya çeviriyor.
+    """
+    kisa = catalog.short_labels(catalog.IMAGE_MODELS)
+    assert kisa["azure-gpt-image-2"] == "Azure · gpt-image-2"
+    assert kisa["openai-gpt-image-2"] == "OpenAI · gpt-image-2"
+    # Aynı listede TEKİL olan `gpt-image-1` önekini bırakıyor: kural çakışmaya
+    # bağlı, sağlayıcıya değil.
+    assert kisa["openai-gpt-image-1"] == "gpt-image-1"
+
+
+def test_MARKA_ADIN_PARCASI_olan_etiket_kirpilmiyor():
+    """`Azure AI Foundry dağıtımı` aynen kalıyor: orada marka adın parçası.
+
+    Kırpma `"içinde marka geçiyor mu"` diye çalışsaydı bu etiket
+    `AI Foundry dağıtımı`ya dönerdi — Azure'da model değil DAĞITIM olduğu
+    bilgisini taşıyan tek satır o.
+    """
+    assert catalog.short_labels(catalog.CHAT_MODELS)["azure-deployment"] == (
+        "Azure AI Foundry dağıtımı")
+
+
+@pytest.mark.parametrize(
+    "models", [catalog.IMAGE_MODELS, catalog.CHAT_MODELS],
+    ids=["gorsel", "sohbet"])
+def test_KISA_ad_her_modelde_var_ve_BOS_DEGIL(models):
+    """Şerit adsız satır çizemez: `id` başına dolu bir ad garanti.
+
+    Markası `PROVIDER_BRANDS`ta yazmayan bir sağlayıcı eklenirse etiket AYNEN
+    dönüyor (kırpma yok) — sessiz ama zararsız yol; boş dize ise şeritte
+    görünmez bir satır demekti.
+    """
+    kisa = catalog.short_labels(models)
+    assert set(kisa) == {m.id for m in models}
+    assert all(ad.strip() for ad in kisa.values()), kisa
+
+
+@pytest.mark.parametrize(
+    "models", [catalog.IMAGE_MODELS, catalog.CHAT_MODELS],
+    ids=["gorsel", "sohbet"])
+def test_KISA_adlar_LISTE_ICINDE_tekil(models):
+    """Asıl mandal: iki satır aynı metni GÖSTEREMEZ.
+
+    Çakışma kuralı tam olarak bunu sağlamak için var; kural bozulursa (ya da
+    katalogda üçüncü bir eşadlı model, örneğin bir `Gemini · gpt-image-2`
+    doğarsa) burada kırmızı yanıyor.
+    """
+    adlar = list(catalog.short_labels(models).values())
+    assert len(adlar) == len(set(adlar)), f"eşadlı satır: {adlar}"

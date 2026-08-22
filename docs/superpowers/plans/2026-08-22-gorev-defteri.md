@@ -60,6 +60,24 @@ onaylandı.
       (talimat yolunun koşullu grubun DIŞINDA olduğu). Chromium: Azure'da
       başlık + kutu var, OpenAI ve Gemini'de ikisi de `display: none`, talimat
       satırı üç sağlayıcıda da görünür.
+- [x] **Şerit satırlarında marka öneki kalktı** (kullanıcı geri bildirimi, aynı
+      tur). İşaret markayı söylediği için `Gemini · Nano Banana 2` satırı aynı
+      bilgiyi iki kez yazıyordu; satır artık `Nano Banana 2` diyor. Kısaltma
+      **sunucuda** (`catalog.short_labels` → `/api/settings`'in yeni
+      `short_label` alanı): istemci ne marka adı sayıyor ne dize kırpıyor.
+      `label` **değişmedi** — hata metinleri, `#model-note` ve durum satırı tam
+      adı okumaya devam ediyor.
+      **Çakışma kuralı** (ölçülmüş): katalogda `gpt-image-2` adını taşıyan İKİ
+      model var (Azure · OpenAI). Önek ikisinden de düşerse açılan listede aynı
+      iki satır oluşur ve native `<option>` işaret taşımadığı için logo onları
+      ayırmaz — o yüzden kısa adı çakışan model tam etiketini koruyor.
+      **Kanıt:** takım 1613 → **1622 geçti / 10 atlandı** (`test_catalog.py`'de
+      altı iddia — kural, çakışma, `Azure AI Foundry dağıtımı`nın kırpılmaması,
+      liste içinde tekillik; `test_settings_route.py`'de donmuş alan kümesi +
+      yeni gövde iddiası; `test_index.py`'de "istemci kırpmıyor" mandalı).
+      Chromium 1024×700 ve 360×780: satırlar `Nano Banana 2` / `GPT-5.6 Terra` /
+      `3.7 Flash`, iki `gpt-image-2` önekli, işaret 14×14 ve `naturalWidth > 0`,
+      taşma x/y = 0, konsol temiz.
 
 ---
 

@@ -518,7 +518,12 @@ function renderModelOptions(zorunluId) {
     const aralik = tarife.length
       ? `${Math.min(...tarife)}–${Math.max(...tarife)} kredi`
       : `${m.credits} kredi`;
-    o.textContent = `${m.label} — ${aralik}`
+    // AD `short_label`: sağlayıcı markasını çipin solundaki işaret söylüyor,
+    // etiketin de söylemesi aynı bilgiyi iki kez yazmak olurdu. Kısaltma
+    // SUNUCUDA yapılıyor (catalog.short_labels) — istemci marka adı saymıyor
+    // ve çakışan adlar tam etiketini koruyor. `|| m.label` eski bir yanıtta
+    // alan yoksa şeridin adsız kalmaması için.
+    o.textContent = `${m.short_label || m.label} — ${aralik}`
       + (m.configured ? "" : " · kurulum gerekli");
     // Tanıtım notu `title`da: bilgi kaybolmuyor ama composer'ın yüksekliğine
     // bedel ödemiyor (bkz. applyModel'deki gerekçe).
@@ -563,7 +568,9 @@ function renderChatModelOptions(zorunluId) {
     const o = document.createElement("option");
     o.value = m.id;
     // `textContent`: sunucudan gelen hiçbir şey innerHTML'e girmiyor.
-    o.textContent = m.label + (m.configured ? "" : " · kurulum gerekli");
+    // Ad, görsel şeridiyle aynı gerekçeyle `short_label` (yukarısı).
+    o.textContent = (m.short_label || m.label)
+      + (m.configured ? "" : " · kurulum gerekli");
     if (m.note) o.title = m.note;
     return o;
   }));

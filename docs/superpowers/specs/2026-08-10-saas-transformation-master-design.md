@@ -75,6 +75,11 @@ graph TD
 > 10 atlandı** (atlananlar yalnız Windows DACL testleri + kurulu olmayan
 > Playwright).
 >
+> **Bu belge NE yapılacağını söylüyor; SIRAYI ve kanıtı görev defteri taşıyor:**
+> [`docs/superpowers/plans/2026-08-22-gorev-defteri.md`](../plans/2026-08-22-gorev-defteri.md).
+> Aşağıdaki her açık madde orada bir kuyruk satırı olarak, kabul ölçütüyle
+> birlikte duruyor.
+>
 > | Faz | Durum |
 > |---|---|
 > | Hazırlık (açık kaynak, BYOK, güvenlik, CI/CD) | ✅ teslim |

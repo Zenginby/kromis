@@ -1,8 +1,8 @@
 # Görev defteri — sıradaki adımlar
 
-**Tarih:** 22 Ağustos 2026 · **Son dal:** `claude/next-task-implementation-dc06i9`
-**Bugünkü ölçüm:** `APP_VERSION` **0.8.0** (sonrakini CI yazıyor),
-`pytest tests/ -q` → **1631 geçti / 10 atlandı**
+**Tarih:** 22 Ağustos 2026 · **Son dal:** `claude/referans-ekle-gorsel-bug-yxrauz`
+**Bugünkü ölçüm:** `APP_VERSION` **0.8.1** (sonrakini CI yazıyor),
+`pytest tests/ -q` → **1636 geçti / 10 atlandı**
 **Defterin açılış ölçümü** (Tur A öncesi): `APP_VERSION` 0.7.0 → 1613 geçti / 10 atlandı
 (atlananlar her iki ölçümde de yalnız Windows'a özgü DACL testleri + kurulu
 olmayan Playwright)
@@ -24,6 +24,108 @@ burada durur. Yol haritaları (README fazları, `2026-08-10-saas-transformation-
 4. Kuyruktan bir madde alındığında **üste taşınır** ve kendi adım listesini
    orada kazanır. Kuyruk sırası bir söz değil, öneri: kullanıcı sırayı
    değiştirebilir.
+
+---
+
+## ✅ Tur C — Medya seçici telefonda kullanılamıyordu + geçersiz ARIA
+
+**Bitti (22 Ağustos).** Bu tur **kullanıcı şikâyetiyle** açıldı, kuyruktan
+değil: telefonda (+) → "Medya'dan seç" açılınca sağ bölme ekranın tamamını
+kaplıyor, ızgara bir şeride iniyor ve **üstteki görseller seçilemiyordu**.
+Kuyruğun **1. maddesi** (geçersiz ARIA) aynı tura katıldı — aynı bileşene
+dokunuyor, ayrı turda yapmak aynı üç dosyayı iki kez açmak olurdu.
+
+- [x] **Sağ bölme telefonda alt şeride indi.** Kök neden ölçüldü: mobil katman
+      kartı tek sütuna indiriyor (`mobile.css`, `"phead" "pnav" "pbody"
+      "pside"`) ama bölmenin DÜŞTÜKTEN SONRA ne kadar yer kaplayacağı hiç
+      sınırlanmamıştı — masaüstü kuralları 180px'lik bir sütun için yazılmış,
+      telefonda 360px'in tamamında koşuyordu. `pbody` ise `minmax(0, 1fr)`,
+      yani **tabanı sıfır**: bölmeye ne kalırsa ızgaraya o kalıyordu.
+      **Ölçülen hâl 360×780'de: ızgara 21px, tam görünen karo 0, ilk karonun
+      merkezine `elementFromPoint` başka bir öğe döndürüyor** — yani şikâyet
+      mecazi değil, karo gerçekten tıklanamıyordu.
+      Bölme artık iki sütunlu kompakt bir şerit: 72px önizleme + yanında künye,
+      altında yan yana iki düğme. `.picker-side`'ın kendi `overflow-y: auto`'su
+      bunu HİÇ çözmüyordu ve ayrım kuralın gövdesine yazıldı: taşan bölme
+      değil, **ezilen ızgara**.
+- [x] **İki emniyet kilidi.** `max-height: 40vh` + satır tanımı
+      `minmax(0, 1fr) auto`: künye beklenmedik biçimde uzasa (iç içe klasör
+      zinciri, kuyruk maddesi 1'in konusu) bölme ekranın %40'ını aşamıyor ve
+      küçülen tek şey künye satırı oluyor — `auto` satırlar küçülmediği için
+      sınıra dayanınca kırpılan ilk şey **düğmeler** olurdu.
+- [x] **Alt güvenli alan payı geldi.** `.picker-card` yalnız `padding-top`
+      alıyordu (`.modal-card`'ın iki kenarlı kuralı seçiciyi bilerek
+      kapsamıyor, kartın kendi sınıfı var). Android'de jest çubuğu "Ek olarak
+      ekle"nin üstüne biniyordu: düğme görünüyor ama basılamıyor — bu dosyanın
+      açtığı kırılma sınıfının aynısı.
+- [x] **İki düğme yan yana ve sarma KURALA bağlı.** `flex-basis` rem tabanlı
+      (Tur B'nin `.chat-hint` dersi: Android WebView sistem yazı ölçeğini
+      uyguluyor, piksel eşiği cihazdan cihaza farklı karar verir).
+      **Yan yana dizince iki eski kusur görünür oldu ve ikisi de ölçüldü:**
+      `.primary`nin `margin-top: 1rem`i (dikey yığın mirası) satırı 16px
+      uzatıp düğmenin kendisini 16px kısaltıyordu — "Referans yap" 44px,
+      "Ek olarak ekle" 60px ve ikisi alt kenarlarından hizalıydı; `.primary`
+      hiç font bildirmediği için UA'nın 13.33px'ini alıyor, `.btn-ghost` ise
+      `font: inherit` ile 15px'te duruyordu. İkisi de yalnız mobil blokta
+      düzeltildi. `font` KISA BİÇİMİ kullanılmadı: `.primary`nin
+      `font-weight: 500`ünü sıfırlar ve birincil eylem inceleşirdi.
+- [x] **Kuyruk maddesi 1 — `aria-selected` → `aria-pressed`.** `.picker-tile`
+      düz bir `<button>`, kapsayıcısı düz bir `<div>`; `aria-selected` yalnız
+      `option`/`tab`/`row`/`treeitem`/`gridcell` rollerinde geçerli.
+      **Ölçüldü:** düzeltme öncesi erişilebilirlik ağacında seçili karo için
+      `pressed` özelliği YOK (ağaçtaki tek `pressed` mod anahtarınınki),
+      sonrasında iki tane — yani seçim ekran okuyucuya gerçekten ulaşmıyordu.
+      `role="listbox"/"option"` çifti reddedildi: gezinen tabindex + ok tuşu
+      modeli ister, depoda öyle bir desen hiç yok; `aria-pressed` altı yerde
+      zaten kurulu.
+- [x] **İkiz kural tekilleşti.** `.picker-tile[aria-selected="true"]` **iki
+      kez** tanımlıydı (biri gezinme bölümüne düşmüş); ikisi `background` ve
+      `outline` için çakışıyordu, ikizden hayatta kalan tek bildirim
+      `box-shadow`du. Tek kurala indirildi, boyanan sonuç birebir aynı.
+
+**Kanıt.** Takım **1632 → 1636 geçti / 10 atlandı**. *(Yukarıdaki "defterin
+açılış ölçümü" satırı 1631 diyordu; Tur C'nin ölçtüğü taban 1632 — defterin
+sayısı bir gerideymiş, kayıt düzeltiliyor.)* Dört yeni mandal ve
+**hepsi mutasyonla doğrulandı — on iki mutasyon, on ikisi de kırmızı**:
+kare önizlemenin sabit boyu, `max-height`, satır tanımı, kuralın medya
+sorgusunun dışına kaçması, alt güvenli alan, rem tabanı, `width: auto`,
+`min-height: var(--tap)`, `margin-top: 0`, JS'in özniteliği ve CSS'in seçicisi.
+
+**Tarayıcı ölçümü** (Chromium 1194, dokunmatik bağlam, seçicide 36 karo):
+
+| Ölçü | 360×780 önce | 360×780 sonra | 360×640 sonra | 800×700 | 1024×700 |
+|---|---|---|---|---|---|
+| ızgara (`.picker-body`) | **21px** | **506px** | 366px | 502px | 502px |
+| bölme (`.picker-side`) | 656px | **171px** | 171px | 502px×180 | 502px×180 |
+| önizleme | 327px kare | 72px | 72px | 147px | 147px |
+| tam görünen karo | **0** | **6** | 6 | 9 | 6 |
+| ilk karo tıklanabilir | **hayır** | evet | evet | evet | evet |
+| ikinci karo dokununca seçildi | **hayır** | evet | evet | — | — |
+| iki düğme aynı satırda | — | evet | evet | hayır (yığın) | hayır (yığın) |
+| yatay taşma | 0 | 0 | 0 | 0 | 0 |
+| konsol | temiz | temiz | temiz | temiz | temiz |
+
+Masaüstü **hiç değişmedi**: kart 776×570, yan bölme 180px, üç sütun — bütün
+kurallar `@media (max-width: 768px)`in içinde ve bir mutasyon tam olarak bunu
+mandallıyor (kuralı sorgunun dışına taşımak testi kırmızıya düşürüyor).
+
+> **Ölçülen tuzak (mandalın kendisinde).** İlk yazımda mobil iddialar CSS
+> gövdesini **yorumlarıyla birlikte** okuyordu ve bu dosyanın kuralları
+> gerekçesini kendi gövdesinde yazıyor: `max-height` bildirimini silen mutasyon,
+> "`max-height` devreye girdiği anda…" diyen YORUM sayesinde **hayatta kaldı**.
+> İkinci tuzak aynı turda: `minmax(0, 1fr)` gövdede aranınca
+> `grid-template-columns`taki aynı değere takılıyordu, yani satır tanımını
+> `auto auto`ya çeviren mutasyon da geçiyordu. Yardımcı artık yorumları
+> ayıklıyor (brace sayımından ÖNCE) ve iddia `grid-template-rows`un DEĞERİNE
+> bakıyor. §0.6/§0.7/§0.9'un "iddia kodu arar, kelimeyi değil" dersinin
+> beşinci ve altıncı kurbanı.
+
+> **Plandan sapma (gerekçeli).** Plan beşinci madde olarak bir Playwright
+> ölçüm testi öngörüyordu. Yazılmadı: `playwright` paketi CI'da kurulu değil
+> (`test_playwright_studio.py` zaten `importorskip` ile atlanıyor) ve bu
+> kaptaki tarayıcı sürümü paketinkiyle uyuşmuyor — eklenen test hiçbir yerde
+> koşmaz, yalnız ikinci bir atlanan dosya olurdu. Tarayıcı ölçümü Tur A ve
+> B'nin yaptığı yerde duruyor: yukarıdaki tabloda.
 
 ---
 
@@ -182,35 +284,27 @@ Sıra öneri; her madde **neden · dokunulacak yer · kabul ölçütü · büyü
 taşıyor. Büyüklükler: **S** tek oturum, **M** bir tur, **L** kendi planını
 isteyen iş, **XL** kendi tasarım belgesi olan faz.
 
-### 1. `aria-selected` düz `<button>`da geçersiz (M1) · **S**
-`folders.js`'te `picker-tile` düz bir `<button>`, kapsayıcı `#picker-grid` düz
-bir `<div>`: `aria-selected` bu bağlamda geçersiz ARIA.
-- [ ] Ya `role="listbox"` + `role="option"` çifti kurulacak, ya da seçim
-      `aria-pressed` ile anlatılacak (uygulamada `aria-pressed` deseni zaten var).
-- **Kabul:** ekran okuyucu ağacında seçim durumu doğru; `tests/test_index.py`'de
-      bir iddia.
-
-### 2. Seçicide iç içe klasör etiketi (K27) · **S/M**
+### 1. Seçicide iç içe klasör etiketi (K27) · **S/M**
 `picker-tile` künyesi yalnız en yakın klasörün adını yazıyor; iç içe klasörlerde
 "hangi A altındaki B" sorusu cevapsız. `folders.js`'te kök→klasör zinciri
 (`parentOf` zinciri zaten var, kırıntı başlığı onu kullanıyor) künyeye taşınacak.
 - [ ] **Kabul:** iki seviyeli klasörde künye "A / B" yazıyor; genişlik 360px'de
       taşmıyor.
 
-### 3. Sonuç kartında "Düzenle" / "+ Ek" (K14) · **M**
+### 2. Sonuç kartında "Düzenle" / "+ Ek" (K14) · **M**
 Karar "tam bir geçmiş kaydı ister" diye ertelenmişti; döküm bugün yalnız
 `image_id` taşıyor. Kart eylemleri için kaydın kendisi lazım.
 - [ ] **Kabul:** sonuç kartından doğrudan düzenlemeye/ek referansa geçilebiliyor
       ve silinmiş görselde yer tutucu davranışı bozulmuyor.
 
-### 4. `gitleaks` işi CI'da · **S**
+### 3. `gitleaks` işi CI'da · **S**
 Adım 1 planının tek açık maddesi: geçmiş taramasının kaydı yok.
 - [ ] `.github/workflows/ci.yml`'e bir iş; `credentials.env` deseni ve test
       sabitleri için allowlist gerekiyor (`tests/test_errlog.py` sahte anahtar
       taşıyor).
 - **Kabul:** iş yeşil koşuyor ve gerçek bir sızıntı denemesinde kırmızıya dönüyor.
 
-### 5. Ayarlar'da canlı bağlantı testi düğmeleri · **M**
+### 4. Ayarlar'da canlı bağlantı testi düğmeleri · **M**
 README Faz 2'nin son açık maddesi. Bugünkü karşılık yalnız "anahtar kayıtlı mı"
 listesi; gerçek bir çağrı denemesi yok.
 - [ ] Sağlayıcı başına küçük bir uç (`POST /api/settings/test`?) + düğme;
@@ -218,7 +312,7 @@ listesi; gerçek bir çağrı denemesi yok.
 - **Kabul:** yanlış anahtarda anlaşılır Türkçe hata, doğru anahtarda "bağlantı
       kuruldu"; anahtar yanıtta HİÇ yankılanmıyor (write-only sözleşmesi).
 
-### 6. Yerel sağlayıcı adaptörleri: ComfyUI · Ollama · **L**
+### 5. Yerel sağlayıcı adaptörleri: ComfyUI · Ollama · **L**
 Anahtar/adres alanları v0.2.0'dan beri kayıtlı, **adaptör ve arayüz yok**
 (`azure_client.get_settings_status` yalnız durum bayrağı döndürüyor).
 - [ ] `providers._ADAPTERS`'a iki adaptör, katalogda modeller, Ayarlar'da
@@ -226,53 +320,53 @@ Anahtar/adres alanları v0.2.0'dan beri kayıtlı, **adaptör ve arayüz yok**
 - **Kabul:** yerel bir kurulumla üretim yapılabiliyor; sağlayıcı düşükken hata
       Türkçe ve anlaşılır.
 
-### 7. fal.ai · Replicate adaptörleri · **L**
+### 6. fal.ai · Replicate adaptörleri · **L**
 Aynı boşluğun bulut yarısı; ikisi de **kuyruklu** akış (`providers`'ın zaman
 aşımı politikası bunu zaten öngörüyor: "adet başına ayrı istek atan sağlayıcı").
 - [ ] **Kabul:** kuyruk beklerken arayüz ilerleme gösteriyor, zaman aşımı
       sağlayıcıya göre çözülüyor (`tests/test_providers.py`'nin deseni).
 
-### 8. Model Arena · **M**
+### 7. Model Arena · **M**
 Aynı prompt'u iki modelde yan yana koşturup karşılaştırma (master spec Faz 3).
 - [ ] **Kabul:** iki üretim tek turda, künyelerinde model + kredi; kayıtlar
       bugünkü şemayı bozmuyor.
 
-### 9. Maske tuvali / bölgesel düzenleme · **L**
+### 8. Maske tuvali / bölgesel düzenleme · **L**
 Master spec Faz 1'in açık yarısı: bugünkü `/api/edit` tüm görsel üzerinden
 çalışıyor, `mask` alanı yok.
 - [ ] Fırça/silgi HTML5 Canvas + `mask` alanının adaptör sözleşmesine girmesi
       (Azure ve OpenAI destekliyor; Gemini'de karşılığı farklı).
 - **Kabul:** maskelenen bölge dışında piksel değişmiyor (golden fixture).
 
-### 10. Stil çipleri · stil şablonları · tipografi katmanı · **M**
+### 9. Stil çipleri · stil şablonları · tipografi katmanı · **M**
 Faz 2'nin açık yarısı. Hazır stil çipleri (*Anime*, *Cyberpunk*, *Cinematic*,
 *Pixel Art*, *3D Render*) prompt'a eklenen jetonlar; tipografi katmanı
 bindirmenin metin tarafı.
 - [ ] **Kabul:** çip seçimi prompt'a görünür biçimde giriyor ve geri alınabiliyor.
 
-### 11. Özel araçlar: Upscaler · Product-in-Hand · **L**
+### 10. Özel araçlar: Upscaler · Product-in-Hand · **L**
 README Faz 3. Upscaler bir sağlayıcı yeteneği; Product-in-Hand bir prompt
 şablonu + referans akışı.
 - [ ] **Kabul:** her ikisi kendi kredi etiketiyle katalogda.
 
-### 12. Image-to-Video motoru · **L**
+### 11. Image-to-Video motoru · **L**
 README Faz 4 (master spec Faz 3'ün video payı). Yeni bir medya TÜRÜ: depo,
 küçük resim, büyüteç ve indirme yolları video tanımıyor.
 - [ ] **Kabul:** üretilen video kayıtta, galeride oynatılabiliyor, indirilebiliyor.
 
-### 13. i18n (TR/EN) · **M**
+### 12. i18n (TR/EN) · **M**
 Arayüz metinleri bugün HTML/JS içinde birebir Türkçe; sözlük katmanı yok.
 - [ ] **Kabul:** dil anahtarı `prefs.json`'a yazılıyor, iki dilde de 360px'de
       taşma yok (İngilizce metinler daha uzun).
 
-### 14. SaaS dönüşümü · **XL**
+### 13. SaaS dönüşümü · **XL**
 Kendi tasarım belgesi var: `docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md`
 (Faz 5). Kredi tarifesi katalogda **metadata olarak** hazır; ledger, hesaplar,
 depolama, ödeme ve filigran açık.
 - [ ] **Kabul:** o belgenin kendi kabul ölçütleri; buraya alınmadan önce ayrı
       bir uygulama planı yazılır.
 
-### 15. PWA · iOS · **L**
+### 14. PWA · iOS · **L**
 Android teslim (Chaquopy APK); PWA'nın service worker/manifest'i ve iOS yok.
 - [ ] **Kabul:** çevrimdışı açılış ve "ana ekrana ekle" akışı çalışıyor.
 

@@ -154,6 +154,126 @@ def test_the_top_edge_is_inset_like_the_bottom_edge(istemci):
         assert ust in blok, secici
 
 
+# ── Medya seçici · telefondaki yerleşim ─────────────────────────────
+
+
+def _mobil_yerlesim(css: str) -> str:
+    """`@media (max-width: 768px)` bloklarının gövdesi, YORUMSUZ ve birleşik.
+
+    Aşağıdaki iddialar kuralı SORGUNUN İÇİNDE arıyor, dosyanın herhangi bir
+    yerinde değil: sorgunun dışına kaçan bir `.picker-side` kuralı masaüstünün
+    üç sütunlu bölmesini de ezer ve bunu hiçbir mobil iddia göstermez —
+    kırılma yalnız 1024px'lik pencerede, gözle görülür.
+
+    Yorumlar AYIKLANIYOR ve bu satır ölçümle kazanıldı: bu dosyanın kuralları
+    gerekçesini kendi gövdesinde yazıyor, yani `max-height` bildirimini silen
+    bir mutasyon "`max-height` devreye girdiği anda…" diyen YORUM sayesinde
+    hayatta kalıyordu. `test_index.py:_strip_js_comments`'in aynı gerekçesi
+    (§0.6/§0.7/§0.9: iddia KODU arar, kelimeyi değil) burada CSS için.
+    Ayıklama brace sayımından ÖNCE: yorum içindeki bir `{` sayımı kaydırırdı.
+    """
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    govdeler = []
+    for m in re.finditer(r"@media \(max-width: 768px\)\s*\{", css):
+        i, derinlik = m.end(), 1
+        bas = i
+        while i < len(css) and derinlik:
+            if css[i] == "{":
+                derinlik += 1
+            elif css[i] == "}":
+                derinlik -= 1
+            i += 1
+        assert derinlik == 0, "medya sorgusu kapanmıyor"
+        govdeler.append(css[bas:i - 1])
+    assert govdeler, "telefon genişliği sorgusu yok"
+    return "\n".join(govdeler)
+
+
+def _kural(govde: str, secici: str) -> str:
+    eslesme = re.search(re.escape(secici) + r"\s*\{([^}]*)\}", govde)
+    assert eslesme, f"{secici} kuralı yok"
+    return eslesme.group(1)
+
+
+def test_the_picker_side_cannot_squeeze_the_grid_off_the_screen(istemci):
+    """Seçicinin sağ bölmesi telefonda ızgarayı EZİYORDU.
+
+    Kart tek sütuna iniyor (`grid-template-areas: "phead" "pnav" "pbody"
+    "pside"`) ama bölmenin ne kadar yer kaplayacağı hiç sınırlanmamıştı:
+    masaüstü kuralları 180px'lik bir sütun için yazılmış, telefonda 360px'in
+    tamamında koşuyordu. Ölçüm (360×780, düzeltme öncesi): önizleme
+    `aspect-ratio: 1` ile ~328px kare, künye ~100px, düğmeler ~84px, not 36px,
+    dolgu 32px → `pside` ≈ 600px. `pbody` ise `minmax(0, 1fr)`, TABANI SIFIR:
+    geriye ~80px kalıyordu, yani yarım karo. Kullanıcının şikâyeti birebir
+    buydu: "referans ekle'ye basınca görsel ekranın tamamını kaplıyor ve
+    üstteki görselleri seçemiyorum."
+
+    Asıl yer yiyen `aspect-ratio: 1` idi ve bu iddianın mandalladığı şey o:
+    telefonda önizlemeye SABİT bir boy verilmezse kare geri gelir ve ızgara
+    yine ezilir. `max-height` ikinci kilit — künye beklenmedik biçimde uzasa
+    (iç içe klasör zinciri) bölme yine de ekranın %40'ını aşamıyor.
+    """
+    govde = _mobil_yerlesim(_metin(istemci, "/static/mobile.css"))
+
+    onizleme = _kural(govde, ".picker-preview")
+    assert re.search(r"height:\s*\d+px", onizleme), (
+        "önizleme telefonda hâlâ içeriğine göre büyüyor: kare geri gelir")
+
+    bolme = _kural(govde, ".picker-side")
+    assert "max-height" in bolme, "bölmenin üst sınırı yok"
+    # Küçülen SADECE künye satırı olmalı; `auto` satırlar küçülmez ve sınıra
+    # dayanınca kırpılan ilk şey en alttaki düğmeler olurdu.
+    #
+    # İddia SATIR tanımına bakıyor, gövdede `minmax(0, 1fr)` aramıyor: aynı
+    # değer `grid-template-columns`ta da var (künye sütunu) ve gevşek arama
+    # satırları `auto auto`ya çeviren mutasyonda HAYATTA KALDI — ölçüldü.
+    satirlar = re.search(r"grid-template-rows:\s*([^;]+);", bolme)
+    assert satirlar and "minmax(0, 1fr)" in satirlar.group(1), (
+        "satır tanımı esnemiyor: sınıra dayanınca düğmeler kırpılır")
+
+
+def test_the_picker_side_carries_the_bottom_safe_area(istemci):
+    """Kartın ALT güvenli alan payı hiç verilmemişti.
+
+    `.picker-card` yukarıda yalnız `padding-top` alıyor; `.modal-card`'ın iki
+    kenarlı kuralı seçiciyi bilerek kapsamıyor (kartın kendi sınıfı var).
+    Sonuç: Android'in jest çubuğu "Ek olarak ekle"nin üstüne biniyordu —
+    düğme GÖRÜNÜYOR ama basılamıyor, bu dosyanın başındaki kırılma sınıfının
+    aynısı ve CI'daki hiçbir tarayıcı bunu göstermiyor.
+
+    Pay bölmeye veriliyor çünkü sayfanın en alt öğesi o.
+    """
+    govde = _mobil_yerlesim(_metin(istemci, "/static/mobile.css"))
+    bolme = _kural(govde, ".picker-side")
+    assert "env(safe-area-inset-bottom, 0px)" in bolme, (
+        "seçicinin en alt öğesi jest çubuğunun altında kalıyor")
+
+
+def test_the_picker_commit_buttons_wrap_by_rule_not_by_measurement(istemci):
+    """İki düğmenin sarması ÖLÇÜYE bağlı kalamaz.
+
+    `.chat-hint` dersinin aynısı (defter, Tur B): Android WebView sistem yazı
+    ölçeğini uyguluyor, piksel tabanlı bir eşik ölçeği büyütmüş telefonda iki
+    satır, küçültmüşte tek satır verir — yerleşim cihazdan cihaza değişir.
+    `rem` tabanı eşiği yazı boyuyla birlikte büyütüyor, yani kural her cihazda
+    aynı kararı veriyor.
+
+    `width: auto` da şart: masaüstünde `.picker-commit .primary` `width: 100%`
+    (style.css) ve o kural düşmezse düğmeler yan yana HİÇ gelmez.
+    """
+    govde = _mobil_yerlesim(_metin(istemci, "/static/mobile.css"))
+    dugmeler = _kural(govde, ".picker-commit .primary, .picker-commit .btn-ghost")
+    assert re.search(r"flex:\s*1\s+1\s+[\d.]+rem", dugmeler), (
+        "sarma eşiği piksel: yazı ölçeği değişince yerleşim de değişir")
+    assert "width: auto" in dugmeler, "masaüstünün `width: 100%`'i eziliyor değil"
+    assert "min-height: var(--tap)" in dugmeler, "dokunma hedefi 44px'in altında"
+    # `.primary`nin `margin-top: 1rem`i (style.css) DİKEY yığın içindi ve yan
+    # yana dizilimde düğmeyi satırın 16px'ini yiyerek kısaltıyor: ölçüm 44px'e
+    # karşı 60px, iki düğme alt kenarlarından hizalı. Kural düşerse yerleşim
+    # hata vermeden çarpılır.
+    assert "margin-top: 0" in dugmeler, "yığın mirası kenar boşluğu düğmeleri eşitsizleştiriyor"
+
+
 def test_the_installed_version_is_readable_on_a_phone(istemci):
     """Telefonda kurulu sürümü görmenin BİR yolu olmak zorunda.
 

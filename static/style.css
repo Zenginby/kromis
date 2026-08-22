@@ -1444,10 +1444,6 @@ body.select-mode #select-toggle,
 .picker-nav-item[aria-current="true"] svg {
   color: var(--accent);
 }
-.picker-tile:hover {
-  background: var(--accent-surface, var(--raised));
-  box-shadow: inset 0 0 0 1px var(--accent-border, transparent);
-}
 .picker-nav-item svg { flex: none; }
 .picker-nav-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-nav-item em {
@@ -1480,7 +1476,20 @@ body.select-mode #select-toggle,
   background: var(--panel-2); border-radius: var(--r-item, 12px); overflow: hidden;
   transition: background var(--dur) var(--ease);
 }
-.picker-tile:hover { background: var(--raised); }
+/* Bu kural da İKİZDİ — `aria-pressed` kuralıyla aynı yapıştırma kazasının
+   öteki yarısı: gezinme bölümünün ortasına `.picker-nav-item[aria-current]`
+   ile `.picker-nav-item svg` arasına düşmüş bir `.picker-tile:hover` bloğu
+   vardı. Özgüllükler eşit olduğu için kaskad sırası buradaki `background`ı
+   kazandırıyordu, yani ikizin `--accent-surface` tercihi hiç boyanmıyordu;
+   ondan hayatta kalan tek bildirim `box-shadow`du — o yüzden buraya alındı.
+   Boyanan sonuç birebir aynı, bildirimin kaynağı tek.
+
+   Seçili karoda aşağıdaki `[aria-pressed="true"]` kuralı bunu eziyor: eşit
+   özgüllük, sonra geliyor. Sıra bilinçli — üzerine gelmek seçimi silmemeli. */
+.picker-tile:hover {
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--accent-border, transparent);
+}
 /* <img> doğrudan düğmenin çocuğu — ara kap YOK. <button> `<div>` taşıyamıyor,
    `<span>` kap ise satır içi olur ve aspect-ratio'yu yutar (mock'ta ölçüldü:
    121×194, kare değil). Ölçüler `.card img` ile birebir; zoom imleci yok,

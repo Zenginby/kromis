@@ -2,7 +2,7 @@
 
 **Tarih:** 22 Ağustos 2026 · **Son dal:** `claude/referans-ekle-gorsel-bug-yxrauz`
 **Bugünkü ölçüm:** `APP_VERSION` **0.8.1** (sonrakini CI yazıyor),
-`pytest tests/ -q` → **1636 geçti / 10 atlandı**
+`pytest tests/ -q` → **1637 geçti / 10 atlandı**
 **Defterin açılış ölçümü** (Tur A öncesi): `APP_VERSION` 0.7.0 → 1613 geçti / 10 atlandı
 (atlananlar her iki ölçümde de yalnız Windows'a özgü DACL testleri + kurulu
 olmayan Playwright)
@@ -50,8 +50,8 @@ dokunuyor, ayrı turda yapmak aynı üç dosyayı iki kez açmak olurdu.
       değil, **ezilen ızgara**.
 - [x] **İki emniyet kilidi.** `max-height: 40vh` + satır tanımı
       `minmax(0, 1fr) auto`: künye beklenmedik biçimde uzasa (iç içe klasör
-      zinciri, kuyruk maddesi 1'in konusu) bölme ekranın %40'ını aşamıyor ve
-      küçülen tek şey künye satırı oluyor — `auto` satırlar küçülmediği için
+      zinciri — kuyruktaki "iç içe klasör etiketi" maddesinin konusu) bölme
+      ekranın %40'ını aşamıyor ve küçülen tek şey künye satırı oluyor — `auto` satırlar küçülmediği için
       sınıra dayanınca kırpılan ilk şey **düğmeler** olurdu.
 - [x] **Alt güvenli alan payı geldi.** `.picker-card` yalnız `padding-top`
       alıyordu (`.modal-card`'ın iki kenarlı kuralı seçiciyi bilerek
@@ -82,14 +82,28 @@ dokunuyor, ayrı turda yapmak aynı üç dosyayı iki kez açmak olurdu.
       kez** tanımlıydı (biri gezinme bölümüne düşmüş); ikisi `background` ve
       `outline` için çakışıyordu, ikizden hayatta kalan tek bildirim
       `box-shadow`du. Tek kurala indirildi, boyanan sonuç birebir aynı.
+- [x] **İkizin ÖTEKİ YARISI da tekilleşti** (aynı turun kapanışı, istek
+      üzerine). Gezinme bölümüne düşen yapıştırma iki kuraldan oluşuyordu;
+      `aria-selected` yarısı yukarıda kapandı, `.picker-tile:hover` yarısı
+      kaldı. Aynı mekanizma: eşit özgüllük, kaskad sırası karo bölümündeki
+      `background`ı kazandırıyor — ikizin `--accent-surface` tercihi hiç
+      boyanmıyordu — ama `box-shadow`u kimse ezmediği için o BOYANIYORDU.
+      **Buradaki asıl risk temizliğin kendisiydi:** ikizi yalnızca silmek,
+      üzerine gelince beliren accent kenarını da sessizce götürürdü. Chromium
+      ölçümü önce/sonra birebir aynı: üzerine gelinen karo
+      `rgb(39,39,40)` + `inset 0 0 0 1px rgba(255,255,255,.2)`, seçili+üzerine
+      gelinen karo `rgb(53,54,55)` + `outline 2px` (yani seçim hover'a
+      yenilmiyor — sıra bilinçli ve mandallı).
 
-**Kanıt.** Takım **1632 → 1636 geçti / 10 atlandı**. *(Yukarıdaki "defterin
+**Kanıt.** Takım **1632 → 1637 geçti / 10 atlandı**. *(Yukarıdaki "defterin
 açılış ölçümü" satırı 1631 diyordu; Tur C'nin ölçtüğü taban 1632 — defterin
 sayısı bir gerideymiş, kayıt düzeltiliyor.)* Dört yeni mandal ve
-**hepsi mutasyonla doğrulandı — on iki mutasyon, on ikisi de kırmızı**:
+**hepsi mutasyonla doğrulandı — on beş mutasyon, on beşi de kırmızı**:
 kare önizlemenin sabit boyu, `max-height`, satır tanımı, kuralın medya
 sorgusunun dışına kaçması, alt güvenli alan, rem tabanı, `width: auto`,
-`min-height: var(--tap)`, `margin-top: 0`, JS'in özniteliği ve CSS'in seçicisi.
+`min-height: var(--tap)`, `margin-top: 0`, JS'in özniteliği, CSS'in seçicisi,
+hover kenarının düşmesi, ikizin geri konması ve iki kuralın sırasının
+ters çevrilmesi.
 
 **Tarayıcı ölçümü** (Chromium 1194, dokunmatik bağlam, seçicide 36 karo):
 
@@ -284,27 +298,42 @@ Sıra öneri; her madde **neden · dokunulacak yer · kabul ölçütü · büyü
 taşıyor. Büyüklükler: **S** tek oturum, **M** bir tur, **L** kendi planını
 isteyen iş, **XL** kendi tasarım belgesi olan faz.
 
-### 1. Seçicide iç içe klasör etiketi (K27) · **S/M**
+### 1. Seçicide karo seçilince ODAK KAYBOLUYOR · **S**
+Tur C'nin `aria-pressed` işini yarıda bırakan kusur, kod gözden geçirmesinde
+çıktı: `#picker-grid` tıklamasında `renderPickerGrid()` çağrılıyor ve o
+`grid.innerHTML = ""` ile bütün karoları **yeniden kuruyor**
+(`folders.js:1070-1072`). Klavyeyle bir karoya Enter'a basan kullanıcının
+odaklı düğümü yok oluyor, odak `<body>`'ye düşüyor — yani ekran okuyucu
+kullanıcısı seçtiği karonun artık "pressed" olduğunu **duymuyor** ve gezinmeye
+diyaloğun başından devam etmek zorunda kalıyor. Kusur `aria-selected`
+döneminden beri var, ama `aria-pressed` düzeltmesinin faydasını tam olarak
+o kullanıcıda siliyor. Karo yeniden kurulmak yerine yalnız özniteliği
+güncellenebilir (eski seçili `false`, yeni seçili `true`) ya da yeniden
+kurulumdan sonra `data-id`'den odak geri verilebilir.
+- [ ] **Kabul:** klavyeyle karo seçildikten sonra `document.activeElement`
+      hâlâ o karo; iddia mutasyonla doğrulanıyor.
+
+### 2. Seçicide iç içe klasör etiketi (K27) · **S/M**
 `picker-tile` künyesi yalnız en yakın klasörün adını yazıyor; iç içe klasörlerde
 "hangi A altındaki B" sorusu cevapsız. `folders.js`'te kök→klasör zinciri
 (`parentOf` zinciri zaten var, kırıntı başlığı onu kullanıyor) künyeye taşınacak.
 - [ ] **Kabul:** iki seviyeli klasörde künye "A / B" yazıyor; genişlik 360px'de
       taşmıyor.
 
-### 2. Sonuç kartında "Düzenle" / "+ Ek" (K14) · **M**
+### 3. Sonuç kartında "Düzenle" / "+ Ek" (K14) · **M**
 Karar "tam bir geçmiş kaydı ister" diye ertelenmişti; döküm bugün yalnız
 `image_id` taşıyor. Kart eylemleri için kaydın kendisi lazım.
 - [ ] **Kabul:** sonuç kartından doğrudan düzenlemeye/ek referansa geçilebiliyor
       ve silinmiş görselde yer tutucu davranışı bozulmuyor.
 
-### 3. `gitleaks` işi CI'da · **S**
+### 4. `gitleaks` işi CI'da · **S**
 Adım 1 planının tek açık maddesi: geçmiş taramasının kaydı yok.
 - [ ] `.github/workflows/ci.yml`'e bir iş; `credentials.env` deseni ve test
       sabitleri için allowlist gerekiyor (`tests/test_errlog.py` sahte anahtar
       taşıyor).
 - **Kabul:** iş yeşil koşuyor ve gerçek bir sızıntı denemesinde kırmızıya dönüyor.
 
-### 4. Ayarlar'da canlı bağlantı testi düğmeleri · **M**
+### 5. Ayarlar'da canlı bağlantı testi düğmeleri · **M**
 README Faz 2'nin son açık maddesi. Bugünkü karşılık yalnız "anahtar kayıtlı mı"
 listesi; gerçek bir çağrı denemesi yok.
 - [ ] Sağlayıcı başına küçük bir uç (`POST /api/settings/test`?) + düğme;
@@ -312,7 +341,7 @@ listesi; gerçek bir çağrı denemesi yok.
 - **Kabul:** yanlış anahtarda anlaşılır Türkçe hata, doğru anahtarda "bağlantı
       kuruldu"; anahtar yanıtta HİÇ yankılanmıyor (write-only sözleşmesi).
 
-### 5. Yerel sağlayıcı adaptörleri: ComfyUI · Ollama · **L**
+### 6. Yerel sağlayıcı adaptörleri: ComfyUI · Ollama · **L**
 Anahtar/adres alanları v0.2.0'dan beri kayıtlı, **adaptör ve arayüz yok**
 (`azure_client.get_settings_status` yalnız durum bayrağı döndürüyor).
 - [ ] `providers._ADAPTERS`'a iki adaptör, katalogda modeller, Ayarlar'da
@@ -320,53 +349,53 @@ Anahtar/adres alanları v0.2.0'dan beri kayıtlı, **adaptör ve arayüz yok**
 - **Kabul:** yerel bir kurulumla üretim yapılabiliyor; sağlayıcı düşükken hata
       Türkçe ve anlaşılır.
 
-### 6. fal.ai · Replicate adaptörleri · **L**
+### 7. fal.ai · Replicate adaptörleri · **L**
 Aynı boşluğun bulut yarısı; ikisi de **kuyruklu** akış (`providers`'ın zaman
 aşımı politikası bunu zaten öngörüyor: "adet başına ayrı istek atan sağlayıcı").
 - [ ] **Kabul:** kuyruk beklerken arayüz ilerleme gösteriyor, zaman aşımı
       sağlayıcıya göre çözülüyor (`tests/test_providers.py`'nin deseni).
 
-### 7. Model Arena · **M**
+### 8. Model Arena · **M**
 Aynı prompt'u iki modelde yan yana koşturup karşılaştırma (master spec Faz 3).
 - [ ] **Kabul:** iki üretim tek turda, künyelerinde model + kredi; kayıtlar
       bugünkü şemayı bozmuyor.
 
-### 8. Maske tuvali / bölgesel düzenleme · **L**
+### 9. Maske tuvali / bölgesel düzenleme · **L**
 Master spec Faz 1'in açık yarısı: bugünkü `/api/edit` tüm görsel üzerinden
 çalışıyor, `mask` alanı yok.
 - [ ] Fırça/silgi HTML5 Canvas + `mask` alanının adaptör sözleşmesine girmesi
       (Azure ve OpenAI destekliyor; Gemini'de karşılığı farklı).
 - **Kabul:** maskelenen bölge dışında piksel değişmiyor (golden fixture).
 
-### 9. Stil çipleri · stil şablonları · tipografi katmanı · **M**
+### 10. Stil çipleri · stil şablonları · tipografi katmanı · **M**
 Faz 2'nin açık yarısı. Hazır stil çipleri (*Anime*, *Cyberpunk*, *Cinematic*,
 *Pixel Art*, *3D Render*) prompt'a eklenen jetonlar; tipografi katmanı
 bindirmenin metin tarafı.
 - [ ] **Kabul:** çip seçimi prompt'a görünür biçimde giriyor ve geri alınabiliyor.
 
-### 10. Özel araçlar: Upscaler · Product-in-Hand · **L**
+### 11. Özel araçlar: Upscaler · Product-in-Hand · **L**
 README Faz 3. Upscaler bir sağlayıcı yeteneği; Product-in-Hand bir prompt
 şablonu + referans akışı.
 - [ ] **Kabul:** her ikisi kendi kredi etiketiyle katalogda.
 
-### 11. Image-to-Video motoru · **L**
+### 12. Image-to-Video motoru · **L**
 README Faz 4 (master spec Faz 3'ün video payı). Yeni bir medya TÜRÜ: depo,
 küçük resim, büyüteç ve indirme yolları video tanımıyor.
 - [ ] **Kabul:** üretilen video kayıtta, galeride oynatılabiliyor, indirilebiliyor.
 
-### 12. i18n (TR/EN) · **M**
+### 13. i18n (TR/EN) · **M**
 Arayüz metinleri bugün HTML/JS içinde birebir Türkçe; sözlük katmanı yok.
 - [ ] **Kabul:** dil anahtarı `prefs.json`'a yazılıyor, iki dilde de 360px'de
       taşma yok (İngilizce metinler daha uzun).
 
-### 13. SaaS dönüşümü · **XL**
+### 14. SaaS dönüşümü · **XL**
 Kendi tasarım belgesi var: `docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md`
 (Faz 5). Kredi tarifesi katalogda **metadata olarak** hazır; ledger, hesaplar,
 depolama, ödeme ve filigran açık.
 - [ ] **Kabul:** o belgenin kendi kabul ölçütleri; buraya alınmadan önce ayrı
       bir uygulama planı yazılır.
 
-### 14. PWA · iOS · **L**
+### 15. PWA · iOS · **L**
 Android teslim (Chaquopy APK); PWA'nın service worker/manifest'i ve iOS yok.
 - [ ] **Kabul:** çevrimdışı açılış ve "ana ekrana ekle" akışı çalışıyor.
 

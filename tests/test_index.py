@@ -2533,6 +2533,38 @@ def test_the_picker_tile_announces_selection_with_a_state_a_button_can_carry():
         "seçili karo kuralı yine ikizlenmiş")
 
 
+def test_the_hover_tile_keeps_the_accent_edge_the_twin_rule_carried():
+    """Kuyruk · `.picker-tile:hover` ikizi tekilleşti, boyası kaybolmadan.
+
+    `aria-pressed` kuralıyla aynı yapıştırma kazasının öteki yarısıydı:
+    gezinme kurallarının ortasına düşmüş ikinci bir `.picker-tile:hover`
+    bloğu. Özgüllükler eşit olduğu için kaskad sırası karo bölümündeki
+    `background`ı kazandırıyordu — ikizin `--accent-surface` tercihi hiç
+    boyanmıyordu — ama `box-shadow`u kimse ezmediği için o BOYANIYORDU.
+
+    İddianın tuttuğu kırılma bu: ikizi yalnızca silen bir temizlik, üzerine
+    gelince beliren accent kenarını da sessizce götürür. Hata çıkmaz, test
+    çıkar. Bu yüzden iddia hem "tek tanım" hem "kenar duruyor" diyor.
+
+    Üçüncü iddia sıra: seçili bir karonun üzerine gelmek seçimi silmemeli.
+    İki kural da eşit özgüllükte (0,2,0), yani kazananı YALNIZ sıra
+    belirliyor — `[aria-pressed]` sonra gelmeli.
+    """
+    govde = _css_block(".picker-tile:hover")
+    assert "var(--accent-border" in govde, (
+        "ikiz silinirken üzerine gelme kenarı da gitmiş")
+
+    css = re.sub(r"/\*.*?\*/", "", _css(), flags=re.S)
+    assert css.count(".picker-tile:hover") == 1, (
+        "karo hover kuralı yine ikizlenmiş")
+
+    hover = css.index(".picker-tile:hover")
+    basili = css.index('.picker-tile[aria-pressed="true"]')
+    assert hover < basili, (
+        "hover kuralı seçim kuralından sonra geliyor: eşit özgüllükte "
+        "üzerine gelmek seçimi siler")
+
+
 def test_the_picker_has_no_hidden_button_clicks():
     """B11 · Gizli düğmeye programatik `.click()` YOK.
 

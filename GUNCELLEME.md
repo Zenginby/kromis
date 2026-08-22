@@ -150,6 +150,12 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.8.2 — ne değişti
+
+- medya seçicide görsel ekranı kaplamıyor, üstteki karolar seçilebiliyor
+
+---
+
 ## Sürüm 0.8.1 — ne değişti
 
 - §11 mandallarının delikleri kapandı, Ayarlar düğmesi tek adla anlatılıyor

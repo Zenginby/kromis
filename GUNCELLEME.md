@@ -3,7 +3,7 @@
 Elindeki uygulamayı yenisiyle değiştirmek için bu sayfayı izle. 3 dakika sürer.
 (İlk kez kuruyorsan: [KURULUM.md](KURULUM.md).)
 
-**Yeni sürüm çıktığını uygulama sana söylüyor:** ⚙ **Ayarlar**'ı açtığında,
+**Yeni sürüm çıktığını uygulama sana söylüyor:** **Ayarlar**'ı açtığında,
 kurulu sürümün hemen altında *"Yeni sürüm çıktı"* satırı belirir. Aynı yerdeki
 anahtarla bu kontrolü kapatabilirsin. Paketleri her zaman
 [son yayın sayfasından](https://github.com/Zenginby/gpt-image-studio/releases/latest)
@@ -134,7 +134,7 @@ yeniden indir. Sürerse Kurum'ya yaz — **kaldırıp yeniden kurma**, önce sor
 
 ## 4. Güncellendiğini doğrula
 
-Sağ üstteki **⚙ (dişli)** düğmesine bas — pencerenin altında **Sürüm** yazıyor.
+Sağ üstteki **Ayarlar** düğmesine bas — pencerenin altında **Sürüm** yazıyor.
 Kurum'nın söylediği numarayla aynıysa güncelleme geçmiş demektir. Destek isterken
 de bu numarayı söyle.
 
@@ -210,7 +210,7 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ## Sürüm 0.5.0 — ne değişti
 
-- Yeni sürüm çıktığında uygulama artık kendisi haber veriyor — ⚙ Ayarlar'da, kurulu sürümün hemen altında.
+- Yeni sürüm çıktığında uygulama artık kendisi haber veriyor — Ayarlar'da, kurulu sürümün hemen altında.
 
 ---
 
@@ -317,7 +317,7 @@ Arada arayüz turları için 2.x'e kadar çıkmış numaralar da vardı; onlar d
 sıfırlamaya girdi.
 
 Kısacası doğru sıra şu: `1.16.0` → **`0.2.0`** → `0.2.1` → **`0.3.0`** (bugün).
-Hangi sürümde olduğunu ⚙ Ayarlar'ın altındaki **Sürüm** satırından görürsün;
+Hangi sürümde olduğunu Ayarlar'ın altındaki **Sürüm** satırından görürsün;
 Kurum'nın söylediği numarayla karşılaştır, büyüklük-küçüklük kıyaslama.
 
 ## Sürüm 0.2.1'de ne değişti
@@ -465,7 +465,7 @@ Hepsi **Prompt Yönetmeni** sekmesinde:
     başka bir ayarla üretmiyor.
   - Sohbet **kaydedilmiyor**: uygulamayı kapatınca gider. Kalıcı olan, üretilen
     görselin prompt'u (o zaten geçmişte duruyor). "Sohbeti temizle" onay soruyor.
-  - Kullanmak için **bir kerelik** ayar gerekiyor: ⚙ **Ayarlar** → *Prompt Yönetmeni
+  - Kullanmak için **bir kerelik** ayar gerekiyor: **Ayarlar** → *Prompt Yönetmeni
     (sohbet modeli)* → **Dağıtım adı** (Kurum verecek, ör. `gpt-5.6-luna`) → **Kaydet**.
     Girilmezse sekme açılır ama "Gönder" kilitli kalır ve nedeni panelde yazar.
   - Azure anahtarını **yeniden girmen gerekmiyor**; sohbet görselinkini kullanıyor.

@@ -406,7 +406,7 @@
         </div>
         <p class="view-desc">
           Azure erişim bilgileri burada değil: onlar uygulama ayarı, üst şeritteki
-          dişli düğmesinden açılıyor.
+          Ayarlar düğmesinden açılıyor.
         </p>
       </section>
     </main>
@@ -507,8 +507,12 @@
          "dağıtım adını gir" yalnızca Azure'ın cevabı. Yalnızca OpenAI ya da
          Gemini anahtarı olan kullanıcıyı Azure'ın alanına yönlendirmek, tam
          olarak #model-note'un görsel tarafında düzelttiği hataydı. -->
+    <!-- Düğme ADIYLA anlatılıyor ("Ayarlar"), görünüşüyle değil: bu ekranda aynı
+         düğmeyi settings.js de anlatıyor (AYARLAR_EKI) ve iki metin ayrışınca
+         kullanıcı tek düğme için iki ad okuyor. Eski "dişli" sözü üstelik yanlış
+         da değildi ama ADI değildi (index.html, `aria-label="Ayarlar"`). -->
     <p id="chat-gate" class="chat-gate" hidden>
-      Prompt Yönetmeni kapalı: Ayarlar'dan (sağ üstteki dişli) bir sohbet
+      Prompt Yönetmeni kapalı: sağ üstteki Ayarlar düğmesinden bir sohbet
       sağlayıcısının anahtarını kaydet — Azure'da ayrıca
       <strong>dağıtım adı</strong> gerekiyor.
     </p>

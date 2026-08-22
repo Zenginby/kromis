@@ -28,7 +28,7 @@ Son kullanıcılar için hazırlanmış hazır derleme paketlerini doğrudan ind
 
 Yukarıdaki üç bağlantı **her zaman en son yayına** işaret ediyor (`releases/latest/download/…`), yani adres sabit — sürüm yükseldiğinde bağlantıyı değiştirmek gerekmiyor. Rozetteki sürüm o yayının sürümü.
 
-1. **Kurulu sürümünü öğren:** uygulamada **⚙ Ayarlar**'ı aç, panelin en altındaki *"Kurulu sürüm"* satırına bak. (Üst şeritteki sürüm rozeti telefonda gizli — dar ekranda oturum başlığını eziyor.)
+1. **Kurulu sürümünü öğren:** uygulamada **Ayarlar**'ı aç, panelin en altındaki *"Kurulu sürüm"* satırına bak. (Üst şeritteki sürüm rozeti telefonda gizli — dar ekranda oturum başlığını eziyor.)
 2. Rozetteki sürümden düşükse APK'yı telefonun tarayıcısından indir.
 3. **Üzerine kur, uygulamayı SİLME.** Paketler aynı anahtarla imzalandığı için Android eskisinin üzerine yazar ve verin (görseller, klasörler, Azure anahtarı) yerinde kalır. Silip yeniden kurmak veriyi de siler.
 4. Güncellemeden sonraki ilk açılış yine **2–5 saniye** sürer (Python çalışma zamanı yeniden açılıyor); sonrakiler hızlı.

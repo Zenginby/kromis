@@ -339,11 +339,41 @@ body {
      (tarayıcıda main ile karşılaştırılarak ölçüldü; main'de taşma YOK).
      `text-overflow` gerekmiyor: native select metnini kendisi kırpıyor. */
   flex: 0 1 auto; width: auto; max-width: 100%; min-width: 0; margin: 0;
-  padding: 6px 10px; cursor: pointer;
+  /* Sol dolgu sağlayıcı işaretinin yeri (14px işaret + 10px kenar + 6px hava).
+     İşaret gizliyken de duruyor: seçili model değişince şeridin metni
+     yatayda ZIPLAMASIN — işaretsiz sağlayıcı (katalogda logosu olmayan) tek
+     kaçış yolu ve o durumda 6px'lik fazladan hava görünmez bir bedel. */
+  padding: 6px 10px 6px 30px; cursor: pointer;
   background: var(--panel-2); color: var(--muted);
   border: 1px solid var(--control-border); border-radius: 999px;
   font-size: 0.74rem;
   transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+/* Şerit + işaret tek kabukta. `position: relative` işareti çipin İÇİNE
+   oturtuyor; işaret `pointer-events: none` olduğu için tıklama native
+   `<select>`e geçiyor (yani Android'de sistem seçicisi açılmaya devam ediyor —
+   index.html'deki "native select" kararının bedelsiz kaldığı yer bu).
+
+   `min-width: 0` BURADA ve bu ZORUNLU, `.composer-head`in aynı satırının
+   gerekçesiyle: flex öğesi artık bu sarmalayıcı ve öğenin varsayılan
+   `min-width: auto` değeri içindeki `<select>`in min-content genişliğine
+   çözülüyor — o da en uzun model adı kadar. Silinirse 360px'de composer'ın
+   bütün çocukları birlikte genişler ve sayfa yatay kayar (ölçüldü; mandal
+   tests/test_mobile.py). */
+.model-pick { position: relative; display: inline-flex; min-width: 0; max-width: 100%; }
+/* `display` ATAYAN her yazar kuralının ödediği bedel: UA'nın
+   `[hidden] { display: none }` kuralını eziyor, yani `hidden` yazılan
+   sarmalayıcı GİZLENMEZDİ. Bugün kimse buraya `hidden` yazmıyor — ama
+   `#chat-model[hidden]` ve `.model-note[hidden]` satırları tam olarak bu dersin
+   iki kez ödenmiş hâli, üçüncüsü bir satır. */
+.model-pick[hidden] { display: none; }
+/* Sol dolgunun İÇİNE oturuyor: `.model-chip`in `padding-left`i işaret için
+   açıldı (10px → 30px), yani metin işaretin üstüne binmiyor. Dikey ortalama
+   `translateY` ile — satır yüksekliği yazı ölçeğiyle değişiyor (Android WebView
+   sistem yazı ölçeğini uyguluyor) ve sabit bir `top` o ölçekte kayardı. */
+.model-logo {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  width: 14px; height: 14px; pointer-events: none;
 }
 .model-chip:hover { background: var(--raised); color: var(--text); }
 .model-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -388,12 +418,17 @@ body:has(.sheet.open) .scrim { display: block; }
 /* Model seçicileri de aynı eksende ve BİRBİRİNİ dışlıyor: aynı yuvada
    durdukları için genişlik bedeli sıfır. #run-cost yalnız Görsel modunda
    anlamlı — sohbetin kredi maliyeti üretimin maliyeti değil. */
-#composer[data-mode="image"] #chat-model,
-#composer[data-mode="director"] #model,
+/* Hedef `<select>` DEĞİL SARMALAYICI (`#model-pick` / `#chat-model-pick`):
+   sağlayıcı işareti şeridin içine girince flex öğesi sarmalayıcı oldu ve
+   yalnız `<select>`i gizlemek kabuğu ayakta bırakıyordu — 360px'de composer'ın
+   ölçülmüş yatay bütçesini taşıran tam olarak o kabuk. */
+#composer[data-mode="image"] #chat-model-pick,
+#composer[data-mode="director"] #model-pick,
 #composer[data-mode="director"] #run-cost { display: none; }
-/* `#chat-model` bugün HTML'de `hidden`: seçeneklerini dolduran kod ve onu tel
-   üzerine çıkaracak yönlendirme henüz yok (bkz. static/index.html'deki not).
-   Bu satır `.model-note[hidden]` ile AYNI derse dayanıyor: `display` atayan
+/* `#chat-model` ARTIK HTML'de `hidden` DEĞİL (seçeneklerini dolduran kod v0.7'de
+   geldi; bu gerekçe onunla birlikte güncellenmemişti). Satır yine de duruyor:
+   şerit bir gün mod ekseninin dışında da gizlenebilir ve o gün
+   `.model-note[hidden]` ile AYNI ders geçerli — `display` atayan
    bir yazar kuralı UA'nın `[hidden] { display: none }` kuralını eziyor.
    Bugün `.model-chip` `display` atamıyor, yani `hidden` tek başına çalışıyor —
    ama o gün geldiğinde gizli seçici Yönetmen modunda sessizce geri gelirdi. */

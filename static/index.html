@@ -435,9 +435,25 @@
          gelmeden bir an "model yok" gibi görünürdü. -->
     <div class="composer-head">
       <label class="sr-only" for="model">Görsel modeli</label>
-      <select id="model" class="model-chip" title="Görsel modeli">
-        <option value="">Modeller yükleniyor…</option>
-      </select>
+      <!-- SARMALAYICI, çünkü işaret çipin İÇİNDE duruyor (mutlak konum + solda
+           dolgu). Native `<option>` görsel taşıyamadığı için açılan listede
+           işaret YOK; buradaki işaret SEÇİLİ modelin sağlayıcısını söylüyor ve
+           `applyModel`'de tazeleniyor.
+
+           DİKKAT — mod eksenindeki `display: none` kuralları artık BU
+           sarmalayıcıları hedefliyor (style.css), `<select>`in kendisini değil:
+           sarmalayıcı gizlenmezse gizli şeridin kabuğu yer kaplamaya devam
+           eder (ölçülmüştü: 360px'de composer'ın yatay bütçesi taşıyordu).
+
+           `alt=""` + `aria-hidden`: sağlayıcı adı `<option>` metninde ZATEN
+           var, işaret onu ikinci kez okutmamalı. Süs değil ama BİLGİ de değil
+           — aynı bilginin görsel kısayolu. -->
+      <span id="model-pick" class="model-pick">
+        <img id="model-logo" class="model-logo" alt="" aria-hidden="true" hidden />
+        <select id="model" class="model-chip" title="Görsel modeli">
+          <option value="">Modeller yükleniyor…</option>
+        </select>
+      </span>
 
       <!-- Yönetmen modunun karşılığı AYNI YUVADA: ikisi #composer[data-mode]
            ekseniyle birbirini dışlıyor, yani genişlik bedeli SIFIR. -->
@@ -449,9 +465,12 @@
            koşuyor — yani "gizle ve unut" olamıyordu.
            Yer tutucu #model ile aynı gerekçeyle var: boş bir <select> Ayarlar
            gelmeden bir an "model yok" gibi görünürdü. -->
-      <select id="chat-model" class="model-chip" title="Prompt Yönetmeni modeli">
-        <option value="">Modeller yükleniyor…</option>
-      </select>
+      <span id="chat-model-pick" class="model-pick">
+        <img id="chat-model-logo" class="model-logo" alt="" aria-hidden="true" hidden />
+        <select id="chat-model" class="model-chip" title="Prompt Yönetmeni modeli">
+          <option value="">Modeller yükleniyor…</option>
+        </select>
+      </span>
 
       <!-- Kapı açıklaması #chat-gate ile AYNI duruş: kontrolün KENDİSİ
            kilitlenmiyor, çünkü kilitli bir kontrol "neden kapalı" bilgisini de
@@ -831,15 +850,21 @@
         </p>
       </div>
 
-      <h3 class="modal-subhead">Prompt Yönetmeni (sohbet modeli)</h3>
-      <!-- DAĞITIM ADI YALNIZCA ONU İSTEYEN SAĞLAYICIDA görünüyor. Kutu
-           öncesinde koşulsuzdu ve yalnızca OpenAI ya da Gemini anahtarı olan
-           bir kullanıcıya doldurulamayan bir alan gösteriyordu: o sağlayıcılarda
-           "dağıtım" diye bir şey yok, model adı katalogda yazılı. 360px'lik bir
-           slide-over'da bu, ödenmiş boş yer + yanlış bir soru demekti.
-           Kapı KATALOGDAN türetiliyor (`chat_models[].needs_deployment`),
-           istemcide sağlayıcı adı sayılmıyor — bkz. settings.js
-           syncProviderFields. -->
+      <!-- BAŞLIK DA KUTUYLA BİRLİKTE GİDİYOR (`#chat-deploy-head`). Önceki tur
+           yalnız kutuyu gizliyor, yerine "bu sağlayıcıda dağıtım adı yok"
+           cümlesini koyuyordu: başlık + açıklama, 360px'lik bir panelde
+           kullanıcının YAPACAĞI bir şey olmadığı hâlde iki satır yer tutuyordu.
+           Artık sağlayıcı bir alan istemiyorsa bölümden hiçbir şey görünmüyor.
+           Kaldırılan cümlenin bilgisi kaybolmuyor: talimat dosyası yolu aşağıda
+           KOŞULSUZ duruyor ve sohbet modelinin nereden seçildiği composer'ın
+           üstündeki şeridin kendisiyle zaten söyleniyor.
+
+           DAĞITIM ADI YALNIZCA ONU İSTEYEN SAĞLAYICIDA görünüyor: o
+           sağlayıcılarda "dağıtım" diye bir şey yok, model adı katalogda
+           yazılı. Kapı KATALOGDAN türetiliyor
+           (`chat_models[].needs_deployment`), istemcide sağlayıcı adı
+           sayılmıyor — bkz. settings.js syncChatDeployField. -->
+      <h3 class="modal-subhead" id="chat-deploy-head">Prompt Yönetmeni (sohbet modeli)</h3>
       <div id="chat-deploy-group" class="prov-fields">
         <label for="set-chat-deployment">Dağıtım adı</label>
         <input id="set-chat-deployment" type="text" autocomplete="off" spellcheck="false"
@@ -850,14 +875,13 @@
           görselin endpoint ve API anahtarını paylaşır.
         </p>
       </div>
-      <!-- Kutu gizlendiğinde başlık boş kalmıyor: kullanıcının sorusu
-           ("bu sağlayıcıda yönetmeni nasıl seçiyorum?") burada cevaplanıyor. -->
-      <p id="chat-no-deploy-note" class="field-note" hidden>
-        Bu sağlayıcıda girilecek bir dağıtım adı yok — sohbet modelini
-        composer'ın üstündeki şeritten seçiyorsun. Anahtarı kaydetmek yeterli.
-      </p>
       <!-- Talimatı ezme yolu: keşfedilebilir olmasa özellik var olmakla olmamak
-           arasında bir fark taşımaz. GET /api/settings dolduruyor. -->
+           arasında bir fark taşımaz. GET /api/settings dolduruyor.
+
+           KENDİ BAŞLIĞI VAR ve KOŞULSUZ: yukarıdaki bölüm sağlayıcıya göre
+           kayboluyor, bu satır ise her sağlayıcıda geçerli — başlıksız
+           kalırsa gizli bölümün altında sahipsiz bir paragraf olurdu. -->
+      <h3 class="modal-subhead">Prompt Yönetmeni · talimat</h3>
       <p class="field-note">
         Yönetmenin talimatını değiştirmek için bu dosyayı oluştur:
         <code id="chat-instructions-path">—</code>

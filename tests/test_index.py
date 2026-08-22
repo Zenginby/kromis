@@ -3085,6 +3085,124 @@ def test_yeni_anahtar_kutulari_ACILISTA_ve_KAYITTAN_SONRA_temizleniyor():
         assert f'$("{alan}").value = ""' in kayit, f"{alan} kayıttan sonra kalıyor"
 
 
+# ── Model şeridinde sağlayıcı işareti (v0.8) ────────────────────────────
+
+
+def test_ISARET_secili_modelin_yaninda_ve_SARMALAYICI_icinde():
+    """İşaret şeridin İÇİNDE: iki `<select>` de bir sarmalayıcıya girmek zorunda.
+
+    Native `<option>` görsel taşıyamıyor (`renderModelOptions`'ın kendi notu),
+    yani açılan listede işaret YOK ve olamaz. Gösterilebilen tek şey SEÇİLİ
+    modelin sağlayıcısı ve onun yeri çipin kendisi — ayrı bir kardeş ikon
+    şeritten kopuk bir süs olurdu.
+    """
+    html = _html()
+    for sarmal, img, secici in (("model-pick", "model-logo", "model"),
+                                ("chat-model-pick", "chat-model-logo", "chat-model")):
+        blok = html.split(f'id="{sarmal}"', 1)
+        assert len(blok) == 2, f"#{sarmal} sarmalayıcısı yok"
+        govde = blok[1].split("</span>", 1)[0]
+        assert f'id="{img}"' in govde, f"#{img} sarmalayıcının dışında"
+        assert f'<select id="{secici}"' in govde, (
+            f"#{secici} sarmalayıcının dışında — mod ekseni kabuğu gizleyemez")
+
+
+def test_ISARET_ekran_okuyucuya_IKINCI_KEZ_okunmuyor():
+    """`alt=""` + `aria-hidden`: sağlayıcı adı `<option>` metninde ZATEN var.
+
+    İşaret yeni bir bilgi taşımıyor, var olanın görsel kısayolu. Adlandırılmış
+    bir `<img>` her şerit değişiminde aynı adı ikinci kez okuturdu.
+    """
+    html = _html()
+    for img in ("model-logo", "chat-model-logo"):
+        etiket = re.search(rf'<img id="{img}"[^>]*>', html)
+        assert etiket, f"#{img} işaretlemede yok"
+        assert 'alt=""' in etiket.group(0), f"#{img} adlandırılmış (alt boş değil)"
+        assert 'aria-hidden="true"' in etiket.group(0), f"#{img} ağaçta duruyor"
+        # İlk karede boş bir kutu çizilmesin: katalog gelene kadar `hidden`.
+        assert "hidden" in etiket.group(0).replace('aria-hidden="true"', ""), (
+            f"#{img} ilk karede görünür — src'siz kırık bir <img> çizer")
+
+
+def test_ISARET_adresi_SUNUCUDAN_geliyor():
+    """İstemci dize birleştirmiyor: `logo` alanı hazır adres taşıyor.
+
+    Sağlayıcı adını istemcide literal saymak (`m.provider === "gemini"`) yeni
+    bir sağlayıcı eklendiği gün işaretin sessizce kaybolması demekti — kapının
+    katalogdan türetilme kuralının (`syncChatDeployField`) aynısı. Adresteki
+    `?v=` de sunucuda kuruluyor, yani sürüm literali istemciye hiç geçmiyor.
+    """
+    js = _js("core.js")
+    govde = js.split("function setModelLogo(", 1)[1].split("\n}", 1)[0]
+    assert "model.logo" in govde, "işaret adresi sunucudan okunmuyor"
+    assert "/static/img/providers" not in govde, "adres istemcide kuruluyor"
+    for ad in ("azure", "openai", "gemini"):
+        assert f'"{ad}"' not in govde, f"sağlayıcı adı ({ad}) literal olarak sayılmış"
+
+
+def test_ISARET_her_iki_seride_de_baglaniyor():
+    """Çağrı yeri `applyModel` / `applyChatModel`: ikisi de hem ilk çizimde hem
+    `change`de koşuyor, yani ikinci bir senkronizasyon noktası doğmuyor.
+
+    Şeridi tazeleyen başka bir yol yok; işaret bu iki fonksiyonun dışında
+    yazılırsa "hangisi kazandı" sorusu doğar (`.model-note`ın hidden ekseniyle
+    aynı ders).
+    """
+    js = _js("core.js")
+    for fn, img in (("function applyModel(", "model-logo"),
+                    ("function applyChatModel(", "chat-model-logo")):
+        govde = js.split(fn, 1)[1].split("\n}", 1)[0]
+        assert f'setModelLogo("{img}"' in govde, f"{fn} işareti tazelemiyor"
+
+
+def test_ISARET_cipin_tiklamasini_YUTMUYOR():
+    """`pointer-events: none` ŞART: işaret çipin üstünde mutlak konumda duruyor.
+
+    Yutarsa işaretin üstüne yapılan tıklama native `<select>`e gitmez ve
+    Android'de sistem seçicisi açılmaz — `index.html`'in "native select"
+    kararının bedelsiz kalması tam olarak buna bağlı.
+    """
+    govde = _css_block(".model-logo")
+    assert "pointer-events: none" in govde, "işaret tıklamayı yutuyor"
+    assert "position: absolute" in govde, "işaret çipin içine oturmuyor"
+    # Metin işaretin üstüne binmesin: çipin sol dolgusu işaret için açık.
+    cip = _css_block(".model-chip")
+    assert "padding: 6px 10px 6px 30px" in cip, (
+        ".model-chip'in sol dolgusu işaret için açılmamış — metin üstüne biner")
+
+
+def test_SARMALAYICI_hidden_yazildiginda_GERCEKTEN_gizleniyor():
+    """`display` atayan bir yazar kuralı UA'nın `[hidden]`ını EZİYOR.
+
+    `.model-pick` `display: inline-flex` atıyor, yani sarmalayıcıya `hidden`
+    yazan bir sonraki tur şeridi gizlediğini SANIR ve şerit yerinde kalır.
+    Depoda bu dersin iki kez ödenmiş hâli var (`#chat-model[hidden]`,
+    `.model-note[hidden]`); üçüncüsü tek satır.
+    """
+    css = _js("style.css")
+    assert ".model-pick[hidden] { display: none; }" in css, (
+        "sarmalayıcının [hidden] mandalı yok — `hidden` sessizce işlemez")
+
+
+def test_SERIT_SATIRI_marka_onekini_TEKRARLAMIYOR():
+    """İşaret markayı söylüyorsa etiket de söylememeli: satır `short_label` yazıyor.
+
+    Kısaltma SUNUCUDA (`catalog.short_labels`): istemci ne marka adı sayıyor ne
+    de dize kırpıyor — `logo` adresinin sunucuda kurulmasıyla aynı gerekçe. Geri
+    düşüş (`|| m.label`) bilinçli: alanı taşımayan eski bir yanıtta şerit adsız
+    kalmasın.
+    """
+    js = _js("core.js")
+    for fn in ("function renderModelOptions(", "function renderChatModelOptions("):
+        govde = js.split(fn, 1)[1].split("\n}", 1)[0]
+        assert "short_label" in govde, f"{fn} şerit adını okumuyor"
+        assert "m.label" in govde, f"{fn} geri düşüşü yok"
+        assert ".split(" not in govde and ".replace(" not in govde, (
+            f"{fn} etiketi İSTEMCİDE kırpıyor — kısaltma sunucunun işi")
+        for ad in ("Azure", "OpenAI", "Gemini"):
+            assert f'"{ad}' not in govde, f"{fn}: marka adı ({ad}) literal sayılmış"
+
+
 # ── Prompt Yönetmeni: model şeridi + dağıtım adı kapısı (v0.7) ──────────
 
 
@@ -3093,13 +3211,42 @@ def test_DAGITIM_ADI_kutusu_adreslenebilir_bir_GRUPTA():
     bir alan gösteriyordu ("dağıtım" Azure'a özgü). Gizlenebilmesi için
     etiketi + notuyla birlikte tek bir kapsayıcıda olmak zorunda: yalnız
     `<input>`u gizlemek etiketi ve altındaki açıklamayı ekranda bırakırdı.
+
+    İDDİA GENİŞLEDİ (v0.8): başlık da adreslenebilir olmak ZORUNDA. Kutu
+    gizlenip başlık kalırsa panelde kullanıcının yapacağı bir şey olmadığı
+    hâlde bir bölüm başlığı durur — istenen, bölümden hiçbir şeyin
+    görünmemesi. Eski "bu sağlayıcıda dağıtım adı yok" paragrafı
+    (`chat-no-deploy-note`) bu turda KALDIRILDI: gizli bir başlığın altında
+    hiç görünemezdi. (Taban 152 id'de olmadığı için id defterine yazılmıyor —
+    test_id_contract.test_defter_tabandan_sec zaten reddediyor.)
     """
     html = _html()
     assert 'id="chat-deploy-group"' in html
-    assert 'id="chat-no-deploy-note"' in html
+    assert 'id="chat-deploy-head"' in html, "başlık adreslenebilir değil"
+    assert 'id="chat-no-deploy-note"' not in html, (
+        "kaldırılan boş-durum paragrafı geri gelmiş")
     grup = html.split('id="chat-deploy-group"', 1)[1].split("</div>", 1)[0]
     assert 'id="set-chat-deployment"' in grup, "kutu grubun DIŞINDA kalmış"
     assert 'for="set-chat-deployment"' in grup, "etiket grubun dışında"
+
+
+def test_YONETMEN_TALIMAT_yolu_KOSULSUZ_gorunur_kaliyor():
+    """Dağıtım bölümü sağlayıcıya göre kaybolurken talimat yolu kalmak ZORUNDA.
+
+    "Keşfedilebilir olmasa özellik var olmakla olmamak arasında bir fark
+    taşımaz" (index.html'deki kendi gerekçesi): yönetmenin talimatını ezme yolu
+    yalnızca Ayarlar'da yazılı. Koşullu bölümün İÇİNE düşerse OpenAI/Gemini
+    kullanıcısı o dosyayı hiç öğrenemez — bu yüzden kendi başlığı var ve
+    `syncChatDeployField` ona HİÇ dokunmuyor.
+    """
+    html = _html()
+    assert 'id="chat-instructions-path"' in html
+    # Koşullu grubun DIŞINDA: grup `</div>`inden sonra geliyor.
+    grup = html.split('id="chat-deploy-group"', 1)[1].split("</div>", 1)[0]
+    assert "chat-instructions-path" not in grup, "talimat yolu koşullu grubun içinde"
+    js = _js("settings.js")
+    govde = js.split("function syncChatDeployField(", 1)[1].split("\n}", 1)[0]
+    assert "chat-instructions-path" not in govde, "talimat yolu kapıya bağlanmış"
 
 
 def test_DAGITIM_ADI_kapisi_KATALOGDAN_turetiliyor():
@@ -3115,8 +3262,12 @@ def test_DAGITIM_ADI_kapisi_KATALOGDAN_turetiliyor():
     govde = js.split("function syncChatDeployField(", 1)[1].split("\n}", 1)[0]
     assert "needs_deployment" in govde, "kapı katalog bayrağını okumuyor"
     assert '"azure"' not in govde, "sağlayıcı adı literal olarak sayılmış"
+    # Başlık ve grup BİRLİKTE: biri gizlenip öteki kalırsa sahipsiz bir bölüm
+    # başlığı (ya da başlıksız bir alan) kalır.
     assert '$("chat-deploy-group").hidden' in govde
-    assert '$("chat-no-deploy-note").hidden' in govde
+    assert '$("chat-deploy-head").hidden' in govde
+    assert "chat-no-deploy-note" not in govde, (
+        "kaldırılan paragrafa hâlâ dokunuluyor — $() null döner")
     # Sağlayıcı değiştiğinde çalışmak ZORUNDA: kapı yalnız açılışta kurulsa
     # seçiciyi çevirmek kutuyu yanlış sağlayıcıda bırakırdı.
     assert "syncChatDeployField(" in js.split(

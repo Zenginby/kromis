@@ -440,11 +440,39 @@ def _sohbet(body, model_id):
 
 
 def test_sohbet_kataloğu_arayuzun_ihtiyaci_olan_ALANLARI_tasiyor(client):
+    """Alan kümesi TAM eşitlikle donmuş: eksik alan sessiz bir bozulma, fazla
+    alan ise ölçülmemiş bir sözleşme genişlemesi. `logo` v0.8'de eklendi —
+    şeridin sağlayıcı işareti (bkz. tests/test_provider_logos.py); `short_label`
+    de onunla birlikte: marka işaretle geldiği için ŞERİDİN adı `label`den ayrı
+    (bkz. catalog.short_labels)."""
     body = client.get("/api/settings").json()
     assert body["default_chat_model"] in {m["id"] for m in body["chat_models"]}
     for m in body["chat_models"]:
-        assert set(m) == {"id", "label", "provider", "configured",
-                          "needs_deployment", "note"}, m["id"]
+        assert set(m) == {"id", "label", "short_label", "provider", "configured",
+                          "needs_deployment", "note", "logo"}, m["id"]
+
+
+def test_iki_katalog_da_SERIT_ADINI_ayri_alanda_donduruyor(client):
+    """`label` TAM ad (hata metinleri onu okuyor), `short_label` ŞERİDİN adı.
+
+    İkisi ayrı alan çünkü ayrı işleri var: `#model-note`un "… anahtarı kayıtlı
+    değil" cümlesinde marka ayırt edici (katalogda iki `gpt-image-2` var), şerit
+    satırındaysa sağlayıcı işaretinin tekrarı. Alanı istemcide türetmek, marka
+    adını istemcide literal saymak olurdu.
+    """
+    body = client.get("/api/settings").json()
+    for anahtar in ("image_models", "chat_models"):
+        assert body[anahtar], f"{anahtar} boş"
+        for m in body[anahtar]:
+            assert m["short_label"].strip(), f"{m['id']} şerit adı boş"
+            assert len(m["short_label"]) <= len(m["label"]), (
+                f"{m['id']}: kısa ad uzun addan uzun olamaz")
+    gorsel = {m["id"]: m for m in body["image_models"]}
+    # Somut iki uç: markası tekil olan model önekini bırakıyor, katalogda iki
+    # kez bulunan ad markasını KORUYOR (bkz. catalog.short_labels).
+    assert gorsel["gemini-nano-banana-2"]["short_label"] == "Nano Banana 2"
+    assert gorsel["gemini-nano-banana-2"]["label"] == "Gemini · Nano Banana 2"
+    assert gorsel["azure-gpt-image-2"]["short_label"] == "Azure · gpt-image-2"
 
 
 def test_DAGITIM_ADI_bayragi_yalnizca_ADI_ORTAMDAN_okunan_modelde(client):

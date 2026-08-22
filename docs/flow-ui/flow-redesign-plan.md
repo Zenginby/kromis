@@ -461,8 +461,22 @@ tasarımı değiştirmeyen üç teknik nokta kaldı:
 
 ## 11. Kabul ölçütleri
 
-- [ ] Sekme yok: tek ray + tek composer; mod anahtarı (+) işaretinin yanında ve klavyeyle
+> **Durum denetimi (2026-08-22).** On bir kutunun **onu** işaretli. Bu turda
+> beşi ölçülerek kapandı: mod anahtarı (§10/1'in birinci yolu), dört temanın
+> kontrast kapıları (tarayıcıda, 1024×700), bugünkü yeteneklerin tamamı, tema
+> kalıcılığı (`prefs.json`) ve yeşil suite (**1597 geçti / 10 atlandı**,
+> `test_id_contract.py` 12 geçti). **Açık kalan tek kutu** "emoji/dekor yok"
+> maddesi: iki somut ihlali var (bir 🎉 ve `.folder-target`'ın vurgu renkli sol
+> kenarı) ve ikisi de aşağıda yazılı. Ölçüm belgeye değil koda/tarayıcıya
+> bakılarak yapıldı.
+
+- [x] Sekme yok: tek ray + tek composer; mod anahtarı (+) işaretinin yanında ve klavyeyle
       erişilebilir.
+      **Teslim.** `index.html`'de mod anahtarı `.composer-bar` içinde, `#plus-btn`'in
+      hemen yanında ("Mod anahtarı: (+) işaretinin yanında, tasarım §4.2" yorumuyla);
+      eski sekme id'leri (`#tab-image` / `#tab-chat` / `#view-tabs-thumb`) o düğmelere
+      **devredildi** — §10/1'in önerdiği birinci yol. İkisi de gerçek `<button>`,
+      `role="group"` içinde, yani klavyeyle erişilebilir.
 - [x] Döküm konuşmayı ve üretilen görselleri **aynı akışta** gösteriyor.
       **7 Ağustos'ta teslim** (Adım 7a, plan §0.6): `result` kartı künyesiyle
       çiziliyor (`Üretildi · 1024² · Orta · x2`), kare büyüteci açıyor, üretim
@@ -475,7 +489,18 @@ tasarımı değiştirmeyen üç teknik nokta kaldı:
       klasör adı · boyut), yazıldığı an klasör sınırı kalkıyor ("Arama
       sonuçları — tüm klasörler" + kartlarda klasör künyesi). Izgara boyutu
       S/M/L de aynı turda geldi.
-- [ ] Dört tema da kontrast kapılarını geçiyor; monokrom varsayılan.
+- [x] Dört tema da kontrast kapılarını geçiyor; monokrom varsayılan.
+      **22 Ağustos'ta tarayıcıda ölçüldü** (Chromium, 1024×700): sayfadaki her görünür
+      metin öğesi için `color` ve gerçek arka plan okunup WCAG oranı hesaplandı, dört
+      temada ayrı ayrı (`data-theme` yazılarak). **Kapı altında kalan öğe yok.**
+      Tek işaretlenen `#tab-image`'in aktif etiketiydi ve o bir ölçüm yapaylığı: metin
+      `--on-primary` (#101011), zemini ise kardeş `.view-tabs-thumb`'ın `--accent`
+      dolgusu — gerçek oran monokromda ~16:1, öteki üç temada 7,4–8,7:1.
+      Temalar zaten **yalnız `--accent`'i** değiştiriyor (yüzey ve metin token'ları
+      dördünde aynı), o yüzden hiçbir tema gövde kontrastını bozamıyor; vurgu rengi de
+      dört temada `--bg`/`--surface`/`--surface-2`/`--surface-3` karşısında ≥5,4:1
+      (kapı 3:1). Monokrom varsayılan: `:root`'ta `--accent: #e8eaed` ve
+      `#theme-picker`'da `value="mono"` `checked`.
 - [x] Silinmiş bir görselin sarkan `image_id`'si dökümü çökertmiyor, yer tutucu gösteriyor.
       **İki payı da bitti:** sunucu kaydı budamıyor ve 200 kalıyor (Adım 5);
       yer tutucu `resultThumb`'ın `error` dinleyicisiyle çiziliyor (Adım 7a).
@@ -483,10 +508,17 @@ tasarımı değiştirmeyen üç teknik nokta kaldı:
 - [x] `result` rolü Azure istemine gitmiyor ve token bütçesine sayılmıyor (birim testi).
       **7 Ağustos'ta teslim** — süzgeç rol düzeyinde, hem `chat_client.build_payload`'ta
       hem rotada; beşi de mutasyon testiyle doğrulandı (plan §0.4).
-- [ ] Bugünkü tüm yetenekler temsil edilmiş: prompt, boyut/kalite/adet, referans + ek
+- [x] Bugünkü tüm yetenekler temsil edilmiş: prompt, boyut/kalite/adet, referans + ek
       görsel, tema rengi/palet, logo/motto/banner + offset, klasörler, çoklu seçim,
       indirme, büyüteç, Azure ayarları, yönetmen sohbeti, içe aktarma.
       (**Yedekler bilerek düştü** — v4/V3, §4.1.)
+      **Teslim.** Tek tek arandı: `#prompt` · `#size`/`#quality`/`#n` · `#ref-chip` +
+      `#extra-strip` · `#theme-picker` + `#palette-modal` · `#logo-type`
+      (logo/motto/banner) + `#logo-offset-x`/`-y` + `#banner-*` · `#folder-grid`
+      (+ `#folder-new`/`#folder-rename`) · `#select-bar` ailesi · `#viewer-download` /
+      `#folder-download` · `#viewer` · `#settings-modal` (artık üç sağlayıcı grubu) ·
+      `#chat-log` ailesi · içe aktarma dosya bırakmayla (`folders.js`,
+      `POST /api/import`, `tests/test_import_route.py`).
 - [x] §4.2 gerçekten teslim edildi: `chat.js`'te "Forma aktar" **kalmadı**, yerine
       "Görsel modunda üret"; Görsel modunda dolu kutuda "Yönetmen'e sor" çıkıyor.
       Sekmelerin kaldırılma gerekçesi bu maddedir — o yüzden ayrı kutu.
@@ -494,7 +526,7 @@ tasarımı değiştirmeyen üç teknik nokta kaldı:
       kalmadı; ters yön metni KOPYALAMIYOR taşıyor ve yönetmenin yazılmış
       mesajının üstüne yazmıyor (K21); düğme çerçevesiz metin (K22). Aynı turda
       Görsel modu kendi oturumunu başlatmaya başladı (K19).
-- [ ] Tema seçici dört temayı gerçekten uyguluyor (`data-theme` yazılıyor) ve seçim
+- [x] Tema seçici dört temayı gerçekten uyguluyor (`data-theme` yazılıyor) ve seçim
       kalıcı (§2.1). Token'ın var olması yetmez. **Kalıcılığın yeri değişti:**
       `settings` (kimlik dosyası) değil `prefs.json` — Adım 6'nın K6 kararı bir
       arayüz tercihini 0600'lük kimlik dosyasına koymayı reddetti ve tema o
@@ -502,9 +534,26 @@ tasarımı değiştirmeyen üç teknik nokta kaldı:
       **Seçici yarısı 7 Ağustos'ta teslim** (Adım 7b, plan §0.7): Araçlar →
       Görünüm dört temayı uyguluyor; monokrom özniteliği siliyor (K15) ve panel
       geçiciliği yazıyla söylüyor. Kutu kalıcılık gelmeden işaretlenmez.
+      **Kalıcılık payı da bitti (Adım 9):** seçim `POST /api/prefs` ile `prefs.json`'a
+      yazılıyor (`settings.js`) ve açılışta geri okunuyor — kutu bu yüzden işaretlendi.
 - [ ] Emoji ikon yok, uydurma metrik yok, sol kenarı renkli yuvarlak kart yok, dekoratif
       gradient yok, aynı eylem için ikinci dolu düğme yok.
-- [ ] Taşımada: `pytest` yeşil ve id sözleşmesi (`test_id_contract.py`) yeşil.
+      **22 Ağustos denetimi: beş şartın üçü tutuyor, ikisi tutmuyor — kutu bu yüzden
+      AÇIK.** Tutanlar: uydurma metrik yok (kredi etiketi ölçülmüş bir tarife),
+      dekoratif gradient yok (kalan yedi `linear-gradient` işlevsel — şeffaflık
+      damalısı, renk seçicinin ton şeridi/HSV alanı, ilerleme çizgisi), aynı eylem için
+      ikinci dolu düğme yok (yedi `.primary` var ve her biri **başka** bir panelin tek
+      onayı). Tutmayan ikisi:
+      1. **Bir emoji girdi:** `#settings-update` satırındaki `🎉 Yeni sürüm çıktı`
+         (güncelleme bildirimiyle geldi, `index.html`).
+      2. **Sol kenarı renkli yuvarlak kart girdi:** `.folder-target`
+         (`border-radius: 10px` + `border-left: 3px solid var(--accent)`, `style.css`).
+         Kardeşi `.chat-gate` aynı biçimde ama kenarı **nötr**, yani şartı bozan yalnız
+         vurgu renkli olan.
+- [x] Taşımada: `pytest` yeşil ve id sözleşmesi (`test_id_contract.py`) yeşil.
+      **22 Ağustos'ta koşuldu:** `pytest tests/ -q` → **1597 geçti, 10 atlandı**
+      (atlananlar yalnız Windows'a özgü DACL testleri + kurulu olmayan Playwright);
+      `pytest tests/test_id_contract.py -q` → **12 geçti**.
 
 > **Bu liste tek başına yeterli değil.** 7 Ağustos denetimi, buradaki kaba
 > ölçütlerin geçtiği hâlde 18 maddenin açık kalabildiğini gösterdi (wordmark,

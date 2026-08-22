@@ -589,6 +589,23 @@ async def edit(
     return {"images": records}
 
 
+def _provider_logo_url(provider: str) -> str | None:
+    """Sağlayıcı işaretinin ADRESİ — katalogdaki dosya adı + sürüm damgası.
+
+    `?v=` cache-buster'ı `index()`in desenini tekrarlıyor ve gerekçesi de aynı:
+    işaretin çizimi bir gün değişirse kullanıcının tarayıcısı eski dosyayı
+    sunmasın. Adresi SUNUCU kuruyor, istemci değil — `settings.js`in sürüm
+    alanını okuyup ikinci bir yerde dize birleştirmesi, aynı bilginin iki
+    kopyası olurdu (core.js ile settings.js arasında da üst düzey ad çakışması
+    üretirdi, bkz. tests/test_id_contract.py).
+
+    Tanımsız sağlayıcıda None: katalogdaki `provider_logo`'nun sessiz yolu
+    burada da korunuyor, istemci `logo` boşsa işareti hiç çizmiyor.
+    """
+    ad = catalog.provider_logo(provider)
+    return f"/static/img/providers/{ad}?v={version.APP_VERSION}" if ad else None
+
+
 def _settings_payload() -> dict:
     """Kimlik DURUMU + hangi modeller var + hangileri kullanılabilir.
 
@@ -612,6 +629,11 @@ def _settings_payload() -> dict:
     """
     cfg = credstore.configured_map()
     chat_cfg = credstore.chat_configured_map()
+    # Şeritte gösterilecek KISA adlar: sağlayıcı markası işaretle geldiği için
+    # etiketten düşüyor. Liste bütününden hesaplanıyor (çakışma kuralı için),
+    # o yüzden model başına değil bir kez (bkz. catalog.short_labels).
+    kisa_gorsel = catalog.short_labels(catalog.IMAGE_MODELS)
+    kisa_sohbet = catalog.short_labels(catalog.CHAT_MODELS)
     return {
         **ac.get_settings_status(),
         # {kimlik_id: bool}. Arayüz Ayarlar'daki sağlayıcı gruplarının
@@ -622,6 +644,10 @@ def _settings_payload() -> dict:
             {
                 "id": m.id,
                 "label": m.label,
+                # ŞERİDİN adı ayrı bir alan: `label` hata metinlerinin ve
+                # `#model-note`un okuduğu TAM ad ve orada marka ayırt edici
+                # kalıyor (katalogda iki `gpt-image-2` var).
+                "short_label": kisa_gorsel[m.id],
                 "provider": m.provider,
                 # Jetonlar ETİKETLERİYLE gönderiliyor, çıplak dize değil:
                 # arayüz `<option>` listelerini bunlardan kuruyor ve etiketi
@@ -641,6 +667,10 @@ def _settings_payload() -> dict:
                 "credits": m.credits,
                 "credits_by_quality": dict(m.credits_by_quality),
                 "note": m.note,
+                # Sağlayıcı işaretinin adresi (yoksa None). Şerit yalnız SEÇİLİ
+                # modelin işaretini çiziyor: native <option> görsel taşımıyor
+                # (bkz. core.js renderModelOptions).
+                "logo": _provider_logo_url(m.provider),
                 # TEK türetilmiş alan: modelin anahtarı GİRİLMİŞ mi. Arayüzün
                 # "#go kilitli mi" kararı ve "anahtar gerekli" etiketi bundan
                 # geliyor — bugün o karar tek bir Azure boolean'ına bağlı ve
@@ -651,7 +681,9 @@ def _settings_payload() -> dict:
         ],
         "default_chat_model": catalog.DEFAULT_CHAT_MODEL,
         "chat_models": [
-            {"id": m.id, "label": m.label, "provider": m.provider,
+            {"id": m.id, "label": m.label,
+             # Görsel şeridiyle AYNI ayrım (bkz. yukarısı).
+             "short_label": kisa_sohbet[m.id], "provider": m.provider,
              # `cfg` (KİMLİK tablosu) DEĞİL `chat_cfg` (MODEL tablosu):
              # Azure'ın dağıtım adı model düzeyinde bir koşul ve kimlik
              # tablosu onu ifade edemiyor — kimliği tam, dağıtımı boş bir
@@ -663,6 +695,8 @@ def _settings_payload() -> dict:
              # sayılmıyor. Sayılsaydı, adı ortamdan okunan ikinci bir
              # sağlayıcı eklendiği gün kutu sessizce görünmez kalırdı.
              "needs_deployment": catalog.chat_needs_deployment(m),
+             # Görsel şeridiyle AYNI alan adı ve aynı gerekçe.
+             "logo": _provider_logo_url(m.provider),
              "note": m.note}
             for m in catalog.CHAT_MODELS
         ],

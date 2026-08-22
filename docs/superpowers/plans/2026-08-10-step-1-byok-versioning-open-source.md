@@ -4,6 +4,28 @@
 **Hedef Sürüm:** v0.2.0  
 **Kapsam:** GPT-Image Studio'nun sürümünü `0.2.0` yapmak, çoklu model (BYOK: OpenAI, Fal.ai, Replicate, ComfyUI, Ollama) anahtar/endpoint ayar altyapısını kurmak, gelişmiş güvenlik & redaksiyon korumalarını entegre etmek, Windows & macOS için otomatik GitHub Releases CI/CD workflow'u hazırlamak, MIT Lisansı ve açık kaynak dokümantasyonunu eklemek.
 
+> ## ✅ Durum: teslim edildi — denetim 2026-08-22
+>
+> Bu plandaki her madde bugün depoda karşılığıyla duruyor; hedef sürüm v0.2.0
+> geride kaldı, uygulama **v0.7.0**'da. Madde madde:
+>
+> | Plan maddesi | Bugünkü karşılığı |
+> |---|---|
+> | `APP_VERSION = 0.2.0` | ✅ `version.py` tek kaynak (bugün `0.7.0`); mandal `tests/test_version.py` |
+> | Write-only API anahtarları | ✅ `GET /api/settings` anahtarı, son dört hanesini ve maskeli hâlini bile döndürmüyor (`tests/test_settings_route.py`) |
+> | Redaksiyon exception handler | ✅ `errlog.redact_secrets` + `app._is_secret_loc` — doğrulama hatası da gizli alan yankılamıyor |
+> | `chmod 0600` / `0700` | ✅ `azure_client._atomic_write`; Windows'ta ayrıca DACL (`winsec.py` — plandan **fazlası**) |
+> | Ayarlar modalında sağlayıcı grupları | ✅ Azure OpenAI · OpenAI · Google Gemini grupları + yalnız-tek-sağlayıcı kurulumu |
+> | `.github/workflows/release.yml` | ✅ üç platform hattı (`_paket-macos` / `_paket-windows` / `_paket-android`); hepsi yeşil olmadan etiket de yayın da yok |
+> | `LICENSE` (MIT) | ✅ kökte |
+> | `README.md` açık kaynak rehberi | ✅ indirme tablosu, BYOK kurulumu, geliştirici rehberi |
+> | `gitleaks` geçmiş taraması | ⬜ **kaydı yok** — CI'da böyle bir iş tanımlı değil; elle yapıldıysa kanıtı depoda durmuyor |
+>
+> Plan **fal.ai / Replicate / ComfyUI / Ollama** anahtarlarını da sayıyordu:
+> alanları ve durum bayrakları geldi (`azure_client.get_settings_status`), ama o
+> dört sağlayıcının **adaptörü ve arayüzü hâlâ yok** — açık iş olarak master yol
+> haritasının Faz 3'ünde duruyor.
+
 ---
 
 ## 1. Amaç ve Değişiklik Özeti

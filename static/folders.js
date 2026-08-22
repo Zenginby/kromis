@@ -909,7 +909,13 @@ function renderPickerGrid(scopes = pickerScopes()) {
     tile.className = "picker-tile";
     tile.dataset.id = rec.id;
     tile.title = title;
-    tile.setAttribute("aria-selected", String(rec.id === pickerSelectedId));
+    // `aria-selected` DEĞİL: bu bir `<button>`, kapsayıcısı düz bir `<div>`.
+    // `aria-selected` yalnız `option`/`tab`/`row`/`treeitem`/`gridcell`
+    // rollerinde geçerli — düğmede sessizce yok sayılıyordu, yani seçim ekran
+    // okuyucuya HİÇ ulaşmıyordu (görsel çerçeve tek işaretti). `role="option"`
+    // seçeneği reddedildi: gezinen tabindex + ok tuşu modeli ister ve depoda
+    // öyle bir desen hiç yok; `aria-pressed` altı yerde zaten kurulu.
+    tile.setAttribute("aria-pressed", String(rec.id === pickerSelectedId));
     tile.appendChild(img);
     if (rec.size) {
       const badge = document.createElement("span");

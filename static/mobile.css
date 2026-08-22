@@ -296,6 +296,94 @@
   .picker-body { padding: 4px 12px 12px; }
   .picker-head { padding: 0 12px; }
 
+  /* Sağ bölme ALT ŞERİDE iner. Yukarıdaki yorum "sağ bölme kartın altına
+     düşüyor" diyordu ama işin yarısını yazmıştı: bölme düştükten sonra NE
+     KADAR YER KAPLAYACAĞI hiç sınırlanmamıştı. Masaüstü kuralları 180px'lik
+     bir sütun için yazılmış, telefonda 360px'in tamamında koşuyorlardı.
+
+     Ölçüm (360×780, düzeltme öncesi): önizleme `aspect-ratio: 1` ile ~328px
+     KARE, künye üç satır ~100px, iki tam genişlik düğme ~84px, not 36px,
+     dolgu 32px → `pside` ≈ 600px. `pbody` ise `minmax(0, 1fr)`, yani TABANI
+     SIFIR: 780 − 56 − 46 − 600 ≈ 80px kalıyordu — yarım karo. Seçicinin tek
+     işi bir görsel SEÇMEK ve telefonda tam olarak o yapılamıyordu.
+
+     `.picker-side`'ın kendi `overflow-y: auto`'su bunu çözmüyordu ve bu
+     ayrımın kaydı burada duruyor: taşan bölme değil, EZİLEN ızgara. Kaydırma
+     çubuğu ancak bölme kendi kutusuna sığmazsa çıkar; bölme sığıyordu, kutuyu
+     komşusundan alıyordu. */
+  .picker-side {
+    /* Bölme artık ALTTA: çizgi de öyle. Sol kenar yatay yığında hiçbir şeyi
+       ayırmıyor, yalnız künyenin soluna anlamsız bir dikey çizgi çiziyordu. */
+    border-left: 0;
+    border-top: 1px solid var(--hairline);
+    /* Alt güvenli alan payı hiç verilmemişti: `.picker-card` yukarıda yalnız
+       `padding-top` alıyor (`.modal-card`'ın iki kenarlı kuralı seçiciyi
+       kapsamıyor). Android'de jest çubuğu "Ek olarak ekle"nin üstüne
+       biniyordu — düğme GÖRÜNÜYOR ama basılamıyor, bu dosyanın başındaki
+       kırılma sınıfının aynısı. Pay BURAYA veriliyor çünkü sayfanın en alt
+       öğesi bu. */
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    /* Dikey yığın yerine iki sütun: önizleme solda küçük, künye yanında.
+       Yerleştirme otomatik (önizleme → 1/1, künye → 1/2, eylemler → 2. satır),
+       ad verilmiş alan YOK: üç çocuk için `grid-template-areas` yazmak
+       kartın kendi `phead/pnav/pbody/pside` adlarıyla karışırdı. */
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    /* İlk satır `minmax(0, 1fr)`, ikincisi `auto` — EMNİYET KİLİDİ. Kap
+       içerik boyunda kaldığı sürece `1fr` içerikten büyümüyor (belirsiz
+       yükseklikte `fr` max-content'e çözülüyor), yani normalde şeridi
+       uzatmıyor. `max-height` devreye girdiği anda ise küçülen SADECE künye
+       satırı oluyor ve iki düğme ekranda kalıyor. Satırlar `auto` olsaydı
+       hiçbiri küçülmez, taşan kısım kırpılır ve kırpılan ilk şey düğmeler
+       olurdu. */
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 8px 10px;
+    /* Bugünkü kırılmanın sınıfına karşı kilit: bölme ne olursa olsun ekranın
+       %40'ından fazlasını alamıyor. İç içe klasör zinciri uzayıp künye üç
+       satırdan fazlasına çıksa bile ızgara bir daha ezilemez. */
+    max-height: 40vh;
+    /* `auto` DEĞİL: kap kaydırılabilir olsaydı sınıra dayandığında düğmeler
+       kaydırma ile ekran dışına çıkabilirdi. Kaydıran tek parça künye. */
+    overflow: hidden;
+  }
+  /* Kare önizleme 328px'in sahibiydi. Küçülmesinin bedeli yok: hangi karonun
+     seçili olduğunu ızgaradaki `--accent` çerçevesi zaten söylüyor, buradaki
+     görsel ikinci bir teyit — ve o teyit için ekranın yarısını vermek seçmenin
+     KENDİSİNİ imkânsız kılıyordu. `aspect-ratio` sabit ölçülerle eziliyor. */
+  .picker-preview { width: 72px; height: 72px; padding: 0; align-self: start; }
+  /* Etiket değerin YANINA geçiyor. Üst üste dizmenin gerekçesi
+     (style.css:1534) 180px'lik sütunda uzun klasör adının sarmasıydı; telefonda
+     sütun 360px ve o gerekçe yok. Etiket sütunu rem tabanlı, yani sistem yazı
+     ölçeğiyle birlikte büyüyor. */
+  .picker-kv { gap: 4px; min-height: 0; overflow-y: auto; }
+  .picker-kv div { grid-template-columns: 4.2rem minmax(0, 1fr); gap: 6px; align-items: baseline; }
+  /* İki düğme yan yana; not kendi satırında (`flex-basis: 100%`), DOM sırası
+     korunuyor. Sarma ÖLÇÜYE değil KURALA bağlı — `.chat-hint` dersinin aynısı
+     (defter, Tur B): Android WebView sistem yazı ölçeğini uyguluyor, piksel
+     eşiği cihazdan cihaza farklı davranır. 9.5rem taban 360px'de iki düğmeyi
+     tek satırda tutuyor (2×152 + 8 = 312 ≤ 336), yazı ölçeği büyüdüğünde
+     kendiliğinden alt alta iniyor. */
+  .picker-commit { grid-column: 1 / -1; margin-top: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .picker-commit .primary, .picker-commit .btn-ghost {
+    flex: 1 1 9.5rem; width: auto; min-height: var(--tap);
+    /* `.primary`nin `margin-top: 1rem`i (style.css:1080) DİKEY yığın içindi.
+       Yan yana dizilimde satırı 16px uzatıp düğmenin KENDİSİNİ 16px
+       kısaltıyor: ölçüldü, "Referans yap" 44px iken "Ek olarak ekle" 60px
+       oluyordu ve ikisi alt kenarlarından hizalanıyordu. */
+    margin-top: 0;
+    /* Font da yan yanayken ayrışıyordu: `.primary` hiç font bildirmiyor ve
+       UA'nın 13.33px sistem yazısını alıyor, `.btn-ghost` ise `font: inherit`
+       ile 15px. Üst üste dizilmiş iki düğmede kimse fark etmiyordu.
+       `font` KISA BİÇİMİ kullanılmıyor: `.primary`nin `font-weight: 500`ünü
+       (style.css:1081) sıfırlar ve birincil eylem inceleşirdi. */
+    font-size: inherit; font-family: inherit;
+  }
+  /* 36px'lik yer tutma iki satırlık bir not içindi (180px sütun). Burada en
+     uzun not ("Bu görsel zaten ek referans listesinde.") tek satır, ama yer
+     tutma KALIYOR: not boşken kaybolsaydı iki düğme parmağın altında 18px
+     zıplardı ve kullanıcı yanlış düğmeye basardı. */
+  .picker-note { flex: 1 1 100%; min-height: 1.5em; }
+
   /* Büyüteç şeridi 6 düğmeyle ~310px; 360px'lik ekranda kenarlara yapışıyor.
      Sarma + kenar boşluğu ile hem sığıyor hem basılabiliyor. */
   .viewer-bar {

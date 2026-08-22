@@ -2479,18 +2479,90 @@ def test_the_picker_reads_its_selection_from_state_not_from_the_dom():
     seçili değil" sanır. Kaynak durumdur, boyanan işaret değil.
     """
     picker = _picker_js()
-    assert "aria-selected" in picker, "seçili karo işaretlenmiyor"
+    assert "aria-pressed" in picker, "seçili karo işaretlenmiyor"
     # İddia sorgunun ARGÜMANINA bakıyor, "querySelector hiç geçmesin"e değil:
     # seçicide meşru bir sorgu zaten var (`[data-picker-close]`). İlk yazım
     # `"aria-selected\"]" not in picker` idi ve MUTASYON TURUNDA hayatta kaldı —
-    # gerçek regresyon `querySelector('[aria-selected="true"]')` diye yazılır,
-    # o dizede `aria-selected` hemen ardından `=` gelir, `"]` değil. Kelime
+    # gerçek regresyon `querySelector('[aria-pressed="true"]')` diye yazılır,
+    # o dizede öznitelik adının hemen ardından `=` gelir, `"]` değil. Kelime
     # aramasının dördüncü kurbanıydı (§0.6, §0.7, §0.9); burada tırnak biçimine
     # bakmayan bir iddiaya çevrildi.
+    #
+    # İKİ yazıma birden bakılıyor: öznitelik `aria-selected`ten `aria-pressed`e
+    # taşındı ve tarama yalnız yeni ada bakarsa aynı regresyon ESKİ adla geri
+    # gelebilir — silinen bir kuralın mandalı da silinmiş olurdu.
     for arg in re.findall(r"querySelector(?:All)?\((.*?)\)", picker):
-        assert "aria-selected" not in arg, f"seçim DOM'dan okunuyor: {arg}"
+        for yazim in ("aria-pressed", "aria-selected"):
+            assert yazim not in arg, f"seçim DOM'dan okunuyor: {arg}"
     assert "pickerById(pickerSelectedId)" in picker, (
         "yan bölme seçimi durumdan almıyor")
+
+
+def test_the_picker_tile_announces_selection_with_a_state_a_button_can_carry():
+    """Defter kuyruğu 1 · `aria-selected` düz `<button>`da GEÇERSİZ ARIA.
+
+    `.picker-tile` bir `<button>`, kapsayıcısı (`#picker-grid`) düz bir `<div>`.
+    `aria-selected` yalnız `option`/`tab`/`row`/`treeitem`/`gridcell` rollerinde
+    tanımlı — düğmede tarayıcı onu erişilebilirlik ağacına HİÇ koymuyor. Yani
+    seçim ekran okuyucuya ulaşmıyordu ve tek işaret görsel çerçeveydi; hata
+    vermeyen, yalnız ekran okuyucuyla fark edilen bir kırılma.
+
+    `role="listbox"/"option"` çifti REDDEDİLDİ: gezinen tabindex ve ok tuşu
+    modeli ister, depoda öyle bir desen hiç yok. `aria-pressed` altı yerde
+    zaten kurulu (core.js:41-42,169 · folders.js:540 · palette.js:185).
+
+    İddia JS ile CSS'i BİRBİRİNE bağlıyor, iki ayrı dize aramıyor: öznitelik
+    adı koddan okunuyor ve boyayan kural o adla aranıyor. Yalnız birini
+    yeniden adlandıran bir düzenleme (seçim görünmez olur, hata çıkmaz)
+    böylece kırmızıya düşüyor.
+    """
+    picker = _picker_js()
+    ad = re.search(r'tile\.setAttribute\("(aria-[a-z]+)"', picker)
+    assert ad, "karo seçim durumunu hiç yazmıyor"
+    assert ad.group(1) == "aria-pressed", (
+        f"düğme taşıyamayacağı bir durum yazıyor: {ad.group(1)}")
+    assert "aria-selected" not in picker, "geçersiz ARIA geri gelmiş"
+
+    css = _css()
+    assert f'.picker-tile[{ad.group(1)}="true"]' in css, (
+        "seçili karoyu boyayan kural JS'in yazdığı özniteliğe bakmıyor")
+    # İkiz kural: aynı seçici gezinme bölümünde bir kez daha tanımlıydı ve
+    # ikisi çakışıyordu. Tek tanım kalmalı, yoksa "hangisi kazanıyor" sorusu
+    # geri döner.
+    assert css.count(f'.picker-tile[{ad.group(1)}="true"] {{') == 1, (
+        "seçili karo kuralı yine ikizlenmiş")
+
+
+def test_the_hover_tile_keeps_the_accent_edge_the_twin_rule_carried():
+    """Kuyruk · `.picker-tile:hover` ikizi tekilleşti, boyası kaybolmadan.
+
+    `aria-pressed` kuralıyla aynı yapıştırma kazasının öteki yarısıydı:
+    gezinme kurallarının ortasına düşmüş ikinci bir `.picker-tile:hover`
+    bloğu. Özgüllükler eşit olduğu için kaskad sırası karo bölümündeki
+    `background`ı kazandırıyordu — ikizin `--accent-surface` tercihi hiç
+    boyanmıyordu — ama `box-shadow`u kimse ezmediği için o BOYANIYORDU.
+
+    İddianın tuttuğu kırılma bu: ikizi yalnızca silen bir temizlik, üzerine
+    gelince beliren accent kenarını da sessizce götürür. Hata çıkmaz, test
+    çıkar. Bu yüzden iddia hem "tek tanım" hem "kenar duruyor" diyor.
+
+    Üçüncü iddia sıra: seçili bir karonun üzerine gelmek seçimi silmemeli.
+    İki kural da eşit özgüllükte (0,2,0), yani kazananı YALNIZ sıra
+    belirliyor — `[aria-pressed]` sonra gelmeli.
+    """
+    govde = _css_block(".picker-tile:hover")
+    assert "var(--accent-border" in govde, (
+        "ikiz silinirken üzerine gelme kenarı da gitmiş")
+
+    css = re.sub(r"/\*.*?\*/", "", _css(), flags=re.S)
+    assert css.count(".picker-tile:hover") == 1, (
+        "karo hover kuralı yine ikizlenmiş")
+
+    hover = css.index(".picker-tile:hover")
+    basili = css.index('.picker-tile[aria-pressed="true"]')
+    assert hover < basili, (
+        "hover kuralı seçim kuralından sonra geliyor: eşit özgüllükte "
+        "üzerine gelmek seçimi siler")
 
 
 def test_the_picker_has_no_hidden_button_clicks():

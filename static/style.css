@@ -1980,7 +1980,21 @@ body.viewer-open { overflow: hidden; }
 .chat-gate[hidden] { display: none; }
 /* #chat-input composer'ın içinde: yükseklik/yeniden boyutlandırma
    `.composer-input`'tan geliyor, id seçicisi onu ezmesin. */
-.chat-hint { flex: 1; font-size: 0.74rem; color: var(--muted); }
+/* Taban genişliği neden `auto`: önceki `flex: 1` kısa biçimi `flex: 1 1 0%`e
+   çözülüyor, yani taban SIFIR oluyor. Satırdaki tek esnek öğe buydu —
+   `#status` bir `<p>` (`flex: 0 1 auto`, tabanı içerik genişliği),
+   `.run-cost` ise `flex: none`. Ölçüm (Chromium, 1024×700 — desktop.py:32'deki
+   en küçük pencere): `#status` 428px alıyor, ipucu 65px'e eziliyor ve DÖRT
+   satıra sarıyor. Kusur origin/main'de de vardı.
+   Taban artık içerikten geliyor ve `nowrap` sarmayı kapatıyor; `.composer-foot`
+   zaten `flex-wrap: wrap`, yani sığmayan kardeş alta düşüyor.
+   `#status`'a KURAL EKLENMEDİ ve bu bilinçli: `flex-basis: 100%` gibi bir kural
+   durumu her zaman kendi satırına atardı ve ipucu telefonda zaten gizli
+   (mobile.css'te `.chat-hint { display: none }`), yani 360px'de bedava bir
+   satır yüksekliği demekti. Bugünkü davranış duruyor: kısa durum metni ipucuyla
+   aynı satırda kalıyor, uzun olan alta düşüyor, boş olan `.composer-foot
+   p:empty` ile tümden kalkıyor. */
+.chat-hint { flex: 0 0 auto; white-space: nowrap; font-size: 0.74rem; color: var(--muted); }
 .chat-send { margin-top: 0; width: auto; padding: 0.65rem 1.5rem; }
 .chat-wait {
   display: flex; align-items: center; gap: 0.6rem;

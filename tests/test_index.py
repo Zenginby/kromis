@@ -3591,3 +3591,26 @@ def test_yuvarlak_kartin_sol_kenari_VURGU_RENGI_degil():
     assert _sol_kenar(hedef) == _sol_kenar(_css_block(".chat-gate")), (
         ".folder-target ile .chat-gate'in sol kenarı ayrışmış")
 
+
+def test_composer_ipucu_TEK_SATIR_taban_genisligi_ICERIKTEN():
+    """`.chat-hint` esnek DEĞİL: tabanı içerikten geliyor.
+
+    Önceki `flex: 1` kısa biçimi `flex: 1 1 0%`e çözülüyordu, yani taban
+    genişliği SIFIR. `.composer-foot`'taki tek esnek öğe buydu — `#status` bir
+    `<p>` (`flex: 0 1 auto`, tabanı içerik genişliği), `.run-cost` ise
+    `flex: none`. Ölçüm (Chromium, 1024×700 — `desktop.py`'deki en küçük
+    pencere): `#status` 428px alıyor, ipucu 65px'e eziliyor ve DÖRT satıra
+    sarıyor. Kusur `origin/main`'de de vardı.
+
+    Mandal bilerek ZAYIF ama doğru yerde: pytest CSS'i ÇALIŞTIRMIYOR, yani
+    "tek satır" iddiası burada ölçülemez — gerçek ölçüm tarayıcıda yapılıp
+    görev defterine yazıldı. Burada korunan şey kuralın kendisi.
+    """
+    govde = _css_block(".chat-hint")
+    assert "white-space: nowrap" in govde, "ipucu sarabilir"
+    assert "flex: 0 0 auto" in govde, "taban genişliği içerikten gelmiyor"
+    # `flex: 1` / `flex: 1 1 0` gibi taban-sıfır biçimlerinin hiçbiri geri
+    # gelmesin. Gövde yorumsuz (`_css_block` ayıklıyor), yoksa bu iddia
+    # kuralın kendi gerekçe yorumundaki `flex: 1`e takılırdı.
+    assert re.search(r"flex:\s*1\b", govde) is None, (
+        "taban-sıfır flex geri geldi — ipucu yine açlıktan ölür")

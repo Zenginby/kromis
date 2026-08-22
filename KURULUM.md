@@ -182,7 +182,7 @@ Windows'ta klasörü hızlı açmak için Dosya Gezgini'nin adres çubuğuna
 bilerek `AppData\Local` altında — `Roaming` olsaydı ürettiğin bütün görseller
 kurumsal profille birlikte ağ üzerinden taşınmaya çalışırdı.)
 
-Hangi sürümü kullandığını **⚙ Ayarlar** penceresinin altındaki **Sürüm**
+Hangi sürümü kullandığını **Ayarlar** penceresinin altındaki **Sürüm**
 satırından görebilirsin.
 
 ---

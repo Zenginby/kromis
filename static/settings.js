@@ -14,6 +14,17 @@
 let configured = false;
 let chatConfigured = false;   // chat.js okuyor (o dosya BUNDAN SONRA yükleniyor)
 
+/** Kullanıcıyı Ayarlar'a yönlendiren ek — düğmenin ADIYLA, glifle DEĞİL.
+ *  Öncesinde "(sağ üstteki ⚙)" yazıyordu ve iki kusuru vardı: (1) üst şeritteki
+ *  gerçek düğme hatlı bir SVG dişli (index.html, `aria-label="Ayarlar"`), yani
+ *  glif düğmenin görünüşünü YANLIŞ söylüyordu; (2) "emoji ikon yok" ölçütünü
+ *  (flow-redesign §11) tartışmaya açıyordu.
+ *  SABİT olmasının gerekçesi ayrı ve bir kusuru kapatıyor: aynı dize ÜÇ kez
+ *  elle yazılıydı ve biri aşağıdaki `includes` NÖBETÇİSİ. Biri değişip öteki
+ *  kalsa hata VERMEZ — nöbetçi bir daha hiç tutmaz ve kullanıcı ayarları
+ *  düzelttikten sonra durum satırı ekranda kalırdı. */
+const AYARLAR_EKI = "(sağ üstteki Ayarlar düğmesi)";
+
 function applyConfigured(s) {
   configured = !!(s && s.configured);
   // Model kataloğu AYNI yanıttan okunuyor: ayrı bir uçtan çekilse ikisi ayrı
@@ -59,8 +70,8 @@ function applyConfigured(s) {
   // ihtiyacı olmayan bir forma yönlendirirdi.
   const kapali = goBlockReason();
   if (kapali) {
-    statusEl.textContent = `${kapali} (sağ üstteki ⚙)`;
-  } else if (statusEl.textContent.includes("(sağ üstteki ⚙)")
+    statusEl.textContent = `${kapali} ${AYARLAR_EKI}`;
+  } else if (statusEl.textContent.includes(AYARLAR_EKI)
              || statusEl.textContent.startsWith("Başlamak için")) {
     statusEl.textContent = "";
   }
@@ -135,7 +146,7 @@ async function loadSettings(openIfMissing) {
     imageModels = [];
     currentModel = null;
     syncGoGate();
-    statusEl.textContent = "Ayar durumu alınamadı. Sağlayıcı ayarlarını kontrol et (sağ üstteki ⚙).";
+    statusEl.textContent = `Ayar durumu alınamadı. Sağlayıcı ayarlarını kontrol et ${AYARLAR_EKI}.`;
     if (openIfMissing) openSettings();
   }
 }

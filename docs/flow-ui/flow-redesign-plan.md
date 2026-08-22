@@ -469,6 +469,12 @@ tasarımı değiştirmeyen üç teknik nokta kaldı:
 > maddesi: iki somut ihlali var (bir 🎉 ve `.folder-target`'ın vurgu renkli sol
 > kenarı) ve ikisi de aşağıda yazılı. Ölçüm belgeye değil koda/tarayıcıya
 > bakılarak yapıldı.
+>
+> **Ek kayıt (2026-08-22, Tur B).** O son kutu da kapandı: **on bir kutunun on
+> biri** işaretli. İki ihlal de düzeltildi, üçüncü bir bulgu (aşağıda) çıkıp
+> aynı turda kapandı ve üçü de artık **mandallı** — ölçüt bir daha sessizce
+> bozulamıyor. Takım **1625 → 1631 geçti / 10 atlandı**;
+> `test_id_contract.py` 12 geçti.
 
 - [x] Sekme yok: tek ray + tek composer; mod anahtarı (+) işaretinin yanında ve klavyeyle
       erişilebilir.
@@ -536,7 +542,7 @@ tasarımı değiştirmeyen üç teknik nokta kaldı:
       geçiciliği yazıyla söylüyor. Kutu kalıcılık gelmeden işaretlenmez.
       **Kalıcılık payı da bitti (Adım 9):** seçim `POST /api/prefs` ile `prefs.json`'a
       yazılıyor (`settings.js`) ve açılışta geri okunuyor — kutu bu yüzden işaretlendi.
-- [ ] Emoji ikon yok, uydurma metrik yok, sol kenarı renkli yuvarlak kart yok, dekoratif
+- [x] Emoji ikon yok, uydurma metrik yok, sol kenarı renkli yuvarlak kart yok, dekoratif
       gradient yok, aynı eylem için ikinci dolu düğme yok.
       **22 Ağustos denetimi: beş şartın üçü tutuyor, ikisi tutmuyor — kutu bu yüzden
       AÇIK.** Tutanlar: uydurma metrik yok (kredi etiketi ölçülmüş bir tarife),
@@ -550,6 +556,49 @@ tasarımı değiştirmeyen üç teknik nokta kaldı:
          (`border-radius: 10px` + `border-left: 3px solid var(--accent)`, `style.css`).
          Kardeşi `.chat-gate` aynı biçimde ama kenarı **nötr**, yani şartı bozan yalnız
          vurgu renkli olan.
+
+      **Tur B'de kapandı (22 Ağustos).** Üstteki denetim kaydı olduğu gibi
+      duruyor; aşağısı her ihlalin nasıl kapandığı.
+      1. **Emoji düştü, yerine metin geldi** (`index.html`): satır artık
+         `Yeni sürüm çıktı:` diyor. Sade metin yeterli çünkü satır varsayılan
+         olarak `hidden` ve yalnız gerçekten yeni sürüm varken açılıyor — yani
+         **varlığı** başlı başına işaret; `GUNCELLEME.md` ve README de bu satırı
+         zaten emojisiz, tam bu sözlerle anlatıyordu. Hatlı SVG glif yolu
+         **reddedildi**: Tur A'nın ölçtüğü sessiz kusur (yorumda çift tire →
+         geçersiz XML → `naturalWidth = 0`, konsolda tek hata yok) bu yola da
+         bulaşır ve tek satırlık bir iş için ağır.
+      2. **Sol kenar nötrleşti** (`style.css`): `.folder-target`'ın token
+         zinciri kardeş `.chat-gate`'ten birebir alındı
+         (`var(--border-strong, var(--control-border))`) — hedef hâl elde vardı,
+         yeni bir değer uydurulmadı. İki kuralı tek sınıfa indirmek
+         **reddedildi**: `padding`, `margin` ve `font-size`'da ayrışıyorlar,
+         birleştirmek ölçülmemiş bir görsel değişim olurdu.
+      3. **ÜÇÜNCÜ BULGU — denetim bunu saymamıştı:** `settings.js` kullanıcıya
+         dönük durum metnini üç yerde `(sağ üstteki ⚙)` diye yazıyordu, ama üst
+         şeritteki gerçek düğme hatlı bir SVG dişli (`aria-label="Ayarlar"`) —
+         yani glif düğmenin görünüşünü **yanlış** söylüyordu. Metin artık
+         düğmenin adını veriyor. Aynı düzeltme bir kusur da kapattı: dize üç kez
+         elle yazılıydı ve biri **nöbetçi** (`includes(...)`, durum satırını
+         temizleyen kapı); biri değişip öteki kalsa hata VERMEZ, satır ekranda
+         asılı kalırdı. Tek sabit: `AYARLAR_EKI`.
+      **Mandallar** (`tests/test_index.py`, dördü de mutasyonla doğrulandı):
+      `..._EMOJI_ikon_yok` iki kademeli ve **sayfanın yüklediği her `.js`/`.css`
+      dosyasını HTML'den keşfedip** tarıyor, yani yeni bir dosya mandalın
+      dışında kalamıyor — kademe 1 astral düzlem + VS16 (HTML·JS·CSS), kademe 2
+      Misc Symbols + Dingbats (HTML·JS; **CSS muaf**, çünkü
+      `content: "✓ "` tek renkli metin sunumlu bir dingbat, yani `🎉` yerine
+      **önerilen** "hatlı glif" biçiminin kendisi). `..._sol_kenari_VURGU_RENGI_degil`
+      tek kurala değil **her `border-left` bildirimine** bakıyor (`style.css` +
+      `mobile.css`), yani ihlal başka bir adla geri gelemiyor; `outline: …
+      var(--accent)` bilerek taranmıyor — odak halkası ve seçili karo meşru
+      durum işaretleri. Ayrıca `..._satiri_METINLE_anlatiyor` (cümle silinmesin)
+      ve `..._TEK_SABITTEN_geliyor` (nöbetçi ile yazan taraf ayrışmasın).
+      **Tarayıcı ölçümü** (Chromium, 1024×700 · 800×700 · 360×780): güncelleme
+      satırında astral kod noktası yok; `#folder-target`'ın sol kenarı
+      **dört temada da** `rgba(255,255,255,0.18)` — `.chat-gate` ile eşit,
+      `--accent`'in hesaplanmış değerine eşit değil (temalar `body`'ye yazıldığı
+      için `--accent` `body`'den okundu; `documentElement`'ten okuyan ilk ölçüm
+      temanın değişmediği yanılgısını vermişti). Taşma x = 0, konsol temiz.
 - [x] Taşımada: `pytest` yeşil ve id sözleşmesi (`test_id_contract.py`) yeşil.
       **22 Ağustos'ta koşuldu:** `pytest tests/ -q` → **1597 geçti, 10 atlandı**
       (atlananlar yalnız Windows'a özgü DACL testleri + kurulu olmayan Playwright);

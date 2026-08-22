@@ -663,3 +663,26 @@ def test_gizlenen_model_seridinin_KABUGU_da_gizleniyor(istemci):
         "Görsel modunda sohbet şeridinin SARMALAYICISI gizlenmiyor")
     assert '#composer[data-mode="director"] #model-pick' in css, (
         "Yönetmen modunda görsel şeridinin SARMALAYICISI gizlenmiyor")
+
+
+def test_composer_ipucu_TELEFONDA_hala_gizli(istemci):
+    """`.chat-hint` telefonda `display: none` KALIYOR.
+
+    Masaüstünde ipucunun taban genişliği `flex: 1`den (yani `flex: 1 1 0%`,
+    taban SIFIR) içerik genişliğine çevrildi: `#status` uzun bir metin
+    yazdığında ipucu 65px'e ezilip dört satıra sarıyordu (ölçüm: Chromium,
+    1024×700). Telefonda ise ipucu ZATEN gizli ve gizli kalması gerekiyor —
+    "⌘/Ctrl + Enter" dokunmatikte yanlış bilgi (Enter satır atlıyor) ve klavye
+    açıkken satır boşuna yer kaplıyor.
+
+    Mandal masaüstü düzeltmesinin telefon tarafına SIZMASINA karşı: kural
+    `style.css`'te değil `mobile.css`'te ve iki dosya ayrı ayrı düzenleniyor,
+    yani "ipucu artık sarmıyor, gizlemeye gerek yok" diye düşünen bir sonraki
+    tur bu satırı sessizce silebilir. Kırılma CI'da görünmez — telefon yok.
+    """
+    css = _metin(istemci, "/static/mobile.css")
+    blok = css.split(".chat-hint {", 1)
+    assert len(blok) == 2, ".chat-hint kuralı mobile.css'ten kaybolmuş"
+    assert "display: none" in blok[1].split("}", 1)[0], (
+        "ipucu telefonda gizlenmiyor — klavye açıkken yer kaplar ve "
+        "dokunmatikte yanlış kısayolu anlatır")

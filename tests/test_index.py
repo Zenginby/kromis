@@ -1,4 +1,6 @@
+import os
 import re
+import subprocess
 
 from fastapi.testclient import TestClient
 import app as appmod
@@ -1718,15 +1720,22 @@ def test_tools_is_a_rail_view_with_two_tool_cards():
 
 
 def test_the_gear_and_the_tools_view_are_different_doors():
-    """Ayrım KASITLI (§4.1): Araçlar = tasarım kararları, dişli = makine ayarı.
+    """Ayrım KASITLI (§4.1): Araçlar = tasarım kararları, Ayarlar = makine ayarı.
 
     Azure kimliği Araçlar görünümüne sızarsa iki kapı aynı şeyi yapar ve
     "yalnızca bu makineye kaydedilir" uyarısının bağlamı kaybolur.
+
+    İşaret düğmenin ADI ("Ayarlar düğmesi"), görünüşü DEĞİL: iddia önce "dişli"
+    sözcüğünü arıyordu ve tam bu yüzden ekrandaki üç ayrı adlandırmadan birini
+    MANDALLIYORDU — yani ayrışmayı engellemek yerine koruyordu (bkz.
+    test_ayarlar_yonlendirmesi_TEK_SABITTEN_geliyor). Ölçülen şey değişmedi:
+    kullanıcı Azure ayarlarının NEREDE olduğunu okuyabiliyor mu.
     """
     view = _section(_html(), "view-tools")
     for leaked in ("set-endpoint", "set-key", "set-chat-deployment"):
         assert leaked not in view, f"{leaked} Araçlar görünümüne sızmış"
-    assert "dişli" in view, "kullanıcı Azure ayarlarının nerede olduğunu okuyamıyor"
+    assert "Ayarlar düğmesinden" in view, (
+        "kullanıcı Azure ayarlarının nerede olduğunu okuyamıyor")
 
 
 def test_media_search_is_served_and_filters_by_prompt_folder_and_size():
@@ -3429,3 +3438,327 @@ def test_SOHBET_MODELI_dinleyicisi_KURESEL_degiskeni_DEREFERANS_etmiyor():
     assert "currentChatModel." not in blok, (
         "dinleyici küresel değişkeni dereferans ediyor: erken çıkışta "
         "TypeError ya da kullanıcının seçmediği modelin diske yazılması")
+
+
+# ══════════════════════════════════════════════════════════════════════
+# "Emoji ikon yok" ve "sol kenarı renkli yuvarlak kart yok" (flow-redesign §11)
+# ══════════════════════════════════════════════════════════════════════
+# Bu bölüm §11'in AÇIK KALAN son kutusunu kapatıyor. Kutu 22 Ağustos'ta iki
+# somut ihlalle açıktı (`🎉` ve `.folder-target`'ın vurgu renkli sol kenarı) ve
+# ikisi de HİÇ ölçülmüyordu — düzeltmek yetmez, tekrar girmesini engellemek
+# gerek. Aşağıdakiler o yüzden tek tek düzeltmeyi değil ÖLÇÜTÜ mandallıyor.
+
+# 🎉 = U+1F389. Astral düzlem gerçek emojinin yaşadığı yer.
+# U+FE0F (VARIATION SELECTOR-16) metin glifini emojiye ÇEVİREN karakter ve tek
+# başına GÖRÜNMEZ — gözle denetimde tam olarak bu kaçıyor, o yüzden desende.
+# KAÇIŞLA yazılıyor (`\uFE0F`), ham karakterle DEĞİL: ham hâli desenin İÇİNDE de
+# görünmez olurdu, yani bir "görünmez karakter temizliği" mandalın bu yarısını
+# görünür diff bırakmadan ve testi kırmızıya düşürmeden silebilirdi. Mandalın
+# kendisi de kurcalanmaya karşı OKUNABİLİR olmak zorunda.
+_EMOJI_ASTRAL = re.compile("[\U0001f000-\U0001faff\uFE0F]")
+# Misc Symbols + Dingbats: `⚙` (U+2699) ve `⚠` (U+26A0) buradan geliyor.
+_EMOJI_BMP = re.compile("[☀-➿]")
+# Kademe 2'nin CSS muafiyeti — DOSYA değil KOD NOKTASI bazında (bkz. testin
+# gövdesi). `✓` = U+2713, `.chat-option[aria-checked="true"]::before`in işareti.
+_CSS_MUAF = frozenset({"\u2713"})
+
+
+def _bildirim(govde: str, ozellik: str) -> str:
+    """Bir CSS kuralının gövdesinden tek bildirim — ADI DA DAHİL, boşluk normal.
+
+    `ozellik` bir DESEN: bir özelliğin mantıksal eşleniği (`border-left` ↔
+    `border-inline-start`) aynı iddianın kapsamında kalabilsin diye.
+
+    Yalnız DEĞERİ döndürmek yetmez: "iki kuralın sol kenarı aynı" iddiasında
+    biri `border-left`, öteki `border-inline-start` olsa değerler eşleşir ve
+    iddia ayrışmayı GÖRMEZ — tam olarak mandalın engellemesi gereken şey.
+    """
+    eslesme = re.search(rf"{ozellik}\s*:[^;}}]*", govde)
+    assert eslesme, f"{ozellik} bildirimi yok"
+    return re.sub(r"\s+", " ", eslesme.group(0)).strip()
+
+
+# Sol kenarın rengi DÖRT ayrı adla yazılabilir: `border-left`, onun `-color`
+# uzun biçimi, mantıksal eşleniği `border-inline-start` ve onun `-color`'ı.
+# Mandal yalnız `border-left:` literalini arıyordu; üçü de (ölçüldü)
+# `border-left: 3px solid var(--accent-border)`, `border-left-color:
+# var(--accent)` ve `border-inline-start: 3px solid var(--accent)` biçiminde
+# sınavdan GEÇİYORDU — yani ölçüt başka bir adla sessizce geri gelebilirdi.
+# KISA `border:` biçimi BİLEREK dışarıda: dört kenarı birden çiziyor, yani
+# ölçütün konusu olan "sol kenar şeridi" değil ÇERÇEVE olur. Kapsama alınsaydı
+# mandal ölçütün söylemediği bir şeyi yasaklardı.
+_SOL_KENAR = re.compile(r"border-(?:left|inline-start)(?:-color)?\s*:[^;}]*")
+
+
+def _sayfa_kaynaklari() -> dict[str, str]:
+    """Sayfanın YÜKLEDİĞİ her `.js`/`.css` — adresler HTML'den okunuyor.
+
+    Liste elle yazılsaydı bir sonraki dosya mandalın dışında kalır ve "emoji
+    yok" iddiası sessizce daralırdı; kırılma de "yeni dosyada emoji var"
+    biçiminde DEĞİL, "mandal artık hiçbir şey ölçmüyor" biçiminde görünürdü.
+    Desen `?v=` damgasından önce duruyor: sorgu dizesi StaticFiles için
+    anlamsız, anahtar olarak da yol yeterli.
+    """
+    c = TestClient(appmod.app)
+    yollar = list(dict.fromkeys(
+        re.findall(r"/static/[\w./-]+\.(?:js|css)", c.get("/").text)))
+    assert len(yollar) >= 10, f"sayfanın kaynakları bulunamadı: {yollar}"
+    return {yol: c.get(yol).text for yol in yollar}
+
+
+def _yorumsuz(yol: str, metin: str) -> str:
+    """Gerekçe yorumları AYIKLANMIŞ gövde.
+
+    Ayıklama ŞART: gerekçe yorumu yasakladığı şeyin adını yazmak ZORUNDA — bu
+    turun kendi yorumları da `settings.js`'te "(sağ üstteki ⚙)" ve
+    `flow-redesign` atıflarında `🎉` diyor. Yorumlu gövdede iddia kendi
+    açıklamasına takılır; depo bu tuzağa dört kez düştü (`_css_block` ve
+    `_strip_js_comments`'in gerekçeleri aynı ders).
+
+    CSS'te `//` yorumu yok, blok yorumunu (`/* */`) ikisi de kullanıyor — o
+    yüzden JS ayıklayıcısı CSS'e de yetiyor, ikinci bir yardımcı gerekmiyor.
+    """
+    return _strip_html_comments(metin) if yol == "/" else _strip_js_comments(metin)
+
+
+def test_servis_edilen_arayuzde_EMOJI_ikon_yok():
+    """§11'in son şartı: "emoji ikon yok". İki kademeli kalıcı mandal.
+
+    KADEME 1 (astral düzlem + VS16) HTML, JS ve CSS'in üçünde de yasak: gerçek
+    emoji orada yaşıyor ve orada meşru bir kullanımı yok.
+
+    KADEME 2 (U+2600–U+27BF, Misc Symbols + Dingbats) her üç türde de yasak;
+    CSS'in TEK muafiyeti `✓` (U+2713) ve muafiyet bilinçli: `style.css`'te
+    `.chat-option[aria-checked="true"]::before { content: "✓ " }` var. `✓` tek
+    renkli, metin sunumlu bir dingbat, yani görev defterinin `🎉` yerine
+    ÖNERDİĞİ "hatlı glif" biçiminin kendisi. Onu da yasaklayan bir mandal,
+    izin verilen çözümü yasaklardı.
+
+    Muafiyet KOD NOKTASI bazında (`_CSS_MUAF`), DOSYA bazında değil: önceki hâli
+    her `.css` dosyasını atlıyordu, yani kademe orada hiçbir şey ÖLÇMÜYORDU —
+    `style.css`'e eklenen `.deneme::before { content: "❌✅⚠"; }` bu sınavdan
+    geçiyordu (ölçüldü). Muafiyetin genişliği gerekçesinin genişliği kadar
+    olmalı; gerekçe tek bir glif.
+
+    Bugünkü arayüzde geçen `─ ═ ⌘ → ← ↔ ↑ ≈ ≤ ≥ ≠ ◼ ▮ ▬ • ⇒ ×`
+    karakterlerinin hiçbiri iki kademeye de girmiyor (kod noktası taramasıyla
+    ölçüldü) — mandal tipografik glifleri değil EMOJİYİ arıyor.
+
+    Satır SONU yorumları `_strip_js_comments`'te bilerek korunuyor, yani oraya
+    yazılan bir emoji mandalı kırar. Doğrusu bu: bir emojiyi gerekçe olarak
+    anlatmak gerekiyorsa yorum kendi satırına ya da blok yoruma taşınır.
+    """
+    kaynaklar = _sayfa_kaynaklari()
+    kaynaklar["/"] = TestClient(appmod.app).get("/").text
+
+    for yol, metin in kaynaklar.items():
+        bulunan = _EMOJI_ASTRAL.findall(_yorumsuz(yol, metin))
+        assert not bulunan, (
+            f"{yol} emoji taşıyor: {bulunan} — §11'in "
+            f'"emoji ikon yok" ölçütü')
+
+    for yol, metin in kaynaklar.items():
+        muaf = _CSS_MUAF if yol.endswith(".css") else frozenset()
+        bulunan = [g for g in _EMOJI_BMP.findall(_yorumsuz(yol, metin))
+                   if g not in muaf]
+        assert not bulunan, (
+            f"{yol} emoji sunumlu simge taşıyor: {bulunan} — düğmeler ADIYLA "
+            f"anlatılıyor, glifle değil")
+
+
+def test_yeni_surum_satiri_METINLE_anlatiyor():
+    """`#settings-update` emojisiz ama SESSİZ de değil.
+
+    `🎉` düştü; satırın cümlesi kalmak ZORUNDA. Emojiyi ayıklayan bir sonraki
+    tur cümleyi de silerse satır yalnızca "v0.9.0 — indir" der ve kullanıcı
+    NEDEN gösterildiğini bilmez — üstelik kırılma sessiz: satır varsayılan
+    olarak `hidden`, yani ancak gerçekten yeni sürüm çıkınca görünür oluyor.
+
+    Cümle `GUNCELLEME.md`'nin ve README'nin bu satırı anlattığı sözlerle
+    birebir aynı ("Yeni sürüm çıktı"); belgeler emojiyi hiç yazmamıştı.
+    """
+    html = _strip_html_comments(_html())
+    bas = html.find('id="settings-update"')
+    assert bas > 0, "#settings-update satırı yok"
+    # Dilim `id`'den değil KAPSAYICI `<p`'den başlıyor: sınıf niteliği id'den
+    # ÖNCE yazılı, yani id'den başlayan bir dilim onu hiç görmez.
+    satir = html[html.rfind("<p", 0, bas):html.find("</p>", bas)]
+    assert "Yeni sürüm çıktı" in satir, "satır NEDEN göründüğünü söylemiyor"
+    assert 'id="settings-update-version"' in satir, "sürüm bağı yok"
+    assert 'id="settings-update-link"' in satir, "indirme bağı yok"
+
+    # Cümle YETMEZ: `settings-update-row` sınıfı HTML'de baştan vardı ama CSS'te
+    # hiç KARŞILIĞI YOKTU (kardeşi `.settings-version-row`ın kuralı var).
+    # Satırı "burada tıklanacak bir şey var" diye işaretleyen tek şey `🎉`
+    # glifiydi; o düşünce satır, ortalanmış "Kurulu sürüm" künyesinin altında
+    # ayırt edilemez bir `.field-note` notuna indi — emoji gitti, İŞARET de
+    # gitti. Ölçütü karşılayan düzeltme glifi silmek DEĞİL, yerine glif
+    # olmayan bir işaret koymak.
+    assert 'class="field-note settings-update-row"' in satir, (
+        "satır kart sınıfını taşımıyor")
+    kart = _css_block(".settings-update-row")
+    # İddia panelin KENDİ "açıklama kartı" idiomuna bağlanıyor, uydurulmuş
+    # değerlere değil: biçim ayrışırsa biri sessizce düz metne dönebilir.
+    kapi = _css_block(".chat-gate")
+    for ozellik in ("background", "border-radius", r"border-(?:left|inline-start)"):
+        assert _bildirim(kart, ozellik) == _bildirim(kapi, ozellik), (
+            f".settings-update-row ile .chat-gate {ozellik} bakımından ayrışmış "
+            f"→ {_bildirim(kart, ozellik)!r} vs {_bildirim(kapi, ozellik)!r}")
+
+    # Kart yetmez: kartı EYLEM yapan şey içindeki bağlantılar ve bu ikisi
+    # uygulamadaki tek biçimlenmemiş `<a>`ydı — hiçbir yerde `a` kuralı yok,
+    # yani tarayıcı varsayılanı (`#0000EE` / ziyaret edilmiş `#551A8B`) geçerli
+    # ve bu panelin koyu yüzeyinde ~1.3:1 kontrast veriyordu. Kart görünür,
+    # tıklanacak yazı okunmaz — çağrının yarısı.
+    bag = _css_block(".settings-update-row a")
+    assert "var(--text)" in _bildirim(bag, "color"), (
+        "bağlantı rengi temadan gelmiyor → tarayıcı varsayılanı koyu yüzeyde "
+        "okunmuyor")
+    assert "underline" in _bildirim(bag, "text-decoration"), (
+        "renk tek başına 'tıklanır' demiyor; altı çizgi kalmalı")
+
+
+def test_ayarlar_yonlendirmesi_TEK_SABITTEN_geliyor():
+    """Durum satırının Ayarlar eki bir SABİT, üç elle yazılmış dize değil.
+
+    Öncesinde `(sağ üstteki ⚙)` dizesi `settings.js`'te üç kez elle yazılıydı
+    ve biri NÖBETÇİ (`statusEl.textContent.includes(...)`): kullanıcı ayarları
+    düzelttiğinde satırı temizleyen kapı o. Biri değişip öteki kalsa hata
+    VERMEZ — nöbetçi bir daha hiç tutmaz ve durum satırı ekranda asılı kalır.
+    Sessiz kusur tam olarak bu, o yüzden mandal "emoji yok"tan AYRI duruyor:
+    `⚙` başka bir glifle değiştirilse bile bu iddia ayakta kalmalı.
+
+    Glifin kendisi de gitti: üst şeritteki gerçek düğme hatlı bir SVG dişli
+    (`aria-label="Ayarlar"`), yani `⚙` düğmenin görünüşünü YANLIŞ söylüyordu.
+    """
+    js = _strip_js_comments(_settings_js())
+    assert 'const AYARLAR_EKI = "(sağ üstteki Ayarlar düğmesi)";' in js, (
+        "Ayarlar eki sabiti yok")
+    assert js.count("(sağ üstteki") == 1, (
+        "metin sabitin DIŞINDA da yazılmış — nöbetçi ile yazan taraf "
+        "birbirinden sessizce ayrılabilir")
+    assert "${AYARLAR_EKI}" in js, "yazan taraf sabiti okumuyor"
+    assert "includes(AYARLAR_EKI)" in js, "nöbetçi sabiti okumuyor"
+
+    # SABİT TEK KAYNAK OLMAK için yetmez: düğmeyi `index.html` de anlatıyor ve
+    # mandal yalnız `settings.js`'e bakıyordu. Ayrışma gerçekten olmuştu —
+    # `settings.js` "Ayarlar düğmesi" derken `#chat-gate` "(sağ üstteki dişli)",
+    # `.view-desc` ise "dişli düğmesi" diyordu: TEK düğme, AYNI ekran, ÜÇ ad.
+    # Kullanıcı hangisinin doğru olduğunu deneyerek buluyordu ve hiçbir test
+    # kırmızıya düşmüyordu.
+    #
+    # İddia "dişli" sözcüğünün ADLANDIRMADA geçmemesi üzerine kurulu: söz yanlış
+    # değil (ikon gerçekten hatlı bir SVG dişli), ama düğmenin ADI değil — ad
+    # `aria-label="Ayarlar"`. Yorumlar AYIKLANIYOR: gerekçe yorumları eski sözü
+    # yazmak ZORUNDA, tam bu satırın kendisi gibi.
+    html = _strip_html_comments(_html())
+    assert "dişli" not in html, (
+        "arayüz Ayarlar düğmesini görünüşüyle anlatıyor — settings.js ADIYLA "
+        "anlatıyor, ikisi tek düğme için iki ad demek")
+    # `"dişli" not in html` tek başına yetmez: paragraf düğmeyi bir BAŞKA
+    # belirsiz sözle ("sağ üstteki simge") anlatsa iddia kırmızıya düşmezdi.
+    # O yüzden kapının kendi gövdesi de düğmenin ADINI söylemek zorunda.
+    bas = html.find('id="chat-gate"')
+    assert bas > 0, "#chat-gate satırı yok"
+    kapi = html[bas:html.find("</p>", bas)]
+    assert "Ayarlar düğmesi" in kapi, (
+        "kapı metni düğmeyi adıyla anlatmıyor — settings.js'in durum satırıyla "
+        "aynı ekranda iki ayrı ad demek")
+
+
+# Kullanıcının okuduğu belgeler — `docs/` BİLEREK dışarıda: oradaki `⚙`
+# atıfları TARİHSEL kayıt ("öncesinde şu yazıyordu"), yeni adla yazılsalar neyin
+# değiştiğini anlatamazlardı. Aynı ayrım `test_depo_adresi.py`'de de var.
+_KULLANICI_BELGELERI = ("GUNCELLEME.md", "KURULUM.md", "README.md")
+
+
+def test_belgeler_AYARLAR_dugmesini_glifle_anlatmiyor():
+    """`⚙` arayüzden düştü; belgelerde KALMASI ölçütü sessizce geri getirir.
+
+    Arayüz düğmeyi adıyla anlatırken belge `⚙ Ayarlar` diyorsa glif ölçütün
+    dışında yaşamaya devam eder ve bir sonraki tur onu "zaten belgede var" diye
+    arayüze geri koyabilir. Üstelik `GUNCELLEME.md` tam olarak `#settings-update`
+    satırının BAĞLANDIĞI dosya: kullanıcı "yeni sürüm çıktı"ya tıklayıp açtığı
+    ilk sayfada, arayüzde artık olmayan bir glifle karşılaşıyordu.
+
+    Liste sabit (`_KULLANICI_BELGELERI`) ama KÖRÜ KÖRÜNE değil: köke eklenen
+    yeni bir `.md` listeye girmedikçe test kırmızıya düşüyor. Elle yazılmış bir
+    liste tek başına olsaydı iddia bir sonraki belgede sessizce daralırdı —
+    `_sayfa_kaynaklari`'nin adresleri HTML'den okumasıyla aynı gerekçe.
+    """
+    kok = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    izlenen = subprocess.run(
+        ["git", "-C", kok, "ls-files", "*.md"],
+        check=True, capture_output=True, text=True).stdout.splitlines()
+    kok_belgeleri = tuple(sorted(y for y in izlenen if "/" not in y))
+    assert kok_belgeleri == _KULLANICI_BELGELERI, (
+        f"kök belgeleri değişmiş: {kok_belgeleri} — yeni belge mandalın "
+        f"dışında kalmasın diye liste elle güncellenmeli")
+
+    for ad in _KULLANICI_BELGELERI:
+        with open(os.path.join(kok, ad), encoding="utf-8") as f:
+            metin = f.read()
+        assert "\u2699" not in metin, (
+            f"{ad} Ayarlar düğmesini `⚙` glifiyle anlatıyor — arayüz onu ADIYLA "
+            f"anlatıyor (settings.js AYARLAR_EKI)")
+
+
+def test_yuvarlak_kartin_sol_kenari_VURGU_RENGI_degil():
+    """§11: "sol kenarı renkli yuvarlak kart yok". Kural bazında mandal.
+
+    İddia `.folder-target`'a DEĞİL, her sol kenar bildirimine bakıyor: ölçütü
+    bozan bir sonraki kart başka bir adla gelir ve tek kurala bakan bir mandal
+    onu görmez. Aynı gerekçe ÖZELLİĞİN ve DEĞERİN adı için de geçerli — mandal
+    dört yazım biçimini birden tarıyor (`_SOL_KENAR`) ve `--accent` ailesinin
+    TAMAMINI reddediyor (`var(--accent` öneki), yalnız `var(--accent)`i değil:
+    `--accent-border` ile çizilen sol kenar da vurgu renkli sol kenardır.
+    Bugün hiçbir sol kenar bu ailenin herhangi bir üyesini kullanmıyor, yani
+    genişletme yanlış-pozitif üretmiyor (ölçüldü).
+
+    `--accent` bu kod tabanında yalnız DURUM anlatıyor (`flow-tokens.css`),
+    `--danger` ise semantik olduğu için muaf ve zaten sol kenar kullanmıyor.
+
+    `outline: … var(--accent)` BİLEREK taranmıyor: odak halkası ve seçili karo
+    çerçevesi meşru durum işaretleri, üstelik `flow-tokens.css`'in `--accent`
+    tanımının asıl işi o.
+    """
+    for ad in ("style.css", "mobile.css"):
+        css = re.sub(r"/\*.*?\*/", "", _js(ad), flags=re.S)
+        for bildirim in _SOL_KENAR.findall(css):
+            assert "var(--accent" not in bildirim, (
+                f"{ad}: vurgu renkli sol kenar geri geldi → {bildirim.strip()}")
+
+    hedef = _css_block(".folder-target")
+    assert "border-radius: 10px" in hedef, "yuvarlak kart biçimi değişmiş"
+    # Kardeşiyle AYNI olduğu iddia ediliyor, "nötr bir şey" değil: hedef hâl
+    # elde vardı ve iki kural ayrışırsa biri sessizce eski hâle dönebilir.
+    # Karşılaştırma ÖZELLİĞİN ADIYLA birlikte: yalnız değer kıyaslansa biri
+    # `border-inline-start`e geçip öteki `border-left`te kalabilir ve iddia
+    # "aynı" derdi.
+    _KENAR = r"border-(?:left|inline-start)"
+    assert _bildirim(hedef, _KENAR) == _bildirim(_css_block(".chat-gate"), _KENAR), (
+        ".folder-target ile .chat-gate'in sol kenarı ayrışmış")
+
+
+def test_composer_ipucu_TEK_SATIR_taban_genisligi_ICERIKTEN():
+    """`.chat-hint` esnek DEĞİL: tabanı içerikten geliyor.
+
+    Önceki `flex: 1` kısa biçimi `flex: 1 1 0%`e çözülüyordu, yani taban
+    genişliği SIFIR. `.composer-foot`'taki tek esnek öğe buydu — `#status` bir
+    `<p>` (`flex: 0 1 auto`, tabanı içerik genişliği), `.run-cost` ise
+    `flex: none`. Ölçüm (Chromium, 1024×700 — `desktop.py`'deki en küçük
+    pencere): `#status` 428px alıyor, ipucu 65px'e eziliyor ve DÖRT satıra
+    sarıyor. Kusur `origin/main`'de de vardı.
+
+    Mandal bilerek ZAYIF ama doğru yerde: pytest CSS'i ÇALIŞTIRMIYOR, yani
+    "tek satır" iddiası burada ölçülemez — gerçek ölçüm tarayıcıda yapılıp
+    görev defterine yazıldı. Burada korunan şey kuralın kendisi.
+    """
+    govde = _css_block(".chat-hint")
+    assert "white-space: nowrap" in govde, "ipucu sarabilir"
+    assert "flex: 0 0 auto" in govde, "taban genişliği içerikten gelmiyor"
+    # `flex: 1` / `flex: 1 1 0` gibi taban-sıfır biçimlerinin hiçbiri geri
+    # gelmesin. Gövde yorumsuz (`_css_block` ayıklıyor), yoksa bu iddia
+    # kuralın kendi gerekçe yorumundaki `flex: 1`e takılırdı.
+    assert re.search(r"flex:\s*1\b", govde) is None, (
+        "taban-sıfır flex geri geldi — ipucu yine açlıktan ölür")

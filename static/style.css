@@ -712,6 +712,30 @@ body:has(.sheet.open) .scrim { display: block; }
    bilgi. Ortalanıyor ki forma ait bir açıklama gibi okunmasın. */
 .settings-version-row { margin-top: 1rem; text-align: center; }
 
+/* Yeni sürüm satırı: künyenin altındaki TEK EYLEM, o yüzden künyeyle aynı düz
+   .field-note metni olamaz. `settings-update-row` sınıfı HTML'de baştan vardı
+   ama CSS'te hiç KARŞILIĞI YOKTU; satırı işaretleyen tek şey `🎉` glifiydi ve o
+   düşünce satır "Kurulu sürüm"ün altında ayırt edilemez bir nota indi.
+
+   Biçim uydurulmadı: bu panelin "açıklama kartı" idiomu (.chat-gate /
+   .folder-target) birebir alındı — sol kenar NÖTR (--border-strong), yani §11'in
+   "sol kenarı renkli yuvarlak kart yok" ölçütü ayakta; kart olması vurgu
+   rengiyle değil yüzeyle anlatılıyor. */
+.settings-update-row {
+  margin: 0.5rem 0 0; padding: 0.6rem 0.75rem; border-radius: 10px;
+  background: var(--panel-2); border-left: 3px solid var(--border-strong, var(--control-border));
+}
+/* Kartı "eylem" yapan ŞEY bu iki bağlantı ve ikisi uygulamadaki TEK
+   biçimlenmemiş `<a>` (üçüncüsü `#viewer-download`, o `.viewer-btn`): hiçbir
+   yerde `a` kuralı yok, yani tarayıcı varsayılanı geçerliydi — `#0000EE`,
+   ziyaret edilmişi `#551A8B`. Bu panelin yüzeyinde (`--panel-2`, ~#1e1e1f)
+   ikisi de ~1.3:1 kontrast, yani tıklanacak yazı OKUNMUYORDU; kartın kendisi
+   düzelse bile çağrı yarım kalırdı (tarayıcıda ölçüldü).
+   Renk `--text`ten geliyor, `--accent`ten DEĞİL: bu kod tabanında `--accent`
+   yalnızca DURUM anlatıyor (flow-tokens.css başlığı). "Tıklanır" işareti altı
+   çizgide — bağlantının en anlaşılır ve renkten bağımsız işareti. */
+.settings-update-row a { color: var(--text); text-decoration: underline; }
+
 .range-val { color: var(--text); font-variant-numeric: tabular-nums; font-size: 0.78rem; }
 .logo-controls input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; margin: 0.1rem 0 0.2rem; }
 
@@ -1290,9 +1314,17 @@ body.select-mode #select-toggle,
 .danger-btn[hidden] { display: none; }
 /* Yıkıcı eylem rengi SEMANTİK — accent yasağının dışında */
 .danger-btn:hover { color: var(--danger); background: var(--panel-2); }
+/* Sol kenar NÖTR, vurgu renkli DEĞİL: `--accent` bu kod tabanında yalnız DURUM
+   anlatıyor (flow-tokens.css:22-25; bir üstteki `.folder-icon`'un gerekçesi de
+   aynı), bu satır ise durum değil — "bulunduğun klasöre eklenecek" diye statik
+   bir ipucu (folders.js:112-119; tetikleyici sürükleme DEĞİL, klasörün İÇİNDE
+   olmak). Vurgu renkli hâli "sol kenarı renkli yuvarlak kart yok" ölçütünün
+   tek ihlaliydi (flow-redesign §11). Token zinciri kardeş `.chat-gate`'ten
+   ("Kapı açıklaması" kuralı) birebir alındı — hedef hâl elde vardı, yeni bir
+   değer uydurulmadı. */
 .folder-target {
   margin: 1rem 0 0; padding: 0.5rem 0.7rem; border-radius: 10px;
-  background: var(--panel-2); border-left: 3px solid var(--accent);
+  background: var(--panel-2); border-left: 3px solid var(--border-strong, var(--control-border));
   color: var(--muted); font-size: 0.78rem; line-height: 1.4;
 }
 .folder-target[hidden] { display: none; }
@@ -1972,7 +2004,21 @@ body.viewer-open { overflow: hidden; }
 .chat-gate[hidden] { display: none; }
 /* #chat-input composer'ın içinde: yükseklik/yeniden boyutlandırma
    `.composer-input`'tan geliyor, id seçicisi onu ezmesin. */
-.chat-hint { flex: 1; font-size: 0.74rem; color: var(--muted); }
+/* Taban genişliği neden `auto`: önceki `flex: 1` kısa biçimi `flex: 1 1 0%`e
+   çözülüyor, yani taban SIFIR oluyor. Satırdaki tek esnek öğe buydu —
+   `#status` bir `<p>` (`flex: 0 1 auto`, tabanı içerik genişliği),
+   `.run-cost` ise `flex: none`. Ölçüm (Chromium, 1024×700 — desktop.py:32'deki
+   en küçük pencere): `#status` 428px alıyor, ipucu 65px'e eziliyor ve DÖRT
+   satıra sarıyor. Kusur origin/main'de de vardı.
+   Taban artık içerikten geliyor ve `nowrap` sarmayı kapatıyor; `.composer-foot`
+   zaten `flex-wrap: wrap`, yani sığmayan kardeş alta düşüyor.
+   `#status`'a KURAL EKLENMEDİ ve bu bilinçli: `flex-basis: 100%` gibi bir kural
+   durumu her zaman kendi satırına atardı ve ipucu telefonda zaten gizli
+   (mobile.css'te `.chat-hint { display: none }`), yani 360px'de bedava bir
+   satır yüksekliği demekti. Bugünkü davranış duruyor: kısa durum metni ipucuyla
+   aynı satırda kalıyor, uzun olan alta düşüyor, boş olan `.composer-foot
+   p:empty` ile tümden kalkıyor. */
+.chat-hint { flex: 0 0 auto; white-space: nowrap; font-size: 0.74rem; color: var(--muted); }
 .chat-send { margin-top: 0; width: auto; padding: 0.65rem 1.5rem; }
 .chat-wait {
   display: flex; align-items: center; gap: 0.6rem;

@@ -1125,3 +1125,11 @@ Adım 10 — kozmetik (**bitti**, v0.2.0–v0.2.1):
 > altkümesiyle (latin + latin-ext) depoda ve `tests/test_fonts.py` bağlantıyı
 > ölçüyor. Flow-UI listesinden geriye ölçüt olarak yalnız "emoji/dekor yok"
 > maddesi kalıyor ve iki ihlali `flow-redesign-plan.md` §11'de yazılı.
+>
+> **İkinci ek kayıt (2026-08-22, Tur B).** "emoji/dekor yok" da kapandı, yani
+> **Flow-UI listesinden geriye ölçüt kalmadı.** İki ihlal düzeltildi (`🎉` →
+> metin; `.folder-target`'ın sol kenarı → kardeş `.chat-gate`'in nötr token
+> zinciri), denetimin saymadığı üçüncü bir bulgu (`settings.js`'in üç yerinde
+> `(sağ üstteki ⚙)`) aynı turda kapandı ve üçü de mandallandı. Dökümü ve
+> gerekçeleri `flow-redesign-plan.md` §11'in son kutusunda; sıra ve kanıt
+> `2026-08-22-gorev-defteri.md`'nin Tur B kaydında.

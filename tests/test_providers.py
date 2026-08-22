@@ -140,6 +140,56 @@ def test_detail_of_dort_saglayicinin_ORTAK_seklini_cozuyor(body, beklenen):
     assert providers.detail_of(body) == beklenen
 
 
+# Google'ın GERÇEK hata gövdesi, `generativelanguage.googleapis.com`a yapılan
+# canlı çağrıdan AYNEN kopyalandı (22 Ağustos 2026). Sarmal bir NESNE değil,
+# tek öğelik bir DİZİ — ve aynı sarmal iki uçta da geliyor:
+# `/v1beta/interactions` (görsel) ve `/v1beta/openai/chat/completions` (sohbet).
+GOOGLE_GERCEK_400 = [{
+    "error": {
+        "code": 400,
+        "message": "API key not valid. Please pass a valid API key.",
+        "status": "INVALID_ARGUMENT",
+        "details": [{"@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                     "reason": "API_KEY_INVALID",
+                     "domain": "googleapis.com"}],
+    }
+}]
+
+
+def test_detail_of_googlein_TEK_OGELIK_DIZI_sarmalini_aciyor():
+    """Bu iddia canlı bir çağrıyla ölçüldü ve elle yazılmış sözlük gövdeleri
+    onu kaçırıyordu.
+
+    Google hata gövdesini `{"error": …}` olarak DEĞİL, `[{"error": …}]` olarak
+    döndürüyor. Dizi açılmazsa `isinstance(body, dict)` kapısı boş dize
+    döndürüyor ve BÜTÜN Gemini hataları çıplak bir "HTTP 400"a çöküyor: 400'ü
+    ikiye ayıran dal (geçersiz anahtar ↔ desteklenmeyen jeton) hiç
+    tetiklenmiyor, yani anahtarı doğru olan kullanıcı sebebi hiçbir yerde
+    okumuyor — bu deponun "sessiz sapma yasak" duruşunun tam karşıtı.
+    """
+    assert providers.detail_of(GOOGLE_GERCEK_400) == (
+        "API key not valid. Please pass a valid API key.")
+
+
+def test_detail_of_COK_OGELI_diziyi_BILEREK_acmiyor():
+    """İlkini seçmek, geri kalanını sessizce yutmak olurdu.
+
+    Tek öğelik sarmal ölçülmüş bir olgu; çok öğeli bir dizi ise bu depoda
+    hiçbir sağlayıcıdan görülmedi. Görülmeyen bir şekli tahminle çözmek,
+    kullanıcıya eksik bir hata metni göstermenin sessiz yolu.
+    """
+    assert providers.detail_of([{"error": {"message": "bir"}},
+                                {"error": {"message": "iki"}}]) == ""
+    assert providers.detail_of([]) == ""
+
+
+def test_detail_of_duz_NESNE_yolunu_degistirmiyor():
+    """Azure ve OpenAI düz nesne döndürüyor: dizi kapısı onların yolunu
+    baytça değiştirmemeli — tripwire, sarmal açma bir gün genelleşirse."""
+    assert providers.detail_of({"error": {"message": "azure der ki"}}) == "azure der ki"
+    assert providers.detail_of([["iç içe dizi"]]) == ""
+
+
 def test_azure_yolu_kimligi_ONCEDEN_cozmuyor():
     """Kimlik `ac.generate`'in İÇİNDE, tembel biçimde çözülüyor.
 

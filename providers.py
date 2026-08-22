@@ -154,7 +154,7 @@ def total_budget(m: catalog.ImageModel, n: int) -> float:
     return read_timeout_for(m, n) * tur
 
 
-def detail_of(body: dict | None) -> str:
+def detail_of(body: dict | list | None) -> str:
     """Sağlayıcı hata gövdesinden kullanıcıya gösterilebilir açıklama.
 
     ŞEKİL paylaşılıyor, MESAJ paylaşılmıyor: `{"error": {"message": …}}`
@@ -162,7 +162,29 @@ def detail_of(body: dict | None) -> str:
     Türkçe metinler sağlayıcıya özgü kalmak zorunda (`chat_client.map_error`'ın
     404 metni Azure AI Foundry'nin dağıtım alanından söz ediyor — o metni
     Gemini'ye göstermek kullanıcıyı olmayan bir forma yönlendirir).
+
+    TEK ÖĞELİK DİZİ DE AÇILIYOR ve bu bir hoşgörü değil ÖLÇÜLMÜŞ bir olgu:
+    `generativelanguage.googleapis.com` hata gövdesini nesne olarak DEĞİL,
+    tek öğelik bir JSON DİZİSİ olarak döndürüyor —
+
+        [{"error": {"code": 400, "message": "API key not valid. …",
+                    "status": "INVALID_ARGUMENT"}}]
+
+    Gerçek uca yapılan çağrıyla doğrulandı (görsel tarafı
+    `/v1beta/interactions`, sohbet tarafı `/v1beta/openai/chat/completions`;
+    ikisi de aynı sarmalı kullanıyor). Dizi açılmazsa `isinstance(body, dict)`
+    kapısı boş dize döndürüyor ve BÜTÜN Gemini hataları çıplak bir
+    "HTTP 400"a çöküyor: `gemini_client.map_error`'ın 400'ü ikiye ayıran dalı
+    (geçersiz anahtar ↔ desteklenmeyen jeton) hiç tetiklenmiyor, yani anahtarı
+    doğru olan kullanıcı sebebi hiçbir yerde okumuyor.
+
+    ÇOK ÖĞELİ dizi BİLEREK açılmıyor: ilkini seçmek, geri kalanını sessizce
+    yutmak olurdu. Azure ve OpenAI düz nesne döndürüyor, o yüzden onların yolu
+    bayt bayt aynı kalıyor.
     """
+    # `list` kapısı `dict` kapısından ÖNCE: aksi hâlde dizi zaten elenmiş olur.
+    if isinstance(body, list) and len(body) == 1:
+        body = body[0]
     if not isinstance(body, dict):
         return ""
     err = body.get("error")

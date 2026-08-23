@@ -150,6 +150,13 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.10.0 — ne değişti
+
+- İnceleme düzeltmeleri (arena): kapı, geri açma, kilit sızıntısı, çipin ARIA'sı
+- aynı prompt 2-4 modelde yan yana, kazanan işaretlenebiliyor
+
+---
+
 ## Sürüm 0.9.2 — ne değişti
 
 - İnceleme düzeltmeleri: paketleme kapısı, sızıntı kapısı, harita kör noktası, çipin adı

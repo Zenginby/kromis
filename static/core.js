@@ -1027,53 +1027,13 @@ let uploadPreviewUrl = null;
 const MAX_EDIT_IMAGES = 4;
 let extras = [];
 
-// Simüle ilerleme: Azure tek yanıt döndürür (gerçek % akışı yok), bu yüzden
-// beklerken ~%90'a doğru yumuşakça doldurup, iş bitince %100'e tamamlarız.
-// generation token: eski/örtüşen bir işlemin stop/hide'ı yeni işlemin barını etkilemez.
-let progressTimer = null;
-let progressHideTimer = null;
-let progressGen = 0;
-
-function startProgress() {
-  const gen = ++progressGen;
-  clearInterval(progressTimer);
-  clearTimeout(progressHideTimer);
-  const fill = $("progress-fill");
-  const pct = $("progress-pct");
-  $("progress").hidden = false;
-  let value = 0;
-  fill.style.width = "0%";
-  pct.textContent = "0%";
-  progressTimer = setInterval(() => {
-    if (gen !== progressGen) return;
-    const remaining = 90 - value;
-    if (remaining <= 0) return;
-    value += Math.max(0.25, remaining * 0.02); // asimptotik + yavaş: yaklaştıkça iyice yavaşlar
-    if (value > 90) value = 90;
-    fill.style.width = value.toFixed(1) + "%";
-    pct.textContent = Math.round(value) + "%";
-  }, 160);
-  return gen;
-}
-
-function stopProgress(complete, gen) {
-  if (gen !== progressGen) return; // daha yeni bir işlem barı devraldı; dokunma
-  clearInterval(progressTimer);
-  progressTimer = null;
-  const fill = $("progress-fill");
-  const pct = $("progress-pct");
-  if (complete) {
-    fill.style.width = "100%";
-    pct.textContent = "100%";
-  }
-  clearTimeout(progressHideTimer);
-  progressHideTimer = setTimeout(() => {
-    if (gen !== progressGen) return; // gizleme beklerken yeni işlem başladıysa dokunma
-    $("progress").hidden = true;
-    fill.style.width = "0%";
-    pct.textContent = "0%";
-  }, complete ? 450 : 200);
-}
+// İlerleme yüzdesi KALDIRILDI (eski `startProgress`/`stopProgress`).
+// Sağlayıcı tek yanıt döndürüyor, gerçek bir % akışı yok: bar 160ms'lik bir
+// setInterval ile ~%90'a doğru asimptotik dolup orada bekliyor, iş bitince
+// %100'e sıçrıyordu — yani sayı bir ÖLÇÜM değil, süsleme. Beklemeyi artık
+// shimmer kutusu anlatıyor (chat.js `beginResultTurn`, static/pixel-canvas.js)
+// ve o hiçbir şey ölçtüğünü iddia etmiyor. Geri getirilecekse ölçülecek bir
+// şey de gelmeli: sağlayıcıdan akış (stream) yanıtı.
 
 // ── İndirme ─────────────────────────────────────────────────────────
 // Konum seçtiren TEK yol. Galeri kartı da (folders.js) büyüteç de
@@ -1495,10 +1455,8 @@ async function run() {
 
   runBusy = true;
   syncGoGate();
-  const gen = startProgress();
   statusEl.textContent = !editing ? "Üretiliyor…"
     : extras.length ? "Görseller birleştiriliyor…" : "Düzenleniyor…";
-  let ok = false;
   try {
     const res = await request;
     if (!res.ok) {
@@ -1536,7 +1494,6 @@ async function run() {
         "yönlendirmesi olmadan üretildi. Prompt'u kısaltıp tekrar dene.");
     }
     if (warnings.length) statusEl.textContent = warnings.join(" · ");
-    ok = true;
     // Sonuç kaydı döküme: konuşma ve üretilen görseller aynı akışta (tasarım §5).
     // `image_ids` sunucunun döndürdüğü kayıtlardan geliyor; adet ayrı
     // taşınmıyor, dizinin uzunluğundan okunuyor.
@@ -1561,7 +1518,6 @@ async function run() {
   } finally {
     runBusy = false;
     syncGoGate();   // kapının tek yazarı — yapılandırma/mod/model hepsini birden görüyor
-    stopProgress(ok, gen);
   }
 }
 

@@ -1194,6 +1194,23 @@ button.palette-sw:focus-visible { outline: 2px solid var(--accent); outline-offs
   min-height: 72px; display: flex; align-items: center; justify-content: center;
   padding: 1rem; background: var(--panel-2); border-radius: 12px; margin: 0.5rem 0;
 }
+/* Bekleme kutusu — üretilecek görselin yerini tutar, içini pixel-canvas
+   doldurur (static/pixel-canvas.js). Kartın tek içeriği.
+   Genişlik sonuç ızgarasının tek görsellik hâline (520px) EŞİT DEĞİL, ondan
+   küçük — bilerek. #composer akışın üstünde YÜZÜYOR ve altındaki şeridi
+   kapatıyor: ölçülen görünür şerit 900/800/700px görünümde 435/385/365px,
+   yani 520'lik bir kare (kart boşluklarıyla ~580px) kartın altını tümden
+   composer'ın arkasına itiyordu. Kart ortalı olduğu için sonuç indiğinde
+   yatay sıçrama olmuyor, yalnızca kutu büyüyor.
+   Oran kare: istenen boyut (dikey/yatay) bu katmana taşınmıyor, kare de en
+   yaygın seçim (composer'ın varsayılanı 1:1).
+   `overflow: hidden` şart: canvas köşeleri yuvarlatılmış kutunun dışına
+   taşıyor, `isolation` ise karışım katmanını kutuda tutuyor. */
+.pending-shimmer {
+  position: relative; width: 100%; max-width: 320px; aspect-ratio: 1;
+  border-radius: 12px; overflow: hidden; isolation: isolate;
+  background: var(--panel); border: 1px solid var(--hairline);
+}
 
 /* Görünüm geçişi: yalnızca GİREN panel canlanıyor (çift panelli cross-fade
    katman + çift odak + sıçrayan yerleşim demekti). Yön sekme sırasından
@@ -1307,8 +1324,6 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 .extra-hint { flex-basis: 100%; margin: 0; font-size: 0.76rem; color: var(--muted); line-height: 1.45; }
 
 .stage { display: flex; flex-direction: column; }
-.progress { display: flex; align-items: center; gap: 0.65rem; margin-bottom: 0.8rem; }
-.progress[hidden] { display: none; }
 .spinner { width: 20px; height: 20px; flex: none; background: var(--accent); animation: smoothMorph 3s ease-in-out infinite; }
 @keyframes smoothMorph {
   0%   { transform: scale(1) rotate(0deg);     border-radius: 50%; }
@@ -1318,9 +1333,6 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
   80%  { transform: scale(1.05) rotate(288deg); border-radius: 25%; }
   100% { transform: scale(1) rotate(360deg);    border-radius: 50%; }
 }
-.bar { flex: 1; height: 3px; background: var(--panel-2); border-radius: 2px; overflow: hidden; }
-.bar-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 4px; transition: width 0.25s var(--ease); }
-.pct { font-size: 0.75rem; color: var(--muted); min-width: 2.6em; text-align: right; font-variant-numeric: tabular-nums; }
 .preview { position: relative; flex: 1; display: grid; place-items: center; min-height: 340px; border-radius: var(--r-panel, 24px); background: var(--panel-2); text-align: center; padding: 1rem; transition: outline-color var(--dur) var(--ease), background var(--dur); outline: 2px dashed transparent; outline-offset: -8px; }
 .preview.empty { color: var(--muted); }
 /* drag-over sözleşmesi (§8): kesikli --accent çerçeve + #141415 (=--panel) örtü */

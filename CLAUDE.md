@@ -53,7 +53,31 @@ python3 -m pytest tests/test_graflar.py -q   # yalnız harita kapısı
 Kurulum ve uygulamayı çalıştırma: [KURULUM.md](KURULUM.md). Sürüm/yayın
 düzeni: [docs/yayin-hatti.md](docs/yayin-hatti.md).
 
-## 4. Bu deponun yazı geleneği
+## 4. Aynı depoda birden fazla oturum
+
+Her Claude Code oturumu KENDİ konteynerinde, kendi klonuyla açılıyor: git
+dışında hiçbir şey paylaşılmıyor. Bu yüzden yukarıdaki düzen bir oturumda ancak
+o oturumun dalında `CLAUDE.md` + `.claude/settings.json` + `tools/graf_uret.py`
+VARSA geçerli. Bunlar `main`'de olduğunda her yeni oturum düzeni kendiliğinden
+alır; bir dal `main`'in gerisindeyse oturum düzeni HİÇ görmez.
+
+Oturum ORTASINDA `git pull`/dal değişimi yapıldıysa kancalar o oturumda
+devreye girmeyebilir (ayar dosyası oturum başında okunuyor). Zararsız: kapı ve
+elle yenileme yerinde duruyor — `python3 tools/graf_uret.py` koşmak yeter.
+
+`docs/graflar/` altında ÇATIŞMA çıkarsa tartışılacak bir şey yok, çünkü o
+dosyalar türetilmiş: iki taraftan herhangi birini al (`git checkout --ours` ya
+da `--theirs`), sonra
+
+```sh
+python3 tools/graf_uret.py && python3 tools/graf_uret.py --kontrol
+```
+
+Doğruyu birleştirme değil ÜRETİCİ belirliyor; `--kontrol` yeşilse çatışma
+gerçekten kapanmıştır. Aynı sebeple graf dosyalarını elle düzeltmeye çalışmak
+kayıp emek.
+
+## 5. Bu deponun yazı geleneği
 
 Kod okurken hemen görülür, yenisini yazarken de sürdürülmeli:
 

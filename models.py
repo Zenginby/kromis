@@ -314,11 +314,35 @@ class PrefsRequest(BaseModel):
         return v
 
 
+def _tek_satir(v: str) -> str:
+    r"""Kullanıcının verdiği ADLARIN ortak kapısı: kontrol karakteri geçmez.
+
+    NEDEN VAR — ölçülmüş bir kusur: klasör adı `app.py`'nin ZIP indirme ucunda
+    `Content-Disposition` DEĞERİNE giriyor ve oradaki süzgeç `\s` sınıfı
+    yüzünden CR/LF'yi koruyordu, yani ad yanıt başlıklarının arasına satır
+    atabiliyordu. Asıl kapı ÇIKIŞTA (`folders.safe_component`) ve o tek başına
+    yetiyor; bu ikinci kapı GİRİŞTE duruyor çünkü aynı ad yarın başka bir yere
+    de (dosya adı, günlük satırı, bildirim metni) konabilir ve o çağrı yerinin
+    süzgeci hatırlaması gerekmemeli.
+
+    Görünür karakterlere dokunulmuyor: Türkçe harfler, noktalama ve emoji
+    geçerli klasör adlarıdır — reddedilen yalnızca ÇİZİLMEYEN karakterler.
+    """
+    if any(ch == "\x7f" or ord(ch) < 32 for ch in v):
+        raise ValueError("ad kontrol karakteri (satır sonu, sekme) içeremez")
+    return v
+
+
 class FolderRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1, max_length=80)
     parent_id: str | None = Field(default=None, max_length=64)  # None = kök klasör
+
+    @field_validator("name")
+    @classmethod
+    def _ad_tek_satir(cls, v: str) -> str:
+        return _tek_satir(v)
 
 
 class MoveImageRequest(BaseModel):

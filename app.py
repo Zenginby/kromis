@@ -860,6 +860,13 @@ def post_settings(req: SettingsRequest) -> dict:
                 continue
             if not deger.strip() and not cred.default_base_url:
                 continue
+            # ŞEMA KAPISI: Azure'ın adresinde ilk günden beri var olan denetim
+            # (bkz. ac.check_base_url) öteki sağlayıcılarda YOKTU — şemasız bir
+            # yapıştırma 200 alıyor, hata ancak ilk üretimde ve "bağlanılamadı"
+            # kılığında görünüyordu. Boş değer bu kapıdan MUAF: yukarıdaki iki
+            # satır onu zaten "varsayılana dön" olarak geçirdi.
+            if deger.strip():
+                ac.check_base_url(deger.strip(), cred.url_field)
             updates[cred.url_env] = deger.strip()
 
         # Kataloğa girmemiş eski BYOK alanları. Katalog döngüsünün DIŞINDA
@@ -870,9 +877,15 @@ def post_settings(req: SettingsRequest) -> dict:
             updates["FAL_KEY"] = req.fal_key.strip()
         if req.replicate_api_token is not None and req.replicate_api_token.strip():
             updates["REPLICATE_API_TOKEN"] = req.replicate_api_token.strip()
+        # Aynı şema kapısı burada da: bu ikisi katalog döngüsünün DIŞINDA
+        # (henüz modelleri yok) ve boş değer yine "temizle" demek.
         if req.comfyui_url is not None:
+            if req.comfyui_url.strip():
+                ac.check_base_url(req.comfyui_url.strip(), "comfyui_url")
             updates["COMFYUI_URL"] = req.comfyui_url.strip()
         if req.ollama_url is not None:
+            if req.ollama_url.strip():
+                ac.check_base_url(req.ollama_url.strip(), "ollama_url")
             updates["OLLAMA_URL"] = req.ollama_url.strip()
 
         if updates:
@@ -1154,7 +1167,12 @@ def download_folder_route(folder_id: str):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    safe_ascii = re.sub(r"[^\w\s-]", "", folder_name).strip().replace(" ", "_")
+    # Süzgeç ARTIK TEK YERDE (`folders.safe_component`). Buradaki kopya
+    # `[^\w\s-]` deseniyle CR/LF'yi KORUYORDU ve klasör adı doğrudan bu
+    # başlığın DEĞERİNE giriyordu — gerekçenin tamamı o fonksiyonun başında.
+    # `filename*` tarafında böyle bir açık hiç yoktu: `quote` satır sonunu
+    # zaten `%0D%0A` olarak kaçırıyor.
+    safe_ascii = folders.safe_component(folder_name)
     safe_ascii = safe_ascii.encode("ascii", "ignore").decode("ascii") or "klasor"
     encoded_utf8 = quote(folder_name)
     # SIRA RFC 6266'nın ÖNERDİĞİ gibi: tırnaklı `filename` önce, `filename*`

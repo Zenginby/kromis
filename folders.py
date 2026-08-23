@@ -26,6 +26,39 @@ FOLDERS_FILE = "folders.json"
 _SAFE_ID = re.compile(r"[0-9a-f]{8,32}")
 
 
+# Kullanıcı metnini dosya/dizin/başlık adına indiren TEK süzgeç.
+#
+# ESKİ DESEN `[^\w\s-]` İDİ ve `\s` yüzünden CR/LF'yi KORUYORDU. Zararsız
+# görünüyordu — ta ki aynı desenin ikinci kopyası `app.py`'nin ZIP indirme
+# ucunda, klasör adını `Content-Disposition` DEĞERİNE koyana kadar. Ölçüldü:
+# adı `kotu\r\nX-Injected: yes` olan bir klasörde başlık
+# `attachment; filename="kotu\r\nX-Injected_yes...` olarak kuruluyor, yani
+# kullanıcı metni yanıt başlıklarının arasına satır atabiliyor. Bugün bunu
+# uvicorn reddediyor (`RuntimeError: Invalid HTTP header value`) — sonuç
+# indirmenin çalışması değil, yakalanmamış bir ASGI hatası ve kopan bağlantı;
+# BAŞKA bir ASGI sunucusunun altında ise yanıt bölme (response splitting).
+# Savunma sunucunun sürümüne bırakılamaz, o yüzden süzgecin KENDİSİ kapatıyor.
+#
+# İKİ ADIM, sırası önemli: önce boşluk sayılan HER karakter (CR, LF, TAB, NBSP)
+# tek düz boşluğa iniyor, sonra `\w`, boşluk ve tire dışındaki her şey düşüyor.
+# Tersi sırada CR/LF önce silinip iki kelime birbirine yapışırdı.
+_BOSLUK = re.compile(r"\s+")
+_AD_DISI = re.compile(r"[^\w -]")
+
+
+def safe_component(name: str, *, fallback: str = "klasor") -> str:
+    r"""Kullanıcı adını TEK SATIRLIK, yol/başlık parçası olarak güvenli ada indirir.
+
+    `.` ve `/` de düşüyor (`\w` dışındalar), yani ZIP girdisi `..` ya da mutlak
+    yol taşıyamıyor — zip-slip kapısı bu fonksiyonun yan ürünü.
+
+    Boşalan ad `fallback`e düşüyor: adı tümüyle noktalama olan bir klasör
+    ("!!!") aksi halde adsız bir ZIP girdisi üretirdi.
+    """
+    duz = _BOSLUK.sub(" ", name or "")
+    return _AD_DISI.sub("", duz).strip().replace(" ", "_") or fallback
+
+
 def _folders_path(output_dir: str) -> str:
     return os.path.join(output_dir, FOLDERS_FILE)
 
@@ -183,7 +216,7 @@ def export_zip(folder_id: str, output_dir: str) -> tuple[bytes, str]:
                 break
             curr = node.get("parent_id")
         chain.reverse()
-        return "/".join(re.sub(r'[^\w\s-]', '', p).strip().replace(' ', '_') or "klasor" for p in chain)
+        return "/".join(safe_component(p) for p in chain)
 
 
     tree_ids = set(descendants(folder_id, output_dir))

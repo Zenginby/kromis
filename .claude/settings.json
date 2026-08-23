@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{ command -v python3 >/dev/null && P=python3 || P=python; }; \"$P\" \"$CLAUDE_PROJECT_DIR/tools/graf_uret.py\" --ozet --json",
+            "timeout": 30,
+            "statusMessage": "Depo haritası okunuyor"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{ command -v python3 >/dev/null && P=python3 || P=python; }; \"$P\" \"$CLAUDE_PROJECT_DIR/tools/graf_uret.py\" --kanca",
+            "timeout": 30,
+            "statusMessage": "Depo haritası yenileniyor"
+          }
+        ]
+      }
+    ]
+  }
+}

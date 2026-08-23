@@ -80,7 +80,8 @@
         "tests/test_playwright_studio.py",
         "tests/test_prefs_route.py",
         "tests/test_provider_logos.py",
-        "tests/test_settings_route.py"
+        "tests/test_settings_route.py",
+        "tests/test_shimmer.py"
       ],
       "yol": "app.py"
     },
@@ -836,7 +837,7 @@
           "/output/{}.png"
         ],
         "dosya": "static/chat.js",
-        "satir": 1791,
+        "satir": 1796,
         "tanim": 70
       },
       {
@@ -850,8 +851,8 @@
           "/output/{}"
         ],
         "dosya": "static/core.js",
-        "satir": 1663,
-        "tanim": 61
+        "satir": 1619,
+        "tanim": 59
       },
       {
         "cagrilan_yollar": [
@@ -882,6 +883,12 @@
         "dosya": "static/palette.js",
         "satir": 756,
         "tanim": 37
+      },
+      {
+        "cagrilan_yollar": [],
+        "dosya": "static/pixel-canvas.js",
+        "satir": 329,
+        "tanim": 0
       },
       {
         "cagrilan_yollar": [
@@ -1093,6 +1100,7 @@
       "/static/mobile.css"
     ],
     "yukleme_sirasi": [
+      "/static/pixel-canvas.js",
       "/static/core.js",
       "/static/folders.js",
       "/static/assets.js",
@@ -1104,7 +1112,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 62,
+  "test_dosyasi_sayisi": 63,
   "uc_noktalar": [
     {
       "islev": "index",

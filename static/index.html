@@ -203,12 +203,10 @@
             <span>Yönetmen düşünüyor… ilk yanıt yarım dakikayı bulabilir.</span>
           </div>
 
-          <!-- Taşınabilir ilerleme çubuğu: üretim sırasında pending kartın içine appendChild edilir -->
-          <div id="progress" class="progress" hidden aria-hidden="true">
-            <div class="spinner"></div>
-            <div class="bar"><div id="progress-fill" class="bar-fill"></div></div>
-            <span id="progress-pct" class="pct">0%</span>
-          </div>
+          <!-- İlerleme çubuğu KALDIRILDI. Yüzde zaten uydurmaydı: sağlayıcı
+               tek yanıt döndürüyor, gerçek bir akış yok — bar %90'a doğru
+               asimptotik dolup orada bekliyordu. Bekleme göstergesi artık
+               shimmer kutusu (chat.js `beginResultTurn` → .pending-shimmer). -->
         </div>
       </section>
 
@@ -1396,6 +1394,12 @@
        Not: bu yorumda örnek olarak tam sorgu dizesi YAZILMAZ — yer tutucu
        burada da değiştirilir ve cache-buster testi onu gerçek bir varlık
        sürümü sanar (bir kez öyle oldu). -->
+  <!-- Bekleme animasyonunun özel elemanı. EN BAŞTA, çünkü chat.js üretim
+       başlarken `document.createElement("pixel-canvas")` çağırıyor: tanım o
+       ana kadar kayıtlı değilse eleman "unknown element" olarak doğar,
+       `start()` diye bir yöntemi olmaz ve bekleme kutusu sessizce boş kalır.
+       Kendi bağımlılığı yok, bu yüzden sıranın başında durması bedava. -->
+  <script src="/static/pixel-canvas.js?v=__APP_VERSION__"></script>
   <!-- core.js folders.js'ten ÖNCE gelmek zorunda: folders.js `IS_TOUCH`i kendi
        üst düzeyinde okuyor ve o bir `const` — sıra ters çevrilirse TDZ
        ReferenceError'ı folders.js'in tamamını düşürür (bkz. core.js:204). -->

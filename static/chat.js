@@ -1310,9 +1310,26 @@ function beginResultTurn(prompt) {
 
   const pendingDiv = document.createElement("div");
   pendingDiv.className = "chat-result is-pending";
-  const progressEl = $("progress");
-  if (progressEl) pendingDiv.appendChild(progressEl);
+  // Kartın TEK içeriği bekleme kutusu: üretilecek görselin yerini tutuyor ve
+  // pixel-canvas ile titriyor (static/pixel-canvas.js). Eskiden burada
+  // taşınabilir bir yüzde çubuğu da vardı — kaldırıldı, gerekçesi core.js'te.
+  const shimmer = document.createElement("div");
+  shimmer.className = "pending-shimmer";
+  const pixels = document.createElement("pixel-canvas");
+  pixels.setAttribute("data-manual", "");   // tetik fare değil, üretimin kendisi
+  shimmer.appendChild(pixels);
+  pendingDiv.appendChild(shimmer);
   $("chat-log").appendChild(pendingDiv);
+  // DOM'a girdikten SONRA başlatılıyor: bileşen ilk karede kendini
+  // getBoundingClientRect ile ölçüyor, bağlanmamış bir düğümde o ölçü 0'dır
+  // ve tek bir piksel bile üretilmez.
+  if (typeof pixels.start === "function") pixels.start();
+  // Kaydırma HEDEFİ artık bekleme kartı, `appendUser`ın kaydırdığı baloncuk
+  // değil. Eski bekleme satırı 72px'ti, baloncuğun altında kendiliğinden
+  // görünüyordu; shimmer kutusu ile kart bir görsel yüksekliğinde, yani
+  // baloncuğa kaydırıldığında kutunun altı görünür şeridin dışında kalıyor
+  // (#composer akışın üstünde yüzüyor). İzlenecek şey bekleme, son söz onun.
+  scrollMessageIntoView(pendingDiv);
 
   return { turn, bubble, pendingDiv };
 }
@@ -1321,14 +1338,9 @@ function dropPendingTurn(pending) {
   if (!pending || pending.done) return;
   chatThread = chatThread.filter((m) => m !== pending.turn);
   if (pending.bubble) pending.bubble.remove();
-  if (pending.pendingDiv) {
-    const progressEl = $("progress");
-    if (progressEl && pending.pendingDiv.contains(progressEl)) {
-      const flow = document.querySelector(".studio-flow");
-      if (flow) flow.appendChild(progressEl);
-    }
-    pending.pendingDiv.remove();
-  }
+  // Kartı silmek yeterli: shimmer kutusu onun İÇİNDE, birlikte gidiyor ve
+  // bileşenin `disconnectedCallback`i rAF döngüsünü kapatıyor.
+  if (pending.pendingDiv) pending.pendingDiv.remove();
   syncEmptyState();
 }
 
@@ -1336,14 +1348,7 @@ async function appendResultTurn(pending, imageIds, params) {
   if (!pending || !transcriptHasRoom(1)) return;
   if (!imageIds.length) { dropPendingTurn(pending); return; }
   pending.done = true;
-  if (pending.pendingDiv) {
-    const progressEl = $("progress");
-    if (progressEl && pending.pendingDiv.contains(progressEl)) {
-      const flow = document.querySelector(".studio-flow");
-      if (flow) flow.appendChild(progressEl);
-    }
-    pending.pendingDiv.remove();
-  }
+  if (pending.pendingDiv) pending.pendingDiv.remove();
   const record = { role: RESULT_ROLE, image_ids: imageIds, params };
   chatThread.push(record);
   appendResult(record);

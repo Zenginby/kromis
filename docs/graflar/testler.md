@@ -2,12 +2,12 @@
 
 # Test haritası
 
-`tests/` altında 62 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
+`tests/` altında 63 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
 
 | modül | testler |
 | --- | --- |
 | `android_main` | `test_android_main.py` |
-| `app` | `test_app.py`, `test_assets_route.py`, `test_backup.py`, `test_banner.py`, `test_chat_route.py`, `test_chats_route.py`, `test_delete_route.py`, `test_edit_route.py`, `test_folders.py`, `test_fonts.py`, `test_id_contract.py`, `test_import_route.py`, `test_index.py`, `test_legacy_formats.py`, `test_logo.py`, `test_mobile.py`, `test_model_secimi.py`, `test_palette_route.py`, `test_paths.py`, `test_playwright_studio.py`, `test_prefs_route.py`, `test_provider_logos.py`, `test_settings_route.py` |
+| `app` | `test_app.py`, `test_assets_route.py`, `test_backup.py`, `test_banner.py`, `test_chat_route.py`, `test_chats_route.py`, `test_delete_route.py`, `test_edit_route.py`, `test_folders.py`, `test_fonts.py`, `test_id_contract.py`, `test_import_route.py`, `test_index.py`, `test_legacy_formats.py`, `test_logo.py`, `test_mobile.py`, `test_model_secimi.py`, `test_palette_route.py`, `test_paths.py`, `test_playwright_studio.py`, `test_prefs_route.py`, `test_provider_logos.py`, `test_settings_route.py`, `test_shimmer.py` |
 | `assets_store` | `test_assets.py`, `test_assets_route.py`, `test_backup.py`, `test_banner.py`, `test_folders.py`, `test_legacy_formats.py`, `test_logo.py`, `test_palette_route.py` |
 | `azure_client` | `test_app.py`, `test_azure_client.py`, `test_azure_client_edit.py`, `test_azure_client_http.py`, `test_banner.py`, `test_catalog.py`, `test_chat_client.py`, `test_credstore.py`, `test_delete_route.py`, `test_edit_route.py`, `test_folders.py`, `test_gemini_client.py`, `test_import_route.py`, `test_legacy_formats.py`, `test_logo.py`, `test_model_secimi.py`, `test_openai_client.py`, `test_palette_route.py`, `test_paths.py`, `test_prefs.py`, `test_providers.py`, `test_settings.py`, `test_settings_route.py` |
 | `backup` | `test_backup.py` |

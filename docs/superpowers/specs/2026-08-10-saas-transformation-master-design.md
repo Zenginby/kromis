@@ -131,9 +131,15 @@ graph TD
   modeli** (Azure gpt-image-2; OpenAI gpt-image-2 / gpt-image-1; Gemini Nano Banana 2 /
   Nano Banana Pro) ve **5 sohbet modeli** kayıtlı. *DALL·E 3, 12 Mayıs 2026'da API'den
   kalktığı için katalogdan çıkarıldı.*
+- **Teslim edilen: Model Arena** (23 Ağustos turu). Aynı prompt 2–4 modelde yan
+  yana koşuyor; fan-out İSTEMCİDE (model başına ayrı `/api/generate`), çünkü zaman
+  aşımı bütçesi model başına ve uçtaki tek yollu 502 kısmi başarısızlığı ifade
+  edemiyor. Sütunlar ayrı kayıt, ortak `arena_id`; boyut ORAN, kalite SIRA
+  üzerinden model başına çevriliyor; kazanan `history.json`da işaretleniyor.
+  Kapsam dışı bırakılan: `/api/edit` arenası.
 - **Açık:** yerel sağlayıcı adaptörleri (ComfyUI, Ollama) — `credentials.env` alanları
-  duruyor, adaptör yok; **Model Arena** (aynı prompt'u yan yana koşturma); **video**
-  tarafının tamamı; **upscaler**; **Product Showcase / Product-in-Hand**.
+  duruyor, adaptör yok; **video** tarafının tamamı; **upscaler**;
+  **Product Showcase / Product-in-Hand**.
 
 ### ⬜ Faz 4: Çoklu Dil Desteği (i18n Framework)
 - TR/EN dil altyapısı.

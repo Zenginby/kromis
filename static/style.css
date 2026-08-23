@@ -449,6 +449,10 @@ body:has(.sheet.open) .scrim { display: block; }
    ölçülmüş yatay bütçesini taşıran tam olarak o kabuk. */
 #composer[data-mode="image"] #chat-model-pick,
 #composer[data-mode="director"] #model-pick,
+/* Arena şeridi de mod eksenine tabi: yönetmen bir SOHBET, karşılaştırılacak
+   bir üretim yok. Anahtarın durumu korunuyor (JS'te bir şey sıfırlanmıyor) —
+   görsel moduna dönen kullanıcı arenasını açık buluyor. */
+#composer[data-mode="director"] #arena-pick,
 #composer[data-mode="director"] #run-cost { display: none; }
 /* `#chat-model` ARTIK HTML'de `hidden` DEĞİL (seçeneklerini dolduran kod v0.7'de
    geldi; bu gerekçe onunla birlikte güncellenmemişti). Satır yine de duruyor:
@@ -2122,6 +2126,49 @@ body.viewer-open { overflow: hidden; }
 .chat-result-grid:not([data-count="1"]) {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+/* ── Arena satırı ─────────────────────────────────────────────────────
+   Bir arena turu, SÜTUNLARI olan tek bir sonuç satırı: aynı prompt, farklı
+   modeller. `.chat-result`ün flex sütununu ezmek zorunda (aynı öğe iki
+   sınıfı birden taşıyor) — bu yüzden kural ondan SONRA yazılı.
+
+   Sütun sayısı `data-count`tan, `.chat-result-grid`in kalıbının aynısı;
+   fark, oradaki sorunun "1 mi, 2 mi, daha fazla mı" olması, buradakinin ise
+   gerçek sayı olması: arena tavanı 4 (core.js ARENA_MAX) ve dört model 2×2
+   değil yan yana durmalı, karşılaştırma tam olarak bu. */
+.chat-result.arena-row {
+  display: grid; gap: 12px; align-items: start;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.chat-result.arena-row[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.chat-result.arena-row[data-count="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* Bekleme hâlinde de IZGARA: `.chat-result.is-pending`in ortalayan flex'i
+   sütunları üst üste yığardı. Dolgu ve zemin ise korunuyor — bekleyen bir tur
+   görsel olarak da beklemeye benzemeli. */
+.chat-result.arena-row.is-pending {
+  display: grid; justify-content: stretch;
+}
+/* `min-width: 0` şart: ızgara öğesinin taban genişliği içeriğidir, yani uzun
+   bir künye sütunu şişirip öteki sütunları ezerdi. */
+.arena-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.arena-col .chat-role { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Düşen sütun: hata O SÜTUNDA kalıyor, tur devam ediyor (istemci fan-out'unun
+   asıl kazancı). Kutu bekleme kutusuyla aynı ölçüde ki satır sıçramasın. */
+.arena-fail {
+  margin: 0; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 12px; aspect-ratio: 1;
+  border-radius: 12px; border: 1px solid var(--hairline);
+  background: var(--panel); color: var(--muted); font-size: 12px;
+}
+/* Kazanan işareti: iki durumlu düğme (`aria-pressed`), basılı hâli vurgulu.
+   Elenen sütunun düğmesi KAYBOLMUYOR — fikir değiştirmek tek tık. */
+.arena-win { align-self: flex-start; }
+.arena-win[aria-pressed="true"] {
+  border-color: var(--accent); color: var(--accent); font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+/* Composer'daki arena anahtarı: açıkken vurgulu, mod anahtarının dilinde. */
+.arena-chip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+
 .chat-media {
   position: relative; margin: 0; overflow: hidden;
   border-radius: 14px; background: var(--panel-2);

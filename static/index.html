@@ -546,6 +546,48 @@
         </select>
       </span>
 
+      <!-- ARENA: aynı prompt'u 2–4 modelde yan yana koşturup karşılaştırma.
+           İKİ kontrol, çünkü iki AYRI soru var ve tek düğmede birleştirilirse
+           ikisi de kaybolur: "arena açık mı" (#arena-toggle, aria-pressed) ve
+           "hangi modeller" (#arena-btn, paneli açar). Anahtar kapalıyken
+           ikinci çip HİÇ yok — kapalı arenada "hangi modeller" sorusunun
+           anlamı da yok.
+
+           YENİ BİR MODEL YÜZEYİ AÇILMIYOR: #arena-btn de #model-sheet'i
+           açıyor, yalnız `arena` EKSENİNDE (core.js MODEL_EKSENLERI). Panel
+           o eksende radyo yerine checkbox çiziyor. İkinci bir liste, ikinci
+           bir filtre ve zamanla ikinci bir gerçek demek olurdu.
+
+           Arena açıkken #model-pick GİZLENİYOR (style.css): birinci sütun
+           zaten arena kümesinin İLK modeli ve iki yerde iki ayrı "seçili
+           model" göstermek, hangisinin üretime gittiği sorusunu doğururdu.
+           Eksenleri (#size/#quality/#n) yine `applyModel` sürüyor — arena
+           yalnız `#model`e YAZIYOR, o mekanizmayı ikinci kez kurmuyor. -->
+      <span id="arena-pick" class="model-pick arena-pick">
+        <!-- `aria-pressed` iki durumlu düğmenin depodaki standart deseni
+             (mod anahtarı, ray daraltma, ızgara boyutu, galeri karoları). -->
+        <button type="button" id="arena-toggle" class="model-chip arena-chip"
+                aria-pressed="false"
+                title="Arena: aynı prompt'u birden çok modelde karşılaştır">
+          <b class="model-chip-label">Arena</b>
+        </button>
+        <!-- Değer tutucu: #model'in çoklu kardeşi, aynı gerekçelerle
+             (`.sr-only` + `tabindex="-1"` + `aria-hidden`) — bir DEĞER
+             TAŞIYICISI kontrol değil, klavye yolu panelin içinde.
+             Seçenekleri core.js dolduruyor. -->
+        <select id="arena-models" class="sr-only" tabindex="-1" aria-hidden="true"
+                multiple title="Arena modelleri"></select>
+        <button type="button" id="arena-btn" class="model-chip" hidden
+                aria-controls="model-sheet" aria-expanded="false"
+                title="Arena modelleri">
+          <b id="arena-btn-label" class="model-chip-label">2 model</b>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m6 9 6 6 6-6"></path>
+          </svg>
+        </button>
+      </span>
+
       <!-- Kapı açıklaması #chat-gate ile AYNI duruş: kontrolün KENDİSİ
            kilitlenmiyor, çünkü kilitli bir kontrol "neden kapalı" bilgisini de
            saklar. Kullanıcı anahtarı olmayan modeli seçebiliyor, burada eksik

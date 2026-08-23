@@ -1,8 +1,8 @@
 # Görev defteri — sıradaki adımlar
 
-**Tarih:** 22 Ağustos 2026 · **Son dal:** `claude/referans-ekle-gorsel-bug-yxrauz`
-**Bugünkü ölçüm:** `APP_VERSION` **0.8.1** (sonrakini CI yazıyor),
-`pytest tests/ -q` → **1637 geçti / 10 atlandı**
+**Tarih:** 23 Ağustos 2026 · **Son dal:** `claude/arena-mode-planning-design-orhatc`
+**Bugünkü ölçüm:** `APP_VERSION` **0.9.2** (sonrakini CI yazıyor),
+`pytest tests/ -q` → **1721 geçti / 10 atlandı**
 **Defterin açılış ölçümü** (Tur A öncesi): `APP_VERSION` 0.7.0 → 1613 geçti / 10 atlandı
 (atlananlar her iki ölçümde de yalnız Windows'a özgü DACL testleri + kurulu
 olmayan Playwright)
@@ -24,6 +24,82 @@ burada durur. Yol haritaları (README fazları, `2026-08-10-saas-transformation-
 4. Kuyruktan bir madde alındığında **üste taşınır** ve kendi adım listesini
    orada kazanır. Kuyruk sırası bir söz değil, öneri: kullanıcı sırayı
    değiştirebilir.
+
+---
+
+## ✅ Tur D — Model Arena (kuyruk maddesi 8)
+
+**Bitti (23 Ağustos).** Kuyruğun **8. maddesi** üste alındı. Kapsam oturumda
+netleşti: 2–4 model seçilebilir · sütun başına AYRI kayıt, ortak `arena_id` ·
+yalnız üretim (`/api/edit` kapsam dışı) · kazanan işaretleniyor, elenen
+sonuç SİLİNMİYOR · yüzey composer'da bir anahtar · kalite ekseni SIRA ile
+eşleniyor.
+
+- [x] **Fan-out İSTEMCİDE, sunucuda değil.** Turun kendisi model başına ayrı
+      bir `POST /api/generate`; sunucuya yeni bir üretim ucu, kuyruk ya da iş
+      parçacığı havuzu GİRMEDİ. Üç ölçülmüş sebep: (a) zaman aşımı bütçesi
+      model başına hesaplanıyor (`providers.total_budget`), tek istekte
+      fan-out isteği en yavaş modele bağlardı — Nano Banana Pro'lu bir turda
+      dakikalarca asılı bir bağlantı; (b) uçtaki hata modeli tek yollu
+      (`except ac.ImageError → 502`, app.py:379) ve "3 modelden 1'i düştü"yü
+      ifade edemiyor; (c) sunucu zaten çok iş parçacıklı (senkron `def` +
+      anyio havuzu), yani N istek gerçekten paralel koşuyor.
+      **Ölçüldü** (Chromium 1024×700): iki istek arasındaki fark **0.000s**,
+      iki sütun **0.7s**'de doldu.
+- [x] **Şema göçü YOK.** `arena_id` kayda KOŞULLU yazılıyor
+      (`imported`/`session_id` deseninin aynısı, storage.py) — arena dışı
+      üretimin kaydı bugünküyle bayt bayt aynı. **Ölçüldü:** arena kapalıyken
+      tek istek gidiyor, son kayıtta `arena_id` anahtarı HİÇ yok.
+      `ResultParams.arena_id` de boş dize varsayılanıyla geldi (v0.6'da
+      `model`in girdiği yolun aynısı), yani v0.6 öncesi oturumlar geçerli
+      kalıyor.
+- [x] **Eksen çevirisi arenanın asıl işi ve TEK yerde.** Modellerin jeton
+      kümeleri farklı: Azure `1024x1536`, Gemini `2:3`; Azure düşük/orta/yüksek,
+      Gemini 1K/2K/4K. Kullanıcı TEK ayar seçiyor, `arenaSutunlari()` model
+      başına çeviriyor — boyut ORAN üzerinden (`sizes[].ratio` sunucudan
+      geliyor, istemci jeton ayrıştırmıyor), kalite SIRA üzerinden. Aynı
+      fonksiyonu hem maliyet göstergesi hem üretim isteği okuyor: iki ayrı
+      yerde çevrilseydi gösterilen fiyat ile faturalanan tur ayrışırdı.
+      **Ölçüldü:** Azure "Orta" seçiliyken Gemini sütunu "2K" ile koştu, tur
+      maliyeti `≈ 14 kredi · 2 model` (8 + 6) yazdı ve diskteki kayıtlar
+      `credits` 8 ve 6 ile indi. Sıra varsayımının bekçisi ayrı bir test:
+      katalogdaki her modelin kalite demeti ARTAN sırada olmak zorunda.
+- [x] **Boyut listesi seçili modellerin KESİŞİMİ.** Kesişim dışı bir oran bazı
+      sütunları sessizce kendi varsayılanına düşürürdü ve karşılaştırma farklı
+      çerçevelerde yapılırdı — aynı prompt'u aynı koşulda koşturmak arenanın
+      tanımı.
+- [x] **İKİNCİ bir model yüzeyi açılmadı.** Arena, `#model-sheet`in ÜÇÜNCÜ
+      ekseni (`MODEL_EKSENLERI`e yeni anahtar): aynı liste, aynı `secilebilirler`
+      filtresi, aynı perde/Escape/Android-geri mekaniği; tek fark kartların
+      radyo yerine checkbox olması. `tests/test_index.py`'nin koruduğu tekillik
+      korundu, iddiası "iki çip" yerine "üç çip" olarak GÜÇLENDİRİLDİ.
+- [x] **Kısmi başarısızlık gerçekten sütunda kalıyor.** **Ölçüldü:** üç modelli
+      turda biri kasten düşürüldü — 3 sütun çizildi, 2'si doldu, düşenin hatası
+      kendi sütununda kaldı, `#status` "2/3 model üretti. gpt-image-1: …" yazdı,
+      diske yalnız 2 kayıt indi ve kazanan düğmesi yalnız dolan iki sütunda
+      göründü.
+- [x] **Kazananın TEK kaynağı `history.json`.** Döküm kaydına ikinci bir kopya
+      yazılmadı: oturum kaydedilmeyen bir turda ikisi ayrışırdı. Depo tarafı
+      tek yazımda hallediyor (kazanana `arena_win`, kardeşlerden anahtarı
+      SİLİYOR) — iki ayrı yazım arada okuyan bir istemciye iki kazanan
+      gösterirdi. **Ölçüldü:** işaret diske indi, fikir değiştirilince tek
+      kazanan kaldı, sayfa yenilenip oturum yeniden açıldığında satır 2
+      sütunuyla ve işaretiyle geri geldi.
+- [x] **Adet arenada 1'e kilitli** (satır gizli): 4 model × 4 görsel hem
+      ızgarayı hem faturayı okunmaz yapardı ve bir sonuç kaydının `image_ids`
+      tavanı zaten bir TURUN çıktısı kadar.
+- [x] **Sessiz sapma yok.** Arena açıkken referans eklenirse `#go` kilitleniyor
+      ve sebebi yazıyor ("Arena düzenlemeyle çalışmıyor — referansı kaldır");
+      beşinci model seçilmeye çalışılınca kutucuk geri alınıyor ve tavan
+      söyleniyor. **İkisi de ölçüldü.**
+- [x] **Telefon.** 360px'de satır en çok 2 sütun; ölçülen karo **143px**.
+      Dört sütun bırakılsaydı karo ~73px olurdu — o karşılaştırma değil, küçük
+      resim şeridi. **Ölçüldü:** 360×780'de taşma x = 0, konsol temiz.
+- [x] **Kanıt:** takım **1686 → 1721 geçti / 10 atlandı** (`tests/test_arena.py`
+      14 iddia: etiket, biçim kapısı, iki modelin kendi kredisi, kazananın tek
+      yazımı, idempotanlık, başka turun görselinde 404; `tests/test_arena_onyuz.py`
+      21 iddia: fan-out, çeviri tekliği, kesişim, tek yazar, tavan, gruplama,
+      mobil ızgara). Chromium 1024×700 ve 360×780 ölçümleri yukarıda.
 
 ---
 
@@ -355,47 +431,42 @@ aşımı politikası bunu zaten öngörüyor: "adet başına ayrı istek atan sa
 - [ ] **Kabul:** kuyruk beklerken arayüz ilerleme gösteriyor, zaman aşımı
       sağlayıcıya göre çözülüyor (`tests/test_providers.py`'nin deseni).
 
-### 8. Model Arena · **M**
-Aynı prompt'u iki modelde yan yana koşturup karşılaştırma (master spec Faz 3).
-- [ ] **Kabul:** iki üretim tek turda, künyelerinde model + kredi; kayıtlar
-      bugünkü şemayı bozmuyor.
-
-### 9. Maske tuvali / bölgesel düzenleme · **L**
+### 8. Maske tuvali / bölgesel düzenleme · **L**
 Master spec Faz 1'in açık yarısı: bugünkü `/api/edit` tüm görsel üzerinden
 çalışıyor, `mask` alanı yok.
 - [ ] Fırça/silgi HTML5 Canvas + `mask` alanının adaptör sözleşmesine girmesi
       (Azure ve OpenAI destekliyor; Gemini'de karşılığı farklı).
 - **Kabul:** maskelenen bölge dışında piksel değişmiyor (golden fixture).
 
-### 10. Stil çipleri · stil şablonları · tipografi katmanı · **M**
+### 9. Stil çipleri · stil şablonları · tipografi katmanı · **M**
 Faz 2'nin açık yarısı. Hazır stil çipleri (*Anime*, *Cyberpunk*, *Cinematic*,
 *Pixel Art*, *3D Render*) prompt'a eklenen jetonlar; tipografi katmanı
 bindirmenin metin tarafı.
 - [ ] **Kabul:** çip seçimi prompt'a görünür biçimde giriyor ve geri alınabiliyor.
 
-### 11. Özel araçlar: Upscaler · Product-in-Hand · **L**
+### 10. Özel araçlar: Upscaler · Product-in-Hand · **L**
 README Faz 3. Upscaler bir sağlayıcı yeteneği; Product-in-Hand bir prompt
 şablonu + referans akışı.
 - [ ] **Kabul:** her ikisi kendi kredi etiketiyle katalogda.
 
-### 12. Image-to-Video motoru · **L**
+### 11. Image-to-Video motoru · **L**
 README Faz 4 (master spec Faz 3'ün video payı). Yeni bir medya TÜRÜ: depo,
 küçük resim, büyüteç ve indirme yolları video tanımıyor.
 - [ ] **Kabul:** üretilen video kayıtta, galeride oynatılabiliyor, indirilebiliyor.
 
-### 13. i18n (TR/EN) · **M**
+### 12. i18n (TR/EN) · **M**
 Arayüz metinleri bugün HTML/JS içinde birebir Türkçe; sözlük katmanı yok.
 - [ ] **Kabul:** dil anahtarı `prefs.json`'a yazılıyor, iki dilde de 360px'de
       taşma yok (İngilizce metinler daha uzun).
 
-### 14. SaaS dönüşümü · **XL**
+### 13. SaaS dönüşümü · **XL**
 Kendi tasarım belgesi var: `docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md`
 (Faz 5). Kredi tarifesi katalogda **metadata olarak** hazır; ledger, hesaplar,
 depolama, ödeme ve filigran açık.
 - [ ] **Kabul:** o belgenin kendi kabul ölçütleri; buraya alınmadan önce ayrı
       bir uygulama planı yazılır.
 
-### 15. PWA · iOS · **L**
+### 14. PWA · iOS · **L**
 Android teslim (Chaquopy APK); PWA'nın service worker/manifest'i ve iOS yok.
 - [ ] **Kabul:** çevrimdışı açılış ve "ana ekrana ekle" akışı çalışıyor.
 

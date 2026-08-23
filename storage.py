@@ -23,6 +23,17 @@ HISTORY_FILE = "history.json"
 _SAFE_ID = re.compile(r"[0-9a-f]{8,32}")
 
 
+def valid_id(value: str | None) -> bool:
+    """`_SAFE_ID` guard'ı, dışarıya açık hâli (bkz. chat_store.valid_id).
+
+    Ayrı bir fonksiyon çünkü `/api/generate` de bunu soruyor: bir kayda
+    yazılacak `arena_id` uçta reddedilmezse depoya kadar iner ve orada
+    SESSİZCE düşürülürdü — turun sütunları birbirini bulamaz, sebebi de
+    hiçbir yerde görünmezdi (app._check_session'ın kuralı).
+    """
+    return bool(value) and _SAFE_ID.fullmatch(value) is not None
+
+
 def _history_path(output_dir: str) -> str:
     return os.path.join(output_dir, HISTORY_FILE)
 
@@ -96,6 +107,17 @@ def save(image_bytes: bytes, meta: dict, output_dir: str, *, now: str) -> dict:
         # doğrudan ya da otomatik kayıt kapalıyken) kalıcı bir hâl, o kayıtlara
         # `"session_id": null` yazmak history.json'ın tamamını değiştirirdi.
         **({"session_id": meta["session_id"]} if meta.get("session_id") else {}),
+        # ARENA ETİKETİ: kayıt, aynı prompt'u birden çok modelde koşturan bir
+        # turun sütunlarından biriyse o turun id'si. `session_id` ile birebir
+        # aynı koşullu desen ve aynı gerekçe — arena DIŞI üretim kalıcı bir hâl
+        # ve o kayıtlara `"arena_id": null` yazmak history.json'ın tamamını
+        # değiştirirdi.
+        #
+        # Turun sütunları AYRI kayıtlar (kayıt başına tek `model`, tek
+        # `credits`); onları birbirine bağlayan tek şey bu alan. `parent_id`
+        # kullanılmadı: o TÜREV zinciri (bir görselden düzenleme), arena
+        # sütunları ise kardeş — hiçbiri ötekinin ebeveyni değil.
+        **({"arena_id": meta["arena_id"]} if meta.get("arena_id") else {}),
         # ÜRETEN MODEL (v0.6) ve o üretimin KREDİ maliyeti.
         #
         # İkisi de KOŞULSUZ — `imported`/`session_id`'nin koşullu deseni burada
@@ -160,6 +182,55 @@ def set_folder(image_id: str, folder_id: str | None, output_dir: str) -> bool:
         _write_history(output_dir,
                        [{**r, "folder_id": folder_id} if r.get("id") == image_id else r
                         for r in history])
+    return True
+
+
+def arena_round(arena_id: str, output_dir: str) -> list[dict]:
+    """Bir arena turunun kayıtları, ÜRETİM SIRASINDA (sütun sırası).
+
+    `list_history` TERSTEN veriyor (galeri en yeniyi üstte istiyor); arena
+    satırı ise sütunları soldan sağa, üretildikleri sırayla çiziyor — bu yüzden
+    ham sıra kullanılıyor.
+
+    Turun kazananı `history.json`da yaşıyor ve TEK kaynak orası: döküm kaydına
+    ikinci bir kopya yazılsaydı oturum kaydedilmeyen bir turda ikisi ayrışırdı.
+    """
+    if not valid_id(arena_id):
+        return []
+    return [r for r in _read_history(output_dir) if r.get("arena_id") == arena_id]
+
+
+def set_arena_winner(arena_id: str, image_id: str, output_dir: str) -> bool:
+    """Bir arena turunun kazananını işaretler. Tur başına TEK kazanan.
+
+    Kazanana `arena_win: True` yazılır, aynı turun ÖTEKİ kayıtlarından alan
+    SİLİNİR — `False` yazmak yerine silmek koşullu alan geleneğinin (bkz. save)
+    devamı: "işaret yok" hâli alanın YOKLUĞU ile anlatılıyor ve hiç kazanan
+    seçilmemiş turlar history.json'da bugünküyle bayt bayt aynı kalıyor.
+
+    TEK yazımda yapılıyor: kazanana yazıp kardeşlerden silmek iki ayrı yazım
+    olsaydı arada okuyan bir istemci İKİ kazanan görürdü (`set_folder_many`'nin
+    gerekçesinin aynısı — her yazım dosyanın tamamını değiştiriyor).
+
+    Kayıt yoksa, id formatı geçersizse ya da görsel o turun içinde DEĞİLSE
+    False döner. İdempotent: aynı kazanana ikinci çağrı aynı sonucu verir.
+    """
+    if not _SAFE_ID.fullmatch(image_id) or not _SAFE_ID.fullmatch(arena_id):
+        return False
+    with _lock(output_dir):
+        history = _read_history(output_dir)
+        if not any(r.get("id") == image_id and r.get("arena_id") == arena_id
+                   for r in history):
+            return False
+        yeni = []
+        for r in history:
+            if r.get("arena_id") != arena_id:
+                yeni.append(r)
+            elif r.get("id") == image_id:
+                yeni.append({**r, "arena_win": True})
+            else:
+                yeni.append({k: v for k, v in r.items() if k != "arena_win"})
+        _write_history(output_dir, yeni)
     return True
 
 

@@ -422,17 +422,25 @@
          boşluğunu yer. Buranın anlamı da doğru: .composer-bar EYLEM şeridi,
          bu satır "neyle üretiyorum" bağlamı.
 
-         Seçici native <select>: #move-target'ın gerekçesinin aynısı
-         (index.html'de aşağıda) — Android'de sistemin kendi seçicisi olarak
-         açılıyor, yani tek dokunuşta onlarca model arasında geçiş. Özel bir
-         popover listbox odak tuzağını, klavye gezintisini ve ARIA listbox'ı
-         sıfırdan getirirdi; uygulamadaki iki popover (#plus-menu,
-         #chats-kebab-menu) DÜĞME menüsü, seçili değeri olan bir değer
-         seçicisi değil.
+         SEÇİCİ ARTIK ALTTAN AÇILAN BİR PANEL (#model-sheet), native <select>
+         DEĞİL — ve bu, eski kararın iptali değil bedelinin ödenmesi. Eski
+         gerekçe şuydu: "özel bir popover odak tuzağını, klavye gezintisini ve
+         ARIA listbox'ı sıfırdan getirirdi". Üçü de sıfırdan GELMİYOR:
+           · kartlar gerçek <input type="radio"> — ok tuşları ve grup
+             semantiği tarayıcıdan,
+           · panel var olan `.sheet` mekaniği — perde, Escape şelalesi ve
+             Android geri tuşu `.sheet.open` seçicisine bakıyor,
+           · <select> DOM'da KALIYOR (.sr-only) ve değeri o tutuyor, yani
+             seçim/tercih/gönderim hattında (core.js applyModel/savePref,
+             submitComposer) tek satır değişmiyor.
+         Kazanç <option>un taşıyamadığı şey: sağlayıcı işareti ve model
+         tanıtımı (`note`) artık EKRANDA. O tanıtım `option.title`da gömülüydü
+         ve telefonda `title` hiç görünmüyor — yani "hangi model ne yapıyor"
+         sorusu tam seçim anında cevapsız kalıyordu.
 
-         Seçenekleri core.js dolduruyor (GET /api/settings → image_models);
-         HTML'de tek bir yer tutucu var, çünkü boş bir <select> Ayarlar
-         gelmeden bir an "model yok" gibi görünürdü. -->
+         Seçenekleri (ve kartları) core.js dolduruyor (GET /api/settings →
+         image_models); HTML'de tek bir yer tutucu var, çünkü boş bir çip
+         Ayarlar gelmeden bir an "model yok" gibi görünürdü. -->
     <div class="composer-head">
       <label class="sr-only" for="model">Görsel modeli</label>
       <!-- SARMALAYICI, çünkü işaret çipin İÇİNDE duruyor (mutlak konum + solda
@@ -450,7 +458,36 @@
            — aynı bilginin görsel kısayolu. -->
       <span id="model-pick" class="model-pick">
         <img id="model-logo" class="model-logo" alt="" aria-hidden="true" hidden />
-        <select id="model" class="model-chip" title="Görsel modeli">
+        <!-- ETİKET `<b>`, `<span>` DEĞİL ve bu bir üslup tercihi değil:
+             tests/test_index.py sarmalayıcının gövdesini `id="model-pick"`ten
+             İLK span kapanışına kadar okuyarak ayıklıyor. Buraya iç içe bir
+             span konursa ayıklama etiketin kapanışında bitiyor, `<select>`
+             gövdenin dışında kalıyor ve test "sarmalayıcının dışında" diye
+             düşüyor. (Bu yorumun kendisi de o dizeyi TAŞIMAMALI — ilk yazımda
+             taşıdı ve testi tam bu yüzden düşürdü.) `<b>` kalınlığı CSS'te
+             geri alınıyor (`.model-chip-label { font-weight: inherit }`). -->
+        <button type="button" id="model-btn" class="model-chip"
+                aria-controls="model-sheet" aria-expanded="false" title="Görsel modeli">
+          <b id="model-btn-label" class="model-chip-label">Modeller yükleniyor…</b>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m6 9 6 6 6-6"></path>
+          </svg>
+        </button>
+        <!-- DEĞER TUTUCU. Panel bu <select>e yazıp `change` atıyor; okuyan
+             herkes (applyModel, savePref, submitComposer, chat.js) olduğu
+             gibi kalıyor, yani seçimin TEK sahibi var. `.sr-only`
+             position:absolute, o yüzden .model-pick'in genişliğine hiç
+             girmiyor (360px bütçesi; bkz. style.css).
+
+             `tabindex="-1"` + `aria-hidden="true"` BİRLİKTE ve ikisi de şart:
+             bir DEĞER TAŞIYICISI kontrol değil. `.sr-only` yalnız GÖZDEN
+             saklıyor — ekran okuyucu onu okumaya devam ediyor, yani tek bir
+             değer için iki kontrol duyuruluyordu ("Görsel modeli, açılır
+             liste" + "Görsel modeli, düğme"). Klavye ve ekran okuyucu yolu
+             panelin radyo grubunda; buraya hiç kimse odaklanmıyor. -->
+        <select id="model" class="sr-only" tabindex="-1" aria-hidden="true"
+                title="Görsel modeli">
           <option value="">Modeller yükleniyor…</option>
         </select>
       </span>
@@ -467,7 +504,22 @@
            gelmeden bir an "model yok" gibi görünürdü. -->
       <span id="chat-model-pick" class="model-pick">
         <img id="chat-model-logo" class="model-logo" alt="" aria-hidden="true" hidden />
-        <select id="chat-model" class="model-chip" title="Prompt Yönetmeni modeli">
+        <button type="button" id="chat-model-btn" class="model-chip"
+                aria-controls="model-sheet" aria-expanded="false"
+                title="Prompt Yönetmeni modeli">
+          <b id="chat-model-btn-label" class="model-chip-label">Modeller yükleniyor…</b>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m6 9 6 6 6-6"></path>
+          </svg>
+        </button>
+        <!-- Görsel şeridinin aynı deseni: değer burada, görünen yüz yukarıda.
+             DİKKAT — bu etikete "hidden" alt dizesi taşıyan bir öznitelik
+             (ör. aria-hidden) YAZILMAMALI: tests/test_index.py seçicinin
+             açık etiketinde o dizeyi arıyor ve "yönlendirme geldi ama seçim
+             gizli" diye düşer. Gizleme işi `.sr-only`nin. -->
+        <select id="chat-model" class="sr-only" tabindex="-1" aria-hidden="true"
+                title="Prompt Yönetmeni modeli">
           <option value="">Modeller yükleniyor…</option>
         </select>
       </span>
@@ -617,6 +669,44 @@
     </div>
   </aside>
 
+  <!-- Model seçimi: ALTTAN açılan panel. Composer'daki iki çip düğmesi
+       (#model-btn, #chat-model-btn) bunu açıyor.
+
+       TEK YÜZEY, İKİ EKSEN (`data-axis`) — ve bu, ikinci bir <aside> yazmamak
+       için bulunmuş bir kolaylık değil, yapının söylediği şey: iki çip
+       #composer[data-mode] ekseniyle birbirini DIŞLIYOR (style.css), yani
+       ikisi birden açık olamaz. İkinci bir panel aynı listeyi, aynı perdeyi ve
+       aynı kapanma mekaniğini ikinci kez tanımlar ve ikisi zamanla ayrışırdı.
+       Deseni core.js'in `setModelLogo`u kurdu: "TEK yardımcı, iki şerit".
+
+       Başlık ve kartlar core.js'te yazılıyor (`openModelSheet`), o yüzden
+       burada yer tutucu bile yok: panel yalnızca açılırken çiziliyor ve boş
+       bir liste kullanıcıya hiç görünmüyor.
+
+       `.sheet-foot`taki "Tamam" bir ONAY kapısı DEĞİL, çıkış kapısı: seçim
+       dokunulduğu an uygulanıyor ve tercih diske yazılıyor (#pref-autosave ve
+       tema seçicisinin deseni). Düğme yine de var, çünkü alttan açılan bir
+       panelde başparmağın gittiği yer orası — perdeye uzanmak değil. -->
+  <aside id="model-sheet" class="sheet sheet-bottom" data-axis="image"
+         aria-labelledby="model-sheet-title">
+    <span class="sheet-grip" aria-hidden="true"></span>
+    <div class="sheet-head">
+      <h2 id="model-sheet-title">Görsel modeli</h2>
+      <button type="button" id="model-sheet-close" class="modal-x" aria-label="Kapat">×</button>
+    </div>
+    <div class="sheet-body">
+      <!-- <fieldset> + radyo: grup semantiği ve ok tuşu gezintisi TARAYICIDAN.
+           Elle yazılmış `role="listbox"`/`role="option"` bilerek YOK — eski
+           native <select> kararının itirazı tam olarak buydu. -->
+      <fieldset id="model-sheet-list" class="model-list">
+        <legend class="sr-only">Modeller</legend>
+      </fieldset>
+    </div>
+    <div class="sheet-foot">
+      <button type="button" id="model-sheet-ok" class="primary">Tamam</button>
+    </div>
+  </aside>
+
   <!-- Üretim ayarları: sağdan slide-over. Bugünkü SİPARİŞ panelinin prompt
        dışındaki her şeyi buraya geldi; `controls` sınıfı korunuyor çünkü
        etiket/aralık stilleri ona bağlı. -->
@@ -763,12 +853,18 @@
     </div>
   </div>
 
-  <!-- Ayarlar: A5 — ortalanmış modal değil sağdan slide-over (tasarım §2.4/3).
+  <!-- Ayarlar: ALTTAN açılan panel. Yol ortalanmış modal → sağdan slide-over
+       (A5, tasarım §2.4/3) → alttan panel; bu son adım model seçicisiyle
+       AYNI yüzeyi paylaşmak için atıldı: telefonda iki ayarlar yüzeyinin biri
+       yandan biri alttan gelmesi, ikisini iki ayrı yer gibi gösteriyordu.
+
        id `settings-modal` KALIYOR: 152 id sözleşmesinin ve JS bağlarının
-       parçası; ad telin üstündeki isim, yüzey hakkında bir iddia değil.
-       Açık/kapalı `.open` sınıfıyla anlatılıyor (oturum paneliyle aynı
-       mekanik), perde ortak #shell-scrim. -->
-  <aside id="settings-modal" class="sheet sheet-right" aria-label="Ayarlar">
+       parçası; ad telin üstündeki isim, yüzey hakkında bir iddia değil —
+       "modal" olmayalı üç tur geçti. Açık/kapalı `.open` sınıfıyla
+       anlatılıyor (oturum paneliyle aynı mekanik), perde ortak
+       #shell-scrim. -->
+  <aside id="settings-modal" class="sheet sheet-bottom" aria-label="Ayarlar">
+    <span class="sheet-grip" aria-hidden="true"></span>
     <div class="sheet-head">
       <!-- Başlık "Azure Ayarları" DEĞİL "Ayarlar": panel artık kimlik dışında
            bir tercih de taşıyor (oturumların otomatik kaydı) ve tasarım §4.1
@@ -908,11 +1004,6 @@
         her koşulda diske kaydedilmeye devam eder.
       </p>
 
-      <p id="settings-status" class="modal-status" role="status"></p>
-      <div class="modal-actions">
-        <button id="settings-save" class="primary" type="button">Kaydet</button>
-      </div>
-
       <!-- Sürüm, üst şeritteki .ver pill'inin İKİNCİ kopyası. Çoğaltma bilerek:
            o pill mobile.css'te `display: none` (360px'de #session-title'ı
            eziyordu) ve yukarıdaki yorumun "Ayarlar modalının dibinden üst şeride
@@ -960,6 +1051,21 @@
         görsellerin ne de anahtarın. Kapatırsan uygulama bu iş için ağa hiç
         çıkmaz.
       </p>
+    </div>
+
+    <!-- KAYDET ARTIK PANELİN DİBİNDE (gövdenin sonunda değil) ve bu, alttan
+         açılan yüzeyin getirdiği somut kazanç: `.sheet-foot` `flex: none`, yani
+         gövde kaydırılırken yerinde duruyor. Önce gövdenin içindeydi ve
+         panelin altındaki üç bölüm (sürüm, güncelleme kontrolü, oturum
+         tercihi) onu ekranın dışına itiyordu — kullanıcı anahtarını yazıp
+         "Kaydet"i bulmak için aşağı kaydırmak zorundaydı.
+
+         #settings-status DA burada: "Kaydedildi." satırının basılan düğmenin
+         yanında durması gerekiyor, yoksa gövdenin ortasında bir yerde kalıp
+         hiç okunmuyordu. `role="status"` duruyor — mesaj sesli de duyuruluyor. -->
+    <div class="sheet-foot">
+      <p id="settings-status" class="modal-status" role="status"></p>
+      <button id="settings-save" class="primary" type="button">Kaydet</button>
     </div>
   </aside>
 

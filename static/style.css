@@ -326,10 +326,13 @@ body {
      tutan satırda. Mandal: tests/test_mobile.py. */
   min-width: 0;
 }
-/* Çip görünümü ama native <select>: oku tarayıcı çiziyor, o yüzden
-   `.specs`in chevron SVG'si ve sabit `gap`i burada yok. `max-width` uzun
-   model adının 360px'de satırı taşırmasını engelliyor. */
+/* ÇİP ARTIK `<button>` (model seçimi alttan açılan `#model-sheet`e taşındı) —
+   yani oku tarayıcı ÇİZMİYOR ve `.specs`in chevron'u ile `gap`i buraya da
+   geldi. `max-width` uzun model adının 360px'de satırı taşırmasını
+   engelliyor. Değeri hâlâ `<select id="model">` tutuyor (`.sr-only`), bu
+   düğme onun görünen yüzü. */
 .model-chip {
+  display: inline-flex; align-items: center; gap: 4px;
   /* `min-width: 0` ŞART ve ölçüldü: `<select>`in İÇSEL genişliği en uzun
      seçeneğinin metni kadar ("OpenAI · DALL·E 3 — 10–20 kredi · kurulum
      gerekli"). Flex öğesinin varsayılan `min-width: auto` değeri o içsel
@@ -337,7 +340,11 @@ body {
      başına yetmiyor — öğe küçülmüyor, KAPSAYICIYI büyütüyor. Bedeli somut:
      360px'de composer 348px'ten 357px'e çıkıyor ve sayfa 10px yatay kayıyor
      (tarayıcıda main ile karşılaştırılarak ölçüldü; main'de taşma YOK).
-     `text-overflow` gerekmiyor: native select metnini kendisi kırpıyor. */
+
+     "`text-overflow` gerekmiyor: native select metnini kendisi kırpıyor"
+     SATIRI DÜŞTÜ ve yerini `#model-btn-label`ın kırpma kuralı aldı: çip artık
+     `<button>` ve bir düğme metnini kendisi kırpmıyor — taşırıyor. Aynı
+     ölçülmüş 10px'lik yatay kayma, aynı yerden, yeni bir sebeple. */
   flex: 0 1 auto; width: auto; max-width: 100%; min-width: 0; margin: 0;
   /* Sol dolgu sağlayıcı işaretinin yeri (14px işaret + 10px kenar + 6px hava).
      İşaret gizliyken de duruyor: seçili model değişince şeridin metni
@@ -349,14 +356,32 @@ body {
   font-size: 0.74rem;
   transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
+/* `display` ATAYAN kuralın bedeli — bu dosyada üçüncü kez ödeniyor
+   (`.model-pick[hidden]`, `.model-note[hidden]` ve `#chat-model[hidden]`
+   satırlarının aynısı). `.model-chip` artık `inline-flex` atıyor, yani UA'nın
+   `[hidden] { display: none }` kuralını eziyor: bu satır olmadan `hidden`
+   yazılan bir çip düğmesi yer kaplamaya devam ederdi. Aynı yorumun
+   `#chat-model[hidden]`da "o gün geldiğinde" dediği gün bu. */
+.model-chip[hidden] { display: none; }
+/* Düğmenin metni: kırpma İSTEĞE BAĞLI DEĞİL (yukarıdaki 360px gerekçesi).
+   Ayrı bir öğe şart — kırpma flex öğesinde çözülüyor ve chevron'un kendi
+   yerini koruması gerekiyor, yoksa uzun adda ok da metinle birlikte eziliyor.
+
+   Öğe `<b>`, `<span>` DEĞİL ve bu index.html'de gerekçelendirildi: sarmalayıcı
+   içindeki iç içe bir `</span>` bekçi testinin ayıklamasını kaydırıyor.
+   `font-weight: inherit` o seçimin bedeli — `<b>` kalın gelir, çip gelmez. */
+.model-chip-label {
+  min-width: 0; font-weight: inherit;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.model-chip > svg { flex: none; }
 /* Şerit + işaret tek kabukta. `position: relative` işareti çipin İÇİNE
-   oturtuyor; işaret `pointer-events: none` olduğu için tıklama native
-   `<select>`e geçiyor (yani Android'de sistem seçicisi açılmaya devam ediyor —
-   index.html'deki "native select" kararının bedelsiz kaldığı yer bu).
+   oturtuyor; işaret `pointer-events: none` olduğu için tıklama altındaki
+   düğmeye geçiyor — yani işarete dokunmak da popup'ı açıyor.
 
    `min-width: 0` BURADA ve bu ZORUNLU, `.composer-head`in aynı satırının
    gerekçesiyle: flex öğesi artık bu sarmalayıcı ve öğenin varsayılan
-   `min-width: auto` değeri içindeki `<select>`in min-content genişliğine
+   `min-width: auto` değeri içindeki çip DÜĞMESİNİN min-content genişliğine
    çözülüyor — o da en uzun model adı kadar. Silinirse 360px'de composer'ın
    bütün çocukları birlikte genişler ve sayfa yatay kayar (ölçüldü; mandal
    tests/test_mobile.py). */
@@ -447,7 +472,63 @@ body:has(.sheet.open) .scrim { display: block; }
 .sheet.open { visibility: visible; transition-delay: 0s; }
 .sheet-left { left: 0; border-right: 1px solid var(--hairline); transform: translateX(-100%); }
 .sheet-right { right: 0; border-left: 1px solid var(--hairline); transform: translateX(100%); }
+/* ÜÇÜNCÜ YÖN, yeni bir bileşen DEĞİL — ve bu ayrım bedavaya üç mekanizma
+   kazandırıyor. Perde (`body:has(.sheet.open) .scrim`), `Escape` şelalesi
+   (core.js) ve Android geri tuşu (`window.geriTusu`) ÜÇÜ DE `.sheet.open`
+   seçicisine bakıyor; ayrı bir sınıf üçünü de sıfırdan getirmek zorunda
+   kalırdı. Geçiş de `.sheet`ten geliyor (`transform` + gecikmeli
+   `visibility`), yani animasyon için tek satır yazılmıyor.
+
+   Genişlik `.sheet`in 320px/88vw'sini EZİYOR: alttan açılan bir panel ekranın
+   iki kenarına dayanmak zorunda, yoksa "yükselen levha" değil "havada duran
+   kutu" olur. Masaüstünde tavan + `margin-inline: auto`, çünkü 1440px'lik bir
+   ekranda baştan başa uzanan bir şerit tuvali ikiye keser; telefonda tam
+   genişliğe mobile.css açıyor.
+
+   `max-height` ŞART: liste uzadıkça panel büyüyor ve tavansız kalırsa
+   `.sheet-head` ekranın dışına çıkar — tam olarak `.sheet-foot`taki
+   "Tamam"ın erişilemez kalması demek. `min()` ikinci sınır: 86vh yüksek bir
+   masaüstü ekranında 900px'e ulaşırdı. */
+.sheet-bottom {
+  top: auto; left: 0; right: 0; bottom: 0;
+  width: min(520px, 100%); max-width: none; margin-inline: auto;
+  /* İKİ bildirim, body'nin `100vh; 100dvh` kalıbının aynısı: `dvh`i
+     tanımayan eski WebView ilkinde kalıyor, tanıyan ikincisini alıyor.
+     Telefonda fark somut — `vh` adres çubuğunu HESABA KATMIYOR, yani panel
+     tarayıcı kabuğunun altına taşıyor. */
+  max-height: min(86vh, 720px);
+  max-height: min(86dvh, 720px);
+  border-top: 1px solid var(--hairline);
+  border-radius: var(--r-panel, 24px) var(--r-panel, 24px) 0 0;
+  /* YATAY ORTALAMA `margin-inline` ile, `translateX(-50%)` ile DEĞİL — ve bu
+     bir tuzağın mandalı: `.sheet.open { transform: none }` BÜTÜN varyantların
+     ortak kuralı, yani transform'la kurulan bir ortalama açılış anında
+     siliniyor ve panel sağa kayıyor. Kayma yalnızca 520px'ten geniş pencerede
+     görünür: telefonda hiç, masaüstünde her açılışta. */
+  transform: translateY(100%);
+}
+/* Ayarlar formu UZUN (kimlik alanları + dört not + iki tercih + künye +
+   güncelleme satırı): ortak 86vh tavanında gövde sürekli kaydırılır hâlde
+   açılıyordu. Genişlik de bir kademe geniş — üç sağlayıcının alan grupları
+   520px'de sıkışıyor.
+
+   `min(…, 100%)` ŞART, sabit bir px DEĞİL: id özgüllüğü (0,1,1 + id) telefon
+   medya sorgusunun `.sheet-bottom { width: 100% }` kuralını EZİYOR.
+   #palette-modal tam bu yüzden mobile.css'te ikinci bir kural istemişti;
+   `min` o ikinci kuralı gereksiz kılıyor. */
+#settings-modal.sheet-bottom {
+  width: min(560px, 100%);
+  max-height: min(92vh, 900px);
+  max-height: min(92dvh, 900px);
+}
 .sheet.open { transform: none; }
+/* Tutamak: panelin alttan geldiğini SÖYLEYEN işaret. `aria-hidden` çünkü
+   sürüklenebilir değil — bugün yalnız bir yön göstergesi ve ekran okuyucuya
+   söylenecek bir şey taşımıyor. */
+.sheet-grip {
+  flex: none; width: 44px; height: 4px; margin: 10px auto 2px;
+  border-radius: 999px; background: var(--border-strong, rgba(255, 255, 255, 0.18));
+}
 .sheet-head {
   flex: none; display: flex; align-items: center; gap: 10px;
   padding: 16px 18px; border-bottom: 1px solid var(--hairline);
@@ -464,6 +545,17 @@ body:has(.sheet.open) .scrim { display: block; }
   flex: none; padding: 12px 18px; border-top: 1px solid var(--hairline);
 }
 .sheet-foot .btn-ghost { width: 100%; margin: 0; }
+/* Birincil eylem de tam genişlik: alttan açılan panelin dibindeki düğme
+   ekran görüntüsündeki "OK" — başparmağın ulaştığı şerit o. `.primary`nin
+   kendi `margin`i sıfırlanıyor, yoksa `.modal-actions .primary`den gelen
+   üst boşluk dipte ikinci bir çizgi gibi durur. */
+.sheet-foot .primary { width: 100%; margin: 0; }
+/* Durum satırı dipte: `.modal-status`ın `min-height: 1.2em`i gövdenin ortasında
+   yer ayırmak içindi (satır belirdiğinde altındakiler zıplamasın). Dipte o
+   payın karşılığı yok — boşken yalnızca düğmeyi 20px aşağı iter. `:empty`
+   deseni `.composer-foot p:empty`den geliyor. */
+.sheet-foot .modal-status { margin: 0 0 8px; min-height: 0; }
+.sheet-foot .modal-status:empty { display: none; }
 
 /* Slide-over form alanları (A5): kurallar .modal-card input'un birebir
    karşılığı — Ayarlar ve Tema rengi panelleri artık modal değil, ama metin
@@ -523,24 +615,93 @@ body:has(.sheet.open) .scrim { display: block; }
    Radyo satırları Flow'un .radio-row'u. İşaret accent-color'dan geliyor:
    tema değişince işaretin kendisi yeni durum rengini gösterir. */
 .theme-picker { border: 0; margin: 0; padding: 0; min-width: 0; }
-.theme-picker .radio-row {
+/* KAPSAM DIŞINA ÇIKARILDI (model seçici popup'ı gelince): kurallar bugüne
+   kadar `.theme-picker .radio-row` diye yazılıydı ve model kartları AYNI
+   deseni ister — ikinci bir kopya, iki yüzeyin sessizce ayrışması demekti
+   (bu dosyadaki `.modal-card input` ↔ `.sheet-body input` ikizliğinin ödediği
+   bedelin aynısı). Tema seçicisinin görünüşü değişmiyor: aşağıdaki gövde eski
+   kuralların birebir kendisi, yalnız seçici bir kademe geneller.
+   `.theme-picker`e özgü bir şey kalmadığı için altında ayrı kural da yok. */
+.radio-row {
   display: flex; gap: 12px; align-items: flex-start; width: 100%;
   background: var(--panel-2); border-radius: var(--r-item, 12px);
   padding: 12px 14px; margin-bottom: 8px; cursor: pointer;
   transition: background var(--dur) var(--ease);
 }
-.theme-picker .radio-row:hover { background: var(--raised); }
-.theme-picker .radio-row:has(input:focus-visible) {
+.radio-row:hover { background: var(--raised); }
+.radio-row:has(input:focus-visible) {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
-.theme-picker .radio-row input {
+.radio-row input {
   width: 16px; height: 16px; margin: 2px 0 0; flex: none; accent-color: var(--accent);
 }
-.theme-picker .radio-row > span { min-width: 0; }
-.theme-picker .radio-row b { display: block; font-weight: 500; font-size: 14px; }
-.theme-picker .radio-row span span {
+.radio-row > span { min-width: 0; }
+.radio-row b { display: block; font-weight: 500; font-size: 14px; }
+.radio-row span span {
   display: block; font-size: 12px; line-height: 1.5; color: var(--muted); margin-top: 3px;
 }
+
+/* ── Model seçici popup'ı (#model-sheet) ───────────────────────────────
+   `.radio-row`un üstüne İKİ şey ekliyor: solda sağlayıcı işareti için bir
+   yuva, sağda radyo. Sıra DOM'dan geliyor (işaret → metin → radyo), yani
+   `order` hilesi yok.
+
+   NEDEN NATIVE RADYO: eski native `<select>` kararının gerekçesi "özel bir
+   popover odak tuzağını, klavye gezintisini ve ARIA listbox semantiğini
+   sıfırdan getirirdi" idi (index.html, tests/test_index.py). Gerçek radyo
+   grubu üçünü de tarayıcıdan alıyor — ok tuşları, grup semantiği ve
+   `:checked` durumu elle yazılmıyor. Kazanç ise `<option>`un taşıyamadığı
+   şey: sağlayıcı işareti ve model tanıtımı (`note`) artık EKRANDA, `title`
+   özniteliğinde gömülü değil — telefonda `title` hiç görünmüyordu. */
+.model-list { border: 0; margin: 0; padding: 0; min-width: 0; }
+.model-row { align-items: center; }
+.model-row-ic {
+  flex: none; width: 28px; height: 28px; border-radius: 8px;
+  background: var(--panel); display: grid; place-items: center;
+}
+.model-row-ic img { width: 18px; height: 18px; }
+/* `min-width: 0` — kart bir flex satırı ve uzun model adı ("Gemini · Nano
+   Banana Pro") metin bloğunun min-content genişliğini kartın dışına taşırır;
+   `.composer-head`in aynı dersi, bir katman içeride. */
+.model-row-txt { flex: 1 1 auto; min-width: 0; }
+/* Radyo dikeyde ORTALANMIŞ: `.radio-row input`in `margin: 2px 0 0`ı
+   `align-items: flex-start` içindi (tema seçicisi), burada eksen `center`. */
+.model-row input { margin: 0; }
+/* Kredi aralığı: karşılaştırma bilgisi ("hangisi ucuz?") ve fatura tonunda —
+   monospace, ikincil. `<option>` metninde de aynı bilgi vardı, kaybolmuyor.
+
+   İKİ SINIFLI SEÇİCİ ve bu zorunlu: `.radio-row span span` (0,1,2) yukarıda
+   her iç <span>e 12px + `margin-top: 3px` yazıyor ve tek sınıflı bir kural
+   (0,1,0) ona yenilirdi — kredi satırı tanıtım notuyla aynı boyda çıkardı. */
+.model-row .model-row-meta {
+  display: block; margin-top: 4px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+}
+/* Anahtarı olmayan model: rozet METİNLE söylüyor, kart kilitlenmiyor.
+   #model-note'un ve #chat-gate'in duruşunun aynısı — kilitli bir kontrol
+   "neden kapalı" bilgisini de saklar; kullanıcı seçebiliyor ve şeritteki
+   açıklamadan Ayarlar'a gidiyor.
+
+   İki sınıflı seçici, `.model-row-meta`nın aynı gerekçesiyle: `.radio-row
+   span span` bu <span>e de `display: block` yazıyor ve rozet adın ALTINA
+   düşerdi — oysa yeri adın YANI. */
+.model-row .model-row-badge {
+  display: inline-block; margin-left: 6px; padding: 1px 6px;
+  border-radius: 999px; background: var(--raised); color: var(--muted);
+  font-size: 10px; font-weight: 400; vertical-align: 1px;
+}
+/* SEÇİLİ KART tema renginden. Referans tasarımdaki beyaz/gradyan çerçeve
+   BİLEREK alınmadı: bu uygulamada renk yalnızca DURUM anlatıyor
+   (flow-tokens.css'in --accent notu) ve dolgu rengi --primary'dir. Jetondan
+   okumanın somut karşılığı: kullanıcı Okyanus/Amber/Menekşe'ye geçtiği an
+   kart da onunla değişiyor, ikinci bir yerde renk güncellemek gerekmiyor.
+   `box-shadow: inset` kullanılıyor, `border` DEĞİL: kenarlık eklemek kartın
+   yüksekliğini 2px oynatırdı ve seçim değiştikçe liste zıplardı. */
+.model-row:has(input:checked) {
+  background: var(--accent-surface);
+  box-shadow: inset 0 0 0 1px var(--accent-border);
+}
+.model-row:has(input:checked) .model-row-ic { background: var(--accent-subtle); }
 
 /* 1200px altında ray otomatik daralır, 760px yükseklik altında şerit 60px
    (tasarım §2.2). En küçük pencere 1024×700 — ikisi de orada devrede. */

@@ -65,14 +65,20 @@
 }
 
 /* Slide-over'lar `position: fixed; top: 0; bottom: 0` — .app'in dolgusunun
-   DIŞINDA kalıyorlar, o yüzden ayrıca. Beşinin de (#chat-sidebar, #specs-sheet,
-   #settings-modal, #look-sheet, #palette-modal) başlığı ve × düğmesi tepede.
+   DIŞINDA kalıyorlar, o yüzden ayrıca. Yandan açılan dördünün (#chat-sidebar,
+   #specs-sheet, #look-sheet, #palette-modal) başlığı ve × düğmesi tepede.
    İKİ kenar birden: panel ekranın tamamını kaplıyor, yani dibindeki "Kaydet"
    düğmesi ve "Kurulu sürüm" satırı jest çubuğunun altında kalıyordu. */
 .sheet {
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+/* Alttan açılan panel (#model-sheet, #settings-modal) tepeye HİÇ dayanmıyor —
+   `top: auto` ve bir `max-height` taşıyor, yani durum çubuğunun payını
+   ayırmak orada kazanç değil KAYIP: panelin en değerli yeri olan liste
+   alanından bir çentik yüksekliği çalar. Alt dolgu olduğu gibi kalıyor:
+   dipteki "Tamam"/"Kaydet" jest çubuğunun altında kalmamalı. */
+.sheet-bottom { padding-top: 0; }
 
 /* ═══════════════════════════════════════════════════════════════════
    2. Yerleşim — telefon genişliği
@@ -194,12 +200,19 @@
   .gallery[data-size="l"] { --tile: 148px; }
 
   /* ── Tam ekran yüzeyler ───────────────────────────────────────────
-     11 katman var: 4 .modal + 5 .sheet + 2 popover. Telefonda "yanda açılan
+     12 katman var: 4 .modal + 6 .sheet + 2 popover. Telefonda "yanda açılan
      panel" diye bir şey yok — 320px'lik bir panel 360px'lik ekranın tamamına
      yakınını kaplayıp arkada 40px'lik anlamsız bir şerit bırakıyordu. */
   .sheet { width: 100%; max-width: 100%; }
   /* Palet paneli kendi genişliğini yazıyor (style.css:715), o yüzden ayrıca. */
   #palette-modal { width: 100%; max-width: 100%; }
+  /* Alttan açılan panelin masaüstü tavanı (`min(520px, 100%)`) burada
+     kalkıyor: 360px'lik bir ekranda ortalanmış 520px'lik bir kutu zaten tam
+     genişlik demek, ama kural açıkça yazılmazsa bir gün tavan büyütülünce
+     telefonda kenarlarda boşluk belirirdi. `max-height` de bir kademe
+     yükseliyor — telefonda arkadaki tuvalden görünen şeridin işi yalnızca
+     "bu bir katman" demek, 14vh'ye ihtiyacı yok. */
+  .sheet-bottom { width: 100%; max-width: 100%; max-height: 88vh; }
 
   .modal { padding: 0; }
   .modal-card {

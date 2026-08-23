@@ -51,6 +51,7 @@ Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Andr
 ### 🖼️ 2. Görsel Üretimi & Çoklu Referans Düzenleme
 * **Çoklu Sağlayıcı Entegrasyonu:** Azure OpenAI (`gpt-image-2`), OpenAI (`gpt-image-2`, `gpt-image-1`) ve Google Gemini (Nano Banana 2 / Nano Banana Pro) üretimi (1-4 görsel). Gemini'de piksel boyutu yerine oran (1:1 … 21:9) ve 1K/2K/4K çözünürlük seçiliyor. *DALL-E 3 12 Mayıs 2026'da OpenAI API'sinden kalktığı için katalogdan çıkarıldı.*
 * **Sağlayıcı İşareti:** Her iki model şeridi (görsel ve Prompt Yönetmeni) seçili modelin sağlayıcısını bir işaretle de gösteriyor — Gemini modelinde Gemini, OpenAI'de OpenAI, Azure'da Azure. Model değişince işaret de değişiyor.
+* **Alttan Açılan Model Seçici:** Stüdyo'daki model çipine dokununca alttan bir panel yükseliyor ve her model bir kart olarak listeleniyor: sağlayıcı işareti, adı, **ne işe yaradığını anlatan bir satır** ve kredi aralığı. O tanıtım metni daha önce yalnızca `title` özniteliğindeydi, yani telefonda hiç görünmüyordu. Seçili kart arayüz temasının rengiyle işaretleniyor (Monokrom / Okyanus / Amber / Menekşe) ve seçim dokunduğun an geçerli oluyor. Aynı panel Yönetmen modelinde de kullanılıyor; **Ayarlar** da aynı yüzeye taşındı ve "Kaydet" artık panelin dibinde, kaydırmadan erişilebilir yerde duruyor.
 * **Çoklu Referans Görsel Bindirme:** Düzenleme (Inpainting / Edits) modunda ana referans görselin yanına en fazla 3 ek referans görsel eklenebilir.
 
 ### 📁 3. Klasörler & Medya Yönetimi

@@ -2938,18 +2938,61 @@ def _served() -> str:
     return TestClient(appmod.app).get("/").text
 
 
-def test_model_secici_native_select_ozel_bir_popover_DEGIL():
-    """Native `<select>`: Android'de sistemin kendi seçicisi olarak açılıyor.
+def test_model_secimi_NATIVE_kontrollerle_yapiliyor():
+    """Seçim ARTIK alttan açılan bir panelde — ama hâlâ native kontrollerle.
 
-    Bu tercih `#move-target` için index.html'de yazılı olarak verilmiş ve aynı
-    gerekçe burada da geçerli — tek dokunuşta onlarca model arasında geçiş.
-    Özel bir popover listbox odak tuzağını, klavye gezintisini ve ARIA listbox
-    semantiğini sıfırdan getirirdi. İddia "daha güzel" bir popover'a dönüşü
-    yakalıyor.
+    ESKİ SÖZLEŞME şuydu: seçici native bir `<select>` olmak zorunda, çünkü
+    "özel bir popover listbox odak tuzağını, klavye gezintisini ve ARIA
+    listbox semantiğini sıfırdan getirirdi". Yüzey kullanıcı isteğiyle alttan
+    açılan bir panele taşındı ve o gerekçenin ÜÇ maddesİ de iptal edilmedi,
+    KARŞILANDI — iddia da onu ölçüyor:
+
+      1. klavye gezintisi + ARIA semantiği → kartlar gerçek
+         `<input type="radio">`, `<fieldset>` içinde. Elle yazılmış
+         `role="listbox"`/`role="option"` YOK.
+      2. katman mekaniği → panel `.sheet sheet-bottom`, yani perde
+         (`body:has(.sheet.open) .scrim`), Escape şelalesi ve Android geri
+         tuşu (`window.geriTusu`) olduğu gibi devralınıyor.
+      3. değerin sahibi → `<select>`ler DOM'da KALIYOR. Seçim onların
+         `value`suna yazılıp `change` gönderiliyor, yani tercih yazımı,
+         eksen doldurma ve `submitComposer` hiç değişmiyor.
+
+    NE İDDİA EDİLMİYOR: odak tuzağı yok ve sürükleyerek kapatma yok —
+    depodaki öteki beş panelde de yok. İddia "elle kurulmuş ARIA'ya dönüşü"
+    yakalıyor; eskiden "daha güzel bir popover'a dönüşü" yakalıyordu.
     """
-    html = _served()
+    # YORUMLAR AYIKLANMIŞ, `_css_block`un yardımcısındaki dersin aynısı:
+    # aşağıdaki "role= yok" iddiası, o kararın index.html'deki GEREKÇESİNDE
+    # geçen `role="listbox"` sözcüğüne takılıyordu — yani iddia kendi
+    # açıklamasını hata sayıyordu. Depo bu tuzağa dördüncü kez düştü.
+    ham = _served()
+    html = re.sub(r"<!--.*?-->", "", ham, flags=re.S)
+    # 3. madde: değer taşıyıcıları yerinde.
     assert '<select id="model"' in html
     assert '<select id="chat-model"' in html
+    # Görünen yüz: iki çip düğmesi de AYNI paneli açıyor.
+    for tetik in ("model-btn", "chat-model-btn"):
+        assert f'id="{tetik}"' in html, f"#{tetik} yok — seçim açılamaz"
+    assert html.count('aria-controls="model-sheet"') == 2, (
+        "iki çip de #model-sheet'i işaret etmiyor")
+    # 2. madde: ortak kabuk.
+    assert 'id="model-sheet" class="sheet sheet-bottom"' in html, (
+        "panel ortak `.sheet` kabuğunu kullanmıyor — perde, Escape ve Android "
+        "geri tuşu `.sheet.open`a bakıyor, hepsi sessizce ölürdü")
+    # 1. madde: ARIA elle YAZILMIYOR.
+    assert 'role="listbox"' not in html and 'role="option"' not in html, (
+        "elle kurulmuş bir listbox semantiği geri gelmiş — native radyo "
+        "grubunun tek gerekçesi tam olarak bunu yazmamaktı")
+    assert 'id="model-sheet-list"' in html
+    assert '<fieldset id="model-sheet-list"' in html, (
+        "kartlar bir <fieldset> içinde değil — radyo grubu semantiği kaybolur")
+    # `<legend>` ŞART, iki sebeple: adsız bir `<fieldset>` ekran okuyucuya
+    # "grup" der ama neyin grubu demez; ve `renderModelCards` onu koruyarak
+    # yeniden çiziyor (`replaceChildren(legend, …)`) — düğüm hiç yoksa o
+    # çağrı `TypeError` atar ve panel BOŞ açılır.
+    liste = html.split('<fieldset id="model-sheet-list"', 1)[1].split("</fieldset>", 1)[0]
+    assert "<legend" in liste, "#model-sheet-list adsız bir grup"
+    assert 'type = "radio"' in _js("core.js"), "kartlar native radyo kurmuyor"
 
 
 def test_model_secici_composer_bar_da_DEGIL():
@@ -3009,23 +3052,45 @@ def test_sohbet_modeli_secicisi_YONLENDIRME_gelmeden_gizli():
     görüyordu.
 
     İDDİA KOŞULLU: yönlendirme geldiği gün (ChatRequest bir `model` alanı
-    kabul ettiğinde) bu test seçicinin AÇILMASINI istiyor. Yani bekçi hem
+    kabul ettiğinde) bu test seçimin AÇILMASINI istiyor. Yani bekçi hem
     bugünü kilitliyor hem de yarın kendini iptal ediyor — "gizle ve unut"
     olmasın diye.
+
+    ÖLÇÜLEN ÖĞE DEĞİŞTİ (alttan açılan seçici turu): "görünürlük" artık
+    `<select>`in özelliği değil. Seçici değer TAŞIYICISI oldu (`.sr-only`) ve
+    kullanıcının gördüğü kontrol `#chat-model-btn`. Eski iddia
+    (`"hidden" not in` seçici etiketi) bugün de geçerdi ama YANLIŞ şeyi
+    ölçerdi: taşıyıcıyı görünür tutmak kullanıcıya hiçbir şey göstermiyor.
+    Bu yüzden koşullu yapı korunuyor, hedef tetikleyiciye taşınıyor.
+
+    DİKKAT — `.sr-only` bir SÖZLEŞME parçası: taşıyıcı erişilebilirlik
+    ağacında ikinci bir kontrol olarak durmamalı, yoksa tek bir değer için iki
+    kontrol duyurulur.
     """
     html = _served()
     yonlendirme_var = "model" in models.ChatRequest.model_fields
     isaretsiz = re.sub(r"<!--.*?-->", "", html, flags=re.S)
     secici = re.search(r"<select id=\"chat-model\"[^>]*>", isaretsiz)
     assert secici, "#chat-model kayboldu (152 id sözleşmesi)"
+    assert "sr-only" in secici.group(0), (
+        "#chat-model bir DEĞER TAŞIYICISI: ekranda görünen kontrol "
+        "#chat-model-btn ve iki kontrol tek değeri paylaşmamalı")
+    assert 'aria-hidden="true"' in secici.group(0), (
+        "taşıyıcı erişilebilirlik ağacında — `.sr-only` yalnız GÖZDEN "
+        "saklıyor, ekran okuyucu tek değer için iki kontrol duyuruyor")
+    assert 'tabindex="-1"' in secici.group(0), (
+        "taşıyıcı sekme sırasında — klavye yolu panelin radyo grubunda")
 
+    tetik = re.search(r"<button[^>]*id=\"chat-model-btn\"[^>]*>", isaretsiz)
     if yonlendirme_var:
-        assert "hidden" not in secici.group(0), (
-            "ChatRequest artık model alıyor — seçici görünür olmalı ve "
-            "seçenekleri doldurulmalı")
+        assert tetik, ("ChatRequest artık model alıyor — seçim görünür olmalı, "
+                       "yani #chat-model-btn bulunmak zorunda")
+        assert "hidden" not in tetik.group(0), (
+            "ChatRequest artık model alıyor ama seçim çipi gizli — "
+            "kullanıcı tel üzerine çıkan bir seçimi hiç yapamıyor")
     else:
-        assert "hidden" in secici.group(0), (
-            "seçim tel üzerine çıkamıyor ama liste görünür — kullanıcıya "
+        assert not tetik or "hidden" in tetik.group(0), (
+            "seçim tel üzerine çıkamıyor ama çip görünür — kullanıcıya "
             "tutulmayan bir seçim sözü veriliyor")
 
 
@@ -3228,12 +3293,33 @@ def test_ISARET_her_iki_seride_de_baglaniyor():
     Şeridi tazeleyen başka bir yol yok; işaret bu iki fonksiyonun dışında
     yazılırsa "hangisi kazandı" sorusu doğar (`.model-note`ın hidden ekseniyle
     aynı ders).
+
+    İDDİA BİR KADEME İLERİ TAŞINDI (alttan açılan seçici turu). Çip artık
+    `<button>` ve tazelenecek ÜÇ şey var: işaret, metin ve panelin işaretli
+    radyosu. Üçü `syncModelChip`te toplandı, yani `applyModel` doğrudan
+    `setModelLogo` çağırmıyor — eski iddia (`setModelLogo("model-logo"` bu
+    fonksiyonun gövdesinde) o yüzden düştü.
+
+    Ölçülen şey DEĞİŞMEDİ, güçlendi: iki fonksiyonun her biri kendi eksenini
+    tazelemek ZORUNDA ve `setModelLogo`un TEK çağrı yeri var. Eskiden iki
+    çağrı yeri vardı ve "işaret ile metin ayrı yerden yazılıyor" hâli
+    ölçülmüyordu — çipin metni native `<select>`ten bedavaya geliyordu ve o
+    bedava yol `<button>`la kapandı.
     """
     js = _js("core.js")
-    for fn, img in (("function applyModel(", "model-logo"),
-                    ("function applyChatModel(", "chat-model-logo")):
+    for fn, eksen in (("function applyModel(", "image"),
+                      ("function applyChatModel(", "chat")):
         govde = js.split(fn, 1)[1].split("\n}", 1)[0]
-        assert f'setModelLogo("{img}"' in govde, f"{fn} işareti tazelemiyor"
+        assert f'syncModelChip("{eksen}"' in govde, f"{fn} çipi tazelemiyor"
+
+    # `setModelLogo` TEK yerden çağrılıyor: iki çağrı yeri, işaretin metinden
+    # ayrı bir yolla yazılabildiği anlamına gelir ve "hangisi kazandı" sorusu
+    # tam orada doğar.
+    assert js.count("setModelLogo(") == 2, (
+        "setModelLogo bir tanım + bir çağrıdan fazla yerde geçiyor — işaret "
+        "artık çipin metninden ayrı bir yoldan yazılabiliyor")
+    govde = js.split("function syncModelChip(", 1)[1].split("\n}", 1)[0]
+    assert "setModelLogo(" in govde, "syncModelChip işareti tazelemiyor"
 
 
 def test_ISARET_cipin_tiklamasini_YUTMUYOR():
@@ -3272,16 +3358,342 @@ def test_SERIT_SATIRI_marka_onekini_TEKRARLAMIYOR():
     de dize kırpıyor — `logo` adresinin sunucuda kurulmasıyla aynı gerekçe. Geri
     düşüş (`|| m.label`) bilinçli: alanı taşımayan eski bir yanıtta şerit adsız
     kalmasın.
+
+    ADI OKUYAN YER ÜÇE ÇIKTI (alttan açılan seçici turu): iki `<option>`
+    listesi ve panelin kart satırı. `<option>` metnini kuran mantık
+    `modelSecenekMetni`ye toplandı — çip artık `<button>` ve seçili modelin
+    metnini native `<select>`ten bedavaya ALAMIYOR, yani aynı metin iki yerde
+    gerekiyordu. Bir yerde `short_label`, ötekinde `label` yazan gün marka
+    çipte iki kez okunur ve bu masaüstünde göze çarpmaz.
+
+    O yüzden iddia iki kademeli: render fonksiyonları adı KENDİ kurmuyor
+    (tek kaynağa soruyor), tek kaynak da `short_label` okuyor.
     """
     js = _js("core.js")
-    for fn in ("function renderModelOptions(", "function renderChatModelOptions("):
+    ADI_KURAN = "function modelSecenekMetni("
+    for fn in (ADI_KURAN, "function renderModelCards("):
         govde = js.split(fn, 1)[1].split("\n}", 1)[0]
         assert "short_label" in govde, f"{fn} şerit adını okumuyor"
         assert "m.label" in govde, f"{fn} geri düşüşü yok"
+
+    # İki <option> listesi adı KENDİ kurmuyor: tek kaynağa soruyor. Kendi
+    # kurarlarsa üç yer arasında ayrışma yeniden mümkün olur.
+    for fn in ("function renderModelOptions(", "function renderChatModelOptions("):
+        govde = js.split(fn, 1)[1].split("\n}", 1)[0]
+        assert "modelSecenekMetni(" in govde, f"{fn} etiketi tek kaynaktan almıyor"
+        assert "short_label" not in govde, (
+            f"{fn} adı KENDİ kuruyor — üç okuyucu arasında ayrışma kapısı")
+
+    for fn in (ADI_KURAN, "function renderModelCards(",
+               "function renderModelOptions(", "function renderChatModelOptions("):
+        govde = js.split(fn, 1)[1].split("\n}", 1)[0]
         assert ".split(" not in govde and ".replace(" not in govde, (
             f"{fn} etiketi İSTEMCİDE kırpıyor — kısaltma sunucunun işi")
         for ad in ("Azure", "OpenAI", "Gemini"):
             assert f'"{ad}' not in govde, f"{fn}: marka adı ({ad}) literal sayılmış"
+
+
+# ── Model seçimi: alttan açılan yüzey ──────────────────────────────────
+#
+# Yüzeyin kaynağı Flow teslimi DEĞİL (docs/flow-ui'de alttan açılan bir ekran
+# yok, flow.css'te `.sheet` bile yok): kullanıcının verdiği "Settings" bottom
+# sheet görüntüsü. Bu blok o turda alınan kararların her birine bir mandal
+# koyuyor — kararların yaşadığı yer bu depoda testler.
+
+
+def _yorumsuz_html() -> str:
+    """Yorumları ayıklanmış servis edilen HTML.
+
+    `_css_block`un yardımcısındaki dersin HTML karşılığı: bu turun gerekçe
+    yorumları reddedilen alternatifleri de yazıyor (`role="listbox"`,
+    span kapanışı, `translateX`) ve o sözcükleri arayan iddialar kendi
+    açıklamalarına takılıyor.
+    """
+    return re.sub(r"<!--.*?-->", "", _served(), flags=re.S)
+
+
+def test_model_yuzeyi_TEK_ve_IKI_ekseni_birlikte_tasiyor():
+    """Bir panel, iki eksen (görsel + Yönetmen). İkinci bir `<aside>` YOK.
+
+    Gerekçe yapısal: iki çip `#composer[data-mode]` ekseniyle birbirini
+    DIŞLIYOR (style.css), yani ikisi aynı anda hiç açılamıyor. Bedeli ise
+    ölçülebilir — kartlar `configured` bayrağını okuyor ve o bayrak Ayarlar
+    her kaydedildiğinde değişiyor. İki kalıcı panel, `applyModels` ve
+    `applyChatModels`e İKİ ayrı tazeleme görevi yüklerdi; tek panel + açılışta
+    çizim `renderModelCards`a TEK çağıran veriyor ve hiç senkronizasyon
+    borcu doğmuyor (`test_ISARET_her_iki_seride_de_baglaniyor`ın dersi).
+    """
+    html = _yorumsuz_html()
+    assert html.count('id="model-sheet"') == 1, "ikinci bir model paneli açılmış"
+    js = _js("core.js")
+    assert js.count("renderModelCards(") == 2, (
+        "renderModelCards bir tanım + bir çağrıdan fazla yerde geçiyor — her "
+        "yeni çağrı yeri bayat kart listesi riskini geri getiriyor")
+    # Eksen tablosu TEK yerde: üç ayrı `axis === "chat" ? … : …` üçlüsü, yeni
+    # bir eksen eklendiği gün birini güncellemeyi unutmak demekti.
+    assert "const MODEL_EKSENLERI" in js
+    for anahtar in ("secici", "dugme", "etiket", "logo", "baslik", "kredi", "liste"):
+        assert f"{anahtar}:" in js, f"eksen tablosunda `{anahtar}` yok"
+
+
+def test_kart_secimi_SELECTE_yaziyor_ve_TEK_olay_gonderiyor():
+    """Değerin sahibi `<select>`; kart ona yazıp `change` gönderiyor.
+
+    Bu satırların hepsi bir kırılmayı kapatıyor:
+      · `.value =` + `dispatchEvent` → var olan dinleyici (applyModel +
+        savePref + `seciliModelTercihi`) TEK yoldan koşuyor.
+      · `bubbles: true` → dinleyici `<select>`in kendisinde, olay ondan
+        yukarı çıkmasa da yakalanır; ama `change` ATAMAYLA hiç doğmuyor, yani
+        elle gönderim şart.
+      · Gövdede `applyModel(` / `savePref(` OLMAMALI: ikinci bir çağrı tercihi
+        diske İKİ kez yazar ve "varsayılana düşüldü" mesajını iki kez basar.
+        İkisi de sessiz — kullanıcı hiçbir şey görmez.
+    """
+    js = _js("core.js")
+    govde = js.split('$("model-sheet-list").addEventListener("change"', 1)[1]
+    govde = govde.split("\n});", 1)[0]
+    assert ".value = " in govde, "kart seçimi taşıyıcıya yazmıyor"
+    assert "dispatchEvent" in govde and '"change"' in govde, (
+        "olay elle gönderilmiyor — `value` ataması `change` DOĞURMUYOR, yani "
+        "tercih hiç kaydedilmez")
+    assert "bubbles: true" in govde
+    for yasak in ("applyModel(", "applyChatModel(", "savePref("):
+        assert yasak not in govde, (
+            f"{yasak} panelden İKİNCİ kez çağrılıyor — tercih iki kez yazılır")
+    # Aynı değere ikinci dokunuşun kapısı: native <select> de değişmeyen bir
+    # değer için `change` atmıyor.
+    assert "return" in govde, "aynı değere ikinci dokunuş için erken çıkış yok"
+
+
+def test_kart_listesi_DELEGE_dinleyici_kullaniyor():
+    """Kartlar her açılışta yeniden çiziliyor: dinleyici LİSTEDE, kartta değil.
+
+    Kart başına dinleyici bağlamak her açılışta yeniden kurulması gereken bir
+    bağ olurdu; çizim fonksiyonu bir gün iki kez çağrılırsa da dinleyiciler
+    üst üste binerdi (ve tercih iki kez yazılırdı).
+    """
+    js = _js("core.js")
+    assert '$("model-sheet-list").addEventListener("change"' in js
+    govde = js.split("function renderModelCards(", 1)[1].split("\n}", 1)[0]
+    assert "addEventListener" not in govde, (
+        "kart çizimi dinleyici bağlıyor — her açılışta bir kopya daha")
+
+
+def test_yuzey_ORTAK_kapidan_aciliyor_ve_KAPANIYOR():
+    """`openSheet` / `closeSheets` dışında bir açma-kapama yolu YOK.
+
+    `hidden` ile yönetilen bir panel üç mekanizmayı birden kaybederdi: perde
+    (`body:has(.sheet.open) .scrim`), Escape şelalesi ve Android geri tuşu
+    (`window.geriTusu`) hepsi `.sheet.open` seçicisine bakıyor.
+    """
+    js = _js("core.js")
+    assert 'openSheet("model-sheet")' in js
+    assert '$("model-sheet").hidden' not in js, (
+        "panel `hidden` ile yönetiliyor — perde, Escape ve Android geri tuşu "
+        "`.sheet.open`a bakıyor, üçü birden sessizce ölür")
+    for dugme in ("model-sheet-close", "model-sheet-ok"):
+        assert f'$("{dugme}").addEventListener("click", closeSheets)' in js, (
+            f"#{dugme} ortak kapanış kapısını kullanmıyor")
+
+
+def test_TAMAM_bir_ONAY_kapisi_DEGIL():
+    """Seçim dokunuşta uygulanıyor; "Tamam" yalnızca kapatıyor.
+
+    Onay kapısı olsaydı bir de "vazgeç" yolu borçlanılırdı ve perdeye
+    dokunmanın anlamı belirsiz kalırdı ("seçtiklerim gitti mi?"). Tercihin
+    anında yazılması `#pref-autosave` ve tema seçicisinin deseni.
+    """
+    js = _js("core.js")
+    satir = [l for l in js.splitlines() if '$("model-sheet-ok")' in l
+             and "addEventListener" in l]
+    assert satir, "#model-sheet-ok bağlanmamış"
+    for yasak in ("savePref", "applyModel", "dispatchEvent"):
+        assert yasak not in satir[0], (
+            f'"Tamam" {yasak} çağırıyor — kapatma düğmesi seçimi UYGULUYOR')
+
+
+def test_kart_MODEL_NOTUNU_ve_ISARETI_gosteriyor():
+    """Bu turun ASIL kazancı: `note` ve sağlayıcı işareti ekranda.
+
+    İkisi de `<option>`un taşıyamadığı şeydi — not `option.title`da gömülüydü
+    ve dokunmatikte `title` HİÇ görünmüyor. Composer şeridinin notu reddetme
+    gerekçesi (`applyModel`: 360px'de kalıcı yer bedeli) böylece bedelsiz
+    duruyor: bilgi var, şerit uzamıyor.
+
+    `innerHTML` YOK: sunucudan gelen hiçbir şey ayrıştırılmıyor.
+    """
+    govde = _js("core.js").split("function renderModelCards(", 1)[1].split("\n}", 1)[0]
+    assert "m.note" in govde, "kart model tanıtımını göstermiyor"
+    assert "m.logo" in govde, "kart sağlayıcı işaretini göstermiyor"
+    assert "innerHTML" not in govde, "sunucudan gelen metin innerHTML'e giriyor"
+    assert "textContent" in govde
+
+
+def test_kredi_ARALIGI_tek_kaynaktan_okunuyor():
+    """Kredi ARALIĞI iki yerde çiziliyor (şeridin `<option>`ları + kartlar).
+
+    Hesap iki yerde yaşarsa ayrışır: biri min–max verirken öteki tek tarifede
+    kalır ve kullanıcı aynı model için iki farklı fiyat görür.
+
+    ÖLÇÜLEN ŞEY ARALIK, `credits_by_quality`nin kendisi DEĞİL: o alan
+    `syncRunCost`ta da okunuyor ve orada BAŞKA bir hesap yapılıyor — bu turun
+    seçili kaliteye düşen GERÇEK maliyeti, aralık değil. İkisini tek sayıya
+    indirmek "iki okuyucu var" diye yanlış bir alarm verirdi (ilk yazımda
+    verdi de).
+    """
+    js = _js("core.js")
+    assert js.count("Math.min(...tarife)") == 1, (
+        "kredi aralığı core.js'te birden fazla yerde hesaplanıyor")
+    for fn in ("function modelSecenekMetni(", "function renderModelCards("):
+        govde = js.split(fn, 1)[1].split("\n}", 1)[0]
+        assert "modelKrediAraligi(" in govde, f"{fn} aralığı tek kaynaktan almıyor"
+
+
+def test_TUTAMAK_bir_sey_VAAT_ETMIYOR():
+    """Tutamak DEKORATİF: sürükleyerek kapatma yok, o yüzden söz de yok.
+
+    Sürüklenebilir görünen ama sürüklenmeyen bir tutamak, tam olarak
+    `test_sohbet_modeli_secicisi_YONLENDIRME_gelmeden_gizli`in reddettiği şey:
+    "kullanıcıya tutulmayan bir söz". Kapatmanın üç gerçek yolu var (×,
+    perde, Escape/geri) ve tutamak yalnızca yüzeyin NEREDEN geldiğini
+    söylüyor.
+    """
+    html = _yorumsuz_html()
+    tutamaklar = re.findall(r"<span class=\"sheet-grip\"[^>]*>", html)
+    assert len(tutamaklar) == 2, (
+        "tutamak iki alttan açılan panelde de olmalı (#model-sheet, "
+        f"#settings-modal) — bulunan: {len(tutamaklar)}")
+    for t in tutamaklar:
+        assert 'aria-hidden="true"' in t, (
+            "tutamak erişilebilirlik ağacında — ekran okuyucuya işlevi "
+            "olmayan bir öğe duyuruluyor")
+    for js_adi in ("core.js", "settings.js", "chat.js"):
+        assert "sheet-grip" not in _js(js_adi), (
+            f"{js_adi} tutamağa bağlanıyor — sürükleme yoksa bağ da olmamalı")
+
+
+def test_ALTTAN_acilan_yuzey_ORTAK_kabugu_KIRMIYOR():
+    """`.sheet-bottom` `.sheet`in bir varyantı; ortak kuralları bozmuyor.
+
+    YATAY ORTALAMA `translateX` ile YAPILAMAZ ve bu iddia o tuzağın mandalı:
+    `.sheet.open { transform: none; }` BÜTÜN varyantların ortak kuralı, yani
+    transform'la kurulan bir ortalama açılış anında siliniyor ve panel sağa
+    kayıyor. Kayma yalnızca 520px'ten geniş pencerede görünür — telefonda
+    hiç, yani mobil testte hiç yakalanmaz.
+
+    `top: auto` da şart: `.sheet`in `top: 0; bottom: 0`ı paneli tam yükseklikte
+    tutuyor ve `max-height` hiç devreye girmezdi.
+    """
+    govde = _css_block(".sheet-bottom")
+    assert "top: auto" in govde, (
+        "`.sheet`in `top: 0`ı ezilmemiş — panel tam yükseklikte açılır ve "
+        "`max-height` hiç devreye girmez")
+    assert "bottom: 0" in govde
+    assert "translateY(100%)" in govde, "panel alttan yükselmiyor"
+    assert "translateX" not in govde, (
+        "yatay ortalama transform ile yapılmış — `.sheet.open { transform: "
+        "none }` onu açılış anında siliyor ve panel sağa kayıyor")
+    assert "margin-inline: auto" in govde or "margin: 0 auto" in govde, (
+        "panel masaüstünde ortalanmıyor")
+    assert "max-height" in govde, "tavansız panel başlığını ekranın dışına iter"
+    # Ortak kural yerinde: varyant onun üstüne biniyor.
+    assert ".sheet.open { transform: none; }" in _css()
+
+
+def test_SECILI_kart_rengi_TEMADAN_geliyor():
+    """"Rengi tema ile uyumlu olsun" isteğinin mandalı.
+
+    Seçili kartın rengi `--accent-*` jetonlarından okunuyor, sabit bir renk
+    değil. Bedeli somut: jetonlar `flow-tokens.css`in `[data-theme=…]`
+    satırlarında yer değiştiriyor, yani biri buraya `#7c3aed` yazarsa kart
+    Okyanus temasında yanlış renkte kalır — ve bu yalnızca temayı değiştiren
+    kullanıcıda görünür, yani gözden kaçar.
+
+    Referans tasarımdaki beyaz/gradyan çerçeve BİLEREK alınmadı: bu
+    uygulamada `--accent` yalnızca DURUM anlatıyor (flow-tokens.css'in kendi
+    notu) ve seçili kart bir durumdur.
+    """
+    govde = _css_block(".model-row:has(input:checked)")
+    assert "var(--accent-surface)" in govde, "seçili kartın zemini temadan gelmiyor"
+    assert "var(--accent-border)" in govde, "seçili kartın çerçevesi temadan gelmiyor"
+    assert "#" not in govde, "seçili karta sabit renk yazılmış"
+    # Çerçeve `box-shadow: inset` — `border` kutuyu 1px büyütür ve seçim
+    # değiştikçe liste zıplar.
+    assert "box-shadow: inset" in govde, (
+        "çerçeve `border` ile çizilmiş — kartın yüksekliği oynar ve seçim "
+        "değiştikçe liste zıplar")
+    # Jetonların üç temada da tanımlı olması sözleşmenin öteki yarısı.
+    tokens = TestClient(appmod.app).get("/static/flow-tokens.css").text
+    for tema in ("ocean", "amber", "viola"):
+        blok = tokens.split(f'[data-theme="{tema}"]', 1)[1].split("}", 1)[0]
+        for jeton in ("--accent-surface", "--accent-border"):
+            assert jeton in blok, f"{tema} temasında {jeton} tanımsız"
+
+
+def test_ayarlar_paneli_ALTTAN_ve_KAYDET_dipte():
+    """Ayarlar da model seçicisiyle AYNI yüzeyde: iki ayarlar yüzeyi, iki ayrı
+    yer gibi görünmesin.
+
+    "Kaydet" artık `.sheet-foot`ta ve bu ölçülebilir bir kazanç: `.sheet-foot`
+    `flex: none`, yani gövde kaydırılırken yerinde duruyor. Önce gövdenin
+    sonundaydı ve altındaki üç bölüm (künye, güncelleme kontrolü, oturum
+    tercihi) onu ekranın dışına itiyordu — kullanıcı anahtarını yazıp
+    "Kaydet"i bulmak için aşağı kaydırmak zorundaydı.
+    """
+    html = _yorumsuz_html()
+    assert 'id="settings-modal" class="sheet sheet-bottom"' in html, (
+        "Ayarlar paneli alttan açılmıyor")
+    dip = html.split('<div class="sheet-foot">')
+    ayarlar_dibi = [d for d in dip if 'id="settings-save"' in d.split("</div>", 1)[0]]
+    assert ayarlar_dibi, "#settings-save panelin dibinde değil"
+    assert 'id="settings-status"' in ayarlar_dibi[0].split("</div>", 1)[0], (
+        "durum satırı basılan düğmeden ayrı — geri bildirim gövdenin ortasında "
+        "kalıp hiç okunmuyor")
+    # Odak metin kutusuna DEĞİL: alttan açılan panelde yazılım klavyesi
+    # panelin yarısını yutuyor.
+    js = _js("settings.js")
+    assert '$("set-endpoint").focus()' not in js, (
+        "Ayarlar açılışında metin kutusuna odaklanıyor — Android'de klavye "
+        "kalkıyor ve alttan açılan paneli kapatıyor")
+    assert '$("set-provider").focus()' in js
+
+
+def test_AYARLAR_dugmesi_openSettingse_OLAYI_gecirmiyor():
+    """`openSettings` bir SAĞLAYICI ADI bekliyor; dinleyici ona MouseEvent verirse
+    panel boş açılıyor.
+
+    Ölçülmüş kırılma (gerçek Chromium, 390x844): bağ
+    `addEventListener("click", openSettings)` biçimindeydi ve fonksiyon
+    argüman olarak MouseEvent alıyordu. `provider` truthy olduğu için
+    `$("set-provider").value = provider` koşuyor, eşleşmeyen bir dizeye
+    atanan `select.value` seçimi DÜŞÜRÜYOR (`selectedIndex = -1`) ve hemen
+    ardından koşan `syncProviderFields` `prov-azure`/`prov-openai`/
+    `prov-gemini`in ÜÇÜNÜ de gizliyordu.
+
+    Kullanıcı tarafındaki sonucu: dişliye basınca açılan Ayarlar panelinde hiç
+    anahtar kutusu YOK. Konsolda tek bir hata bile yok — `select.value`ya
+    geçersiz atama sessiz. Yalnızca ilk kurulumun kendi açtığı panel ve
+    "Ayarlar'ı aç" derin bağlantısı çalışıyordu, yani hata "bazen çalışıyor"
+    kılığındaydı.
+
+    İDDİA İKİ KADEMELİ, çünkü iki kapı da ayrı ayrı kırılabilir:
+      1. bağ, olayı geçirmeyen bir sarmalayıcı olmak zorunda;
+      2. `openSettings`in kendisi, seçicide BULUNMAYAN bir değeri yazmayı
+         reddetmek zorunda (katalogdan gelen bir sağlayıcı adı bir gün
+         seçicide olmayabilir — aynı yol yeniden açılır).
+    """
+    js = _js("settings.js")
+    assert '$("settings-btn").addEventListener("click", openSettings)' not in js, (
+        "dişli bağı `openSettings`e MouseEvent geçiriyor — Ayarlar paneli "
+        "hiçbir anahtar kutusu göstermeden açılır")
+    assert '$("settings-btn").addEventListener("click", () => openSettings())' in js
+
+    govde = js.split("function openSettings(", 1)[1].split("\n}", 1)[0]
+    atama = [l for l in govde.splitlines() if '$("set-provider").value = provider' in l]
+    assert atama, "derin bağlantı sağlayıcıyı hiç yazmıyor"
+    assert ".options" in govde and "some(" in govde, (
+        "`openSettings` seçicide bulunmayan bir değeri de yazıyor — atama "
+        "seçimi sessizce düşürür ve bütün alan grupları gizlenir")
 
 
 # ── Prompt Yönetmeni: model şeridi + dağıtım adı kapısı (v0.7) ──────────

@@ -221,17 +221,38 @@ function openSettings(provider) {
   $("set-gemini-key").value = "";
   // Belirli bir sağlayıcıya derin bağlantı: #model-settings-link buradan
   // geliyor, "anahtar yok" uyarısı doğrudan doğru gruba açsın.
-  if (provider) $("set-provider").value = provider;
+  //
+  // İKİNCİ KAPI (`some`), çağıranın doğru davranmasına GÜVENMİYOR: eşleşmeyen
+  // bir dizeyi `select.value`ya yazmak seçimi sessizce düşürüyor
+  // (`selectedIndex = -1`) ve `syncProviderFields` o anda BÜTÜN alan
+  // gruplarını gizliyor — panel boş açılıyor, konsolda hiçbir hata olmuyor.
+  // #settings-btn'in bağı tam bu tuzağa düşmüştü (aşağıdaki gerekçe).
+  // Katalogdan gelen bir sağlayıcı adı bir gün seçicide bulunmazsa da aynı
+  // yol açılırdı, yani kapı çağıranın düzeltilmesiyle gereksizleşmiyor.
+  if (provider && [...$("set-provider").options].some((o) => o.value === provider)) {
+    $("set-provider").value = provider;
+  }
   syncProviderFields();
   $("set-key").value = ""; // her açılışta boş (write-only)
   // #set-chat-deployment BİLEREK temizlenmiyor: write-only değil, GET'ten dolu
   // geliyor. Temizlenirse kullanıcı endpoint'ini güncellemek için paneli açıp
   // kaydettiğinde dağıtım adını da silmiş olurdu.
   $("settings-status").textContent = "";
-  // A5 (Adım 7b): panel sağdan slide-over (tasarım §2.4/3). Açma/kapama tek
+  // Panel ALTTAN açılıyor (model seçicisiyle aynı yüzey). Açma/kapama tek
   // kapıdan (core.openSheet); perde ve Escape kabuğun ortak dinleyicilerinde.
   openSheet("settings-modal");
-  setTimeout(() => $("set-endpoint").focus(), 0);
+  // ODAK METİN KUTUSUNA DEĞİL SEÇİCİYE. Burada `#set-endpoint` vardı ve yüzey
+  // alttan açılmaya başlayınca o satır bir kırılmaya dönüştü: bir metin
+  // kutusuna odaklanmak Android'de klavyeyi AÇIYOR, klavye de `bottom: 0`a
+  // yapışmış paneli olduğu gibi kapatıyor — yani Ayarlar her açılışta klavye
+  // altında doğuyordu. `<select>`e odaklanmak klavyeyi açmıyor ve panelin ilk
+  // kontrolü zaten o, yani sekme sırası ve Escape'in beklediği "odak panelin
+  // içinde" koşulu korunuyor.
+  //
+  // İkinci kazanç: `#set-endpoint` YALNIZCA Azure seçiliyken görünür
+  // (`syncProviderFields`). Gemini'ye derin bağlantıyla açıldığında
+  // (#model-settings-link) odak gizli bir kutuya gidiyordu, yani hiçbir yere.
+  setTimeout(() => $("set-provider").focus(), 0);
 }
 
 function closeSettings() { closeSheets(); }
@@ -284,7 +305,19 @@ async function saveSettings() {
   }
 }
 
-$("settings-btn").addEventListener("click", openSettings);
+// SARMALAYICI ŞART, çıplak `openSettings` DEĞİL — ve bu ölçülmüş bir kırılmanın
+// düzeltmesi. `addEventListener("click", openSettings)` fonksiyona MouseEvent'i
+// ARGÜMAN olarak veriyor, yani `provider` truthy oluyor ve aşağıdaki satır
+// koşuyordu:
+//     if (provider) $("set-provider").value = provider;
+// `select.value` eşleşmeyen bir dizeye ("[object MouseEvent]") atandığında
+// tarayıcı seçimi DÜŞÜRÜYOR (`selectedIndex = -1`, `value = ""`) ve hemen
+// ardından koşan `syncProviderFields` üç alan grubunun HEPSİNİ gizliyordu.
+// Sonucu somut: dişliye basarak açılan Ayarlar panelinde HİÇBİR anahtar
+// kutusu görünmüyordu — kullanıcı anahtarını yalnızca ilk kurulumun kendi
+// açtığı panelden ya da "Ayarlar'ı aç" derin bağlantısından girebiliyordu.
+// Konsolda tek bir hata bile yok; gerçek Chromium koşumunda görüldü.
+$("settings-btn").addEventListener("click", () => openSettings());
 $("settings-close").addEventListener("click", closeSettings);
 $("settings-save").addEventListener("click", saveSettings);
 

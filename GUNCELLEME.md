@@ -150,6 +150,12 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.9.2 — ne değişti
+
+- İnceleme düzeltmeleri: paketleme kapısı, sızıntı kapısı, harita kör noktası, çipin adı
+
+---
+
 ## Sürüm 0.9.1 — ne değişti
 
 - Stüdyo bekleme animasyonu: shimmer kutusu, uydurma yüzde kalktı

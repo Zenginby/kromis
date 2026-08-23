@@ -1201,10 +1201,20 @@ def test_the_merged_selection_is_drawn_as_a_pill_not_as_a_typed_message():
     assert body, "appendUser() bulunamadı"
     assert "msg.display" in body.group(1), "pil/baloncuk ayrımı yapılmıyor"
     assert '"chat-pick"' in body.group(1), "pil sınıfı verilmiyor"
-    # Yeniden açılışta da pil kalsın: openChat mesaj NESNESİ geçirmeli.
+    # Yeniden açılışta da pil kalsın: çizim mesaj NESNESİ geçirmeli.
+    #
+    # Döngü `openChat`ten `renderThread`e taşındı (arena satırı ardışık sonuç
+    # kayıtlarını gruplamak zorunda). İDDİA GÜÇLENDİ, zayıflamadı: hem
+    # delegasyon hem de nesneyi geçiren çağrı ayrı ayrı aranıyor — biri
+    # koparsa öteki bunu artık örtmüyor.
     open_body = re.search(r"async function openChat\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
-    assert "appendUser(m)" in open_body.group(1), (
-        "openChat content geçiriyor — yeniden açılan sohbette piller baloncuğa döner")
+    assert "renderThread(chatThread)" in open_body.group(1), (
+        "openChat dökümü yeniden çizmiyor")
+    render_body = re.search(r"function renderThread\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert render_body, "renderThread() bulunamadı"
+    assert "appendUser(m)" in render_body.group(1), (
+        "renderThread content geçiriyor — yeniden açılan sohbette piller "
+        "baloncuğa döner")
 
 
 def test_the_send_button_does_not_leak_the_click_event_into_the_display_field():
@@ -1422,8 +1432,14 @@ def test_the_transcript_draws_result_records():
     """
     js = _chat_js()
     assert re.search(r"function appendResult\(", js), "appendResult() yok"
-    body = re.search(r"async function openChat\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
-    assert body, "openChat() bulunamadı"
+    # Döngü `renderThread`de (bkz. pil testinin notu); `openChat` ona
+    # delege ediyor. İki iddia birlikte, aradaki bağ kopmasın.
+    open_body = re.search(r"async function openChat\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert open_body, "openChat() bulunamadı"
+    assert "renderThread(chatThread)" in open_body.group(1), (
+        "openChat dökümü yeniden çizmiyor")
+    body = re.search(r"function renderThread\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "renderThread() bulunamadı"
     assert re.search(r'RESULT_ROLE|=== "result"', body.group(1)), (
         "yeniden açılan oturumda sonuç kaydı role göre çizilmiyor")
 
@@ -2970,11 +2986,15 @@ def test_model_secimi_NATIVE_kontrollerle_yapiliyor():
     # 3. madde: değer taşıyıcıları yerinde.
     assert '<select id="model"' in html
     assert '<select id="chat-model"' in html
-    # Görünen yüz: iki çip düğmesi de AYNI paneli açıyor.
-    for tetik in ("model-btn", "chat-model-btn"):
+    # Görünen yüz: ÜÇ çip düğmesi de AYNI paneli açıyor.
+    #
+    # Üçüncüsü arena ekseni (`#arena-btn`): aynı liste, aynı filtre, aynı
+    # kapanma mekaniği — yalnız kartlar checkbox. İkinci bir model yüzeyi
+    # açmak, bu testin koruduğu tekilliği bozardı.
+    for tetik in ("model-btn", "chat-model-btn", "arena-btn"):
         assert f'id="{tetik}"' in html, f"#{tetik} yok — seçim açılamaz"
-    assert html.count('aria-controls="model-sheet"') == 2, (
-        "iki çip de #model-sheet'i işaret etmiyor")
+    assert html.count('aria-controls="model-sheet"') == 3, (
+        "üç çip de #model-sheet'i işaret etmiyor")
     # 2. madde: ortak kabuk.
     assert 'id="model-sheet" class="sheet sheet-bottom"' in html, (
         "panel ortak `.sheet` kabuğunu kullanmıyor — perde, Escape ve Android "
@@ -2992,7 +3012,9 @@ def test_model_secimi_NATIVE_kontrollerle_yapiliyor():
     # çağrı `TypeError` atar ve panel BOŞ açılır.
     liste = html.split('<fieldset id="model-sheet-list"', 1)[1].split("</fieldset>", 1)[0]
     assert "<legend" in liste, "#model-sheet-list adsız bir grup"
-    assert 'type = "radio"' in _js("core.js"), "kartlar native radyo kurmuyor"
+    assert '"checkbox" : "radio"' in _js("core.js"), (
+        "kartlar native radyo/checkbox kurmuyor — çoklu eksende de semantik "
+        "tarayıcıdan gelmek zorunda")
 
 
 def test_cip_dugmesinin_adi_EKSENI_de_soyluyor():
@@ -3537,6 +3559,28 @@ def test_yuzey_ORTAK_kapidan_aciliyor_ve_KAPANIYOR():
     for dugme in ("model-sheet-close", "model-sheet-ok"):
         assert f'$("{dugme}").addEventListener("click", closeSheets)' in js, (
             f"#{dugme} ortak kapanış kapısını kullanmıyor")
+
+
+def test_kapanis_ARIA_yi_TETIKTEN_sifirliyor_elle_sayilan_listeden_DEGIL():
+    """`aria-expanded` kapanışta `modelSheetTetik` üzerinden sıfırlanmak zorunda.
+
+    Öncesinde `closeSheets` iki çipi ELLE sayıyordu (#model-btn,
+    #chat-model-btn) ve o liste üçüncü eksen (arena) eklenince bayatladı:
+    #arena-btn kapanışta sıfırlanmıyor, yani ekran okuyucu KAPALI bir paneli
+    "açık" okuyordu — sessiz, çünkü ekranda hiçbir iz yok.
+
+    İddia listeyi geri gelmekten koruyor: paneli açan tetik zaten tek bir
+    değişkende yazılı (`openModelSheet` orayı yazıyor), o yüzden dördüncü
+    eksen de kendiliğinden kapsanıyor.
+    """
+    js = _js("core.js")
+    govde = js.split("function closeSheets() {", 1)[1].split("\n}", 1)[0]
+    assert 'modelSheetTetik.setAttribute("aria-expanded", "false")' in govde, (
+        "kapanış çipin aria-expanded'ını tetikten sıfırlamıyor")
+    for cip in ("model-btn", "chat-model-btn", "arena-btn"):
+        assert f'$("{cip}").setAttribute("aria-expanded"' not in govde, (
+            f"#{cip} kapanışta elle sayılıyor — liste bir sonraki eksende "
+            "yine bayatlar")
 
 
 def test_TAMAM_bir_ONAY_kapisi_DEGIL():

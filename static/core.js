@@ -182,18 +182,23 @@ function closeSheets() {
   for (const el of document.querySelectorAll(".sheet.open")) el.classList.remove("open");
   $("chat-sidebar-toggle").setAttribute("aria-expanded", "false");
   $("specs-btn").setAttribute("aria-expanded", "false");
-  // Model çipleri: ikisi de aynı paneli (#model-sheet) açıyor, yani hangisinin
-  // açtığına bakılmadan ikisi de kapanışta sıfırlanıyor — `aria-expanded`
-  // yalancı kalırsa ekran okuyucu kapalı bir paneli açık okur.
-  $("model-btn").setAttribute("aria-expanded", "false");
-  $("chat-model-btn").setAttribute("aria-expanded", "false");
   // ODAK İADESİ. `closeSheets` kapanışın TEK kapısı (× düğmesi, "Tamam",
   // perde, Escape, Android geri tuşu hepsi buraya düşüyor), yani iadenin de
   // tek yeri burası — beş çağıranın her birine ayrı ayrı yazmak, birini
   // unutmak demekti. `isConnected` şart: kart listesi yeniden çizilirken
   // tetikleyici DOM'dan düşmüş olabilir ve kopmuş bir düğüme odaklanmak
   // odağı `<body>`ye atar (chat.js'in menü deseninin aynı kontrolü).
-  if (modelSheetTetik && modelSheetTetik.isConnected) modelSheetTetik.focus();
+  //
+  // `aria-expanded` DE buradan sıfırlanıyor, aynı değişkenden. Öncesinde iki
+  // çip (#model-btn, #chat-model-btn) elle sayılıyordu ve o liste üçüncü
+  // eksen (arena) eklenince bayatladı: #arena-btn kapanışta sıfırlanmıyor,
+  // yani ekran okuyucu KAPALI bir paneli açık okuyordu. Tetikten okumak
+  // listeyi tümden kaldırıyor — dördüncü eksen kendiliğinden kapsanıyor.
+  // Kopmuş bir düğüme yazmak zararsız, o yüzden `isConnected` yalnız odakta.
+  if (modelSheetTetik) {
+    modelSheetTetik.setAttribute("aria-expanded", "false");
+    if (modelSheetTetik.isConnected) modelSheetTetik.focus();
+  }
   modelSheetTetik = null;
 }
 
@@ -325,6 +330,17 @@ function axisLabel(key) {
  */
 function syncRunCost() {
   const el = $("run-cost");
+  // ARENA: turun toplamı, çünkü kullanıcı tek bir düğmeye basıp N modeli
+  // birden ödüyor. Tarife yine tek kaynaktan (`arenaSutunlari`), yani
+  // gösterilen fiyat ile gönderilen istek aynı çeviriyi kullanıyor.
+  if (arenaAcik) {
+    const sutunlar = arenaSutunlari();
+    if (!sutunlar.length) { el.hidden = true; return; }
+    const toplam = sutunlar.reduce((t, s) => t + (s.birim || 0), 0);
+    el.textContent = `≈ ${toplam} kredi · ${sutunlar.length} model`;
+    el.hidden = false;
+    return;
+  }
   if (!currentModel) { el.hidden = true; return; }
   const tarife = currentModel.credits_by_quality || {};
   const birim = tarife[$("quality").value] ?? currentModel.credits;
@@ -367,6 +383,22 @@ function goBlockReason() {
   if (source && !currentModel.supports_edit) {
     return `${currentModel.label} referans görselle çalışmıyor.`;
   }
+  if (arenaAcik) {
+    // Kapının sebebi yazılı: tek modelli bir arena sessizce sıradan bir
+    // üretime dönüşseydi kullanıcı karşılaştırma beklerken tek sonuç alırdı.
+    const idler = arenaSecimi();
+    if (idler.length < ARENA_MIN) return `Arena için en az ${ARENA_MIN} model seç.`;
+    // Sessizce sıradan bir düzenlemeye düşmek YASAK (uygulamanın genel
+    // duruşu): kullanıcı arena açıkken referans eklerse ne olacağını
+    // görmeli. Düzenleme arenası bilinçli olarak kapsam dışı.
+    if (source) return "Arena düzenlemeyle çalışmıyor — referansı kaldır.";
+    const anahtarsiz = idler
+      .map((id) => imageModels.find((m) => m.id === id))
+      .filter((m) => m && !m.configured);
+    if (anahtarsiz.length) {
+      return `${anahtarsiz[0].label} için anahtar yok — Ayarlar'dan ekle.`;
+    }
+  }
   return "";
 }
 
@@ -400,6 +432,16 @@ function setModelLogo(imgId, model) {
   img.hidden = !src;
 }
 
+/** `#n` ekseninin seçenekleri: 1..max_n.
+ *
+ * Tek yerde, çünkü İKİ çağıranı var — `applyModel` ve arena kapanışındaki geri
+ * açma (`arenaUygula`). İki kopyadan biri modelin tavanını unutabilirdi.
+ */
+function adetSecenekleri(model) {
+  return Array.from({ length: model.max_n },
+                    (_, i) => ({ value: String(i + 1), label: String(i + 1) }));
+}
+
 /** Seçili modeli uygular: eksenleri doldurur, notu yazar, tercihi kaydeder. */
 function applyModel(id, { announce = true } = {}) {
   const model = imageModels.find((m) => m.id === id);
@@ -422,9 +464,7 @@ function applyModel(id, { announce = true } = {}) {
   if (s) dusenler.push(`${axisLabel("size")} ${s}`);
   const q = fillAxis("quality", model.qualities, undefined, model.default_quality);
   if (q) dusenler.push(`${axisLabel("quality")} ${q}`);
-  const adetler = Array.from({ length: model.max_n },
-                             (_, i) => ({ value: String(i + 1), label: String(i + 1) }));
-  const nn = fillAxis("n", adetler, undefined, "1");
+  const nn = fillAxis("n", adetSecenekleri(model), undefined, "1");
   if (nn) dusenler.push(`${axisLabel("n")} ${nn}`);
 
   // `quality_hidden` beyan eden model: satır tümden gizleniyor. Tel üzerinde
@@ -597,7 +637,206 @@ function applyModels(s, tercih) {
   const id = secilecek(imageModels, tercih, s.default_image_model);
   renderModelOptions(id);
   applyModel(id, { announce: false });
+  // Arena kümesinin seçenekleri de aynı katalogdan; Ayarlar kaydedildiğinde
+  // (anahtar girildi → `configured` değişti) burası da tazelenmezse arena
+  // paneli bayat bir listeyle çizilirdi.
+  renderArenaOptions();
+  // Ve kümenin GÖRÜNEN sonuçları da tazeleniyor: katalogdan düşen bir model
+  // seçimden de düşer, ama çip "2 model" demeye devam ederdi — tek yazardan
+  // geçmeyen tek yol tam olarak burasıydı.
+  arenaUygula();
 }
+
+// ── Arena: aynı prompt, birden çok model ─────────────────────────────
+//
+// Arena TURU, model başına AYRI bir `POST /api/generate` isteğidir; fan-out
+// istemcide, sunucuda DEĞİL. Üç ölçülmüş sebep (uzunu models.py'de):
+//   · zaman aşımı bütçesi model başına hesaplanıyor (providers.total_budget),
+//     tek istekte fan-out isteği en yavaş modele bağlardı;
+//   · uçtaki hata modeli tek yollu (502), "3 modelden 1'i düştü" ifade
+//     edilemiyor — ayrı istekte her sütun kendi hatasını taşıyor;
+//   · sunucu zaten çok iş parçacıklı (senkron `def` + anyio havuzu), yani
+//     N istek gerçekten paralel koşuyor.
+//
+// EKSEN ÇEVİRİSİ arenanın asıl işi: modellerin jeton kümeleri farklı
+// (Azure `1024x1536`, Gemini `2:3`; Azure düşük/orta/yüksek, Gemini 1K/2K/4K).
+// Kullanıcı TEK ayar seçiyor, `arenaSutunlari` onu model başına çeviriyor —
+// boyut ORAN üzerinden (sunucu her jetonun oranını yayınlıyor), kalite ise
+// SIRA üzerinden. İkinci bir "hangi ayar" kaynağı doğmuyor.
+
+const ARENA_MIN = 2;
+const ARENA_MAX = 4;
+
+let arenaAcik = false;
+
+/** Arena kümesi: `<select multiple>`in seçili id'leri, DOM SIRASINDA.
+ *
+ * Sıra bir süs değil sözleşme: İLK id birinci sütun, yani `#size`/`#quality`
+ * eksenlerini süren model ve öteki sütunların çevirisinin KAYNAĞI.
+ */
+function arenaSecimi() {
+  return [...$("arena-models").selectedOptions].map((o) => o.value);
+}
+
+/** Kümenin seçeneklerini katalogdan çizer; seçili olanlar korunur. */
+function renderArenaOptions() {
+  const secili = new Set(arenaSecimi());
+  $("arena-models").replaceChildren(...imageModels.map((m) => {
+    const o = document.createElement("option");
+    o.value = m.id;
+    // Ad kurgusu görsel şeridiyle TEK kaynaktan (`modelSecenekMetni`).
+    o.textContent = modelSecenekMetni(m, true);
+    o.selected = secili.has(m.id);
+    return o;
+  }));
+}
+
+/** Panelde bir kutucuğa dokunuldu: kümeye gir ya da çık.
+ *
+ * TAVAN kutucuğun kendisinde uygulanıyor (`checked` geri alınıyor), çünkü
+ * beşinci modeli sessizce yok saymak "bastım, hiçbir şey olmadı" demek olurdu
+ * — kapalı `#go`nun sebebini `title`a yazan duruşun aynısı.
+ */
+function arenaKutucuk(kutucuk) {
+  if (!kutucuk || !kutucuk.value) return;
+  const idler = arenaSecimi();
+  if (kutucuk.checked && !idler.includes(kutucuk.value)) {
+    if (idler.length >= ARENA_MAX) {
+      kutucuk.checked = false;
+      statusEl.textContent = `Arena en çok ${ARENA_MAX} model karşılaştırıyor.`;
+      return;
+    }
+    idler.push(kutucuk.value);
+  } else if (!kutucuk.checked) {
+    const yer = idler.indexOf(kutucuk.value);
+    if (yer >= 0) idler.splice(yer, 1);
+  }
+  arenaSecimiYaz(idler);
+}
+
+/** Kümeyi yazan TEK yer: `<select multiple>` değerin sahibi, `arenaUygula`
+ * da o değerin bütün görünen sonuçlarının tek yazarı. */
+function arenaSecimiYaz(idler) {
+  const kume = new Set(idler);
+  for (const o of $("arena-models").options) o.selected = kume.has(o.value);
+  arenaUygula();
+}
+
+/** Seçili modellerin ORTAK oranları — birinci sütunun jetonlarıyla ifade edilmiş.
+ *
+ * Kesişim, çünkü kesişim dışı bir oran seçilirse bazı sütunlar sessizce kendi
+ * varsayılanına düşer ve karşılaştırma farklı çerçevelerde yapılırdı: aynı
+ * prompt'u aynı koşulda koşturmak arenanın tanımı.
+ */
+function arenaOrtakBoyutlar(idler) {
+  const modeller = idler.map((id) => imageModels.find((m) => m.id === id))
+                        .filter(Boolean);
+  if (!modeller.length) return [];
+  const [ilk, ...digerleri] = modeller;
+  return ilk.sizes.filter(
+    (s) => digerleri.every((m) => m.sizes.some((o) => o.ratio === s.ratio)));
+}
+
+/** Arena sütunları: model başına ÇEVRİLMİŞ eksen + birim kredi.
+ *
+ * TEK KAYNAK: maliyet göstergesi de üretim isteği de buradan okuyor. İki ayrı
+ * yerde çevrilseydi kullanıcıya gösterilen fiyat ile faturalanan tur sessizce
+ * ayrışırdı — bu deponun en sevmediği kırılma sınıfı.
+ *
+ * Boyut ORAN üzerinden eşleniyor (`sizes[].ratio` sunucudan geliyor, istemci
+ * jeton AYRIŞTIRMIYOR); oranı olmayan modelde varsayılana düşülüyor.
+ * Kalite SIRA üzerinden: `qualities` demetleri artan sırada ve
+ * `credits_by_quality` bunu doğruluyor (4/8/16 · 6/6/12 · 27/27/48), yani
+ * "yüksek" ile "4K" aynı basamağın iki adı. Demet daha kısaysa son basamağa
+ * kırpılıyor.
+ */
+function arenaSutunlari() {
+  const oran = $("size").selectedOptions[0]?.dataset.ratio || $("size").value;
+  const sira = Math.max(0, [...$("quality").options]
+    .findIndex((o) => o.value === $("quality").value));
+  return arenaSecimi().map((id) => {
+    const m = imageModels.find((x) => x.id === id);
+    if (!m || !m.sizes.length || !m.qualities.length) return null;
+    const boyut = m.sizes.find((s) => s.ratio === oran)
+                  || m.sizes.find((s) => s.value === m.default_size)
+                  || m.sizes[0];
+    const kalite = m.qualities[Math.min(sira, m.qualities.length - 1)];
+    const tarife = m.credits_by_quality || {};
+    return { model: m, size: boyut.value, quality: kalite.value,
+             birim: tarife[kalite.value] ?? m.credits };
+  }).filter(Boolean);
+}
+
+/** Arena durumunun görünen her sonucunun TEK yazarı.
+ *
+ * `#model`e YAZIYOR ama `change` ATMIYOR ve bu bilinçli: `change` dinleyicisi
+ * tercihi diske yazıyor (`savePref`) — arena kümesindeki bir gezinme
+ * kullanıcının kalıcı model tercihini değiştirmemeli. `applyModel` doğrudan
+ * çağrılıyor, yani eksen doldurma/geri düşme mekanizması ikinci kez
+ * kurulmuyor.
+ */
+function arenaUygula() {
+  const idler = arenaSecimi();
+  $("arena-toggle").setAttribute("aria-pressed", String(arenaAcik));
+  $("arena-btn").hidden = !arenaAcik;
+  $("model-pick").hidden = arenaAcik;
+  $("arena-btn-label").textContent = `${idler.length} model`;
+  // Adet arenada 1'e kilitli: sütun başına tek görsel karşılaştırmanın
+  // kendisi. 4 model × 4 görsel hem ızgarayı hem faturayı okunmaz yapardı.
+  $("spec-n").hidden = arenaAcik;
+  if (arenaAcik) {
+    if (idler.length && idler[0] !== $("model").value) {
+      applyModel(idler[0], { announce: false });
+    }
+    const ortak = arenaOrtakBoyutlar(idler);
+    if (ortak.length) {
+      const dusen = fillAxis("size", ortak, undefined, ortak[0].value);
+      if (dusen) {
+        statusEl.textContent = "Seçilen modellerin ortak oranı bu değil, "
+          + `${$("size").selectedOptions[0]?.textContent.trim()} seçildi.`;
+      }
+    }
+    if ($("n").value !== "1") $("n").value = "1";
+    syncSpecs();
+  } else if (currentModel) {
+    // ARENA KAPANIŞI eksenleri GERİ AÇIYOR ve bu iki satır açılışın birebir
+    // tersi: açılışta `#size` modellerin KESİŞİMİNE daraltılıyor, `#n` de 1'e
+    // kilitleniyor. Geri açan kod yoktu ve kırılma arena KAPANDIKTAN sonra
+    // görülüyordu — Nano Banana (10 oran) ile Azure (3) arasında bir arena
+    // kurup kapatan kullanıcı, TEK MODEL üretiminde de oran ekseninde 3
+    // seçenek görmeye devam ediyordu; adet de 1'e mıhlı kalıyordu. Model
+    // yeniden seçilmeden düzelmiyordu, yani sessiz.
+    //
+    // Kullanıcının seçimi bozulmuyor: kesişim modelin kümesinin ALT kümesi,
+    // `fillAxis` de birebir aynı `value`yu koruyor (1. kademe). `applyModel`
+    // çağırmak yerine iki eksenin doldurulması, çünkü arena YALNIZ bu ikisine
+    // dokunuyor — kalite/şerit/tercih zincirini yeniden koşturmak kapsam dışı.
+    fillAxis("size", currentModel.sizes, undefined, currentModel.default_size);
+    fillAxis("n", adetSecenekleri(currentModel), undefined, "1");
+    syncSpecs();
+  }
+  syncRunCost();
+  syncGoGate();
+}
+
+$("arena-toggle").addEventListener("click", () => {
+  arenaAcik = !arenaAcik;
+  // Kapatırken açık arena paneli de kapanıyor: kapalı bir arenanın "hangi
+  // modeller" listesi ekranda asılı kalırdı.
+  if (!arenaAcik) { closeSheets(); arenaUygula(); return; }
+  // AÇILIŞ TOHUMU: küme boşsa o anki model birinci sütun olarak giriyor —
+  // boş bir arena "hangi modeller" sorusunu cevapsız bırakırdı. Panel de
+  // hemen açılıyor, çünkü tek modelli arena diye bir şey yok ve kullanıcının
+  // sıradaki işi zaten ikinciyi seçmek.
+  if (arenaSecimi().length < ARENA_MIN && $("model").value) {
+    arenaSecimiYaz([$("model").value]);
+  } else {
+    arenaUygula();
+  }
+  openModelSheet("arena");
+});
+
+
 
 // ── Prompt Yönetmeni'nin model şeridi ────────────────────────────────
 //
@@ -714,6 +953,19 @@ const MODEL_EKSENLERI = {
     logo: "chat-model-logo", baslik: "Yönetmen modeli", kredi: false,
     liste: () => chatModels,
   },
+  // ÜÇÜNCÜ EKSEN, ikinci bir panel DEĞİL: arena aynı listeyi, aynı filtreyi
+  // (`secilebilirler`) ve aynı kapanma mekaniğini kullanıyor. Tek farkı
+  // `coklu` — kartlar radyo yerine checkbox çiziyor.
+  //
+  // `logo` YOK: arena çipi birden çok sağlayıcıyı temsil ediyor ve tek bir
+  // işaret onlardan birini seçmek zorunda kalırdı. Çipin metnini
+  // `arenaUygula` yazıyor (tek yazar), `syncModelChip` bu eksene hiç
+  // dokunmuyor.
+  arena: {
+    secici: "arena-models", dugme: "arena-btn", etiket: "arena-btn-label",
+    logo: null, baslik: "Arena modelleri", kredi: true, coklu: true,
+    liste: () => imageModels,
+  },
 };
 
 // Panel o an hangi ekseni gösteriyor. `#model-sheet[data-axis]` ile İKİZ ve
@@ -760,7 +1012,12 @@ function syncModelChip(eksenAdi, model) {
  */
 function renderModelCards(eksenAdi) {
   const eksen = MODEL_EKSENLERI[eksenAdi];
-  const secili = $(eksen.secici).value;
+  // ÇOKLU eksende değer bir DİZİ (<select multiple>'ın seçili seçenekleri),
+  // tekilde tek dize. `secilebilirler`in "seçili id her zaman listede" kaçış
+  // kapısı ikisinde de İLK id ile besleniyor: arenada birinci sütun zaten
+  // eksenleri süren model, yani listede kalması gereken de o.
+  const secililer = eksen.coklu ? arenaSecimi() : [$(eksen.secici).value];
+  const secili = secililer[0] || "";
   const kok = $("model-sheet-list");
   const legend = kok.querySelector("legend");
 
@@ -808,16 +1065,20 @@ function renderModelCards(eksenAdi) {
       metin.append(tarife);
     }
 
-    // GERÇEK RADYO: ok tuşu gezintisi, grup semantiği ve `:checked` durumu
-    // tarayıcıdan geliyor. Eski native <select> kararının itirazı ("ARIA
-    // listbox'ı sıfırdan getirirdi") tam olarak burada karşılanıyor.
-    const radyo = document.createElement("input");
-    radyo.type = "radio";
-    radyo.name = "model-sheet-pick";
-    radyo.value = m.id;
-    radyo.checked = m.id === secili;
+    // GERÇEK RADYO / CHECKBOX: ok tuşu gezintisi, grup semantiği ve
+    // `:checked` durumu tarayıcıdan geliyor. Eski native <select> kararının
+    // itirazı ("ARIA listbox'ı sıfırdan getirirdi") tam olarak burada
+    // karşılanıyor — çoklu eksende de, çünkü checkbox grubu zaten native.
+    //
+    // `name` çoklu eksende de yazılıyor: checkbox'lar için gruplama etkisi
+    // yok, ama testler ve CSS tek bir seçiciyle ikisini birden buluyor.
+    const kutucuk = document.createElement("input");
+    kutucuk.type = eksen.coklu ? "checkbox" : "radio";
+    kutucuk.name = "model-sheet-pick";
+    kutucuk.value = m.id;
+    kutucuk.checked = eksen.coklu ? secililer.includes(m.id) : m.id === secili;
 
-    kart.append(kutu, metin, radyo);
+    kart.append(kutu, metin, kutucuk);
     return kart;
   });
 
@@ -874,7 +1135,11 @@ function openModelSheet(eksenAdi) {
 // tazelenmesi) oraya bağlı. Panelden ayrıca `applyModel` çağırmak o zincirin
 // ikinci bir kopyası olurdu.
 $("model-sheet-list").addEventListener("change", (e) => {
-  const secici = $(MODEL_EKSENLERI[modelSheetEkseni].secici);
+  const eksen = MODEL_EKSENLERI[modelSheetEkseni];
+  // Çoklu eksende yönlendirilecek tek bir değer yok: kutucuk kümeye giriyor
+  // ya da çıkıyor (bkz. arenaKutucuk).
+  if (eksen.coklu) { arenaKutucuk(e.target); return; }
+  const secici = $(eksen.secici);
   // AYNI DEĞERE ikinci dokunuş sessiz: native <select> de değişmeyen bir
   // değer için `change` atmıyor. Bu satır olmadan aynı karta her dokunuş
   // diske bir `POST /api/prefs` yazardı — ekranda hiçbir iz bırakmadan.
@@ -885,6 +1150,7 @@ $("model-sheet-list").addEventListener("change", (e) => {
 
 $("model-btn").addEventListener("click", () => openModelSheet("image"));
 $("chat-model-btn").addEventListener("click", () => openModelSheet("chat"));
+$("arena-btn").addEventListener("click", () => openModelSheet("arena"));
 $("model-sheet-close").addEventListener("click", closeSheets);
 // "Tamam" yalnızca KAPATIYOR: seçim dokunulduğu an uygulanmış ve tercih
 // yazılmış oluyor (#pref-autosave ve tema seçicisinin deseni). Bir onay
@@ -1381,9 +1647,143 @@ function clearSource() {
 }
 
 // Tek eylem: referans varsa düzenle, yoksa üret
+/** Turun ORTAK kimliği. `storage._SAFE_ID` ile uyumlu 12 hex.
+ *
+ * İSTEMCİ üretiyor çünkü sütunlar AYRI isteklerle gidiyor ve hepsinin aynı
+ * etiketi taşıması gerekiyor; sunucudan almak turun başına fazladan bir
+ * gidiş-dönüş koyardı. Çakışma riski yok: etiket yalnızca kayıtları
+ * gruplamak için, kimlik uzayı da tura özel.
+ */
+function arenaKimlik() {
+  const ham = (typeof crypto !== "undefined" && crypto.randomUUID)
+    ? crypto.randomUUID().replace(/-/g, "")
+    : Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2);
+  return ham.replace(/[^0-9a-f]/g, "").slice(0, 12).padEnd(12, "0");
+}
+
+/** ARENA TURU: aynı prompt, N model, N PARALEL istek.
+ *
+ * `run()`ın kardeşi ve ondan ayrı, çünkü akışın üç yeri birden farklı: istek
+ * çoğul, bekleme sütunlu, başarısızlık KISMİ. Ortak yerler (palet okuma,
+ * oturum etiketi, prompt kutusunun boşaltılıp hatada geri konması) aynı
+ * fonksiyonlardan geçiyor.
+ *
+ * `Promise.all` bir BARİYER değil: her sütun kendi `then`inde ekrana basılıyor
+ * (`fillArenaSlot`), yani ilk biten ilk görünüyor. Beklenen tek şey turun
+ * KAPANIŞI — döküm kaydı ve `#go` kilidi hepsi bitince açılıyor.
+ */
+async function runArena(prompt) {
+  // Klavye yolu (⌘/Ctrl+Enter) `#go.disabled`a hiç bakmıyor, yani kapı burada
+  // yeniden sorulmak zorunda — ve TAMAMI sorulmak zorunda. Öncesinde yalnız
+  // sütun SAYISI ölçülüyordu ve o eksiklik `goBlockReason`ın referans engelini
+  // ("Arena düzenlemeyle çalışmıyor") ölü bir metne çeviriyordu: referans
+  // ekliyken Enter, kaynağı sessizce düşürüp N tane ÜCRETLİ istek atıyordu —
+  // üstelik #go "Görseli düzenle" yazarken ve kullanıcı referansı EKRANDA
+  // görürken. Kapının tek sahibi `goBlockReason`; burada ikinci bir kopyası
+  // kurulmuyor, olduğu gibi soruluyor.
+  const engel = goBlockReason();
+  if (engel) { statusEl.textContent = engel; return; }
+  // Sayı kapıdan SONRA da ölçülüyor, çünkü kapı SEÇİMİ sayıyor
+  // (`arenaSecimi`) ama koşacak olan sütunlar `arenaSutunlari` — katalogda
+  // bulunmayan bir id orada düşüyor (`filter(Boolean)`), yani ikisi ayrışabilir.
+  const sutunlar = arenaSutunlari();
+  if (sutunlar.length < ARENA_MIN) {
+    statusEl.textContent = `Arena için en az ${ARENA_MIN} model seç.`;
+    return;
+  }
+
+  $("prompt").value = "";
+  autoGrow($("prompt"));
+  syncAskDirector();
+
+  const pal = readPaletteOpts();
+  const sessionId = openSessionId();
+  const arenaId = arenaKimlik();
+  const pending = beginArenaTurn(prompt, sutunlar);
+
+  runBusy = true;
+  syncGoGate();
+  statusEl.textContent = `${sutunlar.length} model üretiyor…`;
+
+  const sonuclar = new Array(sutunlar.length).fill(null);
+  const hatalar = [];
+  // `try/finally` `run()`ın deseni ve AYNI gerekçeyle: `runBusy = false` düz
+  // akışta duruyordu, oysa aşağıdaki `finishArenaTurn`/`loadHistory` kendi
+  // try/catch'ini TUTMUYOR. Orada kopan bir bağlantı `runBusy`i true bırakıp
+  // #go'yu sayfa yenilenene kadar "Üretim sürüyor…" diye kilitliyordu —
+  // görseller çoktan diske düşmüşken, yani kilidin sebebi de yalan.
+  try {
+    await Promise.all(sutunlar.map(async (s, i) => {
+      try {
+        const res = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          // Adet sütun başına 1 (bkz. arenaUygula). `arena_id` bayat bir
+          // sunucuda `extra="forbid"`e takılıp 422 döner ve `detailText` bunu
+          // Türkçe bir "sunucu eski sürüm" mesajına çeviriyor — sessiz sapma yok.
+          body: JSON.stringify({ prompt, size: s.size, quality: s.quality, n: 1,
+                                 model: s.model.id, arena_id: arenaId,
+                                 folder_id: currentFolder ? currentFolder.id : null,
+                                 ...(sessionId ? { session_id: sessionId } : {}),
+                                 ...pal }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(detailText(err) || `Hata (${res.status})`);
+        }
+        const { images } = await res.json();
+        if (!images.length) throw new Error("Sunucu görsel döndürmedi.");
+        const kayit = { image_ids: images.map((r) => r.id),
+                        params: { kind: "generate", size: s.size,
+                                  quality: s.quality, model: s.model.id,
+                                  arena_id: arenaId } };
+        sonuclar[i] = kayit;
+        fillArenaSlot(pending, i, kayit, arenaId);
+        // Önizleme İLK BİTENE değil ilk SÜTUNA ait: sıra kullanıcının seçtiği
+        // sıra ve yarışın hızlısı, karşılaştırmanın birincisi değil.
+        if (i === 0) showPreview(images[0]);
+      } catch (e) {
+        hatalar.push(`${s.model.short_label || s.model.label}: ${e.message}`);
+        failArenaSlot(pending, i, e.message);
+      }
+    }));
+
+    const tutan = sonuclar.filter(Boolean);
+    // Sayı ÖNCE, sebep sonra: "2/3" turun sonucunu tek bakışta veriyor, düşen
+    // sütunun sebebi de kaybolmuyor (uyarıların listede toplanma kuralı).
+    //
+    // Özet döküm/geçmiş adımından ÖNCE yazılıyor: o adım patlarsa turun
+    // sonucu yine ekranda kalmalı, hata metni aşağıda onun ARDINA ekleniyor.
+    const ozet = `${tutan.length}/${sutunlar.length} model üretti.`;
+    statusEl.textContent = hatalar.length ? `${ozet} ${hatalar.join(" · ")}` : ozet;
+    if (!tutan.length) {
+      // HİÇ sütun tutmadı: tur geçmişte kalmıyor ve prompt kutuya geri dönüyor
+      // (`run`ın kuralı) — yeniden denemek onu ikinci kez eklemesin.
+      dropPendingTurn(pending);
+      $("prompt").value = prompt;
+      autoGrow($("prompt"));
+      syncAskDirector();
+    } else {
+      await finishArenaTurn(pending, tutan);
+      await loadHistory();
+    }
+  } catch (e) {
+    // Buraya YALNIZ döküm/geçmiş adımı düşüyor (sütun hataları kendi
+    // `catch`inde kalıyor). Görseller diskte, satır ekranda: söylenmezse
+    // kullanıcı sayfayı yenileyene kadar EKSİK bir geçmiş görür ve bunu
+    // açıklayamaz — "sessiz sapma yasak" duruşunun buradaki karşılığı.
+    statusEl.textContent = `${statusEl.textContent} Geçmiş yenilenemedi: ${e.message}`;
+  } finally {
+    runBusy = false;
+    syncGoGate();   // kapının tek yazarı (run()'ın deseni)
+  }
+}
+
 async function run() {
   const prompt = $("prompt").value.trim();
   if (!prompt) { statusEl.textContent = "Önce bir prompt yaz."; return; }
+  // ARENA kendi akışı: N istek, N sütun, kısmi başarısızlık.
+  if (arenaAcik) return runArena(prompt);
 
   $("prompt").value = "";
   autoGrow($("prompt"));

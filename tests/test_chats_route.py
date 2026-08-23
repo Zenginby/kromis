@@ -440,8 +440,11 @@ def test_a_result_record_round_trips_through_the_store(client, out_dir):
                        # göndermeyen bir istemcinin kaydı geçerli kalmak zorunda —
                        # v0.6'dan önce kaydedilmiş bütün oturumlar tam olarak
                        # öyle (bkz. models.ResultParams'ın gerekçesi).
+                       # `arena_id` de aynı yolla geldi (arena turu): varsayılanı
+                       # boş dize, "bu kayıt bir arena sütunu değil" demek.
                        "params": {"kind": "generate", "size": "1024x1024",
-                                  "quality": "medium", "model": ""}}
+                                  "quality": "medium", "model": "",
+                                  "arena_id": ""}}
     assert "content" not in got[-1], "sonuç kaydına None content yazılmış"
 
 

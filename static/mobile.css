@@ -191,6 +191,25 @@
      telefonda yanlış bilgi (bkz. core.js: dokunmatikte Enter satır atlar). */
   .chat-hint { display: none; }
 
+  /* Arena satırı telefonda EN ÇOK 2 sütun. Ölçü: 360px'lik ekranda tuvalin
+     içi ~328px; dört sütun (3×12px boşlukla) karo başına ~73px bırakıyor ve
+     73px'lik bir karede iki modelin farkı görünmez — o artık karşılaştırma
+     değil, küçük resim şeridi. Chromium 360×780'de ÖLÇÜLDÜ: iki sütunda karo
+     143px, tıklayıp büyütmeye de değecek bir ölçü.
+
+     3 ve 4 model 2×2 (ya da 2+1) sarıyor; `grid-auto-rows` yok, satır
+     yüksekliğini içerik veriyor — sütunların künyeleri farklı uzunlukta ve
+     sabit yükseklik kısa olanı boşluğa iterdi. */
+  .chat-result.arena-row,
+  .chat-result.arena-row[data-count="3"],
+  .chat-result.arena-row[data-count="4"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  /* Künye tek satıra sığmıyor: telefonda model adı + oran + kalite ~30
+     karakter ve ellipsis hepsini yiyordu. Sarmaya izin veriliyor. */
+  .arena-col .chat-role { white-space: normal; font-size: 11px; }
+
   /* Izgaralar: tek sütuna düşmeden 2 sütun kalsın. 268px'lik araç kartı
      360px'lik ekranda tek sütun oluyordu ve iki kart alt alta uzayıp
      gidiyordu. */

@@ -44,12 +44,12 @@ import prefs
 import storage
 import version
 from models import (MAX_CHAT_TITLE_CHARS, MAX_IMAGES_PER_RUN, MAX_PROMPT_CHARS,
-                    WIRE_CHAT_ROLES, WIRE_MESSAGE_FIELDS, BannerRequest,
-                    BulkImagesRequest, BulkMoveRequest, ChatRequest,
-                    ChatSaveRequest, FolderRequest, GenerateRequest, LogoRequest,
-                    MoveImageRequest, PrefsRequest, SavePaletteRequest,
-                    SettingsRequest, SuggestRequest, check_capabilities,
-                    check_drop_indices)
+                    WIRE_CHAT_ROLES, WIRE_MESSAGE_FIELDS, ArenaWinnerRequest,
+                    BannerRequest, BulkImagesRequest, BulkMoveRequest,
+                    ChatRequest, ChatSaveRequest, FolderRequest, GenerateRequest,
+                    LogoRequest, MoveImageRequest, PrefsRequest,
+                    SavePaletteRequest, SettingsRequest, SuggestRequest,
+                    check_capabilities, check_drop_indices)
 
 BASE_DIR = paths.REPO_DIR                    # geriye uyum: mevcut kullanımlar bozulmasın
 OUTPUT_DIR = paths.output_dir()
@@ -253,6 +253,21 @@ def _check_session(session_id: str | None) -> str | None:
     return session_id
 
 
+def _check_arena(arena_id: str | None) -> str | None:
+    """Boş/None ise arena değil (None). Doluysa BİÇİMİ doğrular, 422.
+
+    `_check_session` ile aynı duruş: VARLIK kapısı yok (turun ilk isteği
+    yazıldığında ortada henüz başka kayıt yoktur), yalnız biçim. Biçim kapısı
+    ise zorunlu — geçersiz bir id depoda sessizce düşerdi ve turun sütunları
+    birbirini hiç bulamazdı.
+    """
+    if not arena_id:
+        return None
+    if not storage.valid_id(arena_id):
+        raise HTTPException(status_code=422, detail="Geçersiz arena_id.")
+    return arena_id
+
+
 def _resolve_palette(seed: str, mode: str, *, offline: bool = False) -> list[dict]:
     """`(seed, mod)` → `[{"hex", "name"}]`. offline=True ise ağa ÇIKMAZ.
 
@@ -366,6 +381,7 @@ def _palette_prompt(prompt: str, seed: str | None, mode: str, strength: str,
 def generate(req: GenerateRequest) -> dict:
     folder_id = _check_folder(req.folder_id)
     session_id = _check_session(req.session_id)
+    arena_id = _check_arena(req.arena_id)
     prompt_sent, pal = _palette_prompt(req.prompt, req.palette_hex, req.palette_mode,
                                        req.palette_strength, req.palette_id,
                                        drop=req.palette_drop,
@@ -386,6 +402,10 @@ def generate(req: GenerateRequest) -> dict:
                            "quality": req.quality, "parent_id": None,
                            "folder_id": folder_id, "palette": pal,
                            "session_id": session_id,
+                           # Turun sütunları AYRI isteklerle geliyor (istemci
+                           # fan-out'u; bkz. models.GenerateRequest.arena_id) —
+                           # onları birbirine bağlayan tek şey bu etiket.
+                           "arena_id": arena_id,
                            "model": req.model, "credits": kredi,
                            # Ek düştüyse metin prompt'un birebir aynısı; storage
                            # sözleşmesi "yalnızca farklıysa" diyor (bkz. save).
@@ -1196,6 +1216,37 @@ def move_image(image_id: str, req: MoveImageRequest) -> dict:
     if not storage.set_folder(iid, target, OUTPUT_DIR):
         raise HTTPException(status_code=404, detail="Görsel bulunamadı.")
     return {"id": iid, "folder_id": target}
+
+
+@app.get("/api/arena/{arena_id}")
+def arena_round_route(arena_id: str) -> dict:
+    """Turun kayıtları, sütun sırasında. Bilinmeyen turda boş liste.
+
+    Döküm arena satırını KENDİ kayıtlarından çiziyor; bu uç yalnızca "kazanan
+    hangisi" sorusunu cevaplıyor. Ayrı bir uç, çünkü `/api/history` KLASÖRE
+    göre süzülüyor: başka klasöre taşınmış bir sütunu hiç döndürmezdi
+    (chat.js'in `/output/{id}.png` kararının aynı gerekçesi).
+
+    404 YOK: silinmiş bir tur, boş bir tur gibi okunuyor — döküm satırı yine
+    çizilebilir olmalı (sarkan id'nin yer tutucu davranışıyla aynı duruş).
+    """
+    return {"images": storage.arena_round(os.path.basename(arena_id), OUTPUT_DIR)}
+
+
+@app.post("/api/arena/{arena_id}/winner")
+def set_arena_winner_route(arena_id: str, req: ArenaWinnerRequest) -> dict:
+    """Arena turunun kazananını işaretler; tur başına TEK kazanan.
+
+    Elenen sonuç SİLİNMİYOR — işaret bir tercih kaydı, bir çöp kutusu değil:
+    kullanıcı iki gün sonra ötekini indirebilmeli. Depoda tek yazımla
+    yapılıyor (bkz. storage.set_arena_winner).
+    """
+    aid = os.path.basename(arena_id)
+    iid = os.path.basename(req.image_id)
+    if not storage.set_arena_winner(aid, iid, OUTPUT_DIR):
+        raise HTTPException(status_code=404,
+                            detail="Arena turu ya da görsel bulunamadı.")
+    return {"arena_id": aid, "winner": iid}
 
 
 @app.delete("/api/image/{image_id}")

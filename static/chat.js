@@ -1016,6 +1016,143 @@ function appendResult(msg) {
   return div;
 }
 
+// ── Arena satırı ─────────────────────────────────────────────────────
+//
+// Bir arena turu, dökümde SÜTUNLARI olan TEK satır; kalıcılıkta ise sütun
+// başına AYRI bir `result` kaydı (hepsi aynı `params.arena_id`). Ayrı
+// kayıtlar, çünkü bir kaydın `image_ids` tavanı bir TURUN çıktısı kadar
+// (`models.MAX_IMAGES_PER_RUN`) ve bir kayıtta tek `model` alanı var — dört
+// modeli tek kayda sıkıştırmak ikisini de bozardı.
+//
+// Satırı ARDIŞIKLIK topluyor (`renderThread`): kayıtlar tura ait sırayla
+// yazılıyor ve araya başka bir tur giremiyor (üretim sırasında `#go` kilitli).
+
+/** Sütun künyesi: "Nano Banana 2 · 2:3 · 2K · 12 kredi". */
+function arenaColumnCaption(msg, model) {
+  const p = msg.params || {};
+  const parts = [(model && (model.short_label || model.label)) || p.model || "Model"];
+  if (p.size) parts.push(SIZE_LABELS[p.size] || p.size);
+  if (p.quality) parts.push(QUALITY_LABELS[p.quality] || p.quality);
+  return parts.join(" · ");
+}
+
+/** Turun kazananını işaretler: uç + satırdaki basılı durum.
+ *
+ * İŞARETİN TEK KAYNAĞI `history.json` (bkz. storage.set_arena_winner) — döküm
+ * kaydına ikinci bir kopya yazılsaydı oturum kaydedilmeyen bir turda ikisi
+ * ayrışırdı. Bu yüzden düğme önce ucu çağırıyor, ancak BAŞARIDA basılı hâle
+ * geçiyor: ekranda gösterilen şey diskte olanla aynı kalıyor.
+ */
+async function markArenaWinner(row, arenaId, imageId) {
+  try {
+    await chatApi(`/api/arena/${encodeURIComponent(arenaId)}/winner`,
+                  { method: "POST", body: { image_id: imageId } });
+  } catch (e) {
+    chatStatus(`Kazanan işaretlenemedi: ${e.message}`);
+    return;
+  }
+  syncArenaWinner(row, imageId);
+  // Galeri rozeti aynı kaydı okuyor; tazelenmezse işaret orada bir sonraki
+  // yenilemeye kadar görünmez kalırdı.
+  if (typeof loadHistory === "function") loadHistory();
+}
+
+/** Satırdaki basılı durumun TEK yazarı: tur başına tek kazanan. */
+function syncArenaWinner(row, imageId) {
+  for (const btn of row.querySelectorAll(".arena-win")) {
+    btn.setAttribute("aria-pressed", String(btn.dataset.imageId === imageId));
+  }
+}
+
+/** Diskteki işareti satıra yansıtır. Sessiz başarısızlık BİLİNÇLİ: işaret bir
+ * tercih göstergesi, veri değil — uç düşerse satır işaretsiz çiziliyor ve
+ * kullanıcı yeniden işaretleyebiliyor. */
+async function refreshArenaWinner(row, arenaId) {
+  try {
+    const { images } = await chatApi(`/api/arena/${encodeURIComponent(arenaId)}`);
+    const kazanan = (images || []).find((r) => r.arena_win);
+    if (kazanan) syncArenaWinner(row, kazanan.id);
+  } catch (e) { /* işaretsiz kalıyor */ }
+}
+
+/** Bir sütunun gövdesi: künye + görseller + "Kazanan" düğmesi. */
+function arenaColumn(row, msg, arenaId) {
+  const p = msg.params || {};
+  const model = (typeof imageModels !== "undefined" ? imageModels : [])
+    .find((m) => m.id === p.model);
+  const caption = arenaColumnCaption(msg, model);
+
+  const col = document.createElement("div");
+  col.className = "arena-col";
+
+  const head = document.createElement("span");
+  head.className = "chat-role";
+  head.textContent = caption;
+  col.appendChild(head);
+
+  const ids = msg.image_ids || [];
+  const grid = document.createElement("div");
+  grid.className = "chat-result-grid";
+  grid.dataset.count = String(ids.length);
+  ids.forEach((id, i) => grid.appendChild(resultThumb(id, i, caption)));
+  col.appendChild(grid);
+
+  // Kazanan işareti: iki durumlu düğmenin depodaki standart deseni
+  // (`aria-pressed`). Elenen sonuç SİLİNMİYOR — işaret bir tercih kaydı.
+  if (arenaId && ids.length) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn-ghost arena-win";
+    btn.dataset.imageId = ids[0];
+    btn.setAttribute("aria-pressed", "false");
+    btn.textContent = "Kazanan";
+    btn.addEventListener("click", () => markArenaWinner(row, arenaId, ids[0]));
+    col.appendChild(btn);
+  }
+  return col;
+}
+
+/** Bir arena turunun sütunlarını tek satır olarak döküme basar. */
+function appendArenaRow(kayitlar) {
+  const arenaId = ((kayitlar[0] || {}).params || {}).arena_id || "";
+  const row = document.createElement("div");
+  row.className = "chat-result arena-row";
+  row.dataset.count = String(kayitlar.length);
+  if (arenaId) row.dataset.arenaId = arenaId;
+  for (const msg of kayitlar) row.appendChild(arenaColumn(row, msg, arenaId));
+
+  $("chat-log").appendChild(row);
+  syncEmptyState();
+  scrollMessageIntoView(row);
+  if (arenaId) refreshArenaWinner(row, arenaId);
+  return row;
+}
+
+/** Dökümü çizer: ardışık arena sütunları TEK satırda toplanıyor.
+ *
+ * AYRI fonksiyon çünkü İKİ yer çiziyor (oturum açma ve — ileride — dökümün
+ * yeniden kurulduğu her yer); döngüyü iki kez yazmak, gruplamanın birinde
+ * sessizce eksik kalması demekti.
+ */
+function renderThread(mesajlar) {
+  for (let i = 0; i < mesajlar.length; i++) {
+    const m = mesajlar[i];
+    const aid = m.role === RESULT_ROLE ? (m.params || {}).arena_id : "";
+    if (aid) {
+      const grup = [];
+      while (i < mesajlar.length && mesajlar[i].role === RESULT_ROLE
+             && (mesajlar[i].params || {}).arena_id === aid) {
+        grup.push(mesajlar[i]);
+        i += 1;
+      }
+      i -= 1;                     // döngü sayacı grubun SON öğesinde kalmalı
+      appendArenaRow(grup);
+    } else if (m.role === RESULT_ROLE) appendResult(m);
+    else if (m.role === "user") appendUser(m);
+    else appendBot(m.content);
+  }
+}
+
 function appendBot(text) {
   const parsed = parseDirectorReply(text);
   const div = document.createElement("div");
@@ -1334,6 +1471,105 @@ function beginResultTurn(prompt) {
   return { turn, bubble, pendingDiv };
 }
 
+/** Arena turunu döküme AÇAR: tek kullanıcı repliği + N sütunlu bekleme satırı.
+ *
+ * `beginResultTurn`in arena kardeşi. Kota N+1 sorularak isteniyor: turu AÇAN
+ * ve KAPATAN aynı kapıdan geçmek zorunda (bkz. transcriptHasRoom), yoksa
+ * sütunları döküme sığmayan bir tur açılırdı.
+ *
+ * Bekleme kutusu SÜTUN BAŞINA ayrı: `pixel-canvas` singleton değil, her örnek
+ * kendi rAF döngüsünü taşıyor ve DOM'a girdikten SONRA başlatılıyor (bağlanmamış
+ * düğümde ölçü 0'dır, tek piksel bile üretilmez).
+ */
+function beginArenaTurn(prompt, sutunlar) {
+  if (!sutunlar.length || !transcriptHasRoom(sutunlar.length + 1)) return null;
+  const turn = { role: "user", content: prompt.slice(0, MAX_CHAT_MSG_CHARS) };
+  chatThread.push(turn);
+  const bubble = appendUser(turn);
+
+  const row = document.createElement("div");
+  row.className = "chat-result arena-row is-pending";
+  row.dataset.count = String(sutunlar.length);
+
+  const slots = sutunlar.map((s) => {
+    const col = document.createElement("div");
+    col.className = "arena-col";
+    const head = document.createElement("span");
+    head.className = "chat-role";
+    // Künye BEKLERKEN de tam: hangi modelin hangi ayarla koştuğu, sonuç
+    // gelmeden önce de görünüyor — kolonlar birbirine karışmasın.
+    head.textContent = arenaColumnCaption(
+      { params: { size: s.size, quality: s.quality, model: s.model.id } }, s.model);
+    const shimmer = document.createElement("div");
+    shimmer.className = "pending-shimmer";
+    const pixels = document.createElement("pixel-canvas");
+    pixels.setAttribute("data-manual", "");
+    shimmer.appendChild(pixels);
+    col.append(head, shimmer);
+    row.appendChild(col);
+    return { col, pixels };
+  });
+
+  $("chat-log").appendChild(row);
+  for (const s of slots) {
+    if (typeof s.pixels.start === "function") s.pixels.start();
+  }
+  scrollMessageIntoView(row);
+  return { turn, bubble, pendingDiv: row, row, slots };
+}
+
+/** Bir sütun sonuçlandı: bekleme kutusunun yerine gerçek sütun geçiyor.
+ *
+ * Sütunu `arenaColumn` kuruyor — yani CANLI satır ile yeniden yüklenen satır
+ * AYNI çizim yolundan geçiyor. İki ayrı çizim, ikisinin zamanla ayrışması
+ * demekti (künye bir yerde krediyi yazar, öteki yazmaz).
+ */
+function fillArenaSlot(pending, index, msg, arenaId) {
+  const slot = pending && pending.slots && pending.slots[index];
+  if (!slot) return;
+  const yeni = arenaColumn(pending.row, msg, arenaId);
+  slot.col.replaceWith(yeni);
+  slot.col = yeni;
+}
+
+/** Bir sütun DÜŞTÜ: hata o sütunda kalıyor, tur devam ediyor.
+ *
+ * Arenanın istemci fan-out'uyla kazandığı şey tam olarak bu: tek istekte
+ * fan-out olsaydı bir sağlayıcının 502'si turun tamamını götürürdü.
+ */
+function failArenaSlot(pending, index, mesaj) {
+  const slot = pending && pending.slots && pending.slots[index];
+  if (!slot) return;
+  const not = document.createElement("p");
+  not.className = "arena-fail";
+  not.setAttribute("role", "status");
+  not.textContent = mesaj;
+  const shimmer = slot.col.querySelector(".pending-shimmer");
+  if (shimmer) shimmer.replaceWith(not);
+  else slot.col.appendChild(not);
+}
+
+/** Arena turunu KAPATIR: sütun başına bir `result` kaydı, TEK kalıcılaştırma.
+ *
+ * Kayıtlar `chatThread`e ARDIŞIK yazılıyor — dökümü yeniden çizen `renderThread`
+ * satırı tam olarak bu ardışıklıktan topluyor.
+ *
+ * Hiç sütun tutmadıysa tur geri alınıyor (`run`ın "başarısız tur geçmişte
+ * kalmaz" kuralı): cevapsız bir kullanıcı repliği kalırdı.
+ */
+async function finishArenaTurn(pending, kayitlar) {
+  if (!pending) return;
+  if (!kayitlar.length) { dropPendingTurn(pending); return; }
+  pending.done = true;
+  pending.row.classList.remove("is-pending");
+  // Rolü BURASI yazıyor: `RESULT_ROLE` bu dosyanın sabiti ve core.js'in onu
+  // ikinci kez tanımlaması (ya da dizeyi elle yazması) iki gerçek doğururdu.
+  for (const kayit of kayitlar) {
+    chatThread.push({ role: RESULT_ROLE, ...kayit });
+  }
+  await persistThread();
+}
+
 function dropPendingTurn(pending) {
   if (!pending || pending.done) return;
   chatThread = chatThread.filter((m) => m !== pending.turn);
@@ -1608,11 +1844,7 @@ async function openChat(chatId) {
     resetThread();
     currentChatId = chat.id;
     chatThread = chat.messages || [];
-    for (const m of chatThread) {
-      if (m.role === RESULT_ROLE) appendResult(m);
-      else if (m.role === "user") appendUser(m);
-      else appendBot(m.content);
-    }
+    renderThread(chatThread);
     lockStaleOptions();
     syncEmptyState();
     renderChatList();

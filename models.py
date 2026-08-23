@@ -135,6 +135,18 @@ class GenerateRequest(BaseModel):
     # dışı üretim; etiket o zaman kayda HİÇ yazılmaz (bkz. storage.save).
     # Varlık kapısı BİLEREK yok, yalnızca biçim: bkz. app._check_session.
     session_id: str | None = Field(default=None, max_length=MAX_ID_CHARS)
+    # ARENA TURU: aynı prompt'u birden çok modelde koşturan turun ortak etiketi.
+    # None/boş = arena değil, alan kayda HİÇ yazılmaz (`session_id`'nin kuralı).
+    #
+    # Turun N isteği İSTEMCİDEN paralel gidiyor ve id'yi de istemci üretiyor —
+    # sunucunun N modeli tek istekte fan-out etmemesi bilinçli: `providers`in
+    # zaman aşımı bütçesi MODEL BAŞINA hesaplanıyor (`total_budget`) ve tek
+    # yollu 502 hata modeli "3 modelden 1'i düştü"yü ifade edemiyor. Ayrı
+    # istekler, sütun başına zaman aşımı ve kısmi başarısızlık demek.
+    #
+    # Biçim burada doğrulanmıyor, yalnız uzunluk (`folder_id` geleneği, yukarısı):
+    # gerçek kapı depodaki `storage._SAFE_ID`.
+    arena_id: str | None = Field(default=None, max_length=MAX_ID_CHARS)
     # None = palet yok. Palet `(hex, mod)` çiftinin saf fonksiyonu olduğu için
     # tel üzerinde iki skaler yetiyor; sunucunun bir depoya bakması gerekmez.
     palette_hex: str | None = Field(default=None, max_length=7)
@@ -313,6 +325,17 @@ class MoveImageRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     folder_id: str | None = Field(default=None, max_length=64)  # None = klasörsüz (kök)
+
+
+class ArenaWinnerRequest(BaseModel):
+    """Arena turunun kazananı. Tur başına TEK kazanan (bkz. storage.set_arena_winner).
+
+    `arena_id` gövdede DEĞİL yolda: işaret bir turun İÇİNDEKİ seçim ve yol
+    kaynağı gösteriyor. Gövdede yalnız kazanan görselin id'si var.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    image_id: str = Field(min_length=1, max_length=MAX_ID_CHARS)
 
 
 # Çoklu seçim uçları: tek istek = tek history.json yazımı. İstemci tarafında
@@ -539,6 +562,15 @@ class ResultParams(BaseModel):
     # eski oturumlar bir daha KAYDEDİLEMEZ olurdu — PUT /api/chats/{id} 422
     # döner ve kullanıcı sessizce donmuş bir oturumla kalır.
     model: str = Field(default="", max_length=100)
+    # ARENA TURU (bkz. GenerateRequest.arena_id). Varsayılanı BOŞ dize, `model`
+    # alanının v0.6'da girdiği yolun aynısı: `extra="forbid"` taşıyan bu sınıfta
+    # alanı hiç göndermeyen eski kayıtlar geçerli kalmak ZORUNDA.
+    #
+    # Döküm, arena'yı bu alandan çiziyor: aynı `arena_id`'yi taşıyan ARDIŞIK
+    # sonuç kayıtları tek satırda sütunlara bölünüyor. Kayıt başına TEK model
+    # olduğu için sütun sayısı kadar kayıt var ve `image_ids` tavanı
+    # (MAX_IMAGES_PER_RUN) sütun başına geçerli kalıyor.
+    arena_id: str = Field(default="", max_length=MAX_ID_CHARS)
 
     @field_validator("kind")
     @classmethod

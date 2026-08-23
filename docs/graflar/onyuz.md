@@ -25,9 +25,10 @@ flowchart LR
   n_assets_js["assets.js"] -->|4| n_core_js["core.js"]
   n_assets_js["assets.js"] -->|2| n_folders_js["folders.js"]
   n_chat_js["chat.js"] -->|10| n_core_js["core.js"]
+  n_chat_js["chat.js"] -->|1| n_folders_js["folders.js"]
   n_chat_js["chat.js"] -->|1| n_palette_js["palette.js"]
   n_chat_js["chat.js"] -->|1| n_settings_js["settings.js"]
-  n_core_js["core.js"] -->|6| n_chat_js["chat.js"]
+  n_core_js["core.js"] -->|10| n_chat_js["chat.js"]
   n_core_js["core.js"] -->|2| n_folders_js["folders.js"]
   n_core_js["core.js"] -->|3| n_palette_js["palette.js"]
   n_core_js["core.js"] -->|1| n_settings_js["settings.js"]
@@ -48,8 +49,8 @@ flowchart LR
 | betik | satır | üst düzey tanım | çağırdığı sunucu yolları |
 | --- | --- | --- | --- |
 | `static/assets.js` | 492 | 22 | `/api/assets/{}`, `/api/assets/{}/{}`, `/api/banner`, `/api/banner/preview`, `/api/logo`, `/api/logo/preview`, `/assets/banners/{}`, `/assets/logos/{}`, `/assets/mottos/{}`, `/assets/{}/{}`, `/output/{}` |
-| `static/chat.js` | 1796 | 70 | `/api/chat`, `/api/chats`, `/api/chats/{}`, `/api/prefs`, `/output/{}.png` |
-| `static/core.js` | 1623 | 59 | `/api/edit`, `/api/generate`, `/api/image/{}`, `/api/output/{}/download`, `/api/prefs`, `/output/`, `/output/{}` |
+| `static/chat.js` | 2028 | 81 | `/api/arena/{}`, `/api/arena/{}/winner`, `/api/chat`, `/api/chats`, `/api/chats/{}`, `/api/prefs`, `/output/{}.png` |
+| `static/core.js` | 2023 | 69 | `/api/edit`, `/api/generate`, `/api/image/{}`, `/api/output/{}/download`, `/api/prefs`, `/output/`, `/output/{}` |
 | `static/folders.js` | 1430 | 50 | `/api/folders`, `/api/folders/{}`, `/api/folders/{}/download`, `/api/history`, `/api/images`, `/api/import`, `/output/{}` |
 | `static/mobile.js` | 52 | 0 | — |
 | `static/palette.js` | 756 | 37 | `/api/palette/suggest`, `/api/palettes`, `/api/palettes/{}` |

@@ -4153,7 +4153,11 @@ def test_ayarlar_yonlendirmesi_TEK_SABITTEN_geliyor():
 # Kullanıcının okuduğu belgeler — `docs/` BİLEREK dışarıda: oradaki `⚙`
 # atıfları TARİHSEL kayıt ("öncesinde şu yazıyordu"), yeni adla yazılsalar neyin
 # değiştiğini anlatamazlardı. Aynı ayrım `test_depo_adresi.py`'de de var.
-_KULLANICI_BELGELERI = ("GUNCELLEME.md", "KURULUM.md", "README.md")
+#
+# `CLAUDE.md` kullanıcıya değil GELİŞTİRİCİYE yazılı, ama listeye yine giriyor:
+# mandalın işi "kökteki hiçbir belge ölçütün dışında kalmasın" ve orada geçecek
+# bir `⚙`, arayüzden düşmüş glifi geri getirme riskini birebir aynı taşıyor.
+_KULLANICI_BELGELERI = ("CLAUDE.md", "GUNCELLEME.md", "KURULUM.md", "README.md")
 
 
 def test_belgeler_AYARLAR_dugmesini_glifle_anlatmiyor():

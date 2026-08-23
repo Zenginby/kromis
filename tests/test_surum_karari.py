@@ -152,6 +152,20 @@ def test_pakete_giren_md_dosyasi_guvenli_sayilmaz():
     assert sk.yol_guvenli("docs/android/mimari.md") is True
 
 
+def test_ajan_duzeni_yayin_gerektirmez():
+    """`CLAUDE.md` ve `.claude/` pakete girmiyor — yalnız harita yenilemek
+    için atılan bir commit sürüm artırmamalı. Bekçi burada, çünkü ikisi de
+    GUVENLI_YOLLAR'a SONRADAN eklendi ve beyaz listeden düşmeleri sessizce
+    "her graf güncellemesi bir yayın" demeye dönerdi."""
+    assert sk.yol_guvenli("CLAUDE.md") is True
+    assert sk.yol_guvenli(".claude/settings.json") is True
+    assert sk.yol_guvenli("docs/graflar/moduller.md") is True
+    # Kaynak tarafı hâlâ yayın gerektiriyor: harita üreticisi tools/ altında,
+    # ama app.py'ye dokunan bir commit graf yenilemesiyle birlikte gelirse
+    # karar yine "yayınla" olmalı.
+    assert sk.yol_guvenli("app.py") is False
+
+
 def test_tanimadigi_yol_yayin_gerektirir():
     """GUVENLI_YOLLAR bir BEYAZ liste: belirsizlik her zaman "yayınla"
     tarafına düşmeli. Yeni bir üst dizin eklendiğinde varsayılan davranış

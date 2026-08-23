@@ -3561,6 +3561,28 @@ def test_yuzey_ORTAK_kapidan_aciliyor_ve_KAPANIYOR():
             f"#{dugme} ortak kapanış kapısını kullanmıyor")
 
 
+def test_kapanis_ARIA_yi_TETIKTEN_sifirliyor_elle_sayilan_listeden_DEGIL():
+    """`aria-expanded` kapanışta `modelSheetTetik` üzerinden sıfırlanmak zorunda.
+
+    Öncesinde `closeSheets` iki çipi ELLE sayıyordu (#model-btn,
+    #chat-model-btn) ve o liste üçüncü eksen (arena) eklenince bayatladı:
+    #arena-btn kapanışta sıfırlanmıyor, yani ekran okuyucu KAPALI bir paneli
+    "açık" okuyordu — sessiz, çünkü ekranda hiçbir iz yok.
+
+    İddia listeyi geri gelmekten koruyor: paneli açan tetik zaten tek bir
+    değişkende yazılı (`openModelSheet` orayı yazıyor), o yüzden dördüncü
+    eksen de kendiliğinden kapsanıyor.
+    """
+    js = _js("core.js")
+    govde = js.split("function closeSheets() {", 1)[1].split("\n}", 1)[0]
+    assert 'modelSheetTetik.setAttribute("aria-expanded", "false")' in govde, (
+        "kapanış çipin aria-expanded'ını tetikten sıfırlamıyor")
+    for cip in ("model-btn", "chat-model-btn", "arena-btn"):
+        assert f'$("{cip}").setAttribute("aria-expanded"' not in govde, (
+            f"#{cip} kapanışta elle sayılıyor — liste bir sonraki eksende "
+            "yine bayatlar")
+
+
 def test_TAMAM_bir_ONAY_kapisi_DEGIL():
     """Seçim dokunuşta uygulanıyor; "Tamam" yalnızca kapatıyor.
 

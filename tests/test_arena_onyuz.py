@@ -24,6 +24,16 @@ def _core() -> str:
     return _metin("/static/core.js")
 
 
+def _kodsuz(js: str) -> str:
+    """Satır yorumlarını ayıklar.
+
+    Deponun DÖRT kez düştüğü tuzak (bkz. tests/test_index.py): "burada
+    şu yazmasın" biçimindeki bir iddia, kararın GEREKÇESİNDE geçen aynı
+    sözcüğe takılıyor — yani test kendi açıklamasını hata sayıyor.
+    """
+    return re.sub(r"//[^\n]*", "", js)
+
+
 def _govde(js: str, ad: str) -> str:
     """Bir fonksiyonun gövdesi (üst düzey, girintisiz kapanışa kadar)."""
     m = re.search(rf"function {ad}\([^)]*\)\s*\{{(.*?)\n\}}", js, re.S)
@@ -157,6 +167,27 @@ def test_the_shared_size_list_is_the_intersection_of_the_chosen_models():
     assert "arenaOrtakBoyutlar(idler)" in _govde(js, "arenaUygula")
 
 
+def test_closing_the_arena_gives_the_axes_back():
+    """Daraltma GERİ ALINMAK zorunda: arena `#size`i kesişime, `#n`i 1'e çekiyor.
+
+    Geri açan kod yokken kırılma arena KAPANDIKTAN sonra görülüyordu — Nano
+    Banana (10 oran) ile Azure (3) arasında bir arena kurup kapatan kullanıcı,
+    TEK MODEL üretiminde de 3 oran görmeye devam ediyordu ve adet 1'e mıhlı
+    kalıyordu. Model yeniden seçilmeden düzelmiyordu, yani sessiz.
+    """
+    js = _core()
+    govde = _govde(js, "arenaUygula")
+    kapanis = govde.split("} else if (currentModel) {")
+    assert len(kapanis) == 2, "arena kapanışında eksenleri geri açan dal yok"
+    assert 'fillAxis("size", currentModel.sizes' in kapanis[1], (
+        "oran ekseni kesişimde takılı kalıyor")
+    assert 'fillAxis("n", adetSecenekleri(currentModel)' in kapanis[1], (
+        "adet ekseni 1'de takılı kalıyor")
+    # Adet seçenekleri TEK yerden: iki kopyadan biri modelin tavanını unutabilirdi.
+    assert js.count("function adetSecenekleri(") == 1
+    assert "max_n" not in govde, "arena adet tavanını kendi başına kuruyor"
+
+
 # ── Tek yazar / kapı ───────────────────────────────────────────────────
 
 
@@ -187,6 +218,40 @@ def test_the_go_gate_names_every_arena_blocker():
     assert "Arena düzenlemeyle çalışmıyor" in govde, (
         "arena + referans hâli sessizce sıradan düzenlemeye düşüyor")
     assert "anahtar yok" in govde
+
+
+def test_the_keyboard_path_asks_the_WHOLE_gate_not_just_the_column_count():
+    """`runArena` kapının TAMAMINI soruyor, kendi kopyasını kurmuyor.
+
+    Klavye yolu (⌘/Ctrl+Enter → `submitComposer`) `#go.disabled`a hiç bakmıyor.
+    Yalnız sütun SAYISI ölçüldüğünde `goBlockReason`ın referans engeli ölü bir
+    metne dönüyordu: referans ekliyken Enter, kaynağı sessizce düşürüp N tane
+    ÜCRETLİ istek atıyordu — üstelik #go "Görseli düzenle" yazarken.
+    """
+    govde = _govde(_core(), "runArena")
+    assert "const engel = goBlockReason();" in govde, (
+        "tur kapının tamamını sormuyor — engelin bir kısmı uygulanmıyor")
+    # Sıra bağlayıcı: kapı İSTEKTEN önce sorulmak zorunda.
+    assert govde.index("goBlockReason()") < govde.index('fetch("/api/generate"'), (
+        "kapı istek gönderildikten sonra soruluyor")
+
+
+def test_a_stalled_history_refresh_does_not_wedge_the_go_button():
+    """`runBusy` `finally`de bırakılıyor (`run()`ın deseni).
+
+    `finishArenaTurn`/`loadHistory` kendi try/catch'ini tutmuyor: düz akışta
+    sıfırlanan bir kilit, kopan bağlantıda #go'yu sayfa yenilenene kadar
+    "Üretim sürüyor…" diye kapalı bırakıyordu — görseller diske düşmüşken.
+    """
+    govde = _kodsuz(_govde(_core(), "runArena"))
+    kuyruk = govde.split("} finally {")
+    assert len(kuyruk) == 2, "tur `finally` kullanmıyor"
+    assert "runBusy = false" in kuyruk[1], "kilit `finally` dışında bırakılıyor"
+    assert "runBusy = false" not in kuyruk[0], (
+        "kilit ayrıca düz akışta da bırakılıyor — ikinci bir sahip")
+    # Özet, patlayabilen döküm adımından ÖNCE yazılıyor: tur sonucu ekranda kalsın.
+    assert govde.index("model üretti.") < govde.index("finishArenaTurn(pending"), (
+        "tur özeti döküm adımından sonra yazılıyor — o adım patlarsa sonuç kaybolur")
 
 
 def test_the_cap_is_enforced_on_the_checkbox_itself():

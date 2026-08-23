@@ -182,18 +182,23 @@ function closeSheets() {
   for (const el of document.querySelectorAll(".sheet.open")) el.classList.remove("open");
   $("chat-sidebar-toggle").setAttribute("aria-expanded", "false");
   $("specs-btn").setAttribute("aria-expanded", "false");
-  // Model çipleri: ikisi de aynı paneli (#model-sheet) açıyor, yani hangisinin
-  // açtığına bakılmadan ikisi de kapanışta sıfırlanıyor — `aria-expanded`
-  // yalancı kalırsa ekran okuyucu kapalı bir paneli açık okur.
-  $("model-btn").setAttribute("aria-expanded", "false");
-  $("chat-model-btn").setAttribute("aria-expanded", "false");
   // ODAK İADESİ. `closeSheets` kapanışın TEK kapısı (× düğmesi, "Tamam",
   // perde, Escape, Android geri tuşu hepsi buraya düşüyor), yani iadenin de
   // tek yeri burası — beş çağıranın her birine ayrı ayrı yazmak, birini
   // unutmak demekti. `isConnected` şart: kart listesi yeniden çizilirken
   // tetikleyici DOM'dan düşmüş olabilir ve kopmuş bir düğüme odaklanmak
   // odağı `<body>`ye atar (chat.js'in menü deseninin aynı kontrolü).
-  if (modelSheetTetik && modelSheetTetik.isConnected) modelSheetTetik.focus();
+  //
+  // `aria-expanded` DE buradan sıfırlanıyor, aynı değişkenden. Öncesinde iki
+  // çip (#model-btn, #chat-model-btn) elle sayılıyordu ve o liste üçüncü
+  // eksen (arena) eklenince bayatladı: #arena-btn kapanışta sıfırlanmıyor,
+  // yani ekran okuyucu KAPALI bir paneli açık okuyordu. Tetikten okumak
+  // listeyi tümden kaldırıyor — dördüncü eksen kendiliğinden kapsanıyor.
+  // Kopmuş bir düğüme yazmak zararsız, o yüzden `isConnected` yalnız odakta.
+  if (modelSheetTetik) {
+    modelSheetTetik.setAttribute("aria-expanded", "false");
+    if (modelSheetTetik.isConnected) modelSheetTetik.focus();
+  }
   modelSheetTetik = null;
 }
 
@@ -427,6 +432,16 @@ function setModelLogo(imgId, model) {
   img.hidden = !src;
 }
 
+/** `#n` ekseninin seçenekleri: 1..max_n.
+ *
+ * Tek yerde, çünkü İKİ çağıranı var — `applyModel` ve arena kapanışındaki geri
+ * açma (`arenaUygula`). İki kopyadan biri modelin tavanını unutabilirdi.
+ */
+function adetSecenekleri(model) {
+  return Array.from({ length: model.max_n },
+                    (_, i) => ({ value: String(i + 1), label: String(i + 1) }));
+}
+
 /** Seçili modeli uygular: eksenleri doldurur, notu yazar, tercihi kaydeder. */
 function applyModel(id, { announce = true } = {}) {
   const model = imageModels.find((m) => m.id === id);
@@ -449,9 +464,7 @@ function applyModel(id, { announce = true } = {}) {
   if (s) dusenler.push(`${axisLabel("size")} ${s}`);
   const q = fillAxis("quality", model.qualities, undefined, model.default_quality);
   if (q) dusenler.push(`${axisLabel("quality")} ${q}`);
-  const adetler = Array.from({ length: model.max_n },
-                             (_, i) => ({ value: String(i + 1), label: String(i + 1) }));
-  const nn = fillAxis("n", adetler, undefined, "1");
+  const nn = fillAxis("n", adetSecenekleri(model), undefined, "1");
   if (nn) dusenler.push(`${axisLabel("n")} ${nn}`);
 
   // `quality_hidden` beyan eden model: satır tümden gizleniyor. Tel üzerinde
@@ -784,6 +797,22 @@ function arenaUygula() {
       }
     }
     if ($("n").value !== "1") $("n").value = "1";
+    syncSpecs();
+  } else if (currentModel) {
+    // ARENA KAPANIŞI eksenleri GERİ AÇIYOR ve bu iki satır açılışın birebir
+    // tersi: açılışta `#size` modellerin KESİŞİMİNE daraltılıyor, `#n` de 1'e
+    // kilitleniyor. Geri açan kod yoktu ve kırılma arena KAPANDIKTAN sonra
+    // görülüyordu — Nano Banana (10 oran) ile Azure (3) arasında bir arena
+    // kurup kapatan kullanıcı, TEK MODEL üretiminde de oran ekseninde 3
+    // seçenek görmeye devam ediyordu; adet de 1'e mıhlı kalıyordu. Model
+    // yeniden seçilmeden düzelmiyordu, yani sessiz.
+    //
+    // Kullanıcının seçimi bozulmuyor: kesişim modelin kümesinin ALT kümesi,
+    // `fillAxis` de birebir aynı `value`yu koruyor (1. kademe). `applyModel`
+    // çağırmak yerine iki eksenin doldurulması, çünkü arena YALNIZ bu ikisine
+    // dokunuyor — kalite/şerit/tercih zincirini yeniden koşturmak kapsam dışı.
+    fillAxis("size", currentModel.sizes, undefined, currentModel.default_size);
+    fillAxis("n", adetSecenekleri(currentModel), undefined, "1");
     syncSpecs();
   }
   syncRunCost();
@@ -1644,11 +1673,22 @@ function arenaKimlik() {
  * KAPANIŞI — döküm kaydı ve `#go` kilidi hepsi bitince açılıyor.
  */
 async function runArena(prompt) {
+  // Klavye yolu (⌘/Ctrl+Enter) `#go.disabled`a hiç bakmıyor, yani kapı burada
+  // yeniden sorulmak zorunda — ve TAMAMI sorulmak zorunda. Öncesinde yalnız
+  // sütun SAYISI ölçülüyordu ve o eksiklik `goBlockReason`ın referans engelini
+  // ("Arena düzenlemeyle çalışmıyor") ölü bir metne çeviriyordu: referans
+  // ekliyken Enter, kaynağı sessizce düşürüp N tane ÜCRETLİ istek atıyordu —
+  // üstelik #go "Görseli düzenle" yazarken ve kullanıcı referansı EKRANDA
+  // görürken. Kapının tek sahibi `goBlockReason`; burada ikinci bir kopyası
+  // kurulmuyor, olduğu gibi soruluyor.
+  const engel = goBlockReason();
+  if (engel) { statusEl.textContent = engel; return; }
+  // Sayı kapıdan SONRA da ölçülüyor, çünkü kapı SEÇİMİ sayıyor
+  // (`arenaSecimi`) ama koşacak olan sütunlar `arenaSutunlari` — katalogda
+  // bulunmayan bir id orada düşüyor (`filter(Boolean)`), yani ikisi ayrışabilir.
   const sutunlar = arenaSutunlari();
-  // Klavye yolu (⌘/Ctrl+Enter) `#go.disabled`a bakmıyor — kapı burada da
-  // sorulmak zorunda, yoksa tek modelli bir "arena" sessizce koşardı.
   if (sutunlar.length < ARENA_MIN) {
-    statusEl.textContent = goBlockReason() || `Arena için en az ${ARENA_MIN} model seç.`;
+    statusEl.textContent = `Arena için en az ${ARENA_MIN} model seç.`;
     return;
   }
 
@@ -1667,60 +1707,76 @@ async function runArena(prompt) {
 
   const sonuclar = new Array(sutunlar.length).fill(null);
   const hatalar = [];
-  await Promise.all(sutunlar.map(async (s, i) => {
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // Adet sütun başına 1 (bkz. arenaUygula). `arena_id` bayat bir
-        // sunucuda `extra="forbid"`e takılıp 422 döner ve `detailText` bunu
-        // Türkçe bir "sunucu eski sürüm" mesajına çeviriyor — sessiz sapma yok.
-        body: JSON.stringify({ prompt, size: s.size, quality: s.quality, n: 1,
-                               model: s.model.id, arena_id: arenaId,
-                               folder_id: currentFolder ? currentFolder.id : null,
-                               ...(sessionId ? { session_id: sessionId } : {}),
-                               ...pal }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(detailText(err) || `Hata (${res.status})`);
+  // `try/finally` `run()`ın deseni ve AYNI gerekçeyle: `runBusy = false` düz
+  // akışta duruyordu, oysa aşağıdaki `finishArenaTurn`/`loadHistory` kendi
+  // try/catch'ini TUTMUYOR. Orada kopan bir bağlantı `runBusy`i true bırakıp
+  // #go'yu sayfa yenilenene kadar "Üretim sürüyor…" diye kilitliyordu —
+  // görseller çoktan diske düşmüşken, yani kilidin sebebi de yalan.
+  try {
+    await Promise.all(sutunlar.map(async (s, i) => {
+      try {
+        const res = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          // Adet sütun başına 1 (bkz. arenaUygula). `arena_id` bayat bir
+          // sunucuda `extra="forbid"`e takılıp 422 döner ve `detailText` bunu
+          // Türkçe bir "sunucu eski sürüm" mesajına çeviriyor — sessiz sapma yok.
+          body: JSON.stringify({ prompt, size: s.size, quality: s.quality, n: 1,
+                                 model: s.model.id, arena_id: arenaId,
+                                 folder_id: currentFolder ? currentFolder.id : null,
+                                 ...(sessionId ? { session_id: sessionId } : {}),
+                                 ...pal }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(detailText(err) || `Hata (${res.status})`);
+        }
+        const { images } = await res.json();
+        if (!images.length) throw new Error("Sunucu görsel döndürmedi.");
+        const kayit = { image_ids: images.map((r) => r.id),
+                        params: { kind: "generate", size: s.size,
+                                  quality: s.quality, model: s.model.id,
+                                  arena_id: arenaId } };
+        sonuclar[i] = kayit;
+        fillArenaSlot(pending, i, kayit, arenaId);
+        // Önizleme İLK BİTENE değil ilk SÜTUNA ait: sıra kullanıcının seçtiği
+        // sıra ve yarışın hızlısı, karşılaştırmanın birincisi değil.
+        if (i === 0) showPreview(images[0]);
+      } catch (e) {
+        hatalar.push(`${s.model.short_label || s.model.label}: ${e.message}`);
+        failArenaSlot(pending, i, e.message);
       }
-      const { images } = await res.json();
-      if (!images.length) throw new Error("Sunucu görsel döndürmedi.");
-      const kayit = { image_ids: images.map((r) => r.id),
-                      params: { kind: "generate", size: s.size,
-                                quality: s.quality, model: s.model.id,
-                                arena_id: arenaId } };
-      sonuclar[i] = kayit;
-      fillArenaSlot(pending, i, kayit, arenaId);
-      // Önizleme İLK BİTENE değil ilk SÜTUNA ait: sıra kullanıcının seçtiği
-      // sıra ve yarışın hızlısı, karşılaştırmanın birincisi değil.
-      if (i === 0) showPreview(images[0]);
-    } catch (e) {
-      hatalar.push(`${s.model.short_label || s.model.label}: ${e.message}`);
-      failArenaSlot(pending, i, e.message);
+    }));
+
+    const tutan = sonuclar.filter(Boolean);
+    // Sayı ÖNCE, sebep sonra: "2/3" turun sonucunu tek bakışta veriyor, düşen
+    // sütunun sebebi de kaybolmuyor (uyarıların listede toplanma kuralı).
+    //
+    // Özet döküm/geçmiş adımından ÖNCE yazılıyor: o adım patlarsa turun
+    // sonucu yine ekranda kalmalı, hata metni aşağıda onun ARDINA ekleniyor.
+    const ozet = `${tutan.length}/${sutunlar.length} model üretti.`;
+    statusEl.textContent = hatalar.length ? `${ozet} ${hatalar.join(" · ")}` : ozet;
+    if (!tutan.length) {
+      // HİÇ sütun tutmadı: tur geçmişte kalmıyor ve prompt kutuya geri dönüyor
+      // (`run`ın kuralı) — yeniden denemek onu ikinci kez eklemesin.
+      dropPendingTurn(pending);
+      $("prompt").value = prompt;
+      autoGrow($("prompt"));
+      syncAskDirector();
+    } else {
+      await finishArenaTurn(pending, tutan);
+      await loadHistory();
     }
-  }));
-
-  const tutan = sonuclar.filter(Boolean);
-  if (!tutan.length) {
-    // HİÇ sütun tutmadı: tur geçmişte kalmıyor ve prompt kutuya geri dönüyor
-    // (`run`ın kuralı) — yeniden denemek onu ikinci kez eklemesin.
-    dropPendingTurn(pending);
-    $("prompt").value = prompt;
-    autoGrow($("prompt"));
-    syncAskDirector();
-  } else {
-    await finishArenaTurn(pending, tutan);
-    await loadHistory();
+  } catch (e) {
+    // Buraya YALNIZ döküm/geçmiş adımı düşüyor (sütun hataları kendi
+    // `catch`inde kalıyor). Görseller diskte, satır ekranda: söylenmezse
+    // kullanıcı sayfayı yenileyene kadar EKSİK bir geçmiş görür ve bunu
+    // açıklayamaz — "sessiz sapma yasak" duruşunun buradaki karşılığı.
+    statusEl.textContent = `${statusEl.textContent} Geçmiş yenilenemedi: ${e.message}`;
+  } finally {
+    runBusy = false;
+    syncGoGate();   // kapının tek yazarı (run()'ın deseni)
   }
-  // Sayı ÖNCE, sebep sonra: "2/3" turun sonucunu tek bakışta veriyor, düşen
-  // sütunun sebebi de kaybolmuyor (uyarıların listede toplanma kuralı).
-  const ozet = `${tutan.length}/${sutunlar.length} model üretti.`;
-  statusEl.textContent = hatalar.length ? `${ozet} ${hatalar.join(" · ")}` : ozet;
-
-  runBusy = false;
-  syncGoGate();
 }
 
 async function run() {

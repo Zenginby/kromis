@@ -150,6 +150,14 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.9.0 — ne değişti
+
+- model seçimi alttan açılan panele taşındı, Ayarlar da aynı yüzeye
+- CLAUDE.md kök belge mandalına girdi, üreticinin kaçış dizisi düzeltildi
+- depo grafları üretiliyor, commit'leniyor ve bir kapıyla taze tutuluyor
+
+---
+
 ## Sürüm 0.8.2 — ne değişti
 
 - medya seçicide görsel ekranı kaplamıyor, üstteki karolar seçilebiliyor

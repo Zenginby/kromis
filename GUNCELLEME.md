@@ -150,6 +150,12 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.9.1 — ne değişti
+
+- Stüdyo bekleme animasyonu: shimmer kutusu, uydurma yüzde kalktı
+
+---
+
 ## Sürüm 0.9.0 — ne değişti
 
 - model seçimi alttan açılan panele taşındı, Ayarlar da aynı yüzeye

@@ -719,10 +719,18 @@ def test_model_seridi_kapsayiciyi_genisletemiyor(istemci):
 
     Bu iddia ölçülmüş bir regresyonun mandalı. `#composer` bir flex kolon;
     `.composer-head` onun bir flex ÖĞESİ ve öğenin varsayılan `min-width: auto`
-    değeri kendi min-content genişliğine çözülüyor. İçindeki `<select id="model">`
-    öğesinin min-content'i EN UZUN SEÇENEĞİNİN metni kadar ("Gemini · Nano
+    değeri kendi min-content genişliğine çözülüyor. İçindeki çip DÜĞMESİNİN
+    (`#model-btn`) min-content'i seçili modelin metni kadar ("Gemini · Nano
     Banana Pro — 27–48 kredi · kurulum gerekli"), yani satır kapsayıcının içerik
     kutusundan taşıyor VE kardeşlerini de kendisiyle birlikte genişletiyor.
+
+    TAŞMANIN KAYNAĞI TAŞINDI, kural DEĞİL: ölçüm `<select id="model">` çipin
+    görünen yüzüyken yapıldı ve o zaman baskı en uzun SEÇENEĞİN metninden
+    geliyordu. Seçim alttan açılan panele taşındı, `<select>` `.sr-only`
+    (position:absolute — akışta değil) oldu ve baskı artık çip düğmesinin
+    etiketinden geliyor. Düğme kendi metnini KIRPMIYOR (native `<select>`
+    kırpıyordu), yani `min-width: 0` olmadan `.model-chip-label`ın
+    `text-overflow` kuralı hiç devreye girmiyor.
 
     Somut ölçüm (Chromium, 360×780): taşma varken composer'ın BÜTÜN çocukları
     334px'ten 357px'e çıkıyor ve sayfa 10px yatay kayıyor (`scrollWidth` 370,
@@ -734,7 +742,7 @@ def test_model_seridi_kapsayiciyi_genisletemiyor(istemci):
     de hiç belirmiyor. Zayıf ama doğru yerde duran bir mandal; kuralı silen
     kişiye nedenini söylüyor.
 
-    DİKKAT: `.model-chip`e (yani `<select>`in kendisine) `min-width: 0` vermek
+    DİKKAT: `.model-chip`e (yani çipin KENDİSİNE) `min-width: 0` vermek
     YETMİYOR — denendi ve taşma sürdü. Kısıt öğenin kendisinde değil, onu tutan
     SATIRDA.
     """
@@ -751,8 +759,8 @@ def test_model_seridinin_SARMALAYICISI_da_kucultulebilir(istemci):
     """Sağlayıcı işareti gelince flex öğesi `.model-pick` oldu — kısıt ona taşındı.
 
     `.composer-head`in `min-width: 0`ı zinciri kapsayıcı tarafında açıyor, ama
-    sarmalayıcının KENDİSİ varsayılan `min-width: auto` ile kalırsa içindeki
-    `<select>`in min-content genişliğinin altına inmiyor ve aynı 360px taşmasını
+    sarmalayıcının KENDİSİ varsayılan `min-width: auto` ile kalırsa içindeki çip
+    DÜĞMESİNİN min-content genişliğinin altına inmiyor ve aynı 360px taşmasını
     bir katman aşağıda yeniden üretiyor. İki kural birlikte gerekiyor: biri
     satırda, biri sarmalayıcıda.
 
@@ -806,3 +814,66 @@ def test_composer_ipucu_TELEFONDA_hala_gizli(istemci):
     assert "display: none" in blok[1].split("}", 1)[0], (
         "ipucu telefonda gizlenmiyor — klavye açıkken yer kaplar ve "
         "dokunmatikte yanlış kısayolu anlatır")
+
+
+def test_alttan_acilan_yuzeyde_UST_guvenli_alan_ODENMIYOR(istemci):
+    """`.sheet-bottom` `.sheet`in üst güvenli-alan dolgusunu geri alıyor.
+
+    `.sheet { padding-top: env(safe-area-inset-top) }` yandan açılan panel için
+    doğru: onun başlığı ekranın TEPESİNE dayanıyor ve çentiğin altında kalırdı.
+    Alttan açılan panel tepeye hiç değmiyor (`top: auto` + `max-height`), yani
+    o pay orada bir kazanç değil KAYIP — başlığın üstünde 24-44px ölü boşluk
+    olarak duruyor ve listeden o kadar yer çalıyor.
+
+    ALT dolgu KALIYOR ve iddia onu da koruyor: dipteki "Tamam"/"Kaydet" jest
+    çubuğunun altında kalmamalı.
+
+    MEKANİZMA SIRA: iki kuralın özgüllüğü eşit (`.sheet` 0,1,0 ve
+    `.sheet-bottom` 0,1,0), yani kazanan SONRA gelen. Kurallar yer değiştirirse
+    dolgu sessizce geri gelir — o yüzden iddia sırayı da ölçüyor.
+
+    Kırılma masaüstü Chromium'da GÖRÜNMEZ: `env(safe-area-inset-*)` orada 0
+    döndürüyor. Yalnız çentikli bir telefonda belirir.
+    """
+    css = _metin(istemci, "/static/mobile.css")
+    ortak = css.find(".sheet {")
+    varyant = css.find(".sheet-bottom { padding-top: 0; }")
+    assert ortak != -1, ".sheet güvenli alan kuralı kaybolmuş"
+    assert varyant != -1, (
+        "`.sheet-bottom { padding-top: 0; }` yok — alttan açılan panelin "
+        "başlığının üstünde çentik payı ölü boşluk olarak duruyor")
+    assert varyant > ortak, (
+        "varyant ortak kuraldan ÖNCE geliyor — özgüllükler eşit olduğu için "
+        "ortak kural kazanıyor ve üst dolgu geri geliyor")
+    # Alt kenar payı ORTAK kuralda ve orada kalmalı.
+    govde = css[ortak:].split("}", 1)[0]
+    assert "padding-bottom: env(safe-area-inset-bottom" in govde, (
+        "alt güvenli alan payı silinmiş — dipteki düğme jest çubuğunun "
+        "altında kalır")
+
+
+def test_alttan_acilan_yuzey_telefonda_TAM_GENISLIK(istemci):
+    """Masaüstü tavanı telefonda kalkıyor — ve id özgüllüğü tuzağı KURULMUYOR.
+
+    `#palette-modal` bu tuzağa düştü: `#palette-modal.sheet { width: 420px }`
+    id özgüllüğüyle medya sorgusunun `.sheet { width: 100% }` kuralını eziyordu
+    ve mobile.css ikinci bir kural (`#palette-modal { width: 100% }`) yazmak
+    zorunda kaldı. Alttan açılan panellerde genişlik `min(…, 100%)` yazılıyor,
+    yani tavan telefonda kendiliğinden 100%'e çözülüyor ve id özgüllüğü bir
+    sorun olmaktan çıkıyor.
+    """
+    mobil = _metin(istemci, "/static/mobile.css")
+    assert ".sheet-bottom { width: 100%; max-width: 100%;" in mobil, (
+        "alttan açılan panel telefonda tam genişlik almıyor")
+
+    stil = _metin(istemci, "/static/style.css")
+    for secici in (".sheet-bottom {", "#settings-modal.sheet-bottom {"):
+        blok = stil.split(secici, 1)
+        assert len(blok) == 2, f"{secici} kuralı kaybolmuş"
+        govde = blok[1].split("}", 1)[0]
+        genislik = [s for s in govde.split(";") if "width:" in s and "max-width" not in s]
+        assert genislik, f"{secici} genişlik yazmıyor"
+        assert "min(" in genislik[0] and "100%" in genislik[0], (
+            f"{secici} sabit bir genişlik yazıyor — telefonda #palette-modal'ın "
+            "id özgüllüğü tuzağı geri geliyor (mobile.css ikinci bir kural "
+            "istemek zorunda kalır)")

@@ -850,8 +850,8 @@
           "/output/{}"
         ],
         "dosya": "static/core.js",
-        "satir": 1417,
-        "tanim": 56
+        "satir": 1663,
+        "tanim": 61
       },
       {
         "cagrilan_yollar": [
@@ -889,7 +889,7 @@
           "/api/settings"
         ],
         "dosya": "static/settings.js",
-        "satir": 385,
+        "satir": 418,
         "tanim": 11
       },
       {

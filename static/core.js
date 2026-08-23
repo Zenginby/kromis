@@ -171,10 +171,30 @@ $("rail-collapse").addEventListener("click", () => {
 });
 
 // ── Slide-over'lar ──
+// Odağı iade edecek düğme (#model-btn ya da #chat-model-btn). BURADA
+// tanımlanıyor, panelin kendi bölümünde değil: `closeSheets` bu dosyanın
+// başında ve bir `let`e 500 satır ileriden bakmak, TDZ'ye takılmasa bile
+// okuyanı yanıltır. Yazan yer `openModelSheet` (aşağıda), okuyan yer
+// `closeSheets` — ikisinin ORTAK durumu, o yüzden ortak sahibi de yok.
+let modelSheetTetik = null;
+
 function closeSheets() {
   for (const el of document.querySelectorAll(".sheet.open")) el.classList.remove("open");
   $("chat-sidebar-toggle").setAttribute("aria-expanded", "false");
   $("specs-btn").setAttribute("aria-expanded", "false");
+  // Model çipleri: ikisi de aynı paneli (#model-sheet) açıyor, yani hangisinin
+  // açtığına bakılmadan ikisi de kapanışta sıfırlanıyor — `aria-expanded`
+  // yalancı kalırsa ekran okuyucu kapalı bir paneli açık okur.
+  $("model-btn").setAttribute("aria-expanded", "false");
+  $("chat-model-btn").setAttribute("aria-expanded", "false");
+  // ODAK İADESİ. `closeSheets` kapanışın TEK kapısı (× düğmesi, "Tamam",
+  // perde, Escape, Android geri tuşu hepsi buraya düşüyor), yani iadenin de
+  // tek yeri burası — beş çağıranın her birine ayrı ayrı yazmak, birini
+  // unutmak demekti. `isConnected` şart: kart listesi yeniden çizilirken
+  // tetikleyici DOM'dan düşmüş olabilir ve kopmuş bir düğüme odaklanmak
+  // odağı `<body>`ye atar (chat.js'in menü deseninin aynı kontrolü).
+  if (modelSheetTetik && modelSheetTetik.isConnected) modelSheetTetik.focus();
+  modelSheetTetik = null;
 }
 
 // Panel açmanın TEK kapısı: dört panel aynı perdeyi ve aynı sağ/sol şeridi
@@ -394,7 +414,8 @@ function applyModel(id, { announce = true } = {}) {
     renderModelOptions(id);
   }
   $("model").value = model.id;
-  setModelLogo("model-logo", model);
+  // Çipin işareti + metni + panelin radyosu tek yerden (aşağısı).
+  syncModelChip("image", model);
 
   const dusenler = [];
   const s = fillAxis("size", model.sizes, undefined, model.default_size);
@@ -507,6 +528,41 @@ function secilecek(liste, tercih, varsayilan) {
   return (kurulu[0] || liste[0] || {}).id || "";
 }
 
+/** Kredi aralığı: `credits_by_quality` varsa min–max, yoksa tek tarife.
+ *
+ * AYRI fonksiyon çünkü İKİ yer okuyor — <option> metni ve panelin kart
+ * satırı. Aynı aralığı iki yerde kurmak, ikisinin sessizce ayrışması demekti
+ * (biri "kredi" yazarken öteki "kr." yazan gün kimse fark etmez).
+ */
+function modelKrediAraligi(m) {
+  const tarife = Object.values(m.credits_by_quality || {});
+  return tarife.length
+    ? `${Math.min(...tarife)}–${Math.max(...tarife)} kredi`
+    : `${m.credits} kredi`;
+}
+
+/** Çipin ve <option>un PAYLAŞTIĞI metin.
+ *
+ * Bir zamanlar bu metin yalnızca `<option>`da kuruluyordu ve çip onu bedavaya
+ * alıyordu — native `<select>` seçili seçeneğin metnini kendisi yazar. Çip
+ * `<button>` olunca o bedava yol kapandı; metin İKİ yerde gerekiyor ve iki
+ * yerde ayrı kurulursa ayrışır. O yüzden tek kaynak burada.
+ *
+ * AD `short_label`: sağlayıcı markasını çipin solundaki işaret söylüyor,
+ * etiketin de söylemesi aynı bilgiyi iki kez yazmak olurdu. Kısaltma SUNUCUDA
+ * yapılıyor (catalog.short_labels) — istemci marka adı saymıyor ve çakışan
+ * adlar tam etiketini koruyor. `|| m.label` eski bir yanıtta alan yoksa
+ * şeridin adsız kalmaması için.
+ *
+ * `kredi` eksene göre: sohbet modellerinin kredi tarifesi YOK (`ChatModel`de
+ * alan bile yok) ve uydurma bir aralık yanlış bir karşılaştırma sunardı.
+ */
+function modelSecenekMetni(m, kredi) {
+  const ad = m.short_label || m.label;
+  return (kredi ? `${ad} — ${modelKrediAraligi(m)}` : ad)
+    + (m.configured ? "" : " · kurulum gerekli");
+}
+
 function renderModelOptions(zorunluId) {
   const el = $("model");
   el.replaceChildren(...secilebilirler(imageModels, zorunluId).map((m) => {
@@ -514,19 +570,11 @@ function renderModelOptions(zorunluId) {
     o.value = m.id;
     // Maliyet ve kurulum durumu ETİKETTE: karşılaştırma ("hangisi ucuz?")
     // burada yapılıyor ve native bir <option> yalnız metin taşıyabiliyor.
-    const tarife = Object.values(m.credits_by_quality || {});
-    const aralik = tarife.length
-      ? `${Math.min(...tarife)}–${Math.max(...tarife)} kredi`
-      : `${m.credits} kredi`;
-    // AD `short_label`: sağlayıcı markasını çipin solundaki işaret söylüyor,
-    // etiketin de söylemesi aynı bilgiyi iki kez yazmak olurdu. Kısaltma
-    // SUNUCUDA yapılıyor (catalog.short_labels) — istemci marka adı saymıyor
-    // ve çakışan adlar tam etiketini koruyor. `|| m.label` eski bir yanıtta
-    // alan yoksa şeridin adsız kalmaması için.
-    o.textContent = `${m.short_label || m.label} — ${aralik}`
-      + (m.configured ? "" : " · kurulum gerekli");
-    // Tanıtım notu `title`da: bilgi kaybolmuyor ama composer'ın yüksekliğine
-    // bedel ödemiyor (bkz. applyModel'deki gerekçe).
+    o.textContent = modelSecenekMetni(m, true);
+    // Tanıtım notu `title`da: <option> görsel taşıyamıyor ve bu liste artık
+    // KULLANICIYA GÖRÜNMÜYOR (değer tutucu; seçim #model-sheet'te). Satır yine
+    // de duruyor: `title` bedava ve <select> bir gün geri görünür olursa bilgi
+    // onunla birlikte geri gelir. Notun GÖRÜNEN yeri panelin kart satırı.
     if (m.note) o.title = m.note;
     return o;
   }));
@@ -568,9 +616,9 @@ function renderChatModelOptions(zorunluId) {
     const o = document.createElement("option");
     o.value = m.id;
     // `textContent`: sunucudan gelen hiçbir şey innerHTML'e girmiyor.
-    // Ad, görsel şeridiyle aynı gerekçeyle `short_label` (yukarısı).
-    o.textContent = (m.short_label || m.label)
-      + (m.configured ? "" : " · kurulum gerekli");
+    // Ad kurgusu görsel şeridiyle TEK kaynaktan (`modelSecenekMetni`);
+    // `false` = kredi yok, gerekçesi o fonksiyonun notunda.
+    o.textContent = modelSecenekMetni(m, false);
     if (m.note) o.title = m.note;
     return o;
   }));
@@ -600,7 +648,7 @@ function applyChatModel(id) {
     renderChatModelOptions(id);
   }
   $("chat-model").value = model.id;
-  setModelLogo("chat-model-logo", model);
+  syncModelChip("chat", model);
   syncGoGate();
   // SON SATIR ve gerçek bir kırılmanın bekçisi: dönüş eklenirken bu satır
   // unutulduğunda fonksiyon `undefined` döndürdü, dinleyici de her seferinde
@@ -641,6 +689,204 @@ async function savePref(body) {
     statusEl.textContent = `Tercih kaydedilemedi (seçim bu oturumda geçerli): ${e.message}`;
   }
 }
+
+// ── Model seçici popup'ı (#model-sheet) ──────────────────────────────
+//
+// TEK yüzey, İKİ eksen. Gerekçe index.html'de yazılı (iki çip
+// `#composer[data-mode]` ekseniyle birbirini dışlıyor, yani ikisi birden açık
+// olamaz) ve deseni `setModelLogo` kurdu: "TEK yardımcı, iki şerit". Bu tablo
+// o iki ekseni ADRESLERE bağlıyor — aşağıdaki kodun hiçbir yerinde "görsel mi
+// sohbet mi" diye ikinci bir şart yok, hepsi buradan okuyor.
+//
+// `liste` bir FONKSİYON, dizinin kendisi DEĞİL ve bu ayrım zorunlu:
+// `imageModels`/`chatModels` `applyModels`te YENİDEN ATANIYOR
+// (`imageModels = s.image_models`). Diziyi burada yakalamak, Ayarlar
+// kaydedildikten sonra panelin ESKİ katalogu göstermesi olurdu — üstelik
+// sessizce, çünkü eski dizide de geçerli modeller var.
+const MODEL_EKSENLERI = {
+  image: {
+    secici: "model", dugme: "model-btn", etiket: "model-btn-label",
+    logo: "model-logo", baslik: "Görsel modeli", kredi: true,
+    liste: () => imageModels,
+  },
+  chat: {
+    secici: "chat-model", dugme: "chat-model-btn", etiket: "chat-model-btn-label",
+    logo: "chat-model-logo", baslik: "Yönetmen modeli", kredi: false,
+    liste: () => chatModels,
+  },
+};
+
+// Panel o an hangi ekseni gösteriyor. `#model-sheet[data-axis]` ile İKİZ ve
+// bilerek: öznitelik CSS/test tarafının okuduğu yüz, bu değişken kod tarafının.
+// Tek kaynaktan yazılıyorlar (`openModelSheet`), yani ayrışamıyorlar.
+let modelSheetEkseni = "image";
+// Odak iadesinin diğer yarısı `closeSheets`in yanında (yukarısı): iade
+// olmadan `Escape` odağı kapanan katmanın içinde bırakıyor ve klavye
+// kullanıcısı sekmeye baştan başlıyor (chat.js'in menü deseninin aynısı).
+
+/** Çipi seçili modele göre tazeler: işaret, metin, ve panelin radyosu.
+ *
+ * `applyModel`/`applyChatModel`in ÇAĞIRDIĞI tek satır bu — yani seçim hangi
+ * yolla gelirse gelsin (panel, tercih yükleme, katalog tazeleme) çip aynı
+ * yerden yazılıyor.
+ *
+ * ÜÇÜNCÜ İŞ, panelin radyosu, sonsuz döngünün kapandığı yer: `checked`
+ * ÖZELLİĞİNE yazmak `change` DOĞURMUYOR (yalnız kullanıcı etkileşimi
+ * doğurur). Panel → <select> → applyModel → panel zinciri burada duruyor,
+ * ikinci bir "şu an uyguluyorum" bayrağına gerek yok.
+ */
+function syncModelChip(eksenAdi, model) {
+  const eksen = MODEL_EKSENLERI[eksenAdi];
+  setModelLogo(eksen.logo, model);
+  $(eksen.etiket).textContent = modelSecenekMetni(model, eksen.kredi);
+  if (modelSheetEkseni === eksenAdi) {
+    for (const r of $("model-sheet-list").querySelectorAll("input")) {
+      r.checked = r.value === model.id;
+    }
+  }
+}
+
+/** Paneli seçili eksenin modelleriyle çizer.
+ *
+ * Filtre `secilebilirler` — <option> listesinin AYNISI, yani "hangi modeller
+ * görünür" sorusunun ikinci bir cevabı doğmuyor (o cevabın iki kaçış kapısı
+ * da orada yazılı: ilk kurulumda hepsi görünür, seçili id her zaman listede).
+ *
+ * `textContent` ve `img.src`: sunucudan gelen hiçbir şey `innerHTML`e
+ * girmiyor — `renderChatModelOptions`ın kuralının aynısı.
+ *
+ * `<legend>` KORUNUYOR: `replaceChildren` onu da silerdi ve `<fieldset>`
+ * adsız kalırdı (ekran okuyucu "grup" der, neyin grubu demez).
+ */
+function renderModelCards(eksenAdi) {
+  const eksen = MODEL_EKSENLERI[eksenAdi];
+  const secili = $(eksen.secici).value;
+  const kok = $("model-sheet-list");
+  const legend = kok.querySelector("legend");
+
+  const kartlar = secilebilirler(eksen.liste(), secili).map((m) => {
+    const kart = document.createElement("label");
+    kart.className = "radio-row model-row";
+
+    // İŞARET SUNUCUDAN (`model.logo`, app._provider_logo_url) — istemcide
+    // sağlayıcı adı sayılmıyor, dize birleştirilmiyor. `setModelLogo`un aynı
+    // gerekçesi: yarın yeni bir sağlayıcı eklenince işaret kendiliğinden
+    // geliyor. `alt=""` çünkü sağlayıcı adı kartın metninde ZATEN var.
+    const kutu = document.createElement("span");
+    kutu.className = "model-row-ic";
+    if (m.logo) {
+      const img = document.createElement("img");
+      img.src = m.logo;
+      img.alt = "";
+      kutu.append(img);
+    }
+
+    const metin = document.createElement("span");
+    metin.className = "model-row-txt";
+    const ad = document.createElement("b");
+    ad.textContent = m.short_label || m.label;
+    // Kurulum durumu ROZETLE: `<option>` metninde " · kurulum gerekli" diye
+    // yazıyordu ve bilgi kaybolmuyor, yalnız okunabilir bir biçime geçiyor.
+    if (!m.configured) {
+      const rozet = document.createElement("span");
+      rozet.className = "model-row-badge";
+      rozet.textContent = "kurulum gerekli";
+      ad.append(rozet);
+    }
+    metin.append(ad);
+    // ASIL KAZANÇ: tanıtım notu ekranda. `option.title`da gömülüydü ve
+    // telefonda `title` hiç görünmüyor.
+    if (m.note) {
+      const not = document.createElement("span");
+      not.textContent = m.note;
+      metin.append(not);
+    }
+    if (eksen.kredi) {
+      const tarife = document.createElement("span");
+      tarife.className = "model-row-meta";
+      tarife.textContent = modelKrediAraligi(m);
+      metin.append(tarife);
+    }
+
+    // GERÇEK RADYO: ok tuşu gezintisi, grup semantiği ve `:checked` durumu
+    // tarayıcıdan geliyor. Eski native <select> kararının itirazı ("ARIA
+    // listbox'ı sıfırdan getirirdi") tam olarak burada karşılanıyor.
+    const radyo = document.createElement("input");
+    radyo.type = "radio";
+    radyo.name = "model-sheet-pick";
+    radyo.value = m.id;
+    radyo.checked = m.id === secili;
+
+    kart.append(kutu, metin, radyo);
+    return kart;
+  });
+
+  kok.replaceChildren(legend, ...kartlar);
+}
+
+/** Paneli açar. Kartlar HER AÇILIŞTA yeniden çiziliyor.
+ *
+ * Neden her seferinde: katalog `applyModels` ile değişebiliyor (Ayarlar'a
+ * anahtar girildi → `configured` bayrakları değişti) ve bayat bir liste
+ * "anahtarı olan model kurulum gerektiriyor" diye görünürdü. Çizim maliyeti
+ * beş kart, ölçülecek bir bedel değil.
+ */
+function openModelSheet(eksenAdi) {
+  // İKİNCİ TIK KAPATIYOR — #specs-btn'in kalıbının aynısı. Çip açık bir panelin
+  // altında duruyor (panel ekranın dibinde, çip composer'da) ve tıklanabilir
+  // kalıyor: kapanmayan bir tetikleyici "bastım, hiçbir şey olmadı" demek.
+  const acilacak = !($("model-sheet").classList.contains("open")
+                     && modelSheetEkseni === eksenAdi);
+  closeSheets();
+  if (!acilacak) return;
+
+  modelSheetEkseni = eksenAdi;
+  $("model-sheet").dataset.axis = eksenAdi;
+  $("model-sheet-title").textContent = MODEL_EKSENLERI[eksenAdi].baslik;
+  renderModelCards(eksenAdi);
+  openSheet("model-sheet");                       // tek kapı (yukarısı)
+
+  // SIRA BAĞLAYICI ve sessiz bir kırılmanın mandalı: `openSheet` İÇİNDE
+  // `closeSheets` koşuyor ve o `modelSheetTetik`i null'a çekiyor. Atama
+  // `openSheet`ten ÖNCE yapılsaydı odak iadesi hiç çalışmazdı — ekranda
+  // hiçbir iz bırakmadan, çünkü panel yine açılıyor ve seçim yine işliyor.
+  const tetik = $(MODEL_EKSENLERI[eksenAdi].dugme);
+  modelSheetTetik = tetik;
+  tetik.setAttribute("aria-expanded", "true");
+
+  // Odak İŞARETLİ radyoya: ok tuşlarıyla gezinme ilk tuş basımında çalışsın
+  // (odak listenin dışında kalırsa ilk ok tuşu sayfayı kaydırır). Liste boş
+  // olabiliyor (katalog gelmemiş) — o durumda dipteki düğme.
+  const isaretli = $("model-sheet-list").querySelector("input:checked");
+  setTimeout(() => (isaretli || $("model-sheet-ok")).focus(), 0);
+}
+
+// Kart seçimi: TEK dinleyici, olay yetkilendirmeyle. Kartlar her açılışta
+// yeniden çiziliyor, yani düğüm başına dinleyici bağlamak her açılışta
+// yenilenmesi gereken bir bağ olurdu.
+//
+// Seçim <select>e YÖNLENDİRİLİYOR, doğrudan uygulanmıyor: değerin tek sahibi
+// o ve `change` dinleyicileri (applyModel, savePref, tercihin bellekteki
+// tazelenmesi) oraya bağlı. Panelden ayrıca `applyModel` çağırmak o zincirin
+// ikinci bir kopyası olurdu.
+$("model-sheet-list").addEventListener("change", (e) => {
+  const secici = $(MODEL_EKSENLERI[modelSheetEkseni].secici);
+  // AYNI DEĞERE ikinci dokunuş sessiz: native <select> de değişmeyen bir
+  // değer için `change` atmıyor. Bu satır olmadan aynı karta her dokunuş
+  // diske bir `POST /api/prefs` yazardı — ekranda hiçbir iz bırakmadan.
+  if (!e.target.value || secici.value === e.target.value) return;
+  secici.value = e.target.value;
+  secici.dispatchEvent(new Event("change", { bubbles: true }));
+});
+
+$("model-btn").addEventListener("click", () => openModelSheet("image"));
+$("chat-model-btn").addEventListener("click", () => openModelSheet("chat"));
+$("model-sheet-close").addEventListener("click", closeSheets);
+// "Tamam" yalnızca KAPATIYOR: seçim dokunulduğu an uygulanmış ve tercih
+// yazılmış oluyor (#pref-autosave ve tema seçicisinin deseni). Bir onay
+// kapısı olsaydı "seçtim ama uygulanmadı" durumu doğardı ve panel kazayla
+// kapandığında seçim kaybolurdu.
+$("model-sheet-ok").addEventListener("click", closeSheets);
 
 $("model").addEventListener("change", () => {
   applyModel($("model").value);

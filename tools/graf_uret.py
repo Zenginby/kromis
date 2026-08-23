@@ -268,7 +268,7 @@ _HTML_STIL = re.compile(r"""<link[^>]*\srel=["']stylesheet["'][^>]*\shref=["']([
 def _yorumsuz(metin: str) -> str:
     """Yorum SATIRLARINI atar — yorumda geçen bir adres çağrı değildir.
 
-    core.js'in `// \`/output/<id>.png\` → \`/api/output/<id>/download\`` yorumu
+    core.js'in "// `/output/<id>.png` → `/api/output/<id>/download`" yorumu
     ayıklanmasaydı graf "hiçbir rotaya oturmayan çağrı" diye üç yalancı bulgu
     bildirirdi; yalancı bulgu bildiren bir harita okunmayı bırakır.
 

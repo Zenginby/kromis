@@ -1,0 +1,1717 @@
+{
+  "dongular": [
+    [
+      "gemini_client",
+      "openai_client",
+      "providers"
+    ]
+  ],
+  "eslesmeyen_cagrilar": [],
+  "moduller": [
+    {
+      "ad": "android_main",
+      "erteli_ithal": [
+        "app",
+        "desktop",
+        "errlog",
+        "paths"
+      ],
+      "ithal": [],
+      "ithal_eden": [],
+      "katman": 8,
+      "satir": 194,
+      "testler": [
+        "tests/test_android_main.py"
+      ],
+      "yol": "android_main.py"
+    },
+    {
+      "ad": "app",
+      "erteli_ithal": [],
+      "ithal": [
+        "assets_store",
+        "azure_client",
+        "backup",
+        "catalog",
+        "chat_client",
+        "chat_providers",
+        "chat_store",
+        "color_names",
+        "composite",
+        "credstore",
+        "errlog",
+        "folders",
+        "guncelleme",
+        "models",
+        "palette",
+        "palette_store",
+        "paths",
+        "prefs",
+        "providers",
+        "storage",
+        "version"
+      ],
+      "ithal_eden": [
+        "android_main",
+        "desktop"
+      ],
+      "katman": 6,
+      "satir": 1650,
+      "testler": [
+        "tests/test_app.py",
+        "tests/test_assets_route.py",
+        "tests/test_backup.py",
+        "tests/test_banner.py",
+        "tests/test_chat_route.py",
+        "tests/test_chats_route.py",
+        "tests/test_delete_route.py",
+        "tests/test_edit_route.py",
+        "tests/test_folders.py",
+        "tests/test_fonts.py",
+        "tests/test_id_contract.py",
+        "tests/test_import_route.py",
+        "tests/test_index.py",
+        "tests/test_legacy_formats.py",
+        "tests/test_logo.py",
+        "tests/test_mobile.py",
+        "tests/test_model_secimi.py",
+        "tests/test_palette_route.py",
+        "tests/test_paths.py",
+        "tests/test_playwright_studio.py",
+        "tests/test_prefs_route.py",
+        "tests/test_provider_logos.py",
+        "tests/test_settings_route.py"
+      ],
+      "yol": "app.py"
+    },
+    {
+      "ad": "assets_store",
+      "erteli_ithal": [],
+      "ithal": [
+        "jsonstore"
+      ],
+      "ithal_eden": [
+        "app",
+        "backup",
+        "tools.make_legacy_fixtures"
+      ],
+      "katman": 1,
+      "satir": 114,
+      "testler": [
+        "tests/test_assets.py",
+        "tests/test_assets_route.py",
+        "tests/test_backup.py",
+        "tests/test_banner.py",
+        "tests/test_folders.py",
+        "tests/test_legacy_formats.py",
+        "tests/test_logo.py",
+        "tests/test_palette_route.py"
+      ],
+      "yol": "assets_store.py"
+    },
+    {
+      "ad": "azure_client",
+      "erteli_ithal": [],
+      "ithal": [
+        "paths",
+        "winsec"
+      ],
+      "ithal_eden": [
+        "app",
+        "chat_client",
+        "chat_providers",
+        "credstore",
+        "gemini_client",
+        "models",
+        "openai_chat",
+        "openai_client",
+        "providers"
+      ],
+      "katman": 1,
+      "satir": 438,
+      "testler": [
+        "tests/test_app.py",
+        "tests/test_azure_client.py",
+        "tests/test_azure_client_edit.py",
+        "tests/test_azure_client_http.py",
+        "tests/test_banner.py",
+        "tests/test_catalog.py",
+        "tests/test_chat_client.py",
+        "tests/test_credstore.py",
+        "tests/test_delete_route.py",
+        "tests/test_edit_route.py",
+        "tests/test_folders.py",
+        "tests/test_gemini_client.py",
+        "tests/test_import_route.py",
+        "tests/test_legacy_formats.py",
+        "tests/test_logo.py",
+        "tests/test_model_secimi.py",
+        "tests/test_openai_client.py",
+        "tests/test_palette_route.py",
+        "tests/test_paths.py",
+        "tests/test_prefs.py",
+        "tests/test_providers.py",
+        "tests/test_settings.py",
+        "tests/test_settings_route.py"
+      ],
+      "yol": "azure_client.py"
+    },
+    {
+      "ad": "backup",
+      "erteli_ithal": [],
+      "ithal": [
+        "assets_store",
+        "chat_store",
+        "folders",
+        "jsonstore",
+        "palette_store",
+        "storage"
+      ],
+      "ithal_eden": [
+        "app"
+      ],
+      "katman": 3,
+      "satir": 187,
+      "testler": [
+        "tests/test_backup.py"
+      ],
+      "yol": "backup.py"
+    },
+    {
+      "ad": "catalog",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [
+        "app",
+        "chat_providers",
+        "credstore",
+        "gemini_client",
+        "models",
+        "openai_chat",
+        "openai_client",
+        "prefs",
+        "providers",
+        "storage"
+      ],
+      "katman": 0,
+      "satir": 769,
+      "testler": [
+        "tests/test_catalog.py",
+        "tests/test_chat_providers.py",
+        "tests/test_credstore.py",
+        "tests/test_errlog.py",
+        "tests/test_gemini_client.py",
+        "tests/test_index.py",
+        "tests/test_logo.py",
+        "tests/test_model_secimi.py",
+        "tests/test_openai_chat.py",
+        "tests/test_openai_client.py",
+        "tests/test_prefs.py",
+        "tests/test_prefs_route.py",
+        "tests/test_provider_logos.py",
+        "tests/test_providers.py",
+        "tests/test_settings_route.py",
+        "tests/test_storage.py"
+      ],
+      "yol": "catalog.py"
+    },
+    {
+      "ad": "chat_client",
+      "erteli_ithal": [],
+      "ithal": [
+        "azure_client",
+        "chat_prompt",
+        "models"
+      ],
+      "ithal_eden": [
+        "app",
+        "chat_providers",
+        "openai_chat"
+      ],
+      "katman": 3,
+      "satir": 182,
+      "testler": [
+        "tests/test_chat_client.py",
+        "tests/test_chat_providers.py",
+        "tests/test_openai_chat.py"
+      ],
+      "yol": "chat_client.py"
+    },
+    {
+      "ad": "chat_prompt",
+      "erteli_ithal": [],
+      "ithal": [
+        "paths"
+      ],
+      "ithal_eden": [
+        "chat_client",
+        "openai_chat"
+      ],
+      "katman": 1,
+      "satir": 62,
+      "testler": [
+        "tests/test_chat_prompt.py"
+      ],
+      "yol": "chat_prompt.py"
+    },
+    {
+      "ad": "chat_providers",
+      "erteli_ithal": [],
+      "ithal": [
+        "azure_client",
+        "catalog",
+        "chat_client",
+        "credstore",
+        "openai_chat"
+      ],
+      "ithal_eden": [
+        "app"
+      ],
+      "katman": 5,
+      "satir": 124,
+      "testler": [
+        "tests/test_chat_providers.py",
+        "tests/test_provider_logos.py"
+      ],
+      "yol": "chat_providers.py"
+    },
+    {
+      "ad": "chat_store",
+      "erteli_ithal": [],
+      "ithal": [
+        "jsonstore"
+      ],
+      "ithal_eden": [
+        "app",
+        "backup"
+      ],
+      "katman": 1,
+      "satir": 253,
+      "testler": [
+        "tests/test_chat_store.py",
+        "tests/test_chats_route.py"
+      ],
+      "yol": "chat_store.py"
+    },
+    {
+      "ad": "color_names",
+      "erteli_ithal": [],
+      "ithal": [
+        "palette"
+      ],
+      "ithal_eden": [
+        "app"
+      ],
+      "katman": 1,
+      "satir": 418,
+      "testler": [
+        "tests/test_color_names.py",
+        "tests/test_legacy_formats.py",
+        "tests/test_palette_route.py"
+      ],
+      "yol": "color_names.py"
+    },
+    {
+      "ad": "composite",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [
+        "app"
+      ],
+      "katman": 0,
+      "satir": 158,
+      "testler": [
+        "tests/test_composite.py"
+      ],
+      "yol": "composite.py"
+    },
+    {
+      "ad": "credstore",
+      "erteli_ithal": [],
+      "ithal": [
+        "azure_client",
+        "catalog"
+      ],
+      "ithal_eden": [
+        "app",
+        "chat_providers",
+        "gemini_client",
+        "openai_chat",
+        "openai_client",
+        "providers"
+      ],
+      "katman": 2,
+      "satir": 128,
+      "testler": [
+        "tests/test_credstore.py",
+        "tests/test_prefs.py",
+        "tests/test_settings_route.py"
+      ],
+      "yol": "credstore.py"
+    },
+    {
+      "ad": "desktop",
+      "erteli_ithal": [
+        "app"
+      ],
+      "ithal": [
+        "errlog",
+        "paths",
+        "screencolor"
+      ],
+      "ithal_eden": [
+        "android_main"
+      ],
+      "katman": 7,
+      "satir": 257,
+      "testler": [
+        "tests/test_desktop.py"
+      ],
+      "yol": "desktop.py"
+    },
+    {
+      "ad": "errlog",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [
+        "android_main",
+        "app",
+        "desktop",
+        "guncelleme"
+      ],
+      "katman": 0,
+      "satir": 114,
+      "testler": [
+        "tests/test_errlog.py"
+      ],
+      "yol": "errlog.py"
+    },
+    {
+      "ad": "folders",
+      "erteli_ithal": [],
+      "ithal": [
+        "jsonstore",
+        "storage"
+      ],
+      "ithal_eden": [
+        "app",
+        "backup",
+        "tools.make_legacy_fixtures"
+      ],
+      "katman": 2,
+      "satir": 215,
+      "testler": [
+        "tests/test_folders.py",
+        "tests/test_legacy_formats.py"
+      ],
+      "yol": "folders.py"
+    },
+    {
+      "ad": "gemini_client",
+      "erteli_ithal": [],
+      "ithal": [
+        "azure_client",
+        "catalog",
+        "credstore",
+        "providers"
+      ],
+      "ithal_eden": [
+        "providers"
+      ],
+      "katman": 3,
+      "satir": 293,
+      "testler": [
+        "tests/test_gemini_client.py"
+      ],
+      "yol": "gemini_client.py"
+    },
+    {
+      "ad": "guncelleme",
+      "erteli_ithal": [],
+      "ithal": [
+        "errlog",
+        "jsonstore",
+        "paths",
+        "version"
+      ],
+      "ithal_eden": [
+        "app"
+      ],
+      "katman": 1,
+      "satir": 219,
+      "testler": [
+        "tests/test_depo_adresi.py",
+        "tests/test_guncelleme.py"
+      ],
+      "yol": "guncelleme.py"
+    },
+    {
+      "ad": "jsonstore",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [
+        "assets_store",
+        "backup",
+        "chat_store",
+        "folders",
+        "guncelleme",
+        "palette_store",
+        "prefs",
+        "storage"
+      ],
+      "katman": 0,
+      "satir": 80,
+      "testler": [
+        "tests/test_jsonstore.py"
+      ],
+      "yol": "jsonstore.py"
+    },
+    {
+      "ad": "models",
+      "erteli_ithal": [],
+      "ithal": [
+        "azure_client",
+        "catalog",
+        "palette"
+      ],
+      "ithal_eden": [
+        "app",
+        "chat_client",
+        "prefs"
+      ],
+      "katman": 2,
+      "satir": 724,
+      "testler": [
+        "tests/test_catalog.py",
+        "tests/test_chat_client.py",
+        "tests/test_chat_route.py",
+        "tests/test_chats_route.py",
+        "tests/test_composite.py",
+        "tests/test_index.py",
+        "tests/test_model_secimi.py",
+        "tests/test_prefs.py",
+        "tests/test_prefs_route.py",
+        "tests/test_settings_route.py"
+      ],
+      "yol": "models.py"
+    },
+    {
+      "ad": "openai_chat",
+      "erteli_ithal": [],
+      "ithal": [
+        "azure_client",
+        "catalog",
+        "chat_client",
+        "chat_prompt",
+        "credstore",
+        "providers"
+      ],
+      "ithal_eden": [
+        "chat_providers"
+      ],
+      "katman": 4,
+      "satir": 179,
+      "testler": [
+        "tests/test_chat_providers.py",
+        "tests/test_chat_route.py",
+        "tests/test_openai_chat.py"
+      ],
+      "yol": "openai_chat.py"
+    },
+    {
+      "ad": "openai_client",
+      "erteli_ithal": [],
+      "ithal": [
+        "azure_client",
+        "catalog",
+        "credstore",
+        "providers"
+      ],
+      "ithal_eden": [
+        "providers"
+      ],
+      "katman": 3,
+      "satir": 215,
+      "testler": [
+        "tests/test_openai_client.py"
+      ],
+      "yol": "openai_client.py"
+    },
+    {
+      "ad": "palette",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [
+        "app",
+        "color_names",
+        "models"
+      ],
+      "katman": 0,
+      "satir": 327,
+      "testler": [
+        "tests/test_color_names.py",
+        "tests/test_palette.py",
+        "tests/test_palette_route.py"
+      ],
+      "yol": "palette.py"
+    },
+    {
+      "ad": "palette_store",
+      "erteli_ithal": [],
+      "ithal": [
+        "jsonstore"
+      ],
+      "ithal_eden": [
+        "app",
+        "backup",
+        "tools.make_legacy_fixtures"
+      ],
+      "katman": 1,
+      "satir": 93,
+      "testler": [
+        "tests/test_legacy_formats.py",
+        "tests/test_palette_route.py",
+        "tests/test_palette_store.py"
+      ],
+      "yol": "palette_store.py"
+    },
+    {
+      "ad": "paths",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [
+        "android_main",
+        "app",
+        "azure_client",
+        "chat_prompt",
+        "desktop",
+        "guncelleme"
+      ],
+      "katman": 0,
+      "satir": 167,
+      "testler": [
+        "tests/test_android_main.py",
+        "tests/test_chat_prompt.py",
+        "tests/test_paths.py"
+      ],
+      "yol": "paths.py"
+    },
+    {
+      "ad": "prefs",
+      "erteli_ithal": [],
+      "ithal": [
+        "catalog",
+        "jsonstore",
+        "models"
+      ],
+      "ithal_eden": [
+        "app"
+      ],
+      "katman": 3,
+      "satir": 194,
+      "testler": [
+        "tests/test_index.py",
+        "tests/test_prefs.py",
+        "tests/test_prefs_route.py"
+      ],
+      "yol": "prefs.py"
+    },
+    {
+      "ad": "providers",
+      "erteli_ithal": [
+        "gemini_client",
+        "openai_client"
+      ],
+      "ithal": [
+        "azure_client",
+        "catalog",
+        "credstore"
+      ],
+      "ithal_eden": [
+        "app",
+        "gemini_client",
+        "openai_chat",
+        "openai_client"
+      ],
+      "katman": 3,
+      "satir": 281,
+      "testler": [
+        "tests/test_gemini_client.py",
+        "tests/test_provider_logos.py",
+        "tests/test_providers.py"
+      ],
+      "yol": "providers.py"
+    },
+    {
+      "ad": "release_manifest",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [],
+      "katman": 0,
+      "satir": 70,
+      "testler": [
+        "tests/test_android_apk_name.py",
+        "tests/test_release_manifest.py"
+      ],
+      "yol": "release_manifest.py"
+    },
+    {
+      "ad": "screencolor",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [
+        "desktop"
+      ],
+      "katman": 0,
+      "satir": 150,
+      "testler": [
+        "tests/test_screencolor.py"
+      ],
+      "yol": "screencolor.py"
+    },
+    {
+      "ad": "storage",
+      "erteli_ithal": [],
+      "ithal": [
+        "catalog",
+        "jsonstore"
+      ],
+      "ithal_eden": [
+        "app",
+        "backup",
+        "folders",
+        "tools.make_legacy_fixtures"
+      ],
+      "katman": 1,
+      "satir": 258,
+      "testler": [
+        "tests/test_chats_route.py",
+        "tests/test_edit_route.py",
+        "tests/test_folders.py",
+        "tests/test_legacy_formats.py",
+        "tests/test_palette_route.py",
+        "tests/test_storage.py",
+        "tests/test_storage_delete.py"
+      ],
+      "yol": "storage.py"
+    },
+    {
+      "ad": "tools.graf_uret",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [],
+      "katman": 0,
+      "satir": 958,
+      "testler": [
+        "tests/test_graflar.py"
+      ],
+      "yol": "tools/graf_uret.py"
+    },
+    {
+      "ad": "tools.make_legacy_fixtures",
+      "erteli_ithal": [],
+      "ithal": [
+        "assets_store",
+        "folders",
+        "palette_store",
+        "storage"
+      ],
+      "ithal_eden": [],
+      "katman": 3,
+      "satir": 207,
+      "testler": [],
+      "yol": "tools/make_legacy_fixtures.py"
+    },
+    {
+      "ad": "tools.make_logo_goldens",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [],
+      "katman": 0,
+      "satir": 107,
+      "testler": [],
+      "yol": "tools/make_logo_goldens.py"
+    },
+    {
+      "ad": "tools.render_brand_assets",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [],
+      "katman": 0,
+      "satir": 71,
+      "testler": [],
+      "yol": "tools/render_brand_assets.py"
+    },
+    {
+      "ad": "tools.surum_karari",
+      "erteli_ithal": [
+        "version"
+      ],
+      "ithal": [],
+      "ithal_eden": [],
+      "katman": 1,
+      "satir": 421,
+      "testler": [
+        "tests/test_surum_karari.py"
+      ],
+      "yol": "tools/surum_karari.py"
+    },
+    {
+      "ad": "tools.surum_yaz",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [],
+      "katman": 0,
+      "satir": 138,
+      "testler": [
+        "tests/test_release_manifest.py",
+        "tests/test_surum_yaz.py"
+      ],
+      "yol": "tools/surum_yaz.py"
+    },
+    {
+      "ad": "version",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [
+        "app",
+        "guncelleme",
+        "tools.surum_karari"
+      ],
+      "katman": 0,
+      "satir": 27,
+      "testler": [
+        "tests/test_backup.py",
+        "tests/test_guncelleme.py",
+        "tests/test_index.py",
+        "tests/test_provider_logos.py",
+        "tests/test_release_manifest.py",
+        "tests/test_settings_route.py",
+        "tests/test_version.py"
+      ],
+      "yol": "version.py"
+    },
+    {
+      "ad": "winsec",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [
+        "azure_client"
+      ],
+      "katman": 0,
+      "satir": 305,
+      "testler": [
+        "tests/test_settings.py",
+        "tests/test_winsec.py"
+      ],
+      "yol": "winsec.py"
+    }
+  ],
+  "onyuz": {
+    "betikler": [
+      {
+        "cagrilan_yollar": [
+          "/api/assets/{}",
+          "/api/assets/{}/{}",
+          "/api/banner",
+          "/api/banner/preview",
+          "/api/logo",
+          "/api/logo/preview",
+          "/assets/banners/{}",
+          "/assets/logos/{}",
+          "/assets/mottos/{}",
+          "/assets/{}/{}",
+          "/output/{}"
+        ],
+        "dosya": "static/assets.js",
+        "satir": 492,
+        "tanim": 22
+      },
+      {
+        "cagrilan_yollar": [
+          "/api/chat",
+          "/api/chats",
+          "/api/chats/{}",
+          "/api/prefs",
+          "/output/{}.png"
+        ],
+        "dosya": "static/chat.js",
+        "satir": 1791,
+        "tanim": 70
+      },
+      {
+        "cagrilan_yollar": [
+          "/api/edit",
+          "/api/generate",
+          "/api/image/{}",
+          "/api/output/{}/download",
+          "/api/prefs",
+          "/output/",
+          "/output/{}"
+        ],
+        "dosya": "static/core.js",
+        "satir": 1417,
+        "tanim": 56
+      },
+      {
+        "cagrilan_yollar": [
+          "/api/folders",
+          "/api/folders/{}",
+          "/api/folders/{}/download",
+          "/api/history",
+          "/api/images",
+          "/api/import",
+          "/output/{}"
+        ],
+        "dosya": "static/folders.js",
+        "satir": 1430,
+        "tanim": 50
+      },
+      {
+        "cagrilan_yollar": [],
+        "dosya": "static/mobile.js",
+        "satir": 52,
+        "tanim": 0
+      },
+      {
+        "cagrilan_yollar": [
+          "/api/palette/suggest",
+          "/api/palettes",
+          "/api/palettes/{}"
+        ],
+        "dosya": "static/palette.js",
+        "satir": 756,
+        "tanim": 37
+      },
+      {
+        "cagrilan_yollar": [
+          "/api/prefs",
+          "/api/settings"
+        ],
+        "dosya": "static/settings.js",
+        "satir": 385,
+        "tanim": 11
+      },
+      {
+        "cagrilan_yollar": [
+          "/output/"
+        ],
+        "dosya": "static/viewer.js",
+        "satir": 368,
+        "tanim": 0
+      }
+    ],
+    "kenarlar": [
+      {
+        "adlar": [
+          "closeSheets",
+          "confirmDialog",
+          "showPreview",
+          "showSection"
+        ],
+        "hedef": "static/core.js",
+        "kaynak": "static/assets.js"
+      },
+      {
+        "adlar": [
+          "loadHistory",
+          "selectInGroup"
+        ],
+        "hedef": "static/folders.js",
+        "kaynak": "static/assets.js"
+      },
+      {
+        "adlar": [
+          "autoGrow",
+          "confirmDialog",
+          "downloadImage",
+          "promptDialog",
+          "run",
+          "setGallerySourceById",
+          "setMode",
+          "syncGoGate",
+          "syncRunCost",
+          "syncSpecs"
+        ],
+        "hedef": "static/core.js",
+        "kaynak": "static/chat.js"
+      },
+      {
+        "adlar": [
+          "detailText"
+        ],
+        "hedef": "static/palette.js",
+        "kaynak": "static/chat.js"
+      },
+      {
+        "adlar": [
+          "applyTheme"
+        ],
+        "hedef": "static/settings.js",
+        "kaynak": "static/chat.js"
+      },
+      {
+        "adlar": [
+          "appendResultTurn",
+          "beginResultTurn",
+          "dropPendingTurn",
+          "openSessionId",
+          "sendChat",
+          "syncAskDirector"
+        ],
+        "hedef": "static/chat.js",
+        "kaynak": "static/core.js"
+      },
+      {
+        "adlar": [
+          "goUp",
+          "loadHistory"
+        ],
+        "hedef": "static/folders.js",
+        "kaynak": "static/core.js"
+      },
+      {
+        "adlar": [
+          "detailText",
+          "readPaletteOpts",
+          "renderPalettePanel"
+        ],
+        "hedef": "static/palette.js",
+        "kaynak": "static/core.js"
+      },
+      {
+        "adlar": [
+          "openSettings"
+        ],
+        "hedef": "static/settings.js",
+        "kaynak": "static/core.js"
+      },
+      {
+        "adlar": [
+          "addExtraUpload",
+          "addGalleryExtra",
+          "clearSource",
+          "closeSheets",
+          "confirmDialog",
+          "deleteImage",
+          "downloadImage",
+          "downloadViaAnchor",
+          "extraBlockReason",
+          "indirmeAdresi",
+          "promptDialog",
+          "renderSource",
+          "setCurrentImage",
+          "setGallerySource",
+          "setUploadSource",
+          "showSection"
+        ],
+        "hedef": "static/core.js",
+        "kaynak": "static/folders.js"
+      },
+      {
+        "adlar": [
+          "detailText"
+        ],
+        "hedef": "static/palette.js",
+        "kaynak": "static/folders.js"
+      },
+      {
+        "adlar": [
+          "closeSheets",
+          "confirmDialog",
+          "openSheet",
+          "promptDialog"
+        ],
+        "hedef": "static/core.js",
+        "kaynak": "static/palette.js"
+      },
+      {
+        "adlar": [
+          "selectInGroup"
+        ],
+        "hedef": "static/folders.js",
+        "kaynak": "static/palette.js"
+      },
+      {
+        "adlar": [
+          "loadAssets"
+        ],
+        "hedef": "static/assets.js",
+        "kaynak": "static/settings.js"
+      },
+      {
+        "adlar": [
+          "chatApi"
+        ],
+        "hedef": "static/chat.js",
+        "kaynak": "static/settings.js"
+      },
+      {
+        "adlar": [
+          "applyChatModel",
+          "applyChatModels",
+          "applyModel",
+          "applyModels",
+          "closeSheets",
+          "goBlockReason",
+          "openSheet",
+          "secilecek",
+          "syncGoGate"
+        ],
+        "hedef": "static/core.js",
+        "kaynak": "static/settings.js"
+      },
+      {
+        "adlar": [
+          "loadFolders",
+          "loadHistory",
+          "syncFolderView"
+        ],
+        "hedef": "static/folders.js",
+        "kaynak": "static/settings.js"
+      },
+      {
+        "adlar": [
+          "loadPalettes"
+        ],
+        "hedef": "static/palette.js",
+        "kaynak": "static/settings.js"
+      },
+      {
+        "adlar": [
+          "downloadImage",
+          "indirmeAdresi"
+        ],
+        "hedef": "static/core.js",
+        "kaynak": "static/viewer.js"
+      }
+    ],
+    "stiller": [
+      "/static/fonts.css",
+      "/static/style.css",
+      "/static/flow-tokens.css",
+      "/static/mobile.css"
+    ],
+    "yukleme_sirasi": [
+      "/static/core.js",
+      "/static/folders.js",
+      "/static/assets.js",
+      "/static/palette.js",
+      "/static/settings.js",
+      "/static/viewer.js",
+      "/static/chat.js",
+      "/static/mobile.js"
+    ]
+  },
+  "surum": 1,
+  "test_dosyasi_sayisi": 62,
+  "uc_noktalar": [
+    {
+      "islev": "index",
+      "moduller": [
+        "errlog",
+        "paths",
+        "version"
+      ],
+      "onyuz": [],
+      "satir": 1588,
+      "yardimci_sayisi": 0,
+      "yol": "/",
+      "yontem": "GET"
+    },
+    {
+      "islev": "list_assets_route",
+      "moduller": [
+        "assets_store",
+        "paths"
+      ],
+      "onyuz": [
+        "static/assets.js"
+      ],
+      "satir": 1513,
+      "yardimci_sayisi": 1,
+      "yol": "/api/assets/{kind}",
+      "yontem": "GET"
+    },
+    {
+      "islev": "upload_asset",
+      "moduller": [
+        "assets_store",
+        "paths"
+      ],
+      "onyuz": [
+        "static/assets.js"
+      ],
+      "satir": 1491,
+      "yardimci_sayisi": 3,
+      "yol": "/api/assets/{kind}",
+      "yontem": "POST"
+    },
+    {
+      "islev": "delete_asset_route",
+      "moduller": [
+        "assets_store",
+        "paths"
+      ],
+      "onyuz": [
+        "static/assets.js"
+      ],
+      "satir": 1525,
+      "yardimci_sayisi": 1,
+      "yol": "/api/assets/{kind}/{asset_id}",
+      "yontem": "DELETE"
+    },
+    {
+      "islev": "add_banner",
+      "moduller": [
+        "assets_store",
+        "models",
+        "paths",
+        "storage"
+      ],
+      "onyuz": [
+        "static/assets.js"
+      ],
+      "satir": 1460,
+      "yardimci_sayisi": 6,
+      "yol": "/api/banner",
+      "yontem": "POST"
+    },
+    {
+      "islev": "preview_banner",
+      "moduller": [
+        "assets_store",
+        "models",
+        "paths"
+      ],
+      "onyuz": [
+        "static/assets.js"
+      ],
+      "satir": 1452,
+      "yardimci_sayisi": 5,
+      "yol": "/api/banner/preview",
+      "yontem": "POST"
+    },
+    {
+      "islev": "chat",
+      "moduller": [
+        "catalog",
+        "chat_client",
+        "chat_providers",
+        "models"
+      ],
+      "onyuz": [
+        "static/chat.js"
+      ],
+      "satir": 867,
+      "yardimci_sayisi": 0,
+      "yol": "/api/chat",
+      "yontem": "POST"
+    },
+    {
+      "islev": "delete_all_chats_route",
+      "moduller": [
+        "chat_store",
+        "paths"
+      ],
+      "onyuz": [
+        "static/chat.js"
+      ],
+      "satir": 1035,
+      "yardimci_sayisi": 0,
+      "yol": "/api/chats",
+      "yontem": "DELETE"
+    },
+    {
+      "islev": "list_chats_route",
+      "moduller": [
+        "chat_store",
+        "paths"
+      ],
+      "onyuz": [
+        "static/chat.js"
+      ],
+      "satir": 997,
+      "yardimci_sayisi": 0,
+      "yol": "/api/chats",
+      "yontem": "GET"
+    },
+    {
+      "islev": "create_chat_route",
+      "moduller": [
+        "chat_store",
+        "models",
+        "paths",
+        "prefs"
+      ],
+      "onyuz": [
+        "static/chat.js"
+      ],
+      "satir": 1011,
+      "yardimci_sayisi": 3,
+      "yol": "/api/chats",
+      "yontem": "POST"
+    },
+    {
+      "islev": "delete_chat_route",
+      "moduller": [
+        "chat_store",
+        "paths"
+      ],
+      "onyuz": [
+        "static/chat.js"
+      ],
+      "satir": 1067,
+      "yardimci_sayisi": 0,
+      "yol": "/api/chats/{chat_id}",
+      "yontem": "DELETE"
+    },
+    {
+      "islev": "get_chat_route",
+      "moduller": [
+        "chat_store",
+        "paths"
+      ],
+      "onyuz": [
+        "static/chat.js"
+      ],
+      "satir": 1003,
+      "yardimci_sayisi": 0,
+      "yol": "/api/chats/{chat_id}",
+      "yontem": "GET"
+    },
+    {
+      "islev": "update_chat_route",
+      "moduller": [
+        "chat_store",
+        "models",
+        "paths",
+        "prefs"
+      ],
+      "onyuz": [
+        "static/chat.js"
+      ],
+      "satir": 1045,
+      "yardimci_sayisi": 2,
+      "yol": "/api/chats/{chat_id}",
+      "yontem": "PUT"
+    },
+    {
+      "islev": "edit",
+      "moduller": [
+        "azure_client",
+        "catalog",
+        "chat_store",
+        "color_names",
+        "folders",
+        "models",
+        "palette",
+        "palette_store",
+        "paths",
+        "providers",
+        "storage"
+      ],
+      "onyuz": [
+        "static/core.js"
+      ],
+      "satir": 532,
+      "yardimci_sayisi": 18,
+      "yol": "/api/edit",
+      "yontem": "POST"
+    },
+    {
+      "islev": "list_folders_route",
+      "moduller": [
+        "folders",
+        "paths",
+        "storage"
+      ],
+      "onyuz": [
+        "static/folders.js"
+      ],
+      "satir": 1075,
+      "yardimci_sayisi": 0,
+      "yol": "/api/folders",
+      "yontem": "GET"
+    },
+    {
+      "islev": "create_folder_route",
+      "moduller": [
+        "folders",
+        "models",
+        "paths"
+      ],
+      "onyuz": [
+        "static/folders.js"
+      ],
+      "satir": 1099,
+      "yardimci_sayisi": 2,
+      "yol": "/api/folders",
+      "yontem": "POST"
+    },
+    {
+      "islev": "delete_folder_route",
+      "moduller": [
+        "folders",
+        "paths",
+        "storage"
+      ],
+      "onyuz": [
+        "static/folders.js"
+      ],
+      "satir": 1114,
+      "yardimci_sayisi": 0,
+      "yol": "/api/folders/{folder_id}",
+      "yontem": "DELETE"
+    },
+    {
+      "islev": "rename_folder_route",
+      "moduller": [
+        "folders",
+        "models",
+        "paths"
+      ],
+      "onyuz": [
+        "static/folders.js"
+      ],
+      "satir": 1166,
+      "yardimci_sayisi": 0,
+      "yol": "/api/folders/{folder_id}",
+      "yontem": "PATCH"
+    },
+    {
+      "islev": "download_folder_route",
+      "moduller": [
+        "folders",
+        "paths"
+      ],
+      "onyuz": [
+        "static/folders.js"
+      ],
+      "satir": 1127,
+      "yardimci_sayisi": 0,
+      "yol": "/api/folders/{folder_id}/download",
+      "yontem": "GET"
+    },
+    {
+      "islev": "generate",
+      "moduller": [
+        "azure_client",
+        "catalog",
+        "chat_store",
+        "color_names",
+        "folders",
+        "models",
+        "palette",
+        "palette_store",
+        "paths",
+        "providers",
+        "storage"
+      ],
+      "onyuz": [
+        "static/core.js"
+      ],
+      "satir": 366,
+      "yardimci_sayisi": 9,
+      "yol": "/api/generate",
+      "yontem": "POST"
+    },
+    {
+      "islev": "history",
+      "moduller": [
+        "folders",
+        "paths",
+        "storage"
+      ],
+      "onyuz": [
+        "static/folders.js"
+      ],
+      "satir": 1180,
+      "yardimci_sayisi": 1,
+      "yol": "/api/history",
+      "yontem": "GET"
+    },
+    {
+      "islev": "delete_image",
+      "moduller": [
+        "paths",
+        "storage"
+      ],
+      "onyuz": [
+        "static/core.js"
+      ],
+      "satir": 1202,
+      "yardimci_sayisi": 0,
+      "yol": "/api/image/{image_id}",
+      "yontem": "DELETE"
+    },
+    {
+      "islev": "move_image",
+      "moduller": [
+        "folders",
+        "models",
+        "paths",
+        "storage"
+      ],
+      "onyuz": [
+        "static/core.js"
+      ],
+      "satir": 1192,
+      "yardimci_sayisi": 1,
+      "yol": "/api/image/{image_id}",
+      "yontem": "PATCH"
+    },
+    {
+      "islev": "delete_images",
+      "moduller": [
+        "models",
+        "paths",
+        "storage"
+      ],
+      "onyuz": [
+        "static/folders.js"
+      ],
+      "satir": 1222,
+      "yardimci_sayisi": 0,
+      "yol": "/api/images",
+      "yontem": "DELETE"
+    },
+    {
+      "islev": "move_images",
+      "moduller": [
+        "folders",
+        "models",
+        "paths",
+        "storage"
+      ],
+      "onyuz": [
+        "static/folders.js"
+      ],
+      "satir": 1211,
+      "yardimci_sayisi": 1,
+      "yol": "/api/images",
+      "yontem": "PATCH"
+    },
+    {
+      "islev": "import_image",
+      "moduller": [
+        "folders",
+        "paths",
+        "storage"
+      ],
+      "onyuz": [
+        "static/folders.js"
+      ],
+      "satir": 1232,
+      "yardimci_sayisi": 5,
+      "yol": "/api/import",
+      "yontem": "POST"
+    },
+    {
+      "islev": "add_logo",
+      "moduller": [
+        "assets_store",
+        "composite",
+        "models",
+        "paths",
+        "storage"
+      ],
+      "onyuz": [
+        "static/assets.js"
+      ],
+      "satir": 1385,
+      "yardimci_sayisi": 4,
+      "yol": "/api/logo",
+      "yontem": "POST"
+    },
+    {
+      "islev": "preview_logo",
+      "moduller": [
+        "assets_store",
+        "composite",
+        "models",
+        "paths"
+      ],
+      "onyuz": [
+        "static/assets.js"
+      ],
+      "satir": 1376,
+      "yardimci_sayisi": 3,
+      "yol": "/api/logo/preview",
+      "yontem": "POST"
+    },
+    {
+      "islev": "output_download",
+      "moduller": [
+        "paths"
+      ],
+      "onyuz": [
+        "static/core.js"
+      ],
+      "satir": 1557,
+      "yardimci_sayisi": 1,
+      "yol": "/api/output/{image_id}/download",
+      "yontem": "GET"
+    },
+    {
+      "islev": "suggest_palettes",
+      "moduller": [
+        "color_names",
+        "models",
+        "palette"
+      ],
+      "onyuz": [
+        "static/palette.js"
+      ],
+      "satir": 1273,
+      "yardimci_sayisi": 0,
+      "yol": "/api/palette/suggest",
+      "yontem": "POST"
+    },
+    {
+      "islev": "list_palettes_route",
+      "moduller": [
+        "palette_store",
+        "paths"
+      ],
+      "onyuz": [
+        "static/palette.js"
+      ],
+      "satir": 1304,
+      "yardimci_sayisi": 0,
+      "yol": "/api/palettes",
+      "yontem": "GET"
+    },
+    {
+      "islev": "create_palette_route",
+      "moduller": [
+        "color_names",
+        "models",
+        "palette",
+        "palette_store",
+        "paths"
+      ],
+      "onyuz": [
+        "static/palette.js"
+      ],
+      "satir": 1309,
+      "yardimci_sayisi": 3,
+      "yol": "/api/palettes",
+      "yontem": "POST"
+    },
+    {
+      "islev": "delete_palette_route",
+      "moduller": [
+        "palette_store",
+        "paths"
+      ],
+      "onyuz": [
+        "static/palette.js"
+      ],
+      "satir": 1330,
+      "yardimci_sayisi": 0,
+      "yol": "/api/palettes/{palette_id}",
+      "yontem": "DELETE"
+    },
+    {
+      "islev": "get_prefs_route",
+      "moduller": [
+        "paths",
+        "prefs"
+      ],
+      "onyuz": [
+        "static/chat.js",
+        "static/core.js",
+        "static/settings.js"
+      ],
+      "satir": 920,
+      "yardimci_sayisi": 0,
+      "yol": "/api/prefs",
+      "yontem": "GET"
+    },
+    {
+      "islev": "post_prefs_route",
+      "moduller": [
+        "models",
+        "paths",
+        "prefs"
+      ],
+      "onyuz": [
+        "static/chat.js",
+        "static/core.js",
+        "static/settings.js"
+      ],
+      "satir": 926,
+      "yardimci_sayisi": 0,
+      "yol": "/api/prefs",
+      "yontem": "POST"
+    },
+    {
+      "islev": "get_settings",
+      "moduller": [
+        "azure_client",
+        "catalog",
+        "credstore",
+        "guncelleme",
+        "paths",
+        "prefs",
+        "version"
+      ],
+      "onyuz": [
+        "static/settings.js"
+      ],
+      "satir": 717,
+      "yardimci_sayisi": 2,
+      "yol": "/api/settings",
+      "yontem": "GET"
+    },
+    {
+      "islev": "post_settings",
+      "moduller": [
+        "azure_client",
+        "catalog",
+        "credstore",
+        "models",
+        "version"
+      ],
+      "onyuz": [
+        "static/settings.js"
+      ],
+      "satir": 747,
+      "yardimci_sayisi": 2,
+      "yol": "/api/settings",
+      "yontem": "POST"
+    },
+    {
+      "islev": "asset_file",
+      "moduller": [
+        "assets_store",
+        "paths"
+      ],
+      "onyuz": [
+        "static/assets.js"
+      ],
+      "satir": 1534,
+      "yardimci_sayisi": 1,
+      "yol": "/assets/{kind}/{filename}",
+      "yontem": "GET"
+    },
+    {
+      "islev": "output_file",
+      "moduller": [
+        "paths"
+      ],
+      "onyuz": [
+        "static/assets.js",
+        "static/chat.js",
+        "static/core.js",
+        "static/folders.js",
+        "static/viewer.js"
+      ],
+      "satir": 1546,
+      "yardimci_sayisi": 0,
+      "yol": "/output/{filename}",
+      "yontem": "GET"
+    }
+  ]
+}

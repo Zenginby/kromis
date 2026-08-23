@@ -66,6 +66,11 @@ GUVENLI_YOLLAR: tuple[str, ...] = (
     ".gitignore",
     ".gitattributes",
     "requirements-dev.txt",   # yalnız test/derleme aracı; çalışma zamanına girmiyor
+    # Ajan/geliştirici düzeni; `.spec` yalnız app.py'nin import zincirini
+    # izliyor ve o zincir buraya hiç uğramıyor. Listede OLMASALAR yalnız depo
+    # haritasını yenileyen bir commit sürüm artırıp yayın tetiklerdi.
+    "CLAUDE.md",
+    ".claude/",
 )
 
 SEVIYELER = ("yok", "yama", "minor", "major")

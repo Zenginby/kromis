@@ -23,11 +23,25 @@ dist/
 /branding/lumeo.icns
 
 # graphify generated artifacts
+#
+# Depo haritası ARTIK BURADA DEĞİL: `docs/graflar/` altındaki graflar
+# `tools/graf_uret.py` ile üretiliyor ve BİLEREK commit'leniyor (bkz.
+# CLAUDE.md). Dışarıda tutulan tek şey bu geçici çıktı dizini.
 graphify-out/
 .superpowers/
 
-# Claude Code tool directory (not project content)
-.claude/
+# Claude Code araç dizini — proje içeriği DEĞİL, tek istisna dışında.
+#
+# `.claude/settings.json` İZLENİYOR: içindeki kancalar depo haritasını taze
+# tutan üç mekanizmadan biri (bkz. docs/graflar/README.md). Yalnız bir
+# geliştiricinin makinesinde durursa yeni klonda hiç çalışmaz ve harita
+# sessizce bayatlar — yani o dosya makineye değil PROJEYE ait.
+#
+# `.claude/*` biçiminde yazılı, `.claude/` DEĞİL: git dışlanan bir DİZİNİN
+# içine hiç inmez, o yüzden `.claude/` deseniyle birlikte aşağıdaki
+# olumsuzlama hiçbir işe yaramazdı.
+.claude/*
+!.claude/settings.json
 
 # Tasarım aracı artıkları (oturuma özel, proje içeriği değil)
 .impeccable/

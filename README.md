@@ -128,6 +128,19 @@ Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Andr
 
 ## 💻 Geliştirici Rehberi (Developer Setup)
 
+### 0. Önce depo haritası
+Kod okumaya başlamadan önce **[docs/graflar/README.md](docs/graflar/README.md)**:
+modüller ve katmanları, HTTP uçlarının hangi modüllere dokunduğu, `static/`
+betiklerinin birbirine ve uçlara bağlılığı, her modülü sınayan test dosyaları.
+Graflar `tools/graf_uret.py` ile KAYNAKTAN üretiliyor ve tazeliği bir testle
+(`tests/test_graflar.py`) korunuyor. Değişiklikten sonra yenilemek için:
+
+```bash
+python3 tools/graf_uret.py     # Windows: python tools/graf_uret.py
+```
+
+Çalışma düzeninin tamamı: **[CLAUDE.md](CLAUDE.md)**.
+
 ### 1. Gereksinimler
 - Python 3.10+
 - macOS veya Windows OS (Android paketi için ayrıca JDK 17 + Android SDK — bkz. `android/`)

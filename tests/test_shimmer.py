@@ -26,6 +26,22 @@ def _metin(istemci, yol: str) -> str:
     return yanit.text
 
 
+def _kod(istemci, yol: str) -> str:
+    """Betiğin YALNIZ kodu — `//` ile başlayan satırlar ayıklanmış.
+
+    Gerekmesinin sebebi bu depoda kayıtlı: yorumlar KALDIRILAN satırı tırnak
+    içinde anlatıyor (gelenek, kusuru kaydeden yorum) ve "şu satır olmasın"
+    iddiaları o anlatıyı da yakalıyor. Aşağıdaki iki iddia ilk yazımda tam
+    böyle düştü — pixel-canvas.js'in başındaki sapma listesi hem
+    `this.animation = this.animate(name)`ı hem `new CSSStyleSheet()`i
+    ANLATIYOR. Yorum kalmalı, iddia ise gerçekten koşan kodu ölçmeli.
+    (test_ci_paketleme_kapisi.py'nin `kapsam_kodu`su ve test_index.py'nin
+    `role=` iddiası aynı tuzağın öteki iki kaydı.)
+    """
+    return "\n".join(satir for satir in _metin(istemci, yol).splitlines()
+                      if not satir.lstrip().startswith("//"))
+
+
 def test_component_script_is_served_and_registers_the_element(istemci):
     kaynak = _metin(istemci, "/static/pixel-canvas.js")
     # Kayıt olmazsa `document.createElement("pixel-canvas")` bilinmeyen bir
@@ -59,6 +75,50 @@ def test_component_cancels_its_animation_on_disconnect(istemci):
     govde = kaynak.split("disconnectedCallback()", 1)
     assert len(govde) == 2, "disconnectedCallback yok"
     assert "cancelAnimationFrame(this.animation)" in govde[1].split("handleEvent", 1)[0]
+
+
+def test_the_cancel_gate_is_not_disarmed_by_an_overwritten_handle(istemci):
+    """İptal edilecek kimlik `undefined` OLMAMALI — kapının ikinci yarısı.
+
+    Özgün bileşende `handleAnimation` şöyleydi:
+
+        this.animation = this.animate(name);
+
+    `animate()` değer DÖNDÜRMÜYOR: ilk çağrıda içeride kurulan rAF kimliğinin
+    üstüne `undefined` biniyor ve kimlik ancak SIRADAKİ karede gerçek bir
+    değere kavuşuyor. Yani bir üstteki testin mandalladığı
+    `cancelAnimationFrame` o ilk karede hiçbir şeyi iptal etmiyordu — kart o
+    aralıkta silinirse sızıntı yine kalıyordu. Kimliğin tek yazarı `animate`.
+    """
+    kaynak = _kod(istemci, "/static/pixel-canvas.js")
+    assert "this.animation = this.animate(" not in kaynak, (
+        "rAF kimliği `animate`in dönüşüyle eziliyor (dönüş yok: undefined)")
+    govde = kaynak.split("handleAnimation(name) {", 1)
+    assert len(govde) == 2, "handleAnimation yok"
+    govde = govde[1].split("}", 1)[0]
+    assert "cancelAnimationFrame(this.animation)" in govde, govde
+    assert "this.animate(name)" in govde, govde
+
+
+def test_shadow_style_does_not_need_constructable_stylesheets(istemci):
+    """Gölge kökün stili `<style>` düğümüyle gelmeli.
+
+    `new CSSStyleSheet()` + `adoptedStyleSheets` Safari 16.4'ten önce yok ve
+    masaüstü paketi sistemin WebView'ini kullanıyor. Orada `connectedCallback`
+    FIRLIYOR: eleman hiç kurulmuyor, `start()` çağrısı da bir şey yapmıyor ve
+    kutu sessizce boş kalıyor — bu dosyanın var olma sebebi olan kırılma
+    sınıfının tam kendisi. Kurulabilir sayfanın kazancı (örnekler arası
+    paylaşım) burada zaten yok: aynı anda tek bir bekleme kartı yaşıyor.
+    """
+    kaynak = _kod(istemci, "/static/pixel-canvas.js")
+    assert "new CSSStyleSheet" not in kaynak, "kurulabilir stil sayfası geri gelmiş"
+    assert "adoptedStyleSheets" not in kaynak
+    assert 'document.createElement("style")' in kaynak
+    # Stil gölge köke GERÇEKTEN giriyor mu — düğümü kurup eklememek sessizce
+    # stilsiz bir canvas demek (`:host` boyutu 0 kalır, tek piksel çizilmez).
+    govde = kaynak.split("connectedCallback() {", 1)[1].split("disconnectedCallback", 1)[0]
+    assert "stil.textContent = PixelCanvas.css" in govde, govde
+    assert "this.shadowroot.append(stil, canvas)" in govde, govde
 
 
 def test_component_loads_before_chat(istemci):

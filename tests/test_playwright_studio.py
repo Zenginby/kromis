@@ -28,6 +28,39 @@ from playwright.sync_api import sync_playwright
 from app import app
 
 
+def _ilk_kurulum_perdesini_kapat(page) -> None:
+    """İlk kurulumda kendiliğinden açılan Ayarlar panelini kapatır.
+
+    NEDEN ORTAK YARDIMCI: üç test de aynı perdeyi kapatıyordu ama ÜÇ AYRI
+    çapaya bakarak — biri sayfa iskeletine (`#view-studio`), biri kataloğa,
+    biri `#set-provider` + 800ms uykuya. İlkinin çapası panelden ÖNCE geliyor:
+    `loadSettings` `/api/settings`i BEKLİYOR, yani iskelet hazırken karar
+    henüz verilmemiş oluyor ve "açıksa kapat" iddiası boşa düşüyor. Panel
+    sonra açılıyor, ortak perde (#shell-scrim) composer'ı yutuyor ve sıradaki
+    tıklama 30 saniye bekleyip "intercepts pointer events" diye düşüyor.
+
+    Yani kusur bir YARIŞTI ve testin hızına bağlıydı: sunucu sıcakken yanıt
+    çapadan önce dönüyor, panel açılıyor, kapatma tutuyor ve test yeşil
+    kalıyordu. Soğuk ilk koşumda (bu depoda ölçüldü) yanıt geç kalıyor ve
+    aynı test kırmızı. Bir yarışı 800ms uykuyla kapatmak da aynı kusurun
+    yavaş hâli, o yüzden o satır da gitti.
+
+    ÇAPA `#model`in DEĞERİ: `loadSettings` yanıtı uyguladıktan sonra
+    `openSettings()` kararını AYNI senkron blokta veriyor (`applyConfigured`
+    → `applyModels` → `#model.value`, hemen ardından `if (…) openSettings()`).
+    Değer görünür olduğunda karar VERİLMİŞTİR — JS tek iş parçacıklı, araya
+    bir poll giremez. `|| .sheet.open` ikinci dalı fail-closed yol için:
+    `/api/settings` hata verirse katalog boş kalıyor (`imageModels = []`) ve
+    panel yine açılıyor, o dalda çapa panelin kendisi.
+    """
+    page.wait_for_function(
+        '() => { const m = document.querySelector("#model");'
+        ' return (m && m.value !== "") || !!document.querySelector(".sheet.open"); }')
+    if page.query_selector(".sheet.open"):
+        page.keyboard.press("Escape")
+        page.wait_for_selector(".sheet.open", state="detached")
+
+
 def get_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(('127.0.0.1', 0))
@@ -74,9 +107,12 @@ def test_playwright_studio_single_thread_flow():
             # `importorskip`), o yüzden kırık hâli fark edilmemişti — 041fc2f'te
             # de kırık. Panel kapatılmadan bu testin ölçtüğü hiçbir şeye
             # ulaşılamıyor.
-            if page.query_selector(".sheet.open"):
-                page.keyboard.press("Escape")
-                page.wait_for_selector(".sheet.open", state="detached")
+            #
+            # Kapatma buradan YARDIMCIYA taşındı: bu satırlar `#view-studio`
+            # göründüğü an koşuyordu, yani panel açılmadan ÖNCE — kusuru
+            # yalnızca yavaş koşumda gösteren bir yarış. Gerekçe yardımcının
+            # kendi notunda.
+            _ilk_kurulum_perdesini_kapat(page)
 
             # 2. Assert single studio view is visible and retired IDs are absent
             assert page.is_visible("#view-studio")
@@ -181,13 +217,10 @@ def test_playwright_model_sheet_alttan_aciliyor():
                     if r.method == "POST" and "/api/prefs" in r.url else None)
 
             page.goto(base_url)
-            page.wait_for_function(
-                'document.querySelector("#model") && document.querySelector("#model").value !== ""')
             # İlk kurulumda (anahtar yok) Ayarlar kendiliğinden açılıyor —
-            # perde composer'ı yutuyor, o yüzden önce kapatılıyor.
-            if page.query_selector(".sheet.open"):
-                page.keyboard.press("Escape")
-                page.wait_for_selector(".sheet.open", state="detached")
+            # perde composer'ı yutuyor, o yüzden önce kapatılıyor. Katalog
+            # beklemesi de yardımcının içinde: çapa zaten `#model`in değeri.
+            _ilk_kurulum_perdesini_kapat(page)
 
             # 1. Çipe dokunmak paneli ALT kenardan yükseltiyor.
             page.click("#model-btn")
@@ -303,10 +336,8 @@ def test_playwright_ayarlar_paneli_alttan_ve_ALANLARI_gosteriyor():
             page = browser.new_page(viewport={"width": 390, "height": 844})
             page.goto(base_url)
             page.wait_for_selector("#set-provider")
-            page.wait_for_timeout(800)
-            if page.query_selector(".sheet.open"):
-                page.keyboard.press("Escape")
-                page.wait_for_selector(".sheet.open", state="detached")
+            # 800ms'lik uyku KALKTI: yarışı yavaşlatmak kapatmak değil.
+            _ilk_kurulum_perdesini_kapat(page)
 
             page.click("#settings-btn")
             page.wait_for_selector("#settings-modal.open")

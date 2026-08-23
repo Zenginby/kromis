@@ -53,3 +53,12 @@ Bu modülleri hiçbir test dosyası ithal etmiyor. Dolaylı olarak sınanıyor o
 * `tools.make_logo_goldens` (107 satır)
 * `tools.render_brand_assets` (71 satır)
 
+## Hiçbir modülü ithal etmeyen testler
+
+Yukarıdaki tablonun kör noktası: sütun ithal ilişkisinden çıktığı için ithali olmayan bir test hiçbir satırda görünmez. Bu dosyalar modül değil ARTEFAKT sınıyor (workflow YAML'ı, kodlama sözleşmesi, paketleme adı, Android geri tuşu) — yani bir `.yml`e ya da bir sözleşmeye dokunuyorsan koşturulacak testler burada.
+
+* `tests/test_android_geri.py`
+* `tests/test_android_packaging.py`
+* `tests/test_ci_paketleme_kapisi.py`
+* `tests/test_encoding_contract.py`
+

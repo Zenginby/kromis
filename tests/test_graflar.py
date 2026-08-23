@@ -8,13 +8,16 @@ depo adresi dört dosyada elle yazılıydı ve taşınmada biri kaçtı (bkz.
 tests/test_depo_adresi.py). Ders her ikisinde de aynı: TÜRETİLEN bir şeyin
 bekçisi bir test olmak zorunda, yoksa gelenek olur ve gelenek unutulur.
 
-Bu yüzden kapı ÜÇ ayrı şeyi ölçüyor:
+Bu yüzden kapı DÖRT ayrı şeyi ölçüyor:
 
   1. Commit'lenmiş dosyalar tazeyken üretilenle bayt bayt aynı mı (bayat harita
      kırmızı verir; düzeltmesi `python3 tools/graf_uret.py`).
   2. Tarayıcı kör mü — sayılar depodan BAĞIMSIZ biçimde yeniden ölçülüyor.
      Sessizce boş dönen bir tarayıcı, 1. testi de yeşil bırakırdı.
-  3. Tarayıcının en kırılgan iki parçası (yol eşleştirici, yorum ayıklayıcı)
+  3. Harita EKSİK mi — sayılan her test dosyası bir yerde görünüyor mu. Bir
+     dosyanın sayıya girip hiçbir satırda görünmemesi ölçülmüş bir kusur
+     (bkz. o testin gerekçesi) ve 1. ile 2. testin ikisi de yeşil kalır.
+  4. Tarayıcının en kırılgan iki parçası (yol eşleştirici, yorum ayıklayıcı)
      doğrudan sınanıyor: ikisi de regex'e dayanıyor ve ikisi de yanlış
      çalıştığında GÜRÜLTÜSÜZ yanlış üretiyor.
 """
@@ -75,6 +78,33 @@ def test_the_scanner_is_not_blind():
     # Her rota bir işleve ve gerçek bir satıra bağlı olmalı.
     for r in g["uc_noktalar"]:
         assert r["islev"] and r["satir"] > 0, r
+
+
+def test_every_counted_test_file_is_visible_somewhere_in_the_map():
+    """Sayılan her test dosyası haritada BİR YERDE görünmeli.
+
+    ÖLÇÜLMÜŞ bir kör noktanın kapısı: `testler.md`nin sütunu ithal
+    ilişkisinden çıkıyor, yani hiçbir ürün modülünü ithal etmeyen bir test
+    hiçbir satırda görünmüyordu — yalnız üstteki sayıya giriyordu. PR#51
+    `ci.yml`'ın paketleme kapısına bir bekçi eklediğinde tam bu oldu:
+    CLAUDE.md "ne sınanacak?" sorusunu bu grafa yönlendiriyor ve graf o
+    bekçiyi göstermiyordu.
+
+    İddia ADA DEĞİL SAYIYA bakıyor: yeni bir artefakt testi eklendiğinde
+    kendiliğinden kapsıyor, yani "listeye eklemeyi unutma" diye bir gelenek
+    doğmuyor (bu deponun `test_depo_adresi.py` dersi).
+    """
+    g = gu.graf_topla()
+    gorunen = {os.path.basename(t) for mod in g["moduller"] for t in mod["testler"]}
+    gorunen |= {os.path.basename(t) for t in g["modulsuz_testler"]}
+    diskteki = {a for a in os.listdir(os.path.join(REPO, "tests"))
+                if a.startswith("test_") and a.endswith(".py")}
+    assert diskteki, "tarama boş — testin kendisi anlamsız"
+    assert gorunen == diskteki, (
+        "haritada hiç görünmeyen test dosyası var: "
+        + ", ".join(sorted(diskteki - gorunen)))
+    # Sayı da aynı kümeyi saymalı; ayrışırsa README'deki ölçü yalan söyler.
+    assert g["test_dosyasi_sayisi"] == len(diskteki)
 
 
 def test_the_graph_records_the_deferred_imports_that_break_the_cycle():

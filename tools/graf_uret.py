@@ -476,8 +476,20 @@ def graf_topla() -> dict:
     test_haritasi: dict[str, list[str]] = {ad: [] for ad in urun}
     test_dosyalari = sorted(ad for ad in hepsi
                             if ad.startswith("tests.test_"))
+    # Hiçbir ürün modülünü ithal ETMEYEN testler ayrıca tutuluyor, çünkü
+    # aşağıdaki tabloda HİÇBİR satırda görünmüyorlar: sütun ithal ilişkisinden
+    # çıkıyor, ithali olmayan test de hiçbir modülün altında listelenemiyor.
+    # Sayıya giriyorlardı ama haritada yoktular ve boşluk ÖLÇÜLDÜ: PR#51
+    # `ci.yml`'ın paketleme kapısına bir bekçi ekledi (test_ci_paketleme_
+    # kapisi.py), CLAUDE.md "ne sınanacak?" sorusunu bu grafa yönlendiriyor ve
+    # graf o bekçiyi göstermiyordu. Bu testler ARTEFAKT sınıyor (workflow
+    # YAML'ı, kodlama sözleşmesi, paketleme adı, Android geri tuşu), yani
+    # "modülü yok" onların kusuru değil — haritanın kör noktasıydı.
+    modulsuz_testler: list[str] = []
     for ad in test_dosyalari:
         kenar, _, _ = ithaller(_oku(hepsi[ad]), hepsi[ad], urun)
+        if not kenar:
+            modulsuz_testler.append(hepsi[ad])
         for hedef in sorted(kenar):
             test_haritasi[hedef].append(hepsi[ad])
 
@@ -537,6 +549,7 @@ def graf_topla() -> dict:
             eslesmeyen, key=lambda e: (e["dosya"], e["yol"])),
         "dongular": dongular,
         "test_dosyasi_sayisi": len(test_dosyalari),
+        "modulsuz_testler": modulsuz_testler,
     }
 
 
@@ -740,6 +753,14 @@ def testler_md(g: dict) -> str:
           "çalıştırır), ama doğrudan bekçileri yok.", ""]
     for m in testsiz:
         s.append(f"* `{m['ad']}` ({m['satir']} satır)")
+    s += ["", "## Hiçbir modülü ithal etmeyen testler", "",
+          "Yukarıdaki tablonun kör noktası: sütun ithal ilişkisinden çıktığı "
+          "için ithali olmayan bir test hiçbir satırda görünmez. Bu dosyalar "
+          "modül değil ARTEFAKT sınıyor (workflow YAML'ı, kodlama sözleşmesi, "
+          "paketleme adı, Android geri tuşu) — yani bir `.yml`e ya da bir "
+          "sözleşmeye dokunuyorsan koşturulacak testler burada.", ""]
+    for t in g["modulsuz_testler"]:
+        s.append(f"* `{t}`")
     s.append("")
     return "\n".join(s) + "\n"
 
@@ -770,7 +791,9 @@ def readme_md(g: dict) -> str:
          f"* {len(g['onyuz']['betikler'])} tarayıcı betiği, "
          f"{len(g['onyuz']['kenarlar'])} betik-arası bağ",
          f"* {g['test_dosyasi_sayisi']} test dosyası; "
-         f"{sum(1 for m in mods if not m['testler'])} modülü hiçbir test ithal etmiyor",
+         f"{sum(1 for m in mods if not m['testler'])} modülü hiçbir test ithal "
+         f"etmiyor, {len(g['modulsuz_testler'])} test de hiçbir modülü "
+         "(artefakt sınıyorlar; bkz. testler.md)",
          f"* {len(g['dongular'])} ithal döngüsü, "
          f"{len(g['eslesmeyen_cagrilar'])} rotaya oturmayan tarayıcı çağrısı",
          "",

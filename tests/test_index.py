@@ -2995,6 +2995,49 @@ def test_model_secimi_NATIVE_kontrollerle_yapiliyor():
     assert 'type = "radio"' in _js("core.js"), "kartlar native radyo kurmuyor"
 
 
+def test_cip_dugmesinin_adi_EKSENI_de_soyluyor():
+    """Çipin erişilebilir adı = eksen + seçili model.
+
+    Düğmenin adı bir zamanlar YALNIZ içeriğiydi: ekran okuyucu "gpt-image-1 —
+    5–20 kredi, düğme" diyor, çipin hangi eksene ait olduğunu (görsel modeli
+    mi yönetmen modeli mi) hiç söylemiyordu. Yandaki `.sr-only` etiket
+    `for="model"` ile `aria-hidden` bir DEĞER TAŞIYICISINI etiketliyor, yani
+    görünen kontrolle programatik bağı yoktu — `title` de ad hesabına
+    girmiyor (içerik ve `aria-labelledby` onu eziyor) ve dokunmatikte hiç
+    görünmüyor, bu panelin var olma sebebi tam olarak buydu.
+
+    İddia SIRAYA da bakıyor: sabit yarı önce, değişen yarı sonra. Ters sıra
+    "gpt-image-1 … Görsel modeli" diye okunurdu.
+    """
+    html = re.sub(r"<!--.*?-->", "", _served(), flags=re.S)
+    for tetik, etiket, deger, ad in (
+            ("model-btn", "model-label", "model-btn-label", "Görsel modeli"),
+            ("chat-model-btn", "chat-model-label", "chat-model-btn-label",
+             "Sohbet modeli")):
+        acik = re.search(rf'<button[^>]*id="{tetik}"[^>]*>', html)
+        assert acik, f"#{tetik} yok"
+        assert f'aria-labelledby="{etiket} {deger}"' in acik.group(0), (
+            f"#{tetik} adını eksenden almıyor: {acik.group(0)}")
+        # Referanslar GERÇEKTEN var olmalı: kırık bir idref sessizce adsız
+        # bir düğme demek (ad hesabı bulunamayan referansı atlar).
+        etiket_acik = re.search(rf'<label id="{etiket}"[^>]*>([^<]*)</label>', html)
+        assert etiket_acik, f"#{etiket} etiketi yok — adın sabit yarısı kayıp"
+        assert etiket_acik.group(1).strip() == ad, etiket_acik.group(0)
+        # Etiket ağaçta SERBEST METİN olarak durmamalı: `for` ile işaret ettiği
+        # `<select>` de `aria-hidden` olduğu için gezinme kipinde eksen adı bir
+        # kez tek başına, bir kez de düğmenin adında okunuyordu. `aria-labelledby`
+        # gizli düğümün metnini de okuduğu için ad kaybolmuyor.
+        assert 'aria-hidden="true"' in etiket_acik.group(0), (
+            f"#{etiket} ağaçta serbest metin — eksen adı iki kez okunur")
+        assert f'id="{deger}"' in html, f"#{deger} yok — adın değişen yarısı kayıp"
+    # Değişen yarının TEK yazarı `syncModelChip`; ikinci bir yazar iki adın
+    # ayrışması demekti (`aria-label` yerine `aria-labelledby` seçilmesinin
+    # sebebi de bu).
+    core = _js("core.js")
+    assert core.count("$(eksen.etiket).textContent") == 1, (
+        "çip metnini yazan ikinci bir yer var")
+
+
 def test_model_secici_composer_bar_da_DEGIL():
     """360px genişlik bütçesinin mandalı.
 

@@ -54,7 +54,7 @@ jobs:
       - name: Değişen yollara bak
         id: bak
         env:
-          TABAN: ${{ github.base_ref }}
+          TABAN_SHA: ${{ github.event.pull_request.base.sha }}
           ETIKETLER: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: |
           set -euo pipefail
@@ -67,8 +67,32 @@ jobs:
             exit 0
           fi
 
-          git fetch --no-tags --depth=1 origin "$TABAN"
-          YOLLAR="$(git diff --name-only "origin/$TABAN...HEAD")"
+          # Taban SHA'sı OLAYIN İÇİNDEN geliyor; checkout `fetch-depth: 0` ile
+          # tam geçmişi aldığı için commit yerelde duruyor ve EK BİR FETCH YOK.
+          #
+          # Burada bir zamanlar şu iki satır vardı ve v0.9.1'de kırıldı:
+          #     git fetch --no-tags --depth=1 origin "$TABAN"
+          #     YOLLAR="$(git diff --name-only "origin/$TABAN...HEAD")"
+          # Sığ çekim `.git/shallow` graftını yazıp taban dalını TEK commit'e
+          # kırpıyor. PR'ı CI koşarken merge edersen taban dalının tepesi
+          # PR'ın tabanının ötesine geçiyor (PR#50: CI 19:26:25'te tetiklendi,
+          # merge 19:26:32'de main'e düştü) ve o tek commit'in ataları yerelde
+          # olmadığı için `A...B` ortak ata bulamıyor:
+          #     fatal: origin/main...HEAD: no merge base   → exit 128
+          # Bedeli iki katmanlı: kapı kırılınca `paketle` çıktısı BOŞ kalıyor,
+          # yani üç paketleme işi de atlanıyor — `static/` değişmiş bir PR
+          # paketleme kapısından hiç geçmemiş oluyor.
+          #
+          # `if !` ile sarılı olması da bilinçli: bu diff bir daha kurulamazsa
+          # kapı KIRILMAK yerine güvenli tarafa düşüyor. Aşağıdaki yol
+          # listesinin geniş tutulmasıyla aynı tercih — gereksiz bir paketleme
+          # koşusunun bedeli bedava runner dakikası, atlamanın bedeli kırık
+          # bir yayın.
+          if ! YOLLAR="$(git diff --name-only "$TABAN_SHA...HEAD")"; then
+            echo "diff kurulamadı ($TABAN_SHA...HEAD) — güvenli tarafa düşülüyor"
+            echo "paketle=evet" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           echo "--- değişen yollar ---"
           echo "$YOLLAR"
 

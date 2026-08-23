@@ -702,7 +702,7 @@
       "ithal": [],
       "ithal_eden": [],
       "katman": 0,
-      "satir": 958,
+      "satir": 981,
       "testler": [
         "tests/test_graflar.py"
       ],
@@ -808,6 +808,12 @@
       "yol": "winsec.py"
     }
   ],
+  "modulsuz_testler": [
+    "tests/test_android_geri.py",
+    "tests/test_android_packaging.py",
+    "tests/test_ci_paketleme_kapisi.py",
+    "tests/test_encoding_contract.py"
+  ],
   "onyuz": {
     "betikler": [
       {
@@ -851,7 +857,7 @@
           "/output/{}"
         ],
         "dosya": "static/core.js",
-        "satir": 1619,
+        "satir": 1623,
         "tanim": 59
       },
       {
@@ -887,7 +893,7 @@
       {
         "cagrilan_yollar": [],
         "dosya": "static/pixel-canvas.js",
-        "satir": 329,
+        "satir": 347,
         "tanim": 0
       },
       {

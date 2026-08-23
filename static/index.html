@@ -440,7 +440,7 @@
          image_models); HTML'de tek bir yer tutucu var, çünkü boş bir çip
          Ayarlar gelmeden bir an "model yok" gibi görünürdü. -->
     <div class="composer-head">
-      <label class="sr-only" for="model">Görsel modeli</label>
+      <label id="model-label" class="sr-only" aria-hidden="true" for="model">Görsel modeli</label>
       <!-- SARMALAYICI, çünkü işaret çipin İÇİNDE duruyor (mutlak konum + solda
            dolgu). Native `<option>` görsel taşıyamadığı için açılan listede
            işaret YOK; buradaki işaret SEÇİLİ modelin sağlayıcısını söylüyor ve
@@ -464,8 +464,29 @@
              düşüyor. (Bu yorumun kendisi de o dizeyi TAŞIMAMALI — ilk yazımda
              taşıdı ve testi tam bu yüzden düşürdü.) `<b>` kalınlığı CSS'te
              geri alınıyor (`.model-chip-label { font-weight: inherit }`). -->
+        <!-- AD İKİ PARÇALI (`aria-labelledby`) ve bu bir kusuru kapatıyor:
+             düğmenin adı yalnız içeriğiydi, yani ekran okuyucu "gpt-image-1 —
+             5–20 kredi, düğme" diyor ve çipin HANGİ eksene ait olduğunu
+             (görsel mi yönetmen mi) hiç söylemiyordu. Yandaki `.sr-only`
+             etiket `for="model"` ile artık `aria-hidden` bir değer
+             taşıyıcısını etiketliyor, yani görünen kontrolle programatik bağı
+             KALMAMIŞTI — o bağ buradan kuruluyor.
+             Sıra bağlayıcı: sabit yarı (eksen) önce, değişen yarı (seçili
+             model) sonra. `aria-label` DEĞİL, çünkü değişen yarıyı core.js'in
+             ikinci bir yerde tazelemesi gerekirdi; `aria-labelledby` metni
+             düğümden okuyor, yani `syncModelChip` tek yazar olarak kalıyor.
+             `.sr-only` clip ile saklıyor (`display: none` DEĞİL), bu yüzden
+             ad hesabı etiketin metnini gerçekten görüyor.
+             Etiketin `aria-hidden`ı ÇİFT OKUMAYI kapatıyor: etiket artık
+             `aria-hidden` bir `<select>`i işaret ediyor, yani ağaçta serbest
+             bir metin olarak kalıyordu ve gezinme kipinde "Görsel modeli"
+             bir kez tek başına, bir kez de düğmenin adının içinde okunuyordu.
+             `aria-labelledby` referans verdiği düğümün metnini gizli olsa da
+             okur (ad hesabı kuralı), o yüzden ad kaybolmuyor — desteklemeyen
+             bir yardımcı teknolojide en kötüsü bugünkü davranışa düşmek. -->
         <button type="button" id="model-btn" class="model-chip"
-                aria-controls="model-sheet" aria-expanded="false" title="Görsel modeli">
+                aria-controls="model-sheet" aria-expanded="false"
+                aria-labelledby="model-label model-btn-label" title="Görsel modeli">
           <b id="model-btn-label" class="model-chip-label">Modeller yükleniyor…</b>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -492,7 +513,7 @@
 
       <!-- Yönetmen modunun karşılığı AYNI YUVADA: ikisi #composer[data-mode]
            ekseniyle birbirini dışlıyor, yani genişlik bedeli SIFIR. -->
-      <label class="sr-only" for="chat-model">Sohbet modeli</label>
+      <label id="chat-model-label" class="sr-only" aria-hidden="true" for="chat-model">Sohbet modeli</label>
       <!-- ARTIK AÇIK: `ChatRequest` bir `model` alanı kabul ediyor, yani seçim
            gerçekten tel üzerine çıkıyor, ve seçenekleri core.js dolduruyor
            (GET /api/settings → chat_models). Bekçisi tests/test_index.py'de:
@@ -502,8 +523,11 @@
            gelmeden bir an "model yok" gibi görünürdü. -->
       <span id="chat-model-pick" class="model-pick">
         <img id="chat-model-logo" class="model-logo" alt="" aria-hidden="true" hidden />
+        <!-- Görsel şeridinin aynı deseni (gerekçe yukarıda): ad = eksen +
+             seçili model. -->
         <button type="button" id="chat-model-btn" class="model-chip"
                 aria-controls="model-sheet" aria-expanded="false"
+                aria-labelledby="chat-model-label chat-model-btn-label"
                 title="Prompt Yönetmeni modeli">
           <b id="chat-model-btn-label" class="model-chip-label">Modeller yükleniyor…</b>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"

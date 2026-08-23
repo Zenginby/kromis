@@ -11,6 +11,12 @@ v0.9.1'de tam bu oldu (PR#50). Adım tabanı `--depth=1` ile çekiyordu; sığ �
 edilince taban öteleniyor ve `git diff A...B` ortak ata bulamıyor:
 `fatal: no merge base`, exit 128.
 
+İlk düzeltme tabanı `pull_request.base.sha`dan okudu; kırılmayı bitirdi ama
+kapsamı fazla açtı — o SHA olayın çekildiği andaki taban, HEAD ise merge ref'i
+yeniden hesaplandıkça GÜNCEL tabanı içeriyor, yani senkronlanmayan bir PR'da
+diff'e araya giren main commit'leri de giriyordu. Bugünkü taban merge
+commit'in KENDİ ebeveynleri (`HEAD^1...HEAD^2`): yarışan bir dal tepesi yok.
+
 Yapı YAML'dan AYRIŞTIRILIYOR (test_release_manifest.py'nin gerekçesi):
 satır kaydırması iddiaları anlamsızlaştırmasın.
 """
@@ -31,12 +37,22 @@ def ci() -> dict:
         return yaml.safe_load(f)
 
 
+def _bak_adimi(ci: dict) -> dict:
+    """Betiği koşan adım — SIRAYA göre değil `run` anahtarına göre bulunuyor.
+
+    Bir zamanlar `steps[-1]` yazılıydı ve iddia "run adımı son adımdır"
+    varsayımını taşıyordu; oysa bu dosyanın kendi gerekçesi satır/sıra
+    kaymasından bağımsız olmak. Adıma bir `if:` ya da bir kurulum adımı
+    eklendiği gün varsayım sessizce yanlışa dönerdi.
+    """
+    adimlar = [a for a in ci["jobs"]["kapsam"]["steps"] if "run" in a]
+    assert len(adimlar) == 1, f"kapsam işinde beklenmeyen sayıda run adımı: {len(adimlar)}"
+    return adimlar[0]
+
+
 @pytest.fixture(scope="module")
 def kapsam_betigi(ci: dict) -> str:
-    adimlar = ci["jobs"]["kapsam"]["steps"]
-    betikler = [a["run"] for a in adimlar if "run" in a]
-    assert len(betikler) == 1, f"kapsam işinde beklenmeyen sayıda run adımı: {len(betikler)}"
-    return betikler[0]
+    return _bak_adimi(ci)["run"]
 
 
 @pytest.fixture(scope="module")
@@ -53,15 +69,29 @@ def kapsam_kodu(kapsam_betigi: str) -> str:
 
 
 def test_kapsam_tam_gecmisle_checkout_ediyor(ci: dict):
-    """`fetch-depth: 0` olmadan taban commit'i yerelde OLMAZ.
+    """`fetch-depth: 0` olmadan merge commit'in EBEVEYNLERİ yerelde olmaz.
 
-    Diff artık ek bir fetch yapmıyor, tabanı doğrudan olaydan alıyor — o
-    commit'in yerelde bulunmasının tek sebebi bu satır.
+    Diff ek bir fetch yapmıyor, tabanı `HEAD^1` olarak okuyor. Sığ bir çekimde
+    yalnız merge commit'in kendisi iniyor: `HEAD^1` çözülemez, adım güvenli
+    tarafa düşer ve kapı bir daha hiçbir PR'ı ayırt etmez — hep `evet` der.
     """
     checkout = [a for a in ci["jobs"]["kapsam"]["steps"]
                 if str(a.get("uses", "")).startswith("actions/checkout")]
     assert checkout, "kapsam işinde checkout adımı yok"
     assert checkout[0].get("with", {}).get("fetch-depth") == 0, checkout[0]
+
+
+def test_kapsam_merge_refini_checkout_ediyor(ci: dict):
+    """`ref:` PINLENMEMELİ — `HEAD^2`nin var olma sebebi merge ref'i.
+
+    `pull_request` olayında checkout'un varsayılanı `refs/pull/N/merge`, yani
+    HEAD bir merge commit ve iki ebeveyni var. `ref: …head.sha` yazıldığı an
+    HEAD sıradan bir commit'e döner, `HEAD^2` çözülemez ve kapı sessizce
+    güvenli tarafa düşer: kırılmaz, ama ayırt etmeyi de bırakır.
+    """
+    checkout = [a for a in ci["jobs"]["kapsam"]["steps"]
+                if str(a.get("uses", "")).startswith("actions/checkout")]
+    assert "ref" not in checkout[0].get("with", {}), checkout[0]
 
 
 def test_kapsam_tabani_sig_cekmiyor(kapsam_kodu: str):
@@ -79,17 +109,23 @@ def test_kapsam_tabani_sig_cekmiyor(kapsam_kodu: str):
     )
 
 
-def test_kapsam_tabani_olaydan_okuyor(ci: dict, kapsam_kodu: str):
-    """Taban, dal ADI değil olaydaki SHA olmalı.
+def test_kapsam_tabani_merge_commitin_ebeveynlerinden_okuyor(ci: dict, kapsam_kodu: str):
+    """Taban ne dal ADI ne olaydan gelen bir SHA: merge commit'in ebeveyni.
 
-    `origin/$TABAN` dalın O ANKİ tepesini gösteriyor ve merge ile ötelenebiliyor;
-    `pull_request.base.sha` PR'ın gerçekten dallandığı commit'i gösteriyor ve
-    yarışmıyor.
+    `HEAD^1...HEAD^2` üç kusuru birden kapatıyor — dal tepesi merge ile
+    ötelenemiyor (1. kusur), olaydan gelen taban eskiyip diff'e yabancı
+    commit'ler sokamıyor (2. kusur) ve ek bir fetch gerekmiyor.
     """
-    ortam = ci["jobs"]["kapsam"]["steps"][-1].get("env", {})
-    assert ortam.get("TABAN_SHA") == "${{ github.event.pull_request.base.sha }}", ortam
-    assert "$TABAN_SHA...HEAD" in kapsam_kodu, kapsam_kodu
-    assert "origin/$TABAN..." not in kapsam_kodu, "taban hâlâ dal adından okunuyor"
+    assert "HEAD^1...HEAD^2" in kapsam_kodu, kapsam_kodu
+    assert "origin/$TABAN..." not in kapsam_kodu, "taban dal adından okunuyor"
+    # `base.sha` fazla kapsayan hâlin imzası: geri gelirse iddia düşsün.
+    assert "base.sha" not in kapsam_kodu, (
+        "taban olaydan okunuyor: merge ref'i yeniden hesaplandıkça HEAD ilerler, "
+        "o SHA ilerlemez ve diff araya giren main commit'lerini de kapsar")
+    ortam = _bak_adimi(ci).get("env", {})
+    assert "TABAN_SHA" not in ortam, (
+        f"kullanılmayan taban değişkeni duruyor: {ortam}")
+    assert "ETIKETLER" in ortam, "kaçış kapısının etiket girdisi kaybolmuş"
 
 
 def test_kapsam_diff_kurulamazsa_guvenli_tarafa_dusuyor(kapsam_betigi: str):

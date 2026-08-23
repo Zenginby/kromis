@@ -16,6 +16,21 @@
 //     bir canvas'a çizmeye devam ediyordu. Her üretim bir döngü daha
 //     bırakırdı — hover ile açılıp kapanan bir kartta görünmeyen, burada
 //     kaçınılmaz olan bir sızıntı.
+//  3. `handleAnimation` artık `this.animation`a YAZMIYOR. Özgün hâlde
+//     `this.animation = this.animate(name)` yazılıydı ve `animate()` değer
+//     DÖNDÜRMÜYOR: içeride kurulan rAF kimliğinin üstüne `undefined`
+//     biniyordu. Yani yukarıdaki 2. maddenin kapısı ilk karede AÇIK kalıyordu
+//     — kimlik ancak sıradaki karede (rAF geri çağrısının içinden) gerçek bir
+//     değere kavuşuyor. Kimliğin tek yazarı `animate`; iptal her karede
+//     gerçekten bir şeyi iptal ediyor.
+//  4. Gölge kökün stili `<style>` DÜĞÜMÜ, `new CSSStyleSheet()` +
+//     `adoptedStyleSheets` DEĞİL. Kurulabilir stil sayfaları Safari 16.4'ten
+//     önce yok ve masaüstü paketi sistemin WebView'ini kullanıyor (Apple
+//     Silicon macOS 11/12 hâlâ desteklenen kurulum): orada
+//     `connectedCallback` fırlar, eleman hiç kurulmaz ve kutu SESSİZCE boş
+//     kalır — tam olarak tests/test_shimmer.py'nin var olma sebebi olan
+//     kırılma sınıfı. Kazanılan şey (örnekler arası paylaşılan tek sayfa)
+//     burada zaten yok: aynı anda tek bir bekleme kartı yaşıyor.
 //
 // Betik KÜRESEL kapsamda yükleniyor (deponun düzeni: modül yok), ama `Pixel`
 // gibi genel bir ad küresel kapsamda durmamalı — bu yüzden IIFE içinde. Dışa
@@ -174,15 +189,16 @@
 
     connectedCallback() {
       const canvas = document.createElement("canvas");
-      const sheet = new CSSStyleSheet();
+      // `<style>` düğümü (dosya başındaki 4. sapma): `new CSSStyleSheet()`
+      // eski WebView'de fırlıyor ve eleman hiç kurulmadığı için kutu sessizce
+      // boş kalıyordu.
+      const stil = document.createElement("style");
+      stil.textContent = PixelCanvas.css;
 
       this._parent = this.parentNode;
       this.shadowroot = this.attachShadow({ mode: "open" });
 
-      sheet.replaceSync(PixelCanvas.css);
-
-      this.shadowroot.adoptedStyleSheets = [sheet];
-      this.shadowroot.append(canvas);
+      this.shadowroot.append(stil, canvas);
       this.canvas = this.shadowroot.querySelector("canvas");
       this.ctx = this.canvas.getContext("2d");
       this.timeInterval = 1000 / 60;
@@ -261,8 +277,10 @@
     }
 
     handleAnimation(name) {
+      // ATAMA YOK (dosya başındaki 3. sapma): `animate` kimliği kendi
+      // yazıyor, buradaki bir atama onu `undefined` ile ezerdi.
       cancelAnimationFrame(this.animation);
-      this.animation = this.animate(name);
+      this.animate(name);
     }
 
     init() {

@@ -821,7 +821,11 @@ function renderModelCards(eksenAdi) {
     return kart;
   });
 
-  kok.replaceChildren(legend, ...kartlar);
+  // `legend` YAYILARAK veriliyor, doğrudan DEĞİL: `replaceChildren(null, …)`
+  // argümanı dizeye çevirip panelin tepesine "null" METNİ basar — hata da
+  // vermez. Düğüm bugün index.html'de duruyor (bekçisi tests/test_index.py),
+  // yani ulaşılmaz bir dal; yazılışı niyeti de söylüyor: legend varsa korunur.
+  kok.replaceChildren(...(legend ? [legend] : []), ...kartlar);
 }
 
 /** Paneli açar. Kartlar HER AÇILIŞTA yeniden çiziliyor.

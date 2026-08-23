@@ -54,7 +54,6 @@ jobs:
       - name: Değişen yollara bak
         id: bak
         env:
-          TABAN_SHA: ${{ github.event.pull_request.base.sha }}
           ETIKETLER: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: |
           set -euo pipefail
@@ -67,29 +66,48 @@ jobs:
             exit 0
           fi
 
-          # Taban SHA'sı OLAYIN İÇİNDEN geliyor; checkout `fetch-depth: 0` ile
-          # tam geçmişi aldığı için commit yerelde duruyor ve EK BİR FETCH YOK.
+          # TABAN, MERGE COMMIT'İN KENDİ EBEVEYNLERİNDEN okunuyor. `pull_request`
+          # olayında checkout `refs/pull/N/merge`i alıyor, yani HEAD bir merge
+          # commit: `HEAD^1` tabanın tepesi, `HEAD^2` PR'ın başı. `A...B` üçlü
+          # nokta ortak atadan B'ye olan diff'i verdiği için `HEAD^1...HEAD^2`
+          # TAM OLARAK bu PR'ın değiştirdiği yollar — ne eksik ne fazla. Olay
+          # verisine, dal adına ve ek bir fetch'e ihtiyaç yok; iki commit de
+          # `fetch-depth: 0` sayesinde yerelde.
           #
-          # Burada bir zamanlar şu iki satır vardı ve v0.9.1'de kırıldı:
-          #     git fetch --no-tags --depth=1 origin "$TABAN"
-          #     YOLLAR="$(git diff --name-only "origin/$TABAN...HEAD")"
-          # Sığ çekim `.git/shallow` graftını yazıp taban dalını TEK commit'e
-          # kırpıyor. PR'ı CI koşarken merge edersen taban dalının tepesi
-          # PR'ın tabanının ötesine geçiyor (PR#50: CI 19:26:25'te tetiklendi,
-          # merge 19:26:32'de main'e düştü) ve o tek commit'in ataları yerelde
-          # olmadığı için `A...B` ortak ata bulamıyor:
-          #     fatal: origin/main...HEAD: no merge base   → exit 128
-          # Bedeli iki katmanlı: kapı kırılınca `paketle` çıktısı BOŞ kalıyor,
-          # yani üç paketleme işi de atlanıyor — `static/` değişmiş bir PR
-          # paketleme kapısından hiç geçmemiş oluyor.
+          # Buradaki iki KUSUR sırayla yaşandı, ikisi de bu satırın gerekçesi:
           #
-          # `if !` ile sarılı olması da bilinçli: bu diff bir daha kurulamazsa
-          # kapı KIRILMAK yerine güvenli tarafa düşüyor. Aşağıdaki yol
-          # listesinin geniş tutulmasıyla aynı tercih — gereksiz bir paketleme
-          # koşusunun bedeli bedava runner dakikası, atlamanın bedeli kırık
-          # bir yayın.
-          if ! YOLLAR="$(git diff --name-only "$TABAN_SHA...HEAD")"; then
-            echo "diff kurulamadı ($TABAN_SHA...HEAD) — güvenli tarafa düşülüyor"
+          #  1. v0.9.1'de (PR#50) taban dal ADINDAN okunuyordu ve öncesinde
+          #     sığ çekiliyordu:
+          #         git fetch --no-tags --depth=1 origin "$TABAN"
+          #         YOLLAR="$(git diff --name-only "origin/$TABAN...HEAD")"
+          #     Sığ çekim `.git/shallow` graftını yazıp dalı TEK commit'e
+          #     kırpıyor. PR'ı CI koşarken merge edersen dalın tepesi PR'ın
+          #     tabanının ötesine geçiyor (CI 19:26:25'te tetiklendi, merge
+          #     19:26:32'de main'e düştü) ve o tek commit'in ataları yerelde
+          #     olmadığı için ortak ata bulunamıyor:
+          #         fatal: origin/main...HEAD: no merge base   → exit 128
+          #     Bedeli iki katmanlı: kapı kırılınca `paketle` çıktısı BOŞ
+          #     kalıyor, yani üç paketleme işi de ATLANIYOR — `static/`
+          #     değişmiş bir PR paketleme kapısından hiç geçmemiş oluyor.
+          #
+          #  2. Düzeltmesi `${{ github.event.pull_request.base.sha }}` idi ve
+          #     kırılmayı bitirdi ama kapsamı fazla açtı: o SHA olayın
+          #     çekildiği andaki taban, HEAD ise merge ref'i her yeniden
+          #     hesaplandığında GÜNCEL tabanı içeriyor. Bir süre senkronlanmayan
+          #     PR'da ikisi ayrışıyor ve diff'e araya giren main commit'leri de
+          #     giriyordu — kapı "bu PR ne değiştirdi" sorusuna artık doğru
+          #     cevap vermiyordu (sonuç güvenli tarafa düşüyordu, o yüzden
+          #     sessiz). Merge commit'in ebeveynleri yarışmıyor: `HEAD^2` PR'ın
+          #     başı, `HEAD^1` de o merge'ün gördüğü taban.
+          #
+          # `if !` ile sarılı olması da bilinçli: HEAD bir merge commit değilse
+          # (`HEAD^2` yok — ör. checkout'a elle bir `ref:` verilirse) ya da diff
+          # başka bir sebeple kurulamazsa kapı KIRILMAK yerine güvenli tarafa
+          # düşüyor. Aşağıdaki yol listesinin geniş tutulmasıyla aynı tercih —
+          # gereksiz bir paketleme koşusunun bedeli bedava runner dakikası,
+          # atlamanın bedeli kırık bir yayın.
+          if ! YOLLAR="$(git diff --name-only HEAD^1...HEAD^2)"; then
+            echo "diff kurulamadı (HEAD^1...HEAD^2) — güvenli tarafa düşülüyor"
             echo "paketle=evet" >> "$GITHUB_OUTPUT"
             exit 0
           fi

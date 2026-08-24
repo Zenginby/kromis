@@ -150,6 +150,12 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.11.1 — ne değişti
+
+- yüklenen logo kullanılamaz türe gidiyordu, ek görsel sessizce düşüyordu
+
+---
+
 ## Sürüm 0.11.0 — ne değişti
 
 - masaüstü sunucusuna istek kaynağı kapısı (netguard)

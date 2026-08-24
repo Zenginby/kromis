@@ -32,7 +32,7 @@ flowchart LR
   n_core_js["core.js"] -->|2| n_folders_js["folders.js"]
   n_core_js["core.js"] -->|3| n_palette_js["palette.js"]
   n_core_js["core.js"] -->|1| n_settings_js["settings.js"]
-  n_folders_js["folders.js"] -->|16| n_core_js["core.js"]
+  n_folders_js["folders.js"] -->|17| n_core_js["core.js"]
   n_folders_js["folders.js"] -->|1| n_palette_js["palette.js"]
   n_palette_js["palette.js"] -->|4| n_core_js["core.js"]
   n_palette_js["palette.js"] -->|1| n_folders_js["folders.js"]
@@ -48,13 +48,13 @@ flowchart LR
 
 | betik | satır | üst düzey tanım | çağırdığı sunucu yolları |
 | --- | --- | --- | --- |
-| `static/assets.js` | 492 | 22 | `/api/assets/{}`, `/api/assets/{}/{}`, `/api/banner`, `/api/banner/preview`, `/api/logo`, `/api/logo/preview`, `/assets/banners/{}`, `/assets/logos/{}`, `/assets/mottos/{}`, `/assets/{}/{}`, `/output/{}` |
+| `static/assets.js` | 532 | 24 | `/api/assets/{}`, `/api/assets/{}/{}`, `/api/banner`, `/api/banner/preview`, `/api/logo`, `/api/logo/preview`, `/assets/banners/{}`, `/assets/logos/{}`, `/assets/mottos/{}`, `/assets/{}/{}`, `/output/{}` |
 | `static/chat.js` | 2028 | 81 | `/api/arena/{}`, `/api/arena/{}/winner`, `/api/chat`, `/api/chats`, `/api/chats/{}`, `/api/prefs`, `/output/{}.png` |
 | `static/core.js` | 2023 | 69 | `/api/edit`, `/api/generate`, `/api/image/{}`, `/api/output/{}/download`, `/api/prefs`, `/output/`, `/output/{}` |
-| `static/folders.js` | 1430 | 50 | `/api/folders`, `/api/folders/{}`, `/api/folders/{}/download`, `/api/history`, `/api/images`, `/api/import`, `/output/{}` |
+| `static/folders.js` | 1438 | 50 | `/api/folders`, `/api/folders/{}`, `/api/folders/{}/download`, `/api/history`, `/api/images`, `/api/import`, `/output/{}` |
 | `static/mobile.js` | 52 | 0 | — |
 | `static/palette.js` | 756 | 37 | `/api/palette/suggest`, `/api/palettes`, `/api/palettes/{}` |
 | `static/pixel-canvas.js` | 347 | 0 | — |
-| `static/settings.js` | 418 | 11 | `/api/prefs`, `/api/settings` |
+| `static/settings.js` | 420 | 11 | `/api/prefs`, `/api/settings` |
 | `static/viewer.js` | 368 | 0 | `/output/` |
 

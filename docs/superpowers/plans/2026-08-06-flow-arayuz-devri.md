@@ -1104,6 +1104,18 @@ Adım 9 — arka uç (**bitti**, v0.2.0 · `b7b323c`):
 - [x] Kütüphane'de "Yüklemeler" türü + "Tümü" filtresi
       (`assets_store.py:19 KINDS` → `uploads`; `index.html:325,329`)
 
+      > **Geri alma (2026-08-24).** "Yüklemeler" SEKMESİ kaldırıldı ve `uploads`
+      > artık bir yükleme HEDEFİ değil. Gerekçe: sekme şeridi hedef sayıldığı
+      > için varsayılan sekme ("Tümü") yüklemeyi `uploads` türüne yazıyordu ve o
+      > türü hiçbir bindirme okuyamıyor (`renderOverlayPicker` yalnız
+      > logos/mottos/banners; sunucu tarafında `models.OVERLAY_ASSET_KINDS`) —
+      > kullanıcı logoyu yüklüyor, "Eklendi." yazısını görüyor, logo hiçbir
+      > görsele bindirilemiyordu. Tür arka uçta DURUYOR: eskiden oraya yazılmış
+      > varlıklar "Tümü" listesinde görünmeye ve silinebilmeye devam ediyor.
+      > Hedef artık düğmenin etiketinde yazılı; bekçileri
+      > `tests/test_index.py::test_every_upload_destination_is_a_usable_asset_kind`
+      > ve `test_library_upload_button_says_where_the_file_will_land`.
+
 Adım 10 — kozmetik (**bitti**, v0.2.0–v0.2.1):
 
 - [x] Üst şeritte kebab (oturum menüsü) — `#chats-kebab` (`index.html`, `chat.js`)

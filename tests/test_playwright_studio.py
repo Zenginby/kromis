@@ -370,3 +370,68 @@ def test_playwright_ayarlar_paneli_alttan_ve_ALANLARI_gosteriyor():
             browser.close()
     finally:
         server.stop()
+
+
+def test_playwright_yukleme_hedefi_ve_ek_gorsel_kapisi():
+    """İki sessiz kusurun tarayıcıdaki hâli — ikisi de DİSKE HİÇ DOKUNMADAN.
+
+    Statik bekçileri `tests/test_index.py`'de; buradaki iddia kaynağın değil
+    ÇALIŞAN arayüzün ne yaptığı, çünkü iki kusurun ikisi de "hiçbir hata
+    vermeden hiçbir şey olmuyor" sınıfındaydı:
+
+    1. **Kütüphane.** Sekme şeridi bir filtre, hedef değil; "Tümü" seçiliyken
+       yükleme `uploads` türüne gidiyordu ve o türü hiçbir bindirme okuyamıyor
+       — logo yükleniyor, logo hiçbir yerde görünmüyordu. Düğmenin etiketi
+       artık hedefi SÖYLÜYOR, burada okunan o.
+    2. **Ek görsel.** Ana referans yokken dosya seçici koşulsuz açılıyor,
+       kullanıcı dosyayı seçiyor ve dosya `addExtraUpload`ın kapısında sessizce
+       düşüyordu. Artık seçici HİÇ açılmıyor, gerekçe yazılıyor.
+
+    Yükleme YAPILMIYOR: bu dosya gerçek `app`i koşuyor, yani bir POST
+    kullanıcının asıl varlık dizinine yazardı. Ölçülen şey zaten yüklemenin
+    ÖNCESİ — hedefin görünürlüğü ve seçicinin açılıp açılmadığı.
+    """
+    port = get_free_port()
+    server = ServerThread(port)
+    server.start()
+    time.sleep(1.0)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(f"http://127.0.0.1:{port}")
+            page.wait_for_selector("#view-studio")
+            _ilk_kurulum_perdesini_kapat(page)
+
+            # 1. Kütüphane: varsayılan sekme "Tümü" ve düğme hedefi söylüyor.
+            page.click("#rail-library")
+            page.wait_for_selector("#view-library:not([hidden])")
+            assert page.inner_text("#asset-tabs button.active").strip() == "Tümü"
+            assert page.inner_text("#asset-upload-label").strip() == "Logo yükle", (
+                "yükleme düğmesi hedefini söylemiyor")
+            page.click('#asset-tabs button[data-akind="banners"]')
+            assert page.inner_text("#asset-upload-label").strip() == "Banner yükle", (
+                "sekme değişti, etiket bayat kaldı")
+            assert page.query_selector('#asset-tabs button[data-akind="uploads"]') is None, (
+                "kullanılamaz `uploads` türü hâlâ bir yükleme hedefi")
+
+            # 2. Ek görsel: ana referans YOKKEN seçici açılmamalı.
+            page.evaluate('showSection("studio")')
+            page.click("#plus-btn")
+            page.wait_for_selector("#plus-menu:not([hidden])")
+            secici_acildi = True
+            try:
+                with page.expect_event("filechooser", timeout=1500):
+                    page.click("#extra-add-btn")
+            except Exception:
+                secici_acildi = False
+            assert not secici_acildi, (
+                "ana referans yokken dosya seçici açılıyor — seçilen dosya "
+                "kapıda sessizce düşer")
+            assert "Önce ana görseli seç." in page.inner_text("#status"), (
+                "engel sessiz: kullanıcı neden hiçbir şey olmadığını okumuyor")
+
+            browser.close()
+    finally:
+        server.stop()

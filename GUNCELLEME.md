@@ -150,6 +150,12 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.11.4 — ne değişti
+
+- büyeteçte "Logo ekle" yok, klasöre aktarma iki yerde kırık
+
+---
+
 ## Sürüm 0.11.3 — ne değişti
 
 - çoklu seçimin sonucu ClipData'dan okunuyor — "Bitti" artık yükleme başlatıyor

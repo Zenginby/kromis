@@ -315,9 +315,29 @@ def save_credentials(api_key: str, base_url: str, env_path: str | None = None) -
         raise AzureImageError("api_key ve base_url gerekli.")
     if any(c in s for s in (api_key, base_url) for c in "\r\n"):
         raise AzureImageError("Kimlik bilgileri satır sonu karakteri içeremez.")
-    if not base_url.startswith(("http://", "https://")):
-        raise AzureImageError("base_url http:// veya https:// ile başlamalı.")
+    check_base_url(base_url, "base_url")
     return save_env({IMAGE_KEY: api_key, IMAGE_URL: base_url}, env_path=env_path)
+
+
+def check_base_url(url: str, label: str) -> None:
+    """Adres alanının ŞEMASINI doğrular; geçersizse Türkçe `AzureImageError`.
+
+    Azure yolunda bu kapı ilk günden beri vardı, ama v0.6'da eklenen ÖTEKİ
+    sağlayıcıların adresleri (`openai_base_url`, `gemini_base_url`,
+    `anthropic_base_url`, `COMFYUI_URL`, `OLLAMA_URL`) `save_env`'e doğrudan
+    gidiyordu — orada yalnız satır sonu deneniyor, şema hiç bakılmıyor. Şemasız
+    bir yapıştırma ("api.openai.com/v1") kaydı 200 alıyor, hata ancak İLK ÜRETİM
+    denemesinde ve `httpx.UnsupportedProtocol`in Türkçeye çevrilmiş hâli olarak
+    ("bağlanılamadı") görünüyordu — yani kullanıcı ağını kurcalıyor, oysa kusur
+    kendi yazdığı adreste.
+
+    `http://` REDDEDİLMİYOR: ComfyUI ve Ollama tam olarak `http://127.0.0.1:…`
+    adresinde yaşıyor ve onları kapatmak var olan bir yeteneği kırardı. Uzak bir
+    adrese düz HTTP yazmanın anahtarı şifresiz göndereceği doğru, ama o kararı
+    burada kullanıcı adına vermek LAN'daki meşru bir kurulumu da keserdi.
+    """
+    if not (url or "").startswith(("http://", "https://")):
+        raise AzureImageError(f"{label} http:// veya https:// ile başlamalı.")
 
 
 def resolve_chat_credentials(env_path: str | None = None) -> tuple[str, str, str]:

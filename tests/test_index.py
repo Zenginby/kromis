@@ -1718,6 +1718,73 @@ def test_library_view_keeps_every_asset_control():
     assert 'data-akind="palettes"' not in view, "paletler bir varlık türü değil"
 
 
+def test_every_upload_destination_is_a_usable_asset_kind():
+    """Yüklemenin gittiği her tür bir bindirmede KULLANILABİLİR olmak zorunda.
+
+    Yaşanmış kusur: sekme şeridi hedef sanılıyordu ve varsayılan sekme ("Tümü")
+    yüklemeyi `uploads` türüne yazıyordu. O türü ne `renderOverlayPicker`
+    okuyor ne sunucu kabul ediyor (`models.OVERLAY_ASSET_KINDS` + banner'ın
+    kendi ucu) — yani kullanıcı logoyu yüklüyor, "Eklendi." yazısını görüyor ve
+    logo hiçbir görsele bindirilemiyordu. Süit yeşildi çünkü uç nokta
+    `uploads`'ı gerçekten kabul ediyor; eksik olan tam da bu iddiaydı.
+    """
+    js = _assets_js()
+    tablo = re.search(r"const UPLOAD_TARGET = \{(.*?)\};", js, re.S)
+    assert tablo, "assets.js'te UPLOAD_TARGET tablosu yok — hedef yine örtük"
+    hedefler = dict(re.findall(r'(\w+):\s*"(\w+)"', tablo.group(1)))
+    assert hedefler, "UPLOAD_TARGET boş"
+    kullanilabilir = models.OVERLAY_ASSET_KINDS | {"banners"}
+    for sekme, kind in hedefler.items():
+        assert kind in kullanilabilir, (
+            f"{sekme} sekmesinden yüklenen varlık {kind!r} türüne gidiyor; "
+            "o türü hiçbir bindirme kullanamaz")
+    # Panelde seçilebilen HER sekmenin tabloda bir karşılığı olmak zorunda:
+    # eksik kalan sekme `uploadTargetKind`in yedeğine düşer ve hedef yine
+    # görünmez olur.
+    view = _section(_html(), "view-library")
+    for sekme in re.findall(r'data-akind="(\w+)"', view):
+        assert sekme in hedefler, f"{sekme} sekmesinin yükleme hedefi tanımsız"
+
+
+def test_library_upload_button_says_where_the_file_will_land():
+    """Düğme HEDEFİ söylüyor ("+ Logo yükle"), yalnız "+ Yükle" demiyor.
+
+    Yukarıdaki testin ikinci yarısı: hedefin ölü olmaması yetmez, GÖRÜNÜR de
+    olmak zorunda — görünmez bir varsayılan tam olarak o kusuru doğurmuştu.
+    """
+    view = _section(_html(), "view-library")
+    assert 'id="asset-upload-label"' in view, (
+        "yükleme düğmesinin etiketi ayrı bir öğe değil → hedef yazılamaz")
+    js = _assets_js()
+    assert "syncUploadLabel" in js, "etiketi hedefe göre yazan yol yok"
+    assert 'UPLOAD_LABEL[kind]' in js, "etiket hedeften türetilmiyor"
+    # Sekme değişimi de etiketi tazelemek zorunda; yoksa etiket yanlış türü
+    # söyler ve yanlış söyleyen bir etiket hiç söylememekten kötüdür.
+    handler = re.search(r'\$\("asset-tabs"\)\.addEventListener\("click".*?\n\}\);',
+                        js, re.S)
+    assert handler and "syncUploadLabel()" in handler.group(0), (
+        "sekme değişiminde etiket bayat kalıyor")
+
+
+def test_extra_add_asks_the_gate_before_opening_the_file_picker():
+    """"Ek görsel": kapı dosya SEÇİCİDEN ÖNCE sorulur.
+
+    Yaşanmış kusur: seçici koşulsuz açılıyordu ve engel (`canAddExtra` → "Önce
+    ana görseli seç.") ancak dosya seçildikten SONRA `addExtraUpload` içinde
+    sorulduğu için kullanıcının seçtiği dosya sessizce çöpe gidiyordu — ekranda
+    "ek görsel eklenmiyor" diye görünen şey buydu.
+    """
+    js = _folders_js()
+    handler = re.search(
+        r'\$\("extra-add-btn"\)\.addEventListener\("click",(.*?)\n\}\);', js, re.S)
+    assert handler, (
+        '#extra-add-btn dinleyicisi tek satırlık — dosya seçicisi kapısız açılıyor')
+    govde = handler.group(1)
+    assert "canAddExtra()" in govde, "kapı sorulmuyor"
+    assert govde.index("canAddExtra()") < govde.index('$("extra-file-input").click()'), (
+        "kapı seçiciden SONRA soruluyor; seçilen dosya yine çöpe gider")
+
+
 def test_tools_is_a_rail_view_with_two_tool_cards():
     """A2: Araçlar da görünüm — iki araç kartıyla (tasarım §4.1).
 

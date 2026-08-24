@@ -1345,7 +1345,15 @@ $("file-input").addEventListener("change", () => {
 });
 $("ref-clear").addEventListener("click", clearSource);
 
-$("extra-add-btn").addEventListener("click", () => $("extra-file-input").click());
+// KAPI SEÇİCİDEN ÖNCE sorulur. Eskiden dosya seçici KOŞULSUZ açılıyordu ve
+// engel ancak dosya SEÇİLDİKTEN sonra `addExtraUpload` içinde sorulduğu için
+// kullanıcının seçtiği görsel sessizce çöpe gidiyordu: ana referans yokken
+// "Ek görsel" hiçbir şey yapmıyor gibi görünüyordu ("ek görsel eklenmiyor").
+// `canAddExtra` gerekçeyi #status'a yazıyor — tek kaynak `extraBlockReason`.
+$("extra-add-btn").addEventListener("click", () => {
+  if (!canAddExtra()) return;
+  $("extra-file-input").click();
+});
 $("extra-file-input").addEventListener("change", () => {
   for (const file of $("extra-file-input").files) addExtraUpload(file);
   $("extra-file-input").value = "";

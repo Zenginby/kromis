@@ -8,15 +8,51 @@
 // Açılış çağrılarının tamamı en sonda, settings.js'in dibinde toplanır.
 
 // ── Logo/banner kütüphanesi (prompt altı panel) ─────────────────────
-let assetCache = { all: [], logos: [], banners: [], mottos: [], uploads: [] };
+let assetCache = { all: [], logos: [], banners: [], mottos: [] };
 let assetPanelKind = "all";
 const ASSET_EMPTY_TEXT = {
   all: "Henüz varlık yok · + Yükle ile ekle",
   logos: "Henüz logo yok · + Yükle ile ekle",
   mottos: "Henüz motto yok · + Yükle ile ekle",
   banners: "Henüz banner yok · + Yükle ile ekle",
-  uploads: "Henüz yükleme yok · + Yükle ile ekle",
 };
+
+// ── Yükleme HEDEFİ ──────────────────────────────────────────────────
+//
+// Sekme şeridi bir FİLTRE, hedef DEĞİL. Bu ayrım kaybolduğunda ("Tümü"
+// seçiliyken hedef `uploads` oluyordu) yüklenen logo hiçbir yerde
+// kullanılamıyordu: `renderOverlayPicker` yalnız logos/mottos/banners okuyor ve
+// sunucu da yalnız o türleri kabul ediyor (`models.OVERLAY_ASSET_KINDS`,
+// banner'ın kendi ucu). Kullanıcının gördüğü tam olarak şuydu: "kütüphaneye
+// logo yüklenmiyor" — dosya gidiyor, "Eklendi." yazıyor, logo ortada yok.
+//
+// İKİ MANDAL birlikte tutuyor: hedef ARTIK ölü bir türe düşemiyor (aşağıdaki
+// tablo) ve düğmenin ETİKETİ hedefi söylüyor, yani bir daha görünmez bir
+// varsayılana dönüşemez. Bekçisi tests/test_index.py.
+const UPLOAD_TARGET = {
+  all: "logos",       // "Tümü" bir hedef değil; en sık kullanılan türe düşer
+  logos: "logos",
+  mottos: "mottos",
+  banners: "banners",
+};
+const UPLOAD_LABEL = {
+  logos: "Logo yükle", mottos: "Motto yükle", banners: "Banner yükle",
+};
+const UPLOAD_DONE_TEXT = {
+  logos: "Logo eklendi.", mottos: "Motto eklendi.", banners: "Banner eklendi.",
+};
+
+function uploadTargetKind() {
+  return UPLOAD_TARGET[assetPanelKind] || "logos";
+}
+
+function syncUploadLabel() {
+  const kind = uploadTargetKind();
+  $("asset-upload-label").textContent = UPLOAD_LABEL[kind];
+  $("asset-upload-btn").title =
+    `Seçtiğin dosya "${UPLOAD_LABEL[kind].split(" ")[0]}" olarak kütüphaneye eklenir`;
+}
+
 const OVERLAY_EMPTY_TEXT = {
   // `logo` girdisi, yerleşik KURUM logosu kaldırıldığında eklendi: o seçenek
   // listeyi hiç boş bırakmadığı için logo modunun boş hâli daha önce YOKTU.
@@ -102,7 +138,9 @@ async function uploadAsset(kind, file) {
       const err = await res.json().catch(() => ({}));
       throw new Error(typeof err.detail === "string" ? err.detail : `Hata (${res.status})`);
     }
-    assetStatus("Eklendi.");
+    // Hangi türe gittiğini SÖYLÜYOR: "Eklendi." tek başına, varlığın
+    // kullanılamaz bir türe düştüğü hâlde de aynı cümleyi yazıyordu.
+    assetStatus(UPLOAD_DONE_TEXT[kind] || "Eklendi.");
     await Promise.all([loadAssets(kind), loadAssets("all")]);
   } catch (e) {
     assetStatus(e.message);
@@ -134,13 +172,14 @@ $("asset-tabs").addEventListener("click", (e) => {
   selectInGroup("#asset-tabs", btn);
   assetPanelKind = btn.dataset.akind;
   assetStatus("");
+  syncUploadLabel();   // sekme hedefi de değiştirir; etiket bayat kalmasın
   renderAssetPanel();
 });
 $("asset-upload-btn").addEventListener("click", () => $("asset-file-input").click());
 $("asset-file-input").addEventListener("change", async () => {
   const files = [...$("asset-file-input").files];
   $("asset-file-input").value = "";
-  const targetKind = assetPanelKind === "all" ? "uploads" : assetPanelKind;
+  const targetKind = uploadTargetKind();
   for (const file of files) await uploadAsset(targetKind, file); // sırayla: manifest yazımı atomik
 });
 
@@ -150,6 +189,7 @@ $("asset-file-input").addEventListener("change", async () => {
 // bayat durumunu tazeliyor; aynı düğmede ikinci dinleyici plus-menü kalıbı.
 function openLibraryView() {
   assetStatus("");
+  syncUploadLabel();
   renderAssetPanel();
 }
 

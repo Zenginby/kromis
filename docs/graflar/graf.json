@@ -859,8 +859,8 @@
           "/output/{}"
         ],
         "dosya": "static/assets.js",
-        "satir": 492,
-        "tanim": 22
+        "satir": 532,
+        "tanim": 24
       },
       {
         "cagrilan_yollar": [
@@ -901,7 +901,7 @@
           "/output/{}"
         ],
         "dosya": "static/folders.js",
-        "satir": 1430,
+        "satir": 1438,
         "tanim": 50
       },
       {
@@ -932,7 +932,7 @@
           "/api/settings"
         ],
         "dosya": "static/settings.js",
-        "satir": 418,
+        "satir": 420,
         "tanim": 11
       },
       {
@@ -1044,6 +1044,7 @@
         "adlar": [
           "addExtraUpload",
           "addGalleryExtra",
+          "canAddExtra",
           "clearSource",
           "closeSheets",
           "confirmDialog",

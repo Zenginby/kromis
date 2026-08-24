@@ -412,7 +412,9 @@ loadAssets("all");
 loadAssets("logos");
 loadAssets("mottos");
 loadAssets("banners");
-loadAssets("uploads");
+// `uploads` ÇEKİLMİYOR: o türe artık hiçbir yükleme gitmiyor ve panelde sekmesi
+// yok (bkz. assets.js UPLOAD_TARGET). Eskiden oraya yazılmış varlıklar "Tümü"
+// listesinden geliyor — `/api/assets/all` dört türü de harmanlıyor.
 // Palet varsayılan olarak KAPALI: açılışta öneri istenmez, prompt'a hiçbir
 // şey eklenmez. Yalnızca kütüphane çekilir ki "Kayıtlı paletler" hazır olsun.
 loadPalettes();

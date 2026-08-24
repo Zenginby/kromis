@@ -347,8 +347,14 @@
       <section id="view-library" class="section" aria-labelledby="assets-title" hidden>
         <div class="gallery-head">
           <h2 id="assets-title">Kütüphane</h2>
+          <!-- Etiket HEDEFİ SÖYLÜYOR ("+ Logo yükle"), yalnız "Yükle" demiyor:
+               aşağıdaki sekme şeridi bir FİLTRE ve hedef sanıldığı sürece
+               varsayılan sekmede ("Tümü") hedef GÖRÜNMEZDİ — yükleme `uploads`
+               türüne gidiyor, oradan hiçbir bindirme onu okuyamıyordu. Metni
+               assets.js yazıyor (`syncUploadLabel`). -->
           <button type="button" id="asset-upload-btn" class="btn-ghost">
-            <span class="btn-ghost-plus" aria-hidden="true">+</span> Yükle
+            <span class="btn-ghost-plus" aria-hidden="true">+</span>
+            <span id="asset-upload-label">Logo yükle</span>
           </button>
         </div>
         <p class="view-desc">
@@ -360,7 +366,13 @@
           <button type="button" data-akind="logos">Logolar</button>
           <button type="button" data-akind="mottos">Mottolar</button>
           <button type="button" data-akind="banners">Bannerlar</button>
-          <button type="button" data-akind="uploads">Yüklemeler</button>
+          <!-- "Yüklemeler" sekmesi KALDIRILDI (D9'un `uploads` türü). O tür bir
+               çıkmaz sokaktı: bindirme seçicisi yalnız logos/mottos/banners
+               okuyor, sunucu da `models.OVERLAY_ASSET_KINDS` ile aynı üçünü
+               kabul ediyor — yani oraya düşen bir logo hiçbir görsele
+               bindirilemiyordu. Türün kendisi arka uçta DURUYOR
+               (`assets_store.KINDS`): eskiden oraya yazılmış varlıklar
+               "Tümü"de görünmeye ve silinebilmeye devam ediyor. -->
         </div>
         <input type="file" id="asset-file-input" accept="image/png,image/jpeg,image/webp" multiple hidden />
         <div id="asset-grid" class="asset-grid" aria-live="polite"></div>

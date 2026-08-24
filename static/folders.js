@@ -199,7 +199,7 @@ const MAX_IMPORT_FILES = 20;
 // gerekçesiyle aynı sebep.)
 async function importFiles(fileList, folderId, targetName) {
   const dropped = [...fileList];
-  const images = dropped.filter((f) => ACCEPTED_UPLOAD_TYPES.includes(f.type));
+  const images = dropped.filter(isAcceptedUpload);
   // Finder'dan bir KLASÖR sürüklenirse tür boş gelir → buradan elenir.
   const wrongType = dropped.length - images.length;
   const batch = images.slice(0, MAX_IMPORT_FILES);

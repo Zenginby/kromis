@@ -10,6 +10,47 @@
 const $ = (id) => document.getElementById(id);
 const statusEl = $("status");
 const ACCEPTED_UPLOAD_TYPES = ["image/png", "image/jpeg", "image/webp"];
+// Aynı üç türün UZANTI karşılığı. `isAcceptedUpload`ın var oluş sebebi burada.
+const ACCEPTED_UPLOAD_EXTS = [".png", ".jpg", ".jpeg", ".webp"];
+// "Tür bildirilmedi" demenin iki yolu. Boş dize tarayıcının, octet-stream
+// içerik sağlayıcısının "bilmiyorum"u — ikisi de dosya HAKKINDA bir şey
+// söylemiyor, yani red için kanıt sayılmıyorlar.
+const UNKNOWN_UPLOAD_TYPES = ["", "application/octet-stream", "binary/octet-stream"];
+
+/** Seçilen dosya bu arayüzün kabul ettiği bir görsel mi?
+ *
+ * KURAL: red için KANIT gerekir. Kabul listesiyle eşleşen bir tür ya da uzantı
+ * varsa dosya geçiyor; eşleşmiyorsa ancak dosya kendisi HAKKINDA bir şey
+ * söylüyorsa (bildirilmiş bir tür ya da bir uzantı) reddediliyor. Hiçbir bilgi
+ * yoksa son sözü sunucu söylüyor.
+ *
+ * NEDEN BÖYLE, TÜRE TEK BAŞINA GÜVENİLMİYOR: Android WebView `File.type`ı
+ * ContentResolver'dan alıyor ve her sağlayıcı doğru MIME vermiyor — "Son
+ * kullanılanlar", İndirilenler ve birçok bulut/OEM sağlayıcısı boş dize ya da
+ * `application/octet-stream` döndürüyor; bazıları dosya adını uzantısız
+ * veriyor. Yalnız türe bakan kapı o dosyaları "PNG, JPEG veya WebP bir görsel
+ * seç" diye geri çeviriyordu — kullanıcı gerçekten PNG seçmiş olsa bile.
+ * Masaüstünde HİÇ görünmüyor, çünkü yerel dosya diyaloğu türü her zaman doğru
+ * bildiriyor; kusur bu yüzden yalnız "telefonda logo yüklenmiyor" olarak
+ * görünüyordu.
+ *
+ * Kapının tümden kalkmaması da bilinçli: `.heic` bir fotoğrafı ya da bir PDF'i
+ * ağa çıkmadan söylemek hâlâ daha iyi bir geri bildirim.
+ *
+ * SON SÖZ SUNUCUDA: `app._to_png` her yüklemeyi Pillow'la açıp doğruluyor ve
+ * açılamayanı 422 + Türkçe cümleyle geri çeviriyor. Yani buradaki gevşeme
+ * sunucuya geçersiz bir dosyanın SIZMASINA yol açmıyor.
+ */
+function isAcceptedUpload(file) {
+  if (!file) return false;
+  const tur = (file.type || "").trim().toLowerCase();
+  const ad = (file.name || "").toLowerCase();
+  if (ACCEPTED_UPLOAD_TYPES.includes(tur)) return true;
+  if (ACCEPTED_UPLOAD_EXTS.some((uzanti) => ad.endsWith(uzanti))) return true;
+  const karsiKanit = !UNKNOWN_UPLOAD_TYPES.includes(tur) || /\.[a-z0-9]{1,8}$/.test(ad);
+  return !karsiKanit;
+}
+
 
 // Sunucudaki models.MAX_PROMPT_CHARS ile AYNI olmak zorunda (MAX_EDIT_IMAGES
 // geleneği): yönetmenin ürettiği prompt buraya sığmıyorsa forma yazmak yerine
@@ -1570,7 +1611,7 @@ function canAddExtra() {
 
 function addExtraUpload(file) {
   if (!canAddExtra()) return;
-  if (!file || !ACCEPTED_UPLOAD_TYPES.includes(file.type)) {
+  if (!isAcceptedUpload(file)) {
     statusEl.textContent = "PNG, JPEG veya WebP bir görsel seç.";
     return;
   }
@@ -1600,7 +1641,7 @@ function addGalleryExtra(rec) {
 }
 
 function setUploadSource(file) {
-  if (!file || !ACCEPTED_UPLOAD_TYPES.includes(file.type)) {
+  if (!isAcceptedUpload(file)) {
     statusEl.textContent = "PNG, JPEG veya WebP bir görsel seç.";
     return;
   }

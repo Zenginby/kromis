@@ -435,3 +435,60 @@ def test_playwright_yukleme_hedefi_ve_ek_gorsel_kapisi():
             browser.close()
     finally:
         server.stop()
+
+
+def test_playwright_secilen_dosya_kapisi_TELEFONUN_gercegine_dayaniyor():
+    """`isAcceptedUpload` doğruluk tablosu — TARAYICIDA, saf işlev olarak.
+
+    Bu kapının kusuru yalnız telefonda görünüyordu: Android WebView `File.type`ı
+    ContentResolver'dan alıyor ve birçok sağlayıcı MIME yerine boş dize ya da
+    `application/octet-stream` veriyor, bazıları dosya adını uzantısız veriyor.
+    Yalnız türe bakan eski kapı o dosyaları — kullanıcı gerçekten PNG seçmiş
+    olsa bile — "PNG, JPEG veya WebP bir görsel seç" diye geri çeviriyordu.
+
+    Statik bekçisi `tests/test_mobile.py`'de; buradaki iddia işlevin GERÇEKTEN
+    ne döndürdüğü. Tablo iki yönlü: telefonun ürettiği eksik bilgi geçmek
+    zorunda, karşı kanıt taşıyan dosya (`.heic`, `.pdf`, `.gif`) düşmek zorunda
+    — kapı tümden kalkmış olmasın.
+
+    Hiçbir şey YÜKLENMİYOR: işlev saf, diske dokunulmuyor.
+    """
+    port = get_free_port()
+    server = ServerThread(port)
+    server.start()
+    time.sleep(1.0)
+
+    # (ad, tür, beklenen) — telefonun gerçek ürettiği hâller ve karşı kanıtlar.
+    TABLO = [
+        ("a.png", "image/png", True),
+        ("kurum-logo.JPG", "", True),                       # tür bildirilmemiş
+        ("logo.png", "application/octet-stream", True),    # sağlayıcı "bilmiyorum"
+        ("IMG_0042", "", True),                            # ne tür ne uzantı
+        ("content-9182", "application/octet-stream", True),
+        ("foto.heic", "image/heic", False),
+        ("foto.heic", "", False),                          # uzantı karşı kanıt
+        ("belge.pdf", "application/pdf", False),
+        ("anim.gif", "image/gif", False),
+    ]
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(f"http://127.0.0.1:{port}")
+            page.wait_for_selector("#view-studio")
+            _ilk_kurulum_perdesini_kapat(page)
+
+            for ad, tur, beklenen in TABLO:
+                sonuc = page.evaluate(
+                    "(f) => isAcceptedUpload(f)", {"name": ad, "type": tur})
+                assert sonuc is beklenen, (
+                    f"isAcceptedUpload({ad!r}, {tur!r}) = {sonuc}, "
+                    f"beklenen {beklenen}")
+
+            assert page.evaluate("isAcceptedUpload(null)") is False, (
+                "dosya yokken kapı açık")
+
+            browser.close()
+    finally:
+        server.stop()

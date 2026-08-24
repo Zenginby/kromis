@@ -260,6 +260,8 @@ gerçek cihazda ölçülebilir.
 | `import pydantic` | CI kapısı yeşil (`_paket-android.yml` → *pydantic APK'ya girdi mi*) |
 | Uçtan uca üretim | Azure kimliğini gir → görsel üret → galeride gör → logo bindir → indir |
 | Dosya yükleme | Referans görsel ekle (`onShowFileChooser`) |
+| Kütüphaneye yükleme | Kütüphane → "+ Logo yükle" → seçicide **.jpg** bir dosya seçilebiliyor olmalı (intent'in süzgeci kabul listesinin tamamını taşıyor mu) → yüklenen logo bindirme panelinde görünmeli |
+| Türü bildirilmeyen dosya | Aynı yükleme "Son kullanılanlar"/İndirilenler üzerinden: MIME'ı boş gelen dosya da kabul edilmeli (`isAcceptedUpload`) |
 | İndirme | PNG → `Resimler/Lumeo`, klasör ZIP → `İndirilenler/Lumeo`; ZIP adı klasörün ADI olmalı (`download.zip` değil) |
 | Güvenlik | Başka bir tarayıcıdan `127.0.0.1:<port>/api/history` → **403** |
 | Uzun üretim arka planda | n=4 başlat → uygulamadan çık → 5 dk sonra dön → sonuç kayıpsız |

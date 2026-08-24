@@ -877,3 +877,150 @@ def test_alttan_acilan_yuzey_telefonda_TAM_GENISLIK(istemci):
             f"{secici} sabit bir genişlik yazıyor — telefonda #palette-modal'ın "
             "id özgüllüğü tuzağı geri geliyor (mobile.css ikinci bir kural "
             "istemek zorunda kalır)")
+
+
+# ── Dosya seçme (telefonda görsel yükleme) ──────────────────────────
+
+
+def test_the_file_chooser_intent_carries_every_accepted_type(istemci):
+    """Seçici intent'i kabul listesinin TAMAMINI taşımak zorunda.
+
+    `FileChooserParams.createIntent()` `setType()`e kabul listesinin yalnız İLK
+    türünü koyuyor. Sayfadaki üç dosya girişi de
+    `accept="image/png,image/jpeg,image/webp"` taşıdığı için intent telefonda
+    `type = "image/png"` olarak doğuyordu: `EXTRA_MIME_TYPES`i okuyan seçiciler
+    üç türü de gösteriyor, ama yalnız `type`a bakan OEM galerileri ve dosya
+    yöneticileri JPEG'leri gizliyor. Kullanıcının tarifi "telefonda logo
+    yüklenemiyor" — elindeki logo .jpg olduğu için.
+
+    Bu dosyadaki öteki Kotlin mandallarıyla aynı sınıf: kırılma yalnız gerçek
+    cihazda görünüyor ve hiçbir hata üretmiyor.
+    """
+    kt = _kotlin_kaynagi()
+    assert "dosyaSecici.launch(dosyaSecimIntenti(parametreler))" in kt, (
+        "seçici hâlâ createIntent()e bırakılmış — kabul listesinin yalnız ilk "
+        "türü süzgece giriyor")
+    govde = kt.split("private fun dosyaSecimIntenti(")[1].split("\n    }")[0]
+    assert "Intent.EXTRA_MIME_TYPES" in govde, "tam MIME listesi intent'e girmiyor"
+    assert "Intent.EXTRA_ALLOW_MULTIPLE" in govde, (
+        "çoklu seçim düşüyor — Kütüphane'nin girişi `multiple`")
+    assert "MODE_OPEN_MULTIPLE" in govde, "çoklu seçim koşulsuz açılmış"
+    # Aile tipi TÜRETİLİYOR: sabit bir "image/*" yazmak, accept bir gün
+    # değiştiğinde sessizce yanlış süzgeç demek olurdu.
+    assert '"image/*"' not in govde, "aile tipi sabit yazılmış, türetilmiyor"
+    assert "substringBefore" in govde, "aile tipi kabul listesinden türetilmiyor"
+    # accept yokken karar yine platformun.
+    assert "parametreler.createIntent()" in govde, (
+        "kabul listesi boşken geri düşüş yolu yok")
+
+
+def test_a_picked_file_is_not_rejected_for_a_missing_mime_type(istemci):
+    """Kapı türe TEK BAŞINA güvenmemeli — telefonda tür boş gelebiliyor.
+
+    Android WebView `File.type`ı ContentResolver'dan alıyor: "Son
+    kullanılanlar", İndirilenler ve birçok bulut/OEM sağlayıcısı MIME yerine
+    boş dize ya da `application/octet-stream` veriyor. Yalnız türe bakan kapı o
+    dosyaları "PNG, JPEG veya WebP bir görsel seç" diye geri çeviriyordu —
+    kullanıcı gerçekten PNG seçmiş olsa bile. Masaüstünde HİÇ görünmüyor,
+    çünkü yerel diyalog türü her zaman doğru bildiriyor.
+
+    İddia iki yarımlı: karar TEK yerde (`isAcceptedUpload`) ve o yer uzantıya
+    da bakıyor.
+    """
+    core = _metin(istemci, "/static/core.js")
+    assert "function isAcceptedUpload(" in core, "ortak kapı yok"
+    govde = core.split("function isAcceptedUpload(")[1].split("\n}")[0]
+    assert "ACCEPTED_UPLOAD_EXTS" in govde, (
+        "kapı yalnız MIME'a bakıyor; türü bildirilmeyen dosya geri çevrilir")
+    assert "file.name" in govde, "uzantı dosya adından okunmuyor"
+    # Üçüncü hâl: ne tür ne uzantı. Bazı sağlayıcılar dosya adını uzantısız,
+    # türü de `application/octet-stream` veriyor — yani dosya kendisi hakkında
+    # HİÇBİR şey söylemiyor. Red için kanıt yoksa karar sunucunun.
+    assert "UNKNOWN_UPLOAD_TYPES" in govde, (
+        "bildirilmemiş tür ile YANLIŞ tür ayırt edilmiyor; kanıtsız dosya "
+        "yine kapıda düşer")
+    assert "application/octet-stream" in core, (
+        "içerik sağlayıcısının 'bilmiyorum' türü hiç tanınmıyor")
+
+    # Üç yükleme yolunun HİÇBİRİ kendi başına türe bakmamalı: biri kalırsa
+    # kusur o yolda yaşamaya devam eder ve yine yalnız telefonda görünür.
+    yollar = {
+        "core.js": core,
+        "assets.js": _metin(istemci, "/static/assets.js"),
+        "folders.js": _metin(istemci, "/static/folders.js"),
+    }
+    for ad, kaynak in yollar.items():
+        for satir_no, satir in enumerate(kaynak.split("\n"), start=1):
+            if "ACCEPTED_UPLOAD_TYPES" not in satir or satir.lstrip().startswith("//"):
+                continue
+            # Tek meşru kullanım tanımın kendisi ve ortak kapının içi.
+            assert ad == "core.js" and (
+                satir.startswith("const ACCEPTED_UPLOAD_TYPES")
+                or "return true" in satir
+            ), (f"{ad}:{satir_no} türe kendi başına bakıyor — kapı "
+                "isAcceptedUpload'dan geçmeli")
+
+
+def _blok_yorum_disinda_kalan_satirlar() -> dict[int, str]:
+    """MainActivity.kt'nin KOD durumunda kalan satırları: {satır no: metin}.
+
+    Kotlin dizeleri yorumdan ÖNCE ayrıştırıyor (`"*/*"` bir dize, yorum değil),
+    o yüzden bu mini tarayıcı dize ve yorum durumlarını ayrı izliyor. Amacı tek
+    bir iddiayı beslemek: bir KDoc satırının KOD sayılması.
+    """
+    durum = "kod"
+    kod: dict[int, str] = {}
+    for no, ham in enumerate(_kotlin_kaynagi().split("\n"), start=1):
+        i, gorunen = 0, []
+        while i < len(ham):
+            if durum == "kod":
+                if ham.startswith("//", i):
+                    break
+                if ham.startswith("/*", i):
+                    durum = "blok"; i += 2; continue
+                if ham.startswith('"""', i):
+                    durum = "uc"; i += 3; continue
+                if ham[i] == '"':
+                    durum = "dize"; i += 1; continue
+                gorunen.append(ham[i]); i += 1
+            elif durum == "blok":
+                if ham.startswith("*/", i):
+                    durum = "kod"; i += 2; continue
+                i += 1
+            elif durum == "dize":
+                if ham[i] == "\\":
+                    i += 2; continue
+                if ham[i] == '"':
+                    durum = "kod"
+                i += 1
+            else:  # üç tırnaklı dize
+                if ham.startswith('"""', i):
+                    durum = "kod"; i += 3; continue
+                i += 1
+        if durum == "dize":  # tek satırlık dize satır sonunda kapanır
+            durum = "kod"
+        if (metin := "".join(gorunen).strip()):
+            kod[no] = metin
+    return kod
+
+
+def test_the_kotlin_docs_never_close_their_own_comment_block(istemci):
+    """Bir KDoc satırı KOD durumuna düşmüşse blok erken kapanmıştır.
+
+    Yıldız-bölü ikilisi bir blok yorumu KAPATIR ve bu dosya yerelde HİÇ
+    derlenmiyor — kırılma yalnız Android runner'ında, dakikalar süren bir
+    NDK + Gradle işinin sonunda görünüyor (bu dosyanın başındaki `_KOTLIN`
+    notunun tarif ettiği maliyet).
+
+    Gerçekten oldu: `dosyaSecimIntenti`nin gerekçesi joker MIME'ı harfiyen
+    yazınca KDoc o noktada bitti, kalan gerekçe satırları kod sayıldı ve dosya
+    derlenemez hâle geldi. Yorum yazmanın bu dosyada bir bedeli var; mandalı da
+    olsun.
+    """
+    dusen = {no: m for no, m in _blok_yorum_disinda_kalan_satirlar().items()
+             if m.startswith("*")}
+    assert not dusen, (
+        "KDoc satırı KOD durumunda — blok yorum erken kapanmış:\n"
+        + "\n".join(f"  MainActivity.kt:{no}: {m[:70]}" for no, m in dusen.items())
+        + "\nGerekçe metninde yıldız-bölü ikilisini HARFİYEN yazma; joker "
+          "MIME'ı kelimeyle anlat, gerçek değeri gövdede bırak.")

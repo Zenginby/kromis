@@ -11,10 +11,10 @@
 let assetCache = { all: [], logos: [], banners: [], mottos: [] };
 let assetPanelKind = "all";
 const ASSET_EMPTY_TEXT = {
-  all: "Henüz varlık yok · + Yükle ile ekle",
-  logos: "Henüz logo yok · + Yükle ile ekle",
-  mottos: "Henüz motto yok · + Yükle ile ekle",
-  banners: "Henüz banner yok · + Yükle ile ekle",
+  all: "Henüz varlık yok",
+  logos: "Henüz logo yok",
+  mottos: "Henüz motto yok",
+  banners: "Henüz banner yok",
 };
 
 // ── Yükleme HEDEFİ ──────────────────────────────────────────────────
@@ -44,6 +44,18 @@ const UPLOAD_DONE_TEXT = {
 
 function uploadTargetKind() {
   return UPLOAD_TARGET[assetPanelKind] || "logos";
+}
+
+/** Boş durum cümlesi — düğmenin GERÇEK adını söyleyerek.
+ *
+ * Sabit "+ Yükle ile ekle" metni, düğme hedefiyle adlandırıldığı an ("+ Logo
+ * yükle") var olmayan bir kontrolü tarif etmeye başlıyordu. Aynı kusurun kaydı
+ * settings.js'te de var (`AYARLAR_EKI`: tek düğme için iki ad); ikisi de tek
+ * kaynaktan türetilerek kapanıyor.
+ */
+function assetEmptyText(kind) {
+  const baslik = ASSET_EMPTY_TEXT[kind] || "Henüz varlık yok";
+  return `${baslik} · "+ ${UPLOAD_LABEL[uploadTargetKind()]}" ile ekle`;
 }
 
 function syncUploadLabel() {
@@ -92,7 +104,7 @@ function renderAssetPanel() {
   if (!items.length) {
     const empty = document.createElement("p");
     empty.className = "asset-empty";
-    empty.textContent = ASSET_EMPTY_TEXT[assetPanelKind] || "Henüz varlık yok · + Yükle ile ekle";
+    empty.textContent = assetEmptyText(assetPanelKind);
     grid.appendChild(empty);
     return;
   }
@@ -124,7 +136,7 @@ function renderAssetPanel() {
 }
 
 async function uploadAsset(kind, file) {
-  if (!file || !ACCEPTED_UPLOAD_TYPES.includes(file.type)) {
+  if (!isAcceptedUpload(file)) {
     assetStatus("PNG, JPEG veya WebP bir görsel seç.");
     return;
   }

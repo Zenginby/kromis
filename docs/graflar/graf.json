@@ -859,8 +859,8 @@
           "/output/{}"
         ],
         "dosya": "static/assets.js",
-        "satir": 532,
-        "tanim": 24
+        "satir": 544,
+        "tanim": 25
       },
       {
         "cagrilan_yollar": [
@@ -887,8 +887,8 @@
           "/output/{}"
         ],
         "dosya": "static/core.js",
-        "satir": 2023,
-        "tanim": 69
+        "satir": 2064,
+        "tanim": 70
       },
       {
         "cagrilan_yollar": [
@@ -949,6 +949,7 @@
         "adlar": [
           "closeSheets",
           "confirmDialog",
+          "isAcceptedUpload",
           "showPreview",
           "showSection"
         ],

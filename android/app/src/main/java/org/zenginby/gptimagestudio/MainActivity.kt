@@ -41,6 +41,8 @@ import kotlin.concurrent.thread
  *   2. **Dosya seçici.** `<input type="file">` WebView'de VARSAYILAN OLARAK
  *      ÇALIŞMAZ; `onShowFileChooser` uygulanmazsa görsel içe aktarma, referans
  *      görsel ekleme ve logo/banner yükleme düğmeleri hiçbir şey yapmaz.
+ *      Uygulamak da yetmiyor: intent `createIntent()`e bırakılırsa kabul
+ *      listesinin yalnız İLK türü süzgece giriyor (bkz. `dosyaSecimIntenti`).
  *   3. **İndirme.** WebView'in indirme sistemi YOK: bir indirmeyi tanır tanımaz
  *      iptal ediyor. Uygulama devralmazsa PNG indirme ve klasör ZIP'i sessizce
  *      ölür. Devralmanın İKİ yolu var ve ikisi de burada — sayfanın doğrudan
@@ -302,10 +304,7 @@ class MainActivity : AppCompatActivity() {
                 dosyaSecimGeriCagri?.onReceiveValue(null)
                 dosyaSecimGeriCagri = geriCagri
                 return try {
-                    // `createIntent()` sayfadaki `accept` ve `multiple`
-                    // niteliklerini intent'e çeviriyor — üç <input type="file">
-                    // alanının MIME listesi böylece seçiciye taşınıyor.
-                    dosyaSecici.launch(parametreler.createIntent())
+                    dosyaSecici.launch(dosyaSecimIntenti(parametreler))
                     true
                 } catch (e: ActivityNotFoundException) {
                     dosyaSecimGeriCagri = null
@@ -327,6 +326,56 @@ class MainActivity : AppCompatActivity() {
         webView.setDownloadListener { url, _, contentDisposition, mimeTur, _ ->
             val ad = URLUtil.guessFileName(url, contentDisposition, mimeTur)
             indirmeyiIste(Downloader.Istek(url, ad, mimeTur ?: "application/octet-stream"))
+        }
+    }
+
+    /**
+     * `<input type="file">` için seçici intent'i — `createIntent()` DEĞİL.
+     *
+     * NEDEN KENDİMİZ KURUYORUZ: `FileChooserParams.createIntent()`
+     * `setType()`e kabul listesinin YALNIZ İLK türünü koyuyor. Sayfadaki üç
+     * alan da `accept="image/png,image/jpeg,image/webp"` taşıyor, yani intent
+     * telefonda `type = "image/png"` olarak doğuyor. `EXTRA_MIME_TYPES`i
+     * onuruna okuyan seçiciler (Belgeler/DocumentsUI) üç türü de gösteriyor,
+     * ama YALNIZ `type`a bakan OEM galerileri ve dosya yöneticileri JPEG'leri
+     * gizliyor ya da seçilemez yapıyor. Kullanıcı için tarifi tam olarak
+     * şuydu: "telefonda logo yüklenemiyor" — çünkü elindeki logo .jpg.
+     *
+     * Kurulan intent iki tarafı birden memnun ediyor: `type` AİLE düzeyinde
+     * (görseller için "image" bölü joker), `EXTRA_MIME_TYPES` ise tam liste.
+     * Aile kabul listesinden TÜRETİLİYOR — burada "image" diye bir sabit yok:
+     * türlerin hepsi aynı üst türü paylaşıyorsa o tür kullanılıyor,
+     * paylaşmıyorsa iki joker.
+     *
+     * (Joker dizileri bu KDoc'ta HARFİYEN yazılamıyor: blok yorumun kapanışıyla
+     * aynı iki karakter ve yazıldığında dosya derlenmiyor. Gerçek değerler
+     * aşağıdaki gövdede.)
+     *
+     * `EXTRA_ALLOW_MULTIPLE` de ELLE konuyor: Kütüphane'nin dosya girişi
+     * `multiple` ve tek tek yüklemek kullanıcıya gereksiz tur bindirir.
+     *
+     * Kabul listesi boşsa (`accept` yok) karar yine platformun:
+     * `createIntent()`e düşülüyor.
+     */
+    private fun dosyaSecimIntenti(parametreler: WebChromeClient.FileChooserParams): Intent {
+        // `?: emptyArray()` + `isNullOrBlank`: `getAcceptTypes()` bir platform
+        // tipi (`Array<String!>!`), yani hem dizinin kendisi hem öğeleri
+        // Kotlin'in null denetiminin dışında. Boş bir `accept` niteliği de
+        // gerçekten boş DİZE üretiyor.
+        val turler = (parametreler.acceptTypes ?: emptyArray<String>())
+            .filter { !it.isNullOrBlank() }
+        if (turler.isEmpty()) return parametreler.createIntent()
+
+        val aileler = turler.map { it.substringBefore("/") }.toSet()
+        val tip = if (aileler.size == 1) "${aileler.first()}/*" else "*/*"
+
+        return Intent(Intent.ACTION_GET_CONTENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = tip
+            putExtra(Intent.EXTRA_MIME_TYPES, turler.toTypedArray())
+            if (parametreler.mode == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE) {
+                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            }
         }
     }
 

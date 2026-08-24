@@ -368,8 +368,9 @@
           <button type="button" data-akind="banners">Bannerlar</button>
           <!-- "Yüklemeler" sekmesi KALDIRILDI (D9'un `uploads` türü). O tür bir
                çıkmaz sokaktı: bindirme seçicisi yalnız logos/mottos/banners
-               okuyor, sunucu da `models.OVERLAY_ASSET_KINDS` ile aynı üçünü
-               kabul ediyor — yani oraya düşen bir logo hiçbir görsele
+               okuyor; sunucuda da konumlanabilir bindirme `logos`/`mottos` ile
+               sınırlı (`models.OVERLAY_ASSET_KINDS`) ve banner'ın kendi ucu
+               var — yani oraya düşen bir logo hiçbir görsele
                bindirilemiyordu. Türün kendisi arka uçta DURUYOR
                (`assets_store.KINDS`): eskiden oraya yazılmış varlıklar
                "Tümü"de görünmeye ve silinebilmeye devam ediyor. -->

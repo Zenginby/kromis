@@ -256,6 +256,24 @@
 
           <button type="button" id="select-toggle" class="btn-ghost"
                   title="Görselleri çoklu seç">Seç</button>
+          <!-- İçe aktarmanın TEK tıklanabilir kapısı. `importFiles` ve
+               `/api/import` baştan beri tamdı, ama tetikleyicileri yalnızca
+               HTML5 sürükle-bırak: klasör kartına ve bu alana bırakma. O yol
+               DOKUNMATİKTE hiç çalışmıyor (folders.js FOLDER_HINT_DEFAULT),
+               yani telefondan bir fotoğrafı galeriye/klasöre koymanın hiçbir
+               yolu yoktu — üstelik ipucu metni "Yükle düğmesiyle içe
+               aktarabilirsin" diyerek var olmayan bir kontrolü tarif ediyordu
+               (assets.js `assetEmptyText`in kaydettiği kusurun aynısı).
+               accept listesi öteki üç dosya girişiyle BİREBİR aynı: Android
+               seçici intent'i aileyi bu listeden türetiyor (MainActivity
+               `dosyaSecimIntenti`), `multiple` da EXTRA_ALLOW_MULTIPLE'a
+               çevriliyor. -->
+          <button type="button" id="media-import-btn" class="btn-ghost"
+                  title="Cihazındaki görselleri buraya aktar">
+            <span class="btn-ghost-plus" aria-hidden="true">+</span> Yükle
+          </button>
+          <input type="file" id="media-import-input"
+                 accept="image/png,image/jpeg,image/webp" multiple hidden />
           <button type="button" id="folder-new" class="btn-ghost">
             <span class="btn-ghost-plus" aria-hidden="true">+</span> Yeni klasör
           </button>
@@ -1450,6 +1468,17 @@
               aria-label="Yakınlaştır" title="Yakınlaştır (+)">+</button>
       <button id="viewer-fit" class="viewer-btn" type="button"
               title="Ekrana sığdır (0)">Sığdır</button>
+      <!-- Bindirmenin İKİNCİ kapısı. Sol paneldeki #logo-add-btn yalnız
+           `currentImage` varken etkin ve onu ayarlayan yollar üretim,
+           `applyOverlay` ve galeri karosundaki "Referans" düğmesi — karoya
+           DOKUNMAK yalnız büyüteci açıyordu. Yani kullanıcının görseli
+           tam ekran gördüğü yerde bindirmeye hiç kapı yoktu; telefonda
+           paneldeki düğmeye ulaşmak da ayrı bir tur.
+           #viewer-download'ın YANINDA: ikisi de "bu görselle ne yapılır"
+           sorusunun cevabı ve ikisi de yalnız KAYITLI bir görselde var
+           (viewer.js `kayitOku`). -->
+      <button id="viewer-logo" class="viewer-btn" type="button"
+              title="Bu görsele logo, motto veya banner bindir">Logo ekle</button>
       <a id="viewer-download" class="viewer-btn" download>İndir</a>
       <button id="viewer-close" class="viewer-btn" type="button"
               aria-label="Kapat" title="Kapat (Esc)">×</button>

@@ -14,6 +14,7 @@
   const vimg = $("viewer-img");
   const pct = $("viewer-zoom-pct");
   const dlLink = $("viewer-download");
+  const logoBtn = $("viewer-logo");
 
   const MIN_SCALE = 1;
   const MAX_SCALE = 8;
@@ -33,6 +34,7 @@
   let grabY = 0;
   let rafId = 0;
   let openerRect = null;   // açılışta tıklanan küçük resmin ekrandaki yeri
+  let kayit = null;        // ekrandaki görselin SUNUCU kaydı (yoksa null)
 
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -124,22 +126,41 @@
 
   // --- açılış / kapanış -----------------------------------------------------
 
-  // İndir bağlantısı yalnız sunucuda KAYITLI bir görsel için anlamlı:
-  // henüz kaydedilmemiş yüklemeler blob: URL'i taşır ve kayıt paneline
-  // anlamsız bir ad düşer.
-  function syncDownload(src) {
-    let name = "";
+  // `/output/{ad}` taşıyan bir kaynaktan SUNUCU kaydını türetir; taşımıyorsa null.
+  //
+  // İndir ve "Logo ekle" aynı soruyu soruyor — "bu, sunucuda kayıtlı bir görsel
+  // mi?" — ve ikisinin de cevabı bu tek yerden çıkıyor: iki ayrı ayrıştırma
+  // yazmak ikisinin sessizce ayrışması olurdu.
+  //
+  // `id`nin dosya adından türetilmesi bir DEPO SÖZLEŞMESİ, tahmin değil:
+  // `storage.save` her kaydı `{id}.png` yazıyor (app.py `_output_png_path`) ve
+  // `core.js` `setGallerySourceById` de elinde yalnız id varken aynı türetmeyi
+  // yapıyor. Büyüteç kaydın kendisini hiç görmüyor — `openViewer`a yalnız
+  // `src` geliyor ve chat.js'in karesinde de elde yalnız id var — bu yüzden
+  // yol imzayı büyütmek DEĞİL, var olan adresi okumak.
+  function kayitOku(src) {
+    let ad = "";
     try {
       const path = new URL(src, location.href).pathname;
-      if (path.startsWith("/output/")) name = decodeURIComponent(path.slice("/output/".length));
-    } catch { name = ""; }
-    dlLink.hidden = !name;
-    if (name) {
+      if (path.startsWith("/output/")) ad = decodeURIComponent(path.slice("/output/".length));
+    } catch { ad = ""; }
+    if (!ad) return null;
+    return { id: ad.replace(/\.png$/i, ""), filename: ad };
+  }
+
+  // İndirme ve bindirme yalnız sunucuda KAYITLI bir görsel için anlamlı:
+  // henüz kaydedilmemiş yüklemeler blob: URL'i taşır — kayıt paneline anlamsız
+  // bir ad düşer ve `/api/logo` kaynağı diskte bulamaz.
+  function syncActions(src) {
+    kayit = kayitOku(src);
+    dlLink.hidden = !kayit;
+    logoBtn.hidden = !kayit;
+    if (kayit) {
       // Çizim adresi `src`te kalıyor, bağlantıya İNDİRME adresi yazılıyor
       // (core.js `indirmeAdresi`) — sağ tık → "Bağlantıyı kaydet" de doğru
       // dosyayı vermeli.
       dlLink.setAttribute("href", indirmeAdresi(src));
-      dlLink.setAttribute("download", name);
+      dlLink.setAttribute("download", kayit.filename);
     } else {
       dlLink.removeAttribute("href");
     }
@@ -156,11 +177,30 @@
     downloadImage(href, dlLink.getAttribute("download"));
   });
 
+  // SIRA ZORUNLU: büyüteç ÖNCE kapanıyor, bindirme penceresi SONRA açılıyor.
+  // `#viewer` DOM'da `#logo-modal`'dan SONRA geliyor ve ikisi de `z-index: 50`
+  // (style.css `.modal`) — büyüteç açık kalırsa eşitlikte o üstte boyanır ve
+  // bindirme penceresi ARKADA kalır: açılıyor, odak bile alıyor, ama
+  // görünmüyor. `#confirm-modal { z-index: 60 }` yorumunun kaydettiği kusurun
+  // aynısı; oradaki ilaç katmanı yükseltmekti, burada kapatmak — bindirme
+  // penceresinin kendi önizlemesi var, arkada duran büyüteç zaten gereksiz.
+  //
+  // `setCurrentImage` de çağrılıyor: kullanıcı bindirmeden vazgeçerse sol
+  // paneldeki "Logo ekle" onun BAKTIĞI görsele bakmaya devam etsin — "önizleme"
+  // kavramı tek yerde kalıyor (core.js `currentImage`).
+  logoBtn.addEventListener("click", () => {
+    const rec = kayit;
+    if (!rec) return;
+    close();
+    setCurrentImage(rec);
+    openLogoModal(rec);
+  });
+
   function open(src, alt) {
     if (!src) return;
     vimg.src = src;
     vimg.alt = alt || "";
-    syncDownload(src);
+    syncActions(src);
     fit();
     render();
 
@@ -196,6 +236,7 @@
     vimg.style.transition = "";
     vimg.removeAttribute("src");
     openerRect = null;
+    kayit = null;
   }
 
   // Tek dışa açılan dikiş: dökümdeki sonuç kartı da büyüteci açıyor

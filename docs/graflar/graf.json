@@ -901,7 +901,7 @@
           "/output/{}"
         ],
         "dosya": "static/folders.js",
-        "satir": 1438,
+        "satir": 1465,
         "tanim": 50
       },
       {
@@ -940,7 +940,7 @@
           "/output/"
         ],
         "dosya": "static/viewer.js",
-        "satir": 368,
+        "satir": 409,
         "tanim": 0
       }
     ],
@@ -1135,8 +1135,16 @@
       },
       {
         "adlar": [
+          "openLogoModal"
+        ],
+        "hedef": "static/assets.js",
+        "kaynak": "static/viewer.js"
+      },
+      {
+        "adlar": [
           "downloadImage",
-          "indirmeAdresi"
+          "indirmeAdresi",
+          "setCurrentImage"
         ],
         "hedef": "static/core.js",
         "kaynak": "static/viewer.js"

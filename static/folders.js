@@ -91,12 +91,17 @@ const IMAGE_DND_TYPE = "application/x-gpt-image-id";
 // bırak" yazan bir ipucu, çalışmayan bir yolu tarif etmek olurdu — yani
 // yardımcı değil, yanıltıcı. Taşımanın dokunmatikteki yolu seçim modundaki
 // "Taşı…" düğmesi, içe aktarmanınki ise "Yükle" düğmesi.
+//
+// O "Yükle" düğmesi bu cümle YAZILDIĞINDA YOKTU: ipucu bir dönem var olmayan
+// bir kontrolü tarif etti ve telefondan içe aktarmanın gerçekten hiçbir yolu
+// kalmadı. Düğme artık `#media-import-btn` olarak şeritte; cümle ile kontrol
+// birlikte yaşıyor (aynı kusurun kaydı: assets.js `assetEmptyText`).
 const FOLDER_HINT_DEFAULT = IS_TOUCH
   ? 'Görselleri taşımak için "Seç" ile işaretleyip "Taşı…" düğmesini kullan.'
   : "Bir görseli klasör kartına sürükleyip bırakarak taşıyabilirsin.";
 const FOLDER_HINT_IMPORT = IS_TOUCH
   ? 'Cihazındaki bir görseli "Yükle" düğmesiyle içe aktarabilirsin.'
-  : "Bilgisayarındaki bir görseli klasör kartına ya da bu alana bırakarak içe aktarabilirsin.";
+  : 'Bilgisayarındaki bir görseli "Yükle" düğmesiyle, klasör kartına ya da bu alana bırakarak içe aktarabilirsin.';
 
 function renderFolderHint() {
   const el = $("folder-hint");
@@ -134,6 +139,11 @@ function syncFolderView() {
   if ($("folder-rename")) $("folder-rename").hidden = !inFolder || selectMode;
   if ($("folder-download")) $("folder-download").hidden = !inFolder || selectMode;
   $("folder-new").hidden = selectMode;
+  // "Yükle" de `#folder-new` ile aynı davranışta: seçim modunda şerit görsel
+  // eylemlerine kalıyor. Aramadayken DE çekiliyor — hedef bulunulan klasör ve
+  // arama sırasında "bulunulan klasör" diye bir şey yok (sonuçlar tüm
+  // klasörlerden geliyor), yani düğme nereye aktardığını söyleyemezdi.
+  $("media-import-btn").hidden = selectMode || searching;
 
   const path = inFolder ? folderPath(currentFolder.id) : [];
   // kırıntı: "A / B / C" — cache henüz gelmediyse en azından klasörün adı
@@ -504,6 +514,23 @@ $("folder-delete").addEventListener("click", deleteCurrentFolder);
 if ($("folder-rename")) $("folder-rename").addEventListener("click", renameCurrentFolder);
 if ($("folder-download")) $("folder-download").addEventListener("click", downloadCurrentFolder);
 $("folder-new").addEventListener("click", createFolder);
+
+// İçe aktarmanın dokunmatik yolu. `importFiles` YENİDEN YAZILMIYOR: MIME kapısı
+// (`isAcceptedUpload`), 20 dosya sınırı, SIRAYLA gönderim ve
+// `loadFolders()+loadHistory()` tazelemesi olduğu gibi devralınıyor — bırakma
+// yoluyla tek fark dosyaların nereden geldiği.
+$("media-import-btn").addEventListener("click", () => $("media-import-input").click());
+$("media-import-input").addEventListener("change", (e) => {
+  const dosyalar = [...(e.target.files || [])];
+  // Değer HEMEN sıfırlanıyor: aynı dosya ikinci kez seçildiğinde `change`
+  // hiç ateşlenmez ve düğme sessizce ölü görünür.
+  e.target.value = "";
+  if (!dosyalar.length) return;
+  // Hedef BULUNULAN yer: klasörün içindeysek o klasör, değilse kök. Bırakma
+  // yolundaki `.gallery-wrap` kuralının aynısı.
+  importFiles(dosyalar, currentFolder ? currentFolder.id : null,
+              currentFolder ? currentFolder.name : "Klasörsüz");
+});
 
 
 // ── Çoklu seçim ──────────────────────────────────────────────────────

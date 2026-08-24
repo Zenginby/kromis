@@ -2,7 +2,7 @@
 
 # Test haritası
 
-`tests/` altında 67 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
+`tests/` altında 68 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
 
 | modül | testler |
 | --- | --- |
@@ -26,6 +26,7 @@
 | `guncelleme` | `test_depo_adresi.py`, `test_guncelleme.py` |
 | `jsonstore` | `test_jsonstore.py` |
 | `models` | `test_catalog.py`, `test_chat_client.py`, `test_chat_route.py`, `test_chats_route.py`, `test_composite.py`, `test_guvenlik_baslik.py`, `test_index.py`, `test_model_secimi.py`, `test_prefs.py`, `test_prefs_route.py`, `test_settings_route.py` |
+| `netguard` | `test_netguard.py` |
 | `openai_chat` | `test_chat_providers.py`, `test_chat_route.py`, `test_openai_chat.py` |
 | `openai_client` | `test_openai_client.py` |
 | `palette` | `test_color_names.py`, `test_palette.py`, `test_palette_route.py` |

@@ -21,9 +21,10 @@ import time
 import traceback
 
 import uvicorn
-from fastapi import FastAPI
+from starlette.types import ASGIApp
 
 import errlog
+import netguard
 import paths
 import screencolor
 
@@ -34,7 +35,7 @@ _POLL_INTERVAL = 0.02
 _JOIN_TIMEOUT = 5.0  # saniye — kapanışta uvicorn thread'inin ölmesini bekleme süresi
 
 
-def start_server(fastapi_app: FastAPI, host: str = "127.0.0.1",
+def start_server(asgi_app: ASGIApp, host: str = "127.0.0.1",
                  timeout: float = 15.0, *, loop: str = "auto",
                  http: str = "auto") -> tuple[uvicorn.Server, threading.Thread, int]:
     """Sunucuyu boş bir portta daemon thread'de başlatır; (sunucu, thread, port) döner.
@@ -46,7 +47,7 @@ def start_server(fastapi_app: FastAPI, host: str = "127.0.0.1",
     çalışıp ImportError'a düşerek her açılışta gereksiz iş yapıyor. Seçimi
     çağıran tarafa bırakmak, bu bilgiyi desktop.py'ye gömmekten temiz.
     """
-    config = uvicorn.Config(fastapi_app, host=host, port=0, log_level="warning",
+    config = uvicorn.Config(asgi_app, host=host, port=0, log_level="warning",
                             loop=loop, http=http)
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, daemon=True, name="uvicorn")
@@ -224,7 +225,12 @@ def _run() -> None:
     # atamak o bağı koparır ve düzeltme sessizce ölür.
     webview.settings["ALLOW_DOWNLOADS"] = True
 
-    server, thread, port = start_server(appmod.app)
+    # İSTEK KAYNAĞI KAPISI. Pencere `http://127.0.0.1:{port}` yüklüyor, yani
+    # kendi istekleri hem loopback `Host` hem eşleşen `Origin` taşıyor;
+    # tarayıcıdaki yabancı bir sayfanın istekleri taşımıyor. Gerekçenin tamamı
+    # netguard.py'nin başında. SARMAL, `add_middleware` DEĞİL: `appmod.app`
+    # paylaşılan tek nesne ve yerinde değiştirilmemeli (bkz. netguard.sar).
+    server, thread, port = start_server(netguard.sar(appmod.app))
     try:
         # js_api: damlalık için native köprü (bkz. Api). Olmadan
         # `window.pywebview.api` hiç oluşmaz ve WKWebView'da EyeDropper de

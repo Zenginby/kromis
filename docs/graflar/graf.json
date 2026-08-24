@@ -18,7 +18,7 @@
       ],
       "ithal": [],
       "ithal_eden": [],
-      "katman": 8,
+      "katman": 9,
       "satir": 194,
       "testler": [
         "tests/test_android_main.py"
@@ -53,7 +53,8 @@
       ],
       "ithal_eden": [
         "android_main",
-        "desktop"
+        "desktop",
+        "netguard"
       ],
       "katman": 6,
       "satir": 1719,
@@ -364,14 +365,15 @@
       ],
       "ithal": [
         "errlog",
+        "netguard",
         "paths",
         "screencolor"
       ],
       "ithal_eden": [
         "android_main"
       ],
-      "katman": 7,
-      "satir": 257,
+      "katman": 8,
+      "satir": 263,
       "testler": [
         "tests/test_desktop.py"
       ],
@@ -504,6 +506,22 @@
         "tests/test_settings_route.py"
       ],
       "yol": "models.py"
+    },
+    {
+      "ad": "netguard",
+      "erteli_ithal": [
+        "app"
+      ],
+      "ithal": [],
+      "ithal_eden": [
+        "desktop"
+      ],
+      "katman": 7,
+      "satir": 157,
+      "testler": [
+        "tests/test_netguard.py"
+      ],
+      "yol": "netguard.py"
     },
     {
       "ad": "openai_chat",
@@ -1141,7 +1159,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 67,
+  "test_dosyasi_sayisi": 68,
   "uc_noktalar": [
     {
       "islev": "index",

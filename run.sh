@@ -31,4 +31,8 @@ if [[ -n "$STALE_PIDS" ]]; then
 fi
 
 ( sleep 1.5; open "http://$HOST:$PORT" 2>/dev/null || true ) &
-exec uvicorn app:app --host "$HOST" --port "$PORT"
+# `--factory netguard:korumali_app`, düz `app:app` DEĞİL: bu sunucu 8765'e
+# SABİT ve kullanıcının tarayıcısındaki herhangi bir sayfa multipart uçlara
+# (`/api/edit`, `/api/import`, `/api/assets/…`) ön uçuşsuz istek atabiliyordu.
+# Fabrika, istek kaynağı kapısını app.py'ye dokunmadan takıyor (bkz. netguard.py).
+exec uvicorn --factory netguard:korumali_app --host "$HOST" --port "$PORT"

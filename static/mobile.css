@@ -416,8 +416,10 @@
      zıplardı ve kullanıcı yanlış düğmeye basardı. */
   .picker-note { flex: 1 1 100%; min-height: 1.5em; }
 
-  /* Büyüteç şeridi 6 düğmeyle ~310px; 360px'lik ekranda kenarlara yapışıyor.
-     Sarma + kenar boşluğu ile hem sığıyor hem basılabiliyor. */
+  /* Büyüteç şeridi 7 düğmeyle ~400px; 360px'lik ekranda tek satıra hiç
+     sığmıyor ("Logo ekle" şeride 90px daha bindirdi). Sarma + kenar boşluğu
+     ile iki satıra iniyor ve her düğme basılabilir kalıyor — düğmeyi kısaltmak
+     yerine sarmak, çünkü "Logo ekle" ne yaptığını söylemek zorunda. */
   .viewer-bar {
     left: 12px; right: 12px; transform: none;
     justify-content: center; flex-wrap: wrap;

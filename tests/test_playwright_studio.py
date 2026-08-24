@@ -492,3 +492,125 @@ def test_playwright_secilen_dosya_kapisi_TELEFONUN_gercegine_dayaniyor():
             browser.close()
     finally:
         server.stop()
+
+
+def test_playwright_secim_modunda_karonun_ortasi_gercekten_seciyor():
+    """Seçim modunda karonun ORTASINA basmak seçmeli — TARAYICIDA ölçülüyor.
+
+    Kusur telefonda klasöre taşımayı tümden imkânsız kılıyordu ve statik bir
+    iddiayla yakalanamaz, çünkü soru "hangi CSS kuralı var" değil "o noktada
+    ISABET EDEN öğe hangisi": `.card .acts` şeridi karonun alt bandını kaplıyor
+    ve dokunmatikte SÜREKLİ görünür, `.card-del`in de görünmez 44×44 hedefi var.
+    Kart tıklaması ikisini dışlıyor (`closest(".acts, .card-del, .card-check")`),
+    yani şeride düşen bir dokunuş seçmiyor — üstelik "Referans" düğmesine
+    denk gelirse uygulama Stüdyo'ya ATLIYOR ve kullanıcı galeriden düşüyor.
+
+    Ölçü `elementFromPoint` + gerçek tıklama; DİSKE HİÇ DOKUNULMUYOR: galeri
+    kaydı `historyCache`e elle konuyor ve `renderGallery()` çağrılıyor (küçük
+    resmin 404 olması ölçülen şeyi etkilemiyor — isabet testi yerleşim üstünde).
+    Dokunmatik ölçüsü telefon genişliğinde alınıyor: şerit orada da sarmıyor
+    ama karo en küçük hâlinde.
+    """
+    port = get_free_port()
+    server = ServerThread(port)
+    server.start()
+    time.sleep(1.0)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 390, "height": 780})
+            page.goto(f"http://127.0.0.1:{port}")
+            page.wait_for_selector("#view-studio")
+            _ilk_kurulum_perdesini_kapat(page)
+
+            # Galeriyi elle tohumla: tek kayıt, S ızgara (karonun en küçük hâli).
+            page.evaluate("""() => {
+                showSection("media");
+                historyCache = [{id: "abc123abc123",
+                                 filename: "abc123abc123.png",
+                                 prompt: "deneme"}];
+                renderGallery();
+            }""")
+            page.wait_for_selector("#gallery .card")
+
+            # Şerit gerçekten ekranda mı? Değilse bu testin öncülü düşmüş olur.
+            assert page.eval_on_selector(
+                "#gallery .card .acts",
+                "el => getComputedStyle(el).display !== 'none'"), (
+                "eylem şeridi seçim DIŞI modda da gizli — testin öncülü düştü")
+
+            page.evaluate("setSelectMode(true)")
+            page.wait_for_selector("#gallery .card .card-check")
+
+            # 1. İSABET: karonun tam ortasındaki nokta kartın kendisine düşmeli.
+            isabet = page.eval_on_selector("#gallery .card", """el => {
+                const r = el.getBoundingClientRect();
+                const hedef = document.elementFromPoint(r.left + r.width / 2,
+                                                        r.top + r.height / 2);
+                return {
+                    kart: el.contains(hedef),
+                    engel: hedef && hedef.closest(".acts, .card-del") ? true : false,
+                };
+            }""")
+            assert isabet["kart"], "karonun ortası kartın dışında bir öğeye düşüyor"
+            assert not isabet["engel"], (
+                "karonun ORTASI eylem şeridine/silme düğmesine düşüyor — dokunuş "
+                "seçmiyor, 'Referans'a denk gelirse uygulama Stüdyo'ya atlıyor")
+
+            # 2. DAVRANIŞ: o noktaya tıklamak seçiyor ve Medya'da kalıyoruz.
+            page.click("#gallery .card")
+            assert page.eval_on_selector(
+                "#gallery .card", "el => el.classList.contains('selected')"), (
+                "karonun ortasına tıklamak seçmedi")
+            assert page.is_visible("#view-media"), (
+                "tıklama uygulamayı Medya'dan attı — 'Referans' tetiklenmiş")
+            assert page.eval_on_selector(
+                "#select-move", "el => !el.disabled"), (
+                "seçim var ama 'Taşı…' hâlâ kapalı")
+
+            browser.close()
+    finally:
+        server.stop()
+
+
+def test_playwright_buyutecte_logo_ekle_kayitli_gorselde_beliriyor():
+    """Büyeteçteki "Logo ekle" yalnız KAYITLI bir görselde görünmeli.
+
+    İki yarım, ikisi de tarayıcıda: düğme `/output/…` taşıyan bir kaynakta
+    beliriyor, `blob:` taşıyan (henüz kaydedilmemiş yükleme) bir kaynakta
+    "İndir" ile birlikte gizli kalıyor. İkisi tek ayrıştırmadan besleniyor
+    (`kayitOku`), yani bu test o dikişin ayrışmadığını da ölçüyor.
+
+    Bindirme penceresi AÇILMIYOR: `/api/logo/preview` gerçek sunucuya gider.
+    Ölçülen şey düğmenin görünürlüğü ve türettiği kayıt.
+    """
+    port = get_free_port()
+    server = ServerThread(port)
+    server.start()
+    time.sleep(1.0)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(f"http://127.0.0.1:{port}")
+            page.wait_for_selector("#view-studio")
+            _ilk_kurulum_perdesini_kapat(page)
+
+            page.evaluate('openViewer("/output/abc123abc123.png", "deneme")')
+            page.wait_for_selector("#viewer:not([hidden])")
+            assert page.is_visible("#viewer-logo"), (
+                "kayıtlı görselde bindirme kapısı yok")
+            assert page.is_visible("#viewer-download"), "testin öncülü düştü"
+
+            # Kaydedilmemiş yükleme: iki düğme de çekilmeli.
+            page.evaluate('openViewer("blob:http://localhost/deneme", "yerel")')
+            assert page.is_hidden("#viewer-logo"), (
+                "kaydedilmemiş görselde bindirme düğmesi duruyor — /api/logo "
+                "kaynağı diskte bulamaz")
+            assert page.is_hidden("#viewer-download"), "indirme muhafızı düşmüş"
+
+            browser.close()
+    finally:
+        server.stop()

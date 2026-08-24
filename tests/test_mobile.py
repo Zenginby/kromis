@@ -114,6 +114,53 @@ def test_touch_rules_hang_on_hover_none_not_on_width(istemci):
         assert secici in hover_blok, secici
 
 
+def test_select_mode_retires_the_card_actions(istemci):
+    """Seçim modunda karonun TEK işi seçmek — şerit ve silme düğmesi çekilir.
+
+    TELEFONDA KLASÖRE TAŞIMANIN ÖNÜNDEKİ ASIL ENGEL BUYDU. Dokunmatikte
+    `.card .acts` (İndir · Referans) ve `.card-del` SÜREKLİ görünür — bir
+    üstteki testin şart koştuğu şey — ve seçim modunda da tıklanabilir
+    kalıyorlardı. Şerit karonun alt bandını kaplıyor (kendi ölçüm notuna göre
+    S ızgarada karonun %58'i), üstüne `.card-del`in görünmez 44×44 hedefi
+    biniyor. ~105px'lik bir karoda seçmek için nötr alan neredeyse kalmıyordu:
+    ortaya basan parmak "Referans"a düşüyor ve uygulama Stüdyo'ya ATLIYORDU.
+    Seçilemeyen görsel taşınamaz — `Taşı…` yolunun tamamı sağlamdı ama kapıya
+    hiç varılamıyordu.
+
+    `display: none` şart, `opacity: 0` DEĞİL: `.card .acts` bloğunun kendi
+    yorumu görünmez şeridin tıklamayı YUTTUĞUNU kaydediyor, yani saydamlaştırmak
+    nötr alanı geri getirmezdi.
+    """
+    css = re.sub(r"/\*.*?\*/", "", _metin(istemci, "/static/style.css"), flags=re.S)
+    kural = re.search(
+        r"body\.select-mode[^{}]*\.acts[^{]*\{([^}]*)\}", css)
+    assert kural, "seçim modunda karo eylemleri için kural yok"
+    assert "display: none" in kural.group(1), (
+        "şerit yalnız saydamlaştırılmış — görünmez şerit tıklamayı yutmaya devam eder")
+    assert ".card-del" in kural.group(0), (
+        "silme düğmesi seçim modunda duruyor — sağ üst köşe hâlâ seçilmiyor")
+
+
+def test_the_media_import_input_reaches_the_android_picker(istemci):
+    """Yükle düğmesinin dosya girişi Android seçicisinin beklediği biçimde.
+
+    Bu, telefondan içe aktarmanın TEK yolu (sürükle-bırak dokunmatikte hiç
+    çalışmıyor). İki nitelik ikisi de zorunlu:
+
+    * `accept` — `MainActivity.dosyaSecimIntenti` aileyi bu listeden türetiyor;
+      liste öteki girişlerden saparsa OEM galerisi türlerin bir kısmını gizler
+      (commit 554aed4'ün kapattığı kusur).
+    * `multiple` — `EXTRA_ALLOW_MULTIPLE`a çevriliyor. Telefon galerisinden tek
+      tek fotoğraf aktarmak kullanıcıya dosya başına bir tur bindirirdi.
+    """
+    html = _metin(istemci, "/")
+    giris = re.search(r'<input type="file" id="media-import-input"[^>]*>', html)
+    assert giris, "Yükle düğmesinin dosya girişi yok"
+    assert 'accept="image/png,image/jpeg,image/webp"' in giris.group(0), (
+        "kabul listesi öteki girişlerle aynı değil")
+    assert "multiple" in giris.group(0), "çoklu seçim kapalı"
+
+
 def test_tap_targets_grow_without_resizing_the_controls(istemci):
     """Hedef büyütme ::after ile: görünen boyutlar korunuyor.
 

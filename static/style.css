@@ -1797,6 +1797,25 @@ body.select-mode #select-toggle,
   background: var(--accent-surface, var(--accent-wash));
 }
 body.select-mode .card, body.select-mode .card img { cursor: pointer; }
+/* Seçim modunda karonun TEK işi seçmek: eylem şeridi ve silme düğmesi çekilir.
+   Kart tıklaması ikisini zaten dışlıyor (folders.js `closest(".acts, .card-del,
+   .card-check")`), yani ekranda kaldıkları sürece SEÇİLMEYEN bir alan
+   oluyorlar — üstelik kendi eylemlerini çalıştırıyorlar.
+
+   DOKUNMATİKTE bu, taşımanın önündeki asıl engeldi. Orada ikisi de sürekli
+   görünür (mobile.css, hover olmayan cihazda bilinçli) ve şerit karonun alt
+   bandını kaplıyor: `.card .acts`ın ölçüm notuna göre S ızgarada karonun
+   %58'i, M'de %21'i. Üstüne `.card-del`in görünmez 44×44 hedefi biniyor.
+   ~105px'lik bir karoda seçmek için nötr alan neredeyse kalmıyordu; ortaya
+   basan parmak "Referans"a düşüyor ve uygulama Stüdyo'ya ATLIYORDU. Yani
+   kullanıcı görselleri seçemediği için klasöre hiç taşıyamıyordu.
+
+   `display: none`, `opacity: 0` DEĞİL: `.card .acts` bloğunun kendi yorumu
+   görünmez şeridin tıklamayı YUTTUĞUNU kaydediyor. Aynı duruş `.card-badge`
+   için folders.js'te (`rec.imported && !selectMode`), klasör düğmeleri için
+   `syncFolderView`'da zaten var. */
+body.select-mode .card .acts,
+body.select-mode .card .card-del { display: none; }
 
 /* --- Görsel büyüteci (lightbox) ------------------------------------------ */
 

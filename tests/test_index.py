@@ -360,7 +360,8 @@ def test_viewer_markup_is_served():
     """
     html = TestClient(appmod.app).get("/").text
     for element_id in ("viewer", "viewer-stage", "viewer-img", "viewer-download",
-                       "viewer-zoom-in", "viewer-zoom-out", "viewer-fit", "viewer-close"):
+                       "viewer-logo", "viewer-zoom-in", "viewer-zoom-out",
+                       "viewer-fit", "viewer-close"):
         assert f'id="{element_id}"' in html, element_id
 
 
@@ -2390,6 +2391,107 @@ def test_the_gallery_viewer_keeps_the_download_seam():
     assert 'path.startsWith("/output/")' in _viewer_js(), (
         "büyütecin dosya adı türetmesi değişmiş")
     assert "openViewer" in _folders_js(), "galeri büyüteci hiç açmıyor"
+
+
+def test_the_viewer_offers_the_overlay_door():
+    """Büyeteçteki "Logo ekle": görselin GÖRÜLDÜĞÜ yerde bindirme kapısı.
+
+    Kusur şuydu: `openLogoModal`ın tek kapısı sol paneldeki `#logo-add-btn` ve o
+    düğme yalnız `currentImage` varken etkin. Galeri karosuna dokunmak
+    (`activateCard`) yalnız büyüteci açıyor, `currentImage`'a dokunmuyor — yani
+    kullanıcının görseli tam ekran gördüğü yerde bindirmeye HİÇ kapı yoktu.
+    """
+    viewer = _viewer_js()
+    assert '$("viewer-logo")' in viewer, "büyüteç bindirme düğmesine bağlanmıyor"
+    body = _balanced_body(viewer, 'logoBtn.addEventListener("click"')
+    assert "openLogoModal(" in body, "düğme bindirme penceresini açmıyor"
+
+
+def test_the_viewer_closes_before_it_opens_the_overlay_modal():
+    """SIRA: `close()` ÖNCE, `openLogoModal()` SONRA.
+
+    `#viewer` DOM'da `#logo-modal`'dan SONRA geliyor ve ikisi de `.modal`'ın
+    `z-index: 50`'sini paylaşıyor. Eşitlikte DOM'da sonra gelen üstte boyanır,
+    yani büyüteç açık kalırsa bindirme penceresi ARKADA kalır: açılıyor, odak
+    bile alıyor, ama görünmüyor ve tıklanamıyor. `#confirm-modal { z-index: 60 }`
+    yorumunun kaydettiği kusurun aynısı — bu testin öncülü o katman eşitliği.
+    """
+    css = _css()
+    base = re.search(r"\.modal\s*\{[^}]*?z-index:\s*(\d+)", css, re.S)
+    assert base, ".modal için z-index kuralı yok"
+    html = _html()
+    assert html.index('id="logo-modal"') < html.index('id="viewer"'), (
+        "büyüteç artık bindirme penceresinden ÖNCE geliyor — bu testin öncülü "
+        "düştü, sıra iddiası yeniden gerekçelendirilmeli")
+
+    body = _balanced_body(_viewer_js(), 'logoBtn.addEventListener("click"')
+    assert body.index("close()") < body.index("openLogoModal("), (
+        "bindirme penceresi büyüteç kapanmadan açılıyor → perdenin ARKASINDA kalır")
+    # Kayıt close()'tan ÖNCE okunmak zorunda: close() `kayit`i null'lıyor.
+    assert body.index("kayit") < body.index("close()"), (
+        "kayıt close()'tan sonra okunuyor — o noktada null, pencere hiç açılmaz")
+
+
+def test_the_viewer_overlay_button_needs_a_saved_image():
+    """"Logo ekle" ile "İndir" AYNI muhafızı paylaşır: sunucuda kayıtlı görsel.
+
+    Kaydedilmemiş bir yükleme `blob:` URL taşıyor — `/api/logo` kaynağı diskte
+    bulamaz, indirme de anlamsız bir ad düşürür. İki düğme tek ayrıştırmadan
+    besleniyor (`kayitOku`); ayrı ayrıştırma yazmak ikisinin sessizce
+    ayrışması olurdu.
+    """
+    viewer = _viewer_js()
+    body = _balanced_body(viewer, "function syncActions(src)")
+    assert "dlLink.hidden = !kayit" in body, "indirme muhafızı kayda bağlı değil"
+    assert "logoBtn.hidden = !kayit" in body, (
+        "bindirme düğmesi kaydedilmemiş görselde de görünüyor")
+    # id dosya adından türetiliyor — depo sözleşmesi (`storage.save` → `{id}.png`).
+    assert re.search(r"replace\(/\\\.png\$/i", viewer), (
+        "kayıt id'si dosya adından türetilmiyor")
+
+
+def test_the_media_toolbar_has_the_import_button_the_hint_promises():
+    """İçe aktarmanın TIKLANABİLİR kapısı — ipucu metninin tarif ettiği düğme.
+
+    `importFiles` ve `/api/import` baştan beri tamdı, ama tetikleyicileri
+    yalnızca HTML5 sürükle-bırak: klasör kartına ve `.gallery-wrap`a bırakma.
+    O yol dokunmatikte HİÇ çalışmıyor, yani telefondan bir fotoğrafı
+    galeriye/klasöre koymanın hiçbir yolu yoktu — üstelik `FOLDER_HINT_IMPORT`
+    "Yükle düğmesiyle içe aktarabilirsin" diyerek var OLMAYAN bir kontrolü
+    tarif ediyordu (assets.js `assetEmptyText`in kaydettiği kusurun aynısı).
+    """
+    html = _html()
+    assert 'id="media-import-btn"' in html, "Medya şeridinde Yükle düğmesi yok"
+    assert 'id="media-import-input"' in html, "düğmenin dosya girişi yok"
+
+    folders = _folders_js()
+    assert '$("media-import-btn").addEventListener' in folders, "düğme bağlı değil"
+    body = _balanced_body(folders, '$("media-import-input").addEventListener("change"')
+    assert "importFiles(" in body, (
+        "giriş `importFiles`a gitmiyor — MIME kapısı, 20 dosya sınırı ve "
+        "SIRAYLA gönderim ikinci bir yolda yeniden yazılmış olurdu")
+    assert 'e.target.value = ""' in body, (
+        "değer sıfırlanmıyor — aynı dosya ikinci kez seçilince `change` hiç "
+        "ateşlenmez ve düğme sessizce ölü görünür")
+    assert "currentFolder ? currentFolder.id : null" in body, (
+        "hedef bulunulan klasör değil — klasörün içinde 'Yükle' köke düşerdi")
+    # Şerit seçim modunda görsellere kalıyor (#folder-new ile aynı davranış).
+    assert '$("media-import-btn").hidden = selectMode' in folders, (
+        "seçim modunda Yükle düğmesi şeritte kalıyor")
+
+
+def test_every_file_input_carries_the_same_accept_list():
+    """Dört dosya girişi AYNI kabul listesini taşımak zorunda.
+
+    Android seçici intent'i (`MainActivity.dosyaSecimIntenti`) aileyi bu
+    listeden TÜRETİYOR: tek tür kalırsa `type` aile düzeyine çıkmaz ve OEM
+    galerileri öteki türleri gizler — commit 554aed4'ün kapattığı kusur.
+    Yeni bir giriş listeden saparsa aynı kusur onda yeniden doğar.
+    """
+    kabuller = re.findall(r'<input type="file"[^>]*?accept="([^"]+)"', _html())
+    assert len(kabuller) == 4, f"beklenen dört dosya girişi, bulunan {len(kabuller)}"
+    assert set(kabuller) == {"image/png,image/jpeg,image/webp"}, (
+        f"kabul listeleri ayrışmış: {sorted(set(kabuller))}")
 
 
 # ══════════════════════════════════════════════════════════════════════════

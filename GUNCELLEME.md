@@ -150,6 +150,13 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.11.0 — ne değişti
+
+- masaüstü sunucusuna istek kaynağı kapısı (netguard)
+- klasör adı yanıt başlığına satır sonu sokabiliyordu
+
+---
+
 ## Sürüm 0.10.0 — ne değişti
 
 - İnceleme düzeltmeleri (arena): kapı, geri açma, kilit sızıntısı, çipin ARIA'sı

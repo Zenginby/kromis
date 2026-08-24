@@ -2,6 +2,7 @@ package org.zenginby.gptimagestudio
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
@@ -21,6 +22,7 @@ import android.webkit.WebViewClient
 import android.webkit.URLUtil
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.ActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -42,7 +44,9 @@ import kotlin.concurrent.thread
  *      ÇALIŞMAZ; `onShowFileChooser` uygulanmazsa görsel içe aktarma, referans
  *      görsel ekleme ve logo/banner yükleme düğmeleri hiçbir şey yapmaz.
  *      Uygulamak da yetmiyor: intent `createIntent()`e bırakılırsa kabul
- *      listesinin yalnız İLK türü süzgece giriyor (bkz. `dosyaSecimIntenti`).
+ *      listesinin yalnız İLK türü süzgece giriyor (bkz. `dosyaSecimIntenti`)
+ *      ve dönüş `parseResult()`a bırakılırsa ÇOKLU seçim sessizce iptal
+ *      sayılıyor (bkz. `secilenDosyalar`).
  *   3. **İndirme.** WebView'in indirme sistemi YOK: bir indirmeyi tanır tanımaz
  *      iptal ediyor. Uygulama devralmazsa PNG indirme ve klasör ZIP'i sessizce
  *      ölür. Devralmanın İKİ yolu var ve ikisi de burada — sayfanın doğrudan
@@ -91,9 +95,7 @@ class MainActivity : AppCompatActivity() {
             // İPTAL DE BİLDİRİLMEK ZORUNDA: geri çağrı `null` ile bile olsa
             // çağrılmazsa o <input type="file"> bir daha HİÇ açılmaz — kullanıcı
             // için "düğme bozuldu" demek.
-            dosyaSecimGeriCagri?.onReceiveValue(
-                WebChromeClient.FileChooserParams.parseResult(sonuc.resultCode, sonuc.data)
-            )
+            dosyaSecimGeriCagri?.onReceiveValue(secilenDosyalar(sonuc))
             dosyaSecimGeriCagri = null
         }
 
@@ -377,6 +379,41 @@ class MainActivity : AppCompatActivity() {
                 putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
             }
         }
+    }
+
+    /**
+     * Seçicinin dönüşünü adres dizisine çevirir — `parseResult()` DEĞİL.
+     *
+     * NEDEN KENDİMİZ AYRIŞTIRIYORUZ: `FileChooserParams.parseResult()` yalnız
+     * `Intent.getData()`ya bakıyor. ÇOKLU seçimde sonuç orada değil
+     * `Intent.getClipData()`da geliyor ve `getData()` boş kalıyor — yani
+     * parseResult `null` döndürüyor, WebView bunu "kullanıcı iptal etti"
+     * sayıyor ve `<input type="file">` BOŞ kalıyor. Ekranda görülen tam olarak
+     * şudur: galeriden logo seçilip "Bitti"ye basılıyor, hiçbir şey olmuyor,
+     * hata da yok.
+     *
+     * Kütüphane'nin dosya girişi `multiple` (bir turda birkaç logo), yani orada
+     * sonuç HER ZAMAN ClipData'dan geliyor: `EXTRA_ALLOW_MULTIPLE` taşıyan bir
+     * seçici tek dosya seçildiğinde de onu ClipData'ya koyuyor. Bu yüzden
+     * Kütüphane'ye yükleme telefonda HİÇ çalışmadı; referans görsel (tek seçim,
+     * `getData()`) çalıştı — docs/android/mimari.md'nin elle doğrulama
+     * listesinde de yalnız ikincisi yazılıydı, kusurun hayatta kalma sebebi bu.
+     *
+     * SIRA ÖNEMLİ: önce ClipData, sonra `getData()`. Bazı seçiciler tek seçimde
+     * ikisini birden dolduruyor ve ClipData'yı önce okumak "birkaç dosya
+     * seçildi" hâlini de doğru veriyor; tersi sıra çoklu seçimi tek dosyaya
+     * indirirdi.
+     */
+    private fun secilenDosyalar(sonuc: ActivityResult): Array<Uri>? {
+        if (sonuc.resultCode != Activity.RESULT_OK) return null
+        val veri = sonuc.data ?: return null
+
+        val kirpma = veri.clipData
+        if (kirpma != null) {
+            val adresler = (0 until kirpma.itemCount).mapNotNull { kirpma.getItemAt(it)?.uri }
+            if (adresler.isNotEmpty()) return adresler.toTypedArray()
+        }
+        return veri.data?.let { arrayOf(it) }
     }
 
     // ── İndirme ─────────────────────────────────────────────────────

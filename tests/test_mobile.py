@@ -1024,3 +1024,41 @@ def test_the_kotlin_docs_never_close_their_own_comment_block(istemci):
         + "\n".join(f"  MainActivity.kt:{no}: {m[:70]}" for no, m in dusen.items())
         + "\nGerekçe metninde yıldız-bölü ikilisini HARFİYEN yazma; joker "
           "MIME'ı kelimeyle anlat, gerçek değeri gövdede bırak.")
+
+
+def test_the_file_chooser_result_reads_clipdata_not_just_getdata(istemci):
+    """Çoklu seçimin sonucu ClipData'dan okunmak ZORUNDA.
+
+    `WebChromeClient.FileChooserParams.parseResult()` yalnız
+    `Intent.getData()`ya bakıyor; ÇOKLU seçimde sonuç orada değil
+    `Intent.getClipData()`da geliyor ve `getData()` boş kalıyor. Yani
+    parseResult `null` döndürüyor, WebView bunu "kullanıcı iptal etti" sayıyor
+    ve `<input type="file">` boş kalıyor.
+
+    Kullanıcının telefonda gördüğü tam olarak buydu: galeri açılıyor, logo
+    seçiliyor, "Bitti"ye basılıyor ve HİÇBİR ŞEY olmuyor — hata metni de yok.
+    Kütüphane'nin girişi `multiple` olduğu için (`EXTRA_ALLOW_MULTIPLE`) sonuç
+    orada HER ZAMAN ClipData'dan geliyor, tek dosya seçilse bile; referans
+    görsel yolu tek seçim olduğu için `getData()` ile çalışmaya devam ediyordu.
+    Kusurun bir sürüm boyunca hayatta kalma sebebi bu ayrım.
+
+    Kırılma yalnız gerçek cihazda görünüyor: bu dosya yerelde HİÇ derlenmiyor
+    ve APK'da da bir hata çıkmıyor, yalnız sessizlik var.
+    """
+    kt = _kotlin_kaynagi()
+    geri = kt.split("dosyaSecici = registerForActivityResult(")[1].split("\n        }")[0]
+    assert "parseResult" not in geri, (
+        "dönüş hâlâ parseResult()a bırakılmış — çoklu seçim sessizce iptal olur")
+    assert "secilenDosyalar(sonuc)" in geri, "kendi ayrıştırıcımız çağrılmıyor"
+
+    govde = kt.split("private fun secilenDosyalar(")[1].split("\n    }")[0]
+    assert "clipData" in govde, "ClipData hiç okunmuyor"
+    assert "getItemAt" in govde, "ClipData öğeleri gezilmiyor"
+    # Tek seçim yolu DA ayakta kalmalı: referans görsel oradan geliyor.
+    assert "veri.data" in govde, "tek seçim (getData) yolu düşmüş"
+    # SIRA: ClipData önce. Tersi sıra çoklu seçimi tek dosyaya indirirdi.
+    assert govde.index("clipData") < govde.index("veri.data"), (
+        "getData önce okunuyor — çoklu seçim tek dosyaya iner")
+    # İPTAL null dönmek zorunda: geri çağrıya değer verilmezse o input bir daha
+    # HİÇ açılmaz (dosyanın kendi başındaki not).
+    assert "RESULT_OK" in govde, "başarısız sonuç ayırt edilmiyor"

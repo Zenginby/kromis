@@ -150,6 +150,12 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.11.3 — ne değişti
+
+- çoklu seçimin sonucu ClipData'dan okunuyor — "Bitti" artık yükleme başlatıyor
+
+---
+
 ## Sürüm 0.11.2 — ne değişti
 
 - telefonda yükleme iki yerde kapıda düşüyordu — seçici süzgeci ve MIME

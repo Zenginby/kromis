@@ -259,7 +259,8 @@ gerçek cihazda ölçülebilir.
 | Sunucu ayağa kalkıyor mu | Logcat'te `uvicorn hazır: port=…`, WebView'de arayüz |
 | `import pydantic` | CI kapısı yeşil (`_paket-android.yml` → *pydantic APK'ya girdi mi*) |
 | Uçtan uca üretim | Azure kimliğini gir → görsel üret → galeride gör → logo bindir → indir |
-| Dosya yükleme | Referans görsel ekle (`onShowFileChooser`) |
+| Dosya yükleme | Referans görsel ekle (`onShowFileChooser`) — TEK seçim yolu, `getData()` |
+| **Çoklu seçim** | Kütüphane → "+ Logo yükle" → galeriden seç → **"Bitti"** → dosya gerçekten yüklenmeli. Bu yol `getData()` DEĞİL `ClipData` döndürüyor (`secilenDosyalar`); tek seçim yolunun çalışması bunu kanıtlamıyor — kusur tam olarak bu boşlukta bir sürüm yaşadı |
 | Kütüphaneye yükleme | Kütüphane → "+ Logo yükle" → seçicide **.jpg** bir dosya seçilebiliyor olmalı (intent'in süzgeci kabul listesinin tamamını taşıyor mu) → yüklenen logo bindirme panelinde görünmeli |
 | Türü bildirilmeyen dosya | Aynı yükleme "Son kullanılanlar"/İndirilenler üzerinden: MIME'ı boş gelen dosya da kabul edilmeli (`isAcceptedUpload`) |
 | İndirme | PNG → `Resimler/Lumeo`, klasör ZIP → `İndirilenler/Lumeo`; ZIP adı klasörün ADI olmalı (`download.zip` değil) |

@@ -1,7 +1,9 @@
 # Görev defteri — sıradaki adımlar
 
 **Tarih:** 28 Ağustos 2026 · **Son dal:** `claude/review-work-and-graphs-2z1yjh`
-**Bugünkü ölçüm:** `APP_VERSION` **0.11.5** (sonrakini CI yazıyor),
+(PR #61 ile `main`'e BİRLEŞTİ — dal bu noktadan sonra `main`'in gerisinde;
+yeni oturum kendi dalını `main`'den kurmalı)
+**Bugünkü ölçüm:** `APP_VERSION` **0.11.6** (Tur I+J birleşince CI yazdı),
 `pytest tests/ -q` → **1847 geçti / 10 atlandı** (CI'ın gördüğü sayı; Playwright
 kuruluyken 1854 geçti / 9 atlandı — E2E dosyası artık atlanmıyor)
 **Defterin açılış ölçümü** (Tur A öncesi): `APP_VERSION` 0.7.0 → 1613 geçti / 10 atlandı
@@ -145,6 +147,12 @@ komuttan önce çözülüyor, üç platformda aynı). Yanına da o sessiz hâlin
 eklendi: koşu `diff kurulamadı` yazdıysa test artık kazara geçmek yerine
 bunu söylüyor. **Ölçüldü:** sahte `git` devre dışı bırakıldığında eskiden 5
 test kırmızıydı, şimdi **13** — sekiz sessiz yeşil artık sesli.
+
+**TESLİM EDİLDİ:** PR #61 (üç commit: `60440da` Tur I · `0081056` Tur J ·
+`cc774e2` sentetik koşunun Windows kusuru) yedi kontrolün yedisi de yeşilken
+birleşti; yayın hattı `v0.11.6`'yı kendisi yazdı. Yani Tur H'de kanıtlanan
+"merge → yayın" zinciri ikinci kez ve bu kez sızıntı taraması da hattayken
+yürüdü.
 
 > **Bu turun kendi CI koşusu üç paketi de derleyecek** — `.github/workflows/`
 > altına dokunuyor (gitleaks işi oraya girdi). Tur I'de daraltılan kapı
@@ -1018,14 +1026,50 @@ gösteriyor, bugünküyle eşleşmek zorunda değil. Maddenin kimliği numarası
 BAŞLIĞI; kapanan madde de silinmiyor, ait olduğu turun kutusunda kanıtıyla
 duruyor.
 
-> **SIRADAKİ TUR: 1. madde** (arama, klasör zincirini eşleştirmiyor). Tur J
-> ile 1+2+3 kapandı; sıra kullanıcı değiştirmedikçe kuyruğun başından devam
-> ediyor. 2. madde (güncelleme kontrolü) bir DAĞITIM kararına bağlı ve karar
-> alındı: depo **şimdilik private, ileride public** — yani madde silinmiyor,
-> "public'e dönene kadar kullanıcı kırık bir güncelleme kontrolü taşıyor mu"
-> sorusu ölçülmeyi bekliyor.
+> **SIRADAKİ TUR: 1. madde** — logo önizlemesi kare olmayan görselde eksik
+> görünüyor. Kuyruğun başına o alındı çünkü kaynağı ötekilerden farklı:
+> **kullanıcı bunu kullanırken gördü** (28 Ağustos), yani varlığı hakkında
+> okuma değil kullanım kanıtı var. 2. madde (arama/klasör zinciri) hemen
+> ardından geliyor.
+>
+> 3. madde (güncelleme kontrolü) bir DAĞITIM kararına bağlı ve karar alındı:
+> depo **şimdilik private, ileride public** — madde silinmiyor, "public'e
+> dönene kadar kullanıcı kırık bir güncelleme kontrolü taşıyor mu" sorusu
+> ölçülmeyi bekliyor.
 
-### 1. Arama, klasör adını yalnız EN YAKIN klasörde eşleştiriyor · **S**
+### 1. Logo bindirmede kare OLMAYAN görselde önizleme eksik görünüyor · **S**
+**Kullanıcı bildirdi (28 Ağustos):** "Logo ekleme kısmında görsel kare değilse
+görselin aşağı veya yan kısımlarındaki logo ekleme önizlemesi gözükmüyor."
+Yani 9'lu ızgarada alt/yan bir konum seçildiğinde logo önizlemede görünmüyor.
+
+**HENÜZ ÖLÇÜLMEDİ.** Bu defterin kuralı gereği düzeltme, hangi katmanın
+suçlu olduğu ölçülmeden yazılmaz. Kod okunarak iki aday çıkarıldı ve ikisini
+AYIRAN ölçüm de belli:
+
+* **(a) İstemci — görüntüleme kırpması.** `.logo-preview-wrap` (style.css)
+  `overflow: hidden` + `place-items: center` taşıyor; `.logo-preview-img` ise
+  `max-width: 100%` ve `max-height: min(72vh, 680px)` ile sınırlı. Görsel kabı
+  aşarsa merkezleme taşmayı İKİ UÇTAN birden yapar ve `overflow: hidden` orayı
+  keser — tam da "aşağı ve yan kısımlar" tarifi.
+* **(b) Sunucu — yerleşim aritmetiği.** `composite.paste_position` /
+  `composite_logo`: `margin_px = int(base.width * margin)` kenar boşluğunu
+  YALNIZ genişlikten hesaplıyor ve aynı değeri dikeyde de kullanıyor (satırda
+  bilinçli olduğunu söyleyen bir yorum var). Kare olmayan oranda dikey boşluk
+  orantısız çıkıyor.
+
+**AYIRAN ÖLÇÜM (tek adım):** önizleme ile uygulama AYNI `_composite_logo`
+yolundan geçiyor (`/api/logo/preview` ile `/api/logo` aynı işlevi çağırıyor,
+app.py). O hâlde logo gerçekten görüntünün dışına düşüyorsa KAYDEDİLEN dosyada
+da eksik olur. Kare olmayan bir görselde alt-orta konumla bir kez uygulayıp
+çıktıya bakmak (a) ile (b)'yi tek hamlede ayırır: çıktı doğruysa kusur
+istemcide, çıktı da eksikse sunucuda.
+- [ ] **Kabul:** önce ayıran ölçüm, sonra düzeltme; kare olmayan bir görselde
+      dokuz konumun DOKUZU da önizlemede görünüyor ve önizleme uygulanan
+      çıktıyla birebir aynı şeyi gösteriyor. Bekçisi bir test (istemci
+      katmanıysa `tests/test_index.py`/E2E, sunucu katmanıysa
+      `tests/test_composite.py` — oran testi kare olmayan boyutla).
+
+### 2. Arama, klasör adını yalnız EN YAKIN klasörde eşleştiriyor · **S**
 Tur G'nin künye işinin arama tarafı; aynı turda kod okunurken çıktı.
 `matchesSearch` (folders.js) yalnız `folder.name`e bakıyor, zincire değil.
 Kullanıcı "Kampanyalar" yazınca o klasörün ALTINDAKİ görseller çıkmıyor — oysa
@@ -1035,7 +1079,7 @@ değiştirir ve kendi ölçümünü ister (kaç sonuç, hangi kapsamda, kapsam s
 - [ ] **Kabul:** iç içe klasörde üst klasörün adı aratıldığında alt klasördeki
       görseller de geliyor; kapsam sayaçları buna göre.
 
-### 2. Uygulama içi güncelleme kontrolü deponun PUBLIC olduğunu varsayıyor · **S**
+### 3. Uygulama içi güncelleme kontrolü deponun PUBLIC olduğunu varsayıyor · **S**
 Tur I'de kapının gerekçesi düzeltilirken çıktı: `guncelleme.py`'nin başlığı
 "Depo public olduğu için uç nokta anonim çalışıyor — pakete gömülmüş bir token
 YOK ve olmamalı" diyor ve modül `api.github.com/repos/…/releases/latest`i
@@ -1068,7 +1112,7 @@ kontrol "bakılamadı" durumunu Ayarlar'da görünür kılsın yeter.
       döndüğünde aynı ölçüm 200'e dönerek gerekçeyi doğrular — pakete token
       GÖMÜLMEZ (o kural durur).
 
-### 3. Wheel'in elle bakım yolu hâlâ varlık kotasına bağlı · **S**
+### 4. Wheel'in elle bakım yolu hâlâ varlık kotasına bağlı · **S**
 Tur H'nin bıraktığı uç. Yayın yolunda tek bir `upload-artifact` kalmadı ama
 `build-pydantic-core-android.yml`deki teslim adımı duruyor (`varlik_yukle`
 bayrağı — Yol A: bakımcı workflow'u elle tetikleyip wheel'i indiriyor ve
@@ -1080,13 +1124,13 @@ güncellendiği gün.
       ya da wheel bir taslak yayına yükleniyor; her iki hâlde de kota doluyken
       Yol A yürüyor.
 
-### 4. Sonuç kartında "Düzenle" / "+ Ek" (K14) · **M**
+### 5. Sonuç kartında "Düzenle" / "+ Ek" (K14) · **M**
 Karar "tam bir geçmiş kaydı ister" diye ertelenmişti; döküm bugün yalnız
 `image_id` taşıyor. Kart eylemleri için kaydın kendisi lazım.
 - [ ] **Kabul:** sonuç kartından doğrudan düzenlemeye/ek referansa geçilebiliyor
       ve silinmiş görselde yer tutucu davranışı bozulmuyor.
 
-### 5. Ayarlar'da canlı bağlantı testi düğmeleri · **M**
+### 6. Ayarlar'da canlı bağlantı testi düğmeleri · **M**
 README Faz 2'nin son açık maddesi. Bugünkü karşılık yalnız "anahtar kayıtlı mı"
 listesi; gerçek bir çağrı denemesi yok.
 - [ ] Sağlayıcı başına küçük bir uç (`POST /api/settings/test`?) + düğme;
@@ -1094,7 +1138,7 @@ listesi; gerçek bir çağrı denemesi yok.
 - **Kabul:** yanlış anahtarda anlaşılır Türkçe hata, doğru anahtarda "bağlantı
       kuruldu"; anahtar yanıtta HİÇ yankılanmıyor (write-only sözleşmesi).
 
-### 6. Yerel sağlayıcı adaptörleri: ComfyUI · Ollama · **L**
+### 7. Yerel sağlayıcı adaptörleri: ComfyUI · Ollama · **L**
 Anahtar/adres alanları v0.2.0'dan beri kayıtlı, **adaptör ve arayüz yok**
 (`azure_client.get_settings_status` yalnız durum bayrağı döndürüyor).
 - [ ] `providers._ADAPTERS`'a iki adaptör, katalogda modeller, Ayarlar'da
@@ -1102,48 +1146,48 @@ Anahtar/adres alanları v0.2.0'dan beri kayıtlı, **adaptör ve arayüz yok**
 - **Kabul:** yerel bir kurulumla üretim yapılabiliyor; sağlayıcı düşükken hata
       Türkçe ve anlaşılır.
 
-### 7. fal.ai · Replicate adaptörleri · **L**
+### 8. fal.ai · Replicate adaptörleri · **L**
 Aynı boşluğun bulut yarısı; ikisi de **kuyruklu** akış (`providers`'ın zaman
 aşımı politikası bunu zaten öngörüyor: "adet başına ayrı istek atan sağlayıcı").
 - [ ] **Kabul:** kuyruk beklerken arayüz ilerleme gösteriyor, zaman aşımı
       sağlayıcıya göre çözülüyor (`tests/test_providers.py`'nin deseni).
 
-### 8. Maske tuvali / bölgesel düzenleme · **L**
+### 9. Maske tuvali / bölgesel düzenleme · **L**
 Master spec Faz 1'in açık yarısı: bugünkü `/api/edit` tüm görsel üzerinden
 çalışıyor, `mask` alanı yok.
 - [ ] Fırça/silgi HTML5 Canvas + `mask` alanının adaptör sözleşmesine girmesi
       (Azure ve OpenAI destekliyor; Gemini'de karşılığı farklı).
 - **Kabul:** maskelenen bölge dışında piksel değişmiyor (golden fixture).
 
-### 9. Stil çipleri · stil şablonları · tipografi katmanı · **M**
+### 10. Stil çipleri · stil şablonları · tipografi katmanı · **M**
 Faz 2'nin açık yarısı. Hazır stil çipleri (*Anime*, *Cyberpunk*, *Cinematic*,
 *Pixel Art*, *3D Render*) prompt'a eklenen jetonlar; tipografi katmanı
 bindirmenin metin tarafı.
 - [ ] **Kabul:** çip seçimi prompt'a görünür biçimde giriyor ve geri alınabiliyor.
 
-### 10. Özel araçlar: Upscaler · Product-in-Hand · **L**
+### 11. Özel araçlar: Upscaler · Product-in-Hand · **L**
 README Faz 3. Upscaler bir sağlayıcı yeteneği; Product-in-Hand bir prompt
 şablonu + referans akışı.
 - [ ] **Kabul:** her ikisi kendi kredi etiketiyle katalogda.
 
-### 11. Image-to-Video motoru · **L**
+### 12. Image-to-Video motoru · **L**
 README Faz 4 (master spec Faz 3'ün video payı). Yeni bir medya TÜRÜ: depo,
 küçük resim, büyüteç ve indirme yolları video tanımıyor.
 - [ ] **Kabul:** üretilen video kayıtta, galeride oynatılabiliyor, indirilebiliyor.
 
-### 12. i18n (TR/EN) · **M**
+### 13. i18n (TR/EN) · **M**
 Arayüz metinleri bugün HTML/JS içinde birebir Türkçe; sözlük katmanı yok.
 - [ ] **Kabul:** dil anahtarı `prefs.json`'a yazılıyor, iki dilde de 360px'de
       taşma yok (İngilizce metinler daha uzun).
 
-### 13. SaaS dönüşümü · **XL**
+### 14. SaaS dönüşümü · **XL**
 Kendi tasarım belgesi var: `docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md`
 (Faz 5). Kredi tarifesi katalogda **metadata olarak** hazır; ledger, hesaplar,
 depolama, ödeme ve filigran açık.
 - [ ] **Kabul:** o belgenin kendi kabul ölçütleri; buraya alınmadan önce ayrı
       bir uygulama planı yazılır.
 
-### 14. PWA · iOS · **L**
+### 15. PWA · iOS · **L**
 Android teslim (Chaquopy APK); PWA'nın service worker/manifest'i ve iOS yok.
 - [ ] **Kabul:** çevrimdışı açılış ve "ana ekrana ekle" akışı çalışıyor.
 

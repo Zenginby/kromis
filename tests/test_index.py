@@ -2880,12 +2880,110 @@ def test_adding_an_extra_does_not_disable_the_button_under_the_focus():
     diyaloğun başından Tab. `#picker-note` `role="status"` olduğu için ONAY
     duyuluyordu; kaybolan şey YER.
     """
-    govde = _balanced_body(_picker_js(), '$("picker-use-extra").addEventListener')
-    assert "activeElement" in govde, "odak devri düşünülmemiş"
+    picker = _picker_js()
+    govde = _balanced_body(picker, '$("picker-use-extra").addEventListener')
     assert 'picker-use-ref").focus()' not in govde, (
         "odak turu BİTİREN düğmeye veriliyor: ikinci Space seçiciyi kapatırdı")
-    assert "picker-tile" in govde and "pickerSelectedId" in govde, (
+    assert re.search(r"pickerKaro\(pickerSelectedId\)", govde), (
         "odak seçili karoya değil rastgele bir düğüme veriliyor")
+    # Arayıcının kendisi de mandallı: dolaylılık iddiayı zayıflatmasın.
+    # `_balanced_body` BURADA KULLANILAMAZ ve sebebi ölçüldü: ok işlevinin
+    # gövdesi süslü açmıyor, yardımcının bulduğu ilk `{` şablon dizesinin
+    # içindeki `${id}` oluyor ve iddia `"{id}"` üzerinde koşuyordu.
+    arayici = re.search(r"const pickerKaro = .*?;", picker, re.S)
+    assert arayici, "ortak karo arayıcı yok"
+    assert ".picker-tile[data-id=" in arayici.group(0), (
+        "karo arayıcı karoyu id'sinden bulmuyor")
+
+    # SIRA: `activeElement` MUTASYONDAN ÖNCE okunmalı. `addGalleryExtra` kendi
+    # yüzeyini yeniden çiziyor (`renderSource`); odağı taşıyan bir kabı yıkarsa
+    # sonradan yapılan okuma sessizce `false` döner ve düzeltme HATASIZCA
+    # buharlaşır — mandal da bunu göremezdi, çünkü dizeler yerinde kalırdı.
+    i_oku, i_ekle = govde.find("activeElement"), govde.find("addGalleryExtra(")
+    assert -1 < i_oku < i_ekle, (
+        "odak, ekleme DOM'u değiştirdikten sonra okunuyor: iade sessizce ölür")
+
+
+def test_closing_the_picker_hands_focus_back_to_whatever_opened_it():
+    """Aynı kusurun DÖRDÜNCÜ örneği — ve en sık yürünen yolu.
+
+    `$("media-picker").hidden = true` odaklı karoyu `display: none` yapıyor,
+    yani Escape ya da × ile kapatan klavye kullanıcısının odağı `<body>`ye
+    düşüyordu. **ÖLÇÜLDÜ (360×780):** karoya odaklanıp Escape'e basınca
+    `document.activeElement.tagName === "BODY"` — kullanıcı sayfanın başından
+    Tab'lamak zorunda kalıyordu.
+
+    Desen `core.js`in `dialogPrevFocus`'u: açan düğüm açılışta tutuluyor,
+    kapanışta `isConnected` muhafızıyla geri veriliyor.
+
+    "Referans yap" dalı iadeyi KAPATIYOR ve bu bilinçli: `setGallerySource`
+    odağı `#prompt`a taşıyor (B7'nin yazılı kararı), iade açık kalsaydı odak
+    önce (+) düğmesine dönüp hemen composer'a sıçrardı ve ekran okuyucuya iki
+    ayrı yer duyurulurdu. İddia bu asimetriyi de tutuyor.
+    """
+    picker = _picker_js()
+    ac = _balanced_body(picker, "async function openPicker()")
+    assert "document.activeElement" in ac, "açan düğüm hiç tutulmuyor"
+
+    kapat = _balanced_body(picker, "function closePicker(")
+    assert ".focus()" in kapat, "kapanışta odak iade edilmiyor"
+    # İDDİA VARLIĞA DEĞİL ULAŞILABİLİRLİĞE bakıyor: `if (false) …focus()`
+    # mutasyonu `".focus()" in kapat` iddiasını HAYATTA BIRAKIYORDU (ölçüldü,
+    # mutasyon turunda kaçtı). İadenin kapısı, işlevin KENDİ parametresi olmalı.
+    kapi = re.search(r"function closePicker\((\w+)", picker)
+    assert kapi, "kapanışın iade anahtarı bir parametre değil"
+    assert re.search(rf"\b{kapi.group(1)}\b", kapat), (
+        "iade parametresi gövdede hiç okunmuyor: kapı sabite bağlanmış")
+
+    # `isConnected` TEK BAŞINA YETMİYOR ve bu ölçüldü: açan düğme (+) menüsünün
+    # içinde (`#media-pick-btn`) ve o menü seçici açılırken kapanıyor. Düğüm
+    # DOM'da duruyor — `isConnected` true — ama `[hidden]` bir kabın içinde
+    # olduğu için `.focus()` SESSİZCE hiçbir şey yapmıyor. İlk yazım tam olarak
+    # bu yüzden işe yaramadı: Escape ölçümü hâlâ `BODY` diyordu.
+    hedef = _balanced_body(picker, "function pickerOdakHedefi()")
+    assert "isConnected" in hedef, "kopmuş düğüme odak veriliyor"
+    assert "[hidden]" in hedef, (
+        "görünmez bir kabın içindeki düğme hedef sayılıyor: `.focus()` sessizce "
+        "hiçbir şey yapar ve odak `<body>`de kalır")
+    assert "plus-btn" in hedef, "görünür bir yedek hedef yok"
+
+    ref = _balanced_body(picker, '$("picker-use-ref").addEventListener')
+    assert re.search(r"closePicker\(\s*false\s*\)", ref), (
+        "Referans yap iadeyi kapatmıyor: odak (+) düğmesine dönüp hemen "
+        "#prompt'a sıçrar, ekran okuyucuya iki yer duyurulur")
+
+
+def test_rebuilding_the_grid_also_hands_focus_back():
+    """Izgaranın YENİDEN KURULDUĞU yollar da odağı düşürüyordu.
+
+    Seçim artık oraya uğramıyor, ama arama, kapsam değişimi ve `openPicker`'ın
+    bekleyen `loadAllImages` yanıtı hâlâ `grid.innerHTML = ""` yapıyor.
+    Sonuncusu en sinsisi: `openPicker` `pickerImages`i temizlemiyor, yani bayat
+    liste HEMEN boyanıyor; kullanıcı bir karoya geçiyor ve yanıt gelince ızgara
+    altından siliniyor.
+
+    İddia yine SIRAYA bakıyor: yıkımdan SONRA okunan bir `activeElement` zaten
+    `<body>` olur ve iade sessizce ölür.
+    """
+    izgara = _balanced_body(_picker_js(), "function renderPickerGrid(")
+    i_oku, i_yik, i_ver = (izgara.find("activeElement"),
+                           izgara.find('innerHTML = ""'), izgara.rfind(".focus()"))
+    assert -1 < i_oku < i_yik < i_ver, (
+        "odak kimliği yıkımdan SONRA okunuyor ya da iade hiç yok")
+    assert "closest(" in izgara, (
+        "odak IZGARADA mıydı sorulmuyor: arama kutusuna yazanın odağı her "
+        "tuşta çalınır")
+    # Sıra tek başına YETMİYOR: `if (false)` mutasyonu üç dizeyi de yerinde
+    # bırakıyor ve iddia hayatta kalıyordu (ölçüldü). Yıkımdan ÖNCE yakalanan
+    # kimlik, yıkımdan SONRA gerçekten okunmalı.
+    yakala = re.search(r"const (\w+)\s*=\s*[^;]*closest\([^;]*dataset\.id[^;]*;",
+                       izgara, re.S)
+    assert yakala, "odak kimliği yıkımdan önce yakalanmıyor"
+    # Kimliğin yıkımdan sonra GEÇMESİ de yetmiyor: `if (false) { pickerKaro(odakId) }`
+    # mutasyonu onu da hayatta bırakıyordu (ölçüldü). İADENİN KAPISI o kimlik olmalı.
+    assert re.search(rf"if\s*\(\s*{yakala.group(1)}\s*\)", izgara[i_yik:]), (
+        "iade yakalanan kimliğe değil başka bir koşula bağlanmış: sabit bir "
+        "koşul iadeyi sessizce öldürür")
 
 
 def test_the_tile_caption_names_the_whole_chain_without_burying_the_leaf():
@@ -2918,8 +3016,16 @@ def test_the_tile_caption_names_the_whole_chain_without_burying_the_leaf():
     kap = re.search(r'kap\.className = (\w+)', dugum)
     assert kap, "kapsayıcının sınıfı çağırandan gelmiyor"
     izgara = _balanced_body(_picker_js(), "function renderPickerGrid(")
-    assert 'klasorZinciriDugumu(rec.folder_id, "picker-cap-folder")' in izgara, (
+    assert re.search(
+        r'klasorZinciriDugumu\(rec\.folder_id,\s*"picker-cap-folder"', izgara), (
         "künye ortak zincir düğümünden geçmiyor")
+    # Zincir karo başına BİR kez yürünüyor: `folderPath` klasör başına doğrusal
+    # `find` yapıyor ve ızgara her tuş vuruşunda yeniden kuruluyor, yani ikinci
+    # bir yürüyüş her karo için bedava değil.
+    assert izgara.count("folderPathParts(") == 1, (
+        "zincir karo başına birden çok kez yürünüyor")
+    assert "pickerFolderLabel(rec.folder_id)" not in izgara, (
+        "ipucu zinciri İKİNCİ kez yürüyor: aynı parçalardan üretilmeli")
     assert not re.search(r"folder\s*\?\s*folder\.name", izgara), (
         "künye hâlâ EN YAKIN klasörü tek başına yazıyor")
 
@@ -2931,16 +3037,30 @@ def test_the_tile_caption_names_the_whole_chain_without_burying_the_leaf():
         assert "text-overflow: ellipsis" in kural, f".{ad} kırpılmıyor"
         assert "overflow: hidden" in kural, f".{ad} taşmayı gizlemiyor"
 
-    assert re.search(r"min-width:\s*0", ust_k), (
-        "esnek öğenin otomatik en küçük boyu min-content: onsuz üst zincir HİÇ "
-        "daralmaz ve satır taşar")
-    esneme = re.search(r"flex:\s*([^;]+);", yaprak_k)
-    assert esneme and esneme.group(1).strip() == "none", (
-        f"yaprak daralıyor ({esneme and esneme.group(1)}): uzun bir üst zincir "
-        "yaprağı da kırpar, künye bugünkünden kötü olur")
-    assert re.search(r"max-width:\s*100%", yaprak_k), (
-        "daralmayan yaprak kutusunu taşırıyor: `.picker-tile`ın "
-        "`overflow: hidden`ı onu ÜÇ NOKTASIZ, sert bir kenardan keser")
+    def _daralma(kural):
+        m = re.search(r"flex:\s*(\S+)\s+(\S+)\s+([^;]+);", kural)
+        assert m, f"flex kısa biçimi üç değerli yazılmamış: {kural.strip()!r}"
+        return float(m.group(2))
+
+    # 1) SIRA: yer önce ÜST zincirden alınıyor.
+    assert _daralma(ust_k) > _daralma(yaprak_k), (
+        "üst zincir yapraktan daha hızlı daralmıyor: uzun bir üst zincir "
+        "yaprağı da kırpar ve künye bugünkünden ('Bayram') kötü olur")
+
+    # 2) TABAN: üst zincir SIFIRA inemez. Bu satır bir inceleme bulgusundan
+    #    geldi ve ölçüldü — `min-width: 0` iken uzun yapraklı bir zincir üst
+    #    kutuyu 0px'e indiriyordu; 0px'te `text-overflow` boyayacak yer
+    #    bulamıyor, yani ÜÇ NOKTA DA çıkmıyor ve künye sahipsiz bir
+    #    " / Ramazan Bayrami…" oluyordu. `text-overflow: ellipsis`in VARLIĞINI
+    #    sınamak yetmiyor: boyanabilmesi de gerekiyor.
+    taban = re.search(r"min-width:\s*([\d.]+)(\w*)", ust_k)
+    assert taban and float(taban.group(1)) > 0, (
+        "üst zincirin daralma tabanı yok: sıfıra inince üç nokta da kaybolur "
+        "ve künye baştaki ayraçla sahipsiz kalır")
+
+    # 3) Yaprak DARALABİLİR olmalı: sıra üste dayandığında kırpılacak olan o.
+    assert re.search(r"min-width:\s*0", yaprak_k), (
+        "yaprak daralamıyor: üst zincir tabanına dayandığında satır taşar")
     bosluk = re.search(r"white-space:\s*([\w-]+)", yaprak_k)
     assert bosluk and bosluk.group(1) == "pre", (
         f"ayracın baştaki boşluğu kırpılıyor ({bosluk and bosluk.group(1)}): "
@@ -2964,13 +3084,25 @@ def test_both_folder_captions_go_through_the_same_chain_node():
     """
     js = _folders_js()
     galeri = _render_gallery_body()
-    assert 'klasorZinciriDugumu(rec.folder_id, "card-badge card-where")' in galeri, (
+    assert re.search(
+        r'klasorZinciriDugumu\(rec\.folder_id,\s*"card-badge card-where"', galeri), (
         "arama rozeti zinciri yazmıyor")
     assert not re.search(r"where\.textContent\s*=", galeri), (
         "rozet hâlâ düz metin yazıyor")
     assert js.count("klasorZinciriDugumu(") == 3, (
         "künye düğümünün tanımı + iki çağıranı: üçüncü bir yüzey eklendiyse "
         "iddia da genişletilmeli")
+
+    # ROZET EKRAN OKUYUCUYA DA ULAŞIYOR. Kırpmayı CSS'e vermenin yazılı
+    # gerekçesi "ekran okuyucu zinciri tam duyar" — ama kart AÇIK bir
+    # `aria-label` taşıyor ve açık etiket, içindeki metnin erişilebilir ada
+    # katılmasını ENGELLİYOR. Yani bu yüzeyde gerekçe doğru değildi ve rozet
+    # hiç kimseye okunmuyordu: inceleme bulgusu, mandalı bu.
+    etiket = re.search(r'card\.setAttribute\("aria-label",(.*?)\);', galeri, re.S)
+    assert etiket, "kartın erişilebilir adı yok"
+    assert "kartYolu" in etiket.group(1), (
+        "zincir erişilebilir ada girmiyor: açık aria-label rozetin metnini "
+        "erişilebilirlik ağacından düşürüyor")
 
 
 def test_the_picker_has_no_hidden_button_clicks():
@@ -3331,12 +3463,20 @@ def test_the_picker_labels_folders_with_a_string_not_the_breadcrumb_array():
 
     picker = _picker_js()
     assert "pickerFolderLabel" in picker, "klasör etiketi tek yerden üretilmiyor"
-    etiket = _balanced_body(js, "const pickerFolderLabel =")
-    assert "folderPathParts(" in etiket, (
+    assert "klasorZinciriEtiketi(folderPathParts(" in js, (
         "etiket zinciri kendi başına birleştiriyor: ayraç ikizlenir")
-    for m in re.finditer(r"folderPath\([^)]*\)(.{0,8})", picker):
-        assert m.group(1).lstrip().startswith(".map("), (
-            "folderPath'in DİZİSİ doğrudan etikete veriliyor → [object Object]")
+
+    # AYRACIN TEK KOPYASI. İlk yazımda sabit tanıtılmış ama kırıntı başlığı ile
+    # taşıma listesi kendi `join(" / ")`ünü yazmaya devam ediyordu — yani sabitin
+    # yorumu ("üç yüzey aynı yazımı kullanmak zorunda") DOĞRU DEĞİLDİ ve hiçbir
+    # mandal bunu göstermiyordu. İnceleme bulgusu; iddia o boşluğu kapatıyor.
+    assert js.count('" / "') == 1, (
+        "ayraç ikinci kez satır içi yazılmış: biri değişirse aynı klasör iki "
+        "yüzeyde iki farklı adla görünür")
+
+    # ÖLÜ DÖNGÜ KALDIRILDI: buradaki `folderPath(...)` taraması seçici diliminde
+    # SIFIR eşleşme buluyordu (tek çağrı `folderPathParts`, deseni tutmuyor).
+    # Yukarıdaki `folderPathParts` iddiası aynı türü ondan daha sıkı koruyor.
 
 
 def test_set_gallery_source_by_id_switches_section_to_studio():

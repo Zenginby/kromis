@@ -2,7 +2,7 @@
 
 **Tarih:** 28 Ağustos 2026 · **Son dal:** `claude/next-task-plan-fxqy2d`
 **Bugünkü ölçüm:** `APP_VERSION` **0.11.4** (sonrakini CI yazıyor),
-`pytest tests/ -q` → **1796 geçti / 10 atlandı**
+`pytest tests/ -q` → **1798 geçti / 10 atlandı**
 **Defterin açılış ölçümü** (Tur A öncesi): `APP_VERSION` 0.7.0 → 1613 geçti / 10 atlandı
 (atlananlar her üç ölçümde de yalnız Windows'a özgü DACL testleri + kurulu
 olmayan Playwright)
@@ -121,7 +121,7 @@ kusurun başka yüzeydeki kopyası, üçü de ölçüldü.
       `folderPathParts`e çevrildi. ("Her `folderPath(...)` çağrısının ardından
       `.map(` gelmeli" iddiası dosya geneline AÇILAMAZDI: dört çağrıdan biri
       diziyi meşru olarak bir değişkene alıyor.)
-- [x] **Kanıt:** takım **1789 → 1796 geçti / 10 atlandı** (7 yeni mandal:
+- [x] **Kanıt (inceleme öncesi):** takım **1789 → 1796 geçti / 10 atlandı** (7 yeni mandal:
       `test_index.py`'de altı, `test_mobile.py`'de yerleşim mandalı).
       **Yirmi mutasyon, yirmisi de KIRMIZI** — geri alma `git checkout --` ile
       DEĞİL scratchpad kopyalarından (Tur B'nin kaydettiği tuzak) ve betik
@@ -134,6 +134,67 @@ kusurun başka yüzeydeki kopyası, üçü de ölçüldü.
       `"renderPickerGrid(" not in govde` idi ve mutasyon **2**'de hayatta
       kalırdı — `renderMediaPicker()` de aynı yıkımı yapıyor. §0.6/§0.7/§0.9'un
       "iddia kodu arar, kelimeyi değil" dersinin yedinci kurbanı.
+
+### İnceleme turu — beş gerçek bulgu, biri turun KENDİ kusuruydu
+
+Kod incelemesi on iki bulgu getirdi; hepsi kaynağa bakılarak doğrulandı, beşi
+ölçülerek kapatıldı, kalanlar (ölü bildirimler, dolaylılık, tek yürüyüş) aynı
+turda temizlendi.
+
+- [x] **Üst zincir SIFIRA iniyordu — bu turun kendi kusuru.** İlk yazımda yaprak
+      `flex: none`, üst zincir `min-width: 0` idi. **Ölçüldü:** uzun yapraklı bir
+      zincirde ("Kampanyalar / Bayram / Ramazan Bayrami 2026") üst kutu **0px**
+      oluyor; 0px'te `text-overflow` boyayacak yer bulamıyor, yani ÜÇ NOKTA DA
+      çıkmıyor ve künye ekranda sahipsiz bir " / Ramazan Bayrami…" hâline
+      geliyordu. Yani turun kendi vaadi ("üst zincir eriyor, yaprak duruyor")
+      yalnız KISA yapraklarda doğruydu. Daralma artık sıralı ve TABANLI: üst
+      zincirin ağırlığı yaprağın yüz katı ama `min-width: 2.5ch`, yaprak da
+      `min-width: 0` ile daralabiliyor. **Ölçüldü (sonra):** üst kutu 16.5px,
+      görünür ve kırpılmış; satır taşması 0.
+      *Ders:* mandal `text-overflow: ellipsis`in VARLIĞINI sınıyordu;
+      boyanabilmesini sınamıyordu.
+- [x] **Odak kusurunun DÖRDÜNCÜSÜ: seçici kapanışı.** `hidden = true` odaklı
+      karoyu `display: none` yapıyor. **Ölçüldü:** Escape'ten sonra
+      `activeElement` `<body>`. `core.js`in `dialogPrevFocus` deseni geldi —
+      ama **ilk yazım işe yaramadı ve sebebi ölçüldü:** açan düğme
+      (`#media-pick-btn`) (+) menüsünün İÇİNDE ve o menü seçici açılırken
+      kapanıyor; düğüm DOM'da (`isConnected` true) ama `[hidden]` bir kabın
+      içinde, yani `.focus()` SESSİZCE hiçbir şey yapıyor. Hedef artık
+      görünürlüğe göre seçiliyor, görünmezse menüyü açan `#plus-btn`e dönülüyor.
+      **Ölçüldü (sonra):** iki genişlikte de odak `#plus-btn`.
+      "Referans yap" dalı iadeyi bilerek KAPATIYOR (o yol odağı `#prompt`a
+      taşıyor); asimetri mandallı.
+- [x] **Izgaranın yeniden kurulduğu yollar açıkta kalmıştı.** Seçim artık oraya
+      uğramıyor ama arama, kapsam değişimi ve `openPicker`'ın bekleyen
+      `loadAllImages` yanıtı hâlâ `innerHTML = ""` yapıyor. Sonuncusu en sinsisi:
+      `openPicker` `pickerImages`i temizlemiyor, yani bayat liste HEMEN
+      boyanıyor, kullanıcı bir karoya geçiyor ve yanıt gelince ızgara altından
+      siliniyor. `renderPickerNav`ın iadesi buraya da geldi.
+- [x] **Arama rozeti EKRAN OKUYUCUYA ulaşmıyordu.** Kırpmayı CSS'e vermenin
+      yazılı gerekçesi "ekran okuyucu zinciri tam duyar" idi; bu yüzeyde DOĞRU
+      DEĞİLDİ, çünkü kart açık bir `aria-label` taşıyor ve açık etiket
+      içindeki metnin erişilebilir ada katılmasını engelliyor. Zincir artık
+      `aria-label`ın kendisine giriyor.
+- [x] **Ayracın "tek sabit" iddiası doğru DEĞİLDİ.** `KLASOR_AYRACI` tanıtılmıştı
+      ama kırıntı başlığı ile taşıma listesi kendi `join(" / ")`ünü yazmaya devam
+      ediyordu — yani sabitin yorumu üç yüzeyi anlatırken kod ikisini dışarıda
+      bırakıyordu. İkisi de ortak etikete bağlandı; dosyada `" / "` artık **bir**
+      kez geçiyor ve bir mandal ikinciyi yasaklıyor. (Kuyruğun 2. maddesi bu
+      turda kapandı.)
+- [x] **Kaynak deseninin göremediği kusuru gerçek tarayıcı yakaladı.** Rozet
+      düzeltmesinin ilk yazımında `let kartYolu` erişilebilir addan SONRA
+      duruyordu; `let`in ölü bölgesi yüzünden `renderGallery` daha ilk kartta
+      `ReferenceError` atıyor ve galeri HİÇ çizilmiyordu. Bütün kaynak mandalları
+      yeşildi; `test_playwright_studio.py` kırmızıya döndü. Ölçümün neden bu
+      defterin standardı olduğunun tazelenmiş kanıtı.
+- [x] **Mutasyon turunda İKİ mandal kaçtı ve ikisi de kelime aramasıydı** —
+      §0.6'nın dersi bu turda sekizinci ve dokuzuncu kez. `if (false) …focus()`
+      mutasyonu `".focus()" in govde` iddiasını hayatta bırakıyordu; iddia artık
+      iadenin KAPISINA bakıyor (kapı, yıkımdan önce yakalanan kimliğin ya da
+      işlevin kendi parametresinin ta kendisi olmalı).
+- [x] **Kanıt:** takım **1796 → 1805 geçti / 9 atlandı** (Playwright kurulu;
+      CI koşulunda 1798 / 10). Mandal sayısı 7 → 9. **Otuz mutasyon, otuzu da
+      kırmızı.**
 
 **Tarayıcı ölçümü** (Chromium 1194; 12 görsel, 4 klasör, biri üç seviyeli):
 
@@ -627,16 +688,7 @@ değiştirir ve kendi ölçümünü ister (kaç sonuç, hangi kapsamda, kapsam s
 - [ ] **Kabul:** iç içe klasörde üst klasörün adı aratıldığında alt klasördeki
       görseller de geliyor; kapsam sayaçları buna göre.
 
-### 2. Zincir etiketi iki yerde hâlâ satır içi kuruluyor · **S**
-Tur G ayracı `KLASOR_AYRACI` sabitine aldı ve künye ile `pickerFolderLabel` oradan
-besleniyor, ama kırıntı başlığı ile taşıma listesinin `<option>` döngüsü hâlâ
-kendi `join(" / ")`ünü yazıyor. Bugün üçü de aynı dizeyi kullanıyor; biri
-değişirse aynı klasör iki yüzeyde iki farklı adla görünür ve hiçbir mandal bunu
-göstermez.
-- [ ] **Kabul:** ayracı yazan tek yer kalıyor; bir mandal ikinci bir literali
-      yasaklıyor.
-
-### 3. `#picker-empty` her tuş vuruşunda yeniden duyuruyor OLABİLİR · **S**
+### 2. `#picker-empty` her tuş vuruşunda yeniden duyuruyor OLABİLİR · **S**
 Kap `role="status"` taşıyor ve `renderPickerGrid` `textContent`i KOŞULSUZ yeniden
 atıyor — dize değişmese bile. `textContent` ataması metin düğümünü değiştiriyor,
 yani sonuçsuz bir aramada altı karakter yazmak "Sonuç bulunamadı"yı altı kez
@@ -645,27 +697,27 @@ olarak burada duruyor: ekran okuyucuların tekilleştirmesi araca göre değişi
 Kanıtsız düzeltme, bu defterin kabul etmediği şey.
 - [ ] **Kabul:** önce ölçüm; gerçekse atama yalnız değişiklik olduğunda yapılıyor.
 
-### 4. `uploads` varlık türü ölü ama duruyor · **S**
+### 3. `uploads` varlık türü ölü ama duruyor · **S**
 Tur F'in bıraktığı uç: `assets_store.KINDS` hâlâ taşıyor, hiçbir şey yazmıyor,
 hiçbir sekme göstermiyor. Eskiden yazılmış varlıklar "Tümü" altında görünüp
 silinebilsin diye tür kaldırılmadı.
 - [ ] **Kabul:** ya gerçek bir göç (varlıklar `logos`a taşınıyor) ya da türün
       kaldırılması; ikisi de eski kurulumları kaybetmeden.
 
-### 5. Sonuç kartında "Düzenle" / "+ Ek" (K14) · **M**
+### 4. Sonuç kartında "Düzenle" / "+ Ek" (K14) · **M**
 Karar "tam bir geçmiş kaydı ister" diye ertelenmişti; döküm bugün yalnız
 `image_id` taşıyor. Kart eylemleri için kaydın kendisi lazım.
 - [ ] **Kabul:** sonuç kartından doğrudan düzenlemeye/ek referansa geçilebiliyor
       ve silinmiş görselde yer tutucu davranışı bozulmuyor.
 
-### 6. `gitleaks` işi CI'da · **S**
+### 5. `gitleaks` işi CI'da · **S**
 Adım 1 planının tek açık maddesi: geçmiş taramasının kaydı yok.
 - [ ] `.github/workflows/ci.yml`'e bir iş; `credentials.env` deseni ve test
       sabitleri için allowlist gerekiyor (`tests/test_errlog.py` sahte anahtar
       taşıyor).
 - **Kabul:** iş yeşil koşuyor ve gerçek bir sızıntı denemesinde kırmızıya dönüyor.
 
-### 7. Ayarlar'da canlı bağlantı testi düğmeleri · **M**
+### 6. Ayarlar'da canlı bağlantı testi düğmeleri · **M**
 README Faz 2'nin son açık maddesi. Bugünkü karşılık yalnız "anahtar kayıtlı mı"
 listesi; gerçek bir çağrı denemesi yok.
 - [ ] Sağlayıcı başına küçük bir uç (`POST /api/settings/test`?) + düğme;
@@ -673,7 +725,7 @@ listesi; gerçek bir çağrı denemesi yok.
 - **Kabul:** yanlış anahtarda anlaşılır Türkçe hata, doğru anahtarda "bağlantı
       kuruldu"; anahtar yanıtta HİÇ yankılanmıyor (write-only sözleşmesi).
 
-### 8. Yerel sağlayıcı adaptörleri: ComfyUI · Ollama · **L**
+### 7. Yerel sağlayıcı adaptörleri: ComfyUI · Ollama · **L**
 Anahtar/adres alanları v0.2.0'dan beri kayıtlı, **adaptör ve arayüz yok**
 (`azure_client.get_settings_status` yalnız durum bayrağı döndürüyor).
 - [ ] `providers._ADAPTERS`'a iki adaptör, katalogda modeller, Ayarlar'da
@@ -681,48 +733,48 @@ Anahtar/adres alanları v0.2.0'dan beri kayıtlı, **adaptör ve arayüz yok**
 - **Kabul:** yerel bir kurulumla üretim yapılabiliyor; sağlayıcı düşükken hata
       Türkçe ve anlaşılır.
 
-### 9. fal.ai · Replicate adaptörleri · **L**
+### 8. fal.ai · Replicate adaptörleri · **L**
 Aynı boşluğun bulut yarısı; ikisi de **kuyruklu** akış (`providers`'ın zaman
 aşımı politikası bunu zaten öngörüyor: "adet başına ayrı istek atan sağlayıcı").
 - [ ] **Kabul:** kuyruk beklerken arayüz ilerleme gösteriyor, zaman aşımı
       sağlayıcıya göre çözülüyor (`tests/test_providers.py`'nin deseni).
 
-### 10. Maske tuvali / bölgesel düzenleme · **L**
+### 9. Maske tuvali / bölgesel düzenleme · **L**
 Master spec Faz 1'in açık yarısı: bugünkü `/api/edit` tüm görsel üzerinden
 çalışıyor, `mask` alanı yok.
 - [ ] Fırça/silgi HTML5 Canvas + `mask` alanının adaptör sözleşmesine girmesi
       (Azure ve OpenAI destekliyor; Gemini'de karşılığı farklı).
 - **Kabul:** maskelenen bölge dışında piksel değişmiyor (golden fixture).
 
-### 11. Stil çipleri · stil şablonları · tipografi katmanı · **M**
+### 10. Stil çipleri · stil şablonları · tipografi katmanı · **M**
 Faz 2'nin açık yarısı. Hazır stil çipleri (*Anime*, *Cyberpunk*, *Cinematic*,
 *Pixel Art*, *3D Render*) prompt'a eklenen jetonlar; tipografi katmanı
 bindirmenin metin tarafı.
 - [ ] **Kabul:** çip seçimi prompt'a görünür biçimde giriyor ve geri alınabiliyor.
 
-### 12. Özel araçlar: Upscaler · Product-in-Hand · **L**
+### 11. Özel araçlar: Upscaler · Product-in-Hand · **L**
 README Faz 3. Upscaler bir sağlayıcı yeteneği; Product-in-Hand bir prompt
 şablonu + referans akışı.
 - [ ] **Kabul:** her ikisi kendi kredi etiketiyle katalogda.
 
-### 13. Image-to-Video motoru · **L**
+### 12. Image-to-Video motoru · **L**
 README Faz 4 (master spec Faz 3'ün video payı). Yeni bir medya TÜRÜ: depo,
 küçük resim, büyüteç ve indirme yolları video tanımıyor.
 - [ ] **Kabul:** üretilen video kayıtta, galeride oynatılabiliyor, indirilebiliyor.
 
-### 14. i18n (TR/EN) · **M**
+### 13. i18n (TR/EN) · **M**
 Arayüz metinleri bugün HTML/JS içinde birebir Türkçe; sözlük katmanı yok.
 - [ ] **Kabul:** dil anahtarı `prefs.json`'a yazılıyor, iki dilde de 360px'de
       taşma yok (İngilizce metinler daha uzun).
 
-### 15. SaaS dönüşümü · **XL**
+### 14. SaaS dönüşümü · **XL**
 Kendi tasarım belgesi var: `docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md`
 (Faz 5). Kredi tarifesi katalogda **metadata olarak** hazır; ledger, hesaplar,
 depolama, ödeme ve filigran açık.
 - [ ] **Kabul:** o belgenin kendi kabul ölçütleri; buraya alınmadan önce ayrı
       bir uygulama planı yazılır.
 
-### 16. PWA · iOS · **L**
+### 15. PWA · iOS · **L**
 Android teslim (Chaquopy APK); PWA'nın service worker/manifest'i ve iOS yok.
 - [ ] **Kabul:** çevrimdışı açılış ve "ana ekrana ekle" akışı çalışıyor.
 

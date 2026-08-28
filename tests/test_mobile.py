@@ -291,11 +291,16 @@ def test_the_folder_chain_truncation_is_not_phone_only(istemci):
     (Chromium 1194) 360px'te 104px, 1024px'te 106px. `minmax(96px, 1fr)` karoyu
     zaten oraya çiviliyor, yani künye kutusu masaüstünde daha rahat DEĞİL.
     """
-    mobil = _mobil_yerlesim(_metin(istemci, "/static/mobile.css"))
+    # TÜM `mobile.css` taranıyor, YALNIZ 768px bloğu değil — inceleme bulgusu:
+    # `_mobil_yerlesim` yalnız o sorguyu topluyor, oysa dosyada
+    # `@media (hover: none)` ve `@media (max-width: 560px)` blokları da var.
+    # Kuralı 560px'e taşıyan mutasyon, dar iddia altında HAYATTA KALIRDI ve
+    # docstring'in anlattığı masaüstü kırılması aynen olurdu.
+    mobil = re.sub(r"/\*.*?\*/", "", _metin(istemci, "/static/mobile.css"), flags=re.S)
     genel = re.sub(r"/\*.*?\*/", "", _metin(istemci, "/static/style.css"), flags=re.S)
     for secici in (".picker-cap-folder", ".zincir-ust", ".zincir-yaprak"):
         assert secici not in mobil, (
-            f"{secici} kuralı telefon sorgusuna kaçmış: masaüstünde kırpma ölür")
+            f"{secici} kuralı telefon katmanına kaçmış: masaüstünde kırpma ölür")
         assert secici in genel, f"{secici} kuralı her genişliğe koşan katmanda yok"
 
 

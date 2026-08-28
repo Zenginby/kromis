@@ -1540,8 +1540,12 @@ body.select-mode #select-toggle,
 }
 /* Arama sonucunun klasör künyesi (§4.1): sol ALT köşe — sol üst içe-aktarma
    rozetinin / seçim kutusunun, sağ alt hover eylemlerinin. */
+/* Kırpma bildirimleri BURADA DEĞİL çocuklarda: kap artık esnek kutu
+   (`.picker-cap-folder, .card-where` kuralı) ve kendi satır kutusu yok, yani
+   buradaki `text-overflow` hiçbir şey boyamazdı. `overflow: hidden` duruyor —
+   çocukların taşmasını kap kesiyor. */
 .card-where { top: auto; bottom: 6px; max-width: calc(100% - 12px);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  overflow: hidden; }
 /* Eylemler sürekli görünür bir alt şerit DEĞİL: Flow medya kartında hover ya
    da odakta beliren yüzen satır (tasarım §6 "hover'da açılan eylem satırı").
    :focus-within şart — klavyeyle düğmeye sekince satır görünür kalır.
@@ -1690,19 +1694,26 @@ body.select-mode #select-toggle,
    Kurallar bu dosyada, `mobile.css`te DEĞİL: kırpma her genişlikte doğru
    davranış (masaüstünde karo ~107px, yani kutu 360px'tekinden büyük değil).
 
-   İki bildirim yükü taşıyor ve ikisi de silinemez:
-   · `.zincir-ust`ta `min-width: 0` — esnek öğenin otomatik en küçük boyu
-     min-content'tir, yani onsuz üst zincir HİÇ daralmaz ve satır taşar.
-   · `.zincir-yaprak`ta `max-width: 100%` — `flex: none` daralmadığı için tek
-     başına uzun bir yaprak kutuyu taşırırdı ve `.picker-tile`ın
-     `overflow: hidden`ı onu ÜÇ NOKTASIZ, sert bir kenardan keserdi. */
+   Daralma SIRALI, ikisi de daralabilir: üst zincirin daralma ağırlığı yaprağın
+   yüz katı, yani yer önce ondan alınıyor. AMA üst zincir sıfıra İNEMEZ ve bu
+   satır bir inceleme bulgusundan geldi — ölçüldü: `min-width: 0` + yaprakta
+   `flex: none` iken uzun yapraklı bir zincir ("Kampanyalar / Bayram /
+   Ramazan Bayrami 2026") üst kutuyu **0px**'e indiriyordu. 0px'te
+   `text-overflow` boyayacak yer bulamıyor, yani üç nokta da çıkmıyor ve künye
+   ekranda sahipsiz bir " / Ramazan Bayrami…" oluyordu: kullanıcı baştaki
+   ayracın neyin ayracı olduğunu göremiyordu.
+
+   `min-width: 2.5ch` üst zincire her zaman "K…" kadar yer bırakıyor; yaprak da
+   `min-width: 0` ile daralabildiği için sıra üste dayandığında YAPRAK kırpılıyor
+   ve satır yine taşmıyor. Yaprakta ayrı bir `max-width` GEREKMİYOR — daralabilen
+   bir öğe kabına zaten sığıyor. */
 .picker-cap-folder, .card-where { display: flex; }
 .zincir-ust {
-  flex: 0 1 auto; min-width: 0;
+  flex: 0 100 auto; min-width: 2.5ch;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .zincir-yaprak {
-  flex: none; max-width: 100%;
+  flex: 0 1 auto; min-width: 0;
   overflow: hidden; text-overflow: ellipsis;
   /* `nowrap` DEĞİL `pre`: her esnek öğe kendi satır kutusunu açıyor ve satır
      başındaki boşluk `normal`/`nowrap` altında ATILIYOR — ayraç yaprakla

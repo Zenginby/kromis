@@ -150,6 +150,13 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.11.5 — ne değişti
+
+- İnceleme düzeltmeleri (seçici): üst zincir sıfırlanıyordu, kapanışta odak düşüyordu, rozet ekran okuyucuya ulaşmıyordu
+- klavye kullanıcısı seçim yapınca yerini kaybediyordu; künye iç içe klasörün tam yolunu yazıyor
+
+---
+
 ## Sürüm 0.11.4 — ne değişti
 
 - büyeteçte "Logo ekle" yok, klasöre aktarma iki yerde kırık

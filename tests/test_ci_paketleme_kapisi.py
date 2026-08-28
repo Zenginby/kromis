@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 import shutil
 import subprocess
 
@@ -222,32 +223,47 @@ def _kapsami_kos(tmp_path, degisen: list[str], etiketler: str = "",
                  git_duser: bool = False):
     """Kapsam betiğini sentetik bir diff ile koşturur → (dönüş kodu, karar, çıktı).
 
-    `git`, PATH'in başına konan sahte bir betikle değiştiriliyor: gerçek bir depo
-    kurup merge commit üretmek yerine diff'in ÇIKTISI doğrudan veriliyor. Ölçülen
-    şey zaten diff değil, ondan çıkan karar.
+    Gerçek bir depo kurup merge commit üretmek yerine diff'in ÇIKTISI doğrudan
+    veriliyor: ölçülen şey zaten diff değil, ondan çıkan karar.
+
+    `git` bir KABUK İŞLEVİYLE değiştiriliyor, PATH'in başına konan sahte bir
+    betikle DEĞİL. Sebebi ölçüldü, tahmin edilmedi: PATH yolu Linux'ta
+    çalışıyordu, Windows'ta çalışmıyordu. Git Bash komut ararken uzantısız
+    `git` dosyasını atlayıp gerçek `git.exe`i buluyor; betik depo OLMAYAN bir
+    dizinde `git diff` koşuyor ("Not a git repository"), düşüyor ve kapı
+    GÜVENLİ TARAFA düşüyor. Bedeli iki katmanlı ve ikincisi sinsi: `hayir`
+    bekleyen beş test kırmızıya düşüyordu (Windows paketleme işi 60440da'da
+    tam olarak bunu gösterdi), `evet` bekleyenler ise DOĞRU SEBEPLE DEĞİL
+    kazara geçiyordu — yani o platformda test hiçbir şey ölçmüyordu.
+
+    Kabuk işlevi harici komuttan önce çözüldüğü için üç platformda da aynı
+    şeyi ölçüyor. Aşağıdaki `diff kurulamadı` iddiası da o sessiz hâlin
+    kapısı: sahte `git` bir gün yine devreye girmezse test artık kazara
+    geçmek yerine bunu SÖYLÜYOR.
     """
-    kutu = tmp_path / "bin"
-    kutu.mkdir()
-    sahte = kutu / "git"
-    sahte.write_text(
-        "#!/bin/sh\n" + ("exit 1\n" if git_duser
-                         else "".join(f"echo '{y}'\n" for y in degisen)),
-        encoding="utf-8", newline="\n")
-    sahte.chmod(0o755)
+    if git_duser:
+        onek = "git() { return 1; }\n"
+    else:
+        onek = ("git() { printf '%s\\n' "
+                + " ".join(shlex.quote(y) for y in degisen) + "; }\n")
 
     cikti = tmp_path / "github_output"
     cikti.write_text("", encoding="utf-8")
-    ortam = dict(os.environ, PATH=f"{kutu}{os.pathsep}{os.environ['PATH']}",
-                 GITHUB_OUTPUT=str(cikti), ETIKETLER=etiketler)
+    ortam = dict(os.environ, GITHUB_OUTPUT=str(cikti), ETIKETLER=etiketler)
     with open(CI_YML, encoding="utf-8") as f:
         betik = _bak_adimi(yaml.safe_load(f))["run"]
-    p = subprocess.run([BASH, "-c", betik], cwd=tmp_path, env=ortam, text=True,
-                       encoding="utf-8", capture_output=True)
+    p = subprocess.run([BASH, "-c", onek + betik], cwd=tmp_path, env=ortam,
+                       text=True, encoding="utf-8", capture_output=True)
     karar = ""
     for satir in cikti.read_text(encoding="utf-8").splitlines():
         if satir.startswith("paketle="):
             karar = satir.split("=", 1)[1]
-    return p.returncode, karar, p.stdout + p.stderr
+    tumu = p.stdout + p.stderr
+    if not git_duser:
+        assert "diff kurulamadı" not in tumu, (
+            "sahte `git` devreye girmemiş: karar sentetik diff'ten değil "
+            f"gerçek `git`ten geliyor — bu koşu hiçbir şey ölçmüyor.\n{tumu}")
+    return p.returncode, karar, tumu
 
 
 @bash_gerekli

@@ -128,6 +128,24 @@ kırmızı. Maliyet gerekçesi burada bağlamıyor (Tur I'in aksine): iş ubuntu
   dönmesi.
 * Graflar aynı commit'te yenilendi; `tools/graf_uret.py --kontrol` yeşil.
 
+### Turun kendi kusuru: sentetik koşu Windows'ta hiçbir şey ölçmüyordu
+
+Tur I'in en iyi parçası "kapının kararı ilk kez ölçülüyor"du; o ölçüm **yalnız
+Linux'ta** ölçüyordu. Windows paketleme işi `60440da`'da kırmızıya döndü ve
+sebebi testin kendisiydi: sahte `git` PATH'in başına uzantısız bir betik olarak
+konuyordu, Git Bash komut ararken onu atlayıp gerçek `git.exe`i buluyor, betik
+depo OLMAYAN bir dizinde `git diff` koşuyor ve kapı güvenli tarafa düşüyordu.
+
+Bedeli iki katmanlı ve ikincisi sinsi: `hayir` bekleyen beş test kırmızıya
+düşüyordu (görünen yarı), `evet` bekleyen sekizi ise **doğru sebeple değil
+kazara** geçiyordu — yani o platformda testin ölçtüğü hiçbir şey yoktu.
+
+Düzeltme sahte `git`i PATH yerine bir **kabuk işlevine** taşıyor (harici
+komuttan önce çözülüyor, üç platformda aynı). Yanına da o sessiz hâlin kapısı
+eklendi: koşu `diff kurulamadı` yazdıysa test artık kazara geçmek yerine
+bunu söylüyor. **Ölçüldü:** sahte `git` devre dışı bırakıldığında eskiden 5
+test kırmızıydı, şimdi **13** — sekiz sessiz yeşil artık sesli.
+
 > **Bu turun kendi CI koşusu üç paketi de derleyecek** — `.github/workflows/`
 > altına dokunuyor (gitleaks işi oraya girdi). Tur I'de daraltılan kapı
 > bozulmadı; kapının kararı `tests/test_ci_paketleme_kapisi.py`de sentetik

@@ -150,6 +150,13 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.11.6 — ne değişti
+
+- kapının sentetik koşusu Windows'ta hiçbir şey ölçmüyordu
+- üç küçük borç, üçü de ölçülerek kapandı
+
+---
+
 ## Sürüm 0.11.5 — ne değişti
 
 - İnceleme düzeltmeleri (seçici): üst zincir sıfırlanıyordu, kapanışta odak düşüyordu, rozet ekran okuyucuya ulaşmıyordu

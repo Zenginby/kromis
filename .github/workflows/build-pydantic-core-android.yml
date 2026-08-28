@@ -67,6 +67,25 @@ on:
         type: string
         required: false
         default: ''
+      varlik_yukle:
+        description: "true → wheel Actions VARLIĞI olarak da yüklenir"
+        type: boolean
+        required: false
+        default: true
+
+    # Çağıran wheel'i ÖNBELLEKTEN alıyor, varlıktan değil. Bunun için anahtarı
+    # ve kaynağı bilmesi gerekiyor — ikisini de burada üretiyoruz, yoksa çivi
+    # çözme mantığı çağıranda ikinci kez yazılırdı ve ayrışırdı.
+    outputs:
+      anahtar:
+        description: "Wheel'in önbellek anahtarı"
+        value: ${{ jobs.build-wheel.outputs.anahtar }}
+      kaynak:
+        description: "repo | önbellek | derleme"
+        value: ${{ jobs.build-wheel.outputs.kaynak }}
+      ad:
+        description: "Wheel dosya adı"
+        value: ${{ jobs.build-wheel.outputs.ad }}
 
 permissions:
   contents: read
@@ -76,6 +95,10 @@ jobs:
     name: pydantic-core → android_arm64_v8a
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    outputs:
+      anahtar: ${{ steps.pin.outputs.anahtar }}
+      kaynak: ${{ steps.gerek.outputs.kaynak }}
+      ad: ${{ steps.pin.outputs.ad }}
 
     steps:
       - uses: actions/checkout@v4
@@ -105,6 +128,11 @@ jobs:
           echo "api=$API"    >> "$GITHUB_OUTPUT"
           echo "cp=$CP"      >> "$GITHUB_OUTPUT"
           echo "ad=pydantic_core-$CORE-$CP-$CP-android_${API}_arm64_v8a.whl" >> "$GITHUB_OUTPUT"
+          # Önbellek anahtarı BURADA kuruluyor, geri yükleme adımının içinde
+          # değil: aynı anahtarı çağıran iş de (`_paket-android.yml`) okuyor ve
+          # iki yerde ayrı ayrı yazılsaydı sessizce ayrışabilirdi — wheel
+          # bulunamaz, hata da Chaquopy pip çıktısının içinde kaybolurdu.
+          echo "anahtar=pydantic-core-$CORE-$CP-android$API-arm64_v8a" >> "$GITHUB_OUTPUT"
           echo "pydantic-core=$CORE, python=$PY ($CP), android API=$API"
 
       # ── Derlemeden KAÇINMANIN iki yolu ──────────────────────────────
@@ -138,7 +166,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: cikti
-          key: pydantic-core-${{ steps.pin.outputs.core }}-${{ steps.pin.outputs.cp }}-android${{ steps.pin.outputs.api }}-arm64_v8a
+          key: ${{ steps.pin.outputs.anahtar }}
 
       - name: Derleme gerekiyor mu
         id: gerek
@@ -317,12 +345,19 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: cikti
-          key: ${{ steps.onbellek.outputs.cache-primary-key }}
+          key: ${{ steps.pin.outputs.anahtar }}
 
-      # Varlık HER durumda yükleniyor — kaynağı repo, önbellek ya da yeni
-      # derleme olsun. _paket-android.yml bu workflow'u bir iş olarak çağırıp
-      # varlığı indiriyor, yani yükleme onun için de tek teslim yolu.
+      # Varlık YALNIZCA elle tetiklenen akış için yükleniyor (Yol A: bakımcı
+      # wheel'i indirip `android/wheels/` altına işliyor).
+      #
+      # `_paket-android.yml` bu workflow'u bir iş olarak çağırdığında
+      # `varlik_yukle: false` geçiyor ve wheel'i ÖNBELLEKTEN alıyor. Sebebi
+      # ölçülü: 2026-08-28'de Actions varlık kotası doldu ve yayın hattı,
+      # paketlerin hepsi hatasız derlenmiş olmasına rağmen teslim edilemediği
+      # için günlerce kırmızı kaldı. Önbellek AYRI ve ücretsiz bir havuz (depo
+      # başına 10 GB, LRU), yani bu teslim yolu kotaya hiç dokunmuyor.
       - name: Wheel'i yükle (varlık olarak)
+        if: inputs.varlik_yukle
         uses: actions/upload-artifact@v4
         with:
           name: pydantic-core-android-arm64

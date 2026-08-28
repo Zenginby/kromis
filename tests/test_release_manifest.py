@@ -48,6 +48,44 @@ def yayin_yml() -> dict:
     return _yaml(YAYIN_YML)
 
 
+def _kod(adim: dict) -> str:
+    """Adımın `run` betiği — kabuk YORUMLARI ayıklanmış.
+
+    Gerekiyor çünkü bu deponun yorumları kaldırılan komutu tırnak içinde
+    anlatıyor; "şu komut şurada geçiyor" iddiaları anlatıyı da yakalardı.
+    §Yazı geleneği: iddia kodu arar, kelimeyi değil.
+    """
+    return "\n".join(
+        s for s in str(adim.get("run") or "").splitlines()
+        if not s.lstrip().startswith("#")
+    )
+
+
+def _adimlar(yol: str):
+    for is_adi, is_ in (_yaml(yol).get("jobs") or {}).items():
+        for adim in (is_.get("steps") or []):
+            if isinstance(adim, dict):
+                yield is_adi, adim
+
+
+def _teslim_adimlari(workflow: str) -> list[dict]:
+    """Paketi yerine ULAŞTIRAN adımlar: taslak yayına yükleyenler."""
+    return [a for _, a in _adimlar(os.path.join(IS_AKISLARI, workflow))
+            if "gh release upload" in _kod(a)]
+
+
+def _teslim_komutlari(workflow: str) -> list[str]:
+    """Yalnız `gh release upload` SATIRLARI — adımın tamamı değil.
+
+    Adımın tamamına bakan bir iddia yeterli DEĞİL ve bu ölçüldü: teslim adımı
+    sonunda dosya adını yazan bir `echo` taşıyor, yani komuttaki adı bozan bir
+    mutasyon "ad adımda geçiyor" iddiasını hayatta bırakıyordu. Mandal
+    ANLATIYI değil komutu doğrulamalı — deponun altı kez kaydettiği tuzak.
+    """
+    return [s for a in _teslim_adimlari(workflow)
+            for s in _kod(a).splitlines() if "gh release upload" in s]
+
+
 # --------------------------------------------------------------------------
 # Manifestin kendi sözleşmesi
 # --------------------------------------------------------------------------
@@ -108,65 +146,117 @@ def test_her_paket_isi_kendi_workflowunu_cagiriyor(yayin_yml: dict):
 
 
 @pytest.mark.parametrize("ad", sorted(release_manifest.PAKETLER))
-def test_workflow_varligi_manifestteki_adla_yukluyor(ad: str):
-    """Çağrılabilir workflow, varlığı manifestteki DOSYA ADIYLA yüklemeli.
+def test_workflow_delivers_the_asset_under_the_name_the_manifest_expects(ad: str):
+    """Çağrılabilir workflow, paketi manifestteki DOSYA ADIYLA teslim etmeli.
 
-    Ad kayarsa yayın işi paketi indirir ama küme denetimi onu tanımaz — ve o
+    Ad kayarsa taslak dolar ama `yayinla`nın küme denetimi onu tanımaz — ve o
     kırılma ancak gerçek bir yayın koşusunda, dakikalar sonra görünürdü.
+
+    Teslim yolu 2026-08-28'de değişti (Actions varlığı → taslak yayın), iddia
+    da onunla taşındı: bakılan yer `upload-artifact`in `path:`i değil, `gh
+    release upload` çağrısının kendisi.
     """
     kayit = release_manifest.PAKETLER[ad]
     yol = os.path.join(IS_AKISLARI, kayit["workflow"])
     assert os.path.exists(yol), f"{kayit['workflow']} yok ({ad} için)"
 
-    veri = _yaml(yol)
-    yollar = []
-    for isim, is_ in veri["jobs"].items():
-        for adim in is_.get("steps", []) or []:
-            if str(adim.get("uses", "")).startswith("actions/upload-artifact"):
-                yollar.append(adim.get("with", {}).get("path", ""))
-    assert yollar, f"{kayit['workflow']} hiç artifact yüklemiyor"
-    assert any(str(p).endswith(ad) for p in yollar), (
-        f"{kayit['workflow']} varlığı {yollar} yoluyla yüklüyor, "
-        f"manifest {ad!r} bekliyor"
+    komutlar = _teslim_komutlari(kayit["workflow"])
+    assert komutlar, f"{kayit['workflow']} paketi hiçbir yere teslim etmiyor"
+    assert any(ad in s for s in komutlar), (
+        f"{kayit['workflow']} teslim KOMUTU {ad!r} yüklemiyor: {komutlar}"
     )
 
 
 @pytest.mark.parametrize("ad", sorted(release_manifest.PAKETLER))
-def test_workflow_bos_yuklemeye_karsi_korumali(ad: str):
-    """`if-no-files-found: error` olmadan boş bir yükleme işi YEŞİL bırakır.
+def test_a_missing_package_turns_the_delivery_red_instead_of_green(ad: str):
+    """"Yeşil ama boş" 2026-08-11'de gerçekten oldu: koşu yeşildi, çıktı boştu.
 
-    2026-08-11'de tam olarak bu oldu: koşu yeşildi, çıktı boştu. Kapı üç
-    workflow'da da duruyor; buradaki iddia dördüncü platform eklendiğinde
-    unutulmasını engelliyor.
+    Eski teslim yolunda kapı `if-no-files-found: error` bayrağıydı. Yeni yolda
+    kapı kabuğun kendisi: `gh release upload` var olmayan dosyada sıfırdan
+    farklı çıkıyor ve `set -euo pipefail` onu adımın kırmızısına çeviriyor.
+    Bayraksız bir `gh` çağrısı gibi, `set -e`siz bir betik de sessizce
+    geçerdi — iddia o yüzden bayrağın değil KAPININ yerinde durduğunu ölçüyor.
     """
-    veri = _yaml(os.path.join(IS_AKISLARI, release_manifest.PAKETLER[ad]["workflow"]))
-    for is_ in veri["jobs"].values():
-        for adim in is_.get("steps", []) or []:
-            if str(adim.get("uses", "")).startswith("actions/upload-artifact"):
-                assert adim.get("with", {}).get("if-no-files-found") == "error", (
-                    f"{ad}: upload-artifact adımında if-no-files-found: error yok"
-                )
+    workflow = release_manifest.PAKETLER[ad]["workflow"]
+    for adim in _teslim_adimlari(workflow):
+        kod = _kod(adim)
+        assert "set -euo pipefail" in kod, (
+            f"{workflow}: teslim adımı `set -euo pipefail` olmadan koşuyor — "
+            "eksik dosya adımı kırmızıya düşürmez"
+        )
+        # Kabuk da iddianın parçası ve bu ÖLÇÜLDÜ: Windows runner'ında `run:`
+        # varsayılanı pwsh, orada `set -euo pipefail` bir komut bile değil —
+        # yani yukarıdaki iddia doğru görünüp hiçbir şey korumazdı.
+        assert adim.get("shell") == "bash", (
+            f"{workflow}: teslim adımı kabuğunu açıkça yazmıyor "
+            f"({adim.get('shell')!r}) — `set -euo pipefail` her runner'da "
+            "aynı şeyi yapmıyor"
+        )
 
 
-def test_yayini_yalnizca_tek_is_olusturuyor():
+def test_the_release_path_never_touches_artifact_storage():
+    """Yayın, ÜCRETSİZ OLMAYAN bir kaynağa bağlı kalmamalı.
+
+    2026-08-28: Actions varlık kotası doldu; üç paket de hatasız DERLENDİ ve
+    DOĞRULANDI ama teslim edilemedikleri için yayın çıkmadı. Kota boşaltıldıktan
+    sonra bile sayaç saatlerce dolu kaldı, yani "biraz yer aç" bir çözüm
+    değildi. Yayın varlıkları (Releases altındakiler) o kotaya HİÇ girmiyor;
+    kırılgan olan tek şey aradaki ara kopyaydı.
+
+    Bu iddia o kopyanın geri gelmesini yasaklıyor: yayın yolundaki hiçbir
+    workflow varlık yüklemiyor ya da indirmiyor.
+    """
+    yayin_yolu = ["release.yml"] + [k["workflow"] for k in release_manifest.PAKETLER.values()]
+    for workflow in yayin_yolu:
+        for is_adi, adim in _adimlar(os.path.join(IS_AKISLARI, workflow)):
+            eylem = str(adim.get("uses") or "")
+            assert not eylem.startswith(("actions/upload-artifact",
+                                         "actions/download-artifact")), (
+                f"{workflow}:{is_adi} varlık deposuna dokunuyor ({eylem}) — "
+                "yayın yolu 2026-08-28'de tam olarak bu yüzden kırıldı"
+            )
+
+
+def test_the_wheel_is_delivered_without_an_artifact_too():
+    """Wheel 1.8 MB'dı ve yayını yine de kırdı: kota dolunca boyut önemsiz.
+
+    `_paket-android.yml` wheel workflow'unu bir iş olarak çağırıyor ve wheel'i
+    ÖNBELLEKTEN alıyor (ayrı, ücretsiz havuz). Varlık yüklemesi yalnız elle
+    tetiklenen Yol A akışı için duruyor, o yüzden çağrıda açıkça kapatılıyor —
+    bayrak unutulursa yayın yolu sessizce varlık deposuna geri döner.
+    """
+    veri = _yaml(os.path.join(IS_AKISLARI, "_paket-android.yml"))
+    cagrilar = [i for i in veri["jobs"].values()
+                if "build-pydantic-core-android.yml" in str(i.get("uses", ""))]
+    assert len(cagrilar) == 1, "wheel workflow'u tam bir kez çağrılmalı"
+    assert (cagrilar[0].get("with") or {}).get("varlik_yukle") is False, (
+        "_paket-android.yml wheel'i varlık olarak yükletmeye devam ediyor"
+    )
+
+
+def test_only_one_job_may_turn_the_draft_into_a_release():
     """Yayına YAZAN iş bir taneden fazla olamaz.
 
-    v0.4.2'de iki workflow aynı tag'e yazdı: APK'lı yayın 16:15:29'da yayımlandı,
-    masaüstü zip'leri 16:17:04'te eklendi — arada ~95 saniye eksik bir yayın
-    canlıydı ve masaüstü işi kırmızıya düşseydi öyle kalırdı. İkinci bir yazıcı
-    geri gelirse bu iddia onu yakalar.
+    v0.4.2'de iki workflow aynı tag'e yazdı: APK'lı yayın 16:15:29'da
+    yayımlandı, masaüstü zip'leri 16:17:04'te eklendi — arada ~95 saniye eksik
+    bir yayın CANLIYDI ve masaüstü işi kırmızıya düşseydi öyle kalırdı.
+
+    Teslim yolu 2026-08-28'de taslak yayına döndü, yani artık ÜÇ iş aynı yayın
+    kaydına yazıyor. Güvence bozulmuyor çünkü yazdıkları şey TASLAK: kullanıcıya
+    görünmüyor, tag'i bile yok. Kritik olan tek an, taslağı yayına çeviren
+    an — ve iddia tam olarak onu sayıyor, yüklemeleri değil.
     """
-    yazicilar = []
+    yayimlayanlar = []
     for dosya in sorted(os.listdir(IS_AKISLARI)):
         if not dosya.endswith((".yml", ".yaml")):
             continue
-        veri = _yaml(os.path.join(IS_AKISLARI, dosya))
-        for is_adi, is_ in (veri.get("jobs") or {}).items():
-            for adim in is_.get("steps", []) or []:
-                if "action-gh-release" in str(adim.get("uses", "")):
-                    yazicilar.append(f"{dosya}:{is_adi}")
-    assert yazicilar == ["release.yml:yayinla"], (
-        f"yayına yazan iş(ler): {yazicilar} — tek yazıcı olmalı"
+        for is_adi, adim in _adimlar(os.path.join(IS_AKISLARI, dosya)):
+            yayimlar = ("--draft=false" in _kod(adim)
+                        or "action-gh-release" in str(adim.get("uses", "")))
+            if yayimlar:
+                yayimlayanlar.append(f"{dosya}:{is_adi}")
+    assert yayimlayanlar == ["release.yml:yayinla"], (
+        f"yayına çeviren iş(ler): {yayimlayanlar} — tek yazıcı olmalı"
     )
 
 
@@ -297,3 +387,75 @@ def test_guncelleme_en_ustteki_surum_bolumu_guncel():
     assert ust == version.APP_VERSION, (
         f"GUNCELLEME.md en üstte {ust!r} anlatıyor, version.py {version.APP_VERSION!r}"
     )
+
+
+# --------------------------------------------------------------------------
+# Yayın kapısının KENDİSİ — gömülü betik, sentetik girdiyle
+# --------------------------------------------------------------------------
+
+def _kume_denetimi_betigi() -> str:
+    """`yayinla` işindeki küme denetiminin gömülü Python'ı.
+
+    Betik YALNIZCA gerçek bir yayın koşusunda çalışıyor, yani bir kusuru ancak
+    sürüm harcayarak öğrenirdik — bu dosyanın `test_eksikler_…` testiyle aynı
+    gerekçe, bir kat daha derinde: orada kütüphane işlevi sınanıyor, burada
+    YAML'a gömülü olan ve `release_manifest`i gerçekten çağıran betiğin ta
+    kendisi. TSV ayrıştırması da o betikte yaşıyor ve başka hiçbir yerde
+    sınanmıyordu.
+    """
+    for _, adim in _adimlar(YAYIN_YML):
+        kod = _kod(adim)
+        if "python - <<'PY'" not in kod:
+            continue
+        govde = kod.split("python - <<'PY'", 1)[1]
+        return govde.split("\nPY", 1)[0]
+    raise AssertionError("yayinla işinde gömülü küme denetimi betiği yok")
+
+
+def _kapiyi_kos(tmp_path, satirlar: list[str]):
+    """Betiği verilen varliklar.tsv ile koşturur → (donus_kodu, cikti)."""
+    import subprocess
+    import sys
+
+    (tmp_path / "varliklar.tsv").write_text(
+        "".join(s + "\n" for s in satirlar), encoding="utf-8")
+    ortam = dict(os.environ, PYTHONPATH=REPO, PYTHONIOENCODING="utf-8")
+    p = subprocess.run([sys.executable, "-"], input=_kume_denetimi_betigi(),
+                       cwd=tmp_path, env=ortam, text=True,
+                       encoding="utf-8", capture_output=True)
+    return p.returncode, p.stdout + p.stderr
+
+
+def _tam_kume() -> list[str]:
+    return [f"{ad}\t{1024 * 1024}" for ad in sorted(release_manifest.PAKETLER)]
+
+
+def test_the_release_gate_passes_a_complete_draft(tmp_path):
+    kod, cikti = _kapiyi_kos(tmp_path, _tam_kume())
+    assert kod == 0, cikti
+    assert "birebir" in cikti, cikti
+
+
+def test_the_release_gate_stops_a_draft_that_is_missing_a_package(tmp_path):
+    """Asıl vaat: eksik bir paketle yayın OLUŞMAZ (v0.4.2'nin dersi)."""
+    eksikli = _tam_kume()
+    dusen = eksikli.pop(0).split("\t")[0]
+    kod, cikti = _kapiyi_kos(tmp_path, eksikli)
+    assert kod == 1, cikti
+    assert dusen in cikti, cikti
+
+
+def test_the_release_gate_stops_a_draft_carrying_something_unexpected(tmp_path):
+    """FAZLA da hata: ya bir iş yanlış dosya yükledi ya manifest bayatladı."""
+    kod, cikti = _kapiyi_kos(tmp_path, _tam_kume() + ["bayat.zip\t123"])
+    assert kod == 1, cikti
+    assert "bayat.zip" in cikti, cikti
+
+
+def test_the_release_gate_stops_a_zero_byte_package(tmp_path):
+    """"Yeşil ama boş"un yayın yolundaki son kapısı."""
+    bozuk = _tam_kume()
+    bozuk[0] = bozuk[0].split("\t")[0] + "\t0"
+    kod, cikti = _kapiyi_kos(tmp_path, bozuk)
+    assert kod == 1, cikti
+    assert "0 baytlık" in cikti, cikti

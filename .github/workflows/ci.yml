@@ -128,6 +128,13 @@ jobs:
   # Üç paket de yayın yolundakiyle AYNI çağrılabilir workflow'u kullanıyor —
   # yani PR'da yeşil olan şey, yayında koşacak şeyin ta kendisi. Ayrı bir
   # "PR sürümü" olsaydı ikisi ayrışır ve bu kapı hiçbir şey kanıtlamazdı.
+  #
+  # `taslak` girdisi VERİLMİYOR (varsayılan boş): PR koşusu paketi derleyip
+  # doğruluyor ama hiçbir yere teslim etmiyor. Kapının sorusu zaten "paketleme
+  # ayakta mı"; teslim, yayın yolunun işi. Yan fayda ölçülü: 2026-08-28'de
+  # Actions varlık kotasını dolduran birikimin büyük kısmı PR koşularının
+  # kimsenin okumadığı paketleriydi. Bu satırın yokluğu sayesinde PR'lar artık
+  # o havuza hiç dokunmuyor.
   paket-macos:
     name: macOS paketi
     needs: [test, kapsam]

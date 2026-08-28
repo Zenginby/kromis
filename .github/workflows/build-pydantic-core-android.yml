@@ -330,7 +330,13 @@ jobs:
           # release.yml'deki aynı kapı: bu bayrak olmadan eşleşen dosya
           # bulunmadığında adım yalnız UYARI basar ve iş yeşil kalır.
           if-no-files-found: error
-          retention-days: 90
+          # SAKLAMA — burası 90'dı; paket işlerindeki aynı gerekçe (kota
+          # 2026-08-28'de doldu, CI kırmızıya düştü). 1 değil 7, çünkü bu
+          # varlığın koşu DIŞINDA gerçek bir tüketicisi var: Yol A'da bakımcı
+          # workflow'u elle tetikleyip wheel'i indiriyor ve `android/wheels/`
+          # altına işliyor. Bir hafta o akışa fazlasıyla yetiyor; kaçırılırsa
+          # yeniden tetiklemenin bedeli de saniyeler, çünkü önbellek duruyor.
+          retention-days: 7
 
       - name: Özet
         run: |

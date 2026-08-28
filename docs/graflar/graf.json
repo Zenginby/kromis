@@ -840,6 +840,7 @@
     "tests/test_android_geri.py",
     "tests/test_android_packaging.py",
     "tests/test_ci_paketleme_kapisi.py",
+    "tests/test_ci_varlik_saklama.py",
     "tests/test_encoding_contract.py"
   ],
   "onyuz": {
@@ -901,8 +902,8 @@
           "/output/{}"
         ],
         "dosya": "static/folders.js",
-        "satir": 1465,
-        "tanim": 50
+        "satir": 1682,
+        "tanim": 56
       },
       {
         "cagrilan_yollar": [],
@@ -1169,7 +1170,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 68,
+  "test_dosyasi_sayisi": 69,
   "uc_noktalar": [
     {
       "islev": "index",

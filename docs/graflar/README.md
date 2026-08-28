@@ -17,7 +17,7 @@
 * 39 Python modülü, 83 modül düzeyi ithal kenarı (9 erteli)
 * 41 HTTP uç noktası
 * 9 tarayıcı betiği, 21 betik-arası bağ
-* 68 test dosyası; 3 modülü hiçbir test ithal etmiyor, 4 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
+* 69 test dosyası; 3 modülü hiçbir test ithal etmiyor, 5 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
 * 1 ithal döngüsü, 0 rotaya oturmayan tarayıcı çağrısı
 
 En büyük dosyalar: `app` (1719), `models` (780), `catalog` (769), `azure_client` (458), `color_names` (418).

@@ -60,6 +60,72 @@ function folderPath(id) {
   return path;
 }
 
+// Ayraç TEK sabitte: künye, kırıntı ve taşıma listesi aynı klasörü aynı
+// yazımla anlatmak zorunda. İkisi ayrışırsa kullanıcı aynı klasörü iki yüzeyde
+// iki farklı ad sanır.
+const KLASOR_AYRACI = " / ";
+
+/** Zinciri {ust, yaprak} olarak verir — kök/bilinmeyen id'de ikisi de "".
+ *
+ *  "Klasörsüz" YEDEĞİ BURAYA KONMUYOR: `pickerFolderLabel` bilinmeyen id'de
+ *  boş dize döndürüyor ve `renderPickerSide` (folders.js) kendi yedeğine
+ *  güveniyor. Yedek buraya taşınsaydı o sözleşme sessizce değişirdi.
+ */
+function folderPathParts(id) {
+  const zincir = folderPath(id).map((f) => f.name);
+  return {
+    ust: zincir.slice(0, -1).join(KLASOR_AYRACI),
+    yaprak: zincir.length ? zincir[zincir.length - 1] : "",
+  };
+}
+
+/** Klasör künyesi: zincirin TAMAMI, ama kırpma yükü ÜST zincire biniyor.
+ *
+ *  Künye bugüne kadar yalnız EN YAKIN klasörü yazıyordu, yani iç içe
+ *  klasörlerde "hangi A altındaki B" sorusu cevapsızdı. Aynı ders taşıma
+ *  listesinde zaten yazılı (bu dosyada, `sec.appendChild(o)` döngüsü): orada
+ *  tam yol yazılıyor çünkü "Ağustos" iki ayrı klasörde de aynı olabiliyor.
+ *
+ *  Tek `<span>` + `text-overflow: ellipsis` DENENMEDİ ve sebebi ÖLÇÜLÜ
+ *  (Chromium 1194, 360×780): kart 359px, ızgara 335px, `minmax(96px, 1fr)`
+ *  üç sütun veriyor, karo 104px ve `.picker-cap`'in yatay dolgusundan sonra
+ *  metne ~84px kalıyor — 12px'lik yazıda ≈12 karakter. "Kampanyalar / Bayram"
+ *  sondan kırpılınca ekranda "Kampanyala…" kalırdı: kullanıcının aradığı
+ *  YAPRAK klasör tam da kaybolan yarı, yani bugünkü "yalnız Bayram" hâlinden
+ *  DAHA KÖTÜ. İki kutu bu yüzden: üst zincir daralıyor, yaprak daralmıyor.
+ *
+ *  Kırpma JS'te DEĞİL CSS'te: karakter bütçesi hem erişilebilirlik ağacını da
+ *  kırpardı (ekran okuyucu zinciri tam duyuyor, gören kullanıcı kısaltılmışını
+ *  görüyor) hem de Android WebView'ın sistem yazı ölçeğinde piksel eşiği
+ *  cihazdan cihaza kayardı — `.chat-hint`in dersi (Tur B).
+ */
+/** Aynı parçalardan düz metin etiket ("A / B") — ipucu ve `<option>` için. */
+function klasorZinciriEtiketi(parcalar) {
+  const { ust, yaprak } = parcalar;
+  return ust ? ust + KLASOR_AYRACI + yaprak : yaprak;
+}
+
+function klasorZinciriDugumu(folderId, sinif, parcalar = folderPathParts(folderId)) {
+  const { ust, yaprak } = parcalar;
+  const kap = document.createElement("span");
+  kap.className = sinif;
+  if (ust) {
+    const ustEl = document.createElement("span");
+    ustEl.className = "zincir-ust";
+    ustEl.textContent = ust;
+    kap.appendChild(ustEl);
+  }
+  const yaprakEl = document.createElement("span");
+  yaprakEl.className = "zincir-yaprak";
+  // Ayraç YAPRAKLA taşınıyor, üst zincirin sonunda DEĞİL: esnek kutuda satır
+  // başındaki boşluk kırpılıyor ve künye "Kampanyal…/ Bayram" diye okunurdu.
+  yaprakEl.textContent = yaprak
+    ? (ust ? KLASOR_AYRACI + yaprak : yaprak)
+    : "Klasörsüz";
+  kap.appendChild(yaprakEl);
+  return kap;
+}
+
 // Bir klasörün kendisi + tüm alt klasörleri (silme onayında sayı vermek için)
 function folderSubtree(id) {
   const out = [];
@@ -145,10 +211,9 @@ function syncFolderView() {
   // klasörlerden geliyor), yani düğme nereye aktardığını söyleyemezdi.
   $("media-import-btn").hidden = selectMode || searching;
 
-  const path = inFolder ? folderPath(currentFolder.id) : [];
   // kırıntı: "A / B / C" — cache henüz gelmediyse en azından klasörün adı
   $("gallery-title").textContent = inFolder
-    ? (path.length ? path.map((f) => f.name).join(" / ") : currentFolder.name)
+    ? (klasorZinciriEtiketi(folderPathParts(currentFolder.id)) || currentFolder.name)
     : "Klasörler";
   $("images-title").textContent = inFolder ? "Klasördeki görseller" : "Klasörsüz görseller";
   // Şerit klasör içinde de görünür: taşıma hedefleri oradan geliyor.
@@ -644,7 +709,7 @@ function openMoveDialog() {
   for (const f of folderCache) {
     const o = document.createElement("option");
     o.value = f.id;
-    o.textContent = folderPath(f.id).map((x) => x.name).join(" / ") || f.name;
+    o.textContent = pickerFolderLabel(f.id) || f.name;
     sec.appendChild(o);
   }
   // Bulunulan klasör hedef olarak anlamsız (görseller zaten orada).
@@ -810,6 +875,7 @@ let pickerImages = [];
 let pickerScope = "";
 let pickerQuery = "";
 let pickerSelectedId = null;
+let pickerAcan = null;      // seçiciyi açan düğüm — kapanışta odak oraya döner
 let pickerToken = 0;
 // Boş ızgaranın ÜÇ ayrı nedeni var — yükleniyor, alınamadı, gerçekten boş — ve
 // üçü tek cümleyle anlatılırsa ikisi yalan olur (PR #23 incelemesi, H2).
@@ -834,9 +900,9 @@ const PICKER_ICONS = {
 // `folderPath` bir ETİKET DEĞİL, klasör NESNELERİNDEN oluşan kırıntı zinciri
 // döndürüyor (bkz. tanımı: `path.unshift(node)`). Doğrudan `textContent`e
 // verilirse "[object Object],[object Object]" yazıyor — canlı turda tam olarak
-// bu görüldü. Ayraç kod tabanından alınıyor: galeri başlığı da " / " ile
-// birleştiriyor (bu dosyada `path.map((f) => f.name).join(" / ")`).
-const pickerFolderLabel = (id) => folderPath(id).map((f) => f.name).join(" / ");
+// bu görüldü. Zincir artık `folderPathParts` üzerinden geliyor ve ayraç tek
+// sabitte (`KLASOR_AYRACI`): künye ile bu etiket ayrışamıyor.
+const pickerFolderLabel = (id) => klasorZinciriEtiketi(folderPathParts(id));
 
 function pickerScopes() {
   return [
@@ -889,7 +955,25 @@ function pickerIcon(paths, size = 18) {
 
 function renderPickerNav(scopes = pickerScopes()) {
   const nav = $("picker-kinds");
+  // Şerit yeniden KURULMAK zorunda — ızgaranın çözümü (yalnız özniteliği
+  // çevir) buraya uymuyor: sayaçlar hem kapsamla hem HER TUŞ VURUŞUYLA
+  // değişiyor (`pickerFilter(s).length`). O yüzden odak ADIYLA iade ediliyor;
+  // desen `chat.js`teki `closeMenus`ün aynısı. Ölçüldü: iade olmadan bir
+  // kapsam düğmesine klavyeyle basan kullanıcının odağı `<body>`ye düşüyor,
+  // yani süzgeci daralttığı anda diyaloğun başına atılıyordu.
+  //
+  // Odak ŞERİTTE miydi sorusu şart ve İKİ iş yapıyor: fareyle süzenin odağını
+  // şeride zorla taşımıyor VE arama kutusuna yazan kullanıcının odağını her
+  // tuşta çalmıyor (her tuş bu işlevi yeniden çağırıyor).
+  //
+  // Anahtar TUTULUYOR, düğüm değil: düğümün kendisi birazdan silinecek.
+  // `core.js`teki `isConnected` muhafızı burada YOK ve olmamalı — orada düğüm
+  // yıkımdan ÖNCE tutuluyor, burada yıkımdan SONRA bulunuyor.
+  const odakli = document.activeElement;
+  const seritteydi = odakli && odakli.closest && odakli.closest(".picker-nav-item");
+  const odakAnahtari = seritteydi ? seritteydi.dataset.key : null;
   nav.innerHTML = "";
+  let geriVerilecek = null;
   for (const s of scopes) {
     const n = pickerFilter(s).length;
 
@@ -907,17 +991,29 @@ function renderPickerNav(scopes = pickerScopes()) {
     btn.appendChild(pickerIcon(s.icon));
     btn.appendChild(label);
     btn.appendChild(count);
+    if (s.key === odakAnahtari) geriVerilecek = btn;
     nav.appendChild(btn);
   }
+  // Kapsam listeden düşmüşse (klasör silindi) iade EDİLMİYOR: rastgele bir
+  // düğmeye atlamak kullanıcıyı yerinden etmenin başka bir biçimi olurdu.
+  if (geriVerilecek) geriVerilecek.focus();
 }
 
 function renderPickerGrid(scopes = pickerScopes()) {
   const grid = $("picker-grid");
+  // Izgaranın yeniden KURULDUĞU yollar hâlâ var (arama, kapsam değişimi ve
+  // `openPicker`'ın bekleyen `loadAllImages` yanıtı) — seçim artık buraya
+  // uğramıyor ama o yollarda odak yine `<body>`ye düşerdi. `openPicker`
+  // yarışı en sinsisi: bayat liste hemen boyanıyor, kullanıcı bir karoya
+  // geçiyor, yanıt gelince ızgara altından siliniyor.
+  // İade `renderPickerNav`'daki mekanizmanın aynısı, tek fark anahtarın adı.
+  const odakli = document.activeElement;
+  const odakId = odakli && odakli.closest && odakli.closest(".picker-tile")
+    ? odakli.closest(".picker-tile").dataset.id : null;
   grid.innerHTML = "";
   const list = pickerVisible(scopes);
   for (const rec of list) {
     const title = rec.prompt || rec.filename || rec.id;
-    const folder = folderById(rec.folder_id);
 
     const img = document.createElement("img");
     img.src = `/output/${rec.filename}`;
@@ -929,20 +1025,24 @@ function renderPickerGrid(scopes = pickerScopes()) {
     const cap = document.createElement("span");
     cap.className = "picker-cap";
     cap.appendChild(name);
-    cap.appendChild(document.createTextNode(folder ? folder.name : "Klasörsüz"));
+    // Zincir karo başına BİR kez yürünüyor: hem künye düğümü hem ipucu aynı
+    // parçalardan besleniyor. İki ayrı çağrı `folderPath`i (klasör başına
+    // doğrusal `find` + döngü muhafızı) her karo için iki kez koşturuyordu ve
+    // ızgara her tuş vuruşunda yeniden kuruluyor.
+    const parcalar = folderPathParts(rec.folder_id);
+    cap.appendChild(klasorZinciriDugumu(rec.folder_id, "picker-cap-folder", parcalar));
 
     const tile = document.createElement("button");
     tile.type = "button";
     tile.className = "picker-tile";
     tile.dataset.id = rec.id;
-    tile.title = title;
-    // `aria-selected` DEĞİL: bu bir `<button>`, kapsayıcısı düz bir `<div>`.
-    // `aria-selected` yalnız `option`/`tab`/`row`/`treeitem`/`gridcell`
-    // rollerinde geçerli — düğmede sessizce yok sayılıyordu, yani seçim ekran
-    // okuyucuya HİÇ ulaşmıyordu (görsel çerçeve tek işaretti). `role="option"`
-    // seçeneği reddedildi: gezinen tabindex + ok tuşu modeli ister ve depoda
-    // öyle bir desen hiç yok; `aria-pressed` altı yerde zaten kurulu.
-    tile.setAttribute("aria-pressed", String(rec.id === pickerSelectedId));
+    // İpucu zinciri de taşıyor: künye dar kutuda üst zinciri kırpıyor, tam yol
+    // fareyle bekleyen kullanıcıya burada açılıyor (yan bölmedeki "Klasör"
+    // satırının aynısı).
+    // Klasörsüz karoda da satır YAZILIYOR: künye "Klasörsüz" diyor ve yan
+    // bölmenin "Klasör" satırı da öyle — ipucu ikisiyle aynı şeyi söylemeli,
+    // yoksa yalnız o karolarda sessiz kalırdı.
+    tile.title = `${title}\n${klasorZinciriEtiketi(parcalar) || "Klasörsüz"}`;
     tile.appendChild(img);
     if (rec.size) {
       const badge = document.createElement("span");
@@ -953,12 +1053,61 @@ function renderPickerGrid(scopes = pickerScopes()) {
     tile.appendChild(cap);
     grid.appendChild(tile);
   }
+  // Seçim işaretinin TEK yazıcısı: kurulum da güncelleme de aynı süpürmeden
+  // geçiyor. Karolar eklendikten SONRA çağrılmak zorunda — önce koşarsa
+  // `querySelectorAll` boş küme görür ve hiçbir karo işaretlenmez (sessiz,
+  // hatasız bir kırılma).
+  syncPickerPressed();
+  if (odakId) {
+    const geri = pickerKaro(odakId);
+    // Karo listeden düşmüşse (arama daralttı) iade EDİLMİYOR: rastgele bir
+    // karoya atlamak kullanıcıyı yerinden etmenin başka bir biçimi olurdu.
+    if (geri) geri.focus();
+  }
   $("picker-empty").hidden = list.length > 0;
   $("picker-empty-text").textContent =
     pickerState === "loading" ? "Görseller yükleniyor…"
     : pickerState === "error" ? "Görseller alınamadı."
     : pickerQuery ? "Sonuç bulunamadı"
     : "Bu kapsamda görsel yok";
+}
+
+/** Izgaradaki bir karoyu id'siyle bulur. Klasör id'leri çıplak onaltılık
+ *  (`uuid4().hex[:12]`, storage.py), yani seçiciye gömmek güvenli. */
+const pickerKaro = (id) =>
+  $("picker-grid").querySelector(`.picker-tile[data-id="${id}"]`);
+
+/** Seçim işaretini VAR OLAN karolara yazar — ızgarayı yeniden KURMADAN.
+ *
+ *  Tıklama eskiden `renderPickerGrid()` çağırıyordu ve o `grid.innerHTML = ""`
+ *  ile bütün karoları siliyordu. ÖLÇÜLDÜ (Chromium 1194, üç genişlikte de):
+ *  bir karoya klavyeyle Enter'a basıldıktan sonra `document.activeElement`
+ *  `<body>`. Yani Tur C'de kazanılan `aria-pressed="true"`yi tam da onu
+ *  duyacak kullanıcı HİÇ duymuyordu; üstelik gezinmeye diyaloğun başından
+ *  devam etmek zorunda kalıyordu. İkinci belirti gözle görülür: görünen her
+ *  `<img>` yeniden kuruluyor, `loading="lazy"` durumu sıfırlanıyor.
+ *
+ *  Yeniden kurmanın taşıdığı başka bir bilgi YOK: seçim değişince değişen tek
+ *  şey bu öznitelik (ve ona bağlı iki CSS kuralı). Boş-durum metni `list`e,
+ *  gezinme sayaçları `pickerFilter`a bağlı — ikisi de seçimden bağımsız.
+ *
+ *  DELTA yazımı (eski seçiliyi bul, kapat) BİLEREK yazılmadı: onu yazmanın
+ *  yolu `querySelector('[aria-pressed="true"]')`, yani kaynağı BOYA yapmak.
+ *  Seçim `pickerSelectedId` demek, işaret onun sonucu (B3) — ve o kural bu
+ *  dosyada bir mandalla korunuyor.
+ *
+ *  ÖZNİTELİĞİN KENDİSİ (Tur C'nin kararı, kurulumdan buraya taşındı):
+ *  `aria-selected` DEĞİL, çünkü `.picker-tile` düz bir `<button>` ve
+ *  kapsayıcısı düz bir `<div>` — `aria-selected` yalnız
+ *  `option`/`tab`/`row`/`treeitem`/`gridcell` rollerinde geçerli, düğmede
+ *  tarayıcı onu erişilebilirlik ağacına HİÇ koymuyordu. `role="option"`
+ *  seçeneği reddedildi: gezinen tabindex + ok tuşu modeli ister ve depoda
+ *  öyle bir desen hiç yok; `aria-pressed` altı yerde zaten kurulu.
+ */
+function syncPickerPressed() {
+  for (const tile of $("picker-grid").querySelectorAll(".picker-tile")) {
+    tile.setAttribute("aria-pressed", String(tile.dataset.id === pickerSelectedId));
+  }
 }
 
 function renderPickerSide() {
@@ -1023,6 +1172,12 @@ function renderMediaPicker() {
 }
 
 async function openPicker() {
+  // Kapanışta odağın döneceği düğüm: `core.js`in `dialogPrevFocus` deseni.
+  // Onsuz Escape (ya da ×) odaklı karoyu `display: none` yapıyor ve odak
+  // `<body>`ye düşüyordu — bu turun düzelttiği kusurun DÖRDÜNCÜ kopyası,
+  // üstelik en sık yürünen yolu. "Referans yap" dalı zaten bilinçli olarak
+  // odağı `#prompt`a taşıyor; eksik olan yalnız KAPATMA yoluydu.
+  pickerAcan = document.activeElement;
   // `.sheet` ve `.modal` aynı z-index 50'yi paylaşıyor: açık kalan bir
   // slide-over "Escape neyi kapatır" belirsizliği yaratır (B10).
   closeSheets();
@@ -1069,9 +1224,29 @@ async function openPicker() {
 // oluyor ve içindeki kontroller sekme sırasından çıkıyor. Yalnız görünürlükle
 // (opacity/pointer-events) kapatılan bir kapta 25 kontrol odaklanabilir
 // kalıyordu — Faz 0 mock'unda ölçüldü.
-function closePicker() {
+/** Kapanışta odağın döneceği düğüm.
+ *
+ *  `isConnected` YETMİYOR ve bu ölçüldü: seçiciyi açan düğme (+) menüsünün
+ *  İÇİNDE (`#media-pick-btn`, `#plus-menu`) ve o menü seçici açılırken
+ *  kapanıyor. Düğüm DOM'da duruyor, yani `isConnected` true — ama `[hidden]`
+ *  bir kabın içinde olduğu için `.focus()` SESSİZCE hiçbir şey yapmıyor ve
+ *  odak `<body>`de kalıyordu. İlk yazım tam olarak bu yüzden işe yaramadı;
+ *  Escape ölçümü hâlâ `BODY` diyordu.
+ *
+ *  Görünmez bir açan varsa menüyü AÇAN düğmeye dönülüyor — `chat.js`teki
+ *  `closeMenus`ün "tetiğe dön" kuralının aynısı, ve kullanıcının seçiciye
+ *  girerken bastığı ilk görünür kontrol o.
+ */
+function pickerOdakHedefi() {
+  return pickerAcan && pickerAcan.isConnected && !pickerAcan.closest("[hidden]")
+    ? pickerAcan : $("plus-btn");
+}
+
+function closePicker(odakIadeEt = true) {
   $("media-picker").hidden = true;
   pickerToken++;   // uçuşta olan loadAllImages yanıtı kapalı modalı boyamasın
+  if (odakIadeEt) pickerOdakHedefi().focus();
+  pickerAcan = null;
 }
 
 $("media-pick-btn").addEventListener("click", openPicker);
@@ -1095,7 +1270,7 @@ $("picker-grid").addEventListener("click", (e) => {
   const tile = e.target.closest(".picker-tile");
   if (!tile) return;
   pickerSelectedId = tile.dataset.id;
-  renderPickerGrid();
+  syncPickerPressed();
   renderPickerSide();
 });
 
@@ -1107,7 +1282,11 @@ $("picker-grid").addEventListener("click", (e) => {
 $("picker-use-ref").addEventListener("click", () => {
   const rec = pickerById(pickerSelectedId);
   if (!rec) return;
-  closePicker();
+  // Odak iadesi KAPALI: `setGallerySource` odağı `#prompt`a taşıyor ve bu
+  // yolun kararı zaten o (yukarıdaki B7 notu). İade açık kalsaydı odak önce
+  // (+) düğmesine dönüp hemen composer'a sıçrardı — ekran okuyucuya iki
+  // ayrı yer duyurulurdu.
+  closePicker(false);
   setGallerySource(rec);
 });
 
@@ -1118,8 +1297,21 @@ $("picker-use-ref").addEventListener("click", () => {
 $("picker-use-extra").addEventListener("click", () => {
   const rec = pickerById(pickerSelectedId);
   if (!rec) return;
+  // `activeElement` HER ŞEYDEN ÖNCE okunuyor: `addGalleryExtra` kendi
+  // yüzeyini yeniden çiziyor (`renderSource`) ve odağı taşıyan bir kabı
+  // yıkarsa bu okuma sonradan sessizce `false` olurdu — düzeltme hatasızca
+  // buharlaşırdı.
+  const odakDugmedeydi = document.activeElement === $("picker-use-extra");
   const why = addGalleryExtra(rec);
   if (why) { $("picker-note").textContent = why; return; }
+  // Ekleme BAŞARILI olduğu anda `extraBlockReason(rec)` doluyor ("Bu görsel
+  // zaten ek referans listesinde.") ve `renderPickerSide` bu düğmeyi
+  // `disabled` yapıyor. Odaklı bir düğmeyi disable etmek odağı `<body>`ye
+  // düşürüyor — ÖLÇÜLDÜ: Enter'dan sonra `document.activeElement` `<body>`,
+  // düğme `disabled`. Yani B7'nin gerekçesi ("üç ek slotu var, her biri için
+  // menüden dönmek saçma olurdu") klavye kullanıcısında TAM TERSİNE dönüyordu:
+  // ikinci ek için diyaloğun başından Tab'lamak gerekiyordu. `#picker-note`
+  // `role="status"` olduğu için ONAY duyuluyor, kaybolan şey YER.
   renderPickerSide();
   // Onay ekleme ANINDA yazılıyor. `renderPickerSide` gerekçeyi öne aldığı için
   // (H1) az önce eklenen karo hemen "zaten ek referans listesinde" derdi ve
@@ -1127,6 +1319,13 @@ $("picker-use-extra").addEventListener("click", () => {
   // geçiyor; karo değişince not duran okumaya ("Ek referans · N/3") ya da
   // gerekçeye döner.
   $("picker-note").textContent = `Eklendi · ${extras.length}/${MAX_EDIT_IMAGES - 1}`;
+  // Odak SEÇİLİ KAROYA dönüyor, "Referans yap"a DEĞİL: o düğme seçiciyi
+  // KAPATIYOR, yani ikinci kez Space'e basan kullanıcı ek eklemek yerine turu
+  // bitirirdi. Karo, oradan bir sonraki karoya geçmenin de doğal başlangıcı.
+  if (odakDugmedeydi) {
+    const karo = pickerKaro(pickerSelectedId);
+    if (karo) karo.focus();
+  }
 });
 
 document.addEventListener("keydown", (e) => {
@@ -1325,8 +1524,18 @@ function renderGallery() {
     // duyurulup Enter/Space'e bağlanıyor.
     card.tabIndex = 0;
     card.setAttribute("role", "button");
+    // Zincir erişilebilir addan ÖNCE hesaplanıyor. İlk yazımda `let kartYolu`
+    // rozet bloğunda, yani BU SATIRIN ALTINDA duruyordu: `let`in ölü bölgesi
+    // yüzünden `renderGallery` daha ilk kartta `ReferenceError` atıyor ve
+    // galeri hiç çizilmiyordu. Kaynak deseni arayan mandallar bunu göremezdi —
+    // gerçek tarayıcıda koşan `test_playwright_studio.py` yakaladı.
+    const kartParcalari = searchQuery ? folderPathParts(rec.folder_id) : null;
+    const kartYolu = kartParcalari
+      ? (klasorZinciriEtiketi(kartParcalari) || "Klasörsüz") : "";
     card.setAttribute("aria-label",
-      `${prompt ? prompt.slice(0, 60) : rec.filename} — ${selectMode ? "seç" : "büyüt"}`);
+      `${prompt ? prompt.slice(0, 60) : rec.filename}`
+      + (kartYolu ? ` — ${kartYolu}` : "")
+      + ` — ${selectMode ? "seç" : "büyüt"}`);
     card.addEventListener("keydown", (e) => {
       // Kart İÇİNDEKİ düğmeye basılan Enter kartı da tetiklemesin: olay
       // oradan köpürür ve tek tuş iki eylem çalıştırır. (chat.js:908-910'un
@@ -1350,11 +1559,19 @@ function renderGallery() {
     // sonuçlar tüm klasörlerden geliyor, adsız iki varyant ayırt edilemez.
     // Sol ALT köşede — sol üst card-check/card-badge'in, sağ alt .acts'ın.
     if (searchQuery) {
-      const where = document.createElement("span");
-      where.className = "card-badge card-where";
-      const folder = folderById(rec.folder_id);
-      where.textContent = folder ? folder.name : "Klasörsüz";
-      card.appendChild(where);
+      // Rozetin kendi gerekçesi (yukarıda) "adsız iki varyant ayırt edilemez"
+      // diyor — ama yalnız EN YAKIN klasörü yazdığı sürece iç içe iki ayrı
+      // "Bayram" klasörü hâlâ birbirinin aynısı görünüyordu, yani rozet tam da
+      // engellemek için konduğu belirsizliği üretiyordu. Arama tüm klasörleri
+      // tarayan TEK yüzey olduğu için zincir en çok burada gerekiyor.
+      card.appendChild(
+        klasorZinciriDugumu(rec.folder_id, "card-badge card-where", kartParcalari));
+      // Zincir kartın ERİŞİLEBİLİR ADINA da giriyor. Kırpmayı CSS'e vermenin
+      // gerekçesi "ekran okuyucu zinciri tam duyar" idi ve BU YÜZEYDE o
+      // doğru DEĞİLDİ: kart açık bir `aria-label` taşıyor (aşağıda) ve açık
+      // bir etiket, içindeki metnin erişilebilir ada katılmasını engelliyor —
+      // yani rozet hiç kimseye okunmuyordu. Arama tüm klasörleri tarayan tek
+      // yüzey, yani ayırt edici bilgi tam da burada gerekiyor.
     }
     card.appendChild(delBtn);
     card.appendChild(acts);

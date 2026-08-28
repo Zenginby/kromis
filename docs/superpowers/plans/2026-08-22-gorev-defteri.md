@@ -1,11 +1,17 @@
 # Görev defteri — sıradaki adımlar
 
-**Tarih:** 23 Ağustos 2026 · **Son dal:** `claude/arena-mode-planning-design-orhatc`
-**Bugünkü ölçüm:** `APP_VERSION` **0.9.2** (sonrakini CI yazıyor),
-`pytest tests/ -q` → **1721 geçti / 10 atlandı**
+**Tarih:** 28 Ağustos 2026 · **Son dal:** `claude/next-task-plan-fxqy2d`
+**Bugünkü ölçüm:** `APP_VERSION` **0.11.4** (sonrakini CI yazıyor),
+`pytest tests/ -q` → **1803 geçti / 10 atlandı**
 **Defterin açılış ölçümü** (Tur A öncesi): `APP_VERSION` 0.7.0 → 1613 geçti / 10 atlandı
-(atlananlar her iki ölçümde de yalnız Windows'a özgü DACL testleri + kurulu
+(atlananlar her üç ölçümde de yalnız Windows'a özgü DACL testleri + kurulu
 olmayan Playwright)
+
+> **Defter dört sürüm bayat kalmıştı** ve bu kaydın kendisi bir ders: Tur D'den
+> (v0.9.2) sonra iki tur daha gönderildi (v0.10.0–v0.11.4) ama defter
+> güncellenmedi, yani "sıradaki iş" diye buraya bakan bir sonraki oturum hâlâ
+> 23 Ağustos'u okuyordu. Tur E ve F kutuları o boşluğu **geriye dönük** kapatıyor;
+> kanıtları commit'lerden ve testlerden okunarak yazıldı, hafızadan değil.
 
 Bu defter **canlı** bir belgedir: bitmiş turların kaydı ve sıradaki işin tanımı
 burada durur. Yol haritaları (README fazları, `2026-08-10-saas-transformation-master-design.md`
@@ -27,7 +33,366 @@ burada durur. Yol haritaları (README fazları, `2026-08-10-saas-transformation-
 
 ---
 
-## ✅ Tur D — Model Arena (kuyruk maddesi 8)
+## ✅ Tur G — Seçici klavye kullanıcısının YERİNİ üç ayrı yoldan kaybediyordu
+
+**Bitti (28 Ağustos).** Kuyruğun **1. maddesi** (odak) ve **2. maddesi** (iç içe
+klasör künyesi) üste alındı; ikisi `renderPickerGrid`'in aynı elli satırında
+yaşıyordu ve ayrı turlarda yapmak aynı üç dosyayı iki kez açmak olurdu (Tur C'nin
+gerekçesi). Tur, kod okunurken çıkan **üç bulguyla** genişledi — üçü de aynı
+kusurun başka yüzeydeki kopyası, üçü de ölçüldü.
+
+- [x] **Seçimde ızgara artık yeniden KURULMUYOR** (kuyruk 1). Tıklama
+      `renderPickerGrid()` çağırıyordu ve o `grid.innerHTML = ""` ile bütün
+      karoları siliyordu. **Ölçüldü (önce):** karoya Enter'a basıldıktan sonra
+      `document.activeElement` = `<body>`, üç genişlikte de. Yani Tur C'nin
+      `aria-pressed` kazanımı tam da onu duyacak kullanıcıda siliniyordu.
+      **Ölçüldü (sonra):** odak AYNI DÜĞÜMDE (düğüme damga basılıp doğrulandı),
+      basılı karo sayısı 1. Yerine `syncPickerPressed()`: var olan karolarda
+      yalnız özniteliği çeviriyor. Delta yazımı (eski seçiliyi bul, kapat)
+      REDDEDİLDİ — onu yazmanın yolu `querySelector('[aria-pressed="true"]')`,
+      yani kaynağı BOYA yapmak; B3 mandalı zaten bunu yasaklıyor.
+- [x] **`aria-pressed`in TEK yazıcısı var.** Kurulum satırı silinip
+      `renderPickerGrid` de aynı süpürmeyle bitiriliyor. İki yazıcı bırakmak bu
+      depoda iki tur yakmış bir desendi (Tur C'nin ikiz CSS kuralları). Sıra
+      mandallı: süpürme karolar EKLENDİKTEN sonra koşmak zorunda, yoksa
+      `querySelectorAll` boş küme görür ve hiçbir karo işaretlenmez — sessiz,
+      hatasız bir kırılma.
+- [x] **BULGU 1 — düzeltmenin kendi yan etkisi: odak halkası kayboluyordu.**
+      Seçim ızgarayı yeniden kurmadığı için "seçili VE odaklı" karo artık klavye
+      kullanıcısının NORMAL hâli. `.picker-tile[aria-pressed="true"]` (0,2,0)
+      global `:focus-visible`i (0,1,0) `outline` yarışında EZİYOR — düzeltmeden
+      önce görünmüyordu çünkü ikisi hiç bir arada olmuyordu. Yani düzeltme tek
+      başına ekran okuyucu kullanıcısını kazandırıp **gören klavye
+      kullanıcısını kaybettirirdi.** İki işaret AYRI kanaldan: `outline` içeride
+      seçimi, `box-shadow` dışarıda odağı söylüyor. **Ölçüldü:** seçili+odaklı
+      karoda `outline 2px … offset -2px` VE iki katmanlı `box-shadow`.
+- [x] **BULGU 2 — aynı kusur kapsam şeridinde de vardı.** `renderPickerNav` da
+      `nav.innerHTML = ""` yapıyor. **Ölçüldü (önce):** kapsam düğmesine
+      klavyeyle basınca odak `<body>`. Orada yeniden kurmak KAÇINILMAZ (sayaçlar
+      hem kapsamla hem her tuş vuruşuyla değişiyor), o yüzden çözüm farklı: odak
+      ANAHTARDAN iade ediliyor (`chat.js:closeMenus` deseni). Koşul şart ve iki
+      iş yapıyor — fareyle süzenin odağını şeride zorla taşımıyor VE arama
+      kutusuna yazanın odağını her tuşta çalmıyor. `core.js`'in `isConnected`
+      muhafızı BİLEREK kopyalanmadı: orada düğüm yıkımdan ÖNCE tutuluyor, burada
+      yıkımdan SONRA bulunuyor. **Ölçüldü (sonra):** odak yeni düğmede ve
+      `dataset.key` aynı.
+- [x] **BULGU 3 — "Ek olarak ekle" kendi altındaki odağı kapatıyordu.** Ekleme
+      başarılı olduğu ANDA `extraBlockReason` doluyor ve `renderPickerSide`
+      düğmeyi `disabled` yapıyor; odaklı bir düğmeyi disable etmek odağı
+      `<body>`ye düşürüyor. **Ölçüldü (önce):** Enter'dan sonra
+      `activeElement` = `<body>`, düğme `disabled`, not "Eklendi · 1/3". Yani
+      B7'nin gerekçesi ("üç ek slotu var, her biri için menüden dönmek saçma
+      olurdu") klavye kullanıcısında TAM TERSİNE dönüyordu. `#picker-note`
+      `role="status"` olduğu için ONAY duyuluyordu; kaybolan şey YER. Odak
+      seçili KAROYA dönüyor, "Referans yap"a değil — o düğme seçiciyi kapatır,
+      ikinci Space turu bitirirdi.
+- [x] **Künye zincirin tamamını yazıyor, YAPRAĞI gömmeden** (kuyruk 2). Aranan
+      şey zaten vardı (`folderPath`); ortak `folderPathParts` + tek ayraç sabiti
+      eklendi, `pickerFolderLabel` ona devredildi. **Düz uçtan kırpma ÇÖZÜM
+      DEĞİLDİ ve bu ölçüldü:** 360px'te kart 359px, ızgara 335px,
+      `minmax(96px, 1fr)` üç sütun veriyor, karo **104px**, künye kutusu
+      **84px** (≈12 karakter). "Kampanyalar / Bayram" sondan kırpılınca
+      "Kampanyala…" kalırdı — kullanıcının aradığı YAPRAK tam da kaybolan yarı,
+      yani bugünkünden ("Bayram") KÖTÜ. İki kutu: üst zincir eriyor, yaprak
+      duruyor. **Ölçüldü (sonra):** üst "Kampanyalar" kırpılıyor, yaprak
+      " / Bayram" 51px ile TAM, künye tek satır, karo taşması 0.
+- [x] **BULGU 4 — künye kusurunun üçüncü kopyası: arama sonucu rozeti.**
+      `.card-where`'in KENDİ yorumu "sonuçlar tüm klasörlerden geliyor, adsız
+      iki varyant ayırt edilemez" diyerek var oluş sebebini anlatıyordu — ama
+      yalnız en yakın klasörü yazdığı sürece iç içe iki ayrı "Bayram" hâlâ
+      birbirinin aynısıydı, yani rozet tam da engellemek için konduğu
+      belirsizliği üretiyordu. Aynı düğümden geçiyor artık. **Ölçüldü:** 360px
+      ve 1024px'te rozet zinciri yazıyor, kart taşması 0, konsol temiz.
+- [x] **İki CSS bildirimi yük taşıyor ve ikisi de tarayıcıda doğrulandı** —
+      yorumdaki iddia "öyle olmalı" değil, ölçüm: `.zincir-yaprak`ta
+      `white-space: pre` (`nowrap` DEĞİL) çünkü her esnek öğe kendi satır
+      kutusunu açıyor ve satır başındaki boşluk atılıyor — **ölçüldü:** aynı
+      DOM metniyle (`" / Bayram"`) çizilen genişlik `pre`de 51.4px, `nowrap`ta
+      47.9px, yani ayracın boşluğu gerçekten yutuluyor ("Kampanyal…/ Bayram").
+      `max-width: 100%` ise `flex: none`un bedeli: **ölçüldü** — o bildirim
+      silinince uzun bir yaprak 83px'lik kapta 156px'e büyüyor, karo taşması
+      63px oluyor ve `.picker-tile`ın `overflow: hidden`ı onu ÜÇ NOKTASIZ
+      kesiyor.
+- [x] **Ölmüş bir mandal DÖNÜŞTÜRÜLDÜ, silinmedi.** Zincir ortak yardımcıya
+      taşınınca `test_the_picker_labels_folders_with_a_string_not_the_breadcrumb_array`
+      seçici diliminde SIFIR eşleşme buluyordu: döngü hiç dönmüyor, iddia
+      kendiliğinden vacuous olmuş ve yeşil kalarak hiçbir şey korumuyordu.
+      Sessizce ölen bir mandal hiç yazılmamış olandan kötü; iddia
+      `folderPathParts`e çevrildi. ("Her `folderPath(...)` çağrısının ardından
+      `.map(` gelmeli" iddiası dosya geneline AÇILAMAZDI: dört çağrıdan biri
+      diziyi meşru olarak bir değişkene alıyor.)
+- [x] **Kanıt (inceleme öncesi):** takım **1789 → 1796 geçti / 10 atlandı** (7 yeni mandal:
+      `test_index.py`'de altı, `test_mobile.py`'de yerleşim mandalı).
+      **Yirmi mutasyon, yirmisi de KIRMIZI** — geri alma `git checkout --` ile
+      DEĞİL scratchpad kopyalarından (Tur B'nin kaydettiği tuzak) ve betik
+      hedefi bulamazsa patlıyor. Ayrıca kapta Chromium 1194'e uyan Playwright
+      kurulup `tests/test_playwright_studio.py`'nin **7 gerçek tarayıcı testi
+      de koşturuldu: yedisi de yeşil** (CI'da paket kurulu olmadığı için orada
+      atlanmaya devam ediyor).
+      Odak mandalı AD ARAMIYOR, erişilebilirlik arıyor: "ızgarayı yeniden kuran"
+      işlevlerin tanımı KODDAN çıkarılıp geçişli kapanışı alınıyor. İlk yazım
+      `"renderPickerGrid(" not in govde` idi ve mutasyon **2**'de hayatta
+      kalırdı — `renderMediaPicker()` de aynı yıkımı yapıyor. §0.6/§0.7/§0.9'un
+      "iddia kodu arar, kelimeyi değil" dersinin yedinci kurbanı.
+
+### İnceleme turu — beş gerçek bulgu, biri turun KENDİ kusuruydu
+
+Kod incelemesi on iki bulgu getirdi; hepsi kaynağa bakılarak doğrulandı, beşi
+ölçülerek kapatıldı, kalanlar (ölü bildirimler, dolaylılık, tek yürüyüş) aynı
+turda temizlendi.
+
+- [x] **Üst zincir SIFIRA iniyordu — bu turun kendi kusuru.** İlk yazımda yaprak
+      `flex: none`, üst zincir `min-width: 0` idi. **Ölçüldü:** uzun yapraklı bir
+      zincirde ("Kampanyalar / Bayram / Ramazan Bayrami 2026") üst kutu **0px**
+      oluyor; 0px'te `text-overflow` boyayacak yer bulamıyor, yani ÜÇ NOKTA DA
+      çıkmıyor ve künye ekranda sahipsiz bir " / Ramazan Bayrami…" hâline
+      geliyordu. Yani turun kendi vaadi ("üst zincir eriyor, yaprak duruyor")
+      yalnız KISA yapraklarda doğruydu. Daralma artık sıralı ve TABANLI: üst
+      zincirin ağırlığı yaprağın yüz katı ama `min-width: 2.5ch`, yaprak da
+      `min-width: 0` ile daralabiliyor. **Ölçüldü (sonra):** üst kutu 16.5px,
+      görünür ve kırpılmış; satır taşması 0.
+      *Ders:* mandal `text-overflow: ellipsis`in VARLIĞINI sınıyordu;
+      boyanabilmesini sınamıyordu.
+- [x] **Odak kusurunun DÖRDÜNCÜSÜ: seçici kapanışı.** `hidden = true` odaklı
+      karoyu `display: none` yapıyor. **Ölçüldü:** Escape'ten sonra
+      `activeElement` `<body>`. `core.js`in `dialogPrevFocus` deseni geldi —
+      ama **ilk yazım işe yaramadı ve sebebi ölçüldü:** açan düğme
+      (`#media-pick-btn`) (+) menüsünün İÇİNDE ve o menü seçici açılırken
+      kapanıyor; düğüm DOM'da (`isConnected` true) ama `[hidden]` bir kabın
+      içinde, yani `.focus()` SESSİZCE hiçbir şey yapıyor. Hedef artık
+      görünürlüğe göre seçiliyor, görünmezse menüyü açan `#plus-btn`e dönülüyor.
+      **Ölçüldü (sonra):** iki genişlikte de odak `#plus-btn`.
+      "Referans yap" dalı iadeyi bilerek KAPATIYOR (o yol odağı `#prompt`a
+      taşıyor); asimetri mandallı.
+- [x] **Izgaranın yeniden kurulduğu yollar açıkta kalmıştı.** Seçim artık oraya
+      uğramıyor ama arama, kapsam değişimi ve `openPicker`'ın bekleyen
+      `loadAllImages` yanıtı hâlâ `innerHTML = ""` yapıyor. Sonuncusu en sinsisi:
+      `openPicker` `pickerImages`i temizlemiyor, yani bayat liste HEMEN
+      boyanıyor, kullanıcı bir karoya geçiyor ve yanıt gelince ızgara altından
+      siliniyor. `renderPickerNav`ın iadesi buraya da geldi.
+- [x] **Arama rozeti EKRAN OKUYUCUYA ulaşmıyordu.** Kırpmayı CSS'e vermenin
+      yazılı gerekçesi "ekran okuyucu zinciri tam duyar" idi; bu yüzeyde DOĞRU
+      DEĞİLDİ, çünkü kart açık bir `aria-label` taşıyor ve açık etiket
+      içindeki metnin erişilebilir ada katılmasını engelliyor. Zincir artık
+      `aria-label`ın kendisine giriyor.
+- [x] **Ayracın "tek sabit" iddiası doğru DEĞİLDİ.** `KLASOR_AYRACI` tanıtılmıştı
+      ama kırıntı başlığı ile taşıma listesi kendi `join(" / ")`ünü yazmaya devam
+      ediyordu — yani sabitin yorumu üç yüzeyi anlatırken kod ikisini dışarıda
+      bırakıyordu. İkisi de ortak etikete bağlandı; dosyada `" / "` artık **bir**
+      kez geçiyor ve bir mandal ikinciyi yasaklıyor. (Kuyruğun 2. maddesi bu
+      turda kapandı.)
+- [x] **Kaynak deseninin göremediği kusuru gerçek tarayıcı yakaladı.** Rozet
+      düzeltmesinin ilk yazımında `let kartYolu` erişilebilir addan SONRA
+      duruyordu; `let`in ölü bölgesi yüzünden `renderGallery` daha ilk kartta
+      `ReferenceError` atıyor ve galeri HİÇ çizilmiyordu. Bütün kaynak mandalları
+      yeşildi; `test_playwright_studio.py` kırmızıya döndü. Ölçümün neden bu
+      defterin standardı olduğunun tazelenmiş kanıtı.
+- [x] **Mutasyon turunda İKİ mandal kaçtı ve ikisi de kelime aramasıydı** —
+      §0.6'nın dersi bu turda sekizinci ve dokuzuncu kez. `if (false) …focus()`
+      mutasyonu `".focus()" in govde` iddiasını hayatta bırakıyordu; iddia artık
+      iadenin KAPISINA bakıyor (kapı, yıkımdan önce yakalanan kimliğin ya da
+      işlevin kendi parametresinin ta kendisi olmalı).
+- [x] **Kanıt:** takım **1796 → 1805 geçti / 9 atlandı** (Playwright kurulu;
+      CI koşulunda 1798 / 10). Mandal sayısı 7 → 9. **Otuz mutasyon, otuzu da
+      kırmızı.**
+
+**Tarayıcı ölçümü** (Chromium 1194; 12 görsel, 4 klasör, biri üç seviyeli):
+
+| Ölçü | 360×780 önce | 360×780 sonra | 800×700 sonra | 1024×700 sonra |
+|---|---|---|---|---|
+| karo | 104px | 104px | 99px | 106px |
+| Enter'dan sonra odak | **`<body>`** | **aynı karo** | aynı karo | aynı karo |
+| kapsam Enter'ından sonra odak | **`<body>`** | **aynı çip** | aynı çip | aynı çip |
+| "Ek olarak ekle" Enter'ından sonra | **`<body>`** | seçili karo | — | — |
+| seçili+odaklı halka | yok (odak yok) | outline + box-shadow | aynı | aynı |
+| künye (iki seviyeli) | `Bayram` | `Kampanyal… / Bayram` | aynı | `Kampanyalar / Bayram` |
+| künye satır sayısı | 1 | 1 | 1 | 1 |
+| yatay taşma | 0 | 0 | 0 | 0 |
+| konsol | temiz | temiz | temiz | temiz |
+
+> **Kapsam genişlemesinin gerekçesi.** Defter iki madde söylüyordu, tur beşi
+> kapattı. Dördü aynı dosyanın aynı iki işlevinde ya da onların bir ekran
+> ötesinde; biri (odak halkası) düzeltmenin KENDİ yan etkisi, yani onsuz tur
+> yarım kalırdı — ekran okuyucu kullanıcısı kazanırken gören klavye kullanıcısı
+> kaybederdi. Tur B'nin "ÜÇÜNCÜ BULGU" ve Tur C'nin "aynı bileşene iki kez
+> dokunma" kayıtları emsal.
+
+### CI onarımı — kırmızı, kod hakkında HİÇBİR ŞEY söylemiyordu
+
+Tur G'nin PR'ında (#59) CI'ın üç paketleme işi de kırmızıya düştü. Üçünün de
+sebebi aynıydı ve hiçbiri bu turun diff'i değildi:
+
+```
+Failed to CreateArtifact: Artifact storage quota has been hit.
+```
+
+Paketler DERLENİP DOĞRULANDIKTAN sonra ölüyorlardı — macOS `Info.plist 0.11.4`,
+Windows `FileVersion`/`ProductVersion`/`FixedFileInfo`/`CompanyName` dördü de
+yeşil, Android wheel'i etiketi ve `.so`suyla doğrulanmış. Testler de yeşildi.
+Kırmızı olan yalnız `upload-artifact` adımıydı.
+
+**Ölçüm** (GitHub REST, 28 Ağustos 2026): depoda **221 canlı varlık / 3.98 GiB**.
+
+| varlık | adet | boyut | tüketicisi |
+|---|---|---|---|
+| `lumeo-windows-x64` | 48 | 1.33 GiB | `release.yml`/`yayinla` — **aynı koşu** |
+| `lumeo-macos-arm64` | 47 | 1.12 GiB | aynı koşu |
+| `lumeo-android-arm64` | 48 | 0.88 GiB | aynı koşu |
+| eski adlandırma (`gpt-image-studio-*`) | 22 | 0.55 GiB | **hiç kimse** (ad değişti) |
+| `pydantic-core-android-arm64` | 56 | 0.10 GiB | `_paket-android.yml` — aynı koşu |
+
+- [x] **KÖK SEBEP: saklama süresi varlığın İŞİNDEN bağımsız seçilmişti.**
+      Dört yükleme var, iki indirme; iki indirme de `run-id` VERMİYOR, yani
+      ikisi de kendi koşusundan okuyor. Yani hiçbir varlığın tüketicisi kendi
+      koşusunun dışında değil — ama paketler 30, wheel 90 gün tutuluyordu.
+      Tüketicisi dakikalar sonra biten bir dosya bir ay kotada duruyordu.
+      Paketler **1 güne**, wheel **7 güne** indi. Wheel'in 1 değil 7 olmasının
+      sebebi ölçülü: koşu dışında GERÇEK bir insan tüketicisi olan tek varlık o
+      (Yol A'da bakımcı elle tetikleyip `android/wheels/` altına işliyor) ve
+      hacmin yalnız %2.5'i.
+- [x] **Neden PR sürümü/atlama DEĞİL.** "Paketleri PR'da hiç yükleme" daha
+      büyük bir kazanç olurdu ama `ci.yml`'in kendi gerekçesi buna karşı:
+      "PR'da yeşil olan şey, yayında koşacak şeyin ta kendisi." Yükleme adımını
+      PR'da atlamak, 2026-08-11'de gerçekten kusur yakalamış bir kapıyı
+      (`if-no-files-found: error` + `cp` hedefi ile `path:` arasındaki kayma)
+      yalnız yayın yolunda bırakırdı. Saklama süresini kısaltmak hiçbir kapıyı
+      zayıflatmıyor.
+- [x] **Yeni mandal:** `tests/test_ci_varlik_saklama.py` (5 iddia). Süreyi VE
+      süreyi savunulabilir kılan VARSAYIMI mandallıyor: bir indirme `run-id`
+      alırsa "tüketici aynı koşuda" cümlesi yanlışa döner ve o gün test, süreyi
+      yeniden düşünmesi gereken kişiye tam olarak orayı gösteriyor. Ayrıca
+      ayrıştırıcının boş küme toplamasına karşı sayı METİNDEN türetiliyor —
+      §0.6'nın dersi. **Beş mutasyon, beşi de kırmızı.**
+- [x] **Mutasyon ④ önce hayatta kaldı ve sebebi mandal değil MUTASYONDU:**
+      `run-id`'yi adımın var olan `with:` bloğunun yanına ikinci bir `with:`
+      olarak yazmıştım; YAML yinelenen anahtarda sessizce sonuncuyu alıyor,
+      yani mutasyon hiç uygulanmamıştı. Tur B'nin "mutasyon hedefi bayatladı"
+      kaydının kardeşi: **hayatta kalan bir mutasyon önce mutasyonun kendisini
+      şüpheli kılar.**
+- [x] **Kanıt:** takım **1798 → 1803 geçti / 10 atlandı**.
+
+> **ÇÖZÜLMEYEN YARI — kotanın kendisi.** Yukarıdaki düzeltme birikimi
+> durduruyor ama var olan 3.98 GiB'ı silmiyor; kota dolu kaldığı sürece yeni
+> koşu da yükleyemez. Eski varlıkların temizliği API'den yapılabilir ve
+> geri alınamaz olduğu için bakımcının kararına bırakıldı.
+
+> **AYRICA: `ci.yml`'in bir gerekçesi artık YANLIŞ.** Dosya "Depo public
+> olduğundan GitHub-hosted runner dakikaları faturalanmıyor; workflow'lardaki
+> eski 'macOS dakikası 10x sayılıyor' gerekçesi artık geçerli değil" diyor.
+> Depo bugün **private** (REST ile doğrulandı). Yani hem dakikalar faturalanıyor
+> hem 10x çarpanı geri döndü — `static/` altına dokunan her PR üç paketi de
+> derletiyor. Bu bir POLİTİKA kararı (kapı mı, maliyet mi), o yüzden kuyruğa
+> yazıldı, bu turda değiştirilmedi.
+
+---
+
+## ✅ Tur F — Telefonda yükleme dört halkadan kırılıyordu (geriye dönük kayıt)
+
+**Bitti (24-26 Ağustos), v0.11.1–v0.11.4, PR #55-58.** Defter o gün
+güncellenmedi; kayıt commit'lerden okunarak yazıldı. Tur **kullanıcı
+şikâyetiyle** açıldı ("telefonda logo yükleyemiyorum") ve şikâyet TEK bir kusur
+değil, art arda dizilmiş dört kapı çıktı — her düzeltme bir sonrakini görünür
+yaptı. Ders defterde duruyor: *bir yüklemenin çalışması için dört ayrı katmanın
+aynı anda doğru olması gerekiyordu ve hiçbiri hata vermiyordu.*
+
+- [x] **v0.11.1 — hedef tür.** Kütüphane sekme şeridi bir SÜZGEÇ ama yükleme
+      hedefi `assetPanelKind`'dan okunuyordu: varsayılan sekmede ("Tümü") dosya
+      `uploads` türüne yazılıyordu — hiçbir bindirmenin okuyamadığı ölü bir tür.
+      Kullanıcı "Eklendi." okuyup sonra "Önce Kütüphane'den bir logo yükle"
+      görüyordu. Düğme artık hedefini ADIYLA söylüyor ("+ Logo yükle").
+      İkinci kusur aynı commit'te: `#extra-add-btn` dosya seçiciyi koşulsuz
+      açıyordu, kapı seçimden SONRA soruluyordu, yani seçilen dosya sessizce
+      düşüyordu.
+- [x] **v0.11.2 — seçici süzgeci ve MIME.** `createIntent()` `accept`
+      listesinin yalnız İLK türünü `setType()`e koyuyor: intent
+      `type = "image/png"` doğuyordu ve yalnız `type`a bakan galeriler JPEG'leri
+      GİZLİYORDU — logosu `.jpg` olan kullanıcı dosyayı seçemiyordu bile.
+      İkinci kapı web tarafında: MIME denetimi yalnız `File.type`a bakıyordu,
+      Android WebView ise onu ContentResolver'dan alıyor ve pek çok sağlayıcı
+      boş dize ya da `application/octet-stream` döndürüyor. Yeni kural
+      "**RED için kanıt gerekir**": dosya çelişkili bir şey iddia etmiyorsa
+      sunucu karar veriyor.
+- [x] **v0.11.3 — asıl kök neden: `ClipData`.** `parseResult()` yalnız
+      `Intent.getData()`ya bakıyor; çoklu seçimde sonuç `getClipData()`de
+      geliyor ve `parseResult` `null` dönüyor, WebView bunu "kullanıcı iptal
+      etti" sanıyor. Kütüphane girdisi `multiple` olduğu için TEK dosyada bile
+      URI ClipData'ya düşüyordu — Kütüphane yüklemesi telefonda hiç
+      çalışmamışken referans yolunun (tek seçim) hep çalışmasının sebebi buydu.
+- [x] **v0.11.4 — üç eksik kapı.** Büyeteçte "Logo ekle" yoktu (bindirmeye tek
+      giriş `#logo-add-btn`, o da yalnız `currentImage` varken açık); seçim
+      kipinde kartın ortası tıklanamıyordu (dokunmada eylem şeridi kartın
+      ~%58'ini kaplıyor, `display: none` gerekti — görünmez şerit dokunuşu
+      yutuyor); ve Medya'da **"Yükle" düğmesi hiç yoktu** — `importFiles` ile
+      `/api/import` eksiksizdi ama tek tetik dokunmada çalışmayan sürükle-bırak
+      olduğu için telefondan galeriye görsel koymanın YOLU YOKTU, üstelik ipucu
+      metni var olmayan bir kontrolü anlatıyordu.
+- [x] **Süreç boşluğu adlandırıldı.** `docs/android/mimari.md`'deki elle
+      doğrulama listesinde yalnız tek-seçim satırı vardı; kusurun bir sürümü
+      atlatmasının sebebi tam olarak buydu. "Çoklu seçim" satırı eklendi ve
+      tek-seçimin geçmesinin bu yolu KANITLAMADIĞI yazıldı.
+- [x] **Kanıt ve yöntem:** depoda Android SDK yok, o yüzden Kotlin işlevleri
+      birebir çıkarılıp **Java ile yazılmış** Android stub'larına karşı
+      `kotlinc -Werror` ile derlendi ve 8'er senaryoda KOŞTURULDU (Java bilerek:
+      Kotlin platform tiplerini görsün diye). Mandallar `test_index.py`,
+      `test_mobile.py`, `test_playwright_studio.py`'de; biri kendi kendini
+      ısıran cinsten — Kotlin KDoc'una yazılan bir joker MIME yorum bloğunu
+      kapatıp derlemeyi kırıyor ve bunu yalnız Android koşucusu görürdü.
+- [ ] **AÇIK BIRAKILDI (gerekçeli):** `assets_store.KINDS` içindeki `uploads`
+      türü ölü ama duruyor — hiçbir şey oraya yazmıyor, hiçbir sekme
+      göstermiyor, ama eskiden yazılmış varlıklar "Tümü" altında görünsün ve
+      silinebilsin diye tür kaldırılmadı. Gerçek bir göç yapılmadı.
+- [ ] **AÇIK BIRAKILDI (gerekçeli):** istemci MIME kapısı bilerek gevşetildi;
+      son söz sunucuda (`app._to_png` → 422). Android doğruluğu CI'da
+      derlenmiyor, elle doğrulama tablosuna dayanıyor.
+
+---
+
+## ✅ Tur E — Masaüstü sunucusu tarayıcıdan korunuyor (geriye dönük kayıt)
+
+**Bitti (23-24 Ağustos), v0.11.0, PR #54.** Defter o gün güncellenmedi; kayıt
+commit'lerden okunarak yazıldı.
+
+- [x] **`netguard.py` — istek kaynağı kapısı.** İki saldırı kapandı.
+      (a) **CSRF:** `/api/edit`, `/api/import`, `/api/assets/{kind}`
+      `multipart/form-data` alıyor, yani CORS'un "basit istek"i — ÖN UÇUŞ YOK.
+      Kullanıcının tarayıcısındaki herhangi bir sayfa onun ücretli API kotasını
+      yakabilir ve galerisine yazabilirdi. (b) **DNS rebinding:** `Host` hiç
+      denetlenmiyordu, yani `/api/history`, `/api/chats` ve `/output/*` açıktı.
+      Kural: `Host` loopback olmak zorunda (BAŞLIĞIN YOKLUĞU da reddediliyor —
+      HTTP/1.1'de zorunlu, yokluğu "tarayıcı değil" demek); `Origin` varsa
+      `http://{Host}`e eşit olmalı. Kendi kaynağı **Host'tan türetiliyor**,
+      sabit yazılmıyor: `desktop.py` `port=0` ile bağlanıyor.
+- [x] **Ara katman DEĞİL sarmalayıcı, ve gerekçesi ölçüldü.** `app.app` modül
+      düzeyinde tekil ve Starlette ara katman yığınını ilk istekte donduruyor;
+      `add_middleware` yolu `tests/test_desktop.py`'yi "Cannot add middleware
+      after an application has started" ile düşürdü. Sonuç: **`app.py`'ye hiç
+      dokunulmadı**, kapı `desktop.py` ve `run.sh` girişlerinde kuruluyor —
+      `TestClient` (Host: `testserver`) kapıyı hiç görmüyor.
+- [x] **CRLF enjeksiyonu kapandı.** `/api/folders/{id}/download` klasör adını
+      `Content-Disposition`a koyuyordu ve temizlik `[^\w\s-]` desenliydi —
+      `\s` CR/LF'i **koruyor**. Bugünkü uvicorn başlığı reddettiği için belirti
+      yakalanmamış bir ASGI hatası ve indirilemeyen bir klasördü; başka bir ASGI
+      sunucusunda gerçek yanıt bölmesi olurdu. Desenin İKİ kopyası vardı; ikisi
+      de tek `folders.safe_component()`e indi. Yan fayda docstring'de yazılı:
+      `.` ve `/` de düştüğü için ZIP girdileri artık `..` taşıyamıyor.
+      Girişte ikinci kapı: `models.FolderRequest.name` denetim karakterlerini
+      eliyor. Mandal desenin ÜÇÜNCÜ kez doğmasını engelliyor.
+- [x] **Şema denetimi bütün sağlayıcılara yayıldı** (`azure_client.check_base_url`).
+      `http://` bilerek kabul ediliyor — ComfyUI/Ollama orada yaşıyor.
+- [x] **Kanıt:** yeni `tests/test_netguard.py` (kapıyı GERÇEK uvicorn ve gerçek
+      soket üzerinden ölçüyor, artı iki mandal giriş noktalarının sarmalayıcıyı
+      gerçekten kullandığını zorluyor) ve `tests/test_guvenlik_baslik.py`.
+- [ ] **AÇIK BIRAKILDI (gerekçeli):** kapı `http`ye sabitli (TLS sonlandıran bir
+      vekil eklenirse o satır öğretilmeli — kırılma sessiz değil, 403 olsun
+      diye böyle seçildi) ve **jetonsuz**, Android'in `SessionCookieGuard`ının
+      aksine: masaüstünde düşman bir yerel süreç zaten `credentials.env`i
+      okuyabiliyor, paylaşılan sır bir şey satın almıyor. Ayrıca kapı yalnız
+      BİLİNEN iki giriş noktasında: `app:app`i doğrudan servis eden üçüncü bir
+      giriş korumasız olur.
+
+---
+
+## ✅ Tur D — Model Arena (o günkü kuyruk maddesi 8)
 
 **Bitti (23 Ağustos).** Kuyruğun **8. maddesi** üste alındı. Kapsam oturumda
 netleşti: 2–4 model seçilebilir · sütun başına AYRI kayıt, ortak `arena_id` ·
@@ -374,42 +739,69 @@ Sıra öneri; her madde **neden · dokunulacak yer · kabul ölçütü · büyü
 taşıyor. Büyüklükler: **S** tek oturum, **M** bir tur, **L** kendi planını
 isteyen iş, **XL** kendi tasarım belgesi olan faz.
 
-### 1. Seçicide karo seçilince ODAK KAYBOLUYOR · **S**
-Tur C'nin `aria-pressed` işini yarıda bırakan kusur, kod gözden geçirmesinde
-çıktı: `#picker-grid` tıklamasında `renderPickerGrid()` çağrılıyor ve o
-`grid.innerHTML = ""` ile bütün karoları **yeniden kuruyor**
-(`folders.js:1070-1072`). Klavyeyle bir karoya Enter'a basan kullanıcının
-odaklı düğümü yok oluyor, odak `<body>`'ye düşüyor — yani ekran okuyucu
-kullanıcısı seçtiği karonun artık "pressed" olduğunu **duymuyor** ve gezinmeye
-diyaloğun başından devam etmek zorunda kalıyor. Kusur `aria-selected`
-döneminden beri var, ama `aria-pressed` düzeltmesinin faydasını tam olarak
-o kullanıcıda siliyor. Karo yeniden kurulmak yerine yalnız özniteliği
-güncellenebilir (eski seçili `false`, yeni seçili `true`) ya da yeniden
-kurulumdan sonra `data-id`'den odak geri verilebilir.
-- [ ] **Kabul:** klavyeyle karo seçildikten sonra `document.activeElement`
-      hâlâ o karo; iddia mutasyonla doğrulanıyor.
+**NUMARALAR KAYAR.** Bir madde kapandığında kalanlar yeniden numaralanıyor, yani
+yukarıdaki tur kayıtlarındaki "kuyruğun N. maddesi" atıfları O GÜNKÜ kuyruğu
+gösteriyor, bugünküyle eşleşmek zorunda değil. Maddenin kimliği numarası değil
+BAŞLIĞI; kapanan madde de silinmiyor, ait olduğu turun kutusunda kanıtıyla
+duruyor.
 
-### 2. Seçicide iç içe klasör etiketi (K27) · **S/M**
-`picker-tile` künyesi yalnız en yakın klasörün adını yazıyor; iç içe klasörlerde
-"hangi A altındaki B" sorusu cevapsız. `folders.js`'te kök→klasör zinciri
-(`parentOf` zinciri zaten var, kırıntı başlığı onu kullanıyor) künyeye taşınacak.
-- [ ] **Kabul:** iki seviyeli klasörde künye "A / B" yazıyor; genişlik 360px'de
-      taşmıyor.
+### 1. Arama, klasör adını yalnız EN YAKIN klasörde eşleştiriyor · **S**
+Tur G'nin künye işinin arama tarafı; aynı turda kod okunurken çıktı.
+`matchesSearch` (folders.js) yalnız `folder.name`e bakıyor, zincire değil.
+Kullanıcı "Kampanyalar" yazınca o klasörün ALTINDAKİ görseller çıkmıyor — oysa
+künye artık "Kampanyalar / Bayram" yazdığı için kullanıcı tam da o adı ekranda
+okuyup aratıyor. Tur G'de YAPILMADI: eşleştirmeyi değiştirmek sonuç kümesini
+değiştirir ve kendi ölçümünü ister (kaç sonuç, hangi kapsamda, kapsam sayaçları).
+- [ ] **Kabul:** iç içe klasörde üst klasörün adı aratıldığında alt klasördeki
+      görseller de geliyor; kapsam sayaçları buna göre.
 
-### 3. Sonuç kartında "Düzenle" / "+ Ek" (K14) · **M**
+### 2. `#picker-empty` her tuş vuruşunda yeniden duyuruyor OLABİLİR · **S**
+Kap `role="status"` taşıyor ve `renderPickerGrid` `textContent`i KOŞULSUZ yeniden
+atıyor — dize değişmese bile. `textContent` ataması metin düğümünü değiştiriyor,
+yani sonuçsuz bir aramada altı karakter yazmak "Sonuç bulunamadı"yı altı kez
+duyurabilir. **ÖLÇÜLMEDİ**, o yüzden Tur G'de dokunulmadı ve madde bir iddia
+olarak burada duruyor: ekran okuyucuların tekilleştirmesi araca göre değişiyor.
+Kanıtsız düzeltme, bu defterin kabul etmediği şey.
+- [ ] **Kabul:** önce ölçüm; gerçekse atama yalnız değişiklik olduğunda yapılıyor.
+
+### 3. `uploads` varlık türü ölü ama duruyor · **S**
+Tur F'in bıraktığı uç: `assets_store.KINDS` hâlâ taşıyor, hiçbir şey yazmıyor,
+hiçbir sekme göstermiyor. Eskiden yazılmış varlıklar "Tümü" altında görünüp
+silinebilsin diye tür kaldırılmadı.
+- [ ] **Kabul:** ya gerçek bir göç (varlıklar `logos`a taşınıyor) ya da türün
+      kaldırılması; ikisi de eski kurulumları kaybetmeden.
+
+### 4. Sonuç kartında "Düzenle" / "+ Ek" (K14) · **M**
 Karar "tam bir geçmiş kaydı ister" diye ertelenmişti; döküm bugün yalnız
 `image_id` taşıyor. Kart eylemleri için kaydın kendisi lazım.
 - [ ] **Kabul:** sonuç kartından doğrudan düzenlemeye/ek referansa geçilebiliyor
       ve silinmiş görselde yer tutucu davranışı bozulmuyor.
 
-### 4. `gitleaks` işi CI'da · **S**
+### 5. `gitleaks` işi CI'da · **S**
 Adım 1 planının tek açık maddesi: geçmiş taramasının kaydı yok.
 - [ ] `.github/workflows/ci.yml`'e bir iş; `credentials.env` deseni ve test
       sabitleri için allowlist gerekiyor (`tests/test_errlog.py` sahte anahtar
       taşıyor).
 - **Kabul:** iş yeşil koşuyor ve gerçek bir sızıntı denemesinde kırmızıya dönüyor.
 
-### 5. Ayarlar'da canlı bağlantı testi düğmeleri · **M**
+### 6. Paketleme kapısının maliyeti: depo artık **private** · **S**
+`ci.yml`'in yazılı gerekçesi "Depo public olduğundan GitHub-hosted runner
+dakikaları faturalanmıyor" diyor ve bu bugün YANLIŞ (REST: `visibility:
+private`). Yani `static/`, `android/`, `build.*`, `.github/workflows/` altına
+dokunan HER PR üç paketi de derletiyor ve macOS dakikası 10x sayılıyor —
+workflow'ların kendi eski gerekçesi geri döndü. Bu bir politika kararı: kapının
+değeri (kırık bir yayını merge'den ÖNCE yakalamak) ile bedeli arasında seçim.
+- [ ] Ya gerekçe yorumu düzeltilip maliyet bilinçle kabul edilir, ya kapı
+      daraltılır (ör. paketleme yalnız `tam-paket` etiketiyle ya da yalnız
+      `.spec`/`build.*`/`android/` değişiminde; `static/` listeden çıkar).
+- [ ] Depo public'e dönecekse karar kendiliğinden düşer — o zaman yalnız yorumun
+      doğrulanması kalır.
+- **Kabul:** `ci.yml`'in yorumu ile deponun görünürlüğü aynı şeyi söylüyor;
+      seçim hangisi olursa olsun gerekçesi yazılı.
+- **Not:** varlık saklama süreleri bu maddenin İÇİNDE DEĞİL — o yarı Tur G'nin
+      CI onarımında kapandı (`tests/test_ci_varlik_saklama.py`).
+
+### 7. Ayarlar'da canlı bağlantı testi düğmeleri · **M**
 README Faz 2'nin son açık maddesi. Bugünkü karşılık yalnız "anahtar kayıtlı mı"
 listesi; gerçek bir çağrı denemesi yok.
 - [ ] Sağlayıcı başına küçük bir uç (`POST /api/settings/test`?) + düğme;
@@ -417,7 +809,7 @@ listesi; gerçek bir çağrı denemesi yok.
 - **Kabul:** yanlış anahtarda anlaşılır Türkçe hata, doğru anahtarda "bağlantı
       kuruldu"; anahtar yanıtta HİÇ yankılanmıyor (write-only sözleşmesi).
 
-### 6. Yerel sağlayıcı adaptörleri: ComfyUI · Ollama · **L**
+### 8. Yerel sağlayıcı adaptörleri: ComfyUI · Ollama · **L**
 Anahtar/adres alanları v0.2.0'dan beri kayıtlı, **adaptör ve arayüz yok**
 (`azure_client.get_settings_status` yalnız durum bayrağı döndürüyor).
 - [ ] `providers._ADAPTERS`'a iki adaptör, katalogda modeller, Ayarlar'da
@@ -425,48 +817,48 @@ Anahtar/adres alanları v0.2.0'dan beri kayıtlı, **adaptör ve arayüz yok**
 - **Kabul:** yerel bir kurulumla üretim yapılabiliyor; sağlayıcı düşükken hata
       Türkçe ve anlaşılır.
 
-### 7. fal.ai · Replicate adaptörleri · **L**
+### 9. fal.ai · Replicate adaptörleri · **L**
 Aynı boşluğun bulut yarısı; ikisi de **kuyruklu** akış (`providers`'ın zaman
 aşımı politikası bunu zaten öngörüyor: "adet başına ayrı istek atan sağlayıcı").
 - [ ] **Kabul:** kuyruk beklerken arayüz ilerleme gösteriyor, zaman aşımı
       sağlayıcıya göre çözülüyor (`tests/test_providers.py`'nin deseni).
 
-### 8. Maske tuvali / bölgesel düzenleme · **L**
+### 10. Maske tuvali / bölgesel düzenleme · **L**
 Master spec Faz 1'in açık yarısı: bugünkü `/api/edit` tüm görsel üzerinden
 çalışıyor, `mask` alanı yok.
 - [ ] Fırça/silgi HTML5 Canvas + `mask` alanının adaptör sözleşmesine girmesi
       (Azure ve OpenAI destekliyor; Gemini'de karşılığı farklı).
 - **Kabul:** maskelenen bölge dışında piksel değişmiyor (golden fixture).
 
-### 9. Stil çipleri · stil şablonları · tipografi katmanı · **M**
+### 11. Stil çipleri · stil şablonları · tipografi katmanı · **M**
 Faz 2'nin açık yarısı. Hazır stil çipleri (*Anime*, *Cyberpunk*, *Cinematic*,
 *Pixel Art*, *3D Render*) prompt'a eklenen jetonlar; tipografi katmanı
 bindirmenin metin tarafı.
 - [ ] **Kabul:** çip seçimi prompt'a görünür biçimde giriyor ve geri alınabiliyor.
 
-### 10. Özel araçlar: Upscaler · Product-in-Hand · **L**
+### 12. Özel araçlar: Upscaler · Product-in-Hand · **L**
 README Faz 3. Upscaler bir sağlayıcı yeteneği; Product-in-Hand bir prompt
 şablonu + referans akışı.
 - [ ] **Kabul:** her ikisi kendi kredi etiketiyle katalogda.
 
-### 11. Image-to-Video motoru · **L**
+### 13. Image-to-Video motoru · **L**
 README Faz 4 (master spec Faz 3'ün video payı). Yeni bir medya TÜRÜ: depo,
 küçük resim, büyüteç ve indirme yolları video tanımıyor.
 - [ ] **Kabul:** üretilen video kayıtta, galeride oynatılabiliyor, indirilebiliyor.
 
-### 12. i18n (TR/EN) · **M**
+### 14. i18n (TR/EN) · **M**
 Arayüz metinleri bugün HTML/JS içinde birebir Türkçe; sözlük katmanı yok.
 - [ ] **Kabul:** dil anahtarı `prefs.json`'a yazılıyor, iki dilde de 360px'de
       taşma yok (İngilizce metinler daha uzun).
 
-### 13. SaaS dönüşümü · **XL**
+### 15. SaaS dönüşümü · **XL**
 Kendi tasarım belgesi var: `docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md`
 (Faz 5). Kredi tarifesi katalogda **metadata olarak** hazır; ledger, hesaplar,
 depolama, ödeme ve filigran açık.
 - [ ] **Kabul:** o belgenin kendi kabul ölçütleri; buraya alınmadan önce ayrı
       bir uygulama planı yazılır.
 
-### 14. PWA · iOS · **L**
+### 16. PWA · iOS · **L**
 Android teslim (Chaquopy APK); PWA'nın service worker/manifest'i ve iOS yok.
 - [ ] **Kabul:** çevrimdışı açılış ve "ana ekrana ekle" akışı çalışıyor.
 

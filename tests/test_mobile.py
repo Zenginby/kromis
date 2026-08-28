@@ -279,6 +279,26 @@ def test_the_picker_side_cannot_squeeze_the_grid_off_the_screen(istemci):
         "satır tanımı esnemiyor: sınıra dayanınca düğmeler kırpılır")
 
 
+def test_the_folder_chain_truncation_is_not_phone_only(istemci):
+    """Künyenin zincir kırpması TELEFONA ÖZGÜ DEĞİL — ve olmamalı.
+
+    Kural `@media (max-width: 768px)` içine düşerse masaüstünde üst zincir hiç
+    daralmaz: `flex: none` taşıyan yaprak kutuyu taşırır ve `.picker-tile`ın
+    `overflow: hidden`ı onu ÜÇ NOKTASIZ keser. Kırılma yalnız geniş pencerede
+    ve yalnız gözle görünür — hiçbir mobil iddia göstermez.
+
+    Kısıt genişlikten bağımsız, çünkü karo her iki uçta da aynı boyda: ölçüldü
+    (Chromium 1194) 360px'te 104px, 1024px'te 106px. `minmax(96px, 1fr)` karoyu
+    zaten oraya çiviliyor, yani künye kutusu masaüstünde daha rahat DEĞİL.
+    """
+    mobil = _mobil_yerlesim(_metin(istemci, "/static/mobile.css"))
+    genel = re.sub(r"/\*.*?\*/", "", _metin(istemci, "/static/style.css"), flags=re.S)
+    for secici in (".picker-cap-folder", ".zincir-ust", ".zincir-yaprak"):
+        assert secici not in mobil, (
+            f"{secici} kuralı telefon sorgusuna kaçmış: masaüstünde kırpma ölür")
+        assert secici in genel, f"{secici} kuralı her genişliğe koşan katmanda yok"
+
+
 def test_the_picker_side_carries_the_bottom_safe_area(istemci):
     """Kartın ALT güvenli alan payı hiç verilmemişti.
 

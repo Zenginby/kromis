@@ -1682,6 +1682,34 @@ body.select-mode #select-toggle,
   display: block; font-weight: 450; color: var(--text); margin-bottom: 2px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* KLASÖR ZİNCİRİ — künye artık "A / B" yazıyor ve dar kutuda ÜST zincir eriyor.
+   Kutu gerçekten dar: 360px'te karo 104px, `.picker-cap`'in dolgusundan sonra
+   metne ~84px kalıyor (ölçüldü, Chromium 1194). Tek kutulu sondan kırpma
+   YAPRAĞI götürürdü — gerekçesi `folders.js`teki `klasorZinciriDugumu`da.
+
+   Kurallar bu dosyada, `mobile.css`te DEĞİL: kırpma her genişlikte doğru
+   davranış (masaüstünde karo ~107px, yani kutu 360px'tekinden büyük değil).
+
+   İki bildirim yükü taşıyor ve ikisi de silinemez:
+   · `.zincir-ust`ta `min-width: 0` — esnek öğenin otomatik en küçük boyu
+     min-content'tir, yani onsuz üst zincir HİÇ daralmaz ve satır taşar.
+   · `.zincir-yaprak`ta `max-width: 100%` — `flex: none` daralmadığı için tek
+     başına uzun bir yaprak kutuyu taşırırdı ve `.picker-tile`ın
+     `overflow: hidden`ı onu ÜÇ NOKTASIZ, sert bir kenardan keserdi. */
+.picker-cap-folder, .card-where { display: flex; }
+.zincir-ust {
+  flex: 0 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.zincir-yaprak {
+  flex: none; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis;
+  /* `nowrap` DEĞİL `pre`: her esnek öğe kendi satır kutusunu açıyor ve satır
+     başındaki boşluk `normal`/`nowrap` altında ATILIYOR — ayraç yaprakla
+     birlikte taşındığı için künye "Kampanyal…/ Bayram" diye okunurdu. `pre`
+     sarmayı da kapatıyor, yani `nowrap`ın işini de görüyor. */
+  white-space: pre;
+}
 /* `aria-selected` DEĞİL `aria-pressed`: `.picker-tile` düz bir `<button>` ve
    kapsayıcısı düz bir `<div>` — `aria-selected` yalnız `option`/`tab`/`row`
    gibi rollerde geçerli, burada ekran okuyucu onu sessizce yok sayıyordu.
@@ -1698,6 +1726,25 @@ body.select-mode #select-toggle,
   box-shadow: var(--accent-glow, none);
 }
 .picker-tile[aria-pressed="true"] .picker-cap { color: var(--text); }
+/* Seçim ızgarayı artık yeniden kurmuyor, yani "seçili VE odaklı" karo bundan
+   sonra klavye kullanıcısının NORMAL hâli. Düzeltmeden önce bu bir arada hiç
+   olmuyordu (Enter'dan sonra odak `<body>`ye düşüyordu) ve çakışma
+   görünmüyordu: yukarıdaki kural (0,2,0) global `:focus-visible`i
+   (0,1,0, §8) `outline` yarışında EZİYOR — yani seçen kullanıcı halkasını
+   kaybederdi. Ekran okuyucu kazanırken gören klavye kullanıcısı kaybetmesin.
+
+   İki işaret AYRI kanaldan: `outline` İÇERİDE (offset -2px) seçimi,
+   `box-shadow` DIŞARIDA odağı söylüyor. İç halka panel rengiyle ayrılıyor ki
+   iki accent halkası birbirine yapışmasın; ızgara boşluğu 12px, 4px'lik dış
+   halka komşu karoya değmiyor.
+
+   Seçimin `--accent-glow`u odaklıyken YERİNİ BIRAKIYOR ve bu bilinçli: ikisini
+   tek `box-shadow` listesinde birleştirmek `--accent-glow` tanımsızsa
+   (`none` liste ortasında geçersiz) bildirimin TAMAMINI düşürürdü — halka da
+   giderdi. Seçim zaten `outline` ile söyleniyor, yani hiçbir bilgi kaybolmuyor. */
+.picker-tile[aria-pressed="true"]:focus-visible {
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent);
+}
 .picker-empty {
   display: grid; place-content: center; justify-items: center; gap: 14px;
   padding: 40px 20px; color: var(--muted); text-align: center;

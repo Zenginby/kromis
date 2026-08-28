@@ -96,6 +96,11 @@ async def _lifespan(app: FastAPI):
         backup.backup_manifests_if_version_changed(
             paths.data_dir(), OUTPUT_DIR, ASSETS_DIR,
             version=version.APP_VERSION, now=now)
+        # Ölü `uploads` türünün göçü — YEDEKTEN SONRA, bilerek: göç kullanıcı
+        # verisini yerinden oynatan tek açılış adımı, yani sürüm değişiminde
+        # alınan yedek göç ÖNCESİ hâli taşımalı. Yeni kurulumda maliyeti tek
+        # bir `isdir`; gerekçesi assets_store.migrate_legacy_uploads'ta.
+        assets_store.migrate_legacy_uploads(ASSETS_DIR)
     except Exception:
         errlog.safe_append(paths.data_dir(), traceback.format_exc())
     yield

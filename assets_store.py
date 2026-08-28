@@ -16,7 +16,27 @@ import uuid
 import jsonstore
 
 MANIFEST_FILE = "index.json"
-KINDS = ("logos", "banners", "mottos", "uploads")
+KINDS = ("logos", "banners", "mottos")
+
+# ── ÖLÜ TÜR: `uploads` ──────────────────────────────────────────────
+#
+# D9'da dördüncü bir tür vardı ve kütüphanedeki "+ Yükle" düğmesi "Tümü"
+# sekmesi seçiliyken oraya yazıyordu. ÇIKMAZ SOKAKTI: bindirme seçicisi yalnız
+# logos/mottos/banners okuyor, sunucuda konumlanabilir bindirme de
+# `models.OVERLAY_ASSET_KINDS` ile sınırlı — yani oraya düşen bir logo hiçbir
+# görsele bindirilemiyordu. Kullanıcının gördüğü şuydu: dosya gidiyor,
+# "Eklendi." yazıyor, logo hiçbir yerde kullanılamıyor.
+#
+# Hedef (sekmesi ve yükleme yolu) kaldırıldı ama TÜR duruyordu, çünkü eskiden
+# oraya yazılmış varlıkları kaybetmemek gerekiyordu. Bedeli, yarım bir çözüm
+# olmasıydı: o varlıklar "Tümü" listesinde GÖRÜNÜYOR ama hâlâ HİÇBİR yerde
+# kullanılamıyordu — kullanıcı aynı çıkmaz sokağı bu kez sessizce yaşıyordu.
+#
+# Göç bunu kapatıyor: kayıtlar `logos`a taşınıyor (yükleme hedefinin bugünkü
+# varsayılanı da orası — `assets.js` UPLOAD_TARGET.all === "logos"), yani
+# varlık hem duruyor hem KULLANILABİLİR oluyor, ve tür artık taşınmıyor.
+LEGACY_KIND = "uploads"
+LEGACY_TARGET = "logos"
 
 # storage._SAFE_ID ile aynı: uuid4().hex[:12] üretimiyle uyumlu bare hex token.
 _SAFE_ID = re.compile(r"[0-9a-f]{8,32}")
@@ -91,6 +111,73 @@ def asset_path(kind: str, asset_id: str, assets_dir: str) -> str | None:
         return None
     path = os.path.join(kind_dir, f"{asset_id}.png")
     return path if os.path.isfile(path) else None
+
+
+def migrate_legacy_uploads(assets_dir: str) -> int:
+    """Ölü `uploads` türündeki varlıkları `logos`a taşır; taşınan sayısını döndürür.
+
+    Açılışta koşuyor (`app._lifespan`), dizin yoksa hiçbir şey yapmıyor — yani
+    yeni kurulumlarda maliyeti bir `isdir` çağrısı.
+
+    SIRA BİLİNÇLİ: önce dosya taşınıyor (`os.replace`, aynı dosya sistemi
+    içinde atomik), sonra manifest yazılıyor. Ters sıra, araya düşen bir
+    çökmede manifest'i OLMAYAN bir dosyaya işaret eder bırakırdı — kullanıcı
+    kütüphanede kırık bir karo görürdü. Bu sırada ise yarım kalmış bir koşu
+    yalnız listelenmeyen bir dosya bırakıyor ve İKİNCİ koşu onu topluyor:
+    kaynak dosya yok ama hedef dosya varsa kayıt yine yazılıyor.
+
+    ÇAKIŞMA gerçek bir kayıp riski taşıdığı için ayrıca ele alınıyor: id hedef
+    türde zaten varken kaynak dosya da HÂLÂ duruyorsa bu "göçmüş" değil
+    çakışmış demektir (göçen kaydın kaynağı silinmiş olurdu). Aynı id ikinci
+    kez yazılsaydı eski logo listede görünmez olurdu; onun yerine yeni bir id
+    veriliyor.
+
+    Kaynak dizin yalnız BOŞSA siliniyor: manifest'te kaydı olmayan (uygulamanın
+    hiç görmediği) bir dosya kalmışsa `rmdir` düşer ve dizin yerinde kalır.
+    Kullanıcının dosyasını sessizce silmektense okunmayan bir dizin bırakmak
+    yeğdir.
+    """
+    kaynak = os.path.join(assets_dir, LEGACY_KIND)
+    if not os.path.isdir(kaynak):
+        return 0
+
+    hedef = _kind_dir(assets_dir, LEGACY_TARGET)
+    os.makedirs(hedef, exist_ok=True)
+    tasinan = 0
+
+    with jsonstore.lock_for(_manifest_path(hedef)):
+        kayitlar = _read_manifest(hedef)
+        idler = {r.get("id") for r in kayitlar}
+        for kayit in _read_manifest(kaynak):
+            asset_id = kayit.get("id")
+            if not isinstance(asset_id, str) or not _SAFE_ID.fullmatch(asset_id):
+                continue  # bozuk kayıt: dosyası zaten adreslenemez
+            src = os.path.join(kaynak, f"{asset_id}.png")
+            if asset_id in idler:
+                if not os.path.exists(src):
+                    continue  # göçmüş: yarım kalmış bir koşunun ikinci turu
+                asset_id = uuid.uuid4().hex[:12]  # çakışma (yukarıdaki gerekçe)
+            dst = os.path.join(hedef, f"{asset_id}.png")
+            if os.path.exists(src):
+                os.replace(src, dst)
+            elif not os.path.exists(dst):
+                continue  # ne kaynakta ne hedefte: kayıt zaten öksüz
+            kayitlar.append({**kayit, "id": asset_id,
+                             "filename": f"{asset_id}.png",
+                             "kind": LEGACY_TARGET})
+            idler.add(asset_id)
+            tasinan += 1
+        if tasinan:
+            _write_manifest(hedef, kayitlar)
+
+    manifest = _manifest_path(kaynak)
+    if os.path.exists(manifest):
+        os.remove(manifest)
+    try:
+        os.rmdir(kaynak)
+    except OSError:
+        pass  # manifest'siz dosya kalmış: kullanıcının verisi silinmez
+    return tasinan
 
 
 def delete_asset(kind: str, asset_id: str, assets_dir: str) -> bool:

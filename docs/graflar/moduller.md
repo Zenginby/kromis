@@ -23,7 +23,7 @@ flowchart TD
     n_netguard["netguard<br/>157 satır"]
   end
   subgraph katman6["katman 6"]
-    n_app["app<br/>1719 satır"]
+    n_app["app<br/>1724 satır"]
   end
   subgraph katman5["katman 5"]
     n_chat_providers["chat_providers<br/>124 satır"]
@@ -45,7 +45,7 @@ flowchart TD
     n_models["models<br/>780 satır"]
   end
   subgraph katman1["katman 1"]
-    n_assets_store["assets_store<br/>114 satır"]
+    n_assets_store["assets_store<br/>201 satır"]
     n_azure_client["azure_client<br/>458 satır"]
     n_chat_prompt["chat_prompt<br/>62 satır"]
     n_chat_store["chat_store<br/>253 satır"]
@@ -168,8 +168,8 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | modül | satır | katman | ithal ettiği | ithal eden | test |
 | --- | --- | --- | --- | --- | --- |
 | `android_main.py` | 194 | 9 | `app` (erteli), `desktop` (erteli), `errlog` (erteli), `paths` (erteli) | 0 | 1 |
-| `app.py` | 1719 | 6 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 27 |
-| `assets_store.py` | 114 | 1 | `jsonstore` | 3 | 8 |
+| `app.py` | 1724 | 6 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 27 |
+| `assets_store.py` | 201 | 1 | `jsonstore` | 3 | 8 |
 | `azure_client.py` | 458 | 1 | `paths`, `winsec` | 9 | 25 |
 | `backup.py` | 187 | 3 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 1 | 1 |
 | `catalog.py` | 769 | 0 | — | 10 | 18 |

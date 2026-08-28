@@ -115,13 +115,29 @@ imkânsız kılan iddia bu.
 
 | Değişiklik | PR'da koşan |
 |---|---|
-| Her PR | pytest (~3 dk) |
-| `.spec`, `build.sh`, `build.ps1`, `android/`, `static/`, `bundled/`, `branding/`, `requirements.txt`, `.github/workflows/` | pytest **+ üç paket** |
+| Her PR | pytest (~3 dk) **+ sızıntı taraması** (~1 dk) |
+| `.spec`, `build.sh`, `build.ps1`, `android/`, `branding/`, `requirements.txt`, `.github/workflows/` | pytest **+ üç paket** |
 | `tam-paket` etiketi | pytest **+ üç paket** |
+| `static/`, `bundled/` | yalnız pytest — bkz. aşağısı |
 
-Depo public olduğu için GitHub-hosted runner dakikaları faturalanmıyor;
-workflow'lardaki eski "macOS dakikası 10x sayılıyor" gerekçeleri artık geçerli
-değil.
+**Depo `private`, yani runner dakikaları faturalanıyor** ve macOS dakikası 10x
+sayılıyor. (Bu paragraf bir zamanlar tersini söylüyordu; 2026-08-28'de REST ile
+ölçüldü: `visibility: private`.) Kapı bu yüzden daraltıldı: `static/` ve
+`bundled/` pakete **dizin bütün** olarak giriyor, yani içerikleri paketlemenin
+sonucunu değiştiremiyor. Kapının orada gerçekten yakaladığı tek sınıf —
+doğrulamaların ADA GÖRE aradığı bir dosyanın yeniden adlandırılması — üç runner
+yerine `tests/test_paket_icerik_listesi.py`de, her PR'da ve saniyenin altında
+ölçülüyor. `static/`e dokunan bir PR'da yine de tam matris isteniyorsa yol
+`tam-paket` etiketi.
+
+**Sızıntı taraması her PR'da ve geçmişin TAMAMINDA koşuyor** (`gitleaks`,
+sürüm + sha256 ile sabitlenmiş ikili). Diff'e bakmıyor, çünkü bir sırrın
+commit'ten silinmesi onu geçmişten silmiyor — depoyu klonlayan herkes eski
+commit'i okuyabiliyor. İlk koşunun kaydı: 76 commit, 3.4 MB, 405 ms, gerçek
+sır yok. Muafiyetler `.gitleaks.toml`da tek tek yazılı SAHTE değerler; hiçbir
+dizin bütün olarak muaf değil (yoksa fixture'ların yaşadığı yer kör kalırdı).
+Maliyet gerekçesi burada bağlamıyor: iş ubuntu'da (1x) ve saniyenin yarısı
+sürüyor.
 
 ## Yeni bir kapıyı sürüm harcamadan denemek
 

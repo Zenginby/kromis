@@ -1,0 +1,45 @@
+# Sızıntı taramasının yapılandırması — `.github/workflows/ci.yml` içindeki
+# "Sızıntı taraması" işi bunu kullanıyor.
+#
+# NEDEN VAR: bu depo kimlik bilgisi tutan bir uygulamanın kaynağı
+# (`credentials.env`, sağlayıcı anahtarları) ve testleri anahtar BİÇİMİNDE
+# dizeler taşımak zorunda. Bir gün gerçek bir anahtar yanlışlıkla commit
+# edilirse onu yakalayacak tek şey otomatik bir tarama; insan gözü diff'te
+# `sk-proj-…` ile `sk-proj-DUMMY…` arasındaki farkı kaçırır.
+#
+# TARAMA GEÇMİŞİN TAMAMINI okuyor, yalnız PR'ın diff'ini değil. Sebep basit:
+# bir sırrın silinmesi onu geçmişten SİLMEZ; commit hâlâ orada duruyor ve
+# depoyu klonlayan herkes okuyabiliyor. İlk koşunun kaydı (2026-08-28, 76
+# commit, ~3.4 MB, 405 ms) aşağıdaki listeyi üretti: bulguların hepsi bilerek
+# sahte sabitler, depoda gerçek bir sırrın izi YOK.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = """
+Bilerek SAHTE sabitler. Değerler tek tek yazılı, dizin bütün olarak
+muaf tutulmuyor: `^tests/` muafiyeti yazılsaydı bir gün gerçekten bir teste
+yapıştırılan gerçek anahtar da sessizce geçerdi — oysa fixture'ların yaşadığı
+yer tam da orası.
+
+Liste BÜYÜMEMELİ. Yeni bir sahte anahtar `DUMMY` damgası taşırsa ilk kural onu
+zaten kapsıyor; aşağıdaki dört satır damgadan ÖNCE yazılmış olanlar ve GEÇMİŞTE
+donmuş durumdalar (bir commit'ten silmek onu geçmişten silmiyor), o yüzden
+dosyalar bugün düzeltilse bile bu satırlar kalmak zorunda.
+"""
+regexTarget = "match"
+regexes = [
+  # Depodaki damga: sahte anahtarlar bunu taşıyor (test_credstore, test_errlog,
+  # test_settings_route, test_index …). Yeni fixture'ların da taşıması beklenir.
+  '''(?i)dummy''',
+  # Damgadan önce yazılmış üç fixture — tests/test_settings_route.py (kalıcılık
+  # testinin "eski değer" anahtarı), tests/test_settings.py (fal.ai) ve
+  # tests/test_errlog.py (Azure başlığı).
+  '''sk-proj-KALICI\d+''',
+  '''fal-secret789''',
+  '''abcdef1234567890abcdef''',
+  # docs/android/pydantic-karari.md'deki wheel DOSYA ADI ("…-cp313-cp313-android
+  # -21-arm64_v8a.whl"); anahtar değil, uzun bir ad.
+  '''_arm64_v8a\.whl''',
+]

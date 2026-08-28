@@ -3205,8 +3205,11 @@ def test_the_picker_separates_loading_and_failure_from_emptiness():
     #    kendi başına karşılar — sıfırlama silinse test yeşil kalırdı (ölçüldü).
     #    Sonuç: hatadan sonra tekrar açılışta ekranda "alınamadı" asılı kalır.
     assert 'pickerState = "loading"' in govde, "açılışta durum sıfırlanmıyor"
-    # 4) Boş durum metni DURUMU biliyor, yalnız sorguyu değil.
-    metin = re.search(r'"picker-empty-text"\)\.textContent\s*=(.*?);', picker, re.S)
+    # 4) Boş durum metni DURUMU biliyor, yalnız sorguyu değil. İfade artık
+    #    doğrudan atanmıyor, bir `const`ta duruyor (gerekçesi bir alttaki
+    #    testte: koşulsuz atama canlı bölgeyi her tuş vuruşunda yeniden
+    #    duyuruyordu), o yüzden iddia ATAMAYA değil İFADEYE bakıyor.
+    metin = re.search(r"const bosMetin\s*=(.*?);", picker, re.S)
     assert metin and "pickerState" in metin.group(1), (
         "boş durum metni yükleme/hata durumunu bilmiyor: üç durum tek cümlede")
     assert 'pickerState = "error"' in govde, "ağ reddi hata durumunu kurmuyor"
@@ -3214,6 +3217,41 @@ def test_the_picker_separates_loading_and_failure_from_emptiness():
     # 5) Hata cümlesi ekran okuyucuya da ulaşıyor: kap canlı bölge.
     assert re.search(r'id="picker-empty"[^>]*role="status"', _html()), (
         "#picker-empty canlı bölge değil: hata cümlesi hiç duyurulmuyor")
+
+
+def test_the_empty_state_sentence_is_not_rewritten_when_it_did_not_change():
+    """Kuyruk 1 · sonuçsuz arama canlı bölgeyi HER TUŞ VURUŞUNDA yeniden yazıyordu.
+
+    Madde defterde bir İDDİA olarak duruyordu ("duyuruyor OLABİLİR") ve tam da
+    ölçülmediği için Tur G'de dokunulmamıştı. Ölçüldü — Chromium 1194, boş
+    kütüphane, seçici açık, `#picker-empty` üzerinde MutationObserver
+    (childList + characterData + attributes), sonuçsuz kalacak altı harf:
+
+        düzeltmeden önce:  6 childList mutasyonu — beşi AYNI cümleyle
+                           ("Sonuç bulunamadı" → "Sonuç bulunamadı")
+        düzeltmeden sonra: 1 (yalnız gerçek durum değişimi)
+
+    Kök neden `textContent` atamasının metin düğümünü KOMPLE değiştirmesi:
+    kayıt `characterData` değil `childList` geliyor, yani dize hiç değişmemiş
+    olsa bile canlı bölge YENİ bir düğüm görüyor. Bir ekran okuyucunun bunu
+    kaç kez seslendirdiği araca göre değişir; değişmeyen şey, o kararı veren
+    DOM sinyalinin beş kez FAZLADAN üretilmiş olması.
+
+    `hidden` aynı koşuda suçsuz çıktı (sıfır attributes kaydı: özniteliği
+    zaten yokken kaldırmak mutasyon üretmiyor), o yüzden orada koşul YOK —
+    olmayan bir kusura kalkan yazmak, bir sonraki okuyucuya yanlış bilgi
+    bırakmak olurdu.
+    """
+    govde = _balanced_body(_picker_js(), "function renderPickerGrid(")
+    atama = re.search(r"(\w+)\.textContent\s*=\s*bosMetin", govde)
+    assert atama, "boş durum metni tek bir `bosMetin` değeri üzerinden yazılmıyor"
+    kutu = atama.group(1)
+    assert re.search(
+        r"if\s*\(\s*" + kutu + r"\.textContent\s*!==\s*bosMetin\s*\)\s*"
+        + kutu + r"\.textContent\s*=\s*bosMetin", govde), (
+        "atama koşulsuz: aynı cümle her tuş vuruşunda yeniden duyurulur")
+    assert '$("picker-empty-text").textContent =' not in govde, (
+        "metin koşulu atlayarak doğrudan da yazılıyor: kapı boşa düşer")
 
 
 def test_the_extra_rejection_sentence_lives_in_exactly_one_place():

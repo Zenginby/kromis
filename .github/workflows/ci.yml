@@ -44,6 +44,49 @@ jobs:
     name: Testler
     uses: ./.github/workflows/_test.yml
 
+  # Sırlar geçmişe DE sızabilir: tarama diff'i değil bütün geçmişi okuyor.
+  #
+  # NEDEN AYRI (ve neden her koşuda): bu depo kimlik bilgisi tutan bir
+  # uygulamanın kaynağı ve testleri anahtar BİÇİMİNDE dizeler taşımak zorunda.
+  # İnsan gözü diff'te `sk-proj-…` ile `sk-proj-DUMMY…` arasındaki farkı
+  # kaçırır; kaçırdığında da bir sırrın commit'ten silinmesi onu GEÇMİŞTEN
+  # silmez. İşin maliyeti ölçüldü: 76 commit / 3.4 MB / 405 ms — paketleme
+  # kapısını daraltmayı gerektiren "private depo, dakika faturalanıyor"
+  # gerekçesi bu işi kapsamıyor, çünkü tarama saniyenin yarısı sürüyor ve
+  # ubuntu dakikası 1x.
+  #
+  # RESMİ EYLEM (gitleaks/gitleaks-action) YERİNE SABİTLENMİŞ İKİLİ: eylem
+  # organizasyon hesaplarında lisans anahtarı istiyor ve kendi telemetrisini
+  # taşıyor. Sürüm + sha256 çifti burada yazılı olduğu için koşan şey
+  # denetlenebilir; sürüm yükseltmesi diff'te GÖRÜNÜR bir karar oluyor.
+  #
+  # `--redact`: gerçek bir bulguda sır koşu günlüğüne YAZILMAZ. Bulgunun
+  # dosyası ve satırı zaten yazılıyor, teşhis için o yetiyor — sırrı günlüğe
+  # dökmek onu ikinci bir yere sızdırmak olurdu.
+  sizinti:
+    name: Sızıntı taraması
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Sığ klonda geçmiş yok: tarama yalnız son commit'i görürdü.
+          fetch-depth: 0
+
+      - name: gitleaks
+        env:
+          SURUM: "8.28.0"
+          SHA256: a65b5253807a68ac0cafa4414031fd740aeb55f54fb7e55f386acb52e6a840eb
+        run: |
+          set -euo pipefail
+          curl -sSfL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${SURUM}/gitleaks_${SURUM}_linux_x64.tar.gz"
+          echo "${SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar xzf gitleaks.tar.gz gitleaks
+          # Sıfırdan farklı çıkış = bulgu var = iş kırmızı. Muafiyetler
+          # .gitleaks.toml'da tek tek yazılı; dizin bütün olarak muaf değil.
+          ./gitleaks git --no-banner --redact --config .gitleaks.toml .
+
   # PR paketlemeye dokunuyor mu? Cevabı tek yerde üretip üç işe dağıtıyoruz.
   kapsam:
     name: Paketleme kapsamı

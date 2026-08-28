@@ -1065,11 +1065,27 @@ function renderPickerGrid(scopes = pickerScopes()) {
     if (geri) geri.focus();
   }
   $("picker-empty").hidden = list.length > 0;
-  $("picker-empty-text").textContent =
+  // METİN YALNIZ DEĞİŞİNCE YAZILIYOR. Kap `role="status"`, yani içeriğinin her
+  // değişmesi bir DUYURU; `textContent` ataması da metin düğümünü komple
+  // değiştiriyor (characterData değil, childList mutasyonu) — dize aynı kalsa
+  // bile ekran okuyucu YENİ bir düğüm görüyor.
+  //
+  // ÖLÇÜLDÜ (Chromium 1194, boş kütüphanede seçici açık, sonuçsuz kalacak altı
+  // harf yazıldı; kap üzerinde MutationObserver): koşulsuz atama canlı bölgede
+  // ALTI childList mutasyonu bırakıyordu ve beşi aynı cümleyle
+  // ("Sonuç bulunamadı" → "Sonuç bulunamadı"). Yani arama kutusuna yazan
+  // kullanıcı aynı cümleyi harf başına bir kez daha dinliyordu. Koşullu
+  // atamayla sayı BİRE, yani gerçek durum değişimine iniyor.
+  //
+  // `hidden` aynı ölçümde suçsuz çıktı: `hidden = false` özniteliği zaten
+  // yokken kaldırmak mutasyon üretmiyor (aynı koşuda sıfır attributes kaydı).
+  const bosMetin =
     pickerState === "loading" ? "Görseller yükleniyor…"
     : pickerState === "error" ? "Görseller alınamadı."
     : pickerQuery ? "Sonuç bulunamadı"
     : "Bu kapsamda görsel yok";
+  const bosKutu = $("picker-empty-text");
+  if (bosKutu.textContent !== bosMetin) bosKutu.textContent = bosMetin;
 }
 
 /** Izgaradaki bir karoyu id'siyle bulur. Klasör id'leri çıplak onaltılık

@@ -389,9 +389,12 @@
                okuyor; sunucuda da konumlanabilir bindirme `logos`/`mottos` ile
                sınırlı (`models.OVERLAY_ASSET_KINDS`) ve banner'ın kendi ucu
                var — yani oraya düşen bir logo hiçbir görsele
-               bindirilemiyordu. Türün kendisi arka uçta DURUYOR
-               (`assets_store.KINDS`): eskiden oraya yazılmış varlıklar
-               "Tümü"de görünmeye ve silinebilmeye devam ediyor. -->
+               bindirilemiyordu. Tür bir süre arka uçta DURDU ki
+               eskiden oraya yazılmış varlıklar kaybolmasın; o yarım çözümün
+               bedeli, o varlıkların "Tümü"de GÖRÜNÜP hâlâ hiçbir yerde
+               kullanılamamasıydı. Artık açılışta `logos`a GÖÇÜYORLAR
+               (assets_store.migrate_legacy_uploads) — hem duruyorlar hem
+               bindirmede kullanılabiliyorlar; tür de kalktı. -->
         </div>
         <input type="file" id="asset-file-input" accept="image/png,image/jpeg,image/webp" multiple hidden />
         <div id="asset-grid" class="asset-grid" aria-live="polite"></div>

@@ -27,15 +27,28 @@ main'e merge
    ├─ surum-yaz     tools/surum_yaz.py     → version.py + README + GUNCELLEME.md
    │                                          → main'e "chore(surum): vX.Y.Z [skip ci]"
    ├─ test          _test.yml              → hızlı kapı (Linux, ~3 dk)
+   ├─ taslak        gh release create --draft → boş TASLAK (tag'siz, görünmez)
    ├─ paket-macos   _paket-macos.yml    ─┐
-   ├─ paket-windows _paket-windows.yml  ─┼─ üçü paralel, yayına DOKUNMAZ
-   ├─ paket-android _paket-android.yml  ─┘   (yalnız artifact yükler)
+   ├─ paket-windows _paket-windows.yml  ─┼─ üçü paralel, TASLAĞA yükler
+   ├─ paket-android _paket-android.yml  ─┘   (yayın hâlâ oluşmuyor)
    │
-   └─ yayinla       TEK yazıcı → küme denetimi → tag + yayın + üç paket
+   └─ yayinla       TEK yazıcı → küme denetimi → --draft=false → tag + yayın
 ```
 
 **Tag'i yayın işi atıyor, hattın başında değil.** Yani bir paket kırmızıya
 düşerse ortada ne tag ne yayın kalır — "eksik yayın" diye bir ara durum yok.
+Taslak bunu bozmuyor: taslağın tag'i yoktur ve yalnız yazma yetkisi olanlara
+görünür; tag de, yayın da tek `--draft=false` çağrısında doğar.
+
+**Paketler neden doğrudan taslağa yazıyor.** 2026-08-28'de paketler Actions
+VARLIĞI olarak yükleniyor, `yayinla` onları indiriyordu. Actions varlık kotası
+doldu: üç paket de hatasız derlendi ve doğrulandı ama teslim edilemedikleri
+için yayın çıkmadı — depodaki 3.98 GiB'ın tamamı silindikten sonra bile sayaç
+saatlerce dolu kaldı (hesaplama 6-12 saatte bir ve havuz hesap geneli). Yayın
+varlıkları o kotaya hiç girmiyor; kırılgan olan tek şey aradaki ara kopyaydı.
+Aynı sebeple Android wheel'i de varlıkla değil ÖNBELLEKLE taşınıyor (ayrı ve
+ücretsiz havuz, depo başına 10 GB). Yayın yolunda artık tek bir
+`upload-artifact` yok ve `tests/test_release_manifest.py` bunu mandallıyor.
 
 ## Sürüm nasıl belirleniyor
 
@@ -81,11 +94,13 @@ hiçbir şey ifade etmiyor.
 `release_manifest.py` — yayına giren paketlerin tek kaynağı. İki yerde
 tüketiliyor:
 
-- **Çalışma anında:** `yayinla` işi `dist/` içeriğini manifestle **küme eşitliği**
-  olarak karşılaştırıyor. Eksik varlık da fazla varlık da yayını durduruyor.
+- **Çalışma anında:** `yayinla` işi TASLAĞIN içeriğini manifestle **küme
+  eşitliği** olarak karşılaştırıyor. Eksik varlık da fazla varlık da yayını
+  durduruyor; 0 baytlık bir dosya da geçemiyor.
 - **pytest'te:** `tests/test_release_manifest.py` her PR'da README indirme
   tablosunu, GUNCELLEME.md dosya tablosunu, `yayinla` işinin `needs:` listesini
-  ve her paket işinin artifact adını manifestle karşılaştırıyor.
+  ve her paket işinin TESLİM KOMUTUNDAKİ dosya adını manifestle
+  karşılaştırıyor.
 
 Dördüncü bir platform eklemek için manifeste bir satır yazmak **yetmez**:
 README'si, GUNCELLEME satırı, çağrılabilir workflow'u ve `release.yml`'deki işi

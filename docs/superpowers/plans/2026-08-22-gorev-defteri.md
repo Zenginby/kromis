@@ -2,7 +2,7 @@
 
 **Tarih:** 28 Ağustos 2026 · **Son dal:** `claude/next-task-plan-fxqy2d`
 **Bugünkü ölçüm:** `APP_VERSION` **0.11.4** (sonrakini CI yazıyor),
-`pytest tests/ -q` → **1803 geçti / 10 atlandı**
+`pytest tests/ -q` → **1809 geçti / 10 atlandı**
 **Defterin açılış ölçümü** (Tur A öncesi): `APP_VERSION` 0.7.0 → 1613 geçti / 10 atlandı
 (atlananlar her üç ölçümde de yalnız Windows'a özgü DACL testleri + kurulu
 olmayan Playwright)
@@ -30,6 +30,74 @@ burada durur. Yol haritaları (README fazları, `2026-08-10-saas-transformation-
 4. Kuyruktan bir madde alındığında **üste taşınır** ve kendi adım listesini
    orada kazanır. Kuyruk sırası bir söz değil, öneri: kullanıcı sırayı
    değiştirebilir.
+
+---
+
+## ✅ Tur H — Yayın, ücretsiz olmayan bir depoya bağlıydı
+
+Tur G'nin CI onarımı birikimi durdurdu ama **yetmedi.** Saklama süreleri
+kısaltıldı, depodaki 3.98 GiB'ın TAMAMI silindi (221 varlık; buradan
+doğrulandı: canlı 0) — kota yine de açılmadı. Kanıt zinciri:
+
+| saat | ne oldu |
+|---|---|
+| 13:27 | PR #59 CI: üç paketleme işi de `Artifact storage quota has been hit` |
+| ~17:00 | merge; Yayın #36 aynı hatayla düştü — `retention-days: 1` kayıtta görünüyor, yani düzeltme canlıydı |
+| ~17:30 | bakımcı 217 varlığı sildi; depo 3.98 GiB → **0.00 GiB** |
+| 19:58 | **kanarya** (wheel workflow'u, 16 sn, 1.8 MB) yine aynı hata |
+
+- [x] **Ders, sürenin ötesindeydi.** Sayaç 6-12 saatte bir hesaplanıyor ve havuz
+      DEPO değil HESAP geneli — yani bu deponun temizliği kotayı açmaya
+      yetmeyebilir. Yayın hattı, kendi hatasız ürettiği ikilileri teslim
+      edemediği için rehin kalıyordu. Oysa yayın varlıkları (Releases
+      altındakiler) o kotaya HİÇ girmiyor: kırılgan olan tek şey aradaki ARA
+      KOPYAydı.
+- [x] **Paketler artık TASLAK yayına yazıyor.** `taslak` işi boş bir taslak
+      açıyor (tag'siz, yalnız yazma yetkisi olanlara görünür), üç paket işi
+      `gh release upload` ile doğrudan ona yüklüyor, `yayinla` küme denetimini
+      taslağın İÇİNDE yapıp tek `--draft=false` çağrısıyla yayımlıyor.
+      Bayt akışı da kısalıyor: derleyen makineden doğrudan son yerine.
+- [x] **TEK YAZICI güvencesi korunuyor.** v0.4.2'nin "95 saniye boyunca yarım
+      yayın" sınıfı buraya ulaşamaz çünkü yazılan şey taslak. Mandal da o
+      ayrımı öğrendi: artık YÜKLEYEN işleri değil YAYIMLAYAN işi sayıyor
+      (`--draft=false`), ve tam bir tane olmalı.
+- [x] **Wheel de varlıktan çıktı** — 1.8 MB'dı ve yayını yine de kırıyordu;
+      kota dolunca boyut önemsiz. Teslim artık ÖNBELLEK (ayrı ve ücretsiz
+      havuz, depo başına 10 GB) ve wheel zaten oraya yazılıyordu, yani yeni bir
+      depolama eklenmedi. Anahtar `wheel` işinin ÇIKTISI: çivi çözme mantığı
+      çağıranda ikinci kez yazılsaydı sessizce ayrışırdı.
+- [x] **PR koşusu artık hiçbir yere teslim etmiyor** (`taslak` girdisi boş).
+      Kapının sorusu zaten "paketleme ayakta mı"; kotayı dolduran birikimin
+      büyük kısmı da PR'ların kimsenin okumadığı paketleriydi.
+- [x] **İzin bloğu paket workflow'larından KALDIRILDI** — çağırandan devralınıyor.
+      Sabit yazılamazdı: çağrılan workflow çağıranından fazla izin isteyemez,
+      yani `contents: write` yazılsaydı `ci.yml` (read) bu workflow'u HİÇ
+      çağıramaz, PR'daki paketleme kapısı tümden düşerdi.
+
+**Kaynak deseninin göremediği bir kusuru gözle yakaladım:** teslim adımı ilk
+yazımda kabuğunu bildirmiyordu. `windows-latest`'ta `run:` varsayılanı
+**pwsh**'tir ve orada `set -euo pipefail` bir komut bile değil — yani "eksik
+dosya adımı kırmızıya düşürür" güvencesi Windows'ta sessizce yalandı ve mandalım
+da (metinde o satırı arıyordu) yeşil kalıyordu. Üç teslim tek deyime sabitlendi
+(`shell: bash`) ve iddia artık kabuğu da ölçüyor.
+
+**Bir mandal daha ANLATIYI doğrulamıştı.** "Teslim manifestteki adı kullanıyor"
+iddiası adımın TAMAMINA bakıyordu; adımın sonundaki `echo` da dosya adını
+yazdığı için, komuttaki adı bozan mutasyon iddiayı hayatta bıraktı. İddia
+`gh release upload` SATIRINA indirildi. §0.6'nın dersi bu turda onuncu kez.
+
+- [x] **Yayın kapısının kendisi artık bedava sınanıyor.** `yayinla` işine gömülü
+      küme denetimi betiği YAML'dan çıkarılıp sentetik `varliklar.tsv` ile
+      koşuluyor: tam küme geçiyor, eksik/fazla/0-bayt üçü de kırmızı. O betik
+      daha önce yalnız gerçek bir yayın koşusunda çalışıyordu, yani bir kusuru
+      ancak sürüm harcayarak öğrenirdik.
+- [x] **Kanıt:** takım **1803 → 1809 geçti / 10 atlandı**. **On mutasyon, onu da
+      kırmızı.** Yayın yolunda artık tek bir `upload-artifact` yok.
+
+> **GERÇEK KOŞUYLA KANITLANACAK TEK ŞEY:** çağrılan workflow'un izni
+> çağırandan devralması. Belge böyle diyor ve kaynakta doğrulanamaz; yanılıyorsa
+> belirti nettir — yayın yolunda `gh release upload` 403 döner. CI yolu her
+> hâlükârda güvende, çünkü orada yükleme adımı hiç koşmuyor.
 
 ---
 

@@ -209,26 +209,103 @@ jobs:
     with:
       ref: ${{ needs.surum-yaz.outputs.sha }}
 
+  # TASLAK YAYIN — paketlerin doğrudan yazacağı yer.
+  #
+  # NEDEN VAR. Paketler eskiden Actions VARLIĞI olarak yükleniyor, `yayinla`
+  # onları indirip yayına asıyordu. 2026-08-28'de o ara kopya hattı kırdı:
+  # Actions varlık kotası doldu, üç paket de hatasız derlenip doğrulandığı hâlde
+  # teslim edilemedi ve yayın çıkmadı — kota boşaltıldıktan sonra bile sayaç
+  # saatlerce dolu kaldı. Yayın varlıkları (Releases altındakiler) o kotaya
+  # GİRMİYOR; kırılgan olan tek şey aradaki kopyaydı.
+  #
+  # TASLAK, "tek yazıcı" güvencesini KORUYOR. v0.4.2'de bedeli ödenen sınıf
+  # (yayın 16:15:29'da APK ile yayımlandı, masaüstü zip'leri 16:17:04'te
+  # eklendi; arada ~95 saniye eksik bir yayın canlıydı) buraya ulaşamaz: taslak
+  # kullanıcıya görünmüyor ve tag'i bile yok. Tag de yayın da aşağıdaki tek
+  # `--draft=false` çağrısında, üç paket yerine oturduktan SONRA doğuyor.
+  taslak:
+    name: Taslak yayın
+    needs: [karar, surum-yaz]
+    if: needs.karar.outputs.yayinla == 'evet'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.ac.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.surum-yaz.outputs.sha }}
+
+      - name: Taslağı aç
+        id: ac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SURUM: ${{ needs.karar.outputs.surum }}
+          SHA: ${{ needs.surum-yaz.outputs.sha }}
+          KURU: ${{ inputs.kuru_prova }}
+          DAL: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+
+          # KURU PROVA / DAL KAPISI: taslak açılmıyor ve `tag` BOŞ kalıyor.
+          # Paket işleri boş `taslak` girdisiyle yükleme adımını atlıyor, yani
+          # prova tam olarak eskisi gibi çalışıyor: derle, doğrula, hiçbir yere
+          # yazma. Kapı burada da "hata" değil "yazma" biçiminde — daldan
+          # koşturmanın meşru amacı paketlemeyi denemek.
+          if [ "$KURU" = "true" ] || [ "$DAL" != "refs/heads/main" ]; then
+            echo "kuru prova / dal koşusu — taslak açılmıyor, paketler hiçbir yere yazmayacak"
+            echo "tag=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          TAG="v$SURUM"
+
+          # Yarım kalmış bir koşunun taslağı YENİDEN KULLANILIYOR: hattın
+          # kendi kendini onarma kuralı (tools/surum_karari.py, 1. kural) aynı
+          # sürümü yeniden yayınlamayı bekliyor ve ikinci bir `create` çağrısı
+          # onu ikinci bir hatayla kesecekti.
+          if DURUM="$(gh release view "$TAG" --json isDraft -q .isDraft 2>/dev/null)"; then
+            # YAYIMLANMIŞ bir sürümün üstüne yazmak, kullanıcının indirdiği
+            # ikiliyi sessizce değiştirmek olurdu.
+            test "$DURUM" = "true" || {
+              echo "HATA: $TAG zaten YAYIMLANMIŞ — üzerine yazılmaz."
+              echo "  Sürüm kararı bunu üretmemeliydi (tools/surum_karari.py)."
+              exit 1
+            }
+            echo "önceki yarım koşudan kalan taslak yeniden kullanılıyor: $TAG"
+          else
+            gh release create "$TAG" --draft --target "$SHA" \
+              --title "$TAG" --generate-notes
+            echo "taslak açıldı: $TAG ($SHA)"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  # Üç paket de PR'daki kapıyla AYNI çağrılabilir workflow — yani PR'da yeşil
+  # olan şey, yayında koşacak şeyin ta kendisi. Aralarındaki TEK fark `taslak`
+  # girdisi: PR'da boş (hiçbir yere yazılmaz), burada dolu.
   paket-macos:
     name: macOS paketi
-    needs: [surum-yaz, test]
+    needs: [surum-yaz, test, taslak]
     uses: ./.github/workflows/_paket-macos.yml
     with:
       ref: ${{ needs.surum-yaz.outputs.sha }}
+      taslak: ${{ needs.taslak.outputs.tag }}
 
   paket-windows:
     name: Windows paketi
-    needs: [surum-yaz, test]
+    needs: [surum-yaz, test, taslak]
     uses: ./.github/workflows/_paket-windows.yml
     with:
       ref: ${{ needs.surum-yaz.outputs.sha }}
+      taslak: ${{ needs.taslak.outputs.tag }}
 
   paket-android:
     name: Android paketi
-    needs: [surum-yaz, test]
+    needs: [surum-yaz, test, taslak]
     uses: ./.github/workflows/_paket-android.yml
     with:
       ref: ${{ needs.surum-yaz.outputs.sha }}
+      taslak: ${{ needs.taslak.outputs.tag }}
       # Yayın yolundayız: imzasız APK geçmesin. Kuru provada gevşiyor ki
       # imzalama sırlarına erişimi olmayan bir çatal da provayı koşabilsin.
       imza_zorunlu: ${{ inputs.kuru_prova != true }}
@@ -242,7 +319,7 @@ jobs:
     # `needs` listesi release_manifest.py ile BİREBİR olmak zorunda; bunu
     # tests/test_release_manifest.py her PR'da denetliyor. Bir paket işini
     # buradan düşürmek, o paketsiz bir yayın demek olurdu.
-    needs: [karar, surum-yaz, paket-macos, paket-windows, paket-android]
+    needs: [karar, surum-yaz, taslak, paket-macos, paket-windows, paket-android]
     # `github.ref == 'refs/heads/main'` — dal kapısının ikinci yarısı ve asıl
     # olanı. `surum-yaz` daldan koşulduğunda kuru provaya düşüyor (orada
     # gerekçesi yazılı), ama yayın oluşturmayı ENGELLEYEN şey bu satır: yoksa
@@ -264,65 +341,61 @@ jobs:
         with:
           python-version: '3.14'
 
-      # Üç varlık tek dizine. `merge-multiple` olmadan her artifact kendi alt
-      # dizinine iniyor ve aşağıdaki küme denetimi hiçbir şey bulamazdı.
-      - name: Paketleri indir
-        uses: actions/download-artifact@v4
-        with:
-          pattern: lumeo-*
-          merge-multiple: true
-          path: dist
-
       # EKSİKSİZLİK KAPISI — bu hattın asıl vaadi burada mandallanıyor.
-      # download-artifact eksik varlıkta zaten hata verir, ama bu adım başka bir
-      # şey iddia ediyor: yayına giden küme, manifestin TAM KENDİSİ. Sessizce
-      # atlanmış bir iş, yanlış adla yüklenmiş bir varlık ve bayatlamış bir
-      # manifest — üçü de buradan geçemiyor. Boyut denetimi ayrıca 0 baytlık bir
-      # "indi" durumunu eliyor.
-      - name: Yayına giden küme manifestle birebir mi
+      # Kapının sorusu değişmedi, yalnız baktığı yer değişti: paketler artık
+      # indirilmiyor, taslağın İÇİNDE duruyorlar. Sessizce atlanmış bir iş,
+      # yanlış adla yüklenmiş bir varlık ve bayatlamış bir manifest — üçü de
+      # buradan geçemiyor. Boyut denetimi ayrıca 0 baytlık bir varlığı eliyor.
+      - name: Taslağa giren küme manifestle birebir mi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.taslak.outputs.tag }}
         run: |
           set -euo pipefail
-          ls -l dist
+          test -n "$TAG" || { echo "HATA: taslak tag'i boş — taslak işine bak."; exit 1; }
+          gh release view "$TAG" --json assets \
+            -q '.assets[] | "\(.name)\t\(.size)"' > varliklar.tsv
+          echo "--- taslaktaki varlıklar ---"; cat varliklar.tsv
           python - <<'PY'
-          import os, sys
+          import sys
           import release_manifest as m
 
-          bulunan = sorted(
-              f for f in os.listdir("dist")
-              if os.path.isfile(os.path.join("dist", f))
-          )
+          bulunan, boyut = [], {}
+          with open("varliklar.tsv", encoding="utf-8") as f:
+              for satir in f:
+                  satir = satir.rstrip("\n")
+                  if not satir:
+                      continue
+                  ad, _, bayt = satir.partition("\t")
+                  bulunan.append(ad)
+                  boyut[ad] = int(bayt)
+
           eksik, fazla = m.eksikler(bulunan)
           if eksik:
               print(f"HATA: yayına girmesi gereken paket YOK: {', '.join(eksik)}")
-              print("  İlgili paket işinin kaydına bak — varlığı o yüklüyor.")
+              print("  İlgili paket işinin kaydına bak — taslağa onu o yüklüyor.")
           if fazla:
               print(f"HATA: yayına beklenmeyen dosya geliyor: {', '.join(fazla)}")
-              print("  release_manifest.py bayatlamış olabilir.")
-          bos = [f for f in bulunan if os.path.getsize(os.path.join("dist", f)) == 0]
+              print("  release_manifest.py bayatlamış ya da taslakta artık var olabilir.")
+          bos = [a for a in bulunan if boyut[a] == 0]
           if bos:
               print(f"HATA: 0 baytlık paket: {', '.join(bos)}")
           if eksik or fazla or bos:
               sys.exit(1)
-          for f in bulunan:
-              mb = os.path.getsize(os.path.join("dist", f)) / 1024 / 1024
-              print(f"  {f}  ({mb:.1f} MB)")
+          for a in sorted(bulunan):
+              print(f"  {a}  ({boyut[a] / 1024 / 1024:.1f} MB)")
           print(f"küme manifestle birebir: {len(bulunan)} paket")
           PY
 
       # Tag da yayın da BURADA doğuyor. Bir üstteki kapı geçilmeden buraya
-      # gelinmiyor, yani "eksik yayın" diye bir ara durum yok.
-      #
-      # `files: dist/*` güvenli: bir önceki adım dist/ içeriğinin manifestle
-      # KÜME OLARAK eşit olduğunu kanıtladı, yani buraya fazladan bir dosya
-      # sızamaz. Glob olması dördüncü bir platform eklendiğinde bu satırın
-      # güncellenmesi gerekmediği anlamına da geliyor.
-      - name: Yayını oluştur (tag + üç paket, tek çağrı)
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ needs.karar.outputs.surum }}
-          target_commitish: ${{ needs.surum-yaz.outputs.sha }}
-          name: v${{ needs.karar.outputs.surum }}
-          generate_release_notes: true
-          files: dist/*
+      # gelinmiyor, yani "eksik yayın" diye bir ara durum yok. Taslak
+      # yayımlanana kadar tag de yok: `--draft=false` onu `--target`taki
+      # commit'e oluşturuyor.
+      - name: Taslağı yayımla (tag + üç paket, tek anda)
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.taslak.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" --draft=false --latest
+          echo "yayımlandı: $TAG"

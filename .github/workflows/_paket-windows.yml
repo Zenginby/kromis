@@ -20,9 +20,20 @@ on:
         type: string
         required: false
         default: ""
+      taslak:
+        description: "Yüklenecek TASLAK yayının tag'i (boşsa hiçbir yere yüklenmez)"
+        type: string
+        required: false
+        default: ""
 
-permissions:
-  contents: read
+# İZİN BLOĞU BİLEREK YOK — çağırandan DEVRALINIYOR.
+#
+# Paket, taslak yayına doğrudan yazıyor (aşağıda gerekçesi) ve bu `contents:
+# write` istiyor. Burada sabit yazılamaz: çağrılan workflow çağıranından fazla
+# izin isteyemez, yani `write` yazılsaydı `ci.yml` (contents: read) bu
+# workflow'u HİÇ çağıramaz, PR'daki paketleme kapısı tümden düşerdi. Devralma
+# ikisini de doğru yapıyor: `ci.yml` altında read (yükleme zaten atlanıyor,
+# `taslak` boş), `release.yml` altında write.
 
 jobs:
   paket:
@@ -218,24 +229,41 @@ jobs:
           # Yayın varlığının adı: release_manifest.py'deki anahtarla BİREBİR.
           Copy-Item -LiteralPath $zip -Destination 'dist\lumeo-windows-x64.zip' -Force
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: lumeo-windows-x64
-          path: dist/lumeo-windows-x64.zip
-          # "Yeşil ama boş"un SON kapısı: bu bayrak olmadan upload-artifact
-          # eşleşen dosya bulamayınca yalnızca UYARI basar ve iş yeşil kalır —
-          # 2026-08-11'de tam olarak bu oldu.
-          if-no-files-found: error
-          # SAKLAMA 1 GÜN — burası 30'du ve CI'ı kırdı. Bu varlığı okuyan tek
-          # yer release.yml'in `yayinla` işi ve o AYNI KOŞUDAN indiriyor
-          # (`download-artifact`e `run-id` verilmiyor); PR koşusunda ise varlığı
-          # okuyan hiç kimse yok. 2026-08-28'de depoda 221 canlı varlık /
-          # 3.98 GiB birikmişti ve üç paketleme işi de paketi DERLEYİP
-          # DOĞRULADIKTAN sonra, yalnız yükleme adımında
-          # "Artifact storage quota has been hit" ile kırmızıya düştü.
-          # Bir gün yetiyor çünkü yayına giren ikililer zaten KALICI (yayın
-          # varlığı olarak asılıyorlar) ve yarım kalan bir yayının belgelenmiş
-          # onarımı tek işi değil BÜTÜN koşuyu yeniden başlatmak
-          # (release.yml'deki idempotent `surum-yaz`) — yani günler öncesine
-          # yaslanan bir kurtarma yolu yok.
-          retention-days: 1
+      # TESLİM: paket doğrudan TASLAK yayına yazılıyor — Actions varlığı olarak
+      # DEĞİL.
+      #
+      # NEDEN DEĞİŞTİ. Eskiden paket `upload-artifact` ile yükleniyor, `yayinla`
+      # işi indirip yayına asıyordu. 2026-08-28'de Actions varlık kotası doldu:
+      # üç paket de hatasız DERLENDİ ve DOĞRULANDI, yalnız yükleme adımında
+      # düştüler, yani yayın hattı kendi ürettiği ikilileri teslim edemediği
+      # için kırıldı. Kota boşaltıldıktan sonra bile sayaç saatlerce dolu
+      # kaldı. Yayın varlıkları (Releases altındakiler) o kotaya GİRMİYOR, yani
+      # arada duran ara kopya kırılganlığın tek kaynağıydı; bu adım onu
+      # kaldırıyor. Bayt akışı da kısalıyor: derleyen makineden doğrudan son
+      # yerine.
+      #
+      # TEK YAZICI GÜVENCESİ BOZULMUYOR — v0.4.2'de bedeli ödenen "95 saniye
+      # boyunca yarım yayın" sınıfı buraya ulaşamaz, çünkü yazılan şey TASLAK:
+      # kullanıcıya görünmüyor ve tag'i bile yok. Yayın, üç paket de yerine
+      # oturduktan sonra `yayinla` işinin tek `--draft=false` çağrısıyla, tek
+      # anda doğuyor.
+      #
+      # "Yeşil ama boş"un bu yoldaki kapısı `set -euo pipefail` + `gh release
+      # upload`: dosya yoksa gh sıfırdan farklı çıkıyor ve adım kırmızıya
+      # düşüyor. Eski `if-no-files-found: error` bayrağının işi buydu.
+      #
+      # `--clobber`: yarım kalmış bir koşu yeniden başlatıldığında aynı ad
+      # zaten taslakta olabilir; onarım yolu ikinci bir hatayla kesilmemeli.
+      - name: Paketi taslak yayına yükle
+        if: inputs.taslak != ''
+        # KABUK AÇIKÇA BASH. Windows runner'ında `run:` varsayılanı pwsh'tir ve
+        # orada `set -euo pipefail` bir komut bile değil — yani üstteki "eksik
+        # dosya adımı kırmızıya düşürür" güvencesi sessizce yalan olurdu. Üç
+        # platformda tek deyim: aynı komut, aynı kapı, tek mandal.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release upload "${{ inputs.taslak }}" "dist/lumeo-windows-x64.zip" --clobber
+          echo "taslağa yüklendi: lumeo-windows-x64.zip"

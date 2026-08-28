@@ -36,9 +36,20 @@ on:
         type: boolean
         required: false
         default: false
+      taslak:
+        description: "Yüklenecek TASLAK yayının tag'i (boşsa hiçbir yere yüklenmez)"
+        type: string
+        required: false
+        default: ""
 
-permissions:
-  contents: read
+# İZİN BLOĞU BİLEREK YOK — çağırandan DEVRALINIYOR.
+#
+# Paket, taslak yayına doğrudan yazıyor (aşağıda gerekçesi) ve bu `contents:
+# write` istiyor. Burada sabit yazılamaz: çağrılan workflow çağıranından fazla
+# izin isteyemez, yani `write` yazılsaydı `ci.yml` (contents: read) bu
+# workflow'u HİÇ çağıramaz, PR'daki paketleme kapısı tümden düşerdi. Devralma
+# ikisini de doğru yapıyor: `ci.yml` altında read (yükleme zaten atlanıyor,
+# `taslak` boş), `release.yml` altında write.
 
 jobs:
   # pydantic-core wheel'i — Chaquopy'nin kurabildiği TEK kaynak.
@@ -53,6 +64,9 @@ jobs:
   wheel:
     name: pydantic-core wheel
     uses: ./.github/workflows/build-pydantic-core-android.yml
+    # Varlık İSTENMİYOR: wheel buraya önbellekten geliyor (aşağıda gerekçesi).
+    with:
+      varlik_yukle: false
 
   paket:
     needs: wheel
@@ -92,19 +106,44 @@ jobs:
       # Wheel'i `wheel` işinden al. O iş üç kaynağı da (repo / önbellek /
       # derleme) tek bir varlığa indirgiyor, yani burada ayrım yapmaya gerek yok.
       #
-      # `android/wheels/` içine iniyor çünkü `build.gradle` dosyayı ORADA, çivi
-      # dosyasından kurduğu adla arıyor. Repoda zaten aynı ad varsa üzerine
-      # aynı içerik yazılıyor — `wheel` işi o durumda repodaki dosyayı geçirmişti.
-      - name: Wheel'i indir
-        uses: actions/download-artifact@v4
+      # `android/wheels/` içine kopyalanıyor çünkü `build.gradle` dosyayı ORADA,
+      # çivi dosyasından kurduğu adla arıyor.
+      #
+      # TESLİM YOLU VARLIK DEĞİL ÖNBELLEK. Eskiden `wheel` işi wheel'i Actions
+      # varlığı olarak yüklüyor, burası indiriyordu. 2026-08-28'de Actions
+      # varlık kotası doldu ve bu 1.8 MB'lık teslim, paketlerin hepsi hatasız
+      # derlenmiş olmasına rağmen yayın hattını kırmızıya düşürdü. Önbellek AYRI
+      # ve ücretsiz bir havuz (depo başına 10 GB, LRU) — üstelik wheel zaten
+      # oraya yazılıyordu, yani yeni bir depolama da eklenmiş olmuyor.
+      #
+      # Anahtar `wheel` işinin ÇIKTISI: çivi çözme mantığı burada ikinci kez
+      # yazılsaydı sessizce ayrışabilirdi.
+      #
+      # `kaynak == repo` durumunda geri yükleme YOK ve olmamalı: wheel o zaman
+      # depoya işlenmiş demektir, yani zaten bu işin checkout'unun içinde ve
+      # önbellekte hiç karşılığı olmayabilir.
+      - name: Wheel'i önbellekten al
+        if: needs.wheel.outputs.kaynak != 'repo'
+        uses: actions/cache/restore@v4
         with:
-          name: pydantic-core-android-arm64
-          path: android/wheels
+          path: cikti
+          key: ${{ needs.wheel.outputs.anahtar }}
+          # "Yeşil ama boş"un bu yoldaki karşılığı: bayrak olmadan ıskalanan bir
+          # önbellek adımı yalnız uyarı basar, iş yeşil kalır ve kırılma ancak
+          # Gradle'ın Chaquopy pip çıktısının içinde görünürdü.
+          fail-on-cache-miss: true
+
+      - name: Wheel'i yerine koy
+        if: needs.wheel.outputs.kaynak != 'repo'
+        run: |
+          set -euo pipefail
+          mkdir -p android/wheels
+          cp cikti/*.whl android/wheels/
 
       # Kapı DURUYOR, yalnız artık elle atılmış bir adımı değil, bir önceki işin
-      # teslimatını denetliyor: `wheel` işi yeşil olup da varlığı boş bırakırsa
-      # (release.yml'de bedeli ödenen "yeşil ama boş" sınıfı) Gradle'ın hatası
-      # Chaquopy pip çıktısının içinde kaybolurdu.
+      # teslimatını denetliyor: `wheel` işi yeşil olup da dosyayı yerine
+      # koymazsa (release.yml'de bedeli ödenen "yeşil ama boş" sınıfı) Gradle'ın
+      # hatası Chaquopy pip çıktısının içinde kaybolurdu.
       - name: pydantic-core wheel'i yerinde mi
         run: |
           set -euo pipefail
@@ -324,23 +363,41 @@ jobs:
           mkdir -p dist
           cp "${{ steps.dogrula.outputs.apk }}" dist/lumeo-android-arm64.apk
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: lumeo-android-arm64
-          path: dist/lumeo-android-arm64.apk
-          # "Yeşil ama boş"un SON kapısı: bu bayrak olmadan upload-artifact
-          # eşleşen dosya bulamayınca yalnız UYARI basar ve iş yeşil kalır.
-          if-no-files-found: error
-          # SAKLAMA 1 GÜN — burası 30'du ve CI'ı kırdı. Bu varlığı okuyan tek
-          # yer release.yml'in `yayinla` işi ve o AYNI KOŞUDAN indiriyor
-          # (`download-artifact`e `run-id` verilmiyor); PR koşusunda ise varlığı
-          # okuyan hiç kimse yok. 2026-08-28'de depoda 221 canlı varlık /
-          # 3.98 GiB birikmişti ve üç paketleme işi de paketi DERLEYİP
-          # DOĞRULADIKTAN sonra, yalnız yükleme adımında
-          # "Artifact storage quota has been hit" ile kırmızıya düştü.
-          # Bir gün yetiyor çünkü yayına giren ikililer zaten KALICI (yayın
-          # varlığı olarak asılıyorlar) ve yarım kalan bir yayının belgelenmiş
-          # onarımı tek işi değil BÜTÜN koşuyu yeniden başlatmak
-          # (release.yml'deki idempotent `surum-yaz`) — yani günler öncesine
-          # yaslanan bir kurtarma yolu yok.
-          retention-days: 1
+      # TESLİM: paket doğrudan TASLAK yayına yazılıyor — Actions varlığı olarak
+      # DEĞİL.
+      #
+      # NEDEN DEĞİŞTİ. Eskiden paket `upload-artifact` ile yükleniyor, `yayinla`
+      # işi indirip yayına asıyordu. 2026-08-28'de Actions varlık kotası doldu:
+      # üç paket de hatasız DERLENDİ ve DOĞRULANDI, yalnız yükleme adımında
+      # düştüler, yani yayın hattı kendi ürettiği ikilileri teslim edemediği
+      # için kırıldı. Kota boşaltıldıktan sonra bile sayaç saatlerce dolu
+      # kaldı. Yayın varlıkları (Releases altındakiler) o kotaya GİRMİYOR, yani
+      # arada duran ara kopya kırılganlığın tek kaynağıydı; bu adım onu
+      # kaldırıyor. Bayt akışı da kısalıyor: derleyen makineden doğrudan son
+      # yerine.
+      #
+      # TEK YAZICI GÜVENCESİ BOZULMUYOR — v0.4.2'de bedeli ödenen "95 saniye
+      # boyunca yarım yayın" sınıfı buraya ulaşamaz, çünkü yazılan şey TASLAK:
+      # kullanıcıya görünmüyor ve tag'i bile yok. Yayın, üç paket de yerine
+      # oturduktan sonra `yayinla` işinin tek `--draft=false` çağrısıyla, tek
+      # anda doğuyor.
+      #
+      # "Yeşil ama boş"un bu yoldaki kapısı `set -euo pipefail` + `gh release
+      # upload`: dosya yoksa gh sıfırdan farklı çıkıyor ve adım kırmızıya
+      # düşüyor. Eski `if-no-files-found: error` bayrağının işi buydu.
+      #
+      # `--clobber`: yarım kalmış bir koşu yeniden başlatıldığında aynı ad
+      # zaten taslakta olabilir; onarım yolu ikinci bir hatayla kesilmemeli.
+      - name: Paketi taslak yayına yükle
+        if: inputs.taslak != ''
+        # KABUK AÇIKÇA BASH. Windows runner'ında `run:` varsayılanı pwsh'tir ve
+        # orada `set -euo pipefail` bir komut bile değil — yani üstteki "eksik
+        # dosya adımı kırmızıya düşürür" güvencesi sessizce yalan olurdu. Üç
+        # platformda tek deyim: aynı komut, aynı kapı, tek mandal.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release upload "${{ inputs.taslak }}" "dist/lumeo-android-arm64.apk" --clobber
+          echo "taslağa yüklendi: lumeo-android-arm64.apk"

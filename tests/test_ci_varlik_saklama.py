@@ -23,6 +23,15 @@ gün `download-artifact`e `run-id` verirse o dayanak çöker ve süre yeniden
 düşünülmelidir. O yüzden burada iki ayrı şey mandallanıyor — sayının kendisi ve
 sayıyı doğru kılan sebep.
 
+SONRASI — SÜRE YETMEDİ. Saklama kısaltıldıktan ve depodaki 3.98 GiB'ın tamamı
+silindikten sonra bile kota SAATLERCE dolu kaldı (sayaç 6-12 saatte bir
+hesaplanıyor, üstelik havuz hesap geneli). Yayın hattı o süre boyunca kendi
+hatasız ürettiği ikilileri teslim edemedi. Ders, sürenin ötesinde: ücretsiz
+olmayan bir depoya BAĞLI KALMAK yayının kendisini rehin veriyor. Bu yüzden
+paketler artık taslak yayına, wheel de önbelleğe teslim ediliyor
+(test_release_manifest.py o yapıyı mandallıyor) ve aşağıdaki son iddia varlık
+TÜKETİCİSİNİN geri gelmesini yasaklıyor.
+
 YAML gerçekten AYRIŞTIRILIYOR (test_release_manifest.py'nin gerekçesi):
 biçimlendirme değişikliği iddiaları anlamsızlaştırmasın. Gerekçe yorumları da
 tam bu sayıları TIRNAK İÇİNDE anlatıyor, yani metinde "30" aramak yanlış
@@ -149,19 +158,18 @@ def test_no_artifact_outlives_the_run_that_needs_it(yuklemeler):
         )
 
 
-def test_no_download_reaches_outside_its_own_run(indirmeler):
-    """Kısa saklamanın DAYANAĞI bu; dayanak değişirse süre de değişmeli.
+def test_nothing_consumes_an_artifact_any_more(indirmeler):
+    """Kısa saklama bir ÖNLEMdi; teslimi varlıktan çıkarmak ÇÖZÜMdü.
 
-    `download-artifact`e `run-id` (ve onu mümkün kılan `github-token`)
-    verildiği an varlık BAŞKA bir koşudan okunuyor demektir ve "tüketicisi
-    kendi koşusunda" cümlesi yanlışa döner. O gün bu test, süreyi yeniden
-    düşünmesi gereken kişiye tam olarak burayı gösteriyor.
+    Bir `download-artifact` adımı geri geldiği an, o adımın işi yeniden Actions
+    varlık deposuna bağımlı olur: kota dolduğunda (ki 2026-08-28'de doldu ve
+    depo boşaltıldıktan sonra bile saatlerce açılmadı) iş, ürettiği şey kusursuz
+    olsa bile kırmızıya düşer. Ne yükleme ne indirme kaldı; iddia bunu koruyor.
+
+    `run-id` de ayrıca yasak DEĞİL, çünkü zaten hiç indirme yok — ama bir gün
+    biri eklerse bu iddia onu yakalar ve bu dosyanın başlığına yönlendirir.
     """
-    assert indirmeler, "hiç indirme yok — ayrıştırıcı şüpheli"
-    for dosya, adim in indirmeler:
-        ile = adim.get("with") or {}
-        assert "run-id" not in ile, (
-            f"{dosya}: indirme kendi koşusunun dışına uzanıyor (run-id). "
-            "Saklama süreleri 'tüketici aynı koşuda' varsayımına göre "
-            "seçilmişti — bkz. bu dosyanın başlığı."
-        )
+    assert indirmeler == [], (
+        "varlık indiren adım(lar) geri geldi: "
+        + ", ".join(f"{d}:{(a.get('with') or {}).get('name')}" for d, a in indirmeler)
+    )

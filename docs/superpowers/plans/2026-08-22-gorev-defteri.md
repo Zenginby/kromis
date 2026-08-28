@@ -2,7 +2,7 @@
 
 **Tarih:** 28 Ağustos 2026 · **Son dal:** `claude/next-task-plan-fxqy2d`
 **Bugünkü ölçüm:** `APP_VERSION` **0.11.4** (sonrakini CI yazıyor),
-`pytest tests/ -q` → **1798 geçti / 10 atlandı**
+`pytest tests/ -q` → **1803 geçti / 10 atlandı**
 **Defterin açılış ölçümü** (Tur A öncesi): `APP_VERSION` 0.7.0 → 1613 geçti / 10 atlandı
 (atlananlar her üç ölçümde de yalnız Windows'a özgü DACL testleri + kurulu
 olmayan Playwright)
@@ -216,6 +216,73 @@ turda temizlendi.
 > yarım kalırdı — ekran okuyucu kullanıcısı kazanırken gören klavye kullanıcısı
 > kaybederdi. Tur B'nin "ÜÇÜNCÜ BULGU" ve Tur C'nin "aynı bileşene iki kez
 > dokunma" kayıtları emsal.
+
+### CI onarımı — kırmızı, kod hakkında HİÇBİR ŞEY söylemiyordu
+
+Tur G'nin PR'ında (#59) CI'ın üç paketleme işi de kırmızıya düştü. Üçünün de
+sebebi aynıydı ve hiçbiri bu turun diff'i değildi:
+
+```
+Failed to CreateArtifact: Artifact storage quota has been hit.
+```
+
+Paketler DERLENİP DOĞRULANDIKTAN sonra ölüyorlardı — macOS `Info.plist 0.11.4`,
+Windows `FileVersion`/`ProductVersion`/`FixedFileInfo`/`CompanyName` dördü de
+yeşil, Android wheel'i etiketi ve `.so`suyla doğrulanmış. Testler de yeşildi.
+Kırmızı olan yalnız `upload-artifact` adımıydı.
+
+**Ölçüm** (GitHub REST, 28 Ağustos 2026): depoda **221 canlı varlık / 3.98 GiB**.
+
+| varlık | adet | boyut | tüketicisi |
+|---|---|---|---|
+| `lumeo-windows-x64` | 48 | 1.33 GiB | `release.yml`/`yayinla` — **aynı koşu** |
+| `lumeo-macos-arm64` | 47 | 1.12 GiB | aynı koşu |
+| `lumeo-android-arm64` | 48 | 0.88 GiB | aynı koşu |
+| eski adlandırma (`gpt-image-studio-*`) | 22 | 0.55 GiB | **hiç kimse** (ad değişti) |
+| `pydantic-core-android-arm64` | 56 | 0.10 GiB | `_paket-android.yml` — aynı koşu |
+
+- [x] **KÖK SEBEP: saklama süresi varlığın İŞİNDEN bağımsız seçilmişti.**
+      Dört yükleme var, iki indirme; iki indirme de `run-id` VERMİYOR, yani
+      ikisi de kendi koşusundan okuyor. Yani hiçbir varlığın tüketicisi kendi
+      koşusunun dışında değil — ama paketler 30, wheel 90 gün tutuluyordu.
+      Tüketicisi dakikalar sonra biten bir dosya bir ay kotada duruyordu.
+      Paketler **1 güne**, wheel **7 güne** indi. Wheel'in 1 değil 7 olmasının
+      sebebi ölçülü: koşu dışında GERÇEK bir insan tüketicisi olan tek varlık o
+      (Yol A'da bakımcı elle tetikleyip `android/wheels/` altına işliyor) ve
+      hacmin yalnız %2.5'i.
+- [x] **Neden PR sürümü/atlama DEĞİL.** "Paketleri PR'da hiç yükleme" daha
+      büyük bir kazanç olurdu ama `ci.yml`'in kendi gerekçesi buna karşı:
+      "PR'da yeşil olan şey, yayında koşacak şeyin ta kendisi." Yükleme adımını
+      PR'da atlamak, 2026-08-11'de gerçekten kusur yakalamış bir kapıyı
+      (`if-no-files-found: error` + `cp` hedefi ile `path:` arasındaki kayma)
+      yalnız yayın yolunda bırakırdı. Saklama süresini kısaltmak hiçbir kapıyı
+      zayıflatmıyor.
+- [x] **Yeni mandal:** `tests/test_ci_varlik_saklama.py` (5 iddia). Süreyi VE
+      süreyi savunulabilir kılan VARSAYIMI mandallıyor: bir indirme `run-id`
+      alırsa "tüketici aynı koşuda" cümlesi yanlışa döner ve o gün test, süreyi
+      yeniden düşünmesi gereken kişiye tam olarak orayı gösteriyor. Ayrıca
+      ayrıştırıcının boş küme toplamasına karşı sayı METİNDEN türetiliyor —
+      §0.6'nın dersi. **Beş mutasyon, beşi de kırmızı.**
+- [x] **Mutasyon ④ önce hayatta kaldı ve sebebi mandal değil MUTASYONDU:**
+      `run-id`'yi adımın var olan `with:` bloğunun yanına ikinci bir `with:`
+      olarak yazmıştım; YAML yinelenen anahtarda sessizce sonuncuyu alıyor,
+      yani mutasyon hiç uygulanmamıştı. Tur B'nin "mutasyon hedefi bayatladı"
+      kaydının kardeşi: **hayatta kalan bir mutasyon önce mutasyonun kendisini
+      şüpheli kılar.**
+- [x] **Kanıt:** takım **1798 → 1803 geçti / 10 atlandı**.
+
+> **ÇÖZÜLMEYEN YARI — kotanın kendisi.** Yukarıdaki düzeltme birikimi
+> durduruyor ama var olan 3.98 GiB'ı silmiyor; kota dolu kaldığı sürece yeni
+> koşu da yükleyemez. Eski varlıkların temizliği API'den yapılabilir ve
+> geri alınamaz olduğu için bakımcının kararına bırakıldı.
+
+> **AYRICA: `ci.yml`'in bir gerekçesi artık YANLIŞ.** Dosya "Depo public
+> olduğundan GitHub-hosted runner dakikaları faturalanmıyor; workflow'lardaki
+> eski 'macOS dakikası 10x sayılıyor' gerekçesi artık geçerli değil" diyor.
+> Depo bugün **private** (REST ile doğrulandı). Yani hem dakikalar faturalanıyor
+> hem 10x çarpanı geri döndü — `static/` altına dokunan her PR üç paketi de
+> derletiyor. Bu bir POLİTİKA kararı (kapı mı, maliyet mi), o yüzden kuyruğa
+> yazıldı, bu turda değiştirilmedi.
 
 ---
 
@@ -717,7 +784,24 @@ Adım 1 planının tek açık maddesi: geçmiş taramasının kaydı yok.
       taşıyor).
 - **Kabul:** iş yeşil koşuyor ve gerçek bir sızıntı denemesinde kırmızıya dönüyor.
 
-### 6. Ayarlar'da canlı bağlantı testi düğmeleri · **M**
+### 6. Paketleme kapısının maliyeti: depo artık **private** · **S**
+`ci.yml`'in yazılı gerekçesi "Depo public olduğundan GitHub-hosted runner
+dakikaları faturalanmıyor" diyor ve bu bugün YANLIŞ (REST: `visibility:
+private`). Yani `static/`, `android/`, `build.*`, `.github/workflows/` altına
+dokunan HER PR üç paketi de derletiyor ve macOS dakikası 10x sayılıyor —
+workflow'ların kendi eski gerekçesi geri döndü. Bu bir politika kararı: kapının
+değeri (kırık bir yayını merge'den ÖNCE yakalamak) ile bedeli arasında seçim.
+- [ ] Ya gerekçe yorumu düzeltilip maliyet bilinçle kabul edilir, ya kapı
+      daraltılır (ör. paketleme yalnız `tam-paket` etiketiyle ya da yalnız
+      `.spec`/`build.*`/`android/` değişiminde; `static/` listeden çıkar).
+- [ ] Depo public'e dönecekse karar kendiliğinden düşer — o zaman yalnız yorumun
+      doğrulanması kalır.
+- **Kabul:** `ci.yml`'in yorumu ile deponun görünürlüğü aynı şeyi söylüyor;
+      seçim hangisi olursa olsun gerekçesi yazılı.
+- **Not:** varlık saklama süreleri bu maddenin İÇİNDE DEĞİL — o yarı Tur G'nin
+      CI onarımında kapandı (`tests/test_ci_varlik_saklama.py`).
+
+### 7. Ayarlar'da canlı bağlantı testi düğmeleri · **M**
 README Faz 2'nin son açık maddesi. Bugünkü karşılık yalnız "anahtar kayıtlı mı"
 listesi; gerçek bir çağrı denemesi yok.
 - [ ] Sağlayıcı başına küçük bir uç (`POST /api/settings/test`?) + düğme;
@@ -725,7 +809,7 @@ listesi; gerçek bir çağrı denemesi yok.
 - **Kabul:** yanlış anahtarda anlaşılır Türkçe hata, doğru anahtarda "bağlantı
       kuruldu"; anahtar yanıtta HİÇ yankılanmıyor (write-only sözleşmesi).
 
-### 7. Yerel sağlayıcı adaptörleri: ComfyUI · Ollama · **L**
+### 8. Yerel sağlayıcı adaptörleri: ComfyUI · Ollama · **L**
 Anahtar/adres alanları v0.2.0'dan beri kayıtlı, **adaptör ve arayüz yok**
 (`azure_client.get_settings_status` yalnız durum bayrağı döndürüyor).
 - [ ] `providers._ADAPTERS`'a iki adaptör, katalogda modeller, Ayarlar'da
@@ -733,48 +817,48 @@ Anahtar/adres alanları v0.2.0'dan beri kayıtlı, **adaptör ve arayüz yok**
 - **Kabul:** yerel bir kurulumla üretim yapılabiliyor; sağlayıcı düşükken hata
       Türkçe ve anlaşılır.
 
-### 8. fal.ai · Replicate adaptörleri · **L**
+### 9. fal.ai · Replicate adaptörleri · **L**
 Aynı boşluğun bulut yarısı; ikisi de **kuyruklu** akış (`providers`'ın zaman
 aşımı politikası bunu zaten öngörüyor: "adet başına ayrı istek atan sağlayıcı").
 - [ ] **Kabul:** kuyruk beklerken arayüz ilerleme gösteriyor, zaman aşımı
       sağlayıcıya göre çözülüyor (`tests/test_providers.py`'nin deseni).
 
-### 9. Maske tuvali / bölgesel düzenleme · **L**
+### 10. Maske tuvali / bölgesel düzenleme · **L**
 Master spec Faz 1'in açık yarısı: bugünkü `/api/edit` tüm görsel üzerinden
 çalışıyor, `mask` alanı yok.
 - [ ] Fırça/silgi HTML5 Canvas + `mask` alanının adaptör sözleşmesine girmesi
       (Azure ve OpenAI destekliyor; Gemini'de karşılığı farklı).
 - **Kabul:** maskelenen bölge dışında piksel değişmiyor (golden fixture).
 
-### 10. Stil çipleri · stil şablonları · tipografi katmanı · **M**
+### 11. Stil çipleri · stil şablonları · tipografi katmanı · **M**
 Faz 2'nin açık yarısı. Hazır stil çipleri (*Anime*, *Cyberpunk*, *Cinematic*,
 *Pixel Art*, *3D Render*) prompt'a eklenen jetonlar; tipografi katmanı
 bindirmenin metin tarafı.
 - [ ] **Kabul:** çip seçimi prompt'a görünür biçimde giriyor ve geri alınabiliyor.
 
-### 11. Özel araçlar: Upscaler · Product-in-Hand · **L**
+### 12. Özel araçlar: Upscaler · Product-in-Hand · **L**
 README Faz 3. Upscaler bir sağlayıcı yeteneği; Product-in-Hand bir prompt
 şablonu + referans akışı.
 - [ ] **Kabul:** her ikisi kendi kredi etiketiyle katalogda.
 
-### 12. Image-to-Video motoru · **L**
+### 13. Image-to-Video motoru · **L**
 README Faz 4 (master spec Faz 3'ün video payı). Yeni bir medya TÜRÜ: depo,
 küçük resim, büyüteç ve indirme yolları video tanımıyor.
 - [ ] **Kabul:** üretilen video kayıtta, galeride oynatılabiliyor, indirilebiliyor.
 
-### 13. i18n (TR/EN) · **M**
+### 14. i18n (TR/EN) · **M**
 Arayüz metinleri bugün HTML/JS içinde birebir Türkçe; sözlük katmanı yok.
 - [ ] **Kabul:** dil anahtarı `prefs.json`'a yazılıyor, iki dilde de 360px'de
       taşma yok (İngilizce metinler daha uzun).
 
-### 14. SaaS dönüşümü · **XL**
+### 15. SaaS dönüşümü · **XL**
 Kendi tasarım belgesi var: `docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md`
 (Faz 5). Kredi tarifesi katalogda **metadata olarak** hazır; ledger, hesaplar,
 depolama, ödeme ve filigran açık.
 - [ ] **Kabul:** o belgenin kendi kabul ölçütleri; buraya alınmadan önce ayrı
       bir uygulama planı yazılır.
 
-### 15. PWA · iOS · **L**
+### 16. PWA · iOS · **L**
 Android teslim (Chaquopy APK); PWA'nın service worker/manifest'i ve iOS yok.
 - [ ] **Kabul:** çevrimdışı açılış ve "ana ekrana ekle" akışı çalışıyor.
 

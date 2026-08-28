@@ -226,4 +226,16 @@ jobs:
           # eşleşen dosya bulamayınca yalnızca UYARI basar ve iş yeşil kalır —
           # 2026-08-11'de tam olarak bu oldu.
           if-no-files-found: error
-          retention-days: 30
+          # SAKLAMA 1 GÜN — burası 30'du ve CI'ı kırdı. Bu varlığı okuyan tek
+          # yer release.yml'in `yayinla` işi ve o AYNI KOŞUDAN indiriyor
+          # (`download-artifact`e `run-id` verilmiyor); PR koşusunda ise varlığı
+          # okuyan hiç kimse yok. 2026-08-28'de depoda 221 canlı varlık /
+          # 3.98 GiB birikmişti ve üç paketleme işi de paketi DERLEYİP
+          # DOĞRULADIKTAN sonra, yalnız yükleme adımında
+          # "Artifact storage quota has been hit" ile kırmızıya düştü.
+          # Bir gün yetiyor çünkü yayına giren ikililer zaten KALICI (yayın
+          # varlığı olarak asılıyorlar) ve yarım kalan bir yayının belgelenmiş
+          # onarımı tek işi değil BÜTÜN koşuyu yeniden başlatmak
+          # (release.yml'deki idempotent `surum-yaz`) — yani günler öncesine
+          # yaslanan bir kurtarma yolu yok.
+          retention-days: 1

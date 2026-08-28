@@ -9,10 +9,16 @@
 # değişikliğin kırdığı şey testlerde HİÇ görünmüyor — yalnız paketleme
 # aşamasında, dakikalarca süren bir işin sonunda görünüyor. Yayın artık main'e
 # merge ile tetiklendiği için o kırılmayı merge'den SONRA öğrenmek geç kalmak
-# demek. Depo public olduğundan GitHub-hosted runner dakikaları faturalanmıyor;
-# workflow'lardaki eski "macOS dakikası 10x sayılıyor" gerekçesi artık geçerli
-# değil. Yine de her PR'da koşmuyor: ilgisiz bir PR'ı 40 dakika bekletmenin
+# demek. Yine de her PR'da koşmuyor: ilgisiz bir PR'ı 40 dakika bekletmenin
 # kimseye faydası yok.
+#
+# KAPSAMIN BEDELİ VAR, ÇÜNKÜ DEPO PRIVATE. Buradaki gerekçe bir zamanlar "depo
+# public olduğundan GitHub-hosted runner dakikaları faturalanmıyor, o yüzden
+# eski 'macOS dakikası 10x' gerekçesi artık geçerli değil" diyordu. 2026-08-28'de
+# ölçüldü: REST `visibility: private` döndürüyor — yani o cümle YANLIŞTI ve
+# workflow'ların kendi eski gerekçesi geri gelmişti; kapının her ateşlemesi üç
+# paket demek ve macOS dakikası 10x sayılıyor. Aşağıdaki yol listesi bu yüzden
+# bir maliyet kararı; hangi yolun neden listede olduğu orada tek tek yazılı.
 name: CI
 
 on:
@@ -114,10 +120,33 @@ jobs:
           echo "--- değişen yollar ---"
           echo "$YOLLAR"
 
-          # Paketlemenin sonucunu değiştirebilecek her şey. Liste bilinçle
-          # GENİŞ: bir paketleme koşusunu gereksiz yere başlatmanın bedeli
-          # bedava runner dakikası, atlamanın bedeli kırık bir yayın.
-          if echo "$YOLLAR" | grep -qE '^(gpt-image-studio\.spec|build\.sh|build\.ps1|requirements\.txt|android/|\.github/workflows/|static/|bundled/|branding/)'; then
+          # Paketlemenin sonucunu değiştirebilecek her şey. Liste hâlâ GENİŞ
+          # tarafta: gereksiz bir koşunun bedeli dakika, atlamanın bedeli kırık
+          # bir yayın.
+          #
+          # `static/` ve `bundled/` 2026-08-28'de LİSTEDEN ÇIKARILDI ve sebebi
+          # ölçüldü, tahmin edilmedi: ikisi de pakete DİZİN BÜTÜN olarak giriyor
+          # (`gpt-image-studio.spec` → datas=[('static','static'),('bundled','bundled')],
+          # `android/app/build.gradle` → into("resources/static"){from("../../static")}).
+          # Yani bu iki dizindeki bir İÇERİK değişikliği paketlemeyi kıramaz.
+          # Kırabilen tek sınıf, paket doğrulamalarının ADA GÖRE aradığı bir
+          # dosyanın silinmesi ya da yeniden adlandırılmasıydı.
+          #
+          # O güvence KAYBOLMADI, UCUZLADI: `tests/test_paket_icerik_listesi.py`
+          # aynı listeleri üç workflow'dan ayrıştırıp dosyaların depoda gerçekten
+          # durduğunu ölçüyor. Kapsam da GENİŞLEDİ — eski kapı yalnız `static/`
+          # değişen PR'larda ateşleniyordu, test her PR'da ve saniyenin altında
+          # koşuyor.
+          #
+          # `branding/` bilerek KALIYOR: onun içeriği dizin olarak değil ADA GÖRE
+          # okunuyor (spec `branding/lumeo.ico`i, build.sh `branding/lumeo.iconset`ten
+          # `.icns`i üretiyor), yani oradaki bir yeniden adlandırma gerçekten
+          # paketleme aşamasında patlar.
+          #
+          # `static/`e dokunan bir PR'da yine de tam matris istenirse yol yukarıdaki
+          # `tam-paket` etiketi; kararın kendisi `tests/test_ci_paketleme_kapisi.py`de
+          # sentetik diff'lerle koşturuluyor.
+          if echo "$YOLLAR" | grep -qE '^(gpt-image-studio\.spec|build\.sh|build\.ps1|requirements\.txt|android/|\.github/workflows/|branding/)'; then
             KARAR=evet
           else
             KARAR=hayir

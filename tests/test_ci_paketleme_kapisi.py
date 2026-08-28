@@ -23,6 +23,9 @@ satır kaydırması iddiaları anlamsızlaştırmasın.
 from __future__ import annotations
 
 import os
+import re
+import shutil
+import subprocess
 
 import pytest
 import yaml
@@ -152,3 +155,165 @@ def test_paketleme_isleri_kapsama_bagli(ci: dict):
         isin = ci["jobs"][is_adi]
         assert "kapsam" in isin["needs"], is_adi
         assert isin["if"] == "needs.kapsam.outputs.paketle == 'evet'", is_adi
+
+
+def test_kapsam_yol_listesi_bilincle_dar(kapsam_kodu: str):
+    """Liste ne kazayla genişlemeli ne kazayla daralmalı — ikisi de bedelli.
+
+    Kapı 2026-08-28'de DARALTILDI: `static/` ve `bundled/` çıkarıldı. Karar
+    ölçüye dayanıyor — iki dizin de pakete DİZİN BÜTÜN olarak giriyor
+    (`gpt-image-studio.spec`in `datas`ı, `android/app/build.gradle`ın sahneleme
+    görevi), yani içerik değişikliği paketlemeyi kıramaz. Kırabilen tek sınıf
+    (doğrulamaların ADA GÖRE aradığı bir dosyanın yeniden adlandırılması) artık
+    `tests/test_paket_icerik_listesi.py`de, üç runner yerine saniyenin altında
+    ve YALNIZ `static/` değil her PR'da ölçülüyor.
+
+    Bedeli çift taraflı olduğu için iddia TAM KÜME: bir yol eklemek de çıkarmak
+    da bu satırı değiştirmeyi gerektirir, yani karar yazılı kalır. Depo `private`
+    (2026-08-28, REST) — listeye giren her yol faturalanan dakika, macOS'ta 10x.
+    """
+    desen = re.search(r"grep -qE '\^\(([^)]+)\)'", kapsam_kodu)
+    assert desen, kapsam_kodu
+    yollar = {y.replace("\\.", ".") for y in desen.group(1).split("|")}
+    assert yollar == {
+        "gpt-image-studio.spec",
+        "build.sh",
+        "build.ps1",
+        "requirements.txt",
+        "android/",
+        ".github/workflows/",
+        "branding/",
+    }, yollar
+
+
+def test_kapsam_dizin_butun_kopyalanan_yollari_izlemiyor(kapsam_kodu: str):
+    """`static/` ve `bundled/` GERİ GELMEMELİ; sebebi bu iddianın kendisi.
+
+    Ayrı bir iddia, çünkü tam küme testi bir gün meşru bir yol eklendiğinde
+    güncellenecek ve o güncellemede bu ikisi sessizce geri sızabilir. Geri
+    gelmelerinin tek meşru sebebi olurdu: spec'in `datas`ı ya da Gradle'ın
+    sahneleme görevi dosyaları dizin olarak değil ADA GÖRE saymaya başlarsa.
+    """
+    for yol in ("static/", "bundled/"):
+        assert f"|{yol}" not in kapsam_kodu, (
+            f"`{yol}` kapıya geri gelmiş: pakete dizin bütün olarak giren bir "
+            f"dizin, içeriği değiştiği için üç paketi derletmemeli "
+            f"(bkz. tests/test_paket_icerik_listesi.py)")
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Betiği GERÇEKTEN koşturan bölüm
+#
+# Yukarıdaki iddialar betiğin METNİNİ ölçüyor, kararını değil. Oysa bu işin tek
+# ürünü bir karar (`paketle=evet|hayir`) ve o karar bugüne dek yalnız gerçek bir
+# PR koşusunda görülebiliyordu — yani bir kusuru ya üç paketleme koşusu
+# harcayarak ya da daha kötüsü kapıyı sessizce atlayarak öğrenirdik.
+# `tests/test_release_manifest.py`in yayın kapısı için kurduğu desenin aynısı:
+# betik YAML'dan çıkarılıyor, `git`in yerine sentetik bir diff konuyor.
+# ══════════════════════════════════════════════════════════════════════
+
+BASH = shutil.which("bash")
+
+# Windows'ta Git Bash yoksa bu bölüm atlanır; metin iddiaları orada da koşuyor.
+bash_gerekli = pytest.mark.skipif(BASH is None, reason="bash yok (Windows)")
+
+
+def _kapsami_kos(tmp_path, degisen: list[str], etiketler: str = "",
+                 git_duser: bool = False):
+    """Kapsam betiğini sentetik bir diff ile koşturur → (dönüş kodu, karar, çıktı).
+
+    `git`, PATH'in başına konan sahte bir betikle değiştiriliyor: gerçek bir depo
+    kurup merge commit üretmek yerine diff'in ÇIKTISI doğrudan veriliyor. Ölçülen
+    şey zaten diff değil, ondan çıkan karar.
+    """
+    kutu = tmp_path / "bin"
+    kutu.mkdir()
+    sahte = kutu / "git"
+    sahte.write_text(
+        "#!/bin/sh\n" + ("exit 1\n" if git_duser
+                         else "".join(f"echo '{y}'\n" for y in degisen)),
+        encoding="utf-8", newline="\n")
+    sahte.chmod(0o755)
+
+    cikti = tmp_path / "github_output"
+    cikti.write_text("", encoding="utf-8")
+    ortam = dict(os.environ, PATH=f"{kutu}{os.pathsep}{os.environ['PATH']}",
+                 GITHUB_OUTPUT=str(cikti), ETIKETLER=etiketler)
+    with open(CI_YML, encoding="utf-8") as f:
+        betik = _bak_adimi(yaml.safe_load(f))["run"]
+    p = subprocess.run([BASH, "-c", betik], cwd=tmp_path, env=ortam, text=True,
+                       encoding="utf-8", capture_output=True)
+    karar = ""
+    for satir in cikti.read_text(encoding="utf-8").splitlines():
+        if satir.startswith("paketle="):
+            karar = satir.split("=", 1)[1]
+    return p.returncode, karar, p.stdout + p.stderr
+
+
+@bash_gerekli
+@pytest.mark.parametrize("degisen", [
+    ["static/core.js"],
+    ["static/core.js", "static/mobile.css", "app.py", "tests/test_index.py"],
+    ["bundled/prompts/prompt-yonetmeni.md"],
+    ["app.py"],
+    ["README.md", "docs/graflar/moduller.md"],
+])
+def test_the_gate_skips_packaging_when_nothing_can_break_it(tmp_path, degisen):
+    """Turun ASIL vaadi: ön yüz PR'ı artık üç paketi derletmiyor.
+
+    `static/` ve `bundled/` pakete dizin bütün olarak giriyor, yani içerikleri
+    paketlemenin sonucunu değiştiremez. Depo `private` olduğu için bu koşuların
+    bedeli gerçek (macOS dakikası 10x) — kararın kendisi bu yüzden ölçülüyor.
+    """
+    kod, karar, cikti = _kapsami_kos(tmp_path, degisen)
+    assert kod == 0, cikti
+    assert karar == "hayir", cikti
+
+
+@bash_gerekli
+@pytest.mark.parametrize("degisen", [
+    ["gpt-image-studio.spec"],
+    ["build.sh"],
+    ["build.ps1"],
+    ["requirements.txt"],
+    ["android/app/build.gradle"],
+    [".github/workflows/_paket-macos.yml"],
+    ["branding/lumeo.ico"],
+    ["static/core.js", "gpt-image-studio.spec"],
+])
+def test_the_gate_still_packages_what_can_actually_break(tmp_path, degisen):
+    """Daraltma, kapının işini bırakması DEĞİL.
+
+    Son satır karışık bir PR: paketlemeye dokunan tek bir dosya, `static/`
+    yığınının içinde de olsa kapıyı açmaya yetiyor.
+    """
+    kod, karar, cikti = _kapsami_kos(tmp_path, degisen)
+    assert kod == 0, cikti
+    assert karar == "evet", cikti
+
+
+@bash_gerekli
+def test_the_full_matrix_label_overrides_the_path_filter(tmp_path):
+    """Kaçış kapısı: daraltmadan sonra tam matris istemenin YOLU bu.
+
+    `static/`e dokunan bir PR'da yine de üç paketi görmek isteyen bakımcı
+    `tam-paket` etiketini koyuyor. Etiketsiz aynı diff `hayir` diyor (yukarıdaki
+    test), yani bu iddia gerçekten etiketi ölçüyor.
+    """
+    kod, karar, cikti = _kapsami_kos(tmp_path, ["static/core.js"],
+                                     etiketler="belgeler,tam-paket")
+    assert kod == 0, cikti
+    assert karar == "evet", cikti
+
+
+@bash_gerekli
+def test_the_gate_falls_to_the_safe_side_when_the_diff_fails(tmp_path):
+    """v0.9.1'in kusuru: diff kurulamayınca kapı KIRILMAMALI, `evet` demeli.
+
+    Metin iddiası (`test_kapsam_diff_kurulamazsa_guvenli_tarafa_dusuyor`) o
+    satırın varlığını sınıyor; bu iddia `set -euo pipefail` altında işin
+    gerçekten ölmediğini ve kararın `evet` çıktığını sınıyor.
+    """
+    kod, karar, cikti = _kapsami_kos(tmp_path, [], git_duser=True)
+    assert kod == 0, cikti
+    assert karar == "evet", cikti

@@ -116,12 +116,19 @@ imkânsız kılan iddia bu.
 | Değişiklik | PR'da koşan |
 |---|---|
 | Her PR | pytest (~3 dk) |
-| `.spec`, `build.sh`, `build.ps1`, `android/`, `static/`, `bundled/`, `branding/`, `requirements.txt`, `.github/workflows/` | pytest **+ üç paket** |
+| `.spec`, `build.sh`, `build.ps1`, `android/`, `branding/`, `requirements.txt`, `.github/workflows/` | pytest **+ üç paket** |
 | `tam-paket` etiketi | pytest **+ üç paket** |
+| `static/`, `bundled/` | yalnız pytest — bkz. aşağısı |
 
-Depo public olduğu için GitHub-hosted runner dakikaları faturalanmıyor;
-workflow'lardaki eski "macOS dakikası 10x sayılıyor" gerekçeleri artık geçerli
-değil.
+**Depo `private`, yani runner dakikaları faturalanıyor** ve macOS dakikası 10x
+sayılıyor. (Bu paragraf bir zamanlar tersini söylüyordu; 2026-08-28'de REST ile
+ölçüldü: `visibility: private`.) Kapı bu yüzden daraltıldı: `static/` ve
+`bundled/` pakete **dizin bütün** olarak giriyor, yani içerikleri paketlemenin
+sonucunu değiştiremiyor. Kapının orada gerçekten yakaladığı tek sınıf —
+doğrulamaların ADA GÖRE aradığı bir dosyanın yeniden adlandırılması — üç runner
+yerine `tests/test_paket_icerik_listesi.py`de, her PR'da ve saniyenin altında
+ölçülüyor. `static/`e dokunan bir PR'da yine de tam matris isteniyorsa yol
+`tam-paket` etiketi.
 
 ## Yeni bir kapıyı sürüm harcamadan denemek
 

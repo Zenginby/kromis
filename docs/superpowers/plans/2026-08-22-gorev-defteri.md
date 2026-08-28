@@ -1,8 +1,8 @@
 # Görev defteri — sıradaki adımlar
 
-**Tarih:** 28 Ağustos 2026 · **Son dal:** `claude/next-task-plan-fxqy2d`
-**Bugünkü ölçüm:** `APP_VERSION` **0.11.4** (sonrakini CI yazıyor),
-`pytest tests/ -q` → **1809 geçti / 10 atlandı**
+**Tarih:** 28 Ağustos 2026 · **Son dal:** `claude/review-work-and-graphs-2z1yjh`
+**Bugünkü ölçüm:** `APP_VERSION` **0.11.5** (sonrakini CI yazıyor),
+`pytest tests/ -q` → **1831 geçti / 10 atlandı**
 **Defterin açılış ölçümü** (Tur A öncesi): `APP_VERSION` 0.7.0 → 1613 geçti / 10 atlandı
 (atlananlar her üç ölçümde de yalnız Windows'a özgü DACL testleri + kurulu
 olmayan Playwright)
@@ -30,6 +30,82 @@ burada durur. Yol haritaları (README fazları, `2026-08-10-saas-transformation-
 4. Kuyruktan bir madde alındığında **üste taşınır** ve kendi adım listesini
    orada kazanır. Kuyruk sırası bir söz değil, öneri: kullanıcı sırayı
    değiştirebilir.
+
+---
+
+## ✅ Tur I — Paketleme kapısı ücretsiz bir depo varsayıyordu
+
+**Bitti (28 Ağustos).** Kuyruğun **6. maddesi.** Tur H yayın hattını kotadan
+kurtardı; bu tur onun ikizini, PR yolundaki BEDELİ ele alıyor. `ci.yml`'in
+yazılı gerekçesi "Depo public olduğundan GitHub-hosted runner dakikaları
+faturalanmıyor" diyordu — REST bugün `visibility: private` döndürüyor, yani
+gerekçe yanlıştı ve workflow'ların kendi eski "macOS dakikası 10x" endişesi
+sessizce geri gelmişti.
+
+- [x] **Kapı daraltıldı: `static/` ve `bundled/` yol listesinden çıktı.** Karar
+      ölçüye dayanıyor, tercihe değil: iki dizin de pakete **dizin bütün**
+      olarak giriyor — `gpt-image-studio.spec`in `datas=[('static','static'),
+      ('bundled','bundled')]` satırı ve `android/app/build.gradle`ın
+      `into("resources/static") { from("../../static") }` görevi. İçerik
+      değişikliği paketlemeyi kıramaz. `branding/` KALDI, çünkü onun içeriği
+      dizin olarak değil ADA GÖRE okunuyor (`lumeo.ico`, `lumeo.iconset` →
+      `iconutil`), yani oradaki bir yeniden adlandırma gerçekten patlar.
+- [x] **Kapının gerçekten yakaladığı tek sınıf KAYBOLMADI, ucuzladı.** Üç paket
+      işi paketin İÇİNDE ada göre dosya arıyor (`static/core.js`,
+      `static/mobile.css`, iki woff2, `bundled/prompts/prompt-yonetmeni.md`…);
+      bir yeniden adlandırma bu yüzden kırmızıya düşürüyordu. Yeni
+      `tests/test_paket_icerik_listesi.py` o listeleri üç workflow'dan
+      **ayrıştırıp** (elle kopyalamadan) dosyaların depoda durduğunu ölçüyor.
+      Kapsam da genişledi: eski kapı yalnız `static/` değişmiş PR'da
+      ateşleniyordu, test HER PR'da ve saniyenin altında koşuyor.
+- [x] **Kapının KARARI ilk kez ölçülüyor.** Bugüne dek `kapsam` işinin ürettiği
+      `paketle=evet|hayir` yalnız gerçek bir PR koşusunda görülebiliyordu — yani
+      bir kusuru ya üç paketleme koşusu harcayarak ya da (daha kötüsü) kapı
+      sessizce atlarken öğrenirdik. Betik artık YAML'dan çıkarılıp `git`in yerine
+      sentetik bir diff konarak koşuluyor; Tur H'nin yayın kapısı için kurduğu
+      desenin aynısı.
+
+**Sentetik ölçüm** (betik gerçekten koşturuldu, metin okunmadı):
+
+| değişen yollar | karar |
+|---|---|
+| `static/core.js`, `static/mobile.css` | **hayir** |
+| `static/folders.js`, `tests/…`, `app.py` | **hayir** |
+| `bundled/prompts/prompt-yonetmeni.md` | **hayir** |
+| `gpt-image-studio.spec` | evet |
+| `android/app/build.gradle` | evet |
+| `branding/lumeo.ico` | evet |
+| `static/core.js` + `tam-paket` etiketi | evet |
+| diff kurulamıyor (git düşüyor) | evet (güvenli taraf) |
+
+**Kazanç geçmişten ölçüldü:** son 12 birleşmiş PR'da eski kapı **11 kez**
+ateşliyordu, yeni kapı **6 kez** — beş PR'da üç paketleme işi (macOS'ta 10x
+dakika) tümüyle kalkıyor. Kalan altısı gerçekten `android/` ya da
+`.github/workflows/` altına dokunmuş PR'lar, yani kapı işini bırakmadı.
+
+- [x] **Kanıt:** takım **1809 → 1831 geçti / 10 atlandı**. **Yedi mutasyon,
+      yedisi de kırmızı** — `static/`in kapıya geri gelmesi, `branding/`in
+      düşmesi, güvenli tarafa düşmenin kalkması, `tam-paket` kaçış kapısının
+      kalkması, bir doğrulama listesinin boşalması, `index.html`in üç listeden
+      birden silinmesi ve `static/core.js`in yeniden adlandırılması.
+
+**Aynı yanlış varsayım üçüncü bir yerde daha yaşıyordu ve orası ürün kodu.**
+`docs/yayin-hatti.md`in kapı tablosu bu turda düzeltildi (o, kapının belgesiydi),
+ama `guncelleme.py` de "Depo public olduğu için uç nokta anonim çalışıyor" diyor
+ve GitHub'ın yayın ucunu kimliksiz çağırıyor — private bir depoda o çağrı 404
+döner ve Ayarlar'daki "Yeni sürüm çıktı" satırı sessizce hiç görünmez. **Bu
+turda DÜZELTİLMEDİ, çünkü ölçülemedi:** oturumun ağı vekil üzerinden geçiyor ve
+GitHub isteklerine kimlik ekliyor (`X-Ratelimit-Limit: 5000`; anonim sınır 60),
+yani buradan atılan çağrının 200 dönmesi kullanıcıdaki davranışı kanıtlamıyor.
+Kuyruğun **5. maddesi** olarak, kanıt zinciriyle yazıldı — ve o madde teknik bir
+düzeltmeden çok bir dağıtım kararı: yayın sayfası private ise kullanıcı paketi
+zaten indiremiyor.
+
+> **BU TURUN ÖLÇÜMÜ CI'DA GECİKMELİ GÖRÜNÜR.** PR'ın kendisi
+> `.github/workflows/` altına dokunduğu için kendi koşusunda kapı `evet` diyecek
+> — yani daraltma bu PR'da GÖRÜNMEZ. Görüneceği yer bir sonraki saf ön yüz
+> PR'ının günlüğü: `karar: paketle=hayir`. Yukarıdaki sentetik tablo tam da bu
+> boşluğu kapatmak için var.
 
 ---
 
@@ -94,10 +170,19 @@ yazdığı için, komuttaki adı bozan mutasyon iddiayı hayatta bıraktı. İdd
 - [x] **Kanıt:** takım **1803 → 1809 geçti / 10 atlandı**. **On mutasyon, onu da
       kırmızı.** Yayın yolunda artık tek bir `upload-artifact` yok.
 
-> **GERÇEK KOŞUYLA KANITLANACAK TEK ŞEY:** çağrılan workflow'un izni
-> çağırandan devralması. Belge böyle diyor ve kaynakta doğrulanamaz; yanılıyorsa
-> belirti nettir — yayın yolunda `gh release upload` 403 döner. CI yolu her
-> hâlükârda güvende, çünkü orada yükleme adımı hiç koşmuyor.
+> **KANITLANDI (aynı gün, gerçek koşuyla).** Tek açık kalan soru çağrılan
+> workflow'un izni çağırandan devralmasıydı: kaynakta doğrulanamıyordu ve
+> yanılma belirtisi `gh release upload`ın 403 dönmesi olacaktı. PR #60 21:11'de
+> birleşti, **Yayın koşusu yeşil bitti ve `v0.11.5` 21:15:35'te yayımlandı** —
+> yani izin devralındı, üç paket taslağa yazdı ve tek `--draft=false` çağrısı
+> tag'i de yayını da doğurdu. Kota kırılmasından beri çıkan ilk yayın bu.
+>
+> Yayın yolu böylece kotadan tümüyle çıktı, ama **elle bakım yolu çıkmadı:**
+> `build-pydantic-core-android.yml` içindeki tek `upload-artifact` hâlâ orada
+> (`varlik_yukle` bayrağına bağlı, Yol A). O yolun kotayla düştüğü aynı gün
+> ölçüldü: 19:58 ve 20:10'daki iki kanarya koşusu `Artifact storage quota has
+> been hit` ile bitti. Yayın etkilenmiyor; pydantic çivisi güncellenirken
+> lazım olacak. Kuyrukta madde olarak duruyor.
 
 ---
 
@@ -813,7 +898,36 @@ gösteriyor, bugünküyle eşleşmek zorunda değil. Maddenin kimliği numarası
 BAŞLIĞI; kapanan madde de silinmiyor, ait olduğu turun kutusunda kanıtıyla
 duruyor.
 
-### 1. Arama, klasör adını yalnız EN YAKIN klasörde eşleştiriyor · **S**
+> **SIRADAKİ TUR: 1 + 2 + 3 birlikte** (28 Ağustos kararı). Üçü de **S**, üçü de
+> ayrı yüzeyde ve hiçbiri ötekinin dosyasına dokunmuyor; bir "temizlik turu"
+> olarak tek PR'da, her biri KENDİ ölçümüyle kapanıyor. `#picker-empty` önce
+> ÖLÇÜLÜR: gerçekten yeniden duyuruyor mu? Duyurmuyorsa madde gerekçesiyle
+> kapanır, düzeltme yazılmaz.
+
+### 1. `#picker-empty` her tuş vuruşunda yeniden duyuruyor OLABİLİR · **S**
+Kap `role="status"` taşıyor ve `renderPickerGrid` `textContent`i KOŞULSUZ yeniden
+atıyor — dize değişmese bile. `textContent` ataması metin düğümünü değiştiriyor,
+yani sonuçsuz bir aramada altı karakter yazmak "Sonuç bulunamadı"yı altı kez
+duyurabilir. **ÖLÇÜLMEDİ**, o yüzden Tur G'de dokunulmadı ve madde bir iddia
+olarak burada duruyor: ekran okuyucuların tekilleştirmesi araca göre değişiyor.
+Kanıtsız düzeltme, bu defterin kabul etmediği şey.
+- [ ] **Kabul:** önce ölçüm; gerçekse atama yalnız değişiklik olduğunda yapılıyor.
+
+### 2. `uploads` varlık türü ölü ama duruyor · **S**
+Tur F'in bıraktığı uç: `assets_store.KINDS` hâlâ taşıyor, hiçbir şey yazmıyor,
+hiçbir sekme göstermiyor. Eskiden yazılmış varlıklar "Tümü" altında görünüp
+silinebilsin diye tür kaldırılmadı.
+- [ ] **Kabul:** ya gerçek bir göç (varlıklar `logos`a taşınıyor) ya da türün
+      kaldırılması; ikisi de eski kurulumları kaybetmeden.
+
+### 3. `gitleaks` işi CI'da · **S**
+Adım 1 planının tek açık maddesi: geçmiş taramasının kaydı yok.
+- [ ] `.github/workflows/ci.yml`'e bir iş; `credentials.env` deseni ve test
+      sabitleri için allowlist gerekiyor (`tests/test_errlog.py` sahte anahtar
+      taşıyor).
+- **Kabul:** iş yeşil koşuyor ve gerçek bir sızıntı denemesinde kırmızıya dönüyor.
+
+### 4. Arama, klasör adını yalnız EN YAKIN klasörde eşleştiriyor · **S**
 Tur G'nin künye işinin arama tarafı; aynı turda kod okunurken çıktı.
 `matchesSearch` (folders.js) yalnız `folder.name`e bakıyor, zincire değil.
 Kullanıcı "Kampanyalar" yazınca o klasörün ALTINDAKİ görseller çıkmıyor — oysa
@@ -823,53 +937,49 @@ değiştirir ve kendi ölçümünü ister (kaç sonuç, hangi kapsamda, kapsam s
 - [ ] **Kabul:** iç içe klasörde üst klasörün adı aratıldığında alt klasördeki
       görseller de geliyor; kapsam sayaçları buna göre.
 
-### 2. `#picker-empty` her tuş vuruşunda yeniden duyuruyor OLABİLİR · **S**
-Kap `role="status"` taşıyor ve `renderPickerGrid` `textContent`i KOŞULSUZ yeniden
-atıyor — dize değişmese bile. `textContent` ataması metin düğümünü değiştiriyor,
-yani sonuçsuz bir aramada altı karakter yazmak "Sonuç bulunamadı"yı altı kez
-duyurabilir. **ÖLÇÜLMEDİ**, o yüzden Tur G'de dokunulmadı ve madde bir iddia
-olarak burada duruyor: ekran okuyucuların tekilleştirmesi araca göre değişiyor.
-Kanıtsız düzeltme, bu defterin kabul etmediği şey.
-- [ ] **Kabul:** önce ölçüm; gerçekse atama yalnız değişiklik olduğunda yapılıyor.
+### 5. Uygulama içi güncelleme kontrolü deponun PUBLIC olduğunu varsayıyor · **S**
+Tur I'de kapının gerekçesi düzeltilirken çıktı: `guncelleme.py`'nin başlığı
+"Depo public olduğu için uç nokta anonim çalışıyor — pakete gömülmüş bir token
+YOK ve olmamalı" diyor ve modül `api.github.com/repos/…/releases/latest`i
+kimliksiz çağırıyor. Depo bugün **private** (REST, 28 Ağustos). Private bir
+deponun bu ucu anonim çağrıda 404 döner; o hâlde Ayarlar'daki *"Yeni sürüm
+çıktı"* satırı hiçbir kullanıcıda görünmüyor demektir — sessizce, çünkü kontrol
+zaten arka planda koşuyor ve hatası kullanıcıya çıkmıyor.
 
-### 3. `uploads` varlık türü ölü ama duruyor · **S**
-Tur F'in bıraktığı uç: `assets_store.KINDS` hâlâ taşıyor, hiçbir şey yazmıyor,
-hiçbir sekme göstermiyor. Eskiden yazılmış varlıklar "Tümü" altında görünüp
-silinebilsin diye tür kaldırılmadı.
-- [ ] **Kabul:** ya gerçek bir göç (varlıklar `logos`a taşınıyor) ya da türün
-      kaldırılması; ikisi de eski kurulumları kaybetmeden.
+**ÖLÇÜLEMEDİ ve sebebi kayda değer:** bu oturumun ağı bir vekil üzerinden
+geçiyor ve GitHub isteklerine kimlik ekliyor (`X-Ratelimit-Limit: 5000`, anonim
+sınır 60 olurdu), yani buradan atılan çağrının 200 dönmesi kullanıcının
+makinesindeki davranışı KANITLAMIYOR. Kanıt, kimlik taşımayan bir ağdan tek bir
+`curl` ile alınır.
 
-### 4. Sonuç kartında "Düzenle" / "+ Ek" (K14) · **M**
+Aynı varsayım daha geniş bir soruyu da açıyor: yayın sayfası da private ise
+kullanıcı paketi zaten indiremez (`GUNCELLEME.md` "son yayın sayfasından
+indirebilirsin" diyor). Yani bu madde teknik bir düzeltme kadar bir **dağıtım
+kararı**: depo public'e mi dönecek, yoksa güncelleme/indirme başka bir yüzeye mi
+taşınacak.
+- [ ] **Kabul:** önce ölçüm (kimliksiz ağdan `curl`). Kırıksa: ya depo public'e
+      döner ve modülün gerekçesi doğrulanır, ya kontrol kullanıcıya görünür bir
+      "bakılamadı" durumu döndürür — pakete token GÖMÜLMEZ (o kural durur).
+
+### 6. Wheel'in elle bakım yolu hâlâ varlık kotasına bağlı · **S**
+Tur H'nin bıraktığı uç. Yayın yolunda tek bir `upload-artifact` kalmadı ama
+`build-pydantic-core-android.yml`deki teslim adımı duruyor (`varlik_yukle`
+bayrağı — Yol A: bakımcı workflow'u elle tetikleyip wheel'i indiriyor ve
+`android/wheels/` altına işliyor). **Ölçüldü:** 28 Ağustos 19:58 ve 20:10'daki
+iki kanarya koşusu `Artifact storage quota has been hit` ile düştü, yani o yol
+kota doluyken KIRIK. Yayın etkilenmiyor; lazım olacağı an pydantic çivisinin
+güncellendiği gün.
+- [ ] **Kabul:** ya teslim de önbellekten okunuyor (çağıran zaten öyle yapıyor)
+      ya da wheel bir taslak yayına yükleniyor; her iki hâlde de kota doluyken
+      Yol A yürüyor.
+
+### 7. Sonuç kartında "Düzenle" / "+ Ek" (K14) · **M**
 Karar "tam bir geçmiş kaydı ister" diye ertelenmişti; döküm bugün yalnız
 `image_id` taşıyor. Kart eylemleri için kaydın kendisi lazım.
 - [ ] **Kabul:** sonuç kartından doğrudan düzenlemeye/ek referansa geçilebiliyor
       ve silinmiş görselde yer tutucu davranışı bozulmuyor.
 
-### 5. `gitleaks` işi CI'da · **S**
-Adım 1 planının tek açık maddesi: geçmiş taramasının kaydı yok.
-- [ ] `.github/workflows/ci.yml`'e bir iş; `credentials.env` deseni ve test
-      sabitleri için allowlist gerekiyor (`tests/test_errlog.py` sahte anahtar
-      taşıyor).
-- **Kabul:** iş yeşil koşuyor ve gerçek bir sızıntı denemesinde kırmızıya dönüyor.
-
-### 6. Paketleme kapısının maliyeti: depo artık **private** · **S**
-`ci.yml`'in yazılı gerekçesi "Depo public olduğundan GitHub-hosted runner
-dakikaları faturalanmıyor" diyor ve bu bugün YANLIŞ (REST: `visibility:
-private`). Yani `static/`, `android/`, `build.*`, `.github/workflows/` altına
-dokunan HER PR üç paketi de derletiyor ve macOS dakikası 10x sayılıyor —
-workflow'ların kendi eski gerekçesi geri döndü. Bu bir politika kararı: kapının
-değeri (kırık bir yayını merge'den ÖNCE yakalamak) ile bedeli arasında seçim.
-- [ ] Ya gerekçe yorumu düzeltilip maliyet bilinçle kabul edilir, ya kapı
-      daraltılır (ör. paketleme yalnız `tam-paket` etiketiyle ya da yalnız
-      `.spec`/`build.*`/`android/` değişiminde; `static/` listeden çıkar).
-- [ ] Depo public'e dönecekse karar kendiliğinden düşer — o zaman yalnız yorumun
-      doğrulanması kalır.
-- **Kabul:** `ci.yml`'in yorumu ile deponun görünürlüğü aynı şeyi söylüyor;
-      seçim hangisi olursa olsun gerekçesi yazılı.
-- **Not:** varlık saklama süreleri bu maddenin İÇİNDE DEĞİL — o yarı Tur G'nin
-      CI onarımında kapandı (`tests/test_ci_varlik_saklama.py`).
-
-### 7. Ayarlar'da canlı bağlantı testi düğmeleri · **M**
+### 8. Ayarlar'da canlı bağlantı testi düğmeleri · **M**
 README Faz 2'nin son açık maddesi. Bugünkü karşılık yalnız "anahtar kayıtlı mı"
 listesi; gerçek bir çağrı denemesi yok.
 - [ ] Sağlayıcı başına küçük bir uç (`POST /api/settings/test`?) + düğme;
@@ -877,7 +987,7 @@ listesi; gerçek bir çağrı denemesi yok.
 - **Kabul:** yanlış anahtarda anlaşılır Türkçe hata, doğru anahtarda "bağlantı
       kuruldu"; anahtar yanıtta HİÇ yankılanmıyor (write-only sözleşmesi).
 
-### 8. Yerel sağlayıcı adaptörleri: ComfyUI · Ollama · **L**
+### 9. Yerel sağlayıcı adaptörleri: ComfyUI · Ollama · **L**
 Anahtar/adres alanları v0.2.0'dan beri kayıtlı, **adaptör ve arayüz yok**
 (`azure_client.get_settings_status` yalnız durum bayrağı döndürüyor).
 - [ ] `providers._ADAPTERS`'a iki adaptör, katalogda modeller, Ayarlar'da
@@ -885,48 +995,48 @@ Anahtar/adres alanları v0.2.0'dan beri kayıtlı, **adaptör ve arayüz yok**
 - **Kabul:** yerel bir kurulumla üretim yapılabiliyor; sağlayıcı düşükken hata
       Türkçe ve anlaşılır.
 
-### 9. fal.ai · Replicate adaptörleri · **L**
+### 10. fal.ai · Replicate adaptörleri · **L**
 Aynı boşluğun bulut yarısı; ikisi de **kuyruklu** akış (`providers`'ın zaman
 aşımı politikası bunu zaten öngörüyor: "adet başına ayrı istek atan sağlayıcı").
 - [ ] **Kabul:** kuyruk beklerken arayüz ilerleme gösteriyor, zaman aşımı
       sağlayıcıya göre çözülüyor (`tests/test_providers.py`'nin deseni).
 
-### 10. Maske tuvali / bölgesel düzenleme · **L**
+### 11. Maske tuvali / bölgesel düzenleme · **L**
 Master spec Faz 1'in açık yarısı: bugünkü `/api/edit` tüm görsel üzerinden
 çalışıyor, `mask` alanı yok.
 - [ ] Fırça/silgi HTML5 Canvas + `mask` alanının adaptör sözleşmesine girmesi
       (Azure ve OpenAI destekliyor; Gemini'de karşılığı farklı).
 - **Kabul:** maskelenen bölge dışında piksel değişmiyor (golden fixture).
 
-### 11. Stil çipleri · stil şablonları · tipografi katmanı · **M**
+### 12. Stil çipleri · stil şablonları · tipografi katmanı · **M**
 Faz 2'nin açık yarısı. Hazır stil çipleri (*Anime*, *Cyberpunk*, *Cinematic*,
 *Pixel Art*, *3D Render*) prompt'a eklenen jetonlar; tipografi katmanı
 bindirmenin metin tarafı.
 - [ ] **Kabul:** çip seçimi prompt'a görünür biçimde giriyor ve geri alınabiliyor.
 
-### 12. Özel araçlar: Upscaler · Product-in-Hand · **L**
+### 13. Özel araçlar: Upscaler · Product-in-Hand · **L**
 README Faz 3. Upscaler bir sağlayıcı yeteneği; Product-in-Hand bir prompt
 şablonu + referans akışı.
 - [ ] **Kabul:** her ikisi kendi kredi etiketiyle katalogda.
 
-### 13. Image-to-Video motoru · **L**
+### 14. Image-to-Video motoru · **L**
 README Faz 4 (master spec Faz 3'ün video payı). Yeni bir medya TÜRÜ: depo,
 küçük resim, büyüteç ve indirme yolları video tanımıyor.
 - [ ] **Kabul:** üretilen video kayıtta, galeride oynatılabiliyor, indirilebiliyor.
 
-### 14. i18n (TR/EN) · **M**
+### 15. i18n (TR/EN) · **M**
 Arayüz metinleri bugün HTML/JS içinde birebir Türkçe; sözlük katmanı yok.
 - [ ] **Kabul:** dil anahtarı `prefs.json`'a yazılıyor, iki dilde de 360px'de
       taşma yok (İngilizce metinler daha uzun).
 
-### 15. SaaS dönüşümü · **XL**
+### 16. SaaS dönüşümü · **XL**
 Kendi tasarım belgesi var: `docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md`
 (Faz 5). Kredi tarifesi katalogda **metadata olarak** hazır; ledger, hesaplar,
 depolama, ödeme ve filigran açık.
 - [ ] **Kabul:** o belgenin kendi kabul ölçütleri; buraya alınmadan önce ayrı
       bir uygulama planı yazılır.
 
-### 16. PWA · iOS · **L**
+### 17. PWA · iOS · **L**
 Android teslim (Chaquopy APK); PWA'nın service worker/manifest'i ve iOS yok.
 - [ ] **Kabul:** çevrimdışı açılış ve "ana ekrana ekle" akışı çalışıyor.
 

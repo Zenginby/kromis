@@ -187,9 +187,11 @@
     justify-content: space-between;
   }
 
-  /* Klavye açıkken ipucu satırı yer kaplıyor; üstelik "⌘/Ctrl + Enter"
-     telefonda yanlış bilgi (bkz. core.js: dokunmatikte Enter satır atlar). */
-  .chat-hint { display: none; }
+  /* `.chat-hint { display: none }` KALKTI — düğüm artık HİÇ yok (index.html).
+     Gerekçesi kayda değer ve duruyor: "⌘/Ctrl + Enter" telefonda YANLIŞ bilgi
+     (dokunmatikte Enter satır atlar, bkz. core.js). Şerit masaüstünden de
+     kalkınca bu kural ölü bir seçiciye dönüştü; yanlış bilgi riski ise
+     #go'nun `title`ında yaşamıyor, çünkü `title` dokunmatikte hiç görünmez. */
 
   /* Arena satırı telefonda EN ÇOK 2 sütun. Ölçü: 360px'lik ekranda tuvalin
      içi ~328px; dört sütun (3×12px boşlukla) karo başına ~73px bırakıyor ve

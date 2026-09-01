@@ -614,6 +614,25 @@ async def edit(
     return {"images": records}
 
 
+def _model_available(configured: bool, plan: str) -> bool:
+    """Bu model kullanıcıya GÖRÜNÜYOR mu — arayüzün sorduğu TEK soru.
+
+    Görünmeme sebebi bugün tek: anahtar kayıtlı değil. Kredi/üyelik sistemi
+    geldiğinde ikincisi ekleniyor — "kullanıcının planı bu modeli kapsamıyor" —
+    ve o gün DEĞİŞECEK YER BURASI, istemci değil. Filtrenin istemcide olduğu
+    bir dünyada iki sebebi ayrı ayrı sormak gerekirdi ve "hangi modeller
+    görünür" sorusunun iki cevabı doğardı; `static/core.js secilebilirler`in
+    var olma sebebi tam olarak o ikiliği önlemek.
+
+    `plan` BUGÜN OKUNMUYOR ve bu bilinçli: parametre imzada duruyor çünkü
+    kancanın YERİ burası, ama plan tablosu (kim hangi abonelikte) henüz yok —
+    kullanıcı modeli, kimlik doğrulama ve bakiye SaaS dönüşümüne bağlı
+    (docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md).
+    Uydurma bir eşleştirme yazmak, olmayan bir gerçeği kodlamak olurdu.
+    """
+    return configured
+
+
 def _provider_logo_url(provider: str) -> str | None:
     """Sağlayıcı işaretinin ADRESİ — katalogdaki dosya adı + sürüm damgası.
 
@@ -701,6 +720,17 @@ def _settings_payload() -> dict:
                 # geliyor — bugün o karar tek bir Azure boolean'ına bağlı ve
                 # yalnızca OpenAI'si olan bir kullanıcıda ölü bir düğme üretirdi.
                 "configured": cfg.get(m.credential, False),
+                # GÖRÜNÜRLÜK kararı — arayüzün filtresi YALNIZ bunu okuyor.
+                # Bugün `configured` ile birebir aynı; ayrımın gerekçesi
+                # _model_available'da yazılı. `configured` KALIYOR çünkü
+                # MESAJ ondan geliyor: "anahtar yok" ile "planın kapsamıyor"
+                # kullanıcıya aynı cümle değil.
+                "available": _model_available(cfg.get(m.credential, False),
+                                              m.plan),
+                # Bugün her modelde "free". Arayüz bir gün "Pro" rozetini
+                # bundan çizecek; alan şimdiden akıyor ki o gün şema
+                # değişikliği gerekmesin.
+                "requires_plan": m.plan,
             }
             for m in catalog.IMAGE_MODELS
         ],
@@ -715,6 +745,9 @@ def _settings_payload() -> dict:
              # kurulumda arayüz modeli "kurulu" gösterir ve ilk mesaj 404
              # dönerdi (bkz. credstore.chat_is_configured).
              "configured": chat_cfg.get(m.id, False),
+             # Görsel şeridiyle AYNI alan, aynı gerekçe (_model_available).
+             "available": _model_available(chat_cfg.get(m.id, False), m.plan),
+             "requires_plan": m.plan,
              # Ayarlar formunun dağıtım adı kutusunun kapısı: KATALOGDAN
              # türetiliyor, istemcide sağlayıcı adı literal olarak
              # sayılmıyor. Sayılsaydı, adı ortamdan okunan ikinci bir

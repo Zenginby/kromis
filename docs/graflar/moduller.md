@@ -23,7 +23,7 @@ flowchart TD
     n_netguard["netguard<br/>157 satır"]
   end
   subgraph katman6["katman 6"]
-    n_app["app<br/>1724 satır"]
+    n_app["app<br/>1757 satır"]
   end
   subgraph katman5["katman 5"]
     n_chat_providers["chat_providers<br/>124 satır"]
@@ -55,7 +55,7 @@ flowchart TD
     n_storage["storage<br/>329 satır"]
   end
   subgraph katman0["katman 0"]
-    n_catalog["catalog<br/>769 satır"]
+    n_catalog["catalog<br/>780 satır"]
     n_composite["composite<br/>158 satır"]
     n_errlog["errlog<br/>114 satır"]
     n_jsonstore["jsonstore<br/>80 satır"]
@@ -168,18 +168,18 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | modül | satır | katman | ithal ettiği | ithal eden | test |
 | --- | --- | --- | --- | --- | --- |
 | `android_main.py` | 194 | 9 | `app` (erteli), `desktop` (erteli), `errlog` (erteli), `paths` (erteli) | 0 | 1 |
-| `app.py` | 1724 | 6 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 27 |
+| `app.py` | 1757 | 6 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 27 |
 | `assets_store.py` | 201 | 1 | `jsonstore` | 3 | 8 |
 | `azure_client.py` | 458 | 1 | `paths`, `winsec` | 9 | 25 |
 | `backup.py` | 187 | 3 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 1 | 1 |
-| `catalog.py` | 769 | 0 | — | 10 | 18 |
+| `catalog.py` | 780 | 0 | — | 10 | 19 |
 | `chat_client.py` | 182 | 3 | `azure_client`, `chat_prompt`, `models` | 3 | 3 |
 | `chat_prompt.py` | 62 | 1 | `paths` | 2 | 1 |
 | `chat_providers.py` | 124 | 5 | `azure_client`, `catalog`, `chat_client`, `credstore`, `openai_chat` | 1 | 2 |
 | `chat_store.py` | 253 | 1 | `jsonstore` | 2 | 2 |
 | `color_names.py` | 418 | 1 | `palette` | 1 | 3 |
 | `composite.py` | 158 | 0 | — | 1 | 1 |
-| `credstore.py` | 128 | 2 | `azure_client`, `catalog` | 6 | 3 |
+| `credstore.py` | 128 | 2 | `azure_client`, `catalog` | 6 | 4 |
 | `desktop.py` | 263 | 8 | `errlog`, `netguard`, `paths`, `screencolor`, `app` (erteli) | 1 | 1 |
 | `errlog.py` | 114 | 0 | — | 4 | 1 |
 | `folders.py` | 248 | 2 | `jsonstore`, `storage` | 3 | 3 |

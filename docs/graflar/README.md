@@ -20,7 +20,7 @@
 * 71 test dosyası; 3 modülü hiçbir test ithal etmiyor, 7 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
 * 1 ithal döngüsü, 0 rotaya oturmayan tarayıcı çağrısı
 
-En büyük dosyalar: `app` (1724), `models` (780), `catalog` (769), `azure_client` (458), `color_names` (418).
+En büyük dosyalar: `app` (1757), `catalog` (780), `models` (780), `azure_client` (458), `color_names` (418).
 En çok ithal edilenler: `catalog` (10), `azure_client` (9), `jsonstore` (8), `credstore` (6), `paths` (6).
 
 ## Nasıl güncellenir

@@ -1,11 +1,10 @@
 # Görev defteri — sıradaki adımlar
 
-**Tarih:** 28 Ağustos 2026 · **Son dal:** `claude/review-work-and-graphs-2z1yjh`
-(PR #61 ile `main`'e BİRLEŞTİ — dal bu noktadan sonra `main`'in gerisinde;
-yeni oturum kendi dalını `main`'den kurmalı)
-**Bugünkü ölçüm:** `APP_VERSION` **0.11.6** (Tur I+J birleşince CI yazdı),
-`pytest tests/ -q` → **1847 geçti / 10 atlandı** (CI'ın gördüğü sayı; Playwright
-kuruluyken 1854 geçti / 9 atlandı — E2E dosyası artık atlanmıyor)
+**Tarih:** 1 Eylül 2026 · **Son dal:** `claude/project-graphs-next-tasks-7slwo1`
+(`main`'den kuruldu, henüz birleşmedi)
+**Bugünkü ölçüm:** `APP_VERSION` **0.11.6** (sonrakini CI yazacak),
+`pytest tests/ -q` → **1859 geçti / 9 atlandı** (Playwright kuruluyken; Tur K
+öncesi aynı ortamda 1854 geçti / 9 atlandı — beş yeni test)
 **Defterin açılış ölçümü** (Tur A öncesi): `APP_VERSION` 0.7.0 → 1613 geçti / 10 atlandı
 (atlananlar her üç ölçümde de yalnız Windows'a özgü DACL testleri + kurulu
 olmayan Playwright)
@@ -33,6 +32,156 @@ burada durur. Yol haritaları (README fazları, `2026-08-10-saas-transformation-
 4. Kuyruktan bir madde alındığında **üste taşınır** ve kendi adım listesini
    orada kazanır. Kuyruk sırası bir söz değil, öneri: kullanıcı sırayı
    değiştirebilir.
+
+---
+
+## ✅ Tur K — Stüdyo sadeleşti: az metin, yalnız kullanılabilir modeller, küçülen composer
+
+**Bitti (1 Eylül).** Kuyruk maddesi DEĞİL, **kullanıcının o gün verdiği iş**:
+"stüdyo kısmındaki chat kısmını olabildiğince sadeleştirmek istiyorum, gereksiz
+yazıları kaldıralım ve API key'i girilmeyen modeller gözükmesin. İleride kredi
+ve üyelik sistemine geçtiğimizde aboneliği olan kişiler için belli modeller
+gözükecek şekilde çalışma yapacağız… bir de chat veya görsel üretme prompt'u
+gönderdikten sonra chat kısmı küçülsün."
+
+Kuyruğun başındaki logo maddesi bu yüzden BEKLEDİ; defterin kuralı zaten bunu
+söylüyor ("kuyruk sırası bir söz değil, öneri: kullanıcı sırayı değiştirebilir")
+ve o madde bu oturumda ölçümle DARALDI (aşağıda, kuyrukta).
+
+### 1. Gereksiz yazılar — üçü kalktı, biri kaldı
+
+| kalkan | nerede | ne oldu |
+| --- | --- | --- |
+| 58ch'lik tanıtım paragrafı | `#chat-empty` | başlık + çipler aynı şeyi zaten söylüyor |
+| klavye ipucu şeridi `.chat-hint` | `.composer-foot` | **bilgi ölmedi, taşındı**: `#go`nun `title`ı (tek yazar `syncGoGate`) |
+| "ilk yanıt yarım dakikayı bulabilir" | `#chat-wait` | spinner + "Yönetmen düşünüyor…" kaldı |
+| dört öneri çipi | `#chat-empty` | **KALDI** — kullanıcı kararı; boş ekranın tek eylem kapısı onlar |
+
+Şerit telefonda zaten `display: none` idi, yani kayıp masaüstüne özgüydü;
+kazanç da orada. `title` dokunmatikte hiç görünmüyor ve bu bir gerileme DEĞİL:
+o metin ("⌘/Ctrl + Enter") telefonda zaten YANLIŞ bilgiydi — eski
+`mobile.css` kuralının gerekçesi tam olarak buydu ve gerekçe kayda geçti.
+
+### 2. Anahtarı girilmemiş modeller — kapı KAPANDI
+
+Filtre (`core.js secilebilirler`) zaten vardı; kaçak **ilk kurulum kapısıydı**:
+hiçbir anahtar kayıtlı değilken BÜTÜN katalog listeleniyordu. Kullanıcının
+gördüğü şey buydu.
+
+Kapının eski gerekçesi "boş bir şerit kullanıcıya hiçbir şey söylemez"di ve
+**o gerekçe artık karşılıksız**, çünkü aynı soruyu üç yer cevaplıyor —
+biri zaten duruyordu, ikisi bu turda kuruldu:
+
+* Ayarlar hiçbir görsel modeli kurulu değilken **kendiliğinden açılıyor**
+  (settings.js) — ilk kurulumdaki kullanıcı boş bir şeritle değil, anahtar
+  formuyla karşılaşıyor;
+* şerit ve panel boş hâli **anlatıyor** (`MODEL_BOS_METNI`, `.model-sheet-empty`);
+* `#go` kilitli ve kilidin sebebi `title`da yazılı.
+
+Boş hâl çizilmek ZORUNDAYDI, yoksa kapanan kapı sessiz bir kırılma üretiyordu:
+`secilecek` boş dize döndürüyor, `applyModel` modeli bulamayıp erken çıkıyor ve
+çip **"Modeller yükleniyor…" yazısında donuyordu**. Kaynak taraması bunu
+yakalayamaz — her iki hâlde de kod doğru görünüyor, fark ekranda. O yüzden
+bekçisi bir E2E testi.
+
+Boş hâlin çizimi `syncModelChip`in İÇİNE kondu, ayrı bir fonksiyona değil:
+çipin tek yazarı olması bu dosyanın çivilenmiş kuralı ve üç tripwire onu
+gerçekten sayıyor — ilk yazımda ikinci bir yazar açtım, **üçü birden kırmızı
+oldu** (`test_cip_dugmesinin_adi_EKSENI_de_soyluyor`,
+`test_ISARET_her_iki_seride_de_baglaniyor`,
+`test_model_yuzeyi_TEK_ve_IKI_ekseni_birlikte_tasiyor`). Tasarım testlerin
+dediğine göre düzeltildi; testler haklıydı.
+
+**Ölçüm (Chromium 390×844):**
+
+| kurulum | şeritteki modeller | çip |
+| --- | --- | --- |
+| anahtar YOK | **0** (eskiden katalogun tamamı) | "Model yok — Ayarlar" |
+| yalnız OpenAI | `openai-gpt-image-2`, `openai-gpt-image-1` | seçili modelin adı |
+
+`#go` anahtarsız kurulumda kilitli ve `title`ı
+"Kayıtlı API anahtarı yok — Ayarlar'dan ekle." diyor.
+
+### 3. Üyelik/kredi: TEK alanlık tohum, bugün davranış değişmiyor
+
+Bugün istemcinin sorduğu soru "anahtar var mı" (`configured`). Yarın ikinci bir
+sebep doğacak: "aboneliği bu modeli kapsıyor mu". İki sebebi istemcide ayrı ayrı
+sormak, görünürlük kuralının İKİ cevabı olması demek — `secilebilirler`in var
+olma sebebi tam olarak o ikiliği önlemek.
+
+Karar bu yüzden **sunucuda türetilmiş tek alana** indi:
+
+* `catalog.ImageModel` / `ChatModel` → `plan: str = "free"`;
+* `app._model_available(configured, plan)` → bugün `configured`ı aynen
+  döndürüyor. **Değişecek tek yer burası.**
+* `/api/settings` her modele `available` + `requires_plan` yazıyor;
+  `core.js secilebilirler` artık `m.available` okuyor.
+* `configured` ÖLMEDİ: mesaj yazan yerler (`#model-note`, `goBlockReason`) onu
+  okumaya devam ediyor — "anahtar yok" ile "planın kapsamıyor" aynı cümle değil.
+
+**Kapsam dışı ve bilinçli:** kullanıcı/oturum modeli, kimlik doğrulama, bakiye,
+satın alma. `plan` parametresi bugün OKUNMUYOR ve imzada durmasının sebebi
+kancanın yeri olması — uydurma bir plan eşleştirmesi yazmak, olmayan bir
+gerçeği kodlamak olurdu. Kuyrukta kendi maddesi var.
+
+`available` bugün `configured` ile eşit olduğu için **silinmesi hiçbir testi
+düşürmezdi**; o yüzden kancanın sessizce ölmesini engelleyen bir mandal yazıldı
+(`test_GORUNURLUK_karari_TEK_alandan_geliyor_ve_bugun_configured_ile_ayni`).
+
+### 4. Gönderimden sonra composer küçülüyor
+
+Çapa `submitComposer` — iki mod da oradan geçiyor, yani "chat VEYA görsel"in tek
+karşılığı o. İşaret uzunluk kapılarının ARDINDAN yazılıyor: reddedilen bir
+gönderim küçülmeyi hak etmiyor.
+
+**Turun en öğretici kısmı burasıydı: ilk çözüm ölçümde ÇÖKTÜ.** Plan yalnız
+`min-height`ı düşürmekti (2.5rem → 1.6rem) ve Chromium'da hiçbir şey
+değiştirmedi — **57px → 57px**. Sebep: `autoGrow` kutuya satır içi bir `height`
+yazıyor (`height: auto` → `scrollHeight`) ve o değer tabanın zaten üstünde.
+Boş bir kutunun yüksekliğini fiilen `rows` belirliyor, `min-height` değil.
+
+İkinci ölçüm ikinci bir kusuru gösterdi: `rows` düşürüldükten sonra masaüstü
+küçülüyordu ama **telefon hâlâ 57px'te duruyordu**. Sebep, boş bir
+`<textarea>`nın `scrollHeight`inin YER TUTUCUYU da kapsaması: 390px'de uzun yer
+tutucu iki satıra sarıyor. Yani kutuyu şişiren şey metnin kendisiydi — ve o
+metin zaten kullanıcının kaldırılmasını istediği türden. Yer tutucu ilk
+gönderimden sonra kısa hâline geçiyor.
+
+| ölçüm (boş kutu, odak dışında) | masaüstü 1280×860 | telefon 390×844 |
+| --- | --- | --- |
+| `#prompt` gönderim öncesi | 57px | 57px |
+| `#prompt` gönderim sonrası | **35px** | **35px** |
+| `#prompt` yeniden odaklanınca | 57px | 57px |
+| `#composer` | 208 → **186px** | 248 → **226px** |
+| `--composer-h` (mobil, tuvalin alt boşluğu) | — | 248 → **226px** |
+
+Son satır elle senkron GEREKTİRMEDİ: `--composer-h`i mobile.js bir
+`ResizeObserver` ile ölçüyor, yani telefonda tuvalin alt boşluğu küçülmeyi
+kendiliğinden devraldı.
+
+### Turun kanıtı
+
+* `python3 -m pytest tests/ -q` → **1859 geçti / 9 atlandı** (tur öncesi aynı
+  ortamda 1854/9). Beş yeni test: üçü kaynak mandalı, ikisi Chromium E2E.
+* `python3 tools/graf_uret.py --kontrol` → yeşil; graf dosyaları bu commit'in
+  içinde.
+* Üç senaryo gerçek Chromium'da ölçüldü ve ekran görüntüsüyle doğrulandı
+  (yukarıdaki tablolar).
+
+### Yeniden yazılan iddialar (silinmedi)
+
+Deponun kuralı gereği kapanan iddia silinmiyor, **yeniden yazılıyor**:
+
+| test | eski iddia | yeni iddia |
+| --- | --- | --- |
+| `test_ANAHTARI_OLMAYAN_modeller_seride_GIRMIYOR` | "ilk kurulumda HEPSİ görünsün" | "kapı kapalı VE boş hâl çiziliyor" |
+| `test_composer_ipucu_TEK_SATIR_…` → `…_SERIDI_KALDIRILDI_bilgi_GO_dugmesinde` | `.chat-hint`in flex geometrisi | şerit yok, bilgi `#go`nun `title`ında |
+| `test_sohbet_kataloğu_…_ALANLARI_tasiyor` | 8 alanlık donmuş küme | 10 alan (`available`, `requires_plan`) |
+| `test_playwright_model_sheet_alttan_aciliyor` | anahtarsız sunucuda kartları ölçüyordu | kimlikleri kayıtlı gösteriyor (kartlar VARKEN anlamlı) |
+
+Sonuncusu turun kendi dersi: o test anahtarsız bir sunucuda koşuyordu ve
+kartların varlığını ölçüyordu — filtre sıkılaşınca **haklı olarak** kırmızıya
+döndü. Değişikliğin gerçekten işlediğinin ilk kanıtı o kırmızıydı.
 
 ---
 
@@ -1027,10 +1176,10 @@ BAŞLIĞI; kapanan madde de silinmiyor, ait olduğu turun kutusunda kanıtıyla
 duruyor.
 
 > **SIRADAKİ TUR: 1. madde** — logo önizlemesi kare olmayan görselde eksik
-> görünüyor. Kuyruğun başına o alındı çünkü kaynağı ötekilerden farklı:
-> **kullanıcı bunu kullanırken gördü** (28 Ağustos), yani varlığı hakkında
-> okuma değil kullanım kanıtı var. 2. madde (arama/klasör zinciri) hemen
-> ardından geliyor.
+> görünüyor. Kuyruğun başında DURUYOR: Tur K onun yerine geçmedi, kullanıcı o
+> oturumda başka bir iş verdi (defterin kuralı: "kuyruk sırası bir söz değil,
+> öneri"). Madde ayrıca **daraldı** — Tur K oturumunda iki adaydan biri ölçümle
+> ELENDİ, aşağıda. 2. madde (arama/klasör zinciri) hemen ardından geliyor.
 >
 > 3. madde (güncelleme kontrolü) bir DAĞITIM kararına bağlı ve karar alındı:
 > depo **şimdilik private, ileride public** — madde silinmiyor, "public'e
@@ -1042,9 +1191,9 @@ duruyor.
 görselin aşağı veya yan kısımlarındaki logo ekleme önizlemesi gözükmüyor."
 Yani 9'lu ızgarada alt/yan bir konum seçildiğinde logo önizlemede görünmüyor.
 
-**HENÜZ ÖLÇÜLMEDİ.** Bu defterin kuralı gereği düzeltme, hangi katmanın
-suçlu olduğu ölçülmeden yazılmaz. Kod okunarak iki aday çıkarıldı ve ikisini
-AYIRAN ölçüm de belli:
+**YARISI ÖLÇÜLDÜ (1 Eylül, Tur K oturumu).** Bu defterin kuralı gereği
+düzeltme, hangi katmanın suçlu olduğu ölçülmeden yazılmaz. Kod okunarak iki
+aday çıkarılmıştı; **(b) elendi**, (a) ayakta:
 
 * **(a) İstemci — görüntüleme kırpması.** `.logo-preview-wrap` (style.css)
   `overflow: hidden` + `place-items: center` taşıyor; `.logo-preview-img` ise
@@ -1057,17 +1206,44 @@ AYIRAN ölçüm de belli:
   bilinçli olduğunu söyleyen bir yorum var). Kare olmayan oranda dikey boşluk
   orantısız çıkıyor.
 
-**AYIRAN ÖLÇÜM (tek adım):** önizleme ile uygulama AYNI `_composite_logo`
-yolundan geçiyor (`/api/logo/preview` ile `/api/logo` aynı işlevi çağırıyor,
-app.py). O hâlde logo gerçekten görüntünün dışına düşüyorsa KAYDEDİLEN dosyada
-da eksik olur. Kare olmayan bir görselde alt-orta konumla bir kez uygulayıp
-çıktıya bakmak (a) ile (b)'yi tek hamlede ayırır: çıktı doğruysa kusur
-istemcide, çıktı da eksikse sunucuda.
-- [ ] **Kabul:** önce ayıran ölçüm, sonra düzeltme; kare olmayan bir görselde
-      dokuz konumun DOKUZU da önizlemede görünüyor ve önizleme uygulanan
-      çıktıyla birebir aynı şeyi gösteriyor. Bekçisi bir test (istemci
-      katmanıysa `tests/test_index.py`/E2E, sunucu katmanıysa
-      `tests/test_composite.py` — oran testi kare olmayan boyutla).
+**(b) ELENDİ — ölçüldü.** `paste_position`ın tamsayı matematiği beş oranda ve
+dokuz konumun **dokuzunda da** logoyu kadrajın TAMAMEN içine koyuyor
+(`_clamp_px` negatif koordinatı zaten kesiyor):
+
+| taban | logo | dokuz konumun hepsi kadrajın içinde mi |
+| --- | --- | --- |
+| 1024×1024 | 143×35 | evet |
+| 1536×1024 | 215×53 | evet |
+| 1024×1536 | 143×35 | evet |
+| 2048×512 | 286×71 | evet |
+| 512×2048 | 71×17 | evet |
+
+Yani kaydedilen PNG'de logo HER ZAMAN var; sunucu bir şeyi "gözükmez" yapamaz.
+Önizleme ile uygulama aynı `_composite_logo` yolundan geçtiği için (app.py) bu
+sonuç önizleme için de geçerli — **kusur, sunucudan gelen doğru görselin
+İSTEMCİDE nasıl çizildiğinde.**
+
+**Kalan aday ve önde giden açıklama.** Kullanıcı kusuru **telefonda** gördü,
+yani `mobile.css`in o kutuya özel kuralları devrede:
+`.logo-preview-wrap { height: 38vh }` + `.logo-preview-img { max-height: 100% }`
+(mobile.css:277-285), sarmalayıcıda `overflow: hidden` + `place-items: center`.
+YÜZDE `max-height`, satırı `auto` boyutlanan bir ızgara öğesinde çözülmezse
+`none` gibi davranır; o zaman resmi sınırlayan tek kural `max-width: 100%`
+kalır ve dikey bir görsel (ör. 1024×1536) 328px genişlikte 492px yüksekliğe
+çıkıp 304px'lik kutuda **ortalanır** — taşma alttan ve üstten birden kesilir.
+Yatay görselde `max-width` önce bağladığı için kusur görünmez; "görsel kare
+değilse" koşulu tam olarak buradan geliyor.
+
+**SIRADAKİ ÖLÇÜM (tek adım):** 360×800'lük bir Chromium'da modalı dikey bir
+görselle açıp `#logo-preview-img`in çizilen kutusunu `.logo-preview-wrap`inkiyle
+karşılaştırmak — ve `getComputedStyle(img).maxHeight` okumak, çünkü yüzdenin
+çözülüp çözülmediğini doğrudan o söylüyor. Aynı ölçüm 1280×800'de bir daha:
+kusurun `mobile.css`e özgü olduğunu kanıtlar. (Tur K'da kurulan
+`tests/test_playwright_studio.py` altyapısı bu ölçümü hazır veriyor.)
+- [ ] **Kabul:** kare olmayan bir görselde dokuz konumun DOKUZU da önizlemede
+      görünüyor ve önizleme uygulanan çıktıyla birebir aynı şeyi gösteriyor.
+      Bekçisi iki katman: `tests/test_mobile.py`de CSS kuralının mandalı (CI'da
+      Playwright her işte yok) + bir E2E ölçümü.
 
 ### 2. Arama, klasör adını yalnız EN YAKIN klasörde eşleştiriyor · **S**
 Tur G'nin künye işinin arama tarafı; aynı turda kod okunurken çıktı.
@@ -1190,6 +1366,42 @@ depolama, ödeme ve filigran açık.
 ### 15. PWA · iOS · **L**
 Android teslim (Chaquopy APK); PWA'nın service worker/manifest'i ve iOS yok.
 - [ ] **Kabul:** çevrimdışı açılış ve "ana ekrana ekle" akışı çalışıyor.
+
+### 16. Üyelik/plan görünürlüğü — kanca kondu, KARAR bekliyor · **L**
+Tur K'da sunucuya tek alanlık tohum eklendi: `catalog.*Model.plan` (bugün her
+modelde `"free"`), `app._model_available(configured, plan)` ve
+`/api/settings`in `available` + `requires_plan` alanları. Arayüz görünürlük
+kararını YALNIZ `available`dan okuyor, yani plan kapısı açıldığında istemcide
+değişecek satır **sıfır**.
+
+Eksik olan, kancanın ikinci ucu: **kullanıcı kimdir ve planı nedir**. Bugün
+uygulamanın kullanıcı modeli, kimlik doğrulaması ve bakiyesi YOK — üçü de SaaS
+dönüşümüne bağlı (yukarıdaki 14. madde ve kendi tasarım belgesi). `plan`
+parametresi `_model_available`ın imzasında duruyor ama OKUNMUYOR; uydurma bir
+eşleştirme yazmak, olmayan bir gerçeği kodlamak olurdu.
+- [ ] Modellere gerçek plan etiketleri (`free` / `pro` / …) ve `plan_allows`.
+- [ ] Arayüzde "Pro" rozeti — veri zaten akıyor (`requires_plan`).
+- **Kabul:** planı kapsamayan model listede görünmüyor VE sebebi "anahtar yok"
+      ile KARIŞMIYOR (iki ayrı cümle; `configured` bu yüzden ölmedi).
+
+### 17. Logo kenar boşluğu iki eksende de GENİŞLİKTEN hesaplanıyor · **S**
+1. maddenin ölçümü sırasında çıktı (1 Eylül) ve ondan AYRI bir olgu — kusur
+değil, orantısızlık: `composite_logo`da `margin_px = int(base.width * margin)`
+ve aynı piksel değeri dikeyde de kullanılıyor.
+
+| taban | yatay boşluk | dikey boşluk |
+| --- | --- | --- |
+| 1024×1024 | %2.9 | %2.9 |
+| 1536×1024 | %3.0 | %4.5 |
+| 2048×512 | %3.0 | **%11.9** |
+| 512×2048 | %2.9 | **%0.7** |
+
+Satırdaki yorum bunun bilinçli olduğunu söylüyor (dış script'ten öyle geldi ve
+golden fixture'lar ona bağlı) — yani düzeltmek fixture'ları YENİDEN ÜRETMEK
+demek. Kullanıcıdan gelmiş bir şikâyet YOK; madde ölçüldüğü için duruyor.
+- [ ] **Kabul:** karar önce (orantılı boşluk mu, bugünkü davranış mı); düzeltme
+      seçilirse golden'lar `tools/make_logo_goldens.py` ile yeniden üretiliyor
+      ve `tests/test_composite.py` kare olmayan bir oranı da sınıyor.
 
 ---
 

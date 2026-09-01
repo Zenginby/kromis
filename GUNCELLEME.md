@@ -150,6 +150,14 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.11.7 — ne değişti
+
+- İnceleme bulguları: küçülme çapası, boşa dönen bekçi, eksen metni, ikinci kısayol
+- Stüdyo sadeleşti: az metin, yalnız kullanılabilir modeller, küçülen composer
+- Tur J teslim edildi, kuyruğun başına kullanıcı bulgusu geçti
+
+---
+
 ## Sürüm 0.11.6 — ne değişti
 
 - kapının sentetik koşusu Windows'ta hiçbir şey ölçmüyordu

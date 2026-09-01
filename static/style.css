@@ -241,6 +241,26 @@ body {
 }
 .composer-input:focus { outline: none; border-color: transparent; }
 .composer-input[hidden] { display: none; }
+/* İLK GÖNDERİMDEN SONRA KUTU KÜÇÜLÜR (core.js `composerKuculsun`; kullanıcı
+   isteği: "prompt gönderdikten sonra chat kısmı küçülsün").
+
+   BURASI YALNIZ TABANI İNDİRİYOR, küçülmeyi TEK BAŞINA yapmıyor — ve bu ayrım
+   ölçülerek öğrenildi: yalnız `min-height`ı düşürmek Chromium'da HİÇBİR ŞEY
+   değiştirmedi (57px → 57px), çünkü `autoGrow` kutuya satır içi bir `height`
+   yazıyor ve o değer tabanın zaten üstünde. Küçülmeyi fiilen yapan, aynı turda
+   eklenen `rows` ekseni (core.js `syncComposerSatirlari`); bu kural onun ÖNÜNÜ
+   AÇIYOR: 2.5rem'lik taban yerinde kalsaydı tek satırlık ölçüm ona takılırdı.
+
+   `:focus-within` tabanı GERİ VERİYOR ve `rows` ekseninin odak koşuluyla aynı
+   şeyi söylüyor — ikisi ayrışırsa hangisi kazanırsa o görünür. Sarmalayıcıya
+   bağlanıyor (kutunun kendisine değil), çünkü composer'ın herhangi bir
+   kontrolüne uzanan kullanıcı da yazmaya hazırlanıyor demektir.
+
+   Telefonda ek bir iş YOK: `--composer-h`i mobile.js bir ResizeObserver ile
+   ölçüyor, yani tuvalin alt boşluğu küçülmeyi kendiliğinden devralıyor
+   (390×844'te ölçüldü: composer 248 → 226px, `--composer-h` de 226px). */
+.composer[data-sent] .composer-input { min-height: 1.6rem; }
+.composer[data-sent]:focus-within .composer-input { min-height: 2.5rem; }
 .composer-bar { display: flex; align-items: center; gap: 8px; }
 .plus-wrap { position: relative; flex: none; }
 .plus {
@@ -415,6 +435,13 @@ body {
    aynı satır aynı sebeple var (yukarıda); `display` atayan her kural bu
    bedeli ödemek zorunda. */
 .model-note[hidden] { display: none; }
+/* Panelin boş hâli (core.js renderModelCards). `.radio-row` DEĞİL: tıklanacak
+   bir şey yok, o yüzden kartın yüzeyini ve imlecini almıyor — bir metin gibi
+   görünmesi tam olarak doğru. */
+.model-sheet-empty {
+  margin: 0; padding: 12px 14px; color: var(--muted);
+  font-size: 0.85rem; line-height: 1.55;
+}
 .btn-link {
   padding: 0; border: 0; background: none; cursor: pointer;
   color: var(--accent); font: inherit; text-decoration: underline;
@@ -2000,7 +2027,9 @@ body.viewer-open { overflow: hidden; }
   font-weight: 500;
   font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2.1rem); letter-spacing: -0.015em;
 }
-.chat-empty p { color: var(--muted); line-height: 1.65; margin: 0 0 1.2rem; max-width: 58ch; }
+/* `.chat-empty p` kuralı da düğümüyle birlikte kalktı (tanıtım paragrafı,
+   index.html). `<h2>` ile `.chat-chips` arasındaki boşluğu artık başlığın
+   kendi `margin-bottom`u veriyor. */
 .chat-empty code {
   background: var(--panel-2); border-radius: 5px; padding: 0.05em 0.35em; font-size: 0.9em;
 }
@@ -2316,21 +2345,15 @@ body.viewer-open { overflow: hidden; }
 .chat-gate[hidden] { display: none; }
 /* #chat-input composer'ın içinde: yükseklik/yeniden boyutlandırma
    `.composer-input`'tan geliyor, id seçicisi onu ezmesin. */
-/* Taban genişliği neden `auto`: önceki `flex: 1` kısa biçimi `flex: 1 1 0%`e
-   çözülüyor, yani taban SIFIR oluyor. Satırdaki tek esnek öğe buydu —
-   `#status` bir `<p>` (`flex: 0 1 auto`, tabanı içerik genişliği),
-   `.run-cost` ise `flex: none`. Ölçüm (Chromium, 1024×700 — desktop.py:32'deki
-   en küçük pencere): `#status` 428px alıyor, ipucu 65px'e eziliyor ve DÖRT
-   satıra sarıyor. Kusur origin/main'de de vardı.
-   Taban artık içerikten geliyor ve `nowrap` sarmayı kapatıyor; `.composer-foot`
-   zaten `flex-wrap: wrap`, yani sığmayan kardeş alta düşüyor.
-   `#status`'a KURAL EKLENMEDİ ve bu bilinçli: `flex-basis: 100%` gibi bir kural
-   durumu her zaman kendi satırına atardı ve ipucu telefonda zaten gizli
-   (mobile.css'te `.chat-hint { display: none }`), yani 360px'de bedava bir
-   satır yüksekliği demekti. Bugünkü davranış duruyor: kısa durum metni ipucuyla
-   aynı satırda kalıyor, uzun olan alta düşüyor, boş olan `.composer-foot
-   p:empty` ile tümden kalkıyor. */
-.chat-hint { flex: 0 0 auto; white-space: nowrap; font-size: 0.74rem; color: var(--muted); }
+/* `.chat-hint` KURALI KALKTI çünkü düğümün kendisi kalktı (index.html; kullanıcı
+   isteği: stüdyo sadeleşsin). Kuralın tarihçesi burada kalıyor, çünkü çözdüğü
+   kusur satırın GEOMETRİSİ hakkındaydı ve o geometri duruyor: `flex: 1` kısa
+   biçimi `flex: 1 1 0%`e çözülüyor, yani taban SIFIR oluyor ve o gün ölçülen
+   sonuç (Chromium 1024×700, desktop.py:32'deki en küçük pencere) ipucunun 65px'e
+   ezilip DÖRT satıra sarmasıydı. `#status`'a hâlâ kural EKLENMİYOR: `.composer-foot`
+   `flex-wrap: wrap` ve boş olan `p:empty` ile tümden kalkıyor, yani satır
+   kendiliğinden doğru davranıyor. Şerit gidince o satırda esnek tek öğe de
+   kalmadı — kuralın yokluğu bugün bir gerileme DEĞİL. */
 .chat-send { margin-top: 0; width: auto; padding: 0.65rem 1.5rem; }
 .chat-wait {
   display: flex; align-items: center; gap: 0.6rem;

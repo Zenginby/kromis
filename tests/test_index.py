@@ -1246,8 +1246,15 @@ def test_a_failed_chip_turn_does_not_dump_the_directors_delta_into_the_composer(
     """
     js = _chat_js()
     body = re.search(r"async function sendChat\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
-    assert "if (!label) input.value = message;" in body.group(1), (
+    # İddia DURUYOR, biçimi genişledi: geri koymanın yanına bir `autoGrow`
+    # girdi. Gerekçe küçülmeyle geldi — gönderim `rows`u 1'e indiriyor ve
+    # ölçüm yapılmazsa geri konan çok satırlı mesaj tek satıra kırpılmış
+    # görünüyor. Ölçülen şart değişmedi: geri koyma YALNIZ `!label` dalında.
+    assert re.search(r"if \(!label\)\s*\{?\s*input\.value = message;",
+                     body.group(1)), (
         "başarısız çip turunda delta metni besteciye dökülüyor")
+    assert body.group(1).count("input.value = message") == 1, (
+        "metni geri koyan ikinci bir yol var — çip turu da dökülebilir")
 
 
 def test_the_selection_pill_is_quieter_than_a_typed_message():
@@ -4487,12 +4494,26 @@ def test_SOHBET_MODELI_tercihi_SAGLAYICIYLA_BIRLIKTE_yazILIYOR():
 
 
 def test_ANAHTARI_OLMAYAN_modeller_seride_GIRMIYOR():
-    """İstek: "API key hangilerini destekliyorsa o modeller gözüksün."
+    """İstek: "API key'i girilmeyen modeller gözükmesin."
 
     Kullanıcı Azure anahtarıyla çalışıyorsa OpenAI ve Gemini satırlarının hepsi
     seçilebilir bir 502'den başka bir şey değil. Filtre TEK yerde (`secilebilirler`)
     ve iki şerit de ondan geçiyor — ikinci bir kopya, birini süzüp diğerini
     unutmanın kapısı olurdu.
+
+    İDDİA DEĞİŞTİ, ölçtüğü şey güçlendi. Eskiden bu test İLK KURULUM KAPISINI
+    çiviliyordu: "hiçbiri kurulu değilse HEPSİ görünsün", gerekçesi de "boş bir
+    şerit kullanıcıya hiçbir şey söylemez" idi. O gerekçe kullanıcı isteğiyle
+    düştü (anahtarsız model HİÇ görünmeyecek) ve düşebilmesinin sebebi, aynı
+    soruyu cevaplayan üç yerin artık kurulu olması:
+      · Ayarlar hiçbir görsel modeli kurulu değilken KENDİLİĞİNDEN açılıyor
+        (settings.js) — ilk kurulumdaki kullanıcı boş bir şeritle değil, anahtar
+        formuyla karşılaşıyor;
+      · şerit ve panel boş hâli metinle anlatıyor (`MODEL_BOS_METNI`);
+      · Ayarlar'daki #provider-status hangi sağlayıcıların VAR olduğunu sayıyor.
+
+    Yani kapı kapandı ama "kullanıcı neyin var olduğunu göremez" kırılması geri
+    gelmedi; test artık kapının KAPALI olduğunu VE boş hâlin çizildiğini ölçüyor.
     """
     js = _js("core.js")
     assert "function secilebilirler(" in js
@@ -4500,19 +4521,23 @@ def test_ANAHTARI_OLMAYAN_modeller_seride_GIRMIYOR():
         govde = js.split(fn, 1)[1].split("\n}\n", 1)[0]
         assert "secilebilirler(" in govde, f"{fn} filtreden geçmiyor"
     filtre = js.split("function secilebilirler(", 1)[1].split("\n}\n", 1)[0]
-    # İLK KURULUM KAPISI: hiçbiri kurulu değilse HEPSİ görünüyor — ve bu dal
-    # `zorunluId`den ÖNCE geliyor. Gerçek chromium koşumunda ölçüldü: zorunlu
-    # id filtreye dahil edilirse hiç anahtarı olmayan kullanıcı TEK satırlık
-    # bir şerit görüyor (yalnız seçili varsayılan), yani "hangi modeller var"
-    # sorusunun cevabı da kayboluyor. Boş ya da tek satırlık bir şerit,
-    # #model-note → "Ayarlar'ı aç" yolunun tek keşfedilebilir kapısını kapatır.
-    assert "if (!kurulu.length) return liste;" in filtre, (
-        "ilk kurulumda tüm modeller listelenmiyor — kullanıcı neyin var "
-        "olduğunu hiç göremez")
-    kurulu_tanimi = filtre.split("const kurulu =", 1)[1].split("\n", 1)[0]
-    assert "zorunluId" not in kurulu_tanimi, (
-        "zorunlu id `kurulu` kümesine karışmış: ilk kurulum dalı yanlış "
-        "tarafa düşer ve şerit tek satıra iner")
+    # ÖLÇÜT `available`: görünürlüğün TEK cevabı sunucudan geliyor (app.py
+    # `_model_available`). `configured`e dönmek, kredi/üyelik geldiğinde
+    # "hangi modeller görünür" sorusuna istemcide ikinci bir cevap yazmak olurdu.
+    assert "m.available" in filtre, "filtre görünürlük alanını okumuyor"
+    assert "configured" not in filtre, (
+        "filtre `configured` okuyor — görünürlük kararı iki yere bölünmüş")
+    # İLK KURULUM KAPISI KAPALI: liste boşalabilmeli.
+    assert "kurulu.length" not in filtre, (
+        "ilk kurulum kapısı hâlâ açık — anahtarsız modeller görünmeye devam eder")
+    # …ve boş hâl GERÇEKTEN çiziliyor: hem şerit metni hem #go'nun gerekçesi.
+    assert "MODEL_BOS_METNI" in js, "şeridin boş hâli için metin yok"
+    assert "function modelBosHali(" in js, "boş hâli çizen yol yok"
+    for fn in ("function applyModel(", "function applyChatModel("):
+        govde = js.split(fn, 1)[1].split("\n}\n", 1)[0]
+        assert "modelBosHali(" in govde, (
+            f"{fn} seçim yokken boş hâle geçmiyor — şerit "
+            '"Modeller yükleniyor…" yazısında donar')
 
 
 def test_SECILI_model_seritte_HER_ZAMAN_duruyor():
@@ -4902,25 +4927,164 @@ def test_yuvarlak_kartin_sol_kenari_VURGU_RENGI_degil():
         ".folder-target ile .chat-gate'in sol kenarı ayrışmış")
 
 
-def test_composer_ipucu_TEK_SATIR_taban_genisligi_ICERIKTEN():
-    """`.chat-hint` esnek DEĞİL: tabanı içerikten geliyor.
+def test_composer_ILK_KABUL_EDILEN_gonderimden_sonra_kuculuyor():
+    """"Prompt gönderdikten sonra chat kısmı küçülsün" — ama KABUL EDİLEN prompt.
 
-    Önceki `flex: 1` kısa biçimi `flex: 1 1 0%`e çözülüyordu, yani taban
-    genişliği SIFIR. `.composer-foot`'taki tek esnek öğe buydu — `#status` bir
-    `<p>` (`flex: 0 1 auto`, tabanı içerik genişliği), `.run-cost` ise
-    `flex: none`. Ölçüm (Chromium, 1024×700 — `desktop.py`'deki en küçük
-    pencere): `#status` 428px alıyor, ipucu 65px'e eziliyor ve DÖRT satıra
-    sarıyor. Kusur `origin/main`'de de vardı.
+    ÇAPA `submitComposer` DEĞİL, ve bu iddia bir kusurun üstüne yazıldı: çapa
+    bir tur orada durdu, oysa oradaki kapılar yalnız UZUNLUK kapıları. Boş bir
+    kutuyla "Üret"e basmak `run()`ın "Önce bir prompt yaz."ına takılıyor —
+    ama composer çoktan küçülmüş, `data-sent` yazılmış ve uzun tanıtım yer
+    tutucusu kısasıyla değişmiş oluyordu: hiç gönderim yapmadan onboarding
+    metnini öldürmek. `sendChat`in dört kapısı (chatBusy, boş mesaj, dolu
+    konuşma, toplam karakter) ve `runArena`nın iki kapısı da aynı durumdaydı.
 
-    Mandal bilerek ZAYIF ama doğru yerde: pytest CSS'i ÇALIŞTIRMIYOR, yani
-    "tek satır" iddiası burada ölçülemez — gerçek ölçüm tarayıcıda yapılıp
-    görev defterine yazıldı. Burada korunan şey kuralın kendisi.
+    Yerine geçen çapa KUTUNUN BOŞALDIĞI satır: üç akışın da bütün kapılardan
+    geçtikten sonra yaptığı ilk iş o, yani "kabul edildi"nin kaynaktan
+    okunabilir tek işareti. Bu yüzden iddia bitişikliği ölçüyor — `run`,
+    `runArena` ve `sendChat`in her birinde `composerKuculsun()` boşaltma
+    satırından hemen sonra gelmeli.
+
+    Küçülmeyi fiilen yapan `rows` ekseni; `min-height` tek başına Chromium'da
+    hiçbir şey değiştirmiyordu (57px → 57px), çünkü `autoGrow` satır içi bir
+    `height` yazıyor ve o değer tabanın üstünde kalıyor. Bu yüzden test İKİSİNİ
+    birden arıyor: CSS tabanı düşmezse tek satırlık ölçüm ona takılır.
+
+    Gerçek yükseklik ölçümü tarayıcıda (tests/test_playwright_studio.py);
+    buradaki mandal CI'ın Playwright'sız işleri için.
     """
-    govde = _css_block(".chat-hint")
-    assert "white-space: nowrap" in govde, "ipucu sarabilir"
-    assert "flex: 0 0 auto" in govde, "taban genişliği içerikten gelmiyor"
-    # `flex: 1` / `flex: 1 1 0` gibi taban-sıfır biçimlerinin hiçbiri geri
-    # gelmesin. Gövde yorumsuz (`_css_block` ayıklıyor), yoksa bu iddia
-    # kuralın kendi gerekçe yorumundaki `flex: 1`e takılırdı.
-    assert re.search(r"flex:\s*1\b", govde) is None, (
-        "taban-sıfır flex geri geldi — ipucu yine açlıktan ölür")
+    js = _js("core.js")
+    govde = js.split("function submitComposer(", 1)[1].split("\n}\n", 1)[0]
+    assert "composerKuculsun" not in govde, (
+        "küçülmenin çapası yine uzunluk kapılarının yanında — reddedilen "
+        "gönderim de composer'ı küçültür")
+
+    # Üç kabul noktası, üçünde de aynı bitişiklik. Ölçüm KOD üzerinde: yorum
+    # satırları ayıklanıyor, çünkü aradaki gerekçe metni bitişikliği bozmaz —
+    # bozan şey araya girecek bir KAPI olurdu. Kalan tek satır izni
+    # `autoGrow($("prompt"))` içindir (core.js'in iki akışında boşaltmanın
+    # hemen ardından duruyor); ikinci bir kod satırı girerse iddia düşer.
+    bitisik = re.compile(r'\.value = "";\n(?:[^\n]*\n)?\s*composerKuculsun\(\);')
+    for dosya, imza in (("core.js", "async function run() {"),
+                        ("core.js", "async function runArena(prompt) {"),
+                        ("chat.js", "async function sendChat(")):
+        dal = _js(dosya).split(imza, 1)[1].split("\n}\n", 1)[0]
+        dal = "\n".join(r for r in dal.split("\n") if not r.strip().startswith("//"))
+        assert bitisik.search(dal), (
+            f"{imza}: küçülme kutunun boşaldığı ana bağlı değil — araya bir "
+            "kapı girerse reddedilen gönderim de küçültür")
+
+    # `rows` ekseni ve odak koşulu
+    assert "function syncComposerSatirlari(" in js, "satır ekseni yok"
+    satir = js.split("function syncComposerSatirlari(", 1)[1].split("\n}\n", 1)[0]
+    assert "document.activeElement" in satir, (
+        "odak koşulu yok — yazmaya dönen kullanıcı tek satıra sıkışır")
+    assert "autoGrow(" in satir, (
+        "yeni satır sayısı ölçülmüyor — satır içi `height` bayat kalır")
+
+    # CSS tabanı: `rows` düşse bile 2.5rem'lik taban küçülmeyi yutar.
+    kucuk = _css_block('.composer[data-sent] .composer-input')
+    odakli = _css_block('.composer[data-sent]:focus-within .composer-input')
+    assert "min-height" in kucuk and "min-height" in odakli, (
+        "taban ekseni eksik — küçülme CSS'e takılır ya da geri gelmez")
+
+
+def test_uzun_yer_tutucu_ILK_GONDERIMDEN_SONRA_kisaliyor():
+    """Uzun yer tutucu ilk gönderimden sonra kısa hâline geçiyor.
+
+    İki sebep, biri ölçülmüş: (1) gönderdikten sonra kalıcı bir talimat, tam da
+    kullanıcının kaldırılmasını istediği "gereksiz yazı"; (2) 390px'de uzun
+    metin İKİ SATIRA sarıyor ve boş bir `<textarea>`nın `scrollHeight`i yer
+    tutucuyu de kapsıyor — yani `autoGrow` kutuyu 57px'e çiviliyor ve `rows` ne
+    derse desin küçülme TELEFONDA hiç görünmüyordu.
+
+    Metnin TEK yazarı var: iki çağıran (mod değişimi ve ilk gönderim) aynı iki
+    değişkeni okuyor, metin iki yerde kurulsaydı ayrışırdı.
+    """
+    js = _js("core.js")
+    assert "const PROMPT_YER_TUTUCU" in js, "yer tutucu tablosu yok"
+    assert js.count(".placeholder =") == 1, (
+        "yer tutucuyu yazan ikinci bir yer var — metinler ayrışabilir")
+    govde = js.split("function syncPromptPlaceholder(", 1)[1].split("\n}\n", 1)[0]
+    assert "dataset.sent" in govde, "kısa hâle geçiren koşul yok"
+    for fn in ("function setMode(", "function composerKuculsun("):
+        dal = js.split(fn, 1)[1].split("\n}\n", 1)[0]
+        assert "syncPromptPlaceholder()" in dal, f"{fn} yer tutucuyu tazelemiyor"
+
+
+def test_bos_panelin_metni_EKSENE_gore_degisiyor():
+    """Boş model paneli sohbet ekseninde "anahtar yok" DEMİYOR.
+
+    `renderModelCards` üç eksenin ortağı ve boş hâlin metni bir tur boyunca
+    sabit bir "Kayıtlı API anahtarı yok" cümlesiydi. Görsel ekseninde doğru,
+    sohbet ekseninde YANLIŞ İŞ: `credstore.chat_is_configured` anahtarı VE
+    (Azure'da) dağıtım adını birlikte arıyor, yani kullanıcı anahtarı kayıtlı
+    olduğu hâlde boş bir panel görebiliyor. Ona "anahtarını kaydet" demek,
+    elinde zaten olanı yeniden yapıştırmasını söylemek — yapıştırır, hiçbir
+    şey değişmez, sebep hâlâ görünmez.
+
+    `goBlockReason`ın yönetmen dalı bu ayrımı zaten yapıyor ("Kayıtlı sohbet
+    kimliği yok"); iddia panelin onunla AYNI dili konuşmasını çiviliyor,
+    çünkü aynı hâlin iki yerde iki ayrı iş buyurması sessiz bir kırılma.
+    """
+    js = _js("core.js")
+    assert "const MODEL_BOS_PANEL" in js, "boş panel metinleri tek yerde değil"
+    # Metin fonksiyonda KURULMUYOR, eksenden okunuyor: tek yazar kuralı.
+    govde = js.split("function renderModelCards(", 1)[1].split("\n}\n", 1)[0]
+    assert "eksen.bosMetin" in govde, "boş panel metni eksenden okunmuyor"
+    assert "Kayıtlı" not in govde, (
+        "boş panel metni fonksiyonun içinde yeniden kuruluyor — eksenler ayrışır")
+
+    # İki eksen İKİ AYRI metin okuyor; aynı sabite bağlanırlarsa ayrım ölür.
+    eksenler = js.split("const MODEL_EKSENLERI = {", 1)[1].split("\n};", 1)[0]
+    gorsel = eksenler.split("  chat: {", 1)[0]
+    sohbet = eksenler.split("  chat: {", 1)[1].split("  arena: {", 1)[0]
+    assert "MODEL_BOS_PANEL.anahtar" in gorsel, "görsel ekseni anahtar demiyor"
+    assert "MODEL_BOS_PANEL.kimlik" in sohbet, (
+        "sohbet ekseni de 'anahtar' diyor — Azure dağıtım adı eksik olan "
+        "kullanıcıya yanlış iş veriyor")
+
+
+def test_composer_ipucu_SERIDI_KALDIRILDI_bilgi_GO_dugmesinde():
+    """Klavye ipucu şeridi composer'dan KALKTI (kullanıcı isteği: sadeleşme).
+
+    Bu test bir öncekinin yerine geçiyor ve ölçtüğü şey tersine dönmedi,
+    DARALDI. Eski iddia `.chat-hint`in geometrisiydi: `flex: 1` kısa biçimi
+    `flex: 1 1 0%`e çözülüyor, taban SIFIR oluyor ve ölçümde (Chromium,
+    1024×700 — `desktop.py`'deki en küçük pencere) ipucu 65px'e ezilip DÖRT
+    satıra sarıyordu. O kusur artık imkânsız çünkü düğüm yok.
+
+    Yerine geçen iddia: BİLGİ kaybolmadı. Kısayolun kendisi çalışmaya devam
+    ediyor ve metni `#go`nun `title`ına taşındı — orada tek bir yazarı var
+    (`syncGoGate`), yani "iki yerde iki ad" kırılması da doğmuyor.
+    """
+    html = _served()
+    assert "chat-hint" not in html, "ipucu şeridi HTML'de duruyor"
+    for dosya in ("style.css", "mobile.css"):
+        # Yorumlar ÖNCE ayıklanıyor: iki dosyada da kuralın neden kalktığını
+        # anlatan birer yorum var ve o yorumlar seçicinin adını taşıyor
+        # (`_css_block`ın yardımcı olarak var olma sebebiyle aynı tuzak).
+        css = re.sub(r"/\*.*?\*/", "", _js(dosya), flags=re.S)
+        assert re.search(r"\.chat-hint\s*\{", css) is None, (
+            f"{dosya}'te ölü `.chat-hint` kuralı kalmış")
+
+    js = _js("core.js")
+    assert "GO_KISAYOL" in js, "kısayol metni hiçbir yerde yok"
+    govde = js.split("function syncGoGate(", 1)[1].split("\n}\n", 1)[0]
+    assert "GO_KISAYOL" in govde, (
+        "kısayol #go'nun title'ına yazılmıyor — bilgi tümden kayboldu")
+    # Kilitliyken SEBEP yazılmalı, kısayol değil: çalışmayan bir düğmenin
+    # kısayolunu duyurmak kilidin nedenini saklamak olurdu (#chat-gate'in
+    # duruşu). `sebep ||` sırası tam olarak bunu söylüyor.
+    assert "sebep\n    ||" in govde or "sebep ||" in govde, (
+        "kilitli düğmede sebep yerine kısayol yazılıyor olabilir")
+
+    # ŞERİT İKİ KISAYOL TAŞIYORDU. İlk turda yalnız ⌘/Ctrl+Enter taşındı ve
+    # ⌘/Ctrl+J (mod değiştirme, hâlâ çalışıyor) hiçbir yerde yazmaz hâlde
+    # kaldı: çalışan ama keşfedilemeyen bir kısayol, kullanıcı için yok olanla
+    # aynı şey. İddia "bilgi ölmedi, yer değiştirdi"nin TAMAMINI ölçüyor.
+    assert "MOD_KISAYOL" in js, "mod kısayolu hiçbir yerde yazmıyor"
+    assert 'e.key.toLowerCase() !== "j"' in js, (
+        "mod kısayolu artık çalışmıyor — o zaman metni de kalkmalı")
+    for tab in ("tab-image", "tab-chat"):
+        assert f'$("{tab}").title = ' in js, (
+            f"#{tab} kısayolu duyurmuyor — bilgi yine tek yarım kaldı")

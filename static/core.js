@@ -74,6 +74,37 @@ function syncTabThumb() {
   thumb.style.transform = `translateX(${tab.offsetLeft}px)`;
 }
 
+/** Kutunun yer tutucusu: mod × (ilk gönderim oldu mu).
+ *
+ * KISA HÂL bir sadeleştirme DEĞİL, bir gerekliliğin de karşılığı: telefonda
+ * (390px) uzun metin İKİ SATIRA sarıyor ve boş bir textarea'nın `scrollHeight`i
+ * yer tutucuyu de kapsıyor — yani `autoGrow` kutuyu 57px'e sabitliyordu ve
+ * `rows` ne yazarsa yazsın küçülme GÖRÜNMÜYORDU (Chromium 390×844'te ölçüldü).
+ * Uzun metnin işi zaten ilk kez yazana yol göstermek; gönderdikten sonra
+ * kalıcı bir talimat olarak durması, kullanıcının kaldırılmasını istediği
+ * "gereksiz yazı"nın ta kendisi.
+ */
+const PROMPT_YER_TUTUCU = {
+  image: {
+    tam: "Ne üretmek istiyorsun? Görsel tarifi, renk veya tarz yaz…",
+    kisa: "Ne üretmek istiyorsun?",
+  },
+  director: {
+    tam: "Yönetmen'e sor veya fikir danış… (öğeleri değiştir, sahne ekle)",
+    kisa: "Yönetmen'e sor…",
+  },
+};
+
+/** Yer tutucunun TEK yazarı. İki çağıranı var (mod değişimi ve ilk gönderim)
+ * ve ikisi de aynı iki değişkeni okuyor — metin iki yerde kurulsaydı ayrışırdı.
+ */
+function syncPromptPlaceholder() {
+  const prompt = $("prompt");
+  if (!prompt) return;
+  const metin = PROMPT_YER_TUTUCU[currentMode] || PROMPT_YER_TUTUCU.image;
+  prompt.placeholder = $("composer").dataset.sent ? metin.kisa : metin.tam;
+}
+
 function setMode(modeName) {
   const mode = modeName === "director" ? "director" : "image";
   if (currentSection !== "studio") showSection("studio");
@@ -84,14 +115,7 @@ function setMode(modeName) {
   $("tab-image").classList.toggle("active", mode === "image");
   $("tab-chat").classList.toggle("active", mode === "director");
 
-  const prompt = $("prompt");
-  if (prompt) {
-    if (mode === "image") {
-      prompt.placeholder = "Ne üretmek istiyorsun? Görsel tarifi, renk veya tarz yaz…";
-    } else {
-      prompt.placeholder = "Yönetmen'e sor veya fikir danış… (öğeleri değiştir, sahne ekle)";
-    }
-  }
+  syncPromptPlaceholder();
   renderSource();
   syncTabThumb();
   // Kapı MODA bağlı: Yönetmen modunda sohbet yapılandırması, Görsel modunda
@@ -410,14 +434,21 @@ function goBlockReason() {
     // olan bir kullanıcıda yönetmen ölü bir düğmeyle açılırdı — `#go` kapısının
     // görsel tarafında v0.6'da düzeltilen kırılmanın aynısı.
     if (!chatModels.length) return "Sohbet modeli listesi alınamadı.";
-    if (!currentChatModel) return "Sohbet modeli seçilmedi.";
+    // Liste DOLU ama seçim yok ⇒ hiçbirinin kimliği kayıtlı değil. Bu, filtre
+    // anahtarsız modelleri gizlemeye başladığından beri ULAŞILABİLİR bir hâl
+    // ve "seçilmedi" demek kullanıcıya yanlış bir iş verirdi (seçecek bir şey
+    // yok); doğru iş Ayarlar'da.
+    if (!currentChatModel) {
+      return "Kayıtlı sohbet kimliği yok — Ayarlar'dan ekle.";
+    }
     if (!currentChatModel.configured) {
       return `${currentChatModel.label} için kimlik yok — Ayarlar'dan ekle.`;
     }
     return "";
   }
   if (!imageModels.length) return "Model listesi alınamadı.";
-  if (!currentModel) return "Model seçilmedi.";
+  // Yönetmen dalının aynı gerekçesi (yukarısı).
+  if (!currentModel) return "Kayıtlı API anahtarı yok — Ayarlar'dan ekle.";
   if (!currentModel.configured) {
     return `${currentModel.label} için anahtar yok — Ayarlar'dan ekle.`;
   }
@@ -443,10 +474,41 @@ function goBlockReason() {
   return "";
 }
 
+/** Klavye kısayolu, #go'nun `title`ında.
+ *
+ * Bir zamanlar composer'ın dibinde kalıcı bir şeritti (`.chat-hint`) ve
+ * kullanıcı isteğiyle kaldırıldı — ama BİLGİ kaldırılmadı, taşındı. Buraya,
+ * çünkü kısayolun yaptığı iş tam olarak bu düğmenin işi; ikinci bir yazar
+ * doğmuyor (`title`ın tek sahibi `syncGoGate`).
+ *
+ * Eylem adı düğmenin KENDİ metninden okunuyor, burada ikinci kez KURULMUYOR:
+ * `renderSource` o metni dört ayrı duruma göre yazıyor ("Üret" · "Gönder" ·
+ * "Görseli düzenle" · "Görselleri birleştir") ve burada sabit bir "Üret"
+ * yazmak, referans eklenmiş bir composer'da yanlış bir ipucu demekti.
+ */
+const GO_KISAYOL = "⌘/Ctrl + Enter";
+
+// Şeridin İKİNCİ kısayolu. Bir tur boyunca hiçbir yerde yazmıyordu: şerit
+// kalkarken yalnız ⌘/Ctrl+Enter #go'ya taşınmış, mod değiştirme kısayolu
+// (aşağıda, document keydown) çalışır hâlde ama KEŞFEDİLEMEZ kalmıştı —
+// yazmayan bir kısayol pratikte yok demektir. Yeri mod düğmeleri, çünkü
+// kısayolun yaptığı iş tam olarak o düğmelere basmak; ikisi bir arada
+// duruyor ki "iki dosyada iki ad" kayması doğmasın.
+const MOD_KISAYOL = "⌘/Ctrl + J";
+$("tab-image").title = `Görsel modu · ${MOD_KISAYOL}`;
+$("tab-chat").title = `Yönetmen modu · ${MOD_KISAYOL}`;
+
 function syncGoGate() {
   const sebep = goBlockReason();
+  // `$("go")` bir yerel değişkene ALINMIYOR ve bu bir üslup tercihi değil:
+  // tests/test_id_contract.py `#go.disabled`ın TEK yazarını satır metninden
+  // arıyor (`'("go").disabled'`) — takma ad, tripwire'ı sessizce kör eder.
   $("go").disabled = !!sebep;
-  $("go").title = sebep || "Üret";
+  // Kilitliyken SEBEP yazılıyor, kısayol değil: çalışmayan bir düğmenin
+  // kısayolunu duyurmak, kilidin neden orada olduğunu saklamak olurdu
+  // (#chat-gate'in reddettiği şeyin aynısı).
+  $("go").title = sebep
+    || `${$("go").textContent.trim()} · ${GO_KISAYOL}`;
 }
 
 /** Şeridin sağlayıcı işaretini seçili modele göre çizer.
@@ -486,7 +548,14 @@ function adetSecenekleri(model) {
 /** Seçili modeli uygular: eksenleri doldurur, notu yazar, tercihi kaydeder. */
 function applyModel(id, { announce = true } = {}) {
   const model = imageModels.find((m) => m.id === id);
-  if (!model) return;
+  // BOŞ HÂL: kullanılabilir model yok (anahtarsız modeller artık listelenmiyor).
+  // Erken çıkış TEK BAŞINA yetmiyordu — çip "Modeller yükleniyor…"da donuyor ve
+  // kullanıcı sonsuza kadar yüklenen bir şerit görüyordu. `currentModel` de
+  // sıfırlanıyor, yoksa katalog daralınca ESKİ model seçili sanılırdı.
+  if (!model) {
+    if (!id) { currentModel = null; modelBosHali("image"); }
+    return;
+  }
   currentModel = model;
   // ŞERİT SEÇİLİ MODELİ HER ZAMAN İÇERİYOR. Bu satır `applyModels` dışındaki
   // çağıranlar için: `loadModelPref` katalog geldikten sonra tercihi uyguluyor
@@ -546,44 +615,52 @@ function applyModel(id, { announce = true } = {}) {
   }
 }
 
-/** Seçiciye GİRECEK modeller: kurulu olanlar (+ zorunlu tutulan id).
+/** Seçiciye GİRECEK modeller: KULLANILABİLİR olanlar (+ zorunlu tutulan id).
  *
  * FİLTRE, "10+ modele ölçeklenirken alan duvarına dönüşmesin" isteğinin model
  * şeridindeki karşılığı: kullanıcı Azure anahtarıyla çalışıyorsa OpenAI ve
  * Gemini satırlarının hepsi seçilebilir bir 502'den başka bir şey değil.
  *
- * İKİ KAÇIŞ KAPISI VAR ve ikisi de ölçülmüş bir kırılmayı kapatıyor:
+ * ÖLÇÜT `available`, `configured` DEĞİL — ve bu ayrım ileriye dönük.
+ * Bugün sunucu `available`ı birebir `configured`dan türetiyor (app.py), yani
+ * davranış aynı. Yarın kredi/üyelik geldiğinde bir modelin GÖRÜNMEME sebebi
+ * ikiye çıkıyor ("anahtar yok" · "abonelik kapsamıyor") ve o iki sebebi
+ * İSTEMCİDE ayrı ayrı sormak, görünürlük kuralının iki cevabı olması demek —
+ * bu fonksiyonun var olma sebebi tam olarak o ikiliği önlemek. Karar sunucuda
+ * TEK alana indirgeniyor; buradaki soru hep aynı kalıyor.
+ * `configured` ÖLMÜYOR: mesaj yazan yerler (#model-note, goBlockReason) onu
+ * okumaya devam ediyor, çünkü "anahtar yok" ile "planın kapsamıyor" aynı
+ * cümle değil.
  *
- *   1. HİÇBİRİ KURULU DEĞİLSE HEPSİ görünüyor. İlk kurulumda boş bir <select>
- *      kullanıcıya hiçbir şey söylemez, üstelik #model-note → "Ayarlar'ı aç"
- *      yolunu da kapatır — o yol ilk kurulumun tek keşfedilebilir kapısı.
- *   2. `zorunluId` her zaman listede kalıyor: `applyModel` seçili id'yi
- *      `select.value`'ya yazıyor ve o id seçenekler arasında yoksa <select>
- *      BOŞ görünür — model şeridi "model yok" der ama üretim çalışır.
+ * TEK KAÇIŞ KAPISI KALDI: `zorunluId` her zaman listede duruyor. `applyModel`
+ * seçili id'yi `select.value`'ya yazıyor ve o id seçenekler arasında yoksa
+ * <select> BOŞ görünür — şerit "model yok" der ama üretim çalışır.
  *
- * KEŞFEDİLEBİLİRLİK kaybı yok: Ayarlar'daki #provider-status her sağlayıcıyı
- * "kayıtlı / kayıtlı değil" diye tek tek sayıyor, yani hangi sağlayıcıların
- * VAR OLDUĞU sorusunun cevabı orada duruyor.
+ * İKİNCİ KAPI KAPANDI (kullanıcı isteği: anahtarı girilmemiş modeller hiç
+ * görünmesin). Eskiden hiçbiri kurulu değilken HEPSİ listeleniyordu ve
+ * gerekçesi "boş bir <select> kullanıcıya hiçbir şey söylemez"di. O gerekçe
+ * bugün karşılıksız, çünkü söyleyen üç yer var ve üçü de bu turda kuruldu ya
+ * da zaten duruyordu:
+ *   · `settings.js` hiçbir görsel modeli kurulu değilken Ayarlar'ı
+ *     KENDİLİĞİNDEN açıyor — ilk kurulumdaki kullanıcı boş bir şeritle değil,
+ *     anahtar formuyla karşılaşıyor;
+ *   · şerit ve panel boş hâli açıkça anlatıyor (`MODEL_BOS_METNI`);
+ *   · Ayarlar'daki #provider-status hangi sağlayıcıların VAR olduğunu tek tek
+ *     sayıyor, yani keşfedilebilirlik oraya taşındı.
  */
 function secilebilirler(liste, zorunluId) {
-  const kurulu = liste.filter((m) => m.configured);
-  // İLK KURULUM: `zorunluId` DIŞARIDA bırakılarak ölçülüyor. İlk yazımda
-  // zorunlu id filtreye dahildi ve sonuç gerçek chromium koşumunda görüldü —
-  // hiç anahtarı olmayan kullanıcı TEK satırlık bir şerit görüyordu (seçili
-  // varsayılan), yani "hangi modeller var" sorusunun cevabı da kayboluyordu.
-  if (!kurulu.length) return liste;
-  return liste.filter((m) => m.configured || m.id === zorunluId);
+  return liste.filter((m) => m.available || m.id === zorunluId);
 }
 
-/** Hangi model SEÇİLİ olacak: tercih → varsayılan → ilk kurulu.
+/** Hangi model SEÇİLİ olacak: tercih → varsayılan → ilk kullanılabilir.
  *
- * Üç kademe, hepsi "ANAHTARI OLAN kazanır" kuralına tabi:
+ * Üç kademe, hepsi "KULLANILABİLİR olan kazanır" kuralına tabi:
  *
- *   1. Kullanıcının TERCİHİ — kurulu ise.
- *   2. Sunucunun varsayılanı — kurulu ise.
- *   3. İlk kurulu model. Hiçbiri kurulu değilse (ilk kurulum) kademe 1-2 yine
- *      geçerli ve son çare listenin ilki: orada her model eşit derecede
- *      kullanılamaz ve boş bir şerit kullanıcıya hiçbir şey söylemez.
+ *   1. Kullanıcının TERCİHİ — kullanılabilir ise.
+ *   2. Sunucunun varsayılanı — kullanılabilir ise.
+ *   3. İlk kullanılabilir model. HİÇBİRİ yoksa BOŞ DİZE: "seçim yok" artık
+ *      ifade edilebilen bir durum (eskiden son çare listenin ilkiydi ve
+ *      kullanılamaz bir modeli seçili gösteriyordu).
  *
  * KURULU OLMAYAN TERCİH ARTIK YAPIŞMIYOR ve bu bilinçli bir değişiklik.
  * v0.6'da tersi yazılıydı ("seçili kalıyor, yoksa anahtarı kaydetmek
@@ -598,15 +675,18 @@ function secilebilirler(liste, zorunluId) {
  * kullanıcının açılışta ölü bir #go düğmesiyle karşılanmasıydı.
  */
 function secilecek(liste, tercih, varsayilan) {
-  const kurulu = liste.filter((m) => m.configured);
-  // "Seçilebilir": katalogda var VE (kurulu, ya da hiçbiri kurulu değil).
-  // İkinci koşul ilk kurulumun kapısı: orada her model eşit derecede
-  // kullanılamaz durumda ve birini seçmek gerekiyor.
-  const uygun = (id) => liste.some((m) => m.id === id)
-    && (!kurulu.length || kurulu.some((m) => m.id === id));
+  const kullanilabilir = liste.filter((m) => m.available);
+  // "Seçilebilir" TEK koşula indi: model kullanılabilir olacak. Eskiden ikinci
+  // bir dal vardı ("hiçbiri kurulu değilse hepsi uygun") ve o, `secilebilirler`in
+  // kapanan kaçış kapısının bu fonksiyondaki ikiziydi — biri kapanıp öteki
+  // kalsaydı, listede OLMAYAN bir model seçili görünürdü.
+  const uygun = (id) => kullanilabilir.some((m) => m.id === id);
   if (tercih && uygun(tercih)) return tercih;
   if (uygun(varsayilan)) return varsayilan;
-  return (kurulu[0] || liste[0] || {}).id || "";
+  // Hiçbiri kullanılabilir değilse BOŞ DİZE — "seçim yok" gerçek bir durum ve
+  // artık ifade edilebiliyor. `applyModel`/`applyChatModel` bunu boş hâl olarak
+  // çiziyor, `goBlockReason` da kapıyı gerekçesiyle kapatıyor.
+  return (kullanilabilir[0] || {}).id || "";
 }
 
 /** Kredi aralığı: `credits_by_quality` varsa min–max, yoksa tek tarife.
@@ -921,7 +1001,11 @@ function renderChatModelOptions(zorunluId) {
  */
 function applyChatModel(id) {
   const model = chatModels.find((m) => m.id === id);
-  if (!model) return null;
+  // `applyModel`in boş hâlinin ikizi; gerekçesi orada.
+  if (!model) {
+    if (!id) { currentChatModel = null; modelBosHali("chat"); }
+    return null;
+  }
   currentChatModel = model;
   // `applyModel`in aynı gerekçesi: seçili id şeritte yoksa şerit boş görünür.
   if (![...$("chat-model").options].some((o) => o.value === id)) {
@@ -983,15 +1067,34 @@ async function savePref(body) {
 // (`imageModels = s.image_models`). Diziyi burada yakalamak, Ayarlar
 // kaydedildikten sonra panelin ESKİ katalogu göstermesi olurdu — üstelik
 // sessizce, çünkü eski dizide de geçerli modeller var.
+// BOŞ PANELİN metni EKSENE bağlı, çünkü "model yok"un SEBEBİ eksene göre
+// değişiyor. Görsel tarafında eksik olan gerçekten API anahtarı. Sohbet
+// tarafında eksik olan kimliğin BÜTÜNÜ: Azure'da anahtar kayıtlıyken dağıtım
+// adı boş olabiliyor (credstore.chat_is_configured ikisini birden arıyor) ve o
+// kullanıcıya "anahtar yok" demek, elinde ZATEN olan anahtarı yeniden
+// yapıştırmasını söylemek olurdu — yapıştırır, hiçbir şey değişmez, sebep de
+// hâlâ görünmez. `goBlockReason`ın yönetmen dalı bu ayrımı yapıyor
+// ("Kayıtlı sohbet kimliği yok"); panel de aynı dili konuşmak zorunda, yoksa
+// aynı hâl iki yerde iki ayrı iş buyurur.
+const MODEL_BOS_PANEL = {
+  anahtar: "Kayıtlı API anahtarı yok. Ayarlar'dan bir sağlayıcının anahtarını "
+    + "kaydedince modelleri burada göreceksin.",
+  kimlik: "Kayıtlı sohbet kimliği yok. Ayarlar'dan bir sağlayıcının kimlik "
+    + "bilgilerini (anahtar, gerekiyorsa dağıtım adı) tamamlayınca modelleri "
+    + "burada göreceksin.",
+};
+
 const MODEL_EKSENLERI = {
   image: {
     secici: "model", dugme: "model-btn", etiket: "model-btn-label",
     logo: "model-logo", baslik: "Görsel modeli", kredi: true,
+    bosMetin: MODEL_BOS_PANEL.anahtar,
     liste: () => imageModels,
   },
   chat: {
     secici: "chat-model", dugme: "chat-model-btn", etiket: "chat-model-btn-label",
     logo: "chat-model-logo", baslik: "Yönetmen modeli", kredi: false,
+    bosMetin: MODEL_BOS_PANEL.kimlik,
     liste: () => chatModels,
   },
   // ÜÇÜNCÜ EKSEN, ikinci bir panel DEĞİL: arena aynı listeyi, aynı filtreyi
@@ -1005,6 +1108,8 @@ const MODEL_EKSENLERI = {
   arena: {
     secici: "arena-models", dugme: "arena-btn", etiket: "arena-btn-label",
     logo: null, baslik: "Arena modelleri", kredi: true, coklu: true,
+    // Arena görsel modellerini listeliyor, yani eksik olan da aynı şey.
+    bosMetin: MODEL_BOS_PANEL.anahtar,
     liste: () => imageModels,
   },
 };
@@ -1030,13 +1135,58 @@ let modelSheetEkseni = "image";
  */
 function syncModelChip(eksenAdi, model) {
   const eksen = MODEL_EKSENLERI[eksenAdi];
-  setModelLogo(eksen.logo, model);
-  $(eksen.etiket).textContent = modelSecenekMetni(model, eksen.kredi);
+  // `model` NULL OLABİLİR: anahtarı girilmemiş modeller artık hiç
+  // listelenmediği için "seçili model yok" gerçek bir hâl (ilk kurulumun ta
+  // kendisi). Boş hâl BURADA çiziliyor, ayrı bir fonksiyonda DEĞİL — çipin
+  // tek yazarı olması bu dosyanın çivilenmiş kuralı ve ikinci bir yazar,
+  // işaretle metnin ayrışabildiği anlamına gelirdi. Kural gerçekten ÖLÇÜLÜYOR:
+  // tests/test_index.py işaretin ve etiket atamasının kaç kez geçtiğini SAYAR —
+  // bu yorum o dizeleri taşımıyor, çünkü sayan bir tripwire'ı bir yorum da
+  // kandırabilir (deponun daha önce ödediği bir bedel; bkz. index.html'deki
+  // `<b id="model-btn-label">` notu).
+  setModelLogo(eksen.logo, model);       // model yoksa işaret de yok
+  $(eksen.etiket).textContent = model
+    ? modelSecenekMetni(model, eksen.kredi)
+    : MODEL_BOS_METNI;
   if (modelSheetEkseni === eksenAdi) {
     for (const r of $("model-sheet-list").querySelectorAll("input")) {
-      r.checked = r.value === model.id;
+      r.checked = !!model && r.value === model.id;
     }
   }
+}
+
+/** Şeritte gösterilecek "hiç kullanılabilir model yok" metni.
+ *
+ * TEK dize, üç yer okuyor (çip · panel · testler) — ikinci bir yerde yeniden
+ * kurulsaydı ikisi zamanla ayrışırdı; `modelSecenekMetni`nin aynı dersi.
+ */
+const MODEL_BOS_METNI = "Model yok — Ayarlar";
+
+/** Kullanılabilir model KALMADIĞINDA şeridi ve notu boş hâle çeker.
+ *
+ * Anahtarı girilmemiş modeller artık hiç listelenmediği için bu durum GERÇEK
+ * ve ilk kurulumun ta kendisi. Önceden erişilemezdi (filtre o hâlde bütün
+ * kataloğu gösteriyordu), yani çizilmemiş bir ekrandı: çip "Modeller
+ * yükleniyor…" yazısında donuyordu.
+ *
+ * Kullanıcı burada çıkmaz sokakta DEĞİL — üç kapı birden açık: Ayarlar ilk
+ * kurulumda kendiliğinden açılıyor (settings.js), `#model-note` doğrudan
+ * "Ayarlar'ı aç" düğmesi taşıyor ve `#go` kilidinin sebebi `title`da yazılı.
+ */
+function modelBosHali(eksenAdi) {
+  // Çizim TEK yazardan (yukarısı); burası yalnız "model yok"u ona söylüyor.
+  syncModelChip(eksenAdi, null);
+  // Not YALNIZ görsel ekseninde: Yönetmen'in karşılığı #chat-gate ve onun
+  // yazarı settings.js (`chat_configured`). İki yazar tek düğüme yazsaydı
+  // hangisinin son sözü söylediği çağrı sırasına kalırdı.
+  if (eksenAdi === "image") {
+    $("model-note-text").textContent = "Kayıtlı API anahtarı yok.";
+    $("model-note").hidden = false;
+  }
+  // Panel YENİDEN ÇİZİLMİYOR: kartların tek çağıranı `openModelSheet` ve o
+  // her açılışta çiziyor (bayat liste riski orada kapatılmış). Buradan ikinci
+  // bir çağrı, o tek-çağıran kuralını bozardı.
+  syncGoGate();
 }
 
 /** Paneli seçili eksenin modelleriyle çizer.
@@ -1122,6 +1272,22 @@ function renderModelCards(eksenAdi) {
     kart.append(kutu, metin, kutucuk);
     return kart;
   });
+
+  // BOŞ PANEL bir hâl DEĞİL bir soru: "modeller nerede?". Anahtarsız modeller
+  // artık hiç listelenmediği için panel gerçekten boş kalabiliyor ve o boşluk
+  // kendi başına hiçbir şey söylemez. Tek satırlık açıklama, kartların yerine
+  // geçiyor — çipin `MODEL_BOS_METNI`si ile aynı gerçeği anlatıyor, ama
+  // burada yer var, o yüzden NE YAPILACAĞINI da söylüyor.
+  //
+  // Metin EKSENDEN okunuyor, burada KURULMUYOR: bu fonksiyon üç eksenin
+  // ortağı ve sabit bir "API anahtarı" cümlesi sohbet ekseninde yanlış iş
+  // buyuruyordu (gerekçe MODEL_BOS_PANEL'in başında).
+  if (!kartlar.length) {
+    const bos = document.createElement("p");
+    bos.className = "model-sheet-empty";
+    bos.textContent = eksen.bosMetin;
+    kartlar.push(bos);
+  }
 
   // `legend` YAYILARAK veriliyor, doğrudan DEĞİL: `replaceChildren(null, …)`
   // argümanı dizeye çevirip panelin tepesine "null" METNİ basar — hata da
@@ -1268,6 +1434,76 @@ function autoGrow(el) {
 }
 $("prompt").addEventListener("input", () => autoGrow($("prompt")));
 
+/** İlk gönderimden SONRA composer küçülür (kullanıcı isteği).
+ *
+ * Öznitelik, sınıf değil: `data-sent` bir DURUM ve CSS onu mod ekseniyle
+ * (`#composer[data-mode]`) aynı dilde okuyor.
+ *
+ * ÇAPA `submitComposer` çünkü iki mod da buradan geçiyor — "chat veya görsel
+ * üretme prompt'u gönderildikten sonra" isteğinin tek karşılığı bu. Uzunluk
+ * kapılarının ARDINDAN yazılıyor: reddedilen bir gönderim küçülmeyi hak
+ * etmiyor, kullanıcı hâlâ o metni düzenliyor.
+ *
+ * GERİ ALINMIYOR: bir kez gönderdikten sonra ekranın odağı akış, composer
+ * ise araç. Yazmaya dönen kullanıcı kutuyu `:focus-within` ile tam boyunda
+ * geri buluyor (style.css), yani dar bir kutuya sıkışmıyor.
+ */
+// Küçük ve tam boy hâlin satır sayısı. `rows` ÖZNİTELİĞİ, CSS DEĞİL — ve bu
+// ölçülmüş bir karar: `autoGrow` yüksekliği `height: auto` yapıp `scrollHeight`
+// okuyarak yazıyor, yani BOŞ bir kutunun yüksekliğini fiilen `rows` belirliyor.
+// Yalnız `min-height` düşürmek hiçbir şey değiştirmedi (Chromium'da ölçüldü:
+// 57px → 57px), çünkü satır içi `height` o tabanın zaten üstündeydi.
+const PROMPT_SATIR_TAM = 2;
+const PROMPT_SATIR_KUCUK = 1;
+
+/** Kutunun satır sayısını duruma göre yazar; TEK yazar burası.
+ *
+ * Küçük hâlin iki koşulu birden gerekiyor: gönderim OLMUŞ olacak VE kutu odakta
+ * OLMAYACAK. İkincisi olmazsa yazmaya dönen kullanıcı tek satırlık bir kutuya
+ * sıkışırdı — küçülme akışa yer açmak içindi, yazmayı zorlaştırmak için değil.
+ * (CSS tarafındaki `:focus-within` ikizi `min-height` tabanını aynı anda geri
+ * veriyor; ikisi ayrışırsa hangisi kazanırsa o görünür, o yüzden ikisi de aynı
+ * koşulu anlatıyor.)
+ *
+ * `autoGrow` SONDA çağrılıyor: satır içi `height`i o yazıyor ve yeni `rows`
+ * ancak yeniden ölçülünce ekrana çıkıyor.
+ */
+function syncComposerSatirlari() {
+  const el = $("prompt");
+  const kucuk = !!$("composer").dataset.sent && document.activeElement !== el;
+  el.rows = kucuk ? PROMPT_SATIR_KUCUK : PROMPT_SATIR_TAM;
+  autoGrow(el);
+}
+
+/** İlk KABUL EDİLEN gönderimden sonraki küçük hâle geçirir.
+ *
+ * ÇAĞIRANLAR, üçü de "kutu boşaldı" satırının hemen ardında: `run`, `runArena`
+ * (core.js) ve `sendChat` (chat.js). Kutunun boşalması bu üç akışta da
+ * gönderimin bütün kapılardan geçtiği anın işareti — `submitComposer` ise
+ * yalnız uzunluk kapılarını biliyor, o yüzden çapa orada DEĞİL (gerekçe
+ * submitComposer'ın başında).
+ */
+function composerKuculsun() {
+  $("composer").dataset.sent = "true";
+  syncPromptPlaceholder();   // uzun talimat işini bitirdi
+  syncComposerSatirlari();   // …ve satır sayısını SONRA ölçüyor
+}
+
+// Odak ekseni: kutu odağa gelince tam boy, odaktan çıkınca (gönderim olduysa)
+// küçük. `focus`/`blur` KABARMIYOR, o yüzden dinleyici kutunun kendisinde.
+$("prompt").addEventListener("focus", syncComposerSatirlari);
+$("prompt").addEventListener("blur", syncComposerSatirlari);
+
+/** İki modun ortak gönderim kapısı — ama KÜÇÜLMENİN ÇAPASI DEĞİL.
+ *
+ * Çapa bir tur burada durdu ve yanlıştı: buradaki kapılar yalnız UZUNLUK
+ * kapıları, oysa gönderimi reddeden asıl kapılar aşağıda — `run()`ın "Önce bir
+ * prompt yaz."ı, `runArena`nın iki kapısı, `sendChat`in dördü. Çapa yukarıda
+ * kalınca boş bir kutuyla "Üret"e basmak composer'ı KALICI olarak küçültüyor,
+ * `data-sent`i yazıyor ve uzun tanıtım yer tutucusunu kısasıyla değiştiriyordu:
+ * hiç gönderim olmadan onboarding metni ölüyordu. Küçülme artık kutunun
+ * gerçekten boşaldığı üç yerde — o an gönderimin KABUL EDİLDİĞİ andır.
+ */
 function submitComposer() {
   const promptVal = $("prompt").value.trim();
   if (currentMode === "image") {
@@ -1735,6 +1971,7 @@ async function runArena(prompt) {
 
   $("prompt").value = "";
   autoGrow($("prompt"));
+  composerKuculsun();   // kutu boşaldı ⇒ gönderim KABUL EDİLDİ
   syncAskDirector();
 
   const pal = readPaletteOpts();
@@ -1828,6 +2065,7 @@ async function run() {
 
   $("prompt").value = "";
   autoGrow($("prompt"));
+  composerKuculsun();   // kutu boşaldı ⇒ gönderim KABUL EDİLDİ
   syncAskDirector();
 
 

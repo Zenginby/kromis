@@ -26,6 +26,8 @@ pytest.importorskip("playwright", reason="playwright kurulu değil — E2E testl
 from playwright.sync_api import sync_playwright
 
 from app import app
+import catalog
+import credstore
 
 
 def _ilk_kurulum_perdesini_kapat(page) -> None:
@@ -59,6 +61,29 @@ def _ilk_kurulum_perdesini_kapat(page) -> None:
     if page.query_selector(".sheet.open"):
         page.keyboard.press("Escape")
         page.wait_for_selector(".sheet.open", state="detached")
+
+
+def _tum_kimlikler_kayitli(monkeypatch) -> None:
+    """Sunucuyu "her sağlayıcının anahtarı kayıtlı" hâline getirir.
+
+    NEDEN GEREKLİ: anahtarı girilmemiş modeller artık şeride HİÇ girmiyor
+    (core.js `secilebilirler`; kullanıcı isteği). Anahtarsız bir sunucuda model
+    paneli haklı olarak BOŞ açılıyor, yani kart/radyo hakkında ne söylenirse
+    söylensin ölçülen şey panelin boşluğu olurdu. Bu testin ölçtüğü dört
+    tarayıcı gerçeği (panelin alt kenardan yükselmesi, tercihin diske TEK kez
+    yazılması, odağın çipe dönmesi, 360px'de kaymama) kartlar VARKEN anlamlı.
+
+    `monkeypatch` gerçekten işliyor çünkü `ServerThread` uygulamayı AYNI süreçte
+    koşturuyor: uç nokta `credstore.configured_map`i modül üzerinden çağırıyor.
+    Diske hiçbir şey yazılmıyor — gerçek `credentials.env`e dokunmak,
+    geliştiricinin kendi kurulumunu değiştirmek olurdu.
+    """
+    monkeypatch.setattr(
+        credstore, "configured_map",
+        lambda *a, **k: {c.id: True for c in catalog.CREDENTIALS})
+    monkeypatch.setattr(
+        credstore, "chat_configured_map",
+        lambda *a, **k: {m.id: True for m in catalog.CHAT_MODELS})
 
 
 def get_free_port() -> int:
@@ -182,7 +207,7 @@ def test_playwright_studio_single_thread_flow():
         server.stop()
 
 
-def test_playwright_model_sheet_alttan_aciliyor():
+def test_playwright_model_sheet_alttan_aciliyor(monkeypatch):
     """Alttan açılan model seçicisinin tarayıcı sözleşmesi.
 
     Buradaki dört iddia yalnız GERÇEK bir tarayıcıda ölçülebiliyor ve
@@ -202,6 +227,7 @@ def test_playwright_model_sheet_alttan_aciliyor():
     (`applyChatModel`in dönüş değeri, 360px yatay kayma, sağlayıcı alan
     gruplarının gizlenmesi) pytest'te yeşilken yalnız Chromium'da görülmüştü.
     """
+    _tum_kimlikler_kayitli(monkeypatch)
     port = get_free_port()
     server = ServerThread(port)
     server.start()
@@ -217,9 +243,10 @@ def test_playwright_model_sheet_alttan_aciliyor():
                     if r.method == "POST" and "/api/prefs" in r.url else None)
 
             page.goto(base_url)
-            # İlk kurulumda (anahtar yok) Ayarlar kendiliğinden açılıyor —
-            # perde composer'ı yutuyor, o yüzden önce kapatılıyor. Katalog
-            # beklemesi de yardımcının içinde: çapa zaten `#model`in değeri.
+            # Yardımcı KALIYOR ama artık asıl işi KATALOĞU BEKLEMEK: bu test
+            # kimlikleri kayıtlı gösterdiği için Ayarlar kendiliğinden açılmıyor
+            # (settings.js yalnız hiçbir model kurulu değilken açıyor). Çapa
+            # `#model`in değeri, yani panelden önce kataloğun geldiği kesin.
             _ilk_kurulum_perdesini_kapat(page)
 
             # 1. Çipe dokunmak paneli ALT kenardan yükseltiyor.
@@ -610,6 +637,146 @@ def test_playwright_buyutecte_logo_ekle_kayitli_gorselde_beliriyor():
                 "kaydedilmemiş görselde bindirme düğmesi duruyor — /api/logo "
                 "kaynağı diskte bulamaz")
             assert page.is_hidden("#viewer-download"), "indirme muhafızı düşmüş"
+
+            browser.close()
+    finally:
+        server.stop()
+
+
+def test_playwright_anahtarsiz_acilis_BOS_HALI_anlatiyor():
+    """Anahtar yokken şerit ve panel BOŞ HÂLİ anlatıyor, boş kalmıyor.
+
+    Bu, kullanıcı isteğinin ("API key'i girilmeyen modeller gözükmesin")
+    doğrudan bedeli ve tam olarak yalnız tarayıcıda ölçülebilen kısmı: filtre
+    listeyi boşaltabildiği andan itibaren `applyModel` seçili model BULAMIYOR ve
+    eski kodda erken çıkıyordu — çip "Modeller yükleniyor…" yazısında DONUYOR,
+    kullanıcı sonsuza kadar yüklenen bir şerit görüyordu. Kaynak taraması bunu
+    yakalayamaz: her iki hâlde de kod "doğru" görünüyor, fark ekranda.
+
+    Kimlikler BİLEREK kurgulanmıyor — bu testin öncülü zaten anahtarsız bir
+    kurulum (CI'ın varsayılan hâli).
+    """
+    port = get_free_port()
+    server = ServerThread(port)
+    server.start()
+    time.sleep(1.0)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 390, "height": 844})
+            page.goto(f"http://127.0.0.1:{port}")
+            page.wait_for_selector("#view-studio")
+            # Ayarlar KENDİLİĞİNDEN açılıyor: kullanıcının çıkmaz sokakta
+            # olmadığının birinci kanıtı ve kapının kapanabilmesinin sebebi.
+            page.wait_for_selector(".sheet.open")
+            _ilk_kurulum_perdesini_kapat(page)
+
+            # 1. Çip boş hâli SÖYLÜYOR — yükleniyor yazısında donmuyor.
+            etiket = page.inner_text("#model-btn-label").strip()
+            assert "yükleniyor" not in etiket.lower(), (
+                f"şerit yükleme yazısında donmuş: {etiket!r}")
+            assert "Ayarlar" in etiket, f"boş hâl anlatılmıyor: {etiket!r}"
+
+            # 2. Şeritte gerçekten HİÇ model yok (kapı kapandı).
+            assert page.eval_on_selector_all("#model option", "e => e.length") == 0, (
+                "anahtarsız modeller seçiciye girmeye devam ediyor")
+
+            # 3. Panel açıldığında kart yerine AÇIKLAMA var.
+            page.click("#model-btn")
+            page.wait_for_selector("#model-sheet.open")
+            assert page.eval_on_selector_all(
+                "#model-sheet-list input", "e => e.length") == 0
+            assert page.is_visible(".model-sheet-empty"), (
+                "boş panel hiçbir şey söylemiyor")
+            page.keyboard.press("Escape")
+
+            # 4. #go kilitli VE sebebi yazılı (kilidin nedenini saklamak yok).
+            assert page.is_disabled("#go")
+            assert "Ayarlar" in (page.get_attribute("#go", "title") or ""), (
+                "kilidin sebebi title'da yok")
+
+            # 5. #model-note doğrudan Ayarlar'a giden düğmeyi gösteriyor.
+            assert page.is_visible("#model-note")
+            assert page.is_visible("#model-settings-link")
+
+            browser.close()
+    finally:
+        server.stop()
+
+
+def test_playwright_composer_GONDERIMDEN_SONRA_kuculuyor(monkeypatch):
+    """"Prompt gönderdikten sonra chat kısmı küçülsün" — ölçülen şey YÜKSEKLİK.
+
+    Yalnız tarayıcıda ölçülebilir: küçülmeyi yapan `min-height` ve onu geri
+    veren `:focus-within` CSS kuralları, pytest'te çalışmıyor. Kaynak taraması
+    kuralın VARLIĞINI görür, kutunun gerçekten inip inmediğini görmez —
+    üstelik `autoGrow` satır yüksekliğini satır içi `style.height` ile yazıyor,
+    yani iki mekanizmanın birlikte doğru davrandığı ancak burada anlaşılıyor.
+    """
+    _tum_kimlikler_kayitli(monkeypatch)
+    port = get_free_port()
+    server = ServerThread(port)
+    server.start()
+    time.sleep(1.0)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1280, "height": 860})
+            page.goto(f"http://127.0.0.1:{port}")
+            page.wait_for_selector("#view-studio")
+            _ilk_kurulum_perdesini_kapat(page)
+
+            kutu = lambda: page.eval_on_selector(
+                "#prompt", "e => e.getBoundingClientRect().height")
+            once = kutu()
+            uzun_yer_tutucu = page.get_attribute("#prompt", "placeholder")
+            assert page.get_attribute("#composer", "data-sent") is None, (
+                "composer daha ilk gönderimden önce küçülmüş")
+
+            # REDDEDİLEN GÖNDERİM KÜÇÜLTMEZ. Boş kutuyla "Üret" `#go`ya
+            # takılmıyor (kapı prompt'un boşluğunu saymıyor, `goBlockReason`
+            # modele ve referansa bakıyor) — reddi `run()` veriyor. Küçülmenin
+            # çapası bir tur `submitComposer`daydı ve tam burada kırılıyordu:
+            # hiç gönderim yapmadan `data-sent` yazılıyor, uzun tanıtım yer
+            # tutucusu kısasıyla değişiyordu. Kaynak taraması bitişikliği
+            # görüyor, kullanıcının gördüğü şeyi ise yalnız burası görüyor.
+            assert not page.is_disabled("#go"), (
+                "kapı boş kutuda kilitliymiş — reddi ölçen senaryo geçersiz")
+            page.click("#go")
+            page.wait_for_timeout(200)
+            assert page.get_attribute("#composer", "data-sent") is None, (
+                "reddedilen gönderim de composer'ı küçültüyor")
+            assert page.get_attribute("#prompt", "placeholder") == uzun_yer_tutucu, (
+                "reddedilen gönderim uzun tanıtım yer tutucusunu öldürüyor")
+
+            page.fill("#prompt", "deneme prompt")
+            page.click("#go")
+            # Üretim ANAHTARSIZ sunucuda başarısız olacak ve bu testi
+            # ilgilendirmiyor: küçülme gönderim ANINDA oluyor, sonucun
+            # dönmesini beklemiyor.
+            page.wait_for_function(
+                'document.querySelector("#composer").dataset.sent === "true"')
+            # Kutu ELLE boşaltılıyor. `run()` gönderimde boşaltıyor ama istek
+            # başarısız olunca metni GERİ YAZIYOR (anahtarsız sunucuda tam da
+            # bu oluyor) — ölçüm ise "boş kutu" ile "boş kutu"yu karşılaştırmak
+            # zorunda, yoksa ölçülen şey küçülme değil metnin uzunluğu olurdu.
+            page.fill("#prompt", "")
+            # Odak kutunun DIŞINA alınıyor: `:focus-within` tabanı geri
+            # veriyor ve küçülme yalnız odak yokken görünür.
+            page.evaluate("document.activeElement.blur()")
+            page.wait_for_timeout(200)
+            sonra = kutu()
+            assert sonra < once, (
+                f"composer küçülmedi: {once}px → {sonra}px")
+
+            # ODAKLANINCA GERİ BÜYÜYOR: küçülme akışa yer açmak içindi,
+            # yazmayı zorlaştırmak için değil.
+            page.focus("#prompt")
+            page.wait_for_timeout(200)
+            assert kutu() >= once - 1, (
+                "odaklanan kullanıcı dar bir kutuya sıkışıyor")
 
             browser.close()
     finally:

@@ -121,6 +121,15 @@ class ImageModel:
     poll_timeout: float | None = None
     note: str | None = None       # seçicide gösterilen kısa Türkçe uyarı
     kind: str = "image"
+    # ÜYELİK TOHUMU — bugün hiçbir şeyi değiştirmiyor, yarının tek kancası.
+    # "free" = abonelik gerektirmiyor. Kredi/üyelik sistemi geldiğinde bir
+    # modelin GÖRÜNMEME sebebi ikiye çıkacak ("anahtar yok" · "plan
+    # kapsamıyor") ve o kararın TEK bir yerde verilmesi şart: arayüz bugün de
+    # tek soru soruyor (`available`, bkz. app._model_available). Alanın burada
+    # olmasının sebebi, kararın VERİSİNİN katalogda yaşaması — sağlayıcı
+    # eklendiğinde plan bilgisi modelle birlikte geliyor, ikinci bir tabloda
+    # unutulmuyor.
+    plan: str = "free"
 
 
 @dataclass(frozen=True)
@@ -159,6 +168,8 @@ class ChatModel:
     needs_max_tokens: bool = False
     note: str | None = None       # seçicide gösterilen kısa Türkçe uyarı
     kind: str = "chat"
+    # ImageModel.plan ile AYNI alan ve aynı gerekçe (uzunu orada).
+    plan: str = "free"
 
 
 # ── Kimlik bilgileri ────────────────────────────────────────────────────

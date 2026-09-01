@@ -444,12 +444,19 @@ def test_sohbet_kataloğu_arayuzun_ihtiyaci_olan_ALANLARI_tasiyor(client):
     alan ise ölçülmemiş bir sözleşme genişlemesi. `logo` v0.8'de eklendi —
     şeridin sağlayıcı işareti (bkz. tests/test_provider_logos.py); `short_label`
     de onunla birlikte: marka işaretle geldiği için ŞERİDİN adı `label`den ayrı
-    (bkz. catalog.short_labels)."""
+    (bkz. catalog.short_labels).
+
+    `available` + `requires_plan` üyelik turunda eklendi ve ikisi de ölçülmüş
+    bir gerekçeyle: arayüzün görünürlük filtresi TEK alan okumak zorunda
+    (`static/core.js secilebilirler`), yoksa kredi/üyelik geldiğinde "hangi
+    modeller görünür" sorusunun iki cevabı doğar. Bugünkü eşitliği bir sonraki
+    test çiviliyor."""
     body = client.get("/api/settings").json()
     assert body["default_chat_model"] in {m["id"] for m in body["chat_models"]}
     for m in body["chat_models"]:
         assert set(m) == {"id", "label", "short_label", "provider", "configured",
-                          "needs_deployment", "note", "logo"}, m["id"]
+                          "needs_deployment", "note", "logo",
+                          "available", "requires_plan"}, m["id"]
 
 
 def test_iki_katalog_da_SERIT_ADINI_ayri_alanda_donduruyor(client):
@@ -473,6 +480,34 @@ def test_iki_katalog_da_SERIT_ADINI_ayri_alanda_donduruyor(client):
     assert gorsel["gemini-nano-banana-2"]["short_label"] == "Nano Banana 2"
     assert gorsel["gemini-nano-banana-2"]["label"] == "Gemini · Nano Banana 2"
     assert gorsel["azure-gpt-image-2"]["short_label"] == "Azure · gpt-image-2"
+
+
+def test_GORUNURLUK_karari_TEK_alandan_geliyor_ve_bugun_configured_ile_ayni(client):
+    """Arayüzün görünürlük filtresi TEK alan okuyor: `available`.
+
+    NEDEN AYRI BİR ALAN: bugün bir modelin görünmeme sebebi tek ("anahtar
+    kayıtlı değil") ve `available == configured`. Kredi/üyelik sistemi
+    geldiğinde ikincisi ekleniyor ("kullanıcının planı kapsamıyor") ve o karar
+    SUNUCUDA, `app._model_available`da veriliyor. İstemcide iki sebebi ayrı ayrı
+    sormak, "hangi modeller görünür" sorusuna ikinci bir cevap yazmak olurdu —
+    `static/core.js secilebilirler`in var olma sebebi tam olarak o ikiliği
+    önlemek.
+
+    Bu test alanın SESSİZCE ÖLMESİNİ engelliyor: bugün ikisi eşit olduğu için
+    `available`ı silmek hiçbir testi düşürmezdi ve kanca fark edilmeden
+    kaybolurdu. Bugünkü eşitlik de burada çivili — ayrıştığı gün bu iddia
+    BİLEREK güncellenir, kazara değil.
+    """
+    body = client.get("/api/settings").json()
+    for anahtar in ("image_models", "chat_models"):
+        assert body[anahtar], f"{anahtar} boş"
+        for m in body[anahtar]:
+            assert isinstance(m["available"], bool), m["id"]
+            assert m["available"] == m["configured"], (
+                f"{m['id']}: bugün görünürlük yalnız anahtara bağlı olmalı")
+            # Bugün her model ücretsiz katmanda. Alan şimdiden AKIYOR ki
+            # "Pro" rozeti geldiğinde şema değişikliği gerekmesin.
+            assert m["requires_plan"] == "free", m["id"]
 
 
 def test_DAGITIM_ADI_bayragi_yalnizca_ADI_ORTAMDAN_okunan_modelde(client):

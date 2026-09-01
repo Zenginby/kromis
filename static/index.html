@@ -182,12 +182,11 @@
       <section id="view-studio" class="section stage" role="tabpanel" aria-labelledby="tab-studio">
         <div class="studio-flow">
           <div id="chat-empty" class="chat-empty">
+            <!-- TANITIM PARAGRAFI KALDIRILDI (kullanıcı isteği: stüdyo sadeleşsin).
+                 58ch'lik bir metindi ve boş ekranın en büyük yüzeyiydi; söylediği
+                 şeyi başlık bir satırda, çipler de ÖRNEKLE söylüyor. Çipler bu
+                 yüzden KALIYOR: boş ekranın tek eylem kapısı onlar, metin değil. -->
             <h2>Fikri anlat, prompt'u o yazsın.</h2>
-            <p>
-              Türkçe anlatman yeterli. Yönetmen eksik kalan yerleri sorar, sonra
-              İngilizce bir <code>gpt-image-2</code> prompt'u ve teknik ayarları
-              üretir — tek tıkla üretim formuna geçer.
-            </p>
             <div class="chat-chips" role="group" aria-label="Başlangıç önerileri">
               <button type="button" class="chat-chip">Kurban Bayramı için kare Instagram görseli</button>
               <button type="button" class="chat-chip">Blog kapağı — sıcak editoryal fotoğraf</button>
@@ -200,7 +199,10 @@
 
           <div id="chat-wait" class="chat-wait" hidden>
             <div class="spinner"></div>
-            <span>Yönetmen düşünüyor… ilk yanıt yarım dakikayı bulabilir.</span>
+            <!-- "ilk yanıt yarım dakikayı bulabilir" KALKTI: bekleme zaten
+                 görünür (spinner) ve süre tahmini sağlayıcıya göre yanlış
+                 olabiliyordu. `aria-live` bölgesi kısaldı, kaybolmadı. -->
+            <span>Yönetmen düşünüyor…</span>
           </div>
 
           <!-- İlerleme çubuğu KALDIRILDI. Yüzde zaten uydurmaydı: sağlayıcı
@@ -730,12 +732,22 @@
     </div>
 
     <div class="composer-foot">
-      <span class="chat-hint">⌘/Ctrl + Enter gönderir · ⌘/Ctrl + J mod değiştirir</span>
-      <!-- Bu turun kredi maliyeti: model × boyut × kalite × adet.
+      <!-- KLAVYE İPUCU ŞERİDİ KALDIRILDI (kullanıcı isteği). Kısayolların
+           KENDİSİ duruyor (core.js keydown); kaybolan yalnız kalıcı metin.
+           Bilgi ölmedi, YER DEĞİŞTİRDİ — ve şerit İKİ kısayol taşıyordu, o
+           yüzden iki yere: ⌘/Ctrl+Enter #go'nun `title`ına (tek yazarı
+           syncGoGate), ⌘/Ctrl+J mod düğmelerinin `title`ına (core.js,
+           MOD_KISAYOL). İlk turda yalnız birincisi taşınmış, ikincisi
+           çalışır ama hiçbir yerde yazmaz hâlde kalmıştı; keşfedilemeyen
+           kısayol pratikte yok demek. Şerit telefonda zaten `display: none`
+           idi (eski mobile.css kuralı), yani kayıp masaüstüne özgüydü ve
+           kazanç da orada: composer'ın dibindeki satır artık yalnız gerçekten
+           durum bildiren üç düğüm taşıyor.
+
+           Bu turun kredi maliyeti: model × boyut × kalite × adet.
            .composer-right'ta DEĞİL, burada — o şeridin ölçülmüş 360px bütçesi
-           (mobile.css:152) dolu ve .chat-hint telefonda display:none
-           (mobile.css:184), yani bu satırda tam olarak bu kadar yer boşalıyor.
-           Bugün yalnız METADATA: bakiye yok, satın alma yok, zorlama yok. -->
+           (mobile.css:152) dolu. Bugün yalnız METADATA: bakiye yok, satın alma
+           yok, zorlama yok. -->
       <span id="run-cost" class="run-cost" hidden></span>
       <p id="folder-target" class="folder-target" hidden></p>
       <p id="status" class="status" role="status"></p>

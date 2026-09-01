@@ -865,27 +865,46 @@ def test_gizlenen_model_seridinin_KABUGU_da_gizleniyor(istemci):
         "Yönetmen modunda görsel şeridinin SARMALAYICISI gizlenmiyor")
 
 
-def test_composer_ipucu_TELEFONDA_hala_gizli(istemci):
-    """`.chat-hint` telefonda `display: none` KALIYOR.
+def test_composer_ipucu_TELEFONDA_geri_GELMIYOR(istemci):
+    """`.chat-hint` mobile.css'e GERİ DÖNMÜYOR — ve iddia artık boşa dönmüyor.
 
-    Masaüstünde ipucunun taban genişliği `flex: 1`den (yani `flex: 1 1 0%`,
-    taban SIFIR) içerik genişliğine çevrildi: `#status` uzun bir metin
-    yazdığında ipucu 65px'e ezilip dört satıra sarıyordu (ölçüm: Chromium,
-    1024×700). Telefonda ise ipucu ZATEN gizli ve gizli kalması gerekiyor —
-    "⌘/Ctrl + Enter" dokunmatikte yanlış bilgi (Enter satır atlıyor) ve klavye
-    açıkken satır boşuna yer kaplıyor.
+    Bu test bir öncekinin üstüne yazıldı, çünkü öncekinin kendisi kırıktı.
+    Eski hâli "`.chat-hint { display: none }` mobile.css'te DURUYOR" diyordu ve
+    şerit kaldırıldıktan sonra da YEŞİL kaldı: yerine bırakılan gerekçe yorumu
+    seçicinin adını tırnak içinde taşıyor, `css.split(".chat-hint {")` yorumu
+    yakalıyordu. Deponun daha önce iki kez ödediği tripwire bedelinin aynısı —
+    bu kez ödeyen tarafta bir TEST vardı, yani kapı sessizce açık kaldı ve
+    test_index.py'nin "böyle bir kural OLMAMALI" iddiasıyla açıkça çelişen bir
+    ikinci iddia doğdu; ikisi de yeşildi.
 
-    Mandal masaüstü düzeltmesinin telefon tarafına SIZMASINA karşı: kural
-    `style.css`'te değil `mobile.css`'te ve iki dosya ayrı ayrı düzenleniyor,
-    yani "ipucu artık sarmıyor, gizlemeye gerek yok" diye düşünen bir sonraki
-    tur bu satırı sessizce silebilir. Kırılma CI'da görünmez — telefon yok.
+    Yeni iddia yönü tersine çeviriyor ve yorumları ÖNCE ayıklıyor. Ölçtüğü
+    tehlike hâlâ telefona özgü: kural ölü bir seçiciye dönüştü, ama şeridi
+    geri getirmeye kalkan bir tur onu masaüstünde işe yarar bulup telefona da
+    sızdırabilir — ve "⌘/Ctrl + Enter" dokunmatikte YANLIŞ bilgi (Enter satır
+    atlıyor, bkz. core.js keydown). Kırılma CI'da görünmez, telefon yok.
     """
-    css = _metin(istemci, "/static/mobile.css")
-    blok = css.split(".chat-hint {", 1)
-    assert len(blok) == 2, ".chat-hint kuralı mobile.css'ten kaybolmuş"
-    assert "display: none" in blok[1].split("}", 1)[0], (
-        "ipucu telefonda gizlenmiyor — klavye açıkken yer kaplar ve "
-        "dokunmatikte yanlış kısayolu anlatır")
+    css = re.sub(r"/\*.*?\*/", "", _metin(istemci, "/static/mobile.css"), flags=re.S)
+    assert re.search(r"\.chat-hint\s*\{", css) is None, (
+        "mobile.css'te `.chat-hint` kuralı var — şerit ya geri geldi (o zaman "
+        "dokunmatikte yanlış kısayolu anlatıyor) ya da ölü bir seçici kaldı")
+
+
+def test_composer_KUCULMESI_telefonda_yutulmuyor(istemci):
+    """mobile.css `.composer-input`a küçülmeyi yutacak bir taban koymuyor.
+
+    Küçülme TELEFONDA neredeyse ölmüştü ve sebebi tam olarak buydu: masaüstünde
+    ölçülen 57px → 35px, 390px'de 57px → 57px. Orada suçlu yer tutucunun iki
+    satıra sarmasıydı (boş bir `<textarea>`nın `scrollHeight`i yer tutucuyu da
+    kapsıyor) ve o ayrı bir mekanizmayla çözüldü — ama aynı ölçüm bir kez daha
+    kaybedilebilir: mobile.css `.composer-input`a bir `min-height` yazarsa
+    `.composer[data-sent]` tabanı (style.css) medya sorgusunun altında kalır ve
+    küçülme sessizce yutulur. `max-height: 30vh` KALIYOR, o tavan.
+    """
+    css = re.sub(r"/\*.*?\*/", "", _metin(istemci, "/static/mobile.css"), flags=re.S)
+    for blok in re.findall(r"\.composer-input\s*\{([^}]*)\}", css):
+        assert "min-height" not in blok, (
+            "mobile.css `.composer-input`a taban yazıyor — gönderimden sonraki "
+            "küçülme telefonda yutulur")
 
 
 def test_alttan_acilan_yuzeyde_UST_guvenli_alan_ODENMIYOR(istemci):

@@ -3,8 +3,9 @@
 **Tarih:** 1 Eylül 2026 · **Son dal:** `claude/project-graphs-next-tasks-7slwo1`
 (`main`'den kuruldu, henüz birleşmedi)
 **Bugünkü ölçüm:** `APP_VERSION` **0.11.6** (sonrakini CI yazacak),
-`pytest tests/ -q` → **1859 geçti / 9 atlandı** (Playwright kuruluyken; Tur K
-öncesi aynı ortamda 1854 geçti / 9 atlandı — beş yeni test)
+`pytest tests/ -q` → **1861 geçti / 9 atlandı** (Playwright kuruluyken; Tur K
+öncesi aynı ortamda 1854 geçti / 9 atlandı — beş yeni test, sonra kod
+incelemesiyle bir tane daha)
 **Defterin açılış ölçümü** (Tur A öncesi): `APP_VERSION` 0.7.0 → 1613 geçti / 10 atlandı
 (atlananlar her üç ölçümde de yalnız Windows'a özgü DACL testleri + kurulu
 olmayan Playwright)
@@ -182,6 +183,53 @@ Deponun kuralı gereği kapanan iddia silinmiyor, **yeniden yazılıyor**:
 Sonuncusu turun kendi dersi: o test anahtarsız bir sunucuda koşuyordu ve
 kartların varlığını ölçüyordu — filtre sıkılaşınca **haklı olarak** kırmızıya
 döndü. Değişikliğin gerçekten işlediğinin ilk kanıtı o kırmızıydı.
+
+### 7. Tur K'nın kendi kod incelemesi — dört bulgu, dördü de kapandı
+
+PR #63 açıldıktan sonra kullanıcı bir inceleme istedi. Takım YEŞİLDİ (1859/9),
+yani dördü de **kapıların görmediği** şeyler. Bu bölüm turun ikinci commit'i.
+
+| # | bulgu | neden kapılar görmedi |
+| --- | --- | --- |
+| 1 | Küçülmenin çapası `submitComposer`daydı; oradaki kapılar yalnız UZUNLUK kapıları. Boş kutuyla "Üret" → `data-sent` yazılıyor, `rows` 1'e iniyor, uzun tanıtım yer tutucusu ölüyor — sonra `run()` "Önce bir prompt yaz." diyor. `sendChat`in dört kapısı ve `runArena`nın ikisi de aynı durumda. | Yeni test yalnız `submitComposer` İÇİNDEKİ iki kapıya karşı sırayı ölçüyordu |
+| 2 | `test_composer_ipucu_TELEFONDA_hala_gizli` kaldırılan bir kuralın VARLIĞINI şart koşuyor ama yeşil kalıyordu: yerine bırakılan gerekçe yorumu seçicinin adını taşıyor, `css.split(".chat-hint {")` **yorumu** yakalıyordu. `test_index.py`nin "böyle bir kural olmamalı" iddiasıyla açıkça çelişen ikinci bir iddia — ikisi de yeşil. | Tripwire bedelinin deponun daha önce iki kez ödediği hâli; bu kez ödeyen bir TESTTİ |
+| 3 | Boş panelin metni sabit "Kayıtlı API anahtarı yok" idi, oysa `renderModelCards` üç eksenin ortağı. Azure'da anahtar kayıtlıyken dağıtım adı boş olabiliyor (`chat_is_configured` ikisini birden arıyor): o kullanıcıya elindeki anahtarı yeniden yapıştırmasını söylüyorduk. | Metnin doğruluğunu hiçbir iddia eksene bağlamamıştı |
+| 4 | Şerit İKİ kısayol taşıyordu; yalnız ⌘/Ctrl+Enter `#go`ya taşındı. ⌘/Ctrl+J (mod değiştirme, `core.js` keydown'da hâlâ çalışıyor) hiçbir yerde yazmıyordu. | "Bilgi taşındı" iddiası yalnız birinci yarıyı ölçüyordu |
+
+Kapanışlar ve **her birinin bıraktığı yeni ölçü**:
+
+* **1 →** çapa kutunun boşaldığı üç satıra taşındı (`run`, `runArena`,
+  `sendChat`) — üç akışın da bütün kapılardan geçtikten sonra yaptığı ilk iş o,
+  yani "kabul edildi"nin kaynaktan okunabilir tek işareti. Test artık
+  **bitişikliği** ölçüyor (yorumlar ayıklanarak) ve `submitComposer`da
+  `composerKuculsun`un HİÇ geçmemesini şart koşuyor. Chromium'da ikinci bir
+  iddia: boş kutuyla "Üret"e basınca `data-sent` yazılmıyor **ve** uzun yer
+  tutucu duruyor. Yan düzeltme: `sendChat`in başarısızlık dalı metni geri
+  koyarken artık `autoGrow` da çağırıyor — `rows` 1'e inmişken ölçüm
+  yapılmazsa geri konan çok satırlı mesaj tek satıra kırpılmış görünüyordu.
+* **2 →** iddia tersine çevrildi (`…_TELEFONDA_geri_GELMIYOR`) ve yorumlar
+  ÖNCE ayıklanıyor. Yanına telefona özgü ikinci bir mandal: `mobile.css`
+  `.composer-input`a `min-height` yazamaz — yazarsa `.composer[data-sent]`
+  tabanı medya sorgusunun altında kalır ve küçülme **telefonda** sessizce
+  yutulur (bu turda bir kez neredeyse öyle oldu, bkz. yukarıdaki 4. bölüm).
+* **3 →** metin eksene bağlandı (`MODEL_BOS_PANEL.anahtar` / `.kimlik`,
+  `MODEL_EKSENLERI`den okunuyor). Panel artık `goBlockReason`ın yönetmen
+  dalıyla aynı dili konuşuyor. Ölçüm (Chromium 390×844, anahtarsız sunucu):
+  görsel ekseni "Kayıtlı API anahtarı yok…", sohbet ekseni "Kayıtlı sohbet
+  kimliği yok… (anahtar, gerekiyorsa dağıtım adı)".
+* **4 →** `MOD_KISAYOL` eklendi ve mod düğmelerinin `title`ına yazılıyor
+  (`Görsel modu · ⌘/Ctrl + J`, `Yönetmen modu · ⌘/Ctrl + J`) — kısayolun
+  yaptığı iş tam olarak o düğmelere basmak. İki kısayol sabiti yan yana
+  duruyor ki "iki dosyada iki ad" kayması doğmasın.
+
+**Turun asıl dersi:** dört bulgunun üçü (1, 2, 4) aynı biçimde doğdu — *bir
+şeyin yerinin değiştiğini söyleyen bir iddia, yalnız yeni yerine baktı.*
+Taşınan şeyin ESKİ yerinde bıraktığı boşluğu ölçmeyen bir test, taşımanın
+yarım kaldığını göremiyor. 2 numara bunun en pahalı hâli: iddia yalnız kör
+değildi, **tersini** söyleyen bir kardeşiyle birlikte yeşil duruyordu.
+
+Ölçüm: **1861 geçti / 9 atlandı** (inceleme öncesi 1859/9 — bir yeni test, bir
+de yeniden yazılan iki iddia).
 
 ---
 

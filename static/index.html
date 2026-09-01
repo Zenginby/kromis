@@ -734,8 +734,12 @@
     <div class="composer-foot">
       <!-- KLAVYE İPUCU ŞERİDİ KALDIRILDI (kullanıcı isteği). Kısayolların
            KENDİSİ duruyor (core.js keydown); kaybolan yalnız kalıcı metin.
-           Bilgi ölmedi, YER DEĞİŞTİRDİ: #go'nun `title`ına girdi ve orada tek
-           bir yazarı var (syncGoGate) — şerit telefonda zaten `display: none`
+           Bilgi ölmedi, YER DEĞİŞTİRDİ — ve şerit İKİ kısayol taşıyordu, o
+           yüzden iki yere: ⌘/Ctrl+Enter #go'nun `title`ına (tek yazarı
+           syncGoGate), ⌘/Ctrl+J mod düğmelerinin `title`ına (core.js,
+           MOD_KISAYOL). İlk turda yalnız birincisi taşınmış, ikincisi
+           çalışır ama hiçbir yerde yazmaz hâlde kalmıştı; keşfedilemeyen
+           kısayol pratikte yok demek. Şerit telefonda zaten `display: none`
            idi (eski mobile.css kuralı), yani kayıp masaüstüne özgüydü ve
            kazanç da orada: composer'ın dibindeki satır artık yalnız gerçekten
            durum bildiren üç düğüm taşıyor.

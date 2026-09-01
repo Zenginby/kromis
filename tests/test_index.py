@@ -1246,8 +1246,15 @@ def test_a_failed_chip_turn_does_not_dump_the_directors_delta_into_the_composer(
     """
     js = _chat_js()
     body = re.search(r"async function sendChat\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
-    assert "if (!label) input.value = message;" in body.group(1), (
+    # İddia DURUYOR, biçimi genişledi: geri koymanın yanına bir `autoGrow`
+    # girdi. Gerekçe küçülmeyle geldi — gönderim `rows`u 1'e indiriyor ve
+    # ölçüm yapılmazsa geri konan çok satırlı mesaj tek satıra kırpılmış
+    # görünüyor. Ölçülen şart değişmedi: geri koyma YALNIZ `!label` dalında.
+    assert re.search(r"if \(!label\)\s*\{?\s*input\.value = message;",
+                     body.group(1)), (
         "başarısız çip turunda delta metni besteciye dökülüyor")
+    assert body.group(1).count("input.value = message") == 1, (
+        "metni geri koyan ikinci bir yol var — çip turu da dökülebilir")
 
 
 def test_the_selection_pill_is_quieter_than_a_typed_message():
@@ -4920,12 +4927,22 @@ def test_yuvarlak_kartin_sol_kenari_VURGU_RENGI_degil():
         ".folder-target ile .chat-gate'in sol kenarı ayrışmış")
 
 
-def test_composer_ILK_GONDERIMDEN_SONRA_kuculuyor():
-    """"Chat veya görsel üretme prompt'u gönderdikten sonra chat kısmı küçülsün."
+def test_composer_ILK_KABUL_EDILEN_gonderimden_sonra_kuculuyor():
+    """"Prompt gönderdikten sonra chat kısmı küçülsün" — ama KABUL EDİLEN prompt.
 
-    ÇAPA `submitComposer`: iki mod da oradan geçiyor, yani "chat VEYA görsel"in
-    tek karşılığı o. İşaret uzunluk kapılarının ARDINDAN yazılmalı — reddedilen
-    bir gönderim küçülmeyi hak etmiyor, kullanıcı hâlâ o metni düzenliyor.
+    ÇAPA `submitComposer` DEĞİL, ve bu iddia bir kusurun üstüne yazıldı: çapa
+    bir tur orada durdu, oysa oradaki kapılar yalnız UZUNLUK kapıları. Boş bir
+    kutuyla "Üret"e basmak `run()`ın "Önce bir prompt yaz."ına takılıyor —
+    ama composer çoktan küçülmüş, `data-sent` yazılmış ve uzun tanıtım yer
+    tutucusu kısasıyla değişmiş oluyordu: hiç gönderim yapmadan onboarding
+    metnini öldürmek. `sendChat`in dört kapısı (chatBusy, boş mesaj, dolu
+    konuşma, toplam karakter) ve `runArena`nın iki kapısı da aynı durumdaydı.
+
+    Yerine geçen çapa KUTUNUN BOŞALDIĞI satır: üç akışın da bütün kapılardan
+    geçtikten sonra yaptığı ilk iş o, yani "kabul edildi"nin kaynaktan
+    okunabilir tek işareti. Bu yüzden iddia bitişikliği ölçüyor — `run`,
+    `runArena` ve `sendChat`in her birinde `composerKuculsun()` boşaltma
+    satırından hemen sonra gelmeli.
 
     Küçülmeyi fiilen yapan `rows` ekseni; `min-height` tek başına Chromium'da
     hiçbir şey değiştirmiyordu (57px → 57px), çünkü `autoGrow` satır içi bir
@@ -4937,14 +4954,24 @@ def test_composer_ILK_GONDERIMDEN_SONRA_kuculuyor():
     """
     js = _js("core.js")
     govde = js.split("function submitComposer(", 1)[1].split("\n}\n", 1)[0]
-    assert govde.count("composerKuculsun()") == 2, (
-        "küçülme iki modun ikisinde birden tetiklenmiyor")
-    # Kapıların ARDINDAN: her `composerKuculsun()` kendi dalındaki `return`den
-    # sonra gelmeli. Uzunluk kapıları `return` ile bitiyor, o yüzden dalın
-    # metninde işaretin `return`den SONRA geçmesi ölçülebilir.
-    for dal in govde.split("if (promptVal.length >")[1:]:
-        assert dal.index("return;") < dal.index("composerKuculsun()"), (
-            "reddedilen gönderim de composer'ı küçültüyor")
+    assert "composerKuculsun" not in govde, (
+        "küçülmenin çapası yine uzunluk kapılarının yanında — reddedilen "
+        "gönderim de composer'ı küçültür")
+
+    # Üç kabul noktası, üçünde de aynı bitişiklik. Ölçüm KOD üzerinde: yorum
+    # satırları ayıklanıyor, çünkü aradaki gerekçe metni bitişikliği bozmaz —
+    # bozan şey araya girecek bir KAPI olurdu. Kalan tek satır izni
+    # `autoGrow($("prompt"))` içindir (core.js'in iki akışında boşaltmanın
+    # hemen ardından duruyor); ikinci bir kod satırı girerse iddia düşer.
+    bitisik = re.compile(r'\.value = "";\n(?:[^\n]*\n)?\s*composerKuculsun\(\);')
+    for dosya, imza in (("core.js", "async function run() {"),
+                        ("core.js", "async function runArena(prompt) {"),
+                        ("chat.js", "async function sendChat(")):
+        dal = _js(dosya).split(imza, 1)[1].split("\n}\n", 1)[0]
+        dal = "\n".join(r for r in dal.split("\n") if not r.strip().startswith("//"))
+        assert bitisik.search(dal), (
+            f"{imza}: küçülme kutunun boşaldığı ana bağlı değil — araya bir "
+            "kapı girerse reddedilen gönderim de küçültür")
 
     # `rows` ekseni ve odak koşulu
     assert "function syncComposerSatirlari(" in js, "satır ekseni yok"
@@ -4984,6 +5011,39 @@ def test_uzun_yer_tutucu_ILK_GONDERIMDEN_SONRA_kisaliyor():
         assert "syncPromptPlaceholder()" in dal, f"{fn} yer tutucuyu tazelemiyor"
 
 
+def test_bos_panelin_metni_EKSENE_gore_degisiyor():
+    """Boş model paneli sohbet ekseninde "anahtar yok" DEMİYOR.
+
+    `renderModelCards` üç eksenin ortağı ve boş hâlin metni bir tur boyunca
+    sabit bir "Kayıtlı API anahtarı yok" cümlesiydi. Görsel ekseninde doğru,
+    sohbet ekseninde YANLIŞ İŞ: `credstore.chat_is_configured` anahtarı VE
+    (Azure'da) dağıtım adını birlikte arıyor, yani kullanıcı anahtarı kayıtlı
+    olduğu hâlde boş bir panel görebiliyor. Ona "anahtarını kaydet" demek,
+    elinde zaten olanı yeniden yapıştırmasını söylemek — yapıştırır, hiçbir
+    şey değişmez, sebep hâlâ görünmez.
+
+    `goBlockReason`ın yönetmen dalı bu ayrımı zaten yapıyor ("Kayıtlı sohbet
+    kimliği yok"); iddia panelin onunla AYNI dili konuşmasını çiviliyor,
+    çünkü aynı hâlin iki yerde iki ayrı iş buyurması sessiz bir kırılma.
+    """
+    js = _js("core.js")
+    assert "const MODEL_BOS_PANEL" in js, "boş panel metinleri tek yerde değil"
+    # Metin fonksiyonda KURULMUYOR, eksenden okunuyor: tek yazar kuralı.
+    govde = js.split("function renderModelCards(", 1)[1].split("\n}\n", 1)[0]
+    assert "eksen.bosMetin" in govde, "boş panel metni eksenden okunmuyor"
+    assert "Kayıtlı" not in govde, (
+        "boş panel metni fonksiyonun içinde yeniden kuruluyor — eksenler ayrışır")
+
+    # İki eksen İKİ AYRI metin okuyor; aynı sabite bağlanırlarsa ayrım ölür.
+    eksenler = js.split("const MODEL_EKSENLERI = {", 1)[1].split("\n};", 1)[0]
+    gorsel = eksenler.split("  chat: {", 1)[0]
+    sohbet = eksenler.split("  chat: {", 1)[1].split("  arena: {", 1)[0]
+    assert "MODEL_BOS_PANEL.anahtar" in gorsel, "görsel ekseni anahtar demiyor"
+    assert "MODEL_BOS_PANEL.kimlik" in sohbet, (
+        "sohbet ekseni de 'anahtar' diyor — Azure dağıtım adı eksik olan "
+        "kullanıcıya yanlış iş veriyor")
+
+
 def test_composer_ipucu_SERIDI_KALDIRILDI_bilgi_GO_dugmesinde():
     """Klavye ipucu şeridi composer'dan KALKTI (kullanıcı isteği: sadeleşme).
 
@@ -5017,3 +5077,14 @@ def test_composer_ipucu_SERIDI_KALDIRILDI_bilgi_GO_dugmesinde():
     # duruşu). `sebep ||` sırası tam olarak bunu söylüyor.
     assert "sebep\n    ||" in govde or "sebep ||" in govde, (
         "kilitli düğmede sebep yerine kısayol yazılıyor olabilir")
+
+    # ŞERİT İKİ KISAYOL TAŞIYORDU. İlk turda yalnız ⌘/Ctrl+Enter taşındı ve
+    # ⌘/Ctrl+J (mod değiştirme, hâlâ çalışıyor) hiçbir yerde yazmaz hâlde
+    # kaldı: çalışan ama keşfedilemeyen bir kısayol, kullanıcı için yok olanla
+    # aynı şey. İddia "bilgi ölmedi, yer değiştirdi"nin TAMAMINI ölçüyor.
+    assert "MOD_KISAYOL" in js, "mod kısayolu hiçbir yerde yazmıyor"
+    assert 'e.key.toLowerCase() !== "j"' in js, (
+        "mod kısayolu artık çalışmıyor — o zaman metni de kalkmalı")
+    for tab in ("tab-image", "tab-chat"):
+        assert f'$("{tab}").title = ' in js, (
+            f"#{tab} kısayolu duyurmuyor — bilgi yine tek yarım kaldı")

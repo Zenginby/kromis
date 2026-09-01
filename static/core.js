@@ -488,6 +488,16 @@ function goBlockReason() {
  */
 const GO_KISAYOL = "⌘/Ctrl + Enter";
 
+// Şeridin İKİNCİ kısayolu. Bir tur boyunca hiçbir yerde yazmıyordu: şerit
+// kalkarken yalnız ⌘/Ctrl+Enter #go'ya taşınmış, mod değiştirme kısayolu
+// (aşağıda, document keydown) çalışır hâlde ama KEŞFEDİLEMEZ kalmıştı —
+// yazmayan bir kısayol pratikte yok demektir. Yeri mod düğmeleri, çünkü
+// kısayolun yaptığı iş tam olarak o düğmelere basmak; ikisi bir arada
+// duruyor ki "iki dosyada iki ad" kayması doğmasın.
+const MOD_KISAYOL = "⌘/Ctrl + J";
+$("tab-image").title = `Görsel modu · ${MOD_KISAYOL}`;
+$("tab-chat").title = `Yönetmen modu · ${MOD_KISAYOL}`;
+
 function syncGoGate() {
   const sebep = goBlockReason();
   // `$("go")` bir yerel değişkene ALINMIYOR ve bu bir üslup tercihi değil:
@@ -1057,15 +1067,34 @@ async function savePref(body) {
 // (`imageModels = s.image_models`). Diziyi burada yakalamak, Ayarlar
 // kaydedildikten sonra panelin ESKİ katalogu göstermesi olurdu — üstelik
 // sessizce, çünkü eski dizide de geçerli modeller var.
+// BOŞ PANELİN metni EKSENE bağlı, çünkü "model yok"un SEBEBİ eksene göre
+// değişiyor. Görsel tarafında eksik olan gerçekten API anahtarı. Sohbet
+// tarafında eksik olan kimliğin BÜTÜNÜ: Azure'da anahtar kayıtlıyken dağıtım
+// adı boş olabiliyor (credstore.chat_is_configured ikisini birden arıyor) ve o
+// kullanıcıya "anahtar yok" demek, elinde ZATEN olan anahtarı yeniden
+// yapıştırmasını söylemek olurdu — yapıştırır, hiçbir şey değişmez, sebep de
+// hâlâ görünmez. `goBlockReason`ın yönetmen dalı bu ayrımı yapıyor
+// ("Kayıtlı sohbet kimliği yok"); panel de aynı dili konuşmak zorunda, yoksa
+// aynı hâl iki yerde iki ayrı iş buyurur.
+const MODEL_BOS_PANEL = {
+  anahtar: "Kayıtlı API anahtarı yok. Ayarlar'dan bir sağlayıcının anahtarını "
+    + "kaydedince modelleri burada göreceksin.",
+  kimlik: "Kayıtlı sohbet kimliği yok. Ayarlar'dan bir sağlayıcının kimlik "
+    + "bilgilerini (anahtar, gerekiyorsa dağıtım adı) tamamlayınca modelleri "
+    + "burada göreceksin.",
+};
+
 const MODEL_EKSENLERI = {
   image: {
     secici: "model", dugme: "model-btn", etiket: "model-btn-label",
     logo: "model-logo", baslik: "Görsel modeli", kredi: true,
+    bosMetin: MODEL_BOS_PANEL.anahtar,
     liste: () => imageModels,
   },
   chat: {
     secici: "chat-model", dugme: "chat-model-btn", etiket: "chat-model-btn-label",
     logo: "chat-model-logo", baslik: "Yönetmen modeli", kredi: false,
+    bosMetin: MODEL_BOS_PANEL.kimlik,
     liste: () => chatModels,
   },
   // ÜÇÜNCÜ EKSEN, ikinci bir panel DEĞİL: arena aynı listeyi, aynı filtreyi
@@ -1079,6 +1108,8 @@ const MODEL_EKSENLERI = {
   arena: {
     secici: "arena-models", dugme: "arena-btn", etiket: "arena-btn-label",
     logo: null, baslik: "Arena modelleri", kredi: true, coklu: true,
+    // Arena görsel modellerini listeliyor, yani eksik olan da aynı şey.
+    bosMetin: MODEL_BOS_PANEL.anahtar,
     liste: () => imageModels,
   },
 };
@@ -1247,11 +1278,14 @@ function renderModelCards(eksenAdi) {
   // kendi başına hiçbir şey söylemez. Tek satırlık açıklama, kartların yerine
   // geçiyor — çipin `MODEL_BOS_METNI`si ile aynı gerçeği anlatıyor, ama
   // burada yer var, o yüzden NE YAPILACAĞINI da söylüyor.
+  //
+  // Metin EKSENDEN okunuyor, burada KURULMUYOR: bu fonksiyon üç eksenin
+  // ortağı ve sabit bir "API anahtarı" cümlesi sohbet ekseninde yanlış iş
+  // buyuruyordu (gerekçe MODEL_BOS_PANEL'in başında).
   if (!kartlar.length) {
     const bos = document.createElement("p");
     bos.className = "model-sheet-empty";
-    bos.textContent = "Kayıtlı API anahtarı yok. Ayarlar'dan bir sağlayıcının "
-      + "anahtarını kaydedince modelleri burada göreceksin.";
+    bos.textContent = eksen.bosMetin;
     kartlar.push(bos);
   }
 
@@ -1441,6 +1475,14 @@ function syncComposerSatirlari() {
   autoGrow(el);
 }
 
+/** İlk KABUL EDİLEN gönderimden sonraki küçük hâle geçirir.
+ *
+ * ÇAĞIRANLAR, üçü de "kutu boşaldı" satırının hemen ardında: `run`, `runArena`
+ * (core.js) ve `sendChat` (chat.js). Kutunun boşalması bu üç akışta da
+ * gönderimin bütün kapılardan geçtiği anın işareti — `submitComposer` ise
+ * yalnız uzunluk kapılarını biliyor, o yüzden çapa orada DEĞİL (gerekçe
+ * submitComposer'ın başında).
+ */
 function composerKuculsun() {
   $("composer").dataset.sent = "true";
   syncPromptPlaceholder();   // uzun talimat işini bitirdi
@@ -1452,6 +1494,16 @@ function composerKuculsun() {
 $("prompt").addEventListener("focus", syncComposerSatirlari);
 $("prompt").addEventListener("blur", syncComposerSatirlari);
 
+/** İki modun ortak gönderim kapısı — ama KÜÇÜLMENİN ÇAPASI DEĞİL.
+ *
+ * Çapa bir tur burada durdu ve yanlıştı: buradaki kapılar yalnız UZUNLUK
+ * kapıları, oysa gönderimi reddeden asıl kapılar aşağıda — `run()`ın "Önce bir
+ * prompt yaz."ı, `runArena`nın iki kapısı, `sendChat`in dördü. Çapa yukarıda
+ * kalınca boş bir kutuyla "Üret"e basmak composer'ı KALICI olarak küçültüyor,
+ * `data-sent`i yazıyor ve uzun tanıtım yer tutucusunu kısasıyla değiştiriyordu:
+ * hiç gönderim olmadan onboarding metni ölüyordu. Küçülme artık kutunun
+ * gerçekten boşaldığı üç yerde — o an gönderimin KABUL EDİLDİĞİ andır.
+ */
 function submitComposer() {
   const promptVal = $("prompt").value.trim();
   if (currentMode === "image") {
@@ -1459,14 +1511,12 @@ function submitComposer() {
       statusEl.textContent = `İstem çok uzun (${promptVal.length}/${MAX_PROMPT_CHARS} karakter).`;
       return;
     }
-    composerKuculsun();
     run();
   } else {
     if (promptVal.length > 6000) {
       statusEl.textContent = `Mesaj çok uzun (${promptVal.length}/6000 karakter).`;
       return;
     }
-    composerKuculsun();
     sendChat();
   }
 }
@@ -1921,6 +1971,7 @@ async function runArena(prompt) {
 
   $("prompt").value = "";
   autoGrow($("prompt"));
+  composerKuculsun();   // kutu boşaldı ⇒ gönderim KABUL EDİLDİ
   syncAskDirector();
 
   const pal = readPaletteOpts();
@@ -2014,6 +2065,7 @@ async function run() {
 
   $("prompt").value = "";
   autoGrow($("prompt"));
+  composerKuculsun();   // kutu boşaldı ⇒ gönderim KABUL EDİLDİ
   syncAskDirector();
 
 

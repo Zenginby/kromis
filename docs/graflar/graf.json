@@ -878,7 +878,7 @@
           "/output/{}.png"
         ],
         "dosya": "static/chat.js",
-        "satir": 2028,
+        "satir": 2037,
         "tanim": 81
       },
       {
@@ -892,7 +892,7 @@
           "/output/{}"
         ],
         "dosya": "static/core.js",
-        "satir": 2250,
+        "satir": 2302,
         "tanim": 74
       },
       {
@@ -972,6 +972,7 @@
       {
         "adlar": [
           "autoGrow",
+          "composerKuculsun",
           "confirmDialog",
           "downloadImage",
           "promptDialog",

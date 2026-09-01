@@ -731,8 +731,25 @@ def test_playwright_composer_GONDERIMDEN_SONRA_kuculuyor(monkeypatch):
             kutu = lambda: page.eval_on_selector(
                 "#prompt", "e => e.getBoundingClientRect().height")
             once = kutu()
+            uzun_yer_tutucu = page.get_attribute("#prompt", "placeholder")
             assert page.get_attribute("#composer", "data-sent") is None, (
                 "composer daha ilk gönderimden önce küçülmüş")
+
+            # REDDEDİLEN GÖNDERİM KÜÇÜLTMEZ. Boş kutuyla "Üret" `#go`ya
+            # takılmıyor (kapı prompt'un boşluğunu saymıyor, `goBlockReason`
+            # modele ve referansa bakıyor) — reddi `run()` veriyor. Küçülmenin
+            # çapası bir tur `submitComposer`daydı ve tam burada kırılıyordu:
+            # hiç gönderim yapmadan `data-sent` yazılıyor, uzun tanıtım yer
+            # tutucusu kısasıyla değişiyordu. Kaynak taraması bitişikliği
+            # görüyor, kullanıcının gördüğü şeyi ise yalnız burası görüyor.
+            assert not page.is_disabled("#go"), (
+                "kapı boş kutuda kilitliymiş — reddi ölçen senaryo geçersiz")
+            page.click("#go")
+            page.wait_for_timeout(200)
+            assert page.get_attribute("#composer", "data-sent") is None, (
+                "reddedilen gönderim de composer'ı küçültüyor")
+            assert page.get_attribute("#prompt", "placeholder") == uzun_yer_tutucu, (
+                "reddedilen gönderim uzun tanıtım yer tutucusunu öldürüyor")
 
             page.fill("#prompt", "deneme prompt")
             page.click("#go")

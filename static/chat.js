@@ -1268,6 +1268,11 @@ async function sendChat(display = "") {
   chatThread.push(turn);
   const bubble = appendUser(turn);
   input.value = "";
+  // Dört kapının da ARDINDA: kutunun boşaldığı an gönderimin kabul edildiği
+  // andır ve composer ancak o zaman küçülmeli (core.js composerKuculsun).
+  // `chatBusy`, boş mesaj, dolu konuşma ve toplam karakter kapıları yukarıda
+  // `return false` ile çıkıyor — hiçbiri buraya ulaşmıyor.
+  composerKuculsun();
   chatStatus("");
   setChatBusy(true);
   try {
@@ -1306,7 +1311,11 @@ async function sendChat(display = "") {
     // geri getirirdi.
     chatThread.pop();
     bubble.remove();
-    if (!label) input.value = message;
+    // ÖLÇÜM geri yazmanın parçası: gönderim `rows`u 1'e indirdi ve satır içi
+    // `height` o dar hâlde donmuş durumda. `autoGrow` çağrılmazsa geri konan
+    // çok satırlı mesaj tek satıra kırpılmış görünür — kullanıcı metnini
+    // kaybettiğini sanır, oysa yalnız kutu ölçülmemiştir.
+    if (!label) { input.value = message; autoGrow(input); }
     syncEmptyState();
     chatStatus(e.message);
     return false;

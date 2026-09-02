@@ -150,6 +150,13 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.11.8 — ne değişti
+
+- klasör adı yalnız en yakın klasörde eşleşiyordu
+- logo önizlemesi dikey tabanda kutusunu taşırıp kırpılıyordu
+
+---
+
 ## Sürüm 0.11.7 — ne değişti
 
 - İnceleme bulguları: küçülme çapası, boşa dönen bekçi, eksen metni, ikinci kısayol

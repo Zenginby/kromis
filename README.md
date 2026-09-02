@@ -1,6 +1,6 @@
 # 🎨 Lumeo
 
-[![Release](https://img.shields.io/badge/version-v0.11.7-blue.svg)](https://github.com/Zenginby/gpt-image-studio/releases/latest)
+[![Release](https://img.shields.io/badge/version-v0.11.8-blue.svg)](https://github.com/Zenginby/gpt-image-studio/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![Build & Test](https://github.com/Zenginby/gpt-image-studio/actions/workflows/release.yml/badge.svg)](https://github.com/Zenginby/gpt-image-studio/actions)
@@ -37,7 +37,7 @@ Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Andr
 
 ---
 
-## ✨ Güncel Özellikler (v0.11.7 & Flow-UI)
+## ✨ Güncel Özellikler (v0.11.8 & Flow-UI)
 
 ### 🎬 1. Stüdyo Tek Döküm & Prompt Yönetmeni
 * **Türkçe Diyalogdan İngilizce Prompt:** Türkçe fikir anlatımını otomatik olarak optimizasyonu yapılmış İngilizce `gpt-image-2` prompt'una ve teknik ayarlara (`size`, `quality`, `n`) çevirir.

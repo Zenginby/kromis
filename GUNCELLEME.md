@@ -150,6 +150,12 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.12.0 — ne değişti
+
+- Prompt Yonetmeni elden gecti: oneriler artik kisa brief'lerde de tukenmiyor (yonetmen prompt'ta hic gecmeyen bir ekseni de onerebiliyor ve o kelime prompt'a ancak sen cipe tikladiginda giriyor), her secenegin altinda ne yaptigini anlatan bir aciklama ve renk/oran seceneklerinde kredi harcamadan cizilmis bir ornek var, Yonetmen modundaki yeni "Yonetmen ayarlari" cekmecesine yazdigin kalici yonlendirme her turda gecerli oluyor ve yonetmen artik secili gorsel modelini gordugu icin o modelde gecerli olmayan bir boyut ya da kalite onermiyor.
+
+---
+
 ## Sürüm 0.11.8 — ne değişti
 
 - klasör adı yalnız en yakın klasörde eşleşiyordu

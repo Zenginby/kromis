@@ -169,7 +169,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | --- | --- | --- | --- | --- | --- |
 | `android_main.py` | 194 | 9 | `app` (erteli), `desktop` (erteli), `errlog` (erteli), `paths` (erteli) | 0 | 1 |
 | `app.py` | 1757 | 6 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 27 |
-| `assets_store.py` | 201 | 1 | `jsonstore` | 3 | 8 |
+| `assets_store.py` | 201 | 1 | `jsonstore` | 3 | 9 |
 | `azure_client.py` | 458 | 1 | `paths`, `winsec` | 9 | 25 |
 | `backup.py` | 187 | 3 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 1 | 1 |
 | `catalog.py` | 780 | 0 | — | 10 | 19 |

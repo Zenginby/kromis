@@ -599,15 +599,82 @@ def test_the_logo_preview_sticks_with_a_fixed_height(istemci):
        değişir ve KONTROLLER KULLANICININ PARMAĞININ ALTINDA KAYARDI — sticky
        sorunu çözmek yerine yenisini üretmiş olurdu. `min-height`a dönmek
        masaüstünde hiçbir fark yaratmaz, o yüzden mandal burada.
+
+    İKİ İDDİA YENİDEN YAZILDI (Tur L), ikisi de aynı sebeple — eskiler ölçtüğünü
+    sandıkları şeyi ölçmüyordu:
+
+    * Kesim artık `_mobil_yerlesim` + `_kural` üzerinden, yani YORUMLAR
+      AYIKLANMIŞ ve kural medya sorgusunun İÇİNDE aranıyor. Eski kesim ham
+      CSS'te düz bir regex'ti; bu kuralın gövdesinde zaten bir yorum var
+      (`/* …420px tabanı eziliyor */`), yani her anahtar kelime iddiası bir
+      gerekçe cümlesi uzağında boşa düşebiliyordu — deponun dört kez ödediği
+      bedel (en son Tur K'nın 2 numaralı bulgusu).
+    * `re.search(r"\n\s*height:", govde)` yalnız bir `height` bildiriminin
+      VARLIĞINI arıyordu. `height: auto`, `fit-content`, `max-content` üçü de
+      geçiyordu ve ÜÇÜ DE yukarıdaki 2 numaralı kusuru geri getiriyor. İddia
+      artık DEĞERİ yakalıyor: sabit bir uzunluk mu.
     """
-    css = _metin(istemci, "/static/mobile.css")
-    kural = re.search(r"\.logo-preview-wrap \{(.*?)\n  \}", css, re.S)
-    assert kural, "mobil .logo-preview-wrap kuralı yok"
-    govde = kural.group(1)
+    mobil = _mobil_yerlesim(_metin(istemci, "/static/mobile.css"))
+    govde = _kural(mobil, ".logo-preview-wrap")
     assert "position: sticky" in govde
-    assert re.search(r"\n\s*height:", govde), "sabit yükseklik yok"
+    yukseklik = re.search(r"(?:^|[;{\s])height:\s*([^;]+);", govde)
+    assert yukseklik, "sabit yükseklik yok"
+    assert re.fullmatch(r"\d+(?:\.\d+)?(?:vh|dvh|svh|px|rem)",
+                        yukseklik.group(1).strip()), (
+        f"yükseklik SABİT bir uzunluk değil: {yukseklik.group(1)!r} — "
+        "`auto`/`fit-content` kutuyu görselden boyutlandırır ve kontroller "
+        "her önizleme tazelemesinde parmağın altında kayar")
     # `top: 0` durum çubuğunun ALTINA sokardı: .modal telefonda `inset: 0`.
     assert "safe-area-inset-top" in govde, "güvenli alan payı yok"
+
+
+def test_the_logo_preview_image_cannot_outgrow_the_fixed_box(istemci):
+    """Kare OLMAYAN tabanda önizleme kutusunu taşırıp kırpılıyordu.
+
+    Kullanıcı bildirdi (28 Ağustos): "görsel kare değilse görselin aşağı veya
+    yan kısımlarındaki logo ekleme önizlemesi gözükmüyor." Sunucu ÖLÇÜMLE
+    elendi — `test_composite.py` dokuz konum × beş oranda logonun kadrajın
+    içinde olduğunu zaten kanıtlıyor ve `composite_logo` tam boy PNG
+    döndürüyor.
+
+    Kusur `max-height: 100%`in çözülmemesi değil, NEYE KARŞI çözüldüğüydü:
+    satır ızgarası örtük (`grid-auto-rows: auto`), yani satır görselin içerik
+    yüksekliğine büyüyor; `place-items: center` `align-items` yazıyor,
+    `align-content` değil ve o da `normal` = `stretch` — stretch YALNIZ pozitif
+    boş alanı dağıtır, taşan bir satırı geri küçültmez. Görselin kapsayan
+    bloğu ızgara ALANI olduğu için yüzde kendi büyüttüğü satıra çözülüyordu.
+
+    ÖLÇÜLDÜ (Chromium 1194, 390×844, gerçek /api/logo/preview turu): dikey
+    1024×1536 tabanda kutu 358×320.7 iken görsel 358×537 — üst taşma 0, alt
+    taşma +216.3, yani 9'lu ızgaranın ALT SIRASI `overflow: hidden` ile
+    kesiliyordu. Yatay taban (-41) kırpmıyordu: boş alan pozitif olunca AYNI
+    CSS satırı 320.719px'e geri çekiyor. "Kare değilse" bu yüzden bir KATEGORİ
+    değil EŞİK — kare taban da +37.3 ile eşiğin üstünde.
+
+    İKİ BİLDİRİM AYRI AYRI ANLAMSIZ ve o yüzden BİRLİKTE sınanıyor: biri satırı
+    kutunun kesin yüksekliğine çiviliyor (payda), öteki görseli o kesinliğe
+    bağlıyor (pay). Biri düşerse kusur HATASIZ geri gelir.
+
+    Ölçümün tarayıcı yarısı `tests/test_playwright_studio.py`de; o dosya CI'da
+    atlanıyor (playwright kurulu değil), bu mandal CI'da koşan katman.
+    """
+    mobil = _mobil_yerlesim(_metin(istemci, "/static/mobile.css"))
+    kutu = _kural(mobil, ".logo-preview-wrap")
+    assert re.search(r"grid-(?:template|auto)-rows:\s*minmax\(\s*0\s*,\s*1fr\s*\)",
+                     kutu), (
+        "satır kutuya çivilenmemiş: `1fr` TEK BAŞINA yetmez — asgari boyutlama "
+        "işlevi `auto` kalır ve satır yine içeriğe takılır")
+    gorsel = _kural(mobil, ".logo-preview-img")
+    assert re.search(r"max-height:\s*100%", gorsel), (
+        "görsel satıra bağlanmıyor: kesin satır tek başına hiçbir şeyi "
+        "sınırlamaz")
+
+    # BAĞLAŞIM BEKÇİSİ: kap artık TEK açık satır taşıyor. Spinner bugün
+    # `position: absolute`, yani ızgara ÖĞESİ DEĞİL. Akışa girdiği gün ikinci
+    # bir örtük `auto` satıra düşer ve taşma sessizce geri gelir.
+    genel = re.sub(r"/\*.*?\*/", "", _metin(istemci, "/static/style.css"), flags=re.S)
+    assert "position: absolute" in _kural(genel, ".logo-preview-spin"), (
+        "spinner akışa girmiş: ikinci satır kutunun kesinliğini bozar")
 
 
 # ── İndirme ─────────────────────────────────────────────────────────

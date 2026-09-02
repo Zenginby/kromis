@@ -251,13 +251,13 @@
   .logo-card { width: 100%; }
 
   /* Önizleme SABİT kalıyor — depodaki ilk `position: sticky` kullanımı.
-     .logo-body 760px altında tek sütuna iniyor (style.css:550) ve DOM sırası
-     önizlemeyi (index.html:908) kontrollerin (index.html:913) önüne koyuyor:
+     .logo-body 760px altında tek sütuna iniyor (style.css:857) ve DOM sırası
+     önizlemeyi (index.html:1309) kontrollerin (index.html:1314) önüne koyuyor:
      telefonda "Boyut" ya da "Dikey kaydırma"ya uzanmak önizlemeyi ekrandan
      çıkarıyordu ve kullanıcı her hareketten sonra yukarı kaydırıp bakmak
      zorunda kalıyordu.
 
-     Kaydıran kap `.modal-card` DEĞİL `.modal` (style.css:466-471,
+     Kaydıran kap `.modal-card` DEĞİL `.modal` (style.css:775-780,
      `overflow-y: auto`); .modal-card ile .logo-body `overflow: visible`, yani
      sticky kırpılmıyor.
 
@@ -271,19 +271,66 @@
      yüksekliğini görselden alsa her tazelemede değişir ve KONTROLLER
      KULLANICININ PARMAĞININ ALTINDA KAYARDI — sticky sorunu çözmek yerine
      yenisini üretmiş olurdu. Sabit yükseklik bunu tümden kesiyor; görsel
-     kutunun içinde ortalanmaya devam ediyor (style.css:556 `place-items`).
+     kutunun içinde ortalanmaya devam ediyor (style.css:863 `place-items`).
 
      `z-index: 1`: kontroller önizlemenin ARKASINDAN kaysın. Kutunun zemini
-     zaten opak (dama deseni + var(--panel-2), style.css:551-557), ek arka plan
-     gerekmiyor. */
+     zaten opak (dama deseni + var(--panel-2), style.css:858-864), ek arka plan
+     gerekmiyor.
+
+     `grid-template-rows` — kullanıcı bildirimi (28 Ağustos): "görsel kare
+     değilse görselin aşağı veya yan kısımlarındaki logo ekleme önizlemesi
+     gözükmüyor." Sunucu ÖLÇÜMLE elendi (`paste_position` dokuz konumun
+     dokuzunda da logoyu kadraja koyuyor, `composite_logo` tam boy PNG
+     döndürüyor); kusur BURADAYDI.
+
+     Kusur `.logo-preview-img`in `max-height: 100%`inin çözülmemesi DEĞİL,
+     NEYE KARŞI çözüldüğü. Satır ızgarası örtük, yani `grid-auto-rows: auto`:
+     satır GÖRSELİN içerik yüksekliğine büyüyor. `place-items: center`
+     `align-items` yazıyor, `align-content` değil — o da `normal` = `stretch`
+     ve stretch YALNIZ POZİTİF boş alanı dağıtır, taşan bir satırı geri
+     KÜÇÜLTMEZ. Görselin kapsayan bloğu ızgara ALANI olduğu için yüzde o
+     büyümüş satıra çözülüyordu: öğe kendi büyüttüğü satıra karşı ölçülüyor,
+     sınır etkisiz kalıyor.
+
+     ÖLÇÜLDÜ (Chromium 1194, 390×844, gerçek /api/logo/preview turu):
+
+       taban        kutu        görsel      üstTaşma  altTaşma  satır
+       1024×1536    358×320.7   358×537        0       +216.3   537px
+       1024×1024    358×320.7   358×358        0        +37.3   358px
+       1536×1024    358×320.7   358×238.7    -41         -41    320.719px
+       512×2048     358×320.7   358×1432       0      +1111.3   1432px
+
+     Taşmanın TAMAMI altta (görselin üst kenarı kutununkiyle çakışık), yani
+     9'lu ızgaranın ALT SIRASI `overflow: hidden` ile kesiliyordu. Yatay taban
+     satırı mekanizmanın kanıtı: boş alan POZİTİF olduğu için AYNI CSS satırı
+     320.719px'e geri çekiyor ve kırpma hiç olmuyor — "görsel kare değilse"
+     koşulu tam olarak bu işaret değişimi, kare de 37px ile eşiğin hemen
+     üstünde. Banner akışı da aynı kutuyu kullanıyor ve aynı 216.3px'i
+     ölçüyordu; o da bu satırla düzeliyor.
+
+     `minmax(0, 1fr)` PAYDAYI düzeltiyor: satır kutunun kesin yüksekliğine
+     çivilenince yüzde 320.7px'e çözülüyor. `1fr` TEK BAŞINA yetmez — asgari
+     boyutlama işlevi `auto` kalır ve satır yine içeriğe takılır; aynı tuzağın
+     kaydı bu dosyada `.gallery` kuralında zaten var.
+
+     Kural MOBİL blokta kalıyor: masaüstünde kabın kesin yüksekliği YOK
+     (style.css:863 `min-height: 420px`) ve `fr` satır `align-content`in
+     stretch dalını devre dışı bırakıp kısa görseli kutunun TEPESİNE
+     yapıştırırdı. Masaüstü zaten kırpmıyor — aynı ölçüm 1280×860'ta dört
+     oranda da sıfır taşma verdi, çünkü `min(72vh, 680px)` görüntü alanı
+     tabanlı ve her zaman çözülüyor. */
   .logo-preview-wrap {
     position: sticky;
     top: env(safe-area-inset-top, 0px);
     z-index: 1;
     height: 38vh;
-    min-height: 0;   /* style.css:556'daki 420px tabanı eziliyor */
+    min-height: 0;                       /* style.css:863'teki 420px tabanı eziliyor */
+    grid-template-rows: minmax(0, 1fr);  /* aşağıdaki `max-height: 100%`ün PAYDASI */
   }
-  /* style.css:558'deki `min(72vh, 680px)` 38vh'lik kutuyu taşırırdı. */
+  /* style.css:865'teki `min(72vh, 680px)` 38vh'lik kutuyu taşırırdı. Bu bildirim
+     ile yukarıdaki `grid-template-rows` AYRI AYRI ANLAMSIZ: biri satırı kesin
+     kılıyor, öteki görseli o kesinliğe bağlıyor. Biri düşerse kusur HATASIZ
+     geri gelir. */
   .logo-preview-img { max-height: 100%; }
 
   /* Onay penceresi BİLEREK diyalog kalıyor: tek bir soru için tam ekrana

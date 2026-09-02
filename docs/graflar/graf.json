@@ -110,7 +110,8 @@
         "tests/test_folders.py",
         "tests/test_legacy_formats.py",
         "tests/test_logo.py",
-        "tests/test_palette_route.py"
+        "tests/test_palette_route.py",
+        "tests/test_playwright_studio.py"
       ],
       "yol": "assets_store.py"
     },

@@ -30,6 +30,7 @@ import credstore
 import providers
 import backup
 import chat_client as cc
+import chat_prompt
 import chat_providers
 import chat_store
 import color_names
@@ -934,6 +935,36 @@ def post_settings(req: SettingsRequest) -> dict:
 
 
 
+def _director_context() -> dict:
+    """Yönetmenin sistem mesajına giren TUR bağlamı: seçili model + yönlendirme.
+
+    Bağlamı burada toplamanın sebebi katman kuralı: `chat_prompt` yalnızca
+    diski okuyor (katman 1, tek bağımlılığı `paths`) ve `catalog`/`prefs`'e
+    bakması onu yukarı çekerdi. Rotada ikisi de hâlihazırda var.
+
+    MODEL BURADA TERCİHTEN okunuyor ve bu, aynı dosyadaki `/api/chat`
+    kararının ("model istekten, tercihlerden DEĞİL") istisnası değil TAMAMLAYANI:
+    o karar yönetmenin konuşacağı SOHBET modeliyle ilgili ve tel üzerinde
+    geliyor; buradaki ise kullanıcının üretimde kullanacağı GÖRSEL modeli, yani
+    yönetmenin hangi jetonları önerebileceği. İstemci onu bu uçta göndermiyor
+    (`ChatRequest` `extra="forbid"`) ve göndermesi de gerekmiyor: `prefs.json`
+    o seçimin zaten TEK kaynağı (bkz. prefs.py'nin "hangi modeli İSTİYORUM"
+    kuralı).
+
+    Bilinmeyen/bayat bir tercih sessizce bağlamsız kalıyor — `prefs.read`
+    katalog üyeliğini zaten kapıyor, ama `image_model` yine None dönebilir ve
+    o durumda doğru davranış bugünkü davranıştır: bağlamsız persona.
+    """
+    p = prefs.read(OUTPUT_DIR)
+    m = catalog.image_model(p["image_model"])
+    facts = None
+    if m is not None:
+        facts = {"label": m.label, "sizes": m.sizes, "qualities": m.qualities,
+                 "quality_hidden": m.quality_hidden, "max_n": m.max_n,
+                 "supports_edit": m.supports_edit, "max_refs": m.max_refs}
+    return {"model_facts": facts, "guidance": p["director_guidance"]}
+
+
 @app.post("/api/chat")
 def chat(req: ChatRequest) -> dict:
     """Prompt Yönetmeni: Türkçe sohbet → İngilizce gpt-image-2 prompt'u.
@@ -977,10 +1008,33 @@ def chat(req: ChatRequest) -> dict:
         # ikinci bir kapı yok — `chat_providers._resolve` yine de bilinmeyen
         # id'yi Türkçe bir 502'ye çeviriyor (bayat istemci + katalogdan kalkmış
         # model).
+        # `instructions` ARTIK ROTADAN geçiyor. Adaptörler onu zaten
+        # destekliyordu (`complete(..., instructions=None)`), yani imza
+        # değişmedi — değişen tek şey, `None` bırakıldığında adaptörün diskten
+        # okuduğu personanın yerine burada KURULMUŞ olanın gelmesi.
+        #
+        # `ValueError` → `cc.ChatError`: talimat dosyası bulunamadığında
+        # kullanıcının okuduğu metin, `chat_client`'ın kendi dalında ürettiğiyle
+        # AYNI kalmalı. İki yerde iki Türkçe cümle olsaydı aynı kusur, çağrının
+        # hangi yoldan gittiğine göre iki farklı hata okuturdu.
+        # Bağlam TOPLAMA `try`nin DIŞINDA: `prefs.read` da `ValueError`
+        # yükseltebiliyor (elle cp1254 kaydedilmiş bir prefs.json'da
+        # `json.load` `UnicodeDecodeError` atar ve o bir `ValueError`
+        # alt sınıfı; `_read_raw` yalnız `JSONDecodeError`u yakalıyor).
+        # Çağrı `try`nin içindeyken kullanıcı bozuk prefs.json yüzünden
+        # "Prompt Yönetmeni talimatı yüklenemedi" okuyor, yani YANLIŞ dosyaya
+        # yönlendiriliyordu — üstelik aynı arıza `GET /api/prefs`te çıplak
+        # 500 veriyor, iki uç aynı kusur için iki farklı şey söylüyordu.
+        baglam = _director_context()
+        try:
+            instructions = chat_prompt.build_system(**baglam)
+        except ValueError as e:
+            raise cc.ChatError(f"Prompt Yönetmeni talimatı yüklenemedi: {e}")
         return chat_providers.complete(
             req.model or catalog.DEFAULT_CHAT_MODEL,
             [m.model_dump(include=WIRE_MESSAGE_FIELDS)
-             for m in req.messages if m.role in WIRE_CHAT_ROLES])
+             for m in req.messages if m.role in WIRE_CHAT_ROLES],
+            instructions=instructions)
     except cc.ChatError as e:
         raise HTTPException(status_code=502, detail=str(e))
 

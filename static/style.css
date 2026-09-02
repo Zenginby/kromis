@@ -474,6 +474,11 @@ body:has(.sheet.open) .scrim { display: block; }
    sağlayıcı işareti şeridin içine girince flex öğesi sarmalayıcı oldu ve
    yalnız `<select>`i gizlemek kabuğu ayakta bırakıyordu — 360px'de composer'ın
    ölçülmüş yatay bütçesini taşıran tam olarak o kabuk. */
+/* Yönetmen ayarları çipi mod ekseninin ÖTEKİ dalında: Görsel modunda gizli.
+   Aynı yuvada #specs-btn ile birbirini dışlıyor, yani şeridin ölçülmüş 360px
+   bütçesine yeni bir yük binmiyor — Yönetmen modunda #specs-btn ve
+   #ask-director zaten gizli. */
+#composer[data-mode="image"] #director-btn,
 #composer[data-mode="image"] #chat-model-pick,
 #composer[data-mode="director"] #model-pick,
 /* Arena şeridi de mod eksenine tabi: yönetmen bir SOHBET, karşılaştırılacak
@@ -2119,6 +2124,17 @@ body.viewer-open { overflow: hidden; }
   margin-top: 1rem; padding-top: 0.9rem; border-top: 1px dashed var(--hairline);
 }
 .chat-options-q { margin: 0 0 0.6rem; font-size: 0.9rem; color: var(--text); }
+/* Kartlar satırda AYNI BOYA çekiliyor ve bunun için bir bildirim GEREKMİYOR:
+   `align-items`ın başlangıç değeri `normal`, flex öğeleri için `stretch` gibi
+   davranıyor (mobile.css'te de yazılı olan olgu). Bir kez ayrı bir kural
+   olarak `align-items: stretch` yazılmıştı — aynı seçiciyi iki satır arayla
+   tekrar ederek, hiçbir şeyi değiştirmeyen bir bildirimle, yanında da
+   "`baseline` olsaydı kartlar kayardı" diye bir gerekçeyle. Oysa bu
+   kapsayıcıya `baseline` yazan bir kural HİÇ YOK: `align-items: baseline`
+   `.chat-axis`te, yani eksen SATIRINDA duruyor ve bir öğenin kendi
+   hizalanmasını `align-self` belirlerdi, `align-items` değil. Kural
+   kaldırıldı; değiştirmediği bir şeyi anlatan yorum sonraki okuru yanlış
+   yere bakmaya gönderiyor. */
 .chat-options-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .chat-option {
   background: none; color: var(--muted);
@@ -2130,10 +2146,71 @@ body.viewer-open { overflow: hidden; }
 .chat-option:active { background: var(--selected, var(--raised)); }
 /* Seçili durum RENKLE DEĞİL işaretle de anlatılıyor: yalnız renk kullanılsa
    renk ayrımı zayıf gören kullanıcı hangi seçeneği verdiğini göremezdi. */
+/* ── Açıklamalı seçenek KARTI ──────────────────────────────────────────
+   Sınıf `.chat-option`a EK olarak geliyor, onun YERİNE değil: kilit
+   (`lockStaleOptions`), odak halkası, `.chat-options-done` ve `✓` işareti
+   hepsi o kök sınıftan geliyor ve kart onları kaybetmemeli.
+
+   Kart yalnız TAŞIYACAK BİLGİ VARKEN doğuyor (açıklama ya da örnek);
+   açıklaması olmayan seçenek bugünkü kompakt pill olarak kalıyor. Sebep Tur
+   K'nın kararı: bu ekrandan "gereksiz yazılar" kullanıcı isteğiyle
+   kaldırıldı. Buradaki metin süs değil — seçeneğin SEÇİLEBİLİR olmasının
+   koşulu: "soft grey background" çipinin görsele ne yapacağı başka hiçbir
+   yerde yazmıyordu. Boşuna bir satır eklenmemesi de bu yüzden önemli.
+
+   `border-radius` pill DEĞİL: iki satırlı bir içerik 999px'lik bir kenarın
+   içinde köşelerinden taşar. Sol kenarda `var(--accent…)` YOK (tasarım §11:
+   sol kenarı renkli yuvarlak kart yok). */
+.chat-option-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem;
+  flex: 1 1 13rem; max-width: 22rem;
+  border-radius: var(--r-item, 12px); padding: 0.6rem 0.75rem; text-align: left;
+}
+.chat-option-ad { font-size: 0.84rem; }
+/* Açıklama İKİNCİL: çipin adı kadar bağırmamalı, yoksa kart iki başlık
+   taşıyor gibi okunur. `white-space: normal` şart — `.chat-option` tek
+   satırlık bir pill için yazıldı ve uzun bir açıklama sarmazsa taşar. */
+.chat-option-not {
+  font-size: 0.76rem; color: var(--muted); line-height: 1.35;
+  white-space: normal;
+}
+/* Seçili kartta açıklama da dolgunun üstüne biniyor: `--muted` orada
+   okunmuyor, o yüzden rengi devralıyor ve saydamlıkla geri çekiliyor. */
+.chat-option-card[aria-checked="true"] .chat-option-not {
+  color: inherit; opacity: 0.75;
+}
+
+/* Çizilen örnek. ÜRETİLMİŞ bir görsel DEĞİL — istemcinin doğrulanmış bir
+   hex'ten ya da bir orandan kendi çizdiği şey, yani kredi harcamıyor ve
+   çevrimdışı da görünüyor. Değeri `chat.js` beyaz listeyle doğruluyor
+   (HEX_RE / ORAN_RE); doğrulamayı geçmeyen değer hiç çizilmiyor. */
+.chat-option-ornek {
+  display: block; width: 100%; height: 1.6rem; border-radius: 6px;
+  border: 1px solid var(--hairline);
+}
+.chat-option-ornek-serit { display: flex; overflow: hidden; }
+.chat-option-ornek-serit > span { flex: 1 1 0; }
+/* Oran örneği: yüksekliği ORANDAN geliyor, o yüzden sabit yükseklik kalkıyor
+   ve genişlik içeriğe göre daralıyor — 2:3 ile 3:2 yan yana konduğunda fark
+   ancak böyle görünüyor. */
+.chat-option-ornek-oran {
+  width: auto; height: 2.2rem; background: var(--panel-2);
+}
+
 .chat-option[aria-checked="true"] {
   background: var(--fill-selected); color: var(--on-fill-selected); border-color: var(--fill-selected);
 }
 .chat-option[aria-checked="true"]::before { content: "✓ "; }
+/* KARTTA aynı işaret adın ÖNÜNE yazılıyor, kökün ürettiği yere değil.
+   Sebep ölçüldü (Chromium): `.chat-option-card` bir kolon flex kutusu, bir
+   flex kapsayıcısının `::before`u da BLOKLAŞIP ilk flex ÖĞESİ oluyor — yani
+   işaret etiketin soluna değil örnek kutusunun üstüne, kendi satırına
+   düşüyordu. Kart seçilince 23px uzuyor ve adı 23px aşağı kaydırıyordu:
+   seçmek yerleşimi oynatıyordu. Kökün kuralı DURUYOR (pill'ler onu
+   kullanıyor), kartta yalnız yeri değişiyor — `content: none` işareti
+   kaldırmıyor, aşağıdaki satıra devrediyor. */
+.chat-option-card[aria-checked="true"]::before { content: none; }
+.chat-option-card[aria-checked="true"] .chat-option-ad::before { content: "✓ "; }
 .chat-own { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem; margin-top: 0.85rem; }
 .chat-own-label { flex: 1 0 100%; font-size: 0.78rem; color: var(--muted); }
 .chat-own-input {
@@ -2149,6 +2226,19 @@ body.viewer-open { overflow: hidden; }
    ikinci kez cevap gönderilemesin. */
 .chat-options-done { opacity: 0.55; }
 .chat-options-done .chat-option, .chat-options-done button { cursor: not-allowed; }
+
+/* Yönetmen ayarları çekmecesinin metin alanı. `.sheet-body` kuralı yalnız
+   `input`ları giydiriyor, `textarea`yı değil — sınır `--control-border` olmak
+   ZORUNDA (kontrast kapısı ≥3:1, bkz. style.css'in jeton bölümü). `resize`
+   dikey: yatay büyüyen bir alan 320px'lik şeridin dışına taşardı. */
+#director-guidance {
+  width: 100%; box-sizing: border-box; resize: vertical;
+  padding: 0.55rem 0.7rem; border: 1px solid var(--control-border);
+  border-radius: 10px; background: var(--panel-2); color: var(--text);
+  font: inherit; font-size: 0.88rem; line-height: 1.45;
+}
+#director-guidance::placeholder { color: var(--placeholder); }
+#director-guidance:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* ── Varyasyon ve parametre panelleri (v1.16) ─────────────────────────
    Kök sınıf `.chat-options` PAYLAŞILIYOR: kilit kuralı (lockStaleOptions), odak
@@ -2166,6 +2256,16 @@ body.viewer-open { overflow: hidden; }
   flex: 0 0 auto; padding: 0.1em 0.4em; border-radius: 5px;
   background: var(--panel-2); color: var(--muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.76rem;
+}
+/* Ekleme ekseni: prompt o ekseni hiç söylemiyor. Rozet `.chat-axis-now`'ın
+   kardeşi — aynı yuva, aynı "tıklanabilir değil" duruşu — ama İNGİLİZCE bir
+   ifade değil TÜRKÇE bir durum taşıyor, o yüzden mono değil gövde tipi ve
+   kesikli kenar: "burada bir değer YOK" demenin görsel karşılığı. Dolgusu
+   bilerek saydam; dolgulu bir rozet takas rozetiyle karışırdı. */
+.chat-axis-new {
+  flex: 0 0 auto; padding: 0.1em 0.4em; border-radius: 5px;
+  border: 1px dashed var(--hairline); color: var(--muted);
+  font-size: 0.74rem;
 }
 .chat-axis .chat-options-chips { flex: 1 1 12rem; }
 

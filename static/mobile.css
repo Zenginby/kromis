@@ -173,13 +173,19 @@
      kullanıcının yazı boyutuyla değişiyor ve ölçüye bağlı sarma bir telefonda
      tek satır, diğerinde iki satır veriyordu. Artık her ölçekte iki satır.
 
-     Yalnızca Görsel modu: Yönetmen modunda #specs-btn gizli (style.css:305) ve
-     geriye tek "Gönder" düğmesi kalıyor — ona ikinci satır açmak composer'ı
-     40px boşuna uzatırdı (ölçüm, 393×873: Yönetmen 149px, Görsel 189px).
+     ARTIK İKİ MODDA DA geçerli. Öncesinde yalnız Görsel modundaydı ve gerekçe
+     o gün doğruydu: Yönetmen modunda #specs-btn gizli olduğu için geriye tek
+     "Gönder" düğmesi kalıyordu (ölçüm, 393×873: Yönetmen 149px, Görsel 189px)
+     ve tek düğmeye ikinci satır açmak composer'ı 40px boşuna uzatırdı.
+     #director-btn o boşluğu doldurdu: Yönetmen modu artık iki kontrol taşıyor
+     ("Yönetmen ayarları" + "Gönder") ve kural o modda da gerekli — yoksa
+     `.composer-right`ın `margin-left: auto`'su sarmış satırı sağa yapıştırır,
+     solda kocaman bir boşluk bırakır ve çip ortada asılı kalır (yukarıda
+     ölçülmüş olan kusurun aynısı, yalnız öteki modda).
 
      `flex-wrap` de burada: kutuya yazınca #ask-director beliriyor ve satır üç
      düğmeye çıkıyor; sarmasa 360px'de taşardı. */
-  #composer[data-mode="image"] .composer-right {
+  #composer .composer-right {
     flex: 1 1 100%;
     margin-left: 0;
     flex-wrap: wrap;
@@ -546,6 +552,14 @@
   .icon-btn { min-width: var(--tap); min-height: var(--tap); }
   .viewer-btn { min-height: var(--tap); }
   .modal-x { min-width: var(--tap); min-height: var(--tap); }
+
+  /* Composer'ın ayar çipleri: `.specs` 7px dikey dolgulu ve 0.72rem tipli,
+     yani kendi başına 44px'in altında. Kural SINIFA yazılıyor, id'ye değil —
+     aynı yuvada iki çip var (#specs-btn Görsel modunda, #director-btn
+     Yönetmen modunda) ve ikisinin farklı dokunma hedefi taşıması, kullanıcı
+     için tek bir yerin bazen ıskalanması demek olurdu. Yalnız yükseklik
+     veriliyor: genişlik metinden geliyor ve ikisi de tek kelimeden uzun. */
+  .specs { min-height: var(--tap); }
 
   /* ── Sürükle-bırak yerine geçen yol ───────────────────────────────
      HTML5 sürükle-bırak dokunmatikte HİÇ çalışmıyor. Bugün bir görseli

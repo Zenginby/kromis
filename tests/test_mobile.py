@@ -379,27 +379,54 @@ def test_the_installed_version_is_readable_on_a_phone(istemci):
     assert ".settings-version-row" in _metin(istemci, "/static/style.css")
 
 
-def test_the_image_mode_composer_row_wraps_by_rule_not_by_measurement(istemci):
+def test_the_composer_row_wraps_by_rule_not_by_measurement(istemci):
     """Sarma ÖLÇÜYE bağlı kalamaz: Android WebView sistem yazı ölçeğini uyguluyor.
 
-    Görsel modunda çubuk dört kontrol taşıyor (.plus + .view-tabs +
-    .composer-right, ölçüm 393px'te 446px > 369px) ve sarma kaçınılmaz. Ölçüye
-    bağlı sarma, yazı ölçeğini büyütmüş bir telefonda iki satır, küçültmüş bir
-    telefonda tek satır veriyordu — yani yerleşim cihazdan cihaza değişiyordu.
+    Çubuk üç kontrol taşıyor (.plus + .view-tabs + .composer-right, ölçüm
+    393px'te 446px > 369px) ve sarma kaçınılmaz. Ölçüye bağlı sarma, yazı
+    ölçeğini büyütmüş bir telefonda iki satır, küçültmüş bir telefonda tek
+    satır veriyordu — yani yerleşim cihazdan cihaza değişiyordu.
     `flex-basis: 100%` onu kurala bağlıyor.
 
-    Yalnızca Görsel modu: Yönetmen modunda #specs-btn gizli ve tek "Gönder"
-    düğmesi için ikinci satır açmak composer'ı 40px boşuna uzatırdı — telefonda
-    composer zaten tuvalin ~%25'i.
+    KURAL ARTIK MODSUZ ve bu bir gerekçe değişikliği, gevşetme değil. Eskiden
+    seçici `#composer[data-mode="image"]` idi ve o gün doğruydu: Yönetmen
+    modunda #specs-btn gizli olduğu için `.composer-right`ta tek "Gönder"
+    düğmesi kalıyordu (ölçüm 393×873: Yönetmen 149px, Görsel 189px) ve tek
+    düğmeye ikinci satır açmak composer'ı 40px boşuna uzatırdı. #director-btn
+    o boşluğu doldurdu — Yönetmen modu artık iki kontrol taşıyor, yani kural
+    o modda da GEREKLİ. Modla sınırlı kalsaydı `margin-left: auto` sarmış
+    satırı sağa yapıştırırdı: solda kocaman boşluk, çip ortada asılı (aynı
+    ölçülmüş kusur, yalnız öteki modda).
+
+    İddia mod ekseninin GERİ GELMESİNİ de yasaklıyor: seçici mod-özgü hâle
+    dönerse Yönetmen modu sessizce eski kusura düşer.
     """
     css = _metin(istemci, "/static/mobile.css")
-    blok = css.split('#composer[data-mode="image"] .composer-right', 1)
-    assert len(blok) == 2, "Görsel modu kuralı yok"
+    assert '#composer[data-mode="image"] .composer-right' not in css, (
+        "kural yine mod-özgü — Yönetmen modu #director-btn ile iki kontrol "
+        "taşıyor ve o modda da sarma kuralı gerekiyor")
+    blok = css.split("#composer .composer-right", 1)
+    assert len(blok) == 2, "composer sağ yarısının sarma kuralı yok"
     govde = blok[1].split("}", 1)[0]
     assert "flex: 1 1 100%" in govde, "sarma ölçüye bırakılmış"
     # style.css:273'ün `margin-left: auto`'su ikinci satırda da geçerli kalıyor
     # ve satırı sağa yapıştırıyordu: solda kocaman boşluk, çip ortada asılı.
     assert "margin-left: 0" in govde
+
+
+def test_the_director_chip_is_a_touch_target(istemci):
+    """Çekmecenin tetiği dokunmatikte ≥44px olmak ZORUNDA.
+
+    `.specs` çipi 7px dikey dolgulu ve 0.72rem tipli — kendi başına 44px'in
+    altında. #specs-btn bu bedeli yıllardır taşıyor ve #director-btn onun
+    kardeşi, yani kural İKİSİNİ birden kapsamalı; yalnız yenisine yazmak, aynı
+    yuvadaki iki çipin farklı dokunma hedefi taşıması demek olurdu.
+    """
+    css = _metin(istemci, "/static/mobile.css")
+    assert ".specs" in css, "çip için dokunmatik kuralı yok"
+    blok = css.split("@media (hover: none)", 1)
+    assert len(blok) == 2, "dokunmatik medya sorgusu yok"
+    assert ".specs" in blok[1], "`.specs` dokunmatik bölümünde geçmiyor"
 
 
 def test_the_primary_button_is_not_full_width_inside_the_composer(istemci):

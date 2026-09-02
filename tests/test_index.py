@@ -680,7 +680,10 @@ def test_chat_workspace_markup_is_served():
                        "chat-log", "chat-empty", "prompt", "go", "status",
                        "chat-wait", "chat-gate", "chat-sidebar", "chat-sidebar-toggle",
                        "chat-new", "chat-list", "chat-list-empty",
-                       "set-chat-deployment", "chat-instructions-path"):
+                       "set-chat-deployment", "chat-instructions-path",
+                       # Yönetmen ayarları çekmecesi ve çipi.
+                       "director-btn", "director-sheet", "director-close",
+                       "director-guidance", "director-save", "director-status"):
         assert f'id="{element_id}"' in html, element_id
 
 
@@ -898,7 +901,11 @@ def test_settings_block_is_recognised_by_its_keys_not_by_being_first_json():
 
 
 def test_the_options_block_is_never_drawn_as_a_code_block():
-    """Seçenek bloğunun görünür karşılığı ÇİPLER; ham JSON gösterilmemeli."""
+    """Seçenek bloğunun görünür karşılığı ÇİPLER; ham JSON gösterilmemeli.
+
+    "Gösterilmemeli" KOŞULLU: çipler gerçekten çizilecekse. Çizilmeyeceği
+    hâlin bekçisi `test_a_machine_block_that_breaks_its_contract_...`.
+    """
     js = _chat_js()
     body = re.search(r"function renderMarkdownInto\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
     assert body, "renderMarkdownInto() bulunamadı"
@@ -1180,12 +1187,331 @@ def test_each_parameter_axis_is_mutually_exclusive_on_its_own_row():
 
     Panel geçilse tek bir ışık seçimi bütün eksenlerin seçimini silerdi: kullanıcı
     ışık + palet + kadraj birlikte seçemezdi.
+
+    İddianın ÇAĞRISI iki kez değişti, konusu DEĞİŞMEDİ. Önce
+    `optionChip(String(raw), …)` idi: `String()` maddeler düz dizeyken
+    doğruydu, madde nesne de olabildiği için (açıklama + çizilen örnek) onu
+    "[object Object]" yapardı — hem ekranda hem MODELE GİDEN cevapta. Sonra
+    `raw` → `item` oldu: maddeler artık `drawableOptions` süzgecinden
+    NORMALLEŞTİRİLMİŞ geliyor. Ölçülen şey her üç hâlde de aynı: son iki
+    argüman, `false` (eksen içinde tek seçim) ve `row` (kapsam satır).
     """
     js = _chat_js()
     body = re.search(r"function renderParameters\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
     assert body, "renderParameters() bulunamadı"
-    assert "optionChip(String(raw), false, row)" in body.group(1), (
+    assert "optionChip(item, false, row)" in body.group(1), (
         "eksen alternatifleri satıra bağlı tek seçim değil")
+    assert "String(raw)" not in body.group(1), (
+        "madde `String()` ile sarılıyor — nesne madde '[object Object]' olur")
+
+
+def test_the_option_value_sent_to_the_model_is_not_read_from_the_text():
+    """PLANIN EN KRİTİK SATIRI: `pickedLabels` `dataset.value` okumak ZORUNDA.
+
+    `textContent` okunursa kartın açıklaması modele giden cevaba KARIŞIR —
+    yönetmene "deep navy background Zemin gece lacivertine döner, hilal
+    parlak okunur." diye bir cevap gider. Ayrım tümüyle sessiz: ekranda kart
+    doğru görünür, akıştaki SEÇİM pili doğru görünür, yalnız modelin aldığı
+    metin bozuk olur ve bir sonraki prompt açıklama cümlesini de ciddiye alır.
+    """
+    js = _chat_js()
+    body = re.search(r"function pickedLabels\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "pickedLabels() bulunamadı"
+    govde = _strip_js_comments(body.group(1))
+    assert "dataset.value" in govde, (
+        "seçili çipin değeri `dataset.value`den okunmuyor — kart açıklaması "
+        "modele giden cevaba karışır")
+    # Yazan taraf: değer çipe yazılmazsa okuma yolu boşa çıkar.
+    assert "chip.dataset.value = veri.ad" in js, "değer çipe yazılmıyor"
+
+
+def test_an_explained_option_keeps_the_lockable_chip_semantics():
+    """Kart `.chat-option`u ve `aria-checked`ini KAYBETMEMELİ.
+
+    O kök sınıftan dört şey geliyor: `lockStaleOptions`ın kilidi, odak
+    halkası, `.chat-options-done` soluklaştırması ve `✓` işareti
+    (`[aria-checked="true"]::before`). Kart ikinci bir sınıf olarak eklenmek
+    zorunda — sınıfı DEĞİŞTİRSE eski paneller sonsuza dek canlı kalır ve
+    kullanıcı artık var olmayan bir prompt'a delta gönderir.
+    """
+    js = _chat_js()
+    body = re.search(r"function optionChip\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "optionChip() bulunamadı"
+    govde = _strip_js_comments(body.group(1))
+    assert 'chip.className = "chat-option"' in govde, "kök sınıf değişmiş"
+    assert 'classList.add("chat-option-card")' in govde, (
+        "kart sınıfı EKLENMİYOR — kök sınıfın yerine yazılmışsa kilit ve `✓` gider")
+    assert 'chip.setAttribute("aria-checked", "false")' in govde
+    # Kart CSS'i de kök sınıfın kurallarını ezmemeli: `✓` işareti duruyor.
+    assert '.chat-option[aria-checked="true"]::before' in _css()
+
+
+def test_a_broken_option_item_is_skipped_not_drawn_empty():
+    """Adsız bir madde çizilmemeli: tıklanınca modele BOŞ cevap gider.
+
+    `String(raw)` sarmalayıcısı da bu yüzden kalktı — nesne bir maddeyi
+    "[object Object]" yapıyordu ve o metin hem ekrana hem modele gidiyordu.
+    """
+    js = _chat_js()
+    body = re.search(r"function optionItem\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "optionItem() bulunamadı"
+    assert "return null" in body.group(1), "bozuk madde atlanmıyor"
+    # Atlamanın TAŞIYICI yeri `drawableOptions`: iki panel de çiplerini o
+    # süzgeçten kuruyor, yani "çizilecek madde var mı" sorusunu ham bloğu
+    # atlama kararıyla AYNI fonksiyona soruyorlar (bkz. bir alttaki test).
+    # `if (chip)` ikinci bir kemer olarak duruyor ama tek başına yetmiyordu:
+    # o dal `null`u DOM'dan uzak tutuyor, bloğun görünmesini sağlamıyor.
+    for fn, sarmal in (("renderOptions", "optionItems(parsed)"),
+                       ("renderParameters", "drawableOptions(axis.secenekler)")):
+        govde = re.search(rf"function {fn}\([^)]*\)\s*\{{(.*?)\n\}}", js, re.S)
+        assert sarmal in govde.group(1), \
+            f"{fn} maddelerini paylaşılan süzgeçten kurmuyor"
+        assert "if (chip) chips.appendChild(chip)" in govde.group(1), \
+            f"{fn} `null` çipi atlamıyor"
+
+
+def test_a_panel_with_no_drawable_item_is_not_appended_as_null():
+    """`renderOptions` artık `null` dönebiliyor — çağrı yeri KORUNMALI.
+
+    `appendChild(null)` TypeError atar ve o an yönetmenin bütün yanıtını
+    çizmeyi durdurur: kullanıcı boş bir baloncuk görür. Diğer iki panelin
+    çağrı yeri bu yüzden zaten `if (panel)` ile korunuyordu; seçenek paneli
+    hiç `null` dönmediği için korumasızdı ve şimdi dönebiliyor.
+    """
+    js = _strip_js_comments(_chat_js())
+    assert "div.appendChild(renderOptions(parsed))" not in js, (
+        "renderOptions'ın dönüşü doğrudan appendChild'a gidiyor — `null` "
+        "olduğunda TypeError bütün yanıtın çizimini durdurur")
+    govde = re.search(r"function renderOptions\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert "if (!items.length) return null;" in govde.group(1), (
+        "çizilebilir madde yokken panel yine kuruluyor — tıklanamayan boş "
+        "bir şerit çiziliyor ve ham blok da atlanmış oluyor")
+
+
+def test_an_axis_with_no_drawable_alternative_is_not_a_dead_row():
+    """Eksen kapısı "dizi ve boş değil" DEĞİL "çizilebilir madde var" olmalı.
+
+    Dolu ama tamamı bozuk bir liste (`[{"label": "soft"}]`) eski kapıdan
+    geçiyordu: satır adıyla ve rozetiyle çiziliyor, tıklanacak hiçbir şey
+    taşımıyor, üstelik ham blok atlandığı için modelin ne önerdiği hiçbir
+    yerde görünmüyordu. İki kayıp bir arada.
+    """
+    js = _chat_js()
+    govde = re.search(r"function axisItems\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert govde, "axisItems() bulunamadı"
+    assert "drawableOptions(e.secenekler)" in govde.group(1), (
+        "eksen kapısı çizilebilirliği sormuyor")
+    assert "e.secenekler.length" not in govde.group(1), (
+        "eski uzunluk kapısı geri dönmüş — bozuk maddeler ölü satır üretir")
+
+
+def test_the_hex_gate_accepts_exactly_the_lengths_css_understands():
+    """5 ve 7 haneli bir hex doğrulamadan geçip CSS'te SESSİZCE düşüyordu.
+
+    `{3,8}` yazıldığında `#0b254` kapıdan geçiyor, `style.background`a
+    yazılıyor ve CSSOM onu atıyor — ama `ornekKutusu` kutuyu yine döndüğü
+    için çip karta yükseliyor ve kullanıcı BOŞ bir dikdörtgen görüyordu.
+    "Doğrulamayı geçmeyen değer çizilmiyor" sözü ancak kapı CSS'in kabul
+    ettiği kümeyle (3·4·6·8) aynı olduğunda tutuyor.
+    """
+    js = _chat_js()
+    kapi = re.search(r"const HEX_RE = (.+);", js)
+    assert kapi, "HEX_RE bulunamadı"
+    assert "{3,8}" not in kapi.group(1), (
+        "hex kapısı 5 ve 7 haneli dizeleri kabul ediyor — CSS onları atar, "
+        "kutu boş çizilir")
+    for uzunluk in ("{3,4}", "{6}", "{8}"):
+        assert uzunluk in kapi.group(1), f"hex kapısı {uzunluk} uzunluğunu saymıyor"
+
+
+def test_a_drawn_example_without_a_description_is_still_announced():
+    """`aria-hidden` KOŞULLU olmak zorunda: `aciklama` ile `ornek` bağımsız.
+
+    Kutu "bilgi `aciklama`da yazılı" gerekçesiyle gizleniyor ve bu, açıklaması
+    olan bir maddede doğru. Ama `{"ad": "deep navy", "ornek": {"renk": "#0b2545"}}`
+    sözleşmede geçerli bir madde (iki alan birbirinden bağımsız isteğe bağlı):
+    orada kutuyu koşulsuz gizlemek, seçenekleri BİRBİRİNDEN AYIRAN tek şeyi
+    ekran okuyucudan saklamak olurdu — kullanıcı yalnız "deep navy" duyar.
+    """
+    js = _chat_js()
+    govde = re.search(r"function ornekKutusu\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert govde, "ornekKutusu() bulunamadı"
+    gv = _strip_js_comments(govde.group(1))
+    assert 'if (sessiz)' in gv, "gizleme koşullu değil"
+    assert 'aria-label' in gv, "açıklaması olmayan kutu ADLANDIRILMIYOR"
+    # Koşulun GİRDİSİ: çağrı `aciklama`nın varlığını geçmek zorunda.
+    assert "ornekKutusu(veri.ornek, !!veri.aciklama)" in js, (
+        "kutu açıklamanın varlığını bilmiyor — koşul boşa çıkar")
+
+
+def test_the_selected_mark_does_not_become_its_own_row_on_a_card():
+    """`✓` kartta AYRI BİR SATIR oluyordu ve seçmek yerleşimi oynatıyordu.
+
+    Ölçüldü (Chromium, 1280px): `.chat-option-card` kolon flex kutusu, bir
+    flex kapsayıcısının `::before`u BLOKLAŞIP ilk flex ÖĞESİ oluyor — işaret
+    etiketin soluna değil örnek kutusunun üstüne düşüyor, kart 23,3px uzuyor
+    ve ad 23,3px aşağı kayıyordu. Düzeltmeden sonra ikisi de 0px.
+
+    İşaret KALKMIYOR, yer değiştiriyor: kökün kuralı pill'ler için duruyor,
+    kartta `content: none` onu adın `::before`una devrediyor. "Seçili durum
+    renkle değil işaretle de anlatılıyor" şartı bu yüzden bozulmuyor.
+    """
+    css = _css_yorumsuz()
+    assert '.chat-option-card[aria-checked="true"]::before { content: none; }' in css, (
+        "kartta kök işaret kapatılmıyor — kendi satırına düşer ve kartı uzatır")
+    assert '.chat-option-card[aria-checked="true"] .chat-option-ad::before' in css, (
+        "işaret adın önüne devredilmiyor — kartta seçili durum GÖRÜNMEZ olur")
+    # Pill'in kuralı DURUYOR: kart düzeltmesi onu götürmemeli.
+    assert '.chat-option[aria-checked="true"]::before { content: "✓ "; }' in css
+
+
+def test_the_chips_strip_is_declared_once():
+    """`.chat-options-chips` iki satır arayla KENDİNİ tekrar ediyordu.
+
+    İkinci kural `align-items: stretch` yazıyordu — `align-items`ın başlangıç
+    değeri `normal` ve flex öğeleri için `stretch` gibi davrandığı için
+    hiçbir şeyi değiştirmiyordu. Yanındaki gerekçe ("`baseline` olsaydı
+    kartlar kayardı") var olmayan bir kuralı anlatıyordu: `baseline`
+    `.chat-axis`te, yani eksen SATIRINDA, ve bir öğenin kendi hizalanmasını
+    `align-self` belirlerdi. Değiştirmediği bir şeyi anlatan yorum sonraki
+    okuru yanlış yere bakmaya gönderir.
+    """
+    css = _css_yorumsuz()
+    # Yalnız ÇIPLAK seçici sayılıyor: `.chat-axis .chat-options-chips` meşru ve
+    # ayrı bir kural (eksen satırındaki şeride esneme veriyor), kendini tekrar
+    # eden bir bildirim değil.
+    ciplak = re.findall(r"^\.chat-options-chips\s*\{", css, re.M)
+    assert len(ciplak) == 1, (
+        f".chat-options-chips {len(ciplak)} kez bildirilmiş — bildirimleri tek "
+        "kurala taşıyın, yoksa hangisinin taşıyıcı olduğu okunamaz")
+    # İddia KURALA kapsanıyor, dosyaya değil: `align-items: stretch` başka bir
+    # yerde (`.chat-item`) duruyor ve o kuralın konusu bu değil.
+    assert "align-items" not in _css_block(".chat-options-chips"), (
+        "şeride flex varsayılanını yeniden yazan bir bildirim geri dönmüş")
+
+
+def test_every_r_item_radius_carries_its_fallback():
+    """`--r-item` yalnız flow-tokens.css'te tanımlı: geri düşme değeri ŞART.
+
+    O dosya yüklenmezse ya da paketten düşerse fallback'i olan sekiz yuvarlak
+    yüzey 12px'te kalıyor, olmayan `0` alıyor — köşeleri keskin tek öğe,
+    üstelik "pill olmasın diye yuvarlatıldı" diye yorumu olan öğe olurdu.
+    """
+    css = _css_yorumsuz()
+    ciplak = re.findall(r"var\(--r-item\s*\)", css)
+    assert not ciplak, (
+        f"{len(ciplak)} yerde `var(--r-item)` geri düşme değeri olmadan "
+        "yazılmış — dosyadaki diğer kullanımların hepsi `var(--r-item, 12px)`")
+
+
+def test_the_drawn_example_validates_the_models_text_before_styling():
+    """Model metni bir `style` özelliğine yazılıyor: kapı BEYAZ liste olmalı.
+
+    Bu dosya `innerHTML`i zaten yasaklıyor, ama `style.background` ikinci bir
+    yüzey: doğrulanmamış bir dize oraya yazıldığında `url(...)` gibi bir değer
+    geçerdi. Oran da AYRIŞTIRILMIŞ iki sayıdan kuruluyor, yani CSS'e model
+    metni hiç geçmiyor.
+    """
+    js = _chat_js()
+    assert "HEX_RE" in js and "ORAN_RE" in js, "örnek doğrulayıcıları yok"
+    body = re.search(r"function ornekKutusu\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "ornekKutusu() bulunamadı"
+    govde = _strip_js_comments(body.group(1))
+    # İKİ renk yolu var (tek renk · şerit) ve İKİSİ de doğrulamak zorunda.
+    # ÖLÇÜLDÜ: "HEX_RE.test var mı" tek başına yetmiyordu — tek renk dalının
+    # doğrulaması sökülünce şeridin süzgeci iddiayı yeşil tutuyordu, yani
+    # mutasyon kaçıyordu. Yol SAYILIYOR, varlığı değil.
+    assert govde.count("HEX_RE.test") >= 2, (
+        "renk yollarından biri doğrulamadan boyuyor — iddia yalnız ötekinin "
+        "süzgecini görüyor olabilir")
+    assert "HEX_RE.test(ornek.renk" in govde, "tek renk dalı doğrulanmıyor"
+    assert "ORAN_RE.exec" in govde, "oran doğrulanmadan uygulanıyor"
+    assert "Number(" in govde, "oran ham dizeden yazılıyor"
+    # `style.background`a yazan HER satır bir doğrulamanın ARDINDA olmalı:
+    # atama sayısı doğrulama sayısını aşarsa korunmayan bir yol var.
+    assert govde.count("style.background") <= govde.count("HEX_RE.test")
+    # Örnek DEKORATİF: bilgi `aciklama`da yazılı, ekran okuyucuya iki kez
+    # okutmanın anlamı yok.
+    assert 'setAttribute("aria-hidden", "true")' in govde
+
+
+def test_a_variation_shows_the_request_it_will_send():
+    """`istek` ekranda görünmek ZORUNDA — sözleşmede vardı, arayüzde yoktu.
+
+    Metin zaten doğrulanıyordu (`variationItems`) ve modele kullanıcının bir
+    sonraki mesajı olarak gidiyordu; kullanıcı ise yalnız "Gece" yazan bir
+    düğme görüyor ve neyin değişeceğini ancak tıklayıp yarım dakika
+    bekledikten sonra öğreniyordu.
+
+    Gösterilen metin modele GİDEN metinle aynı, ikinci bir özet değil: iki
+    metin olsaydı düğmenin söylediği ile yaptığı ayrışabilirdi.
+    """
+    js = _chat_js()
+    body = re.search(r"function renderVariations\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "renderVariations() bulunamadı"
+    govde = _strip_js_comments(body.group(1))
+    assert "actionChip(ad, item.istek.trim())" in govde, \
+        "varyasyon açıklaması çipe geçmiyor"
+    # Yerel düzenleme yasağı DURUYOR (mevcut kararın mandalı).
+    assert ".replace(" not in govde and "parsed.prompt" not in govde, \
+        "varyasyon tıklaması prompt'u yerelde düzenliyor"
+
+
+def test_an_addition_axis_is_marked_as_absent_from_the_prompt():
+    """`simdi` yokken satır BOŞ kalmamalı — yoksa ekleme ekseni takas gibi görünür.
+
+    Öncesinde rozet yalnız `if (typeof axis.simdi === "string" && …)` dalında
+    çiziliyordu, yani `simdi` gelmediğinde satırda ad ve çiplerden başka bir şey
+    yoktu: kullanıcı prompt'ta var olmayan bir ifadeyi değiştirdiğini sanırdı.
+    Rozet artık iki durumu da anlatıyor ve `dataset.yeni` ayrımın axesValue'nun
+    okuyabildiği hâli.
+    """
+    js = _chat_js()
+    body = re.search(r"function renderParameters\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "renderParameters() bulunamadı"
+    govde = _strip_js_comments(body.group(1))
+    assert "chat-axis-now" in govde, "takas rozeti düşmüş"
+    assert "chat-axis-new" in govde, "ekleme rozeti yok — boş satır takas gibi görünür"
+    assert "prompt'ta yok" in govde, "ekleme ekseninin durumu ekranda yazmıyor"
+    assert 'row.dataset.yeni = "1"' in govde, \
+        "ekleme ekseni işaretlenmiyor — axesValue iki türü ayırt edemez"
+    # Rozet TEK yerde eklenmeli: iki `appendChild` iki rozet çizerdi.
+    assert govde.count("row.appendChild(now)") == 1, \
+        "rozet birden fazla kez ekleniyor"
+
+
+def test_the_two_axis_kinds_reach_the_model_with_different_verbs():
+    """Takas ve ekleme AYNI cümleye girmemeli.
+
+    "Şu parametreleri değiştir: Işık → soft even light" cümlesi, prompt ışığı
+    hiç söylemiyorsa modele var olmayan bir ifadeyi değiştirmesini söylüyor —
+    model ya uydurma bir eski değer üretir ya da isteği yok sayar. İki fiil,
+    iki liste; kapanış cümlesi ("geri kalanını aynı tut") ikisinde de duruyor.
+    """
+    js = _chat_js()
+    body = re.search(r"function axesValue\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "axesValue() bulunamadı"
+    govde = _strip_js_comments(body.group(1))
+    assert "row.dataset.yeni ? ekleme : takas" in govde, \
+        "eksen türü ayrıştırılmıyor"
+    assert "Şu parametreleri değiştir:" in govde, "takas cümlesi düşmüş"
+    assert "Şunları da belirle:" in govde, "ekleme cümlesi yok"
+    assert "Prompt'un geri kalanını aynı tut." in govde, \
+        "kapanış disiplini düşmüş — tek eksen değişikliği prompt'u baştan yazdırır"
+
+
+def test_the_addition_badge_is_not_a_chip():
+    """Rozet TIKLANABİLİR görünmemeli — `.chat-axis-now` kararının aynısı.
+
+    Ekleme rozeti bir durum bildirimi, bir seçenek değil: dolgulu ya da
+    imleç değiştiren bir rozet, yanındaki gerçek çiplerle karışırdı.
+    """
+    govde = _css_block(".chat-axis-new")
+    assert govde, ".chat-axis-new kuralı yok"
+    assert "cursor" not in govde, "rozet tıklanabilir görünüyor"
+    assert "dashed" in govde, "kesikli kenar yok — takas rozetinden ayrışmıyor"
+    # Sabit renk yasağı (tasarım §11 ile aynı duruş): jetondan okunmalı.
+    assert "#" not in govde, "sabit renk yazılmış, jeton kullanılmıyor"
 
 
 def test_the_merged_selection_is_drawn_as_a_pill_not_as_a_typed_message():
@@ -1283,7 +1609,7 @@ def test_a_free_text_only_parameter_turn_is_not_attributed_to_the_user():
     js = _chat_js()
     body = re.search(r"function axesValue\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
     assert body, "axesValue() bulunamadı"
-    assert "if (!parts.length) return { content, display: own };" in body.group(1), (
+    assert "if (!secili) return { content, display: own };" in body.group(1), (
         "eksen seçilmeyen tur baloncuk olarak çiziliyor — kullanıcı yazmadığı "
         "cümleyi kendi repliği sanır")
     # Seçenek panelinde ters yön korunmalı: orada serbest metin baloncuk KALIR.
@@ -1309,11 +1635,18 @@ def test_a_machine_block_that_breaks_its_contract_is_still_shown_to_the_user():
     assert body, "renderMarkdownInto() bulunamadı"
     skip = re.search(r"const skip = new Set\(\[(.*?)\]", body.group(1), re.S)
     assert skip, "atlama kümesi bulunamadı"
-    for fn in ("variationItems(parsed).length", "axisItems(parsed).length"):
+    # ÜÇ satırın üçü de koşullu. Seçenek satırı bir süre koşulsuzdu ve o
+    # zaman doğruydu (madde düz dizeydi, `String(raw)` her madde için bir çip
+    # üretiyordu). Nesne biçimiyle `optionItem` `null` dönebilir oldu ve ikisi
+    # ayrıştı: tamamı bozuk bir `secenekler` listesi ayrıştırıcıdan geçiyor,
+    # tek çip üretmiyor, ham blok da atlanmış oluyordu.
+    for fn in ("optionItems(parsed).length", "variationItems(parsed).length",
+               "axisItems(parsed).length"):
         assert fn in skip.group(1), (
             f"atlama kümesi {fn} sormuyor — sözleşmesi bozuk blok sessizce kaybolur")
     # Süzgeç GERÇEKTEN paylaşılıyor mu: paneller de aynı fonksiyonu çağırmalı.
-    for name, fn in (("renderVariations", "variationItems(parsed)"),
+    for name, fn in (("renderOptions", "optionItems(parsed)"),
+                     ("renderVariations", "variationItems(parsed)"),
                      ("renderParameters", "axisItems(parsed)")):
         panel = re.search(rf"function {name}\([^)]*\)\s*\{{(.*?)\n\}}", js, re.S)
         assert fn in panel.group(1), (
@@ -2238,6 +2571,19 @@ def _css_block(selector: str) -> str:
     match = re.search(re.escape(selector) + r"\s*\{([^}]*)\}", css)
     assert match, f"{selector} kuralı yok"
     return match.group(1)
+
+
+def _css_yorumsuz() -> str:
+    """style.css'in TAMAMI, yorumlar ayıklanmış.
+
+    `_css_block` tek bir kuralın gövdesini veriyor; kuralların ARASINA bakan
+    iddialar (bir seçici kaç kez bildirilmiş, geri düşme değeri olmayan bir
+    `var()` kalmış mı) dosyanın tamamını istiyor. Ayıklama orada da şart ve
+    sebebi `_css_block`'takinin aynısı: bu dosyadaki gerekçe yorumları
+    KALDIRILAN bildirimleri kendi metninde anıyor, yani yorumlu metinde
+    `assert "…" not in css` kendi açıklamasına takılır.
+    """
+    return re.sub(r"/\*.*?\*/", "", _css(), flags=re.S)
 
 
 def test_a_gallery_card_opens_the_full_viewer():
@@ -4314,26 +4660,194 @@ def test_yuzey_ORTAK_kapidan_aciliyor_ve_KAPANIYOR():
             f"#{dugme} ortak kapanış kapısını kullanmıyor")
 
 
-def test_kapanis_ARIA_yi_TETIKTEN_sifirliyor_elle_sayilan_listeden_DEGIL():
-    """`aria-expanded` kapanışta `modelSheetTetik` üzerinden sıfırlanmak zorunda.
+def test_kapanis_ARIA_yi_TURETILMIS_listeden_sifirliyor_elle_sayilandan_DEGIL():
+    """`aria-expanded` kapanışta TÜRETİLEN listeden sıfırlanmak zorunda.
 
-    Öncesinde `closeSheets` iki çipi ELLE sayıyordu (#model-btn,
-    #chat-model-btn) ve o liste üçüncü eksen (arena) eklenince bayatladı:
-    #arena-btn kapanışta sıfırlanmıyor, yani ekran okuyucu KAPALI bir paneli
-    "açık" okuyordu — sessiz, çünkü ekranda hiçbir iz yok.
+    Elle sayılan liste bu dosyada İKİ KEZ bayatladı ve ikisi de sessizdi
+    (ekran okuyucu KAPALI bir paneli "açık" okur, ekranda hiçbir iz yok):
+      · önce iki model çipi sayılıyordu ve #arena-btn eklenince kapsam dışı
+        kaldı — o tur `modelSheetTetik`i getirdi;
+      · sonra #chat-sidebar-toggle ile #specs-btn elle sayılı KALDI ve
+        #director-btn eklenince aynı boşluk yeniden doğdu. Tetik değişkeni
+        yalnız BİR paneli (modeli) yazıyordu, yani ikinci hand-count'u
+        kapatmıyordu.
 
-    İddia listeyi geri gelmekten koruyor: paneli açan tetik zaten tek bir
-    değişkende yazılı (`openModelSheet` orayı yazıyor), o yüzden dördüncü
-    eksen de kendiliğinden kapsanıyor.
+    Bu yüzden ölçü artık türetme: `aria-controls`u bir `.sheet`e bakan HER
+    tetik. Beşinci yüzey kendiliğinden kapsanıyor. Odak iadesi ayrı ve hâlâ
+    tetik değişkeninden (`sheetTetik`) — bir tek onu türetmek mümkün değil,
+    çünkü "hangi düğme AÇTI" DOM'da yazmıyor.
+
+    İddia HİÇBİR id'nin elle sayılmadığını ölçüyor: eski iki liste de yasak.
     """
     js = _js("core.js")
     govde = js.split("function closeSheets() {", 1)[1].split("\n}", 1)[0]
-    assert 'modelSheetTetik.setAttribute("aria-expanded", "false")' in govde, (
-        "kapanış çipin aria-expanded'ını tetikten sıfırlamıyor")
-    for cip in ("model-btn", "chat-model-btn", "arena-btn"):
+    assert "[aria-controls][aria-expanded]" in govde, (
+        "kapanış tetik listesini türetmiyor")
+    assert 'classList.contains("sheet")' in govde, (
+        "türetme hedefin bir `.sheet` olduğunu sormuyor — `.sheet` olmayan bir "
+        "yüzeyin (popover, menü) tetiği de sıfırlanır")
+    assert 'sheetTetik.setAttribute("aria-expanded", "false")' in govde, (
+        "kapanış açan çipin aria-expanded'ını tetikten sıfırlamıyor")
+    assert "sheetTetik.focus()" in govde, "odak iadesi düşmüş"
+    for cip in ("model-btn", "chat-model-btn", "arena-btn",
+                "chat-sidebar-toggle", "specs-btn", "director-btn"):
         assert f'$("{cip}").setAttribute("aria-expanded"' not in govde, (
-            f"#{cip} kapanışta elle sayılıyor — liste bir sonraki eksende "
+            f"#{cip} kapanışta elle sayılıyor — liste bir sonraki yüzeyde "
             "yine bayatlar")
+
+
+def test_yonetmen_cekmecesi_ORTAK_kapidan_aciliyor():
+    """`.sheet` + `openSheet`/`closeSheets` — kendi mekaniği YAZILMIYOR.
+
+    `hidden` ile yönetilen bir panel üç mekanizmayı birden kaybederdi: perde
+    (`body:has(.sheet.open) .scrim`), Escape şelalesi ve Android geri tuşu —
+    üçü de `.sheet.open` seçicisine bakıyor (bkz. tests/test_mobile.py'nin
+    geri tuşu listesi). Çekmece o sınıfı taşıdığı için üçü de bedava geliyor.
+    """
+    html = _yorumsuz_html()
+    assert 'id="director-sheet" class="sheet sheet-right"' in html, (
+        "çekmece `.sheet` kabuğunu kullanmıyor — perde, Escape ve Android geri "
+        "tuşu onu görmez")
+    js = _chat_js()
+    assert 'openSheet("director-sheet")' in js
+    assert '$("director-sheet").hidden' not in js, "panel `hidden` ile yönetiliyor"
+    assert '$("director-close").addEventListener("click", closeSheets)' in js
+
+
+def test_yonetmen_cipi_MOD_eksenine_bagli_ve_ikinci_tik_kapatiyor():
+    """Çip yalnız Yönetmen modunda görünür ve ikinci dokunuş paneli kapatır.
+
+    Görünürlük CSS'te `#composer[data-mode]` ekseninden, JS'ten DEĞİL: aynı
+    eksen #specs-btn'i Yönetmen modunda gizliyor, yani iki çip aynı yuvada
+    birbirini dışlıyor ve şeridin ölçülmüş 360px bütçesine yeni yük binmiyor.
+    `:has()` bu depoda taşıyıcı davranış için kullanılmıyor (eski WebView).
+
+    İkinci tık kapatma #specs-btn'in kalıbı: `openSheet` aynı paneli kapatıp
+    yeniden açardı ve kullanıcı bir titreme görürdü.
+    """
+    css = _css()
+    assert '#composer[data-mode="image"] #director-btn' in css, (
+        "çip Görsel modunda gizlenmiyor")
+    html = _yorumsuz_html()
+    assert 'aria-controls="director-sheet"' in html
+    govde = _chat_js().split('$("director-btn").addEventListener("click"', 1)[1]
+    govde = govde.split("\n});", 1)[0]
+    assert "willOpen" in govde and "closeSheets()" in govde, \
+        "ikinci tık kapatma kalıbı yok"
+
+
+def test_cekmece_acilirken_METIN_ALANINA_odaklanmiyor():
+    """Android'de klavye alttan açılıyor ve metin alanına odak paneli YUTUYOR.
+
+    Ayarlar panelinin ölçülmüş dersi (`#set-provider` seçilmesinin sebebi).
+    Odak yine de panelin İÇİNE gidiyor — hiç gitmezse Escape'in neyi
+    kapattığı ve odağın nereye döneceği belirsiz kalır.
+    """
+    govde = _chat_js().split('$("director-btn").addEventListener("click"', 1)[1]
+    govde = _strip_js_comments(govde.split("\n});", 1)[0])
+    assert '$("director-guidance").focus()' not in govde, \
+        "metin alanına odaklanılıyor — telefonda panel klavyenin altında kalır"
+    assert ".focus()" in govde, "odak panele hiç girmiyor"
+
+
+def test_cekmecenin_durum_satiri_YAZAN_dugmenin_yaninda():
+    """Durum satırı `.sheet-foot`ta olmak zorunda, kaydırılan gövdede DEĞİL.
+
+    `#settings-status`ın ölçülmüş dersi: `.sheet-foot` `flex: none`, yani gövde
+    ne kadar uzarsa uzasın basılan düğmenin yanında kalıyor. Burada risk daha
+    da büyük çünkü metin alanı `resize: vertical`: kullanıcı alanı uzattığında
+    gövdedeki "Kaydedilemedi: …" satırı görünür alanın dışına çıkıyor, Kaydet
+    ise sabit ayakta duruyordu — düğmeye basılıyor ve hiçbir şey olmuyor gibi
+    görünüyordu.
+    """
+    html = _yorumsuz_html()
+    ayak = re.search(r'<div class="sheet-foot">(.*?)</div>',
+                     html.split('id="director-sheet"', 1)[1], re.S)
+    assert ayak, "çekmecenin `.sheet-foot`u bulunamadı"
+    assert 'id="director-status"' in ayak.group(1), (
+        "durum satırı ayakta değil — uzatılan metin alanı onu görünür alanın "
+        "dışına iter")
+    assert 'id="director-save"' in ayak.group(1), "Kaydet ayakta değil"
+
+
+def test_cekmece_her_ACILISTA_durum_satirini_sifirliyor():
+    """Eski "kaydedildi" satırı KAYDEDİLMEMİŞ metnin yanında asılı kalıyordu.
+
+    Kullanıcı kaydediyor, kapatıyor, sonra yeniden açıp yeni bir şey yazıyor
+    ve Kaydet'e BASMADAN kapatıyor. Metin kutuda duruyor (bilerek), üstündeki
+    satır da "Yönlendirme kaydedildi — bundan sonraki her turda geçerli."
+    diyor. İkisi bir arada okununca yönlendirmenin etkin olduğunu söylüyor,
+    oysa `/api/chat` hâlâ eski metni gönderiyor. `openSettings`ın durum
+    satırını açılışta temizlemesinin sebebi birebir bu.
+    """
+    govde = _chat_js().split('$("director-btn").addEventListener("click"', 1)[1]
+    govde = _strip_js_comments(govde.split("\n});", 1)[0])
+    assert '$("director-status").textContent = ""' in govde, (
+        "açılışta durum satırı temizlenmiyor — bayat bir onay mesajı "
+        "kaydedilmemiş metni kaydedilmiş gibi gösterir")
+
+
+def test_kaydet_dugmesi_UCUS_SIRASINDA_kilitli():
+    """İki tık iki POST atıyordu ve ikisi de dönüşte AYNI iki alana yazıyor.
+
+    Sonuç yarışa kalıyor: ilk istek ağda düşüp ikincisi başarırsa kullanıcı
+    BAŞARILI bir yazımın üstünde "Kaydedilemedi: …" okuyabiliyor (ya da
+    tersi). `#settings-save`ın kalıbı — `disabled` + `finally`.
+
+    `finally` şart ve ayrı ölçülüyor: yalnız başarı dalında açılsaydı tek bir
+    ağ hatası düğmeyi TEMELLİ kilitler ve kullanıcı yazdığını hiç
+    kaydedemezdi.
+    """
+    js = _chat_js()
+    govde = re.search(r"async function saveDirectorGuidance\([^)]*\)\s*\{(.*?)\n\}",
+                      js, re.S)
+    assert govde, "saveDirectorGuidance() bulunamadı"
+    gv = _strip_js_comments(govde.group(1))
+    assert '$("director-save").disabled = true' in gv, "düğme uçuş sırasında kilitlenmiyor"
+    assert "finally" in gv, "kilit `finally`de açılmıyor — ağ hatası düğmeyi temelli kilitler"
+    assert gv.index("finally") < gv.index('$("director-save").disabled = false'), \
+        "kilit `finally` dışında açılıyor"
+
+
+def test_cekmecenin_tetigi_openSheetten_SONRA_yaziliyor():
+    """SIRA BAĞLAYICI: `openSheet` içinde `closeSheets` koşuyor ve tetiği siler.
+
+    Atama önce yapılsaydı odak iadesi HİÇ çalışmazdı ve ekranda tek iz
+    bırakmazdı — panel yine açılır, kaydetme yine işler, yalnız Escape'ten
+    sonra odak `<body>`ye düşer. `openModelSheet`in aynı mandalı.
+    """
+    govde = _chat_js().split('$("director-btn").addEventListener("click"', 1)[1]
+    govde = _strip_js_comments(govde.split("\n});", 1)[0])
+    assert 'sheetTetik = $("director-btn")' in govde, "odak iadesi kurulmuyor"
+    assert govde.index('openSheet("director-sheet")') < govde.index("sheetTetik ="), \
+        "tetik `openSheet`ten ÖNCE yazılıyor — closeSheets onu null'a çeker"
+
+
+def test_kalici_yonlendirme_DUGMEYLE_kaydediliyor_ve_hata_metni_silmiyor():
+    """Anında yazım DEĞİL: değer uzun bir serbest metin.
+
+    `#pref-autosave`in kalıbı bir onay kutusu için doğru (değer tek bit, hata
+    dalında kutu geri döner ve hiçbir şey kaybolmaz). Burada sessizce
+    başarısız olan bir yazım kullanıcının yazdığını kaybettirir — `sendChat`in
+    başarısızlık dalının reddettiği şeyin aynısı.
+
+    Ekrandaki değer SUNUCUNUN döndürdüğünden kuruluyor: sunucu kırpmışsa
+    kullanıcı kırpılmış hâli görür, yani kaydedilenle ekranda duran ayrışmaz.
+    """
+    js = _chat_js()
+    assert '$("director-save").addEventListener("click", saveDirectorGuidance)' in js
+    govde = js.split("async function saveDirectorGuidance()", 1)[1]
+    govde = _strip_js_comments(govde.split("\n}", 1)[0])
+    assert '"/api/prefs"' in govde and "director_guidance" in govde
+    assert 'p.director_guidance || ""' in govde, \
+        "ekran sunucunun döndürdüğü değerden kurulmuyor"
+    # Hata dalı metni KUTUDA bırakmalı.
+    hata = govde.split("catch", 1)[1]
+    assert '$("director-guidance").value = ""' not in hata, \
+        "hata dalı kullanıcının yazdığını siliyor"
+    # Değer açılışta okunuyor: yazılıp okunmayan bir tercih yok sayılır.
+    assert '$("director-guidance").value = p.director_guidance || ""' in \
+        js.split("async function loadPrefs()", 1)[1].split("\n}", 1)[0]
 
 
 def test_TAMAM_bir_ONAY_kapisi_DEGIL():

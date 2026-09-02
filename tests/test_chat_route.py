@@ -32,6 +32,25 @@ def fake_complete(monkeypatch):
     return calls
 
 
+@pytest.fixture
+def fake_kwargs(monkeypatch):
+    """`cc.complete`e geçen KWARGS'ı toplar (sistem mesajı orada).
+
+    `fake_complete` yalnız `messages` biriktiriyor ve bilerek öyle kalıyor:
+    onun konusu dökümün süzgeci. Bağlam dikişinin konusu `instructions`, yani
+    ayrı bir fixture — ikisini tek listede birleştirmek her iki testin
+    iddialarını da bulanıklaştırırdı.
+    """
+    calls = []
+
+    def _complete(messages, **kwargs):
+        calls.append(kwargs)
+        return {"content": "ok", "finish_reason": "stop"}
+
+    monkeypatch.setattr(appmod.cc, "complete", _complete)
+    return calls
+
+
 def _post(client, messages):
     return client.post("/api/chat", json={"messages": messages})
 
@@ -453,3 +472,136 @@ def test_UYUMLU_adaptorun_hatasi_da_502_ve_TURKCE(client, monkeypatch):
 
     assert r.status_code == 502
     assert "gpt-5.6-terra" in r.json()["detail"]
+
+
+# ── Bağlam dikişi: sistem mesajı ROTADAN kuruluyor ───────────────────────
+
+def test_the_route_builds_the_system_message_itself(client, fake_kwargs):
+    """`instructions` rotadan geçiyor, adaptörün diskten okumasına bırakılmıyor.
+
+    Adaptörler `instructions=None` iken personayı kendileri okuyor ve bu yol
+    hâlâ geçerli (imza değişmedi) — ama o yolda kullanıcının kalıcı
+    yönlendirmesinin ve seçili modelin ulaşacağı bir yer YOK. Dikişin tek
+    görünür işareti bu kwarg.
+    """
+    _post(client, [{"role": "user", "content": "kare görsel"}])
+
+    assert fake_kwargs, "cc.complete hiç çağrılmadı"
+    talimat = fake_kwargs[0].get("instructions")
+    assert talimat, "sistem mesajı rotadan geçmiyor"
+    assert "Rolün" in talimat, "persona sistem mesajında yok"
+
+
+def test_the_saved_guidance_reaches_the_wire(client, fake_kwargs):
+    """Çekmeceye yazılan metin HER turda sistem mesajında olmalı.
+
+    Özelliğin tamamı bu satıra bağlı: yönlendirme `prefs.json`'a yazılıyor ama
+    oradan sistem mesajına taşınmazsa kullanıcı bir kutuya yazıp hiçbir şeyin
+    değişmediğini görür.
+    """
+    client.post("/api/prefs", json={"director_guidance": "her zaman düz vektör"})
+    _post(client, [{"role": "user", "content": "bayram görseli"}])
+
+    talimat = fake_kwargs[0]["instructions"]
+    assert "her zaman düz vektör" in talimat
+    assert "Kullanıcının kalıcı yönlendirmesi" in talimat
+
+
+def test_without_guidance_the_system_message_is_the_bare_persona(client, fake_kwargs):
+    """Yönlendirme boşken sistem mesajı BUGÜNKÜ metinle aynı kalmalı.
+
+    Bağlam bloğu yine giriyor (seçili model her zaman var), o yüzden iddia
+    yalnız yönlendirme bölümünün YOKLUĞUNU ölçüyor: çekmeceyi hiç açmamış
+    kullanıcı kendi adına yazılmış bir bölüm görmemeli.
+    """
+    _post(client, [{"role": "user", "content": "kare görsel"}])
+
+    talimat = fake_kwargs[0]["instructions"]
+    assert "Kullanıcının kalıcı yönlendirmesi" not in talimat
+
+
+def test_the_context_block_names_the_selected_image_model(client, fake_kwargs):
+    """Seçili GÖRSEL modeli sistem mesajına giriyor — sohbet modeli değil.
+
+    İkisi ayrı eksen: sohbet modeli yönetmenin KİM olduğunu, görsel modeli
+    yönetmenin hangi jetonları önerebileceğini belirliyor. İkincisi bu uçta
+    tel üzerinde HİÇ gelmiyor (`ChatRequest` `extra="forbid"`), o yüzden
+    `prefs.json`'dan okunmak zorunda.
+    """
+    import catalog
+    _post(client, [{"role": "user", "content": "kare görsel"}])
+
+    talimat = fake_kwargs[0]["instructions"]
+    assert "Bu turun bağlamı" in talimat
+    varsayilan = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
+    assert varsayilan.label in talimat, "seçili modelin adı bağlamda yok"
+
+
+def test_a_missing_instruction_file_becomes_the_same_turkish_502(client, monkeypatch):
+    """Talimat dosyası yoksa kullanıcı 500 DEĞİL Türkçe bir 502 görmeli.
+
+    Metin `chat_client`'ın kendi dalıyla AYNI olmak zorunda: iki yerde iki
+    cümle olsaydı aynı kusur, çağrının hangi yoldan gittiğine göre iki farklı
+    hata okuturdu.
+    """
+    monkeypatch.setattr(appmod.chat_prompt, "load_instructions",
+                        lambda **kw: (_ for _ in ()).throw(ValueError("yok")))
+    r = _post(client, [{"role": "user", "content": "kare görsel"}])
+
+    assert r.status_code == 502
+    assert "Prompt Yönetmeni talimatı yüklenemedi" in r.json()["detail"]
+
+
+
+def test_a_mis_encoded_prefs_file_is_not_blamed_on_the_instruction_file(
+        client, fake_kwargs, monkeypatch):
+    """Bozuk prefs.json, yönetmenin TALİMAT dosyasının suçu gibi görünüyordu.
+
+    Elle düzenlenmiş bir prefs.json (modülün beklediği bir durum — bkz.
+    `prefs.read`'in `theme: "neon"` notu) cp1254 kaydedilmişse `json.load`
+    UTF-8 çözerken `UnicodeDecodeError` atıyor ve o bir `ValueError` ALT
+    SINIFI. `_director_context()` çağrısı `except ValueError` dalının İÇİNDE
+    olduğu sürece kullanıcı 502 ile "Prompt Yönetmeni talimatı yüklenemedi"
+    okuyordu, yani hiç bozulmamış bir dosyaya yönlendiriliyordu. Üstelik aynı
+    arıza `GET /api/prefs`te çıplak 500 veriyordu: iki uç aynı kusur için iki
+    ayrı şey söylüyordu.
+
+    İki dokunuş birlikte ölçülüyor çünkü tek başına biri yetmiyor: bağlam
+    toplama `try`nin dışına çıktı (yanlış atıf gitti) ve `prefs._read_raw`
+    kod çözme hatasını da yakalıyor (modülün "okuma yolu HOŞGÖRÜLÜ" sözü).
+    """
+    os.makedirs(appmod.OUTPUT_DIR, exist_ok=True)
+    yol = os.path.join(appmod.OUTPUT_DIR, "prefs.json")
+    # Türkçe bir tema adı cp1254'te yazıldığında UTF-8 çözücü düşüyor.
+    with open(yol, "w", encoding="cp1254") as f:
+        f.write('{"theme": "mono", "director_guidance": "düz çizgi üslubu"}')
+
+    r = client.post("/api/chat", json={"messages": [{"role": "user", "content": "kedi"}]})
+
+    assert r.status_code == 200, (
+        f"bozuk prefs.json turu düşürüyor: {r.status_code} {r.text}")
+    assert "talimatı yüklenemedi" not in r.text, (
+        "bozuk prefs.json talimat dosyasının suçu gibi raporlanıyor")
+    # Tur YİNE personayla gidiyor: bağlam bir kolaylık, kaybı sohbeti düşürmez.
+    assert fake_kwargs[0]["instructions"], "sistem mesajı hiç kurulmamış"
+    # Ve aynı dosya prefs ucunu da düşürmüyor: iki uç artık aynı şeyi diyor.
+    assert client.get("/api/prefs").status_code == 200
+
+
+def test_the_context_is_gathered_outside_the_instruction_guard(client, fake_kwargs):
+    """TRIPWIRE: `_director_context()` `try`nin İÇİNE geri taşınmamalı.
+
+    Yukarıdaki test davranışı ölçüyor ama yalnız BİR arıza türüyle
+    (`UnicodeDecodeError`). `prefs`/`catalog` yolundan gelecek başka bir
+    `ValueError` de aynı yanlış atıfla raporlanırdı; kapının yeri o yüzden
+    ayrıca mandallanıyor.
+    """
+    import pathlib as _p
+    kaynak = (_p.Path(__file__).resolve().parent.parent / "app.py").read_text(
+        encoding="utf-8")
+    assert "instructions = chat_prompt.build_system(**baglam)" in kaynak, (
+        "bağlam çağrısı `build_system`in argümanı olarak `try` içinde duruyor")
+    govde = kaynak.split("baglam = _director_context()", 1)
+    assert len(govde) == 2, "bağlam `try` öncesinde toplanmıyor"
+    assert "try:" in govde[1].split("except ValueError", 1)[0], (
+        "kapı bağlam toplamadan SONRA açılmıyor")

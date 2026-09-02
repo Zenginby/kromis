@@ -69,6 +69,15 @@ _SCHEMA: dict[str, tuple[object, type]] = {
     # seçmedi" ile "şu modeli seçti" ayrımını korumak için — sağlayıcı
     # değiştiğinde eski sağlayıcının modeli yapışıp kalmasın.
     "chat_model": ("", str),
+    # Yönetmen ayarları çekmecesindeki kalıcı yönlendirme (serbest metin).
+    # `_ENUMS`'a GİRMİYOR ve giremez: değer kümesi açık.
+    #
+    # Buraya, `chat_instructions_override()` dosyasına DEĞİL — ikisi aynı işi
+    # yapmıyor. O dosya personayı EZİYOR (on sekiz bin karakteri yeniden yazmak
+    # demek); bu alan personaya EKLENİYOR. Kullanıcının "her zaman düz vektör"
+    # demek için personanın tamamını devralmak zorunda kalması, özelliğin
+    # pratikte var olmaması demekti.
+    "director_guidance": ("", str),
 }
 
 DEFAULTS = {name: default for name, (default, _) in _SCHEMA.items()}
@@ -94,13 +103,22 @@ def _read_raw(output_dir: str) -> dict:
     path = _prefs_path(output_dir)
     if not os.path.exists(path):
         return {}
-    with open(path, encoding="utf-8") as f:
-        try:
+    try:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
-        except json.JSONDecodeError:
-            # Bozuk dosya: çökmek yerine varsayılanlar
-            # (storage._read_history / chat_store._read ile aynı davranış).
-            return {}
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        # Bozuk dosya: çökmek yerine varsayılanlar
+        # (storage._read_history / chat_store._read ile aynı davranış).
+        #
+        # `UnicodeDecodeError` de burada ve o AYRI bir olay: elle düzenlenmiş
+        # bir prefs.json (modülün beklediği bir durum — bkz. read()'in
+        # `theme: "neon"` notu) cp1254 kaydedilmişse `json.load` UTF-8
+        # çözerken düşüyor, JSON'a hiç varamıyor. Yalnız `JSONDecodeError`
+        # yakalandığında bu dosya "okuma yolu HOŞGÖRÜLÜ" sözünü deliyordu:
+        # `GET /api/prefs` çıplak 500 veriyor, `POST /api/chat` ise aynı
+        # arızayı yönetmenin TALİMAT dosyasının suçu gibi gösteriyordu.
+        # `open` da `try`nin içinde: kod çözme okuma sırasında oluyor.
+        return {}
     if not isinstance(data, dict):
         return {}
     return data

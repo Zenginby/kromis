@@ -24,7 +24,7 @@ Stiller: `/static/fonts.css`, `/static/style.css`, `/static/flow-tokens.css`, `/
 flowchart LR
   n_assets_js["assets.js"] -->|5| n_core_js["core.js"]
   n_assets_js["assets.js"] -->|2| n_folders_js["folders.js"]
-  n_chat_js["chat.js"] -->|11| n_core_js["core.js"]
+  n_chat_js["chat.js"] -->|13| n_core_js["core.js"]
   n_chat_js["chat.js"] -->|1| n_folders_js["folders.js"]
   n_chat_js["chat.js"] -->|1| n_palette_js["palette.js"]
   n_chat_js["chat.js"] -->|1| n_settings_js["settings.js"]
@@ -50,8 +50,8 @@ flowchart LR
 | betik | satır | üst düzey tanım | çağırdığı sunucu yolları |
 | --- | --- | --- | --- |
 | `static/assets.js` | 544 | 25 | `/api/assets/{}`, `/api/assets/{}/{}`, `/api/banner`, `/api/banner/preview`, `/api/logo`, `/api/logo/preview`, `/assets/banners/{}`, `/assets/logos/{}`, `/assets/mottos/{}`, `/assets/{}/{}`, `/output/{}` |
-| `static/chat.js` | 2037 | 81 | `/api/arena/{}`, `/api/arena/{}/winner`, `/api/chat`, `/api/chats`, `/api/chats/{}`, `/api/prefs`, `/output/{}.png` |
-| `static/core.js` | 2302 | 74 | `/api/edit`, `/api/generate`, `/api/image/{}`, `/api/output/{}/download`, `/api/prefs`, `/output/`, `/output/{}` |
+| `static/chat.js` | 2353 | 86 | `/api/arena/{}`, `/api/arena/{}/winner`, `/api/chat`, `/api/chats`, `/api/chats/{}`, `/api/prefs`, `/output/{}.png` |
+| `static/core.js` | 2310 | 74 | `/api/edit`, `/api/generate`, `/api/image/{}`, `/api/output/{}/download`, `/api/prefs`, `/output/`, `/output/{}` |
 | `static/folders.js` | 1806 | 57 | `/api/folders`, `/api/folders/{}`, `/api/folders/{}/download`, `/api/history`, `/api/images`, `/api/import`, `/output/{}` |
 | `static/mobile.js` | 52 | 0 | — |
 | `static/palette.js` | 756 | 37 | `/api/palette/suggest`, `/api/palettes`, `/api/palettes/{}` |

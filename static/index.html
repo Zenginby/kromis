@@ -727,6 +727,28 @@
             <path d="m6 9 6 6 6-6"></path>
           </svg>
         </button>
+        <!-- Yönetmen ayarları çipi: Görsel modundaki "Üretim ayarları"nın
+             SİMETRİĞİ ve tasarım §4.2'nin Yönetmen modu için istediği
+             "Yönetmen talimatları ikonu" (flow-redesign-plan.md) —
+             flow arayüz devrinde bilerek yapılmayanlara yazılmıştı.
+
+             Yeri composer'ın İÇİ, yüzen bir düğme DEĞİL. Dört şey bedavaya
+             geliyor: mod ekseni (#composer[data-mode]), showSection'ın
+             composer'ı gizlemesi, mobile.js'in `--composer-h` ölçümü ve
+             mobilin sarma kuralları. Yüzen bir düğme dördünü de kendi
+             kurmak zorunda kalır ve z-index'i composer(5) ile perde(40)
+             arasına sıkıştırmak gerekirdi.
+
+             360px bütçesi tutuyor: Yönetmen modunda #specs-btn ve
+             #ask-director gizli (style.css), şerit 149px kullanıyordu. -->
+        <button type="button" id="director-btn" class="specs" aria-controls="director-sheet"
+                aria-expanded="false">
+          <span>Yönetmen ayarları</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m6 9 6 6 6-6"></path>
+          </svg>
+        </button>
         <button id="go" class="primary composer-send" type="button">Üret</button>
       </div>
     </div>
@@ -908,6 +930,55 @@
         </div>
         <p class="asset-status">"Logo ekle" önizlemedeki görsele uygulanır — galeriden bir görsele tıkla ya da yeni bir görsel üret.</p>
       </section>
+    </div>
+  </aside>
+
+  <!-- Yönetmen ayarları: sağdan slide-over. `.sheet-right` ve `sheet-grip` YOK —
+       ikisi birlikte bilinçli: ayarların yeri bu depoda sağ şerit (#specs-sheet,
+       #look-sheet, #palette-modal) ve tutamak yalnız ALTTAN açılan iki panelde
+       var (dekoratif; sürükleyerek kapatma yok, o yüzden söz de yok).
+
+       İÇERİK bugün tek alan ve bu bir eksiklik değil karar: kullanıcı yalnız
+       kalıcı yönlendirmeyi istedi. Soru sıklığı, varsayılan üslup/dil ve öneri
+       yoğunluğu anahtarları aynı `.sheet-body`ye eklenecek — çekmece açıldığı
+       için ikinci bir yüzey gerektirmiyorlar. -->
+  <aside id="director-sheet" class="sheet sheet-right" aria-label="Yönetmen ayarları">
+    <div class="sheet-head">
+      <h2>Yönetmen ayarları</h2>
+      <button type="button" id="director-close" class="modal-x" aria-label="Kapat">×</button>
+    </div>
+    <div class="sheet-body">
+      <h3 class="modal-subhead modal-subhead-first">Kalıcı yönlendirme</h3>
+      <!-- `maxlength` sunucudaki İKİ sınırı aynalıyor (models.PrefsRequest'in
+           422 kapısı ve chat_prompt.MAX_GUIDANCE_CHARS'ın kırpması). Tarayıcı
+           tarafında olması bir savunma değil nezaket: kullanıcı sınırı yazarken
+           görüyor, kaydete basıp 422 okumuyor. -->
+      <textarea id="director-guidance" rows="6" maxlength="1500" spellcheck="false"
+                placeholder="Örn. her zaman düz vektör üslubu; görselin üzerine metin yazma; marka rengim #0b2545"></textarea>
+      <p class="field-note">
+        Bu metin yönetmenin talimatını <strong>ezmiyor, ona ekleniyor</strong> —
+        her yeni turda geçerli, tekrar yazmanız gerekmiyor. Kapsam ve ret
+        kurallarını değiştirmez. Talimatın <em>tamamını</em> kendiniz yazmak
+        isterseniz yol Ayarlar'da duruyor.
+      </p>
+    </div>
+    <!-- ANINDA yazım DEĞİL "Kaydet" — ve bu, #pref-autosave'in kalıbından
+         bilerek ayrılıyor. O kalıp bir onay kutusu için doğru: değer tek bit,
+         yazım başarısızsa kutu geri dönüyor ve kullanıcı hiçbir şey
+         kaybetmiyor. Burada değer uzun bir serbest metin; sessizce başarısız
+         olan bir yazım kullanıcının yazdığını kaybettirir. Metin alanının
+         kalıbı #settings-modal: .sheet-foot + Kaydet + durum satırı.
+
+         DURUM SATIRI DA burada, gövdede değil — #settings-status'un ölçülmüş
+         dersinin aynısı: `.sheet-foot` `flex: none`, yani kaydırılan gövde ne
+         kadar uzarsa uzasın basılan düğmenin YANINDA kalıyor. Gövdede
+         bırakılmıştı ve buradaki metin alanı `resize: vertical` olduğu için
+         durum daha da kötüydü: kullanıcı alanı uzattığında "Kaydedilemedi: …"
+         satırı görünür alanın dışına çıkıyor, Kaydet ise sabit ayakta
+         kalıyordu — basılıyor ve hiçbir şey olmuyor gibi görünüyordu. -->
+    <div class="sheet-foot">
+      <p id="director-status" class="modal-status" role="status"></p>
+      <button type="button" id="director-save" class="primary">Kaydet</button>
     </div>
   </aside>
 

@@ -84,6 +84,7 @@
         "tests/test_playwright_studio.py",
         "tests/test_prefs_route.py",
         "tests/test_provider_logos.py",
+        "tests/test_search_predicate.py",
         "tests/test_settings_route.py",
         "tests/test_shimmer.py"
       ],
@@ -416,7 +417,8 @@
       "testler": [
         "tests/test_folders.py",
         "tests/test_guvenlik_baslik.py",
-        "tests/test_legacy_formats.py"
+        "tests/test_legacy_formats.py",
+        "tests/test_playwright_studio.py"
       ],
       "yol": "folders.py"
     },
@@ -722,6 +724,7 @@
         "tests/test_folders.py",
         "tests/test_legacy_formats.py",
         "tests/test_palette_route.py",
+        "tests/test_playwright_studio.py",
         "tests/test_storage.py",
         "tests/test_storage_delete.py"
       ],
@@ -907,8 +910,8 @@
           "/output/{}"
         ],
         "dosya": "static/folders.js",
-        "satir": 1698,
-        "tanim": 56
+        "satir": 1806,
+        "tanim": 57
       },
       {
         "cagrilan_yollar": [],
@@ -1176,7 +1179,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 71,
+  "test_dosyasi_sayisi": 72,
   "uc_noktalar": [
     {
       "islev": "index",

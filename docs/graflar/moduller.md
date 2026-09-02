@@ -168,7 +168,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | modül | satır | katman | ithal ettiği | ithal eden | test |
 | --- | --- | --- | --- | --- | --- |
 | `android_main.py` | 194 | 9 | `app` (erteli), `desktop` (erteli), `errlog` (erteli), `paths` (erteli) | 0 | 1 |
-| `app.py` | 1757 | 6 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 27 |
+| `app.py` | 1757 | 6 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 28 |
 | `assets_store.py` | 201 | 1 | `jsonstore` | 3 | 9 |
 | `azure_client.py` | 458 | 1 | `paths`, `winsec` | 9 | 25 |
 | `backup.py` | 187 | 3 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 1 | 1 |
@@ -182,7 +182,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `credstore.py` | 128 | 2 | `azure_client`, `catalog` | 6 | 4 |
 | `desktop.py` | 263 | 8 | `errlog`, `netguard`, `paths`, `screencolor`, `app` (erteli) | 1 | 1 |
 | `errlog.py` | 114 | 0 | — | 4 | 1 |
-| `folders.py` | 248 | 2 | `jsonstore`, `storage` | 3 | 3 |
+| `folders.py` | 248 | 2 | `jsonstore`, `storage` | 3 | 4 |
 | `gemini_client.py` | 293 | 3 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `guncelleme.py` | 219 | 1 | `errlog`, `jsonstore`, `paths`, `version` | 1 | 2 |
 | `jsonstore.py` | 80 | 0 | — | 8 | 1 |
@@ -197,7 +197,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `providers.py` | 281 | 3 | `azure_client`, `catalog`, `credstore`, `gemini_client` (erteli), `openai_client` (erteli) | 4 | 3 |
 | `release_manifest.py` | 70 | 0 | — | 0 | 2 |
 | `screencolor.py` | 150 | 0 | — | 1 | 1 |
-| `storage.py` | 329 | 1 | `catalog`, `jsonstore` | 4 | 8 |
+| `storage.py` | 329 | 1 | `catalog`, `jsonstore` | 4 | 9 |
 | `version.py` | 27 | 0 | — | 3 | 7 |
 | `winsec.py` | 305 | 0 | — | 1 | 2 |
 

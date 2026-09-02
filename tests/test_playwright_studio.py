@@ -1010,3 +1010,123 @@ def test_playwright_logo_onizlemesi_kare_OLMAYAN_tabanda_kirpilmiyor(
             browser.close()
     finally:
         server.stop()
+
+
+# ── Arama: klasör zinciri ───────────────────────────────────────────
+
+
+def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(
+        tmp_path, monkeypatch):
+    """Üst klasörün adı alt klasördeki görselleri VE sayaçları getiriyor.
+
+    NEDEN DURUM ENJEKTE EDİLİYOR: arama %100 istemcide. Sunucuda arama ucu yok
+    (`/api/history` yalnız TAM `folder_id` eşitliğiyle süzüyor), yani tam bir
+    tur `loadAllImages`in klasör başına yayılımını ölçerdi — yüklemi değil.
+    Enjeksiyon ölçülen şeyi daraltıyor: ÇİZİLEN sayaçlar.
+
+    BU TESTİN ÖLÇTÜĞÜ, BAŞKA HİÇBİR KATMANIN ÖLÇEMEDİĞİ YARI:
+    `tests/test_search_predicate.py` yüklemi node'da gerçekten koşturuyor ama
+    yalnız yüklemi; `tests/test_index.py` kaynağın şeklini sınıyor. Sayaçların
+    ekrana doğru çizildiğini yalnız burası görüyor — kabul ölçütü de tam olarak
+    "kapsam sayaçları buna göre" diyor.
+
+    ÖLÇÜLDÜ (Chromium 1194, "kampanyalar"): historyCache 0 → 3, şerit
+    "4 klasör · 1 görsel" → "1 klasör · 3 görsel", seçicide "Tümü" 0 → 3 ve
+    "Kampanyalar / Bayram" 0 → 3. YEM klasör "Yılbaşı / Bayram" 0 → 0 kaldı:
+    eşleşen ATA, ağaçta geçen herhangi bir ad değil.
+    """
+    import folders as fmod
+    import storage
+    from PIL import Image
+
+    out = str(tmp_path / "output")
+    os.makedirs(out, exist_ok=True)
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", out)
+
+    simdi = "2026-09-02T09:00:00"
+    kampanyalar = fmod.create("Kampanyalar", out, parent_id=None, now=simdi)
+    bayram = fmod.create("Bayram", out, parent_id=kampanyalar["id"], now=simdi)
+    yilbasi = fmod.create("Yılbaşı", out, parent_id=None, now=simdi)
+    # YEM: aynı yaprak adı, BAŞKA bir ata. "kampanyalar" sorgusunda 0 kalmalı.
+    yem = fmod.create("Bayram", out, parent_id=yilbasi["id"], now=simdi)
+
+    buf = io.BytesIO()
+    Image.new("RGB", (64, 64), (30, 30, 30)).save(buf, "PNG")
+    ham = buf.getvalue()
+
+    def koy(prompt: str, folder_id) -> None:
+        storage.save(ham, {"prompt": prompt, "size": "1024x1024",
+                           "quality": "medium", "folder_id": folder_id},
+                     out, now=simdi)
+
+    for i in range(3):
+        koy(f"bayram gorsel {i}", bayram["id"])
+    for i in range(2):
+        koy(f"yem gorsel {i}", yem["id"])
+    koy("kokteki gorsel", None)
+
+    port = get_free_port()
+    server = ServerThread(port)
+    server.start()
+    time.sleep(1.0)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            page.goto(f"http://127.0.0.1:{port}")
+            page.wait_for_selector("#view-studio")
+            _ilk_kurulum_perdesini_kapat(page)
+            page.wait_for_function(
+                "() => typeof folderCache !== 'undefined' && folderCache.length === 4")
+
+            page.evaluate("() => showSection('media')")
+            page.fill("#media-search", "kampanyalar")
+            # Çapa SAYININ KENDİSİ: `refreshSearch` klasör başına bir istek
+            # atıyor ve sabit bir uyku o yarışı kapatmaz, yavaşlatır.
+            page.wait_for_function(
+                "() => historyCache.length === 3", timeout=10000)
+
+            rozetler = page.eval_on_selector_all(
+                ".card-where", "els => els.map(e => e.textContent)")
+            assert rozetler == ["Kampanyalar / Bayram"] * 3, (
+                f"rozetler zinciri yazmıyor: {rozetler}")
+
+            # ŞERİT EKRANI SAYIYOR: iki yarısı da. Önce ikisi de yanlıştı.
+            kart_sayisi = page.eval_on_selector_all(
+                "#folder-grid .folder-cell", "els => els.length")
+            serit = page.text_content("#media-rail-count")
+            assert serit == f"{kart_sayisi} klasör · 3 görsel", (
+                f"şerit ekranla uyuşmuyor: {serit!r}, ekranda {kart_sayisi} kart")
+
+            # KAPSAM SAYAÇLARI
+            page.evaluate("() => openPicker()")
+            page.wait_for_selector("#media-picker:not([hidden])")
+            page.fill("#picker-search", "kampanyalar")
+            page.wait_for_function(
+                "() => [...document.querySelectorAll('.picker-nav-item')]"
+                ".some(b => +b.querySelector('em').textContent === 3)",
+                timeout=10000)
+            kapsamlar = dict(page.evaluate(
+                "() => [...document.querySelectorAll('.picker-nav-item')]"
+                ".map(b => [b.querySelector('span').textContent,"
+                " +b.querySelector('em').textContent])"))
+
+            assert kapsamlar["Kampanyalar / Bayram"] == 3, (
+                "alt klasörün kapsamı hâlâ 0: kullanıcı 'Tümü'de gördüğü "
+                "görselleri kapsamına tıklayınca boş ızgara buluyor")
+            assert kapsamlar["Yılbaşı / Bayram"] == 0, (
+                "YEM kapsam doldu: eşleşme ATAYA değil ağaçtaki herhangi bir "
+                "ada bakıyor")
+            # BÖLME DEĞİŞMEZİ (kapsamlar alt ağaca AÇILMADI): klasör kapsamları
+            # + Klasörsüz tam olarak Tümü'nü tüketiyor. `imported` bilerek
+            # dışarıda — o `crossing`, yani kesişen tek süzgeç.
+            bolme = sum(v for k, v in kapsamlar.items()
+                        if k not in ("Tümü", "İçe aktarılanlar"))
+            assert bolme == kapsamlar["Tümü"], (
+                f"kapsamlar artık bir BÖLME değil: parçalar {bolme}, "
+                f"Tümü {kapsamlar['Tümü']}")
+
+            browser.close()
+    finally:
+        server.stop()

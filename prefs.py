@@ -69,6 +69,15 @@ _SCHEMA: dict[str, tuple[object, type]] = {
     # seçmedi" ile "şu modeli seçti" ayrımını korumak için — sağlayıcı
     # değiştiğinde eski sağlayıcının modeli yapışıp kalmasın.
     "chat_model": ("", str),
+    # Yönetmen ayarları çekmecesindeki kalıcı yönlendirme (serbest metin).
+    # `_ENUMS`'a GİRMİYOR ve giremez: değer kümesi açık.
+    #
+    # Buraya, `chat_instructions_override()` dosyasına DEĞİL — ikisi aynı işi
+    # yapmıyor. O dosya personayı EZİYOR (16,5 bin karakteri yeniden yazmak
+    # demek); bu alan personaya EKLENİYOR. Kullanıcının "her zaman düz vektör"
+    # demek için personanın tamamını devralmak zorunda kalması, özelliğin
+    # pratikte var olmaması demekti.
+    "director_guidance": ("", str),
 }
 
 DEFAULTS = {name: default for name, (default, _) in _SCHEMA.items()}

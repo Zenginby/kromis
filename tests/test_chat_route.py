@@ -32,6 +32,25 @@ def fake_complete(monkeypatch):
     return calls
 
 
+@pytest.fixture
+def fake_kwargs(monkeypatch):
+    """`cc.complete`e geçen KWARGS'ı toplar (sistem mesajı orada).
+
+    `fake_complete` yalnız `messages` biriktiriyor ve bilerek öyle kalıyor:
+    onun konusu dökümün süzgeci. Bağlam dikişinin konusu `instructions`, yani
+    ayrı bir fixture — ikisini tek listede birleştirmek her iki testin
+    iddialarını da bulanıklaştırırdı.
+    """
+    calls = []
+
+    def _complete(messages, **kwargs):
+        calls.append(kwargs)
+        return {"content": "ok", "finish_reason": "stop"}
+
+    monkeypatch.setattr(appmod.cc, "complete", _complete)
+    return calls
+
+
 def _post(client, messages):
     return client.post("/api/chat", json={"messages": messages})
 
@@ -453,3 +472,82 @@ def test_UYUMLU_adaptorun_hatasi_da_502_ve_TURKCE(client, monkeypatch):
 
     assert r.status_code == 502
     assert "gpt-5.6-terra" in r.json()["detail"]
+
+
+# ── Bağlam dikişi: sistem mesajı ROTADAN kuruluyor ───────────────────────
+
+def test_the_route_builds_the_system_message_itself(client, fake_kwargs):
+    """`instructions` rotadan geçiyor, adaptörün diskten okumasına bırakılmıyor.
+
+    Adaptörler `instructions=None` iken personayı kendileri okuyor ve bu yol
+    hâlâ geçerli (imza değişmedi) — ama o yolda kullanıcının kalıcı
+    yönlendirmesinin ve seçili modelin ulaşacağı bir yer YOK. Dikişin tek
+    görünür işareti bu kwarg.
+    """
+    _post(client, [{"role": "user", "content": "kare görsel"}])
+
+    assert fake_kwargs, "cc.complete hiç çağrılmadı"
+    talimat = fake_kwargs[0].get("instructions")
+    assert talimat, "sistem mesajı rotadan geçmiyor"
+    assert "Rolün" in talimat, "persona sistem mesajında yok"
+
+
+def test_the_saved_guidance_reaches_the_wire(client, fake_kwargs):
+    """Çekmeceye yazılan metin HER turda sistem mesajında olmalı.
+
+    Özelliğin tamamı bu satıra bağlı: yönlendirme `prefs.json`'a yazılıyor ama
+    oradan sistem mesajına taşınmazsa kullanıcı bir kutuya yazıp hiçbir şeyin
+    değişmediğini görür.
+    """
+    client.post("/api/prefs", json={"director_guidance": "her zaman düz vektör"})
+    _post(client, [{"role": "user", "content": "bayram görseli"}])
+
+    talimat = fake_kwargs[0]["instructions"]
+    assert "her zaman düz vektör" in talimat
+    assert "Kullanıcının kalıcı yönlendirmesi" in talimat
+
+
+def test_without_guidance_the_system_message_is_the_bare_persona(client, fake_kwargs):
+    """Yönlendirme boşken sistem mesajı BUGÜNKÜ metinle aynı kalmalı.
+
+    Bağlam bloğu yine giriyor (seçili model her zaman var), o yüzden iddia
+    yalnız yönlendirme bölümünün YOKLUĞUNU ölçüyor: çekmeceyi hiç açmamış
+    kullanıcı kendi adına yazılmış bir bölüm görmemeli.
+    """
+    _post(client, [{"role": "user", "content": "kare görsel"}])
+
+    talimat = fake_kwargs[0]["instructions"]
+    assert "Kullanıcının kalıcı yönlendirmesi" not in talimat
+
+
+def test_the_context_block_names_the_selected_image_model(client, fake_kwargs):
+    """Seçili GÖRSEL modeli sistem mesajına giriyor — sohbet modeli değil.
+
+    İkisi ayrı eksen: sohbet modeli yönetmenin KİM olduğunu, görsel modeli
+    yönetmenin hangi jetonları önerebileceğini belirliyor. İkincisi bu uçta
+    tel üzerinde HİÇ gelmiyor (`ChatRequest` `extra="forbid"`), o yüzden
+    `prefs.json`'dan okunmak zorunda.
+    """
+    import catalog
+    _post(client, [{"role": "user", "content": "kare görsel"}])
+
+    talimat = fake_kwargs[0]["instructions"]
+    assert "Bu turun bağlamı" in talimat
+    varsayilan = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
+    assert varsayilan.label in talimat, "seçili modelin adı bağlamda yok"
+
+
+def test_a_missing_instruction_file_becomes_the_same_turkish_502(client, monkeypatch):
+    """Talimat dosyası yoksa kullanıcı 500 DEĞİL Türkçe bir 502 görmeli.
+
+    Metin `chat_client`'ın kendi dalıyla AYNI olmak zorunda: iki yerde iki
+    cümle olsaydı aynı kusur, çağrının hangi yoldan gittiğine göre iki farklı
+    hata okuturdu.
+    """
+    monkeypatch.setattr(appmod.chat_prompt, "load_instructions",
+                        lambda **kw: (_ for _ in ()).throw(ValueError("yok")))
+    r = _post(client, [{"role": "user", "content": "kare görsel"}])
+
+    assert r.status_code == 502
+    assert "Prompt Yönetmeni talimatı yüklenemedi" in r.json()["detail"]
+

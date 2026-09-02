@@ -1130,3 +1130,262 @@ def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(
             browser.close()
     finally:
         server.stop()
+
+
+def test_playwright_yonetmen_cekmecesi_SAGDAN_aciliyor(monkeypatch):
+    """Yönetmen ayarları çekmecesinin tarayıcı sözleşmesi.
+
+    Kaynak taramasının göremediği beş şey burada ölçülüyor:
+
+      · çipin YALNIZ Yönetmen modunda göründüğü — CSS kaynağı kuralı yazdığını
+        söylüyor, hesaplanan `display`i söylemiyor (kaskad özgüllük kadar SIRA
+        demek, flow turunun dersi).
+      · panelin gerçekten SAĞ kenardan geldiği.
+      · odağın metin alanına GİTMEDİĞİ — Android'de klavye paneli yutuyor ve
+        bu yalnız `document.activeElement` ile görülüyor.
+      · Escape'ten sonra odağın çipe döndüğü — `sheetTetik` atamasının
+        `openSheet`ten sonra olması gerektiği tam bu yolla kanıtlanıyor;
+        yanlış sırada panel yine açılır, kaydetme yine işler ve tek kayıp
+        odaktır.
+      · tercihin diske TEK kez yazıldığı ve kaydedilen metnin geri okunduğu.
+    """
+    _tum_kimlikler_kayitli(monkeypatch)
+    port = get_free_port()
+    server = ServerThread(port)
+    server.start()
+    time.sleep(1.0)
+    base_url = f"http://127.0.0.1:{port}"
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 390, "height": 844})
+            prefs_posts = []
+            page.on("request", lambda r: prefs_posts.append(r.url)
+                    if r.method == "POST" and "/api/prefs" in r.url else None)
+
+            page.goto(base_url)
+            _ilk_kurulum_perdesini_kapat(page)
+
+            # 1. GÖRSEL modunda çip GİZLİ — mod ekseni gerçekten uyguluyor.
+            assert page.eval_on_selector(
+                "#director-btn", 'e => getComputedStyle(e).display') == "none", (
+                "Yönetmen ayarları çipi Görsel modunda görünüyor")
+
+            page.click("#tab-chat")
+            page.wait_for_function(
+                'document.querySelector("#composer").getAttribute("data-mode")'
+                ' === "director"')
+            assert page.eval_on_selector(
+                "#director-btn", 'e => getComputedStyle(e).display') != "none", (
+                "çip Yönetmen modunda da gizli")
+
+            # 2. Panel SAĞDAN geliyor ve sağ kenara dayanıyor.
+            page.click("#director-btn")
+            page.wait_for_selector("#director-sheet.open")
+            page.wait_for_function(
+                'getComputedStyle(document.querySelector("#director-sheet"))'
+                '.transform === "none"')
+            kutu = page.eval_on_selector(
+                "#director-sheet", "e => e.getBoundingClientRect()")
+            assert abs(kutu["right"] - 390) < 2, (
+                f"panel sağ kenara dayanmıyor: {kutu}")
+            assert page.get_attribute("#director-btn", "aria-expanded") == "true"
+
+            # 3. Odak panelin İÇİNDE ama metin alanında DEĞİL.
+            odak = page.evaluate("document.activeElement.id")
+            assert odak != "director-guidance", (
+                "odak metin alanında — Android'de klavye paneli yutar")
+            assert page.evaluate(
+                'document.querySelector("#director-sheet")'
+                '.contains(document.activeElement)'), "odak panelin dışında"
+
+            # 4. Kaydetme: TEK POST, ve metin sunucudan geri okunuyor.
+            page.fill("#director-guidance", "her zaman düz vektör")
+            page.click("#director-save")
+            page.wait_for_function(
+                'document.querySelector("#director-status").textContent'
+                '.includes("kaydedildi")')
+            assert len(prefs_posts) == 1, (
+                f"tercih {len(prefs_posts)} kez yazıldı — bir kez yazılmalı")
+
+            # 5. Escape kapatıyor, odak ÇİPE dönüyor.
+            page.keyboard.press("Escape")
+            page.wait_for_selector("#director-sheet:not(.open)")
+            assert page.evaluate("document.activeElement.id") == "director-btn", (
+                "odak tetikleyiciye dönmüyor — klavye kullanıcısı sayfanın "
+                "başına düşüyor")
+            assert page.get_attribute("#director-btn", "aria-expanded") == "false"
+
+            # 6. 360px'de yatay kayma YOK — Yönetmen modunda composer artık
+            #    iki kontrol taşıyor (#director-btn + Gönder).
+            page.set_viewport_size({"width": 360, "height": 780})
+            page.wait_for_timeout(300)
+            kaydi = page.evaluate("document.documentElement.scrollWidth >"
+                                  " document.documentElement.clientWidth")
+            assert not kaydi, "360px'de sayfa yatay kayıyor — composer taşıyor"
+
+            # 7. "İkinci etkinleştirme kapatıyor" — KLAVYEYLE ölçülüyor.
+            #
+            # ÖLÇÜLDÜ ve iki kez şaşırttı; kayda geçiyor çünkü kalıbın
+            # `willOpen` dalı ilk bakışta ÖLÜ görünüyor:
+            #
+            #   · 390×844'te telefonda `.sheet` tam genişlik (mobile.css
+            #     `.sheet { width: 100% }`) ve açık panel çipin ÜSTÜNE
+            #     biniyor: "subtree intercepts pointer events".
+            #   · 1280×860'ta panel çipi kapatmıyor AMA perde kapatıyor:
+            #     `.scrim` `position: fixed; inset: 0; z-index: 40` ve
+            #     `#composer` `z-index: 5`, yani çip perdenin ALTINDA kalıyor
+            #     ("#shell-scrim intercepts pointer events"). Fareyle ikinci
+            #     tık HİÇBİR genişlikte çipe ulaşmıyor — ulaşan tık perdeye
+            #     gidiyor ve perde de `closeSheets` çağırıyor, o yüzden
+            #     kullanıcının GÖRDÜĞÜ sonuç aynı: panel kapanıyor.
+            #
+            # Dal yine de ölü DEĞİL: odak tuzağı yok, yani kullanıcı
+            # Shift+Tab ile çipe dönüp Enter'a basabiliyor ve o yol
+            # `willOpen`i gerçekten `false` ile çalıştırıyor. ÖLÇÜLDÜ:
+            # #specs-btn de bire bir aynı davranıyor, yani bu #director-btn'in
+            # getirdiği bir bedel değil, `.scrim` + `#composer` z-index
+            # ilişkisinin yıllardır süren sonucu.
+            page.set_viewport_size({"width": 1280, "height": 860})
+            page.wait_for_timeout(200)
+            page.click("#director-btn")
+            page.wait_for_selector("#director-sheet.open")
+            page.focus("#director-btn")
+            page.keyboard.press("Enter")
+            page.wait_for_selector("#director-sheet:not(.open)")
+            assert page.get_attribute("#director-btn", "aria-expanded") == "false"
+
+            browser.close()
+    finally:
+        server.stop()
+
+
+# Yönetmenin tek bir yanıtı: prompt + varyasyon + üç eksen. İki eksen
+# AÇIKLAMALI seçenek nesnesi taşıyor, biri düz dize; ikisinde `simdi` yok
+# (ekleme ekseni). Tek bir yanıtın bu turda eklenen her yolu birden
+# tetiklemesi bilinçli — paneller birbirinin yanında çizildiğinde hizalanma
+# ve taşma ancak öyle ölçülüyor.
+_ORNEK_YONETMEN_YANITI = """Sade bir kare kurdum.
+
+**PROMPT**
+```
+A flat vector illustration of a tea glass on a plain cream background.
+```
+
+**Teknik ayarlar**
+```json
+{"size": "1024x1024", "quality": "medium", "n": 1}
+```
+
+```variations
+{"varyasyonlar": [{"ad": "Gece", "istek": "Zemini derin lacivert gece gogune cevir. Geri kalanini ayni tut."}]}
+```
+
+```parameters
+{"eksenler": [
+  {"ad": "Zemin", "simdi": "plain cream background",
+   "secenekler": [
+     {"ad": "deep navy background", "aciklama": "Gece laciverti; hilal parlak okunur.",
+      "ornek": {"renk": "#0b2545"}},
+     {"ad": "soft grey background", "aciklama": "Notr gri; nesneler one cikar.",
+      "ornek": {"renk": "#c9c9c9"}}]},
+  {"ad": "Isik", "secenekler": ["soft even light", "warm side light"]},
+  {"ad": "Oran",
+   "secenekler": [{"ad": "portrait", "aciklama": "Dikey kadraj.", "ornek": {"oran": "2:3"}}]}
+]}
+"""
+
+
+def test_playwright_aciklamali_oneri_karti_CIZILIYOR_ve_degeri_karismiyor():
+    """Açıklamalı öneri kartının tarayıcı sözleşmesi.
+
+    Kaynak taraması bunların HİÇBİRİNİ göremiyor:
+
+      · örnek kutusunun gerçekten BOYANDIĞI — `style.background`a yazılan
+        dizenin geçerli bir renge çözülüp çözülmediğini yalnız
+        `getComputedStyle` söylüyor. (Depo bu tuzağa bir kez düştü: çift
+        tireli bir yorum yüzünden işaret dosyaları 200 dönüp HİÇBİR ŞEY
+        çizmemişti ve konsolda tek hata yoktu.)
+      · `✓` işaretinin KARTTA da göründüğü — kural `.chat-option`ın
+        `::before`ından geliyor ve kart onu kaybedebilirdi.
+      · MODELE GİDEN metnin açıklamayı TAŞIMADIĞI — `axesValue`ın çıktısı
+        yalnız çalışan bir sayfada var ve bu, planın en kritik satırının
+        (`dataset.value`) tek gerçek ölçümü.
+      · takas ve ekleme eksenlerinin AYRI FİİLLE gittiği.
+      · iki satırlı kartların 390px'de taşmadığı.
+    """
+    port = get_free_port()
+    server = ServerThread(port)
+    server.start()
+    time.sleep(1.0)
+    base_url = f"http://127.0.0.1:{port}"
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 390, "height": 844})
+            page.goto(base_url)
+            _ilk_kurulum_perdesini_kapat(page)
+            page.click("#tab-chat")
+
+            # Yanıt DOĞRUDAN çizdiriliyor: gerçek bir Azure turu olmadan
+            # ayrıştırıcı + çizim yolu ölçülüyor. `appendBot` küresel kapsamda
+            # (chat.js klasik betik), yani sahte bir sunucuya gerek yok.
+            page.evaluate("t => appendBot(t)", _ORNEK_YONETMEN_YANITI)
+            page.wait_for_selector(".chat-axes")
+
+            # 1. Kartlar ve örnekler çizildi.
+            assert page.eval_on_selector_all(
+                ".chat-option-card", "e => e.length") == 4, "kartlar çizilmedi"
+            assert page.eval_on_selector_all(
+                ".chat-option-ornek", "e => e.length") == 3, "örnekler çizilmedi"
+
+            # 2. Renk GERÇEKTEN boyandı (200 alıp hiçbir şey çizmemek gibi bir
+            #    sessiz kayıp burada yakalanıyor).
+            assert page.eval_on_selector(
+                ".chat-axis[data-axis='Zemin'] .chat-option-ornek",
+                "e => getComputedStyle(e).backgroundColor") == "rgb(11, 37, 69)"
+            assert page.eval_on_selector(
+                ".chat-option-ornek-oran",
+                "e => getComputedStyle(e).aspectRatio") == "2 / 3"
+
+            # 3. Ekleme ekseni ekranda AYIRT EDİLİYOR (`simdi` yok).
+            rozetler = page.eval_on_selector_all(
+                ".chat-axis-new", "e => e.map(x => x.textContent)")
+            assert rozetler == ["prompt'ta yok", "prompt'ta yok"], rozetler
+
+            # 4. Varyasyonun `istek`i ekranda.
+            assert "Zemini derin lacivert" in page.eval_on_selector(
+                ".chat-variation .chat-option-not", "e => e.textContent")
+
+            # 5. MODELE GİDEN metin: açıklama KARIŞMIYOR, iki fiil AYRI.
+            page.click(".chat-axis[data-axis='Zemin'] .chat-option-card")
+            page.click(".chat-axis[data-axis='Isik'] .chat-option")
+            deger = page.evaluate(
+                "axesValue(document.querySelector('.chat-axes'))")
+            assert "Şu parametreleri değiştir: Zemin → deep navy background." \
+                in deger["content"], deger["content"]
+            assert "Şunları da belirle: Isik → soft even light." \
+                in deger["content"], deger["content"]
+            assert "Prompt'un geri kalanını aynı tut." in deger["content"]
+            for sizinti in ("Gece laciverti", "hilal parlak"):
+                assert sizinti not in deger["content"], (
+                    f"kart açıklaması modele giden cevaba karıştı: {sizinti}")
+                assert sizinti not in deger["display"], (
+                    "kart açıklaması akıştaki SEÇİM piline karıştı")
+
+            # 6. `✓` işareti KARTTA da var (kök sınıfın kuralı).
+            assert page.eval_on_selector(
+                ".chat-option-card[aria-checked='true']",
+                "e => getComputedStyle(e, '::before').content") == '"✓ "'
+
+            # 7. İki satırlı kartlar 390px'de taşmıyor.
+            assert not page.evaluate(
+                "document.documentElement.scrollWidth >"
+                " document.documentElement.clientWidth"), "kartlar taşıyor"
+
+            browser.close()
+    finally:
+        server.stop()
+

@@ -352,16 +352,128 @@ function answerGroup(label, { radio = false } = {}) {
   return group;
 }
 
+/** Seçenek maddesini normalleştirir: dize DE nesne DE gelebilir.
+ *
+ * Sözleşme geriye dönük uyumlu — eski yanıtlar (düz dize listesi) aynen
+ * çalışıyor. Süzgeç PAYLAŞILAN bir fonksiyon, `variationItems`/`axisItems`
+ * deseninin aynısı: iki panel (seçenek ve parametre) aynı soruyu soruyor ve
+ * ayrı yazılırlarsa biri bir alanı okur, öteki okumaz.
+ *
+ * → `{ ad, aciklama, ornek }`. `ad` MODELE GİDEN değer, yani bugünkü düz
+ * dizenin tam karşılığı; `aciklama` ve `ornek` yalnız ekrana ait. Bozuk bir
+ * madde `null` dönüyor ve çizilmiyor: adı olmayan bir çip tıklanınca modele
+ * boş bir cevap gönderirdi.
+ */
+function optionItem(raw) {
+  if (typeof raw === "string") {
+    return raw.trim() ? { ad: raw.trim(), aciklama: "", ornek: null } : null;
+  }
+  if (!raw || typeof raw !== "object" || typeof raw.ad !== "string" || !raw.ad.trim()) {
+    return null;
+  }
+  return {
+    ad: raw.ad.trim(),
+    aciklama: typeof raw.aciklama === "string" ? raw.aciklama.trim() : "",
+    ornek: raw.ornek && typeof raw.ornek === "object" ? raw.ornek : null,
+  };
+}
+
+// Örnek görselinin DOĞRULAYICILARI. Model metni bir `style` özelliğine
+// yazılacak, o yüzden kapı dar ve BEYAZ liste: doğrulamayı geçmeyen değer
+// çizilmiyor (metin yine görünüyor). `innerHTML` hiç kullanılmıyor, ama
+// `style.background = "url(...)"` gibi bir değer de burada geçemez.
+const HEX_RE = /^#[0-9a-fA-F]{3,8}$/;
+const ORAN_RE = /^([1-9][0-9]?):([1-9][0-9]?)$/;
+
+/** Seçeneğin ÇİZİLEBİLİR örneği (yoksa null).
+ *
+ * Üç şekil: tek renk · renk şeridi (2–5) · oran dikdörtgeni. Liste bilerek
+ * KISA — istemcinin gerçekten çizebildiği şeyler bunlar. "soft overcast light"
+ * gibi bir eksende görsel örnek üretmek üretim demek olurdu ve üretim para
+ * harcıyor (bkz. `#go` otomatik tıklanmaz kararı); o eksende doğru karşılık
+ * `aciklama` metni.
+ */
+function ornekKutusu(ornek) {
+  if (!ornek) return null;
+  const kutu = document.createElement("span");
+  kutu.className = "chat-option-ornek";
+  kutu.setAttribute("aria-hidden", "true");   // bilgi `aciklama`da yazılı
+
+  if (typeof ornek.renk === "string" && HEX_RE.test(ornek.renk.trim())) {
+    kutu.style.background = ornek.renk.trim();
+    return kutu;
+  }
+  if (Array.isArray(ornek.renkler)) {
+    const renkler = ornek.renkler
+      .filter((r) => typeof r === "string" && HEX_RE.test(r.trim()))
+      .map((r) => r.trim())
+      .slice(0, 5);
+    if (renkler.length < 2) return null;
+    kutu.classList.add("chat-option-ornek-serit");
+    for (const r of renkler) {
+      const dilim = document.createElement("span");
+      dilim.style.background = r;
+      kutu.appendChild(dilim);
+    }
+    return kutu;
+  }
+  if (typeof ornek.oran === "string") {
+    const m = ORAN_RE.exec(ornek.oran.trim());
+    if (!m) return null;
+    kutu.classList.add("chat-option-ornek-oran");
+    // `aspectRatio` sayısal: dizeyi doğrudan yazmak yerine ayrıştırılmış iki
+    // sayıdan kuruluyor, yani CSS'e model metni HİÇ geçmiyor.
+    kutu.style.aspectRatio = `${Number(m[1])} / ${Number(m[2])}`;
+    return kutu;
+  }
+  return null;
+}
+
 /** Seçilebilir çip. `scope` = DIŞLAYICILIK kapsamı, panelin kendisi olmak
  * zorunda değil: parametre panelinde eksen SATIRI geçiliyor, böylece "eksen içi
- * tek seçim, eksenler birbirinden bağımsız" semantiği bedavaya geliyor. */
-function optionChip(label, multi, scope) {
+ * tek seçim, eksenler birbirinden bağımsız" semantiği bedavaya geliyor.
+ *
+ * `item` dize DE nesne DE olabilir (`optionItem` normalleştiriyor). Açıklaması
+ * olan madde KART oluyor, olmayan bugünkü kompakt pill olarak kalıyor: kart
+ * yalnız taşıyacak bilgi varken doğuyor, yoksa şerit boşuna büyürdü.
+ *
+ * KART DA `.chat-option` sınıfını, `role`unu ve `aria-checked`ini TAŞIYOR:
+ * `lockStaleOptions`ın kilidi, odak halkası, `.chat-options-done` ve
+ * `[aria-checked="true"]::before { content: "✓ " }` hepsi o sınıftan geliyor.
+ */
+function optionChip(item, multi, scope) {
+  const veri = optionItem(item);
+  if (!veri) return null;
   const chip = document.createElement("button");
   chip.type = "button";
   chip.className = "chat-option";
   chip.setAttribute("role", multi ? "checkbox" : "radio");
   chip.setAttribute("aria-checked", "false");
-  chip.textContent = label;          // ← model metni: yalnızca textContent
+  // MODELE GİDEN değer burada, `textContent`te DEĞİL. `pickedLabels` eskiden
+  // `textContent` okuyordu ve kartın açıklaması o metne karışırdı — yönetmene
+  // "deep navy background Zemin gece lacivertine döner…" diye bir cevap
+  // giderdi. Ayrım sessiz olurdu: ekranda kart doğru görünür, yalnız modelin
+  // aldığı cevap bozuk olur.
+  chip.dataset.value = veri.ad;
+
+  const kutu = ornekKutusu(veri.ornek);
+  if (veri.aciklama || kutu) {
+    chip.classList.add("chat-option-card");
+    if (kutu) chip.appendChild(kutu);
+    const ad = document.createElement("span");
+    ad.className = "chat-option-ad";
+    ad.textContent = veri.ad;        // ← model metni: yalnızca textContent
+    chip.appendChild(ad);
+    if (veri.aciklama) {
+      const not = document.createElement("span");
+      not.className = "chat-option-not";
+      not.textContent = veri.aciklama;   // ← model metni: yalnızca textContent
+      chip.appendChild(not);
+    }
+  } else {
+    chip.textContent = veri.ad;      // ← model metni: yalnızca textContent
+  }
+
   chip.addEventListener("click", () => {
     const on = chip.getAttribute("aria-checked") === "true";
     if (!multi) {
@@ -378,19 +490,44 @@ function optionChip(label, multi, scope) {
 
 /** Varyasyon düğmesi. `role="checkbox"`/`aria-checked` BİLEREK YOK: varyasyon bir
  * EYLEM, açılıp kapanan bir anahtar değil — işaretlenmemiş bir onay kutusu diye
- * duyurmak ekran okuyucuya yalan söylemek olurdu. */
-function actionChip(label) {
+ * duyurmak ekran okuyucuya yalan söylemek olurdu.
+ *
+ * `aciklama` = maddenin `istek` alanı. O metin sözleşmede ZATEN vardı ve
+ * doğrulanıyordu (`variationItems`), ama ekranda HİÇ görünmüyordu: kullanıcı
+ * "Gece" yazan bir düğme görüyor ve neyin değişeceğini ancak tıklayıp
+ * bekledikten sonra öğreniyordu. Metin modele giden istekle AYNI — yani
+ * düğmenin ne yapacağının birebir kaydı, ikinci bir özet değil.
+ */
+function actionChip(label, aciklama) {
   const chip = document.createElement("button");
   chip.type = "button";
   chip.className = "chat-option chat-variation";
-  chip.textContent = label;          // ← model metni: yalnızca textContent
+  if (aciklama) {
+    chip.classList.add("chat-option-card");
+    const ad = document.createElement("span");
+    ad.className = "chat-option-ad";
+    ad.textContent = label;          // ← model metni: yalnızca textContent
+    const not = document.createElement("span");
+    not.className = "chat-option-not";
+    not.textContent = aciklama;      // ← model metni: yalnızca textContent
+    chip.append(ad, not);
+  } else {
+    chip.textContent = label;        // ← model metni: yalnızca textContent
+  }
   return chip;
 }
 
+/** Seçili çiplerin MODELE GİDEN değerleri.
+ *
+ * `dataset.value` okunuyor, `textContent` DEĞİL: kart varyantı çipin içine
+ * açıklama ve örnek koyuyor ve `textContent` onları da toplardı. `??` düşme
+ * yolu, `.chat-option` taşıyan ama `dataset.value` yazmayan bir çip
+ * (varyasyon düğmesi) buraya girerse eski davranışı koruyor.
+ */
 function pickedLabels(scope) {
   return [...scope.querySelectorAll(".chat-option")]
     .filter((c) => c.getAttribute("aria-checked") === "true")
-    .map((c) => c.textContent);
+    .map((c) => c.dataset.value ?? c.textContent);
 }
 
 /** Serbest yazı alanı: etiket + input. Düğme YOK — her panel kendi düğmesini
@@ -456,19 +593,28 @@ function optionsValue(group) {
  * iskeleti `content`'te kalıyor, yani görünmüyor.
  */
 function axesValue(group) {
-  const parts = [];
+  // İKİ liste, çünkü iki eksen türü modele AYRI fiille gidiyor: takas ekseni
+  // prompt'ta duran bir ifadeyi değiştiriyor, ekleme ekseni prompt'un hiç
+  // söylemediği bir şeyi belirliyor. Tek cümlede toplansalardı model
+  // "değiştir" fiilini var olmayan bir ifadeye uygulamak zorunda kalır ve
+  // ya uydurma bir eski değer üretir ya da isteği yok sayardı.
+  const takas = [];
+  const ekleme = [];
   const shown = [];
   for (const row of group.querySelectorAll(".chat-axis")) {
     const picked = pickedLabels(row);
     if (!picked.length) continue;
     const name = row.dataset.axis || "";
-    parts.push(`${name} → ${picked[0]}`);
+    (row.dataset.yeni ? ekleme : takas).push(`${name} → ${picked[0]}`);
     shown.push(`${name}: ${picked[0]}`);
   }
+  const parts = [...takas, ...ekleme];
   const own = ownText(group);
   if (!parts.length && !own) return { content: "", display: "" };
-  const sentence = parts.length
-    ? `Şu parametreleri değiştir: ${parts.join("; ")}.` : "";
+  const sentence = [
+    takas.length ? `Şu parametreleri değiştir: ${takas.join("; ")}.` : "",
+    ekleme.length ? `Şunları da belirle: ${ekleme.join("; ")}.` : "",
+  ].filter(Boolean).join(" ");
   // Kullanıcı noktalama koymadıysa biz koyuyoruz: yoksa serbest metin ile
   // kapanış cümlesi tek cümleye yapışıyor ("zemin daha sade Prompt'un geri
   // kalanını aynı tut") ve model sınırın nerede olduğunu tahmin etmek zorunda.
@@ -518,7 +664,12 @@ function renderOptions(parsed) {
   const chips = document.createElement("div");
   chips.className = "chat-options-chips";
   for (const raw of spec.secenekler.slice(0, OPTION_MAX)) {
-    chips.appendChild(optionChip(String(raw), multi, group));
+    // `String(raw)` KALDIRILDI: madde artık nesne de olabiliyor ve `String`
+    // onu "[object Object]" yapardı — ekranda da, modele giden cevapta da.
+    // Bozuk madde `null` dönüyor ve atlanıyor: adsız bir çip tıklanınca
+    // modele boş cevap gönderirdi.
+    const chip = optionChip(raw, multi, group);
+    if (chip) chips.appendChild(chip);
   }
   group.appendChild(chips);
 
@@ -602,7 +753,7 @@ function renderVariations(parsed) {
   chips.className = "chat-options-chips";
   for (const item of items) {
     const ad = item.ad.trim();
-    const chip = actionChip(ad);
+    const chip = actionChip(ad, item.istek.trim());
     chip.addEventListener("click", async () => {
       $("prompt").value = `"${ad}" varyasyonunu uygula: ${item.istek.trim()}`;
       if (await sendChat(`Varyasyon: ${ad}`)) lockOptions(group);
@@ -639,19 +790,32 @@ function renderParameters(parsed) {
     label.textContent = name;
     row.appendChild(label);
 
+    // Rozet İKİ durumu anlatıyor ve ikisi de görünür olmak ZORUNDA: `simdi`
+    // varsa satır bir TAKAS (prompt'ta duran ifade gösteriliyor, kullanıcı
+    // neyi feda ettiğini görüyor), yoksa bir EKLEME (prompt o ekseni hiç
+    // söylemiyor). Öncesinde `simdi` yokken hiçbir şey çizilmiyordu, yani
+    // ekleme ekseni takas gibi görünüyordu — kullanıcı var olmayan bir
+    // ifadeyi değiştirdiğini sanırdı. `dataset.yeni` bu ayrımın axesValue'nun
+    // okuduğu hâli: iki eksen türü modele ayrı fiille gidiyor.
+    const now = document.createElement("span");
     if (typeof axis.simdi === "string" && axis.simdi.trim()) {
-      // Takas edilen değer GÖRÜNÜR olmalı ama tıklanabilir GÖRÜNMEMELİ:
-      // o yüzden çip değil kod rozeti.
-      const now = document.createElement("span");
+      // Değer GÖRÜNÜR olmalı ama tıklanabilir GÖRÜNMEMELİ: çip değil kod rozeti.
       now.className = "chat-axis-now";
       now.textContent = axis.simdi.trim();
-      row.appendChild(now);
+    } else {
+      row.dataset.yeni = "1";
+      now.className = "chat-axis-new";
+      now.textContent = "prompt'ta yok";
     }
+    row.appendChild(now);
 
     const chips = document.createElement("div");
     chips.className = "chat-options-chips";
     for (const raw of axis.secenekler.slice(0, OPTION_MAX)) {
-      chips.appendChild(optionChip(String(raw), false, row));
+      // `false` = eksen içinde TEK seçim, `row` = dışlayıcılık kapsamı
+      // (panel değil SATIR): ışık + palet + kadraj birlikte seçilebilsin.
+      const chip = optionChip(raw, false, row);
+      if (chip) chips.appendChild(chip);
     }
     row.appendChild(chips);
     group.appendChild(row);
@@ -1761,6 +1925,9 @@ async function loadPrefs() {
     const p = await chatApi("/api/prefs");
     $("pref-autosave").checked = p.autosave_sessions !== false;
     $("pref-guncelleme").checked = p.guncelleme_kontrolu !== false;
+    // `|| ""`: alanı hiç tanımayan bayat bir sunucu `undefined` döndürür ve
+    // `undefined` bir textarea'ya yazıldığında ekranda "undefined" YAZAR.
+    $("director-guidance").value = p.director_guidance || "";
     if (p.theme) {
       applyTheme(p.theme);
       const radio = document.querySelector(`input[name="theme"][value="${p.theme}"]`);
@@ -1788,6 +1955,35 @@ async function saveAutosavePref() {
   } catch (e) {
     $("pref-autosave").checked = !on;   // gerçekleşmeyen değişikliği geri al
     $("settings-status").textContent = `Tercih kaydedilemedi: ${e.message}`;
+  }
+}
+
+/** Kalıcı yönlendirmeyi yazar. Anında yazım DEĞİL, düğmeye bağlı.
+ *
+ * `saveAutosavePref`ten AYRILIYOR ve sebebi tür farkı: bir onay kutusunun
+ * değeri tek bit, yazım reddedilirse kutu geri döner ve kullanıcı hiçbir şey
+ * kaybetmez. Burada değer uzun bir serbest metin — her tuş vuruşunda POST
+ * atmak hem gereksiz, hem de sessizce başarısız olan bir yazım kullanıcının
+ * yazdığını kaybettirir. Metin alanının kalıbı #settings-modal'ın "Kaydet"i.
+ *
+ * Ekrandaki değer SUNUCUNUN döndürdüğünden kuruluyor (autosave deseninin
+ * aynısı): sunucu kırpmışsa kullanıcı kırpılmış hâli görür, yani kaydedilenle
+ * ekranda duran ayrışmaz.
+ */
+async function saveDirectorGuidance() {
+  const metin = $("director-guidance").value;
+  $("director-status").textContent = "Kaydediliyor…";
+  try {
+    const p = await chatApi("/api/prefs",
+      { method: "POST", body: { director_guidance: metin } });
+    $("director-guidance").value = p.director_guidance || "";
+    $("director-status").textContent = p.director_guidance
+      ? "Yönlendirme kaydedildi — bundan sonraki her turda geçerli."
+      : "Yönlendirme temizlendi.";
+  } catch (e) {
+    // Metin KUTUDA BIRAKILIYOR: kullanıcının yazdığını bir ağ hatası yüzünden
+    // silmek, sendChat'in başarısızlık dalının reddettiği şeyin aynısı.
+    $("director-status").textContent = `Kaydedilemedi: ${e.message}`;
   }
 }
 
@@ -2029,6 +2225,36 @@ if ($("chats-kebab-delete-all")) {
 }
 $("pref-autosave").addEventListener("change", saveAutosavePref);
 $("pref-guncelleme").addEventListener("change", saveGuncellemePref);
+
+// ── Yönetmen ayarları çekmecesi ──────────────────────────────────────
+// İKİNCİ TIK KAPATIYOR — #specs-btn'in kalıbının aynısı (core.js). Açık bir
+// panelin çipine yeniden dokunmak onu kapatmalı, yoksa `openSheet` aynı paneli
+// kapatıp yeniden açar ve kullanıcı bir titreme görür.
+//
+// `aria-expanded`ın SIFIRLANMASI burada DEĞİL `closeSheets`te: kapanışın beş
+// kapısı var (× · perde · Escape · Android geri · başka bir panelin açılması)
+// ve her birine ayrı ayrı yazmak birini unutmak demekti (bkz. core.js'in
+// #arena-btn dersi).
+$("director-btn").addEventListener("click", () => {
+  const willOpen = !$("director-sheet").classList.contains("open");
+  closeSheets();
+  if (willOpen) {
+    openSheet("director-sheet");
+    // SIRA BAĞLAYICI: `openSheet` içinde `closeSheets` koşuyor ve o
+    // `sheetTetik`i null'a çekiyor — atama ÖNCE yapılsaydı odak iadesi hiç
+    // çalışmazdı (openModelSheet'in aynı mandalı).
+    sheetTetik = $("director-btn");
+    $("director-btn").setAttribute("aria-expanded", "true");
+    // Odak BAŞLIĞA, metin alanına DEĞİL: Android'de klavye alttan açılıyor ve
+    // bir metin alanına odaklanmak paneli yutuyor (settings.js'in ölçülmüş
+    // dersi, `#set-provider` yerine `set-provider` seçilmesinin sebebi).
+    // `tabIndex = -1` şart: `<h2>` odaklanabilir bir öğe değil.
+    const head = $("director-sheet").querySelector(".sheet-head h2");
+    if (head) { head.tabIndex = -1; head.focus(); }
+  }
+});
+$("director-close").addEventListener("click", closeSheets);
+$("director-save").addEventListener("click", saveDirectorGuidance);
 
 
 syncEmptyState();

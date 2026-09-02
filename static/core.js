@@ -236,35 +236,43 @@ $("rail-collapse").addEventListener("click", () => {
 });
 
 // ── Slide-over'lar ──
-// Odağı iade edecek düğme (#model-btn ya da #chat-model-btn). BURADA
-// tanımlanıyor, panelin kendi bölümünde değil: `closeSheets` bu dosyanın
-// başında ve bir `let`e 500 satır ileriden bakmak, TDZ'ye takılmasa bile
-// okuyanı yanıltır. Yazan yer `openModelSheet` (aşağıda), okuyan yer
-// `closeSheets` — ikisinin ORTAK durumu, o yüzden ortak sahibi de yok.
-let modelSheetTetik = null;
+// Açık paneli AÇAN düğme — odak ona iade edilecek. BURADA tanımlanıyor,
+// panelin kendi bölümünde değil: `closeSheets` bu dosyanın başında ve bir
+// `let`e 500 satır ileriden bakmak, TDZ'ye takılmasa bile okuyanı yanıltır.
+// Yazan yerler `openModelSheet` (aşağıda) ve chat.js'in yönetmen çipi, okuyan
+// yer `closeSheets` — ortak durum, o yüzden ortak sahibi de yok.
+//
+// Adı `modelSheetTetik` DEĞİL: değişken artık yalnız model panelinin çipini
+// taşımıyor ve model adını taşıyan bir isim, ikinci bir yüzeyin buraya
+// yazmasını yanlış gösterirdi.
+let sheetTetik = null;
 
 function closeSheets() {
   for (const el of document.querySelectorAll(".sheet.open")) el.classList.remove("open");
-  $("chat-sidebar-toggle").setAttribute("aria-expanded", "false");
-  $("specs-btn").setAttribute("aria-expanded", "false");
+  // `aria-expanded` TÜRETİLMİŞ listeden sıfırlanıyor: `aria-controls`u bir
+  // `.sheet`e bakan her tetik. Öncesinde liste ELLE sayılıyordu (önce iki
+  // model çipi, sonra #chat-sidebar-toggle + #specs-btn) ve her seferinde
+  // bayatladı — #arena-btn eklendiğinde ekran okuyucu KAPALI bir paneli
+  // "açık" okuyordu ve ekranda hiçbir iz yoktu. Türetme beşinci yüzeyi de
+  // kendiliğinden kapsıyor; kopmuş bir düğüme yazmak zararsız olduğu için
+  // burada `isConnected` kontrolü YOK (odakta var).
+  for (const tetik of document.querySelectorAll("[aria-controls][aria-expanded]")) {
+    const hedef = document.getElementById(tetik.getAttribute("aria-controls"));
+    if (hedef && hedef.classList.contains("sheet")) {
+      tetik.setAttribute("aria-expanded", "false");
+    }
+  }
   // ODAK İADESİ. `closeSheets` kapanışın TEK kapısı (× düğmesi, "Tamam",
   // perde, Escape, Android geri tuşu hepsi buraya düşüyor), yani iadenin de
   // tek yeri burası — beş çağıranın her birine ayrı ayrı yazmak, birini
   // unutmak demekti. `isConnected` şart: kart listesi yeniden çizilirken
   // tetikleyici DOM'dan düşmüş olabilir ve kopmuş bir düğüme odaklanmak
   // odağı `<body>`ye atar (chat.js'in menü deseninin aynı kontrolü).
-  //
-  // `aria-expanded` DE buradan sıfırlanıyor, aynı değişkenden. Öncesinde iki
-  // çip (#model-btn, #chat-model-btn) elle sayılıyordu ve o liste üçüncü
-  // eksen (arena) eklenince bayatladı: #arena-btn kapanışta sıfırlanmıyor,
-  // yani ekran okuyucu KAPALI bir paneli açık okuyordu. Tetikten okumak
-  // listeyi tümden kaldırıyor — dördüncü eksen kendiliğinden kapsanıyor.
-  // Kopmuş bir düğüme yazmak zararsız, o yüzden `isConnected` yalnız odakta.
-  if (modelSheetTetik) {
-    modelSheetTetik.setAttribute("aria-expanded", "false");
-    if (modelSheetTetik.isConnected) modelSheetTetik.focus();
+  if (sheetTetik) {
+    sheetTetik.setAttribute("aria-expanded", "false");
+    if (sheetTetik.isConnected) sheetTetik.focus();
   }
-  modelSheetTetik = null;
+  sheetTetik = null;
 }
 
 // Panel açmanın TEK kapısı: dört panel aynı perdeyi ve aynı sağ/sol şeridi
@@ -1319,11 +1327,11 @@ function openModelSheet(eksenAdi) {
   openSheet("model-sheet");                       // tek kapı (yukarısı)
 
   // SIRA BAĞLAYICI ve sessiz bir kırılmanın mandalı: `openSheet` İÇİNDE
-  // `closeSheets` koşuyor ve o `modelSheetTetik`i null'a çekiyor. Atama
+  // `closeSheets` koşuyor ve o `sheetTetik`i null'a çekiyor. Atama
   // `openSheet`ten ÖNCE yapılsaydı odak iadesi hiç çalışmazdı — ekranda
   // hiçbir iz bırakmadan, çünkü panel yine açılıyor ve seçim yine işliyor.
   const tetik = $(MODEL_EKSENLERI[eksenAdi].dugme);
-  modelSheetTetik = tetik;
+  sheetTetik = tetik;
   tetik.setAttribute("aria-expanded", "true");
 
   // Odak İŞARETLİ radyoya: ok tuşlarıyla gezinme ilk tuş basımında çalışsın

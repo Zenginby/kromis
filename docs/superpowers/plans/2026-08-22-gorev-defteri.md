@@ -1,11 +1,12 @@
 # Görev defteri — sıradaki adımlar
 
-**Tarih:** 2 Eylül 2026 · **Son dal:** `claude/recent-changes-status-rwc2hx`
+**Tarih:** 2 Eylül 2026 · **Son dal:** `claude/improve-project-manager-avgocm`
 (`main`'den kuruldu, henüz birleşmedi)
-**Bugünkü ölçüm:** `APP_VERSION` **0.11.7** (sonrakini CI yazacak),
-`pytest tests/ -q` → **1880 geçti / 9 atlandı** (Playwright kuruluyken; Tur L
-öncesi aynı ortamda 1861 geçti / 9 atlandı — on dokuz yeni test: iki mobil
-mandalı, iki E2E, beş kaynak mandalı ve node ile koşan on bir davranış testi)
+**Bugünkü ölçüm:** `APP_VERSION` **0.11.8** (sonrakini CI yazacak),
+`pytest tests/ -q` → **1913 geçti / 9 atlandı** (Playwright kuruluyken; Tur M
+öncesi aynı ortamda 1884 geçti / 9 atlandı — yirmi dokuz yeni test: on persona
+ve bağlam mandalı, beş rota mandalı, on bir kaynak mandalı, bir mobil mandalı
+ve iki E2E)
 **Defterin açılış ölçümü** (Tur A öncesi): `APP_VERSION` 0.7.0 → 1613 geçti / 10 atlandı
 (atlananlar her üç ölçümde de yalnız Windows'a özgü DACL testleri + kurulu
 olmayan Playwright)
@@ -33,6 +34,166 @@ burada durur. Yol haritaları (README fazları, `2026-08-10-saas-transformation-
 4. Kuyruktan bir madde alındığında **üste taşınır** ve kendi adım listesini
    orada kazanır. Kuyruk sırası bir söz değil, öneri: kullanıcı sırayı
    değiştirebilir.
+
+---
+
+## ✅ Tur M — Yönetmen: öneri tükeniyordu, seçenekler çıplaktı, yönlendirme yoktu
+
+**Bitti (2 Eylül).** Kullanıcı isteği; üç parça da sorulup onaylandı
+(önizleme biçimi · çekmece içeriği · hangi kök sebebe ağırlık verileceği).
+Kuyruk maddesi DEĞİL — ama flow arayüz devrinin "bilerek yapılmayanlar"
+listesindeki bir borcu kapatıyor (aşağıda 3. bölüm).
+
+### 1. Öneri "çok az"dı ve sebebi iki DOĞRU kararın çarpışmasıydı
+
+`parameters` ekseni yalnız prompt'ta **AYNEN geçen** bir ifade üzerinden
+kurulabiliyordu (`simdi` sözleşmesi) ve prompt'a kelime eklemek yasaktı.
+v1.16'nın "Sadelik disiplini" (*"alt sınır yoktur, uydurma katman yazma"*)
+prompt'ları kısalttı — kısalan prompt'ta takas edilecek ifade kalmadığı için
+**panel 0–1 eksenle geliyordu.** İki kural da tek tek doğru; kusur, öneri
+kapısının prompt'un UZUNLUĞUNA bağlanmasıydı.
+
+- [x] **Ekleme ekseni.** `simdi` artık **atlanabilir**: yazılmazsa eksen bir
+      takas değil ekleme teklifidir ("prompt bunu söylemiyor"). Sadelik
+      disiplini bozulmuyor, çünkü kelime prompt'a yönetmenin elinden değil
+      **kullanıcı çipe tıkladığında** giriyor. Uydurulmuş `simdi` yasağı
+      eklendi — o yasak olmadan açılan kapının kendi kusuru doğardı.
+- [x] **İki eksen türü modele AYRI FİİLLE gidiyor.** `axesValue` iki liste
+      kuruyor: `Şu parametreleri değiştir: …` ve `Şunları da belirle: …`. Tek
+      cümlede toplansalardı model "değiştir" fiilini var olmayan bir ifadeye
+      uygulamak zorunda kalır ve ya uydurma bir eski değer üretir ya da isteği
+      yok sayardı.
+- [x] **Ekleme ekseni EKRANDA ayırt ediliyor** (`.chat-axis-new`,
+      `prompt'ta yok`). Öncesinde rozet yalnız `simdi` varken çiziliyordu, yani
+      satır boş kalıyor ve ekleme ekseni takas gibi görünüyordu.
+- [x] **Tavanlar istemciyle eşitlendi**: varyasyon 2 → **4**, eksen 3 → **6**.
+      `static/chat.js` `VARIATION_MAX = 4` / `AXIS_MAX = 6`'yı zaten kabul
+      ediyordu — tavan iki yıl boşa durdu ve kullanıcı istemcinin
+      çizebileceğinin yarısını aldı. İstemcide tek satır değişmedi.
+
+### 2. Seçenekler çıplaktı — artık açıklamalı ve ÇİZİLEN örnekli
+
+`optionChip` yalnız `chip.textContent = label` yazıyordu: "soft grey
+background" çipinin görsele ne yapacağı hiçbir yerde yazmıyordu.
+
+- [x] **Sözleşme geriye dönük uyumlu genişledi.** `secenekler` maddesi dize DE
+      nesne DE olabiliyor: `{ad, aciklama, ornek}`. Açıklaması olan madde KART,
+      olmayan bugünkü kompakt pill — kart yalnız taşıyacak bilgi varken doğuyor.
+- [x] **`ornek` BEYAZ liste** ve istemcinin gerçekten çizebildiği üç şekil:
+      `{"renk": "#…"}` · `{"renkler": […]}` · `{"oran": "2:3"}`. Kredi
+      harcamıyor, çevrimdışı da görünüyor. Işık/üslup gibi eksenlerde örnek
+      YASAK — orada görsel örnek üretmek ÜRETİM demek olurdu (`#go` otomatik
+      tıklanmaz kararı).
+- [x] **Varyasyonun `istek`i ekranda.** Metin sözleşmede ZATEN vardı, ZATEN
+      doğrulanıyordu (`variationItems`) ve modele gidiyordu — ama kullanıcıya
+      hiç gösterilmiyordu: "Gece" yazan bir düğme görüp neyin değişeceğini
+      ancak tıklayıp yarım dakika bekledikten sonra öğreniyordu. Turun en ucuz
+      kazancı: sözleşme değişmedi, bütçe harcanmadı.
+
+**Turun en kritik tek satırı** — `pickedLabels` artık `dataset.value` okuyor,
+`textContent` değil. Kart açıklamayı çipin İÇİNE koyuyor ve eski okuma yolu
+onu da toplardı: yönetmene *"deep navy background Zemin gece lacivertine
+döner…"* diye bir cevap giderdi. Ayrım tümüyle sessiz olurdu — ekranda kart
+doğru, akıştaki SEÇİM pili doğru, yalnız modelin aldığı metin bozuk.
+
+### 3. Kalıcı yönlendirme: TASARIMDA vardı, teslim edilmemişti
+
+`docs/flow-ui/flow-redesign-plan.md:209` (§4.2) Yönetmen modu için composer'ın
+sağında **"Yönetmen talimatları ikonu"** diyor; `2026-08-06-flow-arayuz-devri.md`
+onu *"bilerek yapılmayanlar"*a yazmıştı. Bu tur o borcu kapatıyor.
+
+Ayrıca ölçülmüş bir eksiklik: yönlendirmenin TEK yolu
+`data_dir()/chat-instructions.md` ile **16,5 bin karakterlik personayı tümden
+EZMEK**ti. "Her zaman düz vektör" demek için personanın tamamını devralmak
+gerekiyordu, yani özellik pratikte yoktu.
+
+- [x] **`#director-btn`** — `.composer-right` içinde, Görsel modundaki
+      "Üretim ayarları" çipinin simetriği. Composer'ın İÇİNDE olduğu için mod
+      ekseni, `showSection`ın gizlemesi, `--composer-h` ölçümü ve mobil sarma
+      kuralları bedava geliyor.
+- [x] **`#director-sheet`** — `.sheet .sheet-right`, `sheet-grip` YOK. İkisi
+      birlikte bilinçli: ayarların yeri bu depoda sağ şerit, tutamak yalnız
+      alttan açılan iki panelde var ve `sheet-grip` sayısı 2'ye çivili.
+- [x] **`prefs.director_guidance`** (+ `models.PrefsRequest` çifti — biri
+      atlanırsa uç 422 döner, `guncelleme_kontrolu` kusurunun aynısı).
+- [x] **`chat_prompt.build_system()`** — bağlam dikişi. Boş girdiyle dönüş
+      `load_instructions()` ile **bayt bayt aynı**: dikiş açılırken bugünkü
+      davranış değişmemeli.
+- [x] **Dikişin ikinci yolcusu: seçili model.** Sistem mesajı öncesinde HER
+      kullanıcıda ve HER modelde bayt bayt aynıydı ve bunun ölçülmüş bir
+      bedeli vardı — persona `low·medium·high` tablosunu elle yazıyor, Nano
+      Banana'nın ekseni ise `1K/2K/4K`, yani o modeli seçen kullanıcıda
+      yönetmenin her teknik ayar önerisi `applyIfSupported` tarafından
+      "uygulanamadı" diye reddediliyordu. Öneri ölü doğuyor ve sebebi hiçbir
+      yerde görünmüyordu. Kullanıcı bunu şikâyet listesinde işaretlemedi, ama
+      dikiş zaten açılıyordu.
+- [x] **Yönlendirme kapsamı GENİŞLETEMİYOR.** Metin çitleniyor (çit
+      kullanıcının metninde geçerse SÖKÜLÜYOR, kırpılmıyor) ve sistem mesajı
+      "bu bir TERCİHTİR, kural kazanır" diyor.
+
+### Yeniden yazılan iddialar (silinmedi)
+
+| iddia | neden yeniden yazıldı |
+| --- | --- |
+| `test_kapanis_ARIA_yi_TETIKTEN_sifirliyor_…` → `…_TURETILMIS_listeden_…` | Elle sayılan liste bu dosyada **İKİNCİ** kez bayatladı: `modelSheetTetik` turu üç model çipini kapatmıştı ama `#chat-sidebar-toggle` + `#specs-btn` elle sayılı KALDI ve `#director-btn` aynı boşluğu yeniden doğurdu. Ölçü artık türetme (`[aria-controls]` → `.sheet`); iddia altı id'nin HİÇBİRİNİN elle sayılmadığını sınıyor. `modelSheetTetik` → `sheetTetik` yeniden adlandırıldı: değişken artık tek bir panelin çipini taşımıyor. |
+| `test_each_parameter_axis_is_mutually_exclusive_on_its_own_row` | Çağrı değişti, konu değişmedi: `optionChip(String(raw), …)` → `optionChip(raw, …)`. `String()` sarmalayıcısı madde düz dizeyken doğruydu; nesne maddeyi "[object Object]" yapardı — hem ekranda hem MODELE giden cevapta. İddia yeni bir mandal da kazandı (`String(raw)` geri gelmesin). |
+| `test_the_image_mode_composer_row_wraps_by_rule_…` → `test_the_composer_row_wraps_by_rule_…` | Kural mod-özgü olmaktan çıktı. Eski gerekçe o gün doğruydu (Yönetmen modunda `.composer-right`ta tek "Gönder" kalıyordu, ölçüm 393×873: Yönetmen 149px, Görsel 189px); `#director-btn` o boşluğu doldurdu. İddia mod ekseninin GERİ GELMESİNİ de yasaklıyor. |
+| `test_the_bundled_default_stays_within_its_budget` | Tavan **18.000 → 19.500**, gerekçesiyle. Üç taşıyıcı sözleşme eklendi; karşılığında `size`/`quality` tabloları kısaldı (geçerli jetonlar artık bağlam bloğundan). **1.500 karakter boşluk kasıtlı:** 18.000'de dosya 17.996'ya oturuyordu, yani bir sonraki tek satırlık ekleme testi kırar ve kıran kişi gerekçeyi okumadan tavanı yükseltmeye kalkardı. |
+
+### Turun kanıtı
+
+`pytest tests/ -q` → **1913 geçti / 9 atlandı** (öncesi 1884/9, aynı ortam).
+Yirmi dokuz yeni test; dördü Playwright'ta ve **CI'da koşmuyor**, o yüzden her
+birinin kaynak-taraması kardeşi `test_index.py`de duruyor.
+
+**Chromium ölçümü (390×844 ve 1280×860, gerçek sunucu):** çip Görsel modunda
+`display: none` / Yönetmen modunda görünür · panel sağ kenara dayanıyor
+(`right` = 390) · odak panelin içinde ama metin alanında DEĞİL · tercih diske
+**TEK** POST · Escape sonrası odak çipe dönüyor · dört kart + üç örnek çizildi ·
+renk gerçekten boyandı (`rgb(11, 37, 69)`) · oran `2 / 3` · `✓` kartta da var ·
+modele giden metin iki fiil taşıyor ve açıklamayı TAŞIMIYOR · 360px'de yatay
+kayma yok · konsol temiz.
+
+### Turun ÖLÇÜLMÜŞ sürprizi: "ikinci tık kapatıyor" fareyle ULAŞILMIYOR
+
+`#specs-btn`in `willOpen` dalı ilk bakışta ölü göründü ve iki kez şaşırttı:
+
+* **390px:** telefonda `.sheet` tam genişlik, açık panel çipin ÜSTÜNE biniyor —
+  Playwright tıklamayı reddediyor ("subtree intercepts pointer events").
+* **1280px:** panel çipi kapatmıyor AMA **perde** kapatıyor. `.scrim`
+  `position: fixed; inset: 0; z-index: 40`, `#composer` ise `z-index: 5`, yani
+  çip perdenin ALTINDA. Fareyle ikinci tık HİÇBİR genişlikte çipe ulaşmıyor —
+  ulaşan tık perdeye gidiyor ve perde de `closeSheets` çağırıyor, o yüzden
+  kullanıcının GÖRDÜĞÜ sonuç aynı: panel kapanıyor.
+
+Dal yine de ölü değil: odak tuzağı yok, kullanıcı Shift+Tab ile çipe dönüp
+Enter'a basabiliyor ve o yol `willOpen`i gerçekten `false` ile çalıştırıyor
+(ölçüldü). **`#specs-btn` bire bir aynı davranıyor**, yani bu `#director-btn`in
+getirdiği bir bedel değil — `.scrim` + `#composer` z-index ilişkisinin
+yıllardır süren sonucu. E2E iddiası bu yüzden klavyeyle yazıldı.
+
+**Turun dersi:** bir iddiayı yeşil görmek onu ölçmüş olmak değil.
+`"HEX_RE.test" in govde` iddiası, tek renk dalının doğrulaması sökülünce
+**şeridin** süzgeci sayesinde yeşil kaldı — mutasyon kaçtı. Düzeltme yolu
+SAYMAK oldu (`count(...) >= 2` + `count("style.background") <= count("HEX_RE.test")`).
+Aynı sınıf: "bir şeyin VARLIĞINI" soran iddia, o şeyin İKİ yolda da
+gerekli olduğu yerde kör.
+
+### Bu turda bilerek YAPILMAYANLAR
+
+* **Kredi harcayan "tıkla-üret" önizleme** — kullanıcı kararı. Zemini hazır:
+  `POST /api/logo/preview` diske yazmadan `{"b64": "data:image/png;base64,…"}`
+  döndürüyor ve en ucuz üretim `low` + `1024x1024` = 4 kredi.
+* **Soru sıklığı · varsayılan üslup/dil · öneri yoğunluğu anahtarları** —
+  kullanıcı yalnız kalıcı yönlendirme metnini seçti. Çekmece açıldığı için
+  ikinci bir yüzey gerektirmiyorlar; sonraki tur onları aynı `.sheet-body`ye
+  ekler.
+* **Streaming** — yanıtlar bu turda uzadı ama karar duruyor
+  (*"yönetmenin çıktısı zaten ancak tamamlanınca işe yarıyor"*). Yükseltme yolu
+  `chat_client.py`nin başında yazılı.
+* **`#specs-btn`e odak iadesi** — `#director-btn` `sheetTetik`e yazıyor,
+  `#specs-btn` hâlâ yazmıyor (Escape'ten sonra odak `<body>`ye düşüyor). Aynı
+  tek satırlık mekanizma ama bu turun konusu değil; kayda geçiyor.
 
 ---
 
@@ -1368,6 +1529,13 @@ duruyor.
 >
 > Kuyruğun eski 1. ve 2. maddeleri (logo önizlemesi · arama zinciri) **Tur L'de
 > kapandı**; kanıtları yukarıdaki kutuda. Numaralar buna göre kaydı.
+>
+> **Tur M kuyruktan GELMEDİ** (kullanıcı isteği) ve kuyruğa dokunmuyor — ama
+> flow arayüz devrinin "bilerek yapılmayanlar" listesindeki *"Yönetmen
+> talimatları ikonu"* borcunu kapatıyor. 8. madde (stil çipleri) onunla
+> KOMŞU: açıklamalı seçenek nesnesi (`ad`/`aciklama`/`ornek`) hazır stil
+> çiplerinin taşıyacağı sözleşmenin aynısı, yani o madde artık kendi tel
+> biçimini icat etmek zorunda değil.
 >
 > 8. madde (Türkçe harf katlaması) ölçülmüş bir kusur ve **S** boyutunda, yani
 > sıraya bakmadan alınabilir: `İstanbul` bugün `istanbul` yazılarak

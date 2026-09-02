@@ -2124,14 +2124,18 @@ body.viewer-open { overflow: hidden; }
   margin-top: 1rem; padding-top: 0.9rem; border-top: 1px dashed var(--hairline);
 }
 .chat-options-q { margin: 0 0 0.6rem; font-size: 0.9rem; color: var(--text); }
+/* Kartlar satırda AYNI BOYA çekiliyor ve bunun için bir bildirim GEREKMİYOR:
+   `align-items`ın başlangıç değeri `normal`, flex öğeleri için `stretch` gibi
+   davranıyor (mobile.css'te de yazılı olan olgu). Bir kez ayrı bir kural
+   olarak `align-items: stretch` yazılmıştı — aynı seçiciyi iki satır arayla
+   tekrar ederek, hiçbir şeyi değiştirmeyen bir bildirimle, yanında da
+   "`baseline` olsaydı kartlar kayardı" diye bir gerekçeyle. Oysa bu
+   kapsayıcıya `baseline` yazan bir kural HİÇ YOK: `align-items: baseline`
+   `.chat-axis`te, yani eksen SATIRINDA duruyor ve bir öğenin kendi
+   hizalanmasını `align-self` belirlerdi, `align-items` değil. Kural
+   kaldırıldı; değiştirmediği bir şeyi anlatan yorum sonraki okuru yanlış
+   yere bakmaya gönderiyor. */
 .chat-options-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-/* Kart varlığında şerit HİZALANIYOR: `align-items: stretch` (flex
-   varsayılanı) kartları en uzun açıklamanın boyuna çekiyor, yani satırdaki
-   kartların alt kenarları aynı hizada duruyor. `baseline` olsaydı — pill
-   şeridinde doğru olan hizalama — iki satırlı kartlar birbirine göre
-   kayardı. Seçici `:has()` DEĞİL, sınıfla: `:has()` bu depoda taşıyıcı
-   davranış için kullanılmıyor (eski WebView). */
-.chat-options-chips { align-items: stretch; }
 .chat-option {
   background: none; color: var(--muted);
   border: 1px solid var(--control-border); border-radius: 999px;
@@ -2160,7 +2164,7 @@ body.viewer-open { overflow: hidden; }
 .chat-option-card {
   display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem;
   flex: 1 1 13rem; max-width: 22rem;
-  border-radius: var(--r-item); padding: 0.6rem 0.75rem; text-align: left;
+  border-radius: var(--r-item, 12px); padding: 0.6rem 0.75rem; text-align: left;
 }
 .chat-option-ad { font-size: 0.84rem; }
 /* Açıklama İKİNCİL: çipin adı kadar bağırmamalı, yoksa kart iki başlık
@@ -2197,6 +2201,16 @@ body.viewer-open { overflow: hidden; }
   background: var(--fill-selected); color: var(--on-fill-selected); border-color: var(--fill-selected);
 }
 .chat-option[aria-checked="true"]::before { content: "✓ "; }
+/* KARTTA aynı işaret adın ÖNÜNE yazılıyor, kökün ürettiği yere değil.
+   Sebep ölçüldü (Chromium): `.chat-option-card` bir kolon flex kutusu, bir
+   flex kapsayıcısının `::before`u da BLOKLAŞIP ilk flex ÖĞESİ oluyor — yani
+   işaret etiketin soluna değil örnek kutusunun üstüne, kendi satırına
+   düşüyordu. Kart seçilince 23px uzuyor ve adı 23px aşağı kaydırıyordu:
+   seçmek yerleşimi oynatıyordu. Kökün kuralı DURUYOR (pill'ler onu
+   kullanıyor), kartta yalnız yeri değişiyor — `content: none` işareti
+   kaldırmıyor, aşağıdaki satıra devrediyor. */
+.chat-option-card[aria-checked="true"]::before { content: none; }
+.chat-option-card[aria-checked="true"] .chat-option-ad::before { content: "✓ "; }
 .chat-own { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem; margin-top: 0.85rem; }
 .chat-own-label { flex: 1 0 100%; font-size: 0.78rem; color: var(--muted); }
 .chat-own-input {

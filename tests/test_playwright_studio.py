@@ -1375,10 +1375,44 @@ def test_playwright_aciklamali_oneri_karti_CIZILIYOR_ve_degeri_karismiyor():
                 assert sizinti not in deger["display"], (
                     "kart açıklaması akıştaki SEÇİM piline karıştı")
 
-            # 6. `✓` işareti KARTTA da var (kök sınıfın kuralı).
+            # 6. `✓` işareti KARTTA da var — ve YERLEŞİMİ OYNATMIYOR.
+            #
+            # İşaret kartta kök sınıfın `::before`ından GELMİYOR, adın
+            # `::before`ından geliyor ve sebebi ancak tarayıcıda görülüyor:
+            # `.chat-option-card` bir kolon flex kutusu, bir flex
+            # kapsayıcısının `::before`u da bloklaşıp İLK FLEX ÖĞESİ oluyor —
+            # işaret etiketin soluna değil örnek kutusunun ÜSTÜNE, kendi
+            # satırına düşüyordu. Ölçülen bedel: kart 23,3px uzuyor ve ad
+            # 23,3px aşağı kayıyordu, yani SEÇMEK kartı zıplatıyordu. Kaynak
+            # taraması bunu göremez — `::before`ın bloklaşması yalnız
+            # yerleşim hesabında var, işaretin varlığında değil.
             assert page.eval_on_selector(
-                ".chat-option-card[aria-checked='true']",
-                "e => getComputedStyle(e, '::before').content") == '"✓ "'
+                ".chat-option-card[aria-checked='true'] .chat-option-ad",
+                "e => getComputedStyle(e, '::before').content") == '"✓ "', \
+                "seçili kartta işaret yok — seçili durum yalnız renkle anlatılır"
+            # Kökün kuralı PILL'lerde duruyor: kart düzeltmesi onu götürmemeli.
+            # (Isik ekseni düz pill; 5. adımda seçilmiş durumda.)
+            assert page.eval_on_selector(
+                ".chat-axis[data-axis='Isik'] .chat-option[aria-checked='true']",
+                "e => getComputedStyle(e, '::before').content") == '"✓ "', \
+                "pill'de işaret kayboldu — kart düzeltmesi kök kuralı götürmüş"
+            # Düzeltmenin ASIL ölçüsü: seçmek yerleşimi oynatmıyor.
+            oyn = page.eval_on_selector(
+                ".chat-axis[data-axis='Zemin'] .chat-option-card",
+                """k => {
+                    const ad = k.querySelector('.chat-option-ad');
+                    const olc = () => ({h: k.getBoundingClientRect().height,
+                                        adTop: ad.getBoundingClientRect().top});
+                    const secili = olc();
+                    k.setAttribute('aria-checked', 'false');
+                    const bos = olc();
+                    k.setAttribute('aria-checked', 'true');
+                    return {dh: Math.abs(secili.h - bos.h),
+                            dad: Math.abs(secili.adTop - bos.adTop)};
+                }""")
+            assert oyn["dh"] < 1 and oyn["dad"] < 1, (
+                f"seçmek kartın yerleşimini oynatıyor: {oyn} — işaret kendi "
+                "flex satırına düşmüş")
 
             # 7. İki satırlı kartlar 390px'de taşmıyor.
             assert not page.evaluate(

@@ -279,7 +279,11 @@ class PrefsRequest(BaseModel):
     # `chat_prompt.MAX_GUIDANCE_CHARS`'tan TÜREMİYOR, onu AYNALIYOR — ve bu
     # bilinçli: models katmanı `chat_prompt`'a bakmıyor (katman 2 → katman 1
     # bir kenar açardı ve bu modül prefs/settings şemalarının tek yeri).
-    # Ayrışma tests/test_prefs_route.py'de mekanik olarak ölçülüyor.
+    # Ayrışma mekanik olarak ölçülüyor: `test_chat_prompt.py` içindeki
+    # `test_the_request_model_mirrors_the_guidance_cap` iki sayıyı
+    # karşılaştırıyor. (Bir süre burada `test_prefs_route.py` yazılıydı;
+    # oradaki mandal alanın VARLIĞINI ölçüyor, SINIRINI değil — pointer'ı
+    # izleyen okur sınırın bekçisiz olduğu sonucuna varırdı.)
     #
     # Sunucu ayrıca KIRPIYOR (`chat_prompt.build_system`), yani bu kapı bir
     # savunma değil kullanıcıya verilen SÖZ: sınırı aşan bir metin sessizce

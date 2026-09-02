@@ -961,15 +961,23 @@
         kurallarını değiştirmez. Talimatın <em>tamamını</em> kendiniz yazmak
         isterseniz yol Ayarlar'da duruyor.
       </p>
-      <p id="director-status" class="modal-status" role="status"></p>
     </div>
     <!-- ANINDA yazım DEĞİL "Kaydet" — ve bu, #pref-autosave'in kalıbından
          bilerek ayrılıyor. O kalıp bir onay kutusu için doğru: değer tek bit,
          yazım başarısızsa kutu geri dönüyor ve kullanıcı hiçbir şey
          kaybetmiyor. Burada değer uzun bir serbest metin; sessizce başarısız
          olan bir yazım kullanıcının yazdığını kaybettirir. Metin alanının
-         kalıbı #settings-modal: .sheet-foot + Kaydet + durum satırı. -->
+         kalıbı #settings-modal: .sheet-foot + Kaydet + durum satırı.
+
+         DURUM SATIRI DA burada, gövdede değil — #settings-status'un ölçülmüş
+         dersinin aynısı: `.sheet-foot` `flex: none`, yani kaydırılan gövde ne
+         kadar uzarsa uzasın basılan düğmenin YANINDA kalıyor. Gövdede
+         bırakılmıştı ve buradaki metin alanı `resize: vertical` olduğu için
+         durum daha da kötüydü: kullanıcı alanı uzattığında "Kaydedilemedi: …"
+         satırı görünür alanın dışına çıkıyor, Kaydet ise sabit ayakta
+         kalıyordu — basılıyor ve hiçbir şey olmuyor gibi görünüyordu. -->
     <div class="sheet-foot">
+      <p id="director-status" class="modal-status" role="status"></p>
       <button type="button" id="director-save" class="primary">Kaydet</button>
     </div>
   </aside>

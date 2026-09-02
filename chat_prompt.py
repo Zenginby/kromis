@@ -11,10 +11,13 @@ markdown'ı kaynağa gömmek okunamaz hale getirir ve paketlenmiş `.app` içind
 düzenlenemez. Ayrı dosya olduğu için kullanıcı personayı `data_dir()`'e bir
 dosya bırakarak değiştirebiliyor.
 
-Bu sayı bir kez bayatladı: dosya 9 binden 15,4 bine çıkarken buradaki ve
-`chat_client`'taki yorum "dokuz bin" demeye devam etti, yani birikmenin tek
-kaydı sessizce yanlışa döndü. Üst sınır artık testte yaşıyor
-(tests/test_chat_prompt.py, 18 bin karakter bütçesi).
+Persona'nın uzunluğu İKİ kez buradaki rakamı geride bıraktı. İlkinde dosya
+neredeyse iki katına çıkarken buradaki ve `chat_client`'taki yorum eski sayıyı
+söylemeye devam etti. İkincisi tam bu paragrafta oldu: bütçeyi yükselten commit
+metindeki rakamı güncellemedi, yani drift'i KAYDEDEN cümlenin kendisi drift
+etti. Ders, sayıyı ikinci bir yerde tutmamak — o yüzden burada artık hiç
+rakam yok. Bütçe `tests/test_chat_prompt.py`'de ölçülüyor ve yükseltmenin
+gerekçesi commit mesajında isteniyor; boşluk kalıp kalmadığına oradan bakın.
 
 Bu modül BİLEREK yalnızca `paths`'e bakıyor ve düz `ValueError` yükseltiyor;
 `ChatError`'a çevirmek `chat_client`'ın işi. Tek yönlü bağımlılık

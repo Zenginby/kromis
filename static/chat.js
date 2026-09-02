@@ -159,13 +159,20 @@ function renderMarkdownInto(host, text, parsed) {
   // Tanınmayan bir JSON bloğu da çizilir — dürüst sonuç: yönetmen anlaşılmayan
   // bir şey yazdıysa kullanıcı onu görsün.
   //
-  // ⚠️ Atlama koşulu "blok VAR" değil "**panel GERÇEKTEN çizilecek**": varyasyon
-  // ve parametre panelleri sözleşmeye uymayan maddelerde `null` dönüyor. İkisi
-  // ayrıştığında blok ne panel ne kod bloğu olarak görünüyordu, yani sessizce
-  // kayboluyordu — üstteki dürüstlük kuralının tam tersi. Süzgeç bu yüzden
-  // `variationItems`/`axisItems` ile PAYLAŞILIYOR.
+  // ⚠️ Atlama koşulu "blok VAR" değil "**panel GERÇEKTEN çizilecek**": üç panel
+  // de sözleşmeye uymayan maddelerde `null` dönüyor. İkisi ayrıştığında blok ne
+  // panel ne kod bloğu olarak görünüyordu, yani sessizce kayboluyordu —
+  // üstteki dürüstlük kuralının tam tersi. Süzgeç bu yüzden
+  // `optionItems`/`variationItems`/`axisItems` ile PAYLAŞILIYOR.
+  //
+  // Seçenek satırı bir süre KOŞULSUZDU ve o zaman doğruydu: madde düz dizeydi,
+  // `String(raw)` her madde için bir çip üretiyordu, yani "blok var" ile "panel
+  // çizilecek" aynı şeydi. Nesne biçimi gelince (`optionItem` artık `null`
+  // dönebiliyor) ikisi AYRIŞTI: `{"etiket": "gri"}` gibi bir madde listesi
+  // ayrıştırıcıdan geçiyor ama tek çip üretmiyordu — kullanıcı ne seçenek ne
+  // ham JSON görüyordu. Alt satırların koşullu olma sebebinin aynısı.
   const skip = new Set([
-    parsed.optionsBody,
+    optionItems(parsed).length ? parsed.optionsBody : "",
     variationItems(parsed).length ? parsed.variationsBody : "",
     axisItems(parsed).length ? parsed.parametersBody : "",
   ].filter(Boolean));
@@ -378,11 +385,41 @@ function optionItem(raw) {
   };
 }
 
+/** Bir listeden ÇİZİLEBİLİR maddeler (bozuklar düşer, tavan uygulanır).
+ *
+ * `variationItems`/`axisItems` ile aynı sebeple var ve aynı sebeple
+ * PAYLAŞILIYOR: bloğu ham JSON olarak çizmeyi atlama kararı ile panelin
+ * gerçekten çizilip çizilmeyeceği kararı TEK yerden okunmalı, yoksa
+ * sözleşmesi bozuk bir blok ikisinin arasında sessizce kaybolur
+ * (bkz. renderMarkdownInto'daki ⚠️ notu).
+ *
+ * Maddeler NORMALLEŞTİRİLMİŞ dönüyor ve `optionItem` kendi çıktısında
+ * değişmez (idempotent), yani `optionChip` aynı maddeyi ikinci kez
+ * normalleştirmekten zarar görmüyor.
+ */
+function drawableOptions(list) {
+  return (Array.isArray(list) ? list : [])
+    .slice(0, OPTION_MAX).map(optionItem).filter(Boolean);
+}
+
+/** Seçenek panelinin çizeceği maddeler. `variationItems(parsed)` /
+ * `axisItems(parsed)` ile aynı şekil: atlama kümesi üçünü de aynı biçimde
+ * soruyor. */
+function optionItems(parsed) {
+  return parsed.options ? drawableOptions(parsed.options.secenekler) : [];
+}
+
 // Örnek görselinin DOĞRULAYICILARI. Model metni bir `style` özelliğine
 // yazılacak, o yüzden kapı dar ve BEYAZ liste: doğrulamayı geçmeyen değer
 // çizilmiyor (metin yine görünüyor). `innerHTML` hiç kullanılmıyor, ama
 // `style.background = "url(...)"` gibi bir değer de burada geçemez.
-const HEX_RE = /^#[0-9a-fA-F]{3,8}$/;
+// Uzunluk listesi 3·4·6·8 ve bu SAYILI: CSS'in tanıdığı hex uzunlukları
+// bunlar. Kapı bir süre `{3,8}` diyordu, yani 5 ve 7 haneli bir dize
+// doğrulamadan GEÇİYOR ama `style.background`a yazıldığında CSSOM onu sessizce
+// atıyordu — kutu yine döndüğü için çip karta yükseliyor ve kullanıcı BOŞ bir
+// dikdörtgen görüyordu. "Doğrulamayı geçmeyen değer çizilmiyor" sözü ancak
+// doğrulama CSS'in kabul ettiği kümeyle aynı olduğunda tutuyor.
+const HEX_RE = /^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 const ORAN_RE = /^([1-9][0-9]?):([1-9][0-9]?)$/;
 
 /** Seçeneğin ÇİZİLEBİLİR örneği (yoksa null).
@@ -393,14 +430,28 @@ const ORAN_RE = /^([1-9][0-9]?):([1-9][0-9]?)$/;
  * harcıyor (bkz. `#go` otomatik tıklanmaz kararı); o eksende doğru karşılık
  * `aciklama` metni.
  */
-function ornekKutusu(ornek) {
+function ornekKutusu(ornek, sessiz) {
   if (!ornek) return null;
   const kutu = document.createElement("span");
   kutu.className = "chat-option-ornek";
-  kutu.setAttribute("aria-hidden", "true");   // bilgi `aciklama`da yazılı
+  // `sessiz` = maddenin bir `aciklama`sı var, yani kutunun taşıdığı bilgi
+  // METİN olarak da ekranda: kutuyu ekran okuyucudan gizlemek doğru, iki kez
+  // duyurmak gürültü olurdu.
+  //
+  // Ama `aciklama` ile `ornek` sözleşmede BİRBİRİNDEN BAĞIMSIZ isteğe bağlı
+  // alanlar: `{"ad": "deep navy", "ornek": {"renk": "#0b2545"}}` geçerli bir
+  // madde. Kutu orada koşulsuz `aria-hidden` olsaydı seçenekleri BİRBİRİNDEN
+  // AYIRAN tek şey görsel kalır, ekran okuyucu kullanıcısı yalnız "deep navy"
+  // duyardı. O yüzden açıklama yoksa kutu bir `img` gibi ADLANDIRILIYOR.
+  const adlandir = (metin) => {
+    if (sessiz) { kutu.setAttribute("aria-hidden", "true"); return; }
+    kutu.setAttribute("role", "img");
+    kutu.setAttribute("aria-label", metin);
+  };
 
   if (typeof ornek.renk === "string" && HEX_RE.test(ornek.renk.trim())) {
     kutu.style.background = ornek.renk.trim();
+    adlandir(`örnek renk ${ornek.renk.trim()}`);
     return kutu;
   }
   if (Array.isArray(ornek.renkler)) {
@@ -410,6 +461,7 @@ function ornekKutusu(ornek) {
       .slice(0, 5);
     if (renkler.length < 2) return null;
     kutu.classList.add("chat-option-ornek-serit");
+    adlandir(`örnek renkler: ${renkler.join(", ")}`);
     for (const r of renkler) {
       const dilim = document.createElement("span");
       dilim.style.background = r;
@@ -422,8 +474,10 @@ function ornekKutusu(ornek) {
     if (!m) return null;
     kutu.classList.add("chat-option-ornek-oran");
     // `aspectRatio` sayısal: dizeyi doğrudan yazmak yerine ayrıştırılmış iki
-    // sayıdan kuruluyor, yani CSS'e model metni HİÇ geçmiyor.
+    // sayıdan kuruluyor, yani CSS'e model metni HİÇ geçmiyor. Etiket de aynı
+    // iki sayıdan kuruluyor, ham dizeden değil.
     kutu.style.aspectRatio = `${Number(m[1])} / ${Number(m[2])}`;
+    adlandir(`örnek oran ${Number(m[1])}:${Number(m[2])}`);
     return kutu;
   }
   return null;
@@ -456,7 +510,7 @@ function optionChip(item, multi, scope) {
   // aldığı cevap bozuk olur.
   chip.dataset.value = veri.ad;
 
-  const kutu = ornekKutusu(veri.ornek);
+  const kutu = ornekKutusu(veri.ornek, !!veri.aciklama);
   if (veri.aciklama || kutu) {
     chip.classList.add("chat-option-card");
     if (kutu) chip.appendChild(kutu);
@@ -608,9 +662,11 @@ function axesValue(group) {
     (row.dataset.yeni ? ekleme : takas).push(`${name} → ${picked[0]}`);
     shown.push(`${name}: ${picked[0]}`);
   }
-  const parts = [...takas, ...ekleme];
+  // Sayı YETİYOR: `[...takas, ...ekleme]` diye birleştirilmiş bir dizi
+  // yalnızca `length`i için ayrılıyordu.
+  const secili = takas.length + ekleme.length;
   const own = ownText(group);
-  if (!parts.length && !own) return { content: "", display: "" };
+  if (!secili && !own) return { content: "", display: "" };
   const sentence = [
     takas.length ? `Şu parametreleri değiştir: ${takas.join("; ")}.` : "",
     ekleme.length ? `Şunları da belirle: ${ekleme.join("; ")}.` : "",
@@ -623,7 +679,7 @@ function axesValue(group) {
     .filter(Boolean).join(" ");
   // Eksen seçilmedi: `shown` boş, o yüzden aşağıdaki birleştirme kullanılamaz
   // (başa sarkan bir ayraç üretirdi). Pilde kullanıcının yazdığı metin duruyor.
-  if (!parts.length) return { content, display: own };
+  if (!secili) return { content, display: own };
   return { content, display: own ? `${shown.join(OPTION_JOIN)}${OPTION_JOIN}${own}`
                                  : shown.join(OPTION_JOIN) };
 }
@@ -651,6 +707,13 @@ function lockStaleOptions() {
 
 function renderOptions(parsed) {
   const spec = parsed.options;
+  // Hiç çizilebilir madde yoksa panel KURULMUYOR ve `renderMarkdownInto`
+  // bloğu ham JSON olarak gösteriyor — iki karar aynı süzgeci okuduğu için
+  // ayrışamıyorlar. Soru prozada da yazılı (persona bunu şart koşuyor), yani
+  // kullanıcı soruyu görmeye devam ediyor; kaybolan tek şey tıklanamayan
+  // boş bir şerit olurdu.
+  const items = optionItems(parsed);
+  if (!items.length) return null;
   const multi = spec.coklu !== false;
   const group = answerGroup(String(spec.soru || "Seçenekler"), { radio: !multi });
 
@@ -663,12 +726,12 @@ function renderOptions(parsed) {
 
   const chips = document.createElement("div");
   chips.className = "chat-options-chips";
-  for (const raw of spec.secenekler.slice(0, OPTION_MAX)) {
+  for (const item of items) {
     // `String(raw)` KALDIRILDI: madde artık nesne de olabiliyor ve `String`
     // onu "[object Object]" yapardı — ekranda da, modele giden cevapta da.
-    // Bozuk madde `null` dönüyor ve atlanıyor: adsız bir çip tıklanınca
-    // modele boş cevap gönderirdi.
-    const chip = optionChip(raw, multi, group);
+    // Bozuk maddeyi düşüren yer artık `drawableOptions`; buradaki `if (chip)`
+    // ikinci bir kemer, taşıyıcı olan süzgeç.
+    const chip = optionChip(item, multi, group);
     if (chip) chips.appendChild(chip);
   }
   group.appendChild(chips);
@@ -728,12 +791,19 @@ function variationItems(parsed) {
     .slice(0, VARIATION_MAX);
 }
 
-/** Sözleşmeye uyan eksenler (yoksa boş dizi). Bkz. `variationItems`. */
+/** Sözleşmeye uyan eksenler (yoksa boş dizi). Bkz. `variationItems`.
+ *
+ * Kapı "dizi ve boş değil"den `drawableOptions`a GEÇTİ ve sebebi atlama
+ * kümesiyle aynı: dolu ama tamamı bozuk bir `secenekler` listesi
+ * (`[{"label": "soft"}]`) eski kapıdan geçiyordu, yani eksen satırı adıyla ve
+ * rozetiyle çiziliyor ama TIKLANACAK hiçbir şey taşımıyordu — üstelik ham blok
+ * da atlanmış olduğu için modelin ne önerdiği hiçbir yerde görünmüyordu.
+ */
 function axisItems(parsed) {
   if (!parsed.parameters) return [];
   return parsed.parameters.eksenler
     .filter((e) => e && typeof e.ad === "string" && e.ad.trim()
-                   && Array.isArray(e.secenekler) && e.secenekler.length)
+                   && drawableOptions(e.secenekler).length)
     .slice(0, AXIS_MAX);
 }
 
@@ -811,10 +881,10 @@ function renderParameters(parsed) {
 
     const chips = document.createElement("div");
     chips.className = "chat-options-chips";
-    for (const raw of axis.secenekler.slice(0, OPTION_MAX)) {
+    for (const item of drawableOptions(axis.secenekler)) {
       // `false` = eksen içinde TEK seçim, `row` = dışlayıcılık kapsamı
       // (panel değil SATIR): ışık + palet + kadraj birlikte seçilebilsin.
-      const chip = optionChip(raw, false, row);
+      const chip = optionChip(item, false, row);
       if (chip) chips.appendChild(chip);
     }
     row.appendChild(chips);
@@ -1331,7 +1401,12 @@ function appendBot(text) {
   // Paneller mesajın SONUNDA: okuma sırası prompt → ayarlar → "Sonraki adım"
   // cümlesi → varyasyonlar → parametreler. Her biri null dönebilir (blok eksik
   // ya da içi bozuk) — o durumda panel hiç çizilmiyor, hata verilmiyor.
-  if (parsed.options) div.appendChild(renderOptions(parsed));
+  if (parsed.options) {
+    // `null` olabiliyor (çizilebilir madde yok) — diğer iki panelin çağrı
+    // yeriyle aynı şekil; `appendChild(null)` TypeError atardı.
+    const panel = renderOptions(parsed);
+    if (panel) div.appendChild(panel);
+  }
   if (parsed.variations) {
     const panel = renderVariations(parsed);
     if (panel) div.appendChild(panel);
@@ -1972,6 +2047,13 @@ async function saveAutosavePref() {
  */
 async function saveDirectorGuidance() {
   const metin = $("director-guidance").value;
+  // Düğme UÇUŞ SIRASINDA kilitli (`#settings-save`ın kalıbı): iki tık iki POST
+  // atıyordu ve ikisi de dönüşte AYNI iki alana yazıyor — `textarea`ya ve durum
+  // satırına. Sonuç yarışa kalıyordu: ilki ağda düşüp ikincisi başarırsa
+  // kullanıcı başarılı bir yazımın üstünde "Kaydedilemedi: …" okuyabiliyordu.
+  // `finally` şart — hata dalında da açılmalı, yoksa bir ağ hatası düğmeyi
+  // temelli kilitler.
+  $("director-save").disabled = true;
   $("director-status").textContent = "Kaydediliyor…";
   try {
     const p = await chatApi("/api/prefs",
@@ -1984,6 +2066,8 @@ async function saveDirectorGuidance() {
     // Metin KUTUDA BIRAKILIYOR: kullanıcının yazdığını bir ağ hatası yüzünden
     // silmek, sendChat'in başarısızlık dalının reddettiği şeyin aynısı.
     $("director-status").textContent = `Kaydedilemedi: ${e.message}`;
+  } finally {
+    $("director-save").disabled = false;
   }
 }
 
@@ -2245,6 +2329,12 @@ $("director-btn").addEventListener("click", () => {
     // çalışmazdı (openModelSheet'in aynı mandalı).
     sheetTetik = $("director-btn");
     $("director-btn").setAttribute("aria-expanded", "true");
+    // Durum satırı her AÇILIŞTA sıfırlanıyor (`openSettings`ın kalıbı).
+    // Yoksa eski "Yönlendirme kaydedildi" satırı panelde asılı kalıyor ve
+    // çekmece Kaydet'e basılmadan kapatılıp yeniden açıldığında KAYDEDİLMEMİŞ
+    // metnin yanında duruyordu — kullanıcı yönlendirmesinin etkin olduğunu
+    // sanırken `/api/chat` hâlâ eski metni gönderiyor olurdu.
+    $("director-status").textContent = "";
     // Odak BAŞLIĞA, metin alanına DEĞİL: Android'de klavye alttan açılıyor ve
     // bir metin alanına odaklanmak paneli yutuyor (settings.js'in ölçülmüş
     // dersi, `#set-provider` yerine `set-provider` seçilmesinin sebebi).

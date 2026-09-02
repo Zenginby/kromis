@@ -901,7 +901,11 @@ def test_settings_block_is_recognised_by_its_keys_not_by_being_first_json():
 
 
 def test_the_options_block_is_never_drawn_as_a_code_block():
-    """Seçenek bloğunun görünür karşılığı ÇİPLER; ham JSON gösterilmemeli."""
+    """Seçenek bloğunun görünür karşılığı ÇİPLER; ham JSON gösterilmemeli.
+
+    "Gösterilmemeli" KOŞULLU: çipler gerçekten çizilecekse. Çizilmeyeceği
+    hâlin bekçisi `test_a_machine_block_that_breaks_its_contract_...`.
+    """
     js = _chat_js()
     body = re.search(r"function renderMarkdownInto\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
     assert body, "renderMarkdownInto() bulunamadı"
@@ -1184,17 +1188,18 @@ def test_each_parameter_axis_is_mutually_exclusive_on_its_own_row():
     Panel geçilse tek bir ışık seçimi bütün eksenlerin seçimini silerdi: kullanıcı
     ışık + palet + kadraj birlikte seçemezdi.
 
-    İddianın ÇAĞRISI değişti, konusu DEĞİŞMEDİ: eskiden `optionChip(String(raw),
-    …)` aranıyordu. `String()` sarmalayıcısı seçenek maddeleri düz dizeyken
-    doğruydu; madde artık nesne de olabildiği için (açıklama + çizilen örnek)
-    o sarmalayıcı maddeyi "[object Object]" yapardı — hem ekranda hem MODELE
-    GİDEN cevapta. Ölçülen şey hâlâ son iki argüman: `false` (eksen içinde tek
-    seçim) ve `row` (kapsam satır).
+    İddianın ÇAĞRISI iki kez değişti, konusu DEĞİŞMEDİ. Önce
+    `optionChip(String(raw), …)` idi: `String()` maddeler düz dizeyken
+    doğruydu, madde nesne de olabildiği için (açıklama + çizilen örnek) onu
+    "[object Object]" yapardı — hem ekranda hem MODELE GİDEN cevapta. Sonra
+    `raw` → `item` oldu: maddeler artık `drawableOptions` süzgecinden
+    NORMALLEŞTİRİLMİŞ geliyor. Ölçülen şey her üç hâlde de aynı: son iki
+    argüman, `false` (eksen içinde tek seçim) ve `row` (kapsam satır).
     """
     js = _chat_js()
     body = re.search(r"function renderParameters\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
     assert body, "renderParameters() bulunamadı"
-    assert "optionChip(raw, false, row)" in body.group(1), (
+    assert "optionChip(item, false, row)" in body.group(1), (
         "eksen alternatifleri satıra bağlı tek seçim değil")
     assert "String(raw)" not in body.group(1), (
         "madde `String()` ile sarılıyor — nesne madde '[object Object]' olur")
@@ -1251,11 +1256,152 @@ def test_a_broken_option_item_is_skipped_not_drawn_empty():
     body = re.search(r"function optionItem\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
     assert body, "optionItem() bulunamadı"
     assert "return null" in body.group(1), "bozuk madde atlanmıyor"
-    # İki panel de atlamayı UYGULAMALI, yoksa `null` DOM'a gider.
-    for fn in ("renderOptions", "renderParameters"):
+    # Atlamanın TAŞIYICI yeri `drawableOptions`: iki panel de çiplerini o
+    # süzgeçten kuruyor, yani "çizilecek madde var mı" sorusunu ham bloğu
+    # atlama kararıyla AYNI fonksiyona soruyorlar (bkz. bir alttaki test).
+    # `if (chip)` ikinci bir kemer olarak duruyor ama tek başına yetmiyordu:
+    # o dal `null`u DOM'dan uzak tutuyor, bloğun görünmesini sağlamıyor.
+    for fn, sarmal in (("renderOptions", "optionItems(parsed)"),
+                       ("renderParameters", "drawableOptions(axis.secenekler)")):
         govde = re.search(rf"function {fn}\([^)]*\)\s*\{{(.*?)\n\}}", js, re.S)
+        assert sarmal in govde.group(1), \
+            f"{fn} maddelerini paylaşılan süzgeçten kurmuyor"
         assert "if (chip) chips.appendChild(chip)" in govde.group(1), \
             f"{fn} `null` çipi atlamıyor"
+
+
+def test_a_panel_with_no_drawable_item_is_not_appended_as_null():
+    """`renderOptions` artık `null` dönebiliyor — çağrı yeri KORUNMALI.
+
+    `appendChild(null)` TypeError atar ve o an yönetmenin bütün yanıtını
+    çizmeyi durdurur: kullanıcı boş bir baloncuk görür. Diğer iki panelin
+    çağrı yeri bu yüzden zaten `if (panel)` ile korunuyordu; seçenek paneli
+    hiç `null` dönmediği için korumasızdı ve şimdi dönebiliyor.
+    """
+    js = _strip_js_comments(_chat_js())
+    assert "div.appendChild(renderOptions(parsed))" not in js, (
+        "renderOptions'ın dönüşü doğrudan appendChild'a gidiyor — `null` "
+        "olduğunda TypeError bütün yanıtın çizimini durdurur")
+    govde = re.search(r"function renderOptions\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert "if (!items.length) return null;" in govde.group(1), (
+        "çizilebilir madde yokken panel yine kuruluyor — tıklanamayan boş "
+        "bir şerit çiziliyor ve ham blok da atlanmış oluyor")
+
+
+def test_an_axis_with_no_drawable_alternative_is_not_a_dead_row():
+    """Eksen kapısı "dizi ve boş değil" DEĞİL "çizilebilir madde var" olmalı.
+
+    Dolu ama tamamı bozuk bir liste (`[{"label": "soft"}]`) eski kapıdan
+    geçiyordu: satır adıyla ve rozetiyle çiziliyor, tıklanacak hiçbir şey
+    taşımıyor, üstelik ham blok atlandığı için modelin ne önerdiği hiçbir
+    yerde görünmüyordu. İki kayıp bir arada.
+    """
+    js = _chat_js()
+    govde = re.search(r"function axisItems\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert govde, "axisItems() bulunamadı"
+    assert "drawableOptions(e.secenekler)" in govde.group(1), (
+        "eksen kapısı çizilebilirliği sormuyor")
+    assert "e.secenekler.length" not in govde.group(1), (
+        "eski uzunluk kapısı geri dönmüş — bozuk maddeler ölü satır üretir")
+
+
+def test_the_hex_gate_accepts_exactly_the_lengths_css_understands():
+    """5 ve 7 haneli bir hex doğrulamadan geçip CSS'te SESSİZCE düşüyordu.
+
+    `{3,8}` yazıldığında `#0b254` kapıdan geçiyor, `style.background`a
+    yazılıyor ve CSSOM onu atıyor — ama `ornekKutusu` kutuyu yine döndüğü
+    için çip karta yükseliyor ve kullanıcı BOŞ bir dikdörtgen görüyordu.
+    "Doğrulamayı geçmeyen değer çizilmiyor" sözü ancak kapı CSS'in kabul
+    ettiği kümeyle (3·4·6·8) aynı olduğunda tutuyor.
+    """
+    js = _chat_js()
+    kapi = re.search(r"const HEX_RE = (.+);", js)
+    assert kapi, "HEX_RE bulunamadı"
+    assert "{3,8}" not in kapi.group(1), (
+        "hex kapısı 5 ve 7 haneli dizeleri kabul ediyor — CSS onları atar, "
+        "kutu boş çizilir")
+    for uzunluk in ("{3,4}", "{6}", "{8}"):
+        assert uzunluk in kapi.group(1), f"hex kapısı {uzunluk} uzunluğunu saymıyor"
+
+
+def test_a_drawn_example_without_a_description_is_still_announced():
+    """`aria-hidden` KOŞULLU olmak zorunda: `aciklama` ile `ornek` bağımsız.
+
+    Kutu "bilgi `aciklama`da yazılı" gerekçesiyle gizleniyor ve bu, açıklaması
+    olan bir maddede doğru. Ama `{"ad": "deep navy", "ornek": {"renk": "#0b2545"}}`
+    sözleşmede geçerli bir madde (iki alan birbirinden bağımsız isteğe bağlı):
+    orada kutuyu koşulsuz gizlemek, seçenekleri BİRBİRİNDEN AYIRAN tek şeyi
+    ekran okuyucudan saklamak olurdu — kullanıcı yalnız "deep navy" duyar.
+    """
+    js = _chat_js()
+    govde = re.search(r"function ornekKutusu\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert govde, "ornekKutusu() bulunamadı"
+    gv = _strip_js_comments(govde.group(1))
+    assert 'if (sessiz)' in gv, "gizleme koşullu değil"
+    assert 'aria-label' in gv, "açıklaması olmayan kutu ADLANDIRILMIYOR"
+    # Koşulun GİRDİSİ: çağrı `aciklama`nın varlığını geçmek zorunda.
+    assert "ornekKutusu(veri.ornek, !!veri.aciklama)" in js, (
+        "kutu açıklamanın varlığını bilmiyor — koşul boşa çıkar")
+
+
+def test_the_selected_mark_does_not_become_its_own_row_on_a_card():
+    """`✓` kartta AYRI BİR SATIR oluyordu ve seçmek yerleşimi oynatıyordu.
+
+    Ölçüldü (Chromium, 1280px): `.chat-option-card` kolon flex kutusu, bir
+    flex kapsayıcısının `::before`u BLOKLAŞIP ilk flex ÖĞESİ oluyor — işaret
+    etiketin soluna değil örnek kutusunun üstüne düşüyor, kart 23,3px uzuyor
+    ve ad 23,3px aşağı kayıyordu. Düzeltmeden sonra ikisi de 0px.
+
+    İşaret KALKMIYOR, yer değiştiriyor: kökün kuralı pill'ler için duruyor,
+    kartta `content: none` onu adın `::before`una devrediyor. "Seçili durum
+    renkle değil işaretle de anlatılıyor" şartı bu yüzden bozulmuyor.
+    """
+    css = _css_yorumsuz()
+    assert '.chat-option-card[aria-checked="true"]::before { content: none; }' in css, (
+        "kartta kök işaret kapatılmıyor — kendi satırına düşer ve kartı uzatır")
+    assert '.chat-option-card[aria-checked="true"] .chat-option-ad::before' in css, (
+        "işaret adın önüne devredilmiyor — kartta seçili durum GÖRÜNMEZ olur")
+    # Pill'in kuralı DURUYOR: kart düzeltmesi onu götürmemeli.
+    assert '.chat-option[aria-checked="true"]::before { content: "✓ "; }' in css
+
+
+def test_the_chips_strip_is_declared_once():
+    """`.chat-options-chips` iki satır arayla KENDİNİ tekrar ediyordu.
+
+    İkinci kural `align-items: stretch` yazıyordu — `align-items`ın başlangıç
+    değeri `normal` ve flex öğeleri için `stretch` gibi davrandığı için
+    hiçbir şeyi değiştirmiyordu. Yanındaki gerekçe ("`baseline` olsaydı
+    kartlar kayardı") var olmayan bir kuralı anlatıyordu: `baseline`
+    `.chat-axis`te, yani eksen SATIRINDA, ve bir öğenin kendi hizalanmasını
+    `align-self` belirlerdi. Değiştirmediği bir şeyi anlatan yorum sonraki
+    okuru yanlış yere bakmaya gönderir.
+    """
+    css = _css_yorumsuz()
+    # Yalnız ÇIPLAK seçici sayılıyor: `.chat-axis .chat-options-chips` meşru ve
+    # ayrı bir kural (eksen satırındaki şeride esneme veriyor), kendini tekrar
+    # eden bir bildirim değil.
+    ciplak = re.findall(r"^\.chat-options-chips\s*\{", css, re.M)
+    assert len(ciplak) == 1, (
+        f".chat-options-chips {len(ciplak)} kez bildirilmiş — bildirimleri tek "
+        "kurala taşıyın, yoksa hangisinin taşıyıcı olduğu okunamaz")
+    # İddia KURALA kapsanıyor, dosyaya değil: `align-items: stretch` başka bir
+    # yerde (`.chat-item`) duruyor ve o kuralın konusu bu değil.
+    assert "align-items" not in _css_block(".chat-options-chips"), (
+        "şeride flex varsayılanını yeniden yazan bir bildirim geri dönmüş")
+
+
+def test_every_r_item_radius_carries_its_fallback():
+    """`--r-item` yalnız flow-tokens.css'te tanımlı: geri düşme değeri ŞART.
+
+    O dosya yüklenmezse ya da paketten düşerse fallback'i olan sekiz yuvarlak
+    yüzey 12px'te kalıyor, olmayan `0` alıyor — köşeleri keskin tek öğe,
+    üstelik "pill olmasın diye yuvarlatıldı" diye yorumu olan öğe olurdu.
+    """
+    css = _css_yorumsuz()
+    ciplak = re.findall(r"var\(--r-item\s*\)", css)
+    assert not ciplak, (
+        f"{len(ciplak)} yerde `var(--r-item)` geri düşme değeri olmadan "
+        "yazılmış — dosyadaki diğer kullanımların hepsi `var(--r-item, 12px)`")
 
 
 def test_the_drawn_example_validates_the_models_text_before_styling():
@@ -1463,7 +1609,7 @@ def test_a_free_text_only_parameter_turn_is_not_attributed_to_the_user():
     js = _chat_js()
     body = re.search(r"function axesValue\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
     assert body, "axesValue() bulunamadı"
-    assert "if (!parts.length) return { content, display: own };" in body.group(1), (
+    assert "if (!secili) return { content, display: own };" in body.group(1), (
         "eksen seçilmeyen tur baloncuk olarak çiziliyor — kullanıcı yazmadığı "
         "cümleyi kendi repliği sanır")
     # Seçenek panelinde ters yön korunmalı: orada serbest metin baloncuk KALIR.
@@ -1489,11 +1635,18 @@ def test_a_machine_block_that_breaks_its_contract_is_still_shown_to_the_user():
     assert body, "renderMarkdownInto() bulunamadı"
     skip = re.search(r"const skip = new Set\(\[(.*?)\]", body.group(1), re.S)
     assert skip, "atlama kümesi bulunamadı"
-    for fn in ("variationItems(parsed).length", "axisItems(parsed).length"):
+    # ÜÇ satırın üçü de koşullu. Seçenek satırı bir süre koşulsuzdu ve o
+    # zaman doğruydu (madde düz dizeydi, `String(raw)` her madde için bir çip
+    # üretiyordu). Nesne biçimiyle `optionItem` `null` dönebilir oldu ve ikisi
+    # ayrıştı: tamamı bozuk bir `secenekler` listesi ayrıştırıcıdan geçiyor,
+    # tek çip üretmiyor, ham blok da atlanmış oluyordu.
+    for fn in ("optionItems(parsed).length", "variationItems(parsed).length",
+               "axisItems(parsed).length"):
         assert fn in skip.group(1), (
             f"atlama kümesi {fn} sormuyor — sözleşmesi bozuk blok sessizce kaybolur")
     # Süzgeç GERÇEKTEN paylaşılıyor mu: paneller de aynı fonksiyonu çağırmalı.
-    for name, fn in (("renderVariations", "variationItems(parsed)"),
+    for name, fn in (("renderOptions", "optionItems(parsed)"),
+                     ("renderVariations", "variationItems(parsed)"),
                      ("renderParameters", "axisItems(parsed)")):
         panel = re.search(rf"function {name}\([^)]*\)\s*\{{(.*?)\n\}}", js, re.S)
         assert fn in panel.group(1), (
@@ -2418,6 +2571,19 @@ def _css_block(selector: str) -> str:
     match = re.search(re.escape(selector) + r"\s*\{([^}]*)\}", css)
     assert match, f"{selector} kuralı yok"
     return match.group(1)
+
+
+def _css_yorumsuz() -> str:
+    """style.css'in TAMAMI, yorumlar ayıklanmış.
+
+    `_css_block` tek bir kuralın gövdesini veriyor; kuralların ARASINA bakan
+    iddialar (bir seçici kaç kez bildirilmiş, geri düşme değeri olmayan bir
+    `var()` kalmış mı) dosyanın tamamını istiyor. Ayıklama orada da şart ve
+    sebebi `_css_block`'takinin aynısı: bu dosyadaki gerekçe yorumları
+    KALDIRILAN bildirimleri kendi metninde anıyor, yani yorumlu metinde
+    `assert "…" not in css` kendi açıklamasına takılır.
+    """
+    return re.sub(r"/\*.*?\*/", "", _css(), flags=re.S)
 
 
 def test_a_gallery_card_opens_the_full_viewer():
@@ -4582,6 +4748,65 @@ def test_cekmece_acilirken_METIN_ALANINA_odaklanmiyor():
     assert '$("director-guidance").focus()' not in govde, \
         "metin alanına odaklanılıyor — telefonda panel klavyenin altında kalır"
     assert ".focus()" in govde, "odak panele hiç girmiyor"
+
+
+def test_cekmecenin_durum_satiri_YAZAN_dugmenin_yaninda():
+    """Durum satırı `.sheet-foot`ta olmak zorunda, kaydırılan gövdede DEĞİL.
+
+    `#settings-status`ın ölçülmüş dersi: `.sheet-foot` `flex: none`, yani gövde
+    ne kadar uzarsa uzasın basılan düğmenin yanında kalıyor. Burada risk daha
+    da büyük çünkü metin alanı `resize: vertical`: kullanıcı alanı uzattığında
+    gövdedeki "Kaydedilemedi: …" satırı görünür alanın dışına çıkıyor, Kaydet
+    ise sabit ayakta duruyordu — düğmeye basılıyor ve hiçbir şey olmuyor gibi
+    görünüyordu.
+    """
+    html = _yorumsuz_html()
+    ayak = re.search(r'<div class="sheet-foot">(.*?)</div>',
+                     html.split('id="director-sheet"', 1)[1], re.S)
+    assert ayak, "çekmecenin `.sheet-foot`u bulunamadı"
+    assert 'id="director-status"' in ayak.group(1), (
+        "durum satırı ayakta değil — uzatılan metin alanı onu görünür alanın "
+        "dışına iter")
+    assert 'id="director-save"' in ayak.group(1), "Kaydet ayakta değil"
+
+
+def test_cekmece_her_ACILISTA_durum_satirini_sifirliyor():
+    """Eski "kaydedildi" satırı KAYDEDİLMEMİŞ metnin yanında asılı kalıyordu.
+
+    Kullanıcı kaydediyor, kapatıyor, sonra yeniden açıp yeni bir şey yazıyor
+    ve Kaydet'e BASMADAN kapatıyor. Metin kutuda duruyor (bilerek), üstündeki
+    satır da "Yönlendirme kaydedildi — bundan sonraki her turda geçerli."
+    diyor. İkisi bir arada okununca yönlendirmenin etkin olduğunu söylüyor,
+    oysa `/api/chat` hâlâ eski metni gönderiyor. `openSettings`ın durum
+    satırını açılışta temizlemesinin sebebi birebir bu.
+    """
+    govde = _chat_js().split('$("director-btn").addEventListener("click"', 1)[1]
+    govde = _strip_js_comments(govde.split("\n});", 1)[0])
+    assert '$("director-status").textContent = ""' in govde, (
+        "açılışta durum satırı temizlenmiyor — bayat bir onay mesajı "
+        "kaydedilmemiş metni kaydedilmiş gibi gösterir")
+
+
+def test_kaydet_dugmesi_UCUS_SIRASINDA_kilitli():
+    """İki tık iki POST atıyordu ve ikisi de dönüşte AYNI iki alana yazıyor.
+
+    Sonuç yarışa kalıyor: ilk istek ağda düşüp ikincisi başarırsa kullanıcı
+    BAŞARILI bir yazımın üstünde "Kaydedilemedi: …" okuyabiliyor (ya da
+    tersi). `#settings-save`ın kalıbı — `disabled` + `finally`.
+
+    `finally` şart ve ayrı ölçülüyor: yalnız başarı dalında açılsaydı tek bir
+    ağ hatası düğmeyi TEMELLİ kilitler ve kullanıcı yazdığını hiç
+    kaydedemezdi.
+    """
+    js = _chat_js()
+    govde = re.search(r"async function saveDirectorGuidance\([^)]*\)\s*\{(.*?)\n\}",
+                      js, re.S)
+    assert govde, "saveDirectorGuidance() bulunamadı"
+    gv = _strip_js_comments(govde.group(1))
+    assert '$("director-save").disabled = true' in gv, "düğme uçuş sırasında kilitlenmiyor"
+    assert "finally" in gv, "kilit `finally`de açılmıyor — ağ hatası düğmeyi temelli kilitler"
+    assert gv.index("finally") < gv.index('$("director-save").disabled = false'), \
+        "kilit `finally` dışında açılıyor"
 
 
 def test_cekmecenin_tetigi_openSheetten_SONRA_yaziliyor():

@@ -510,3 +510,80 @@ def test_the_request_model_mirrors_the_guidance_cap():
         f"PrefsRequest {sinir} diyor, chat_prompt "
         f"{chat_prompt.MAX_GUIDANCE_CHARS} kırpıyor")
 
+
+
+def test_the_options_section_caps_the_label_it_sends_to_the_model():
+    """`ad` MODELE GİDEN değer: sınırı nesne biçiminde de yazılmak ZORUNDA.
+
+    Eski satır "en fazla 40 karakter"i yalnız *düz etiket* alternatifine
+    bağlıyordu; nesne biçiminin `ad`ı sınırsız kalmıştı. `parameters` kendi
+    alternatiflerini 40'ta tutuyor, yani sınır kayboldu değil ASİMETRİK oldu —
+    ve iki biçim aynı yere gidiyor (`chip.dataset.value`, oradan da modele
+    verilen cevaba). Bir cümle uzunluğunda "kısa etiket" seçilebilir bir çip
+    değil, üstelik modele kısa bir cevap yerine paragraf gönderirdi.
+    """
+    metin = chat_prompt.load_instructions()
+    bolum = metin.split("### Soru sorarken", 1)[1].split("## 2. Adım", 1)[0]
+    assert "en fazla 40 karakter" in bolum, "seçenek etiketinin sınırı yazılı değil"
+    # Sınırın `ad`a bağlandığı görünmeli: "düz etiket" parantezinde kalmışsa
+    # nesne biçimi yine sınırsız olur.
+    ad_satiri = next(s for s in bolum.split("\n") if "`ad` seçilebilir" in s)
+    assert "40 karakter" in ad_satiri, (
+        "sınır `ad`ın anlatıldığı satırda değil — nesne biçimi sınırsız kalır")
+
+
+def test_the_options_section_points_at_the_example_whitelist():
+    """`ornek` seçenek bölümünde ÖRNEKLENİYOR, kuralı 130 satır sonra yazılı.
+
+    Beyaz liste (`renk` · `renkler` · `oran`) `parameters` blok kurallarında
+    duruyor. Yalnız 1. adımı okuyup `{"ornek": {"gorsel": "..."}}` yazan bir
+    tur sessizce hiçbir şey çizdirmiyordu: istemci doğrulamayı geçmeyen değeri
+    atıyor, model de neden çizilmediğini hiçbir yerde göremiyor.
+    """
+    metin = chat_prompt.load_instructions()
+    bolum = metin.split("### Soru sorarken", 1)[1].split("## 2. Adım", 1)[0]
+    assert "`ornek`" in bolum, "`ornek` seçenek bölümünde hiç anlatılmıyor"
+    for jeton in ("renk", "renkler", "oran"):
+        assert jeton in bolum, f"`{jeton}` seçenek bölümünde anılmıyor"
+
+
+def test_the_module_docstring_does_not_carry_a_stale_budget_number():
+    """Bütçe sayısının tek KESİN kaydı test; docstring okuru testE yönlendirir.
+
+    Bu drift İKİ kez oldu. İlki: dosya 9 binden 15,4 bine çıkarken yorum
+    "dokuz bin" demeye devam etti. İkincisi bu docstring'in kendisinde: bütçeyi
+    18 binden 19.500'e çıkaran commit metinde "18 bin karakter bütçesi"
+    bırakmıştı — yani drift'i KAYDEDEN paragraf drift etti. Bir sayıyı iki
+    yerde tutmanın bedeli bu; docstring artık sayıyı hiç söylemiyor.
+
+    İddia mekanik: docstring'de dört haneli bir bütçe literali GEÇMEMELİ.
+    """
+    import re
+    dok = chat_prompt.__doc__
+    literaller = re.findall(r"\b\d{2}[.,]?\d{3}\b|\b\d{2} bin\b", dok)
+    assert not literaller, (
+        f"docstring bütçe literali taşıyor: {literaller} — sayı testte "
+        "yaşıyor, burada bayatlıyor")
+    assert "tests/test_chat_prompt.py" in dok, (
+        "docstring okuru sayının GERÇEK kaydına yönlendirmiyor")
+
+
+def test_the_models_pointer_to_this_tripwire_resolves():
+    """`models.py`'nin yorumu bu dosyadaki mandalın ADINI doğru söylemeli.
+
+    Yorum bir süre `tests/test_prefs_route.py`yi gösteriyordu. Oradaki mandal
+    alanın VARLIĞINI ölçüyor (`_SCHEMA ⊆ PrefsRequest`), SINIRINI değil —
+    yani pointer'ı izleyen okur `MAX_GUIDANCE_CHARS`ı yükseltirken aynanın
+    bekçisiz olduğu sonucuna varır ve tam olarak mandalın önlediği şeyi yapar.
+    Yanlış yere bakan bir pointer, hiç pointer olmamasından kötü.
+    """
+    import pathlib as _p
+    kaynak = _p.Path(__file__).resolve().parent.parent / "models.py"
+    yorum = kaynak.read_text(encoding="utf-8")
+    hedef = "test_the_request_model_mirrors_the_guidance_cap"
+    blok = yorum.split("director_guidance", 1)[0][-1200:]
+    assert hedef in blok, (
+        "models.py aynayı ölçen mandalın adını söylemiyor")
+    # Ve adı söylediği şey GERÇEKTEN burada olmalı.
+    assert f"def {hedef}(" in _p.Path(__file__).read_text(encoding="utf-8"), (
+        f"models.py {hedef} diyor ama bu dosyada öyle bir test yok")

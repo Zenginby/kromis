@@ -3,10 +3,10 @@
 **Tarih:** 2 Eylül 2026 · **Son dal:** `claude/improve-project-manager-avgocm`
 (`main`'den kuruldu, henüz birleşmedi)
 **Bugünkü ölçüm:** `APP_VERSION` **0.11.8** (sonrakini CI yazacak),
-`pytest tests/ -q` → **1913 geçti / 9 atlandı** (Playwright kuruluyken; Tur M
-öncesi aynı ortamda 1884 geçti / 9 atlandı — yirmi dokuz yeni test: on persona
-ve bağlam mandalı, beş rota mandalı, on bir kaynak mandalı, bir mobil mandalı
-ve iki E2E)
+`pytest tests/ -q` → **1930 geçti / 9 atlandı** (Playwright kuruluyken; Tur M
+öncesi aynı ortamda 1884 geçti / 9 atlandı — Tur M kırk altı test ekledi:
+yirmi dokuzu özelliğin kendisiyle, on yedisi ardından koşan kod denetiminin
+bulgularıyla)
 **Defterin açılış ölçümü** (Tur A öncesi): `APP_VERSION` 0.7.0 → 1613 geçti / 10 atlandı
 (atlananlar her üç ölçümde de yalnız Windows'a özgü DACL testleri + kurulu
 olmayan Playwright)
@@ -194,6 +194,78 @@ gerekli olduğu yerde kör.
 * **`#specs-btn`e odak iadesi** — `#director-btn` `sheetTetik`e yazıyor,
   `#specs-btn` hâlâ yazmıyor (Escape'ten sonra odak `<body>`ye düşüyor). Aynı
   tek satırlık mekanizma ama bu turun konusu değil; kayda geçiyor.
+
+### 6. Kod denetimi: on beş bulgu, on dördü gerçek
+
+Tur M gönderildikten sonra `/code-review` koşuldu ve **on beş bulgu** döndü.
+Hepsi kaynakta doğrulandı; **on dördü gerçekti**, biri yarı yarıya. Bulguların
+ikisi SESSİZ KAYIP sınıfındaydı ve ikisi de bu turun kendi eklediği yüzeyden
+geliyordu — kayda geçmesi gereken şey bu:
+
+**Paylaşılan süzgeç kuralı, tam da onu yazan turda kırıldı.** Atlama kümesinin
+üç satırından ikisi koşulluydu (`variationItems`/`axisItems`), seçenek satırı
+koşulsuzdu — ve koşulsuz olması ESKİDEN doğruydu: madde düz dizeydi,
+`String(raw)` her madde için bir çip üretiyordu, yani "blok var" ile "panel
+çizilecek" aynı şeydi. Nesne biçimi `optionItem`i `null` dönebilir yapınca
+ikisi ayrıştı: `{"etiket": "gri"}` gibi bir liste ayrıştırıcıdan geçiyor, tek
+çip üretmiyor, ham blok da atlanmış oluyordu — kullanıcı hiçbir şey görmüyordu.
+Aynı kusurun ikinci hâli `axisItems`teydi (kapı `secenekler.length` soruyordu,
+"çizilebilir madde var mı" değil): eksen satırı adıyla ve rozetiyle çiziliyor,
+tıklanacak hiçbir şey taşımıyordu. **Ders:** bir invaryantı "üç yerin üçü de
+aynı fonksiyonu sorsun" diye kurmak yetmiyor; o fonksiyonun dönüş sözleşmesi
+DEĞİŞTİĞİNDE üç çağrı yerinin hepsi yeniden okunmalı.
+
+**`✓` işareti kartta kendi satırına düşüyordu ve bunu yalnız tarayıcı
+söyledi.** `.chat-option-card` kolon flex kutusu, bir flex kapsayıcısının
+`::before`u da bloklaşıp İLK FLEX ÖĞESİ oluyor. Kaynak taraması bunu göremez
+(kural yerinde, glif yerinde); Chromium'da ölçüm kartın seçilince **23,3px
+uzadığını** ve adın **23,3px aşağı kaydığını** verdi. Bu turun ilk yazdığı
+E2E iddiası `::before`ı KÖK sınıfta arıyordu, yani düzeltme onu kırdı ve
+haklıydı: iddia yeniden yazılırken "hangi öğe taşıyor"dan **"kullanıcı ne
+görüyor"**a çevrildi — işaret görünüyor mu, ve seçmek yerleşimi oynatıyor mu.
+
+Geri kalan bulgular: hex kapısı 5 ve 7 haneli dizeleri kabul ediyordu (CSS
+onları atıyor, kutu BOŞ çiziliyordu); örnek kutusu koşulsuz `aria-hidden`
+alıyordu, oysa `aciklama` ile `ornek` sözleşmede birbirinden bağımsız —
+açıklamasız bir kartta seçenekleri ayıran tek şey ekran okuyucudan gizleniyordu;
+çekmece açılışta durum satırını temizlemiyor (bayat bir "kaydedildi",
+kaydedilmemiş metnin yanında duruyordu) ve Kaydet uçuş sırasında kilitlenmiyordu;
+`#director-status` `.sheet-body`deydi, oysa yanındaki yorum `.sheet-foot`
+diyordu — üstelik metin alanı `resize: vertical`, yani uzatıldığında hata
+satırı görünür alanın dışına çıkıyordu.
+
+**Yanlış dosyayı suçlayan hata**, iki dokunuşla kapandı ve ikincisi bulgunun
+kendisinden büyük çıktı: `_director_context()` `except ValueError` dalının
+İÇİNDE çağrılıyordu, yani cp1254 kaydedilmiş bir `prefs.json`
+(`UnicodeDecodeError` bir `ValueError` alt sınıfı) kullanıcıya *"Prompt
+Yönetmeni talimatı yüklenemedi"* diye okunuyordu. Çağrı `try`nin dışına
+çıkarıldı — ama aynı arıza `GET /api/prefs`te çıplak 500 veriyordu, yani
+`prefs.py`nin kendi başındaki **"okuma yolu HOŞGÖRÜLÜ (bozuk dosya →
+varsayılanlar)"** sözü zaten delikti: `_read_raw` yalnız `JSONDecodeError`
+yakalıyordu. Elle düzenleme bu modülün BEKLEDİĞİ bir durum (`read`in
+`theme: "neon"` notu), yani bu kapsam dışı bir kaza değil eksik bir daldı.
+
+**Dört bayat yorum**, üçü bu turun kendi yazdığı: `chat_prompt.py`nin
+docstring'i "18 bin karakter bütçesi" diyordu, oysa bütçeyi 19.500'e çıkaran
+commit onun kendisiydi — yani **drift'i kaydeden paragraf drift etti**. Çözüm
+sayıyı güncellemek değil KALDIRMAK oldu (docstring artık okuru teste
+yönlendiriyor) ve bir mandal dört haneli bir bütçe literalinin geri dönmesini
+yakalıyor. `models.py` ayna mandalını `test_prefs_route.py`de gösteriyordu;
+oradaki mandal alanın VARLIĞINI ölçüyor, SINIRINI değil — pointer'ı izleyen
+okur sınırın bekçisiz olduğu sonucuna varırdı, yani yanlış yere bakan bir
+pointer hiç pointer olmamasından kötü. Yeni bir test artık pointer'ın ADINI
+söylediği testin gerçekten var olduğunu doğruluyor.
+
+**Reddedilen yarım bulgu:** denetim `axesValue`ın pili ile mesajının eksen
+SIRASINI ayrı verdiğini kusur saydı. Değil: pil ekran sırasında seçimleri
+listeliyor, mesaj fiile göre gruplanmış talimatları — ikisi ayrı şey ve
+gruplama bu turun kararı. Aynı bulgunun öteki yarısı (`[...takas, ...ekleme]`
+dizisi yalnız `length`i için ayrılıyordu) alındı.
+
+**Ölçüm:** on yedi yeni test, hepsi mutasyonla sınandı (yirmi bir mutasyon,
+yirmi biri de yakalandı). `.chat-options-chips`in kendini tekrar eden
+`align-items: stretch` bildirimi de kaldırıldı — flex varsayılanını yeniden
+yazıyor, yanındaki gerekçe var olmayan bir `baseline` kuralını anlatıyordu.
 
 ---
 

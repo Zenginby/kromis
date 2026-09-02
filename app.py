@@ -1017,8 +1017,17 @@ def chat(req: ChatRequest) -> dict:
         # kullanıcının okuduğu metin, `chat_client`'ın kendi dalında ürettiğiyle
         # AYNI kalmalı. İki yerde iki Türkçe cümle olsaydı aynı kusur, çağrının
         # hangi yoldan gittiğine göre iki farklı hata okuturdu.
+        # Bağlam TOPLAMA `try`nin DIŞINDA: `prefs.read` da `ValueError`
+        # yükseltebiliyor (elle cp1254 kaydedilmiş bir prefs.json'da
+        # `json.load` `UnicodeDecodeError` atar ve o bir `ValueError`
+        # alt sınıfı; `_read_raw` yalnız `JSONDecodeError`u yakalıyor).
+        # Çağrı `try`nin içindeyken kullanıcı bozuk prefs.json yüzünden
+        # "Prompt Yönetmeni talimatı yüklenemedi" okuyor, yani YANLIŞ dosyaya
+        # yönlendiriliyordu — üstelik aynı arıza `GET /api/prefs`te çıplak
+        # 500 veriyor, iki uç aynı kusur için iki farklı şey söylüyordu.
+        baglam = _director_context()
         try:
-            instructions = chat_prompt.build_system(**_director_context())
+            instructions = chat_prompt.build_system(**baglam)
         except ValueError as e:
             raise cc.ChatError(f"Prompt Yönetmeni talimatı yüklenemedi: {e}")
         return chat_providers.complete(

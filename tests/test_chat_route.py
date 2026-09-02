@@ -551,3 +551,57 @@ def test_a_missing_instruction_file_becomes_the_same_turkish_502(client, monkeyp
     assert r.status_code == 502
     assert "Prompt Yönetmeni talimatı yüklenemedi" in r.json()["detail"]
 
+
+
+def test_a_mis_encoded_prefs_file_is_not_blamed_on_the_instruction_file(
+        client, fake_kwargs, monkeypatch):
+    """Bozuk prefs.json, yönetmenin TALİMAT dosyasının suçu gibi görünüyordu.
+
+    Elle düzenlenmiş bir prefs.json (modülün beklediği bir durum — bkz.
+    `prefs.read`'in `theme: "neon"` notu) cp1254 kaydedilmişse `json.load`
+    UTF-8 çözerken `UnicodeDecodeError` atıyor ve o bir `ValueError` ALT
+    SINIFI. `_director_context()` çağrısı `except ValueError` dalının İÇİNDE
+    olduğu sürece kullanıcı 502 ile "Prompt Yönetmeni talimatı yüklenemedi"
+    okuyordu, yani hiç bozulmamış bir dosyaya yönlendiriliyordu. Üstelik aynı
+    arıza `GET /api/prefs`te çıplak 500 veriyordu: iki uç aynı kusur için iki
+    ayrı şey söylüyordu.
+
+    İki dokunuş birlikte ölçülüyor çünkü tek başına biri yetmiyor: bağlam
+    toplama `try`nin dışına çıktı (yanlış atıf gitti) ve `prefs._read_raw`
+    kod çözme hatasını da yakalıyor (modülün "okuma yolu HOŞGÖRÜLÜ" sözü).
+    """
+    os.makedirs(appmod.OUTPUT_DIR, exist_ok=True)
+    yol = os.path.join(appmod.OUTPUT_DIR, "prefs.json")
+    # Türkçe bir tema adı cp1254'te yazıldığında UTF-8 çözücü düşüyor.
+    with open(yol, "w", encoding="cp1254") as f:
+        f.write('{"theme": "mono", "director_guidance": "düz çizgi üslubu"}')
+
+    r = client.post("/api/chat", json={"messages": [{"role": "user", "content": "kedi"}]})
+
+    assert r.status_code == 200, (
+        f"bozuk prefs.json turu düşürüyor: {r.status_code} {r.text}")
+    assert "talimatı yüklenemedi" not in r.text, (
+        "bozuk prefs.json talimat dosyasının suçu gibi raporlanıyor")
+    # Tur YİNE personayla gidiyor: bağlam bir kolaylık, kaybı sohbeti düşürmez.
+    assert fake_kwargs[0]["instructions"], "sistem mesajı hiç kurulmamış"
+    # Ve aynı dosya prefs ucunu da düşürmüyor: iki uç artık aynı şeyi diyor.
+    assert client.get("/api/prefs").status_code == 200
+
+
+def test_the_context_is_gathered_outside_the_instruction_guard(client, fake_kwargs):
+    """TRIPWIRE: `_director_context()` `try`nin İÇİNE geri taşınmamalı.
+
+    Yukarıdaki test davranışı ölçüyor ama yalnız BİR arıza türüyle
+    (`UnicodeDecodeError`). `prefs`/`catalog` yolundan gelecek başka bir
+    `ValueError` de aynı yanlış atıfla raporlanırdı; kapının yeri o yüzden
+    ayrıca mandallanıyor.
+    """
+    import pathlib as _p
+    kaynak = (_p.Path(__file__).resolve().parent.parent / "app.py").read_text(
+        encoding="utf-8")
+    assert "instructions = chat_prompt.build_system(**baglam)" in kaynak, (
+        "bağlam çağrısı `build_system`in argümanı olarak `try` içinde duruyor")
+    govde = kaynak.split("baglam = _director_context()", 1)
+    assert len(govde) == 2, "bağlam `try` öncesinde toplanmıyor"
+    assert "try:" in govde[1].split("except ValueError", 1)[0], (
+        "kapı bağlam toplamadan SONRA açılmıyor")

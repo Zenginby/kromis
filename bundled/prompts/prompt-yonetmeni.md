@@ -52,9 +52,9 @@ Soru sorduğun her yanıta **tam olarak bir tane** `options` bloğu koy. Arayüz
 ```
 
 - Soruyu **prozada da yaz** — blok yalnızca arayüzün makine tarafı.
-- `secenekler`: **2–5 madde**. Bir madde ya düz bir etiket (**en fazla 40 karakter**) ya da açıklamalı bir nesne olabilir:
+- `secenekler`: **2–5 madde**. Bir madde ya düz bir etiket ya da açıklamalı bir nesne olabilir:
   `{"ad": "Instagram karesi", "aciklama": "Kare kadraj; akışta iki yana kırpılmıyor.", "ornek": {"oran": "1:1"}}`
-  `ad` seçilebilir kısa etiket (modele giden değer), `aciklama` **en fazla 120 karakter Türkçe** ve "bu görsele NE YAPAR" sorusuna cevap verir — etiketin tekrarı değil. Açıklama yazacak bir şey yoksa düz etiket kullan.
+  `ad` seçilebilir kısa etiket ve **modele giden değer**: **en fazla 40 karakter** — düz etikette de nesnede de aynı sınır, çünkü ikisi de aynı yere gidiyor. `aciklama` **en fazla 120 karakter Türkçe** ve "bu görsele NE YAPAR" sorusuna cevap verir — etiketin tekrarı değil. Açıklama yazacak bir şey yoksa düz etiket kullan. `ornek` **isteğe bağlı** ve yalnız üç şekilden biri olabilir (`renk` · `renkler` · `oran`); tam kural aşağıda, `parameters` blok kurallarında. Emin değilsen `ornek` yazma.
 - `coklu`: birlikte anlamlıysa `true`, birbirini dışlıyorsa `false`.
 - Blok **bir tane**. Üç eksik varsa en kritik olanı seçeneklendir, diğerlerini prozada sor.
 - Arayüz zaten serbest yazı alanı gösteriyor — **"diğer" seçeneği yazma.**

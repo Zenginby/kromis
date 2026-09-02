@@ -286,3 +286,28 @@ def test_SOHBET_modeli_saglayicisiyla_BIRLIKTE_yazilabiliyor(tmp_path):
     out = prefs.update({"chat_provider": m.provider, "chat_model": m.id},
                        str(tmp_path))
     assert (out["chat_provider"], out["chat_model"]) == (m.provider, m.id)
+
+
+def test_a_mis_encoded_file_falls_back_to_defaults_without_writing(tmp_path):
+    """"Okuma yolu HOŞGÖRÜLÜ" sözü KOD ÇÖZME hatasını da kapsamak zorunda.
+
+    Modül bozuk bir dosyada çökmemeyi vaat ediyor ve `JSONDecodeError`ı
+    yakalıyordu — ama elle cp1254 kaydedilmiş bir dosyada `json.load` JSON'a
+    hiç VARAMIYOR: UTF-8 çözücü `UnicodeDecodeError` atıyor. Elle düzenleme
+    bu modülün beklediği bir durum (bkz. `read`in `theme: "neon"` notu), yani
+    bu kapsam dışı bir kaza değil eksik bir daldı: `GET /api/prefs` çıplak 500
+    veriyor, `POST /api/chat` ise aynı arızayı yönetmenin talimat dosyasının
+    suçu gibi gösteriyordu.
+
+    Yan etkisizlik de ölçülüyor: okuma dosyayı DÜZELTMİYOR. Kullanıcının
+    dosyası kendi kaydettiği hâlde kalıyor, düzeltme bir sonraki `update()`e
+    bırakılıyor — `read`in bütün diğer dallarındaki duruşun aynısı.
+    """
+    yol = tmp_path / prefs.PREFS_FILE
+    ham = '{"theme": "mono", "director_guidance": "düz çizgi üslubu"}'
+    yol.write_text(ham, encoding="cp1254")
+
+    okunan = prefs.read(str(tmp_path))
+
+    assert okunan == prefs.DEFAULTS, "bozuk kodlama varsayılanlara düşmüyor"
+    assert yol.read_bytes() == ham.encode("cp1254"), "okuma dosyayı DEĞİŞTİRDİ"

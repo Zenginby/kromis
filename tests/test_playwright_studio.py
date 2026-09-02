@@ -10,6 +10,7 @@ Tests:
 from __future__ import annotations
 
 import asyncio
+import io
 import os
 import socket
 import threading
@@ -26,6 +27,7 @@ pytest.importorskip("playwright", reason="playwright kurulu değil — E2E testl
 from playwright.sync_api import sync_playwright
 
 from app import app
+import app as appmod
 import catalog
 import credstore
 
@@ -777,6 +779,353 @@ def test_playwright_composer_GONDERIMDEN_SONRA_kuculuyor(monkeypatch):
             page.wait_for_timeout(200)
             assert kutu() >= once - 1, (
                 "odaklanan kullanıcı dar bir kutuya sıkışıyor")
+
+            browser.close()
+    finally:
+        server.stop()
+
+
+# ── Logo bindirme önizlemesi ────────────────────────────────────────
+
+
+def _olcum_kutuphanesi(tmp_path, monkeypatch) -> dict[str, str]:
+    """Ölçüm için gerçek PNG tabanlar + bir logo ve bir banner varlığı.
+
+    `OUTPUT_DIR`/`ASSETS_DIR` sunucu THREAD'İ BAŞLAMADAN yönlendiriliyor:
+    `ServerThread` uygulamayı aynı süreçte koşturuyor ve uçlar (`output_file`,
+    `_composite_logo`) yolu modül üzerinden ÇAĞRI ANINDA okuyor. Geliştiricinin
+    kendi kütüphanesine dokunulmuyor.
+
+    Varlıklar sayfa yüklenmeden önce kaydediliyor ve bu ŞART: `assetCache.logos`
+    boş kalırsa `overlayNeedsAsset()` kısa devre yapıyor, sunucuya hiç
+    gidilmiyor ve test sessizce "ham görsel sığıyor mu"ya dönüşüp yine yeşil
+    kalıyor. `img.currentSrc.startsWith("data:")` iddiası o sessiz düşüşün
+    bekçisi.
+    """
+    import assets_store as astore
+    from PIL import Image
+
+    out = str(tmp_path / "output")
+    assets = str(tmp_path / "assets")
+    os.makedirs(out, exist_ok=True)
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", out)
+    monkeypatch.setattr(appmod, "ASSETS_DIR", assets)
+
+    tabanlar = {}
+    for ad, boyut in LOGO_ORANLARI.items():
+        dosya = f"{ad}.png"
+        # Düz KOYU zemin: macenta logo yoklaması ancak kontrast varken anlamlı.
+        Image.new("RGB", boyut, (40, 44, 52)).save(os.path.join(out, dosya), "PNG")
+        tabanlar[ad] = dosya
+
+    for tur, boyut in (("logos", (240, 60)), ("banners", (1024, 120))):
+        buf = io.BytesIO()
+        # Macenta: LANCZOS küçültmesi, PNG yeniden kodlaması ve tarayıcı
+        # ölçeklemesinden sonra bile r>200 & b>200 & g<80 kalıyor.
+        Image.new("RGBA", boyut, (255, 0, 200, 255)).save(buf, format="PNG")
+        astore.save_asset(tur, buf.getvalue(), f"olcum {tur}", assets,
+                          now="2026-09-02T10:00:00")
+    return tabanlar
+
+
+LOGO_ORANLARI = {
+    "dikey": (1024, 1536),
+    "kare": (1024, 1024),
+    "yatay": (1536, 1024),
+    "cok_dikey": (512, 2048),
+}
+
+# Önizleme kutusu ile görselin dikdörtgenleri; taşma POZİTİFSE kırpılıyor.
+_TASMA_OKU = """() => {
+  const w = document.querySelector('.logo-preview-wrap');
+  const i = document.querySelector('#logo-preview-img');
+  const wr = w.getBoundingClientRect(), ir = i.getBoundingClientRect();
+  return {
+    ust: wr.top - ir.top, alt: ir.bottom - wr.bottom,
+    yan: Math.max(wr.left - ir.left, ir.right - wr.right),
+    kutu: [wr.x, wr.y, wr.width, wr.height],
+    kaynak: i.currentSrc.slice(0, 5),
+  };
+}"""
+
+
+def _onizleme_bekle(page) -> None:
+    page.wait_for_selector("#logo-modal:not([hidden])")
+    page.wait_for_function(
+        '() => { const i = document.querySelector("#logo-preview-img");'
+        ' return i.currentSrc.startsWith("data:") && i.complete'
+        ' && i.naturalWidth > 0; }', timeout=15000)
+
+
+def _onizleme_tazelenmesini_bekle(page, eski: str) -> None:
+    """Yeni base64 önizleme GELENE kadar bekler.
+
+    `_onizleme_bekle` burada YETMEZ: `currentSrc` zaten bir `data:` URL'i, yani
+    "data: ile başlıyor" iddiası bir öncekinin önünde de doğru. Kaydırıcı ve
+    konum değişikliklerinin 220ms'lik gecikmesi de var (assets.js). Çapa bu
+    yüzden DEĞERİN KENDİSİ: eskisinden farklı bir kaynak.
+    """
+    page.wait_for_function(
+        "(eski) => { const i = document.querySelector('#logo-preview-img');"
+        " return i.currentSrc !== eski && i.currentSrc.startsWith('data:')"
+        " && i.complete && i.naturalWidth > 0; }",
+        arg=eski, timeout=15000)
+
+
+def _kaydiriciyi_ayarla(page, eleman_id: str, deger: int) -> None:
+    eski = page.evaluate("() => document.querySelector('#logo-preview-img').currentSrc")
+    page.evaluate(
+        "([id, v]) => { const el = document.getElementById(id); el.value = String(v);"
+        " el.dispatchEvent(new Event('input', { bubbles: true })); }",
+        [eleman_id, deger])
+    _onizleme_tazelenmesini_bekle(page, eski)
+
+
+def _konumu_sec(page, konum: str) -> None:
+    eski = page.evaluate("() => document.querySelector('#logo-preview-img').currentSrc")
+    page.click(f'#logo-grid button[data-pos="{konum}"]')
+    _onizleme_tazelenmesini_bekle(page, eski)
+
+
+def _macenta_var_mi(png: bytes) -> bool:
+    """Kırpıntıda macenta logodan bir piksel var mı.
+
+    EŞİKLER ÖLÇÜLDÜ, tahmin değil: varlık (255, 0, 200) ve ekran görüntüsünde
+    de birebir (255, 0, 200) olarak çıkıyor. İlk yazımda `b > 200` idi ve mavi
+    kanal TAM 200 olduğu için yoklama düzeltme YERİNDEYKEN bile düşüyordu —
+    yani eşik, ölçtüğünü sandığı şeyi değil kendi kenarını ölçüyordu.
+    Kenarlardaki harmanlanmış pikseller ayıklansın diye pay yalnız mavide.
+    """
+    from PIL import Image
+    im = Image.open(io.BytesIO(png)).convert("RGB")
+    return any(r > 200 and b > 150 and g < 80
+               for r, g, b in im.getdata())
+
+
+def test_playwright_logo_onizlemesi_kare_OLMAYAN_tabanda_kirpilmiyor(
+        tmp_path, monkeypatch):
+    """Kullanıcı bildirimi (28 Ağustos): kare olmayan görselde alt/yan konumlar
+    önizlemede gözükmüyor.
+
+    NEDEN YALNIZ TARAYICIDA ÖLÇÜLEBİLİR: sunucu her zaman TAM kadrajı
+    döndürüyor (`test_composite.py` dokuz konum × beş oranda logonun kadrajın
+    içinde olduğunu zaten kanıtlıyor), yani kaynağa bakan hiçbir iddia farkı
+    göremez — kusur çizimde. Bu test öteki yarıyı ölçüyor: **kadraj ⊆ görünür
+    kutu**. Kullanıcıya görünen özellik ikisinin bileşkesi.
+
+    DOKUZ KONUM TARAYICIDA GEZİLMİYOR ve bu bilinçli: geometri konumdan
+    bağımsız, yani dokuz hücrelik bir döngü sunucuyu pahalı bir vekille ölçer
+    ve CSS kırıkken bile — kırpma örneklenen hücreyi ıskaladığı sürece — yeşil
+    kalabilirdi. Konum tarafını iki PİKSEL yoklaması taşıyor.
+
+    ÖLÇÜLDÜ (Chromium 1194, 390×844, düzeltmeden ÖNCE): dikey 1024×1536 tabanda
+    kutu 358×320.7 iken görsel 358×537, üst taşma 0 ve alt taşma +216.3 —
+    taşmanın tamamı altta, yani 9'lu ızgaranın alt sırası ekranda hiç yoktu.
+    Kare taban da +37.3 ile eşiğin üstünde; yatay taban (-41) kırpmıyordu, o
+    yüzden "kare değilse" bir KATEGORİ değil EŞİK.
+    """
+    tabanlar = _olcum_kutuphanesi(tmp_path, monkeypatch)
+    port = get_free_port()
+    server = ServerThread(port)
+    server.start()
+    time.sleep(1.0)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 390, "height": 844})
+            page.goto(f"http://127.0.0.1:{port}")
+            page.wait_for_selector("#view-studio")
+            _ilk_kurulum_perdesini_kapat(page)
+            page.wait_for_function(
+                "() => typeof assetCache !== 'undefined'"
+                " && assetCache.logos.length > 0")
+
+            for ad, dosya in tabanlar.items():
+                page.evaluate("([id, fn]) => openLogoModal({ id, filename: fn })",
+                              [ad, dosya])
+                _onizleme_bekle(page)
+                t = page.evaluate(_TASMA_OKU)
+                assert t["kaynak"] == "data:", (
+                    "önizleme sunucudan gelmedi: logo varlığı seçilmemiş olabilir "
+                    "ve test sessizce yalnız ham görseli ölçüyor")
+                assert t["ust"] <= 1 and t["alt"] <= 1 and t["yan"] <= 1, (
+                    f"{ad} tabanda önizleme kutusunu taşırıyor: üst={t['ust']:.1f} "
+                    f"alt={t['alt']:.1f} yan={t['yan']:.1f}")
+                page.evaluate("() => closeLogoModal()")
+
+            # İki PİKSEL yoklaması: kusur "logo GÖZÜKMÜYOR" diye bildirildi,
+            # yani geometrinin yanında logonun KENDİSİ de aranmalı — kutunun
+            # kırpılan ucunda. Dikey taban, çünkü kırpılan yarı orada.
+            page.evaluate("([id, fn]) => openLogoModal({ id, filename: fn })",
+                          ["dikey", tabanlar["dikey"]])
+            _onizleme_bekle(page)
+            # Logo BÜYÜTÜLÜYOR (%14 → %40, kaydırıcının tavanı): 1024 genişlikli
+            # taban 214px'e inince %14'lük logo ekranda ~30×7px kalıyor ve
+            # kenarları koyu zeminle harmanlanıyor — yoklama o boyutta logonun
+            # yokluğunu değil ÖLÇEĞİ ölçerdi. Ölçüldü: %14'te yoklama düşüyor,
+            # %40'ta (~85×21px) sağlam geçiyor.
+            _kaydiriciyi_ayarla(page, "logo-size", 40)
+            # SIRA ÖNEMLİ: modal `bottom-right` ile açılıyor (assets.js), yani
+            # ilk yoklama oradan başlasaydı tıklama AYNI görseli üretir, base64
+            # değişmez ve "tazelendi" çapası sonsuza kadar beklerdi. Önce
+            # `top-left`e geçiliyor, sonra geri dönülüyor: iki geçiş de gerçek.
+            for konum, dilim in (("top-left", 0), ("bottom-right", 3)):
+                _konumu_sec(page, konum)
+                x, y, w, h = page.evaluate(_TASMA_OKU)["kutu"]
+                ceyrek = page.screenshot(clip={
+                    "x": x, "y": y + h * dilim / 4, "width": w, "height": h / 4})
+                assert _macenta_var_mi(ceyrek), (
+                    f"{konum} konumundaki logo kutunun görünür alanında yok")
+            page.evaluate("() => closeLogoModal()")
+
+            # Banner AYNI kutuyu kullanıyor ve `_composite_banner` da tam boy
+            # görsel döndürüyor: kusur oradaydı, düzeltme onu da kapsıyor.
+            # Varsayılan kenar `bottom`, yani en çok kırpılan hâl.
+            page.evaluate("([id, fn]) => openLogoModal({ id, filename: fn })",
+                          ["dikey", tabanlar["dikey"]])
+            page.wait_for_selector("#logo-modal:not([hidden])")
+            page.click('#logo-type button[data-type="banner"]')
+            _onizleme_bekle(page)
+            t = page.evaluate(_TASMA_OKU)
+            assert t["ust"] <= 1 and t["alt"] <= 1, (
+                f"banner önizlemesi taşıyor: üst={t['ust']:.1f} alt={t['alt']:.1f}")
+            page.evaluate("() => closeLogoModal()")
+
+            # MASAÜSTÜ GERİLEME BEKÇİSİ: kural mobil blokta duruyor ve orada
+            # durmalı. Masaüstünde kabın kesin yüksekliği yok; bir `fr` satır
+            # `align-content`in stretch dalını devre dışı bırakıp kısa görseli
+            # kutunun TEPESİNE yapıştırırdı. Ölçüldü: düzeltmeden önce ve sonra
+            # masaüstü sayıları BİREBİR aynı.
+            page.set_viewport_size({"width": 1280, "height": 860})
+            for ad, dosya in tabanlar.items():
+                page.evaluate("([id, fn]) => openLogoModal({ id, filename: fn })",
+                              [ad, dosya])
+                _onizleme_bekle(page)
+                t = page.evaluate(_TASMA_OKU)
+                assert t["ust"] <= 1 and t["alt"] <= 1 and t["yan"] <= 1, (
+                    f"masaüstünde {ad} tabanda kırpma doğdu: {t}")
+                page.evaluate("() => closeLogoModal()")
+
+            browser.close()
+    finally:
+        server.stop()
+
+
+# ── Arama: klasör zinciri ───────────────────────────────────────────
+
+
+def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(
+        tmp_path, monkeypatch):
+    """Üst klasörün adı alt klasördeki görselleri VE sayaçları getiriyor.
+
+    NEDEN DURUM ENJEKTE EDİLİYOR: arama %100 istemcide. Sunucuda arama ucu yok
+    (`/api/history` yalnız TAM `folder_id` eşitliğiyle süzüyor), yani tam bir
+    tur `loadAllImages`in klasör başına yayılımını ölçerdi — yüklemi değil.
+    Enjeksiyon ölçülen şeyi daraltıyor: ÇİZİLEN sayaçlar.
+
+    BU TESTİN ÖLÇTÜĞÜ, BAŞKA HİÇBİR KATMANIN ÖLÇEMEDİĞİ YARI:
+    `tests/test_search_predicate.py` yüklemi node'da gerçekten koşturuyor ama
+    yalnız yüklemi; `tests/test_index.py` kaynağın şeklini sınıyor. Sayaçların
+    ekrana doğru çizildiğini yalnız burası görüyor — kabul ölçütü de tam olarak
+    "kapsam sayaçları buna göre" diyor.
+
+    ÖLÇÜLDÜ (Chromium 1194, "kampanyalar"): historyCache 0 → 3, şerit
+    "4 klasör · 1 görsel" → "1 klasör · 3 görsel", seçicide "Tümü" 0 → 3 ve
+    "Kampanyalar / Bayram" 0 → 3. YEM klasör "Yılbaşı / Bayram" 0 → 0 kaldı:
+    eşleşen ATA, ağaçta geçen herhangi bir ad değil.
+    """
+    import folders as fmod
+    import storage
+    from PIL import Image
+
+    out = str(tmp_path / "output")
+    os.makedirs(out, exist_ok=True)
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", out)
+
+    simdi = "2026-09-02T09:00:00"
+    kampanyalar = fmod.create("Kampanyalar", out, parent_id=None, now=simdi)
+    bayram = fmod.create("Bayram", out, parent_id=kampanyalar["id"], now=simdi)
+    yilbasi = fmod.create("Yılbaşı", out, parent_id=None, now=simdi)
+    # YEM: aynı yaprak adı, BAŞKA bir ata. "kampanyalar" sorgusunda 0 kalmalı.
+    yem = fmod.create("Bayram", out, parent_id=yilbasi["id"], now=simdi)
+
+    buf = io.BytesIO()
+    Image.new("RGB", (64, 64), (30, 30, 30)).save(buf, "PNG")
+    ham = buf.getvalue()
+
+    def koy(prompt: str, folder_id) -> None:
+        storage.save(ham, {"prompt": prompt, "size": "1024x1024",
+                           "quality": "medium", "folder_id": folder_id},
+                     out, now=simdi)
+
+    for i in range(3):
+        koy(f"bayram gorsel {i}", bayram["id"])
+    for i in range(2):
+        koy(f"yem gorsel {i}", yem["id"])
+    koy("kokteki gorsel", None)
+
+    port = get_free_port()
+    server = ServerThread(port)
+    server.start()
+    time.sleep(1.0)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            page.goto(f"http://127.0.0.1:{port}")
+            page.wait_for_selector("#view-studio")
+            _ilk_kurulum_perdesini_kapat(page)
+            page.wait_for_function(
+                "() => typeof folderCache !== 'undefined' && folderCache.length === 4")
+
+            page.evaluate("() => showSection('media')")
+            page.fill("#media-search", "kampanyalar")
+            # Çapa SAYININ KENDİSİ: `refreshSearch` klasör başına bir istek
+            # atıyor ve sabit bir uyku o yarışı kapatmaz, yavaşlatır.
+            page.wait_for_function(
+                "() => historyCache.length === 3", timeout=10000)
+
+            rozetler = page.eval_on_selector_all(
+                ".card-where", "els => els.map(e => e.textContent)")
+            assert rozetler == ["Kampanyalar / Bayram"] * 3, (
+                f"rozetler zinciri yazmıyor: {rozetler}")
+
+            # ŞERİT EKRANI SAYIYOR: iki yarısı da. Önce ikisi de yanlıştı.
+            kart_sayisi = page.eval_on_selector_all(
+                "#folder-grid .folder-cell", "els => els.length")
+            serit = page.text_content("#media-rail-count")
+            assert serit == f"{kart_sayisi} klasör · 3 görsel", (
+                f"şerit ekranla uyuşmuyor: {serit!r}, ekranda {kart_sayisi} kart")
+
+            # KAPSAM SAYAÇLARI
+            page.evaluate("() => openPicker()")
+            page.wait_for_selector("#media-picker:not([hidden])")
+            page.fill("#picker-search", "kampanyalar")
+            page.wait_for_function(
+                "() => [...document.querySelectorAll('.picker-nav-item')]"
+                ".some(b => +b.querySelector('em').textContent === 3)",
+                timeout=10000)
+            kapsamlar = dict(page.evaluate(
+                "() => [...document.querySelectorAll('.picker-nav-item')]"
+                ".map(b => [b.querySelector('span').textContent,"
+                " +b.querySelector('em').textContent])"))
+
+            assert kapsamlar["Kampanyalar / Bayram"] == 3, (
+                "alt klasörün kapsamı hâlâ 0: kullanıcı 'Tümü'de gördüğü "
+                "görselleri kapsamına tıklayınca boş ızgara buluyor")
+            assert kapsamlar["Yılbaşı / Bayram"] == 0, (
+                "YEM kapsam doldu: eşleşme ATAYA değil ağaçtaki herhangi bir "
+                "ada bakıyor")
+            # BÖLME DEĞİŞMEZİ (kapsamlar alt ağaca AÇILMADI): klasör kapsamları
+            # + Klasörsüz tam olarak Tümü'nü tüketiyor. `imported` bilerek
+            # dışarıda — o `crossing`, yani kesişen tek süzgeç.
+            bolme = sum(v for k, v in kapsamlar.items()
+                        if k not in ("Tümü", "İçe aktarılanlar"))
+            assert bolme == kapsamlar["Tümü"], (
+                f"kapsamlar artık bir BÖLME değil: parçalar {bolme}, "
+                f"Tümü {kapsamlar['Tümü']}")
 
             browser.close()
     finally:

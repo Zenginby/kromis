@@ -1829,11 +1829,23 @@ def test_the_gear_and_the_tools_view_are_different_doors():
         "kullanıcı Azure ayarlarının nerede olduğunu okuyamıyor")
 
 
-def test_media_search_is_served_and_filters_by_prompt_folder_and_size():
+def test_media_search_matches_prompt_the_whole_folder_chain_and_size():
     """A3: Arama YALNIZCA Medya'da (üst şeritten kaldırıldı, §4.1).
 
     Sözleşme üç alanı sayıyor: prompt, klasör, boyut. Biri düşerse arama
     "çalışıyor" görünür ama kullanıcı aradığını bulamaz — sessiz bir eksik.
+
+    YENİDEN YAZILDI (Tur L) — ve testin ADI da değişti, çünkü "folder" diyen
+    eski ad artık yalan söylerdi: klasör alanı EN YAKIN klasörün adı değil
+    ZİNCİRİN TAMAMI. Eski iddia `assert "folder.name" in body` idi ve tam da bu
+    turda yanlış çıkan şey oydu — künye "Kampanyalar / Bayram" yazarken arama
+    yalnız "Bayram"ı buluyordu, yani kullanıcı ekranda OKUDUĞU adı aratınca
+    hiçbir şey bulamıyordu. İddia silinmedi, YER DEĞİŞTİRDİ: artık samanlığa
+    giren değerin NEREDEN geldiği sınanıyor ve o kaynak künyeyi besleyen
+    zincirin ta kendisi.
+
+    Ölçüldü (Chromium 1194): Kampanyalar > Bayram altındaki üç görsel için
+    "kampanyalar" araması 0 → 3 sonuç.
     """
     html = _html()
     assert 'id="media-search"' in html, "Medya'da arama alanı yok"
@@ -1842,14 +1854,21 @@ def test_media_search_is_served_and_filters_by_prompt_folder_and_size():
     assert "searchQuery" in js, "arama durumu yok"
     body = re.search(r"function matchesSearch\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
     assert body, "matchesSearch() bulunamadı"
+    govde = body.group(1)
     # Üç alan da SAMANLIĞIN KENDİSİNDE aranıyor (şablon dizesi), gövdede adı
     # geçen bir değişkende değil — mutasyon dersi: `const folder = …` satırı
     # tek başına "klasör aranıyor" saymaya yetiyordu.
-    haystack = re.search(r"return `([^`]*)`", body.group(1))
+    haystack = re.search(r"return `([^`]*)`", govde)
     assert haystack, "eşleşme şablon dizesiyle kurulmuyor"
-    for field in ("prompt", "folderName", "size"):
+    for field in ("prompt", "klasorZinciri", "size"):
         assert f"${{{field}}}" in haystack.group(1), f"{field} aranmıyor"
-    assert "folder.name" in body.group(1), "klasör ADI değil başka bir alan aranıyor"
+    assert re.search(
+        r"klasorZinciriEtiketi\(folderPathParts\(rec\.folder_id\)\)", govde), (
+        "klasör alanı ZİNCİRDEN gelmiyor: künye 'Kampanyalar / Bayram' yazarken "
+        "arama yalnız yaprağı bulur")
+    assert "folderById(" not in govde, (
+        "yüklem hâlâ TEK klasörü çözüyor: zincir yardımcısı bunu zaten yapıyor, "
+        "ikinci bir çözüm bir gün yalnız-yaprak eşleşmesine geri döner")
 
 
 def test_search_leaves_the_folder_boundary():
@@ -3074,6 +3093,135 @@ def test_the_tile_caption_names_the_whole_chain_without_burying_the_leaf():
         "her esnek öğe kendi satır kutusunu açıyor → 'Kampanyal…/ Bayram'")
 
 
+def test_the_chain_is_walked_once_per_folder_not_once_per_record():
+    """Zincir KLASÖR başına bir kez yürünüyor, KAYIT başına değil.
+
+    Zincir bu turda arama yüklemine girdi, yani artık kayıt başına okunuyor —
+    üstelik seçicinin kapsam şeridi aynı yüklemi HER KAPSAM için tüm kayıtlara
+    uyguluyor ve şerit her tuş vuruşunda yeniden kuruluyor. Belleksiz maliyet
+    tuş başına `(F + 3) × N × D × F` klasör karşılaştırması (F=30, D=3, N=500
+    için ≈1,6 milyon), çünkü `folderPath` her kademede doğrusal `find` koşuyor.
+
+    ÖLÇÜLDÜ (Chromium 1194, seçici açık): `renderPickerNav` ortalaması bellekli
+    zincir yükleminde 0.152 ms — zinciri aramaya SOKMADAN önceki 0.164 ms'nin
+    altında. Yani zincire geçmenin bedeli negatif çıktı.
+
+    `Object.freeze` ayrı bir iddia ve süs değil: dönen nesne PAYLAŞILIYOR, bir
+    çağıranın yazması BAŞKA bir yüzeyin künyesini değiştirirdi — suçlu satır ile
+    belirtinin ayrı yüzeylerde olduğu, teşhisi çok zor bir kirlenme.
+    """
+    parcalar = _balanced_body(_folders_js(), "function folderPathParts(")
+    assert "zincirBellegi.get(" in parcalar and "zincirBellegi.set(" in parcalar, (
+        "zincir belleği yok: yüklem KAYIT başına `folderPath` yürüyor ve "
+        "seçicinin kapsam şeridi bunu HER KAPSAM için tekrarlıyor")
+    assert "Object.freeze(" in parcalar, (
+        "bellekteki parçalar dondurulmamış: dönen nesne paylaşılıyor")
+
+
+def test_every_writer_of_the_folder_cache_resets_the_chain_memo():
+    """`folderCache`i değiştiren HER yazar zincir belleğini tazeliyor.
+
+    Bu testin var oluş sebebi ölçülmüş bir tuzak: `folderCache` DİZİSİNE iki
+    atama var (`loadFolders`ın iki dalı), ama İÇERİĞİ üçüncü bir yerde YERİNDE
+    değişiyor — `renameCurrentFolder` `loadFolders()` çağırmıyor (yeniden
+    adlandırma sayıları değiştirmiyor) ve önbellekteki nesnenin `name`ini
+    doğrudan yazıyor. Zincir METNİNİ tutan bellek orada sıfırlanmazsa kullanıcı
+    klasörü yeniden adlandırdıktan sonra YENİ adı aratınca hiçbir şey bulamaz,
+    ESKİ adı aratınca sonuç almaya devam eder — ve künyeler de eski adı yazar.
+
+    Sayılar bu yüzden pinlenmiş: dördüncü bir yazar eklendiği gün bu satır
+    kırmızıya döner ve yazan kişi sıfırlamayı düşünmek ZORUNDA kalır.
+    """
+    js = _folders_js()
+    assert js.count("folderCache = ") == 4, (
+        f"`folderCache` yazarları değişmiş ({js.count('folderCache = ')}): yeni "
+        "bir yazar zincir belleğini de tazelemek zorunda")
+    assert js.count("found.name = ") == 1, (
+        "önbellekteki klasöre yeni bir YERİNDE yazım eklenmiş")
+    for fn in ("async function loadFolders(", "async function renameCurrentFolder("):
+        assert "zincirBellegiSifirla()" in _balanced_body(js, fn), (
+            f"{fn} zincir belleğini tazelemiyor")
+    assert js.count("zincirBellegiSifirla()") == 3, (
+        "tanım + iki çağrı: üçüncüsü ya yeni bir yazar ya gereksiz temizlik")
+
+    yukle = _balanced_body(js, "async function loadFolders(")
+    assert yukle.count("zincirBellegiSifirla()") == 1, (
+        "temizlik dal başına ikizlenmiş: üçüncü dalda unutulur")
+    assert yukle.index("zincirBellegiSifirla()") > yukle.rindex("catch"), (
+        "temizlik `catch`ten ÖNCE koşuyor: hata dalında `folderCache = []` "
+        "sorulan her id'yi 'kök' diye belleğe yazar ve sonraki BAŞARILI yükleme "
+        "o yalanı hazır bulur")
+
+
+def test_the_folder_cards_deliberately_match_only_their_own_name():
+    """Klasör KARTLARININ süzgeci zincire geçmiyor — bilinçli.
+
+    Arama yüklemi zinciri eşleştiriyor, yani "kampanyalar" alt klasördeki
+    GÖRSELLERİ getiriyor. Kart ise yalnız `f.name` ÇİZİYOR: zincire geçilseydi
+    ekrana, sebebi hiçbir yerde yazmayan bir "Bayram" kartı düşerdi —
+    düzelttiğinden daha kötü bir ayrışma. İki liste iki ayrı soruyu cevaplıyor.
+
+    Mandal kararın kendisini taşıyor ki sonraki okuyucu bunu "unutulmuş yarı"
+    sanıp sessizce kapatmasın.
+    """
+    kart = _balanced_body(_folders_js(), "function renderFolders()")
+    assert re.search(
+        r"folderCache\.filter\(\(f\) => f\.name\.toLowerCase\(\)\.includes\(q\)\)",
+        kart), (
+        "klasör KARTLARI zincire geçmiş: kart yalnız `f.name` çiziyor, yani "
+        "'kampanyalar' aramasında sebebi ekranda yazmayan bir 'Bayram' kartı "
+        "belirir. Zincire geçilecekse kart da zinciri ÇİZMELİ — dördüncü künye "
+        "yüzeyi, kendi CSS'i, kendi 360×780 ölçümü")
+
+
+def test_the_picker_scopes_stay_a_partition_not_a_subtree():
+    """Kapsam düğmeleri TAM eşitlikte kalıyor, alt ağaca açılmıyor.
+
+    Klasör kapsamları "Klasörsüz" ile birlikte "Tümü"yü tüketen bir BÖLME; tek
+    kesişen süzgeç `imported` ve o `crossing` sınıfıyla gözle işaretli. Alt
+    ağaçta her klasör işaretsiz bir kesişen süzgece dönerdi ve toplam "Tümü"yü
+    aşardı — okuyanın "sayaç bozuk" diyeceği hâl.
+
+    Kabul ölçütünün istediği "sayaçlar buna göre" kapsamlara DOKUNMADAN
+    sağlanıyor: sayaç `pickerFilter` üzerinden yüklemi çağırıyor. ÖLÇÜLDÜ:
+    "Kampanyalar / Bayram" kapsamı "kampanyalar" aramasında 0 → 3, yem klasör
+    "Yılbaşı / Bayram" ise 0 → 0 (yani eşleşen ATA, ağaçtaki herhangi bir ad
+    değil), toplam "Tümü" = 3 ile tutuyor.
+    """
+    picker = _picker_js()
+    assert re.search(r"test: \(r\) => r\.folder_id === f\.id", picker), (
+        "kapsam ALT AĞACA geçmiş: üst klasörün sayacı alt klasörünkileri de "
+        "sayar ve toplam 'Tümü'yü AŞAR")
+    assert "folderSubtree(" not in picker, (
+        "kapsam testi alt ağaç yürüyor: kapsam BAŞINA kayıt BAŞINA BFS")
+
+
+def test_the_rail_count_reports_what_is_actually_on_screen():
+    """Şeridin iki yarısı da EKRANI sayıyor.
+
+    ÖLÇÜLDÜ (Tur L, "kampanyalar" araması, üç eşleşen görsel ve bir eşleşen
+    kart): şerit "4 klasör · 1 görsel" yazıyordu — İKİ sayı da yanlış. Klasör
+    yarısı süzgeci hiç görmüyordu; görsel yarısı ise arama BİTMEDEN okunuyordu
+    (`syncFolderView` → `renderFolders` sırası, `refreshSearch` sonra bitiyor).
+    Zincir eşleşmesi görsel sayısını büyüttüğü için çelişki bu turdan sonra
+    daha sık ekrana gelecekti. Sonra: "1 klasör · 3 görsel".
+    """
+    js = _folders_js()
+    kart = _balanced_body(js, "function renderFolders()")
+    assert "gorunenKlasorSayisi = matching.length" in kart, (
+        "aramada şerit hâlâ TÜM klasörleri sayıyor, ekranda ise yalnız eşleşen "
+        "kartlar var")
+    assert "gorunenKlasorSayisi = 0" in kart, (
+        "hiç eşleşme yokken ızgara gizleniyor ama şerit klasör saymaya devam eder")
+    assert "gorunenKlasorSayisi = null" in kart, (
+        "arama DIŞI dal sayacı sıfırlamıyor: bir kez arama yapan kullanıcı "
+        "sorguyu silince şeritte eski süzülmüş sayıyı okumaya devam eder")
+    arama = _balanced_body(js, "async function refreshSearch(")
+    assert "updateMediaRailCount()" in arama, (
+        "arama sonucu geldikten sonra şerit tazelenmiyor: görsel sayısı bir "
+        "önceki aramanınki kalır")
+
+
 def test_both_folder_captions_go_through_the_same_chain_node():
     """Künyeyi yazan İKİ yüzey de aynı düğümden geçiyor.
 
@@ -3084,10 +3232,14 @@ def test_both_folder_captions_go_through_the_same_chain_node():
     yani rozet tam da engellemek için konduğu belirsizliği üretiyordu.
 
     İddia `folders.js`in TAMAMINA bakmıyor, KÜNYE yüzeylerine bakıyor ve bu
-    bilinçli: `folder.name` dosyada dört yerde daha geçiyor (üst-seviye kartının
-    etiketi, iki durum cümlesi, arama eşleştirmesi) ve hepsi meşru — bağlamı
-    zaten belli, zincir orada gürültü olurdu. Genel bir "`folder.name` hiç
-    geçmesin" iddiası YANLIŞ olurdu.
+    bilinçli: zincir her `folder.name` geçişinde gerekmiyor, bağlamı belli olan
+    yerlerde gürültü olurdu. Genel bir "`folder.name` hiç geçmesin" iddiası
+    YANLIŞ olurdu.
+
+    DÜZYAZI SAYIM MEKANİK SAYIMA ÇEVRİLDİ (Tur L): docstring meşru yerler
+    arasında "arama eşleştirmesi"ni de sayıyordu ve o cümle bu turda BAYATLADI —
+    arama artık zincirden geçiyor. Bayat bir düzyazı hiçbir kapıyı çalmıyor,
+    o yüzden sayı aşağıda iddiaya bağlandı.
     """
     js = _folders_js()
     galeri = _render_gallery_body()
@@ -3099,6 +3251,13 @@ def test_both_folder_captions_go_through_the_same_chain_node():
     assert js.count("klasorZinciriDugumu(") == 3, (
         "künye düğümünün tanımı + iki çağıranı: üçüncü bir yüzey eklendiyse "
         "iddia da genişletilmeli")
+    # `folder.name` artık YALNIZ `renameCurrentFolder`da ve orada PATCH
+    # YANITINDAN okunuyor (`currentFolder.name` ve `found.name` yazımları).
+    # Üçüncü bir geçiş çıktıysa biri daha ÖNBELLEKTEKİ klasörden tek ad
+    # okuyor demektir — arama tam bu yüzden zincire geçti (Tur L).
+    assert js.count("folder.name") == 2, (
+        f"`folder.name` {js.count('folder.name')} yerde geçiyor: yeni bir "
+        "tek-ad okuması eklendiyse zincir mi gerekiyordu diye SORULMALI")
 
     # ROZET EKRAN OKUYUCUYA DA ULAŞIYOR. Kırpmayı CSS'e vermenin yazılı
     # gerekçesi "ekran okuyucu zinciri tam duyar" — ama kart AÇIK bir

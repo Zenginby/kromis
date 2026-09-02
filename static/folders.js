@@ -20,11 +20,25 @@ let folderCache = [];
 let searchQuery = "";
 let mediaSortOrder = "date"; // "date" (Yeni-Eski) veya "name" (A-Z)
 
+// Aramada ızgarada yalnız EŞLEŞEN kartlar duruyor. Şeridin sayısı ekranda
+// GERÇEKTEN duran kart sayısı olmalı; `null` = süzme yok, yani tüm klasörler.
+// Tek yazar `renderFolders` — sayıyı üreten yer orası.
+let gorunenKlasorSayisi = null;
+
 function updateMediaRailCount() {
   const el = $("media-rail-count");
   if (!el) return;
   const imgCount = historyCache ? historyCache.length : 0;
-  const foldCount = folderCache ? folderCache.length : 0;
+  // ŞERİDİN İKİ YARISI DA EKRANI SAYIYOR (Tur L). Eskiden hiçbiri saymıyordu:
+  // görsel yarısı arama tamamlanmadan okunuyordu (`syncFolderView` →
+  // `renderFolders` sırası, `refreshSearch` sonra bitiyor) ve klasör yarısı
+  // süzgeci hiç görmüyordu. ÖLÇÜLDÜ ("kampanyalar" araması, üç eşleşen görsel
+  // ve bir eşleşen kart): şerit "4 klasör · 1 görsel" yazıyordu — iki sayı da
+  // yanlış. Zincir eşleşmesi görsel sayısını büyüttüğü için çelişki bu turdan
+  // sonra daha da sık ekrana gelecekti.
+  const foldCount = gorunenKlasorSayisi === null
+    ? (folderCache ? folderCache.length : 0)
+    : gorunenKlasorSayisi;
   if (currentFolder) {
     el.textContent = `${imgCount} görsel`;
   } else {
@@ -65,6 +79,32 @@ function folderPath(id) {
 // iki farklı ad sanır.
 const KLASOR_AYRACI = " / ";
 
+// Zincir belleği: klasör id → DONDURULMUŞ {ust, yaprak}.
+//
+// NEDEN ŞART (Tur L): zincir bu turda ARAMA YÜKLEMİNE de girdi, yani artık
+// klasör başına değil KAYIT başına okunuyor — üstelik seçicinin kapsam şeridi
+// aynı yüklemi HER KAPSAM için tüm kayıtlara uyguluyor (`pickerFilter(s).length`)
+// ve şerit her tuş vuruşunda yeniden kuruluyor. Bellek olmadan tek tuşun
+// maliyeti (F klasör, D derinlik ≤ MAX_FOLDER_DEPTH = 5, N kayıt):
+// `(F + 3) × N × D × F` klasör karşılaştırması, çünkü `folderPath` her kademede
+// `folderById`nin doğrusal `find`ini koşuyor — F=30, D=3, N=500 için ≈1,6 milyon.
+//
+// Bellek `folderPathParts`ın İÇİNE kondu, ayrı bir ada değil: künye düğümü,
+// kırıntı, taşıma listesi ve kart rozeti dahil HER çağıran bedavaya kazanıyor
+// ve hiçbir çağrı yeri belleği atlayamıyor.
+//
+// DÖNEN NESNE PAYLAŞILIYOR: bugün her çağıran yalnız okuyor (destructuring),
+// ama bir gün biri yazsaydı bellekteki kaydı bozar ve AYNI klasörün künyesi
+// BAŞKA bir yüzeyde değişirdi — suçlu satır ile belirtinin ayrı yüzeylerde
+// olduğu, teşhisi çok zor bir kirlenme. `Object.freeze` onu yazanın kendi
+// satırında durduruyor.
+const zincirBellegi = new Map();
+
+// Belleği tazeleyen TEK yol. Ayrı bir işlev, çünkü İKİ çağıranın da gerekçeyi
+// aynı yerde okuması gerekiyor: `folderCache`in İÇERİĞİ değiştiği her an bellek
+// yalan söylemeye başlıyor.
+function zincirBellegiSifirla() { zincirBellegi.clear(); }
+
 /** Zinciri {ust, yaprak} olarak verir — kök/bilinmeyen id'de ikisi de "".
  *
  *  "Klasörsüz" YEDEĞİ BURAYA KONMUYOR: `pickerFolderLabel` bilinmeyen id'de
@@ -72,11 +112,17 @@ const KLASOR_AYRACI = " / ";
  *  güveniyor. Yedek buraya taşınsaydı o sözleşme sessizce değişirdi.
  */
 function folderPathParts(id) {
+  // Bellek yalnız NESNE saklıyor, yani `get`in dönüşü ya isabet ya `undefined`:
+  // saklanmış bir değerin yanlışlıkla falsy olması mümkün değil.
+  const bellekte = zincirBellegi.get(id);
+  if (bellekte) return bellekte;
   const zincir = folderPath(id).map((f) => f.name);
-  return {
+  const parcalar = Object.freeze({
     ust: zincir.slice(0, -1).join(KLASOR_AYRACI),
     yaprak: zincir.length ? zincir[zincir.length - 1] : "",
-  };
+  });
+  zincirBellegi.set(id, parcalar);
+  return parcalar;
 }
 
 /** Klasör künyesi: zincirin TAMAMI, ama kırpma yükü ÜST zincire biniyor.
@@ -231,6 +277,14 @@ async function loadFolders() {
     folderCache = [];
     statusEl.textContent = "Klasörler alınamadı.";
   }
+  // TEK satır, try/catch'in DIŞINDA: iki dal da diziyi KOŞULSUZ yeniden atıyor,
+  // yani dal başına bir temizlik yazmak aynı işi ikizler ve üçüncü bir dal
+  // eklendiğinde biri unutulur.
+  // HATA DALI BİLHASSA ÖNEMLİ: `folderCache = []` iken sorulan her id "kök"
+  // diye belleğe yazılır ({ust:"", yaprak:""}) ve sonraki BAŞARILI yükleme o
+  // yalanı hazır bulurdu — bir kez ağ hatası alıp yeniden denemek bütün
+  // künyeleri ve arama zincirini kalıcı olarak boşaltırdı.
+  zincirBellegiSifirla();
   renderFolderHint();
   renderFolders();
 }
@@ -409,9 +463,18 @@ function renderFolders() {
 
   if (searching) {
     const q = searchQuery.toLowerCase();
+    // KART SÜZGECİ ZİNCİRE GEÇMİYOR ve bu bilinçli (Tur L). Arama YÜKLEMİ artık
+    // zinciri eşleştiriyor, yani "kampanyalar" alt klasördeki GÖRSELLERİ
+    // getiriyor — ama kart yalnız `f.name` ÇİZİYOR. Zincire geçilseydi ekrana,
+    // sebebi hiçbir yerde yazmayan bir "Bayram" kartı düşerdi: düzelttiğinden
+    // daha kötü bir ayrışma. İki liste iki ayrı soruyu cevaplıyor — kartlar
+    // "adı buna benzeyen klasörler", görseller "buranın altındaki görseller".
+    // Kart zincire geçecekse önce zinciri ÇİZMELİ: dördüncü künye yüzeyi,
+    // kendi CSS'i ve Tur G'nin 360×780 ölçümünün tekrarı, yani ayrı bir tur.
     const matching = folderCache.filter((f) => f.name.toLowerCase().includes(q));
     if (!matching.length) {
       grid.hidden = true;
+      gorunenKlasorSayisi = 0;   // ızgara gizli: ekranda sıfır kart var
       updateMediaRailCount();
       return;
     }
@@ -423,11 +486,13 @@ function renderFolders() {
     for (const f of matching) {
       grid.appendChild(createFolderCell(f));
     }
+    gorunenKlasorSayisi = matching.length;
     updateMediaRailCount();
     return;
   }
 
   grid.hidden = false;
+  gorunenKlasorSayisi = null;   // süzme yok: şerit tüm klasörleri sayıyor
 
   // Bir klasörün içindeyken "yukarı" kartı: bir seviye üstü gösterir (kökte "Klasörsüz"),
   // hem çıkış hem de o seviyeye taşıma hedefi.
@@ -559,6 +624,13 @@ async function renameCurrentFolder() {
     currentFolder.name = folder.name;
     const found = folderById(target.id);
     if (found) found.name = folder.name;
+    // `loadFolders()` BİLEREK çağrılmıyor (yeniden adlandırma sayıları
+    // değiştirmiyor), yani `folderCache`in İÇERİĞİ yerinde değişen tek yer
+    // burası — dizinin iki atamasının yanındaki ÜÇÜNCÜ yazar. Bellek zincir
+    // METNİNİ tutuyor: sıfırlanmazsa kullanıcı klasörü yeniden adlandırdıktan
+    // sonra YENİ adı aratınca hiçbir şey bulamaz, ESKİ adı aratınca sonuç
+    // almaya devam eder — ve künyeler de eski adı yazmayı sürdürür.
+    zincirBellegiSifirla();
     statusEl.textContent = "Klasör yeniden adlandırıldı.";
     syncFolderView();
   } catch (e) {
@@ -802,12 +874,32 @@ document.addEventListener("keydown", (e) => {
 // `q` parametreli: TEK yüklem, iki çağıran (Medya araması + Medya seçicisi).
 // Seçici kendi eşleştirmesini yazsaydı arama iki yerde ayrışırdı — birinde
 // klasör adı aranır, diğerinde aranmaz ve fark sessiz olurdu (plan B5).
+//
+// KLASÖR ALANI ZİNCİRİN TAMAMI (Tur L). Eskiden yalnız EN YAKIN klasörün adı
+// aranıyordu; oysa Tur G'den beri hem kart rozeti hem seçici künyesi tam yolu
+// ("Kampanyalar / Bayram") yazıyor. Yani kullanıcı ekranda OKUDUĞU adı aratıyor
+// ve alt klasördeki görselleri hiç bulamıyordu — rozet tam da kendi doğurduğu
+// beklentiyi karşılamıyordu (Tur G'nin BULGU 4'ünün arama tarafı).
+// ÖLÇÜLDÜ (Chromium 1194): Kampanyalar > Bayram altındaki üç görsel için
+// "kampanyalar" araması ÖNCE 0 sonuç veriyordu, SONRA 3.
+//
+// Ayraç `klasorZinciriEtiketi`ten geliyor, satır içine yazılmıyor: samanlık ile
+// künye AYNI dizeyi üretmek zorunda, yoksa "gördüğünü aratabilirsin" sözü
+// başka bir yerden yeniden kırılır. Bunun bilinçli bir yan sonucu var —
+// kullanıcı künyeyi olduğu gibi ("kampanyalar / bayram") yapıştırıp
+// aratabiliyor; sorgu ayracı aşabildiği için ("lar / bay") de eşleşiyor,
+// samanlığın alanlar arası sınırları zaten baştan beri geçirgen.
+//
+// "Klasörsüz" YEDEĞİ BURADA YOK ve bu bilinçli: kök görsellerin rozeti
+// "Klasörsüz" yazıyor ama samanlıkta boş dize duruyor, yani o kelime
+// aranamıyor. Aynı kusur SINIFI ama ayrı bir sonuç kümesi değişikliği —
+// taze bir kütüphanede her görsel klasörsüz olduğu için o sorgu kütüphanenin
+// TAMAMINI döndürür ve kendi ölçümünü ister. Kuyrukta kendi maddesi var.
 function matchesSearch(rec, q = searchQuery) {
-  const folder = folderById(rec.folder_id);
-  const folderName = folder ? folder.name : "";
+  const klasorZinciri = klasorZinciriEtiketi(folderPathParts(rec.folder_id));
   const size = rec.size || "";
   const prompt = rec.prompt || rec.filename || "";
-  return `${prompt} ${folderName} ${size}`.toLowerCase().includes(q);
+  return `${prompt} ${klasorZinciri} ${size}`.toLowerCase().includes(q);
 }
 
 // Tüm klasörlerin görselleri: `/api/history` klasörsüzleri, `?folder_id=` tek
@@ -842,6 +934,9 @@ async function refreshSearch(token = searchToken) {
   historyCache = all.filter((r) => matchesSearch(r));
   selected = new Set([...selected].filter((id) => historyCache.some((r) => r.id === id)));
   renderGallery();
+  // Şerit BURADA tazeleniyor: `renderFolders` sorgu yazıldığı an koşuyor, yani
+  // görsel sayısını arama daha bitmeden okuyor ve bir öncekini yazıyordu.
+  updateMediaRailCount();
   syncSelectUI();
 }
 
@@ -911,6 +1006,16 @@ function pickerScopes() {
       test: (r) => !r.folder_id },
     ...folderCache.map((f) => ({
       key: `f:${f.id}`, label: pickerFolderLabel(f.id), icon: PICKER_ICONS.folder,
+      // Kapsam testi TAM eşitlik, ALT AĞAÇ değil (Tur L kararı). Klasör
+      // kapsamları "Klasörsüz" ile birlikte "Tümü"yü tüketen bir BÖLME ve tek
+      // kesişen süzgeç `imported` — o da `crossing` sınıfıyla gözle işaretli
+      // (yukarıdaki gerekçe). Alt ağaçta her klasör işaretsiz bir kesişen
+      // süzgece dönerdi ve `Kampanyalar + Bayram > Tümü` okunurdu.
+      // Kabul ölçütünün istediği "sayaçlar buna göre" ZATEN sağlanıyor: sayaç
+      // `pickerFilter` üzerinden YÜKLEMİ çağırıyor, yani zincir eşleşmesi
+      // sayaçlara kendiliğinden giriyor. Ölçüldü: "Kampanyalar / Bayram"
+      // kapsamı "kampanyalar" aramasında 0 → 3 (eskiden 0 gösteriyor ve
+      // tıklanınca boş ızgara açıyordu).
       test: (r) => r.folder_id === f.id,
     })),
     { key: "imported", label: "İçe aktarılanlar", icon: PICKER_ICONS.imported,
@@ -1025,10 +1130,13 @@ function renderPickerGrid(scopes = pickerScopes()) {
     const cap = document.createElement("span");
     cap.className = "picker-cap";
     cap.appendChild(name);
-    // Zincir karo başına BİR kez yürünüyor: hem künye düğümü hem ipucu aynı
-    // parçalardan besleniyor. İki ayrı çağrı `folderPath`i (klasör başına
-    // doğrusal `find` + döngü muhafızı) her karo için iki kez koşturuyordu ve
-    // ızgara her tuş vuruşunda yeniden kuruluyor.
+    // Zincir karo başına BİR kez OKUNUYOR: künye düğümü ile ipucu AYNI parça
+    // nesnesinden besleniyor, yani ikisi ayrışamıyor.
+    // MALİYET GEREKÇESİ TAŞINDI (Tur L): bu satırın eski sebebi `folderPath`in
+    // karo başına iki kez yürümesiydi; zincir artık `folderPathParts` içinde
+    // belleklendiği için ikinci bir çağrı da yalnız bir Map araması olurdu.
+    // Kalan sebep ucuzluk DEĞİL TEKLİK: iki ayrı okuma bir gün iki ayrı yedek
+    // ya da iki ayrı kırpma kazanabilir.
     const parcalar = folderPathParts(rec.folder_id);
     cap.appendChild(klasorZinciriDugumu(rec.folder_id, "picker-cap-folder", parcalar));
 

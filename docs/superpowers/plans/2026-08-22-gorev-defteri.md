@@ -1,11 +1,11 @@
 # Görev defteri — sıradaki adımlar
 
-**Tarih:** 1 Eylül 2026 · **Son dal:** `claude/project-graphs-next-tasks-7slwo1`
+**Tarih:** 2 Eylül 2026 · **Son dal:** `claude/recent-changes-status-rwc2hx`
 (`main`'den kuruldu, henüz birleşmedi)
-**Bugünkü ölçüm:** `APP_VERSION` **0.11.6** (sonrakini CI yazacak),
-`pytest tests/ -q` → **1861 geçti / 9 atlandı** (Playwright kuruluyken; Tur K
-öncesi aynı ortamda 1854 geçti / 9 atlandı — beş yeni test, sonra kod
-incelemesiyle bir tane daha)
+**Bugünkü ölçüm:** `APP_VERSION` **0.11.7** (sonrakini CI yazacak),
+`pytest tests/ -q` → **1880 geçti / 9 atlandı** (Playwright kuruluyken; Tur L
+öncesi aynı ortamda 1861 geçti / 9 atlandı — on dokuz yeni test: iki mobil
+mandalı, iki E2E, beş kaynak mandalı ve node ile koşan on bir davranış testi)
 **Defterin açılış ölçümü** (Tur A öncesi): `APP_VERSION` 0.7.0 → 1613 geçti / 10 atlandı
 (atlananlar her üç ölçümde de yalnız Windows'a özgü DACL testleri + kurulu
 olmayan Playwright)
@@ -33,6 +33,145 @@ burada durur. Yol haritaları (README fazları, `2026-08-10-saas-transformation-
 4. Kuyruktan bir madde alındığında **üste taşınır** ve kendi adım listesini
    orada kazanır. Kuyruk sırası bir söz değil, öneri: kullanıcı sırayı
    değiştirebilir.
+
+---
+
+## ✅ Tur L — Kuyruğun 1. ve 2. maddesi: ekranda yazan ile yapılan ayrışmıştı
+
+**Bitti (2 Eylül).** Kuyruğun o günkü **1. ve 2. maddesi**. İkisi de aynı kusur
+sınıfı — kullanıcının ekranda OKUDUĞU şey ile uygulamanın YAPTIĞI şey ayrışmış —
+ama ayrı dosyalarda yaşadıkları için tek dalda **iki bağımsız commit**.
+
+### Logo önizlemesi dikey tabanda kutusunu taşırıp kırpılıyordu
+
+Kullanıcı 28 Ağustos'ta bildirmişti; sunucu 1 Eylül'de elenmişti. Bu turda kalan
+aday ölçüldü ve kusur bulundu — **ama defterin tahmin ettiği mekanizma DEĞİLDİ.**
+
+Kusur `max-height: 100%`in çözülmemesi değil, **neye karşı çözüldüğüydü.** Kabın
+satır ızgarası örtük (`grid-auto-rows: auto`), yani satır görselin içerik
+yüksekliğine büyüyor; `place-items: center` `align-items` yazıyor,
+`align-content` değil ve o da `normal` = `stretch` — **stretch yalnız POZİTİF
+boş alanı dağıtır, taşan bir satırı geri KÜÇÜLTMEZ.** Görselin kapsayan bloğu
+ızgara ALANI olduğu için yüzde, öğenin kendi büyüttüğü satıra çözülüyor ve
+hiçbir şeyi sınırlamıyordu.
+
+**Ölçüm (Chromium 1194, 390×844, gerçek `/api/logo/preview` turu):**
+
+| taban | kutu | görsel | üst taşma | alt taşma | satır |
+| --- | --- | --- | --- | --- | --- |
+| 1024×1536 | 358×320.7 | 358×537 | **0** | **+216.3** | `537px` |
+| 1024×1024 | 358×320.7 | 358×358 | 0 | +37.3 | `358px` |
+| 1536×1024 | 358×320.7 | 358×238.7 | −41 | −41 | `320.719px` |
+| 512×2048 | 358×320.7 | 358×1432 | 0 | +1111.3 | `1432px` |
+
+Yatay taban satırı mekanizmanın **kanıtı**, yalnız tutarlı bir gözlem değil: boş
+alan POZİTİF olduğu için AYNI CSS satırı 320.719px'e geri çekiyor ve kırpma hiç
+olmuyor. "Görsel kare değilse" koşulu tam olarak bu işaret değişimi — kare taban
+da +37.3 ile eşiğin hemen üstünde, yani bir KATEGORİ değil EŞİK.
+
+Düzeltme sonrası dört oranda da taşma **≤ 0**, oran korunuyor (1024×1536 →
+213.8×320.7) ve **masaüstü sayıları BİREBİR aynı** kaldı — kuralın mobil blokta
+kalması gerektiğinin kanıtı bu son satır.
+
+Düzeltme paydayı düzeltiyor: `grid-template-rows: minmax(0, 1fr)`. `1fr` tek
+başına yetmez (asgari boyutlama işlevi `auto` kalır); aynı tuzağın kaydı
+`.gallery` kuralında zaten vardı. **Banner akışı aynı kutuyu kullanıyor ve
+`_composite_banner` da tam boy görsel döndürüyor — o da bedavaya düzeldi**
+(ölçüldü: banner modunda da aynı +216.3 → 0).
+
+### Arama klasör adını yalnız en yakın klasörde eşleştiriyordu
+
+**Ölçüm kusuru defterin tarif ettiğinden GENİŞ gösterdi.** Kütüphane:
+`Kampanyalar > Bayram` (3 görsel) ve yem olarak `Yılbaşı > Bayram` (2 görsel).
+
+| ölçüm ("kampanyalar" araması) | önce | sonra |
+| --- | --- | --- |
+| `historyCache` | **0** | **3** |
+| `#media-rail-count` | `4 klasör · 1 görsel` | `1 klasör · 3 görsel` |
+| ekrandaki klasör kartı | 1 | 1 |
+| seçici "Tümü" | 0 | 3 |
+| seçici "Kampanyalar / Bayram" | **0** | **3** |
+| seçici "Yılbaşı / Bayram" (**yem**) | 0 | **0** |
+| `renderPickerNav` ortalaması | 0.164 ms | **0.152 ms** |
+
+Yem satırı turun asıl kanıtı: değişiklik **ATAYI** eşleştiriyor, "ağaçta geçen
+herhangi bir adı" değil. Şerit satırı ölçüm sırasında çıkan ikinci bir olguydu —
+ekranda **bir** kart dururken şerit "4 klasör" yazıyordu ve görsel yarısı da
+arama bitmeden okunduğu için "1 görsel" diyordu; **iki sayı da yanlıştı.** İkisi
+de bu turda ekrana bağlandı.
+
+Son satır beklenmedik ve kayda değer: zincir yürüyüşü belleklendiği için
+(`folderPathParts` içinde, `Object.freeze`li) **yeni yüklem eskisinden DE ucuz.**
+Zinciri aramaya sokmanın bedeli negatif çıktı.
+
+**Planı değiştiren bulgu — `folderCache`in ÜÇ yazarı var.** Diziye iki atama var
+(`loadFolders`ın iki dalı) ama içeriği `renameCurrentFolder`da **yerinde**
+değişiyor (`found.name = …`) ve orası `loadFolders()` çağırmıyor. Bellek orada
+sıfırlanmasaydı kullanıcı klasörü yeniden adlandırdıktan sonra **yeni adı
+aratınca hiçbir şey bulamaz, eski adı aratınca sonuç almaya devam ederdi** —
+bugünkü hiçbir test bunu görmezdi. Bulgu artık koşturulabilir bir iddia
+(`test_renaming_a_folder_is_searchable_only_after_the_memo_reset`).
+
+`loadFolders`taki temizlik `try/catch`in **dışında** ve bu da ölçülü bir karar:
+`folderCache = []` iken sorulan her id "kök" diye belleğe yazılırdı ve sonraki
+başarılı yükleme o yalanı hazır bulurdu — bir kez ağ hatası alıp yeniden denemek
+bütün künyeleri kalıcı olarak boşaltırdı.
+
+### Bilinçli olarak YAPILMAYANLAR (kullanıcı kararı; yoruma VE mandala yazılı)
+
+* **Seçici kapsamları alt ağaca açılmadı.** Kabul ölçütünün istediği "sayaçlar
+  buna göre" kapsamlara dokunmadan sağlanıyor (sayaç `pickerFilter` üzerinden
+  yüklemi çağırıyor). Alt ağaç, `imported`ın `crossing` işaretiyle korunan
+  BÖLMEYİ kırardı: `Kampanyalar + Bayram > Tümü` okunurdu. Kuyrukta kendi
+  maddesi var.
+* **Klasör kartlarının süzgeci zincire geçmedi.** Kart yalnız `f.name` ÇİZİYOR;
+  zincire geçilseydi ekrana sebebi hiçbir yerde yazmayan bir "Bayram" kartı
+  düşerdi.
+* **"Klasörsüz" araması bu turda kapanmadı** — kuyruğa, alınacak ölçümüyle.
+
+### Bekçiler — ve her katmanın NE KANITLAYAMADIĞI
+
+| katman | ne kanıtlıyor | CI'da koşuyor mu |
+| --- | --- | --- |
+| `test_mobile.py` (2 mandal) | CSS bildirimleri duruyor | evet |
+| `test_index.py` (5 yeni + 2 yeniden yazılmış) | kaynağın ŞEKLİ: yüklem zincirden geçiyor, bellek her yazarda tazeleniyor | evet |
+| **`test_search_predicate.py` (11, YENİ)** | yüklemin **davranışı** — kesilmiş GERÇEK kaynak node'da koşuyor | **evet** (`ubuntu-latest` Node ile geliyor) |
+| `test_playwright_studio.py` (2 yeni) | çizilen geometri ve çizilen SAYAÇLAR | hayır (kullanıcı kararı) |
+
+Üçüncü satır bu turun yapısal kazancı: kaynak mandalları `Bayram`daki bir
+görselin `kampanyalar` sorgusuyla gerçekten döndüğünü **kanıtlayamaz** —
+`folderPath`in muhafızı ince biçimde yanlış olsa, `slice(0, -1)` bir kaysa ya da
+bellek bayat nesne döndürse hepsi yeşil kalırdı. Node katmanı tam o boşluğu
+kapatıyor ve Playwright'in aksine CI'da koşuyor. Kesim GÖNDERİLEN dosyadan
+yapılıyor (parafraz değil) ve bunun kendi bekçisi var.
+
+### Turun kanıtı
+
+* `python3 -m pytest tests/ -q` → **1880 geçti / 9 atlandı** (tur öncesi aynı
+  ortamda 1861/9).
+* `python3 tools/graf_uret.py --kontrol` → yeşil; graflar commit'lerin içinde.
+* **On iki mutasyon, on ikisi de KIRMIZI.** CSS tarafında `minmax(0,1fr)→1fr`,
+  `max-height` silme, `height→auto`, `height→fit-content`, spinner'ın akışa
+  girmesi; arama tarafında yüklemin yaprağa dönmesi (E2E dahil),
+  `renameCurrentFolder`ın sıfırlamasının silinmesi, temizliğin `catch` içine
+  alınması, `Object.freeze` silinmesi, şeridin arama sonrası tazelenmemesi.
+
+### Yeniden yazılan iddialar (silinmedi)
+
+| yer | eski iddia | yeni iddia |
+| --- | --- | --- |
+| defter, o günkü 1. madde | "taşma alttan ve üstten birden kesilir" | taşmanın TAMAMI altta (üst taşma ölçüldü: **0**) — simetrik kırpma `align-content: center`ın davranışı, bugünkü CSS'in değil |
+| defter, o günkü 1. madde | "`getComputedStyle(img).maxHeight` yüzdenin çözülüp çözülmediğini doğrudan söyler" | **boşa dönen ölçüm:** CSSOM'da `max-height` kullanılmış değere çözülmüyor, yüzde yüzde kalıyor — ölçüldü, iki rakip açıklamada da `"100%"`. Ayıran ölçüm `img.top - wrap.top` |
+| `test_the_logo_preview_sticks_with_a_fixed_height` | ham CSS'te `height:` bildiriminin VARLIĞI | kesim yorumları ayıklıyor; iddia DEĞERİ sınıyor — eskisi `height: auto` ve `fit-content`i geçiriyordu, ikisi de kayan-kontroller kusurunu geri getirir |
+| `test_media_search_is_served_and_filters_by_prompt_folder_and_size` | gövdede `folder.name` geçiyor | adı da değişti (`…_matches_prompt_the_whole_folder_chain_and_size`); değerin ZİNCİRDEN geldiği sınanıyor, `folderById(` gövdede yasak |
+| `test_both_folder_captions_go_through_the_same_chain_node` | docstring meşru `folder.name` yerleri arasında "arama eşleştirmesi"ni sayıyordu | bayat düzyazı **mekanik sayıma** çevrildi: `js.count("folder.name") == 2` |
+| `renderPickerGrid` yorumu | "iki çağrı `folderPath`i iki kez yürütür" | maliyet gerekçesi belleğe taşındı; kalan sebep **teklik** |
+
+**Turun dersi:** iki maddede de kod okuması doğru KATMANI buldu ama yanlış
+MEKANİZMAYI anlattı — biri kırpmanın yönünü, öteki kusurun kapsamını. Üstelik
+defterin önerdiği ölçümlerden biri (`maxHeight` okumak) **hiçbir şey
+ayırmıyordu**: iki rakip açıklamada da aynı değeri döndürüyor. Yani "ölçmeden
+düzeltme yazma" kuralı yetmiyor — ölçümün RAKİPLERİ AYIRDIĞI da gösterilmeli.
 
 ---
 
@@ -1223,87 +1362,18 @@ gösteriyor, bugünküyle eşleşmek zorunda değil. Maddenin kimliği numarası
 BAŞLIĞI; kapanan madde de silinmiyor, ait olduğu turun kutusunda kanıtıyla
 duruyor.
 
-> **SIRADAKİ TUR: 1. madde** — logo önizlemesi kare olmayan görselde eksik
-> görünüyor. Kuyruğun başında DURUYOR: Tur K onun yerine geçmedi, kullanıcı o
-> oturumda başka bir iş verdi (defterin kuralı: "kuyruk sırası bir söz değil,
-> öneri"). Madde ayrıca **daraldı** — Tur K oturumunda iki adaydan biri ölçümle
-> ELENDİ, aşağıda. 2. madde (arama/klasör zinciri) hemen ardından geliyor.
+> **SIRADAKİ TUR: 1. madde** — güncelleme kontrolü. Bir DAĞITIM kararına bağlı
+> ve karar alındı: depo **şimdilik private, ileride public**. Maddenin (b) yarısı
+> o günü BEKLEMİYOR — kullanıcı bugün sessizce kırık bir kontrol taşıyor.
 >
-> 3. madde (güncelleme kontrolü) bir DAĞITIM kararına bağlı ve karar alındı:
-> depo **şimdilik private, ileride public** — madde silinmiyor, "public'e
-> dönene kadar kullanıcı kırık bir güncelleme kontrolü taşıyor mu" sorusu
-> ölçülmeyi bekliyor.
+> Kuyruğun eski 1. ve 2. maddeleri (logo önizlemesi · arama zinciri) **Tur L'de
+> kapandı**; kanıtları yukarıdaki kutuda. Numaralar buna göre kaydı.
+>
+> 8. madde (Türkçe harf katlaması) ölçülmüş bir kusur ve **S** boyutunda, yani
+> sıraya bakmadan alınabilir: `İstanbul` bugün `istanbul` yazılarak
+> bulunamıyor.
 
-### 1. Logo bindirmede kare OLMAYAN görselde önizleme eksik görünüyor · **S**
-**Kullanıcı bildirdi (28 Ağustos):** "Logo ekleme kısmında görsel kare değilse
-görselin aşağı veya yan kısımlarındaki logo ekleme önizlemesi gözükmüyor."
-Yani 9'lu ızgarada alt/yan bir konum seçildiğinde logo önizlemede görünmüyor.
-
-**YARISI ÖLÇÜLDÜ (1 Eylül, Tur K oturumu).** Bu defterin kuralı gereği
-düzeltme, hangi katmanın suçlu olduğu ölçülmeden yazılmaz. Kod okunarak iki
-aday çıkarılmıştı; **(b) elendi**, (a) ayakta:
-
-* **(a) İstemci — görüntüleme kırpması.** `.logo-preview-wrap` (style.css)
-  `overflow: hidden` + `place-items: center` taşıyor; `.logo-preview-img` ise
-  `max-width: 100%` ve `max-height: min(72vh, 680px)` ile sınırlı. Görsel kabı
-  aşarsa merkezleme taşmayı İKİ UÇTAN birden yapar ve `overflow: hidden` orayı
-  keser — tam da "aşağı ve yan kısımlar" tarifi.
-* **(b) Sunucu — yerleşim aritmetiği.** `composite.paste_position` /
-  `composite_logo`: `margin_px = int(base.width * margin)` kenar boşluğunu
-  YALNIZ genişlikten hesaplıyor ve aynı değeri dikeyde de kullanıyor (satırda
-  bilinçli olduğunu söyleyen bir yorum var). Kare olmayan oranda dikey boşluk
-  orantısız çıkıyor.
-
-**(b) ELENDİ — ölçüldü.** `paste_position`ın tamsayı matematiği beş oranda ve
-dokuz konumun **dokuzunda da** logoyu kadrajın TAMAMEN içine koyuyor
-(`_clamp_px` negatif koordinatı zaten kesiyor):
-
-| taban | logo | dokuz konumun hepsi kadrajın içinde mi |
-| --- | --- | --- |
-| 1024×1024 | 143×35 | evet |
-| 1536×1024 | 215×53 | evet |
-| 1024×1536 | 143×35 | evet |
-| 2048×512 | 286×71 | evet |
-| 512×2048 | 71×17 | evet |
-
-Yani kaydedilen PNG'de logo HER ZAMAN var; sunucu bir şeyi "gözükmez" yapamaz.
-Önizleme ile uygulama aynı `_composite_logo` yolundan geçtiği için (app.py) bu
-sonuç önizleme için de geçerli — **kusur, sunucudan gelen doğru görselin
-İSTEMCİDE nasıl çizildiğinde.**
-
-**Kalan aday ve önde giden açıklama.** Kullanıcı kusuru **telefonda** gördü,
-yani `mobile.css`in o kutuya özel kuralları devrede:
-`.logo-preview-wrap { height: 38vh }` + `.logo-preview-img { max-height: 100% }`
-(mobile.css:277-285), sarmalayıcıda `overflow: hidden` + `place-items: center`.
-YÜZDE `max-height`, satırı `auto` boyutlanan bir ızgara öğesinde çözülmezse
-`none` gibi davranır; o zaman resmi sınırlayan tek kural `max-width: 100%`
-kalır ve dikey bir görsel (ör. 1024×1536) 328px genişlikte 492px yüksekliğe
-çıkıp 304px'lik kutuda **ortalanır** — taşma alttan ve üstten birden kesilir.
-Yatay görselde `max-width` önce bağladığı için kusur görünmez; "görsel kare
-değilse" koşulu tam olarak buradan geliyor.
-
-**SIRADAKİ ÖLÇÜM (tek adım):** 360×800'lük bir Chromium'da modalı dikey bir
-görselle açıp `#logo-preview-img`in çizilen kutusunu `.logo-preview-wrap`inkiyle
-karşılaştırmak — ve `getComputedStyle(img).maxHeight` okumak, çünkü yüzdenin
-çözülüp çözülmediğini doğrudan o söylüyor. Aynı ölçüm 1280×800'de bir daha:
-kusurun `mobile.css`e özgü olduğunu kanıtlar. (Tur K'da kurulan
-`tests/test_playwright_studio.py` altyapısı bu ölçümü hazır veriyor.)
-- [ ] **Kabul:** kare olmayan bir görselde dokuz konumun DOKUZU da önizlemede
-      görünüyor ve önizleme uygulanan çıktıyla birebir aynı şeyi gösteriyor.
-      Bekçisi iki katman: `tests/test_mobile.py`de CSS kuralının mandalı (CI'da
-      Playwright her işte yok) + bir E2E ölçümü.
-
-### 2. Arama, klasör adını yalnız EN YAKIN klasörde eşleştiriyor · **S**
-Tur G'nin künye işinin arama tarafı; aynı turda kod okunurken çıktı.
-`matchesSearch` (folders.js) yalnız `folder.name`e bakıyor, zincire değil.
-Kullanıcı "Kampanyalar" yazınca o klasörün ALTINDAKİ görseller çıkmıyor — oysa
-künye artık "Kampanyalar / Bayram" yazdığı için kullanıcı tam da o adı ekranda
-okuyup aratıyor. Tur G'de YAPILMADI: eşleştirmeyi değiştirmek sonuç kümesini
-değiştirir ve kendi ölçümünü ister (kaç sonuç, hangi kapsamda, kapsam sayaçları).
-- [ ] **Kabul:** iç içe klasörde üst klasörün adı aratıldığında alt klasördeki
-      görseller de geliyor; kapsam sayaçları buna göre.
-
-### 3. Uygulama içi güncelleme kontrolü deponun PUBLIC olduğunu varsayıyor · **S**
+### 1. Uygulama içi güncelleme kontrolü deponun PUBLIC olduğunu varsayıyor · **S**
 Tur I'de kapının gerekçesi düzeltilirken çıktı: `guncelleme.py`'nin başlığı
 "Depo public olduğu için uç nokta anonim çalışıyor — pakete gömülmüş bir token
 YOK ve olmamalı" diyor ve modül `api.github.com/repos/…/releases/latest`i
@@ -1336,7 +1406,7 @@ kontrol "bakılamadı" durumunu Ayarlar'da görünür kılsın yeter.
       döndüğünde aynı ölçüm 200'e dönerek gerekçeyi doğrular — pakete token
       GÖMÜLMEZ (o kural durur).
 
-### 4. Wheel'in elle bakım yolu hâlâ varlık kotasına bağlı · **S**
+### 2. Wheel'in elle bakım yolu hâlâ varlık kotasına bağlı · **S**
 Tur H'nin bıraktığı uç. Yayın yolunda tek bir `upload-artifact` kalmadı ama
 `build-pydantic-core-android.yml`deki teslim adımı duruyor (`varlik_yukle`
 bayrağı — Yol A: bakımcı workflow'u elle tetikleyip wheel'i indiriyor ve
@@ -1348,13 +1418,13 @@ güncellendiği gün.
       ya da wheel bir taslak yayına yükleniyor; her iki hâlde de kota doluyken
       Yol A yürüyor.
 
-### 5. Sonuç kartında "Düzenle" / "+ Ek" (K14) · **M**
+### 3. Sonuç kartında "Düzenle" / "+ Ek" (K14) · **M**
 Karar "tam bir geçmiş kaydı ister" diye ertelenmişti; döküm bugün yalnız
 `image_id` taşıyor. Kart eylemleri için kaydın kendisi lazım.
 - [ ] **Kabul:** sonuç kartından doğrudan düzenlemeye/ek referansa geçilebiliyor
       ve silinmiş görselde yer tutucu davranışı bozulmuyor.
 
-### 6. Ayarlar'da canlı bağlantı testi düğmeleri · **M**
+### 4. Ayarlar'da canlı bağlantı testi düğmeleri · **M**
 README Faz 2'nin son açık maddesi. Bugünkü karşılık yalnız "anahtar kayıtlı mı"
 listesi; gerçek bir çağrı denemesi yok.
 - [ ] Sağlayıcı başına küçük bir uç (`POST /api/settings/test`?) + düğme;
@@ -1362,7 +1432,7 @@ listesi; gerçek bir çağrı denemesi yok.
 - **Kabul:** yanlış anahtarda anlaşılır Türkçe hata, doğru anahtarda "bağlantı
       kuruldu"; anahtar yanıtta HİÇ yankılanmıyor (write-only sözleşmesi).
 
-### 7. Yerel sağlayıcı adaptörleri: ComfyUI · Ollama · **L**
+### 5. Yerel sağlayıcı adaptörleri: ComfyUI · Ollama · **L**
 Anahtar/adres alanları v0.2.0'dan beri kayıtlı, **adaptör ve arayüz yok**
 (`azure_client.get_settings_status` yalnız durum bayrağı döndürüyor).
 - [ ] `providers._ADAPTERS`'a iki adaptör, katalogda modeller, Ayarlar'da
@@ -1370,52 +1440,52 @@ Anahtar/adres alanları v0.2.0'dan beri kayıtlı, **adaptör ve arayüz yok**
 - **Kabul:** yerel bir kurulumla üretim yapılabiliyor; sağlayıcı düşükken hata
       Türkçe ve anlaşılır.
 
-### 8. fal.ai · Replicate adaptörleri · **L**
+### 6. fal.ai · Replicate adaptörleri · **L**
 Aynı boşluğun bulut yarısı; ikisi de **kuyruklu** akış (`providers`'ın zaman
 aşımı politikası bunu zaten öngörüyor: "adet başına ayrı istek atan sağlayıcı").
 - [ ] **Kabul:** kuyruk beklerken arayüz ilerleme gösteriyor, zaman aşımı
       sağlayıcıya göre çözülüyor (`tests/test_providers.py`'nin deseni).
 
-### 9. Maske tuvali / bölgesel düzenleme · **L**
+### 7. Maske tuvali / bölgesel düzenleme · **L**
 Master spec Faz 1'in açık yarısı: bugünkü `/api/edit` tüm görsel üzerinden
 çalışıyor, `mask` alanı yok.
 - [ ] Fırça/silgi HTML5 Canvas + `mask` alanının adaptör sözleşmesine girmesi
       (Azure ve OpenAI destekliyor; Gemini'de karşılığı farklı).
 - **Kabul:** maskelenen bölge dışında piksel değişmiyor (golden fixture).
 
-### 10. Stil çipleri · stil şablonları · tipografi katmanı · **M**
+### 8. Stil çipleri · stil şablonları · tipografi katmanı · **M**
 Faz 2'nin açık yarısı. Hazır stil çipleri (*Anime*, *Cyberpunk*, *Cinematic*,
 *Pixel Art*, *3D Render*) prompt'a eklenen jetonlar; tipografi katmanı
 bindirmenin metin tarafı.
 - [ ] **Kabul:** çip seçimi prompt'a görünür biçimde giriyor ve geri alınabiliyor.
 
-### 11. Özel araçlar: Upscaler · Product-in-Hand · **L**
+### 9. Özel araçlar: Upscaler · Product-in-Hand · **L**
 README Faz 3. Upscaler bir sağlayıcı yeteneği; Product-in-Hand bir prompt
 şablonu + referans akışı.
 - [ ] **Kabul:** her ikisi kendi kredi etiketiyle katalogda.
 
-### 12. Image-to-Video motoru · **L**
+### 10. Image-to-Video motoru · **L**
 README Faz 4 (master spec Faz 3'ün video payı). Yeni bir medya TÜRÜ: depo,
 küçük resim, büyüteç ve indirme yolları video tanımıyor.
 - [ ] **Kabul:** üretilen video kayıtta, galeride oynatılabiliyor, indirilebiliyor.
 
-### 13. i18n (TR/EN) · **M**
+### 11. i18n (TR/EN) · **M**
 Arayüz metinleri bugün HTML/JS içinde birebir Türkçe; sözlük katmanı yok.
 - [ ] **Kabul:** dil anahtarı `prefs.json`'a yazılıyor, iki dilde de 360px'de
       taşma yok (İngilizce metinler daha uzun).
 
-### 14. SaaS dönüşümü · **XL**
+### 12. SaaS dönüşümü · **XL**
 Kendi tasarım belgesi var: `docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md`
 (Faz 5). Kredi tarifesi katalogda **metadata olarak** hazır; ledger, hesaplar,
 depolama, ödeme ve filigran açık.
 - [ ] **Kabul:** o belgenin kendi kabul ölçütleri; buraya alınmadan önce ayrı
       bir uygulama planı yazılır.
 
-### 15. PWA · iOS · **L**
+### 13. PWA · iOS · **L**
 Android teslim (Chaquopy APK); PWA'nın service worker/manifest'i ve iOS yok.
 - [ ] **Kabul:** çevrimdışı açılış ve "ana ekrana ekle" akışı çalışıyor.
 
-### 16. Üyelik/plan görünürlüğü — kanca kondu, KARAR bekliyor · **L**
+### 14. Üyelik/plan görünürlüğü — kanca kondu, KARAR bekliyor · **L**
 Tur K'da sunucuya tek alanlık tohum eklendi: `catalog.*Model.plan` (bugün her
 modelde `"free"`), `app._model_available(configured, plan)` ve
 `/api/settings`in `available` + `requires_plan` alanları. Arayüz görünürlük
@@ -1432,7 +1502,7 @@ eşleştirme yazmak, olmayan bir gerçeği kodlamak olurdu.
 - **Kabul:** planı kapsamayan model listede görünmüyor VE sebebi "anahtar yok"
       ile KARIŞMIYOR (iki ayrı cümle; `configured` bu yüzden ölmedi).
 
-### 17. Logo kenar boşluğu iki eksende de GENİŞLİKTEN hesaplanıyor · **S**
+### 15. Logo kenar boşluğu iki eksende de GENİŞLİKTEN hesaplanıyor · **S**
 1. maddenin ölçümü sırasında çıktı (1 Eylül) ve ondan AYRI bir olgu — kusur
 değil, orantısızlık: `composite_logo`da `margin_px = int(base.width * margin)`
 ve aynı piksel değeri dikeyde de kullanılıyor.
@@ -1451,9 +1521,73 @@ demek. Kullanıcıdan gelmiş bir şikâyet YOK; madde ölçüldüğü için dur
       seçilirse golden'lar `tools/make_logo_goldens.py` ile yeniden üretiliyor
       ve `tests/test_composite.py` kare olmayan bir oranı da sınıyor.
 
+### 16. Kök görseller rozetlerindeki "Klasörsüz" kelimesiyle aranamıyor · **S**
+Tur L'de çıktı ve **bilinçli olarak ertelendi**. Kart rozeti, karo ipucu ve yan
+bölme köke düşen görsele "Klasörsüz" yazıyor, ama o kelime aratıldığında hiçbir
+şey bulunmuyor — Tur L'de kapatılan kusurun tıpatıp aynı sınıfı, üçüncü kopyası.
+Bugünkü davranış bir inanç değil, koşturulan bir iddia:
+`test_a_root_image_matches_its_prompt_but_carries_no_folder_word`.
+
+**NEDEN AYRI BİR TUR — alınacak ölçüm burada:** taze bir kütüphanede HER görsel
+klasörsüz, yani "klasörsüz" sorgusu kütüphanenin TAMAMINI döndürür; klasör kartı
+listesi ise hiçbir şey döndürmez ("0 klasör · 400 görsel"). Bu bir tasarım
+cevabı istiyor, bir yükleme yapıştırılacak `|| "Klasörsüz"` değil. Ayrıca
+`folders.js`in yazılı kararı var (`folderPathParts` JSDoc'u): yedek ortak
+yardımcıya KONMUYOR, çağıranlarda duruyor — yapılırsa rozet metni ile samanlık
+TEK ifadeden gelmeli, üçüncü bir literal kopyası açılmamalı.
+- [ ] **Kabul:** önce ölçüm (taze kütüphanede sonuç kümesi ve şerit metni), sonra
+      karar; davranış değişirse yukarıdaki test de yeniden yazılır.
+
+### 17. Arama Türkçe büyük/küçük harf katlamasını yanlış yapıyor · **S**
+Tur L'de kod okunurken çıktı ve **ölçüldü** (node, bu depodaki sürüm):
+
+```
+"İstanbul".toLowerCase()                → "i̇stanbul"  (i + U+0307)
+   .includes("istanbul")                → false
+"Irmak".toLowerCase().includes("ırmak") → false
+```
+
+Yani `İstanbul` adlı bir klasör `istanbul` yazılarak **bugün de** bulunamıyor;
+kusur Tur L'den ÖNCE de vardı (yaprak adında) ve zincire açılmak onu ata
+adlarına da taşıdı — aynı kusur, daha geniş yüzey. Türkçe arayüzlü bir
+uygulamada sıradan bir kullanıcı hareketi.
+
+Düzeltme `toLocaleLowerCase("tr")` — **iki tarafta birden** (sorgu ve samanlık),
+yoksa kayma yalnız yön değiştirir. Sonuç kümesini yeniden değiştirdiği için
+kendi ölçümünü istiyor.
+- [ ] **Kabul:** `İ/ı/I/i` çiftlerinin dördü de aratıldığında beklenen klasörü
+      buluyor; bekçisi `tests/test_search_predicate.py`ye eklenen bir satır
+      (o dosya node ile CI'da koşuyor).
+
+### 18. Seçici kapsamları alt ağacı kapsamıyor · **M**
+Tur L'de **bilerek yapılmadı** (kullanıcı kararı; gerekçesi `pickerScopes`
+yorumunda ve `test_the_picker_scopes_stay_a_partition_not_a_subtree`de yazılı).
+Bugün "Kampanyalar" kapsamı yalnız o klasörün DOĞRUDAN görsellerini gösteriyor.
+
+Madde kapalı değil çünkü kullanıcı beklentisi öteki yönde olabilir — ama
+düzeltme ucuz değil: kapsamlar bugün "Klasörsüz" ile birlikte "Tümü"yü tüketen
+bir BÖLME ve tek kesişen süzgeç `imported` (o da `crossing` sınıfıyla gözle
+işaretli, kendi testiyle korunuyor). Alt ağaçta her klasör işaretsiz bir kesişen
+süzgece döner ve `Kampanyalar + Bayram > Tümü` okunur.
+- [ ] **Kabul:** karar önce (bölme mi, kesişen süzgeç mi); kesişene geçilirse
+      ekranda BİR işaret ve `pickerFilter`ın maliyeti ölçülür (kapsam başına
+      kayıt başına `folderSubtree` BFS'i demek).
+
 ---
 
 ## Bilinçli olarak YAPILMAYANLAR
+
+**Zincir eşleştiren klasör kartları (Tur L).** Arama yüklemi zinciri
+eşleştiriyor ama klasör KARTLARININ süzgeci `f.name`de kaldı: kart yalnız o adı
+çiziyor, zincire geçilseydi ekrana sebebi hiçbir yerde yazmayan bir "Bayram"
+kartı düşerdi. Kart zincire geçecekse önce zinciri ÇİZMELİ — dördüncü künye
+yüzeyi, kendi CSS'i, Tur G'nin 360×780 ölçümünün tekrarı. Mandalı:
+`test_the_folder_cards_deliberately_match_only_their_own_name`.
+
+**844×390 yatay telefon (Tur L ölçümü).** Medya sorgusu GENİŞLİK tabanlı, yani
+yatay tutulan bir telefon **masaüstü kurallarını** alıyor ve logo önizlemesini
+hiç kırpmıyor. "Telefonda görüldü", "iki yönde de görüldü" demek değil — mobil
+bir kusur ararken sorgunun hangi eksene baktığı önce sorulmalı.
 
 macOS paketleme planından devralınan liste, hâlâ geçerli: Apple
 **notarization**, **universal2/Intel** paketi, **DMG** kurulumcusu. Ücretli

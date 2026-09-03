@@ -137,9 +137,30 @@ graph TD
   edemiyor. Sütunlar ayrı kayıt, ortak `arena_id`; boyut ORAN, kalite SIRA
   üzerinden model başına çevriliyor; kazanan `history.json`da işaretleniyor.
   Kapsam dışı bırakılan: `/api/edit` arenası.
+- **Teslim edilen: video motorunun ilk turu** (3 Eylül 2026). `catalog.VIDEO_MODELS`
+  ayrı bir demet (`kind="video"`) ve `catalog.ImageModel`in üç tohumunu birden
+  kullanıyor (`kind`, `poll_timeout`, kredi tarifesi); `veo_client.py` deponun
+  DÖRDÜNCÜ tel formatı ve tek POST varsayımını kıran ilki (submit →
+  `predictLongRunning` operation yoklaması → imzalı `uri`den indirme);
+  `providers.py` ikinci bir sevk masası taşıyor (`_VIDEO_ADAPTERS`) ve görsel yolu
+  bayt bayt dokunulmadan duruyor. Uçlar `/api/video` (metinden) ve
+  `/api/video/animate` (bir kareden, `/api/edit`in kalıbı). Yeni medya türü uçtan
+  uca: `storage.save` uzantıyı `kind`den türetiyor, `/output/{filename}` ve indirme
+  ucu MIME'ı uzantıdan çözüyor, ön yüzde composer'ın ÜÇÜNCÜ modu + `<video>`
+  oynatıcısı + süre ekseni. Kredi tarifesi video tarafında SANİYE BAŞINA.
+  Kapsam dışı bırakılan: iş kuyruğu (üretim senkron), arena, palet,
+  `extend-video`, çoklu referans.
 - **Açık:** yerel sağlayıcı adaptörleri (ComfyUI, Ollama) — `credentials.env` alanları
-  duruyor, adaptör yok; **video** tarafının tamamı; **upscaler**;
+  duruyor, adaptör yok; **kuyruklu bulut sağlayıcıları** (fal.ai, Replicate) —
+  `FAL_KEY`/`REPLICATE_API_TOKEN` alanları da aynı durumda ve video model
+  çeşitliliğinin (Kling, Wan, Seedance, LTX) tek kapısı orası; **upscaler**;
   **Product Showcase / Product-in-Hand**.
+- **Ölü uçlar (3 Eylül 2026'da araştırıldı, kataloğa GİRMEDİ):** OpenAI Sora 2 ve
+  Videos API 24 Eylül 2026'da kapanıyor (`sora-2`, `sora-2-pro` ve anlık
+  görüntüleri; sonrasında 410) ve OpenAI yerine gelecek bir model ADI VERMİYOR;
+  Azure AI Foundry'de geçilecek başka video modeli barındırılmıyor (`sora`
+  28 Şubat, `sora-2` 14 Eylül 2026'da kalkıyor); Anthropic'in video ucu yok.
+  Gerekçenin uzunu `catalog.VIDEO_MODELS`in başlığında.
 
 ### ⬜ Faz 4: Çoklu Dil Desteği (i18n Framework)
 - TR/EN dil altyapısı.
@@ -152,6 +173,13 @@ graph TD
   - Standart Görsel (ImageFx Pro, DALL-E 3): 4–10 Kredi
   - Yüksek Çözünürlüklü / Premium Görsel (Nano Banana 2, Flux Pro): 20 Kredi
   - AI Video Üretimi (Wan 2.7, Veo 3.1): 50–105 Kredi
+    *(Bu tahmin ÇAPAYLA UYUŞMUYOR ve video teslim edilirken düzeltildi. Çapa
+    Azure `medium` = 8 kredi ≈ 0,04 USD, yani 1 kredi ≈ 0,005 USD; Veo'nun
+    yayınlanmış saniye fiyatları o çapaya bölündüğünde lite 16, fast 30, tam
+    kademe 80 kredi/sn çıkıyor — 8 saniyelik bir kalite klibi 640 kredi.
+    Video tarifesi bu yüzden ÜRETİM BAŞINA değil SANİYE BAŞINA;
+    `catalog.ImageModel.credits` alanının birimi `kind`e bağlı ve ayrım
+    `cost_for`da yaşıyor.)*
 - **Filigran & Kredi Kuralları:** Ücretsiz deneme katmanı (filigranlı), Ücretli katmanlar (filigransız + ticari haklar), Devredilmeyen devirli aylık kredi mantığı (no-rollover).
 - **Ödeme Altyapısı:** Stripe / PaynKolay entegrasyonu.
 - **Teslim edilen: kredi tarifesinin kendisi.** Her katalog girdisi kendi kredisini

@@ -150,6 +150,12 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.13.0 — ne değişti
+
+- Video üretimi geldi: composer'ın üçüncü modu (Görsel · Video · Yönetmen). Metinden video üretebiliyor ya da galerideki bir görseli tek tıkla canlandırabiliyorsun; model Gemini · Veo 3.1'in üç kademesi (Lite · Fast · tam) ve anahtar zaten girdiğin Gemini anahtarı — Ayarlar'a yeni bir alan gelmedi. Yeni ayar SÜRE (4, 6 ya da 8 saniye) ve kredi tahmini süreyle çarpılıyor, çünkü video tarifesi saniye başına. Üretilen video geçmişe kaydediliyor, Medya'da oynatılabiliyor, büyüteçte tam ekran açılıyor ve .mp4 olarak indirilebiliyor. NOT: video üretimi 1-6 dakika sürüyor ve o süre boyunca sekmeyi açık bırakmalısın; ayrıca Veo'nun ücretsiz kademesi YOK — Gemini anahtarının bağlı olduğu projede faturalandırma açık olmak zorunda.
+
+---
+
 ## Sürüm 0.12.0 — ne değişti
 
 - Prompt Yonetmeni elden gecti: oneriler artik kisa brief'lerde de tukenmiyor (yonetmen prompt'ta hic gecmeyen bir ekseni de onerebiliyor ve o kelime prompt'a ancak sen cipe tikladiginda giriyor), her secenegin altinda ne yaptigini anlatan bir aciklama ve renk/oran seceneklerinde kredi harcamadan cizilmis bir ornek var, Yonetmen modundaki yeni "Yonetmen ayarlari" cekmecesine yazdigin kalici yonlendirme her turda gecerli oluyor ve yonetmen artik secili gorsel modelini gordugu icin o modelde gecerli olmayan bir boyut ya da kalite onermiyor.

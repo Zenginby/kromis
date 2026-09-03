@@ -103,7 +103,12 @@ class ImageModel:
     sizes: tuple[str, ...]
     qualities: tuple[str, ...]    # en az BİR jeton — bkz. docstring
     max_n: int
-    credits: int                  # GÖRSEL BAŞINA taban maliyet (yalnız metadata)
+    # TABAN maliyet, yalnız metadata. BİRİMİ `kind`e BAĞLI ve bu ayrım
+    # `cost_for`da yaşıyor: `kind="image"` → GÖRSEL başına, `kind="video"` →
+    # SANİYE başına. Video tarafında üretim-başına yazmak, süre ekseni olan bir
+    # modelde etiketi anlamsız kılardı (4 sn ile 8 sn aynı krediyi gösterirdi
+    # ve fatura iki katı olurdu). Mandal: tests/test_catalog.py.
+    credits: int
     images_per_request: int = 1
     supports_edit: bool = False
     max_refs: int = 1
@@ -117,9 +122,30 @@ class ImageModel:
     default_quality: str = ""
     # Kalite → maliyet; verilen kaliteler `credits` tabanını EZER.
     credits_by_quality: tuple[tuple[str, int], ...] = ()
-    # Kuyruklu sağlayıcı (fal/Replicate) için tek isteğin süresi. None = tek vuruş.
+    # Kuyruklu sağlayıcı (fal/Replicate) ya da yoklamalı bir uç (Veo'nun
+    # `predictLongRunning`i) için sürenin tavanı. None = tek vuruş.
     poll_timeout: float | None = None
+    # SÜRE EKSENİ — yalnız video modellerinde dolu; `()` = "bu modelin süresi
+    # yok" ve görsel girdilerinin tamamı böyle. `sizes`/`qualities`in aksine
+    # jetonlar SAYI: `durationSeconds` telde tam sayı ve arayüzdeki etiket
+    # ("4 sn") sunucuda türetiliyor, yani ikinci bir eşleme tablosu gerekmiyor.
+    #
+    # NEDEN `qualities`e KATLANMADI: bir modelin çözünürlüğü ile süresi
+    # BAĞIMSIZ iki eksen (720p×4sn de 1080p×4sn de geçerli) ve tek jetona
+    # katlamak çarpım kadar sentetik jeton üretirdi ("720p-4", "720p-6", …).
+    # `credits_by_quality` de o jetonlara bakıyor, yani tarife de çarpım kadar
+    # satır olurdu.
+    durations: tuple[int, ...] = ()
+    # Arayüzün ilk seçtiği süre. 0 = demetin ilk öğesi (`default_size`in kuralı).
+    default_duration: int = 0
     note: str | None = None       # seçicide gösterilen kısa Türkçe uyarı
+    # MEDYA TÜRÜ. `"image"` ve `"video"` iki AYRI demette yaşıyor
+    # (`IMAGE_MODELS` / `VIDEO_MODELS`), yani bu alan üyeliğin tekrarı gibi
+    # görünüyor — ama tekrar DEĞİL, çünkü model örneği demetinden KOPUK
+    # dolaşıyor: `storage.save` kaydın uzantısını (`.png` / `.mp4`) bu alandan
+    # gelen değere göre türetiyor ve `providers`in sevk memuru da onu okuyor.
+    # Üyeliği ikinci kez sormak (`m in VIDEO_MODELS`) katalogu her katmana
+    # import ettirirdi.
     kind: str = "image"
     # ÜYELİK TOHUMU — bugün hiçbir şeyi değiştirmiyor, yarının tek kancası.
     # "free" = abonelik gerektirmiyor. Kredi/üyelik sistemi geldiğinde bir
@@ -476,6 +502,154 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
 )
 
 
+# ── Video modelleri ─────────────────────────────────────────────────────
+#
+# AYRI BİR DEMET, `IMAGE_MODELS`a EKLENMİŞ girdiler DEĞİL — ve bu kararın
+# taşıyıcı gerekçesi şu: `image_model()` bugün beş yerden okunuyor (prefs
+# doğrulaması, `models.check_capabilities`, `app._model_available`,
+# `storage.save`in varsayılanı, arena turu). Video girdileri o demete girse
+# BEŞİNİN DE süzgeç öğrenmesi gerekirdi ve birini unutmak videoyu
+# `/api/generate`de seçilebilir kılardı: senkron bir görsel ucuna 7 dakikalık
+# bir video isteği, yani sessiz sapmanın en pahalı türü. Ayrı demet
+# `image_model()`i dokunulmadan bırakıyor; `kind` alanı da o yüzden hâlâ
+# gerekli (bkz. onun yorumu — örnek demetinden kopuk dolaşıyor).
+#
+# DATACLASS PAYLAŞILIYOR (`ImageModel`), ikinci bir `VideoModel` AÇILMADI:
+# eksenlerin dördü (`sizes`→aspectRatio, `qualities`→resolution, `credential`,
+# `wire_model`) birebir örtüşüyor, `supports_edit`/`max_refs` de video
+# tarafında "görselden animasyon" olarak aynı soruyu soruyor. Ayrı bir sınıf,
+# `short_labels`, `cost_for`, `geometry_of`, `provider_logo` ve
+# `app._model_payload`ın hepsini iki tür alacak şekilde ikizlemek olurdu —
+# tam olarak `short_labels`in "iki tür alıyor, ortak alanları okuyor"
+# duruşunun önlemek için var olduğu şey. Sınıfın ADI artık türünden geniş,
+# ama ad değiştirmek 5 modül + onlarca testin baktığı bir simgeyi kırardı.
+#
+# ÖLÜ UÇLAR BİLEREK YOK — üçü de araştırıldı ve üçü de kataloğa GİRMEDİ:
+#   • OpenAI Sora 2 / Videos API 24 Eylül 2026'da kapanıyor (`sora-2`,
+#     `sora-2-pro` ve anlık görüntüleri; sonrasında 410) ve OpenAI yerine
+#     gelecek bir ad VERMİYOR. Girmesi `openai-dall-e-3` deneyiminin birebir
+#     tekrarı olurdu: üç hafta sonra seçilebilir bir 410.
+#   • Azure AI Foundry'de video YOK: `sora` 28 Şubat 2026'da, `sora-2`
+#     14 Eylül 2026'da kalkıyor ve Foundry'de geçilecek başka video modeli
+#     barındırılmıyor.
+#   • Anthropic'in video ucu yok (görsel için `CREDENTIALS`ta yazılı olanın
+#     aynısı).
+# fal.ai ve Replicate GERÇEK adaylar (anahtar alanları v0.2.0'dan beri formda,
+# bkz. app.py'nin "kataloğa girmemiş eski BYOK alanları" bloğu) ama adaptörleri
+# yok; sırası kendi kuyruk adaptörleriyle birlikte.
+
+DEFAULT_VIDEO_MODEL = "gemini-veo-3-1-lite"
+
+# Veo'nun BELGELENMİŞ iki oranı. `ASPECT_RATIOS`in on jetonu burada
+# KULLANILMIYOR ve bu eksik beyan bilinçli: Veo yalnız 16:9 ve 9:16 kabul
+# ediyor, ötekiler telde 400 demek — yani arayüzde seçilebilir bir hata.
+# Demetin paylaşılma gerekçesi `ASPECT_RATIOS`in aynısı: üç girdiye elle üç
+# kez yazmak, birine oran ekleyip ötekini unutmanın kapısı olurdu.
+VIDEO_ASPECT_RATIOS: tuple[str, ...] = ("16:9", "9:16")
+
+# Veo 3.1'in klip süreleri. Sekiz saniye modelin tek üretimdeki tavanı;
+# daha uzunu `extend-video` ile yapılıyor ve o BU TURDA KAPSAM DIŞI (kendi
+# yetenek bayrağını ve kendi arayüz kontrolünü ister).
+VIDEO_DURATIONS: tuple[int, ...] = (4, 6, 8)
+
+# SIRA ANLAMLI (görsel modellerindeki kural) ve burada ARTAN MALİYETE göre:
+# ilk girdi varsayılan, yani `DEFAULT_VIDEO_MODEL` en UCUZ kademe. Görsel
+# tarafında varsayılan "en güçlü" (Azure'ın gpt-image-2'si), burada değil —
+# ayrımın sebebi fiyat farkının BÜYÜKLÜĞÜ: yanlışlıkla atılan tek bir tık
+# lite'ta 4 saniye için ~0,32 USD, kalite kademesinde ~1,60 USD. Bir
+# görselde o fark sentlerle ölçülüyordu.
+#
+# KREDİ ÇAPASI görsel tarafındakiyle AYNI: Azure `medium` = 8 kredi ≈ 0,04 USD,
+# yani 1 kredi ≈ 0,005 USD. Veo'nun yayınlanmış saniye fiyatları bu çapaya
+# bölündü: lite ~0,08 USD/sn → 16, fast ~0,15 → 30, kalite ~0,40 → 80. Birim
+# SANİYE (bkz. `credits` alanının yorumu), yani 8 saniyelik bir kalite klibi
+# 640 kredi — ve bu, kullanıcıya "8 kredi"lik bir görselle GERÇEK bir
+# karşılaştırma veriyor.
+#
+# `qualities` ÜÇ GİRDİDE AYNI DEĞİL ve bu da eksik beyan disiplini: Gemini'nin
+# belgesi `resolution`ı "Veo 3 modellerinde desteklenir, varsayılan 720p"
+# diyor ve 1080p'yi yalnız tam kademe için AÇIKÇA sayıyor. Fast/lite'ın
+# 1080p'si bu depoda doğrulanmadı, o yüzden tek jeton beyan ediyorlar ve
+# `quality_hidden=True` ile knob'u hiç göstermiyorlar — doğrulanmamış bir
+# jeton beyan etmek arayüzde seçilebilir bir 400, eksik beyan etmek ise
+# yalnızca bir yeteneği kullanmamak. 4K de aynı sebeple YOK.
+#
+# `poll_timeout` bir BEKLENTİ değil TAVAN: üretim tipik olarak 1-3 dakika
+# sürüyor, buradaki sayı döngünün duvar saati sınırı (bkz.
+# providers.total_budget ve veo_client'in son tarih hesabı).
+
+VIDEO_MODELS: tuple[ImageModel, ...] = (
+    ImageModel(
+        id=DEFAULT_VIDEO_MODEL,
+        label="Gemini · Veo 3.1 Lite",
+        provider="gemini",
+        wire_model="veo-3.1-lite-generate-preview",
+        # Kimlik GÖRSEL tarafıyla PAYLAŞILIYOR: aynı `GEMINI_API_KEY`, aynı
+        # konak. İkinci bir `Credential` açmak kullanıcıdan aynı anahtarı iki
+        # kez istemek olurdu (`ChatModel.endpoint_path`in yorumundaki gerekçe).
+        credential="gemini",
+        sizes=VIDEO_ASPECT_RATIOS,
+        default_size="16:9",
+        qualities=("720p",),
+        quality_hidden=True,
+        durations=VIDEO_DURATIONS,
+        # En kısa süre varsayılan: aynı "yanlış tık pahalı olmasın" kararı.
+        default_duration=4,
+        max_n=1,
+        images_per_request=1,
+        supports_edit=True,
+        max_refs=1,
+        poll_timeout=420.0,
+        credits=16,
+        kind="video",
+        note="En ucuz Veo. Gemini anahtarının ödemesi AÇIK olmalı.",
+    ),
+    ImageModel(
+        id="gemini-veo-3-1-fast",
+        label="Gemini · Veo 3.1 Fast",
+        provider="gemini",
+        wire_model="veo-3.1-fast-generate-preview",
+        credential="gemini",
+        sizes=VIDEO_ASPECT_RATIOS,
+        default_size="16:9",
+        qualities=("720p",),
+        quality_hidden=True,
+        durations=VIDEO_DURATIONS,
+        default_duration=4,
+        max_n=1,
+        images_per_request=1,
+        supports_edit=True,
+        max_refs=1,
+        poll_timeout=420.0,
+        credits=30,
+        kind="video",
+        note="Hız ile kalite arasında denge; sesi de kendi üretiyor.",
+    ),
+    ImageModel(
+        id="gemini-veo-3-1",
+        label="Gemini · Veo 3.1",
+        provider="gemini",
+        wire_model="veo-3.1-generate-preview",
+        credential="gemini",
+        sizes=VIDEO_ASPECT_RATIOS,
+        default_size="16:9",
+        qualities=("720p", "1080p"),
+        default_quality="720p",
+        durations=VIDEO_DURATIONS,
+        default_duration=4,
+        max_n=1,
+        images_per_request=1,
+        supports_edit=True,
+        max_refs=1,
+        # 1080p'lik sekiz saniye en uzun süren üretim; tavan ona göre.
+        poll_timeout=600.0,
+        credits=80,
+        kind="video",
+        note="En iyi Veo, 1080p açık. Saniyesi pahalı — süreye dikkat.",
+    ),
+)
+
+
 # ── Arayüz etiketleri ───────────────────────────────────────────────────
 #
 # Jeton → (etiket, oran). MODEL BAŞINA değil ORTAK: jetonlar sağlayıcılar
@@ -530,6 +704,11 @@ QUALITY_LABELS: dict[str, str] = {
     "1K": "1K · 1 MP",
     "2K": "2K · 4 MP",
     "4K": "4K · 16 MP",
+    # Veo'nun `resolution` jetonları. Video tarafında MEGAPİKSEL yazmak yanlış
+    # olurdu: video dünyasında ölçü satır sayısıdır ve kullanıcı "720p"yi
+    # zaten öyle tanıyor.
+    "720p": "720p · HD",
+    "1080p": "1080p · Full HD",
 }
 
 
@@ -548,6 +727,32 @@ def default_size_of(m: ImageModel) -> str:
 
 def default_quality_of(m: ImageModel) -> str:
     return m.default_quality or m.qualities[0]
+
+
+def default_duration_of(m: ImageModel) -> int:
+    """Arayüzün ilk seçeceği süre; süre ekseni olmayan modelde 0.
+
+    `default_size_of`/`default_quality_of` ile aynı desen, tek farkı BOŞ
+    DEMET hâli: onların `sizes`/`qualities`i hiç boş olamıyor (kalite ekseni
+    olmayan model sentetik bir jeton beyan ediyor), süre ekseni ise gerçekten
+    yok olabiliyor ve `m.durations[0]` o modelde IndexError olurdu.
+    """
+    if not m.durations:
+        return 0
+    return m.default_duration or m.durations[0]
+
+
+def duration_label(seconds: int) -> str:
+    """Süre jetonunun arayüzdeki etiketi.
+
+    `GEOMETRY_LABELS`/`QUALITY_LABELS` gibi bir tablo YOK ve gerekmiyor:
+    jeton sayı olduğu için etiket ondan türetilebiliyor. Tablo açmak, her
+    yeni süre değerinde ikinci bir yere satır eklemeyi unutmanın kapısı
+    olurdu — ve etiketi unutulan jeton arayüzde çıplak sayı olarak görünürdü.
+    Etiketin SUNUCUDA türetilmesi ise `GEOMETRY_LABELS`in gerekçesiyle aynı:
+    istemcide kurulan bir dize, aynı bilginin bayatlayabilen ikinci kopyası.
+    """
+    return f"{seconds} sn"
 
 
 # ── Sohbet modelleri ────────────────────────────────────────────────────
@@ -653,6 +858,25 @@ def image_model_ids() -> tuple[str, ...]:
     return tuple(m.id for m in IMAGE_MODELS)
 
 
+def video_model(model_id: str) -> ImageModel | None:
+    """`image_model`in ikizi, `VIDEO_MODELS` üzerinde.
+
+    AYRI bir fonksiyon ve iki demeti birden tarayan tek bir arama YOK: bugün
+    hiçbir çağıran "görsel mi video mu, fark etmez" demiyor — `/api/generate`
+    yalnız görseli, `/api/video` yalnız videoyu kabul ediyor ve o ayrım
+    ucun sözleşmesi. Birleşik bir arama, yanlış türü doğru sanan bir
+    çağıranı sessizce geçirirdi.
+    """
+    for m in VIDEO_MODELS:
+        if m.id == model_id:
+            return m
+    return None
+
+
+def video_model_ids() -> tuple[str, ...]:
+    return tuple(m.id for m in VIDEO_MODELS)
+
+
 def chat_model(model_id: str) -> ChatModel | None:
     for m in CHAT_MODELS:
         if m.id == model_id:
@@ -754,16 +978,28 @@ def credential(cred_id: str) -> Credential | None:
     return None
 
 
-def cost_for(m: ImageModel, quality: str, n: int = 1) -> int:
+def cost_for(m: ImageModel, quality: str, n: int = 1, *,
+             duration: int = 0) -> int:
     """Bir turun kredi maliyeti. TEK hesaplama noktası.
 
     Bilinmeyen kalite `credits` tabanına düşüyor, hata YÜKSELTMİYOR: maliyet
     metadata'sı bir üretimi engellememeli. Kalitenin geçerliliği zaten
     `GenerateRequest`'in yetenek kapısında yüksek sesle doğrulanıyor; burada
     ikinci bir 500 üretmek yalnızca üretimi kaybettirirdi.
+
+    `duration` VERİLDİYSE taban saniye başına yorumlanıyor — `credits`
+    alanının `kind`e bağlı birimi (bkz. o alanın yorumu) burada, tek bir
+    çarpma olarak yaşıyor. Anahtar argüman olması bilinçli: görsel
+    çağıranların hiçbiri değişmiyor ve bir gün üçüncü bir eksen gelirse
+    konumlu bir parametre sırası kırılmıyor.
+
+    0 ve None AYNI anlamda ("süre ekseni yok"): `default_duration_of` süre
+    ekseni olmayan modelde 0 döndürüyor ve o değer buraya doğrudan
+    akabiliyor. Çarpan olarak 0 kullanmak, ücretsiz görünen bir video
+    demekti.
     """
     per = dict(m.credits_by_quality).get(quality, m.credits)
-    return per * n
+    return per * n * (duration or 1)
 
 
 def secret_field_names() -> frozenset[str]:

@@ -406,7 +406,15 @@ function makeDropTarget(el, folderId, targetName) {
 }
 
 function createFolderCell(f) {
-  const coverRec = historyCache ? historyCache.find((r) => r.folder_id === f.id) : null;
+  // KAPAK VİDEO OLAMAZ: `<img>` bir MP4'ü çizemiyor ve sonuç kırık bir küçük
+  // resim. Yüklem "video değil", "görsel" DEĞİL — eski kayıtlarda `kind` alanı
+  // HİÇ yok ve onlar da kapak olabilmeli (bkz. kayitVideoMu). Yalnız video
+  // taşıyan bir klasör kapaksız kalıyor ve varsayılan klasör ikonuna düşüyor:
+  // ilk karesi çıkarılmış bir poster üretmek, sunucuya ffmpeg bağımlılığı
+  // eklemek olurdu.
+  const coverRec = historyCache
+    ? historyCache.find((r) => r.folder_id === f.id && !kayitVideoMu(r))
+    : null;
   let icon;
   if (coverRec && coverRec.filename) {
     icon = document.createElement("img");
@@ -1337,7 +1345,14 @@ async function openPicker() {
   // düştü, gerisi geldi) ızgara doluyor ve akış bozulmuyor — sözleşme yalnız
   // "boşluk gerçek mi" sorusunu koruyor.
   pickerState = res.images.length === 0 && res.failed > 0 ? "error" : "ready";
-  pickerImages = res.images;
+  // VİDEOLAR SÜZÜLÜYOR ve tek yerde: bu seçici bir REFERANS GÖRSEL seçtiriyor
+  // (`#media-pick-btn` → composer'ın ana referansı). Bir video karosu burada
+  // iki kez kırılırdı: ızgara ve önizleme `<img src>` kuruyor (kırık resim),
+  // seçilirse de sunucu kaynağı `app._output_png_path`ten okuyor ve 404
+  // veriyor. Süzgeç `pickerImages`e girişte, `pickerFilter`da DEĞİL: gezinme
+  // sayaçları (`pickerFilter(s).length`) da aynı listeden besleniyor, yani
+  // kapsam düğmeleri "3 görsel" derken ızgarada iki karo görünmesi olurdu.
+  pickerImages = res.images.filter((r) => !kayitVideoMu(r));
   if (!pickerById(pickerSelectedId)) {
     pickerSelectedId = res.images.length ? res.images[0].id : null;
   }
@@ -1500,6 +1515,18 @@ async function loadHistory() {
 
 // Galeri kartlarını `historyCache`'ten çizer. loadHistory'den ayrı: seçim moduna
 // girip çıkmak yeniden istek atmaz, yalnızca yeniden çizer.
+/** Galeri kaydı VİDEO mu.
+ *
+ * Ölçüt `rec.kind`, uzantı DEĞİL — `filename` de doğru cevabı verirdi ama
+ * ikisini birden okumak aynı bilgiyi iki yoldan taşımak olurdu ve `kind`
+ * kaydın SÖZLEŞMESİ (uzantı ondan türetiliyor, bkz. storage.save). Eski
+ * kayıtlarda alan HİÇ YOK ve o zaman cevap "görsel": göç gerekmiyor
+ * (`imported`/`session_id`in aynı disiplini).
+ */
+function kayitVideoMu(rec) {
+  return (rec || {}).kind === "video";
+}
+
 function renderGallery() {
   const g = $("gallery");
   g.innerHTML = "";
@@ -1534,20 +1561,40 @@ function renderGallery() {
     // Karta tıklamak BÜYÜTECİ açar (tasarım §6 / media-browser.html). Küçük
     // resmin eski gizli "düzenleme kısayolu" kaldırıldı: aynı tıklama iki iş
     // yapamaz ve referans atama artık .acts şeridinde adı yazan bir düğme.
-    const img = document.createElement("img");
+    const videoMu = kayitVideoMu(rec);
+    // VİDEODA `<video>`, GÖRSELDE `<img>` — chat.js'in sonuç kartıyla aynı
+    // ayrım ve aynı gerekçe. Değişken adı `img` KALIYOR: aşağıda sekiz kez
+    // okunuyor ve yeniden adlandırmak bu işlevi baştan sona dokunulmuş
+    // gösterirdi (gerçek değişiklik iki satır).
+    const img = document.createElement(videoMu ? "video" : "img");
     img.src = `/output/${rec.filename}`;
-    img.alt = prompt.slice(0, 60);
+    if (videoMu) {
+      // KÜÇÜK RESİMDE DENETİM YOK ve bu bilinçli: karonun tek tıklaması
+      // büyüteci açıyor (`activateCard`) ve bir oynat düğmesi o tıklamayla
+      // çakışırdı. `preload="metadata"` ilk kareyi çiziyor, yani karo boş
+      // kalmıyor — ayrı bir poster dosyası üretilmiyor (sunucuya ffmpeg
+      // bağımlılığı eklemek demekti).
+      img.preload = "metadata";
+      img.muted = true;
+      img.playsInline = true;
+      img.setAttribute("aria-hidden", "true");
+    } else {
+      img.alt = prompt.slice(0, 60);
+    }
     // Taşıma cümlesi girdi türüne göre değişiyor: dokunmatikte sürükleme yok
     // (bkz. FOLDER_HINT_DEFAULT). `title` zaten dokunmatikte hiç GÖRÜNMÜYOR,
     // ama ekran okuyucular okuyor — yanlış yönerge orada da yanlış.
     const tasimaIpucu = IS_TOUCH
       ? '"Taşı…" ile klasöre taşı'
       : "taşımak için klasöre sürükle";
+    // Fiil TÜRE göre: bir videoyu "büyütmek" değil "oynatmak" isteniyor ve
+    // büyüteç de gerçekten oynatıcıyı açıyor (viewer.js).
+    const eylemIpucu = videoMu ? "Oynatmak için tıkla" : "Büyütmek için tıkla";
     img.title = selectMode
       ? `Seçmek için tıkla · seçili görselleri ${tasimaIpucu}`
       : prompt
-        ? `${prompt}\n\nBüyütmek için tıkla · ${tasimaIpucu}`
-        : `Büyütmek için tıkla · ${tasimaIpucu}`;
+        ? `${prompt}\n\n${eylemIpucu} · ${tasimaIpucu}`
+        : `${eylemIpucu} · ${tasimaIpucu}`;
     // img'in yerel sürüklemesi kapatılır ki sürükleme kartın kendisinden başlasın
     // (aksi halde dataTransfer'a görsel URL'i düşer ve sürükleme hayaleti bozulur)
     img.draggable = false;
@@ -1578,13 +1625,21 @@ function renderGallery() {
     // `$("composer").hidden = !studio` satırı), yani `setGallerySource`'un
     // yazdığı #ref-chip ve #status gizli kapların içinde kalıyordu — referans
     // gerçekten atanıyor ama kullanıcı hiçbir geri bildirim görmüyordu.
-    const refBtn = document.createElement("button");
-    refBtn.textContent = "Referans";
-    refBtn.title = "Bu görseli ana referans yap";
-    refBtn.addEventListener("click", () => {
-      showSection("studio");
-      setGallerySource(rec);
-    });
+    // "REFERANS" VİDEODA ÇİZİLMİYOR: referans yolu bir PNG bekliyor
+    // (`app._output_png_path` uzantıyı çakılı tutuyor) ve bir MP4'ü referans
+    // görsel olarak göndermenin karşılığı yok. Düğmeyi çizip sonra 404
+    // göstermek, olmayan bir yol göstermek olurdu — chat.js'in sonuç
+    // kartındaki aynı karar.
+    let refBtn = null;
+    if (!videoMu) {
+      refBtn = document.createElement("button");
+      refBtn.textContent = "Referans";
+      refBtn.title = "Bu görseli ana referans yap";
+      refBtn.addEventListener("click", () => {
+        showSection("studio");
+        setGallerySource(rec);
+      });
+    }
 
     // Şerit İKİ pill: İndir · Referans — media-browser.html'in yazdığı
     // kompozisyonun aynısı. Eski "+Ek" düğmesi ÖLÇÜMLE düştü (A9): üçüncü
@@ -1600,13 +1655,13 @@ function renderGallery() {
     const acts = document.createElement("div");
     acts.className = "acts";
     acts.appendChild(downloadLink);
-    acts.appendChild(refBtn);
+    if (refBtn) acts.appendChild(refBtn);
 
     const delBtn = document.createElement("button");
     delBtn.className = "card-del";
     delBtn.textContent = "×";
     delBtn.title = "Sil";
-    delBtn.setAttribute("aria-label", "Görseli sil");
+    delBtn.setAttribute("aria-label", videoMu ? "Videoyu sil" : "Görseli sil");
     delBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       deleteImage(rec);
@@ -1634,8 +1689,13 @@ function renderGallery() {
     // (viewer.js'in `openerRect`'i zaten bunun için var).
     const activateCard = () => {
       if (selectMode) { toggleSelected(rec.id); return; }
+      // Dördüncü argüman TÜR: büyüteç `<img>` ile `<video>` arasında ona göre
+      // seçiyor (viewer.js). Adresten çıkarmak da mümkündü ama uzantı
+      // ayrıştırmak, kaydın zaten taşıdığı bilgiyi ikinci bir yoldan
+      // türetmek olurdu.
       window.openViewer(`/output/${rec.filename}`, prompt || rec.filename,
-                        card.getBoundingClientRect());
+                        card.getBoundingClientRect(),
+                        videoMu ? "video" : "image");
     };
     // Kart içi eylemler kartın işini tetiklemez: şerit, silme, seçim kutusu.
     // Tek muhafızda toplanıyor — dağınık muhafızlar birinin unutulmasıyla
@@ -1659,7 +1719,7 @@ function renderGallery() {
     card.setAttribute("aria-label",
       `${prompt ? prompt.slice(0, 60) : rec.filename}`
       + (kartYolu ? ` — ${kartYolu}` : "")
-      + ` — ${selectMode ? "seç" : "büyüt"}`);
+      + ` — ${selectMode ? "seç" : videoMu ? "oynat" : "büyüt"}`);
     card.addEventListener("keydown", (e) => {
       // Kart İÇİNDEKİ düğmeye basılan Enter kartı da tetiklemesin: olay
       // oradan köpürür ve tek tuş iki eylem çalıştırır. (chat.js:908-910'un
@@ -1677,6 +1737,17 @@ function renderGallery() {
       const badge = document.createElement("span");
       badge.className = "card-badge";
       badge.textContent = "içe aktarıldı";
+      card.appendChild(badge);
+    }
+    // SÜRE ROZETİ: bir video karosu hareketsiz ilk karesiyle bir görselden
+    // ayırt edilemiyor ve rozet o ayrımı yapan tek şey. `imported` rozetinin
+    // aynı deseni ve aynı yeri; seçim modunda sol üst `card-check`in olduğu
+    // için o hâlde gizli. Süresi olmayan (bayat) bir video kaydında yalnız
+    // "video" yazıyor — sıfır saniye yazmak yanlış bir olgu olurdu.
+    if (videoMu && !selectMode) {
+      const badge = document.createElement("span");
+      badge.className = "card-badge";
+      badge.textContent = rec.duration ? `video · ${rec.duration} sn` : "video";
       card.appendChild(badge);
     }
     // Arama sonucu kartı hangi klasörden geldiğini söyler (§4.1 künye kuralı):

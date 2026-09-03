@@ -1,7 +1,15 @@
-"""Üretilen görsellerin diske kaydı ve history.json yönetimi.
+"""Üretilen MEDYANIN diske kaydı ve history.json yönetimi.
 
 Atomik yazım ve "oku → değiştir → yaz" kilidi jsonstore.py'de paylaşılıyor:
 manifest deposu olan beş dosya aynı iki mekaniği kullanıyor.
+
+"GÖRSEL" DEĞİL "MEDYA": v0.13'ten beri depo iki tür taşıyor (PNG ve MP4) ve
+türü söyleyen tek şey kaydın `kind` alanı. Uzantı ondan TÜRETİLİYOR
+(bkz. `save`), yani ikinci bir gerçek kaynağı yok — kayıtta `"kind": "video"`
+yazıyorsa dosya `.mp4`'tür, tersi de doğrudur. Alan adları (`image_id`,
+`image_ids`) DEĞİŞMEDİ ve bu bilinçli: onlar `history.json`da, `chats.json`da
+ve `/api/image/{id}` ucunda yaşayan KİMLİK adları — yeniden adlandırmak, tek
+kazancı estetik olan bir veri göçü olurdu.
 """
 from __future__ import annotations
 
@@ -16,6 +24,44 @@ import catalog
 import jsonstore
 
 HISTORY_FILE = "history.json"
+
+# `kind` → dosya uzantısı. TEK eşleme noktası: `save` uzantıyı buradan
+# alıyor, `media_type_for` de MIME'ı uzantıdan çözüyor, yani zincir tek yönlü
+# ve tek kaynaklı (kind → uzantı → MIME).
+MEDIA_EXTS = {"video": ".mp4"}
+DEFAULT_EXT = ".png"
+
+# Uzantı → HTTP içerik türü. `app.py` bu tabloyu okuyor; oradaki üç rota
+# (`/output/{filename}`, indirme ucu ve varlık rotası) v0.13'e kadar
+# `image/png`i ÇAKILI taşıyordu. Tablo BURADA, `app.py`de değil: uzantı
+# kararının verildiği yer bu dosya ve iki bilgiyi ayrı dosyalarda tutmak,
+# birine tür ekleyip ötekini unutmanın kapısı olurdu — bir MP4'ü
+# `image/png` olarak sunmak tarayıcıda sessiz bir bozuk resim demek.
+MEDIA_TYPES = {".png": "image/png", ".mp4": "video/mp4"}
+FALLBACK_MEDIA_TYPE = "application/octet-stream"
+
+
+def ext_for(kind: str | None) -> str:
+    """Medya türünün dosya uzantısı. Bilinmeyen/boş tür → `.png`.
+
+    Varsayılanın PNG olması geriye uyum: `kind` göndermeyen her çağıran
+    (üretim öncesi yollar, içe aktarma, logo/afiş bindirmeleri) bugünkü
+    davranışı bayt bayt koruyor.
+    """
+    return MEDIA_EXTS.get(kind or "", DEFAULT_EXT)
+
+
+def media_type_for(filename: str) -> str:
+    """Dosya adından HTTP içerik türü.
+
+    Bilinmeyen uzantıda `application/octet-stream` — `image/png` DEĞİL. Ayrım
+    önemli: yanlış bir `image/png`, tarayıcıya "bunu resim olarak çiz" demek
+    ve sonuç sessizce bozuk bir resim oluyor; octet-stream ise "ne olduğunu
+    bilmiyorum" diyor ve tarayıcı indirmeyi öneriyor. İkisi de hata hâli, ama
+    yalnız ikincisi kendini gösteriyor.
+    """
+    _kok, _nokta, uzanti = filename.rpartition(".")
+    return MEDIA_TYPES.get("." + uzanti.lower(), FALLBACK_MEDIA_TYPE)
 
 # Image ids are generated as uuid.uuid4().hex[:12] (see save()): bare lowercase
 # hex tokens with no separators or dots. Reject anything else up front so a
@@ -73,7 +119,10 @@ def _lock(output_dir: str):
 def save(image_bytes: bytes, meta: dict, output_dir: str, *, now: str) -> dict:
     os.makedirs(output_dir, exist_ok=True)
     image_id = uuid.uuid4().hex[:12]
-    filename = f"{image_id}.png"
+    # Uzantı `kind`dan TÜRETİLİYOR, çağıran ayrıca dosya adı vermiyor: iki
+    # bilgi (tür ve uzantı) ayrı ayrı geçirilse ayrışabilirlerdi ve
+    # ayrıştıkları anda `/output/{filename}` yanlış MIME sunardı.
+    filename = f"{image_id}{ext_for(meta.get('kind'))}"
     with open(os.path.join(output_dir, filename), "wb") as f:
         f.write(image_bytes)
     record = {
@@ -118,6 +167,17 @@ def save(image_bytes: bytes, meta: dict, output_dir: str, *, now: str) -> dict:
         # kullanılmadı: o TÜREV zinciri (bir görselden düzenleme), arena
         # sütunları ise kardeş — hiçbiri ötekinin ebeveyni değil.
         **({"arena_id": meta["arena_id"]} if meta.get("arena_id") else {}),
+        # MEDYA TÜRÜ (v0.13) ve klip SÜRESİ. `imported`/`session_id`/`arena_id`
+        # ile birebir aynı KOŞULLU desen ve aynı gerekçe: yokluğun tanımlı bir
+        # anlamı var ("görsel", "süresi yok"), yani göç GEREKMİYOR ve bugüne
+        # kadar üretilmiş her görsel kaydı bayt bayt aynı kalıyor.
+        #
+        # `model`/`credits`in KOŞULSUZ deseni burada BİLEREK kullanılmıyor:
+        # onlar her üretilen kayıtta var olan olgular, tür ise gerçek bir
+        # yokluk hâli taşıyor — `history.json`ın tamamına `"kind": "image"`
+        # yazmak, hiçbir soruyu cevaplamayan bir göç olurdu.
+        **({"kind": meta["kind"]} if meta.get("kind") else {}),
+        **({"duration": int(meta["duration"])} if meta.get("duration") else {}),
         # ÜRETEN MODEL (v0.6) ve o üretimin KREDİ maliyeti.
         #
         # İkisi de KOŞULSUZ — `imported`/`session_id`'nin koşullu deseni burada

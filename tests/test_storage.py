@@ -168,3 +168,79 @@ def test_bos_model_GECIYOR_varsayilana_cevrilmiyor(tmp_path):
     assert rec["model"] == "", "boş model varsayılana çevrildi — uydurma üretici"
     assert "model" in rec, "alan tümden düştü (sözleşme: alan HER kayıtta var)"
     assert rec["credits"] == 0
+
+
+# ── Medya türü (v0.13) ─────────────────────────────────────────────────
+#
+# Depo iki tür taşıyor ve türü söyleyen tek şey kaydın `kind` alanı; uzantı
+# ONDAN türetiliyor. Aşağıdaki testlerin ortak iddiası: zincir TEK YÖNLÜ ve
+# TEK KAYNAKLI (kind → uzantı → MIME). Kırılsa `/output/{filename}` bir MP4'ü
+# `image/png` olarak sunardı — tarayıcıda sessiz bir bozuk resim.
+
+
+def test_the_extension_is_DERIVED_from_the_kind(tmp_path):
+    out = str(tmp_path)
+    video = storage.save(b"ftypmp42", {"prompt": "kedi", "size": "16:9",
+                                       "quality": "720p", "parent_id": None,
+                                       "kind": "video", "duration": 4},
+                         out, now="2026-09-03T10:00:00")
+
+    assert video["filename"] == f"{video['id']}.mp4"
+    assert (tmp_path / video["filename"]).read_bytes() == b"ftypmp42"
+    assert video["kind"] == "video"
+    assert video["duration"] == 4
+
+
+def test_a_call_WITHOUT_a_kind_produces_todays_record_byte_for_byte(tmp_path):
+    """"Kayıtlı kullanıcı için sıfır davranış değişikliği"nin depo tarafı.
+
+    `kind` göndermeyen her çağıran (üretim öncesi yollar, içe aktarma,
+    logo/afiş bindirmeleri) bugünkü davranışı aynen alıyor: `.png` uzantı ve
+    kayıtta `kind`/`duration` alanları HİÇ YOK. Alanları koşulsuz yazmak,
+    `history.json`ın tamamını değiştirmek olurdu (hiçbir soruyu cevaplamayan
+    bir göç).
+    """
+    out = str(tmp_path)
+    rec = storage.save(b"\x89PNG", {"prompt": "kedi", "size": "1024x1024",
+                                    "quality": "medium", "parent_id": None},
+                       out, now="2026-09-03T10:00:00")
+
+    assert rec["filename"].endswith(".png")
+    assert "kind" not in rec
+    assert "duration" not in rec
+
+
+def test_a_ZERO_duration_is_not_written(tmp_path):
+    """0 ve None AYNI anlamda ("süre ekseni yok") — `imported`/`session_id`in
+    koşullu deseni. `"duration": 0` yazmak, süresi olmayan bir medyaya sıfır
+    saniyelik bir olgu uydurmak olurdu."""
+    rec = storage.save(b"\x89PNG", {"prompt": "k", "size": "1:1",
+                                    "quality": "1K", "parent_id": None,
+                                    "duration": 0},
+                       str(tmp_path), now="2026-09-03T10:00:00")
+
+    assert "duration" not in rec
+
+
+def test_the_media_type_is_resolved_from_the_extension():
+    assert storage.media_type_for("abc123.png") == "image/png"
+    assert storage.media_type_for("abc123.mp4") == "video/mp4"
+    assert storage.media_type_for("ABC123.MP4") == "video/mp4"
+
+
+def test_an_UNKNOWN_extension_falls_back_to_octet_stream():
+    """`image/png` DEĞİL. Ayrım önemli: yanlış bir `image/png`, tarayıcıya
+    "bunu resim olarak çiz" demek ve sonuç sessizce bozuk bir resim oluyor;
+    octet-stream ise "ne olduğunu bilmiyorum" diyor. İkisi de hata hâli, ama
+    yalnız ikincisi kendini gösteriyor."""
+    assert storage.media_type_for("abc123.webm") == "application/octet-stream"
+    assert storage.media_type_for("uzantisiz") == "application/octet-stream"
+
+
+def test_ext_for_and_MEDIA_TYPES_stay_in_agreement():
+    """Zincirin iki halkası ayrışamaz: `ext_for`un ürettiği her uzantının
+    `MEDIA_TYPES`te bir karşılığı OLMAK ZORUNDA, yoksa kaydedilen bir medya
+    octet-stream olarak sunulur."""
+    for kind in list(storage.MEDIA_EXTS) + ["", None, "image"]:
+        uzanti = storage.ext_for(kind)
+        assert uzanti in storage.MEDIA_TYPES, f"{kind!r} → {uzanti} eşlemesiz"

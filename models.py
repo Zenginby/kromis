@@ -110,6 +110,44 @@ def check_capabilities(model_id: str, size: str, quality: str, n: int) -> str:
     return m.id
 
 
+def check_video_capabilities(model_id: str, size: str, quality: str,
+                             duration: int, n: int) -> str:
+    """`check_capabilities`ın VİDEO ikizi; `catalog.video_model`a bakıyor.
+
+    AYRI bir işlev ve iki demeti birden tarayan tek bir kapı YOK — gerekçe
+    `catalog.video_model`da yazılı: uçların sözleşmesi türü ayırıyor
+    (`/api/generate` yalnız görsel, `/api/video` yalnız video) ve birleşik bir
+    kapı yanlış türü doğru sanan bir isteği sessizce geçirirdi.
+
+    `check_capabilities`la AYNI iki disiplin: dönen değer NORMALLEŞTİRİLMİŞ
+    id (boş girdi varsayılana düşüyor) ve mesajlar hangi değerlerin GEÇERLİ
+    olduğunu söylüyor. İkincisi video tarafında daha da gerekli: geçerli oran
+    kümesi görselin ONDA İKİSİ kadar (Veo yalnız 16:9 ve 9:16 kabul ediyor) ve
+    bayat bir sekme ya da Prompt Yönetmeni'nin önerdiği bir jeton buraya
+    kolayca ulaşabiliyor.
+
+    SÜRE de kapıdan geçiyor: `parameters.durationSeconds` doğrulanmazsa
+    yanlış bir değer telde 400 olur, ama ondan önce FATURAYI da değiştirir
+    (`catalog.cost_for` süreyle çarpıyor) — yani kayda yazılan kredi ile
+    gerçek maliyet ayrışırdı.
+    """
+    m = catalog.video_model(model_id or catalog.DEFAULT_VIDEO_MODEL)
+    if m is None:
+        raise ValueError(f"bilinmeyen video modeli: {model_id}")
+    if size not in m.sizes:
+        raise ValueError(f"{m.label} bu oranı desteklemiyor: {size} "
+                         f"(geçerli: {', '.join(m.sizes)})")
+    if quality not in m.qualities:
+        raise ValueError(f"{m.label} bu çözünürlüğü desteklemiyor: {quality} "
+                         f"(geçerli: {', '.join(m.qualities)})")
+    if duration not in m.durations:
+        raise ValueError(f"{m.label} bu süreyi desteklemiyor: {duration} "
+                         f"(geçerli: {', '.join(str(d) for d in m.durations)})")
+    if n > m.max_n:
+        raise ValueError(f"{m.label} tek turda en fazla {m.max_n} video üretiyor")
+    return m.id
+
+
 class GenerateRequest(BaseModel):
     # Bilinmeyen alanı reddet — palet için bu özellikle kritik: eski bir sunucu
     # süreci `palette_hex`'i sessizce yok sayıp 200 ile renksiz görsel
@@ -214,6 +252,57 @@ class GenerateRequest(BaseModel):
         return self
 
 
+class VideoRequest(BaseModel):
+    """`POST /api/video` gövdesi — `GenerateRequest`in video ikizi.
+
+    ALAN ALAN İKİZİ DEĞİL ve eksikler bilinçli:
+
+      • PALET ALANLARI YOK. Palet bir GÖRSEL prompt eki
+        (`palette._ORDER_CUE` renkleri "geniş alanlara / küçük vurgu olarak"
+        diye sıralıyor) ve video prompt'unda o cümlenin karşılığı
+        doğrulanmadı. Alanı açıp yok saymak, kullanıcıya çalışmayan bir çip
+        göstermek olurdu.
+      • `arena_id` YOK. Arena aynı prompt'u birden çok modelde koşturup
+        SONUÇLARI YAN YANA karşılaştırmak için var; video tarafında bu, tek
+        tıkla üç ayrı dakikalarca süren ve saniyesi faturalanan üretim demek.
+        Alanın gelmesi kendi kararını ister.
+
+    `extra="forbid"` KORUNUYOR ve burada ikinci bir faydası var: yeni bir
+    arayüz bayat bir sunucuya `duration` gönderdiğinde istek sessizce
+    varsayılan süreye DÜŞMÜYOR — 422 dönüyor. Süre doğrudan faturaya
+    dokunduğu için sessiz düşme buradaki en pahalı sapma olurdu.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    prompt: str = Field(min_length=1, max_length=MAX_PROMPT_CHARS)
+    # None = VARSAYILAN video modeli (`GenerateRequest.model`in kuralı).
+    model: str | None = Field(default=None, max_length=100)
+    size: str
+    quality: str
+    duration: int
+    # Tavan `MAX_IMAGES_PER_RUN` ile PAYLAŞILIYOR ve bu bir tembellik değil:
+    # o sabit aynı zamanda bir sonuç kaydının azami `image_ids` uzunluğu
+    # (bkz. `ChatMessage.image_ids`), yani video kayıtları da onun altında
+    # kalmak zorunda. Gerçek tavan bugün modelin `max_n`i (1) ve onu
+    # `check_video_capabilities` uyguluyor.
+    n: int = Field(default=1, ge=1, le=MAX_IMAGES_PER_RUN)
+    folder_id: str | None = Field(default=None, max_length=64)
+    session_id: str | None = Field(default=None, max_length=MAX_ID_CHARS)
+
+    @model_validator(mode="after")
+    def _capabilities_fit_the_model(self):
+        """`GenerateRequest`in aynı adlı doğrulayıcısının ikizi — aynı iki
+        gerekçe: geçerli küme kardeş bir alana (`model`) bağlı olduğu için
+        `field_validator` göremez, ve `model` NORMALLEŞTİRİLİYOR ki kayda
+        giden değer ile doğrulanan değer ayrışmasın."""
+        try:
+            self.model = check_video_capabilities(
+                self.model, self.size, self.quality, self.duration, self.n)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+        return self
+
+
 class SettingsRequest(BaseModel):
     # api_key ve base_url boş/None bırakılabilir: mevcut değerler korunur.
     api_key: str = Field(default="", max_length=500)
@@ -273,6 +362,8 @@ class PrefsRequest(BaseModel):
     guncelleme_kontrolu: bool | None = None
     # Seçili görsel modeli ve Prompt Yönetmeni sağlayıcı/modeli (v0.6).
     image_model: str | None = Field(default=None, max_length=100)
+    # Seçili video modeli (v0.13). AYRI anahtar; gerekçesi prefs._SCHEMA'da.
+    video_model: str | None = Field(default=None, max_length=100)
     chat_provider: str | None = Field(default=None, max_length=50)
     chat_model: str | None = Field(default=None, max_length=100)
     # Yönetmen ayarları çekmecesindeki kalıcı yönlendirme. Üst sınır
@@ -305,6 +396,14 @@ class PrefsRequest(BaseModel):
         şemasının ayrışması demek olur") ikisinin birden var olmasını istiyor."""
         if v is not None and catalog.image_model(v) is None:
             raise ValueError(f"geçersiz image_model: {v}")
+        return v
+
+    @field_validator("video_model")
+    @classmethod
+    def _video_model_ok(cls, v: str | None) -> str | None:
+        """`_image_model_ok`un ikizi, `video_model_ids()` üzerinde."""
+        if v is not None and catalog.video_model(v) is None:
+            raise ValueError(f"geçersiz video_model: {v}")
         return v
 
     @field_validator("chat_provider")
@@ -533,7 +632,21 @@ CHAT_ROLES = WIRE_CHAT_ROLES | {RESULT_ROLE}
 # Sonuç kaydının nasıl doğduğu. Kart başlığı buradan çiziliyor
 # ("Üretildi · …" / "Düzenlendi · …"). Bu küme BİZE ait, Azure'a değil:
 # `size`/`quality` allowlist'e karşı doğrulanmıyor (aşağıdaki not).
-RESULT_KINDS = {"generate", "edit"}
+#
+# `video`/`animate` v0.13'te eklendi ve BU KÜME ARTIK İKİ İŞ YAPIYOR: kart
+# başlığını çizmenin yanında, kartın `<img>` mi `<video>` mü olacağını da
+# söylüyor. Ayrı bir `media_kind` alanı AÇILMADI çünkü `ResultParams`
+# `extra="forbid"` taşıyor ve yeni bir ZORUNLU alan bütün eski oturumları
+# kaydedilemez kılardı; `kind` ise ZATEN her kayıtta var ve istemci onu
+# ZATEN okuyor (`chat.js resultCaption`). Yani ikinci bir gerçek kaynağı
+# doğmuyor — türü söyleyen tek alan bu.
+RESULT_KINDS = {"generate", "edit", "video", "animate"}
+# Video döndüren sonuç türleri. `RESULT_KINDS`in ALT KÜMESİ olarak burada
+# yazılı, çünkü "hangi kart video çiziyor" sorusunun tek bir cevabı olmalı ve
+# o cevap istemcide literal olarak sayılmamalı (`PROVIDER_LOGOS`in
+# gerekçesinin aynısı: yeni bir tür eklendiği gün kart sessizce `<img>`
+# çizerdi).
+VIDEO_RESULT_KINDS = {"video", "animate"}
 # Sonuç kayıtları KONUŞMA kotasından ayrı bir baş payı alıyor. Aynı 24'ü
 # paylaşsalardı üretim yapan bir oturum ~8 turda dolar ve kullanıcı pydantic'in
 # İNGİLİZCE `too_long` hatasını görürdü — modele hiç gitmeyen bir kaydın
@@ -609,6 +722,20 @@ class ResultParams(BaseModel):
     # olduğu için sütun sayısı kadar kayıt var ve `image_ids` tavanı
     # (MAX_IMAGES_PER_RUN) sütun başına geçerli kalıyor.
     arena_id: str = Field(default="", max_length=MAX_ID_CHARS)
+    # KLİP SÜRESİ (saniye). Varsayılanı 0 ve anlamı "süre ekseni yok" —
+    # `catalog.default_duration_of`un görsel modellerde döndürdüğü değerin
+    # aynısı, yani iki katman aynı yokluk işaretini kullanıyor.
+    #
+    # Varsayılanının OLMASI şart, `model`/`arena_id`nin v0.6'da girdiği yolun
+    # aynısı: bu sınıf `extra="forbid"` taşıyor ama alanı hiç GÖNDERMEYEN
+    # eski kayıtlar geçerli kalmak zorunda — aksi hâlde PUT /api/chats/{id}
+    # 422 döner ve kullanıcı sessizce donmuş bir oturumla kalır.
+    #
+    # ÜST SINIR katalogdaki en uzun süreye karşı DOĞRULANMIYOR, yalnız
+    # sayısal: `size`/`quality`nin allowlist'siz olma gerekçesinin aynısı —
+    # katalog bir gün 8 saniyeyi kaldırırsa o süreyle üretilmiş oturumlar
+    # kaydedilemez olurdu.
+    duration: int = Field(default=0, ge=0, le=3600)
 
     @field_validator("kind")
     @classmethod

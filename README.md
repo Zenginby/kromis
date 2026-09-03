@@ -1,6 +1,6 @@
 # 🎨 Lumeo
 
-[![Release](https://img.shields.io/badge/version-v0.12.0-blue.svg)](https://github.com/Zenginby/gpt-image-studio/releases/latest)
+[![Release](https://img.shields.io/badge/version-v0.13.0-blue.svg)](https://github.com/Zenginby/gpt-image-studio/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![Build & Test](https://github.com/Zenginby/gpt-image-studio/actions/workflows/release.yml/badge.svg)](https://github.com/Zenginby/gpt-image-studio/actions)
@@ -37,7 +37,7 @@ Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Andr
 
 ---
 
-## ✨ Güncel Özellikler (v0.12.0 & Flow-UI)
+## ✨ Güncel Özellikler (v0.13.0 & Flow-UI)
 
 ### 🎬 1. Stüdyo Tek Döküm & Prompt Yönetmeni
 * **Türkçe Diyalogdan İngilizce Prompt:** Türkçe fikir anlatımını otomatik olarak optimizasyonu yapılmış İngilizce `gpt-image-2` prompt'una ve teknik ayarlara (`size`, `quality`, `n`) çevirir.
@@ -54,7 +54,33 @@ Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Andr
 * **Alttan Açılan Model Seçici:** Stüdyo'daki model çipine dokununca alttan bir panel yükseliyor ve her model bir kart olarak listeleniyor: sağlayıcı işareti, adı, **ne işe yaradığını anlatan bir satır** ve kredi aralığı. O tanıtım metni daha önce yalnızca `title` özniteliğindeydi, yani telefonda hiç görünmüyordu. Seçili kart arayüz temasının rengiyle işaretleniyor (Monokrom / Okyanus / Amber / Menekşe) ve seçim dokunduğun an geçerli oluyor. Aynı panel Yönetmen modelinde de kullanılıyor; **Ayarlar** da aynı yüzeye taşındı ve "Kaydet" artık panelin dibinde, kaydırmadan erişilebilir yerde duruyor.
 * **Çoklu Referans Görsel Bindirme:** Düzenleme (Inpainting / Edits) modunda ana referans görselin yanına en fazla 3 ek referans görsel eklenebilir.
 
-### 📁 3. Klasörler & Medya Yönetimi
+### 🎞️ 3. Video Üretimi (Metin→Video & Görsel→Video)
+* **Composer'ın üçüncü modu:** Görsel · **Video** · Yönetmen. `⌘/Ctrl+J` üçü
+  arasında dolaşıyor. Video modu görselin bütün kabuğunu paylaşıyor (aynı
+  prompt kutusu, aynı ayar çekmecesi, aynı bekleme göstergesi) — yeni bir
+  ekran açılmadı.
+* **Gemini · Veo 3.1, üç kademe:** Lite (16 kredi/sn), Fast (30) ve tam kademe
+  (80, 1080p açık). Anahtar **görsel tarafıyla paylaşılıyor** — aynı
+  `GEMINI_API_KEY`, Ayarlar'a yeni bir alan gelmedi. Ses modelin kendisi
+  üretiyor.
+* **Yeni eksen: SÜRE.** 4 / 6 / 8 saniye ve kredi tahmini süreyle çarpılıyor,
+  çünkü video tarifesi **saniye başına** (görselde üretim başına). Oran yalnız
+  16:9 ve 9:16 — Veo'nun belgelediği iki jeton; ötekiler telde 400 demek olurdu.
+* **Görseli tek tıkla canlandırma:** Medya'daki bir karonun "Referans"ına
+  dokunup Video moduna geçmek yeterli; ilk kare o görsel oluyor ve kayıtta
+  türev bağı (`parent_id`) duruyor.
+* **Yeni medya türü uçtan uca:** depo `.mp4` yazıyor (uzantı kaydın türünden
+  türetiliyor), galeri karosu ve döküm kartı `<video>` çiziyor, büyüteç
+  denetimleriyle oynatıyor, indirme doğru adı ve MIME'ı veriyor. Süre rozeti
+  bir video karosunu hareketsiz ilk karesinden ayırıyor.
+* ⚠️ **Üretim 1-6 dakika sürüyor ve SENKRON:** istek o süre boyunca açık
+  kalıyor, yani sekmeyi kapatmak işi kaybettiriyor (iş kuyruğu açık bir madde).
+* ⚠️ **Veo'nun ücretsiz kademesi YOK:** ilk saniyeden faturalanıyor. Görsel
+  üretiminde çalışan bir Gemini anahtarı, projesinde faturalandırma açık
+  değilse burada reddediliyor — ve hata metni bunu açıkça söylüyor, "anahtarını
+  kontrol et" demiyor.
+
+### 📁 4. Klasörler & Medya Yönetimi
 * **Sınırsız Hiyerarşik Klasör Ağacı:** İç içe alt klasörler (`parent_id` hiyerarşisi), kırıntı (breadcrumb) gezintisi.
 * **Akıllı Kapak Görselleri (`.folder-thumb`):** Klasör kartları, klasör içindeki ilk üretilen görselin küçük resmini otomatik kapak olarak gösterir.
 * **Klasör Yeniden Adlandırma:** `#folder-rename` düğmesi ile klasör adları anında güncellenir.
@@ -62,24 +88,24 @@ Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Andr
 * **Medya Sıralama & Arama:** Görseller ve klasörler **Tarih** veya **İsim (A-Z)** sırasına göre dizilebilir. Prompt, boyut veya klasör adına göre anlık arama yapılabilir.
 * **Boş Durum Glifleri:** Boş galeri veya arama sonuçlarında açıklayıcı Türkçe boş durum ekranları beliri.
 
-### 🔘 4. Çoklu Seçim & Toplu İşlemler
+### 🔘 5. Çoklu Seçim & Toplu İşlemler
 * **Toplu Seçim Modu:** Görseller tek tıkla seçilebilir, seçili gruptaki görseller tek seferde başka bir klasöre sürüklenebilir veya toplu olarak silinebilir.
 
-### 🎨 5. OKLCH Renk Teorisi & Palet Motoru
+### 🎨 6. OKLCH Renk Teorisi & Palet Motoru
 * **OKLCH Armoni Önerileri:** Bir tohum renkten 6 uyumlu renk paleti türetilir.
 * **3 Kademeli Renk Baskısı:** İpucu (%25), Dengeli (%50), Katı (%85) renk hassasiyet seviyeleri.
 * **Paletten Renk Çıkarma:** İstenmeyen renkler çipe tıklanarak paletten çıkarılabilir.
 * **Damlalık (EyeDropper):** Tarayıcıda EyeDropper API, macOS masaüstü uygulamasında yerel `NSColorSampler` ile ekranın her yerinden renk seçimi.
 
-### 🏷️ 6. Varlık Kütüphanesi & Bindirme (Logo / Motto / Banner)
+### 🏷️ 7. Varlık Kütüphanesi & Bindirme (Logo / Motto / Banner)
 * **Kurumsal Bindirme:** Görsel üzerine Logo, Motto veya Banner yerleştirme.
 * **9'lu Izgara Çapası & Offset Kaydırma:** 9 farklı yön noktasına çapalama ve hassas oran kaydırma, boyut ve gölge ayarları. Canlı önizleme desteği.
 
-### 🌙 7. Tüm Uygulamayı Kapsayan Tema Motoru
+### 🌙 8. Tüm Uygulamayı Kapsayan Tema Motoru
 * **4 Curated Dark Theme:** **Mono** (Siyah/Gri), **Ocean** (Okyanus Mavisi), **Amber** (Kehribar/Sıcak), **Viola** (Mor/Asil) karanlık cam Temaları.
 * **Erişilebilirlik:** `prefers-reduced-motion` desteği.
 
-### 🔒 8. BYOK (Bring Your Own Key) & Güvenlik Redaksiyonu
+### 🔒 9. BYOK (Bring Your Own Key) & Güvenlik Redaksiyonu
 * **Çoklu Sağlayıcı Desteği:** OpenAI, Fal.ai, Replicate, ComfyUI, Ollama altyapısı.
 * **Write-Only Güvenlik Maskelemesi:** `GET /api/settings` yanıtlarında hiçbir API anahtarı istemciye açık olarak dönmez, yalnızca boolean durum bayrakları döndürülür.
 * **Otomatik Log Sansürleme:** `errlog.py` içerisindeki `redact_secrets()` mekanizması, loglarda veya hata traceback'lerinde geçen tüm API anahtarlarını sansürler.
@@ -112,9 +138,24 @@ Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Andr
   - [ ] Elde Ürün Görselleştirme (Product-in-Hand).
   - [ ] Otomatik Arka Plan Kaldırma & Konu Gölgeleme.
   - [ ] Görsel İçi Metin & Banner Sihirbazı (E-ticaret duyuruları için).
-* **Faz 4: Image-to-Video Animasyon Motoru** — ⬜ açık
-  - [ ] Üretilen görselleri tek tıkla animasyona çevirme (Kling, Luma Dream Machine,
-        Runway Gen-3 entegrasyonları).
+* **Faz 4: Image-to-Video Animasyon Motoru** — 🟡 kısmi (Veo teslim)
+  - [x] **Video modu:** composer'ın üçüncü modu (Görsel · Video · Yönetmen). Metinden
+        video ve galerideki bir görseli tek tıkla animasyona çevirme
+        (`POST /api/video`, `POST /api/video/animate`).
+  - [x] **Gemini · Veo 3.1** üç kademesiyle katalogda (Lite · Fast · tam).
+        Anahtar GÖRSEL tarafıyla paylaşılıyor — Ayarlar'a yeni bir alan gelmedi.
+        Yeni eksen SÜRE (4/6/8 sn) ve kredi tarifesi saniye başına.
+  - [x] **Yeni medya türü uçtan uca:** depo `.mp4` yazıyor (uzantı kaydın `kind`inden
+        türetiliyor), galeri karosu ve döküm kartı `<video>` çiziyor, büyüteç
+        oynatıyor, indirme doğru adı ve MIME'ı veriyor.
+  - [ ] Kling, Luma, Runway, Wan — fal.ai/Replicate kuyruk adaptörleriyle birlikte
+        (`FAL_KEY` / `REPLICATE_API_TOKEN` alanları duruyor, adaptör yok).
+  - [ ] İş kuyruğu: üretim bugün SENKRON, yani sekme yenilenirse iş kaybediliyor.
+  - [ ] `extend-video`, ilk/son kare geçişi ve çoklu referans — Veo destekliyor,
+        katalogda yetenek bayrağı yok.
+  - **Ölü uçlar (araştırıldı, girmedi):** OpenAI Sora 2 / Videos API 24 Eylül
+    2026'da kapanıyor ve yerine gelen bir ad yok; Azure AI Foundry'de video
+    barındırılmıyor; Anthropic'in video ucu yok.
 * **Faz 5: SaaS & Bulut Altyapısı** — 🟡 yalnız kredi metadata'sı hazır
   - [x] **Model bazlı kredi tarifesi:** katalogda her modelin kredisi yazılı ve üretim
         anındaki değer kayda geçiyor. **Bugün YALNIZ metadata:** hiçbir bakiye

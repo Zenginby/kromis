@@ -1704,10 +1704,30 @@ README Faz 3. Upscaler bir sağlayıcı yeteneği; Product-in-Hand bir prompt
 şablonu + referans akışı.
 - [ ] **Kabul:** her ikisi kendi kredi etiketiyle katalogda.
 
-### 10. Image-to-Video motoru · **L**
+### 10. Image-to-Video motoru · **L** — 🟡 İLK TUR TESLİM (3 Eylül 2026)
 README Faz 4 (master spec Faz 3'ün video payı). Yeni bir medya TÜRÜ: depo,
-küçük resim, büyüteç ve indirme yolları video tanımıyor.
-- [ ] **Kabul:** üretilen video kayıtta, galeride oynatılabiliyor, indirilebiliyor.
+küçük resim, büyüteç ve indirme yolları video tanımıyordu.
+- [x] **Kabul:** üretilen video kayıtta (`kind="video"`, uzantı ondan türetiliyor),
+      galeride `<video>` olarak oynatılabiliyor, büyüteçte oynuyor ve `.mp4`
+      adıyla indirilebiliyor. Sağlayıcı: Gemini · Veo 3.1 (üç kademe), anahtar
+      görsel tarafıyla paylaşılıyor. Uçlar `/api/video` ve `/api/video/animate`.
+- [ ] **Açık (10a): kuyruklu sağlayıcılar — fal.ai · Replicate · **M**.** Omurga
+      hazır; eklenecek şey bir `Credential`, bir `_VIDEO_ADAPTERS` girdisi ve
+      Ayarlar formuna bir alan. Kazanç: Kling, Wan, Seedance, LTX ve ucuz kademe
+      (~0,05 USD/sn). `FAL_KEY`/`REPLICATE_API_TOKEN` v0.2.0'dan beri kayıtlı.
+- [ ] **Açık (10b): iş kuyruğu · **M**.** Üretim bugün SENKRON: istek 1-6 dakika
+      açık kalıyor ve sekme yenilenirse iş kaybediliyor. Emsal `guncelleme.py`nin
+      daemon thread + JSON önbellek deseni; uçlar `POST /api/video` → `job_id` +
+      `GET /api/video/{job_id}`. İlerleme YÜZDESİ yine gelmiyor — o karar
+      (`index.html`in "yüzde uydurmaydı" notu) Veo'nun operation'ı da yüzde
+      vermediği için hâlâ geçerli.
+- [ ] **Açık (10c): `extend-video`, ilk/son kare, çoklu referans · **M**.** Veo
+      destekliyor; her biri katalogda bir yetenek bayrağı ve ön yüzde bir kontrol
+      istiyor.
+- [ ] **Açık (10d): Prompt Yönetmeni video bağlamı · **S**.**
+      `app._director_context` bugün `prefs["image_model"]`i okuyor, yani video
+      modunda da GÖRSEL modelinin jetonlarını öneriyor. Persona da gpt-image
+      prompt'u için yazılmış.
 
 ### 11. i18n (TR/EN) · **M**
 Arayüz metinleri bugün HTML/JS içinde birebir Türkçe; sözlük katmanı yok.

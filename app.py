@@ -50,7 +50,8 @@ from models import (MAX_CHAT_TITLE_CHARS, MAX_IMAGES_PER_RUN, MAX_PROMPT_CHARS,
                     ChatRequest, ChatSaveRequest, FolderRequest, GenerateRequest,
                     LogoRequest, MoveImageRequest, PrefsRequest,
                     SavePaletteRequest, SettingsRequest, SuggestRequest,
-                    check_capabilities, check_drop_indices)
+                    VideoRequest, check_capabilities,
+                    check_drop_indices, check_video_capabilities)
 
 BASE_DIR = paths.REPO_DIR                    # geriye uyum: mevcut kullanımlar bozulmasın
 OUTPUT_DIR = paths.output_dir()
@@ -191,6 +192,39 @@ def _output_png_path(image_id: str) -> str:
     if not safe or not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="Kaynak görsel bulunamadı.")
     return path
+
+
+def _output_media_path(media_id: str) -> str:
+    """history id → output/<id>.<uzantı> yolu; bulunamayanda HTTPException(404).
+
+    `_output_png_path`in İKİZİ DEĞİL, KARDEŞİ — ve ikisinin ayrı durması
+    bilinçli:
+
+      • `_output_png_path` REFERANS okuma yolu (`/api/edit`in `source_id`si,
+        logo/afiş bindirmeleri, video için ilk kare). Orada PNG olmak bir
+        VARSAYIM değil ŞART: bir MP4'ü referans görsel olarak sağlayıcıya
+        göndermek anlamsız. O yüzden o işlev PNG'de çakılı KALIYOR ve bir
+        videonun id'siyle çağrıldığında 404 vermeye devam ediyor — doğru
+        cevap bu.
+      • Bu işlev SERVİS yolu (`/output/{filename}` ve indirme ucu), yani
+        kullanıcının görmek/indirmek istediği her şey.
+
+    Uzantı DENENİYOR, `history.json` OKUNMUYOR: manifesti okumak her küçük
+    resim isteğinde bir dosya kilidi ve tam bir JSON ayrıştırması demekti
+    (galeri tek ekranda onlarca istek atıyor). Deneme kümesi
+    `storage.MEDIA_TYPES`ten geliyor, yani yeni bir tür eklendiğinde burada
+    hatırlanacak bir şey yok.
+
+    Path-traversal guard'ı `_output_png_path`in aynısı: id yalnızca
+    basename'e indiriliyor.
+    """
+    safe = os.path.basename(media_id or "")
+    if safe:
+        for uzanti in storage.MEDIA_TYPES:
+            path = os.path.join(OUTPUT_DIR, f"{safe}{uzanti}")
+            if os.path.isfile(path):
+                return path
+    raise HTTPException(status_code=404, detail="Kaynak medya bulunamadı.")
 
 
 def _read_png_file(path: str) -> bytes:
@@ -422,6 +456,148 @@ def generate(req: GenerateRequest) -> dict:
     return {"images": records}
 
 
+@app.post("/api/video")
+def video(req: VideoRequest) -> dict:
+    """Metin → video. `generate`in video ikizi.
+
+    SENKRON ve bu bilinçli bir seçim, kaza değil: üretim 1-6 dakika sürüyor ve
+    istek o süre boyunca açık kalıyor. Emsali depoda zaten var — Azure'ın n=4
+    üretimi `180+120·3` = 540 saniyelik bir okuma bütçesiyle çalışıyor
+    (`azure_client.read_timeout_for`). Yoklamanın adaptörün İÇİNDE olması,
+    `providers` sözleşmesini (`list[bytes]`) bozmadan bu yolu açıyor;
+    `catalog.poll_timeout` alanının ilk yorumu da tam olarak bu günü tarif
+    ediyordu.
+    Bilinen bedeli: sekme yenilenirse iş kaybediliyor ve ilerleme yüzde
+    olarak gösterilemiyor. İkincisi zaten deponun kayıtlı kararı
+    (`index.html`in "yüzde uydurmaydı" notu); ilkinin cevabı bir iş kuyruğu ve
+    o ayrı bir madde.
+
+    `def`, `async def` DEĞİL — `generate` ve `chat` ile aynı gerekçe: Starlette
+    senkron rotayı iş parçacığı havuzunda koşturuyor, yani bloklayan httpx
+    çağrısı olay döngüsünü dondurmuyor. `async def` içinde aynı çağrı bütün
+    sunucuyu kilitlerdi ve burada süre dakikalarla ölçülüyor.
+
+    PALET ve ARENA yok; gerekçeleri `VideoRequest`in docstring'inde.
+    """
+    folder_id = _check_folder(req.folder_id)
+    session_id = _check_session(req.session_id)
+    # `req.model` doğrulayıcıda NORMALLEŞTİRİLDİ (None → varsayılanın gerçek
+    # id'si), yani doğrulanan değer ile kaydedilen değer ayrışamıyor.
+    spec = catalog.video_model(req.model)
+    try:
+        videos = providers.generate_video(req.model, req.prompt, req.size,
+                                          req.quality, req.duration, req.n)
+    except ac.ImageError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    kredi = catalog.cost_for(spec, req.quality, duration=req.duration)
+    records = [
+        storage.save(vid, {"prompt": req.prompt, "size": req.size,
+                           "quality": req.quality, "parent_id": None,
+                           "folder_id": folder_id, "palette": None,
+                           "session_id": session_id,
+                           "kind": "video", "duration": req.duration,
+                           "model": req.model, "credits": kredi,
+                           "prompt_sent": None},
+                     OUTPUT_DIR, now=_now())
+        for vid in videos
+    ]
+    # ANAHTAR `videos`, `images` DEĞİL: istemci yanıtın türünü gövdeden
+    # okuyor ve `{"images": …}` döndürmek, bayat bir istemcinin videoyu
+    # `<img>` olarak çizmesine yol açardı — sessiz bir bozuk resim. Ayrı
+    # anahtar, eski istemcide YÜKSEK SESLE "images undefined" demek.
+    return {"videos": records}
+
+
+def _check_video_form(prompt: str, size: str, quality: str, duration: int,
+                      n: int, file: UploadFile | None,
+                      source_id: str | None, model: str = "") -> str:
+    """`/api/video/animate` form alanlarını doğrular; geçersizse 422.
+
+    `_check_edit_form`un video ikizi ve aynı iki gerekçeyle var: multipart uçta
+    tek bir Pydantic modeli YOK (elle doğrulama şart) ve yetenek kapısı JSON
+    ucuyla PAYLAŞILMAK zorunda — iki kopya, iki ucun sessizce ayrışması
+    demekti (arayüz bir süreyi sunar, bir uçta geçer, diğerinde 422 döner).
+
+    Palet kapıları YOK: bu ucun palet alanı da yok (bkz. `VideoRequest`).
+    """
+    try:
+        model_id = check_video_capabilities(model, size, quality, duration, n)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    spec = catalog.video_model(model_id)
+    if not spec.supports_edit:
+        raise HTTPException(status_code=422,
+                            detail=f"{spec.label} referans görselle çalışmıyor.")
+    if not prompt or len(prompt) > MAX_PROMPT_CHARS:
+        raise HTTPException(status_code=422,
+                            detail=f"prompt 1-{MAX_PROMPT_CHARS} karakter olmalı.")
+    if (file is None) == (source_id is None):
+        raise HTTPException(status_code=422,
+                            detail="Tam olarak biri gerekli: file veya source_id.")
+    return model_id
+
+
+@app.post("/api/video/animate")
+async def animate(
+    request: Request,
+    prompt: str = Form(...),
+    size: str = Form(...),
+    quality: str = Form(...),
+    duration: int = Form(...),
+    n: int = Form(1),
+    file: UploadFile | None = File(None),
+    source_id: str | None = Form(None),
+    folder_id: str | None = Form(None),
+    session_id: str | None = Form(None),
+    model: str = Form(""),
+) -> dict:
+    """Görsel → video: bir kareyi hareketlendirir.
+
+    `/api/edit`in kalıbı AYNEN kullanılıyor — `_collect_edit_refs` de aynen,
+    yeniden yazılmadan. O işlev "ana görsel → ek yüklemeler → ek galeri
+    görselleri" sırasını ve `parent_id` türev zincirini zaten kuruyor; video
+    tarafında yalnız TAVAN farklı ve o tavan katalogdan geliyor
+    (`max_refs=1`, yani ilk kare). Kapı `refs` toplandıktan SONRA: erken
+    davranmak, `_collect_edit_refs`in kendi 413/422 mesajlarını
+    ikizlemek olurdu.
+
+    Referans PNG'ye çevriliyor (`_to_png`, `_collect_edit_refs`in içinde) ve
+    `source_id` yolu `_output_png_path`ten okuyor — o işlev PNG'de çakılı
+    KALIYOR ve bu doğru: bir videoyu ilk kare olarak göndermek anlamsız,
+    404 doğru cevap (bkz. `_output_media_path`in docstring'i).
+    """
+    model_id = _check_video_form(prompt, size, quality, duration, n,
+                                 file, source_id, model)
+    spec = catalog.video_model(model_id)
+    target_folder = _check_folder(folder_id)
+    session = _check_session(session_id)
+    refs, parent_id = await _collect_edit_refs(request, file, source_id)
+    if len(refs) > spec.max_refs:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{spec.label} en fazla {spec.max_refs} referans görsel "
+                   "alıyor (ilk kare).")
+
+    try:
+        videos = providers.animate_video(model_id, prompt, refs, size, quality,
+                                         duration, n)
+    except ac.ImageError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    kredi = catalog.cost_for(spec, quality, duration=duration)
+    records = [
+        storage.save(vid, {"prompt": prompt, "size": size, "quality": quality,
+                           "parent_id": parent_id, "folder_id": target_folder,
+                           "palette": None, "session_id": session,
+                           "kind": "video", "duration": duration,
+                           "model": model_id, "credits": kredi,
+                           "prompt_sent": None},
+                     OUTPUT_DIR, now=_now())
+        for vid in videos
+    ]
+    return {"videos": records}
+
+
 def _check_edit_form(prompt: str, size: str, quality: str, n: int,
                      file: UploadFile | None, source_id: str | None,
                      palette_mode: str, palette_strength: str,
@@ -651,6 +827,71 @@ def _provider_logo_url(provider: str) -> str | None:
     return f"/static/img/providers/{ad}?v={version.APP_VERSION}" if ad else None
 
 
+def _model_payload(m: catalog.ImageModel, cfg: dict, kisa: dict) -> dict:
+    """Bir görsel/video modelinin arayüze giden hâli.
+
+    ÇIKARILDI, kopyalanmadı: `image_models` ve `video_models` listelerinin
+    ikisi de bu sözlüğü kuruyor ve elle iki kez yazmak, birine alan ekleyip
+    ötekini unutmanın kapısı olurdu — `catalog.ASPECT_RATIOS`in paylaşılma
+    gerekçesinin aynısı. Bugün ölçülebilir sonucu şu: `requires_plan` ya da
+    `logo` bir gün değişirse iki şerit birlikte değişiyor.
+
+    Jetonlar ETİKETLERİYLE gönderiliyor, çıplak dize değil: arayüz `<option>`
+    listelerini bunlardan kuruyor ve etiketi istemcide tutmak `SIZE_RATIO`'nun
+    bayatlayan aynası olurdu. `ratio` de sunucudan geliyor çünkü Gemini'nin
+    jetonları `WxH` biçiminde DEĞİL — istemci ayrıştırma yapmamalı.
+    """
+    return {
+        "id": m.id,
+        "label": m.label,
+        # ŞERİDİN adı ayrı bir alan: `label` hata metinlerinin ve
+        # `#model-note`un okuduğu TAM ad ve orada marka ayırt edici
+        # kalıyor (katalogda iki `gpt-image-2` var).
+        "short_label": kisa[m.id],
+        "provider": m.provider,
+        "sizes": [{"value": s, "label": catalog.geometry_of(s)[0],
+                   "ratio": catalog.geometry_of(s)[1]} for s in m.sizes],
+        "qualities": [{"value": q, "label": catalog.quality_label(q)}
+                      for q in m.qualities],
+        "quality_hidden": m.quality_hidden,
+        # SÜRE EKSENİ. Görsel modellerinde boş liste + 0, yani arayüz için
+        # "bu knob yok" — `quality_hidden`ın kurulmuş kalıbının aynısı, tek
+        # farkı bayrak yerine LİSTENİN BOŞLUĞUNUN işaret olması (boş bir
+        # eksen için ayrı bir `duration_hidden` bayrağı ikinci bir gerçek
+        # kaynağı olurdu).
+        "durations": [{"value": d, "label": catalog.duration_label(d)}
+                      for d in m.durations],
+        "default_duration": catalog.default_duration_of(m),
+        "default_size": catalog.default_size_of(m),
+        "default_quality": catalog.default_quality_of(m),
+        "max_n": m.max_n,
+        "supports_edit": m.supports_edit,
+        "max_refs": m.max_refs,
+        # Video modellerinde SANİYE BAŞINA (bkz. catalog.ImageModel.credits).
+        # Arayüz farkı `durations`ın boş olup olmamasından biliyor ve süreyle
+        # çarpıyor — ikinci bir birim alanı göndermek, aynı bilgiyi iki
+        # yoldan taşımak olurdu.
+        "credits": m.credits,
+        "credits_by_quality": dict(m.credits_by_quality),
+        "note": m.note,
+        # Sağlayıcı işaretinin adresi (yoksa None). Şerit yalnız SEÇİLİ
+        # modelin işaretini çiziyor: native <option> görsel taşımıyor
+        # (bkz. core.js renderModelOptions).
+        "logo": _provider_logo_url(m.provider),
+        # TEK türetilmiş alan: modelin anahtarı GİRİLMİŞ mi. Arayüzün
+        # "#go kilitli mi" kararı ve "anahtar gerekli" etiketi bundan geliyor.
+        "configured": cfg.get(m.credential, False),
+        # GÖRÜNÜRLÜK kararı — arayüzün filtresi YALNIZ bunu okuyor.
+        # Bugün `configured` ile birebir aynı; ayrımın gerekçesi
+        # _model_available'da yazılı. `configured` KALIYOR çünkü MESAJ ondan
+        # geliyor: "anahtar yok" ile "planın kapsamıyor" aynı cümle değil.
+        "available": _model_available(cfg.get(m.credential, False), m.plan),
+        # Bugün her modelde "free". Arayüz bir gün "Pro" rozetini bundan
+        # çizecek; alan şimdiden akıyor ki o gün şema değişikliği gerekmesin.
+        "requires_plan": m.plan,
+    }
+
+
 def _settings_payload() -> dict:
     """Kimlik DURUMU + hangi modeller var + hangileri kullanılabilir.
 
@@ -679,62 +920,28 @@ def _settings_payload() -> dict:
     # o yüzden model başına değil bir kez (bkz. catalog.short_labels).
     kisa_gorsel = catalog.short_labels(catalog.IMAGE_MODELS)
     kisa_sohbet = catalog.short_labels(catalog.CHAT_MODELS)
+    # Video şeridinin kısa adları AYRI hesaplanıyor, görselle BİRLİKTE değil:
+    # `short_labels`ın çakışma kuralı verilen listenin BÜTÜNÜNE bakıyor ve
+    # iki şeridi birleştirmek, ayrı seçicilerde duran iki modelin birbirine
+    # marka öneki taktırması olurdu (kullanıcı hiçbir zaman aynı listede
+    # `Veo 3.1` ile bir görsel modelini yan yana görmüyor).
+    kisa_video = catalog.short_labels(catalog.VIDEO_MODELS)
     return {
         **ac.get_settings_status(),
         # {kimlik_id: bool}. Arayüz Ayarlar'daki sağlayıcı gruplarının
         # "Kayıtlı" durumunu buradan okuyor.
         "providers": cfg,
         "default_image_model": catalog.DEFAULT_IMAGE_MODEL,
-        "image_models": [
-            {
-                "id": m.id,
-                "label": m.label,
-                # ŞERİDİN adı ayrı bir alan: `label` hata metinlerinin ve
-                # `#model-note`un okuduğu TAM ad ve orada marka ayırt edici
-                # kalıyor (katalogda iki `gpt-image-2` var).
-                "short_label": kisa_gorsel[m.id],
-                "provider": m.provider,
-                # Jetonlar ETİKETLERİYLE gönderiliyor, çıplak dize değil:
-                # arayüz `<option>` listelerini bunlardan kuruyor ve etiketi
-                # istemcide tutmak `SIZE_RATIO`'nun bayatlayan aynası olurdu.
-                # `ratio` de sunucudan geliyor çünkü Gemini'nin jetonları
-                # `WxH` biçiminde DEĞİL — istemci ayrıştırma yapmamalı.
-                "sizes": [{"value": s, "label": catalog.geometry_of(s)[0],
-                           "ratio": catalog.geometry_of(s)[1]} for s in m.sizes],
-                "qualities": [{"value": q, "label": catalog.quality_label(q)}
-                              for q in m.qualities],
-                "quality_hidden": m.quality_hidden,
-                "default_size": catalog.default_size_of(m),
-                "default_quality": catalog.default_quality_of(m),
-                "max_n": m.max_n,
-                "supports_edit": m.supports_edit,
-                "max_refs": m.max_refs,
-                "credits": m.credits,
-                "credits_by_quality": dict(m.credits_by_quality),
-                "note": m.note,
-                # Sağlayıcı işaretinin adresi (yoksa None). Şerit yalnız SEÇİLİ
-                # modelin işaretini çiziyor: native <option> görsel taşımıyor
-                # (bkz. core.js renderModelOptions).
-                "logo": _provider_logo_url(m.provider),
-                # TEK türetilmiş alan: modelin anahtarı GİRİLMİŞ mi. Arayüzün
-                # "#go kilitli mi" kararı ve "anahtar gerekli" etiketi bundan
-                # geliyor — bugün o karar tek bir Azure boolean'ına bağlı ve
-                # yalnızca OpenAI'si olan bir kullanıcıda ölü bir düğme üretirdi.
-                "configured": cfg.get(m.credential, False),
-                # GÖRÜNÜRLÜK kararı — arayüzün filtresi YALNIZ bunu okuyor.
-                # Bugün `configured` ile birebir aynı; ayrımın gerekçesi
-                # _model_available'da yazılı. `configured` KALIYOR çünkü
-                # MESAJ ondan geliyor: "anahtar yok" ile "planın kapsamıyor"
-                # kullanıcıya aynı cümle değil.
-                "available": _model_available(cfg.get(m.credential, False),
-                                              m.plan),
-                # Bugün her modelde "free". Arayüz bir gün "Pro" rozetini
-                # bundan çizecek; alan şimdiden akıyor ki o gün şema
-                # değişikliği gerekmesin.
-                "requires_plan": m.plan,
-            }
-            for m in catalog.IMAGE_MODELS
-        ],
+        # Video şeridi. ANAHTARIN AYRI OLMASI şart: `image_models`a katmak,
+        # bugün o listeyi okuyan her yerin (model kartları, arena sütun
+        # seçicisi, `secilebilirler` süzgeci) videoyu görsel sanması demekti —
+        # `catalog.VIDEO_MODELS`in ayrı bir demet olma gerekçesinin ön yüz
+        # tarafındaki karşılığı.
+        "default_video_model": catalog.DEFAULT_VIDEO_MODEL,
+        "video_models": [_model_payload(m, cfg, kisa_video)
+                         for m in catalog.VIDEO_MODELS],
+        "image_models": [_model_payload(m, cfg, kisa_gorsel)
+                         for m in catalog.IMAGE_MODELS],
         "default_chat_model": catalog.DEFAULT_CHAT_MODEL,
         "chat_models": [
             {"id": m.id, "label": m.label,
@@ -1705,13 +1912,26 @@ def asset_file(kind: str, filename: str) -> FileResponse:
 
 @app.get("/output/{filename}")
 def output_file(filename: str) -> FileResponse:
+    """Depodaki medyayı ÇİZİM için sunar (inline, indirme başlığı YOK).
+
+    Tür ARTIK TÜRETİLİYOR: v0.13'e kadar `image/png` çakılıydı ve o doğruydu
+    çünkü depoda tek tür vardı. MP4 gelince çakılı tür sessiz bir kırılma
+    olurdu — tarayıcı `image/png` diyen bir gövdeyi resim olarak çizmeye
+    çalışır, `<video>` etiketi hiçbir şey oynatmaz ve konsolda bir hata bile
+    çıkmaz. Eşleme `storage.MEDIA_TYPES`te, yani uzantı kararının verildiği
+    yerde (bkz. o tablonun yorumu).
+
+    `Content-Disposition` HÂLÂ YOK ve bu adres hâlâ her galeri küçük resminin
+    `src`i — indirme yolu ayrı bir uç (`output_download`) ve gerekçesi orada
+    yazılı.
+    """
     safe = os.path.basename(filename)
     if not safe or safe in (".", ".."):
         raise HTTPException(status_code=404, detail="bulunamadı")
     path = os.path.join(OUTPUT_DIR, safe)
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="bulunamadı")
-    return FileResponse(path, media_type="image/png")
+    return FileResponse(path, media_type=storage.media_type_for(safe))
 
 
 @app.get("/api/output/{image_id}/download")
@@ -1737,12 +1957,20 @@ def output_download(image_id: str) -> FileResponse:
     dosya adını da frontend veriyor. Bu uç orada yalnız köprünün indirdiği adres
     olarak kalıyor.
 
-    Path-traversal guard'ı yeniden yazılmıyor: `_output_png_path` deponun tek
-    kapısı ve 404'ü de o veriyor.
+    Path-traversal guard'ı yeniden yazılmıyor: `_output_media_path` servis
+    yolunun tek kapısı ve 404'ü de o veriyor.
+
+    TÜR VE DOSYA ADI, DİSKTEKİ DOSYADAN geliyor — `image_id`ye uzantı
+    EKLENMİYOR. Fark v0.13'te gerçek oldu: `f"{id}.png"` yazan bir indirme,
+    bir videoyu `.png` adıyla teslim ederdi ve dosya kullanıcının
+    diskinde açılmayan bir şey olurdu. Adı diskteki gerçeğe bağlamak, aynı
+    zamanda `download` özniteliğiyle (`folders.js` onu `rec.filename`den
+    veriyor) tek bir gerçeği paylaşmak demek.
     """
-    path = _output_png_path(image_id)
-    return FileResponse(path, media_type="image/png",
-                        filename=f"{os.path.basename(image_id)}.png")
+    path = _output_media_path(image_id)
+    ad = os.path.basename(path)
+    return FileResponse(path, media_type=storage.media_type_for(ad),
+                        filename=ad)
 
 
 @app.get("/")

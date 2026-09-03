@@ -430,3 +430,134 @@ def test_KATALOGDAKI_her_saglayicinin_MARKA_ADI_yazili(models):
         "marka adı yazılmayan sağlayıcı: " + ", ".join(sorted(eksik))
         + ". catalog.PROVIDER_BRANDS'e bir satır gerekiyor, yoksa şerit "
           "satırında marka öneki ekranda kalır.")
+
+
+# ── Video kataloğu (v0.13) ─────────────────────────────────────────────
+
+
+def test_the_two_model_families_NEVER_share_an_id():
+    """`catalog.image_model()` ve `video_model()` iki AYRI demeti tarıyor ve
+    çakışan bir id, çağıranın hangisini bulacağını arama sırasına bırakırdı."""
+    gorsel = set(catalog.image_model_ids())
+    video = set(catalog.video_model_ids())
+
+    assert gorsel.isdisjoint(video), f"iki demette birden: {gorsel & video}"
+
+
+def test_no_VIDEO_model_leaks_into_the_image_catalog():
+    """Ayrı demetin BÜTÜN gerekçesi bu (bkz. VIDEO_MODELS'in başlığı): bir
+    video girdisi `IMAGE_MODELS`a düşse `/api/generate`de seçilebilir olurdu
+    — senkron bir görsel ucuna 7 dakikalık bir video isteği."""
+    assert all(m.kind == "image" for m in catalog.IMAGE_MODELS)
+    assert all(m.kind == "video" for m in catalog.VIDEO_MODELS)
+    assert catalog.video_model(catalog.DEFAULT_IMAGE_MODEL) is None
+    assert catalog.image_model(catalog.DEFAULT_VIDEO_MODEL) is None
+
+
+def test_the_default_video_model_is_IN_the_catalog():
+    assert catalog.video_model(catalog.DEFAULT_VIDEO_MODEL) is not None
+
+
+def test_the_default_video_model_is_the_CHEAPEST_tier():
+    """Görsel tarafında varsayılan "en güçlü"; burada değil — ayrımın sebebi
+    fiyat farkının BÜYÜKLÜĞÜ: yanlışlıkla atılan tek bir tık lite'ta 4 saniye
+    için ~0,32 USD, kalite kademesinde ~1,60 USD. Bir görselde o fark
+    sentlerle ölçülüyordu."""
+    varsayilan = catalog.video_model(catalog.DEFAULT_VIDEO_MODEL)
+
+    assert varsayilan.credits == min(m.credits for m in catalog.VIDEO_MODELS)
+    # SIRA da artan maliyete göre: ilk girdi varsayılan.
+    assert catalog.VIDEO_MODELS[0].id == catalog.DEFAULT_VIDEO_MODEL
+    krediler = [m.credits for m in catalog.VIDEO_MODELS]
+    assert krediler == sorted(krediler), f"sıra artan maliyette değil: {krediler}"
+
+
+@pytest.mark.parametrize("m", catalog.VIDEO_MODELS, ids=lambda m: m.id)
+def test_every_video_model_declares_what_the_pipeline_needs(m):
+    """Video yolunun ÇALIŞMASI için gereken beyanlar. Biri eksik olsa
+    kırılma çalışma anında ve pahalı bir yerde görünürdü."""
+    # Kimlik `CREDENTIALS`ta olmalı, yoksa `credstore.resolve` patlar.
+    assert catalog.credential(m.credential) is not None
+    # Adaptörü olmayan bir sağlayıcı, seçilebilir bir çalışma-anı hatası.
+    import providers
+    assert m.provider in providers.video_adapter_ids()
+    # `poll_timeout` YOKSA `total_budget` görselin formülüne düşer (180 sn) ve
+    # dakikalarca süren bir üretim her seferinde zaman aşımına uğrar.
+    assert m.poll_timeout, "poll_timeout yok — döngünün tavanı görselin formülü olur"
+    # Süre ekseni olmayan bir video modeli, `durationSeconds`ı gönderemez.
+    assert m.durations, "durations boş"
+    assert catalog.default_duration_of(m) in m.durations
+    # `qualities` HİÇ boş olamıyor (ResultParams `min_length=1`).
+    assert m.qualities
+    assert catalog.default_quality_of(m) in m.qualities
+    assert catalog.default_size_of(m) in m.sizes
+
+
+def test_the_video_credits_are_PER_SECOND():
+    """`credits` alanının birimi `kind`e BAĞLI ve ayrım `cost_for`da yaşıyor.
+    Video tarafında üretim-başına yazmak, süre ekseni olan bir modelde
+    etiketi anlamsız kılardı: 4 sn ile 8 sn aynı krediyi gösterir, fatura
+    iki katı olurdu."""
+    m = catalog.video_model(catalog.DEFAULT_VIDEO_MODEL)
+
+    assert catalog.cost_for(m, "720p", 1, duration=4) == m.credits * 4
+    assert catalog.cost_for(m, "720p", 1, duration=8) == m.credits * 8
+    # Görsel yolu DEĞİŞMEDİ: süre verilmeyen çağrı üretim-başına kalıyor.
+    g = catalog.IMAGE_MODELS[0]
+    assert catalog.cost_for(g, "medium", 2) == \
+        dict(g.credits_by_quality)["medium"] * 2
+
+
+def test_a_ZERO_duration_never_zeroes_the_cost():
+    """0 ve None aynı anlamda ("süre ekseni yok") ve çarpan olarak 0
+    kullanmak, ücretsiz görünen bir video demekti."""
+    m = catalog.video_model(catalog.DEFAULT_VIDEO_MODEL)
+
+    assert catalog.cost_for(m, "720p", 1, duration=0) == m.credits
+    assert catalog.cost_for(m, "720p", 1) == m.credits
+
+
+def test_the_video_aspect_ratios_are_a_SUBSET_of_the_documented_ones():
+    """Veo yalnız iki oran kabul ediyor; `ASPECT_RATIOS`in onu buraya
+    KOPYALANMADI — doğrulanmamış bir jeton, arayüzde seçilebilir bir 400."""
+    for m in catalog.VIDEO_MODELS:
+        assert set(m.sizes) == set(catalog.VIDEO_ASPECT_RATIOS)
+        assert set(m.sizes) <= set(catalog.ASPECT_RATIOS), (
+            "video oranları GEOMETRY_LABELS'ın tanıdığı kümenin dışına çıktı — "
+            "etiket çıplak jetona düşer")
+
+
+def test_the_duration_axis_is_EMPTY_for_every_image_model():
+    """Arayüz süre satırının kapısını listenin BOŞLUĞUNDAN okuyor."""
+    for m in catalog.IMAGE_MODELS:
+        assert m.durations == ()
+        assert catalog.default_duration_of(m) == 0
+
+
+def test_every_video_quality_token_has_a_LABEL():
+    """Bilinmeyen jeton hata değil (etiketi kendisi olur) ama çirkin: video
+    seçicisinde "720p · HD" ile çıplak "720p" arasındaki fark, kalite
+    ekseninin okunabilirliği."""
+    for m in catalog.VIDEO_MODELS:
+        for q in m.qualities:
+            assert catalog.quality_label(q) != q, f"{q} etiketsiz"
+
+
+@pytest.mark.parametrize(
+    "models", [catalog.VIDEO_MODELS], ids=["video"])
+def test_VIDEO_kisa_adlari_LISTE_ICINDE_tekil(models):
+    """Görsel/sohbet şeritlerinin aynı mandalı: iki satır aynı metni
+    GÖSTEREMEZ. Kısa adlar şerit BAŞINA hesaplanıyor (`app._settings_payload`),
+    yani çakışma kuralı bu listenin kendi içinde çalışmak zorunda."""
+    adlar = list(catalog.short_labels(models).values())
+    assert len(adlar) == len(set(adlar)), f"eşadlı satır: {adlar}"
+
+
+def test_the_video_providers_all_have_a_LOGO():
+    """`tests/test_provider_logos.py` adaptörü olan her sağlayıcı için dosya
+    arıyor; video sağlayıcıları o taramaya `providers.video_adapter_ids()`
+    üzerinden GİRMİYOR, o yüzden ikinci bir mandal burada."""
+    for m in catalog.VIDEO_MODELS:
+        assert catalog.provider_logo(m.provider), (
+            f"{m.provider} işaretsiz — şerit işaretsiz çizilir")
+        assert m.provider in catalog.PROVIDER_BRANDS

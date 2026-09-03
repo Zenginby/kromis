@@ -64,6 +64,12 @@ _SCHEMA: dict[str, tuple[object, type]] = {
     "theme": ("mono", str),
     "guncelleme_kontrolu": (True, bool),
     "image_model": (catalog.DEFAULT_IMAGE_MODEL, str),
+    # Video şeridinin seçimi. `image_model`in AYRI bir anahtarı ve bu
+    # bilinçli: iki şerit iki farklı listeden besleniyor
+    # (`catalog.VIDEO_MODELS` ↔ `IMAGE_MODELS`) ve tek anahtarda tutmak, mod
+    # değiştiren kullanıcının seçimini karşı listede GEÇERSİZ kılardı — yani
+    # her mod geçişinde sessizce varsayılana düşerdi.
+    "video_model": (catalog.DEFAULT_VIDEO_MODEL, str),
     "chat_provider": (catalog.DEFAULT_CHAT_PROVIDER, str),
     # "" = sağlayıcının ilk modeli. Boş bir varsayılan, "kullanıcı henüz
     # seçmedi" ile "şu modeli seçti" ayrımını korumak için — sağlayıcı
@@ -91,6 +97,7 @@ DEFAULTS = {name: default for name, (default, _) in _SCHEMA.items()}
 _ENUMS: dict[str, tuple[str, ...]] = {
     "theme": ALLOWED_THEMES,
     "image_model": catalog.image_model_ids(),
+    "video_model": catalog.video_model_ids(),
     "chat_provider": catalog.chat_provider_ids(),
 }
 

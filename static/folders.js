@@ -1353,8 +1353,12 @@ async function openPicker() {
   // sayaçları (`pickerFilter(s).length`) da aynı listeden besleniyor, yani
   // kapsam düğmeleri "3 görsel" derken ızgarada iki karo görünmesi olurdu.
   pickerImages = res.images.filter((r) => !kayitVideoMu(r));
+  // VARSAYILAN SEÇİM DE SÜZÜLMÜŞ listeden: `res.images`e bakmak, en yeni kayıt
+  // bir videoysa `pickerImages`te OLMAYAN bir id seçmek olurdu ve
+  // `pickerById` onu bulamadığı için seçici önizlemesiz, "Referans yap"ı
+  // kapalı açılırdı — süzgecin önlemek için var olduğu kırık hâlin ta kendisi.
   if (!pickerById(pickerSelectedId)) {
-    pickerSelectedId = res.images.length ? res.images[0].id : null;
+    pickerSelectedId = pickerImages.length ? pickerImages[0].id : null;
   }
   renderMediaPicker();
 }

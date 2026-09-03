@@ -211,19 +211,17 @@ def _output_media_path(media_id: str) -> str:
 
     Uzantı DENENİYOR, `history.json` OKUNMUYOR: manifesti okumak her küçük
     resim isteğinde bir dosya kilidi ve tam bir JSON ayrıştırması demekti
-    (galeri tek ekranda onlarca istek atıyor). Deneme kümesi
-    `storage.MEDIA_TYPES`ten geliyor, yani yeni bir tür eklendiğinde burada
-    hatırlanacak bir şey yok.
+    (galeri tek ekranda onlarca istek atıyor). Aramanın KENDİSİ `storage`da
+    (`media_path_of`) çünkü silme yolu da aynı soruyu soruyor — iki yerde iki
+    döngü, birine tür eklenip ötekinin unutulmasının kapısı olurdu.
 
     Path-traversal guard'ı `_output_png_path`in aynısı: id yalnızca
     basename'e indiriliyor.
     """
     safe = os.path.basename(media_id or "")
-    if safe:
-        for uzanti in storage.MEDIA_TYPES:
-            path = os.path.join(OUTPUT_DIR, f"{safe}{uzanti}")
-            if os.path.isfile(path):
-                return path
+    path = storage.media_path_of(safe, OUTPUT_DIR) if safe else None
+    if path:
+        return path
     raise HTTPException(status_code=404, detail="Kaynak medya bulunamadı.")
 
 
@@ -528,6 +526,15 @@ def _check_video_form(prompt: str, size: str, quality: str, duration: int,
     if not spec.supports_edit:
         raise HTTPException(status_code=422,
                             detail=f"{spec.label} referans görselle çalışmıyor.")
+    # `_check_edit_form`un aynı kapısı ve burada ALT sınır daha da gerekli:
+    # `check_video_capabilities` yalnız TAVANI ölçüyor (`n > max_n`) ve form
+    # ucunda `n` için pydantic `ge=1` YOK (JSON ikizinde var). `n=0` geçse
+    # `providers.total_budget` SIFIR dönerdi — yani Veo işi gönderilir
+    # (faturalanır) ve döngü ilk yoklamadan önce "süre doldu" der.
+    if not (1 <= n <= min(spec.max_n, MAX_IMAGES_PER_RUN)):
+        raise HTTPException(
+            status_code=422,
+            detail=f"n 1-{min(spec.max_n, MAX_IMAGES_PER_RUN)} arasında olmalı.")
     if not prompt or len(prompt) > MAX_PROMPT_CHARS:
         raise HTTPException(status_code=422,
                             detail=f"prompt 1-{MAX_PROMPT_CHARS} karakter olmalı.")

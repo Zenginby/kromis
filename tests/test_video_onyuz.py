@@ -476,6 +476,23 @@ def test_the_viewer_CLEARS_the_video_src_on_close():
     assert "videoKipi = false" in govde
 
 
+def test_the_viewer_RESETS_the_zoom_state_when_a_video_opens():
+    """`fit()` video kipinde erken dönüyor (tek muhafız kuralı), yani ölçek
+    ELLE sıfırlanmak zorunda. Ölçülebilir sonucu klavyede: ok tuşlarının
+    dalı `scale > 1` ile açılıyor ve `preventDefault` çağırıyor — yani
+    büyütülmüş bir görselden sonra açılan video, oynatıcının ileri/geri
+    sarma tuşlarını yutuyordu. `.zoomed` sınıfı da düşüyor, yoksa imleç
+    çalışmayan bir "tut ve kaydır" jestini davet ediyordu."""
+    js = _kodsuz(_viewer())
+    m = re.search(r"if \(videoKipi\) \{(.*?)\n    \}", js, re.S)
+    assert m, "open()'ın video dalı bulunamadı"
+    govde = m.group(1)
+
+    assert "scale = 1" in govde
+    assert "tx = 0" in govde and "ty = 0" in govde
+    assert "syncCursor()" in govde
+
+
 def test_the_viewer_STOPS_the_video_when_an_image_is_opened():
     """İki düğüm birbirini dışlıyor ve kapatılanın `src`i temizleniyor:
     bırakılan bir `<video src>` arka planda ses çalmaya devam edebiliyor."""
@@ -572,12 +589,26 @@ def test_the_DIRECTOR_HANDOFF_is_closed_in_video_mode():
     assert '#composer[data-mode="video"] #ask-director' in _css()
 
 
-def test_the_EXTRA_REFERENCE_strip_is_hidden_in_video_mode():
-    """Veo tek bir ilk kare alıyor. Şeridi açık bırakmak, kullanıcıya
-    ekleyebileceğini söyleyip sonra üretimi kilitlemek olurdu."""
-    govde = _govde(_kodsuz(_core()), "renderSource")
+def test_the_EXTRA_REFERENCE_strip_is_a_REMOVAL_surface_in_video_mode():
+    """Veo tek bir ilk kare alıyor, yani EKLEME kapalı — ama şerit KOŞULSUZ
+    gizlenemiyor ve bu ikinci koşul kilitlenmenin çıkış kapısı.
 
-    assert '$("extra-row").hidden = !source || currentMode === "video"' in govde
+    Ölçülen kırılma şu: görsel modunda eklenen ekler moda geçerken
+    silinmiyor, `goBlockReason` onlar yüzünden `#go`yu kilitliyor ve şerit
+    koşulsuz gizliyse `×` düğmeleri hiç çizilmiyor — kullanıcı kilitli bir
+    düğme ile göremediği bir ek arasında sıkışıyor. Şerit bu yüzden
+    "eklenecek bir şey yoksa gizli, kaldırılacak bir şey varsa görünür".
+    """
+    js = _kodsuz(_core())
+    govde = _govde(js, "renderSource")
+
+    assert 'currentMode === "video" && extras.length === 0' in govde, (
+        "şerit video modunda koşulsuz gizleniyor — eklenmiş bir ek "
+        "kaldırılamaz hâle gelir")
+    # EKLEME iki yoldan da kapalı: düğme ve paylaşılan gerekçe.
+    assert 'currentMode === "video" || extraSlotsLeft() <= 0' in \
+        _govde(js, "renderExtras")
+    assert 'if (currentMode === "video") {' in _govde(js, "extraBlockReason")
 
 
 def test_the_gate_REFUSES_an_extra_reference_in_video_mode():

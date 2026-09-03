@@ -344,7 +344,20 @@ def edit(model_id: str, prompt: str, images, size: str, quality: str, n: int,
 
 
 def video_is_configured(model_id: str) -> bool:
-    """`is_configured`ın video ikizi. Katalogda olmayan model için False."""
+    """`is_configured`ın video ikizi. Katalogda olmayan model için False.
+
+    ÜRETİMDE ÇAĞIRANI YOK ve bu not okurun onu aramasını önlemek için: iki
+    kardeşi de (`is_configured` yukarıda, `chat_providers.is_configured`)
+    aynı durumda. Arayüzün gerçekten okuduğu kapı `app._model_available` ve
+    o `credstore`u doğrudan sorguluyor.
+
+    Üçlü yine de duruyor çünkü sevk memurunun sözleşmesinin parçası: bir
+    adaptör katmanına "bu modeli konuşabiliyor muyum" sorusunun cevabı o
+    katmanda olmalı. Silinseydi bu modül, kardeşlerinin cevapladığı bir
+    soruyu cevaplamayan tek sevk masası olurdu — ve dördüncü bir sağlayıcı
+    eklerken o asimetri "video tarafında bu soru nasıl soruluyor?" diye
+    aranan bir şey olurdu.
+    """
     m = catalog.video_model(model_id)
     return bool(m) and credstore.is_configured(m.credential)
 

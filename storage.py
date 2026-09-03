@@ -51,6 +51,28 @@ def ext_for(kind: str | None) -> str:
     return MEDIA_EXTS.get(kind or "", DEFAULT_EXT)
 
 
+def media_path_of(image_id: str, output_dir: str) -> str | None:
+    """`{id}` için diskte GERÇEKTEN duran dosyanın yolu; yoksa None.
+
+    UZANTI DENENİYOR, kayıttan okunmuyor — ve bunun sebebi silme
+    sözleşmesinin kendisi: "kaydı olmayan ama dosyası olan id de silinmiş
+    sayılır", yani türü söyleyecek bir kayıt OLMADIĞI hâl sözleşmede yazılı.
+    Deneme kümesi `MEDIA_TYPES`ten geliyor, yani uzantı kararının verildiği
+    yer; yeni bir tür eklendiğinde silme yolunda hatırlanacak bir şey yok.
+
+    İKİ TARAFTAN OKUNUYOR: `delete`/`delete_many` ve `app._output_media_path`.
+    Üçü de v0.13'e kadar `f"{id}.png"` yazıyordu ve o doğruydu (depoda tek
+    tür vardı); MP4 gelince o literal SESSİZ BİR SIZINTI oldu — kayıt
+    siliniyor, dosya diskte kalıyor ve `/output/{id}.mp4` ile indirme ucu onu
+    sunmaya devam ediyordu (megabaytlarca, hiçbir arayüzün ulaşamadığı yerde).
+    """
+    for uzanti in MEDIA_TYPES:
+        path = os.path.join(output_dir, f"{image_id}{uzanti}")
+        if os.path.isfile(path):
+            return path
+    return None
+
+
 def media_type_for(filename: str) -> str:
     """Dosya adından HTTP içerik türü.
 
@@ -341,8 +363,9 @@ def set_folder_many(image_ids: Iterable[str], folder_id: str | None, output_dir:
 def delete_many(image_ids: Iterable[str], output_dir: str) -> int:
     """Birden çok görseli tek yazımda siler (dosya + kayıt); silinen sayıyı döndürür.
 
-    `delete()` ile aynı sözleşme: dosya adı `{id}.png`, kaydı olmayan ama dosyası
-    olan (veya tersi) id de silinmiş sayılır.
+    `delete()` ile aynı sözleşme: dosya adı `{id}.{uzantı}` (uzantı kaydın
+    `kind`inden doğuyor, bkz. `save`), kaydı olmayan ama dosyası olan (veya
+    tersi) id de silinmiş sayılır.
     """
     targets = {iid for iid in image_ids if iid and _SAFE_ID.fullmatch(iid)}
     if not targets:
@@ -354,9 +377,11 @@ def delete_many(image_ids: Iterable[str], output_dir: str) -> int:
 
         deleted = set(existing_records)
         for image_id in targets:
-            file_path = os.path.join(output_dir, f"{image_id}.png")
-            if os.path.exists(file_path):
-                # `exists` ile `remove` arasında dosya kaybolabilir (aynı görseli
+            # UZANTI ARANIYOR, yazılmıyor (bkz. `media_path_of`): `.png` çakılı
+            # kalsaydı bir video kaydı silinirken dosyası diskte kalırdı.
+            file_path = media_path_of(image_id, output_dir)
+            if file_path:
+                # Bulma ile `remove` arasında dosya kaybolabilir (aynı görseli
                 # iki sekmeden silmek yeter). Sonuç zaten istenen: dosya yok.
                 with contextlib.suppress(FileNotFoundError):
                     os.remove(file_path)
@@ -376,8 +401,9 @@ def delete(image_id: str, output_dir: str) -> bool:
         remaining = [r for r in history if r.get("id") != image_id]
         record_existed = len(remaining) != len(history)
 
-        file_path = os.path.join(output_dir, f"{image_id}.png")
-        file_existed = os.path.exists(file_path)
+        # `delete_many` ile aynı arama (bkz. `media_path_of`).
+        file_path = media_path_of(image_id, output_dir)
+        file_existed = file_path is not None
         if file_existed:
             # delete_many ile aynı yarış: araya başka bir silme girebilir.
             with contextlib.suppress(FileNotFoundError):

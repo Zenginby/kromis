@@ -736,7 +736,19 @@ function aktifModeliUygula() {
   const model = aktifModel();
   // Yönetmen modunda eksen yok (üretim yok) ve modeli olmayan bir modda
   // `<select>`lere dokunmak, geri dönen kullanıcının seçimini silmek olurdu.
-  if (!model) return;
+  if (!model) {
+    // ÜRETİM modunda model YOKSA not yine yazılmak zorunda ve O EKSENİ
+    // anlatmak zorunda. Erken dönmek iki kusur üretiyordu: (1) görsel
+    // modunun "… için API anahtarı kayıtlı değil" uyarısı video modunda
+    // ekranda kalıyordu — `modelNotuYaz`ın önlemek için var olduğu "yanlış
+    // kutuyu işaret eden not"un ta kendisi; (2) video ekseninin kendi boş
+    // hâli HİÇ görünmüyordu, çünkü `modelBosHali`nin mod kapısı yalnız
+    // açılışta (mod "image" iken) sınanıyordu.
+    if (currentMode === "image" || currentMode === "video") {
+      modelBosHali(currentMode);
+    }
+    return;
+  }
   eksenleriDoldur(model, { announce: false });
   // Not da aktif eksenin modelini anlatmak zorunda: video modunda "Azure için
   // anahtar yok" yazan bir uyarı yanlış kutuyu işaret ederdi.
@@ -1936,15 +1948,24 @@ const SUPPORTS_SAVE_PICKER = typeof window.showSaveFilePicker === "function";
 // uygulanması zararsız. Çevrilemeyen adres (blob:, data:, /assets/…) olduğu gibi
 // dönüyor — bu işlev bir yönlendirme tablosu, bir doğrulayıcı değil.
 const OUTPUT_ONEKI = "/output/";
+// ÇEVRİLEBİLİR UZANTILAR — sunucudaki `storage.MEDIA_TYPES`in aynası ve küme
+// KAPALI (`viewer.js`in id soyma regex'iyle aynı disiplin). v0.13'e kadar
+// burada tek bir `.png` literali vardı ve o doğruydu; MP4 gelince o literal
+// videoyu SESSİZCE çizim adresinde bırakıyordu — yani `Content-Disposition`
+// taşımayan adreste. Sonuç `output_download`un v0.13'te öğrendiği her şeyin
+// (diskteki gerçek ad, gerçek MIME) video için hiç kullanılmaması ve Android
+// WebView'de indirmenin bu işlevin var olma sebebine geri düşmesiydi.
+const INDIRME_UZANTILARI = [".png", ".mp4"];
 
 function indirmeAdresi(url) {
   if (typeof url !== "string" || !url.startsWith(OUTPUT_ONEKI)) return url;
   const ad = url.slice(OUTPUT_ONEKI.length);
-  if (!ad.endsWith(".png")) return url;
+  const uzanti = INDIRME_UZANTILARI.find((u) => ad.toLowerCase().endsWith(u));
+  if (!uzanti) return url;
   // Ad zaten kodlanmış olarak geliyor (chat.js:920 `encodeURIComponent`,
   // folders.js kayıt adını olduğu gibi yazıyor); yeniden kodlamak `%` işaretini
   // ikinci kez kaçırıp adresi bozardı.
-  return `/api/output/${ad.slice(0, -".png".length)}/download`;
+  return `/api/output/${ad.slice(0, -uzanti.length)}/download`;
 }
 
 // Android APK'nın enjekte ettiği indirme köprüsü (MainActivity `IndirmeKoprusu`).
@@ -1990,7 +2011,25 @@ function downloadViaAnchor(url, filename) {
   a.remove();
 }
 
-// Kayıt panelini açar, seçilen dosyaya görselin baytlarını yazar.
+/** Kayıt panelinin tür süzgeci — ADI VERİLEN dosyaya göre.
+ *
+ * ÇAKILI "PNG görsel" DEĞİL: `showSaveFilePicker`in süzgeci `suggestedName`in
+ * uzantısıyla çelişirse tarayıcı adı süzgece UYDURUYOR (Chromium ölçüldü),
+ * yani bir MP4 kullanıcının diskine `.png` adıyla iniyordu — tam olarak
+ * `app.output_download`un "bir videoyu `.png` adıyla teslim etmek" diye
+ * kaydettiği kusurun istemci tarafındaki ikizi. Süzgecin adı da yanlış
+ * kutuyu gösteriyordu ("PNG görsel" yazan bir video kaydı).
+ *
+ * Küme `INDIRME_UZANTILARI` ile aynı gerekçeyle KAPALI: bilinmeyen uzantı
+ * PNG'ye düşüyor, yani bugünkü davranış (tek tür) bayt bayt korunuyor.
+ */
+function kayitPaneliTuru(filename) {
+  return String(filename || "").toLowerCase().endsWith(".mp4")
+    ? { description: "MP4 video", accept: { "video/mp4": [".mp4"] } }
+    : { description: "PNG görsel", accept: { "image/png": [".png"] } };
+}
+
+// Kayıt panelini açar, seçilen dosyaya medyanın baytlarını yazar.
 async function downloadImage(url, filename) {
   // Köprü varsa panel HİÇ denenmiyor: Android'de `showSaveFilePicker` zaten yok,
   // ama bir gün gelirse kayıt paneli köprünün sessizce devre dışı kalması demek
@@ -2001,7 +2040,7 @@ async function downloadImage(url, filename) {
   try {
     handle = await window.showSaveFilePicker({
       suggestedName: filename,
-      types: [{ description: "PNG görsel", accept: { "image/png": [".png"] } }],
+      types: [kayitPaneliTuru(filename)],
     });
   } catch (e) {
     // Vazgeçmek hata değil: panel kapatıldıysa hiçbir şey yapma. Panelin
@@ -2090,11 +2129,16 @@ function renderSource() {
       goBtn.textContent = "Gönder";
     }
   }
-  // Ek görsel yalnızca bir ana görsel varken VE yalnız görsel modunda
-  // anlamlı: Veo tek bir ilk kare alıyor (`max_refs=1`) ve `goBlockReason`
-  // ekli bir referansta kapıyı kapatıyor. Şeridi açık bırakmak, kullanıcıya
-  // ekleyebileceğini söyleyip sonra üretimi kilitlemek olurdu.
-  $("extra-row").hidden = !source || currentMode === "video";
+  // Ek görsel yalnızca bir ana görsel varken anlamlı. Video modunda şerit
+  // EKLEME için kapalı (Veo tek bir ilk kare alıyor, `max_refs=1`) ama
+  // KALDIRILACAK bir şey varsa GÖRÜNÜR kalıyor — ve bu ikinci koşul bir
+  // süsleme değil, kilitlenmenin çıkış kapısı: görsel modunda eklenen ekler
+  // moda geçerken silinmiyor, `goBlockReason` da onlar yüzünden `#go`yu
+  // kilitliyor. Şerit koşulsuz gizlense kullanıcı göremediği bir eki
+  // kaldırmak zorunda kalırdı. Ekleme yolu ayrıca kapalı (`extraBlockReason`,
+  // `#extra-add-btn`), yani şerit yalnız bir SİLME yüzeyi olarak duruyor.
+  $("extra-row").hidden =
+    !source || (currentMode === "video" && extras.length === 0);
   renderExtras();
   // Palet notu referans görsel varken değişir (üretim ≠ düzenleme ifadesi)
   renderPalettePanel();
@@ -2147,7 +2191,10 @@ function renderExtras() {
   $("extra-count").textContent = extras.length
     ? `${extras.length}/${MAX_EDIT_IMAGES - 1}`
     : "";
-  $("extra-add-btn").disabled = extraSlotsLeft() <= 0;
+  // Düğme MOD ekseninde de kapanıyor (gerekçe `extraBlockReason`da): açık bir
+  // "+ Ek", video modunda kullanıcıya ekleyebileceğini söyleyip sonra üretimi
+  // kilitlemek olurdu — `#extra-row`un gizlenme gerekçesinin aynısı.
+  $("extra-add-btn").disabled = currentMode === "video" || extraSlotsLeft() <= 0;
 }
 
 function removeExtra(item) {
@@ -2168,6 +2215,16 @@ function removeExtra(item) {
 //
 // Boş dize = engel yok. Çağıranlar `if (why)` ile okuyor.
 function extraBlockReason(rec) {
+  // VİDEO MODUNDA EK REFERANS YOK: Veo'nun girdisi tek bir İLK KARE
+  // (`max_refs=1`) ve `goBlockReason` o yüzden ekli bir referansta kapıyı
+  // kapatıyor. Kapı BURADA da duruyor çünkü ekleme yolları iki tane
+  // (`#extra-add-btn` ve Medya seçicisinin "Ek olarak ekle"si) ve ikisi de bu
+  // tek gerekçeyi okuyor. Onsuz video modunda eklenen bir ek, `#extra-row`
+  // gizli olduğu için KALDIRILAMIYORDU: kullanıcı kilitli bir `#go` ile
+  // göremediği bir ek arasında sıkışıyordu.
+  if (currentMode === "video") {
+    return "Video tek referans görsel alıyor (ilk kare).";
+  }
   if (!source) return "Önce ana görseli seç.";
   if (extraSlotsLeft() <= 0) return `En fazla ${MAX_EDIT_IMAGES} görsel gönderilebilir.`;
   if (!rec) return "";

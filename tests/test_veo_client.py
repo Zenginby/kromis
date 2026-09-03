@@ -43,10 +43,13 @@ MP4 = b"\x00\x00\x00\x20ftypmp42"
 
 
 class FakeResponse:
-    def __init__(self, status_code, json_body=None, content=b""):
+    def __init__(self, status_code, json_body=None, content=b"", headers=None):
         self.status_code = status_code
         self._json = json_body
         self.content = content
+        # `headers` gerçek bir httpx yanıtında her zaman var; indirme
+        # yönlendirmesi `location`ı oradan okuyor.
+        self.headers = headers or {}
 
     def json(self):
         if self._json is None:
@@ -70,11 +73,9 @@ class FakeClient:
         self._responses = list(responses)
         self.calls = []
 
-    def request(self, method, url, headers=None, json=None, timeout=None,
-                follow_redirects=False):
+    def request(self, method, url, headers=None, json=None, timeout=None):
         self.calls.append({"method": method, "url": url, "headers": headers,
-                           "json": json, "timeout": timeout,
-                           "follow_redirects": follow_redirects})
+                           "json": json, "timeout": timeout})
         i = len(self.calls) - 1
         # Tek yanıt verildiyse her çağrıda o dönüyor (kardeş dosyanın kuralı).
         return self._responses[i] if len(self._responses) > 1 else self._responses[0]
@@ -95,9 +96,16 @@ def uyku_yok(monkeypatch):
     monkeypatch.setattr(vc, "_bekle", lambda saniye: None)
 
 
-def _op(done=True, uri="https://generativelanguage.googleapis.com/v1beta/files/x:download",
-        b64=None, hata=None, rai=None):
-    """Bir operation gövdesi. Belgedeki yuvalanma birebir kuruluyor."""
+URI = "https://generativelanguage.googleapis.com/v1beta/files/x:download"
+
+
+def _op(done=True, uri=URI, b64=None, hata=None, rai=None, rai_sayac=None):
+    """Bir operation gövdesi. Belgedeki yuvalanma birebir kuruluyor.
+
+    `uri=None` + `b64=None` → `generatedSamples` BOŞ, yani "video yok" hâli.
+    `hata` ile `rai` AYRI parametreler çünkü anlamları ayrı (bkz.
+    `veo_client._operation_hatasi` / `_filtre_gerekcesi`).
+    """
     govde = {"name": OP, "done": done}
     if not done:
         return govde
@@ -109,6 +117,8 @@ def _op(done=True, uri="https://generativelanguage.googleapis.com/v1beta/files/x
     kap = {"generatedSamples": [ornek] if ornek else []}
     if rai is not None:
         kap["raiMediaFilteredReasons"] = rai
+    if rai_sayac is not None:
+        kap["raiMediaFilteredCount"] = rai_sayac
     govde["response"] = {"generateVideoResponse": kap}
     if hata:
         govde["error"] = {"code": 400, "message": hata}
@@ -336,17 +346,98 @@ def test_the_sleep_never_overshoots_the_remaining_budget(monkeypatch):
 # ── Sonucun okunması ───────────────────────────────────────────────────
 
 
-def test_the_download_FOLLOWS_REDIRECTS():
+def test_the_download_FOLLOWS_a_redirect_manually():
     """İmzalı `uri` depolama katmanına 302 ile yönlendiriyor ve httpx
     varsayılan olarak yönlendirmeyi İZLEMİYOR. İzlenmezse gövde boş bir 302
     olur ve hata "video döndürmedi" kılığında görünür — sebebi yanlış yerde
-    aratan bir mesaj."""
-    c = FakeClient(FakeResponse(200, _op()), FakeResponse(200, content=MP4))
+    aratan bir mesaj.
+
+    İzleme ELLE (`veo_client._indir`) ve gerekçesi bir sonraki testte:
+    `follow_redirects=True` özel başlıkları da taşıyordu.
+    """
+    hedef = "https://storage.example.com/imzali/x.mp4"
+    c = FakeClient(FakeResponse(200, _op()),
+                   FakeResponse(302, headers={"location": hedef}),
+                   FakeResponse(200, content=MP4))
+
+    out = vc.generate(LITE, "k", "16:9", "720p", 4, 1, client=c,
+                      credentials=CREDS)
+
+    assert out == [MP4]
+    assert c.calls[-1]["url"] == hedef
+
+
+def test_the_api_key_is_NOT_forwarded_to_a_NON_GOOGLE_redirect():
+    """Bu dosyanın güvenlik iddiası.
+
+    `follow_redirects=True` yönlendirmeyi izliyor VE `x-goog-api-key`
+    başlığını yeni konağa da taşıyordu (httpx yalnız `Authorization`ı
+    soyuyor). Hedef konak YANIT GÖVDESİNDEN geliyor, yani onu gövdeyi yazan
+    taraf belirliyor — faturalı bir Gemini anahtarını Google dışı bir konağa
+    vermek, anahtarı karşı tarafın eline bırakmak olurdu. İmzalı depolama
+    adresleri kimlik istemiyor: imza zaten yetkilendirmenin kendisi.
+    """
+    c = FakeClient(FakeResponse(200, _op()),
+                   FakeResponse(302, headers={
+                       "location": "https://storage.example.com/x.mp4"}),
+                   FakeResponse(200, content=MP4))
 
     vc.generate(LITE, "k", "16:9", "720p", 4, 1, client=c, credentials=CREDS)
 
-    assert c.calls[0]["follow_redirects"] is False, "submit yönlendirme izlemiyor"
-    assert c.calls[-1]["follow_redirects"] is True, "indirme yönlendirmeyi izlemiyor"
+    ilk_indirme, son_indirme = c.calls[1], c.calls[2]
+    # Google konağına GİDİYOR…
+    assert ilk_indirme["headers"]["x-goog-api-key"] == "AIzaTESTKEY"
+    # …yabancı konağa GİTMİYOR.
+    assert "x-goog-api-key" not in son_indirme["headers"]
+
+
+def test_the_api_key_SURVIVES_a_redirect_that_stays_on_google():
+    """Anahtarı koşulsuz düşürmek de yanlış olurdu: Google içi bir
+    yönlendirme (ör. bölgesel bir uç) kimliği hâlâ isteyebilir."""
+    c = FakeClient(FakeResponse(200, _op()),
+                   FakeResponse(302, headers={
+                       "location": "https://eu.googleapis.com/v1beta/files/x"}),
+                   FakeResponse(200, content=MP4))
+
+    vc.generate(LITE, "k", "16:9", "720p", 4, 1, client=c, credentials=CREDS)
+
+    assert c.calls[-1]["headers"]["x-goog-api-key"] == "AIzaTESTKEY"
+
+
+def test_a_RELATIVE_redirect_target_is_made_absolute():
+    """Göreceli adres de geçerli (RFC 7231). Mutlaklaştırılmazsa konak boş
+    görünür ve anahtar Google konağında bile DÜŞERDİ."""
+    c = FakeClient(FakeResponse(200, _op()),
+                   FakeResponse(302, headers={"location": "/v1beta/files/y"}),
+                   FakeResponse(200, content=MP4))
+
+    vc.generate(LITE, "k", "16:9", "720p", 4, 1, client=c, credentials=CREDS)
+
+    assert c.calls[-1]["url"] == \
+        "https://generativelanguage.googleapis.com/v1beta/files/y"
+    assert c.calls[-1]["headers"]["x-goog-api-key"] == "AIzaTESTKEY"
+
+
+def test_a_redirect_LOOP_ends_with_its_own_message():
+    """Sonsuz döngü de bir hata hâli ve zaman aşımıyla değil kendi mesajıyla
+    bitmeli — yoksa kullanıcı dakikalarca bekleyip "süre doldu" okur ve
+    yanlış knob'u (süreyi) kurcalar."""
+    dongu = FakeResponse(302, headers={"location": URI})
+    c = FakeClient(FakeResponse(200, _op()), *([dongu] * 20))
+
+    with pytest.raises(ac.ImageError) as hata:
+        vc.generate(LITE, "k", "16:9", "720p", 4, 1, client=c, credentials=CREDS)
+
+    assert "yönlendirmeden sonra" in str(hata.value)
+
+
+def test_a_redirect_WITHOUT_a_location_fails_loudly():
+    c = FakeClient(FakeResponse(200, _op()), FakeResponse(302))
+
+    with pytest.raises(ac.ImageError) as hata:
+        vc.generate(LITE, "k", "16:9", "720p", 4, 1, client=c, credentials=CREDS)
+
+    assert "adres taşımıyor" in str(hata.value)
 
 
 def test_an_INLINE_base64_video_needs_no_second_request():
@@ -380,16 +471,21 @@ def test_more_samples_than_requested_are_TRUNCATED():
     assert out == [b"BIR"]
 
 
-def test_a_DONE_operation_with_NO_video_reports_the_REASON():
-    """`done: true` + video yok. `gemini_client.decode_images`in "200 ile
-    gelen ret metnini yutma" dersinin video karşılığı: gerekçe elimizdeyken
-    "video üretilemedi" demek, kullanıcıya sebebi olmayan bir 502 vermek."""
-    c = FakeClient(FakeResponse(200, _op(hata="quota exceeded for veo")))
+def test_a_FAILED_operation_reports_its_error_EVEN_IF_a_video_is_present():
+    """`error` alanı operation'ın DÜŞTÜĞÜNÜ söylüyor: gövdede bir video
+    görünse bile o sonuç geçerli değil, yani dal KOŞULSUZ yükseltiliyor.
+    `gemini_client.decode_images`in "200 ile gelen ret metnini yutma"
+    dersinin video karşılığı — gerekçe elimizdeyken "video üretilemedi"
+    demek, kullanıcıya sebebi olmayan bir 502 vermek."""
+    c = FakeClient(FakeResponse(200, _op(hata="quota exceeded for veo")),
+                   FakeResponse(200, content=MP4))
 
     with pytest.raises(ac.ImageError) as hata:
         vc.generate(LITE, "k", "16:9", "720p", 4, 1, client=c, credentials=CREDS)
 
     assert "quota exceeded for veo" in str(hata.value)
+    # İNDİRME HİÇ DENENMEDİ: düşmüş bir işin videosu indirilmez.
+    assert len(c.calls) == 1
 
 
 def test_a_SAFETY_FILTERED_operation_reports_the_filter_reason():
@@ -402,6 +498,45 @@ def test_a_SAFETY_FILTERED_operation_reports_the_filter_reason():
         vc.generate(LITE, "k", "16:9", "720p", 4, 1, client=c, credentials=CREDS)
 
     assert "Person/Face generation" in str(hata.value)
+
+
+def test_a_filter_COUNT_without_reasons_still_reports_something():
+    c = FakeClient(FakeResponse(200, _op(uri=None, rai_sayac=1)))
+
+    with pytest.raises(ac.ImageError) as hata:
+        vc.generate(LITE, "k", "16:9", "720p", 4, 1, client=c, credentials=CREDS)
+
+    assert "güvenlik filtresi" in str(hata.value)
+
+
+def test_a_PARTIAL_filter_still_DELIVERS_the_video_that_came():
+    """Filtre KISMİ olabiliyor: n örnekten biri engellenir, geri kalanı
+    teslim edilir. Gerekçeyi koşulsuz yükseltmek, Google'ın ÜRETTİĞİ ve
+    FATURALADIĞI bir videoyu atmak olurdu. `max_n=1` olduğu sürece
+    ulaşılamaz bir dal — bu test onun katalog tavanı yükseldiği gün de doğru
+    kalmasını sağlıyor."""
+    c = FakeClient(FakeResponse(200, _op(rai_sayac=1)),
+                   FakeResponse(200, content=MP4))
+
+    out = vc.generate(LITE, "k", "16:9", "720p", 4, 1, client=c,
+                      credentials=CREDS)
+
+    assert out == [MP4]
+
+
+def test_an_unrecognised_shape_YIELDS_TO_the_filter_reason():
+    """Şekil tanınmadı AMA filtre gerekçesi var: kullanıcının okumak
+    istediği şey gerekçe, "generatedSamples yok" değil."""
+    op = {"name": OP, "done": True,
+          "response": {"raiMediaFilteredReasons": ["Celebrity likeness"]}}
+    c = FakeClient(FakeResponse(200, op))
+
+    with pytest.raises(ac.ImageError) as hata:
+        vc.generate(LITE, "k", "16:9", "720p", 4, 1, client=c, credentials=CREDS)
+
+    metin = str(hata.value)
+    assert "Celebrity likeness" in metin
+    assert "generatedSamples" not in metin
 
 
 def test_an_UNRECOGNISED_response_shape_names_the_keys_it_found():

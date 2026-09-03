@@ -191,6 +191,24 @@ def build_payload(prompt: str, size: str, quality: str, duration: int, n: int,
     }
 
 
+def _coz_base64(deger) -> bytes:
+    """Gömülü videoyu açar; BOZUK gövdeyi `ac.ImageError`a çevirir.
+
+    Sarmalama ŞART ve gerekçesi `ac.ImageError`in docstring'inde yazılı:
+    `binascii.Error` bir `ValueError` ve `app.py`nin
+    `except ac.ImageError` süzgeçinden GEÇİP ham 500 olur — gövdesi JSON
+    olmayan, kullanıcının sebebini hiçbir yerde okumadığı bir 500. Bu dalın
+    şekli canlı DOĞRULANMADI (bkz. dosya başlığı), yani bozuk gelmesi
+    teorik bir olasılık değil, en olası hatalardan biri.
+    """
+    try:
+        return base64.b64decode(deger)
+    except Exception as exc:
+        raise ac.ImageError(
+            "Veo yanıtındaki gömülü video çözülemedi (bozuk base64). "
+            "Prompt'u değiştirip tekrar deneyin.") from exc
+
+
 def _video_uri(op: dict) -> tuple[list[str], list[bytes]]:
     """Tamamlanmış operation'dan `(uri listesi, gömülü bayt listesi)`.
 
@@ -230,31 +248,47 @@ def _video_uri(op: dict) -> tuple[list[str], list[bytes]]:
         if video.get("uri"):
             uriler.append(str(video["uri"]))
         elif video.get("bytesBase64Encoded"):
-            gomulu.append(base64.b64decode(video["bytesBase64Encoded"]))
+            gomulu.append(_coz_base64(video["bytesBase64Encoded"]))
     return uriler, gomulu
 
 
-def _refuse_message(op: dict) -> str | None:
-    """Operation BAŞARIYLA bitti ama video yok — sebebini anlatan metin.
+# `gemini_client.decode_images`'ın "200 ile gelen ret metnini yutma" kuralının
+# video karşılığı. Sinyal İKİ AYRI KILIKTA geliyor ve İKİ AYRI İŞLEV okuyor —
+# çünkü ANLAMLARI farklı ve ilk yazımda tek işlevde toplanmaları ölçülebilir
+# bir kusur üretiyordu:
+#
+#   • `error` alanı → operation BAŞARISIZ bitti (kota, geçersiz parametre).
+#     Sonuç geçersiz, yani video gelmiş olsa bile teslim edilmemeli.
+#   • RAI FİLTRESİ → operation BAŞARIYLA bitti, içeriğin bir kısmı
+#     engellendi. `sampleCount > 1` olduğunda n örnekten biri engellenip
+#     geri kalanı TESLİM EDİLİYOR; ikisi tek işlevde toplandığında o teslim
+#     edilen video atılıyordu — Google'ın ürettiği ve faturaladığı bir video.
+#
+# İkisi de HİÇBİR HTTP durumuyla haber verilmiyor: reddedilen bir prompt da
+# 200 + `done: true` dönüyor. Yutulursa kullanıcı "video üretilemedi" diyen
+# ama sebebini söylemeyen bir 502 alır — hem de gerekçe elimizdeyken.
 
-    Bu, `gemini_client.decode_images`'ın "200 ile gelen ret metnini yutma"
-    kuralının video karşılığı ve burada iki ayrı kılıkta geliyor:
 
-      • `error` alanı — üretim sırasında düşen bir iş (kota, geçersiz
-        parametre). `done: true` olduğu için HTTP tarafı 200'dü.
-      • RAI FİLTRESİ — güvenlik reddi. Sayaç (`raiMediaFilteredCount`) ve
-        gerekçe listesi (`raiMediaFilteredReasons`) `response`ın içinde
-        duruyor ve HİÇBİR HTTP durumu bunu haber vermiyor: prompt reddedilmiş
-        bir istek de 200 + `done: true` dönüyor. Yutulursa kullanıcı
-        "video üretilemedi" diyen ama sebebini söylemeyen bir 502 alır — hem
-        de ret gerekçesi elimizdeyken.
+def _operation_hatasi(op: dict) -> str | None:
+    """Operation'ın KENDİSİ düştü mü — düştüyse mesajı.
 
-    None = "sebep bulunamadı", yani çağıran genel bir hata yazıyor.
+    Bu dal KOŞULSUZ yükseltiliyor (bkz. `_uret`): başarısız bir operation'ın
+    gövdesinde bir video görünse bile o sonuç geçerli değil.
     """
     hata = op.get("error")
     if isinstance(hata, dict) and hata.get("message"):
         return str(hata["message"])
+    return None
 
+
+def _filtre_gerekcesi(op: dict) -> str | None:
+    """İçerik güvenlik filtresi devreye girdi mi — girdiyse gerekçesi.
+
+    KOŞULLU yükseltiliyor (bkz. `_uret`): filtre KISMİ olabiliyor ve
+    engellenmeyen örnekler teslim edilmek zorunda.
+
+    None = "gerekçe bulunamadı", yani çağıran genel bir metin yazıyor.
+    """
     yanit = op.get("response")
     kap = (yanit.get("generateVideoResponse")
            if isinstance(yanit, dict) else None)
@@ -286,28 +320,38 @@ def _timeout_message(gecen: float, butce: float) -> str:
             "sonuç bu tarafa ulaşmadı.")
 
 
-def _istek(client, method: str, url: str, key: str, *, read: float,
-           json=None, follow_redirects: bool = False):
+def _istek(client, method: str, url: str, key: str | None, *, read: float,
+           json=None):
     """Ortak HTTP + taşıma hatası çevirisi. Yanıtı ÇÖZÜMLEMİYOR.
 
     Üç adımın (submit / yokla / indir) üçü de bu kapıdan geçiyor, çünkü
-    üçünde de aynı iki şey doğru olmak zorunda: kimlik `x-goog-api-key`
-    başlığında ve sarmalanmayan bir httpx hatası `app.py`nin
-    `except ac.AzureImageError` süzgeçinden GEÇİP ham 500 olur (bkz.
-    `ac.ImageError`in docstring'i).
+    üçünde de aynı şey doğru olmak zorunda: sarmalanmayan bir httpx hatası
+    `app.py`nin `except ac.AzureImageError` süzgeçinden GEÇİP ham 500 olur
+    (bkz. `ac.ImageError`in docstring'i).
+
+    `key=None` KİMLİKSİZ istek demek ve tek kullanıcısı `_indir`in Google
+    dışı yönlendirme dalı — gerekçesi orada yazılı. Submit ve yoklama her
+    zaman anahtar veriyor.
+
+    YÖNLENDİRME İZLENMİYOR (`follow_redirects` yok): `_indir` onu ELLE
+    izliyor, çünkü httpx yönlendirmede özel başlıkları soymuyor ve
+    `x-goog-api-key` yabancı bir konağa gidiyordu.
 
     Durum kodu BURADA denetlenmiyor: `map_error` çağrısı için adım bağlamı
     (hangi model, hangi aşama) gerekiyor ve o bilgi çağıranda.
     """
     import httpx
+    basliklar = {}
+    if key:
+        basliklar["x-goog-api-key"] = key
+    if json is not None:
+        basliklar["Content-Type"] = "application/json"
     try:
         return client.request(
             method, url,
-            headers={"x-goog-api-key": key,
-                     **({"Content-Type": "application/json"} if json is not None else {})},
+            headers=basliklar,
             json=json,
             timeout=ac.request_timeout(read),
-            follow_redirects=follow_redirects,
         )
     except httpx.TransportError as exc:
         # Mesaj `azure_client`tan geliyor, sağlayıcı adı düzeltiliyor:
@@ -315,6 +359,66 @@ def _istek(client, method: str, url: str, key: str, *, read: float,
         # endpoint'i kurcalamaya iter (`gemini_client._post`un aynı satırı).
         raise ac.ImageError(
             ac.transport_error_message(exc, read).replace("Azure", "Veo")) from exc
+
+
+# İndirme yönlendirmesinde kimliğin GİDEBİLECEĞİ konaklar. Küme KAPALI ve
+# hepsi Google'a ait.
+GOOGLE_KONAK_SONLARI = (".googleapis.com", ".google.com",
+                        ".googleusercontent.com")
+# Yönlendirme tavanı: sonsuz döngü de bir hata hâli ve zaman aşımıyla değil
+# kendi mesajıyla bitmeli.
+MAX_YONLENDIRME = 5
+_YONLENDIRME_KODLARI = (301, 302, 303, 307, 308)
+
+
+def _google_konagi(url: str) -> bool:
+    from urllib.parse import urlparse
+    konak = (urlparse(url).hostname or "").lower()
+    return konak.endswith(GOOGLE_KONAK_SONLARI) or konak in (
+        "googleapis.com", "google.com")
+
+
+def _indir(client, url: str, key: str, *, wire_model: str) -> bytes:
+    """MP4'ü indirir. Yönlendirmeyi ELLE izler — ve bu bir güvenlik kararı.
+
+    `follow_redirects=True` iki şeyi birden yapıyordu: yönlendirmeyi izliyor
+    VE `x-goog-api-key` başlığını yeni konağa da taşıyordu. httpx
+    yönlendirmede yalnız `Authorization`ı soyuyor, ÖZEL başlıkları değil — ve
+    buradaki `uri` YANIT GÖVDESİNDEN geliyor, yani hedef konağı gövdeyi yazan
+    taraf belirliyor. Faturalı bir Gemini anahtarını Google dışı bir konağa
+    vermek, o anahtarı karşı tarafın eline bırakmak olurdu; üstelik bu dalın
+    kimlik mekanizması bu depoda DOĞRULANMADI (bkz. dosya başlığı), yani
+    "nereye gittiğini biliyoruz" varsayımı da yok.
+
+    İzleme yine ŞART: izlenmezse gövde boş bir 302 olur ve hata "video
+    döndürmedi" kılığında görünür — sebebi yanlış yerde aratan bir mesaj.
+    Yani karar "izle ama kimliği taşıma".
+
+    İmzalı depolama adresleri kimlik İSTEMİYOR: imza zaten yetkilendirmenin
+    kendisi. O yüzden anahtarı düşürmek erişimi kaybetmek değil.
+    """
+    from urllib.parse import urljoin
+
+    for _ in range(MAX_YONLENDIRME + 1):
+        resp = _istek(client, "GET", url,
+                      key if _google_konagi(url) else None,
+                      read=DOWNLOAD_READ_TIMEOUT)
+        if resp.status_code not in _YONLENDIRME_KODLARI:
+            if resp.status_code != 200:
+                raise ac.ImageError(map_error(resp.status_code, _govde(resp),
+                                              wire_model=wire_model))
+            return resp.content
+        hedef = (getattr(resp, "headers", None) or {}).get("location")
+        if not hedef:
+            raise ac.ImageError(
+                f"Veo videosu indirilemedi: {resp.status_code} yönlendirmesi "
+                "adres taşımıyor.")
+        # GÖRECELİ adres de geçerli (RFC 7231): `urljoin` mutlaklaştırıyor,
+        # yoksa `_google_konagi` boş bir konak görüp anahtarı düşürürdü.
+        url = urljoin(url, hedef)
+    raise ac.ImageError(
+        f"Veo videosu indirilemedi: {MAX_YONLENDIRME} yönlendirmeden sonra "
+        "hâlâ dosyaya ulaşılamadı.")
 
 
 def _govde(resp):
@@ -379,7 +483,10 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str,
             gecen = _simdi() - baslangic
             if gecen >= butce:
                 raise ac.ImageError(_timeout_message(gecen, butce))
-            _bekle(min(aralik, POLL_INTERVAL_MAX, max(0.0, butce - gecen)))
+            # `POLL_INTERVAL_MAX` burada İKİNCİ KEZ sorulmuyor: `aralik` bir
+            # satır aşağıda zaten onunla sınırlanıyor. Kalan tek tavan SON
+            # TARİH — hazır olabilecek bir sonucu bütçenin ötesinde bekletmemek.
+            _bekle(min(aralik, max(0.0, butce - gecen)))
             aralik = min(aralik * POLL_BACKOFF, POLL_INTERVAL_MAX)
             resp = _istek(client, "GET", op_url, key, read=POLL_READ_TIMEOUT)
             if resp.status_code != 200:
@@ -388,31 +495,44 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str,
             op = _govde(resp) or {}
 
         # ── 3. Sonuç ─────────────────────────────────────────────────────
-        sebep = _refuse_message(op)
-        if sebep:
-            # Ret/hata metni VARSA şeklin tanınıp tanınmadığına hiç
-            # bakılmıyor: kullanıcının okumak istediği şey sebep, "response
-            # yok" değil.
-            raise ac.ImageError(f"Veo video üretmedi: {sebep}")
+        #
+        # OPERATION HATASI KOŞULSUZ: iş düştüyse sonuç geçersiz ve gövdede
+        # bir video görünse bile teslim edilmemeli.
+        hata = _operation_hatasi(op)
+        if hata:
+            raise ac.ImageError(f"Veo video üretmedi: {hata}")
 
-        uriler, gomulu = _video_uri(op)
+        # FİLTRE GEREKÇESİ KOŞULLU ve bu sıra ölçülü: filtre KISMİ olabiliyor
+        # (n örnekten biri engellenir, geri kalanı teslim edilir) ve ilk
+        # yazımda gerekçe koşulsuz yükseltiliyordu — yani Google'ın ÜRETTİĞİ
+        # ve FATURALADIĞI bir video atılıyordu. `max_n=1` olduğu sürece
+        # ulaşılamaz bir dal, ama katalog tavanı yükseldiği gün canlı; o gün
+        # burada hatırlanacak bir şey olmasın diye şimdi doğru.
+        filtre = _filtre_gerekcesi(op)
+        try:
+            uriler, gomulu = _video_uri(op)
+        except ac.ImageError:
+            # Şekil TANINMADI. Filtre gerekçesi varsa kullanıcının okumak
+            # istediği şey o ("içerik filtresi engelledi"), "generatedSamples
+            # yok" değil; gerekçe de yoksa şekil hatası kendi teşhis edici
+            # mesajıyla çıkıyor (bkz. `_video_uri`in docstring'i).
+            if not filtre:
+                raise
+            uriler, gomulu = [], []
+
         out: list[bytes] = list(gomulu)
         for uri in uriler:
-            # `follow_redirects=True` ŞART: imzalı `uri` depolama katmanına
-            # 302 ile yönlendiriyor ve httpx varsayılan olarak yönlendirmeyi
-            # İZLEMİYOR. İzlenmezse gövde boş bir 302 olur ve hata "video
-            # döndürmedi" kılığında görünür — yani sebebi yanlış yerde
-            # aratan bir mesaj.
-            vresp = _istek(client, "GET", uri, key,
-                           read=DOWNLOAD_READ_TIMEOUT, follow_redirects=True)
-            if vresp.status_code != 200:
-                raise ac.ImageError(map_error(vresp.status_code, _govde(vresp),
-                                              wire_model=m.wire_model))
-            out.append(vresp.content)
+            out.append(_indir(client, uri, key, wire_model=m.wire_model))
 
         if not out:
+            # GEREKÇE BURAYA DA GİRİYOR: filtre TÜM örnekleri engellediğinde
+            # tek çıkış bu satır ve gerekçesiz bir "video döndürmedi",
+            # kullanıcıya prompt'unu neden değiştirmesi gerektiğini
+            # söylemeyen bir mesaj olurdu.
             raise ac.ImageError(
-                "Veo video döndürmedi. Prompt'u değiştirip tekrar deneyin.")
+                "Veo video döndürmedi"
+                + (f": {filtre}" if filtre
+                   else ". Prompt'u değiştirip tekrar deneyin."))
         # `gemini_client._uret`in tavanıyla aynı gerekçe: uç istenenden FAZLA
         # örnek döndürebiliyor ve fazlalık sessizce ilerlemiyor, ilerideki bir
         # doğrulamada patlıyor (`ChatMessage.image_ids` `max_length=4`). Eksik

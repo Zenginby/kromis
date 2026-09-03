@@ -249,6 +249,20 @@
     zoomKontrolleri(!videoKipi);
     if (videoKipi) {
       vimg.removeAttribute("src");
+      // ÖLÇEK DURUMU SIFIRLANIYOR ve `fit()` ÇAĞRILMIYOR: o işlev video
+      // kipinde erken dönüyor (tek muhafız kuralı), yani önceki GÖRSELDEN
+      // kalan `scale > 1` burada yaşamaya devam ederdi. Ölçülebilir sonucu
+      // klavyede: ok tuşlarının dalı `scale > 1` ile açılıyor ve
+      // `preventDefault` çağırıyor — yani büyütülmüş bir görselden sonra
+      // açılan video, oynatıcının ileri/geri sarma tuşlarını yutuyordu.
+      scale = 1;
+      tx = 0;
+      ty = 0;
+      // `.zoomed` SINIFI da düşüyor: onu yazan tek yer `syncCursor` ve
+      // `fit()` çağrılamadığı için o da koşmuyordu — büyütülmüş bir
+      // görselden sonra açılan videonun üstünde imleç "tut ve kaydır"
+      // gösteriyordu, yani çalışmayan bir jesti davet ediyordu.
+      syncCursor();
       vvid.src = src;
       vvid.setAttribute("aria-label", alt || "");
       // Sahne ETİKETİ de değişiyor: "Görseli büyüt" diyen bir diyalog adı,

@@ -68,7 +68,9 @@ let currentSection = "studio";
 /** Bitişik segmentin kayan dolgusu: aktif düğmenin ölçüsünden okunuyor. */
 function syncTabThumb() {
   const thumb = $("view-tabs-thumb");
-  const tab = currentMode === "image" ? $("tab-image") : $("tab-chat");
+  // Eşleme TABLODAN, üçlü koşuldan DEĞİL: iki modda bir `?:` okunabilirdi,
+  // üçüncü modda iç içe bir koşul olurdu ve dördüncüsü onu kesin bozardı.
+  const tab = $(MOD_SEKMELERI[currentMode] || MOD_SEKMELERI.image);
   if (!thumb || !tab) return;
   thumb.style.width = `${tab.offsetWidth}px`;
   thumb.style.transform = `translateX(${tab.offsetLeft}px)`;
@@ -89,11 +91,26 @@ const PROMPT_YER_TUTUCU = {
     tam: "Ne üretmek istiyorsun? Görsel tarifi, renk veya tarz yaz…",
     kisa: "Ne üretmek istiyorsun?",
   },
+  video: {
+    tam: "Nasıl bir video? Sahneyi, kamera hareketini ve ışığı yaz…",
+    kisa: "Nasıl bir video?",
+  },
   director: {
     tam: "Yönetmen'e sor veya fikir danış… (öğeleri değiştir, sahne ekle)",
     kisa: "Yönetmen'e sor…",
   },
 };
+
+/** Mod → o modun sekme düğmesi. TEK eşleme, üç okuyan (`syncTabThumb`,
+ * `setMode`in aria/class döngüsü, `MOD_KISAYOL` başlıkları).
+ *
+ * Bir zamanlar bu bilgi üç yerde birden üçlü koşul olarak yazılıydı ve iki
+ * modda çalışıyordu; üçüncü mod eklenirken üçünden birini unutmak, sekmenin
+ * `aria-pressed`ının sessizce yanlış kalması demekti — ekran okuyucu
+ * kullanıcısına "Görsel modu seçili" derken composer video üretiyor olurdu.
+ */
+const MOD_SEKMELERI = { image: "tab-image", video: "tab-video",
+                        director: "tab-chat" };
 
 /** Yer tutucunun TEK yazarı. İki çağıranı var (mod değişimi ve ilk gönderim)
  * ve ikisi de aynı iki değişkeni okuyor — metin iki yerde kurulsaydı ayrışırdı.
@@ -106,18 +123,27 @@ function syncPromptPlaceholder() {
 }
 
 function setMode(modeName) {
-  const mode = modeName === "director" ? "director" : "image";
+  // Bilinmeyen ad GÖRSELE düşüyor (bugünkü davranış): tablo üyeliği tek
+  // ölçüt, yani yeni bir mod eklemek yalnız `MOD_SEKMELERI`ye bir satır.
+  const mode = MOD_SEKMELERI[modeName] ? modeName : "image";
   if (currentSection !== "studio") showSection("studio");
   currentMode = mode;
   $("composer").dataset.mode = mode;
-  $("tab-image").setAttribute("aria-pressed", mode === "image" ? "true" : "false");
-  $("tab-chat").setAttribute("aria-pressed", mode === "director" ? "true" : "false");
-  $("tab-image").classList.toggle("active", mode === "image");
-  $("tab-chat").classList.toggle("active", mode === "director");
+  for (const [ad, tabId] of Object.entries(MOD_SEKMELERI)) {
+    const el = $(tabId);
+    if (!el) continue;
+    el.setAttribute("aria-pressed", ad === mode ? "true" : "false");
+    el.classList.toggle("active", ad === mode);
+  }
 
   syncPromptPlaceholder();
   renderSource();
   syncTabThumb();
+  // Eksenler MODA bağlı: video modunda süre/oran/çözünürlük seçili VİDEO
+  // modelinden geliyor. Mod değişince yeniden doldurulmalı, yoksa
+  // `#specs-sheet` bir modun jetonlarını öteki moda gönderirdi — yani telde
+  // 422 (`check_video_capabilities` oranı reddeder).
+  if (typeof aktifModeliUygula === "function") aktifModeliUygula();
   // Kapı MODA bağlı: Yönetmen modunda sohbet yapılandırması, Görsel modunda
   // seçili modelin durumu karar veriyor. Mod değişince yeniden sorulmalı.
   // `typeof` guard'ı SIRA yüzünden: setMode bu dosyanın üst düzeyinde de
@@ -127,6 +153,7 @@ function setMode(modeName) {
 }
 
 $("tab-image").addEventListener("click", () => setMode("image"));
+$("tab-video").addEventListener("click", () => setMode("video"));
 $("tab-chat").addEventListener("click", () => setMode("director"));
 window.addEventListener("resize", syncTabThumb);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(syncTabThumb);
@@ -341,6 +368,40 @@ for (const id of ["upload-btn", "extra-add-btn", "media-pick-btn"]) {
 // GET /api/settings → image_models[].sizes[].{value,label,ratio}.
 let imageModels = [];      // sunucudan gelen katalog
 let currentModel = null;   // seçili tanım (imageModels'ten bir öğe)
+// Video ekseninin İKİZ değişkenleri. `imageModels`/`currentModel`e
+// KATILMIYORLAR ve gerekçe `catalog.VIDEO_MODELS`in ayrı bir demet olma
+// gerekçesinin aynısı: `imageModels`i okuyan beş yer (renderModelOptions,
+// secilecek, renderArenaOptions, goBlockReason'ın arena dalı,
+// #model-settings-link) hepsi öğeyi bir GÖRSEL modeli sanıyor. Tek listede
+// tutmak, o beş yerin her birine "türü de sor" eklemek olurdu — beşten birini
+// unutmak ise video modelini arena sütunu olarak seçilebilir kılardı.
+let videoModels = [];
+let currentVideoModel = null;
+
+/** O ANDA eksenleri süren model: moda göre görsel ya da video.
+ *
+ * TEK yardımcı, beş okuyan (`syncSpecs`, `syncRunCost`, `goBlockReason`,
+ * `run`, `renderSource`). Beşi de aynı soruyu soruyor ("hangi modelin
+ * jetonlarıyla üretiyorum?") ve beşinde ayrı bir `currentMode === "video"`
+ * koşulu yazmak, birini unuttuğunda yanlış modelin tarifesini gösteren ya da
+ * yanlış modelin id'sini gönderen bir kayma olurdu.
+ *
+ * Yönetmen modunda NULL: orada üretim yok, sohbet var — ve o dalın kendi
+ * modeli (`currentChatModel`) ayrı bir eksende yaşıyor.
+ *
+ * KAPI ÜRETİM MODLARINI SAYIYOR, Yönetmen'i ELEMİYOR DEĞİL — ve bu bir üslup
+ * tercihi değil ölçülmüş bir tripwire çakışmasının kapısı: tests/test_index.py
+ * `goBlockReason`ın yönetmen dalını, o dalın koşul satırını KAYNAK METİNDE
+ * arayarak ayıklıyor. Bu işlev aynı koşulu yazsa (dosyada daha yukarıda
+ * olduğu için) ayıklama BURAYA takılır ve test yönetmen kapısını bir daha
+ * hiç ölçmez — sessizce. Aynı sebeple bu yorum da o koşulu birebir
+ * TAŞIMIYOR; deponun yorum-tuzağına beşinci kez düşmemesi için.
+ */
+function aktifModel() {
+  if (currentMode === "video") return currentVideoModel;
+  if (currentMode === "image") return currentModel;
+  return null;
+}
 let runBusy = false;       // üretim sürüyor mu — #go kapısının bir girdisi
 // Yönetmenin karşılığı: aynı yuvada, aynı desende (bkz. applyChatModels).
 // Burada yaşamak ZORUNDA çünkü `goBlockReason` bu dosyanın üst düzeyinde
@@ -414,13 +475,25 @@ function syncRunCost() {
     el.hidden = false;
     return;
   }
-  if (!currentModel) { el.hidden = true; return; }
-  const tarife = currentModel.credits_by_quality || {};
-  const birim = tarife[$("quality").value] ?? currentModel.credits;
+  const model = aktifModel();
+  if (!model) { el.hidden = true; return; }
+  const tarife = model.credits_by_quality || {};
+  const birim = tarife[$("quality").value] ?? model.credits;
   if (birim === undefined || birim === null) { el.hidden = true; return; }
+  // SÜRE ÇARPANI: video modellerinde `credits` SANİYE BAŞINA (bkz.
+  // catalog.ImageModel.credits) ve çarpan `catalog.cost_for`un yaptığının
+  // birebir aynısı — iki taraf aynı çarpımı yapmak zorunda, yoksa kullanıcı
+  // ekranda bir sayı görüp kaydında başkasını bulurdu.
+  //
+  // Birim SORULMUYOR, `durations`ın BOŞLUĞUNDAN okunuyor: sunucu ikinci bir
+  // "bu tarife saniyelik mi" alanı göndermiyor ve göndermemeli — aynı bilginin
+  // iki kopyası olurdu (bkz. app._model_payload'ın `credits` yorumu).
+  const sure = model.durations && model.durations.length
+    ? Number($("duration").value || 0) || 1
+    : 1;
   // `≈` bilerek: bu bir fatura değil, metadata — tilde bunu bir paragraf
   // açıklama yazmadan söylüyor.
-  el.textContent = `≈ ${birim * Number($("n").value || 1)} kredi`;
+  el.textContent = `≈ ${birim * sure * Number($("n").value || 1)} kredi`;
   el.hidden = false;
 }
 
@@ -451,6 +524,27 @@ function goBlockReason() {
     }
     if (!currentChatModel.configured) {
       return `${currentChatModel.label} için kimlik yok — Ayarlar'dan ekle.`;
+    }
+    return "";
+  }
+  if (currentMode === "video") {
+    // Görsel dalının AYNI üç kademesi, ayrı liste üzerinde. Arena dalı YOK:
+    // arena video modunda hiç açılmıyor (CSS `#arena-pick`i gizliyor) ve
+    // burada ikinci bir kapı yazmak, olmayan bir durumu kollamak olurdu.
+    if (!videoModels.length) return "Video modeli listesi alınamadı.";
+    if (!currentVideoModel) return "Kayıtlı API anahtarı yok — Ayarlar'dan ekle.";
+    if (!currentVideoModel.configured) {
+      return `${currentVideoModel.label} için anahtar yok — Ayarlar'dan ekle.`;
+    }
+    if (source && !currentVideoModel.supports_edit) {
+      return `${currentVideoModel.label} referans görselle çalışmıyor.`;
+    }
+    // EK REFERANS video tarafında kabul edilmiyor: Veo'nun girdisi tek bir
+    // İLK KARE (`max_refs=1`) ve sunucu da 422 döndürüyor. Kapı burada da
+    // duruyor çünkü sessizce ilerlemek, dakikalarca bekleyip bir 422 görmek
+    // olurdu — hem de referansları eklemenin bir işe yaradığını sanarak.
+    if (extras.length) {
+      return `${currentVideoModel.label} tek referans görsel alıyor (ilk kare).`;
     }
     return "";
   }
@@ -504,6 +598,7 @@ const GO_KISAYOL = "⌘/Ctrl + Enter";
 // duruyor ki "iki dosyada iki ad" kayması doğmasın.
 const MOD_KISAYOL = "⌘/Ctrl + J";
 $("tab-image").title = `Görsel modu · ${MOD_KISAYOL}`;
+$("tab-video").title = `Video modu · ${MOD_KISAYOL}`;
 $("tab-chat").title = `Yönetmen modu · ${MOD_KISAYOL}`;
 
 function syncGoGate() {
@@ -553,6 +648,133 @@ function adetSecenekleri(model) {
                     (_, i) => ({ value: String(i + 1), label: String(i + 1) }));
 }
 
+/** `#duration` ekseninin seçenekleri. Süre taşımayan modelde boş dizi.
+ *
+ * DEĞER DİZEYE ÇEVRİLİYOR ve bu bir süsleme değil, ölçülmüş bir tuzağın
+ * kapısı: sunucu süreyi SAYI olarak gönderiyor (`durations[].value` = 4) ama
+ * bir `<option>`un `value`su her zaman DİZE. `fillAxis` eski seçimi
+ * `o.value === onceki` ile karşılaştırıyor, yani sayı ile dize hiç
+ * eşleşmez — çevrilmezse eksen her doldurmada "varsayılana düşüldü" der ve
+ * kullanıcının seçtiği süre sessizce geri alınırdı.
+ */
+function sureSecenekleri(model) {
+  return (model.durations || []).map((d) => ({ value: String(d.value),
+                                               label: d.label }));
+}
+
+/** `#specs-sheet`in eksenlerini VERİLEN modele göre doldurur.
+ *
+ * ÇIKARILDI, kopyalanmadı: iki eksen (görsel · video) aynı dört `<select>`i
+ * paylaşıyor — `#size`, `#quality`, `#duration`, `#n` — çünkü composer'ın
+ * 360px'lik bütçesi ikinci bir ayar paneli taşımıyor ve ikisi zaten aynı
+ * soruyu soruyor. İki kopya yazmak, birine eksen ekleyip ötekini unutmanın
+ * kapısı olurdu (`app._model_payload`ın çıkarılma gerekçesinin aynısı).
+ *
+ * PAYLAŞILAN <select>ler tek bir kural getiriyor: doldurmanın SAHİBİ o anda
+ * AKTİF olan eksen. `applyModel`/`applyVideoModel` bu yüzden yalnız kendi
+ * modu etkinken buraya geliyor, ve mod değişimi `aktifModeliUygula` ile
+ * yeniden dolduruyor. Aksi hâlde açılışta iki eksen aynı `<select>`e sırayla
+ * yazar ve son yazan kazanırdı — yani şerit bir modun jetonlarını öteki modda
+ * gösterirdi.
+ */
+function eksenleriDoldur(model, { announce = true } = {}) {
+  const dusenler = [];
+  const s = fillAxis("size", model.sizes, undefined, model.default_size);
+  if (s) dusenler.push(`${axisLabel("size")} ${s}`);
+  const q = fillAxis("quality", model.qualities, undefined, model.default_quality);
+  if (q) dusenler.push(`${axisLabel("quality")} ${q}`);
+  // SÜRE, `#n`den ÖNCE dolduruluyor: `syncSpecs` çipin metnini soldan sağa
+  // kuruyor ve okunma sırası "oran · çözünürlük · süre · adet".
+  const sureli = !!(model.durations && model.durations.length);
+  if (sureli) {
+    const d = fillAxis("duration", sureSecenekleri(model), undefined,
+                       String(model.default_duration));
+    if (d) dusenler.push(`${axisLabel("duration")} ${d}`);
+  }
+  const nn = fillAxis("n", adetSecenekleri(model), undefined, "1");
+  if (nn) dusenler.push(`${axisLabel("n")} ${nn}`);
+
+  // `quality_hidden` beyan eden model: satır tümden gizleniyor. Tel üzerinde
+  // yine geçerli bir jeton gidiyor — katalogdaki sentetik "standard".
+  // Örnek olarak burada "Gemini" yazıyordu ve YANLIŞTI: Nano Banana'nın
+  // çözünürlük ekseni var (1K/2K/4K) ve fiyatı da onunla değişiyor, yani
+  // gizlenmesi gereken bir eksen değil — `image_size` jetonları `qualities`
+  // olarak geliyor ve satır GÖRÜNÜYOR.
+  $("spec-quality").hidden = !!model.quality_hidden;
+  // SÜRE satırının kapısı bir BAYRAK değil, listenin BOŞLUĞU: `qualities` hiç
+  // boş olamıyor (kalite ekseni olmayan model sentetik bir jeton beyan
+  // ediyor) ve o yüzden orada bir bayrak gerekiyordu; `durations` gerçekten
+  // boş olabiliyor, yani ikinci bir bayrak aynı bilginin ayrışabilen kopyası
+  // olurdu.
+  $("spec-duration").hidden = !sureli;
+  // ADET satırı tek seçenekli modelde gizli. Türetilmiş, moda bağlı DEĞİL:
+  // "seçenek yok" ile "seçenek gizli" aynı şey ve tek öğeli bir açılır liste
+  // kullanıcıya bozuk bir kontrol gibi görünüyor. Bugün yalnız video
+  // modellerini etkiliyor (`max_n=1`), ama kural modelin BEYANINDAN okunuyor.
+  $("spec-n").hidden = model.max_n <= 1;
+  // Eksenin ADI modele göre değişiyor: piksel boyutu seçen model "Boyut",
+  // oran seçen model "Oran" diyor. chat.js'in atlanan-öneri metni buradan okuyor.
+  $("label-size").textContent =
+    model.sizes.some((o) => o.value.includes("x")) ? "Boyut" : "Oran";
+
+  syncSpecs();
+  syncRunCost();
+  if (announce && dusenler.length) {
+    statusEl.textContent = `${model.label} bu ayarları desteklemiyor, `
+      + `varsayılana düşüldü: ${dusenler.join(", ")}.`;
+  }
+}
+
+/** Aktif modun modelini eksenlere yeniden UYGULAR (mod değişiminde).
+ *
+ * `setMode`in çağırdığı tek satır. Ayrı bir işlev, çünkü `setMode` bu
+ * dosyanın ÜST DÜZEYİNDE de çağrılabiliyor ve o an `currentVideoModel` gibi
+ * `let`ler henüz tanımlı olmayabilir — `setMode`in `syncGoGate` için
+ * kullandığı `typeof` guard'ının aynı gerekçesi.
+ */
+function aktifModeliUygula() {
+  const model = aktifModel();
+  // Yönetmen modunda eksen yok (üretim yok) ve modeli olmayan bir modda
+  // `<select>`lere dokunmak, geri dönen kullanıcının seçimini silmek olurdu.
+  if (!model) {
+    // ÜRETİM modunda model YOKSA not yine yazılmak zorunda ve O EKSENİ
+    // anlatmak zorunda. Erken dönmek iki kusur üretiyordu: (1) görsel
+    // modunun "… için API anahtarı kayıtlı değil" uyarısı video modunda
+    // ekranda kalıyordu — `modelNotuYaz`ın önlemek için var olduğu "yanlış
+    // kutuyu işaret eden not"un ta kendisi; (2) video ekseninin kendi boş
+    // hâli HİÇ görünmüyordu, çünkü `modelBosHali`nin mod kapısı yalnız
+    // açılışta (mod "image" iken) sınanıyordu.
+    if (currentMode === "image" || currentMode === "video") {
+      modelBosHali(currentMode);
+    }
+    return;
+  }
+  eksenleriDoldur(model, { announce: false });
+  // Not da aktif eksenin modelini anlatmak zorunda: video modunda "Azure için
+  // anahtar yok" yazan bir uyarı yanlış kutuyu işaret ederdi.
+  modelNotuYaz(model);
+  syncGoGate();
+}
+
+/** `#model-note`un TEK yazarı: seçili modelin anahtarı yoksa açar.
+ *
+ * Bir zamanlar bu üç satır `applyModel`in içindeydi ve tek eksen varken
+ * doğruydu. İki üretim ekseni olunca not da PAYLAŞILAN bir düğüm oldu
+ * (`#model-note` composer'ın model şeridinde, mod eksenine tabi değil) —
+ * ve paylaşılan bir düğümün iki yazarı, hangisinin son sözü söylediğini
+ * çağrı sırasına bırakmak demek. Şeridin çipiyle aynı ders (`syncModelChip`).
+ */
+function modelNotuYaz(model) {
+  const not = $("model-note");
+  if (!model || model.configured) {
+    not.hidden = true;
+    return;
+  }
+  $("model-note-text").textContent =
+    `${model.label} için API anahtarı kayıtlı değil.`;
+  not.hidden = false;
+}
+
 /** Seçili modeli uygular: eksenleri doldurur, notu yazar, tercihi kaydeder. */
 function applyModel(id, { announce = true } = {}) {
   const model = imageModels.find((m) => m.id === id);
@@ -577,25 +799,15 @@ function applyModel(id, { announce = true } = {}) {
   // Çipin işareti + metni + panelin radyosu tek yerden (aşağısı).
   syncModelChip("image", model);
 
-  const dusenler = [];
-  const s = fillAxis("size", model.sizes, undefined, model.default_size);
-  if (s) dusenler.push(`${axisLabel("size")} ${s}`);
-  const q = fillAxis("quality", model.qualities, undefined, model.default_quality);
-  if (q) dusenler.push(`${axisLabel("quality")} ${q}`);
-  const nn = fillAxis("n", adetSecenekleri(model), undefined, "1");
-  if (nn) dusenler.push(`${axisLabel("n")} ${nn}`);
+  // EKSENLERE yalnız GÖRSEL ekseni aktifken yazılıyor (bkz.
+  // `eksenleriDoldur`un "paylaşılan <select>" notu). Video modunda bu çağrı
+  // kullanıcının süresini ve oranını silerdi — üstelik sessizce, çünkü
+  // `applyModel` Ayarlar her kaydedildiğinde yeniden koşuyor.
+  if (currentMode !== "video") eksenleriDoldur(model, { announce });
 
-  // `quality_hidden` beyan eden model: satır tümden gizleniyor. Tel üzerinde
-  // yine geçerli bir jeton gidiyor — katalogdaki sentetik "standard".
-  // Örnek olarak burada "Gemini" yazıyordu ve YANLIŞTI: Nano Banana'nın
-  // çözünürlük ekseni var (1K/2K/4K) ve fiyatı da onunla değişiyor, yani
-  // gizlenmesi gereken bir eksen değil — `image_size` jetonları `qualities`
-  // olarak geliyor ve satır GÖRÜNÜYOR.
-  $("spec-quality").hidden = !!model.quality_hidden;
-  // Eksenin ADI modele göre değişiyor: piksel boyutu seçen model "Boyut",
-  // oran seçen model "Oran" diyor. chat.js'in atlanan-öneri metni buradan okuyor.
-  $("label-size").textContent =
-    model.sizes.some((o) => o.value.includes("x")) ? "Boyut" : "Oran";
+  // Not da aktif eksenin işi; video modunda görsel modelinin uyarısını
+  // yazmak yanlış kutuyu işaret etmek olurdu.
+  if (currentMode !== "video") modelNotuYaz(model);
 
   // Şerit YALNIZCA EYLEM GEREKTİĞİNDE açılıyor: anahtar eksikse.
   //
@@ -605,22 +817,46 @@ function applyModel(id, { announce = true } = {}) {
   // yani kullanıcının hiçbir şey yapmasını gerektirmeyen durumda. Bilgi
   // seçicinin `title`ında yaşıyor (aşağıda, renderModelOptions); eylem
   // gerektiren tek durum burada.
-  const not = $("model-note");
-  if (model.configured) {
-    not.hidden = true;
-  } else {
-    $("model-note-text").textContent =
-      `${model.label} için API anahtarı kayıtlı değil.`;
-    not.hidden = false;
-  }
-
-  syncSpecs();
-  syncRunCost();
   syncGoGate();
-  if (announce && dusenler.length) {
-    statusEl.textContent = `${model.label} bu ayarları desteklemiyor, `
-      + `varsayılana düşüldü: ${dusenler.join(", ")}.`;
+}
+
+
+/** Seçili VİDEO modelini uygular. `applyModel`in ikizi.
+ *
+ * AYRI bir işlev, `applyModel`e bir tür parametresi eklemek DEĞİL: o işlev
+ * `imageModels`, `renderModelOptions`, `#model` ve `seciliModelTercihi`nin
+ * dördüne birden bağlı ve dördü de video tarafında BAŞKA bir düğüm. Bir
+ * parametre, o dördünü de koşullu okumak olurdu — yani dört sessiz karışma
+ * noktası. `applyChatModel`in `applyModel`den ayrı durmasının aynı gerekçesi.
+ *
+ * Dönüş değeri `applyChatModel`in deseni: uygulanan model ya da null. Tercih
+ * yazan dinleyici bunu okuyor — uygulanmadıysa yazılacak bir tercih de yok.
+ */
+function applyVideoModel(id, { announce = true } = {}) {
+  const model = videoModels.find((m) => m.id === id);
+  if (!model) {
+    // `applyModel`in boş hâlinin ikizi; gerekçesi orada.
+    if (!id) { currentVideoModel = null; modelBosHali("video"); }
+    return null;
   }
+  currentVideoModel = model;
+  // `applyModel`in aynı gerekçesi: seçili id şeritte yoksa şerit boş görünür.
+  if (![...$("video-model").options].some((o) => o.value === id)) {
+    renderVideoModelOptions(id);
+  }
+  $("video-model").value = model.id;
+  syncModelChip("video", model);
+  // Eksenlerin sahibi AKTİF mod (bkz. `eksenleriDoldur`): açılışta bu işlev
+  // Görsel modunda koşuyor ve o an `#specs-sheet` görselin jetonlarını
+  // taşıyor — video modeli oraya yazsaydı şerit "1:1 · ORTA · x1" yerine
+  // "16:9 · 720P · 4 SN" gösterirdi, hem de kullanıcı video modunu hiç
+  // görmemişken.
+  if (currentMode === "video") {
+    eksenleriDoldur(model, { announce });
+    modelNotuYaz(model);
+  }
+  syncGoGate();
+  return model;
 }
 
 /** Seçiciye GİRECEK modeller: KULLANILABİLİR olanlar (+ zorunlu tutulan id).
@@ -704,10 +940,16 @@ function secilecek(liste, tercih, varsayilan) {
  * (biri "kredi" yazarken öteki "kr." yazan gün kimse fark etmez).
  */
 function modelKrediAraligi(m) {
+  // BİRİM süre eksenine bağlı: video modellerinde `credits` SANİYE BAŞINA
+  // (bkz. catalog.ImageModel.credits) ve "16 kredi" yazan bir şerit,
+  // 8 saniyelik bir klibin 128 kredi olduğunu SAKLARDI — yani karşılaştırma
+  // için var olan etiket yanlış bir karşılaştırma sunardı. Ölçüt `durations`ın
+  // boşluğu, ikinci bir birim alanı DEĞİL (aynı bilginin iki kopyası olurdu).
+  const birim = m.durations && m.durations.length ? "kredi/sn" : "kredi";
   const tarife = Object.values(m.credits_by_quality || {});
   return tarife.length
-    ? `${Math.min(...tarife)}–${Math.max(...tarife)} kredi`
-    : `${m.credits} kredi`;
+    ? `${Math.min(...tarife)}–${Math.max(...tarife)} ${birim}`
+    : `${m.credits} ${birim}`;
 }
 
 /** Çipin ve <option>un PAYLAŞTIĞI metin.
@@ -749,6 +991,17 @@ function renderModelOptions(zorunluId) {
   }));
 }
 
+function renderVideoModelOptions(zorunluId) {
+  const el = $("video-model");
+  el.replaceChildren(...secilebilirler(videoModels, zorunluId).map((m) => {
+    const o = document.createElement("option");
+    o.value = m.id;
+    o.textContent = modelSecenekMetni(m, true);
+    if (m.note) o.title = m.note;
+    return o;
+  }));
+}
+
 /** Katalog + hangi modellerin kullanılabilir olduğunu sunucudan çeker.
  *
  * `/api/settings` ile AYNI yanıttan okunuyor, ayrı bir uçtan değil: ikisi ayrı
@@ -774,6 +1027,29 @@ function applyModels(s, tercih) {
   // seçimden de düşer, ama çip "2 model" demeye devam ederdi — tek yazardan
   // geçmeyen tek yol tam olarak burasıydı.
   arenaUygula();
+}
+
+/** `applyModels`in video ikizi. AYNI yanıttan okunuyor (`/api/settings`).
+ *
+ * Ayrı bir uçtan çekilmiyor ve gerekçesi `applyModels`inkinin aynısı: iki
+ * liste ayrı zamanlarda gelirse şerit bir an "hepsi kullanılabilir" gösterip
+ * sonra fikir değiştirirdi. Bir de ikinci bir gerekçe var — anahtar
+ * PAYLAŞILIYOR (Veo, görsel Gemini'nin `GEMINI_API_KEY`ini kullanıyor), yani
+ * iki şeridin `configured` durumu aynı olguya bakıyor ve onların iki farklı
+ * anda güncellenmesi kullanıcıya çelişen iki ekran gösterirdi.
+ *
+ * BAYAT SUNUCU DALı: `video_models` alanı olmayan bir yanıt (v0.13 öncesi
+ * sunucu) sessizce geçiliyor ve şerit "Modeller yükleniyor…"da kalıyor, ama
+ * `goBlockReason` "Video modeli listesi alınamadı." diyerek kapıyı GEREKÇESİYLE
+ * kapatıyor — yani bilgi kayboluyor değil, doğru yerde duruyor.
+ */
+function applyVideoModels(s, tercih) {
+  if (!s || !Array.isArray(s.video_models)) return;
+  videoModels = s.video_models;
+  // SIRA: önce seçilecek id, SONRA çizim (`applyModels`in aynı gerekçesi).
+  const id = secilecek(videoModels, tercih, s.default_video_model);
+  renderVideoModelOptions(id);
+  applyVideoModel(id, { announce: false });
 }
 
 // ── Arena: aynı prompt, birden çok model ─────────────────────────────
@@ -1105,6 +1381,18 @@ const MODEL_EKSENLERI = {
     bosMetin: MODEL_BOS_PANEL.kimlik,
     liste: () => chatModels,
   },
+  // Video ekseni: görselin BİREBİR aynı mekaniği (radyo kartları, aynı panel,
+  // aynı `secilebilirler` filtresi) yalnız başka bir liste üzerinde. Eksik
+  // olan şey de aynı — API anahtarı — o yüzden boş panel metni de görselin
+  // metni. `kredi: true` çünkü tarife var; birimi (`kredi/sn`)
+  // `modelKrediAraligi` söylüyor.
+  video: {
+    secici: "video-model", dugme: "video-model-btn",
+    etiket: "video-model-btn-label", logo: "video-model-logo",
+    baslik: "Video modeli", kredi: true,
+    bosMetin: MODEL_BOS_PANEL.anahtar,
+    liste: () => videoModels,
+  },
   // ÜÇÜNCÜ EKSEN, ikinci bir panel DEĞİL: arena aynı listeyi, aynı filtreyi
   // (`secilebilirler`) ve aynı kapanma mekaniğini kullanıyor. Tek farkı
   // `coklu` — kartlar radyo yerine checkbox çiziyor.
@@ -1184,10 +1472,16 @@ const MODEL_BOS_METNI = "Model yok — Ayarlar";
 function modelBosHali(eksenAdi) {
   // Çizim TEK yazardan (yukarısı); burası yalnız "model yok"u ona söylüyor.
   syncModelChip(eksenAdi, null);
-  // Not YALNIZ görsel ekseninde: Yönetmen'in karşılığı #chat-gate ve onun
-  // yazarı settings.js (`chat_configured`). İki yazar tek düğüme yazsaydı
-  // hangisinin son sözü söylediği çağrı sırasına kalırdı.
-  if (eksenAdi === "image") {
+  // Not İKİ ÜRETİM EKSENİNDE de yazılıyor, Yönetmen'de YAZILMIYOR: onun
+  // karşılığı #chat-gate ve onun yazarı settings.js (`chat_configured`) —
+  // iki yazar tek düğüme yazsaydı hangisinin son sözü söylediği çağrı
+  // sırasına kalırdı.
+  //
+  // AKTİF MOD KAPISI: video ekseni açılışta da boş olabiliyor (anahtar yok)
+  // ve o an mod "image" — notu o anda yazmak, görsel modeli çalışırken
+  // "Kayıtlı API anahtarı yok" diyen bir uyarı göstermek olurdu.
+  if ((eksenAdi === "image" || eksenAdi === "video")
+      && currentMode === eksenAdi) {
     $("model-note-text").textContent = "Kayıtlı API anahtarı yok.";
     $("model-note").hidden = false;
   }
@@ -1364,6 +1658,7 @@ $("model-sheet-list").addEventListener("change", (e) => {
 });
 
 $("model-btn").addEventListener("click", () => openModelSheet("image"));
+$("video-model-btn").addEventListener("click", () => openModelSheet("video"));
 $("chat-model-btn").addEventListener("click", () => openModelSheet("chat"));
 $("arena-btn").addEventListener("click", () => openModelSheet("arena"));
 $("model-sheet-close").addEventListener("click", closeSheets);
@@ -1390,6 +1685,21 @@ $("model").addEventListener("change", () => {
   seciliModelTercihi = $("model").value;
 });
 
+$("video-model").addEventListener("change", () => {
+  // Dönüş değeri KÜRESEL DEĞİŞKEN YERİNE kullanılıyor (`applyChatModel`in
+  // deseni): uygulanmadıysa yazılacak bir tercih de yok.
+  const model = applyVideoModel($("video-model").value);
+  if (!model) return;
+  savePref({ video_model: model.id });
+  // Bellekteki tercih de tazeleniyor: `applyVideoModels` her Ayarlar
+  // kaydedişinde yeniden koşuyor ve o değişkeni okuyor — yazılmazsa
+  // kullanıcının bu turda seçtiği model AÇILIŞTAKİ değere geri sıçrardı
+  // (görsel tarafında gerçek chromium koşumunda ölçülmüş kırılmanın aynısı).
+  // settings.js'in adına OLAY ANINDA dokunuluyor: yükleme sırası kuralının
+  // izin verdiği tek yol.
+  seciliVideoModeliTercihi = model.id;
+});
+
 $("chat-model").addEventListener("change", () => {
   // Dönüş değeri KÜRESEL DEĞİŞKEN YERİNE kullanılıyor: `applyChatModel`
   // uygulamadıysa yazılacak bir tercih de yok (bkz. o fonksiyonun notu).
@@ -1412,7 +1722,12 @@ $("model-settings-link").addEventListener("click", () => {
   // düğmesi kullanıcıyı doğru kutuya götürmezse uyarı yarım kalır.
   // settings.js'in adına OLAY ANINDA dokunuluyor — yükleme sırası kuralının
   // izin verdiği tek yol (settings.js core.js'ten SONRA yükleniyor).
-  openSettings(currentModel ? currentModel.provider : undefined);
+  // AKTİF eksenin modeli: video modunda "Ayarlar'ı aç" düğmesi de video
+  // modelinin sağlayıcı grubunu açmak zorunda. Bugün ikisi de `gemini`
+  // olabiliyor ama bu bir tesadüf — fal/Replicate adaptörü geldiği gün
+  // `currentModel`i okumak kullanıcıyı yanlış kutuya götürürdü.
+  const model = aktifModel() || currentModel;
+  openSettings(model ? model.provider : undefined);
 });
 
 // ── Üretim ayarları çipi ──
@@ -1425,10 +1740,17 @@ function syncSpecs() {
   if (!$("spec-quality").hidden && $("quality").selectedOptions[0]) {
     parts.push($("quality").selectedOptions[0].textContent.trim().toUpperCase());
   }
-  parts.push(`x${$("n").value}`);
+  // SÜRE ve ADET aynı kuralı paylaşıyor: satır gizliyse çipte de yok. Kapı
+  // `hidden` özniteliğinden okunuyor, modeldan İKİNCİ KEZ değil —
+  // `eksenleriDoldur` o özniteliğin tek yazarı ve çipin ondan ayrışması
+  // "kalite kayboldu" tuzağının süre/adet karşılığı olurdu.
+  if (!$("spec-duration").hidden && $("duration").selectedOptions[0]) {
+    parts.push($("duration").selectedOptions[0].textContent.trim().toUpperCase());
+  }
+  if (!$("spec-n").hidden) parts.push(`x${$("n").value}`);
   $("specs-label").textContent = parts.join(" · ");
 }
-for (const id of ["size", "quality", "n"]) {
+for (const id of ["size", "quality", "duration", "n"]) {
   $(id).addEventListener("change", () => { syncSpecs(); syncRunCost(); });
 }
 syncSpecs();
@@ -1514,7 +1836,7 @@ $("prompt").addEventListener("blur", syncComposerSatirlari);
  */
 function submitComposer() {
   const promptVal = $("prompt").value.trim();
-  if (currentMode === "image") {
+  if (currentMode === "image" || currentMode === "video") {
     if (promptVal.length > MAX_PROMPT_CHARS) {
       statusEl.textContent = `İstem çok uzun (${promptVal.length}/${MAX_PROMPT_CHARS} karakter).`;
       return;
@@ -1569,7 +1891,12 @@ document.addEventListener("keydown", (e) => {
   if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "j") return;
   if (currentSection !== "studio") return;
   e.preventDefault();
-  setMode(currentMode === "image" ? "director" : "image");
+  // ÜÇ MOD arasında DÖNGÜ: görsel → video → yönetmen → görsel. İki modda bu
+  // bir "geçiş" idi; üçte bir sıra gerekiyor ve sıra `MOD_SEKMELERI`nin
+  // anahtar sırası — yani sekmelerin ekrandaki sırası. İkinci bir liste
+  // yazmak, kısayolun sekmelerden farklı bir sırada dolaşması demekti.
+  const sira = Object.keys(MOD_SEKMELERI);
+  setMode(sira[(sira.indexOf(currentMode) + 1) % sira.length]);
 });
 
 // Ana referans görsel: null | { kind: "upload", file, label } | { kind: "gallery", id, label }
@@ -1621,15 +1948,24 @@ const SUPPORTS_SAVE_PICKER = typeof window.showSaveFilePicker === "function";
 // uygulanması zararsız. Çevrilemeyen adres (blob:, data:, /assets/…) olduğu gibi
 // dönüyor — bu işlev bir yönlendirme tablosu, bir doğrulayıcı değil.
 const OUTPUT_ONEKI = "/output/";
+// ÇEVRİLEBİLİR UZANTILAR — sunucudaki `storage.MEDIA_TYPES`in aynası ve küme
+// KAPALI (`viewer.js`in id soyma regex'iyle aynı disiplin). v0.13'e kadar
+// burada tek bir `.png` literali vardı ve o doğruydu; MP4 gelince o literal
+// videoyu SESSİZCE çizim adresinde bırakıyordu — yani `Content-Disposition`
+// taşımayan adreste. Sonuç `output_download`un v0.13'te öğrendiği her şeyin
+// (diskteki gerçek ad, gerçek MIME) video için hiç kullanılmaması ve Android
+// WebView'de indirmenin bu işlevin var olma sebebine geri düşmesiydi.
+const INDIRME_UZANTILARI = [".png", ".mp4"];
 
 function indirmeAdresi(url) {
   if (typeof url !== "string" || !url.startsWith(OUTPUT_ONEKI)) return url;
   const ad = url.slice(OUTPUT_ONEKI.length);
-  if (!ad.endsWith(".png")) return url;
+  const uzanti = INDIRME_UZANTILARI.find((u) => ad.toLowerCase().endsWith(u));
+  if (!uzanti) return url;
   // Ad zaten kodlanmış olarak geliyor (chat.js:920 `encodeURIComponent`,
   // folders.js kayıt adını olduğu gibi yazıyor); yeniden kodlamak `%` işaretini
   // ikinci kez kaçırıp adresi bozardı.
-  return `/api/output/${ad.slice(0, -".png".length)}/download`;
+  return `/api/output/${ad.slice(0, -uzanti.length)}/download`;
 }
 
 // Android APK'nın enjekte ettiği indirme köprüsü (MainActivity `IndirmeKoprusu`).
@@ -1675,7 +2011,25 @@ function downloadViaAnchor(url, filename) {
   a.remove();
 }
 
-// Kayıt panelini açar, seçilen dosyaya görselin baytlarını yazar.
+/** Kayıt panelinin tür süzgeci — ADI VERİLEN dosyaya göre.
+ *
+ * ÇAKILI "PNG görsel" DEĞİL: `showSaveFilePicker`in süzgeci `suggestedName`in
+ * uzantısıyla çelişirse tarayıcı adı süzgece UYDURUYOR (Chromium ölçüldü),
+ * yani bir MP4 kullanıcının diskine `.png` adıyla iniyordu — tam olarak
+ * `app.output_download`un "bir videoyu `.png` adıyla teslim etmek" diye
+ * kaydettiği kusurun istemci tarafındaki ikizi. Süzgecin adı da yanlış
+ * kutuyu gösteriyordu ("PNG görsel" yazan bir video kaydı).
+ *
+ * Küme `INDIRME_UZANTILARI` ile aynı gerekçeyle KAPALI: bilinmeyen uzantı
+ * PNG'ye düşüyor, yani bugünkü davranış (tek tür) bayt bayt korunuyor.
+ */
+function kayitPaneliTuru(filename) {
+  return String(filename || "").toLowerCase().endsWith(".mp4")
+    ? { description: "MP4 video", accept: { "video/mp4": [".mp4"] } }
+    : { description: "PNG görsel", accept: { "image/png": [".png"] } };
+}
+
+// Kayıt panelini açar, seçilen dosyaya medyanın baytlarını yazar.
 async function downloadImage(url, filename) {
   // Köprü varsa panel HİÇ denenmiyor: Android'de `showSaveFilePicker` zaten yok,
   // ama bir gün gelirse kayıt paneli köprünün sessizce devre dışı kalması demek
@@ -1686,7 +2040,7 @@ async function downloadImage(url, filename) {
   try {
     handle = await window.showSaveFilePicker({
       suggestedName: filename,
-      types: [{ description: "PNG görsel", accept: { "image/png": [".png"] } }],
+      types: [kayitPaneliTuru(filename)],
     });
   } catch (e) {
     // Vazgeçmek hata değil: panel kapatıldıysa hiçbir şey yapma. Panelin
@@ -1726,7 +2080,12 @@ let currentImage = null;
 
 function setCurrentImage(rec) {
   currentImage = rec;
-  $("logo-add-btn").disabled = !rec;
+  // VİDEO KAYDINDA BİNDİRME KAPALI: logo/afiş yolu Pillow ile PNG bindiriyor
+  // (`composite.composite_logo`) ve sunucu kaynağı `_output_png_path`ten
+  // okuyor — bir video id'siyle o kapı 404 veriyor. Yani düğme açık kalsa
+  // kullanıcı üretimini kaybetmezdi ama anlamsız bir hata alırdı; kapalı bir
+  // düğme "bu iş bu medyaya yapılmıyor" demenin daha dürüst yolu.
+  $("logo-add-btn").disabled = !rec || rec.kind === "video";
 }
 
 function showPreview(rec) {
@@ -1750,6 +2109,12 @@ function renderSource() {
     }
     if (currentMode === "image") {
       goBtn.textContent = extras.length ? "Görselleri birleştir" : "Görseli düzenle";
+    } else if (currentMode === "video") {
+      // "Düzenle" DEĞİL "Canlandır": video tarafında referans görsel
+      // değiştirilmiyor, HAREKETLENDİRİLİYOR — düğmenin metni kullanıcının
+      // ne alacağını söylemek zorunda (`#go`nun dört durumlu metninin
+      // kurulmuş kuralı).
+      goBtn.textContent = "Görseli canlandır";
     } else {
       goBtn.textContent = "Gönder";
     }
@@ -1758,12 +2123,22 @@ function renderSource() {
     if (chipImg) { chipImg.hidden = true; chipImg.removeAttribute("src"); }
     if (currentMode === "image") {
       goBtn.textContent = "Üret";
+    } else if (currentMode === "video") {
+      goBtn.textContent = "Video üret";
     } else {
       goBtn.textContent = "Gönder";
     }
   }
-  // Ek görsel yalnızca bir ana görsel varken anlamlı
-  $("extra-row").hidden = !source;
+  // Ek görsel yalnızca bir ana görsel varken anlamlı. Video modunda şerit
+  // EKLEME için kapalı (Veo tek bir ilk kare alıyor, `max_refs=1`) ama
+  // KALDIRILACAK bir şey varsa GÖRÜNÜR kalıyor — ve bu ikinci koşul bir
+  // süsleme değil, kilitlenmenin çıkış kapısı: görsel modunda eklenen ekler
+  // moda geçerken silinmiyor, `goBlockReason` da onlar yüzünden `#go`yu
+  // kilitliyor. Şerit koşulsuz gizlense kullanıcı göremediği bir eki
+  // kaldırmak zorunda kalırdı. Ekleme yolu ayrıca kapalı (`extraBlockReason`,
+  // `#extra-add-btn`), yani şerit yalnız bir SİLME yüzeyi olarak duruyor.
+  $("extra-row").hidden =
+    !source || (currentMode === "video" && extras.length === 0);
   renderExtras();
   // Palet notu referans görsel varken değişir (üretim ≠ düzenleme ifadesi)
   renderPalettePanel();
@@ -1816,7 +2191,10 @@ function renderExtras() {
   $("extra-count").textContent = extras.length
     ? `${extras.length}/${MAX_EDIT_IMAGES - 1}`
     : "";
-  $("extra-add-btn").disabled = extraSlotsLeft() <= 0;
+  // Düğme MOD ekseninde de kapanıyor (gerekçe `extraBlockReason`da): açık bir
+  // "+ Ek", video modunda kullanıcıya ekleyebileceğini söyleyip sonra üretimi
+  // kilitlemek olurdu — `#extra-row`un gizlenme gerekçesinin aynısı.
+  $("extra-add-btn").disabled = currentMode === "video" || extraSlotsLeft() <= 0;
 }
 
 function removeExtra(item) {
@@ -1837,6 +2215,16 @@ function removeExtra(item) {
 //
 // Boş dize = engel yok. Çağıranlar `if (why)` ile okuyor.
 function extraBlockReason(rec) {
+  // VİDEO MODUNDA EK REFERANS YOK: Veo'nun girdisi tek bir İLK KARE
+  // (`max_refs=1`) ve `goBlockReason` o yüzden ekli bir referansta kapıyı
+  // kapatıyor. Kapı BURADA da duruyor çünkü ekleme yolları iki tane
+  // (`#extra-add-btn` ve Medya seçicisinin "Ek olarak ekle"si) ve ikisi de bu
+  // tek gerekçeyi okuyor. Onsuz video modunda eklenen bir ek, `#extra-row`
+  // gizli olduğu için KALDIRILAMIYORDU: kullanıcı kilitli bir `#go` ile
+  // göremediği bir ek arasında sıkışıyordu.
+  if (currentMode === "video") {
+    return "Video tek referans görsel alıyor (ilk kare).";
+  }
   if (!source) return "Önce ana görseli seç.";
   if (extraSlotsLeft() <= 0) return `En fazla ${MAX_EDIT_IMAGES} görsel gönderilebilir.`;
   if (!rec) return "";
@@ -2080,10 +2468,18 @@ async function run() {
   const size = $("size").value;
   const quality = $("quality").value;
   const n = $("n").value;
+  const videoMu = currentMode === "video";
   // TEK yerde okunup İKİ dala aynı değişkenden veriliyor. Paletin dersi
   // (aşağıda, FormData döngüsünün yorumu): alanları elle saymak bir kez
   // `palette_id`'yi düşürmüştü.
-  const model = $("model").value;
+  //
+  // MODEL AKTİF EKSENDEN: iki `<select>` var ve yanlışını okumak, telde
+  // "bilinmeyen video modeli" ya da (daha kötüsü) senkron bir görsel ucuna
+  // gitmiş bir video isteği demekti.
+  const model = videoMu ? $("video-model").value : $("model").value;
+  // Süre yalnız video dalında anlamlı; görselde `#spec-duration` gizli ve
+  // `<select>` boş.
+  const duration = videoMu ? parseInt($("duration").value, 10) : 0;
   const editing = source !== null;
   // Palet İKİ dalın da payload'ına eklenmeli — biri atlanırsa o yolda renk
   // sessizce kaybolur. Palet kapalıyken {} döner, böylece gövde bugünküyle
@@ -2108,7 +2504,39 @@ async function run() {
   const pending = beginResultTurn(prompt);
 
   let request;
-  if (editing) {
+  if (videoMu) {
+    // VİDEO DALI, görselin iki dalının yanında ÜÇÜNCÜ bir dal olarak:
+    // `/api/video` (metinden) ve `/api/video/animate` (bir kareden). İkisi
+    // görselin `/api/generate` + `/api/edit` çiftinin birebir kalıbı, tek
+    // farkı `duration` ve PALETİN OLMAMASI (bkz. models.VideoRequest'in
+    // gerekçesi — palet bir görsel prompt eki).
+    if (editing) {
+      const fd = new FormData();
+      fd.append("prompt", prompt);
+      fd.append("size", size);
+      fd.append("quality", quality);
+      fd.append("duration", String(duration));
+      fd.append("n", n);
+      fd.append("model", model);
+      if (source.kind === "upload") fd.append("file", source.file);
+      else fd.append("source_id", source.id);
+      if (currentFolder) fd.append("folder_id", currentFolder.id);
+      if (sessionId) fd.append("session_id", sessionId);
+      // EK REFERANS GÖNDERİLMİYOR: Veo tek bir ilk kare alıyor
+      // (`max_refs=1`) ve kapı `goBlockReason`da zaten kapalı. Alanları yine
+      // de eklemek, sunucunun 422'siyle karşılaşan sessiz bir yol açardı.
+      request = fetch("/api/video/animate", { method: "POST", body: fd });
+    } else {
+      request = fetch("/api/video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, size, quality, duration,
+                               n: parseInt(n, 10), model,
+                               folder_id: currentFolder ? currentFolder.id : null,
+                               ...(sessionId ? { session_id: sessionId } : {}) }),
+      });
+    }
+  } else if (editing) {
     const fd = new FormData();
     fd.append("prompt", prompt);
     fd.append("size", size);
@@ -2146,7 +2574,15 @@ async function run() {
 
   runBusy = true;
   syncGoGate();
-  statusEl.textContent = !editing ? "Üretiliyor…"
+  // VİDEO metni SÜREYİ SÖYLÜYOR ve bu bir süsleme değil: üretim dakikalarca
+  // sürüyor, senkron istek o süre boyunca açık kalıyor ve ekranda yalnız
+  // shimmer var. "Üretiliyor…" yazan bir satır, kullanıcıya donmuş bir
+  // uygulama gibi görünürdü — depo ilerleme YÜZDESİNİ bilerek kaldırdı
+  // (index.html'in notu: "yüzde zaten uydurmaydı") ve Veo'nun operation'ı da
+  // yüzde vermiyor, ama BEKLENEN SÜRE uydurma değil bir olgu.
+  statusEl.textContent = videoMu
+    ? "Video üretiliyor — bir kaç dakika sürebilir, sekmeyi kapatma…"
+    : !editing ? "Üretiliyor…"
     : extras.length ? "Görseller birleştiriliyor…" : "Düzenleniyor…";
   try {
     const res = await request;
@@ -2154,10 +2590,18 @@ async function run() {
       const err = await res.json().catch(() => ({}));
       throw new Error(detailText(err) || `Hata (${res.status})`);
     }
-    const { images } = await res.json();
+    const govde = await res.json();
+    // ANAHTAR TÜRE GÖRE: sunucu videoyu `{"videos": …}` içinde döndürüyor ve
+    // bu ayrım bilinçli (bkz. app.video'nun notu) — `images` sanmak, bayat bir
+    // istemcinin videoyu `<img>` olarak çizmesine yol açardı. Burada ikisi
+    // aynı değişkende buluşuyor çünkü kayıtların ŞEKLİ aynı; ayrışan tek şey
+    // dökümün `kind`i (aşağısı).
+    const images = videoMu ? govde.videos : govde.images;
     if (images[0]) showPreview(images[0]);
     clearUploadPreviewUrl(); // sonuç sunucu URL'inden gösteriliyor; blob artık gereksiz
-    statusEl.textContent = editing ? "Düzenleme tamam." : `${images.length} görsel üretildi.`;
+    statusEl.textContent = videoMu
+      ? (editing ? "Video hazır." : `${images.length} video üretildi.`)
+      : editing ? "Düzenleme tamam." : `${images.length} görsel üretildi.`;
     // Bayat sunucu tespiti — /api/edit multipart olduğu için orada
     // extra="forbid" karşılığı YOK: Starlette bilinmeyen form alanını sessizce
     // atar ve 200 döner. Tek savunma yanıtın alanı geri YANKILAMASI.
@@ -2173,7 +2617,21 @@ async function run() {
         + `"${images[0].model || "bilinmiyor"}" ile üretti — sunucu eski sürüm `
         + "görünüyor, ./run.sh ile yeniden başlat.");
     }
-    if (pal.palette_hex && images[0] && !images[0].palette) {
+    // PALET UYARILARI YALNIZ GÖRSEL DALINDA: video ucu palet alanı hiç
+    // kabul etmiyor (`VideoRequest` `extra="forbid"`), yani `pal.palette_hex`
+    // dolu olsa bile gönderilmedi — "palet uygulanmadı, sunucu eski"
+    // demek kullanıcıyı olmayan bir sorunu aramaya iterdi.
+    if (videoMu) {
+      // Video kaydının SÜRESİ de yankılanıyor: bayat bir sunucu `duration`ı
+      // yok sayarsa kullanıcı 8 saniye isteyip 4 saniye alır ve FATURA da
+      // ona göre olur (kredi süreyle çarpılıyor). Model yankısının aynı iki
+      // yönlü gerekçesi.
+      if (images[0] && images[0].duration !== duration) {
+        warnings.push(`Süre uygulanmadı: ${duration} sn istendi, sunucu `
+          + `${images[0].duration || "bilinmiyor"} sn ile üretti — sunucu eski `
+          + "sürüm görünüyor, ./run.sh ile yeniden başlat.");
+      }
+    } else if (pal.palette_hex && images[0] && !images[0].palette) {
       warnings.push(
         "Palet uygulanmadı: sunucu eski sürüm görünüyor — ./run.sh ile yeniden başlat.");
     } else if (images[0] && images[0].palette && images[0].palette.applied === false) {
@@ -2193,9 +2651,19 @@ async function run() {
     // (`models.ResultParams`) alanı v0.6'da öğrendi — bu iki taraf AYNI
     // sürümde inmek zorunda, yoksa `extra="forbid"` kaydı 422 yapar ve
     // görsel diske düşerken oturum turu sessizce kaybolur.
+    // `kind` DÖRT DEĞERLİ artık ve dördü de `models.RESULT_KINDS`te yazılı.
+    // Bu alan iki iş yapıyor: kart başlığını çiziyor ve kartın `<img>` mi
+    // `<video>` mü olacağını söylüyor (`models.VIDEO_RESULT_KINDS`,
+    // chat.js `resultThumb`). İkinci bir tür alanı AÇILMADI çünkü
+    // `ResultParams` `extra="forbid"` taşıyor ve yeni bir zorunlu alan bütün
+    // eski oturumları kaydedilemez kılardı.
     await appendResultTurn(pending, images.map((r) => r.id),
-                           { kind: editing ? "edit" : "generate", size, quality,
-                             model });
+                           { kind: videoMu ? (editing ? "animate" : "video")
+                                           : editing ? "edit" : "generate",
+                             size, quality, model,
+                             // Süre yalnız video kaydında anlamlı; görselde 0
+                             // ve `ResultParams`ın varsayılanı da o.
+                             ...(videoMu ? { duration } : {}) });
     await loadHistory();
   } catch (e) {
     // BAŞARISIZ TUR GEÇMİŞTE KALMAZ (sendChat'in kuralı): kalsaydı döküme

@@ -486,6 +486,33 @@ body:has(.sheet.open) .scrim { display: block; }
    görsel moduna dönen kullanıcı arenasını açık buluyor. */
 #composer[data-mode="director"] #arena-pick,
 #composer[data-mode="director"] #run-cost { display: none; }
+/* ÜÇÜNCÜ MOD (v0.13): video. Yukarıdaki iki blok İKİ modlu bir dünyada
+   yazılmıştı ve DOKUNULMADI — üçüncü mod kendi bloğunu getiriyor. Sebep
+   mekanik: `tests/test_index.py` yukarıdaki Yönetmen bloğunu ARDIŞIK bir
+   seçici koşusu olarak ayıklıyor (`#ask-director` o koşunun içinde olmak
+   zorunda) ve blokları yeniden düzenlemek o ayıklamayı sessizce kör ederdi.
+   Genişletmek yerine EKLEMEK, testin ölçtüğü şeyi ölçmeye devam etmesini
+   sağlıyor.
+   #arena-pick video modunda da gizli: arena aynı prompt'u N modelde
+   koşturuyor ve video tarafında bu, tek tıkla N tane dakikalarca süren,
+   saniyesi faturalanan üretim demek — kendi kararını isteyen bir şey.
+   #specs-btn ve #run-cost ise video modunda DURUYOR: süre ve çözünürlük
+   tam olarak orada seçiliyor ve kredi tahmini süreyle çarpılıyor. */
+#composer[data-mode="image"] #video-model-pick,
+#composer[data-mode="director"] #video-model-pick,
+#composer[data-mode="video"] #model-pick,
+#composer[data-mode="video"] #chat-model-pick,
+#composer[data-mode="video"] #director-btn,
+/* "Yönetmen'e sor" VİDEO MODUNDA DA GİZLİ ve bu bir eksik değil ölçülü bir
+   karar: Yönetmen'in tur bağlamı `prefs["image_model"]`den geliyor
+   (`app._director_context`), yani video modunda GÖRSEL modelinin jetonlarını
+   öneriyor — "1024x1024" ya da "Orta kalite" gibi, video ucunda 422 dönen
+   değerler. Persona da gpt-image prompt'u için yazılmış. Devri açık bırakmak,
+   kullanıcıyı uygulanamayan bir öneriye götürmek olurdu; kapı, Yönetmen video
+   bağlamını öğrenene kadar duruyor (görev defteri madde 10d). Yönetmen modu
+   ELLE hâlâ erişilebilir — kapanan tek şey bu kısayol. */
+#composer[data-mode="video"] #ask-director,
+#composer[data-mode="video"] #arena-pick { display: none; }
 /* `#chat-model` ARTIK HTML'de `hidden` DEĞİL (seçeneklerini dolduran kod v0.7'de
    geldi; bu gerekçe onunla birlikte güncellenmemişti). Satır yine de duruyor:
    şerit bir gün mod ekseninin dışında da gizlenebilir ve o gün

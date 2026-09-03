@@ -14,14 +14,14 @@
 
 ## Ölçüler
 
-* 39 Python modülü, 84 modül düzeyi ithal kenarı (9 erteli)
-* 41 HTTP uç noktası
+* 40 Python modülü, 88 modül düzeyi ithal kenarı (10 erteli)
+* 43 HTTP uç noktası
 * 9 tarayıcı betiği, 21 betik-arası bağ
-* 72 test dosyası; 3 modülü hiçbir test ithal etmiyor, 7 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
+* 75 test dosyası; 3 modülü hiçbir test ithal etmiyor, 7 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
 * 1 ithal döngüsü, 0 rotaya oturmayan tarayıcı çağrısı
 
-En büyük dosyalar: `app` (1811), `models` (794), `catalog` (780), `azure_client` (458), `color_names` (418).
-En çok ithal edilenler: `catalog` (10), `azure_client` (9), `jsonstore` (8), `credstore` (6), `paths` (6).
+En büyük dosyalar: `app` (2046), `catalog` (1016), `models` (921), `veo_client` (558), `azure_client` (458).
+En çok ithal edilenler: `catalog` (11), `azure_client` (10), `jsonstore` (8), `credstore` (7), `paths` (6).
 
 ## Nasıl güncellenir
 

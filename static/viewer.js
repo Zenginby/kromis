@@ -7,11 +7,20 @@
 // Durum tek yerde: (scale, tx, ty) → #viewer-img üzerinde tek bir transform.
 // scale=1 "ekrana sığdırılmış" hâldir (CSS max-width/max-height ile), 1'in
 // altına inilmez; büyütme oradan yukarı çarpanla ilerler.
+//
+// İKİ MEDYA TÜRÜ (v0.13): görsel ve video. Video KİPİNDE yakınlaştırma ve
+// kaydırma KAPALI ve bu bir eksik değil bir karar — `<video controls>` kendi
+// denetimlerini taşıyor (oynat, sürgü, ses, tam ekran) ve aynı sahnede
+// pinch/sürükleme onlarla çakışırdı: kullanıcı sürgüyü çekerken kare
+// kayardı. Büyütme yolu kapanmıyor, oynatıcının tam ekran düğmesine
+// devrediliyor. Bütün zoom/pan mekaniği `#viewer-img`e bağlı KALIYOR ve
+// video kipinde tek bir bayrakla (`videoKipi`) devre dışı.
 
 (() => {
   const viewer = $("viewer");
   const stage = $("viewer-stage");
   const vimg = $("viewer-img");
+  const vvid = $("viewer-video");
   const pct = $("viewer-zoom-pct");
   const dlLink = $("viewer-download");
   const logoBtn = $("viewer-logo");
@@ -34,7 +43,8 @@
   let grabY = 0;
   let rafId = 0;
   let openerRect = null;   // açılışta tıklanan küçük resmin ekrandaki yeri
-  let kayit = null;        // ekrandaki görselin SUNUCU kaydı (yoksa null)
+  let kayit = null;        // ekrandaki medyanın SUNUCU kaydı (yoksa null)
+  let videoKipi = false;   // ekranda video var mı (zoom/pan kapalı)
 
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -86,6 +96,11 @@
   // manipülasyon hissinin tamamı buradan geliyor (merkeze göre zoom yapmak
   // kullanıcının baktığı yeri kaçırır).
   function zoomAt(clientX, clientY, factor) {
+    // TEK MUHAFIZ, yolların hepsinin geçtiği yer: `wheel`, `dblclick`, pinch,
+    // −/+ düğmeleri ve klavye kısayolları HEPSİ buraya varıyor. Muhafızı
+    // dinleyicilerin her birine koymak beş kopya olurdu ve birini unutmak,
+    // video oynatılırken sessizce ölçek değiştiren bir sahne demekti.
+    if (videoKipi) return;
     const next = clamp(scale * factor, MIN_SCALE, MAX_SCALE);
     if (next === scale) return;
     const r = stage.getBoundingClientRect();
@@ -105,6 +120,7 @@
   }
 
   function fit() {
+    if (videoKipi) return;
     scale = 1;
     tx = 0;
     ty = 0;
@@ -133,7 +149,12 @@
   // yazmak ikisinin sessizce ayrışması olurdu.
   //
   // `id`nin dosya adından türetilmesi bir DEPO SÖZLEŞMESİ, tahmin değil:
-  // `storage.save` her kaydı `{id}.png` yazıyor (app.py `_output_png_path`) ve
+  // `storage.save` her kaydı `{id}.{uzantı}` yazıyor ve uzantıyı kaydın
+  // `kind`inden türetiyor (`.png` görsel, `.mp4` video) — yani ikisini de
+  // soymak gerekiyor ve KÜME KAPALI: sunucudaki `storage.MEDIA_TYPES`in
+  // aynası. Genel bir `\.[^.]+$` yazmak, prompt'undan gelen noktalı bir ada
+  // sahip bir dosyada id'yi budamak olurdu.
+  //
   // `core.js` `setGallerySourceById` de elinde yalnız id varken aynı türetmeyi
   // yapıyor. Büyüteç kaydın kendisini hiç görmüyor — `openViewer`a yalnız
   // `src` geliyor ve chat.js'in karesinde de elde yalnız id var — bu yüzden
@@ -145,7 +166,7 @@
       if (path.startsWith("/output/")) ad = decodeURIComponent(path.slice("/output/".length));
     } catch { ad = ""; }
     if (!ad) return null;
-    return { id: ad.replace(/\.png$/i, ""), filename: ad };
+    return { id: ad.replace(/\.(png|mp4)$/i, ""), filename: ad };
   }
 
   // İndirme ve bindirme yalnız sunucuda KAYITLI bir görsel için anlamlı:
@@ -154,7 +175,11 @@
   function syncActions(src) {
     kayit = kayitOku(src);
     dlLink.hidden = !kayit;
-    logoBtn.hidden = !kayit;
+    // BİNDİRME VİDEODA KAPALI: `/api/logo` yolu Pillow ile PNG bindiriyor ve
+    // kaynağı `app._output_png_path`ten okuyor — bir video id'sinde o kapı
+    // 404 veriyor. Düğmeyi açık bırakmak, kullanıcıya olmayan bir yol
+    // göstermek olurdu (core.js `setCurrentImage`in aynı kararı).
+    logoBtn.hidden = !kayit || videoKipi;
     if (kayit) {
       // Çizim adresi `src`te kalıyor, bağlantıya İNDİRME adresi yazılıyor
       // (core.js `indirmeAdresi`) — sağ tık → "Bağlantıyı kaydet" de doğru
@@ -196,8 +221,65 @@
     openLogoModal(rec);
   });
 
-  function open(src, alt) {
+  /** Yakınlaştırma kontrollerinin görünürlüğü — video kipinde hepsi gizli.
+   *
+   * GİZLENİYOR, yalnız devre dışı BIRAKILMIYOR: `%100` yazan bir gösterge ve
+   * çalışmayan bir "Sığdır" düğmesi, kilidin neden orada olduğunu saklamak
+   * olurdu — deponun `#go` kapısında ve `#chat-gate`te reddettiği şeyin
+   * aynısı. Burada fark şu: video kipinde o kontrollerin bir GEREKÇESİ yok
+   * (oynatıcı kendi tam ekranını taşıyor), yani söylenecek bir sebep de yok.
+   * "İndir" DURUYOR — o soru türe bağlı değil.
+   */
+  function zoomKontrolleri(goster) {
+    for (const id of ["viewer-zoom-out", "viewer-zoom-pct", "viewer-zoom-in",
+                      "viewer-fit"]) {
+      $(id).hidden = !goster;
+    }
+  }
+
+  function open(src, alt, kind) {
     if (!src) return;
+    videoKipi = kind === "video";
+    // İKİ DÜĞÜM BİRBİRİNİ DIŞLIYOR ve kapatılan düğümün `src`i TEMİZLENİYOR:
+    // bırakılan bir `<video src>` arka planda ses çalmaya devam edebiliyor
+    // (Chromium'da ölçüldü) ve bırakılan bir `<img src>` de gereksiz bir
+    // bellek tutuyor.
+    vimg.hidden = videoKipi;
+    vvid.hidden = !videoKipi;
+    zoomKontrolleri(!videoKipi);
+    if (videoKipi) {
+      vimg.removeAttribute("src");
+      // ÖLÇEK DURUMU SIFIRLANIYOR ve `fit()` ÇAĞRILMIYOR: o işlev video
+      // kipinde erken dönüyor (tek muhafız kuralı), yani önceki GÖRSELDEN
+      // kalan `scale > 1` burada yaşamaya devam ederdi. Ölçülebilir sonucu
+      // klavyede: ok tuşlarının dalı `scale > 1` ile açılıyor ve
+      // `preventDefault` çağırıyor — yani büyütülmüş bir görselden sonra
+      // açılan video, oynatıcının ileri/geri sarma tuşlarını yutuyordu.
+      scale = 1;
+      tx = 0;
+      ty = 0;
+      // `.zoomed` SINIFI da düşüyor: onu yazan tek yer `syncCursor` ve
+      // `fit()` çağrılamadığı için o da koşmuyordu — büyütülmüş bir
+      // görselden sonra açılan videonun üstünde imleç "tut ve kaydır"
+      // gösteriyordu, yani çalışmayan bir jesti davet ediyordu.
+      syncCursor();
+      vvid.src = src;
+      vvid.setAttribute("aria-label", alt || "");
+      // Sahne ETİKETİ de değişiyor: "Görseli büyüt" diyen bir diyalog adı,
+      // ekran okuyucu kullanıcısına yanlış içeriği duyururdu.
+      stage.setAttribute("aria-label", "Videoyu oynat");
+      syncActions(src);
+      viewer.hidden = false;
+      document.body.classList.add("viewer-open");
+      // AÇILIŞ ANİMASYONU YOK: o animasyon `vimg`in transform'unu sürüyor
+      // (bkz. aşağısı) ve video kipinde o düğüm gizli. Videoyu aynı yoldan
+      // büyütmek, oynatıcı denetimlerini de ölçekleyip okunamaz kılardı.
+      stage.focus();
+      return;
+    }
+    vvid.pause();
+    vvid.removeAttribute("src");
+    stage.setAttribute("aria-label", "Görseli büyüt");
     vimg.src = src;
     vimg.alt = alt || "";
     syncActions(src);
@@ -235,6 +317,13 @@
     viewer.hidden = true;
     vimg.style.transition = "";
     vimg.removeAttribute("src");
+    // DURDURMAK YETMİYOR, `src` DE SİLİNİYOR: `hidden` bir `<video>` sesi
+    // çalmaya devam ediyor ve yalnız `pause()` çağırmak, kullanıcı büyüteci
+    // Escape ile kapattıktan sonra videoyu YENİDEN açtığında onu kaldığı
+    // yerden değil baştan başlatmıyordu — iki hâl de şaşırtıcı.
+    vvid.pause();
+    vvid.removeAttribute("src");
+    videoKipi = false;
     openerRect = null;
     kayit = null;
   }
@@ -244,9 +333,15 @@
   // pan sınırı, ctrl+wheel pinch ve ok adımı aynen yukarıda. `rect` verilirse
   // büyüteç tıklanan karenin BULUNDUĞU yerden büyüyor: `openerRect` zaten bu
   // iş için vardı, yalnız erişimi #preview-img'e kapalıydı.
-  window.openViewer = (src, alt, rect) => {
+  // DÖRDÜNCÜ ARGÜMAN `kind`: "video" ise oynatıcı, değilse (ve
+  // verilmediyse) görsel. Varsayılanın GÖRSEL olması geriye uyum — bu işlevi
+  // üç argümanla çağıran her yer (yükleme önizlemesi, arena sütunu, medya
+  // seçici) bugünkü davranışı aynen alıyor. Tür adresten ÇIKARILMIYOR:
+  // uzantı ayrıştırmak, çağıranın zaten bildiği bir şeyi ikinci bir yoldan
+  // türetmek olurdu.
+  window.openViewer = (src, alt, rect, kind) => {
     openerRect = rect || null;
-    open(src, alt);
+    open(src, alt, kind);
   };
 
   // --- olaylar --------------------------------------------------------------

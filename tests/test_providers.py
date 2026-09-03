@@ -277,3 +277,79 @@ def test_is_content_policy_SEMA_hatasini_icerik_reddi_SANMIYOR():
     assert not providers.is_content_policy(
         "messages[0].content is required")
     assert not providers.is_content_policy("")
+
+
+# ── Video sevkiyatı (v0.13) ────────────────────────────────────────────
+
+
+def test_the_video_table_is_SEPARATE_from_the_image_table():
+    """Bir sağlayıcı iki tabloda birden bulunabiliyor — Gemini bugün tam
+    olarak öyle (görselde `gemini_client`, videoda `veo_client`). Tek tabloda
+    bu "sağlayıcı → dörtlü demet" olurdu ve görsel adaptörü olmayan bir video
+    sağlayıcısı iki boş yuva taşırdı."""
+    assert providers.video_adapter_ids() == frozenset({"gemini"})
+    # Görsel tablosu DEĞİŞMEDİ.
+    assert providers.adapter_ids() == frozenset({"azure", "openai", "gemini"})
+
+
+def test_an_IMAGE_model_id_is_refused_by_the_video_dispatcher():
+    """`_resolve_video` `catalog.video_model`a bakıyor, `image_model`a değil.
+    Ayrım sessiz sapmayı kapatan yer: bir görsel modelinin id'siyle gelen
+    video isteği, senkron bir görsel adaptörüne DÜŞMÜYOR."""
+    with pytest.raises(ac.ImageError) as hata:
+        providers.generate_video(catalog.DEFAULT_IMAGE_MODEL, "k", "16:9",
+                                 "720p", 4, 1)
+
+    assert "Bilinmeyen video modeli" in str(hata.value)
+
+
+def test_a_VIDEO_model_id_is_refused_by_the_image_dispatcher():
+    """Ters yön de kapalı: `/api/generate`e video id'si gelmesi 502 + Türkçe
+    mesaj, sessiz bir düşme DEĞİL."""
+    with pytest.raises(ac.ImageError) as hata:
+        providers.generate(catalog.DEFAULT_VIDEO_MODEL, "k", "16:9", "720p", 1)
+
+    assert "Bilinmeyen model" in str(hata.value)
+
+
+def test_an_unknown_video_model_never_falls_back_silently():
+    with pytest.raises(ac.ImageError):
+        providers.generate_video("yok-boyle-bir-model", "k", "16:9", "720p", 4, 1)
+
+
+def test_the_video_adapter_is_bound_with_a_PLAIN_import():
+    """`importlib` PyInstaller'ın statik analizinden kaçar ve
+    `hiddenimports=[]` değerini geçersiz kılar (o dosyanın 50 satırlık yorumu
+    bunu ÖLÇÜLMÜŞ bir değişmez sayıyor). Geç bağlama şart (döngü), ama düz
+    bir `import` ifadesiyle."""
+    import inspect
+
+    kaynak = inspect.getsource(providers._veo_adapter)
+    assert "import veo_client" in kaynak
+    assert "importlib" not in kaynak
+
+
+def test_the_video_adapters_resolve_to_callables():
+    generate, animate = providers._video_pair("gemini")
+
+    assert callable(generate) and callable(animate)
+
+
+def test_the_poll_timeout_becomes_the_whole_BUDGET_for_a_video_model():
+    """`catalog.poll_timeout` alanının yorumu bu günü tarif ediyordu.
+    `read_timeout_for` onu doğrudan döndürüyor ve `total_budget` (n=1) ona
+    eşit oluyor — yani döngünün duvar saati tavanı katalogdan geliyor."""
+    m = catalog.video_model(catalog.DEFAULT_VIDEO_MODEL)
+
+    assert providers.read_timeout_for(m, 1) == m.poll_timeout
+    assert providers.total_budget(m, 1) == m.poll_timeout
+
+
+def test_video_is_configured_reads_the_SHARED_gemini_credential():
+    """Veo görselin `GEMINI_API_KEY`ini paylaşıyor: ikinci bir kimlik açmak,
+    kullanıcıdan aynı anahtarı iki kez istemek olurdu."""
+    m = catalog.video_model(catalog.DEFAULT_VIDEO_MODEL)
+
+    assert m.credential == "gemini"
+    # Katalogda olmayan model için False, istisna DEĞİL.
+    assert providers.video_is_configured("yok-boyle-bir-model") is False

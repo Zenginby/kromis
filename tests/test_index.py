@@ -1786,16 +1786,24 @@ def test_the_transcript_draws_result_records():
 
 
 def test_a_result_image_url_is_built_from_the_id():
-    """Döküm yalnız `image_ids` taşıyor; dosya adı sözleşmesi `{id}.png`.
+    """Döküm yalnız `image_ids` taşıyor; dosya adı sözleşmesi `{id}.{uzantı}`.
 
     Sözleşme storage.py'de yazılı (`delete_many` docstring'i, `save`'in
     `filename` satırı) ve ikinci bir istek gerektirmiyor. `/api/history`
     KULLANILAMAZ: o uç klasöre göre süzülüyor, yani başka bir klasördeki
     sonuç görselini hiç döndürmezdi.
+
+    UZANTI v0.13'te SABİT OLMAKTAN ÇIKTI: depo iki tür taşıyor ve uzantı
+    kaydın `kind`inden türetiliyor. İddianın ÖZÜ değişmedi — adres hâlâ
+    id'den kuruluyor, ikinci bir istek (HEAD, `/api/history`) yok. Değişen
+    tek şey uzantının artık bir DAL olması ve iki dalın da burada sayılması:
+    birini düşürmek, o türü hiç açılmayan bir 404'e çevirirdi.
     """
     js = _chat_js()
-    assert re.search(r"/output/\$\{[^}]*\}\.png", js), (
-        "sonuç görselinin URL'i id'den kurulmuyor")
+    assert re.search(r"/output/\$\{[^}]*\}\.\$\{[^}]*\}", js), (
+        "sonuç medyasının URL'i id'den kurulmuyor")
+    assert re.search(r'videoMu \? "mp4" : "png"', js), (
+        "uzantı türden türetilmiyor — iki dal da yazılı olmalı")
 
 
 def test_a_deleted_result_image_draws_a_placeholder():
@@ -2817,9 +2825,21 @@ def test_the_viewer_overlay_button_needs_a_saved_image():
     assert "dlLink.hidden = !kayit" in body, "indirme muhafızı kayda bağlı değil"
     assert "logoBtn.hidden = !kayit" in body, (
         "bindirme düğmesi kaydedilmemiş görselde de görünüyor")
-    # id dosya adından türetiliyor — depo sözleşmesi (`storage.save` → `{id}.png`).
-    assert re.search(r"replace\(/\\\.png\$/i", viewer), (
-        "kayıt id'si dosya adından türetilmiyor")
+    # İKİNCİ MUHAFIZ (v0.13): bindirme VİDEODA da kapalı. `/api/logo` yolu
+    # Pillow ile PNG bindiriyor ve kaynağı `_output_png_path`ten okuyor — bir
+    # video id'sinde o kapı 404 veriyor, yani açık bir düğme kullanıcıya
+    # olmayan bir yol gösterirdi. İNDİRME muhafızına eklenmedi ve bu ayrım
+    # ölçülü: bir videoyu indirmek tamamen anlamlı.
+    assert "videoKipi" in body, (
+        "bindirme düğmesi video kipinde de görünüyor — /api/logo bir MP4'ü "
+        "kaynak olarak okuyamaz")
+    # id dosya adından türetiliyor — depo sözleşmesi (`storage.save` →
+    # `{id}.{uzantı}`). KÜME KAPALI (sunucudaki `storage.MEDIA_TYPES`in
+    # aynası); genel bir "son noktadan sonrasını at" deseni, prompt'undan
+    # gelen noktalı bir adda id'yi budardı.
+    assert re.search(r"replace\(/\\\.\(png\|mp4\)\$/i", viewer), (
+        "kayıt id'si dosya adından türetilmiyor ya da iki uzantıyı birden "
+        "soymuyor")
 
 
 def test_the_media_toolbar_has_the_import_button_the_hint_promises():
@@ -4085,15 +4105,22 @@ def test_model_secimi_NATIVE_kontrollerle_yapiliyor():
     # 3. madde: değer taşıyıcıları yerinde.
     assert '<select id="model"' in html
     assert '<select id="chat-model"' in html
-    # Görünen yüz: ÜÇ çip düğmesi de AYNI paneli açıyor.
+    assert '<select id="video-model"' in html
+    # Görünen yüz: DÖRT çip düğmesi de AYNI paneli açıyor.
     #
     # Üçüncüsü arena ekseni (`#arena-btn`): aynı liste, aynı filtre, aynı
     # kapanma mekaniği — yalnız kartlar checkbox. İkinci bir model yüzeyi
     # açmak, bu testin koruduğu tekilliği bozardı.
-    for tetik in ("model-btn", "chat-model-btn", "arena-btn"):
+    #
+    # DÖRDÜNCÜSÜ video ekseni (v0.13) ve tam olarak aynı dersi ödüyor: video
+    # şeridi kendi `<select>`ini ve kendi çipini getirdi (tür karışmasın diye,
+    # bkz. index.html'deki gerekçe) ama İKİNCİ BİR PANEL getirmedi. Sayı
+    # burada LİTERAL duruyor ki beşinci bir eksen eklendiğinde bu satır
+    # okunmak zorunda kalsın.
+    for tetik in ("model-btn", "chat-model-btn", "video-model-btn", "arena-btn"):
         assert f'id="{tetik}"' in html, f"#{tetik} yok — seçim açılamaz"
-    assert html.count('aria-controls="model-sheet"') == 3, (
-        "üç çip de #model-sheet'i işaret etmiyor")
+    assert html.count('aria-controls="model-sheet"') == 4, (
+        "dört çip de #model-sheet'i işaret etmiyor")
     # 2. madde: ortak kabuk.
     assert 'id="model-sheet" class="sheet sheet-bottom"' in html, (
         "panel ortak `.sheet` kabuğunu kullanmıyor — perde, Escape ve Android "
@@ -5250,9 +5277,9 @@ def test_TERCIH_okuma_yolu_da_FILTREDEN_geciyor():
     """
     govde = _js("settings.js").split("async function loadModelPref()", 1)[1] \
                               .split("\n}", 1)[0]
-    assert govde.count("secilecek(") == 2, (
-        "tercih uygulaması filtreyi atlıyor (görsel ve sohbet şeridi için "
-        "birer `secilecek` çağrısı bekleniyor)")
+    assert govde.count("secilecek(") == 3, (
+        "tercih uygulaması filtreyi atlıyor (görsel, video ve sohbet şeridi "
+        "için birer `secilecek` çağrısı bekleniyor)")
     assert "applyModel(secilecek(" in govde
     assert "applyChatModel(secilecek(" in govde
 

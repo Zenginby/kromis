@@ -26,6 +26,23 @@ sözleşmeye HİÇ girmiyor.
 (tests/test_azure_client_http.py'deki FakeClient) ve her yeni adaptör aynı
 dikişi bedavaya alıyor, testleri de bugünkülere benziyor.
 
+VİDEO SÖZLEŞMESİ AYRI ve iki eksen bilerek AYRIŞTIRILDI:
+
+    generate_video(model_id, prompt, size, quality, duration, n, …) -> list[bytes]
+    animate_video(model_id, prompt, images, size, quality, duration, n, …) -> list[bytes]
+
+Tek bir `generate`e katlanmadı çünkü katlamanın bedeli GÖRSEL yolunda
+ödenecekti: `duration` görsel adaptörlerin üçünün imzasına da girer, üçü de
+onu yok saymak zorunda kalır ve `azure_client`ın "baytları değişmemiş
+fonksiyon" güvencesi (bkz. `_azure_generate`in yorumu) kırılırdı. Ayrı iki
+masa, görsel yolunu BAYT BAYT dokunulmadan bırakıyor.
+
+`_VIDEO_ADAPTERS` de `_ADAPTERS`ten ayrı bir tablo ve aynı gerekçenin
+devamı: bir sağlayıcı iki tabloda birden bulunabiliyor (Gemini bugün tam
+olarak öyle — görselde `gemini_client`, videoda `veo_client`) ve tek tabloda
+bu "sağlayıcı → dörtlü demet" olurdu, yani görsel adaptörü olmayan bir video
+sağlayıcısı iki boş yuva taşırdı.
+
 Sınıf DEĞİL, fonksiyon modülü: bu depoda hiçbir yerde servis sınıfı yok.
 
 Adaptörler modül düzeyinde STATİK import ediliyor, `importlib` ile DEĞİL.
@@ -100,12 +117,30 @@ def _gemini_adapter():
     return (gemini_client.generate, gemini_client.edit)
 
 
+def _veo_adapter():
+    """`_gemini_adapter`ın aynı gerekçesi: `veo_client` bu modülü import ediyor
+    (`total_budget`, `detail_of` ve iki paylaşılan yüklem için), yani modül
+    düzeyinde import etmek DÖNGÜ olurdu. Düz `import` ifadesi, yalnız
+    fonksiyon içinde — PyInstaller'ın statik analizi onu da görüyor, yani
+    `hiddenimports=[]` korunuyor."""
+    import veo_client
+    return (veo_client.generate, veo_client.animate)
+
+
 _ADAPTERS: dict[str, tuple] = {
     "azure": (_azure_generate, _azure_edit),
     # Değer bir ÇAĞRILABİLİR döndürücü olabiliyor (döngüyü kıran geç bağlama);
     # `_pair` ikisini de karşılıyor.
     "openai": _openai_adapter,
     "gemini": _gemini_adapter,
+}
+
+# provider → (generate_video, animate_video). Boş kalmayan tek anahtar bugün
+# `gemini`: OpenAI'nin Videos API'si 24 Eylül 2026'da kapanıyor (yerine gelen
+# ad YOK), Azure AI Foundry'de video barındırılmıyor, Anthropic'in video ucu
+# hiç yok. Gerekçenin uzunu `catalog.VIDEO_MODELS`in başlığında.
+_VIDEO_ADAPTERS: dict[str, tuple] = {
+    "gemini": _veo_adapter,
 }
 
 
@@ -115,8 +150,18 @@ def _pair(provider: str) -> tuple:
     return girdi() if callable(girdi) else girdi
 
 
+def _video_pair(provider: str) -> tuple:
+    """`_pair`in video tablosundaki ikizi."""
+    girdi = _VIDEO_ADAPTERS[provider]
+    return girdi() if callable(girdi) else girdi
+
+
 def adapter_ids() -> frozenset[str]:
     return frozenset(_ADAPTERS)
+
+
+def video_adapter_ids() -> frozenset[str]:
+    return frozenset(_VIDEO_ADAPTERS)
 
 
 def _resolve(model_id: str) -> catalog.ImageModel:
@@ -128,6 +173,23 @@ def _resolve(model_id: str) -> catalog.ImageModel:
     if m.provider not in _ADAPTERS:
         raise ac.ImageError(
             f"{m.label} için sağlayıcı adaptörü yok ({m.provider}).")
+    return m
+
+
+def _resolve_video(model_id: str) -> catalog.ImageModel:
+    """`_resolve`ın video tablosundaki ikizi; mesajlar da onun kalıbında.
+
+    `catalog.video_model`a bakıyor, `image_model`a DEĞİL — ve bu ayrım
+    sessiz sapmayı kapatan yer: bir görsel modelinin id'siyle `/api/video`ya
+    gelen istek burada "bilinmeyen video modeli" alıyor, senkron bir görsel
+    adaptörüne 7 dakikalık bir video isteği olarak DÜŞMÜYOR.
+    """
+    m = catalog.video_model(model_id)
+    if m is None:
+        raise ac.ImageError(f"Bilinmeyen video modeli: {model_id}")
+    if m.provider not in _VIDEO_ADAPTERS:
+        raise ac.ImageError(
+            f"{m.label} için video adaptörü yok ({m.provider}).")
     return m
 
 
@@ -279,3 +341,43 @@ def edit(model_id: str, prompt: str, images, size: str, quality: str, n: int,
         raise ac.ImageError(f"{m.label} referans görselle çalışmıyor.")
     return _pair(m.provider)[1](m, prompt, images, size, quality, n,
                                 client=client, credentials=credentials)
+
+
+def video_is_configured(model_id: str) -> bool:
+    """`is_configured`ın video ikizi. Katalogda olmayan model için False.
+
+    ÜRETİMDE ÇAĞIRANI YOK ve bu not okurun onu aramasını önlemek için: iki
+    kardeşi de (`is_configured` yukarıda, `chat_providers.is_configured`)
+    aynı durumda. Arayüzün gerçekten okuduğu kapı `app._model_available` ve
+    o `credstore`u doğrudan sorguluyor.
+
+    Üçlü yine de duruyor çünkü sevk memurunun sözleşmesinin parçası: bir
+    adaptör katmanına "bu modeli konuşabiliyor muyum" sorusunun cevabı o
+    katmanda olmalı. Silinseydi bu modül, kardeşlerinin cevapladığı bir
+    soruyu cevaplamayan tek sevk masası olurdu — ve dördüncü bir sağlayıcı
+    eklerken o asimetri "video tarafında bu soru nasıl soruluyor?" diye
+    aranan bir şey olurdu.
+    """
+    m = catalog.video_model(model_id)
+    return bool(m) and credstore.is_configured(m.credential)
+
+
+def generate_video(model_id: str, prompt: str, size: str, quality: str,
+                   duration: int, n: int, *, client=None,
+                   credentials=None) -> list[bytes]:
+    m = _resolve_video(model_id)
+    return _video_pair(m.provider)[0](m, prompt, size, quality, duration, n,
+                                      client=client, credentials=credentials)
+
+
+def animate_video(model_id: str, prompt: str, images, size: str, quality: str,
+                  duration: int, n: int, *, client=None,
+                  credentials=None) -> list[bytes]:
+    m = _resolve_video(model_id)
+    if not m.supports_edit:
+        # `edit`teki ikinci kapının aynısı ve aynı gerekçesi: rota kapısı
+        # (`app._check_video_form`) tek çağıran olmayabilir.
+        raise ac.ImageError(f"{m.label} referans görselle çalışmıyor.")
+    return _video_pair(m.provider)[1](m, prompt, images, size, quality,
+                                      duration, n, client=client,
+                                      credentials=credentials)

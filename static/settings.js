@@ -37,6 +37,11 @@ function applyConfigured(s) {
   // zamanlarda gelir ve seçici bir an "hepsi kullanılabilir" gösterip sonra
   // fikir değiştirirdi (`guncelleme` alanı için yazılı olan gerekçe).
   applyChatModels(s, seciliSohbetModeliTercihi);
+  // Video şeridi de AYNI yanıttan ve aynı gerekçeyle. İkinci bir gerekçe de
+  // var: Veo görselin `GEMINI_API_KEY`ini PAYLAŞIYOR, yani iki şeridin
+  // `configured` durumu tek bir olguya bakıyor — ayrı zamanlarda gelmeleri
+  // kullanıcıya çelişen iki ekran gösterirdi.
+  applyVideoModels(s, seciliVideoModeliTercihi);
   // `#go` artık BURADA yazılmıyor: tek yazar core.js'teki syncGoGate ve o,
   // yapılandırma + mod + seçili modelin durumunu BİRLİKTE görüyor. Öncesinde
   // dört ayrı yerden yazılıyordu ve `!configured` yalnız AZURE'u ölçtüğü için
@@ -145,6 +150,11 @@ async function loadSettings(openIfMissing) {
     // artık geçerli olmayan bir modelle üretmeye çalışır.
     imageModels = [];
     currentModel = null;
+    // Video kataloğu da boşalıyor, aynı gerekçeyle: eski bir listeyle kapı
+    // açık kalırsa kullanıcı artık geçerli olmayan bir modelle dakikalarca
+    // süren ve faturalanan bir üretim başlatmaya çalışır.
+    videoModels = [];
+    currentVideoModel = null;
     syncGoGate();
     statusEl.textContent = `Ayar durumu alınamadı. Sağlayıcı ayarlarını kontrol et ${AYARLAR_EKI}.`;
     if (openIfMissing) openSettings();
@@ -368,6 +378,12 @@ let seciliModelTercihi = "";
  *  tarafından zaten reddediliyor. */
 let seciliSohbetModeliTercihi = "";
 
+/** Kullanıcının VİDEO modeli tercihi. `seciliModelTercihi`nin ikizi ve AYRI
+ *  bir değişken: iki şerit iki listeden besleniyor ve tek değişkende tutmak,
+ *  mod değiştiren kullanıcının seçimini karşı listede geçersiz kılardı
+ *  (gerekçenin uzunu prefs.py'nin `video_model` girdisinde). */
+let seciliVideoModeliTercihi = "";
+
 async function loadModelPref() {
   try {
     const res = await fetch("/api/prefs");
@@ -379,6 +395,16 @@ async function loadModelPref() {
       seciliSohbetModeliTercihi = p.chat_model;
       if (chatModels.length) {
         applyChatModel(secilecek(chatModels, seciliSohbetModeliTercihi, ""));
+      }
+    }
+    // Video tercihi GÖRSELDEN BAĞIMSIZ okunuyor — sohbet tercihinin aynı
+    // gerekçesi: `image_model` boşsa erken dönmek video seçimini de sessizce
+    // yutardı.
+    if (p.video_model) {
+      seciliVideoModeliTercihi = p.video_model;
+      if (videoModels.length) {
+        applyVideoModel(secilecek(videoModels, seciliVideoModeliTercihi, ""),
+                        { announce: false });
       }
     }
     if (!p.image_model) return;

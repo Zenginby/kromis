@@ -547,6 +547,40 @@
         </select>
       </span>
 
+      <!-- VİDEO şeridi: görselin ve yönetmenin AYNI YUVASINDA, üçü birbirini
+           #composer[data-mode] ekseniyle dışlıyor — yani üçüncü şeridin
+           genişlik bedeli de SIFIR ve composer'ın ölçülmüş 360px yatay
+           bütçesine yeni bir yük binmiyor.
+
+           AYRI BİR <select> ve ayrı bir çip, `#model`in listesini modla
+           değiştirmek DEĞİL. Gerekçe `catalog.VIDEO_MODELS`in ayrı bir demet
+           olma gerekçesinin ön yüz tarafındaki karşılığı: `#model`in değerini
+           okuyan yerler (applyModel, secilecek, renderArenaOptions, chat.js'in
+           yönetmen bağlamı) hepsi onu bir GÖRSEL modeli sanıyor ve içine video
+           id'si koymak, o beş yerin her birinde sessiz bir tür karışması
+           olurdu. İki değer taşıyıcısı, karışması mümkün olmayan iki tür. -->
+      <label id="video-model-label" class="sr-only" aria-hidden="true" for="video-model">Video modeli</label>
+      <span id="video-model-pick" class="model-pick">
+        <img id="video-model-logo" class="model-logo" alt="" aria-hidden="true" hidden />
+        <button type="button" id="video-model-btn" class="model-chip"
+                aria-controls="model-sheet" aria-expanded="false"
+                aria-labelledby="video-model-label video-model-btn-label"
+                title="Video modeli">
+          <b id="video-model-btn-label" class="model-chip-label">Modeller yükleniyor…</b>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m6 9 6 6 6-6"></path>
+          </svg>
+        </button>
+        <!-- Görsel şeridinin aynı deseni: değer burada, görünen yüz yukarıda.
+             `tabindex="-1"` + `aria-hidden` birlikte — bir DEĞER TAŞIYICISI
+             kontrol değil (gerekçenin uzunu `#model`de). -->
+        <select id="video-model" class="sr-only" tabindex="-1" aria-hidden="true"
+                title="Video modeli">
+          <option value="">Modeller yükleniyor…</option>
+        </select>
+      </span>
+
       <!-- Yönetmen modunun karşılığı AYNI YUVADA: ikisi #composer[data-mode]
            ekseniyle birbirini dışlıyor, yani genişlik bedeli SIFIR. -->
       <label id="chat-model-label" class="sr-only" aria-hidden="true" for="chat-model">Sohbet modeli</label>
@@ -708,6 +742,13 @@
       <div class="seg view-tabs mode" role="group" aria-label="Mod">
         <span id="view-tabs-thumb" class="view-tabs-thumb" aria-hidden="true"></span>
         <button id="tab-image" type="button" class="active" aria-pressed="true">Görsel</button>
+        <!-- ÜÇÜNCÜ MOD (v0.13). Sıra ANLAMLI ve Yönetmen'in SOLUNA konmuyor
+             bilerek: kayan dolgu (#view-tabs-thumb) aktif düğmenin
+             `offsetLeft`inden okunuyor, yani araya girmek varsayılan modun
+             dolgusunu değil ama kullanıcının kas hafızasını kaydırırdı —
+             "Yönetmen" bir turdur, en sağda kalıyor. Video, Görsel'in
+             komşusu çünkü ikisi de bir ÜRETİM. -->
+        <button id="tab-video" type="button" aria-pressed="false">Video</button>
         <button id="tab-chat" type="button" aria-pressed="false">Yönetmen</button>
       </div>
 
@@ -877,6 +918,20 @@
             <option value="medium" selected>Orta</option>
             <option value="high">Yüksek</option>
           </select>
+        </div>
+        <!-- SÜRE EKSENİ (v0.13): yalnız süre taşıyan modellerde görünüyor ve
+             kapı `durations` listesinin BOŞLUĞU — ayrı bir `duration_hidden`
+             bayrağı gelmedi, çünkü boş bir eksenin ikinci bir işareti aynı
+             bilginin ayrışabilen kopyası olurdu (`quality_hidden` bir bayrak
+             taşıyor çünkü orada liste HİÇ boş olamıyor; bkz. katalogdaki
+             sentetik jeton kuralı).
+             Yer tutucu YOK ve bu bilinçli: görsel modeller süre taşımıyor,
+             yani ilk çizimde bu satır zaten gizli — sahte bir "4 sn" yazmak
+             video modeline hiç geçmeyen kullanıcıya ölü bir seçenek
+             göstermek olurdu. -->
+        <div id="spec-duration" hidden>
+          <label for="duration" id="label-duration">Süre</label>
+          <select id="duration"></select>
         </div>
         <div id="spec-n">
           <label for="n" id="label-n">Adet</label>
@@ -1545,6 +1600,21 @@
     <div id="viewer-stage" class="viewer-stage" role="dialog" aria-modal="true"
          aria-label="Görseli büyüt" tabindex="-1">
       <img id="viewer-img" class="viewer-img" alt="" draggable="false" />
+      <!-- VİDEO OYNATICISI, `#viewer-img`in KARDEŞİ. İkisi birbirini `hidden`
+           ile dışlıyor ve tek bir elemanı tür değiştirmek (`<img>` → `<video>`)
+           MÜMKÜN DEĞİL: viewer.js'in bütün yakınlaştırma/kaydırma mekaniği
+           (`pointerdown`/`pointermove` yakalamaları, `offsetWidth` tabanlı pan
+           sınırı) `#viewer-img` düğümüne BAĞLANMIŞ durumda ve düğümü
+           değiştirmek o dinleyicileri her açılışta yeniden kurmak olurdu.
+           İkinci bir düğüm, o mekaniğe hiç dokunmuyor.
+
+           `controls`: oynatıcının kendi denetimleri — yakınlaştırma/kaydırma
+           burada KAPALI (gerekçe viewer.js'te). `playsinline` iOS Safari için:
+           olmadan dokunma videoyu tarayıcının kendi tam ekranına alıyor ve
+           kullanıcı büyüteçten kopuyor. `preload="metadata"` ilk kareyi
+           çiziyor. -->
+      <video id="viewer-video" class="viewer-img" controls playsinline
+             preload="metadata" hidden></video>
     </div>
     <div class="viewer-bar">
       <button id="viewer-zoom-out" class="viewer-btn" type="button"

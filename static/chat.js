@@ -1123,8 +1123,31 @@ function appendUser(msg) {
 // bu yüzden burada da hata değil — ham hâliyle gösteriliyor.
 const SIZE_LABELS = { "1024x1024": "1024²", "1024x1536": "1024×1536",
                       "1536x1024": "1536×1024" };
-const QUALITY_LABELS = { low: "Düşük", medium: "Orta", high: "Yüksek" };
-const RESULT_KIND_LABELS = { generate: "Üretildi", edit: "Düzenlendi" };
+const QUALITY_LABELS = { low: "Düşük", medium: "Orta", high: "Yüksek",
+                         // Veo'nun `resolution` jetonları (v0.13).
+                         "720p": "720p", "1080p": "1080p" };
+const RESULT_KIND_LABELS = { generate: "Üretildi", edit: "Düzenlendi",
+                             video: "Video üretildi",
+                             animate: "Canlandırıldı" };
+
+/** Bu sonuç kaydı VİDEO mu — kartın `<img>` mi `<video>` mü olacağı.
+ *
+ * Ölçüt `params.kind` ve küme burada LİTERAL: `models.VIDEO_RESULT_KINDS`in
+ * istemci aynası. Aynanın bedeli bir satır, kazancı şu — ikinci bir alan
+ * (`media_kind`) açmak `ResultParams`a yeni bir alan eklemek olurdu ve o
+ * sınıf `extra="forbid"` taşıyor, yani ESKİ oturumların hepsi kaydedilemez
+ * hale gelirdi. `kind` ise zaten her kayıtta var ve bu dosya onu ZATEN
+ * okuyor (`resultCaption`).
+ *
+ * UZANTIYA BAKILMIYOR ve bu bilinçli: kart yalnız `image_ids`i biliyor,
+ * dosya adını değil (`/output/{id}` adresini kendisi kuruyor). Türü adresten
+ * çıkarmaya çalışmak, önce bir HEAD isteği atmak demekti.
+ */
+const VIDEO_RESULT_KINDS = ["video", "animate"];
+
+function sonucVideoMu(msg) {
+  return VIDEO_RESULT_KINDS.includes((msg.params || {}).kind);
+}
 
 /** Kart künyesi: "Üretildi · 1024² · Orta · x2".
  *
@@ -1136,6 +1159,12 @@ function resultCaption(msg) {
   const parts = [RESULT_KIND_LABELS[p.kind] || "Üretildi"];
   if (p.size) parts.push(SIZE_LABELS[p.size] || p.size);
   if (p.quality) parts.push(QUALITY_LABELS[p.quality] || p.quality);
+  // SÜRE künyeye giriyor çünkü videoda o, faturayı belirleyen eksen (kredi
+  // saniyeyle çarpılıyor) — "Video üretildi · 16:9 · 720p" yazan bir künye
+  // dört saniyelik bir klibi sekiz saniyelikten ayırt edemezdi. Eski
+  // kayıtlarda alan 0 (`ResultParams`ın varsayılanı) ve o zaman hiç
+  // yazılmıyor: göç YOK.
+  if (p.duration) parts.push(`${p.duration} sn`);
   parts.push(`x${(msg.image_ids || []).length}`);
   return parts.join(" · ");
 }
@@ -1147,7 +1176,7 @@ function resultCaption(msg) {
  * gerçekten yoksa `/output/{id}.png` 404 döner. Gerçek koşulu ölçmek, ayrıca
  * tutulacak bir liste de bırakmıyor.
  */
-function resultThumb(imageId, index, caption) {
+function resultThumb(imageId, index, caption, videoMu = false) {
   const fig = document.createElement("figure");
   fig.className = "chat-media";
 
@@ -1155,18 +1184,41 @@ function resultThumb(imageId, index, caption) {
   num.className = "chat-media-num";
   num.textContent = String(index + 1).padStart(2, "0");
 
-  const src = `/output/${encodeURIComponent(imageId)}.png`;
-  const img = document.createElement("img");
-  img.src = src;
-  img.alt = caption;
-  img.loading = "lazy";
-  img.addEventListener("error", () => {
+  // UZANTI TÜRDEN: sunucu videoyu `.mp4` olarak kaydediyor (uzantıyı kaydın
+  // `kind`inden türetiyor, bkz. storage.save) ve `/output/{id}.png` bir video
+  // için 404. İki uzantıyı denemek YOK — tür kaydın kendisinde yazılı ve
+  // buraya `params.kind` üzerinden ulaşıyor.
+  const src = `/output/${encodeURIComponent(imageId)}.${videoMu ? "mp4" : "png"}`;
+  // VİDEODA `<video>`, GÖRSELDE `<img>`. Ortak dört şey aynı kalıyor: `src`,
+  // erişilebilir ad, tembel yükleme ve `error` OLAYI — yani silinmiş medya
+  // tespiti tür değiştirmiyor (`<video>` de `error` yayıyor).
+  const media = document.createElement(videoMu ? "video" : "img");
+  media.src = src;
+  if (videoMu) {
+    // `controls`: oynatıcının kendi denetimleri. Kart içinde otomatik
+    // oynatma YOK ve bu bilinçli — bir döküm ekranında dört klibin birden
+    // sesle başlaması kullanıcıya saldırı gibi gelirdi.
+    media.controls = true;
+    // `preload="metadata"`: ilk kare POSTER'ın yerine geçiyor. Ayrı bir
+    // poster dosyası ÜRETİLMİYOR (bu, sunucuda ffmpeg bağımlılığı demekti ve
+    // requirements.txt'nin dört satırlık disiplinini bozardı); tarayıcı
+    // metadata ile ilk kareyi zaten çiziyor ve tam dosyayı indirmiyor.
+    media.preload = "metadata";
+    // iOS Safari: `playsinline` olmadan dokunma videoyu TAM EKRANA alıyor ve
+    // kullanıcı dökümden kopuyor.
+    media.playsInline = true;
+    media.setAttribute("aria-label", caption);
+  } else {
+    media.alt = caption;
+    media.loading = "lazy";
+  }
+  media.addEventListener("error", () => {
     // Kare boş KALMIYOR: kaybolan bir küçük resim "yükleniyor" ile
     // "silindi"yi ayırt edilemez yapardı.
-    img.remove();
+    media.remove();
     const ph = document.createElement("span");
     ph.className = "chat-media-ph";
-    ph.textContent = "Görsel silindi";
+    ph.textContent = videoMu ? "Video silindi" : "Görsel silindi";
     fig.append(ph);
     fig.classList.add("gone");
     fig.removeAttribute("tabindex");
@@ -1175,17 +1227,26 @@ function resultThumb(imageId, index, caption) {
 
   // Tıklama VE Enter: kare bir düğme değil (içinde kendi eylemi olan bir
   // <figure>), o yüzden ikisi de elle bağlanıyor.
-  fig.tabIndex = 0;
-  fig.setAttribute("role", "button");
-  fig.setAttribute("aria-label", `${caption} — büyüt`);
-  const zoom = () => {
-    if (fig.classList.contains("gone")) return;
-    window.openViewer(src, caption, fig.getBoundingClientRect());
-  };
-  fig.addEventListener("click", zoom);
-  fig.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); zoom(); }
-  });
+  // VİDEODA KART TIKLANMIYOR ve bu bir eksik değil bir zorunluluk:
+  // `<video controls>` kendi denetimlerini taşıyor ve karenin `click`
+  // dinleyicisi oynat/durdur ile büyüteci ÇAKIŞTIRIRDI — kullanıcı oynatmaya
+  // basarken büyüteç açılırdı. Büyütme yolu kapanmıyor, denetimlerin tam
+  // ekran düğmesine devrediliyor.
+  if (!videoMu) {
+    // Tıklama VE Enter: kare bir düğme değil (içinde kendi eylemi olan bir
+    // <figure>), o yüzden ikisi de elle bağlanıyor.
+    fig.tabIndex = 0;
+    fig.setAttribute("role", "button");
+    fig.setAttribute("aria-label", `${caption} — büyüt`);
+    const zoom = () => {
+      if (fig.classList.contains("gone")) return;
+      window.openViewer(src, caption, fig.getBoundingClientRect());
+    };
+    fig.addEventListener("click", zoom);
+    fig.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); zoom(); }
+    });
+  }
 
   const actionsContainer = document.createElement("div");
   actionsContainer.className = "chat-media-actions";
@@ -1196,28 +1257,36 @@ function resultThumb(imageId, index, caption) {
   dl.textContent = "İndir";
   dl.addEventListener("click", (e) => {
     e.stopPropagation();               // indirme büyüteci açmasın
-    downloadImage(src, `${imageId}.png`);
+    downloadImage(src, `${imageId}.${videoMu ? "mp4" : "png"}`);
   });
   dl.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") e.stopPropagation();
   });
 
-  const refBtn = document.createElement("button");
-  refBtn.type = "button";
-  refBtn.className = "chat-media-act";
-  refBtn.textContent = "Referans Al";
-  refBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    if (typeof setGallerySourceById === "function") {
-      setGallerySourceById(imageId, caption);
-    }
-  });
-  refBtn.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") e.stopPropagation();
-  });
-
-  actionsContainer.append(dl, refBtn);
-  fig.append(img, num, actionsContainer);
+  // "REFERANS AL" VİDEODA YOK: referans yolu bir PNG bekliyor
+  // (`app._output_png_path` uzantıyı çakılı tutuyor ve bir video id'sinde 404
+  // veriyor) ve bir MP4'ü ilk kare olarak göndermenin karşılığı da yok.
+  // Düğmeyi çizip sonra 404 göstermek, kullanıcıya olmayan bir yol
+  // göstermek olurdu.
+  if (videoMu) {
+    actionsContainer.append(dl);
+  } else {
+    const refBtn = document.createElement("button");
+    refBtn.type = "button";
+    refBtn.className = "chat-media-act";
+    refBtn.textContent = "Referans Al";
+    refBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (typeof setGallerySourceById === "function") {
+        setGallerySourceById(imageId, caption);
+      }
+    });
+    refBtn.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+    });
+    actionsContainer.append(dl, refBtn);
+  }
+  fig.append(media, num, actionsContainer);
   return fig;
 
 
@@ -1236,12 +1305,16 @@ function appendResult(msg) {
   const grid = document.createElement("div");
   grid.className = "chat-result-grid";
   const ids = msg.image_ids || [];
+  // Tür BİR KEZ sorulup ızgaranın tamamına veriliyor: bir sonuç kaydının
+  // bütün kareleri aynı üretimden geliyor, yani kare başına sormak aynı
+  // cevabı N kez hesaplamak olurdu.
+  const videoMu = sonucVideoMu(msg);
   // Izgara sütunu ADETTEN geliyor: tek görsel yarım kart olarak değil geniş
   // çizilmeli (referans ekranın `.media.r32` kartı). Üst sınır SUNUCUDA
   // (`models.MAX_IMAGES_PER_RUN`), burada aynalanacak bir şey yok — CSS
   // yalnızca "1 mi, 2 mi, daha fazla mı" sorusunu soruyor.
   grid.dataset.count = String(ids.length);
-  ids.forEach((id, i) => grid.appendChild(resultThumb(id, i, caption)));
+  ids.forEach((id, i) => grid.appendChild(resultThumb(id, i, caption, videoMu)));
   div.appendChild(grid);
 
   $("chat-log").appendChild(div);
@@ -1328,7 +1401,12 @@ function arenaColumn(row, msg, arenaId) {
   const grid = document.createElement("div");
   grid.className = "chat-result-grid";
   grid.dataset.count = String(ids.length);
-  ids.forEach((id, i) => grid.appendChild(resultThumb(id, i, caption)));
+  // Arena bugün YALNIZ görsel (video modunda #arena-pick gizli, bkz.
+  // style.css) — yani bu değer bugün her zaman false. Sabit `false` yazmak
+  // yerine kaydın kendisine sormak, arena bir gün video da koşturursa
+  // burada hatırlanacak bir şey bırakmıyor.
+  const videoMu = sonucVideoMu(msg);
+  ids.forEach((id, i) => grid.appendChild(resultThumb(id, i, caption, videoMu)));
   col.appendChild(grid);
 
   // Kazanan işareti: iki durumlu düğmenin depodaki standart deseni

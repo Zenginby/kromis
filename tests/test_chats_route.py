@@ -442,9 +442,15 @@ def test_a_result_record_round_trips_through_the_store(client, out_dir):
                        # öyle (bkz. models.ResultParams'ın gerekçesi).
                        # `arena_id` de aynı yolla geldi (arena turu): varsayılanı
                        # boş dize, "bu kayıt bir arena sütunu değil" demek.
+                       # `duration` v0.13'te (video) AYNI yolla geldi:
+                       # varsayılanı 0 ve anlamı "süre ekseni yok". Bu satır
+                       # onun tel üzerindeki KANITI — alan bir gün zorunlu
+                       # olursa ya da varsayılanı düşerse eski oturumlar
+                       # kaydedilemez hale gelir ve testin kırılması o
+                       # kırılmanın ta kendisi olur.
                        "params": {"kind": "generate", "size": "1024x1024",
                                   "quality": "medium", "model": "",
-                                  "arena_id": ""}}
+                                  "arena_id": "", "duration": 0}}
     assert "content" not in got[-1], "sonuç kaydına None content yazılmış"
 
 

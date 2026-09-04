@@ -2,7 +2,7 @@
 
 # Modül grafı
 
-40 Python modülü, 88 modül düzeyi + 10 erteli ithal kenarı.
+41 Python modülü, 90 modül düzeyi + 10 erteli ithal kenarı.
 
 Katman, o modülün depo içindeki en uzun bağımlılık zincirinin uzunluğu:
 **katman 0 hiçbir depo modülüne dayanmaz**, en üst katman uygulamanın
@@ -17,7 +17,7 @@ flowchart TD
     n_android_main["android_main<br/>194 satır"]
   end
   subgraph katman8["katman 8"]
-    n_desktop["desktop<br/>263 satır"]
+    n_desktop["desktop<br/>558 satır"]
   end
   subgraph katman7["katman 7"]
     n_netguard["netguard<br/>157 satır"]
@@ -65,6 +65,7 @@ flowchart TD
     n_release_manifest["release_manifest<br/>70 satır"]
     n_screencolor["screencolor<br/>150 satır"]
     n_version["version<br/>27 satır"]
+    n_winclr["winclr<br/>331 satır"]
     n_winsec["winsec<br/>305 satır"]
   end
   n_android_main -.->|erteli| n_app
@@ -119,6 +120,8 @@ flowchart TD
   n_desktop --> n_netguard
   n_desktop --> n_paths
   n_desktop --> n_screencolor
+  n_desktop --> n_version
+  n_desktop --> n_winclr
   n_desktop -.->|erteli| n_app
   n_folders --> n_jsonstore
   n_folders --> n_storage
@@ -187,7 +190,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `color_names.py` | 418 | 1 | `palette` | 1 | 3 |
 | `composite.py` | 158 | 0 | — | 1 | 1 |
 | `credstore.py` | 128 | 2 | `azure_client`, `catalog` | 7 | 4 |
-| `desktop.py` | 263 | 8 | `errlog`, `netguard`, `paths`, `screencolor`, `app` (erteli) | 1 | 1 |
+| `desktop.py` | 558 | 8 | `errlog`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli) | 1 | 2 |
 | `errlog.py` | 114 | 0 | — | 4 | 1 |
 | `folders.py` | 248 | 2 | `jsonstore`, `storage` | 3 | 4 |
 | `gemini_client.py` | 293 | 3 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
@@ -206,7 +209,8 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `screencolor.py` | 150 | 0 | — | 1 | 1 |
 | `storage.py` | 415 | 1 | `catalog`, `jsonstore` | 4 | 9 |
 | `veo_client.py` | 558 | 3 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
-| `version.py` | 27 | 0 | — | 3 | 7 |
+| `version.py` | 27 | 0 | — | 4 | 7 |
+| `winclr.py` | 331 | 0 | — | 1 | 1 |
 | `winsec.py` | 305 | 0 | — | 1 | 2 |
 
 ## Giriş noktaları ve öksüzler

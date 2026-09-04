@@ -59,10 +59,15 @@ Eski sürümü önceden silmen gerekmiyor; değiştirmek yeterli.
 
 ### Windows
 
-1. Yeni `lumeo-windows-x64.zip` dosyasına sağ tıkla → **Tümünü
-   ayıkla** (Extract All).
-2. Çıkan `Lumeo` klasörünü, eski klasörünün **bulunduğu yere** taşı.
-3. Windows *"Hedefte aynı adda dosyalar var"* diye soracak → **Hedefteki
+1. Yeni `lumeo-windows-x64.zip` dosyasına **sağ tıkla → Özellikler**
+   (Properties). En altta **Engellemeyi Kaldır** (Unblock) kutusu varsa
+   işaretle → Uygula. **Ayıklamadan ÖNCE**, çünkü Windows'un "internetten indi"
+   işareti ayıklarken çıkan her dosyaya kopyalanıyor ve uygulama açılmayabiliyor.
+   Her güncellemede yeni bir zip indiğinden bu adım da her seferinde gerekiyor
+   (3. adımdaki güvenlik izniyle aynı mantık).
+2. Zip dosyasına sağ tıkla → **Tümünü ayıkla** (Extract All).
+3. Çıkan `Lumeo` klasörünü, eski klasörünün **bulunduğu yere** taşı.
+4. Windows *"Hedefte aynı adda dosyalar var"* diye soracak → **Hedefteki
    dosyaları değiştir** de.
 
 **Klasörü olduğu gibi taşı, içinden yalnız `.exe`'yi çekip almaya çalışma:**
@@ -632,8 +637,12 @@ klasörlerini bir üstteki `Lumeo` klasöründeki aynı adlı klasörlerin
 - **Uygulama hiç açılmıyor:** hata kaydını Kurum'ya gönder —
   macOS'ta `~/Library/Application Support/Lumeo/hata.log`,
   Windows'ta `%LOCALAPPDATA%\Lumeo\hata.log`.
-- **(Windows) Pencere hiç gelmiyor:** `.exe`'yi `_internal` klasöründen ayırmış
-  olabilirsin — ikisi aynı klasörde olmalı (2. adım).
+- **(Windows) Pencere hiç gelmiyor:** iki olağan sebebi var. (a) `.exe`'yi
+  `_internal` klasöründen ayırmış olabilirsin — ikisi aynı klasörde olmalı.
+  (b) Zip'i **engellemesini kaldırmadan** ayıklamış olabilirsin (1. adım); o
+  zaman zip'i baştan, 1. adımdan başlayarak yeniden ayıkla. Sebep hâlâ
+  anlaşılmıyorsa `Lumeo` klasöründe `.\Lumeo.exe --onyukleme-denetimi` koştur ve
+  oluşan `%LOCALAPPDATA%\Lumeo\onyukleme-denetimi.txt` dosyasını Kurum'ya gönder.
 - **Eski arayüzü görüyorum gibi:** uygulamayı tamamen kapat (macOS'ta ⌘Q) ve
   yeniden aç.
 - **Geçmişim boş görünüyor:** hiçbir şey silme, Kurum'ya yaz — yukarıdaki yedek

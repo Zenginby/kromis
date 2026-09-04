@@ -169,18 +169,28 @@ def test_kapsam_yol_listesi_bilincle_dar(kapsam_kodu: str):
     `tests/test_paket_icerik_listesi.py`de, üç runner yerine saniyenin altında
     ve YALNIZ `static/` değil her PR'da ölçülüyor.
 
+    Kapı 2026-09-04'te bir yol GENİŞLEDİ: `requirements.txt` →
+    `requirements(-dev)?.txt`. Sebebi aynı sınıf bir ölçü — `requirements-dev.txt`
+    `pyinstaller` ve `pyinstaller-hooks-contrib`i tutuyor, yani
+    `Python.Runtime.dll`i ve WebView2 DLL'lerini pakete KOYAN hook'ları. O dosya
+    listede olmadığı sürece Windows paketinin İÇERİĞİNİ değiştiren bir PR hiçbir
+    paket derletmeden geçiyordu.
+
     Bedeli çift taraflı olduğu için iddia TAM KÜME: bir yol eklemek de çıkarmak
     da bu satırı değiştirmeyi gerektirir, yani karar yazılı kalır. Depo `private`
     (2026-08-28, REST) — listeye giren her yol faturalanan dakika, macOS'ta 10x.
     """
-    desen = re.search(r"grep -qE '\^\(([^)]+)\)'", kapsam_kodu)
+    # `.+` AÇGÖZLÜ, `[^)]+` DEĞİL: listedeki yollardan biri artık kendi
+    # parantezini taşıyor (`requirements(-dev)?\.txt`) ve açgözsüz bir okuma
+    # deseni orada keser — küme sessizce yarım okunur, iddia da anlamsızlaşırdı.
+    desen = re.search(r"grep -qE '\^\((.+)\)'", kapsam_kodu)
     assert desen, kapsam_kodu
     yollar = {y.replace("\\.", ".") for y in desen.group(1).split("|")}
     assert yollar == {
         "gpt-image-studio.spec",
         "build.sh",
         "build.ps1",
-        "requirements.txt",
+        "requirements(-dev)?.txt",
         "android/",
         ".github/workflows/",
         "branding/",
@@ -292,6 +302,10 @@ def test_the_gate_skips_packaging_when_nothing_can_break_it(tmp_path, degisen):
     ["build.sh"],
     ["build.ps1"],
     ["requirements.txt"],
+    # `requirements-dev.txt` paketin İÇERİĞİNİ belirliyor (pyinstaller +
+    # hooks-contrib → Python.Runtime.dll, WebView2 DLL'leri), yani kapının
+    # tam da kapatması gereken sınıf.
+    ["requirements-dev.txt"],
     ["android/app/build.gradle"],
     [".github/workflows/_paket-macos.yml"],
     ["branding/lumeo.ico"],

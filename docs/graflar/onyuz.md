@@ -51,7 +51,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | `static/assets.js` | 544 | 25 | `/api/assets/{}`, `/api/assets/{}/{}`, `/api/banner`, `/api/banner/preview`, `/api/logo`, `/api/logo/preview`, `/assets/banners/{}`, `/assets/logos/{}`, `/assets/mottos/{}`, `/assets/{}/{}`, `/output/{}` |
 | `static/chat.js` | 2453 | 87 | `/api/arena/{}`, `/api/arena/{}/winner`, `/api/chat`, `/api/chats`, `/api/chats/{}`, `/api/prefs`, `/output/{}.${videoMu ` |
-| `static/core.js` | 2778 | 83 | `/api/edit`, `/api/generate`, `/api/image/{}`, `/api/output/{}/download`, `/api/prefs`, `/api/video`, `/api/video/animate`, `/output/`, `/output/{}` |
+| `static/core.js` | 2784 | 83 | `/api/edit`, `/api/generate`, `/api/image/{}`, `/api/output/{}/download`, `/api/prefs`, `/api/video`, `/api/video/animate`, `/output/`, `/output/{}` |
 | `static/folders.js` | 1899 | 58 | `/api/folders`, `/api/folders/{}`, `/api/folders/{}/download`, `/api/history`, `/api/images`, `/api/import`, `/output/{}`, `/output/{}${videoMu ` |
 | `static/mobile.js` | 52 | 0 | — |
 | `static/palette.js` | 756 | 37 | `/api/palette/suggest`, `/api/palettes`, `/api/palettes/{}` |

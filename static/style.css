@@ -513,6 +513,27 @@ body:has(.sheet.open) .scrim { display: block; }
    ELLE hâlâ erişilebilir — kapanan tek şey bu kısayol. */
 #composer[data-mode="video"] #ask-director,
 #composer[data-mode="video"] #arena-pick { display: none; }
+
+/* AYAR SAYFASININ video hâli: Tema rengi, Logo ekle ve Kütüphane blokları
+   video modunda GİZLİ — üçü de o modda ölü denetim.
+
+     • palet `/api/video`ye HİÇ gönderilmiyor (`VideoRequest` `extra="forbid"`
+       taşıyor, core.js'in video dalı `...pal`ı bilerek atlıyor). Yani
+       kullanıcı bir tema rengi seçebiliyordu ve o seçim sessizce düşüyordu —
+       panelin en pahalı hâli: yapılan iş kayboluyor ve hiçbir yerde bunun
+       söylendiği bir yer yok.
+     • logo bindirme `/api/logo` üstünden Pillow ile PNG'ye yapılıyor ve video
+       kaydında zaten kapalı (`core.js`in `logo-add-btn.disabled` satırı,
+       `viewer.js`in `logoBtn.hidden`ı). Video modunda düğme "bir gün
+       çalışacak" diye duruyordu.
+     • Kütüphane o bindirmenin varlıklarını yönetiyor — bindirme yoksa
+       yönetilecek bir şey de yok.
+
+   GİZLENİYOR, SİLİNMİYOR: üç id de `docs/flow-ui/id-baseline.txt`te yazılı ve
+   silmek deftere gerekçe + JS bağının kaldırılması demek (tests/test_id_
+   contract.py). Görsel modunda üçü de aynen duruyor. */
+#specs-sheet[data-mode="video"] .palette-panel,
+#specs-sheet[data-mode="video"] .assets-panel { display: none; }
 /* `#chat-model` ARTIK HTML'de `hidden` DEĞİL (seçeneklerini dolduran kod v0.7'de
    geldi; bu gerekçe onunla birlikte güncellenmemişti). Satır yine de duruyor:
    şerit bir gün mod ekseninin dışında da gizlenebilir ve o gün

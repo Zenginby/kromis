@@ -151,6 +151,37 @@ def test_the_SPECS_chip_stays_visible_in_video_mode():
 # ── Değer taşıyıcıları: iki tür karışmıyor ─────────────────────────────
 
 
+def test_the_SPECS_SHEET_carries_the_mode_too():
+    """`#composer[data-mode]` ayar sayfasına UZANMIYOR — `#specs-sheet`
+    composer'ın içinde değil, ayrı bir `<aside>`. Kanca bu yüzden ikinci bir
+    düğüme de yazılıyor; ikinci bir DURUM değişkeni değil, aynı `mode`."""
+    govde = _govde(_kodsuz(_core()), "setMode")
+
+    assert '$("specs-sheet").dataset.mode = mode' in govde
+
+
+def test_the_DEAD_controls_are_closed_in_video_mode():
+    """Tema rengi / Logo ekle / Kütüphane video modunda ölü denetimdi.
+
+    Palet `/api/video`ye HİÇ gitmiyor (`VideoRequest` `extra="forbid"`, ön yüz
+    de göndermiyor — bkz. test_the_video_request_carries_NO_palette), yani
+    seçilen tema rengi SESSİZCE düşüyordu: kullanıcı bir iş yapıyor, iş
+    kayboluyor ve hiçbir yerde söylenmiyor. Logo bindirme de video kaydında
+    zaten kapalı; Kütüphane onun varlıklarını yönetiyor.
+
+    Gizleniyor, SİLİNMİYOR: üç id de `id-baseline.txt`te yazılı."""
+    css = _css()
+
+    assert '#specs-sheet[data-mode="video"] .palette-panel' in css
+    assert '#specs-sheet[data-mode="video"] .assets-panel' in css
+    # Görsel modunda üçü de DURUYOR — kural yalnız video moduna bakıyor.
+    assert '#specs-sheet[data-mode="image"] .palette-panel' not in css
+    # id'ler yerinde: gizleme silme değil.
+    html = _html()
+    for eleman in ("palette-btn", "logo-add-btn", "library-btn"):
+        assert f'id="{eleman}"' in html
+
+
 def test_the_video_strip_has_its_OWN_value_carrier():
     """`#model`in listesini modla değiştirmek DEĞİL, ayrı bir `<select>`.
 

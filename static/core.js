@@ -129,6 +129,12 @@ function setMode(modeName) {
   if (currentSection !== "studio") showSection("studio");
   currentMode = mode;
   $("composer").dataset.mode = mode;
+  // AYAR SAYFASI da modu bilmek zorunda ve composer'ın `data-mode`u ona
+  // UZANMIYOR: `#specs-sheet` composer'ın içinde değil, ayrı bir `<aside>`.
+  // İkinci bir durum değişkeni açmak yerine aynı kanca ikinci bir düğüme
+  // yazılıyor — CSS o kancadan okuyor (bkz. style.css'teki `.palette-panel` /
+  // `.assets-panel` kuralı).
+  $("specs-sheet").dataset.mode = mode;
   for (const [ad, tabId] of Object.entries(MOD_SEKMELERI)) {
     const el = $(tabId);
     if (!el) continue;

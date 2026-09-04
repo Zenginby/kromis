@@ -750,6 +750,52 @@ def test_a_crashing_browser_call_is_not_a_second_crash(monkeypatch, tmp_path):
     assert desktop._tarayici_yedegi("http://127.0.0.1:1", "/tmp/hata.log") is False
 
 
+def _sahte_webview_guilib(renderer: str = "edgechromium"):
+    """`webview` paketini AD ÇAKIŞMASIYLA birlikte kurar; (paket, guilib) döner.
+
+    Çakışma sahtenin bir kaprisi değil, pywebview 6.2'nin gerçeği:
+    `webview/__init__.py:29` `from webview.guilib import GUIType, initialize`
+    yapıp alt modülü paketin niteliği olarak bağlıyor, `:157` ise
+    `guilib = None` ile o niteliğin üstüne yazıyor.
+    """
+    paket = types.ModuleType("webview")
+    paket.guilib = None                     # ÇAKIŞMA: paketin niteliği None
+    guilib = types.ModuleType("webview.guilib")
+    secilen = types.ModuleType("webview.platforms.winforms")
+    secilen.renderer = renderer
+    guilib.initialize = lambda: secilen
+    return paket, guilib
+
+
+def test_the_backend_stage_survives_the_guilib_name_collision(monkeypatch):
+    """`from webview import guilib` HER ZAMAN None verir (gerekçe yukarıda) ve
+    kademe `AttributeError` ile düşerdi — kapı 2026-09-04'te tam olarak buna
+    düştü, üstelik ölçtüğü halka SAĞLAMKEN: kendi kusurumuz yüzünden kırmızı
+    bir kapı, uzun yaşamaz."""
+    paket, guilib = _sahte_webview_guilib()
+    monkeypatch.setitem(sys.modules, "webview", paket)
+    monkeypatch.setitem(sys.modules, "webview.guilib", guilib)
+
+    kademeler = dict(desktop._onyukleme_kademeleri())
+    metin = kademeler["webview.guilib.initialize()"]()
+
+    assert "webview.platforms.winforms" in metin
+
+
+def test_the_backend_stage_reports_the_renderer_not_just_the_module(monkeypatch):
+    """Windows'ta `initialize()` HER hâlükârda `webview.platforms.winforms`
+    döner; edgechromium→mshtml düşüşü o modülün `renderer` alanında görünüyor.
+    Yalnız modül adını yazmak, "sessiz gerilemeyi görürüz" iddiasını boş bir
+    cümleye çevirirdi."""
+    paket, guilib = _sahte_webview_guilib(renderer="mshtml")
+    monkeypatch.setitem(sys.modules, "webview", paket)
+    monkeypatch.setitem(sys.modules, "webview.guilib", guilib)
+
+    kademeler = dict(desktop._onyukleme_kademeleri())
+
+    assert "mshtml" in kademeler["webview.guilib.initialize()"]()
+
+
 def test_the_preflight_flag_exits_zero_when_the_gui_backend_initializes(
         monkeypatch, tmp_path):
     monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))

@@ -17,7 +17,7 @@ flowchart TD
     n_android_main["android_main<br/>194 satır"]
   end
   subgraph katman8["katman 8"]
-    n_desktop["desktop<br/>540 satır"]
+    n_desktop["desktop<br/>558 satır"]
   end
   subgraph katman7["katman 7"]
     n_netguard["netguard<br/>157 satır"]
@@ -190,7 +190,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `color_names.py` | 418 | 1 | `palette` | 1 | 3 |
 | `composite.py` | 158 | 0 | — | 1 | 1 |
 | `credstore.py` | 128 | 2 | `azure_client`, `catalog` | 7 | 4 |
-| `desktop.py` | 540 | 8 | `errlog`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli) | 1 | 2 |
+| `desktop.py` | 558 | 8 | `errlog`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli) | 1 | 2 |
 | `errlog.py` | 114 | 0 | — | 4 | 1 |
 | `folders.py` | 248 | 2 | `jsonstore`, `storage` | 3 | 4 |
 | `gemini_client.py` | 293 | 3 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |

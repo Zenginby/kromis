@@ -428,12 +428,30 @@ def _onyukleme_kademeleri() -> list[tuple[str, Callable[[], str]]]:
         return getattr(wf, "__name__", "?")
 
     def _backend():
-        from webview import guilib
-        secilen = guilib.initialize()
+        # `from webview import guilib` DEĞİL — o biçim HER ZAMAN None veriyor.
+        # `webview/__init__.py` önce `from webview.guilib import GUIType,
+        # initialize` yapıyor (import düzeni alt modülü paketin bir NİTELİĞİ
+        # olarak bağlar), sonra 157. satırda `guilib = None` ile o niteliğin
+        # ÜSTÜNE yazıyor. Paketten çekilen ad bu yüzden None ve
+        # `guilib.initialize()` AttributeError veriyor: kapı 2026-09-04'te tam
+        # olarak buna düştü — üstelik ölçmek istediği halka SAĞLAMKEN (ilk üç
+        # kademe geçmişti), yani kırmızı kendi kusurumuzdu. Alt modülü doğrudan
+        # istemek çakışmayı atlıyor; `webview/__init__.py`nin kendi biçimi de bu.
+        from webview.guilib import initialize
+
+        secilen = initialize()
         # SEÇİLEN ARKA UÇ RAPORA YAZILIYOR: WebView2 bulunamazsa pywebview
         # sessizce `mshtml`e düşer ve kapı yeşil kalır. Bir gün oraya düşmek
         # başlı başına bir bulgudur; ancak bu satır sayesinde görünür.
-        return getattr(secilen, "__name__", repr(secilen))
+        #
+        # AMA MODÜL ADI ONU GÖSTERMEZ: Windows'ta `initialize()` her hâlükârda
+        # `webview.platforms.winforms` döner; edgechromium/mshtml seçimi o
+        # modülün İÇİNDE, import anında yapılıp `renderer`a yazılıyor
+        # (winforms.py: `_is_chromium()` → 'edgechromium' | 'mshtml').
+        # `webview/__init__.py:249` da renderer'ı oradan okuyor. Yani yukarıdaki
+        # gerekçeyi gerçekten taşıyan alan bu ikincisi.
+        return (f"{getattr(secilen, '__name__', repr(secilen))} "
+                f"(renderer={getattr(secilen, 'renderer', '?')})")
 
     return [
         ("import clr", _clr),

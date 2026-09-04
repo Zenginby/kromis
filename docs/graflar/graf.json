@@ -393,7 +393,7 @@
         "android_main"
       ],
       "katman": 8,
-      "satir": 540,
+      "satir": 558,
       "testler": [
         "tests/test_desktop.py",
         "tests/test_windows_acilis.py"

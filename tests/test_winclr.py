@@ -207,6 +207,21 @@ def test_a_marker_that_cannot_be_removed_is_reported_as_such(tmp_path, monkeypat
     assert "kilitli" in metin
 
 
+def test_a_marker_nobody_tried_to_remove_is_not_called_a_failure(tmp_path):
+    """ÜÇ DURUM, İKİ DEĞİL. `kaldir=False` hiç silme denemiyor; orada
+    "KALDIRILAMADI" yazmak olmayan bir izin hatası uydurur ve raporu okuyanı
+    — kullanıcının bilgisayarını göremeyen kişiyi — yanlış yere bakmaya
+    gönderir. Üstelik o satırı düzeltecek `!` satırı da yok: gerekçe yalnız
+    `zone_kaldirilamayan`da tutuluyor ve bu dalda o boş."""
+    _isaretle(_saglikli(tmp_path))
+
+    metin = winclr.rapor(winclr.topla(str(tmp_path), kaldir=False,
+                                      oku_net=lambda: 533320))
+
+    assert "KALDIRILAMADI" not in metin
+    assert "denenmedi" in metin
+
+
 def test_collecting_without_removal_leaves_the_marker_in_place(tmp_path):
     """`kaldir=False` salt-okuma teşhisi için — dosyaya dokunmamalı."""
     dll = _saglikli(tmp_path)
@@ -227,6 +242,30 @@ def test_the_report_paths_are_relative_to_the_package_root(tmp_path):
         "pythonnet", "runtime", "Python.Runtime.dll")
 
 
+def test_a_marker_that_was_removed_is_not_worth_an_error_log(tmp_path):
+    """ONARILAN İŞARET BULGU DEĞİL. Zip'i Dosya Gezgini ile açmak işaretin
+    OLAĞAN sebebi — beklenen durum, arıza değil — ve denetim onu `import clr`
+    öncesinde siliyor: uygulama ardından sorunsuz açılıyor. hata.log yaratmak
+    kullanıcıya kendi kendine kapanmış bir sorunu bildirtirdi ve KURULUM.md'nin
+    "varsa gönder" cümlesini anlamsızlaştırırdı."""
+    _isaretle(_saglikli(tmp_path))
+
+    b = winclr.topla(str(tmp_path), oku_net=lambda: 533320)
+
+    assert b.zone_bulunan and set(b.zone_kaldirilan) == set(b.zone_bulunan)
+    assert not winclr.kayda_deger(b)
+
+
+def test_a_marker_still_in_place_is_worth_an_error_log(tmp_path):
+    """Ölçüt "işaret var mıydı" değil, "işaret HÂLÂ duruyor mu": .NET
+    yüklemesini engelleyen tek şey bu."""
+    _isaretle(_saglikli(tmp_path))
+
+    b = winclr.topla(str(tmp_path), kaldir=False, oku_net=lambda: 533320)
+
+    assert winclr.kayda_deger(b)
+
+
 # --- açılış yolundaki sözleşme ----------------------------------------------
 
 def test_the_boot_step_does_nothing_off_windows(tmp_path, monkeypatch):
@@ -239,16 +278,33 @@ def test_the_boot_step_does_nothing_off_windows(tmp_path, monkeypatch):
     assert winclr.zone_isareti_var_mi(dll)      # dokunulmadı
 
 
-def test_the_boot_step_reports_and_repairs_on_windows(tmp_path, monkeypatch):
+def test_the_boot_step_repairs_a_marked_package_without_shouting(tmp_path,
+                                                                 monkeypatch):
+    """Onarım GERÇEKTEN oluyor ama sessizce: kullanıcının uygulaması açıldı ve
+    ona bildirilecek bir şey kalmadı. Tam döküm `--onyukleme-denetimi`
+    kipinde, ayrı dosyada duruyor."""
     dll = _saglikli(tmp_path)
     _isaretle(dll)
     monkeypatch.setattr(winclr.sys, "platform", "win32")
     monkeypatch.setattr(winclr, "_winreg_release", lambda: 533320)
 
+    assert winclr.onyukle(str(tmp_path)) == ""
+    assert not winclr.zone_isareti_var_mi(dll)
+
+
+def test_a_marker_that_survives_the_repair_is_reported(tmp_path, monkeypatch):
+    """Silinemeyen işaret bulgudur: uygulama artık `Lumeo.exe.config`'teki
+    `loadFromRemoteSources`a kalmıştır ve o da kurtarmadıysa sebebi bilinmeli
+    (salt-okunur kurulum dizini, kurumsal politika, kilit)."""
+    _isaretle(_saglikli(tmp_path))
+    monkeypatch.setattr(winclr.sys, "platform", "win32")
+    monkeypatch.setattr(winclr, "_winreg_release", lambda: 533320)
+    monkeypatch.setattr(winclr, "zone_isaretini_kaldir", lambda _y: "OSError: kilitli")
+
     metin = winclr.onyukle(str(tmp_path))
 
-    assert "indirme işareti" in metin
-    assert not winclr.zone_isareti_var_mi(dll)
+    assert "KALDIRILAMADI" in metin
+    assert "kilitli" in metin
 
 
 def test_the_boot_step_stays_quiet_on_a_healthy_package(tmp_path, monkeypatch):

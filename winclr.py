@@ -234,9 +234,26 @@ def kayda_deger(b: Bulgular) -> bool:
     günlüğe çevirir ve sözleşmeyi sessizce bozar. Bu yüzden temiz bir
     makinede HİÇBİR ŞEY yazılmıyor; tam rapor yalnız `--onyukleme-denetimi`
     kipinde, ayrı bir dosyaya düşüyor.
+
+    ONARILMIŞ BİR İŞARET DE BULGU DEĞİL. Zip'i Dosya Gezgini ile açmak
+    işaretin OLAĞAN sebebi — yani beklenen durum, arıza değil — ve `topla()`
+    onu `import clr`'dan önce siliyor: uygulama ardından sorunsuz açılıyor.
+    O yolda hata.log yaratmak kullanıcıya kendi kendine kapanmış bir sorunu
+    bildirtir ve dosyanın varlığını tam olarak yukarıdaki paragrafın
+    reddettiği şeye çevirir. KALAN işaret ise bulgudur: silinemediyse
+    (salt-okunur dizin, kilit) uygulama `Lumeo.exe.config`'teki
+    `loadFromRemoteSources`a kalmıştır ve o kurtarmadıysa sebebi bilinmeli.
     """
+    # Bulunup KALDIRILMAMIŞ olan: hem silme hatası alanlar hem `kaldir=False`
+    # ile hiç denenmeyenler. Ölçüt "işaret var mıydı" değil, "işaret HÂLÂ
+    # duruyor mu" — .NET yüklemesini engelleyen tek şey bu.
+    kalan_isaret = [y for y in b.zone_bulunan if y not in b.zone_kaldirilan]
     return bool(
-        b.zone_bulunan
+        kalan_isaret
+        # Gereksiz görünüyor ama duruyor: yukarıdaki liste `zone_bulunan`'a
+        # dayanıyor ve elle kurulmuş bir `Bulgular`'da (test kurgusu, ileride
+        # başka bir çağıran) bir silme hatası o listede olmayabilir. Bir
+        # hatayı SESSİZ geçmenin bedeli, bir fazla koşulun bedelinden büyük.
         or b.zone_kaldirilamayan
         or not b.dll_boyutu
         or b.net_release is None
@@ -274,8 +291,20 @@ def rapor(b: Bulgular) -> str:
         satirlar.append("indirme işareti   : yok")
     else:
         satirlar.append(f"indirme işareti   : {len(b.zone_bulunan)} dosyada bulundu")
+        # ÜÇ DURUM, İKİ DEĞİL. `topla(kaldir=False)` (yaptırımlı salt-okuma
+        # teşhisi) hiç silme denemiyor; orada "KALDIRILAMADI" yazmak olmayan
+        # bir izin hatası uydurur ve raporu okuyan kişiyi — kullanıcının
+        # bilgisayarını göremeyen kişiyi — yanlış yere bakmaya gönderir.
+        # Üstelik o satırı düzeltecek `!` satırı da yoktur: gerekçe yalnız
+        # `zone_kaldirilamayan`da tutuluyor ve o dalda boş.
+        kaldirilamayan = {yol for yol, _hata in b.zone_kaldirilamayan}
         for yol in b.zone_bulunan:
-            durum = "kaldırıldı" if yol in b.zone_kaldirilan else "KALDIRILAMADI"
+            if yol in b.zone_kaldirilan:
+                durum = "kaldırıldı"
+            elif yol in kaldirilamayan:
+                durum = "KALDIRILAMADI"
+            else:
+                durum = "duruyor (silme denenmedi)"
             satirlar.append(f"  - {yol}: {durum}")
     for yol, hata in b.zone_kaldirilamayan:
         satirlar.append(f"  ! {yol}: {hata}")

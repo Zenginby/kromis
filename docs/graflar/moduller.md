@@ -17,7 +17,7 @@ flowchart TD
     n_android_main["android_main<br/>194 satır"]
   end
   subgraph katman8["katman 8"]
-    n_desktop["desktop<br/>507 satır"]
+    n_desktop["desktop<br/>540 satır"]
   end
   subgraph katman7["katman 7"]
     n_netguard["netguard<br/>157 satır"]
@@ -65,7 +65,7 @@ flowchart TD
     n_release_manifest["release_manifest<br/>70 satır"]
     n_screencolor["screencolor<br/>150 satır"]
     n_version["version<br/>27 satır"]
-    n_winclr["winclr<br/>302 satır"]
+    n_winclr["winclr<br/>331 satır"]
     n_winsec["winsec<br/>305 satır"]
   end
   n_android_main -.->|erteli| n_app
@@ -190,7 +190,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `color_names.py` | 418 | 1 | `palette` | 1 | 3 |
 | `composite.py` | 158 | 0 | — | 1 | 1 |
 | `credstore.py` | 128 | 2 | `azure_client`, `catalog` | 7 | 4 |
-| `desktop.py` | 507 | 8 | `errlog`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli) | 1 | 2 |
+| `desktop.py` | 540 | 8 | `errlog`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli) | 1 | 2 |
 | `errlog.py` | 114 | 0 | — | 4 | 1 |
 | `folders.py` | 248 | 2 | `jsonstore`, `storage` | 3 | 4 |
 | `gemini_client.py` | 293 | 3 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
@@ -210,7 +210,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `storage.py` | 415 | 1 | `catalog`, `jsonstore` | 4 | 9 |
 | `veo_client.py` | 558 | 3 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `version.py` | 27 | 0 | — | 4 | 7 |
-| `winclr.py` | 302 | 0 | — | 1 | 1 |
+| `winclr.py` | 331 | 0 | — | 1 | 1 |
 | `winsec.py` | 305 | 0 | — | 1 | 2 |
 
 ## Giriş noktaları ve öksüzler

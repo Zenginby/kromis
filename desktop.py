@@ -134,8 +134,8 @@ def _escape_applescript(text: str) -> str:
     return text.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def _alert_macos(title: str, message: str, *, kritik: bool = True) -> None:
-    """`osascript` ile uyarı; `kritik=False` bilgi kutusu.
+def _alert_macos(title: str, message: str, *, kritik: bool = True) -> bool:
+    """`osascript` ile uyarı; `kritik=False` bilgi kutusu. True = kutu çıktı.
 
     AppKit.NSAlert yerine subprocess tercih edildi: bu noktada pywebview'ın
     NSApplication çalışma döngüsünü başlatıp başlatmadığı belirsiz (hata
@@ -151,12 +151,18 @@ def _alert_macos(title: str, message: str, *, kritik: bool = True) -> None:
     tur = "as critical" if kritik else "as informational"
     script = (f'display alert "{_escape_applescript(title)}" '
              f'message "{_escape_applescript(message)}" {tur}')
-    subprocess.run(["osascript", "-e", script], check=False,
-                   timeout=30 if kritik else None, capture_output=True)
+    surec = subprocess.run(["osascript", "-e", script], check=False,
+                           timeout=30 if kritik else None, capture_output=True)
+    # ÇIKIŞ KODU, KUTUNUN GERÇEKTEN ÇIKTIĞININ TEK KANITI. `display alert`
+    # kullanıcı Tamam'a basınca 0 ile döner; kutu hiç çizilemediyse (GUI
+    # oturumu yok, otomasyon izni reddedildi, `osascript` bir sözdizimi
+    # hatasına düştü) sıfırdan farklı bir kod ve boş bir bekleme. Bu ayrım
+    # tarayıcı yedeği için hayati — gerekçe `_uyari_goster`de.
+    return surec.returncode == 0
 
 
-def _alert_windows(title: str, message: str, *, kritik: bool = True) -> None:
-    """`MessageBoxW` ile sistem uyarısı — ctypes, subprocess DEĞİL.
+def _alert_windows(title: str, message: str, *, kritik: bool = True) -> bool:
+    """`MessageBoxW` ile sistem uyarısı — ctypes, subprocess DEĞİL. True = çıktı.
 
     Burada osascript'in karşılığı `msg.exe`/PowerShell olurdu ama ikisi de yeni
     bir süreç açar: `--windowed` pakette bu bir konsol penceresi çaktırır ve
@@ -185,21 +191,31 @@ def _alert_windows(title: str, message: str, *, kritik: bool = True) -> None:
         # kadar açık duruyor ve o süre boyunca HER pencerenin üstünde durmak
         # düşmanca olurdu — kullanıcı tarayıcıda çalışmaya çalışıyor.
         bayraklar = MB_ICONINFORMATION | MB_SETFOREGROUND
-    ctypes.windll.user32.MessageBoxW(None, message, title, bayraklar)
+    # MessageBoxW kutuyu KURAMAZSA 0 döner (bellek yok, oturumda pencere
+    # istasyonu yok); kurabildiyse basılan düğmenin kimliği. Sıfır demek
+    # "hiç bloklamadı" demek ve tarayıcı yedeği tam olarak o bloklamaya
+    # dayanıyor — dönüş değerini yutmak o yedeği sessizce boşa çıkarır.
+    return bool(ctypes.windll.user32.MessageBoxW(None, message, title, bayraklar))
 
 
-def _uyari_goster(title: str, message: str, *, kritik: bool) -> None:
-    """Platforma göre sistem uyarısı; KENDİSİ asla patlamaz.
+def _uyari_goster(title: str, message: str, *, kritik: bool) -> bool:
+    """Platforma göre sistem uyarısı; KENDİSİ asla patlamaz. True = kutu çıktı.
 
     Windows'ta ayrı bir dal ŞART, çünkü `--windowed` pakette stderr yok:
     osascript orada bulunamaz, uyarı hiç çıkmaz ve açılış hatası tamamen
     sessiz kalırdı (v1.8'de `errlog`'u doğuran gerekçenin birebir aynısı).
+
+    DÖNÜŞ DEĞERİ SÜS DEĞİL. Ölümcül uyarı için sonuç önemsiz (süreç zaten
+    çıkıyor), ama tarayıcı yedeği süreci ayakta tutmak için bu kutunun
+    BLOKLAMASINA dayanıyor. Kutu hiç çizilemediyse — Windows'ta MessageBoxW
+    0 döndü, ya da makine ne win32 ne macOS ve `osascript` hiç yok — çağrı
+    anında dönüyor ve "gösterdim" demek bir yalan olurdu.
     """
     alert = _alert_windows if sys.platform == "win32" else _alert_macos
     try:
-        alert(title, message, kritik=kritik)
+        return bool(alert(title, message, kritik=kritik))
     except Exception:
-        pass
+        return False
 
 
 def _show_fatal_alert(log_path: str) -> None:
@@ -242,14 +258,19 @@ def _tarayici_yedegi(url: str, log_path: str) -> bool:
     except Exception:
         return False
 
-    _uyari_goster(
+    # DÖNÜŞ, KUTUNUN GERÇEKTEN BLOKLAMASINA BAĞLI. Koşulsuz `True` şunu
+    # saklıyordu: kutu çizilemezse çağrı anında döner, `_run()` biter,
+    # `finally: _shutdown()` uvicorn'u kapatır ve az önce açılan sekme
+    # "bağlantı reddedildi" gösterir — çıkış kodu 0, ölümcül uyarı yok,
+    # hiçbir iz yok. False dönmek `_run()`'daki `raise`ı serbest bırakıyor:
+    # kullanıcı hiç değilse ölümcül uyarıyı ve hata.log'u görüyor.
+    return _uyari_goster(
         "Lumeo tarayıcıda açıldı",
         f"Lumeo'nun kendi penceresi açılamadı, uygulama tarayıcınızda açıldı:\n"
         f"{url}\n\n"
         "BU PENCEREYİ KAPATMAYIN — kapattığınızda Lumeo da kapanır.\n"
         f"Hata kaydı: {log_path} — lütfen bu dosyayı Kurum'ya iletin.",
         kritik=False)
-    return True
 
 
 class Api:
@@ -307,7 +328,19 @@ def _onyukle() -> None:
     işareti o andan önce kaldırılmış olmalı, sonra kaldırmanın anlamı yok.
 
     Temiz bir makinede hiçbir şey yazmıyor — gerekçe `winclr.kayda_deger`.
+
+    YALNIZ PAKETTE. Kaynaktan koşarken `resource_dir()` DEPO KÖKÜ ve orada
+    `pythonnet/runtime/Python.Runtime.dll` hiç yok (pythonnet site-packages'ta
+    duruyor) — denetim her açılışta "Python.Runtime.dll: YOK" diye YANLIŞ bir
+    bulgu üretip depo köküne `hata.log` bırakırdı. Bu, `winclr.kayda_deger`in
+    koruduğu sözleşmenin tam tersi: dosyanın varlığı "kötü haber" demek.
+    Ölçülen şey PAKETİN içi; kaynak ağacında ölçülecek bir şey yok.
+    `--onyukleme-denetimi` kipi bilerek dışarıda — o, kullanıcının AÇIKÇA
+    istediği teşhis ve raporunu ayrı dosyaya yazıyor.
     """
+    if not paths.is_frozen():
+        return
+
     try:
         bulgu = winclr.onyukle(paths.resource_dir())
         if bulgu:

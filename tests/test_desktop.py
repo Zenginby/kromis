@@ -1,4 +1,5 @@
 """desktop.start_server gerçek bir sokete bağlanır — pencere kısmı manuel doğrulanır."""
+import ctypes
 import sys
 import threading
 import time
@@ -350,6 +351,28 @@ def test_shutdown_logs_when_thread_join_times_out(monkeypatch, tmp_path):
     assert "kapanmadı" in log_path.read_text(encoding="utf-8")
 
 
+class _SahteSurec:
+    """`subprocess.run`ın döndürdüğü CompletedProcess yerine en küçük nesne.
+
+    `_alert_macos` artık ÇIKIŞ KODUNU okuyor — kutunun gerçekten çıkıp
+    çıkmadığının tek kanıtı o. `None` döndüren bir sahte, gerçek kodun asla
+    girmediği bir dala (AttributeError → yutulan istisna) sokardı ve test
+    yeşil kalırken hiçbir şey ölçmezdi.
+    """
+
+    def __init__(self, returncode: int = 0) -> None:
+        self.returncode = returncode
+
+
+def _osascript_casusu(kayit: list, *, returncode: int = 0):
+    """`subprocess.run` yerine geçen, çağrıyı kaydeden sahte."""
+    def _run(*args, **kwargs):
+        kayit.append((args, kwargs))
+        return _SahteSurec(returncode)
+
+    return _run
+
+
 def test_main_logs_and_shows_alert_when_startup_fails(monkeypatch, tmp_path):
     """I1: Finder'dan açan kullanıcı stderr göremez — main() her hatayı
     hata.log'a yazmalı, native bir uyarı göstermeli ve süreç non-zero çıkmalı.
@@ -368,8 +391,7 @@ def test_main_logs_and_shows_alert_when_startup_fails(monkeypatch, tmp_path):
     # makinenin işletim sistemi değil. Dal seçiminin kendisi ayrı testlerde.
     monkeypatch.setattr(desktop.sys, "platform", "darwin")
     alert_calls: list[tuple] = []
-    monkeypatch.setattr(desktop.subprocess, "run",
-                        lambda *a, **k: alert_calls.append((a, k)))
+    monkeypatch.setattr(desktop.subprocess, "run", _osascript_casusu(alert_calls))
 
     with pytest.raises(SystemExit) as exc_info:
         desktop.main()
@@ -389,8 +411,7 @@ def test_main_logs_and_shows_alert_when_startup_fails(monkeypatch, tmp_path):
 def test_fatal_alert_uses_osascript_on_macos(monkeypatch):
     monkeypatch.setattr(desktop.sys, "platform", "darwin")
     calls: list[tuple] = []
-    monkeypatch.setattr(desktop.subprocess, "run",
-                        lambda *a, **k: calls.append((a, k)))
+    monkeypatch.setattr(desktop.subprocess, "run", _osascript_casusu(calls))
 
     desktop._show_fatal_alert("/tmp/hata.log")
 
@@ -419,6 +440,40 @@ def test_fatal_alert_uses_messagebox_on_windows(monkeypatch):
     title, message = alerts[0]
     assert "Lumeo" in title
     assert r"C:\Users\x\hata.log" in message
+
+
+def test_the_macos_alert_reports_whether_the_box_appeared(monkeypatch):
+    """`display alert` kullanıcı Tamam'a basınca 0 ile döner. Sıfırdan farklı
+    kod = kutu hiç çizilemedi (GUI oturumu yok, otomasyon izni reddedildi) ve
+    çağrı BLOKLAMADI. Tarayıcı yedeği tam olarak o bloklamaya dayanıyor."""
+    monkeypatch.setattr(desktop.sys, "platform", "darwin")
+
+    monkeypatch.setattr(desktop.subprocess, "run", _osascript_casusu([]))
+    assert desktop._uyari_goster("t", "m", kritik=False) is True
+
+    monkeypatch.setattr(desktop.subprocess, "run",
+                        _osascript_casusu([], returncode=1))
+    assert desktop._uyari_goster("t", "m", kritik=False) is False
+
+
+def test_the_windows_alert_reports_a_box_that_could_not_be_created(monkeypatch):
+    """MessageBoxW kutuyu kuramazsa 0 döner ve HİÇ BLOKLAMAZ; kurabildiyse
+    basılan düğmenin kimliğini döner. Bu ayrımı yutmak, tarayıcı yedeğini
+    sessizce boşa çıkarır."""
+    monkeypatch.setattr(desktop.sys, "platform", "win32")
+
+    class _Windll:
+        def __init__(self, sonuc: int) -> None:
+            self.user32 = types.SimpleNamespace(
+                MessageBoxW=lambda *args: sonuc)
+
+    # `raising=False`: Linux'ta `ctypes.windll` YOK. `_alert_windows` ctypes'ı
+    # gövdesinin içinde import ediyor, yani buradaki modül nesnesiyle aynısı.
+    monkeypatch.setattr(ctypes, "windll", _Windll(1), raising=False)
+    assert desktop._uyari_goster("t", "m", kritik=True) is True
+
+    monkeypatch.setattr(ctypes, "windll", _Windll(0), raising=False)
+    assert desktop._uyari_goster("t", "m", kritik=True) is False
 
 
 @pytest.mark.parametrize("platform", ["darwin", "win32"])
@@ -467,6 +522,7 @@ def test_the_clr_preflight_runs_before_the_window_is_created(monkeypatch):
     çağrılırken tetikleniyor. İndirme işareti o andan ÖNCE kaldırılmış olmak
     zorunda; sonra kaldırmanın hiçbir anlamı yok."""
     sira: list[str] = []
+    monkeypatch.setattr(desktop.paths, "is_frozen", lambda: True)
     fake_webview = _fake_webview_module()
     fake_webview.create_window = lambda *a, **k: sira.append("create_window")
     fake_webview.start = lambda: sira.append("start")
@@ -483,6 +539,7 @@ def test_the_clr_preflight_runs_before_the_window_is_created(monkeypatch):
 
 def test_a_preflight_finding_is_written_to_the_error_log(monkeypatch, tmp_path):
     monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(desktop.paths, "is_frozen", lambda: True)
     monkeypatch.setattr(desktop.winclr, "onyukle",
                         lambda kok: "indirme işareti: 3 dosyada bulundu")
 
@@ -496,7 +553,24 @@ def test_a_clean_preflight_leaves_no_error_log_behind(monkeypatch, tmp_path):
     kullanıcıya "varsa gönder" diyor). Her açılışta satır yazmak onu sıradan
     bir günlüğe çevirir ve sözleşmeyi sessizce bozar."""
     monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(desktop.paths, "is_frozen", lambda: True)
     monkeypatch.setattr(desktop.winclr, "onyukle", lambda kok: "")
+
+    desktop._onyukle()
+
+    assert not (tmp_path / "hata.log").exists()
+
+
+def test_the_preflight_does_not_run_from_a_source_checkout(monkeypatch, tmp_path):
+    """Kaynaktan koşarken `resource_dir()` DEPO KÖKÜ ve orada
+    `pythonnet/runtime/Python.Runtime.dll` hiç yok (pythonnet site-packages'ta).
+    Denetim orada her açılışta "Python.Runtime.dll: YOK" diye YANLIŞ bir bulgu
+    üretip depo köküne hata.log bırakırdı — yukarıdaki sözleşmenin tam tersi.
+    Ölçülen şey PAKETİN içi; kaynak ağacında ölçülecek bir şey yok."""
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(desktop.paths, "is_frozen", lambda: False)
+    monkeypatch.setattr(desktop.winclr, "onyukle",
+                        lambda kok: pytest.fail("kaynakta denetim koşmamalı"))
 
     desktop._onyukle()
 
@@ -506,6 +580,7 @@ def test_a_clean_preflight_leaves_no_error_log_behind(monkeypatch, tmp_path):
 def test_a_crashing_preflight_never_blocks_startup(monkeypatch, tmp_path):
     """Bir ÖNYÜKLEME DENETİMİNİN açılışı engellemesinden kötü sonuç yok."""
     monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(desktop.paths, "is_frozen", lambda: True)
 
     def _patla(_kok):
         raise RuntimeError("denetim çöktü")
@@ -528,7 +603,9 @@ def test_the_browser_fallback_opens_the_same_url_the_window_would_have(
     acilan: list[str] = []
     monkeypatch.setattr(desktop.webbrowser, "open",
                         lambda url: acilan.append(url) or True)
-    monkeypatch.setattr(desktop, "_uyari_goster", lambda *a, **k: None)
+    # `True`: kutu GERÇEKTEN gösterildi demek. Yedek artık dönüşü buna
+    # bağlıyor — `None` döndüren bir sahte "kutu çizilemedi" anlamına gelir.
+    monkeypatch.setattr(desktop, "_uyari_goster", lambda *a, **k: True)
 
     pencere_url: dict = {}
     gercek = desktop.start_server
@@ -567,6 +644,7 @@ def test_the_browser_fallback_keeps_the_server_alive_until_dismissed(
     def _kutu(*a, **k):
         durum["alive"] = yakalanan["thread"].is_alive()
         durum["should_exit"] = yakalanan["server"].should_exit
+        return True
 
     monkeypatch.setattr(desktop, "start_server", _casus)
     monkeypatch.setattr(desktop, "_uyari_goster", _kutu)
@@ -591,7 +669,7 @@ def test_the_window_failure_is_logged_before_the_blocking_alert(
 
     gorulen: dict = {}
     monkeypatch.setattr(desktop, "_uyari_goster", lambda *a, **k: gorulen.update(
-        log=(tmp_path / "hata.log").read_text(encoding="utf-8")))
+        log=(tmp_path / "hata.log").read_text(encoding="utf-8")) or True)
 
     desktop._run()
 
@@ -605,7 +683,7 @@ def test_a_successful_fallback_does_not_exit_non_zero(monkeypatch, tmp_path):
     monkeypatch.setitem(sys.modules, "webview",
                         _pencere_patlatan_webview(RuntimeError("Failed to resolve")))
     monkeypatch.setattr(desktop.webbrowser, "open", lambda url: True)
-    monkeypatch.setattr(desktop, "_uyari_goster", lambda *a, **k: None)
+    monkeypatch.setattr(desktop, "_uyari_goster", lambda *a, **k: True)
 
     desktop.main([])            # fırlatmamalı
 
@@ -618,6 +696,38 @@ def test_a_failing_browser_still_reaches_the_fatal_alert_and_exit_one(
     monkeypatch.setitem(sys.modules, "webview",
                         _pencere_patlatan_webview(RuntimeError("Failed to resolve")))
     monkeypatch.setattr(desktop.webbrowser, "open", lambda url: False)
+    olumcul: list[str] = []
+    monkeypatch.setattr(desktop, "_show_fatal_alert", lambda yol: olumcul.append(yol))
+
+    with pytest.raises(SystemExit) as exc_info:
+        desktop.main([])
+
+    assert exc_info.value.code == 1
+    assert len(olumcul) == 1
+
+
+def test_a_fallback_whose_alert_never_appeared_is_not_a_success(
+        monkeypatch, tmp_path):
+    """UYARI KUTUSU SÜS DEĞİL, SÜREÇ TUTUCU. Çizilemezse çağrı anında döner:
+    `_run()` biter, `finally: _shutdown()` uvicorn'u kapatır ve kullanıcının
+    az önce açılan sekmesi "bağlantı reddedildi" gösterir."""
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(desktop.webbrowser, "open", lambda url: True)
+    monkeypatch.setattr(desktop, "_uyari_goster", lambda *a, **k: False)
+
+    assert desktop._tarayici_yedegi("http://127.0.0.1:1", "/tmp/hata.log") is False
+
+
+def test_a_fallback_without_a_blocking_alert_reaches_the_fatal_path(
+        monkeypatch, tmp_path):
+    """Ve sonucu görünür: sessiz bir sıfır çıkış yerine ölümcül uyarı + exit 1.
+    Kullanıcı hiç değilse hata.log'u ve nereye bakacağını öğreniyor."""
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr("paths.ensure_data_dirs", lambda: None)
+    monkeypatch.setitem(sys.modules, "webview",
+                        _pencere_patlatan_webview(RuntimeError("Failed to resolve")))
+    monkeypatch.setattr(desktop.webbrowser, "open", lambda url: True)
+    monkeypatch.setattr(desktop, "_uyari_goster", lambda *a, **k: False)
     olumcul: list[str] = []
     monkeypatch.setattr(desktop, "_show_fatal_alert", lambda yol: olumcul.append(yol))
 

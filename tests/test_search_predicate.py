@@ -33,6 +33,22 @@ NODE = shutil.which("node")
 pytestmark = pytest.mark.skipif(
     NODE is None, reason="node yok — yüklem yalnız KAYNAK düzeyinde sınanıyor")
 
+# `node -e` için üst sınır. İKİ AYRI SÜREYİ KARIŞTIRMAMAK için cömert:
+# ölçülen iş (yüklemi birkaç kayıt üzerinde koşturmak) mikrosaniyeler sürüyor,
+# bütçenin tamamı `node.exe`nin AÇILMASINA gidiyor. Windows runner'ında ilk
+# açılış Defender taramasıyla birlikte on saniyeyi aşabiliyor: 2026-09-04'te
+# v0.13.1 yayını tam olarak buna düştü — `build.ps1`in paketlemeden önce
+# koşturduğu takımda bu dosyanın İLK testi (yani takımdaki ilk node çağrısı)
+# 10 sn'de zaman aşımına uğradı, pytest kırmızı oldu ve Windows paketi hiç
+# üretilmedi. Aynı test aynı kodla dakikalar önce PR koşusunda geçmişti.
+#
+# Sınırın KENDİSİ yine de bir iddianın parçası ve kaldırılamaz: döngüsel bir
+# klasör zinciri `folderPath`i sonsuz döndürürse takım KİLİTLENMEK yerine
+# DÜŞMELİ (bkz. test_a_cyclic_parent_chain_terminates). O kusur sonsuz sürer,
+# yani 10 ile 60 arasındaki fark onu yakalamayı hiç etkilemiyor — takımın
+# tamamı ~60 sn, asılı kalan bir node oradan gizlenemez.
+NODE_ZAMAN_ASIMI = 60
+
 # Yüklemin gerçekten bağlı olduğu bildirimler. Liste ELDE tutuluyor ki bir gün
 # yüklem yeni bir yardımcıya dayandığında kesim SESSİZCE eksik kalmasın:
 # eksik bir bildirim aşağıda ReferenceError'a değil, AÇIK bir iddiaya çarpıyor.
@@ -97,11 +113,13 @@ def _kosturucu(govde: str) -> dict:
     """Kesilmiş yüklemi node'da koşturur; `govde` JSON basar.
 
     `timeout` şart ve bir iddianın parçası: döngüsel bir zincir testi takılırsa
-    takım kilitlenmek yerine DÜŞMELİ.
+    takım kilitlenmek yerine DÜŞMELİ. Değerin neden cömert olduğu
+    `NODE_ZAMAN_ASIMI`de yazılı — sayı bir başarım bütçesi değil, bir kilit
+    kapısı.
     """
     betik = _kaynak() + "\n" + govde
     sonuc = subprocess.run([NODE, "-e", betik], capture_output=True,
-                           text=True, timeout=10)
+                           text=True, timeout=NODE_ZAMAN_ASIMI)
     assert sonuc.returncode == 0, f"node düştü:\n{sonuc.stderr}"
     return json.loads(sonuc.stdout)
 

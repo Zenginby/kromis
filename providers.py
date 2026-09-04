@@ -371,13 +371,19 @@ def generate_video(model_id: str, prompt: str, size: str, quality: str,
 
 
 def animate_video(model_id: str, prompt: str, images, size: str, quality: str,
-                  duration: int, n: int, *, client=None,
+                  duration: int, n: int, *, last_frame=None, client=None,
                   credentials=None) -> list[bytes]:
     m = _resolve_video(model_id)
     if not m.supports_edit:
         # `edit`teki ikinci kapının aynısı ve aynı gerekçesi: rota kapısı
         # (`app._check_video_form`) tek çağıran olmayabilir.
         raise ac.ImageError(f"{m.label} referans görselle çalışmıyor.")
+    if last_frame is not None and not m.supports_last_frame:
+        # AYNI ikinci-kapı disiplini, ayrı bayrak üstünde: `supports_edit`
+        # "ilk kareyi alır" diyor, son kareyi almayı SÖYLEMİYOR (Veo 3 ailesi
+        # tam olarak böyle). Kapısız bırakmak, telde 400 dönen ve gerekçesi
+        # sağlayıcının diliyle yazılmış bir istek demekti.
+        raise ac.ImageError(f"{m.label} bitiş görseli almıyor.")
     return _video_pair(m.provider)[1](m, prompt, images, size, quality,
-                                      duration, n, client=client,
-                                      credentials=credentials)
+                                      duration, n, last_frame=last_frame,
+                                      client=client, credentials=credentials)

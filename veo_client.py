@@ -25,22 +25,27 @@ SÖZLEŞME `providers.py`'deki görsel sözleşmesinin video ikizi — adaptör
 ÇÖZÜLMÜŞ MP4 BAYTLARI döndürüyor:
 
     generate(m, prompt, size, quality, duration, n, *, client=None, credentials=None) -> list[bytes]
-    animate(m, prompt, images, size, quality, duration, n, *, client=None, credentials=None) -> list[bytes]
+    animate(m, prompt, images, size, quality, duration, n, *, last_frame=None, client=None, credentials=None) -> list[bytes]
 
 `images`: görsel sözleşmesinin AYNI biçimi, sıralı [(dosya_adı, png_baytları)].
-Yalnız İLKİ kullanılıyor (`catalog` `max_refs=1` diyor): Veo'nun bu turdaki
-girdisi ilk KARE. Uçun ilk/son kare ve çoklu referans yetenekleri BİLEREK
-kapsam dışı — her biri kendi yetenek bayrağını ve kendi arayüz kontrolünü
-ister.
+Yalnız İLKİ kullanılıyor (`catalog` `max_refs=1` diyor): Veo'nun girdisi ilk
+KARE. SON KARE ayrı bir argüman (`last_frame`, ham PNG baytları) ve ayrı bir
+yetenek bayrağı (`catalog.ImageModel.supports_last_frame`) — `images`in ikinci
+öğesi DEĞİL: bir listedeki sıra, ikinci görselin "son kare mi ikinci referans
+mı" olduğunu söyleyemez. Uçun çoklu referans (`referenceImages`) ve
+`extend-video` yetenekleri hâlâ kapsam dışı; her biri kendi bayrağını ister.
 
 CANLI DOĞRULAMANIN DURUMU (3 Eylül 2026): HİÇ canlı çağrı yapılmadı, bu
 depoda yapılamıyor da — Veo'nun ÜCRETSİZ KADEMESİ YOK, yani anahtarsız bir
 çağrı `gemini_client`in aldığı gibi "yol tanınıyor" sinyali bile vermiyor,
 faturalı bir anahtar gerekiyor. Aşağıdaki her şey belgeye dayanıyor
 (ai.google.dev/gemini-api → Veo) ve ilk gerçek anahtarla bir kez sınanmalı.
-Riskin en yüksek olduğu üç yer: `_video_uri`nin okuduğu yuvalanma
-(`generateVideoResponse.generatedSamples[]`), `parameters` alan adları, ve
-indirme `GET`inin kimliği başlıkla mı sorgu dizesiyle mi istediği.
+Riskin en yüksek olduğu dört yer: `_video_uri`nin okuduğu yuvalanma
+(`generateVideoResponse.generatedSamples[]`), `parameters` alan adları,
+indirme `GET`inin kimliği başlıkla mı sorgu dizesiyle mi istediği, ve
+`instances[0].lastFrame`in adı. Sonuncusunun riski KOŞULLU: alan yalnız
+kullanıcı bir bitiş görseli seçtiğinde gövdeye giriyor, yani ad yanlışsa
+kırılan tek şey o yeni yol olur — bugünkü istek bit bit aynı kalıyor.
 
 DOSYA KÖKTE ve DÜZ olmak ZORUNDA: Android'in Chaquopy kaynak kümesi
 `include "*.py"` ile kurulu, alt paket APK'ya hiç girmez (bkz.
@@ -158,8 +163,18 @@ def map_error(status_code: int, body: dict | list | None, *,
     return f"Veo isteği başarısız (HTTP {status_code})." + ek
 
 
+def _kare(raw: bytes) -> dict:
+    """Bir PNG'nin `instances[0]`daki hâli — ilk kare de son kare de AYNI biçim.
+
+    İki satır ama ORTAK: iki alanın biçiminin ayrışması, birine `mimeType`
+    eklenip ötekine unutulmasıyla biten türden sessiz bir kusur olurdu.
+    """
+    return {"bytesBase64Encoded": base64.b64encode(raw).decode("ascii"),
+            "mimeType": PNG_MIME}
+
+
 def build_payload(prompt: str, size: str, quality: str, duration: int, n: int,
-                  *, images=None) -> dict:
+                  *, images=None, last_frame: bytes | None = None) -> dict:
     """`predictLongRunning` gövdesi.
 
     ŞEKİL Interactions'tan tümden farklı: prompt `instances[0]`ın içinde,
@@ -173,13 +188,24 @@ def build_payload(prompt: str, size: str, quality: str, duration: int, n: int,
     (`gemini_client`in düzenlemeyi `input[]`e katmasının aynı olgusu). Yalnız
     İLK görsel kullanılıyor; sözleşme "ilk görsel ana referans" diyor ve
     `max_refs=1` de aynı şeyi söylüyor.
+
+    SON KARE `instances[0].lastFrame`e giriyor ve `image` ile aynı biçimi
+    taşıyor (`_kare`). KOŞULLU yazılıyor: `last_frame` verilmediğinde anahtar
+    gövdede HİÇ GEÇMİYOR, yani bitiş görseli seçmeyen bir kullanıcının isteği
+    bu değişiklikten ÖNCEKİYLE bit bit aynı. Bu, alan adının canlı olarak
+    doğrulanmamış olmasının (bkz. modül docstring'i) bedelini yeni yola
+    hapsediyor.
+
+    `last_frame` TEK BAŞINA anlamsız — ilk kare olmadan neyin arasında geçiş
+    yapılacağı yok. Kapı burada DEĞİL çağıranlarda: `app._check_video_form`
+    formu, `core.goBlockReason` da arayüzü kapatıyor. Burada ikinci bir kapı
+    yazmak, üç yerde bakımı olan bir kuralın üçüncü kopyası olurdu.
     """
     instance: dict = {"prompt": prompt}
     for _ad, raw in (images or ())[:1]:
-        instance["image"] = {
-            "bytesBase64Encoded": base64.b64encode(raw).decode("ascii"),
-            "mimeType": PNG_MIME,
-        }
+        instance["image"] = _kare(raw)
+    if last_frame is not None:
+        instance["lastFrame"] = _kare(last_frame)
     return {
         "instances": [instance],
         "parameters": {
@@ -429,7 +455,8 @@ def _govde(resp):
 
 
 def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str,
-          duration: int, n: int, images, *, client, credentials) -> list[bytes]:
+          duration: int, n: int, images, *, last_frame=None,
+          client, credentials) -> list[bytes]:
     """`generate` ve `animate`in PAYLAŞILAN gövdesi — tek fark `images`.
 
     `gemini_client._uret`in duruşunun aynısı ve aynı gerekçeyle: Veo'da
@@ -451,7 +478,8 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str,
                      else credstore.resolve(m.credential))
     taban = base_url.rstrip("/")
     butce = providers.total_budget(m, n)
-    payload = build_payload(prompt, size, quality, duration, n, images=images)
+    payload = build_payload(prompt, size, quality, duration, n, images=images,
+                            last_frame=last_frame)
 
     import httpx
     owns = client is None
@@ -551,8 +579,12 @@ def generate(m: catalog.ImageModel, prompt: str, size: str, quality: str,
 
 
 def animate(m: catalog.ImageModel, prompt: str, images, size: str, quality: str,
-            duration: int, n: int, *, client=None,
+            duration: int, n: int, *, last_frame=None, client=None,
             credentials=None) -> list[bytes]:
-    """`images`: sıralı [(dosya_adı, png_baytları), ...] — yalnız ilki kullanılıyor."""
+    """`images`: sıralı [(dosya_adı, png_baytları), ...] — yalnız ilki kullanılıyor.
+
+    `last_frame`: ham PNG baytları ya da None. `images`in ikinci öğesi DEĞİL —
+    gerekçe `build_payload`ın docstring'inde.
+    """
     return _uret(m, prompt, size, quality, duration, n, images,
-                 client=client, credentials=credentials)
+                 last_frame=last_frame, client=client, credentials=credentials)

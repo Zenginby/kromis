@@ -2873,15 +2873,19 @@ def test_the_media_toolbar_has_the_import_button_the_hint_promises():
 
 
 def test_every_file_input_carries_the_same_accept_list():
-    """Dört dosya girişi AYNI kabul listesini taşımak zorunda.
+    """BEŞ dosya girişi AYNI kabul listesini taşımak zorunda.
 
     Android seçici intent'i (`MainActivity.dosyaSecimIntenti`) aileyi bu
     listeden TÜRETİYOR: tek tür kalırsa `type` aile düzeyine çıkmaz ve OEM
     galerileri öteki türleri gizler — commit 554aed4'ün kapattığı kusur.
     Yeni bir giriş listeden saparsa aynı kusur onda yeniden doğar.
+
+    Beşincisi `#last-frame-input` (video modunun bitiş karesi); sayı burada
+    LİTERAL kalıyor çünkü asıl mandal o: yeni bir giriş eklenince bu test
+    KIRILIYOR ve ekleyen kişi kabul listesini bilerek onaylamak zorunda.
     """
     kabuller = re.findall(r'<input type="file"[^>]*?accept="([^"]+)"', _html())
-    assert len(kabuller) == 4, f"beklenen dört dosya girişi, bulunan {len(kabuller)}"
+    assert len(kabuller) == 5, f"beklenen beş dosya girişi, bulunan {len(kabuller)}"
     assert set(kabuller) == {"image/png,image/jpeg,image/webp"}, (
         f"kabul listeleri ayrışmış: {sorted(set(kabuller))}")
 
@@ -3314,7 +3318,7 @@ def test_closing_the_picker_hands_focus_back_to_whatever_opened_it():
     ayrı yer duyurulurdu. İddia bu asimetriyi de tutuyor.
     """
     picker = _picker_js()
-    ac = _balanced_body(picker, "async function openPicker()")
+    ac = _balanced_body(picker, "async function openPicker(")
     assert "document.activeElement" in ac, "açan düğüm hiç tutulmuyor"
 
     kapat = _balanced_body(picker, "function closePicker(")
@@ -3720,7 +3724,7 @@ def test_the_picker_separates_loading_and_failure_from_emptiness():
     döndürüyor; boş liste **tek başına** "yok" anlamına gelmiyor.
     """
     picker = _picker_js()
-    govde = _balanced_body(picker, "async function openPicker()")
+    govde = _balanced_body(picker, "async function openPicker(")
     # 1) Redde bir karşılayıcı var: yakalanmamış promise reddi bırakılmıyor.
     #    Sıraya bakılıyor, tek bir yazıma değil — try gövdesine küme parantezi
     #    girse de iddia ayakta kalmalı.

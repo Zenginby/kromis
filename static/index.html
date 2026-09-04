@@ -944,6 +944,49 @@
         </div>
       </div>
 
+      <!-- İLK/SON KARE — yalnız video modunda görünür (style.css'te
+           `#specs-sheet:not([data-mode="video"]) .frames-panel`). Kare
+           yuvaları AYAR SAYFASINDA, composer'da değil: ikisi bir arada
+           durmadan "başlangıç ile bitiş arasında geçiş" fikri okunmuyor.
+
+           Başlangıç yuvası composer'ın ANA REFERANSINI (`source`) çiziyor,
+           ikinci bir durum değişkeni YOK — `#ref-chip` ile aynı gerçeği iki
+           yerde göstermek, birinin bayatlaması demekti. -->
+      <section class="frames-panel" id="frames-panel" aria-label="Başlangıç ve bitiş görseli">
+        <div class="frame-slot" id="first-frame-slot">
+          <span class="frame-slot-title">Başlangıç görseli</span>
+          <div class="frame-slot-box">
+            <img id="first-frame-img" alt="" hidden />
+            <span id="first-frame-empty" class="frame-slot-empty">Yok</span>
+            <button type="button" id="first-frame-clear" class="frame-slot-clear"
+                    aria-label="Başlangıç görselini kaldır" hidden>×</button>
+          </div>
+          <div class="frame-slot-acts">
+            <button type="button" id="first-frame-pick" class="btn-ghost"
+                    title="Başlangıç görselini galeriden seç">Galeri</button>
+            <button type="button" id="first-frame-upload" class="btn-ghost"
+                    title="Başlangıç görselini bilgisayardan yükle">Yükle</button>
+          </div>
+        </div>
+        <div class="frame-slot" id="last-frame-slot">
+          <span class="frame-slot-title">Bitiş görseli</span>
+          <div class="frame-slot-box">
+            <img id="last-frame-img" alt="" hidden />
+            <span id="last-frame-empty" class="frame-slot-empty">Yok</span>
+            <button type="button" id="last-frame-clear" class="frame-slot-clear"
+                    aria-label="Bitiş görselini kaldır" hidden>×</button>
+          </div>
+          <div class="frame-slot-acts">
+            <button type="button" id="last-frame-pick" class="btn-ghost"
+                    title="Bitiş görselini galeriden seç">Galeri</button>
+            <button type="button" id="last-frame-upload" class="btn-ghost"
+                    title="Bitiş görselini bilgisayardan yükle">Yükle</button>
+          </div>
+        </div>
+        <p id="frames-note" class="asset-status" role="status"></p>
+      </section>
+      <input type="file" id="last-frame-input" accept="image/png,image/jpeg,image/webp" hidden />
+
       <section class="palette-panel" aria-label="Tema rengi ve renk paleti">
         <div class="palette-actions">
           <button type="button" id="palette-btn" class="btn-ghost"

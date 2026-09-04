@@ -142,6 +142,121 @@ def test_an_UPLOADED_frame_is_accepted(client, monkeypatch):
     assert r.json()["videos"][0]["parent_id"] is None
 
 
+# ── Bitiş görseli (son kare) ───────────────────────────────────────────
+
+
+def _son_kare_yakala(monkeypatch):
+    """Sevk memuruna ulaşan `last_frame`i yakalayan sahte."""
+    gorulen = {}
+
+    def sahte(*a, **k):
+        gorulen["last_frame"] = k.get("last_frame")
+        return [MP4]
+
+    monkeypatch.setattr(appmod.providers, "animate_video", sahte)
+    return gorulen
+
+
+def test_the_LAST_FRAME_reaches_the_dispatcher_as_PNG_bytes(client, monkeypatch):
+    """Bitiş görseli `refs`e KATILMIYOR, kendi argümanı olarak gidiyor.
+
+    Katılsaydı `max_refs=1` kapısı (app.py'nin "en fazla N referans görsel"
+    satırı) bitiş görseli seçen HER isteği 422 yapardı — yani yetenek eklenir
+    eklenmez kendi kapısına takılırdı."""
+    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+    gorulen = _son_kare_yakala(monkeypatch)
+
+    r = client.post("/api/video/animate", data=GECERLI,
+                    files={"file": ("a.png", _png(), "image/png"),
+                           "last_file": ("b.png", _png(), "image/png")})
+
+    assert r.status_code == 200, r.text
+    assert gorulen["last_frame"] is not None
+    assert gorulen["last_frame"].startswith(b"\x89PNG")
+
+
+def test_WITHOUT_a_last_frame_the_dispatcher_sees_None(client, monkeypatch):
+    """Bugünkü yol DEĞİŞMEDİ: bitiş görseli seçmeyen istek aynı istek."""
+    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+    gorulen = _son_kare_yakala(monkeypatch)
+
+    r = client.post("/api/video/animate", data=GECERLI,
+                    files={"file": ("a.png", _png(), "image/png")})
+
+    assert r.status_code == 200, r.text
+    assert gorulen["last_frame"] is None
+
+
+def test_AT_MOST_ONE_of_last_file_or_last_source_id(client, monkeypatch):
+    """Ana karenin "tam olarak biri" kapısının ikizi — tek farkı bitiş
+    görselinin İSTEĞE BAĞLI olması, yani "hiçbiri" geçerli bir cevap."""
+    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+
+    r = client.post("/api/video/animate",
+                    data={**GECERLI, "last_source_id": "beef1234beef"},
+                    files={"file": ("a.png", _png(), "image/png"),
+                           "last_file": ("b.png", _png(), "image/png")})
+
+    assert r.status_code == 422
+    assert "last_file" in r.text
+
+
+def test_a_last_frame_WITHOUT_a_first_frame_is_refused(client, monkeypatch):
+    """Son kare tek başına anlamsız: neyin arasında geçiş yapılacağı yok.
+
+    Kapı ANA KARENİN kapısından geliyor (`file` ya da `source_id` zorunlu), bu
+    yüzden ayrı bir kural yazılmadı — ama davranışın mandallanması gerekiyor:
+    ileride ana kare isteğe bağlı yapılırsa bu test kırılır ve kararı veren
+    kişi bu yolu bilerek açmak zorunda kalır."""
+    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+
+    r = client.post("/api/video/animate", data=GECERLI,
+                    files={"last_file": ("b.png", _png(), "image/png")})
+
+    assert r.status_code == 422
+
+
+def test_a_model_WITHOUT_the_capability_refuses_the_last_frame(client, monkeypatch):
+    """Yetenek `supports_edit`ten AYRI: ilk kareyi alan bir model son kareyi
+    almayabilir (Veo 3 ailesinin tamamı böyle)."""
+    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+    spec = catalog.video_model(catalog.DEFAULT_VIDEO_MODEL)
+    monkeypatch.setattr(appmod.catalog, "video_model",
+                        lambda mid: spec.__class__(
+                            **{**spec.__dict__, "supports_last_frame": False}))
+
+    r = client.post("/api/video/animate", data=GECERLI,
+                    files={"file": ("a.png", _png(), "image/png"),
+                           "last_file": ("b.png", _png(), "image/png")})
+
+    assert r.status_code == 422
+    assert "bitiş görseli" in r.text
+
+
+def test_a_VIDEO_id_cannot_be_used_as_a_LAST_frame_either(client):
+    """Ana karenin aynı kararı: `_output_png_path` uzantıyı ÇAKILI tutuyor ve
+    bir MP4'ü kare olarak göndermenin karşılığı yok."""
+    video = client.post("/api/video", json=GECERLI).json()["videos"][0]
+
+    r = client.post("/api/video/animate",
+                    data={**GECERLI, "last_source_id": video["id"]},
+                    files={"file": ("a.png", _png(), "image/png")})
+
+    assert r.status_code == 404
+
+
+def test_the_capability_flows_to_the_UI_as_its_OWN_key(client):
+    """Arayüz "bitiş yuvasını çizeyim mi" sorusunu bu anahtardan soruyor.
+    `max_refs`ten türetmek, ikinci referans ile son kareyi aynı sayının
+    arkasına saklamak olurdu."""
+    ayar = client.get("/api/settings").json()
+
+    for m in ayar["video_models"]:
+        assert m["supports_last_frame"] is True, m["id"]
+    for m in ayar["image_models"]:
+        assert m["supports_last_frame"] is False, m["id"]
+
+
 # ── Yetenek kapıları: İKİ UÇTA AYNI ────────────────────────────────────
 #
 # Parametrik desen `tests/test_model_secimi.py`'den: aynı geçersiz değer iki

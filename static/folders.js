@@ -979,6 +979,11 @@ let pickerScope = "";
 let pickerQuery = "";
 let pickerSelectedId = null;
 let pickerAcan = null;      // seçiciyi açan düğüm — kapanışta odak oraya döner
+// Seçicinin HEDEFİ: "ref" (ana referans / başlangıç karesi) | "last" (bitiş
+// karesi). Aynı ızgara, aynı süzgeç, aynı önizleme — değişen tek şey onay
+// düğmesinin ne yaptığı. İkinci bir modal açmak, videoyu süzen o listeyi ve
+// arama/kapsam gezinmesini ikinci kez yazmak olurdu.
+let pickerHedef = "ref";
 let pickerToken = 0;
 // Boş ızgaranın ÜÇ ayrı nedeni var — yükleniyor, alınamadı, gerçekten boş — ve
 // üçü tek cümleyle anlatılırsa ikisi yalan olur (PR #23 incelemesi, H2).
@@ -1267,7 +1272,15 @@ function renderPickerSide() {
   }
 
   const why = extraBlockReason(rec);
+  // Düğmenin FİİLİ hedeften: aynı düğme bitiş karesini de atıyor ve
+  // "Referans yap" o dalda yanlış bir söz olurdu.
+  $("picker-use-ref").textContent =
+    pickerHedef === "last" ? "Bitiş karesi yap" : "Referans yap";
   $("picker-use-ref").disabled = !rec;
+  // "Ek olarak ekle" BİTİŞ KARESİ hedefinde hiç yok: ek referans video
+  // modunda zaten kapalı ve burada ikinci bir eylem sunmak, kullanıcıyı
+  // `goBlockReason`ın kilitlediği bir duruma davet etmek olurdu.
+  $("picker-use-extra").hidden = pickerHedef === "last";
   $("picker-use-extra").disabled = !!why;
   // GEREKÇE kazanır: kapalı bir düğme sebepsiz kalmaz. Eski hâl
   // `extras.length ? sayaç : gerekçe` idi — "3/3'te sayaç gerekçeyi yener"
@@ -1303,7 +1316,8 @@ function renderMediaPicker() {
   renderPickerSide();
 }
 
-async function openPicker() {
+async function openPicker(hedef = "ref") {
+  pickerHedef = hedef === "last" ? "last" : "ref";
   // Kapanışta odağın döneceği düğüm: `core.js`in `dialogPrevFocus` deseni.
   // Onsuz Escape (ya da ×) odaklı karoyu `display: none` yapıyor ve odak
   // `<body>`ye düşüyordu — bu turun düzelttiği kusurun DÖRDÜNCÜ kopyası,
@@ -1425,6 +1439,15 @@ $("picker-grid").addEventListener("click", (e) => {
 $("picker-use-ref").addEventListener("click", () => {
   const rec = pickerById(pickerSelectedId);
   if (!rec) return;
+  // BİTİŞ KARESİ dalı: seçici kapanıyor ama odak İADE EDİLİYOR — `setSonKare
+  // Gallery` odağı `#prompt`a taşımıyor (aşağıdaki B7 notunun gerekçesi
+  // yalnız ana referans dalı için geçerli), yani iade kapalı bırakılsa odak
+  // `<body>`ye düşerdi.
+  if (pickerHedef === "last") {
+    closePicker();
+    setSonKareGallery(rec);
+    return;
+  }
   // Odak iadesi KAPALI: `setGallerySource` odağı `#prompt`a taşıyor ve bu
   // yolun kararı zaten o (yukarıdaki B7 notu). İade açık kalsaydı odak önce
   // (+) düğmesine dönüp hemen composer'a sıçrardı — ekran okuyucuya iki
@@ -1805,6 +1828,23 @@ $("file-input").addEventListener("change", () => {
   if (files.length) setUploadSource(files[0]);
 });
 $("ref-clear").addEventListener("click", clearSource);
+
+// ── Kare yuvaları (ayar sayfası, video modu) ────────────────────────
+//
+// Başlangıç yuvası MEVCUT yolları yeniden kullanıyor: aynı seçici, aynı gizli
+// dosya girişi, aynı `clearSource`. Yuva referansın İKİNCİ YÜZEYİ, ikinci bir
+// mekanizması değil — composer'daki `#ref-chip` ile aynı gerçeği gösteriyor.
+$("first-frame-pick").addEventListener("click", () => openPicker("ref"));
+$("first-frame-upload").addEventListener("click", () => $("file-input").click());
+$("first-frame-clear").addEventListener("click", clearSource);
+
+$("last-frame-pick").addEventListener("click", () => openPicker("last"));
+$("last-frame-upload").addEventListener("click", () => $("last-frame-input").click());
+$("last-frame-clear").addEventListener("click", clearSonKare);
+$("last-frame-input").addEventListener("change", () => {
+  const files = $("last-frame-input").files;
+  if (files.length) setSonKareUpload(files[0]);
+});
 
 // KAPI SEÇİCİDEN ÖNCE sorulur. Eskiden dosya seçici KOŞULSUZ açılıyordu ve
 // engel ancak dosya SEÇİLDİKTEN sonra `addExtraUpload` içinde sorulduğu için

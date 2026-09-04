@@ -534,6 +534,39 @@ body:has(.sheet.open) .scrim { display: block; }
    contract.py). Görsel modunda üçü de aynen duruyor. */
 #specs-sheet[data-mode="video"] .palette-panel,
 #specs-sheet[data-mode="video"] .assets-panel { display: none; }
+
+/* İLK/SON KARE — bunun TERSİ: yalnız video modunda var. Görsel ve Yönetmen
+   modlarında hiç anlamı yok (`/api/generate`in referansı composer'da yaşıyor
+   ve orada "son kare" diye bir şey yok). Kural `:not(...)` ile yazılıyor ki
+   `data-mode` henüz HİÇ yazılmamışken de (sayfa açılışında, `setMode`tan
+   önce) panel GİZLİ kalsın — açılıp bir kare sonra kaybolan bir blok, en
+   ucuz hatasıyla titreme, en pahalısıyla yanlış moda ait bir kontrol. */
+#specs-sheet:not([data-mode="video"]) .frames-panel { display: none; }
+
+.frames-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+/* Not iki sütunu da kaplıyor: yuvaların altında tek satır. */
+.frames-panel #frames-note { grid-column: 1 / -1; margin: 0; }
+.frame-slot { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+.frame-slot-title { color: var(--muted); font-size: 0.78rem; }
+/* Kutu KARE ve `overflow: hidden`: seçilen görselin oranı ne olursa olsun iki
+   yuva aynı boyda durmalı, yoksa "başlangıç → bitiş" okuması bozuluyor. */
+.frame-slot-box {
+  position: relative; aspect-ratio: 1; border-radius: 10px;
+  background: var(--panel-2); border: 1px dashed var(--hairline);
+  display: grid; place-items: center; overflow: hidden;
+}
+.frame-slot-box img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.frame-slot-empty { color: var(--muted); font-size: 0.78rem; }
+.frame-slot-clear {
+  position: absolute; top: 4px; right: 4px; z-index: 2;
+  width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%;
+  background: rgba(20, 20, 21, 0.88); color: oklch(100% 0 0);
+  cursor: pointer; line-height: 1;
+}
+.frame-slot-acts { display: flex; gap: 0.3rem; }
+/* İki düğme eşit pay: yuva dar (sayfa 320px, iki sütun) ve birinin ötekini
+   ezmesi "Galeri"yi okunmaz kılardı. */
+.frame-slot-acts .btn-ghost { flex: 1; min-width: 0; justify-content: center; }
 /* `#chat-model` ARTIK HTML'de `hidden` DEĞİL (seçeneklerini dolduran kod v0.7'de
    geldi; bu gerekçe onunla birlikte güncellenmemişti). Satır yine de duruyor:
    şerit bir gün mod ekseninin dışında da gizlenebilir ve o gün

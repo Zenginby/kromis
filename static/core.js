@@ -552,6 +552,18 @@ function goBlockReason() {
     if (extras.length) {
       return `${currentVideoModel.label} tek referans görsel alıyor (ilk kare).`;
     }
+    // SON KARE tek başına anlamsız: neyin arasında geçiş yapılacağı yok.
+    // Sunucu da 422 diyor (`app._check_video_form`in "tam olarak biri" kapısı
+    // ana kareyi zorunlu tutuyor); kapı burada da duruyor çünkü sessizce
+    // ilerlemek, prompt yazıp üretime basıp bir 422 görmek olurdu.
+    if (sonKare && !source) {
+      return "Bitiş görseli tek başına kullanılamaz — bir başlangıç görseli de seç.";
+    }
+    if (sonKare && !currentVideoModel.supports_last_frame) {
+      // Bayat bir sekmede ya da model değiştirildikten sonra ulaşılabilir bir
+      // hâl: yuva doluyken Veo 3.1 dışı bir modele geçmek.
+      return `${currentVideoModel.label} bitiş görseli almıyor.`;
+    }
     return "";
   }
   if (!imageModels.length) return "Model listesi alınamadı.";
@@ -1909,6 +1921,20 @@ document.addEventListener("keydown", (e) => {
 let source = null;
 let uploadPreviewUrl = null;
 
+// BİTİŞ GÖRSELİ (video modunun son karesi). `source`un ŞEKLİ birebir aynı ve
+// bu bilinçli: iki yuva aynı iki yoldan doldurulabiliyor (galeriden ya da
+// yüklemeyle) ve `renderFrames` ikisini de tek gövdeyle çiziyor.
+//
+// AYRI bir değişken, `extras`ın bir öğesi DEĞİL: `extras` "ek REFERANS"
+// demek ve video modunda üç ayrı kapıyla kapalı (`renderExtras`,
+// `extraBlockReason`, `goBlockReason`). Son kare bir referans değil ayrı bir
+// eksen — sunucuda da öyle (`last_file`/`last_source_id`, `refs` değil).
+//
+// BAŞLANGIÇ karesi için ikinci bir değişken YOK: o zaten `source`. İki yerde
+// iki gerçek tutmak, birinin bayatlaması demekti.
+let sonKare = null;
+let sonKarePreviewUrl = null;
+
 // Ek referanslar (ana görselin yanında gpt-image-2'ye gönderilir).
 // Öğe: { kind: "upload", file, label, src } | { kind: "gallery", id, label, src }
 // Sunucudaki MAX_EDIT_IMAGES ile aynı: 1 ana + 3 ek.
@@ -2100,6 +2126,9 @@ function showPreview(rec) {
 
 // Referans durumunu arayüze yansıt: chip + ana buton etiketi + ek görsel şeridi
 function renderSource() {
+  // Kare yuvaları `source`u okuyor, yani referans her değiştiğinde onlar da
+  // yeniden çizilmeli — `renderSource` referansın TEK çizim kapısı.
+  renderFrames();
   const chip = $("ref-chip");
   const chipImg = $("ref-chip-img");
   const goBtn = $("go");
@@ -2322,7 +2351,89 @@ function clearSource() {
   clearExtras();
   source = null;
   $("file-input").value = "";
+  // BİTİŞ GÖRSELİ DE GİDİYOR: son kare tek başına anlamsız (neyin arasında
+  // geçiş yapılacağı yok) ve sunucu da öyle diyor. Başlangıcı temizleyip
+  // bitişi bırakmak, `#go`yu `goBlockReason` üstünden kilitleyen bir duruma
+  // sessizce düşmek olurdu.
+  clearSonKare();
   renderSource();
+}
+
+function clearSonKarePreviewUrl() {
+  if (sonKarePreviewUrl) {
+    URL.revokeObjectURL(sonKarePreviewUrl);
+    sonKarePreviewUrl = null;
+  }
+}
+
+function clearSonKare() {
+  clearSonKarePreviewUrl();
+  sonKare = null;
+  $("last-frame-input").value = "";
+  renderFrames();
+}
+
+function setSonKareUpload(file) {
+  if (!isAcceptedUpload(file)) {
+    statusEl.textContent = "PNG, JPEG veya WebP bir görsel seç.";
+    return;
+  }
+  clearSonKarePreviewUrl();
+  sonKare = { kind: "upload", file, label: `Yüklendi: ${file.name}` };
+  sonKarePreviewUrl = URL.createObjectURL(file);
+  renderFrames();
+}
+
+function setSonKareGallery(rec) {
+  clearSonKarePreviewUrl();
+  $("last-frame-input").value = "";
+  sonKare = { kind: "gallery", id: rec.id,
+              label: `Bitiş: ${(rec.prompt || rec.id).slice(0, 40)}` };
+  renderFrames();
+}
+
+/** İki kare yuvasını çizer.
+ *
+ * BAŞLANGIÇ yuvası `source`u okuyor — composer'ın `#ref-chip`iyle AYNI
+ * gerçek, ikinci bir durum değişkeni yok. Bu yüzden `renderSource` da bunu
+ * çağırmak zorunda: referans composer'dan değiştiğinde yuva da değişmeli.
+ *
+ * Önizleme adresi türü ne olursa olsun aynı iki yoldan geliyor: yüklemede
+ * `URL.createObjectURL`, galeride `/output/{id}.png`. Uzantı PNG'de ÇAKILI ve
+ * bu sunucunun kararı (`app._output_png_path`) — bir mp4'ü kare olarak
+ * göndermenin karşılığı yok, seçici de videoları zaten süzüyor.
+ */
+function renderFrames() {
+  const yuvalar = [
+    { deger: source, onizleme: uploadPreviewUrl, img: "first-frame-img",
+      bos: "first-frame-empty", sil: "first-frame-clear" },
+    { deger: sonKare, onizleme: sonKarePreviewUrl, img: "last-frame-img",
+      bos: "last-frame-empty", sil: "last-frame-clear" },
+  ];
+  for (const y of yuvalar) {
+    const img = $(y.img);
+    const adres = !y.deger ? ""
+      : y.deger.kind === "upload" ? (y.onizleme || "")
+      : `/output/${encodeURIComponent(y.deger.id)}.png`;
+    if (adres) {
+      img.src = adres;
+      img.alt = y.deger.label;
+    } else {
+      img.removeAttribute("src");
+      img.alt = "";
+    }
+    img.hidden = !adres;
+    $(y.bos).hidden = !!adres;
+    $(y.sil).hidden = !y.deger;
+  }
+  // NOT SATIRI yalnız yapılacak bir iş varken doluyor. Boş bir yuva çifti
+  // kendi başını anlatıyor ("Yok" + "Seç…"); orada bir cümle daha yazmak
+  // panelin dört satırlık bütçesini gürültüye harcamak olurdu.
+  $("frames-note").textContent = (sonKare && !source)
+    ? "Bitiş görseli tek başına kullanılamaz — bir başlangıç görseli de seç."
+    : (source && sonKare)
+      ? "İki kare arasında geçiş üretilecek."
+      : "";
 }
 
 // Tek eylem: referans varsa düzenle, yoksa üret
@@ -2531,6 +2642,16 @@ async function run() {
       // EK REFERANS GÖNDERİLMİYOR: Veo tek bir ilk kare alıyor
       // (`max_refs=1`) ve kapı `goBlockReason`da zaten kapalı. Alanları yine
       // de eklemek, sunucunun 422'siyle karşılaşan sessiz bir yol açardı.
+      //
+      // SON KARE o kanaldan GEÇMİYOR — yukarıdaki cümle hâlâ doğru. Kendi iki
+      // alanı var (`last_file`/`last_source_id`, `_extra_refs`in gördüğü
+      // `extra_*` DEĞİL), çünkü sunucuda da ayrı bir eksen: `refs` listesine
+      // katılsaydı `max_refs=1` kapısı bitiş görseli seçen her isteği 422
+      // yapardı.
+      if (sonKare) {
+        if (sonKare.kind === "upload") fd.append("last_file", sonKare.file);
+        else fd.append("last_source_id", sonKare.id);
+      }
       request = fetch("/api/video/animate", { method: "POST", body: fd });
     } else {
       request = fetch("/api/video", {

@@ -236,6 +236,50 @@ def test_only_the_FIRST_reference_is_sent():
     assert base64.b64decode(instance["image"]["bytesBase64Encoded"]) == b"BIR"
 
 
+def test_the_LAST_FRAME_rides_in_the_same_instance_as_the_first():
+    """Son kare `instances[0].lastFrame` — `image` ile AYNI biçim.
+
+    Biçim ortak bir yardımcıdan (`_kare`) geliyor: iki alanın ayrışması,
+    birine `mimeType` eklenip ötekine unutulmasıyla biten türden bir kusur
+    olurdu ve telin cevabı yalnız 400 derdi, hangi alan diye söylemezdi.
+    """
+    c = FakeClient(FakeResponse(200, _op()), FakeResponse(200, content=MP4))
+
+    vc.animate(LITE, "geçiş", [("a.png", b"ILK")], "16:9", "720p", 4, 1,
+               last_frame=b"SON", client=c, credentials=CREDS)
+
+    instance = c.calls[0]["json"]["instances"][0]
+    assert instance["image"] == {
+        "bytesBase64Encoded": base64.b64encode(b"ILK").decode(),
+        "mimeType": "image/png"}
+    assert instance["lastFrame"] == {
+        "bytesBase64Encoded": base64.b64encode(b"SON").decode(),
+        "mimeType": "image/png"}
+    # Uç yine `predictLongRunning` ve `parameters` DEĞİŞMEDİ: son kare bir
+    # knob değil, bir girdi.
+    assert c.calls[0]["url"].endswith(":predictLongRunning")
+    assert set(c.calls[0]["json"]["parameters"]) == {
+        "aspectRatio", "resolution", "durationSeconds", "sampleCount"}
+
+
+def test_WITHOUT_a_last_frame_the_body_is_bit_for_bit_what_it_always_was():
+    """Alanın adı canlı olarak DOĞRULANMADI (bkz. modül docstring'i), yani
+    riskin nereye hapsedildiği önemli: `lastFrame` yalnız kullanıcı bir bitiş
+    görseli seçtiğinde gövdeye giriyor. Ad yanlışsa kırılan tek şey o yeni
+    yol olur; bitiş görseli seçmeyen herkesin isteği aynı kalır."""
+    c = FakeClient(FakeResponse(200, _op()), FakeResponse(200, content=MP4))
+
+    vc.animate(LITE, "k", [("a.png", b"ILK")], "16:9", "720p", 4, 1,
+               client=c, credentials=CREDS)
+
+    assert "lastFrame" not in c.calls[0]["json"]["instances"][0]
+
+    # Metinden üretimde de yok — o yolda kare KAVRAMI bile yok.
+    c2 = FakeClient(FakeResponse(200, _op()), FakeResponse(200, content=MP4))
+    vc.generate(LITE, "k", "16:9", "720p", 4, 1, client=c2, credentials=CREDS)
+    assert c2.calls[0]["json"]["instances"] == [{"prompt": "k"}]
+
+
 # ── Yoklama döngüsü ────────────────────────────────────────────────────
 
 

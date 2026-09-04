@@ -182,6 +182,91 @@ def test_the_DEAD_controls_are_closed_in_video_mode():
         assert f'id="{eleman}"' in html
 
 
+# ── İlk/son kare ───────────────────────────────────────────────────────
+
+
+def test_the_FRAME_SLOTS_live_only_in_video_mode():
+    """Kural `:not(...)` ile yazılıyor, `[data-mode="image"]` listesiyle değil.
+
+    Gerekçe açılış anı: `setMode` çalışmadan önce `#specs-sheet`in
+    `data-mode`u HİÇ YOK. Pozitif listeyle yazılsaydı panel o an GÖRÜNÜR olur,
+    bir kare sonra kaybolurdu — en ucuz hâliyle titreme, en pahalısıyla
+    yanlış moda ait bir kontrol."""
+    css = _css()
+
+    assert '#specs-sheet:not([data-mode="video"]) .frames-panel' in css
+    # Panel gerçekten VAR ve iki yuvası da adreslenebilir.
+    html = _html()
+    for eleman in ("frames-panel", "first-frame-img", "last-frame-img",
+                   "first-frame-pick", "last-frame-pick",
+                   "first-frame-clear", "last-frame-clear",
+                   "last-frame-input", "frames-note"):
+        assert f'id="{eleman}"' in html, eleman
+
+
+def test_the_START_frame_has_NO_second_state_variable():
+    """Başlangıç yuvası `source`u OKUYOR — composer'daki `#ref-chip` ile aynı
+    gerçek. İkinci bir değişken, birinin bayatlaması demekti: kullanıcı
+    composer'dan referansı kaldırır, yuva dolu görünmeye devam ederdi.
+
+    Bunun sonucu şu zorunluluk: `renderSource` yuvaları da çizmek zorunda."""
+    js = _kodsuz(_core())
+
+    assert "let sonKare = null" in js
+    # Başlangıç için `ilkKare` diye bir ikiz YOK.
+    assert "let ilkKare" not in js
+    assert "renderFrames()" in _govde(js, "renderSource")
+    assert "{ deger: source," in _govde(js, "renderFrames")
+
+
+def test_clearing_the_source_ALSO_clears_the_end_frame():
+    """Son kare tek başına `#go`yu kilitliyor (`goBlockReason`). Başlangıcı
+    temizleyip bitişi bırakmak, kullanıcıyı sessizce o kilide düşürmek
+    olurdu."""
+    assert "clearSonKare()" in _govde(_kodsuz(_core()), "clearSource")
+
+
+def test_the_end_frame_travels_in_its_OWN_form_fields():
+    """`extra_*` kanalı DEĞİL: o kanal "ek REFERANS" demek ve video modunda üç
+    ayrı kapıyla kapalı. Sunucuda da ayrı — `refs`e katılsaydı `max_refs=1`
+    kapısı bitiş görseli seçen her isteği 422 yapardı."""
+    js = _kodsuz(_core())
+    # Dilim VİDEO dalı: `extra_source_ids` GÖRSEL dalında (`/api/edit`) meşru
+    # olarak geçiyor, o yüzden dosyanın tamamında aramak yanlış olurdu.
+    ucta = js.index("/api/video/animate")
+    dal = js[js.rindex("if (videoMu) {", 0, ucta):ucta]
+
+    assert 'fd.append("last_file", sonKare.file)' in dal
+    assert 'fd.append("last_source_id", sonKare.id)' in dal
+    # Ek referans yolu video dalında HÂLÂ kapalı: son kare oradan geçmiyor.
+    assert "extra_source_ids" not in dal
+
+
+def test_the_GATE_refuses_an_end_frame_that_stands_alone():
+    """Sunucu da 422 diyor; kapı burada da duruyor çünkü sessizce ilerlemek,
+    prompt yazıp üretime basıp dakikalar sonra bir 422 görmek olurdu."""
+    govde = _govde(_kodsuz(_core()), "goBlockReason")
+
+    assert "if (sonKare && !source) {" in govde
+    assert "if (sonKare && !currentVideoModel.supports_last_frame) {" in govde
+
+
+def test_the_PICKER_is_reused_for_the_end_frame_not_duplicated():
+    """Aynı ızgara, aynı video süzgeci, aynı arama/kapsam gezinmesi — değişen
+    tek şey onay düğmesinin ne yaptığı. İkinci bir modal, o süzgeci ve
+    gezinmeyi ikinci kez yazmak olurdu.
+
+    "Ek olarak ekle" bitiş hedefinde GİZLİ: ek referans video modunda zaten
+    kapalı ve orada ikinci bir eylem sunmak, kullanıcıyı `goBlockReason`ın
+    kilitlediği bir duruma davet etmek olurdu."""
+    js = _kodsuz(_folders())
+
+    assert 'async function openPicker(hedef = "ref")' in js
+    assert '$("last-frame-pick").addEventListener("click", () => openPicker("last"))' in js
+    assert 'if (pickerHedef === "last") {' in js
+    assert '$("picker-use-extra").hidden = pickerHedef === "last"' in js
+
+
 def test_the_video_strip_has_its_OWN_value_carrier():
     """`#model`in listesini modla değiştirmek DEĞİL, ayrı bir `<select>`.
 

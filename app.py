@@ -508,7 +508,9 @@ def video(req: VideoRequest) -> dict:
 
 def _check_video_form(prompt: str, size: str, quality: str, duration: int,
                       n: int, file: UploadFile | None,
-                      source_id: str | None, model: str = "") -> str:
+                      source_id: str | None, model: str = "",
+                      last_file: UploadFile | None = None,
+                      last_source_id: str | None = None) -> str:
     """`/api/video/animate` form alanlarını doğrular; geçersizse 422.
 
     `_check_edit_form`un video ikizi ve aynı iki gerekçeyle var: multipart uçta
@@ -541,6 +543,22 @@ def _check_video_form(prompt: str, size: str, quality: str, duration: int,
     if (file is None) == (source_id is None):
         raise HTTPException(status_code=422,
                             detail="Tam olarak biri gerekli: file veya source_id.")
+    # SON KARE. Ana karenin "tam olarak biri" kapısının ikizi, tek farkı
+    # İSTEĞE BAĞLI olması: bitiş görseli hiç verilmeyebilir (o zaman istek
+    # bugünküyle aynı), ama iki yoldan birden verilemez.
+    if last_file is not None and last_source_id is not None:
+        raise HTTPException(
+            status_code=422,
+            detail="Bitiş görseli için en fazla biri: last_file veya "
+                   "last_source_id.")
+    if (last_file is not None or last_source_id is not None) \
+            and not spec.supports_last_frame:
+        # Yetenek kapısı `supports_edit`ten AYRI: ilk kareyi alan bir model
+        # son kareyi almayabilir. Mesaj hangi modelin reddettiğini söylüyor,
+        # çünkü çözüm composer'daki şeritten başka bir model seçmek.
+        raise HTTPException(
+            status_code=422,
+            detail=f"{spec.label} bitiş görseli almıyor.")
     return model_id
 
 
@@ -554,6 +572,12 @@ async def animate(
     n: int = Form(1),
     file: UploadFile | None = File(None),
     source_id: str | None = Form(None),
+    # SON KARE ana karenin form çiftinin BİREBİR ikizi. `_extra_refs`in
+    # "ek referans" kanalından geçirilmedi ve gerekçesi katalogtaki
+    # `supports_last_frame` yorumunda: son kare bir referans değil ayrı bir
+    # eksen, o kanal da video tarafında üç ayrı kapıyla zaten kapalı.
+    last_file: UploadFile | None = File(None),
+    last_source_id: str | None = Form(None),
     folder_id: str | None = Form(None),
     session_id: str | None = Form(None),
     model: str = Form(""),
@@ -574,7 +598,8 @@ async def animate(
     404 doğru cevap (bkz. `_output_media_path`in docstring'i).
     """
     model_id = _check_video_form(prompt, size, quality, duration, n,
-                                 file, source_id, model)
+                                 file, source_id, model,
+                                 last_file, last_source_id)
     spec = catalog.video_model(model_id)
     target_folder = _check_folder(folder_id)
     session = _check_session(session_id)
@@ -584,10 +609,24 @@ async def animate(
             status_code=422,
             detail=f"{spec.label} en fazla {spec.max_refs} referans görsel "
                    "alıyor (ilk kare).")
+    # Son kare `refs`e KATILMIYOR: `max_refs` sayacı "kaç referans" sorusunun
+    # cevabı ve son kare o sorunun konusu değil. Katsaydı yukarıdaki kapı
+    # bitiş görseli seçen HER isteği 422 yapardı.
+    #
+    # PNG'ye çevirme `_collect_edit_refs`in kullandığı AYNI iki yardımcıyla —
+    # ikinci bir okuma yolu yazmak, birinde `_to_png` çağrısını unutmakla
+    # biten türden bir ayrışma olurdu. `_output_png_path` uzantıyı PNG'de
+    # çakılı tutuyor, yani bir VİDEO id'si burada da 404: bir mp4'ü son kare
+    # olarak göndermenin karşılığı yok (ana karenin aynı kararı).
+    son_kare = None
+    if last_source_id is not None:
+        son_kare = _read_png_file(_output_png_path(os.path.basename(last_source_id)))
+    elif last_file is not None:
+        son_kare = await _read_upload_png(last_file)
 
     try:
         videos = providers.animate_video(model_id, prompt, refs, size, quality,
-                                         duration, n)
+                                         duration, n, last_frame=son_kare)
     except ac.ImageError as e:
         raise HTTPException(status_code=502, detail=str(e))
 
@@ -874,6 +913,11 @@ def _model_payload(m: catalog.ImageModel, cfg: dict, kisa: dict) -> dict:
         "max_n": m.max_n,
         "supports_edit": m.supports_edit,
         "max_refs": m.max_refs,
+        # SON KARE yeteneği AYRI bir anahtar, `max_refs`in bir değeri değil:
+        # arayüz "bitiş görseli yuvasını çizeyim mi" sorusunu buradan soruyor
+        # ve sayıdan türetmek, ikinci referans ile son kareyi aynı sayının
+        # arkasına saklamak olurdu (gerekçenin uzunu katalogda).
+        "supports_last_frame": m.supports_last_frame,
         # Video modellerinde SANİYE BAŞINA (bkz. catalog.ImageModel.credits).
         # Arayüz farkı `durations`ın boş olup olmamasından biliyor ve süreyle
         # çarpıyor — ikinci bir birim alanı göndermek, aynı bilgiyi iki

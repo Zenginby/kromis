@@ -116,7 +116,7 @@ imkânsız kılan iddia bu.
 | Değişiklik | PR'da koşan |
 |---|---|
 | Her PR | pytest (~3 dk) **+ sızıntı taraması** (~1 dk) |
-| `.spec`, `build.sh`, `build.ps1`, `android/`, `branding/`, `requirements.txt`, `.github/workflows/` | pytest **+ üç paket** |
+| `.spec`, `build.sh`, `build.ps1`, `android/`, `branding/`, `requirements.txt`, `requirements-dev.txt`, `.github/workflows/` | pytest **+ üç paket** |
 | `tam-paket` etiketi | pytest **+ üç paket** |
 | `static/`, `bundled/` | yalnız pytest — bkz. aşağısı |
 
@@ -157,6 +157,9 @@ sürüyor.
 | `yayinla` "yayına girmesi gereken paket YOK" dedi | Bir paket işi düştü | O işin kaydına bak; sorunu düzeltip main'e merge et — sürüm İKİNCİ kez artmaz |
 | Android işi "imza ZORUNLU" dedi | Keystore sırları yok ya da `secrets: inherit` eksik | `docs/android/mimari.md` → İmzalama |
 | Koşu hiç başlamadı | Workflow YAML'ı bozuk (GitHub onu sessizce yok sayar) | `pytest tests/test_release_manifest.py` — `test_butun_workflowlar_gecerli_yaml` bunu yakalar |
+| Windows "Açılış denetimi" kırmızı, **MOTW'siz** senaryoda | Paketlenen .NET köprüsü (pythonnet/clr_loader) frozen'da çalışmıyor | Sorun sürüm yığınında: `requirements.txt`'teki pinlere bak. Geri çekilme yolu `_paket-windows.yml`'in `python-version`'ını 3.13'e indirip `pythonnet==3.0.*`'a dönmek (`tests/test_bagimlilik_pinleri.py` ikisini birlikte zorluyor) |
+| Windows "Açılış denetimi" kırmızı, yalnız **MOTW'li** senaryoda | İndirme işareti .NET assembly yüklemesini engelliyor | Kusur kullanıcının göreceği kusurun ta kendisi. `branding/Lumeo.exe.config` exe'nin yanına kopyalanıyor mu, `winclr` işareti kaldırabiliyor mu — adımın bastığı rapora bak |
+| Windows "Açılış denetimi" "rapor dosyasi hic yazilmamis" dedi | `Lumeo.exe` raporu yazmadan öldü | En ağır belirti: süreç `--onyukleme-denetimi` kipinde bile ayakta kalamıyor. `hata.log` basılıyor; yoksa kusur `desktop.main()`'den de önce |
 
 ## İmzalama ve notarization
 
@@ -167,6 +170,10 @@ sürüyor.
   Sistem Ayarları → Gizlilik ve Güvenlik → "Yine de Aç" yapıyor (KURULUM.md).
   Bu hattın kapsamı dışında; değiştirmek Apple Developer üyeliği gerektirir.
 - **Windows:** kod imzası yok; SmartScreen uyarısı çıkıyor (KURULUM.md).
+  İmzasızlığın İKİNCİ bir bedeli 2026-09-04'te ölçüldü: indirilen zip'ten çıkan
+  dosyalara yapışan Mark-of-the-Web, .NET köprüsünün yüklenmesini engelledi ve
+  paket hiç açılmadı. Hattın buna karşı kapısı `_paket-windows.yml` →
+  "Açılış denetimi": paketi hem işaretli hem işaretsiz ortamda açıyor.
 
 ## Kapsam dışı
 

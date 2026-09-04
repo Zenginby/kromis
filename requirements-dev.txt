@@ -10,3 +10,15 @@ pyinstaller==6.21.*
 # değişince kırılır ve kırılma "yayın kapısı çalışmıyor" biçiminde görünür.
 PyYAML>=6.0
 
+# `Python.Runtime.dll`i ve WebView2 DLL'lerini pakete KOYAN şey bu paketteki
+# `hook-clr.py` / `hook-webview.py` (bkz. gpt-image-studio.spec başlığı) — yani
+# Windows paketinin içeriğini pyinstaller kadar bu belirliyor ve pinsizdi.
+#
+# TAM SÜRÜM, `==2026.*` DEĞİL: bu paket takvim sürümlemesi kullanıyor (YYYY.N),
+# yani `2026.*` bir yıllık pencere demek — pin değil, pin görüntüsü. Deponun
+# `MAJOR.MINOR.*` geleneği burada anlamını kaybediyor, o yüzden bilinçle
+# ayrılıyor. Değer, kusurlu paketleri üreten koşuların kullandığı sürüm
+# (2026-08-24'te yayımlandı; v0.11.4–v0.12.0 arası bununla derlendi): pin bir
+# İYİLEŞTİRME değil, o günkü gerçeğin KAYDI — iyileştirmenin kanıtı açılış
+# denetiminin yeşile dönmesi olacak.
+pyinstaller-hooks-contrib==2026.7

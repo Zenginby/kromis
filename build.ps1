@@ -100,6 +100,19 @@ if (-not (Test-Path -LiteralPath $Exe)) {
     exit 1
 }
 
+Write-Host '→ .NET yapılandırması'
+# NEDEN spec'in `datas`'ı DEĞİL: PyInstaller 6 onedir'de datas `_internal/`
+# altına iniyor, CLR ise varsayılan AppDomain'in config'ini `<exe yolu>.config`
+# diye arıyor. `_internal/` altındaki bir kopya HİÇ okunmaz — yani spec'e
+# eklemek "yapıldı" görünen, hiçbir şey yapmayan bir değişiklik olurdu.
+# Dosyanın kendisi ve gerekçesi: branding/Lumeo.exe.config.
+$Config = "$Exe.config"
+Copy-Item -LiteralPath (Join-Path 'branding' 'Lumeo.exe.config') -Destination $Config -Force
+if (-not (Test-Path -LiteralPath $Config)) {
+    Write-Host "HATA: .NET yapılandırması kopyalanmadı: $Config" -ForegroundColor Red
+    exit 1
+}
+
 Write-Host '→ zip'
 if (Test-Path -LiteralPath $Zip) { Remove-Item -LiteralPath $Zip -Force }
 # Compress-Archive DEĞİL: PowerShell 5.1'deki uygulaması zip girdi adlarına ters

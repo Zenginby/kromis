@@ -407,8 +407,10 @@ def test_fatal_alert_uses_messagebox_on_windows(monkeypatch):
     monkeypatch.setattr(desktop.subprocess, "run",
                         lambda *a, **k: subprocess_calls.append((a, k)))
     alerts: list[tuple[str, str]] = []
+    # `**kwargs`: `_uyari_goster` artık `kritik=` geçiriyor (ölümcül uyarı ile
+    # tarayıcı yedeğinin kutusu aynı fonksiyondan çıkıyor, farklı bayraklarla).
     monkeypatch.setattr(desktop, "_alert_windows",
-                        lambda title, message: alerts.append((title, message)))
+                        lambda title, message, **kwargs: alerts.append((title, message)))
 
     desktop._show_fatal_alert(r"C:\Users\x\hata.log")
 
@@ -438,3 +440,272 @@ def test_alert_failure_does_not_crash_main(monkeypatch, tmp_path, platform):
         desktop.main()
     assert exc_info.value.code == 1
     assert (tmp_path / "hata.log").is_file()
+
+
+# --- Windows .NET köprüsü: önyükleme, tarayıcı yedeği, denetim kipi ---------
+#
+# Üçü de 2026-09-04'teki tek kusurdan doğdu: indirilen Windows paketi
+# `webview.start()` içinde pythonnet'e takılıp HİÇ açılmadı (bkz. desktop.py
+# docstring'i). Buradaki testler o üç mandalın gerçekten kurulu olduğunu
+# ölçüyor — hiçbiri gerçek `webview`'ı, dolayısıyla `clr`'ı import etmiyor.
+
+
+def _pencere_patlatan_webview(hata: Exception) -> types.ModuleType:
+    """`webview.start()` çağrısı patlayan sahte modül (Windows kusurunun eşi)."""
+    fake = _fake_webview_module()
+    fake.create_window = lambda *a, **k: None
+
+    def _start() -> None:
+        raise hata
+
+    fake.start = _start
+    return fake
+
+
+def test_the_clr_preflight_runs_before_the_window_is_created(monkeypatch):
+    """SIRA SÖZLEŞMESİ: `import clr` zincirin içinde, `webview.start()`
+    çağrılırken tetikleniyor. İndirme işareti o andan ÖNCE kaldırılmış olmak
+    zorunda; sonra kaldırmanın hiçbir anlamı yok."""
+    sira: list[str] = []
+    fake_webview = _fake_webview_module()
+    fake_webview.create_window = lambda *a, **k: sira.append("create_window")
+    fake_webview.start = lambda: sira.append("start")
+    monkeypatch.setitem(sys.modules, "webview", fake_webview)
+    monkeypatch.setattr("paths.ensure_data_dirs", lambda: None)
+    monkeypatch.setattr(desktop.winclr, "onyukle",
+                        lambda kok: sira.append("onyukle") or "")
+
+    desktop._run()
+
+    assert sira[0] == "onyukle"
+    assert sira[1:] == ["create_window", "start"]
+
+
+def test_a_preflight_finding_is_written_to_the_error_log(monkeypatch, tmp_path):
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(desktop.winclr, "onyukle",
+                        lambda kok: "indirme işareti: 3 dosyada bulundu")
+
+    desktop._onyukle()
+
+    assert "indirme işareti" in (tmp_path / "hata.log").read_text(encoding="utf-8")
+
+
+def test_a_clean_preflight_leaves_no_error_log_behind(monkeypatch, tmp_path):
+    """HATA.LOG SÖZLEŞMESİ: dosyanın VARLIĞI "kötü haber" demek (KURULUM.md
+    kullanıcıya "varsa gönder" diyor). Her açılışta satır yazmak onu sıradan
+    bir günlüğe çevirir ve sözleşmeyi sessizce bozar."""
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(desktop.winclr, "onyukle", lambda kok: "")
+
+    desktop._onyukle()
+
+    assert not (tmp_path / "hata.log").exists()
+
+
+def test_a_crashing_preflight_never_blocks_startup(monkeypatch, tmp_path):
+    """Bir ÖNYÜKLEME DENETİMİNİN açılışı engellemesinden kötü sonuç yok."""
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+
+    def _patla(_kok):
+        raise RuntimeError("denetim çöktü")
+
+    monkeypatch.setattr(desktop.winclr, "onyukle", _patla)
+
+    desktop._onyukle()          # fırlatmamalı
+
+    assert "denetim çöktü" in (tmp_path / "hata.log").read_text(encoding="utf-8")
+
+
+def test_the_browser_fallback_opens_the_same_url_the_window_would_have(
+        monkeypatch, tmp_path):
+    """Yedek, sunucunun GERÇEKTE dinlediği portu açmalı. İki ayrı yerde
+    kurulsaydı kusur yalnız yedeğe düşüldüğünde görünürdü."""
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr("paths.ensure_data_dirs", lambda: None)
+    monkeypatch.setitem(sys.modules, "webview",
+                        _pencere_patlatan_webview(RuntimeError("Failed to resolve")))
+    acilan: list[str] = []
+    monkeypatch.setattr(desktop.webbrowser, "open",
+                        lambda url: acilan.append(url) or True)
+    monkeypatch.setattr(desktop, "_uyari_goster", lambda *a, **k: None)
+
+    pencere_url: dict = {}
+    gercek = desktop.start_server
+
+    def _casus(app, **kwargs):
+        server, thread, port = gercek(app, **kwargs)
+        pencere_url["port"] = port
+        return server, thread, port
+
+    monkeypatch.setattr(desktop, "start_server", _casus)
+
+    desktop._run()
+
+    assert acilan == [f"http://127.0.0.1:{pencere_url['port']}"]
+
+
+def test_the_browser_fallback_keeps_the_server_alive_until_dismissed(
+        monkeypatch, tmp_path):
+    """Bloklayan kutu SÜS DEĞİL: uvicorn thread'i `daemon=True`, ana thread
+    orada beklemezse süreç anında ölür ve kullanıcının sekmesi boşluğa bakar."""
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr("paths.ensure_data_dirs", lambda: None)
+    monkeypatch.setitem(sys.modules, "webview",
+                        _pencere_patlatan_webview(RuntimeError("Failed to resolve")))
+    monkeypatch.setattr(desktop.webbrowser, "open", lambda url: True)
+
+    durum: dict = {}
+    yakalanan: dict = {}
+    gercek = desktop.start_server
+
+    def _casus(app, **kwargs):
+        server, thread, port = gercek(app, **kwargs)
+        yakalanan["server"], yakalanan["thread"] = server, thread
+        return server, thread, port
+
+    def _kutu(*a, **k):
+        durum["alive"] = yakalanan["thread"].is_alive()
+        durum["should_exit"] = yakalanan["server"].should_exit
+
+    monkeypatch.setattr(desktop, "start_server", _casus)
+    monkeypatch.setattr(desktop, "_uyari_goster", _kutu)
+
+    desktop._run()
+
+    assert durum["alive"] is True, "kutu gösterilirken sunucu ayakta olmalı"
+    assert durum["should_exit"] is False
+    # ve kutu döndükten sonra kapanış gerçekten koşmuş olmalı
+    assert yakalanan["server"].should_exit is True
+    assert not yakalanan["thread"].is_alive()
+
+
+def test_the_window_failure_is_logged_before_the_blocking_alert(
+        monkeypatch, tmp_path):
+    """Kutu bloklarken süreç öldürülürse geriye kalan tek iz bu kayıt olur."""
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr("paths.ensure_data_dirs", lambda: None)
+    monkeypatch.setitem(sys.modules, "webview",
+                        _pencere_patlatan_webview(RuntimeError("Failed to resolve X")))
+    monkeypatch.setattr(desktop.webbrowser, "open", lambda url: True)
+
+    gorulen: dict = {}
+    monkeypatch.setattr(desktop, "_uyari_goster", lambda *a, **k: gorulen.update(
+        log=(tmp_path / "hata.log").read_text(encoding="utf-8")))
+
+    desktop._run()
+
+    assert "Failed to resolve X" in gorulen["log"]
+
+
+def test_a_successful_fallback_does_not_exit_non_zero(monkeypatch, tmp_path):
+    """Yedek tuttuysa uygulama BAŞARIYLA çalıştı: `main()` SystemExit üretmemeli."""
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr("paths.ensure_data_dirs", lambda: None)
+    monkeypatch.setitem(sys.modules, "webview",
+                        _pencere_patlatan_webview(RuntimeError("Failed to resolve")))
+    monkeypatch.setattr(desktop.webbrowser, "open", lambda url: True)
+    monkeypatch.setattr(desktop, "_uyari_goster", lambda *a, **k: None)
+
+    desktop.main([])            # fırlatmamalı
+
+
+def test_a_failing_browser_still_reaches_the_fatal_alert_and_exit_one(
+        monkeypatch, tmp_path):
+    """Yedek de tutmazsa eski davranış aynen geçerli: uyarı + exit 1."""
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr("paths.ensure_data_dirs", lambda: None)
+    monkeypatch.setitem(sys.modules, "webview",
+                        _pencere_patlatan_webview(RuntimeError("Failed to resolve")))
+    monkeypatch.setattr(desktop.webbrowser, "open", lambda url: False)
+    olumcul: list[str] = []
+    monkeypatch.setattr(desktop, "_show_fatal_alert", lambda yol: olumcul.append(yol))
+
+    with pytest.raises(SystemExit) as exc_info:
+        desktop.main([])
+
+    assert exc_info.value.code == 1
+    assert len(olumcul) == 1
+
+
+def test_a_crashing_browser_call_is_not_a_second_crash(monkeypatch, tmp_path):
+    """`webbrowser.open` fırlatırsa yedek False dönmeli, yeni bir istisna DEĞİL."""
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+
+    def _patla(_url):
+        raise OSError("tarayıcı yok")
+
+    monkeypatch.setattr(desktop.webbrowser, "open", _patla)
+
+    assert desktop._tarayici_yedegi("http://127.0.0.1:1", "/tmp/hata.log") is False
+
+
+def test_the_preflight_flag_exits_zero_when_the_gui_backend_initializes(
+        monkeypatch, tmp_path):
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(desktop.paths, "resource_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(desktop, "_onyukleme_kademeleri",
+                        lambda: [("import clr", lambda: "sahte"),
+                                 ("backend", lambda: "edgechromium")])
+
+    with pytest.raises(SystemExit) as exc_info:
+        desktop.main([desktop.ONYUKLEME_BAYRAGI])
+
+    assert exc_info.value.code == 0
+    rapor = (tmp_path / desktop.ONYUKLEME_RAPORU).read_text(encoding="utf-8")
+    assert "[GEÇTİ] import clr" in rapor
+    # Seçilen arka uç rapora YAZILMALI: WebView2 bulunamazsa pywebview sessizce
+    # mshtml'e düşer ve kapı yeşil kalır; gerileme ancak burada görünür.
+    assert "edgechromium" in rapor
+
+
+def test_the_preflight_flag_exits_non_zero_when_a_stage_fails(monkeypatch, tmp_path):
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(desktop.paths, "resource_dir", lambda: str(tmp_path))
+
+    def _clr_patla():
+        raise RuntimeError("Failed to resolve Python.Runtime.Loader.Initialize")
+
+    monkeypatch.setattr(desktop, "_onyukleme_kademeleri",
+                        lambda: [("import clr", _clr_patla),
+                                 ("backend", lambda: pytest.fail("bu kademe koşmamalı"))])
+
+    with pytest.raises(SystemExit) as exc_info:
+        desktop.main([desktop.ONYUKLEME_BAYRAGI])
+
+    assert exc_info.value.code == 1
+    rapor = (tmp_path / desktop.ONYUKLEME_RAPORU).read_text(encoding="utf-8")
+    assert "[DÜŞTÜ] import clr" in rapor
+    assert "Failed to resolve" in rapor
+    # Kusur hata.log'a da düşüyor: KURULUM.md yıllardır o dosyayı istiyor.
+    assert "Failed to resolve" in (tmp_path / "hata.log").read_text(encoding="utf-8")
+
+
+def test_the_preflight_flag_never_opens_a_window(monkeypatch, tmp_path):
+    """CI runner'ında pencere açmak güvenilir değil; ölçtüğümüz şey zaten
+    pencere değil, ondan ÖNCEKİ halka."""
+    monkeypatch.setattr(desktop.paths, "data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(desktop.paths, "resource_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(desktop, "_onyukleme_kademeleri", lambda: [])
+    monkeypatch.setattr(desktop, "_run", lambda: pytest.fail("_run koşmamalı"))
+    # Modal uyarı runner'ı sonsuza kadar bekletirdi.
+    monkeypatch.setattr(desktop, "_uyari_goster",
+                        lambda *a, **k: pytest.fail("bu kipte uyarı gösterilmemeli"))
+
+    with pytest.raises(SystemExit) as exc_info:
+        desktop.main([desktop.ONYUKLEME_BAYRAGI])
+
+    assert exc_info.value.code == 0
+
+
+def test_an_unrelated_argument_does_not_trigger_the_preflight(monkeypatch):
+    """Explorer kısayolları ve sürükle-bırak beklenmedik argüman geçirebiliyor;
+    hiçbiri normal açılışı engellememeli (argparse'ın kaçındığımız davranışı)."""
+    kostu: list[str] = []
+    monkeypatch.setattr(desktop, "_run", lambda: kostu.append("run"))
+    monkeypatch.setattr(desktop, "_onyukleme_denetimi_guvenli",
+                        lambda: pytest.fail("denetim kipi tetiklenmemeli"))
+
+    desktop.main([r"C:\Users\x\Desktop\bir-dosya.png", "--baska-bir-sey"])
+
+    assert kostu == ["run"]

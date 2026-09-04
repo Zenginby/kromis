@@ -28,13 +28,23 @@ için, sana gönderilen paket değildir.
 2. Çıkan uygulamayı **Programlar (Applications)** klasörüne sürükle.
 
 ### Windows
-1. Zip dosyasına sağ tıkla → **Tümünü ayıkla** (Extract All).
-2. Çıkan `Lumeo` klasörünü kalıcı bir yere taşı — ör.
+1. İndirdiğin zip dosyasına **sağ tıkla → Özellikler** (Properties). Pencerenin
+   en altında *"Bu dosya başka bir bilgisayardan geldi…"* satırı ve yanında
+   **Engellemeyi Kaldır** (Unblock) kutusu varsa **işaretle → Uygula → Tamam**.
+   Kutu yoksa yapacak bir şey yok, 2. adıma geç.
+
+   > **Bunu AYIKLAMADAN ÖNCE yap.** Windows internetten indirilen dosyaları
+   > işaretliyor; zip'i önce ayıklarsan bu işaret içinden çıkan **her dosyaya**
+   > kopyalanıyor ve uygulama açılmayabiliyor. Zip'i önce serbest bırakırsan
+   > işaret hiç yayılmaz. Sonradan yüzlerce dosyayı tek tek temizlemek yerine
+   > en kolayı zip'i bu adımdan başlayarak yeniden ayıklamaktır.
+2. Zip dosyasına sağ tıkla → **Tümünü ayıkla** (Extract All).
+3. Çıkan `Lumeo` klasörünü kalıcı bir yere taşı — ör.
    `C:\Users\<kullanıcı adın>\Programlar\Lumeo`.
    **Klasörü olduğu gibi taşı, içinden yalnız `.exe`'yi çekip almaya çalışma:**
    uygulama yanındaki `_internal` klasörüne ihtiyaç duyar, `.exe` tek başına
    çalışmaz.
-3. Uygulamayı `Lumeo.exe` ile açarsın. İstersen ona sağ tıklayıp
+4. Uygulamayı `Lumeo.exe` ile açarsın. İstersen ona sağ tıklayıp
    **Başlat'a sabitle** / **Kısayol oluştur** diyebilirsin.
 
 > **Zip'i doğrudan içinden çalıştırma.** Windows zip'in içeriğini geçici bir
@@ -124,7 +134,14 @@ açılışlarda sormaz.
 doğrulandı, ANCAK SmartScreen penceresi bu makinede tetiklenmedi (dosya
 internetten indirilmediği için Mark-of-the-Web bayrağı yok). Yukarıdaki metin
 Microsoft'un standart uyarı metnine dayanıyor; gerçekten indirilen bir zip'le
-birebir metin + ekran görüntüsü hâlâ alınmalı. -->
+birebir metin + ekran görüntüsü hâlâ alınmalı.
+
+     O EKSİK DOĞRULAMANIN BEDELİ 2026-09-04'te ödendi: yerelde derlenen pakette
+     olmayan Mark-of-the-Web, indirilen pakette VARDI ve .NET köprüsü (pythonnet)
+     yüklenemeyince uygulama hiç açılmadı — 1. adımdaki "Engellemeyi Kaldır"
+     maddesi o kusurdan doğdu. CI artık paketi hem işaretli hem işaretsiz
+     ortamda açarak sınıyor (`_paket-windows.yml` → "Açılış denetimi"), yani bu
+     sınıf bir daha elle doğrulamaya bağlı kalmıyor. -->
 
 ## 3. Azure kimliğini gir
 İlk açılışta Ayarlar penceresi kendiliğinden açılır ve "Üret" düğmesi kilitlidir.
@@ -279,10 +296,22 @@ adım), yani uygulamayı silip yenisini koymak geçmişine dokunmaz.
 ## Sorun çıkarsa
 - **Pencere boş açılıyor:** uygulamayı kapat, tekrar aç.
 - **"Üret" kilitli:** Ayarlar (dişli) → endpoint + key girilmiş mi?
-- **(Windows) Uygulama hiç açılmıyor, pencere gelmiyor:** `.exe`'yi `_internal`
-  klasöründen ayırmış olabilirsin — ikisi aynı klasörde olmalı (1. adım). Ayrıca
-  `%LOCALAPPDATA%\Lumeo\hata.log` dosyasına bak; varsa içeriğini
-  Kurum'ya gönder.
+- **(Windows) Uygulama hiç açılmıyor, pencere gelmiyor:** iki olağan sebebi var.
+  (a) `.exe`'yi `_internal` klasöründen ayırmış olabilirsin — ikisi aynı klasörde
+  olmalı. (b) Zip'i **engellemesini kaldırmadan** ayıklamış olabilirsin (1. adım);
+  bu durumda en temizi zip'i baştan, 1. adımdan başlayarak yeniden ayıklamak.
+  Her iki durumda da `%LOCALAPPDATA%\Lumeo\hata.log` dosyasına bak; varsa
+  içeriğini Kurum'ya gönder.
+- **(Windows) Sebebi anlaşılmıyorsa — kendi kendine teşhis:** `Lumeo` klasöründe
+  boş bir yere **Shift + sağ tık → PowerShell penceresini burada aç** de ve şunu
+  yaz: `.\Lumeo.exe --onyukleme-denetimi`. Pencere açılmaz, bunun yerine
+  `%LOCALAPPDATA%\Lumeo\onyukleme-denetimi.txt` dosyası oluşur — onu Kurum'ya
+  gönder, hangi halkanın koptuğunu yazıyor.
+- **(Windows) Uygulama tarayıcıda açıldı ve "bu pencereyi kapatmayın" diyor:**
+  bu bir arıza değil, yedek yol — Lumeo'nun kendi penceresi açılamadığında
+  uygulama tarayıcında açılıyor ve her şey normal çalışıyor. O küçük pencereyi
+  kapatınca Lumeo de kapanır. Yine de `hata.log`'u Kurum'ya gönder: yedeğe
+  düşülmesinin bir sebebi var ve o sebep düzeltilebilir.
 - **(Windows) Antivirüs uygulamayı karantinaya aldı:** paket imzalanmadığı için
   bazı kurumsal antivirüsler yanlış-pozitif verebiliyor. Klasörü silme, Kurum'ya
   yaz.

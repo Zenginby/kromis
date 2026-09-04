@@ -186,10 +186,17 @@ jobs:
           # `.icns`i üretiyor), yani oradaki bir yeniden adlandırma gerçekten
           # paketleme aşamasında patlar.
           #
+          # `requirements-dev.txt` 2026-09-04'te EKLENDİ ve sebebi ölçüldü: o
+          # dosya `pyinstaller` ve `pyinstaller-hooks-contrib`i tutuyor, yani
+          # `Python.Runtime.dll`i ve WebView2 DLL'lerini pakete KOYAN hook'ları.
+          # Listede olmadığı sürece Windows paketinin içeriğini değiştiren bir PR
+          # hiçbir paket derletmeden geçiyordu — tam olarak bu kapının var olma
+          # sebebi olan sınıf.
+          #
           # `static/`e dokunan bir PR'da yine de tam matris istenirse yol yukarıdaki
           # `tam-paket` etiketi; kararın kendisi `tests/test_ci_paketleme_kapisi.py`de
           # sentetik diff'lerle koşturuluyor.
-          if echo "$YOLLAR" | grep -qE '^(gpt-image-studio\.spec|build\.sh|build\.ps1|requirements\.txt|android/|\.github/workflows/|branding/)'; then
+          if echo "$YOLLAR" | grep -qE '^(gpt-image-studio\.spec|build\.sh|build\.ps1|requirements(-dev)?\.txt|android/|\.github/workflows/|branding/)'; then
             KARAR=evet
           else
             KARAR=hayir

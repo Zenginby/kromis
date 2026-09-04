@@ -385,15 +385,18 @@
         "errlog",
         "netguard",
         "paths",
-        "screencolor"
+        "screencolor",
+        "version",
+        "winclr"
       ],
       "ithal_eden": [
         "android_main"
       ],
       "katman": 8,
-      "satir": 263,
+      "satir": 507,
       "testler": [
-        "tests/test_desktop.py"
+        "tests/test_desktop.py",
+        "tests/test_windows_acilis.py"
       ],
       "yol": "desktop.py"
     },
@@ -850,6 +853,7 @@
       "ithal": [],
       "ithal_eden": [
         "app",
+        "desktop",
         "guncelleme",
         "tools.surum_karari"
       ],
@@ -865,6 +869,20 @@
         "tests/test_version.py"
       ],
       "yol": "version.py"
+    },
+    {
+      "ad": "winclr",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [
+        "desktop"
+      ],
+      "katman": 0,
+      "satir": 302,
+      "testler": [
+        "tests/test_winclr.py"
+      ],
+      "yol": "winclr.py"
     },
     {
       "ad": "winsec",
@@ -885,6 +903,7 @@
   "modulsuz_testler": [
     "tests/test_android_geri.py",
     "tests/test_android_packaging.py",
+    "tests/test_bagimlilik_pinleri.py",
     "tests/test_ci_paketleme_kapisi.py",
     "tests/test_ci_sizinti.py",
     "tests/test_ci_varlik_saklama.py",
@@ -1225,7 +1244,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 75,
+  "test_dosyasi_sayisi": 78,
   "uc_noktalar": [
     {
       "islev": "index",

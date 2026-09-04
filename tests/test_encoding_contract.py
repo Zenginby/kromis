@@ -47,6 +47,9 @@ ATLANAN_DIZINLER = {
 MUAF = {
     ("os", "open"),            # dosya tanıtıcısı döndürür, metin katmanı yok
     ("Image", "open"),         # PIL: ikili görsel açar, `encoding` parametresi yok
+    # `webbrowser.open` bir DOSYA açmıyor, bir URL'i tarayıcıda açıyor —
+    # dönüşü bool, metin katmanı hiç yok (desktop.py'nin tarayıcı yedeği).
+    ("webbrowser", "open"),
     ("jsonstore", "write_text"),
     ("jsonstore", "read_text"),
 }

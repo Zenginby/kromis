@@ -178,6 +178,24 @@ jobs:
           }
           Write-Host "veri dosyaları tam: $($beklenenler -join ', ')"
 
+          # (4b) .NET yapılandırması exe'nin YANINDA mı?
+          #
+          # `$beklenenler` listesine GİRMİYOR ve sebebi yerleşim: o liste yol
+          # SONEKİYLE aranıyor (PyInstaller datas'ı `_internal/` altına koyuyor),
+          # bu dosya ise tam tersini istiyor — CLR varsayılan AppDomain'in
+          # config'ini `<exe yolu>.config` diye arar ve `_internal/` altındaki
+          # bir kopyayı HİÇ okumaz. Yani "pakette bulundu" yetmez, YER şart:
+          # yanlış yere düşmüş bir kopya "yapıldı" görünür, hiçbir şey yapmaz.
+          # (`tests/test_paket_icerik_listesi.py` `$beklenenler`i ayrıştırıp
+          # depoda arıyor; dosya depoda `branding/Lumeo.exe.config` adıyla
+          # durduğu için o listeye girseydi testi yanlış yere baktırırdı.)
+          $cfg = @($girdiler | Where-Object { $_ -like '*/Lumeo.exe.config' })
+          if ($cfg.Count -ne 1 -or $cfg[0] -ne ($exeGirdi[0] + '.config')) {
+            Write-Host "HATA: Lumeo.exe.config exe'nin yaninda degil: $($cfg -join ', ')"
+            exit 1
+          }
+          Write-Host "net yapilandirmasi: $($cfg[0])"
+
           # (5) Sürüm. exe zip'ten ÇIKARILIP okunuyor, dist/ içindeki kopyadan
           # değil: doğrulanan şey gönderilen dosyanın kendisi olmalı.
           # Bu adım aynı zamanda spec'in derleme-zamanı version.py yüklemesinin
@@ -228,6 +246,151 @@ jobs:
 
           # Yayın varlığının adı: release_manifest.py'deki anahtarla BİREBİR.
           Copy-Item -LiteralPath $zip -Destination 'dist\lumeo-windows-x64.zip' -Force
+
+      # AÇILIŞ KAPISI — üstteki adımların HEPSİ zip'in İÇERİĞİ hakkında, hiçbiri
+      # exe'yi ÇALIŞTIRMIYOR. Bu dosyanın kendi başlığı "yeşil bir koşu tek
+      # başına kanıt değildir" diyor; kapatılmamış kapı buydu. v0.5.2'den beri
+      # Windows paketi bu hâliyle yeşil koşudan geçip yayına çıktı ve
+      # KULLANICIDA HİÇ AÇILMADI (2026-09-04): `webview.start()` → winforms →
+      # `import clr` → clr_loader →
+      #   "Failed to resolve Python.Runtime.Loader.Initialize from
+      #    ...\_internal\pythonnet\runtime\Python.Runtime.dll"
+      #
+      # v0.3.0'da bu güvence VARDI ama ELDEYDİ: `gpt-image-studio.spec`in başlığı
+      # "paket ÇALIŞTIRILDI — pencere açıldı, hata.log yazılmadı" diye kaydediyor.
+      # Elle yapılan doğrulama bir kez yapılır; bu adım onu her koşuya taşıyor.
+      #
+      # NEDEN PENCERE AÇMIYORUZ: runner'da GUI penceresi güvenilir değil ve
+      # ölçmek istediğimiz şey zaten pencere değil, ONDAN ÖNCEKİ halka — .NET
+      # köprüsünün çözülmesi. `Lumeo.exe --onyukleme-denetimi` (desktop.py) tam
+      # olarak onu yapıyor: kademe kademe `import clr` → AddReference →
+      # winforms → `guilib.initialize()`, sonra rapor dosyası + çıkış kodu.
+      # `console=False` olduğu için stdout YOK; raporun tek çıkış yolu o dosya
+      # ve onu görmenin tek yolu koşu günlüğü (varlık deposuna yüklemek yasak —
+      # tests/test_release_manifest.py, 2026-08-28 kotası).
+      #
+      # NEDEN İKİ SENARYO: (a) MOTW'siz = bugüne dek elde doğrulanan hâl,
+      # (b) MOTW'li = KULLANICININ hâli. İnternetten inen zip Dosya Gezgini ile
+      # açıldığında ÇIKAN HER DOSYAYA `Zone.Identifier` akışı yapışıyor ve .NET
+      # güvenilmeyen bölgeden assembly yüklemeyi reddedebiliyor. `ZipFile` bu
+      # akışı YAYMIYOR (yalnız Gezgin yayıyor), o yüzden burada ELLE basılıyor —
+      # yoksa (b) sessizce (a)'nın kopyası olurdu: iki yeşil koşu, tek ölçüm.
+      #
+      # Hangisinin düştüğü DOĞRUDAN teşhis:
+      #   (a) düşerse → sorun pythonnet/clr_loader yığınında (requirements.txt)
+      #   (b) düşerse → sorun MOTW'de (Lumeo.exe.config + winclr + KURULUM.md)
+      #
+      # `if:` YOK: PR'da da (ci.yml) yayın yolunda da koşmalı — kapının bütün
+      # anlamı bu.
+      - name: Açılış denetimi (MOTW'siz ve MOTW'li — kullanıcının ortamı)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+          $zip   = (Resolve-Path -LiteralPath 'dist\Lumeo-windows.zip').Path
+          $veri  = Join-Path $env:LOCALAPPDATA 'Lumeo'
+          $rapor = 'onyukleme-denetimi.txt'
+          $hataVar = $false
+
+          foreach ($senaryo in @(
+            @{ ad = "MOTW yok (yerelde derlenen paket)"; motw = $false },
+            @{ ad = "MOTW var (indirilmis zip)";         motw = $true  }
+          )) {
+            Write-Host "=== acilis denetimi: $($senaryo.ad) ==="
+
+            # Her senaryo KENDİ dizinine açılıyor: ilk koşunun bıraktığı durum
+            # ikincisini yanıltmamalı.
+            $kok = Join-Path $env:RUNNER_TEMP ("acilis-" + [guid]::NewGuid().ToString('N'))
+            [System.IO.Compression.ZipFile]::ExtractToDirectory($zip, $kok)
+            $exe = @(Get-ChildItem -LiteralPath $kok -Recurse -Filter 'Lumeo.exe')[0]
+            if (-not $exe) { Write-Host 'HATA: cikarilan agacta Lumeo.exe yok'; exit 1 }
+
+            if ($senaryo.motw) {
+              # [ZoneTransfer]/ZoneId=3 = "internetten geldi" — Gezgin'in zip
+              # çıkarıcısının yaptığının birebir aynısı. Ağacın TAMAMINA
+              # basılıyor: `winclr`ın dar tarama listesinin körlüğü burada
+              # kırmızıya düşsün diye.
+              #
+              # `-Encoding ascii` AÇIKÇA: 5.1'in varsayılanı ANSI, pwsh 7'ninki
+              # UTF8. BOM'lu bir akış `[ZoneTransfer]` başlığını tanınmaz kılar,
+              # yani damga "var görünür ama yok" olur ve bu adım hiçbir şey
+              # ölçmeden yeşil kalırdı. Bu depo kodlamadan iki kez yandı (bkz.
+              # üstteki CompanyName gerekçesi); doğrulamanın KENDİSİ kodlama
+              # kusuruna açık olamaz.
+              $dosyalar = @(Get-ChildItem -LiteralPath $kok -Recurse -File)
+              foreach ($f in $dosyalar) {
+                Set-Content -LiteralPath $f.FullName -Stream 'Zone.Identifier' `
+                            -Value "[ZoneTransfer]`r`nZoneId=3" -Encoding ascii
+              }
+              # ÖNCÜL DOĞRULAMASI. Bu blok olmadan senaryo (b) senaryo (a)
+              # olurdu — ADS yazılamadığı gün adım hiçbir şey ölçmeden yeşil
+              # kalır ve yalan söyler.
+              $damgali = @($dosyalar | Where-Object {
+                Get-Item -LiteralPath $_.FullName -Stream 'Zone.Identifier' -ErrorAction SilentlyContinue })
+              Write-Host "MOTW damgasi: $($damgali.Count)/$($dosyalar.Count) dosya"
+              if ($damgali.Count -ne $dosyalar.Count) {
+                Write-Host 'HATA: damga butun dosyalara yapismadi — bu senaryo hicbir sey olcmez'
+                exit 1
+              }
+              $ornek = Get-Content -LiteralPath $exe.FullName -Stream 'Zone.Identifier' -Raw
+              if ($ornek -notmatch 'ZoneId=3') {
+                Write-Host "HATA: Zone.Identifier icerigi beklenmedik: $ornek"
+                exit 1
+              }
+            }
+
+            # Önceki koşunun kaydı silinsin ki aşağıda basılan hata.log BU
+            # koşuya ait olsun — yoksa teşhis yanlış senaryoya bakar.
+            Remove-Item -Path (Join-Path $veri 'hata.log*') -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path (Join-Path $veri $rapor)      -Force -ErrorAction SilentlyContinue
+
+            # `& $exe` KAPI DEĞİLDİR. Paket `console=False` (GUI alt sistemi):
+            # kabuk böyle bir exe'yi BEKLEMEZ, hemen döner ve $LASTEXITCODE o
+            # sürecin kodu bile olmaz — `&` ile yazılmış bir kapı, uygulama hiç
+            # açılmasa da yeşil kalırdı, yani bu adımın var olma sebebinin tam
+            # tersi.
+            #
+            # `-NoNewWindow` = UseShellExecute FALSE. Start-Process varsayılanı
+            # ShellExecute'tur ve MOTW'li bir exe'de SmartScreen diyaloğunu
+            # tetikleyebilir: modal pencere runner'da sonsuza kadar bekler.
+            # Ölçtüğümüz şey SmartScreen değil, assembly yükleme BÖLGESİ.
+            $p = Start-Process -FilePath $exe.FullName -ArgumentList '--onyukleme-denetimi' `
+                               -WorkingDirectory $exe.DirectoryName -NoNewWindow -PassThru
+
+            # Zaman aşımı SÜS DEĞİL: açılış hatasında desktop.py MessageBox
+            # gösteriyor (modal) ve iş 45 dakikalık tavana çarpardı — kırmızının
+            # SEBEBİ de görünmez olurdu.
+            if (-not $p.WaitForExit(120000)) {
+              $p.Kill()
+              $hataVar = $true
+              Write-Host 'HATA: acilis denetimi 120 sn icinde bitmedi (modal uyari ya da asili kalma)'
+            } elseif ($p.ExitCode -ne 0) {
+              $hataVar = $true
+              Write-Host "HATA: acilis denetimi cikis kodu $($p.ExitCode)"
+            } else {
+              Write-Host "gecti: $($senaryo.ad)"
+            }
+
+            # Rapor ve hata kaydı HER DURUMDA basılıyor, yalnız kırmızıda değil:
+            # geçen bir koşunun raporu da bilgi taşıyor (seçilen arka uç, DLL
+            # boyutu, .NET sürümü) ve sessiz bir gerileme ancak orada görünür.
+            foreach ($ad in @($rapor, 'hata.log', 'hata.log.1')) {
+              $yol = Join-Path $veri $ad
+              if (Test-Path -LiteralPath $yol) {
+                Write-Host "--- $ad ---"
+                Get-Content -LiteralPath $yol -Encoding utf8
+              }
+            }
+            if (-not (Test-Path -LiteralPath (Join-Path $veri $rapor))) {
+              $hataVar = $true
+              Write-Host 'HATA: rapor dosyasi hic yazilmamis — surec raporu yazmadan oldu'
+            }
+
+            Remove-Item -LiteralPath $kok -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
+          if ($hataVar) { exit 1 }
 
       # TESLİM: paket doğrudan TASLAK yayına yazılıyor — Actions varlığı olarak
       # DEĞİL.

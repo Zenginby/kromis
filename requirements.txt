@@ -5,3 +5,24 @@ pytest==8.*
 Pillow==11.*
 python-multipart==0.0.*
 pywebview==6.2.*
+
+# Windows .NET köprüsü — pywebview'ın KENDİ dolaylı bağımlılıkları
+# (`pythonnet; sys_platform=="win32"`), burada yalnız SÜRÜMLERİ sabitleniyor.
+#
+# NEDEN: pinsiz kaldığı sürece Windows paketinin içeriğini derleme GÜNÜ PyPI'de
+# ne varsa o belirliyordu. Windows işi v0.5.2'de (2026-08-19) doğdu ve CI Python
+# 3.14 kullanıyor; pythonnet 3.0.5 `Requires-Python: <3.14` olduğu için orada
+# ZORUNLU olarak 3.1.0 (2026-05-23) + clr_loader 0.3.1 seçiliyordu. O ikili hiç
+# açılarak doğrulanmamıştı ve kullanıcıda paket hiç açılmadı (2026-09-04,
+# "Failed to resolve Python.Runtime.Loader.Initialize"). Sürümün YAZILI olması,
+# bir dahaki sefere neyin değiştiğini tahmin değil kayıt yapar.
+#
+# İŞARETÇİ ŞART: bu dosya Linux (_test.yml) ve macOS'ta da kuruluyor; işaretçi
+# olmadan pip oralara da .NET köprüsü kurar ve macOS paketine girer.
+#
+# Yama hanesi BİLEREK serbest (deponun geleneği, bkz. üstteki satırlar): bu
+# kusuru düzeltecek bir 3.1.x kendiliğinden gelsin. Onu güvenli kılan şey
+# `_paket-windows.yml`'deki açılış denetimi — pin ile kapı BİRLİKTE anlamlı,
+# ayrı ayrı değil.
+pythonnet==3.1.*; sys_platform == "win32"
+clr-loader==0.3.*; sys_platform == "win32"

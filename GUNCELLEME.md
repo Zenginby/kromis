@@ -155,6 +155,14 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.13.1 — ne değişti
+
+- CI açılış kapısını kendi kusuru düşürüyordu — guilib ad çakışması
+- kod denetiminin dört bulgusu — üçü sessiz yalan, biri gürültü
+- indirilen paket hiç açılmıyordu — .NET köprüsü + açılış kapısı
+
+---
+
 ## Sürüm 0.13.0 — ne değişti
 
 - Video üretimi geldi: composer'ın üçüncü modu (Görsel · Video · Yönetmen). Metinden video üretebiliyor ya da galerideki bir görseli tek tıkla canlandırabiliyorsun; model Gemini · Veo 3.1'in üç kademesi (Lite · Fast · tam) ve anahtar zaten girdiğin Gemini anahtarı — Ayarlar'a yeni bir alan gelmedi. Yeni ayar SÜRE (4, 6 ya da 8 saniye) ve kredi tahmini süreyle çarpılıyor, çünkü video tarifesi saniye başına. Üretilen video geçmişe kaydediliyor, Medya'da oynatılabiliyor, büyüteçte tam ekran açılıyor ve .mp4 olarak indirilebiliyor. NOT: video üretimi 1-6 dakika sürüyor ve o süre boyunca sekmeyi açık bırakmalısın; ayrıca Veo'nun ücretsiz kademesi YOK — Gemini anahtarının bağlı olduğu projede faturalandırma açık olmak zorunda.

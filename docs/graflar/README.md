@@ -20,7 +20,7 @@
 * 78 test dosyası; 3 modülü hiçbir test ithal etmiyor, 8 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
 * 1 ithal döngüsü, 0 rotaya oturmayan tarayıcı çağrısı
 
-En büyük dosyalar: `app` (2090), `catalog` (1035), `models` (921), `veo_client` (590), `desktop` (558).
+En büyük dosyalar: `app` (2104), `catalog` (1035), `models` (921), `veo_client` (590), `desktop` (558).
 En çok ithal edilenler: `catalog` (11), `azure_client` (10), `jsonstore` (8), `credstore` (7), `paths` (6).
 
 ## Nasıl güncellenir

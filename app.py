@@ -597,6 +597,20 @@ async def animate(
     KALIYOR ve bu doğru: bir videoyu ilk kare olarak göndermek anlamsız,
     404 doğru cevap (bkz. `_output_media_path`in docstring'i).
     """
+    # BOŞ FORM ALANI "VERİLMEDİ" DEMEK. Bütün alanlarını koşulsuz serileştiren
+    # bir istemci `last_source_id=""` yolluyor ve `is not None` onu "bitiş
+    # görseli var" sayardı: yeteneği olmayan bir modelde hiç bitiş karesi
+    # TAŞIMAYAN bir istek 422 yer, yetenekli modelde `_output_png_path("")`
+    # 404 döner — ikisi de kullanıcının yapmadığı bir şeyi anlatan mesajlar.
+    # `_extra_refs` galeri id'lerini tam bu yüzden `v.strip()` ile süzüyor.
+    # Normalleştirme kapıdan ÖNCE: kapı ile rota AYNI değeri görmek zorunda.
+    #
+    # `last_file`in İKİZİ YOK ve gerekmiyor: dosya adı olmayan bir parçayı
+    # Starlette `str` olarak çözüyor, declared `UploadFile | None` da onu daha
+    # buraya varmadan 422 yapıyor (`_extra_refs`in ham formu okumasının
+    # gerekçesi tam bu). Ana karenin `file` alanı da aynı davranıyor — burada
+    # ayrı bir süzgeç açmak iki kardeş alanı sessizce ayrıştırırdı.
+    last_source_id = (last_source_id or "").strip() or None
     model_id = _check_video_form(prompt, size, quality, duration, n,
                                  file, source_id, model,
                                  last_file, last_source_id)
@@ -620,7 +634,7 @@ async def animate(
     # olarak göndermenin karşılığı yok (ana karenin aynı kararı).
     son_kare = None
     if last_source_id is not None:
-        son_kare = _read_png_file(_output_png_path(os.path.basename(last_source_id)))
+        son_kare = _read_png_file(_output_png_path(last_source_id))
     elif last_file is not None:
         son_kare = await _read_upload_png(last_file)
 

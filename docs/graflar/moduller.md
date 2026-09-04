@@ -23,7 +23,7 @@ flowchart TD
     n_netguard["netguard<br/>157 satır"]
   end
   subgraph katman6["katman 6"]
-    n_app["app<br/>2090 satır"]
+    n_app["app<br/>2104 satır"]
   end
   subgraph katman5["katman 5"]
     n_chat_providers["chat_providers<br/>124 satır"]
@@ -178,7 +178,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | modül | satır | katman | ithal ettiği | ithal eden | test |
 | --- | --- | --- | --- | --- | --- |
 | `android_main.py` | 194 | 9 | `app` (erteli), `desktop` (erteli), `errlog` (erteli), `paths` (erteli) | 0 | 1 |
-| `app.py` | 2090 | 6 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 30 |
+| `app.py` | 2104 | 6 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 30 |
 | `assets_store.py` | 201 | 1 | `jsonstore` | 3 | 9 |
 | `azure_client.py` | 458 | 1 | `paths`, `winsec` | 10 | 27 |
 | `backup.py` | 187 | 3 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 1 | 1 |
@@ -207,7 +207,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `providers.py` | 389 | 3 | `azure_client`, `catalog`, `credstore`, `gemini_client` (erteli), `openai_client` (erteli), `veo_client` (erteli) | 5 | 5 |
 | `release_manifest.py` | 70 | 0 | — | 0 | 2 |
 | `screencolor.py` | 150 | 0 | — | 1 | 1 |
-| `storage.py` | 415 | 1 | `catalog`, `jsonstore` | 4 | 9 |
+| `storage.py` | 415 | 1 | `catalog`, `jsonstore` | 4 | 10 |
 | `veo_client.py` | 590 | 3 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `version.py` | 27 | 0 | — | 4 | 7 |
 | `winclr.py` | 331 | 0 | — | 1 | 1 |

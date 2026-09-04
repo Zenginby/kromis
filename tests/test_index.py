@@ -3680,10 +3680,16 @@ def test_the_picker_note_shows_the_reason_not_just_the_counter():
     ekleme ANINDA, çağrı yerinde veriliyor — çünkü ekleme başarılı olduğunda
     seçili karo ARTIK ek listesindedir ve `why` o an da doludur, yani onay
     `renderPickerSide`'a bırakılsa hiç görünmezdi.
+
+    İfadenin BAŞINA sonradan bir hedef dalı geldi (`pickerHedef === "last"`) ve
+    bu iddiayı zayıflatmıyor, kapsamını daraltıyor: notun iki cümlesi de
+    "+ Ek" düğmesinin hikâyesi ve o düğme bitiş karesi dalında hiç yok. Sıra
+    hâlâ ölçülüyor — `why` sayaçtan ÖNCE.
     """
     picker = _picker_js()
     # 1) Notun ifadesi GEREKÇEYLE başlıyor; sayaç yalnız gerekçe yokken.
-    assert re.search(r'"picker-note"\)\.textContent\s*=\s*why\s*\|\|', picker), (
+    assert re.search(r'"picker-note"\)\.textContent\s*=.*?\bwhy\s*\|\|',
+                     picker, re.S), (
         "sayaç gerekçeyi eziyor: kapalı düğme açıklamasız kalır")
     # 2) Onay çağrı yerinde: ekleme başarılıysa fiil O AN yazılıyor.
     assert re.search(

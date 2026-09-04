@@ -1190,11 +1190,18 @@ function resultThumb(imageId, index, caption, videoMu = false, oran = "") {
   // Oran CSS'ten `:has()` ile DEĞİL buradan geliyor: metadata inene kadar
   // `<video>` 300×150 durur ve kutu sonradan zıplardı. `params.size` zaten bu
   // dosyanın okuduğu alan (`resultCaption`), ikinci bir gerçek kaynağı yok.
-  if (videoMu && oran.includes(":")) {
-    fig.style.aspectRatio = oran.replace(":", " / ");
-    // İmleç de düzeltiliyor: `.chat-media`nın `zoom-in`i video kartında yalan
-    // söylüyordu — büyüteç bağlanmıyor.
+  //
+  // SINIF ORANDAN AYRI DURUYOR. `.video` iki işi birden yapıyor ve ikisinin de
+  // orana bağımlılığı YOK: `.chat-media`nın `zoom-in` imlecini düzeltiyor
+  // (video kartına büyüteç bağlanmıyor, aşağıdaki `if (!videoMu)`) ve indirme
+  // şeridini denetim çubuğunun üstünden çekiyor (style.css). `params.size`
+  // BİLEREK allowlist'siz (`models.ResultParams`), yani iki nokta içermeyen
+  // bir değer ulaşılabilir — eski bir döküm, içe aktarılmış bir oturum ya da
+  // oranı jeton olarak yazmayan bir model. Tek koşula bağlanmış olsalardı o
+  // hâlde İKİ düzeltme birden düşerdi.
+  if (videoMu) {
     fig.classList.add("video");
+    if (oran.includes(":")) fig.style.aspectRatio = oran.replace(":", " / ");
   }
 
   const num = document.createElement("span");
@@ -1428,7 +1435,11 @@ function arenaColumn(row, msg, arenaId) {
   // yerine kaydın kendisine sormak, arena bir gün video da koşturursa
   // burada hatırlanacak bir şey bırakmıyor.
   const videoMu = sonucVideoMu(msg);
-  ids.forEach((id, i) => grid.appendChild(resultThumb(id, i, caption, videoMu)));
+  // ORAN DA GEÇİYOR, aynı gerekçeyle: `videoMu`yu kayda sormak ama oranı
+  // sormamak yarım bir hazırlık olurdu — arena bir gün video koşturursa kart
+  // kare çizilir, klip şeritlenir ve `.video` sınıfı hiç eklenmediği için
+  // indirme hapı denetim çubuğunun üstünde kalırdı. `p.size` zaten burada.
+  ids.forEach((id, i) => grid.appendChild(resultThumb(id, i, caption, videoMu, p.size || "")));
   col.appendChild(grid);
 
   // Kazanan işareti: iki durumlu düğmenin depodaki standart deseni

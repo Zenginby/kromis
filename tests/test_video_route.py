@@ -472,3 +472,50 @@ def test_the_duration_axis_is_EMPTY_for_image_models(client):
     for m in s["video_models"]:
         assert m["durations"], f"{m['id']} süre taşımıyor"
         assert m["default_duration"] in [d["value"] for d in m["durations"]]
+
+
+def test_an_EMPTY_last_source_id_means_no_end_frame(client, monkeypatch):
+    """Boş form alanı "verilmedi" demek — "verildi ama boş" değil.
+
+    Bütün alanlarını koşulsuz serileştiren bir istemci `last_source_id=""`
+    yolluyor. `is not None` onu "bitiş görseli var" sayıyordu ve iki ayrı yanlış
+    cevap üretiyordu: yeteneği olmayan bir modelde hiç bitiş karesi TAŞIMAYAN
+    bir istek "… bitiş görseli almıyor." diye 422 yiyor, yetenekli modelde ise
+    `_output_png_path("")` "Kaynak görsel bulunamadı." diye 404 dönüyordu.
+    İkisi de kullanıcının yapmadığı bir şeyi anlatıyor.
+
+    `_extra_refs` galeri id'lerini tam bu yüzden `strip()` ile süzüyor; buradaki
+    normalleştirme de kapıdan ÖNCE, yani kapı ile rota AYNI değeri görüyor.
+    """
+    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+    gorulen = _son_kare_yakala(monkeypatch)
+
+    r = client.post("/api/video/animate",
+                    data={**GECERLI, "last_source_id": "   "},
+                    files={"file": ("a.png", _png(), "image/png")})
+
+    assert r.status_code == 200, r.text
+    assert gorulen["last_frame"] is None
+
+
+def test_a_last_file_part_WITHOUT_a_filename_is_refused_BEFORE_the_route(client,
+                                                                        monkeypatch):
+    """Dosya tarafında ikiz bir süzgeç YOK ve olmamalı — mandallanan bu.
+
+    Starlette dosya adı olmayan bir parçayı `UploadFile` değil düz `str` olarak
+    çözüyor, declared `last_file: UploadFile | None` da onu rota gövdesine
+    varmadan 422 yapıyor (`_extra_refs`in ham formu okumasının gerekçesi tam
+    bu). Ana karenin `file` alanı da BİREBİR aynı davranıyor; `last_file` için
+    ayrı bir süzgeç açmak iki kardeş alanı sessizce ayrıştırmak olurdu.
+
+    Yani `last_source_id`in boş-dize normalleştirmesinin dosya tarafında bir
+    karşılığı yok — ve bu bir eksik değil, ölçülmüş bir sınır.
+    """
+    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+
+    r = client.post("/api/video/animate", data=GECERLI,
+                    files={"file": ("a.png", _png(), "image/png"),
+                           "last_file": ("", b"", "application/octet-stream")})
+
+    assert r.status_code == 422
+    assert "last_file" in r.text

@@ -142,6 +142,17 @@ function setMode(modeName) {
     el.classList.toggle("active", ad === mode);
   }
 
+  // BİTİŞ GÖRSELİ VİDEONUN DURUMU, uygulamanın değil. Yuvası `.frames-panel`
+  // ile birlikte video dışındaki modlarda gizleniyor ve `run()`ın görsel /
+  // yönetmen dalları `last_*` göndermiyor — taşınan bir seçim GÖRÜNMEZ ve
+  // SİLİNEMEZ bir hâle düşerdi: kullanıcı varlığını göremediği bir şeyi
+  // kaldıramaz.
+  //
+  // EK REFERANSLARLA AYRIM BİLİNÇLİ: onlar görselin durumu ve video modunda
+  // yalnız ATIL kalıyorlar — `goBlockReason` gerekçeyi yazıyor, şerit
+  // yerinde duruyor, moda dönünce hepsi geri geliyor. Son karenin video
+  // dışında ne bir yüzeyi ne de bir anlamı var.
+  if (mode !== "video") clearSonKare();
   syncPromptPlaceholder();
   renderSource();
   syncTabThumb();

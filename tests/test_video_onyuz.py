@@ -28,6 +28,7 @@ from fastapi.testclient import TestClient
 import app as appmod
 import catalog
 import models
+import storage
 
 
 def _metin(yol: str) -> str:
@@ -517,20 +518,31 @@ def test_the_DURATION_echo_is_checked_for_a_stale_server():
 
 
 def test_the_gallery_tile_is_a_VIDEO_for_video_records():
-    """Ölçüt `kind` ve küme İKİ ÜYELİ — `chat.js`in aynasıyla birebir.
+    """Ölçüt `kind` ve küme TEK ÜYELİ — `chat.js`in listesiyle KASITLI OLARAK
+    aynı değil.
 
-    Tek üyeli (`kind === "video"`) hâli bugün de doğru cevabı veriyordu, çünkü
-    `app.py` her iki uçta da `"kind": "video"` yazıyor. Ama iki aynanın FARKLI
-    olması sessiz bir ayrışma: bir gün `animate` kaydı düşerse galeri
-    `<img src="….mp4">` çizer, kırık resim gösterir ve hiçbir yerde hata
-    görünmez. İki listenin AYNI olması bu yüzden mandallanıyor.
+    İki alan aynı adı taşıyor ama aynı sözlükten gelmiyor: `chat.js` DÖKÜM
+    kaydının `params.kind`ini okuyor (`models.ResultParams`: generate / edit /
+    video / animate), galeri ise DEPO kaydının `kind`ini ve onun sözlüğü
+    `storage.MEDIA_EXTS` — uzantıyı belirleyen tek eşleme, ve orada yalnız
+    `"video"` var.
+
+    `"animate"`i galeri kümesine eklemek bu yüzden aynayı düzeltmez BOZAR:
+    öyle bir kayıt `ext_for`un varsayılanıyla diske `.png` yazılır, galeri de
+    bir PNG'ye `<video>` çizer — karo boş kalır, "Referans yap" gerçek bir
+    görselde kaybolur, büyüteç durağan bir kareye oynatıcı açar. Kümenin ayna
+    tutacağı yer `storage.MEDIA_EXTS`; iki listenin AYRI olması bu testin
+    ölçtüğü şeyin ta kendisi.
     """
     js = _kodsuz(_folders())
 
     assert "function kayitVideoMu(rec)" in js
-    assert 'const VIDEO_KAYIT_TURLERI = ["video", "animate"]' in js
+    assert 'const VIDEO_KAYIT_TURLERI = ["video"]' in js
     assert "VIDEO_KAYIT_TURLERI.includes((rec || {}).kind)" in js
-    # `chat.js`teki ikizi AYNI iki üyeyi taşıyor.
+    # Küme, uzantıyı belirleyen eşlemenin AYNISI — kaynaktan okunuyor, elle
+    # yazılmış bir kopya değil.
+    assert set(storage.MEDIA_EXTS) == {"video"}
+    # `chat.js`in listesi AYRI ve öyle kalmalı: farklı soru, farklı sözlük.
     assert 'const VIDEO_RESULT_KINDS = ["video", "animate"]' in _kodsuz(_chat())
     govde = _govde(js, "renderGallery")
     assert 'document.createElement(videoMu ? "video" : "img")' in govde
@@ -815,3 +827,157 @@ def test_the_OVERLAY_button_is_closed_for_a_video_record():
     büyüteçteki `#viewer-logo`) kapalı."""
     assert '!rec || rec.kind === "video"' in _kodsuz(_core())
     assert "logoBtn.hidden = !kayit || videoKipi" in _kodsuz(_viewer())
+
+
+# ── Mobil çizim: incelemenin açtığı ikinci tur ─────────────────────────
+
+
+def test_the_DOWNLOAD_pill_moves_off_the_video_control_bar():
+    """`<video controls>`ün denetim çubuğu görünür olunca indirme hapı ONUN
+    ÜSTÜNE düştü — düzeltmenin kendi kendini yarı yarıya geri alması.
+
+    `.chat-media-actions` sağ-ALTTA ve `z-index: 3`; oynatıcının denetim
+    çubuğu da elemanın alt kenarında ve TAM EKRAN düğmesi o çubuğun sağ
+    ucunda. Masaüstünde hap yalnız `:hover`da beliriyor, ama dokunmatikte
+    `:hover` hiç tetiklenmediği için kalıcı opak (`mobile.css`) — yani tam
+    ekrana basmak mp4'ü indiriyordu. Kullanıcının bildirdiği kusur
+    ("stüdyoda video oynatılamıyor") tam da bu düğmenin altında sürerdi.
+
+    Şerit yalnız VİDEODA taşınıyor: görsel kartında altta çakışacak bir
+    denetim yok ve künye (`.chat-media-num`) üst-SOLDA, yani üst-sağ boş.
+    """
+    css = _css()
+
+    assert re.search(
+        r"\.chat-media\.video \.chat-media-actions \{[^}]*top: 8px;"
+        r"[^}]*bottom: auto;", css), (
+        "indirme hapı video kartında denetim çubuğunun üstünde duruyor")
+    # Görselde şerit YERİNDE: taşıma koşulsuz değil.
+    assert re.search(r"^\.chat-media-actions \{[^}]*bottom: 8px", css, re.M)
+
+
+def test_the_VIDEO_class_does_not_depend_on_parsing_the_aspect_ratio():
+    """`.video` sınıfı ile oran AYRI koşullar — ikisi tek kapıya bağlıydı.
+
+    Sınıf iki iş yapıyor ve ikisinin de orana bağımlılığı yok: `.chat-media`nın
+    `zoom-in` imlecini düzeltiyor (video kartına büyüteç bağlanmıyor) ve
+    indirme şeridini denetim çubuğunun üstünden çekiyor. `params.size` ise
+    BİLEREK allowlist'siz (`models.ResultParams`), yani iki nokta içermeyen bir
+    değer ulaşılabilir: eski bir döküm, içe aktarılmış bir oturum, oranı jeton
+    olarak yazmayan bir model. Tek koşulda iki düzeltme birden düşerdi.
+    """
+    govde = _govde(_kodsuz(_chat()), "resultThumb")
+
+    assert 'videoMu && oran.includes(":")' not in govde, (
+        "sınıf orana bağlı: oran ayrıştırılamazsa imleç ve hap düzeltmesi düşer")
+    assert re.search(r"if \(videoMu\) \{\s*fig\.classList\.add\(\"video\"\);",
+                     govde)
+    assert 'if (oran.includes(":")) fig.style.aspectRatio' in govde
+
+
+def test_the_ARENA_column_hands_the_aspect_ratio_over_too():
+    """`arenaColumn` `videoMu`yu kayda SORUYOR ama oranı geçirmiyordu.
+
+    Sorunun gerekçesi yerinde yazılı: "arena bir gün video koşturursa burada
+    hatırlanacak bir şey kalmasın". Yarım bırakılınca o gün kart KARE çizilir,
+    klip şeritlenir ve `.video` sınıfı hiç eklenmediği için indirme hapı yine
+    denetim çubuğunun üstünde kalır — yani `appendResult` yolunda düzeltilen
+    kusurun aynısı ikinci yolda ayakta kalırdı. `p.size` zaten kapsamda.
+    """
+    govde = _govde(_kodsuz(_chat()), "arenaColumn")
+
+    assert 'resultThumb(id, i, caption, videoMu, p.size || "")' in govde
+
+
+def test_LEAVING_video_mode_drops_the_end_frame():
+    """Bitiş görseli VİDEONUN durumu: mod değişince gidiyor.
+
+    Yuvası `.frames-panel` ile birlikte video dışındaki modlarda gizleniyor ve
+    `run()`ın görsel/yönetmen dalları `last_*` göndermiyor — taşınan bir seçim
+    GÖRÜNMEZ ve SİLİNEMEZ olurdu: kullanıcı varlığını göremediği bir şeyi
+    kaldıramaz. 993b56f'in palet için kapattığı kusurun aynısı, yeni eksende.
+
+    EK REFERANSLARLA AYRIM BİLİNÇLİ ve ölçülüyor: onlar video modunda yalnız
+    ATIL kalıyor (şerit duruyor, `goBlockReason` gerekçeyi yazıyor, moda
+    dönünce hepsi yerinde). Son karenin video dışında ne yüzeyi var ne anlamı.
+    """
+    js = _kodsuz(_core())
+    govde = _govde(js, "setMode")
+
+    assert 'if (mode !== "video") clearSonKare();' in govde
+    # Temizlik ÇİZİMDEN önce: `renderSource` yuvayı da çiziyor, sonra
+    # temizlenseydi bir kare dolu görünürdü.
+    assert govde.index("clearSonKare()") < govde.index("renderSource()")
+    # Ek referanslar AYNI yerde temizlenmiyor — ayrım kasıtlı.
+    assert "clearExtras()" not in govde
+
+
+def test_the_picker_REOPENS_the_panel_it_was_opened_from():
+    """Kare yuvalarının "Galeri" düğmeleri ayar sayfasının İÇİNDE ve
+    `openPicker` paneli kapatmak ZORUNDA (`.sheet` ile `.modal` aynı z-index
+    50'yi paylaşıyor). Panel kapanınca iki şey birden kayboluyordu:
+
+      • GERİ BİLDİRİM — `setSonKareGallery` yalnız `#last-frame-img`i boyuyor,
+        o da yuvanın içinde. Kullanıcı composer'a dönüyor, değişen tek piksel
+        görünmüyor, `#status` sessiz: bitiş karesinin atanıp atanmadığını
+        anlamanın tek yolu paneli yeniden açmak.
+      • ODAK — `pickerOdakHedefi`nin `[hidden]` kontrolü bu hâli GÖREMİYOR:
+        `.sheet` `hidden` özniteliğiyle değil `.open` sınıfıyla kapanıyor,
+        kapalı hâli `visibility: hidden`. Düğüm DOM'da ve `[hidden]` bir kabın
+        içinde değil, ama `.focus()` sessizce hiçbir şey yapmıyor — odak
+        `<body>`ye düşüyordu, yani `pickerOdakHedefi`nin kapattığı kusurun
+        BEŞİNCİ kopyası.
+
+    Paneli geri açmak ikisini de tek hamlede kurtarıyor.
+    """
+    js = _kodsuz(_folders())
+
+    ac = _govde(js, "openPicker")
+    assert 'document.querySelector(".sheet.open")' in ac
+    # Panel `closeSheets()`ten ÖNCE okunuyor, yoksa hep boş bulunurdu.
+    assert ac.index("pickerPanel = acikPanel") < ac.index("closeSheets();")
+
+    kapa = _govde(js, "closePicker")
+    assert "openSheet(pickerPanel)" in kapa
+    # PANEL ÖNCE, ODAK SONRA: kapalı bir panelin düğmesine odaklanmak sessizce
+    # başarısız olur.
+    assert kapa.index("openSheet(pickerPanel)") < kapa.index("pickerOdakHedefi()")
+    # `closeSheets` `aria-expanded`ı false'a çekti; iz bırakmadan dönmek onu
+    # da kapsıyor.
+    assert '"aria-expanded", "true"' in kapa
+
+
+def test_the_EXTRA_reference_reason_is_SILENT_in_the_end_frame_branch():
+    """`#picker-note`un iki cümlesi de "+ Ek" düğmesinin hikâyesi — ve o düğme
+    bitiş karesi dalında hiç yok (`#picker-use-extra` gizli).
+
+    Üstelik `extraBlockReason` video modunda HER kayıt için "Video tek referans
+    görsel alıyor (ilk kare)." diyor: hemen yanında ETKİN duran "Bitiş karesi
+    yap" düğmesiyle açıkça çelişen bir cümle. Kullanıcı hangisine inanacağını
+    bilemezdi — düğme mi çalışıyor, not mu doğru?
+    """
+    govde = _govde(_kodsuz(_folders()), "renderPickerSide")
+
+    assert '$("picker-note").textContent = pickerHedef === "last" ? ""' in govde
+    # Sayaç da susuyor: o da aynı düğmenin okuması.
+    assert re.search(
+        r'"picker-note"\)\.textContent = pickerHedef === "last" \? ""\s*'
+        r': \(why \|\|', govde)
+
+
+def test_the_END_FRAME_file_input_is_RESET_after_every_change():
+    """`setSonKareUpload` kabul etmediği bir türü REDDEDİYOR ve girdinin değeri
+    kalırsa kullanıcı AYNI dosyayı yeniden seçtiğinde `change` HİÇ tetiklenmez:
+    ikinci denemede uygulama ölü görünür, bir mesaj bile çıkmaz.
+
+    `extra-file-input`in aynı satırı, aynı gerekçeyle — ve `clearSonKare` da
+    (× yolu) zaten sıfırlıyordu, eksik olan yalnız RET yoluydu. Kabul edilen
+    dosyada zararsız: `sonKare.file` `File` nesnesini tutuyor, girdinin
+    değerini değil.
+    """
+    js = _kodsuz(_folders())
+    m = re.search(r'\$\("last-frame-input"\)\.addEventListener\("change",'
+                  r' \(\) => \{(.*?)\n\}\);', js, re.S)
+    assert m, "#last-frame-input change dinleyicisi bulunamadı"
+
+    assert '$("last-frame-input").value = "";' in m.group(1)

@@ -2486,6 +2486,16 @@ body.viewer-open { overflow: hidden; }
 /* Video kartında büyüteç YOK (chat.js: denetimler zaten kartın içinde), yani
    `zoom-in` imleci olmayan bir eylemi vaat ediyordu. */
 .chat-media.video { cursor: default; }
+/* İNDİRME ŞERİDİ VİDEODA ÜSTE TAŞINIYOR. `.chat-media-actions` sağ-ALTTA ve
+   `z-index: 3`; `<video controls>`ün kendi denetim çubuğu da elemanın ALT
+   kenarında ve tam ekran düğmesi o çubuğun SAĞ ucunda — yani hap tam onun
+   üstüne düşüyordu. Masaüstünde hap yalnız `:hover`da beliriyor, ama
+   dokunmatikte `:hover` hiç tetiklenmediği için kalıcı opak (mobile.css) ve
+   tam ekrana basmak mp4'ü indiriyordu: bu turun görünür kıldığı denetim
+   çubuğunu yarı yarıya geri alan bir örtüşme.
+   Üst-SAĞ boş: künye (`.chat-media-num`) üst-SOLDA. Görselde şerit YERİNDE
+   KALIYOR — orada altta çakışacak bir denetim yok. */
+.chat-media.video .chat-media-actions { top: 8px; bottom: auto; }
 .chat-media:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Künye ve eylem: `pointer-events` KAPALI olan yalnızca sayı — düğme
    tıklanabilir kalmak zorunda (indirme büyüteci açmasın diye JS'te de

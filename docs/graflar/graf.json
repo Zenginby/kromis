@@ -941,7 +941,7 @@
           "/output/{}.${videoMu "
         ],
         "dosya": "static/chat.js",
-        "satir": 2431,
+        "satir": 2453,
         "tanim": 87
       },
       {
@@ -968,10 +968,11 @@
           "/api/history",
           "/api/images",
           "/api/import",
-          "/output/{}"
+          "/output/{}",
+          "/output/{}${videoMu "
         ],
         "dosya": "static/folders.js",
-        "satir": 1881,
+        "satir": 1899,
         "tanim": 58
       },
       {

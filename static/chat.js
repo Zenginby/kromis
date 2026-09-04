@@ -1176,9 +1176,26 @@ function resultCaption(msg) {
  * gerçekten yoksa `/output/{id}.png` 404 döner. Gerçek koşulu ölçmek, ayrıca
  * tutulacak bir liste de bırakmıyor.
  */
-function resultThumb(imageId, index, caption, videoMu = false) {
+function resultThumb(imageId, index, caption, videoMu = false, oran = "") {
   const fig = document.createElement("figure");
   fig.className = "chat-media";
+
+  // KARENİN ORANI VİDEODA SABİT DEĞİL. `.chat-media` görsel için kare çiziyor
+  // (`aspect-ratio: 1`) ve `overflow: hidden` taşanı kırpıyor; bir 16:9 video o
+  // kutuda kendi doğal ölçüsüyle (1280×720) yerleşince oynatıcının denetim
+  // çubuğu karenin ALTINDA kalıp kırpılıyordu — mobilde videoyu oynatmanın TEK
+  // yolu kapanıyordu, çünkü video kartına tıklama da bilerek bağlanmıyor
+  // (aşağıdaki `if (!videoMu)`).
+  //
+  // Oran CSS'ten `:has()` ile DEĞİL buradan geliyor: metadata inene kadar
+  // `<video>` 300×150 durur ve kutu sonradan zıplardı. `params.size` zaten bu
+  // dosyanın okuduğu alan (`resultCaption`), ikinci bir gerçek kaynağı yok.
+  if (videoMu && oran.includes(":")) {
+    fig.style.aspectRatio = oran.replace(":", " / ");
+    // İmleç de düzeltiliyor: `.chat-media`nın `zoom-in`i video kartında yalan
+    // söylüyordu — büyüteç bağlanmıyor.
+    fig.classList.add("video");
+  }
 
   const num = document.createElement("span");
   num.className = "chat-media-num";
@@ -1314,7 +1331,12 @@ function appendResult(msg) {
   // (`models.MAX_IMAGES_PER_RUN`), burada aynalanacak bir şey yok — CSS
   // yalnızca "1 mi, 2 mi, daha fazla mı" sorusunu soruyor.
   grid.dataset.count = String(ids.length);
-  ids.forEach((id, i) => grid.appendChild(resultThumb(id, i, caption, videoMu)));
+  // ORAN da bir kez sorulup ızgaranın tamamına veriliyor (türle aynı gerekçe).
+  // Video modellerinde `params.size` ZATEN bir oran jetonu ("16:9"/"9:16",
+  // `catalog.VIDEO_ASPECT_RATIOS`); görselde "1024x1024" biçiminde ve orada
+  // hiç okunmuyor.
+  const oran = (msg.params || {}).size || "";
+  ids.forEach((id, i) => grid.appendChild(resultThumb(id, i, caption, videoMu, oran)));
   div.appendChild(grid);
 
   $("chat-log").appendChild(div);

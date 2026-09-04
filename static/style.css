@@ -1576,8 +1576,16 @@ body.select-mode #select-toggle,
 .card { position: relative; background: var(--panel-2); border-radius: var(--r-item, 12px); overflow: hidden; }
 /* zoom-in: karo artık büyüteci açıyor. İmleç bunu söylemeli, yoksa özellik
    keşfedilmez (`.preview-img`'de zaten yazılmış kural). Seçim modunda
-   `body.select-mode .card img` özgüllükle kazanıp pointer'a döndürüyor. */
-.card img { width: 100%; display: block; aspect-ratio: 1; object-fit: cover; cursor: zoom-in; }
+   `body.select-mode .card :is(img, video)` özgüllükle kazanıp pointer'a
+   döndürüyor. */
+/* `:is(img, video)` — YALNIZ `img` yazmak, video karosunu kuralsız bırakıyordu:
+   `<video>` doğal ölçüsüne (1280×720) açılıyor, `.gallery`de `grid-auto-rows`
+   olmadığı için satır o boya çıkıyor ve `align-items: stretch` yüzünden aynı
+   satırdaki GÖRSEL kartları da geriliyordu — kullanıcının gördüğü "aşağı doğru
+   uzayan karolar" bu. Karo KARE kalıyor: ızgaranın tekdüzeliği ızgaranın
+   anlamı ve burada çizilen bir sonuç değil bir küçük resim (stüdyo kartının
+   `contain` kararından bilerek ayrılıyor). */
+.card :is(img, video) { width: 100%; display: block; aspect-ratio: 1; object-fit: cover; cursor: zoom-in; }
 .card-del {
   position: absolute; top: 6px; right: 6px; z-index: 2;
   width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%;
@@ -1913,7 +1921,7 @@ body.select-mode #select-toggle,
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: var(--accent-surface, var(--accent-wash));
 }
-body.select-mode .card, body.select-mode .card img { cursor: pointer; }
+body.select-mode .card, body.select-mode .card :is(img, video) { cursor: pointer; }
 /* Seçim modunda karonun TEK işi seçmek: eylem şeridi ve silme düğmesi çekilir.
    Kart tıklaması ikisini zaten dışlıyor (folders.js `closest(".acts, .card-del,
    .card-check")`), yani ekranda kaldıkları sürece SEÇİLMEYEN bir alan
@@ -2408,6 +2416,22 @@ body.viewer-open { overflow: hidden; }
   aspect-ratio: 1; cursor: zoom-in;
 }
 .chat-media > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* `> img` bir `<video>`ye DEĞMİYOR ve depoda `<video>` etiketini hedefleyen
+   başka kural da yoktu (tek istisna `#viewer-video`, o da `class="viewer-img"`
+   sayesinde). Kuralsız bir `<video>` kendi doğal ölçüsüyle (720p'de 1280×720)
+   yerleşiyor: kutu taşıyor, `overflow: hidden` kırpıyor ve oynatıcının denetim
+   çubuğu görünür alanın dışında kalıyordu — mobilde video oynatılamıyordu.
+
+   `contain` + siyah zemin: kartın oranı `params.size`ten geliyor (chat.js), ama
+   modelin döndürdüğü klip teoride başka bir orana düşerse kırpmak yerine
+   şeritlemek doğru — kullanıcının parasını ödediği kare kesilmemeli. */
+.chat-media > video {
+  width: 100%; height: 100%; object-fit: contain; display: block;
+  background: #000;
+}
+/* Video kartında büyüteç YOK (chat.js: denetimler zaten kartın içinde), yani
+   `zoom-in` imleci olmayan bir eylemi vaat ediyordu. */
+.chat-media.video { cursor: default; }
 .chat-media:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Künye ve eylem: `pointer-events` KAPALI olan yalnızca sayı — düğme
    tıklanabilir kalmak zorunda (indirme büyüteci açmasın diye JS'te de

@@ -1526,9 +1526,18 @@ async function loadHistory() {
  * kaydın SÖZLEŞMESİ (uzantı ondan türetiliyor, bkz. storage.save). Eski
  * kayıtlarda alan HİÇ YOK ve o zaman cevap "görsel": göç gerekmiyor
  * (`imported`/`session_id`in aynı disiplini).
+ *
+ * KÜME İKİ ÜYELİ, tek değil: `models.VIDEO_RESULT_KINDS`in aynası ve
+ * `chat.js`in `VIDEO_RESULT_KINDS`iyle birebir. Bugün `app.py` her iki uçta da
+ * `"kind": "video"` yazıyor (app.py:496, :599), yani tek üye de doğru cevabı
+ * verirdi — ama iki aynanın FARKLI olması sessiz bir ayrışma: bir gün
+ * `animate` kaydı düşerse galeri `<img src="....mp4">` çizer, kırık resim
+ * gösterir ve kimse bir hata görmezdi.
  */
+const VIDEO_KAYIT_TURLERI = ["video", "animate"];
+
 function kayitVideoMu(rec) {
-  return (rec || {}).kind === "video";
+  return VIDEO_KAYIT_TURLERI.includes((rec || {}).kind);
 }
 
 function renderGallery() {
@@ -1571,7 +1580,16 @@ function renderGallery() {
     // okunuyor ve yeniden adlandırmak bu işlevi baştan sona dokunulmuş
     // gösterirdi (gerçek değişiklik iki satır).
     const img = document.createElement(videoMu ? "video" : "img");
-    img.src = `/output/${rec.filename}`;
+    // `#t=0.1` YALNIZ videoda: `preload="metadata"` bazı WebView/iOS
+    // sürümlerinde ilk kareyi ÇÖZMÜYOR ve karo bomboş gri kalıyordu (mobilde
+    // ölçüldü). Poster dosyası üretmek sunucuya ffmpeg bağımlılığı eklemek
+    // demek; medya parçası aynı işi bedelsiz yapıyor — tarayıcı 0,1 sn'ye
+    // atlıyor ve o kareyi çiziyor.
+    //
+    // STÜDYO kartına UYGULANMIYOR (chat.js): orada `<video>` gerçekten
+    // oynatılıyor ve parça, klibin ilk anını atlatırdı. Burada karo
+    // `aria-hidden` ve yalnız küçük resim, kayma bedelsiz.
+    img.src = `/output/${rec.filename}${videoMu ? "#t=0.1" : ""}`;
     if (videoMu) {
       // KÜÇÜK RESİMDE DENETİM YOK ve bu bilinçli: karonun tek tıklaması
       // büyüteci açıyor (`activateCard`) ve bir oynat düğmesi o tıklamayla

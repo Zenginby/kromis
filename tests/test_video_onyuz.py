@@ -401,13 +401,87 @@ def test_the_DURATION_echo_is_checked_for_a_stale_server():
 
 
 def test_the_gallery_tile_is_a_VIDEO_for_video_records():
+    """Ölçüt `kind` ve küme İKİ ÜYELİ — `chat.js`in aynasıyla birebir.
+
+    Tek üyeli (`kind === "video"`) hâli bugün de doğru cevabı veriyordu, çünkü
+    `app.py` her iki uçta da `"kind": "video"` yazıyor. Ama iki aynanın FARKLI
+    olması sessiz bir ayrışma: bir gün `animate` kaydı düşerse galeri
+    `<img src="….mp4">` çizer, kırık resim gösterir ve hiçbir yerde hata
+    görünmez. İki listenin AYNI olması bu yüzden mandallanıyor.
+    """
     js = _kodsuz(_folders())
 
     assert "function kayitVideoMu(rec)" in js
-    assert 'return (rec || {}).kind === "video"' in js
+    assert 'const VIDEO_KAYIT_TURLERI = ["video", "animate"]' in js
+    assert "VIDEO_KAYIT_TURLERI.includes((rec || {}).kind)" in js
+    # `chat.js`teki ikizi AYNI iki üyeyi taşıyor.
+    assert 'const VIDEO_RESULT_KINDS = ["video", "animate"]' in _kodsuz(_chat())
     govde = _govde(js, "renderGallery")
     assert 'document.createElement(videoMu ? "video" : "img")' in govde
     assert 'img.preload = "metadata"' in govde
+
+
+def test_the_video_NODES_are_actually_STYLED():
+    """Kartın `<video>` kurması YETMİYOR — ölçüsü de olmalı.
+
+    Mobilde ölçülen iki kusurun TEK kökü buydu: depoda `<video>` etiketini
+    hedefleyen hiçbir kural yoktu (tek istisna `#viewer-video`, o da
+    `class="viewer-img"` sayesinde). Kuralsız bir `<video>` kendi DOĞAL
+    ölçüsüne açılıyor (720p'de 1280×720) ve iki yerde birden kırılıyordu:
+
+      • stüdyo kartında `.chat-media` kare + `overflow: hidden` olduğu için
+        oynatıcının denetim çubuğu görünür alanın dışında kalıyor, yani video
+        oynatılamıyordu (karta tıklama da bilerek bağlı değil),
+      • galeride karo 720px boyunda bir kutuya dönüşüyor, `.gallery`de
+        `grid-auto-rows` olmadığı için satır o boya çıkıyor ve `stretch`
+        yüzünden aynı satırdaki GÖRSEL kartları da uzuyordu.
+
+    Eski testlerin hepsi JS'in `createElement(videoMu ? "video" : "img")`
+    satırını ölçüyordu ve o satır DOĞRUYDU — kusur CSS'te olduğu için hiçbiri
+    görmedi. Delik burada kapanıyor.
+    """
+    css = _css()
+
+    assert ".chat-media > video" in css, "stüdyo kartındaki video kuralsız"
+    assert ".card :is(img, video)" in css, "galeri karosundaki video kuralsız"
+
+
+def test_the_result_card_takes_the_VIDEO_ratio_not_the_square():
+    """Kare kart bir 16:9 videoyu kırpardı — hem de kullanıcının saniyesi
+    faturalanan çıktısını. Oran `params.size`ten geliyor: video modellerinde o
+    alan ZATEN bir oran jetonu (`catalog.VIDEO_ASPECT_RATIOS`) ve bu dosya onu
+    zaten okuyor (`resultCaption`), yani ikinci bir gerçek kaynağı yok.
+
+    CSS'in `:has()`i DEĞİL JS tercih edildi: metadata inene kadar `<video>`
+    300×150 durur ve kutu sonradan zıplardı."""
+    js = _kodsuz(_chat())
+
+    assert "function resultThumb(imageId, index, caption, videoMu = false, oran" in js
+    govde = _govde(js, "resultThumb")
+    assert 'fig.style.aspectRatio = oran.replace(":", " / ")' in govde
+    # Oran ızgaranın tamamına BİR KEZ soruluyor — türle aynı gerekçe.
+    assert 'const oran = (msg.params || {}).size || ""' in _govde(js, "appendResult")
+
+
+def test_the_video_card_does_not_promise_a_ZOOM_it_never_binds():
+    """`.chat-media`nın `cursor: zoom-in`i video kartında yalan söylüyordu:
+    büyüteç video için bilerek bağlanmıyor (denetimler kartın içinde)."""
+    assert ".chat-media.video { cursor: default; }" in _css()
+    assert 'fig.classList.add("video")' in _govde(_kodsuz(_chat()), "resultThumb")
+
+
+def test_the_gallery_tile_asks_the_browser_for_a_FIRST_FRAME():
+    """`preload="metadata"` bazı WebView/iOS sürümlerinde ilk kareyi çözmüyor
+    ve karo bomboş gri kalıyordu. Poster DOSYASI üretmek sunucuya ffmpeg
+    bağımlılığı eklemek demek; medya parçası (`#t=0.1`) aynı işi bedelsiz
+    yapıyor.
+
+    Parça YALNIZ galeride: stüdyo kartında `<video>` gerçekten oynatılıyor ve
+    orada klibin ilk anını atlatırdı."""
+    govde = _govde(_kodsuz(_folders()), "renderGallery")
+
+    assert 'img.src = `/output/${rec.filename}${videoMu ? "#t=0.1" : ""}`' in govde
+    assert "#t=0.1" not in _kodsuz(_chat())
 
 
 def test_the_gallery_tile_carries_a_DURATION_BADGE():

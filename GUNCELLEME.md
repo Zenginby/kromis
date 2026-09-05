@@ -155,6 +155,16 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.14.0 — ne değişti
+
+- incelemenin bulduğu on gerileme — hap, oran, son kare akışı
+- başlangıç + bitiş karesi ile geçiş üretimi
+- ayar sayfasındaki üç denetim video modunda ölüydü
+- mobilde video ne oynatılıyor ne de karosuna sığıyordu
+- node'un soğuk açılışı Windows yayınını kırdı — sınır 10 sn'den 60'a
+
+---
+
 ## Sürüm 0.13.1 — ne değişti
 
 - CI açılış kapısını kendi kusuru düşürüyordu — guilib ad çakışması

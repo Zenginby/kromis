@@ -36,7 +36,7 @@
 | `providers` | `test_catalog.py`, `test_gemini_client.py`, `test_provider_logos.py`, `test_providers.py`, `test_veo_client.py` |
 | `release_manifest` | `test_android_apk_name.py`, `test_release_manifest.py` |
 | `screencolor` | `test_screencolor.py` |
-| `storage` | `test_arena.py`, `test_chats_route.py`, `test_edit_route.py`, `test_folders.py`, `test_legacy_formats.py`, `test_palette_route.py`, `test_playwright_studio.py`, `test_storage.py`, `test_storage_delete.py` |
+| `storage` | `test_arena.py`, `test_chats_route.py`, `test_edit_route.py`, `test_folders.py`, `test_legacy_formats.py`, `test_palette_route.py`, `test_playwright_studio.py`, `test_storage.py`, `test_storage_delete.py`, `test_video_onyuz.py` |
 | `tools.graf_uret` | `test_graflar.py` |
 | `tools.make_legacy_fixtures` | — |
 | `tools.make_logo_goldens` | — |

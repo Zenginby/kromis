@@ -112,6 +112,19 @@ class ImageModel:
     images_per_request: int = 1
     supports_edit: bool = False
     max_refs: int = 1
+    # SON KARE (`instances[0].lastFrame`) — yalnız Veo 3.1 ailesinde.
+    #
+    # `max_refs`e KATLANMADI ve gerekçesi şu: son kare bir REFERANS değil ayrı
+    # bir EKSEN. `max_refs=2` demek "iki referans görsel" demekti ve sıra
+    # bilgisini taşımazdı — ikinci görselin son kare mi yoksa ikinci bir
+    # referans mı olduğu sayıdan okunamaz. Ayrı bayrak, ayrı form alanı
+    # (`app.animate`in `last_file`/`last_source_id` çifti) ve ayrı arayüz
+    # yuvası: üçü de aynı ayrımı söylüyor.
+    #
+    # `supports_edit`e de katlanmadı: ilk kareyi alan bir model son kareyi
+    # almayabilir (Veo 3'ün tamamı böyle). İkisini tek bayrağa indirmek, o gün
+    # telde 400 dönen bir istek üretirdi.
+    supports_last_frame: bool = False
     quality_hidden: bool = False
     # Arayüzün ilk seçtiği değerler. BOŞ = listenin ilk öğesi. Azure'da
     # `default_quality="medium"` bilerek yazılı: index.html'de `medium`
@@ -599,6 +612,8 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         images_per_request=1,
         supports_edit=True,
         max_refs=1,
+        # Veo 3.1'in ailesi; ilk/son kare geçişi ÜÇÜNDE de var.
+        supports_last_frame=True,
         poll_timeout=420.0,
         credits=16,
         kind="video",
@@ -620,6 +635,8 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         images_per_request=1,
         supports_edit=True,
         max_refs=1,
+        # Veo 3.1'in ailesi; ilk/son kare geçişi ÜÇÜNDE de var.
+        supports_last_frame=True,
         poll_timeout=420.0,
         credits=30,
         kind="video",
@@ -641,6 +658,8 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         images_per_request=1,
         supports_edit=True,
         max_refs=1,
+        # Veo 3.1'in ailesi; ilk/son kare geçişi ÜÇÜNDE de var.
+        supports_last_frame=True,
         # 1080p'lik sekiz saniye en uzun süren üretim; tavan ona göre.
         poll_timeout=600.0,
         credits=80,

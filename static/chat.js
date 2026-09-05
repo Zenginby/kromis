@@ -1176,9 +1176,33 @@ function resultCaption(msg) {
  * gerçekten yoksa `/output/{id}.png` 404 döner. Gerçek koşulu ölçmek, ayrıca
  * tutulacak bir liste de bırakmıyor.
  */
-function resultThumb(imageId, index, caption, videoMu = false) {
+function resultThumb(imageId, index, caption, videoMu = false, oran = "") {
   const fig = document.createElement("figure");
   fig.className = "chat-media";
+
+  // KARENİN ORANI VİDEODA SABİT DEĞİL. `.chat-media` görsel için kare çiziyor
+  // (`aspect-ratio: 1`) ve `overflow: hidden` taşanı kırpıyor; bir 16:9 video o
+  // kutuda kendi doğal ölçüsüyle (1280×720) yerleşince oynatıcının denetim
+  // çubuğu karenin ALTINDA kalıp kırpılıyordu — mobilde videoyu oynatmanın TEK
+  // yolu kapanıyordu, çünkü video kartına tıklama da bilerek bağlanmıyor
+  // (aşağıdaki `if (!videoMu)`).
+  //
+  // Oran CSS'ten `:has()` ile DEĞİL buradan geliyor: metadata inene kadar
+  // `<video>` 300×150 durur ve kutu sonradan zıplardı. `params.size` zaten bu
+  // dosyanın okuduğu alan (`resultCaption`), ikinci bir gerçek kaynağı yok.
+  //
+  // SINIF ORANDAN AYRI DURUYOR. `.video` iki işi birden yapıyor ve ikisinin de
+  // orana bağımlılığı YOK: `.chat-media`nın `zoom-in` imlecini düzeltiyor
+  // (video kartına büyüteç bağlanmıyor, aşağıdaki `if (!videoMu)`) ve indirme
+  // şeridini denetim çubuğunun üstünden çekiyor (style.css). `params.size`
+  // BİLEREK allowlist'siz (`models.ResultParams`), yani iki nokta içermeyen
+  // bir değer ulaşılabilir — eski bir döküm, içe aktarılmış bir oturum ya da
+  // oranı jeton olarak yazmayan bir model. Tek koşula bağlanmış olsalardı o
+  // hâlde İKİ düzeltme birden düşerdi.
+  if (videoMu) {
+    fig.classList.add("video");
+    if (oran.includes(":")) fig.style.aspectRatio = oran.replace(":", " / ");
+  }
 
   const num = document.createElement("span");
   num.className = "chat-media-num";
@@ -1314,7 +1338,12 @@ function appendResult(msg) {
   // (`models.MAX_IMAGES_PER_RUN`), burada aynalanacak bir şey yok — CSS
   // yalnızca "1 mi, 2 mi, daha fazla mı" sorusunu soruyor.
   grid.dataset.count = String(ids.length);
-  ids.forEach((id, i) => grid.appendChild(resultThumb(id, i, caption, videoMu)));
+  // ORAN da bir kez sorulup ızgaranın tamamına veriliyor (türle aynı gerekçe).
+  // Video modellerinde `params.size` ZATEN bir oran jetonu ("16:9"/"9:16",
+  // `catalog.VIDEO_ASPECT_RATIOS`); görselde "1024x1024" biçiminde ve orada
+  // hiç okunmuyor.
+  const oran = (msg.params || {}).size || "";
+  ids.forEach((id, i) => grid.appendChild(resultThumb(id, i, caption, videoMu, oran)));
   div.appendChild(grid);
 
   $("chat-log").appendChild(div);
@@ -1406,7 +1435,11 @@ function arenaColumn(row, msg, arenaId) {
   // yerine kaydın kendisine sormak, arena bir gün video da koşturursa
   // burada hatırlanacak bir şey bırakmıyor.
   const videoMu = sonucVideoMu(msg);
-  ids.forEach((id, i) => grid.appendChild(resultThumb(id, i, caption, videoMu)));
+  // ORAN DA GEÇİYOR, aynı gerekçeyle: `videoMu`yu kayda sormak ama oranı
+  // sormamak yarım bir hazırlık olurdu — arena bir gün video koşturursa kart
+  // kare çizilir, klip şeritlenir ve `.video` sınıfı hiç eklenmediği için
+  // indirme hapı denetim çubuğunun üstünde kalırdı. `p.size` zaten burada.
+  ids.forEach((id, i) => grid.appendChild(resultThumb(id, i, caption, videoMu, p.size || "")));
   col.appendChild(grid);
 
   // Kazanan işareti: iki durumlu düğmenin depodaki standart deseni

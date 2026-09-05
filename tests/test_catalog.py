@@ -109,6 +109,12 @@ def test_her_gorsel_modeli_tutarli_beyan_ediyor(m):
         assert len(m.qualities) == 1, "gizli eksen tek jeton taşımalı"
     if m.supports_edit:
         assert m.max_refs >= 1
+    # SON KARE `supports_edit`i ŞART koşuyor: ilk kare olmadan son kare
+    # anlamsız (neyin arasında geçiş yapılacağı yok) ve `app.animate` de
+    # ana kareyi zorunlu tutuyor. Tersi serbest — ilk kareyi alan bir model
+    # son kareyi almayabilir (Veo 3 ailesinin tamamı böyle).
+    if m.supports_last_frame:
+        assert m.supports_edit, f"{m.id}: son kare var, ilk kare yolu yok"
 
 
 @pytest.mark.parametrize("m", catalog.CHAT_MODELS, ids=lambda m: m.id)

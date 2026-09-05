@@ -979,6 +979,23 @@ let pickerScope = "";
 let pickerQuery = "";
 let pickerSelectedId = null;
 let pickerAcan = null;      // seçiciyi açan düğüm — kapanışta odak oraya döner
+// Seçicinin HEDEFİ: "ref" (ana referans / başlangıç karesi) | "last" (bitiş
+// karesi). Aynı ızgara, aynı süzgeç, aynı önizleme — değişen tek şey onay
+// düğmesinin ne yaptığı. İkinci bir modal açmak, videoyu süzen o listeyi ve
+// arama/kapsam gezinmesini ikinci kez yazmak olurdu.
+let pickerHedef = "ref";
+// Seçiciyi AÇAN panel — kapanışta geri açılıyor. `openPicker` `closeSheets()`
+// çağırmak ZORUNDA (`.sheet` ile `.modal` aynı z-index 50'yi paylaşıyor) ve
+// kare yuvalarının "Galeri" düğmeleri ayar sayfasının İÇİNDE: panel kapanınca
+// iki şey birden kayboluyordu — seçimin GÖRÜLECEĞİ yüzey (yuva doldu mu?) ve
+// odağın DÖNECEĞİ düğme.
+//
+// `pickerOdakHedefi`nin `[hidden]` kontrolü bu hâli GÖRMÜYOR ve göremez:
+// `.sheet` `hidden` özniteliğiyle değil `.open` sınıfıyla kapanıyor, kapalı
+// hâli de `visibility: hidden` (style.css) — düğüm DOM'da, `[hidden]` bir
+// kabın içinde değil, ama `.focus()` sessizce hiçbir şey yapmıyor. Panelin
+// kendisini geri açmak hem geri bildirimi hem odağı tek hamlede kurtarıyor.
+let pickerPanel = "";
 let pickerToken = 0;
 // Boş ızgaranın ÜÇ ayrı nedeni var — yükleniyor, alınamadı, gerçekten boş — ve
 // üçü tek cümleyle anlatılırsa ikisi yalan olur (PR #23 incelemesi, H2).
@@ -1267,7 +1284,15 @@ function renderPickerSide() {
   }
 
   const why = extraBlockReason(rec);
+  // Düğmenin FİİLİ hedeften: aynı düğme bitiş karesini de atıyor ve
+  // "Referans yap" o dalda yanlış bir söz olurdu.
+  $("picker-use-ref").textContent =
+    pickerHedef === "last" ? "Bitiş karesi yap" : "Referans yap";
   $("picker-use-ref").disabled = !rec;
+  // "Ek olarak ekle" BİTİŞ KARESİ hedefinde hiç yok: ek referans video
+  // modunda zaten kapalı ve burada ikinci bir eylem sunmak, kullanıcıyı
+  // `goBlockReason`ın kilitlediği bir duruma davet etmek olurdu.
+  $("picker-use-extra").hidden = pickerHedef === "last";
   $("picker-use-extra").disabled = !!why;
   // GEREKÇE kazanır: kapalı bir düğme sebepsiz kalmaz. Eski hâl
   // `extras.length ? sayaç : gerekçe` idi — "3/3'te sayaç gerekçeyi yener"
@@ -1281,8 +1306,14 @@ function renderPickerSide() {
   // yerinde yazılıyor. İki cümle AYRI olmak zorunda: aynı dize kullanılsaydı
   // hiç eklenmemiş bir karoya geçince de "Eklendi" yazardı ve kullanıcı o karoyu
   // eklemiş sanırdı (`why` boş olan HER karo bu dala düşüyor).
-  $("picker-note").textContent = why
-    || (extras.length ? `Ek referans · ${extras.length}/${MAX_EDIT_IMAGES - 1}` : "");
+  // NOT SATIRI BİTİŞ KARESİ DALINDA SUSUYOR. İki cümlesi de "+ Ek" düğmesinin
+  // hikâyesi (gerekçesi ve sayacı) ve o düğme bu dalda hiç yok — üstelik
+  // `extraBlockReason` video modunda HER kayıt için "Video tek referans görsel
+  // alıyor (ilk kare)." diyor: hemen yanında ETKİN duran "Bitiş karesi yap"
+  // düğmesiyle açıkça çelişen bir cümle. Kullanıcı hangisine inanacağını
+  // bilemezdi.
+  $("picker-note").textContent = pickerHedef === "last" ? ""
+    : (why || (extras.length ? `Ek referans · ${extras.length}/${MAX_EDIT_IMAGES - 1}` : ""));
 }
 
 // Adı `renderPicker` DEĞİL: `palette.js:96` aynı adı çoktan kullanıyor (renk
@@ -1303,13 +1334,17 @@ function renderMediaPicker() {
   renderPickerSide();
 }
 
-async function openPicker() {
+async function openPicker(hedef = "ref") {
+  pickerHedef = hedef === "last" ? "last" : "ref";
   // Kapanışta odağın döneceği düğüm: `core.js`in `dialogPrevFocus` deseni.
   // Onsuz Escape (ya da ×) odaklı karoyu `display: none` yapıyor ve odak
   // `<body>`ye düşüyordu — bu turun düzelttiği kusurun DÖRDÜNCÜ kopyası,
   // üstelik en sık yürünen yolu. "Referans yap" dalı zaten bilinçli olarak
   // odağı `#prompt`a taşıyor; eksik olan yalnız KAPATMA yoluydu.
   pickerAcan = document.activeElement;
+  // Kapanışta geri açılacak panel, `closeSheets()`ten ÖNCE okunuyor.
+  const acikPanel = document.querySelector(".sheet.open");
+  pickerPanel = acikPanel ? acikPanel.id : "";
   // `.sheet` ve `.modal` aynı z-index 50'yi paylaşıyor: açık kalan bir
   // slide-over "Escape neyi kapatır" belirsizliği yaratır (B10).
   closeSheets();
@@ -1388,6 +1423,20 @@ function pickerOdakHedefi() {
 function closePicker(odakIadeEt = true) {
   $("media-picker").hidden = true;
   pickerToken++;   // uçuşta olan loadAllImages yanıtı kapalı modalı boyamasın
+  // PANEL ÖNCE, ODAK SONRA — sıra bağlayıcı: kapalı (`visibility: hidden`) bir
+  // panelin içindeki düğmeye odaklanmak sessizce başarısız olur ve odak
+  // `<body>`ye düşerdi. `aria-expanded` de geri veriliyor, çünkü
+  // `closeSheets` onu türetilmiş listeden `false`a çekti ve `openSheet` tek
+  // başına `true` yazmıyor (bugün bunu `#specs-btn`in kendi dinleyicisi
+  // yapıyor); iz bırakmadan geri dönmek o bayrağı da kapsıyor.
+  if (pickerPanel && document.getElementById(pickerPanel)) {
+    openSheet(pickerPanel);
+    for (const tetik of
+         document.querySelectorAll(`[aria-controls="${pickerPanel}"][aria-expanded]`)) {
+      tetik.setAttribute("aria-expanded", "true");
+    }
+  }
+  pickerPanel = "";
   if (odakIadeEt) pickerOdakHedefi().focus();
   pickerAcan = null;
 }
@@ -1425,6 +1474,22 @@ $("picker-grid").addEventListener("click", (e) => {
 $("picker-use-ref").addEventListener("click", () => {
   const rec = pickerById(pickerSelectedId);
   if (!rec) return;
+  // BİTİŞ KARESİ dalı: seçici kapanıyor ama odak İADE EDİLİYOR — `setSonKare
+  // Gallery` odağı `#prompt`a taşımıyor (aşağıdaki B7 notunun gerekçesi
+  // yalnız ana referans dalı için geçerli), yani iade kapalı bırakılsa odak
+  // `<body>`ye düşerdi.
+  //
+  // `closePicker` ayrıca AYAR SAYFASINI geri açıyor (bkz. `pickerPanel`) ve
+  // bu bir süs değil geri bildirimin kendisi: `setSonKareGallery` yalnız
+  // `#last-frame-img`i boyuyor, o da yuvanın içinde. Panel kapalı kalsaydı
+  // kullanıcı composer'a dönerdi — değişen tek piksel görünmez, `#status`
+  // sessiz, bitiş karesinin atanıp atanmadığını anlamanın tek yolu paneli
+  // yeniden açmak olurdu.
+  if (pickerHedef === "last") {
+    closePicker();
+    setSonKareGallery(rec);
+    return;
+  }
   // Odak iadesi KAPALI: `setGallerySource` odağı `#prompt`a taşıyor ve bu
   // yolun kararı zaten o (yukarıdaki B7 notu). İade açık kalsaydı odak önce
   // (+) düğmesine dönüp hemen composer'a sıçrardı — ekran okuyucuya iki
@@ -1526,9 +1591,25 @@ async function loadHistory() {
  * kaydın SÖZLEŞMESİ (uzantı ondan türetiliyor, bkz. storage.save). Eski
  * kayıtlarda alan HİÇ YOK ve o zaman cevap "görsel": göç gerekmiyor
  * (`imported`/`session_id`in aynı disiplini).
+ *
+ * KÜME TEK ÜYELİ ve `chat.js`in `VIDEO_RESULT_KINDS`iyle KASITLI OLARAK aynı
+ * DEĞİL — iki alan aynı adı taşıyor ama aynı sözlükten gelmiyor:
+ *
+ *   - `chat.js` DÖKÜM kaydının `params.kind`ini okuyor; sözlüğü
+ *     `models.ResultParams` (generate / edit / video / animate).
+ *   - burada okunan DEPO kaydının `kind`i; sözlüğü `storage.MEDIA_EXTS` ve o
+ *     eşleme yalnız `"video"` biliyor — çünkü UZANTIYI belirleyen tek yer o
+ *     (`ext_for`, varsayılan `.png`).
+ *
+ * `"animate"`i kümeye eklemek bu yüzden aynayı DÜZELTMEZ, bozar: öyle bir
+ * kayıt diske `.png` olarak yazılır, galeri de bir PNG'ye `<video>` çizer —
+ * karo boş kalır, "Referans yap" gerçek bir görselde kaybolur ve büyüteç bir
+ * durağan kareye oynatıcı açar. Kümenin ayna tutacağı yer `storage.MEDIA_EXTS`.
  */
+const VIDEO_KAYIT_TURLERI = ["video"];
+
 function kayitVideoMu(rec) {
-  return (rec || {}).kind === "video";
+  return VIDEO_KAYIT_TURLERI.includes((rec || {}).kind);
 }
 
 function renderGallery() {
@@ -1571,7 +1652,16 @@ function renderGallery() {
     // okunuyor ve yeniden adlandırmak bu işlevi baştan sona dokunulmuş
     // gösterirdi (gerçek değişiklik iki satır).
     const img = document.createElement(videoMu ? "video" : "img");
-    img.src = `/output/${rec.filename}`;
+    // `#t=0.1` YALNIZ videoda: `preload="metadata"` bazı WebView/iOS
+    // sürümlerinde ilk kareyi ÇÖZMÜYOR ve karo bomboş gri kalıyordu (mobilde
+    // ölçüldü). Poster dosyası üretmek sunucuya ffmpeg bağımlılığı eklemek
+    // demek; medya parçası aynı işi bedelsiz yapıyor — tarayıcı 0,1 sn'ye
+    // atlıyor ve o kareyi çiziyor.
+    //
+    // STÜDYO kartına UYGULANMIYOR (chat.js): orada `<video>` gerçekten
+    // oynatılıyor ve parça, klibin ilk anını atlatırdı. Burada karo
+    // `aria-hidden` ve yalnız küçük resim, kayma bedelsiz.
+    img.src = `/output/${rec.filename}${videoMu ? "#t=0.1" : ""}`;
     if (videoMu) {
       // KÜÇÜK RESİMDE DENETİM YOK ve bu bilinçli: karonun tek tıklaması
       // büyüteci açıyor (`activateCard`) ve bir oynat düğmesi o tıklamayla
@@ -1787,6 +1877,30 @@ $("file-input").addEventListener("change", () => {
   if (files.length) setUploadSource(files[0]);
 });
 $("ref-clear").addEventListener("click", clearSource);
+
+// ── Kare yuvaları (ayar sayfası, video modu) ────────────────────────
+//
+// Başlangıç yuvası MEVCUT yolları yeniden kullanıyor: aynı seçici, aynı gizli
+// dosya girişi, aynı `clearSource`. Yuva referansın İKİNCİ YÜZEYİ, ikinci bir
+// mekanizması değil — composer'daki `#ref-chip` ile aynı gerçeği gösteriyor.
+$("first-frame-pick").addEventListener("click", () => openPicker("ref"));
+$("first-frame-upload").addEventListener("click", () => $("file-input").click());
+$("first-frame-clear").addEventListener("click", clearSource);
+
+$("last-frame-pick").addEventListener("click", () => openPicker("last"));
+$("last-frame-upload").addEventListener("click", () => $("last-frame-input").click());
+$("last-frame-clear").addEventListener("click", clearSonKare);
+$("last-frame-input").addEventListener("change", () => {
+  const files = $("last-frame-input").files;
+  if (files.length) setSonKareUpload(files[0]);
+  // DEĞER SIFIRLANIYOR — `extra-file-input`in aynı satırı, aynı gerekçeyle.
+  // `setSonKareUpload` kabul etmediği bir türü REDDEDİYOR ve girdinin değeri
+  // kalırsa kullanıcı AYNI dosyayı yeniden seçtiğinde `change` hiç tetiklenmez:
+  // uygulama ölü görünür, ikinci denemede hiçbir mesaj bile çıkmaz. Kabul
+  // edilen dosyada da zararsız — `sonKare.file` `File` nesnesini tutuyor,
+  // girdinin değerini değil.
+  $("last-frame-input").value = "";
+});
 
 // KAPI SEÇİCİDEN ÖNCE sorulur. Eskiden dosya seçici KOŞULSUZ açılıyordu ve
 // engel ancak dosya SEÇİLDİKTEN sonra `addExtraUpload` içinde sorulduğu için

@@ -151,7 +151,11 @@ Adım adım anlatım ve "bilinmeyen kaynak" izinleri için: [KURULUM.md → Andr
   - [ ] Kling, Luma, Runway, Wan — fal.ai/Replicate kuyruk adaptörleriyle birlikte
         (`FAL_KEY` / `REPLICATE_API_TOKEN` alanları duruyor, adaptör yok).
   - [ ] İş kuyruğu: üretim bugün SENKRON, yani sekme yenilenirse iş kaybediliyor.
-  - [ ] `extend-video`, ilk/son kare geçişi ve çoklu referans — Veo destekliyor,
+  - [x] **İlk/son kare geçişi:** `instances[0].lastFrame`, katalogda
+        `supports_last_frame` bayrağı, ayar sayfasında iki kare yuvası. Alan
+        adı CANLI DOĞRULANMADI (Veo'nun ücretsiz kademesi yok) ama risk
+        koşullu: bitiş görseli seçilmedikçe gövde bugünküyle aynı.
+  - [ ] `extend-video` ve çoklu referans (`referenceImages`) — Veo destekliyor,
         katalogda yetenek bayrağı yok.
   - **Ölü uçlar (araştırıldı, girmedi):** OpenAI Sora 2 / Videos API 24 Eylül
     2026'da kapanıyor ve yerine gelen bir ad yok; Azure AI Foundry'de video

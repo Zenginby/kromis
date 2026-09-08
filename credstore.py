@@ -19,12 +19,54 @@ onlar düz `read_env_values()` okuyor.
 """
 from __future__ import annotations
 
+from urllib.parse import urlsplit
+
 import azure_client as ac
 import catalog
 
 
 def _values(env_path: str | None = None) -> dict[str, str]:
     return ac.read_env_values(env_path)
+
+
+# ── Azure AI Foundry adresinin TÜRETİLMESİ ─────────────────────────────
+#
+# MAI ve FLUX dağıtımları `<kaynak>.services.ai.azure.com` üzerinde duruyor;
+# uygulamanın bildiği Azure adresi ise `<kaynak>.openai.azure.com`. Sonda
+# ikisinin AYNI anahtarla çalıştığını ölçtü, yani kullanıcıdan ikinci bir
+# anahtar istemek gereksiz — değişen tek şey HOST.
+#
+# TÜRETME BİR TABLO, DİZE AMELİYATI DEĞİL: `replace("openai", "services.ai")`
+# gibi bir dokunuş kaynak adında "openai" geçen her kurulumu bozardı
+# (`my-openai-lab.openai.azure.com`). Tablo yalnız TANINAN son ekleri
+# çeviriyor; tanınmayan bir host (vekil, özel alan adı) HİÇ türetmiyor ve
+# `resolve` Türkçe bir hatayla `AZURE_FOUNDRY_BASE_URL`ü ADIYLA istiyor.
+# Sessiz düşme YOK: yanlış hosta atılan istek 404 döner ve sebebi kullanıcının
+# hiçbir yerde okumadığı bir şey olur — bu modülün var olma sebebinin tam
+# tersi. Mandal: tests/test_credstore.py.
+_FOUNDRY_HOST = "services.ai.azure.com"
+_FOUNDRY_SOURCES: tuple[str, ...] = (
+    "openai.azure.com",
+    "cognitiveservices.azure.com",
+    _FOUNDRY_HOST,
+)
+
+
+def derive_foundry_base_url(image_base_url: str) -> str:
+    """`AZURE_IMAGE_BASE_URL`ün HOSTundan Foundry KÖK adresi; tanınmazsa "".
+
+    YOL ve SORGU BİLEREK DÜŞÜYOR: görsel adresi `/openai/v1/` ile bitiyor,
+    Foundry yolları ise adaptörlerin kendi sabitleri (`/mai/v1/…`,
+    `/providers/blackforestlabs/v1/…`). Kök adresi döndürmek o iki sabitin
+    TEK yerde kalmasını sağlıyor — burada birleştirilse yol bilgisi iki
+    dosyada birden yaşardı.
+    """
+    host = (urlsplit(image_base_url.strip()).hostname or "").lower()
+    for son in _FOUNDRY_SOURCES:
+        if host.endswith("." + son):
+            kaynak = host[: -len(son) - 1]
+            return f"https://{kaynak}.{_FOUNDRY_HOST}"
+    return ""
 
 
 def resolve(cred_id: str, env_path: str | None = None) -> tuple[str, str]:
@@ -57,6 +99,30 @@ def resolve(cred_id: str, env_path: str | None = None) -> tuple[str, str]:
             raise ac.ImageError(
                 "Azure sohbet kimliği eksik: Ayarlar'dan endpoint ve API "
                 "anahtarını kaydet.")
+        return key, url
+
+    if cred_id == "azure_foundry":
+        # `azure_chat` dalının İKİZİ ve aynı ölçülmüş olguya dayanıyor: tek
+        # anahtar üç yüzeyde de geçiyor (Azure OpenAI, MAI, FLUX).
+        #
+        # ADRES İKİ KADEMELİ ve sıra bağlayıcı: elle yazılan
+        # `AZURE_FOUNDRY_BASE_URL` KAZANIYOR (vekil ya da ayrı bir kaynak
+        # kullanan kurulum), boşsa görselin adresinden türetiliyor. Tersi
+        # olsaydı kullanıcının yazdığı adres sessizce yok sayılırdı.
+        values = _values(env_path)
+        key = values.get(cred.key_env) or values.get(ac.IMAGE_KEY, "")
+        url = (values.get(cred.url_env, "").strip()
+               or derive_foundry_base_url(values.get(ac.IMAGE_URL, "")))
+        if not key:
+            raise ac.ImageError(
+                f"{cred.label} anahtarı yok: Ayarlar'dan Azure API anahtarını "
+                f"kaydet (ortam değişkeni: {cred.key_env} ya da {ac.IMAGE_KEY}).")
+        if not url:
+            raise ac.ImageError(
+                f"{cred.label} adresi çözülemedi: Azure adresin tanınan bir "
+                f"Foundry hostu değil. Ayarlar'daki Foundry adresi alanına "
+                f"https://<kaynak>.{_FOUNDRY_HOST} yaz "
+                f"(ortam değişkeni: {cred.url_env}).")
         return key, url
 
     values = _values(env_path)

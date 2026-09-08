@@ -331,6 +331,12 @@ class SettingsRequest(BaseModel):
     gemini_base_url: str | None = Field(default=None, max_length=500)
     anthropic_base_url: str | None = Field(default=None, max_length=500)
 
+    # Azure AI Foundry (MAI + FLUX) KÖK adresi. GİZLİ DEĞİL ve boş
+    # bırakılabilir: boşken `credstore` onu `AZURE_IMAGE_BASE_URL`ün HOSTundan
+    # türetiyor (bkz. credstore.derive_foundry_base_url). Ayrı bir ANAHTAR
+    # alanı YOK — aynı `AZURE_IMAGE_API_KEY` üç yüzeyde de geçiyor.
+    azure_foundry_base_url: str | None = Field(default=None, max_length=500)
+
 
 
 ALLOWED_THEMES = ("mono", "ocean", "amber", "viola")

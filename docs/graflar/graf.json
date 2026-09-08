@@ -211,7 +211,7 @@
         "veo_client"
       ],
       "katman": 0,
-      "satir": 1035,
+      "satir": 1063,
       "testler": [
         "tests/test_arena.py",
         "tests/test_arena_onyuz.py",
@@ -367,7 +367,7 @@
         "veo_client"
       ],
       "katman": 2,
-      "satir": 128,
+      "satir": 194,
       "testler": [
         "tests/test_credstore.py",
         "tests/test_playwright_studio.py",
@@ -513,7 +513,7 @@
         "prefs"
       ],
       "katman": 2,
-      "satir": 921,
+      "satir": 927,
       "testler": [
         "tests/test_catalog.py",
         "tests/test_chat_client.py",
@@ -1005,7 +1005,7 @@
           "/api/settings"
         ],
         "dosya": "static/settings.js",
-        "satir": 448,
+        "satir": 456,
         "tanim": 11
       },
       {

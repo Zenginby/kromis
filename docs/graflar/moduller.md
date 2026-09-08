@@ -41,9 +41,9 @@ flowchart TD
     n_veo_client["veo_client<br/>590 satır"]
   end
   subgraph katman2["katman 2"]
-    n_credstore["credstore<br/>128 satır"]
+    n_credstore["credstore<br/>194 satır"]
     n_folders["folders<br/>248 satır"]
-    n_models["models<br/>921 satır"]
+    n_models["models<br/>927 satır"]
   end
   subgraph katman1["katman 1"]
     n_assets_store["assets_store<br/>201 satır"]
@@ -56,7 +56,7 @@ flowchart TD
     n_storage["storage<br/>415 satır"]
   end
   subgraph katman0["katman 0"]
-    n_catalog["catalog<br/>1035 satır"]
+    n_catalog["catalog<br/>1063 satır"]
     n_composite["composite<br/>158 satır"]
     n_errlog["errlog<br/>114 satır"]
     n_jsonstore["jsonstore<br/>80 satır"]
@@ -182,21 +182,21 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `assets_store.py` | 201 | 1 | `jsonstore` | 3 | 9 |
 | `azure_client.py` | 458 | 1 | `paths`, `winsec` | 10 | 27 |
 | `backup.py` | 187 | 3 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 1 | 1 |
-| `catalog.py` | 1035 | 0 | — | 11 | 23 |
+| `catalog.py` | 1063 | 0 | — | 11 | 23 |
 | `chat_client.py` | 182 | 3 | `azure_client`, `chat_prompt`, `models` | 3 | 3 |
 | `chat_prompt.py` | 172 | 1 | `paths` | 3 | 1 |
 | `chat_providers.py` | 124 | 5 | `azure_client`, `catalog`, `chat_client`, `credstore`, `openai_chat` | 1 | 2 |
 | `chat_store.py` | 253 | 1 | `jsonstore` | 2 | 2 |
 | `color_names.py` | 418 | 1 | `palette` | 1 | 3 |
 | `composite.py` | 158 | 0 | — | 1 | 1 |
-| `credstore.py` | 128 | 2 | `azure_client`, `catalog` | 7 | 4 |
+| `credstore.py` | 194 | 2 | `azure_client`, `catalog` | 7 | 4 |
 | `desktop.py` | 558 | 8 | `errlog`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli) | 1 | 2 |
 | `errlog.py` | 114 | 0 | — | 4 | 1 |
 | `folders.py` | 248 | 2 | `jsonstore`, `storage` | 3 | 4 |
 | `gemini_client.py` | 293 | 3 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `guncelleme.py` | 219 | 1 | `errlog`, `jsonstore`, `paths`, `version` | 1 | 2 |
 | `jsonstore.py` | 80 | 0 | — | 8 | 1 |
-| `models.py` | 921 | 2 | `azure_client`, `catalog`, `palette` | 3 | 13 |
+| `models.py` | 927 | 2 | `azure_client`, `catalog`, `palette` | 3 | 13 |
 | `netguard.py` | 157 | 7 | `app` (erteli) | 1 | 1 |
 | `openai_chat.py` | 179 | 4 | `azure_client`, `catalog`, `chat_client`, `chat_prompt`, `credstore`, `providers` | 1 | 3 |
 | `openai_client.py` | 215 | 3 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |

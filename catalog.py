@@ -270,6 +270,34 @@ CREDENTIALS: tuple[Credential, ...] = (
         secret_field="anthropic_api_key",
         url_field="anthropic_base_url",
     ),
+    # MAI ve FLUX aynı Azure kaynağında ama BAŞKA bir hostta yaşıyor
+    # (`<kaynak>.services.ai.azure.com`) ve `/openai/v1` onları SERVİS
+    # ETMİYOR: şema doğrulamasını geçen istek "Model not supported with
+    # Responses API" ile düşüyor. Sebep Entra sondasıyla kanıtlandı — iki
+    # AYRI veri eylemi (`…/accounts/OpenAI/images/generations/action` ve
+    # `…/accounts/MaaS/images/generations/action`). Yani bu modelleri
+    # `azure_image` kimliğinin altına koymak, bu dosyanın uyardığı
+    # "arayüzde seçilebilir bir 400"ün tam kendisi olurdu.
+    #
+    # `secret_field=None` ve bu `azure_chat`in duruşunun aynısı: anahtar
+    # `AZURE_IMAGE_API_KEY`e DÜŞÜYOR (sonda tek anahtarın üç yüzeyde de
+    # geçtiğini ölçtü), yani forma ikinci bir gizli alan eklemek kullanıcıya
+    # aynı değeri iki kez yazdırmak olurdu. Forma giren TEK yeni alan
+    # `azure_foundry_base_url` ve o gizli DEĞİL — yani
+    # `app._redact_validation_errors`'ın katalogdan türettiği redaksiyon
+    # kümesi değişmiyor.
+    #
+    # `default_base_url` YOK çünkü sabit bir adres yok: adres ya elle yazılıyor
+    # ya da görselin adresinin HOSTundan türetiliyor
+    # (bkz. credstore.derive_foundry_base_url).
+    Credential(
+        id="azure_foundry",
+        label="Azure AI Foundry · MAI ve FLUX",
+        key_env="AZURE_FOUNDRY_API_KEY",
+        url_env="AZURE_FOUNDRY_BASE_URL",
+        secret_field=None,
+        url_field="azure_foundry_base_url",
+    ),
 )
 
 

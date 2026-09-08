@@ -567,3 +567,57 @@ def test_the_video_providers_all_have_a_LOGO():
         assert catalog.provider_logo(m.provider), (
             f"{m.provider} işaretsiz — şerit işaretsiz çizilir")
         assert m.provider in catalog.PROVIDER_BRANDS
+
+
+# ── Azure AI Foundry · MAI (v0.15) ─────────────────────────────────────
+
+
+def test_MAI_jetonlari_PIKSEL_butcesine_uyuyor():
+    """Bu testin ölçtüğü şey bir GÜVENLİK SINIRI, bir kolaylık değil.
+
+    MAI hatalı bir `size` gönderildiğinde 400 DÖNMÜYOR, sessizce varsayılanla
+    üretiyor — sondada ölçüldü (`size:"1x1"` yutuldu, iki gerçek görsel
+    üretildi ve faturalandı). Yani sağlayıcı bir doğrulama katmanı değil;
+    `models.check_capabilities` TEK kapı ve o da katalogdan besleniyor.
+    Buradaki bir hata kullanıcıya hata değil, İSTEMEDİĞİ BOYUTTA BİR FATURA
+    gösterir.
+    """
+    for jeton in catalog.MAI_SIZES:
+        w, h = (int(p) for p in jeton.split("x"))
+        assert w >= catalog.MAI_MIN_EDGE and h >= catalog.MAI_MIN_EDGE, (
+            f"{jeton}: MAI kenarı {catalog.MAI_MIN_EDGE} pikselin altına inemiyor")
+        assert w * h <= catalog.MAI_PIXEL_CAP, (
+            f"{jeton}: {w * h} piksel, MAI tavanı {catalog.MAI_PIXEL_CAP}")
+
+
+def test_MAI_jetonlari_AZURE_nun_uc_oranini_KARSILIYOR():
+    """`test_gemini_oranlari_…`ın ikizi ve aynı gerekçesi: model değiştirmek
+    ORANI TAŞIMALI, sebepsiz bir "varsayılana düşüldü" uyarısı basmamalı."""
+    azure = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
+    azure_oranlari = {catalog.geometry_of(s)[1] for s in azure.sizes}
+    mai_oranlari = {catalog.geometry_of(s)[1] for s in catalog.MAI_SIZES}
+
+    assert azure_oranlari <= mai_oranlari, (
+        "Azure'dan MAI'ye geçişte karşılığı olmayan oran: "
+        f"{sorted(azure_oranlari - mai_oranlari)}")
+
+
+def test_MAI_girdileri_jetonlari_PAYLASIYOR():
+    """Üç girdiye elle üç kez yazmak, birine jeton ekleyip ötekini unutmanın
+    kapısı olurdu (`ASPECT_RATIOS`in paylaşılma gerekçesi)."""
+    mai = [m for m in catalog.IMAGE_MODELS if m.provider == "azure-mai"]
+    assert len(mai) == 3, "katalogda üç MAI girdisi olmalı"
+    for m in mai:
+        assert m.sizes is catalog.MAI_SIZES, (
+            f"{m.id}: jetonları kopyalamış, MAI_SIZES'ı paylaşmıyor")
+        assert m.credential == "azure_foundry", m.credential
+        # Adet TEL ÜZERİNDE YOK: MAI'de `n` parametresi hiç mevcut değil,
+        # yani adet başına AYRI istek atılıyor (bkz. karar 5).
+        assert m.images_per_request == 1
+        # Kalite ekseni YOK: tek sentetik jeton + gizli knob (karar 4).
+        assert m.quality_hidden is True
+        # Düzenleme TEK referans alıyor (multipart `image`, tekrar YOK).
+        assert m.supports_edit is True and m.max_refs == 1
+        assert m.note and "Önizleme" in m.note, (
+            f"{m.id}: MAI ailesinin üçü de önizleme; notta yazılı olmalı "
+            "(bkz. openai-gpt-image-1'in duruşu)")

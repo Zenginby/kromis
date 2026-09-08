@@ -288,8 +288,11 @@ def test_the_video_table_is_SEPARATE_from_the_image_table():
     bu "sağlayıcı → dörtlü demet" olurdu ve görsel adaptörü olmayan bir video
     sağlayıcısı iki boş yuva taşırdı."""
     assert providers.video_adapter_ids() == frozenset({"gemini"})
-    # Görsel tablosu DEĞİŞMEDİ.
-    assert providers.adapter_ids() == frozenset({"azure", "openai", "gemini"})
+    # Görsel tablosu MAI'yle BÜYÜDÜ, video tablosuyla PAYLAŞILMADI: `azure-mai`
+    # yalnız görsel tarafında (MAI'nin video ucu yok), bu yüzden iki küme hâlâ
+    # ayrık kalıyor — testin iddiası tam olarak bu.
+    assert providers.adapter_ids() == frozenset(
+        {"azure", "openai", "gemini", "azure-mai"})
 
 
 def test_an_IMAGE_model_id_is_refused_by_the_video_dispatcher():

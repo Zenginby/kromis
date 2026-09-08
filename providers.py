@@ -127,12 +127,29 @@ def _veo_adapter():
     return (veo_client.generate, veo_client.animate)
 
 
+def _mai_adapter():
+    """`_gemini_adapter`ın aynı gerekçesi: `azure_mai_client` bu modülü import
+    ediyor (`read_timeout_for`, `detail_of`, `is_content_policy` için), yani
+    modül düzeyinde import etmek DÖNGÜ olurdu. Düz `import` ifadesi, yalnız
+    fonksiyon içinde — PyInstaller'ın statik analizi onu da görüyor, yani
+    `hiddenimports=[]` korunuyor."""
+    import azure_mai_client
+    return (azure_mai_client.generate, azure_mai_client.edit)
+
+
 _ADAPTERS: dict[str, tuple] = {
     "azure": (_azure_generate, _azure_edit),
     # Değer bir ÇAĞRILABİLİR döndürücü olabiliyor (döngüyü kıran geç bağlama);
     # `_pair` ikisini de karşılıyor.
     "openai": _openai_adapter,
     "gemini": _gemini_adapter,
+    # Azure AI Foundry'nin İKİ AYRI teli, TEK anahtar altında: MAI ile FLUX
+    # aynı hostta ve aynı `api-key` ile çalışıyor ama gövdeleri, yolları ve
+    # hata şekilleri farklı. Tek bir `azure-foundry` anahtarı olsaydı iki tel
+    # formatı bir modülde yaşardı, hata eşlemesi bulanıklaşırdı ve
+    # `PROVIDER_LOGOS` tek anahtara düşerdi — oysa üretici GERÇEKTEN iki
+    # (Microsoft ve Black Forest Labs).
+    "azure-mai": _mai_adapter,
 }
 
 # provider → (generate_video, animate_video). Boş kalmayan tek anahtar bugün

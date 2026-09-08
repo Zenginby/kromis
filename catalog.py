@@ -321,6 +321,7 @@ PROVIDER_LOGOS: dict[str, str] = {
     "azure": "azure.svg",
     "openai": "openai.svg",
     "gemini": "gemini.svg",
+    "azure-mai": "microsoft.svg",
 }
 
 # İşaret ARTIK MARKAYI SÖYLÜYOR, o yüzden etiketin de söylemesi gereksiz: şeritte
@@ -338,7 +339,39 @@ PROVIDER_BRANDS: dict[str, str] = {
     "openai": "OpenAI",
     "gemini": "Gemini",
     "anthropic": "Anthropic",
+    "azure-mai": "Microsoft",
 }
+
+
+# MAI'nin GEOMETRİ BÜTÇESİ — canlı ölçüldü: w,h ≥ 768 VE w·h ≤ 1.048.576.
+#
+# Jetonlar `gpt-image-2`den KOPYALANMIYOR ve sebep sert: `1024x1536` ile
+# `1536x1024` 1.572.864 piksel eder, yani tavanı %50 aşar. Kopyalamak iki
+# jetonu doğrudan hataya sokardı.
+#
+# BU LİSTE BİR KOLAYLIK DEĞİL, GÜVENLİK SINIRI. MAI hatalı bir `size`
+# gönderildiğinde 400 DÖNMÜYOR, sessizce varsayılanla ÜRETİYOR — sondada
+# ölçüldü: `size:"1x1"` yutuldu ve iki gerçek 1024×1024 görsel üretildi.
+# Yani sağlayıcı artık bir doğrulama katmanı DEĞİL ve
+# `models.check_capabilities` TEK kapı; buradaki bir hata kullanıcıya hata
+# değil İSTEMEDİĞİ BOYUTTA BİR FATURA gösterir.
+#
+# Küme mevcut oranların HEPSİNİ karşılıyor (1:1, 4:3, 3:4, 3:2, 2:3, 16:9,
+# 9:16), yani `gpt-image-2`den MAI'ye geçen kullanıcı "varsayılana düşüldü"
+# uyarısı ALMIYOR (bkz. core.js `fillAxis`in ikinci kademesi).
+#
+# Mandal: tests/test_catalog.py::test_MAI_jetonlari_PIKSEL_butcesine_uyuyor.
+MAI_MIN_EDGE = 768
+MAI_PIXEL_CAP = 1_048_576
+MAI_SIZES: tuple[str, ...] = (
+    "1024x1024",   # 1.048.576 · 1:1
+    "1024x768",    #   786.432 · 4:3
+    "768x1024",    #   786.432 · 3:4
+    "1248x832",    # 1.038.336 · 3:2
+    "832x1248",    # 1.038.336 · 2:3
+    "1365x768",    # 1.048.320 · 16:9
+    "768x1365",    # 1.048.320 · 9:16
+)
 
 
 # ── Görsel modelleri ────────────────────────────────────────────────────
@@ -540,6 +573,90 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         credits_by_quality=(("1K", 27), ("2K", 27), ("4K", 48)),
         note="Metin ve marka tutarlılığında en güçlü Gemini; pahalı.",
     ),
+    # ── Azure AI Foundry · MAI-Image (Microsoft) ────────────────────────
+    #
+    # ÜÇÜ DE ÖNİZLEME ve notlarında yazılı: ad ya da sözleşme haber vermeden
+    # değişebilir. `openai-gpt-image-1` girdisinin duruşu benimseniyor —
+    # kalktığı gün girdi SİLİNİR, çünkü katalogda kalan ölü bir girdi
+    # arayüzde seçilebilir bir 404 demek (`openai-dall-e-3`ün ölçülmüş dersi).
+    #
+    # KREDİ ÇAPASI görsel tarafındakiyle AYNI: Azure `medium` = 8 kredi
+    # ≈ 0,04 USD, yani 1 kredi ≈ 0,005 USD. MAI token bazlı faturalanıyor ve
+    # sonda ölçüyü verdi: 1024×1024 görsel için `usage.num_output_tokens`
+    # = 1024. 2.6 → 1024 tok × 38 USD/M = 0,0389 USD → 8 kredi;
+    # 2.5-Pro → 1024 tok × 47 USD/M = 0,0481 USD → 10 kredi.
+    # 2.6-Flash'ın yayınlanmış birim fiyatı DOĞRULANAMADI (Azure fiyat
+    # sayfaları JS ile çiziliyor, tablo boş döndü) — 4 kredi GEÇİCİ.
+    #
+    # KABUL EDİLEN YAKLAŞIKLIK: `cost_for`un boyut ekseni yok, oysa MAI'de
+    # token = piksel. Kredi VARSAYILAN boyuttaki maliyeti gösteriyor;
+    # düzeltmek `cost_for`a üçüncü bir eksen eklemek demek ve bu turun
+    # kapsamı dışında.
+    #
+    # `max_n=4`: MAI'de `n` parametresi HİÇ YOK, tavan
+    # `models.MAX_IMAGES_PER_RUN`dan geliyor ve dört AYRI istek atılıyor.
+    ImageModel(
+        id="azure-mai-image-2-6",
+        label="Microsoft · MAI-Image 2.6",
+        provider="azure-mai",
+        wire_model="MAI-Image-2.6",
+        credential="azure_foundry",
+        sizes=MAI_SIZES,
+        default_size="1024x1024",
+        # Kalite ekseni YOK (karar 4): tek sentetik jeton + gizli knob. Boş
+        # bırakmak `ResultParams`ta 422 demekti, yani o modelle üretilmiş bir
+        # oturumun BİR DAHA KAYDEDİLEMEMESİ.
+        qualities=("standard",),
+        quality_hidden=True,
+        max_n=4,
+        images_per_request=1,
+        supports_edit=True,
+        # Düzenleme ucu TEK görsel alıyor (canlı ölçüldü). `max_refs=1` beyan
+        # eden ilk GÖRSEL modeli bu, yani ikinci kapı adaptörde
+        # (`azure_mai_client.build_image_file`) — görsel düzenleme rotası
+        # model başına `max_refs`e bakmıyor.
+        max_refs=1,
+        credits=8,
+        note="Fotogerçekçi ürün ve portre işi; metin işlemede MAI'nin en "
+             "iyisi. Önizleme.",
+    ),
+    ImageModel(
+        id="azure-mai-image-2-6-flash",
+        label="Microsoft · MAI-Image 2.6 Flash",
+        provider="azure-mai",
+        wire_model="MAI-Image-2.6-Flash",
+        credential="azure_foundry",
+        sizes=MAI_SIZES,
+        default_size="1024x1024",
+        qualities=("standard",),
+        quality_hidden=True,
+        max_n=4,
+        images_per_request=1,
+        supports_edit=True,
+        max_refs=1,
+        # GEÇİCİ: birim fiyat doğrulanamadı, oran 2.6'nın yarısı varsayıldı.
+        credits=4,
+        note="2.6'nın hızlı ve ucuz kardeşi; taslak ve deneme turları için. "
+             "Önizleme.",
+    ),
+    ImageModel(
+        id="azure-mai-image-2-5-pro",
+        label="Microsoft · MAI-Image 2.5 Pro",
+        provider="azure-mai",
+        wire_model="MAI-Image-2.5-Pro",
+        credential="azure_foundry",
+        sizes=MAI_SIZES,
+        default_size="1024x1024",
+        qualities=("standard",),
+        quality_hidden=True,
+        max_n=4,
+        images_per_request=1,
+        supports_edit=True,
+        max_refs=1,
+        credits=10,
+        note="Kalabalık sahnelerde nesne ve karakter tutarlılığı; pahalı. "
+             "Önizleme.",
+    ),
 )
 
 
@@ -734,6 +851,16 @@ GEOMETRY_LABELS: dict[str, tuple[str, str]] = {
     "9:16": ("▮ 9:16", "9:16"),
     "16:9": ("▬ 16:9", "16:9"),
     "21:9": ("▬ 21:9", "21:9"),
+    # MAI'nin bütçeye uyan jetonları (bkz. MAI_SIZES). `ratio` sütunu Azure ve
+    # Gemini'nin oranlarıyla AYNI dizeleri veriyor — `fillAxis`in ikinci
+    # kademesi model değiştirirken oranı böyle taşıyor. Glif YÖNÜ söylüyor:
+    # ◼ kare, ▮ dikey, ▬ yatay.
+    "1024x768": ("▬ 4:3", "4:3"),
+    "768x1024": ("▮ 3:4", "3:4"),
+    "1248x832": ("▬ 3:2", "3:2"),
+    "832x1248": ("▮ 2:3", "2:3"),
+    "1365x768": ("▬ 16:9", "16:9"),
+    "768x1365": ("▮ 9:16", "9:16"),
 }
 
 QUALITY_LABELS: dict[str, str] = {

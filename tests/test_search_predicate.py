@@ -62,6 +62,9 @@ BILDIRIMLER = (
     "function folderPathParts(",
     "function klasorZinciriEtiketi(",
     "function matchesSearch(",
+    "const VIDEO_KAYIT_TURLERI",
+    "function kayitVideoMu(",
+    "const MEDYA_TUR_SUZGECLERI",
 )
 
 
@@ -298,3 +301,34 @@ def test_the_extracted_layer_is_the_shipped_source():
     assert "function matchesSearch(rec, q = searchQuery)" in kaynak
     assert re.search(r"return `\$\{prompt\} \$\{klasorZinciri\} \$\{size\}`", kaynak), (
         "kesilen yüklem beklenen samanlığı kurmuyor")
+
+
+def test_media_kind_filters_predicate_truth_table():
+    """Medya tür süzgeci doğruluk tablosu — göç yok ve kesişen süzgeç kanıtı.
+
+    Yüklem 'video değil' olmak zorunda, 'kind === image' olamaz — eski kayıtlarda
+    kind alanı hiç yok. imported ise kind'den bağımsız kesişen bir süzgeçtir.
+    """
+    sonuc = _kosturucu("""
+      const suzgec = (key) => MEDYA_TUR_SUZGECLERI.find((s) => s.key === key).test;
+      const kayitlar = {
+        eski:     { id: "1", prompt: "eski görsel" },
+        video:    { id: "2", prompt: "video kayıt", kind: "video" },
+        yuklenen: { id: "3", filename: "yuklenen.png", imported: true },
+        afis:     { id: "4", prompt: "afis", model: "" },
+      };
+      const keys = ["", "image", "video", "imported"];
+      const matris = {};
+      for (const [kAd, rec] of Object.entries(kayitlar)) {
+        matris[kAd] = {};
+        for (const k of keys) {
+          matris[kAd][k] = suzgec(k)(rec);
+        }
+      }
+      console.log(JSON.stringify(matris));
+    """)
+    assert sonuc["eski"] == {"": True, "image": True, "video": False, "imported": False}
+    assert sonuc["video"] == {"": True, "image": False, "video": True, "imported": False}
+    assert sonuc["yuklenen"] == {"": True, "image": True, "video": False, "imported": True}
+    assert sonuc["afis"] == {"": True, "image": True, "video": False, "imported": False}
+

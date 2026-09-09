@@ -98,7 +98,7 @@ Zaten var olan ve yeni satırları KENDİLİĞİNDEN kapsayan kapılar (bunlara 
   - `models.SettingsRequest.azure_foundry_base_url: str | None`
   - DOM: `#set-foundry-url`
 
-- [ ] **Step 1: `catalog.CREDENTIALS`'a `azure_foundry` girdisini ekle**
+- [x] **Step 1: `catalog.CREDENTIALS`'a `azure_foundry` girdisini ekle**
 
 `catalog.py`'de `anthropic` girdisinden SONRA, `)` kapanışından önce:
 
@@ -133,7 +133,7 @@ Zaten var olan ve yeni satırları KENDİLİĞİNDEN kapsayan kapılar (bunlara 
     ),
 ```
 
-- [ ] **Step 2: `models.SettingsRequest`'e adres alanını ekle**
+- [x] **Step 2: `models.SettingsRequest`'e adres alanını ekle**
 
 `models.py`'de `anthropic_base_url` satırından SONRA:
 
@@ -145,7 +145,7 @@ Zaten var olan ve yeni satırları KENDİLİĞİNDEN kapsayan kapılar (bunlara 
     azure_foundry_base_url: str | None = Field(default=None, max_length=500)
 ```
 
-- [ ] **Step 3: Türetme tablosunun testini yaz (kırmızı)**
+- [x] **Step 3: Türetme tablosunun testini yaz (kırmızı)**
 
 `tests/test_credstore.py` dosyasının SONUNA:
 
@@ -234,12 +234,12 @@ def test_anahtarsiz_kurulumda_foundry_KAPALI(env):
     assert credstore.is_configured("azure_foundry") is False
 ```
 
-- [ ] **Step 4: Testleri koş, kırmızı olduklarını gör**
+- [x] **Step 4: Testleri koş, kırmızı olduklarını gör**
 
 Run: `python -m pytest tests/test_credstore.py -q`
 Expected: FAIL — `AttributeError: module 'credstore' has no attribute 'derive_foundry_base_url'`
 
-- [ ] **Step 5: `credstore.py`'ye türetme tablosunu ve `azure_foundry` dalını ekle**
+- [x] **Step 5: `credstore.py`'ye türetme tablosunu ve `azure_foundry` dalını ekle**
 
 Modül başındaki import bloğunu şöyle yap (`urlsplit` MODÜL DÜZEYİNDE: stdlib, PyInstaller'ın statik analizi görüyor, `hiddenimports=[]` korunuyor):
 
@@ -323,12 +323,12 @@ def derive_foundry_base_url(image_base_url: str) -> str:
         return key, url
 ```
 
-- [ ] **Step 6: Testleri koş, yeşil olduklarını gör**
+- [x] **Step 6: Testleri koş, yeşil olduklarını gör**
 
 Run: `python -m pytest tests/test_credstore.py tests/test_catalog.py -q`
 Expected: PASS (tümü). `test_catalog.py` de yeşil olmalı — `test_katalogdaki_her_alan_adi_ayarlar_formunda_var` yeni `url_field`ı `SettingsRequest`te buluyor, `test_adressiz_kimligin_varsayilan_adresi_var` ise `azure`la başlayan kimlikleri atlıyor.
 
-- [ ] **Step 7: Ayarlar rotasının gidiş-dönüş testini yaz (kırmızı)**
+- [x] **Step 7: Ayarlar rotasının gidiş-dönüş testini yaz (kırmızı)**
 
 `tests/test_settings_route.py` dosyasının SONUNA:
 
@@ -395,12 +395,12 @@ def test_BOS_foundry_adresi_yazilmis_degeri_KORUYOR(client):
     assert credstore.resolve("azure_foundry")[1] == "https://ozel.ornek/foundry"
 ```
 
-- [ ] **Step 8: Testleri koş — üçü yeşil, biri kırmızı olmalı**
+- [x] **Step 8: Testleri koş — üçü yeşil, biri kırmızı olmalı**
 
 Run: `python -m pytest tests/test_settings_route.py -q`
 Expected: PASS (tümü). Kırmızı gelirse sebep `catalog`/`models` adımlarından biridir; `app.py`'ye KOD eklenmemeli.
 
-- [ ] **Step 9: `static/index.html`'e adres alanını ekle**
+- [x] **Step 9: `static/index.html`'e adres alanını ekle**
 
 `#prov-azure` grubundaki `<p class="field-note">` bloğundan SONRA, `</div>` kapanışından ÖNCE:
 
@@ -419,7 +419,7 @@ Expected: PASS (tümü). Kırmızı gelirse sebep `catalog`/`models` adımların
 
 Not: `#set-foundry-url` YENİ bir id ve `docs/flow-ui/id-defteri.md`'ye kayıt GEREKMİYOR — defter yalnız KALDIRILAN id'leri sayıyor, taban ise 152 id'lik donmuş bir anlık görüntü (bkz. `tests/test_id_contract.py::test_baseline_matches_frozen_commit`). Alan `saveSettings` içinde okunuyor, top-level bir bağ DEĞİL, yani `test_toplevel_baglar_htmlde_duruyor` da kapsamıyor.
 
-- [ ] **Step 10: `static/settings.js`'te gövdeye alanı ekle**
+- [x] **Step 10: `static/settings.js`'te gövdeye alanı ekle**
 
 `saveSettings` içindeki `JSON.stringify({...})` çağrısını şöyle yap:
 
@@ -440,12 +440,12 @@ Not: `#set-foundry-url` YENİ bir id ve `docs/flow-ui/id-defteri.md`'ye kayıt G
 
 Alan GİZLİ DEĞİL, o yüzden `openSettings`te ve kayıttan sonra temizlenmiyor (`#set-chat-deployment`in duruşu).
 
-- [ ] **Step 11: Ön yüz kapılarını ve tam takımı koş**
+- [x] **Step 11: Ön yüz kapılarını ve tam takımı koş**
 
 Run: `python -m pytest tests/test_id_contract.py tests/test_index.py tests/test_settings_route.py tests/test_credstore.py tests/test_catalog.py -q`
 Expected: PASS
 
-- [ ] **Step 12: Grafları yenile ve commit'le**
+- [x] **Step 12: Grafları yenile ve commit'le**
 
 ```bash
 python tools/graf_uret.py && python tools/graf_uret.py --kontrol
@@ -485,7 +485,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `catalog.MAI_SIZES: tuple[str, ...]`, `catalog.MAI_PIXEL_CAP: int`, `catalog.MAI_MIN_EDGE: int`
   - Katalog id'leri: `azure-mai-image-2-6`, `azure-mai-image-2-6-flash`, `azure-mai-image-2-5-pro`; provider anahtarı `azure-mai`
 
-- [ ] **Step 1: `catalog.py`'ye MAI geometri kümesini ve etiketlerini ekle**
+- [x] **Step 1: `catalog.py`'ye MAI geometri kümesini ve etiketlerini ekle**
 
 `ASPECT_RATIOS` tanımının yanına (`# ── Görsel modelleri ──` başlığından ÖNCE):
 
@@ -539,7 +539,7 @@ MAI_SIZES: tuple[str, ...] = (
 `PROVIDER_LOGOS`'a: `"azure-mai": "microsoft.svg",`
 `PROVIDER_BRANDS`'e: `"azure-mai": "Microsoft",`
 
-- [ ] **Step 2: Katalog kapılarının testini yaz (kırmızı)**
+- [x] **Step 2: Katalog kapılarının testini yaz (kırmızı)**
 
 `tests/test_catalog.py` dosyasının SONUNA:
 
@@ -598,12 +598,12 @@ def test_MAI_girdileri_jetonlari_PAYLASIYOR():
             "(bkz. openai-gpt-image-1'in duruşu)")
 ```
 
-- [ ] **Step 3: Testleri koş, kırmızı olduklarını gör**
+- [x] **Step 3: Testleri koş, kırmızı olduklarını gör**
 
 Run: `python -m pytest tests/test_catalog.py -q -k "MAI"`
 Expected: FAIL — `test_MAI_girdileri_jetonlari_PAYLASIYOR` "katalogda üç MAI girdisi olmalı" diyor (piksel bütçesi ve oran testleri Step 1 sayesinde zaten yeşil).
 
-- [ ] **Step 4: `azure_mai_client.py`'yi yaz**
+- [x] **Step 4: `azure_mai_client.py`'yi yaz**
 
 ```python
 """Azure AI Foundry · MAI-Image ailesi — `/mai/v1/images/{generations,edits}`.
@@ -898,7 +898,7 @@ def edit(m: catalog.ImageModel, prompt: str, images, size: str, quality: str,
                  client=client, credentials=credentials)
 ```
 
-- [ ] **Step 5: `providers.py`'ye MAI adaptörünü kaydet**
+- [x] **Step 5: `providers.py`'ye MAI adaptörünü kaydet**
 
 `_veo_adapter` tanımından SONRA:
 
@@ -925,7 +925,7 @@ def _mai_adapter():
     "azure-mai": _mai_adapter,
 ```
 
-- [ ] **Step 6: Üç MAI katalog girdisini ekle**
+- [x] **Step 6: Üç MAI katalog girdisini ekle**
 
 `IMAGE_MODELS` demetinin SONUNA (gemini girdilerinden sonra, `)` kapanışından önce):
 
@@ -1016,7 +1016,7 @@ def _mai_adapter():
     ),
 ```
 
-- [ ] **Step 7: `microsoft.svg`'yi yaz**
+- [x] **Step 7: `microsoft.svg`'yi yaz**
 
 `static/img/providers/microsoft.svg` — kardeş dosyaların sözleşmesi: geçerli XML (**yorumda çift tire YASAK**, Türkçe harf de YOK), kökte `viewBox=`/`width=`/`height=`, `currentColor` YOK, `#e8eaed` VAR.
 
@@ -1045,12 +1045,12 @@ def _mai_adapter():
 <svg width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#e8eaed"><title>Microsoft</title><path d="M11.4 24H0V12.6h11.4zM24 24H12.6V12.6H24zM11.4 11.4H0V0h11.4zM24 11.4H12.6V0H24z"/></svg>
 ```
 
-- [ ] **Step 8: Katalog + sağlayıcı + işaret kapılarını koş**
+- [x] **Step 8: Katalog + sağlayıcı + işaret kapılarını koş**
 
 Run: `python -m pytest tests/test_catalog.py tests/test_providers.py tests/test_provider_logos.py -q`
 Expected: PASS
 
-- [ ] **Step 9: MAI adaptörünün testini yaz (kırmızı bekleniyor)**
+- [x] **Step 9: MAI adaptörünün testini yaz (kırmızı bekleniyor)**
 
 Create `tests/test_azure_mai_client.py`:
 
@@ -1339,17 +1339,17 @@ def test_the_identity_is_resolved_LAZILY_when_credentials_are_given(monkeypatch)
     assert out == [b"\x89PNG"]
 ```
 
-- [ ] **Step 10: Testleri koş ve yeşile getir**
+- [x] **Step 10: Testleri koş ve yeşile getir**
 
 Run: `python -m pytest tests/test_azure_mai_client.py -q`
 Expected: PASS. Kırmızı gelirse Step 4'teki modülü düzelt — TEST DEĞİL; testler tel sözleşmesinin mandalı.
 
-- [ ] **Step 11: Tam takımı koş**
+- [x] **Step 11: Tam takımı koş**
 
 Run: `python -m pytest tests/ -q`
 Expected: PASS (tamamı)
 
-- [ ] **Step 12: Grafları yenile ve commit'le**
+- [x] **Step 12: Grafları yenile ve commit'le**
 
 ```bash
 python tools/graf_uret.py && python tools/graf_uret.py --kontrol
@@ -1391,7 +1391,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `catalog.FLUX_SIZES: tuple[str, ...]`
   - Katalog id'leri: `azure-flux-2-pro`, `azure-flux-2-flex`; provider anahtarı `azure-flux`
 
-- [ ] **Step 1: `detail_of`un liste dalının testini yaz (kırmızı)**
+- [x] **Step 1: `detail_of`un liste dalının testini yaz (kırmızı)**
 
 `tests/test_providers.py`'de `test_detail_of_duz_NESNE_yolunu_degistirmiyor`'dan SONRA:
 
@@ -1444,12 +1444,12 @@ def test_detail_of_survives_a_details_list_of_JUNK():
     assert providers.detail_of({"error": {"details": []}}) == ""
 ```
 
-- [ ] **Step 2: Testleri koş, kırmızı olduklarını gör**
+- [x] **Step 2: Testleri koş, kırmızı olduklarını gör**
 
 Run: `python -m pytest tests/test_providers.py -q -k "detail_of"`
 Expected: FAIL — `assert '' == 'body.width: must be a multiple of 32'`
 
-- [ ] **Step 3: `providers.detail_of`a liste dalını ekle**
+- [x] **Step 3: `providers.detail_of`a liste dalını ekle**
 
 `detail_of` tanımından ÖNCE:
 
@@ -1525,12 +1525,12 @@ def _details_metni(err: dict) -> str:
     yolu bayt bayt aynı kalıyor (onların `details`i ya yok ya bir dize).
 ```
 
-- [ ] **Step 4: Testleri koş, yeşil olduklarını gör**
+- [x] **Step 4: Testleri koş, yeşil olduklarını gör**
 
 Run: `python -m pytest tests/test_providers.py tests/test_gemini_client.py tests/test_openai_client.py tests/test_azure_mai_client.py -q`
 Expected: PASS — mevcut `detail_of` iddialarının hiçbiri kaymamalı.
 
-- [ ] **Step 5: `catalog.py`'ye FLUX jetonlarını, etiketlerini ve markasını ekle**
+- [x] **Step 5: `catalog.py`'ye FLUX jetonlarını, etiketlerini ve markasını ekle**
 
 `MAI_SIZES` bloğundan SONRA:
 
@@ -1570,7 +1570,7 @@ FLUX_SIZES: tuple[str, ...] = ("1024x1024", "1024x1536", "1536x1024")
 `PROVIDER_LOGOS`'a: `"azure-flux": "blackforestlabs.svg",`
 `PROVIDER_BRANDS`'e: `"azure-flux": "Black Forest Labs",`
 
-- [ ] **Step 6: FLUX katalog kapılarının testini yaz (kırmızı)**
+- [x] **Step 6: FLUX katalog kapılarının testini yaz (kırmızı)**
 
 `tests/test_catalog.py`'de MAI bloğundan SONRA:
 
@@ -1615,12 +1615,12 @@ def test_FLUX_pro_nun_kalite_ekseni_GIZLI_flex_in_GERCEK():
     assert catalog.default_quality_of(flex) == "dengeli"
 ```
 
-- [ ] **Step 7: Testleri koş, kırmızı olduklarını gör**
+- [x] **Step 7: Testleri koş, kırmızı olduklarını gör**
 
 Run: `python -m pytest tests/test_catalog.py -q -k "FLUX"`
 Expected: FAIL — "katalogda iki FLUX girdisi olmalı" ve `image_model("azure-flux-2-pro")` `None`.
 
-- [ ] **Step 8: İki FLUX katalog girdisini ekle**
+- [x] **Step 8: İki FLUX katalog girdisini ekle**
 
 `IMAGE_MODELS`'ın SONUNA, MAI girdilerinden sonra:
 
@@ -1691,7 +1691,7 @@ Expected: FAIL — "katalogda iki FLUX girdisi olmalı" ve `image_model("azure-f
     ),
 ```
 
-- [ ] **Step 9: `blackforestlabs.svg`'yi yaz**
+- [x] **Step 9: `blackforestlabs.svg`'yi yaz**
 
 `static/img/providers/blackforestlabs.svg`:
 
@@ -1724,7 +1724,7 @@ Expected: FAIL — "katalogda iki FLUX girdisi olmalı" ve `image_model("azure-f
 python -m pytest tests/test_provider_logos.py -q
 ```
 
-- [ ] **Step 10: İşaret ve katalog kapılarını koş**
+- [x] **Step 10: İşaret ve katalog kapılarını koş**
 
 Run: `python -m pytest tests/test_provider_logos.py tests/test_catalog.py -q`
 Expected: `test_ADAPTORU_OLAN_her_saglayicinin_isareti_var` YEŞİL (işaret geldi) ama `test_providers.py::test_katalogdaki_her_saglayicinin_adaptoru_kayitli` KIRMIZI olacak — adaptör bir sonraki adımda.
@@ -1732,7 +1732,7 @@ Expected: `test_ADAPTORU_OLAN_her_saglayicinin_isareti_var` YEŞİL (işaret gel
 Run: `python -m pytest tests/test_providers.py -q -k adaptoru`
 Expected: FAIL — "`azure-flux` adaptörü _ADAPTERS'ta yok"
 
-- [ ] **Step 11: `azure_flux_client.py`'yi yaz**
+- [x] **Step 11: `azure_flux_client.py`'yi yaz**
 
 ```python
 """Azure AI Foundry · FLUX.2 (Black Forest Labs) — BFL yolu.
@@ -2029,7 +2029,7 @@ def edit(m: catalog.ImageModel, prompt: str, images, size: str, quality: str,
                  client=client, credentials=credentials)
 ```
 
-- [ ] **Step 12: `providers.py`'ye FLUX adaptörünü kaydet**
+- [x] **Step 12: `providers.py`'ye FLUX adaptörünü kaydet**
 
 `_mai_adapter` tanımından SONRA:
 
@@ -2049,7 +2049,7 @@ def _flux_adapter():
     "azure-flux": _flux_adapter,
 ```
 
-- [ ] **Step 13: FLUX adaptörünün testini yaz (kırmızı)**
+- [x] **Step 13: FLUX adaptörünün testini yaz (kırmızı)**
 
 Create `tests/test_azure_flux_client.py`:
 
@@ -2315,17 +2315,17 @@ def test_a_TIMEOUT_becomes_a_TURKISH_error_that_names_FOUNDRY():
     assert "Foundry" in mesaj and "Azure" not in mesaj
 ```
 
-- [ ] **Step 14: Testleri koş ve yeşile getir**
+- [x] **Step 14: Testleri koş ve yeşile getir**
 
 Run: `python -m pytest tests/test_azure_flux_client.py -q`
 Expected: PASS
 
-- [ ] **Step 15: Tam takımı koş**
+- [x] **Step 15: Tam takımı koş**
 
 Run: `python -m pytest tests/ -q`
 Expected: PASS (tamamı)
 
-- [ ] **Step 16: Grafları yenile ve commit'le**
+- [x] **Step 16: Grafları yenile ve commit'le**
 
 ```bash
 python tools/graf_uret.py && python tools/graf_uret.py --kontrol
@@ -2352,7 +2352,7 @@ Spec'in 9. kararının ikinci yarısı: "Mevcut girdilerin notları da bu turda 
 - Consumes: Task 2 ve 3'ün eklediği `azure-mai` / `azure-flux` girdileri (yeni notlarla karşılaştırma için).
 - Produces: yeni bir simge YOK — yalnız `note` dizeleri ve bir test.
 
-- [ ] **Step 1: Not sözleşmesinin testini yaz (kırmızı bekleniyor)**
+- [x] **Step 1: Not sözleşmesinin testini yaz (kırmızı bekleniyor)**
 
 `tests/test_catalog.py`'de FLUX bloğundan SONRA:
 
@@ -2402,12 +2402,12 @@ def test_hicbir_not_uygulamanin_YAPMADIGI_bir_seyi_vaat_etmiyor():
                 f"{min(m.max_refs, appmod.MAX_EDIT_IMAGES)}")
 ```
 
-- [ ] **Step 2: Testi koş ve hangi notların düştüğünü gör**
+- [x] **Step 2: Testi koş ve hangi notların düştüğünü gör**
 
 Run: `python -m pytest tests/test_catalog.py -q -k "notu or ONIZLEME or YAPMADIGI"`
 Expected: kısmen FAIL. Beş mevcut girdinin notları bu tur yazılmadan önce uzunluk/tekrar kapısına takılabiliyor. **Hangi girdilerin düştüğünü ÇIKTIDAN oku** — bir sonraki adım beşini de yeniden yazıyor, ama düşen satırların listesi doğrulamanın kanıtı. Yeni beş girdi (MAI ×3, FLUX ×2) ve önizleme/vaat iddiaları Task 2-3'ten YEŞİL gelmeli; gelmiyorsa kusur o görevlerdeki notlardadır, bu testte değil.
 
-- [ ] **Step 3: Beş mevcut girdinin notunu yeniden yaz**
+- [x] **Step 3: Beş mevcut girdinin notunu yeniden yaz**
 
 `catalog.py`'de, girdilerin `note=` satırlarını şöyle yap (yalnız `note` değişiyor; başka hiçbir alana dokunulmuyor):
 
@@ -2451,17 +2451,17 @@ Notların yanına, `IMAGE_MODELS` demetinin başındaki yorum bloğuna bir parag
 # tests/test_catalog.py'nin `note` sözleşmesi bloğu.
 ```
 
-- [ ] **Step 4: Not testlerini koş, yeşil olduklarını gör**
+- [x] **Step 4: Not testlerini koş, yeşil olduklarını gör**
 
 Run: `python -m pytest tests/test_catalog.py -q`
 Expected: PASS
 
-- [ ] **Step 5: Tam takımı koş — kanıt olmadan iddia yok**
+- [x] **Step 5: Tam takımı koş — kanıt olmadan iddia yok**
 
 Run: `python -m pytest tests/ -q`
 Expected: PASS (tamamı). Çıktıyı OKU; "hepsi geçti" demeden önce satırı gör.
 
-- [ ] **Step 6: Harita kapısını ayrıca doğrula**
+- [x] **Step 6: Harita kapısını ayrıca doğrula**
 
 ```bash
 python tools/graf_uret.py && python tools/graf_uret.py --kontrol && python tools/graf_uret.py --ozet
@@ -2469,7 +2469,7 @@ python tools/graf_uret.py && python tools/graf_uret.py --kontrol && python tools
 
 Özette şunlar görünmeli: iki yeni modül (`azure_mai_client`, `azure_flux_client`) ve `providers`ın onları ERTELİ ithal ettiği (`gemini_client`/`openai_client`/`veo_client` ile aynı kalıp).
 
-- [ ] **Step 7: Grafları yenile ve commit'le**
+- [x] **Step 7: Grafları yenile ve commit'le**
 
 ```bash
 git add catalog.py tests/test_catalog.py docs/graflar

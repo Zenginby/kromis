@@ -155,6 +155,18 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.15.0 — ne değişti
+
+- asgari Python 3.13 -- 45 sebepsiz kirmizinin gercek sebebi
+- SyntaxWarning kapisi worktree kopyalarini kaynak sayiyordu
+- ham olmayan docstring'in doğurduğu SyntaxWarning ve depo geneli kapısı
+- yanlis "en ucuz" iddiasi, MAI tek-referans aciklamasi ve mandali
+- FLUX.2 adaptoru, iki katalog girdisi ve detail_of liste dali
+- MAI-Image adaptoru ve uc katalog girdisi
+- azure_foundry kimligi, host turetme tablosu ve adres alani
+
+---
+
 ## Sürüm 0.14.0 — ne değişti
 
 - incelemenin bulduğu on gerileme — hap, oran, son kare akışı

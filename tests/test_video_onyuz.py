@@ -364,9 +364,12 @@ def test_the_COUNT_row_hides_itself_when_the_model_offers_one():
     js = _kodsuz(_core())
 
     assert '$("spec-n").hidden = model.max_n <= 1' in _govde(js, "eksenleriDoldur")
-    # Bugün yalnız video modellerini etkiliyor.
+    # FLUX'un `max_n=1` girdileriyle (karar 5) kural artık GÖRSEL tarafında
+    # da tetikleniyor — tam olarak bu testin iddiasının kanıtı: satır "video
+    # mu görsel mi" sormuyor, yalnız modelin BEYANINA (`max_n`) bakıyor.
     assert all(m.max_n == 1 for m in catalog.VIDEO_MODELS)
-    assert all(m.max_n > 1 for m in catalog.IMAGE_MODELS)
+    assert any(m.max_n == 1 for m in catalog.IMAGE_MODELS)
+    assert any(m.max_n > 1 for m in catalog.IMAGE_MODELS)
 
 
 def test_the_specs_chip_reads_the_HIDDEN_attribute_not_the_model():

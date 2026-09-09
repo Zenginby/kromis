@@ -322,6 +322,7 @@ PROVIDER_LOGOS: dict[str, str] = {
     "openai": "openai.svg",
     "gemini": "gemini.svg",
     "azure-mai": "microsoft.svg",
+    "azure-flux": "blackforestlabs.svg",
 }
 
 # İşaret ARTIK MARKAYI SÖYLÜYOR, o yüzden etiketin de söylemesi gereksiz: şeritte
@@ -340,6 +341,7 @@ PROVIDER_BRANDS: dict[str, str] = {
     "gemini": "Gemini",
     "anthropic": "Anthropic",
     "azure-mai": "Microsoft",
+    "azure-flux": "Black Forest Labs",
 }
 
 
@@ -372,6 +374,20 @@ MAI_SIZES: tuple[str, ...] = (
     "1365x768",    # 1.048.320 · 16:9
     "768x1365",    # 1.048.320 · 9:16
 )
+
+# FLUX.2 `gpt-image-2`nin ÜÇ JETONUNU AYNEN kullanabiliyor: üçü de belgelenmiş
+# 4 MP tavanının çok altında ve 32'nin katı. Kazanç somut ve ölçülebilir —
+# gpt-image-2'den FLUX'a geçen kullanıcı "varsayılana düşüldü" uyarısı ALMIYOR
+# (bkz. core.js `fillAxis`).
+#
+# MAI'de aynı şeyi yapmak MÜMKÜN DEĞİLDİ (bkz. MAI_SIZES): `1024x1536` ve
+# `1536x1024` MAI'nin piksel tavanını %50 aşıyor. İki sağlayıcının iki ayrı
+# demet taşımasının sebebi bu, üslup değil.
+#
+# FLUX'un GERÇEK boyut kabulü (alt sınır, 32'nin katı olma şartı) bu depoda
+# ÖLÇÜLMEDİ; üç jeton tavanın çok altında kaldığı için ilk tur güvenli.
+# Mandal: tests/test_catalog.py::test_FLUX_jetonlari_gpt_image_2_ile_AYNI.
+FLUX_SIZES: tuple[str, ...] = ("1024x1024", "1024x1536", "1536x1024")
 
 
 # ── Görsel modelleri ────────────────────────────────────────────────────
@@ -657,6 +673,70 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         note="Kalabalık sahnelerde nesne ve karakter tutarlılığı; pahalı. "
              "Önizleme.",
     ),
+    # ── Azure AI Foundry · FLUX.2 (Black Forest Labs) ───────────────────
+    #
+    # KREDİLER GEÇİCİ: FLUX megapiksel başına faturalanıyor ve yayınlanmış
+    # birim fiyat doğrulanamadı (Azure fiyat sayfaları JS ile çiziliyor,
+    # tablo boş döndü). Çapa yine Azure `medium` = 8 kredi ≈ 0,04 USD.
+    # Krediler zaten "doğrulanacak bir olgu değil, ürün kararı" — ama ORAN
+    # yanlışsa seçicideki karşılaştırma yalan söyler, o yüzden takip ediliyor.
+    #
+    # `max_n=1` ve gerekçesi iki katmanlı: (1) `num_images`ın üst sınırı
+    # ölçülmedi ve fazla beyan arayüzde seçilebilir bir hata; (2) FLUX
+    # dağıtımlarının kapasitesi düşük (belgelenmiş RPM'de flex için 5/dk) —
+    # dört paralel istek 429'a girerdi ve sonda sırasında `RateLimitReached`
+    # gerçekten görüldü.
+    #
+    # ÇOK REFERANSLI DÜZENLEME 8/10 görsele kadar çıkıyor ama ilk tur
+    # `app.MAX_EDIT_IMAGES` (4) tavanında kalıyor; not bu yüzden 8/10 SÖZÜ
+    # VERMİYOR — uygulamanın yapmadığı bir şeyi seçicide vaat etmek bu
+    # deponun yasakladığı sessiz sapmanın kendisi.
+    #
+    # İÇERİK FİLTRESİ YOK (Microsoft'un kendi uyarısı), yani
+    # `providers.is_content_policy` bu sağlayıcıda hiç tetiklenmiyor. Not
+    # adaptörün başlığında da yazılı ki ileride "neden çalışmıyor" diye
+    # aranmasın.
+    ImageModel(
+        id="azure-flux-2-pro",
+        label="Black Forest Labs · FLUX.2 pro",
+        provider="azure-flux",
+        wire_model="FLUX.2-pro",
+        credential="azure_foundry",
+        sizes=FLUX_SIZES,
+        # `quality` parametresi YOK: tek sentetik jeton + gizli knob (karar 4).
+        qualities=("standard",),
+        quality_hidden=True,
+        max_n=1,
+        images_per_request=1,
+        supports_edit=True,
+        max_refs=4,
+        credits=16,
+        note="En yüksek görsel kalite; yavaş ve pahalı. Tek turda 1 görsel.",
+    ),
+    ImageModel(
+        id="azure-flux-2-flex",
+        label="Black Forest Labs · FLUX.2 flex",
+        provider="azure-flux",
+        wire_model="FLUX.2-flex",
+        credential="azure_foundry",
+        sizes=FLUX_SIZES,
+        # GERÇEK bir eksen (karar 4): jetonlar `steps`/`guidance` çiftlerine
+        # çözülüyor (bkz. azure_flux_client._FLEX_QUALITY). Sentetik bir jeton
+        # burada israf olurdu.
+        qualities=("hizli", "dengeli", "detayli"),
+        default_quality="dengeli",
+        max_n=1,
+        images_per_request=1,
+        supports_edit=True,
+        max_refs=4,
+        credits=10,
+        # Taban `dengeli` (25 adım); ötekiler adım oranından türetildi
+        # (10/25 → 0,6× ve 50/25 → 1,6×, yuvarlanmış). ÜÇÜ DE GEÇİCİ —
+        # megapiksel fiyatı doğrulanmadı.
+        credits_by_quality=(("hizli", 6), ("dengeli", 10), ("detayli", 16)),
+        note="Adım ve yönlendirme seçilebiliyor: metin ağırlıklı yerleşimler "
+             "için. Tek turda 1 görsel.",
+    ),
 )
 
 
@@ -883,6 +963,18 @@ QUALITY_LABELS: dict[str, str] = {
     # zaten öyle tanıyor.
     "720p": "720p · HD",
     "1080p": "1080p · Full HD",
+    # FLUX.2-flex'in `steps`/`guidance` kademeleri. Sentetik bir jeton İSRAF
+    # olurdu: belgelenmiş `steps` (≤50) ve `guidance` (1.5–10) kaliteyi
+    # DOĞRUDAN belirliyor, yani burada gerçek bir eksen var (karar 4).
+    #
+    # JETONLAR ASCII ve bu deponun kurulu deseni: `low`, `1K`, `720p`, tema
+    # adları — hepsi ASCII. Jeton `history.json`a, `prefs.json`a ve
+    # `ResultParams.quality`ye yazılıyor; Türkçe metin ETİKETTE yaşıyor.
+    # Jetonlar sağlayıcıya GİTMİYOR: `azure_flux_client.quality_axis` onları
+    # sayılara çeviriyor.
+    "hizli": "Hızlı · 10 adım",
+    "dengeli": "Dengeli · 25 adım",
+    "detayli": "Detaylı · 50 adım",
 }
 
 

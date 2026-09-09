@@ -2,7 +2,7 @@
 
 # Modül grafı
 
-42 Python modülü, 94 modül düzeyi + 11 erteli ithal kenarı.
+43 Python modülü, 98 modül düzeyi + 12 erteli ithal kenarı.
 
 Katman, o modülün depo içindeki en uzun bağımlılık zincirinin uzunluğu:
 **katman 0 hiçbir depo modülüne dayanmaz**, en üst katman uygulamanın
@@ -32,13 +32,14 @@ flowchart TD
     n_openai_chat["openai_chat<br/>179 satır"]
   end
   subgraph katman3["katman 3"]
+    n_azure_flux_client["azure_flux_client<br/>292 satır"]
     n_azure_mai_client["azure_mai_client<br/>290 satır"]
     n_backup["backup<br/>187 satır"]
     n_chat_client["chat_client<br/>182 satır"]
     n_gemini_client["gemini_client<br/>293 satır"]
     n_openai_client["openai_client<br/>215 satır"]
     n_prefs["prefs<br/>219 satır"]
-    n_providers["providers<br/>406 satır"]
+    n_providers["providers<br/>472 satır"]
     n_veo_client["veo_client<br/>590 satır"]
   end
   subgraph katman2["katman 2"]
@@ -57,7 +58,7 @@ flowchart TD
     n_storage["storage<br/>415 satır"]
   end
   subgraph katman0["katman 0"]
-    n_catalog["catalog<br/>1190 satır"]
+    n_catalog["catalog<br/>1282 satır"]
     n_composite["composite<br/>158 satır"]
     n_errlog["errlog<br/>114 satır"]
     n_jsonstore["jsonstore<br/>80 satır"]
@@ -98,6 +99,10 @@ flowchart TD
   n_assets_store --> n_jsonstore
   n_azure_client --> n_paths
   n_azure_client --> n_winsec
+  n_azure_flux_client --> n_azure_client
+  n_azure_flux_client --> n_catalog
+  n_azure_flux_client --> n_credstore
+  n_azure_flux_client --> n_providers
   n_azure_mai_client --> n_azure_client
   n_azure_mai_client --> n_catalog
   n_azure_mai_client --> n_credstore
@@ -159,6 +164,7 @@ flowchart TD
   n_providers --> n_azure_client
   n_providers --> n_catalog
   n_providers --> n_credstore
+  n_providers -.->|erteli| n_azure_flux_client
   n_providers -.->|erteli| n_azure_mai_client
   n_providers -.->|erteli| n_gemini_client
   n_providers -.->|erteli| n_openai_client
@@ -177,7 +183,7 @@ Birbirini ithal eden öbekler. Kesikli (`erteli`) bir kenarla
 kırılmış döngü KUSUR DEĞİL — işlev içinde yapılan ithal, import
 anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 
-* azure_mai_client ↔ gemini_client ↔ openai_client ↔ providers ↔ veo_client — erteli bir ithalle kırılmış
+* azure_flux_client ↔ azure_mai_client ↔ gemini_client ↔ openai_client ↔ providers ↔ veo_client — erteli bir ithalle kırılmış
 
 ## Modüller
 
@@ -186,17 +192,18 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `android_main.py` | 194 | 9 | `app` (erteli), `desktop` (erteli), `errlog` (erteli), `paths` (erteli) | 0 | 1 |
 | `app.py` | 2104 | 6 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 30 |
 | `assets_store.py` | 201 | 1 | `jsonstore` | 3 | 9 |
-| `azure_client.py` | 458 | 1 | `paths`, `winsec` | 11 | 28 |
+| `azure_client.py` | 458 | 1 | `paths`, `winsec` | 12 | 29 |
+| `azure_flux_client.py` | 292 | 3 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `azure_mai_client.py` | 290 | 3 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `backup.py` | 187 | 3 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 1 | 1 |
-| `catalog.py` | 1190 | 0 | — | 12 | 24 |
+| `catalog.py` | 1282 | 0 | — | 13 | 25 |
 | `chat_client.py` | 182 | 3 | `azure_client`, `chat_prompt`, `models` | 3 | 3 |
 | `chat_prompt.py` | 172 | 1 | `paths` | 3 | 1 |
 | `chat_providers.py` | 124 | 5 | `azure_client`, `catalog`, `chat_client`, `credstore`, `openai_chat` | 1 | 2 |
 | `chat_store.py` | 253 | 1 | `jsonstore` | 2 | 2 |
 | `color_names.py` | 418 | 1 | `palette` | 1 | 3 |
 | `composite.py` | 158 | 0 | — | 1 | 1 |
-| `credstore.py` | 194 | 2 | `azure_client`, `catalog` | 8 | 4 |
+| `credstore.py` | 194 | 2 | `azure_client`, `catalog` | 9 | 4 |
 | `desktop.py` | 558 | 8 | `errlog`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli) | 1 | 2 |
 | `errlog.py` | 114 | 0 | — | 4 | 1 |
 | `folders.py` | 248 | 2 | `jsonstore`, `storage` | 3 | 4 |
@@ -211,7 +218,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `palette_store.py` | 93 | 1 | `jsonstore` | 3 | 3 |
 | `paths.py` | 167 | 0 | — | 6 | 3 |
 | `prefs.py` | 219 | 3 | `catalog`, `jsonstore`, `models` | 1 | 4 |
-| `providers.py` | 406 | 3 | `azure_client`, `catalog`, `credstore`, `azure_mai_client` (erteli), `gemini_client` (erteli), `openai_client` (erteli), `veo_client` (erteli) | 6 | 6 |
+| `providers.py` | 472 | 3 | `azure_client`, `catalog`, `credstore`, `azure_flux_client` (erteli), `azure_mai_client` (erteli), `gemini_client` (erteli), `openai_client` (erteli), `veo_client` (erteli) | 7 | 7 |
 | `release_manifest.py` | 70 | 0 | — | 0 | 2 |
 | `screencolor.py` | 150 | 0 | — | 1 | 1 |
 | `storage.py` | 415 | 1 | `catalog`, `jsonstore` | 4 | 10 |

@@ -190,6 +190,54 @@ def test_detail_of_duz_NESNE_yolunu_degistirmiyor():
     assert providers.detail_of([["iç içe dizi"]]) == ""
 
 
+# ── FLUX'un ÜÇÜNCÜ hata şekli: `error.details[]` ───────────────────────
+#
+# Mevcut hiçbir çözümleyici bu listeyi tanımıyordu ve bedeli ölçülebilir:
+# `error.message` boş olduğu için BÜTÜN 422'ler çıplak bir "HTTP 422"ya
+# çöküyor, yani kullanıcı hangi alanın yanlış olduğunu hiçbir yerde okumuyor.
+
+
+def test_detail_of_FLATTENS_the_flux_details_list():
+    govde = {"error": {"details": [
+        {"loc": ["body", "width"], "msg": "must be a multiple of 32"},
+    ]}}
+    assert providers.detail_of(govde) == "body.width: must be a multiple of 32"
+
+
+def test_detail_of_joins_at_most_THREE_details():
+    """Sınır bir süsleme değil: doğrulayıcı onlarca madde döndürebiliyor ve
+    hepsini tek satıra dizmek kullanıcıya okunamayan bir duvar gösterirdi."""
+    govde = {"error": {"details": [
+        {"loc": ["body", f"a{i}"], "msg": "bad"} for i in range(6)
+    ]}}
+    detay = providers.detail_of(govde)
+    assert detay.count(";") == 2, detay
+    assert "a3" not in detay
+
+
+def test_detail_of_keeps_the_MESSAGE_when_both_are_present():
+    """Mesaj varsa o ANA cümle; liste onu tamamlıyor, EZMİYOR."""
+    govde = {"error": {"message": "Validation failed",
+                       "details": [{"loc": ["body", "steps"], "msg": "too big"}]}}
+    detay = providers.detail_of(govde)
+    assert detay.startswith("Validation failed")
+    assert "body.steps: too big" in detay
+
+
+def test_detail_of_IGNORES_a_string_details_field():
+    """MAI'nin gövdesinde de `details` var ama o bir DİZE ve mesaj zaten
+    `error.message`da — o yolun baytları DEĞİŞMEMELİ."""
+    govde = {"error": {"code": "BadRequest", "message": "prompt is required",
+                       "details": "see docs"}}
+    assert providers.detail_of(govde) == "prompt is required"
+
+
+def test_detail_of_survives_a_details_list_of_JUNK():
+    """Şekil doğrulanmadan gelen bir gövde ham istisna üretmemeli."""
+    assert providers.detail_of({"error": {"details": [None, 3, "x"]}}) == ""
+    assert providers.detail_of({"error": {"details": []}}) == ""
+
+
 def test_azure_yolu_kimligi_ONCEDEN_cozmuyor():
     """Kimlik `ac.generate`'in İÇİNDE, tembel biçimde çözülüyor.
 
@@ -288,11 +336,13 @@ def test_the_video_table_is_SEPARATE_from_the_image_table():
     bu "sağlayıcı → dörtlü demet" olurdu ve görsel adaptörü olmayan bir video
     sağlayıcısı iki boş yuva taşırdı."""
     assert providers.video_adapter_ids() == frozenset({"gemini"})
-    # Görsel tablosu MAI'yle BÜYÜDÜ, video tablosuyla PAYLAŞILMADI: `azure-mai`
-    # yalnız görsel tarafında (MAI'nin video ucu yok), bu yüzden iki küme hâlâ
-    # ayrık kalıyor — testin iddiası tam olarak bu.
+    # Görsel tablosu MAI'yle, şimdi FLUX'la BÜYÜDÜ; iki küme TAMAMEN ayrık
+    # DEĞİL — `gemini` ikisinde birden var (bkz. bu testin kendi docstring'i).
+    # İddia daha dar: her YENİ sağlayıcı (`azure-mai`, `azure-flux`) yalnız
+    # görsel tarafında, video tablosuyla PAYLAŞILMIYOR — ikisinin de video
+    # ucu yok.
     assert providers.adapter_ids() == frozenset(
-        {"azure", "openai", "gemini", "azure-mai"})
+        {"azure", "openai", "gemini", "azure-mai", "azure-flux"})
 
 
 def test_an_IMAGE_model_id_is_refused_by_the_video_dispatcher():

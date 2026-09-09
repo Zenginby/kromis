@@ -1,6 +1,7 @@
 {
   "dongular": [
     [
+      "azure_flux_client",
       "azure_mai_client",
       "gemini_client",
       "openai_client",
@@ -130,6 +131,7 @@
       ],
       "ithal_eden": [
         "app",
+        "azure_flux_client",
         "azure_mai_client",
         "chat_client",
         "chat_providers",
@@ -149,6 +151,7 @@
         "tests/test_azure_client.py",
         "tests/test_azure_client_edit.py",
         "tests/test_azure_client_http.py",
+        "tests/test_azure_flux_client.py",
         "tests/test_azure_mai_client.py",
         "tests/test_banner.py",
         "tests/test_catalog.py",
@@ -174,6 +177,25 @@
         "tests/test_video_route.py"
       ],
       "yol": "azure_client.py"
+    },
+    {
+      "ad": "azure_flux_client",
+      "erteli_ithal": [],
+      "ithal": [
+        "azure_client",
+        "catalog",
+        "credstore",
+        "providers"
+      ],
+      "ithal_eden": [
+        "providers"
+      ],
+      "katman": 3,
+      "satir": 292,
+      "testler": [
+        "tests/test_azure_flux_client.py"
+      ],
+      "yol": "azure_flux_client.py"
     },
     {
       "ad": "azure_mai_client",
@@ -221,6 +243,7 @@
       "ithal": [],
       "ithal_eden": [
         "app",
+        "azure_flux_client",
         "azure_mai_client",
         "chat_providers",
         "credstore",
@@ -234,10 +257,11 @@
         "veo_client"
       ],
       "katman": 0,
-      "satir": 1190,
+      "satir": 1282,
       "testler": [
         "tests/test_arena.py",
         "tests/test_arena_onyuz.py",
+        "tests/test_azure_flux_client.py",
         "tests/test_azure_mai_client.py",
         "tests/test_catalog.py",
         "tests/test_chat_providers.py",
@@ -383,6 +407,7 @@
       ],
       "ithal_eden": [
         "app",
+        "azure_flux_client",
         "azure_mai_client",
         "chat_providers",
         "gemini_client",
@@ -697,6 +722,7 @@
     {
       "ad": "providers",
       "erteli_ithal": [
+        "azure_flux_client",
         "azure_mai_client",
         "gemini_client",
         "openai_client",
@@ -709,6 +735,7 @@
       ],
       "ithal_eden": [
         "app",
+        "azure_flux_client",
         "azure_mai_client",
         "gemini_client",
         "openai_chat",
@@ -716,8 +743,9 @@
         "veo_client"
       ],
       "katman": 3,
-      "satir": 406,
+      "satir": 472,
       "testler": [
+        "tests/test_azure_flux_client.py",
         "tests/test_azure_mai_client.py",
         "tests/test_catalog.py",
         "tests/test_gemini_client.py",
@@ -1278,7 +1306,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 79,
+  "test_dosyasi_sayisi": 80,
   "uc_noktalar": [
     {
       "islev": "index",

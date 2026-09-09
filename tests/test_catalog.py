@@ -621,3 +621,43 @@ def test_MAI_girdileri_jetonlari_PAYLASIYOR():
         assert m.note and "Önizleme" in m.note, (
             f"{m.id}: MAI ailesinin üçü de önizleme; notta yazılı olmalı "
             "(bkz. openai-gpt-image-1'in duruşu)")
+
+
+# ── Azure AI Foundry · FLUX.2 (v0.15) ──────────────────────────────────
+
+
+def test_FLUX_jetonlari_gpt_image_2_ile_AYNI():
+    """Aynı jeton kümesi = model değiştirirken "varsayılana düşüldü" uyarısı
+    YOK. Ayrışırsa kullanıcı sebepsiz bir düşme uyarısı görür."""
+    azure = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
+    assert set(catalog.FLUX_SIZES) == set(azure.sizes)
+
+
+def test_FLUX_girdileri_jetonlari_PAYLASIYOR():
+    flux = [m for m in catalog.IMAGE_MODELS if m.provider == "azure-flux"]
+    assert len(flux) == 2, "katalogda iki FLUX girdisi olmalı"
+    for m in flux:
+        assert m.sizes is catalog.FLUX_SIZES, (
+            f"{m.id}: jetonları kopyalamış, FLUX_SIZES'ı paylaşmıyor")
+        assert m.credential == "azure_foundry", m.credential
+        assert m.images_per_request == 1
+        # `num_images` tavanı ÖLÇÜLMEDİ: eksik beyan yalnızca bir yeteneği
+        # kullanmamak, fazla beyan seçilebilir bir hata. Kapasite de bunu
+        # destekliyor (flex belgelenmiş RPM'de 5/dk).
+        assert m.max_n == 1, f"{m.id}: num_images tavanı ölçülmedi (karar 5)"
+        assert m.supports_edit is True and m.max_refs == 4
+
+
+def test_FLUX_pro_nun_kalite_ekseni_GIZLI_flex_in_GERCEK():
+    """Ayrım kararın kendisi: pro'da `quality` parametresi YOK (sentetik jeton
+    + gizli knob), flex'te `steps`/`guidance` GERÇEK bir eksen."""
+    pro = catalog.image_model("azure-flux-2-pro")
+    flex = catalog.image_model("azure-flux-2-flex")
+
+    assert pro.quality_hidden is True and pro.qualities == ("standard",)
+    assert flex.quality_hidden is False
+    assert flex.qualities == ("hizli", "dengeli", "detayli")
+    # Tarife jetonların ÜÇÜNE de yazılı: eksik kalan jeton `cost_for`da
+    # sessizce tabana düşer ve seçicideki karşılaştırma yalan söyler.
+    assert set(dict(flex.credits_by_quality)) == set(flex.qualities)
+    assert catalog.default_quality_of(flex) == "dengeli"

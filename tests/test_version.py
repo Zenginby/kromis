@@ -62,6 +62,11 @@ def test_spec_has_no_syntax_warnings():
 
     `compile` sadece derler, ÇALIŞTIRMAZ: spec'in Analysis/EXE çağrıları ve
     SPECPATH globali burada sorun etmez.
+
+    KAPSAM: bu kapı yalnız spec'e bakıyor ve o yüzden aynı kusurun bir test
+    docstring'inde İKİNCİ kez geçmesini göremedi. Sınıfın depo geneli kapısı
+    artık tests/test_syntax_warnings.py; bu test onun altında kalıyor çünkü
+    v0.3.0 olayının kaydı ve spec'i adıyla gösteren bir hata mesajı veriyor.
     """
     with warnings.catch_warnings():
         warnings.simplefilter("error", SyntaxWarning)

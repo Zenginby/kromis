@@ -965,7 +965,8 @@
     "tests/test_ci_sizinti.py",
     "tests/test_ci_varlik_saklama.py",
     "tests/test_encoding_contract.py",
-    "tests/test_paket_icerik_listesi.py"
+    "tests/test_paket_icerik_listesi.py",
+    "tests/test_syntax_warnings.py"
   ],
   "onyuz": {
     "betikler": [
@@ -1306,7 +1307,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 80,
+  "test_dosyasi_sayisi": 81,
   "uc_noktalar": [
     {
       "islev": "index",

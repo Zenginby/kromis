@@ -53,9 +53,21 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # tests/test_encoding_contract.py'deki liste ile bilinçli olarak İKİZ: test
 # dosyaları birbirinden içe aktarma yapmıyor (her sözleşme tek başına
 # okunabilsin diye), o yüzden küçük yürüteç burada tekrarlanıyor.
+#
+# `.claude` NEDEN atlanıyor: `.claude/worktrees/` altında git worktree'leri,
+# yani BAŞKA commit'lerin tam çalışma kopyaları yaşıyor. Bu kapı bir
+# worktree'nin İÇİNDE yazıldı ve orada `.claude/worktrees/` HİÇ yoktu, yani
+# yazıldığı yerde yeşildi; ana çalışma kopyasında ilk koşuda eski bir
+# commit'in DÜZELTİLMEMİŞ `tests/test_mobile.py`sini bulup kırmızıya döndü —
+# düzelttiği kusuru başka bir commit'te yeniden okuyordu. Atlamak bir
+# istisna DEĞİL, listenin başındaki "bize ait olmayan kod" sözü: o ağaç
+# `.gitignore:43` ile yok sayılıyor (`.claude/*`, yalnız `settings.json`
+# muaf) ve `.claude` altında İZLENEN tek bir `.py` yok — ölçüldü, yani
+# atlamak hiçbir kaynağı kör noktaya sokmuyor. `tools/graf_uret.py` aynı
+# tuzağa hiç düşmedi çünkü özyineli yürüteç kullanmıyor.
 ATLANAN_DIZINLER = {
-    ".venv", ".git", "__pycache__", "dist", "build", "graphify-out",
-    "output", "node_modules", ".pytest_cache",
+    ".venv", ".git", ".claude", "__pycache__", "dist", "build",
+    "graphify-out", "output", "node_modules", ".pytest_cache",
 }
 
 # `.spec` PyInstaller'ın Python kaynağıdır: uzantısı `.py` OLMADIĞI için

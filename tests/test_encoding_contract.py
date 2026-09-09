@@ -35,10 +35,18 @@ import os
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Taranmayan ağaçlar: bize ait olmayan ya da üretilmiş kod.
+# Taranmayan ağaçlar: bize ait olmayan ya da üretilmiş kod. `.claude` bu
+# tanımın en keskin örneği — `.claude/worktrees/` altında BAŞKA commit'lerin
+# tam çalışma kopyaları duruyor. Liste
+# tests/test_syntax_warnings.py'dekiyle İKİZ kalmak ZORUNDA: orada bu satırın
+# eksikliği ölçülmüş bir YANLIŞ KIRMIZI üretti (kapı kendi düzelttiği kusuru
+# eski bir commit'in kopyasında yeniden okudu) ve bu sözleşme aynı kör
+# noktayı taşıyordu — yalnız henüz ateşlenmemişti, çünkü o kopyalar
+# `encoding` sözleşmesine zaten uyuyor. Bir gün sözleşmeden ÖNCEKİ bir
+# commit worktree'ye çıktığında ateşlenirdi.
 ATLANAN_DIZINLER = {
-    ".venv", ".git", "__pycache__", "dist", "build", "graphify-out",
-    "output", "node_modules", ".pytest_cache",
+    ".venv", ".git", ".claude", "__pycache__", "dist", "build",
+    "graphify-out", "output", "node_modules", ".pytest_cache",
 }
 
 # Adı benzediği için karışan, `encoding` alamayan çağrılar.

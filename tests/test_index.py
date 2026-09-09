@@ -2262,6 +2262,30 @@ def test_grid_size_segment_is_served_and_applied():
         "ızgara --tile'ı okumuyor")
 
 
+def test_media_kind_segment_is_served_and_structured():
+    """Medya görünümünde tür süzgeci segmentli denetimi (#kind-seg).
+
+    Dört dışlayıcı düğme: Tümü, Görsel, Video, Yüklenen.
+    Tam birinde aria-pressed="true" (varsayılan: Tümü), Yüklenen kesişen süzgeç
+    olduğu için .crossing sınıfını taşır.
+    """
+    html = _html()
+    seg_match = re.search(r'id="kind-seg".*?</div>', html, re.S)
+    assert seg_match, "#kind-seg yok"
+    seg = seg_match.group(0)
+    for kind in ("", "image", "video", "imported"):
+        assert f'data-kind="{kind}"' in seg, f"data-kind='{kind}' yok"
+    pressed = re.findall(r'aria-pressed="true"', seg)
+    assert len(pressed) == 1, f"tam bir aktif düğme olmalı, bulunan: {len(pressed)}"
+    assert re.search(r'data-kind=""[^>]*aria-pressed="true"', seg), "varsayılan 'Tümü' olmalı"
+    assert re.search(r'data-kind="imported"[^>]*class="[^"]*\bcrossing\b[^"]*"', seg), (
+        "Yüklenen düğmesi .crossing sınıfı taşımalı")
+    css = _css()
+    assert ".kindseg" in css, ".kindseg stili yok"
+    assert re.search(r"\.kindseg\s+button", css) or re.search(r"\.kindseg\s*\.crossing", css), (
+        ".kindseg kuralı eksik")
+
+
 def test_settings_is_a_slide_over_not_a_centered_modal():
     """A5: Ayarlar sağdan slide-over (§2.4/3), ortalanmış modal değil.
 
@@ -3931,6 +3955,49 @@ def test_the_imported_scope_is_a_crossing_filter_not_a_partition():
     # kalkar. Kural "kodu ara" idi; burada belgelenmiş olmanın KENDİSİ şart.
     assert re.search(r"kesişen süzgeç", _picker_js_raw()), (
         "kesişen süzgeç olduğu yazılmamış — sonraki okuyucu bunu hata sanar")
+
+
+def test_media_history_cache_readers_use_derived_gorunen_medya():
+    """Ayrışma mandalı: sayaç, seçim ve galeri gorunenMedya() okur.
+
+    historyCache ham çekim belleğidir. Süzgeç açıkken renderGallery,
+    updateMediaRailCount, syncSelectUI ve #select-all doğrudan historyCache
+    okursa sayaç ve seçim ekrandan ayrışır.
+    """
+    js = _folders_js()
+    galeri = _balanced_body(js, "function renderGallery()")
+    assert "gorunenMedya()" in galeri, "renderGallery gorunenMedya() okumuyor"
+    assert "historyCache" not in galeri, "renderGallery hâlâ doğrudan historyCache okuyor"
+
+    rail = _balanced_body(js, "function updateMediaRailCount()")
+    assert "gorunenMedya()" in rail, "updateMediaRailCount gorunenMedya() okumuyor"
+    assert "historyCache" not in rail, "updateMediaRailCount hâlâ doğrudan historyCache okuyor"
+
+    select_ui = _balanced_body(js, "function syncSelectUI()")
+    assert "gorunenMedya()" in select_ui, "syncSelectUI gorunenMedya() okumuyor"
+    assert "historyCache" not in select_ui, "syncSelectUI hâlâ doğrudan historyCache okuyor"
+
+    select_all = _balanced_body(js, '$("select-all").addEventListener')
+    assert "gorunenMedya()" in select_all, "#select-all dinleyicisi gorunenMedya() okumuyor"
+    assert "historyCache" not in select_all, "#select-all dinleyicisi hâlâ historyCache okuyor"
+
+
+def test_create_folder_cell_reads_raw_history_cache():
+    """Klasör kartları tür süzgecinden etkilenmez kararı mandalı.
+
+    createFolderCell kapak görseli seçerken süzülmemiş ham historyCache'i
+    okumaya devam etmelidir.
+    """
+    js = _folders_js()
+    cell = _balanced_body(js, "function createFolderCell(f)")
+    assert "historyCache" in cell, "createFolderCell historyCache okumuyor"
+    assert "gorunenMedya" not in cell, (
+        "createFolderCell tür süzgecine bağlanmış — klasör kapakları türle süzülemez")
+
+
+def test_the_picker_does_not_mention_media_tur_suzgeci():
+    """Seçici Medya'nın durumunu yazmaz ve okumaz — süzgeç yalnız Medya görünümüne aittir."""
+    assert "medyaTurSuzgeci" not in _picker_js(), "seçici medyaTurSuzgeci'ni referans almış"
 
 
 def test_the_picker_grid_geometry_matches_the_approved_split():

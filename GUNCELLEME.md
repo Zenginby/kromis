@@ -135,12 +135,12 @@ anahtarın orada. Üzerine kurmak (aynı imzayla imzalandığı için sorunsuz
 çalışır) verine hiç dokunmaz.
 
 *"Uygulama yüklenmedi"* diyorsa çoğunlukla dosya yarım inmiştir: APK'yı sil,
-yeniden indir. Sürerse Kurum'ya yaz — **kaldırıp yeniden kurma**, önce sor.
+yeniden indir. Sürerse teknik desteğe yaz — **kaldırıp yeniden kurma**, önce sor.
 
 ## 4. Güncellendiğini doğrula
 
 Sağ üstteki **Ayarlar** düğmesine bas — pencerenin altında **Sürüm** yazıyor.
-Kurum'nın söylediği numarayla aynıysa güncelleme geçmiş demektir. Destek isterken
+Yöneticinizin söylediği numarayla aynıysa güncelleme geçmiş demektir. Destek isterken
 de bu numarayı söyle.
 
 ## 5. Kontrol et: her şey yerinde mi
@@ -150,7 +150,7 @@ de bu numarayı söyle.
 - **Azure anahtarını yeniden girmen gerekmez** — o uygulamanın içinde değil,
   ayrı bir yerde duruyor.
 
-Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya yaz
+Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve teknik desteğe yaz
 (aşağıdaki yedek işine yarayabilir).
 
 ---
@@ -484,7 +484,7 @@ sıfırlamaya girdi.
 
 Kısacası doğru sıra şu: `1.16.0` → **`0.2.0`** → `0.2.1` → **`0.3.0`** (bugün).
 Hangi sürümde olduğunu Ayarlar'ın altındaki **Sürüm** satırından görürsün;
-Kurum'nın söylediği numarayla karşılaştır, büyüklük-küçüklük kıyaslama.
+yöneticinizin söylediği numarayla karşılaştır, büyüklük-küçüklük kıyaslama.
 
 ## Sürüm 0.2.1'de ne değişti
 
@@ -632,7 +632,7 @@ Hepsi **Prompt Yönetmeni** sekmesinde:
   - Sohbet **kaydedilmiyor**: uygulamayı kapatınca gider. Kalıcı olan, üretilen
     görselin prompt'u (o zaten geçmişte duruyor). "Sohbeti temizle" onay soruyor.
   - Kullanmak için **bir kerelik** ayar gerekiyor: **Ayarlar** → *Prompt Yönetmeni
-    (sohbet modeli)* → **Dağıtım adı** (Kurum verecek, ör. `gpt-5.6-luna`) → **Kaydet**.
+    (sohbet modeli)* → **Dağıtım adı** (yöneticinizin vereceği ad, ör. `gpt-5.6-luna`) → **Kaydet**.
     Girilmezse sekme açılır ama "Gönder" kilitli kalır ve nedeni panelde yazar.
   - Azure anahtarını **yeniden girmen gerekmiyor**; sohbet görselinkini kullanıyor.
 - **Ayarlar kaydetmek artık başka ayarları silmiyor.** Endpoint'i tek başına
@@ -675,14 +675,14 @@ sohbetler, logo kütüphanesi) — **görseller kopyalanmıyor**, onlar zaten
 yerlerinde duruyor.
 Birkaç KB tutar, silmen gerekmez.
 
-Geri yüklemek gerekirse (Kurum söylerse): o klasörün içindeki `output` ve `assets`
+Geri yüklemek gerekirse (teknik destek söylerse): o klasörün içindeki `output` ve `assets`
 klasörlerini bir üstteki `Lumeo` klasöründeki aynı adlı klasörlerin
 üstüne sürükle.
 
 ## Sorun çıkarsa
 
 - **Pencere boş açılıyor:** uygulamayı kapat, tekrar aç.
-- **Uygulama hiç açılmıyor:** hata kaydını Kurum'ya gönder —
+- **Uygulama hiç açılmıyor:** hata kaydını teknik desteğe gönder —
   macOS'ta `~/Library/Application Support/Lumeo/hata.log`,
   Windows'ta `%LOCALAPPDATA%\Lumeo\hata.log`.
 - **(Windows) Pencere hiç gelmiyor:** iki olağan sebebi var. (a) `.exe`'yi
@@ -690,8 +690,8 @@ klasörlerini bir üstteki `Lumeo` klasöründeki aynı adlı klasörlerin
   (b) Zip'i **engellemesini kaldırmadan** ayıklamış olabilirsin (1. adım); o
   zaman zip'i baştan, 1. adımdan başlayarak yeniden ayıkla. Sebep hâlâ
   anlaşılmıyorsa `Lumeo` klasöründe `.\Lumeo.exe --onyukleme-denetimi` koştur ve
-  oluşan `%LOCALAPPDATA%\Lumeo\onyukleme-denetimi.txt` dosyasını Kurum'ya gönder.
+  oluşan `%LOCALAPPDATA%\Lumeo\onyukleme-denetimi.txt` dosyasını teknik desteğe gönder.
 - **Eski arayüzü görüyorum gibi:** uygulamayı tamamen kapat (macOS'ta ⌘Q) ve
   yeniden aç.
-- **Geçmişim boş görünüyor:** hiçbir şey silme, Kurum'ya yaz — yukarıdaki yedek
+- **Geçmişim boş görünüyor:** hiçbir şey silme, teknik desteğe yaz — yukarıdaki yedek
   klasörü duruyor.

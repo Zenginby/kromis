@@ -10,8 +10,8 @@ arasındaki kayma riski tests/test_composite.py'deki golden fixture'larla ölç�
 
 BİNDİRİLEN GÖRSEL TEK: çağıran `logo_path` verir. Eskiden mavi/beyaz bir ÇİFT
 geçilir ve `color="auto"` zemin parlaklığına göre birini seçerdi; o mekanizma
-(pick_logo + region_box + parlaklık örneklemesi) yalnızca pakete gömülü KURUM
-logo çifti için vardı. Uygulama marka-nötr — kullanıcının kütüphanesinden
+(pick_logo + region_box + parlaklık örneklemesi) yalnızca pakete gömülü eski
+yerleşik logo çifti için vardı. Uygulama marka-nötr — kullanıcının kütüphanesinden
 gelen logolar tek dosya — ve varyant seçimi karşılıksız kalmıştı. Golden
 fixture'lar korunuyor: aynı dosya doğrudan geçildiğinde pikseller birebir aynı
 (bkz. tests/fixtures/logo/cases.json'daki `logo` alanı).

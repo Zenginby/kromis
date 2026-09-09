@@ -22,7 +22,7 @@ from PIL import Image
 import composite
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "logo")
-# Bu iki PNG bir zamanlar pakete gömülü KURUM logolarıydı; uygulama marka-nötr
+# Bu iki PNG bir zamanlar pakete gömülü yerleşik logolardı; uygulama marka-nötr
 # olunca (yerleşik logo ve mavi/beyaz varyant seçimi kaldırıldı) paketten çıkıp
 # YALNIZCA golden'ların girdisi olarak burada kaldılar. Golden PNG'ler onların
 # piksellerini taşıdığı için başka bir görselle değiştirilemezler.

@@ -855,7 +855,7 @@
       "ithal": [],
       "ithal_eden": [],
       "katman": 0,
-      "satir": 71,
+      "satir": 112,
       "testler": [],
       "yol": "tools/render_brand_assets.py"
     },
@@ -962,6 +962,7 @@
     "tests/test_android_geri.py",
     "tests/test_android_packaging.py",
     "tests/test_bagimlilik_pinleri.py",
+    "tests/test_brand_assets.py",
     "tests/test_ci_paketleme_kapisi.py",
     "tests/test_ci_sizinti.py",
     "tests/test_ci_varlik_saklama.py",
@@ -1314,7 +1315,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 82,
+  "test_dosyasi_sayisi": 83,
   "uc_noktalar": [
     {
       "islev": "index",

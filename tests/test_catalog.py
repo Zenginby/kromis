@@ -672,8 +672,11 @@ def test_her_gorsel_modelinin_notu_NE_ZAMAN_SECILIR_i_cevapliyor(m):
     işi şu soruyu cevaplamak: "ne zaman bunu seçerim?".
 
     Boş bir not o satırı adı tekrar eden bir başlığa indiriyor. Uzunluk üst
-    sınırı da gerçek: 360px'lik bir yüzeyde iki satırı aşan not kaydırma
-    üretiyor ve komşu satırların hizasını bozuyor.
+    sınırı da gerçek ve ÖLÇÜLMÜŞ, yazılı olduğu yer `static/core.js:843`:
+    360px'de not 36px, yani iki satır tutuyor; aşanı kaydırma üretiyor ve
+    komşu satırların hizasını bozuyor. 110 karakter o 36px'in satır başına
+    ~55 karakterle çevrilmiş hâli — kesin bir font ölçümü DEĞİL. Bağlayıcı
+    da değil: en uzun gerçek not 88 karakter, yani %20 boşluk var.
     """
     assert m.note, f"{m.id}: not yok — seçicideki satır sebepsiz kalıyor"
     assert 20 <= len(m.note) <= 110, (
@@ -687,7 +690,7 @@ def test_her_gorsel_modelinin_notu_NE_ZAMAN_SECILIR_i_cevapliyor(m):
     #
     # `catalog.short_labels()` burada işe YARAMAZ: onun ölçülmüş çakışma
     # istisnası iki `gpt-image-2` girdisinde öneki BİLEREK koruyor (seçicide
-    # doğru olan bu), ki o da tam tam bu iki girdide iddiayı yeniden boşa
+    # doğru olan bu), ki o da tam da bu iki girdide iddiayı yeniden boşa
     # düşürürdü. Buradaki soru ayrıştırma değil, notun modelin KENDİ adıyla
     # başlayıp satırı tekrar etmesi.
     ad = m.label.rsplit("·", 1)[-1].strip().lower()
@@ -711,10 +714,41 @@ def test_hicbir_not_uygulamanin_YAPMADIGI_bir_seyi_vaat_etmiyor():
     yapmadığı bir şeyi vaat etmek olurdu — bu deponun yasakladığı sessiz
     sapmanın kendisi. Sayı bir gün yükselirse önce bu test kırmızıya döner.
     """
-    import app as appmod
-
+    # Tavan (`app.MAX_EDIT_IMAGES`) mesaja ELDEN yazılıyor: `app`i ithal etmek
+    # bu yaprak test dosyasını 6. katmandaki 2100 satırlık modüle bağlardı ve
+    # ilgisiz bir `app.py` kırılması burayı da kırmızıya çevirip suçu
+    # bulandırırdı. Değer değişirse bu satır bayatlar — ama iddia zaten
+    # jetonlara bakıyor, mesaja değil.
     for m in catalog.IMAGE_MODELS:
         for sayi in ("8 referans", "10 referans"):
             assert sayi not in m.note, (
                 f"{m.id}: not {sayi} vaat ediyor, tavan "
-                f"{min(m.max_refs, appmod.MAX_EDIT_IMAGES)}")
+                f"{min(m.max_refs, 4)}")
+
+
+def test_MALIYET_ustunlugu_iddia_eden_not_GERCEKTEN_en_ucuz():
+    """Seçici bir KARŞILAŞTIRMA yüzeyi: not, kredi rakamının tam yanında
+    çiziliyor (static/core.js). "en ucuz" yazan bir not, kendisinden ucuz bir
+    satır bir alt sırada dururken kullanıcıya yanlış söylüyor.
+
+    Ölçülmüş kusur, bu turun kendisinden: `gemini-nano-banana-2`nin notu "en
+    ucuz" diyordu (6 kredi), oysa AYNI dalda eklenen MAI-Image 2.6 Flash 4
+    kredi. İddiayı yazan görev ile onu yanlışlayan görev aynı daldaydı ve iki
+    görev incelemesi de göremedi, çünkü not sözleşmesi uzunluğa, ada,
+    önizlemeye ve referans vaadine bakıyordu — KARŞILAŞTIRMAYA bakmıyordu.
+
+    Hız üstünlüğü burada sınanmıyor: katalogda gecikme verisi yok, yani
+    ölçülemez. Maliyet ölçülebilir, o yüzden mandalı bu.
+    """
+    en_az = min(m.credits for m in catalog.IMAGE_MODELS)
+    en_cok = max(m.credits for m in catalog.IMAGE_MODELS)
+    for m in catalog.IMAGE_MODELS:
+        notu = m.note.lower()
+        if "en ucuz" in notu:
+            assert m.credits == en_az, (
+                f"{m.id}: not 'en ucuz' diyor ama {m.credits} kredi "
+                f"(katalogdaki en az {en_az})")
+        if "en pahalı" in notu:
+            assert m.credits == en_cok, (
+                f"{m.id}: not 'en pahalı' diyor ama {m.credits} kredi "
+                f"(katalogdaki en çok {en_cok})")

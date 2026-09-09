@@ -617,10 +617,16 @@ def test_BOS_foundry_adresi_yazilmis_degeri_KORUYOR(client):
     """
     import credstore
 
-    client.post("/api/settings", json={
+    ilk = client.post("/api/settings", json={
         "api_key": "K", "base_url": "https://ai-ornek.openai.azure.com/openai/v1/",
         "azure_foundry_base_url": "https://ozel.ornek/foundry"})
+    assert ilk.status_code == 200
 
-    client.post("/api/settings", json={"azure_foundry_base_url": ""})
+    # DURUM KODU da iddia ediliyor: boş kutuyla kaydetmek ÇOĞU kurulumun
+    # yaptığı şey (alan koşulsuz gönderiliyor, doldurmak gerekmiyor). Boş dize
+    # bir gün doğrulamaya takılsa saklanan değer YİNE yerinde kalırdı, yani
+    # aşağıdaki iddia geçerdi ve her gerçek kayıt sessizce 422 dönerdi.
+    bos = client.post("/api/settings", json={"azure_foundry_base_url": ""})
+    assert bos.status_code == 200
 
     assert credstore.resolve("azure_foundry")[1] == "https://ozel.ornek/foundry"

@@ -578,8 +578,11 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=6,
         credits_by_quality=(("1K", 6), ("2K", 6), ("4K", 12)),
-        note="En hızlı ve en ucuz tur; oran seçiliyor (piksel değil). "
-             "Taslak için.",
+        # "en ucuz" DEĞİL, ölçüldü: MAI-Image 2.6 Flash 4 kredi, bu 6. İddiayı
+        # yazan tur ile onu yanlışlayan tur AYNI daldı. Hız iddiası duruyor —
+        # katalogda gecikme verisi yok, yani ölçülemez; maliyet ölçülebilir ve
+        # artık mandallı.
+        note="En hızlı tur; oran seçiliyor (piksel değil). Taslak için.",
     ),
     ImageModel(
         id="gemini-nano-banana-pro",
@@ -645,7 +648,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=1,
         credits=8,
         note="Fotogerçekçi ürün ve portre işi; metin işlemede MAI'nin en "
-             "iyisi. Önizleme.",
+             "iyisi. Tek referansla düzenliyor. Önizleme.",
     ),
     ImageModel(
         id="azure-mai-image-2-6-flash",
@@ -664,7 +667,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         # GEÇİCİ: birim fiyat doğrulanamadı, oran 2.6'nın yarısı varsayıldı.
         credits=4,
         note="2.6'nın hızlı ve ucuz kardeşi; taslak ve deneme turları için. "
-             "Önizleme.",
+             "Tek referansla düzenliyor. Önizleme.",
     ),
     ImageModel(
         id="azure-mai-image-2-5-pro",
@@ -682,7 +685,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=1,
         credits=10,
         note="Kalabalık sahnelerde nesne ve karakter tutarlılığı; pahalı. "
-             "Önizleme.",
+             "Tek referansla düzenliyor. Önizleme.",
     ),
     # ── Azure AI Foundry · FLUX.2 (Black Forest Labs) ───────────────────
     #

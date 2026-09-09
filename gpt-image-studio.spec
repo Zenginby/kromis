@@ -135,7 +135,7 @@ if sys.platform == "win32":
         kids=[
             _vi.StringFileInfo([
                 _vi.StringTable("041F04B0", [
-                    _vi.StringStruct("CompanyName", "Kurum Derneği"),
+                    _vi.StringStruct("CompanyName", "Lumeo"),
                     _vi.StringStruct("FileDescription", "Lumeo"),
                     _vi.StringStruct("FileVersion", APP_VERSION),
                     _vi.StringStruct("InternalName", "Lumeo"),

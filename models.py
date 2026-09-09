@@ -558,7 +558,7 @@ class LogoRequest(BaseModel):
     id: str = Field(min_length=1, max_length=64)
     # asset_id ZORUNLU (min_length=1): bindirilecek görsel her zaman kullanıcının
     # kütüphanesinden gelir. Eskiden None geçilebilirdi ve sunucu pakete gömülü
-    # KURUM logo çiftine düşerdi; uygulama marka-nötr olduğundan o varsayılan yok.
+    # yerleşik logo çiftine düşerdi; uygulama marka-nötr olduğundan o varsayılan yok.
     # Tip `str | None` KALIYOR: alan hiç gönderilmediğinde Pydantic'in ürettiği
     # hata "asset_id zorunlu" olarak okunsun, `extra="forbid"` ile karışmasın.
     asset_id: str | None = Field(default=None, min_length=1, max_length=64)

@@ -20,7 +20,7 @@ from PIL import Image, ImageDraw
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES = os.path.join(REPO, "tests", "fixtures", "logo")
 SCRIPT = os.path.expanduser("~/.config/claude-tools/composite-logo.py")
-# Logo çifti FIXTURES altında: bunlar bir zamanlar pakete gömülü KURUM logolarıydı,
+# Logo çifti FIXTURES altında: bunlar bir zamanlar pakete gömülü yerleşik logolardı,
 # uygulama marka-nötr olunca paketten çıkıp yalnızca bu golden'ların
 # girdisi olarak testlerde kaldılar.
 LOGO_BLUE = os.path.join(FIXTURES, "kurum-logo-blue.png")

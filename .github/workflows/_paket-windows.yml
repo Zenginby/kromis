@@ -220,14 +220,8 @@ jobs:
           # üç haneli. İkisi de ayrı ayrı denetleniyor: biri elle yazılırsa öteki
           # yakalar.
           $dortlu = "$($bilgi.FileMajorPart).$($bilgi.FileMinorPart).$($bilgi.FileBuildPart).$($bilgi.FilePrivatePart)"
-          # CompanyName kodlama kapısı: bu proje Türkçe karakter kodlamasından iki
-          # kez yandı (cp1254'e düşen geçmiş okuması; PS 5.1'in BOM'suz dosyayı
-          # cp1254 sanması). Beklenti "Kurum Derneği" diye YAZILMIYOR, KOD
-          # NOKTALARINDAN kuruluyor — çünkü bu betiği kabuk BOM'suz bir dosyadan
-          # okuyor ve literal yazılsaydı iddia kabuğun dosya kodlamasına bağlı
-          # olurdu: doğrulamanın kendisi kodlama kusuruna açık olamaz. 0x130='İ',
-          # 0x11F='ğ' (Faz 2'de exe'den bayt düzeyinde okunan değerler).
-          $sirket = -join (@(0x130,0x6C,0x61,0x20,0x44,0x65,0x72,0x6E,0x65,0x11F,0x69) | ForEach-Object { [char]$_ })
+          # CompanyName doğrulama kapısı
+          $sirket = 'Lumeo'
           $iddialar = @(
             @{ ad = 'FileVersion';    got = "$($bilgi.FileVersion)";    bek = $beklenen },
             @{ ad = 'ProductVersion'; got = "$($bilgi.ProductVersion)"; bek = $beklenen },

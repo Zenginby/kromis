@@ -16,7 +16,7 @@ yapıyor; yedeğin KENDİSİNİ test eden dosya (tests/test_backup.py) muaf tutu
 çünkü gerçek fonksiyonu koşturmak zorunda.
 
 TARİHÇE: burada İKİNCİ bir guard vardı — `seed.seed_builtin_logos` pakete gömülü
-KURUM logolarını kullanıcı kütüphanesine kopyalıyor ve `.logos-seeded`'i repo
+yerleşik logoları kullanıcı kütüphanesine kopyalıyor ve `.logos-seeded`'i repo
 kökünde bırakıyordu. Uygulama marka-nötr olunca seed.py tümüyle kaldırıldı, o
 guard da onunla birlikte gitti.
 

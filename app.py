@@ -89,7 +89,7 @@ async def _lifespan(app: FastAPI):
     kesinlikle kötüdür.
 
     NOT: Burada bir İKİNCİ adım vardı — `seed.seed_builtin_logos`
-    pakete gömülü KURUM logo çiftini kullanıcının kütüphanesine kopyalardı.
+    pakete gömülü yerleşik logo çiftini kullanıcının kütüphanesine kopyalardı.
     Uygulama marka-nötr olduğundan o modül tamamen kaldırıldı; kütüphane artık
     boş başlar ve kullanıcı kendi logosunu yükler.
     """
@@ -1822,7 +1822,7 @@ def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
     """Logo/motto filigranını süreç içinde bindirir (composite.py).
 
     Bindirilecek görsel HER ZAMAN kullanıcının kütüphanesinden gelir. Eskiden
-    `asset_id` boş bırakılabilir ve pakete gömülü KURUM logo çiftine düşülürdü;
+    `asset_id` boş bırakılabilir ve pakete gömülü yerleşik logo çiftine düşülürdü;
     uygulama marka-nötr olduğundan o varsayılan yok — seçim yapılmadıysa istek
     422 ile reddedilir (modelde `asset_id` zorunlu), bulunamazsa 404.
     """
@@ -2127,7 +2127,7 @@ def index() -> HTMLResponse:
         return HTMLResponse(
             "<h1>Arayüz yüklenemedi</h1>"
             "<p>Uygulama dosyaları okunamadı. Lütfen uygulamayı kapatıp yeniden açın; "
-            f"sürerse hata kaydını (<code>{log_path or 'hata.log'}</code>) Kurum'ya iletin.</p>",
+            f"sürerse hata kaydını (<code>{log_path or 'hata.log'}</code>) teknik desteğe iletin.</p>",
             status_code=500, headers={"Cache-Control": "no-store"})
     return HTMLResponse(template.replace("__APP_VERSION__", version.APP_VERSION),
                         headers={"Cache-Control": "no-store"})

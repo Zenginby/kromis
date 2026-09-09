@@ -155,6 +155,12 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.17.1 — ne değişti
+
+- windows simgesi ve favicon icin coklu cozunurluk destegi
+
+---
+
 ## Sürüm 0.17.0 — ne değişti
 
 - video prompt'u, uretim hafizasi ve model-farkindalikli yonlendirme

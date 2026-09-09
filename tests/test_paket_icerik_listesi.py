@@ -119,5 +119,11 @@ def test_the_verified_core_did_not_quietly_shrink(yollar):
         "static/mobile.js",
         "static/fonts/dm-sans-v17-latin.woff2",
         "bundled/prompts/prompt-yonetmeni.md",
+        # Video bölümü AYRI bir dosya ve düşerse özellik SESSİZCE yarım kalır:
+        # `load_video_instructions` yokluğunda boş dönüyor (doğru çalışma-anı
+        # davranışı), yani paketten düşen dosya hiçbir hata üretmeden yönetmeni
+        # yalnız görsel bilen hâline indirirdi. Tam olarak fontun kapıya giriş
+        # gerekçesi.
+        "bundled/prompts/prompt-yonetmeni-video.md",
     }
     assert cekirdek <= birlesim, f"paket doğrulamalarından düşmüş: {cekirdek - birlesim}"

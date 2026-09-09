@@ -398,9 +398,25 @@ def test_the_bundled_default_stays_within_its_budget():
     Tavan neden çalışma zamanında DEĞİL: uzun bir dosyayı kırpmak persona'yı
     sessizce öldürür — tam olarak `MIN_INSTRUCTIONS_CHARS`'ın engellediği kırılma,
     ters yönde.
+
+    TAVAN 19.500 → 20.500 (model yönlendirmesi turu). İki yeni sözleşme girdi ve
+    ikisi de taşıyıcı: teknik ayar bloğunun ZORUNLU `model` alanı (yönetmen artık
+    modeli kendisi seçiyor, çıktının türünü de o alan belirliyor) ve `[üretim]`
+    notlarının tanıtımı (yönetmen ne ürettiğini artık görüyor, ama o mesajların
+    kullanıcıya ait olmadığını bilmesi gerekiyor).
+
+    Karşılığında `size`/`quality` jeton tabloları dosyadan ÇIKTI — geçerli
+    jetonlar zaten `build_system`in bağlam bloğundan ve model menüsünden
+    geliyordu, yani dosyadaki tablo bayatlayan bir aynaydı. Maliyet notundaki
+    literal jetonlar da aynı sebeple gitti. Net büyüme ~725 karakter.
+
+    Boşluk yine ~1.500 karakter ve yine kasıtlı: 19.500'de dosya 18.971'e
+    oturuyordu, yani bir sonraki tek paragraflık ekleme testi kırardı ve kıran
+    kişi bu gerekçeyi okumadan tavanı yükseltmeye kalkardı. Bir bütçenin işe
+    yaraması, aşılmasının bir KARAR olmasına bağlı.
     """
     text = _bundled_text()
-    assert len(text) <= 19500, f"talimat bütçesi aşıldı: {len(text)} karakter"
+    assert len(text) <= 20500, f"talimat bütçesi aşıldı: {len(text)} karakter"
 
 
 # ── Bağlam dikişi: build_system ─────────────────────────────────────────
@@ -417,6 +433,11 @@ def test_an_empty_context_leaves_the_system_message_byte_identical():
     # Boş dize ve yalnız boşluktan oluşan metin de "yok" sayılıyor.
     assert chat_prompt.build_system(guidance="   \n  ") == chat_prompt.load_instructions()
     assert chat_prompt.build_system(model_facts=None) == chat_prompt.load_instructions()
+    # Model menüsü de aynı sözleşmeye tabi: `None` ile `[]` ikisi de "yok".
+    # Boş bir liste bir başlık bile bastırsaydı, menüsü olmayan (hiç anahtarı
+    # girilmemiş) kullanıcı ölçülmemiş bir persona değişikliği alırdı.
+    assert chat_prompt.build_system(available_models=None) == chat_prompt.load_instructions()
+    assert chat_prompt.build_system(available_models=[]) == chat_prompt.load_instructions()
 
 
 def test_the_context_block_carries_the_selected_models_own_tokens():
@@ -587,3 +608,244 @@ def test_the_models_pointer_to_this_tripwire_resolves():
     # Ve adı söylediği şey GERÇEKTEN burada olmalı.
     assert f"def {hedef}(" in _p.Path(__file__).read_text(encoding="utf-8"), (
         f"models.py {hedef} diyor ama bu dosyada öyle bir test yok")
+
+
+# ── Katman kapısı ───────────────────────────────────────────────────────
+
+def test_chat_prompt_stays_a_leaf_that_never_imports_the_catalog():
+    """Modül YALNIZCA diski okuyor ve tek proje bağımlılığı `paths`.
+
+    Bu duruş modülün docstring'inde yazılıydı ama hiçbir şey onu ölçmüyordu.
+    Model menüsü açılınca ihlal etmek çok kolaylaştı: satırları kurmak için
+    `catalog`u ithal etmek bir satırlık iş ve modülü katman 0'dan çıkarır,
+    "yalnızca diski okur" sözünü bozar, `chat_client → chat_prompt` tek yönlü
+    bağımlılığını da döngüye açardı. Olguları çağıranın vermesi (rotanın işi,
+    orada `catalog` ZATEN var) tam olarak bunun için.
+
+    AST ile ölçülüyor, `sys.modules` ile değil — `tests/test_catalog.py`nin
+    aynı kapısının tekniği: ithal zaten olmuşsa geç kalınmış olurdu.
+    """
+    import ast
+
+    kaynak = os.path.join(REPO, "chat_prompt.py")
+    with open(kaynak, encoding="utf-8") as f:
+        agac = ast.parse(f.read())
+
+    proje = {ad[:-3] for ad in os.listdir(REPO) if ad.endswith(".py")}
+    ithal = set()
+    for dugum in ast.walk(agac):
+        if isinstance(dugum, ast.Import):
+            ithal |= {a.name.split(".")[0] for a in dugum.names}
+        elif isinstance(dugum, ast.ImportFrom) and dugum.module:
+            ithal.add(dugum.module.split(".")[0])
+
+    assert ithal & proje == {"paths"}, f"yaprak duruşu bozuldu: {ithal & proje}"
+
+
+# ── Model menüsü ────────────────────────────────────────────────────────
+
+_MENU = [
+    {"id": "azure-gpt-image-2", "label": "Azure · gpt-image-2", "kind": "image",
+     "sizes": ("1024x1024",), "qualities": ("low", "high"), "max_n": 4,
+     "supports_edit": True, "max_refs": 4, "durations": (), "credits": 8},
+    {"id": "gemini-veo-3-1-lite", "label": "Gemini · Veo 3.1 Lite", "kind": "video",
+     "sizes": ("16:9", "9:16"), "qualities": ("720p",), "quality_hidden": True,
+     "max_n": 1, "supports_edit": True, "max_refs": 1, "durations": (4, 8),
+     "supports_last_frame": True, "credits": 16},
+]
+
+
+def test_the_model_menu_lists_only_what_it_was_given():
+    """Menü katalogtan DEĞİL çağrandan geliyor; süzgeç rotada (`_model_available`).
+
+    Modül katalogu okusaydı anahtarı olmayan modelleri de listelerdi ve
+    yönetmen kullanıcının çalıştıramayacağı bir model önerirdi.
+    """
+    metin = chat_prompt.build_system(available_models=_MENU)
+    assert chat_prompt.MODELS_HEADING in metin
+    assert "azure-gpt-image-2" in metin and "gemini-veo-3-1-lite" in metin
+    assert "gemini-nano-banana-pro" not in metin, "verilmeyen model menüde"
+
+
+def test_the_model_menu_carries_the_id_the_client_will_apply():
+    """Satırın TEK zorunlu alanı `id`: yönetmen model öneriyor ve ön yüz
+    önerilen id'yi uyguluyor. Onsuz menü okunabilir ama işe yaramaz olurdu."""
+    metin = chat_prompt._models_block(_MENU)
+    for satir, m in zip(
+            [s for s in metin.splitlines() if s.startswith("* ")], _MENU):
+        assert f"`{m['id']}`" in satir, satir
+
+
+def test_the_menu_teaches_the_axes_a_suggestion_needs():
+    """Öneri UYGULANABİLİR olmalı: jetonları bilmeyen yönetmenin `size`/
+    `duration` önerisi `applyIfSupported` tarafından reddedilir ve tek tıklı
+    üretim düşer.
+
+    Kalite ekseni OLMAYAN modelde "yazma" deniyor — Nano Banana kusurunun
+    (bağlam bloğunun var olma sebebi) menü tarafındaki karşılığı.
+    """
+    metin = chat_prompt._models_block(_MENU)
+    assert "16:9" in metin and "1024x1024" in metin
+    assert "4 · 8 sn" in metin, "süre ekseni menüde yok"
+    assert "kalite ekseni YOK" in metin
+    # Kredi YALNIZ videoda ve birimiyle: görselde birim adet, videoda saniye.
+    assert "saniyesi 16 kredi" in metin
+    assert "8 kredi" not in metin.split("gemini-veo")[0], "görselde kredi yazılmış"
+
+
+def test_a_single_output_model_is_told_not_to_write_n():
+    """`max_n=1` olan modelde `n` bir eksen değil: arayüz satırı gizliyor ve
+    yönetmenin yazdığı `n: 2` tek tıklı üretimi DÜŞÜRÜR."""
+    metin = chat_prompt._models_block(_MENU)
+    video = [s for s in metin.splitlines() if "veo" in s][0]
+    assert "`n` yazma" in video
+    gorsel = [s for s in metin.splitlines() if "gpt-image-2" in s][0]
+    assert "n: 1–4" in gorsel
+
+
+def test_the_model_menu_stays_within_its_budget():
+    """Menü HER TURDA gidiyor ve bu yüzeyde prompt caching yok: her karakter
+    her mesajda yeniden ödeniyor.
+
+    Katalogdaki HER model yapılandırılmışken ölçülüyor, yani en kötü hâl.
+    Bir bütçe olmadan yeni bir model ya da yeni bir alan eklemek sessizce
+    kalıcı maliyet ekler; bütçeyle bu bir KARAR oluyor.
+    """
+    import catalog
+
+    hepsi = [{"id": m.id, "label": m.label, "kind": m.kind, "sizes": m.sizes,
+              "qualities": m.qualities, "quality_hidden": m.quality_hidden,
+              "max_n": m.max_n, "supports_edit": m.supports_edit,
+              "max_refs": m.max_refs, "durations": m.durations,
+              "supports_last_frame": m.supports_last_frame, "credits": m.credits}
+             for m in catalog.IMAGE_MODELS + catalog.VIDEO_MODELS]
+    blok = chat_prompt._models_block(hepsi)
+    assert len(blok) <= 3200, f"menü bütçesi aşıldı: {len(blok)} karakter"
+
+
+def test_an_unconfigured_selection_is_flagged_and_a_configured_one_is_not():
+    """Seçili modelin menüde OLMAMASI ulaşılabilir bir hâl (`prefs.read` bayat
+    seçimi bilerek koruyor). Söylenmezse yönetmen bağlam bloğuna güvenip
+    üretilemeyecek bir öneri yazar."""
+    disarida = chat_prompt.build_system(
+        model_facts={"id": "azure-flux-2-pro", "label": "FLUX"},
+        available_models=_MENU)
+    assert "SEÇİLİ modeli bu listede YOK" in disarida
+
+    icerde = chat_prompt.build_system(
+        model_facts={"id": "azure-gpt-image-2", "label": "Azure · gpt-image-2"},
+        available_models=_MENU)
+    assert "SEÇİLİ modeli bu listede YOK" not in icerde
+
+
+# ── Video talimatı ──────────────────────────────────────────────────────
+
+def _video_text() -> str:
+    """GÖMÜLÜ video dosyası — `load_video_instructions()` DEĞİL, aynı gerekçe:
+    içerik testleri repoyu doğruluyor, geliştiricinin ezme dosyasını değil."""
+    path = os.path.join(paths.bundled_prompts_dir(),
+                        chat_prompt.VIDEO_INSTRUCTIONS_FILE)
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+def test_the_bundled_video_instructions_ship_with_the_repo():
+    """`load_video_instructions` dosya yokken SESSİZCE boş dönüyor ve bu doğru
+    çalışma-anı davranışı; dosyanın depoda eksik olması ise kusur. İki soru
+    ayrı, o yüzden kapı burada."""
+    metin = _video_text()
+    assert len(metin) >= chat_prompt.MIN_VIDEO_INSTRUCTIONS_CHARS
+
+
+def test_the_video_instructions_start_with_the_documented_heading():
+    """Başlığı `build_system` eklemiyor, dosya taşıyor — sabit test çapası."""
+    assert _video_text().startswith(chat_prompt.VIDEO_HEADING)
+
+
+def test_the_video_instructions_open_the_scope_they_need():
+    """Ana persona "yalnızca görsel" diyor ve tek cümlelik bir ret tanımlıyor.
+
+    Video dosyası o kapsamı AÇMAZSA yönetmen video isteğine ret basar — yani
+    özellik sessizce hiç çalışmaz. Ana personayı değiştirmek de yanlış olurdu:
+    video anahtarı olmayan kullanıcıda koşturulamayan bir iş vaat ederdi.
+    """
+    metin = _video_text()
+    assert "Kapsam" in metin and "videoyu da kapsar" in metin
+
+
+def test_the_video_instructions_do_not_reprint_the_token_table():
+    """Nano Banana kusurunun video tarafında TEKRARLANMAMASI.
+
+    Persona `low·medium·high` tablosunu elle yazıyordu ve o modeli seçen
+    kullanıcıda her öneri reddediliyordu. Geçerli jetonlar artık menüden
+    geliyor; dosyada ` · ` ile birleştirilmiş bir jeton listesi görünmesi, tam
+    olarak menünün ürettiği biçimin ikinci bir kopyası demek olurdu.
+    """
+    metin = _video_text()
+    for tablo in ("4 · 6 · 8", "16:9 · 9:16", "720p · 1080p"):
+        assert tablo not in metin, f"jeton tablosu geri gelmiş: {tablo}"
+
+
+def test_the_video_instructions_only_use_tokens_the_app_actually_sends():
+    """Dosyadaki her ayar örneği KATALOĞA karşı ölçülüyor.
+
+    Literal bir kara liste değil: katalog bir gün değişirse bu test onunla
+    birlikte hareket eder. Uydurulmuş bir jeton, kullanıcının okuduğu ilk
+    örneğin telde 422 dönmesi demek.
+    """
+    import json
+
+    import catalog
+
+    ornekler = re.findall(r"```json\n(.*?)\n```", _video_text(), re.S)
+    assert ornekler, "video dosyasında hiç ayar örneği yok"
+    for ham in ornekler:
+        ayar = json.loads(ham)
+        assert ayar["model"] in catalog.video_model_ids(), ayar
+        assert ayar["size"] in catalog.VIDEO_ASPECT_RATIOS, ayar
+        assert ayar["duration"] in catalog.VIDEO_DURATIONS, ayar
+        # `n` video bloğunda HİÇ yazılmamalı: bütün video modelleri `max_n=1`.
+        assert "n" not in ayar, ayar
+
+
+def test_a_video_model_in_the_menu_pulls_in_the_video_instructions():
+    """Kapı LİSTEDEN türetiliyor, ayrı bir bayraktan değil."""
+    metin = chat_prompt.build_system(available_models=_MENU)
+    assert chat_prompt.VIDEO_HEADING in metin
+
+
+def test_a_menu_without_video_leaves_the_video_instructions_out():
+    """Ayrı bir `video=True` bayrağı listeyle AYRIŞABİLİRDİ ve ayrıştığı hâl tam
+    olarak zararlı olan hâl: video talimatı sistem mesajında dururken menüde hiç
+    video modeli olmayan bir tur, yönetmene koşturulamayan bir öneri yazdırırdı.
+
+    Ayrıca video zanaatı her turda ödenen karakter — video kullanmayan kullanıcı
+    onu ödememeli.
+    """
+    yalniz_gorsel = [m for m in _MENU if m["kind"] == "image"]
+    metin = chat_prompt.build_system(available_models=yalniz_gorsel)
+    assert chat_prompt.VIDEO_HEADING not in metin
+    assert "video KAPALI" in metin, "kullanıcıya eksik olanın ANAHTAR olduğu söylenmiyor"
+
+
+# ── Persona ile öteki katmanların aynası ────────────────────────────────
+
+def test_the_persona_teaches_the_model_field():
+    """Yönetmen `model` yazmazsa ön yüz hedefi türetemez ve her öneri görsel
+    moduna düşer — video özelliği sessizce hiç çalışmaz."""
+    metin = _bundled_text()
+    assert '"model"' in metin, "ayar bloğu örneğinde model alanı yok"
+    assert "Kullanılabilir modeller" in metin, "yönetmene menü adres gösterilmiyor"
+
+
+def test_the_persona_explains_the_generation_note_marker():
+    """AYNA: önek `models.RESULT_NOTE_PREFIX`te kuruluyor, personada tanıtılıyor.
+
+    İkisi ayrışırsa yönetmen uygulamanın otomatik notunu kullanıcının yazdığı
+    bir cümle sanar ve ona cevap vermeye başlar.
+    """
+    import models
+
+    assert models.RESULT_NOTE_PREFIX in _bundled_text(), (
+        "personada üretim notlarının işareti tanıtılmıyor")
+

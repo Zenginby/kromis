@@ -127,6 +127,9 @@ function applyConfigured(s) {
   if (s && s.chat_instructions_path) {
     $("chat-instructions-path").textContent = s.chat_instructions_path;
   }
+  if (s && s.chat_video_instructions_path) {
+    $("chat-video-instructions-path").textContent = s.chat_video_instructions_path;
+  }
 }
 
 async function loadSettings(openIfMissing) {

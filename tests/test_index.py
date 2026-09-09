@@ -847,7 +847,7 @@ def test_view_switching_updates_aria_selected():
     assert "aria-pressed" in body.group(1)
 
 
-def test_apply_to_form_switches_to_the_image_view():
+def test_apply_to_form_switches_to_the_TARGET_view():
     """Aktarma görünümü çevirmezse kullanıcı sohbette kalır ve prompt'un forma
     girdiğini GÖRMEZ: "bir şey olmadı" sanıp ikinci kez basar, ayarlar da
     sessizce ikinci kez ezilir.
@@ -856,12 +856,18 @@ def test_apply_to_form_switches_to_the_image_view():
     sayfa okuma adımı sekmeyi kendisi değiştirip odağı kaydırdığı için geçiş
     "olmamış" göründü — davranış doğruydu, ölçüm yanlıştı. Tripwire o yüzden
     burada: bir dahaki sefere cevap testten okunsun.
+
+    HEDEF ARTIK SABİT DEĞİL: yönetmen video da önerebiliyor ve mod, önerdiği
+    modelin hangi katalogda olduğundan türetiliyor. Sabit `setMode("image")`
+    kalsaydı bir video önerisi görsel moduna aktarılır, telde 422 dönerdi.
     """
     js = TestClient(appmod.app).get("/static/chat.js").text
     body = re.search(r"function applyToForm\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
     assert body, "applyToForm() bulunamadı"
-    assert 'setMode("image")' in body.group(1), (
-        "aktarma görsel sekmesine geçmiyor — kullanıcı sonucu görmez")
+    assert "setMode(hedef.eksen)" in body.group(1), (
+        "aktarma HEDEF moda geçmiyor — video önerisi görsel ucuna giderdi")
+    assert 'setMode("image")' not in body.group(1), (
+        "mod hâlâ sabit — hedef tablosu boşa çıkmış")
     assert '$("prompt").focus()' in body.group(1), (
         "prompt alanı odaklanmıyor — aktarılan metin gözle bulunabilmeli")
 
@@ -942,7 +948,12 @@ def test_prompt_actions_live_on_the_prompt_block_not_at_the_bottom():
     assert body, "promptFigure() bulunamadı"
     assert "chat-prompt-bar" in body.group(1)
     assert "copyPrompt(parsed.prompt)" in body.group(1), "Kopyala bağlı değil"
-    assert "applyToForm(parsed)" in body.group(1), "Görsel modunda üret bağlı değil"
+    # Zincir bir kademe uzadı: düğme artık üretimi de başlatıyor, yani
+    # `applyToForm`u DOĞRUDAN değil `sohbettenUret` üzerinden çağırıyor.
+    assert "sohbettenUret(parsed)" in body.group(1), "üretim düğmesi bağlı değil"
+    uret = re.search(r"function sohbettenUret\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert uret, "sohbettenUret() bulunamadı"
+    assert "applyToForm(parsed)" in uret.group(1), "aktarma zinciri koptu"
     # Sınıf adı bir AÇIKLAMADA geçebilir (neden kaldırıldığı yazıyor); yasak olan
     # şey ona bir düğüm bağlanması, yani dizeyle atanması.
     assert '"chat-msg-actions"' not in js, "eski alt eylem satırı hâlâ üretiliyor"
@@ -2407,8 +2418,14 @@ def test_the_prompt_block_button_names_the_mode_not_a_form():
     assert "Forma aktar" not in js, "eski etiket chat.js'te duruyor"
     body = re.search(r"function promptFigure\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
     assert body, "promptFigure() bulunamadı"
-    assert re.search(r'apply\.textContent\s*=\s*"Görsel modunda üret"', body.group(1)), (
-        "prompt bloğunun eylem düğmesi §4.2'nin adını taşımıyor")
+    # Ad artık HEDEFTEN geliyor: "Görsel modunda üret" iki adımın (mod değiştir,
+    # sonra Üret'e bas) adıydı ve adım bire indi. Sabit dize kalsaydı bir video
+    # önerisinin düğmesi de "Görsel" derdi.
+    assert "hedefli.hedef.dugme" in body.group(1), (
+        "düğmenin adı hedeften okunmuyor")
+    assert '"Görsel modunda üret"' not in js, "iki adımlı eski ad duruyor"
+    assert '"Görsel üret"' in js and '"Video üret"' in js, (
+        "hedef tablosu iki modun düğme adını taşımıyor")
 
 
 def test_the_image_mode_button_pastes_the_prompt_and_switches_mode():
@@ -2422,9 +2439,207 @@ def test_the_image_mode_button_pastes_the_prompt_and_switches_mode():
     assert body, "applyToForm() bulunamadı"
     fn = body.group(1)
     assert '$("prompt").value = parsed.prompt' in fn, "prompt composer'a basılmıyor"
-    assert 'setMode("image")' in fn, "mod Görsel'e alınmıyor"
+    assert "setMode(hedef.eksen)" in fn, "mod HEDEFE alınmıyor"
     assert "forma aktarıldı" not in fn.lower(), "durum satırı hâlâ 'form' diyor"
-    assert "Görsel modu" in fn, "durum satırı nereye aktarıldığını söylemiyor"
+    assert "${hedef.ad} moduna aktarıldı" in fn, (
+        "durum satırı nereye aktarıldığını söylemiyor")
+
+
+# ── Yönetmenin model önerisi ve tek tıklı üretim (v2.1) ─────────────────
+
+def test_the_settings_signature_stays_disjoint_from_the_panel_signatures():
+    """İmza genişledi (`duration`); genişleyen imza bir paneli KAÇIRTMAMALI.
+
+    Ayrıklığın gerçek garantisi ad uzayı: ayar bloğunun anahtarları İngilizce,
+    panel bloklarınınki Türkçe. Kesişen bir ad seçilse `parseDirectorReply` bir
+    seçenek panelini ayar bloğu sanardı ve kullanıcı ham JSON okurdu.
+    """
+    js = _chat_js()
+    keys = re.search(r"const SETTING_KEYS = \[(.*?)\];", js, re.S)
+    assert keys, "SETTING_KEYS bulunamadı"
+    ayar = set(re.findall(r'"([^"]+)"', keys.group(1)))
+    assert "duration" in ayar, "süre ekseni imzaya girmemiş"
+    assert not ayar & {"secenekler", "varyasyonlar", "eksenler"}, ayar
+    # `model` bloğun YÜKÜ, imzası değil: yalnız model taşıyan bir JSON ayar
+    # sanılmamalı.
+    assert "model" not in ayar, "yük imzaya karışmış"
+
+
+def test_the_director_target_is_read_from_a_TABLE_not_a_conditional():
+    """Hedef `MOD_SEKMELERI`den okunamaz: orada `director` da geçerli bir üye
+
+    ama üretim yapmıyor. `setMode`un "bilinmeyen ad görsele düşer" kuralına
+    yaslanmak da yanlış: sessiz sapma olurdu ve `"director"` hedefi prompt'u
+    yönetmene GERİ gönderirdi.
+    """
+    js = _chat_js()
+    tablo = re.search(r"const HEDEF_MODLAR = \{(.*?)\n\};", js, re.S)
+    assert tablo, "HEDEF_MODLAR bulunamadı"
+    assert "director" not in tablo.group(1), "yönetmen modu üretim hedefi sanılmış"
+    for alan in ("eksen", "dugme", "ad"):
+        assert alan in tablo.group(1), f"tabloda {alan} yok"
+    body = re.search(r"function hedefCoz\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body, "hedefCoz() bulunamadı"
+    assert "HEDEF_MODLAR[" not in body.group(1), (
+        "hedef dizeyle indeksleniyor — tanınmayan değer sessizce geçebilir")
+    assert "return null" in body.group(1), "tanınmayan model reddedilmiyor"
+
+
+def test_the_target_is_derived_from_the_model_id_not_a_wire_field():
+    """Tür telde AYRI bir alanla taşınmıyor, `model` id'sinden türetiliyor.
+
+    Ayrı bir `mode`/`kind` alanı çelişebilirdi (`mode:image` + bir Veo id'si) ve
+    çözüm kuralı hem personaya öğretilmek hem burada dallanmak zorunda kalırdı.
+    Arama İKİ AYRI listede: birleşik bir arama yanlış türü doğru sanardı.
+    """
+    body = re.search(
+        r"function hedefCoz\([^)]*\)\s*\{(.*?)\n\}", _chat_js(), re.S)
+    assert body, "hedefCoz() bulunamadı"
+    fn = body.group(1)
+    assert "videoModels.find" in fn and "imageModels.find" in fn
+    assert fn.index("videoModels.find") < fn.index("imageModels.find")
+    # `\b`: `settings.model` içinde `settings.mode` ALT DİZE olarak geçiyor,
+    # düz `in` testi bu yüzden her zaman yanlış pozitif veriyordu.
+    assert not re.search(r"settings\.mode\b", fn), "telde tür alanı okunuyor"
+
+
+def test_apply_to_form_refuses_before_it_mutates_anything():
+    """Reddedilen bir yanıt kullanıcının modunu, modelini ve TERCİHİNİ de
+    değiştirmemeli: ya hep ya hiç.
+
+    Model önerisi `savePref`e kadar gidiyor, yani yarım uygulanmış bir ret
+    kullanıcının kalıcı seçimini de kaydırırdı.
+    """
+    body = re.search(
+        r"function applyToForm\([^)]*\)\s*\{(.*?)\n\}", _chat_js(), re.S)
+    assert body, "applyToForm() bulunamadı"
+    fn = body.group(1)
+    ilk_mutasyon = fn.index("setMode(hedef.eksen)")
+    for kapi in ("hedefCoz(parsed)", "!parsed.prompt", "MAX_PROMPT_CHARS"):
+        assert fn.index(kapi) < ilk_mutasyon, f"{kapi} kapısı mutasyondan sonra"
+
+
+def test_apply_to_form_sets_the_MODE_and_MODEL_before_the_axes():
+    """SIRA: mod → model → eksenler. Ölçülmüş bir kırılmanın bekçisi.
+
+    `#size`/`#quality`/`#duration` PAYLAŞILAN `<select>`ler ve içerikleri
+    `setMode` → `aktifModeliUygula` → `eksenleriDoldur` zinciriyle SEÇİLİ
+    MODELE göre yeniden doluyor. Eksenler önce yazılırsa video modundan gelen
+    kullanıcıda `1024x1024` önerisi bayat `16:9` listesine çarpıp "uygulanamadı"
+    olur, sonra doğru liste yüklenir ve öneri KAYBOLUR.
+    """
+    body = re.search(
+        r"function applyToForm\([^)]*\)\s*\{(.*?)\n\}", _chat_js(), re.S)
+    assert body, "applyToForm() bulunamadı"
+    fn = body.group(1)
+    assert (fn.index("setMode(hedef.eksen)")
+            < fn.index("modelOnerisiniUygula(")
+            < fn.index("SETTING_TARGETS")), "mod/model/eksen sırası bozulmuş"
+
+
+def test_the_model_suggestion_writes_to_the_CARRIER_and_fires_ONE_change():
+    """Öneri, panelin kullandığı ZİNCİRİN aynısından geçiyor.
+
+    `change` dinleyicisi `applyModel`/`applyVideoModel` + `savePref` + bellekteki
+    tercihin üçünü tek yoldan koşturuyor. Buradan `applyModel` çağırmak zincirin
+    ikinci bir kopyası, tercihi de iki kez diske yazmak olurdu.
+    """
+    body = re.search(
+        r"function modelOnerisiniUygula\([^)]*\)\s*\{(.*?)\n\}", _chat_js(), re.S)
+    assert body, "modelOnerisiniUygula() bulunamadı"
+    fn = body.group(1)
+    assert "secici.value = model.id" in fn, "değer taşıyıcıya yazılmıyor"
+    assert "bubbles: true" in fn, "change olayı yayılmıyor"
+    for yasak in ("applyModel(", "applyVideoModel(", "savePref("):
+        assert yasak not in fn, f"{yasak} zincirin ikinci kopyası"
+    assert "if (secici.value === model.id) return" in fn, (
+        "aynı değere ikinci dokunuş sessiz değil — gereksiz tercih yazımı")
+
+
+def test_the_model_suggestion_names_its_THREE_refusals_separately():
+    """Üç ayrı sebep üç ayrı cümle: "katalogda yok" ≠ "anahtar yok" ≠ "arena".
+
+    Tek bir "uygulanamadı" cümlesi kullanıcıya YANLIŞ iş buyururdu — anahtarı
+    olmayan modelde Ayarlar'a gitmesi gerekirken arenayı kapatmaya çalışırdı.
+    Seçilebilirlik `secilebilirler` ile tek yerden soruluyor: `<select>`e giren
+    küme de aynı süzgeçten geçiyor.
+    """
+    body = re.search(
+        r"function modelOnerisiniUygula\([^)]*\)\s*\{(.*?)\n\}", _chat_js(), re.S)
+    assert body, "modelOnerisiniUygula() bulunamadı"
+    fn = body.group(1)
+    assert "arenaAcik" in fn and "arena açık" in fn
+    assert "secilebilirler(" in fn, "seçilebilirlik ikinci kez kuruluyor"
+    assert "anahtar yok" in fn
+    assert "MODEL_EKSENLERI[hedef.eksen]" in fn, "eksen tablosu atlanmış"
+
+
+def test_a_chat_started_generation_asks_the_WHOLE_gate():
+    """EN DEĞERLİSİ: kapıyı sormayan bir giriş noktası ÜCRETLİ bir isteği
+    sessizce yollar.
+
+    `run()` `goBlockReason`ı SORMUYOR ve `#go.disabled` bu düğmeyi hiç
+    bağlamıyor — `runArena`nın kendi içinde kapattığı boşluğun aynısı. Kapı
+    `submitComposer`dan ÖNCE sorulmak zorunda.
+    """
+    body = re.search(
+        r"function sohbettenUret\([^)]*\)\s*\{(.*?)\n\}", _chat_js(), re.S)
+    assert body, "sohbettenUret() bulunamadı"
+    fn = body.group(1)
+    assert "goBlockReason()" in fn, "kapı hiç sorulmuyor"
+    assert fn.index("goBlockReason()") < fn.index("submitComposer()"), (
+        "kapı üretimden SONRA soruluyor")
+    assert "fetch(" not in fn, "ikinci bir üretim yolu açılmış"
+
+
+def test_a_partial_suggestion_does_not_spend_credits():
+    """Uygulanamayan bir öneri varken üretim BAŞLAMAZ.
+
+    Gerekçe ölçülebilir bir yarış: `run()` durum satırını hemen "Üretiliyor…"
+    ile eziyor, yani "şu öneriler uygulanamadı" mesajı mikrosaniyede kaybolur
+    ve SESSİZ SAPMA YASAK kuralı pratikte ölür.
+    """
+    js = _chat_js()
+    body = re.search(r"function applyToForm\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body and "return !skipped.length" in body.group(1), (
+        "applyToForm kısmi uygulamayı bildirmiyor")
+    uret = re.search(r"function sohbettenUret\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert uret and "if (!applyToForm(parsed)) return;" in uret.group(1), (
+        "kısmi öneride üretim duruyor değil")
+
+
+def test_a_hidden_axis_is_never_written_behind_the_users_back():
+    """Gizli satır = eksen bu modda/modelde YOK.
+
+    Üç sızıntıyı birden kapatıyor: görsel modunda gelen `duration` (süresiz
+    modelde `#duration` TEMİZLENMİYOR, bayat seçeneklere denk gelip "uygulandı"
+    derdi), `quality_hidden` modelde kalite önerisi, arena açıkken `n` önerisi.
+
+    Değer zaten isteneni gösteriyorsa sapma YOK — video modellerinin `n: 1`i
+    uygulanamamış bir öneri değil, gerçekleşmiş bir öneridir.
+    """
+    body = re.search(
+        r"function applyIfSupported\([^)]*\)\s*\{(.*?)\n\}", _chat_js(), re.S)
+    assert body, "applyIfSupported() bulunamadı"
+    fn = body.group(1)
+    assert "spec-${selectId}" in fn, "gizli satır sorulmuyor"
+    assert ".hidden" in fn
+    assert "el.value === match.value" in fn, (
+        "gizli eksende zaten doğru olan değer 'uygulanamadı' sayılıyor")
+
+
+def test_the_skipped_label_comes_from_the_axis_LABEL_not_a_hardcoded_word():
+    """Aynı eksen bir modelde "Boyut", ötekinde "Oran" (`#label-size` video
+    modunda değişiyor).
+
+    Elle yazılmış etiket, kullanıcının ekranında OLMAYAN bir kelimeyi söylerdi.
+    """
+    js = _chat_js()
+    body = re.search(r"function applyToForm\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
+    assert body and "axisLabel(" in body.group(1), (
+        "atlanan öneri etiketi eksenden okunmuyor")
+    assert '"Boyut"' not in js and '"Kalite"' not in js, (
+        "eksen adı chat.js'te sabit yazılmış")
 
 
 def test_ask_director_is_invisible_while_the_prompt_box_is_empty():

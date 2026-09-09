@@ -139,9 +139,18 @@ function promptFigure(pre, parsed) {
   apply.className = "primary chat-prompt-btn";
   // Devrin manşeti (tasarım §4.2): sekmeler bu düğme uğruna kaldırıldı — eski
   // etiketin vaat ettiği "diğer sekmeye git" yolculuğu ortadan kalkacaktı.
-  // Ortada bir form da yok artık; tek composer var, düğme onun MODUNU söylüyor.
-  apply.textContent = "Görsel modunda üret";
-  apply.addEventListener("click", () => applyToForm(parsed));
+  // Ortada bir form da yok artık; tek composer var.
+  //
+  // ETİKET ARTIK HEDEFTEN ve iki adım BİRE indi: eski ad, modu değiştirip
+  // AYRICA composer'ın kendi düğmesine basmanın adıydı; bu düğme artık üretimi
+  // kendisi başlatıyor, ad da yalnız onun TÜRÜNÜ söylüyor.
+  //
+  // Bilinmeyen hedefte düğme YİNE çiziliyor: tıklama `applyToForm`un ret
+  // kapısına düşüyor ve gerekçe yazılıyor. Sessizce kaybolan bir düğme,
+  // kullanıcının hiç açıklayamayacağı tek hâl olurdu.
+  const hedefli = hedefCoz(parsed);
+  apply.textContent = hedefli ? hedefli.hedef.dugme : "Üret";
+  apply.addEventListener("click", () => sohbettenUret(parsed));
 
   bar.append(label, copy, apply);
   fig.append(bar, pre);
@@ -155,7 +164,8 @@ function renderMarkdownInto(host, text, parsed) {
   // renderParameters). Atlanmasalar kullanıcı ham JSON okurdu.
   //
   // Ayar JSON'u listede YOK ve çizilmeye devam ediyor (bilinçli): kullanıcının
-  // "Görsel modunda üret"e basmadan da hangi boyut/kalite önerildiğini görmesi gerekiyor.
+  // üret düğmesine basmadan da hangi model/boyut/kalite önerildiğini görmesi
+  // gerekiyor — düğme artık üretimi doğrudan başlattığı için bu daha da önemli.
   // Tanınmayan bir JSON bloğu da çizilir — dürüst sonuç: yönetmen anlaşılmayan
   // bir şey yazdıysa kullanıcı onu görsün.
   //
@@ -259,7 +269,17 @@ function jsonObject(block) {
 // belge): tip dört imzadan okunuyor ve imzalar ayrık. Dallar bilerek bu
 // fonksiyonun İÇİNDE — tests/test_index.py imzaları buranın gövdesinden greple
 // arıyor, modül düzeyi bir tabloya taşımak o tripwire'ı düşürürdü.
-const SETTING_KEYS = ["size", "quality", "n"];
+//
+// AYRIKLIĞIN GERÇEK GARANTİSİ yazıya geçiyor, çünkü imza artık genişledi:
+// ayar bloğunun anahtarları İNGİLİZCE (`size`/`quality`/`n`/`duration`),
+// öteki üç bloğunki TÜRKÇE (`secenekler`/`varyasyonlar`/`eksenler`). İki ad
+// uzayı kesişmediği sürece yeni bir eksen eklemek hiçbir paneli kaçırtmaz;
+// kesişecek bir ad seçilirse ayrıklık sessizce ölür.
+//
+// `model` bu listede DEĞİL ve olmamalı: liste "bu blok bir ayar bloğu mu"
+// sorusunun cevabı, `model` ise bloğun YÜKÜ. İmzayı ona genişletmek, yalnız
+// model taşıyan bir JSON'u da ayar sanmak olurdu.
+const SETTING_KEYS = ["size", "quality", "n", "duration"];
 
 /** → { prompt, settings, options, variations, parameters, *Body }.
  *
@@ -287,15 +307,15 @@ function parseDirectorReply(text) {
   let parameters = null;
   let parametersBlock = null;
 
+  // SIRA KURALI: EN GENİŞ İMZA EN SONDA sorulur. Ayar dalı `SETTING_KEYS`in
+  // HERHANGİ biriyle tetikleniyor, yani dördü içinde en gevşek olan o; panel
+  // dalları ise tek ve kendine özgü bir dizi anahtarı arıyor. Bugün fark
+  // üretmiyor (ad uzayları ayrık), ama melez bir blok geldiği gün sıra
+  // panelin ayar sanılmasını önlüyor.
   for (const b of blocks) {
     const obj = jsonObject(b);
     if (!obj) continue;
     jsonBlocks.add(b);
-    if (!settings && SETTING_KEYS.some((k) => obj[k] !== undefined)) {
-      settings = obj;
-      settingsBlock = b;
-      continue;
-    }
     if (!options && Array.isArray(obj.secenekler) && obj.secenekler.length) {
       options = obj;
       optionsBlock = b;
@@ -311,6 +331,11 @@ function parseDirectorReply(text) {
     if (!parameters && Array.isArray(obj.eksenler) && obj.eksenler.length) {
       parameters = obj;
       parametersBlock = b;
+      continue;
+    }
+    if (!settings && SETTING_KEYS.some((k) => obj[k] !== undefined)) {
+      settings = obj;
+      settingsBlock = b;
     }
   }
 
@@ -915,9 +940,56 @@ function renderParameters(parsed) {
 }
 
 // ── Forma uygulama ──────────────────────────────────────────────────
-// [json anahtarı, <select> id'si, kullanıcıya görünen ad]
-const SETTING_TARGETS = [["size", "size", "Boyut"], ["quality", "quality", "Kalite"],
-                         ["n", "n", "Adet"]];
+
+// Yönetmenin hedefleyebileceği ÜRETİM modları. `MOD_SEKMELERI`nin kopyası
+// DEĞİL: orada `director` da geçerli bir üye ama o mod üretim YAPMIYOR —
+// `setMode` onu kabul ederdi ve tek tıklı üretim prompt'u yönetmene GERİ
+// gönderirdi. Bilinmeyen bir hedefte `setMode`un "görsele düş" kuralına
+// yaslanmak da yanlış olurdu: sessiz sapma.
+//
+// `eksen` bir kimlik eşlemesi gibi duruyor ama DEĞİL: `MODEL_EKSENLERI`nin
+// anahtarları {image, chat, video, arena}, mod adları {image, video, director}
+// — iki ad uzayı yalnız iki üyede rastlaşıyor. Adı burada YAZMAK, o rastlantıyı
+// sözleşme sanmamak için.
+const HEDEF_MODLAR = {
+  image: { eksen: "image", dugme: "Görsel üret", ad: "Görsel" },
+  video: { eksen: "video", dugme: "Video üret", ad: "Video" },
+};
+
+/** Ayar bloğunun hedefi ve önerdiği model. → {hedef, model} | null.
+ *
+ * TÜR `model` id'sinden TÜRETİLİYOR, telde ayrı bir `mode`/`kind` alanı YOK:
+ * iki alan çelişebilirdi (`{"mode":"image","model":"gemini-veo-3-1"}`) ve
+ * çözüm kuralı hem personaya öğretilmek hem burada dallanmak zorunda kalırdı.
+ * Türetmenin kaynağı literal bir tablo da değil — `/api/settings`in ayrı ayrı
+ * gönderdiği iki liste, yani sunucunun gerçeği.
+ *
+ * `model` HİÇ YOKSA hedef görsel: bugünkü davranış ve `model` alanını
+ * tanımayan her eski döküm aynen çalışmaya devam ediyor.
+ *
+ * Listelerde SÜZGEÇ YOK (`secilebilirler` burada çağrılmıyor): "katalogda yok"
+ * ile "anahtarı yok" ayrı sorular ve kullanıcının okuyacağı cümle de ayrı.
+ * İkincisini `modelOnerisiniUygula` söylüyor.
+ */
+function hedefCoz(parsed) {
+  const id = (parsed.settings && parsed.settings.model
+    ? String(parsed.settings.model) : "").trim();
+  if (!id) return { hedef: HEDEF_MODLAR.image, model: null };
+  const video = videoModels.find((m) => m.id === id);
+  if (video) return { hedef: HEDEF_MODLAR.video, model: video };
+  const gorsel = imageModels.find((m) => m.id === id);
+  if (gorsel) return { hedef: HEDEF_MODLAR.image, model: gorsel };
+  return null;
+}
+
+// [json anahtarı = <select> id'si = `#spec-*`/`#label-*` son eki]. Tablo tek
+// sütuna İNDİ: üçüncü sütun elle yazılmış sabit bir eksen adıydı ve video
+// eklendiği an yanlış olurdu — `#label-size` video modunda "Oran" oluyor
+// (core.js `eksenleriDoldur`), yani mesaj kullanıcının ekranında olmayan bir
+// kelimeyi söylerdi. Görünen ad artık `axisLabel()`ten geliyor; core.js'teki
+// "chat.js'in atlanan-öneri metni bunu kullanıyor" yorumu da bugün ilk kez
+// DOĞRU.
+const SETTING_TARGETS = ["size", "quality", "duration", "n"];
 
 /** Yalnızca <option> listesinde GERÇEKTEN var olan değeri uygular. */
 function applyIfSupported(selectId, value) {
@@ -930,34 +1002,117 @@ function applyIfSupported(selectId, value) {
   const match = [...el.options].find(
     (o) => o.value === wanted || o.text.trim() === wanted);
   if (!match) return false;
+  // GİZLİ SATIR = eksen bu modda/modelde YOK. Ölçüt `hidden` özniteliği, modele
+  // sorulan İKİNCİ bir soru değil — `syncSpecs`in okuduğu kuralın aynısı ve tek
+  // yazarı `eksenleriDoldur`.
+  //
+  // Değer zaten isteneni gösteriyorsa SAPMA YOK: video modellerinin hepsi
+  // `max_n=1` ve `#spec-n` gizli, yani yönetmenin `n: 1`i uygulanamamış bir
+  // öneri değil GERÇEKLEŞMİŞ bir öneridir. Göstermiyorsa yazmak yanlış olurdu:
+  // kullanıcının göremediği bir ekseni arkasından oynatırdı.
+  //
+  // Üç sızıntıyı birden kapatıyor: görsel modunda gelen `duration` (süresiz
+  // modelde `#duration` TEMİZLENMİYOR, bayat seçeneklere denk gelip
+  // "uygulandı" derdi), `quality_hidden` modelde kalite önerisi, arena açıkken
+  // `n` önerisi.
+  const satir = $(`spec-${selectId}`);
+  if (satir && satir.hidden) return el.value === match.value;
   el.value = match.value;
   return true;
 }
 
+/** Yönetmenin model önerisini uygular. → "" (uygulandı ya da öneri yok) | sebep.
+ *
+ * DEĞER TAŞIYICIYA yazılıyor ve `change` ELLE gönderiliyor: o dinleyici
+ * (core.js) `applyModel`/`applyVideoModel` + `savePref` + bellekteki tercihin
+ * ÜÇÜNÜ tek yoldan koşturuyor — `#model-sheet-list`in kurduğu desenin aynısı.
+ * Buradan `applyModel` çağırmak o zincirin ikinci bir kopyası, tercihi de iki
+ * kez diske yazmak olurdu.
+ *
+ * TERCİHE YAZILMASI yalnız tutarlılık değil İŞLEVSEL bir zorunluluk:
+ * `app._director_context` yönetmenin tur bağlamını `prefs`ten kuruyor. Öneri
+ * tercihe yazılmazsa yönetmen bir sonraki turda hâlâ ESKİ modelin jetonlarını
+ * anlatır ve `applyIfSupported`ın reddettiği önerileri yazmaya devam eder.
+ */
+function modelOnerisiniUygula(hedef, model) {
+  if (!model) return "";
+  // Arena açıkken sütunları `arenaSecimi()` sürüyor ve `#model` yalnız birinci
+  // sütunun eksenlerini besliyor: öneriyi uygulamak kullanıcıya sessizce başka
+  // bir şey vaat etmek olurdu.
+  if (hedef.eksen === "image" && arenaAcik) {
+    return `${model.label} (arena açık — önce arenayı kapat)`;
+  }
+  const eksen = MODEL_EKSENLERI[hedef.eksen];
+  // SEÇİLEBİLİRLİK tek yerden soruluyor: `<select>`e giren küme de aynı
+  // süzgeçten geçiyor, yani "listede var ama yazılamaz" hâli doğamıyor.
+  if (!secilebilirler(eksen.liste(), "").some((m) => m.id === model.id)) {
+    return `${model.label} (anahtar yok — Ayarlar'dan ekle)`;
+  }
+  const secici = $(eksen.secici);
+  if (secici.value === model.id) return "";   // aynı değere ikinci dokunuş SESSİZ
+  secici.value = model.id;
+  secici.dispatchEvent(new Event("change", { bubbles: true }));
+  return "";
+}
+
+/** Yanıtı composer'a aktarır. → önerinin TAMAMI uygulandıysa true.
+ *
+ * Dönüş değeri `sohbettenUret`in kapısı: kısmi uygulanmış bir öneriyle üretime
+ * başlamak, aşağıdaki "uygulanamadı" mesajını `run()`ın "Üretiliyor…"suna
+ * mikrosaniyede ezdirirdi — yani SESSİZ SAPMA YASAK kuralı pratikte ölürdü.
+ */
 function applyToForm(parsed) {
+  // ── 1 · RET KAPILARI, hiçbir şey UYGULANMADAN önce ──
+  // Reddedilen bir yanıt kullanıcının modunu, modelini ve tercihini de
+  // değiştirmemeli: ya hep ya hiç.
+  const cozum = hedefCoz(parsed);
+  if (!cozum) {
+    chatStatus(`Yönetmen tanınmayan bir model bildirdi `
+      + `(${parsed.settings.model}) — hangi modeli kullanacağını tekrar sor.`);
+    return false;
+  }
   if (!parsed.prompt) {
     chatStatus("Yanıtta prompt bloğu bulunamadı — yönetmene prompt'u tekrar yazmasını söyle.");
-    return;
+    return false;
   }
   if (parsed.prompt.length > MAX_PROMPT_CHARS) {
     // KIRPMA YOK: kırpılmış bir prompt sessizce BAŞKA bir görsel üretir.
     chatStatus(`Prompt ${MAX_PROMPT_CHARS} karakter sınırını aşıyor `
       + `(${parsed.prompt.length}). Yönetmene kısaltmasını söyle.`);
-    return;
+    return false;
   }
 
+  const { hedef, model } = cozum;
+  const skipped = [];
+  // ── 2 · MOD, eksenlerin SAHİBİ ──
+  // Eskiden eksenler `setMode`dan ÖNCE yazılıyordu ve bu, üç mod dünyasında
+  // kırılıyor: video modundan gelen kullanıcıda `#size` `16:9` jetonlarını
+  // taşıyor, `1024x1024` önerisi `false` dönüyor (boşuna "uygulanamadı"),
+  // sonra `aktifModeliUygula` görsel jetonlarını dolduruyor ve öneri
+  // KAYBOLUYOR. `setMode` idempotent, hedef mod zaten aktifse zararsız.
+  setMode(hedef.eksen);
+  // ── 3 · MODEL, eksenleri KENDİ jetonlarıyla yeniden dolduruyor ──
+  // Bu yüzden eksenlerden önce; ayrıca `applyModel`/`applyVideoModel`
+  // `currentMode` kapısından geçiyor, yani modun 2. adımda oturmuş olması şart.
+  const modelSebep = modelOnerisiniUygula(hedef, model);
+  if (modelSebep) skipped.push(modelSebep);
+
+  // ── 4 · PROMPT ──
   $("prompt").value = parsed.prompt;
   // Programatik yazım `input` olayı DOĞURMAZ: ters yönün düğmesi elle
   // eşitlenmezse dolu kutunun yanında görünmez kalırdı.
   syncAskDirector();
-  const skipped = [];
-  for (const [key, selectId, label] of SETTING_TARGETS) {
+
+  // ── 5 · EKSENLER, mod ve model oturduktan SONRA ──
+  // Artık `<option>` listesi hedef modun + hedef modelin listesi, yani
+  // `applyIfSupported`ın `false`u GERÇEKTEN desteklenmeyen bir değer demek.
+  for (const key of SETTING_TARGETS) {
     const value = parsed.settings ? parsed.settings[key] : undefined;
     if (value === undefined || value === null || value === "") continue;
-    if (!applyIfSupported(selectId, value)) skipped.push(`${label} ${value}`);
+    if (!applyIfSupported(key, value)) skipped.push(`${axisLabel(key)} ${value}`);
   }
 
-  setMode("image");
+  // ── 6 · EŞİTLEME ve RAPOR ──
   $("prompt").focus();
   // Programatik `.value` ataması `change` olayını DOĞURMAZ: syncSpecs elle
   // çağrılmazsa üretim ayarları çipi eski değerleri göstermeye devam eder.
@@ -969,9 +1124,41 @@ function applyToForm(parsed) {
   // SESSİZ SAPMA YASAK (palette applied:false ile aynı gerekçe): uygulanamayan
   // öneri açıkça söylenir, yoksa kullanıcı formda başka bir ayar görür ve
   // sonucu açıklayamaz.
-  statusEl.textContent = "Prompt Görsel moduna aktarıldı."
-    + (skipped.length ? ` Şu öneriler uygulanamadı: ${skipped.join(", ")}`
-                        + " — üretim ayarlarındaki seçeneklerde yok." : "");
+  statusEl.textContent = `Prompt ${hedef.ad} moduna aktarıldı.`
+    + (skipped.length ? ` Şu öneriler uygulanamadı: ${skipped.join(", ")}.`
+                        + " Üretimi elle başlatabilirsin." : "");
+  return !skipped.length;
+}
+
+/** Sohbet içi üretim: hazırla → kapıyı SOR → composer'ın kendi yolundan koş.
+ *
+ * MEVCUT yol yeniden kullanılıyor, ikinci bir üretim yolu YAZILMIYOR. Kazanç
+ * yalnız kod tasarrufu değil; bunların hepsi bedava geliyor: `goBlockReason`
+ * kapısı, arena dalı, referans/ek referans/son kare dalları,
+ * `beginResultTurn`+`appendResultTurn` ile sonucun DÖKÜME yazılması, kredi
+ * tahmini, bayat sunucu yankı denetimleri ve hata yolunda turun geri alınması.
+ * Kendi `fetch`ini yazan bir düğme bunların hepsini yeniden borçlanırdı.
+ *
+ * Giriş `submitComposer` — `run()` DEĞİL: uzunluk kapısını ve mod dalını o
+ * taşıyor, yani üç giriş noktası (`#go`, ⌘/Ctrl+Enter, bu düğme) tek
+ * fonksiyonda birleşiyor. Mod `applyToForm` tarafından image|video'ya
+ * çekildiği için `sendChat` dalına düşmesi imkânsız.
+ *
+ * KAPI BURADA YENİDEN SORULUYOR çünkü `run()` onu SORMUYOR ve `#go.disabled`
+ * bu düğmeyi hiç bağlamıyor — `runArena`nın yazılı dersinin aynısı: kapıyı
+ * sormayan bir giriş noktası, kapının metnini ölü bir cümleye çevirir ve
+ * ÜCRETLİ bir isteği sessizce yollar.
+ *
+ * MEŞGULİYET için yeni bayrak gerekmiyor: `run()` `runBusy`yı kuruyor ve
+ * `goBlockReason`ın ilk satırı onu okuyor. Düğmeler `disabled` da EDİLMİYOR —
+ * kapı zamanla değişiyor (anahtar sonradan girilir, üretim biter) ve eski bir
+ * dökümde donmuş bir `disabled` yanlış bir söz olurdu.
+ */
+function sohbettenUret(parsed) {
+  if (!applyToForm(parsed)) return;   // gerekçeyi applyToForm yazdı
+  const engel = goBlockReason();
+  if (engel) { chatStatus(engel); return; }
+  submitComposer();
 }
 
 // ── Ters yön: "Yönetmen'e sor" (tasarım §4.2 · D13) ──────────────────
@@ -1601,7 +1788,12 @@ async function sendChat(display = "") {
     return false;
   }
   // Toplam, sunucunun `models._check_chat_total` ile AYNI şeyi sayıyor:
-  // `content` + `display`, sonuç kayıtları HARİÇ (onlar modele gitmiyor).
+  // `content` + `display`, sonuç kayıtları HARİÇ. Gerekçe "onlar modele
+  // gitmiyor" idi ve ARTIK DOĞRU DEĞİL (sunucu onları kısa bir nota çeviriyor,
+  // bkz. models.wire_messages); sayaç yine de onları saymıyor çünkü sunucunun
+  // kapısı da saymıyor — iki taraf aynı şeyi ölçmek ZORUNDA, yoksa istemci
+  // "yer var" derken sunucu 422 döndürürdü. Notun ağırlığı sunucuda sabit ve
+  // sınırlı (MAX_RESULT_NOTE_CHARS × MAX_CHAT_RESULTS).
   // `m.content.length` yazılamaz: sonuç kaydında `content` HİÇ YOK ve okumak
   // TypeError atardı — gönderim tümden ölürdü.
   const used = chatThread.reduce(
@@ -1609,7 +1801,7 @@ async function sendChat(display = "") {
       : n + (m.content || "").length + (m.display || "").length), 0);
   if (used + message.length + label.length > MAX_CHAT_TOTAL_CHARS) {
     chatStatus("Sohbet çok uzadı — soldaki \"Yeni sohbet\" ile devam et. (Son prompt'u "
-      + "kaybetmemek için önce \"Görsel modunda üret\"e bas.)");
+      + "kaybetmemek için önce prompt bloğundaki üret düğmesine bas.)");
     return false;
   }
 

@@ -786,12 +786,56 @@ def test_a_FOLDER_COVER_is_never_a_video():
     assert "!kayitVideoMu(r)" in govde
 
 
-def test_the_DIRECTOR_HANDOFF_is_closed_in_video_mode():
-    """Yönetmen'in tur bağlamı `prefs["image_model"]`den geliyor
-    (`app._director_context`), yani video modunda GÖRSEL modelinin jetonlarını
-    öneriyor — video ucunda 422 dönen değerler. Kapı, Yönetmen video bağlamını
-    öğrenene kadar duruyor (görev defteri madde 10d)."""
-    assert '#composer[data-mode="video"] #ask-director' in _css()
+def test_the_DIRECTOR_HANDOFF_is_OPEN_in_video_mode():
+    """Devir KAPALIYDI ve kapının kendi koşulu vardı: "Yönetmen video bağlamını
+    öğrenene kadar".
+
+    Gerekçe şuydu — tur bağlamı yalnız `prefs["image_model"]`den geliyordu, yani
+    video modunda GÖRSEL modelinin jetonlarını öneriyordu (video ucunda 422
+    dönen değerler) ve persona gpt-image prompt'u için yazılmıştı.
+
+    O koşul artık SAĞLANDI: bağlam yapılandırılmış video modellerini de taşıyor
+    (`app._director_context` → `available_models`) ve video zanaatı ayrı bir
+    talimat dosyasında. Kapıyı açık bırakmak, sağlanmış bir koşulu yok saymak
+    olurdu — ve kullanıcıyı video modunda yönetmene EL İLE geçmeye zorlardı.
+    """
+    assert '#composer[data-mode="video"] #ask-director' not in _css(), (
+        "devir hâlâ kapalı — koşulu sağlandığı hâlde")
+
+
+def test_the_video_target_closes_the_ARENA_gate():
+    """Arena video modunda AÇILAMIYOR ama AÇIK KALABİLİYOR ve bu ölçülmüş bir
+    sessiz tür karışmasıydı.
+
+    Anahtarın durumu mod değişiminde bilerek korunuyor (style.css: "görsel
+    moduna dönen kullanıcı arenasını açık buluyor") ve `#arena-pick` video
+    modunda gizli, yani kullanıcı onu KAPATAMIYOR. `run()` ise arena dalını
+    `videoMu`dan ÖNCE soruyor: `#go` "Video üret" yazarken `runArena` GÖRSEL
+    modelleriyle `/api/generate`e gidiyordu.
+
+    Kapı ÇIKIŞ YOLUNU da söylemek zorunda: kapatma denetimi bu modda görünmüyor.
+    """
+    dal = _govde(_kodsuz(_core()), "goBlockReason")
+    video = dal[dal.index('currentMode === "video"'):]
+    video = video[:video.index('if (!imageModels.length)')]
+    assert "arenaAcik" in video, "video dalı arenayı hiç sormuyor"
+    assert "Görsel moduna" in video, "kullanıcıya çıkış yolu söylenmiyor"
+
+
+def test_the_director_can_target_the_VIDEO_mode():
+    """Yönetmenin hedef tablosu video ekseninin adını taşımalı ve süre ekseni
+    uygulanabilir alanlar arasında olmalı.
+
+    İkisinden biri eksikse yönetmen video prompt'u yazar ama uygulama onu
+    görsel moduna aktarır (ya da süreyi düşürür) — telde 422.
+    """
+    js = _kodsuz(_chat())
+    tablo = re.search(r"const HEDEF_MODLAR = \{(.*?)\n\};", js, re.S)
+    assert tablo, "HEDEF_MODLAR bulunamadı"
+    assert 'video: { eksen: "video"' in tablo.group(1)
+    hedefler = re.search(r"const SETTING_TARGETS = \[(.*?)\];", js, re.S)
+    assert hedefler and '"duration"' in hedefler.group(1), (
+        "süre ekseni uygulanabilir alanlar arasında değil")
 
 
 def test_the_EXTRA_REFERENCE_strip_is_a_REMOVAL_surface_in_video_mode():

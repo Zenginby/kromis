@@ -23,7 +23,7 @@ flowchart TD
     n_netguard["netguard<br/>157 satır"]
   end
   subgraph katman6["katman 6"]
-    n_app["app<br/>2104 satır"]
+    n_app["app<br/>2155 satır"]
   end
   subgraph katman5["katman 5"]
     n_chat_providers["chat_providers<br/>124 satır"]
@@ -35,7 +35,7 @@ flowchart TD
     n_azure_flux_client["azure_flux_client<br/>292 satır"]
     n_azure_mai_client["azure_mai_client<br/>290 satır"]
     n_backup["backup<br/>187 satır"]
-    n_chat_client["chat_client<br/>182 satır"]
+    n_chat_client["chat_client<br/>188 satır"]
     n_gemini_client["gemini_client<br/>293 satır"]
     n_openai_client["openai_client<br/>215 satır"]
     n_prefs["prefs<br/>219 satır"]
@@ -45,12 +45,12 @@ flowchart TD
   subgraph katman2["katman 2"]
     n_credstore["credstore<br/>194 satır"]
     n_folders["folders<br/>248 satır"]
-    n_models["models<br/>927 satır"]
+    n_models["models<br/>1020 satır"]
   end
   subgraph katman1["katman 1"]
     n_assets_store["assets_store<br/>201 satır"]
     n_azure_client["azure_client<br/>458 satır"]
-    n_chat_prompt["chat_prompt<br/>172 satır"]
+    n_chat_prompt["chat_prompt<br/>358 satır"]
     n_chat_store["chat_store<br/>253 satır"]
     n_color_names["color_names<br/>418 satır"]
     n_guncelleme["guncelleme<br/>219 satır"]
@@ -63,7 +63,7 @@ flowchart TD
     n_errlog["errlog<br/>114 satır"]
     n_jsonstore["jsonstore<br/>80 satır"]
     n_palette["palette<br/>327 satır"]
-    n_paths["paths<br/>167 satır"]
+    n_paths["paths<br/>180 satır"]
     n_release_manifest["release_manifest<br/>70 satır"]
     n_screencolor["screencolor<br/>150 satır"]
     n_version["version<br/>27 satır"]
@@ -190,15 +190,15 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | modül | satır | katman | ithal ettiği | ithal eden | test |
 | --- | --- | --- | --- | --- | --- |
 | `android_main.py` | 194 | 9 | `app` (erteli), `desktop` (erteli), `errlog` (erteli), `paths` (erteli) | 0 | 1 |
-| `app.py` | 2104 | 6 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 30 |
+| `app.py` | 2155 | 6 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 30 |
 | `assets_store.py` | 201 | 1 | `jsonstore` | 3 | 9 |
 | `azure_client.py` | 458 | 1 | `paths`, `winsec` | 12 | 29 |
 | `azure_flux_client.py` | 292 | 3 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `azure_mai_client.py` | 290 | 3 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `backup.py` | 187 | 3 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 1 | 1 |
-| `catalog.py` | 1296 | 0 | — | 13 | 25 |
-| `chat_client.py` | 182 | 3 | `azure_client`, `chat_prompt`, `models` | 3 | 3 |
-| `chat_prompt.py` | 172 | 1 | `paths` | 3 | 1 |
+| `catalog.py` | 1296 | 0 | — | 13 | 26 |
+| `chat_client.py` | 188 | 3 | `azure_client`, `chat_prompt`, `models` | 3 | 3 |
+| `chat_prompt.py` | 358 | 1 | `paths` | 3 | 1 |
 | `chat_providers.py` | 124 | 5 | `azure_client`, `catalog`, `chat_client`, `credstore`, `openai_chat` | 1 | 2 |
 | `chat_store.py` | 253 | 1 | `jsonstore` | 2 | 2 |
 | `color_names.py` | 418 | 1 | `palette` | 1 | 3 |
@@ -210,13 +210,13 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `gemini_client.py` | 293 | 3 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `guncelleme.py` | 219 | 1 | `errlog`, `jsonstore`, `paths`, `version` | 1 | 2 |
 | `jsonstore.py` | 80 | 0 | — | 8 | 1 |
-| `models.py` | 927 | 2 | `azure_client`, `catalog`, `palette` | 3 | 13 |
+| `models.py` | 1020 | 2 | `azure_client`, `catalog`, `palette` | 3 | 13 |
 | `netguard.py` | 157 | 7 | `app` (erteli) | 1 | 1 |
 | `openai_chat.py` | 179 | 4 | `azure_client`, `catalog`, `chat_client`, `chat_prompt`, `credstore`, `providers` | 1 | 3 |
 | `openai_client.py` | 215 | 3 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `palette.py` | 327 | 0 | — | 3 | 3 |
 | `palette_store.py` | 93 | 1 | `jsonstore` | 3 | 3 |
-| `paths.py` | 167 | 0 | — | 6 | 3 |
+| `paths.py` | 180 | 0 | — | 6 | 3 |
 | `prefs.py` | 219 | 3 | `catalog`, `jsonstore`, `models` | 1 | 4 |
 | `providers.py` | 472 | 3 | `azure_client`, `catalog`, `credstore`, `azure_flux_client` (erteli), `azure_mai_client` (erteli), `gemini_client` (erteli), `openai_client` (erteli), `veo_client` (erteli) | 7 | 7 |
 | `release_manifest.py` | 70 | 0 | — | 0 | 2 |

@@ -257,6 +257,7 @@ jobs:
           assets/resources/static/mobile.js
           assets/resources/static/fonts/dm-sans-v17-latin.woff2
           assets/resources/bundled/prompts/prompt-yonetmeni.md
+          assets/resources/bundled/prompts/prompt-yonetmeni-video.md
           "
           EKSIK=""
           for f in $BEKLENENLER; do

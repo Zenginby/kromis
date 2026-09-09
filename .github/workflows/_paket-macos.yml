@@ -81,7 +81,8 @@ jobs:
                    static/fonts.css static/mobile.css static/mobile.js \
                    static/fonts/dm-sans-v17-latin.woff2 \
                    static/fonts/dm-sans-v17-latin-ext.woff2 \
-                   bundled/prompts/prompt-yonetmeni.md; do
+                   bundled/prompts/prompt-yonetmeni.md \
+                   bundled/prompts/prompt-yonetmeni-video.md; do
             test -f "$APP/Contents/Resources/$f" || { echo "EKSİK: $f"; exit 1; }
           done
           # Info.plist'teki sürüm version.py ile aynı mı? Spec sürümü SPECPATH +

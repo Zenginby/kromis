@@ -166,9 +166,17 @@ def test_chat_deployment_is_not_written_when_the_credentials_are_rejected(client
 
 
 def test_settings_expose_where_the_instructions_file_can_be_overridden(client):
-    """Ezme yolu keşfedilebilir olmalı: yoksa özellik var ama kimse bulamaz."""
+    """Ezme yolu keşfedilebilir olmalı: yoksa özellik var ama kimse bulamaz.
+
+    İKİ yol var çünkü video bölümü ayrı bir dosya (sistem mesajına yalnız video
+    modeli yapılandırılmışken giriyor). İkincisi panele yazılmazsa video
+    personasını özelleştirmek isteyen kullanıcı dosyanın ADINI hiçbir yerde
+    göremez — birincinin var olma gerekçesinin aynısı.
+    """
     body = client.get("/api/settings").json()
     assert body["chat_instructions_path"].endswith("chat-instructions.md")
+    assert body["chat_video_instructions_path"].endswith(
+        "chat-instructions-video.md")
 
 
 def test_settings_never_leak_a_hand_written_chat_api_key(client, tmp_path, monkeypatch):

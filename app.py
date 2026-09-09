@@ -45,13 +45,14 @@ import prefs
 import storage
 import version
 from models import (MAX_CHAT_TITLE_CHARS, MAX_IMAGES_PER_RUN, MAX_PROMPT_CHARS,
-                    WIRE_CHAT_ROLES, WIRE_MESSAGE_FIELDS, ArenaWinnerRequest,
+                    ArenaWinnerRequest,
                     BannerRequest, BulkImagesRequest, BulkMoveRequest,
                     ChatRequest, ChatSaveRequest, FolderRequest, GenerateRequest,
                     LogoRequest, MoveImageRequest, PrefsRequest,
                     SavePaletteRequest, SettingsRequest, SuggestRequest,
                     VideoRequest, check_capabilities,
-                    check_drop_indices, check_video_capabilities)
+                    check_drop_indices, check_video_capabilities,
+                    wire_messages)
 
 BASE_DIR = paths.REPO_DIR                    # geriye uyum: mevcut kullanımlar bozulmasın
 OUTPUT_DIR = paths.output_dir()
@@ -1056,7 +1057,10 @@ def get_settings() -> dict:
     yalnızca Info.plist'te vardı ve arayüz onu hiç göstermiyordu.
 
     `chat_instructions_path` da burada birleşiyor: talimatı ezme özelliği
-    keşfedilebilir olmasa var olmakla olmamak arasında bir fark kalmaz.
+    keşfedilebilir olmasa var olmakla olmamak arasında bir fark kalmaz. Video
+    bölümünün ezmesi AYRI bir yol ve o da burada, aynı gerekçeyle: iki dosya
+    ayrı çünkü video talimatı sistem mesajına yalnız video modeli
+    yapılandırılmışsa giriyor (bkz. chat_prompt.build_system).
 
     `guncelleme` de burada: kullanılan sürümün YANINDA durması gerekiyor, çünkü
     kullanıcının sorduğu şey "hangi sürümdeyim" değil "güncel miyim". Ayrı bir
@@ -1071,7 +1075,9 @@ def get_settings() -> dict:
             "version": version.APP_VERSION,
             "guncelleme": guncelleme.bilgi(
                 OUTPUT_DIR, izin=prefs.read(OUTPUT_DIR)["guncelleme_kontrolu"]),
-            "chat_instructions_path": paths.chat_instructions_override()}
+            "chat_instructions_path": paths.chat_instructions_override(),
+            "chat_video_instructions_path":
+                paths.chat_video_instructions_override()}
 
 
 @app.post("/api/settings")
@@ -1207,8 +1213,33 @@ def post_settings(req: SettingsRequest) -> dict:
 
 
 
+def _model_facts(m: catalog.ImageModel) -> dict:
+    """Yönetmene giden model olguları — İKİ okuyanın ortak sözlüğü.
+
+    Satır içi bir sözlükken yalnız bağlam bloğu okuyordu; model menüsü açılınca
+    ikinci okuyan geldi ve elle yazılmış iki kopya kaçınılmaz olarak ayrışırdı
+    (bağlam bloğuna bir eksen eklenip menüye eklenmemesi, yönetmenin seçili
+    modelde bildiği bir şeyi öteki modellerde bilmemesi demek olurdu).
+    Çıkarma, `_model_payload`ın "ÇIKARILDI, kopyalanmadı" gerekçesinin aynısı.
+
+    `_model_payload` BURADA KULLANILAMAZ ve bu bir tembellik değil: o sözlük
+    arayüzün sözleşmesi (etiket/değer çiftleri, logo adresi, `credits_by_quality`,
+    `short_label`) ve sistem mesajına girdiğinde HER TURDA ödenen ölü karakter
+    olurdu — bu yüzeyde prompt caching yok.
+
+    `id` alanı ZORUNLU ve yeni: yönetmen artık model ÖNERİYOR, ön yüz de
+    önerilen id'yi uyguluyor. Onsuz menü okunabilir ama işe yaramaz olurdu.
+    """
+    return {"id": m.id, "label": m.label, "kind": m.kind,
+            "sizes": m.sizes, "qualities": m.qualities,
+            "quality_hidden": m.quality_hidden, "max_n": m.max_n,
+            "supports_edit": m.supports_edit, "max_refs": m.max_refs,
+            "durations": m.durations, "supports_last_frame": m.supports_last_frame,
+            "credits": m.credits}
+
+
 def _director_context() -> dict:
-    """Yönetmenin sistem mesajına giren TUR bağlamı: seçili model + yönlendirme.
+    """Yönetmenin sistem mesajına giren TUR bağlamı: seçili model + menü + yönlendirme.
 
     Bağlamı burada toplamanın sebebi katman kuralı: `chat_prompt` yalnızca
     diski okuyor (katman 1, tek bağımlılığı `paths`) ve `catalog`/`prefs`'e
@@ -1226,15 +1257,36 @@ def _director_context() -> dict:
     Bilinmeyen/bayat bir tercih sessizce bağlamsız kalıyor — `prefs.read`
     katalog üyeliğini zaten kapıyor, ama `image_model` yine None dönebilir ve
     o durumda doğru davranış bugünkü davranıştır: bağlamsız persona.
+
+    MENÜ (`available_models`) seçili modelin YANINDA duruyor, onun yerine
+    değil: bağlam bloğu "bu turda hangi jetonlar geçerli" sorusunu, menü
+    "hangi modele GEÇİLEBİLİR" sorusunu cevaplıyor ve ikisi farklı sorular.
+
+    Süzgeç `_model_available`, ikinci bir "eksik mi" mantığı DEĞİL: arayüzün
+    gösterdiği küme ile yönetmenin gördüğü küme ayrışsaydı yönetmen
+    kullanıcının ekranında olmayan bir modeli önerirdi — o fonksiyonun var
+    olma gerekçesi tam olarak bu ikiliği önlemek. `credstore.configured_map()`
+    de altı kimliği BİR kez çözüyor; model başına `providers.is_configured`
+    çağırmak aynı dosyayı on üç kez okumak olurdu.
+
+    `selected` `_model_facts`in İÇİNDE değil çünkü o bir MODEL olgusu değil bu
+    TURUN olgusu — aynı sözlüğün iki bağlamda kullanılabilmesinin şartı bu
+    ayrım. İki tercih birden işaretleniyor: video modu Yönetmen'e kapalı
+    olmadığı için kullanıcının video seçimi de "seçili" sayılmalı.
     """
     p = prefs.read(OUTPUT_DIR)
     m = catalog.image_model(p["image_model"])
-    facts = None
-    if m is not None:
-        facts = {"label": m.label, "sizes": m.sizes, "qualities": m.qualities,
-                 "quality_hidden": m.quality_hidden, "max_n": m.max_n,
-                 "supports_edit": m.supports_edit, "max_refs": m.max_refs}
-    return {"model_facts": facts, "guidance": p["director_guidance"]}
+    cfg = credstore.configured_map()
+    secili = {p["image_model"], p["video_model"]}
+    # GÖRSEL + VİDEO tek listede: `catalog.video_model`in "birleşik arama YOK"
+    # kuralı id ile ARAMA hakkında (yanlış türü doğru sanan bir çağıranı
+    # sessizce geçirirdi); burada arama değil sıralı gösterim var ve tür her
+    # satırda `kind` alanıyla açıkça taşınıyor.
+    menu = [{**_model_facts(x), "selected": x.id in secili}
+            for x in catalog.IMAGE_MODELS + catalog.VIDEO_MODELS
+            if _model_available(cfg.get(x.credential, False), x.plan)]
+    return {"model_facts": _model_facts(m) if m is not None else None,
+            "guidance": p["director_guidance"], "available_models": menu}
 
 
 @app.post("/api/chat")
@@ -1252,15 +1304,15 @@ def chat(req: ChatRequest) -> dict:
     kullanıcının "bunu sakla" demesi aynı şey değil; ayrımı
     tests/test_chat_route.py mekanik olarak koruyor.
 
-    Dump ALLOWLIST ile: `ChatMessage.display` yalnızca arayüzün çizdiği etikettir
-    ve Azure onu bilmiyor — çıplak `model_dump()` onu tel üzerine koyar ve istek
-    400 döner. Süzgeç `chat_client.build_payload`'ta da var (gerçek tel sınırı
-    orası); burada olması isteğin hiç oraya kadar gitmemesini sağlıyor.
+    Tel mesajlarını `models.wire_messages` kuruyor ve o bir SÜZGEÇ DEĞİL
+    ÇEVİRMEN: `display` gibi arayüz alanlarını allowlist'le dışarıda tutmaya
+    devam ediyor (çıplak `model_dump()` onları tele koyar ve istek 400 döner),
+    ama `result` kayıtlarını artık DÜŞÜRMÜYOR — kısa bir nota çeviriyor, çünkü
+    yönetmenin ne ürettiğini bilmesi gerekiyor.
 
-    ROL süzgeci de aynı çift kapıdan geçiyor (v2.0): birleşik döküm `result`
-    kayıtlarını konuşmanın içinde tutuyor, Azure ise yalnız `user`/`assistant`
-    biliyor. Alan allowlist'i onları tek başına çıkaramaz — `{"role": "result"}`
-    geride kalır ve istek 400 döner.
+    `chat_client.build_payload`'ın kendi rol/alan süzgeci YERİNDE DURUYOR ve
+    gövdesine dokunulmadı: o telin gerçek sınırı, yani son savunma. Çevirmen
+    bir gün yeni bir rolü çevirmeyi unutursa istek yine 400 almasın diye.
 
     ÇAĞRI ARTIK SEVK MEMURUNDAN geçiyor (`chat_providers`), doğrudan
     `chat_client`'tan değil: yönetmen üç sağlayıcı konuşabiliyor ve hangisinin
@@ -1304,8 +1356,7 @@ def chat(req: ChatRequest) -> dict:
             raise cc.ChatError(f"Prompt Yönetmeni talimatı yüklenemedi: {e}")
         return chat_providers.complete(
             req.model or catalog.DEFAULT_CHAT_MODEL,
-            [m.model_dump(include=WIRE_MESSAGE_FIELDS)
-             for m in req.messages if m.role in WIRE_CHAT_ROLES],
+            wire_messages(req.messages),
             instructions=instructions)
     except cc.ChatError as e:
         raise HTTPException(status_code=502, detail=str(e))

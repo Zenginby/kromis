@@ -240,6 +240,18 @@
             <span id="media-sort-label">Tarih</span>
           </button>
 
+          <!-- Medya tür süzgeci: dışlayıcı segmentli denetim -->
+          <div id="kind-seg" class="sizeseg kindseg" role="group" aria-label="Medya türü">
+            <button type="button" data-kind=""         aria-pressed="true">Tümü</button>
+            <button type="button" data-kind="image"    aria-pressed="false">Görsel</button>
+            <button type="button" data-kind="video"    aria-pressed="false">Video</button>
+            <!-- .crossing: "Yüklenen" bir BÖLME değil kesişen süzgeç — Görsel+Video
+                 zaten Tümü'yü tüketiyor, bu düğme Görsel'in İÇİNDEN geçiyor. Ayıraç
+                 bunu gözle söylüyor; .picker-nav-item.crossing'in aynı gerekçesi. -->
+            <button type="button" data-kind="imported" aria-pressed="false"
+                    class="crossing">Yüklenen</button>
+          </div>
+
           <!-- Izgara boyutu: kutucuk ölçüsünü CSS'teki --tile üzerinden
                değiştiriyor. JS'ten grid-template-columns yazmak duyarlılık
                kurallarını (1024×700) sessizce ezerdi. -->

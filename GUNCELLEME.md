@@ -155,6 +155,12 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.16.0 — ne değişti
+
+- tur suzgeci -- tumu, gorsel, video, yuklenen
+
+---
+
 ## Sürüm 0.15.0 — ne değişti
 
 - asgari Python 3.13 -- 45 sebepsiz kirmizinin gercek sebebi

@@ -155,6 +155,12 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve Kurum'ya 
 
 ---
 
+## Sürüm 0.17.0 — ne değişti
+
+- video prompt'u, uretim hafizasi ve model-farkindalikli yonlendirme
+
+---
+
 ## Sürüm 0.16.0 — ne değişti
 
 - tur suzgeci -- tumu, gorsel, video, yuklenen

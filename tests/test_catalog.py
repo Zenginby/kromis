@@ -661,3 +661,48 @@ def test_FLUX_pro_nun_kalite_ekseni_GIZLI_flex_in_GERCEK():
     # sessizce tabana düşer ve seçicideki karşılaştırma yalan söyler.
     assert set(dict(flex.credits_by_quality)) == set(flex.qualities)
     assert catalog.default_quality_of(flex) == "dengeli"
+
+
+# ── `note` sözleşmesi ──────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("m", catalog.IMAGE_MODELS, ids=lambda m: m.id)
+def test_her_gorsel_modelinin_notu_NE_ZAMAN_SECILIR_i_cevapliyor(m):
+    """`note` seçicide model adının ALTINA yazılıyor (static/core.js) ve tek
+    işi şu soruyu cevaplamak: "ne zaman bunu seçerim?".
+
+    Boş bir not o satırı adı tekrar eden bir başlığa indiriyor. Uzunluk üst
+    sınırı da gerçek: 360px'lik bir yüzeyde iki satırı aşan not kaydırma
+    üretiyor ve komşu satırların hizasını bozuyor.
+    """
+    assert m.note, f"{m.id}: not yok — seçicideki satır sebepsiz kalıyor"
+    assert 20 <= len(m.note) <= 110, (
+        f"{m.id}: not {len(m.note)} karakter (beklenen 20-110)")
+    # Adı TEKRAR ETMİYOR: etiket zaten satırın kendisi.
+    assert m.label.lower() not in m.note.lower(), (
+        f"{m.id}: not etiketi tekrar ediyor")
+
+
+def test_her_ONIZLEME_modelinin_notu_bunu_SOYLUYOR():
+    """MAI ailesinin üçü de önizleme: ad ya da sözleşme haber vermeden
+    değişebilir. `openai-gpt-image-1`in duruşu benimseniyor — notta yazılı,
+    kalkınca girdi silinir. Yazılmazsa kullanıcı kararlı bir model sanır.
+    """
+    for m in catalog.IMAGE_MODELS:
+        if m.provider == "azure-mai":
+            assert "Önizleme" in m.note, f"{m.id}: önizleme uyarısı yok"
+
+
+def test_hicbir_not_uygulamanin_YAPMADIGI_bir_seyi_vaat_etmiyor():
+    """FLUX 8/10 referans alabiliyor ama ilk tur `app.MAX_EDIT_IMAGES` (4)
+    tavanında kalıyor ve `max_n=1`. Seçicide "8 referans" yazmak, uygulamanın
+    yapmadığı bir şeyi vaat etmek olurdu — bu deponun yasakladığı sessiz
+    sapmanın kendisi. Sayı bir gün yükselirse önce bu test kırmızıya döner.
+    """
+    import app as appmod
+
+    for m in catalog.IMAGE_MODELS:
+        for sayi in ("8 referans", "10 referans"):
+            assert sayi not in m.note, (
+                f"{m.id}: not {sayi} vaat ediyor, tavan "
+                f"{min(m.max_refs, appmod.MAX_EDIT_IMAGES)}")

@@ -69,6 +69,7 @@
         "tests/test_assets_route.py",
         "tests/test_backup.py",
         "tests/test_banner.py",
+        "tests/test_catalog.py",
         "tests/test_chat_route.py",
         "tests/test_chats_route.py",
         "tests/test_delete_route.py",
@@ -257,7 +258,7 @@
         "veo_client"
       ],
       "katman": 0,
-      "satir": 1282,
+      "satir": 1293,
       "testler": [
         "tests/test_arena.py",
         "tests/test_arena_onyuz.py",

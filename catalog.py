@@ -407,6 +407,13 @@ FLUX_SIZES: tuple[str, ...] = ("1024x1024", "1024x1536", "1536x1024")
 # Pro 1K/2K ≈ 0,134 USD → 27, 4K ≈ 0,24 USD → 48). Böylece seçicideki kredi
 # etiketi kullanıcıya GERÇEK bir karşılaştırma veriyor: "27 kredi" gerçekten
 # "8 kredi"nin üç katı kadar pahalı.
+#
+# `note` SEÇİCİDE model adının ALTINA yazılıyor (static/core.js) ve tek işi
+# şu soruyu cevaplamak: "ne zaman bunu seçerim?". Bu yüzden notlar bir yetenek
+# listesi DEĞİL, bir KARAR cümlesi — ve UYGULAMANIN YAPMADIĞI bir şeyi vaat
+# etmiyorlar: FLUX 8/10 referans alabiliyor ama ilk tur `app.MAX_EDIT_IMAGES`
+# (4) tavanında kalıyor, o yüzden hiçbir not o sayıları yazmıyor. Mandal:
+# tests/test_catalog.py'nin `note` sözleşmesi bloğu.
 
 DEFAULT_IMAGE_MODEL = "azure-gpt-image-2"
 
@@ -448,7 +455,8 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=8,
         credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
-        note="Metin ve düzenlemede en güçlü. Uygulamanın varsayılanı.",
+        note="Metin, tabela ve çok referanslı düzenlemede en güçlü; "
+             "uygulamanın varsayılanı.",
     ),
     # OpenAI DOĞRUDAN (Azure üzerinden değil). Tel formatı Azure'ın aynısı, o
     # yüzden adaptör onun bilinçli ikizi (bkz. openai_client.py'nin başlığı).
@@ -496,7 +504,8 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=8,
         credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
-        note="Azure'daki modelin aynısı, kendi OpenAI anahtarınla.",
+        note="Azure'daki modelin aynısı, kendi anahtarınla — kurumsal "
+             "kaynağın yoksa bunu seç.",
     ),
     # KATALOGDA KALIYOR ama ÖMÜRLÜ: 23 Ekim 2026'da OpenAI API'sinden kalkıyor.
     # Bugün çalışıyor ve anahtarı yalnız bu modele erişen hesaplar var, o yüzden
@@ -518,7 +527,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=8,
         credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
-        note="23 Ekim 2026'da API'den kalkıyor — gpt-image-2'ye geç.",
+        note="Seçmeyin: 23 Ekim 2026'da API'den kalkıyor. gpt-image-2'ye geç.",
     ),
     # ── Gemini · Nano Banana ────────────────────────────────────────────
     #
@@ -569,7 +578,8 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=6,
         credits_by_quality=(("1K", 6), ("2K", 6), ("4K", 12)),
-        note="Oran seçiliyor (piksel değil). Hızlı ve ucuz; düzenleme yapıyor.",
+        note="En hızlı ve en ucuz tur; oran seçiliyor (piksel değil). "
+             "Taslak için.",
     ),
     ImageModel(
         id="gemini-nano-banana-pro",
@@ -587,7 +597,8 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=27,
         credits_by_quality=(("1K", 27), ("2K", 27), ("4K", 48)),
-        note="Metin ve marka tutarlılığında en güçlü Gemini; pahalı.",
+        note="Marka tutarlılığı ve uzun metin yerleşimi; pahalı ama en "
+             "sadık.",
     ),
     # ── Azure AI Foundry · MAI-Image (Microsoft) ────────────────────────
     #

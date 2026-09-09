@@ -155,6 +155,12 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve teknik de
 
 ---
 
+## Sürüm 0.17.2 — ne değişti
+
+- Küçük düzeltmeler ve iyileştirmeler.
+
+---
+
 ## Sürüm 0.17.1 — ne değişti
 
 - windows simgesi ve favicon icin coklu cozunurluk destegi

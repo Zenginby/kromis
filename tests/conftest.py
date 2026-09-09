@@ -19,10 +19,14 @@ TARİHÇE: burada İKİNCİ bir guard vardı — `seed.seed_builtin_logos` paket
 KURUM logolarını kullanıcı kütüphanesine kopyalıyor ve `.logos-seeded`'i repo
 kökünde bırakıyordu. Uygulama marka-nötr olunca seed.py tümüyle kaldırıldı, o
 guard da onunla birlikte gitti.
+
+Aşağıdaki `pytest_configure` bir fixture DEĞİL: takım koşmadan önce
+yorumlayıcının ön koşulunu (`os.fchmod`) bir kez sınıyor. Gerekçesi orada.
 """
 from __future__ import annotations
 
 import os
+import sys
 
 import pytest
 
@@ -30,6 +34,78 @@ import backup as backup_module
 import paths as paths_module
 
 _UNGUARDED_BACKUP_FILENAME = "test_backup.py"
+
+# Bu deponun ASGARİ Python sürümü — TEK tanım. README'nin "Gereksinimler"
+# başlığı, requirements-dev.txt'in girişi ve CI'daki `python-version` pinleri
+# buna göre sınanıyor (tests/test_python_surumu.py). Yani bu sayıyı değiştirmek
+# tek bir yeri değil, o testin gösterdiği HER yeri değiştirmek demek.
+ASGARI_PYTHON = (3, 13)
+
+# Kapıyı bilerek atlamanın yolu; mesajın kendi içinde de yazılı.
+ESKI_PYTHON_IZNI = "GIS_ALLOW_OLD_PYTHON"
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """`os.fchmod` yoksa takımı HİÇ başlatmaz; tek ve okunur bir hata verir.
+
+    NEDEN VAR (2026-09-08): Windows + Python 3.12.10'da ölçüldü — takım
+    "45 failed, 2142 passed" veriyor ve 45'inin de TEK sebebi
+    azure_client.py:262'deki `os.fchmod`. Kimlik dosyası YAZAN her yol aynı
+    satırdan geçtiği için kırmızı üç dosyaya birden yayılıyor (test_credstore
+    12, test_settings 9, test_settings_route 24) ve hiçbiri sebebi söylemiyor:
+    `AttributeError: module 'os' has no attribute 'fchmod'`. Üstelik sinyal
+    YANLIŞTI — README "Python 3.10+" yazıyordu; geliştirici belgeye UYDUĞU için
+    bu duvara çarpıyordu.
+
+    NEDEN 3.13: `os.fchmod` CPython'un Windows yapısına o sürümde eklendi
+    (belge: "Changed in version 3.13: Added support on Windows"). 3.12'de
+    yedek bir yol da YOK — `os.chmod` orada dosya tanıtıcısı kabul etmiyor
+    (aynı makinede ölçüldü: `os.chmod in os.supports_fd` → False).
+
+    NEDEN DURDURMAK, uyarmak DEĞİL: 45 sebepsiz kırmızının içinde GERÇEK bir
+    gerileme görünmez olur. winsec.py'deki ilkenin öteki yüzü — orada
+    "testlerin yeşil olduğu bir yalan"dan kaçınılıyor; sebepsiz kırmızı da
+    kapıyı aynı biçimde işlevsizleştirir. Bir kez söyle ve dur.
+
+    NEDEN `hasattr(os, "fchmod")`, sürüm KARŞILAŞTIRMASI DEĞİL: sınanan şey
+    yorumlayıcının NUMARASI değil, eksik olan YETENEK. POSIX'te `fchmod` 3.13
+    öncesinde de var ve orada takımı durdurmanın hiçbir sebebi yok — kapı bu
+    yüzden yalnızca gerçekten kırılan yerde kapanıyor. `winsec.is_supported()`
+    ile aynı disiplin.
+
+    NEDEN Türkçe metin: depo geleneği — ama ÖLÇÜLDÜ: cp1252 konsola boru ile
+    yazıldığında pytest `backslashreplace` uyguluyor, yani harfler `\\u0131`
+    kaçışlarına düşer ama UnicodeEncodeError ÇIKMIYOR
+    (test_encoding_contract'ın Faz 5 dersi). Eyleme dönük kısımlar — sürümler,
+    komutlar, ortam değişkeni — bu yüzden ASCII bırakıldı: kodlama ne olursa
+    olsun onlar okunur kalıyor.
+    """
+    if hasattr(os, "fchmod"):
+        return
+    if os.environ.get(ESKI_PYTHON_IZNI) == "1":
+        return  # bilinçli atlama: yukarıda sayılan 45 test yine düşecek
+
+    asgari = ".".join(str(parca) for parca in ASGARI_PYTHON)
+    bulunan = ".".join(str(parca) for parca in sys.version_info[:3])
+    raise pytest.UsageError(
+        f"Bu depo Python {asgari}+ ISTIYOR - bulunan: {bulunan} ({sys.platform})."
+        "\n\n"
+        "NEDEN: azure_client._atomic_write, kimlik dosyasini yazmadan ONCE "
+        "izinleri sikilastirmak icin `os.fchmod(fd, 0o600)` cagiriyor ve bu "
+        "cagri CPython'un Windows yapisina ancak 3.13'te eklendi. Bu "
+        "yorumlayicida kimlik YAZAN her test \"AttributeError: module 'os' has "
+        "no attribute 'fchmod'\" ile duser (olculdu: 45 test) - kusur SENIN "
+        "degisikliginde degil, yorumlayicida."
+        "\n\n"
+        "COZUM: 3.13 ya da ustunu kur (CI ve paketler 3.14 kullaniyor) ve "
+        ".venv'i onunla yeniden yarat:\n"
+        "    py -3.13 -m venv .venv\n"
+        "    .venv\\Scripts\\python -m pip install -r requirements.txt "
+        "-r requirements-dev.txt"
+        "\n\n"
+        "Kimlige dokunmayan testleri bu yorumlayicida yine de kosmak icin: "
+        f"{ESKI_PYTHON_IZNI}=1 (o 45 test yine duser)."
+    )
 
 
 @pytest.fixture(autouse=True)

@@ -1,6 +1,8 @@
 {
   "dongular": [
     [
+      "azure_flux_client",
+      "azure_mai_client",
       "gemini_client",
       "openai_client",
       "providers",
@@ -129,6 +131,8 @@
       ],
       "ithal_eden": [
         "app",
+        "azure_flux_client",
+        "azure_mai_client",
         "chat_client",
         "chat_providers",
         "credstore",
@@ -147,6 +151,8 @@
         "tests/test_azure_client.py",
         "tests/test_azure_client_edit.py",
         "tests/test_azure_client_http.py",
+        "tests/test_azure_flux_client.py",
+        "tests/test_azure_mai_client.py",
         "tests/test_banner.py",
         "tests/test_catalog.py",
         "tests/test_chat_client.py",
@@ -171,6 +177,44 @@
         "tests/test_video_route.py"
       ],
       "yol": "azure_client.py"
+    },
+    {
+      "ad": "azure_flux_client",
+      "erteli_ithal": [],
+      "ithal": [
+        "azure_client",
+        "catalog",
+        "credstore",
+        "providers"
+      ],
+      "ithal_eden": [
+        "providers"
+      ],
+      "katman": 3,
+      "satir": 292,
+      "testler": [
+        "tests/test_azure_flux_client.py"
+      ],
+      "yol": "azure_flux_client.py"
+    },
+    {
+      "ad": "azure_mai_client",
+      "erteli_ithal": [],
+      "ithal": [
+        "azure_client",
+        "catalog",
+        "credstore",
+        "providers"
+      ],
+      "ithal_eden": [
+        "providers"
+      ],
+      "katman": 3,
+      "satir": 290,
+      "testler": [
+        "tests/test_azure_mai_client.py"
+      ],
+      "yol": "azure_mai_client.py"
     },
     {
       "ad": "backup",
@@ -199,6 +243,8 @@
       "ithal": [],
       "ithal_eden": [
         "app",
+        "azure_flux_client",
+        "azure_mai_client",
         "chat_providers",
         "credstore",
         "gemini_client",
@@ -211,10 +257,12 @@
         "veo_client"
       ],
       "katman": 0,
-      "satir": 1035,
+      "satir": 1296,
       "testler": [
         "tests/test_arena.py",
         "tests/test_arena_onyuz.py",
+        "tests/test_azure_flux_client.py",
+        "tests/test_azure_mai_client.py",
         "tests/test_catalog.py",
         "tests/test_chat_providers.py",
         "tests/test_chat_route.py",
@@ -359,6 +407,8 @@
       ],
       "ithal_eden": [
         "app",
+        "azure_flux_client",
+        "azure_mai_client",
         "chat_providers",
         "gemini_client",
         "openai_chat",
@@ -367,7 +417,7 @@
         "veo_client"
       ],
       "katman": 2,
-      "satir": 128,
+      "satir": 194,
       "testler": [
         "tests/test_credstore.py",
         "tests/test_playwright_studio.py",
@@ -513,7 +563,7 @@
         "prefs"
       ],
       "katman": 2,
-      "satir": 921,
+      "satir": 927,
       "testler": [
         "tests/test_catalog.py",
         "tests/test_chat_client.py",
@@ -672,6 +722,8 @@
     {
       "ad": "providers",
       "erteli_ithal": [
+        "azure_flux_client",
+        "azure_mai_client",
         "gemini_client",
         "openai_client",
         "veo_client"
@@ -683,14 +735,18 @@
       ],
       "ithal_eden": [
         "app",
+        "azure_flux_client",
+        "azure_mai_client",
         "gemini_client",
         "openai_chat",
         "openai_client",
         "veo_client"
       ],
       "katman": 3,
-      "satir": 389,
+      "satir": 472,
       "testler": [
+        "tests/test_azure_flux_client.py",
+        "tests/test_azure_mai_client.py",
         "tests/test_catalog.py",
         "tests/test_gemini_client.py",
         "tests/test_provider_logos.py",
@@ -909,7 +965,9 @@
     "tests/test_ci_sizinti.py",
     "tests/test_ci_varlik_saklama.py",
     "tests/test_encoding_contract.py",
-    "tests/test_paket_icerik_listesi.py"
+    "tests/test_paket_icerik_listesi.py",
+    "tests/test_python_surumu.py",
+    "tests/test_syntax_warnings.py"
   ],
   "onyuz": {
     "betikler": [
@@ -1005,7 +1063,7 @@
           "/api/settings"
         ],
         "dosya": "static/settings.js",
-        "satir": 448,
+        "satir": 456,
         "tanim": 11
       },
       {
@@ -1250,7 +1308,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 78,
+  "test_dosyasi_sayisi": 82,
   "uc_noktalar": [
     {
       "islev": "index",

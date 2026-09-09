@@ -295,6 +295,14 @@ async function saveSettings() {
       // grubun açık olduğuna göre dallanmasına gerek yok.
       body: JSON.stringify({ api_key, base_url,
                              chat_deployment: $("set-chat-deployment").value.trim(),
+                             // Adres alanı KOŞULSUZ gidiyor, gizli alanlarla
+                             // aynı gerekçeyle: sunucu "alan yok" ile "boş"
+                             // arasında ayrım yapıyor ve boş değer
+                             // `default_base_url`ü olmayan kimlikte
+                             // "dokunmadım" demek (app.post_settings). Yani
+                             // yazılmış bir Foundry adresi bir sonraki
+                             // kayıtta silinmiyor.
+                             azure_foundry_base_url: $("set-foundry-url").value.trim(),
                              openai_api_key: $("set-openai-key").value,
                              gemini_api_key: $("set-gemini-key").value }),
     });

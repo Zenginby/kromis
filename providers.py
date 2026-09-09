@@ -127,12 +127,39 @@ def _veo_adapter():
     return (veo_client.generate, veo_client.animate)
 
 
+def _mai_adapter():
+    """`_gemini_adapter`ın aynı gerekçesi: `azure_mai_client` bu modülü import
+    ediyor (`read_timeout_for`, `detail_of`, `is_content_policy` için), yani
+    modül düzeyinde import etmek DÖNGÜ olurdu. Düz `import` ifadesi, yalnız
+    fonksiyon içinde — PyInstaller'ın statik analizi onu da görüyor, yani
+    `hiddenimports=[]` korunuyor."""
+    import azure_mai_client
+    return (azure_mai_client.generate, azure_mai_client.edit)
+
+
+def _flux_adapter():
+    """`_mai_adapter`ın aynı gerekçesi: `azure_flux_client` bu modülü import
+    ediyor (`read_timeout_for` ve `detail_of` için), yani modül düzeyinde
+    import etmek DÖNGÜ olurdu. Düz `import` ifadesi, yalnız fonksiyon içinde —
+    PyInstaller'ın statik analizi onu da görüyor."""
+    import azure_flux_client
+    return (azure_flux_client.generate, azure_flux_client.edit)
+
+
 _ADAPTERS: dict[str, tuple] = {
     "azure": (_azure_generate, _azure_edit),
     # Değer bir ÇAĞRILABİLİR döndürücü olabiliyor (döngüyü kıran geç bağlama);
     # `_pair` ikisini de karşılıyor.
     "openai": _openai_adapter,
     "gemini": _gemini_adapter,
+    # Azure AI Foundry'nin İKİ AYRI teli, TEK anahtar altında: MAI ile FLUX
+    # aynı hostta ve aynı `api-key` ile çalışıyor ama gövdeleri, yolları ve
+    # hata şekilleri farklı. Tek bir `azure-foundry` anahtarı olsaydı iki tel
+    # formatı bir modülde yaşardı, hata eşlemesi bulanıklaşırdı ve
+    # `PROVIDER_LOGOS` tek anahtara düşerdi — oysa üretici GERÇEKTEN iki
+    # (Microsoft ve Black Forest Labs).
+    "azure-mai": _mai_adapter,
+    "azure-flux": _flux_adapter,
 }
 
 # provider → (generate_video, animate_video). Boş kalmayan tek anahtar bugün
@@ -216,6 +243,51 @@ def total_budget(m: catalog.ImageModel, n: int) -> float:
     return read_timeout_for(m, n) * tur
 
 
+# FLUX'un 422'si mesajı DEĞİL bir LİSTE taşıyor: `error.details[]` içinde
+# `{"loc": [...], "msg": "..."}` maddeleri. Mevcut hiçbir çözümleyici bunu
+# tanımıyordu ve `error.message` boş olduğu için BÜTÜN 422'ler çıplak bir
+# "HTTP 422"ya çöküyordu — yani kullanıcı hangi alanın yanlış olduğunu hiçbir
+# yerde okumuyordu. Tam olarak `detail_of`un Gemini'nin tek öğelik dizisi için
+# var olma sebebi, üçüncü bir şekilde.
+#
+# YALNIZ LİSTE OKUNUYOR: MAI'nin gövdesinde de `details` var ama o bir DİZE ve
+# mesaj zaten `error.message`da — o yolun baytları değişmiyor.
+#
+# ÜÇ MADDE TAVANI: doğrulayıcı onlarca madde döndürebiliyor ve hepsini tek
+# satıra dizmek kullanıcıya okunamayan bir duvar gösterirdi. Kesme SESSİZ
+# SAPMA değil çünkü ilk madde neredeyse her zaman asıl kusuru söylüyor;
+# tamamı zaten `errlog`da duruyor.
+_DETAIL_LIMIT = 3
+
+
+def _madde_metni(madde: dict) -> str:
+    """Tek bir `details[]` maddesini `"body.width: must be …"` biçimine indirir.
+
+    `msg` yoksa `message` deneniyor: iki ad da canlıda görülüyor ve hangisinin
+    geldiğine göre boş dönmek, sebebi hiç göstermemek olurdu.
+    """
+    loc = madde.get("loc")
+    yer = ".".join(str(p) for p in loc) if isinstance(loc, list) else ""
+    msg = str(madde.get("msg") or madde.get("message") or "")
+    if yer and msg:
+        return f"{yer}: {msg}"
+    return msg or yer
+
+
+def _details_metni(err: dict) -> str:
+    ayrintilar = err.get("details")
+    if not isinstance(ayrintilar, list):
+        return ""
+    parcalar = []
+    for madde in ayrintilar[:_DETAIL_LIMIT]:
+        if not isinstance(madde, dict):
+            continue
+        metin = _madde_metni(madde)
+        if metin:
+            parcalar.append(metin)
+    return "; ".join(parcalar)
+
+
 def detail_of(body: dict | list | None) -> str:
     """Sağlayıcı hata gövdesinden kullanıcıya gösterilebilir açıklama.
 
@@ -243,6 +315,11 @@ def detail_of(body: dict | list | None) -> str:
     ÇOK ÖĞELİ dizi BİLEREK açılmıyor: ilkini seçmek, geri kalanını sessizce
     yutmak olurdu. Azure ve OpenAI düz nesne döndürüyor, o yüzden onların yolu
     bayt bayt aynı kalıyor.
+
+    ÜÇÜNCÜ ŞEKİL — `error.details[]`: FLUX'un 422'si mesaj yerine bir LİSTE
+    döndürüyor ve o liste okunmazsa bütün 422'ler çıplak bir "HTTP 422"ya
+    çöküyor. Ayrıntı `_details_metni`de; Azure, OpenAI ve MAI'nin düz nesne
+    yolu bayt bayt aynı kalıyor (onların `details`i ya yok ya bir dize).
     """
     # `list` kapısı `dict` kapısından ÖNCE: aksi hâlde dizi zaten elenmiş olur.
     if isinstance(body, list) and len(body) == 1:
@@ -251,7 +328,13 @@ def detail_of(body: dict | list | None) -> str:
         return ""
     err = body.get("error")
     if isinstance(err, dict):
-        return str(err.get("message", ""))
+        mesaj = str(err.get("message", ""))
+        # Liste MESAJI EZMİYOR, TAMAMLIYOR: ikisi de dolu gelebiliyor ve
+        # mesajı düşürmek asıl cümleyi çöpe atmak olurdu.
+        ayrintilar = _details_metni(err)
+        if mesaj and ayrintilar:
+            return f"{mesaj} ({ayrintilar})"
+        return mesaj or ayrintilar
     if isinstance(err, str):
         return err
     return ""

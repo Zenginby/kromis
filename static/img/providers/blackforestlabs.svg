@@ -1,0 +1,20 @@
+<!-- Black Forest Labs (FLUX.2) · saglayici isareti.
+     KAYNAK YOK ve bu bilerek kaydediliyor: simple-icons ve iconify'da BFL
+     girdisi bulunmuyor, yani kardes dosyalardaki CC0 zinciri burada
+     kurulamiyor. Ureticinin tescilli isaretini elle yeniden cizmek yerine
+     SOYUT bir yer tutucu kullaniliyor (uc agac silueti, "black forest");
+     amaci yalnizca satirin hangi saglayiciya ait oldugunu ayirt ettirmek.
+     CC0 bir kaynak cikarsa dosya oldugu gibi degistirilebilir,
+     PROVIDER_LOGOS satiri ayni kalir.
+
+     TEK RENK ve renk DOSYADA sabit (fill), currentColor DEGIL: dosya <img> ile
+     yukleniyor ve <img> icerigi sayfanin rengini miras almaz. Sabit deger
+     tema katmanindaki fg (#e8eaed) ile ayni ve uygulamanin DORT temasi da
+     koyu, yani tek varyant hepsinde okunuyor. Bir gun acik tema gelirse dogru
+     yol mask-image + background: currentColor'a gecmek olur.
+
+     DIKKAT: bu yorumda cift tire (XML'de yasak) YOK, bu olcum sonucu. Ilk
+     yazimda "fg" token'i cift tireyle yaziliydi; dosya gecerli XML olmaktan
+     cikti, tarayici 200 alip HICBIR SEY cizmedi ve naturalWidth 0 kaldi.
+     Sessiz kusur tam olarak buydu (bkz. tests/test_provider_logos.py). -->
+<svg width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#e8eaed"><title>Black Forest Labs</title><path d="M6 3 1.5 13h9zM18 3l-4.5 10h9zM12 10 4.5 21h15z"/></svg>

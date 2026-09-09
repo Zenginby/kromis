@@ -127,3 +127,87 @@ def test_is_configured_resolve_ile_AYNI_karari_veriyor(env):
         else:
             beklenen = True
         assert credstore.is_configured(cred.id) is beklenen, cred.id
+
+
+# ── Azure AI Foundry (MAI + FLUX) ──────────────────────────────────────
+#
+# Bu bloğun ölçtüğü şey tek cümle: kullanıcıdan İKİNCİ bir anahtar ve İKİNCİ
+# bir adres istemeden MAI/FLUX'a ulaşılabilmeli — ama tanınmayan bir hostta
+# SESSİZCE yanlış bir adrese düşülmemeli.
+
+
+@pytest.mark.parametrize("gorsel_adresi, beklenen", [
+    ("https://ai-ornek-swedencentral.openai.azure.com/openai/v1/",
+     "https://ai-ornek-swedencentral.services.ai.azure.com"),
+    ("https://ai-ornek-swedencentral.cognitiveservices.azure.com/",
+     "https://ai-ornek-swedencentral.services.ai.azure.com"),
+    ("https://ai-ornek-swedencentral.services.ai.azure.com",
+     "https://ai-ornek-swedencentral.services.ai.azure.com"),
+])
+def test_foundry_adresi_TANINAN_hostlardan_turetiliyor(gorsel_adresi, beklenen):
+    """Türetme bir TABLO, dize ameliyatı DEĞİL.
+
+    `replace("openai", "services.ai")` gibi bir dokunuş kaynak adında "openai"
+    geçen her kurulumu bozardı (`my-openai-lab.openai.azure.com`). Tablo yalnız
+    tanınan SON EKİ çeviriyor ve kaynak adına hiç dokunmuyor.
+    """
+    assert credstore.derive_foundry_base_url(gorsel_adresi) == beklenen
+
+
+@pytest.mark.parametrize("gorsel_adresi", [
+    "https://vekil.sirket.local/azure/openai/v1/",
+    "https://openai.azure.com/openai/v1/",     # alt alan adı YOK
+    "ai-ornek.openai.azure.com/openai/v1/",      # şema YOK
+    "",
+])
+def test_TANINMAYAN_host_HIC_turetmiyor(gorsel_adresi):
+    """Sessiz düşme YOK: yanlış hosta atılan istek 404 döner ve sebebi
+    kullanıcının hiçbir yerde okumadığı bir şey olur."""
+    assert credstore.derive_foundry_base_url(gorsel_adresi) == ""
+
+
+def test_foundry_anahtari_GORSELIN_anahtarina_dusuyor(env):
+    """Sonda tek anahtarın üç yüzeyde de geçtiğini ölçtü (`azure_chat`in
+    ikizi). İkinci bir anahtar istemek, aynı değeri iki kez yazdırmak olurdu."""
+    ac.save_credentials("PAYLASILAN", "https://ai-ornek.openai.azure.com/openai/v1/")
+
+    key, url = credstore.resolve("azure_foundry")
+    assert key == "PAYLASILAN"
+    assert url == "https://ai-ornek.services.ai.azure.com"
+    assert credstore.is_configured("azure_foundry") is True
+
+
+def test_foundry_nun_KENDI_anahtari_gorseli_eziyor(env):
+    """Ayrı bir kaynak/anahtar kullanan kurulum forma alan eklemeden mümkün
+    olmalı (`azure_chat`in aynı davranışı)."""
+    ac.save_credentials("GORSEL", "https://ai-ornek.openai.azure.com/openai/v1/")
+    ac.save_env({"AZURE_FOUNDRY_API_KEY": "FOUNDRY"})
+
+    assert credstore.resolve("azure_foundry")[0] == "FOUNDRY"
+
+
+def test_ELLE_yazilan_foundry_adresi_turetmeyi_eziyor(env):
+    ac.save_credentials("K", "https://ai-ornek.openai.azure.com/openai/v1/")
+    ac.save_env({"AZURE_FOUNDRY_BASE_URL": "https://ozel.ornek/foundry"})
+
+    assert credstore.resolve("azure_foundry")[1] == "https://ozel.ornek/foundry"
+
+
+def test_TANINMAYAN_hostta_hata_ALAN_ADINI_soyluyor(env):
+    """Çıkışı olmayan bir hata olmamalı: mesaj hangi env değişkenini
+    doldurmak gerektiğini ADIYLA söylemeli."""
+    ac.save_credentials("K", "https://vekil.sirket.local/azure/openai/v1/")
+
+    with pytest.raises(ac.ImageError) as exc:
+        credstore.resolve("azure_foundry")
+
+    mesaj = str(exc.value)
+    assert "AZURE_FOUNDRY_BASE_URL" in mesaj
+    assert credstore.is_configured("azure_foundry") is False
+
+
+def test_anahtarsiz_kurulumda_foundry_KAPALI(env):
+    """Adres türetilse bile anahtar yoksa model seçilebilir olmamalı."""
+    ac.save_env({"AZURE_IMAGE_BASE_URL": "https://ai-ornek.openai.azure.com/openai/v1/"})
+
+    assert credstore.is_configured("azure_foundry") is False

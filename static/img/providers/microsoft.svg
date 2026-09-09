@@ -1,0 +1,22 @@
+<!-- Microsoft (MAI-Image) · saglayici isareti.
+     Kaynak: simple-icons · microsoft, lisans CC0-1.0. Marka adlari ve
+     isaretleri sahiplerinin tescilli markalaridir; burada YALNIZCA hangi
+     saglayicinin secili oldugunu gostermek icin kullaniliyor.
+
+     TEK RENK ve renk DOSYADA sabit (fill), currentColor DEGIL: dosya <img> ile
+     yukleniyor ve <img> icerigi sayfanin rengini miras almaz. Sabit deger
+     tema katmanindaki fg (#e8eaed) ile ayni ve uygulamanin DORT temasi da
+     koyu, yani tek varyant hepsinde okunuyor. Bir gun acik tema gelirse dogru
+     yol mask-image + background: currentColor'a gecmek olur.
+
+     DORT KARE TEK RENK: gercek isaret dort ayri renk tasiyor, ama bu dosya
+     <img> ile yuklendigi icin tema rengiyle boyanmasi mumkun degil ve
+     kardes dosyalarla ayni tek renk kurali gecerli. Silueti yine ayirt
+     edici.
+
+     DIKKAT: bu yorumda cift tire (XML'de yasak) ve Turkce harf YOK, ikisi de
+     olcum sonucu. Ilk yazimda "fg" token'i cift tireyle yaziliydi; dosya
+     gecerli XML olmaktan cikti, tarayici 200 alip HICBIR SEY cizmedi ve
+     naturalWidth 0 kaldi. Sessiz kusur tam olarak buydu (bkz.
+     tests/test_provider_logos.py). -->
+<svg width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#e8eaed"><title>Microsoft</title><path d="M11.4 24H0V12.6h11.4zM24 24H12.6V12.6H24zM11.4 11.4H0V0h11.4zM24 11.4H12.6V0H24z"/></svg>

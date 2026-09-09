@@ -270,6 +270,34 @@ CREDENTIALS: tuple[Credential, ...] = (
         secret_field="anthropic_api_key",
         url_field="anthropic_base_url",
     ),
+    # MAI ve FLUX aynı Azure kaynağında ama BAŞKA bir hostta yaşıyor
+    # (`<kaynak>.services.ai.azure.com`) ve `/openai/v1` onları SERVİS
+    # ETMİYOR: şema doğrulamasını geçen istek "Model not supported with
+    # Responses API" ile düşüyor. Sebep Entra sondasıyla kanıtlandı — iki
+    # AYRI veri eylemi (`…/accounts/OpenAI/images/generations/action` ve
+    # `…/accounts/MaaS/images/generations/action`). Yani bu modelleri
+    # `azure_image` kimliğinin altına koymak, bu dosyanın uyardığı
+    # "arayüzde seçilebilir bir 400"ün tam kendisi olurdu.
+    #
+    # `secret_field=None` ve bu `azure_chat`in duruşunun aynısı: anahtar
+    # `AZURE_IMAGE_API_KEY`e DÜŞÜYOR (sonda tek anahtarın üç yüzeyde de
+    # geçtiğini ölçtü), yani forma ikinci bir gizli alan eklemek kullanıcıya
+    # aynı değeri iki kez yazdırmak olurdu. Forma giren TEK yeni alan
+    # `azure_foundry_base_url` ve o gizli DEĞİL — yani
+    # `app._redact_validation_errors`'ın katalogdan türettiği redaksiyon
+    # kümesi değişmiyor.
+    #
+    # `default_base_url` YOK çünkü sabit bir adres yok: adres ya elle yazılıyor
+    # ya da görselin adresinin HOSTundan türetiliyor
+    # (bkz. credstore.derive_foundry_base_url).
+    Credential(
+        id="azure_foundry",
+        label="Azure AI Foundry · MAI ve FLUX",
+        key_env="AZURE_FOUNDRY_API_KEY",
+        url_env="AZURE_FOUNDRY_BASE_URL",
+        secret_field=None,
+        url_field="azure_foundry_base_url",
+    ),
 )
 
 
@@ -293,6 +321,8 @@ PROVIDER_LOGOS: dict[str, str] = {
     "azure": "azure.svg",
     "openai": "openai.svg",
     "gemini": "gemini.svg",
+    "azure-mai": "microsoft.svg",
+    "azure-flux": "blackforestlabs.svg",
 }
 
 # İşaret ARTIK MARKAYI SÖYLÜYOR, o yüzden etiketin de söylemesi gereksiz: şeritte
@@ -310,7 +340,54 @@ PROVIDER_BRANDS: dict[str, str] = {
     "openai": "OpenAI",
     "gemini": "Gemini",
     "anthropic": "Anthropic",
+    "azure-mai": "Microsoft",
+    "azure-flux": "Black Forest Labs",
 }
+
+
+# MAI'nin GEOMETRİ BÜTÇESİ — canlı ölçüldü: w,h ≥ 768 VE w·h ≤ 1.048.576.
+#
+# Jetonlar `gpt-image-2`den KOPYALANMIYOR ve sebep sert: `1024x1536` ile
+# `1536x1024` 1.572.864 piksel eder, yani tavanı %50 aşar. Kopyalamak iki
+# jetonu doğrudan hataya sokardı.
+#
+# BU LİSTE BİR KOLAYLIK DEĞİL, GÜVENLİK SINIRI. MAI hatalı bir `size`
+# gönderildiğinde 400 DÖNMÜYOR, sessizce varsayılanla ÜRETİYOR — sondada
+# ölçüldü: `size:"1x1"` yutuldu ve iki gerçek 1024×1024 görsel üretildi.
+# Yani sağlayıcı artık bir doğrulama katmanı DEĞİL ve
+# `models.check_capabilities` TEK kapı; buradaki bir hata kullanıcıya hata
+# değil İSTEMEDİĞİ BOYUTTA BİR FATURA gösterir.
+#
+# Küme mevcut oranların HEPSİNİ karşılıyor (1:1, 4:3, 3:4, 3:2, 2:3, 16:9,
+# 9:16), yani `gpt-image-2`den MAI'ye geçen kullanıcı "varsayılana düşüldü"
+# uyarısı ALMIYOR (bkz. core.js `fillAxis`in ikinci kademesi).
+#
+# Mandal: tests/test_catalog.py::test_MAI_jetonlari_PIKSEL_butcesine_uyuyor.
+MAI_MIN_EDGE = 768
+MAI_PIXEL_CAP = 1_048_576
+MAI_SIZES: tuple[str, ...] = (
+    "1024x1024",   # 1.048.576 · 1:1
+    "1024x768",    #   786.432 · 4:3
+    "768x1024",    #   786.432 · 3:4
+    "1248x832",    # 1.038.336 · 3:2
+    "832x1248",    # 1.038.336 · 2:3
+    "1365x768",    # 1.048.320 · 16:9
+    "768x1365",    # 1.048.320 · 9:16
+)
+
+# FLUX.2 `gpt-image-2`nin ÜÇ JETONUNU AYNEN kullanabiliyor: üçü de belgelenmiş
+# 4 MP tavanının çok altında ve 32'nin katı. Kazanç somut ve ölçülebilir —
+# gpt-image-2'den FLUX'a geçen kullanıcı "varsayılana düşüldü" uyarısı ALMIYOR
+# (bkz. core.js `fillAxis`).
+#
+# MAI'de aynı şeyi yapmak MÜMKÜN DEĞİLDİ (bkz. MAI_SIZES): `1024x1536` ve
+# `1536x1024` MAI'nin piksel tavanını %50 aşıyor. İki sağlayıcının iki ayrı
+# demet taşımasının sebebi bu, üslup değil.
+#
+# FLUX'un GERÇEK boyut kabulü (alt sınır, 32'nin katı olma şartı) bu depoda
+# ÖLÇÜLMEDİ; üç jeton tavanın çok altında kaldığı için ilk tur güvenli.
+# Mandal: tests/test_catalog.py::test_FLUX_jetonlari_gpt_image_2_ile_AYNI.
+FLUX_SIZES: tuple[str, ...] = ("1024x1024", "1024x1536", "1536x1024")
 
 
 # ── Görsel modelleri ────────────────────────────────────────────────────
@@ -330,6 +407,13 @@ PROVIDER_BRANDS: dict[str, str] = {
 # Pro 1K/2K ≈ 0,134 USD → 27, 4K ≈ 0,24 USD → 48). Böylece seçicideki kredi
 # etiketi kullanıcıya GERÇEK bir karşılaştırma veriyor: "27 kredi" gerçekten
 # "8 kredi"nin üç katı kadar pahalı.
+#
+# `note` SEÇİCİDE model adının ALTINA yazılıyor (static/core.js) ve tek işi
+# şu soruyu cevaplamak: "ne zaman bunu seçerim?". Bu yüzden notlar bir yetenek
+# listesi DEĞİL, bir KARAR cümlesi — ve UYGULAMANIN YAPMADIĞI bir şeyi vaat
+# etmiyorlar: FLUX 8/10 referans alabiliyor ama ilk tur `app.MAX_EDIT_IMAGES`
+# (4) tavanında kalıyor, o yüzden hiçbir not o sayıları yazmıyor. Mandal:
+# tests/test_catalog.py'nin `note` sözleşmesi bloğu.
 
 DEFAULT_IMAGE_MODEL = "azure-gpt-image-2"
 
@@ -371,7 +455,8 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=8,
         credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
-        note="Metin ve düzenlemede en güçlü. Uygulamanın varsayılanı.",
+        note="Metin, tabela ve çok referanslı düzenlemede en güçlü; "
+             "uygulamanın varsayılanı.",
     ),
     # OpenAI DOĞRUDAN (Azure üzerinden değil). Tel formatı Azure'ın aynısı, o
     # yüzden adaptör onun bilinçli ikizi (bkz. openai_client.py'nin başlığı).
@@ -419,7 +504,8 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=8,
         credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
-        note="Azure'daki modelin aynısı, kendi OpenAI anahtarınla.",
+        note="Azure'daki modelin aynısı, kendi anahtarınla — kurumsal "
+             "kaynağın yoksa bunu seç.",
     ),
     # KATALOGDA KALIYOR ama ÖMÜRLÜ: 23 Ekim 2026'da OpenAI API'sinden kalkıyor.
     # Bugün çalışıyor ve anahtarı yalnız bu modele erişen hesaplar var, o yüzden
@@ -441,7 +527,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=8,
         credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
-        note="23 Ekim 2026'da API'den kalkıyor — gpt-image-2'ye geç.",
+        note="Seçmeyin: 23 Ekim 2026'da API'den kalkıyor. gpt-image-2'ye geç.",
     ),
     # ── Gemini · Nano Banana ────────────────────────────────────────────
     #
@@ -492,7 +578,11 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=6,
         credits_by_quality=(("1K", 6), ("2K", 6), ("4K", 12)),
-        note="Oran seçiliyor (piksel değil). Hızlı ve ucuz; düzenleme yapıyor.",
+        # "en ucuz" DEĞİL, ölçüldü: MAI-Image 2.6 Flash 4 kredi, bu 6. İddiayı
+        # yazan tur ile onu yanlışlayan tur AYNI daldı. Hız iddiası duruyor —
+        # katalogda gecikme verisi yok, yani ölçülemez; maliyet ölçülebilir ve
+        # artık mandallı.
+        note="En hızlı tur; oran seçiliyor (piksel değil). Taslak için.",
     ),
     ImageModel(
         id="gemini-nano-banana-pro",
@@ -510,7 +600,156 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=27,
         credits_by_quality=(("1K", 27), ("2K", 27), ("4K", 48)),
-        note="Metin ve marka tutarlılığında en güçlü Gemini; pahalı.",
+        note="Marka tutarlılığı ve uzun metin yerleşimi; pahalı ama en "
+             "sadık.",
+    ),
+    # ── Azure AI Foundry · MAI-Image (Microsoft) ────────────────────────
+    #
+    # ÜÇÜ DE ÖNİZLEME ve notlarında yazılı: ad ya da sözleşme haber vermeden
+    # değişebilir. `openai-gpt-image-1` girdisinin duruşu benimseniyor —
+    # kalktığı gün girdi SİLİNİR, çünkü katalogda kalan ölü bir girdi
+    # arayüzde seçilebilir bir 404 demek (`openai-dall-e-3`ün ölçülmüş dersi).
+    #
+    # KREDİ ÇAPASI görsel tarafındakiyle AYNI: Azure `medium` = 8 kredi
+    # ≈ 0,04 USD, yani 1 kredi ≈ 0,005 USD. MAI token bazlı faturalanıyor ve
+    # sonda ölçüyü verdi: 1024×1024 görsel için `usage.num_output_tokens`
+    # = 1024. 2.6 → 1024 tok × 38 USD/M = 0,0389 USD → 8 kredi;
+    # 2.5-Pro → 1024 tok × 47 USD/M = 0,0481 USD → 10 kredi.
+    # 2.6-Flash'ın yayınlanmış birim fiyatı DOĞRULANAMADI (Azure fiyat
+    # sayfaları JS ile çiziliyor, tablo boş döndü) — 4 kredi GEÇİCİ.
+    #
+    # KABUL EDİLEN YAKLAŞIKLIK: `cost_for`un boyut ekseni yok, oysa MAI'de
+    # token = piksel. Kredi VARSAYILAN boyuttaki maliyeti gösteriyor;
+    # düzeltmek `cost_for`a üçüncü bir eksen eklemek demek ve bu turun
+    # kapsamı dışında.
+    #
+    # `max_n=4`: MAI'de `n` parametresi HİÇ YOK, tavan
+    # `models.MAX_IMAGES_PER_RUN`dan geliyor ve dört AYRI istek atılıyor.
+    ImageModel(
+        id="azure-mai-image-2-6",
+        label="Microsoft · MAI-Image 2.6",
+        provider="azure-mai",
+        wire_model="MAI-Image-2.6",
+        credential="azure_foundry",
+        sizes=MAI_SIZES,
+        default_size="1024x1024",
+        # Kalite ekseni YOK (karar 4): tek sentetik jeton + gizli knob. Boş
+        # bırakmak `ResultParams`ta 422 demekti, yani o modelle üretilmiş bir
+        # oturumun BİR DAHA KAYDEDİLEMEMESİ.
+        qualities=("standard",),
+        quality_hidden=True,
+        max_n=4,
+        images_per_request=1,
+        supports_edit=True,
+        # Düzenleme ucu TEK görsel alıyor (canlı ölçüldü). `max_refs=1` beyan
+        # eden ilk GÖRSEL modeli bu, yani ikinci kapı adaptörde
+        # (`azure_mai_client.build_image_file`) — görsel düzenleme rotası
+        # model başına `max_refs`e bakmıyor.
+        max_refs=1,
+        credits=8,
+        note="Fotogerçekçi ürün ve portre işi; metin işlemede MAI'nin en "
+             "iyisi. Tek referansla düzenliyor. Önizleme.",
+    ),
+    ImageModel(
+        id="azure-mai-image-2-6-flash",
+        label="Microsoft · MAI-Image 2.6 Flash",
+        provider="azure-mai",
+        wire_model="MAI-Image-2.6-Flash",
+        credential="azure_foundry",
+        sizes=MAI_SIZES,
+        default_size="1024x1024",
+        qualities=("standard",),
+        quality_hidden=True,
+        max_n=4,
+        images_per_request=1,
+        supports_edit=True,
+        max_refs=1,
+        # GEÇİCİ: birim fiyat doğrulanamadı, oran 2.6'nın yarısı varsayıldı.
+        credits=4,
+        note="2.6'nın hızlı ve ucuz kardeşi; taslak ve deneme turları için. "
+             "Tek referansla düzenliyor. Önizleme.",
+    ),
+    ImageModel(
+        id="azure-mai-image-2-5-pro",
+        label="Microsoft · MAI-Image 2.5 Pro",
+        provider="azure-mai",
+        wire_model="MAI-Image-2.5-Pro",
+        credential="azure_foundry",
+        sizes=MAI_SIZES,
+        default_size="1024x1024",
+        qualities=("standard",),
+        quality_hidden=True,
+        max_n=4,
+        images_per_request=1,
+        supports_edit=True,
+        max_refs=1,
+        credits=10,
+        note="Kalabalık sahnelerde nesne ve karakter tutarlılığı; pahalı. "
+             "Tek referansla düzenliyor. Önizleme.",
+    ),
+    # ── Azure AI Foundry · FLUX.2 (Black Forest Labs) ───────────────────
+    #
+    # KREDİLER GEÇİCİ: FLUX megapiksel başına faturalanıyor ve yayınlanmış
+    # birim fiyat doğrulanamadı (Azure fiyat sayfaları JS ile çiziliyor,
+    # tablo boş döndü). Çapa yine Azure `medium` = 8 kredi ≈ 0,04 USD.
+    # Krediler zaten "doğrulanacak bir olgu değil, ürün kararı" — ama ORAN
+    # yanlışsa seçicideki karşılaştırma yalan söyler, o yüzden takip ediliyor.
+    #
+    # `max_n=1` ve gerekçesi iki katmanlı: (1) `num_images`ın üst sınırı
+    # ölçülmedi ve fazla beyan arayüzde seçilebilir bir hata; (2) FLUX
+    # dağıtımlarının kapasitesi düşük (belgelenmiş RPM'de flex için 5/dk) —
+    # dört paralel istek 429'a girerdi ve sonda sırasında `RateLimitReached`
+    # gerçekten görüldü.
+    #
+    # ÇOK REFERANSLI DÜZENLEME 8/10 görsele kadar çıkıyor ama ilk tur
+    # `app.MAX_EDIT_IMAGES` (4) tavanında kalıyor; not bu yüzden 8/10 SÖZÜ
+    # VERMİYOR — uygulamanın yapmadığı bir şeyi seçicide vaat etmek bu
+    # deponun yasakladığı sessiz sapmanın kendisi.
+    #
+    # İÇERİK FİLTRESİ YOK (Microsoft'un kendi uyarısı), yani
+    # `providers.is_content_policy` bu sağlayıcıda hiç tetiklenmiyor. Not
+    # adaptörün başlığında da yazılı ki ileride "neden çalışmıyor" diye
+    # aranmasın.
+    ImageModel(
+        id="azure-flux-2-pro",
+        label="Black Forest Labs · FLUX.2 pro",
+        provider="azure-flux",
+        wire_model="FLUX.2-pro",
+        credential="azure_foundry",
+        sizes=FLUX_SIZES,
+        # `quality` parametresi YOK: tek sentetik jeton + gizli knob (karar 4).
+        qualities=("standard",),
+        quality_hidden=True,
+        max_n=1,
+        images_per_request=1,
+        supports_edit=True,
+        max_refs=4,
+        credits=16,
+        note="En yüksek görsel kalite; yavaş ve pahalı. Tek turda 1 görsel.",
+    ),
+    ImageModel(
+        id="azure-flux-2-flex",
+        label="Black Forest Labs · FLUX.2 flex",
+        provider="azure-flux",
+        wire_model="FLUX.2-flex",
+        credential="azure_foundry",
+        sizes=FLUX_SIZES,
+        # GERÇEK bir eksen (karar 4): jetonlar `steps`/`guidance` çiftlerine
+        # çözülüyor (bkz. azure_flux_client._FLEX_QUALITY). Sentetik bir jeton
+        # burada israf olurdu.
+        qualities=("hizli", "dengeli", "detayli"),
+        default_quality="dengeli",
+        max_n=1,
+        images_per_request=1,
+        supports_edit=True,
+        max_refs=4,
+        credits=10,
+        # Taban `dengeli` (25 adım); ötekiler adım oranından türetildi
+        # (10/25 → 0,6× ve 50/25 → 1,6×, yuvarlanmış). ÜÇÜ DE GEÇİCİ —
+        # megapiksel fiyatı doğrulanmadı.
+        credits_by_quality=(("hizli", 6), ("dengeli", 10), ("detayli", 16)),
+        note="Adım ve yönlendirme seçilebiliyor: metin ağırlıklı yerleşimler "
+             "için. Tek turda 1 görsel.",
     ),
 )
 
@@ -706,6 +945,16 @@ GEOMETRY_LABELS: dict[str, tuple[str, str]] = {
     "9:16": ("▮ 9:16", "9:16"),
     "16:9": ("▬ 16:9", "16:9"),
     "21:9": ("▬ 21:9", "21:9"),
+    # MAI'nin bütçeye uyan jetonları (bkz. MAI_SIZES). `ratio` sütunu Azure ve
+    # Gemini'nin oranlarıyla AYNI dizeleri veriyor — `fillAxis`in ikinci
+    # kademesi model değiştirirken oranı böyle taşıyor. Glif YÖNÜ söylüyor:
+    # ◼ kare, ▮ dikey, ▬ yatay.
+    "1024x768": ("▬ 4:3", "4:3"),
+    "768x1024": ("▮ 3:4", "3:4"),
+    "1248x832": ("▬ 3:2", "3:2"),
+    "832x1248": ("▮ 2:3", "2:3"),
+    "1365x768": ("▬ 16:9", "16:9"),
+    "768x1365": ("▮ 9:16", "9:16"),
 }
 
 QUALITY_LABELS: dict[str, str] = {
@@ -728,6 +977,18 @@ QUALITY_LABELS: dict[str, str] = {
     # zaten öyle tanıyor.
     "720p": "720p · HD",
     "1080p": "1080p · Full HD",
+    # FLUX.2-flex'in `steps`/`guidance` kademeleri. Sentetik bir jeton İSRAF
+    # olurdu: belgelenmiş `steps` (≤50) ve `guidance` (1.5–10) kaliteyi
+    # DOĞRUDAN belirliyor, yani burada gerçek bir eksen var (karar 4).
+    #
+    # JETONLAR ASCII ve bu deponun kurulu deseni: `low`, `1K`, `720p`, tema
+    # adları — hepsi ASCII. Jeton `history.json`a, `prefs.json`a ve
+    # `ResultParams.quality`ye yazılıyor; Türkçe metin ETİKETTE yaşıyor.
+    # Jetonlar sağlayıcıya GİTMİYOR: `azure_flux_client.quality_axis` onları
+    # sayılara çeviriyor.
+    "hizli": "Hızlı · 10 adım",
+    "dengeli": "Dengeli · 25 adım",
+    "detayli": "Detaylı · 50 adım",
 }
 
 

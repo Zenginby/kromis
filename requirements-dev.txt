@@ -1,3 +1,16 @@
+# ASGARİ PYTHON: 3.13. Bu dosya `pip install -r` ile okunuyor ve pip'in bir
+# "yorumlayıcı sürümü" kısıtı YOK (`python_requires` setuptools'a ait; bu depo
+# kurulabilir bir paket değil, o yüzden pyproject.toml/setup.cfg da yok). Yani
+# buradaki satır bir KISIT değil, KAYIT — zorlayan iki mekanizma başka yerde:
+# `tests/conftest.py` takım başlamadan durduruyor, `tests/test_python_surumu.py`
+# de bu sayının README ve CI pinleriyle aynı kalmasını sınıyor.
+#
+# NEDEN 3.13: `azure_client._atomic_write`, kimlik dosyasını yazmadan ÖNCE
+# izinleri sıkılaştırmak için `os.fchmod(fd, 0o600)` çağırıyor ve `os.fchmod`
+# CPython'un Windows yapısına ancak 3.13'te eklendi. Windows + 3.12.10'da
+# ölçüldü: kimlik yazan 45 test `AttributeError: module 'os' has no attribute
+# 'fchmod'` ile düşüyor. CI ve yayın paketleri 3.14 kullanıyor.
+
 # Yalnız paket derlemek için gerekir; uygulamanın çalışma zamanı bağımlılığı DEĞİL.
 pyinstaller==6.21.*
 

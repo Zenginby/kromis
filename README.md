@@ -2,7 +2,7 @@
 
 [![Release](https://img.shields.io/badge/version-v0.14.0-blue.svg)](https://github.com/Zenginby/gpt-image-studio/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![Python Version](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org/)
 [![Build & Test](https://github.com/Zenginby/gpt-image-studio/actions/workflows/release.yml/badge.svg)](https://github.com/Zenginby/gpt-image-studio/actions)
 
 **Lumeo**, yapay zeka destekli görsel üretimi, görsel içi nesne/metin düzenleme, akıllı prompt yönetmenliği, renk paleti teorisi ve kurumsal görsel bindirme (logo/banner/motto) işlemlerini tek bir arayüzde birleştiren gelişmiş masaüstü ve yerel web uygulamasıdır.
@@ -188,8 +188,23 @@ python3 tools/graf_uret.py     # Windows: python tools/graf_uret.py
 Çalışma düzeninin tamamı: **[CLAUDE.md](CLAUDE.md)**.
 
 ### 1. Gereksinimler
-- Python 3.10+
+- **Python 3.13+** — Windows'ta ZORUNLU (gerekçe aşağıda). CI ve yayın
+  paketleri her platformda 3.14 kullanıyor.
 - macOS veya Windows OS (Android paketi için ayrıca JDK 17 + Android SDK — bkz. `android/`)
+
+> **NEDEN 3.13 — burada "Python 3.10+" yazıyordu ve YANLIŞTI:**
+> `azure_client._atomic_write` kimlik dosyasını yazmadan ÖNCE izinleri
+> sıkılaştırmak için `os.fchmod(fd, 0o600)` çağırıyor; 0600 güvencesinin
+> dayanağı bu SIRA (bkz. `winsec.py` başlığı). `os.fchmod` ise CPython'un
+> **Windows** yapısına ancak 3.13'te eklendi ("Changed in version 3.13: Added
+> support on Windows") ve 3.12'de yedek bir yol da yok, çünkü `os.chmod` orada
+> dosya tanıtıcısı kabul etmiyor. Daha eski bir yorumlayıcıda kimlik YAZAN her
+> test `AttributeError: module 'os' has no attribute 'fchmod'` ile düşüyor —
+> Windows + 3.12.10'da ölçüldü: 45 test (`test_credstore`, `test_settings`,
+> `test_settings_route`). Belge "3.10+" dediği için geliştirici tam olarak
+> belgeye UYDUĞUNDA bu duvara çarpıyordu; `tests/conftest.py` artık takım
+> başlamadan tek satırda söylüyor, `tests/test_python_surumu.py` de bu sayının
+> dört yerde aynı kalmasını sınıyor.
 
 ### 2. Yerel Sunucuyu Çalıştırma
 ```bash

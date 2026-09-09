@@ -1198,6 +1198,17 @@
           Azure AI Foundry'deki kaynak adresi ve anahtarı. Adres her kullanıcıda
           farklı olduğu için burada soruluyor — OpenAI'de sabit.
         </p>
+
+        <label for="set-foundry-url">Foundry adresi (MAI · FLUX)</label>
+        <input id="set-foundry-url" type="url" autocomplete="off" spellcheck="false"
+               placeholder="boş bırak: Endpoint'ten türetilir" />
+        <p class="field-note">
+          MAI ve FLUX modelleri aynı kaynakta ama başka bir hostta
+          (<code>services.ai.azure.com</code>) duruyor. <strong>Boş bırakılırsa
+          adres yukarıdaki Endpoint'ten türetilir</strong> ve anahtar da aynı
+          kalır — yani çoğu kurulumda burada yapılacak bir şey yok. Yalnızca
+          vekil arkasındaki ya da ayrı bir kaynaktaki dağıtımlar için doldur.
+        </p>
       </div>
 
       <div id="prov-openai" class="prov-fields" hidden>

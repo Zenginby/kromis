@@ -567,3 +567,188 @@ def test_the_video_providers_all_have_a_LOGO():
         assert catalog.provider_logo(m.provider), (
             f"{m.provider} işaretsiz — şerit işaretsiz çizilir")
         assert m.provider in catalog.PROVIDER_BRANDS
+
+
+# ── Azure AI Foundry · MAI (v0.15) ─────────────────────────────────────
+
+
+def test_MAI_jetonlari_PIKSEL_butcesine_uyuyor():
+    """Bu testin ölçtüğü şey bir GÜVENLİK SINIRI, bir kolaylık değil.
+
+    MAI hatalı bir `size` gönderildiğinde 400 DÖNMÜYOR, sessizce varsayılanla
+    üretiyor — sondada ölçüldü (`size:"1x1"` yutuldu, iki gerçek görsel
+    üretildi ve faturalandı). Yani sağlayıcı bir doğrulama katmanı değil;
+    `models.check_capabilities` TEK kapı ve o da katalogdan besleniyor.
+    Buradaki bir hata kullanıcıya hata değil, İSTEMEDİĞİ BOYUTTA BİR FATURA
+    gösterir.
+    """
+    for jeton in catalog.MAI_SIZES:
+        w, h = (int(p) for p in jeton.split("x"))
+        assert w >= catalog.MAI_MIN_EDGE and h >= catalog.MAI_MIN_EDGE, (
+            f"{jeton}: MAI kenarı {catalog.MAI_MIN_EDGE} pikselin altına inemiyor")
+        assert w * h <= catalog.MAI_PIXEL_CAP, (
+            f"{jeton}: {w * h} piksel, MAI tavanı {catalog.MAI_PIXEL_CAP}")
+
+
+def test_MAI_jetonlari_AZURE_nun_uc_oranini_KARSILIYOR():
+    """`test_gemini_oranlari_…`ın ikizi ve aynı gerekçesi: model değiştirmek
+    ORANI TAŞIMALI, sebepsiz bir "varsayılana düşüldü" uyarısı basmamalı."""
+    azure = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
+    azure_oranlari = {catalog.geometry_of(s)[1] for s in azure.sizes}
+    mai_oranlari = {catalog.geometry_of(s)[1] for s in catalog.MAI_SIZES}
+
+    assert azure_oranlari <= mai_oranlari, (
+        "Azure'dan MAI'ye geçişte karşılığı olmayan oran: "
+        f"{sorted(azure_oranlari - mai_oranlari)}")
+
+
+def test_MAI_girdileri_jetonlari_PAYLASIYOR():
+    """Üç girdiye elle üç kez yazmak, birine jeton ekleyip ötekini unutmanın
+    kapısı olurdu (`ASPECT_RATIOS`in paylaşılma gerekçesi)."""
+    mai = [m for m in catalog.IMAGE_MODELS if m.provider == "azure-mai"]
+    assert len(mai) == 3, "katalogda üç MAI girdisi olmalı"
+    for m in mai:
+        assert m.sizes is catalog.MAI_SIZES, (
+            f"{m.id}: jetonları kopyalamış, MAI_SIZES'ı paylaşmıyor")
+        assert m.credential == "azure_foundry", m.credential
+        # Adet TEL ÜZERİNDE YOK: MAI'de `n` parametresi hiç mevcut değil,
+        # yani adet başına AYRI istek atılıyor (bkz. karar 5).
+        assert m.images_per_request == 1
+        # Kalite ekseni YOK: tek sentetik jeton + gizli knob (karar 4).
+        assert m.quality_hidden is True
+        # Düzenleme TEK referans alıyor (multipart `image`, tekrar YOK).
+        assert m.supports_edit is True and m.max_refs == 1
+        assert m.note and "Önizleme" in m.note, (
+            f"{m.id}: MAI ailesinin üçü de önizleme; notta yazılı olmalı "
+            "(bkz. openai-gpt-image-1'in duruşu)")
+
+
+# ── Azure AI Foundry · FLUX.2 (v0.15) ──────────────────────────────────
+
+
+def test_FLUX_jetonlari_gpt_image_2_ile_AYNI():
+    """Aynı jeton kümesi = model değiştirirken "varsayılana düşüldü" uyarısı
+    YOK. Ayrışırsa kullanıcı sebepsiz bir düşme uyarısı görür."""
+    azure = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
+    assert set(catalog.FLUX_SIZES) == set(azure.sizes)
+
+
+def test_FLUX_girdileri_jetonlari_PAYLASIYOR():
+    flux = [m for m in catalog.IMAGE_MODELS if m.provider == "azure-flux"]
+    assert len(flux) == 2, "katalogda iki FLUX girdisi olmalı"
+    for m in flux:
+        assert m.sizes is catalog.FLUX_SIZES, (
+            f"{m.id}: jetonları kopyalamış, FLUX_SIZES'ı paylaşmıyor")
+        assert m.credential == "azure_foundry", m.credential
+        assert m.images_per_request == 1
+        # `num_images` tavanı ÖLÇÜLMEDİ: eksik beyan yalnızca bir yeteneği
+        # kullanmamak, fazla beyan seçilebilir bir hata. Kapasite de bunu
+        # destekliyor (flex belgelenmiş RPM'de 5/dk).
+        assert m.max_n == 1, f"{m.id}: num_images tavanı ölçülmedi (karar 5)"
+        assert m.supports_edit is True and m.max_refs == 4
+
+
+def test_FLUX_pro_nun_kalite_ekseni_GIZLI_flex_in_GERCEK():
+    """Ayrım kararın kendisi: pro'da `quality` parametresi YOK (sentetik jeton
+    + gizli knob), flex'te `steps`/`guidance` GERÇEK bir eksen."""
+    pro = catalog.image_model("azure-flux-2-pro")
+    flex = catalog.image_model("azure-flux-2-flex")
+
+    assert pro.quality_hidden is True and pro.qualities == ("standard",)
+    assert flex.quality_hidden is False
+    assert flex.qualities == ("hizli", "dengeli", "detayli")
+    # Tarife jetonların ÜÇÜNE de yazılı: eksik kalan jeton `cost_for`da
+    # sessizce tabana düşer ve seçicideki karşılaştırma yalan söyler.
+    assert set(dict(flex.credits_by_quality)) == set(flex.qualities)
+    assert catalog.default_quality_of(flex) == "dengeli"
+
+
+# ── `note` sözleşmesi ──────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("m", catalog.IMAGE_MODELS, ids=lambda m: m.id)
+def test_her_gorsel_modelinin_notu_NE_ZAMAN_SECILIR_i_cevapliyor(m):
+    """`note` seçicide model adının ALTINA yazılıyor (static/core.js) ve tek
+    işi şu soruyu cevaplamak: "ne zaman bunu seçerim?".
+
+    Boş bir not o satırı adı tekrar eden bir başlığa indiriyor. Uzunluk üst
+    sınırı da gerçek ve ÖLÇÜLMÜŞ, yazılı olduğu yer `static/core.js:843`:
+    360px'de not 36px, yani iki satır tutuyor; aşanı kaydırma üretiyor ve
+    komşu satırların hizasını bozuyor. 110 karakter o 36px'in satır başına
+    ~55 karakterle çevrilmiş hâli — kesin bir font ölçümü DEĞİL. Bağlayıcı
+    da değil: en uzun gerçek not 88 karakter, yani %20 boşluk var.
+    """
+    assert m.note, f"{m.id}: not yok — seçicideki satır sebepsiz kalıyor"
+    assert 20 <= len(m.note) <= 110, (
+        f"{m.id}: not {len(m.note)} karakter (beklenen 20-110)")
+    # Adı TEKRAR ETMİYOR: etiket zaten satırın kendisi. Karşılaştırma
+    # `·`DEN SONRAKİ PARÇAYLA yapılıyor, tam etiketle DEĞİL: tam etiket
+    # ("OpenAI · gpt-image-2") hiçbir notta harfi harfine geçmez, yani tam
+    # etiketle kıyaslayan bir iddia hiç ateşlenemezdi. Ölçüldü — notu
+    # "gpt-image-1 artık kalkıyor…" yapan mutasyon, yani bu iddianın
+    # ENGELLEMEK İÇİN VAR OLDUĞU kusur, tam etiket kıyasını geçiyordu.
+    #
+    # `catalog.short_labels()` burada işe YARAMAZ: onun ölçülmüş çakışma
+    # istisnası iki `gpt-image-2` girdisinde öneki BİLEREK koruyor (seçicide
+    # doğru olan bu), ki o da tam da bu iki girdide iddiayı yeniden boşa
+    # düşürürdü. Buradaki soru ayrıştırma değil, notun modelin KENDİ adıyla
+    # başlayıp satırı tekrar etmesi.
+    ad = m.label.rsplit("·", 1)[-1].strip().lower()
+    assert ad not in m.note.lower(), (
+        f"{m.id}: not model adını ({ad}) tekrar ediyor")
+
+
+def test_her_ONIZLEME_modelinin_notu_bunu_SOYLUYOR():
+    """MAI ailesinin üçü de önizleme: ad ya da sözleşme haber vermeden
+    değişebilir. `openai-gpt-image-1`in duruşu benimseniyor — notta yazılı,
+    kalkınca girdi silinir. Yazılmazsa kullanıcı kararlı bir model sanır.
+    """
+    for m in catalog.IMAGE_MODELS:
+        if m.provider == "azure-mai":
+            assert "Önizleme" in m.note, f"{m.id}: önizleme uyarısı yok"
+
+
+def test_hicbir_not_uygulamanin_YAPMADIGI_bir_seyi_vaat_etmiyor():
+    """FLUX 8/10 referans alabiliyor ama ilk tur `app.MAX_EDIT_IMAGES` (4)
+    tavanında kalıyor ve `max_n=1`. Seçicide "8 referans" yazmak, uygulamanın
+    yapmadığı bir şeyi vaat etmek olurdu — bu deponun yasakladığı sessiz
+    sapmanın kendisi. Sayı bir gün yükselirse önce bu test kırmızıya döner.
+    """
+    # Tavan (`app.MAX_EDIT_IMAGES`) mesaja ELDEN yazılıyor: `app`i ithal etmek
+    # bu yaprak test dosyasını 6. katmandaki 2100 satırlık modüle bağlardı ve
+    # ilgisiz bir `app.py` kırılması burayı da kırmızıya çevirip suçu
+    # bulandırırdı. Değer değişirse bu satır bayatlar — ama iddia zaten
+    # jetonlara bakıyor, mesaja değil.
+    for m in catalog.IMAGE_MODELS:
+        for sayi in ("8 referans", "10 referans"):
+            assert sayi not in m.note, (
+                f"{m.id}: not {sayi} vaat ediyor, tavan "
+                f"{min(m.max_refs, 4)}")
+
+
+def test_MALIYET_ustunlugu_iddia_eden_not_GERCEKTEN_en_ucuz():
+    """Seçici bir KARŞILAŞTIRMA yüzeyi: not, kredi rakamının tam yanında
+    çiziliyor (static/core.js). "en ucuz" yazan bir not, kendisinden ucuz bir
+    satır bir alt sırada dururken kullanıcıya yanlış söylüyor.
+
+    Ölçülmüş kusur, bu turun kendisinden: `gemini-nano-banana-2`nin notu "en
+    ucuz" diyordu (6 kredi), oysa AYNI dalda eklenen MAI-Image 2.6 Flash 4
+    kredi. İddiayı yazan görev ile onu yanlışlayan görev aynı daldaydı ve iki
+    görev incelemesi de göremedi, çünkü not sözleşmesi uzunluğa, ada,
+    önizlemeye ve referans vaadine bakıyordu — KARŞILAŞTIRMAYA bakmıyordu.
+
+    Hız üstünlüğü burada sınanmıyor: katalogda gecikme verisi yok, yani
+    ölçülemez. Maliyet ölçülebilir, o yüzden mandalı bu.
+    """
+    en_az = min(m.credits for m in catalog.IMAGE_MODELS)
+    en_cok = max(m.credits for m in catalog.IMAGE_MODELS)
+    for m in catalog.IMAGE_MODELS:
+        notu = m.note.lower()
+        if "en ucuz" in notu:
+            assert m.credits == en_az, (
+                f"{m.id}: not 'en ucuz' diyor ama {m.credits} kredi "
+                f"(katalogdaki en az {en_az})")
+        if "en pahalı" in notu:
+            assert m.credits == en_cok, (
+                f"{m.id}: not 'en pahalı' diyor ama {m.credits} kredi "
+                f"(katalogdaki en çok {en_cok})")

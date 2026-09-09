@@ -1,0 +1,24 @@
+# graphify bilgi grafı — dışarıda tutulanlar
+#
+# `.gitignore` graphify tarafından KENDİLİĞİNDEN uygulanıyor; burada yalnız
+# git'in izlediği ama grafa girmemesi gereken şeyler yazılı.
+
+# Deponun KENDİ depo haritası (`tools/graf_uret.py` üretiyor, bkz. CLAUDE.md).
+# Türetilmiş bir haritayı ikinci bir haritaya beslemek grafı kendi çıktısıyla
+# şişirir: aynı modüller bir kez kaynaktan, bir kez de bu md/json'lardan
+# düğüm olur. Kaynağın kendisi zaten taranıyor.
+docs/graflar/
+
+# İkili varlıklar. Bunlar anlamsal çıkarımda LLM'e GÖNDERİLİR (kod göndermez,
+# görsel/PDF gönderir) — golden PNG'ler ve ikon setlerinden çıkacak bir şey
+# yok, karşılığı bedava değil.
+tests/fixtures/
+docs/flow-ui/assets/
+branding/*.png
+branding/*.ico
+branding/*.icns
+branding/lumeo.iconset/
+static/img/
+
+# graphify'ın kendi çıktısı (`.gitignore`'da da var, kendi kendini taramasın)
+graphify-out/

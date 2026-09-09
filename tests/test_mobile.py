@@ -612,7 +612,7 @@ def test_the_three_grid_sizes_really_differ_on_a_phone(istemci):
 
 
 def test_the_logo_preview_sticks_with_a_fixed_height(istemci):
-    """Önizleme telefonda SABİT kalmalı — ve yüksekliği DEĞİŞMEMELİ.
+    r"""Önizleme telefonda SABİT kalmalı — ve yüksekliği DEĞİŞMEMELİ.
 
     İki ayrı kusur, tek kural:
 

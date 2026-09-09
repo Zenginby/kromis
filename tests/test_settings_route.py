@@ -562,3 +562,71 @@ def test_AZURE_CLIENT_in_kendi_bayragi_DEGISMEDI(client):
         "api_key": "", "base_url": "", "gemini_api_key": "AIza-x"})
     assert ac.get_settings_status()["chat_configured"] is False
     assert client.get("/api/settings").json()["chat_configured"] is True
+
+
+# ── Azure AI Foundry adresi (MAI + FLUX) ───────────────────────────────
+
+
+def test_foundry_adresi_gidip_geliyor(client):
+    """`post_settings`in adres döngüsü KATALOGDAN türetiliyor, elle
+    sayılmıyor — yani yeni bir `url_field` rotada kod değişikliği İSTEMİYOR.
+
+    Bu test o sözü ölçüyor: söz tutulmazsa alan sessizce hiç yazılmaz,
+    kullanıcı "kaydettim" sanır ve üretim "adres çözülemedi" der.
+    """
+    import credstore
+
+    r = client.post("/api/settings", json={
+        "api_key": "K", "base_url": "https://ai-ornek.openai.azure.com/openai/v1/",
+        "azure_foundry_base_url": "https://ozel.ornek/foundry"})
+
+    assert r.status_code == 200, r.text
+    assert credstore.resolve("azure_foundry")[1] == "https://ozel.ornek/foundry"
+
+
+def test_foundry_adresi_YOKKEN_gorselin_adresinden_turetiliyor(client):
+    """Kullanıcı hiçbir şey yazmadan MAI/FLUX çalışmalı: forma yeni bir
+    ZORUNLU alan eklemek, bugün Azure'ı kurulu olan herkesi yeniden
+    yapılandırmaya zorlamak olurdu."""
+    import credstore
+
+    client.post("/api/settings", json={
+        "api_key": "K", "base_url": "https://ai-ornek.openai.azure.com/openai/v1/"})
+
+    assert credstore.resolve("azure_foundry") == (
+        "K", "https://ai-ornek.services.ai.azure.com")
+
+
+def test_SEMASIZ_foundry_adresi_reddediliyor(client):
+    """Adres kapısı (`ac.check_base_url`) katalog döngüsünde duruyor: şemasız
+    bir yapıştırma 200 almamalı, hata ilk üretimde "bağlanılamadı" kılığında
+    görünmemeli."""
+    r = client.post("/api/settings", json={
+        "api_key": "K", "base_url": "https://ai-ornek.openai.azure.com/openai/v1/",
+        "azure_foundry_base_url": "ai-ornek.services.ai.azure.com"})
+
+    assert r.status_code == 422
+
+
+def test_BOS_foundry_adresi_yazilmis_degeri_KORUYOR(client):
+    """`default_base_url`ü olmayan kimlikte boş adres "varsayılana dön" değil
+    "dokunmadım" demek (app.post_settings'in ölçülmüş veri kaybı düzeltmesi).
+
+    İstemci alanı KOŞULSUZ gönderiyor, yani bu kural olmasa Foundry adresini
+    yazan kullanıcı bir sonraki kayıtta onu kaybederdi.
+    """
+    import credstore
+
+    ilk = client.post("/api/settings", json={
+        "api_key": "K", "base_url": "https://ai-ornek.openai.azure.com/openai/v1/",
+        "azure_foundry_base_url": "https://ozel.ornek/foundry"})
+    assert ilk.status_code == 200
+
+    # DURUM KODU da iddia ediliyor: boş kutuyla kaydetmek ÇOĞU kurulumun
+    # yaptığı şey (alan koşulsuz gönderiliyor, doldurmak gerekmiyor). Boş dize
+    # bir gün doğrulamaya takılsa saklanan değer YİNE yerinde kalırdı, yani
+    # aşağıdaki iddia geçerdi ve her gerçek kayıt sessizce 422 dönerdi.
+    bos = client.post("/api/settings", json={"azure_foundry_base_url": ""})
+    assert bos.status_code == 200
+
+    assert credstore.resolve("azure_foundry")[1] == "https://ozel.ornek/foundry"

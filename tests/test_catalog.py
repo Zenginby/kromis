@@ -678,9 +678,21 @@ def test_her_gorsel_modelinin_notu_NE_ZAMAN_SECILIR_i_cevapliyor(m):
     assert m.note, f"{m.id}: not yok — seçicideki satır sebepsiz kalıyor"
     assert 20 <= len(m.note) <= 110, (
         f"{m.id}: not {len(m.note)} karakter (beklenen 20-110)")
-    # Adı TEKRAR ETMİYOR: etiket zaten satırın kendisi.
-    assert m.label.lower() not in m.note.lower(), (
-        f"{m.id}: not etiketi tekrar ediyor")
+    # Adı TEKRAR ETMİYOR: etiket zaten satırın kendisi. Karşılaştırma
+    # `·`DEN SONRAKİ PARÇAYLA yapılıyor, tam etiketle DEĞİL: tam etiket
+    # ("OpenAI · gpt-image-2") hiçbir notta harfi harfine geçmez, yani tam
+    # etiketle kıyaslayan bir iddia hiç ateşlenemezdi. Ölçüldü — notu
+    # "gpt-image-1 artık kalkıyor…" yapan mutasyon, yani bu iddianın
+    # ENGELLEMEK İÇİN VAR OLDUĞU kusur, tam etiket kıyasını geçiyordu.
+    #
+    # `catalog.short_labels()` burada işe YARAMAZ: onun ölçülmüş çakışma
+    # istisnası iki `gpt-image-2` girdisinde öneki BİLEREK koruyor (seçicide
+    # doğru olan bu), ki o da tam tam bu iki girdide iddiayı yeniden boşa
+    # düşürürdü. Buradaki soru ayrıştırma değil, notun modelin KENDİ adıyla
+    # başlayıp satırı tekrar etmesi.
+    ad = m.label.rsplit("·", 1)[-1].strip().lower()
+    assert ad not in m.note.lower(), (
+        f"{m.id}: not model adını ({ad}) tekrar ediyor")
 
 
 def test_her_ONIZLEME_modelinin_notu_bunu_SOYLUYOR():

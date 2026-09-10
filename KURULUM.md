@@ -312,10 +312,25 @@ adım), yani uygulamayı silip yenisini koymak geçmişine dokunmaz.
   Her iki durumda da `%LOCALAPPDATA%\Kromis\hata.log` dosyasına bak; varsa
   içeriğini teknik desteğe gönder.
 - **(Windows) Sebebi anlaşılmıyorsa — kendi kendine teşhis:** `Kromis` klasöründe
-  boş bir yere **Shift + sağ tık → PowerShell penceresini burada aç** de ve şunu
-  yaz: `.\Kromis.exe --onyukleme-denetimi`. Pencere açılmaz, bunun yerine
-  `%LOCALAPPDATA%\Kromis\onyukleme-denetimi.txt` dosyası oluşur — onu teknik desteğe
-  gönder, hangi halkanın koptuğunu yazıyor.
+  boş bir yere **Shift + sağ tık → PowerShell penceresini burada aç** de ve şu iki
+  satırı sırayla yaz. Pencere açılmaz; çıkan dosyayı teknik desteğe gönder, hangi
+  halkanın koptuğunu yazıyor.
+
+  ```powershell
+  $p = Start-Process -FilePath .\Kromis.exe -ArgumentList '--onyukleme-denetimi' -NoNewWindow -PassThru; [void]$p.WaitForExit(120000); "cikis kodu: $($p.ExitCode)"
+  Get-Content $env:LOCALAPPDATA\Kromis\onyukleme-denetimi.txt -Encoding utf8
+  ```
+
+  > Neden bu kadar uzun: `.\Kromis.exe --onyukleme-denetimi` de çalışır ama paket
+  > pencere kipinde derlendiği için PowerShell onu BEKLEMEZ — komut hemen geri
+  > döner, dosya bir iki saniye sonra oluşur. Hemen bakılırsa "dosya oluşmadı"
+  > sanılıyor (2026-09-10'da tam olarak bu yaşandı). `Start-Process` bekliyor ve
+  > çıkış kodunu da veriyor: **0** = zincir sağlam, **1** = bir kademe düştü,
+  > **2** = rapor bile yazılamadı (o zaman `hata.log`'a bak).
+  >
+  > `$env:LOCALAPPDATA` yazımı da önemli: bu sayfadaki öteki `%LOCALAPPDATA%`
+  > yazımları Dosya Gezgini'nin adres çubuğu için doğru, ama PowerShell onları
+  > genişletmez — boş döner.
 - **(Windows) Uygulama tarayıcıda açıldı ve "bu pencereyi kapatmayın" diyor:**
   bu bir arıza değil, yedek yol — Kromis'nun kendi penceresi açılamadığında
   uygulama tarayıcında açılıyor ve her şey normal çalışıyor. O küçük pencereyi

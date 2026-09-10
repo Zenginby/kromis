@@ -111,13 +111,13 @@ def test_android_branch_opens_only_with_the_env_var(monkeypatch):
 
 def test_android_writes_under_the_app_private_dir(monkeypatch):
     """Yazılabilir kök Kotlin'in bildirdiği `filesDir`; `~` HİÇ kullanılmıyor."""
-    monkeypatch.setenv(paths.ANDROID_DATA_ENV, "/data/user/0/org.kurum.gpt_image_studio/files")
+    monkeypatch.setenv(paths.ANDROID_DATA_ENV, "/data/user/0/com.zenginby.kromis/files")
     # `~`'ı bilerek saçma bir yere çekiyoruz: bir yol expanduser'a uğrarsa
     # iddia kırmızıya düşsün. Android'de HOME'un tanımsız/"/" olması tam olarak
     # bu sınıf bir hatayı üretirdi.
     monkeypatch.setenv("HOME", "/olmayan-ev")
 
-    kok = "/data/user/0/org.kurum.gpt_image_studio/files"
+    kok = "/data/user/0/com.zenginby.kromis/files"
     assert paths.is_android()
     assert paths.data_dir() == kok
     assert paths.output_dir() == os.path.join(kok, "output")

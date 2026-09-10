@@ -20,7 +20,11 @@ kullanıcısını kaydediyor — o gerekçe artık geçerli DEĞİL.
 | 0 — depo adı | ✅ `Zenginby/kromis`; boş "taşındı" deposu bilerek AÇILMADI (gerekçe Faz 0'da) |
 | 1 — imza anahtarı | ✅ keystore repo D I Ş I N D A üretildi, dört sır tanımlandı |
 | 2–9 | ✅ uygulandı; `main` (v0.17.2) birleştirildi, tam takım **2359 geçti, 1 atlandı** |
-| 10 — doğrulama/yayın | ⏳ kuru prova koşuyor (PR #75, koşu 34503743056) |
+| 10 — doğrulama/yayın | ⏳ imza ve parmak izi ÖLÇÜLDÜ (koşu 34505244509); üç cihaz denetimi gerçek yayın varlıklarını bekliyor |
+| 11 — public'e açılma | ⏳ geçmiş temizliği ŞART; sıra Faz 11'de yazılı |
+
+PR: [Zenginby/kromis#75](https://github.com/Zenginby/kromis/pull/75) — bütün
+kapılar yeşil (sızıntı taraması, paketleme kapsamı, pytest, Android paketi).
 
 ### `main` ile birleşme — 2026-09-10
 

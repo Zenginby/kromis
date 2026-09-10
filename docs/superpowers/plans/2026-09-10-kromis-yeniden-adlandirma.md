@@ -1,6 +1,6 @@
 # Kromis Studio — Yeniden Adlandırma + Yeni İmza Anahtarı (Uygulama Planı)
 
-**Goal:** Uygulamanın kimliğini `Lumeo` (+ Android'de kalan `org.zenginby.gptimagestudio`)
+**Goal:** Uygulamanın kimliğini `Lumeo` (+ Android'de eski kurum alan adına dayalı bir `applicationId`)
 adından **Kromis Studio**'ya taşımak, Android için sıfırdan bir imza anahtarı üretmek ve
 bunu MEVCUT KULLANICININ VERİSİNİ KAYBETMEDEN yapmak.
 
@@ -21,7 +21,7 @@ kullanıcısını kaydediyor — o gerekçe artık geçerli DEĞİL.
 | 1 — imza anahtarı | ✅ keystore repo D I Ş I N D A üretildi, dört sır tanımlandı |
 | 2–9 | ✅ uygulandı; `main` (v0.17.2) birleştirildi, tam takım **2359 geçti, 1 atlandı** |
 | 10 — doğrulama/yayın | ⏳ imza ve parmak izi ÖLÇÜLDÜ (koşu 34505244509); üç cihaz denetimi gerçek yayın varlıklarını bekliyor |
-| 11 — public'e açılma | ⏳ geçmiş temizliği ŞART; sıra Faz 11'de yazılı |
+| 11 — public'e açılma | ⏳ denetim BİTTİ (sır/lisans/Actions yüzeyi temiz); geçmiş VE GitHub tarafı temizliği ŞART, sıra Faz 11'de |
 
 PR: [Zenginby/kromis#75](https://github.com/Zenginby/kromis/pull/75) — bütün
 kapılar yeşil (sızıntı taraması, paketleme kapsamı, pytest, Android paketi).
@@ -31,7 +31,7 @@ kapılar yeşil (sızıntı taraması, paketleme kapsamı, pytest, Android paket
 Dal v0.15.0 tabanında açılmıştı; arada `main`'e iki yayın daha girdi (v0.16.0,
 v0.17.2) ve ikisi de tam bu planın dokunduğu yerlere dokundu — 22 içerik
 çakışması. Kural: **sözcük `main`'in, adlar bu dalın.** Sebebi, iki tarafın
-AYNI "Kurum" cümlelerini birbirinden bağımsız temizlemesi: `main` "teknik desteğe"
+AYNI "eski kurum" cümlelerini birbirinden bağımsız temizlemesi: `main` "teknik desteğe"
 ve "yerleşik logo" dedi, bu dal "geliştiriciye" ve "kurumsal logo". `main`
 YAYIMLANMIŞ ve uygulama İÇİ metinleri (`desktop.py`, `app.py`, `strings.xml`,
 `winclr.py`) onun sözcüklerini taşıyor; belgelerin aynı sözlükten konuşması için
@@ -71,7 +71,7 @@ karşı tarafın YENİ dosyaları eski adı hiç çakışmadan getiriyor.
   geliştiricinin ev dizinini oynatırdı. `_guard_against_real_migration`
   varsayılanı no-op yapıyor, `test_paths.py` muaf (yedek guard'ının aynısı).
 * **Eski GitHub hesabının adı da silindi** (`guncelleme.py`, `mimari.md`,
-  `GUNCELLEME.md`, iki test): "Kurum" kuralının kapsamındaydı ama önceki taramada
+  `GUNCELLEME.md`, iki test): "eski kurum" kuralının kapsamındaydı ama önceki taramada
   küçük harfli olduğu için kaçmıştı. Gerekçeler ("boşalan ad başkası tarafından
   alınabilir") ad-nötr yazılarak KORUNDU.
 
@@ -115,10 +115,10 @@ Bunlar "eski ad" değil; ya tarihsel kayıt ya üçüncü tarafın kimliği:
 * `docs/android/mimari.md`'deki ESKİ anahtarın parmak izi tablosu — silinmiyor, "v0.15.0'a
   kadarki anahtar" olarak etiketleniyor; yeni tablo yanına ekleniyor.
 
-## Ek bulgu: "Kurum" (eski kurum) izleri — 2026-09-10'da TEMİZLENDİ
+## Ek bulgu: "eski kurum" (eski kurum) izleri — 2026-09-10'da TEMİZLENDİ
 
-**Karar: "Kurum" yazısı hiçbir yerde geçmeyecek.** Proje özel bir proje; Azure
-kimliği de kullanıcının KENDİ kaynağından geliyor, Kurum'dan gelen bir şey yok.
+**Karar: "eski kurum" yazısı hiçbir yerde geçmeyecek.** Proje özel bir proje; Azure
+kimliği de kullanıcının KENDİ kaynağından geliyor, kurumdan gelen bir şey yok.
 Aşağıdaki altı sınıfın beşi uygulandı; kalan tek iz paket kimliği (Faz 5).
 
 **Uygulandı — 33 dosya:** destek yönlendirmeleri (`teknik desteğe` — ilk
@@ -130,7 +130,7 @@ birleşmede KORUNDU), kaldırılmış yerleşik logo yorumları (`yerleşik logo
 `prompt-yonetmeni.md`'deki noktalı-İ dersi (`İZMİR`, ders korundu),
 `docs/flow-ui` maketlerinin marka etiketleri (`Kurumsal mavi`, tema jetonu
 `kurumsal` → `kurumsal`), `CompanyName` (`Zenginby`) ve test/maketlerdeki gerçek
-Azure ana bilgisayar adları (`ai-ornek-swedencentral` → `ai-ornek-swedencentral`).
+Azure ana bilgisayar adları (gerçek kaynak adı → `ai-ornek-swedencentral`).
 
 > **Yan bulgu — kaybolan güvence.** `CompanyName` ASCII'ye indiği için
 > `_paket-windows.yml`'in Türkçe karakter kodlama kapısı KONUSUZ kaldı: eskiden
@@ -140,7 +140,7 @@ Azure ana bilgisayar adları (`ai-ornek-swedencentral` → `ai-ornek-swedencentr
 > Türkçe karakter koymak — Kromis adı buna uygun bir fırsat.
 
 > **Yan bulgu — sızıntı hijyeni.** Testlerde ve maketlerde kullanıcının GERÇEK
-> Azure kaynak adı (`ai-ornek-swedencentral`) yazılıydı; depo public olacaksa bu
+> Azure kaynak adının kendisi yazılıydı; depo public olacaksa bu
 > zaten kalmamalıydı. Örnek ada çevrildi.
 
 ### Karar (a) — tarihsel kayıtlar: TEMİZLENDİ (2026-09-10)
@@ -157,19 +157,25 @@ KANITI değil — "o gün ne olduğu" sorusunun cevabı `Şirket Logosu Mavi` ya
 okunamaz hâle gelmiyor. Üç yan kazanç:
 
 * **Sızıntı hijyeni.** Kullanıcının gerçek Azure ana bilgisayar adı
-  (`ai-ornek-swedencentral`, 24 geçiş) ve gerçek yerel kullanıcı adı
-  (`/Users/kullanici/...`) bu belgelerde yazılıydı. Depo public olacaksa ikisi
+  (24 geçiş) ve gerçek yerel kullanıcı adı (macOS ev dizini yolunda)
+  bu belgelerde yazılıydı. Depo public olacaksa ikisi
   de kalmamalıydı; testlerde ve maketlerde zaten örnek ada çevrilmişti.
 * **Ölü bağlantı YOK — tersine.** Plan "eski PR bağlantıları yeni adla
   yazılırsa var olmayan adresler olur" diyordu; bu YANLIŞ. PR numaraları depo
   ve hesap yeniden adlandırmasında korunuyor, yani kanonik adres
   `Zenginby/kromis/pull/16`. Eski adresler yalnız GitHub'ın yönlendirmesi
   yaşadığı sürece çalışıyordu.
-* Eski `applicationId` (`org.zenginby.gptimagestudio`) da bu belgelerdeydi.
+* Eski `applicationId` (eski kurum alan adına dayalıydı) da bu belgelerdeydi.
 
-**Tek istisna bu belgenin KENDİSİ.** "Kurum yazısı hiçbir yerde geçmeyecek"
-kararını KAYDEDEN yer burası; sözcüğü buradan da silmek kararı okunamaz
-yapardı. Kural kendi kaydında geçiyor, üründe hiçbir yerde geçmiyor.
+**DÜZELTME (2026-09-10, Faz 11 denetimi): bu belge de istisna DEĞİL.**
+Plan başta "kuralı kaydeden yer burası, sözcük buradan silinemez" diyordu
+ve depo ÖZEL kaldığı sürece bu tutarlıydı. Public'e açılırken istisna
+kendini bozuyor: temizlenen dizelerin HEAD'deki TEK taşıyıcısı bu dosya
+kalıyordu — gerçek Azure kaynak adını, gerçek yerel kullanıcı adını, eski
+kurumun alan adına dayalı `applicationId`'yi ve eski hesap adını düzgün
+bir tabloyla yayımlıyordu. Ölçüldü: 31 geçiş, hepsi bu dosyada, başka
+hiçbir izlenen dosyada yok. Kayıt korundu, harfler çıkarıldı: karar
+"eski kurum" adlandırmasıyla hâlâ okunuyor, ölçüm sayıları yerinde duruyor.
 
 ### Kalan açık karar
 
@@ -191,7 +197,7 @@ yazıldı (karar (a), yukarıda). Depoda tek bir açık madde kaldı:
 Aşağıdaki sınıflandırma neyin NEDEN öyle çözüldüğünü saklıyor.
 
 **1. Kullanıcıya dönük destek yönlendirmeleri — 2026-09-10'da TEMİZLENDİ.**
-"lütfen bu dosyayı Kurum'ya iletin" / "Kurum'ya yaz" / "Kurum'ya gönder" ifadeleri
+"lütfen bu dosyayı kuruma iletin" / "kuruma yaz" / "kuruma gönder" ifadeleri
 `teknik desteğe` ile değiştirildi: `android/.../strings.xml`
 (`sunucu_baslatilamadi_detay`), `desktop.py`, `app.py`, `KURULUM.md` (4),
 `GUNCELLEME.md` (5), ve o cümleyi ALINTILAYAN `winclr.py` yorumu (hata.log
@@ -205,20 +211,20 @@ düzenlenmesi gerekmiyor.
 > zaten onu taşıyor ve kullanıcının ekranında gördüğü sözcük o.
 
 **2. Dağıtım/kimlik modelini anlatan cümleler — KARAR GEREKİYOR.** Bunlar
-sözcük değil, bir MODEL anlatıyor: uygulamayı Kurum dağıtıyor ve Azure kimliğini
-Kurum veriyor. Yeni kimlikte (public Releases + kullanıcının kendi anahtarı) bu
+sözcük değil, bir MODEL anlatıyor: uygulamayı kurum dağıtıyor ve Azure kimliğini
+kurum veriyor. Yeni kimlikte (public Releases + kullanıcının kendi anahtarı) bu
 cümleler yalnız eski adı değil, YANLIŞ bir işleyişi de taşıyor — o yüzden
 sözcük değişimiyle kapatılmadı:
 
 | yer | cümle |
 | --- | --- |
-| `KURULUM.md:148` | "Endpoint ve API key alanlarını Kurum'dan aldığın bilgilerle doldur" |
-| `KURULUM.md:173` | "Dağıtım adı alanına Kurum'dan aldığın adı yaz" |
-| `KURULUM.md:280` | "Kurum yeni bir `.zip` gönderdiğinde…" |
-| `KURULUM.md:323` | "Kurum'ya doğru adı sor" |
-| `GUNCELLEME.md:143,469` | "Kurum'nın söylediği numarayla aynıysa/karşılaştır" |
-| `GUNCELLEME.md:617` | "Dağıtım adı (Kurum verecek, ör. `gpt-5.6-luna`)" |
-| `GUNCELLEME.md:660` | "Geri yüklemek gerekirse (Kurum söylerse)…" |
+| `KURULUM.md:148` | "Endpoint ve API key alanlarını kurumdan aldığın bilgilerle doldur" |
+| `KURULUM.md:173` | "Dağıtım adı alanına kurumdan aldığın adı yaz" |
+| `KURULUM.md:280` | "kurum yeni bir `.zip` gönderdiğinde…" |
+| `KURULUM.md:323` | "kuruma doğru adı sor" |
+| `GUNCELLEME.md:143,469` | "kurumun söylediği numarayla aynıysa/karşılaştır" |
+| `GUNCELLEME.md:617` | "Dağıtım adı (kurum verecek, ör. `gpt-5.6-luna`)" |
+| `GUNCELLEME.md:660` | "Geri yüklemek gerekirse (kurum söylerse)…" |
 
 **Karar (Faz 8, 2026-09-10): BYOK anlatısı.** "Kendi Azure kaynağından aldığın
 endpoint/anahtar", "Azure portalı → kaynağın → *Keys and Endpoint*", "Azure'da
@@ -398,14 +404,14 @@ ile yazılıyor — JDK çoğunlukla okur, ama bu, bir kez ölçülmüş yoldan 
 * [ ] `android/settings.gradle` → `rootProject.name = "kromis-android"`
 * [ ] `build.gradle`: `namespace` + `applicationId` = `com.zenginby.kromis`;
       `outputFileName = "kromis-android-arm64-${variant.buildType.name}.apk"`
-* [ ] Kaynakları taşı: `android/app/src/main/java/org/zenginby/gptimagestudio/` →
+* [ ] Kaynakları taşı: `android/app/src/main/java/` altındaki eski paket dizini →
       `android/app/src/main/java/com/zenginby/kromis/`; beş dosyada `package` bildirimi.
       `AndroidManifest.xml` göreli ad kullanıyor (`.MainActivity`, `.ServerService`,
       `.StudioApplication`) ve `BuildConfig` aynı paketten çözülüyor — ikisi de
       kendiliğinden düzeliyor, dokunma.
 * [ ] `proguard-rules.pro:10` → `-keep class com.zenginby.kromis.** { *; }`
 * [ ] `strings.xml`: `app_name` = `Kromis Studio`, `bildirim_basligi` = `Kromis Studio
-      çalışıyor`, ve **`sunucu_baslatilamadi_detay`** — "lütfen bu dosyayı Kurum'ya iletin"
+      çalışıyor`, ve **`sunucu_baslatilamadi_detay`** — "lütfen bu dosyayı kuruma iletin"
       yeni sahiplikle uyumlu metne döner (karar (c)). Kullanıcıya görünen son eski-kimlik izi.
 * [ ] `Downloader.kt:42` → `ALT_KLASOR = "Kromis"`
 * [ ] İç adlar (karar (b)): `gis_session` → `kromis_session` (`android_main.py:37` **VE**
@@ -447,7 +453,7 @@ ile yazılıyor — JDK çoğunlukla okur, ama bu, bir kez ölçülmüş yoldan 
       `name='Kromis'` (EXE ve COLLECT), `name='Kromis.app'`, `_exe_icon` →
       `branding/kromis.ico`, `_icns_path` → `branding/kromis.icns`,
       `bundle_identifier='com.zenginby.kromis'`, ve VERSIONINFO: `CompanyName` →
-      **`Zenginby`** (karar (c); bugün `Kurum Derneği`), `FileDescription`/`InternalName` →
+      **`Zenginby`** (karar (c); bugün `eski kurum adı`), `FileDescription`/`InternalName` →
       `Kromis`, `OriginalFilename` → `Kromis.exe`, `ProductName` → `Kromis Studio`.
 * [ ] `branding/Lumeo.exe.config` → `branding/Kromis.exe.config`. **Ad exe adıyla BİREBİR
       olmak zorunda** (CLR `<exe>.config` arıyor); çifti `build.ps1:110` ve
@@ -477,7 +483,7 @@ ile yazılıyor — JDK çoğunlukla okur, ama bu, bir kez ölçülmüş yoldan 
       `dist/Kromis.zip`** (`:77,78,99,137,138`)
 * [ ] `_paket-windows.yml`: **ara ad `dist\Kromis-windows.zip` (`:109` ve `:291`)**,
       `*/Kromis.exe` (`:145`), `*/Kromis.exe.config` (`:192,194`), `:248` yayın adı, ve
-      **`:229` CompanyName kapısı** — hex diziyle yazılmış `Kurum Derneği` yerine `Zenginby`
+      **`:229` CompanyName kapısı** — hex diziyle yazılmış `eski kurum adı` yerine `Zenginby`
       (ASCII olduğu için hex kaçışına artık gerek yok; kapının NEDEN'i yorumda kalmalı)
 * [ ] `ci.yml:172,186,198` (yukarıda) · `release.yml` yorum atıfları
 * [ ] `tests/test_ci_varlik_saklama.py:15` (`lumeo-*` → `kromis-*`, yorum)
@@ -512,7 +518,7 @@ gömülü. Güncellenmezse kalıp hiçbir şey bulamaz ve tek-kaynak bekçisi t�
       `tests/test_desktop.py:441` · `tests/test_windows_acilis.py:31,110,116,124`
 * [ ] `tests/test_mobile.py:736` — `KromisIndirme` sözleşmesi
 * [ ] **`tests/test_android_geri.py:20` ve `tests/test_mobile.py:40`** — Kotlin
-      kaynak yolunu `"org", "zenginby", "gptimagestudio"` parçalarından kuruyorlar;
+      Kotlin kaynak yolunu eski paket adının parçalarından kuruyorlar;
       paket taşınınca ikisi de dosyayı bulamaz (eski planda YOKTU)
 * [ ] `tests/test_ci_paketleme_kapisi.py:190,301,311,312` — spec adı + `branding/kromis.ico`
 * [ ] `tests/test_python_surumu.py:54` — `PkromisBuildPython` regex'i
@@ -583,37 +589,117 @@ gömülü. Güncellenmezse kalıp hiçbir şey bulamaz ve tek-kaynak bekçisi t�
 **Karar (2026-09-10): depo public olacak.** Bu, `guncelleme.py`'nin yazılı
 şartını (anonim `releases/latest`) doğrular ve güncelleme bildirimini
 diriltir — o güne kadar özel depoda 404 alarak sessizce ölüydü (ölçüm
-modulun docstring'inde).
+modülün docstring'inde).
 
-**Ama çalışma ağacını temizlemek YETMEZ.** Kurum izleri commit geçmişinde
-duruyor ve public'e geçmek onları da yayımlar. Ölçüldü (`git log --all -S`):
+### Public'e açılma denetimi — 2026-09-10
 
-| iz | commit |
-|---|---|
-| `ai-ornek-swedencentral` (gerçek Azure ana bilgisayarı) | 9 |
-| `kullanici` (yerel kullanıcı adı) | 7 |
-| `zenginby` (eski paket kimliği) | 8 |
-| `Zenginby` (eski hesap/depo) | 19 |
+"Public yapmak bizim açımızdan sorun oluşturur mu" sorusu tahminle değil
+ölçümle cevaplandı. Ayrım şu: bir yüzey `git filter-repo` ile temizlenebilir
+mi, yoksa GitHub tarafında AYRI bir iş mi?
 
-Keystore geçmişe HİÇ girmemiş — bu ayrıca ölçüldü
-(`git log --all --diff-filter=A -- '*.keystore' '*.jks' '*.p12' '*.pfx'` boş),
-yani geçmişte sır yok, yalnız kimlik izi var.
+#### Temiz çıkanlar — ek iş gerekmiyor
 
-**SIRA ŞART:**
+| ne arandı | nasıl | sonuç |
+| --- | --- | --- |
+| sır: OpenAI/GitHub/AWS/Google/Slack anahtarı, JWT, özel anahtar bloğu | ulaşılabilir 2723 nesnenin 1849 metin blobu (her dosyanın her sürümü) tek tek tarandı | isabetlerin TAMAMI test kuklası (`sk-proj-DUMMY…`) ya da yanlış pozitif (`icon_16x16@2x.png` e-posta kalıbına takılıyor) |
+| `.env` / `secrets*` dosyası | `git log --all --diff-filter=A` | hiç commit edilmemiş |
+| keystore / jks / p12 / pem / crt | aynı tarama | hiç girmemiş — geçmişte anahtar malzemesi YOK |
+| lisans ve telif | `LICENSE` MIT (© 2026 Zenginby); `static/fonts/OFL.txt` fontun yanında duruyor (OFL 1.1'in ŞARTI); `gradle-wrapper.jar` Apache-2.0 | dağıtım hakkı yerinde |
+| Actions saldırı yüzeyi | `pull_request_target` / `workflow_run` YOK; `github.event.*` yalnız `env:` üzerinden geçiyor (enjeksiyona karşı önerilen kalıp); `permissions: contents: read`; self-hosted runner yok | çatal PR'ı sır alamaz |
+| çatal PR'ı CI'da haksız kırmızıya düşer mi | `ci.yml`'de `imza_zorunlu` BİLEREK verilmiyor, gerekçesi orada yazılı | çatal katkısı kapıdan geçebilir |
+| yayın notları | 38 yayının gövdesi tarandı | izli not: 0 |
 
-1. [ ] PR #75 `main`'e girsin (geçmiş yeniden yazılmadan ÖNCE — sonra
-       yazılsa PR'ın commit'leri geçersiz olurdu)
-2. [ ] Faz 10'un cihaz denetimleri gerçek yayın varlıklarıyla bitsin
-3. [ ] Geçmiş yeniden yazılsın (`git filter-repo --replace-text`, aynı
-       karşılık tablosu çalışma ağacında kullanılanın AYNISI olacak),
-       tag'ler yeni SHA'lara taşınsın, `--force-with-lease` ile gönderilsin
-4. [ ] Aynı `git log --all -S` taraması DÖRDÜNÜ DE 0 demeli
-5. [ ] Görünürlük public'e alınsın (**kullanıcı işi** — depo ayarı)
-6. [ ] Anonim uç nokta ölçülsün: yukarıdaki `curl` 200 demeli; sonra
-       uygulamada güncelleme bildiriminin gerçekten göründüğü görülsin
+> **Yan kazanç — kalkacak bir kısıt.** Public depoda standart runner'lar
+> ücretsiz. 2026-08-28'de Actions varlık kotasını dolduran birikim ve "macOS
+> dakikası 10x sayılıyor" maliyet kararı (`ci.yml`'deki yol süzgeci,
+> paketlerin doğrudan taslak yayına yazması) bu yüzden vardı; public'e
+> geçtikten sonra o GEREKÇE geçersiz. Bu Faz'ın işi değil, ama kararı yeniden
+> açmanın yolu artık var. Ayrıca secret scanning ve Dependabot uyarıları
+> public depoda ücretsiz açılıyor.
 
-**Uyarı — zorla gönderme her şeyi silmiyor.** Force-push'tan sonra eski
-commit'ler ulaşılamaz olur ama GitHub onları bir süre DOĞRUDAN SHA ile
-sunmaya devam ediyor (GC'ye kadar). Tam güvence isteniyorsa yol, temiz
-geçmişi YENİ bir depoya açmak ve eskisini özel arşiv olarak bırakmak —
-karşılığı PR geçmişinin ve yayın/tag tarihinin geride kalması.
+#### A) Git geçmişi — `filter-repo` çözüyor
+
+| iz | dosya içeriği | commit mesajı | dosya YOLU |
+| --- | --- | --- | --- |
+| gerçek Azure ana bilgisayarı | 10 commit | 1 | — |
+| gerçek yerel kullanıcı adı | 8 | 2 | — |
+| eski kurumun alan adı (eski `applicationId`) | 9 | 2 | 5 Kotlin dosyası |
+| eski hesap/depo adı | 20 | 5 | — |
+
+Sayılar planın ilk yazımındaki 9/7/8/19'dan birer fazla: PR #75'in birleşmesi
+her ize bir commit daha ekledi — bir dizeyi SİLEN commit de o dizeye "dokunan"
+commit'tir ve `git log -S` onu sayar.
+
+**Planın ilk hâli üç yerde yetersizdi; düzeltildi:**
+
+1. **`--replace-text` YETMEZ.** Commit ÜSTVERİSİ kimliği taşıyor ve üstveri
+   dosya içeriği değil. Ölçüldü: 103 yazar + 96 committer commit'i eski kurum
+   adıyla ve o kurumun alan adındaki GERÇEK bir posta adresiyle, 31+7 commit
+   eski hesap adıyla, 1 commit bir ÜNİVERSİTE e-posta adresiyle (kişisel
+   veri), 2 commit ayrı bir kişisel gmail ile imzalı. Bunlar ancak `--mailmap`
+   ile taşınıyor. Mesajlar için de ayrıca `--replace-message` gerekiyor —
+   `--replace-text` mesajlara dokunmuyor.
+2. **`Lumeo` karşılık tablosuna GİRMEMELİ.** Plan "karşılık tablosu çalışma
+   ağacındakinin aynısı olacak" diyordu; bu YANLIŞ olurdu. `paths.py:32`
+   `OLD_APP_NAME = "Lumeo"` ve göç işlevi bu dizeye BAĞLI, bekçisi
+   `tests/test_paths.py`'de 11 geçiş. Blanket bir karşılık HEAD'i de yeniden
+   yazar ve v0.15.0'dan gelen kullanıcının verisini bulan kodu bozar. Kaldı ki
+   `Lumeo` bir gizlilik sorunu değil: eski ÜRÜN adı, kimse değil. Geçmişteki
+   14 `branding/lumeo*` yolu da aynı sebeple duruyor.
+3. **Yolları içerikten ayrı düşünmek gerekiyor.** `--replace-text` yalnız
+   içeriğe dokunuyor, `git log --stat` ise YOLLARI gösteriyor: eski paket
+   dizini 5 Kotlin dosyasının yolunda yazılı. `--path-rename` şart.
+
+**Karşılık tablosu nerede duruyor.** Tablonun KENDİSİ harfleri taşıdığı için
+depoya girmiyor — keystore ile aynı gerekçe. Depo dışında tutuldu; içeriği
+tarif olarak şu: gerçek Azure ana bilgisayarı → `ai-ornek-swedencentral`
+(çalışma ağacında kullanılanın aynısı), eski kurum alan adı → `zenginby`,
+gerçek yerel kullanıcı adı → `kullanici`, eski hesap adı → `Zenginby`; artı
+eski Kotlin paket dizini için bir `--path-rename` ve altı girdilik bir
+`--mailmap` (bütün insan commit'leri hesabın GitHub `users.noreply` adresine
+toplanıyor: katkı grafiği korunuyor, gerçek posta adresi yayımlanmıyor).
+
+#### B) GitHub tarafı — `filter-repo` DOKUNAMAZ
+
+Bu tabloyu kaçırmak, geçmişi temizleyip "bitti" demek olurdu.
+
+| yüzey | ölçüm | neden git dışı |
+| --- | --- | --- |
+| **45 uzak dal** | `git ls-remote --heads` | yalnız `main` yeniden yazılırsa kalan 44 dal eski commit'leri REFERANSLA canlı tutar (SHA ile değil, dalla) — yeniden yazma hiçbir şey ifade etmez. Çözüm: `filter-repo` hepsini aynı geçişte yazıyor, hepsi gönderiliyor. |
+| **76 PR'ın başlık/gövdesi** | eski hesap adı 9 PR'da (#75, 40, 36, 34, 33, 32, 31, 30, 2), eski kurum alan adı 3'te (#75, #35, #31), yerel kullanıcı adı 1'de (#75), Azure kaynağı 2'de (#75, #9) | PR gövdesi git nesnesi değil, GitHub verisi; ancak `gh api PATCH` ile tek tek düzenlenir |
+| **201 Actions koşu günlüğü** | ölçüldü: 2026-09-09 Yayın koşusunun günlüğünde eski `applicationId`'yi yazan `aapt` satırı duruyor | günlükler public okuma yetkisiyle görünür ve DÜZENLENEMEZ; yalnız koşunun tamamı silinebilir |
+| **38 yayın ve varlıkları** | yayın notları temiz (0 iz); ama v0.17.2 ve öncesinin APK'ları içlerinde eski `applicationId`'yi ve eski sertifika DN'ini taşıyor | varlık içeriği değiştirilemez: yayın ya silinir ya olduğu gibi kalır |
+| 76 PR'ın inceleme yorumları | sayılmadı | aynı sınıf — GitHub verisi, git değil |
+
+### Sıra ŞART
+
+1. [x] PR #75 `main`'e girsin (geçmiş yeniden yazılmadan ÖNCE — sonra yazılsa
+       PR'ın commit'leri geçersiz olurdu). #76 da girdi.
+2. [x] Bu belgenin harfleri çıkarılsın (yukarıdaki DÜZELTME). Yan faydası
+       ölçülebilir bir güvence: HEAD artık hiçbir hassas dize taşımadığı için
+       yeniden yazma HEAD'in AĞACINI DEĞİŞTİRMEMEK zorunda — "yeniden
+       yazılmış HEAD ağacı == özgün HEAD ağacı" iddiası, karşılık tablosunun
+       kaçak bir eşleşme yapmadığının kanıtı oluyor.
+3. [ ] Geçmiş yeniden yazılsın: `--replace-text` + `--replace-message` +
+       `--mailmap` + `--path-rename`, 45 dalın ve 38 tag'in TAMAMI, taze bir
+       klonda; sonra `--force-with-lease` ile gönderilsin.
+4. [ ] Aynı tarama DÖRDÜNÜ DE 0 demeli — içerikte, mesajda, yolda ve
+       yazar/committer üstverisinde.
+5. [ ] GitHub tarafı (B tablosu) için karar uygulanmalı: PR gövdeleri,
+       Actions günlükleri, eski yayınlar.
+6. [ ] Görünürlük public'e alınsın (**kullanıcı işi** — depo ayarı).
+7. [ ] Anonim uç nokta ölçülsün: `curl` 200 demeli; sonra uygulamada
+       güncelleme bildiriminin gerçekten göründüğü görülsin.
+
+> **Faz 10'un cihaz denetimleri bu sırayı BEKLETMİYOR.** Planın ilk hâli
+> onları 3. adımın önüne koymuştu; ölçünce bağımlılık olmadığı görüldü:
+> v0.17.3'ün varlıkları yayında duruyor ve geçmişi yeniden yazmak yayın
+> varlıklarına dokunmuyor. Tag'ler yeni SHA'lara taşınıyor, dosyalar aynı
+> kalıyor.
+
+> **Uyarı — zorla gönderme her şeyi silmiyor.** Force-push'tan sonra eski
+> commit'ler ulaşılamaz olur ama GitHub onları bir süre DOĞRUDAN SHA ile
+> sunmaya devam ediyor (GC'ye kadar). Tam güvence isteniyorsa yol, temiz
+> geçmişi YENİ bir depoya açmak ve eskisini özel arşiv olarak bırakmak —
+> karşılığı PR geçmişinin, yayın/tag tarihinin ve yıldız/izleyici sayısının
+> geride kalması.

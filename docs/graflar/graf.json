@@ -21,10 +21,11 @@
       ],
       "ithal": [],
       "ithal_eden": [],
-      "katman": 9,
+      "katman": 10,
       "satir": 194,
       "testler": [
-        "tests/test_android_main.py"
+        "tests/test_android_main.py",
+        "tests/test_mobile.py"
       ],
       "yol": "android_main.py"
     },
@@ -60,7 +61,7 @@
         "desktop",
         "netguard"
       ],
-      "katman": 6,
+      "katman": 7,
       "satir": 2104,
       "testler": [
         "tests/test_app.py",
@@ -143,7 +144,7 @@
         "providers",
         "veo_client"
       ],
-      "katman": 1,
+      "katman": 2,
       "satir": 458,
       "testler": [
         "tests/test_app.py",
@@ -190,7 +191,7 @@
       "ithal_eden": [
         "providers"
       ],
-      "katman": 3,
+      "katman": 4,
       "satir": 292,
       "testler": [
         "tests/test_azure_flux_client.py"
@@ -209,7 +210,7 @@
       "ithal_eden": [
         "providers"
       ],
-      "katman": 3,
+      "katman": 4,
       "satir": 290,
       "testler": [
         "tests/test_azure_mai_client.py"
@@ -300,7 +301,7 @@
         "chat_providers",
         "openai_chat"
       ],
-      "katman": 3,
+      "katman": 4,
       "satir": 182,
       "testler": [
         "tests/test_chat_client.py",
@@ -320,7 +321,7 @@
         "chat_client",
         "openai_chat"
       ],
-      "katman": 1,
+      "katman": 2,
       "satir": 172,
       "testler": [
         "tests/test_chat_prompt.py"
@@ -340,7 +341,7 @@
       "ithal_eden": [
         "app"
       ],
-      "katman": 5,
+      "katman": 6,
       "satir": 124,
       "testler": [
         "tests/test_chat_providers.py",
@@ -416,7 +417,7 @@
         "providers",
         "veo_client"
       ],
-      "katman": 2,
+      "katman": 3,
       "satir": 194,
       "testler": [
         "tests/test_credstore.py",
@@ -442,8 +443,8 @@
       "ithal_eden": [
         "android_main"
       ],
-      "katman": 8,
-      "satir": 558,
+      "katman": 9,
+      "satir": 559,
       "testler": [
         "tests/test_desktop.py",
         "tests/test_windows_acilis.py"
@@ -458,7 +459,8 @@
         "android_main",
         "app",
         "desktop",
-        "guncelleme"
+        "guncelleme",
+        "paths"
       ],
       "katman": 0,
       "satir": 114,
@@ -501,7 +503,7 @@
       "ithal_eden": [
         "providers"
       ],
-      "katman": 3,
+      "katman": 4,
       "satir": 293,
       "testler": [
         "tests/test_gemini_client.py"
@@ -520,7 +522,7 @@
       "ithal_eden": [
         "app"
       ],
-      "katman": 1,
+      "katman": 2,
       "satir": 219,
       "testler": [
         "tests/test_depo_adresi.py",
@@ -562,7 +564,7 @@
         "chat_client",
         "prefs"
       ],
-      "katman": 2,
+      "katman": 3,
       "satir": 927,
       "testler": [
         "tests/test_catalog.py",
@@ -590,7 +592,7 @@
       "ithal_eden": [
         "desktop"
       ],
-      "katman": 7,
+      "katman": 8,
       "satir": 157,
       "testler": [
         "tests/test_netguard.py"
@@ -611,7 +613,7 @@
       "ithal_eden": [
         "chat_providers"
       ],
-      "katman": 4,
+      "katman": 5,
       "satir": 179,
       "testler": [
         "tests/test_chat_providers.py",
@@ -632,7 +634,7 @@
       "ithal_eden": [
         "providers"
       ],
-      "katman": 3,
+      "katman": 4,
       "satir": 215,
       "testler": [
         "tests/test_openai_client.py"
@@ -680,7 +682,9 @@
     {
       "ad": "paths",
       "erteli_ithal": [],
-      "ithal": [],
+      "ithal": [
+        "errlog"
+      ],
       "ithal_eden": [
         "android_main",
         "app",
@@ -689,8 +693,8 @@
         "desktop",
         "guncelleme"
       ],
-      "katman": 0,
-      "satir": 167,
+      "katman": 1,
+      "satir": 273,
       "testler": [
         "tests/test_android_main.py",
         "tests/test_chat_prompt.py",
@@ -709,7 +713,7 @@
       "ithal_eden": [
         "app"
       ],
-      "katman": 3,
+      "katman": 4,
       "satir": 219,
       "testler": [
         "tests/test_index.py",
@@ -742,7 +746,7 @@
         "openai_client",
         "veo_client"
       ],
-      "katman": 3,
+      "katman": 4,
       "satir": 472,
       "testler": [
         "tests/test_azure_flux_client.py",
@@ -897,7 +901,7 @@
       "ithal_eden": [
         "providers"
       ],
-      "katman": 3,
+      "katman": 4,
       "satir": 590,
       "testler": [
         "tests/test_veo_client.py"
@@ -935,7 +939,7 @@
         "desktop"
       ],
       "katman": 0,
-      "satir": 331,
+      "satir": 334,
       "testler": [
         "tests/test_winclr.py"
       ],

@@ -1,4 +1,4 @@
-package org.zenginby.gptimagestudio
+package com.zenginby.kromis
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -90,7 +90,7 @@ class ServerService : Service() {
     }
 
     companion object {
-        private const val KANAL_ID = "gis_sunucu"
+        private const val KANAL_ID = "kromis_sunucu"
         private const val BILDIRIM_ID = 1
 
         fun baslat(context: Context) {

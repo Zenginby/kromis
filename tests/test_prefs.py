@@ -214,7 +214,7 @@ def test_yapilandirilmamis_model_secili_KALIYOR(tmp_path, monkeypatch):
 
     KİMLİK YOLLARI İZOLE EDİLİYOR ve bu satırlar bedava değil: ilk yazımda
     yoktular ve test, geliştiricinin makinesinde GERÇEK bir
-    `~/.config/lumeo/credentials.env` oluştuğu anda düştü (tarayıcıda elle
+    `~/.config/kromis/credentials.env` oluştuğu anda düştü (tarayıcıda elle
     doğrulama yapılırken tam bu oldu). O hâliyle iddia "anahtar yokken" değil
     "geliştiricinin makinesinde anahtar yokken" diyordu — conftest.py'nin
     "kaçak damga" guard'larıyla aynı sınıf sızıntı. `DEFAULT_ENV_PATH` de

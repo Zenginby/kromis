@@ -195,24 +195,24 @@ jobs:
             echo "imzali=hayir" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/gis.keystore"
-          test -s "$RUNNER_TEMP/gis.keystore" || { echo "HATA: keystore boş çözüldü"; exit 1; }
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/kromis.keystore"
+          test -s "$RUNNER_TEMP/kromis.keystore" || { echo "HATA: keystore boş çözüldü"; exit 1; }
           echo "imzali=evet" >> "$GITHUB_OUTPUT"
 
       - name: Derle (assembleRelease)
         working-directory: android
         env:
-          ANDROID_KEYSTORE_PATH: ${{ steps.imza.outputs.imzali == 'evet' && format('{0}/gis.keystore', runner.temp) || '' }}
+          ANDROID_KEYSTORE_PATH: ${{ steps.imza.outputs.imzali == 'evet' && format('{0}/kromis.keystore', runner.temp) || '' }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew --no-daemon -PgisBuildPython=python3.13 :app:assembleRelease
+        run: ./gradlew --no-daemon -PkromisBuildPython=python3.13 :app:assembleRelease
 
       - name: APK'yı doğrula (iddiaların hepsi APK'nın İÇİ hakkında)
         id: dogrula
         run: |
           set -euo pipefail
-          APK="android/app/build/outputs/apk/release/lumeo-android-arm64-release.apk"
+          APK="android/app/build/outputs/apk/release/kromis-android-arm64-release.apk"
 
           # (1) Paket GERÇEKTEN var mı? "Yeşil ama boş"un birinci kapısı.
           test -s "$APK" || {
@@ -361,7 +361,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp "${{ steps.dogrula.outputs.apk }}" dist/lumeo-android-arm64.apk
+          cp "${{ steps.dogrula.outputs.apk }}" dist/kromis-android-arm64.apk
 
       # TESLİM: paket doğrudan TASLAK yayına yazılıyor — Actions varlığı olarak
       # DEĞİL.
@@ -399,5 +399,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh release upload "${{ inputs.taslak }}" "dist/lumeo-android-arm64.apk" --clobber
-          echo "taslağa yüklendi: lumeo-android-arm64.apk"
+          gh release upload "${{ inputs.taslak }}" "dist/kromis-android-arm64.apk" --clobber
+          echo "taslağa yüklendi: kromis-android-arm64.apk"

@@ -1,4 +1,4 @@
-// Lumeo — Azure ayarları (write-only) ve açılış çağrıları.
+// Kromis — Azure ayarları (write-only) ve açılış çağrıları.
 //
 // Klasik script (ES module DEĞİL): bütün parçalar TEK global kapsamı paylaşır
 // ve index.html'deki yükleme SIRASI bağlayıcıdır:

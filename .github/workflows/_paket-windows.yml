@@ -106,7 +106,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $zipYol = 'dist\Lumeo-windows.zip'
+          $zipYol = 'dist\Kromis-windows.zip'
 
           # (1) Paket GERÇEKTEN var mı? "Yeşil ama boş" koşusunun birinci kapısı.
           if (-not (Test-Path -LiteralPath $zipYol)) {
@@ -142,9 +142,9 @@ jobs:
 
           # (3) exe. Ada göre TEK eşleşme aranıyor: spec'teki `name` değişirse
           # build.ps1'in kendi kontrolü de bu da kırmızıya düşer.
-          $exeGirdi = @($girdiler | Where-Object { $_ -like '*/Lumeo.exe' })
+          $exeGirdi = @($girdiler | Where-Object { $_ -like '*/Kromis.exe' })
           if ($exeGirdi.Count -ne 1) {
-            Write-Host "HATA: zip'te 'Lumeo.exe' beklendi, $($exeGirdi.Count) eşleşme bulundu"
+            Write-Host "HATA: zip'te 'Kromis.exe' beklendi, $($exeGirdi.Count) eşleşme bulundu"
             exit 1
           }
           Write-Host "exe girdisi: $($exeGirdi[0])"
@@ -187,11 +187,11 @@ jobs:
           # bir kopyayı HİÇ okumaz. Yani "pakette bulundu" yetmez, YER şart:
           # yanlış yere düşmüş bir kopya "yapıldı" görünür, hiçbir şey yapmaz.
           # (`tests/test_paket_icerik_listesi.py` `$beklenenler`i ayrıştırıp
-          # depoda arıyor; dosya depoda `branding/Lumeo.exe.config` adıyla
+          # depoda arıyor; dosya depoda `branding/Kromis.exe.config` adıyla
           # durduğu için o listeye girseydi testi yanlış yere baktırırdı.)
-          $cfg = @($girdiler | Where-Object { $_ -like '*/Lumeo.exe.config' })
+          $cfg = @($girdiler | Where-Object { $_ -like '*/Kromis.exe.config' })
           if ($cfg.Count -ne 1 -or $cfg[0] -ne ($exeGirdi[0] + '.config')) {
-            Write-Host "HATA: Lumeo.exe.config exe'nin yaninda degil: $($cfg -join ', ')"
+            Write-Host "HATA: Kromis.exe.config exe'nin yaninda degil: $($cfg -join ', ')"
             exit 1
           }
           Write-Host "net yapilandirmasi: $($cfg[0])"
@@ -203,7 +203,7 @@ jobs:
           # hiçbir pytest onu görmüyor (macOS'ta Info.plist için de böyle).
           $gecici = Join-Path $env:RUNNER_TEMP 'surum-denetimi'
           New-Item -ItemType Directory -Force -Path $gecici | Out-Null
-          $hedef = Join-Path $gecici 'Lumeo.exe'
+          $hedef = Join-Path $gecici 'Kromis.exe'
           $arsiv = [System.IO.Compression.ZipFile]::OpenRead($zip)
           try {
             # GetEntry zip'teki HAM adı ister — normalize edilmiş hâli değil.
@@ -219,19 +219,34 @@ jobs:
           # üç haneli. İkisi de ayrı ayrı denetleniyor: biri elle yazılırsa öteki
           # yakalar.
           $dortlu = "$($bilgi.FileMajorPart).$($bilgi.FileMinorPart).$($bilgi.FileBuildPart).$($bilgi.FilePrivatePart)"
-          # CompanyName kodlama kapısı: bu proje Türkçe karakter kodlamasından iki
-          # kez yandı (cp1254'e düşen geçmiş okuması; PS 5.1'in BOM'suz dosyayı
-          # cp1254 sanması). Beklenti "Kurum Derneği" diye YAZILMIYOR, KOD
-          # NOKTALARINDAN kuruluyor — çünkü bu betiği kabuk BOM'suz bir dosyadan
-          # okuyor ve literal yazılsaydı iddia kabuğun dosya kodlamasına bağlı
-          # olurdu: doğrulamanın kendisi kodlama kusuruna açık olamaz. 0x130='İ',
-          # 0x11F='ğ' (Faz 2'de exe'den bayt düzeyinde okunan değerler).
-          $sirket = -join (@(0x130,0x6C,0x61,0x20,0x44,0x65,0x72,0x6E,0x65,0x11F,0x69) | ForEach-Object { [char]$_ })
+          # CompanyName: sahiplik 2026-09-10'da `Zenginby`'ye geçti ve bu alan
+          # ASCII'ye indi, o yüzden düz literal — cp1254/utf-8/ascii ASCII
+          # baytlarda birebir aynı, yani iddia kabuğun dosya kodlamasına bağlı
+          # değil.
+          #
+          # FileDescription: TÜRKÇE KARAKTER TURUNU ölçen alan. Bu güvence
+          # 2026-09-10'da bir an KAYBOLDU — eski CompanyName ('İ', 'ğ' taşıyan)
+          # ASCII bir sahiplikle değişince VERSIONINFO alanlarının tamamı ASCII
+          # kaldı ve tur ölçülemez oldu. Aynı gün Kromis adlandırmasıyla geri
+          # alındı: açıklama alanına bilinçli olarak 'ö', 'ü' ve em dash konuldu
+          # (`kromis.spec`).
+          #
+          # NEDEN KOD NOKTALARINDAN: doğrulamanın KENDİSİ, ölçtüğü kodlama
+          # kusuruna açık olmamalı. Bu YAML BOM'suz UTF-8 ve PowerShell 5.1
+          # BOM'suz bir dosyayı cp1254 sanabiliyor — düz yazılmış bir 'ö'
+          # literali o durumda sessizce başka bir dizeye dönüşür ve kapı, ölçtüğü
+          # kusurun tam kendisiyle yanlış kırmızı verir. Bu proje Türkçe karakter
+          # kodlamasından İKİ KEZ yandı (cp1254'e düşen geçmiş okuması; PS 5.1'in
+          # BOM'suz dosyayı cp1254 sanması), o yüzden beklenti burada harf harf
+          # kuruluyor.
+          $sirket = 'Zenginby'
+          $aciklama = 'Kromis Studio ' + [char]0x2014 + ' g' + [char]0xF6 + 'rsel ' + [char]0xFC + 'retim'
           $iddialar = @(
-            @{ ad = 'FileVersion';    got = "$($bilgi.FileVersion)";    bek = $beklenen },
-            @{ ad = 'ProductVersion'; got = "$($bilgi.ProductVersion)"; bek = $beklenen },
-            @{ ad = 'FixedFileInfo';  got = $dortlu;                    bek = "$beklenen.0" },
-            @{ ad = 'CompanyName';    got = "$($bilgi.CompanyName)";    bek = $sirket }
+            @{ ad = 'FileVersion';     got = "$($bilgi.FileVersion)";     bek = $beklenen },
+            @{ ad = 'ProductVersion';  got = "$($bilgi.ProductVersion)";  bek = $beklenen },
+            @{ ad = 'FixedFileInfo';   got = $dortlu;                     bek = "$beklenen.0" },
+            @{ ad = 'CompanyName';     got = "$($bilgi.CompanyName)";     bek = $sirket },
+            @{ ad = 'FileDescription'; got = "$($bilgi.FileDescription)"; bek = $aciklama }
           )
           $hataVar = $false
           foreach ($i in $iddialar) {
@@ -245,7 +260,7 @@ jobs:
           if ($hataVar) { exit 1 }
 
           # Yayın varlığının adı: release_manifest.py'deki anahtarla BİREBİR.
-          Copy-Item -LiteralPath $zip -Destination 'dist\lumeo-windows-x64.zip' -Force
+          Copy-Item -LiteralPath $zip -Destination 'dist\kromis-windows-x64.zip' -Force
 
       # AÇILIŞ KAPISI — üstteki adımların HEPSİ zip'in İÇERİĞİ hakkında, hiçbiri
       # exe'yi ÇALIŞTIRMIYOR. Bu dosyanın kendi başlığı "yeşil bir koşu tek
@@ -256,13 +271,13 @@ jobs:
       #   "Failed to resolve Python.Runtime.Loader.Initialize from
       #    ...\_internal\pythonnet\runtime\Python.Runtime.dll"
       #
-      # v0.3.0'da bu güvence VARDI ama ELDEYDİ: `gpt-image-studio.spec`in başlığı
+      # v0.3.0'da bu güvence VARDI ama ELDEYDİ: `kromis.spec`in başlığı
       # "paket ÇALIŞTIRILDI — pencere açıldı, hata.log yazılmadı" diye kaydediyor.
       # Elle yapılan doğrulama bir kez yapılır; bu adım onu her koşuya taşıyor.
       #
       # NEDEN PENCERE AÇMIYORUZ: runner'da GUI penceresi güvenilir değil ve
       # ölçmek istediğimiz şey zaten pencere değil, ONDAN ÖNCEKİ halka — .NET
-      # köprüsünün çözülmesi. `Lumeo.exe --onyukleme-denetimi` (desktop.py) tam
+      # köprüsünün çözülmesi. `Kromis.exe --onyukleme-denetimi` (desktop.py) tam
       # olarak onu yapıyor: kademe kademe `import clr` → AddReference →
       # winforms → `guilib.initialize()`, sonra rapor dosyası + çıkış kodu.
       # `console=False` olduğu için stdout YOK; raporun tek çıkış yolu o dosya
@@ -278,7 +293,7 @@ jobs:
       #
       # Hangisinin düştüğü DOĞRUDAN teşhis:
       #   (a) düşerse → sorun pythonnet/clr_loader yığınında (requirements.txt)
-      #   (b) düşerse → sorun MOTW'de (Lumeo.exe.config + winclr + KURULUM.md)
+      #   (b) düşerse → sorun MOTW'de (Kromis.exe.config + winclr + KURULUM.md)
       #
       # `if:` YOK: PR'da da (ci.yml) yayın yolunda da koşmalı — kapının bütün
       # anlamı bu.
@@ -288,8 +303,8 @@ jobs:
           $ErrorActionPreference = 'Stop'
           Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-          $zip   = (Resolve-Path -LiteralPath 'dist\Lumeo-windows.zip').Path
-          $veri  = Join-Path $env:LOCALAPPDATA 'Lumeo'
+          $zip   = (Resolve-Path -LiteralPath 'dist\Kromis-windows.zip').Path
+          $veri  = Join-Path $env:LOCALAPPDATA 'Kromis'
           $rapor = 'onyukleme-denetimi.txt'
           $hataVar = $false
 
@@ -303,8 +318,8 @@ jobs:
             # ikincisini yanıltmamalı.
             $kok = Join-Path $env:RUNNER_TEMP ("acilis-" + [guid]::NewGuid().ToString('N'))
             [System.IO.Compression.ZipFile]::ExtractToDirectory($zip, $kok)
-            $exe = @(Get-ChildItem -LiteralPath $kok -Recurse -Filter 'Lumeo.exe')[0]
-            if (-not $exe) { Write-Host 'HATA: cikarilan agacta Lumeo.exe yok'; exit 1 }
+            $exe = @(Get-ChildItem -LiteralPath $kok -Recurse -Filter 'Kromis.exe')[0]
+            if (-not $exe) { Write-Host 'HATA: cikarilan agacta Kromis.exe yok'; exit 1 }
 
             if ($senaryo.motw) {
               # [ZoneTransfer]/ZoneId=3 = "internetten geldi" — Gezgin'in zip
@@ -428,5 +443,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh release upload "${{ inputs.taslak }}" "dist/lumeo-windows-x64.zip" --clobber
-          echo "taslağa yüklendi: lumeo-windows-x64.zip"
+          gh release upload "${{ inputs.taslak }}" "dist/kromis-windows-x64.zip" --clobber
+          echo "taslağa yüklendi: kromis-windows-x64.zip"

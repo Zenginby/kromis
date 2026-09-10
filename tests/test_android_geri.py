@@ -17,8 +17,8 @@ import re
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KOTLIN = os.path.join(
-    REPO, "android", "app", "src", "main", "java", "org", "zenginby",
-    "gptimagestudio", "MainActivity.kt",
+    REPO, "android", "app", "src", "main", "java", "com", "zenginby",
+    "kromis", "MainActivity.kt",
 )
 STRINGS = os.path.join(REPO, "android", "app", "src", "main", "res", "values", "strings.xml")
 

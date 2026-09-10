@@ -169,7 +169,7 @@ jobs:
           #
           # `static/` ve `bundled/` 2026-08-28'de LİSTEDEN ÇIKARILDI ve sebebi
           # ölçüldü, tahmin edilmedi: ikisi de pakete DİZİN BÜTÜN olarak giriyor
-          # (`gpt-image-studio.spec` → datas=[('static','static'),('bundled','bundled')],
+          # (`kromis.spec` → datas=[('static','static'),('bundled','bundled')],
           # `android/app/build.gradle` → into("resources/static"){from("../../static")}).
           # Yani bu iki dizindeki bir İÇERİK değişikliği paketlemeyi kıramaz.
           # Kırabilen tek sınıf, paket doğrulamalarının ADA GÖRE aradığı bir
@@ -182,7 +182,7 @@ jobs:
           # koşuyor.
           #
           # `branding/` bilerek KALIYOR: onun içeriği dizin olarak değil ADA GÖRE
-          # okunuyor (spec `branding/lumeo.ico`i, build.sh `branding/lumeo.iconset`ten
+          # okunuyor (spec `branding/kromis.ico`i, build.sh `branding/kromis.iconset`ten
           # `.icns`i üretiyor), yani oradaki bir yeniden adlandırma gerçekten
           # paketleme aşamasında patlar.
           #
@@ -196,7 +196,7 @@ jobs:
           # `static/`e dokunan bir PR'da yine de tam matris istenirse yol yukarıdaki
           # `tam-paket` etiketi; kararın kendisi `tests/test_ci_paketleme_kapisi.py`de
           # sentetik diff'lerle koşturuluyor.
-          if echo "$YOLLAR" | grep -qE '^(gpt-image-studio\.spec|build\.sh|build\.ps1|requirements(-dev)?\.txt|android/|\.github/workflows/|branding/)'; then
+          if echo "$YOLLAR" | grep -qE '^(kromis\.spec|build\.sh|build\.ps1|requirements(-dev)?\.txt|android/|\.github/workflows/|branding/)'; then
             KARAR=evet
           else
             KARAR=hayir

@@ -111,7 +111,7 @@ def test_bundled_prompts_are_packaged_by_the_spec():
     dahil; burada o girdinin VARLIĞI doğrulanıyor (tests/test_version.py'deki
     metin-üzerinden-spec tekniğinin aynısı: spec'i pytest çalıştıramaz).
     """
-    with open(os.path.join(REPO, "gpt-image-studio.spec"), encoding="utf-8") as f:
+    with open(os.path.join(REPO, "kromis.spec"), encoding="utf-8") as f:
         text = f.read()
     assert re.search(r"\(\s*'bundled'\s*,\s*'bundled'\s*\)", text), \
         "spec bundled/ ağacını paketlemiyor — talimat dosyası .app'e girmez"

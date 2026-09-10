@@ -42,7 +42,7 @@ import paths
 import version
 
 # Yayınların okunduğu depo. Sabit: uygulama kendi kaynağını biliyor.
-DEPO = "Zenginby/gpt-image-studio"
+DEPO = "Zenginby/kromis"
 API = f"https://api.github.com/repos/{DEPO}/releases/latest"
 YAYIN_SAYFASI = f"https://github.com/{DEPO}/releases/latest"
 
@@ -118,7 +118,7 @@ def _guvenli_url(ham: object) -> str:
 
     Risk soyut değil: `follow_redirects=True` bilinçli olarak açık (depo bir
     gün yeniden adlandırılırsa kontrol sessizce ölmesin diye) ve v0.5.3'te depo
-    gerçekten taşındı — `Zenginby` adı boşaldı. Yayınlanmış eski istemciler
+    gerçekten taşındı — eski hesap adı boşaldı. Yayınlanmış eski istemciler
     hâlâ o yolu istiyor; o adı alan biri isteği kendi `releases/latest`ine
     yönlendirebilir. Bu doğrulamayla en kötü sonuç sahte bir "yeni sürüm var"
     satırı olur; bağlantı her hâlde bizim yayın sayfamıza gider.

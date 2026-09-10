@@ -1,7 +1,7 @@
 """Uygulama sürümü — TEK kaynak.
 
 Buradaki değer üç yere birden akar:
-  1. macOS paketinin Info.plist'i (gpt-image-studio.spec → CFBundle*Version),
+  1. macOS paketinin Info.plist'i (kromis.spec → CFBundle*Version),
   2. index.html'deki statik dosya cache-buster'ı (`?v=`, app.py:index()),
   3. Ayarlar panelinde kullanıcıya gösterilen sürüm satırı (GET /api/settings).
 
@@ -13,7 +13,7 @@ KURAL: gönderilen HER build APP_VERSION'ı artırır — yalnızca bir CSS/JS
 düzeltmesi de olsa. Cache-buster artık buna bağlı; sürüm sabit kalırsa
 statik dosyaların URL'si de sabit kalır ve istemci eski kopyayı sunabilir.
 
-Bu modül BİLEREK bağımlılıksız (yalnız __future__): gpt-image-studio.spec onu
+Bu modül BİLEREK bağımlılıksız (yalnız __future__): kromis.spec onu
 PyInstaller DERLEME zamanında, uygulamanın hiçbir bağımlılığı import edilmeden
 dosyadan yükler (bkz. spec'in başındaki açıklama). Buraya bir proje import'u
 eklemek o yüklemeyi kırar — tests/test_version.py bunu zorluyor.

@@ -1,4 +1,4 @@
-package org.zenginby.gptimagestudio
+package com.zenginby.kromis
 
 import android.Manifest
 import android.content.ContentValues
@@ -39,7 +39,7 @@ import java.util.concurrent.Executors
 object Downloader {
 
     private const val ETIKET = "GIS"
-    private const val ALT_KLASOR = "Lumeo"
+    private const val ALT_KLASOR = "Kromis"
 
     private val havuz = Executors.newSingleThreadExecutor()
     private val anaThread = Handler(Looper.getMainLooper())

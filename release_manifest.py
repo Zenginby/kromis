@@ -28,10 +28,10 @@ from __future__ import annotations
 
 # Anahtar = yayın varlığının adı. Paket işleri artifact'i BU adla yüklüyor;
 # yayın işi indirdiği dosya adlarını bu kümeyle karşılaştırıyor. Ara bir ad
-# (eskiden `dist-lumeo-android-arm64.apk`) bilinçle bırakılmadı: ayrışabilecek
+# (eskiden `dist-kromis-android-arm64.apk`) bilinçle bırakılmadı: ayrışabilecek
 # her ek isim, ayrışacak bir yerdir.
 PAKETLER: dict[str, dict[str, str]] = {
-    "lumeo-macOS-arm64.zip": {
+    "kromis-macOS-arm64.zip": {
         # release.yml'deki iş adı — `yayinla` işinin `needs:` listesinde
         # görünmek ZORUNDA, yoksa bu paket üretilmeden yayın oluşabilirdi.
         "is": "paket-macos",
@@ -40,12 +40,12 @@ PAKETLER: dict[str, dict[str, str]] = {
         # Kullanıcıya gösterilen sistem adı (GUNCELLEME.md tablosu).
         "sistem": "macOS (Apple Silicon)",
     },
-    "lumeo-windows-x64.zip": {
+    "kromis-windows-x64.zip": {
         "is": "paket-windows",
         "workflow": "_paket-windows.yml",
         "sistem": "Windows 10/11 (64-bit)",
     },
-    "lumeo-android-arm64.apk": {
+    "kromis-android-arm64.apk": {
         "is": "paket-android",
         "workflow": "_paket-android.yml",
         "sistem": "Android 8.0+ (arm64)",

@@ -16,6 +16,7 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
+import android_main
 import app as appmod
 
 
@@ -37,7 +38,7 @@ def _metin(istemci, yol: str) -> str:
 # aynı kaymayı saniyede yakalıyor.
 _KOTLIN = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "android", "app", "src", "main", "java", "org", "zenginby", "gptimagestudio",
+    "android", "app", "src", "main", "java", "com", "zenginby", "kromis",
     "MainActivity.kt",
 )
 
@@ -733,7 +734,7 @@ def test_the_android_download_bridge_is_wired_on_both_sides(istemci):
     indirme sistemi hiç yok ve devralma zinciri koptuğunda tıklama SESSİZCE
     hiçbir şey yapmıyor — hata da çıkmıyor.
 
-    Ad ayrışırsa aynı sessizlik geri geliyor: `window.LumeoIndirme` tanımsız
+    Ad ayrışırsa aynı sessizlik geri geliyor: `window.KromisIndirme` tanımsız
     kalır, frontend eski çıpa yoluna düşer ve kimse bir şey fark etmez. Kırılma
     yine iki dosyanın BİRLEŞTİĞİ yerde — bu dosyadaki diğer mandallarla aynı
     sınıf.
@@ -764,6 +765,29 @@ def test_the_android_download_bridge_is_wired_on_both_sides(istemci):
         "WebView sunucudan sonra kuruluyor: köprü ilk yüklemeyi kaçırır"
     assert "webView.loadUrl" in kt.split("private fun sunucuHazir(")[1], \
         "sayfa artık başka bir yerden yükleniyor: sıra iddiası anlamsızlaştı"
+
+
+def test_the_session_cookie_name_is_the_same_on_both_sides():
+    """Oturum çerezinin adı Python ile Kotlin'de AYNI olmak zorunda.
+
+    NEDEN BU TEST 2026-09-10'da YAZILDI: `MainActivity`in yorumu "`android_main.
+    SESSION_COOKIE` ile AYNI olmak zorunda" diyordu ama bunu tutan HİÇBİR ŞEY
+    yoktu — iki taraf da kendi sabitini okuyor, testler de sabit üzerinden
+    geçtiği için literal hiç karşılaştırılmıyordu. Ad `gis_session`'dan
+    `kromis_session`'a taşınırken tek taraf güncellenseydi kusur şöyle
+    görünürdü: WebView isteği çerezsiz (ya da yabancı adlı bir çerezle) gider,
+    `android_main`'in oturum kapısı HER isteği 403 ile reddeder ve kullanıcı boş
+    bir ekrana bakar. Yalnız gerçek telefonda görünen, sebebi görünmeyen bir
+    kırılma — bu dosyadaki köprü mandalıyla aynı sınıf.
+    """
+    kt = _kotlin_kaynagi()
+
+    ad = re.search(r'OTURUM_CEREZI\s*=\s*"([^"]+)"', kt)
+    assert ad, "MainActivity.kt'de OTURUM_CEREZI sabiti bulunamadı"
+    assert ad.group(1) == android_main.SESSION_COOKIE, (
+        f"Kotlin çerezi `{ad.group(1)}` diye kuruyor, Python "
+        f"`{android_main.SESSION_COOKIE}` bekliyor — oturum kapısı her isteği "
+        "403'le reddeder ve bu ancak telefonda görünür")
 
 
 def test_the_bridge_only_accepts_our_own_server(istemci):

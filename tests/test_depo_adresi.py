@@ -1,6 +1,6 @@
 """Depo adresi TEK kaynaktan mı akıyor: guncelleme.DEPO ↔ elle yazılan bağlantılar.
 
-NEDEN VAR: hesap bir kez taşındı (`Zenginby` → `Zenginby`) ve adres o an
+NEDEN VAR: hesap bir kez taşındı (eski hesap → `Zenginby`) ve adres o an
 dört ayrı dosyada elle yazılıydı — guncelleme.py, static/index.html (iki kez),
 README.md, GUNCELLEME.md. Hepsi elle düzeltildi; kaçırılan bir tanesi kırmızıya
 düşmez, sessizce 404 verir.
@@ -33,7 +33,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Bu projenin deposuna yapılan atıflar — başka projelerin GitHub adresleri
 # (android/gradlew → gradle/gradle, static/fonts/OFL.txt → googlefonts) kalıba
 # hiç girmesin diye depo ADI kalıbın içine sabitlendi.
-_ATIF = re.compile(r"github\.com/([A-Za-z0-9_.-]+)/gpt-image-studio")
+_ATIF = re.compile(r"github\.com/([A-Za-z0-9_.-]+)/kromis")
 
 _TARANMAZ = ("docs/superpowers/", "tests/")
 

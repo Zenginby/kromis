@@ -1,4 +1,4 @@
-package org.zenginby.gptimagestudio
+package com.zenginby.kromis
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -126,7 +126,7 @@ class MainActivity : AppCompatActivity() {
         // ARKA PLAN THREAD'İ ŞART: ilk açılışta Chaquopy stdlib'i açıyor ve
         // assets kopyalanıyor (2–5 sn). Ana thread'de yapılsaydı sistem ANR
         // diyaloğunu gösterirdi.
-        thread(name = "gis-baslatici") {
+        thread(name = "kromis-baslatici") {
             try {
                 val yeniUc = PythonServer.baslat(this)
                 runOnUiThread { sunucuHazir(yeniUc) }
@@ -595,15 +595,15 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         /** `android_main.SESSION_COOKIE` ile AYNI olmak zorunda. */
-        private const val OTURUM_CEREZI = "gis_session"
+        private const val OTURUM_CEREZI = "kromis_session"
 
         /**
          * Köprünün JS'teki adı — `core.js` `androidKoprusu()` ile AYNI olmak
-         * zorunda. Ayrışırsa hiçbir hata çıkmaz: `window.LumeoIndirme` tanımsız
+         * zorunda. Ayrışırsa hiçbir hata çıkmaz: `window.KromisIndirme` tanımsız
          * kalır, frontend sessizce `<a download>` yoluna düşer ve indirme
          * telefonda yine ölür. Bekçisi `tests/test_mobile.py`.
          */
-        private const val KOPRU_ADI = "LumeoIndirme"
+        private const val KOPRU_ADI = "KromisIndirme"
 
         /**
          * Geri basışının uygulama İÇİNDE karşılığı varsa "true" döner.

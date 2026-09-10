@@ -7,7 +7,7 @@
 # hiçbir şeyi göremiyor — buduğunda hata ancak cihazda, açılış anında
 # ClassNotFoundException olarak görünür.
 -keep class com.chaquo.python.** { *; }
--keep class org.zenginby.gptimagestudio.** { *; }
+-keep class com.zenginby.kromis.** { *; }
 
 # WebView'e JS köprüsü eklenirse (@JavascriptInterface) o sınıflar da
 # korunmalı. Bugün böyle bir köprü YOK — damlalık Android'de zaten gizli

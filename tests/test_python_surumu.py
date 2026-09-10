@@ -48,10 +48,10 @@ _BADGE = re.compile(r"badge/python-(\d+)\.(\d+)%2B")
 def _surumler(desen: re.Pattern[str], metin: str) -> list[tuple[int, int]]:
     return [(int(a), int(b)) for a, b in desen.findall(metin)]
 
-# `python-version: '3.14'` (setup-python) ve `-PgisBuildPython=python3.13`
+# `python-version: '3.14'` (setup-python) ve `-PkromisBuildPython=python3.13`
 # (Android'in gradle çağrısı) — ikisi de bir yorumlayıcı SEÇİYOR.
 _PIN = re.compile(r"""python-version:\s*['"]?(\d+)\.(\d+)"""
-                  r"""|PgisBuildPython=python(\d+)\.(\d+)""")
+                  r"""|PkromisBuildPython=python(\d+)\.(\d+)""")
 
 
 def _oku(yol: str) -> str:

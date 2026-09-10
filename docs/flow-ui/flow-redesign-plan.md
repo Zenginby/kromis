@@ -8,7 +8,7 @@ etkileşim grameri ve renk/tipografi sistemi.
 
 | Geri bildirim | Karar |
 |---|---|
-| "KURUM mavisi zorunlu değil, başka temalar da olabilir" | `--accent` **tek değiştirilebilir tema tokenı** oldu; 4 hazır tema, **varsayılan monokrom** (Flow'a birebir). §2.1 |
+| "Kurumsal mavi zorunlu değil, başka temalar da olabilir" | `--accent` **tek değiştirilebilir tema tokenı** oldu; 4 hazır tema, **varsayılan monokrom** (Flow'a birebir). §2.1 |
 | "Prompt girilen yer ve Prompt Yönetmeni aynı chat kısmında olsun, (+) yanından geçiş" | Sekmeler kaldırıldı. **Tek composer + (+) yanında Görsel/Yönetmen mod anahtarı.** §4.2 |
 | "Sohbet geçmişinde hem konuşmalar hem üretilen görseller tutulsun" | **Birleşik oturum**: döküm konuşma + üretim sonuçlarını aynı akışta tutuyor. Veri modeli ve bir ürün kararı çakışması: §5 |
 | "Görsel arama Medya kısmında olsun" | Üst şeritteki arama pill'i **kaldırıldı**, arama Medya görünümüne taşındı; ray dörde indi. §4.1 |
@@ -97,7 +97,7 @@ her temada aynı — bu yüzden hiçbir tema kontrastı bozamıyor.
 | Tema | `--accent` | Not |
 |---|---|---|
 | **Monokrom (varsayılan)** | `#e8eaed` | Flow'a birebir; renk hiç yok |
-| KURUM mavisi | `oklch(72% 0.11 245)` | logo varlıklarından ölçülen `#085888`'in koyu zeminde okunabilir türevi |
+| Kurumsal mavi | `oklch(72% 0.11 245)` | logo varlıklarından ölçülen `#085888`'in koyu zeminde okunabilir türevi |
 | Amber | `oklch(76% 0.14 68)` | motto turuncusu `#e08038` ailesinden |
 | Menekşe | `oklch(72% 0.13 300)` | nötr üçüncü seçenek |
 

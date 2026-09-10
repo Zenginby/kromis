@@ -46,7 +46,7 @@ sağlayıcısı iki boş yuva taşırdı.
 Sınıf DEĞİL, fonksiyon modülü: bu depoda hiçbir yerde servis sınıfı yok.
 
 Adaptörler modül düzeyinde STATİK import ediliyor, `importlib` ile DEĞİL.
-Sebep: `gpt-image-studio.spec`'in `hiddenimports=[]` değeri PyInstaller'ın
+Sebep: `kromis.spec`'in `hiddenimports=[]` değeri PyInstaller'ın
 statik analizine dayanıyor ve o dosyanın 50 satırlık yorumu bunu ölçülmüş bir
 değişmez sayıyor. Dinamik import o analizden kaçar ve paketlenmiş uygulamada
 adaptör bulunamaz.

@@ -6,7 +6,7 @@ karar mantığı (`surum_karari.py`) ve sürüm yazıcısı (`surum_yaz.py`) art
 alması, her test dosyasında importlib kurulumu tekrarlamaktan hem kısa hem
 sağlam.
 
-Buradaki modüller PAKETE GİRMİYOR: `gpt-image-studio.spec` yalnızca app.py'nin
+Buradaki modüller PAKETE GİRMİYOR: `kromis.spec` yalnızca app.py'nin
 import zincirini izliyor ve o zincir `tools`'a hiç dokunmuyor. `tools/` ayrıca
 `tools/surum_karari.py` içindeki GUVENLI_YOLLAR listesinde "pakete girmeyen
 yollar" arasında sayılı — yani buraya yapılan bir değişiklik tek başına yayın

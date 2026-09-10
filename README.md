@@ -1,11 +1,11 @@
-# 🎨 Lumeo
+# 🎨 Kromis Studio
 
-[![Release](https://img.shields.io/badge/version-v0.15.0-blue.svg)](https://github.com/Zenginby/gpt-image-studio/releases/latest)
+[![Release](https://img.shields.io/badge/version-v0.15.0-blue.svg)](https://github.com/Zenginby/kromis/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org/)
-[![Build & Test](https://github.com/Zenginby/gpt-image-studio/actions/workflows/release.yml/badge.svg)](https://github.com/Zenginby/gpt-image-studio/actions)
+[![Build & Test](https://github.com/Zenginby/kromis/actions/workflows/release.yml/badge.svg)](https://github.com/Zenginby/kromis/actions)
 
-**Lumeo**, yapay zeka destekli görsel üretimi, görsel içi nesne/metin düzenleme, akıllı prompt yönetmenliği, renk paleti teorisi ve kurumsal görsel bindirme (logo/banner/motto) işlemlerini tek bir arayüzde birleştiren gelişmiş masaüstü ve yerel web uygulamasıdır.
+**Kromis Studio**, yapay zeka destekli görsel üretimi, görsel içi nesne/metin düzenleme, akıllı prompt yönetmenliği, renk paleti teorisi ve kurumsal görsel bindirme (logo/banner/motto) işlemlerini tek bir arayüzde birleştiren gelişmiş masaüstü ve yerel web uygulamasıdır.
 
 ---
 
@@ -15,9 +15,9 @@ Son kullanıcılar için hazırlanmış hazır derleme paketlerini doğrudan ind
 
 | Platform | Mimari | İndirme Bağlantısı |
 |---|---|---|
-| 🍏 **macOS** | Apple Silicon (M1 / M2 / M3 / M4) | [İndir (ZIP / ARM64)](https://github.com/Zenginby/gpt-image-studio/releases/latest/download/lumeo-macOS-arm64.zip) |
-| 🪟 **Windows** | x64 (Windows 10 / 11) | [İndir (ZIP / x64)](https://github.com/Zenginby/gpt-image-studio/releases/latest/download/lumeo-windows-x64.zip) |
-| 🤖 **Android** | arm64-v8a (Android 8.0+) | [İndir (APK / arm64)](https://github.com/Zenginby/gpt-image-studio/releases/latest/download/lumeo-android-arm64.apk) |
+| 🍏 **macOS** | Apple Silicon (M1 / M2 / M3 / M4) | [İndir (ZIP / ARM64)](https://github.com/Zenginby/kromis/releases/latest/download/kromis-macOS-arm64.zip) |
+| 🪟 **Windows** | x64 (Windows 10 / 11) | [İndir (ZIP / x64)](https://github.com/Zenginby/kromis/releases/latest/download/kromis-windows-x64.zip) |
+| 🤖 **Android** | arm64-v8a (Android 8.0+) | [İndir (APK / arm64)](https://github.com/Zenginby/kromis/releases/latest/download/kromis-android-arm64.apk) |
 
 > [!TIP]
 > Paketleme hakkında detaylı bilgi ve kurulum talimatları için [KURULUM.md](KURULUM.md) rehberini inceleyebilirsiniz — belge üç sistemi de kapsıyor (macOS Gatekeeper, Windows SmartScreen ve Android "bilinmeyen kaynak" adımları dahil).

@@ -17,7 +17,7 @@ docs/flow-ui/assets/
 branding/*.png
 branding/*.ico
 branding/*.icns
-branding/lumeo.iconset/
+branding/kromis.iconset/
 static/img/
 
 # graphify'ın kendi çıktısı (`.gitignore`'da da var, kendi kendini taramasın)

@@ -1,4 +1,4 @@
-// Lumeo — üretim akışı: prompt, referans görseller, ilerleme, onay penceresi.
+// Kromis — üretim akışı: prompt, referans görseller, ilerleme, onay penceresi.
 //
 // Klasik script (ES module DEĞİL): bütün parçalar TEK global kapsamı paylaşır
 // ve index.html'deki yükleme SIRASI bağlayıcıdır:
@@ -2029,7 +2029,7 @@ function indirmeAdresi(url) {
 // Köprü YOKSA (tarayıcı, masaüstü paketi) hiçbir şey değişmiyor: eski
 // `<a download>` yolu aynen duruyor.
 function androidKoprusu() {
-  const kopru = window.LumeoIndirme;
+  const kopru = window.KromisIndirme;
   return kopru && typeof kopru.indir === "function" ? kopru : null;
 }
 

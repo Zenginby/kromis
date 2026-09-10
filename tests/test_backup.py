@@ -291,7 +291,7 @@ def test_lifespan_survives_a_backup_error(monkeypatch, tmp_path):
     görür. Hata hata.log'a düşer, uygulama yine de servis verir.
 
     (Buranın bir kardeşi vardı: yedek hatasının TOHUMLAMAYI düşürmediğini
-    ölçen test. Tohumlama — pakete gömülü KURUM logolarının kullanıcı
+    ölçen test. Tohumlama — pakete gömülü kurumsal logolarının kullanıcı
     kütüphanesine kopyalanması — ürün marka-nötr olunca kaldırıldı, o test de
     lifespan'daki sıra testiyle birlikte gitti.)
     """

@@ -14,7 +14,7 @@ Bağımlılık listemizin tamamı bu kapıdan geçiyor — biri hariç:
 |---|---|
 | `fastapi`, `starlette`, `httpx`, `anyio`, `h11`, `certifi`, `idna`, `sniffio`, `python-multipart` | saf Python ✔ |
 | `Pillow` | Chaquopy deposunda 11.0.0 var; `requirements.txt`'teki `Pillow==11.*` pinine uyuyor ✔ |
-| `uvicorn` | `uvloop`/`httptools` native, ama **sade** uvicorn (asyncio + h11) saf Python ✔ — bu zaten kanıtlı: `gpt-image-studio.spec:97` masaüstü paketinde de bu dördünü dışarıda bırakıyor ve uygulama çalışıyor |
+| `uvicorn` | `uvloop`/`httptools` native, ama **sade** uvicorn (asyncio + h11) saf Python ✔ — bu zaten kanıtlı: `kromis.spec:97` masaüstü paketinde de bu dördünü dışarıda bırakıyor ve uygulama çalışıyor |
 | **`pydantic-core`** | **YOK** ✘ — ne Chaquopy deposunda ne PyPI'de Android wheel'i var |
 
 `pydantic-core` Rust ile yazılmış ve `pydantic`'in tamamı ona bağlı; `pydantic`

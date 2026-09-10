@@ -1,4 +1,4 @@
-"""Lumeo — yerel FastAPI arayüzü."""
+"""Kromis Studio — yerel FastAPI arayüzü."""
 from __future__ import annotations
 
 import base64
@@ -88,7 +88,7 @@ async def _lifespan(app: FastAPI):
     kesinlikle kötüdür.
 
     NOT: Burada bir İKİNCİ adım vardı — `seed.seed_builtin_logos`
-    pakete gömülü KURUM logo çiftini kullanıcının kütüphanesine kopyalardı.
+    pakete gömülü kurumsal logo çiftini kullanıcının kütüphanesine kopyalardı.
     Uygulama marka-nötr olduğundan o modül tamamen kaldırıldı; kütüphane artık
     boş başlar ve kullanıcı kendi logosunu yükler.
     """
@@ -108,7 +108,7 @@ async def _lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Lumeo", lifespan=_lifespan)
+app = FastAPI(title="Kromis Studio", lifespan=_lifespan)
 
 
 # Kimlik FORMU olan rotalar: yanıtta hiçbir alanın değeri yankılanmak zorunda
@@ -1771,7 +1771,7 @@ def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
     """Logo/motto filigranını süreç içinde bindirir (composite.py).
 
     Bindirilecek görsel HER ZAMAN kullanıcının kütüphanesinden gelir. Eskiden
-    `asset_id` boş bırakılabilir ve pakete gömülü KURUM logo çiftine düşülürdü;
+    `asset_id` boş bırakılabilir ve pakete gömülü kurumsal logo çiftine düşülürdü;
     uygulama marka-nötr olduğundan o varsayılan yok — seçim yapılmadıysa istek
     422 ile reddedilir (modelde `asset_id` zorunlu), bulunamazsa 404.
     """
@@ -2076,7 +2076,7 @@ def index() -> HTMLResponse:
         return HTMLResponse(
             "<h1>Arayüz yüklenemedi</h1>"
             "<p>Uygulama dosyaları okunamadı. Lütfen uygulamayı kapatıp yeniden açın; "
-            f"sürerse hata kaydını (<code>{log_path or 'hata.log'}</code>) Kurum'ya iletin.</p>",
+            f"sürerse hata kaydını (<code>{log_path or 'hata.log'}</code>) geliştiriciye iletin.</p>",
             status_code=500, headers={"Cache-Control": "no-store"})
     return HTMLResponse(template.replace("__APP_VERSION__", version.APP_VERSION),
                         headers={"Cache-Control": "no-store"})

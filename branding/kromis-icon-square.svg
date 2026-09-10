@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Lumeo uygulama simgesi (favicon, macOS/Windows paket ikonu, Android eski
-  mipmap yoğunlukları için TEK kaynak). Diyafram işareti lumeo-mark.svg ile
+  Kromis uygulama simgesi (favicon, macOS/Windows paket ikonu, Android eski
+  mipmap yoğunlukları için TEK kaynak). Diyafram işareti kromis-mark.svg ile
   birebir aynı geometri; burada 512×512 tuvale ortalanmış ve koyu, hafif
   degrade bir kare arka plan eklendi (Android'in adaptive-icon arka planıyla
   aynı ton ailesi: flow-tokens.css'teki surface / bg tokenları).

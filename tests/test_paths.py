@@ -35,7 +35,7 @@ def test_frozen_mode_writes_under_application_support(monkeypatch):
     monkeypatch.setattr(sys, "_MEIPASS", "/tmp/meipass-test", raising=False)
 
     expected_data = os.path.join(
-        os.path.expanduser("~/Library/Application Support"), "Lumeo")
+        os.path.expanduser("~/Library/Application Support"), "Kromis")
     assert paths.is_frozen()
     assert paths.data_dir() == expected_data
     assert paths.output_dir() == os.path.join(expected_data, "output")
@@ -43,7 +43,7 @@ def test_frozen_mode_writes_under_application_support(monkeypatch):
 
 
 def test_frozen_mode_writes_under_local_appdata_on_windows(monkeypatch):
-    """Windows dalı: veri `%LOCALAPPDATA%\\Lumeo` altına gider.
+    """Windows dalı: veri `%LOCALAPPDATA%\\Kromis` altına gider.
 
     Roaming (`%APPDATA%`) DEĞİL: bu dizin üretilen görselleri tutuyor ve etki
     alanı profilinde ağ üzerinden taşınması istenmez.
@@ -53,7 +53,7 @@ def test_frozen_mode_writes_under_local_appdata_on_windows(monkeypatch):
     monkeypatch.setenv("LOCALAPPDATA", r"C:\Kullanicilar\test\AppData\Local")
 
     expected_data = os.path.join(r"C:\Kullanicilar\test\AppData\Local",
-                                 "Lumeo")
+                                 "Kromis")
     assert paths.data_dir() == expected_data
     assert paths.output_dir() == os.path.join(expected_data, "output")
     assert paths.assets_dir() == os.path.join(expected_data, "assets")
@@ -66,7 +66,7 @@ def test_frozen_windows_falls_back_when_localappdata_is_missing(monkeypatch):
     monkeypatch.delenv("LOCALAPPDATA", raising=False)
 
     expected = os.path.join(os.path.expanduser("~"), "AppData", "Local",
-                            "Lumeo")
+                            "Kromis")
     assert paths.data_dir() == expected
 
 
@@ -163,16 +163,23 @@ def test_android_resource_dir_falls_back_under_data_dir(monkeypatch):
     assert paths.resource_dir() == os.path.join("/data/veri", "resources")
 
 
-def test_desktop_credential_paths_are_unchanged(monkeypatch):
-    """Kimlik yolları `paths`'e taşındı — masaüstü değerleri BİREBİR aynı kalmalı.
+def test_desktop_credential_paths_follow_the_current_app_name(monkeypatch):
+    """Kimlik yolları `paths`'te tek yerde; masaüstü değerleri BUNLAR.
 
-    Bu iki yol mevcut kurulumlardaki dosyaları gösteriyor; değişmesi
-    kullanıcının Azure anahtarının "kaybolması" demek olurdu.
+    TARİHÇE: bu testin adı `..._are_unchanged` idi ve gerekçesi "değişmesi
+    kullanıcının Azure anahtarının kaybolması demek olurdu" diye yazılıydı.
+    2026-09-10'da uygulama adı `Lumeo` → `Kromis` olurken yol DEĞİŞTİ; o
+    gerekçe silinmedi, karşılığı kuruldu — `paths._migrate_from_old_name`
+    dosyayı yeni ada taşıyor. Yani bu yolu bir daha değiştiren, göç
+    sabitlerini (`OLD_CONFIG_DIRNAME`) de kaydırmak zorunda.
+
+    `claude-tools` ile paylaşılan dosyanın yolu bu yeniden adlandırmadan
+    ETKİLENMİYOR: o dosya başka bir projenin ve adı bizim adımız değil.
     """
     monkeypatch.delenv(paths.ANDROID_DATA_ENV, raising=False)
 
     assert paths.credentials_path() == os.path.expanduser(
-        "~/.config/lumeo/credentials.env")
+        "~/.config/kromis/credentials.env")
     assert paths.shared_credentials_path() == os.path.expanduser(
         "~/.config/claude-tools/azure-gpt-image2.env")
 
@@ -228,6 +235,10 @@ def test_ensure_data_dirs_runs_on_startup_not_on_import(monkeypatch):
 
 
 def test_ensure_data_dirs_is_idempotent(monkeypatch, tmp_path):
+    # Göç burada BİLEREK no-op: bu test `makedirs` idempotentliğini ölçüyor ve
+    # bu dosya conftest'in göç guard'ından muaf (bkz. `_guard_against_real_migration`)
+    # — patchlenmezse gerçek `~/.config/lumeo` dizinine dokunurdu.
+    monkeypatch.setattr(paths, "_migrate_from_old_name", lambda: None)
     monkeypatch.setattr(paths, "data_dir", lambda: str(tmp_path / "veri"))
 
     paths.ensure_data_dirs()
@@ -237,3 +248,192 @@ def test_ensure_data_dirs_is_idempotent(monkeypatch, tmp_path):
     assert (tmp_path / "veri" / "output").is_dir()
     assert (tmp_path / "veri" / "assets").is_dir()
     assert (tmp_path / "veri" / "output" / "dokunma.txt").read_text(encoding="utf-8") == "kalmalı"
+
+
+# ── Ad göçü: Lumeo → Kromis ─────────────────────────────────────────
+# Bu bölümün var oluş sebebi, bir önceki yeniden adlandırmadan (gpt-image-studio
+# → lumeo) FARKLI: v0.15.0 `Lumeo` adıyla yayınlandı ve KULLANILDI. Yani
+# `%LOCALAPPDATA%\Lumeo` ve `~/.config/lumeo/` altında gerçek kullanıcı verisi
+# (üretilmiş görseller, kütüphane, Azure anahtarı) duruyor. Göç olmadan yeni
+# sürüm boş bir uygulama gibi açılır ve kullanıcı verisini KAYBETTİĞİNİ sanar.
+#
+# Testlerin çoğu üretimin en alt katmanını (`_move_if_new_is_absent`) ölçüyor:
+# kurallar orada ve yollar parametre olduğu için iddialar tmp_path'te kalıyor,
+# koşan makinenin ev dizinine hiç dokunmuyor.
+
+
+def test_migration_moves_the_old_directory(tmp_path):
+    eski = tmp_path / "Lumeo"
+    (eski / "output").mkdir(parents=True)
+    (eski / "output" / "resim.png").write_bytes(b"veri")
+    yeni = tmp_path / "Kromis"
+
+    paths._move_if_new_is_absent(str(eski), str(yeni))
+
+    assert not eski.exists(), "eski dizin taşındıktan sonra geride kalmamalı"
+    assert (yeni / "output" / "resim.png").read_bytes() == b"veri"
+
+
+def test_migration_does_not_touch_a_populated_new_directory(tmp_path):
+    """En pahalı kırılma bu olurdu: TAZE veriyi bayat veriyle ezmek.
+
+    Kullanıcı yeni adla bir süre çalıştıktan sonra eski dizin hâlâ diskte
+    duruyor. Göç koşulsuz olsaydı ikinci bir açılış yeni kütüphaneyi eski
+    hâline döndürürdü — ve `rename` atomik olduğu için geri dönüşü olmazdı.
+    """
+    eski = tmp_path / "Lumeo"
+    eski.mkdir()
+    (eski / "bayat.txt").write_text("eski", encoding="utf-8")
+    yeni = tmp_path / "Kromis"
+    yeni.mkdir()
+    (yeni / "taze.txt").write_text("yeni", encoding="utf-8")
+
+    paths._move_if_new_is_absent(str(eski), str(yeni))
+
+    assert (yeni / "taze.txt").read_text(encoding="utf-8") == "yeni"
+    assert not (yeni / "bayat.txt").exists()
+    assert (eski / "bayat.txt").exists(), "hiçbir şey SİLİNMEZ"
+
+
+def test_migration_uses_an_empty_new_directory(tmp_path):
+    """Boş kabuk göçü ENGELLEMEZ.
+
+    `ensure_data_dirs` bir önceki açılışta hedefi açıp bırakmış olabilir (göç
+    eklenmeden önce yayınlanmış bir ara sürüm, ya da göçün patladığı bir
+    açılış). Boş dizin "kullanıcı yeni adla çalıştı" demek değil; aksi hâlde
+    göç bir kez atlanınca BİR DAHA hiç koşmazdı.
+    """
+    eski = tmp_path / "Lumeo"
+    eski.mkdir()
+    (eski / "veri.txt").write_text("tasinmali", encoding="utf-8")
+    yeni = tmp_path / "Kromis"
+    yeni.mkdir()
+
+    paths._move_if_new_is_absent(str(eski), str(yeni))
+
+    assert (yeni / "veri.txt").read_text(encoding="utf-8") == "tasinmali"
+
+
+def test_migration_is_silent_when_there_is_nothing_to_move(tmp_path):
+    """Eski dizin yoksa hedef de YARATILMAZ.
+
+    Yaratılsaydı temiz bir kurulumda `_move_if_new_is_absent` boş bir kabuk
+    bırakırdı ve bir sonraki maddenin ("boş dizin göçü engellemez") ölçtüğü
+    durumu kendi eliyle üretirdi.
+    """
+    yeni = tmp_path / "Kromis"
+
+    paths._move_if_new_is_absent(str(tmp_path / "hic-olmayan"), str(yeni))
+
+    assert not yeni.exists()
+
+
+def test_migration_is_idempotent(tmp_path):
+    eski = tmp_path / "Lumeo"
+    eski.mkdir()
+    (eski / "veri.txt").write_text("bir", encoding="utf-8")
+    yeni = tmp_path / "Kromis"
+
+    paths._move_if_new_is_absent(str(eski), str(yeni))
+    paths._move_if_new_is_absent(str(eski), str(yeni))  # ikinci çağrı no-op
+
+    assert (yeni / "veri.txt").read_text(encoding="utf-8") == "bir"
+
+
+def test_migration_swallows_oserror_and_records_it(monkeypatch, tmp_path):
+    """Göç hatası uygulamayı açılamaz hâle GETİRMEMELİ; sessiz de kalmamalı.
+
+    Gerçek sebepler: dosya başka bir süreçte açık (Windows), birim
+    salt-okunur, ya da iki yol farklı sürücüde (`rename` birimler arası
+    çalışmaz). Üçünde de doğru davranış aynı: eski dizin yerinde kalır,
+    uygulama açılır, `hata.log` nereye bakılacağını söyler.
+    """
+    eski = tmp_path / "Lumeo"
+    eski.mkdir()
+    (eski / "veri.txt").write_text("bir", encoding="utf-8")
+    yeni = tmp_path / "Kromis"
+    monkeypatch.setattr(paths, "data_dir", lambda: str(tmp_path / "gunluk"))
+
+    def _patla(*a, **k):
+        raise OSError("cihaz mesgul")
+
+    monkeypatch.setattr(paths.os, "rename", _patla)
+    paths._move_if_new_is_absent(str(eski), str(yeni))  # patlamamalı
+
+    assert (eski / "veri.txt").exists(), "başarısız göç veriyi yerinde bırakmalı"
+    kayit = (tmp_path / "gunluk" / "hata.log").read_text(encoding="utf-8")
+    assert "Lumeo" in kayit and "Kromis" in kayit and "cihaz mesgul" in kayit
+
+
+def test_migration_never_runs_on_android(monkeypatch):
+    """Telefonda göç YOK — `applicationId` değiştiği için eski uygulamanın
+    app-private dizini bu uygulamaya kapalı; taşımaya çalışmak yalnız hata
+    üretirdi. Veri kaybı bilinçli ve KURULUM.md'de yazılı."""
+    monkeypatch.setenv(paths.ANDROID_DATA_ENV, "/data/veri")
+    cagrilar = []
+    monkeypatch.setattr(paths, "_move_if_new_is_absent",
+                        lambda eski, yeni: cagrilar.append((eski, yeni)))
+
+    paths._migrate_from_old_name()
+
+    assert cagrilar == []
+
+
+def test_migration_skips_the_data_root_in_dev_mode(monkeypatch):
+    """Geliştirmede veri kökü REPO_DIR'dir — taşımak DEPONUN KENDİSİNİ oynatırdı.
+
+    Kimlik dosyası ise frozen'dan bağımsız: kaynaktan çalıştıran da
+    `~/.config/<ad>/credentials.env` kullanıyor, o yüzden tek çağrı kalıyor.
+    """
+    monkeypatch.delenv(paths.ANDROID_DATA_ENV, raising=False)
+    cagrilar = []
+    monkeypatch.setattr(paths, "_move_if_new_is_absent",
+                        lambda eski, yeni: cagrilar.append((eski, yeni)))
+
+    assert not paths.is_frozen()
+    paths._migrate_from_old_name()
+
+    assert cagrilar == [(paths._desktop_credentials_path(paths.OLD_CONFIG_DIRNAME),
+                         paths.credentials_path())]
+
+
+def test_migration_moves_both_roots_when_frozen(monkeypatch):
+    """Paketlenmiş uygulamada İKİ kök taşınıyor: veri dizini + kimlik dosyası."""
+    monkeypatch.delenv(paths.ANDROID_DATA_ENV, raising=False)
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    cagrilar = []
+    monkeypatch.setattr(paths, "_move_if_new_is_absent",
+                        lambda eski, yeni: cagrilar.append((eski, yeni)))
+
+    paths._migrate_from_old_name()
+
+    assert cagrilar == [
+        (paths._desktop_data_root(paths.OLD_APP_NAME), paths.data_dir()),
+        (paths._desktop_credentials_path(paths.OLD_CONFIG_DIRNAME),
+         paths.credentials_path()),
+    ]
+    # Eski kök gerçekten ESKİ adı göstermeli; sabit boşalırsa göç sessizce
+    # kendi kendini taşımaya çalışırdı.
+    assert paths._desktop_data_root(paths.OLD_APP_NAME) != paths.data_dir()
+
+
+def test_ensure_data_dirs_migrates_before_creating_the_dirs(monkeypatch, tmp_path):
+    """SIRA sözleşmenin parçası, süs değil.
+
+    `makedirs` önce koşsaydı hedef dizin göç sırasında ARTIK BOŞ OLMAZDI
+    (`output/` ve `assets/` içinde) — "yeni dizin doluysa dokunma" kuralı
+    tetiklenir ve göç ilk açılıştan sonra bir daha hiç koşmazdı. Bu iddia o
+    yüzden çağrı sırasını değil, göçün GÖRDÜĞÜ dünyayı ölçüyor.
+    """
+    gordugu = {}
+
+    def _goc():
+        gordugu["output_vardi"] = (tmp_path / "veri" / "output").exists()
+
+    monkeypatch.setattr(paths, "_migrate_from_old_name", _goc)
+    monkeypatch.setattr(paths, "data_dir", lambda: str(tmp_path / "veri"))
+
+    paths.ensure_data_dirs()
+
+    assert gordugu["output_vardi"] is False

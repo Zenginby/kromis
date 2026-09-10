@@ -159,8 +159,8 @@ sürüyor.
 | Koşu hiç başlamadı | Workflow YAML'ı bozuk (GitHub onu sessizce yok sayar) | `pytest tests/test_release_manifest.py` — `test_butun_workflowlar_gecerli_yaml` bunu yakalar |
 | Windows işi **"Derle"** adımında kırmızı, kayıtta `FAILED tests/…` | `build.ps1` paketlemeden ÖNCE tam pytest takımını Windows yorumlayıcısıyla koşturuyor | Kusur paketlemede değil TESTTE: kaydın sonundaki `short test summary`ye bak. Linux'ta yeşil olan bir testin yalnız burada düşmesi bir platform farkıdır (yol ayracı, ADS, süreç açma süresi) — 2026-09-04'te `node.exe`nin soğuk açılışı 10 sn'lik bir sınırı aştı, bkz. `tests/test_search_predicate.py` → `NODE_ZAMAN_ASIMI` |
 | Windows "Açılış denetimi" kırmızı, **MOTW'siz** senaryoda | Paketlenen .NET köprüsü (pythonnet/clr_loader) frozen'da çalışmıyor | Sorun sürüm yığınında: `requirements.txt`'teki pinlere bak. Geri çekilme yolu `_paket-windows.yml`'in `python-version`'ını 3.13'e indirip `pythonnet==3.0.*`'a dönmek (`tests/test_bagimlilik_pinleri.py` ikisini birlikte zorluyor) |
-| Windows "Açılış denetimi" kırmızı, yalnız **MOTW'li** senaryoda | İndirme işareti .NET assembly yüklemesini engelliyor | Kusur kullanıcının göreceği kusurun ta kendisi. `branding/Lumeo.exe.config` exe'nin yanına kopyalanıyor mu, `winclr` işareti kaldırabiliyor mu — adımın bastığı rapora bak |
-| Windows "Açılış denetimi" "rapor dosyasi hic yazilmamis" dedi | `Lumeo.exe` raporu yazmadan öldü | En ağır belirti: süreç `--onyukleme-denetimi` kipinde bile ayakta kalamıyor. `hata.log` basılıyor; yoksa kusur `desktop.main()`'den de önce |
+| Windows "Açılış denetimi" kırmızı, yalnız **MOTW'li** senaryoda | İndirme işareti .NET assembly yüklemesini engelliyor | Kusur kullanıcının göreceği kusurun ta kendisi. `branding/Kromis.exe.config` exe'nin yanına kopyalanıyor mu, `winclr` işareti kaldırabiliyor mu — adımın bastığı rapora bak |
+| Windows "Açılış denetimi" "rapor dosyasi hic yazilmamis" dedi | `Kromis.exe` raporu yazmadan öldü | En ağır belirti: süreç `--onyukleme-denetimi` kipinde bile ayakta kalamıyor. `hata.log` basılıyor; yoksa kusur `desktop.main()`'den de önce |
 
 ## İmzalama ve notarization
 

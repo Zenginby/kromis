@@ -32,7 +32,7 @@ Tek kaynak korunuyor — masaüstünde düzeltilen bir hata telefonda da düzeli
 | Dosya | İşi |
 |---|---|
 | `android_main.py` | Android girişi: yolları açar, token'ı üretir, uvicorn'u başlatır |
-| `paths.py` | Dördüncü dal (Android) — `GIS_ANDROID_DATA_DIR` / `GIS_ANDROID_RESOURCE_DIR` |
+| `paths.py` | Dördüncü dal (Android) — `KROMIS_ANDROID_DATA_DIR` / `KROMIS_ANDROID_RESOURCE_DIR` |
 | `android/pins.properties` | pydantic / pydantic-core / Python sürümleri — tek kaynak |
 | `android/app/build.gradle` | Chaquopy yapılandırması, sürümü `version.py`'den okur |
 | `…/StudioApplication.kt` | `Python.start()` — süreç başına bir kez |
@@ -78,7 +78,7 @@ hata çıkmıyor — tıklama **sessizce hiçbir şey yapmıyor**. Telefonda "in
 çalışmıyor"un tarifi tam olarak bu ve tek bir `Content-Disposition` başlığı onu
 kapatmıyor.
 
-Bu yüzden `MainActivity` sayfaya `LumeoIndirme` adında bir arayüz enjekte
+Bu yüzden `MainActivity` sayfaya `KromisIndirme` adında bir arayüz enjekte
 ediyor (`addJavascriptInterface`, `loadUrl`'den **önce**) ve `core.js`
 `downloadViaAnchor` köprü varsa doğrudan onu çağırıyor. Zincirden çıkanlar:
 WebView'in indirme devralması, `<a download>`, ve `URLUtil.guessFileName` —
@@ -125,7 +125,7 @@ Bakımcı tarafı iki yol:
 **Deneme paketi (yayın oluşmaz).** Actions → *Yayın* → **Run workflow**; dalı
 seç, `surum` alanına bir sonraki sürümü yaz, `kuru_prova`yı işaretle. Dal
 kapısı sürüm commit'ini ve yayını engelliyor (`release.yml` → DAL KAPISI), ama
-Android işi tam olarak koşuyor. Koşu bitince `lumeo-android-arm64` varlığını
+Android işi tam olarak koşuyor. Koşu bitince `kromis-android-arm64` varlığını
 indir, ZIP'ten çıkan APK'yı telefona at. `android/` altına dokunan bir PR'da
 aynı iş kendiliğinden koşuyor (`docs/yayin-hatti.md` → "PR'da ne koşuyor") —
 orada ayrıca tetiklemek gerekmiyor. Wheel önbellekte olduğu sürece koşu
@@ -181,8 +181,9 @@ uygulamayı kaldırmak zorunda kalır ve kaldırma tüm verisini siler. Anahtar 
 dışında, parola yöneticisinde ya da şifreli bir yedekte durmalı.
 
 ```bash
-keytool -genkeypair -v -keystore gis.keystore -alias gis \
-        -keyalg RSA -keysize 4096 -validity 10000 -storetype PKCS12
+keytool -genkeypair -v -keystore kromis.keystore -alias kromis \
+        -keyalg RSA -keysize 4096 -validity 10000 -storetype PKCS12 \
+        -dname "CN=Kromis Studio, O=Zenginby, C=TR"
 ```
 
 PKCS12'de **anahtar parolası = depo parolası**; `keytool` ayrı bir anahtar
@@ -193,7 +194,13 @@ Sırları tanımladıktan sonra yukarıdaki *deneme paketi* koşusunu tetikle. B
 `İmzayı doğrula` atlanmaz; `apksigner verify --print-certs` sertifikayı basar ve
 o adım yeşilse paket telefona kurulur.
 
-#### Yayındaki anahtarın kimliği
+#### Anahtar kimliği
+
+**v0.15.0'a kadarki anahtar (TARİHSEL).** Paket kimliği `com.zenginby.kromis`e
+taşındığında (2026-09-10) yeni bir anahtar üretilmesi kararlaştırıldı; aşağıdaki
+değerler ESKİ anahtara ait ve yalnız kayıt olarak duruyor. Yeni anahtarın
+parmak izleri ilk imzalı koşudan sonra buraya eklenecek — tablo boş kaldığı
+sürece "yeni anahtarla imzalanmış bir paket henüz ölçülmedi" demektir.
 
 `apksigner verify --print-certs` ile ölçüldü (koşu 32478330228, 2026-08-21):
 
@@ -217,7 +224,7 @@ Sırlar depo **ayarlarında** yaşıyor, git ağacında değil: `git clone` onla
 getirmiyor, depoya bakarak varlıkları anlaşılmıyor. Hesap değişikliğinden sonra
 ilk soru her zaman "dört sır hâlâ orada mı" oluyor.
 
-Ölçüldü: depo `Zenginby`'dan `Zenginby`'ye taşındıktan sonra (2026-08-21,
+Ölçüldü: depo eski hesaptan `Zenginby`'ye taşındıktan sonra (2026-08-21,
 koşu 32478330228) dördü de yerindeydi — GitHub taşımada depo sırlarını
 düşürmedi ve APK yukarıdaki parmak iziyle imzalandı. Yine de her taşımadan
 sonra ölçülmeli; tek güvenilir işaret `İmzayı doğrula` adımının ATLANMAMIŞ
@@ -263,7 +270,7 @@ gerçek cihazda ölçülebilir.
 | **Çoklu seçim** | Kütüphane → "+ Logo yükle" → galeriden seç → **"Bitti"** → dosya gerçekten yüklenmeli. Bu yol `getData()` DEĞİL `ClipData` döndürüyor (`secilenDosyalar`); tek seçim yolunun çalışması bunu kanıtlamıyor — kusur tam olarak bu boşlukta bir sürüm yaşadı |
 | Kütüphaneye yükleme | Kütüphane → "+ Logo yükle" → seçicide **.jpg** bir dosya seçilebiliyor olmalı (intent'in süzgeci kabul listesinin tamamını taşıyor mu) → yüklenen logo bindirme panelinde görünmeli |
 | Türü bildirilmeyen dosya | Aynı yükleme "Son kullanılanlar"/İndirilenler üzerinden: MIME'ı boş gelen dosya da kabul edilmeli (`isAcceptedUpload`) |
-| İndirme | PNG → `Resimler/Lumeo`, klasör ZIP → `İndirilenler/Lumeo`; ZIP adı klasörün ADI olmalı (`download.zip` değil) |
+| İndirme | PNG → `Resimler/Kromis`, klasör ZIP → `İndirilenler/Kromis`; ZIP adı klasörün ADI olmalı (`download.zip` değil) |
 | Güvenlik | Başka bir tarayıcıdan `127.0.0.1:<port>/api/history` → **403** |
 | Uzun üretim arka planda | n=4 başlat → uygulamadan çık → 5 dk sonra dön → sonuç kayıpsız |
 | Responsive | Gerçek telefonda ve Chrome DevTools 390×844'te yatay kaydırma **olmamalı** |

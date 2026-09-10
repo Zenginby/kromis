@@ -20,7 +20,7 @@ kurulmuş desen (bkz. models.py:44-47).
 ŞEKİL NEDEN dataclass, `prefs._SCHEMA`'nın demet üslubu DEĞİL: `_SCHEMA` girdi
 başına 2 alan taşıyor, bir model tanımı ~14. Konumlu bir demette her okuyan
 tarafın alanı SAYIYLA indekslemesi gerekirdi. `dataclasses` stdlib olduğu için
-`requirements.txt` değişmiyor → `gpt-image-studio.spec`'in `hiddenimports=[]`
+`requirements.txt` değişmiyor → `kromis.spec`'in `hiddenimports=[]`
 değeri (o dosyanın 50 satırlık yorumu bunu ÖLÇÜLMÜŞ bir değişmez sayıyor)
 korunuyor → Chaquopy de etkilenmiyor. `frozen=True`, deponun bugün modül
 düzeyindeki demetlerden aldığı değişmezlik garantisinin aynısını veriyor.
@@ -314,7 +314,7 @@ CREDENTIALS: tuple[Credential, ...] = (
 # `index()`indeki tek desenden geliyor ve katalog yaprak kalıyor (`version`
 # import etmiyor).
 #
-# Dosyalar `static/img/providers/` altında ve `gpt-image-studio.spec` `static`
+# Dosyalar `static/img/providers/` altında ve `kromis.spec` `static`
 # dizininin tamamını aldığı için paketleme bedeli SIFIR.
 
 PROVIDER_LOGOS: dict[str, str] = {

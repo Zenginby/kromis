@@ -1,8 +1,8 @@
-﻿# Lumeo'yu Windows uygulaması olarak derler ve zip'ler.
+﻿# Kromis Studio'yu Windows uygulaması olarak derler ve zip'ler.
 #
 # build.sh'in Windows karşılığıdır; o dosyaya DOKUNULMAZ — macOS hattı kendi
 # akışıyla (ad-hoc imza + ditto) çalışmaya devam eder. Ortak olan tek şey
-# gpt-image-studio.spec: iki platform aynı spec'i kullanır, spec kendi içinde
+# kromis.spec: iki platform aynı spec'i kullanır, spec kendi içinde
 # platforma göre dallanır.
 #
 # İMZA YOK: Windows'ta ad-hoc imzanın karşılığı yoktur; gerçek imza ücretli bir
@@ -25,7 +25,7 @@ $ErrorActionPreference = 'Stop'
 # yollar (spec, requirements, tests) çözülsün.
 Set-Location -LiteralPath $PSScriptRoot
 
-$AppName = 'Lumeo'
+$AppName = 'Kromis'
 $AppDir  = Join-Path 'dist' $AppName
 $Exe     = Join-Path $AppDir "$AppName.exe"
 $Zip     = Join-Path 'dist' "$AppName-windows.zip"
@@ -90,7 +90,7 @@ foreach ($d in @('build', 'dist')) {
 Write-Host '→ derleme'
 # `pyinstaller.exe` yerine `-m PyInstaller`: shim exe'nin gömülü shebang'i
 # .venv taşındığında/kopyalandığında bozulur, modül çağrısı bozulmaz.
-& $VenvPy -m PyInstaller 'gpt-image-studio.spec' --noconfirm
+& $VenvPy -m PyInstaller 'kromis.spec' --noconfirm
 Assert-Basarili 'pyinstaller'
 
 # PyInstaller sıfır dönüp yine de beklenen adı üretmemiş olabilir (spec'teki
@@ -105,9 +105,9 @@ Write-Host '→ .NET yapılandırması'
 # altına iniyor, CLR ise varsayılan AppDomain'in config'ini `<exe yolu>.config`
 # diye arıyor. `_internal/` altındaki bir kopya HİÇ okunmaz — yani spec'e
 # eklemek "yapıldı" görünen, hiçbir şey yapmayan bir değişiklik olurdu.
-# Dosyanın kendisi ve gerekçesi: branding/Lumeo.exe.config.
+# Dosyanın kendisi ve gerekçesi: branding/Kromis.exe.config.
 $Config = "$Exe.config"
-Copy-Item -LiteralPath (Join-Path 'branding' 'Lumeo.exe.config') -Destination $Config -Force
+Copy-Item -LiteralPath (Join-Path 'branding' 'Kromis.exe.config') -Destination $Config -Force
 if (-not (Test-Path -LiteralPath $Config)) {
     Write-Host "HATA: .NET yapılandırması kopyalanmadı: $Config" -ForegroundColor Red
     exit 1

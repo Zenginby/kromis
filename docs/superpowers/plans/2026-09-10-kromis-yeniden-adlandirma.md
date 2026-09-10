@@ -129,7 +129,7 @@ birleşmede KORUNDU), kaldırılmış yerleşik logo yorumları (`yerleşik logo
 `yerlesik-logo-*.png`),
 `prompt-yonetmeni.md`'deki noktalı-İ dersi (`İZMİR`, ders korundu),
 `docs/flow-ui` maketlerinin marka etiketleri (`Kurumsal mavi`, tema jetonu
-`kurumsal` → `kurumsal`), `CompanyName` (`Zenginby`) ve test/maketlerdeki gerçek
+(eski kurum kısaltması) → `kurumsal`), `CompanyName` (`Zenginby`) ve test/maketlerdeki gerçek
 Azure ana bilgisayar adları (gerçek kaynak adı → `ai-ornek-swedencentral`).
 
 > **Yan bulgu — kaybolan güvence.** `CompanyName` ASCII'ye indiği için
@@ -238,25 +238,25 @@ oluşturduğun dağıtımın adı" — gerekçesi
 > bir MODEL anlattığı için.
 
 **3. Kaldırılmış özelliğin tarihsel kaydı — DOKUNULMUYOR.** `app.py:91,1774`,
-`composite.py:13`, `models.py:561`, `assets_store.py:65` pakete gömülü "KURUM logo
+`composite.py:13`, `models.py:561`, `assets_store.py:65` pakete gömülü "kurum logo
 çifti"nden söz ediyor; o özellik marka-nötr olsun diye KALDIRILDI
 (`docs/flow-ui/id-defteri.md:46`) ve yorumlar o kararın gerekçesi. Deponun yazı
 geleneği bu yorumları korumayı söylüyor. `assets_store.py:65` ayrıca cp1254
-kodlama dersini "KURUM Logo Mavi" örneğiyle kaydediyor — örnek değişirse ders
+kodlama dersini "Kurum Logo Mavi" örneğiyle kaydediyor — örnek değişirse ders
 okunmaz hâle gelir.
 
-**4. `bundled/prompts/prompt-yonetmeni.md:99,102` — DİKKATLİ DEĞİŞTİR.** "KURUM
-DERNEĞİ" ve `the word "KURUM" spelled letter-by-letter as I-with-dot, L, A` burada
+**4. `bundled/prompts/prompt-yonetmeni.md:99,102` — DİKKATLİ DEĞİŞTİR.** eski kurumun adı ve o adı `spelled letter-by-letter as I-with-dot, L, A`
+diye yazdıran yönerge burada
 marka değil, **noktalı büyük İ'nin görsel modellerde bozulması** dersinin örneği.
 `KROMIS` ile değiştirmek dersi yok eder (Kromis'te noktalı İ yok). Değişecekse
 örnek yine noktalı İ taşıyan bir sözcük olmalı (ör. `İSTANBUL`).
 
-**5. `docs/flow-ui/` — 26 izlenen dosya, KURUM markasıyla dolu tasarım maketi.**
-`data-set-theme="kurumsal"` + "KURUM mavisi" (`#085888`), "KURUM kurumsal", "KURUM Logo
-Beyaz/Mavi", `alt="KURUM Derneği beyaz logo bindirmesi"` ve **7 gerçek KURUM marka
+**5. `docs/flow-ui/` — 26 izlenen dosya, eski kurumun markasıyla dolu tasarım maketi.**
+`data-set-theme="kurumsal"` + kurumsal mavi (`#085888`), kurumsal motto ve
+logo etiketleri, `alt` metinlerinde kurumun adı ve **7 gerçek marka
 PNG'si** (`docs/flow-ui/assets/brand/{banner,logo-beyaz,logo-mavi,motto-*}.png`).
 İyi haber: bunların hiçbiri ÜRÜNE girmiyor — `models.ALLOWED_THEMES` =
-`("mono", "ocean", "amber", "viola")`, yani canlı uygulamada `kurumsal` teması YOK ve
+`("mono", "ocean", "amber", "viola")`, yani canlı uygulamada o tema YOK ve
 depo kökündeki `assets/` git'te izlenmiyor. Karar: maket tarihsel kayıt olarak
 kalsın mı, yoksa üçüncü tarafa ait marka görselleri depodan çıkarılsın mı? İkinci
 seçenek yeniden adlandırmadan bağımsız ve ayrıca savunulabilir.

@@ -543,8 +543,26 @@ gömülü. Güncellenmezse kalıp hiçbir şey bulamaz ve tek-kaynak bekçisi t�
 * [x] `apksigner verify --print-certs` çıktısındaki yeni DN + SHA-256 + SHA-1'i
       `docs/android/mimari.md`'nin yeni tablosuna yaz (aynı PR'da) — iki tablo
       birden duruyor: geçerli anahtar ve v0.17.2'ye kadarki tarihsel anahtar
-* [ ] Windows: zip'i indirip `Kromis.exe --onyukleme-denetimi` (MOTW'li senaryo,
-      `_paket-windows.yml`'in açılış kapısı)
+* [x] Windows: zip'i indirip `Kromis.exe --onyukleme-denetimi` — gerçek makinede,
+      gerçek indirilmiş paketle: dört kademe de GEÇTİ (`import clr` → AddReference
+      → winforms → `guilib.initialize()`, renderer=edgechromium), sürüm 0.17.3
+
+  > **MOTW yarısı yerelde ÖLÇÜLMEDİ, CI'da ölçüldü.** Yerel raporda
+  > `indirme işareti : yok` çıktı — zip ya *Engellemeyi kaldır* ile ya da
+  > damgayı yaymayan bir araçla (7-Zip, `Expand-Archive`) açılmış. Aynı ikili
+  > için `_paket-windows.yml`'in kapısı MOTW'li senaryoyu koşuturuyor ve DAHA
+  > SIKI koşuturuyor: 235/235 dosyaya `Zone.Identifier` basıyor (Gezgin yalnız
+  > çıkardığı dosyalara basıyor), `winclr` 106 DLL'den damgayı kaldırıyor, çıkış
+  > kodu 0. Yani MOTW kapsamı var; eksik olan yalnız "bu makinede" olması.
+
+  > **Bulunan belge kusuru — düzeltildi.** Kullanıcı denetimi koşturdu ve
+  > "dosya oluşmadı" dedi; dosya baştan yazılmıştı. İki sebep birden:
+  > (1) `KURULUM.md` "PowerShell penceresi aç" diyip arasından `%LOCALAPPDATA%`
+  > yazımı veriyordu — o yazım cmd/Gezgin için doğru, PowerShell onu
+  > genişletmez; (2) paket `console=False` olduğu için kabuk exe'yi BEKLEMEZ,
+  > komut hemen döner ve dosya bir iki saniye sonra oluşur. İkisi de belgeye
+  > yazıldı; `Start-Process -PassThru` + `WaitForExit` + çıkış kodu tablosu
+  > verildi (CI kapısı zaten bu sebeple `& $exe` kullanmıyor).
 * [ ] Android: eski kurulu bir cihaza yeni APK'yı kur — yan yana kurulum ve göç
       notunun doğruluğu ölçülür
 * [ ] Masaüstünde göç: eski veri dizini duran bir makinede yeni sürümü aç;

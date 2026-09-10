@@ -739,8 +739,11 @@ klasörlerini bir üstteki `Kromis` klasöründeki aynı adlı klasörlerin
   `_internal` klasöründen ayırmış olabilirsin — ikisi aynı klasörde olmalı.
   (b) Zip'i **engellemesini kaldırmadan** ayıklamış olabilirsin (1. adım); o
   zaman zip'i baştan, 1. adımdan başlayarak yeniden ayıkla. Sebep hâlâ
-  anlaşılmıyorsa `Kromis` klasöründe `.\Kromis.exe --onyukleme-denetimi` koştur ve
-  oluşan `%LOCALAPPDATA%\Kromis\onyukleme-denetimi.txt` dosyasını teknik desteğe gönder.
+  anlaşılmıyorsa `Kromis` klasöründe PowerShell açıp ön yükleme denetimini koştur
+  ve çıkan raporu teknik desteğe gönder — komutlar ve çıkış kodlarının anlamı:
+  [KURULUM.md → Sorun çıkarsa](KURULUM.md#sorun-çıkarsa). Özetle: paket
+  pencere kipinde olduğu için kabuk exe'yi BEKLEMEZ, dosya bir iki saniye sonra
+  oluşur; ve PowerShell'de yol `$env:LOCALAPPDATA\Kromis\...` diye yazılır.
 - **Eski arayüzü görüyorum gibi:** uygulamayı tamamen kapat (macOS'ta ⌘Q) ve
   yeniden aç.
 - **Geçmişim boş görünüyor:** hiçbir şey silme, teknik desteğe yaz — yukarıdaki yedek

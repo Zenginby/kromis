@@ -1,6 +1,11 @@
-# GPT-Image Studio → Google Flow Arayüz Planı
+# Kromis Studio → Google Flow Arayüz Planı
 
-**Amaç:** GPT-Image Studio'nun (FastAPI + vanilla JS, yerel masaüstü uygulaması)
+> Bu belge yazıldığında (6 Ağustos 2026) uygulamanın adı **Kromis Studio**'ydu;
+> sonra `Lumeo`, sonra `Kromis Studio` oldu. Ad bugüne çekildi çünkü burada
+> KANIT taşımıyor — belgeyi bugün açan biri, iki adlandırma önce ölmüş bir adla
+> karşılaşmasın. Tarih ve kararlar olduğu gibi duruyor.
+
+**Amaç:** Kromis Studio'nun (FastAPI + vanilla JS, yerel masaüstü uygulaması)
 arayüzünü Google Flow'un tasarım diline taşımak — aynı yetenekler, Flow'un kabuğu,
 etkileşim grameri ve renk/tipografi sistemi.
 

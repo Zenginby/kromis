@@ -190,6 +190,14 @@ sonucu var:
 
 ---
 
+## Sürüm 0.17.3 — ne değişti
+
+- bos bir sir "sir yok" diye bildiriliyordu
+- Merge origin/main (v0.17.2) into chore/kromis-yeniden-adlandirma
+- logo fixture DOSYA adlarinda kalan eski kurum izi
+
+---
+
 ## Sürüm 0.17.2 — ne değişti
 
 - Küçük düzeltmeler ve iyileştirmeler.

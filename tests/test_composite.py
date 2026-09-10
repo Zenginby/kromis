@@ -26,8 +26,8 @@ FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "logo")
 # olunca (yerleşik logo ve mavi/beyaz varyant seçimi kaldırıldı) paketten çıkıp
 # YALNIZCA golden'ların girdisi olarak burada kaldılar. Golden PNG'ler onların
 # piksellerini taşıdığı için başka bir görselle değiştirilemezler.
-LOGO_BLUE = os.path.join(FIXTURES, "kurum-logo-blue.png")
-LOGO_WHITE = os.path.join(FIXTURES, "kurum-logo-white.png")
+LOGO_BLUE = os.path.join(FIXTURES, "kurumsal-logo-blue.png")
+LOGO_WHITE = os.path.join(FIXTURES, "kurumsal-logo-white.png")
 OVERLAY = os.path.join(FIXTURES, "overlay.png")
 # cases.json'daki `logo` alanı → dosya. Dış script her vakada fiilen hangi
 # dosyayı bindirdiyse o; composite_logo tek `logo_path` aldığı için test onu

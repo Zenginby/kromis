@@ -490,7 +490,7 @@ def test_playwright_secilen_dosya_kapisi_TELEFONUN_gercegine_dayaniyor():
     # (ad, tür, beklenen) — telefonun gerçek ürettiği hâller ve karşı kanıtlar.
     TABLO = [
         ("a.png", "image/png", True),
-        ("kurum-logo.JPG", "", True),                       # tür bildirilmemiş
+        ("kurumsal-logo.JPG", "", True),                       # tür bildirilmemiş
         ("logo.png", "application/octet-stream", True),    # sağlayıcı "bilmiyorum"
         ("IMG_0042", "", True),                            # ne tür ne uzantı
         ("content-9182", "application/octet-stream", True),

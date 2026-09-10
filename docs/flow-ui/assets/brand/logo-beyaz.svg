@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1371 1782"
+     role="img" aria-label="Logo (beyaz) — yer tutucu">
+  <title>Logo (beyaz) — yer tutucu</title>
+  <!-- Bu bir YER TUTUCU. Maketler eskiden gerçek kurumsal logo/motto
+       PNG'lerine bakıyordu; o görseller 2026-09-10'da depodan çıkarıldı
+       (gerekçe: docs/flow-ui/flow-redesign-plan.md). Oran ve etiket korunuyor,
+       marka korunmuyor. -->
+  <rect width="1371" height="1782" fill="#e8e8ec" stroke="#b8b8c4"
+        stroke-width="6" stroke-dasharray="22" />
+  <text x="685" y="819" text-anchor="middle" dominant-baseline="middle"
+        font-family="system-ui, sans-serif" font-size="152" fill="#6b6b7b">Logo (beyaz)</text>
+  <text x="685" y="1033" text-anchor="middle" dominant-baseline="middle"
+        font-family="system-ui, sans-serif" font-size="85" fill="#9a9aab">1371×1782 yer tutucu</text>
+</svg>

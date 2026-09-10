@@ -172,10 +172,17 @@ yapardı. Kural kendi kaydında geçiyor, üründe hiçbir yerde geçmiyor.
 Paket kimliği 2026-09-10'da temizlendi (Faz 5) ve tarihsel kayıtlar da yeniden
 yazıldı (karar (a), yukarıda). Depoda tek bir açık madde kaldı:
 
-* **`docs/flow-ui/assets/brand/*.png` (7 dosya) — KARAR GEREKİYOR.** Metin
-  temizlendi ama bunlar Kurum'nın GÖRSEL logoları/mottoları; dosya adları nötr
-  (`logo-beyaz.png`). Maketler onlara atıf veriyor, ürün vermiyor. Depodan
-  çıkarılacaksa maketlerdeki 12 atıf da yer tutucuya döner.
+* **`docs/flow-ui/assets/brand/*.png` (7 dosya) — ÇÖZÜLDÜ (2026-09-10):
+  çıkarıldı.** Metin temizlenmişti ama bunlar eski kurumun GÖRSEL
+  logoları/mottolarıydı ve depo public'e açılacak (aşağıdaki karar) — metinden
+  silinen izin görselde kalması tutarsız olurdu. Yerlerine aynı adla, aynı
+  ORANDA nötr SVG yer tutucular kondu (476 KB PNG → 6 KB SVG) ve maketlerdeki
+  23 atıf onlara bağlandı: maket hâlâ "burada portre bir logo, şurada geniş bir
+  şerit var" diyor, kimsenin markasını söylemeden. `data-px` değerleri
+  tasarımın varsaydığı gerçek boyutları kaydetmeye devam ediyor.
+  Gerekçe maketlerin kendi belgesinde: `docs/flow-ui/flow-redesign-plan.md`.
+  (Atıf sayısı 12 değil 23 çıktı: ilk tarama yalnız `<img src>`leri saymış,
+  `data-src` niteliklerini atlamıştı.)
 
 Aşağıdaki sınıflandırma neyin NEDEN öyle çözüldüğünü saklıyor.
 
@@ -517,7 +524,8 @@ gömülü. Güncellenmezse kalıp hiçbir şey bulamaz ve tek-kaynak bekçisi t�
 * [x] `release.yml`'i `workflow_dispatch` + kuru prova ile daldan koştur — koşu
       34503743056, `surum=0.17.3`, beş iş de yeşil; dal kapısı ve taslak kapısı
       tasarlandığı gibi çalıştı (sürüm commit'i atılmadı, yayın oluşmadı)
-* [ ] **`İmzayı doğrula` adımının ATLANMADIĞINI** gör — ⏳ 1. koşuda ATLANDI
+* [x] **`İmzayı doğrula` adımının ATLANMADIĞINI** gör — 2. koşuda (34505244509)
+      KOŞTU; 1. koşuda atlanmıştı
 
   > **Ölçüm — 2026-09-10, koşu 34503743056.** `gh secret list` dördünü de
   > gösteriyordu ve `ANDROID_KEYSTORE_PASSWORD` koşuda `***` olarak çözüldü — yani
@@ -528,11 +536,62 @@ gömülü. Güncellenmezse kalıp hiçbir şey bulamaz ve tek-kaynak bekçisi t�
   > KANITLAMIYOR — tek güvenilir işaret `İmzayı doğrula`nın koşması; (2) adımın
   > "sır yok" metni yanlış yere baktırıyordu, "tanımlı DEĞİL ya da BOŞ" olarak
   > düzeltildi ve özete `wc -c` doğrulaması eklendi.
-* [ ] `apksigner verify --print-certs` çıktısındaki yeni DN + SHA-256 + SHA-1'i
-      `docs/android/mimari.md`'nin yeni tablosuna yaz (aynı PR'da)
+* [x] `apksigner verify --print-certs` çıktısındaki yeni DN + SHA-256 + SHA-1'i
+      `docs/android/mimari.md`'nin yeni tablosuna yaz (aynı PR'da) — iki tablo
+      birden duruyor: geçerli anahtar ve v0.17.2'ye kadarki tarihsel anahtar
 * [ ] Windows: zip'i indirip `Kromis.exe --onyukleme-denetimi` (MOTW'li senaryo,
       `_paket-windows.yml`'in açılış kapısı)
-* [ ] Android: eski Lumeo kurulu bir cihaza yeni APK'yı kur — yan yana kurulum ve göç
+* [ ] Android: eski kurulu bir cihaza yeni APK'yı kur — yan yana kurulum ve göç
       notunun doğruluğu ölçülür
-* [ ] Masaüstünde göç: eski `Lumeo` veri dizini duran bir makinede yeni sürümü aç;
+* [ ] Masaüstünde göç: eski veri dizini duran bir makinede yeni sürümü aç;
       kütüphane ve API anahtarlarının yerinde olduğunu gör
+
+> **SIRA DÜZELTMESİ — son üç madde kuru provayla YAPILAMAZ.** Paketler artık
+> Actions varlığı olarak yüklenmiyor, doğrudan taslak yayına yazılıyor
+> (`release.yml`'in "TASLAK YAYIN" gerekçesi: 2026-08-28'de Actions varlık
+> kotası dolup üç paket de teslim edilemedi) ve kuru provada taslak
+> AÇILMIYOR — yani indirilebilir bir paket yok. Parmak izi ölçümü kuru
+> provayla yapılabildi çünkü `apksigner` çıktısı KOŞU KAYDINDA duruyor;
+> cihaz denetimleri için gerçek yayının varlıkları gerekiyor. Windows MOTW
+> senaryosu için bu zaten daha doğru: o kapı gerçekten İNDİRİLMİŞ bir zip
+> istiyor (`KURULUM.md` → Mark-of-the-Web).
+
+## Faz 11 — Depo public'e açılmadan ÖNCE: geçmiş temizliği
+
+**Karar (2026-09-10): depo public olacak.** Bu, `guncelleme.py`'nin yazılı
+şartını (anonim `releases/latest`) doğrular ve güncelleme bildirimini
+diriltir — o güne kadar özel depoda 404 alarak sessizce ölüydü (ölçüm
+modulun docstring'inde).
+
+**Ama çalışma ağacını temizlemek YETMEZ.** Kurum izleri commit geçmişinde
+duruyor ve public'e geçmek onları da yayımlar. Ölçüldü (`git log --all -S`):
+
+| iz | commit |
+|---|---|
+| `ai-ornek-swedencentral` (gerçek Azure ana bilgisayarı) | 9 |
+| `kullanici` (yerel kullanıcı adı) | 7 |
+| `zenginby` (eski paket kimliği) | 8 |
+| `Zenginby` (eski hesap/depo) | 19 |
+
+Keystore geçmişe HİÇ girmemiş — bu ayrıca ölçüldü
+(`git log --all --diff-filter=A -- '*.keystore' '*.jks' '*.p12' '*.pfx'` boş),
+yani geçmişte sır yok, yalnız kimlik izi var.
+
+**SIRA ŞART:**
+
+1. [ ] PR #75 `main`'e girsin (geçmiş yeniden yazılmadan ÖNCE — sonra
+       yazılsa PR'ın commit'leri geçersiz olurdu)
+2. [ ] Faz 10'un cihaz denetimleri gerçek yayın varlıklarıyla bitsin
+3. [ ] Geçmiş yeniden yazılsın (`git filter-repo --replace-text`, aynı
+       karşılık tablosu çalışma ağacında kullanılanın AYNISI olacak),
+       tag'ler yeni SHA'lara taşınsın, `--force-with-lease` ile gönderilsin
+4. [ ] Aynı `git log --all -S` taraması DÖRDÜNÜ DE 0 demeli
+5. [ ] Görünürlük public'e alınsın (**kullanıcı işi** — depo ayarı)
+6. [ ] Anonim uç nokta ölçülsün: yukarıdaki `curl` 200 demeli; sonra
+       uygulamada güncelleme bildiriminin gerçekten göründüğü görülsin
+
+**Uyarı — zorla gönderme her şeyi silmiyor.** Force-push'tan sonra eski
+commit'ler ulaşılamaz olur ama GitHub onları bir süre DOĞRUDAN SHA ile
+sunmaya devam ediyor (GC'ye kadar). Tam güvence isteniyorsa yol, temiz
+geçmişi YENİ bir depoya açmak ve eskisini özel arşiv olarak bırakmak —
+karşılığı PR geçmişinin ve yayın/tag tarihinin geride kalması.

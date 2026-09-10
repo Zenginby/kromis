@@ -27,6 +27,19 @@ imzasız bir kendi kendini değiştirme yolu, uygulamaya açılmış bir kapıd�
 
 Depo public olduğu için uç nokta anonim çalışıyor — pakete gömülmüş bir token
 YOK ve olmamalı.
+
+BU CÜMLE BİR ŞART, BETIMLEME DEĞİL. Özel bir depoda `releases/latest` anonim
+çağrıya 404 dönüyor ve 1. sözleşme (asla exception sızdırma) onu `None`'a
+çeviriyor: kontrol sessizce ÖLÜR, kullanıcı yeni sürümü hiç öğrenmez ve
+hiçbir yerde bir hata görünmez. 2026-09-10'da tam olarak bu durumdaydı —
+depo o gün `private`'tı ve
+
+    curl -s -o /dev/null -w "%{http_code}"       https://api.github.com/repos/Zenginby/kromis/releases/latest
+
+404 döndürüyordu. Depo görünürlüğü değiştirilirse burası çalışmayacak; çözüm
+pakete token gömmek DEĞİL (bir okuma token'ı bile paketi indiren herkese
+verilmiş olurdu), yayın bilgisini token istemeyen bir yerden okumak ya da
+özelliği kapatmak.
 """
 from __future__ import annotations
 

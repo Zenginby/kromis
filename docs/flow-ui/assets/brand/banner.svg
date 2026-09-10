@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3330 748"
+     role="img" aria-label="Alt şerit banner — yer tutucu">
+  <title>Alt şerit banner — yer tutucu</title>
+  <!-- Bu bir YER TUTUCU. Maketler eskiden gerçek kurumsal logo/motto
+       PNG'lerine bakıyordu; o görseller 2026-09-10'da depodan çıkarıldı
+       (gerekçe: docs/flow-ui/flow-redesign-plan.md). Oran ve etiket korunuyor,
+       marka korunmuyor. -->
+  <rect width="3330" height="748" fill="#e8e8ec" stroke="#b8b8c4"
+        stroke-width="3" stroke-dasharray="12" />
+  <text x="1665" y="344" text-anchor="middle" dominant-baseline="middle"
+        font-family="system-ui, sans-serif" font-size="83" fill="#6b6b7b">Alt şerit banner</text>
+  <text x="1665" y="433" text-anchor="middle" dominant-baseline="middle"
+        font-family="system-ui, sans-serif" font-size="46" fill="#9a9aab">3330×748 yer tutucu</text>
+</svg>

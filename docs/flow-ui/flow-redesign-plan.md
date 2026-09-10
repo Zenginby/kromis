@@ -360,9 +360,18 @@ Hepsi ortak `flow.css` tasarım sistemini kullanıyor (tokenlar tek yerde, ekran
 
 **Gerçek içerik, yer tutucu değil.** Görsel üretimi bu projede yapılandırılmadığı için
 (Fal API anahtarı yok) tel kafes yerine uygulamanın **kendi çıktıları** kullanıldı:
-`output/`'tan 8 üretim ve `assets/`'ten 7 gerçek logo/motto/banner `assets/samples/` ve
-`assets/brand/` altına küçültülerek kopyalandı. Prompt metinleri de `history.json`'daki
-gerçek kayıtlardan. Uydurma metrik, lorem, emoji ikon yok.
+`output/`'tan 8 üretim `assets/samples/` altına küçültülerek kopyalandı. Prompt
+metinleri de `history.json`'daki gerçek kayıtlardan. Uydurma metrik, lorem, emoji
+ikon yok.
+
+> **`assets/brand/` bunun ISTISNASI — 2026-09-10'dan beri.** Orada eskiden 7
+> gerçek logo/motto/banner PNG'si duruyordu; onlar eski kurumun marka
+> görselleriydi ve depo public'e açılacak. Metinden silinen kurumsal izin
+> görselde kalması tutarsız olurdu, o yüzden PNG'ler çıkarıldı ve yerlerine
+> aynı adla, aynı ORANDA nötr SVG yer tutucular kondu. Maket hâlâ "burada
+> portre bir logo, şurada geniş bir şerit var" diyor — kimsenin markasını
+> söylemeden. `data-px` değerleri tasarımın varsaydığı gerçek boyutları
+> kaydetmeye devam ediyor.
 
 **Çalışan etkileşimler** (statik ekran görüntüsü değil): mod anahtarı + `⌘J`, otomatik
 büyüyen prompt kutusu, "Yönetmen'e sor" görünürlüğü, (+) menüsü, referans çipi silme,

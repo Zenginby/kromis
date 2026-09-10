@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2036 1196"
+     role="img" aria-label="Motto 2 — yer tutucu">
+  <title>Motto 2 — yer tutucu</title>
+  <!-- Bu bir YER TUTUCU. Maketler eskiden gerçek kurumsal logo/motto
+       PNG'lerine bakıyordu; o görseller 2026-09-10'da depodan çıkarıldı
+       (gerekçe: docs/flow-ui/flow-redesign-plan.md). Oran ve etiket korunuyor,
+       marka korunmuyor. -->
+  <rect width="2036" height="1196" fill="#e8e8ec" stroke="#b8b8c4"
+        stroke-width="5" stroke-dasharray="19" />
+  <text x="1018" y="550" text-anchor="middle" dominant-baseline="middle"
+        font-family="system-ui, sans-serif" font-size="132" fill="#6b6b7b">Motto 2</text>
+  <text x="1018" y="693" text-anchor="middle" dominant-baseline="middle"
+        font-family="system-ui, sans-serif" font-size="74" fill="#9a9aab">2036×1196 yer tutucu</text>
+</svg>

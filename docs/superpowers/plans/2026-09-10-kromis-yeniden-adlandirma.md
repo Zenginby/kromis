@@ -103,16 +103,39 @@ Azure ana bilgisayar adları (`ai-ornek-swedencentral` → `ai-ornek-swedencentr
 > Azure kaynak adı (`ai-ornek-swedencentral`) yazılıydı; depo public olacaksa bu
 > zaten kalmamalıydı. Örnek ada çevrildi.
 
-### İki açık karar
+### Karar (a) — tarihsel kayıtlar: TEMİZLENDİ (2026-09-10)
 
-Paket kimliği 2026-09-10'da temizlendi (Faz 5 uygulandı, aşağıda). Depoda
-"Kurum" yazısı artık YALNIZ tarihsel planlama kayıtlarında geçiyor.
-* **Tarihsel kayıtlar — KARAR GEREKİYOR.** `docs/superpowers/plans|specs/` ve
-  `.superpowers/sdd/` altında ~100 geçiş var. Bunların bir kısmı LİTERAL git
-  diff'i (`review-*.diff`): düzenlemek kaydı bozar, yani "o gün ne olduğu"
-  sorusunun cevabını yok eder. Seçenekler: (a) olduğu gibi bırak (tarihsel
-  kayıt), (b) `.superpowers/sdd/` dizinini depodan çıkar (türetilmiş çalışma
-  kaydı, ürüne girmiyor), (c) hepsini yeniden yaz.
+Öneri `.superpowers/sdd/`'yi depodan çıkarmaktı; **ölçünce o dizinin depoda
+hiç olmadığı görüldü** — `.gitignore:31` onu zaten kapsıyor, izlenen dosya
+sayısı SIFIR. Yani seçenek (b) baştan gerçekleşmiş durumdaydı ve geriye kalan
+tek soru `docs/superpowers/` idi: 7 izlenen belgede 83 geçiş.
+
+Uygulanan: **hepsi yeniden yazıldı**, karşılıklar canlı koddaki taramayla
+BİREBİR aynı (`Şirket Logosu Mavi`, `kurumsal logolar`, `kurumsal mavi`,
+`İZMİR`), yani depo kendi içinde tutarlı. Gerekçe: bunlar tasarım kaydı, kusur
+KANITI değil — "o gün ne olduğu" sorusunun cevabı `Şirket Logosu Mavi` yazınca
+okunamaz hâle gelmiyor. Üç yan kazanç:
+
+* **Sızıntı hijyeni.** Kullanıcının gerçek Azure ana bilgisayar adı
+  (`ai-ornek-swedencentral`, 24 geçiş) ve gerçek yerel kullanıcı adı
+  (`/Users/kullanici/...`) bu belgelerde yazılıydı. Depo public olacaksa ikisi
+  de kalmamalıydı; testlerde ve maketlerde zaten örnek ada çevrilmişti.
+* **Ölü bağlantı YOK — tersine.** Plan "eski PR bağlantıları yeni adla
+  yazılırsa var olmayan adresler olur" diyordu; bu YANLIŞ. PR numaraları depo
+  ve hesap yeniden adlandırmasında korunuyor, yani kanonik adres
+  `Zenginby/kromis/pull/16`. Eski adresler yalnız GitHub'ın yönlendirmesi
+  yaşadığı sürece çalışıyordu.
+* Eski `applicationId` (`org.zenginby.gptimagestudio`) da bu belgelerdeydi.
+
+**Tek istisna bu belgenin KENDİSİ.** "Kurum yazısı hiçbir yerde geçmeyecek"
+kararını KAYDEDEN yer burası; sözcüğü buradan da silmek kararı okunamaz
+yapardı. Kural kendi kaydında geçiyor, üründe hiçbir yerde geçmiyor.
+
+### Kalan açık karar
+
+Paket kimliği 2026-09-10'da temizlendi (Faz 5) ve tarihsel kayıtlar da yeniden
+yazıldı (karar (a), yukarıda). Depoda tek bir açık madde kaldı:
+
 * **`docs/flow-ui/assets/brand/*.png` (7 dosya) — KARAR GEREKİYOR.** Metin
   temizlendi ama bunlar Kurum'nın GÖRSEL logoları/mottoları; dosya adları nötr
   (`logo-beyaz.png`). Maketler onlara atıf veriyor, ürün vermiyor. Depodan

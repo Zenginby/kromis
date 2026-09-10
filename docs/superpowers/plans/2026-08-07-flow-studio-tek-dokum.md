@@ -1,7 +1,7 @@
 # Flow Stüdyo — tek döküm turu (Adım 11 · 12 · 13) — uygulama planı
 
 **Tarih:** 7 Ağustos 2026 (Adım 0 · commit ayrımı: 8 Ağustos)
-**Dal:** `feat/flow-ui-pr4` — Adım 7b (`f9227de`) + Adım 8 (`f35b5c6`) **PR [#21](https://github.com/Zenginby/gpt-image-studio/pull/21)** ile `main`'e indi (rebase merge, 8 Ağustos)
+**Dal:** `feat/flow-ui-pr4` — Adım 7b (`f9227de`) + Adım 8 (`f35b5c6`) **PR [#21](https://github.com/Zenginby/kromis/pull/21)** ile `main`'e indi (rebase merge, 8 Ağustos)
 **Başlangıç:** `4375062` (`main` ucu · `APP_VERSION` = **2.1.0**), `pytest` **1106 yeşil**, çalışma ağacı temiz
 **Tasarım sözleşmesi:** `docs/flow-ui/flow-redesign-plan.md` (referans ekranlar `docs/flow-ui/*.html`)
 **Önceki plan:** `docs/superpowers/plans/2026-08-06-flow-arayuz-devri.md` (Adım 0–8 orada; §0.1 tablosu buraya işaret ediyor)
@@ -22,14 +22,14 @@ Bu plan başka bir oturumda uygulanmak üzere yazıldı. Sırayla:
    Değilse önce onu çöz; yeni tur yeşil tabandan başlar.
 3. ~~**Adım 11'e geç.**~~ **Bitti (8 Ağustos, `c65fbb7`, `APP_VERSION` 2.1.1).**
    Karar kaydı ve kanıtlar **§0.9**'da; A9 ölçümle reddedildi (şerit iki pill).
-   PR **[#22](https://github.com/Zenginby/gpt-image-studio/pull/22)** rebase ile
+   PR **[#22](https://github.com/Zenginby/kromis/pull/22)** rebase ile
    `main`'e indi (8 Ağustos). 1. maddedeki not **yine geçerli çıktı**: rebase merge
    fast-forward mümkünken bile commit'leri yeniden yazdı (`b79dc17` → `c65fbb7`,
    `6cf86f4` → `2bfd87e`), atıflar bu turun commit'inde düzeltildi.
 4. ~~**Adım 12.**~~ **Bitti (8 Ağustos, `APP_VERSION` 2.2.0).** Faz 0 kapısı **§0.10**,
    port ve doğrulama kapısının bulduğu üç kusur **§0.11**, PR'dan sonra çalıştırılan
    **inceleme turunun** bulduğu iki HIGH ve düzeltmeleri **§0.12** (K28 · K29).
-   PR **[#23](https://github.com/Zenginby/gpt-image-studio/pull/23)** açık.
+   PR **[#23](https://github.com/Zenginby/kromis/pull/23)** açık.
    Sıradaki iş **Adım 13**; bekleyen kararlar **K27** (iç içe klasör yolu) ve
    **M1** (`aria-selected` düz `<button>`da geçersiz) — ikisi de D10 turunda.
 

@@ -212,11 +212,33 @@ o adım yeşilse paket telefona kurulur.
 
 #### Anahtar kimliği
 
+**Geçerli anahtar.** `apksigner verify --print-certs` ile ölçüldü
+(koşu 34505244509, 2026-09-10 — yeni anahtarın İLK imzalı derlemesi):
+
+| Alan | Değer |
+|---|---|
+| Sertifika DN | `CN=Kromis Studio, O=Zenginby, C=TR` |
+| Sertifika SHA-256 | `ca5a0dd3ebeabdaa3587e3955e4f537db9598288e3e203204fd904769cd8ff4d` |
+| Sertifika SHA-1 | `be70398ae5e25e5fd7be1fe4fe8def65774512ca` |
+| Anahtar | RSA 4096 |
+| İmza şeması | yalnız v2 (APK Signature Scheme v2) |
+
+DN'in `OU`/`L`/`ST` alanları YOK: eski anahtarda `keytool`'un etkileşimli
+soruları boş bırakıldığı için `OU=Unknown, ST=Unknown` gibi anlamsız değerler
+girmişti. Yeni anahtar `-dname` ile üretildi (yukarıdaki `keytool` çağrısı);
+üç alanla sınırlı bir DN, "Unknown" taşıyan bir DN'den daha doğru.
+
+Bu parmak izleri **sır değil**: imzalı her APK'nın içinden okunabiliyorlar.
+Burada durmalarının sebebi, bir sonraki imzalı derlemenin AYNI anahtarla
+imzalandığını kanıtlayacak referans olmaları. Parmak izi değiştiyse anahtar da
+değişmiştir ve o paket telefondaki kurulumun üzerine yazamaz — kullanıcı
+uygulamayı kaldırmak zorunda kalır.
+
 **v0.17.2'ye kadarki anahtar (TARİHSEL).** Paket kimliği `com.zenginby.kromis`e
-taşındığında (2026-09-10) yeni bir anahtar üretilmesi kararlaştırıldı; aşağıdaki
-değerler ESKİ anahtara ait ve yalnız kayıt olarak duruyor. Yeni anahtarın
-parmak izleri ilk imzalı koşudan sonra buraya eklenecek — tablo boş kaldığı
-sürece "yeni anahtarla imzalanmış bir paket henüz ölçülmedi" demektir.
+taşındığında (2026-09-10) yeni bir anahtar üretildi; aşağıdaki değerler ESKİ
+anahtara ait ve yalnız kayıt olarak duruyor. İki tablonun birden durması
+gerekiyor: bir kullanıcının telefonunda hangi anahtarla imzalanmış bir APK
+olduğu sorusunun cevabı burada.
 
 `apksigner verify --print-certs` ile ölçüldü (koşu 32478330228, 2026-08-21):
 
@@ -228,11 +250,10 @@ sürece "yeni anahtarla imzalanmış bir paket henüz ölçülmedi" demektir.
 | Anahtar | RSA 4096 |
 | İmza şeması | yalnız v2 (APK Signature Scheme v2) |
 
-Bu parmak izleri **sır değil**: imzalı her APK'nın içinden okunabiliyorlar.
-Burada durmalarının sebebi, bir sonraki imzalı derlemenin AYNI anahtarla
-imzalandığını kanıtlayacak referans olmaları. Parmak izi değiştiyse anahtar da
-değişmiştir ve o paket telefondaki kurulumun üzerine yazamaz — kullanıcı
-uygulamayı kaldırmak zorunda kalır.
+İki anahtarın parmak izleri FARKLI ve bu bilerek böyle: `applicationId` de
+değiştiği için yeni paket eskisinin üzerine yazmıyor, YAN YANA kuruluyor —
+yani "üzerine yazamaz" sorunu bu geçişte zaten geçerli değil. Bir kerelik geçiş
+adımları: `GUNCELLEME.md` → *Uygulamanın adı değiştiyse*.
 
 #### Depo başka bir hesaba taşındığında
 
@@ -242,7 +263,8 @@ ilk soru her zaman "dört sır hâlâ orada mı" oluyor.
 
 Ölçüldü: depo eski hesaptan `Zenginby`'ye taşındıktan sonra (2026-08-21,
 koşu 32478330228) dördü de yerindeydi — GitHub taşımada depo sırlarını
-düşürmedi ve APK yukarıdaki parmak iziyle imzalandı. Yine de her taşımadan
+düşürmedi ve APK o günün anahtarıyla (yukarıdaki TARİHSEL tablo) imzalandı.
+Yine de her taşımadan
 sonra ölçülmeli; tek güvenilir işaret `İmzayı doğrula` adımının ATLANMAMIŞ
 olması.
 

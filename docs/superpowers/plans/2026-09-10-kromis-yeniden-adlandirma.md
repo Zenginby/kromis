@@ -685,11 +685,61 @@ Bu tabloyu kaçırmak, geçmişi temizleyip "bitti" demek olurdu.
        klonda; sonra `--force-with-lease` ile gönderilsin.
 4. [ ] Aynı tarama DÖRDÜNÜ DE 0 demeli — içerikte, mesajda, yolda ve
        yazar/committer üstverisinde.
-5. [ ] GitHub tarafı (B tablosu) için karar uygulanmalı: PR gövdeleri,
-       Actions günlükleri, eski yayınlar.
+5. [x] GitHub tarafı (B tablosu) uygulandı — aşağıdaki "GitHub tarafı:
+       uygulandı" bölümü.
 6. [ ] Görünürlük public'e alınsın (**kullanıcı işi** — depo ayarı).
 7. [ ] Anonim uç nokta ölçülsün: `curl` 200 demeli; sonra uygulamada
        güncelleme bildiriminin gerçekten göründüğü görülsin.
+
+### GitHub tarafı: uygulandı (2026-09-10)
+
+**PR başlık/gövdeleri — 16 PR düzenlendi, 9 değil.** Denetimin ilk sayısı
+yanlıştı çünkü yalnız dört BİLEŞİK dizeye bakıyordu; sözcük sınırlı tarama
+büyük harfli biçimi de sayınca liste #1, #2, #4, #5, #9, #25, #30, #31, #32,
+#33, #34, #35, #36, #40, #74, #75 oldu. Karşılıklar depodakiyle BİREBİR aynı
+tutuldu — başka bir karşılık kullanmak "aynı ize iki ad" durumu yaratır ve
+ileride hangisinin ne olduğu okunmaz. Sonra yeniden ölçüldü: 0 PR'da iz.
+
+**İnceleme yorumları: iş çıkmadı.** Denetimde "sayılmadı" diye bırakılmıştı;
+sayıldı — 13 yorum, 0 iz.
+
+**Actions koşuları: 187 silindi, 18 kaldı.** Ölçütü bulmak iki denemede oldu
+ve YANLIŞ olan biri kaydedilmeye değer:
+
+* **Çalışmayan ölçüt — koşunun HEAD commit'inin AĞACI.** "Ağaçta iz varsa
+  günlükte de olabilir" diye düşünüldü; 205 koşunun 198'i "izli" çıktı, yani
+  ölçüt hiçbir şey ayırt etmiyordu. Sebebi basit: plan belgesi 2026-09-10'dan
+  beri o dizeleri ağaçta taşıyordu, ama bir pytest koşusu bir BELGE dosyasını
+  günlüğe basmıyor. Ağaç, günlüğün içeriği için vekil değil.
+* **Çalışan ölçüt — GÜNLÜĞÜN kendisi.** İzin günlüğe girdiği yer belli:
+  `aapt` çıktısı ve Kotlin derleyici uyarıları. Atıflı koşuların günlüğü
+  indirilip grep'lendi ve karar tek tek verildi:
+
+| koşu | atıf | günlük | karar |
+| --- | --- | --- | --- |
+| 31727509717 | `.gitattributes`, `tests/test_index.py` | eski hesap adı 8 satır | silindi |
+| 32478330228 | `docs/android/mimari.md` (3 yer) | eski kurum adı 2+2 satır | silindi |
+| 32478178747 | `docs/android/mimari.md` | **temiz** | KORUNDU |
+| 34503743056 · 34505244509 | plan, `mimari.md` | **temiz** (725 KB grep'lendi) | KORUNDU |
+
+Silinen iki koşuya atıf veren üç yerde NEDEN yazıldı: numara kayıt olarak
+duruyor, bağlantı 404 veriyor, ölçümün kendisi belgede. Bunu yazmamak,
+ileride okuyan birine "atıf yanlış" dedirtirdi.
+
+2026-09-10'un 17 koşusunun tamamı yeniden adlandırmadan SONRA ve tamamı
+rename dalında ya da sonrasında koştu — yani "2026-09-10 öncesi" kesimi bu
+depoda tam olarak "yeniden adlandırmadan önce" demek oluyor.
+
+**Eski yayınlar: dokunulmadı.** 38 yayının notlarında iz yok (ölçüldü);
+kalan iz yalnız v0.17.2 ve öncesinin APK ikilisi içindeki eski
+`applicationId` ve sertifika DN'i. Karşılığı 38 yayının ve tag tarihlerinin
+gitmesi olurdu.
+
+> **Yan etki — ölü koşu bağlantıları.** Silinen koşuların numaraları bazı PR
+> gövdelerinde bağlantı olarak duruyor (ör. #2'deki 30402056066, #30'daki
+> 31963046134). Bunlar artık 404. PR gövdelerini bu yüzden ayrıca düzenlemeye
+> gerek görülmedi: numara zaten metinsel bir kayıt ve hangi koşunun neden
+> gittiği burada yazılı.
 
 > **Faz 10'un cihaz denetimleri bu sırayı BEKLETMİYOR.** Planın ilk hâli
 > onları 3. adımın önüne koymuştu; ölçünce bağımlılık olmadığı görüldü:

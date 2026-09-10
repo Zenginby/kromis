@@ -1740,7 +1740,9 @@ def test_the_total_char_gate_skips_result_records():
     # Satır sonu TEMSİLİ bu iddiayı etkilemEMEli. CI Windows checkout'u CRLF
     # veriyor (Git for Windows'un `core.autocrlf` varsayılanı `true`) ve eski
     # `;\n` çapalı desen orada HİÇ eşleşmiyordu: yerelde 1171 yeşilken CI'da
-    # kırmızı, koşu 31727509717. Depo tarafındaki kök düzeltme `.gitattributes`
+    # kırmızı, koşu 31727509717 (o koşu Faz 11 geçmiş temizliğinde silindi —
+    # günlüğü eski kurumun adını taşıyordu; numara kayıt, bağlantı 404).
+    # Depo tarafındaki kök düzeltme `.gitattributes`
     # (eol=lf); bu döngü ise iddianın KENDİSİNİ temsile bağımlı olmaktan
     # kurtarıyor — ikisi ayrı iş, biri ötekinin yerine geçmez.
     for etiket, js in (("LF", lf), ("CRLF", lf.replace("\n", "\r\n"))):

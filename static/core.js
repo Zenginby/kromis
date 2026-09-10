@@ -545,13 +545,27 @@ function goBlockReason() {
     return "";
   }
   if (currentMode === "video") {
-    // Görsel dalının AYNI üç kademesi, ayrı liste üzerinde. Arena dalı YOK:
-    // arena video modunda hiç açılmıyor (CSS `#arena-pick`i gizliyor) ve
-    // burada ikinci bir kapı yazmak, olmayan bir durumu kollamak olurdu.
+    // Görsel dalının AYNI üç kademesi, ayrı liste üzerinde.
     if (!videoModels.length) return "Video modeli listesi alınamadı.";
     if (!currentVideoModel) return "Kayıtlı API anahtarı yok — Ayarlar'dan ekle.";
     if (!currentVideoModel.configured) {
       return `${currentVideoModel.label} için anahtar yok — Ayarlar'dan ekle.`;
+    }
+    // ARENA KAPISI. Burada öncesinde "arena dalı YOK: arena video modunda hiç
+    // açılmıyor, olmayan bir durumu kollamak olurdu" yazılıydı ve YANLIŞTI —
+    // iki yorum birbiriyle çelişiyordu, hata da tam o boşlukta yaşıyordu:
+    // arena video modunda AÇILAMIYOR ama AÇIK KALABİLİYOR. Anahtarın durumu
+    // mod değişiminde bilinçli olarak korunuyor (style.css: "görsel moduna
+    // dönen kullanıcı arenasını açık buluyor") ve `#arena-pick` video modunda
+    // gizli, yani kullanıcı onu KAPATAMIYOR. `run()` ise arena dalını
+    // `videoMu`dan ÖNCE soruyor — yani `#go` "Video üret" yazarken `runArena`
+    // GÖRSEL modelleriyle `/api/generate`e gidiyordu: sessiz tür karışması.
+    //
+    // Cümle kullanıcıya ÇIKIŞ YOLUNU söylüyor, çünkü kapatma denetimi bu
+    // modda görünmüyor: gerekçesi olan bir kapı, çaresi olmayan bir kapı
+    // olmamalı.
+    if (arenaAcik) {
+      return "Arena video modunda çalışmıyor — Görsel moduna geçip kapat.";
     }
     if (source && !currentVideoModel.supports_edit) {
       return `${currentVideoModel.label} referans görselle çalışmıyor.`;

@@ -7,11 +7,11 @@ import assets_store as astore
 
 def test_save_writes_file_and_manifest(tmp_path):
     out = str(tmp_path)
-    rec = astore.save_asset("logos", b"\x89PNG", "Şirket mavi", out,
+    rec = astore.save_asset("logos", b"\x89PNG", "Logo Mavi", out,
                             now="2026-07-23T10:00:00")
     kind_dir = tmp_path / "logos"
     assert (kind_dir / rec["filename"]).read_bytes() == b"\x89PNG"
-    assert rec["name"] == "Şirket mavi"
+    assert rec["name"] == "Logo Mavi"
     assert rec["kind"] == "logos"
     assert rec["created_at"] == "2026-07-23T10:00:00"
     assert rec["id"] == rec["filename"].rsplit(".", 1)[0]

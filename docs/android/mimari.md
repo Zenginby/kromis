@@ -196,7 +196,7 @@ o adım yeşilse paket telefona kurulur.
 
 #### Anahtar kimliği
 
-**v0.15.0'a kadarki anahtar (TARİHSEL).** Paket kimliği `com.zenginby.kromis`e
+**v0.17.2'ye kadarki anahtar (TARİHSEL).** Paket kimliği `com.zenginby.kromis`e
 taşındığında (2026-09-10) yeni bir anahtar üretilmesi kararlaştırıldı; aşağıdaki
 değerler ESKİ anahtara ait ve yalnız kayıt olarak duruyor. Yeni anahtarın
 parmak izleri ilk imzalı koşudan sonra buraya eklenecek — tablo boş kaldığı

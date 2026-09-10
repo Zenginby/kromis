@@ -1099,6 +1099,26 @@ def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(
             assert serit == f"{kart_sayisi} klasör · 3 görsel", (
                 f"şerit ekranla uyuşmuyor: {serit!r}, ekranda {kart_sayisi} kart")
 
+            # TÜR SÜZGECİ: Video seçilince ızgara ve şerit tür birimiyle güncellenir
+            page.click('#kind-seg button[data-kind="video"]')
+            page.wait_for_function(
+                "() => document.querySelector('#kind-seg button[data-kind=\"video\"][aria-pressed=\"true\"]')")
+            page.wait_for_function(
+                f"() => document.querySelector('#media-rail-count').textContent === '{kart_sayisi} klasör · 0 video'")
+            assert page.eval_on_selector_all("#gallery video", "els => els.length") == 0
+            assert page.eval_on_selector_all("#gallery .card", "els => els.length") == 0
+
+            # Görsel seçilince 3 görsel geri gelir
+            page.click('#kind-seg button[data-kind="image"]')
+            page.wait_for_function(
+                f"() => document.querySelector('#media-rail-count').textContent === '{kart_sayisi} klasör · 3 görsel'")
+            assert page.eval_on_selector_all("#gallery .card", "els => els.length") == 3
+
+            # Tümü'ne dön
+            page.click('#kind-seg button[data-kind=""]')
+            page.wait_for_function(
+                f"() => document.querySelector('#media-rail-count').textContent === '{kart_sayisi} klasör · 3 görsel'")
+
             # KAPSAM SAYAÇLARI
             page.evaluate("() => openPicker()")
             page.wait_for_selector("#media-picker:not([hidden])")

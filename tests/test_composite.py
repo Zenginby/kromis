@@ -22,12 +22,12 @@ from PIL import Image
 import composite
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "logo")
-# Bu iki PNG bir zamanlar pakete gömülü kurumsal logolarıydı; uygulama marka-nötr
+# Bu iki PNG bir zamanlar pakete gömülü yerleşik logolardı; uygulama marka-nötr
 # olunca (yerleşik logo ve mavi/beyaz varyant seçimi kaldırıldı) paketten çıkıp
 # YALNIZCA golden'ların girdisi olarak burada kaldılar. Golden PNG'ler onların
 # piksellerini taşıdığı için başka bir görselle değiştirilemezler.
-LOGO_BLUE = os.path.join(FIXTURES, "kurumsal-logo-blue.png")
-LOGO_WHITE = os.path.join(FIXTURES, "kurumsal-logo-white.png")
+LOGO_BLUE = os.path.join(FIXTURES, "yerlesik-logo-blue.png")
+LOGO_WHITE = os.path.join(FIXTURES, "yerlesik-logo-white.png")
 OVERLAY = os.path.join(FIXTURES, "overlay.png")
 # cases.json'daki `logo` alanı → dosya. Dış script her vakada fiilen hangi
 # dosyayı bindirdiyse o; composite_logo tek `logo_path` aldığı için test onu

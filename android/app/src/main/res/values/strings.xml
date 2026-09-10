@@ -16,7 +16,7 @@
 
     <!-- Hatalar -->
     <string name="sunucu_baslatilamadi">Uygulama başlatılamadı</string>
-    <string name="sunucu_baslatilamadi_detay">Hata kaydı: %1$s — lütfen bu dosyayı geliştiriciye iletin.</string>
+    <string name="sunucu_baslatilamadi_detay">Hata kaydı: %1$s — lütfen bu dosyayı teknik desteğe iletin.</string>
     <!-- Sunucu AYAKTA ama arayüz yüklenemedi (ağ hatası ya da oturum kapısının
          403'ü). Ayrı bir metin: "başlatılamadı" ile aynı diyalogda gösteriliyor
          ama sebep farklı ve hata kaydında aranacak iz de farklı. -->

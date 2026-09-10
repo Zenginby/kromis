@@ -19,6 +19,7 @@ let currentFolder = null;
 let folderCache = [];
 let searchQuery = "";
 let mediaSortOrder = "date"; // "date" (Yeni-Eski) veya "name" (A-Z)
+let medyaTurSuzgeci = "";   // "" | "image" | "video" | "imported"
 
 // Aramada ızgarada yalnız EŞLEŞEN kartlar duruyor. Şeridin sayısı ekranda
 // GERÇEKTEN duran kart sayısı olmalı; `null` = süzme yok, yani tüm klasörler.
@@ -28,7 +29,9 @@ let gorunenKlasorSayisi = null;
 function updateMediaRailCount() {
   const el = $("media-rail-count");
   if (!el) return;
-  const imgCount = historyCache ? historyCache.length : 0;
+  const suzgec = medyaTurSuzgeciAktif();
+  const imgCount = gorunenMedya().length;
+  const birim = suzgec.birim;
   // ŞERİDİN İKİ YARISI DA EKRANI SAYIYOR (Tur L). Eskiden hiçbiri saymıyordu:
   // görsel yarısı arama tamamlanmadan okunuyordu (`syncFolderView` →
   // `renderFolders` sırası, `refreshSearch` sonra bitiyor) ve klasör yarısı
@@ -40,9 +43,9 @@ function updateMediaRailCount() {
     ? (folderCache ? folderCache.length : 0)
     : gorunenKlasorSayisi;
   if (currentFolder) {
-    el.textContent = `${imgCount} görsel`;
+    el.textContent = `${imgCount} ${birim}`;
   } else {
-    el.textContent = `${foldCount} klasör · ${imgCount} görsel`;
+    el.textContent = `${foldCount} klasör · ${imgCount} ${birim}`;
   }
 }
 
@@ -746,7 +749,7 @@ function syncSelectUI() {
   }
   if (!selectMode) return;
 
-  const total = historyCache.length;
+  const total = gorunenMedya().length;
   $("select-count").textContent = `${selected.size} seçili`;
   const allSelected = total > 0 && selected.size === total;
   $("select-all").textContent = allSelected ? "Seçimi temizle" : "Tümünü seç";
@@ -863,8 +866,9 @@ document.addEventListener("keydown", (e) => {
   closeMoveDialog();
 }, true);
 $("select-all").addEventListener("click", () => {
-  const allSelected = historyCache.length > 0 && selected.size === historyCache.length;
-  selected = allSelected ? new Set() : new Set(historyCache.map((r) => r.id));
+  const gorunen = gorunenMedya();
+  const allSelected = gorunen.length > 0 && selected.size === gorunen.length;
+  selected = allSelected ? new Set() : new Set(gorunen.map((r) => r.id));
   renderGallery();
   syncSelectUI();
 });
@@ -1562,6 +1566,23 @@ $("size-seg").addEventListener("click", (e) => {
   $("gallery").dataset.size = btn.dataset.size;
 });
 
+$("kind-seg").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-kind]");
+  if (!btn || btn.dataset.kind === medyaTurSuzgeci) return;
+  medyaTurSuzgeci = btn.dataset.kind;
+  for (const b of $("kind-seg").querySelectorAll("button[data-kind]")) {
+    b.setAttribute("aria-pressed", String(b === btn));
+  }
+  // Süzgeç daralınca ekrandan düşen kayıtların seçimi DE düşer — yoksa
+  // "3 seçili" yazarken ızgara boş kalır ve Sil görünmeyeni siler
+  // (`refreshSearch`in [folders.js:943] aynı budaması).
+  const gorunen = gorunenMedya();
+  selected = new Set([...selected].filter((id) => gorunen.some((r) => r.id === id)));
+  renderGallery();
+  updateMediaRailCount();
+  syncSelectUI();
+});
+
 async function loadHistory() {
   // Arama açıkken geçmişin tazelenmesi (silme, taşıma, içe aktarma sonrası)
   // arama sonuçlarını tazelemek demek — klasör görünümüne sessizce dönülmez.
@@ -1612,11 +1633,33 @@ function kayitVideoMu(rec) {
   return VIDEO_KAYIT_TURLERI.includes((rec || {}).kind);
 }
 
+// Medya tür süzgeci tablosu ve türetilmiş görünüm.
+// Not: `updateMediaRailCount` dosyanın başında bu tabloyu okuyor; açılış
+// çağrılarının tamamı `settings.js`in dibinde toplandığı için (dosya başı
+// sözleşmesi) değerlendirme anında TDZ hatası doğmaz.
+const MEDYA_TUR_SUZGECLERI = [
+  { key: "",         label: "Tümü",     birim: "görsel",   test: () => true },
+  { key: "image",    label: "Görsel",   birim: "görsel",   test: (r) => !kayitVideoMu(r) },
+  { key: "video",    label: "Video",    birim: "video",    test: (r) => kayitVideoMu(r) },
+  { key: "imported", label: "Yüklenen", birim: "yüklenen", test: (r) => !!r.imported },
+];
+
+const medyaTurSuzgeciAktif = () =>
+  MEDYA_TUR_SUZGECLERI.find((s) => s.key === medyaTurSuzgeci) || MEDYA_TUR_SUZGECLERI[0];
+
+function gorunenMedya() {
+  const suzgec = medyaTurSuzgeciAktif();
+  // Sarmalayıcı arrow ŞART, `filter(suzgec.test)` DEĞİL: `filter` ikinci
+  // argüman olarak `index` geçiriyor ve bu depo o kusura zaten bir mandal
+  // yazdı (test_id_contract: `matchesSearch` bare referans mandalı).
+  return historyCache ? historyCache.filter((r) => suzgec.test(r)) : [];
+}
+
 function renderGallery() {
   const g = $("gallery");
   g.innerHTML = "";
 
-  const sorted = [...historyCache].sort((a, b) => {
+  const sorted = [...gorunenMedya()].sort((a, b) => {
     if (mediaSortOrder === "name") {
       const nameA = a.prompt || a.filename || a.id;
       const nameB = b.prompt || b.filename || b.id;
@@ -1631,9 +1674,11 @@ function renderGallery() {
     if (sorted.length === 0) {
       emptyEl.hidden = false;
       if (emptyText) {
-        emptyText.textContent = searchQuery
-          ? "Aramanızla eşleşen görsel bulunamadı."
-          : (currentFolder ? "Bu klasörde henüz görsel yok." : "Henüz görsel üretilmedi.");
+        emptyText.textContent = medyaTurSuzgeci
+          ? `Bu görünümde "${medyaTurSuzgeciAktif().label}" bulunamadı.`
+          : (searchQuery
+            ? "Aramanızla eşleşen görsel bulunamadı."
+            : (currentFolder ? "Bu klasörde henüz görsel yok." : "Henüz görsel üretilmedi."));
       }
     } else {
       emptyEl.hidden = true;

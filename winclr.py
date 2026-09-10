@@ -232,7 +232,7 @@ def kayda_deger(b: Bulgular) -> bool:
     """Bu bulgular hata.log'a yazılmayı hak ediyor mu?
 
     HATA.LOG SÖZLEŞMESİ. KURULUM.md kullanıcıya "`hata.log` dosyasına bak,
-    VARSA içeriğini geliştiriciye gönder" diyor — yani o dosyanın varlığı başlı
+    VARSA içeriğini teknik desteğe gönder" diyor — yani o dosyanın varlığı başlı
     başına "kötü haber" demek. Her açılışta bir satır yazmak onu sıradan bir
     günlüğe çevirir ve sözleşmeyi sessizce bozar. Bu yüzden temiz bir
     makinede HİÇBİR ŞEY yazılmıyor; tam rapor yalnız `--onyukleme-denetimi`

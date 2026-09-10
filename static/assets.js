@@ -66,7 +66,7 @@ function syncUploadLabel() {
 }
 
 const OVERLAY_EMPTY_TEXT = {
-  // `logo` girdisi, yerleşik kurumsal logo kaldırıldığında eklendi: o seçenek
+  // `logo` girdisi, yerleşik logo kaldırıldığında eklendi: o seçenek
   // listeyi hiç boş bırakmadığı için logo modunun boş hâli daha önce YOKTU.
   logo: "Önce Kütüphane'den bir logo yükle.",
   motto: "Önce Kütüphane'den bir motto yükle.",
@@ -219,8 +219,8 @@ let logoId = null;
 let rawPreviewSrc = "";                                 // ham (bindirmesiz) görsel URL'i
 let overlayMode = "logo";                               // "logo" | "motto" | "banner"
 // logo/motto/banner: id|null — üçü de kullanıcı kütüphanesinden gelir.
-// Logonun eskiden "builtin" adlı bir dördüncü hâli vardı (pakete gömülü
-// kurumsal çift); uygulama marka-nötr olduğundan kaldırıldı.
+// Logonun eskiden "builtin" adlı bir dördüncü hâli vardı (pakete gömülü yerleşik
+// logo çifti); uygulama marka-nötr olduğundan kaldırıldı.
 let selectedAsset = { logo: null, motto: null, banner: null };
 // Kaydırma, boyut/gölgenin AKSİNE mod başına hatırlanır: motto genelde logodan
 // farklı bir noktaya konur, ortak tutulsa tür değiştirmek diğerinin ince

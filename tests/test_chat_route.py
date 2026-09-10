@@ -269,10 +269,18 @@ def _result(*image_ids, **params):
                        "quality": "medium", **params}}
 
 
-def test_a_result_record_is_accepted_but_never_forwarded(client, fake_complete):
-    """Birleşik döküm: üretilen görseller konuşmanın İÇİNDE yaşıyor, yani her
-    turda tel üzerinden geri geliyorlar. Modele giden gövdede olmamaları
-    şart — Azure `result` rolünü bilmiyor (400) ve bilse de işine yaramaz.
+def test_a_result_record_reaches_the_wire_as_a_short_note(client, fake_complete):
+    """Birleşik döküm: üretilen görseller konuşmanın İÇİNDE yaşıyor ve her turda
+    tel üzerinden geri geliyor.
+
+    ÖNCESİNDE rol süzgeci onları DÜŞÜRÜYORDU ve bunun ölçülmüş bir bedeli
+    vardı: yönetmen ne yazdığını biliyor ama ne ÜRETİLDİĞİNİ bilmiyordu.
+    "Bunu videoya çevir" dendiğinde neyin kastedildiğini, hangi modelle ve
+    hangi ayarlarla üretildiğini kendi prompt metninden TAHMİN ediyordu.
+
+    HAM kayıt hâlâ tele çıkmıyor ve çıkmamalı: Azure `result` rolünü bilmiyor
+    (400) ve `image_ids`/`params` ona bir şey söylemez. Çıkan şey sunucunun
+    kurduğu, şeması kapalı kısa bir NOT.
     """
     thread = [{"role": "user", "content": "kare instagram görseli"},
               {"role": "assistant", "content": "**PROMPT**\n```\na cat\n```"},
@@ -282,8 +290,18 @@ def test_a_result_record_is_accepted_but_never_forwarded(client, fake_complete):
     r = _post(client, thread)
 
     assert r.status_code == 200, r.text
-    assert fake_complete[0] == [thread[0], thread[1], thread[3]], \
-        "sonuç kaydı Azure gövdesine sızdı"
+    gonderilen = fake_complete[0]
+    assert len(gonderilen) == 4, "sonuç kaydı hâlâ düşürülüyor"
+    # Konuşma turları BAYT BAYT aynı: not yalnızca ARAYA giriyor.
+    assert [gonderilen[0], gonderilen[1], gonderilen[3]] == \
+        [thread[0], thread[1], thread[3]]
+    not_ = gonderilen[2]
+    # Ham alanlar sızarsa Azure 400 döner: bir kez üretim yapmış oturum bir
+    # daha hiç konuşamaz.
+    assert set(not_) == {"role", "content"}, not_
+    assert not_["role"] == "user"
+    assert not_["content"].startswith(models.RESULT_NOTE_PREFIX)
+    assert "2 görsel üretildi" in not_["content"]
 
 
 def test_result_records_do_not_count_towards_the_total_cap(client, fake_complete):
@@ -389,7 +407,186 @@ def test_results_get_their_own_headroom_on_top_of_the_message_count(client, fake
     assert len(with_results) > models.MAX_CHAT_MESSAGES
 
     assert _post(client, with_results).status_code == 200
-    assert len(fake_complete[0]) == models.MAX_CHAT_MESSAGES
+    # Dört sonuç kaydı dört NOTA dönüşüyor, yani tele çıkan öğe sayısı konuşma
+    # turlarının ÜSTÜNE biniyor. İddia edilen şey hâlâ aynı: sonuç kayıtları
+    # `MAX_CHAT_MESSAGES` kotasını YEMİYOR — istek 422 almadı.
+    assert len(fake_complete[0]) == models.MAX_CHAT_MESSAGES + 4
+
+
+def test_the_result_note_names_the_model_the_size_and_the_count(client, fake_complete):
+    """Notun taşıdığı şey, yönetmenin bir sonraki turda ihtiyaç duyduğu şey.
+
+    Model ETİKETİ yazılıyor, ham id değil: yönetmen kullanıcıyla marka adıyla
+    konuşuyor ("Nano Banana ile yapmıştık") ve id'yi zaten menüden biliyor.
+    """
+    import catalog
+    m = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
+    thread = [{"role": "user", "content": "kare görsel"},
+              {"role": "assistant", "content": "ok"},
+              _result("aaaa1111aaaa", model=m.id, quality="high"),
+              {"role": "user", "content": "devam"}]
+
+    _post(client, thread)
+
+    note = fake_complete[0][2]["content"]
+    assert "1 görsel üretildi" in note
+    assert m.label in note
+    assert "1024x1024" in note and "high" in note
+
+
+def test_a_video_result_note_carries_its_duration(client, fake_complete):
+    """Süre notta OLMAK ZORUNDA: "aynısını daha uzun yap" isteğinin dayanağı o.
+
+    `quality` ise YAZILMIYOR — Veo Lite'ın kalite ekseni yok ve menü yönetmene
+    "`quality` yazma" diyor. Ona okutulan bir kalite değeri, aynı turda hem
+    "yazma" hem "işte değeri" demek olurdu.
+    """
+    import catalog
+    v = catalog.video_model(catalog.DEFAULT_VIDEO_MODEL)
+    thread = [{"role": "user", "content": "klip"},
+              {"role": "assistant", "content": "ok"},
+              _result("aaaa1111aaaa", kind="video", model=v.id,
+                      size="16:9", quality="720p", duration=8),
+              {"role": "user", "content": "devam"}]
+
+    _post(client, thread)
+
+    note = fake_complete[0][2]["content"]
+    assert "1 video üretildi" in note
+    assert "8 sn" in note
+    assert "720p" not in note, "kalite ekseni olmayan modelde kalite okutuldu"
+
+
+def test_a_legacy_result_without_a_model_still_produces_a_note(client, fake_complete):
+    """v0.6 öncesi kayıtlarda `model` alanı YOK ve varsayılanı boş dize.
+
+    O turu düşürmek ya da "None" yazmak, eski bir oturumu açan kullanıcının
+    sohbetini bozardı — `ResultParams`ın bütün varsayılanlarının var olma
+    gerekçesinin aynısı.
+    """
+    thread = [{"role": "user", "content": "kare görsel"},
+              {"role": "assistant", "content": "ok"},
+              _result("aaaa1111aaaa"),
+              {"role": "user", "content": "devam"}]
+
+    _post(client, thread)
+
+    note = fake_complete[0][2]["content"]
+    assert note.startswith(models.RESULT_NOTE_PREFIX)
+    assert "None" not in note and "1 görsel üretildi" in note
+
+
+# ── Model menüsü: yönetmen neyi GÖRÜYOR (v2.1) ──────────────────────────
+
+def _menu_ids(talimat):
+    """Sistem mesajındaki menü satırlarından id'ler."""
+    import re
+    parcalar = talimat.split(appmod.chat_prompt.MODELS_HEADING, 1)
+    if len(parcalar) < 2:
+        return set()
+    # Arama menü bloğunun İÇİNE hapsediliyor: sonrasında video talimatı ve
+    # yönlendirme geliyor ve ikisi de kendi madde listelerini taşıyabiliyor.
+    # Ölçüldü: video dosyasının maliyet bölümündeki "variations bloğunda…"
+    # satırı bir model id'si sanılıyordu.
+    blok = parcalar[1].split(chr(10) + "---" + chr(10), 1)[0]
+    return set(re.findall(r"^\* `([^`]+)`", blok, re.M))
+
+
+def test_only_configured_models_reach_the_directors_menu(
+        client, fake_kwargs, monkeypatch):
+    """ÖZELLİĞİN ÇEKİRDEK İDDİASI: menü "var olan" değil "ULAŞILABİLEN" modeller.
+
+    Anahtarı girilmemiş bir modeli önermek, kullanıcıyı uygulanamayan bir
+    öneriye götürmek olurdu — üstelik sebebi hiçbir yerde görünmeden.
+    """
+    import catalog
+    monkeypatch.setattr(appmod.credstore, "configured_map",
+                        lambda: {"gemini": True})
+
+    _post(client, [{"role": "user", "content": "bir klip"}])
+    ids = _menu_ids(fake_kwargs[0]["instructions"])
+
+    gemini = {m.id for m in catalog.IMAGE_MODELS + catalog.VIDEO_MODELS
+              if m.credential == "gemini"}
+    assert ids == gemini, ids
+    assert catalog.DEFAULT_IMAGE_MODEL not in ids, "anahtarsız model menüde"
+
+
+def test_the_menu_and_the_ui_ask_the_same_visibility_question(
+        client, fake_kwargs, monkeypatch):
+    """Menü ile arayüzün listesi AYRIŞAMAZ.
+
+    Ayrışsalardı yönetmen kullanıcının ekranında olmayan bir modeli önerirdi ve
+    ön yüz onu "anahtar yok" diye reddederdi: iki taraf da doğru davranmış olur,
+    kullanıcı yine boşa bir tur harcardı. `_model_available` tam olarak bu
+    ikiliği önlemek için tek bir kapı.
+    """
+    monkeypatch.setattr(appmod.credstore, "configured_map",
+                        lambda: {"gemini": True, "openai": True})
+
+    _post(client, [{"role": "user", "content": "kare görsel"}])
+    ids = _menu_ids(fake_kwargs[0]["instructions"])
+
+    payload = appmod._settings_payload()
+    arayuz = {m["id"] for m in payload["image_models"] + payload["video_models"]
+              if m["available"]}
+    assert ids == arayuz
+
+
+def test_the_video_instructions_only_ship_when_a_video_model_is_configured(
+        client, fake_kwargs, monkeypatch):
+    """Video zanaatı HER TURDA ödenen karakter: video kullanmayan kullanıcı
+    onu ödememeli.
+
+    Ters yön daha da önemli: video modeli VARKEN talimatın gelmemesi,
+    yönetmenin video isteğine kapsam reddi basması demek.
+    """
+    VH = appmod.chat_prompt.VIDEO_HEADING
+
+    monkeypatch.setattr(appmod.credstore, "configured_map",
+                        lambda: {"azure_image": True})
+    _post(client, [{"role": "user", "content": "kare görsel"}])
+    assert VH not in fake_kwargs[0]["instructions"], "videosuz kurulumda geldi"
+
+    monkeypatch.setattr(appmod.credstore, "configured_map",
+                        lambda: {"gemini": True})
+    _post(client, [{"role": "user", "content": "bir klip"}])
+    assert VH in fake_kwargs[1]["instructions"], "video modeli varken gelmedi"
+
+
+def test_an_unconfigured_selected_model_is_flagged_to_the_director(
+        client, fake_kwargs, monkeypatch):
+    """`prefs.read` yapılandırılmamış bir seçimi BİLEREK koruyor, yani seçili
+    modelin menüde olmaması ULAŞILABİLİR bir hâl.
+
+    Söylenmezse yönetmen bağlam bloğundaki jetonlara güvenip üretilemeyecek
+    bir öneri yazar ve kullanıcı sebebini hiçbir yerde göremez.
+    """
+    monkeypatch.setattr(appmod.credstore, "configured_map",
+                        lambda: {"gemini": True})
+
+    _post(client, [{"role": "user", "content": "kare görsel"}])
+    talimat = fake_kwargs[0]["instructions"]
+
+    assert "SEÇİLİ modeli bu listede YOK" in talimat
+
+
+def test_a_setup_without_video_tells_the_director_to_name_the_missing_key(
+        client, fake_kwargs, monkeypatch):
+    """Eksik olan bir YETENEK değil bir ANAHTAR ve yönetmen bunu söylemeli.
+
+    Bu satır olmadan yönetmen video isteğine kapsam reddi basıyor ("ben yalnızca
+    görsel prompt'u hazırlayan yönetmenim") ve kullanıcı uygulamanın videoyu HİÇ
+    yapamadığını sanıyor.
+    """
+    monkeypatch.setattr(appmod.credstore, "configured_map",
+                        lambda: {"azure_image": True})
+
+    _post(client, [{"role": "user", "content": "kare görsel"}])
+    talimat = fake_kwargs[0]["instructions"]
+
+    assert "video KAPALI" in talimat
+    assert "Ayarlar" in talimat.split(appmod.chat_prompt.MODELS_HEADING, 1)[1]
 
 
 # ── Model seçimi (v0.7) ────────────────────────────────────────────────

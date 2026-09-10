@@ -97,8 +97,14 @@ def build_payload(messages: list[dict], deployment: str, instructions: str) -> d
     döküm `result` kayıtlarını konuşmanın İÇİNDE tutuyor ve her tur tel üzerinden
     geri geliyor. Alan allowlist'i tek başına yetmez — süzülmüş bir sonuç kaydı
     geride `{"role": "result"}` bırakır, Azure o rolü bilmez ve 400 döner: bir
-    kez üretim yapmış oturum bir daha hiç konuşamaz. Rol allowlist'i olduğu için
-    dökümde açılacak SONRAKİ roller de varsayılan olarak dışarıda kalır.
+    kez üretim yapmış oturum bir daha hiç konuşamaz.
+
+    ROTA ARTIK BU SÜZGECE GÜVENMİYOR: `models.wire_messages` sonuç kayıtlarını
+    daha üstte kısa bir NOTA çeviriyor, yani buraya `result` rolü normalde hiç
+    ulaşmıyor. Süzgeç yine de kaldırılmadı ve sebebi bu fonksiyonun ne olduğu:
+    telin gerçek sınırı burası. Ham dict geçiren başka bir çağıran, ya da
+    dökümde açılıp çevirmene eklenmesi unutulan SONRAKİ bir rol, buradan
+    sessizce geçip 400'e dönüşmemeli.
     """
     return {
         "model": deployment,  # DAĞITIM adı, model ailesi adı DEĞİL

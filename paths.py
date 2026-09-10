@@ -151,6 +151,19 @@ def chat_instructions_override() -> str:
     return os.path.join(data_dir(), "chat-instructions.md")
 
 
+def chat_video_instructions_override() -> str:
+    """Video yönetmenliği bölümünün kullanıcı ezmesi (varsa gömülü olanı EZER).
+
+    Yukarıdakinin birebir ikizi ve aynı gerekçeyle `data_dir()`'de. Video
+    talimatı ayrı bir dosya çünkü sistem mesajına yalnız kullanıcının video
+    modeli yapılandırılmışsa giriyor (bkz. chat_prompt.build_system); ezmesinin
+    de ayrı olması bunun doğal sonucu — tek dosya olsaydı video bölümünü
+    özelleştirmek isteyen kullanıcı görsel personayı da üstlenmek zorunda
+    kalırdı.
+    """
+    return os.path.join(data_dir(), "chat-instructions-video.md")
+
+
 def credentials_path() -> str:
     """Uygulamanın KENDİ kimlik dosyası — Ayarlar penceresi buraya yazar.
 

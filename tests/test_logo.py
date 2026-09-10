@@ -27,7 +27,7 @@ def _logo_asset(tmp_path, monkeypatch, *, png: bytes = b"\x89PNG-logo",
                 kind: str = "logos") -> str:
     """Kütüphaneye bir varlık koyar, id'sini döndürür; ASSETS_DIR'i de yönlendirir.
 
-    Yerleşik kurumsal logo kaldırıldığından /api/logo HER ZAMAN bir `asset_id`
+    Yerleşik logo kaldırıldığından /api/logo HER ZAMAN bir `asset_id`
     istiyor (bkz. models.LogoRequest) — bu yüzden bindirme yapan hemen her test
     önce kütüphaneye bir şey koymak zorunda.
     """
@@ -129,7 +129,7 @@ def test_logo_404_for_unknown_id(tmp_path, monkeypatch):
 def test_logo_without_asset_id_is_rejected(tmp_path, monkeypatch):
     """asset_id YOKSA istek reddedilir — yerleşik logo diye bir şey yok.
 
-    Eskiden bu yol pakete gömülü kurumsal logo çiftine düşer ve 200 dönerdi. Ürün
+    Eskiden bu yol pakete gömülü yerleşik logo çiftine düşer ve 200 dönerdi. Ürün
     marka-nötr olduğundan artık bindirilecek görsel her zaman kullanıcının
     kütüphanesinden gelmek zorunda; sessizce bir varsayılana düşmek kullanıcının
     hiç seçmediği bir logoyu görselin üstüne basmak olurdu.

@@ -503,15 +503,23 @@ body:has(.sheet.open) .scrim { display: block; }
 #composer[data-mode="video"] #model-pick,
 #composer[data-mode="video"] #chat-model-pick,
 #composer[data-mode="video"] #director-btn,
-/* "Yönetmen'e sor" VİDEO MODUNDA DA GİZLİ ve bu bir eksik değil ölçülü bir
-   karar: Yönetmen'in tur bağlamı `prefs["image_model"]`den geliyor
-   (`app._director_context`), yani video modunda GÖRSEL modelinin jetonlarını
-   öneriyor — "1024x1024" ya da "Orta kalite" gibi, video ucunda 422 dönen
-   değerler. Persona da gpt-image prompt'u için yazılmış. Devri açık bırakmak,
-   kullanıcıyı uygulanamayan bir öneriye götürmek olurdu; kapı, Yönetmen video
-   bağlamını öğrenene kadar duruyor (görev defteri madde 10d). Yönetmen modu
-   ELLE hâlâ erişilebilir — kapanan tek şey bu kısayol. */
-#composer[data-mode="video"] #ask-director,
+/* "Yönetmen'e sor" ARTIK VİDEO MODUNDA DA AÇIK. Kapalıydı ve gerekçesi
+   yazılıydı: Yönetmen'in tur bağlamı yalnız `prefs["image_model"]`den
+   geliyordu, yani video modunda GÖRSEL modelinin jetonlarını öneriyordu
+   ("1024x1024", "Orta kalite" — video ucunda 422 dönen değerler) ve persona
+   gpt-image prompt'u için yazılmıştı. Kapının kendi koşulu "Yönetmen video
+   bağlamını öğrenene kadar" idi; o koşul artık sağlandı: bağlam yapılandırılmış
+   VİDEO modellerini de taşıyor ve video zanaatı ayrı bir talimat dosyasında
+   (bkz. chat_prompt.build_system). Kapıyı açık bırakmak, sağlanmış bir koşulu
+   yok saymak olurdu.
+
+   #arena-pick video modunda GİZLİ KALIYOR: arena aynı prompt'u N modelde
+   koşturuyor ve video tarafında bu, tek tıkla N tane dakikalarca süren,
+   saniyesi faturalanan üretim demek — kendi kararını isteyen bir şey. Ama
+   gizlemek KAPATMAK değil ve anahtarın durumu mod değişiminde korunuyor
+   (yukarıdaki karar), yani arena AÇIK KALABİLİYOR ve kullanıcı onu bu modda
+   kapatamıyor; `goBlockReason`ın video dalındaki arena kapısı tam olarak o
+   boşluğu kapatıyor ve çıkış yolunu söylüyor. */
 #composer[data-mode="video"] #arena-pick { display: none; }
 
 /* AYAR SAYFASININ video hâli: Tema rengi, Logo ekle ve Kütüphane blokları
@@ -1525,6 +1533,22 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
   background: var(--accent-subtle, var(--fill-selected));
   color: var(--fg, var(--on-fill-selected));
   box-shadow: inset 0 0 0 1px var(--accent-border, transparent);
+}
+
+/* Medya tür süzgeci: ikonsuz, simetrik padding. "Yüklenen" kesişen süzgeç
+   olduğu için soluna dikey hairline alır (.picker-nav-item.crossing gibi). */
+.kindseg {
+  padding: 4px;
+}
+.kindseg button {
+  min-width: 0;
+  padding: 0 11px;
+}
+.kindseg .crossing {
+  border-left: 1px solid var(--hairline);
+  margin-left: 3px;
+  padding-left: 11px;
+  border-radius: 999px;
 }
 
 /* Klasörler — başlık şeridi Flow'un crumb'ı: altında saç teli, başlık display

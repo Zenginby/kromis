@@ -229,7 +229,7 @@ def _show_fatal_alert(log_path: str) -> None:
     _uyari_goster(
         "Kromis Studio başlatılamadı",
         f"Uygulama açılamadı. Hata kaydı: {log_path} "
-        "— lütfen bu dosyayı geliştiriciye iletin.",
+        "— lütfen bu dosyayı teknik desteğe iletin.",
         kritik=True)
 
 
@@ -270,7 +270,7 @@ def _tarayici_yedegi(url: str, log_path: str) -> bool:
         f"Kromis Studio'nun kendi penceresi açılamadı, uygulama tarayıcınızda açıldı:\n"
         f"{url}\n\n"
         "BU PENCEREYİ KAPATMAYIN — kapattığınızda Kromis Studio da kapanır.\n"
-        f"Hata kaydı: {log_path} — lütfen bu dosyayı geliştiriciye iletin.",
+        f"Hata kaydı: {log_path} — lütfen bu dosyayı teknik desteğe iletin.",
         kritik=False)
 
 

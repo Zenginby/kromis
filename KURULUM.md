@@ -146,8 +146,7 @@ birebir metin + ekran görüntüsü hâlâ alınmalı.
 
 ## 3. Azure kimliğini gir
 İlk açılışta Ayarlar penceresi kendiliğinden açılır ve "Üret" düğmesi kilitlidir.
-1. **Endpoint** ve **API key** alanlarını kendi Azure kaynağından aldığın
-   bilgilerle doldur (Azure portalı → kaynağın → *Keys and Endpoint*).
+1. **Endpoint** ve **API key** alanlarını yöneticinizden aldığın bilgilerle doldur.
 2. **Kaydet**. Kilit açılır.
 
 Key bilgisayarında yalnız senin okuyabileceğin izinle saklanır ve bir daha
@@ -172,8 +171,7 @@ Yönetmen üç sağlayıcı ile konuşabiliyor; hangisini kullandığına göre 
 
 **Azure kullanacaksan:** Ayarlar penceresinde sağlayıcı **Azure OpenAI** seçili
 dururken, **Prompt Yönetmeni (sohbet modeli)** başlığının altındaki
-**Dağıtım adı** alanına Azure'da oluşturduğun dağıtımın adını yaz
-(ör. `gpt-5.6-luna`) →
+**Dağıtım adı** alanına yöneticinizden aldığın adı yaz (ör. `gpt-5.6-luna`) →
 **Kaydet**. Bu, Azure AI Foundry'deki **deployment** adıdır; model ailesi adı
 değil. Sohbet, görselinkiyle aynı endpoint ve API anahtarını kullanır — ikinci
 bir anahtar girmen gerekmez.
@@ -269,9 +267,9 @@ Telefona özgü iki fark:
 - **"Uygulama yüklenmedi" / "Paket geçersiz":** dosya yarım inmiş olabilir —
   APK'yı sil ve yeniden indir.
 - **"Uygulamanız bu cihazla uyumlu değil":** telefon 32-bit ya da Android 8'in
-  altında. Bu pakete uygun değil, geliştiriciye yaz.
+  altında. Bu pakete uygun değil, teknik desteğe yaz.
 - **Ekranda sürekli "Başlatılıyor…" yazıyor:** uygulamayı tamamen kapat
-  (son uygulamalardan kaydır) ve yeniden aç. Sürerse geliştiriciye yaz.
+  (son uygulamalardan kaydır) ve yeniden aç. Sürerse teknik desteğe yaz.
 - **"Üret" kilitli:** Ayarlar (dişli) → endpoint + key girilmiş mi? (3. adım)
 - **İndirdiğim görseli galeride bulamıyorum:** Galeri uygulaması yeni klasörü
   görmek için biraz gecikebilir; Dosyalar uygulamasından
@@ -280,7 +278,7 @@ Telefona özgü iki fark:
 ---
 
 ## Sonra: yeni sürüm gelirse
-Yeni bir sürüm yayımlandığında [GUNCELLEME.md](GUNCELLEME.md) sayfasını izle.
+Yeni bir `.zip` aldığında [GUNCELLEME.md](GUNCELLEME.md) sayfasını izle.
 
 - **macOS:** uygulamayı kapat → yenisini Programlar'a sürükleyip **Değiştir** →
   güvenlik iznini bir kez daha ver. `Application Support` klasörünü SİLME.
@@ -310,25 +308,25 @@ adım), yani uygulamayı silip yenisini koymak geçmişine dokunmaz.
   olmalı. (b) Zip'i **engellemesini kaldırmadan** ayıklamış olabilirsin (1. adım);
   bu durumda en temizi zip'i baştan, 1. adımdan başlayarak yeniden ayıklamak.
   Her iki durumda da `%LOCALAPPDATA%\Kromis\hata.log` dosyasına bak; varsa
-  içeriğini geliştiriciye gönder.
+  içeriğini teknik desteğe gönder.
 - **(Windows) Sebebi anlaşılmıyorsa — kendi kendine teşhis:** `Kromis` klasöründe
   boş bir yere **Shift + sağ tık → PowerShell penceresini burada aç** de ve şunu
   yaz: `.\Kromis.exe --onyukleme-denetimi`. Pencere açılmaz, bunun yerine
-  `%LOCALAPPDATA%\Kromis\onyukleme-denetimi.txt` dosyası oluşur — onu
-  geliştiriciye gönder, hangi halkanın koptuğunu yazıyor.
+  `%LOCALAPPDATA%\Kromis\onyukleme-denetimi.txt` dosyası oluşur — onu teknik desteğe
+  gönder, hangi halkanın koptuğunu yazıyor.
 - **(Windows) Uygulama tarayıcıda açıldı ve "bu pencereyi kapatmayın" diyor:**
   bu bir arıza değil, yedek yol — Kromis'nun kendi penceresi açılamadığında
   uygulama tarayıcında açılıyor ve her şey normal çalışıyor. O küçük pencereyi
-  kapatınca Kromis de kapanır. Yine de `hata.log`'u geliştiriciye gönder: yedeğe
+  kapatınca Kromis da kapanır. Yine de `hata.log`'u teknik desteğe gönder: yedeğe
   düşülmesinin bir sebebi var ve o sebep düzeltilebilir.
 - **(Windows) Antivirüs uygulamayı karantinaya aldı:** paket imzalanmadığı için
-  bazı kurumsal antivirüsler yanlış-pozitif verebiliyor. Klasörü silme,
-  geliştiriciye yaz.
-- **Görsel üretilmiyor, hata mesajı çıkıyor:** key süresi/rotasyonu için geliştiriciye yaz.
+  bazı kurumsal antivirüsler yanlış-pozitif verebiliyor. Klasörü silme, teknik desteğe
+  yaz.
+- **Görsel üretilmiyor, hata mesajı çıkıyor:** key süresi/rotasyonu için teknik desteğe yaz.
 - **Prompt Yönetmeni'nde "Gönder" kilitli:** hiçbir sohbet sağlayıcısı
   yapılandırılmamış. Azure'da **Dağıtım adı** boştur; OpenAI/Gemini'de anahtar
   kaydedilmemiştir. Düğmenin üzerine gelince hangi modelin eksik olduğunu yazar.
 - **"Sohbet dağıtımı bulunamadı (404)":** yazdığın dağıtım adı Azure'daki adla
-  birebir aynı değil. Doğru adı Azure portalındaki dağıtım listesinden kopyala.
+  birebir aynı değil. Yöneticinize doğru adı sor.
 - **"… bu modeli tanımıyor (404)":** OpenAI/Gemini tarafında seçtiğin model
   kalkmış olabilir — şeritten başka bir sohbet modeli seç.

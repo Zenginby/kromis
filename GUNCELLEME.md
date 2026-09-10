@@ -135,7 +135,7 @@ anahtarın orada. Üzerine kurmak (aynı imzayla imzalandığı için sorunsuz
 çalışır) verine hiç dokunmaz.
 
 *"Uygulama yüklenmedi"* diyorsa çoğunlukla dosya yarım inmiştir: APK'yı sil,
-yeniden indir. Sürerse geliştiriciye yaz — **kaldırıp yeniden kurma**, önce sor.
+yeniden indir. Sürerse teknik desteğe yaz — **kaldırıp yeniden kurma**, önce sor.
 
 ## 4. Güncellendiğini doğrula
 
@@ -150,7 +150,7 @@ isterken de bu numarayı söyle.
 - **Azure anahtarını yeniden girmen gerekmez** — o uygulamanın içinde değil,
   ayrı bir yerde duruyor.
 
-Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve geliştiriciye yaz
+Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve teknik desteğe yaz
 (aşağıdaki yedek işine yarayabilir).
 
 ## Uygulamanın adı değiştiyse — bir kerelik geçiş
@@ -187,6 +187,30 @@ sonucu var:
 - **Telefona indirdiğin görseller yerinde kalıyor:** `Resimler/` altındaki eski
   adlı klasör olduğu gibi duruyor, silinmiyor. Yeni indirmeler
   `Resimler/Kromis` altına iniyor.
+
+---
+
+## Sürüm 0.17.2 — ne değişti
+
+- Küçük düzeltmeler ve iyileştirmeler.
+
+---
+
+## Sürüm 0.17.1 — ne değişti
+
+- windows simgesi ve favicon icin coklu cozunurluk destegi
+
+---
+
+## Sürüm 0.17.0 — ne değişti
+
+- video prompt'u, uretim hafizasi ve model-farkindalikli yonlendirme
+
+---
+
+## Sürüm 0.16.0 — ne değişti
+
+- tur suzgeci -- tumu, gorsel, video, yuklenen
 
 ---
 
@@ -649,8 +673,7 @@ Hepsi **Prompt Yönetmeni** sekmesinde:
   - Sohbet **kaydedilmiyor**: uygulamayı kapatınca gider. Kalıcı olan, üretilen
     görselin prompt'u (o zaten geçmişte duruyor). "Sohbeti temizle" onay soruyor.
   - Kullanmak için **bir kerelik** ayar gerekiyor: **Ayarlar** → *Prompt Yönetmeni
-    (sohbet modeli)* → **Dağıtım adı** (Azure'daki dağıtımının adı, ör.
-    `gpt-5.6-luna`) → **Kaydet**.
+    (sohbet modeli)* → **Dağıtım adı** (yöneticinizin vereceği ad, ör. `gpt-5.6-luna`) → **Kaydet**.
     Girilmezse sekme açılır ama "Gönder" kilitli kalır ve nedeni panelde yazar.
   - Azure anahtarını **yeniden girmen gerekmiyor**; sohbet görselinkini kullanıyor.
 - **Ayarlar kaydetmek artık başka ayarları silmiyor.** Endpoint'i tek başına
@@ -693,14 +716,14 @@ sohbetler, logo kütüphanesi) — **görseller kopyalanmıyor**, onlar zaten
 yerlerinde duruyor.
 Birkaç KB tutar, silmen gerekmez.
 
-Geri yüklemek gerekirse: o klasörün içindeki `output` ve `assets`
+Geri yüklemek gerekirse (teknik destek söylerse): o klasörün içindeki `output` ve `assets`
 klasörlerini bir üstteki `Kromis` klasöründeki aynı adlı klasörlerin
 üstüne sürükle.
 
 ## Sorun çıkarsa
 
 - **Pencere boş açılıyor:** uygulamayı kapat, tekrar aç.
-- **Uygulama hiç açılmıyor:** hata kaydını geliştiriciye gönder —
+- **Uygulama hiç açılmıyor:** hata kaydını teknik desteğe gönder —
   macOS'ta `~/Library/Application Support/Kromis/hata.log`,
   Windows'ta `%LOCALAPPDATA%\Kromis\hata.log`.
 - **(Windows) Pencere hiç gelmiyor:** iki olağan sebebi var. (a) `.exe`'yi
@@ -708,8 +731,8 @@ klasörlerini bir üstteki `Kromis` klasöründeki aynı adlı klasörlerin
   (b) Zip'i **engellemesini kaldırmadan** ayıklamış olabilirsin (1. adım); o
   zaman zip'i baştan, 1. adımdan başlayarak yeniden ayıkla. Sebep hâlâ
   anlaşılmıyorsa `Kromis` klasöründe `.\Kromis.exe --onyukleme-denetimi` koştur ve
-  oluşan `%LOCALAPPDATA%\Kromis\onyukleme-denetimi.txt` dosyasını geliştiriciye gönder.
+  oluşan `%LOCALAPPDATA%\Kromis\onyukleme-denetimi.txt` dosyasını teknik desteğe gönder.
 - **Eski arayüzü görüyorum gibi:** uygulamayı tamamen kapat (macOS'ta ⌘Q) ve
   yeniden aç.
-- **Geçmişim boş görünüyor:** hiçbir şey silme, geliştiriciye yaz — yukarıdaki yedek
+- **Geçmişim boş görünüyor:** hiçbir şey silme, teknik desteğe yaz — yukarıdaki yedek
   klasörü duruyor.

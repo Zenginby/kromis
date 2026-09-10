@@ -62,7 +62,7 @@ def _read_manifest(kind_dir: str) -> list[dict]:
         return []
     # encoding="utf-8" AÇIKÇA — gerekçe storage._read_history'deki ile aynı:
     # manifest utf-8 yazılıyor, okuma platform varsayılanına düşerse Türkçe
-    # varlık adları ("Şirket Logosu Mavi") Türkçe Windows'ta cp1254 ile bozulur.
+    # varlık adları ("Logo Mavi") Türkçe Windows'ta cp1254 ile bozulur.
     with open(path, encoding="utf-8") as f:
         try:
             data = json.load(f)

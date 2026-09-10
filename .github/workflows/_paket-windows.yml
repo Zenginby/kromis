@@ -166,7 +166,8 @@ jobs:
             # yedek yazı tipiyle çizilir. O yüzden kapıya girdi.
             'static/fonts/dm-sans-v17-latin.woff2',
             'static/fonts/dm-sans-v17-latin-ext.woff2',
-            'bundled/prompts/prompt-yonetmeni.md'
+            'bundled/prompts/prompt-yonetmeni.md',
+            'bundled/prompts/prompt-yonetmeni-video.md'
           )
           $eksik = @()
           foreach ($f in $beklenenler) {

@@ -558,7 +558,7 @@ class LogoRequest(BaseModel):
     id: str = Field(min_length=1, max_length=64)
     # asset_id ZORUNLU (min_length=1): bindirilecek görsel her zaman kullanıcının
     # kütüphanesinden gelir. Eskiden None geçilebilirdi ve sunucu pakete gömülü
-    # kurumsal logo çiftine düşerdi; uygulama marka-nötr olduğundan o varsayılan yok.
+    # yerleşik logo çiftine düşerdi; uygulama marka-nötr olduğundan o varsayılan yok.
     # Tip `str | None` KALIYOR: alan hiç gönderilmediğinde Pydantic'in ürettiği
     # hata "asset_id zorunlu" olarak okunsun, `extra="forbid"` ile karışmasın.
     asset_id: str | None = Field(default=None, min_length=1, max_length=64)
@@ -671,10 +671,14 @@ def _check_chat_total(messages: list["ChatMessage"], limit: int) -> list["ChatMe
     olurdu — tek başına küçük, ama sınırın amacı "dosya istemcinin gönderdiği
     kadar büyüyebilmesin" ve ölçülmeyen her alan o amacı deler.
 
-    `result` kayıtları SAYILMIYOR (v2.0): bu sınır token bütçesi, sonuç kayıtları
-    ise modele hiç gitmiyor. Ölçülmemiş ağırlık da bırakmıyorlar — şemaları
-    kapalı: en çok `MAX_IMAGES_PER_RUN` id + üç kısa parametre, adetleri de
-    `MAX_CHAT_RESULTS` ile bağlı. Serbest metin taşıyabildikleri tek alan
+    `result` kayıtları SAYILMIYOR ve bu karar v2.0'da "modele hiç gitmiyorlar"
+    diye gerekçelendirilmişti; o cümle ARTIK DOĞRU DEĞİL (bkz. `wire_messages`)
+    ama karar duruyor, çünkü asıl gerekçe ölçülebilir: tele çıkan şey istemcinin
+    yazdığı metin DEĞİL, sunucunun kurduğu kapalı şemalı bir not. En kötü hâli
+    `MAX_RESULT_NOTE_CHARS` ile kırpılıyor ve adedi `MAX_CHAT_RESULTS` ile bağlı,
+    yani tavanı 240 × 24 = 5.760 karakter: toplam bütçenin ~%10'u ve SABİT.
+    Bu sınırın amacı "dosya/istem istemcinin gönderdiği kadar büyümesin" ve
+    istemci bu ağırlığı şişiremiyor — serbest metin taşıyabildikleri tek alan
     (`content`) onlara YASAK; `display` de öyle.
     """
     if sum(len(m.content or "") + len(m.display or "")
@@ -829,6 +833,95 @@ class ChatMessage(BaseModel):
         if self.role != "user" and self.display is not None:
             raise ValueError("display yalnızca kullanıcı mesajında kullanılabilir")
         return self
+
+
+# Notu kullanıcının KENDİ repliğinden ayıran işaret. Personada da tanıtılıyor
+# ("`[üretim]` ile başlayan mesajlar uygulamanın otomatik notlarıdır") ve iki
+# yerin ayrışmaması bir testle mandallı: önek burada değişip personada
+# değişmezse yönetmen notu kullanıcının yazdığı bir cümle sanar.
+RESULT_NOTE_PREFIX = "[üretim]"
+# Notun tavanı. Kırpmak BURADA güvenli — makine notu kısalınca yalnız bilgi
+# eksilir; persona'yı kırpmanın yasak olma gerekçesi (sessizce ölen bir
+# sözleşme) burada geçerli değil. `guidance`ın kırpılmasıyla aynı sınıf.
+MAX_RESULT_NOTE_CHARS = 240
+
+
+def result_note(m: "ChatMessage") -> str:
+    """Bir sonuç kaydının tel karşılığı: "[üretim] 1 video üretildi · … · 8 sn".
+
+    Yönetmen v2.0'dan beri ne YAZDIĞINI biliyordu ama ne ÜRETİLDİĞİNİ
+    bilmiyordu: rol süzgeci sonuç kayıtlarını düşürüyordu. "Bunu videoya çevir"
+    dendiğinde neyin kastedildiğini, hangi modelle ve hangi ayarlarla
+    üretildiğini bilmeden yanıt veriyordu.
+
+    Not, kaydın KENDİ alanlarından kuruluyor; ikinci bir gerçek kaynağı yok:
+    * fiil `kind`ten, video/görsel ayrımı `VIDEO_RESULT_KINDS`ten — "hangi kayıt
+      video" sorusunun tek cevabı orası ve ikinci bir liste yazmak onun var olma
+      gerekçesini çiğnerdi;
+    * model etiketi katalogdan, bulunamazsa HAM İD (katalogdan kalkmış bir model
+      notu düşürmemeli), `model` hiç yoksa segment yazılmıyor — v0.6 öncesi
+      kayıtlar tam olarak öyle;
+    * `quality`, çözülen modelde `quality_hidden` ise YAZILMIYOR: yönetmene
+      "bu modelde kalite ekseni yok, önerme" denen bir ekseni ona okutmak
+      çelişki olurdu;
+    * `arena_id` yazılmıyor — o dökümün çizim kavramı, prompt zanaatına bir şey
+      söylemiyor.
+    """
+    p = m.params
+    if p is None:
+        return ""
+    isim = "video" if p.kind in VIDEO_RESULT_KINDS else "görsel"
+    fiil = "düzenlendi" if p.kind == "edit" else "üretildi"
+    parcalar = ["%d %s %s" % (len(m.image_ids or ()), isim, fiil)]
+    # İKİ katalogda da aranıyor ve bu, `catalog.video_model`in "birleşik arama
+    # YOK" kuralıyla çelişmiyor: orada yasak olan, bir İSTEĞİ yanlış türün
+    # modeliyle koşturmak. Burada üretim OLMUŞ ve tek soru "bu id'nin etiketi
+    # neydi" — türü zaten `kind` söylüyor.
+    spec = catalog.image_model(p.model) or catalog.video_model(p.model)
+    if p.model:
+        parcalar.append(spec.label if spec is not None else p.model)
+    if p.size:
+        parcalar.append(p.size)
+    if p.quality and not (spec is not None and spec.quality_hidden):
+        parcalar.append(p.quality)
+    if p.duration:
+        parcalar.append(catalog.duration_label(p.duration))
+    return (RESULT_NOTE_PREFIX + " " + " · ".join(parcalar))[:MAX_RESULT_NOTE_CHARS]
+
+
+def wire_messages(messages: list["ChatMessage"]) -> list[dict]:
+    """Döküm → telin göreceği mesajlar. SÜZGEÇ DEĞİL, ÇEVİRMEN.
+
+    Öncesinde rota bir liste kavrayışıyla `result` kayıtlarını DÜŞÜRÜYORDU;
+    burada düşmüyor, kısa bir nota dönüşüyor. Sıra korunuyor: not, doğduğu
+    turun yerinde kalmalı, yoksa yönetmen üretimin ne zaman olduğunu
+    kaybederdi.
+
+    ROL `user` ve üç seçenekten kalan tek doğru o:
+    * `system` MEKANİK OLARAK ELENİYOR — `WIRE_CHAT_ROLES` onu
+      `chat_client.build_payload`'ta düşürürdü, yani özellik sessizce hiç
+      çalışmazdı; kümeyi genişletmek de v2.0'da 400'ü kapatan mandalı
+      gevşetmek olurdu.
+    * `assistant` yönetmenin AĞZINA bir cümle koyar: kendi önceki çıktısı
+      sanıp o biçimi taklit edebilir, "PROMPT bloğu yazdım" sandığı bir turda
+      iterasyon mantığı bozulur.
+    * `user` semantik olarak doğru: not, kullanıcı adına UYGULAMANIN bildirdiği
+      bir olay. `[üretim]` öneki onu kullanıcının kendi repliğinden ayırıyor.
+
+    `chat_client.build_payload`ın rol süzgeci KALIYOR ve gövdesine
+    dokunulmadı: o telin gerçek sınırı, yani SON SAVUNMA. Buranın bir gün yeni
+    bir rolü çevirmeyi unutması hâlinde istek yine 400 almasın diye duruyor.
+    """
+    out: list[dict] = []
+    for m in messages:
+        if m.role in WIRE_CHAT_ROLES:
+            out.append(m.model_dump(include=WIRE_MESSAGE_FIELDS))
+            continue
+        if m.role == RESULT_ROLE:
+            note = result_note(m)
+            if note:
+                out.append({"role": "user", "content": note})
+    return out
 
 
 class ChatRequest(BaseModel):

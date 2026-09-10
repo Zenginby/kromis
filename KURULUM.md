@@ -146,7 +146,8 @@ birebir metin + ekran görüntüsü hâlâ alınmalı.
 
 ## 3. Azure kimliğini gir
 İlk açılışta Ayarlar penceresi kendiliğinden açılır ve "Üret" düğmesi kilitlidir.
-1. **Endpoint** ve **API key** alanlarını yöneticinizden aldığın bilgilerle doldur.
+1. **Endpoint** ve **API key** alanlarını kendi Azure kaynağından aldığın
+   bilgilerle doldur (Azure portalı → kaynağın → *Keys and Endpoint*).
 2. **Kaydet**. Kilit açılır.
 
 Key bilgisayarında yalnız senin okuyabileceğin izinle saklanır ve bir daha
@@ -171,7 +172,8 @@ Yönetmen üç sağlayıcı ile konuşabiliyor; hangisini kullandığına göre 
 
 **Azure kullanacaksan:** Ayarlar penceresinde sağlayıcı **Azure OpenAI** seçili
 dururken, **Prompt Yönetmeni (sohbet modeli)** başlığının altındaki
-**Dağıtım adı** alanına yöneticinizden aldığın adı yaz (ör. `gpt-5.6-luna`) →
+**Dağıtım adı** alanına Azure'da oluşturduğun dağıtımın adını yaz
+(ör. `gpt-5.6-luna`) →
 **Kaydet**. Bu, Azure AI Foundry'deki **deployment** adıdır; model ailesi adı
 değil. Sohbet, görselinkiyle aynı endpoint ve API anahtarını kullanır — ikinci
 bir anahtar girmen gerekmez.
@@ -327,6 +329,6 @@ adım), yani uygulamayı silip yenisini koymak geçmişine dokunmaz.
   yapılandırılmamış. Azure'da **Dağıtım adı** boştur; OpenAI/Gemini'de anahtar
   kaydedilmemiştir. Düğmenin üzerine gelince hangi modelin eksik olduğunu yazar.
 - **"Sohbet dağıtımı bulunamadı (404)":** yazdığın dağıtım adı Azure'daki adla
-  birebir aynı değil. Yöneticinize doğru adı sor.
+  birebir aynı değil. Doğru adı Azure portalındaki dağıtım listesinden kopyala.
 - **"… bu modeli tanımıyor (404)":** OpenAI/Gemini tarafında seçtiğin model
   kalkmış olabilir — şeritten başka bir sohbet modeli seç.

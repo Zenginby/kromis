@@ -17,10 +17,43 @@ kullanıcısını kaydediyor — o gerekçe artık geçerli DEĞİL.
 
 | Faz | Durum |
 | --- | --- |
-| 0 — depo adı | ⏳ **KULLANICI** (GitHub Settings + boş "taşındı" deposu) |
-| 1 — imza anahtarı | ⏳ **KULLANICI** (keytool + dört sır) |
-| 2–9 | ✅ uygulandı; tam takım **2312 geçti, 1 atlandı** |
-| 10 — doğrulama/yayın | ⏳ Faz 0+1 bitince (kuru prova + parmak izi ölçümü) |
+| 0 — depo adı | ✅ `Zenginby/kromis`; boş "taşındı" deposu bilerek AÇILMADI (gerekçe Faz 0'da) |
+| 1 — imza anahtarı | ✅ keystore repo D I Ş I N D A üretildi, dört sır tanımlandı |
+| 2–9 | ✅ uygulandı; `main` (v0.17.2) birleştirildi, tam takım **2359 geçti, 1 atlandı** |
+| 10 — doğrulama/yayın | ⏳ kuru prova koşuyor (PR #75, koşu 34503743056) |
+
+### `main` ile birleşme — 2026-09-10
+
+Dal v0.15.0 tabanında açılmıştı; arada `main`'e iki yayın daha girdi (v0.16.0,
+v0.17.2) ve ikisi de tam bu planın dokunduğu yerlere dokundu — 22 içerik
+çakışması. Kural: **sözcük `main`'in, adlar bu dalın.** Sebebi, iki tarafın
+AYNI "Kurum" cümlelerini birbirinden bağımsız temizlemesi: `main` "teknik desteğe"
+ve "yerleşik logo" dedi, bu dal "geliştiriciye" ve "kurumsal logo". `main`
+YAYIMLANMIŞ ve uygulama İÇİ metinleri (`desktop.py`, `app.py`, `strings.xml`,
+`winclr.py`) onun sözcüklerini taşıyor; belgelerin aynı sözlükten konuşması için
+1. ve 3. sınıfın sözcüğü `main`'den alındı. Fixture'lar da o sözcüğe hizalandı
+(`kurumsal-logo-*.png` → `yerlesik-logo-*.png`).
+
+**Kimlik cümleleri (2. sınıf) bunun DIŞINDA kaldı.** `main` orada yalnız markayı
+temizlemiş ("yöneticinizden aldığın bilgiler") — yani eski dağıtım modeli, adı
+silinmiş hâliyle duruyor. Projenin kayıtlı yönü BYOK
+(`2026-08-10-step-1-byok-versioning-open-source.md`) ve bu dalın metni onu
+anlatıyor: anahtar kullanıcının KENDİ Azure kaynağından geliyor. Muhatap
+sözcüğü `main`'in, kimlik anlatısı bu dalın.
+
+Üç istisna daha, gerekçeleriyle: `tools/render_brand_assets.py`'de `main`'in
+çoklu çözünürlük DÜZELTMESİ esas alındı (`--ours` seçilse simge yeniden 16x16'ya
+düşerdi, PR #73); `GUNCELLEME.md`'de sürüm numarasını "yönetici" değil YAYIN
+SAYFASI söylüyor (aynı belgenin 9. satırı ve `guncelleme.YAYIN_SAYFASI` oraya
+yönlendiriyor); `prompt-yonetmeni.md`'de örnek "LUMEO" değil "İZMİR KAHVESİ"
+kaldı — madde Türkçe karakter bozulmasını anlatıyor ve "LUMEO"da hiç Türkçe
+karakter yok.
+
+**Birleşmenin SESSİZCE geçirdiği şey.** `tests/test_brand_assets.py` `main`'de
+YENİ bir dosya: çakışma çıkmadı, birleşme onu olduğu gibi aldı ve dosya eski
+simge adlarını arıyordu — iki test kırmızı düştü. Ders: yeniden adlandırma
+dalı bir birleşmeden sonra ÇAKIŞMA LİSTESİNE değil, TAKIMA bakmak zorunda;
+karşı tarafın YENİ dosyaları eski adı hiç çakışmadan getiriyor.
 
 **Planın ötesine geçen üç iş** (gerekçeleri ilgili fazlarda):
 
@@ -84,9 +117,12 @@ Bunlar "eski ad" değil; ya tarihsel kayıt ya üçüncü tarafın kimliği:
 kimliği de kullanıcının KENDİ kaynağından geliyor, Kurum'dan gelen bir şey yok.
 Aşağıdaki altı sınıfın beşi uygulandı; kalan tek iz paket kimliği (Faz 5).
 
-**Uygulandı — 33 dosya:** destek yönlendirmeleri (`geliştiriciye`), dağıtım ve
-kimlik cümleleri (kendi Azure kaynağı anlatısı), kaldırılmış yerleşik logo
-yorumları (`kurumsal logo`), fixture/örnek varlık adları (`Şirket Logosu Mavi`),
+**Uygulandı — 33 dosya:** destek yönlendirmeleri (`teknik desteğe` — ilk
+uygulamada `geliştiriciye` yazılmıştı, `main`'in birleşmesinde onun sözcüğüne
+hizalandı), dağıtım ve kimlik cümleleri (kendi Azure kaynağı anlatısı — BYOK,
+birleşmede KORUNDU), kaldırılmış yerleşik logo yorumları (`yerleşik logo`,
+`main`'in sözcüğü), fixture/örnek varlık adları (`Logo Mavi`,
+`yerlesik-logo-*.png`),
 `prompt-yonetmeni.md`'deki noktalı-İ dersi (`İZMİR`, ders korundu),
 `docs/flow-ui` maketlerinin marka etiketleri (`Kurumsal mavi`, tema jetonu
 `kurumsal` → `kurumsal`), `CompanyName` (`Zenginby`) ve test/maketlerdeki gerçek
@@ -145,10 +181,17 @@ Aşağıdaki sınıflandırma neyin NEDEN öyle çözüldüğünü saklıyor.
 
 **1. Kullanıcıya dönük destek yönlendirmeleri — 2026-09-10'da TEMİZLENDİ.**
 "lütfen bu dosyayı Kurum'ya iletin" / "Kurum'ya yaz" / "Kurum'ya gönder" ifadeleri
-`geliştiriciye` ile değiştirildi: `android/.../strings.xml` (`sunucu_baslatilamadi_detay`),
-`desktop.py:231,272`, `app.py:2079`, `KURULUM.md` (4), `GUNCELLEME.md` (5), ve o
-cümleyi ALINTILAYAN `winclr.py:232` yorumu (hata.log sözleşmesi). Marka-nötr
-sözcük bilinçli: yeniden adlandırmadan sonra yeniden düzenlenmesi gerekmiyor.
+`teknik desteğe` ile değiştirildi: `android/.../strings.xml`
+(`sunucu_baslatilamadi_detay`), `desktop.py`, `app.py`, `KURULUM.md` (4),
+`GUNCELLEME.md` (5), ve o cümleyi ALINTILAYAN `winclr.py` yorumu (hata.log
+sözleşmesi). Marka-nötr sözcük bilinçli: yeniden adlandırmadan sonra yeniden
+düzenlenmesi gerekmiyor.
+
+> Bu sınıf ilk uygulamada `geliştiriciye` yazılmıştı. `main` aynı cümleleri
+> BAĞIMSIZ olarak `teknik desteğe` diye temizleyip v0.17.2'de YAYIMLADI; iki
+> sözcük bir arada, aynı deponun iki yerinde aynı şeyi başka türlü söylüyor
+> olurdu. Birleşmede `main`'in sözcüğü esas alındı — uygulama İÇİ metinler
+> zaten onu taşıyor ve kullanıcının ekranında gördüğü sözcük o.
 
 **2. Dağıtım/kimlik modelini anlatan cümleler — KARAR GEREKİYOR.** Bunlar
 sözcük değil, bir MODEL anlatıyor: uygulamayı Kurum dağıtıyor ve Azure kimliğini
@@ -166,10 +209,16 @@ sözcük değişimiyle kapatılmadı:
 | `GUNCELLEME.md:617` | "Dağıtım adı (Kurum verecek, ör. `gpt-5.6-luna`)" |
 | `GUNCELLEME.md:660` | "Geri yüklemek gerekirse (Kurum söylerse)…" |
 
-Faz 8'de karar: ya "geliştirici" olarak yeniden yazılır (aynı model, yeni sahip),
-ya BYOK anlatısına çevrilir ("kendi Azure kaynağından aldığın endpoint/anahtar") —
-ikincisi `docs/superpowers/plans/2026-08-10-step-1-byok-versioning-open-source.md`
-yönüyle tutarlı olan.
+**Karar (Faz 8, 2026-09-10): BYOK anlatısı.** "Kendi Azure kaynağından aldığın
+endpoint/anahtar", "Azure portalı → kaynağın → *Keys and Endpoint*", "Azure'da
+oluşturduğun dağıtımın adı" — gerekçesi
+`docs/superpowers/plans/2026-08-10-step-1-byok-versioning-open-source.md`.
+
+> `main` bu cümleleri bağımsız olarak "yöneticinizden aldığın bilgiler" diye
+> temizledi. O bir sözcük değişimi: eski dağıtım modeli, yalnız adı silinmiş
+> hâliyle duruyor ve "size anahtarı veren bir kurum var" diyor. Bu yüzden 1. ve
+> 3. sınıfın aksine bu sınıfta `main`'in sözcüğü AL I N M A D I — tek istisna,
+> bir MODEL anlattığı için.
 
 **3. Kaldırılmış özelliğin tarihsel kaydı — DOKUNULMUYOR.** `app.py:91,1774`,
 `composite.py:13`, `models.py:561`, `assets_store.py:65` pakete gömülü "KURUM logo
@@ -464,11 +513,21 @@ gömülü. Güncellenmezse kalıp hiçbir şey bulamaz ve tek-kaynak bekçisi t�
 
 ## Faz 10 — Doğrulama ve yayın
 
-* [ ] `python -m pytest tests/ -q` — tam takım yeşil
-* [ ] `release.yml`'i `workflow_dispatch` + kuru prova ile daldan koştur (dalda tetikleme
-      çalışıyor; `docs/android/mimari.md` ölçmüş)
-* [ ] **`İmzayı doğrula` adımının ATLANMADIĞINI** gör — atlandıysa APK imzasızdır ve
-      telefona kurulmaz
+* [x] `python -m pytest tests/ -q` — tam takım yeşil (2359/1, `main` birleşmesinden sonra)
+* [x] `release.yml`'i `workflow_dispatch` + kuru prova ile daldan koştur — koşu
+      34503743056, `surum=0.17.3`, beş iş de yeşil; dal kapısı ve taslak kapısı
+      tasarlandığı gibi çalıştı (sürüm commit'i atılmadı, yayın oluşmadı)
+* [ ] **`İmzayı doğrula` adımının ATLANMADIĞINI** gör — ⏳ 1. koşuda ATLANDI
+
+  > **Ölçüm — 2026-09-10, koşu 34503743056.** `gh secret list` dördünü de
+  > gösteriyordu ve `ANDROID_KEYSTORE_PASSWORD` koşuda `***` olarak çözüldü — yani
+  > `secrets: inherit` çalışıyor. Buna rağmen `KEYSTORE_B64` BOŞ geldi: sır VAR,
+  > değeri boş. Muhtemel sebep, `base64` çıktısı boşken (dosya bulunamadığında
+  > `base64` stderr'e yazar, stdout boş kalır) borunun `gh secret set`e boş girdi
+  > vermesi. İki ders: (1) `gh secret list`te görünmek değerin dolu olduğunu
+  > KANITLAMIYOR — tek güvenilir işaret `İmzayı doğrula`nın koşması; (2) adımın
+  > "sır yok" metni yanlış yere baktırıyordu, "tanımlı DEĞİL ya da BOŞ" olarak
+  > düzeltildi ve özete `wc -c` doğrulaması eklendi.
 * [ ] `apksigner verify --print-certs` çıktısındaki yeni DN + SHA-256 + SHA-1'i
       `docs/android/mimari.md`'nin yeni tablosuna yaz (aynı PR'da)
 * [ ] Windows: zip'i indirip `Kromis.exe --onyukleme-denetimi` (MOTW'li senaryo,

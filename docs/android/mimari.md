@@ -194,6 +194,22 @@ Sırları tanımladıktan sonra yukarıdaki *deneme paketi* koşusunu tetikle. B
 `İmzayı doğrula` atlanmaz; `apksigner verify --print-certs` sertifikayı basar ve
 o adım yeşilse paket telefona kurulur.
 
+> **`gh secret list`te görünmek YETMEZ — değer boş olabilir.** 2026-09-10'da
+> (koşu 34503743056) dört sır da listede duruyordu, `ANDROID_KEYSTORE_PASSWORD`
+> koşuda `***` olarak çözülüyordu — ama `ANDROID_KEYSTORE_BASE64`'ün DEĞERİ
+> boştu ve `İmzayı doğrula` sessizce atlandı. Kuru provada `imza_zorunlu` gevşek
+> olduğu için koşu yeşil bitti. Sebep, `base64` çıktısı boşken (dosya
+> bulunamadığında `base64` stderr'e yazar, stdout boş kalır) borunun
+> `gh secret set`e boş girdi vermesi. Sırrı yazmadan ÖNCE değeri say:
+>
+> ```bash
+> base64 -w0 kromis.keystore | wc -c     # birkaç bin demeli; 0 ise dosya yok
+> base64 -w0 kromis.keystore | gh secret set ANDROID_KEYSTORE_BASE64 --repo Zenginby/kromis
+> ```
+>
+> Boruyla yazılıyor, `--body` ile DEĞİL: base64 özel anahtarın kendisi ve
+> `--body` onu kabuk geçmişine düşürür.
+
 #### Anahtar kimliği
 
 **v0.17.2'ye kadarki anahtar (TARİHSEL).** Paket kimliği `com.zenginby.kromis`e

@@ -673,7 +673,8 @@ Hepsi **Prompt Yönetmeni** sekmesinde:
   - Sohbet **kaydedilmiyor**: uygulamayı kapatınca gider. Kalıcı olan, üretilen
     görselin prompt'u (o zaten geçmişte duruyor). "Sohbeti temizle" onay soruyor.
   - Kullanmak için **bir kerelik** ayar gerekiyor: **Ayarlar** → *Prompt Yönetmeni
-    (sohbet modeli)* → **Dağıtım adı** (yöneticinizin vereceği ad, ör. `gpt-5.6-luna`) → **Kaydet**.
+    (sohbet modeli)* → **Dağıtım adı** (Azure'daki dağıtımının adı, ör.
+    `gpt-5.6-luna`) → **Kaydet**.
     Girilmezse sekme açılır ama "Gönder" kilitli kalır ve nedeni panelde yazar.
   - Azure anahtarını **yeniden girmen gerekmiyor**; sohbet görselinkini kullanıyor.
 - **Ayarlar kaydetmek artık başka ayarları silmiyor.** Endpoint'i tek başına

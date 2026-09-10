@@ -177,14 +177,26 @@ jobs:
             # imzasız bir APK telefona atıldı ve ancak orada anlaşıldı.
             # Uyarı hem loga hem koşu ÖZETİNE yazılıyor: varlığı indiren
             # kişi log satırlarını değil, koşu sayfasını görüyor.
-            echo "UYARI: ANDROID_KEYSTORE_BASE64 yok — APK İMZASIZ derlenecek."
+            # "YOK ya da BOŞ" — ikisi ayrı arıza ve bu adım ikisini
+            # ayırt edemiyor (boş bir sır ile tanımsız bir sır `env`'e aynı şekilde,
+            # boş dize olarak düşüyor). Metin 2026-09-10'da düzeltildi: o gün sır
+            # `gh secret list`te GÖRÜNÜYORDU ama değeri boştu (boru `base64`
+            # çıktısı boşken `gh secret set`e boş girdi vermiş) ve eski metin
+            # "yok" diyerek arayan kişiyi baştan yanlış yere baktırıyordu.
+            echo "UYARI: ANDROID_KEYSTORE_BASE64 tanımlı DEĞİL ya da BOŞ — APK İMZASIZ derlenecek."
             echo "  İmzasız APK telefona KURULAMAZ ('paket geçersiz görünüyor')."
+            echo "  Sır listede görünüyorsa değerinin boş olmadığını doğrula:"
+            echo "  \`base64 -w0 kromis.keystore | wc -c\` birkaç bin karakter demeli."
             echo "  Gerekli sırlar: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,"
             echo "  ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD (docs/android/mimari.md → İmzalama)."
             {
               echo "### ⚠️ Bu APK İMZASIZ — telefona kurulamaz"
               echo
               echo "Android imzasız paketi kurmaz; \`Paket geçersiz görünüyor\` hatası verir."
+              echo
+              echo "Sır **listede görünüyor** olabilir ve yine de boş olabilir —"
+              echo "2026-09-10'da tam olarak bu oldu. \`base64 -w0 kromis.keystore | wc -c\`"
+              echo "birkaç bin karakter demeli; \`0\` diyorsa dosya bulunamamış demektir."
               echo "Aşağıdaki varlık yalnızca **derlemenin ayakta olduğunu** gösterir."
               echo
               echo "Kurulabilir paket için dört GitHub Secret gerekiyor —"

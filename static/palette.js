@@ -1,4 +1,4 @@
-// Lumeo — tema rengi, renk seçici, palet önerileri ve kütüphanesi.
+// Kromis — tema rengi, renk seçici, palet önerileri ve kütüphanesi.
 //
 // Klasik script (ES module DEĞİL): bütün parçalar TEK global kapsamı paylaşır
 // ve index.html'deki yükleme SIRASI bağlayıcıdır:

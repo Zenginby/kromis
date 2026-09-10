@@ -4,11 +4,16 @@ NEDEN VAR: bu kusur sınıfı burada İKİ KEZ geçti ve ikisi de aynı desendey
 kod DOĞRU çalışıyor, uyarı gürültünün içinde kayboluyor, borç sessizce ileriye
 yazılıyor:
 
-  • v0.3.0 — `gpt-image-studio.spec`: yorumdaki `%LOCALAPPDATA%\Lumeo` yolu
-    `\L`'yi geçersiz bir kaçış dizisi yaptı. Uyarı yalnız DERLEME sırasında,
-    pyinstaller'ın onlarca INFO satırı arasında görünüyordu — kaybolmaya birebir
-    uygun. Kapısı `tests/test_version.py::test_spec_has_no_syntax_warnings`
-    olarak yazıldı, ama YALNIZ spec'e bakıyordu.
+  • v0.3.0 — spec dosyası: yorumdaki `%LOCALAPPDATA%\Kromis` yolu `\K`'yi
+    geçersiz bir kaçış dizisi yaptı. (Örnek uygulama adıyla BİRLİKTE
+    güncelleniyor: kusur "veri dizinini yorumda anmak" ve baş harf her
+    yeniden adlandırmada değişiyor — v0.3.0'da `\G`, `Lumeo` döneminde `\L`,
+    bugün `\K`. Harfi ada bağlı tutmak kapının BUGÜNKÜ tuzağı göstermesini
+    sağlıyor; sabitlemek onu tarihsel bir merağa çevirirdi.) Uyarı yalnız
+    DERLEME sırasında, pyinstaller'ın onlarca INFO satırı arasında
+    görünüyordu — kaybolmaya birebir uygun. Kapısı
+    `tests/test_version.py::test_spec_has_no_syntax_warnings` olarak yazıldı,
+    ama YALNIZ spec'e bakıyordu.
   • `tests/test_mobile.py:639` — bir docstring eski bir regex'i alıntılıyordu:
     `re.search(r"\n\s*height:", govde)`. Docstring HAM DEĞİLDİ, yani `\s`
     geçersiz kaçış (SyntaxWarning) oldu. İkinci ve daha sinsi yarısı: `\n`
@@ -73,7 +78,7 @@ ATLANAN_DIZINLER = {
 # `.spec` PyInstaller'ın Python kaynağıdır: uzantısı `.py` OLMADIĞI için
 # yürüteç onu adıyla almak zorunda — v0.3.0 kusuru tam orada yaşandı, yani
 # `.py` süzgeci tek başına kapıyı ilk olayına karşı kör bırakırdı.
-EK_KAYNAKLAR = ("gpt-image-studio.spec",)
+EK_KAYNAKLAR = ("kromis.spec",)
 
 
 def _kaynak_dosyalari():
@@ -131,7 +136,7 @@ def test_the_scanner_sees_the_defects_it_was_written_for():
 
     Yukarıdaki testin yeşil olması iki şey demek olabilir — uyarı yok, YA DA
     tarayıcı kör. Bu test ikincisini eliyor: örnek, modül docstring'indeki İKİ
-    gerçek olayı da taşıyor (`\L` yolu ve `\s` regex'i) ve yanlış-pozitif
+    gerçek olayı da taşıyor (`\K` yolu ve `\s` regex'i) ve yanlış-pozitif
     üretmemesi gereken ÜÇ geçerli biçimi — çünkü aşırı hevesli bir tarayıcı da
     kapı değildir, deponun 90 ham regex'ini kırmızıya boyar.
 
@@ -140,7 +145,7 @@ def test_the_scanner_sees_the_defects_it_was_written_for():
     gelir — bu kapının konusu tam olarak o karışıklık.
     """
     ornek = "\n".join((
-        r'"""Yol: %LOCALAPPDATA%\Lumeo."""',   # 1 ← v0.3.0: geçersiz `\L`
+        r'"""Yol: %LOCALAPPDATA%\Kromis."""',  # 1 ← v0.3.0: geçersiz `\K`
         r'DESEN = "\s+"',                      # 2 ← test_mobile: geçersiz `\s`
         r'HAM = r"\s+"',                       # 3 ham dize: geçerli
         r'KACIS = "\\s+"',                     # 4 kaçırılmış ters bölü: geçerli

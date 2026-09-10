@@ -1,4 +1,4 @@
-# Lumeo — Kurulum (macOS, Windows ve Android)
+# Kromis Studio — Kurulum (macOS, Windows ve Android)
 
 Bilgisayarına Python veya başka bir şey kurman gerekmiyor. 5 dakika sürer.
 
@@ -8,9 +8,9 @@ Prompt Yönetmeni) iki sistemde aynıdır.
 
 | Sistem | Dosya |
 |---|---|
-| macOS (Apple Silicon) | `lumeo-macOS-arm64.zip` |
-| Windows 10/11 (64-bit) | `lumeo-windows-x64.zip` |
-| Android 8.0+ (arm64) | `lumeo-android-arm64.apk` |
+| macOS (Apple Silicon) | `kromis-macOS-arm64.zip` |
+| Windows 10/11 (64-bit) | `kromis-windows-x64.zip` |
+| Android 8.0+ (arm64) | `kromis-android-arm64.apk` |
 
 **Telefona kuruyorsan** aşağıdaki 1. ve 2. adımları atla, doğrudan
 [Android (sideload)](#android-sideload) bölümüne git — 3., 4. ve 5. adımlar
@@ -24,7 +24,8 @@ için, sana gönderilen paket değildir.
 ## 1. Uygulamayı yerine koy
 
 ### macOS
-1. `Lumeo.zip` dosyasına çift tıkla — yanında `Lumeo` uygulaması çıkar.
+1. İndirdiğin `kromis-macOS-arm64.zip` dosyasına çift tıkla — yanında
+   `Kromis` uygulaması çıkar.
 2. Çıkan uygulamayı **Programlar (Applications)** klasörüne sürükle.
 
 ### Windows
@@ -39,12 +40,12 @@ için, sana gönderilen paket değildir.
    > işaret hiç yayılmaz. Sonradan yüzlerce dosyayı tek tek temizlemek yerine
    > en kolayı zip'i bu adımdan başlayarak yeniden ayıklamaktır.
 2. Zip dosyasına sağ tıkla → **Tümünü ayıkla** (Extract All).
-3. Çıkan `Lumeo` klasörünü kalıcı bir yere taşı — ör.
-   `C:\Users\<kullanıcı adın>\Programlar\Lumeo`.
+3. Çıkan `Kromis` klasörünü kalıcı bir yere taşı — ör.
+   `C:\Users\<kullanıcı adın>\Programlar\Kromis`.
    **Klasörü olduğu gibi taşı, içinden yalnız `.exe`'yi çekip almaya çalışma:**
    uygulama yanındaki `_internal` klasörüne ihtiyaç duyar, `.exe` tek başına
    çalışmaz.
-4. Uygulamayı `Lumeo.exe` ile açarsın. İstersen ona sağ tıklayıp
+4. Uygulamayı `Kromis.exe` ile açarsın. İstersen ona sağ tıklayıp
    **Başlat'a sabitle** / **Kısayol oluştur** diyebilirsin.
 
 > **Zip'i doğrudan içinden çalıştırma.** Windows zip'in içeriğini geçici bir
@@ -61,8 +62,8 @@ native), Rosetta çevirisi yapılmaz.
 
 1. Uygulamaya çift tıkla. Uygulama **açılmayacak** ve şu uyarı çıkacak:
 
-   > **"Lumeo" Not Opened**
-   > Apple could not verify "Lumeo" is free of malware that may harm
+   > **"Kromis" Not Opened**
+   > Apple could not verify "Kromis" is free of malware that may harm
    > your Mac or compromise your privacy.
    >
    > *(Türkçe sistemde aynı uyarı "…Açılmadı / Apple … doğrulayamadı" biçiminde
@@ -82,7 +83,7 @@ native), Rosetta çevirisi yapılmaz.
    yalnızca Apple onayı (notarization) yok.
 2. Ekranın sol üstündeki **Apple menüsü** → **Sistem Ayarları** (System Settings)
    → **Gizlilik ve Güvenlik** (Privacy & Security).
-3. Sayfayı aşağı kaydır: *"Lumeo engellendi"* / *"was blocked"* satırını
+3. Sayfayı aşağı kaydır: *"Kromis engellendi"* / *"was blocked"* satırını
    bul → **Yine de Aç** (**Open Anyway**).
 4. Çıkan onayda tekrar **Yine de Aç** → Mac şifreni gir (ya da Touch ID).
 5. Uygulama açılır. Bir daha sormaz.
@@ -102,7 +103,7 @@ Uygulama ücretli bir kod imzalama sertifikasıyla imzalanmadığı için Window
 **SmartScreen** ilk açılışta araya giriyor. Bir kez izin verirsin, sonraki
 açılışlarda sormaz.
 
-1. `Lumeo.exe`'ye çift tıkla. Uygulama **açılmayacak** ve mavi bir
+1. `Kromis.exe`'ye çift tıkla. Uygulama **açılmayacak** ve mavi bir
    pencere çıkacak:
 
    > **Windows bilgisayarınızı korudu**
@@ -145,7 +146,8 @@ birebir metin + ekran görüntüsü hâlâ alınmalı.
 
 ## 3. Azure kimliğini gir
 İlk açılışta Ayarlar penceresi kendiliğinden açılır ve "Üret" düğmesi kilitlidir.
-1. **Endpoint** ve **API key** alanlarını yöneticinizden aldığın bilgilerle doldur.
+1. **Endpoint** ve **API key** alanlarını kendi Azure kaynağından aldığın
+   bilgilerle doldur (Azure portalı → kaynağın → *Keys and Endpoint*).
 2. **Kaydet**. Kilit açılır.
 
 Key bilgisayarında yalnız senin okuyabileceğin izinle saklanır ve bir daha
@@ -153,15 +155,15 @@ ekranda gösterilmez. Dosyanın yeri iki sistemde de aynı mantıkta:
 
 | Sistem | Dosya |
 |---|---|
-| macOS | `~/.config/lumeo/credentials.env` (izin `0600`) |
-| Windows | `C:\Users\<kullanıcı adın>\.config\lumeo\credentials.env` |
+| macOS | `~/.config/kromis/credentials.env` (izin `0600`) |
+| Windows | `C:\Users\<kullanıcı adın>\.config\kromis\credentials.env` |
 
 Windows'ta POSIX izin bitleri işlemediği için dosyaya erişim listesi (DACL)
 sıkılaştırılıyor: kalıtım kesilir ve listede **yalnız senin hesabın** kalır.
 Kendin görmek istersen:
 
 ```powershell
-icacls "$env:USERPROFILE\.config\lumeo\credentials.env"
+icacls "$env:USERPROFILE\.config\kromis\credentials.env"
 ```
 
 ## 4. Prompt Yönetmeni'ni aç (istersen)
@@ -170,7 +172,8 @@ Yönetmen üç sağlayıcı ile konuşabiliyor; hangisini kullandığına göre 
 
 **Azure kullanacaksan:** Ayarlar penceresinde sağlayıcı **Azure OpenAI** seçili
 dururken, **Prompt Yönetmeni (sohbet modeli)** başlığının altındaki
-**Dağıtım adı** alanına yöneticinizden aldığın adı yaz (ör. `gpt-5.6-luna`) →
+**Dağıtım adı** alanına Azure'da oluşturduğun dağıtımın adını yaz
+(ör. `gpt-5.6-luna`) →
 **Kaydet**. Bu, Azure AI Foundry'deki **deployment** adıdır; model ailesi adı
 değil. Sohbet, görselinkiyle aynı endpoint ve API anahtarını kullanır — ikinci
 bir anahtar girmen gerekmez.
@@ -190,12 +193,12 @@ kapatıp açsan da geçmişin durur.
 
 | Sistem | Görsellerin yeri |
 |---|---|
-| macOS | `~/Library/Application Support/Lumeo/output/` |
-| Windows | `%LOCALAPPDATA%\Lumeo\output\` — yani `C:\Users\<kullanıcı adın>\AppData\Local\Lumeo\output\` |
-| Android | Uygulamanın kendi özel klasörü (dosya yöneticisinden görünmez). Telefona indirdiklerin ise `Resimler/Lumeo/` altında. |
+| macOS | `~/Library/Application Support/Kromis/output/` |
+| Windows | `%LOCALAPPDATA%\Kromis\output\` — yani `C:\Users\<kullanıcı adın>\AppData\Local\Kromis\output\` |
+| Android | Uygulamanın kendi özel klasörü (dosya yöneticisinden görünmez). Telefona indirdiklerin ise `Resimler/Kromis/` altında. |
 
 Windows'ta klasörü hızlı açmak için Dosya Gezgini'nin adres çubuğuna
-`%LOCALAPPDATA%\Lumeo` yazıp Enter'a basabilirsin. (Bu klasör
+`%LOCALAPPDATA%\Kromis` yazıp Enter'a basabilirsin. (Bu klasör
 bilerek `AppData\Local` altında — `Roaming` olsaydı ürettiğin bütün görseller
 kurumsal profille birlikte ağ üzerinden taşınmaya çalışırdı.)
 
@@ -217,7 +220,7 @@ sonra Python çalışma zamanı açılıyor ve ürettiğin görseller de telefon
 duruyor — pay bunun için).
 
 ### A1. APK'yı indir
-Telefonun tarayıcısından `lumeo-android-arm64.apk` dosyasını indir.
+Telefonun tarayıcısından `kromis-android-arm64.apk` dosyasını indir.
 Tarayıcı *"Bu dosya türü cihazına zarar verebilir"* diye sorabilir → **Yine de
 indir**. (Bu uyarı her APK için çıkar, dosyayla ilgili bir şey söylemiyor.)
 
@@ -240,7 +243,7 @@ yalnızca Play Store dışından geldiğini söylüyor.
 uygulama Python çalışma zamanını telefonun içine açıyor. Bu yalnız ilk açılışta
 (ve her güncellemeden sonra bir kez) olur; sonraki açılışlar hızlıdır.
 
-Uygulama açılınca kalıcı bir bildirim görürsün: *"Lumeo çalışıyor"*.
+Uygulama açılınca kalıcı bir bildirim görürsün: *"Kromis Studio çalışıyor"*.
 Bu bildirim **gerekli, kapatma**: sayesinde uzun süren bir üretim sırasında
 uygulamadan çıksan bile Android işlemi öldürmez ve ücretli istek boşa gitmez.
 
@@ -259,8 +262,8 @@ Telefona özgü iki fark:
   sürükle-bırak dokunmatik ekranda çalışmıyor.
 
 ### A5. İndirdiklerin nereye gidiyor
-- Görseller (PNG): **Resimler → Lumeo**
-- Klasör ZIP'leri: **İndirilenler → Lumeo**
+- Görseller (PNG): **Resimler → Kromis**
+- Klasör ZIP'leri: **İndirilenler → Kromis**
 
 ### Android'de sorun çıkarsa
 - **"Uygulama yüklenmedi" / "Paket geçersiz":** dosya yarım inmiş olabilir —
@@ -272,7 +275,7 @@ Telefona özgü iki fark:
 - **"Üret" kilitli:** Ayarlar (dişli) → endpoint + key girilmiş mi? (3. adım)
 - **İndirdiğim görseli galeride bulamıyorum:** Galeri uygulaması yeni klasörü
   görmek için biraz gecikebilir; Dosyalar uygulamasından
-  `Resimler/Lumeo` klasörüne bak.
+  `Resimler/Kromis` klasörüne bak.
 
 ---
 
@@ -281,13 +284,19 @@ Yeni bir `.zip` aldığında [GUNCELLEME.md](GUNCELLEME.md) sayfasını izle.
 
 - **macOS:** uygulamayı kapat → yenisini Programlar'a sürükleyip **Değiştir** →
   güvenlik iznini bir kez daha ver. `Application Support` klasörünü SİLME.
-- **Windows:** uygulamayı kapat → yeni zip'i ayıkla → eski `Lumeo`
+- **Windows:** uygulamayı kapat → yeni zip'i ayıkla → eski `Kromis`
   klasörünün **yerine** koy (Windows "Hedefteki dosyaları değiştir" diye sorar,
   onayla) → SmartScreen izni bir kez daha gerekebilir.
-  `AppData\Local\Lumeo` klasörünü SİLME.
+  `AppData\Local\Kromis` klasörünü SİLME.
 - **Android:** yeni APK'yı indir ve üzerine kur — **uygulamayı SİLME.**
   Android eskisinin üzerine yazar ve verin (görseller, klasörler, Azure anahtarı)
   yerinde kalır. Uygulamayı kaldırıp yeniden kurarsan hepsi silinir.
+
+> **Uygulamanın adı değiştiyse bu bölüm geçerli değil.** Uygulama **Kromis
+> Studio** adını aldı; eski adla kurulu bir sürümden geçiyorsan masaüstünde
+> veri kendiliğinden taşınıyor, Android'de ise yeni APK eskisinin ÜZERİNE
+> yazmıyor — yan yana kuruluyor ve eskisini elle kaldırman gerekiyor. Tek
+> seferlik adımlar: [GUNCELLEME.md → Uygulamanın adı değiştiyse](GUNCELLEME.md#uygulamanın-adı-değiştiyse--bir-kerelik-geçiş).
 
 İki sistemde de **verin kaybolmaz** ve Azure anahtarını yeniden girmen gerekmez:
 görseller ve ayarlar uygulama klasörünün DIŞINDA duruyor (yerleri için 3. ve 5.
@@ -300,17 +309,17 @@ adım), yani uygulamayı silip yenisini koymak geçmişine dokunmaz.
   (a) `.exe`'yi `_internal` klasöründen ayırmış olabilirsin — ikisi aynı klasörde
   olmalı. (b) Zip'i **engellemesini kaldırmadan** ayıklamış olabilirsin (1. adım);
   bu durumda en temizi zip'i baştan, 1. adımdan başlayarak yeniden ayıklamak.
-  Her iki durumda da `%LOCALAPPDATA%\Lumeo\hata.log` dosyasına bak; varsa
+  Her iki durumda da `%LOCALAPPDATA%\Kromis\hata.log` dosyasına bak; varsa
   içeriğini teknik desteğe gönder.
-- **(Windows) Sebebi anlaşılmıyorsa — kendi kendine teşhis:** `Lumeo` klasöründe
+- **(Windows) Sebebi anlaşılmıyorsa — kendi kendine teşhis:** `Kromis` klasöründe
   boş bir yere **Shift + sağ tık → PowerShell penceresini burada aç** de ve şunu
-  yaz: `.\Lumeo.exe --onyukleme-denetimi`. Pencere açılmaz, bunun yerine
-  `%LOCALAPPDATA%\Lumeo\onyukleme-denetimi.txt` dosyası oluşur — onu teknik desteğe
+  yaz: `.\Kromis.exe --onyukleme-denetimi`. Pencere açılmaz, bunun yerine
+  `%LOCALAPPDATA%\Kromis\onyukleme-denetimi.txt` dosyası oluşur — onu teknik desteğe
   gönder, hangi halkanın koptuğunu yazıyor.
 - **(Windows) Uygulama tarayıcıda açıldı ve "bu pencereyi kapatmayın" diyor:**
-  bu bir arıza değil, yedek yol — Lumeo'nun kendi penceresi açılamadığında
+  bu bir arıza değil, yedek yol — Kromis'nun kendi penceresi açılamadığında
   uygulama tarayıcında açılıyor ve her şey normal çalışıyor. O küçük pencereyi
-  kapatınca Lumeo de kapanır. Yine de `hata.log`'u teknik desteğe gönder: yedeğe
+  kapatınca Kromis da kapanır. Yine de `hata.log`'u teknik desteğe gönder: yedeğe
   düşülmesinin bir sebebi var ve o sebep düzeltilebilir.
 - **(Windows) Antivirüs uygulamayı karantinaya aldı:** paket imzalanmadığı için
   bazı kurumsal antivirüsler yanlış-pozitif verebiliyor. Klasörü silme, teknik desteğe
@@ -320,6 +329,6 @@ adım), yani uygulamayı silip yenisini koymak geçmişine dokunmaz.
   yapılandırılmamış. Azure'da **Dağıtım adı** boştur; OpenAI/Gemini'de anahtar
   kaydedilmemiştir. Düğmenin üzerine gelince hangi modelin eksik olduğunu yazar.
 - **"Sohbet dağıtımı bulunamadı (404)":** yazdığın dağıtım adı Azure'daki adla
-  birebir aynı değil. Yöneticinize doğru adı sor.
+  birebir aynı değil. Doğru adı Azure portalındaki dağıtım listesinden kopyala.
 - **"… bu modeli tanımıyor (404)":** OpenAI/Gemini tarafında seçtiğin model
   kalkmış olabilir — şeritten başka bir sohbet modeli seç.

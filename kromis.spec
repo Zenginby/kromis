@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec: Lumeo -> macOS .app + Windows klasörü.
+"""PyInstaller spec: Kromis Studio -> macOS .app + Windows klasörü.
 
 TEK spec, İKİ platform: build.sh (macOS) ve build.ps1 (Windows) aynı dosyayı
 çağırır. Platforma göre dallanan yalnızca İKİ şey var: sürüm kaynağı
@@ -41,7 +41,7 @@ module" satırları YANILTICI: bunlar Python modülü değil .NET assembly'leri,
 platformda hiç çalışmıyor (`screencolor` v0.3.0'dan beri macOS dışında
 `AppKit`'e hiç dokunmuyor).
 Kanıt derlemenin ötesinde: paket ÇALIŞTIRILDI — pencere açıldı, `hata.log`
-yazılmadı, veri dizini `%LOCALAPPDATA%\\Lumeo` altında doğdu,
+yazılmadı, veri dizini `%LOCALAPPDATA%\\Kromis` altında doğdu,
 pencere kapanınca süreç temiz çıktı. Bir gün paket "açılmıyor" hâline gelirse
 ilk bakılacak yer budur: `hiddenimports` eklemek gerekiyorsa hangi modülün
 eksik olduğunu `hata.log`'daki traceback söyler.
@@ -135,12 +135,12 @@ if sys.platform == "win32":
         kids=[
             _vi.StringFileInfo([
                 _vi.StringTable("041F04B0", [
-                    _vi.StringStruct("CompanyName", "Lumeo"),
-                    _vi.StringStruct("FileDescription", "Lumeo"),
+                    _vi.StringStruct("CompanyName", "Zenginby"),
+                    _vi.StringStruct("FileDescription", "Kromis Studio — görsel üretim"),
                     _vi.StringStruct("FileVersion", APP_VERSION),
-                    _vi.StringStruct("InternalName", "Lumeo"),
-                    _vi.StringStruct("OriginalFilename", "Lumeo.exe"),
-                    _vi.StringStruct("ProductName", "Lumeo"),
+                    _vi.StringStruct("InternalName", "Kromis"),
+                    _vi.StringStruct("OriginalFilename", "Kromis.exe"),
+                    _vi.StringStruct("ProductName", "Kromis Studio"),
                     _vi.StringStruct("ProductVersion", APP_VERSION),
                 ]),
             ]),
@@ -151,14 +151,14 @@ if sys.platform == "win32":
 # Windows exe'nin simgesi. macOS'ta EXE seviyesindeki icon PyInstaller
 # tarafından yok sayılır (asıl .icns BUNDLE'a veriliyor, aşağıda) — burada da
 # yalnızca win32'de doldurulur ki gereksiz bir "icon ignored" uyarısı eklenmesin.
-_exe_icon = os.path.join(SPECPATH, 'branding', 'lumeo.ico') if sys.platform == "win32" else None
+_exe_icon = os.path.join(SPECPATH, 'branding', 'kromis.ico') if sys.platform == "win32" else None
 
 exe = EXE(
     pyz,
     a.scripts,
     [],
     exclude_binaries=True,
-    name='Lumeo',
+    name='Kromis',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -181,20 +181,20 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name='Lumeo',
+    name='Kromis',
 )
 
 if sys.platform == "darwin":
-    # build.sh, pyinstaller'dan ÖNCE `iconutil` ile branding/lumeo.iconset'ten
+    # build.sh, pyinstaller'dan ÖNCE `iconutil` ile branding/kromis.iconset'ten
     # bu .icns'i üretir (iconutil yalnız macOS'ta var, o yüzden burada
     # commit edilmiş bir dosya değil — bkz. build.sh). Henüz üretilmemişse
     # (ör. spec'i build.sh'siz doğrudan çalıştırmak) sessizce simgesiz derler.
-    _icns_path = os.path.join(SPECPATH, 'branding', 'lumeo.icns')
+    _icns_path = os.path.join(SPECPATH, 'branding', 'kromis.icns')
     app = BUNDLE(
         coll,
-        name='Lumeo.app',
+        name='Kromis.app',
         icon=_icns_path if os.path.isfile(_icns_path) else None,
-        bundle_identifier='org.zenginby.gptimagestudio',
+        bundle_identifier='com.zenginby.kromis',
         info_plist={
             'LSMultipleInstancesProhibited': True,   # iki kez çift tıklama ikinci sunucu doğurmaz
             'NSHighResolutionCapable': True,

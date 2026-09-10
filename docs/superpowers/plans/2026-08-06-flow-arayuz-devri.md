@@ -34,12 +34,12 @@ JS'ten `$()` ile dokunulan id sayısı **145**; bunların **56'sı top-level ba�
 
 ## 0.1 Durum — nerede kaldık (8 Ağustos: PR 1 · PR 2 · PR 3 merge edildi)
 
-**PR 1 bitti ve `main`'e indi.** [PR #16](https://github.com/Zenginby/gpt-image-studio/pull/16)
+**PR 1 bitti ve `main`'e indi.** [PR #16](https://github.com/Zenginby/kromis/pull/16)
 squash ile merge edildi; `main`'e inen tek commit **`a1478d4`**. Merge sonrası
 ağaç hash'i dal ucuyla birebir aynı (`a717ef93`), yani squash'ta içerik kaybı yok.
-**PR 2 de indi:** [PR #19](https://github.com/Zenginby/gpt-image-studio/pull/19)
+**PR 2 de indi:** [PR #19](https://github.com/Zenginby/kromis/pull/19)
 → **`55b3356`**, Adım 5 + 6 + 7a'nın üçü birden (`APP_VERSION` 2.0.0).
-**PR 3 de indi:** [PR #21](https://github.com/Zenginby/gpt-image-studio/pull/21)
+**PR 3 de indi:** [PR #21](https://github.com/Zenginby/kromis/pull/21)
 **rebase** ile merge edildi (squash değil — dal `main`'in tepesinden 4 commit
 ileri, 0 geri olduğu için adım commit'leri ayrı ayrı korunabildi). Adım 7b →
 **`f9227de`**, Adım 8 → **`f35b5c6`** (`APP_VERSION` 2.1.0), dokümanlar
@@ -563,7 +563,7 @@ TDD ile: **15 test önce**, hepsi kırmızı görüldü, sonra kod. `pytest`
   aranıyor. Düzeltme sonrası beşi de kırmızıya döndü.
 - **Canlı tur** (8799 — §0.6 tuzağına karşı ayrı origin, geliştiricinin gerçek
   verisi, tümü SALT OKUNUR): dört ray görünümü gezildi; Kütüphane gerçek
-  logoları, Araçlar iki kartı gösterdi · Görünüm panelinden KURUM mavisi seçildi
+  logoları, Araçlar iki kartı gösterdi · Görünüm panelinden kurumsal mavi seçildi
   → `data-theme="kurumsal"` + `--accent oklch(72% 0.11 245)`, Monokrom'a dönüş
   özniteliği sildi · Tema rengi kartı 420px slide-over'ı açtı, HSV/ton/hex/
   öneriler canlı · dişli Ayarlar'ı sağdan açtı (endpoint dolu, anahtar

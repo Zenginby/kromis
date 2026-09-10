@@ -66,7 +66,7 @@ def test_readme_surum_olmayan_sayilara_dokunmaz():
 # --------------------------------------------------------------------------
 
 _GUNCELLEME = (
-    "# Lumeo — Güncelleme\n\n"
+    "# Kromis Studio — Güncelleme\n\n"
     "Giriş metni.\n\n"
     "## Sürüm 0.4.2 — ne değişti\n\n"
     "- Elle yazılmış eski anlatım.\n\n"

@@ -74,8 +74,8 @@ jobs:
       - name: Paketi doğrula
         run: |
           set -euo pipefail
-          APP="dist/Lumeo.app"
-          lipo -archs "$APP/Contents/MacOS/Lumeo" | tee /dev/stderr | grep -qx arm64
+          APP="dist/Kromis.app"
+          lipo -archs "$APP/Contents/MacOS/Kromis" | tee /dev/stderr | grep -qx arm64
           codesign --verify --strict "$APP"
           for f in static/index.html static/core.js static/viewer.js \
                    static/fonts.css static/mobile.css static/mobile.js \
@@ -97,7 +97,7 @@ jobs:
           du -sh "$APP" dist/*.zip
           # Yayın varlığının adı: release_manifest.py'deki anahtarla BİREBİR.
           # Ad kayarsa tests/test_release_manifest.py PR'da kırmızıya düşer.
-          cp "dist/Lumeo.zip" "dist/lumeo-macOS-arm64.zip"
+          cp "dist/Kromis.zip" "dist/kromis-macOS-arm64.zip"
 
       # TESLİM: paket doğrudan TASLAK yayına yazılıyor — Actions varlığı olarak
       # DEĞİL.
@@ -135,5 +135,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh release upload "${{ inputs.taslak }}" "dist/lumeo-macOS-arm64.zip" --clobber
-          echo "taslağa yüklendi: lumeo-macOS-arm64.zip"
+          gh release upload "${{ inputs.taslak }}" "dist/kromis-macOS-arm64.zip" --clobber
+          echo "taslağa yüklendi: kromis-macOS-arm64.zip"

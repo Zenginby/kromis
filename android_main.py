@@ -34,7 +34,7 @@ import traceback
 # Çerezin adı JS'te HİÇ geçmiyor — 27 fetch çağrısının hepsi göreli olduğu için
 # tarayıcı çerezi kendiliğinden gönderiyor. Bu yüzden ad yalnızca iki tarafın
 # (Kotlin + bu modül) anlaştığı bir sabit; frontend'de karşılığı yok.
-SESSION_COOKIE = "gis_session"
+SESSION_COOKIE = "kromis_session"
 
 # Token uzunluğu: 32 bayt (256 bit). Aynı cihazdaki kötü niyetli bir uygulama
 # portu tarayıp deneyebilir; bu uzunlukta deneme yanılma anlamsız.

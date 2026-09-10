@@ -3,7 +3,7 @@
 Bu dosyanın koruduğu şey KOD DEĞİL, KARARLAR. Üçü de "yapıldı görünen ama
 hiçbir şey yapmayan" bir değişiklikle sessizce ölebilir:
 
-  1. `Lumeo.exe.config` exe'nin YANINDA olmak zorunda. CLR varsayılan
+  1. `Kromis.exe.config` exe'nin YANINDA olmak zorunda. CLR varsayılan
      AppDomain'in config'ini `<exe yolu>.config` diye arıyor; spec'in
      `datas`ına konsa `_internal/` altına iner ve HİÇ okunmaz.
   2. CI açılış kapısı exe'yi GERÇEKTEN beklemek zorunda. Paket
@@ -28,8 +28,8 @@ import yaml
 import desktop
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONFIG = os.path.join(KOK, "branding", "Lumeo.exe.config")
-SPEC = os.path.join(KOK, "gpt-image-studio.spec")
+CONFIG = os.path.join(KOK, "branding", "Kromis.exe.config")
+SPEC = os.path.join(KOK, "kromis.spec")
 BUILD_PS1 = os.path.join(KOK, "build.ps1")
 WORKFLOW = os.path.join(KOK, ".github", "workflows", "_paket-windows.yml")
 
@@ -107,13 +107,13 @@ def test_the_spec_does_not_ship_the_config_as_a_data_file():
     "Yapıldı" görünen, hiçbir şey yapmayan değişikliğin tam tanımı. Dosya
     exe'nin yanına build.ps1 tarafından kopyalanıyor.
     """
-    assert "Lumeo.exe.config" not in _oku(SPEC)
+    assert "Kromis.exe.config" not in _oku(SPEC)
 
 
 def test_the_build_script_copies_the_config_beside_the_exe():
     kod = _oku(BUILD_PS1)
     assert '"$Exe.config"' in kod, "config exe'nin yanına kopyalanmıyor"
-    assert "branding" in kod and "Lumeo.exe.config" in kod
+    assert "branding" in kod and "Kromis.exe.config" in kod
 
 
 def test_the_package_job_asserts_the_config_sits_beside_the_exe():
@@ -121,7 +121,7 @@ def test_the_package_job_asserts_the_config_sits_beside_the_exe():
     with open(WORKFLOW, encoding="utf-8") as f:
         wf = yaml.safe_load(f)
     kod = "\n".join(_kod(a) for a in wf["jobs"]["paket"]["steps"])
-    assert "Lumeo.exe.config" in kod
+    assert "Kromis.exe.config" in kod
     assert "$exeGirdi[0] + '.config'" in kod, (
         "config yalnız ADA göre aranıyor — yanlış yere düşmüş bir kopya geçer")
 
@@ -188,7 +188,7 @@ def test_the_gate_prints_the_report_and_the_error_log(acilis_kodu):
 
 
 def test_the_gate_starts_each_scenario_from_a_clean_data_directory(acilis_kodu):
-    """İki senaryo `%LOCALAPPDATA%\\Lumeo`yu PAYLAŞIYOR: temizlik unutulursa
+    """İki senaryo `%LOCALAPPDATA%\\Kromis`yu PAYLAŞIYOR: temizlik unutulursa
     basılan kayıt bir öncekine ait olur ve teşhis yanlış yere bakar."""
     assert "Remove-Item" in acilis_kodu
     assert "hata.log*" in acilis_kodu

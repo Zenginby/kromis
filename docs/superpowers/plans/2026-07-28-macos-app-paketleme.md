@@ -59,8 +59,8 @@
 | `paths.py` | yeni | frozen/dev yol çözümü, veri dizini oluşturma, gömülü logo yolları |
 | `composite.py` | yeni | logo/motto filigranı bindirme (saf görüntü matematiği, I/O'su yalnız aç/kaydet) |
 | `desktop.py` | yeni | uvicorn'u thread'de başlat + pywebview penceresi + kapanış |
-| `seed.py` | yeni | ilk açılışta gömülü KURUM logolarını kullanıcı kütüphanesine tohumla |
-| `bundled/logos/kurum-logo-{blue,white}.png` | yeni (commit) | pakete gömülen KURUM logoları |
+| `seed.py` | yeni | ilk açılışta gömülü kurumsal logoları kullanıcı kütüphanesine tohumla |
+| `bundled/logos/kurumsal-logo-{blue,white}.png` | yeni (commit) | pakete gömülen kurumsal logolar |
 | `gpt-image-studio.spec` | yeni | PyInstaller yapılandırması |
 | `build.sh` | yeni | derle → ad-hoc imzala → zip |
 | `KURULUM.md` | yeni | son kullanıcı talimatı (Türkçe) |
@@ -143,8 +143,8 @@ def test_frozen_mode_reads_resources_from_meipass(monkeypatch):
 
 
 def test_builtin_logo_resolves_both_variants():
-    assert paths.builtin_logo("blue").endswith("bundled/logos/kurum-logo-blue.png")
-    assert paths.builtin_logo("white").endswith("bundled/logos/kurum-logo-white.png")
+    assert paths.builtin_logo("blue").endswith("bundled/logos/kurumsal-logo-blue.png")
+    assert paths.builtin_logo("white").endswith("bundled/logos/kurumsal-logo-white.png")
 
 
 def test_builtin_logo_rejects_unknown_variant():
@@ -229,10 +229,10 @@ def bundled_logos_dir() -> str:
 
 
 def builtin_logo(variant: str) -> str:
-    """Gömülü KURUM logosunun yolu. variant: "blue" | "white"."""
+    """Gömülü kurumsal logonun yolu. variant: "blue" | "white"."""
     if variant not in _LOGO_VARIANTS:
         raise ValueError(f"geçersiz logo varyantı: {variant!r}")
-    return os.path.join(bundled_logos_dir(), f"kurum-logo-{variant}.png")
+    return os.path.join(bundled_logos_dir(), f"kurumsal-logo-{variant}.png")
 
 
 def ensure_data_dirs() -> None:
@@ -296,7 +296,7 @@ bugünküyle birebir aynı kalır (mevcut 599 test dokunulmadan geçiyor)."
 - Create: `composite.py`
 - Create: `tests/test_composite.py`
 - Reference (okunacak, DEĞİŞTİRİLMEYECEK): `~/.config/claude-tools/composite-logo.py`
-- Copy from: `/Users/kullanici/Documents/Projects/Claude Code Projects/Website/assets/kurum-logo-{blue,white}.png`
+- Copy from: `/Users/kullanici/Documents/Projects/Claude Code Projects/Website/assets/kurumsal-logo-{blue,white}.png`
 
 **Interfaces:**
 - Consumes: `paths.builtin_logo(variant)` (Task 1)
@@ -313,12 +313,12 @@ bugünküyle birebir aynı kalır (mevcut 599 test dokunulmadan geçiyor)."
 ```bash
 cd "/Users/kullanici/Documents/Projects/Claude Code Projects/gpt-image-studio"
 mkdir -p bundled/logos
-cp "/Users/kullanici/Documents/Projects/Claude Code Projects/Website/assets/kurum-logo-blue.png" bundled/logos/
-cp "/Users/kullanici/Documents/Projects/Claude Code Projects/Website/assets/kurum-logo-white.png" bundled/logos/
+cp "/Users/kullanici/Documents/Projects/Claude Code Projects/Website/assets/kurumsal-logo-blue.png" bundled/logos/
+cp "/Users/kullanici/Documents/Projects/Claude Code Projects/Website/assets/kurumsal-logo-white.png" bundled/logos/
 ls -la bundled/logos/
 ```
 
-Expected: iki dosya, her biri ~300 KB. `assets/` gitignore'da; `bundled/` **gitignore'da değil** — kontrol et: `git check-ignore -v bundled/logos/kurum-logo-blue.png` çıktı vermemeli.
+Expected: iki dosya, her biri ~300 KB. `assets/` gitignore'da; `bundled/` **gitignore'da değil** — kontrol et: `git check-ignore -v bundled/logos/kurumsal-logo-blue.png` çıktı vermemeli.
 
 - [x] **Step 2: Golden fixture üreticisini yaz**
 
@@ -345,8 +345,8 @@ from PIL import Image, ImageDraw
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES = os.path.join(REPO, "tests", "fixtures", "logo")
 SCRIPT = os.path.expanduser("~/.config/claude-tools/composite-logo.py")
-LOGO_BLUE = os.path.join(REPO, "bundled", "logos", "kurum-logo-blue.png")
-LOGO_WHITE = os.path.join(REPO, "bundled", "logos", "kurum-logo-white.png")
+LOGO_BLUE = os.path.join(REPO, "bundled", "logos", "kurumsal-logo-blue.png")
+LOGO_WHITE = os.path.join(REPO, "bundled", "logos", "kurumsal-logo-white.png")
 
 # (ad, base, position, color, scale, shadow_alpha, shadow_blur, overlay_or_None)
 CASES = [
@@ -445,8 +445,8 @@ import composite
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "logo")
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LOGO_BLUE = os.path.join(REPO, "bundled", "logos", "kurum-logo-blue.png")
-LOGO_WHITE = os.path.join(REPO, "bundled", "logos", "kurum-logo-white.png")
+LOGO_BLUE = os.path.join(REPO, "bundled", "logos", "kurumsal-logo-blue.png")
+LOGO_WHITE = os.path.join(REPO, "bundled", "logos", "kurumsal-logo-white.png")
 OVERLAY = os.path.join(FIXTURES, "overlay.png")
 
 # Vakaların tek kaynağı üreticinin yazdığı manifest — elle ikinci bir liste
@@ -543,7 +543,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'composite'`
 Matematik dış script'ten **birebir** taşınır; tek fark: argparse yok, dosyaya yazma yok, bayt döner.
 
 ```python
-"""KURUM logo/motto filigranı bindirme — composite-logo.py'nin süreç içi port'u.
+"""kurumsal logo/motto filigranı bindirme — composite-logo.py'nin süreç içi port'u.
 
 Neden port: paket içinde ne `python3` ne de o script bulunur; subprocess çağrısı
 Logo ve Banner uçlarını 500'e düşürürdü. Yan fayda: her canlı önizlemede bir
@@ -665,7 +665,7 @@ git commit -m "feat: composite-logo.py'yi composite.py olarak repoya port et
 Paket içinde python3 + dış script bulunmadığı için logo bindirme subprocess
 ile yapılamaz. Matematik birebir taşındı; 6 golden fixture dış script'in
 çıktısıyla bayt bayt karşılaştırıyor. Dış script blog routine'i için yerinde
-kalıyor. KURUM logoları bundled/logos'a alındı."
+kalıyor. kurumsal logolar bundled/logos'a alındı."
 ```
 
 ---
@@ -733,7 +733,7 @@ def test_logo_passes_options_to_composite(tmp_path, monkeypatch):
 
 
 def test_logo_builtin_uses_bundled_ila_logos(tmp_path, monkeypatch):
-    """asset_id yoksa gömülü mavi/beyaz KURUM logoları geçilir (auto seçim composite'te)."""
+    """asset_id yoksa gömülü mavi/beyaz kurumsal logolar geçilir (auto seçim composite'te)."""
     monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
     calls = []
@@ -743,8 +743,8 @@ def test_logo_builtin_uses_bundled_ila_logos(tmp_path, monkeypatch):
     src_id = _make_source(c)
     assert c.post("/api/logo", json={"id": src_id}).status_code == 200
     kw = calls[-1]
-    assert kw["logo_blue"].endswith("bundled/logos/kurum-logo-blue.png")
-    assert kw["logo_white"].endswith("bundled/logos/kurum-logo-white.png")
+    assert kw["logo_blue"].endswith("bundled/logos/kurumsal-logo-blue.png")
+    assert kw["logo_white"].endswith("bundled/logos/kurumsal-logo-white.png")
     assert kw["logo_blue"] != kw["logo_white"]
 
 
@@ -938,8 +938,8 @@ NOW = "2026-07-28T12:00:00"
 def _make_bundled(tmp_path):
     bundled = tmp_path / "bundled" / "logos"
     bundled.mkdir(parents=True)
-    (bundled / "kurum-logo-blue.png").write_bytes(b"\x89PNG-blue")
-    (bundled / "kurum-logo-white.png").write_bytes(b"\x89PNG-white")
+    (bundled / "kurumsal-logo-blue.png").write_bytes(b"\x89PNG-blue")
+    (bundled / "kurumsal-logo-white.png").write_bytes(b"\x89PNG-white")
     return str(bundled)
 
 
@@ -951,11 +951,11 @@ def test_seeds_both_logos_into_an_empty_library(tmp_path):
 
     assert len(added) == 2
     names = sorted(r["name"] for r in astore.list_assets("logos", assets))
-    assert names == ["KURUM Logo Beyaz", "KURUM Logo Mavi"]
+    assert names == ["Şirket Logosu Beyaz", "Şirket Logosu Mavi"]
     stored = {r["name"]: open(os.path.join(assets, "logos", r["filename"]), "rb").read()
               for r in astore.list_assets("logos", assets)}
-    assert stored["KURUM Logo Mavi"] == b"\x89PNG-blue"
-    assert stored["KURUM Logo Beyaz"] == b"\x89PNG-white"
+    assert stored["Şirket Logosu Mavi"] == b"\x89PNG-blue"
+    assert stored["Şirket Logosu Beyaz"] == b"\x89PNG-white"
 
 
 def test_second_call_does_not_duplicate(tmp_path):
@@ -1015,7 +1015,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'seed'`
 - [ ] **Step 3: `seed.py`'yi yaz**
 
 ```python
-"""İlk açılış tohumlaması: pakete gömülü KURUM logolarını kullanıcı kütüphanesine ekler.
+"""İlk açılış tohumlaması: pakete gömülü kurumsal logoları kullanıcı kütüphanesine ekler.
 
 Neden gerekli: assets/ gitignore'da ve kullanıcı verisi dizini boş başlar; tohumlama
 olmadan Logo modalındaki kütüphane bomboş görünür.
@@ -1032,8 +1032,8 @@ import assets_store
 MARKER_FILE = ".logos-seeded"
 # (dosya adı, kütüphanede görünecek ad)
 BUILTIN_LOGOS = (
-    ("kurum-logo-blue.png", "KURUM Logo Mavi"),
-    ("kurum-logo-white.png", "KURUM Logo Beyaz"),
+    ("kurumsal-logo-blue.png", "Şirket Logosu Mavi"),
+    ("kurumsal-logo-white.png", "Şirket Logosu Beyaz"),
 )
 
 
@@ -1143,7 +1143,7 @@ Sonra gerçek çalıştırma: `./run.sh` → Kütüphane modalını aç → logo
 
 ```bash
 git add seed.py tests/test_seed.py app.py .gitignore
-git commit -m "feat: ilk açılışta gömülü KURUM logolarını kütüphaneye tohumla
+git commit -m "feat: ilk açılışta gömülü kurumsal logoları kütüphaneye tohumla
 
 assets/ gitignore'da olduğu için yeni bir makinede logo kütüphanesi boş
 başlıyordu. Tohumlama marker dosyasıyla bir kez yapılır: kullanıcı logoyu
@@ -1377,7 +1377,7 @@ Doğrula: `.venv/bin/pyinstaller --version` → `6.21.x`
 ```bash
 cd "/Users/kullanici/Documents/Projects/Claude Code Projects/gpt-image-studio"
 .venv/bin/pyi-makespec --windowed --name "GPT-Image Studio" \
-  --osx-bundle-identifier org.zenginby.gptimagestudio \
+  --osx-bundle-identifier com.zenginby.kromis \
   --target-arch arm64 desktop.py
 mv "GPT-Image Studio.spec" gpt-image-studio.spec
 ```
@@ -1490,7 +1490,7 @@ Kontrol listesi — hepsi geçmeli:
 - [ ] Kimlik yapılandırılmamış olduğu için **Ayarlar modalı otomatik açılıyor**, "Üret" kilitli.
 - [ ] Endpoint + key girilince kaydediyor; `ls -l ~/.config/gpt-image-studio/credentials.env` → izin `-rw-------`.
 - [ ] Görsel üretiliyor ve galeride görünüyor.
-- [ ] Kütüphane modalında **KURUM Logo Mavi + KURUM Logo Beyaz** duruyor (tohumlama çalıştı).
+- [ ] Kütüphane modalında **Şirket Logosu Mavi + Şirket Logosu Beyaz** duruyor (tohumlama çalıştı).
 - [ ] Logo bindirme: canlı önizleme geliyor, "Uygula" türev üretiyor.
 - [ ] Banner bindirme çalışıyor.
 - [ ] Klasör oluşturma + sürükle-bırak taşıma çalışıyor.
@@ -1538,7 +1538,7 @@ soru soruyor. Bir kez izin verirsin, sonraki açılışlarda sormaz.
 
 ## 3. Azure kimliğini gir
 İlk açılışta Ayarlar penceresi kendiliğinden açılır ve "Üret" düğmesi kilitlidir.
-1. **Endpoint** ve **API key** alanlarını Kurum'dan aldığın bilgilerle doldur.
+1. **Endpoint** ve **API key** alanlarını kendi Azure kaynağından aldığın bilgilerle doldur.
 2. **Kaydet**. Kilit açılır.
 
 Key bilgisayarında `~/.config/gpt-image-studio/credentials.env` dosyasında, yalnız
@@ -1552,7 +1552,7 @@ uygulamayı kapatıp açsan da geçmişin durur.
 ## Sorun çıkarsa
 - **Pencere boş açılıyor:** uygulamayı kapat, tekrar aç.
 - **"Üret" kilitli:** Ayarlar (dişli) → endpoint + key girilmiş mi?
-- **Görsel üretilmiyor, hata mesajı çıkıyor:** key süresi/rotasyonu için Kurum'ya yaz.
+- **Görsel üretilmiyor, hata mesajı çıkıyor:** key süresi/rotasyonu için geliştiriciye yaz.
 ```
 
 - [x] **Step 10: `README.md`'ye paketleme bölümü ekle**
@@ -1650,7 +1650,7 @@ jobs:
           lipo -archs "$APP/Contents/MacOS/GPT-Image Studio" | tee /dev/stderr | grep -qx arm64
           codesign --verify --strict "$APP"
           for f in static/index.html static/core.js \
-                   bundled/logos/kurum-logo-blue.png bundled/logos/kurum-logo-white.png; do
+                   bundled/logos/kurumsal-logo-blue.png bundled/logos/kurumsal-logo-white.png; do
             test -f "$APP/Contents/Resources/$f" || { echo "EKSİK: $f"; exit 1; }
           done
           du -sh "$APP" dist/*.zip

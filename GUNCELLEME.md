@@ -1,4 +1,4 @@
-# Lumeo — Güncelleme (macOS, Windows ve Android)
+# Kromis Studio — Güncelleme (macOS, Windows ve Android)
 
 Elindeki uygulamayı yenisiyle değiştirmek için bu sayfayı izle. 3 dakika sürer.
 (İlk kez kuruyorsan: [KURULUM.md](KURULUM.md).)
@@ -6,14 +6,14 @@ Elindeki uygulamayı yenisiyle değiştirmek için bu sayfayı izle. 3 dakika s�
 **Yeni sürüm çıktığını uygulama sana söylüyor:** **Ayarlar**'ı açtığında,
 kurulu sürümün hemen altında *"Yeni sürüm çıktı"* satırı belirir. Aynı yerdeki
 anahtarla bu kontrolü kapatabilirsin. Paketleri her zaman
-[son yayın sayfasından](https://github.com/Zenginby/gpt-image-studio/releases/latest)
+[son yayın sayfasından](https://github.com/Zenginby/kromis/releases/latest)
 da indirebilirsin — adres sabit, sürüm yükseldiğinde değişmiyor.
 
 | Sistem | Dosya |
 |---|---|
-| macOS (Apple Silicon) | `lumeo-macOS-arm64.zip` |
-| Windows 10/11 (64-bit) | `lumeo-windows-x64.zip` |
-| Android 8.0+ (arm64) | `lumeo-android-arm64.apk` |
+| macOS (Apple Silicon) | `kromis-macOS-arm64.zip` |
+| Windows 10/11 (64-bit) | `kromis-windows-x64.zip` |
+| Android 8.0+ (arm64) | `kromis-android-arm64.apk` |
 
 **Telefondaysan** 1.–3. adımları atla, doğrudan
 [Android'i güncelleme](#androidi-güncelleme) bölümüne git. 4. ve 5. adımlar
@@ -32,8 +32,8 @@ var — kendi dalını oku, ötekini atla. 1., 4. ve 5. adımlar iki sistemde ay
 >
 >    | Sistem | Silinmemesi gereken klasör |
 >    |---|---|
->    | macOS | `~/Library/Application Support/Lumeo/` |
->    | Windows | `%LOCALAPPDATA%\Lumeo\` |
+>    | macOS | `~/Library/Application Support/Kromis/` |
+>    | Windows | `%LOCALAPPDATA%\Kromis\` |
 >    | Android | Uygulamanın kendi klasörü — **uygulamayı KALDIRMA**, üzerine kur |
 >
 > 2. **(Yalnız macOS) Güvenlik uyarısında "Çöp Sepetine Taşı"ya ve Enter'a
@@ -50,7 +50,7 @@ değiştirmeye çalışmak yarım kurulmuş bir uygulama bırakabilir.
 
 ### macOS
 
-1. Yeni `lumeo-macOS-arm64.zip` dosyasına çift tıkla — yanında
+1. Yeni `kromis-macOS-arm64.zip` dosyasına çift tıkla — yanında
    uygulama çıkar.
 2. Çıkan uygulamayı **Programlar (Applications)** klasörüne sürükle.
 3. macOS *"Aynı adda bir öge var"* diye soracak → **Değiştir** (Replace) de.
@@ -59,14 +59,14 @@ Eski sürümü önceden silmen gerekmiyor; değiştirmek yeterli.
 
 ### Windows
 
-1. Yeni `lumeo-windows-x64.zip` dosyasına **sağ tıkla → Özellikler**
+1. Yeni `kromis-windows-x64.zip` dosyasına **sağ tıkla → Özellikler**
    (Properties). En altta **Engellemeyi Kaldır** (Unblock) kutusu varsa
    işaretle → Uygula. **Ayıklamadan ÖNCE**, çünkü Windows'un "internetten indi"
    işareti ayıklarken çıkan her dosyaya kopyalanıyor ve uygulama açılmayabiliyor.
    Her güncellemede yeni bir zip indiğinden bu adım da her seferinde gerekiyor
    (3. adımdaki güvenlik izniyle aynı mantık).
 2. Zip dosyasına sağ tıkla → **Tümünü ayıkla** (Extract All).
-3. Çıkan `Lumeo` klasörünü, eski klasörünün **bulunduğu yere** taşı.
+3. Çıkan `Kromis` klasörünü, eski klasörünün **bulunduğu yere** taşı.
 4. Windows *"Hedefte aynı adda dosyalar var"* diye soracak → **Hedefteki
    dosyaları değiştir** de.
 
@@ -84,8 +84,8 @@ açılışta yeniden soruyor. Kurulumdaki adımların aynısı.
 
 1. Uygulamaya çift tıkla. Uygulama **açılmayacak** ve şu uyarı çıkacak:
 
-   > **"Lumeo" Not Opened**
-   > Apple could not verify "Lumeo" is free of malware that may harm
+   > **"Kromis" Not Opened**
+   > Apple could not verify "Kromis" is free of malware that may harm
    > your Mac or compromise your privacy.
    >
    > *(Türkçe sistemde aynı uyarı "…Açılmadı / Apple … doğrulayamadı" biçiminde
@@ -102,14 +102,14 @@ açılışta yeniden soruyor. Kurulumdaki adımların aynısı.
 
 2. **Apple menüsü** → **Sistem Ayarları** (System Settings) → **Gizlilik ve
    Güvenlik** (Privacy & Security).
-3. Sayfayı aşağı kaydır: *"Lumeo engellendi"* / *"was blocked"*
+3. Sayfayı aşağı kaydır: *"Kromis engellendi"* / *"was blocked"*
    satırını bul → **Yine de Aç** (**Open Anyway**).
 4. Çıkan onayda tekrar **Yine de Aç** → Mac şifreni gir (ya da Touch ID).
 5. Uygulama açılır. Bu sürüm için bir daha sormaz.
 
 ### Windows
 
-1. `Lumeo.exe`'ye çift tıkla. Mavi **SmartScreen** penceresi
+1. `Kromis.exe`'ye çift tıkla. Mavi **SmartScreen** penceresi
    çıkabilir ("Windows bilgisayarınızı korudu").
 2. **Daha fazla bilgi** (More info) → **Yine de çalıştır** (Run anyway).
 
@@ -122,7 +122,7 @@ açılışta yeniden soruyor. Kurulumdaki adımların aynısı.
 
 **Uygulamayı KALDIRMA.** Yeni APK'yı doğrudan eskisinin üzerine kur:
 
-1. Yeni `lumeo-android-arm64.apk` dosyasını telefona indir.
+1. Yeni `kromis-android-arm64.apk` dosyasını telefona indir.
 2. Dosyaya dokun → **Yükle**. Android *"Bu uygulamanın yeni bir sürümünü
    yüklemek ister misiniz?"* diye sorar → **Yükle**.
 3. İlk açılış yine **2–5 saniye** sürer: uygulama yeni sürümün arayüz
@@ -140,8 +140,8 @@ yeniden indir. Sürerse teknik desteğe yaz — **kaldırıp yeniden kurma**, ö
 ## 4. Güncellendiğini doğrula
 
 Sağ üstteki **Ayarlar** düğmesine bas — pencerenin altında **Sürüm** yazıyor.
-Yöneticinizin söylediği numarayla aynıysa güncelleme geçmiş demektir. Destek isterken
-de bu numarayı söyle.
+Yayın sayfasındaki en son numarayla aynıysa güncelleme geçmiş demektir. Destek
+isterken de bu numarayı söyle.
 
 ## 5. Kontrol et: her şey yerinde mi
 
@@ -152,6 +152,41 @@ de bu numarayı söyle.
 
 Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve teknik desteğe yaz
 (aşağıdaki yedek işine yarayabilir).
+
+## Uygulamanın adı değiştiyse — bir kerelik geçiş
+
+Uygulamanın adı **Kromis Studio** oldu. Eski adla kurduğun bir sürümden
+geliyorsan bu bölüm bir kez okunur, sonra hiç gerekmez.
+
+**macOS ve Windows'ta hiçbir şey yapmıyorsun.** Yeni sürüm ilk açılışta eski
+veri klasörünü yeni ada KENDİSİ taşıyor: geçmişin, klasörlerin, paletlerin,
+logo kütüphanen ve Azure anahtarın olduğu gibi geliyor. Taşıma yalnız yeni
+klasör henüz yoksa (ya da boşsa) yapılıyor ve **hiçbir şey silinmiyor** — eski
+klasör bir aksilik olursa yerinde durur. Taşıma yapılamazsa uygulama yine
+açılır ve sebebi `hata.log`'a yazılır.
+
+| Sistem | Taşınan |
+|---|---|
+| macOS | `~/Library/Application Support/<eski ad>/` → `.../Kromis/` |
+| Windows | `%LOCALAPPDATA%\<eski ad>\` → `%LOCALAPPDATA%\Kromis\` |
+| Her ikisi | `~/.config/<eski ad>/credentials.env` → `~/.config/kromis/credentials.env` |
+
+İşi bittikten sonra bilgisayarındaki eski **uygulama** klasörünü (`.app` ya da
+`.exe`'nin durduğu klasör) elle silebilirsin; veri klasörü artık `Kromis`
+adında.
+
+**Android'de yeni APK'yı elle kurman ve eskisini elle kaldırman gerekiyor.**
+Yeni uygulama eskisinin ÜZERİNE yazmaz, **yan yana** kurulur (paket kimliği ve
+imza anahtarı değişti — Android bunları farklı iki uygulama sayar). Bunun iki
+sonucu var:
+
+- Eski uygulamanın kendi içindeki veri (Azure anahtarı dahil) yeni uygulamaya
+  **geçmez ve okunamaz**; eski uygulamayı kaldırmak o veriyi siler. Azure
+  kimliğini yeni uygulamada bir kez daha girmen gerekiyor (masaüstünde
+  gerekmiyor).
+- **Telefona indirdiğin görseller yerinde kalıyor:** `Resimler/` altındaki eski
+  adlı klasör olduğu gibi duruyor, silinmiyor. Yeni indirmeler
+  `Resimler/Kromis` altına iniyor.
 
 ---
 
@@ -364,7 +399,7 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve teknik de
 
 ## Sürüm 0.5.3 — ne değişti
 
-- depo adresi yeni hesaba çevrildi (Zenginby → Zenginby)
+- depo adresi yeni hesaba çevrildi (eski hesap → Zenginby)
 
 ---
 
@@ -388,7 +423,7 @@ Bir şey eksik görünüyorsa **uygulamayı kullanmaya devam etme** ve teknik de
 
 ## Sürüm 0.4.2 — ne değişti
 
-**Manşet: uygulamanın adı artık Lumeo.** Simge de yenilendi. Adı değişti diye
+**Manşet: uygulama yeniden adlandırıldı.** Simge de yenilendi. Adı değişti diye
 hiçbir şeyini kaybetmiyorsun — görsellerin, geçmişin, klasörlerin ve paletlerin
 olduğu gibi duruyor.
 
@@ -397,7 +432,7 @@ olduğu gibi duruyor.
 - **README'deki indirme bağlantıları çalışıyor.** Üç bağlantı da her zaman en
   son yayına işaret ediyor; sürüm yükseldiğinde adresi değiştirmek gerekmiyor.
 - **Android paketinin adı düzeltildi.** Telefona kurulacak dosya artık
-  `lumeo-android-arm64.apk` adıyla geliyor.
+  uygulama adını taşıyan bir dosya adıyla geliyor.
 
 > Bu bölümü artık yayın hattı otomatik yazıyor (`tools/surum_yaz.py`). Her
 > yayında en üste yeni bir bölüm ekleniyor, eskiler aşağıda duruyor.
@@ -456,7 +491,7 @@ geri kalanı tamamen Windows'u ayağa kaldırmakla ilgili.
 
 **Windows tarafında neler var:**
 
-- **Görsellerin `%LOCALAPPDATA%\Lumeo\` altında** duruyor (yani
+- **Görsellerin `%LOCALAPPDATA%\Kromis\` altında** duruyor (yani
   `C:\Users\<kullanıcı adın>\AppData\Local\...`). Bilerek `Local`, `Roaming`
   değil: `Roaming` olsaydı ürettiğin bütün görseller kurumsal profille birlikte
   ağ üzerinden taşınmaya çalışırdı.
@@ -490,7 +525,7 @@ sıfırlamaya girdi.
 
 Kısacası doğru sıra şu: `1.16.0` → **`0.2.0`** → `0.2.1` → **`0.3.0`** (bugün).
 Hangi sürümde olduğunu Ayarlar'ın altındaki **Sürüm** satırından görürsün;
-yöneticinizin söylediği numarayla karşılaştır, büyüklük-küçüklük kıyaslama.
+yayın sayfasındaki numarayla karşılaştır, büyüklük-küçüklük kıyaslama.
 
 ## Sürüm 0.2.1'de ne değişti
 
@@ -638,7 +673,8 @@ Hepsi **Prompt Yönetmeni** sekmesinde:
   - Sohbet **kaydedilmiyor**: uygulamayı kapatınca gider. Kalıcı olan, üretilen
     görselin prompt'u (o zaten geçmişte duruyor). "Sohbeti temizle" onay soruyor.
   - Kullanmak için **bir kerelik** ayar gerekiyor: **Ayarlar** → *Prompt Yönetmeni
-    (sohbet modeli)* → **Dağıtım adı** (yöneticinizin vereceği ad, ör. `gpt-5.6-luna`) → **Kaydet**.
+    (sohbet modeli)* → **Dağıtım adı** (Azure'daki dağıtımının adı, ör.
+    `gpt-5.6-luna`) → **Kaydet**.
     Girilmezse sekme açılır ama "Gönder" kilitli kalır ve nedeni panelde yazar.
   - Azure anahtarını **yeniden girmen gerekmiyor**; sohbet görselinkini kullanıyor.
 - **Ayarlar kaydetmek artık başka ayarları silmiyor.** Endpoint'i tek başına
@@ -673,8 +709,8 @@ Uygulama, sürüm değiştiğinde listelerinin bir kopyasını kendiliğinden al
 
 | Sistem | Yedek klasörü |
 |---|---|
-| macOS | `~/Library/Application Support/Lumeo/backups/<sürüm>-<tarih>/` |
-| Windows | `%LOCALAPPDATA%\Lumeo\backups\<sürüm>-<tarih>\` |
+| macOS | `~/Library/Application Support/Kromis/backups/<sürüm>-<tarih>/` |
+| Windows | `%LOCALAPPDATA%\Kromis\backups\<sürüm>-<tarih>\` |
 
 İçinde yalnızca küçük liste dosyaları var (geçmiş, klasörler, paletler, kayıtlı
 sohbetler, logo kütüphanesi) — **görseller kopyalanmıyor**, onlar zaten
@@ -682,21 +718,21 @@ yerlerinde duruyor.
 Birkaç KB tutar, silmen gerekmez.
 
 Geri yüklemek gerekirse (teknik destek söylerse): o klasörün içindeki `output` ve `assets`
-klasörlerini bir üstteki `Lumeo` klasöründeki aynı adlı klasörlerin
+klasörlerini bir üstteki `Kromis` klasöründeki aynı adlı klasörlerin
 üstüne sürükle.
 
 ## Sorun çıkarsa
 
 - **Pencere boş açılıyor:** uygulamayı kapat, tekrar aç.
 - **Uygulama hiç açılmıyor:** hata kaydını teknik desteğe gönder —
-  macOS'ta `~/Library/Application Support/Lumeo/hata.log`,
-  Windows'ta `%LOCALAPPDATA%\Lumeo\hata.log`.
+  macOS'ta `~/Library/Application Support/Kromis/hata.log`,
+  Windows'ta `%LOCALAPPDATA%\Kromis\hata.log`.
 - **(Windows) Pencere hiç gelmiyor:** iki olağan sebebi var. (a) `.exe`'yi
   `_internal` klasöründen ayırmış olabilirsin — ikisi aynı klasörde olmalı.
   (b) Zip'i **engellemesini kaldırmadan** ayıklamış olabilirsin (1. adım); o
   zaman zip'i baştan, 1. adımdan başlayarak yeniden ayıkla. Sebep hâlâ
-  anlaşılmıyorsa `Lumeo` klasöründe `.\Lumeo.exe --onyukleme-denetimi` koştur ve
-  oluşan `%LOCALAPPDATA%\Lumeo\onyukleme-denetimi.txt` dosyasını teknik desteğe gönder.
+  anlaşılmıyorsa `Kromis` klasöründe `.\Kromis.exe --onyukleme-denetimi` koştur ve
+  oluşan `%LOCALAPPDATA%\Kromis\onyukleme-denetimi.txt` dosyasını teknik desteğe gönder.
 - **Eski arayüzü görüyorum gibi:** uygulamayı tamamen kapat (macOS'ta ⌘Q) ve
   yeniden aç.
 - **Geçmişim boş görünüyor:** hiçbir şey silme, teknik desteğe yaz — yukarıdaki yedek

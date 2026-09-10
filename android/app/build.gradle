@@ -41,11 +41,11 @@ if (!pydanticCoreWheel.exists()) {
 }
 
 android {
-    namespace "org.zenginby.gptimagestudio"
+    namespace "com.zenginby.kromis"
     compileSdk 35
 
     defaultConfig {
-        applicationId "org.zenginby.gptimagestudio"
+        applicationId "com.zenginby.kromis"
         // minSdk 26 (Android 8.0): arm64-v8a taşıyan tüm telefonlar bunun
         // üstünde. Wheel etiketindeki API seviyesi de bununla aynı olmalı —
         // büyük olursa pip cihazda wheel'i uyumsuz sayar (bkz. pins.properties).
@@ -67,10 +67,10 @@ android {
 
             // Chaquopy pip'i çalıştırmak için yerel bir Python istiyor ve
             // sürümünün hedefle aynı olması önerilir. CI bunu
-            // `-PgisBuildPython=python3.13` ile veriyor; yerelde ayarlanmazsa
+            // `-PkromisBuildPython=python3.13` ile veriyor; yerelde ayarlanmazsa
             // Chaquopy kendi araması yapar.
-            if (project.hasProperty("gisBuildPython")) {
-                buildPython project.property("gisBuildPython")
+            if (project.hasProperty("kromisBuildPython")) {
+                buildPython project.property("kromisBuildPython")
             }
 
             pip {
@@ -79,7 +79,7 @@ android {
                 //   1. `uvicorn` SADE — `[standard]` değil. O ekstra uvloop ve
                 //      httptools çeker; ikisi de native ve Android wheel'leri
                 //      yok. Sadesi asyncio + h11 ile saf Python ve bu zaten
-                //      kanıtlı: gpt-image-studio.spec:97 masaüstü paketinde de
+                //      kanıtlı: kromis.spec:97 masaüstü paketinde de
                 //      aynı dördünü dışarıda bırakıyor.
                 //   2. `pytest` YOK — çalışma zamanı bağımlılığı değil.
                 //   3. `pywebview` YOK — pencereyi Android tarafı açıyor;
@@ -127,7 +127,7 @@ android {
             // yalnız akış veriyor.
             // `asFile` AÇIKÇA: dize interpolasyonu `Directory.toString()`'e
             // güvenirdi ve o sözleşmenin parçası değil.
-            assets.srcDirs += [layout.buildDirectory.dir("gis-resources").get().asFile]
+            assets.srcDirs += [layout.buildDirectory.dir("kromis-resources").get().asFile]
         }
     }
 
@@ -194,7 +194,7 @@ android {
     // tests/test_android_apk_name.py.
     applicationVariants.configureEach { variant ->
         variant.outputs.configureEach { output ->
-            output.outputFileName = "lumeo-android-arm64-${variant.buildType.name}.apk"
+            output.outputFileName = "kromis-android-arm64-${variant.buildType.name}.apk"
         }
     }
 }
@@ -203,7 +203,7 @@ android {
 // tarafında yapılıyor ki APK'nın içindeki yerleşim (resources/static,
 // resources/bundled) paths.py'nin beklediğiyle BİREBİR aynı olsun.
 def kaynakSahneleme = tasks.register("gisKaynaklariSahnele", Copy) {
-    into layout.buildDirectory.dir("gis-resources")
+    into layout.buildDirectory.dir("kromis-resources")
     into("resources/static") { from("../../static") }
     into("resources/bundled") { from("../../bundled") }
 }

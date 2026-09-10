@@ -27,6 +27,19 @@ imzasız bir kendi kendini değiştirme yolu, uygulamaya açılmış bir kapıd�
 
 Depo public olduğu için uç nokta anonim çalışıyor — pakete gömülmüş bir token
 YOK ve olmamalı.
+
+BU CÜMLE BİR ŞART, BETIMLEME DEĞİL. Özel bir depoda `releases/latest` anonim
+çağrıya 404 dönüyor ve 1. sözleşme (asla exception sızdırma) onu `None`'a
+çeviriyor: kontrol sessizce ÖLÜR, kullanıcı yeni sürümü hiç öğrenmez ve
+hiçbir yerde bir hata görünmez. 2026-09-10'da tam olarak bu durumdaydı —
+depo o gün `private`'tı ve
+
+    curl -s -o /dev/null -w "%{http_code}"       https://api.github.com/repos/Zenginby/kromis/releases/latest
+
+404 döndürüyordu. Depo görünürlüğü değiştirilirse burası çalışmayacak; çözüm
+pakete token gömmek DEĞİL (bir okuma token'ı bile paketi indiren herkese
+verilmiş olurdu), yayın bilgisini token istemeyen bir yerden okumak ya da
+özelliği kapatmak.
 """
 from __future__ import annotations
 
@@ -42,7 +55,7 @@ import paths
 import version
 
 # Yayınların okunduğu depo. Sabit: uygulama kendi kaynağını biliyor.
-DEPO = "Zenginby/gpt-image-studio"
+DEPO = "Zenginby/kromis"
 API = f"https://api.github.com/repos/{DEPO}/releases/latest"
 YAYIN_SAYFASI = f"https://github.com/{DEPO}/releases/latest"
 
@@ -118,7 +131,7 @@ def _guvenli_url(ham: object) -> str:
 
     Risk soyut değil: `follow_redirects=True` bilinçli olarak açık (depo bir
     gün yeniden adlandırılırsa kontrol sessizce ölmesin diye) ve v0.5.3'te depo
-    gerçekten taşındı — `Zenginby` adı boşaldı. Yayınlanmış eski istemciler
+    gerçekten taşındı — eski hesap adı boşaldı. Yayınlanmış eski istemciler
     hâlâ o yolu istiyor; o adı alan biri isteği kendi `releases/latest`ine
     yönlendirebilir. Bu doğrulamayla en kötü sonuç sahte bir "yeni sürüm var"
     satırı olur; bağlantı her hâlde bizim yayın sayfamıza gider.

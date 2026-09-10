@@ -325,7 +325,7 @@ def test_android_isi_sirlari_devraliyor():
     kırmızıya düşürür — yani yayın hiç çıkmaz. Ucuz bir iddiayla o koşuyu hiç
     başlatmamak daha iyi.
     """
-    android_is = release_manifest.PAKETLER["lumeo-android-arm64.apk"]["is"]
+    android_is = release_manifest.PAKETLER["kromis-android-arm64.apk"]["is"]
     for yol in (YAYIN_YML, os.path.join(IS_AKISLARI, "ci.yml")):
         veri = _yaml(yol)
         is_ = veri["jobs"].get(android_is)

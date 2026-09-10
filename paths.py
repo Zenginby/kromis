@@ -18,8 +18,24 @@ from __future__ import annotations
 import os
 import sys
 
-APP_NAME = "Lumeo"
+import errlog
+
+APP_NAME = "Kromis"
 REPO_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Bir önceki uygulama adı — YALNIZ göç için duruyor (`_migrate_from_old_name`).
+# v0.15.0 `Lumeo` adıyla YAYINLANDI ve kullanıldı: bu adla açılmış dizinlerde
+# gerçek kullanıcı verisi (üretilmiş görseller, kütüphane, tercihler) ve Azure
+# anahtarı duruyor. Bir önceki yeniden adlandırmada (`gpt-image-studio` →
+# `lumeo`) göç GEREKMEMİŞTİ çünkü uygulama henüz kullanımda değildi; o gerekçe
+# 2026-09-10'da geçerliliğini yitirdi ve göç kodu bu yüzden doğdu.
+OLD_APP_NAME = "Lumeo"
+
+# `~/.config/<ad>/credentials.env`in dizin adı. Uygulama adının küçük harfli
+# hâli DEĞİL, ayrı bir sabit: XDG dizin adları küçük harf geleneğinde ve ikisi
+# bir gün ayrışabilir (`Kromis Studio` gibi bir görsel ada geçilirse).
+CONFIG_DIRNAME = "kromis"
+OLD_CONFIG_DIRNAME = "lumeo"
 
 # Android dalını AÇAN ortam değişkenleri. Kotlin tarafı (ServerService) Python'u
 # başlatmadan ÖNCE ikisini de `os.environ`'a yazar.
@@ -29,8 +45,8 @@ REPO_DIR = os.path.dirname(os.path.abspath(__file__))
 # geliştiricinin Linux'ta koşturduğu uygulama Android sanılırdı. Ortam
 # değişkeni açık, test edilebilir (monkeypatch) ve mevcut üç dalın hiçbirine
 # dokunmuyor.
-ANDROID_DATA_ENV = "GIS_ANDROID_DATA_DIR"
-ANDROID_RESOURCE_ENV = "GIS_ANDROID_RESOURCE_DIR"
+ANDROID_DATA_ENV = "KROMIS_ANDROID_DATA_DIR"
+ANDROID_RESOURCE_ENV = "KROMIS_ANDROID_RESOURCE_DIR"
 
 
 def is_android() -> bool:
@@ -90,11 +106,22 @@ def data_dir() -> str:
         return _android_data_dir()
     if not is_frozen():
         return REPO_DIR
+    return _desktop_data_root(APP_NAME)
+
+
+def _desktop_data_root(app_name: str) -> str:
+    """Frozen masaüstü yerleşiminde `app_name` uygulamasının veri kökü.
+
+    Ad PARAMETRE, sabit değil: göç kodu aynı dal düzenini ESKİ adla sormak
+    zorunda (`_migrate_from_old_name`) ve iki yere ayrı ayrı yazılmış bir dal
+    düzeni bir gün ayrışırdı — göç o gün sessizce yanlış dizine bakıp
+    "taşınacak bir şey yok" derdi. Gerekçeler `data_dir`'in docstring'inde.
+    """
     if sys.platform == "win32":
         local = os.environ.get("LOCALAPPDATA") or os.path.join(
             os.path.expanduser("~"), "AppData", "Local")
-        return os.path.join(local, APP_NAME)
-    return os.path.join(os.path.expanduser("~/Library/Application Support"), APP_NAME)
+        return os.path.join(local, app_name)
+    return os.path.join(os.path.expanduser("~/Library/Application Support"), app_name)
 
 
 def output_dir() -> str:
@@ -140,10 +167,12 @@ def chat_video_instructions_override() -> str:
 def credentials_path() -> str:
     """Uygulamanın KENDİ kimlik dosyası — Ayarlar penceresi buraya yazar.
 
-    Masaüstünde `~/.config/lumeo/`; karar `azure_client`'tan buraya taşındı ki
-    Android dalı tek bir yerde açılabilsin. (Dizin adı yeniden adlandırmada
-    `gpt-image-studio` → `lumeo` oldu; uygulama henüz kullanımda olmadığı için
-    veri taşıma adımı gerekmedi.)
+    Masaüstünde `~/.config/kromis/`; karar `azure_client`'tan buraya taşındı ki
+    Android dalı tek bir yerde açılabilsin. Dizin adı İKİ kez değişti:
+    `gpt-image-studio` → `lumeo` geçişinde veri taşıma adımı GEREKMEDİ (uygulama
+    henüz kullanımda değildi), `lumeo` → `kromis` geçişinde GEREKTİ — dosyanın
+    içinde kullanıcının Azure anahtarı var ve taşınmazsa uygulama açılışta
+    "kimlik yok" der. Göç `_migrate_from_old_name` içinde.
 
     Android'de `~` KULLANILAMAZ (bkz. `data_dir`), bu yüzden dosya app-private
     kökün altına iniyor. Dizin zaten yalnız bu uygulamaya açık; üstelik
@@ -155,7 +184,16 @@ def credentials_path() -> str:
     """
     if is_android():
         return os.path.join(data_dir(), "credentials.env")
-    return os.path.expanduser("~/.config/lumeo/credentials.env")
+    return _desktop_credentials_path(CONFIG_DIRNAME)
+
+
+def _desktop_credentials_path(config_dirname: str) -> str:
+    """`~/.config/<config_dirname>/credentials.env`.
+
+    Dizin adı PARAMETRE — gerekçe `_desktop_data_root` ile aynı: göç eski adı
+    aynı yol düzeniyle sormak zorunda.
+    """
+    return os.path.expanduser(f"~/.config/{config_dirname}/credentials.env")
 
 
 def shared_credentials_path() -> str | None:
@@ -174,7 +212,75 @@ def shared_credentials_path() -> str | None:
     return os.path.expanduser("~/.config/claude-tools/azure-gpt-image2.env")
 
 
+def _move_if_new_is_absent(old: str, new: str) -> None:
+    """`old`'u `new`'e taşır — ama YALNIZ `new` yokken ya da boş bir dizinken.
+
+    Dört kural ve NEDEN'leri:
+
+    1. `new` doluysa HİÇBİR ŞEY yapılmaz. Kullanıcı yeni adla zaten çalışmışsa
+       taze verisi, eski kurulumun bayat verisiyle ezilemez. Boş bir dizin
+       göçü ENGELLEMEZ: `makedirs`'in bir önceki açılışta açıp bıraktığı boş
+       kabuk "kullanıcı yeni adla çalıştı" demek değil.
+    2. Taşıma `os.rename`: aynı birimde atomik ve bedava. Kopyala-sonra-sil
+       olsaydı yarı yolda kesilen bir göç (kapatma, disk dolması) veriyi iki
+       dizine bölerdi ve hangisinin doğru olduğu bilinemezdi.
+    3. Hiçbir şey SİLİNMEZ. Tek istisna hedefteki BOŞ dizin — `os.rename`
+       Windows'ta var olan bir hedefin üstüne yazmıyor, `rmdir` o kabuğu
+       kaldırıyor ve boş bir dizinde kaybedilecek veri yok.
+    4. `OSError` YUTULUR (kilitli dosya, salt-okunur birim, farklı sürücü —
+       `rename` birimler arasında çalışmaz) ve `hata.log`'a yazılır. Bir göç
+       hatası uygulamayı hiç açılamaz hâle getirmemeli: en kötü hâlde kullanıcı
+       verisini kaybetmiş SANIR, oysa eski dizin olduğu gibi yerinde durur ve
+       log nereye bakacağını söyler.
+    """
+    if not os.path.exists(old):
+        return
+    if os.path.exists(new) and (not os.path.isdir(new) or os.listdir(new)):
+        return
+    try:
+        if os.path.isdir(new):
+            os.rmdir(new)
+        os.makedirs(os.path.dirname(new), exist_ok=True)
+        os.rename(old, new)
+    except OSError as e:
+        errlog.safe_append(data_dir(), f"Veri göçü başarısız: {old} -> {new}: {e}")
+
+
+def _migrate_from_old_name() -> None:
+    """Eski adla (`Lumeo`) açılmış kullanıcı verisini yeni ada taşır.
+
+    `ensure_data_dirs()`in İÇİNDE, `makedirs`'ten ÖNCE çağrılıyor — sıra
+    sözleşmenin parçası: dizinler bir kez açıldıktan sonra "yeni dizin boş mu"
+    sorusunun cevabı değişir ve göç bir daha hiç koşmaz. Üç giriş noktası da
+    (`app.py`, `desktop.py`, `android_main.py`) açılışta orayı çağırıyor,
+    import'ta değil (`tests/test_paths.py` bunun bekçisi).
+
+    Android'de HİÇ koşmaz. Orada kök `filesDir` ve uygulama adı yolun hiçbir
+    yerinde geçmiyor; üstelik `applicationId` de değiştiği için eski
+    uygulamanın app-private dizini yeni uygulamaya KAPALI — okunamayan bir
+    dizini taşımaya çalışmak yalnız hata üretirdi. Telefondaki eski veri
+    bilinçli olarak KAYIP; KURULUM.md bunu kullanıcıya yazıyor.
+    """
+    if is_android():
+        return
+    # Veri kökü adı YALNIZ frozen'da taşıyor. Geliştirmede kök repo dizinidir
+    # ve `REPO_DIR`i taşımaya çalışmak deponun kendisini oynatırdı.
+    if is_frozen():
+        _move_if_new_is_absent(_desktop_data_root(OLD_APP_NAME), data_dir())
+    # Kimlik dosyası frozen'dan BAĞIMSIZ: kaynaktan çalıştıran da aynı
+    # `~/.config/<ad>/credentials.env`i kullanıyor ve içinde Azure anahtarı var.
+    _move_if_new_is_absent(_desktop_credentials_path(OLD_CONFIG_DIRNAME),
+                           credentials_path())
+
+
 def ensure_data_dirs() -> None:
-    """Yazılabilir dizinleri oluşturur; var olanlara dokunmaz."""
+    """Yazılabilir dizinleri oluşturur; var olanlara dokunmaz.
+
+    Göç `makedirs`'ten ÖNCE: gerekçe `_migrate_from_old_name`'de. Çağrı MODÜL
+    GLOBAL'i üzerinden gidiyor, `from ... import` ile değil — testlerin
+    (ve `tests/conftest.py`'nin gerçek `~/.config` ağacını koruyan guard'ının)
+    onu değiştirebilmesi buna bağlı.
+    """
+    _migrate_from_old_name()
     for path in (output_dir(), assets_dir()):
         os.makedirs(path, exist_ok=True)

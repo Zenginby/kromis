@@ -23,8 +23,8 @@ SCRIPT = os.path.expanduser("~/.config/claude-tools/composite-logo.py")
 # Logo çifti FIXTURES altında: bunlar bir zamanlar pakete gömülü yerleşik logolardı,
 # uygulama marka-nötr olunca paketten çıkıp yalnızca bu golden'ların
 # girdisi olarak testlerde kaldılar.
-LOGO_BLUE = os.path.join(FIXTURES, "kurum-logo-blue.png")
-LOGO_WHITE = os.path.join(FIXTURES, "kurum-logo-white.png")
+LOGO_BLUE = os.path.join(FIXTURES, "yerlesik-logo-blue.png")
+LOGO_WHITE = os.path.join(FIXTURES, "yerlesik-logo-white.png")
 
 # (ad, base, position, color, scale, shadow_alpha, shadow_blur, overlay_or_None, logo)
 #

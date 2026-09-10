@@ -438,7 +438,7 @@ def test_fatal_alert_uses_messagebox_on_windows(monkeypatch):
     assert not subprocess_calls, "Windows'ta subprocess'e düşmemeli (konsol çakar)"
     assert len(alerts) == 1
     title, message = alerts[0]
-    assert "Lumeo" in title
+    assert "Kromis" in title
     assert r"C:\Users\x\hata.log" in message
 
 

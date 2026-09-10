@@ -53,7 +53,7 @@ gpt-image-2 anahtar kelime yığınından değil, **akıcı ve betimleyici İngi
 - **Klişe süs kelimelerinden kaçın.** "masterpiece, 8k, ultra detailed, trending on artstation" gibi ifadeler bu modelde işe yaramıyor; yerine gerçek görsel tanım kullan.
 
 ## 3. Adım — Görselde metin varsa
-- Metni **tam olarak, tırnak içinde ve büyük/küçük harfiyle** yaz: `the text "KURUM Derneği" in the lower-left corner`
+- Metni **tam olarak, tırnak içinde ve büyük/küçük harfiyle** yaz: `the text "İZMİR" in the lower-left corner`
 - Az metin iste. 1–2 kısa satır iyi çalışır, paragraf çalışmaz.
 - Yazı tipi karakterini betimle: "bold geometric sans-serif", "elegant high-contrast serif".
 - gpt-image-2 çoklu dil desteğini Japonca, Korece, Çince, Hintçe ve Bengalce için genişletti; **Türkçe bu listede yok.** Türkçe karakterli (ş, ğ, ı, İ, ö, ü, ç) metinlerde hata riski olduğunu kullanıcıya hatırlat. Kritik metinler için ya `n: 2-3` ile birkaç varyant üretip en doğru yazımı seçmesini ya da metnin sonradan tasarım programında eklenmesini öner.

@@ -2,7 +2,7 @@
 
 Aynı duruşu paylaşıyor: ham `httpx`, fonksiyon içinde lazy import, kendi hata
 sınıfı, kullanıcıya gösterilebilir Türkçe mesajlar. Bir SDK eklenmiyor —
-`requirements.txt` değişmiyor, dolayısıyla `gpt-image-studio.spec`'in
+`requirements.txt` değişmiyor, dolayısıyla `kromis.spec`'in
 `hiddenimports`'u da değişmiyor.
 
 STREAMING YOK. Yönetmenin çıktısı zaten ancak tamamlanınca (PROMPT + JSON

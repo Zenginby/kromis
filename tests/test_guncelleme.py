@@ -241,7 +241,7 @@ def test_yabanci_url_reddedilir(monkeypatch, tmp_path):
     (`static/settings.js` → `#settings-update-link.href`).
 
     Risk soyut değil: `follow_redirects=True` bilinçle açık ve v0.5.3'te depo
-    taşındığında `Zenginby` adı boşaldı. O adı alan biri isteği kendi
+    taşındığında eski hesap adı boşaldı. O adı alan biri isteği kendi
     `releases/latest`ine yönlendirebilir; doğrulama olmadan uygulamanın "indir"
     bağlantısı yabancı bir yayın sayfasını gösterirdi.
     """
@@ -251,7 +251,7 @@ def test_yabanci_url_reddedilir(monkeypatch, tmp_path):
         def raise_for_status(self): pass
         def json(self): return {
             "tag_name": "v99.0.0",
-            "html_url": "https://github.com/saldirgan/gpt-image-studio/releases/tag/v99.0.0",
+            "html_url": "https://github.com/saldirgan/kromis/releases/tag/v99.0.0",
         }
 
     monkeypatch.setattr(httpx, "get", lambda *a, **k: SahteYanit())
@@ -285,7 +285,7 @@ def test_onbellekteki_yabanci_url_de_reddedilir(veri_dizini, monkeypatch):
     monkeypatch.setattr(guncelleme, "_tazeleme_baslat", lambda d: None)
     _onbellek_yaz(veri_dizini, {
         "zaman": time.time(), "surum": "99.0.0",
-        "url": "https://github.com/saldirgan/gpt-image-studio/releases/latest",
+        "url": "https://github.com/saldirgan/kromis/releases/latest",
     })
 
     assert guncelleme.bilgi(veri_dizini)["url"] == guncelleme.YAYIN_SAYFASI

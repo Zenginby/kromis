@@ -2,7 +2,7 @@
 
 Bu testler, v0.4.2'den beri süren ve Windows masaüstünde uygulamanın simgesini
 bulanık gösteren kusuru (Pillow'un IcoImagePlugin'inin ana görsel boyutundan
-büyük kareleri sessizce atması sonucu lumeo.ico'nun yalnız 16x16 kalması)
+büyük kareleri sessizce atması sonucu kromis.ico'nun yalnız 16x16 kalması)
 kalıcı olarak engeller.
 """
 import os
@@ -25,11 +25,11 @@ def test_windows_ico_has_all_required_resolutions():
     128x128: Büyük simgeler
     256x256: Çok büyük simgeler / 4K ölçekleme
     """
-    ico_path = os.path.join(BRANDING, "lumeo.ico")
-    assert os.path.isfile(ico_path), f"lumeo.ico bulunamadı: {ico_path}"
+    ico_path = os.path.join(BRANDING, "kromis.ico")
+    assert os.path.isfile(ico_path), f"kromis.ico bulunamadı: {ico_path}"
 
     with Image.open(ico_path) as im:
-        assert hasattr(im, "ico") and im.ico.entry, "lumeo.ico geçerli bir ICO dosyası değil"
+        assert hasattr(im, "ico") and im.ico.entry, "kromis.ico geçerli bir ICO dosyası değil"
         sizes = {(e.width, e.height) for e in im.ico.entry}
         beklenen = {(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)}
         assert beklenen.issubset(sizes), f"Eksik çözünürlükler: {beklenen - sizes} (mevcut: {sizes})"
@@ -62,7 +62,7 @@ def test_apple_touch_icon_resolution():
 
 def test_macos_iconset_has_required_png_files():
     """macOS iconset klasörü iconutil'in .icns üretmesi için gereken tüm PNG'leri içerir."""
-    iconset_dir = os.path.join(BRANDING, "lumeo.iconset")
+    iconset_dir = os.path.join(BRANDING, "kromis.iconset")
     beklenen_dosyalar = {
         "icon_16x16.png": (16, 16),
         "icon_16x16@2x.png": (32, 32),

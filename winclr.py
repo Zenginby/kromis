@@ -1,7 +1,10 @@
 """winclr — Windows'ta .NET köprüsünün açılış öncesi denetimi ve onarımı.
 
-NEDEN VAR: 2026-09-04'te bir kullanıcı `lumeo-windows-x64.zip`'i indirip
-`Downloads` altına açtı ve uygulama HİÇ açılmadı. `hata.log`:
+NEDEN VAR: 2026-09-04'te bir kullanıcı Windows paketini indirip `Downloads`
+altına açtı ve uygulama HİÇ açılmadı. Aşağıdaki `hata.log` alıntısı O GÜNÜN
+kaydı; uygulama o gün `Lumeo` adıyla yayınlanıyordu (2026-09-10'da `Kromis`
+oldu) ve alıntı KANIT olduğu için olduğu gibi duruyor — yeniden yazılırsa
+teşhisin dayandığı gözlem uydurulmuş olur:
 
     webview/guilib.py:74 import_winforms -> clr.py:6 -> pythonnet/__init__.py:143
     -> clr_loader/netfx.py:47 _get_callable
@@ -32,7 +35,7 @@ NEDEN TÜM AĞAÇ TARANMIYOR — üç gerekçe, üçü de ölçülebilir:
      `.pyd`/`.dll` native yüklemesi (`LoadLibrary`) etkilenmiyor. 200+ dosyada
      işaret silmenin kazancı sıfır.
   2. "Uygulama, indirdiğin her dosyanın güvenlik işaretini siliyor"
-     savunulabilir bir cümle değil. `Lumeo.exe`'ye BİLEREK dokunulmuyor:
+     savunulabilir bir cümle değil. `Kromis.exe`'ye BİLEREK dokunulmuyor:
      SmartScreen kararı kullanıcınındır ve o kapıdan zaten geçmiştir.
   3. Dar liste denetlenebilir; testi bir şey ölçer.
 Listenin körlüğü CI'da kapanıyor: `_paket-windows.yml`'deki açılış denetimi
@@ -100,7 +103,7 @@ def zone_isaretini_kaldir(yol: str) -> str | None:
 
     ASLA FIRLATMAZ. Salt-okunur bir kurulum dizininde (ör. `Program Files`,
     kurumsal politika) silme başarısız olur ve bu bir ÇÖKME değil bir
-    BULGUDUR: o senaryoyu `Lumeo.exe.config`'teki `loadFromRemoteSources`
+    BULGUDUR: o senaryoyu `Kromis.exe.config`'teki `loadFromRemoteSources`
     kurtarıyor, çünkü o dosya yazma izni istemiyor.
     """
     try:
@@ -241,7 +244,7 @@ def kayda_deger(b: Bulgular) -> bool:
     O yolda hata.log yaratmak kullanıcıya kendi kendine kapanmış bir sorunu
     bildirtir ve dosyanın varlığını tam olarak yukarıdaki paragrafın
     reddettiği şeye çevirir. KALAN işaret ise bulgudur: silinemediyse
-    (salt-okunur dizin, kilit) uygulama `Lumeo.exe.config`'teki
+    (salt-okunur dizin, kilit) uygulama `Kromis.exe.config`'teki
     `loadFromRemoteSources`a kalmıştır ve o kurtarmadıysa sebebi bilinmeli.
     """
     # Bulunup KALDIRILMAMIŞ olan: hem silme hatası alanlar hem `kaldir=False`

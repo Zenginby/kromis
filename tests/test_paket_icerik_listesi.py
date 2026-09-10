@@ -6,7 +6,7 @@ karşılığıdır.** 2026-08-28'e kadar `static/` ve `bundled/` altına dokunan
 sınıfını yakalıyordu: paket doğrulamalarının ADA GÖRE aradığı bir dosyanın
 silinmesi ya da yeniden adlandırılması. İçerik değişikliği paketlemeyi zaten
 kıramaz, çünkü iki dizin de pakete DİZİN BÜTÜN olarak giriyor
-(`gpt-image-studio.spec` → `datas=[('static','static'), ('bundled','bundled')]`;
+(`kromis.spec` → `datas=[('static','static'), ('bundled','bundled')]`;
 `android/app/build.gradle` → `into("resources/static") { from("../../static") }`).
 
 Depo `private` olduğu için o kapsamın bedeli gerçek: her ateşleme üç paket, macOS

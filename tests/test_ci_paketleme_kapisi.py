@@ -163,7 +163,7 @@ def test_kapsam_yol_listesi_bilincle_dar(kapsam_kodu: str):
 
     Kapı 2026-08-28'de DARALTILDI: `static/` ve `bundled/` çıkarıldı. Karar
     ölçüye dayanıyor — iki dizin de pakete DİZİN BÜTÜN olarak giriyor
-    (`gpt-image-studio.spec`in `datas`ı, `android/app/build.gradle`ın sahneleme
+    (`kromis.spec`in `datas`ı, `android/app/build.gradle`ın sahneleme
     görevi), yani içerik değişikliği paketlemeyi kıramaz. Kırabilen tek sınıf
     (doğrulamaların ADA GÖRE aradığı bir dosyanın yeniden adlandırılması) artık
     `tests/test_paket_icerik_listesi.py`de, üç runner yerine saniyenin altında
@@ -187,7 +187,7 @@ def test_kapsam_yol_listesi_bilincle_dar(kapsam_kodu: str):
     assert desen, kapsam_kodu
     yollar = {y.replace("\\.", ".") for y in desen.group(1).split("|")}
     assert yollar == {
-        "gpt-image-studio.spec",
+        "kromis.spec",
         "build.sh",
         "build.ps1",
         "requirements(-dev)?.txt",
@@ -298,7 +298,7 @@ def test_the_gate_skips_packaging_when_nothing_can_break_it(tmp_path, degisen):
 
 @bash_gerekli
 @pytest.mark.parametrize("degisen", [
-    ["gpt-image-studio.spec"],
+    ["kromis.spec"],
     ["build.sh"],
     ["build.ps1"],
     ["requirements.txt"],
@@ -308,8 +308,8 @@ def test_the_gate_skips_packaging_when_nothing_can_break_it(tmp_path, degisen):
     ["requirements-dev.txt"],
     ["android/app/build.gradle"],
     [".github/workflows/_paket-macos.yml"],
-    ["branding/lumeo.ico"],
-    ["static/core.js", "gpt-image-studio.spec"],
+    ["branding/kromis.ico"],
+    ["static/core.js", "kromis.spec"],
 ])
 def test_the_gate_still_packages_what_can_actually_break(tmp_path, degisen):
     """Daraltma, kapının işini bırakması DEĞİL.

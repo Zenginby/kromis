@@ -1,4 +1,4 @@
-"""Lumeo — yerel FastAPI arayüzü."""
+"""Kromis Studio — yerel FastAPI arayüzü."""
 from __future__ import annotations
 
 import base64
@@ -109,7 +109,7 @@ async def _lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Lumeo", lifespan=_lifespan)
+app = FastAPI(title="Kromis Studio", lifespan=_lifespan)
 
 
 # Kimlik FORMU olan rotalar: yanıtta hiçbir alanın değeri yankılanmak zorunda

@@ -1,4 +1,4 @@
-package org.zenginby.gptimagestudio
+package com.zenginby.kromis
 
 import android.app.Application
 import com.chaquo.python.Python

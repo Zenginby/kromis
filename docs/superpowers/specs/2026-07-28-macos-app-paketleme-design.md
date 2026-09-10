@@ -11,8 +11,8 @@ bile üç yerde kırılırdı:
 
 1. `app.py:37` logo bindirmeyi repo **dışındaki** `~/.config/claude-tools/composite-logo.py`
    dosyasını `python3` ile çağırarak yapıyor — o makinelerde ne dosya ne o yol var.
-2. O script'in `DEFAULT_LOGO_BLUE/WHITE` varsayılanları Kurum'nın makinesine **mutlak
-   yolla** bağlı (`.../Website/assets/kurum-logo-*.png`).
+2. O script'in `DEFAULT_LOGO_BLUE/WHITE` varsayılanları geliştiricinin makinesine **mutlak
+   yolla** bağlı (`.../Website/assets/kurumsal-logo-*.png`).
 3. `assets/` gitignore'da → logo/motto/banner kütüphanesi boş başlar (v1.5'te not düşüldü).
 
 ## Hedef
@@ -115,10 +115,10 @@ silinirdi. Bu yüzden zorunlu.
 okumasına dayanıyor. `paths.py` bu davranışı bozmamalı; geliştirme modunda çözülen
 yollar bugünküyle birebir aynı olmalı ki testlerin hiçbiri elden geçmesin.
 
-### K4 — KURUM logoları pakete gömülür ve ilk açılışta tohumlanır
+### K4 — kurumsal logolar pakete gömülür ve ilk açılışta tohumlanır
 
-`bundled/logos/kurum-logo-{blue,white}.png` repoya **commit edilir** (kaynak:
-`.../Website/assets/kurum-logo-*.png`, ~300 KB × 2). `assets/` gitignore'da kalır.
+`bundled/logos/kurumsal-logo-{blue,white}.png` repoya **commit edilir** (kaynak:
+`.../Website/assets/kurumsal-logo-*.png`, ~300 KB × 2). `assets/` gitignore'da kalır.
 
 İlk açılışta kullanıcı `assets/logos/` boşsa iki logo kopyalanır ve `index.json`'a
 yazılır (mevcut `assets_store` deseniyle, atomik). İkinci açılışta **çoğaltmaz**.

@@ -293,7 +293,7 @@ def test_the_boot_step_repairs_a_marked_package_without_shouting(tmp_path,
 
 
 def test_a_marker_that_survives_the_repair_is_reported(tmp_path, monkeypatch):
-    """Silinemeyen işaret bulgudur: uygulama artık `Lumeo.exe.config`'teki
+    """Silinemeyen işaret bulgudur: uygulama artık `Kromis.exe.config`'teki
     `loadFromRemoteSources`a kalmıştır ve o da kurtarmadıysa sebebi bilinmeli
     (salt-okunur kurulum dizini, kurumsal politika, kilit)."""
     _isaretle(_saglikli(tmp_path))

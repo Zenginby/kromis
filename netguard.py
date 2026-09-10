@@ -19,7 +19,7 @@ token'ıyla kurulmuştu; masaüstünde hiç kurulmamıştı ve kapatılan iki yo
 NEDEN TOKEN DEĞİL, Android'deki gibi: tehdit modeli farklı. Android'de loopback
 CİHAZDAKİ HER UYGULAMAYA açık, yani düşman yerel bir süreç olabiliyor ve onu
 yalnız paylaşılan bir sır durdurur. Masaüstünde ise yerel bir süreç zaten
-`~/.config/lumeo/credentials.env` dosyasını doğrudan okuyabilir — ona karşı
+`~/.config/kromis/credentials.env` dosyasını doğrudan okuyabilir — ona karşı
 token da bir şey kazandırmazdı. Buradaki gerçek düşman TARAYICIDAKİ BİR SAYFA
 ve tarayıcının kendisi bize iki güvenilir tanık veriyor: sayfanın uyduramadığı
 `Origin` ve `Host` başlıkları. Kapı bu yüzden başlık düzeyinde, sırsız.

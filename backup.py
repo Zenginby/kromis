@@ -1,7 +1,7 @@
 """Sürüm değiştiğinde manifest'lerin BİR KEZ yedeklenmesi.
 
 Neden: ofis çalışanı yükseltmeyi `.app`'i değiştirerek yapıyor. Verisi
-`~/Library/Application Support/Lumeo/` altında kalıyor ve bugün de
+`~/Library/Application Support/Kromis/` altında kalıyor ve bugün de
 kaybolmuyor — ama yeni sürümdeki bir veri biçimi hatası (yeniden adlandırılmış
 bir alan, bozulmuş bir yazım) kütüphaneyi okunamaz hale getirebilir ve bunu
 ilk fark eden çalışan olur. Yedek o hatanın geri dönüşünü mümkün kılıyor.

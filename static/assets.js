@@ -1,4 +1,4 @@
-// Lumeo — logo/motto/banner kütüphanesi ve bindirme modalı.
+// Kromis — logo/motto/banner kütüphanesi ve bindirme modalı.
 //
 // Klasik script (ES module DEĞİL): bütün parçalar TEK global kapsamı paylaşır
 // ve index.html'deki yükleme SIRASI bağlayıcıdır:

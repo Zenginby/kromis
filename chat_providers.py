@@ -27,7 +27,7 @@ olarak `providers._azure_generate`'in docstring'inde ölçülmüş kırılmayı
 tekrarlardı: stub'lanmış bir çağrı bile gerçek bir `credentials.env` isterdi.
 
 Adaptörler modül düzeyinde STATİK import ediliyor, `importlib` ile DEĞİL
-(`gpt-image-studio.spec`'in `hiddenimports=[]` değeri PyInstaller'ın statik
+(`kromis.spec`'in `hiddenimports=[]` değeri PyInstaller'ın statik
 analizine dayanıyor). Döngü de yok: `openai_chat` bu modülü İMPORT ETMİYOR.
 
 Dosya KÖKTE ve DÜZ — Chaquopy kaynak kümesi `include "*.py"` (bkz.

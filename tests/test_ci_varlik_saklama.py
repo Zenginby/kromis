@@ -12,7 +12,7 @@ wheel'i etiketiyle ve `.so`suyla doğrulandı. Üçü de bir sonraki adımda,
 O gün depoda 221 canlı varlık ve 3.98 GiB birikmişti. Sebep, saklama süresinin
 varlığın İŞİNDEN bağımsız seçilmiş olmasıydı: paketler 30, wheel 90 gün
 tutuluyordu — oysa dört yüklemenin de tüketicisi KENDİ KOŞUSUNUN İÇİNDE.
-`release.yml`'in `yayinla` işi `lumeo-*`ı dakikalar sonra indiriyor,
+`release.yml`'in `yayinla` işi `kromis-*`ı dakikalar sonra indiriyor,
 `_paket-android.yml` wheel'i saniyeler sonra. Depo private olduğu için bu
 birikimin bir tavanı var ve tavana çarpınca CI, kodu hakkında hiçbir şey
 söylemeden kırmızı oluyor: en pahalı kırmızı türü, çünkü yanlış yere baktırıyor.

@@ -9,7 +9,7 @@ olur. tests/test_legacy_formats.py bu ağaca karşı koşar.
 
 ÜRETİM DÜRÜSTLÜĞÜ (tools/make_logo_goldens.py'deki dersin aynısı: vakaların
 tek kaynağı üreticinin KENDİ çıktısı olmalı):
-gpt-image-studio.spec gönderilen sürümün 1.8.0 olduğunu söylüyor ve git tag
+kromis.spec gönderilen sürümün 1.8.0 olduğunu söylüyor ve git tag
 yok — yani v1.9 yazıcı değişikliği inmeden önce bugünkü çalışma ağacı 1.8.0
 üreticisinin kendisidir. Bu yüzden kayıtlar GERÇEK yazıcılar çağrılarak
 üretilir (storage.save / folders.create / palette_store.create /
@@ -131,7 +131,7 @@ def main() -> int:
 
     # ── varlıklar (gerçek yazıcı, üç tür) ────────────────────────────────
     asset_ids: dict[str, list[str]] = {}
-    for kind, names in (("logos", ["KURUM Logo Mavi", "KURUM Logo Beyaz"]),
+    for kind, names in (("logos", ["Şirket Logosu Mavi", "Şirket Logosu Beyaz"]),
                         ("banners", ["Alt Şerit"]),
                         ("mottos", ["Motto Beyaz"])):
         recs = [assets_store.save_asset(kind, TINY_PNG, name, ASSETS, now=now)

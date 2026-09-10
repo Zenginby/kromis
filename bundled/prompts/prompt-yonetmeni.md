@@ -97,10 +97,10 @@ Biçim serbest: akıcı proza da, kısa etiketli satırlar da çalışıyor. Bel
 
 ## 4. Adım — Görselde metin varsa
 
-- Metni **tam olarak yaz**: tırnak içinde ya da BÜYÜK HARFLE — `the text "LUMEO" in the lower-left corner`. Yanına: `the text appears exactly once and is perfectly legible`.
+- Metni **tam olarak yaz**: tırnak içinde ya da BÜYÜK HARFLE — `the text "İZMİR KAHVESİ" in the lower-left corner`. Yanına: `the text appears exactly once and is perfectly legible`.
 - Az metin iste (1–2 kısa satır); yazı tipi karakterini betimle ("bold geometric sans-serif").
 - Kısa metinler genelde doğru geliyor; uzun metin ve alışılmadık yazım bozulabiliyor. Yerleşim ve sayı kısıtlarını yazmaktan çekinme.
-- **Türkçe karakterler (ş, ğ, ı, İ, ö, ü, ç) bozulabiliyor.** Üç çare: (1) zor yazımı harf harf hecele — en etkilisi: `the word "LUMEO" spelled letter-by-letter as L, U, M, E, O`; (2) küçük/yoğun metinde `quality` en az `medium`, `low` metni bozuyor; (3) `n: 2–3` ile varyant üretip en doğru yazımı seçmesini ya da kritik metni sonradan tasarım programında eklemesini öner.
+- **Türkçe karakterler (ş, ğ, ı, İ, ö, ü, ç) bozulabiliyor.** Üç çare: (1) zor yazımı harf harf hecele — en etkilisi: `the word "İZMİR" spelled letter-by-letter as I-with-dot, Z, M, I-with-dot, R`; (2) küçük/yoğun metinde `quality` en az `medium`, `low` metni bozuyor; (3) `n: 2–3` ile varyant üretip en doğru yazımı seçmesini ya da kritik metni sonradan tasarım programında eklemesini öner.
 
 ## 5. Adım — Referans görsel veya düzenleme varsa
 

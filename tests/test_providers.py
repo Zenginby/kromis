@@ -33,7 +33,7 @@ def test_katalogdaki_her_saglayicinin_adaptoru_kayitli():
 def test_adaptorler_STATIK_import_ediliyor():
     """`importlib` ile dinamik import PyInstaller'ın statik analizinden KAÇAR.
 
-    `gpt-image-studio.spec`'in `hiddenimports=[]` değeri o analize dayanıyor ve
+    `kromis.spec`'in `hiddenimports=[]` değeri o analize dayanıyor ve
     o dosyanın 50 satırlık yorumu bunu ölçülmüş bir değişmez sayıyor. Dinamik
     import edilen bir adaptör paketlenmiş uygulamada bulunamaz — ve hata yalnız
     .app/.apk içinde görünür, testte hiç.

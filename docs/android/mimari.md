@@ -32,7 +32,7 @@ Tek kaynak korunuyor — masaüstünde düzeltilen bir hata telefonda da düzeli
 | Dosya | İşi |
 |---|---|
 | `android_main.py` | Android girişi: yolları açar, token'ı üretir, uvicorn'u başlatır |
-| `paths.py` | Dördüncü dal (Android) — `GIS_ANDROID_DATA_DIR` / `GIS_ANDROID_RESOURCE_DIR` |
+| `paths.py` | Dördüncü dal (Android) — `KROMIS_ANDROID_DATA_DIR` / `KROMIS_ANDROID_RESOURCE_DIR` |
 | `android/pins.properties` | pydantic / pydantic-core / Python sürümleri — tek kaynak |
 | `android/app/build.gradle` | Chaquopy yapılandırması, sürümü `version.py`'den okur |
 | `…/StudioApplication.kt` | `Python.start()` — süreç başına bir kez |
@@ -78,7 +78,7 @@ hata çıkmıyor — tıklama **sessizce hiçbir şey yapmıyor**. Telefonda "in
 çalışmıyor"un tarifi tam olarak bu ve tek bir `Content-Disposition` başlığı onu
 kapatmıyor.
 
-Bu yüzden `MainActivity` sayfaya `LumeoIndirme` adında bir arayüz enjekte
+Bu yüzden `MainActivity` sayfaya `KromisIndirme` adında bir arayüz enjekte
 ediyor (`addJavascriptInterface`, `loadUrl`'den **önce**) ve `core.js`
 `downloadViaAnchor` köprü varsa doğrudan onu çağırıyor. Zincirden çıkanlar:
 WebView'in indirme devralması, `<a download>`, ve `URLUtil.guessFileName` —
@@ -125,7 +125,7 @@ Bakımcı tarafı iki yol:
 **Deneme paketi (yayın oluşmaz).** Actions → *Yayın* → **Run workflow**; dalı
 seç, `surum` alanına bir sonraki sürümü yaz, `kuru_prova`yı işaretle. Dal
 kapısı sürüm commit'ini ve yayını engelliyor (`release.yml` → DAL KAPISI), ama
-Android işi tam olarak koşuyor. Koşu bitince `lumeo-android-arm64` varlığını
+Android işi tam olarak koşuyor. Koşu bitince `kromis-android-arm64` varlığını
 indir, ZIP'ten çıkan APK'yı telefona at. `android/` altına dokunan bir PR'da
 aynı iş kendiliğinden koşuyor (`docs/yayin-hatti.md` → "PR'da ne koşuyor") —
 orada ayrıca tetiklemek gerekmiyor. Wheel önbellekte olduğu sürece koşu
@@ -181,8 +181,9 @@ uygulamayı kaldırmak zorunda kalır ve kaldırma tüm verisini siler. Anahtar 
 dışında, parola yöneticisinde ya da şifreli bir yedekte durmalı.
 
 ```bash
-keytool -genkeypair -v -keystore gis.keystore -alias gis \
-        -keyalg RSA -keysize 4096 -validity 10000 -storetype PKCS12
+keytool -genkeypair -v -keystore kromis.keystore -alias kromis \
+        -keyalg RSA -keysize 4096 -validity 10000 -storetype PKCS12 \
+        -dname "CN=Kromis Studio, O=Zenginby, C=TR"
 ```
 
 PKCS12'de **anahtar parolası = depo parolası**; `keytool` ayrı bir anahtar
@@ -193,7 +194,51 @@ Sırları tanımladıktan sonra yukarıdaki *deneme paketi* koşusunu tetikle. B
 `İmzayı doğrula` atlanmaz; `apksigner verify --print-certs` sertifikayı basar ve
 o adım yeşilse paket telefona kurulur.
 
-#### Yayındaki anahtarın kimliği
+> **`gh secret list`te görünmek YETMEZ — değer boş olabilir.** 2026-09-10'da
+> (koşu 34503743056) dört sır da listede duruyordu, `ANDROID_KEYSTORE_PASSWORD`
+> koşuda `***` olarak çözülüyordu — ama `ANDROID_KEYSTORE_BASE64`'ün DEĞERİ
+> boştu ve `İmzayı doğrula` sessizce atlandı. Kuru provada `imza_zorunlu` gevşek
+> olduğu için koşu yeşil bitti. Sebep, `base64` çıktısı boşken (dosya
+> bulunamadığında `base64` stderr'e yazar, stdout boş kalır) borunun
+> `gh secret set`e boş girdi vermesi. Sırrı yazmadan ÖNCE değeri say:
+>
+> ```bash
+> base64 -w0 kromis.keystore | wc -c     # birkaç bin demeli; 0 ise dosya yok
+> base64 -w0 kromis.keystore | gh secret set ANDROID_KEYSTORE_BASE64 --repo Zenginby/kromis
+> ```
+>
+> Boruyla yazılıyor, `--body` ile DEĞİL: base64 özel anahtarın kendisi ve
+> `--body` onu kabuk geçmişine düşürür.
+
+#### Anahtar kimliği
+
+**Geçerli anahtar.** `apksigner verify --print-certs` ile ölçüldü
+(koşu 34505244509, 2026-09-10 — yeni anahtarın İLK imzalı derlemesi):
+
+| Alan | Değer |
+|---|---|
+| Sertifika DN | `CN=Kromis Studio, O=Zenginby, C=TR` |
+| Sertifika SHA-256 | `ca5a0dd3ebeabdaa3587e3955e4f537db9598288e3e203204fd904769cd8ff4d` |
+| Sertifika SHA-1 | `be70398ae5e25e5fd7be1fe4fe8def65774512ca` |
+| Anahtar | RSA 4096 |
+| İmza şeması | yalnız v2 (APK Signature Scheme v2) |
+
+DN'in `OU`/`L`/`ST` alanları YOK: eski anahtarda `keytool`'un etkileşimli
+soruları boş bırakıldığı için `OU=Unknown, ST=Unknown` gibi anlamsız değerler
+girmişti. Yeni anahtar `-dname` ile üretildi (yukarıdaki `keytool` çağrısı);
+üç alanla sınırlı bir DN, "Unknown" taşıyan bir DN'den daha doğru.
+
+Bu parmak izleri **sır değil**: imzalı her APK'nın içinden okunabiliyorlar.
+Burada durmalarının sebebi, bir sonraki imzalı derlemenin AYNI anahtarla
+imzalandığını kanıtlayacak referans olmaları. Parmak izi değiştiyse anahtar da
+değişmiştir ve o paket telefondaki kurulumun üzerine yazamaz — kullanıcı
+uygulamayı kaldırmak zorunda kalır.
+
+**v0.17.2'ye kadarki anahtar (TARİHSEL).** Paket kimliği `com.zenginby.kromis`e
+taşındığında (2026-09-10) yeni bir anahtar üretildi; aşağıdaki değerler ESKİ
+anahtara ait ve yalnız kayıt olarak duruyor. İki tablonun birden durması
+gerekiyor: bir kullanıcının telefonunda hangi anahtarla imzalanmış bir APK
+olduğu sorusunun cevabı burada.
 
 `apksigner verify --print-certs` ile ölçüldü (koşu 32478330228, 2026-08-21):
 
@@ -205,11 +250,10 @@ o adım yeşilse paket telefona kurulur.
 | Anahtar | RSA 4096 |
 | İmza şeması | yalnız v2 (APK Signature Scheme v2) |
 
-Bu parmak izleri **sır değil**: imzalı her APK'nın içinden okunabiliyorlar.
-Burada durmalarının sebebi, bir sonraki imzalı derlemenin AYNI anahtarla
-imzalandığını kanıtlayacak referans olmaları. Parmak izi değiştiyse anahtar da
-değişmiştir ve o paket telefondaki kurulumun üzerine yazamaz — kullanıcı
-uygulamayı kaldırmak zorunda kalır.
+İki anahtarın parmak izleri FARKLI ve bu bilerek böyle: `applicationId` de
+değiştiği için yeni paket eskisinin üzerine yazmıyor, YAN YANA kuruluyor —
+yani "üzerine yazamaz" sorunu bu geçişte zaten geçerli değil. Bir kerelik geçiş
+adımları: `GUNCELLEME.md` → *Uygulamanın adı değiştiyse*.
 
 #### Depo başka bir hesaba taşındığında
 
@@ -217,9 +261,10 @@ Sırlar depo **ayarlarında** yaşıyor, git ağacında değil: `git clone` onla
 getirmiyor, depoya bakarak varlıkları anlaşılmıyor. Hesap değişikliğinden sonra
 ilk soru her zaman "dört sır hâlâ orada mı" oluyor.
 
-Ölçüldü: depo `Zenginby`'dan `Zenginby`'ye taşındıktan sonra (2026-08-21,
+Ölçüldü: depo eski hesaptan `Zenginby`'ye taşındıktan sonra (2026-08-21,
 koşu 32478330228) dördü de yerindeydi — GitHub taşımada depo sırlarını
-düşürmedi ve APK yukarıdaki parmak iziyle imzalandı. Yine de her taşımadan
+düşürmedi ve APK o günün anahtarıyla (yukarıdaki TARİHSEL tablo) imzalandı.
+Yine de her taşımadan
 sonra ölçülmeli; tek güvenilir işaret `İmzayı doğrula` adımının ATLANMAMIŞ
 olması.
 
@@ -263,7 +308,7 @@ gerçek cihazda ölçülebilir.
 | **Çoklu seçim** | Kütüphane → "+ Logo yükle" → galeriden seç → **"Bitti"** → dosya gerçekten yüklenmeli. Bu yol `getData()` DEĞİL `ClipData` döndürüyor (`secilenDosyalar`); tek seçim yolunun çalışması bunu kanıtlamıyor — kusur tam olarak bu boşlukta bir sürüm yaşadı |
 | Kütüphaneye yükleme | Kütüphane → "+ Logo yükle" → seçicide **.jpg** bir dosya seçilebiliyor olmalı (intent'in süzgeci kabul listesinin tamamını taşıyor mu) → yüklenen logo bindirme panelinde görünmeli |
 | Türü bildirilmeyen dosya | Aynı yükleme "Son kullanılanlar"/İndirilenler üzerinden: MIME'ı boş gelen dosya da kabul edilmeli (`isAcceptedUpload`) |
-| İndirme | PNG → `Resimler/Lumeo`, klasör ZIP → `İndirilenler/Lumeo`; ZIP adı klasörün ADI olmalı (`download.zip` değil) |
+| İndirme | PNG → `Resimler/Kromis`, klasör ZIP → `İndirilenler/Kromis`; ZIP adı klasörün ADI olmalı (`download.zip` değil) |
 | Güvenlik | Başka bir tarayıcıdan `127.0.0.1:<port>/api/history` → **403** |
 | Uzun üretim arka planda | n=4 başlat → uygulamadan çık → 5 dk sonra dön → sonuç kayıpsız |
 | Responsive | Gerçek telefonda ve Chrome DevTools 390×844'te yatay kaydırma **olmamalı** |

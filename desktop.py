@@ -13,7 +13,8 @@ yazar (bkz. errlog.py) ve kullanıcıya Türkçe bir sistem uyarısı gösterir 
 aksi halde Dock ikonu bir kez zıplayıp sessizce kaybolurdu.
 
 WINDOWS'A ÖZGÜ ÜÇ EK — hepsi 2026-09-04'te yaşanmış tek bir kusurdan doğdu.
-İndirilen paket kullanıcıda HİÇ açılmadı; `hata.log`'daki tek iz:
+İndirilen paket kullanıcıda HİÇ açılmadı; `hata.log`'daki tek iz (o günün
+kaydı, olduğu gibi — uygulama o gün `Lumeo` adıyla yayınlanıyordu):
 
     webview/guilib.py:74 import_winforms -> clr.py:6 -> pythonnet/__init__.py:143
     RuntimeError: Failed to resolve Python.Runtime.Loader.Initialize from
@@ -54,7 +55,7 @@ import screencolor
 import version
 import winclr
 
-WINDOW_TITLE = "Lumeo"
+WINDOW_TITLE = "Kromis Studio"
 WINDOW_SIZE = (1440, 900)
 MIN_WINDOW_SIZE = (1024, 700)
 _POLL_INTERVAL = 0.02
@@ -226,7 +227,7 @@ def _show_fatal_alert(log_path: str) -> None:
     çıkmalı.
     """
     _uyari_goster(
-        "Lumeo başlatılamadı",
+        "Kromis Studio başlatılamadı",
         f"Uygulama açılamadı. Hata kaydı: {log_path} "
         "— lütfen bu dosyayı teknik desteğe iletin.",
         kritik=True)
@@ -265,10 +266,10 @@ def _tarayici_yedegi(url: str, log_path: str) -> bool:
     # hiçbir iz yok. False dönmek `_run()`'daki `raise`ı serbest bırakıyor:
     # kullanıcı hiç değilse ölümcül uyarıyı ve hata.log'u görüyor.
     return _uyari_goster(
-        "Lumeo tarayıcıda açıldı",
-        f"Lumeo'nun kendi penceresi açılamadı, uygulama tarayıcınızda açıldı:\n"
+        "Kromis Studio tarayıcıda açıldı",
+        f"Kromis Studio'nun kendi penceresi açılamadı, uygulama tarayıcınızda açıldı:\n"
         f"{url}\n\n"
-        "BU PENCEREYİ KAPATMAYIN — kapattığınızda Lumeo da kapanır.\n"
+        "BU PENCEREYİ KAPATMAYIN — kapattığınızda Kromis Studio da kapanır.\n"
         f"Hata kaydı: {log_path} — lütfen bu dosyayı teknik desteğe iletin.",
         kritik=False)
 
@@ -475,7 +476,7 @@ def _onyukleme_denetimi() -> int:
     runner'ında sonsuza kadar beklerdi.
     """
     satirlar = [
-        "[Lumeo önyükleme denetimi]",
+        "[Kromis Studio önyükleme denetimi]",
         f"sürüm      : {version.APP_VERSION}",
         f"platform   : {sys.platform}",
         f"frozen     : {paths.is_frozen()}",

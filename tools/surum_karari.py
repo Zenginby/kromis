@@ -29,7 +29,7 @@ destekler: CI onu olduğu gibi kabul eder.
 "PAKETE GİRMİYOR" NEDEN YOLA BAKARAK ÖLÇÜLÜYOR
 ----------------------------------------------
 Bu deponun squash-merge başlıklarının bir kısmı Conventional Commits'e uymuyor
-("Telefondaki üç arayüz kusurunu düzelt…", "Lumeo: yeniden adlandırma…").
+("Telefondaki üç arayüz kusurunu düzelt…", "Kromis: yeniden adlandırma…").
 Yalnızca mesaja bakan bir ayrıştırıcı bunları "tip yok → yayınlanacak bir şey
 yok" diye okur ve tam da yayınlanması gereken değişikliği atlardı.
 

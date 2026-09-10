@@ -24,7 +24,7 @@ pyinstaller==6.21.*
 PyYAML>=6.0
 
 # `Python.Runtime.dll`i ve WebView2 DLL'lerini pakete KOYAN şey bu paketteki
-# `hook-clr.py` / `hook-webview.py` (bkz. gpt-image-studio.spec başlığı) — yani
+# `hook-clr.py` / `hook-webview.py` (bkz. kromis.spec başlığı) — yani
 # Windows paketinin içeriğini pyinstaller kadar bu belirliyor ve pinsizdi.
 #
 # TAM SÜRÜM, `==2026.*` DEĞİL: bu paket takvim sürümlemesi kullanıyor (YYYY.N),

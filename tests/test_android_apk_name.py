@@ -1,10 +1,11 @@
 """Gradle'ın ürettiği APK adı ile workflow'un aradığı ad AYNI olmak zorunda.
 
-Bu test var, çünkü hata gerçekten oldu: Lumeo yeniden adlandırmasında Android
-workflow'u `lumeo-android-arm64-release.apk`'yı ararken
-`android/app/build.gradle`'ın `outputFileName`'i `gpt-image-studio-...` olarak
-kaldı. Gradle APK'yı sorunsuz üretti, workflow onu bulamadı ve iş "APK yok"
-diyerek düştü.
+Bu test var, çünkü hata gerçekten oldu: bir önceki yeniden adlandırmada Android
+workflow'u APK'yı YENİ adıyla ararken `android/app/build.gradle`'ın
+`outputFileName`'i ESKİ adda kaldı. Gradle APK'yı sorunsuz üretti, workflow onu
+bulamadı ve iş "APK yok" diyerek düştü. (Aynı sınıf 2026-09-10'daki Kromis
+adlandırmasında yine masadaydı; APK adı bu yüzden üç platformun yayın varlığı
+adlarıyla AYNI commit'e bırakıldı.)
 
 Kırılma sınıfı sinsi: iki dosya da kendi içinde tutarlı, hata yalnızca
 BİRLEŞTİKLERİ yerde var ve ancak Android runner'ında (NDK + Gradle, dakikalar
@@ -23,7 +24,7 @@ GRADLE = os.path.join(REPO, "android", "app", "build.gradle")
 # APK'yı üreten workflow'un adı manifestten okunuyor, buraya sabit yazılmıyor:
 # dosya yeniden adlandırılırsa (build-android.yml → _paket-android.yml'de tam
 # olarak bu oldu) test kırmızı değil, DOĞRU yere bakıyor olmalı.
-_APK = "lumeo-android-arm64.apk"
+_APK = "kromis-android-arm64.apk"
 WORKFLOW = os.path.join(
     REPO, ".github", "workflows", release_manifest.PAKETLER[_APK]["workflow"]
 )
@@ -70,12 +71,12 @@ def test_workflow_looks_for_the_apk_gradle_actually_writes():
 def test_yayin_adina_kopyalanan_dosya_manifestteki_ad():
     """Gradle'ın adıyla yayının adı arasındaki SON halka.
 
-    Zincir şu: Gradle `lumeo-android-arm64-release.apk` yazar → workflow onu
+    Zincir şu: Gradle `kromis-android-arm64-release.apk` yazar → workflow onu
     yayın adına kopyalar → o ad manifeste (ve README'ye, GUNCELLEME'ye) girer.
     Yukarıdaki test zincirin ilk halkasını, `test_release_manifest.py` son
     halkasını çiviliyor; bu iddia ortadaki `cp`'yi kolluyor.
 
-    Eskiden burada üçüncü bir ad daha vardı (`dist-lumeo-android-arm64.apk`) ve
+    Eskiden burada üçüncü bir ad daha vardı (`dist-kromis-android-arm64.apk`) ve
     yayın işi onu `mv` ile düzeltiyordu — ayrışabilecek fazladan bir isim. O ara
     ad kaldırıldı; workflow doğrudan yayın adına kopyalıyor.
     """

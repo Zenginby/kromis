@@ -13,7 +13,7 @@ import warnings
 import version
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SPEC = os.path.join(REPO, "gpt-image-studio.spec")
+SPEC = os.path.join(REPO, "kromis.spec")
 
 
 def _spec_text() -> str:
@@ -53,7 +53,7 @@ def test_spec_anchors_the_version_load_on_specpath():
 def test_spec_has_no_syntax_warnings():
     """Yorumlara/docstring'e giren Windows yolları geçersiz kaçış dizisi doğurur.
 
-    `%LOCALAPPDATA%\\Lumeo` yazmak `\\G`'yi geçersiz bir kaçış dizisi
+    `%LOCALAPPDATA%\\Kromis` yazmak `\\K`'yi geçersiz bir kaçış dizisi
     yapar ve Python SyntaxWarning basar (v0.3.0'da gerçekten oldu). Bu uyarı
     ancak DERLEME sırasında, pyinstaller'ın onlarca INFO satırı arasında
     görünür — kaybolmaya birebir uygun; ayrıca Python 3.15'te bu sınıf uyarı
@@ -87,6 +87,55 @@ def test_spec_windows_version_resource_derives_the_version():
             f"VERSIONINFO'da {alan} elle yazılmış — tek kaynak bozuldu"
         assert re.search(rf'StringStruct\(\s*"{alan}"\s*,\s*APP_VERSION\s*\)', text), \
             f"VERSIONINFO'daki {alan} APP_VERSION'dan gelmeli"
+
+
+def test_the_windows_gate_expects_exactly_what_the_spec_writes():
+    """EŞLEŞEN ÇİFT: spec'in VERSIONINFO alanları ↔ workflow'un kapısı.
+
+    `_paket-windows.yml` derlenen exe'nin `CompanyName` ve `FileDescription`
+    alanlarını okuyup BEKLENEN değerle karşılaştırıyor. İki dosya da kendi
+    içinde tutarlı olabilir ama birleştikleri yerde ayrışırsa sonuç en pahalı
+    kırmızı: Windows paketi ONLARCA DAKİKA derlenip, tam yayına gireceği anda
+    "beklenen [X], gelen [Y]" diyerek düşer. Yerelde koşan bu ucuz iddia aynı
+    kaymayı saniyede yakalıyor — `tests/test_android_apk_name.py` ile birebir
+    aynı gerekçe.
+
+    NEDEN `FileDescription` TÜRKÇE KARAKTER TAŞIMALI: o alan VERSIONINFO'nun
+    Türkçe karakter turunu ölçen TEK yer. Güvence 2026-09-10'da bir an
+    kaybolmuştu (eski `CompanyName` Türkçe karakter taşıyordu, ASCII bir
+    sahiplikle değişince VERSIONINFO tümden ASCII kaldı). ASCII'ye inen bir
+    açıklama kapıyı yeşil bırakır ama KONUSUZ yapar; bu yüzden ölçülüyor.
+
+    Workflow tarafındaki beklenti kod noktalarından kuruluyor
+    (`[char]0xF6`) — gerekçesi orada yazılı: doğrulamanın kendisi, ölçtüğü
+    kodlama kusuruna açık olmamalı. Bu test o küçük ifadeyi çözüp değeri
+    yeniden kuruyor.
+    """
+    spec = _spec_text()
+    with open(os.path.join(REPO, ".github", "workflows", "_paket-windows.yml"),
+              encoding="utf-8") as f:
+        workflow = f.read()
+
+    def _spec_alani(ad: str) -> str:
+        m = re.search(rf'StringStruct\(\s*"{ad}"\s*,\s*"([^"]*)"\s*\)', spec)
+        assert m, f"kromis.spec'te VERSIONINFO alanı {ad} bulunamadı"
+        return m.group(1)
+
+    def _ps_dizesi(degisken: str) -> str:
+        """`$x = 'a' + [char]0xF6 + 'b'` ifadesini çözer."""
+        m = re.search(rf"\${degisken}\s*=\s*(.+)", workflow)
+        assert m, f"_paket-windows.yml'de ${degisken} atanmıyor"
+        parcalar = re.findall(r"'([^']*)'|\[char\]0x([0-9A-Fa-f]+)", m.group(1))
+        assert parcalar, f"${degisken} ifadesi çözülemedi: {m.group(1)!r}"
+        return "".join(duz or chr(int(kod, 16)) for duz, kod in parcalar)
+
+    assert _ps_dizesi("sirket") == _spec_alani("CompanyName")
+    aciklama = _spec_alani("FileDescription")
+    assert _ps_dizesi("aciklama") == aciklama
+    assert any(ord(c) > 127 for c in aciklama), (
+        "FileDescription ASCII'ye indi — VERSIONINFO'nun Türkçe karakter turunu "
+        "ölçen alan buydu; kapı yeşil kalır ama artık hiçbir şey ölçmez"
+    )
 
 
 def test_spec_builds_the_version_resource_only_on_windows():

@@ -6,7 +6,10 @@ belgelediği standart kalıptır; bunu kullanan HERHANGİ bir test dosyası
 lifespan'ı tetikler ve lifespan'daki yan etkiler GERÇEK dosya sistemine
 (geliştiricinin repo kökündeki assets/ ve output/ dizinlerine) yazar.
 
-Bugün lifespan'da tek yan etki var: backup.py'nin sürüm-değişimi yedeği.
+Lifespan'da bugün İKİ yan etki var: backup.py'nin sürüm-değişimi yedeği ve
+(2026-09-10'dan beri) `paths._migrate_from_old_name` — eski `Lumeo` adıyla
+açılmış kullanıcı dizinlerini yeni ada taşıyan göç. İkisinin de guard'ı
+aşağıda, ikisi de kendi bekçi dosyasında muaf.
 Geliştiricinin repo kökünde gerçek `output/history.json` ve `assets/*/index.json`
 dosyaları VAR, yani `with TestClient(app)` kullanan tek bir test
 `<repo>/backups/bilinmeyen-<bugün>/` ve `<repo>/.last-version` bırakırdı. O
@@ -34,6 +37,7 @@ import backup as backup_module
 import paths as paths_module
 
 _UNGUARDED_BACKUP_FILENAME = "test_backup.py"
+_UNGUARDED_MIGRATION_FILENAME = "test_paths.py"
 
 # Bu deponun ASGARİ Python sürümü — TEK tanım. README'nin "Gereksinimler"
 # başlığı, requirements-dev.txt'in girişi ve CI'daki `python-version` pinleri
@@ -42,7 +46,7 @@ _UNGUARDED_BACKUP_FILENAME = "test_backup.py"
 ASGARI_PYTHON = (3, 13)
 
 # Kapıyı bilerek atlamanın yolu; mesajın kendi içinde de yazılı.
-ESKI_PYTHON_IZNI = "GIS_ALLOW_OLD_PYTHON"
+ESKI_PYTHON_IZNI = "KROMIS_ALLOW_OLD_PYTHON"
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -113,7 +117,7 @@ def _guard_against_leaking_android_env():
     """Android dalını açan ortam değişkenleri testler arasında SIZMASIN.
 
     Üçüncü guard, aynı sınıf bir tehdide karşı: `paths.py`'nin Android dalı
-    `GIS_ANDROID_DATA_DIR` ortam değişkenine bakıyor ve o değişken KÜRESEL —
+    `KROMIS_ANDROID_DATA_DIR` ortam değişkenine bakıyor ve o değişken KÜRESEL —
     `monkeypatch` yalnız KENDİ yazdığı değerleri geri alıyor. Ortam değişkenine
     doğrudan yazan bir üretim fonksiyonu (`android_main._prepare_environment`,
     Kotlin'in yaptığı işi taklit ederken) değeri geride bırakırsa, o noktadan
@@ -143,6 +147,29 @@ def _guard_against_real_backups(request: pytest.FixtureRequest,
         return
     monkeypatch.setattr(backup_module, "backup_manifests_if_version_changed",
                         lambda *a, **k: None)
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _guard_against_real_migration(request: pytest.FixtureRequest,
+                                  monkeypatch: pytest.MonkeyPatch):
+    """Ad göçünü varsayılan olarak no-op yapar (2026-09-10).
+
+    DÖRDÜNCÜ guard, yedek guard'ıyla aynı sınıf bir tehdide karşı:
+    `paths.ensure_data_dirs()` artık `_migrate_from_old_name()` çağırıyor ve o
+    fonksiyon geliştiricinin GERÇEK `~/.config/lumeo/credentials.env` dosyasını
+    `~/.config/kromis/` altına taşıyor. `with TestClient(app)` kullanan tek bir
+    test, geliştiricinin ev dizinini oynatırdı — üstelik sessizce, çünkü göç
+    başarılı olduğunda hiçbir şey söylemiyor.
+
+    Muafiyet `test_paths.py`: göç davranışının bekçisi orada ve gerçek
+    fonksiyonu koşturmak zorunda. O dosyadaki her göç testi yolları tmp_path'e
+    çekiyor, yani muafiyet ev dizinini açıkta bırakmıyor.
+    """
+    if os.path.basename(str(request.node.fspath)) == _UNGUARDED_MIGRATION_FILENAME:
+        yield
+        return
+    monkeypatch.setattr(paths_module, "_migrate_from_old_name", lambda: None)
     yield
 
 

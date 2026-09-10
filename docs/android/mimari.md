@@ -149,6 +149,15 @@ indiriyor.
 > `claude/gis-keystore-mobile-app-mgakyw`. (`main`'de HİÇ bulunmayan bir
 > workflow dalda tetiklenemez — API 404 döner.)
 
+> **Koşu 32478330228'in GÜNLÜĞÜ artık yok.** Depo public'e açılmadan önce
+> geçmiş temizlendi (2026-09-10, Faz 11) ve o koşunun günlüğü eski kurumun
+> adını taşıdığı için koşu SİLİNDİ. Bu belgedeki üç atıf (yukarıdaki blok,
+> tarihsel sertifika tablosu, sır ölçümü) artık 404 veren bir bağlantıya
+> işaret ediyor — ama ÖLÇÜMLER burada duruyor: silinen şey kanıtın kaydı
+> değil, günlüğün kendisi. Ölçüt "eski koşu" DEĞİL "günlüğü izli koşu"
+> oldu: aynı temizlikte günlüğü temiz çıkan atıflı koşu korundu
+> (32478178747, aşağıda).
+
 ### İmzalama
 
 Anahtar repoya **girmiyor**. CI dört GitHub Secret okuyor:

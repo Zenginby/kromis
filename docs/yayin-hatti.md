@@ -98,6 +98,19 @@ Seviye tespiti bu daraltmanın DIŞINDA: `feat:`/`fix:`/`[surum: …]` hâlâ so
 tag'den beri biriken bütün commit'lerden okunuyor, yoksa yayınlanmamış bir
 `feat:` sonraki yayında yama sayılırdı.
 
+`[yayin: yok]` markörü **satırı bitirmek zorunda** — başlığın sonuna eklenir
+(`docs(faz11): … kimlik kacagi kapatildi [yayin: yok]`) ya da kendi satırında
+tek başına durur. Ardından cümle devam ediyorsa markörden SÖZ EDİLİYOR sayılır
+ve veto çalışmaz. Kural bir kusurdan doğdu: v0.18.0'dan sonra vetonun kapsamını
+daraltan commit'in kendi başlığı markörü tırnak içinde anlatıyordu ve hat onu
+direktif sandı — üstelik iki kez, çünkü GitHub aynı metni merge commit'inin
+gövdesine de yazıyor. O turda yalnız `docs/`, `tools/`, `tests/` değiştiği için
+sonuç zaten "yayın yok"tu ve kusur görünmedi; yayın hattını konu alan bir
+sonraki düzeltme sessizce atlanacaktı.
+
+> `[surum: …]` markörü bu çapayı ŞİMDİLİK taşımıyor: ondan söz eden bir başlık
+> seviyeyi hâlâ ezebilir. Henüz yaşanmadı, yaşanırsa aynı düzeltme uygulanır.
+
 Son madde önemli: not verilmezse GUNCELLEME.md commit başlıklarından üretiliyor
 ve `fix(ci): ABI kapısı aapt2'nin tek tırnağını da silsin` satırı kullanıcı için
 hiçbir şey ifade etmiyor.

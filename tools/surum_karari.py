@@ -15,7 +15,8 @@ KARAR KURALI
     2) version.py son tag'le AYNIYSA → tag'den beri gelen değişikliklere bak:
          - BU İTMEDE `[yayin: yok]` varsa       → yayın YOK (yalnız kendi
                                                   merge'ini susturur; kapsam
-                                                  `tetikleyen_aralik`)
+                                                  `tetikleyen_aralik`, markör
+                                                  satırı BİTİRMELİ)
          - hiçbiri pakete girmiyorsa            → yayın YOK
          - `feat` varsa                         → minör artır
          - `!`/BREAKING CHANGE varsa            → majör artır
@@ -80,7 +81,14 @@ GUVENLI_YOLLAR: tuple[str, ...] = (
 SEVIYELER = ("yok", "yama", "minor", "major")
 
 # Commit metnine yazılan elle geçersiz kılmalar.
-_YAYIN_YOK = re.compile(r"\[yayin:\s*yok\]", re.I)
+# Veto markörü SATIRI BİTİRMEK ZORUNDA ($ + re.M): "… kapatildi [yayin: yok]"
+# bir direktiftir, "[yayin: yok] artik yalniz kendi merge'ini susturuyor" ise
+# ondan SÖZ EDEN bir başlık. Ayrım olmadan, v0.18.0'dan sonra vetonun kapsamını
+# daraltan commit'in kendisi vetolandı — üstelik iki kez, çünkü GitHub aynı
+# metni merge commit'inin gövdesine de yazıyor. Çapa satır sonunda; deponun tek
+# gerçek kullanımı (başlığın SONUNA eklemek) korunuyor, `^…$` (markör yalnız
+# kendi satırında) onu bozardı.
+_YAYIN_YOK = re.compile(r"\[yayin:\s*yok\][ \t\r]*$", re.I | re.M)
 _SEVIYE = re.compile(r"\[surum:\s*(major|minor|yama|patch)\]", re.I)
 # Conventional Commits başlığı: "feat(android)!: ..." / "fix: ..."
 _BASLIK = re.compile(r"^(?P<tip>[a-zA-Z]+)(?:\([^)]*\))?(?P<kir>!)?:", re.M)

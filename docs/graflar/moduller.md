@@ -23,7 +23,7 @@ flowchart TD
     n_netguard["netguard<br/>157 satır"]
   end
   subgraph katman7["katman 7"]
-    n_app["app<br/>2155 satır"]
+    n_app["app<br/>2184 satır"]
   end
   subgraph katman6["katman 6"]
     n_chat_providers["chat_providers<br/>124 satır"]
@@ -193,7 +193,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | modül | satır | katman | ithal ettiği | ithal eden | test |
 | --- | --- | --- | --- | --- | --- |
 | `android_main.py` | 194 | 10 | `app` (erteli), `desktop` (erteli), `errlog` (erteli), `paths` (erteli) | 0 | 2 |
-| `app.py` | 2155 | 7 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 30 |
+| `app.py` | 2184 | 7 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 32 |
 | `assets_store.py` | 201 | 1 | `jsonstore` | 3 | 9 |
 | `azure_client.py` | 458 | 2 | `paths`, `winsec` | 12 | 29 |
 | `azure_flux_client.py` | 292 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
@@ -211,7 +211,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `errlog.py` | 114 | 0 | — | 5 | 1 |
 | `folders.py` | 248 | 2 | `jsonstore`, `storage` | 3 | 4 |
 | `gemini_client.py` | 293 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
-| `guncelleme.py` | 237 | 2 | `errlog`, `jsonstore`, `paths`, `version` | 1 | 2 |
+| `guncelleme.py` | 237 | 2 | `errlog`, `jsonstore`, `paths`, `version` | 1 | 4 |
 | `jsonstore.py` | 80 | 0 | — | 8 | 1 |
 | `models.py` | 1020 | 3 | `azure_client`, `catalog`, `palette` | 3 | 13 |
 | `netguard.py` | 157 | 8 | `app` (erteli) | 1 | 1 |
@@ -226,7 +226,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `screencolor.py` | 150 | 0 | — | 1 | 1 |
 | `storage.py` | 415 | 1 | `catalog`, `jsonstore` | 4 | 10 |
 | `veo_client.py` | 590 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
-| `version.py` | 27 | 0 | — | 4 | 7 |
+| `version.py` | 27 | 0 | — | 4 | 8 |
 | `winclr.py` | 334 | 0 | — | 1 | 1 |
 | `winsec.py` | 305 | 0 | — | 1 | 2 |
 

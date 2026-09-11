@@ -106,16 +106,7 @@ function applyConfigured(s) {
   // GET'te alan HER ZAMAN var ama `null` olabilir — üç ayrı durumu birden
   // anlatıyor ve arayüz için üçü de aynı: kontrol kapalı, henüz cevap yok,
   // ya da zaten en yeni sürümdeyiz (bkz. guncelleme.py → bilgi()).
-  if (s && s.guncelleme !== undefined) {
-    const satir = $("settings-update");
-    if (s.guncelleme && s.guncelleme.surum) {
-      $("settings-update-version").textContent = s.guncelleme.surum;
-      if (s.guncelleme.url) $("settings-update-link").href = s.guncelleme.url;
-      satir.hidden = false;
-    } else {
-      satir.hidden = true;
-    }
-  }
+  if (s && s.guncelleme !== undefined) uygulaGuncelleme(s.guncelleme);
 
   // ── Prompt Yönetmeni kapısı ──
   // Sekmenin KENDİSİ kilitlenmiyor: kilitli bir sekme "neden kapalı" bilgisini
@@ -135,11 +126,80 @@ function applyConfigured(s) {
   // ekrandaki kopyaları gitti.
 }
 
+/** "Yeni sürüm çıktı" satırı + dişli düğmesindeki rozet — İKİ yüzey, TEK kaynak.
+ *
+ *  Satır tek başına yetmiyordu: Ayarlar modalının DİBİNDE duruyor, yani bildirim
+ *  ancak paneli zaten açıp aşağı inen kişiye ulaşıyordu. Rozet dişlinin üstünde
+ *  ve telefonda da görünür — mobile.css `.ver` pill'ini gizliyor, dişliyi
+ *  gizlemiyor, yani mobilde yeni sürümü haber veren TEK yüzey bu.
+ *
+ *  İkisini iki ayrı yerde yazmak, birini güncellerken ötekini unutmanın
+ *  kapısıydı: `[data-app-version]` seçicisinin çözdüğü sorunun aynısı. */
+function uygulaGuncelleme(g) {
+  const varMi = !!(g && g.surum);
+  if (varMi) {
+    $("settings-update-version").textContent = g.surum;
+    if (g.url) $("settings-update-link").href = g.url;
+  }
+  $("settings-update").hidden = !varMi;
+
+  // Rozet SALT GÖRSEL olamaz: nokta bir ekran okuyucuda hiç yok. Anlamı
+  // düğmenin kendi adına giriyor — `title` fare kullanıcısına, `aria-label`
+  // ötekine aynı cümleyi söylüyor.
+  const dis = $("settings-btn");
+  if (!dis) return;
+  dis.classList.toggle("has-update", varMi);
+  const etiket = varMi ? `Ayarlar — yeni sürüm var (v${g.surum})` : "Ayarlar";
+  dis.title = etiket;
+  dis.setAttribute("aria-label", etiket);
+}
+
+/** Açılıştaki cevap "bilmiyorum" ise güncelleme cevabını ARDINDAN yoklar.
+ *
+ *  NEDEN VAR: `/api/settings`'in ilk cevabı çoğu açılışta `null`dur — önbellek
+ *  bayatsa `guncelleme.bilgi()` tazelemeyi arka plana atıp hemen dönüyor
+ *  (guncelleme.py'nin 2. sözleşmesi: istek yolunu asla bekletme). O modül bunu
+ *  "birkaç saniye sonrakinde gerçek cevap gelir" diye yazmıştı, ama bu dosyada
+ *  `loadSettings` YALNIZ bir kez çağrılıyor: "sonraki" istek hiç gelmiyordu ve
+ *  tazelenen cevap bir sonraki uygulama açılışına kadar diskte kalıyordu.
+ *  Kullanıcı tarafından bakıldığında bu, bildirimin hiç gelmemesiyle aynı şey.
+ *
+ *  Gecikmeler arka plan kontrolünün ömrüne göre seçildi: GitHub çağrısının
+ *  zaman aşımı 5sn (guncelleme.ZAMAN_ASIMI_SANIYE), yani 3sn normal cevabı,
+ *  8sn yavaş ağı, 20sn zaman aşımına düşmüş kontrolün bıraktığı damgayı
+ *  yakalıyor. İlk dolu cevapta duruyor; üç deneme bitince de duruyor —
+ *  sonsuz yoklama, kullanıcının kapatamayacağı bir arka plan isteğidir.
+ *
+ *  `/api/settings` yeniden çağrılamaz: o yanıt `applyConfigured()` üzerinden
+ *  formun tamamını yeniden yazar ve kullanıcının o sırada doldurduğu alanları
+ *  ezerdi. Ayrı uç tam olarak bunun için var (bkz. app.py → get_guncelleme). */
+const GUNCELLEME_YOKLAMA_MS = [3000, 8000, 20000];
+
+async function yoklaGuncelleme(sira = 0) {
+  if (sira >= GUNCELLEME_YOKLAMA_MS.length) return;
+  await new Promise((r) => setTimeout(r, GUNCELLEME_YOKLAMA_MS[sira]));
+  try {
+    const { guncelleme } = await (await fetch("/api/guncelleme")).json();
+    if (guncelleme && guncelleme.surum) {
+      uygulaGuncelleme(guncelleme);
+      return;                                   // bulundu: yoklama biter
+    }
+  } catch {
+    // Sessiz: guncelleme.py'nin 1. sözleşmesinin ön yüzdeki karşılığı. Bir
+    // sürüm kontrolünün kullanıcıya hata göstermesi, hiçbir şey kazandırmadan
+    // çalışan uygulamayı bozuk gösterir.
+  }
+  yoklaGuncelleme(sira + 1);
+}
+
 async function loadSettings(openIfMissing) {
   try {
     const res = await fetch("/api/settings");
     const s = await res.json();
     applyConfigured(s);
+    // Cevap henüz yoksa ardıl yoklama (gerekçe: yoklaGuncelleme'nin başlığı).
+    // `s.guncelleme` doluysa gereksiz — üç istek, zaten bilinen bir cevap için.
+    if (!s.guncelleme) yoklaGuncelleme();
     // Kapı `configured`e BAKMIYOR: o bayrak yalnız AZURE'u ölçüyor ve
     // yalnızca OpenAI anahtarı olan kullanıcıya her açılışta Ayarlar
     // panelini zorla açıyordu — tam olarak 180342a'nın kapatmaya çalıştığı

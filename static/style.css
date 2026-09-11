@@ -958,6 +958,23 @@ body:has(.sheet.open) .scrim { display: block; }
 .icon-btn svg { display: block; }
 .icon-btn[hidden] { display: none !important; }
 
+/* Güncelleme rozeti — dişli düğmesinin köşesindeki nokta.
+   NEDEN BURADA: "yeni sürüm çıktı" bilgisi Ayarlar modalının DİBİNDE duruyordu,
+   yani ancak paneli zaten açıp aşağı inen kişiye ulaşıyordu — bildirimin
+   tanımı gereği ulaşması gereken kişiye değil. Nokta telefonda da görünen TEK
+   yüzey: mobile.css `.ver` pill'ini gizliyor, dişliyi gizlemiyor.
+   `--accent` doğru belirteç: bu kod tabanında yalnızca DURUM anlatıyor
+   (flow-tokens.css başlığı) ve rozet tam olarak bir durum.
+   `position: relative` ŞART — `.icon-btn` bir grid ve akıştaki bir ::after
+   simgeyi merkezden kaydırırdı. Halka (`box-shadow`) noktayı şeridin
+   zemininden ayırıyor; onsuz simgenin çizgileriyle karışıyor. */
+.icon-btn { position: relative; }
+.icon-btn.has-update::after {
+  content: ""; position: absolute; top: 5px; right: 5px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 0 2px var(--bg);
+}
+
 
 /* Modal */
 /* flex + kart üzerinde margin:auto: yer varken ortalar, kart viewport'tan uzunsa
@@ -1156,6 +1173,13 @@ body:has(.sheet.open) .scrim { display: block; }
    yalnızca DURUM anlatıyor (flow-tokens.css başlığı). "Tıklanır" işareti altı
    çizgide — bağlantının en anlaşılır ve renkten bağımsız işareti. */
 .settings-update-row a { color: var(--text); text-decoration: underline; }
+/* ASIL eylem düğme, o yüzden yukarıdaki kuralın altı çizgisinden MUAF: altı
+   çizili bir düğme yazısı, düğmeyi bağlantı sanmanın işareti olurdu. Kural
+   `.settings-update-row a`dan sonra geliyor — aynı özgüllükte, sonraki kazanır.
+   Adım satırı ayrı bir blok: düğmeyle aynı satırda kalırsa `.btn-block`un
+   `width: 100%`ü onu düğmenin altına zaten iter, ama boşluğu bu satır veriyor. */
+.settings-update-row .btn-ghost { text-decoration: none; }
+.settings-update-steps { display: block; margin-top: 0.5rem; }
 
 .range-val { color: var(--text); font-variant-numeric: tabular-nums; font-size: 0.78rem; }
 .logo-controls input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; margin: 0.1rem 0 0.2rem; }

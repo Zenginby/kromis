@@ -27,7 +27,7 @@ flowchart LR
   n_chat_js["chat.js"] -->|18| n_core_js["core.js"]
   n_chat_js["chat.js"] -->|1| n_folders_js["folders.js"]
   n_chat_js["chat.js"] -->|1| n_palette_js["palette.js"]
-  n_chat_js["chat.js"] -->|1| n_settings_js["settings.js"]
+  n_chat_js["chat.js"] -->|2| n_settings_js["settings.js"]
   n_core_js["core.js"] -->|10| n_chat_js["chat.js"]
   n_core_js["core.js"] -->|2| n_folders_js["folders.js"]
   n_core_js["core.js"] -->|3| n_palette_js["palette.js"]
@@ -50,12 +50,12 @@ flowchart LR
 | betik | satır | üst düzey tanım | çağırdığı sunucu yolları |
 | --- | --- | --- | --- |
 | `static/assets.js` | 544 | 25 | `/api/assets/{}`, `/api/assets/{}/{}`, `/api/banner`, `/api/banner/preview`, `/api/logo`, `/api/logo/preview`, `/assets/banners/{}`, `/assets/logos/{}`, `/assets/mottos/{}`, `/assets/{}/{}`, `/output/{}` |
-| `static/chat.js` | 2656 | 90 | `/api/arena/{}`, `/api/arena/{}/winner`, `/api/chat`, `/api/chats`, `/api/chats/{}`, `/api/prefs`, `/output/{}.${videoMu ` |
+| `static/chat.js` | 2659 | 90 | `/api/arena/{}`, `/api/arena/{}/winner`, `/api/chat`, `/api/chats`, `/api/chats/{}`, `/api/prefs`, `/output/{}.${videoMu ` |
 | `static/core.js` | 2930 | 88 | `/api/edit`, `/api/generate`, `/api/image/{}`, `/api/output/{}/download`, `/api/prefs`, `/api/video`, `/api/video/animate`, `/output/`, `/output/{}`, `/output/{}.png` |
 | `static/folders.js` | 2040 | 60 | `/api/folders`, `/api/folders/{}`, `/api/folders/{}/download`, `/api/history`, `/api/images`, `/api/import`, `/output/{}`, `/output/{}${videoMu ` |
 | `static/mobile.js` | 52 | 0 | — |
 | `static/palette.js` | 756 | 37 | `/api/palette/suggest`, `/api/palettes`, `/api/palettes/{}` |
 | `static/pixel-canvas.js` | 347 | 0 | — |
-| `static/settings.js` | 665 | 17 | `/api/prefs`, `/api/settings` |
+| `static/settings.js` | 725 | 19 | `/api/guncelleme`, `/api/prefs`, `/api/settings` |
 | `static/viewer.js` | 504 | 0 | `/output/` |
 

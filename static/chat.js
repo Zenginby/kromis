@@ -2388,8 +2388,11 @@ async function saveGuncellemePref() {
       ? "Yeni sürüm çıkınca haber verilecek."
       : "Sürüm kontrolü kapatıldı — uygulama bu iş için ağa çıkmayacak.";
     // Satır ANINDA gizlensin: kontrolü kapatıp açık kalan bir bildirim,
-    // anahtarın işe yaramadığı izlenimi verir.
-    if (!p.guncelleme_kontrolu) $("settings-update").hidden = true;
+    // anahtarın işe yaramadığı izlenimi verir. Artık `uygulaGuncelleme`
+    // üzerinden: satırla birlikte dişli düğmesindeki ROZET de sönmek zorunda —
+    // satırı tek başına gizlemek, o izlenimi rozette aynen bırakırdı.
+    // settings.js chat.js'ten ÖNCE yükleniyor (index.html), guard gereksiz.
+    if (!p.guncelleme_kontrolu) uygulaGuncelleme(null);
   } catch (e) {
     $("pref-guncelleme").checked = !on;   // gerçekleşmeyen değişikliği geri al
     $("settings-status").textContent = `Tercih kaydedilemedi: ${e.message}`;

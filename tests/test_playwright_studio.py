@@ -62,7 +62,26 @@ def _ilk_kurulum_perdesini_kapat(page) -> None:
         ' return (m && m.value !== "") || !!document.querySelector(".sheet.open"); }')
     if page.query_selector(".sheet.open"):
         page.keyboard.press("Escape")
-        page.wait_for_selector(".sheet.open", state="detached")
+        # BEKLENEN KOŞUL `.open` SINIFININ GİTMESİ DEĞİL, PANELİN GERÇEKTEN
+        # ÇEKİLMESİ. `closeSheets()` sınıfı ANINDA kaldırıyor, ama style.css
+        # görünürlüğü bilerek geciktiriyor:
+        #     .sheet { visibility: hidden;
+        #              transition: transform var(--dur), visibility 0s linear var(--dur) }
+        # yani panel sınıf gittikten SONRA 180ms daha `visibility: visible`
+        # kalıyor (kapanma animasyonu görünsün diye) ve o pencerede isabet
+        # testini YUTMAYA DEVAM EDİYOR.
+        #
+        # Bedeli ölçüldü (2026-09-11, CI'da Playwright ilk kez koşarken):
+        # `test_..._karonun_ortasi_gercekten_seciyor` karonun ortasında
+        # `DIV.settings-panes` buluyordu — `.sheet.open` çoktan yokken. Kırılma
+        # yalnız panelin AÇILDIĞI makinede görünüyor, yani kimliksiz olanda:
+        # CI'da kırmızı, kimlikleri kayıtlı geliştiricide yeşil.
+        #
+        # `visibility` doğru çapa çünkü isabet testini kesen ŞEY o; `transform`
+        # bitse de `visibility: visible` kalan bir panel tıklamayı yutardı.
+        page.wait_for_function(
+            '() => [...document.querySelectorAll(".sheet")]'
+            '.every((s) => getComputedStyle(s).visibility === "hidden")')
 
 
 def _tum_kimlikler_kayitli(monkeypatch) -> None:
@@ -86,6 +105,25 @@ def _tum_kimlikler_kayitli(monkeypatch) -> None:
     monkeypatch.setattr(
         credstore, "chat_configured_map",
         lambda *a, **k: {m.id: True for m in catalog.CHAT_MODELS})
+
+
+def _hicbir_kimlik_kayitli_degil(monkeypatch) -> None:
+    """Sunucuyu "hiçbir sağlayıcının anahtarı yok" hâline getirir.
+
+    NEDEN GEREKLİ: `credstore` GERÇEK kimlik deposunu okuyor ve `ServerThread`
+    uygulamayı aynı süreçte koşturuyor. Yani "anahtarsız kurulum" öncülü,
+    kurgulanmadığı sürece TESTİN DEĞİL, testi koşturan MAKİNENİN özelliği
+    oluyordu: CI'da (kimliksiz) yeşil, geliştiricinin kendi makinesinde
+    (kimlikleri kayıtlı) kırmızı. Bu depoda ölçüldü — `configured_map()`
+    azure_image/azure_chat/gemini/azure_foundry için True dönüyor, `loadSettings`
+    paneli haklı olarak AÇMIYOR ve `.sheet.open` beklemesi 30sn'de düşüyordu.
+
+    Kırmızının anlattığı şey uygulamayla ilgili DEĞİLDİ, o yüzden okuyanı da
+    kaynağa götürmüyordu. `_tum_kimlikler_kayitli`nin tersi; ikisi de aynı
+    duruşun parçası: öncül kurguyla kurulur, ortamdan UMULMAZ.
+    """
+    monkeypatch.setattr(credstore, "configured_map", lambda *a, **k: {})
+    monkeypatch.setattr(credstore, "chat_configured_map", lambda *a, **k: {})
 
 
 def get_free_port() -> int:
@@ -690,7 +728,7 @@ def test_playwright_buyutecte_logo_ekle_kayitli_gorselde_beliriyor():
         server.stop()
 
 
-def test_playwright_anahtarsiz_acilis_BOS_HALI_anlatiyor():
+def test_playwright_anahtarsiz_acilis_BOS_HALI_anlatiyor(monkeypatch):
     """Anahtar yokken şerit ve panel BOŞ HÂLİ anlatıyor, boş kalmıyor.
 
     Bu, kullanıcı isteğinin ("API key'i girilmeyen modeller gözükmesin")
@@ -700,9 +738,14 @@ def test_playwright_anahtarsiz_acilis_BOS_HALI_anlatiyor():
     kullanıcı sonsuza kadar yüklenen bir şerit görüyordu. Kaynak taraması bunu
     yakalayamaz: her iki hâlde de kod "doğru" görünüyor, fark ekranda.
 
-    Kimlikler BİLEREK kurgulanmıyor — bu testin öncülü zaten anahtarsız bir
-    kurulum (CI'ın varsayılan hâli).
+    ÖNCÜL KURGULANIYOR. Burada "kimlikler bilerek kurgulanmıyor, bu testin
+    öncülü zaten anahtarsız bir kurulum (CI'ın varsayılan hâli)" yazıyordu ve
+    o cümle testi CI'a bağımlı kılıyordu: `credstore` gerçek kimlik deposunu
+    okuduğu için öncül, testin değil MAKİNENİN özelliğiydi — kimlikleri kayıtlı
+    her geliştiricide bu test kırmızıydı ve kırmızısı uygulama hakkında hiçbir
+    şey söylemiyordu (bkz. `_hicbir_kimlik_kayitli_degil`).
     """
+    _hicbir_kimlik_kayitli_degil(monkeypatch)
     port = get_free_port()
     server = ServerThread(port)
     server.start()

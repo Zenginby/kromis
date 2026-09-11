@@ -1406,16 +1406,24 @@
            kullanıcı orada üç platformun paketini birden ve sürüm notlarını
            görüyor — telefondaki kullanıcı APK'yı, masaüstündeki zip'i seçiyor.
            Doğrudan bir dosyaya indirmek, yanlış platformun paketini indirmeyi
-           tek tıka indirgerdi. -->
+           tek tıka indirgerdi.
+
+           EYLEM ARTIK BİR DÜĞME GİBİ DURUYOR: "— indir" bir cümlenin sonundaki
+           altı çizili sözcüktü ve kartın üç bağlantısı (sürüm, GUNCELLEME.md)
+           aynı ağırlıkta okunuyordu, yani ASIL eylem ötekilerden ayırt
+           edilemiyordu. `.btn-ghost` bu paneldeki eylem idiomu.
+
+           Yine de `<a>`: gerçekten GEZİNEN bir eylem bu. `<button>`e çevirmek
+           yeni sekmeyi, orta tıklamayı, "bağlantıyı kopyala"yı ve ekran
+           okuyucunun "bağlantı" duyurusunu JS'e borçlu hale getirirdi. -->
       <p class="field-note settings-update-row" id="settings-update" hidden>
-        Yeni sürüm çıktı:
-        <a id="settings-update-link" href="https://github.com/Zenginby/kromis/releases/latest"
-           target="_blank" rel="noopener noreferrer">
-          <strong>v<span id="settings-update-version">—</span></strong> — indir
-        </a>
-        <br />
-        Güncelleme adımları: <a href="https://github.com/Zenginby/kromis/blob/main/GUNCELLEME.md"
-                                target="_blank" rel="noopener noreferrer">GUNCELLEME.md</a>
+        Yeni sürüm çıktı: <strong>v<span id="settings-update-version">—</span></strong>
+        <a id="settings-update-link" class="btn-ghost btn-block"
+           href="https://github.com/Zenginby/kromis/releases/latest"
+           target="_blank" rel="noopener noreferrer">Güncelle</a>
+        <span class="settings-update-steps">Güncelleme adımları:
+          <a href="https://github.com/Zenginby/kromis/blob/main/GUNCELLEME.md"
+             target="_blank" rel="noopener noreferrer">GUNCELLEME.md</a></span>
       </p>
 
       <label class="switch-row" for="pref-guncelleme">

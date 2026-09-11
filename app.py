@@ -1080,6 +1080,35 @@ def get_settings() -> dict:
                 paths.chat_video_instructions_override()}
 
 
+@app.get("/api/guncelleme")
+def get_guncelleme() -> dict:
+    """Yalnız güncelleme cevabı — `/api/settings`'in ARDIL okuması.
+
+    NEDEN AYRI BİR UÇ: `guncelleme.bilgi()` bayat önbellekte tazelemeyi arka
+    plana atıp `None` döner (guncelleme.py'nin 2. sözleşmesi). Modül bunu
+    "birkaç saniye sonrakinde gerçek cevap gelir" diye yazmıştı, ama ön yüz
+    `/api/settings`'i YALNIZ açılışta bir kez soruyor (settings.js'nin tek
+    `loadSettings(true)` çağrısı) — yani "sonraki" istek hiç gelmiyordu ve
+    tazelenen cevap BİR SONRAKİ uygulama açılışına kadar diskte kalıyordu.
+    Kullanıcı tarafından bakıldığında bu, "bildirim hiç gelmiyor"dan ayırt
+    edilemez.
+
+    Alan `/api/settings`'ten KALDIRILMADI ve kaldırılmamalı: oradaki gerekçe
+    (sürüm satırıyla aynı yanıtta gelmezse panel bir an "güncelsin" deyip fikir
+    değiştirir) ilk çizim için hâlâ geçerli. Bu uç onun YERİNE değil ARDINDAN
+    geliyor — çağrıldığı anda sürüm zaten çizilmiş oluyor, dolayısıyla
+    "fikir değiştirme" durumu doğmuyor.
+
+    Ön yüz bunun için `/api/settings`'i yeniden çağıramaz: o yanıt
+    `applyConfigured()` üzerinden formun tamamını yeniden yazıyor ve
+    kullanıcının o sırada doldurduğu alanları ezerdi.
+
+    İstek yolunu BEKLETMEZ — `/api/settings` ile aynı çağrı, aynı önbellek.
+    """
+    return {"guncelleme": guncelleme.bilgi(
+        OUTPUT_DIR, izin=prefs.read(OUTPUT_DIR)["guncelleme_kontrolu"])}
+
+
 @app.post("/api/settings")
 def post_settings(req: SettingsRequest) -> dict:
     """Sağlayıcı kimliklerini yalnızca-yazılır kaydeder; durumu döndürür (key'siz).

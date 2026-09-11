@@ -47,14 +47,29 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
-      # Tarayıcı ikilisi pip paketiyle GELMİYOR, ayrı indiriliyor — ve o indirme
-      # olmadan `pytest.importorskip` değil ama `p.chromium.launch()` düşerdi.
+      # PAKET VE TARAYICI TEK ADIMDA, VE YALNIZ BURADA. İkisi de bilinçli:
+      #
+      # `requirements-dev.txt`e KONMUYOR, çünkü `build.sh`/`build.ps1` o dosyayı
+      # üç paketleme işine de kuruyor VE pytest'i koşturuyor — tarayıcı
+      # indirmeden. Orada paket kurulu olunca
+      # `pytest.importorskip("playwright")` atlamayı bırakıyor ve 14 E2E testi
+      # `BrowserType.launch: Executable doesn't exist` ile düşüyor; 2026-09-11'de
+      # tam olarak bu yaşandı, macOS paketi hiç derlenmeden kırmızıya döndü.
+      # `importorskip` paketin İMPORT EDİLEBİLİRLİĞİNİ tarayıcının varlığına
+      # VEKİL sayıyor — vekil ancak paket yalnız buraya kurulursa doğru.
+      #
+      # İkisi AYNI `run` bloğunda, çünkü ayrı adımlar ayrışabilir: birini
+      # eklemek ötekini eklemeden mümkün olur ve kırılma test işinde değil
+      # PAKETLEME işinde görünür. `tests/test_playwright_kurulumu.py` her iki
+      # sözleşmeyi de kapıya çeviriyor.
+      #
       # YALNIZ chromium: testlerin tamamı onu başlatıyor, öteki iki motoru
-      # indirmek indirme süresini üçe katlar ve hiçbir iddiayı sınamaz.
-      # `--with-deps` işletim sistemi kütüphanelerini de kuruyor; runner
-      # imajında bulunmayanlar olmadan chromium başlamıyor.
-      - name: Playwright tarayıcısı
-        run: playwright install --with-deps chromium
+      # indirmek süreyi üçe katlar ve hiçbir iddiayı sınamaz. `--with-deps`
+      # işletim sistemi kütüphanelerini de kuruyor; onlarsız chromium başlamıyor.
+      - name: Playwright (paket + tarayıcı)
+        run: |
+          pip install playwright==1.62.*
+          playwright install --with-deps chromium
 
       - name: Pytest
         run: pytest tests/ -q

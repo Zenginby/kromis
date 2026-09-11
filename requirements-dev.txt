@@ -35,19 +35,3 @@ PyYAML>=6.0
 # İYİLEŞTİRME değil, o günkü gerçeğin KAYDI — iyileştirmenin kanıtı açılış
 # denetiminin yeşile dönmesi olacak.
 pyinstaller-hooks-contrib==2026.7
-
-# tests/test_playwright_*.py'nin ÇALIŞABİLMESİ için. Yalnız test; ne uygulamanın
-# ne de paketin çalışma zamanı bağımlılığı (app kodu bu paketi hiç import
-# etmiyor, o yüzden pakete de girmiyor). PyYAML ile aynı sınıf: bu dosya
-# "derleme" bağımlılıklarının yanında yalnızca-test bağımlılıklarını da tutuyor.
-#
-# NEDEN EKLENDİ: paket kurulu olmadığı sürece `pytest.importorskip("playwright")`
-# İKİ E2E dosyasını da sessizce ATLIYOR. 2026-09-11'de ölçüldü — CI'ın pytest
-# işi "2365 passed, 13 skipped" diyerek YEŞİL dönüyordu ve atlananların içinde
-# güncelleme bildiriminin ön yüzünü kanıtlayan test de vardı. O kusur zaten
-# yalnız tarayıcıda görünüyordu (sunucu tarafı kusursuz, her birim testi
-# yeşildi); yani CI onu yakalayabilecek TEK testi koşturmuyordu.
-#
-# Tarayıcı ikilisi bu paketle GELMİYOR: `playwright install chromium` ayrı bir
-# adım (bkz. .github/workflows/_test.yml).
-playwright==1.62.*

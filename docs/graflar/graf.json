@@ -871,7 +871,7 @@
       "ithal": [],
       "ithal_eden": [],
       "katman": 1,
-      "satir": 465,
+      "satir": 466,
       "testler": [
         "tests/test_surum_karari.py"
       ],
@@ -883,7 +883,7 @@
       "ithal": [],
       "ithal_eden": [],
       "katman": 0,
-      "satir": 138,
+      "satir": 150,
       "testler": [
         "tests/test_release_manifest.py",
         "tests/test_surum_yaz.py"

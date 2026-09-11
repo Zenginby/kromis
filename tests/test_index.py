@@ -5872,7 +5872,8 @@ def test_ayarlar_yonlendirmesi_TEK_SABITTEN_geliyor():
 # `CLAUDE.md` kullanıcıya değil GELİŞTİRİCİYE yazılı, ama listeye yine giriyor:
 # mandalın işi "kökteki hiçbir belge ölçütün dışında kalmasın" ve orada geçecek
 # bir `⚙`, arayüzden düşmüş glifi geri getirme riskini birebir aynı taşıyor.
-_KULLANICI_BELGELERI = ("CLAUDE.md", "GUNCELLEME.md", "KURULUM.md", "README.md")
+_KULLANICI_BELGELERI = ("CLAUDE.md", "GUNCELLEME.md", "KURULUM.md",
+                        "README.en.md", "README.md")
 
 
 def test_belgeler_AYARLAR_dugmesini_glifle_anlatmiyor():

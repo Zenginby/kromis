@@ -9,6 +9,9 @@ Buradaki iddialar tam olarak o sınıfı kolluyor.
 """
 from __future__ import annotations
 
+import os
+import subprocess
+
 import pytest
 
 from tools import surum_yaz as sy
@@ -59,6 +62,31 @@ def test_readme_butun_surum_literallerini_gunceller():
 def test_readme_surum_olmayan_sayilara_dokunmaz():
     metin = "Android 8.0+ ve arm64-v8a destekleniyor. Python 3.14 kullanılıyor.\n"
     assert sy.readme_yaz(metin, "0.5.0") == metin
+
+
+def test_kokteki_HER_readme_yazicinin_listesinde():
+    """İkinci dil sessizce bayatlayabilecek tek yer burası.
+
+    `test_version.py`'nin "kaçak sürüm literali" iddiası YALNIZ README.md'yi
+    okuyor; README.en.md rozetinde bayat bir sürümle kalsa hiçbir test kırmızıya
+    dönmezdi ve kusur ancak İngilizce sayfaya bakan kişide görünürdü — v0.4.1'de
+    Türkçe rozetle yaşanan şeyin birebir aynısı.
+
+    İddia elle yazılmış bir çift ada DEĞİL, depodaki gerçek dosya kümesine
+    bağlı: köke üçüncü bir dil eklenirse (README.de.md) liste güncellenene
+    kadar kırmızı kalır.
+    """
+    kok = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    izlenen = subprocess.run(
+        ["git", "-C", kok, "ls-files", "README*.md"],
+        check=True, capture_output=True, text=True).stdout.split()
+    kok_readmeleri = {y for y in izlenen if "/" not in y}
+    yazilanlar = {ad for ad, _ in sy.SURUM_DOSYALARI}
+
+    assert kok_readmeleri, "kökte hiç README bulunamadı — kalıp bayatladı mı?"
+    assert kok_readmeleri <= yazilanlar, (
+        f"sürüm yazıcısının görmediği README(ler): "
+        f"{sorted(kok_readmeleri - yazilanlar)} — rozetleri bayatlar")
 
 
 # --------------------------------------------------------------------------

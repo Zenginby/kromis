@@ -110,6 +110,21 @@ def _yaz(yol: str, metin: str) -> None:
         f.write(metin)
 
 
+# Sürüm literali TAŞIYAN dosyalar → onu tazeleyen işlev. Liste burada, main'in
+# içinde değil: bekçisi (tests/test_surum_yaz.py) çalıştırmadan okuyabilsin.
+#
+# `README.en.md` NEDEN listede: İngilizce sayfa da rozetinde ve "What it does
+# (vX.Y.Z)" başlığında aynı literali taşıyor. Listeye girmeseydi Türkçe rozet
+# tazelenir, İngilizcesi olduğu yerde kalırdı — ve bunu hiçbir şey kırmızıya
+# düşürmezdi: test_version.py'nin "kaçak literal" iddiası YALNIZ README.md'yi
+# okuyor. Bu tam olarak v0.4.1'de yaşanan kusurun ikinci dildeki kopyası.
+SURUM_DOSYALARI: tuple[tuple[str, object], ...] = (
+    ("version.py", version_py_yaz),
+    ("README.md", readme_yaz),
+    ("README.en.md", readme_yaz),
+)
+
+
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
         print("kullanım: surum_yaz.py <surum> [not...]", file=sys.stderr)
@@ -120,10 +135,7 @@ def main(argv: list[str]) -> int:
         return 2
     notlar = [n for n in argv[2:] if n.strip()]
 
-    for ad, yazici in (
-        ("version.py", version_py_yaz),
-        ("README.md", readme_yaz),
-    ):
+    for ad, yazici in SURUM_DOSYALARI:
         yol = os.path.join(KOK, ad)
         _yaz(yol, yazici(_oku(yol), surum))
         print(f"yazıldı: {ad}")

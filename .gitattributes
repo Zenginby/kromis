@@ -38,6 +38,19 @@
 *.ttf   binary
 *.otf   binary
 
+# Görüntüler de AÇIKÇA ikili; yazı tipleriyle birebir aynı gerekçe. Depoda iki
+# ayrı küme var: `branding/` altındaki üretilmiş ikonlar ve `docs/gorseller/`
+# altındaki README ekran görüntüleri. İkisi de bugüne kadar `text=auto`
+# sezgisine dayanıyordu; sezgi bir PNG'yi metin sanırsa satır sonu dönüşümü
+# dosyayı sessizce bozar ve sonuç "görsel açılmıyor" olarak, yalnız o dosyaya
+# bakan kişide görünür. `-diff` de bunun parçası: ikili bir dosyanın satır satır
+# farkı okunamaz, üstelik ekran görüntüleri büyük.
+*.png   binary
+*.ico   binary
+*.jpg   binary
+*.jpeg  binary
+*.mp4   binary
+
 # ── Gradle sarmalayıcısı (android/) ──────────────────────────────────
 # Üç dosya, üç ayrı gerekçe — üçü de yukarıdaki `* text=auto eol=lf` genel
 # kuralının BU dosyalar için yanlış olmasından doğuyor:

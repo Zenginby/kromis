@@ -63,6 +63,7 @@ GUVENLI_YOLLAR: tuple[str, ...] = (
     "tools/",
     ".github/",
     "README.md",
+    "README.en.md",   # aynı sayfanın İngilizcesi; pakete o da girmiyor
     "KURULUM.md",
     "GUNCELLEME.md",
     "LICENSE",

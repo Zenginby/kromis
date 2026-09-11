@@ -190,6 +190,12 @@ sonucu var:
 
 ---
 
+## Sürüm 0.18.0 — ne değişti
+
+- Ayarlar penceresi ekranin ortasindan aciliyor ve bolumlere ayrildi;
+
+---
+
 ## Sürüm 0.17.3 — ne değişti
 
 - bos bir sir "sir yok" diye bildiriliyordu

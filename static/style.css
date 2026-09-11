@@ -632,21 +632,56 @@ body:has(.sheet.open) .scrim { display: block; }
      görünür: telefonda hiç, masaüstünde her açılışta. */
   transform: translateY(100%);
 }
-/* Ayarlar formu UZUN (kimlik alanları + dört not + iki tercih + künye +
-   güncelleme satırı): ortak 86vh tavanında gövde sürekli kaydırılır hâlde
-   açılıyordu. Genişlik de bir kademe geniş — üç sağlayıcının alan grupları
-   520px'de sıkışıyor.
+/* DÖRDÜNCÜ YÖN (#settings-modal) — `.sheet-bottom`un gerekçesinin aynısı:
+   ayrı bir bileşen değil bir VARYANT, çünkü perde (`body:has(.sheet.open)
+   .scrim`), `Escape` şelalesi (core.js), Android geri tuşu (`window.geriTusu`)
+   ve odak iadesi (`closeSheets`) DÖRDÜ DE `.sheet.open` seçicisine bakıyor.
+   Ayrı bir sınıf dördünü de sıfırdan getirmek zorunda kalırdı.
 
-   `min(…, 100%)` ŞART, sabit bir px DEĞİL: id özgüllüğü (0,1,1 + id) telefon
-   medya sorgusunun `.sheet-bottom { width: 100% }` kuralını EZİYOR.
-   #palette-modal tam bu yüzden mobile.css'te ikinci bir kural istemişti;
-   `min` o ikinci kuralı gereksiz kılıyor. */
-#settings-modal.sheet-bottom {
-  width: min(560px, 100%);
-  max-height: min(92vh, 900px);
-  max-height: min(92dvh, 900px);
+   ORTALAMA `inset: 0` + `margin: auto` İLE, `translate` ile DEĞİL — ve bu,
+   `.sheet-bottom`un ödediği tuzağın aynısı: `.sheet.open { transform: none }`
+   BÜTÜN varyantların ortak kuralı, yani transform'la kurulan bir ortalama
+   açılış anında siliniyor ve pencere köşeye kayıyor. `transform` burada
+   yalnız GİRİŞ HAREKETİ taşıyor (scale), konum taşımıyor.
+
+   `height` ŞART, `max-height` DEĞİL: iç düzen iki sütunlu bir ızgara ve sol
+   gezinmenin kendi yüksekliği yok — `max-height` ile pencere en uzun bölmenin
+   boyuna göre her geçişte ZIPLARDI. Sabit yükseklik dört bölmeyi de aynı
+   çerçevede tutuyor. `dvh` ikinci bildirim, body'nin `100vh; 100dvh`
+   kalıbının aynısı.
+
+   `min(…, 94vw)` ŞART, sabit bir px DEĞİL: telefon medya sorgusunun
+   `width: 100%` kuralıyla çatışmasın (#palette-modal'ın id özgüllüğü tuzağı,
+   .sheet-bottom'ın kendi notu). */
+.sheet-center {
+  inset: 0; margin: auto;
+  width: min(760px, 94vw); max-width: none;
+  height: min(600px, 88vh);
+  height: min(600px, 88dvh);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-panel, 24px);
+  /* Giriş hareketi `.modal-card`ın `modalIn`iyle AYNI ölçüde (scale .98 → 1):
+     iki ortalanmış yüzey iki ayrı hızda belirirse aynı uygulamadan
+     gelmiyormuş gibi duruyor. */
+  transform: scale(0.98);
 }
 .sheet.open { transform: none; }
+/* Dipteki eylem ORTADAN açılan pencerede TAM GENİŞLİK DEĞİL.
+   `.sheet-foot .primary { width: 100% }` alttan açılan panelin başparmak
+   şeridi içindi (320-560px) ve orada doğru. 760px'lik bir pencerede aynı
+   kural, ekranın en parlak öğesini baştan başa uzanan bir beyaz banda
+   çeviriyor — forma bakan gözün önündeki en gürültülü şey oluyor (ölçüldü,
+   1280x900). Düğme sağa, durum satırı onun soluna.
+
+   `margin-left: auto` ŞART, `justify-content: space-between` DEĞİL: durum
+   satırı boşken gizleniyor (`.sheet-foot .modal-status:empty`) ve
+   `space-between` o an tek çocuğu SOLA yapıştırırdı. */
+.sheet-center .sheet-foot { display: flex; align-items: center; gap: 12px; }
+.sheet-center .sheet-foot .primary {
+  width: auto; margin: 0 0 0 auto; padding: 0.7rem 1.6rem;
+}
+.sheet-center .sheet-foot .modal-status { margin: 0; }
+
 /* Tutamak: panelin alttan geldiğini SÖYLEYEN işaret. `aria-hidden` çünkü
    sürüklenebilir değil — bugün yalnız bir yön göstergesi ve ekran okuyucuya
    söylenecek bir şey taşımıyor. */
@@ -682,10 +717,12 @@ body:has(.sheet.open) .scrim { display: block; }
 .sheet-foot .modal-status { margin: 0 0 8px; min-height: 0; }
 .sheet-foot .modal-status:empty { display: none; }
 
-/* Slide-over form alanları (A5): kurallar .modal-card input'un birebir
-   karşılığı — Ayarlar ve Tema rengi panelleri artık modal değil, ama metin
-   girişinin algılanabilir sınırı kalmalı (§0.0/G, ≥3:1). Radyo/onay
-   kutusu/kaydırıcı dışarıda: onların ölçüsünü kendi satır bileşenleri veriyor. */
+/* `.sheet` gövdesindeki form alanları (A5): kurallar modal kartının metin
+   kutusu kabuğunun birebir karşılığı. Ayarlar ekranın ortasından açılıyor ama
+   yine bir `.sheet` (bkz. `.sheet-center`), yani o kuralları MİRAS ALMIYOR —
+   metin girişinin algılanabilir sınırı burada ayrıca yazılmak zorunda
+   (§0.0/G, ≥3:1). Radyo/onay kutusu/kaydırıcı dışarıda: onların ölçüsünü
+   kendi satır bileşenleri veriyor. */
 .sheet-body input:not([type="radio"]):not([type="checkbox"]):not([type="range"]) {
   width: 100%; background: var(--panel-2); color: var(--text);
   border: 1px solid var(--control-border); border-radius: 10px; padding: 0.6rem 0.7rem;
@@ -699,9 +736,68 @@ body:has(.sheet.open) .scrim { display: block; }
 #settings-modal .sheet-body label {
   display: block; font-size: 0.85rem; color: var(--muted); margin: 0.7rem 0 0.25rem;
 }
-/* Talimat dosyasının yolu boşluksuz tek sözcük: 320px şeritte kırılmazsa
-   gövdenin iç dolgusuna taşıyor (ölçüldü: 9px). */
-#chat-instructions-path { overflow-wrap: anywhere; }
+/* Sağlayıcı başlığı bir `<label for>` DEĞİL (işaret edeceği `<select>` ekran
+   okuyucudan gizli), ama GÖRÜNÜŞÜ etiketin aynısı olmak zorunda: formda aynı
+   hizada duran iki başlığın biri gri biri değilse satır kırık okunuyor. */
+#settings-modal .sheet-body .settings-label {
+  display: block; font-size: 0.85rem; color: var(--muted); margin: 0.7rem 0 0.25rem;
+}
+
+/* ── Ayarlar'ın iki sütunu (sol gezinme + bölme) ───────────────────────
+   `.sheet-body`nin kendi `overflow-y: auto`su BURADA KAPANIYOR ve kaydırma bir
+   katman içeri, `.settings-panes`e iniyor. Sebebi somut: kaydırma dışarıda
+   kalırsa sol gezinme de metinle birlikte yukarı kayar ve uzun bir bölmede
+   ekrandan çıkar — gezinme, gezinmek için geri kaydırmayı gerektirirdi.
+
+   Seçici İKİ SINIFLI (`.sheet-body.settings-layout`, 0,2,0): tek sınıflı bir
+   kural `.sheet-body`nin (0,1,0) `padding`ini ancak dosyadaki SIRAYA güvenerek
+   ezerdi ve kurallar yer değiştirdiği gün iç dolgu sessizce geri gelirdi. */
+.sheet-body.settings-layout {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  padding: 0;
+  overflow: hidden;
+  min-height: 0;
+}
+.settings-nav {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 12px; overflow-y: auto;
+  border-right: 1px solid var(--hairline);
+}
+.settings-nav .picker-nav-item[hidden] { display: none; }
+.settings-panes { padding: 16px 18px; overflow-y: auto; min-width: 0; }
+
+/* ── Sağlayıcı seçici düğmesi ──────────────────────────────────────────
+   GÖRÜNÜŞ `textarea, select` kuralının birebir aynısı ve bu bilerek: düğme
+   native bir `<select>`in YERİNE geçti, formdaki öteki kutularla aynı
+   hizada duruyor ve farklı görünen bir kabuk "bu bir metin kutusu mu, düğme
+   mi" sorusunu doğururdu. Fark yalnız sağdaki chevron — `.model-chip`in
+   kendi dersi: çip artık `<button>` olduğu için oku tarayıcı ÇİZMİYOR. */
+.provider-pick {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--control-border); border-radius: 10px;
+  padding: 0.6rem 0.7rem; font: inherit; text-align: left; cursor: pointer;
+  transition: border-color var(--dur) var(--ease);
+}
+.provider-pick:hover { border-color: var(--border-strong); }
+.provider-pick:focus-visible { outline: none; border-color: var(--accent); }
+/* İşaret kutusu SEÇİLİ sağlayıcının logosu yokken de duruyor (`.model-chip`in
+   sol dolgusunun gerekçesi): sağlayıcı değişince düğmenin metni yatayda
+   ZIPLAMASIN. */
+.provider-pick-ic {
+  flex: none; width: 22px; height: 22px; border-radius: 6px;
+  background: var(--panel); display: grid; place-items: center;
+}
+.provider-pick-ic img { width: 15px; height: 15px; }
+/* `min-width: 0` ŞART: uzun bir sağlayıcı adı flex öğesinin min-content
+   genişliğini kutunun dışına taşırır (`.model-chip`in ölçülmüş dersi). */
+#set-provider-label {
+  flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.provider-pick > svg { flex: none; color: var(--muted); }
+
 
 /* ── Araçlar görünümü (A2) ─────────────────────────────────────────────
    İki kapı kartı (referans settings-panels.html .tool): yüzey kart, hover bir
@@ -910,12 +1006,24 @@ body:has(.sheet.open) .scrim { display: block; }
 .modal-x:hover { color: var(--text); }
 .modal-desc { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.9rem; line-height: 1.5; }
 .modal-card label { display: block; font-size: 0.85rem; color: var(--muted); margin: 0.7rem 0 0.25rem; }
-.modal-card input {
+/* METİN kutusu kabuğu — RADYO VE ONAY KUTUSU DIŞARIDA. Ayıklama
+   `.sheet-body input`ın kalıbının aynısı ve ölçülmüş bir kırılmanın
+   düzeltmesi: sağlayıcı penceresinin kartları `.radio-row` ve radyoları bu
+   kuralın `width: 100%`unu alıyordu — 16px'lik nokta 371px'e uzuyor, metin
+   sütununu 0 pikselde eziyor ve kart adı iki satıra kırılıyordu (Chromium
+   1280x900'de ölçüldü).
+
+   `range` BİLEREK dışarıda bırakılmadı: logo/banner modallarının
+   kaydırıcıları bu kabuğu bugün alıyor ve görünüşleri ona bağlı — kapsamı
+   daraltmak, ölçülmemiş bir yüzeyi değiştirmek olurdu. */
+.modal-card input:not([type="radio"]):not([type="checkbox"]) {
   width: 100%; background: var(--panel-2); color: var(--text);
   border: 1px solid var(--control-border); border-radius: 10px; padding: 0.6rem 0.7rem;
   font: inherit; transition: border-color var(--dur) var(--ease);
 }
-.modal-card input:focus { outline: none; border-color: var(--accent); }
+.modal-card input:not([type="radio"]):not([type="checkbox"]):focus {
+  outline: none; border-color: var(--accent);
+}
 .modal-status { color: var(--muted); min-height: 1.2em; font-size: 0.82rem; margin: 0.7rem 0 0; }
 .modal-actions { margin-top: 0.4rem; }
 .modal-actions .primary { margin-top: 0.6rem; }
@@ -944,6 +1052,29 @@ body:has(.sheet.open) .scrim { display: block; }
 .dialog-actions .primary { width: auto; margin: 0; padding: 0.6rem 1.1rem; }
 .dialog-actions .btn-ghost { padding: 0.6rem 1rem; }
 /* Animasyon kapatma dosyanın sonundaki prefers-reduced-motion bloğunda */
+
+/* ── Sağlayıcı penceresi ───────────────────────────────────────────────
+   `.sheet` (50) ÜSTÜ, `#confirm-modal` (60) ALTI. Ayarlar'ın ÜSTÜNDE açılmak
+   zorunda — altında boyansa düğmeye basılıyor, pencere açılıyor, hiçbir şey
+   görünmüyordu (#confirm-modal'ın ödediği kusurun aynısı). 60'a çıkmıyor
+   çünkü onay penceresi bunun da üstünde kalmalı. */
+#provider-modal { z-index: 55; }
+.provider-card { width: min(420px, 100%); }
+/* Kartlar `.radio-row.model-row` ailesini olduğu gibi kullanıyor; buraya
+   yalnız listenin modal başlığına olan mesafesi yazılıyor. */
+.provider-card .model-list { margin-top: 0.6rem; }
+/* ÖLÇÜLDÜ (Chromium 1280x900): kartlar DİKEY yığılıyordu — işaret, metin ve
+   radyo üç ayrı satırda, radyo ortada. Sebebi `.modal-card label` (0,1,1)
+   kuralının `display: block`u: `.radio-row` (0,1,0) ona yeniliyor ve satır
+   düzeni hiç kurulmuyor. Aynı kural `margin`i de eziyordu.
+
+   Seçici `.modal-card`a bağlı, `.provider-card`a DEĞİL: ezilen kural da
+   `.modal-card`ın ve bir gün ikinci bir modalın içine radyo kartı konduğunda
+   aynı tuzak yeniden kurulurdu. İki sınıf (0,2,0) sıraya güvenmeden kazanıyor. */
+.modal-card .radio-row {
+  display: flex; margin: 0 0 8px;
+  font-size: inherit; color: inherit;
+}
 
 /* Logo / banner modal */
 .logo-card { width: min(1040px, 100%); }
@@ -996,7 +1127,11 @@ body:has(.sheet.open) .scrim { display: block; }
 .field-note[hidden] { display: none; }
 /* Sürüm künyesi "Kaydet"ten SONRA geliyor: bir alan değil, panelin dibindeki
    bilgi. Ortalanıyor ki forma ait bir açıklama gibi okunmasın. */
-.settings-version-row { margin-top: 1rem; text-align: center; }
+/* ORTALAMA KALKTI: satır bir zamanlar panelin DİBİNDE, formun dışında duran
+   bir künyeydi ve orada ortalanmak doğruydu. Artık "Hakkında" bölmesinin ilk
+   satırı — sola yaslı bir formun içinde ortalanmış tek öğe, hizası bozuk
+   görünüyor (ölçüldü, 1280x900). */
+.settings-version-row { margin-top: 0; }
 
 /* Yeni sürüm satırı: künyenin altındaki TEK EYLEM, o yüzden künyeyle aynı düz
    .field-note metni olamaz. `settings-update-row` sınıfı HTML'de baştan vardı
@@ -2601,8 +2736,9 @@ body.viewer-open { overflow: hidden; }
 .chat-wait[hidden] { display: none; }
 .chat-status { margin: 0.5rem 0 0; min-height: 1.2em; color: var(--muted); font-size: 0.85rem; }
 
-/* Ayarlar modalindeki bölüm başlığı (Azure kimliği / Prompt Yönetmeni ayrımı) —
-   Flow alan etiketi dilinde: 13px, gri, cümle düzeni (§3) */
+/* Bölüm başlığı (bugün Ayarlar'ın "Sohbet modeli" ve Yönetmen çekmecesinin
+   "Kalıcı yönlendirme" satırları) — Flow alan etiketi dilinde: 13px, gri,
+   cümle düzeni (§3) */
 .modal-subhead {
   margin: 1.4rem 0 0; padding-top: 1rem; border-top: 1px solid var(--hairline);
   font-size: 13px; font-weight: 500; letter-spacing: 0.01em; color: var(--muted);
@@ -2782,11 +2918,3 @@ body.viewer-open { overflow: hidden; }
 }
 
 
-/* Sağlayıcı durum listesi: seçici + tek alan grubu deseninin bedeli olan
-   "hangisi kurulu?" görünümünü geri veriyor (bkz. index.html'deki gerekçe). */
-.provider-status { list-style: none; margin: 0 0 12px; padding: 0; }
-.provider-status li {
-  font-size: 0.74rem; color: var(--muted);
-  padding: 2px 0;
-}
-.provider-status li.ok { color: var(--text); }

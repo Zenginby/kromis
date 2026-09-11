@@ -67,7 +67,11 @@ function applyConfigured(s) {
         ? "Kayıtlı · değiştirmek için yeni anahtar yaz"
         : bos;
     }
-    renderProviderStatus(s.providers);
+    // Bayraklar SAKLANIYOR: kartlar pencere açıldığında çiziliyor ve o an
+    // elde yalnız bu sözlük oluyor. Kaydet'ten sonra applyConfigured yeniden
+    // koştuğu için rozetler de kendiliğinden tazeleniyor.
+    saglayiciDurumu = s.providers;
+    syncProviderPick($("set-provider").value);
   }
 
   // Açılış mesajı artık SEÇİLİ MODELE bakıyor, Azure'a değil: yalnızca OpenAI
@@ -123,13 +127,12 @@ function applyConfigured(s) {
   if (s && s.chat_deployment !== undefined) {
     $("set-chat-deployment").value = s.chat_deployment;
   }
-  // Yalnızca GET'te var (yol çalışma anında değişmez) — version ile aynı guard.
-  if (s && s.chat_instructions_path) {
-    $("chat-instructions-path").textContent = s.chat_instructions_path;
-  }
-  if (s && s.chat_video_instructions_path) {
-    $("chat-video-instructions-path").textContent = s.chat_video_instructions_path;
-  }
+  // `chat_instructions_path` / `chat_video_instructions_path` ARTIK
+  // OKUNMUYOR: Ayarlar'daki "Prompt Yönetmeni · talimat" bölümü kaldırıldı
+  // (11 Eylül 2026, kullanıcı kararı) — iki satır salt-okunur birer dosya
+  // yolu gösteriyordu ve kullanıcının panelde yapabileceği bir şey yoktu.
+  // Sunucu alanları döndürmeye devam ediyor (app.get_settings); yalnız
+  // ekrandaki kopyaları gitti.
 }
 
 async function loadSettings(openIfMissing) {
@@ -164,21 +167,103 @@ async function loadSettings(openIfMissing) {
   }
 }
 
-/** Sağlayıcı durum satırları. Seçici + tek alan grubu deseninin bedeli olan
- *  "hangisi kurulu?" görünümünü geri veriyor; kaynak `providers` bayrakları. */
-function renderProviderStatus(providers) {
-  const satirlar = [
-    ["azure_image", "Azure OpenAI"],
-    ["openai", "OpenAI"],
-    ["gemini", "Google Gemini"],
-  ];
-  $("provider-status").replaceChildren(...satirlar.map(([id, ad]) => {
-    const li = document.createElement("li");
+/** Sağlayıcı bayrakları (`GET /api/settings` → `providers`). AYRI bir
+ *  değişken çünkü kartlar pencere AÇILIRKEN çiziliyor, bayraklar ise
+ *  `/api/settings` döndüğünde geliyor — iki ayrı zaman. `seciliModelTercihi`
+ *  ile aynı desen. */
+let saglayiciDurumu = {};
+
+/** Seçicideki değer → `providers` sözlüğündeki kimlik. Azure'ın SEÇİCİ değeri
+ *  `azure`, KİMLİĞİ `azure_image` ve ikisi aynı şey değil: eşitlemek rozeti
+ *  Azure'da kalıcı olarak "kayıtlı değil" bırakırdı (aynı ayrım index.html'de
+ *  `prov-azure` grubu için de yazılı). Ötekiler kendi adlarını kullanıyor, o
+ *  yüzden tabloda yalnız istisna var. */
+const SAGLAYICI_KIMLIGI = { azure: "azure_image" };
+
+function saglayiciKayitli(deger) {
+  return !!saglayiciDurumu[SAGLAYICI_KIMLIGI[deger] || deger];
+}
+
+/** Sağlayıcı işaretinin adresi — KATALOGDAN okunuyor, istemcide dize
+ *  birleştirilmiyor. Adresi sunucu kuruyor (`app._provider_logo_url`, sürüm
+ *  damgası dâhil) ve `setModelLogo`un gerekçesi burada da geçerli: yarın yeni
+ *  bir sağlayıcı eklenince işaret kendiliğinden geliyor. İşareti olmayan
+ *  sağlayıcıda `undefined` — kutu boş kalıyor (renderModelCards'ın kaçış
+ *  yolunun aynısı). */
+function saglayiciLogosu(deger) {
+  const m = imageModels.find((x) => x.provider === deger);
+  return m && m.logo;
+}
+
+/** Sağlayıcı penceresinin kartları. `<option>`lardan türüyor — ikinci bir
+ *  sağlayıcı listesi yazmak, seçici ile pencerenin ayrışması demekti; kapı
+ *  zaten `syncProviderFields`in okuduğu aynı değerler.
+ *
+ *  ROZET, kaldırılan #provider-status listesinin işini devralıyor: "hangisi
+ *  kurulu?" sorusu artık seçimin yapıldığı YERDE cevaplanıyor, formun
+ *  başındaki ayrı bir satırda değil. Kaynak aynı `providers` bayrakları, yani
+ *  ikinci bir doğruluk kaynağı doğmuyor. */
+function renderProviderCards() {
+  const secici = $("set-provider");
+  const kok = $("provider-list");
+  const legend = kok.querySelector("legend");
+
+  const kartlar = [...secici.options].map((o) => {
+    const kart = document.createElement("label");
+    kart.className = "radio-row model-row";
+
+    const kutu = document.createElement("span");
+    kutu.className = "model-row-ic";
+    const logo = saglayiciLogosu(o.value);
+    if (logo) {
+      const img = document.createElement("img");
+      img.src = logo;
+      // `alt=""`: sağlayıcının adı kartın metninde ZATEN var.
+      img.alt = "";
+      kutu.append(img);
+    }
+
+    const metin = document.createElement("span");
+    metin.className = "model-row-txt";
+    const ad = document.createElement("b");
     // `textContent`: sunucudan gelen hiçbir şey innerHTML'e girmiyor.
-    li.textContent = `${ad}: ${providers[id] ? "kayıtlı" : "kayıtlı değil"}`;
-    li.classList.toggle("ok", !!providers[id]);
-    return li;
-  }));
+    ad.textContent = o.textContent;
+    const rozet = document.createElement("span");
+    rozet.className = "model-row-badge";
+    rozet.textContent = saglayiciKayitli(o.value) ? "kayıtlı" : "kayıtlı değil";
+    ad.append(rozet);
+    metin.append(ad);
+
+    // GERÇEK RADYO: ok tuşu gezintisi, grup semantiği ve `:checked` durumu
+    // tarayıcıdan geliyor (#model-sheet'in kendi kararı).
+    const kutucuk = document.createElement("input");
+    kutucuk.type = "radio";
+    kutucuk.name = "provider-pick";
+    kutucuk.value = o.value;
+    kutucuk.checked = o.value === secici.value;
+
+    kart.append(kutu, metin, kutucuk);
+    return kart;
+  });
+
+  // `legend` YAYILARAK veriliyor: `replaceChildren(null, …)` argümanı dizeye
+  // çevirip listenin tepesine "null" METNİ basardı (renderModelCards'ın notu).
+  kok.replaceChildren(...(legend ? [legend] : []), ...kartlar);
+}
+
+/** Düğmenin görünen yüzü: seçili `<option>`un metni + sağlayıcı işareti.
+ *  TEK YAZAR burası — adı ikinci bir yerden yazmak, `<select>`in değeriyle
+ *  ekranda okunan adın ayrışmasına kapı açardı. */
+function syncProviderPick(secili) {
+  const secenek = [...$("set-provider").options].find((o) => o.value === secili);
+  $("set-provider-label").textContent = secenek ? secenek.textContent : "Sağlayıcı seç";
+  const kutu = $("set-provider-ic");
+  const logo = saglayiciLogosu(secili);
+  if (!logo) { kutu.replaceChildren(); return; }
+  const img = document.createElement("img");
+  img.src = logo;
+  img.alt = "";
+  kutu.replaceChildren(img);
 }
 
 /** Seçilen sağlayıcının alan grubunu gösterir, ötekileri gizler. */
@@ -187,6 +272,10 @@ function syncProviderFields() {
   for (const p of ["azure", "openai", "gemini"]) {
     $(`prov-${p}`).hidden = p !== secili;
   }
+  // Düğmenin yüzü BURADA tazeleniyor, seçim yapılan yerde değil: değer üç
+  // yoldan değişebiliyor (pencere, derin bağlantı `openSettings(provider)`,
+  // açılıştaki varsayılan) ve üçüne ayrı ayrı yazmak birini unutmak demekti.
+  syncProviderPick(secili);
   syncChatDeployField(secili);
 }
 
@@ -223,9 +312,118 @@ function syncChatDeployField(provider) {
     : true;
   $("chat-deploy-head").hidden = !isteyen;
   $("chat-deploy-group").hidden = !isteyen;
+  // GEZİNME DÜĞMESİ DE AYNI KAPIDA. Bölmeli düzenin getirdiği yeni kusur bu:
+  // başlık ve grup gizlenince "Yönetmen" bölmesinde görünecek hiçbir şey
+  // kalmıyor, ama düğme duruyordu — tıklanınca bomboş açılan bir bölme,
+  // kaldırılan "bu sağlayıcıda dağıtım adı yok" cümlesinin daha kötü hâli.
+  $("settings-nav-director").hidden = !isteyen;
+  // Bölme O AN AÇIKSA geri düşüyor. Bugün bu satır bir kusuru DEĞİL bir
+  // TUTARLILIĞI koruyor: seçici yalnız "Erişim" bölmesinde olduğu için
+  // sağlayıcı Yönetmen açıkken çevrilemiyor, ve `openSettings` zaten
+  // "Erişim"e dönüyor. Satırın işi kuralı bu fonksiyonun İÇİNDE tutmak —
+  // "gezinme düğmesi gizliyse o bölme açık kalamaz" kararının iki ayrı yerde
+  // yaşaması, ikisinin ayrışmasının kapısı olurdu (aynı gerekçe başlık ve
+  // grubun birlikte gizlenmesinde de yazılı).
+  if (!isteyen && acikBolme === "director") showSettingsPane("access");
 }
 
 $("set-provider").addEventListener("change", syncProviderFields);
+
+// ── Bölmeler (sol gezinme) ──────────────────────────────────────────
+// Ayarlar formu dört konu taşıyor ve hepsi tek kayan gövdedeydi: 19 blok,
+// kullanıcının "çok karışık" dediği şey buydu. Bölmek bilgiyi silmiyor, AYNI
+// ANDA GÖRÜNENİ azaltıyor.
+//
+// Açık bölmenin adı BİR DEĞİŞKENDE, DOM'dan okunarak DEĞİL: `syncChatDeployField`
+// (yukarısı) "bölme şu an açık mı" sorusunu soruyor ve `hidden` özniteliklerini
+// tarayan bir cevap, kapının kendisinin yazdığı özniteliği geri okumak olurdu.
+let acikBolme = "access";
+
+function showSettingsPane(ad) {
+  acikBolme = ad;
+  // `aria-current="false"` ARIA'da "geçerli değil" demek — `aria-pressed`in
+  // #palette-tabs'taki kalıbının aynısı; öznitelik SİLİNMİYOR ki CSS seçicisi
+  // (`.picker-nav-item[aria-current="true"]`) tek kuralla çalışsın.
+  for (const dugme of $("settings-nav").querySelectorAll(".picker-nav-item")) {
+    dugme.setAttribute("aria-current", String(dugme.dataset.pane === ad));
+  }
+  for (const bolme of document.querySelectorAll("#settings-modal .settings-pane")) {
+    bolme.hidden = bolme.dataset.pane !== ad;
+  }
+}
+
+// TEK dinleyici, olay yetkilendirmeyle (#model-sheet-list'in kalıbı): düğme
+// başına bağ kurmak, bir gün beşinci bölme eklendiğinde sessizce eksik kalırdı.
+$("settings-nav").addEventListener("click", (e) => {
+  const dugme = e.target.closest(".picker-nav-item");
+  if (dugme) showSettingsPane(dugme.dataset.pane);
+});
+
+// ── Sağlayıcı penceresi ─────────────────────────────────────────────
+// Pencereyi açan düğme — odak ona iade edilecek. `.sheet`lerin `sheetTetik`i
+// ve `.modal`ların `dialogPrevFocus`u ile aynı iş; ayrı bir değişken çünkü bu
+// katman ikisinin de ÜSTÜNDE açılıyor ve onların kapanışıyla ilgisi yok.
+let providerModalTetik = null;
+
+function openProviderModal() {
+  // Kartlar HER AÇILIŞTA yeniden çiziliyor: `providers` bayrakları Kaydet'ten
+  // sonra değişiyor ve bayat bir liste, anahtarı yeni girilmiş bir sağlayıcıyı
+  // "kayıtlı değil" diye gösterirdi (openModelSheet'in gerekçesinin aynısı).
+  renderProviderCards();
+  $("provider-modal").hidden = false;
+  providerModalTetik = $("set-provider-btn");
+  providerModalTetik.setAttribute("aria-expanded", "true");
+  // Odak İŞARETLİ radyoya: ok tuşlarıyla gezinme ilk tuş basımında çalışsın.
+  const isaretli = $("provider-list").querySelector("input:checked");
+  setTimeout(() => (isaretli || $("provider-close")).focus(), 0);
+}
+
+function closeProviderModal() {
+  if ($("provider-modal").hidden) return;
+  $("provider-modal").hidden = true;
+  if (providerModalTetik) {
+    providerModalTetik.setAttribute("aria-expanded", "false");
+    // `isConnected`: pencere Ayarlar kapanırken de kapatılabiliyor ve kopmuş
+    // bir düğmeye odaklanmak odağı <body>ye atar (closeSheets'in aynı kontrolü).
+    if (providerModalTetik.isConnected) providerModalTetik.focus();
+  }
+  providerModalTetik = null;
+}
+
+$("set-provider-btn").addEventListener("click", openProviderModal);
+$("provider-close").addEventListener("click", closeProviderModal);
+$("provider-modal").addEventListener("click", (e) => {
+  if (e.target.hasAttribute("data-provider-close")) closeProviderModal();
+});
+
+// Seçim `<select>`e YÖNLENDİRİLİYOR, doğrudan uygulanmıyor: değerin tek sahibi
+// o ve `change` dinleyicisi (syncProviderFields → alan grupları + dağıtım
+// kapısı + düğmenin yüzü) oraya bağlı. Buradan ayrıca çağırmak o zincirin
+// ikinci bir kopyası olurdu (#model-sheet-list'in kararı).
+$("provider-list").addEventListener("change", (e) => {
+  const secici = $("set-provider");
+  // AYNI DEĞERE ikinci dokunuş sessiz: native <select> de değişmeyen bir değer
+  // için `change` atmıyor.
+  if (e.target.value && secici.value !== e.target.value) {
+    secici.value = e.target.value;
+    secici.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  // Kapanış SEÇİMİN KENDİSİ: üç satırlık bir listede ayrıca "Tamam"a basmak,
+  // #model-sheet'in dipteki düğmesinin (başparmakla ulaşılan şerit) telefona
+  // özgü gerekçesi olmadan ödenen fazladan bir tık olurdu.
+  closeProviderModal();
+});
+
+// ESCAPE MUHAFIZI — YAKALAMA EVRESİNDE (`, true`) ve bu ŞART, üslup değil:
+// core.js'teki `.sheet` dinleyicisi bu dosyadan ÖNCE kayıtlı, yani kabarma
+// evresinde yazılan bir `stopImmediatePropagation` onu DURDURAMAZ ve tek
+// Escape hem pencereyi hem arkasındaki Ayarlar'ı kapatırdı. Aynı desen
+// folders.js'teki taşıma penceresi için de kurulu.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || $("provider-modal").hidden) return;
+  e.stopImmediatePropagation();
+  closeProviderModal();
+}, true);
 
 function openSettings(provider) {
   // Gizli alanların HEPSİ temizleniyor (write-only): kayıtlı anahtar hiçbir
@@ -251,6 +449,11 @@ function openSettings(provider) {
   // geliyor. Temizlenirse kullanıcı endpoint'ini güncellemek için paneli açıp
   // kaydettiğinde dağıtım adını da silmiş olurdu.
   $("settings-status").textContent = "";
+  // Her açılış "Erişim"den başlıyor: pencere kapandığında bölme hatırlansa,
+  // anahtarını girmeye gelen kullanıcı bir önceki turda baktığı "Hakkında"
+  // bölmesiyle karşılanırdı. Derin bağlantı da (openSettings(provider)) zaten
+  // bu bölmeyi hedefliyor.
+  showSettingsPane("access");
   // Panel ALTTAN açılıyor (model seçicisiyle aynı yüzey). Açma/kapama tek
   // kapıdan (core.openSheet); perde ve Escape kabuğun ortak dinleyicilerinde.
   openSheet("settings-modal");
@@ -265,10 +468,13 @@ function openSettings(provider) {
   // İkinci kazanç: `#set-endpoint` YALNIZCA Azure seçiliyken görünür
   // (`syncProviderFields`). Gemini'ye derin bağlantıyla açıldığında
   // (#model-settings-link) odak gizli bir kutuya gidiyordu, yani hiçbir yere.
-  setTimeout(() => $("set-provider").focus(), 0);
+  setTimeout(() => $("set-provider-btn").focus(), 0);
 }
 
-function closeSettings() { closeSheets(); }
+// Sağlayıcı penceresi de kapanıyor: normalde perdesi Ayarlar'ı örttüğü için
+// ikisi birlikte kapanmıyor, ama "Kaydet" 550ms sonra kendiliğinden kapatıyor
+// (saveSettings) — o yolla açık bir pencere sahipsiz kalırdı.
+function closeSettings() { closeProviderModal(); closeSheets(); }
 
 async function saveSettings() {
   const base_url = $("set-endpoint").value.trim();

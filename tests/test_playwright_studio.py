@@ -340,8 +340,8 @@ def test_playwright_model_sheet_alttan_aciliyor(monkeypatch):
         server.stop()
 
 
-def test_playwright_ayarlar_paneli_alttan_ve_ALANLARI_gosteriyor():
-    """Dişliyle açılan Ayarlar: alttan geliyor VE sağlayıcı alanları görünüyor.
+def test_playwright_ayarlar_paneli_ortadan_ve_ALANLARI_gosteriyor():
+    """Dişliyle açılan Ayarlar: ORTADAN geliyor VE sağlayıcı alanları görünüyor.
 
     İkinci yarısı bu turda bulunan bir kırılmanın mandalı ve kırılma bu
     değişiklikten ÖNCE de vardı: `$("settings-btn").addEventListener("click",
@@ -364,7 +364,11 @@ def test_playwright_ayarlar_paneli_alttan_ve_ALANLARI_gosteriyor():
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={"width": 390, "height": 844})
             page.goto(base_url)
-            page.wait_for_selector("#set-provider")
+            # `state="attached"`: seçici artık `.sr-only` (değeri tutan kutu
+            # gizli, görünen yüz `#set-provider-btn`) ve varsayılan "visible"
+            # ölçütü bir gün `.sr-only`nin 1x1 kutusuna takılırdı. Burada
+            # sorulan şey zaten "iskelet geldi mi", görünürlük değil.
+            page.wait_for_selector("#set-provider", state="attached")
             # 800ms'lik uyku KALKTI: yarışı yavaşlatmak kapatmak değil.
             _ilk_kurulum_perdesini_kapat(page)
 
@@ -374,12 +378,25 @@ def test_playwright_ayarlar_paneli_alttan_ve_ALANLARI_gosteriyor():
                 'getComputedStyle(document.querySelector("#settings-modal")).transform'
                 ' === "none"')
 
+            # DİKEY ORTALAMA tarayıcıda ölçülüyor: `.sheet-center` konumu
+            # `inset: 0` + `margin: auto` ile kuruyor ve `.sheet.open`ın
+            # `transform: none`u onu silmiyor. transform'la kurulsaydı kaynak
+            # taraması "ortalanmış" der, ekran köşeye kaymış bir pencere
+            # gösterirdi — `.sheet-bottom`un ölçülmüş tuzağının aynısı.
+            # 390x844'te pencere TAM EKRAN (mobile.css), o yüzden iki hâl de
+            # kabul: ya iki kenardan eşit uzaklıkta ya da ekranı kaplıyor.
             box = page.eval_on_selector("#settings-modal", "e => e.getBoundingClientRect()")
-            assert abs(box["bottom"] - 844) < 2, f"Ayarlar alt kenara dayanmıyor: {box}"
-            assert box["top"] > 0, "Ayarlar tepeye dayanmış — alttan açılmıyor"
+            ust, alt = box["top"], 844 - box["bottom"]
+            assert abs(ust - alt) < 2, (
+                f"Ayarlar dikeyde ortalanmamış (üst {ust}, alt {alt}): {box}")
+            sol, sag = box["left"], 390 - box["right"]
+            assert abs(sol - sag) < 2, (
+                f"Ayarlar yatayda ortalanmamış (sol {sol}, sağ {sag}): {box}")
 
             # Sağlayıcı seçimi AYAKTA ve bir alan grubu görünür.
-            assert page.input_value("#set-provider") == "azure", (
+            # Değer DOM'dan okunuyor: kutu `.sr-only`, yani görünürlük
+            # gerektiren bir yardımcıya bağlanmanın anlamı yok.
+            assert page.eval_on_selector("#set-provider", "e => e.value") == "azure", (
                 "dişliyle açılınca sağlayıcı seçimi düşüyor — bütün anahtar "
                 "kutuları gizlenir")
             gizli = page.evaluate(
@@ -392,9 +409,37 @@ def test_playwright_ayarlar_paneli_alttan_ve_ALANLARI_gosteriyor():
             assert 0 <= kaydet["top"] and kaydet["bottom"] <= 844, (
                 f"Kaydet görünür alanın dışında: {kaydet}")
 
-            # Odak metin kutusunda DEĞİL: alttan açılan panelde yazılım
-            # klavyesi panelin yarısını yutuyor.
+            # Odak metin kutusunda DEĞİL: bir metin kutusuna odaklanmak
+            # Android'de yazılım klavyesini açıyor ve klavye pencereyi yutuyor.
             assert page.evaluate("document.activeElement.id") != "set-endpoint"
+
+            # SAĞLAYICI PENCERESİ: ortadan açılıyor, Ayarlar AÇIK KALIYOR ve
+            # Escape yalnız üstteki katmanı kapatıyor. Üçü de yalnız tarayıcıda
+            # ölçülebilir — Escape sırası (yakalama evresi) kaynak taramasında
+            # "geçerli" görünen iki farklı hâlden birini seçmek demek.
+            page.click("#set-provider-btn")
+            page.wait_for_selector("#provider-modal:not([hidden])")
+            kartlar = page.eval_on_selector_all("#provider-list input", "e => e.length")
+            assert kartlar == 3, f"sağlayıcı kartları çizilmedi: {kartlar}"
+            page.keyboard.press("Escape")
+            # `state="attached"`: `[hidden]` bir öğe hiçbir zaman "visible"
+            # olmuyor, yani varsayılan ölçütle bu satır zaman aşımına düşerdi.
+            page.wait_for_selector("#provider-modal[hidden]", state="attached")
+            assert page.is_visible("#settings-modal.open"), (
+                "Escape iki katmanı birden kapattı — muhafız yakalama "
+                "evresinde değil (core.js'in dinleyicisi ÖNCE kayıtlı)")
+
+            # Seçim `<select>`e yönleniyor: kart → değer → alan grubu.
+            page.click("#set-provider-btn")
+            page.wait_for_selector("#provider-modal:not([hidden])")
+            page.click("#provider-list input[value='gemini']")
+            page.wait_for_selector("#provider-modal[hidden]", state="attached")
+            assert page.eval_on_selector("#set-provider", "e => e.value") == "gemini", (
+                "kart seçimi <select>e yönlenmiyor")
+            gorunen = page.evaluate(
+                """() => ["azure", "openai", "gemini"]
+                     .filter(p => !document.querySelector(`#prov-${p}`).hidden)""")
+            assert gorunen == ["gemini"], f"alan grubu değişmedi: {gorunen}"
 
             browser.close()
     finally:
@@ -1123,12 +1168,20 @@ def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(
             page.evaluate("() => openPicker()")
             page.wait_for_selector("#media-picker:not([hidden])")
             page.fill("#picker-search", "kampanyalar")
+            # SEÇİCİ `#picker-kinds` İLE KAPSANMIŞ DURUMDA ve bu kapsam
+            # YÜKLENMİŞ bir kısıt, süs değil: `.picker-nav-item` artık iki
+            # yüzeyde kullanılıyor — medya seçicisinin kapsam şeridi ve
+            # Ayarlar penceresinin sol gezinmesi. Kapsamsız sorgu Ayarlar'ın
+            # düğümlerini de topluyordu ve onlarda sayaç `<em>`i yok:
+            # `b.querySelector('em').textContent` null üzerinde patlıyor,
+            # yani test ölçtüğü şeyle ilgisi olmayan bir TypeError ile
+            # düşüyordu.
             page.wait_for_function(
-                "() => [...document.querySelectorAll('.picker-nav-item')]"
+                "() => [...document.querySelectorAll('#picker-kinds .picker-nav-item')]"
                 ".some(b => +b.querySelector('em').textContent === 3)",
                 timeout=10000)
             kapsamlar = dict(page.evaluate(
-                "() => [...document.querySelectorAll('.picker-nav-item')]"
+                "() => [...document.querySelectorAll('#picker-kinds .picker-nav-item')]"
                 ".map(b => [b.querySelector('span').textContent,"
                 " +b.querySelector('em').textContent])"))
 

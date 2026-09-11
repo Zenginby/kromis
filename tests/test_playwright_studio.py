@@ -62,7 +62,26 @@ def _ilk_kurulum_perdesini_kapat(page) -> None:
         ' return (m && m.value !== "") || !!document.querySelector(".sheet.open"); }')
     if page.query_selector(".sheet.open"):
         page.keyboard.press("Escape")
-        page.wait_for_selector(".sheet.open", state="detached")
+        # BEKLENEN KOŞUL `.open` SINIFININ GİTMESİ DEĞİL, PANELİN GERÇEKTEN
+        # ÇEKİLMESİ. `closeSheets()` sınıfı ANINDA kaldırıyor, ama style.css
+        # görünürlüğü bilerek geciktiriyor:
+        #     .sheet { visibility: hidden;
+        #              transition: transform var(--dur), visibility 0s linear var(--dur) }
+        # yani panel sınıf gittikten SONRA 180ms daha `visibility: visible`
+        # kalıyor (kapanma animasyonu görünsün diye) ve o pencerede isabet
+        # testini YUTMAYA DEVAM EDİYOR.
+        #
+        # Bedeli ölçüldü (2026-09-11, CI'da Playwright ilk kez koşarken):
+        # `test_..._karonun_ortasi_gercekten_seciyor` karonun ortasında
+        # `DIV.settings-panes` buluyordu — `.sheet.open` çoktan yokken. Kırılma
+        # yalnız panelin AÇILDIĞI makinede görünüyor, yani kimliksiz olanda:
+        # CI'da kırmızı, kimlikleri kayıtlı geliştiricide yeşil.
+        #
+        # `visibility` doğru çapa çünkü isabet testini kesen ŞEY o; `transform`
+        # bitse de `visibility: visible` kalan bir panel tıklamayı yutardı.
+        page.wait_for_function(
+            '() => [...document.querySelectorAll(".sheet")]'
+            '.every((s) => getComputedStyle(s).visibility === "hidden")')
 
 
 def _tum_kimlikler_kayitli(monkeypatch) -> None:

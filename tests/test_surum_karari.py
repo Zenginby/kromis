@@ -243,6 +243,39 @@ def test_tetikleyen_aralik_squash_itmede_yalniz_HEADi_kapsiyor():
     assert sk.tetikleyen_aralik(1) == "HEAD~1..HEAD"
 
 
+def test_baslik_sonundaki_yayin_yok_govdeli_committe_de_vetoluyor():
+    """Depodaki TEK gerçek kullanım markörü başlığın SONUNA ekliyor
+    ("docs(faz11): … kimlik kacagi kapatildi [yayin: yok]"), kendi satırına
+    değil. Gövdesi olan bir commit'te o satır metnin sonu DEĞİL: kalıp satır
+    başına çapalanmazsa geçerli bir veto sessizce çalışmaz olur."""
+    k = _karar(
+        commitler=["docs(faz11): kimlik kacagi kapatildi [yayin: yok]\n\n"
+                   "Ölçülen şeyler gövdede anlatılıyor."],
+        degisen_yollar=["app.py"],
+    )
+    assert k["yayinla"] is False
+
+
+def test_markorden_soz_eden_commit_kendi_merge_ini_vetolamiyor():
+    """v0.18.0'dan sonra gerçekten oldu: markörün KAPSAMINI daraltan commit'in
+    kendi başlığı markörü tırnak içinde anlatıyordu ve hat onu direktif saydı
+    ("Commit metninde [yayin: yok] var — yayın atlandı"). Aynı metin merge
+    commit'inin gövdesine de düşüyor, yani aralıktaki iki commit birden.
+
+    O turda yalnız docs/tools/tests değiştiği için sonuç zaten "yayın yok"tu;
+    bir dahakine yayınlanması gereken bir düzeltmeyi susturacaktı. Ayrım şu:
+    direktif satırı BİTİRİR, ondan söz eden cümle devam eder."""
+    k = _karar(
+        commitler=[
+            "fix(yayin): [yayin: yok] artik yalniz kendi merge'ini susturuyor",
+            "Merge pull request #6 from Zenginby/fix/yayin-vetosu-kapsami\n\n"
+            "fix(yayin): [yayin: yok] artik yalniz kendi merge'ini susturuyor",
+        ],
+        degisen_yollar=["app.py"],
+    )
+    assert k["yayinla"] is True
+
+
 def test_surum_etiketi_seviyeyi_ezer():
     k = _karar(commitler=["fix: küçük görünen ama büyük değişiklik [surum: minor]"])
     assert k["surum"] == "0.5.0"

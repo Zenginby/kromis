@@ -21,7 +21,7 @@ kullanıcısını kaydediyor — o gerekçe artık geçerli DEĞİL.
 | 1 — imza anahtarı | ✅ keystore repo D I Ş I N D A üretildi, dört sır tanımlandı |
 | 2–9 | ✅ uygulandı; `main` (v0.17.2) birleştirildi, tam takım **2359 geçti, 1 atlandı** |
 | 10 — doğrulama/yayın | ⏳ imza ve parmak izi ÖLÇÜLDÜ (koşu 34505244509); üç cihaz denetimi gerçek yayın varlıklarını bekliyor |
-| 11 — public'e açılma | ⏳ denetim BİTTİ (sır/lisans/Actions yüzeyi temiz); geçmiş VE GitHub tarafı temizliği ŞART, sıra Faz 11'de |
+| 11 — public'e açılma | ⏳ geçmiş temizlendi ve depo temiz geçmişle YENİDEN KURULDU (`refs/pull/*` silinemediği için); kalan: sırlar + görünürlük + uç nokta ölçümü |
 
 PR: [Zenginby/kromis#75](https://github.com/Zenginby/kromis/pull/75) — bütün
 kapılar yeşil (sızıntı taraması, paketleme kapsamı, pytest, Android paketi).
@@ -680,14 +680,14 @@ Bu tabloyu kaçırmak, geçmişi temizleyip "bitti" demek olurdu.
        yeniden yazma HEAD'in AĞACINI DEĞİŞTİRMEMEK zorunda — "yeniden
        yazılmış HEAD ağacı == özgün HEAD ağacı" iddiası, karşılık tablosunun
        kaçak bir eşleşme yapmadığının kanıtı oluyor.
-3. [ ] Geçmiş yeniden yazılsın: `--replace-text` + `--replace-message` +
+3. [x] Geçmiş yeniden yazılsın: `--replace-text` + `--replace-message` +
        `--mailmap` + `--path-rename`, 45 dalın ve 38 tag'in TAMAMI, taze bir
        klonda; sonra `--force-with-lease` ile gönderilsin.
-4. [ ] Aynı tarama DÖRDÜNÜ DE 0 demeli — içerikte, mesajda, yolda ve
+4. [x] Aynı tarama DÖRDÜNÜ DE 0 dedi — içerikte, mesajda, yolda ve
        yazar/committer üstverisinde.
 5. [x] GitHub tarafı (B tablosu) uygulandı — aşağıdaki "GitHub tarafı:
        uygulandı" bölümü.
-6. [ ] Görünürlük public'e alınsın (**kullanıcı işi** — depo ayarı).
+6. [ ] Görünürlük public'e alınsın (YENİ depoda) (**kullanıcı işi** — depo ayarı).
 7. [ ] Anonim uç nokta ölçülsün: `curl` 200 demeli; sonra uygulamada
        güncelleme bildiriminin gerçekten göründüğü görülsin.
 
@@ -740,6 +740,83 @@ gitmesi olurdu.
 > 31963046134). Bunlar artık 404. PR gövdelerini bu yüzden ayrıca düzenlemeye
 > gerek görülmedi: numara zaten metinsel bir kayıt ve hangi koşunun neden
 > gittiği burada yazılı.
+
+### Yeniden yazma uygulandı — ve YETMEDİ (2026-09-11)
+
+`--replace-text` + `--replace-message` + `--mailmap` + `--path-rename` taze
+bir mirror klonda koştu, 85 referansın her biri için ayrı
+`--force-with-lease` ile gönderildi (kör `--force` değil: uzaktaki referans
+ölçülen SHA'da durmuyorsa reddedilsin diye). Ölçümler:
+
+| iddia | sonuç |
+| --- | --- |
+| `main` AĞACI değişmedi | `81b6a6bb…` — yeniden yazma öncesiyle bit bit aynı |
+| referanslar korundu | 47 dal, 38 tag |
+| sözcük sınırlı tarama | içerik / mesaj / blob: üçü de TEMİZ |
+| kimlikler | 9 ayrı yazar+committer → **4**, hepsi `noreply` |
+| göç sağ | `paths.py` `OLD_APP_NAME = "Lumeo"` yerinde |
+| bütünlük | `git fsck` sessiz |
+| sürüm | harcanmadı (`yayinla=hayir`), tag yeni SHA'ya taşındı, 3 varlık yerinde |
+
+Bir commit DÜŞTÜ (417 → 416): tek değişikliği eski hesap adını `Zenginby`
+yapmak olan commit, karşılık tablosundan sonra iki tarafı da `Zenginby`
+okuduğu için boşaldı ve `--prune-empty auto` onu attı. Beklenen ve zararsız.
+
+#### Asıl engel: `refs/pull/*`
+
+Force-push'tan sonra taze bir **mirror** klon 740 commit getirdi, 416 değil.
+Sebep: `git clone --mirror` `refs/*`'ın tamamını alıyor ve GitHub'ın PR
+referansları (`refs/pull/N/head`, 78 adet) YENİDEN YAZILMAMIŞ commit'lere
+işaret etmeye devam ediyor. Bunlar GitHub'ın yönettiği, git ile
+yazılamayan/silinemeyen referanslar.
+
+Ölçüldü, varsayılmadı: `3a946b4` sunucuda canlı, eski posta adresiyle
+imzalı, içindeki bu plan belgesi 12 iz taşıyor; PR #75'in commit listesi
+eski SHA'ları gösteriyor. Ayrım keskin:
+
+| nasıl bakılırsa | sonuç |
+| --- | --- |
+| `git clone` (normal) | 325 commit, üç yüzey de **TEMİZ** |
+| `git clone --mirror` / `fetch refs/pull/*` / PR "Commits" sekmesi | 740 commit, 1882 iz, eski kimlikler |
+
+Yani force-push tek başına yetmiyordu: depo o hâlde public'e alınsaydı
+temizlenen her şey PR referansları üzerinden yayımlanırdı. Depo özel
+kaldığı için hiçbir zaman sızıntı olmadı.
+
+#### Çözüm: depo temiz geçmişle YENİDEN KURULDU (2026-09-11)
+
+`refs/pull/*` silinemediği için seçenek ikiye iniyordu — GitHub Support'tan
+temizlik istemek (her şeyi korur, süresi ve sonucu GitHub'da) ya da temiz
+geçmişi yeni bir depoya açmak (kesin, bugün biter). İkincisi seçildi.
+
+Uygulanan sıra:
+
+1. `Zenginby/kromis` → `Zenginby/kromis-arsiv` olarak yeniden adlandırıldı,
+   **ÖZEL kaldı**. `refs/pull/*` ve 78 PR tartışması orada duruyor.
+2. `Zenginby/kromis` adıyla yeni depo açıldı — **önce özel**, itilip
+   doğrulanmadan görünür olmasın diye.
+3. Kaynak `git clone --bare` ile alındı: `--mirror`'ın aksine `--bare`
+   `refs/pull/*`'ı GETİRMİYOR. 47 dal + 38 tag, 325 commit.
+4. Hepsi itildi. 11 dalda `main`'e birleşmemiş 1–5 commit vardı; bu yüzden
+   yalnız `main` değil dalların TAMAMI taşındı.
+5. v0.17.3 yayını üç varlığıyla yeniden kuruldu ve SHA-256 ile
+   karşılaştırıldı: üçü de bit bit aynı.
+
+**En sert sınav geçti.** Yeni deponun `--mirror` klonu — eski depoyu ele
+veren şeyin ta kendisi — yalnız `refs/heads/*` (47) ve `refs/tags/*` (38)
+getiriyor, 325 commit, `main` ağacı `81b6a6bb…`, üç yüzey TEMİZ, 4 `noreply`
+kimlik.
+
+**Bedeli, açıkça.** 78 PR tartışması ve v0.17.2'ye kadarki 37 yayın public
+tarafa gelmedi; özel arşivde duruyorlar. Belgelerdeki `#NN` biçimli PR
+atıfları bu depoda açılmıyor — ölçümlerin kendisi ilgili belgelerde yazılı
+olduğu için kayıt kaybolmuyor, yalnız bağlantı ölüyor. `releases/latest` ve
+`releases/latest/download/…` bağlantıları ÇALIŞIYOR (ölçüldü).
+
+**Sırlar taşınmadı.** GitHub sırları depoya bağlı; yeni depoda dördü de YOK
+(`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
+`ANDROID_KEY_PASSWORD`). Yeniden tanımlanmadan önce imzalı APK üretilemez;
+tek güvenilir işaret yine `İmzayı doğrula` adımının ATLANMAMIŞ olması.
 
 > **Faz 10'un cihaz denetimleri bu sırayı BEKLETMİYOR.** Planın ilk hâli
 > onları 3. adımın önüne koymuştu; ölçünce bağımlılık olmadığı görüldü:

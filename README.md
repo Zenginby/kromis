@@ -239,6 +239,21 @@ Ayrıntı, kuru prova ve sorun giderme: **[docs/yayin-hatti.md](docs/yayin-hatti
 
 ---
 
+## 🕰️ Depo geçmişi hakkında
+
+Bu depo **2026-09-11'de temiz bir geçmişle yeniden kuruldu**. Sebebi teknik:
+public'e açılmadan önce commit geçmişindeki eski kurum izleri silindi, ama
+GitHub'ın PR referansları (`refs/pull/*`) git ile silinemiyor ve yeniden
+yazılmamış commit'leri tutmaya devam ediyordu.
+
+Kodun, 47 dalın ve 38 sürüm etiketinin tamamı taşındı; **PR tartışmaları ve
+önceki sürümlerin yayınları özel arşivde kaldı.** Pratik sonucu: belgelerdeki
+`#NN` biçimli PR atıfları bu depoda açılmıyor — ölçümlerin kendisi ilgili
+belgelerde yazılı olduğu için kayıt duruyor, yalnız bağlantı ölü. Ayrıntılı
+kayıt: [Faz 11](docs/superpowers/plans/2026-09-10-kromis-yeniden-adlandirma.md).
+
+---
+
 ## 📜 Lisans
 
 Bu proje **MIT Lisansı** altında lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakabilirsiniz.

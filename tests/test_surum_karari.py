@@ -27,6 +27,9 @@ def _karar(**kwargs):
         degisen_yollar=["app.py"],
     )
     varsayilan.update(kwargs)
+    # Testlerin çoğu vetonun kapsamıyla ilgilenmiyor; belirtilmediyse "bu
+    # itmenin getirdiği commit'ler" = aralığın tamamı sayılıyor.
+    varsayilan.setdefault("tetikleyen_commitler", varsayilan["commitler"])
     return sk.karar(**varsayilan)
 
 
@@ -182,8 +185,62 @@ def test_hic_degisiklik_yoksa_yayin_yok():
 # --------------------------------------------------------------------------
 
 def test_yayin_yok_etiketi_yayini_durdurur():
-    k = _karar(commitler=["fix: acil", "[yayin: yok]"], degisen_yollar=["app.py"])
+    k = _karar(commitler=["fix: acil", "[yayin: yok]"],
+               tetikleyen_commitler=["fix: acil", "[yayin: yok]"],
+               degisen_yollar=["app.py"])
     assert k["yayinla"] is False
+
+
+def test_onceki_bir_turun_yayin_yok_etiketi_bu_merge_i_susturmuyor():
+    """Etiket YAPIŞKANDI ve hattı sessizce kilitliyordu — gerçekten oldu.
+
+    Veto son tag'den HEAD'e bütün commit'lerde aranıyordu. Veto yeni tag
+    atılmasını da engellediği için etiketi taşıyan commit pencereden HİÇ
+    çıkmıyor ve ondan sonraki HER merge de yayınsız kalıyordu. Depoda tam
+    olarak bu yaşandı: `docs(faz11): … [yayin: yok]` v0.17.3'ten sonra girdi,
+    ardından gelen iki PR (biri `feat:` ve `static/` değiştiriyor) yayın
+    üretmedi. Koşu "başarılı" göründüğü için kusur ancak "yayın nerede?" diye
+    sorulunca fark edildi.
+
+    Kapsam artık BU İTMENİN getirdiği commit'ler: etiket eski bir commit'te
+    kaldıysa yayını durdurmuyor.
+    """
+    k = _karar(
+        commitler=["docs: önceki tur [yayin: yok]", "feat: bu turun işi"],
+        tetikleyen_commitler=["feat: bu turun işi"],
+        degisen_yollar=["app.py"],
+    )
+    assert k["yayinla"] is True
+    # Seviye TÜM aralıktan geliyor: yayınlanmamış bir feat minörü hak ediyor.
+    assert k["surum"] == "0.5.0"
+
+
+def test_eski_commitlerdeki_feat_seviyeyi_belirlemeye_devam_ediyor():
+    """Kapsamı daraltmak SEVİYE tespitini daraltmamalı.
+
+    Veto penceresi küçüldü diye seviye de küçülseydi, yayınlanmamış bir
+    `feat:` sonraki yayında yama sayılır ve sürüm sessizce yanlış artardı.
+    """
+    k = _karar(
+        commitler=["feat: yayınlanmamış iş", "fix: bu turun düzeltmesi"],
+        tetikleyen_commitler=["fix: bu turun düzeltmesi"],
+        degisen_yollar=["app.py"],
+    )
+    assert k["surum"] == "0.5.0"
+
+
+def test_tetikleyen_aralik_birlestirmede_DALIN_commitlerini_kapsiyor():
+    """Etiket bu depoda DAL commit'ine yazılıyor, merge commit'ine değil.
+
+    `docs(faz11): … [yayin: yok]` dalın commit'iydi; merge commit'inin metni
+    "Merge pull request #2 …". Yalnız HEAD'e bakan bir kapsam kullanıcının
+    niyetini kaçırır ve istenmeyen bir yayın çıkardı.
+    """
+    assert sk.tetikleyen_aralik(2) == "HEAD^1..HEAD"
+
+
+def test_tetikleyen_aralik_squash_itmede_yalniz_HEADi_kapsiyor():
+    assert sk.tetikleyen_aralik(1) == "HEAD~1..HEAD"
 
 
 def test_surum_etiketi_seviyeyi_ezer():

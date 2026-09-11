@@ -13,6 +13,9 @@ KARAR KURALI
     1) version.py son tag'den İLERİDEYSE → o sürüm henüz yayınlanmamış demektir.
        Artırma YOK, olduğu gibi yayınla.  (kendi kendini onarma)
     2) version.py son tag'le AYNIYSA → tag'den beri gelen değişikliklere bak:
+         - BU İTMEDE `[yayin: yok]` varsa       → yayın YOK (yalnız kendi
+                                                  merge'ini susturur; kapsam
+                                                  `tetikleyen_aralik`)
          - hiçbiri pakete girmiyorsa            → yayın YOK
          - `feat` varsa                         → minör artır
          - `!`/BREAKING CHANGE varsa            → majör artır
@@ -182,6 +185,7 @@ def karar(
     mevcut_surum: str,
     son_tag: str | None,
     commitler: list[str],
+    tetikleyen_commitler: list[str],
     degisen_yollar: list[str],
 ) -> dict[str, object]:
     """Yayın kararı. Saf fonksiyon — git'e, ağa, dosya sistemine dokunmaz.
@@ -237,7 +241,16 @@ def karar(
         }
 
     # 2. KURAL — version.py son tag'le aynı.
-    if any(_YAYIN_YOK.search(m) for m in commitler):
+    #
+    # Veto YALNIZ bu itmenin getirdiği commit'lerde aranıyor, aralığın
+    # tamamında DEĞİL. Fark kozmetik değil: veto yeni tag atılmasını da
+    # engellediği için etiketi taşıyan commit pencereden hiç çıkmıyordu ve
+    # ondan sonraki HER merge sessizce yayınsız kalıyordu (v0.17.3'ten sonra
+    # gerçekten oldu — bkz. tests/test_surum_karari.py'deki
+    # test_onceki_bir_turun_yayin_yok_etiketi_bu_merge_i_susturmuyor).
+    # Seviye tespiti ise BİLEREK tüm aralığa bakmaya devam ediyor: yayınlanmamış
+    # bir `feat:` sonraki yayında da minörü hak ediyor.
+    if any(_YAYIN_YOK.search(m) for m in tetikleyen_commitler):
         return {
             "yayinla": False,
             "surum": mevcut_surum,
@@ -361,13 +374,43 @@ def _cikti_yaz(karar_sozlugu: dict[str, object]) -> None:
             f.write(f"- Sürüm: **{satirlar['surum']}**\n")
 
 
-def _gecmis(son: str | None) -> tuple[list[str], list[str]]:
-    """(commit metinleri, değişen yollar) — son tag'den HEAD'e."""
+def tetikleyen_aralik(ebeveyn_sayisi: int) -> str:
+    """Bu itmenin GETİRDİĞİ commit'lerin git aralığı.
+
+    İki ayrı biçim, çünkü `main`'e iki ayrı yoldan yazılıyor:
+
+    * **Birleştirme commit'i** (iki ebeveyn): `HEAD^1..HEAD` — dalın bütün
+      commit'leri ARTI merge commit'i. Yalnız HEAD'e bakmak YETMEZ: bu depoda
+      `[yayin: yok]` etiketi DAL commit'ine yazılıyor (`docs(faz11): …`),
+      merge commit'inin metni ise "Merge pull request #N …". Dar bir kapsam
+      kullanıcının niyetini kaçırır ve istenmeyen bir yayın çıkarırdı.
+    * **Düz/squash itme** (tek ebeveyn): `HEAD~1..HEAD` — getirdiği tek commit
+      HEAD'in kendisi.
+    """
+    return "HEAD^1..HEAD" if ebeveyn_sayisi >= 2 else "HEAD~1..HEAD"
+
+
+def _commit_metinleri(aralik: str) -> list[str]:
+    return [c for c in _git("log", aralik, "--format=%B%x00").split("\0") if c.strip()]
+
+
+def _head_ebeveyn_sayisi() -> int:
+    # "<head> <ebeveyn1> [<ebeveyn2>]" — ilk alan commit'in kendisi.
+    return len(_git("rev-list", "--parents", "-n", "1", "HEAD").split()) - 1
+
+
+def _gecmis(son: str | None) -> tuple[list[str], list[str], list[str]]:
+    """(commit metinleri, bu itmenin commit metinleri, değişen yollar).
+
+    İlk liste son tag'den HEAD'e kadar HER ŞEY (seviye ve notlar oradan
+    geliyor); ikincisi yalnız bu itmenin getirdikleri (veto kapsamı).
+    """
     if not son:
-        return [], []
-    commitler = [c for c in _git("log", f"{son}..HEAD", "--format=%B%x00").split("\0") if c.strip()]
+        return [], [], []
+    commitler = _commit_metinleri(f"{son}..HEAD")
+    tetikleyen = _commit_metinleri(tetikleyen_aralik(_head_ebeveyn_sayisi()))
     yollar = [y for y in _git("diff", "--name-only", f"{son}...HEAD").splitlines() if y]
-    return commitler, yollar
+    return commitler, tetikleyen, yollar
 
 
 def main() -> int:
@@ -382,7 +425,7 @@ def main() -> int:
     # böylece not üretimi de karar mantığıyla aynı yerde, aynı testlerin
     # altında kalıyor.
     if "--notlar" in sys.argv[1:]:
-        commitler, _ = _gecmis(son)
+        commitler, _, _ = _gecmis(son)
         for n in degisiklik_notlari(commitler):
             print(n)
         return 0
@@ -406,12 +449,13 @@ def main() -> int:
         })
         return 0
 
-    commitler, yollar = _gecmis(son)
+    commitler, tetikleyen, yollar = _gecmis(son)
 
     _cikti_yaz(karar(
         mevcut_surum=version.APP_VERSION,
         son_tag=son,
         commitler=commitler,
+        tetikleyen_commitler=tetikleyen,
         degisen_yollar=yollar,
     ))
     return 0

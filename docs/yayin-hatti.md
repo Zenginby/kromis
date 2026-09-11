@@ -85,6 +85,19 @@ Commit ya da PR başlığına yazılır:
 - `[surum: minor]` / `[surum: major]` / `[surum: patch]` — seviyeyi ez
 - `[not] Kullanıcıya şu şekilde anlat.` — GUNCELLEME.md'ye **bu** cümle girsin
 
+`[yayin: yok]` YALNIZ kendi merge'ini susturuyor: kapsam, itmenin getirdiği
+commit'ler (birleştirmede dalın commit'leri + merge commit'i, düz/squash itmede
+tek commit). Bir dönem bütün aralık taranıyordu ve sonuç sessiz bir kilitti —
+veto yeni tag atılmasını da engellediği için etiketli commit pencereden hiç
+çıkmıyor, ondan sonraki her merge de yayınsız kalıyordu. v0.17.3'ten sonra
+gerçekten yaşandı: etiket bir belge commit'indeydi, ardından gelen iki PR (biri
+`feat:`) yayın üretmedi ve koşular "başarılı" göründüğü için kusur ancak "yayın
+nerede?" diye sorulunca görüldü.
+
+Seviye tespiti bu daraltmanın DIŞINDA: `feat:`/`fix:`/`[surum: …]` hâlâ son
+tag'den beri biriken bütün commit'lerden okunuyor, yoksa yayınlanmamış bir
+`feat:` sonraki yayında yama sayılırdı.
+
 Son madde önemli: not verilmezse GUNCELLEME.md commit başlıklarından üretiliyor
 ve `fix(ci): ABI kapısı aapt2'nin tek tırnağını da silsin` satırı kullanıcı için
 hiçbir şey ifade etmiyor.

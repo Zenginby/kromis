@@ -88,6 +88,25 @@ def _tum_kimlikler_kayitli(monkeypatch) -> None:
         lambda *a, **k: {m.id: True for m in catalog.CHAT_MODELS})
 
 
+def _hicbir_kimlik_kayitli_degil(monkeypatch) -> None:
+    """Sunucuyu "hiçbir sağlayıcının anahtarı yok" hâline getirir.
+
+    NEDEN GEREKLİ: `credstore` GERÇEK kimlik deposunu okuyor ve `ServerThread`
+    uygulamayı aynı süreçte koşturuyor. Yani "anahtarsız kurulum" öncülü,
+    kurgulanmadığı sürece TESTİN DEĞİL, testi koşturan MAKİNENİN özelliği
+    oluyordu: CI'da (kimliksiz) yeşil, geliştiricinin kendi makinesinde
+    (kimlikleri kayıtlı) kırmızı. Bu depoda ölçüldü — `configured_map()`
+    azure_image/azure_chat/gemini/azure_foundry için True dönüyor, `loadSettings`
+    paneli haklı olarak AÇMIYOR ve `.sheet.open` beklemesi 30sn'de düşüyordu.
+
+    Kırmızının anlattığı şey uygulamayla ilgili DEĞİLDİ, o yüzden okuyanı da
+    kaynağa götürmüyordu. `_tum_kimlikler_kayitli`nin tersi; ikisi de aynı
+    duruşun parçası: öncül kurguyla kurulur, ortamdan UMULMAZ.
+    """
+    monkeypatch.setattr(credstore, "configured_map", lambda *a, **k: {})
+    monkeypatch.setattr(credstore, "chat_configured_map", lambda *a, **k: {})
+
+
 def get_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(('127.0.0.1', 0))
@@ -690,7 +709,7 @@ def test_playwright_buyutecte_logo_ekle_kayitli_gorselde_beliriyor():
         server.stop()
 
 
-def test_playwright_anahtarsiz_acilis_BOS_HALI_anlatiyor():
+def test_playwright_anahtarsiz_acilis_BOS_HALI_anlatiyor(monkeypatch):
     """Anahtar yokken şerit ve panel BOŞ HÂLİ anlatıyor, boş kalmıyor.
 
     Bu, kullanıcı isteğinin ("API key'i girilmeyen modeller gözükmesin")
@@ -700,9 +719,14 @@ def test_playwright_anahtarsiz_acilis_BOS_HALI_anlatiyor():
     kullanıcı sonsuza kadar yüklenen bir şerit görüyordu. Kaynak taraması bunu
     yakalayamaz: her iki hâlde de kod "doğru" görünüyor, fark ekranda.
 
-    Kimlikler BİLEREK kurgulanmıyor — bu testin öncülü zaten anahtarsız bir
-    kurulum (CI'ın varsayılan hâli).
+    ÖNCÜL KURGULANIYOR. Burada "kimlikler bilerek kurgulanmıyor, bu testin
+    öncülü zaten anahtarsız bir kurulum (CI'ın varsayılan hâli)" yazıyordu ve
+    o cümle testi CI'a bağımlı kılıyordu: `credstore` gerçek kimlik deposunu
+    okuduğu için öncül, testin değil MAKİNENİN özelliğiydi — kimlikleri kayıtlı
+    her geliştiricide bu test kırmızıydı ve kırmızısı uygulama hakkında hiçbir
+    şey söylemiyordu (bkz. `_hicbir_kimlik_kayitli_degil`).
     """
+    _hicbir_kimlik_kayitli_degil(monkeypatch)
     port = get_free_port()
     server = ServerThread(port)
     server.start()

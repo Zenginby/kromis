@@ -190,6 +190,17 @@ sonucu var:
 
 ---
 
+## Sürüm 0.19.0 — ne değişti
+
+- playwright yalniz test isine kuruluyor, paket + tarayici tek adimda
+- ilk kurulum perdesi GERCEKTEN cekilene kadar bekleniyor
+- anahtarsiz acilis testi kendi onculunu kuruyor
+- bildirim acik sayfaya ulasiyor, eylem bir dugme oldu
+- veto markörü artık satırı bitirmek zorunda
+- [yayin: yok] artik yalniz kendi merge'ini susturuyor
+
+---
+
 ## Sürüm 0.18.0 — ne değişti
 
 - Ayarlar penceresi ekranin ortasindan aciliyor ve bolumlere ayrildi;

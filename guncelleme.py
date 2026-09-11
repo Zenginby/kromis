@@ -40,6 +40,11 @@ depo o gün `private`'tı ve
 pakete token gömmek DEĞİL (bir okuma token'ı bile paketi indiren herkese
 verilmiş olurdu), yayın bilgisini token istemeyen bir yerden okumak ya da
 özelliği kapatmak.
+
+ŞART 2026-09-11'de SAĞLANDI ve ölçüldü: depo public'e açıldı, aynı `curl`
+200 dönüyor, `_sor()` artık `None` değil `{"surum": …, "url": …}` veriyor.
+Bu satır bir kutlama değil, kontrolün canlı olduğunun tarihli kanıtı —
+görünürlük bir gün geri alınırsa yukarıdaki sessiz ölüm aynen geri gelir.
 """
 from __future__ import annotations
 

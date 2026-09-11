@@ -20,7 +20,7 @@ kullanıcısını kaydediyor — o gerekçe artık geçerli DEĞİL.
 | 0 — depo adı | ✅ `Zenginby/kromis`; boş "taşındı" deposu bilerek AÇILMADI (gerekçe Faz 0'da) |
 | 1 — imza anahtarı | ✅ keystore repo D I Ş I N D A üretildi, dört sır tanımlandı |
 | 2–9 | ✅ uygulandı; `main` (v0.17.2) birleştirildi, tam takım **2359 geçti, 1 atlandı** |
-| 10 — doğrulama/yayın | ⏳ imza ve parmak izi ÖLÇÜLDÜ (koşu 34505244509); üç cihaz denetimi gerçek yayın varlıklarını bekliyor |
+| 10 — doğrulama/yayın | ⏳ imza, parmak izi, Windows ön yükleme ve Android yan-yana kurulum ÖLÇÜLDÜ; tek kalan masaüstü göçü (eski veri dizini duran bir makine gerekiyor) |
 | 11 — public'e açılma | ✅ depo temiz geçmişle yeniden kuruldu, public, imza doğrulandı, güncelleme kontrolü CANLI |
 
 PR: [Zenginby/kromis#75](https://github.com/Zenginby/kromis/pull/75) — bütün
@@ -569,8 +569,19 @@ gömülü. Güncellenmezse kalıp hiçbir şey bulamaz ve tek-kaynak bekçisi t�
   > komut hemen döner ve dosya bir iki saniye sonra oluşur. İkisi de belgeye
   > yazıldı; `Start-Process -PassThru` + `WaitForExit` + çıkış kodu tablosu
   > verildi (CI kapısı zaten bu sebeple `& $exe` kullanmıyor).
-* [ ] Android: eski kurulu bir cihaza yeni APK'yı kur — yan yana kurulum ve göç
-      notunun doğruluğu ölçülür
+* [x] Android: eski kurulu bir cihaza yeni APK'yı kur — **ölçüldü
+      (2026-09-11, gerçek telefon):** eski uygulama kuruluyken yeni APK
+      kurulduğunda Android GÜNCELLEME YAPMADI, ayrı uygulama olarak kurdu.
+      Beklenen buydu: `applicationId` `com.zenginby.kromis`'e taşındığı için
+      işletim sistemi ikisini akraba saymıyor.
+
+  > **Ne ölçüldü, ne ölçülmedi.** Ölçülen: yan yana kurulum, yani eski sürümü
+  > kullanan biri yeni sürüme geçerken eskisini KAYBETMİYOR ve ikisi bir arada
+  > durabiliyor. Ölçülmeyen: eski uygulamanın verisinin yeni uygulamaya geçip
+  > geçmediği — ölçülemezdi de, Android'de uygulama veri dizinleri birbirine
+  > kapalı ve `GUNCELLEME.md`'nin geçiş notu zaten bunu söylüyor. Masaüstündeki
+  > göç bundan AYRI bir mekanizma (`paths.OLD_APP_NAME`) ve aşağıdaki madde onu
+  > ölçüyor.
 * [ ] Masaüstünde göç: eski veri dizini duran bir makinede yeni sürümü aç;
       kütüphane ve API anahtarlarının yerinde olduğunu gör
 

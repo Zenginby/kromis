@@ -47,5 +47,14 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
+      # Tarayıcı ikilisi pip paketiyle GELMİYOR, ayrı indiriliyor — ve o indirme
+      # olmadan `pytest.importorskip` değil ama `p.chromium.launch()` düşerdi.
+      # YALNIZ chromium: testlerin tamamı onu başlatıyor, öteki iki motoru
+      # indirmek indirme süresini üçe katlar ve hiçbir iddiayı sınamaz.
+      # `--with-deps` işletim sistemi kütüphanelerini de kuruyor; runner
+      # imajında bulunmayanlar olmadan chromium başlamıyor.
+      - name: Playwright tarayıcısı
+        run: playwright install --with-deps chromium
+
       - name: Pytest
         run: pytest tests/ -q

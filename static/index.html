@@ -1045,8 +1045,9 @@
 
   <!-- Yönetmen ayarları: sağdan slide-over. `.sheet-right` ve `sheet-grip` YOK —
        ikisi birlikte bilinçli: ayarların yeri bu depoda sağ şerit (#specs-sheet,
-       #look-sheet, #palette-modal) ve tutamak yalnız ALTTAN açılan iki panelde
-       var (dekoratif; sürükleyerek kapatma yok, o yüzden söz de yok).
+       #look-sheet, #palette-modal) ve tutamak yalnız ALTTAN açılan panelde
+       var (bugün tek: #model-sheet — dekoratif; sürükleyerek kapatma yok, o
+       yüzden söz de yok).
 
        İÇERİK bugün tek alan ve bu bir eksiklik değil karar: kullanıcı yalnız
        kalıcı yönlendirmeyi istedi. Soru sıklığı, varsayılan üslup/dil ve öneri
@@ -1144,18 +1145,30 @@
     </div>
   </div>
 
-  <!-- Ayarlar: ALTTAN açılan panel. Yol ortalanmış modal → sağdan slide-over
-       (A5, tasarım §2.4/3) → alttan panel; bu son adım model seçicisiyle
-       AYNI yüzeyi paylaşmak için atıldı: telefonda iki ayarlar yüzeyinin biri
-       yandan biri alttan gelmesi, ikisini iki ayrı yer gibi gösteriyordu.
+  <!-- Ayarlar: ORTADAN açılan pencere. Yol ortalanmış modal → sağdan
+       slide-over (A5, tasarım §2.4/3) → alttan panel → ortadan pencere.
+       Son adımın gerekçesi ölçüm değil KULLANICI KARARI: alttan açılan yüzey
+       560px'lik bir şeritti ve form ona sığmıyordu — panel her açılışta
+       kaydırılmak zorundaydı. Ortada açılan pencere iki sütun taşıyabiliyor,
+       yani form SOL GEZİNMEYLE bölümlere ayrılabiliyor; alttan açılan bir
+       şeritte olmayan tek şey buydu.
+
+       KABUK HÂLÂ `.sheet` ve bu bilerek: perde (`body:has(.sheet.open)
+       .scrim`), Escape şelalesi (core.js), Android geri tuşu
+       (`window.geriTusu`) ve odak iadesi (`closeSheets`) DÖRDÜ DE
+       `.sheet.open` seçicisine bakıyor. `.modal`a çevirmek dördünü de
+       sıfırdan yazmak demekti; `.sheet-center` yalnızca DÖRDÜNCÜ BİR YÖN —
+       `.sheet-bottom`un kendi gerekçesinin aynısı (style.css).
+
+       TUTAMAK GİTTİ: `.sheet-grip` "bu yüzey aşağıdan geldi" diyen bir
+       işaretti. Ortada açılan bir pencerede aynı çubuk "aşağı sürükle"
+       diye okunur ve tutulmayan bir söz verirdi.
 
        id `settings-modal` KALIYOR: 152 id sözleşmesinin ve JS bağlarının
-       parçası; ad telin üstündeki isim, yüzey hakkında bir iddia değil —
-       "modal" olmayalı üç tur geçti. Açık/kapalı `.open` sınıfıyla
-       anlatılıyor (oturum paneliyle aynı mekanik), perde ortak
-       #shell-scrim. -->
-  <aside id="settings-modal" class="sheet sheet-bottom" aria-label="Ayarlar">
-    <span class="sheet-grip" aria-hidden="true"></span>
+       parçası; ad telin üstündeki isim, yüzey hakkında bir iddia değil.
+       Açık/kapalı `.open` sınıfıyla anlatılıyor (oturum paneliyle aynı
+       mekanik), perde ortak #shell-scrim. -->
+  <aside id="settings-modal" class="sheet sheet-center" aria-label="Ayarlar">
     <div class="sheet-head">
       <!-- Başlık "Azure Ayarları" DEĞİL "Ayarlar": panel artık kimlik dışında
            bir tercih de taşıyor (oturumların otomatik kaydı) ve tasarım §4.1
@@ -1164,31 +1177,86 @@
       <h2 id="settings-title">Ayarlar</h2>
       <button id="settings-close" class="modal-x" type="button" aria-label="Kapat">×</button>
     </div>
-    <div class="sheet-body">
-      <h3 class="modal-subhead modal-subhead-first">Görsel modelleri · erişim</h3>
+    <!-- İKİ SÜTUN: solda bölümler, sağda yalnız seçili bölümün alanları.
+         Öncesinde dört bölüm TEK kayan gövdedeydi ve toplam 19 blok ediyordu
+         (4 başlık, 3 alan grubu, 7 uzun not, 2 anahtar, künye, güncelleme) —
+         kullanıcının "çok karışık" dediği şey buydu. Bölmek bilgiyi silmiyor,
+         AYNI ANDA GÖRÜNENİ azaltıyor.
+
+         Gezinme düğmeleri `.picker-nav-item` sınıfını YENİDEN KULLANIYOR
+         (medya seçicisinin sol bölmesi): `aria-current` durumu, hover'ı ve
+         kırpması hazır. İkinci bir gezinme bileşeni yazmak, ikisinin zamanla
+         ayrışması demekti. -->
+    <div class="sheet-body settings-layout">
+      <!-- `<nav>` + `aria-current="page"` DEĞİL `"true"`: bunlar sayfa değil
+           aynı pencerenin bölmeleri (`.picker-nav-item`in kendi kalıbı). -->
+      <nav id="settings-nav" class="settings-nav" aria-label="Ayarlar bölümleri">
+        <button type="button" class="picker-nav-item" data-pane="access"
+                aria-current="true"><span>Erişim</span></button>
+        <!-- Bu düğme SAĞLAYICIYA GÖRE gizlenebiliyor (settings.js
+             `syncChatDeployField`): dağıtım adı istemeyen bir sağlayıcıda
+             bölümde görünecek hiçbir şey kalmıyor ve boş bir bölme, tıklanacak
+             bir soru işaretinden başka bir şey değil. -->
+        <button type="button" class="picker-nav-item" id="settings-nav-director"
+                data-pane="director"><span>Yönetmen</span></button>
+        <button type="button" class="picker-nav-item" data-pane="sessions">
+          <span>Oturumlar</span></button>
+        <button type="button" class="picker-nav-item" data-pane="about">
+          <span>Hakkında</span></button>
+      </nav>
+
+      <div class="settings-panes">
+
+      <!-- ── Erişim ───────────────────────────────────────────────────── -->
+      <section class="settings-pane" data-pane="access">
       <p class="modal-desc">
-        Anahtarlar yalnızca bu makineye kaydedilir (izin 0600) ve ekranda
-        hiçbir zaman gösterilmez. Sağlayıcıyı seç, alanlarını doldur, Kaydet'e bas.
+        Anahtarlar yalnız bu makinede saklanır ve ekranda hiç gösterilmez.
       </p>
 
       <!-- SEÇİCİ + TEK ALAN GRUBU deseni. Alternatifler ve neden değil:
-             · Her sağlayıcıya bir .modal-subhead bölümü → 360px'de tam
-               genişlik bir slide-over'da onlarca alanlık bir kaydırma olur ve
-               istek "10+ modele ölçeklenirken alan duvarına dönüşmesin" idi.
-             · <details> akordeon → index.html'de HİÇ <details> yok. Bir
-               slide-over'ın içinde, Android'de, ayarlar panelinde hiç
-               kullanılmamış bir etkileşim ilkeli açmanın yeri burası değil.
+             · Her sağlayıcıya bir .modal-subhead bölümü → onlarca alanlık bir
+               kaydırma olur ve istek "10+ modele ölçeklenirken alan duvarına
+               dönüşmesin" idi.
+             · <details> akordeon → index.html'de HİÇ <details> yok. Ayarlar
+               penceresinde hiç kullanılmamış bir etkileşim ilkeli açmanın yeri
+               burası değil.
            Seçicinin bedeli "hangisi kurulu?" sorusunu bir bakışta
-           cevaplayamamak; o bedel aşağıdaki #provider-status satırıyla
-           METİNLE geri alınıyor ve kaynağı GET /api/settings'in `providers`
-           bayrakları, yani ikinci bir doğruluk kaynağı doğmuyor. -->
-      <ul id="provider-status" class="provider-status" aria-live="polite"></ul>
+           cevaplayamamak; o bedel artık SEÇİCİNİN KENDİ KARTLARINDA, her
+           satırdaki "kayıtlı" rozetiyle ödeniyor (settings.js
+           `renderProviderCards`). Ayrı bir #provider-status listesi bu turda
+           KALKTI: aynı olguyu iki yerde söylemek sadeleştirmenin tersiydi ve
+           kaynağı da aynı `providers` bayraklarıydı. -->
+      <!-- `<label for>` DEĞİL `<span>`: etiketin işaret edeceği kontrol artık
+           ekran okuyucudan gizli (`aria-hidden`), yani `for` odağı görünmeyen
+           bir kutuya yollardı. Erişilebilir ad düğmeye `aria-labelledby` ile
+           bağlanıyor; görünüş `label` kuralının aynısı (style.css). -->
+      <span class="settings-label" id="set-provider-caption">Sağlayıcı</span>
+      <!-- DEĞERİ HÂLÂ `<select>` TUTUYOR, düğme onun görünen yüzü — `#model`
+           çipinin birebir deseni (style.css `.model-chip`, core.js
+           `renderModelCards`). Gerekçe ölçülmüş: native bir `<select>`in
+           açtığı liste tarayıcı/işletim sistemi tarafından çiziliyor, yani
+           uygulamanın hiçbir jetonuna (`--panel`, `--r-item`, `--accent`)
+           uğramıyor ve CSS ile biçimlendirilemiyor — karanlık bir arayüzün
+           ortasında sistem renkli bir kutu açılıyordu.
 
-      <label for="set-provider">Sağlayıcı</label>
-      <select id="set-provider">
-        <option value="azure" selected>Azure OpenAI (varsayılan)</option>
-        <option value="openai">OpenAI · gpt-image-2</option>
-        <option value="gemini">Google Gemini · Nano Banana</option>
+           `<select>`i SİLMEK yerine gizlemenin sebebi: değerin tek sahibi o ve
+           `change` zinciri (syncProviderFields → alan grupları + dağıtım
+           kapısı) ona bağlı. Kaldırmak o zincirin ikinci bir kopyasını yazmak
+           olurdu; `.sr-only` bedava. -->
+      <button type="button" id="set-provider-btn" class="provider-pick"
+              aria-haspopup="dialog" aria-expanded="false"
+              aria-controls="provider-modal"
+              aria-labelledby="set-provider-caption set-provider-label">
+        <span class="provider-pick-ic" id="set-provider-ic" aria-hidden="true"></span>
+        <span id="set-provider-label">Azure OpenAI</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+      </button>
+      <select id="set-provider" class="sr-only" tabindex="-1" aria-hidden="true">
+        <option value="azure" selected>Azure OpenAI</option>
+        <option value="openai">OpenAI</option>
+        <option value="gemini">Google Gemini</option>
       </select>
 
       <!-- Her sağlayıcı AYRI blok, paylaşılan tek bir <input> DEĞİL: paylaşılan
@@ -1206,20 +1274,18 @@
         <label for="set-key">API Key</label>
         <input id="set-key" type="password" autocomplete="off" spellcheck="false"
                placeholder="Azure API anahtarını yapıştır" />
-        <p class="field-note">
-          Azure AI Foundry'deki kaynak adresi ve anahtarı. Adres her kullanıcıda
-          farklı olduğu için burada soruluyor — OpenAI'de sabit.
-        </p>
+        <p class="field-note">Azure AI Foundry'deki kaynak adresi ve anahtarı.</p>
 
         <label for="set-foundry-url">Foundry adresi (MAI · FLUX)</label>
         <input id="set-foundry-url" type="url" autocomplete="off" spellcheck="false"
                placeholder="boş bırak: Endpoint'ten türetilir" />
+        <!-- NOT KISALDI, KURAL DEĞİL: "boş bırakılırsa Endpoint'ten türetilir"
+             cümlesi kalmak ZORUNDA, çünkü bu alanın çoğu kurulumda BOŞ
+             BIRAKILMASI gerektiğini söyleyen tek yer o — yer tutucu da aynı
+             şeyi tekrarlıyor ki not okunmasa bile bilgi kaybolmasın. -->
         <p class="field-note">
-          MAI ve FLUX modelleri aynı kaynakta ama başka bir hostta
-          (<code>services.ai.azure.com</code>) duruyor. <strong>Boş bırakılırsa
-          adres yukarıdaki Endpoint'ten türetilir</strong> ve anahtar da aynı
-          kalır — yani çoğu kurulumda burada yapılacak bir şey yok. Yalnızca
-          vekil arkasındaki ya da ayrı bir kaynaktaki dağıtımlar için doldur.
+          Boş bırak — adres Endpoint'ten türetilir. Yalnız ayrı bir kaynak ya da
+          vekil arkasındaki dağıtımlar için doldur.
         </p>
       </div>
 
@@ -1227,12 +1293,12 @@
         <label for="set-openai-key">OpenAI API Key</label>
         <input id="set-openai-key" type="password" autocomplete="off"
                spellcheck="false" placeholder="sk-…" />
-        <p class="field-note">
-          platform.openai.com → API keys. <strong>gpt-image-2</strong> Azure'daki
-          modelin aynısı. <strong>gpt-image-1</strong> hâlâ seçilebiliyor ama
-          23 Ekim 2026'da API'den kalkıyor; <strong>DALL·E 3</strong> 12 Mayıs
-          2026'da kalktı ve katalogdan çıkarıldı.
-        </p>
+        <!-- MODEL EMEKLİLİK TARİHLERİ BURADAN ÇIKTI ve kaybolmadı: katalog
+             onları zaten taşıyor ve model seçicisinin kartlarında `note`
+             alanıyla görünüyorlar. Anahtar girmeye gelen kullanıcının
+             cevaplaması gereken soru "anahtarı nereden alırım" — bu satır
+             yalnızca onu söylüyor. -->
+        <p class="field-note">platform.openai.com → API keys.</p>
       </div>
 
       <!-- Gemini'nin ADRES alanı YOK, OpenAI ile aynı gerekçeyle: adres her
@@ -1244,75 +1310,76 @@
         <label for="set-gemini-key">Gemini API Key</label>
         <input id="set-gemini-key" type="password" autocomplete="off"
                spellcheck="false" placeholder="AIza…" />
+        <!-- "Ücretsiz kademede kapalı" KALIYOR: anahtarı olan ama üretemeyen
+             kullanıcının tek açıklaması o ve fatura tarafında bir karar
+             gerektiriyor. Oran/çözünürlük anlatımı gitti — o bilgi zaten
+             üretim ayarları panelinde, seçenekleri çizen yerde. -->
         <p class="field-note">
-          aistudio.google.com → API keys. <strong>Nano Banana</strong>
-          modellerinde piksel boyutu değil <strong>oran</strong> seçiliyor
-          (1:1, 16:9, 9:16 …) ve çözünürlük 1K/2K/4K olarak ayrı bir eksen.
-          Görsel üretimi ücretsiz kademede kapalı.
+          aistudio.google.com → API keys. Görsel üretimi ücretsiz kademede kapalı.
         </p>
       </div>
 
+      </section>
+
+      <!-- ── Yönetmen ─────────────────────────────────────────────────── -->
       <!-- BAŞLIK DA KUTUYLA BİRLİKTE GİDİYOR (`#chat-deploy-head`). Önceki tur
            yalnız kutuyu gizliyor, yerine "bu sağlayıcıda dağıtım adı yok"
-           cümlesini koyuyordu: başlık + açıklama, 360px'lik bir panelde
-           kullanıcının YAPACAĞI bir şey olmadığı hâlde iki satır yer tutuyordu.
-           Artık sağlayıcı bir alan istemiyorsa bölümden hiçbir şey görünmüyor.
-           Kaldırılan cümlenin bilgisi kaybolmuyor: talimat dosyası yolu aşağıda
-           KOŞULSUZ duruyor ve sohbet modelinin nereden seçildiği composer'ın
-           üstündeki şeridin kendisiyle zaten söyleniyor.
+           cümlesini koyuyordu: başlık + açıklama, kullanıcının YAPACAĞI bir şey
+           olmadığı hâlde iki satır yer tutuyordu. Artık sağlayıcı bir alan
+           istemiyorsa bölümden hiçbir şey görünmüyor — bu turda BÖLMENİN
+           GEZİNME DÜĞMESİ de (`#settings-nav-director`) onlarla birlikte
+           gizleniyor, yoksa tıklanınca bomboş açılan bir bölme kalırdı.
 
            DAĞITIM ADI YALNIZCA ONU İSTEYEN SAĞLAYICIDA görünüyor: o
            sağlayıcılarda "dağıtım" diye bir şey yok, model adı katalogda
            yazılı. Kapı KATALOGDAN türetiliyor
            (`chat_models[].needs_deployment`), istemcide sağlayıcı adı
-           sayılmıyor — bkz. settings.js syncChatDeployField. -->
-      <h3 class="modal-subhead" id="chat-deploy-head">Prompt Yönetmeni (sohbet modeli)</h3>
+           sayılmıyor — bkz. settings.js syncChatDeployField.
+
+           "Prompt Yönetmeni · talimat" BÖLÜMÜ KALDIRILDI (11 Eylül 2026,
+           kullanıcı kararı): iki satır yalnızca birer DOSYA YOLU gösteriyordu
+           (`chat-instructions.md` ve video karşılığı) ve kullanıcının panelde
+           yapabileceği hiçbir şey yoktu — ayarlar penceresinin en pahalı
+           yerinde duran salt-okunur bir künyeydi. Yollar sunucu tarafında
+           duruyor (paths.chat_instructions_override) ve GET /api/settings hâlâ
+           döndürüyor; yalnız ekrandaki kopyası gitti. -->
+      <section class="settings-pane" data-pane="director" hidden>
+      <h3 class="modal-subhead modal-subhead-first" id="chat-deploy-head">Sohbet modeli</h3>
       <div id="chat-deploy-group" class="prov-fields">
         <label for="set-chat-deployment">Dağıtım adı</label>
         <input id="set-chat-deployment" type="text" autocomplete="off" spellcheck="false"
                maxlength="200" placeholder="ör. gpt-5.6-luna" />
+        <!-- "Boş bırakılırsa kapalı kalır" KALIYOR: bu kutunun boş olmasının
+             bir SONUCU var (Yönetmen hiç açılmıyor) ve onu söyleyen tek yer
+             burası. "Model ailesi adı değil" de kalıyor — ölçülmüş bir yanlış
+             doldurma. Endpoint paylaşımı cümlesi gitti: kullanıcının burada
+             vereceği bir karar değil. -->
         <p class="field-note">
-          Azure AI Foundry'deki <strong>deployment</strong> adı — model ailesi adı değil.
-          Boş bırakılırsa Prompt Yönetmeni'nin Azure girdisi kapalı kalır. Sohbet,
-          görselin endpoint ve API anahtarını paylaşır.
+          Azure AI Foundry'deki <strong>deployment</strong> adı — model ailesi
+          adı değil. Boş bırakılırsa Yönetmen kapalı kalır.
         </p>
       </div>
-      <!-- Talimatı ezme yolu: keşfedilebilir olmasa özellik var olmakla olmamak
-           arasında bir fark taşımaz. GET /api/settings dolduruyor.
+      </section>
 
-           KENDİ BAŞLIĞI VAR ve KOŞULSUZ: yukarıdaki bölüm sağlayıcıya göre
-           kayboluyor, bu satır ise her sağlayıcıda geçerli — başlıksız
-           kalırsa gizli bölümün altında sahipsiz bir paragraf olurdu. -->
-      <h3 class="modal-subhead">Prompt Yönetmeni · talimat</h3>
-      <p class="field-note">
-        Yönetmenin talimatını değiştirmek için bu dosyayı oluştur:
-        <code id="chat-instructions-path">—</code>
-      </p>
-      <!-- İKİNCİ yol: video yönetmenliği bölümü ayrı bir dosya, çünkü sistem
-           mesajına yalnız bir video modeli yapılandırılmışken giriyor. Tek
-           dosya olsaydı video bölümünü özelleştirmek isteyen kullanıcı görsel
-           personayı da üstlenmek zorunda kalırdı. -->
-      <p class="field-note">
-        Video bölümü ayrı bir dosyada:
-        <code id="chat-video-instructions-path">—</code>
-      </p>
-
+      <!-- ── Oturumlar ────────────────────────────────────────────────── -->
       <!-- Oturum tercihleri: karar D1'in güvence (c)'si. "Kaydet" düğmesinin
            DIŞINDA ve bilerek — bu anahtar `/api/prefs`'e yazıyor, kimlik formu
            ise `/api/settings`'e (§0.5/K7). Aynı düğmeye bağlanırsa bir tercihi
            çevirmek Azure kimliğini yeniden yazmak zorunda kalır ve Azure hiç
            yapılandırılmamışken anahtar çevrilemez olur; o yüzden anında yazıyor. -->
-      <h3 class="modal-subhead">Oturumlar</h3>
+      <section class="settings-pane" data-pane="sessions" hidden>
       <label class="switch-row" for="pref-autosave">
         <input type="checkbox" id="pref-autosave" checked />
         <span>Oturumları otomatik kaydet</span>
       </label>
       <p class="field-note">
-        Açıkken her tur ve her üretim açık oturumun dökümüne yazılır — hepsi
-        <strong>yerelde</strong>, bugünkü çıktı klasöründe. Kapatılırsa yalnızca
-        kendin kaydettiğin ve adlandırdığın oturumlar yazılır. Üretilen görseller
-        her koşulda diske kaydedilmeye devam eder.
+        Kapalıyken yalnız kendin kaydettiğin oturumlar yazılır; üretilen
+        görseller her koşulda diske iner.
       </p>
+      </section>
+
+      <!-- ── Hakkında ─────────────────────────────────────────────────── -->
+      <section class="settings-pane" data-pane="about" hidden>
 
       <!-- Sürüm, üst şeritteki .ver pill'inin İKİNCİ kopyası. Çoğaltma bilerek:
            o pill mobile.css'te `display: none` (360px'de #session-title'ı
@@ -1355,20 +1422,26 @@
         <input type="checkbox" id="pref-guncelleme" checked />
         <span>Yeni sürüm çıkınca haber ver</span>
       </label>
+      <!-- "BAŞKA HİÇBİR ŞEY GÖNDERMEZ" KALIYOR ve kısaltmanın kesemeyeceği
+           yer burası: bu anahtarın açık olması uygulamanın ağa çıkması demek
+           ve kullanıcının vereceği karar tam olarak bunun üzerine. -->
       <p class="field-note">
-        Açıkken uygulama günde bir kez GitHub'a sorup yeni bir sürüm olup
-        olmadığına bakar — <strong>başka hiçbir şey göndermez</strong>, ne
-        görsellerin ne de anahtarın. Kapatırsan uygulama bu iş için ağa hiç
-        çıkmaz.
+        Günde bir kez GitHub'a sürüm sorar — <strong>başka hiçbir şey
+        göndermez</strong>. Kapalıyken bu iş için ağa hiç çıkmaz.
       </p>
+      </section>
+
+      </div>
     </div>
 
-    <!-- KAYDET ARTIK PANELİN DİBİNDE (gövdenin sonunda değil) ve bu, alttan
-         açılan yüzeyin getirdiği somut kazanç: `.sheet-foot` `flex: none`, yani
-         gövde kaydırılırken yerinde duruyor. Önce gövdenin içindeydi ve
-         panelin altındaki üç bölüm (sürüm, güncelleme kontrolü, oturum
+    <!-- KAYDET PANELİN DİBİNDE (gövdenin sonunda değil): `.sheet-foot`
+         `flex: none`, yani gövde kaydırılırken yerinde duruyor. Önce gövdenin
+         içindeydi ve altındaki üç bölüm (sürüm, güncelleme kontrolü, oturum
          tercihi) onu ekranın dışına itiyordu — kullanıcı anahtarını yazıp
-         "Kaydet"i bulmak için aşağı kaydırmak zorundaydı.
+         "Kaydet"i bulmak için aşağı kaydırmak zorundaydı. Bölmeli düzende
+         kazanç KATLANIYOR: "Kaydet" yalnız kimlik formuna ait ama dört
+         bölmenin hepsinde aynı yerde duruyor, yani hangi bölmedeyken
+         kaydettiğin bir soru olmaktan çıkıyor.
 
          #settings-status DA burada: "Kaydedildi." satırının basılan düğmenin
          yanında durması gerekiyor, yoksa gövdenin ortasında bir yerde kalıp
@@ -1378,6 +1451,39 @@
       <button id="settings-save" class="primary" type="button">Kaydet</button>
     </div>
   </aside>
+
+  <!-- Sağlayıcı seçici: ORTADAN açılan pencere, native <select>in açtığı
+       sistem listesinin yerine. Gerekçe ölçülmüş — o liste tarayıcı tarafından
+       çiziliyor, uygulamanın jetonlarına hiç uğramıyor ve CSS ile
+       biçimlendirilemiyor.
+
+       `.modal`, `.sheet` DEĞİL — ve bu bir üslup tercihi değil zorunluluk:
+       `openSheet` içinde `closeSheets()` koşuyor (core.js), yani bir `.sheet`
+       olsaydı açılırken ARKASINDAKİ Ayarlar'ı kapatırdı. `.modal` zaten bir
+       katmanın üstünde açılan biçim (#confirm-modal, #move-modal aynısını
+       yapıyor) ve `hidden` ile çevriliyor.
+
+       Kartlar settings.js'te çiziliyor (`renderProviderCards`), burada yer
+       tutucu bile yok: liste `<option>`lardan + `providers` bayraklarından
+       türüyor ve boş bir liste kullanıcıya hiç görünmemeli. Model
+       seçicisinin (#model-sheet) kalıbının aynısı. -->
+  <div id="provider-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-provider-close></div>
+    <div class="modal-card provider-card" role="dialog" aria-modal="true"
+         aria-labelledby="provider-modal-title">
+      <div class="modal-head">
+        <h2 id="provider-modal-title">Sağlayıcı</h2>
+        <button type="button" id="provider-close" class="modal-x"
+                aria-label="Kapat">×</button>
+      </div>
+      <!-- <fieldset> + gerçek radyo: grup semantiği ve ok tuşu gezintisi
+           TARAYICIDAN. Elle yazılmış `role="listbox"`/`role="option"` bilerek
+           YOK — #model-sheet'in kendi gerekçesinin aynısı. -->
+      <fieldset id="provider-list" class="model-list">
+        <legend class="sr-only">Sağlayıcılar</legend>
+      </fieldset>
+    </div>
+  </div>
 
   <!-- Görünüm: A6 — tema seçici (tasarım §2.1). Dört tema; seçim body'ye
        data-theme yazar (settings.js). KALICI: Adım 9 ile geldi — seçim

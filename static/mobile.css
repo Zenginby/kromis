@@ -73,7 +73,7 @@
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-/* Alttan açılan panel (#model-sheet, #settings-modal) tepeye HİÇ dayanmıyor —
+/* Alttan açılan panel (bugün tek: #model-sheet) tepeye HİÇ dayanmıyor —
    `top: auto` ve bir `max-height` taşıyor, yani durum çubuğunun payını
    ayırmak orada kazanç değil KAYIP: panelin en değerli yeri olan liste
    alanından bir çentik yüksekliği çalar. Alt dolgu olduğu gibi kalıyor:
@@ -241,6 +241,65 @@
      "bu bir katman" demek, 14vh'ye ihtiyacı yok. */
   .sheet-bottom { width: 100%; max-width: 100%; max-height: 88vh; }
 
+  /* Ortadan açılan pencere (#settings-modal) telefonda TAM EKRAN — masaüstünde
+     `min(760px, 94vw)` × `min(600px, 88dvh)`. 360px'lik bir ekranda 94vw zaten
+     neredeyse tam genişlik ama yükseklik öyle değil: 600px tavanı 844px'lik
+     bir telefonda pencereyi ortada asılı bırakıyor ve iki sütunun daralmış
+     hâli o çerçeveye sığmıyor. `inset: 0` + `margin: auto` konumu kurduğu için
+     genişlik/yüksekliği 100%'e çekmek pencereyi kendiliğinden kenarlara
+     dayıyor — ayrıca bir konum kuralı gerekmiyor.
+
+     `border-radius: 0` ve kenarlığın kalkması, tam ekran açılan öteki
+     yüzeylerin kuralının aynı gerekçesi: yuvarlatılmış bir köşe arkasında
+     hiçbir şey görünmediği için yalnızca kırpılmış bir çerçeve olur.
+
+     YORUMLAR BU DOSYADA SINIF ADI YAZAMAZ ve bu bir üslup kaprisi değil:
+     tests/test_mobile.py güvenli-alan kurallarını `css.split(<seçici>)` ile
+     ayıklıyor, yani bir kuralın adını KENDİSİNDEN ÖNCE anan bir yorum, testi
+     açıklamaya takıp gerçek kuralı hiç görmemesine yol açıyor. Aynı tuzağın
+     uzun anlatımı tests/test_id_contract.py'de. */
+  .sheet-center {
+    width: 100%; max-width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+  }
+  /* SOL GEZİNME YATAY ŞERİDE İNİYOR — medya seçicisinin telefon kuralının
+     birebir aynısı (aynı sorun, aynı çözüm, aşağıda): 180px'lik bir sütun +
+     bölme, 360px'de iki sütunu da okunmaz yapıyordu. Izgara tek sütuna
+     iniyor, gezinme başlığın altında kaydırılan bir şerit oluyor.
+
+     İKİ SINIFLI SEÇİCİ ŞART ve ölçüldü: masaüstü kuralı
+     `.sheet-body.settings-layout` (0,2,0) ve medya sorgusu özgüllüğe HİÇBİR
+     ŞEY KATMIYOR — tek sınıflı bir kural (0,1,0) telefonda sessizce
+     kaybediyordu. Ekranda somut hâli: 390px'de ızgara iki sütun kalıyor, sol
+     gezinme 180px'i alıyor ve form 170px'lik bir şeride sıkışıyordu. */
+  .sheet-body.settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .settings-nav {
+    flex-direction: row;
+    gap: 6px;
+    padding: 8px 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+  /* Şeritte kırpılma YOK: `.picker-nav-item`in `overflow: hidden` +
+     `text-overflow` kuralı sütun içindi. Yatayda düğme metninin tamamı
+     görünmeli, daralması gereken şey şerit değil kaydırma mesafesi. */
+  .settings-nav .picker-nav-item { flex: none; }
+
+  /* Dipteki eylem telefonda TAM GENİŞLİĞE DÖNÜYOR: masaüstündeki sağa yaslı
+     düğmenin gerekçesi genişlikti (760px'de baştan başa beyaz bant), telefonda
+     ise tersi geçerli — başparmağın gittiği yer o şerit. Satır düzeni de
+     kalkıyor ki durum satırı düğmenin YANINA değil ÜSTÜNE düşsün. */
+  .sheet-center .sheet-foot { display: block; }
+  .sheet-center .sheet-foot .primary { width: 100%; margin: 0; }
+  .sheet-center .sheet-foot .modal-status { margin: 0 0 8px; }
+
   .modal { padding: 0; }
   .modal-card {
     width: 100%;
@@ -342,6 +401,19 @@
   /* Onay penceresi BİLEREK diyalog kalıyor: tek bir soru için tam ekrana
      geçmek, arkadaki bağlamı (hangi görselin silineceğini) gizler. */
   .modal-card.confirm-card {
+    width: min(420px, calc(100% - 2rem));
+    min-height: 0;
+    margin: auto;
+    border-radius: var(--r-panel, 24px);
+    padding: calc(var(--space) * 1.1);
+  }
+
+  /* Sağlayıcı penceresi de BİLEREK diyalog kalıyor, onay penceresiyle aynı
+     gerekçe: tam ekran kuralı uzun formlar için ve üç satırlık bir liste
+     orada ekranın %80'ini boş bırakıyor — "seçim yapıyorum" değil "başka bir
+     ekrana geçtim" hissi veriyor (390x844'te ölçüldü). Arkadaki Ayarlar'ın
+     görünür kalması da bilgi: seçim onun İÇİNDE yapılıyor. */
+  .modal-card.provider-card {
     width: min(420px, calc(100% - 2rem));
     min-height: 0;
     margin: auto;

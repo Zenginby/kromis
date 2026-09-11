@@ -680,7 +680,7 @@ def test_chat_workspace_markup_is_served():
                        "chat-log", "chat-empty", "prompt", "go", "status",
                        "chat-wait", "chat-gate", "chat-sidebar", "chat-sidebar-toggle",
                        "chat-new", "chat-list", "chat-list-empty",
-                       "set-chat-deployment", "chat-instructions-path",
+                       "set-chat-deployment",
                        # Yönetmen ayarları çekmecesi ve çipi.
                        "director-btn", "director-sheet", "director-close",
                        "director-guidance", "director-save", "director-status"):
@@ -2299,22 +2299,28 @@ def test_media_kind_segment_is_served_and_structured():
         ".kindseg kuralı eksik")
 
 
-def test_settings_is_a_slide_over_not_a_centered_modal():
-    """A5: Ayarlar sağdan slide-over (§2.4/3), ortalanmış modal değil.
+def test_settings_is_a_sheet_even_though_it_opens_centered():
+    """Ayarlar ORTADAN açılıyor ama kabuğu hâlâ `.sheet` — ve bu bir ayrıntı değil.
+
+    Perde (`body:has(.sheet.open) .scrim`), Escape şelalesi (core.js), Android
+    geri tuşu (`window.geriTusu`) ve odak iadesi (`closeSheets`) DÖRDÜ DE
+    `.sheet.open` seçicisine bakıyor. Yüzeyi `.modal`a çevirmek dördünü de
+    sıfırdan yazmak demekti; `.sheet-center` yalnızca dördüncü bir YÖN.
 
     id `settings-modal` olarak KALIYOR: 152 id sözleşmesinin (test_id_contract)
     ve JS bağının parçası — ad telin üstündeki isim, yüzey hakkında bir iddia
-    değil. Değişen şey kabuk: `.sheet` + `.open` + ortak perde.
+    değil.
     """
     html = _html()
     tag = re.search(r"<aside id=\"settings-modal\"[^>]*", html)
     assert tag, "Ayarlar hâlâ <aside class=\"sheet\"> değil"
-    assert "sheet" in tag.group(0), "slide-over sınıfı yok"
-    assert 'data-close' not in _section(html, "settings-modal"), (
-        "modal perdesi kalmış — slide-over ortak #shell-scrim kullanır")
+    assert "sheet" in tag.group(0), "ortak kabuk sınıfı yok"
+    assert "sheet-center" in tag.group(0), "pencere ortadan açılmıyor"
+    assert 'class="modal-backdrop"' not in _section(html, "settings-modal"), (
+        "kendi perdesini taşıyor — ortak #shell-scrim kullanmalı")
     js = _settings_js()
-    assert "openSheet" in js, "panel slide-over mekaniğiyle açılmıyor"
-    assert '$("settings-modal").hidden = false' not in js, "hâlâ modal gibi açılıyor"
+    assert "openSheet" in js, "panel ortak sheet mekaniğiyle açılmıyor"
+    assert '$("settings-modal").hidden = false' not in js, "modal gibi açılıyor"
 
 
 def test_palette_is_a_slide_over_not_a_centered_modal():
@@ -4671,7 +4677,11 @@ def test_saglayici_secicisindeki_her_deger_bir_ALAN_GRUBUNA_karsilik_geliyor():
     öncekinin üstünde kalır), listede olup HTML'de olmayan bir ad ise
     `$()` null döndürüp `hidden` atamasında TypeError atar."""
     html = _html()
-    secici = html.split('<select id="set-provider">', 1)[1].split("</select>", 1)[0]
+    # Açılış etiketi artık öznitelik taşıyor (`class="sr-only"` — değeri tutan
+    # kutu gizli, görünen yüz `#set-provider-btn`). Literal yerine regex:
+    # öznitelik eklendiği gün testin sessizce IndexError atması, ölçtüğü şeyle
+    # ilgisi olmayan bir kırılma olurdu.
+    secici = re.split(r'<select id="set-provider"[^>]*>', html, maxsplit=1)[1]         .split("</select>", 1)[0]
     secenekler = set(re.findall(r'value="([a-z-]+)"', secici))
     gruplar = set(re.findall(r'id="prov-([a-z-]+)"', html))
     assert secenekler == gruplar, (
@@ -5235,9 +5245,14 @@ def test_TUTAMAK_bir_sey_VAAT_ETMIYOR():
     """
     html = _yorumsuz_html()
     tutamaklar = re.findall(r"<span class=\"sheet-grip\"[^>]*>", html)
-    assert len(tutamaklar) == 2, (
-        "tutamak iki alttan açılan panelde de olmalı (#model-sheet, "
-        f"#settings-modal) — bulunan: {len(tutamaklar)}")
+    # BİR tane: Ayarlar ortadan açılmaya başlayınca tutamağı da bıraktı —
+    # ortada duran bir çubuk "aşağı sürükle" diye okunur ve bu dosyanın
+    # reddettiği şeyin ta kendisi olurdu ("tutulmayan bir söz").
+    assert len(tutamaklar) == 1, (
+        "tutamak yalnız alttan açılan panelde olmalı (#model-sheet) — "
+        f"bulunan: {len(tutamaklar)}")
+    assert 'class="sheet-grip"' not in _section(html, "settings-modal"), (
+        "ortadan açılan pencerede alttan-geliyorum işareti kalmış")
     for t in tutamaklar:
         assert 'aria-hidden="true"' in t, (
             "tutamak erişilebilirlik ağacında — ekran okuyucuya işlevi "
@@ -5305,32 +5320,34 @@ def test_SECILI_kart_rengi_TEMADAN_geliyor():
             assert jeton in blok, f"{tema} temasında {jeton} tanımsız"
 
 
-def test_ayarlar_paneli_ALTTAN_ve_KAYDET_dipte():
-    """Ayarlar da model seçicisiyle AYNI yüzeyde: iki ayarlar yüzeyi, iki ayrı
-    yer gibi görünmesin.
+def test_ayarlar_paneli_ORTADAN_ve_KAYDET_dipte():
+    """Ayarlar ekranın ORTASINDAN açılıyor ve "Kaydet" penceresinin dibinde.
 
-    "Kaydet" artık `.sheet-foot`ta ve bu ölçülebilir bir kazanç: `.sheet-foot`
+    "Kaydet" `.sheet-foot`ta ve bu ölçülebilir bir kazanç: `.sheet-foot`
     `flex: none`, yani gövde kaydırılırken yerinde duruyor. Önce gövdenin
     sonundaydı ve altındaki üç bölüm (künye, güncelleme kontrolü, oturum
     tercihi) onu ekranın dışına itiyordu — kullanıcı anahtarını yazıp
-    "Kaydet"i bulmak için aşağı kaydırmak zorundaydı.
+    "Kaydet"i bulmak için aşağı kaydırmak zorundaydı. Bölmeli düzende kazanç
+    KATLANIYOR: dört bölmenin hangisindeyken kaydettiğin bir soru değil.
     """
     html = _yorumsuz_html()
-    assert 'id="settings-modal" class="sheet sheet-bottom"' in html, (
-        "Ayarlar paneli alttan açılmıyor")
+    assert 'id="settings-modal" class="sheet sheet-center"' in html, (
+        "Ayarlar penceresi ortadan açılmıyor")
     dip = html.split('<div class="sheet-foot">')
     ayarlar_dibi = [d for d in dip if 'id="settings-save"' in d.split("</div>", 1)[0]]
     assert ayarlar_dibi, "#settings-save panelin dibinde değil"
     assert 'id="settings-status"' in ayarlar_dibi[0].split("</div>", 1)[0], (
         "durum satırı basılan düğmeden ayrı — geri bildirim gövdenin ortasında "
         "kalıp hiç okunmuyor")
-    # Odak metin kutusuna DEĞİL: alttan açılan panelde yazılım klavyesi
-    # panelin yarısını yutuyor.
+    # Odak metin kutusuna DEĞİL: bir metin kutusuna odaklanmak Android'de
+    # yazılım klavyesini açıyor ve klavye pencerenin yarısını yutuyor.
+    # Odak artık sağlayıcı DÜĞMESİNDE: `<select>` ekran okuyucudan gizlendi
+    # (`.sr-only`) ve gizli bir öğeye odaklanmak odağı hiçbir yere götürmezdi.
     js = _js("settings.js")
     assert '$("set-endpoint").focus()' not in js, (
         "Ayarlar açılışında metin kutusuna odaklanıyor — Android'de klavye "
-        "kalkıyor ve alttan açılan paneli kapatıyor")
-    assert '$("set-provider").focus()' in js
+        "kalkıyor ve pencereyi yutuyor")
+    assert '$("set-provider-btn").focus()' in js
 
 
 def test_AYARLAR_dugmesi_openSettingse_OLAYI_gecirmiyor():
@@ -5398,23 +5415,28 @@ def test_DAGITIM_ADI_kutusu_adreslenebilir_bir_GRUPTA():
     assert 'for="set-chat-deployment"' in grup, "etiket grubun dışında"
 
 
-def test_YONETMEN_TALIMAT_yolu_KOSULSUZ_gorunur_kaliyor():
-    """Dağıtım bölümü sağlayıcıya göre kaybolurken talimat yolu kalmak ZORUNDA.
+def test_YONETMEN_TALIMAT_bolumu_KALDIRILDI():
+    """"Prompt Yönetmeni · talimat" bölümü Ayarlar'dan çıktı (11 Eylül 2026).
 
-    "Keşfedilebilir olmasa özellik var olmakla olmamak arasında bir fark
-    taşımaz" (index.html'deki kendi gerekçesi): yönetmenin talimatını ezme yolu
-    yalnızca Ayarlar'da yazılı. Koşullu bölümün İÇİNE düşerse OpenAI/Gemini
-    kullanıcısı o dosyayı hiç öğrenemez — bu yüzden kendi başlığı var ve
-    `syncChatDeployField` ona HİÇ dokunmuyor.
+    Bölüm SALT OKUNUR iki dosya yolundan ibaretti ve kullanıcının panelde
+    yapabileceği hiçbir şey yoktu — ayarlar penceresinin en pahalı yerinde
+    duran bir künye. Sunucu alanları döndürmeye DEVAM ediyor
+    (tests/test_settings_route.py), yani kaldırılan yalnızca ekrandaki kopya.
+
+    İkinci iddia asıl mandal: id gittiği hâlde JS ona bakmaya devam ederse
+    `$()` null döner ve `textContent` ataması TypeError atar — settings.js'in
+    o satırdan sonraki dinleyicilerinin HİÇBİRİ kurulmaz (test_id_contract.py
+    aynı boşluğu ters yönden kapatıyor).
     """
     html = _html()
-    assert 'id="chat-instructions-path"' in html
-    # Koşullu grubun DIŞINDA: grup `</div>`inden sonra geliyor.
-    grup = html.split('id="chat-deploy-group"', 1)[1].split("</div>", 1)[0]
-    assert "chat-instructions-path" not in grup, "talimat yolu koşullu grubun içinde"
+    ayarlar = _yorumsuz_html().split(
+        'id="settings-modal"', 1)[1].split("</aside>", 1)[0]
+    for kalkan in ("chat-instructions-path", "chat-video-instructions-path"):
+        assert f'id="{kalkan}"' not in html, f"{kalkan} hala HTML'de"
+    assert "talimat" not in ayarlar.lower(), "talimat bolumunden bir metin kalmis"
     js = _js("settings.js")
-    govde = js.split("function syncChatDeployField(", 1)[1].split("\n}", 1)[0]
-    assert "chat-instructions-path" not in govde, "talimat yolu kapıya bağlanmış"
+    for kalkan in ("chat-instructions-path", "chat-video-instructions-path"):
+        assert f'$("{kalkan}")' not in js, f"settings.js hala {kalkan}'e bakiyor"
 
 
 def test_DAGITIM_ADI_kapisi_KATALOGDAN_turetiliyor():
@@ -6082,3 +6104,150 @@ def test_composer_ipucu_SERIDI_KALDIRILDI_bilgi_GO_dugmesinde():
     for tab in ("tab-image", "tab-chat"):
         assert f'$("{tab}").title = ' in js, (
             f"#{tab} kısayolu duyurmuyor — bilgi yine tek yarım kaldı")
+
+
+# ══ Ayarlar penceresi: bölmeler ve sağlayıcı seçici ═══════════════════════
+#
+# Üçü de bu turda (11 Eylül 2026) doğan kusur sınıflarının mandalı: Ayarlar
+# alttan açılan tek kayan bir gövdeden, ortadan açılan sol gezinmeli bir
+# pencereye geçti ve sağlayıcı seçimi native `<select>`ten kendi penceresine.
+
+
+def test_her_gezinme_dugmesinin_bir_BOLMESI_var():
+    """`#settings-nav`daki her düğmenin karşılığı bir `.settings-pane`, tersi de.
+
+    `showSettingsPane` eşleşmeyi `data-pane` üzerinden kuruyor: düğmede olup
+    bölmede olmayan bir ad tıklanınca HİÇBİR bölme görünmez (dört `hidden`
+    birden true olur) ve pencere bomboş kalır — konsolda tek satır hata yok.
+    Ters yön de sessiz: bölmede olup düğmede olmayan bir ad, ulaşılamayan bir
+    form demek. `syncProviderFields`in alan gruplarıyla `#set-provider`in
+    değerleri arasında kurduğu aynı sözleşme, bir katman yukarıda.
+    """
+    html = _yorumsuz_html()
+    ayarlar = html.split('id="settings-modal"', 1)[1].split("</aside>", 1)[0]
+    gezinme = ayarlar.split('id="settings-nav"', 1)[1].split("</nav>", 1)[0]
+    dugmeler = set(re.findall(r'data-pane="([a-z-]+)"', gezinme))
+    bolmeler = set(re.findall(
+        r'<section class="settings-pane" data-pane="([a-z-]+)"', ayarlar))
+    assert dugmeler, "gezinme düğmesi bulunamadı"
+    assert dugmeler == bolmeler, f"düğmeler {sorted(dugmeler)}, bölmeler {sorted(bolmeler)}"
+
+    # Açılışta TEK bölme görünür: ikisi birden açık kalırsa `aria-current`
+    # hangisini anlattığı belirsizleşir ve kaydırma iki formu birden taşır.
+    acik = [m for m in re.finditer(
+        r'<section class="settings-pane" data-pane="[a-z-]+"( hidden)?>', ayarlar)
+        if not m.group(1)]
+    assert len(acik) == 1, f"açılışta {len(acik)} bölme görünür — tam bir tane olmalı"
+
+    js = _js("settings.js")
+    assert 'dugme.dataset.pane' in js, "gezinme eşleşmesi data-pane üzerinden kurulmuyor"
+
+
+def test_YONETMEN_bolmesi_bos_kalinca_GEZINME_DUGMESI_de_gizleniyor():
+    """Dağıtım adı istemeyen sağlayıcıda "Yönetmen" bölmesinde HİÇBİR ŞEY yok.
+
+    `syncChatDeployField` başlığı ve grubu birlikte gizliyor (kendi gerekçesi
+    yukarıdaki testte). Bölmeli düzen bunun üstüne yeni bir kusur açtı: düğme
+    durmaya devam ederse tıklanınca BOMBOŞ bir bölme açılıyor — kaldırılan
+    "bu sağlayıcıda dağıtım adı yok" cümlesinin daha kötü hâli, çünkü o cümle
+    en azından nedenini söylüyordu.
+
+    İkinci iddia geri düşmeyi ölçüyor: kullanıcı Yönetmen bölmesindeyken
+    sağlayıcıyı çevirebiliyor ve baktığı içerik ayağının altından çekiliyor.
+    """
+    js = _js("settings.js")
+    govde = js.split("function syncChatDeployField(", 1)[1].split("\n}", 1)[0]
+    assert '$("settings-nav-director").hidden' in govde, (
+        "gezinme düğmesi kapıya bağlı değil — boş bölme tıklanabilir kalıyor")
+    assert "showSettingsPane" in govde, (
+        "bölme o an açıkken geri düşmüyor — kullanıcı boş bölmede kalır")
+    assert 'id="settings-nav-director"' in _html(), "düğme adreslenebilir değil"
+
+
+def test_SAGLAYICI_SECICISI_native_select_DEGIL_kendi_penceresi():
+    """Sağlayıcı listesi uygulamanın penceresinde açılıyor, sistemin değil.
+
+    Native bir `<select>`in açtığı liste tarayıcı/işletim sistemi tarafından
+    çiziliyor: uygulamanın hiçbir jetonuna (`--panel`, `--r-item`, `--accent`)
+    uğramıyor ve CSS ile biçimlendirilemiyor — karanlık bir arayüzün ortasında
+    sistem renkli bir kutu açılıyordu.
+
+    DEĞER HÂLÂ `<select>`TE ve bu şart: `change` zinciri (syncProviderFields →
+    alan grupları + dağıtım kapısı + düğmenin yüzü) ona bağlı. Kartların
+    seçimi ona YÖNLENDİRİLİYOR — ikinci bir uygulama zinciri yazmak, ikisinin
+    zamanla ayrışması demekti (#model-sheet'in kendi kararı).
+    """
+    html = _html()
+    etiket = re.search(r'<select id="set-provider"[^>]*>', html)
+    assert etiket, "#set-provider kaybolmuş — değerin sahibi o"
+    assert "sr-only" in etiket.group(0), (
+        "seçici hâlâ görünür — native listesi tema dışında açılmaya devam eder")
+    assert 'id="set-provider-btn"' in html, "görünen yüz (düğme) yok"
+    assert 'id="provider-modal"' in html and 'id="provider-list"' in html
+
+    # Pencere `.modal`, `.sheet` DEĞİL — ve bu zorunluluk: `openSheet` içinde
+    # `closeSheets()` koşuyor, yani bir `.sheet` olsaydı açılırken ARKASINDAKİ
+    # Ayarlar'ı kapatırdı.
+    pencere = re.search(r'<div id="provider-modal"[^>]*>', html)
+    assert "sheet" not in pencere.group(0), (
+        "sağlayıcı penceresi bir .sheet — açılırken Ayarlar'ı kapatır")
+    assert "modal" in pencere.group(0)
+
+    js = _js("settings.js")
+    govde = js.split('$("provider-list").addEventListener("change"', 1)[1]
+    govde = govde.split("\n});", 1)[0]
+    assert 'secici.dispatchEvent(new Event("change"' in govde, (
+        "seçim <select>e yönlendirilmiyor — change zinciri hiç koşmaz")
+    assert "applyConfigured" not in govde and "syncProviderFields" not in govde, (
+        "pencere zinciri DOĞRUDAN çağırıyor — <select>in dinleyicisinin "
+        "ikinci bir kopyası")
+
+
+def test_SAGLAYICI_PENCERESININ_escape_muhafizi_YAKALAMA_evresinde():
+    """Escape yalnız üstteki katmanı kapatmalı ve bu SIRAYA bağlı.
+
+    core.js'teki `.sheet` dinleyicisi settings.js'ten ÖNCE kayıtlı (yükleme
+    sırası bağlayıcı). Kabarma evresinde yazılan bir `stopImmediatePropagation`
+    ondan SONRA koşar, yani onu durduramaz: tek Escape hem sağlayıcı
+    penceresini hem arkasındaki Ayarlar'ı kapatırdı. Yakalama evresi
+    (`, true`) folders.js'teki taşıma penceresinin kurduğu desen.
+
+    Kaynak taraması bunu görmek ZORUNDA: iki hâl de "geçerli JavaScript" ve
+    ekranda tek fark, Ayarlar'ın da kapanması.
+    """
+    js = _strip_js_comments(_js("settings.js"))
+    parca = js.split('document.addEventListener("keydown"')
+    assert len(parca) == 2, (
+        f"settings.js'te tam bir Escape dinleyicisi bekleniyor, {len(parca) - 1} var")
+    govde = parca[1]
+    assert '$("provider-modal").hidden' in govde, "muhafız pencereye bakmıyor"
+    assert "stopImmediatePropagation" in govde, "alttaki katman durdurulmuyor"
+    kapanis = govde.split("closeProviderModal();", 1)[1].lstrip()
+    assert kapanis.startswith("}, true);"), (
+        "dinleyici yakalama evresinde kayıtlı değil (`, true` yok) — "
+        "core.js'in dinleyicisi ÖNCE koşar ve Ayarlar da kapanır")
+
+
+def test_ROZET_kaldirilan_provider_status_listesinin_isini_devraldi():
+    """"Hangisi kurulu?" cevabı seçimin YAPILDIĞI yerde.
+
+    Ayrı bir `#provider-status` listesi, seçicinin bedelini metinle geri
+    ödemek içindi. Kartlar rozetle aynı cevabı verdiği an o liste aynı olguyu
+    İKİNCİ kez söylüyor — sadeleştirmenin tersi. Liste kalktı; iddia hem
+    kalktığını hem de bilginin kaybolmadığını ölçüyor.
+
+    Kaynak AYNI: `GET /api/settings`in `providers` bayrakları. Azure'ın seçici
+    değeri `azure`, kimliği `azure_image` — eşitlemek rozeti Azure'da kalıcı
+    olarak "kayıtlı değil" bırakırdı.
+    """
+    html = _html()
+    assert 'id="provider-status"' not in html, "ikinci durum listesi geri gelmiş"
+    js = _js("settings.js")
+    assert "renderProviderStatus" not in js, "ölü fonksiyon kalmış"
+    assert "model-row-badge" in js, "kartlarda kurulum rozeti yok"
+    assert "azure_image" in js, (
+        "seçici değeri ile providers kimliği eşitlenmiş — Azure rozeti hep "
+        "'kayıtlı değil' kalır")
+    css = re.sub(r"/\*.*?\*/", "", _css(), flags=re.S)
+    assert re.search(r"\.provider-status\s*\{", css) is None, (
+        "style.css'te ölü `.provider-status` kuralı kalmış")

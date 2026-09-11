@@ -1076,7 +1076,10 @@ def test_alttan_acilan_yuzey_telefonda_TAM_GENISLIK(istemci):
         "alttan açılan panel telefonda tam genişlik almıyor")
 
     stil = _metin(istemci, "/static/style.css")
-    for secici in (".sheet-bottom {", "#settings-modal.sheet-bottom {"):
+    # `#settings-modal.sheet-bottom` ARTIK YOK: Ayarlar ortadan açılıyor
+    # (`.sheet-center`) ve kendi genişliğini o varyantta yazıyor. Aynı tuzak
+    # orada da kurulmuyor — ölçüsü aşağıdaki testte.
+    for secici in (".sheet-bottom {",):
         blok = stil.split(secici, 1)
         assert len(blok) == 2, f"{secici} kuralı kaybolmuş"
         govde = blok[1].split("}", 1)[0]
@@ -1086,6 +1089,41 @@ def test_alttan_acilan_yuzey_telefonda_TAM_GENISLIK(istemci):
             f"{secici} sabit bir genişlik yazıyor — telefonda #palette-modal'ın "
             "id özgüllüğü tuzağı geri geliyor (mobile.css ikinci bir kural "
             "istemek zorunda kalır)")
+
+
+def test_ortadan_acilan_pencere_telefonda_TAM_EKRAN(istemci):
+    """Ayarlar penceresi (`.sheet-center`) telefonda tam ekran ve tek sütun.
+
+    Masaüstünde `min(760px, 94vw)` × `min(600px, 88dvh)` ve İKİ SÜTUN (sol
+    gezinme + bölme). 360px'lik bir ekranda 180px'lik bir gezinme sütunu
+    bölmeye 180px bırakırdı — iki sütun da okunmaz. `.picker-card`ın telefonda
+    ödediği kırılmanın aynısı, aynı çözümle: ızgara tek sütuna iniyor, gezinme
+    başlığın altında yatay kaydırılan bir şeride dönüyor.
+
+    Genişlik `min(…, 94vw)` yazılıyor, sabit px DEĞİL — `.sheet-bottom`un
+    id özgüllüğü tuzağının aynı gerekçesi.
+    """
+    stil = _metin(istemci, "/static/style.css")
+    govde = stil.split(".sheet-center {", 1)[1].split("}", 1)[0]
+    genislik = [s for s in govde.split(";") if "width:" in s and "max-width" not in s]
+    assert genislik and "min(" in genislik[0], (
+        ".sheet-center sabit bir genişlik yazıyor")
+    assert "translate" not in govde, (
+        "ortalama transform ile kurulmuş — `.sheet.open { transform: none }` "
+        "onu açılış anında siliyor ve pencere köşeye kayıyor "
+        "(.sheet-bottom'ın ölçülmüş tuzağı)")
+    assert "inset: 0" in govde and "margin: auto" in govde, (
+        "ortalama `inset: 0` + `margin: auto` ile kurulmamış")
+
+    mobil = _metin(istemci, "/static/mobile.css")
+    tel = mobil.split("@media (max-width: 768px)", 1)[1]
+    kural = tel.split(".sheet-center {", 1)[1].split("}", 1)[0]
+    assert "width: 100%" in kural and "height: 100%" in kural, (
+        "pencere telefonda tam ekran değil")
+    gezinme = tel.split(".settings-nav {", 1)[1].split("}", 1)[0]
+    assert "flex-direction: row" in gezinme, (
+        "sol gezinme telefonda yatay şeride inmiyor — 360px'de iki sütun da "
+        "okunmaz kalır")
 
 
 # ── Dosya seçme (telefonda görsel yükleme) ──────────────────────────

@@ -524,7 +524,7 @@
         "app"
       ],
       "katman": 2,
-      "satir": 232,
+      "satir": 237,
       "testler": [
         "tests/test_depo_adresi.py",
         "tests/test_guncelleme.py"

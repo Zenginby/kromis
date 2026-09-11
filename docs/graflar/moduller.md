@@ -50,7 +50,7 @@ flowchart TD
     n_azure_client["azure_client<br/>458 satır"]
     n_chat_prompt["chat_prompt<br/>358 satır"]
     n_folders["folders<br/>248 satır"]
-    n_guncelleme["guncelleme<br/>232 satır"]
+    n_guncelleme["guncelleme<br/>237 satır"]
   end
   subgraph katman1["katman 1"]
     n_assets_store["assets_store<br/>201 satır"]
@@ -211,7 +211,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `errlog.py` | 114 | 0 | — | 5 | 1 |
 | `folders.py` | 248 | 2 | `jsonstore`, `storage` | 3 | 4 |
 | `gemini_client.py` | 293 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
-| `guncelleme.py` | 232 | 2 | `errlog`, `jsonstore`, `paths`, `version` | 1 | 2 |
+| `guncelleme.py` | 237 | 2 | `errlog`, `jsonstore`, `paths`, `version` | 1 | 2 |
 | `jsonstore.py` | 80 | 0 | — | 8 | 1 |
 | `models.py` | 1020 | 3 | `azure_client`, `catalog`, `palette` | 3 | 13 |
 | `netguard.py` | 157 | 8 | `app` (erteli) | 1 | 1 |

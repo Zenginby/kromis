@@ -21,7 +21,7 @@ kullanıcısını kaydediyor — o gerekçe artık geçerli DEĞİL.
 | 1 — imza anahtarı | ✅ keystore repo D I Ş I N D A üretildi, dört sır tanımlandı |
 | 2–9 | ✅ uygulandı; `main` (v0.17.2) birleştirildi, tam takım **2359 geçti, 1 atlandı** |
 | 10 — doğrulama/yayın | ⏳ imza ve parmak izi ÖLÇÜLDÜ (koşu 34505244509); üç cihaz denetimi gerçek yayın varlıklarını bekliyor |
-| 11 — public'e açılma | ⏳ geçmiş temizlendi ve depo temiz geçmişle YENİDEN KURULDU (`refs/pull/*` silinemediği için); kalan: sırlar + görünürlük + uç nokta ölçümü |
+| 11 — public'e açılma | ✅ depo temiz geçmişle yeniden kuruldu, public, imza doğrulandı, güncelleme kontrolü CANLI |
 
 PR: [Zenginby/kromis#75](https://github.com/Zenginby/kromis/pull/75) — bütün
 kapılar yeşil (sızıntı taraması, paketleme kapsamı, pytest, Android paketi).
@@ -687,8 +687,8 @@ Bu tabloyu kaçırmak, geçmişi temizleyip "bitti" demek olurdu.
        yazar/committer üstverisinde.
 5. [x] GitHub tarafı (B tablosu) uygulandı — aşağıdaki "GitHub tarafı:
        uygulandı" bölümü.
-6. [ ] Görünürlük public'e alınsın (YENİ depoda) (**kullanıcı işi** — depo ayarı).
-7. [ ] Anonim uç nokta ölçülsün: `curl` 200 demeli; sonra uygulamada
+6. [x] Görünürlük public'e alındı (YENİ depoda) (**kullanıcı işi** — depo ayarı).
+7. [x] Anonim uç nokta ölçüldü: `curl` 200 demeli; sonra uygulamada
        güncelleme bildiriminin gerçekten göründüğü görülsin.
 
 ### GitHub tarafı: uygulandı (2026-09-10)
@@ -817,6 +817,68 @@ olduğu için kayıt kaybolmuyor, yalnız bağlantı ölüyor. `releases/latest`
 (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
 `ANDROID_KEY_PASSWORD`). Yeniden tanımlanmadan önce imzalı APK üretilemez;
 tek güvenilir işaret yine `İmzayı doğrula` adımının ATLANMAMIŞ olması.
+
+### Faz 11 KAPANDI — 2026-09-11
+
+**İmza zinciri yeni depoda ayakta.** Sırlar depoya bağlı olduğu için taşınmadı;
+dördü de yeniden tanımlandı. Üç kuru prova gerekti ve ikisi kırmızıydı — ikisi
+de tanıyı bir katman daralttığı için kaydedilmeye değer:
+
+| koşu | hata | ne öğretti |
+| --- | --- | --- |
+| 34602854199 | `KeytoolException: … keystore password was incorrect` | PKCS12'nin MAC denetimi, yani `KeyStore.load` düşüyor: depo parolası yanlış ya da dosya bozuk. Yanlış ANAHTAR parolası olsaydı `Cannot recover key` derdi. |
+| 34604122605 | `No key with alias '***' found in keystore` | Parola artık doğru (store açıldı); uyuşmayan tek şey alias. |
+| 34605834832 | **yeşil** | `İmzayı doğrula` ATLANMADI — kuru provada `imza_zorunlu` gevşek olduğu için tek güvenilir işaret budur. |
+
+Yeşil koşunun bastığı sertifika, belgedeki tabloyla ve kullanıcının keystore'dan
+okuduğu parmak iziyle üç yönden aynı çıktı: DN `CN=Kromis Studio, O=Zenginby,
+C=TR`, SHA-256 `ca5a0dd3…ff4d`, SHA-1 `be70398a…12ca`, RSA 4096, yalnız v2.
+Yani depo yeniden kurulurken imza kimliği BOZULMADI.
+
+> **Karışıklığın kaynağı yazılı olsun.** Üç sır arka arkaya `gh secret set` ile
+> girildi ve istem her seferinde yalnız "Paste your secret:" diyor; 13:09:23,
+> :30 ve :33'te girilen üç değerden ikisi yanlış yere düştü. `gh secret list`'in
+> "Updated" sütunu da yanıltıcı: ORADA YAZAN OLUŞTURMA zamanı. Gerçek güncelleme
+> zamanı yalnız API'de: `gh api repos/<depo>/actions/secrets --jq '.secrets[]'`.
+
+**Public ölçümü.** Görünürlük açıldıktan sonra:
+
+| ölçüm | sonuç |
+| --- | --- |
+| anonim `releases/latest` | **200** (özel depoda 404'tü — `guncelleme.py`'nin şartı) |
+| `releases/latest/download/…` üçü | 200 |
+| `guncelleme._sor()` | `{"surum": "0.17.3", "url": …}` — eskiden `None` (sessiz ölüm) |
+| `bilgi()` yerel sürüm eskiyken | bildirim yükünü döndürüyor |
+| `bilgi(izin=False)` | `None` — "ağa hiç çıkma" sözleşmesi korunuyor |
+
+#### Son kaçak: mailmap yalnız O ANDAKİ commit'lere ulaşır
+
+Public ölçümünün kendisi bir kusur buldu. Yeniden yazmadan SONRA yapılan tek
+commit (`8cfd0b7`) yerel git kimliğiyle imzalanmıştı ve o kimlik hâlâ
+`zenginby20@gmail.com`'du: mailmap geçmişi düzeltir, YEREL AYARI düzeltmez, o
+yüzden bir sonraki commit kaldırılan adresi geri getirir. Kök neden kapatıldı
+(`git config user.email` → hesabın `users.noreply` adresi).
+
+Şiddet farkı bilerek tartıldı: önceki durum 415 commit ve eski KURUMUN kimliğiydi;
+bu 1 commit ve kullanıcının KENDİ adresi. O yüzden depo bir daha kurulmadı —
+`main` yeniden yazıldı (ağaç birebir aynı: `3db5bdb7`, commit sayısı 306),
+dal silindi, `refs/pull/1/head` kalıntısı BİLEREK kabul edildi.
+
+| klon türü | commit | kimlik | `zenginby20` |
+| --- | --- | --- | --- |
+| sıradan `git clone` (kullanıcıların gördüğü) | 327 | 3, hepsi `noreply` | **0** |
+| `--mirror` (refs/pull dâhil) | 328 | +1 | yalnız `refs/pull/1/head` |
+
+#### Public olmanın açtığı üç kapı (bu Faz'ın işi değil, kayıt)
+
+* **Dal koruması** artık kullanılabilir — özel depoda ücretsiz planda kapalıydı,
+  bu yüzden `main` bugüne kadar korumasızdı.
+* **Ücretsiz standart runner'lar** — `ci.yml`'deki yol süzgecinin ve paketlerin
+  doğrudan taslak yayına yazmasının gerekçesi (2026-08-28 varlık kotası, macOS
+  dakikasının 10x sayılması) artık geçersiz.
+* **Dinamik sürüm rozeti** — `tests/test_version.py` elle yazılan rozetin
+  bekçisi ve gerekçesi "depo private, shields.io okuyamaz" diye yazılı. O
+  gerekçe düştü; rozet dinamiğe çevrilirse bekçi de sadeleşebilir.
 
 > **Faz 10'un cihaz denetimleri bu sırayı BEKLETMİYOR.** Planın ilk hâli
 > onları 3. adımın önüne koymuştu; ölçünce bağımlılık olmadığı görüldü:

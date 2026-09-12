@@ -1,6 +1,6 @@
 # Kromis Studio
 
-[![Release](https://img.shields.io/badge/version-v0.18.0-blue.svg)](https://github.com/Zenginby/kromis/releases/latest)
+[![Release](https://img.shields.io/badge/version-v0.20.0-blue.svg)](https://github.com/Zenginby/kromis/releases/latest)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org/)
 [![Build & Test](https://github.com/Zenginby/kromis/actions/workflows/release.yml/badge.svg)](https://github.com/Zenginby/kromis/actions)
@@ -50,7 +50,7 @@ when the version does.
 
 ---
 
-## ✨ What it does (v0.18.0)
+## ✨ What it does (v0.20.0)
 
 ### Say what you want; the Director writes the prompt
 

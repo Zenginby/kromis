@@ -190,6 +190,14 @@ sonucu var:
 
 ---
 
+## Sürüm 0.20.0 — ne değişti
+
+- main (dal korumasi) lisans daline alindi
+- yeni kok belgeleri Ayarlar-glifi mandalinin listesine girdi
+- AGPL-3.0 gecisi, marka politikasi ve paket dogrulama
+
+---
+
 ## Sürüm 0.19.0 — ne değişti
 
 - playwright yalniz test isine kuruluyor, paket + tarayici tek adimda

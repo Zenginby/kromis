@@ -26,5 +26,5 @@ noktalı-sayısal bir dizi bekler.
 """
 from __future__ import annotations
 
-APP_VERSION = "0.19.0"
+APP_VERSION = "0.20.0"
 

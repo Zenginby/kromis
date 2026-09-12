@@ -17,7 +17,7 @@
 * 43 Python modülü, 99 modül düzeyi ithal kenarı (12 erteli)
 * 44 HTTP uç noktası
 * 9 tarayıcı betiği, 21 betik-arası bağ
-* 86 test dosyası; 3 modülü hiçbir test ithal etmiyor, 12 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
+* 87 test dosyası; 3 modülü hiçbir test ithal etmiyor, 13 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
 * 1 ithal döngüsü, 0 rotaya oturmayan tarayıcı çağrısı
 
 En büyük dosyalar: `app` (2184), `catalog` (1296), `models` (1020), `veo_client` (590), `desktop` (559).

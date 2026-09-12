@@ -35,6 +35,8 @@ main'e merge
    └─ yayinla       TEK yazıcı → küme denetimi → --draft=false → tag + yayın
 ```
 
+**`main` korumada mı?** Silme ve zorla gönderme kapalı; PR ve durum denetimi zorunluluğu BİLEREK açılmadı, çünkü `surum-yaz` sürüm commit'ini doğrudan main'e itiyor ve o kurallar botu keserdi — [docs/dal-korumasi.md](dal-korumasi.md).
+
 **Tag'i yayın işi atıyor, hattın başında değil.** Yani bir paket kırmızıya
 düşerse ortada ne tag ne yayın kalır — "eksik yayın" diye bir ara durum yok.
 Taslak bunu bozmuyor: taslağın tag'i yoktur ve yalnız yazma yetkisi olanlara
@@ -183,6 +185,7 @@ sürüyor.
 | `yayinla` "yayına girmesi gereken paket YOK" dedi | Bir paket işi düştü | O işin kaydına bak; sorunu düzeltip main'e merge et — sürüm İKİNCİ kez artmaz |
 | Android işi "imza ZORUNLU" dedi | Keystore sırları yok ya da `secrets: inherit` eksik | `docs/android/mimari.md` → İmzalama |
 | Koşu hiç başlamadı | Workflow YAML'ı bozuk (GitHub onu sessizce yok sayar) | `pytest tests/test_release_manifest.py` — `test_butun_workflowlar_gecerli_yaml` bunu yakalar |
+| `surum-yaz` "sürüm commit'i main'e gönderilemedi" dedi | `main`'e PR ya da durum denetimi zorunluluğu eklendi; `GITHUB_TOKEN` admin değil, ikisi de doğrudan push'u kapsıyor | [docs/dal-korumasi.md](dal-korumasi.md) → Aşama 2: önce bota yol açılır, SONRA kural eklenir |
 | Windows işi **"Derle"** adımında kırmızı, kayıtta `FAILED tests/…` | `build.ps1` paketlemeden ÖNCE tam pytest takımını Windows yorumlayıcısıyla koşturuyor | Kusur paketlemede değil TESTTE: kaydın sonundaki `short test summary`ye bak. Linux'ta yeşil olan bir testin yalnız burada düşmesi bir platform farkıdır (yol ayracı, ADS, süreç açma süresi) — 2026-09-04'te `node.exe`nin soğuk açılışı 10 sn'lik bir sınırı aştı, bkz. `tests/test_search_predicate.py` → `NODE_ZAMAN_ASIMI` |
 | Windows "Açılış denetimi" kırmızı, **MOTW'siz** senaryoda | Paketlenen .NET köprüsü (pythonnet/clr_loader) frozen'da çalışmıyor | Sorun sürüm yığınında: `requirements.txt`'teki pinlere bak. Geri çekilme yolu `_paket-windows.yml`'in `python-version`'ını 3.13'e indirip `pythonnet==3.0.*`'a dönmek (`tests/test_bagimlilik_pinleri.py` ikisini birlikte zorluyor) |
 | Windows "Açılış denetimi" kırmızı, yalnız **MOTW'li** senaryoda | İndirme işareti .NET assembly yüklemesini engelliyor | Kusur kullanıcının göreceği kusurun ta kendisi. `branding/Kromis.exe.config` exe'nin yanına kopyalanıyor mu, `winclr` işareti kaldırabiliyor mu — adımın bastığı rapora bak |

@@ -1156,6 +1156,33 @@ def get_guncelleme() -> dict:
         OUTPUT_DIR, izin=prefs.read(OUTPUT_DIR)["guncelleme_kontrolu"])}
 
 
+@app.post("/api/guncelleme")
+def post_guncelleme() -> dict:
+    """"Şimdi kontrol et" — TTL'i baypas eden, SONUCU BEKLEYEN elle kontrol.
+
+    NEDEN VAR: `GET` yalnız önbelleğe bakıyor ve önbellek 24 saat taze sayılıyor
+    (`guncelleme.TTL_SANIYE`). Yayın hızı bundan yüksekse — 2026-09-12'de
+    ölçüldü: son beş yayın ortalama 7.7 saatte bir çıkmış — kullanıcının
+    önbelleği "taze" olduğu hâlde cevabı bayat kalıyor ve GitHub'a hiç
+    sorulmuyor. Tam olarak yaşanan kusur bu: v0.20.1 yayınlandı, telefon
+    bildirimi göstermedi, kullanıcının elinde tetikleyecek HİÇBİR yol yoktu
+    (tercih anahtarını kapatıp açmak önbelleğe dokunmuyor).
+
+    NEDEN POST, GET DEĞİL: bu uç yan etkili — ağa çıkıyor ve önbelleği yeniden
+    yazıyor. Aynı adresin GET'i saf okuma olarak kalıyor, yani ön yüzün açılış
+    yoklaması (`yoklaGuncelleme`) yanlışlıkla ağ çağrısı tetikleyemiyor.
+
+    İSTEK YOLUNU BEKLETİR ve bu bilinçli — gerekçe `guncelleme.simdi_kontrol_et`
+    başlığında: 2. sözleşme açılış yolunu koruyor, kullanıcının bastığı bir
+    düğmeyi değil. Rota senkron, Starlette onu threadpool'da koşturuyor.
+
+    Gövde `{"durum": …, "guncelleme": …}`; `durum` dört değerden biri
+    (`guncelleme.DURUM_*`) ve arayüz her birini ayrı bir cümleye çeviriyor.
+    """
+    return guncelleme.simdi_kontrol_et(
+        OUTPUT_DIR, izin=prefs.read(OUTPUT_DIR)["guncelleme_kontrolu"])
+
+
 @app.post("/api/settings")
 def post_settings(req: SettingsRequest) -> dict:
     """Sağlayıcı kimliklerini yalnızca-yazılır kaydeder; durumu döndürür (key'siz).

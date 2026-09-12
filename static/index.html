@@ -1476,6 +1476,28 @@
              target="_blank" rel="noopener noreferrer">GUNCELLEME.md</a></span>
       </p>
 
+      <!-- "ŞİMDİ KONTROL ET" — yukarıdaki satırın gizli kalmasının ELLE çaresi.
+           NEDEN VAR: kontrol 24 saatte bir koşuyor (guncelleme.TTL_SANIYE) ve
+           yayın hızı bunun üstüne çıktığında (2026-09-12'de ölçüldü: ortalama
+           7.7 saatte bir yayın) önbellek "taze" sayılıp GitHub'a hiç
+           sorulmuyordu. Kullanıcının elinde tetikleyecek hiçbir şey yoktu —
+           tercih anahtarını kapatıp açmak önbelleğe dokunmuyor — yani tek yol
+           beklemekti. Gerçekten yaşandı: v0.20.1 çıktı, telefon göstermedi.
+
+           SATIRIN AKSİNE HER ZAMAN GÖRÜNÜR: gizli bir "kontrol et" düğmesi
+           tanım gereği anlamsız olurdu, çünkü ona ihtiyaç duyulan an tam da
+           satırın gizli olduğu andır.
+
+           `role="status"` + `aria-live`: cevap yalnız metin değişimiyle
+           geliyor, yani ekran okuyucu ona kendiliğinden uğramaz. Düğmeye basan
+           kişinin "ne oldu?" sorusu görme yoluyla cevaplanamıyorsa hiç
+           cevaplanmamıştır. -->
+      <p class="field-note settings-update-check-row">
+        <button id="settings-update-check" class="btn-ghost" type="button">
+          {{t:settings.update_check_now}}</button>
+        <span id="settings-update-check-status" role="status" aria-live="polite"></span>
+      </p>
+
       <label class="switch-row" for="pref-guncelleme">
         <input type="checkbox" id="pref-guncelleme" checked />
         <span>{{t:settings.update_check}}</span>

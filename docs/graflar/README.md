@@ -15,12 +15,12 @@
 ## Ölçüler
 
 * 45 Python modülü, 127 modül düzeyi ithal kenarı (13 erteli)
-* 44 HTTP uç noktası
+* 45 HTTP uç noktası
 * 10 tarayıcı betiği, 28 betik-arası bağ
 * 91 test dosyası; 3 modülü hiçbir test ithal etmiyor, 14 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
 * 1 ithal döngüsü, 0 rotaya oturmayan tarayıcı çağrısı
 
-En büyük dosyalar: `app` (2249), `catalog` (1247), `models` (1058), `desktop` (580), `veo_client` (578).
+En büyük dosyalar: `app` (2276), `catalog` (1247), `models` (1058), `desktop` (580), `veo_client` (578).
 En çok ithal edilenler: `i18n` (20), `catalog` (14), `azure_client` (12), `credstore` (9), `jsonstore` (8).
 
 ## Nasıl güncellenir

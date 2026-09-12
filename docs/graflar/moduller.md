@@ -23,7 +23,7 @@ flowchart TD
     n_netguard["netguard<br/>160 satır"]
   end
   subgraph katman8["katman 8"]
-    n_app["app<br/>2249 satır"]
+    n_app["app<br/>2276 satır"]
   end
   subgraph katman7["katman 7"]
     n_chat_providers["chat_providers<br/>130 satır"]
@@ -57,7 +57,7 @@ flowchart TD
   end
   subgraph katman2["katman 2"]
     n_chat_prompt["chat_prompt<br/>396 satır"]
-    n_guncelleme["guncelleme<br/>240 satır"]
+    n_guncelleme["guncelleme<br/>356 satır"]
     n_i18n["i18n<br/>276 satır"]
   end
   subgraph katman1["katman 1"]
@@ -226,7 +226,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | modül | satır | katman | ithal ettiği | ithal eden | test |
 | --- | --- | --- | --- | --- | --- |
 | `android_main.py` | 197 | 11 | `app` (erteli), `desktop` (erteli), `errlog` (erteli), `paths` (erteli) | 0 | 2 |
-| `app.py` | 2249 | 8 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `etiket`, `folders`, `guncelleme`, `i18n`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 35 |
+| `app.py` | 2276 | 8 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `etiket`, `folders`, `guncelleme`, `i18n`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 35 |
 | `assets_store.py` | 205 | 3 | `i18n`, `jsonstore` | 3 | 9 |
 | `azure_client.py` | 458 | 3 | `i18n`, `paths`, `winsec` | 12 | 30 |
 | `azure_flux_client.py` | 289 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
@@ -245,7 +245,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `etiket.py` | 118 | 3 | `catalog`, `i18n` | 6 | 1 |
 | `folders.py` | 252 | 3 | `i18n`, `jsonstore`, `storage` | 3 | 4 |
 | `gemini_client.py` | 295 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
-| `guncelleme.py` | 240 | 2 | `errlog`, `jsonstore`, `paths`, `version` | 1 | 5 |
+| `guncelleme.py` | 356 | 2 | `errlog`, `jsonstore`, `paths`, `version` | 1 | 5 |
 | `i18n.py` | 276 | 2 | `paths` | 20 | 3 |
 | `jsonstore.py` | 83 | 0 | — | 8 | 1 |
 | `models.py` | 1058 | 4 | `azure_client`, `catalog`, `etiket`, `i18n`, `palette` | 3 | 14 |
@@ -261,7 +261,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `screencolor.py` | 153 | 0 | — | 1 | 1 |
 | `storage.py` | 418 | 1 | `catalog`, `jsonstore` | 4 | 10 |
 | `veo_client.py` | 578 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
-| `version.py` | 30 | 0 | — | 4 | 8 |
+| `version.py` | 30 | 0 | — | 4 | 9 |
 | `winclr.py` | 337 | 0 | — | 1 | 1 |
 | `winsec.py` | 308 | 0 | — | 1 | 2 |
 

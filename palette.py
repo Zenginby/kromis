@@ -17,6 +17,7 @@ token'larıyla yazılmış; aynı uzayda kalmak tutarlı.
 """
 from __future__ import annotations
 
+import i18n
 import math
 import re
 from collections.abc import Mapping, Sequence
@@ -93,10 +94,10 @@ def parse_hex(value: str) -> str:
     zaman 7 karakterlik `#rrggbb` gönderir, esneklik gereksiz yüzey açar.
     """
     if not isinstance(value, str):
-        raise ValueError("hex bir metin olmalı")
+        raise ValueError(i18n.t("err.hex_must_be_text"))
     m = _HEX_RE.fullmatch(value.strip())
     if not m:
-        raise ValueError(f"geçersiz hex: {value!r}")
+        raise ValueError(i18n.t("err.invalid_field_value", None, alan="hex", deger=repr(value)))
     return "#" + m.group(1).lower()
 
 
@@ -197,7 +198,7 @@ def harmony(seed_hex: str, mode: str) -> tuple[str, ...]:
     Deterministik ve çevrimdışı: aynı girdi her zaman aynı çıktıyı verir.
     """
     if mode not in MODES:
-        raise ValueError(f"geçersiz mod: {mode!r}")
+        raise ValueError(i18n.t("err.invalid_field_value", None, alan="mode", deger=repr(mode)))
     seed = parse_hex(seed_hex)
     lightness, chroma, hue = hex_to_oklch(seed)
 
@@ -318,9 +319,10 @@ def prompt_suffix(colors: Sequence[Mapping[str, str]], strength: str,
     if not colors:
         return ""
     if strength not in STRENGTHS:
-        raise ValueError(f"geçersiz güç: {strength!r}")
+        raise ValueError(i18n.t("err.invalid_field_value", None, alan="strength",
+                                deger=repr(strength)))
     if task not in TASKS:
-        raise ValueError(f"geçersiz görev: {task!r}")
+        raise ValueError(i18n.t("err.invalid_field_value", None, alan="task", deger=repr(task)))
     body = _TEMPLATES[(task, strength)].format(
         names=_join_names([str(c["name"]) for c in colors]),
         detailed=", ".join(f"{c['name']} ({c['hex']})" for c in colors),

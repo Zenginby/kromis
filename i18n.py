@@ -242,3 +242,35 @@ def js_payload(lang: str) -> str:
     """
     return json.dumps(catalog(lang), ensure_ascii=False,
                       separators=(",", ":")).replace("</", "<\\/")
+
+
+def language_name(lang: str) -> str:
+    """Dilin KENDİ adı ("Türkçe", "English") — aktif dilden BAĞIMSIZ.
+
+    Bu bir çeviri DEĞİL: bir dilin adı, listeyi kim okursa okusun o dilde
+    yazılır. İngilizce arayüzde satır "Turkish" deseydi, arayüzü yanlışlıkla
+    İngilizce'ye çevirmiş bir kullanıcı geri dönüş yolunu ararken tanıdığı
+    sözcüğü ("Türkçe") listede bulamazdı — yani liste tam da en çok gerektiği
+    anda işe yaramaz olurdu.
+
+    Değer her kataloğun KENDİ içinde duruyor (`language.native_name`), yani
+    yeni bir dil eklemek yalnız bir dosya açmak: adını da o dosya söylüyor.
+    """
+    return t("language.native_name", lang)
+
+
+def language_options_html(selected: str | None) -> str:
+    """Dil açılır listesinin `<option>` gövdesi (`app.index` yerleştiriyor).
+
+    ŞABLONDA SABİT LİSTE YOK ve asıl kazanç bu: seçenekler `LANGUAGES`'tan
+    türetildiği için üçüncü bir dil eklemek `bundled/i18n/xx.json` + bir jeton
+    demek, `index.html`e dokunmak değil. Liste iki yerde yazılı olsaydı,
+    birini unutmanın bedeli sessiz olurdu: katalog var, seçenek yok.
+
+    Sıra `LANGUAGES`'ın sırası — yani bildirilen sıra GÖRÜNEN sıra.
+    """
+    secili = normalize(selected)
+    return "".join(
+        f'<option value="{kod}"{" selected" if kod == secili else ""}>'
+        f'{html.escape(language_name(kod), quote=False)}</option>'
+        for kod in LANGUAGES)

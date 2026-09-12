@@ -11,6 +11,7 @@ import pytest
 
 import azure_client as ac
 import catalog
+import etiket
 import i18n
 import models
 
@@ -357,10 +358,10 @@ def test_PREVIEW_jetonu_beyan_edilmiyor(m):
 
 def test_KISA_ad_marka_onekini_dusuruyor():
     """Kural: `"{marka} · "` öneki düşüyor, geri kalanı aynen kalıyor."""
-    kisa = catalog.short_labels(catalog.IMAGE_MODELS)
+    kisa = etiket.short_labels(catalog.IMAGE_MODELS)
     assert kisa["gemini-nano-banana-2"] == "Nano Banana 2"
     assert kisa["gemini-nano-banana-pro"] == "Nano Banana Pro"
-    sohbet = catalog.short_labels(catalog.CHAT_MODELS)
+    sohbet = etiket.short_labels(catalog.CHAT_MODELS)
     assert sohbet["openai-gpt-5.6-terra"] == "GPT-5.6 Terra"
     assert sohbet["gemini-3.7-flash"] == "3.7 Flash"
 
@@ -373,7 +374,7 @@ def test_CAKISAN_ad_tam_etiketini_KORUYOR():
     de anahtarı olan kullanıcı hangisini seçtiğini bilemez. Bu iddia, "önek her
     yerden düşsün" diye sadeleştiren bir sonraki turu kırmızıya çeviriyor.
     """
-    kisa = catalog.short_labels(catalog.IMAGE_MODELS)
+    kisa = etiket.short_labels(catalog.IMAGE_MODELS)
     assert kisa["azure-gpt-image-2"] == "Azure · gpt-image-2"
     assert kisa["openai-gpt-image-2"] == "OpenAI · gpt-image-2"
     # Aynı listede TEKİL olan `gpt-image-1` önekini bırakıyor: kural çakışmaya
@@ -388,7 +389,7 @@ def test_MARKA_ADIN_PARCASI_olan_etiket_kirpilmiyor():
     `AI Foundry dağıtımı`ya dönerdi — Azure'da model değil DAĞITIM olduğu
     bilgisini taşıyan tek satır o.
     """
-    assert catalog.short_labels(catalog.CHAT_MODELS)["azure-deployment"] == (
+    assert etiket.short_labels(catalog.CHAT_MODELS)["azure-deployment"] == (
         "Azure AI Foundry dağıtımı")
 
 
@@ -402,7 +403,7 @@ def test_KISA_ad_her_modelde_var_ve_BOS_DEGIL(models):
     dönüyor (kırpma yok) — sessiz ama zararsız yol; boş dize ise şeritte
     görünmez bir satır demekti.
     """
-    kisa = catalog.short_labels(models)
+    kisa = etiket.short_labels(models)
     assert set(kisa) == {m.id for m in models}
     assert all(ad.strip() for ad in kisa.values()), kisa
 
@@ -417,7 +418,7 @@ def test_KISA_adlar_LISTE_ICINDE_tekil(models):
     katalogda üçüncü bir eşadlı model, örneğin bir `Gemini · gpt-image-2`
     doğarsa) burada kırmızı yanıyor.
     """
-    adlar = list(catalog.short_labels(models).values())
+    adlar = list(etiket.short_labels(models).values())
     assert len(adlar) == len(set(adlar)), f"eşadlı satır: {adlar}"
 
 
@@ -547,7 +548,7 @@ def test_every_video_quality_token_has_a_LABEL():
     ekseninin okunabilirliği."""
     for m in catalog.VIDEO_MODELS:
         for q in m.qualities:
-            assert catalog.quality_label(q) != q, f"{q} etiketsiz"
+            assert etiket.quality_label(q) != q, f"{q} etiketsiz"
 
 
 @pytest.mark.parametrize(
@@ -556,7 +557,7 @@ def test_VIDEO_kisa_adlari_LISTE_ICINDE_tekil(models):
     """Görsel/sohbet şeritlerinin aynı mandalı: iki satır aynı metni
     GÖSTEREMEZ. Kısa adlar şerit BAŞINA hesaplanıyor (`app._settings_payload`),
     yani çakışma kuralı bu listenin kendi içinde çalışmak zorunda."""
-    adlar = list(catalog.short_labels(models).values())
+    adlar = list(etiket.short_labels(models).values())
     assert len(adlar) == len(set(adlar)), f"eşadlı satır: {adlar}"
 
 
@@ -697,7 +698,7 @@ def test_her_gorsel_modelinin_notu_NE_ZAMAN_SECILIR_i_cevapliyor(m, dil):
     # "gpt-image-1 artık kalkıyor…" yapan mutasyon, yani bu iddianın
     # ENGELLEMEK İÇİN VAR OLDUĞU kusur, tam etiket kıyasını geçiyordu.
     #
-    # `catalog.short_labels()` burada işe YARAMAZ: onun ölçülmüş çakışma
+    # `etiket.short_labels()` burada işe YARAMAZ: onun ölçülmüş çakışma
     # istisnası iki `gpt-image-2` girdisinde öneki BİLEREK koruyor (seçicide
     # doğru olan bu), ki o da tam da bu iki girdide iddiayı yeniden boşa
     # düşürürdü. Buradaki soru ayrıştırma değil, notun modelin KENDİ adıyla

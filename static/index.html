@@ -1403,17 +1403,25 @@
            kimliğini yeniden yazmak zorunda kalmasın. #pref-autosave'in
            kalıbının aynısı. -->
       <section class="settings-pane" data-pane="language" hidden>
-      <fieldset id="language-picker" class="theme-picker">
-        <legend class="palette-picker-title">{{t:settings.language_title}}</legend>
-        <label class="radio-row">
-          <input type="radio" name="language" value="tr" checked />
-          <span><b>Türkçe</b><span>{{t:settings.language_tr_desc}}</span></span>
-        </label>
-        <label class="radio-row">
-          <input type="radio" name="language" value="en" />
-          <span><b>English</b><span>{{t:settings.language_en_desc}}</span></span>
-        </label>
-      </fieldset>
+      <!-- NEDEN NATIVE <select>, model seçicinin radyo kararının TERSİ:
+           orada her satır sağlayıcı işareti ve model tanıtımı taşıyor,
+           `<option>` ikisini de taşıyamıyor (style.css, .model-list). Burada
+           satırın taşıdığı TEK şey dilin kendi adı — ve liste her yeni dille
+           uzuyor. Radyo yığını üç dilde Ayarlar bölmesini doldurmaya başlar;
+           native seçici uzun listeyi telefonda sistem tekerleği, klavyede ok
+           tuşlarıyla zaten veriyor.
+
+           SEÇENEKLER SUNUCUDAN (`__APP_LANG_OPTIONS__` ← app.index): tek
+           kaynak `i18n.LANGUAGES`. Burada sabit bir liste dursaydı yeni bir
+           dil İKİ dosyaya dokunmak olurdu ve birini unutmak sessiz kalırdı.
+
+           ADLAR ÇEVRİLMİYOR: her dil kendi adını kendi kataloğunda söylüyor
+           (`i18n.language_name`ın gerekçesi). -->
+      <div id="language-picker">
+        <label for="language-select" class="palette-picker-title"
+               >{{t:settings.language_title}}</label>
+        <select id="language-select">__APP_LANG_OPTIONS__</select>
+      </div>
       <p class="field-note">
         {{t:settings.language_note}}
       </p>

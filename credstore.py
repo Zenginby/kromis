@@ -26,6 +26,8 @@ from urllib.parse import urlsplit
 
 import azure_client as ac
 import catalog
+import etiket
+import i18n
 
 
 def _values(env_path: str | None = None) -> dict[str, str]:
@@ -84,7 +86,7 @@ def resolve(cred_id: str, env_path: str | None = None) -> tuple[str, str]:
         # Katalog ile kod ayrışmış: bu bir programlama hatası, kullanıcı hatası
         # değil — ama yine de Türkçe ve 502'ye çevrilebilir bir tür olmalı,
         # yoksa ham 500 olur ve arayüz gövdeyi ayrıştıramaz.
-        raise ac.ImageError(f"Tanımsız kimlik: {cred_id}")
+        raise ac.ImageError(i18n.t("err.unknown_credential", None, kimlik=cred_id))
 
     if cred_id == "azure_image":
         # Azure'ın iki dosyalı düşmesi ve legacy paylaşılan dosyası korunuyor.
@@ -100,8 +102,7 @@ def resolve(cred_id: str, env_path: str | None = None) -> tuple[str, str]:
         key, url, _deployment = ac.resolve_chat_credentials(env_path)
         if not key or not url:
             raise ac.ImageError(
-                "Azure sohbet kimliği eksik: Ayarlar'dan endpoint ve API "
-                "anahtarını kaydet.")
+                                i18n.t("err.azure_chat_credentials_missing"))
         return key, url
 
     if cred_id == "azure_foundry":
@@ -118,14 +119,14 @@ def resolve(cred_id: str, env_path: str | None = None) -> tuple[str, str]:
                or derive_foundry_base_url(values.get(ac.IMAGE_URL, "")))
         if not key:
             raise ac.ImageError(
-                f"{cred.label} anahtarı yok: Ayarlar'dan Azure API anahtarını "
-                f"kaydet (ortam değişkeni: {cred.key_env} ya da {ac.IMAGE_KEY}).")
+                i18n.t("err.foundry_key_missing", None,
+                       kimlik=etiket.label_of(cred), env=cred.key_env,
+                       env2=ac.IMAGE_KEY))
         if not url:
             raise ac.ImageError(
-                f"{cred.label} adresi çözülemedi: Azure adresin tanınan bir "
-                f"Foundry hostu değil. Ayarlar'daki Foundry adresi alanına "
-                f"https://<kaynak>.{_FOUNDRY_HOST} yaz "
-                f"(ortam değişkeni: {cred.url_env}).")
+                i18n.t("err.foundry_url_unresolved", None,
+                       kimlik=etiket.label_of(cred), host=_FOUNDRY_HOST,
+                       env=cred.url_env))
         return key, url
 
     values = _values(env_path)
@@ -133,12 +134,12 @@ def resolve(cred_id: str, env_path: str | None = None) -> tuple[str, str]:
     url = (values.get(cred.url_env, "") if cred.url_env else "") or (cred.default_base_url or "")
     if not key:
         raise ac.ImageError(
-            f"{cred.label} anahtarı yok: Ayarlar'dan kaydet "
-            f"(ortam değişkeni: {cred.key_env}).")
+            i18n.t("err.credential_key_missing", None,
+                   kimlik=etiket.label_of(cred), env=cred.key_env))
     if not url:
         raise ac.ImageError(
-            f"{cred.label} adresi yok: Ayarlar'dan kaydet "
-            f"(ortam değişkeni: {cred.url_env}).")
+            i18n.t("err.credential_url_missing", None,
+                   kimlik=etiket.label_of(cred), env=cred.url_env))
     return key, url
 
 

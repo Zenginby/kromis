@@ -15,6 +15,7 @@ kataloğa yazılmamış bir anahtar (`{{t:rail.studio}}` ↔ `rail.studo`). O da
 ekranda ham anahtar olarak görünürdü; aşağıdaki kapılar yazım hatasını
 kullanıcıya varmadan yakalıyor.
 """
+import ast
 import json
 import os
 import re
@@ -387,9 +388,48 @@ def test_the_language_pane_is_served():
     yer orası, tema gibi ayrı bir slide-over değil."""
     html = TestClient(appmod.app).get("/").text
     assert 'data-pane="language"' in html, "dil bölmesi yok"
-    assert 'id="language-picker"' in html, "dil seçicisi yok"
+    assert 'id="language-select"' in html, "dil seçicisi yok"
     for jeton in i18n.LANGUAGES:
-        assert f'name="language" value="{jeton}"' in html, jeton
+        assert f'<option value="{jeton}"' in html, jeton
+
+
+def test_the_served_list_marks_the_language_the_page_was_drawn_in():
+    """Açılır liste sayfanın DİLİNİ gösteriyor, varsayılanı değil.
+
+    Sunucu `selected`i yazmasaydı liste her yüklemede ilk dili gösterirdi ve
+    İngilizce arayüzde "Türkçe" yazardı — kullanıcıya, seçiminin kaydedilmediği
+    yalanını söyleyen bir ekran.
+    """
+    for jeton in i18n.LANGUAGES:
+        html = i18n.language_options_html(jeton)
+        assert f'<option value="{jeton}" selected>' in html, jeton
+        assert html.count(" selected") == 1, f"{jeton}: tek işaret olmalı"
+
+
+def test_adding_a_language_costs_no_template_edit():
+    """ÜÇÜNCÜ DİLİN BEDELİ ÖLÇÜLÜYOR: bir katalog dosyası + bir jeton.
+
+    Seçenekler şablonda sabit dursaydı yeni bir dil İKİ dosyaya dokunmak
+    olurdu ve birini unutmak sessiz kalırdı — katalog yerinde, seçenek yok.
+    Bu test o sessizliği imkânsız kılıyor: liste yalnız sunucudan gelebilir.
+    """
+    with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
+        sablon = f.read()
+    assert "__APP_LANG_OPTIONS__" in sablon, "seçenekler sunucudan gelmiyor"
+    bolme = sablon[sablon.find('data-pane="language"'):]
+    bolme = bolme[:bolme.find("</section>")]
+    for jeton in i18n.LANGUAGES:
+        assert f'value="{jeton}"' not in bolme, (
+            f"{jeton} şablona elle yazılmış — liste iki yerde")
+
+
+def test_every_language_says_its_own_name():
+    """Adı katalogdan GELMEK ZORUNDA: eksikse `t()` anahtarı döndürür ve
+    kullanıcı listede "language.native_name" okur."""
+    for jeton in i18n.LANGUAGES:
+        ad = i18n.language_name(jeton)
+        assert ad != "language.native_name", f"{jeton}: kendi adı yazılmamış"
+        assert ad.strip() == ad and ad, f"{jeton}: {ad!r}"
 
 
 def test_the_language_button_is_not_translated():
@@ -409,17 +449,16 @@ def test_the_language_button_is_not_translated():
 def test_the_language_names_are_written_in_their_own_language():
     """Çeviren bir liste, İngilizce arayüzde Türkçe'yi "Turkish" diye
     gösterirdi — Türkçe konuşan kullanıcı kendi dilini tanımadığı bir adla
-    arardı. Adlar bu yüzden şablonda SABİT, katalogda değil."""
-    with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
-        html = f.read()
-    secici = html[html.find('id="language-picker"'):html.find("</fieldset>",
-                                                              html.find('id="language-picker"'))]
-    assert "<b>Türkçe</b>" in secici and "<b>English</b>" in secici, (
-        "dil adları kendi dillerinde yazılmamış")
-    # Yalnız ADLAR sabit; satırın AÇIKLAMASI çevriliyor ve çevrilmeli — o
-    # cümle kullanıcıya seçimin ne demek olduğunu anlatıyor, dilin adını değil.
-    adlar = re.findall(r"<b>([^<]*)</b>", secici)
-    assert all("{{t:" not in ad for ad in adlar), f"dil adı çeviriden geçiyor: {adlar}"
+    arardı. Bu yüzden ad AKTİF dilden değil, dilin KENDİ kataloğundan geliyor:
+    liste hangi dilde çizilirse çizilsin aynı sözcükleri gösteriyor.
+    """
+    listeler = {jeton: i18n.language_options_html(jeton) for jeton in i18n.LANGUAGES}
+    adlar = {jeton: re.findall(r">([^<]+)</option>", html)
+             for jeton, html in listeler.items()}
+    tek = list(adlar.values())[0]
+    assert all(v == tek for v in adlar.values()), (
+        f"dil adları arayüz diline göre değişiyor: {adlar}")
+    assert "Türkçe" in tek and "English" in tek, f"adlar kendi dillerinde değil: {tek}"
 
 
 def test_changing_the_language_reloads_the_page():
@@ -457,7 +496,7 @@ def test_the_picker_reads_the_language_from_the_page_not_the_server():
     govde = js[js.find("function syncLanguagePicker"):]
     govde = govde[:govde.find("\n}")]
     assert "KROMIS_DIL" in govde, "seçili dil sayfadan okunmuyor"
-    assert "/api/prefs" not in govde, "seçili radyoyu kurmak için ağa çıkılıyor"
+    assert "/api/prefs" not in govde, "seçili seçeneği kurmak için ağa çıkılıyor"
 
 
 # ── Sunucu mesajları ─────────────────────────────────────────────────
@@ -552,3 +591,95 @@ def test_the_readmes_still_explain_why_the_prompt_is_english():
         assert "İngilizce" in metin or "English" in metin, ad
         assert ("ölçülmüş" in metin or "measured" in metin), (
             f"{ad}: İngilizce prompt kuralının GEREKÇESİ yazılı değil")
+
+
+# ── Kaçan Türkçe metin ───────────────────────────────────────────────
+
+# Kullanıcıya METİN döndüren modüller. Liste ELLE tutuluyor ve bu bilinçli:
+# "hangi modül kullanıcıya konuşuyor" sorusunun mekanik bir cevabı yok (bir
+# `ValueError` kimi yerde 422 gövdesi, kimi yerde iç değişmez), yani otomatik
+# bir ölçüt ya gürültü üretir ya da yanlış susar. Yeni bir modül metin
+# döndürmeye başladığında buraya bir satır eklemek, o kararı GÖRÜNÜR yapıyor.
+KULLANICIYA_KONUSAN = (
+    "app.py", "assets_store.py", "azure_client.py", "azure_flux_client.py",
+    "azure_mai_client.py", "catalog.py", "chat_client.py", "chat_providers.py",
+    "composite.py", "credstore.py", "etiket.py", "folders.py", "gemini_client.py",
+    "models.py", "openai_chat.py", "openai_client.py", "palette.py", "prefs.py",
+    "providers.py", "storage.py", "veo_client.py",
+)
+
+# Türkçe kalması KARAR olan dizeler — gerekçesiyle. Muafiyet DİZE düzeyinde,
+# dosya düzeyinde DEĞİL: bir dosyayı bütünüyle muaf tutmak, o dosyaya bir gün
+# eklenen gerçek bir arayüz metnini de sessizce muaf tutardı.
+TURKCE_KALANLAR = {
+    # `models.result_note` TELE yazıyor, ekrana değil: Prompt Yönetmeni'nin
+    # döküm bağlamı. Persona Türkçe, yani bu metinlerin dili modelin okuduğu
+    # dille aynı olmak zorunda — arayüz diliyle değil.
+    "[üretim]": "yönetmenin döküm bağlamı (models.result_note)",
+    "görsel": "yönetmenin döküm bağlamı (models.result_note)",
+    "düzenlendi": "yönetmenin döküm bağlamı (models.result_note)",
+    "üretildi": "yönetmenin döküm bağlamı (models.result_note)",
+}
+
+
+def _turkce_sabitler(kaynak: str) -> list[tuple[int, str]]:
+    """Docstring OLMAYAN, Türkçe harf taşıyan dize sabitleri.
+
+    Docstring'ler ve yorumlar DIŞARIDA: bu deponun yazı geleneği onların
+    Türkçe olmasını ŞART koşuyor (CLAUDE.md §5). Aranan şey kullanıcıya
+    giden metin, geliştiriciye giden metin değil.
+    """
+    agac = ast.parse(kaynak)
+    docstringler = set()
+    for dugum in ast.walk(agac):
+        if isinstance(dugum, (ast.Module, ast.ClassDef, ast.FunctionDef,
+                              ast.AsyncFunctionDef)):
+            ilk = dugum.body[0] if dugum.body else None
+            if (isinstance(ilk, ast.Expr) and isinstance(ilk.value, ast.Constant)
+                    and isinstance(ilk.value.value, str)):
+                docstringler.add(id(ilk.value))
+    return [(d.lineno, d.value) for d in ast.walk(agac)
+            if isinstance(d, ast.Constant) and isinstance(d.value, str)
+            and id(d) not in docstringler and _TURKCE_HARF.search(d.value)]
+
+
+_TURKCE_HARF = re.compile(r"[şğıİŞĞÇçÖöÜü]")
+
+
+def test_no_user_facing_module_still_carries_turkish_text():
+    """ÖLÇÜLEN KUSUR: çeviriden KAÇMIŞ bir cümle.
+
+    İlk turda `app.py`nin `HTTPException` metinleri ve sekiz `map_error`
+    çevrildi, ama aynı kullanıcıya konuşan `models.py` doğrulayıcıları,
+    `credstore.py` kurulum uyarıları ve `catalog.py` kalite etiketleri
+    çevrilmeden kaldı — yani İngilizce arayüzde "Orta", "kredi" ve
+    "Azure OpenAI · görsel" yazıyordu. Kaçış SESSİZDİ çünkü Türkçe arayüzde
+    her şey doğru görünüyor; kusur yalnız öteki dilde var.
+
+    Bu test o sessizliği kapatıyor: kullanıcıya konuşan bir modüle Türkçe bir
+    cümle yazmak artık ya çeviriyi ya da `TURKCE_KALANLAR`a gerekçeli bir
+    satırı gerektiriyor.
+    """
+    kacanlar = []
+    for ad in KULLANICIYA_KONUSAN:
+        yol = os.path.join(REPO, ad)
+        assert os.path.exists(yol), f"{ad} listede ama dosya yok"
+        with open(yol, encoding="utf-8") as f:
+            for satir, deger in _turkce_sabitler(f.read()):
+                if deger not in TURKCE_KALANLAR:
+                    kacanlar.append(f"{ad}:{satir}: {deger!r}")
+    assert not kacanlar, (
+        "çevrilmemiş kullanıcı metni (ya `i18n.t` ya da gerekçeli muafiyet):\n"
+        + "\n".join(kacanlar))
+
+
+def test_the_exemption_list_has_no_dead_entry():
+    """Muafiyet bir KARAR kaydı; kaydı kalan ama dizesi silinmiş bir satır,
+    okuyana var olmayan bir kararı anlatır. `test_no_catalog_key_is_unused`
+    ile aynı disiplin."""
+    bulunan = set()
+    for ad in KULLANICIYA_KONUSAN:
+        with open(os.path.join(REPO, ad), encoding="utf-8") as f:
+            bulunan |= {d for _, d in _turkce_sabitler(f.read())}
+    olu = set(TURKCE_KALANLAR) - bulunan
+    assert not olu, f"artık var olmayan dizeler muaf tutuluyor: {sorted(olu)}"

@@ -668,14 +668,18 @@ $("theme-picker").addEventListener("change", (e) => {
 //      kayıp olurdu (sendChat'in başarısızlık dalının reddettiği şeyin
 //      aynısı). Kutu boşken soru sormak ise gereksiz bir tık.
 //
-// Seçili radyo `window.KROMIS_LANG`ten kuruluyor, `/api/prefs`ten DEĞİL:
-// sunucu sayfayı zaten o dille çizdi, yani ekranda duran metin ile işaretli
-// radyo TANIM GEREĞİ aynı olmak zorunda. Ayrı bir uçtan sormak, ikisinin
-// ayrışabildiği bir an açardı (`applyConfigured`ın "aynı yanıttan" gerekçesi).
+// Seçili seçenek `window.KROMIS_LANG`ten kuruluyor, `/api/prefs`ten DEĞİL:
+// sunucu sayfayı zaten o dille çizdi, yani ekranda duran metin ile listede
+// işaretli dil TANIM GEREĞİ aynı olmak zorunda. Ayrı bir uçtan sormak,
+// ikisinin ayrışabildiği bir an açardı (`applyConfigured`ın "aynı yanıttan"
+// gerekçesi).
+//
+// Sunucu `selected` özniteliğini zaten yazıyor (`i18n.language_options_html`);
+// bu satır onun kopyası değil GERİ ALMA yolu: onay penceresinden "vazgeç"
+// çıkınca liste kullanıcının seçtiği dilde kalırdı, oysa arayüz eski dilde.
 function syncLanguagePicker() {
-  const secili = document.querySelector(
-    `input[name="language"][value="${KROMIS_DIL}"]`);
-  if (secili) secili.checked = true;
+  const secici = $("language-select");
+  if (secici) secici.value = KROMIS_DIL;
 }
 
 async function saveLanguagePref(dil) {
@@ -700,9 +704,7 @@ async function saveLanguagePref(dil) {
   }
 }
 
-$("language-picker").addEventListener("change", (e) => {
-  if (e.target.name === "language") saveLanguagePref(e.target.value);
-});
+$("language-select").addEventListener("change", (e) => saveLanguagePref(e.target.value));
 
 /** Kullanıcının kayıtlı model tercihi. `applyModels` bunu okuyor.
  *

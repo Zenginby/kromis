@@ -168,8 +168,21 @@ Etiket **her iki dilde de "Dil / Language"** — bilerek çevrilmiyor. Yanlış
 dilde kalmış bir kullanıcının geri dönüş yolu bu düğme; çevrilirse aradığı
 kelimeyi göremez.
 
-Tema seçicinin `radio-row` kalıbı yeniden kullanılıyor. Değişimde
-`POST /api/prefs {language}` → başarılıysa `location.reload()`.
+Seçici bir **native `<select>`** (`#language-select`). Plan önce tema
+seçicinin `radio-row` kalıbını öngörüyordu; iki dilde ikisi de çalışıyor ama
+radyo yığını üçüncü dilde Ayarlar bölmesini doldurmaya başlıyor ve asıl bedel
+görünüşte değil: her satır şablona elle yazılırdı, yani yeni bir dil İKİ
+dosyaya dokunmak olurdu. `<option>` listesi `i18n.language_options_html` ile
+`LANGUAGES`tan üretilip `__APP_LANG_OPTIONS__` yer tutucusuna basılıyor —
+üçüncü dilin bedeli **bir katalog dosyası + bir jeton**, şablon sabit kalıyor
+(`test_adding_a_language_costs_no_template_edit`).
+
+Dilin ADI çevrilmiyor: her katalog kendi adını `language.native_name` ile
+söylüyor, yani liste hangi dilde çizilirse çizilsin aynı sözcükleri gösteriyor
+— arayüzü yanlışlıkla tanımadığı bir dile çevirmiş kullanıcının geri dönüş
+yolu bu.
+
+Değişimde `POST /api/prefs {language}` → başarılıysa `location.reload()`.
 Composer'da ya da sohbet kutusunda yazılmış metin varsa ÖNCE onay istenir
 (`#confirm-modal` zaten var) — yenileme kullanıcının yazdığını silmemeli.
 
@@ -228,6 +241,51 @@ Uygulama sırasında ortaya çıkan ve plana girmemiş üç kusur düzeltildi; �
 
 Ayrıca iki BAYAT yer düzeltildi: Görünüm panelindeki "tema seçimi yeniden
 başlatınca sıfırlanır" notu (Adım 9'dan beri yanlış) ve onu ARAYAN test.
+
+**7. commit (CI kırmızısı).** Yukarıdaki altı commit'ten sonra CI iki kusur
+gösterdi; ikisi de tarayıcı testleriydi ve bu kapsayıcıda Chromium
+açılamadığı için yerelde ÖLÇÜLEMEMİŞTİ (13 Playwright testi burada launch
+hatasıyla düşüyor — depoyla ilgisi yok):
+
+* `syncPromptPlaceholder` anahtar tablosunun değerini `t()`den geçirmeden
+  `placeholder`a yazıyordu; kullanıcı composer'da
+  `composer.placeholder_director` okuyordu. Kaynak taramasının göremeyeceği
+  bir kusur: satırda tablonun adı bile geçmiyor, yerel bir takma ad var.
+  Bekçisi artık `tests/test_playwright_dil.py` — DOM'un tamamını tarayıp
+  ekranda duran her metni katalog anahtarlarıyla karşılaştırıyor, iki dilde.
+* `model.director_title` çeviri sırasında "Yönetmen modeli"nden "Prompt
+  Yönetmeni modeli"ne kaymıştı. Çeviri metni DEĞİŞTİRMEZ; eski değer geri
+  alındı ve testin haklı olduğu kabul edildi.
+
+**8. commit (kaçan sunucu metni).** CI kusurlarını ararken İngilizce arayüz
+Chromium'da baştan sona TARANDI (DOM'daki her metin düğümü ve öznitelik) ve
+ilk turun "sunucu mesajları da çevrilsin" kararının YARIM kaldığı görüldü:
+`app.py`nin `HTTPException`ları ve sekiz `map_error` çevrilmişti, ama aynı
+kullanıcıya konuşan şu yerler çevrilmemişti —
+
+| yer | İngilizce arayüzde görünen |
+| --- | --- |
+| `catalog.QUALITY_LABELS` | "1:1 · ORTA · x1" |
+| `catalog.duration_label` | "16:9 · 4 SN" |
+| `core.js` kredi metinleri | "≈ 8 kredi", "16 kredi/sn" |
+| `core.js` "kurulum gerekli" | model kartının rozeti |
+| dört `catalog` etiketi | "Azure OpenAI · görsel", "Azure AI Foundry dağıtımı" |
+| `models.py` doğrulayıcıları | "geçersiz theme", "{model} bu boyutu desteklemiyor: …" |
+| `credstore.py` kurulum uyarıları | "… anahtarı yok: Ayarlar'dan kaydet" |
+| `providers.py` / `chat_providers.py` | "… için sağlayıcı adaptörü yok" |
+| `prefs.py` / `folders.py` / `palette.py` / `composite.py` | 422 gövdesindeki metinler |
+
+Kusur SESSİZDİ çünkü Türkçe arayüzde hepsi doğru görünüyor. Bekçisi iki
+testte birden: `test_no_user_facing_module_still_carries_turkish_text`
+(kullanıcıya konuşan modüllerde Türkçe dize sabiti aramak, gerekçeli
+muafiyet listesiyle) ve tarayıcıdaki DOM taraması.
+
+**`etiket.py` (yeni modül).** Etiket çözümü `catalog.py`ye konamadı:
+`tests/test_catalog.py` kataloğun PROJE İÇİNDEN hiçbir şey import etmemesini
+şart koşuyor (yaprak kalmalı; `i18n` de `paths`i çeker). Ayrım şu oldu —
+`catalog` neyin VAR OLDUĞUNU söylüyor (jetonlar, yetenekler, etiket
+anahtarları), `etiket` onu kullanıcının OKUYACAĞI metne çeviriyor
+(`label_of`, `quality_label`, `duration_label`, `short_labels`).
 
 ---
 

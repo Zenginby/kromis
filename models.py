@@ -27,6 +27,7 @@ from pydantic import (BaseModel, ConfigDict, Field, field_validator,
 import azure_client as ac
 import catalog
 import i18n
+import etiket
 import palette
 
 MAX_PROMPT_CHARS = 4000    # kullanıcı prompt'u + palet eki
@@ -77,9 +78,9 @@ def check_drop_indices(values: list[int]) -> list[int]:
     """
     unique = sorted(set(values))
     if any(not 0 <= index < palette.COLORS_PER_PALETTE for index in unique):
-        raise ValueError("geçersiz palette_drop indeksi")
+        raise ValueError(i18n.t("err.bad_palette_drop_index"))
     if len(unique) >= palette.COLORS_PER_PALETTE:
-        raise ValueError("paletten en az bir renk kalmalı")
+        raise ValueError(i18n.t("err.palette_empty"))
     return unique
 
 
@@ -102,15 +103,18 @@ def check_capabilities(model_id: str, size: str, quality: str, n: int) -> str:
     """
     m = catalog.image_model(model_id or catalog.DEFAULT_IMAGE_MODEL)
     if m is None:
-        raise ValueError(f"bilinmeyen model: {model_id}")
+        raise ValueError(i18n.t("err.unknown_model", None, model=model_id))
     if size not in m.sizes:
-        raise ValueError(f"{m.label} bu boyutu desteklemiyor: {size} "
-                         f"(geçerli: {', '.join(m.sizes)})")
+        raise ValueError(i18n.t("err.size_unsupported", None,
+                                        model=etiket.label_of(m), deger=size,
+                                        gecerli=", ".join(m.sizes)))
     if quality not in m.qualities:
-        raise ValueError(f"{m.label} bu kaliteyi desteklemiyor: {quality} "
-                         f"(geçerli: {', '.join(m.qualities)})")
+        raise ValueError(i18n.t("err.quality_unsupported", None,
+                                        model=etiket.label_of(m), deger=quality,
+                                        gecerli=", ".join(m.qualities)))
     if n > m.max_n:
-        raise ValueError(f"{m.label} tek turda en fazla {m.max_n} görsel üretiyor")
+        raise ValueError(i18n.t("err.max_images_per_run", None,
+                                model=etiket.label_of(m), adet=m.max_n))
     return m.id
 
 
@@ -137,18 +141,22 @@ def check_video_capabilities(model_id: str, size: str, quality: str,
     """
     m = catalog.video_model(model_id or catalog.DEFAULT_VIDEO_MODEL)
     if m is None:
-        raise ValueError(f"bilinmeyen video modeli: {model_id}")
+        raise ValueError(i18n.t("err.unknown_video_model", None, model=model_id))
     if size not in m.sizes:
-        raise ValueError(f"{m.label} bu oranı desteklemiyor: {size} "
-                         f"(geçerli: {', '.join(m.sizes)})")
+        raise ValueError(i18n.t("err.ratio_unsupported", None,
+                                        model=etiket.label_of(m), deger=size,
+                                        gecerli=", ".join(m.sizes)))
     if quality not in m.qualities:
-        raise ValueError(f"{m.label} bu çözünürlüğü desteklemiyor: {quality} "
-                         f"(geçerli: {', '.join(m.qualities)})")
+        raise ValueError(i18n.t("err.resolution_unsupported", None,
+                                        model=etiket.label_of(m), deger=quality,
+                                        gecerli=", ".join(m.qualities)))
     if duration not in m.durations:
-        raise ValueError(f"{m.label} bu süreyi desteklemiyor: {duration} "
-                         f"(geçerli: {', '.join(str(d) for d in m.durations)})")
+        raise ValueError(i18n.t("err.duration_unsupported", None,
+                                        model=etiket.label_of(m), deger=duration,
+                                        gecerli=", ".join(str(d) for d in m.durations)))
     if n > m.max_n:
-        raise ValueError(f"{m.label} tek turda en fazla {m.max_n} video üretiyor")
+        raise ValueError(i18n.t("err.max_videos_per_run", None,
+                                model=etiket.label_of(m), adet=m.max_n))
     return m.id
 
 
@@ -210,20 +218,20 @@ class GenerateRequest(BaseModel):
         try:
             return palette.parse_hex(v)
         except ValueError:
-            raise ValueError("geçersiz palette_hex")
+            raise ValueError(i18n.t("err.invalid_field", None, alan="palette_hex"))
 
     @field_validator("palette_mode")
     @classmethod
     def _palette_mode_ok(cls, v):
         if v not in palette.MODES:
-            raise ValueError("geçersiz palette_mode")
+            raise ValueError(i18n.t("err.invalid_field", None, alan="palette_mode"))
         return v
 
     @field_validator("palette_strength")
     @classmethod
     def _palette_strength_ok(cls, v):
         if v not in palette.STRENGTHS:
-            raise ValueError("geçersiz palette_strength")
+            raise ValueError(i18n.t("err.invalid_field", None, alan="palette_strength"))
         return v
 
     @field_validator("palette_drop")
@@ -405,7 +413,7 @@ class PrefsRequest(BaseModel):
     @classmethod
     def _theme_ok(cls, v: str | None) -> str | None:
         if v is not None and v not in ALLOWED_THEMES:
-            raise ValueError("geçersiz theme")
+            raise ValueError(i18n.t("err.invalid_field", None, alan="theme"))
         return v
 
     @field_validator("language")
@@ -415,7 +423,7 @@ class PrefsRequest(BaseModel):
         rotanın "buraya düşmek pydantic ile prefs şemasının ayrışması demek
         olur" notu ikisinin birden var olmasını istiyor."""
         if v is not None and v not in ALLOWED_LANGUAGES:
-            raise ValueError("geçersiz language")
+            raise ValueError(i18n.t("err.invalid_field", None, alan="language"))
         return v
 
     @field_validator("image_model")
@@ -425,7 +433,8 @@ class PrefsRequest(BaseModel):
         kapı bilinçli: rotanın notu ("buraya düşmek pydantic ile prefs
         şemasının ayrışması demek olur") ikisinin birden var olmasını istiyor."""
         if v is not None and catalog.image_model(v) is None:
-            raise ValueError(f"geçersiz image_model: {v}")
+            raise ValueError(i18n.t("err.invalid_field_value", None,
+                                alan="image_model", deger=v))
         return v
 
     @field_validator("video_model")
@@ -433,14 +442,16 @@ class PrefsRequest(BaseModel):
     def _video_model_ok(cls, v: str | None) -> str | None:
         """`_image_model_ok`un ikizi, `video_model_ids()` üzerinde."""
         if v is not None and catalog.video_model(v) is None:
-            raise ValueError(f"geçersiz video_model: {v}")
+            raise ValueError(i18n.t("err.invalid_field_value", None,
+                                alan="video_model", deger=v))
         return v
 
     @field_validator("chat_provider")
     @classmethod
     def _chat_provider_ok(cls, v: str | None) -> str | None:
         if v is not None and v not in catalog.chat_provider_ids():
-            raise ValueError(f"geçersiz chat_provider: {v}")
+            raise ValueError(i18n.t("err.invalid_field_value", None,
+                                alan="chat_provider", deger=v))
         return v
 
     @field_validator("chat_model")
@@ -453,7 +464,8 @@ class PrefsRequest(BaseModel):
         zorunda, yani karar depoya erişimi olan katmanda verilmeli.
         """
         if v not in (None, "") and catalog.chat_model(v) is None:
-            raise ValueError(f"geçersiz chat_model: {v}")
+            raise ValueError(i18n.t("err.invalid_field_value", None,
+                                alan="chat_model", deger=v))
         return v
 
 
@@ -472,7 +484,7 @@ def _tek_satir(v: str) -> str:
     geçerli klasör adlarıdır — reddedilen yalnızca ÇİZİLMEYEN karakterler.
     """
     if any(ch == "\x7f" or ord(ch) < 32 for ch in v):
-        raise ValueError("ad kontrol karakteri (satır sonu, sekme) içeremez")
+        raise ValueError(i18n.t("err.name_control_chars"))
     return v
 
 
@@ -531,7 +543,7 @@ class SuggestRequest(BaseModel):
         try:
             return palette.parse_hex(v)
         except ValueError:
-            raise ValueError("geçersiz hex")
+            raise ValueError(i18n.t("err.invalid_field", None, alan="hex"))
 
 
 class SavePaletteRequest(BaseModel):
@@ -559,20 +571,20 @@ class SavePaletteRequest(BaseModel):
         try:
             return palette.parse_hex(v)
         except ValueError:
-            raise ValueError("geçersiz seed")
+            raise ValueError(i18n.t("err.invalid_field", None, alan="seed"))
 
     @field_validator("mode")
     @classmethod
     def _mode_ok(cls, v):
         if v not in palette.MODES:
-            raise ValueError("geçersiz mode")
+            raise ValueError(i18n.t("err.invalid_field", None, alan="mode"))
         return v
 
     @field_validator("strength")
     @classmethod
     def _strength_ok(cls, v):
         if v not in palette.STRENGTHS:
-            raise ValueError("geçersiz strength")
+            raise ValueError(i18n.t("err.invalid_field", None, alan="strength"))
         return v
 
 
@@ -601,14 +613,14 @@ class LogoRequest(BaseModel):
     @classmethod
     def _position_ok(cls, v):
         if v not in LOGO_POSITIONS:
-            raise ValueError("geçersiz position")
+            raise ValueError(i18n.t("err.invalid_field", None, alan="position"))
         return v
 
     @field_validator("asset_kind")
     @classmethod
     def _asset_kind_ok(cls, v):
         if v not in OVERLAY_ASSET_KINDS:
-            raise ValueError("geçersiz asset_kind")
+            raise ValueError(i18n.t("err.invalid_field", None, alan="asset_kind"))
         return v
 
 
@@ -707,7 +719,7 @@ def _check_chat_total(messages: list["ChatMessage"], limit: int) -> list["ChatMe
     """
     if sum(len(m.content or "") + len(m.display or "")
            for m in messages if m.role in WIRE_CHAT_ROLES) > limit:
-        raise ValueError("sohbet çok uzun: yeni bir sohbet başlat")
+        raise ValueError(i18n.t("err.chat_too_long"))
     return messages
 
 
@@ -718,7 +730,7 @@ def _check_chat_counts(messages: list["ChatMessage"]) -> list["ChatMessage"]:
     tutuyor; konuşma turlarının kendi sınırı burada sayılıyor.
     """
     if sum(1 for m in messages if m.role in WIRE_CHAT_ROLES) > MAX_CHAT_MESSAGES:
-        raise ValueError("sohbet çok uzun: yeni bir sohbet başlat")
+        raise ValueError(i18n.t("err.chat_too_long"))
     return messages
 
 
@@ -775,7 +787,7 @@ class ResultParams(BaseModel):
     @classmethod
     def _kind_ok(cls, v):
         if v not in RESULT_KINDS:
-            raise ValueError("geçersiz kind")
+            raise ValueError(i18n.t("err.invalid_field", None, alan="kind"))
         return v
 
 
@@ -824,7 +836,7 @@ class ChatMessage(BaseModel):
     @classmethod
     def _role_ok(cls, v):
         if v not in CHAT_ROLES:
-            raise ValueError("geçersiz role")
+            raise ValueError(i18n.t("err.invalid_field", None, alan="role"))
         return v
 
     @model_validator(mode="after")
@@ -836,26 +848,27 @@ class ChatMessage(BaseModel):
             # `MAX_CHAT_TOTAL_CHARS`'a sayılmayan (bkz. _check_chat_total)
             # ölçülmemiş bir ağırlık açılırdı — bütçenin delindiği yer tam burası.
             if self.content is not None:
-                raise ValueError("sonuç kaydında content olamaz")
+                raise ValueError(i18n.t("err.result_has_content"))
             if not self.image_ids:
-                raise ValueError("sonuç kaydında image_ids zorunlu")
+                raise ValueError(i18n.t("err.result_needs_image_ids"))
             if self.params is None:
-                raise ValueError("sonuç kaydında params zorunlu")
+                raise ValueError(i18n.t("err.result_needs_params"))
         else:
             if self.content is None:
                 raise ValueError("content zorunlu")
             # Konuşma mesajına sonuç alanı takılsa döküm İKİ ayrı yerden sonuç
             # kartı çizmeye başlardı; hangisinin doğru olduğu belirsiz kalırdı.
             if self.image_ids is not None or self.params is not None:
-                raise ValueError("image_ids/params yalnızca sonuç kaydında kullanılabilir")
+                raise ValueError(i18n.t("err.result_fields_misplaced"))
         if self.role == "user" and len(self.content) > MAX_CHAT_MSG_CHARS:
-            raise ValueError(f"mesaj çok uzun: en fazla {MAX_CHAT_MSG_CHARS} karakter")
+            raise ValueError(i18n.t("err.message_too_long", None,
+                                adet=MAX_CHAT_MSG_CHARS))
         # `display` yalnızca KULLANICI turunda anlamlı: pil, kullanıcının verdiği
         # seçimi gösteriyor. Asistan mesajında kabul edilse yönetmenin yanıtı
         # ekranda tek satırlık bir pile inerdi — prompt'u da, "Forma aktar"
         # düğmesini de görünmez yapan sessiz bir kırılma.
         if self.role != "user" and self.display is not None:
-            raise ValueError("display yalnızca kullanıcı mesajında kullanılabilir")
+            raise ValueError(i18n.t("err.display_user_only"))
         return self
 
 
@@ -909,7 +922,7 @@ def result_note(m: "ChatMessage") -> str:
     if p.quality and not (spec is not None and spec.quality_hidden):
         parcalar.append(p.quality)
     if p.duration:
-        parcalar.append(catalog.duration_label(p.duration))
+        parcalar.append(etiket.duration_label(p.duration))
     return (RESULT_NOTE_PREFIX + " " + " · ".join(parcalar))[:MAX_RESULT_NOTE_CHARS]
 
 
@@ -974,7 +987,8 @@ class ChatRequest(BaseModel):
         # Boş dize de None gibi "varsayılan" demek: `JSON.stringify` bir seçici
         # henüz dolmadan boş `value` gönderebilir ve o istek 422 ile ölmemeli.
         if v not in (None, "") and catalog.chat_model(v) is None:
-            raise ValueError(f"geçersiz model: {v}")
+            raise ValueError(i18n.t("err.invalid_field_value", None,
+                                alan="model", deger=v))
         return v
 
     @field_validator("messages")
@@ -988,7 +1002,7 @@ class ChatRequest(BaseModel):
         if v[-1].role != "user":
             # Son mesaj asistandaysa model kendi cevabını yeniden üretmeye
             # çalışır; sonuç kaydıysa Azure'a yalnız sistem talimatı giderdi.
-            raise ValueError("son mesaj kullanıcıdan olmalı")
+            raise ValueError(i18n.t("err.last_message_must_be_user"))
         return _check_chat_total(_check_chat_counts(v), MAX_CHAT_TOTAL_CHARS)
 
 
@@ -1033,12 +1047,12 @@ class BannerRequest(BaseModel):
     @classmethod
     def _edge_ok(cls, v):
         if v not in BANNER_EDGES:
-            raise ValueError("geçersiz edge")
+            raise ValueError(i18n.t("err.invalid_field", None, alan="edge"))
         return v
 
     @field_validator("align")
     @classmethod
     def _align_ok(cls, v):
         if v not in BANNER_ALIGNS:
-            raise ValueError("geçersiz align")
+            raise ValueError(i18n.t("err.invalid_field", None, alan="align"))
         return v

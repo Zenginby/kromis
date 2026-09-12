@@ -21,6 +21,7 @@ fixture'lar korunuyor: aynı dosya doğrudan geçildiğinde pikseller birebir ay
 """
 from __future__ import annotations
 
+import i18n
 import io
 
 from PIL import Image, ImageFilter
@@ -59,7 +60,8 @@ def _check_position(position: str) -> None:
     dönüşüyordu. Burada erken ve gürültülü başarısız oluyoruz.
     """
     if position not in POSITIONS:
-        raise ValueError(f"geçersiz konum: {position!r}")
+        raise ValueError(i18n.t("err.invalid_field_value", None, alan="position",
+                            deger=repr(position)))
 
 
 def _check_offset(value: float) -> None:
@@ -71,7 +73,8 @@ def _check_offset(value: float) -> None:
     reddedilir — karşılaştırmalar False dönüyor.
     """
     if not -OFFSET_LIMIT <= value <= OFFSET_LIMIT:
-        raise ValueError(f"geçersiz kaydırma: {value!r}")
+        raise ValueError(i18n.t("err.invalid_field_value", None, alan="offset",
+                            deger=repr(value)))
 
 
 def _vh(position: str) -> tuple[str, str]:

@@ -117,7 +117,7 @@ function syncPromptPlaceholder() {
   const prompt = $("prompt");
   if (!prompt) return;
   const metin = PROMPT_YER_TUTUCU[currentMode] || PROMPT_YER_TUTUCU.image;
-  prompt.placeholder = $("composer").dataset.sent ? metin.kisa : metin.tam;
+  prompt.placeholder = t($("composer").dataset.sent ? metin.kisa : metin.tam);
 }
 
 function setMode(modeName) {
@@ -486,7 +486,7 @@ function syncRunCost() {
     const sutunlar = arenaSutunlari();
     if (!sutunlar.length) { el.hidden = true; return; }
     const toplam = sutunlar.reduce((t, s) => t + (s.birim || 0), 0);
-    el.textContent = `≈ ${toplam} kredi · ${sutunlar.length} model`;
+    el.textContent = `${tc("gen.cost_one", "gen.cost_many", toplam)} · ${tc("gen.models_one", "gen.models_many", sutunlar.length)}`;
     el.hidden = false;
     return;
   }
@@ -508,7 +508,8 @@ function syncRunCost() {
     : 1;
   // `≈` bilerek: bu bir fatura değil, metadata — tilde bunu bir paragraf
   // açıklama yazmadan söylüyor.
-  el.textContent = `≈ ${birim * sure * Number($("n").value || 1)} kredi`;
+  el.textContent = tc("gen.cost_one", "gen.cost_many",
+                      birim * sure * Number($("n").value || 1));
   el.hidden = false;
 }
 
@@ -986,7 +987,8 @@ function modelKrediAraligi(m) {
   // 8 saniyelik bir klibin 128 kredi olduğunu SAKLARDI — yani karşılaştırma
   // için var olan etiket yanlış bir karşılaştırma sunardı. Ölçüt `durations`ın
   // boşluğu, ikinci bir birim alanı DEĞİL (aynı bilginin iki kopyası olurdu).
-  const birim = m.durations && m.durations.length ? "kredi/sn" : "kredi";
+  const birim = t(m.durations && m.durations.length
+                  ? "gen.credits_unit_per_sec" : "gen.credits_unit");
   const tarife = Object.values(m.credits_by_quality || {});
   return tarife.length
     ? `${Math.min(...tarife)}–${Math.max(...tarife)} ${birim}`
@@ -1012,7 +1014,7 @@ function modelKrediAraligi(m) {
 function modelSecenekMetni(m, kredi) {
   const ad = m.short_label || m.label;
   return (kredi ? `${ad} — ${modelKrediAraligi(m)}` : ad)
-    + (m.configured ? "" : " · kurulum gerekli");
+    + (m.configured ? "" : ` · ${t("model.setup_required")}`);
 }
 
 function renderModelOptions(zorunluId) {
@@ -1226,7 +1228,8 @@ function arenaUygula() {
   $("arena-toggle").setAttribute("aria-pressed", String(arenaAcik));
   $("arena-btn").hidden = !arenaAcik;
   $("model-pick").hidden = arenaAcik;
-  $("arena-btn-label").textContent = `${idler.length} model`;
+  $("arena-btn-label").textContent =
+    tc("gen.models_one", "gen.models_many", idler.length);
   // Adet arenada 1'e kilitli: sütun başına tek görsel karşılaştırmanın
   // kendisi. 4 model × 4 görsel hem ızgarayı hem faturayı okunmaz yapardı.
   $("spec-n").hidden = arenaAcik;

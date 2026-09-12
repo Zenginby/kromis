@@ -1907,7 +1907,9 @@ function renderGallery() {
     if (videoMu && !selectMode) {
       const badge = document.createElement("span");
       badge.className = "card-badge";
-      badge.textContent = rec.duration ? `video · ${rec.duration} sn` : "video";
+      badge.textContent = rec.duration
+        ? `video · ${t("gen.duration_label", { sn: rec.duration })}`
+        : "video";
       card.appendChild(badge);
     }
     // Arama sonucu kartı hangi klasörden geldiğini söyler (§4.1 künye kuralı):

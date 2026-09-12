@@ -63,6 +63,8 @@ from __future__ import annotations
 import azure_client as ac
 import catalog
 import credstore
+import etiket
+import i18n
 
 
 def _azure_generate(m, prompt, size, quality, n, *, client=None, credentials=None):
@@ -202,7 +204,8 @@ def _resolve(model_id: str) -> catalog.ImageModel:
         raise ac.ImageError(f"Bilinmeyen model: {model_id}")
     if m.provider not in _ADAPTERS:
         raise ac.ImageError(
-            f"{m.label} için sağlayıcı adaptörü yok ({m.provider}).")
+            i18n.t("err.no_image_adapter", None, model=etiket.label_of(m),
+                   saglayici=m.provider))
     return m
 
 
@@ -219,7 +222,8 @@ def _resolve_video(model_id: str) -> catalog.ImageModel:
         raise ac.ImageError(f"Bilinmeyen video modeli: {model_id}")
     if m.provider not in _VIDEO_ADAPTERS:
         raise ac.ImageError(
-            f"{m.label} için video adaptörü yok ({m.provider}).")
+            i18n.t("err.no_video_adapter", None, model=etiket.label_of(m),
+                   saglayici=m.provider))
     return m
 
 
@@ -424,7 +428,8 @@ def edit(model_id: str, prompt: str, images, size: str, quality: str, n: int,
     if not m.supports_edit:
         # Katalog kapısı rotada da var (app._check_edit_form); buradaki ikinci
         # kapı `providers.edit`'in başka bir çağıranı olduğu gün de korur.
-        raise ac.ImageError(f"{m.label} referans görselle çalışmıyor.")
+        raise ac.ImageError(i18n.t("err.model_no_reference", None,
+                                   model=etiket.label_of(m)))
     return _pair(m.provider)[1](m, prompt, images, size, quality, n,
                                 client=client, credentials=credentials)
 
@@ -463,13 +468,15 @@ def animate_video(model_id: str, prompt: str, images, size: str, quality: str,
     if not m.supports_edit:
         # `edit`teki ikinci kapının aynısı ve aynı gerekçesi: rota kapısı
         # (`app._check_video_form`) tek çağıran olmayabilir.
-        raise ac.ImageError(f"{m.label} referans görselle çalışmıyor.")
+        raise ac.ImageError(i18n.t("err.model_no_reference", None,
+                                   model=etiket.label_of(m)))
     if last_frame is not None and not m.supports_last_frame:
         # AYNI ikinci-kapı disiplini, ayrı bayrak üstünde: `supports_edit`
         # "ilk kareyi alır" diyor, son kareyi almayı SÖYLEMİYOR (Veo 3 ailesi
         # tam olarak böyle). Kapısız bırakmak, telde 400 dönen ve gerekçesi
         # sağlayıcının diliyle yazılmış bir istek demekti.
-        raise ac.ImageError(f"{m.label} bitiş görseli almıyor.")
+        raise ac.ImageError(i18n.t("err.model_no_last_frame", None,
+                                   model=etiket.label_of(m)))
     return _video_pair(m.provider)[1](m, prompt, images, size, quality,
                                       duration, n, last_frame=last_frame,
                                       client=client, credentials=credentials)

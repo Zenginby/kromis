@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import base64
 import datetime as _dt
+import etiket
 import io
 import os
 import re
@@ -576,7 +577,7 @@ def _check_video_form(prompt: str, size: str, quality: str, duration: int,
     spec = catalog.video_model(model_id)
     if not spec.supports_edit:
         raise HTTPException(status_code=422,
-                            detail=i18n.t("err.model_no_reference", _dil(), model=spec.label))
+                            detail=i18n.t("err.model_no_reference", _dil(), model=etiket.label_of(spec)))
     # `_check_edit_form`un aynı kapısı ve burada ALT sınır daha da gerekli:
     # `check_video_capabilities` yalnız TAVANI ölçüyor (`n > max_n`) ve form
     # ucunda `n` için pydantic `ge=1` YOK (JSON ikizinde var). `n=0` geçse
@@ -606,7 +607,7 @@ def _check_video_form(prompt: str, size: str, quality: str, duration: int,
         # çünkü çözüm composer'daki şeritten başka bir model seçmek.
         raise HTTPException(
             status_code=422,
-            detail=i18n.t("err.model_no_last_frame", _dil(), model=spec.label))
+            detail=i18n.t("err.model_no_last_frame", _dil(), model=etiket.label_of(spec)))
     return model_id
 
 
@@ -669,7 +670,7 @@ async def animate(
     if len(refs) > spec.max_refs:
         raise HTTPException(
             status_code=422,
-            detail=i18n.t("err.model_max_refs", _dil(), model=spec.label, adet=spec.max_refs))
+            detail=i18n.t("err.model_max_refs", _dil(), model=etiket.label_of(spec), adet=spec.max_refs))
     # Son kare `refs`e KATILMIYOR: `max_refs` sayacı "kaç referans" sorusunun
     # cevabı ve son kare o sorunun konusu değil. Katsaydı yukarıdaki kapı
     # bitiş görseli seçen HER isteği 422 yapardı.
@@ -734,7 +735,7 @@ def _check_edit_form(prompt: str, size: str, quality: str, n: int,
     spec = catalog.image_model(model_id)
     if not spec.supports_edit:
         raise HTTPException(status_code=422,
-                            detail=i18n.t("err.model_no_reference", _dil(), model=spec.label))
+                            detail=i18n.t("err.model_no_reference", _dil(), model=etiket.label_of(spec)))
     # Küresel tavan, model tavanının ÜSTÜNDE: `MAX_IMAGES_PER_RUN` aynı zamanda
     # bir sonuç kaydının azami `image_ids` uzunluğu (bkz. models.py), yani onu
     # aşan bir değer dökümü bozar. Buradaki sayı v0.6'ya kadar ELLE yazılmış
@@ -950,7 +951,7 @@ def _model_payload(m: catalog.ImageModel, cfg: dict, kisa: dict) -> dict:
     """
     return {
         "id": m.id,
-        "label": m.label,
+        "label": etiket.label_of(m),
         # ŞERİDİN adı ayrı bir alan: `label` hata metinlerinin ve
         # `#model-note`un okuduğu TAM ad ve orada marka ayırt edici
         # kalıyor (katalogda iki `gpt-image-2` var).
@@ -958,7 +959,7 @@ def _model_payload(m: catalog.ImageModel, cfg: dict, kisa: dict) -> dict:
         "provider": m.provider,
         "sizes": [{"value": s, "label": catalog.geometry_of(s)[0],
                    "ratio": catalog.geometry_of(s)[1]} for s in m.sizes],
-        "qualities": [{"value": q, "label": catalog.quality_label(q)}
+        "qualities": [{"value": q, "label": etiket.quality_label(q)}
                       for q in m.qualities],
         "quality_hidden": m.quality_hidden,
         # SÜRE EKSENİ. Görsel modellerinde boş liste + 0, yani arayüz için
@@ -966,7 +967,7 @@ def _model_payload(m: catalog.ImageModel, cfg: dict, kisa: dict) -> dict:
         # farkı bayrak yerine LİSTENİN BOŞLUĞUNUN işaret olması (boş bir
         # eksen için ayrı bir `duration_hidden` bayrağı ikinci bir gerçek
         # kaynağı olurdu).
-        "durations": [{"value": d, "label": catalog.duration_label(d)}
+        "durations": [{"value": d, "label": etiket.duration_label(d)}
                       for d in m.durations],
         "default_duration": catalog.default_duration_of(m),
         "default_size": catalog.default_size_of(m),
@@ -1030,14 +1031,14 @@ def _settings_payload() -> dict:
     # Şeritte gösterilecek KISA adlar: sağlayıcı markası işaretle geldiği için
     # etiketten düşüyor. Liste bütününden hesaplanıyor (çakışma kuralı için),
     # o yüzden model başına değil bir kez (bkz. catalog.short_labels).
-    kisa_gorsel = catalog.short_labels(catalog.IMAGE_MODELS)
-    kisa_sohbet = catalog.short_labels(catalog.CHAT_MODELS)
+    kisa_gorsel = etiket.short_labels(catalog.IMAGE_MODELS)
+    kisa_sohbet = etiket.short_labels(catalog.CHAT_MODELS)
     # Video şeridinin kısa adları AYRI hesaplanıyor, görselle BİRLİKTE değil:
     # `short_labels`ın çakışma kuralı verilen listenin BÜTÜNÜNE bakıyor ve
     # iki şeridi birleştirmek, ayrı seçicilerde duran iki modelin birbirine
     # marka öneki taktırması olurdu (kullanıcı hiçbir zaman aynı listede
     # `Veo 3.1` ile bir görsel modelini yan yana görmüyor).
-    kisa_video = catalog.short_labels(catalog.VIDEO_MODELS)
+    kisa_video = etiket.short_labels(catalog.VIDEO_MODELS)
     return {
         **ac.get_settings_status(),
         # {kimlik_id: bool}. Arayüz Ayarlar'daki sağlayıcı gruplarının
@@ -1056,7 +1057,7 @@ def _settings_payload() -> dict:
                          for m in catalog.IMAGE_MODELS],
         "default_chat_model": catalog.DEFAULT_CHAT_MODEL,
         "chat_models": [
-            {"id": m.id, "label": m.label,
+            {"id": m.id, "label": etiket.label_of(m),
              # Görsel şeridiyle AYNI ayrım (bkz. yukarısı).
              "short_label": kisa_sohbet[m.id], "provider": m.provider,
              # `cfg` (KİMLİK tablosu) DEĞİL `chat_cfg` (MODEL tablosu):
@@ -1305,7 +1306,7 @@ def _model_facts(m: catalog.ImageModel) -> dict:
     `id` alanı ZORUNLU ve yeni: yönetmen artık model ÖNERİYOR, ön yüz de
     önerilen id'yi uyguluyor. Onsuz menü okunabilir ama işe yaramaz olurdu.
     """
-    return {"id": m.id, "label": m.label, "kind": m.kind,
+    return {"id": m.id, "label": etiket.label_of(m), "kind": m.kind,
             "sizes": m.sizes, "qualities": m.qualities,
             "quality_hidden": m.quality_hidden, "max_n": m.max_n,
             "supports_edit": m.supports_edit, "max_refs": m.max_refs,
@@ -1518,7 +1519,7 @@ def _auto_title(messages: list[dict]) -> str:
         if text:
             return (text if len(text) <= MAX_CHAT_TITLE_CHARS
                     else text[:MAX_CHAT_TITLE_CHARS - 1] + "…")
-    return "Adsız oturum"
+    return i18n.t("chat.untitled_session", _dil())
 
 @app.get("/api/chats")
 def list_chats_route() -> dict:
@@ -1818,7 +1819,7 @@ async def import_image(request: Request,
 
     # Dosya adı yalnızca ETİKET (galeri başlığı/alt metni); kayıt adı uuid'den
     # geliyor. basename yol parçalarını düşürür, kırpma başlığı taşırmaz.
-    label = os.path.basename(file.filename or "").strip()[:120] or "içe aktarılan görsel"
+    label = os.path.basename(file.filename or "").strip()[:120] or i18n.t("media.imported_image", _dil())
     record = storage.save(
         png,
         {"prompt": label, "size": _png_dimensions(png), "quality": "",
@@ -2067,7 +2068,7 @@ async def upload_asset(
         raise HTTPException(status_code=413, detail=i18n.t("err.file_too_big", _dil()))
     image_bytes = _to_png(raw)  # şeffaflığı koruyan RGBA PNG'ye yeniden kodla
     stem = os.path.splitext(os.path.basename(file.filename or ""))[0]
-    label = (name.strip() or stem or "varlık")[:120]
+    label = (name.strip() or stem or i18n.t("library.asset"))[:120]
     record = assets_store.save_asset(kind, image_bytes, label, ASSETS_DIR, now=_now())
     return {"asset": record}
 
@@ -2220,7 +2221,8 @@ def index() -> HTMLResponse:
     sayfa = (template
              .replace("__APP_VERSION__", version.APP_VERSION)
              .replace("__APP_LANG__", dil)
-             .replace("__APP_I18N__", i18n.js_payload(dil)))
+             .replace("__APP_I18N__", i18n.js_payload(dil))
+             .replace("__APP_LANG_OPTIONS__", i18n.language_options_html(dil)))
     return HTMLResponse(i18n.render(sayfa, dil),
                         headers={"Cache-Control": "no-store"})
 

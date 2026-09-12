@@ -403,7 +403,9 @@ def test_the_UNIT_is_read_from_the_duration_list_not_a_second_field():
     js = _kodsuz(_core())
     govde = _govde(js, "modelKrediAraligi")
 
-    assert "kredi/sn" in govde
+    # Metin değil ANAHTAR aranıyor: birim artık sözlükte (`gen.credits_unit*`)
+    # ve testin iddiası zaten metnin kendisi değil, DOĞRU dalın seçilmesi.
+    assert "gen.credits_unit_per_sec" in govde
     assert "m.durations && m.durations.length" in govde
 
 
@@ -625,7 +627,8 @@ def test_the_gallery_tile_carries_a_DURATION_BADGE():
     govde = _govde(_kodsuz(_folders()), "renderGallery")
 
     assert "if (videoMu && !selectMode) {" in govde
-    assert "rec.duration ?" in govde
+    assert "rec.duration" in govde
+    assert "gen.duration_label" in govde, "rozet süreyi yazmıyor"
 
 
 def test_the_gallery_passes_the_TYPE_to_the_viewer():

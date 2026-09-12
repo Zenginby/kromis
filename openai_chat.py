@@ -52,6 +52,7 @@ import chat_client as cc
 import chat_prompt
 import credstore
 import i18n
+import etiket
 import providers
 
 # Zaman aşımı ve ağ-hatası metni `chat_client` ile PAYLAŞILIYOR
@@ -69,7 +70,7 @@ def _label(m: catalog.ChatModel) -> str:
     sağlayıcının adını değiştirince hatanın eski adı söylemesi demekti.
     """
     cred = catalog.credential(m.credential)
-    return cred.label if cred else m.provider
+    return etiket.label_of(cred) if cred else m.provider
 
 
 def map_error(status_code: int, body: dict | list | None, *, label: str,

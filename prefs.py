@@ -34,6 +34,7 @@ import json
 import os
 
 import catalog
+import i18n
 import jsonstore
 from models import ALLOWED_LANGUAGES, ALLOWED_THEMES
 
@@ -214,12 +215,12 @@ def update(values: dict, output_dir: str) -> dict:
     """
     for name, value in values.items():
         if name not in _SCHEMA:
-            raise ValueError(f"bilinmeyen tercih: {name}")
+            raise ValueError(i18n.t("err.unknown_pref", None, ad=name))
         if not isinstance(value, _SCHEMA[name][1]):
-            raise ValueError(f"tercih için geçersiz değer: {name}")
+            raise ValueError(i18n.t("err.bad_pref_type", None, ad=name))
         allowed = _ENUMS.get(name)
         if allowed is not None and value not in allowed:
-            raise ValueError(f"tercih için geçersiz {name} değeri: {value}")
+            raise ValueError(i18n.t("err.bad_pref_value", None, ad=name, deger=value))
 
     # `chat_model` ÇAPRAZ bir kural: geçerliliği `chat_provider`'a bağlı, yani
     # `_ENUMS` gibi anahtar-başına bir tablo onu ifade edemiyor. Kontrol
@@ -232,8 +233,8 @@ def update(values: dict, output_dir: str) -> dict:
         gecerli = [m.id for m in catalog.chat_models_for(provider)]
         if values["chat_model"] not in gecerli:
             raise ValueError(
-                f"tercih için geçersiz chat_model değeri: {values['chat_model']} "
-                f"({provider} sağlayıcısında yok)")
+                i18n.t("err.bad_pref_chat_model", None,
+                       model=values["chat_model"], saglayici=provider))
 
     if not values:
         return read(output_dir)

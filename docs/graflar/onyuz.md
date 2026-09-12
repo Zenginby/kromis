@@ -6,15 +6,16 @@ Betikler küresel kapsamda, `static/index.html`'deki SIRAYLA yükleniyor — mod
 
 ## Yükleme sırası
 
-1. `/static/pixel-canvas.js`
-2. `/static/core.js`
-3. `/static/folders.js`
-4. `/static/assets.js`
-5. `/static/palette.js`
-6. `/static/settings.js`
-7. `/static/viewer.js`
-8. `/static/chat.js`
-9. `/static/mobile.js`
+1. `/static/i18n.js`
+2. `/static/pixel-canvas.js`
+3. `/static/core.js`
+4. `/static/folders.js`
+5. `/static/assets.js`
+6. `/static/palette.js`
+7. `/static/settings.js`
+8. `/static/viewer.js`
+9. `/static/chat.js`
+10. `/static/mobile.js`
 
 Stiller: `/static/fonts.css`, `/static/style.css`, `/static/flow-tokens.css`, `/static/mobile.css`
 
@@ -53,6 +54,7 @@ flowchart LR
 | `static/chat.js` | 2662 | 90 | `/api/arena/{}`, `/api/arena/{}/winner`, `/api/chat`, `/api/chats`, `/api/chats/{}`, `/api/prefs`, `/output/{}.${videoMu ` |
 | `static/core.js` | 2933 | 88 | `/api/edit`, `/api/generate`, `/api/image/{}`, `/api/output/{}/download`, `/api/prefs`, `/api/video`, `/api/video/animate`, `/output/`, `/output/{}`, `/output/{}.png` |
 | `static/folders.js` | 2043 | 60 | `/api/folders`, `/api/folders/{}`, `/api/folders/{}/download`, `/api/history`, `/api/images`, `/api/import`, `/output/{}`, `/output/{}${videoMu ` |
+| `static/i18n.js` | 78 | 2 | — |
 | `static/mobile.js` | 55 | 0 | — |
 | `static/palette.js` | 759 | 37 | `/api/palette/suggest`, `/api/palettes`, `/api/palettes/{}` |
 | `static/pixel-canvas.js` | 347 | 0 | — |

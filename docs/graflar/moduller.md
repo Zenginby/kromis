@@ -23,7 +23,7 @@ flowchart TD
     n_netguard["netguard<br/>160 satır"]
   end
   subgraph katman7["katman 7"]
-    n_app["app<br/>2218 satır"]
+    n_app["app<br/>2226 satır"]
   end
   subgraph katman6["katman 6"]
     n_chat_providers["chat_providers<br/>127 satır"]
@@ -51,7 +51,7 @@ flowchart TD
     n_chat_prompt["chat_prompt<br/>361 satır"]
     n_folders["folders<br/>251 satır"]
     n_guncelleme["guncelleme<br/>240 satır"]
-    n_i18n["i18n<br/>195 satır"]
+    n_i18n["i18n<br/>204 satır"]
   end
   subgraph katman1["katman 1"]
     n_assets_store["assets_store<br/>204 satır"]
@@ -197,7 +197,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | modül | satır | katman | ithal ettiği | ithal eden | test |
 | --- | --- | --- | --- | --- | --- |
 | `android_main.py` | 197 | 10 | `app` (erteli), `desktop` (erteli), `errlog` (erteli), `paths` (erteli) | 0 | 2 |
-| `app.py` | 2218 | 7 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `i18n`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 33 |
+| `app.py` | 2226 | 7 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `i18n`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 33 |
 | `assets_store.py` | 204 | 1 | `jsonstore` | 3 | 9 |
 | `azure_client.py` | 461 | 2 | `paths`, `winsec` | 12 | 29 |
 | `azure_flux_client.py` | 295 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
@@ -216,7 +216,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `folders.py` | 251 | 2 | `jsonstore`, `storage` | 3 | 4 |
 | `gemini_client.py` | 296 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `guncelleme.py` | 240 | 2 | `errlog`, `jsonstore`, `paths`, `version` | 1 | 5 |
-| `i18n.py` | 195 | 2 | `paths` | 2 | 1 |
+| `i18n.py` | 204 | 2 | `paths` | 2 | 1 |
 | `jsonstore.py` | 83 | 0 | — | 8 | 1 |
 | `models.py` | 1044 | 3 | `azure_client`, `catalog`, `i18n`, `palette` | 3 | 14 |
 | `netguard.py` | 160 | 8 | `app` (erteli) | 1 | 1 |

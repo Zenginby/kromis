@@ -63,7 +63,7 @@
         "netguard"
       ],
       "katman": 7,
-      "satir": 2218,
+      "satir": 2226,
       "testler": [
         "tests/test_app.py",
         "tests/test_arena.py",
@@ -549,7 +549,7 @@
         "models"
       ],
       "katman": 2,
-      "satir": 195,
+      "satir": 204,
       "testler": [
         "tests/test_i18n.py"
       ],
@@ -1075,6 +1075,12 @@
       },
       {
         "cagrilan_yollar": [],
+        "dosya": "static/i18n.js",
+        "satir": 78,
+        "tanim": 2
+      },
+      {
+        "cagrilan_yollar": [],
         "dosya": "static/mobile.js",
         "satir": 55,
         "tanim": 0
@@ -1341,6 +1347,7 @@
       "/static/mobile.css"
     ],
     "yukleme_sirasi": [
+      "/static/i18n.js",
       "/static/pixel-canvas.js",
       "/static/core.js",
       "/static/folders.js",

@@ -2192,7 +2192,15 @@ def index() -> HTMLResponse:
             "<h1>" + i18n.t("boot.load_failed.title", dil) + "</h1>"
             "<p>" + i18n.t("boot.load_failed.body", dil, log=kayit) + "</p>",
             status_code=500, headers={"Cache-Control": "no-store"})
-    return HTMLResponse(template.replace("__APP_VERSION__", version.APP_VERSION),
+    # SIRA: önce sabit yer tutucular, EN SON `{{t:…}}`. Ters sırada bir
+    # çevirinin içindeki `__APP_VERSION__` benzeri bir dizi de değiştirilirdi
+    # — bugün öyle bir çeviri yok ama sıranın bunu imkânsız kılması, o
+    # çevirinin bir gün yazılmamasına güvenmekten ucuz.
+    sayfa = (template
+             .replace("__APP_VERSION__", version.APP_VERSION)
+             .replace("__APP_LANG__", dil)
+             .replace("__APP_I18N__", i18n.js_payload(dil)))
+    return HTMLResponse(i18n.render(sayfa, dil),
                         headers={"Cache-Control": "no-store"})
 
 

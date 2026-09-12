@@ -6,7 +6,11 @@
      YORUM DOCTYPE'IN ALTINDA, üstünde DEĞİL: doctype'tan önce gelen her
      şey IE ve bazı gömülü görünümlerde belgeyi quirks moduna düşürür ve
      tüm yerleşim sessizce bozulurdu. -->
-<html lang="tr">
+<!-- `lang` SABİT DEĞİL: yer tutucuyu app.index seçili dille değiştiriyor.
+     Süs değil — ekran okuyucu sesletimi, tarayıcının yazım denetimi ve
+     `:lang()` kuralları buna bakıyor; İngilizce bir arayüzü `lang="tr"` ile
+     servis etmek metni yanlış aksanla okutur. -->
+<html lang="__APP_LANG__">
 <head>
   <meta charset="utf-8" />
   <!-- viewport-fit=cover ŞART: onsuz Android'de sayfa jest çubuğunun ÜSTÜNDE
@@ -60,9 +64,9 @@
     <!-- Rayda wordmark YOK (tasarım §6): kimlik üst şeritteki oturum adına ve
          pencere başlığına (<title>) devredildi. Referans ekranların rayı da
          yalnızca gezinme öğelerinden oluşuyor. -->
-    <nav id="rail" class="rail" aria-label="Ana gezinme">
+    <nav id="rail" class="rail" aria-label="{{t:rail.aria}}">
       <button id="rail-studio" class="rail-item active" type="button" data-section="studio"
-              aria-current="page" title="Stüdyo">
+              aria-current="page" title="{{t:rail.studio}}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M12 3v3"></path><path d="M12 18v3"></path>
@@ -70,51 +74,51 @@
           <path d="M4.9 16.5 7.5 15"></path><path d="M16.5 9l2.6-1.5"></path>
           <circle cx="12" cy="12" r="3.2"></circle>
         </svg>
-        <span>Stüdyo</span>
+        <span>{{t:rail.studio}}</span>
       </button>
 
-      <button id="rail-media" class="rail-item" type="button" data-section="media" title="Medya">
+      <button id="rail-media" class="rail-item" type="button" data-section="media" title="{{t:rail.media}}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="3" y="4" width="18" height="16" rx="2.5"></rect>
           <circle cx="8.5" cy="9.5" r="1.6"></circle>
           <path d="m4 17 4.5-4.5 3 3L15 12l5 5"></path>
         </svg>
-        <span>Medya</span>
+        <span>{{t:rail.media}}</span>
       </button>
 
-      <button id="rail-library" class="rail-item" type="button" title="Kütüphane">
+      <button id="rail-library" class="rail-item" type="button" title="{{t:rail.library}}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="m12 3 8 4.5-8 4.5-8-4.5L12 3Z"></path>
           <path d="m4 12 8 4.5 8-4.5"></path>
           <path d="m4 16.5 8 4.5 8-4.5"></path>
         </svg>
-        <span>Kütüphane</span>
+        <span>{{t:rail.library}}</span>
       </button>
 
       <hr class="rail-sep" />
 
-      <button id="rail-tools" class="rail-item" type="button" title="Araçlar">
+      <button id="rail-tools" class="rail-item" type="button" title="{{t:rail.tools}}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M4 7h10"></path><circle cx="17" cy="7" r="2.4"></circle>
           <path d="M20 14H10"></path><circle cx="7" cy="14" r="2.4"></circle>
           <path d="M4 20h10"></path><circle cx="17" cy="20" r="2.4"></circle>
         </svg>
-        <span>Araçlar</span>
+        <span>{{t:rail.tools}}</span>
       </button>
 
       <div class="rail-spacer"></div>
 
       <button id="rail-collapse" class="rail-item" type="button" aria-pressed="false"
-              title="Rayı daralt">
+              title="{{t:rail.collapse_title}}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="3" y="4" width="18" height="16" rx="2.5"></rect>
           <path d="M9 4v16"></path><path d="m16 10-2 2 2 2"></path>
         </svg>
-        <span>Daralt</span>
+        <span>{{t:rail.collapse}}</span>
       </button>
     </nav>
 
@@ -124,7 +128,7 @@
            slide-over olduğu için mekanik aynı, yüzey değişti. -->
       <button id="chat-sidebar-toggle" class="icon-btn" type="button"
               aria-controls="chat-sidebar" aria-expanded="false"
-              aria-label="Oturumlar" title="Oturumlar">
+              aria-label="{{t:sessions.title}}" title="{{t:sessions.title}}">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
           <path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h16"></path>
@@ -132,14 +136,14 @@
       </button>
 
       <div class="session">
-        <h1 id="session-title">Yeni oturum</h1>
+        <h1 id="session-title">{{t:session.new}}</h1>
         <span id="session-stamp" class="stamp"></span>
       </div>
 
       <div class="topbar-right">
         <div class="kebab-wrap">
           <button id="chats-kebab" class="icon-btn" type="button"
-                  aria-label="Oturum seçenekleri" title="Oturum seçenekleri"
+                  aria-label="{{t:session.options}}" title="{{t:session.options}}"
                   aria-expanded="false" aria-haspopup="true">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -148,21 +152,21 @@
               <circle cx="12" cy="19" r="1.5"></circle>
             </svg>
           </button>
-          <div id="chats-kebab-menu" class="dropdown-menu" hidden role="menu" aria-label="Oturum seçenekleri">
-            <button type="button" id="chats-rename" class="dropdown-item" role="menuitem">Oturumu yeniden adlandır</button>
-            <button type="button" id="chats-clear-current" class="dropdown-item" role="menuitem">Sohbeti temizle</button>
+          <div id="chats-kebab-menu" class="dropdown-menu" hidden role="menu" aria-label="{{t:session.options}}">
+            <button type="button" id="chats-rename" class="dropdown-item" role="menuitem">{{t:session.rename}}</button>
+            <button type="button" id="chats-clear-current" class="dropdown-item" role="menuitem">{{t:session.clear}}</button>
             <hr class="dropdown-divider" />
-            <button type="button" id="chats-kebab-delete-all" class="dropdown-item dropdown-item-danger" role="menuitem">Tüm oturumları sil…</button>
+            <button type="button" id="chats-kebab-delete-all" class="dropdown-item dropdown-item-danger" role="menuitem">{{t:session.delete_all_menu}}</button>
           </div>
         </div>
         <button id="chat-new" class="icon-btn" type="button"
-                aria-label="Yeni oturum" title="Yeni oturum">
+                aria-label="{{t:session.new}}" title="{{t:session.new}}">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 5v14"></path><path d="M5 12h14"></path>
           </svg>
         </button>
-        <button id="settings-btn" class="icon-btn" type="button" aria-label="Ayarlar" title="Ayarlar">
+        <button id="settings-btn" class="icon-btn" type="button" aria-label="{{t:settings.title}}" title="{{t:settings.title}}">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="3"></circle>
@@ -173,7 +177,7 @@
              geçtiğinin tek gözle görülür kanıtı. Ayarlar modalının dibinden
              üst şeride taşındı (tasarım §6) — daha görünür, aynı id, aynı
              GET /api/settings kaynağı. -->
-        <span class="ver" title="Uygulama sürümü">v<span id="settings-version"
+        <span class="ver" title="{{t:settings.app_version}}">v<span id="settings-version"
               data-app-version>—</span></span>
       </div>
     </header>
@@ -193,23 +197,23 @@
                  58ch'lik bir metindi ve boş ekranın en büyük yüzeyiydi; söylediği
                  şeyi başlık bir satırda, çipler de ÖRNEKLE söylüyor. Çipler bu
                  yüzden KALIYOR: boş ekranın tek eylem kapısı onlar, metin değil. -->
-            <h2>Fikri anlat, prompt'u o yazsın.</h2>
-            <div class="chat-chips" role="group" aria-label="Başlangıç önerileri">
-              <button type="button" class="chat-chip">Kurban Bayramı için kare Instagram görseli</button>
-              <button type="button" class="chat-chip">Blog kapağı — sıcak editoryal fotoğraf</button>
-              <button type="button" class="chat-chip">Üç renkli düz vektör illüstrasyon</button>
-              <button type="button" class="chat-chip">Bağış kampanyası için dikey afiş</button>
+            <h2>{{t:hero.subtitle}}</h2>
+            <div class="chat-chips" role="group" aria-label="{{t:hero.suggestions_aria}}">
+              <button type="button" class="chat-chip">{{t:hero.suggestion1}}</button>
+              <button type="button" class="chat-chip">{{t:hero.suggestion2}}</button>
+              <button type="button" class="chat-chip">{{t:hero.suggestion3}}</button>
+              <button type="button" class="chat-chip">{{t:hero.suggestion4}}</button>
             </div>
           </div>
 
-          <div id="chat-log" class="chat-log" aria-live="polite" aria-label="Sohbet ve üretim akışı"></div>
+          <div id="chat-log" class="chat-log" aria-live="polite" aria-label="{{t:flow.aria}}"></div>
 
           <div id="chat-wait" class="chat-wait" hidden>
             <div class="spinner"></div>
             <!-- "ilk yanıt yarım dakikayı bulabilir" KALKTI: bekleme zaten
                  görünür (spinner) ve süre tahmini sağlayıcıya göre yanlış
                  olabiliyordu. `aria-live` bölgesi kısaldı, kaybolmadı. -->
-            <span>Yönetmen düşünüyor…</span>
+            <span>{{t:director.thinking}}</span>
           </div>
 
           <!-- İlerleme çubuğu KALDIRILDI. Yüzde zaten uydurmaydı: sağlayıcı
@@ -224,7 +228,7 @@
            üst şeritteki merkezi arama pill'i kaldırıldı, çünkü aranacak tek şey
            medya. Sorgu yazıldığı an klasör sınırı kalkıyor — folders.js
            loadAllImages ile bütün klasörleri tarıyor. -->
-      <section id="view-media" class="section gallery-wrap" aria-label="Klasörler ve geçmiş" hidden>
+      <section id="view-media" class="section gallery-wrap" aria-label="{{t:folders.aria}}" hidden>
         <!-- Araç şeridi: arama · ızgara boyutu · seçim. Klasör kırıntısından
              AYRI şerit (referans media-browser.html): kırıntı bulunulan yere
              göre değişiyor, bu şerit her yerde aynı kalıyor. -->
@@ -235,34 +239,34 @@
               <circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path>
             </svg>
             <input id="media-search" type="search" autocomplete="off" spellcheck="false"
-                   placeholder="Prompt, klasör veya boyutta ara" />
+                   placeholder="{{t:media.search_placeholder}}" />
           </label>
 
           <!-- D10: Medya Sıralama Düğmesi -->
-          <button type="button" id="media-sort-btn" class="btn-ghost" title="Görselleri sırala" aria-label="Görselleri sırala">
+          <button type="button" id="media-sort-btn" class="btn-ghost" title="{{t:media.sort_aria}}" aria-label="{{t:media.sort_aria}}">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="m3 16 4 4 4-4"></path><path d="M7 20V4"></path><path d="m21 8-4-4-4 4"></path><path d="M17 4v16"></path>
             </svg>
-            <span id="media-sort-label">Tarih</span>
+            <span id="media-sort-label">{{t:media.sort_date}}</span>
           </button>
 
           <!-- Medya tür süzgeci: dışlayıcı segmentli denetim -->
-          <div id="kind-seg" class="sizeseg kindseg" role="group" aria-label="Medya türü">
-            <button type="button" data-kind=""         aria-pressed="true">Tümü</button>
-            <button type="button" data-kind="image"    aria-pressed="false">Görsel</button>
-            <button type="button" data-kind="video"    aria-pressed="false">Video</button>
+          <div id="kind-seg" class="sizeseg kindseg" role="group" aria-label="{{t:media.kind_aria}}">
+            <button type="button" data-kind=""         aria-pressed="true">{{t:common.all}}</button>
+            <button type="button" data-kind="image"    aria-pressed="false">{{t:common.image}}</button>
+            <button type="button" data-kind="video"    aria-pressed="false">{{t:common.video}}</button>
             <!-- .crossing: "Yüklenen" bir BÖLME değil kesişen süzgeç — Görsel+Video
                  zaten Tümü'yü tüketiyor, bu düğme Görsel'in İÇİNDEN geçiyor. Ayıraç
                  bunu gözle söylüyor; .picker-nav-item.crossing'in aynı gerekçesi. -->
             <button type="button" data-kind="imported" aria-pressed="false"
-                    class="crossing">Yüklenen</button>
+                    class="crossing">{{t:media.kind_uploaded}}</button>
           </div>
 
           <!-- Izgara boyutu: kutucuk ölçüsünü CSS'teki --tile üzerinden
                değiştiriyor. JS'ten grid-template-columns yazmak duyarlılık
                kurallarını (1024×700) sessizce ezerdi. -->
-          <div id="size-seg" class="sizeseg" role="group" aria-label="Izgara boyutu">
+          <div id="size-seg" class="sizeseg" role="group" aria-label="{{t:media.grid_aria}}">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
               <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
@@ -270,13 +274,13 @@
               <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
               <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
             </svg>
-            <button type="button" data-size="s" aria-pressed="false" title="Küçük ızgara">S</button>
-            <button type="button" data-size="m" aria-pressed="true" title="Orta ızgara">M</button>
-            <button type="button" data-size="l" aria-pressed="false" title="Büyük ızgara">L</button>
+            <button type="button" data-size="s" aria-pressed="false" title="{{t:media.grid_s}}">S</button>
+            <button type="button" data-size="m" aria-pressed="true" title="{{t:media.grid_m}}">M</button>
+            <button type="button" data-size="l" aria-pressed="false" title="{{t:media.grid_l}}">L</button>
           </div>
 
           <button type="button" id="select-toggle" class="btn-ghost"
-                  title="Görselleri çoklu seç">Seç</button>
+                  title="{{t:media.select_aria}}">{{t:media.select}}</button>
           <!-- İçe aktarmanın TEK tıklanabilir kapısı. `importFiles` ve
                `/api/import` baştan beri tamdı, ama tetikleyicileri yalnızca
                HTML5 sürükle-bırak: klasör kartına ve bu alana bırakma. O yol
@@ -290,40 +294,40 @@
                `dosyaSecimIntenti`), `multiple` da EXTRA_ALLOW_MULTIPLE'a
                çevriliyor. -->
           <button type="button" id="media-import-btn" class="btn-ghost"
-                  title="Cihazındaki görselleri buraya aktar">
-            <span class="btn-ghost-plus" aria-hidden="true">+</span> Yükle
+                  title="{{t:media.upload_title}}">
+            <span class="btn-ghost-plus" aria-hidden="true">+</span> {{t:common.upload}}
           </button>
           <input type="file" id="media-import-input"
                  accept="image/png,image/jpeg,image/webp" multiple hidden />
           <button type="button" id="folder-new" class="btn-ghost">
-            <span class="btn-ghost-plus" aria-hidden="true">+</span> Yeni klasör
+            <span class="btn-ghost-plus" aria-hidden="true">+</span> {{t:folders.new}}
           </button>
 
           <!-- Seçim modu şeridi: Seç / Yeni klasör bunlarla yer değiştirir -->
           <div id="select-bar" class="select-bar" hidden>
-            <span id="select-count" class="select-count" role="status">0 seçili</span>
-            <button type="button" id="select-all" class="btn-ghost">Tümünü seç</button>
+            <span id="select-count" class="select-count" role="status">{{t:media.selected_none}}</span>
+            <button type="button" id="select-all" class="btn-ghost">{{t:media.select_all}}</button>
             <!-- Sürükle-bırakın erişilebilir karşılığı: dokunmatikte sürükleme
                  HİÇ çalışmıyor, klavyeyle de zaten çalışmıyordu. -->
-            <button type="button" id="select-move" class="btn-ghost" disabled>Taşı…</button>
-            <button type="button" id="select-delete" class="btn-ghost btn-ghost-danger">Sil</button>
-            <button type="button" id="select-cancel" class="btn-ghost">Vazgeç</button>
+            <button type="button" id="select-move" class="btn-ghost" disabled>{{t:common.move_ellipsis}}</button>
+            <button type="button" id="select-delete" class="btn-ghost btn-ghost-danger">{{t:common.delete}}</button>
+            <button type="button" id="select-cancel" class="btn-ghost">{{t:common.cancel}}</button>
           </div>
         </div>
 
         <div class="gallery-head">
           <button type="button" id="folder-back" class="icon-btn back-btn" hidden
-                  aria-label="Klasörden çık" title="Klasörden çık">
+                  aria-label="{{t:folders.leave}}" title="{{t:folders.leave}}">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path>
             </svg>
           </button>
-          <h2 id="gallery-title">Klasörler</h2>
+          <h2 id="gallery-title">{{t:folders.title}}</h2>
           <span id="media-rail-count" class="media-count" role="status"></span>
           <!-- Klasör İndir (ZIP) -->
           <button type="button" id="folder-download" class="icon-btn" hidden
-                  aria-label="Bu klasörü indir (ZIP)" title="Bu klasörü indir (ZIP)">
+                  aria-label="{{t:folders.download}}" title="{{t:folders.download}}">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -333,14 +337,14 @@
           </button>
           <!-- D17: Klasör Yeniden Adlandır -->
           <button type="button" id="folder-rename" class="icon-btn" hidden
-                  aria-label="Klasörü yeniden adlandır" title="Klasörü yeniden adlandır">
+                  aria-label="{{t:folders.rename}}" title="{{t:folders.rename}}">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
             </svg>
           </button>
           <button type="button" id="folder-delete" class="icon-btn danger-btn" hidden
-                  aria-label="Bu klasörü sil" title="Bu klasörü sil">
+                  aria-label="{{t:folders.delete}}" title="{{t:folders.delete}}">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M3 6h18"></path>
@@ -354,18 +358,18 @@
         <!-- Arama açıkken kırıntının yerini bu etiket alıyor: sonuçlar artık
              bulunulan klasöre ait değil, o yüzden kapsam yazıyla söyleniyor. -->
         <p id="search-label" class="images-title" role="status" hidden>
-          Arama sonuçları — tüm klasörler
+          {{t:folders.search_results}}
         </p>
 
         <!-- Statik metin İÇE AKTARMAYI anlatır: o özellik klasör olmadan da çalışıyor
              ve JS düşse bile keşfedilebilir kalmalı. Taşıma cümlesini folders.js
              (renderFolderHint) yalnızca klasör varken ekliyor. -->
         <p id="folder-hint" class="folder-hint">
-          Bilgisayarındaki bir görseli klasör kartına ya da bu alana bırakarak içe aktarabilirsin.
+          {{t:folders.drop_hint}}
         </p>
         <div id="folder-grid" class="folder-grid" aria-live="polite"></div>
 
-        <h3 id="images-title" class="images-title">Klasörsüz görseller</h3>
+        <h3 id="images-title" class="images-title">{{t:folders.unfiled}}</h3>
         <div id="gallery" class="gallery" data-size="m"></div>
         <!-- D16: Medya Boş Durum Glifi ve Bilgilendirme -->
         <div id="media-empty-state" class="empty-state" hidden>
@@ -374,7 +378,7 @@
             <circle cx="8.5" cy="8.5" r="1.5"></circle>
             <path d="m21 15-5-5L5 21"></path>
           </svg>
-          <p id="media-empty-text">Henüz üretilmiş bir görsel bulunmuyor.</p>
+          <p id="media-empty-text">{{t:folders.empty}}</p>
         </div>
       </section>
 
@@ -385,7 +389,7 @@
            gerekçe docs/flow-ui/id-defteri.md'de. -->
       <section id="view-library" class="section" aria-labelledby="assets-title" hidden>
         <div class="gallery-head">
-          <h2 id="assets-title">Kütüphane</h2>
+          <h2 id="assets-title">{{t:library.title}}</h2>
           <!-- Etiket HEDEFİ SÖYLÜYOR ("+ Logo yükle"), yalnız "Yükle" demiyor:
                aşağıdaki sekme şeridi bir FİLTRE ve hedef sanıldığı sürece
                varsayılan sekmede ("Tümü") hedef GÖRÜNMEZDİ — yükleme `uploads`
@@ -393,18 +397,17 @@
                assets.js yazıyor (`syncUploadLabel`). -->
           <button type="button" id="asset-upload-btn" class="btn-ghost">
             <span class="btn-ghost-plus" aria-hidden="true">+</span>
-            <span id="asset-upload-label">Logo yükle</span>
+            <span id="asset-upload-label">{{t:library.upload_logo}}</span>
           </button>
         </div>
         <p class="view-desc">
-          Bindirmede kullanılacak logo, motto ve bannerlar. Buradan yükleyip silebilirsin;
-          şeffaflık korunur (PNG olarak yeniden kodlanır).
+          {{t:library.desc}}
         </p>
-        <div id="asset-tabs" class="seg" role="group" aria-label="Varlık türü">
-          <button type="button" data-akind="all" class="active">Tümü</button>
-          <button type="button" data-akind="logos">Logolar</button>
-          <button type="button" data-akind="mottos">Mottolar</button>
-          <button type="button" data-akind="banners">Bannerlar</button>
+        <div id="asset-tabs" class="seg" role="group" aria-label="{{t:library.kind_aria}}">
+          <button type="button" data-akind="all" class="active">{{t:common.all}}</button>
+          <button type="button" data-akind="logos">{{t:library.kind_logos}}</button>
+          <button type="button" data-akind="mottos">{{t:library.kind_mottos}}</button>
+          <button type="button" data-akind="banners">{{t:library.kind_banners}}</button>
           <!-- "Yüklemeler" sekmesi KALDIRILDI (D9'un `uploads` türü). O tür bir
                çıkmaz sokaktı: bindirme seçicisi yalnız logos/mottos/banners
                okuyor; sunucuda da konumlanabilir bindirme `logos`/`mottos` ile
@@ -426,9 +429,9 @@
            Tema rengi/paletler sağ slide-over'ı, Görünüm tema seçicisini açıyor.
            Azure ayarları BURADA DEĞİL (bilinçli ayrım): onlar makine/kurulum
            ayarı ve üst şeritteki dişliden açılıyor. -->
-      <section id="view-tools" class="section" aria-label="Araçlar" hidden>
+      <section id="view-tools" class="section" aria-label="{{t:tools.title}}" hidden>
         <div class="gallery-head">
-          <h2>Araçlar</h2>
+          <h2>{{t:tools.title}}</h2>
         </div>
         <div class="tools">
           <button type="button" id="tool-palette" class="tool" aria-controls="palette-modal">
@@ -441,9 +444,8 @@
                 <circle cx="14" cy="15" r="1.3"></circle>
               </svg>
             </span>
-            <b>Tema rengi ve paletler</b>
-            <span>Bir tema rengi seç; uyumlu paletler renk teorisiyle üretilir ve
-              prompt'a renk yönlendirmesi olarak eklenir.</span>
+            <b>{{t:tools.palette_title}}</b>
+            <span>{{t:tools.palette_desc}}</span>
           </button>
           <button type="button" id="tool-look" class="tool" aria-controls="look-sheet">
             <span class="tool-ic" aria-hidden="true">
@@ -453,13 +455,12 @@
                 <path d="M12 3.5v17"></path><path d="M12 8.5a3.5 3.5 0 0 1 0 7"></path>
               </svg>
             </span>
-            <b>Görünüm</b>
-            <span>Arayüz teması. Yüzeyler ve metin sabit; yalnızca durum rengi değişir.</span>
+            <b>{{t:tools.look_title}}</b>
+            <span>{{t:tools.look_desc}}</span>
           </button>
         </div>
         <p class="view-desc">
-          Azure erişim bilgileri burada değil: onlar uygulama ayarı, üst şeritteki
-          Ayarlar düğmesinden açılıyor.
+          {{t:tools.access_note}}
         </p>
       </section>
     </main>
@@ -495,7 +496,7 @@
          image_models); HTML'de tek bir yer tutucu var, çünkü boş bir çip
          Ayarlar gelmeden bir an "model yok" gibi görünürdü. -->
     <div class="composer-head">
-      <label id="model-label" class="sr-only" aria-hidden="true" for="model">Görsel modeli</label>
+      <label id="model-label" class="sr-only" aria-hidden="true" for="model">{{t:model.image_title}}</label>
       <!-- SARMALAYICI, çünkü işaret çipin İÇİNDE duruyor (mutlak konum + solda
            dolgu). Native `<option>` görsel taşıyamadığı için açılan listede
            işaret YOK; buradaki işaret SEÇİLİ modelin sağlayıcısını söylüyor ve
@@ -541,8 +542,8 @@
              bir yardımcı teknolojide en kötüsü bugünkü davranışa düşmek. -->
         <button type="button" id="model-btn" class="model-chip"
                 aria-controls="model-sheet" aria-expanded="false"
-                aria-labelledby="model-label model-btn-label" title="Görsel modeli">
-          <b id="model-btn-label" class="model-chip-label">Modeller yükleniyor…</b>
+                aria-labelledby="model-label model-btn-label" title="{{t:model.image_title}}">
+          <b id="model-btn-label" class="model-chip-label">{{t:model.loading}}</b>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="m6 9 6 6 6-6"></path>
@@ -561,8 +562,8 @@
              liste" + "Görsel modeli, düğme"). Klavye ve ekran okuyucu yolu
              panelin radyo grubunda; buraya hiç kimse odaklanmıyor. -->
         <select id="model" class="sr-only" tabindex="-1" aria-hidden="true"
-                title="Görsel modeli">
-          <option value="">Modeller yükleniyor…</option>
+                title="{{t:model.image_title}}">
+          <option value="">{{t:model.loading}}</option>
         </select>
       </span>
 
@@ -578,14 +579,14 @@
            yönetmen bağlamı) hepsi onu bir GÖRSEL modeli sanıyor ve içine video
            id'si koymak, o beş yerin her birinde sessiz bir tür karışması
            olurdu. İki değer taşıyıcısı, karışması mümkün olmayan iki tür. -->
-      <label id="video-model-label" class="sr-only" aria-hidden="true" for="video-model">Video modeli</label>
+      <label id="video-model-label" class="sr-only" aria-hidden="true" for="video-model">{{t:model.video_title}}</label>
       <span id="video-model-pick" class="model-pick">
         <img id="video-model-logo" class="model-logo" alt="" aria-hidden="true" hidden />
         <button type="button" id="video-model-btn" class="model-chip"
                 aria-controls="model-sheet" aria-expanded="false"
                 aria-labelledby="video-model-label video-model-btn-label"
-                title="Video modeli">
-          <b id="video-model-btn-label" class="model-chip-label">Modeller yükleniyor…</b>
+                title="{{t:model.video_title}}">
+          <b id="video-model-btn-label" class="model-chip-label">{{t:model.loading}}</b>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="m6 9 6 6 6-6"></path>
@@ -595,14 +596,14 @@
              `tabindex="-1"` + `aria-hidden` birlikte — bir DEĞER TAŞIYICISI
              kontrol değil (gerekçenin uzunu `#model`de). -->
         <select id="video-model" class="sr-only" tabindex="-1" aria-hidden="true"
-                title="Video modeli">
-          <option value="">Modeller yükleniyor…</option>
+                title="{{t:model.video_title}}">
+          <option value="">{{t:model.loading}}</option>
         </select>
       </span>
 
       <!-- Yönetmen modunun karşılığı AYNI YUVADA: ikisi #composer[data-mode]
            ekseniyle birbirini dışlıyor, yani genişlik bedeli SIFIR. -->
-      <label id="chat-model-label" class="sr-only" aria-hidden="true" for="chat-model">Sohbet modeli</label>
+      <label id="chat-model-label" class="sr-only" aria-hidden="true" for="chat-model">{{t:model.chat_title}}</label>
       <!-- ARTIK AÇIK: `ChatRequest` bir `model` alanı kabul ediyor, yani seçim
            gerçekten tel üzerine çıkıyor, ve seçenekleri core.js dolduruyor
            (GET /api/settings → chat_models). Bekçisi tests/test_index.py'de:
@@ -617,8 +618,8 @@
         <button type="button" id="chat-model-btn" class="model-chip"
                 aria-controls="model-sheet" aria-expanded="false"
                 aria-labelledby="chat-model-label chat-model-btn-label"
-                title="Prompt Yönetmeni modeli">
-          <b id="chat-model-btn-label" class="model-chip-label">Modeller yükleniyor…</b>
+                title="{{t:model.director_title}}">
+          <b id="chat-model-btn-label" class="model-chip-label">{{t:model.loading}}</b>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="m6 9 6 6 6-6"></path>
@@ -630,8 +631,8 @@
              açık etiketinde o dizeyi arıyor ve "yönlendirme geldi ama seçim
              gizli" diye düşer. Gizleme işi `.sr-only`nin. -->
         <select id="chat-model" class="sr-only" tabindex="-1" aria-hidden="true"
-                title="Prompt Yönetmeni modeli">
-          <option value="">Modeller yükleniyor…</option>
+                title="{{t:model.director_title}}">
+          <option value="">{{t:model.loading}}</option>
         </select>
       </span>
 
@@ -657,7 +658,7 @@
              (mod anahtarı, ray daraltma, ızgara boyutu, galeri karoları). -->
         <button type="button" id="arena-toggle" class="model-chip arena-chip"
                 aria-pressed="false"
-                title="Arena: aynı prompt'u birden çok modelde karşılaştır">
+                title="{{t:arena.title}}">
           <b class="model-chip-label">Arena</b>
         </button>
         <!-- Değer tutucu: #model'in çoklu kardeşi, aynı gerekçelerle
@@ -665,11 +666,11 @@
              TAŞIYICISI kontrol değil, klavye yolu panelin içinde.
              Seçenekleri core.js dolduruyor. -->
         <select id="arena-models" class="sr-only" tabindex="-1" aria-hidden="true"
-                multiple title="Arena modelleri"></select>
+                multiple title="{{t:arena.models}}"></select>
         <button type="button" id="arena-btn" class="model-chip" hidden
                 aria-controls="model-sheet" aria-expanded="false"
-                title="Arena modelleri">
-          <b id="arena-btn-label" class="model-chip-label">2 model</b>
+                title="{{t:arena.models}}">
+          <b id="arena-btn-label" class="model-chip-label">{{t:arena.two_models}}</b>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="m6 9 6 6 6-6"></path>
@@ -683,7 +684,7 @@
            olanı okuyor ve düğmeyle doğrudan Ayarlar'a gidiyor. -->
       <p id="model-note" class="model-note" hidden>
         <span id="model-note-text"></span>
-        <button type="button" id="model-settings-link" class="btn-link">Ayarlar'ı aç</button>
+        <button type="button" id="model-settings-link" class="btn-link">{{t:composer.open_settings}}</button>
       </p>
     </div>
 
@@ -691,19 +692,19 @@
       <span id="ref-chip" class="ref-chip" hidden>
         <img id="ref-chip-img" class="ref-chip-img" alt="" hidden />
         <span id="ref-label"></span>
-        <button type="button" id="ref-clear" aria-label="Referansı kaldır">×</button>
+        <button type="button" id="ref-clear" aria-label="{{t:composer.remove_reference}}">×</button>
       </span>
 
       <div id="extra-row" class="extra-row" hidden>
-        <span class="extra-title">Ek görseller <span id="extra-count" class="range-val"></span></span>
+        <span class="extra-title">{{t:composer.extra_images}} <span id="extra-count" class="range-val"></span></span>
         <div id="extra-strip" class="extra-strip" aria-live="polite"></div>
-        <p class="extra-hint">Prompt her iki görsele birlikte uygulanır — ör. "ikinci görseldeki ürünü sahneye yerleştir".</p>
+        <p class="extra-hint">{{t:composer.extra_images_hint}}</p>
       </div>
     </div>
 
-    <label class="sr-only" for="prompt">Prompt veya Mesajın</label>
+    <label class="sr-only" for="prompt">{{t:composer.prompt_label}}</label>
     <textarea id="prompt" class="composer-input" rows="2"
-              placeholder="Ne üretmek istiyorsun? Görsel tarifi, renk veya tarz yaz…"></textarea>
+              placeholder="{{t:composer.placeholder}}"></textarea>
 
     <!-- Kapı açıklaması: mod anahtarının KENDİSİ kilitlenmiyor. Kilitli bir
          anahtar "neden kapalı" bilgisini de saklardı; burada kullanıcı geçip ne
@@ -717,15 +718,14 @@
          kullanıcı tek düğme için iki ad okuyor. Eski "dişli" sözü üstelik yanlış
          da değildi ama ADI değildi (index.html, `aria-label="Ayarlar"`). -->
     <p id="chat-gate" class="chat-gate" hidden>
-      Prompt Yönetmeni kapalı: sağ üstteki Ayarlar düğmesinden bir sohbet
-      sağlayıcısının anahtarını kaydet — Azure'da ayrıca
-      <strong>dağıtım adı</strong> gerekiyor.
+      {{t:composer.director_off_1}}
+      <strong>{{t:composer.director_off_link}}</strong> {{t:composer.director_off_2}}
     </p>
 
     <div class="composer-bar">
       <div class="plus-wrap">
         <button type="button" id="plus-btn" class="plus" aria-expanded="false"
-                aria-controls="plus-menu" aria-label="Görsel ekle" title="Görsel ekle">
+                aria-controls="plus-menu" aria-label="{{t:composer.add_image}}" title="{{t:composer.add_image}}">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
             <path d="M12 5v14"></path><path d="M5 12h14"></path>
@@ -735,10 +735,10 @@
              aynı, yalnızca yerleri değişti. -->
         <div id="plus-menu" class="popover" hidden>
           <button type="button" id="upload-btn" class="btn-ghost">
-            <span class="btn-ghost-plus" aria-hidden="true">+</span> Referans görsel
+            <span class="btn-ghost-plus" aria-hidden="true">+</span> {{t:composer.reference}}
           </button>
           <button type="button" id="extra-add-btn" class="btn-ghost">
-            <span class="btn-ghost-plus" aria-hidden="true">+</span> Ek görsel
+            <span class="btn-ghost-plus" aria-hidden="true">+</span> {{t:composer.extra_ref}}
           </button>
           <!-- Hairline dosya yolunu (yukarısı #file-input'a gider) Medya
                yolundan ayırıyor. -->
@@ -750,7 +750,7 @@
               <path d="M3 15l4.5-4 3.5 3 3-2.5L21 17"></path>
               <circle cx="15.5" cy="8.5" r="1.4"></circle>
             </svg>
-            Medya'dan seç
+            {{t:composer.pick_from_media}}
           </button>
         </div>
         <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" hidden />
@@ -758,17 +758,17 @@
       </div>
 
       <!-- Mod anahtarı: (+) işaretinin yanında, tasarım §4.2. -->
-      <div class="seg view-tabs mode" role="group" aria-label="Mod">
+      <div class="seg view-tabs mode" role="group" aria-label="{{t:composer.mode_aria}}">
         <span id="view-tabs-thumb" class="view-tabs-thumb" aria-hidden="true"></span>
-        <button id="tab-image" type="button" class="active" aria-pressed="true">Görsel</button>
+        <button id="tab-image" type="button" class="active" aria-pressed="true">{{t:common.image}}</button>
         <!-- ÜÇÜNCÜ MOD (v0.13). Sıra ANLAMLI ve Yönetmen'in SOLUNA konmuyor
              bilerek: kayan dolgu (#view-tabs-thumb) aktif düğmenin
              `offsetLeft`inden okunuyor, yani araya girmek varsayılan modun
              dolgusunu değil ama kullanıcının kas hafızasını kaydırırdı —
              "Yönetmen" bir turdur, en sağda kalıyor. Video, Görsel'in
              komşusu çünkü ikisi de bir ÜRETİM. -->
-        <button id="tab-video" type="button" aria-pressed="false">Video</button>
-        <button id="tab-chat" type="button" aria-pressed="false">Yönetmen</button>
+        <button id="tab-video" type="button" aria-pressed="false">{{t:common.video}}</button>
+        <button id="tab-chat" type="button" aria-pressed="false">{{t:common.director}}</button>
       </div>
 
       <div class="composer-right">
@@ -776,12 +776,12 @@
              belirir, yazdığın ham metni yönetmene devreder. METİN düğmesi ve
              `hidden` başlıyor. -->
         <button type="button" id="ask-director" class="btn-ghost composer-ask" hidden>
-          Yönetmen'e sor
+          {{t:composer.ask_director}}
         </button>
         <!-- Üretim ayarları çipi: boyut · kalite · adet özetini gösterir -->
         <button type="button" id="specs-btn" class="specs" aria-controls="specs-sheet"
-                aria-expanded="false" title="Üretim ayarları">
-          <span id="specs-label">1:1 · ORTA · x1</span>
+                aria-expanded="false" title="{{t:gen.title}}">
+          <span id="specs-label">{{t:composer.settings_summary_default}}</span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="m6 9 6 6 6-6"></path>
@@ -803,13 +803,13 @@
              #ask-director gizli (style.css), şerit 149px kullanıyordu. -->
         <button type="button" id="director-btn" class="specs" aria-controls="director-sheet"
                 aria-expanded="false">
-          <span>Yönetmen ayarları</span>
+          <span>{{t:director.settings_title}}</span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="m6 9 6 6 6-6"></path>
           </svg>
         </button>
-        <button id="go" class="primary composer-send" type="button">Üret</button>
+        <button id="go" class="primary composer-send" type="button">{{t:composer.generate}}</button>
       </div>
     </div>
 
@@ -841,14 +841,14 @@
 
   <!-- Oturum listesi: soldan açılan slide-over. chat.js `.open` sınıfını
        kullanıyor, o yüzden `hidden` YOK — açık/kapalı sınıfla anlatılıyor. -->
-  <aside id="chat-sidebar" class="sheet sheet-left chat-sidebar" aria-label="Kayıtlı sohbetler">
+  <aside id="chat-sidebar" class="sheet sheet-left chat-sidebar" aria-label="{{t:sessions.aria}}">
     <div class="sheet-head">
-      <h2>Oturumlar</h2>
-      <button type="button" id="sessions-close" class="modal-x" aria-label="Kapat">×</button>
+      <h2>{{t:sessions.title}}</h2>
+      <button type="button" id="sessions-close" class="modal-x" aria-label="{{t:common.close}}">×</button>
     </div>
     <div class="sheet-body">
       <ul id="chat-list" class="chat-list"></ul>
-      <p id="chat-list-empty" class="chat-list-empty">Henüz kayıtlı sohbet yok.</p>
+      <p id="chat-list-empty" class="chat-list-empty">{{t:sessions.empty}}</p>
     </div>
     <!-- Karar D1'in güvence (b)'si: tek tıkla "tümünü sil". Listenin ALTINDA
          (tasarım §4.1) ve ayrı bir dipte: yıkıcı eylem, tıklanacak satırların
@@ -856,7 +856,7 @@
          yeri, burası oturumların. -->
     <div class="sheet-foot">
       <button type="button" id="chats-delete-all" class="btn-ghost btn-ghost-danger">
-        Tüm oturumları sil
+        {{t:sessions.delete_all}}
       </button>
     </div>
   </aside>
@@ -883,29 +883,29 @@
          aria-labelledby="model-sheet-title">
     <span class="sheet-grip" aria-hidden="true"></span>
     <div class="sheet-head">
-      <h2 id="model-sheet-title">Görsel modeli</h2>
-      <button type="button" id="model-sheet-close" class="modal-x" aria-label="Kapat">×</button>
+      <h2 id="model-sheet-title">{{t:model.image_title}}</h2>
+      <button type="button" id="model-sheet-close" class="modal-x" aria-label="{{t:common.close}}">×</button>
     </div>
     <div class="sheet-body">
       <!-- <fieldset> + radyo: grup semantiği ve ok tuşu gezintisi TARAYICIDAN.
            Elle yazılmış `role="listbox"`/`role="option"` bilerek YOK — eski
            native <select> kararının itirazı tam olarak buydu. -->
       <fieldset id="model-sheet-list" class="model-list">
-        <legend class="sr-only">Modeller</legend>
+        <legend class="sr-only">{{t:model.picker_title}}</legend>
       </fieldset>
     </div>
     <div class="sheet-foot">
-      <button type="button" id="model-sheet-ok" class="primary">Tamam</button>
+      <button type="button" id="model-sheet-ok" class="primary">{{t:common.ok}}</button>
     </div>
   </aside>
 
   <!-- Üretim ayarları: sağdan slide-over. Bugünkü SİPARİŞ panelinin prompt
        dışındaki her şeyi buraya geldi; `controls` sınıfı korunuyor çünkü
        etiket/aralık stilleri ona bağlı. -->
-  <aside id="specs-sheet" class="sheet sheet-right" aria-label="Üretim ayarları">
+  <aside id="specs-sheet" class="sheet sheet-right" aria-label="{{t:gen.title}}">
     <div class="sheet-head">
-      <h2>Üretim ayarları</h2>
-      <button type="button" id="specs-close" class="modal-x" aria-label="Kapat">×</button>
+      <h2>{{t:gen.title}}</h2>
+      <button type="button" id="specs-close" class="modal-x" aria-label="{{t:common.close}}">×</button>
     </div>
     <div class="sheet-body controls">
       <!-- Üç sarmalayıcı ARTIK ADRESLENEBİLİR (#spec-*): eksen modele göre
@@ -923,7 +923,7 @@
            gelmeden önceki ilk çizim için yer tutucu. -->
       <div class="row">
         <div id="spec-size">
-          <label for="size" id="label-size">Boyut</label>
+          <label for="size" id="label-size">{{t:gen.size}}</label>
           <select id="size">
             <option value="1024x1024">◼ 1:1</option>
             <option value="1024x1536">▮ 2:3</option>
@@ -931,11 +931,11 @@
           </select>
         </div>
         <div id="spec-quality">
-          <label for="quality" id="label-quality">Kalite</label>
+          <label for="quality" id="label-quality">{{t:gen.quality}}</label>
           <select id="quality">
-            <option value="low">Düşük</option>
-            <option value="medium" selected>Orta</option>
-            <option value="high">Yüksek</option>
+            <option value="low">{{t:gen.quality_low}}</option>
+            <option value="medium" selected>{{t:gen.quality_medium}}</option>
+            <option value="high">{{t:gen.quality_high}}</option>
           </select>
         </div>
         <!-- SÜRE EKSENİ (v0.13): yalnız süre taşıyan modellerde görünüyor ve
@@ -949,11 +949,11 @@
              video modeline hiç geçmeyen kullanıcıya ölü bir seçenek
              göstermek olurdu. -->
         <div id="spec-duration" hidden>
-          <label for="duration" id="label-duration">Süre</label>
+          <label for="duration" id="label-duration">{{t:gen.duration}}</label>
           <select id="duration"></select>
         </div>
         <div id="spec-n">
-          <label for="n" id="label-n">Adet</label>
+          <label for="n" id="label-n">{{t:gen.count}}</label>
           <select id="n">
             <option value="1">1</option>
             <option value="2">2</option>
@@ -971,46 +971,46 @@
            Başlangıç yuvası composer'ın ANA REFERANSINI (`source`) çiziyor,
            ikinci bir durum değişkeni YOK — `#ref-chip` ile aynı gerçeği iki
            yerde göstermek, birinin bayatlaması demekti. -->
-      <section class="frames-panel" id="frames-panel" aria-label="Başlangıç ve bitiş görseli">
+      <section class="frames-panel" id="frames-panel" aria-label="{{t:gen.frames_aria}}">
         <div class="frame-slot" id="first-frame-slot">
-          <span class="frame-slot-title">Başlangıç görseli</span>
+          <span class="frame-slot-title">{{t:gen.first_frame}}</span>
           <div class="frame-slot-box">
             <img id="first-frame-img" alt="" hidden />
-            <span id="first-frame-empty" class="frame-slot-empty">Yok</span>
+            <span id="first-frame-empty" class="frame-slot-empty">{{t:common.none}}</span>
             <button type="button" id="first-frame-clear" class="frame-slot-clear"
-                    aria-label="Başlangıç görselini kaldır" hidden>×</button>
+                    aria-label="{{t:gen.first_frame_remove}}" hidden>×</button>
           </div>
           <div class="frame-slot-acts">
             <button type="button" id="first-frame-pick" class="btn-ghost"
-                    title="Başlangıç görselini galeriden seç">Galeri</button>
+                    title="{{t:gen.first_frame_gallery}}">{{t:common.gallery}}</button>
             <button type="button" id="first-frame-upload" class="btn-ghost"
-                    title="Başlangıç görselini bilgisayardan yükle">Yükle</button>
+                    title="{{t:gen.first_frame_upload}}">{{t:common.upload}}</button>
           </div>
         </div>
         <div class="frame-slot" id="last-frame-slot">
-          <span class="frame-slot-title">Bitiş görseli</span>
+          <span class="frame-slot-title">{{t:gen.last_frame}}</span>
           <div class="frame-slot-box">
             <img id="last-frame-img" alt="" hidden />
-            <span id="last-frame-empty" class="frame-slot-empty">Yok</span>
+            <span id="last-frame-empty" class="frame-slot-empty">{{t:common.none}}</span>
             <button type="button" id="last-frame-clear" class="frame-slot-clear"
-                    aria-label="Bitiş görselini kaldır" hidden>×</button>
+                    aria-label="{{t:gen.last_frame_remove}}" hidden>×</button>
           </div>
           <div class="frame-slot-acts">
             <button type="button" id="last-frame-pick" class="btn-ghost"
-                    title="Bitiş görselini galeriden seç">Galeri</button>
+                    title="{{t:gen.last_frame_gallery}}">{{t:common.gallery}}</button>
             <button type="button" id="last-frame-upload" class="btn-ghost"
-                    title="Bitiş görselini bilgisayardan yükle">Yükle</button>
+                    title="{{t:gen.last_frame_upload}}">{{t:common.upload}}</button>
           </div>
         </div>
         <p id="frames-note" class="asset-status" role="status"></p>
       </section>
       <input type="file" id="last-frame-input" accept="image/png,image/jpeg,image/webp" hidden />
 
-      <section class="palette-panel" aria-label="Tema rengi ve renk paleti">
+      <section class="palette-panel" aria-label="{{t:palette.inline_aria}}">
         <div class="palette-actions">
           <button type="button" id="palette-btn" class="btn-ghost"
-                  title="Tema rengi seç ve uyumlu palet önerilerini gör">
-            <span class="btn-ghost-plus" aria-hidden="true">+</span> Tema rengi
+                  title="{{t:palette.open_title}}">
+            <span class="btn-ghost-plus" aria-hidden="true">+</span> {{t:palette.seed}}
           </button>
           <span id="palette-chip" class="ref-chip" hidden>
             <!-- aria-hidden YOK: v1.11'den beri swatch'lar tıklanabilir düğme
@@ -1018,34 +1018,34 @@
                  aria-hidden içinde bırakmak ekran okuyucudan tamamen saklar —
                  klavyeyle ulaşılan ama duyurulmayan bir kontrol kalırdı. -->
             <span id="palette-chip-sw" class="palette-sw-row"
-                  role="group" aria-label="Palet renkleri — çıkarmak için tıkla"></span>
+                  role="group" aria-label="{{t:palette.swatches_aria}}"></span>
             <span id="palette-label"></span>
-            <button type="button" id="palette-clear" aria-label="Paleti kaldır">×</button>
+            <button type="button" id="palette-clear" aria-label="{{t:palette.remove}}">×</button>
           </span>
         </div>
         <div id="palette-strength-row" class="palette-strength-row" hidden>
-          <span id="palette-strength-label" class="palette-strength-title">Renk baskısı</span>
+          <span id="palette-strength-label" class="palette-strength-title">{{t:palette.strength}}</span>
           <div id="palette-strength" class="seg" role="group"
                aria-labelledby="palette-strength-label">
-            <button type="button" data-strength="hint">İpucu</button>
-            <button type="button" data-strength="balanced" class="active">Dengeli</button>
-            <button type="button" data-strength="strict">Katı</button>
+            <button type="button" data-strength="hint">{{t:palette.strength_hint}}</button>
+            <button type="button" data-strength="balanced" class="active">{{t:palette.strength_balanced}}</button>
+            <button type="button" data-strength="strict">{{t:palette.strength_strict}}</button>
           </div>
         </div>
         <p id="palette-mode-note" class="field-note" hidden></p>
         <p id="palette-status" class="asset-status" role="status"></p>
       </section>
 
-      <section class="assets-panel" aria-label="Bindirme ve kütüphane">
+      <section class="assets-panel" aria-label="{{t:overlay.aria}}">
         <div class="asset-actions">
           <button type="button" id="logo-add-btn" class="btn-ghost" disabled
-                  title="Önizlemedeki görsele logo, motto veya banner bindir">
-            <span class="btn-ghost-plus" aria-hidden="true">+</span> Logo ekle
+                  title="{{t:overlay.add_title}}">
+            <span class="btn-ghost-plus" aria-hidden="true">+</span> {{t:overlay.add}}
           </button>
           <button type="button" id="library-btn" class="btn-ghost"
-                  title="Logo, motto ve banner kütüphanesini yönet">Kütüphane</button>
+                  title="{{t:library.manage_title}}">{{t:library.title}}</button>
         </div>
-        <p class="asset-status">"Logo ekle" önizlemedeki görsele uygulanır — galeriden bir görsele tıkla ya da yeni bir görsel üret.</p>
+        <p class="asset-status">{{t:overlay.hint}}</p>
       </section>
     </div>
   </aside>
@@ -1060,24 +1060,21 @@
        kalıcı yönlendirmeyi istedi. Soru sıklığı, varsayılan üslup/dil ve öneri
        yoğunluğu anahtarları aynı `.sheet-body`ye eklenecek — çekmece açıldığı
        için ikinci bir yüzey gerektirmiyorlar. -->
-  <aside id="director-sheet" class="sheet sheet-right" aria-label="Yönetmen ayarları">
+  <aside id="director-sheet" class="sheet sheet-right" aria-label="{{t:director.settings_title}}">
     <div class="sheet-head">
-      <h2>Yönetmen ayarları</h2>
-      <button type="button" id="director-close" class="modal-x" aria-label="Kapat">×</button>
+      <h2>{{t:director.settings_title}}</h2>
+      <button type="button" id="director-close" class="modal-x" aria-label="{{t:common.close}}">×</button>
     </div>
     <div class="sheet-body">
-      <h3 class="modal-subhead modal-subhead-first">Kalıcı yönlendirme</h3>
+      <h3 class="modal-subhead modal-subhead-first">{{t:director.guidance_label}}</h3>
       <!-- `maxlength` sunucudaki İKİ sınırı aynalıyor (models.PrefsRequest'in
            422 kapısı ve chat_prompt.MAX_GUIDANCE_CHARS'ın kırpması). Tarayıcı
            tarafında olması bir savunma değil nezaket: kullanıcı sınırı yazarken
            görüyor, kaydete basıp 422 okumuyor. -->
       <textarea id="director-guidance" rows="6" maxlength="1500" spellcheck="false"
-                placeholder="Örn. her zaman düz vektör üslubu; görselin üzerine metin yazma; marka rengim #0b2545"></textarea>
+                placeholder="{{t:director.guidance_placeholder}}"></textarea>
       <p class="field-note">
-        Bu metin yönetmenin talimatını <strong>ezmiyor, ona ekleniyor</strong> —
-        her yeni turda geçerli, tekrar yazmanız gerekmiyor. Kapsam ve ret
-        kurallarını değiştirmez. Talimatın <em>tamamını</em> kendiniz yazmak
-        isterseniz yol Ayarlar'da duruyor.
+        {{t:director.guidance_note_1}} <strong>{{t:director.guidance_note_em}}</strong> {{t:director.guidance_note_2}} <em>{{t:director.guidance_note_em2}}</em> {{t:director.guidance_note_3}}
       </p>
     </div>
     <!-- ANINDA yazım DEĞİL "Kaydet" — ve bu, #pref-autosave'in kalıbından
@@ -1096,7 +1093,7 @@
          kalıyordu — basılıyor ve hiçbir şey olmuyor gibi görünüyordu. -->
     <div class="sheet-foot">
       <p id="director-status" class="modal-status" role="status"></p>
-      <button type="button" id="director-save" class="primary">Kaydet</button>
+      <button type="button" id="director-save" class="primary">{{t:common.save}}</button>
     </div>
   </aside>
 
@@ -1114,18 +1111,18 @@
             <path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"></path>
           </svg>
         </span>
-        <h2 id="confirm-title">Emin misiniz?</h2>
+        <h2 id="confirm-title">{{t:confirm.title}}</h2>
       </div>
       <p id="confirm-desc" class="modal-desc"></p>
 
       <div id="confirm-field" hidden>
-        <label for="confirm-input">Ad</label>
+        <label for="confirm-input">{{t:common.name}}</label>
         <input id="confirm-input" type="text" autocomplete="off" spellcheck="false" maxlength="80" />
       </div>
 
       <div class="dialog-actions">
-        <button id="confirm-cancel" class="btn-ghost" type="button">Vazgeç</button>
-        <button id="confirm-ok" class="primary" type="button">Onayla</button>
+        <button id="confirm-cancel" class="btn-ghost" type="button">{{t:common.cancel}}</button>
+        <button id="confirm-ok" class="primary" type="button">{{t:common.confirm}}</button>
       </div>
     </div>
   </div>
@@ -1138,16 +1135,16 @@
     <div class="modal-backdrop" data-move-close></div>
     <div class="modal-card move-card" role="dialog" aria-modal="true" aria-labelledby="move-title">
       <div class="modal-head">
-        <h2 id="move-title">Klasöre taşı</h2>
+        <h2 id="move-title">{{t:move.title}}</h2>
       </div>
       <p id="move-desc" class="modal-desc"></p>
 
-      <label for="move-target">Hedef klasör</label>
+      <label for="move-target">{{t:move.target}}</label>
       <select id="move-target"></select>
 
       <div class="dialog-actions">
-        <button id="move-cancel" class="btn-ghost" type="button">Vazgeç</button>
-        <button id="move-ok" class="primary" type="button">Taşı</button>
+        <button id="move-cancel" class="btn-ghost" type="button">{{t:common.cancel}}</button>
+        <button id="move-ok" class="primary" type="button">{{t:common.move}}</button>
       </div>
     </div>
   </div>
@@ -1175,14 +1172,14 @@
        parçası; ad telin üstündeki isim, yüzey hakkında bir iddia değil.
        Açık/kapalı `.open` sınıfıyla anlatılıyor (oturum paneliyle aynı
        mekanik), perde ortak #shell-scrim. -->
-  <aside id="settings-modal" class="sheet sheet-center" aria-label="Ayarlar">
+  <aside id="settings-modal" class="sheet sheet-center" aria-label="{{t:settings.title}}">
     <div class="sheet-head">
       <!-- Başlık "Azure Ayarları" DEĞİL "Ayarlar": panel artık kimlik dışında
            bir tercih de taşıyor (oturumların otomatik kaydı) ve tasarım §4.1
            dişliyi tek bir "Ayarlar" paneli olarak adlandırıyor. Azure kendi
            alt başlığına indi. -->
-      <h2 id="settings-title">Ayarlar</h2>
-      <button id="settings-close" class="modal-x" type="button" aria-label="Kapat">×</button>
+      <h2 id="settings-title">{{t:settings.title}}</h2>
+      <button id="settings-close" class="modal-x" type="button" aria-label="{{t:common.close}}">×</button>
     </div>
     <!-- İKİ SÜTUN: solda bölümler, sağda yalnız seçili bölümün alanları.
          Öncesinde dört bölüm TEK kayan gövdedeydi ve toplam 19 blok ediyordu
@@ -1197,19 +1194,19 @@
     <div class="sheet-body settings-layout">
       <!-- `<nav>` + `aria-current="page"` DEĞİL `"true"`: bunlar sayfa değil
            aynı pencerenin bölmeleri (`.picker-nav-item`in kendi kalıbı). -->
-      <nav id="settings-nav" class="settings-nav" aria-label="Ayarlar bölümleri">
+      <nav id="settings-nav" class="settings-nav" aria-label="{{t:settings.nav_aria}}">
         <button type="button" class="picker-nav-item" data-pane="access"
-                aria-current="true"><span>Erişim</span></button>
+                aria-current="true"><span>{{t:settings.nav_access}}</span></button>
         <!-- Bu düğme SAĞLAYICIYA GÖRE gizlenebiliyor (settings.js
              `syncChatDeployField`): dağıtım adı istemeyen bir sağlayıcıda
              bölümde görünecek hiçbir şey kalmıyor ve boş bir bölme, tıklanacak
              bir soru işaretinden başka bir şey değil. -->
         <button type="button" class="picker-nav-item" id="settings-nav-director"
-                data-pane="director"><span>Yönetmen</span></button>
+                data-pane="director"><span>{{t:common.director}}</span></button>
         <button type="button" class="picker-nav-item" data-pane="sessions">
-          <span>Oturumlar</span></button>
+          <span>{{t:sessions.title}}</span></button>
         <button type="button" class="picker-nav-item" data-pane="about">
-          <span>Hakkında</span></button>
+          <span>{{t:settings.nav_about}}</span></button>
       </nav>
 
       <div class="settings-panes">
@@ -1217,7 +1214,7 @@
       <!-- ── Erişim ───────────────────────────────────────────────────── -->
       <section class="settings-pane" data-pane="access">
       <p class="modal-desc">
-        Anahtarlar yalnız bu makinede saklanır ve ekranda hiç gösterilmez.
+        {{t:settings.access_desc}}
       </p>
 
       <!-- SEÇİCİ + TEK ALAN GRUBU deseni. Alternatifler ve neden değil:
@@ -1237,7 +1234,7 @@
            ekran okuyucudan gizli (`aria-hidden`), yani `for` odağı görünmeyen
            bir kutuya yollardı. Erişilebilir ad düğmeye `aria-labelledby` ile
            bağlanıyor; görünüş `label` kuralının aynısı (style.css). -->
-      <span class="settings-label" id="set-provider-caption">Sağlayıcı</span>
+      <span class="settings-label" id="set-provider-caption">{{t:settings.provider}}</span>
       <!-- DEĞERİ HÂLÂ `<select>` TUTUYOR, düğme onun görünen yüzü — `#model`
            çipinin birebir deseni (style.css `.model-chip`, core.js
            `renderModelCards`). Gerekçe ölçülmüş: native bir `<select>`in
@@ -1274,30 +1271,29 @@
            parçası ve applyConfigured onları dolduruyor; yalnızca yerleri
            değişti, yani id defterine kayıt GEREKMİYOR. -->
       <div id="prov-azure" class="prov-fields">
-        <label for="set-endpoint">Endpoint (Base URL)</label>
+        <label for="set-endpoint">{{t:settings.endpoint}}</label>
         <input id="set-endpoint" type="url" autocomplete="off" spellcheck="false"
                placeholder="https://…/openai/v1/" />
 
-        <label for="set-key">API Key</label>
+        <label for="set-key">{{t:settings.api_key}}</label>
         <input id="set-key" type="password" autocomplete="off" spellcheck="false"
-               placeholder="Azure API anahtarını yapıştır" />
-        <p class="field-note">Azure AI Foundry'deki kaynak adresi ve anahtarı.</p>
+               placeholder="{{t:settings.azure_key_placeholder}}" />
+        <p class="field-note">{{t:settings.foundry_desc}}</p>
 
-        <label for="set-foundry-url">Foundry adresi (MAI · FLUX)</label>
+        <label for="set-foundry-url">{{t:settings.foundry_label}}</label>
         <input id="set-foundry-url" type="url" autocomplete="off" spellcheck="false"
-               placeholder="boş bırak: Endpoint'ten türetilir" />
+               placeholder="{{t:settings.foundry_placeholder}}" />
         <!-- NOT KISALDI, KURAL DEĞİL: "boş bırakılırsa Endpoint'ten türetilir"
              cümlesi kalmak ZORUNDA, çünkü bu alanın çoğu kurulumda BOŞ
              BIRAKILMASI gerektiğini söyleyen tek yer o — yer tutucu da aynı
              şeyi tekrarlıyor ki not okunmasa bile bilgi kaybolmasın. -->
         <p class="field-note">
-          Boş bırak — adres Endpoint'ten türetilir. Yalnız ayrı bir kaynak ya da
-          vekil arkasındaki dağıtımlar için doldur.
+          {{t:settings.foundry_hint}}
         </p>
       </div>
 
       <div id="prov-openai" class="prov-fields" hidden>
-        <label for="set-openai-key">OpenAI API Key</label>
+        <label for="set-openai-key">{{t:settings.openai_key}}</label>
         <input id="set-openai-key" type="password" autocomplete="off"
                spellcheck="false" placeholder="sk-…" />
         <!-- MODEL EMEKLİLİK TARİHLERİ BURADAN ÇIKTI ve kaybolmadı: katalog
@@ -1314,7 +1310,7 @@
            elle yazabiliyor. Forma alan eklemek, hiç kimsenin dolduramadığı
            bir kutuyu 360px'de yer kaplatmak olurdu. -->
       <div id="prov-gemini" class="prov-fields" hidden>
-        <label for="set-gemini-key">Gemini API Key</label>
+        <label for="set-gemini-key">{{t:settings.gemini_key}}</label>
         <input id="set-gemini-key" type="password" autocomplete="off"
                spellcheck="false" placeholder="AIza…" />
         <!-- "Ücretsiz kademede kapalı" KALIYOR: anahtarı olan ama üretemeyen
@@ -1322,7 +1318,7 @@
              gerektiriyor. Oran/çözünürlük anlatımı gitti — o bilgi zaten
              üretim ayarları panelinde, seçenekleri çizen yerde. -->
         <p class="field-note">
-          aistudio.google.com → API keys. Görsel üretimi ücretsiz kademede kapalı.
+          {{t:settings.gemini_hint}}
         </p>
       </div>
 
@@ -1351,19 +1347,18 @@
            duruyor (paths.chat_instructions_override) ve GET /api/settings hâlâ
            döndürüyor; yalnız ekrandaki kopyası gitti. -->
       <section class="settings-pane" data-pane="director" hidden>
-      <h3 class="modal-subhead modal-subhead-first" id="chat-deploy-head">Sohbet modeli</h3>
+      <h3 class="modal-subhead modal-subhead-first" id="chat-deploy-head">{{t:model.chat_title}}</h3>
       <div id="chat-deploy-group" class="prov-fields">
-        <label for="set-chat-deployment">Dağıtım adı</label>
+        <label for="set-chat-deployment">{{t:settings.deployment}}</label>
         <input id="set-chat-deployment" type="text" autocomplete="off" spellcheck="false"
-               maxlength="200" placeholder="ör. gpt-5.6-luna" />
+               maxlength="200" placeholder="{{t:settings.deployment_placeholder}}" />
         <!-- "Boş bırakılırsa kapalı kalır" KALIYOR: bu kutunun boş olmasının
              bir SONUCU var (Yönetmen hiç açılmıyor) ve onu söyleyen tek yer
              burası. "Model ailesi adı değil" de kalıyor — ölçülmüş bir yanlış
              doldurma. Endpoint paylaşımı cümlesi gitti: kullanıcının burada
              vereceği bir karar değil. -->
         <p class="field-note">
-          Azure AI Foundry'deki <strong>deployment</strong> adı — model ailesi
-          adı değil. Boş bırakılırsa Yönetmen kapalı kalır.
+          {{t:settings.deployment_note_1}} <strong>deployment</strong> {{t:settings.deployment_note_2}}
         </p>
       </div>
       </section>
@@ -1377,11 +1372,10 @@
       <section class="settings-pane" data-pane="sessions" hidden>
       <label class="switch-row" for="pref-autosave">
         <input type="checkbox" id="pref-autosave" checked />
-        <span>Oturumları otomatik kaydet</span>
+        <span>{{t:settings.autosave}}</span>
       </label>
       <p class="field-note">
-        Kapalıyken yalnız kendin kaydettiğin oturumlar yazılır; üretilen
-        görseller her koşulda diske iner.
+        {{t:settings.autosave_hint}}
       </p>
       </section>
 
@@ -1397,7 +1391,7 @@
            İki eleman tek kaynaktan besleniyor: settings.js `[data-app-version]`
            seçicisiyle hepsini birden yazıyor, yani üçüncü bir kopya da bedava. -->
       <p class="field-note settings-version-row">
-        Kurulu sürüm: <strong>v<span id="settings-version-foot"
+        {{t:settings.installed_version}} <strong>v<span id="settings-version-foot"
                                      data-app-version>—</span></strong>
       </p>
 
@@ -1424,25 +1418,24 @@
            yeni sekmeyi, orta tıklamayı, "bağlantıyı kopyala"yı ve ekran
            okuyucunun "bağlantı" duyurusunu JS'e borçlu hale getirirdi. -->
       <p class="field-note settings-update-row" id="settings-update" hidden>
-        Yeni sürüm çıktı: <strong>v<span id="settings-update-version">—</span></strong>
+        {{t:settings.update_available}} <strong>v<span id="settings-update-version">—</span></strong>
         <a id="settings-update-link" class="btn-ghost btn-block"
            href="https://github.com/Zenginby/kromis/releases/latest"
-           target="_blank" rel="noopener noreferrer">Güncelle</a>
-        <span class="settings-update-steps">Güncelleme adımları:
+           target="_blank" rel="noopener noreferrer">{{t:settings.update_button}}</a>
+        <span class="settings-update-steps">{{t:settings.update_steps}}
           <a href="https://github.com/Zenginby/kromis/blob/main/GUNCELLEME.md"
              target="_blank" rel="noopener noreferrer">GUNCELLEME.md</a></span>
       </p>
 
       <label class="switch-row" for="pref-guncelleme">
         <input type="checkbox" id="pref-guncelleme" checked />
-        <span>Yeni sürüm çıkınca haber ver</span>
+        <span>{{t:settings.update_check}}</span>
       </label>
       <!-- "BAŞKA HİÇBİR ŞEY GÖNDERMEZ" KALIYOR ve kısaltmanın kesemeyeceği
            yer burası: bu anahtarın açık olması uygulamanın ağa çıkması demek
            ve kullanıcının vereceği karar tam olarak bunun üzerine. -->
       <p class="field-note">
-        Günde bir kez GitHub'a sürüm sorar — <strong>başka hiçbir şey
-        göndermez</strong>. Kapalıyken bu iş için ağa hiç çıkmaz.
+        {{t:settings.update_check_hint_1}} <strong>{{t:settings.update_check_hint_em}}</strong>{{t:settings.update_check_hint_2}}
       </p>
 
       <!-- KÜNYE — yasal kimlik uygulamanın İÇİNDE, yalnız depoda değil.
@@ -1469,12 +1462,11 @@
         <strong>Kromis Studio</strong> v<span data-app-version>—</span> —
         © 2026 Alperen Zengin<br />
         <a href="https://github.com/Zenginby/kromis/blob/main/LICENSE"
-           target="_blank" rel="noopener noreferrer">GNU AGPL-3.0</a> ile
-        lisanslı ·
+           target="_blank" rel="noopener noreferrer">GNU AGPL-3.0</a> {{t:settings.license_1}}
         <a href="https://github.com/Zenginby/kromis"
-           target="_blank" rel="noopener noreferrer">kaynak kodu</a><br />
-        Değiştirip dağıtırsan kaynağını da açmak zorundasın. <strong>Kromis</strong>
-        adı ve logosu lisansın kapsamı dışındadır.
+           target="_blank" rel="noopener noreferrer">{{t:settings.source_code}}</a><br />
+        {{t:settings.license_2}} <strong>Kromis</strong>
+        {{t:settings.trademark}}
       </p>
       </section>
 
@@ -1495,7 +1487,7 @@
          hiç okunmuyordu. `role="status"` duruyor — mesaj sesli de duyuruluyor. -->
     <div class="sheet-foot">
       <p id="settings-status" class="modal-status" role="status"></p>
-      <button id="settings-save" class="primary" type="button">Kaydet</button>
+      <button id="settings-save" class="primary" type="button">{{t:common.save}}</button>
     </div>
   </aside>
 
@@ -1519,15 +1511,15 @@
     <div class="modal-card provider-card" role="dialog" aria-modal="true"
          aria-labelledby="provider-modal-title">
       <div class="modal-head">
-        <h2 id="provider-modal-title">Sağlayıcı</h2>
+        <h2 id="provider-modal-title">{{t:settings.provider}}</h2>
         <button type="button" id="provider-close" class="modal-x"
-                aria-label="Kapat">×</button>
+                aria-label="{{t:common.close}}">×</button>
       </div>
       <!-- <fieldset> + gerçek radyo: grup semantiği ve ok tuşu gezintisi
            TARAYICIDAN. Elle yazılmış `role="listbox"`/`role="option"` bilerek
            YOK — #model-sheet'in kendi gerekçesinin aynısı. -->
       <fieldset id="provider-list" class="model-list">
-        <legend class="sr-only">Sağlayıcılar</legend>
+        <legend class="sr-only">{{t:settings.providers}}</legend>
       </fieldset>
     </div>
   </div>
@@ -1537,41 +1529,41 @@
        `POST /api/prefs` ile prefs.json'a yazılıyor (settings.js:132) ve
        açılışta geri okunuyor (chat.js:1492). Uç bilerek `/api/settings`
        DEĞİL: gerekçe §0.5/K6-K7. -->
-  <aside id="look-sheet" class="sheet sheet-right" aria-label="Görünüm">
+  <aside id="look-sheet" class="sheet sheet-right" aria-label="{{t:tools.look_title}}">
     <div class="sheet-head">
-      <h2>Görünüm</h2>
-      <button id="look-close" class="modal-x" type="button" aria-label="Kapat">×</button>
+      <h2>{{t:tools.look_title}}</h2>
+      <button id="look-close" class="modal-x" type="button" aria-label="{{t:common.close}}">×</button>
     </div>
     <div class="sheet-body">
       <fieldset id="theme-picker" class="theme-picker">
-        <legend class="palette-picker-title">Arayüz teması</legend>
+        <legend class="palette-picker-title">{{t:look.theme_title}}</legend>
         <label class="radio-row">
           <input type="radio" name="theme" value="mono" checked />
-          <span><b>Monokrom</b><span>Renk yok; durum rengi de beyaza yakın.
-            Flow'un varsayılanı.</span></span>
+          <span><b>{{t:look.theme_mono}}</b><span>{{t:look.theme_mono_desc}}</span></span>
         </label>
         <label class="radio-row">
           <input type="radio" name="theme" value="ocean" />
-          <span><b>Okyanus mavisi</b><span>Sakin ve okunabilir derin mavi tonu.</span></span>
+          <span><b>{{t:look.theme_ocean}}</b><span>{{t:look.theme_ocean_desc}}</span></span>
         </label>
         <label class="radio-row">
           <input type="radio" name="theme" value="amber" />
-          <span><b>Amber</b><span>Motto turuncusu ailesinden sıcak bir durum rengi.</span></span>
+          <span><b>{{t:look.theme_amber}}</b><span>{{t:look.theme_amber_desc}}</span></span>
         </label>
         <label class="radio-row">
           <input type="radio" name="theme" value="viola" />
-          <span><b>Menekşe</b><span>Nötr üçüncü seçenek.</span></span>
+          <span><b>{{t:look.theme_viola}}</b><span>{{t:look.theme_viola_desc}}</span></span>
         </label>
       </fieldset>
       <p class="field-note">
-        Tema yalnızca durum rengini değiştirir: üretim ilerlemesi, odak halkası,
-        seçili görsel çerçevesi ve döküm sonuç satırının ikonu. Yüzeyler, metin ve
-        birincil eylem her temada aynı kalır.
+        {{t:look.theme_note}}
       </p>
-      <p class="field-note">
-        Seçim şimdilik bu pencereyle sınırlı — uygulamayı yeniden başlatınca
-        varsayılana döner. Oturumlar arası hatırlama sonraki sürümde.
-      </p>
+      <!-- BURADA "seçim şimdilik bu pencereyle sınırlı — uygulamayı yeniden
+           başlatınca varsayılana döner" diyen bir not vardı ve YANLIŞTI: tema
+           Adım 9'dan beri `POST /api/prefs` ile prefs.json'a yazılıyor
+           (settings.js `saveThemePref`) ve açılışta geri okunuyor (chat.js
+           `loadPrefs`) — yani not, on iki satır YUKARIDAKİ yorumun anlattığı
+           mekanizmayı inkâr ediyordu. Kullanıcıya "bu ayar kalıcı değil"
+           demek, kalıcı bir ayarı hiç kullandırmamak demek. -->
     </div>
   </aside>
 
@@ -1579,36 +1571,34 @@
        "+ Tema rengi"nden) açılan sağ slide-over. Seçim sırasında arkadaki
        tuvalin görünür kalması işin kendisi; ortalanmış modal onu kapatıyordu.
        id `palette-modal` KALIYOR (settings-modal ile aynı gerekçe). -->
-  <aside id="palette-modal" class="sheet sheet-right" aria-label="Tema rengi ve paletler">
+  <aside id="palette-modal" class="sheet sheet-right" aria-label="{{t:tools.palette_title}}">
     <div class="sheet-head">
-      <h2 id="palette-title">Tema Rengi ve Paletler</h2>
-      <button id="palette-close" class="modal-x" type="button" aria-label="Kapat">×</button>
+      <h2 id="palette-title">{{t:palette.sheet_title}}</h2>
+      <button id="palette-close" class="modal-x" type="button" aria-label="{{t:common.close}}">×</button>
     </div>
     <div class="sheet-body">
       <p class="modal-desc">
-        Bir tema rengi seç — uyumlu paletler renk teorisiyle anında üretilir.
-        Seçtiğin palet üretim ve düzenleme prompt'una renk yönlendirmesi olarak eklenir;
-        logo/banner bindirmelerini etkilemez.
+        {{t:palette.sheet_desc}}
       </p>
 
-      <div id="palette-tabs" class="seg" role="group" aria-label="Palet sekmesi">
-        <button type="button" data-ptab="new" class="active">Yeni palet</button>
-        <button type="button" data-ptab="saved">Kayıtlı paletler</button>
+      <div id="palette-tabs" class="seg" role="group" aria-label="{{t:palette.tabs_aria}}">
+        <button type="button" data-ptab="new" class="active">{{t:palette.tab_new}}</button>
+        <button type="button" data-ptab="saved">{{t:palette.tab_saved}}</button>
       </div>
 
       <div id="palette-new">
-        <span class="palette-picker-title">Tema rengi</span>
+        <span class="palette-picker-title">{{t:palette.seed}}</span>
         <div class="palette-picker">
           <!-- Klasik HSV karesi: x = doygunluk, y = 1 - parlaklık. Zemin iki
                gradyanla kuruluyor, üstteki siyah örtü altta duruyor. -->
           <div id="palette-field" class="palette-field" tabindex="0" role="group"
-               aria-label="Doygunluk ve parlaklık alanı — ok tuşlarıyla da ayarlanır">
+               aria-label="{{t:palette.field_aria}}">
             <span id="palette-field-thumb" class="palette-field-thumb" aria-hidden="true"></span>
           </div>
           <div class="palette-picker-row">
             <!-- EyeDropper API yalnızca Chromium'da var; desteklenmiyorsa JS gizler. -->
             <button type="button" id="palette-eyedrop" class="icon-btn" hidden
-                    aria-label="Ekrandan renk seç" title="Ekrandan renk seç">
+                    aria-label="{{t:palette.eyedrop}}" title="{{t:palette.eyedrop}}">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="m2 22 1-1h3l9-9"></path>
@@ -1619,26 +1609,25 @@
             <!-- Stil id ile veriliyor: `.modal-card input` bir class seçicisini
                  özgüllükte yeniyor (bkz. style.css'teki #palette-hue notu). -->
             <input type="range" id="palette-hue"
-                   min="0" max="360" step="1" value="24" aria-label="Ton" />
+                   min="0" max="360" step="1" value="24" aria-label="{{t:palette.hue}}" />
           </div>
           <div class="palette-picker-row">
             <span id="palette-seed-sw" class="palette-sw palette-seed-sw" aria-hidden="true"></span>
             <label for="palette-seed-hex">Hex</label>
             <input type="text" id="palette-seed-hex" maxlength="7" spellcheck="false"
-                   aria-label="Tema rengi hex kodu" placeholder="#c86a3c" />
+                   aria-label="{{t:palette.hex_aria}}" placeholder="#c86a3c" />
           </div>
         </div>
         <div id="palette-suggestions" class="palette-suggestions" aria-live="polite"></div>
         <p class="field-note">
-          Renk adları prompt'a İngilizce girer — görsel modeli renk adlarına
-          hex kodlarından çok daha iyi tepki veriyor.
+          {{t:palette.names_hint}}
         </p>
         <div class="palette-save-row">
           <button type="button" id="palette-save" class="btn-ghost" disabled>
-            Adlandır ve kaydet
+            {{t:palette.name_and_save}}
           </button>
           <button type="button" id="palette-apply" class="primary" disabled>
-            Bu paleti kullan
+            {{t:palette.use}}
           </button>
         </div>
       </div>
@@ -1654,97 +1643,97 @@
     <div class="modal-backdrop" data-logo-close></div>
     <div class="modal-card logo-card" role="dialog" aria-modal="true" aria-labelledby="logo-title">
       <div class="modal-head">
-        <h2 id="logo-title">Logo / Motto / Banner Bindir</h2>
-        <button id="logo-close" class="modal-x" type="button" aria-label="Kapat">×</button>
+        <h2 id="logo-title">{{t:overlay.sheet_title}}</h2>
+        <button id="logo-close" class="modal-x" type="button" aria-label="{{t:common.close}}">×</button>
       </div>
 
       <div class="logo-body">
         <div class="logo-preview-wrap">
-          <img id="logo-preview-img" class="logo-preview-img" alt="Önizleme" />
+          <img id="logo-preview-img" class="logo-preview-img" alt="{{t:overlay.preview_alt}}" />
           <div id="logo-preview-spin" class="logo-preview-spin" hidden><div class="spinner"></div></div>
         </div>
 
         <div class="logo-controls">
-          <label>Tür</label>
-          <div id="logo-type" class="seg" role="group" aria-label="Bindirme türü">
+          <label>{{t:common.kind}}</label>
+          <div id="logo-type" class="seg" role="group" aria-label="{{t:overlay.kind_aria}}">
             <button type="button" data-type="logo" class="active">Logo</button>
             <button type="button" data-type="motto">Motto</button>
             <button type="button" data-type="banner">Banner</button>
           </div>
 
-          <label>Kaynak</label>
-          <div id="overlay-picker" class="overlay-picker" role="group" aria-label="Varlık seç"></div>
+          <label>{{t:overlay.source}}</label>
+          <div id="overlay-picker" class="overlay-picker" role="group" aria-label="{{t:overlay.asset_aria}}"></div>
 
           <div id="logo-only">
-            <label>Konum</label>
-            <div id="logo-grid" class="logo-grid" role="group" aria-label="Logo konumu">
-              <button type="button" data-pos="top-left"      aria-label="Sol üst">↖</button>
-              <button type="button" data-pos="top-center"    aria-label="Üst orta">↑</button>
-              <button type="button" data-pos="top-right"     aria-label="Sağ üst">↗</button>
-              <button type="button" data-pos="center-left"   aria-label="Sol orta">←</button>
-              <button type="button" data-pos="center"        aria-label="Merkez">•</button>
-              <button type="button" data-pos="center-right"  aria-label="Sağ orta">→</button>
-              <button type="button" data-pos="bottom-left"   aria-label="Sol alt">↙</button>
-              <button type="button" data-pos="bottom-center" aria-label="Alt orta">↓</button>
-              <button type="button" data-pos="bottom-right"  aria-label="Sağ alt">↘</button>
+            <label>{{t:overlay.position}}</label>
+            <div id="logo-grid" class="logo-grid" role="group" aria-label="{{t:overlay.position_aria}}">
+              <button type="button" data-pos="top-left"      aria-label="{{t:overlay.pos_tl}}">↖</button>
+              <button type="button" data-pos="top-center"    aria-label="{{t:overlay.pos_tc}}">↑</button>
+              <button type="button" data-pos="top-right"     aria-label="{{t:overlay.pos_tr}}">↗</button>
+              <button type="button" data-pos="center-left"   aria-label="{{t:overlay.pos_ml}}">←</button>
+              <button type="button" data-pos="center"        aria-label="{{t:overlay.pos_mc}}">•</button>
+              <button type="button" data-pos="center-right"  aria-label="{{t:overlay.pos_mr}}">→</button>
+              <button type="button" data-pos="bottom-left"   aria-label="{{t:overlay.pos_bl}}">↙</button>
+              <button type="button" data-pos="bottom-center" aria-label="{{t:overlay.pos_bc}}">↓</button>
+              <button type="button" data-pos="bottom-right"  aria-label="{{t:overlay.pos_br}}">↘</button>
             </div>
 
-            <label for="logo-size">Boyut <span id="logo-size-val" class="range-val">14%</span></label>
+            <label for="logo-size">{{t:gen.size}} <span id="logo-size-val" class="range-val">14%</span></label>
             <input id="logo-size" type="range" min="6" max="40" value="14" />
 
             <!-- Izgara noktasından ince ayar. .nudge sarmalayıcı orta çentiği
                  taşır: bipolar bir kaydırıcıda sıfırın nerede olduğu gözle
                  bulunabilmeli (native track özelleştirilmiyor, bkz. style.css). -->
-            <label for="logo-offset-x">Yatay kaydırma
+            <label for="logo-offset-x">{{t:overlay.offset_x}}
               <span id="logo-offset-x-val" class="range-val">0</span></label>
             <div class="nudge"><input id="logo-offset-x" type="range" min="-25" max="25" value="0" /></div>
 
-            <label for="logo-offset-y">Dikey kaydırma (− yukarı / + aşağı)
+            <label for="logo-offset-y">{{t:overlay.offset_y}}
               <span id="logo-offset-y-val" class="range-val">0</span></label>
             <div class="nudge"><input id="logo-offset-y" type="range" min="-25" max="25" value="0" /></div>
 
             <p class="field-note">
-              Izgaradaki noktadan ince ayar. Görselin dışına taşmaz — kenara gelince durur.
-              <button type="button" id="logo-offset-reset" class="btn-ghost">Sıfırla</button>
+              {{t:overlay.offset_hint}}
+              <button type="button" id="logo-offset-reset" class="btn-ghost">{{t:common.reset}}</button>
             </p>
 
-            <label for="logo-shadow">Gölge yoğunluğu <span id="logo-shadow-val" class="range-val">47%</span></label>
+            <label for="logo-shadow">{{t:overlay.shadow_opacity}} <span id="logo-shadow-val" class="range-val">47%</span></label>
             <input id="logo-shadow" type="range" min="0" max="100" value="47" />
 
-            <label for="logo-blur">Gölge bulanıklığı <span id="logo-blur-val" class="range-val">6</span></label>
+            <label for="logo-blur">{{t:overlay.shadow_blur}} <span id="logo-blur-val" class="range-val">6</span></label>
             <input id="logo-blur" type="range" min="0" max="30" value="6" />
           </div>
 
           <div id="banner-only" hidden>
-            <label>Kenar</label>
-            <div id="banner-edge" class="seg" role="group" aria-label="Banner kenarı">
-              <button type="button" data-edge="top">Üst</button>
-              <button type="button" data-edge="bottom" class="active">Alt</button>
+            <label>{{t:overlay.edge}}</label>
+            <div id="banner-edge" class="seg" role="group" aria-label="{{t:overlay.edge_aria}}">
+              <button type="button" data-edge="top">{{t:overlay.edge_top}}</button>
+              <button type="button" data-edge="bottom" class="active">{{t:overlay.edge_bottom}}</button>
             </div>
 
-            <label for="banner-scale">Genişlik <span id="banner-scale-val" class="range-val">100%</span></label>
+            <label for="banner-scale">{{t:overlay.width}} <span id="banner-scale-val" class="range-val">100%</span></label>
             <input id="banner-scale" type="range" min="20" max="100" value="100" />
 
-            <label>Hizalama</label>
-            <div id="banner-align" class="seg" role="group" aria-label="Banner hizalaması">
-              <button type="button" data-align="left">Sol</button>
-              <button type="button" data-align="center" class="active">Orta</button>
-              <button type="button" data-align="right">Sağ</button>
+            <label>{{t:overlay.align}}</label>
+            <div id="banner-align" class="seg" role="group" aria-label="{{t:overlay.align_aria}}">
+              <button type="button" data-align="left">{{t:overlay.align_left}}</button>
+              <button type="button" data-align="center" class="active">{{t:overlay.align_center}}</button>
+              <button type="button" data-align="right">{{t:overlay.align_right}}</button>
             </div>
             <p id="banner-align-note" class="field-note">
-              Genişlik %100 iken hizalama etkisiz — banner zaten tam genişlikte. Küçültünce açılır.
+              {{t:overlay.align_hint}}
             </p>
 
-            <label for="banner-margin">Kenar boşluğu <span id="banner-margin-val" class="range-val">0%</span></label>
+            <label for="banner-margin">{{t:overlay.margin}} <span id="banner-margin-val" class="range-val">0%</span></label>
             <input id="banner-margin" type="range" min="0" max="20" value="0" />
-            <p class="field-note">Banner'ı seçilen kenardan içeri kaydırır (görsel yüksekliğinin oranı).</p>
+            <p class="field-note">{{t:overlay.margin_hint}}</p>
           </div>
         </div>
       </div>
 
       <p id="logo-status" class="modal-status" role="status"></p>
       <div class="modal-actions">
-        <button id="logo-apply" class="primary" type="button">Uygula</button>
+        <button id="logo-apply" class="primary" type="button">{{t:common.apply}}</button>
       </div>
     </div>
   </div>
@@ -1762,7 +1751,7 @@
        mock'unda ölçülerek seçildi (K25, plan §0.10). -->
   <div id="media-picker" class="modal" hidden>
     <div class="modal-backdrop" data-picker-close></div>
-    <div class="picker-card" role="dialog" aria-modal="true" aria-label="Medya'dan seç">
+    <div class="picker-card" role="dialog" aria-modal="true" aria-label="{{t:composer.pick_from_media}}">
 
       <div class="picker-head">
         <label class="search">
@@ -1771,16 +1760,16 @@
             <circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path>
           </svg>
           <input id="picker-search" type="search" autocomplete="off" spellcheck="false"
-                 placeholder="Prompt, klasör veya boyutta ara" />
+                 placeholder="{{t:media.search_placeholder}}" />
         </label>
         <!-- Sıralama YOK ve bu bir eksiklik değil karar: #sort-btn hiçbir yerde
              ship etmedi, arkasındaki Medya görünümünde de yok. Yalnız modalda
              sıralama koymak "çalışmayan arama kutusu konmadı" kuralının tersi
              olurdu. D10 ile iki yüzeye birlikte gelecek (plan B9). -->
-        <button id="picker-close" class="modal-x" type="button" aria-label="Kapat">×</button>
+        <button id="picker-close" class="modal-x" type="button" aria-label="{{t:common.close}}">×</button>
       </div>
 
-      <nav id="picker-kinds" class="picker-nav" aria-label="Kapsam"></nav>
+      <nav id="picker-kinds" class="picker-nav" aria-label="{{t:picker.scope_aria}}"></nav>
 
       <div class="picker-body">
         <div id="picker-grid" class="picker-grid"></div>
@@ -1794,18 +1783,18 @@
             <rect x="3" y="4" width="18" height="16" rx="2"></rect>
             <path d="M3 15l4.5-4 3.5 3 3-2.5L21 17"></path>
           </svg>
-          <p id="picker-empty-text">Sonuç bulunamadı</p>
+          <p id="picker-empty-text">{{t:picker.no_results}}</p>
         </div>
       </div>
 
       <aside class="picker-side">
         <div class="picker-preview">
-          <img id="picker-preview-img" alt="Seçili görselin önizlemesi" />
+          <img id="picker-preview-img" alt="{{t:picker.preview_alt}}" />
         </div>
         <div id="picker-meta" class="picker-kv"></div>
         <div class="picker-commit">
-          <button id="picker-use-ref" class="primary" type="button">Referans yap</button>
-          <button id="picker-use-extra" class="btn-ghost" type="button">Ek olarak ekle</button>
+          <button id="picker-use-ref" class="primary" type="button">{{t:picker.as_reference}}</button>
+          <button id="picker-use-extra" class="btn-ghost" type="button">{{t:picker.as_extra}}</button>
           <!-- TEK geri bildirim yüzeyi (B8). #status buraya yazamaz: Yönetmen
                modunda display:none, Görsel modunda modalın arkasında — Adım
                11'in kök nedeni tam olarak buydu (§0.9). Not düğmelerin ALTINDA:
@@ -1825,7 +1814,7 @@
   <div id="viewer" class="modal viewer" hidden>
     <div class="modal-backdrop" data-viewer-close></div>
     <div id="viewer-stage" class="viewer-stage" role="dialog" aria-modal="true"
-         aria-label="Görseli büyüt" tabindex="-1">
+         aria-label="{{t:viewer.open}}" tabindex="-1">
       <img id="viewer-img" class="viewer-img" alt="" draggable="false" />
       <!-- VİDEO OYNATICISI, `#viewer-img`in KARDEŞİ. İkisi birbirini `hidden`
            ile dışlıyor ve tek bir elemanı tür değiştirmek (`<img>` → `<video>`)
@@ -1845,12 +1834,12 @@
     </div>
     <div class="viewer-bar">
       <button id="viewer-zoom-out" class="viewer-btn" type="button"
-              aria-label="Uzaklaştır" title="Uzaklaştır (−)">−</button>
+              aria-label="{{t:viewer.zoom_out}}" title="{{t:viewer.zoom_out_title}}">−</button>
       <span id="viewer-zoom-pct" class="viewer-pct" role="status">%100</span>
       <button id="viewer-zoom-in" class="viewer-btn" type="button"
-              aria-label="Yakınlaştır" title="Yakınlaştır (+)">+</button>
+              aria-label="{{t:viewer.zoom_in}}" title="{{t:viewer.zoom_in_title}}">+</button>
       <button id="viewer-fit" class="viewer-btn" type="button"
-              title="Ekrana sığdır (0)">Sığdır</button>
+              title="{{t:viewer.fit_title}}">{{t:viewer.fit}}</button>
       <!-- Bindirmenin İKİNCİ kapısı. Sol paneldeki #logo-add-btn yalnız
            `currentImage` varken etkin ve onu ayarlayan yollar üretim,
            `applyOverlay` ve galeri karosundaki "Referans" düğmesi — karoya
@@ -1861,10 +1850,10 @@
            sorusunun cevabı ve ikisi de yalnız KAYITLI bir görselde var
            (viewer.js `kayitOku`). -->
       <button id="viewer-logo" class="viewer-btn" type="button"
-              title="Bu görsele logo, motto veya banner bindir">Logo ekle</button>
-      <a id="viewer-download" class="viewer-btn" download>İndir</a>
+              title="{{t:viewer.overlay_title}}">{{t:overlay.add}}</button>
+      <a id="viewer-download" class="viewer-btn" download>{{t:common.download}}</a>
       <button id="viewer-close" class="viewer-btn" type="button"
-              aria-label="Kapat" title="Kapat (Esc)">×</button>
+              aria-label="{{t:common.close}}" title="{{t:viewer.close_title}}">×</button>
     </div>
   </div>
 
@@ -1885,11 +1874,23 @@
        Not: bu yorumda örnek olarak tam sorgu dizesi YAZILMAZ — yer tutucu
        burada da değiştirilir ve cache-buster testi onu gerçek bir varlık
        sürümü sanar (bir kez öyle oldu). -->
-  <!-- Bekleme animasyonunun özel elemanı. EN BAŞTA, çünkü chat.js üretim
-       başlarken `document.createElement("pixel-canvas")` çağırıyor: tanım o
-       ana kadar kayıtlı değilse eleman "unknown element" olarak doğar,
-       `start()` diye bir yöntemi olmaz ve bekleme kutusu sessizce boş kalır.
-       Kendi bağımlılığı yok, bu yüzden sıranın başında durması bedava. -->
+  <!-- SÖZLÜK, her şeyden önce. Satır içi ve ayrı bir dosyadan çekilmiyor:
+       gerekçe i18n.js_payload'ın docstring'inde (ek ağ turu · belge zaten
+       no-store · dil değişken, dosya adı sabit). `defer` ya da `async`
+       KONMAZ — aşağıdaki betiklerin hepsi `t()`yi üst düzeyde çağırabiliyor
+       ve bu nesne onlardan önce var olmak zorunda.
+
+       Bu iki satır `pixel-canvas.js`in de ÖNÜNDE ve bu sıra "önce sözlük"
+       kuralının bir istisnası değil, tam olarak kendisi: aşağıdaki her betik
+       `t()`ye bağımlı, pixel-canvas ise hiçbir şeye bağımlı değil — yani en
+       başa alınacak iki aday arasında bağımlılığı OLAN kazanıyor. -->
+  <script>window.KROMIS_LANG="__APP_LANG__";window.KROMIS_I18N=__APP_I18N__;</script>
+  <script src="/static/i18n.js?v=__APP_VERSION__"></script>
+  <!-- Bekleme animasyonunun özel elemanı. Betiklerin BAŞINDA, çünkü chat.js
+       üretim başlarken `document.createElement("pixel-canvas")` çağırıyor:
+       tanım o ana kadar kayıtlı değilse eleman "unknown element" olarak
+       doğar, `start()` diye bir yöntemi olmaz ve bekleme kutusu sessizce boş
+       kalır. Kendi bağımlılığı yok, bu yüzden erken durması bedava. -->
   <script src="/static/pixel-canvas.js?v=__APP_VERSION__"></script>
   <!-- core.js folders.js'ten ÖNCE gelmek zorunda: folders.js `IS_TOUCH`i kendi
        üst düzeyinde okuyor ve o bir `const` — sıra ters çevrilirse TDZ

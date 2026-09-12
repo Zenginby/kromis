@@ -2384,17 +2384,28 @@ def test_theme_picker_really_writes_data_theme():
             assert tok in block, f"{tok} token'ı {theme} tema bloğunda yok"
 
 
-def test_theme_picker_admits_it_is_not_persisted_yet():
-    """Kalıcılık Adım 9'un arka uç işi; seçici onu VAAT ETMEMELİ.
+def test_theme_picker_no_longer_claims_the_choice_is_temporary():
+    """Bu test bir zamanlar TERSİNİ ölçüyordu ve o hâliyle BAYATLADI.
 
-    `SettingsRequest`'te tema alanı yok (models.py) — bir "Kaydet" düğmesi
-    koymak ya da sessiz kalmak, yeniden başlatınca sıfırlanan seçimi
-    kullanıcının hatası gibi gösterirdi.
+    Eski gerekçe şuydu: kalıcılık Adım 9'un arka uç işi, seçici onu vaat
+    etmemeli — o yüzden panelde "uygulamayı yeniden başlatınca varsayılana
+    döner" diyen bir satır aranıyordu. Adım 9 GELDİ: tema `POST /api/prefs`
+    ile prefs.json'a yazılıyor (settings.js `saveThemePref`) ve açılışta geri
+    okunuyor (chat.js `loadPrefs`). Yani panelde duran o satır kullanıcıya
+    YANLIŞ bilgi veriyordu — kalıcı bir ayarı "geçici" diye tanıtmak, o ayarı
+    hiç kullandırmamak demek.
+
+    Testin ESKİ kaçış kapısı ("tema ayara girdiyse bu testin gerekçesi de
+    bitmiştir") çalışmadı ve sebebi öğretici: tema `SettingsRequest`e değil
+    `PrefsRequest`e girdi, yani nöbetçi YANLIŞ modele bakıyordu ve bir yıl
+    boyunca sessizce doğru kaldı. Yeni iddia olguya bakıyor, modelin adına
+    değil.
     """
     sheet = _section(_html(), "look-sheet")
-    assert "yeniden başla" in sheet, "geçiciliği söyleyen satır yok"
-    assert "theme" not in models.SettingsRequest.model_fields, (
-        "tema ayara girdiyse bu testin gerekçesi de bitmiştir — Adım 9'da güncelle")
+    assert "yeniden başla" not in sheet, (
+        "panel tema seçimini hâlâ geçici gösteriyor — oysa prefs.json'a yazılıyor")
+    assert "theme" in models.PrefsRequest.model_fields, (
+        "tema tercihi kalktıysa panelin de yeniden 'geçici' demesi gerekir")
 
 
 def test_escape_keeps_a_slide_over_open_under_a_confirm_dialog():

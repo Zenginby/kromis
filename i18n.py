@@ -157,21 +157,30 @@ def t(key: str, lang: str = FALLBACK, /, **degiskenler: object) -> str:
 def render(template: str, lang: str) -> str:
     """`{{t:anahtar}}` yer tutucularını `lang` diline çevirir.
 
-    Değer HTML'e KAÇIŞLI giriyor (`html.escape(..., quote=True)`) ve bu bir
-    enjeksiyon savunması değil — kataloglar depodan geliyor, kullanıcıdan
-    değil — DOĞRULUK meselesi: `&` taşıyan bir çeviri kaçışsız yazıldığında
-    tarayıcı onu varlık başlangıcı sanar, `"` taşıyan bir çeviri de bir
-    `title="…"` özniteliğini ORTASINDAN böler. Tek bir kaçış hem metin
-    düğümünde hem çift tırnaklı öznitelikte doğru olduğu için yer tutucunun
-    nerede durduğunu bilmeye gerek kalmıyor.
+    Değer HTML'e KAÇIŞLI giriyor ve bu bir enjeksiyon savunması değil —
+    kataloglar depodan geliyor, kullanıcıdan değil — DOĞRULUK meselesi: `&`
+    taşıyan bir çeviri kaçışsız yazıldığında tarayıcı onu varlık başlangıcı
+    sanar, `"` taşıyan bir çeviri de bir `title="…"` özniteliğini ORTASINDAN
+    böler. Tek bir kaçış hem metin düğümünde hem çift tırnaklı öznitelikte
+    doğru olduğu için yer tutucunun nerede durduğunu bilmeye gerek kalmıyor.
+
+    KESME İŞARETİ KAÇIRILMIYOR ve bu bilinçli bir sapma: `html.escape`in
+    `quote=True` hâli `'`yi de `&#x27;` yapıyor ve Türkçe metin kesme
+    işaretiyle dolu ("Medya'dan seç", "Ayarlar'ı aç", "prompt'u"). Tarayıcıda
+    ikisi de doğru görünüyor, ama servis edilen HTML okunamaz hale geliyor ve
+    metne bakan her test `&#x27;` beklemek zorunda kalıyor — yani kaçış,
+    koruduğu hiçbir şeyi korumadan bir maliyet biriktiriyor. Güvenli olmasının
+    sebebi şablonun kendisi: her öznitelik ÇİFT tırnaklı. Bu varsayım
+    `tests/test_i18n.py`de ölçülüyor, umut edilmiyor.
 
     Bunun bedeli: çeviri metnine HTML ETİKETİ yazılamaz. Bu bir kısıt değil
     tercih — `<b>Monokrom</b><span>…</span>` gibi bir satır İKİ anahtara
     bölünüyor, yani çevirmen biçimlendirmeyi bozamıyor ve etiketler şablonda
     kalıyor.
     """
-    return _PLACEHOLDER.sub(
-        lambda m: html.escape(t(m.group(1), lang), quote=True), template)
+    def _koy(m):
+        return html.escape(t(m.group(1), lang), quote=False).replace('"', "&quot;")
+    return _PLACEHOLDER.sub(_koy, template)
 
 
 def js_payload(lang: str) -> str:

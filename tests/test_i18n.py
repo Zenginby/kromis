@@ -212,6 +212,29 @@ def test_render_escapes_the_value(tmp_path, monkeypatch):
     i18n._cache.clear()
 
 
+def test_render_leaves_the_apostrophe_alone(tmp_path, monkeypatch):
+    """`&#x27;` doğru görünür ama hiçbir şeyi korumaz: Türkçe metin kesme
+    işaretiyle dolu ("Medya'dan seç") ve şablondaki her öznitelik ÇİFT
+    tırnaklı. Kaçış yalnızca servis edilen HTML'i okunamaz yapardı."""
+    monkeypatch.setattr(paths, "bundled_i18n_dir", lambda: str(tmp_path))
+    (tmp_path / "tr.json").write_text(
+        json.dumps({"a": "Medya'dan seç"}), encoding="utf-8")
+    i18n._cache.clear()
+    assert i18n.render("<p>{{t:a}}</p>", "tr") == "<p>Medya'dan seç</p>"
+    i18n._cache.clear()
+
+
+def test_no_placeholder_sits_inside_a_single_quoted_attribute():
+    """`render`ın kesme işaretini kaçırmama kararı ŞABLONUN tek tırnak
+    kullanmamasına dayanıyor. Varsayım umut edilmiyor, ölçülüyor: tek
+    tırnaklı bir özniteliğe konmuş yer tutucu, içindeki `'` yüzünden
+    özniteliği ortasından kapatırdı."""
+    with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
+        html_metni = f.read()
+    kotu = re.findall(r"=\s*'[^']*\{\{t:", html_metni)
+    assert not kotu, f"tek tırnaklı özniteliğe konmuş yer tutucu: {kotu}"
+
+
 def test_render_leaves_an_unknown_key_visible(tmp_path, monkeypatch):
     """Yer tutucu yer tutucu olarak KALMIYOR, anahtara dönüşüyor: ekranda
     `{{t:…}}` görmek "sunucu çeviriyi hiç çalıştırmadı" demektir ve o AYRI bir
@@ -252,3 +275,90 @@ def test_the_boot_failure_page_speaks_the_selected_language(monkeypatch):
     assert r.status_code == 500
     assert "The interface could not be loaded" in r.text
     assert "Arayüz yüklenemedi" not in r.text
+
+
+# ── Şablon ↔ katalog ─────────────────────────────────────────────────
+
+def _sablon_anahtarlari():
+    with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
+        return set(i18n._PLACEHOLDER.findall(f.read()))
+
+
+def _betik_anahtarlari():
+    """`static/*.js` içindeki SABİT dizeli `t("…")` çağrılarının anahtarları.
+
+    Değişkenli çağrılar (`t(anahtar)`) burada GÖRÜNMEZ ve bu bilinen bir sınır:
+    statik tarama çalışma anını okumuyor (`tools/graf_uret.py`nin aynı duruşu).
+    Böyle bir çağrı yazıldığında anahtarları elle bir demete koymak gerekir;
+    bugün hiç yok, o yüzden muafiyet listesi de yok.
+    """
+    desen = re.compile(r'\bt\(\s*"([a-zA-Z0-9_.]+)"')
+    bulunan = set()
+    for ad in sorted(os.listdir(STATIC)):
+        if not ad.endswith(".js"):
+            continue
+        with open(os.path.join(STATIC, ad), encoding="utf-8") as f:
+            bulunan |= set(desen.findall(f.read()))
+    return bulunan
+
+
+def test_every_template_placeholder_has_a_translation():
+    """Şablona yazılmış ama kataloğa yazılmamış bir anahtar ekranda HAM olarak
+    görünür (`{{t:rail.studio}}` ↔ `rail.studo`). Yazım hatası kullanıcıya
+    varmadan burada düşüyor."""
+    for lang in i18n.LANGUAGES:
+        eksik = _sablon_anahtarlari() - set(_yukle(lang))
+        assert not eksik, f"{lang}.json'da olmayan şablon anahtarı: {sorted(eksik)}"
+
+
+def test_every_script_key_has_a_translation():
+    for lang in i18n.LANGUAGES:
+        eksik = _betik_anahtarlari() - set(_yukle(lang))
+        assert not eksik, f"{lang}.json'da olmayan betik anahtarı: {sorted(eksik)}"
+
+
+def test_no_catalog_key_is_unused():
+    """Ölü anahtar, sözlüğü zamanla okunamaz yapar ve çeviren kişiye var
+    olmayan bir ekranı tarif eder. Kullanım YERİ iki yerden birinde olmak
+    zorunda: şablon ya da betik.
+
+    Sunucu tarafı anahtarlar (`err.*`, `boot.*`, `model.*.note`) bu taramada
+    GÖRÜNMEZ — onlar Python'da `i18n.t("…")` ile çağrılıyor, o yüzden kaynak
+    olarak `.py` dosyaları da taranıyor.
+    """
+    desen = re.compile(r'i18n\.t\(\s*"([a-zA-Z0-9_.]+)"')
+    py_anahtarlari = set()
+    for ad in sorted(os.listdir(REPO)):
+        if not ad.endswith(".py"):
+            continue
+        with open(os.path.join(REPO, ad), encoding="utf-8") as f:
+            py_anahtarlari |= set(desen.findall(f.read()))
+    kullanilan = _sablon_anahtarlari() | _betik_anahtarlari() | py_anahtarlari
+    olu = set(_yukle(i18n.FALLBACK)) - kullanilan
+    assert not olu, f"hiçbir yerde kullanılmayan anahtar: {sorted(olu)}"
+
+
+def test_the_served_page_has_no_unsubstituted_translation_placeholder():
+    """`test_index_has_no_unsubstituted_placeholder`ın ikizi. Ekranda `{{t:…}}`
+    görmek "sunucu çeviriyi hiç çalıştırmadı" demek; ham bir ANAHTAR görmek
+    ise "anahtar katalogda yok" demek — ikisi ayrı kusur ve ayrı testleri var."""
+    assert "{{t:" not in TestClient(appmod.app).get("/").text
+
+
+def test_the_page_is_served_in_the_selected_language(monkeypatch):
+    monkeypatch.setattr(appmod, "_dil", lambda: "en")
+    html = TestClient(appmod.app).get("/").text
+    assert '<html lang="en">' in html
+    assert ">Studio<" in html and ">Stüdyo<" not in html
+
+
+def test_the_dictionary_is_inlined_for_the_scripts(monkeypatch):
+    """Betikler `window.KROMIS_I18N`i ÜST DÜZEYDE okuyabiliyor; bir `fetch`
+    dönene kadar beklemek, sıranın başındaki i18n.js'in var olma sebebini
+    ortadan kaldırırdı."""
+    monkeypatch.setattr(appmod, "_dil", lambda: "en")
+    html = TestClient(appmod.app).get("/").text
+    assert 'window.KROMIS_LANG="en"' in html
+    assert "window.KROMIS_I18N={" in html
+    # Sözlük betiklerin HEPSİNDEN önce gelmeli.
+    assert html.index("window.KROMIS_I18N") < html.index("/static/core.js")

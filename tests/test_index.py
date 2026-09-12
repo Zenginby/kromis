@@ -601,11 +601,17 @@ def test_settings_modal_shows_the_app_version():
     """Destek sorusu "hangi sürümdesiniz?" — cevabı arayüzde OLMALI.
 
     Yazan taraf artık `settings-version` id'siyle DEĞİL, `[data-app-version]`
-    seçicisiyle çalışıyor: sürüm iki yerde görünüyor (üst şeritteki pill +
-    Ayarlar'ın dibindeki satır) çünkü pill telefonda gizli. Bu iddia
+    seçicisiyle çalışıyor: sürüm ÜÇ yerde görünüyor (üst şeritteki pill,
+    Ayarlar'ın dibindeki satır, künye) çünkü pill telefonda gizli. Bu iddia
     mekanizmayla birlikte güncellendi ama gevşemedi — id'nin varlığını da,
-    yazımın gerçekten bağlandığını da hâlâ ölçüyor, üstüne İKİ hedefin de
+    yazımın gerçekten bağlandığını da hâlâ ölçüyor, üstüne ÜÇ hedefin de
     işaretli olduğunu ekliyor.
+
+    ÜÇÜNCÜ HEDEF, seçiciye geçmenin tam olarak vaat ettiği şey: künye
+    (`.settings-legal`, AGPL §13 için eklendi) yazan tarafa tek satır bile
+    eklemeden sürümü gösteriyor. Künyede sürümün DURMASI gerekiyor çünkü bir
+    ihlal iddiasında "hangi sürümden türetilmiş" sorusunun cevabı orası
+    (TELIF.md); bekçisi ise tests/test_lisans.py.
     """
     client = TestClient(appmod.app)
     html = client.get("/").text
@@ -613,8 +619,8 @@ def test_settings_modal_shows_the_app_version():
     # HTML yorumları AYIKLANIYOR: seçici yorumlarda da anlatılıyor ve onları
     # sayan bir iddia işaretin gerçekten öznitelik olarak durduğunu ölçmezdi.
     isaretsiz = re.sub(r"<!--.*?-->", "", html, flags=re.S)
-    # İki görünür hedef: üst şerit pill'i ve Ayarlar'ın dibi.
-    assert isaretsiz.count("data-app-version") == 2, \
+    # Üç görünür hedef: üst şerit pill'i, Ayarlar'ın dibi ve künye.
+    assert isaretsiz.count("data-app-version") == 3, \
         "sürüm hedeflerinden biri işaretsiz — orada '—' olarak kalır"
     assert 'querySelectorAll("[data-app-version]")' in \
         client.get("/static/settings.js").text

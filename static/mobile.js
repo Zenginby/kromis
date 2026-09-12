@@ -1,3 +1,6 @@
+// Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+// GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+// Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 // Mobil yerleşimin ÖLÇÜM katmanı — CSS'in tek başına yapamadığı tek iş.
 //
 // Klasik script (bkz. core.js başlığı), en son yüklenen dosya: yalnızca zaten

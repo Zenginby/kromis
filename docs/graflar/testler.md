@@ -2,7 +2,7 @@
 
 # Test haritası
 
-`tests/` altında 86 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
+`tests/` altında 88 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
 
 | modül | testler |
 | --- | --- |
@@ -25,7 +25,7 @@
 | `errlog` | `test_errlog.py` |
 | `folders` | `test_folders.py`, `test_guvenlik_baslik.py`, `test_legacy_formats.py`, `test_playwright_studio.py` |
 | `gemini_client` | `test_gemini_client.py` |
-| `guncelleme` | `test_depo_adresi.py`, `test_guncelleme.py`, `test_guncelleme_route.py`, `test_playwright_guncelleme.py` |
+| `guncelleme` | `test_depo_adresi.py`, `test_guncelleme.py`, `test_guncelleme_route.py`, `test_lisans.py`, `test_playwright_guncelleme.py` |
 | `jsonstore` | `test_jsonstore.py` |
 | `models` | `test_catalog.py`, `test_chat_client.py`, `test_chat_prompt.py`, `test_chat_route.py`, `test_chats_route.py`, `test_composite.py`, `test_guvenlik_baslik.py`, `test_index.py`, `test_model_secimi.py`, `test_prefs.py`, `test_prefs_route.py`, `test_settings_route.py`, `test_video_onyuz.py` |
 | `netguard` | `test_netguard.py` |
@@ -54,9 +54,9 @@
 
 Bu modülleri hiçbir test dosyası ithal etmiyor. Dolaylı olarak sınanıyor olabilirler (`import app` app'in ithal ettiği her şeyi çalıştırır), ama doğrudan bekçileri yok.
 
-* `tools.make_legacy_fixtures` (207 satır)
-* `tools.make_logo_goldens` (107 satır)
-* `tools.render_brand_assets` (112 satır)
+* `tools.make_legacy_fixtures` (210 satır)
+* `tools.make_logo_goldens` (110 satır)
+* `tools.render_brand_assets` (115 satır)
 
 ## Hiçbir modülü ithal etmeyen testler
 
@@ -74,4 +74,5 @@ Yukarıdaki tablonun kör noktası: sütun ithal ilişkisinden çıktığı içi
 * `tests/test_playwright_kurulumu.py`
 * `tests/test_python_surumu.py`
 * `tests/test_syntax_warnings.py`
+* `tests/test_telif_basligi.py`
 

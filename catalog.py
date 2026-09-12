@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Model kataloğu — hangi görsel/sohbet modelleri var, ne yapabiliyorlar, kaça.
 
 Bu modül BİLEREK YAPRAK: proje içinden hiçbir şey import etmiyor (yalnız

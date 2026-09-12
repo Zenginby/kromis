@@ -1,4 +1,11 @@
 <!doctype html>
+<!-- Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+     GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+     Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+
+     YORUM DOCTYPE'IN ALTINDA, üstünde DEĞİL: doctype'tan önce gelen her
+     şey IE ve bazı gömülü görünümlerde belgeyi quirks moduna düşürür ve
+     tüm yerleşim sessizce bozulurdu. -->
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
@@ -1436,6 +1443,38 @@
       <p class="field-note">
         Günde bir kez GitHub'a sürüm sorar — <strong>başka hiçbir şey
         göndermez</strong>. Kapalıyken bu iş için ağa hiç çıkmaz.
+      </p>
+
+      <!-- KÜNYE — yasal kimlik uygulamanın İÇİNDE, yalnız depoda değil.
+           Üç ayrı iş görüyor:
+
+           1. AGPL-3.0 §13'ün ŞARTI. Kromis kendi HTTP sunucusunu koşuyor, yani
+              ağ üzerinden erişilen bir program: kullanıcısına kaynağa ulaşma
+              yolunu SUNMAK zorunda. Aşağıdaki "kaynak kodu" bağlantısı o
+              yükümlülüğün karşılandığı yer. Bir çatal bunu KENDİ deposuna
+              çevirmek zorunda — silmek bir çözüm değil, ihlaldir (MARKA.md).
+
+           2. Telif bildirimi (AGPL-3.0 §5a) kullanıcının GÖRDÜĞÜ yerde duruyor.
+              Depodaki LICENSE dosyası yeniden paketleyen birinin tek tıkla
+              düşürebileceği bir şey; buradaki satırı düşürmek arayüzü
+              düzenlemeyi gerektirir, yani kazara değil BİLEREK yapılır. İhlal
+              iddiasında aradaki fark tam olarak budur (TELIF.md).
+
+           3. Kullanıcı hangi sürüme baktığını ve neyi çalıştırdığını görür.
+
+           Sürüm YİNE tek kaynaktan: `[data-app-version]` seçicisi settings.js'te
+           querySelectorAll ile yazılıyor, yani üçüncü kopya bedava geldi —
+           yukarıdaki "İki eleman tek kaynaktan besleniyor" notunun aynısı. -->
+      <p class="field-note settings-legal">
+        <strong>Kromis Studio</strong> v<span data-app-version>—</span> —
+        © 2026 Alperen Zengin<br />
+        <a href="https://github.com/Zenginby/kromis/blob/main/LICENSE"
+           target="_blank" rel="noopener noreferrer">GNU AGPL-3.0</a> ile
+        lisanslı ·
+        <a href="https://github.com/Zenginby/kromis"
+           target="_blank" rel="noopener noreferrer">kaynak kodu</a><br />
+        Değiştirip dağıtırsan kaynağını da açmak zorundasın. <strong>Kromis</strong>
+        adı ve logosu lisansın kapsamı dışındadır.
       </p>
       </section>
 

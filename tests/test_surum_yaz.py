@@ -89,6 +89,45 @@ def test_kokteki_HER_readme_yazicinin_listesinde():
         f"{sorted(kok_readmeleri - yazilanlar)} — rozetleri bayatlar")
 
 
+def test_surum_yazicisinin_yazdigi_her_dosya_sahneleniyor():
+    """Yazmak YETMİYOR: yayın işi dosyayı `git add` ile sahnelemezse yazdığı
+    şey koşucuda kalır ve commit'e hiç girmez.
+
+    Bu tam olarak yaşandı: `SURUM_DOSYALARI` README.en.md'yi içeriyordu ve
+    `surum_yaz.py` onu her koşuda tazeliyordu, ama `release.yml`'deki
+    `git add version.py README.md GUNCELLEME.md` satırında YOKTU. Sonuç:
+    v0.19.0 yayımlandığında İngilizce sayfanın rozeti v0.18.0'da kaldı.
+
+    Bir üstteki test yazıcının listesini kolluyor, bu test o listenin karşılığı
+    olan sahneleme satırını — ikisi ayrı yerde yaşayan aynı gerçeğin iki
+    yarısı. `test_kokteki_HER_readme_yazicinin_listesinde` tek başına yeşil
+    kalabildiği için kusuru hiçbir şey görmemişti.
+    """
+    import yaml
+
+    kok = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(kok, ".github", "workflows", "release.yml"),
+              encoding="utf-8") as f:
+        akis = yaml.safe_load(f)
+
+    # Kabuk YORUMLARI ayıklanıyor: bu deponun yorumları kaldırılan/eklenen
+    # komutu anlatıyor ve düz bir `in` araması anlatıyı da yakalardı.
+    kod = "\n".join(
+        s for adim in akis["jobs"]["surum-yaz"]["steps"]
+        for s in str(adim.get("run") or "").splitlines()
+        if not s.lstrip().startswith("#")
+    )
+    add_satirlari = [s for s in kod.splitlines() if s.lstrip().startswith("git add")]
+    assert add_satirlari, "surum-yaz işinde `git add` satırı bulunamadı"
+    sahnelenen = " ".join(add_satirlari)
+
+    eksik = [ad for ad, _ in sy.SURUM_DOSYALARI if ad not in sahnelenen]
+    assert not eksik, (
+        f"sürüm yazıcısı bu dosyaları yazıyor ama release.yml sahnelemiyor: "
+        f"{eksik} — yazdıkları her koşuda atılır"
+    )
+
+
 # --------------------------------------------------------------------------
 # GUNCELLEME.md
 # --------------------------------------------------------------------------

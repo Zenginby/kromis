@@ -100,3 +100,73 @@ def test_the_endpoint_does_not_wait_for_the_network(client, out_dir, monkeypatch
 
     assert time.monotonic() - basladi < 1.0
     assert r.json() == {"guncelleme": None}        # henüz cevap yok
+
+
+# --------------------------------------------------------------------------
+# `POST /api/guncelleme` — "Şimdi kontrol et"
+# --------------------------------------------------------------------------
+
+def test_the_manual_check_reaches_github_even_with_a_fresh_cache(
+        client, out_dir, monkeypatch):
+    """ASIL İDDİA. `GET` yalnız önbelleğe bakıyor ve önbellek 24 saat taze
+    sayılıyor; yayın hızı bunun üstündeyse (ölçüldü: ~7.7 saatte bir) cevap
+    bayat kalır ve kullanıcının tetikleyecek hiçbir yolu yoktur."""
+    _onbellek_yaz(out_dir, {"zaman": time.time(), "son_deneme": time.time(),
+                            "surum": version.APP_VERSION})
+    monkeypatch.setattr(guncelleme, "_sor",
+                        lambda: {"surum": "99.0.0", "url": guncelleme.YAYIN_SAYFASI})
+
+    assert client.get("/api/guncelleme").json() == {"guncelleme": None}
+
+    r = client.post("/api/guncelleme")
+
+    assert r.status_code == 200
+    assert r.json() == {"durum": "yeni",
+                        "guncelleme": {"surum": "99.0.0",
+                                       "url": guncelleme.YAYIN_SAYFASI}}
+
+
+def test_the_manual_check_separates_up_to_date_from_unreachable(
+        client, out_dir, monkeypatch):
+    """İki durumda da `guncelleme` alanı `null`; farkı YALNIZ `durum` taşıyor.
+    Arayüz bunları iki ayrı cümleye çeviriyor — "güncelsin" bir cevap,
+    "soramadım" ise bir kusur bildirimi."""
+    monkeypatch.setattr(guncelleme, "_sor",
+                        lambda: {"surum": version.APP_VERSION,
+                                 "url": guncelleme.YAYIN_SAYFASI})
+    assert client.post("/api/guncelleme").json() == {"durum": "guncel",
+                                                     "guncelleme": None}
+
+    monkeypatch.setattr(guncelleme, "_sor", lambda: None)
+    assert client.post("/api/guncelleme").json() == {"durum": "hata",
+                                                     "guncelleme": None}
+
+
+def test_the_preference_switches_the_manual_check_off_too(client, out_dir, monkeypatch):
+    """3. sözleşme elle yolda da geçerli. Bir düğmenin varlığı, kullanıcının
+    kapattığı şeyi açmanın gerekçesi değil."""
+    def _patlar():
+        raise AssertionError("kontrol kapalıyken ağa çıkıldı")
+
+    monkeypatch.setattr(guncelleme, "_sor", _patlar)
+    client.post("/api/prefs", json={"guncelleme_kontrolu": False})
+
+    assert client.post("/api/guncelleme").json() == {"durum": "kapali",
+                                                     "guncelleme": None}
+
+
+def test_the_read_path_stays_side_effect_free(client, out_dir, monkeypatch):
+    """GET yan etkisiz KALMALI: ön yüzün açılış yoklaması (`yoklaGuncelleme`)
+    onu saniyeler içinde üç kez çağırıyor ve her biri senkron bir ağ çağrısı
+    tetikleseydi 2. sözleşme çöker, üstelik anonim istek sınırı da yanardı.
+    Yan etkili olan YALNIZ POST — aynı adres, ayrı yöntem."""
+    cagrildi = []
+    monkeypatch.setattr(guncelleme, "_kontrol_et",
+                        lambda d: cagrildi.append(d) or True)
+    _onbellek_yaz(out_dir, {"zaman": time.time(), "son_deneme": time.time(),
+                            "surum": version.APP_VERSION})
+
+    client.get("/api/guncelleme")
+
+    assert cagrildi == []
+

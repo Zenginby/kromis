@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 
 import pytest
@@ -191,13 +192,93 @@ def test_bozuk_onbellek_dosyasi_patlatmaz(veri_dizini, monkeypatch):
 
 def test_basarisiz_kontrol_de_damgalanir(veri_dizini, monkeypatch):
     """Yoksa ağı olmayan bir makinede HER `/api/settings` çağrısı yeni bir iş
-    parçacığı başlatırdı."""
+    parçacığı başlatırdı. Damga `son_deneme` — `zaman` DEĞİL: bkz. aşağısı."""
     monkeypatch.setattr(guncelleme, "_sor", lambda: None)
 
     guncelleme._tazele(veri_dizini)
 
     with open(os.path.join(veri_dizini, guncelleme.ONBELLEK_DOSYASI), encoding="utf-8") as f:
-        assert float(json.load(f)["zaman"]) > 0
+        kayit = json.load(f)
+    assert float(kayit["son_deneme"]) > 0
+    assert "zaman" not in kayit
+
+
+def test_a_failed_check_does_not_cost_a_whole_day(veri_dizini, monkeypatch):
+    """ASIL İDDİA — 2026-09-12'de ölçülen kusur.
+
+    Başarısızlık `zaman`ı damgalıyordu, yani TEK bir zaman aşımı kullanıcıyı
+    24 saat kör bırakıyordu. Telefonda bu masaüstünden çok daha sık (5 sn'lik
+    zaman aşımı + mobil veri) ve sonucu "bildirim hiç gelmiyor"dan ayırt
+    edilemez.
+    """
+    monkeypatch.setattr(guncelleme, "_sor", lambda: None)
+    guncelleme._kontrol_et(veri_dizini)                  # ağ yok: başarısız tur
+
+    cagrildi = []
+    monkeypatch.setattr(guncelleme, "_tazeleme_baslat", lambda d: cagrildi.append(d))
+
+    # Hata geri çekilmesi dolar dolmaz yeniden denenmeli — 24 saat DEĞİL.
+    # Değer ÖNCE yakalanıyor: `guncelleme.time` testin `time`ıyla AYNI modül
+    # nesnesi, yani lambda içindeki `time.time()` yamanın kendisini çağırırdı.
+    ileri = time.time() + guncelleme.HATA_TTL_SANIYE + 1
+    monkeypatch.setattr(guncelleme.time, "time", lambda: ileri)
+    guncelleme.bilgi(veri_dizini)
+
+    assert cagrildi == [veri_dizini]
+    assert guncelleme.HATA_TTL_SANIYE < guncelleme.TTL_SANIYE
+
+
+def test_a_failed_check_is_not_retried_immediately(veri_dizini, monkeypatch):
+    """Geri çekilmenin ÖBÜR yarısı: hata da olsa arka arkaya sorulmuyor.
+    Bu, damgalamanın doğuş sebebi ve kısaltma onu geçersiz kılmamalı."""
+    monkeypatch.setattr(guncelleme, "_sor", lambda: None)
+    guncelleme._kontrol_et(veri_dizini)
+
+    cagrildi = []
+    monkeypatch.setattr(guncelleme, "_tazeleme_baslat", lambda d: cagrildi.append(d))
+    guncelleme.bilgi(veri_dizini)
+
+    assert cagrildi == []
+
+
+def test_a_successful_check_still_holds_for_a_day(veri_dizini, monkeypatch):
+    """Kısaltma YALNIZ hataya ait: başarılı cevap 24 saat taze sayılmaya devam
+    ediyor, yoksa anonim istek sınırı (saatte 60, IP başına) boşuna yakılırdı."""
+    monkeypatch.setattr(guncelleme, "_sor",
+                        lambda: {"surum": "99.0.0", "url": guncelleme.YAYIN_SAYFASI})
+    guncelleme._kontrol_et(veri_dizini)
+
+    cagrildi = []
+    monkeypatch.setattr(guncelleme, "_tazeleme_baslat", lambda d: cagrildi.append(d))
+    # Değer ÖNCE yakalanıyor: `guncelleme.time` testin `time`ıyla AYNI modül
+    # nesnesi, yani lambda içindeki `time.time()` yamanın kendisini çağırırdı.
+    ileri = time.time() + guncelleme.HATA_TTL_SANIYE + 1
+    monkeypatch.setattr(guncelleme.time, "time", lambda: ileri)
+    guncelleme.bilgi(veri_dizini)
+
+    assert cagrildi == []
+
+
+def test_an_old_failure_stamp_is_not_mistaken_for_an_answer(veri_dizini, monkeypatch):
+    """GÖÇ KAPISI: eski düzende başarısız kontrol de `zaman` yazıyordu ve
+    diskte "damgalı ama cevapsız" kayıtlar duruyor. O damga başarı sayılsaydı
+    düzeltilen kusur bir tur daha yaşanırdı."""
+    _onbellek_yaz(veri_dizini, {"zaman": time.time()})   # eski biçim: surum YOK
+    cagrildi = []
+    monkeypatch.setattr(guncelleme, "_tazeleme_baslat", lambda d: cagrildi.append(d))
+
+    guncelleme.bilgi(veri_dizini)
+
+    assert cagrildi == [veri_dizini]
+
+
+def test_a_corrupt_timestamp_does_not_raise(veri_dizini, monkeypatch):
+    """1. sözleşme ÖNBELLEK yolunda da geçerli: elle bozulmuş bir damga
+    `bilgi()`den ValueError olarak çıkıp `/api/settings`i 500'e düşürürdü."""
+    _onbellek_yaz(veri_dizini, {"zaman": "dün", "son_deneme": None, "surum": "99.0.0"})
+    monkeypatch.setattr(guncelleme, "_tazeleme_baslat", lambda d: None)
+
+    assert guncelleme.bilgi(veri_dizini)["surum"] == "99.0.0"
 
 
 # --------------------------------------------------------------------------
@@ -289,3 +370,100 @@ def test_onbellekteki_yabanci_url_de_reddedilir(veri_dizini, monkeypatch):
     })
 
     assert guncelleme.bilgi(veri_dizini)["url"] == guncelleme.YAYIN_SAYFASI
+
+
+# --------------------------------------------------------------------------
+# Elle kontrol — `simdi_kontrol_et`
+# --------------------------------------------------------------------------
+
+def test_a_manual_check_bypasses_the_cache_window(veri_dizini, monkeypatch):
+    """BU UCUN VAR OLMA SEBEBİ. Önbellek TAZE ama cevabı bayat: yayın hızı
+    kontrol aralığından yüksekse (ölçüldü: ~7.7 saatte bir yayın, 24 saatte bir
+    kontrol) `bilgi()` GitHub'a hiç sormaz ve kullanıcının elinde tetikleyecek
+    hiçbir şey yoktur."""
+    _onbellek_yaz(veri_dizini, {"zaman": time.time(), "son_deneme": time.time(),
+                                "surum": version.APP_VERSION})
+    monkeypatch.setattr(guncelleme, "_sor",
+                        lambda: {"surum": "99.0.0", "url": guncelleme.YAYIN_SAYFASI})
+
+    # Önce kanıt: normal yol taze önbellekte SORMUYOR.
+    cagrildi = []
+    monkeypatch.setattr(guncelleme, "_tazeleme_baslat", lambda d: cagrildi.append(d))
+    assert guncelleme.bilgi(veri_dizini) is None
+    assert cagrildi == []
+
+    sonuc = guncelleme.simdi_kontrol_et(veri_dizini)
+
+    assert sonuc["durum"] == guncelleme.DURUM_YENI
+    assert sonuc["guncelleme"]["surum"] == "99.0.0"
+
+
+def test_a_manual_check_reports_being_up_to_date(veri_dizini, monkeypatch):
+    """"Güncelsin" ile "soramadım" AYRI cevaplar olmak zorunda: `bilgi()` ikisini
+    de `None`a indiriyor ve elle basılan bir düğmede fark asıl bilgidir."""
+    monkeypatch.setattr(guncelleme, "_sor",
+                        lambda: {"surum": version.APP_VERSION,
+                                 "url": guncelleme.YAYIN_SAYFASI})
+
+    sonuc = guncelleme.simdi_kontrol_et(veri_dizini)
+
+    assert sonuc == {"durum": guncelleme.DURUM_GUNCEL, "guncelleme": None}
+
+
+def test_a_manual_check_reports_a_failure(veri_dizini, monkeypatch):
+    monkeypatch.setattr(guncelleme, "_sor", lambda: None)
+
+    sonuc = guncelleme.simdi_kontrol_et(veri_dizini)
+
+    assert sonuc == {"durum": guncelleme.DURUM_HATA, "guncelleme": None}
+
+
+def test_a_manual_check_obeys_the_preference(veri_dizini, monkeypatch):
+    """3. sözleşme elle yolda da geçerli: kapalıysa ağa HİÇ çıkılmaz. Bir
+    düğmenin varlığı, kullanıcının kapattığı şeyi açmanın gerekçesi değil."""
+    def _patlar():
+        raise AssertionError("kontrol kapalıyken ağa çıkıldı")
+
+    monkeypatch.setattr(guncelleme, "_sor", _patlar)
+
+    assert guncelleme.simdi_kontrol_et(veri_dizini, izin=False) == {
+        "durum": guncelleme.DURUM_KAPALI, "guncelleme": None}
+
+
+def test_a_manual_check_does_not_clear_the_background_flag(veri_dizini, monkeypatch):
+    """`_tazele`nin `finally`si `_KOSUYOR`u sıfırlıyor. Elle çağrı o yolu
+    kullansaydı, koşan bir arka plan tazelemesinin bayrağını düşürür ve ikinci
+    bir iş parçacığının doğmasına yol açardı — `_kontrol_et`in ayrı bir işlev
+    olmasının sebebi tam olarak bu."""
+    monkeypatch.setattr(guncelleme, "_sor", lambda: None)
+    guncelleme._KOSUYOR = True                    # arka planda biri koşuyor
+
+    guncelleme.simdi_kontrol_et(veri_dizini)
+
+    assert guncelleme._KOSUYOR is True
+
+
+def test_the_browser_and_the_server_agree_on_the_status_names():
+    """`durum` değerleri İKİ dilde yazılı: burada sabit, `settings.js`te düz
+    dize. Ayrışma SESSİZ olurdu — sunucu "guncel" der, betik onu tanımaz ve
+    `else` dalına düşüp kullanıcıya "kontrol edilemedi" gösterir. Yani doğru
+    çalışan bir kontrol, kırıkmış gibi görünür.
+
+    Betik tarafı `DURUM_HATA`yı ADIYLA karşılaştırmıyor (bilinçli: ağ hatası ve
+    sunucunun "hata"sı aynı `else` dalına düşüyor), o yüzden ondan söz edilmesi
+    beklenmiyor — ötekilerin üçü de geçmek zorunda.
+    """
+    yol = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       "static", "settings.js")
+    with open(yol, encoding="utf-8") as f:
+        betik = f.read()
+
+    karsilastirilan = set(re.findall(r'cevap\.durum === "([a-z]+)"', betik))
+
+    assert karsilastirilan, "settings.js hiçbir `durum` değeriyle karşılaştırmıyor"
+    tanimli = {guncelleme.DURUM_YENI, guncelleme.DURUM_GUNCEL,
+               guncelleme.DURUM_HATA, guncelleme.DURUM_KAPALI}
+    assert karsilastirilan <= tanimli, (
+        f"settings.js tanımsız bir durum arıyor: {sorted(karsilastirilan - tanimli)}")
+    assert karsilastirilan == tanimli - {guncelleme.DURUM_HATA}
+

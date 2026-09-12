@@ -1184,6 +1184,19 @@ body:has(.sheet.open) .scrim { display: block; }
 .settings-update-row .btn-ghost { text-decoration: none; }
 .settings-update-steps { display: block; margin-top: 0.5rem; }
 
+/* "Şimdi kontrol et" satırı — düğme + durum yazısı YAN YANA, sarabilir.
+   Kart DEĞİL (.settings-update-row'un aksine): bu satır her zaman görünür ve
+   kart biçimi verilseydi, gerçekten bir şey söyleyen "yeni sürüm var" kartıyla
+   aynı ağırlıkta okunup onun vurgusunu düşürürdü — künyenin kart olmama
+   gerekçesinin aynısı.
+   `align-items: center` düğmeyi ve tek satırlık cevabı hizalıyor; `flex-wrap`
+   dar telefonda (mobile.css'in ölçtüğü 360px) yazıyı alt satıra indiriyor,
+   düğmeyi ezmek yerine. */
+.settings-update-check-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+  margin: 0.5rem 0 0;
+}
+
 /* Künye — panelin DİBİNDEKİ yasal kimlik (index.html'de gerekçesi yazılı).
 
    Üstündeki içerikten `border-top` ile ayrılıyor, kart olarak DEĞİL:

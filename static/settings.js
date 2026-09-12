@@ -166,6 +166,56 @@ function uygulaGuncelleme(g) {
   dis.setAttribute("aria-label", etiket);
 }
 
+/** "Şimdi kontrol et" — TTL'i baypas eden, cevabı BEKLEYEN elle kontrol.
+ *
+ *  NEDEN AYRI BİR YOL: `yoklaGuncelleme` yalnız SORUYOR (`GET`), sunucunun
+ *  önbelleği bayatsa arka plan kontrolünün bitmesini umuyor. Önbellek "taze"
+ *  ama cevabı eski olduğunda (24 saatlik TTL, ondan hızlı çıkan yayınlar) o
+ *  yoklama sonsuza kadar aynı eski cevabı okur. `POST` sunucuya kontrolü
+ *  ZORLA koşturuyor.
+ *
+ *  DÖRT DURUM, DÖRT CÜMLE: sunucunun `durum` alanı olmasa "güncelsin" ile
+ *  "soramadım" ayırt edilemezdi — ikisinde de `guncelleme` alanı `null` gelir.
+ *  Düğmeye basan kullanıcı için o fark cevabın kendisi; sessizlik ya da tek
+ *  bir "bir şey yok" cümlesi, kontrolün çalışıp çalışmadığını gizlerdi.
+ *
+ *  `uygulaGuncelleme` HER durumda çağrılıyor, yalnız "yeni"de değil: cevap
+ *  `null` ise satırın ve rozetin GİZLENMESİ gerekiyor. Kullanıcı bu arada
+ *  güncellemiş olabilir ve ekranda asılı kalan bir "yeni sürüm var" satırı,
+ *  hiç görünmeyen bir satır kadar yanlış. */
+async function simdiKontrolEt() {
+  const dugme = $("settings-update-check");
+  const yazi = $("settings-update-check-status");
+
+  // Düğme kilitleniyor: her basış GERÇEK bir GitHub isteği ve anonim API
+  // saatte 60 istekle sınırlı (guncelleme.py'deki TTL gerekçesi). Üst üste
+  // basan bir kullanıcının o sınırı kendi başına yakmasının anlamı yok.
+  dugme.disabled = true;
+  yazi.textContent = t("settings.update_checking");
+  try {
+    const res = await fetch("/api/guncelleme", { method: "POST" });
+    if (!res.ok) throw new Error(t("err.http", { durum: res.status }));
+    const cevap = await res.json();
+    uygulaGuncelleme(cevap.guncelleme);
+    if (cevap.durum === "yeni") {
+      yazi.textContent = t("settings.update_found", { surum: cevap.guncelleme.surum });
+    } else if (cevap.durum === "guncel") {
+      yazi.textContent = t("settings.update_current");
+    } else if (cevap.durum === "kapali") {
+      yazi.textContent = t("settings.update_off");
+    } else {
+      yazi.textContent = t("settings.update_failed");
+    }
+  } catch {
+    // Ağ hatası ile sunucunun "hata" durumu kullanıcı için AYNI şey: kontrol
+    // yapılamadı. İkisini iki ayrı cümleye ayırmak, hiçbir kararı
+    // değiştirmeyen bir ayrım olurdu.
+    yazi.textContent = t("settings.update_failed");
+  } finally {
+    dugme.disabled = false;
+  }
+}
+
 /** Açılıştaki cevap "bilmiyorum" ise güncelleme cevabını ARDINDAN yoklar.
  *
  *  NEDEN VAR: `/api/settings`'in ilk cevabı çoğu açılışta `null`dur — önbellek
@@ -618,6 +668,7 @@ async function saveSettings() {
 // Konsolda tek bir hata bile yok; gerçek Chromium koşumunda görüldü.
 $("settings-btn").addEventListener("click", () => openSettings());
 $("settings-close").addEventListener("click", closeSettings);
+$("settings-update-check").addEventListener("click", simdiKontrolEt);
 $("settings-save").addEventListener("click", saveSettings);
 
 // ── Tema seçici (A6 / Adım 7b) ──────────────────────────────────────

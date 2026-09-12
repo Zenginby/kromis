@@ -19,6 +19,7 @@ import re
 import uuid
 import zipfile
 
+import i18n
 import jsonstore
 import storage
 
@@ -196,13 +197,13 @@ def rename(folder_id: str, new_name: str, output_dir: str) -> dict | None:
 def export_zip(folder_id: str, output_dir: str) -> tuple[bytes, str]:
     """Klasörü ve tüm alt ağacını görselleriyle birlikte ZIP arşivi olarak üretir."""
     if not folder_id or not _SAFE_ID.fullmatch(folder_id):
-        raise ValueError("Geçersiz klasör id.")
+        raise ValueError(i18n.t("err.bad_folder_id"))
 
     all_folders = _read(output_dir)
     folder_map = {f["id"]: f for f in all_folders if f.get("id")}
     root_folder = folder_map.get(folder_id)
     if not root_folder:
-        raise ValueError("Klasör bulunamadı.")
+        raise ValueError(i18n.t("err.folder_missing"))
 
     root_name = root_folder.get("name", "klasor").strip()
 

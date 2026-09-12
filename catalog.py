@@ -154,7 +154,10 @@ class ImageModel:
     durations: tuple[int, ...] = ()
     # Arayüzün ilk seçtiği süre. 0 = demetin ilk öğesi (`default_size`in kuralı).
     default_duration: int = 0
-    note: str | None = None       # seçicide gösterilen kısa Türkçe uyarı
+    # Seçicide gösterilen kısa açıklama. Değer METİN DEĞİL ÇEVİRİ ANAHTARI
+    # (`model.<id>.note`) ve çözüm `app._model_payload`da: katalog dilsiz
+    # kalmalı — onu on üç modül ithal ediyor ve hiçbirinin dille işi yok.
+    note: str | None = None
     # MEDYA TÜRÜ. `"image"` ve `"video"` iki AYRI demette yaşıyor
     # (`IMAGE_MODELS` / `VIDEO_MODELS`), yani bu alan üyeliğin tekrarı gibi
     # görünüyor — ama tekrar DEĞİL, çünkü model örneği demetinden KOPUK
@@ -208,7 +211,10 @@ class ChatModel:
     # ayrı bir olgu. Minimal-gövde tripwire'ı bu yüzden adaptör BAŞINA yazılıyor,
     # yoksa buradaki meşru `max_tokens` bir gün Azure gövdesine kopyalanır.
     needs_max_tokens: bool = False
-    note: str | None = None       # seçicide gösterilen kısa Türkçe uyarı
+    # Seçicide gösterilen kısa açıklama. Değer METİN DEĞİL ÇEVİRİ ANAHTARI
+    # (`model.<id>.note`) ve çözüm `app._model_payload`da: katalog dilsiz
+    # kalmalı — onu on üç modül ithal ediyor ve hiçbirinin dille işi yok.
+    note: str | None = None
     kind: str = "chat"
     # ImageModel.plan ile AYNI alan ve aynı gerekçe (uzunu orada).
     plan: str = "free"
@@ -222,7 +228,7 @@ class ChatModel:
 CREDENTIALS: tuple[Credential, ...] = (
     Credential(
         id="azure_image",
-        label="Azure OpenAI · görsel",
+        label="credential.azure_image",
         key_env="AZURE_IMAGE_API_KEY",
         url_env="AZURE_IMAGE_BASE_URL",
         secret_field="api_key",
@@ -230,7 +236,7 @@ CREDENTIALS: tuple[Credential, ...] = (
     ),
     Credential(
         id="azure_chat",
-        label="Azure OpenAI · sohbet",
+        label="credential.azure_chat",
         key_env="AZURE_CHAT_API_KEY",
         url_env="AZURE_CHAT_BASE_URL",
         # Sohbetin kendi anahtarı yoksa GÖRSELİN kimliğine düşüyor — canlı
@@ -295,7 +301,7 @@ CREDENTIALS: tuple[Credential, ...] = (
     # (bkz. credstore.derive_foundry_base_url).
     Credential(
         id="azure_foundry",
-        label="Azure AI Foundry · MAI ve FLUX",
+        label="credential.azure_foundry",
         key_env="AZURE_FOUNDRY_API_KEY",
         url_env="AZURE_FOUNDRY_BASE_URL",
         secret_field=None,
@@ -458,8 +464,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=8,
         credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
-        note="Metin, tabela ve çok referanslı düzenlemede en güçlü; "
-             "uygulamanın varsayılanı.",
+        note="model.azure-gpt-image-2.note",
     ),
     # OpenAI DOĞRUDAN (Azure üzerinden değil). Tel formatı Azure'ın aynısı, o
     # yüzden adaptör onun bilinçli ikizi (bkz. openai_client.py'nin başlığı).
@@ -507,8 +512,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=8,
         credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
-        note="Azure'daki modelin aynısı, kendi anahtarınla — kurumsal "
-             "kaynağın yoksa bunu seç.",
+        note="model.openai-gpt-image-2.note",
     ),
     # KATALOGDA KALIYOR ama ÖMÜRLÜ: 23 Ekim 2026'da OpenAI API'sinden kalkıyor.
     # Bugün çalışıyor ve anahtarı yalnız bu modele erişen hesaplar var, o yüzden
@@ -530,7 +534,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=8,
         credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
-        note="Seçmeyin: 23 Ekim 2026'da API'den kalkıyor. gpt-image-2'ye geç.",
+        note="model.openai-gpt-image-1.note",
     ),
     # ── Gemini · Nano Banana ────────────────────────────────────────────
     #
@@ -585,7 +589,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         # yazan tur ile onu yanlışlayan tur AYNI daldı. Hız iddiası duruyor —
         # katalogda gecikme verisi yok, yani ölçülemez; maliyet ölçülebilir ve
         # artık mandallı.
-        note="En hızlı tur; oran seçiliyor (piksel değil). Taslak için.",
+        note="model.gemini-nano-banana-2.note",
     ),
     ImageModel(
         id="gemini-nano-banana-pro",
@@ -603,8 +607,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=27,
         credits_by_quality=(("1K", 27), ("2K", 27), ("4K", 48)),
-        note="Marka tutarlılığı ve uzun metin yerleşimi; pahalı ama en "
-             "sadık.",
+        note="model.gemini-nano-banana-pro.note",
     ),
     # ── Azure AI Foundry · MAI-Image (Microsoft) ────────────────────────
     #
@@ -650,8 +653,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         # model başına `max_refs`e bakmıyor.
         max_refs=1,
         credits=8,
-        note="Fotogerçekçi ürün ve portre işi; metin işlemede MAI'nin en "
-             "iyisi. Tek referansla düzenliyor. Önizleme.",
+        note="model.azure-mai-image-2-6.note",
     ),
     ImageModel(
         id="azure-mai-image-2-6-flash",
@@ -669,8 +671,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=1,
         # GEÇİCİ: birim fiyat doğrulanamadı, oran 2.6'nın yarısı varsayıldı.
         credits=4,
-        note="2.6'nın hızlı ve ucuz kardeşi; taslak ve deneme turları için. "
-             "Tek referansla düzenliyor. Önizleme.",
+        note="model.azure-mai-image-2-6-flash.note",
     ),
     ImageModel(
         id="azure-mai-image-2-5-pro",
@@ -687,8 +688,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         supports_edit=True,
         max_refs=1,
         credits=10,
-        note="Kalabalık sahnelerde nesne ve karakter tutarlılığı; pahalı. "
-             "Tek referansla düzenliyor. Önizleme.",
+        note="model.azure-mai-image-2-5-pro.note",
     ),
     # ── Azure AI Foundry · FLUX.2 (Black Forest Labs) ───────────────────
     #
@@ -728,7 +728,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         supports_edit=True,
         max_refs=4,
         credits=16,
-        note="En yüksek görsel kalite; yavaş ve pahalı. Tek turda 1 görsel.",
+        note="model.azure-flux-2-pro.note",
     ),
     ImageModel(
         id="azure-flux-2-flex",
@@ -751,8 +751,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         # (10/25 → 0,6× ve 50/25 → 1,6×, yuvarlanmış). ÜÇÜ DE GEÇİCİ —
         # megapiksel fiyatı doğrulanmadı.
         credits_by_quality=(("hizli", 6), ("dengeli", 10), ("detayli", 16)),
-        note="Adım ve yönlendirme seçilebiliyor: metin ağırlıklı yerleşimler "
-             "için. Tek turda 1 görsel.",
+        note="model.azure-flux-2-flex.note",
     ),
 )
 
@@ -859,7 +858,7 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         poll_timeout=420.0,
         credits=16,
         kind="video",
-        note="En ucuz Veo. Gemini anahtarının ödemesi AÇIK olmalı.",
+        note="model.gemini-veo-3-1-lite.note",
     ),
     ImageModel(
         id="gemini-veo-3-1-fast",
@@ -882,7 +881,7 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         poll_timeout=420.0,
         credits=30,
         kind="video",
-        note="Hız ile kalite arasında denge; sesi de kendi üretiyor.",
+        note="model.gemini-veo-3-1-fast.note",
     ),
     ImageModel(
         id="gemini-veo-3-1",
@@ -906,7 +905,7 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         poll_timeout=600.0,
         credits=80,
         kind="video",
-        note="En iyi Veo, 1080p açık. Saniyesi pahalı — süreye dikkat.",
+        note="model.gemini-veo-3-1.note",
     ),
 )
 
@@ -960,26 +959,35 @@ GEOMETRY_LABELS: dict[str, tuple[str, str]] = {
     "768x1365": ("▮ 9:16", "9:16"),
 }
 
+# Değerler ETİKET DEĞİL ÇEVİRİ ANAHTARI (`ImageModel.note`un aynı kararı ve
+# `etiket.quality_label` çözüyor): etiketi kullanıcı okuyor, yani dile bağlı —
+# JETON ise `history.json`a, `prefs.json`a ve tele gidiyor, yani dile bağlı
+# OLAMAZ. İkisini ayırmanın yolu tabloda anahtarı tutmak.
+#
+# Dile bağlı OLMAYAN satırlar da (1K · 1 MP, 720p · HD) anahtar taşıyor ve bu
+# bilinçli: "bunun çevirisi yok" kararı iki katalogda AYNI değeri yazarak
+# GÖRÜNÜR kalıyor, tabloda literal bırakılarak gizlenmiyor — yeni bir dil
+# eklendiğinde çevirmen satırı görüyor ve gerekiyorsa değiştiriyor.
 QUALITY_LABELS: dict[str, str] = {
-    "low": "Düşük",
-    "medium": "Orta",
-    "high": "Yüksek",
+    "low": "gen.quality_low",
+    "medium": "gen.quality_medium",
+    "high": "gen.quality_high",
     # Kalite ekseni OLMAYAN modellerin sentetik jetonu (bkz. karar Q1).
     # Bugün onu taşıyan GERÇEK bir model yok (DALL·E 3 gitti, Gemini'nin
     # çözünürlük ekseni var); jeton yine de duruyor çünkü `quality_hidden`
     # sözleşmesinin belgelenmiş karşılığı bu ve testler onu kullanıyor.
-    "standard": "Standart",
+    "standard": "gen.quality_standard",
     # Gemini'nin `image_size` jetonları. Piksel yerine MEGAPİKSEL yazılı:
     # oran seçen bir modelde "2048x2048" demek yanlış olurdu (2K, seçilen
     # orana göre farklı piksel boyutlarına çözülüyor).
-    "1K": "1K · 1 MP",
-    "2K": "2K · 4 MP",
-    "4K": "4K · 16 MP",
+    "1K": "gen.quality_1k",
+    "2K": "gen.quality_2k",
+    "4K": "gen.quality_4k",
     # Veo'nun `resolution` jetonları. Video tarafında MEGAPİKSEL yazmak yanlış
     # olurdu: video dünyasında ölçü satır sayısıdır ve kullanıcı "720p"yi
     # zaten öyle tanıyor.
-    "720p": "720p · HD",
-    "1080p": "1080p · Full HD",
+    "720p": "gen.quality_720p",
+    "1080p": "gen.quality_1080p",
     # FLUX.2-flex'in `steps`/`guidance` kademeleri. Sentetik bir jeton İSRAF
     # olurdu: belgelenmiş `steps` (≤50) ve `guidance` (1.5–10) kaliteyi
     # DOĞRUDAN belirliyor, yani burada gerçek bir eksen var (karar 4).
@@ -989,19 +997,15 @@ QUALITY_LABELS: dict[str, str] = {
     # `ResultParams.quality`ye yazılıyor; Türkçe metin ETİKETTE yaşıyor.
     # Jetonlar sağlayıcıya GİTMİYOR: `azure_flux_client.quality_axis` onları
     # sayılara çeviriyor.
-    "hizli": "Hızlı · 10 adım",
-    "dengeli": "Dengeli · 25 adım",
-    "detayli": "Detaylı · 50 adım",
+    "hizli": "gen.quality_flux_fast",
+    "dengeli": "gen.quality_flux_balanced",
+    "detayli": "gen.quality_flux_detailed",
 }
 
 
 def geometry_of(token: str) -> tuple[str, str]:
     """(etiket, oran). Bilinmeyen jetonda ikisi de jetonun kendisi."""
     return GEOMETRY_LABELS.get(token, (token, token))
-
-
-def quality_label(token: str) -> str:
-    return QUALITY_LABELS.get(token, token)
 
 
 def default_size_of(m: ImageModel) -> str:
@@ -1024,18 +1028,6 @@ def default_duration_of(m: ImageModel) -> int:
         return 0
     return m.default_duration or m.durations[0]
 
-
-def duration_label(seconds: int) -> str:
-    """Süre jetonunun arayüzdeki etiketi.
-
-    `GEOMETRY_LABELS`/`QUALITY_LABELS` gibi bir tablo YOK ve gerekmiyor:
-    jeton sayı olduğu için etiket ondan türetilebiliyor. Tablo açmak, her
-    yeni süre değerinde ikinci bir yere satır eklemeyi unutmanın kapısı
-    olurdu — ve etiketi unutulan jeton arayüzde çıplak sayı olarak görünürdü.
-    Etiketin SUNUCUDA türetilmesi ise `GEOMETRY_LABELS`in gerekçesiyle aynı:
-    istemcide kurulan bir dize, aynı bilginin bayatlayabilen ikinci kopyası.
-    """
-    return f"{seconds} sn"
 
 
 # ── Sohbet modelleri ────────────────────────────────────────────────────
@@ -1074,12 +1066,12 @@ DEFAULT_CHAT_MODEL = "azure-deployment"
 CHAT_MODELS: tuple[ChatModel, ...] = (
     ChatModel(
         id=DEFAULT_CHAT_MODEL,
-        label="Azure AI Foundry dağıtımı",
+        label="model.azure_deployment.label",
         provider="azure",
         credential="azure_chat",
         wire_model="",                          # ORTAMDAN okunuyor
         wire_from_env="AZURE_CHAT_DEPLOYMENT",
-        note="Adı Ayarlar'dan giriliyor: Azure'da model değil DAĞITIM var.",
+        note="model.azure-deployment.note",
     ),
     # GPT-5.6 ailesinin üç kademesi. Üçü de AYNI tel, yalnız `wire_model`
     # farklı — o yüzden üçü de tek adaptörden geçiyor ve yeni bir kademe
@@ -1091,7 +1083,7 @@ CHAT_MODELS: tuple[ChatModel, ...] = (
         provider="openai",
         credential="openai",
         wire_model="gpt-5.6-terra",
-        note="Dengeli kademe — günlük brief'ler için varsayılan.",
+        note="model.openai-gpt-5.6-terra.note",
     ),
     ChatModel(
         id="openai-gpt-5.6-luna",
@@ -1099,7 +1091,7 @@ CHAT_MODELS: tuple[ChatModel, ...] = (
         provider="openai",
         credential="openai",
         wire_model="gpt-5.6-luna",
-        note="En ucuz ve en hızlı kademe; kısa turlar için.",
+        note="model.openai-gpt-5.6-luna.note",
     ),
     ChatModel(
         id="openai-gpt-5.6-sol",
@@ -1107,7 +1099,7 @@ CHAT_MODELS: tuple[ChatModel, ...] = (
         provider="openai",
         credential="openai",
         wire_model="gpt-5.6-sol",
-        note="Ailenin en güçlüsü ve en pahalısı; uzun, çok kısıtlı brief'ler için.",
+        note="model.openai-gpt-5.6-sol.note",
     ),
     ChatModel(
         id="gemini-3.7-flash",
@@ -1118,7 +1110,7 @@ CHAT_MODELS: tuple[ChatModel, ...] = (
         # Görsel tarafı `/v1beta/interactions` konuşuyor; sohbet tarafı
         # OpenAI-uyumlu uçtan gidiyor. Aynı kimlik, iki ayrı yol.
         endpoint_path="/v1beta/openai/chat/completions",
-        note="Gemini'nin OpenAI-uyumlu ucundan konuşuyor; hızlı ve ucuz.",
+        note="model.gemini-3.7-flash.note",
     ),
 )
 
@@ -1196,50 +1188,6 @@ def provider_logo(provider: str) -> str | None:
     (tests/test_provider_logos.py), çalışma zamanı değil.
     """
     return PROVIDER_LOGOS.get(provider)
-
-
-# Marka ile adın arasındaki ayraç. Etiketlerin yazım kuralı bu ve `_drop_brand`
-# aynı dizeyi hem ARIYOR hem UZUNLUĞUNU kullanıyor: iki yerde ayrı yazılmış
-# olsaydı ("· " ile " · ") kırpma bir karakter kayar ve ad boşlukla başlardı.
-_BRAND_SEP = " · "
-
-
-def _drop_brand(label: str, provider: str) -> str:
-    marka = PROVIDER_BRANDS.get(provider)
-    if not marka:
-        return label
-    onek = f"{marka}{_BRAND_SEP}"
-    return label[len(onek):] if label.startswith(onek) else label
-
-
-def short_labels(
-    models: Sequence[ImageModel] | Sequence[ChatModel],
-) -> dict[str, str]:
-    """Model id → ŞERİTTE gösterilecek ad: marka öneki düşürülmüş `label`.
-
-    ÇAKIŞMA KURALI tek istisna ve ölçülmüş bir kırılmayı kapatıyor: önek
-    düşünce `Azure · gpt-image-2` ile `OpenAI · gpt-image-2` AYNI satıra
-    dönüşüyor — ikisinin de anahtarı olan kullanıcı açılan listede hangisini
-    seçtiğini bilemez ve native bir `<option>` işaret taşıyamıyor, yani logo o
-    satırları ayırmıyor. O yüzden kısa adı bir başkasıyla çakışan model TAM
-    etiketini koruyor. Kullanıcının gördüğü fark şu: markası tekil olan her
-    model (Gemini'nin ikisi, OpenAI'nin sohbet kademeleri) önekini bırakıyor,
-    yalnız gerçekten iki yerde birden bulunan ad markasını taşımaya devam
-    ediyor.
-
-    Önek `f"{marka} · "` deseniyle aranıyor, "içinde marka geçiyor mu" diye
-    DEĞİL: Azure'ın sohbet girdisi `Azure AI Foundry dağıtımı` ve orada marka
-    adın PARÇASI (Azure'da model yok, dağıtım var) — kırpılırsa etiket
-    anlamsızlaşır.
-
-    `models` iki tür alıyor (`ImageModel` ve `ChatModel`); ortak alan olarak
-    yalnız `id`, `label` ve `provider` okunuyor.
-    """
-    kisa = {m.id: _drop_brand(m.label, m.provider) for m in models}
-    adlar = list(kisa.values())
-    cakisan = {ad for ad in adlar if adlar.count(ad) > 1}
-    return {m.id: (m.label if kisa[m.id] in cakisan else kisa[m.id])
-            for m in models}
 
 
 def chat_provider_ids() -> tuple[str, ...]:

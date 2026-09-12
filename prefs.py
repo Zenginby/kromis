@@ -34,8 +34,9 @@ import json
 import os
 
 import catalog
+import i18n
 import jsonstore
-from models import ALLOWED_THEMES
+from models import ALLOWED_LANGUAGES, ALLOWED_THEMES
 
 PREFS_FILE = "prefs.json"
 
@@ -65,6 +66,20 @@ PREFS_FILE = "prefs.json"
 _SCHEMA: dict[str, tuple[object, type]] = {
     "autosave_sessions": (True, bool),
     "theme": ("mono", str),
+    # Arayüz dili (v0.21). Varsayılan "tr" ve bu bir TEMBELLİK DEĞİL KARAR:
+    #
+    #   1. Mevcut kullanıcı bir güncellemeden sonra arayüzünü değişmiş
+    #      bulmamalı. Sistem/tarayıcı dilinden otomatik algılama tam bunu
+    #      yapardı — hem de tercih henüz diske yazılmadığı için SESSİZCE.
+    #   2. Kaynak metin Türkçe yazılıyor: yeni bir dize önce `tr.json`'da var
+    #      oluyor, çeviri sonra geliyor (`i18n.FALLBACK`'in gerekçesi). Ön
+    #      tanımlı dilin düşüş diliyle AYNI olması, çevrilmemiş bir dizenin
+    #      varsayılan kurulumda hiç görünmemesi demek.
+    #
+    # Anahtar burada, `credentials.env`'de DEĞİL: dosyanın başındaki iki
+    # gerekçe (bir arayüz tercihinin 0600 olmasının anlamı yok · anahtarı
+    # çevirmek Azure kimliğini yeniden yazmaya bağlanırdı) birebir geçerli.
+    "language": ("tr", str),
     "guncelleme_kontrolu": (True, bool),
     "image_model": (catalog.DEFAULT_IMAGE_MODEL, str),
     # Video şeridinin seçimi. `image_model`in AYRI bir anahtarı ve bu
@@ -99,6 +114,12 @@ DEFAULTS = {name: default for name, (default, _) in _SCHEMA.items()}
 # yani anahtar BAŞINA bir kural onu ifade edemiyor (bkz. update()).
 _ENUMS: dict[str, tuple[str, ...]] = {
     "theme": ALLOWED_THEMES,
+    # `theme`in gerekçesi kelimesi kelimesine geçerli: elle yazılmış bir
+    # `language: "de"` buradan geçse arayüz karşılığı olmayan bir sözlüğe
+    # düşer ve ekran baştan sona ham ANAHTAR gösterirdi — sessiz ve teşhisi
+    # zor. `i18n.normalize` çalışma anında ayrıca koruyor ama o bir savunma;
+    # tercihin kendisinin geçerli kalması bu tablonun işi.
+    "language": ALLOWED_LANGUAGES,
     "image_model": catalog.image_model_ids(),
     "video_model": catalog.video_model_ids(),
     "chat_provider": catalog.chat_provider_ids(),
@@ -194,12 +215,12 @@ def update(values: dict, output_dir: str) -> dict:
     """
     for name, value in values.items():
         if name not in _SCHEMA:
-            raise ValueError(f"bilinmeyen tercih: {name}")
+            raise ValueError(i18n.t("err.unknown_pref", None, ad=name))
         if not isinstance(value, _SCHEMA[name][1]):
-            raise ValueError(f"tercih için geçersiz değer: {name}")
+            raise ValueError(i18n.t("err.bad_pref_type", None, ad=name))
         allowed = _ENUMS.get(name)
         if allowed is not None and value not in allowed:
-            raise ValueError(f"tercih için geçersiz {name} değeri: {value}")
+            raise ValueError(i18n.t("err.bad_pref_value", None, ad=name, deger=value))
 
     # `chat_model` ÇAPRAZ bir kural: geçerliliği `chat_provider`'a bağlı, yani
     # `_ENUMS` gibi anahtar-başına bir tablo onu ifade edemiyor. Kontrol
@@ -212,8 +233,8 @@ def update(values: dict, output_dir: str) -> dict:
         gecerli = [m.id for m in catalog.chat_models_for(provider)]
         if values["chat_model"] not in gecerli:
             raise ValueError(
-                f"tercih için geçersiz chat_model değeri: {values['chat_model']} "
-                f"({provider} sağlayıcısında yok)")
+                i18n.t("err.bad_pref_chat_model", None,
+                       model=values["chat_model"], saglayici=provider))
 
     if not values:
         return read(output_dir)

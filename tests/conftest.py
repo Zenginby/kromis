@@ -184,3 +184,27 @@ def fake_composite():
         with open(base_path, "rb") as f:
             return f.read()
     return _fake_composite
+
+
+def tr(anahtar: str) -> str:
+    """Bir çeviri anahtarının TÜRKÇE metni — arayüz metnine bakan testler için.
+
+    Çoklu dil desteği (v0.21) arayüz metinlerini `static/*.js` ve
+    `static/index.html` içinden `bundled/i18n/*.json`a taşıdı. Bunu ölçen
+    testlerin İKİ farklı sorusu var ve ikisi ayrı yere bakmalı:
+
+      · "Bu dal DOĞRU cümleyi mi seçiyor?" → betikte ANAHTARI ara
+        (`t("gate.arena_no_edit")`). Metin değişse bile dal aynı kalır, yani
+        test cümlenin yazımına değil KARARA bakmış olur.
+      · "Cümle kullanıcıya şunu SÖYLÜYOR mu?" → metni buradan al. Anahtarın
+        kendisini kopyalamak yetmezdi: sözlükten silinmiş bir anahtar
+        `i18n.t` tarafından sessizce kendisine düşer ve test yine geçerdi.
+
+    İkincisi için doğrudan `i18n.t` çağrılabilirdi; bu sarmalayıcı ADIYLA
+    hangi soruyu sorduğunu söylüyor ve testlerin dile bağımlılığını tek bir
+    yerde topluyor.
+    """
+    import i18n
+    metin = i18n.t(anahtar, "tr")
+    assert metin != anahtar, f"sözlükte yok: {anahtar}"
+    return metin

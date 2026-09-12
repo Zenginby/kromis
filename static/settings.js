@@ -26,7 +26,7 @@ let chatConfigured = false;   // chat.js okuyor (o dosya BUNDAN SONRA yükleniyo
  *  elle yazılıydı ve biri aşağıdaki `includes` NÖBETÇİSİ. Biri değişip öteki
  *  kalsa hata VERMEZ — nöbetçi bir daha hiç tutmaz ve kullanıcı ayarları
  *  düzelttikten sonra durum satırı ekranda kalırdı. */
-const AYARLAR_EKI = "(sağ üstteki Ayarlar düğmesi)";
+const AYARLAR_EKI = t("settings.button_suffix");
 
 function applyConfigured(s) {
   configured = !!(s && s.configured);
@@ -52,8 +52,8 @@ function applyConfigured(s) {
   syncGoGate();
   if (s && s.endpoint) $("set-endpoint").value = s.endpoint;
   $("set-key").placeholder = configured
-    ? "Kayıtlı · değiştirmek için yeni anahtar yaz"
-    : "Azure API anahtarını yapıştır";
+    ? t("settings.key_saved_placeholder")
+    : t("settings.azure_key_placeholder");
 
   // Sağlayıcı başına "Kayıtlı" durumu. `!== undefined` guard'ı `version` ve
   // `guncelleme` ile AYNI gerekçeye sahip: POST /api/settings yanıtı GET'ten
@@ -67,7 +67,7 @@ function applyConfigured(s) {
       ["set-gemini-key", "gemini", "AIza…"],
     ]) {
       $(alan).placeholder = s.providers[kimlik]
-        ? "Kayıtlı · değiştirmek için yeni anahtar yaz"
+        ? t("settings.key_saved_placeholder")
         : bos;
     }
     // Bayraklar SAKLANIYOR: kartlar pencere açıldığında çiziliyor ve o an
@@ -83,8 +83,16 @@ function applyConfigured(s) {
   const kapali = goBlockReason();
   if (kapali) {
     statusEl.textContent = `${kapali} ${AYARLAR_EKI}`;
-  } else if (statusEl.textContent.includes(AYARLAR_EKI)
-             || statusEl.textContent.startsWith("Başlamak için")) {
+  } else if (statusEl.textContent.includes(AYARLAR_EKI)) {
+    // İKİNCİ bir nöbetçi daha vardı: `startsWith("Başlamak için")`. ÖLÜYDÜ —
+    // depoda o cümleyi yazan hiçbir yer kalmamış, yani koşul hiç doğru
+    // olmuyordu. Çeviriyle birlikte zararsızlıktan çıkıyordu: sabit bir Türkçe
+    // dizeye bakan bir nöbetçi İngilizce arayüzde hiçbir zaman tutmaz, yani
+    // "ölü ama masum" olan şey "dile bağlı ve sessizce yanlış" olurdu.
+    //
+    // Kalan nöbetçi `t()`den geçen AYNI dizeyi arıyor, yani dil değişse de
+    // iki taraf birlikte değişiyor — settings.js'in en başındaki
+    // "aynı dize ÜÇ kez elle yazılıydı" dersinin devamı.
     statusEl.textContent = "";
   }
   // POST /api/settings yanıtında `version` YOK (sürüm çalışma anında
@@ -152,7 +160,8 @@ function uygulaGuncelleme(g) {
   const dis = $("settings-btn");
   if (!dis) return;
   dis.classList.toggle("has-update", varMi);
-  const etiket = varMi ? `Ayarlar — yeni sürüm var (v${g.surum})` : "Ayarlar";
+  const etiket = varMi ? t("settings.btn_update_available", { surum: g.surum })
+                       : t("settings.title");
   dis.title = etiket;
   dis.setAttribute("aria-label", etiket);
 }
@@ -225,7 +234,7 @@ async function loadSettings(openIfMissing) {
     videoModels = [];
     currentVideoModel = null;
     syncGoGate();
-    statusEl.textContent = `Ayar durumu alınamadı. Sağlayıcı ayarlarını kontrol et ${AYARLAR_EKI}.`;
+    statusEl.textContent = t("settings.status_unavailable", { ek: AYARLAR_EKI });
     if (openIfMissing) openSettings();
   }
 }
@@ -293,7 +302,7 @@ function renderProviderCards() {
     ad.textContent = o.textContent;
     const rozet = document.createElement("span");
     rozet.className = "model-row-badge";
-    rozet.textContent = saglayiciKayitli(o.value) ? "kayıtlı" : "kayıtlı değil";
+    rozet.textContent = t(saglayiciKayitli(o.value) ? "settings.saved" : "settings.not_saved");
     ad.append(rozet);
     metin.append(ad);
 
@@ -319,7 +328,7 @@ function renderProviderCards() {
  *  ekranda okunan adın ayrışmasına kapı açardı. */
 function syncProviderPick(secili) {
   const secenek = [...$("set-provider").options].find((o) => o.value === secili);
-  $("set-provider-label").textContent = secenek ? secenek.textContent : "Sağlayıcı seç";
+  $("set-provider-label").textContent = secenek ? secenek.textContent : t("settings.pick_provider");
   const kutu = $("set-provider-ic");
   const logo = saglayiciLogosu(secili);
   if (!logo) { kutu.replaceChildren(); return; }
@@ -547,14 +556,14 @@ async function saveSettings() {
   // OpenAI anahtarı eklemeye çalışan kullanıcıya BAŞKA bir sağlayıcı hakkında
   // konuşuyordu — sunucu tarafındaki aynı kilidin istemci yarısı.
   if ($("set-provider").value === "azure") {
-    if (!base_url) { st.textContent = "Endpoint gerekli."; return; }
+    if (!base_url) { st.textContent = t("settings.endpoint_required"); return; }
     if (!configured && !api_key.trim()) {
-      st.textContent = "İlk kurulumda API key gerekli."; return;
+      st.textContent = t("settings.key_required"); return;
     }
   }
 
   $("settings-save").disabled = true;
-  st.textContent = "Kaydediliyor…";
+  st.textContent = t("common.saving");
   try {
     const res = await fetch("/api/settings", {
       method: "POST",
@@ -580,13 +589,13 @@ async function saveSettings() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `Hata (${res.status})`);
+      throw new Error(err.detail || t("err.http", { durum: res.status }));
     }
     applyConfigured(await res.json());
     $("set-key").value = "";
     $("set-openai-key").value = "";
     $("set-gemini-key").value = "";
-    st.textContent = "Kaydedildi.";
+    st.textContent = t("common.saved");
     setTimeout(closeSettings, 550);
   } catch (e) {
     st.textContent = e.message;
@@ -616,8 +625,11 @@ $("settings-save").addEventListener("click", saveSettings);
 // ([data-theme=…]); burası onları GERÇEKTEN uygulayan taraf. Monokrom =
 // öznitelik yok: varsayılan --accent zaten monokrom, sahte bir "mono"
 // değeri yazmak token katmanında karşılığı olmayan bir durum üretirdi.
-// KALICILIK BİLEREK YOK — SettingsRequest'te tema alanı yok; o Adım 9'un
-// arka uç işi ve panel bunu kullanıcıya açıkça söylüyor.
+// KALICI: seçim `POST /api/prefs` ile prefs.json'a yazılıyor (aşağıdaki
+// `saveThemePref`) ve açılışta chat.js'in `loadPrefs`'i geri okuyor. Burada
+// bir zamanlar "KALICILIK BİLEREK YOK" yazılıydı ve o cümle Adım 9 geldikten
+// sonra bayatladı — panelin içindeki "yeniden başlatınca sıfırlanır" notuyla
+// birlikte kaldırıldı.
 function applyTheme(theme) {
   if (theme === "mono") delete document.body.dataset.theme;
   else document.body.dataset.theme = theme;
@@ -640,6 +652,59 @@ $("theme-picker").addEventListener("change", (e) => {
     saveThemePref(theme);
   }
 });
+
+// ── Dil seçici ───────────────────────────────────────────────────────
+//
+// Tema seçicisinin kalıbı ama İKİ noktada bilerek ayrılıyor:
+//
+//   1. SAYFA YENİLENİYOR. Temayı bir CSS özniteliği taşıyor, dili ise HTML'in
+//      KENDİSİ: metinler sunucuda `{{t:…}}` yer tutucularından çözülüyor
+//      (`i18n.render`) ve `<html lang>` de orada yazılıyor. İstemcide DOM'u
+//      gezip yeniden yazmak ikinci bir çeviri yolu açardı — iki yol zamanla
+//      ayrışır ve arayüzün bir köşesi eski dilde kalırdı. Yenileme tek yolu
+//      korur; bedeli bir sayfa yüklemesi, loopback'te ölçülemez.
+//   2. ÖNCE ONAY — ama yalnız kaybedilecek bir şey varsa. Yenileme
+//      composer'da yazılı metni siler ve bu, kullanıcının hiç beklemediği bir
+//      kayıp olurdu (sendChat'in başarısızlık dalının reddettiği şeyin
+//      aynısı). Kutu boşken soru sormak ise gereksiz bir tık.
+//
+// Seçili seçenek `window.KROMIS_LANG`ten kuruluyor, `/api/prefs`ten DEĞİL:
+// sunucu sayfayı zaten o dille çizdi, yani ekranda duran metin ile listede
+// işaretli dil TANIM GEREĞİ aynı olmak zorunda. Ayrı bir uçtan sormak,
+// ikisinin ayrışabildiği bir an açardı (`applyConfigured`ın "aynı yanıttan"
+// gerekçesi).
+//
+// Sunucu `selected` özniteliğini zaten yazıyor (`i18n.language_options_html`);
+// bu satır onun kopyası değil GERİ ALMA yolu: onay penceresinden "vazgeç"
+// çıkınca liste kullanıcının seçtiği dilde kalırdı, oysa arayüz eski dilde.
+function syncLanguagePicker() {
+  const secici = $("language-select");
+  if (secici) secici.value = KROMIS_DIL;
+}
+
+async function saveLanguagePref(dil) {
+  const durum = $("language-status");
+  const yazili = ($("prompt").value || "").trim();
+  if (yazili && !await confirmDialog(t("settings.language_unsaved"),
+                                     t("settings.language_unsaved_body"),
+                                     { okLabel: t("settings.language_switch_ok") })) {
+    syncLanguagePicker();          // gerçekleşmeyen değişikliği geri al
+    return;
+  }
+  durum.textContent = t("settings.language_switching");
+  try {
+    await chatApi("/api/prefs", { method: "POST", body: { language: dil } });
+    // `reload()` YAZIMDAN SONRA: önce yenilenip sonra yazmak, yazım
+    // başarısız olduğunda kullanıcıyı eski dilde ve hiçbir açıklama olmadan
+    // bırakırdı.
+    window.location.reload();
+  } catch (e) {
+    syncLanguagePicker();
+    durum.textContent = t("prefs.write_failed", { hata: e.message });
+  }
+}
+
+$("language-select").addEventListener("change", (e) => saveLanguagePref(e.target.value));
 
 /** Kullanıcının kayıtlı model tercihi. `applyModels` bunu okuyor.
  *
@@ -710,6 +775,8 @@ async function loadModelPref() {
 }
 
 syncFolderView();
+// Ağa ÇIKMIYOR: seçili dil sayfanın kendisinden (`window.KROMIS_LANG`) okunuyor.
+syncLanguagePicker();
 loadFolders();
 loadHistory();
 loadSettings(true);

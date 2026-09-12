@@ -17,11 +17,13 @@ is no server in between.
 🇹🇷 [Türkçe](README.md) · 📦 [Installation](KURULUM.md) *(Turkish)* · 📖 [Full feature list](docs/ozellikler.md) *(Turkish)*
 
 > [!NOTE]
-> **The interface is Turkish only** — there is no language switch yet, so every
-> screenshot below shows Turkish labels. The Prompt Director takes your idea in
-> Turkish and writes the image prompt in English; the rest of the UI has not been
-> translated. The same is true of the in-repo documentation: this README is the
-> English entry point, the deeper documents are Turkish.
+> **The interface speaks English** — switch it in Settings → **Dil / Language**
+> (the button is deliberately named in both languages so you can find it from
+> either side). The choice is saved to disk, so it survives a restart.
+>
+> The screenshots below still show the Turkish interface, and the in-repo
+> documentation is Turkish: this README is the English entry point, the deeper
+> documents are not translated.
 
 ![Kromis Studio — a generated image in the studio flow](docs/gorseller/uretim-sonucu.png)
 
@@ -54,10 +56,18 @@ when the version does.
 
 ### Say what you want; the Director writes the prompt
 
-Describe the idea in everyday Turkish. The Director turns it into an optimised
-English prompt plus the technical settings (size, quality, count), asks you about
-anything it had to guess using **clickable options**, and offers variations and
-parameter axes. One click sends the prompt you like to generation.
+Describe the idea in everyday language — **you get an answer in whatever
+language you wrote in**; the limit is whichever languages the chat model you
+picked as the Director supports. The Director turns it into an optimised
+**English** prompt plus the technical settings (size, quality, count), asks you
+about anything it had to guess using **clickable options**, and offers
+variations and parameter axes. One click sends the prompt you like to
+generation.
+
+The prompt being English is not a language preference but a measured behaviour:
+image models produce noticeably more faithful results when the same scene is
+described in English. Ask for a prompt in another language and the Director will
+give you one, with the English version alongside it.
 
 ![The Prompt Director: generated prompt, technical settings, variations and parameter axes](docs/gorseller/studyo-yonetmen.png)
 

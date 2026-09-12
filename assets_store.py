@@ -11,6 +11,7 @@ manifest yazımı ve yazma kilidi jsonstore.py'de paylaşılıyor. Varlıklar t�
 """
 from __future__ import annotations
 
+import i18n
 import json
 import os
 import re
@@ -47,7 +48,7 @@ _SAFE_ID = re.compile(r"[0-9a-f]{8,32}")
 
 def _check_kind(kind: str) -> None:
     if kind not in KINDS:
-        raise ValueError(f"geçersiz kind: {kind!r}")
+        raise ValueError(i18n.t("err.invalid_field_value", None, alan="kind", deger=repr(kind)))
 
 
 def _kind_dir(assets_dir: str, kind: str) -> str:

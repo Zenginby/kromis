@@ -13,11 +13,13 @@
 // ── Logo/banner kütüphanesi (prompt altı panel) ─────────────────────
 let assetCache = { all: [], logos: [], banners: [], mottos: [] };
 let assetPanelKind = "all";
-const ASSET_EMPTY_TEXT = {
-  all: "Henüz varlık yok",
-  logos: "Henüz logo yok",
-  mottos: "Henüz motto yok",
-  banners: "Henüz banner yok",
+// Değerler ETİKET değil ANAHTAR (palette.js'teki HARMONY_KEYS'in gerekçesi):
+// çözüm okundukları yerde `t()` ile yapılıyor, tabloda değil.
+const ASSET_EMPTY_KEYS = {
+  all: "library.empty_all",
+  logos: "library.empty_logos",
+  mottos: "library.empty_mottos",
+  banners: "library.empty_banners",
 };
 
 // ── Yükleme HEDEFİ ──────────────────────────────────────────────────
@@ -38,11 +40,21 @@ const UPLOAD_TARGET = {
   mottos: "mottos",
   banners: "banners",
 };
-const UPLOAD_LABEL = {
-  logos: "Logo yükle", mottos: "Motto yükle", banners: "Banner yükle",
+const UPLOAD_LABEL_KEYS = {
+  logos: "library.upload_logo", mottos: "library.upload_motto",
+  banners: "library.upload_banner",
 };
-const UPLOAD_DONE_TEXT = {
-  logos: "Logo eklendi.", mottos: "Motto eklendi.", banners: "Banner eklendi.",
+const UPLOAD_DONE_KEYS = {
+  logos: "library.added_logo", mottos: "library.added_motto",
+  banners: "library.added_banner",
+};
+// Tür ADI ayrı bir tablo ve bu bir tekrar DEĞİL: düğme etiketinden ilk kelimeyi
+// kesip tür adı olarak kullanmak ("Logo yükle".split(" ")[0]) Türkçe'de kazara
+// çalışıyordu, İngilizce'de "Upload" verirdi. Dil bilgisi sırasına dayanan bir
+// çıkarım, çeviriyle birlikte sessizce yanlışa döner.
+const ASSET_KIND_KEYS = {
+  logos: "library.kind_logo_one", mottos: "library.kind_motto_one",
+  banners: "library.kind_banner_one",
 };
 
 function uploadTargetKind() {
@@ -57,32 +69,33 @@ function uploadTargetKind() {
  * kaynaktan türetilerek kapanıyor.
  */
 function assetEmptyText(kind) {
-  const baslik = ASSET_EMPTY_TEXT[kind] || "Henüz varlık yok";
-  return `${baslik} · "+ ${UPLOAD_LABEL[uploadTargetKind()]}" ile ekle`;
+  const baslik = t(ASSET_EMPTY_KEYS[kind] || "library.empty_all");
+  return t("library.empty_hint",
+           { baslik, dugme: t(UPLOAD_LABEL_KEYS[uploadTargetKind()]) });
 }
 
 function syncUploadLabel() {
   const kind = uploadTargetKind();
-  $("asset-upload-label").textContent = UPLOAD_LABEL[kind];
+  $("asset-upload-label").textContent = t(UPLOAD_LABEL_KEYS[kind]);
   $("asset-upload-btn").title =
-    `Seçtiğin dosya "${UPLOAD_LABEL[kind].split(" ")[0]}" olarak kütüphaneye eklenir`;
+    t("library.upload_btn_title", { tur: t(ASSET_KIND_KEYS[kind]) });
 }
 
-const OVERLAY_EMPTY_TEXT = {
+const OVERLAY_EMPTY_KEYS = {
   // `logo` girdisi, yerleşik logo kaldırıldığında eklendi: o seçenek
   // listeyi hiç boş bırakmadığı için logo modunun boş hâli daha önce YOKTU.
-  logo: "Önce Kütüphane'den bir logo yükle.",
-  motto: "Önce Kütüphane'den bir motto yükle.",
-  banner: "Önce Kütüphane'den bir banner yükle.",
+  logo: "overlay.need_logo",
+  motto: "overlay.need_motto",
+  banner: "overlay.need_banner",
 };
 
-// Kütüphane DOLU ama seçim yapılmamış hâli (OVERLAY_EMPTY_TEXT'ten farklı: orada
+// Kütüphane DOLU ama seçim yapılmamış hâli (OVERLAY_EMPTY_KEYS'ten farklı: orada
 // yüklenecek bir şey yok, burada seçilecek). `logo` girdisi de üç modun üçünün
 // de seçim gerektirmesiyle birlikte eklendi — bkz. overlayNeedsAsset.
-const OVERLAY_PICK_TEXT = {
-  logo: "Bir logo seç.",
-  motto: "Bir motto seç.",
-  banner: "Bir banner seç.",
+const OVERLAY_PICK_KEYS = {
+  logo: "overlay.pick_logo",
+  motto: "overlay.pick_motto",
+  banner: "overlay.pick_banner",
 };
 
 function assetStatus(msg) { $("asset-status").textContent = msg || ""; }
@@ -90,11 +103,11 @@ function assetStatus(msg) { $("asset-status").textContent = msg || ""; }
 async function loadAssets(kind) {
   try {
     const res = await fetch(`/api/assets/${kind}`);
-    if (!res.ok) throw new Error(`Hata (${res.status})`);
+    if (!res.ok) throw new Error(t("err.http", { durum: res.status }));
     assetCache[kind] = (await res.json()).items || [];
   } catch {
     assetCache[kind] = [];
-    assetStatus("Kütüphane alınamadı.");
+    assetStatus(t("library.load_failed"));
   }
   if (kind === assetPanelKind) renderAssetPanel();
   if (!$("logo-modal").hidden) renderOverlayPicker(); // modal açıksa seçiciyi tazele
@@ -121,7 +134,7 @@ function renderAssetPanel() {
     const del = document.createElement("button");
     del.className = "asset-del";
     del.textContent = "×";
-    del.title = "Sil";
+    del.title = t("common.delete");
     del.setAttribute("aria-label", `${item.name} sil`);
     del.addEventListener("click", () => deleteAssetItem(itemKind, item.id));
 
@@ -140,10 +153,10 @@ function renderAssetPanel() {
 
 async function uploadAsset(kind, file) {
   if (!isAcceptedUpload(file)) {
-    assetStatus("PNG, JPEG veya WebP bir görsel seç.");
+    assetStatus(t("library.bad_format"));
     return;
   }
-  assetStatus("Yükleniyor…");
+  assetStatus(t("library.uploading"));
   const fd = new FormData();
   fd.append("file", file);
   fd.append("name", file.name.replace(/\.[^.]+$/, ""));
@@ -151,11 +164,11 @@ async function uploadAsset(kind, file) {
     const res = await fetch(`/api/assets/${kind}`, { method: "POST", body: fd });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(typeof err.detail === "string" ? err.detail : `Hata (${res.status})`);
+      throw new Error(typeof err.detail === "string" ? err.detail : t("err.http", { durum: res.status }));
     }
     // Hangi türe gittiğini SÖYLÜYOR: "Eklendi." tek başına, varlığın
     // kullanılamaz bir türe düştüğü hâlde de aynı cümleyi yazıyordu.
-    assetStatus(UPLOAD_DONE_TEXT[kind] || "Eklendi.");
+    assetStatus(t(UPLOAD_DONE_KEYS[kind] || "library.added"));
     await Promise.all([loadAssets(kind), loadAssets("all")]);
   } catch (e) {
     assetStatus(e.message);
@@ -163,21 +176,21 @@ async function uploadAsset(kind, file) {
 }
 
 async function deleteAssetItem(kind, id) {
-  const ok = await confirmDialog("Varlığı sil",
-    "Bu logo/motto/banner kütüphaneden kalıcı olarak silinecek.");
+  const ok = await confirmDialog(t("library.delete_title"),
+    t("library.delete_body"));
   if (!ok) return;
   try {
     const res = await fetch(`/api/assets/${kind}/${id}`, { method: "DELETE" });
-    if (!res.ok) throw new Error(`Hata (${res.status})`);
+    if (!res.ok) throw new Error(t("err.http", { durum: res.status }));
     // modalda seçili öğe silindiyse seçimi güvenli varsayılana düşür
     if (kind === "logos" && selectedAsset.logo === id) selectedAsset.logo = null;
     if (kind === "mottos" && selectedAsset.motto === id) selectedAsset.motto = null;
     if (kind === "banners" && selectedAsset.banner === id) selectedAsset.banner = null;
-    assetStatus("Silindi.");
+    assetStatus(t("library.deleted"));
     await Promise.all([loadAssets(kind), loadAssets("all")]);
     if (!$("logo-modal").hidden) refreshLogoPreview();
   } catch {
-    assetStatus("Silinemedi.");
+    assetStatus(t("library.delete_failed"));
   }
 }
 
@@ -325,7 +338,7 @@ function renderOverlayPicker() {
   if (!options.length) {
     const hint = document.createElement("p");
     hint.className = "overlay-empty";
-    hint.textContent = OVERLAY_EMPTY_TEXT[overlayMode] || "Önce Kütüphane'den bir varlık yükle.";
+    hint.textContent = t(OVERLAY_EMPTY_KEYS[overlayMode] || "overlay.need_asset");
     wrap.appendChild(hint);
     return;
   }
@@ -416,7 +429,7 @@ async function fetchOverlayPreview() {
   if (!logoId) return;
   if (overlayNeedsAsset()) {
     $("logo-preview-img").src = rawPreviewSrc;
-    $("logo-status").textContent = OVERLAY_PICK_TEXT[overlayMode] || "Bir görsel seç.";
+    $("logo-status").textContent = t(OVERLAY_PICK_KEYS[overlayMode] || "overlay.pick_asset");
     return;
   }
   const token = ++logoPreviewToken;
@@ -431,7 +444,7 @@ async function fetchOverlayPreview() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(typeof err.detail === "string" ? err.detail : `Hata (${res.status})`);
+      throw new Error(typeof err.detail === "string" ? err.detail : t("err.http", { durum: res.status }));
     }
     const { b64 } = await res.json();
     if (token !== logoPreviewToken) return; // daha yeni bir önizleme devraldı
@@ -450,16 +463,17 @@ function refreshLogoPreview() {
   logoPreviewTimer = setTimeout(fetchOverlayPreview, 220);
 }
 
-const OVERLAY_DONE_TEXT = { logo: "Logo eklendi.", motto: "Motto eklendi.", banner: "Banner eklendi." };
+const OVERLAY_DONE_KEYS = { logo: "library.added_logo", motto: "library.added_motto",
+                            banner: "library.added_banner" };
 
 async function applyOverlay() {
   if (!logoId) return;
   if (overlayNeedsAsset()) {
-    $("logo-status").textContent = OVERLAY_PICK_TEXT[overlayMode] || "Bir görsel seç.";
+    $("logo-status").textContent = t(OVERLAY_PICK_KEYS[overlayMode] || "overlay.pick_asset");
     return;
   }
   $("logo-apply").disabled = true;
-  $("logo-status").textContent = "Uygulanıyor…";
+  $("logo-status").textContent = t("overlay.applying");
   const url = overlayMode === "banner" ? "/api/banner" : "/api/logo";
   const body = overlayMode === "banner" ? readBannerOpts() : readLogoOpts();
   try {
@@ -470,10 +484,10 @@ async function applyOverlay() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(typeof err.detail === "string" ? err.detail : `Hata (${res.status})`);
+      throw new Error(typeof err.detail === "string" ? err.detail : t("err.http", { durum: res.status }));
     }
     const { image } = await res.json();
-    const doneText = OVERLAY_DONE_TEXT[overlayMode] || "Eklendi.";
+    const doneText = t(OVERLAY_DONE_KEYS[overlayMode] || "library.added");
     closeLogoModal();
     showPreview(image);
     statusEl.textContent = doneText;

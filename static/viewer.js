@@ -270,7 +270,7 @@
       vvid.setAttribute("aria-label", alt || "");
       // Sahne ETİKETİ de değişiyor: "Görseli büyüt" diyen bir diyalog adı,
       // ekran okuyucu kullanıcısına yanlış içeriği duyururdu.
-      stage.setAttribute("aria-label", "Videoyu oynat");
+      stage.setAttribute("aria-label", t("viewer.play_video"));
       syncActions(src);
       viewer.hidden = false;
       document.body.classList.add("viewer-open");
@@ -282,7 +282,7 @@
     }
     vvid.pause();
     vvid.removeAttribute("src");
-    stage.setAttribute("aria-label", "Görseli büyüt");
+    stage.setAttribute("aria-label", t("viewer.open"));
     vimg.src = src;
     vimg.alt = alt || "";
     syncActions(src);

@@ -11,6 +11,8 @@ import pytest
 
 import azure_client as ac
 import catalog
+import etiket
+import i18n
 import models
 
 
@@ -356,10 +358,10 @@ def test_PREVIEW_jetonu_beyan_edilmiyor(m):
 
 def test_KISA_ad_marka_onekini_dusuruyor():
     """Kural: `"{marka} · "` öneki düşüyor, geri kalanı aynen kalıyor."""
-    kisa = catalog.short_labels(catalog.IMAGE_MODELS)
+    kisa = etiket.short_labels(catalog.IMAGE_MODELS)
     assert kisa["gemini-nano-banana-2"] == "Nano Banana 2"
     assert kisa["gemini-nano-banana-pro"] == "Nano Banana Pro"
-    sohbet = catalog.short_labels(catalog.CHAT_MODELS)
+    sohbet = etiket.short_labels(catalog.CHAT_MODELS)
     assert sohbet["openai-gpt-5.6-terra"] == "GPT-5.6 Terra"
     assert sohbet["gemini-3.7-flash"] == "3.7 Flash"
 
@@ -372,7 +374,7 @@ def test_CAKISAN_ad_tam_etiketini_KORUYOR():
     de anahtarı olan kullanıcı hangisini seçtiğini bilemez. Bu iddia, "önek her
     yerden düşsün" diye sadeleştiren bir sonraki turu kırmızıya çeviriyor.
     """
-    kisa = catalog.short_labels(catalog.IMAGE_MODELS)
+    kisa = etiket.short_labels(catalog.IMAGE_MODELS)
     assert kisa["azure-gpt-image-2"] == "Azure · gpt-image-2"
     assert kisa["openai-gpt-image-2"] == "OpenAI · gpt-image-2"
     # Aynı listede TEKİL olan `gpt-image-1` önekini bırakıyor: kural çakışmaya
@@ -387,7 +389,7 @@ def test_MARKA_ADIN_PARCASI_olan_etiket_kirpilmiyor():
     `AI Foundry dağıtımı`ya dönerdi — Azure'da model değil DAĞITIM olduğu
     bilgisini taşıyan tek satır o.
     """
-    assert catalog.short_labels(catalog.CHAT_MODELS)["azure-deployment"] == (
+    assert etiket.short_labels(catalog.CHAT_MODELS)["azure-deployment"] == (
         "Azure AI Foundry dağıtımı")
 
 
@@ -401,7 +403,7 @@ def test_KISA_ad_her_modelde_var_ve_BOS_DEGIL(models):
     dönüyor (kırpma yok) — sessiz ama zararsız yol; boş dize ise şeritte
     görünmez bir satır demekti.
     """
-    kisa = catalog.short_labels(models)
+    kisa = etiket.short_labels(models)
     assert set(kisa) == {m.id for m in models}
     assert all(ad.strip() for ad in kisa.values()), kisa
 
@@ -416,7 +418,7 @@ def test_KISA_adlar_LISTE_ICINDE_tekil(models):
     katalogda üçüncü bir eşadlı model, örneğin bir `Gemini · gpt-image-2`
     doğarsa) burada kırmızı yanıyor.
     """
-    adlar = list(catalog.short_labels(models).values())
+    adlar = list(etiket.short_labels(models).values())
     assert len(adlar) == len(set(adlar)), f"eşadlı satır: {adlar}"
 
 
@@ -546,7 +548,7 @@ def test_every_video_quality_token_has_a_LABEL():
     ekseninin okunabilirliği."""
     for m in catalog.VIDEO_MODELS:
         for q in m.qualities:
-            assert catalog.quality_label(q) != q, f"{q} etiketsiz"
+            assert etiket.quality_label(q) != q, f"{q} etiketsiz"
 
 
 @pytest.mark.parametrize(
@@ -555,7 +557,7 @@ def test_VIDEO_kisa_adlari_LISTE_ICINDE_tekil(models):
     """Görsel/sohbet şeritlerinin aynı mandalı: iki satır aynı metni
     GÖSTEREMEZ. Kısa adlar şerit BAŞINA hesaplanıyor (`app._settings_payload`),
     yani çakışma kuralı bu listenin kendi içinde çalışmak zorunda."""
-    adlar = list(catalog.short_labels(models).values())
+    adlar = list(etiket.short_labels(models).values())
     assert len(adlar) == len(set(adlar)), f"eşadlı satır: {adlar}"
 
 
@@ -618,7 +620,7 @@ def test_MAI_girdileri_jetonlari_PAYLASIYOR():
         assert m.quality_hidden is True
         # Düzenleme TEK referans alıyor (multipart `image`, tekrar YOK).
         assert m.supports_edit is True and m.max_refs == 1
-        assert m.note and "Önizleme" in m.note, (
+        assert m.note and "Önizleme" in i18n.t(m.note, "tr"), (
             f"{m.id}: MAI ailesinin üçü de önizleme; notta yazılı olmalı "
             "(bkz. openai-gpt-image-1'in duruşu)")
 
@@ -667,7 +669,8 @@ def test_FLUX_pro_nun_kalite_ekseni_GIZLI_flex_in_GERCEK():
 
 
 @pytest.mark.parametrize("m", catalog.IMAGE_MODELS, ids=lambda m: m.id)
-def test_her_gorsel_modelinin_notu_NE_ZAMAN_SECILIR_i_cevapliyor(m):
+@pytest.mark.parametrize("dil", i18n.LANGUAGES)
+def test_her_gorsel_modelinin_notu_NE_ZAMAN_SECILIR_i_cevapliyor(m, dil):
     """`note` seçicide model adının ALTINA yazılıyor (static/core.js) ve tek
     işi şu soruyu cevaplamak: "ne zaman bunu seçerim?".
 
@@ -677,10 +680,17 @@ def test_her_gorsel_modelinin_notu_NE_ZAMAN_SECILIR_i_cevapliyor(m):
     komşu satırların hizasını bozuyor. 110 karakter o 36px'in satır başına
     ~55 karakterle çevrilmiş hâli — kesin bir font ölçümü DEĞİL. Bağlayıcı
     da değil: en uzun gerçek not 88 karakter, yani %20 boşluk var.
+
+    v0.21'den beri `note` bir ÇEVİRİ ANAHTARI ve sözleşme HER DİLDE geçerli
+    olmak zorunda: 36px'lik kutu çeviriyle büyümüyor. Test bu yüzden dil
+    ekseninde de parametreli — İngilizce bir notun taşması Türkçe'sine
+    bakarak görülemezdi.
     """
     assert m.note, f"{m.id}: not yok — seçicideki satır sebepsiz kalıyor"
-    assert 20 <= len(m.note) <= 110, (
-        f"{m.id}: not {len(m.note)} karakter (beklenen 20-110)")
+    metin = i18n.t(m.note, dil)
+    assert metin != m.note, f"{m.id}: {dil}.json'da not yok"
+    assert 20 <= len(metin) <= 110, (
+        f"{m.id} ({dil}): not {len(metin)} karakter (beklenen 20-110)")
     # Adı TEKRAR ETMİYOR: etiket zaten satırın kendisi. Karşılaştırma
     # `·`DEN SONRAKİ PARÇAYLA yapılıyor, tam etiketle DEĞİL: tam etiket
     # ("OpenAI · gpt-image-2") hiçbir notta harfi harfine geçmez, yani tam
@@ -688,14 +698,14 @@ def test_her_gorsel_modelinin_notu_NE_ZAMAN_SECILIR_i_cevapliyor(m):
     # "gpt-image-1 artık kalkıyor…" yapan mutasyon, yani bu iddianın
     # ENGELLEMEK İÇİN VAR OLDUĞU kusur, tam etiket kıyasını geçiyordu.
     #
-    # `catalog.short_labels()` burada işe YARAMAZ: onun ölçülmüş çakışma
+    # `etiket.short_labels()` burada işe YARAMAZ: onun ölçülmüş çakışma
     # istisnası iki `gpt-image-2` girdisinde öneki BİLEREK koruyor (seçicide
     # doğru olan bu), ki o da tam da bu iki girdide iddiayı yeniden boşa
     # düşürürdü. Buradaki soru ayrıştırma değil, notun modelin KENDİ adıyla
     # başlayıp satırı tekrar etmesi.
     ad = m.label.rsplit("·", 1)[-1].strip().lower()
-    assert ad not in m.note.lower(), (
-        f"{m.id}: not model adını ({ad}) tekrar ediyor")
+    assert ad not in metin.lower(), (
+        f"{m.id} ({dil}): not model adını ({ad}) tekrar ediyor")
 
 
 def test_her_ONIZLEME_modelinin_notu_bunu_SOYLUYOR():
@@ -703,9 +713,12 @@ def test_her_ONIZLEME_modelinin_notu_bunu_SOYLUYOR():
     değişebilir. `openai-gpt-image-1`in duruşu benimseniyor — notta yazılı,
     kalkınca girdi silinir. Yazılmazsa kullanıcı kararlı bir model sanır.
     """
+    # Uyarı HER DİLDE durmak zorunda: yalnız Türkçe'ye bakan bir iddia,
+    # İngilizce notta "Preview" unutulduğunda sessizce yeşil kalırdı.
     for m in catalog.IMAGE_MODELS:
         if m.provider == "azure-mai":
-            assert "Önizleme" in m.note, f"{m.id}: önizleme uyarısı yok"
+            assert "Önizleme" in i18n.t(m.note, "tr"), f"{m.id}: önizleme uyarısı yok"
+            assert "Preview" in i18n.t(m.note, "en"), f"{m.id}: preview warning missing"
 
 
 def test_hicbir_not_uygulamanin_YAPMADIGI_bir_seyi_vaat_etmiyor():

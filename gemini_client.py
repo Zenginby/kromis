@@ -37,6 +37,7 @@ import base64
 import azure_client as ac
 import catalog
 import credstore
+import i18n
 import providers
 
 # Sürüm ÖNEKİ burada, `credentials.env`'de DEĞİL. `GEMINI_BASE_URL` ve
@@ -55,7 +56,7 @@ PNG_MIME = "image/png"
 
 def map_error(status_code: int, body: dict | list | None, *,
               wire_model: str | None = None) -> str:
-    """HTTP durumunu Türkçe mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
+    """HTTP durumunu mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
 
     `openai_client.map_error`'ın duruşunun aynısı ve aynı gerekçeyle: "OpenAI
     yetkilendirme hatası" diyen bir metin, Gemini anahtarını kurcalayan
@@ -74,15 +75,12 @@ def map_error(status_code: int, body: dict | list | None, *,
     """
     detail = providers.detail_of(body)
     if status_code == 400 and providers.is_invalid_key(detail):
-        return ("Gemini API anahtarı geçersiz (400): Ayarlar'dan yeniden "
-                "kaydet." + (f" {detail}" if detail else ""))
+        return i18n.t("err.gemini_bad_key") + (f" {detail}" if detail else "")
     if status_code in (401, 403):
-        return (f"Gemini erişimi reddetti ({status_code}): anahtar geçersiz "
-                "olabilir ya da hesabın bu modele erişimi yok."
+        return (i18n.t("err.gemini_denied", None, durum=status_code)
                 + (f" {detail}" if detail else ""))
     if status_code == 429:
-        return ("Gemini istek limiti aşıldı (429): biraz bekleyip tekrar dene. "
-                "Ücretsiz kademede görsel üretimi kapalı olabilir.")
+        return i18n.t("err.gemini_429")
     if status_code == 404:
         # Ölmüş bir model adının kullanıcıya görünen hâli. Metin MODELİ
         # söylüyor: `openai-dall-e-3` deneyimi tam olarak bunu öğretti —
@@ -96,14 +94,15 @@ def map_error(status_code: int, body: dict | list | None, *,
         # modelin kalktığını okuyamıyordu. Ad `payload["model"]`den geliyor,
         # yani telin GERÇEKTEN gönderdiği değer — katalogdan ikinci bir
         # okuma değil.
-        return ("Gemini bu modeli tanımıyor (404)"
-                + (f": {wire_model}." if wire_model else ": katalogdaki ad "
-                   "artık geçerli olmayabilir.")
-                + " Composer'daki şeritten başka bir model seç."
+        return (i18n.t("err.gemini_404")
+                + (f": {wire_model}." if wire_model else
+                   ": " + i18n.t("err.catalog_name_stale"))
+                + " " + i18n.t("err.pick_another_from_strip")
                 + (f" {detail}" if detail else ""))
     if status_code == 400 and providers.is_content_policy(detail):
-        return "İçerik politikası reddi: prompt Gemini tarafından engellendi."
-    return f"Gemini isteği başarısız (HTTP {status_code})." + (f" {detail}" if detail else "")
+        return i18n.t("err.gemini_content_policy")
+    return i18n.t("err.gemini_failed", None, durum=status_code) + (
+        f" {detail}" if detail else "")
 
 
 def build_input(prompt: str, images=None) -> list[dict]:
@@ -157,7 +156,7 @@ def decode_images(response_json: dict) -> list[bytes]:
     """
     adimlar = response_json.get("steps")
     if not isinstance(adimlar, list):
-        raise ac.ImageError("Gemini yanıtı beklenmedik biçimde geldi (steps yok).")
+        raise ac.ImageError(i18n.t("err.gemini_unexpected"))
 
     out: list[bytes] = []
     metinler: list[str] = []
@@ -176,9 +175,9 @@ def decode_images(response_json: dict) -> list[bytes]:
         aciklama = " ".join(m for m in metinler if m)[:300]
         durum = response_json.get("status")
         raise ac.ImageError(
-            "Gemini görsel döndürmedi"
+            i18n.t("err.gemini_no_image")
             + (f" (durum: {durum})" if durum and durum != "completed" else "")
-            + (f": {aciklama}" if aciklama else ". Prompt'u değiştirip tekrar deneyin."))
+            + (f": {aciklama}" if aciklama else ". " + i18n.t("err.change_prompt_retry")))
     return out
 
 

@@ -64,6 +64,7 @@ import time
 import azure_client as ac
 import catalog
 import credstore
+import i18n
 import providers
 
 # Sürüm ÖNEKİ kodda, `credentials.env`'de DEĞİL — `gemini_client.ENDPOINT_PATH`
@@ -124,7 +125,7 @@ def _bekle(saniye: float) -> None:
 
 def map_error(status_code: int, body: dict | list | None, *,
               wire_model: str | None = None) -> str:
-    """HTTP durumunu Türkçe mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
+    """HTTP durumunu mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
 
     `gemini_client.map_error`'ın duruşunun aynısı ve aynı gerekçeyle: "Gemini
     görsel" diyen bir metin, video faturasını arayan kullanıcıyı yanlış yere
@@ -141,29 +142,22 @@ def map_error(status_code: int, body: dict | list | None, *,
     detail = providers.detail_of(body)
     ek = f" {detail}" if detail else ""
     if status_code == 400 and providers.is_invalid_key(detail):
-        return ("Gemini API anahtarı geçersiz (400): Ayarlar'dan yeniden "
-                "kaydet." + ek)
+        return i18n.t("err.gemini_bad_key") + ek
     if status_code in (401, 403):
-        return ("Veo erişimi reddedildi "
-                f"({status_code}): Veo'nun ÜCRETSİZ KADEMESİ YOK — Gemini "
-                "anahtarının bağlı olduğu projede faturalandırma açık olmak "
-                "zorunda. Anahtar görsel üretiminde çalışıyorsa sorun anahtarda "
-                "değil, projenin ödeme ayarındadır." + ek)
+        return i18n.t("err.veo_denied", None, durum=status_code) + ek
     if status_code == 429:
-        return ("Veo istek limiti aşıldı (429): biraz bekleyip tekrar dene. "
-                "Faturalandırması yeni açılmış projelerde video kotası düşük "
-                "başlıyor." + ek)
+        return i18n.t("err.veo_429") + ek
     if status_code == 404:
         # `gemini_client.map_error`ın 404 dalıyla aynı ders: metin MODELİ
         # söylüyor. Burada ad YOLDAN geliyor, yani telin gerçekten çağırdığı
         # değer — katalogdan ikinci bir okuma değil.
-        return ("Gemini bu video modelini tanımıyor (404)"
-                + (f": {wire_model}." if wire_model else ": katalogdaki ad "
-                   "artık geçerli olmayabilir.")
-                + " Composer'daki şeritten başka bir model seç." + ek)
+        return (i18n.t("err.veo_404")
+                + (f": {wire_model}." if wire_model else
+                   ": " + i18n.t("err.catalog_name_stale"))
+                + " " + i18n.t("err.pick_another_from_strip") + ek)
     if status_code == 400 and providers.is_content_policy(detail):
-        return "İçerik politikası reddi: prompt Veo tarafından engellendi."
-    return f"Veo isteği başarısız (HTTP {status_code})." + ek
+        return i18n.t("err.veo_content_policy")
+    return i18n.t("err.veo_failed", None, durum=status_code) + ek
 
 
 def _kare(raw: bytes) -> dict:
@@ -234,8 +228,8 @@ def _coz_base64(deger) -> bytes:
         return base64.b64decode(deger)
     except Exception as exc:
         raise ac.ImageError(
-            "Veo yanıtındaki gömülü video çözülemedi (bozuk base64). "
-            "Prompt'u değiştirip tekrar deneyin.") from exc
+            i18n.t("err.veo_bad_base64") + " "
+            + i18n.t("err.change_prompt_retry")) from exc
 
 
 def _video_uri(op: dict) -> tuple[list[str], list[bytes]]:
@@ -255,16 +249,13 @@ def _video_uri(op: dict) -> tuple[list[str], list[bytes]]:
     yanit = op.get("response")
     if not isinstance(yanit, dict):
         raise ac.ImageError(
-            "Veo yanıtı beklenmedik biçimde geldi (`response` yok). "
-            f"Gövdedeki anahtarlar: {sorted(op)}.")
+            i18n.t("err.veo_no_response", None, anahtarlar=sorted(op)))
 
     kap = yanit.get("generateVideoResponse")
     ornekler = kap.get("generatedSamples") if isinstance(kap, dict) else None
     if not isinstance(ornekler, list):
         raise ac.ImageError(
-            "Veo yanıtı beklenmedik biçimde geldi "
-            "(`generateVideoResponse.generatedSamples` yok). "
-            f"`response` içindeki anahtarlar: {sorted(yanit)}.")
+            i18n.t("err.veo_no_samples", None, anahtarlar=sorted(yanit)))
 
     uriler: list[str] = []
     gomulu: list[bytes] = []
@@ -328,8 +319,7 @@ def _filtre_gerekcesi(op: dict) -> str | None:
         if isinstance(sebepler, list) and sebepler:
             return "; ".join(str(x) for x in sebepler)
         if kaynak.get("raiMediaFilteredCount"):
-            return ("içerik güvenlik filtresi videoyu engelledi "
-                    "(gerekçe belirtilmedi)")
+            return i18n.t("err.veo_filtered_no_reason")
     return None
 
 
@@ -343,10 +333,8 @@ def _timeout_message(gecen: float, butce: float) -> str:
     saniyesi faturalanmış olabilir ve kullanıcı "hata aldım, demek ki
     ücretlenmedim" diye düşünmemeli.
     """
-    return (f"Veo {gecen:.0f} saniyede bitmedi (tavan {butce:.0f} sn). "
-            "Süreyi ya da çözünürlüğü düşürüp tekrar dene. Not: üretim Google "
-            "tarafında tamamlanmış ve ücretlendirilmiş olabilir, yalnızca "
-            "sonuç bu tarafa ulaşmadı.")
+    return i18n.t("err.veo_timeout", None, gecen=f"{gecen:.0f}",
+                  butce=f"{butce:.0f}")
 
 
 def _istek(client, method: str, url: str, key: str | None, *, read: float,
@@ -440,14 +428,12 @@ def _indir(client, url: str, key: str, *, wire_model: str) -> bytes:
         hedef = (getattr(resp, "headers", None) or {}).get("location")
         if not hedef:
             raise ac.ImageError(
-                f"Veo videosu indirilemedi: {resp.status_code} yönlendirmesi "
-                "adres taşımıyor.")
+                i18n.t("err.veo_redirect_no_location", None, durum=resp.status_code))
         # GÖRECELİ adres de geçerli (RFC 7231): `urljoin` mutlaklaştırıyor,
         # yoksa `_google_konagi` boş bir konak görüp anahtarı düşürürdü.
         url = urljoin(url, hedef)
     raise ac.ImageError(
-        f"Veo videosu indirilemedi: {MAX_YONLENDIRME} yönlendirmeden sonra "
-        "hâlâ dosyaya ulaşılamadı.")
+        i18n.t("err.veo_too_many_redirects", None, adet=MAX_YONLENDIRME))
 
 
 def _govde(resp):
@@ -500,8 +486,7 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str,
         ad = op.get("name")
         if not ad:
             raise ac.ImageError(
-                "Veo işi başlatılamadı: yanıtta operation adı yok "
-                f"(anahtarlar: {sorted(op)}).")
+                i18n.t("err.veo_no_operation", None, anahtarlar=sorted(op)))
 
         # ── 2. Yoklama ───────────────────────────────────────────────────
         # `done` İLK yanıtta da gelebiliyor (belgede kısa işler için mümkün);
@@ -531,7 +516,7 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str,
         # bir video görünse bile teslim edilmemeli.
         hata = _operation_hatasi(op)
         if hata:
-            raise ac.ImageError(f"Veo video üretmedi: {hata}")
+            raise ac.ImageError(i18n.t("err.veo_no_video", None, hata=hata))
 
         # FİLTRE GEREKÇESİ KOŞULLU ve bu sıra ölçülü: filtre KISMİ olabiliyor
         # (n örnekten biri engellenir, geri kalanı teslim edilir) ve ilk
@@ -561,9 +546,9 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str,
             # kullanıcıya prompt'unu neden değiştirmesi gerektiğini
             # söylemeyen bir mesaj olurdu.
             raise ac.ImageError(
-                "Veo video döndürmedi"
+                i18n.t("err.veo_returned_nothing")
                 + (f": {filtre}" if filtre
-                   else ". Prompt'u değiştirip tekrar deneyin."))
+                   else ". " + i18n.t("err.change_prompt_retry")))
         # `gemini_client._uret`in tavanıyla aynı gerekçe: uç istenenden FAZLA
         # örnek döndürebiliyor ve fazlalık sessizce ilerlemiyor, ilerideki bir
         # doğrulamada patlıyor (`ChatMessage.image_ids` `max_length=4`). Eksik

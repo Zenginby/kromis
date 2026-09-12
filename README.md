@@ -5,7 +5,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org/)
 [![Build & Test](https://github.com/Zenginby/kromis/actions/workflows/release.yml/badge.svg)](https://github.com/Zenginby/kromis/actions)
 
-**Türkçe anlat, prompt'u uygulama yazsın.** Kromis Studio; görsel ve video
+**Kendi dilinde anlat, prompt'u uygulama yazsın.** Kromis Studio; görsel ve video
 üretimini, görsel düzenlemeyi, renk paletini ve kurumsal logo/motto/banner
 bindirmeyi tek pencerede toplar. Masaüstü uygulaması olarak da, bilgisayarındaki
 yerel bir web sayfası olarak da aynı şeydir.
@@ -42,12 +42,26 @@ Bağlantılar her zaman **en son yayına** gider; sürüm yükselince adres değ
 
 ## ✨ Güncel Özellikler (v0.20.0)
 
-### Fikri Türkçe anlat, prompt'u Yönetmen yazsın
+### Fikri kendi dilinde anlat, prompt'u Yönetmen yazsın
 
-Ne istediğini gündelik Türkçeyle yaz. Yönetmen bunu optimize edilmiş İngilizce
-bir prompt'a ve teknik ayarlara (boyut, kalite, adet) çevirir; kararsız kaldığı
-yeri sana **tıklanabilir seçeneklerle** sorar, varyasyon ve parametre ekseni
-önerir. Beğendiğin prompt tek tuşla üretime gider.
+Ne istediğini gündelik dille yaz — **hangi dilde yazarsan o dilde cevap
+alırsın**; sınır Yönetmen olarak seçtiğin sohbet modelinin desteklediği
+dillerdir. Yönetmen bunu optimize edilmiş **İngilizce** bir prompt'a ve teknik
+ayarlara (boyut, kalite, adet) çevirir; kararsız kaldığı yeri sana
+**tıklanabilir seçeneklerle** sorar, varyasyon ve parametre ekseni önerir.
+Beğendiğin prompt tek tuşla üretime gider.
+
+Prompt'un İngilizce olması bir dil tercihi değil ölçülmüş bir davranış: aynı
+sahne İngilizce tarif edildiğinde görsel modelleri belirgin biçimde daha sadık
+çıktı veriyor. Türkçe (ya da başka bir dilde) prompt istersen Yönetmen onu da
+verir, İngilizcesini yanına ekler.
+
+### Arayüz dili: Türkçe ya da İngilizce
+
+Ayarlar → **Dil / Language**. Seçim `prefs.json`'a yazılıyor, yani uygulamayı
+kapatıp açınca yerinde duruyor. Arayüzün tamamı — menüler, durum satırları,
+onay pencereleri ve hata mesajları — seçilen dilde geliyor. Belgeler ve
+buradaki ekran görüntüleri Türkçe kalıyor.
 
 ![Prompt Yönetmeni: üretilen prompt, teknik ayarlar, varyasyonlar ve parametre eksenleri](docs/gorseller/studyo-yonetmen.png)
 

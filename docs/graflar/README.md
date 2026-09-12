@@ -16,7 +16,7 @@
 
 * 44 Python modülü, 102 modül düzeyi ithal kenarı (12 erteli)
 * 44 HTTP uç noktası
-* 10 tarayıcı betiği, 21 betik-arası bağ
+* 10 tarayıcı betiği, 28 betik-arası bağ
 * 90 test dosyası; 3 modülü hiçbir test ithal etmiyor, 14 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
 * 1 ithal döngüsü, 0 rotaya oturmayan tarayıcı çağrısı
 

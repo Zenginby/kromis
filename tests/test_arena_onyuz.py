@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 import app as appmod
 import catalog
+from tests.conftest import tr
 
 
 def _metin(yol: str) -> str:
@@ -80,7 +81,8 @@ def test_a_failed_column_does_not_take_the_round_down():
     assert "failArenaSlot" in govde, "düşen sütun işaretlenmiyor"
     assert "catch" in govde, "sütun hatası yakalanmıyor"
     # Özet SAYIYLA: kullanıcı turun sonucunu tek bakışta görmeli.
-    assert "tutan.length}/${sutunlar.length}" in govde, "tur özeti sayı vermiyor"
+    assert 'tutan: tutan.length' in govde and 'toplam: sutunlar.length' in govde, \
+        "tur özeti sayı vermiyor"
 
 
 def test_a_round_with_no_surviving_column_leaves_no_orphan_turn():
@@ -212,12 +214,21 @@ def test_choosing_arena_models_does_not_rewrite_the_saved_preference():
 
 
 def test_the_go_gate_names_every_arena_blocker():
-    """Kilitli bir düğmenin SEBEBİ yazılı olmak zorunda (#go kapısının kuralı)."""
+    """Kilitli bir düğmenin SEBEBİ yazılı olmak zorunda (#go kapısının kuralı).
+
+    İddia METNE değil ANAHTARA bakıyor: çeviriden sonra cümleyi aramak, testi
+    bir yazım tercihine bağlardı. Ölçülen şey dalın DOĞRU cümleyi seçmesi ve
+    cümlenin gerçekten var olması — ikincisi `tr()` üzerinden, çünkü sözlükten
+    silinmiş bir anahtar `i18n.t` tarafından sessizce kendisine düşer ve
+    yalnız anahtarı aramak bunu kaçırırdı.
+    """
     govde = _govde(_core(), "goBlockReason")
     assert "ARENA_MIN" in govde, "en az model sayısı kapıda değil"
-    assert "Arena düzenlemeyle çalışmıyor" in govde, (
+    assert "gate.arena_no_edit" in govde, (
         "arena + referans hâli sessizce sıradan düzenlemeye düşüyor")
-    assert "anahtar yok" in govde
+    assert "gate.model_no_key" in govde, "anahtarsız model hâli kapıda değil"
+    assert "anahtar yok" in tr("gate.model_no_key"), (
+        "anahtar eksikliğini söyleyen cümle değişmiş")
 
 
 def test_the_keyboard_path_asks_the_WHOLE_gate_not_just_the_column_count():
@@ -250,7 +261,7 @@ def test_a_stalled_history_refresh_does_not_wedge_the_go_button():
     assert "runBusy = false" not in kuyruk[0], (
         "kilit ayrıca düz akışta da bırakılıyor — ikinci bir sahip")
     # Özet, patlayabilen döküm adımından ÖNCE yazılıyor: tur sonucu ekranda kalsın.
-    assert govde.index("model üretti.") < govde.index("finishArenaTurn(pending"), (
+    assert govde.index("arena.summary") < govde.index("finishArenaTurn(pending"), (
         "tur özeti döküm adımından sonra yazılıyor — o adım patlarsa sonuç kaybolur")
 
 

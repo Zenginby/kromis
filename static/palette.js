@@ -37,15 +37,23 @@ let selectedSuggestion = null; // seçili harmoni modu
 let suggestTimer = null;
 let suggestToken = 0;
 
-const HARMONY_LABELS = {
-  monochrome: "Tek renk",
-  analogic: "Komşu",
-  complement: "Karşıt",
-  "analogic-complement": "Komşu + karşıt",
-  triad: "Üçlü",
-  quad: "Dörtlü",
+// Değerler ETİKET değil ANAHTAR ve ad bunu SÖYLÜYOR: `…_LABELS` kalsaydı
+// okuyan biri `t()`den geçirmeden doğrudan ekrana basardı ve ham anahtar
+// görünürdü — tam olarak sessiz kalan kusur sınıfı.
+const HARMONY_KEYS = {
+  monochrome: "palette.scheme_monochrome",
+  analogic: "palette.scheme_analogic",
+  complement: "palette.scheme_complement",
+  "analogic-complement": "palette.scheme_analogic_complement",
+  triad: "palette.scheme_triad",
+  quad: "palette.scheme_quad",
 };
-const STRENGTH_LABELS = { hint: "İpucu", balanced: "Dengeli", strict: "Katı" };
+// HARMONY_KEYS'in ikizi, aynı adlandırma gerekçesiyle. Çözüm OKUNDUĞU yerde
+// yapılıyor: burada `t()` çağırmak, sözlüğü modül yüklenirken tek bir dile
+// çakmak olurdu ve dil değişiminde bayat kalırdı.
+const STRENGTH_KEYS = { hint: "palette.strength_hint",
+                        balanced: "palette.strength_balanced",
+                        strict: "palette.strength_strict" };
 const DEFAULT_SEED = "#c86a3c";
 
 // ── Renk seçici (HSV karesi + ton kaydırıcısı) ───────────────────────
@@ -112,8 +120,8 @@ function renderPicker({ syncHexField = true } = {}) {
   field.style.background =
     `linear-gradient(0deg, #000, transparent),` +
     `linear-gradient(90deg, #fff, hsl(${pick.h} 100% 50%))`;
-  field.setAttribute("aria-valuetext", `doygunluk ${Math.round(pick.s * 100)}%, ` +
-    `parlaklık ${Math.round(pick.v * 100)}%, ${hex}`);
+  field.setAttribute("aria-valuetext", t("palette.field_valuetext", {
+    doygunluk: Math.round(pick.s * 100), parlaklik: Math.round(pick.v * 100), hex }));
   const thumb = $("palette-field-thumb");
   thumb.style.left = `${pick.s * 100}%`;
   thumb.style.top = `${(1 - pick.v) * 100}%`;
@@ -144,8 +152,7 @@ function detailText(err) {
   if (typeof d === "string") return d;
   if (!Array.isArray(d)) return "";
   if (d.some((e) => e && e.type === "extra_forbidden")) {
-    return "Sunucu bu alanı tanımıyor — eski bir sunucu süreci çalışıyor. " +
-           "./run.sh ile yeniden başlat.";
+    return t("err.extra_forbidden");
   }
   return d.map((e) => (e && e.msg) || "").filter(Boolean).join("; ");
 }
@@ -186,8 +193,9 @@ function swatchRow(colors, { interactive = false, dropped = null, onToggle = nul
       sw.type = "button";
       // Bilgi renk algısına bağlı olmasın: durum hem aria-pressed hem metinde.
       sw.setAttribute("aria-pressed", String(isDropped));
-      sw.setAttribute("aria-label", `${c.name} ${c.hex} — ` + (
-        !secili ? "bu paleti seç" : (isDropped ? "geri ekle" : "paletten çıkar")));
+      sw.setAttribute("aria-label", `${c.name} ${c.hex} — ` + t(
+        !secili ? "palette.sw_pick" : (isDropped ? "palette.sw_restore"
+                                                 : "palette.sw_drop")));
       // `stopPropagation` ŞART: seçim tıklaması sarmalayıcı <div>'de dinleniyor
       // (renderSuggestions / renderPaletteLibrary) ve kutucuk tıklaması oraya
       // baloncuklanırsa her çıkarma aynı anda bir "seçim" olarak da sayılırdı.
@@ -204,7 +212,10 @@ function swatchRow(colors, { interactive = false, dropped = null, onToggle = nul
 }
 
 function paletteTitleOf(pal) {
-  return pal.name || HARMONY_LABELS[pal.mode] || pal.mode;
+  // `t()` bilinmeyen anahtarı KENDİSİ olarak döndürdüğü için eski
+  // `|| pal.mode` yedeği burada bedavaya korunuyor: tanınmayan bir mod
+  // jetonu ham hâliyle görünmeye devam ediyor.
+  return pal.name || t(HARMONY_KEYS[pal.mode] || pal.mode);
 }
 
 function renderPalettePanel() {
@@ -230,9 +241,10 @@ function renderPalettePanel() {
   const kept = total - activePalette.dropped.size;
   // Sayaç YALNIZCA bir şey çıkarıldığında görünüyor: her zaman "5/5" yazmak
   // kullanıcıya taşımadığı bir bilgiyi sürekli okutur.
-  const count = activePalette.dropped.size ? ` · ${kept}/${total} renk` : "";
+  const count = activePalette.dropped.size
+    ? ` · ${t("palette.kept_count", { kalan: kept, toplam: total })}` : "";
   $("palette-label").textContent =
-    `${paletteTitleOf(activePalette)} · ${STRENGTH_LABELS[paletteStrength]}${count}`;
+    `${paletteTitleOf(activePalette)} · ${t(STRENGTH_KEYS[paletteStrength])}${count}`;
 
   $("palette-strength-row").hidden = false;
   selectInGroup("#palette-strength",
@@ -243,9 +255,7 @@ function renderPalettePanel() {
   // geçerli olduğunu görmeli.
   const note = $("palette-mode-note");
   note.hidden = false;
-  note.textContent = source
-    ? "Referans görselde renk derecelendirmesi olarak uygulanır — kompozisyon korunur."
-    : "Renk yönlendirmesi prompt'un sonuna İngilizce eklenir.";
+  note.textContent = t(source ? "palette.mode_note_edit" : "palette.mode_note_generate");
 }
 
 function readPaletteOpts() {
@@ -282,7 +292,7 @@ function applyPalette({ seed, mode, colors, name = "", strength = null, id = nul
   activePalette = { seed, mode, colors, name, id, dropped: new Set(dropped || []) };
   if (strength) paletteStrength = strength;
   renderPalettePanel();
-  paletteStatus(`Palet uygulandı: ${paletteTitleOf(activePalette)}`);
+  paletteStatus(t("palette.applied", { ad: paletteTitleOf(activePalette) }));
 }
 
 /**
@@ -295,8 +305,8 @@ function applyPalette({ seed, mode, colors, name = "", strength = null, id = nul
  */
 function cikarmayiCevir(dropped, toplam, index) {
   if (!dropped.has(index) && dropped.size + 1 >= toplam) {
-    paletteStatus("En az bir renk kalmalı.");
-    paletteModalStatus("En az bir renk kalmalı.");
+    paletteStatus(t("palette.keep_one_colour"));
+    paletteModalStatus(t("palette.keep_one_colour"));
     return false;
   }
   if (dropped.has(index)) dropped.delete(index);
@@ -309,7 +319,7 @@ function cikarmayiCevir(dropped, toplam, index) {
 function clearPalette() {
   activePalette = null;
   renderPalettePanel();
-  paletteStatus("Palet kaldırıldı.");
+  paletteStatus(t("palette.removed"));
 }
 
 // ── Öneriler ────────────────────────────────────────────────────────
@@ -320,7 +330,7 @@ function scheduleSuggest() {
 
 async function fetchSuggestions() {
   const token = ++suggestToken;
-  paletteModalStatus("Paletler hesaplanıyor…");
+  paletteModalStatus(t("palette.computing"));
   try {
     const res = await fetch("/api/palette/suggest", {
       method: "POST",
@@ -329,7 +339,7 @@ async function fetchSuggestions() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(detailText(err) || `Hata (${res.status})`);
+      throw new Error(detailText(err) || t("err.http", { durum: res.status }));
     }
     const body = await res.json();
     // Sıra dışı yanıt guard'ı (logoPreviewToken deseni). DOM'dan ÖNCE state'i
@@ -428,12 +438,12 @@ function renderSuggestions() {
   const grid = $("palette-suggestions");
   grid.innerHTML = "";
   if (!suggestions.length) {
-    emptyNote(grid, "Palet önerisi yok — bir tema rengi seç.");
+    emptyNote(grid, t("palette.no_suggestions"));
   } else {
     for (const item of suggestions) {
       const secili = selectedSuggestion === item.mode;
       const kart = makeChoiceButton({
-        title: HARMONY_LABELS[item.mode] || item.mode,
+        title: t(HARMONY_KEYS[item.mode] || item.mode),
         colors: item.colors,
         cikarilabilir: true,
         dropped: secili ? onizlemeCikarilan : null,
@@ -493,11 +503,11 @@ function onizlemeCikarmayiCevir(item, index) {
 async function loadPalettes() {
   try {
     const res = await fetch("/api/palettes");
-    if (!res.ok) throw new Error(`Hata (${res.status})`);
+    if (!res.ok) throw new Error(t("err.http", { durum: res.status }));
     paletteCache = (await res.json()).items || [];
   } catch {
     paletteCache = [];
-    paletteStatus("Palet kütüphanesi alınamadı.");
+    paletteStatus(t("palette.library_failed"));
   }
   // Panel slide-over: açıklık `hidden` ile değil `.open` sınıfıyla anlatılıyor.
   if ($("palette-modal").classList.contains("open") && paletteTab === "saved") {
@@ -509,7 +519,7 @@ function renderPaletteLibrary() {
   const grid = $("palette-lib-grid");
   grid.innerHTML = "";
   if (!paletteCache.length) {
-    emptyNote(grid, "Henüz kayıtlı palet yok — \"Yeni palet\" sekmesinden oluştur.");
+    emptyNote(grid, t("palette.library_empty"));
     return;
   }
   for (const rec of paletteCache) {
@@ -519,8 +529,8 @@ function renderPaletteLibrary() {
     const btn = makeChoiceButton({
       title: rec.name,
       colors: rec.colors,
-      subtitle: `${HARMONY_LABELS[rec.mode] || rec.mode} · ` +
-                `${STRENGTH_LABELS[rec.strength] || rec.strength}`,
+      subtitle: `${t(HARMONY_KEYS[rec.mode] || rec.mode)} · ` +
+                `${t(STRENGTH_KEYS[rec.strength] || rec.strength)}`,
     });
     btn.addEventListener("click", () => {
       // Kayıttaki renkler zaten dondurulmuş — yeniden hesaplamaya gerek yok.
@@ -533,8 +543,8 @@ function renderPaletteLibrary() {
     const del = document.createElement("button");
     del.type = "button";
     del.className = "palette-lib-del";
-    del.setAttribute("aria-label", `${rec.name} paletini sil`);
-    del.title = "Paleti sil";
+    del.setAttribute("aria-label", t("palette.delete_named", { ad: rec.name }));
+    del.title = t("palette.delete");
     del.textContent = "×";
     del.addEventListener("click", (e) => { e.stopPropagation(); deletePalette(rec); });
     cell.appendChild(del);
@@ -547,9 +557,9 @@ async function savePalette() {
   const item = currentSuggestion();
   if (!item) return;
   const name = await promptDialog(
-    "Paleti kaydet",
-    "\"Kayıtlı paletler\" sekmesinden sonraki üretimlerde yeniden seçebilirsin.",
-    { okLabel: "Kaydet" });
+    t("palette.save_title"),
+    t("palette.save_body"),
+    { okLabel: t("common.save") });
   if (!name) return;
   try {
     const res = await fetch("/api/palettes", {
@@ -560,7 +570,7 @@ async function savePalette() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(detailText(err) || `Hata (${res.status})`);
+      throw new Error(detailText(err) || t("err.http", { durum: res.status }));
     }
     const saved = (await res.json()).palette;
     await loadPalettes();
@@ -574,15 +584,15 @@ async function savePalette() {
 
 async function deletePalette(rec) {
   const ok = await confirmDialog(
-    `"${rec.name}" paletini sil?`,
-    "Palet kütüphaneden kaldırılır. Üretilmiş görseller etkilenmez.");
+    t("palette.delete_title", { ad: rec.name }),
+    t("palette.delete_body"));
   if (!ok) return;
   try {
     const res = await fetch(`/api/palettes/${rec.id}`, { method: "DELETE" });
-    if (!res.ok) throw new Error(`Hata (${res.status})`);
+    if (!res.ok) throw new Error(t("err.http", { durum: res.status }));
     await loadPalettes();
     renderPaletteLibrary();
-    paletteModalStatus("Palet silindi.");
+    paletteModalStatus(t("palette.deleted"));
   } catch (e) {
     paletteModalStatus(e.message);
   }

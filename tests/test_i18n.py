@@ -284,22 +284,37 @@ def _sablon_anahtarlari():
         return set(i18n._PLACEHOLDER.findall(f.read()))
 
 
-def _betik_anahtarlari():
-    """`static/*.js` içindeki SABİT dizeli `t("…")` çağrılarının anahtarları.
+# Anahtar BİÇİMİ: `bolum.ad` — en az bir nokta, küçük harf/rakam/alt çizgi.
+# Tarama `t("…")` çağrısı ARAMIYOR, bu biçime uyan HER dizeyi topluyor ve bu
+# bilinçli: anahtarların bir kısmı çağrı yerinde değil bir TABLODA duruyor
+# (`HARMONY_KEYS`, `MODEL_EKSENLERI`, `MEDYA_TUR_SUZGECLERI` …) ve `t()` onlara
+# değişkenle dokunuyor. Yalnız çağrı yerlerini taramak o tabloları "ölü anahtar"
+# ilan ederdi.
+_ANAHTAR_BICIMI = re.compile(r'"([a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+)"')
 
-    Değişkenli çağrılar (`t(anahtar)`) burada GÖRÜNMEZ ve bu bilinen bir sınır:
-    statik tarama çalışma anını okumuyor (`tools/graf_uret.py`nin aynı duruşu).
-    Böyle bir çağrı yazıldığında anahtarları elle bir demete koymak gerekir;
-    bugün hiç yok, o yüzden muafiyet listesi de yok.
-    """
-    desen = re.compile(r'\bt\(\s*"([a-zA-Z0-9_.]+)"')
+# Şablonla KURULAN anahtar aileleri. `static/folders.js`in
+# `MEDYA_TUR_SUZGECLERI` tablosu anahtarın ÖN EKİNİ taşıyor,
+# `updateMediaRailCount` da ona `_one` / `_many` ekleyip `tc()`ye veriyor —
+# çünkü sayıdan sonra çoğul eki Türkçe'de yok, İngilizce'de var.
+#
+# Yani taramanın bulduğu `media.images` bir ANAHTAR DEĞİL, iki anahtarın ön
+# eki. Liste ELLE ve bu bir eksiklik değil tercih: statik tarama çalışma anını
+# okumuyor (`tools/graf_uret.py`nin aynı duruşu) ve muafiyetin ADIYLA
+# yazılması, sessizce atlanmasından iyidir.
+COGUL_ON_EKLERI = ("media.images", "media.videos", "media.uploads")
+DINAMIK_ANAHTARLAR = tuple(
+    f"{on}_{ek}" for on in COGUL_ON_EKLERI for ek in ("one", "many"))
+
+
+def _betik_anahtarlari():
+    """`static/*.js` içinde anahtar biçimine uyan dizeler."""
     bulunan = set()
     for ad in sorted(os.listdir(STATIC)):
         if not ad.endswith(".js"):
             continue
         with open(os.path.join(STATIC, ad), encoding="utf-8") as f:
-            bulunan |= set(desen.findall(f.read()))
-    return bulunan
+            bulunan |= set(_ANAHTAR_BICIMI.findall(f.read()))
+    return bulunan - set(COGUL_ON_EKLERI)
 
 
 def test_every_template_placeholder_has_a_translation():
@@ -313,7 +328,7 @@ def test_every_template_placeholder_has_a_translation():
 
 def test_every_script_key_has_a_translation():
     for lang in i18n.LANGUAGES:
-        eksik = _betik_anahtarlari() - set(_yukle(lang))
+        eksik = (_betik_anahtarlari() | set(DINAMIK_ANAHTARLAR)) - set(_yukle(lang))
         assert not eksik, f"{lang}.json'da olmayan betik anahtarı: {sorted(eksik)}"
 
 
@@ -326,14 +341,14 @@ def test_no_catalog_key_is_unused():
     GÖRÜNMEZ — onlar Python'da `i18n.t("…")` ile çağrılıyor, o yüzden kaynak
     olarak `.py` dosyaları da taranıyor.
     """
-    desen = re.compile(r'i18n\.t\(\s*"([a-zA-Z0-9_.]+)"')
     py_anahtarlari = set()
     for ad in sorted(os.listdir(REPO)):
         if not ad.endswith(".py"):
             continue
         with open(os.path.join(REPO, ad), encoding="utf-8") as f:
-            py_anahtarlari |= set(desen.findall(f.read()))
-    kullanilan = _sablon_anahtarlari() | _betik_anahtarlari() | py_anahtarlari
+            py_anahtarlari |= set(_ANAHTAR_BICIMI.findall(f.read()))
+    kullanilan = (_sablon_anahtarlari() | _betik_anahtarlari() | py_anahtarlari
+                  | set(DINAMIK_ANAHTARLAR))
     olu = set(_yukle(i18n.FALLBACK)) - kullanilan
     assert not olu, f"hiçbir yerde kullanılmayan anahtar: {sorted(olu)}"
 

@@ -29,6 +29,7 @@ import app as appmod
 import catalog
 import models
 import storage
+from tests.conftest import tr
 
 
 def _metin(yol: str) -> str:
@@ -439,8 +440,10 @@ def test_the_deleted_media_probe_stays_the_ERROR_EVENT_for_both_types():
     govde = _govde(_kodsuz(_chat()), "resultThumb")
 
     assert 'media.addEventListener("error"' in govde
-    assert '"Video silindi"' in govde
-    assert '"Görsel silindi"' in govde
+    assert '"result.video_deleted"' in govde
+    assert '"result.image_deleted"' in govde
+    assert tr("result.video_deleted") == "Video silindi"
+    assert tr("result.image_deleted") == "Görsel silindi"
 
 
 def test_the_video_card_does_NOT_bind_a_zoom_click():
@@ -504,7 +507,8 @@ def test_the_status_line_WARNS_about_the_wait():
     duruyor (uydurma olurdu); BEKLENEN SÜRE ise bir olgu."""
     govde = _govde(_kodsuz(_core()), "run")
 
-    assert "sekmeyi kapatma" in govde
+    assert "gen.video_running" in govde
+    assert "sekmeyi kapatma" in tr("gen.video_running")
     assert "%" not in govde.split("statusEl.textContent = videoMu")[1][:200]
 
 
@@ -819,7 +823,8 @@ def test_the_video_target_closes_the_ARENA_gate():
     video = dal[dal.index('currentMode === "video"'):]
     video = video[:video.index('if (!imageModels.length)')]
     assert "arenaAcik" in video, "video dalı arenayı hiç sormuyor"
-    assert "Görsel moduna" in video, "kullanıcıya çıkış yolu söylenmiyor"
+    assert "gate.arena_not_in_video" in video, "kullanıcıya çıkış yolu söylenmiyor"
+    assert "Görsel moduna" in tr("gate.arena_not_in_video")
 
 
 def test_the_director_can_target_the_VIDEO_mode():
@@ -866,7 +871,8 @@ def test_the_gate_REFUSES_an_extra_reference_in_video_mode():
     govde = _govde(_kodsuz(_core()), "goBlockReason")
 
     assert "if (extras.length) {" in govde
-    assert "tek referans görsel alıyor" in govde
+    assert "gate.model_one_reference" in govde
+    assert "tek referans görsel alıyor" in tr("gate.model_one_reference")
 
 
 def test_the_OVERLAY_button_is_closed_for_a_video_record():

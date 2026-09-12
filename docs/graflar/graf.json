@@ -1024,7 +1024,7 @@
           "/output/{}"
         ],
         "dosya": "static/assets.js",
-        "satir": 547,
+        "satir": 561,
         "tanim": 25
       },
       {
@@ -1038,7 +1038,7 @@
           "/output/{}.${videoMu "
         ],
         "dosya": "static/chat.js",
-        "satir": 2662,
+        "satir": 2665,
         "tanim": 90
       },
       {
@@ -1055,7 +1055,7 @@
           "/output/{}.png"
         ],
         "dosya": "static/core.js",
-        "satir": 2933,
+        "satir": 2930,
         "tanim": 88
       },
       {
@@ -1070,7 +1070,7 @@
           "/output/{}${videoMu "
         ],
         "dosya": "static/folders.js",
-        "satir": 2043,
+        "satir": 2061,
         "tanim": 60
       },
       {
@@ -1092,7 +1092,7 @@
           "/api/palettes/{}"
         ],
         "dosya": "static/palette.js",
-        "satir": 759,
+        "satir": 769,
         "tanim": 37
       },
       {
@@ -1108,7 +1108,7 @@
           "/api/settings"
         ],
         "dosya": "static/settings.js",
-        "satir": 728,
+        "satir": 737,
         "tanim": 19
       },
       {
@@ -1142,6 +1142,13 @@
       },
       {
         "adlar": [
+          "t"
+        ],
+        "hedef": "static/i18n.js",
+        "kaynak": "static/assets.js"
+      },
+      {
+        "adlar": [
           "arenaSecimi",
           "autoGrow",
           "axisLabel",
@@ -1169,6 +1176,13 @@
           "loadHistory"
         ],
         "hedef": "static/folders.js",
+        "kaynak": "static/chat.js"
+      },
+      {
+        "adlar": [
+          "t"
+        ],
+        "hedef": "static/i18n.js",
         "kaynak": "static/chat.js"
       },
       {
@@ -1208,6 +1222,14 @@
           "loadHistory"
         ],
         "hedef": "static/folders.js",
+        "kaynak": "static/core.js"
+      },
+      {
+        "adlar": [
+          "t",
+          "tc"
+        ],
+        "hedef": "static/i18n.js",
         "kaynak": "static/core.js"
       },
       {
@@ -1254,6 +1276,14 @@
       },
       {
         "adlar": [
+          "t",
+          "tc"
+        ],
+        "hedef": "static/i18n.js",
+        "kaynak": "static/folders.js"
+      },
+      {
+        "adlar": [
           "detailText"
         ],
         "hedef": "static/palette.js",
@@ -1274,6 +1304,13 @@
           "selectInGroup"
         ],
         "hedef": "static/folders.js",
+        "kaynak": "static/palette.js"
+      },
+      {
+        "adlar": [
+          "t"
+        ],
+        "hedef": "static/i18n.js",
         "kaynak": "static/palette.js"
       },
       {
@@ -1318,6 +1355,13 @@
       },
       {
         "adlar": [
+          "t"
+        ],
+        "hedef": "static/i18n.js",
+        "kaynak": "static/settings.js"
+      },
+      {
+        "adlar": [
           "loadPalettes"
         ],
         "hedef": "static/palette.js",
@@ -1337,6 +1381,13 @@
           "setCurrentImage"
         ],
         "hedef": "static/core.js",
+        "kaynak": "static/viewer.js"
+      },
+      {
+        "adlar": [
+          "t"
+        ],
+        "hedef": "static/i18n.js",
         "kaynak": "static/viewer.js"
       }
     ],

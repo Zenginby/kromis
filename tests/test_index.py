@@ -5879,7 +5879,7 @@ def test_ayarlar_yonlendirmesi_TEK_SABITTEN_geliyor():
 # mandalın işi "kökteki hiçbir belge ölçütün dışında kalmasın" ve orada geçecek
 # bir `⚙`, arayüzden düşmüş glifi geri getirme riskini birebir aynı taşıyor.
 _KULLANICI_BELGELERI = ("CLAUDE.md", "GUNCELLEME.md", "KURULUM.md",
-                        "README.en.md", "README.md")
+                        "MARKA.md", "README.en.md", "README.md", "TELIF.md")
 
 
 def test_belgeler_AYARLAR_dugmesini_glifle_anlatmiyor():

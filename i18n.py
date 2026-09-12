@@ -33,6 +33,7 @@ buharlaşması, ekranda duran `{adet}`ten çok daha sessiz bir kusur olurdu.
 """
 from __future__ import annotations
 
+import contextvars
 import html
 import json
 import os
@@ -53,7 +54,7 @@ FALLBACK = "tr"
 # sözdizim: sürüm TEK bir değer, bu ise adlı bir tablo — `{{t:…}}` biçimi
 # anahtarı yer tutucunun İÇİNDE taşıyor ve bir HTML özniteliğinin içinde de
 # tırnak kaçışı gerektirmiyor.
-_PLACEHOLDER = re.compile(r"\{\{t:([a-zA-Z0-9_.]+)\}\}")
+_PLACEHOLDER = re.compile(r"\{\{t:([a-zA-Z0-9_.-]+)\}\}")
 
 # `{ad}` — yalnız harf/rakam/alt çizgi. Dar tutulması bilinçli: CSS ya da JSON
 # örneği taşıyan bir çeviri metnindeki süslü parantezler değişken sanılmasın.
@@ -71,6 +72,41 @@ _cache: dict[str, tuple[float, dict[str, str]]] = {}
 # `jsonstore.lock_for`ın deseni DEĞİL ve olmamalı: orada yazma var, burada
 # yalnızca okuma — süreçler arası bir kilide gerek yok.
 _lock = threading.Lock()
+
+
+# BU İSTEĞİN dili. `ContextVar`, küresel bir değişken DEĞİL: değeri isteğin
+# bağlamına bağlı ve eşzamanlı iki istek birbirinin dilini göremiyor —
+# `asyncio` görevleri ile `run_in_threadpool`'un iş parçacıkları bağlamı
+# kopyalayarak taşıyor, yani FastAPI'nin hem async hem senkron rotaları
+# doğru değeri okuyor.
+#
+# NEDEN VAR: hata metinlerini üreten yer sağlayıcı istemcileri
+# (`azure_client.map_error` ve yedi ikizi) ve onlar dili SORAMIYOR —
+# `prefs`'i ithal etmeleri döngü açardı (`prefs` → `models` → `azure_client`).
+# Dili beş kademe boyunca parametre olarak taşımak (rota → providers →
+# adaptör → istemci → map_error) her imzayı genişletmek ve her testi
+# güncellemek demekti; üstelik o zincirdeki her yeni fonksiyon aynı
+# parametreyi unutmaya açık olurdu.
+#
+# TEK YAZAR `app`'in ara katmanı (`_dil_baglami`). İkinci bir yazar doğarsa
+# hangisinin son sözü söylediği çağrı sırasına kalırdı; `#go.disabled`ın "tek
+# yazar" kuralının aynısı.
+_AKTIF = contextvars.ContextVar("kromis_dil", default=FALLBACK)
+
+
+def set_active(lang: str | None) -> None:
+    """Bu isteğin dilini kurar. Tek çağıranı `app`'in ara katmanı."""
+    _AKTIF.set(normalize(lang))
+
+
+def active() -> str:
+    """Bu isteğin dili; hiç kurulmamışsa `FALLBACK`.
+
+    Kurulmamış hâl GERÇEK ve doğru davranışı da o: `desktop.py` sunucu hiç
+    açılmadan uyarı gösteriyor, testler `map_error`ı doğrudan çağırıyor.
+    İkisinde de Türkçe'ye düşmek, patlamaktan da boş dizeden de iyidir.
+    """
+    return _AKTIF.get()
 
 
 def normalize(lang: str | None) -> str:
@@ -127,8 +163,12 @@ def catalog(lang: str) -> dict[str, str]:
     return temiz
 
 
-def t(key: str, lang: str = FALLBACK, /, **degiskenler: object) -> str:
+def t(key: str, lang: str | None = None, /, **degiskenler: object) -> str:
     """`key`in `lang` dilindeki karşılığı; yoksa `tr`, o da yoksa anahtarın kendisi.
+
+    `lang` VERİLMEZSE isteğin dili (`active()`) kullanılıyor. Açıkça vermek
+    hâlâ mümkün ve gerekli: testler belirli bir dili ölçüyor, `app.index` de
+    şablonu çözerken dili zaten elinde tutuyor.
 
     Anahtarın EKRANA çıkması bilerek gürültülü — sessizce boş bir etiket
     bırakmak, eksik çeviriyi görünmez kılardı. Kullanıcıya ulaşmasını ise
@@ -138,7 +178,7 @@ def t(key: str, lang: str = FALLBACK, /, **degiskenler: object) -> str:
     `lang` adında bir DEĞİŞKENİ olan bir metin (`"{lang} seçildi"`) aksi hâlde
     parametreyle çakışırdı.
     """
-    lang = normalize(lang)
+    lang = active() if lang is None else normalize(lang)
     metin = catalog(lang).get(key)
     if metin is None and lang != FALLBACK:
         metin = catalog(FALLBACK).get(key)

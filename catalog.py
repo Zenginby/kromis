@@ -154,7 +154,10 @@ class ImageModel:
     durations: tuple[int, ...] = ()
     # Arayüzün ilk seçtiği süre. 0 = demetin ilk öğesi (`default_size`in kuralı).
     default_duration: int = 0
-    note: str | None = None       # seçicide gösterilen kısa Türkçe uyarı
+    # Seçicide gösterilen kısa açıklama. Değer METİN DEĞİL ÇEVİRİ ANAHTARI
+    # (`model.<id>.note`) ve çözüm `app._model_payload`da: katalog dilsiz
+    # kalmalı — onu on üç modül ithal ediyor ve hiçbirinin dille işi yok.
+    note: str | None = None
     # MEDYA TÜRÜ. `"image"` ve `"video"` iki AYRI demette yaşıyor
     # (`IMAGE_MODELS` / `VIDEO_MODELS`), yani bu alan üyeliğin tekrarı gibi
     # görünüyor — ama tekrar DEĞİL, çünkü model örneği demetinden KOPUK
@@ -208,7 +211,10 @@ class ChatModel:
     # ayrı bir olgu. Minimal-gövde tripwire'ı bu yüzden adaptör BAŞINA yazılıyor,
     # yoksa buradaki meşru `max_tokens` bir gün Azure gövdesine kopyalanır.
     needs_max_tokens: bool = False
-    note: str | None = None       # seçicide gösterilen kısa Türkçe uyarı
+    # Seçicide gösterilen kısa açıklama. Değer METİN DEĞİL ÇEVİRİ ANAHTARI
+    # (`model.<id>.note`) ve çözüm `app._model_payload`da: katalog dilsiz
+    # kalmalı — onu on üç modül ithal ediyor ve hiçbirinin dille işi yok.
+    note: str | None = None
     kind: str = "chat"
     # ImageModel.plan ile AYNI alan ve aynı gerekçe (uzunu orada).
     plan: str = "free"
@@ -458,8 +464,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=8,
         credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
-        note="Metin, tabela ve çok referanslı düzenlemede en güçlü; "
-             "uygulamanın varsayılanı.",
+        note="model.azure-gpt-image-2.note",
     ),
     # OpenAI DOĞRUDAN (Azure üzerinden değil). Tel formatı Azure'ın aynısı, o
     # yüzden adaptör onun bilinçli ikizi (bkz. openai_client.py'nin başlığı).
@@ -507,8 +512,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=8,
         credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
-        note="Azure'daki modelin aynısı, kendi anahtarınla — kurumsal "
-             "kaynağın yoksa bunu seç.",
+        note="model.openai-gpt-image-2.note",
     ),
     # KATALOGDA KALIYOR ama ÖMÜRLÜ: 23 Ekim 2026'da OpenAI API'sinden kalkıyor.
     # Bugün çalışıyor ve anahtarı yalnız bu modele erişen hesaplar var, o yüzden
@@ -530,7 +534,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=8,
         credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
-        note="Seçmeyin: 23 Ekim 2026'da API'den kalkıyor. gpt-image-2'ye geç.",
+        note="model.openai-gpt-image-1.note",
     ),
     # ── Gemini · Nano Banana ────────────────────────────────────────────
     #
@@ -585,7 +589,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         # yazan tur ile onu yanlışlayan tur AYNI daldı. Hız iddiası duruyor —
         # katalogda gecikme verisi yok, yani ölçülemez; maliyet ölçülebilir ve
         # artık mandallı.
-        note="En hızlı tur; oran seçiliyor (piksel değil). Taslak için.",
+        note="model.gemini-nano-banana-2.note",
     ),
     ImageModel(
         id="gemini-nano-banana-pro",
@@ -603,8 +607,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=4,
         credits=27,
         credits_by_quality=(("1K", 27), ("2K", 27), ("4K", 48)),
-        note="Marka tutarlılığı ve uzun metin yerleşimi; pahalı ama en "
-             "sadık.",
+        note="model.gemini-nano-banana-pro.note",
     ),
     # ── Azure AI Foundry · MAI-Image (Microsoft) ────────────────────────
     #
@@ -650,8 +653,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         # model başına `max_refs`e bakmıyor.
         max_refs=1,
         credits=8,
-        note="Fotogerçekçi ürün ve portre işi; metin işlemede MAI'nin en "
-             "iyisi. Tek referansla düzenliyor. Önizleme.",
+        note="model.azure-mai-image-2-6.note",
     ),
     ImageModel(
         id="azure-mai-image-2-6-flash",
@@ -669,8 +671,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         max_refs=1,
         # GEÇİCİ: birim fiyat doğrulanamadı, oran 2.6'nın yarısı varsayıldı.
         credits=4,
-        note="2.6'nın hızlı ve ucuz kardeşi; taslak ve deneme turları için. "
-             "Tek referansla düzenliyor. Önizleme.",
+        note="model.azure-mai-image-2-6-flash.note",
     ),
     ImageModel(
         id="azure-mai-image-2-5-pro",
@@ -687,8 +688,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         supports_edit=True,
         max_refs=1,
         credits=10,
-        note="Kalabalık sahnelerde nesne ve karakter tutarlılığı; pahalı. "
-             "Tek referansla düzenliyor. Önizleme.",
+        note="model.azure-mai-image-2-5-pro.note",
     ),
     # ── Azure AI Foundry · FLUX.2 (Black Forest Labs) ───────────────────
     #
@@ -728,7 +728,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         supports_edit=True,
         max_refs=4,
         credits=16,
-        note="En yüksek görsel kalite; yavaş ve pahalı. Tek turda 1 görsel.",
+        note="model.azure-flux-2-pro.note",
     ),
     ImageModel(
         id="azure-flux-2-flex",
@@ -751,8 +751,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         # (10/25 → 0,6× ve 50/25 → 1,6×, yuvarlanmış). ÜÇÜ DE GEÇİCİ —
         # megapiksel fiyatı doğrulanmadı.
         credits_by_quality=(("hizli", 6), ("dengeli", 10), ("detayli", 16)),
-        note="Adım ve yönlendirme seçilebiliyor: metin ağırlıklı yerleşimler "
-             "için. Tek turda 1 görsel.",
+        note="model.azure-flux-2-flex.note",
     ),
 )
 
@@ -859,7 +858,7 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         poll_timeout=420.0,
         credits=16,
         kind="video",
-        note="En ucuz Veo. Gemini anahtarının ödemesi AÇIK olmalı.",
+        note="model.gemini-veo-3-1-lite.note",
     ),
     ImageModel(
         id="gemini-veo-3-1-fast",
@@ -882,7 +881,7 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         poll_timeout=420.0,
         credits=30,
         kind="video",
-        note="Hız ile kalite arasında denge; sesi de kendi üretiyor.",
+        note="model.gemini-veo-3-1-fast.note",
     ),
     ImageModel(
         id="gemini-veo-3-1",
@@ -906,7 +905,7 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         poll_timeout=600.0,
         credits=80,
         kind="video",
-        note="En iyi Veo, 1080p açık. Saniyesi pahalı — süreye dikkat.",
+        note="model.gemini-veo-3-1.note",
     ),
 )
 
@@ -1079,7 +1078,7 @@ CHAT_MODELS: tuple[ChatModel, ...] = (
         credential="azure_chat",
         wire_model="",                          # ORTAMDAN okunuyor
         wire_from_env="AZURE_CHAT_DEPLOYMENT",
-        note="Adı Ayarlar'dan giriliyor: Azure'da model değil DAĞITIM var.",
+        note="model.azure-deployment.note",
     ),
     # GPT-5.6 ailesinin üç kademesi. Üçü de AYNI tel, yalnız `wire_model`
     # farklı — o yüzden üçü de tek adaptörden geçiyor ve yeni bir kademe
@@ -1091,7 +1090,7 @@ CHAT_MODELS: tuple[ChatModel, ...] = (
         provider="openai",
         credential="openai",
         wire_model="gpt-5.6-terra",
-        note="Dengeli kademe — günlük brief'ler için varsayılan.",
+        note="model.openai-gpt-5.6-terra.note",
     ),
     ChatModel(
         id="openai-gpt-5.6-luna",
@@ -1099,7 +1098,7 @@ CHAT_MODELS: tuple[ChatModel, ...] = (
         provider="openai",
         credential="openai",
         wire_model="gpt-5.6-luna",
-        note="En ucuz ve en hızlı kademe; kısa turlar için.",
+        note="model.openai-gpt-5.6-luna.note",
     ),
     ChatModel(
         id="openai-gpt-5.6-sol",
@@ -1107,7 +1106,7 @@ CHAT_MODELS: tuple[ChatModel, ...] = (
         provider="openai",
         credential="openai",
         wire_model="gpt-5.6-sol",
-        note="Ailenin en güçlüsü ve en pahalısı; uzun, çok kısıtlı brief'ler için.",
+        note="model.openai-gpt-5.6-sol.note",
     ),
     ChatModel(
         id="gemini-3.7-flash",
@@ -1118,7 +1117,7 @@ CHAT_MODELS: tuple[ChatModel, ...] = (
         # Görsel tarafı `/v1beta/interactions` konuşuyor; sohbet tarafı
         # OpenAI-uyumlu uçtan gidiyor. Aynı kimlik, iki ayrı yol.
         endpoint_path="/v1beta/openai/chat/completions",
-        note="Gemini'nin OpenAI-uyumlu ucundan konuşuyor; hızlı ve ucuz.",
+        note="model.gemini-3.7-flash.note",
     ),
 )
 

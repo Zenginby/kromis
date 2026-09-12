@@ -290,7 +290,8 @@ def _sablon_anahtarlari():
 # (`HARMONY_KEYS`, `MODEL_EKSENLERI`, `MEDYA_TUR_SUZGECLERI` …) ve `t()` onlara
 # değişkenle dokunuyor. Yalnız çağrı yerlerini taramak o tabloları "ölü anahtar"
 # ilan ederdi.
-_ANAHTAR_BICIMI = re.compile(r'"([a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+)"')
+# Tire de geçerli: model kimlikleri onu taşıyor (`model.gemini-veo-3-1.note`).
+_ANAHTAR_BICIMI = re.compile(r'"([a-z][a-z0-9_-]*(?:\.[a-z0-9_.-]+)+)"')
 
 # Şablonla KURULAN anahtar aileleri. `static/folders.js`in
 # `MEDYA_TUR_SUZGECLERI` tablosu anahtarın ÖN EKİNİ taşıyor,
@@ -457,3 +458,64 @@ def test_the_picker_reads_the_language_from_the_page_not_the_server():
     govde = govde[:govde.find("\n}")]
     assert "KROMIS_DIL" in govde, "seçili dil sayfadan okunmuyor"
     assert "/api/prefs" not in govde, "seçili radyoyu kurmak için ağa çıkılıyor"
+
+
+# ── Sunucu mesajları ─────────────────────────────────────────────────
+
+def test_a_route_error_speaks_the_selected_language(monkeypatch, tmp_path):
+    """Yarım bir çeviri en çok HATA ANINDA göze batar: İngilizce bir arayüzde
+    Türkçe bir hata kutusu, kullanıcının "bu uygulama bana mı ait" sorusunu
+    sorduğu an olurdu."""
+    import prefs
+    out = str(tmp_path / "output")
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", out)
+    prefs.update({"language": "en"}, out)
+    c = TestClient(appmod.app)
+    assert c.delete("/api/image/yokboyle").json()["detail"] == "The image was not found."
+    prefs.update({"language": "tr"}, out)
+    assert c.delete("/api/image/yokboyle").json()["detail"] == "Görsel bulunamadı."
+
+
+def test_a_provider_error_speaks_the_selected_language():
+    """Sağlayıcı istemcileri dili PARAMETREYLE almıyor, isteğin bağlamından
+    okuyor (`i18n.active()`). Beş kademelik bir imza genişletmesinden kaçınan
+    kararın gerçekten çalıştığının kanıtı bu."""
+    import azure_client
+    i18n.set_active("en")
+    try:
+        assert "invalid" in azure_client.map_error(401, None)
+    finally:
+        i18n.set_active(i18n.FALLBACK)
+    assert "geçersiz" in azure_client.map_error(401, None)
+
+
+def test_the_active_language_is_per_request_not_global():
+    """`ContextVar` seçimi burada ölçülüyor: iki eşzamanlı isteğin dili
+    birbirine SIZAMAZ. Küresel bir değişken olsaydı, dili İngilizce olan bir
+    kullanıcının isteği, aynı anda üreten Türkçe kullanıcının hata mesajını
+    da çevirirdi."""
+    import concurrent.futures
+
+    def calis(dil):
+        i18n.set_active(dil)
+        return i18n.t("err.not_found")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as havuz:
+        sonuc = list(havuz.map(calis, ["en", "tr"]))
+    assert sonuc == ["not found", "bulunamadı"]
+    # Ana bağlam HİÇ dokunulmadan kaldı: alt bağlamdaki `set` dışarı sızmıyor.
+    assert i18n.active() == i18n.FALLBACK
+
+
+def test_every_model_note_is_a_translation_key():
+    """`catalog` DİLSİZ kalmak zorunda: onu on üç modül ithal ediyor ve
+    hiçbirinin dille işi yok. Not bir metin olarak kalsaydı katalog tek bir
+    dile çakılırdı."""
+    import catalog
+    for m in catalog.IMAGE_MODELS + catalog.VIDEO_MODELS + catalog.CHAT_MODELS:
+        if m.note is None:
+            continue
+        assert m.note.startswith("model.") and m.note.endswith(".note"), (
+            f"{m.id}: not bir çeviri anahtarı değil: {m.note!r}")
+        for lang in i18n.LANGUAGES:
+            assert m.note in _yukle(lang), f"{m.id}: {lang}.json'da yok"

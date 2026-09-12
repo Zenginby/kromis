@@ -116,8 +116,16 @@ async def _lifespan(app: FastAPI):
 app = FastAPI(title="Kromis Studio", lifespan=_lifespan)
 
 
-def _dil() -> str:
-    """Kullanıcının seçtiği arayüz dili; okunamıyorsa `i18n.FALLBACK`.
+@app.middleware("http")
+async def _dil_baglami(request: Request, call_next):
+    """Her isteğin başında arayüz dilini kurar. `i18n._AKTIF`ın TEK YAZARI.
+
+    NEDEN ARA KATMAN, rotada tek tek okumak DEĞİL: metni üreten yerlerin çoğu
+    rotada değil — sekiz sağlayıcı istemcisinin `map_error`ı, `catalog`ın
+    model notları, `chat_prompt`ın bağlam bloğu. Onların hepsine dili
+    parametre olarak taşımak beş kademelik bir imza genişletmesi olurdu ve o
+    zincire eklenen her yeni fonksiyon parametreyi unutmaya açık kalırdı.
+    Tek bir yazar, tek bir okuma noktası.
 
     İSTEK BAŞINA okunuyor, modül düzeyinde bir sabite ALINMIYOR: tercih
     çalışırken değişebiliyor (Ayarlar'daki seçici `POST /api/prefs` atıyor) ve
@@ -131,14 +139,25 @@ def _dil() -> str:
     çoğu zaman pywebview'ın penceresi, yani başlık kullanıcının bir tercihi
     bile değil.
 
-    Hata YUTULUYOR: dil, uygulamanın açılmasını engelleyecek kadar önemli bir
-    şey değil. `prefs.read` bozuk dosyada zaten varsayılana düşüyor; bu kapı
-    onun ötesindeki durumlar için (okunamayan veri dizini).
+    Hata YUTULUYOR: dil, bir isteği düşürecek kadar önemli bir şey değil.
+    `prefs.read` bozuk dosyada zaten varsayılana düşüyor; bu kapı onun
+    ötesindeki durumlar için (okunamayan veri dizini).
     """
     try:
-        return i18n.normalize(prefs.read(OUTPUT_DIR).get("language"))
+        i18n.set_active(prefs.read(OUTPUT_DIR).get("language"))
     except OSError:
-        return i18n.FALLBACK
+        i18n.set_active(i18n.FALLBACK)
+    return await call_next(request)
+
+
+def _dil() -> str:
+    """Bu isteğin arayüz dili. Yazan taraf yukarıdaki ara katman.
+
+    İnce bir sarmalayıcı ve ADIYLA duruyor: rotalar `i18n.active()` çağırsaydı
+    okuyan kişi "hangi istek?" sorusunu her seferinde yeniden sormak zorunda
+    kalırdı.
+    """
+    return i18n.active()
 
 
 # Kimlik FORMU olan rotalar: yanıtta hiçbir alanın değeri yankılanmak zorunda
@@ -201,12 +220,12 @@ def _to_png(raw: bytes) -> bytes:
         Image.open(io.BytesIO(raw)).verify()
         im = Image.open(io.BytesIO(raw))
         if im.width * im.height > MAX_IMAGE_PIXELS:
-            raise HTTPException(status_code=422, detail="Görsel çözünürlüğü çok yüksek.")
+            raise HTTPException(status_code=422, detail=i18n.t("err.image_too_large", _dil()))
         im = im.convert("RGBA")
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(status_code=422, detail="Geçersiz görsel dosyası.")
+        raise HTTPException(status_code=422, detail=i18n.t("err.bad_image", _dil()))
     out = io.BytesIO()
     im.save(out, format="PNG")
     return out.getvalue()
@@ -220,7 +239,7 @@ def _output_png_path(image_id: str) -> str:
     safe = os.path.basename(image_id or "")
     path = os.path.join(OUTPUT_DIR, f"{safe}.png")
     if not safe or not os.path.isfile(path):
-        raise HTTPException(status_code=404, detail="Kaynak görsel bulunamadı.")
+        raise HTTPException(status_code=404, detail=i18n.t("err.source_image_missing", _dil()))
     return path
 
 
@@ -252,7 +271,7 @@ def _output_media_path(media_id: str) -> str:
     path = storage.media_path_of(safe, OUTPUT_DIR) if safe else None
     if path:
         return path
-    raise HTTPException(status_code=404, detail="Kaynak medya bulunamadı.")
+    raise HTTPException(status_code=404, detail=i18n.t("err.source_media_missing", _dil()))
 
 
 def _read_png_file(path: str) -> bytes:
@@ -264,7 +283,7 @@ async def _read_upload_png(upload: UploadFile) -> bytes:
     """Yüklenen dosyayı boyut sınırıyla okur ve doğrulanmış PNG'ye çevirir."""
     raw = await upload.read()
     if len(raw) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="Dosya çok büyük (maks 10 MB).")
+        raise HTTPException(status_code=413, detail=i18n.t("err.file_too_big", _dil()))
     return _to_png(raw)
 
 
@@ -297,7 +316,7 @@ def _check_folder(folder_id: str | None) -> str | None:
     if not folder_id:
         return None
     if not folders.exists(folder_id, OUTPUT_DIR):
-        raise HTTPException(status_code=404, detail="Klasör bulunamadı.")
+        raise HTTPException(status_code=404, detail=i18n.t("err.folder_missing", _dil()))
     return folder_id
 
 
@@ -317,7 +336,7 @@ def _check_session(session_id: str | None) -> str | None:
     if not session_id:
         return None
     if not chat_store.valid_id(session_id):
-        raise HTTPException(status_code=422, detail="Geçersiz session_id.")
+        raise HTTPException(status_code=422, detail=i18n.t("err.bad_session_id", _dil()))
     return session_id
 
 
@@ -332,7 +351,7 @@ def _check_arena(arena_id: str | None) -> str | None:
     if not arena_id:
         return None
     if not storage.valid_id(arena_id):
-        raise HTTPException(status_code=422, detail="Geçersiz arena_id.")
+        raise HTTPException(status_code=422, detail=i18n.t("err.bad_arena_id", _dil()))
     return arena_id
 
 
@@ -429,7 +448,7 @@ def _palette_prompt(prompt: str, seed: str | None, mode: str, strength: str,
         # Sessizce çıkarmayı yok saymak yerine gürültülü 422: renksiz sonucu
         # açıklayamayan kullanıcı, bu özelliğin engellemek için var olduğu şey.
         raise HTTPException(status_code=422,
-                            detail="Paletten en az bir renk kalmalı.")
+                            detail=i18n.t("err.palette_empty", _dil()))
 
     suffix = palette.prompt_suffix(kept, strength, task=task)
     applied = len(prompt) + len(suffix) <= MAX_PROMPT_CHARS
@@ -557,7 +576,7 @@ def _check_video_form(prompt: str, size: str, quality: str, duration: int,
     spec = catalog.video_model(model_id)
     if not spec.supports_edit:
         raise HTTPException(status_code=422,
-                            detail=f"{spec.label} referans görselle çalışmıyor.")
+                            detail=i18n.t("err.model_no_reference", _dil(), model=spec.label))
     # `_check_edit_form`un aynı kapısı ve burada ALT sınır daha da gerekli:
     # `check_video_capabilities` yalnız TAVANI ölçüyor (`n > max_n`) ve form
     # ucunda `n` için pydantic `ge=1` YOK (JSON ikizinde var). `n=0` geçse
@@ -566,21 +585,20 @@ def _check_video_form(prompt: str, size: str, quality: str, duration: int,
     if not (1 <= n <= min(spec.max_n, MAX_IMAGES_PER_RUN)):
         raise HTTPException(
             status_code=422,
-            detail=f"n 1-{min(spec.max_n, MAX_IMAGES_PER_RUN)} arasında olmalı.")
+            detail=i18n.t("err.n_range", _dil(), ust=min(spec.max_n, MAX_IMAGES_PER_RUN)))
     if not prompt or len(prompt) > MAX_PROMPT_CHARS:
         raise HTTPException(status_code=422,
-                            detail=f"prompt 1-{MAX_PROMPT_CHARS} karakter olmalı.")
+                            detail=i18n.t("err.prompt_range", _dil(), ust=MAX_PROMPT_CHARS))
     if (file is None) == (source_id is None):
         raise HTTPException(status_code=422,
-                            detail="Tam olarak biri gerekli: file veya source_id.")
+                            detail=i18n.t("err.exactly_one_source", _dil()))
     # SON KARE. Ana karenin "tam olarak biri" kapısının ikizi, tek farkı
     # İSTEĞE BAĞLI olması: bitiş görseli hiç verilmeyebilir (o zaman istek
     # bugünküyle aynı), ama iki yoldan birden verilemez.
     if last_file is not None and last_source_id is not None:
         raise HTTPException(
             status_code=422,
-            detail="Bitiş görseli için en fazla biri: last_file veya "
-                   "last_source_id.")
+            detail=i18n.t("err.at_most_one_last", _dil()))
     if (last_file is not None or last_source_id is not None) \
             and not spec.supports_last_frame:
         # Yetenek kapısı `supports_edit`ten AYRI: ilk kareyi alan bir model
@@ -588,7 +606,7 @@ def _check_video_form(prompt: str, size: str, quality: str, duration: int,
         # çünkü çözüm composer'daki şeritten başka bir model seçmek.
         raise HTTPException(
             status_code=422,
-            detail=f"{spec.label} bitiş görseli almıyor.")
+            detail=i18n.t("err.model_no_last_frame", _dil(), model=spec.label))
     return model_id
 
 
@@ -651,8 +669,7 @@ async def animate(
     if len(refs) > spec.max_refs:
         raise HTTPException(
             status_code=422,
-            detail=f"{spec.label} en fazla {spec.max_refs} referans görsel "
-                   "alıyor (ilk kare).")
+            detail=i18n.t("err.model_max_refs", _dil(), model=spec.label, adet=spec.max_refs))
     # Son kare `refs`e KATILMIYOR: `max_refs` sayacı "kaç referans" sorusunun
     # cevabı ve son kare o sorunun konusu değil. Katsaydı yukarıdaki kapı
     # bitiş görseli seçen HER isteği 422 yapardı.
@@ -717,7 +734,7 @@ def _check_edit_form(prompt: str, size: str, quality: str, n: int,
     spec = catalog.image_model(model_id)
     if not spec.supports_edit:
         raise HTTPException(status_code=422,
-                            detail=f"{spec.label} referans görselle çalışmıyor.")
+                            detail=i18n.t("err.model_no_reference", _dil(), model=spec.label))
     # Küresel tavan, model tavanının ÜSTÜNDE: `MAX_IMAGES_PER_RUN` aynı zamanda
     # bir sonuç kaydının azami `image_ids` uzunluğu (bkz. models.py), yani onu
     # aşan bir değer dökümü bozar. Buradaki sayı v0.6'ya kadar ELLE yazılmış
@@ -726,17 +743,17 @@ def _check_edit_form(prompt: str, size: str, quality: str, n: int,
     if not (1 <= n <= min(spec.max_n, MAX_IMAGES_PER_RUN)):
         raise HTTPException(
             status_code=422,
-            detail=f"n 1-{min(spec.max_n, MAX_IMAGES_PER_RUN)} arasında olmalı.")
+            detail=i18n.t("err.n_range", _dil(), ust=min(spec.max_n, MAX_IMAGES_PER_RUN)))
     if not prompt or len(prompt) > MAX_PROMPT_CHARS:
         raise HTTPException(status_code=422,
-                            detail=f"prompt 1-{MAX_PROMPT_CHARS} karakter olmalı.")
+                            detail=i18n.t("err.prompt_range", _dil(), ust=MAX_PROMPT_CHARS))
     if palette_mode not in palette.MODES:
-        raise HTTPException(status_code=422, detail="Geçersiz palette_mode.")
+        raise HTTPException(status_code=422, detail=i18n.t("err.bad_palette_mode", _dil()))
     if palette_strength not in palette.STRENGTHS:
-        raise HTTPException(status_code=422, detail="Geçersiz palette_strength.")
+        raise HTTPException(status_code=422, detail=i18n.t("err.bad_palette_strength", _dil()))
     if (file is None) == (source_id is None):
         raise HTTPException(status_code=422,
-                            detail="Tam olarak biri gerekli: file veya source_id.")
+                            detail=i18n.t("err.exactly_one_source", _dil()))
     return model_id
 
 
@@ -747,7 +764,7 @@ def _check_palette_hex(palette_hex: str | None) -> str | None:
     try:
         return palette.parse_hex(palette_hex)
     except ValueError:
-        raise HTTPException(status_code=422, detail="Geçersiz palette_hex.")
+        raise HTTPException(status_code=422, detail=i18n.t("err.bad_palette_hex", _dil()))
 
 
 def _check_palette_drop(value: str | None) -> list[int]:
@@ -766,7 +783,7 @@ def _check_palette_drop(value: str | None) -> list[int]:
     try:
         indices = [int(part) for part in value.split(",")]
     except ValueError:
-        raise HTTPException(status_code=422, detail="Geçersiz palette_drop.")
+        raise HTTPException(status_code=422, detail=i18n.t("err.bad_palette_drop", _dil()))
     try:
         return check_drop_indices(indices)
     except ValueError as exc:
@@ -797,12 +814,12 @@ async def _collect_edit_refs(
     extra_uploads, extra_ids = await _extra_refs(request)
     if 1 + len(extra_uploads) + len(extra_ids) > MAX_EDIT_IMAGES:
         raise HTTPException(status_code=422,
-                            detail=f"En fazla {MAX_EDIT_IMAGES} görsel gönderilebilir "
-                                   f"(1 ana + {MAX_EDIT_IMAGES - 1} ek).")
+                            detail=i18n.t("err.max_images", _dil(), adet=MAX_EDIT_IMAGES,
+                                                                      ek=MAX_EDIT_IMAGES - 1))
 
     content_length = request.headers.get("content-length")
     if content_length is not None and content_length.isdigit() and int(content_length) > MAX_REQUEST_BYTES:
-        raise HTTPException(status_code=413, detail="İstek çok büyük.")
+        raise HTTPException(status_code=413, detail=i18n.t("err.request_too_big", _dil()))
 
     refs: list[tuple[str, bytes]] = []
     if source_id is not None:
@@ -968,7 +985,7 @@ def _model_payload(m: catalog.ImageModel, cfg: dict, kisa: dict) -> dict:
         # yoldan taşımak olurdu.
         "credits": m.credits,
         "credits_by_quality": dict(m.credits_by_quality),
-        "note": m.note,
+        "note": i18n.t(m.note) if m.note else None,
         # Sağlayıcı işaretinin adresi (yoksa None). Şerit yalnız SEÇİLİ
         # modelin işaretini çiziyor: native <option> görsel taşımıyor
         # (bkz. core.js renderModelOptions).
@@ -1058,7 +1075,7 @@ def _settings_payload() -> dict:
              "needs_deployment": catalog.chat_needs_deployment(m),
              # Görsel şeridiyle AYNI alan adı ve aynı gerekçe.
              "logo": _provider_logo_url(m.provider),
-             "note": m.note}
+             "note": i18n.t(m.note) if m.note else None}
             for m in catalog.CHAT_MODELS
         ],
         # `ac.get_settings_status()`in AYNI ADLI alanını BİLEREK eziyor (bu
@@ -1180,9 +1197,9 @@ def post_settings(req: SettingsRequest) -> dict:
         # Azure hedefleniyorsa İKİSİ de gerekli. Mesajlar bilerek ayrı: hangi
         # alanın eksik olduğunu söylemeyen bir hata kullanıcıyı formda arattırır.
         if not api_key:
-            raise HTTPException(status_code=422, detail="İlk kurulumda API key gerekli.")
+            raise HTTPException(status_code=422, detail=i18n.t("err.first_setup_key", _dil()))
         if not base_url:
-            raise HTTPException(status_code=422, detail="İlk kurulumda base_url gerekli.")
+            raise HTTPException(status_code=422, detail=i18n.t("err.first_setup_base_url", _dil()))
 
     try:
         # Kimlik doğrulaması DİĞER alanların yazımından ÖNCE: geçersiz bir
@@ -1472,9 +1489,7 @@ def _guard_autosave(title: str | None) -> None:
     """
     if title is None and not prefs.read(OUTPUT_DIR)["autosave_sessions"]:
         raise HTTPException(status_code=409,
-                            detail="Oturumların otomatik kaydı kapalı: "
-                                   "Ayarlar'dan açabilir ya da oturuma ad vererek "
-                                   "kendiniz kaydedebilirsiniz.")
+                            detail=i18n.t("err.autosave_off", _dil()))
 
 
 def _auto_title(messages: list[dict]) -> str:
@@ -1509,7 +1524,7 @@ def list_chats_route() -> dict:
 def get_chat_route(chat_id: str) -> dict:
     rec = chat_store.get(os.path.basename(chat_id), OUTPUT_DIR)
     if rec is None:
-        raise HTTPException(status_code=404, detail="Sohbet bulunamadı.")
+        raise HTTPException(status_code=404, detail=i18n.t("err.chat_missing", _dil()))
     return {"chat": rec}
 
 
@@ -1528,9 +1543,9 @@ def create_chat_route(req: ChatSaveRequest) -> dict:
     `display: null` satırları eski sohbetlerin gövdesini sebepsiz büyütür.
     """
     if req.title is not None and not req.title.strip():
-        raise HTTPException(status_code=422, detail="Sohbet başlığı boş olamaz.")
+        raise HTTPException(status_code=422, detail=i18n.t("err.chat_title_empty", _dil()))
     if not req.messages:
-        raise HTTPException(status_code=422, detail="Kaydedilecek mesaj yok.")
+        raise HTTPException(status_code=422, detail=i18n.t("err.nothing_to_save", _dil()))
     messages = [m.model_dump(exclude_none=True) for m in req.messages]
     _guard_autosave(req.title)
     title = req.title.strip() if req.title else _auto_title(messages)
@@ -1556,7 +1571,7 @@ def update_chat_route(chat_id: str, req: ChatSaveRequest) -> dict:
     """
     title = None if req.title is None else req.title.strip()
     if title is not None and not title:
-        raise HTTPException(status_code=422, detail="Sohbet başlığı boş olamaz.")
+        raise HTTPException(status_code=422, detail=i18n.t("err.chat_title_empty", _dil()))
     # Gövde-yalnız `PUT` = tur sonu otomatik yazımı (bkz. _guard_autosave).
     if req.messages is not None:
         _guard_autosave(req.title)
@@ -1565,7 +1580,7 @@ def update_chat_route(chat_id: str, req: ChatSaveRequest) -> dict:
     rec = chat_store.update(os.path.basename(chat_id), OUTPUT_DIR,
                             messages=messages, title=title, now=_now())
     if rec is None:
-        raise HTTPException(status_code=404, detail="Sohbet bulunamadı.")
+        raise HTTPException(status_code=404, detail=i18n.t("err.chat_missing", _dil()))
     return {"chat": rec}
 
 
@@ -1573,7 +1588,7 @@ def update_chat_route(chat_id: str, req: ChatSaveRequest) -> dict:
 def delete_chat_route(chat_id: str) -> dict:
     cid = os.path.basename(chat_id)
     if not chat_store.delete(cid, OUTPUT_DIR):
-        raise HTTPException(status_code=404, detail="Sohbet bulunamadı.")
+        raise HTTPException(status_code=404, detail=i18n.t("err.chat_missing", _dil()))
     return {"deleted": cid}
 
 
@@ -1605,14 +1620,14 @@ def list_folders_route() -> dict:
 def create_folder_route(req: FolderRequest) -> dict:
     name = req.name.strip()
     if not name:
-        raise HTTPException(status_code=422, detail="Klasör adı gerekli.")
+        raise HTTPException(status_code=422, detail=i18n.t("err.folder_name_required", _dil()))
     parent_id = _check_folder(req.parent_id)
     # Sınırsız derinlik başlık şeridini taşırıyor ve köke dönüşü zorlaştırıyor;
     # yeniden ebeveynleme olmadığı için tek kapı burası.
     if parent_id and folders.depth(parent_id, OUTPUT_DIR) >= MAX_FOLDER_DEPTH:
         raise HTTPException(
             status_code=422,
-            detail=f"En fazla {MAX_FOLDER_DEPTH} kademe klasör açılabilir.")
+            detail=i18n.t("err.folder_depth", _dil(), adet=MAX_FOLDER_DEPTH))
     return {"folder": folders.create(name, OUTPUT_DIR, parent_id=parent_id, now=_now())}
 
 
@@ -1623,7 +1638,7 @@ def delete_folder_route(folder_id: str) -> dict:
     # Sıra önemli: önce ağacı çöz (yoksa 404), sonra görselleri çıkar, sonra kayıtları sil.
     doomed = folders.descendants(fid, OUTPUT_DIR)
     if not doomed:
-        raise HTTPException(status_code=404, detail="Klasör bulunamadı.")
+        raise HTTPException(status_code=404, detail=i18n.t("err.folder_missing", _dil()))
     unfiled = storage.unfile_folders(doomed, OUTPUT_DIR)
     deleted = folders.delete_tree(fid, OUTPUT_DIR)
     return {"deleted": deleted, "folders": len(deleted), "unfiled": unfiled}
@@ -1634,7 +1649,7 @@ def download_folder_route(folder_id: str):
     """Klasörü ve alt klasörlerini görselleriyle birlikte ZIP olarak indirir."""
     fid = os.path.basename(folder_id)
     if not folders.exists(fid, OUTPUT_DIR):
-        raise HTTPException(status_code=404, detail="Klasör bulunamadı.")
+        raise HTTPException(status_code=404, detail=i18n.t("err.folder_missing", _dil()))
     try:
         zip_bytes, folder_name = folders.export_zip(fid, OUTPUT_DIR)
     except ValueError as e:
@@ -1679,10 +1694,10 @@ def rename_folder_route(folder_id: str, req: FolderRequest) -> dict:
     fid = os.path.basename(folder_id)
     name = req.name.strip()
     if not name:
-        raise HTTPException(status_code=422, detail="Klasör adı gerekli.")
+        raise HTTPException(status_code=422, detail=i18n.t("err.folder_name_required", _dil()))
     updated = folders.rename(fid, name, OUTPUT_DIR)
     if not updated:
-        raise HTTPException(status_code=404, detail="Klasör bulunamadı.")
+        raise HTTPException(status_code=404, detail=i18n.t("err.folder_missing", _dil()))
     return {"folder": updated}
 
 
@@ -1705,7 +1720,7 @@ def move_image(image_id: str, req: MoveImageRequest) -> dict:
     target = _check_folder(req.folder_id)
     iid = os.path.basename(image_id)
     if not storage.set_folder(iid, target, OUTPUT_DIR):
-        raise HTTPException(status_code=404, detail="Görsel bulunamadı.")
+        raise HTTPException(status_code=404, detail=i18n.t("err.image_missing", _dil()))
     return {"id": iid, "folder_id": target}
 
 
@@ -1736,7 +1751,7 @@ def set_arena_winner_route(arena_id: str, req: ArenaWinnerRequest) -> dict:
     iid = os.path.basename(req.image_id)
     if not storage.set_arena_winner(aid, iid, OUTPUT_DIR):
         raise HTTPException(status_code=404,
-                            detail="Arena turu ya da görsel bulunamadı.")
+                            detail=i18n.t("err.arena_or_image_missing", _dil()))
     return {"arena_id": aid, "winner": iid}
 
 
@@ -1745,7 +1760,7 @@ def delete_image(image_id: str) -> dict:
     iid = os.path.basename(image_id)
     removed = storage.delete(iid, OUTPUT_DIR)
     if not removed:
-        raise HTTPException(status_code=404, detail="Görsel bulunamadı.")
+        raise HTTPException(status_code=404, detail=i18n.t("err.image_missing", _dil()))
     return {"deleted": iid}
 
 
@@ -1756,7 +1771,7 @@ def move_images(req: BulkMoveRequest) -> dict:
     ids = [os.path.basename(i) for i in req.ids]
     moved = storage.set_folder_many(ids, target, OUTPUT_DIR)
     if not moved:
-        raise HTTPException(status_code=404, detail="Görsel bulunamadı.")
+        raise HTTPException(status_code=404, detail=i18n.t("err.image_missing", _dil()))
     return {"moved": moved, "folder_id": target}
 
 
@@ -1766,7 +1781,7 @@ def delete_images(req: BulkImagesRequest) -> dict:
     ids = [os.path.basename(i) for i in req.ids]
     deleted = storage.delete_many(ids, OUTPUT_DIR)
     if not deleted:
-        raise HTTPException(status_code=404, detail="Görsel bulunamadı.")
+        raise HTTPException(status_code=404, detail=i18n.t("err.image_missing", _dil()))
     return {"deleted": deleted}
 
 
@@ -1791,7 +1806,7 @@ async def import_image(request: Request,
     """
     content_length = request.headers.get("content-length")
     if content_length is not None and content_length.isdigit() and int(content_length) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="Dosya çok büyük (maks 10 MB).")
+        raise HTTPException(status_code=413, detail=i18n.t("err.file_too_big", _dil()))
     target_folder = _check_folder(folder_id)
     png = await _read_upload_png(file)
 
@@ -1851,7 +1866,7 @@ def list_palettes_route() -> dict:
 def create_palette_route(req: SavePaletteRequest) -> dict:
     name = req.name.strip()
     if not name:
-        raise HTTPException(status_code=422, detail="Palet adı gerekli.")
+        raise HTTPException(status_code=422, detail=i18n.t("err.palette_name_required", _dil()))
     # Renkleri SUNUCU yeniden hesaplar: istemci renk listesi göndermediği için
     # doğrulanacak istemci verisi yok ve tek doğruluk kaynağı korunur.
     #
@@ -1872,7 +1887,7 @@ def create_palette_route(req: SavePaletteRequest) -> dict:
 def delete_palette_route(palette_id: str) -> dict:
     pid = os.path.basename(palette_id)
     if not palette_store.delete(pid, OUTPUT_DIR):
-        raise HTTPException(status_code=404, detail="Palet bulunamadı.")
+        raise HTTPException(status_code=404, detail=i18n.t("err.palette_missing", _dil()))
     return {"deleted": pid}
 
 
@@ -1885,10 +1900,10 @@ def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
     422 ile reddedilir (modelde `asset_id` zorunlu), bulunamazsa 404.
     """
     if not req.asset_id:
-        raise HTTPException(status_code=422, detail="Bindirilecek bir görsel seç.")
+        raise HTTPException(status_code=422, detail=i18n.t("err.pick_an_image", _dil()))
     overlay_path = assets_store.asset_path(req.asset_kind, req.asset_id, ASSETS_DIR)
     if overlay_path is None:
-        raise HTTPException(status_code=404, detail="görsel bulunamadı")
+        raise HTTPException(status_code=404, detail=i18n.t("err.image_missing", _dil()))
     try:
         return composite.composite_logo(
             src_path,
@@ -1907,7 +1922,7 @@ def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
             # str(exc) boş olabilir (argümansız istisna) — o zaman sınıf adı
             # hiç yoktan iyidir. `exc or ...` işe yaramaz: istisna nesneleri
             # her zaman truthy.
-            detail=f"Logo bindirme başarısız: {str(exc) or type(exc).__name__}") from exc
+            detail=i18n.t("err.overlay_failed", _dil(), hata=str(exc) or type(exc).__name__)) from exc
 
 
 def _logo_src_path(image_id: str) -> str:
@@ -1981,7 +1996,7 @@ def _composite_banner(src_path: str, banner_path: str, edge: str,
 def _banner_asset_path(asset_id: str) -> str:
     path = assets_store.asset_path("banners", asset_id, ASSETS_DIR)
     if path is None:
-        raise HTTPException(status_code=404, detail="banner bulunamadı")
+        raise HTTPException(status_code=404, detail=i18n.t("err.banner_missing", _dil()))
     return path
 
 
@@ -2026,7 +2041,7 @@ def _check_asset_kind(kind: str, *, allow_all: bool = False) -> None:
     if allow_all and kind == "all":
         return
     if kind not in assets_store.KINDS:
-        raise HTTPException(status_code=404, detail="bilinmeyen tür")
+        raise HTTPException(status_code=404, detail=i18n.t("err.unknown_kind", _dil()))
 
 
 @app.post("/api/assets/{kind}")
@@ -2040,10 +2055,10 @@ async def upload_asset(
     _check_asset_kind(kind)
     content_length = request.headers.get("content-length")
     if content_length is not None and content_length.isdigit() and int(content_length) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="Dosya çok büyük (maks 10 MB).")
+        raise HTTPException(status_code=413, detail=i18n.t("err.file_too_big", _dil()))
     raw = await file.read()
     if len(raw) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="Dosya çok büyük (maks 10 MB).")
+        raise HTTPException(status_code=413, detail=i18n.t("err.file_too_big", _dil()))
     image_bytes = _to_png(raw)  # şeffaflığı koruyan RGBA PNG'ye yeniden kodla
     stem = os.path.splitext(os.path.basename(file.filename or ""))[0]
     label = (name.strip() or stem or "varlık")[:120]
@@ -2068,7 +2083,7 @@ def delete_asset_route(kind: str, asset_id: str) -> dict:
     _check_asset_kind(kind)
     removed = assets_store.delete_asset(kind, asset_id, ASSETS_DIR)
     if not removed:
-        raise HTTPException(status_code=404, detail="varlık bulunamadı")
+        raise HTTPException(status_code=404, detail=i18n.t("err.asset_missing", _dil()))
     return {"deleted": os.path.basename(asset_id)}
 
 
@@ -2077,10 +2092,10 @@ def asset_file(kind: str, filename: str) -> FileResponse:
     _check_asset_kind(kind)
     safe = os.path.basename(filename)
     if not safe or safe in (".", "..") or safe == assets_store.MANIFEST_FILE:
-        raise HTTPException(status_code=404, detail="bulunamadı")
+        raise HTTPException(status_code=404, detail=i18n.t("err.not_found", _dil()))
     path = os.path.join(ASSETS_DIR, kind, safe)
     if not os.path.isfile(path):
-        raise HTTPException(status_code=404, detail="bulunamadı")
+        raise HTTPException(status_code=404, detail=i18n.t("err.not_found", _dil()))
     return FileResponse(path, media_type="image/png")
 
 
@@ -2101,10 +2116,10 @@ def output_file(filename: str) -> FileResponse:
     """
     safe = os.path.basename(filename)
     if not safe or safe in (".", ".."):
-        raise HTTPException(status_code=404, detail="bulunamadı")
+        raise HTTPException(status_code=404, detail=i18n.t("err.not_found", _dil()))
     path = os.path.join(OUTPUT_DIR, safe)
     if not os.path.isfile(path):
-        raise HTTPException(status_code=404, detail="bulunamadı")
+        raise HTTPException(status_code=404, detail=i18n.t("err.not_found", _dil()))
     return FileResponse(path, media_type=storage.media_type_for(safe))
 
 

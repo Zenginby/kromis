@@ -21,7 +21,7 @@
       ],
       "ithal": [],
       "ithal_eden": [],
-      "katman": 10,
+      "katman": 11,
       "satir": 197,
       "testler": [
         "tests/test_android_main.py",
@@ -62,8 +62,8 @@
         "desktop",
         "netguard"
       ],
-      "katman": 7,
-      "satir": 2226,
+      "katman": 8,
+      "satir": 2241,
       "testler": [
         "tests/test_app.py",
         "tests/test_arena.py",
@@ -131,6 +131,7 @@
       "ad": "azure_client",
       "erteli_ithal": [],
       "ithal": [
+        "i18n",
         "paths",
         "winsec"
       ],
@@ -148,8 +149,8 @@
         "providers",
         "veo_client"
       ],
-      "katman": 2,
-      "satir": 461,
+      "katman": 3,
+      "satir": 458,
       "testler": [
         "tests/test_app.py",
         "tests/test_arena.py",
@@ -167,6 +168,7 @@
         "tests/test_folders.py",
         "tests/test_gemini_client.py",
         "tests/test_guvenlik_baslik.py",
+        "tests/test_i18n.py",
         "tests/test_import_route.py",
         "tests/test_legacy_formats.py",
         "tests/test_logo.py",
@@ -190,13 +192,14 @@
         "azure_client",
         "catalog",
         "credstore",
+        "i18n",
         "providers"
       ],
       "ithal_eden": [
         "providers"
       ],
-      "katman": 4,
-      "satir": 295,
+      "katman": 5,
+      "satir": 289,
       "testler": [
         "tests/test_azure_flux_client.py"
       ],
@@ -209,13 +212,14 @@
         "azure_client",
         "catalog",
         "credstore",
+        "i18n",
         "providers"
       ],
       "ithal_eden": [
         "providers"
       ],
-      "katman": 4,
-      "satir": 293,
+      "katman": 5,
+      "satir": 286,
       "testler": [
         "tests/test_azure_mai_client.py"
       ],
@@ -262,7 +266,7 @@
         "veo_client"
       ],
       "katman": 0,
-      "satir": 1299,
+      "satir": 1298,
       "testler": [
         "tests/test_arena.py",
         "tests/test_arena_onyuz.py",
@@ -275,6 +279,7 @@
         "tests/test_credstore.py",
         "tests/test_errlog.py",
         "tests/test_gemini_client.py",
+        "tests/test_i18n.py",
         "tests/test_index.py",
         "tests/test_logo.py",
         "tests/test_model_secimi.py",
@@ -299,6 +304,7 @@
       "ithal": [
         "azure_client",
         "chat_prompt",
+        "i18n",
         "models"
       ],
       "ithal_eden": [
@@ -306,8 +312,8 @@
         "chat_providers",
         "openai_chat"
       ],
-      "katman": 4,
-      "satir": 191,
+      "katman": 5,
+      "satir": 190,
       "testler": [
         "tests/test_chat_client.py",
         "tests/test_chat_providers.py",
@@ -346,7 +352,7 @@
       "ithal_eden": [
         "app"
       ],
-      "katman": 6,
+      "katman": 7,
       "satir": 127,
       "testler": [
         "tests/test_chat_providers.py",
@@ -422,7 +428,7 @@
         "providers",
         "veo_client"
       ],
-      "katman": 3,
+      "katman": 4,
       "satir": 197,
       "testler": [
         "tests/test_credstore.py",
@@ -435,10 +441,12 @@
     {
       "ad": "desktop",
       "erteli_ithal": [
-        "app"
+        "app",
+        "prefs"
       ],
       "ithal": [
         "errlog",
+        "i18n",
         "netguard",
         "paths",
         "screencolor",
@@ -448,8 +456,8 @@
       "ithal_eden": [
         "android_main"
       ],
-      "katman": 9,
-      "satir": 562,
+      "katman": 10,
+      "satir": 580,
       "testler": [
         "tests/test_desktop.py",
         "tests/test_windows_acilis.py"
@@ -503,13 +511,14 @@
         "azure_client",
         "catalog",
         "credstore",
+        "i18n",
         "providers"
       ],
       "ithal_eden": [
         "providers"
       ],
-      "katman": 4,
-      "satir": 296,
+      "katman": 5,
+      "satir": 295,
       "testler": [
         "tests/test_gemini_client.py"
       ],
@@ -546,11 +555,21 @@
       ],
       "ithal_eden": [
         "app",
-        "models"
+        "azure_client",
+        "azure_flux_client",
+        "azure_mai_client",
+        "chat_client",
+        "desktop",
+        "gemini_client",
+        "models",
+        "openai_chat",
+        "openai_client",
+        "veo_client"
       ],
       "katman": 2,
-      "satir": 204,
+      "satir": 244,
       "testler": [
+        "tests/test_catalog.py",
         "tests/test_i18n.py"
       ],
       "yol": "i18n.py"
@@ -590,7 +609,7 @@
         "chat_client",
         "prefs"
       ],
-      "katman": 3,
+      "katman": 4,
       "satir": 1044,
       "testler": [
         "tests/test_catalog.py",
@@ -619,7 +638,7 @@
       "ithal_eden": [
         "desktop"
       ],
-      "katman": 8,
+      "katman": 9,
       "satir": 160,
       "testler": [
         "tests/test_netguard.py"
@@ -635,13 +654,14 @@
         "chat_client",
         "chat_prompt",
         "credstore",
+        "i18n",
         "providers"
       ],
       "ithal_eden": [
         "chat_providers"
       ],
-      "katman": 5,
-      "satir": 182,
+      "katman": 6,
+      "satir": 179,
       "testler": [
         "tests/test_chat_providers.py",
         "tests/test_chat_route.py",
@@ -656,13 +676,14 @@
         "azure_client",
         "catalog",
         "credstore",
+        "i18n",
         "providers"
       ],
       "ithal_eden": [
         "providers"
       ],
-      "katman": 4,
-      "satir": 218,
+      "katman": 5,
+      "satir": 217,
       "testler": [
         "tests/test_openai_client.py"
       ],
@@ -740,11 +761,13 @@
         "models"
       ],
       "ithal_eden": [
-        "app"
+        "app",
+        "desktop"
       ],
-      "katman": 4,
+      "katman": 5,
       "satir": 242,
       "testler": [
+        "tests/test_i18n.py",
         "tests/test_index.py",
         "tests/test_prefs.py",
         "tests/test_prefs_route.py",
@@ -775,7 +798,7 @@
         "openai_client",
         "veo_client"
       ],
-      "katman": 4,
+      "katman": 5,
       "satir": 475,
       "testler": [
         "tests/test_azure_flux_client.py",
@@ -925,13 +948,14 @@
         "azure_client",
         "catalog",
         "credstore",
+        "i18n",
         "providers"
       ],
       "ithal_eden": [
         "providers"
       ],
-      "katman": 4,
-      "satir": 593,
+      "katman": 5,
+      "satir": 578,
       "testler": [
         "tests/test_veo_client.py"
       ],
@@ -1420,11 +1444,10 @@
         "errlog",
         "i18n",
         "paths",
-        "prefs",
         "version"
       ],
       "onyuz": [],
-      "satir": 2151,
+      "satir": 2166,
       "yardimci_sayisi": 1,
       "yol": "/",
       "yontem": "GET"
@@ -1438,7 +1461,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1713,
+      "satir": 1728,
       "yardimci_sayisi": 0,
       "yol": "/api/arena/{arena_id}",
       "yontem": "GET"
@@ -1446,6 +1469,7 @@
     {
       "islev": "set_arena_winner_route",
       "moduller": [
+        "i18n",
         "models",
         "paths",
         "storage"
@@ -1453,8 +1477,8 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1728,
-      "yardimci_sayisi": 0,
+      "satir": 1743,
+      "yardimci_sayisi": 1,
       "yol": "/api/arena/{arena_id}/winner",
       "yontem": "POST"
     },
@@ -1462,13 +1486,14 @@
       "islev": "list_assets_route",
       "moduller": [
         "assets_store",
+        "i18n",
         "paths"
       ],
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 2055,
-      "yardimci_sayisi": 1,
+      "satir": 2070,
+      "yardimci_sayisi": 2,
       "yol": "/api/assets/{kind}",
       "yontem": "GET"
     },
@@ -1476,13 +1501,14 @@
       "islev": "upload_asset",
       "moduller": [
         "assets_store",
+        "i18n",
         "paths"
       ],
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 2033,
-      "yardimci_sayisi": 3,
+      "satir": 2048,
+      "yardimci_sayisi": 4,
       "yol": "/api/assets/{kind}",
       "yontem": "POST"
     },
@@ -1490,13 +1516,14 @@
       "islev": "delete_asset_route",
       "moduller": [
         "assets_store",
+        "i18n",
         "paths"
       ],
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 2067,
-      "yardimci_sayisi": 1,
+      "satir": 2082,
+      "yardimci_sayisi": 2,
       "yol": "/api/assets/{kind}/{asset_id}",
       "yontem": "DELETE"
     },
@@ -1504,6 +1531,7 @@
       "islev": "add_banner",
       "moduller": [
         "assets_store",
+        "i18n",
         "models",
         "paths",
         "storage"
@@ -1511,8 +1539,8 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 2002,
-      "yardimci_sayisi": 6,
+      "satir": 2017,
+      "yardimci_sayisi": 7,
       "yol": "/api/banner",
       "yontem": "POST"
     },
@@ -1520,14 +1548,15 @@
       "islev": "preview_banner",
       "moduller": [
         "assets_store",
+        "i18n",
         "models",
         "paths"
       ],
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 1994,
-      "yardimci_sayisi": 5,
+      "satir": 2009,
+      "yardimci_sayisi": 6,
       "yol": "/api/banner/preview",
       "yontem": "POST"
     },
@@ -1546,7 +1575,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1351,
+      "satir": 1368,
       "yardimci_sayisi": 3,
       "yol": "/api/chat",
       "yontem": "POST"
@@ -1560,7 +1589,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1541,
+      "satir": 1556,
       "yardimci_sayisi": 0,
       "yol": "/api/chats",
       "yontem": "DELETE"
@@ -1574,7 +1603,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1503,
+      "satir": 1518,
       "yardimci_sayisi": 0,
       "yol": "/api/chats",
       "yontem": "GET"
@@ -1583,6 +1612,7 @@
       "islev": "create_chat_route",
       "moduller": [
         "chat_store",
+        "i18n",
         "models",
         "paths",
         "prefs"
@@ -1590,8 +1620,8 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1517,
-      "yardimci_sayisi": 3,
+      "satir": 1532,
+      "yardimci_sayisi": 4,
       "yol": "/api/chats",
       "yontem": "POST"
     },
@@ -1599,13 +1629,14 @@
       "islev": "delete_chat_route",
       "moduller": [
         "chat_store",
+        "i18n",
         "paths"
       ],
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1573,
-      "yardimci_sayisi": 0,
+      "satir": 1588,
+      "yardimci_sayisi": 1,
       "yol": "/api/chats/{chat_id}",
       "yontem": "DELETE"
     },
@@ -1613,13 +1644,14 @@
       "islev": "get_chat_route",
       "moduller": [
         "chat_store",
+        "i18n",
         "paths"
       ],
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1509,
-      "yardimci_sayisi": 0,
+      "satir": 1524,
+      "yardimci_sayisi": 1,
       "yol": "/api/chats/{chat_id}",
       "yontem": "GET"
     },
@@ -1627,6 +1659,7 @@
       "islev": "update_chat_route",
       "moduller": [
         "chat_store",
+        "i18n",
         "models",
         "paths",
         "prefs"
@@ -1634,8 +1667,8 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1551,
-      "yardimci_sayisi": 2,
+      "satir": 1566,
+      "yardimci_sayisi": 3,
       "yol": "/api/chats/{chat_id}",
       "yontem": "PUT"
     },
@@ -1647,6 +1680,7 @@
         "chat_store",
         "color_names",
         "folders",
+        "i18n",
         "models",
         "palette",
         "palette_store",
@@ -1657,8 +1691,8 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 824,
-      "yardimci_sayisi": 18,
+      "satir": 841,
+      "yardimci_sayisi": 19,
       "yol": "/api/edit",
       "yontem": "POST"
     },
@@ -1672,7 +1706,7 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1581,
+      "satir": 1596,
       "yardimci_sayisi": 0,
       "yol": "/api/folders",
       "yontem": "GET"
@@ -1681,14 +1715,15 @@
       "islev": "create_folder_route",
       "moduller": [
         "folders",
+        "i18n",
         "models",
         "paths"
       ],
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1605,
-      "yardimci_sayisi": 2,
+      "satir": 1620,
+      "yardimci_sayisi": 3,
       "yol": "/api/folders",
       "yontem": "POST"
     },
@@ -1696,14 +1731,15 @@
       "islev": "delete_folder_route",
       "moduller": [
         "folders",
+        "i18n",
         "paths",
         "storage"
       ],
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1620,
-      "yardimci_sayisi": 0,
+      "satir": 1635,
+      "yardimci_sayisi": 1,
       "yol": "/api/folders/{folder_id}",
       "yontem": "DELETE"
     },
@@ -1711,14 +1747,15 @@
       "islev": "rename_folder_route",
       "moduller": [
         "folders",
+        "i18n",
         "models",
         "paths"
       ],
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1677,
-      "yardimci_sayisi": 0,
+      "satir": 1692,
+      "yardimci_sayisi": 1,
       "yol": "/api/folders/{folder_id}",
       "yontem": "PATCH"
     },
@@ -1726,13 +1763,14 @@
       "islev": "download_folder_route",
       "moduller": [
         "folders",
+        "i18n",
         "paths"
       ],
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1633,
-      "yardimci_sayisi": 0,
+      "satir": 1648,
+      "yardimci_sayisi": 1,
       "yol": "/api/folders/{folder_id}/download",
       "yontem": "GET"
     },
@@ -1744,6 +1782,7 @@
         "chat_store",
         "color_names",
         "folders",
+        "i18n",
         "models",
         "palette",
         "palette_store",
@@ -1754,8 +1793,8 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 449,
-      "yardimci_sayisi": 10,
+      "satir": 468,
+      "yardimci_sayisi": 11,
       "yol": "/api/generate",
       "yontem": "POST"
     },
@@ -1769,7 +1808,7 @@
       "onyuz": [
         "static/settings.js"
       ],
-      "satir": 1113,
+      "satir": 1130,
       "yardimci_sayisi": 0,
       "yol": "/api/guncelleme",
       "yontem": "GET"
@@ -1778,28 +1817,30 @@
       "islev": "history",
       "moduller": [
         "folders",
+        "i18n",
         "paths",
         "storage"
       ],
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1691,
-      "yardimci_sayisi": 1,
+      "satir": 1706,
+      "yardimci_sayisi": 2,
       "yol": "/api/history",
       "yontem": "GET"
     },
     {
       "islev": "delete_image",
       "moduller": [
+        "i18n",
         "paths",
         "storage"
       ],
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 1744,
-      "yardimci_sayisi": 0,
+      "satir": 1759,
+      "yardimci_sayisi": 1,
       "yol": "/api/image/{image_id}",
       "yontem": "DELETE"
     },
@@ -1807,6 +1848,7 @@
       "islev": "move_image",
       "moduller": [
         "folders",
+        "i18n",
         "models",
         "paths",
         "storage"
@@ -1814,14 +1856,15 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 1703,
-      "yardimci_sayisi": 1,
+      "satir": 1718,
+      "yardimci_sayisi": 2,
       "yol": "/api/image/{image_id}",
       "yontem": "PATCH"
     },
     {
       "islev": "delete_images",
       "moduller": [
+        "i18n",
         "models",
         "paths",
         "storage"
@@ -1829,8 +1872,8 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1764,
-      "yardimci_sayisi": 0,
+      "satir": 1779,
+      "yardimci_sayisi": 1,
       "yol": "/api/images",
       "yontem": "DELETE"
     },
@@ -1838,6 +1881,7 @@
       "islev": "move_images",
       "moduller": [
         "folders",
+        "i18n",
         "models",
         "paths",
         "storage"
@@ -1845,8 +1889,8 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1753,
-      "yardimci_sayisi": 1,
+      "satir": 1768,
+      "yardimci_sayisi": 2,
       "yol": "/api/images",
       "yontem": "PATCH"
     },
@@ -1854,14 +1898,15 @@
       "islev": "import_image",
       "moduller": [
         "folders",
+        "i18n",
         "paths",
         "storage"
       ],
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1774,
-      "yardimci_sayisi": 5,
+      "satir": 1789,
+      "yardimci_sayisi": 6,
       "yol": "/api/import",
       "yontem": "POST"
     },
@@ -1870,6 +1915,7 @@
       "moduller": [
         "assets_store",
         "composite",
+        "i18n",
         "models",
         "paths",
         "storage"
@@ -1877,8 +1923,8 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 1927,
-      "yardimci_sayisi": 4,
+      "satir": 1942,
+      "yardimci_sayisi": 5,
       "yol": "/api/logo",
       "yontem": "POST"
     },
@@ -1887,28 +1933,30 @@
       "moduller": [
         "assets_store",
         "composite",
+        "i18n",
         "models",
         "paths"
       ],
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 1918,
-      "yardimci_sayisi": 3,
+      "satir": 1933,
+      "yardimci_sayisi": 4,
       "yol": "/api/logo/preview",
       "yontem": "POST"
     },
     {
       "islev": "output_download",
       "moduller": [
+        "i18n",
         "paths",
         "storage"
       ],
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 2112,
-      "yardimci_sayisi": 1,
+      "satir": 2127,
+      "yardimci_sayisi": 2,
       "yol": "/api/output/{image_id}/download",
       "yontem": "GET"
     },
@@ -1922,7 +1970,7 @@
       "onyuz": [
         "static/palette.js"
       ],
-      "satir": 1815,
+      "satir": 1830,
       "yardimci_sayisi": 0,
       "yol": "/api/palette/suggest",
       "yontem": "POST"
@@ -1936,7 +1984,7 @@
       "onyuz": [
         "static/palette.js"
       ],
-      "satir": 1846,
+      "satir": 1861,
       "yardimci_sayisi": 0,
       "yol": "/api/palettes",
       "yontem": "GET"
@@ -1945,6 +1993,7 @@
       "islev": "create_palette_route",
       "moduller": [
         "color_names",
+        "i18n",
         "models",
         "palette",
         "palette_store",
@@ -1953,22 +2002,23 @@
       "onyuz": [
         "static/palette.js"
       ],
-      "satir": 1851,
-      "yardimci_sayisi": 3,
+      "satir": 1866,
+      "yardimci_sayisi": 4,
       "yol": "/api/palettes",
       "yontem": "POST"
     },
     {
       "islev": "delete_palette_route",
       "moduller": [
+        "i18n",
         "palette_store",
         "paths"
       ],
       "onyuz": [
         "static/palette.js"
       ],
-      "satir": 1872,
-      "yardimci_sayisi": 0,
+      "satir": 1887,
+      "yardimci_sayisi": 1,
       "yol": "/api/palettes/{palette_id}",
       "yontem": "DELETE"
     },
@@ -1983,7 +2033,7 @@
         "static/core.js",
         "static/settings.js"
       ],
-      "satir": 1426,
+      "satir": 1443,
       "yardimci_sayisi": 0,
       "yol": "/api/prefs",
       "yontem": "GET"
@@ -2000,7 +2050,7 @@
         "static/core.js",
         "static/settings.js"
       ],
-      "satir": 1432,
+      "satir": 1449,
       "yardimci_sayisi": 0,
       "yol": "/api/prefs",
       "yontem": "POST"
@@ -2012,6 +2062,7 @@
         "catalog",
         "credstore",
         "guncelleme",
+        "i18n",
         "paths",
         "prefs",
         "version"
@@ -2019,7 +2070,7 @@
       "onyuz": [
         "static/settings.js"
       ],
-      "satir": 1078,
+      "satir": 1095,
       "yardimci_sayisi": 4,
       "yol": "/api/settings",
       "yontem": "GET"
@@ -2030,14 +2081,15 @@
         "azure_client",
         "catalog",
         "credstore",
+        "i18n",
         "models",
         "version"
       ],
       "onyuz": [
         "static/settings.js"
       ],
-      "satir": 1142,
-      "yardimci_sayisi": 4,
+      "satir": 1159,
+      "yardimci_sayisi": 5,
       "yol": "/api/settings",
       "yontem": "POST"
     },
@@ -2048,6 +2100,7 @@
         "catalog",
         "chat_store",
         "folders",
+        "i18n",
         "models",
         "paths",
         "providers",
@@ -2056,8 +2109,8 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 488,
-      "yardimci_sayisi": 3,
+      "satir": 507,
+      "yardimci_sayisi": 4,
       "yol": "/api/video",
       "yontem": "POST"
     },
@@ -2068,6 +2121,7 @@
         "catalog",
         "chat_store",
         "folders",
+        "i18n",
         "models",
         "paths",
         "providers",
@@ -2076,8 +2130,8 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 596,
-      "yardimci_sayisi": 10,
+      "satir": 614,
+      "yardimci_sayisi": 11,
       "yol": "/api/video/animate",
       "yontem": "POST"
     },
@@ -2085,19 +2139,21 @@
       "islev": "asset_file",
       "moduller": [
         "assets_store",
+        "i18n",
         "paths"
       ],
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 2076,
-      "yardimci_sayisi": 1,
+      "satir": 2091,
+      "yardimci_sayisi": 2,
       "yol": "/assets/{kind}/{filename}",
       "yontem": "GET"
     },
     {
       "islev": "output_file",
       "moduller": [
+        "i18n",
         "paths",
         "storage"
       ],
@@ -2108,8 +2164,8 @@
         "static/folders.js",
         "static/viewer.js"
       ],
-      "satir": 2088,
-      "yardimci_sayisi": 0,
+      "satir": 2103,
+      "yardimci_sayisi": 1,
       "yol": "/output/{filename}",
       "yontem": "GET"
     }

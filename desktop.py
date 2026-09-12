@@ -52,6 +52,7 @@ import uvicorn
 from starlette.types import ASGIApp
 
 import errlog
+import i18n
 import netguard
 import paths
 import screencolor
@@ -230,9 +231,8 @@ def _show_fatal_alert(log_path: str) -> None:
     çıkmalı.
     """
     _uyari_goster(
-        "Kromis Studio başlatılamadı",
-        f"Uygulama açılamadı. Hata kaydı: {log_path} "
-        "— lütfen bu dosyayı teknik desteğe iletin.",
+        i18n.t("desktop.fatal_title"),
+        i18n.t("desktop.fatal_body", None, kayit=log_path),
         kritik=True)
 
 
@@ -269,11 +269,8 @@ def _tarayici_yedegi(url: str, log_path: str) -> bool:
     # hiçbir iz yok. False dönmek `_run()`'daki `raise`ı serbest bırakıyor:
     # kullanıcı hiç değilse ölümcül uyarıyı ve hata.log'u görüyor.
     return _uyari_goster(
-        "Kromis Studio tarayıcıda açıldı",
-        f"Kromis Studio'nun kendi penceresi açılamadı, uygulama tarayıcınızda açıldı:\n"
-        f"{url}\n\n"
-        "BU PENCEREYİ KAPATMAYIN — kapattığınızda Kromis Studio da kapanır.\n"
-        f"Hata kaydı: {log_path} — lütfen bu dosyayı teknik desteğe iletin.",
+        i18n.t("desktop.browser_title"),
+        i18n.t("desktop.browser_body", None, url=url, kayit=log_path),
         kritik=False)
 
 
@@ -533,6 +530,19 @@ def _onyukleme_denetimi_guvenli() -> int:
         return 2
 
 
+def _dil_tercihi() -> str:
+    """Kullanıcının arayüz dili; `app`in ara katmanının masaüstü karşılığı.
+
+    `prefs` GEÇ ithal ediliyor (fonksiyon içinde): bu modül uygulamanın giriş
+    noktası ve modül düzeyinde `prefs` ithal etmek, `--onyukleme-denetimi`
+    yolunu da katalog+pydantic ağacını yüklemeye zorlardı — o yolun tek işi
+    "paket sağlam mı" sorusunu cevaplamak ve mümkün olduğunca az şeye
+    dokunmak (bkz. `_onyukleme_denetimi`).
+    """
+    import prefs
+    return prefs.read(paths.output_dir()).get("language", i18n.FALLBACK)
+
+
 def main(argv: list[str] | None = None) -> None:
     """`_run()`'ı çalıştırır; her hatayı loglar + kullanıcıya gösterir.
 
@@ -541,6 +551,14 @@ def main(argv: list[str] | None = None) -> None:
     kaybolduğunu görür, ne olduğunu asla öğrenemez — ve onu destekleyecek
     kişi de (terminal kullanamıyor) öğrenemez.
     """
+    # Dil EN BAŞTA kuruluyor: aşağıdaki uyarı pencereleri sunucu hiç
+    # açılmadan da çıkabiliyor, yani `app`in ara katmanı onları hiç görmüyor.
+    # Hata YUTULUYOR — okunamayan bir tercih yüzünden uygulama hiç
+    # açılmamalı; Türkçe'ye düşmek doğru davranış.
+    try:
+        i18n.set_active(_dil_tercihi())
+    except Exception:
+        pass
     args = list(sys.argv[1:] if argv is None else argv)
     # `argparse` DEĞİL, düz üyelik testi. İki gerekçe: (1) `console=False`
     # pakette argparse'ın usage/hata çıktısı stderr'e gider, yani GÖRÜNMEZ ve

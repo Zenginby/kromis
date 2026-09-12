@@ -25,6 +25,7 @@ import chat_prompt
 # Yanıt sınırı `models`'ta yaşıyor çünkü ORASI onu zorunlu kılan yer
 # (`ChatMessage.content`); ikinci bir sabit iki sayının ayrışmasına davetiye
 # olurdu. Döngü yok: `models` yalnız `azure_client` ve `palette`'e bakıyor.
+import i18n
 import models
 
 # Okuma zaman aşımı. ~16,5 bin karakter sistem talimatı + akıl yürüten dağıtım
@@ -50,29 +51,27 @@ def map_error(status_code: int, body: dict | None) -> str:
         elif isinstance(err, str):
             detail = err
     if status_code == 401:
-        return "Azure yetkilendirme hatası (401): API key geçersiz veya süresi dolmuş."
+        return i18n.t("err.azure_401")
     if status_code == 404:
         # Bu uçta EN SIK hata: Ayarlar'a yazılan ad ile Foundry'deki dağıtım adı
         # ayrışması. Genel "istek başarısız" metni kullanıcıyı hiçbir yere
         # götürmezdi; 404 burada tek bir eyleme işaret ediyor.
-        return ("Sohbet dağıtımı bulunamadı (404): Ayarlar'daki dağıtım adını "
-                "Azure AI Foundry'deki adla karşılaştır.")
+        return i18n.t("err.chat_deployment_404")
     if status_code == 429:
-        return "İstek limiti aşıldı (429): biraz bekleyip tekrar deneyin."
+        return i18n.t("err.rate_limited")
     if status_code == 400 and "content" in detail.lower():
-        return "İçerik politikası reddi: mesaj Azure tarafından engellendi."
-    return f"Sohbet isteği başarısız (HTTP {status_code})." + (f" {detail}" if detail else "")
+        return i18n.t("err.chat_content_policy")
+    return i18n.t("err.chat_failed", None, durum=status_code) + (
+        f" {detail}" if detail else "")
 
 
 def load_credentials(env_path: str | None = None) -> tuple[str, str, str]:
     """(key, base_url, deployment). Sohbet key/url'si yoksa GÖRSEL olanlara düşer."""
     key, base_url, deployment = ac.resolve_chat_credentials(env_path)
     if not key or not base_url:
-        raise ChatError("Azure kimlik bilgileri eksik: önce Ayarlar'dan endpoint ve "
-                        "API key'i kaydet.")
+        raise ChatError(i18n.t("err.azure_credentials_missing"))
     if not deployment:
-        raise ChatError("Sohbet dağıtımı tanımlı değil: Ayarlar'dan Prompt Yönetmeni "
-                        "dağıtım adını gir (ör. gpt-5.6-luna).")
+        raise ChatError(i18n.t("err.chat_deployment_missing"))
     return key, base_url, deployment
 
 
@@ -131,23 +130,23 @@ def extract_content(response_json: dict) -> tuple[str, str]:
     """
     choices = response_json.get("choices") if isinstance(response_json, dict) else None
     if not isinstance(choices, list) or not choices:
-        raise ChatError("Sohbet yanıtı boş döndü (choices yok). Tekrar deneyin.")
+        raise ChatError(i18n.t("err.chat_empty"))
     choice = choices[0] if isinstance(choices[0], dict) else {}
     finish_reason = str(choice.get("finish_reason") or "")
     message = choice.get("message") if isinstance(choice.get("message"), dict) else {}
     content = message.get("content")
     if not isinstance(content, str) or not content.strip():
-        raise ChatError("Sohbet yanıtı boş içerik döndürdü"
-                        + (f" (finish_reason: {finish_reason})" if finish_reason else "")
-                        + ". Mesajı kısaltıp tekrar deneyin.")
+        raise ChatError(i18n.t("err.chat_empty_content")
+                                + (f" (finish_reason: {finish_reason})" if finish_reason else "")
+                                + " " + i18n.t("err.shorten_and_retry"))
     # AŞIRI UZUN yanıt da burada, ayrıştırıldığı yerde patlar. Geçirilse ekrana
     # çizilirdi ama `models.ChatMessage`'a sığmazdı: bir sonraki tur ve kaydetme
     # pydantic'in İNGİLİZCE 422'siyle geri döner, sohbet sessizce kilitlenirdi.
     # Uzunluğu biz seçemiyoruz — `build_payload` bilerek `max_tokens` göndermiyor.
     if len(content) > models.MAX_CHAT_REPLY_CHARS:
         raise ChatError(
-            f"Yönetmenin yanıtı beklenmedik biçimde uzun geldi ({len(content)} karakter, "
-            f"sınır {models.MAX_CHAT_REPLY_CHARS}). Brief'i kısaltıp tekrar deneyin.")
+            i18n.t("err.chat_reply_too_long", None, uzunluk=len(content),
+                           sinir=models.MAX_CHAT_REPLY_CHARS))
     return content, finish_reason
 
 
@@ -159,7 +158,7 @@ def complete(messages: list[dict], *, client=None, credentials=None,
         try:
             instructions = chat_prompt.load_instructions()
         except ValueError as e:
-            raise ChatError(f"Prompt Yönetmeni talimatı yüklenemedi: {e}")
+            raise ChatError(i18n.t("err.persona_load_failed", None, hata=e))
 
     endpoint = base_url.rstrip("/") + "/chat/completions"
     payload = build_payload(messages, deployment, instructions)

@@ -625,8 +625,11 @@ $("settings-save").addEventListener("click", saveSettings);
 // ([data-theme=…]); burası onları GERÇEKTEN uygulayan taraf. Monokrom =
 // öznitelik yok: varsayılan --accent zaten monokrom, sahte bir "mono"
 // değeri yazmak token katmanında karşılığı olmayan bir durum üretirdi.
-// KALICILIK BİLEREK YOK — SettingsRequest'te tema alanı yok; o Adım 9'un
-// arka uç işi ve panel bunu kullanıcıya açıkça söylüyor.
+// KALICI: seçim `POST /api/prefs` ile prefs.json'a yazılıyor (aşağıdaki
+// `saveThemePref`) ve açılışta chat.js'in `loadPrefs`'i geri okuyor. Burada
+// bir zamanlar "KALICILIK BİLEREK YOK" yazılıydı ve o cümle Adım 9 geldikten
+// sonra bayatladı — panelin içindeki "yeniden başlatınca sıfırlanır" notuyla
+// birlikte kaldırıldı.
 function applyTheme(theme) {
   if (theme === "mono") delete document.body.dataset.theme;
   else document.body.dataset.theme = theme;
@@ -648,6 +651,57 @@ $("theme-picker").addEventListener("change", (e) => {
     applyTheme(theme);
     saveThemePref(theme);
   }
+});
+
+// ── Dil seçici ───────────────────────────────────────────────────────
+//
+// Tema seçicisinin kalıbı ama İKİ noktada bilerek ayrılıyor:
+//
+//   1. SAYFA YENİLENİYOR. Temayı bir CSS özniteliği taşıyor, dili ise HTML'in
+//      KENDİSİ: metinler sunucuda `{{t:…}}` yer tutucularından çözülüyor
+//      (`i18n.render`) ve `<html lang>` de orada yazılıyor. İstemcide DOM'u
+//      gezip yeniden yazmak ikinci bir çeviri yolu açardı — iki yol zamanla
+//      ayrışır ve arayüzün bir köşesi eski dilde kalırdı. Yenileme tek yolu
+//      korur; bedeli bir sayfa yüklemesi, loopback'te ölçülemez.
+//   2. ÖNCE ONAY — ama yalnız kaybedilecek bir şey varsa. Yenileme
+//      composer'da yazılı metni siler ve bu, kullanıcının hiç beklemediği bir
+//      kayıp olurdu (sendChat'in başarısızlık dalının reddettiği şeyin
+//      aynısı). Kutu boşken soru sormak ise gereksiz bir tık.
+//
+// Seçili radyo `window.KROMIS_LANG`ten kuruluyor, `/api/prefs`ten DEĞİL:
+// sunucu sayfayı zaten o dille çizdi, yani ekranda duran metin ile işaretli
+// radyo TANIM GEREĞİ aynı olmak zorunda. Ayrı bir uçtan sormak, ikisinin
+// ayrışabildiği bir an açardı (`applyConfigured`ın "aynı yanıttan" gerekçesi).
+function syncLanguagePicker() {
+  const secili = document.querySelector(
+    `input[name="language"][value="${KROMIS_DIL}"]`);
+  if (secili) secili.checked = true;
+}
+
+async function saveLanguagePref(dil) {
+  const durum = $("language-status");
+  const yazili = ($("prompt").value || "").trim();
+  if (yazili && !await confirmDialog(t("settings.language_unsaved"),
+                                     t("settings.language_unsaved_body"),
+                                     { okLabel: t("settings.language_switch_ok") })) {
+    syncLanguagePicker();          // gerçekleşmeyen değişikliği geri al
+    return;
+  }
+  durum.textContent = t("settings.language_switching");
+  try {
+    await chatApi("/api/prefs", { method: "POST", body: { language: dil } });
+    // `reload()` YAZIMDAN SONRA: önce yenilenip sonra yazmak, yazım
+    // başarısız olduğunda kullanıcıyı eski dilde ve hiçbir açıklama olmadan
+    // bırakırdı.
+    window.location.reload();
+  } catch (e) {
+    syncLanguagePicker();
+    durum.textContent = t("prefs.write_failed", { hata: e.message });
+  }
+}
+
+$("language-picker").addEventListener("change", (e) => {
+  if (e.target.name === "language") saveLanguagePref(e.target.value);
 });
 
 /** Kullanıcının kayıtlı model tercihi. `applyModels` bunu okuyor.
@@ -719,6 +773,8 @@ async function loadModelPref() {
 }
 
 syncFolderView();
+// Ağa ÇIKMIYOR: seçili dil sayfanın kendisinden (`window.KROMIS_LANG`) okunuyor.
+syncLanguagePicker();
 loadFolders();
 loadHistory();
 loadSettings(true);

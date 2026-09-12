@@ -44,7 +44,7 @@ flowchart LR
   n_palette_js["palette.js"] -->|1| n_i18n_js["i18n.js"]
   n_settings_js["settings.js"] -->|1| n_assets_js["assets.js"]
   n_settings_js["settings.js"] -->|1| n_chat_js["chat.js"]
-  n_settings_js["settings.js"] -->|11| n_core_js["core.js"]
+  n_settings_js["settings.js"] -->|12| n_core_js["core.js"]
   n_settings_js["settings.js"] -->|3| n_folders_js["folders.js"]
   n_settings_js["settings.js"] -->|1| n_i18n_js["i18n.js"]
   n_settings_js["settings.js"] -->|1| n_palette_js["palette.js"]
@@ -65,6 +65,6 @@ flowchart LR
 | `static/mobile.js` | 55 | 0 | — |
 | `static/palette.js` | 769 | 37 | `/api/palette/suggest`, `/api/palettes`, `/api/palettes/{}` |
 | `static/pixel-canvas.js` | 347 | 0 | — |
-| `static/settings.js` | 737 | 19 | `/api/guncelleme`, `/api/prefs`, `/api/settings` |
+| `static/settings.js` | 793 | 21 | `/api/guncelleme`, `/api/prefs`, `/api/settings` |
 | `static/viewer.js` | 507 | 0 | `/output/` |
 

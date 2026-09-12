@@ -1205,6 +1205,13 @@
                 data-pane="director"><span>{{t:common.director}}</span></button>
         <button type="button" class="picker-nav-item" data-pane="sessions">
           <span>{{t:sessions.title}}</span></button>
+        <!-- Etiket İKİ DİLDE birden ve bu bir özensizlik değil, panelin en
+             önemli ayrıntısı: yanlış dilde kalmış bir kullanıcının GERİ DÖNÜŞ
+             yolu tam olarak bu düğme. Çevrilseydi aradığı kelimeyi göremezdi —
+             yani dil seçicisi, ona en çok ihtiyaç duyulan anda bulunamaz
+             olurdu. (Aynı sebeple sözlükte de iki dilde AYNI değeri taşıyor.) -->
+        <button type="button" class="picker-nav-item" data-pane="language">
+          <span>{{t:settings.nav_language}}</span></button>
         <button type="button" class="picker-nav-item" data-pane="about">
           <span>{{t:settings.nav_about}}</span></button>
       </nav>
@@ -1377,6 +1384,40 @@
       <p class="field-note">
         {{t:settings.autosave_hint}}
       </p>
+      </section>
+
+      <!-- ── Dil ──────────────────────────────────────────────────────── -->
+      <!-- Tema seçicisinin `radio-row` kalıbı yeniden kullanılıyor: grup
+           semantiği, ok tuşu gezintisi ve `:checked` durumu tarayıcıdan
+           geliyor. İkinci bir seçici bileşeni yazmak, ikisinin zamanla
+           ayrışması demekti (#model-sheet'in kendi kararı).
+
+           Dil adları ÇEVRİLMİYOR, her biri KENDİ dilinde yazılı ("Türkçe",
+           "English"). Çeviren bir liste, İngilizce arayüzde Türkçe'yi
+           "Turkish" diye gösterirdi — yani Türkçe konuşan kullanıcı kendi
+           dilini tanımadığı bir adla arardı. Bu yüzden iki katalogda da AYNI
+           değerler yazılı.
+
+           "Kaydet" düğmesi YOK, anında yazıyor: uç `/api/prefs` ve bu, kimlik
+           formunun `/api/settings`'inden AYRI (§0.5/K7) — dili çevirmek Azure
+           kimliğini yeniden yazmak zorunda kalmasın. #pref-autosave'in
+           kalıbının aynısı. -->
+      <section class="settings-pane" data-pane="language" hidden>
+      <fieldset id="language-picker" class="theme-picker">
+        <legend class="palette-picker-title">{{t:settings.language_title}}</legend>
+        <label class="radio-row">
+          <input type="radio" name="language" value="tr" checked />
+          <span><b>Türkçe</b><span>{{t:settings.language_tr_desc}}</span></span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="language" value="en" />
+          <span><b>English</b><span>{{t:settings.language_en_desc}}</span></span>
+        </label>
+      </fieldset>
+      <p class="field-note">
+        {{t:settings.language_note}}
+      </p>
+      <p id="language-status" class="modal-status" role="status"></p>
       </section>
 
       <!-- ── Hakkında ─────────────────────────────────────────────────── -->

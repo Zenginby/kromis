@@ -1108,8 +1108,8 @@
           "/api/settings"
         ],
         "dosya": "static/settings.js",
-        "satir": 737,
-        "tanim": 19
+        "satir": 793,
+        "tanim": 21
       },
       {
         "cagrilan_yollar": [
@@ -1336,6 +1336,7 @@
           "applyVideoModel",
           "applyVideoModels",
           "closeSheets",
+          "confirmDialog",
           "goBlockReason",
           "openSheet",
           "secilecek",

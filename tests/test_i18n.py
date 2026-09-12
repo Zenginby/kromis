@@ -377,3 +377,83 @@ def test_the_dictionary_is_inlined_for_the_scripts(monkeypatch):
     assert "window.KROMIS_I18N={" in html
     # Sözlük betiklerin HEPSİNDEN önce gelmeli.
     assert html.index("window.KROMIS_I18N") < html.index("/static/core.js")
+
+
+# ── Ayarlar'daki dil seçici ──────────────────────────────────────────
+
+def test_the_language_pane_is_served():
+    """Seçici Ayarlar'ın İÇİNDE: kullanıcı onu "dil" diye aradığında bulacağı
+    yer orası, tema gibi ayrı bir slide-over değil."""
+    html = TestClient(appmod.app).get("/").text
+    assert 'data-pane="language"' in html, "dil bölmesi yok"
+    assert 'id="language-picker"' in html, "dil seçicisi yok"
+    for jeton in i18n.LANGUAGES:
+        assert f'name="language" value="{jeton}"' in html, jeton
+
+
+def test_the_language_button_is_not_translated():
+    """Yanlış dilde kalmış bir kullanıcının GERİ DÖNÜŞ yolu bu düğme.
+
+    Çevrilirse aradığı kelimeyi göremez — yani dil seçicisi, ona en çok
+    ihtiyaç duyulan anda bulunamaz olur. Bu yüzden iki katalogda da AYNI değer
+    yazılı ve bu test o eşitliğin bekçisi.
+    """
+    degerler = {_yukle(lang)["settings.nav_language"] for lang in i18n.LANGUAGES}
+    assert len(degerler) == 1, f"dil düğmesinin adı dile göre değişiyor: {degerler}"
+    tek = degerler.pop()
+    assert "Dil" in tek and "Language" in tek, (
+        f"düğme iki dilin de sözcüğünü taşımıyor: {tek!r}")
+
+
+def test_the_language_names_are_written_in_their_own_language():
+    """Çeviren bir liste, İngilizce arayüzde Türkçe'yi "Turkish" diye
+    gösterirdi — Türkçe konuşan kullanıcı kendi dilini tanımadığı bir adla
+    arardı. Adlar bu yüzden şablonda SABİT, katalogda değil."""
+    with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
+        html = f.read()
+    secici = html[html.find('id="language-picker"'):html.find("</fieldset>",
+                                                              html.find('id="language-picker"'))]
+    assert "<b>Türkçe</b>" in secici and "<b>English</b>" in secici, (
+        "dil adları kendi dillerinde yazılmamış")
+    # Yalnız ADLAR sabit; satırın AÇIKLAMASI çevriliyor ve çevrilmeli — o
+    # cümle kullanıcıya seçimin ne demek olduğunu anlatıyor, dilin adını değil.
+    adlar = re.findall(r"<b>([^<]*)</b>", secici)
+    assert all("{{t:" not in ad for ad in adlar), f"dil adı çeviriden geçiyor: {adlar}"
+
+
+def test_changing_the_language_reloads_the_page():
+    """Dili İSTEMCİDE uygulamak ikinci bir çeviri yolu açardı ve iki yol
+    zamanla ayrışırdı — arayüzün bir köşesi eski dilde kalırdı. Metinleri
+    sunucu çözüyor (`i18n.render`), yani tek doğru yol yeniden istemek."""
+    js = TestClient(appmod.app).get("/static/settings.js").text
+    govde = js[js.find("async function saveLanguagePref"):]
+    govde = govde[:govde.find("\n}")]
+    assert '"/api/prefs"' in govde and "language: dil" in govde, "tercih yazılmıyor"
+    assert "window.location.reload()" in govde, "sayfa yenilenmiyor"
+    assert govde.index('"/api/prefs"') < govde.index("window.location.reload()"), (
+        "yenileme yazımdan ÖNCE: başarısız bir yazım kullanıcıyı eski dilde "
+        "ve açıklamasız bırakır")
+
+
+def test_the_language_switch_guards_unsent_text():
+    """Yenileme composer'da yazılı metni siler; kullanıcının hiç beklemediği
+    bir kayıp olurdu (sendChat'in başarısızlık dalının reddettiği şeyin
+    aynısı). Kutu boşken soru sormak ise gereksiz bir tık."""
+    js = TestClient(appmod.app).get("/static/settings.js").text
+    govde = js[js.find("async function saveLanguagePref"):]
+    govde = govde[:govde.find("\n}")]
+    assert '$("prompt").value' in govde, "yazılı metin hiç sorulmuyor"
+    assert "confirmDialog" in govde, "onay istenmiyor"
+    assert "yazili &&" in govde, "kutu boşken de onay isteniyor"
+
+
+def test_the_picker_reads_the_language_from_the_page_not_the_server():
+    """Sunucu sayfayı ZATEN o dille çizdi: ekranda duran metin ile işaretli
+    radyo tanım gereği aynı olmak zorunda. Ayrı bir uçtan sormak, ikisinin
+    ayrışabildiği bir an açardı (`applyConfigured`ın "aynı yanıttan"
+    gerekçesinin aynısı)."""
+    js = TestClient(appmod.app).get("/static/settings.js").text
+    govde = js[js.find("function syncLanguagePicker"):]
+    govde = govde[:govde.find("\n}")]
+    assert "KROMIS_DIL" in govde, "seçili dil sayfadan okunmuyor"
+    assert "/api/prefs" not in govde, "seçili radyoyu kurmak için ağa çıkılıyor"

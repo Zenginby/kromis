@@ -1,3 +1,6 @@
+// Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+// GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+// Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 // Kromis — logo/motto/banner kütüphanesi ve bindirme modalı.
 //
 // Klasik script (ES module DEĞİL): bütün parçalar TEK global kapsamı paylaşır

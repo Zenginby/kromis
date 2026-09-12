@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Kullanıcı tercihleri (gizli DEĞİL) ve prefs.json yönetimi.
 
 v2.0'da otomatik kayıt (karar D1) bir anahtar gerektirdi ve iki aday yer de

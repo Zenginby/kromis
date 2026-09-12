@@ -1,7 +1,7 @@
 # Kromis Studio
 
 [![Release](https://img.shields.io/badge/version-v0.18.0-blue.svg)](https://github.com/Zenginby/kromis/releases/latest)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org/)
 [![Build & Test](https://github.com/Zenginby/kromis/actions/workflows/release.yml/badge.svg)](https://github.com/Zenginby/kromis/actions)
 
@@ -173,4 +173,22 @@ are dead.
 
 ## 📜 License
 
-MIT — see [LICENSE](LICENSE).
+**GNU AGPL-3.0** — see [LICENSE](LICENSE).
+
+Use it, study it, change it, redistribute it. One thing is asked in return:
+**if you distribute a modified version, you must publish its source too.**
+Bundling it into a closed-source product, or closing the source and selling it
+as your own, violates the licence.
+
+Whatever you **create with** the app — images and videos — is entirely yours.
+The licence covers the code, not its output, and commercial use is unrestricted.
+
+* Copyright, the previous licence (the project was opened under MIT) and how to
+  report an infringement: [TELIF.md](TELIF.md)
+* **The "Kromis" name and logo are NOT covered by the licence.** Forking is
+  free; the name is not — with a concrete rename checklist: [MARKA.md](MARKA.md)
+* Third-party components and their notices: [NOTICE](NOTICE)
+
+The packages are distributed unsigned; every release publishes the SHA-256 of
+each package so you can verify that the file you downloaded really came from
+this repository — see [KURULUM.md](KURULUM.md).

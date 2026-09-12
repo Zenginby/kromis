@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """winclr — Windows'ta .NET köprüsünün açılış öncesi denetimi ve onarımı.
 
 NEDEN VAR: 2026-09-04'te bir kullanıcı Windows paketini indirip `Downloads`

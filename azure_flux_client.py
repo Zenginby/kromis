@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Azure AI Foundry · FLUX.2 (Black Forest Labs) — BFL yolu.
 
 `azure_mai_client`ın KARDEŞİ ama İKİZİ DEĞİL: aynı host, aynı `api-key`, ama

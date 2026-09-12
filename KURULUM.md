@@ -21,6 +21,47 @@ Actions'ın arm64 / windows runner'ında) üretildiğini varsayar — geliştirm
 makinesinde yerel olarak alınan derlemeler yalnızca paketleme yolunu sınamak
 için, sana gönderilen paket değildir.
 
+## Önce: dosya gerçekten buradan mı geldi?
+
+Kromis'in paketleri **imzasız** dağıtılıyor (macOS noter onayı ve Windows
+Authenticode sertifikası yıllık ücretli; 2. adımdaki Gatekeeper/SmartScreen
+uyarıları da bu yüzden çıkıyor). İmza olmayınca "bu dosya bozulmamış ve
+gerçekten Kromis'in yayınından geldi" diyebilmenin yolu **SHA-256 özeti**.
+
+Bunu yapmanı gerektiren tek durum var ama önemli: paketi
+[resmî yayın sayfası](https://github.com/Zenginby/kromis/releases/latest)
+dışında bir yerden indirdiysen — bir blog, bir dosya paylaşım sitesi, bir
+arkadaşının gönderdiği kopya. Uygulama senin API anahtarlarını tutuyor;
+değiştirilmiş bir kopya onları dışarı taşıyabilir.
+
+**Her yayının notlarında üç paketin özeti yazılı** (ayrıca `SHA256SUMS.txt`
+olarak da ekli). İndirdiğin dosyanınkini hesapla ve karşılaştır:
+
+```sh
+# macOS
+shasum -a 256 ~/Downloads/kromis-macOS-arm64.zip
+
+# Android (bilgisayarda, APK'yı telefona atmadan önce)
+shasum -a 256 ~/Downloads/kromis-android-arm64.apk
+```
+
+```powershell
+# Windows — PowerShell
+Get-FileHash $HOME\Downloads\kromis-windows-x64.zip -Algorithm SHA256
+```
+
+Çıkan 64 karakterlik değer yayın sayfasındakiyle **birebir aynıysa** dosya
+doğrudur; devam et. **Tutmuyorsa kurma** — dosyayı sil ve resmî yayın
+sayfasından yeniden indir.
+
+> [!NOTE]
+> Özetler yayının kendi sayfasında duruyor, yani onları sahte paketi dağıtan
+> kişi değiştiremez. Karşılaştırmayı her zaman yukarıdaki resmî bağlantıdan
+> açtığın sayfayla yap; paketi aldığın yerde yazan bir özetle değil.
+>
+> "Kromis" adı ve logosu lisansın kapsamı dışında ([MARKA.md](MARKA.md)):
+> Kromis adıyla dağıtılan resmî olmayan bir paket zaten kural dışıdır.
+
 ## 1. Uygulamayı yerine koy
 
 ### macOS

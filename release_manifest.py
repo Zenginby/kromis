@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Yayına giren paketlerin TEK kaynağı.
 
 Buradaki sözlük dört yere birden akar:
@@ -53,6 +56,22 @@ PAKETLER: dict[str, dict[str, str]] = {
 }
 
 
+# Paketlerden TÜRETİLEN, yayın işinin KENDİ yazdığı varlıklar.
+#
+# NEDEN AYRI BİR KÜME: aşağıdaki `eksikler()` fazlalığı da hata sayıyor ve bu
+# doğru — yayına beklenmeyen bir dosya girmesi ya yanlış yükleme ya bayat
+# manifest demek. Ama özet dosyasını yayın işinin kendisi üretiyor ve hat
+# yarım kalmış bir taslağı YENİDEN KULLANIYOR (bkz. release.yml → `taslak`
+# işindeki "yarım kalmış koşu" dalı). İkinci koşu, birincisinin bıraktığı
+# SHA256SUMS.txt'yi taslakta bulur; ayrım olmasaydı kapı kendi çıktısını
+# "fazla" sayıp yayını durdururdu — hem de ancak gerçek bir yayın koşusunda
+# ortaya çıkan, sürüm harcatan bir kusur olarak.
+#
+# Bu küme paketlerin yerine GEÇMEZ: `varliklar()` hâlâ yalnız paketleri
+# döndürüyor, yani "üç paket de yerinde mi" kapısı olduğu gibi duruyor.
+TURETILEN: frozenset[str] = frozenset({"SHA256SUMS.txt"})
+
+
 def varliklar() -> set[str]:
     """Yayında bulunması gereken dosya adları."""
     return set(PAKETLER)
@@ -64,7 +83,10 @@ def eksikler(bulunanlar: list[str] | set[str]) -> tuple[list[str], list[str]]:
     FAZLA da hata sayılıyor: yayına beklenmeyen bir dosya girmesi, ya bir işin
     yanlış varlık yüklediği ya da manifestin bayatladığı anlamına gelir.
     İkisi de sessizce geçmemeli.
+
+    TEK İSTİSNA `TURETILEN`: yayın işinin kendi ürettiği özet dosyası. Gerekçe
+    o sabitin başında yazılı.
     """
-    bulunan = set(bulunanlar)
+    bulunan = set(bulunanlar) - TURETILEN
     beklenen = varliklar()
     return sorted(beklenen - bulunan), sorted(bulunan - beklenen)

@@ -459,3 +459,85 @@ def test_the_release_gate_stops_a_zero_byte_package(tmp_path):
     kod, cikti = _kapiyi_kos(tmp_path, bozuk)
     assert kod == 1, cikti
     assert "0 baytlık" in cikti, cikti
+
+
+# --------------------------------------------------------------------------
+# Paket doğrulama — yayımlanan SHA-256 özetleri
+# --------------------------------------------------------------------------
+#
+# NEDEN VAR: paketler imzasız dağıtılıyor (macOS noter onayı / Windows
+# Authenticode yok). İmza olmayınca "bu dosya gerçekten bu hattan çıktı"
+# diyebilmenin kalan tek yolu özet, ve özetin DEĞERİ yayının içinde durmasında:
+# sahte bir paketi başka bir yerde dağıtan kişi bu sayfayı değiştiremez.
+# Kullanıcıya anlatımı KURULUM.md → "Önce: dosya gerçekten buradan mı geldi?".
+
+def _yayinla_adimlari(yayin_yml: dict) -> list[dict]:
+    return yayin_yml["jobs"]["yayinla"]["steps"]
+
+
+def _adim_sirasi(yayin_yml: dict, parca: str) -> int:
+    for i, adim in enumerate(_yayinla_adimlari(yayin_yml)):
+        if parca in str(adim.get("name") or ""):
+            return i
+    raise AssertionError(f"`yayinla` işinde {parca!r} adımı yok")
+
+
+def test_the_release_publishes_a_checksum_file_for_the_packages(yayin_yml: dict):
+    adim = _yayinla_adimlari(yayin_yml)[_adim_sirasi(yayin_yml, "SHA-256")]
+    kod = _kod(adim)
+    assert "sha256sum" in kod, "özet hiç hesaplanmıyor"
+    assert "gh release upload" in kod and "SHA256SUMS.txt" in kod, \
+        "özet dosyası yayına eklenmiyor — kullanıcı karşılaştıracak bir şey bulamaz"
+    # Adlar manifestten okunuyor, `*` ile değil: bir paket eksikse `sha256sum`
+    # kırmızıya düşsün ve çıktı sırası kararlı olsun.
+    assert "release_manifest" in kod, \
+        "özetlenecek dosya adları manifestten okunmuyor"
+
+
+def test_the_checksum_step_runs_after_the_completeness_gate_and_before_publish(
+        yayin_yml: dict):
+    """Sıra anlamın kendisi: eksik bir kümenin özeti yanlış bir güven verirdi,
+    yayımlandıktan SONRA eklenen bir özet ise kullanıcıya geç kalırdı."""
+    kapi = _adim_sirasi(yayin_yml, "manifestle birebir mi")
+    ozet = _adim_sirasi(yayin_yml, "SHA-256")
+    yayim = _adim_sirasi(yayin_yml, "Taslağı yayımla")
+    assert kapi < ozet < yayim, \
+        f"adım sırası bozuk: kapı={kapi}, özet={ozet}, yayım={yayim}"
+
+
+def test_the_generated_release_notes_are_kept_when_the_checksums_are_appended(
+        yayin_yml: dict):
+    """`--generate-notes` gövdesinin üzerine yazmak, sürüm notlarını SİLMEK
+    olurdu; hattın kullanıcıya dönük tek anlatımı orada."""
+    kod = _kod(_yayinla_adimlari(yayin_yml)[_adim_sirasi(yayin_yml, "SHA-256")])
+    assert "--json body" in kod, "var olan not gövdesi hiç okunmuyor"
+    assert "--notes-file" in kod, "notlar dosyadan yazılmıyor"
+
+
+def test_the_release_gate_tolerates_a_checksum_file_left_by_a_half_run(tmp_path):
+    """Hat yarım kalmış bir taslağı YENİDEN KULLANIYOR (bkz. `taslak` işi).
+    İkinci koşu, birincisinin bıraktığı SHA256SUMS.txt'yi taslakta bulur.
+    `TURETILEN` ayrımı olmasaydı kapı kendi çıktısını "fazla" sayar ve yayını
+    durdururdu — üstelik ancak GERÇEK bir yayın koşusunda, sürüm harcayarak
+    öğrenilebilecek bir kusur olarak."""
+    kod, cikti = _kapiyi_kos(tmp_path, _tam_kume() + ["SHA256SUMS.txt\t256"])
+    assert kod == 0, cikti
+    assert "birebir" in cikti, cikti
+
+
+def test_an_unexpected_file_is_still_caught_next_to_the_checksum_file(tmp_path):
+    """`TURETILEN` istisnası, fazlalık denetimini TOPTAN gevşetmiş olmasın."""
+    kod, cikti = _kapiyi_kos(
+        tmp_path, _tam_kume() + ["SHA256SUMS.txt\t256", "bayat.zip\t123"])
+    assert kod == 1, cikti
+    assert "bayat.zip" in cikti, cikti
+
+
+def test_kurulum_tells_the_user_how_to_check_a_package():
+    """Özet yayımlanıp nasıl kullanılacağı hiçbir yerde yazmazsa, kimse
+    kullanmaz. Üç sistemin üçü de anlatılmak zorunda: Windows'ta `shasum` yok,
+    komut `Get-FileHash`."""
+    metin = _oku("KURULUM.md")
+    assert "SHA-256" in metin
+    assert "shasum -a 256" in metin, "macOS/Android doğrulaması anlatılmamış"
+    assert "Get-FileHash" in metin, "Windows doğrulaması anlatılmamış"

@@ -49,13 +49,13 @@ flowchart LR
 
 | betik | satır | üst düzey tanım | çağırdığı sunucu yolları |
 | --- | --- | --- | --- |
-| `static/assets.js` | 544 | 25 | `/api/assets/{}`, `/api/assets/{}/{}`, `/api/banner`, `/api/banner/preview`, `/api/logo`, `/api/logo/preview`, `/assets/banners/{}`, `/assets/logos/{}`, `/assets/mottos/{}`, `/assets/{}/{}`, `/output/{}` |
-| `static/chat.js` | 2659 | 90 | `/api/arena/{}`, `/api/arena/{}/winner`, `/api/chat`, `/api/chats`, `/api/chats/{}`, `/api/prefs`, `/output/{}.${videoMu ` |
-| `static/core.js` | 2930 | 88 | `/api/edit`, `/api/generate`, `/api/image/{}`, `/api/output/{}/download`, `/api/prefs`, `/api/video`, `/api/video/animate`, `/output/`, `/output/{}`, `/output/{}.png` |
-| `static/folders.js` | 2040 | 60 | `/api/folders`, `/api/folders/{}`, `/api/folders/{}/download`, `/api/history`, `/api/images`, `/api/import`, `/output/{}`, `/output/{}${videoMu ` |
-| `static/mobile.js` | 52 | 0 | — |
-| `static/palette.js` | 756 | 37 | `/api/palette/suggest`, `/api/palettes`, `/api/palettes/{}` |
+| `static/assets.js` | 547 | 25 | `/api/assets/{}`, `/api/assets/{}/{}`, `/api/banner`, `/api/banner/preview`, `/api/logo`, `/api/logo/preview`, `/assets/banners/{}`, `/assets/logos/{}`, `/assets/mottos/{}`, `/assets/{}/{}`, `/output/{}` |
+| `static/chat.js` | 2662 | 90 | `/api/arena/{}`, `/api/arena/{}/winner`, `/api/chat`, `/api/chats`, `/api/chats/{}`, `/api/prefs`, `/output/{}.${videoMu ` |
+| `static/core.js` | 2933 | 88 | `/api/edit`, `/api/generate`, `/api/image/{}`, `/api/output/{}/download`, `/api/prefs`, `/api/video`, `/api/video/animate`, `/output/`, `/output/{}`, `/output/{}.png` |
+| `static/folders.js` | 2043 | 60 | `/api/folders`, `/api/folders/{}`, `/api/folders/{}/download`, `/api/history`, `/api/images`, `/api/import`, `/output/{}`, `/output/{}${videoMu ` |
+| `static/mobile.js` | 55 | 0 | — |
+| `static/palette.js` | 759 | 37 | `/api/palette/suggest`, `/api/palettes`, `/api/palettes/{}` |
 | `static/pixel-canvas.js` | 347 | 0 | — |
-| `static/settings.js` | 725 | 19 | `/api/guncelleme`, `/api/prefs`, `/api/settings` |
-| `static/viewer.js` | 504 | 0 | `/output/` |
+| `static/settings.js` | 728 | 19 | `/api/guncelleme`, `/api/prefs`, `/api/settings` |
+| `static/viewer.js` | 507 | 0 | `/output/` |
 

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Yeni sürümü tek kaynağa ve ona bağlı belgelere yazar.
 
 `release.yml`'deki `surum-yaz` işi bunu çağırıyor. Elle yapılırken atlanan tam

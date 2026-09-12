@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """OpenAI görsel üretimi — `azure_client.py`'nin BİLİNÇLİ ikizi.
 
 `chat_client.py`'nin duruşunun aynısı ve aynı gerekçeyle: iki dosya aynı teli

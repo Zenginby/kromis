@@ -1,0 +1,62 @@
+Kromis Studio
+Copyright (C) 2026 Alperen Zengin (@Zenginby)
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License along
+with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+Source code: https://github.com/Zenginby/kromis
+
+--------------------------------------------------------------------------------
+BU DOSYA KOPYALARLA BİRLİKTE TAŞINIR / THIS FILE TRAVELS WITH COPIES
+
+Bu bildirim, kaynağın ve ikili paketlerin her kopyasında bulunmak zorundadır
+(AGPL-3.0 §5a). Kaldırılması lisans ihlalidir.
+
+"Kromis" ve "Kromis Studio" adları ile logo/ikon varlıkları AGPL-3.0'ın
+kapsamı DIŞINDADIR — bkz. MARKA.md. Bir çatal, lisansa tam uysa bile bu adı
+ve logoyu kullanamaz.
+
+v0.19.0 ve öncesi MIT lisanslıydı; geçişin kaydı TELIF.md'dedir.
+
+The names "Kromis" and "Kromis Studio", together with the logo and icon assets,
+are NOT covered by the AGPL-3.0 grant -- see MARKA.md. A fork must rename, even
+when it complies with the license in full.
+
+--------------------------------------------------------------------------------
+ÜÇÜNCÜ PARTİ BİLEŞENLER / THIRD-PARTY COMPONENTS
+
+Aşağıdaki bileşenler bu dağıtımın içinde taşınır ve KENDİ lisanslarına tabidir.
+Hepsi AGPL-3.0 ile uyumludur.
+
+  DM Sans (static/fonts/)
+    Copyright 2014 The DM Sans Project Authors
+    SIL Open Font License 1.1 -- tam metin: static/fonts/OFL.txt
+
+  pixel-canvas (static/pixel-canvas.js)
+    Ryan Mulligan -- https://ryanmulligan.dev/blog/pixel-canvas/
+    MIT License -- uyarlamanın kaydı dosyanın kendi başlığında
+
+  FastAPI (MIT), Uvicorn (BSD-3-Clause), httpx (BSD-3-Clause),
+  Pillow (MIT-CMU), python-multipart (Apache-2.0), pywebview (BSD-3-Clause),
+  pythonnet (MIT), clr-loader (MIT)
+    Sürüm pinleri: requirements.txt
+
+  Gradle Wrapper (android/gradle/)
+    Copyright Gradle Inc. -- Apache License 2.0
+
+  Sağlayıcı logoları (static/img/providers/)
+    OpenAI, Microsoft, Azure, Google Gemini ve Black Forest Labs markalarına
+    aittir; yalnızca ilgili sağlayıcıyı TANIMLAMAK için kullanılır. Bu
+    kullanım bir ortaklık ya da onay ima etmez ve söz konusu markalar
+    AGPL-3.0 kapsamında dağıtılmaz.
+
+Ayrıntı ve ihlal bildirimi yolu: TELIF.md

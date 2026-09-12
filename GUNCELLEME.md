@@ -190,6 +190,20 @@ sonucu var:
 
 ---
 
+## Sürüm 0.20.1 — ne değişti
+
+- CI kırmızısını kapat, dil seçimini açılır listeye çevir, kaçan metinleri topla
+- Planı sonuçla eşitle; İngilizce kapı cümlesini tarayıcıda ölçüp düzelt
+- Yönetmen'in dil kilidini kaldır, README'yi düzelt
+- Sunucu mesajlarını da sözlüğe taşı
+- Ayarlar'a dil seçici
+- Betiklerdeki arayüz metinlerini sözlüğe taşı
+- index.html'i çeviriye açan yer tutucular ve istemci sözlüğü
+- Dil tercihi ve sözlük altyapısı (i18n)
+- Çoklu dil desteği için plan belgesi
+
+---
+
 ## Sürüm 0.20.0 — ne değişti
 
 - main (dal korumasi) lisans daline alindi

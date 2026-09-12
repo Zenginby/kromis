@@ -1,0 +1,4 @@
+{
+  "boot.load_failed.title": "Arayüz yüklenemedi",
+  "boot.load_failed.body": "Uygulama dosyaları okunamadı. Lütfen uygulamayı kapatıp yeniden açın; sürerse hata kaydını ({log}) teknik desteğe iletin."
+}

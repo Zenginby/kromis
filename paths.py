@@ -144,6 +144,23 @@ def bundled_prompts_dir() -> str:
     return os.path.join(resource_dir(), "bundled", "prompts")
 
 
+def bundled_i18n_dir() -> str:
+    """Arayüz sözlüklerinin dizini (`tr.json`, `en.json`).
+
+    `static/` ALTINDA DEĞİL ve bu bilinçli: sözlüğü tarayıcı kadar SUNUCU da
+    okuyor — `app.index` HTML'i servis ederken çeviriyor ve rotalar hata
+    mesajlarını buradan üretiyor. `static/` "tarayıcıya servis edilen dosya"
+    demek; `bundled/` ise tam olarak "uygulamanın okuduğu, paketle gelen veri"
+    için var (bugünkü tek sakini Yönetmen personası).
+
+    Ayrımın ölçülebilir bir bedeli de yok: `kromis.spec` ve
+    `android/app/build.gradle` iki dizini de BÜTÜN olarak paketliyor, yani yeni
+    bir dil dosyası ikisinde de değişiklik gerektirmiyor
+    (`tests/test_paket_icerik_listesi.py` bunun bekçisi).
+    """
+    return os.path.join(resource_dir(), "bundled", "i18n")
+
+
 def chat_instructions_override() -> str:
     """Kullanıcının düzenleyebildiği talimat dosyası (varsa gömülü olanı EZER).
 

@@ -41,6 +41,7 @@ import composite
 import errlog
 import folders
 import guncelleme
+import i18n
 import palette
 import palette_store
 import paths
@@ -113,6 +114,31 @@ async def _lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Kromis Studio", lifespan=_lifespan)
+
+
+def _dil() -> str:
+    """Kullanıcının seçtiği arayüz dili; okunamıyorsa `i18n.FALLBACK`.
+
+    İSTEK BAŞINA okunuyor, modül düzeyinde bir sabite ALINMIYOR: tercih
+    çalışırken değişebiliyor (Ayarlar'daki seçici `POST /api/prefs` atıyor) ve
+    donmuş bir değer, dili çeviren kullanıcıya sunucu yeniden başlayana kadar
+    eski dili göstermeye devam ederdi. `prefs.read` yan etkisiz ve tek bir
+    küçük JSON okuması — loopback'te ölçülebilir bir bedeli yok.
+
+    `Accept-Language` BİLEREK okunmuyor: kaynak tek olmalı. Tarayıcı başlığı
+    ile diskteki tercih ayrıştığında hangisinin kazandığı, kullanıcının
+    seçimini sessizce ezebilecek bir soru olurdu — ve bu uygulamada tarayıcı
+    çoğu zaman pywebview'ın penceresi, yani başlık kullanıcının bir tercihi
+    bile değil.
+
+    Hata YUTULUYOR: dil, uygulamanın açılmasını engelleyecek kadar önemli bir
+    şey değil. `prefs.read` bozuk dosyada zaten varsayılana düşüyor; bu kapı
+    onun ötesindeki durumlar için (okunamayan veri dizini).
+    """
+    try:
+        return i18n.normalize(prefs.read(OUTPUT_DIR).get("language"))
+    except OSError:
+        return i18n.FALLBACK
 
 
 # Kimlik FORMU olan rotalar: yanıtta hiçbir alanın değeri yankılanmak zorunda
@@ -2151,15 +2177,20 @@ def index() -> HTMLResponse:
     Şablon her istekte diskten okunuyor, BELLEKTE TUTULMUYOR: run.sh ile
     geliştirirken "HTML'i düzenle → yenile → gör" akışı böyle korunuyor.
     """
+    dil = _dil()
     try:
         with open(os.path.join(STATIC_DIR, "index.html"), encoding="utf-8") as f:
             template = f.read()
     except OSError:
         log_path = errlog.safe_append(paths.data_dir(), traceback.format_exc())
+        # `<code>` etiketi BURADA, katalogda DEĞİL: `i18n.render`ın kaçışı
+        # çeviri metnine HTML yazılmasını kasten imkânsız kılıyor (bkz. o
+        # fonksiyonun docstring'i). Etiket şablon tarafında kalınca çevirmen
+        # biçimlendirmeyi bozamıyor.
+        kayit = "<code>" + (log_path or "hata.log") + "</code>"
         return HTMLResponse(
-            "<h1>Arayüz yüklenemedi</h1>"
-            "<p>Uygulama dosyaları okunamadı. Lütfen uygulamayı kapatıp yeniden açın; "
-            f"sürerse hata kaydını (<code>{log_path or 'hata.log'}</code>) teknik desteğe iletin.</p>",
+            "<h1>" + i18n.t("boot.load_failed.title", dil) + "</h1>"
+            "<p>" + i18n.t("boot.load_failed.body", dil, log=kayit) + "</p>",
             status_code=500, headers={"Cache-Control": "no-store"})
     return HTMLResponse(template.replace("__APP_VERSION__", version.APP_VERSION),
                         headers={"Cache-Control": "no-store"})

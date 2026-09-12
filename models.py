@@ -26,6 +26,7 @@ from pydantic import (BaseModel, ConfigDict, Field, field_validator,
 
 import azure_client as ac
 import catalog
+import i18n
 import palette
 
 MAX_PROMPT_CHARS = 4000    # kullanıcı prompt'u + palet eki
@@ -344,6 +345,13 @@ class SettingsRequest(BaseModel):
 
 ALLOWED_THEMES = ("mono", "ocean", "amber", "viola")
 
+# Arayüz dilleri. KOPYA DEĞİL İTHAL: liste `i18n.LANGUAGES`te yaşıyor ve burada
+# elle tekrarlansaydı `prefs` kabul ettiği bir dili sözlüğün tanımadığı bir
+# gün gelirdi — arayüz o gün baştan sona ham anahtar gösterirdi. Aynı ayrışma
+# sınıfı bu dosyada bir kez zaten yaşandı (`theme` kontrolü `ALLOWED_THEMES`
+# varken listeyi LİTERAL tekrarlıyordu, bkz. prefs._ENUMS'un notu).
+ALLOWED_LANGUAGES = i18n.LANGUAGES
+
 
 class PrefsRequest(BaseModel):
     """`POST /api/prefs` gövdesi — gizli olmayan kullanıcı tercihleri (v2.0).
@@ -361,6 +369,9 @@ class PrefsRequest(BaseModel):
 
     autosave_sessions: bool | None = None
     theme: str | None = None
+    # Arayüz dili (v0.21). `theme`in birebir komşusu ve aynı sebeple BURADA:
+    # gizli değil, arayüzün gördüğü bir tercih. Değer kapısı aşağıda.
+    language: str | None = None
     # EKSİKTİ ve `extra="forbid"` yüzünden sessiz değil GÜRÜLTÜLÜ bir kırılma
     # üretiyordu: `static/chat.js`'in "yeni sürüm çıkınca haber ver" anahtarı
     # `{guncelleme_kontrolu: …}` POST ediyor, uç 422 dönüyor, arayüz onay
@@ -395,6 +406,16 @@ class PrefsRequest(BaseModel):
     def _theme_ok(cls, v: str | None) -> str | None:
         if v is not None and v not in ALLOWED_THEMES:
             raise ValueError("geçersiz theme")
+        return v
+
+    @field_validator("language")
+    @classmethod
+    def _language_ok(cls, v: str | None) -> str | None:
+        """`_theme_ok`un ikizi. Çift kapı (burada + `prefs.update`) bilinçli:
+        rotanın "buraya düşmek pydantic ile prefs şemasının ayrışması demek
+        olur" notu ikisinin birden var olmasını istiyor."""
+        if v is not None and v not in ALLOWED_LANGUAGES:
+            raise ValueError("geçersiz language")
         return v
 
     @field_validator("image_model")

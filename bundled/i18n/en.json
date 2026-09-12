@@ -1,0 +1,4 @@
+{
+  "boot.load_failed.title": "The interface could not be loaded",
+  "boot.load_failed.body": "The application files could not be read. Please close the app and open it again; if it persists, send the error log ({log}) to technical support."
+}

@@ -133,11 +133,26 @@ loopback'te bedelsiz.
 
 * `app.py`: `_lang()` yardımcısı (`prefs.read(OUTPUT_DIR)["language"]`),
   `HTTPException(detail=i18n.t("err.…", _lang()))`.
-* Sekiz istemci modülünün `map_error`'ı: **isteğe bağlı `lang` parametresi,
-  varsayılanı `"tr"`**. Anahtarı çağırana döndürüp çeviriyi rotaya bırakmak
-  daha temiz görünüyor ama sekiz modülü ve onlara bakan ~100 test iddiasını
-  birden kırardı; varsayılanlı parametre mevcut bekçileri AYAKTA tutuyor ve
-  İngilizce yol kendi yeni iddialarını alıyor.
+* Sekiz istemci modülünün `map_error`'ı: **dili İSTEĞİN BAĞLAMINDAN okuyor**
+  (`i18n.active()`, `contextvars.ContextVar`), parametre almıyor.
+
+  > **PLANDAN SAPMA (uygulama sırasında).** Burada önce "isteğe bağlı `lang`
+  > parametresi" yazıyordu. Uygulamada görüldü ki parametre `map_error`da
+  > bitmiyor: onu çağıran istemci fonksiyonu da, onu çağıran adaptör de,
+  > `providers` de, rota da almak zorunda — BEŞ kademelik bir imza
+  > genişletmesi, ve o zincire eklenen her yeni fonksiyon parametreyi
+  > unutmaya açık kalırdı. Üstelik metni üreten tek yer `map_error` değil:
+  > `catalog`ın model notları ve `desktop.py`nin uyarıları da aynı sorunu
+  > yaşıyor.
+  >
+  > `ContextVar` küresel bir değişken DEĞİL — değeri isteğin bağlamına bağlı
+  > ve eşzamanlı iki istek birbirinin dilini göremiyor (`asyncio` görevleri
+  > ile `run_in_threadpool`un iş parçacıkları bağlamı kopyalayarak taşıyor).
+  > Tek yazar `app`in ara katmanı. Sızıntı olmadığı `test_i18n.py`de
+  > ölçülüyor.
+  >
+  > Kararın korunan yanı aynı: `map_error` imzası ÇAĞIRANLAR için değişmedi,
+  > yani mevcut ~100 test iddiası olduğu gibi ayakta kaldı.
 * `catalog.py` `note=` alanı artık bir ÇEVİRİ ANAHTARI taşır
   (`model.<id>.note`); çözümleme `app._model_payload`'da, etkin dille yapılır.
   Katalog böylece dilsiz kalıyor — 13 modül onu ithal ediyor ve hiçbirinin
@@ -183,17 +198,36 @@ kuralının doğru bir özeti. Yani düzeltme önce personada:
 
 ---
 
-## 4. Commit sırası
+## 4. Commit sırası — UYGULANDI
 
 Her commit kendi başına yeşil; graflar `tools/graf_uret.py` ile aynı commit'in
-İÇİNDE yenilenir (CLAUDE.md §2).
+İÇİNDE yenilendi (CLAUDE.md §2).
 
-1. `language` tercihi + `i18n.py` + boş kataloglar + bekçi testleri
-2. `index.html` yer tutucuları + `index()` çevirisi + `static/i18n.js`
-3. `static/*.js` dizeleri
-4. Ayarlar'daki dil seçici
-5. Sunucu mesajları (`app.py`, sekiz `map_error`, `catalog` notları, `desktop.py`)
-6. Persona + README düzeltmesi
+1. ✅ `language` tercihi + `i18n.py` + kataloglar + bekçi testleri
+2. ✅ `index.html` yer tutucuları + `index()` çevirisi + `static/i18n.js`
+3. ✅ `static/*.js` dizeleri
+4. ✅ Ayarlar'daki dil seçici
+5. ✅ Sunucu mesajları (`app.py`, sekiz `map_error`, `catalog` notları, `desktop.py`)
+6. ✅ Persona + README düzeltmesi
+
+Katalog **743 anahtar** ile kapandı (plan ~1060 dize tahmin ediyordu; fark
+tekrarların tek anahtarda toplanmasından — ör. `Hata (…)` 22 yerde yazılıydı,
+`Kapat` on yerde).
+
+Uygulama sırasında ortaya çıkan ve plana girmemiş üç kusur düzeltildi; üçü de
+çeviri OLMASA sessiz kalmaya devam edecekti:
+
+* `assets.js` düğme etiketinden ilk kelimeyi kesip tür adı olarak kullanıyordu
+  (`"Logo yükle".split(" ")[0]`) — Türkçe'de kazara doğru, İngilizce'de
+  "Upload".
+* `folders.js` sıralaması `localeCompare(…, "tr")` ile Türkçe harf sırasını
+  sabit dayatıyordu.
+* `settings.js`te `startsWith("Başlamak için")` diye ölü bir nöbetçi vardı;
+  çeviriyle birlikte "ölü ama masum"dan "dile bağlı ve sessizce yanlış"a
+  dönüyordu.
+
+Ayrıca iki BAYAT yer düzeltildi: Görünüm panelindeki "tema seçimi yeniden
+başlatınca sıfırlanır" notu (Adım 9'dan beri yanlış) ve onu ARAYAN test.
 
 ---
 

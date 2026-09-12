@@ -56,7 +56,7 @@ PNG_MIME = "image/png"
 
 def map_error(status_code: int, body: dict | list | None, *,
               wire_model: str | None = None) -> str:
-    """HTTP durumunu Türkçe mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
+    """HTTP durumunu mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
 
     `openai_client.map_error`'ın duruşunun aynısı ve aynı gerekçeyle: "OpenAI
     yetkilendirme hatası" diyen bir metin, Gemini anahtarını kurcalayan

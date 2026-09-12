@@ -40,7 +40,7 @@ import providers
 
 def map_error(status_code: int, body: dict | list | None, *,
               wire_model: str | None = None) -> str:
-    """HTTP durumunu Türkçe mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
+    """HTTP durumunu mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
 
     `providers.detail_of` gövde şeklini çözüyor (dört sağlayıcı da
     `{"error": {"message": …}}` kullanıyor), ama metinler sağlayıcıya özgü

@@ -177,7 +177,7 @@ def decode_images(response_json: dict) -> list[bytes]:
 
 
 def map_error(status_code: int, body: dict | list | None) -> str:
-    """HTTP durumunu Türkçe mesaja çevirir.
+    """HTTP durumunu kullanıcıya gösterilebilir bir mesaja çevirir.
 
     422 KENDİ DALINDA ve bu dosyanın en çok işe yarayan yeri: FLUX'un
     doğrulayıcısı mesaj yerine `error.details[]` listesi döndürüyor ve o liste

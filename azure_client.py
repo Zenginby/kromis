@@ -134,7 +134,7 @@ AzureImageError = ImageError
 
 
 def transport_error_message(exc: Exception, timeout: float) -> str:
-    """httpx TAŞIMA hatasını kullanıcıya gösterilebilir Türkçe mesaja çevirir.
+    """httpx TAŞIMA hatasını kullanıcıya gösterilebilir bir mesaja çevirir.
 
     `map_error`'ın ikizi: o Azure'ın DÖNDÜĞÜ HTTP durumunu çevirir, bu ise yanıtın
     hiç gelmediği durumu. İkisi de aynı yere varmak zorunda — app.py Azure

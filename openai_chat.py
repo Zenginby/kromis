@@ -74,7 +74,7 @@ def _label(m: catalog.ChatModel) -> str:
 
 def map_error(status_code: int, body: dict | list | None, *, label: str,
               wire_model: str) -> str:
-    """HTTP durumunu Türkçe mesaja çevirir. `chat_client.map_error`'ın ikizi.
+    """HTTP durumunu mesaja çevirir. `chat_client.map_error`'ın ikizi.
 
     Gövde şeklini `providers.detail_of` çözüyor (dört sağlayıcı da
     `{"error": {"message": …}}` kullanıyor); ayrışan taraf metinler.

@@ -1360,13 +1360,19 @@ def _director_context() -> dict:
     menu = [{**_model_facts(x), "selected": x.id in secili}
             for x in catalog.IMAGE_MODELS + catalog.VIDEO_MODELS
             if _model_available(cfg.get(x.credential, False), x.plan)]
+    # DİL de bu turun olgusu: persona "kullanıcı hangi dilde yazıyorsa o dilde
+    # konuş" diyor, ama ilk mesaj dilsiz olabiliyor (tek kelime, bir oran, bir
+    # hex kodu) ve o turda modelin elinde hiçbir işaret kalmıyor. Arayüz dili
+    # o boşluğun en iyi tahmini — kullanıcı onu bilerek seçmiş. Aynı sözlükten
+    # okunuyor, ikinci bir kaynak açılmıyor.
     return {"model_facts": _model_facts(m) if m is not None else None,
-            "guidance": p["director_guidance"], "available_models": menu}
+            "guidance": p["director_guidance"], "available_models": menu,
+            "language": p["language"]}
 
 
 @app.post("/api/chat")
 def chat(req: ChatRequest) -> dict:
-    """Prompt Yönetmeni: Türkçe sohbet → İngilizce gpt-image-2 prompt'u.
+    """Prompt Yönetmeni: kullanıcının dilinde sohbet → İngilizce prompt.
 
     SENKRON `def` (bilinçli): httpx çağrısı bloklayıcı, Starlette bunu kendi
     threadpool'unda koşturur ve olay döngüsü — yani pencere — donmaz;
@@ -1428,7 +1434,7 @@ def chat(req: ChatRequest) -> dict:
         try:
             instructions = chat_prompt.build_system(**baglam)
         except ValueError as e:
-            raise cc.ChatError(f"Prompt Yönetmeni talimatı yüklenemedi: {e}")
+            raise cc.ChatError(i18n.t("err.persona_load_failed", None, hata=e))
         return chat_providers.complete(
             req.model or catalog.DEFAULT_CHAT_MODEL,
             wire_messages(req.messages),

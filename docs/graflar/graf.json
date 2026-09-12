@@ -63,7 +63,7 @@
         "netguard"
       ],
       "katman": 8,
-      "satir": 2241,
+      "satir": 2247,
       "testler": [
         "tests/test_app.py",
         "tests/test_arena.py",
@@ -71,6 +71,7 @@
         "tests/test_assets_route.py",
         "tests/test_backup.py",
         "tests/test_banner.py",
+        "tests/test_chat_prompt.py",
         "tests/test_chat_route.py",
         "tests/test_chats_route.py",
         "tests/test_delete_route.py",
@@ -333,7 +334,7 @@
         "openai_chat"
       ],
       "katman": 2,
-      "satir": 361,
+      "satir": 396,
       "testler": [
         "tests/test_chat_prompt.py"
       ],
@@ -1447,7 +1448,7 @@
         "version"
       ],
       "onyuz": [],
-      "satir": 2166,
+      "satir": 2172,
       "yardimci_sayisi": 1,
       "yol": "/",
       "yontem": "GET"
@@ -1461,7 +1462,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1728,
+      "satir": 1734,
       "yardimci_sayisi": 0,
       "yol": "/api/arena/{arena_id}",
       "yontem": "GET"
@@ -1477,7 +1478,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1743,
+      "satir": 1749,
       "yardimci_sayisi": 1,
       "yol": "/api/arena/{arena_id}/winner",
       "yontem": "POST"
@@ -1492,7 +1493,7 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 2070,
+      "satir": 2076,
       "yardimci_sayisi": 2,
       "yol": "/api/assets/{kind}",
       "yontem": "GET"
@@ -1507,7 +1508,7 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 2048,
+      "satir": 2054,
       "yardimci_sayisi": 4,
       "yol": "/api/assets/{kind}",
       "yontem": "POST"
@@ -1522,7 +1523,7 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 2082,
+      "satir": 2088,
       "yardimci_sayisi": 2,
       "yol": "/api/assets/{kind}/{asset_id}",
       "yontem": "DELETE"
@@ -1539,7 +1540,7 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 2017,
+      "satir": 2023,
       "yardimci_sayisi": 7,
       "yol": "/api/banner",
       "yontem": "POST"
@@ -1555,7 +1556,7 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 2009,
+      "satir": 2015,
       "yardimci_sayisi": 6,
       "yol": "/api/banner/preview",
       "yontem": "POST"
@@ -1568,6 +1569,7 @@
         "chat_prompt",
         "chat_providers",
         "credstore",
+        "i18n",
         "models",
         "paths",
         "prefs"
@@ -1575,7 +1577,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1368,
+      "satir": 1374,
       "yardimci_sayisi": 3,
       "yol": "/api/chat",
       "yontem": "POST"
@@ -1589,7 +1591,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1556,
+      "satir": 1562,
       "yardimci_sayisi": 0,
       "yol": "/api/chats",
       "yontem": "DELETE"
@@ -1603,7 +1605,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1518,
+      "satir": 1524,
       "yardimci_sayisi": 0,
       "yol": "/api/chats",
       "yontem": "GET"
@@ -1620,7 +1622,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1532,
+      "satir": 1538,
       "yardimci_sayisi": 4,
       "yol": "/api/chats",
       "yontem": "POST"
@@ -1635,7 +1637,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1588,
+      "satir": 1594,
       "yardimci_sayisi": 1,
       "yol": "/api/chats/{chat_id}",
       "yontem": "DELETE"
@@ -1650,7 +1652,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1524,
+      "satir": 1530,
       "yardimci_sayisi": 1,
       "yol": "/api/chats/{chat_id}",
       "yontem": "GET"
@@ -1667,7 +1669,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 1566,
+      "satir": 1572,
       "yardimci_sayisi": 3,
       "yol": "/api/chats/{chat_id}",
       "yontem": "PUT"
@@ -1706,7 +1708,7 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1596,
+      "satir": 1602,
       "yardimci_sayisi": 0,
       "yol": "/api/folders",
       "yontem": "GET"
@@ -1722,7 +1724,7 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1620,
+      "satir": 1626,
       "yardimci_sayisi": 3,
       "yol": "/api/folders",
       "yontem": "POST"
@@ -1738,7 +1740,7 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1635,
+      "satir": 1641,
       "yardimci_sayisi": 1,
       "yol": "/api/folders/{folder_id}",
       "yontem": "DELETE"
@@ -1754,7 +1756,7 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1692,
+      "satir": 1698,
       "yardimci_sayisi": 1,
       "yol": "/api/folders/{folder_id}",
       "yontem": "PATCH"
@@ -1769,7 +1771,7 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1648,
+      "satir": 1654,
       "yardimci_sayisi": 1,
       "yol": "/api/folders/{folder_id}/download",
       "yontem": "GET"
@@ -1824,7 +1826,7 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1706,
+      "satir": 1712,
       "yardimci_sayisi": 2,
       "yol": "/api/history",
       "yontem": "GET"
@@ -1839,7 +1841,7 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 1759,
+      "satir": 1765,
       "yardimci_sayisi": 1,
       "yol": "/api/image/{image_id}",
       "yontem": "DELETE"
@@ -1856,7 +1858,7 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 1718,
+      "satir": 1724,
       "yardimci_sayisi": 2,
       "yol": "/api/image/{image_id}",
       "yontem": "PATCH"
@@ -1872,7 +1874,7 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1779,
+      "satir": 1785,
       "yardimci_sayisi": 1,
       "yol": "/api/images",
       "yontem": "DELETE"
@@ -1889,7 +1891,7 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1768,
+      "satir": 1774,
       "yardimci_sayisi": 2,
       "yol": "/api/images",
       "yontem": "PATCH"
@@ -1905,7 +1907,7 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 1789,
+      "satir": 1795,
       "yardimci_sayisi": 6,
       "yol": "/api/import",
       "yontem": "POST"
@@ -1923,7 +1925,7 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 1942,
+      "satir": 1948,
       "yardimci_sayisi": 5,
       "yol": "/api/logo",
       "yontem": "POST"
@@ -1940,7 +1942,7 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 1933,
+      "satir": 1939,
       "yardimci_sayisi": 4,
       "yol": "/api/logo/preview",
       "yontem": "POST"
@@ -1955,7 +1957,7 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 2127,
+      "satir": 2133,
       "yardimci_sayisi": 2,
       "yol": "/api/output/{image_id}/download",
       "yontem": "GET"
@@ -1970,7 +1972,7 @@
       "onyuz": [
         "static/palette.js"
       ],
-      "satir": 1830,
+      "satir": 1836,
       "yardimci_sayisi": 0,
       "yol": "/api/palette/suggest",
       "yontem": "POST"
@@ -1984,7 +1986,7 @@
       "onyuz": [
         "static/palette.js"
       ],
-      "satir": 1861,
+      "satir": 1867,
       "yardimci_sayisi": 0,
       "yol": "/api/palettes",
       "yontem": "GET"
@@ -2002,7 +2004,7 @@
       "onyuz": [
         "static/palette.js"
       ],
-      "satir": 1866,
+      "satir": 1872,
       "yardimci_sayisi": 4,
       "yol": "/api/palettes",
       "yontem": "POST"
@@ -2017,7 +2019,7 @@
       "onyuz": [
         "static/palette.js"
       ],
-      "satir": 1887,
+      "satir": 1893,
       "yardimci_sayisi": 1,
       "yol": "/api/palettes/{palette_id}",
       "yontem": "DELETE"
@@ -2033,7 +2035,7 @@
         "static/core.js",
         "static/settings.js"
       ],
-      "satir": 1443,
+      "satir": 1449,
       "yardimci_sayisi": 0,
       "yol": "/api/prefs",
       "yontem": "GET"
@@ -2050,7 +2052,7 @@
         "static/core.js",
         "static/settings.js"
       ],
-      "satir": 1449,
+      "satir": 1455,
       "yardimci_sayisi": 0,
       "yol": "/api/prefs",
       "yontem": "POST"
@@ -2145,7 +2147,7 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 2091,
+      "satir": 2097,
       "yardimci_sayisi": 2,
       "yol": "/assets/{kind}/{filename}",
       "yontem": "GET"
@@ -2164,7 +2166,7 @@
         "static/folders.js",
         "static/viewer.js"
       ],
-      "satir": 2103,
+      "satir": 2109,
       "yardimci_sayisi": 1,
       "yol": "/output/{filename}",
       "yontem": "GET"

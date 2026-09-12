@@ -125,7 +125,7 @@ def _bekle(saniye: float) -> None:
 
 def map_error(status_code: int, body: dict | list | None, *,
               wire_model: str | None = None) -> str:
-    """HTTP durumunu Türkçe mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
+    """HTTP durumunu mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
 
     `gemini_client.map_error`'ın duruşunun aynısı ve aynı gerekçeyle: "Gemini
     görsel" diyen bir metin, video faturasını arayan kullanıcıyı yanlış yere

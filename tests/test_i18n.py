@@ -519,3 +519,36 @@ def test_every_model_note_is_a_translation_key():
             f"{m.id}: not bir çeviri anahtarı değil: {m.note!r}")
         for lang in i18n.LANGUAGES:
             assert m.note in _yukle(lang), f"{m.id}: {lang}.json'da yok"
+
+
+# ── Belgeler ─────────────────────────────────────────────────────────
+
+def test_the_readmes_no_longer_claim_a_turkish_only_interface():
+    """README'nin iddiası ARTIK YANLIŞ olabilir ve bu sessiz bir kusur sınıfı:
+    belge, kodun bir turda kazandığı yeteneği yok saymaya devam eder ve
+    kullanıcı var olan bir özelliği hiç aramaz.
+
+    İddia İKİ yönlü: eski cümlelerin gitmiş olması yetmez, yeni yeteneğin
+    ADIYLA yazılı olması da gerekiyor — yoksa cümleyi silmek de testi
+    yeşile döndürürdü.
+    """
+    en = open(os.path.join(REPO, "README.en.md"), encoding="utf-8").read()
+    assert "The interface is Turkish only" not in en, (
+        "README.en hâlâ arayüzün yalnız Türkçe olduğunu söylüyor")
+    assert "Dil / Language" in en, "dil anahtarının nerede olduğu yazılı değil"
+
+    tr_readme = open(os.path.join(REPO, "README.md"), encoding="utf-8").read()
+    assert "Fikri Türkçe anlat" not in tr_readme, (
+        "README hâlâ Yönetmen'e Türkçe yazmayı şart koşuyor")
+    assert "Dil / Language" in tr_readme, "dil anahtarının nerede olduğu yazılı değil"
+
+
+def test_the_readmes_still_explain_why_the_prompt_is_english():
+    """İngilizce prompt kuralı KALKMADI ve kalkmamalı: o bir dil tercihi
+    değil, görsel modellerinin ölçülmüş davranışı. Sebebi yazılı olmazsa
+    kullanıcı onu bir eksiklik sanar ve "neden Türkçe yazmıyor" diye sorar."""
+    for ad in ("README.md", "README.en.md"):
+        metin = open(os.path.join(REPO, ad), encoding="utf-8").read()
+        assert "İngilizce" in metin or "English" in metin, ad
+        assert ("ölçülmüş" in metin or "measured" in metin), (
+            f"{ad}: İngilizce prompt kuralının GEREKÇESİ yazılı değil")

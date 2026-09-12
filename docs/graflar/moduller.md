@@ -23,7 +23,7 @@ flowchart TD
     n_netguard["netguard<br/>160 satır"]
   end
   subgraph katman8["katman 8"]
-    n_app["app<br/>2241 satır"]
+    n_app["app<br/>2247 satır"]
   end
   subgraph katman7["katman 7"]
     n_chat_providers["chat_providers<br/>127 satır"]
@@ -50,7 +50,7 @@ flowchart TD
     n_backup["backup<br/>190 satır"]
   end
   subgraph katman2["katman 2"]
-    n_chat_prompt["chat_prompt<br/>361 satır"]
+    n_chat_prompt["chat_prompt<br/>396 satır"]
     n_folders["folders<br/>251 satır"]
     n_guncelleme["guncelleme<br/>240 satır"]
     n_i18n["i18n<br/>244 satır"]
@@ -209,7 +209,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | modül | satır | katman | ithal ettiği | ithal eden | test |
 | --- | --- | --- | --- | --- | --- |
 | `android_main.py` | 197 | 11 | `app` (erteli), `desktop` (erteli), `errlog` (erteli), `paths` (erteli) | 0 | 2 |
-| `app.py` | 2241 | 8 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `i18n`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 33 |
+| `app.py` | 2247 | 8 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `i18n`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 34 |
 | `assets_store.py` | 204 | 1 | `jsonstore` | 3 | 9 |
 | `azure_client.py` | 458 | 3 | `i18n`, `paths`, `winsec` | 12 | 30 |
 | `azure_flux_client.py` | 289 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
@@ -217,7 +217,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `backup.py` | 190 | 3 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 1 | 1 |
 | `catalog.py` | 1298 | 0 | — | 13 | 27 |
 | `chat_client.py` | 190 | 5 | `azure_client`, `chat_prompt`, `i18n`, `models` | 3 | 3 |
-| `chat_prompt.py` | 361 | 2 | `paths` | 3 | 1 |
+| `chat_prompt.py` | 396 | 2 | `paths` | 3 | 1 |
 | `chat_providers.py` | 127 | 7 | `azure_client`, `catalog`, `chat_client`, `credstore`, `openai_chat` | 1 | 2 |
 | `chat_store.py` | 256 | 1 | `jsonstore` | 2 | 2 |
 | `color_names.py` | 421 | 1 | `palette` | 1 | 3 |

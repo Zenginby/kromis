@@ -190,6 +190,13 @@ sonucu var:
 
 ---
 
+## Sürüm 0.22.0 — ne değişti
+
+- ilk+son kare reddinde süreyi ADIYLA söyle
+- ön tanımlı arayüz dili İngilizce
+
+---
+
 ## Sürüm 0.21.0 — ne değişti
 
 - Ayarlar → Hakkında'ya "Şimdi kontrol et" düğmesi eklendi: yeni sürümü beklemeden sorabilirsiniz. Ayrıca başarısız bir güncelleme kontrolü artık 24 saat değil 30 dakika sonra yeniden deneniyor — bağlantı bir an koptuğunda bildirim bir gün gecikmiyor.

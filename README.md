@@ -1,6 +1,6 @@
 # Kromis Studio
 
-[![Release](https://img.shields.io/badge/version-v0.21.0-blue.svg)](https://github.com/Zenginby/kromis/releases/latest)
+[![Release](https://img.shields.io/badge/version-v0.22.0-blue.svg)](https://github.com/Zenginby/kromis/releases/latest)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org/)
 [![Build & Test](https://github.com/Zenginby/kromis/actions/workflows/release.yml/badge.svg)](https://github.com/Zenginby/kromis/actions)
@@ -40,7 +40,7 @@ Bağlantılar her zaman **en son yayına** gider; sürüm yükselince adres değ
 
 ---
 
-## ✨ Güncel Özellikler (v0.21.0)
+## ✨ Güncel Özellikler (v0.22.0)
 
 ### Fikri kendi dilinde anlat, prompt'u Yönetmen yazsın
 

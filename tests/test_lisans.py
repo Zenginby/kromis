@@ -197,3 +197,82 @@ def test_the_stylesheet_actually_renders_the_notice():
     önce yaşadığı kusur (`settings-update-row`, style.css'teki gerekçesi)."""
     assert ".settings-legal" in _oku("static", "style.css"), \
         "style.css'te .settings-legal kuralı yok"
+
+
+# --------------------------------------------------------------------------
+# Geri çekilen MIT dönemi paketleri
+
+# v0.17.3 / v0.18.0 / v0.19.0 paketlerinin, YAYIN SAYFASINDAN SİLİNMEDEN ÖNCE
+# GitHub'ın kendi hesapladığı SHA-256 değerleri.
+#
+# NEDEN PİN: o üç sürümün hazır paketleri 2026-09-13'te kaldırıldı (gerekçe
+# TELIF.md'de: `SHA256SUMS.txt` v0.20.0'da başladı, öncesi doğrulanamıyordu).
+# Dosya silinince GitHub'ın hesabı da silindi — geriye kalan TEK nüsha
+# TELIF.md'deki liste. Oradan bir satır düşerse o sürüm için "bu ikili benim
+# derlememdir" diyebilme imkânı da düşer ve kayıp SESSİZ olur: hiçbir şey
+# kırılmaz, kimse fark etmez. Fark etmek bu testin işi.
+MIT_DONEMI_OZETLERI: dict[str, tuple[str, ...]] = {
+    "v0.17.3": (
+        "911de3ed46572901f761c993c5e781b2f1a8bf733e6524efb8d0356aa4ccc60a",
+        "b9fd91b716b4692a2459a4b167d0bee5a3903f0dcad508c975a0a70c62c8f427",
+        "2d6b047a8b7d36630f91e7cf703dd885db3da8106ae61aad0778386d34efae5d",
+    ),
+    "v0.18.0": (
+        "988d9d6a6612ccdd4456cb8754d06e78ac2eca7d5d2e29b5f283f1bdc5bef349",
+        "ed48bc79fdcc3ef765370d7f74b8fb22aefaa22ff6d7f279f3fc52dc5c29d9a7",
+        "586f044f620fd93d2fec80a8c2016f497d2b0fcb3b13a966cad6292153c7905e",
+    ),
+    "v0.19.0": (
+        "eea42bdbc8c4f44fec029c13f31275d2633b56e0234c92ca8b4a1261012e2443",
+        "2f0dae6ac1fcfa1b1202d2ce8d3d437e6f86bf09b6458e4b4b37efb5035dbb02",
+        "669043ebbfefcfc63d2a5100903be09c7e2452bc908c2f0fd23fb6f7de6ae2a6",
+    ),
+}
+
+PAKET_ADLARI = (
+    "kromis-android-arm64.apk",
+    "kromis-macOS-arm64.zip",
+    "kromis-windows-x64.zip",
+)
+
+
+@pytest.mark.parametrize("surum", sorted(MIT_DONEMI_OZETLERI))
+def test_TELIF_keeps_every_fingerprint_of_the_withdrawn_MIT_packages(surum):
+    """Silinen paketin parmak izi belgede duruyor mu — sürüm sürüm.
+
+    İhlal iddiasının en somut anı şudur: karşı tarafta bir dosya var, "bu
+    seninkinden mi çıktı?" diye soruluyor. Cevabı verecek şey özet. MIT
+    dönemi için o özetin başka nüshası kalmadı."""
+    metin = _oku("TELIF.md")
+    assert surum in metin, f"TELIF.md {surum}'ı hiç anmıyor"
+    for ozet, ad in zip(MIT_DONEMI_OZETLERI[surum], PAKET_ADLARI):
+        assert f"{ozet}  {ad}" in metin, \
+            f"{surum} için {ad} özeti TELIF.md'de yok (ya da biçimi bozuldu)"
+
+
+def test_TELIF_says_WHY_the_MIT_packages_were_withdrawn():
+    """Kayıt, gerekçesi olmadan yarım.
+
+    Paketlerin kaldırılması lisansla karıştırılırsa belge kendi anlattığı
+    şeyle çelişir: MIT geri alınamaz ve bu belge zaten öyle diyor. Kaldırma
+    DAĞITIM hijyeni — v0.20.0 öncesinde `SHA256SUMS.txt` yoktu. Bu ayrımın
+    yazılı durması, ileride 'demek ki lisansı gizlemeye çalışmış' okumasının
+    önündeki tek şey."""
+    metin = _oku("TELIF.md")
+    assert "SHA256SUMS.txt" in metin, \
+        "TELIF.md kaldırmanın gerekçesini (doğrulanamayan paket) söylemiyor"
+    assert "geri alma" in metin or "geri alınamaz" in metin, \
+        "TELIF.md MIT'in geri alınamadığını söylemeyi bırakmış"
+
+
+def test_the_withdrawn_releases_still_exist_as_a_dated_record():
+    """Kaldırılan DOSYALAR; yayın kayıtları değil.
+
+    Sürüm kayıtlarını da silmek, 'hangi sürüm MIT'ti' sorusunun cevabını
+    yalnız telif sahibinin düzenleyebildiği bir belgeye indirger — yani
+    kanıt değerini düşürür. Belge bu ayrımı açıkça yazmak zorunda ki
+    ileride biri 'madem sildin, hepsini silseydin' dediğinde gerekçe
+    hazır olsun."""
+    metin = _oku("TELIF.md")
+    assert "Silinen yalnız dosyalar" in metin, \
+        "TELIF.md yayın kaydı ile paket dosyası ayrımını yapmıyor"

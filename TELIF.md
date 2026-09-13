@@ -83,6 +83,53 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+### MIT dönemi paketlerinin parmak izleri
+
+v0.17.3, v0.18.0 ve v0.19.0'ın hazır paketleri (apk/zip) **2026-09-13'te
+yayın sayfalarından kaldırıldı.** Gerekçe lisans değil dağıtım hijyeni: o üç
+sürümün `SHA256SUMS.txt`'si YOK — paket doğrulama v0.20.0'da başladı — yani
+oradan indirilen bir dosyanın gerçekten bu hattan çıktığı kanıtlanamıyordu.
+Kanaldaki doğrulanamayan tek nokta orasıydı. Silmek MIT'i geri almaz ve öyle
+bir amacı da yok; kaynağın kendisi `main`'in geçmişinde, herkese açık duruyor.
+
+Yayın kayıtları, tarihleri ve notları YERİNDE: hangi sürümün hangi lisansla
+çıktığının cevabı, sonradan düzenlenebilecek bir belgede değil GitHub'ın
+tarihli kaydında kalsın diye. Silinen yalnız dosyalar.
+
+Özetler burada, çünkü **dosyayı silmek parmak izini de silerdi.** Yarın
+ortaya MIT dönemine ait bir ikili çıkarsa, onun bu depodan çıktığını — ya da
+ÇIKMADIĞINI — gösterebilecek tek şey bu liste. Değerler GitHub'ın kendi
+bağımsız hesabı; silme işleminden ÖNCE yayın API'sinden okundu. Biçim
+`sha256sum` ile uyumlu, doğrudan `sha256sum -c` verilebilir.
+
+**v0.17.3** — 2026-09-11 12:55:42 UTC · indirme sayacı: 2 / 3 / 3
+
+```
+911de3ed46572901f761c993c5e781b2f1a8bf733e6524efb8d0356aa4ccc60a  kromis-android-arm64.apk
+b9fd91b716b4692a2459a4b167d0bee5a3903f0dcad508c975a0a70c62c8f427  kromis-macOS-arm64.zip
+2d6b047a8b7d36630f91e7cf703dd885db3da8106ae61aad0778386d34efae5d  kromis-windows-x64.zip
+```
+
+**v0.18.0** — 2026-09-11 16:46:19 UTC · indirme sayacı: 3 / 1 / 1
+
+```
+988d9d6a6612ccdd4456cb8754d06e78ac2eca7d5d2e29b5f283f1bdc5bef349  kromis-android-arm64.apk
+ed48bc79fdcc3ef765370d7f74b8fb22aefaa22ff6d7f279f3fc52dc5c29d9a7  kromis-macOS-arm64.zip
+586f044f620fd93d2fec80a8c2016f497d2b0fcb3b13a966cad6292153c7905e  kromis-windows-x64.zip
+```
+
+**v0.19.0** — 2026-09-11 19:03:34 UTC · indirme sayacı: 1 / 1 / 1
+
+```
+eea42bdbc8c4f44fec029c13f31275d2633b56e0234c92ca8b4a1261012e2443  kromis-android-arm64.apk
+2f0dae6ac1fcfa1b1202d2ce8d3d437e6f86bf09b6458e4b4b37efb5035dbb02  kromis-macOS-arm64.zip
+669043ebbfefcfc63d2a5100903be09c7e2452bc908c2f0fd23fb6f7de6ae2a6  kromis-windows-x64.zip
+```
+
+İndirme sayacı toplamı 16. Sayaç KİMİN indirdiğini söylemez; üç sürüm ve üç
+platform üzerinden birkaç kişilik bir dağılımla tutarlı, ama "kimse almadı"
+diye okunamaz. Bu belge o yüzden ihtimale değil kayda dayanıyor.
+
 ## AGPL-3.0 pratikte ne demek
 
 ### Kullanıcıysan — hiçbir şey değişmedi

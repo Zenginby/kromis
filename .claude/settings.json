@@ -8,6 +8,12 @@
             "command": "{ command -v python3 >/dev/null && P=python3 || P=python; }; \"$P\" \"$CLAUDE_PROJECT_DIR/tools/graf_uret.py\" --ozet --json",
             "timeout": 30,
             "statusMessage": "Depo haritası okunuyor"
+          },
+          {
+            "type": "command",
+            "command": "{ command -v python3 >/dev/null && P=python3 || P=python; }; \"$P\" \"$CLAUDE_PROJECT_DIR/tools/test_ortami.py\" --ozet --json",
+            "timeout": 60,
+            "statusMessage": "Test ortamı denetleniyor"
           }
         ]
       }

@@ -71,5 +71,20 @@ jobs:
           pip install playwright==1.62.*
           playwright install --with-deps chromium
 
+      # `KROMIS_E2E_ZORUNLU`: E2E testleri ATLANIRSA takım kırmızıya döner.
+      #
+      # NEDEN: yukarıdaki adım bir gün sessizce kaybolur ya da adı değişirse
+      # `pytest.importorskip("playwright")` E2E dosyalarını atlar ve bu iş yine
+      # "passed" der — yani kapı yok olur ama yeşil kalır. Üstteki adımın
+      # METNİNİ `tests/test_playwright_kurulumu.py` sınıyor; bu değişken de
+      # adımın GERÇEKTEN iş gördüğünü sınıyor. İkisi farklı şeyler: biri
+      # workflow'u okuyor, öteki koşan ortamı ölçüyor.
+      #
+      # Yerelde VERİLMİYOR (`tools/test_ortami.py` de vermiyor): playwright'ı
+      # olmayan bir makinede takımın geri kalanı yine koşabilmeli — orada
+      # doğru davranış atlamak, yanlış olan atlamanın görünmemesiydi ve onu
+      # `tests/conftest.py`nin sonundaki uyarı kapatıyor.
       - name: Pytest
+        env:
+          KROMIS_E2E_ZORUNLU: "1"
         run: pytest tests/ -q

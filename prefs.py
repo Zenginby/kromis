@@ -66,20 +66,26 @@ PREFS_FILE = "prefs.json"
 _SCHEMA: dict[str, tuple[object, type]] = {
     "autosave_sessions": (True, bool),
     "theme": ("mono", str),
-    # Arayüz dili (v0.21). Varsayılan "tr" ve bu bir TEMBELLİK DEĞİL KARAR:
+    # Arayüz dili (v0.21). Varsayılan İNGİLİZCE (v0.22'de "tr"den çevrildi) ve
+    # değer LİTERAL DEĞİL İTHAL: tek kaynak `i18n.DEFAULT` — iki yer ayrışırsa
+    # "hiç seçim yokken hangi dil" sorusunun, biri sunucu tarafında biri
+    # sözlükte olmak üzere iki cevabı olurdu.
     #
-    #   1. Mevcut kullanıcı bir güncellemeden sonra arayüzünü değişmiş
-    #      bulmamalı. Sistem/tarayıcı dilinden otomatik algılama tam bunu
-    #      yapardı — hem de tercih henüz diske yazılmadığı için SESSİZCE.
-    #   2. Kaynak metin Türkçe yazılıyor: yeni bir dize önce `tr.json`'da var
-    #      oluyor, çeviri sonra geliyor (`i18n.FALLBACK`'in gerekçesi). Ön
-    #      tanımlı dilin düşüş diliyle AYNI olması, çevrilmemiş bir dizenin
-    #      varsayılan kurulumda hiç görünmemesi demek.
+    # Ön tanımlı dil ile `i18n.FALLBACK` ARTIK AYNI DEĞİL ve bunun bir bedeli
+    # var: çevrilmemiş bir dize varsayılan kurulumda Türkçe görünür. Kapı
+    # çalışma anında değil testte (`tests/test_i18n.py` iki kataloğun
+    # anahtarlarını eşitliyor) — `chat_prompt.load_video_instructions`ın
+    # "kapı burada değil testte" ayrımının aynısı.
+    #
+    # Sistem/tarayıcı dilinden OTOMATİK ALGILAMA hâlâ yok ve bu kasıtlı:
+    # `app._dil_baglami`nin `Accept-Language` gerekçesi burada da geçerli —
+    # tercihin tek kaynağı diskteki bu dosya, yoksa kullanıcının seçimini
+    # sessizce ezen ikinci bir otorite doğardı.
     #
     # Anahtar burada, `credentials.env`'de DEĞİL: dosyanın başındaki iki
     # gerekçe (bir arayüz tercihinin 0600 olmasının anlamı yok · anahtarı
     # çevirmek Azure kimliğini yeniden yazmaya bağlanırdı) birebir geçerli.
-    "language": ("tr", str),
+    "language": (i18n.DEFAULT, str),
     "guncelleme_kontrolu": (True, bool),
     "image_model": (catalog.DEFAULT_IMAGE_MODEL, str),
     # Video şeridinin seçimi. `image_model`in AYRI bir anahtarı ve bu

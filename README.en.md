@@ -17,9 +17,11 @@ is no server in between.
 🇹🇷 [Türkçe](README.md) · 📦 [Installation](KURULUM.md) *(Turkish)* · 📖 [Full feature list](docs/ozellikler.md) *(Turkish)*
 
 > [!NOTE]
-> **The interface speaks English** — switch it in Settings → **Dil / Language**
-> (the button is deliberately named in both languages so you can find it from
-> either side). The choice is saved to disk, so it survives a restart.
+> **The interface speaks English out of the box** (the default since v0.22) —
+> switch it in Settings → **Dil / Language** (the button is deliberately named
+> in both languages so you can find it from either side). The choice is saved
+> to disk, so it survives a restart; an installation that already picked a
+> language keeps it.
 >
 > The screenshots below still show the Turkish interface, and the in-repo
 > documentation is Turkish: this README is the English entry point, the deeper

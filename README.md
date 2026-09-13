@@ -63,6 +63,11 @@ kapatıp açınca yerinde duruyor. Arayüzün tamamı — menüler, durum satır
 onay pencereleri ve hata mesajları — seçilen dilde geliyor. Belgeler ve
 buradaki ekran görüntüleri Türkçe kalıyor.
 
+**Ön tanımlı dil v0.22'den beri İngilizce.** Dilini daha önce seçmiş bir
+kurulum etkilenmiyor (tercih diskte duruyor); hiç seçmemiş bir kurulum bu
+sürümden sonra arayüzü İngilizce açar ve aynı menüden tek tıkla Türkçe'ye
+döner.
+
 ![Prompt Yönetmeni: üretilen prompt, teknik ayarlar, varyasyonlar ve parametre eksenleri](docs/gorseller/studyo-yonetmen.png)
 
 ### Üret ve düzenle — birçok model, tek şerit

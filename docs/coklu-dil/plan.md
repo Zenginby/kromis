@@ -37,6 +37,15 @@ kaldığı sürece bunların hiçbiri kırılmıyor (bkz. §1).
 
 ## 1. Varsayılan `tr` — bu bir karar, tembellik değil
 
+> **SONRADAN ÇEVRİLDİ (v0.22).** Bu bölüm v0.21'in kararını ve gerekçesini
+> olduğu gibi saklıyor; ürünün bugünkü varsayılanı `"en"` (`i18n.DEFAULT`).
+> Aşağıdaki iki gerekçenin ikisi de o gün geçerliydi ve bugün ikisi de
+> karşılandı: (1) tercihini kaydetmiş kullanıcı etkilenmiyor, kaydetmemiş
+> kullanıcı Ayarlar'dan tek tıkla geri dönüyor; (2) Türkçe metne bakan test
+> iddiaları körelmedi, İNGİLİZCE metne çevrildi — yani bekçiler hâlâ
+> kullanıcının gerçekten gördüğü cümleyi ölçüyor. Belge silinmiyor çünkü
+> kararın gerekçesi, kararın kendisinden uzun yaşıyor.
+
 `prefs.json`'da `language` yoksa değer `"tr"`. İki sebep:
 
 1. Mevcut kullanıcı bir güncellemeden sonra arayüzünü değişmiş bulmuyor.

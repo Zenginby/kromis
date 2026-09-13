@@ -195,19 +195,19 @@ def test_playwright_studio_single_thread_flow():
             # 4. Check initial mode (Image mode)
             composer = page.query_selector("#composer")
             assert composer.get_attribute("data-mode") == "image"
-            assert page.inner_text("#go").strip() == "Üret"
-            assert "Ne üretmek istiyorsun?" in prompt.get_attribute("placeholder")
+            assert page.inner_text("#go").strip() == "Generate"
+            assert "What do you want to create?" in prompt.get_attribute("placeholder")
 
             # 5. Switch to Director mode
             page.click("#tab-chat")
             page.wait_for_function('document.querySelector("#composer").getAttribute("data-mode") === "director"')
-            assert page.inner_text("#go").strip() == "Gönder"
-            assert "Yönetmen'e sor" in prompt.get_attribute("placeholder")
+            assert page.inner_text("#go").strip() == "Send"
+            assert "Ask the Director" in prompt.get_attribute("placeholder")
 
             # 6. Switch back to Image mode
             page.click("#tab-image")
             page.wait_for_function('document.querySelector("#composer").getAttribute("data-mode") === "image"')
-            assert page.inner_text("#go").strip() == "Üret"
+            assert page.inner_text("#go").strip() == "Generate"
 
             # 7. Type prompt and check character count / autoGrow
             page.fill("#prompt", "A futuristic Turkish coffee cup on marble table, 8k render")
@@ -343,7 +343,7 @@ def test_playwright_model_sheet_alttan_aciliyor(monkeypatch):
                 'document.querySelector("#composer").getAttribute("data-mode") === "director"')
             page.click("#chat-model-btn")
             page.wait_for_selector("#model-sheet.open")
-            assert page.inner_text("#model-sheet-title").strip() == "Yönetmen modeli"
+            assert page.inner_text("#model-sheet-title").strip() == "Director model"
             assert page.eval_on_selector("#model-sheet-list input:checked",
                                          "e => e.value") == page.input_value("#chat-model")
             page.keyboard.press("Escape")
@@ -519,11 +519,11 @@ def test_playwright_yukleme_hedefi_ve_ek_gorsel_kapisi():
             # 1. Kütüphane: varsayılan sekme "Tümü" ve düğme hedefi söylüyor.
             page.click("#rail-library")
             page.wait_for_selector("#view-library:not([hidden])")
-            assert page.inner_text("#asset-tabs button.active").strip() == "Tümü"
-            assert page.inner_text("#asset-upload-label").strip() == "Logo yükle", (
+            assert page.inner_text("#asset-tabs button.active").strip() == "All"
+            assert page.inner_text("#asset-upload-label").strip() == "Upload a logo", (
                 "yükleme düğmesi hedefini söylemiyor")
             page.click('#asset-tabs button[data-akind="banners"]')
-            assert page.inner_text("#asset-upload-label").strip() == "Banner yükle", (
+            assert page.inner_text("#asset-upload-label").strip() == "Upload a banner", (
                 "sekme değişti, etiket bayat kaldı")
             assert page.query_selector('#asset-tabs button[data-akind="uploads"]') is None, (
                 "kullanılamaz `uploads` türü hâlâ bir yükleme hedefi")
@@ -541,7 +541,7 @@ def test_playwright_yukleme_hedefi_ve_ek_gorsel_kapisi():
             assert not secici_acildi, (
                 "ana referans yokken dosya seçici açılıyor — seçilen dosya "
                 "kapıda sessizce düşer")
-            assert "Önce ana görseli seç." in page.inner_text("#status"), (
+            assert "Pick the main image first." in page.inner_text("#status"), (
                 "engel sessiz: kullanıcı neden hiçbir şey olmadığını okumuyor")
 
             browser.close()
@@ -764,9 +764,9 @@ def test_playwright_anahtarsiz_acilis_BOS_HALI_anlatiyor(monkeypatch):
 
             # 1. Çip boş hâli SÖYLÜYOR — yükleniyor yazısında donmuyor.
             etiket = page.inner_text("#model-btn-label").strip()
-            assert "yükleniyor" not in etiket.lower(), (
+            assert "loading" not in etiket.lower(), (
                 f"şerit yükleme yazısında donmuş: {etiket!r}")
-            assert "Ayarlar" in etiket, f"boş hâl anlatılmıyor: {etiket!r}"
+            assert "Settings" in etiket, f"boş hâl anlatılmıyor: {etiket!r}"
 
             # 2. Şeritte gerçekten HİÇ model yok (kapı kapandı).
             assert page.eval_on_selector_all("#model option", "e => e.length") == 0, (
@@ -783,7 +783,7 @@ def test_playwright_anahtarsiz_acilis_BOS_HALI_anlatiyor(monkeypatch):
 
             # 4. #go kilitli VE sebebi yazılı (kilidin nedenini saklamak yok).
             assert page.is_disabled("#go")
-            assert "Ayarlar" in (page.get_attribute("#go", "title") or ""), (
+            assert "Settings" in (page.get_attribute("#go", "title") or ""), (
                 "kilidin sebebi title'da yok")
 
             # 5. #model-note doğrudan Ayarlar'a giden düğmeyi gösteriyor.
@@ -1184,7 +1184,13 @@ def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(
             kart_sayisi = page.eval_on_selector_all(
                 "#folder-grid .folder-cell", "els => els.length")
             serit = page.text_content("#media-rail-count")
-            assert serit == f"{kart_sayisi} klasör · 3 görsel", (
+            # ÇOĞUL EKİ ARAYÜZÜN DİLİNDEN geliyor (`media.folders_one` /
+            # `media.folders_many`) ve ön tanımlı dil İngilizce: "1 folder",
+            # "2 folders". Türkçe'de ek yoktu, o yüzden bu satır önce tek
+            # biçimdi — sayıyı elle çoğullamak, testin ölçtüğü şeyi
+            # (şeridin ekranı sayması) değiştirmiyor.
+            klasor_kelimesi = "folder" if kart_sayisi == 1 else "folders"
+            assert serit == f"{kart_sayisi} {klasor_kelimesi} · 3 images", (
                 f"şerit ekranla uyuşmuyor: {serit!r}, ekranda {kart_sayisi} kart")
 
             # TÜR SÜZGECİ: Video seçilince ızgara ve şerit tür birimiyle güncellenir
@@ -1192,20 +1198,23 @@ def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(
             page.wait_for_function(
                 "() => document.querySelector('#kind-seg button[data-kind=\"video\"][aria-pressed=\"true\"]')")
             page.wait_for_function(
-                f"() => document.querySelector('#media-rail-count').textContent === '{kart_sayisi} klasör · 0 video'")
+                f"() => document.querySelector('#media-rail-count').textContent === "
+                f"'{kart_sayisi} {klasor_kelimesi} · 0 videos'")
             assert page.eval_on_selector_all("#gallery video", "els => els.length") == 0
             assert page.eval_on_selector_all("#gallery .card", "els => els.length") == 0
 
             # Görsel seçilince 3 görsel geri gelir
             page.click('#kind-seg button[data-kind="image"]')
             page.wait_for_function(
-                f"() => document.querySelector('#media-rail-count').textContent === '{kart_sayisi} klasör · 3 görsel'")
+                f"() => document.querySelector('#media-rail-count').textContent === "
+                f"'{kart_sayisi} {klasor_kelimesi} · 3 images'")
             assert page.eval_on_selector_all("#gallery .card", "els => els.length") == 3
 
             # Tümü'ne dön
             page.click('#kind-seg button[data-kind=""]')
             page.wait_for_function(
-                f"() => document.querySelector('#media-rail-count').textContent === '{kart_sayisi} klasör · 3 görsel'")
+                f"() => document.querySelector('#media-rail-count').textContent === "
+                f"'{kart_sayisi} {klasor_kelimesi} · 3 images'")
 
             # KAPSAM SAYAÇLARI
             page.evaluate("() => openPicker()")
@@ -1237,11 +1246,17 @@ def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(
             # BÖLME DEĞİŞMEZİ (kapsamlar alt ağaca AÇILMADI): klasör kapsamları
             # + Klasörsüz tam olarak Tümü'nü tüketiyor. `imported` bilerek
             # dışarıda — o `crossing`, yani kesişen tek süzgeç.
+            #
+            # KAPSAM ADLARI ARAYÜZ METNİ (`common.all` · `picker.scope_imported`)
+            # ve ön tanımlı dil İngilizce, yani "All" / "Imported". Türkçe
+            # adlar burada bayat kalırdı ve kusur SESSİZ olurdu: `k not in
+            # (...)` hiçbir şeyi elemez, toplam şişer ve iddia "bölme bozuldu"
+            # diye yanlış bir teşhis yazardı.
             bolme = sum(v for k, v in kapsamlar.items()
-                        if k not in ("Tümü", "İçe aktarılanlar"))
-            assert bolme == kapsamlar["Tümü"], (
+                        if k not in ("All", "Imported"))
+            assert bolme == kapsamlar["All"], (
                 f"kapsamlar artık bir BÖLME değil: parçalar {bolme}, "
-                f"Tümü {kapsamlar['Tümü']}")
+                f"Tümü {kapsamlar['All']}")
 
             browser.close()
     finally:
@@ -1321,7 +1336,7 @@ def test_playwright_yonetmen_cekmecesi_SAGDAN_aciliyor(monkeypatch):
             page.click("#director-save")
             page.wait_for_function(
                 'document.querySelector("#director-status").textContent'
-                '.includes("kaydedildi")')
+                '.includes("was saved")')
             assert len(prefs_posts) == 1, (
                 f"tercih {len(prefs_posts)} kez yazıldı — bir kez yazılmalı")
 
@@ -1469,7 +1484,7 @@ def test_playwright_aciklamali_oneri_karti_CIZILIYOR_ve_degeri_karismiyor():
             # 3. Ekleme ekseni ekranda AYIRT EDİLİYOR (`simdi` yok).
             rozetler = page.eval_on_selector_all(
                 ".chat-axis-new", "e => e.map(x => x.textContent)")
-            assert rozetler == ["prompt'ta yok", "prompt'ta yok"], rozetler
+            assert rozetler == ["not in the prompt", "not in the prompt"], rozetler
 
             # 4. Varyasyonun `istek`i ekranda.
             assert "Zemini derin lacivert" in page.eval_on_selector(
@@ -1480,11 +1495,11 @@ def test_playwright_aciklamali_oneri_karti_CIZILIYOR_ve_degeri_karismiyor():
             page.click(".chat-axis[data-axis='Isik'] .chat-option")
             deger = page.evaluate(
                 "axesValue(document.querySelector('.chat-axes'))")
-            assert "Şu parametreleri değiştir: Zemin → deep navy background." \
+            assert "Change these parameters: Zemin → deep navy background." \
                 in deger["content"], deger["content"]
-            assert "Şunları da belirle: Isik → soft even light." \
+            assert "Also set these: Isik → soft even light." \
                 in deger["content"], deger["content"]
-            assert "Prompt'un geri kalanını aynı tut." in deger["content"]
+            assert "Keep the rest of the prompt the same." in deger["content"]
             for sizinti in ("Gece laciverti", "hilal parlak"):
                 assert sizinti not in deger["content"], (
                     f"kart açıklaması modele giden cevaba karıştı: {sizinti}")

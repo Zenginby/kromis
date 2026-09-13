@@ -173,10 +173,13 @@ def test_theme_validation_in_models():
 
 def test_language_preference_persistence(tmp_path):
     out = str(tmp_path / "output")
-    assert prefs.read(out)["language"] == "tr", "varsayılan dil değişmiş"
-    merged = prefs.update({"language": "en"}, out)
-    assert merged["language"] == "en"
-    assert prefs.read(out)["language"] == "en"
+    # Ön tanımlı dil İNGİLİZCE (v0.22). Tek kaynak `i18n.DEFAULT`; burada
+    # LİTERAL yazılı olması bilinçli — sabiti okuyup kendisiyle karşılaştıran
+    # bir iddia, değeri değiştirmenin kimseyi uyandırmadığı bir test olurdu.
+    assert prefs.read(out)["language"] == "en", "varsayılan dil değişmiş"
+    merged = prefs.update({"language": "tr"}, out)
+    assert merged["language"] == "tr"
+    assert prefs.read(out)["language"] == "tr"
 
 
 def test_language_validation_in_models():
@@ -200,7 +203,7 @@ def test_a_hand_written_unknown_language_falls_back_to_the_default(tmp_path):
     os.makedirs(out, exist_ok=True)
     with open(os.path.join(out, prefs.PREFS_FILE), "w", encoding="utf-8") as f:
         f.write(json.dumps({"language": "de"}))
-    assert prefs.read(out)["language"] == "tr"
+    assert prefs.read(out)["language"] == "en"
 
 
 def test_writing_the_language_does_not_touch_the_other_preferences(tmp_path):

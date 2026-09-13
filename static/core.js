@@ -1794,7 +1794,14 @@ function syncSpecs() {
   $("specs-label").textContent = parts.join(" · ");
 }
 for (const id of ["size", "quality", "duration", "n"]) {
-  $(id).addEventListener("change", () => { syncSpecs(); syncRunCost(); });
+  // `renderFrames` de dinliyor ve YALNIZ süre yüzünden: kare notu artık
+  // süreye bakıyor (geçiş 8 sn istiyor), yani süre değiştiğinde not bayat
+  // kalırdı — kullanıcı 8'e çevirir, uyarı ekranda durmaya devam ederdi.
+  // Dört eksen için de çağrılıyor çünkü ayrı bir dal açmak, aynı satırın
+  // ikinci bir bakım noktası olurdu; `renderFrames` yan etkisiz ve ucuz.
+  $(id).addEventListener("change", () => {
+    syncSpecs(); syncRunCost(); renderFrames();
+  });
 }
 syncSpecs();
 
@@ -2457,10 +2464,31 @@ function renderFrames() {
   // NOT SATIRI yalnız yapılacak bir iş varken doluyor. Boş bir yuva çifti
   // kendi başını anlatıyor ("Yok" + "Seç…"); orada bir cümle daha yazmak
   // panelin dört satırlık bütçesini gürültüye harcamak olurdu.
+  //
+  // SÜRE UYARISI İKİ KARE DOLUYKEN ve yalnız süre 8 sn DEĞİLKEN ekleniyor:
+  // Veo'nun geçiş yolu 8 saniyelik üretimde belgeleniyor ve arayüzün ön
+  // tanımlı süresi 4 (katalog: `default_duration`). Ölçülen kusur tam
+  // buydu — kullanıcı iki kareyi seçiyor, üretime basıyor ve Google'dan
+  // İngilizce bir 400 alıyordu (13 Eylül 2026).
+  //
+  // KAPI DEĞİL NOT, ve bu ayrım bilinçli: bu depoda Veo'nun hiçbir yolu
+  // canlı doğrulanmadı (veo_client'in "CANLI DOĞRULAMANIN DURUMU" notu).
+  // Doğrulanmamış bir sınırı `goBlockReason`a koymak, yanılırsak çalışan
+  // bir kombinasyonu erişilemez yapardı; not yanılırsa yalnızca fazladan
+  // bir cümle olur. Reddedilen istek ÜRETİM BAŞLATMIYOR, yani denemenin
+  // faturası da yok — `map_error`ın `err.veo_last_frame_400` metni aynı
+  // düğmeyi sunucu tarafında da gösteriyor.
+  //
+  // SÜRE 8 DEĞİLSE ölçütü `#duration`ın DEĞERİNDEN okunuyor, modelden
+  // değil: eksenin tek yazarı `eksenleriDoldur` ve seçili değeri o tutuyor
+  // (çipin `hidden`den okuma kuralının aynısı).
+  const gecis = !!(source && sonKare);
+  const sure = Number($("duration").value || 0);
   $("frames-note").textContent = (sonKare && !source)
     ? t("gate.last_frame_needs_first")
-    : (source && sonKare)
+    : gecis
       ? t("gen.transition_between_frames")
+        + (sure && sure !== 8 ? ` ${t("gen.last_frame_wants_8s")}` : "")
       : "";
 }
 

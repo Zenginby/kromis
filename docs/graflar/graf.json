@@ -470,7 +470,7 @@
         "android_main"
       ],
       "katman": 10,
-      "satir": 580,
+      "satir": 584,
       "testler": [
         "tests/test_desktop.py",
         "tests/test_windows_acilis.py"
@@ -612,7 +612,7 @@
         "veo_client"
       ],
       "katman": 2,
-      "satir": 276,
+      "satir": 305,
       "testler": [
         "tests/test_catalog.py",
         "tests/test_i18n.py",
@@ -816,7 +816,7 @@
         "desktop"
       ],
       "katman": 5,
-      "satir": 243,
+      "satir": 249,
       "testler": [
         "tests/test_i18n.py",
         "tests/test_index.py",
@@ -1009,7 +1009,7 @@
         "providers"
       ],
       "katman": 5,
-      "satir": 578,
+      "satir": 629,
       "testler": [
         "tests/test_veo_client.py"
       ],
@@ -1134,7 +1134,7 @@
           "/output/{}.png"
         ],
         "dosya": "static/core.js",
-        "satir": 2933,
+        "satir": 2961,
         "tanim": 88
       },
       {
@@ -1155,7 +1155,7 @@
       {
         "cagrilan_yollar": [],
         "dosya": "static/i18n.js",
-        "satir": 78,
+        "satir": 83,
         "tanim": 2
       },
       {

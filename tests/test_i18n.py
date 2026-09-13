@@ -119,6 +119,53 @@ def test_the_fallback_is_a_supported_language():
     assert i18n.FALLBACK in i18n.LANGUAGES
 
 
+def test_the_default_language_is_english_and_supported():
+    """Ön tanımlı dil (v0.22): hiç seçim yapmamış bir kurulum İNGİLİZCE açılır.
+
+    LİTERAL karşılaştırma bilinçli — `i18n.DEFAULT`u kendisiyle kıyaslayan bir
+    iddia, değeri değiştirmenin kimseyi uyandırmadığı bir test olurdu. Bu
+    satır kırmızıya döndüğünde sorulacak soru "test bayat mı" değil, "bu ürün
+    kararı gerçekten değişti mi".
+    """
+    assert i18n.DEFAULT == "en"
+    assert i18n.DEFAULT in i18n.LANGUAGES
+
+
+def test_the_preference_default_comes_from_the_language_module():
+    """`prefs` varsayılanı `i18n.DEFAULT`u İTHAL ediyor, kopyalamıyor.
+
+    İki yer ayrışsaydı "hiç seçim yokken hangi dil" sorusunun biri sunucu
+    tarafında biri sözlükte olmak üzere iki cevabı olurdu — `LANGUAGES` ile
+    `models.ALLOWED_LANGUAGES` arasındaki aynalamama kuralının aynısı."""
+    import prefs
+    assert prefs.DEFAULTS["language"] == i18n.DEFAULT
+
+
+def test_the_client_side_fallback_matches_the_default():
+    """`static/i18n.js` sunucusuz açılan bir şablonda kendi yedeğine düşüyor
+    ve o değer `i18n.DEFAULT` ile AYNI olmak zorunda: ayrışsalardı aynı
+    sayfanın şablon metinleri bir dilde, betiklerin ürettiği cümleler başka
+    bir dilde görünürdü."""
+    with open(os.path.join(STATIC, "i18n.js"), encoding="utf-8") as f:
+        kaynak = f.read()
+    assert f'window.KROMIS_LANG || "{i18n.DEFAULT}"' in kaynak, (
+        "istemci yedeği i18n.DEFAULT ile ayrışmış")
+
+
+def test_an_installation_with_no_stored_preference_is_served_in_english(tmp_path,
+                                                                       monkeypatch):
+    """UÇTAN UCA kapı: tercih dosyası HİÇ YOKKEN sayfa hangi dilde geliyor?
+
+    Yukarıdaki iki test sabitlerin birbirini tuttuğunu söylüyor; bu, o
+    sabitlerin gerçekten sayfaya ULAŞTIĞINI söylüyor — ara katman
+    (`app._dil_baglami`) tercihi okumayı bıraksa ötekiler yine yeşil kalırdı.
+    """
+    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
+    html = TestClient(appmod.app).get("/").text
+    assert '<html lang="en">' in html
+    assert 'window.KROMIS_LANG="en"' in html
+
+
 # ── Çalışma anı davranışı ────────────────────────────────────────────
 
 def test_an_unknown_language_token_falls_back():

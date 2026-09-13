@@ -173,6 +173,34 @@ def _guard_against_real_migration(request: pytest.FixtureRequest,
     yield
 
 
+@pytest.fixture(autouse=True)
+def _dil_baglami_testler_arasinda_sizmasin():
+    """Her testi `i18n.FALLBACK` bağlamıyla başlatır.
+
+    BEŞİNCİ guard ve sebebi ÖLÇÜLDÜ (v0.22, ön tanımlı dil "en" olurken):
+    `app._dil_baglami` her istekte `i18n.set_active` çağırıyor ve `TestClient`
+    isteği kendi portalında koşturduğu için o değer ana bağlamda ASILI
+    KALIYOR. Yani bir `client.post(...)`tan sonra koşan HER test, bağlamı hiç
+    kurmadan `i18n.t(anahtar, None)` çağırdığında bir önceki testin dilini
+    görüyor — sıraya bağlı, dosya dışına taşan bir sızıntı.
+
+    Sızıntı ÖNCEDEN DE VARDI, yalnızca GÖRÜNMÜYORDU: ön tanımlı dil ile
+    kaynak dil aynı olduğu sürece sızan değer zaten beklenen değerdi. İkisi
+    ayrılınca `map_error`ı doğrudan çağıran testler (test_gemini_client ve
+    yedi ikizi) tek başına YEŞİL, takımın içinde KIRMIZI oldu — testin kendi
+    kusuru değil, bağlamın kusuru.
+
+    `FALLBACK`, `DEFAULT` DEĞİL: bu fixture'ın kurduğu şey "kullanıcı yok"
+    hâli ve `i18n._AKTIF`ın kendi varsayılanı da o (gerekçesi orada). Ürünün
+    ön tanımlı dilinin bekçisi ayrı: `test_prefs.py` varsayılanı,
+    `test_i18n.py` de hiç tercih yazılmamış bir kurulumun hangi dilde
+    servis edildiğini sınıyor.
+    """
+    import i18n
+    i18n.set_active(i18n.FALLBACK)
+    yield
+
+
 @pytest.fixture
 def fake_composite():
     """composite.composite_logo yerine geçer: girdiyi olduğu gibi döndürür.

@@ -230,7 +230,7 @@ def test_a_model_WITHOUT_the_capability_refuses_the_last_frame(client, monkeypat
                            "last_file": ("b.png", _png(), "image/png")})
 
     assert r.status_code == 422
-    assert "bitiş görseli" in r.text
+    assert "does not take a last frame" in r.text
 
 
 def test_a_VIDEO_id_cannot_be_used_as_a_LAST_frame_either(client):
@@ -275,14 +275,14 @@ def _iki_uc(client, monkeypatch, **degisiklik):
 
 
 @pytest.mark.parametrize("degisiklik, beklenen", [
-    ({"size": "1:1"}, "oranı desteklemiyor"),
-    ({"size": "1024x1024"}, "oranı desteklemiyor"),
-    ({"quality": "1080p"}, "çözünürlüğü desteklemiyor"),
-    ({"quality": "4K"}, "çözünürlüğü desteklemiyor"),
-    ({"duration": 5}, "süreyi desteklemiyor"),
-    ({"duration": 0}, "süreyi desteklemiyor"),
-    ({"model": "azure-gpt-image-2"}, "bilinmeyen video modeli"),
-    ({"model": "yok-boyle-bir-model"}, "bilinmeyen video modeli"),
+    ({"size": "1:1"}, "does not support this ratio"),
+    ({"size": "1024x1024"}, "does not support this ratio"),
+    ({"quality": "1080p"}, "does not support this resolution"),
+    ({"quality": "4K"}, "does not support this resolution"),
+    ({"duration": 5}, "does not support this duration"),
+    ({"duration": 0}, "does not support this duration"),
+    ({"model": "azure-gpt-image-2"}, "unknown video model"),
+    ({"model": "yok-boyle-bir-model"}, "unknown video model"),
 ])
 def test_both_endpoints_refuse_the_same_bad_token(client, monkeypatch,
                                                   degisiklik, beklenen):
@@ -341,7 +341,7 @@ def test_MORE_THAN_ONE_reference_is_refused(client, monkeypatch):
                     files={"file": ("a.png", _png(), "image/png")})
 
     assert r.status_code == 422
-    assert "referans görsel" in r.text
+    assert "reference images" in r.text
 
 
 def test_EXACTLY_ONE_of_file_or_source_id_is_required(client, monkeypatch):

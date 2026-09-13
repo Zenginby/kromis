@@ -85,7 +85,7 @@ def test_import_with_unknown_folder_404(tmp_path, monkeypatch):
     c = _client(tmp_path, monkeypatch)
     r = _import(c, folder_id="yokboyleklasor")
     assert r.status_code == 404
-    assert r.json()["detail"] == "Klasör bulunamadı."
+    assert r.json()["detail"] == "The folder was not found."
     assert c.get("/api/history").json()["images"] == []
 
 

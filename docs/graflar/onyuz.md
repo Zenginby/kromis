@@ -61,7 +61,7 @@ flowchart LR
 | `static/chat.js` | 2665 | 90 | `/api/arena/{}`, `/api/arena/{}/winner`, `/api/chat`, `/api/chats`, `/api/chats/{}`, `/api/prefs`, `/output/{}.${videoMu ` |
 | `static/core.js` | 2933 | 88 | `/api/edit`, `/api/generate`, `/api/image/{}`, `/api/output/{}/download`, `/api/prefs`, `/api/video`, `/api/video/animate`, `/output/`, `/output/{}`, `/output/{}.png` |
 | `static/folders.js` | 2063 | 60 | `/api/folders`, `/api/folders/{}`, `/api/folders/{}/download`, `/api/history`, `/api/images`, `/api/import`, `/output/{}`, `/output/{}${videoMu ` |
-| `static/i18n.js` | 78 | 2 | — |
+| `static/i18n.js` | 83 | 2 | — |
 | `static/mobile.js` | 55 | 0 | — |
 | `static/palette.js` | 769 | 37 | `/api/palette/suggest`, `/api/palettes`, `/api/palettes/{}` |
 | `static/pixel-canvas.js` | 347 | 0 | — |

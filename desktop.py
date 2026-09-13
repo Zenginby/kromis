@@ -540,7 +540,11 @@ def _dil_tercihi() -> str:
     dokunmak (bkz. `_onyukleme_denetimi`).
     """
     import prefs
-    return prefs.read(paths.output_dir()).get("language", i18n.FALLBACK)
+    # `.get`in ikinci argümanı SAVUNMA: `prefs.read` şemayı zaten dolduruyor,
+    # yani anahtar normal yolda hep var. Yine de `i18n.DEFAULT` — `FALLBACK`
+    # yazmak, varsayılan dil değiştiğinde masaüstü uyarılarını arayüzün geri
+    # kalanından ayrı bir dile düşüren sessiz bir ayrışma olurdu.
+    return prefs.read(paths.output_dir()).get("language", i18n.DEFAULT)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -554,7 +558,7 @@ def main(argv: list[str] | None = None) -> None:
     # Dil EN BAŞTA kuruluyor: aşağıdaki uyarı pencereleri sunucu hiç
     # açılmadan da çıkabiliyor, yani `app`in ara katmanı onları hiç görmüyor.
     # Hata YUTULUYOR — okunamayan bir tercih yüzünden uygulama hiç
-    # açılmamalı; Türkçe'ye düşmek doğru davranış.
+    # açılmamalı; varsayılan dile düşmek doğru davranış.
     try:
         i18n.set_active(_dil_tercihi())
     except Exception:

@@ -22,8 +22,13 @@
 
 /** Sunucunun seçtiği dil. Yalnız OKUNUYOR: dili değiştiren yol
  *  `POST /api/prefs` + sayfa yenileme (settings.js), çünkü sunucu HTML'i
- *  yeniden üretmeden şablondaki metinler eski dilde kalırdı. */
-const KROMIS_DIL = window.KROMIS_LANG || "tr";
+ *  yeniden üretmeden şablondaki metinler eski dilde kalırdı.
+ *
+ *  `||` dalı yalnız SUNUCUSUZ açılan bir şablonda çalışıyor (yer tutucu
+ *  değiştirilmemiş) ve değeri `i18n.DEFAULT` ile aynı olmak zorunda: ayrı
+ *  düşselerdi aynı sayfanın şablon metinleri bir dilde, betiklerin ürettiği
+ *  cümleler başka bir dilde görünürdü. */
+const KROMIS_DIL = window.KROMIS_LANG || "en";
 
 /** Sözlük. `||` ile boş nesneye düşüyor: index.html'i BU dosyayla birlikte
  *  ama sunucusuz açan bir okur (ya da yer tutucusu değiştirilmemiş bir

@@ -315,7 +315,7 @@ def test_composite_failure_becomes_500(tmp_path, monkeypatch):
     src_id = _make_source(c)
     r = c.post("/api/logo", json={"id": src_id, "asset_id": asset_id})
     assert r.status_code == 500
-    assert "Logo bindirme başarısız" in r.json()["detail"]
+    assert "The overlay failed" in r.json()["detail"]
 
 
 def test_unexpected_composite_error_also_becomes_500(tmp_path, monkeypatch):
@@ -337,7 +337,7 @@ def test_unexpected_composite_error_also_becomes_500(tmp_path, monkeypatch):
     src_id = _make_source(c)
     r = c.post("/api/logo", json={"id": src_id, "asset_id": asset_id})
     assert r.status_code == 500
-    assert "Logo bindirme başarısız" in r.json()["detail"]
+    assert "The overlay failed" in r.json()["detail"]
 
 
 def test_logo_end_to_end_with_real_compositing(tmp_path, monkeypatch):

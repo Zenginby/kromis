@@ -150,11 +150,11 @@ def test_a_single_oversized_message_is_rejected(client, fake_complete):
     assert not fake_complete
 
 
-def test_the_user_cap_is_reported_in_turkish(client, fake_complete):
+def test_the_user_cap_is_reported_in_the_interface_language(client, fake_complete):
     """Sınır rol duyarlı olduğu için mesajı pydantic DEĞİL biz yazıyoruz."""
     r = _post(client, [{"role": "user", "content": "x" * (models.MAX_CHAT_MSG_CHARS + 1)}])
 
-    assert "uzun" in str(r.json()["detail"])
+    assert "too long" in str(r.json()["detail"])
 
 
 def test_the_directors_own_reply_may_be_longer_than_a_user_message(client, fake_complete):
@@ -453,7 +453,7 @@ def test_a_video_result_note_carries_its_duration(client, fake_complete):
 
     note = fake_complete[0][2]["content"]
     assert "1 video üretildi" in note
-    assert "8 sn" in note
+    assert "8 sec" in note
     assert "720p" not in note, "kalite ekseni olmayan modelde kalite okutuldu"
 
 
@@ -734,7 +734,7 @@ def test_the_context_block_names_the_selected_image_model(client, fake_kwargs):
     assert varsayilan.label in talimat, "seçili modelin adı bağlamda yok"
 
 
-def test_a_missing_instruction_file_becomes_the_same_turkish_502(client, monkeypatch):
+def test_a_missing_instruction_file_becomes_the_same_502(client, monkeypatch):
     """Talimat dosyası yoksa kullanıcı 500 DEĞİL Türkçe bir 502 görmeli.
 
     Metin `chat_client`'ın kendi dalıyla AYNI olmak zorunda: iki yerde iki
@@ -746,7 +746,7 @@ def test_a_missing_instruction_file_becomes_the_same_turkish_502(client, monkeyp
     r = _post(client, [{"role": "user", "content": "kare görsel"}])
 
     assert r.status_code == 502
-    assert "Prompt Yönetmeni talimatı yüklenemedi" in r.json()["detail"]
+    assert "Prompt Director instructions could not be loaded" in r.json()["detail"]
 
 
 

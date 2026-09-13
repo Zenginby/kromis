@@ -147,7 +147,7 @@ async def _dil_baglami(request: Request, call_next):
     try:
         i18n.set_active(prefs.read(OUTPUT_DIR).get("language"))
     except OSError:
-        i18n.set_active(i18n.FALLBACK)
+        i18n.set_active(i18n.DEFAULT)
     return await call_next(request)
 
 

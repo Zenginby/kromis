@@ -581,7 +581,7 @@ def test_static_assets_stay_cacheable():
     assert r.headers.get("etag"), "StaticFiles doğrulayıcı göndermeli"
 
 
-def test_index_read_failure_is_reported_in_turkish(monkeypatch, tmp_path):
+def test_index_read_failure_is_reported_in_the_interface_language(monkeypatch, tmp_path):
     """--windowed pakette stderr YOK: okunamayan index.html iz bırakmıyordu.
 
     FileResponse gönderim anında yakalanmayan bir RuntimeError'a düşüyordu →
@@ -593,7 +593,7 @@ def test_index_read_failure_is_reported_in_turkish(monkeypatch, tmp_path):
                         lambda d, t: (written.append(t), "hata.log")[1])
     r = TestClient(appmod.app).get("/")
     assert r.status_code == 500
-    assert "Arayüz yüklenemedi" in r.text
+    assert "The interface could not be loaded" in r.text
     assert "Traceback" not in r.text, "kullanıcıya traceback gösterilmez"
     assert written and "Traceback" in written[0], "hata.log'a traceback yazılmalı"
 
@@ -2192,7 +2192,7 @@ def test_the_gear_and_the_tools_view_are_different_doors():
     view = _section(_html(), "view-tools")
     for leaked in ("set-endpoint", "set-key", "set-chat-deployment"):
         assert leaked not in view, f"{leaked} Araçlar görünümüne sızmış"
-    assert "Ayarlar düğmesinden" in view, (
+    assert "from the Settings button" in view, (
         "kullanıcı Azure ayarlarının nerede olduğunu okuyamıyor")
 
 
@@ -2249,7 +2249,7 @@ def test_search_leaves_the_folder_boundary():
     label = re.search(r'<p id="search-label"[^>]*>\s*([^<]*)', html)
     assert label, "#search-label yok"
     assert "hidden" in label.group(0), "arama etiketi başlangıçta görünür"
-    assert "tüm klasörler" in label.group(1), "etiket kapsamı söylemiyor"
+    assert "all folders" in label.group(1), "etiket kapsamı söylemiyor"
     js = _folders_js()
     body = re.search(r"async function loadAllImages\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
     assert body, "loadAllImages() yok — arama tek klasörde kalıyor"
@@ -3263,7 +3263,7 @@ def test_the_plus_menu_offers_choosing_from_media():
     """
     menu = _section_div(_html(), "plus-menu")
     assert 'id="media-pick-btn"' in menu, "menüde Medya'dan seç yok"
-    assert "Medya'dan seç" in menu, "maddenin etiketi yok"
+    assert "Pick from Media" in menu, "maddenin etiketi yok"
     assert "<hr" in menu, "dosya yolu ile Medya yolu ayrılmamış"
     # Dördüncü madde eklenmedi: #file-input'a ikinci kapı yok.
     assert menu.count('type="file"') == 0, "menüye dosya girdisi kaçmış"
@@ -4495,9 +4495,9 @@ def test_cip_dugmesinin_adi_EKSENI_de_soyluyor():
     """
     html = re.sub(r"<!--.*?-->", "", _served(), flags=re.S)
     for tetik, etiket, deger, ad in (
-            ("model-btn", "model-label", "model-btn-label", "Görsel modeli"),
+            ("model-btn", "model-label", "model-btn-label", "Image model"),
             ("chat-model-btn", "chat-model-label", "chat-model-btn-label",
-             "Sohbet modeli")):
+             "Chat model")):
         acik = re.search(rf'<button[^>]*id="{tetik}"[^>]*>', html)
         assert acik, f"#{tetik} yok"
         assert f'aria-labelledby="{etiket} {deger}"' in acik.group(0), (
@@ -5818,7 +5818,7 @@ def test_yeni_surum_satiri_METINLE_anlatiyor():
     # Dilim `id`'den değil KAPSAYICI `<p`'den başlıyor: sınıf niteliği id'den
     # ÖNCE yazılı, yani id'den başlayan bir dilim onu hiç görmez.
     satir = html[html.rfind("<p", 0, bas):html.find("</p>", bas)]
-    assert "Yeni sürüm çıktı" in satir, "satır NEDEN göründüğünü söylemiyor"
+    assert "A new version is out" in satir, "satır NEDEN göründüğünü söylemiyor"
     assert 'id="settings-update-version"' in satir, "sürüm bağı yok"
     assert 'id="settings-update-link"' in satir, "indirme bağı yok"
 
@@ -5897,7 +5897,7 @@ def test_ayarlar_yonlendirmesi_TEK_SABITTEN_geliyor():
     bas = html.find('id="chat-gate"')
     assert bas > 0, "#chat-gate satırı yok"
     kapi = html[bas:html.find("</p>", bas)]
-    assert "Ayarlar düğmesi" in kapi, (
+    assert "Settings button" in kapi, (
         "kapı metni düğmeyi adıyla anlatmıyor — settings.js'in durum satırıyla "
         "aynı ekranda iki ayrı ad demek")
 

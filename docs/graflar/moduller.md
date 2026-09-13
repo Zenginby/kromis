@@ -17,7 +17,7 @@ flowchart TD
     n_android_main["android_main<br/>197 satır"]
   end
   subgraph katman10["katman 10"]
-    n_desktop["desktop<br/>580 satır"]
+    n_desktop["desktop<br/>584 satır"]
   end
   subgraph katman9["katman 9"]
     n_netguard["netguard<br/>160 satır"]
@@ -37,7 +37,7 @@ flowchart TD
     n_chat_client["chat_client<br/>190 satır"]
     n_gemini_client["gemini_client<br/>295 satır"]
     n_openai_client["openai_client<br/>217 satır"]
-    n_prefs["prefs<br/>243 satır"]
+    n_prefs["prefs<br/>249 satır"]
     n_providers["providers<br/>482 satır"]
     n_veo_client["veo_client<br/>578 satır"]
   end
@@ -58,7 +58,7 @@ flowchart TD
   subgraph katman2["katman 2"]
     n_chat_prompt["chat_prompt<br/>396 satır"]
     n_guncelleme["guncelleme<br/>356 satır"]
-    n_i18n["i18n<br/>276 satır"]
+    n_i18n["i18n<br/>305 satır"]
   end
   subgraph katman1["katman 1"]
     n_chat_store["chat_store<br/>256 satır"]
@@ -240,13 +240,13 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `color_names.py` | 421 | 4 | `palette` | 1 | 3 |
 | `composite.py` | 164 | 3 | `i18n` | 1 | 1 |
 | `credstore.py` | 198 | 4 | `azure_client`, `catalog`, `etiket`, `i18n` | 9 | 5 |
-| `desktop.py` | 580 | 10 | `errlog`, `i18n`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli), `prefs` (erteli) | 1 | 2 |
+| `desktop.py` | 584 | 10 | `errlog`, `i18n`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli), `prefs` (erteli) | 1 | 2 |
 | `errlog.py` | 117 | 0 | — | 5 | 1 |
 | `etiket.py` | 118 | 3 | `catalog`, `i18n` | 6 | 1 |
 | `folders.py` | 252 | 3 | `i18n`, `jsonstore`, `storage` | 3 | 4 |
 | `gemini_client.py` | 295 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
 | `guncelleme.py` | 356 | 2 | `errlog`, `jsonstore`, `paths`, `version` | 1 | 5 |
-| `i18n.py` | 276 | 2 | `paths` | 20 | 3 |
+| `i18n.py` | 305 | 2 | `paths` | 20 | 3 |
 | `jsonstore.py` | 83 | 0 | — | 8 | 1 |
 | `models.py` | 1058 | 4 | `azure_client`, `catalog`, `etiket`, `i18n`, `palette` | 3 | 14 |
 | `netguard.py` | 160 | 9 | `app` (erteli) | 1 | 1 |
@@ -255,7 +255,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `palette.py` | 332 | 3 | `i18n` | 3 | 3 |
 | `palette_store.py` | 96 | 1 | `jsonstore` | 3 | 3 |
 | `paths.py` | 306 | 1 | `errlog` | 7 | 4 |
-| `prefs.py` | 243 | 5 | `catalog`, `i18n`, `jsonstore`, `models` | 2 | 6 |
+| `prefs.py` | 249 | 5 | `catalog`, `i18n`, `jsonstore`, `models` | 2 | 6 |
 | `providers.py` | 482 | 5 | `azure_client`, `catalog`, `credstore`, `etiket`, `i18n`, `azure_flux_client` (erteli), `azure_mai_client` (erteli), `gemini_client` (erteli), `openai_client` (erteli), `veo_client` (erteli) | 7 | 7 |
 | `release_manifest.py` | 92 | 0 | — | 0 | 2 |
 | `screencolor.py` | 153 | 0 | — | 1 | 1 |

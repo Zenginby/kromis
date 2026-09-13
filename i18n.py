@@ -48,7 +48,27 @@ LANGUAGES: tuple[str, ...] = ("tr", "en")
 
 # Eksik anahtarın düştüğü dil. Türkçe, çünkü kaynak metin Türkçe yazılıyor:
 # yeni bir dize önce burada var oluyor, çeviri sonra geliyor.
+#
+# `DEFAULT` ile KARIŞTIRILMAMALI ve bilerek ayrı iki sabit: bu, "anahtar
+# çevrilmemişse hangi dil" sorusunun cevabı (yazım sırasının olgusu); öteki,
+# "kullanıcı henüz seçmemişse hangi dil" sorusununki (ürün kararı). Aynı
+# değere indirgenselerdi varsayılanı değiştirmek, çevrilmemiş bir dizenin
+# düşeceği yeri de sessizce değiştirirdi.
 FALLBACK = "tr"
+
+# HİÇ SEÇİM YAPILMAMIŞKEN arayüzün dili. `prefs._SCHEMA["language"]` bunu
+# İTHAL ediyor, kopyalamıyor — ikisi ayrışırsa "varsayılan dil" sorusunun iki
+# cevabı olurdu (`models.ALLOWED_LANGUAGES`in `LANGUAGES`i aynalamama
+# gerekçesinin aynısı).
+#
+# İngilizce ve bu bir TEMBELLİK DEĞİL KARAR: uygulama iki dilli yayımlanıyor
+# ve deponun okur kitlesi Türkçe konuşanlarla sınırlı değil — hiç
+# yapılandırılmamış bir kurulumun anlaşılma olasılığı en yüksek dil bu.
+# BEDELİ kayıtlı: dil tercihini hiç kaydetmemiş MEVCUT bir kurulum, bu
+# sürümden sonra arayüzünü İngilizce bulur (tercih diske ancak Ayarlar'dan
+# seçilince yazılıyor). Sessiz bir kayıp değil geri alınabilir bir kayma:
+# Ayarlar → Dil tek tıkla Türkçe'ye döndürüyor ve seçim o an kalıcılaşıyor.
+DEFAULT = "en"
 
 # `index.html`'deki yer tutucu. `__APP_VERSION__` ile AYNI FİKİR ama ayrı
 # sözdizim: sürüm TEK bir değer, bu ise adlı bir tablo — `{{t:…}}` biçimi
@@ -91,6 +111,13 @@ _lock = threading.Lock()
 # TEK YAZAR `app`'in ara katmanı (`_dil_baglami`). İkinci bir yazar doğarsa
 # hangisinin son sözü söylediği çağrı sırasına kalırdı; `#go.disabled`ın "tek
 # yazar" kuralının aynısı.
+#
+# VARSAYILAN `FALLBACK`, `DEFAULT` DEĞİL ve ayrım bilinçli: burada bağlamsız
+# kalmak "kullanıcı dilini seçmemiş" demek değil, ORTADA KULLANICI YOK demek
+# (testler `map_error`ı doğrudan çağırıyor, `desktop` uyarısını sunucudan önce
+# gösterebiliyor). Kullanıcısı olmayan bir metin için doğru seçim, her
+# anahtarın karşılığının bulunduğu kaynak dil — yani eksik anahtarın düştüğü
+# yerin aynısı.
 _AKTIF = contextvars.ContextVar("kromis_dil", default=FALLBACK)
 
 
@@ -104,7 +131,9 @@ def active() -> str:
 
     Kurulmamış hâl GERÇEK ve doğru davranışı da o: `desktop.py` sunucu hiç
     açılmadan uyarı gösteriyor, testler `map_error`ı doğrudan çağırıyor.
-    İkisinde de Türkçe'ye düşmek, patlamaktan da boş dizeden de iyidir.
+    İkisinde de kaynak dile düşmek, patlamaktan da boş dizeden de iyidir.
+    Ürünün ön tanımlı dili (`DEFAULT`) bu soruya karışmıyor: o "kullanıcı
+    seçmemişse" sorusunun cevabı, buradaki ise "kullanıcı YOKSA" sorusunun.
     """
     return _AKTIF.get()
 

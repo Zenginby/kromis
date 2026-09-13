@@ -2,7 +2,7 @@
 
 # Modül grafı
 
-45 Python modülü, 127 modül düzeyi + 13 erteli ithal kenarı.
+46 Python modülü, 127 modül düzeyi + 13 erteli ithal kenarı.
 
 Katman, o modülün depo içindeki en uzun bağımlılık zincirinin uzunluğu:
 **katman 0 hiçbir depo modülüne dayanmaz**, en üst katman uygulamanın
@@ -289,5 +289,6 @@ flowchart LR
   n_tools_surum_karari["tools.surum_karari"]
   n_tools_surum_karari --> n_version["version"]
   n_tools_surum_yaz["tools.surum_yaz"]
+  n_tools_test_ortami["tools.test_ortami"]
 ```
 

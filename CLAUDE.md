@@ -43,10 +43,44 @@ gerçeği anlatmalı.
    Windows'ta çalışmaz, orada 2. madde yok sayılıp 1. madde iş görür.)
 3. **Bu dosya** — ilk okunacak yerin neresi olduğunu söyler.
 
-## 3. Testler
+## 3. Testler — ve "yeşil"in ne zaman yeşil OLMADIĞI
+
+**KURAL: bir değişiklik ancak E2E DÂHİL tam takım bu makinede koşmuşsa
+itilir.** Bu bir üslup tercihi değil, ölçülmüş bir kusurun kapısı.
 
 ```sh
-python3 -m pytest tests/ -q                  # tam takım (CI'ın koştuğu şey)
+python3 tools/test_ortami.py           # ortamı CI'ınkiyle AYNI yapar (bir kez)
+python3 tools/test_ortami.py --kontrol # hazır mı? (0 = evet)
+.venv/bin/python -m pytest tests/ -q   # tam takım
+```
+
+NEDEN AYRI BİR ADIM VAR: `pytest tests/ -q` tek başına "CI'ın koştuğu şey"
+DEĞİL. `tests/test_playwright_*.py` dosyaları `pytest.importorskip("playwright")`
+ile başlıyor; playwright kurulu olmayan bir makinede o dosyalar ATLANIYOR ve
+pytest yine "passed" diyor. 2026-09-13'te ölçüldü: `ci.yml` bu depoda dokuz kez
+kırmızıya döndü, SEKİZİNDE düşen testler tam olarak o atlanan dosyalardaydı
+(arayüz metni, ön tanımlı dil ve DOM çapası değişiklikleri yalnız orada
+görünüyor). Dokuzuncusu da aynı ailenin öteki yüzüydü: takım hiç koşmamıştı.
+
+Taze bir Claude Code oturumunun konteynerinde durum daha da sessiz — aynı gün
+ölçüldü: `python3` orada 3.11 (bu depo 3.13+ istiyor), `pytest` kurulu değil ve
+`pip install -r requirements.txt` sistem Python'uyla derlenmiyor. Yani "testler
+yeşil" cümlesi çoğu zaman "testler hiç koşmadı" anlamına geliyordu.
+`tools/test_ortami.py` bu ikisini birden kapatıyor: 3.13+ bir `.venv` kuruyor,
+`_test.yml`in kurduğu HER ŞEYİ kuruyor (pinleri o dosyadan okuyarak) ve tarayıcı
+indirilemeyen ortamlarda makinede hazır duran chromium'a bağ atıyor.
+
+Üç mekanizma bu kuralı unutmaya karşı koruyor:
+
+1. **`tests/conftest.py`** — E2E atlandıysa takımın sonunda gürültülü bir uyarı
+   basar. `KROMIS_E2E_ZORUNLU=1` ile atlama HATAYA döner; CI bu değişkeni
+   veriyor, yani orada kurulum adımı kaybolursa takım yeşil kalmaz.
+2. **`.claude/settings.json`** — oturum başında ortamın E2E koşup koşamadığını
+   söyler.
+3. **`tests/test_test_ortami.py`** — aracın okuduğu pinler `_test.yml`le aynı
+   mı, kapıyı kapıda tutar.
+
+```sh
 python3 -m pytest tests/test_graflar.py -q   # yalnız harita kapısı
 ```
 

@@ -2,7 +2,7 @@
 
 # Test haritası
 
-`tests/` altında 91 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
+`tests/` altında 92 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
 
 | modül | testler |
 | --- | --- |
@@ -47,6 +47,7 @@
 | `tools.render_brand_assets` | — |
 | `tools.surum_karari` | `test_surum_karari.py` |
 | `tools.surum_yaz` | `test_release_manifest.py`, `test_surum_yaz.py` |
+| `tools.test_ortami` | `test_test_ortami.py` |
 | `veo_client` | `test_veo_client.py` |
 | `version` | `test_backup.py`, `test_guncelleme.py`, `test_guncelleme_route.py`, `test_index.py`, `test_playwright_guncelleme.py`, `test_provider_logos.py`, `test_release_manifest.py`, `test_settings_route.py`, `test_version.py` |
 | `winclr` | `test_winclr.py` |

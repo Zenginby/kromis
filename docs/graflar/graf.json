@@ -996,6 +996,18 @@
       "yol": "tools/surum_yaz.py"
     },
     {
+      "ad": "tools.test_ortami",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [],
+      "katman": 0,
+      "satir": 529,
+      "testler": [
+        "tests/test_test_ortami.py"
+      ],
+      "yol": "tools/test_ortami.py"
+    },
+    {
       "ad": "veo_client",
       "erteli_ithal": [],
       "ithal": [
@@ -1491,7 +1503,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 91,
+  "test_dosyasi_sayisi": 92,
   "uc_noktalar": [
     {
       "islev": "index",

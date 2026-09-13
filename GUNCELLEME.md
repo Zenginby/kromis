@@ -190,6 +190,12 @@ sonucu var:
 
 ---
 
+## Sürüm 0.22.1 — ne değişti
+
+- Küçük düzeltmeler ve iyileştirmeler.
+
+---
+
 ## Sürüm 0.22.0 — ne değişti
 
 - ilk+son kare reddinde süreyi ADIYLA söyle

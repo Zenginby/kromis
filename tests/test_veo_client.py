@@ -655,6 +655,69 @@ def test_a_CONTENT_POLICY_400_says_so():
     assert "İçerik politikası" in metin
 
 
+def test_a_400_ON_A_TRANSITION_REQUEST_names_the_dial_to_turn():
+    """Ölçülmüş şikâyet (13 Eylül 2026): Veo 3.1 Fast + ilk/son kare,
+    arayüzün ön tanımlı 4 saniyesiyle Google'dan İngilizce bir 400 alıyordu
+    ve bizim metnimiz yalnız "istek başarısız" diyordu — kullanıcının
+    çevireceği DÜĞMEYİ söylemiyordu.
+
+    Ayrım İSTEĞE bakıyor, gövdedeki metne DEĞİL: "bu istekte bitiş görseli
+    vardı" bizim bildiğimiz bir olgu ve Google bir cümleyi yeniden yazdığında
+    bayatlamıyor.
+    """
+    metin = vc.map_error(400, {"error": {"message": "Invalid request"}},
+                         last_frame=True)
+
+    assert "8 saniye" in metin, "süre sınırı yazılı değil"
+    assert "Veo 3.1 Fast" in metin, "hangi modellerde belgelendiği yazılı değil"
+    # Google'ın kendi açıklaması SİLİNMİYOR: bizim tahminimiz onun YERİNE
+    # geçseydi, sınır başka bir şey olduğunda kullanıcı hiçbir ipucu görmezdi.
+    assert "Invalid request" in metin
+
+
+def test_a_400_WITHOUT_a_last_frame_keeps_the_general_wording():
+    """Yeni dal İSTEĞE bağlı: bitiş görseli olmayan bir 400, süre hakkında
+    hiçbir şey söylemiyor — söyleseydi ilgisiz bir kusurda kullanıcıyı
+    ilgisiz bir düğmeye yollardık."""
+    metin = vc.map_error(400, {"error": {"message": "Invalid request"}})
+
+    assert "8 saniye" not in metin
+    assert "Invalid request" in metin
+
+
+def test_the_TRANSITION_hint_does_not_hijack_a_key_or_policy_400():
+    """Sıra ÖNEMLİ: anahtar ve içerik politikası dalları geçiş ipucundan
+    ÖNCE geliyor. Ters sırada, faturalandırması kapalı bir anahtarla geçiş
+    deneyen kullanıcı "süreyi 8 sn yap" okurdu — çalışmayan bir öğüt."""
+    anahtar = vc.map_error(400, {"error": {"message": "API key not valid."}},
+                           last_frame=True)
+    politika = vc.map_error(400, {"error": {"message": "blocked by safety filters"}},
+                            last_frame=True)
+
+    assert "anahtarı geçersiz" in anahtar and "8 saniye" not in anahtar
+    assert "İçerik politikası" in politika and "8 saniye" not in politika
+
+
+def test_the_SUBMIT_call_is_the_only_one_that_carries_the_transition_hint():
+    """Yoklama ve indirme istekleri GÖVDESİZ: biri `done` bayrağı, öteki bir
+    dosya soruyor. Oradaki bir 400 bitiş görselinden gelemez, yani ipucu
+    oraya sızarsa yanlış bir teşhis olurdu."""
+    c = FakeClient(FakeResponse(400, {"error": {"message": "nope"}}))
+
+    with pytest.raises(ac.ImageError) as hata:
+        vc.animate(LITE, "geçiş", [("a.png", b"ILK")], "16:9", "720p", 4, 1,
+                   last_frame=b"SON", client=c, credentials=CREDS)
+    assert "8 saniye" in str(hata.value)
+
+    # Aynı 400 YOKLAMADA: submit geçmiş, gövde kabul edilmiş demektir.
+    c2 = FakeClient(FakeResponse(200, {"name": "models/x/operations/1"}),
+                    FakeResponse(400, {"error": {"message": "nope"}}))
+    with pytest.raises(ac.ImageError) as hata2:
+        vc.animate(LITE, "geçiş", [("a.png", b"ILK")], "16:9", "720p", 4, 1,
+                   last_frame=b"SON", client=c2, credentials=CREDS)
+    assert "8 saniye" not in str(hata2.value)
+
+
 def test_the_error_texts_never_borrow_the_IMAGE_adapters_wording():
     """ŞEKİL paylaşılıyor, METİN paylaşılmıyor (`gemini_client`in duruşu).
 

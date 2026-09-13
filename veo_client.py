@@ -50,6 +50,32 @@ indirme `GET`inin kimliği başlıkla mı sorgu dizesiyle mi istediği, ve
 kullanıcı bir bitiş görseli seçtiğinde gövdeye giriyor, yani ad yanlışsa
 kırılan tek şey o yeni yol olur — bugünkü istek bit bit aynı kalıyor.
 
+SON KARE — 13 EYLÜL 2026'DA ÖĞRENİLENLER (hâlâ canlı doğrulama DEĞİL):
+
+  • ALAN ADI DOĞRU. `google-genai` SDK'sı (`_GenerateVideosConfig_to_mldev`)
+    Gemini Developer API için `last_frame`i tam olarak `instances[0].lastFrame`
+    altına, `image` ile aynı `{bytesBase64Encoded, mimeType}` biçiminde
+    yazıyor — bu dosyanın gövdesiyle alan alan aynı. Yukarıdaki dört riskten
+    biri böylece kapandı.
+  • BİR KULLANICI RAPORU VAR ve tel gerçekten reddetmiş: Veo 3.1 Fast +
+    ilk/son kare, arayüzün ön tanımlı 4 saniyesiyle Google'dan İngilizce bir
+    400 dönüyor. Yani kırılan şey alan adı değil, isteğin geri kalanı.
+  • EN OLASI SEBEP SÜRE: geçiş (interpolation) yolunun 8 SANİYELİK üretimde
+    desteklendiği belgelerde ve topluluk kayıtlarında tekrarlanıyor;
+    `catalog`ın `default_duration=4` değeri tam o tuzağa düşürüyor. Bu yüzden
+    `map_error`ın 400 dalı bitiş görseli gönderilmiş isteklerde süreyi ADIYLA
+    söylüyor ve `core.renderFrames` aynı cümleyi üretimden ÖNCE gösteriyor.
+  • KURAL OLARAK YAZILMADI (katalogda bir `durations` kısıtı ya da bir kapı
+    yok): kaynak ikinci el ve bu depoda faturalı bir anahtar yok. Yanlışsa
+    bedeli fazladan bir cümle; kapı olsaydı bedeli çalışan bir kombinasyonu
+    erişilemez yapmak olurdu.
+  • YETENEK BAYRAĞI ÜÇÜNDE DE `True` KALIYOR. "Geçiş yalnız Veo 3.1 ve 3.1
+    Fast'te var, Lite'ta yok" diyen ikinci el kaynaklar mevcut ama "Veo 3.1
+    Lite start-end frame" başlığıyla hizmet veren sağlayıcılar da var —
+    çelişki çözülmeden Lite'ın bayrağını düşürmek, belki de çalışan bir yolu
+    kullanıcıya kapatmak olurdu. Elde tek sağlam veri noktası (Fast'in
+    reddi) zaten Lite hakkında bir şey söylemiyor.
+
 DOSYA KÖKTE ve DÜZ olmak ZORUNDA: Android'in Chaquopy kaynak kümesi
 `include "*.py"` ile kurulu, alt paket APK'ya hiç girmez (bkz.
 tests/test_android_packaging.py). Adaptör `providers.py`'de düz bir `import`
@@ -124,7 +150,7 @@ def _bekle(saniye: float) -> None:
 
 
 def map_error(status_code: int, body: dict | list | None, *,
-              wire_model: str | None = None) -> str:
+              wire_model: str | None = None, last_frame: bool = False) -> str:
     """HTTP durumunu mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
 
     `gemini_client.map_error`'ın duruşunun aynısı ve aynı gerekçeyle: "Gemini
@@ -157,6 +183,25 @@ def map_error(status_code: int, body: dict | list | None, *,
                 + " " + i18n.t("err.pick_another_from_strip") + ek)
     if status_code == 400 and providers.is_content_policy(detail):
         return i18n.t("err.veo_content_policy")
+    if status_code == 400 and last_frame:
+        # SON KARE gönderilmiş bir 400: kalan 400'lerin İÇİNDEN ayrılıyor ve
+        # ayrım İSTEĞE bakıyor, gövdedeki metne DEĞİL. Metne bakmak
+        # (`"lastFrame" in detail`) Google'ın bir cümleyi yeniden yazdığı gün
+        # sessizce genel dala düşerdi; "bu istekte bitiş görseli VARDI" ise
+        # bizim bildiğimiz bir olgu ve bayatlamıyor.
+        #
+        # NEDEN AYRI BİR METİN: ölçülmüş bir kullanıcı şikâyeti (13 Eylül
+        # 2026) — Veo 3.1 Fast + ilk/son kare, arayüzün ön tanımlı 4 saniyesi
+        # ile 400 dönüyor ve genel metin yalnız "istek başarısız" diyordu.
+        # Kullanıcının çevireceği DÜĞME yazılı değildi; oysa geçiş yolunun
+        # belgelenmiş sınırı tam olarak orada (süre).
+        #
+        # METİN İHTİMAL DİLİYLE yazılı ("dene"), kesin bir kural gibi değil:
+        # bu depoda Veo'nun hiçbir yolu canlı doğrulanmadı (modül
+        # docstring'indeki "CANLI DOĞRULAMANIN DURUMU") ve Google'ın kendi
+        # açıklaması `ek` olarak zaten cümlenin sonunda duruyor — yani
+        # bizim tahminimiz onun yerine GEÇMİYOR, yanına ekleniyor.
+        return i18n.t("err.veo_last_frame_400") + ek
     return i18n.t("err.veo_failed", None, durum=status_code) + ek
 
 
@@ -480,8 +525,14 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str,
         resp = _istek(client, "POST", submit_url, key,
                       read=POLL_READ_TIMEOUT, json=payload)
         if resp.status_code != 200:
+            # `last_frame` bayrağı YALNIZ BU çağrıda: gövdeyi uç burada
+            # doğruluyor. Yoklama ve indirme istekleri gövdesiz (biri bir
+            # `done` bayrağı, öteki bir dosya soruyor), yani oradaki bir 400
+            # bitiş görselinden gelemez — bayrağı üçüne de geçirmek, doğru
+            # olmayan bir ipucunu iki yola daha yaymak olurdu.
             raise ac.ImageError(map_error(resp.status_code, _govde(resp),
-                                          wire_model=m.wire_model))
+                                          wire_model=m.wire_model,
+                                          last_frame=last_frame is not None))
         op = _govde(resp) or {}
         ad = op.get("name")
         if not ad:

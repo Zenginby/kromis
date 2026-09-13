@@ -39,7 +39,7 @@ flowchart TD
     n_openai_client["openai_client<br/>217 satır"]
     n_prefs["prefs<br/>249 satır"]
     n_providers["providers<br/>482 satır"]
-    n_veo_client["veo_client<br/>578 satır"]
+    n_veo_client["veo_client<br/>629 satır"]
   end
   subgraph katman4["katman 4"]
     n_backup["backup<br/>190 satır"]
@@ -260,7 +260,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `release_manifest.py` | 92 | 0 | — | 0 | 2 |
 | `screencolor.py` | 153 | 0 | — | 1 | 1 |
 | `storage.py` | 418 | 1 | `catalog`, `jsonstore` | 4 | 10 |
-| `veo_client.py` | 578 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
+| `veo_client.py` | 629 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
 | `version.py` | 30 | 0 | — | 4 | 9 |
 | `winclr.py` | 337 | 0 | — | 1 | 1 |
 | `winsec.py` | 308 | 0 | — | 1 | 2 |

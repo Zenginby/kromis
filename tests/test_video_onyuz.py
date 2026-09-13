@@ -221,6 +221,37 @@ def test_the_START_frame_has_NO_second_state_variable():
     assert "{ deger: source," in _govde(js, "renderFrames")
 
 
+def test_the_frames_note_asks_for_8_SECONDS_when_a_transition_is_set_up():
+    """Ölçülmüş kusur (13 Eylül 2026): iki kare seçilip üretime basıldığında
+    Google 400 dönüyordu — Veo'nun geçiş yolu 8 saniyelik üretimde
+    belgeleniyor, arayüzün ön tanımlı süresi ise 4 (`default_duration`).
+
+    NOT, KAPI DEĞİL: bu depoda Veo'nun hiçbir yolu canlı doğrulanmadı, yani
+    sınırı `goBlockReason`a koymak yanılma ihtimalimizi kullanıcının
+    erişemediği bir kombinasyona çevirirdi. Reddedilen istek üretim de
+    başlatmıyor, yani yanlış denemenin faturası yok.
+    """
+    govde = _govde(_kodsuz(_core()), "renderFrames")
+
+    assert 't("gen.last_frame_wants_8s")' in govde, "süre ipucu yok"
+    # İpucu YALNIZ iki yuva da doluyken ve süre 8 DEĞİLKEN: tek başına duran
+    # bir bitiş görselinin sorunu süre değil, eksik başlangıç karesi.
+    assert "sure !== 8" in govde
+    assert "const gecis = !!(source && sonKare);" in govde
+
+
+def test_the_note_is_redrawn_when_the_DURATION_axis_changes():
+    """İpucu süreye baktığı an, süre değişiminde yeniden çizilmek ZORUNDA:
+    kullanıcı 8'e çevirir, uyarı ekranda durmaya devam ederdi — kendi
+    çözdüğü bir sorunu anlatan bir cümle."""
+    js = _kodsuz(_core())
+
+    m = re.search(r'for \(const id of \["size", "quality", "duration", "n"\]\)'
+                  r'\s*\{(.*?)\n\}', js, re.S)
+    assert m, "eksen dinleyicisi bulunamadı"
+    assert "renderFrames()" in m.group(1)
+
+
 def test_clearing_the_source_ALSO_clears_the_end_frame():
     """Son kare tek başına `#go`yu kilitliyor (`goBlockReason`). Başlangıcı
     temizleyip bitişi bırakmak, kullanıcıyı sessizce o kilide düşürmek

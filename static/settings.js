@@ -62,6 +62,7 @@ function applyConfigured(s) {
     for (const [alan, kimlik, bos] of [
       ["set-openai-key", "openai", "sk-…"],
       ["set-gemini-key", "gemini", "AIza…"],
+      ["set-fal-key", "fal", "fal anahtarı"],
     ]) {
       $(alan).placeholder = s.providers[kimlik]
         ? "Kayıtlı · değiştirmek için yeni anahtar yaz"
@@ -251,7 +252,13 @@ function saglayiciKayitli(deger) {
  *  sağlayıcıda `undefined` — kutu boş kalıyor (renderModelCards'ın kaçış
  *  yolunun aynısı). */
 function saglayiciLogosu(deger) {
-  const m = imageModels.find((x) => x.provider === deger);
+  // İKİ KATALOG birden taranıyor ve bu bir tamlık düzeltmesi değil, ÖLÇÜLMÜŞ
+  // bir sessiz kusur: fal yalnız VİDEO sağlayıcısı, yani `imageModels`te HİÇ
+  // görünmüyor ve tek başına o listeye bakmak fal'ın işaretini kalıcı olarak
+  // kaybettirirdi. Kusur sessiz olurdu — kutu boş kalır, konsolda bir şey
+  // yazmaz (test_provider_logos.py'nin başlığındaki sınıfın aynısı).
+  const m = imageModels.find((x) => x.provider === deger)
+         || videoModels.find((x) => x.provider === deger);
   return m && m.logo;
 }
 
@@ -329,7 +336,7 @@ function syncProviderPick(secili) {
 /** Seçilen sağlayıcının alan grubunu gösterir, ötekileri gizler. */
 function syncProviderFields() {
   const secili = $("set-provider").value;
-  for (const p of ["azure", "openai", "gemini"]) {
+  for (const p of ["azure", "openai", "gemini", "fal"]) {
     $(`prov-${p}`).hidden = p !== secili;
   }
   // Düğmenin yüzü BURADA tazeleniyor, seçim yapılan yerde değil: değer üç
@@ -490,6 +497,7 @@ function openSettings(provider) {
   // zaman forma dolmuyor, o yüzden boş kutu "sildim" değil "dokunmadım"dır.
   $("set-openai-key").value = "";
   $("set-gemini-key").value = "";
+  $("set-fal-key").value = "";
   // Belirli bir sağlayıcıya derin bağlantı: #model-settings-link buradan
   // geliyor, "anahtar yok" uyarısı doğrudan doğru gruba açsın.
   //
@@ -573,7 +581,8 @@ async function saveSettings() {
                              // kayıtta silinmiyor.
                              azure_foundry_base_url: $("set-foundry-url").value.trim(),
                              openai_api_key: $("set-openai-key").value,
-                             gemini_api_key: $("set-gemini-key").value }),
+                             gemini_api_key: $("set-gemini-key").value,
+                             fal_key: $("set-fal-key").value }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -583,6 +592,7 @@ async function saveSettings() {
     $("set-key").value = "";
     $("set-openai-key").value = "";
     $("set-gemini-key").value = "";
+    $("set-fal-key").value = "";
     st.textContent = "Kaydedildi.";
     setTimeout(closeSettings, 550);
   } catch (e) {

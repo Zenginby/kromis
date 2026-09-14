@@ -320,6 +320,27 @@ CREDENTIALS: tuple[Credential, ...] = (
         secret_field=None,
         url_field="azure_foundry_base_url",
     ),
+    # fal.ai — TOPLAYICI: tek anahtar, çok model. Bu tur yalnız VİDEO
+    # tarafında kullanılıyor (`providers._VIDEO_ADAPTERS`), görsel tablosuna
+    # girmiyor.
+    #
+    # `FAL_KEY` YENİ DEĞİL: v0.2.0'dan beri `POST /api/settings`'te kabul
+    # ediliyordu ama kataloğa girmediği için hem redaksiyonun hem de formun
+    # DIŞINDAYDI — bugüne kadar yalnız `curl` ile yazılabiliyordu.
+    #
+    # `url_field=None` ve bu `azure_chat`in duruşunun aynısı: fal'da
+    # kullanıcıya özel endpoint YOK, adres tek ve sabit. Vekil arkasına almak
+    # isteyen `credentials.env`'e `FAL_BASE_URL` yazıyor — forma alan
+    # eklemeden (OpenAI girdisindeki aynı gerekçe).
+    Credential(
+        id="fal",
+        label="fal.ai",
+        key_env="FAL_KEY",
+        url_env="FAL_BASE_URL",
+        default_base_url="https://queue.fal.run",
+        secret_field="fal_key",
+        url_field=None,
+    ),
 )
 
 

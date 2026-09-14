@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 import azure_client as ac
 import app as appmod
+import catalog
 import models
 import version
 
@@ -638,3 +639,43 @@ def test_BOS_foundry_adresi_yazilmis_degeri_KORUYOR(client):
     assert bos.status_code == 200
 
     assert credstore.resolve("azure_foundry")[1] == "https://ozel.ornek/foundry"
+
+
+def test_fal_key_is_written_through_the_catalog_loop():
+    """`fal_key` artık KATALOGDAN yazılıyor, elle yazılmış bir daldan değil.
+
+    Ayrım görünmez değil: katalog döngüsü aynı anda REDAKSİYONU da veriyor
+    (`app._redact_validation_errors` gizli alan adlarını `CREDENTIALS`tan
+    türetiyor). Elle yazılmış dal o türetmenin DIŞINDAYDI ve `Credential`
+    docstring'i bunu "listenin elle tutulmasının bedeli" diye yazıyor.
+    """
+    cred = next(c for c in catalog.CREDENTIALS if c.id == "fal")
+    assert cred.key_env == "FAL_KEY"
+    assert cred.secret_field == "fal_key"
+    assert cred.default_base_url == "https://queue.fal.run"
+    # Adres alanı forma GİRMİYOR: fal'da kullanıcıya özel endpoint yok.
+    assert cred.url_field is None
+
+
+def test_fal_key_is_redacted_from_validation_errors():
+    """Gizli alan kümesi katalogdan türediği için `fal_key` artık kapsamda."""
+    assert "fal_key" in catalog.secret_field_names()
+
+
+def test_fal_key_kaydedilebiliyor_ve_credstore_ile_okunuyor(client):
+    """Gözden geçirenin tek sorusunun DOĞRUDAN kanıtı: kullanıcı fal anahtarını
+    Ayarlar ucundan (`POST /api/settings`) kaydedebiliyor mu?
+
+    `test_fal_key_is_written_through_the_catalog_loop` katalog GİRDİSİNİ
+    doğruluyor; bu test rotanın UCTAN UCA çalıştığını — anahtarın gerçekten
+    `credentials.env`e yazılıp `credstore.resolve` ile geri okunabildiğini —
+    kanıtlıyor.
+    """
+    import credstore
+
+    r = client.post("/api/settings", json={"fal_key": "fal-gizli-anahtar"})
+    assert r.status_code == 200
+    # Yanıt anahtarı SIZDIRMAMALI (yalnızca-yazılır formun sözleşmesi).
+    assert "fal-gizli-anahtar" not in r.text
+
+    assert credstore.resolve("fal") == ("fal-gizli-anahtar", "https://queue.fal.run")

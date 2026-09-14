@@ -1219,8 +1219,11 @@ def post_settings(req: SettingsRequest) -> dict:
         # bilerek: bunların henüz bir modeli ve adaptörü yok, kataloğa yazmak
         # "bağlı" gibi görünmelerine yol açardı. Yazma yolu korunuyor çünkü
         # v0.2.0'dan beri kaydediliyorlar ve veri kaybı olmamalı.
-        if req.fal_key is not None and req.fal_key.strip():
-            updates["FAL_KEY"] = req.fal_key.strip()
+        #
+        # `fal_key` BURADAN ÇIKTI: adaptörü geldi, kataloğa girdi ve yukarıdaki
+        # `for cred in catalog.CREDENTIALS` döngüsü onu aynı env'e aynı
+        # "boş = dokunma" kuralıyla yazıyor — üstelik redaksiyonu da
+        # kendiliğinden kapsıyor.
         if req.replicate_api_token is not None and req.replicate_api_token.strip():
             updates["REPLICATE_API_TOKEN"] = req.replicate_api_token.strip()
         # Aynı şema kapısı burada da: bu ikisi katalog döngüsünün DIŞINDA

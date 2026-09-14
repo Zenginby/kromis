@@ -1257,6 +1257,7 @@
         <option value="azure" selected>Azure OpenAI</option>
         <option value="openai">OpenAI</option>
         <option value="gemini">Google Gemini</option>
+        <option value="fal">fal.ai</option>
       </select>
 
       <!-- Her sağlayıcı AYRI blok, paylaşılan tek bir <input> DEĞİL: paylaşılan
@@ -1317,6 +1318,14 @@
         <p class="field-note">
           aistudio.google.com → API keys. Görsel üretimi ücretsiz kademede kapalı.
         </p>
+      </div>
+
+      <!-- fal.ai — yalnız VİDEO modelleri. Adres alanı YOK: fal'da
+           kullanıcıya özel endpoint yok (bkz. catalog.Credential id="fal"). -->
+      <div id="prov-fal" hidden>
+        <label for="set-fal-key">fal.ai API anahtarı</label>
+        <input id="set-fal-key" type="password" autocomplete="off"
+               spellcheck="false" placeholder="fal anahtarı">
       </div>
 
       </section>

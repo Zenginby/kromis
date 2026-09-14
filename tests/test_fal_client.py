@@ -100,3 +100,54 @@ def test_the_queue_path_keeps_only_the_owner_and_app_segments(tam_yol, uygulama)
     kusurun mandalı.
     """
     assert fal_client.queue_app_path(tam_yol) == uygulama
+
+
+# ── Hata çevirisi ──────────────────────────────────────────────────────
+
+
+def test_top_level_detail_list_is_read_like_fluxs_error_details():
+    """fal FastAPI tabanlı: doğrulama hatası ÜST DÜZEY `detail` listesi.
+
+    `providers.detail_of` `error.details[]` okuyor, üst düzey `detail`i
+    DEĞİL — ve o fonksiyona dokunmak Azure/OpenAI/Gemini/FLUX yolunun
+    baytlarını değiştirirdi. Sarmal bu yüzden burada.
+    """
+    govde = {"detail": [{"loc": ["body", "duration"],
+                         "msg": "value is not a valid enumeration member"}]}
+    assert "duration" in fal_client.detail_of(govde)
+
+
+def test_a_plain_error_string_still_resolves():
+    """Kuyruk `COMPLETED` iken hatayı düz bir dize olarak taşıyabiliyor."""
+    assert fal_client.detail_of({"error": "boom"}) == "boom"
+
+
+def test_401_names_the_fal_key_and_not_a_generic_key():
+    mesaj = fal_client.map_error(401, {"detail": "Unauthorized"})
+    assert "fal" in mesaj.lower()
+    assert "401" in mesaj
+
+
+def test_402_talks_about_BALANCE_and_never_about_the_key():
+    """fal ÖN ÖDEMELİ. 'Anahtarını kontrol et' demek, anahtarı doğru olan
+    kullanıcıyı çalışan kurulumunu bozmaya davet etmek olurdu —
+    `veo_client`in 403/429 dalının birebir gerekçesi."""
+    mesaj = fal_client.map_error(402, {"detail": "insufficient balance"})
+    assert "bakiye" in mesaj.lower()
+    assert "anahtar" not in mesaj.lower()
+
+
+def test_429_talks_about_CONCURRENCY_and_not_about_the_key():
+    mesaj = fal_client.map_error(429, None)
+    assert "eşzamanlı" in mesaj.lower()
+    assert "anahtar" not in mesaj.lower()
+
+
+def test_content_refusal_is_recognised_through_the_shared_predicate():
+    mesaj = fal_client.map_error(400, {"detail": "flagged by safety checker"})
+    assert "içerik" in mesaj.lower()
+
+
+def test_an_unknown_status_still_carries_the_detail():
+    mesaj = fal_client.map_error(503, {"detail": "upstream down"})
+    assert "503" in mesaj and "upstream down" in mesaj

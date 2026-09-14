@@ -41,7 +41,9 @@ from __future__ import annotations
 
 import base64
 
+import azure_client as ac
 import catalog
+import providers
 
 # Yüklenen referans karenin MIME'ı. `app._to_png` girdiyi koşulsuz PNG'ye
 # çevirdiği için sağlayıcıya sorulacak bir şey yok (`veo_client.PNG_MIME`
@@ -150,3 +152,81 @@ def build_payload(m: catalog.ImageModel, prompt: str, size: str, quality: str,
     if images:
         tum["image_url"] = _data_uri(images[0][1])
     return {ad: deger for ad, deger in tum.items() if ad in izin}
+
+
+def detail_of(body: dict | list | None) -> str:
+    """`providers.detail_of`un fal sarmalı — ÜST DÜZEY `detail` de okunuyor.
+
+    `providers.detail_of` iki şekil tanıyor: `{"error": {"message": …}}` ve
+    onun `details[]` listesi. fal FastAPI/pydantic tabanlı olduğu için
+    doğrulama hatasını ÜST DÜZEYDE taşıyor —
+
+        {"detail": [{"loc": ["body", "duration"], "msg": "…"}]}
+
+    — yani paylaşılan fonksiyon boş dize döndürür ve BÜTÜN 422'ler çıplak bir
+    "HTTP 422"ya çöker. Tam olarak FLUX'un `error.details[]` dalının var olma
+    sebebi, dördüncü bir şekilde.
+
+    `providers.detail_of` DEĞİŞTİRİLMİYOR: Azure, OpenAI, Gemini ve FLUX'un
+    yolları bayt bayt aynı kalmalı ve o fonksiyonun docstring'i hangi şekli
+    neden tanıdığını tek tek sayıyor. Sarmal, o listeyi `error.details`
+    konumuna TAŞIYIP aynı ayrıştırıcıya veriyor — ikinci bir `{loc, msg}`
+    çözümleyicisi yazmamak için.
+    """
+    paylasilan = providers.detail_of(body)
+    if paylasilan:
+        return paylasilan
+    if isinstance(body, list) and len(body) == 1:
+        body = body[0]
+    if not isinstance(body, dict):
+        return ""
+    ust = body.get("detail")
+    if isinstance(ust, str):
+        return ust
+    if isinstance(ust, list):
+        return providers.detail_of({"error": {"details": ust}})
+    return ""
+
+
+def map_error(status_code: int, body: dict | list | None) -> str:
+    """HTTP durumunu Türkçe mesaja çevirir. ŞEKİL paylaşılıyor, METİN değil.
+
+    `veo_client.map_error`in duruşunun aynısı: "Veo" diyen bir metin fal
+    faturasını arayan kullanıcıyı yanlış konsola yönlendirir.
+
+    402 DALI BU DOSYANIN EN ÖNEMLİ YERİ ve `veo_client`in 403/429 dalının
+    ikizi: **fal ön ödemeli.** Bakiyesi biten kullanıcıya "anahtarını kontrol
+    et" demek, anahtarı GERÇEKTEN doğru olan birini çalışan kurulumunu
+    bozmaya davet etmek olurdu.
+
+    429 DA AYRI bir cümle: fal'da yeni hesaplar İKİ eşzamanlı istekle
+    başlıyor, yani 429 çoğu zaman bir kota değil bir SIRA sorunu ve cevabı
+    "bekle ve tekrar dene".
+    """
+    detail = detail_of(body)
+    ek = f" {detail}" if detail else ""
+    if status_code in (401, 403):
+        return ("fal.ai yetkilendirme hatası "
+                f"({status_code}): anahtar geçersiz ya da bu modele erişimi "
+                "yok. Ayarlar'dan yeniden kaydet." + ek)
+    if status_code == 402:
+        return ("fal.ai bakiyesi yetersiz (402): fal ön ödemeli çalışıyor, "
+                "hesabına kredi yükleyip tekrar dene." + ek)
+    if status_code == 404:
+        return ("fal.ai modeli bulunamadı (404): bu uç yeniden adlandırılmış "
+                "ya da kaldırılmış olabilir." + ek)
+    if status_code == 429:
+        return ("fal.ai eşzamanlı istek sınırı (429): bir önceki üretim hâlâ "
+                "sürüyor olabilir. Yeni hesaplarda sınır ikidir; biraz "
+                "bekleyip tekrar dene." + ek)
+    if providers.is_content_policy(detail):
+        return ("fal.ai isteği içerik kurallarıyla reddetti "
+                f"(HTTP {status_code}): prompt'u ya da referans görseli "
+                "değiştirip tekrar dene." + ek)
+    if status_code == 400 and providers.is_invalid_key(detail):
+        return ("fal.ai anahtarı geçersiz (400): Ayarlar'dan yeniden "
+                "kaydet." + ek)
+    if status_code == 422:
+        return ("fal.ai isteği reddetti (422): "
+                + (detail or "gövdedeki alanlardan biri geçersiz."))
+    return f"fal.ai isteği başarısız (HTTP {status_code})." + ek

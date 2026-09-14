@@ -139,6 +139,7 @@
         "chat_client",
         "chat_providers",
         "credstore",
+        "fal_client",
         "gemini_client",
         "models",
         "openai_chat",
@@ -478,11 +479,13 @@
       "ad": "fal_client",
       "erteli_ithal": [],
       "ithal": [
-        "catalog"
+        "azure_client",
+        "catalog",
+        "providers"
       ],
       "ithal_eden": [],
-      "katman": 1,
-      "satir": 152,
+      "katman": 5,
+      "satir": 232,
       "testler": [
         "tests/test_fal_client.py"
       ],
@@ -762,6 +765,7 @@
         "app",
         "azure_flux_client",
         "azure_mai_client",
+        "fal_client",
         "gemini_client",
         "openai_chat",
         "openai_client",

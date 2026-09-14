@@ -2,7 +2,7 @@
 
 # Test haritası
 
-`tests/` altında 86 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
+`tests/` altında 87 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
 
 | modül | testler |
 | --- | --- |
@@ -13,7 +13,7 @@
 | `azure_flux_client` | `test_azure_flux_client.py` |
 | `azure_mai_client` | `test_azure_mai_client.py` |
 | `backup` | `test_backup.py` |
-| `catalog` | `test_arena.py`, `test_arena_onyuz.py`, `test_azure_flux_client.py`, `test_azure_mai_client.py`, `test_catalog.py`, `test_chat_prompt.py`, `test_chat_providers.py`, `test_chat_route.py`, `test_credstore.py`, `test_errlog.py`, `test_gemini_client.py`, `test_index.py`, `test_logo.py`, `test_model_secimi.py`, `test_openai_chat.py`, `test_openai_client.py`, `test_playwright_studio.py`, `test_prefs.py`, `test_prefs_route.py`, `test_provider_logos.py`, `test_providers.py`, `test_settings_route.py`, `test_storage.py`, `test_veo_client.py`, `test_video_onyuz.py`, `test_video_route.py` |
+| `catalog` | `test_arena.py`, `test_arena_onyuz.py`, `test_azure_flux_client.py`, `test_azure_mai_client.py`, `test_catalog.py`, `test_chat_prompt.py`, `test_chat_providers.py`, `test_chat_route.py`, `test_credstore.py`, `test_errlog.py`, `test_fal_client.py`, `test_gemini_client.py`, `test_index.py`, `test_logo.py`, `test_model_secimi.py`, `test_openai_chat.py`, `test_openai_client.py`, `test_playwright_studio.py`, `test_prefs.py`, `test_prefs_route.py`, `test_provider_logos.py`, `test_providers.py`, `test_settings_route.py`, `test_storage.py`, `test_veo_client.py`, `test_video_onyuz.py`, `test_video_route.py` |
 | `chat_client` | `test_chat_client.py`, `test_chat_providers.py`, `test_openai_chat.py` |
 | `chat_prompt` | `test_chat_prompt.py` |
 | `chat_providers` | `test_chat_providers.py`, `test_provider_logos.py` |
@@ -23,6 +23,7 @@
 | `credstore` | `test_credstore.py`, `test_playwright_studio.py`, `test_prefs.py`, `test_settings_route.py` |
 | `desktop` | `test_desktop.py`, `test_windows_acilis.py` |
 | `errlog` | `test_errlog.py` |
+| `fal_client` | `test_fal_client.py` |
 | `folders` | `test_folders.py`, `test_guvenlik_baslik.py`, `test_legacy_formats.py`, `test_playwright_studio.py` |
 | `gemini_client` | `test_gemini_client.py` |
 | `guncelleme` | `test_depo_adresi.py`, `test_guncelleme.py`, `test_guncelleme_route.py`, `test_playwright_guncelleme.py` |

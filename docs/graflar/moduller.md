@@ -2,7 +2,7 @@
 
 # Modül grafı
 
-43 Python modülü, 99 modül düzeyi + 12 erteli ithal kenarı.
+44 Python modülü, 100 modül düzeyi + 12 erteli ithal kenarı.
 
 Katman, o modülün depo içindeki en uzun bağımlılık zincirinin uzunluğu:
 **katman 0 hiçbir depo modülüne dayanmaz**, en üst katman uygulamanın
@@ -56,6 +56,7 @@ flowchart TD
     n_assets_store["assets_store<br/>201 satır"]
     n_chat_store["chat_store<br/>253 satır"]
     n_color_names["color_names<br/>418 satır"]
+    n_fal_client["fal_client<br/>152 satır"]
     n_palette_store["palette_store<br/>93 satır"]
     n_paths["paths<br/>286 satır"]
     n_storage["storage<br/>415 satır"]
@@ -135,6 +136,7 @@ flowchart TD
   n_desktop --> n_version
   n_desktop --> n_winclr
   n_desktop -.->|erteli| n_app
+  n_fal_client --> n_catalog
   n_folders --> n_jsonstore
   n_folders --> n_storage
   n_gemini_client --> n_azure_client
@@ -199,7 +201,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `azure_flux_client.py` | 292 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `azure_mai_client.py` | 290 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `backup.py` | 187 | 3 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 1 | 1 |
-| `catalog.py` | 1339 | 0 | — | 13 | 26 |
+| `catalog.py` | 1339 | 0 | — | 14 | 27 |
 | `chat_client.py` | 188 | 4 | `azure_client`, `chat_prompt`, `models` | 3 | 3 |
 | `chat_prompt.py` | 358 | 2 | `paths` | 3 | 1 |
 | `chat_providers.py` | 124 | 6 | `azure_client`, `catalog`, `chat_client`, `credstore`, `openai_chat` | 1 | 2 |
@@ -209,6 +211,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `credstore.py` | 194 | 3 | `azure_client`, `catalog` | 9 | 4 |
 | `desktop.py` | 559 | 9 | `errlog`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli) | 1 | 2 |
 | `errlog.py` | 114 | 0 | — | 5 | 1 |
+| `fal_client.py` | 152 | 1 | `catalog` | 0 | 1 |
 | `folders.py` | 248 | 2 | `jsonstore`, `storage` | 3 | 4 |
 | `gemini_client.py` | 293 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `guncelleme.py` | 237 | 2 | `errlog`, `jsonstore`, `paths`, `version` | 1 | 4 |
@@ -235,6 +238,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 Kimsenin ithal etmediği modüller. `app`, `desktop`, `android_main` uygulamanın giriş noktaları — geri kalanı ya bir betikten çağrılıyor ya da artık kullanılmıyor; ikincisi bir bulgudur.
 
 * `android_main` — giriş noktası
+* `fal_client` — ithal eden yok — kullanımı elle doğrulanmalı
 * `release_manifest` — ithal eden yok — kullanımı elle doğrulanmalı
 
 ## Yardımcılar (`tools/`)

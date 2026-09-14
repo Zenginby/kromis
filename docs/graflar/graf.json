@@ -250,6 +250,7 @@
         "azure_mai_client",
         "chat_providers",
         "credstore",
+        "fal_client",
         "gemini_client",
         "models",
         "openai_chat",
@@ -272,6 +273,7 @@
         "tests/test_chat_route.py",
         "tests/test_credstore.py",
         "tests/test_errlog.py",
+        "tests/test_fal_client.py",
         "tests/test_gemini_client.py",
         "tests/test_index.py",
         "tests/test_logo.py",
@@ -471,6 +473,20 @@
         "tests/test_errlog.py"
       ],
       "yol": "errlog.py"
+    },
+    {
+      "ad": "fal_client",
+      "erteli_ithal": [],
+      "ithal": [
+        "catalog"
+      ],
+      "ithal_eden": [],
+      "katman": 1,
+      "satir": 152,
+      "testler": [
+        "tests/test_fal_client.py"
+      ],
+      "yol": "fal_client.py"
     },
     {
       "ad": "folders",
@@ -1327,7 +1343,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 86,
+  "test_dosyasi_sayisi": 87,
   "uc_noktalar": [
     {
       "islev": "index",

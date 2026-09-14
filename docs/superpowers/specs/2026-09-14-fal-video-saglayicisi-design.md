@@ -473,6 +473,14 @@ disiplin (yanlışlıkla eklenen bir alan artık "422 ile yakalanır" diye
 GÜVENİLEMEZ), ama testlerin bunu 422 bekleyerek DEĞİL, gönderilen JSON gövdesini
 doğrudan inceleyerek doğrulaması gerekiyor.
 
+Bu yalnız ŞEMA DOĞRULAMASI düzeyinde bir yanıt — DAHA DERİN soru AYRI ve
+ÖLÇÜLEMEDİ: alanın Kling i2v'nin çıktısını GERÇEKTEN etkileyip etkilemediği
+(örn. gönderilen `aspect_ratio` çıktı oranına yansıyor mu, yoksa şema
+doğrulamasını geçtikten sonra sunucu tarafında da mı sessizce yok sayılıyor)
+ölçülemedi, çünkü üretim görüntü hatasından ötürü hiç başlamadı. "Şemayı
+geçiyor" ile "işlevsel olarak etkili" İKİ AYRI iddia; burada yalnız birincisi
+kanıtlanmıştır.
+
 **Beklenmeyen bulgu — status/cancel adresi TABAN+TAM YOL'dan kurulamıyor.**
 Karar 4'ün "adres YANITTAN alınmıyor, TABANDAN kuruluyor" güvenlik kararı
 DOĞRU kalıyor, ama kurma KURALI yanlış ölçülmüştü: gerçek `status_url` /

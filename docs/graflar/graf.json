@@ -163,6 +163,7 @@
         "tests/test_credstore.py",
         "tests/test_delete_route.py",
         "tests/test_edit_route.py",
+        "tests/test_fal_client.py",
         "tests/test_folders.py",
         "tests/test_gemini_client.py",
         "tests/test_guvenlik_baslik.py",
@@ -417,6 +418,7 @@
         "azure_flux_client",
         "azure_mai_client",
         "chat_providers",
+        "fal_client",
         "gemini_client",
         "openai_chat",
         "openai_client",
@@ -481,11 +483,12 @@
       "ithal": [
         "azure_client",
         "catalog",
+        "credstore",
         "providers"
       ],
       "ithal_eden": [],
       "katman": 5,
-      "satir": 232,
+      "satir": 508,
       "testler": [
         "tests/test_fal_client.py"
       ],

@@ -109,6 +109,28 @@ class ImageModel:
     # modelde etiketi anlamsız kılardı (4 sn ile 8 sn aynı krediyi gösterirdi
     # ve fatura iki katı olurdu). Mandal: tests/test_catalog.py.
     credits: int
+    # İKİNCİ TEL YOLU (`wire_model`in ikizi) — yalnız uçları AYRIŞMIŞ
+    # sağlayıcıda dolu.
+    #
+    # BURADA, `wire_model`in yanında DEĞİL: `dataclasses` varsayılanlı bir
+    # alandan sonra varsayılansız alan kabul etmiyor ve `wire_model`i
+    # `credential`, `sizes`, `qualities`, `max_n`, `credits` izliyor. Yerleşim
+    # teknik zorunluluk, üslup tercihi değil.
+    #
+    # fal.ai'da metin→video ve görsel→video AYRI uçlar
+    # (`…/text-to-video` ≠ `…/image-to-video`), oysa Azure, Gemini, MAI ve
+    # FLUX'ta düzenleme aynı ucun bir ALANI. "" = ikisi aynı uca gidiyor,
+    # yani bugünkü on üç girdinin hiçbirinin teli değişmiyor.
+    #
+    # UÇ YOLUNU ADAPTÖRDE TÜRETMEK reddedildi: kural ilk istisnada kırılıyor
+    # (`fal-ai/veo3.1` metin tarafında ÇIPLAK, görsel tarafında
+    # `/image-to-video`) ve kırılma telde 404 olarak görünürdü — bu dosyanın
+    # her yerde uyardığı "arayüzde seçilebilir hata".
+    #
+    # MODEL BAŞINA İKİ GİRDİ de reddedildi: şerit iki kart gösterir ve
+    # kullanıcı "(metin)" / "(görsel)" ayrımını elle yapardı — oysa
+    # `supports_edit` bayrağı tam olarak bu ayrımı SAKLAMAK için var.
+    wire_model_edit: str = ""
     images_per_request: int = 1
     supports_edit: bool = False
     max_refs: int = 1

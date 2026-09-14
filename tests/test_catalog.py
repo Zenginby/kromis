@@ -726,6 +726,26 @@ def test_hicbir_not_uygulamanin_YAPMADIGI_bir_seyi_vaat_etmiyor():
                 f"{min(m.max_refs, 4)}")
 
 
+def test_wire_model_edit_defaults_to_empty_on_every_existing_entry():
+    """Alan EKLENİYOR ama mevcut girdilerin hiçbirinin telini değiştirmiyor.
+
+    Varsayılanın "" olması, "düzenleme ve üretim AYNI uca gidiyor" demek —
+    Azure, OpenAI, Gemini, MAI, FLUX ve Veo'nun tamamı böyle. Bu test alanın
+    varsayılanını mandallıyor: bir gün varsayılan değişirse on üç girdi
+    sessizce başka bir uca gitmeye başlardı.
+    """
+    for m in catalog.IMAGE_MODELS + catalog.VIDEO_MODELS:
+        assert m.wire_model_edit == "", f"{m.id} beklenmedik ikinci tel yolu"
+
+
+def test_the_field_default_itself_is_empty():
+    """(a)'daki döngü ileride fal girdileri gelince SÜZGEÇ kazanacak; bu
+    iddia süzgeçten etkilenmiyor ve asıl korunan şeyi ölçüyor: VARSAYILAN.
+    Varsayılan bir gün "" olmaktan çıkarsa on üç girdi sessizce başka bir uca
+    gitmeye başlardı."""
+    assert catalog.ImageModel.__dataclass_fields__["wire_model_edit"].default == ""
+
+
 def test_MALIYET_ustunlugu_iddia_eden_not_GERCEKTEN_en_ucuz():
     """Seçici bir KARŞILAŞTIRMA yüzeyi: not, kredi rakamının tam yanında
     çiziliyor (static/core.js). "en ucuz" yazan bir not, kendisinden ucuz bir

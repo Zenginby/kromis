@@ -422,6 +422,71 @@ Mevcut dosyalara eklenenler:
 * `docs/ozellikler.md` — üç yeni model, 15 saniyelik klip ekseni ve fal'ın ön
   ödemeli olduğu notu.
 
+## Ölçüm sonuçları (2026-09-14, canlı uçtan)
+
+Sonda `credentials.env`'deki gerçek `FAL_KEY` ile `queue.fal.run`'a üç model
+için en ucuz isteği attı (Wan/PixVerse tamamlandı, Kling t2v tamamlandı) ve
+yalnız GERÇEKTEN belirsiz iki jetonu (Wan `duration=10`, Kling i2v
+`aspect_ratio`) test etti — geri kalanı (PixVerse/Kling'in 15 saniyeye kadar
+`duration`'ı, üç modelin de 1:1 oranı) şema zaten AÇIKÇA saydığı için kesin
+kabul edildi, parayla yeniden doğrulanmadı (bkz. betiğin baş yorumu).
+
+| model | kabul edilen `duration` | `aspect_ratio` | `resolution` | USD/sn |
+| --- | --- | --- | --- | --- |
+| Wan 3.0 | 5 (tamamlandı), 10 (kabul edildi — jeton sondası kuyrukta iptal edildi, tamamlanmadı) | 16:9 (tamamlanan videonun 854×480 çözünürlüğü oranı doğruluyor) | 480p (tamamlandı) | 480p **$0,05**; 720p **$0,10**; 1080p **$0,20** ([fal.ai model sayfası](https://fal.ai/models/alibaba/wan-3.0/text-to-video)) |
+| PixVerse C1 | 5 (tamamlandı); 10/15 ayrıca sondalanmadı — şema `duration`ı 1–15 AÇIKÇA sayıyor, kesin | 16:9 (tamamlandı) | 360p (tamamlandı) | 360p **$0,030** sessiz / $0,040 sesli; 540p $0,040/$0,050; 720p $0,050/$0,065; 1080p **$0,095**/$0,120 ([fal.ai model sayfası](https://fal.ai/models/fal-ai/pixverse/c1/text-to-video)) |
+| Kling V3 Turbo Pro | 5 (tamamlandı, t2v); 10/15 ayrıca sondalanmadı — şema `duration`ı 3–15 AÇIKÇA sayıyor, kesin | 16:9 (tamamlandı, t2v) | (yok — gizli tek jeton, tel'e hiç gönderilmiyor) | **$0,14** düz (çözünürlükten bağımsız) ([fal.ai model sayfası](https://fal.ai/models/fal-ai/kling-video/v3/turbo/pro/text-to-video)) |
+
+200 yanıtının şekli: **modele göre FARKLI**, ama üçü de `video.url` yuvalanmasını
+paylaşıyor —
+
+* Wan: `{"video": {"url","content_type","file_name","file_size","width","height","fps","duration","num_frames"}, "seed", "duration", "actual_prompt"}`
+* PixVerse / Kling: `{"video": {"url","content_type","file_name","file_size"}}` (Wan'daki ek alanlar yok)
+
+Hata gövdesinin anahtarı: `detail` — FastAPI'nin standart listesi
+(`[{"loc": [...], "msg": ..., "type": ..., "url": ..., "input": ...}]`).
+Gözlem bir `duration`/`aspect_ratio` reddinden değil, Kling i2v sondasının
+bozuk referans görüntüsünden geldi (`image_load_error`); yine de `detail`
+anahtarının biçimi bu depoya güvenle yazılabilir kadar nettir.
+
+Kling i2v `aspect_ratio`'yu GERÇEKTEN reddediyor mu: **HAYIR — şema
+doğrulaması düzeyinde reddetmiyor.** İstek `aspect_ratio` alanıyla (i2v
+şemasında o alan yokken) şema doğrulamasını GEÇTİ; 422 aldık ama hatanın türü
+`image_load_error` — yani sondanın test görüntüsü (1×1 saydam PNG) fal'ın
+görüntü çözümleyicisi tarafından reddedildi, alanın kendisi DEĞİL. Bilinmeyen
+alan bir "extra input değil" hatasıyla değil, tamamen farklı bir hatayla
+karşılandı; bu, `fal_client.py`'nin "tabloda olmayan hiçbir alan
+gönderilmiyor, fal pydantic tabanlı, bilinmeyen alan 422 demek" varsayımının
+en azından bu uçta YANLIŞ olduğunu gösteriyor — fal muhtemelen bilinmeyen
+alanları sessizce YOK SAYIYOR. Sonuç: adaptör alan tablosuna UYMAK hâlâ doğru
+disiplin (yanlışlıkla eklenen bir alan artık "422 ile yakalanır" diye
+GÜVENİLEMEZ), ama testlerin bunu 422 bekleyerek DEĞİL, gönderilen JSON gövdesini
+doğrudan inceleyerek doğrulaması gerekiyor.
+
+**Beklenmeyen bulgu — status/cancel adresi TABAN+TAM YOL'dan kurulamıyor.**
+Karar 4'ün "adres YANITTAN alınmıyor, TABANDAN kuruluyor" güvenlik kararı
+DOĞRU kalıyor, ama kurma KURALI yanlış ölçülmüştü: gerçek `status_url` /
+`cancel_url` / `response_url`, gönderilen tam tel yolunun (`.../text-to-video`
+dahil) yalnız İLK İKİ segmentini (`sahip/uygulama`) taşıyor, uç adı DÜŞÜYOR.
+Örnek: `fal-ai/pixverse/c1/text-to-video`'ya gönderilen istek
+`.../fal-ai/pixverse/requests/{id}/status` adresinden yoklanıyor —
+`c1/text-to-video` yok. Bu YANLIŞ varsayımla kurulan adresler PixVerse ve
+Kling'in izleme döngüsünde 600 sn boyunca boş gövde döndürdü (betik bunları
+zaman aşımına uğrattı) ve iki jeton sondasının iptal `PUT`'u 405 ile geri
+döndü; üçü de betik dışında elle kurulmuş 2-segmentli adreslerle düzeltildi.
+**Görev 4'e taşınacak bulgu:** `fal_client.py` `status`/`cancel`/`sonuç`
+adresini `wire_model`'in İLK İKİ segmentinden türetmeli, tam yoldan değil.
+
+**Maliyet:** Üç DENEME tamamlandı (Wan 5,038 sn×480p ≈ 0,25 USD + PixVerse
+5 sn×360p ≈ 0,15 USD + Kling 5 sn ≈ 0,70 USD ≈ **1,10 USD**); Wan `duration=10`
+jeton sondası kuyrukta iptal edildi (muhtemelen faturasız); Kling i2v sondası
+üretime hiç başlamadan görüntü hatasıyla düştü (muhtemelen faturasız, teyit
+edilemedi — fal'ın fatura dökümüne bu betikten erişilmedi). Toplam tahmini
+**~1,10 USD**, brief'in "1 USD altı" tahmininin hafifçe üzerinde — Kling'in düz
+$0,14/sn'sinin diğer ikisinden pahalı çıkması bunun sebebi.
+
+Katalog literalleri (Görev 7) YALNIZ bu tablodan yazıldı.
+
 ## Riskler
 
 | risk | azaltma |

@@ -206,12 +206,17 @@ ve bu, dosya başlığında yazılı olacak — ki ileride biri `fal-client`ı
 ```
 1. submit    POST {base}/{wire_path}          Authorization: Key <FAL_KEY>
              -> {request_id, status_url, response_url, cancel_url, queue_position}
-2. yokla     GET  {base}/{wire_path}/requests/{id}/status
+2. yokla     GET  {base}/{app_path}/requests/{id}/status
              -> {status: IN_QUEUE | IN_PROGRESS | COMPLETED, queue_position?, error?}
-3. sonuç     GET  {base}/{wire_path}/requests/{id}
+3. sonuç     GET  {base}/{app_path}/requests/{id}
              -> {video: {url, content_type, file_name, file_size}}
 4. indir     GET  video.url                    -> mp4 baytları
 ```
+
+`app_path` = `wire_path`in İLK İKİ SEGMENTİ (`fal-ai/kling-video/v3/turbo/pro/
+text-to-video` → `fal-ai/kling-video`). Gönderim tam yola, yoklama ve sonuç
+uygulama yoluna gidiyor; 2026-09-14'te canlı uçtan ölçüldü ve tam yolla kurulan
+adres 404 değil BOŞ GÖVDE döndürüyor — yani sessiz bir kusur.
 
 ### GÜVENLİK: 2. ve 3. adımın adresi YANITTAN alınmıyor
 
@@ -270,8 +275,13 @@ yok, oran ilk kareden türetiliyor. Katalog `sizes`'ı yine beyan ediyor (metin
 yolunda gerçek); adaptör düzenleme yolunda onu SESSİZCE değil, TABLOYA BAKARAK
 düşürüyor.
 
-**Tabloda olmayan hiçbir alan gönderilmiyor.** fal pydantic tabanlı; bilinmeyen
-alan 422 demek.
+**Tabloda olmayan hiçbir alan gönderilmiyor** — ve gerekçe 2026-09-14
+ölçümünden SONRA değişti (bkz. "Ölçüm sonuçları"). İlk tasarım "fal pydantic
+tabanlı, bilinmeyen alan 422 demek" diyordu; ölçüm bunu ÇÜRÜTTÜ — beyan
+edilmemiş alan SESSİZCE YOK SAYILIYOR. Bu tabloyu gereksiz değil DAHA gerekli
+kılıyor: 422 kendini gösteren bir hata, sessiz yok sayım göstermeyen bir
+sapma. Kullanıcı 9:16 seçer, tel isteği kabul eder, video 16:9 döner ve
+hiçbir yerde hata okunmaz.
 
 ### Referans görsel
 

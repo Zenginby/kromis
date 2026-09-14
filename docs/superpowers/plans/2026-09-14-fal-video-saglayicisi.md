@@ -215,7 +215,7 @@ git commit -m "docs(spec): fal telinin canlı ölçümü — katalog literalleri
 fal'da metin→video ve görsel→video AYRI uçlar; `wire_model` tek alan. Varsayılanı `""` olduğu için mevcut on üç girdinin baytı değişmiyor.
 
 **Files:**
-- Modify: `catalog.py` (`ImageModel` dataclass, `wire_model` alanının hemen altı)
+- Modify: `catalog.py` (`ImageModel` dataclass — alan `credits`ten SONRA, bkz. Step 3'ün "Yer bağlayıcı" notu)
 - Test: `tests/test_catalog.py`
 
 **Interfaces:**
@@ -249,7 +249,13 @@ Expected: FAIL — `AttributeError: 'ImageModel' object has no attribute 'wire_m
 `catalog.py`, `ImageModel` içinde `wire_model: str` satırının HEMEN ALTINA:
 
 ```python
-    # İKİNCİ TEL YOLU — yalnız uçları AYRIŞMIŞ sağlayıcıda dolu.
+    # İKİNCİ TEL YOLU (`wire_model`in ikizi) — yalnız uçları AYRIŞMIŞ
+    # sağlayıcıda dolu.
+    #
+    # BURADA, `wire_model`in yanında DEĞİL: `dataclasses` varsayılanlı bir
+    # alandan sonra varsayılansız alan kabul etmiyor ve `wire_model`i
+    # `credential`, `sizes`, `qualities`, `max_n`, `credits` izliyor. Yerleşim
+    # teknik zorunluluk, üslup tercihi değil.
     #
     # fal.ai'da metin→video ve görsel→video AYRI uçlar
     # (`…/text-to-video` ≠ `…/image-to-video`), oysa Azure, Gemini, MAI ve
@@ -477,10 +483,12 @@ Yaklaşım 1'in taşıyıcı parçası. Katalog "bu model ne yapabiliyor" diyor;
 ```python
 """fal_client: gövde kurma, uç seçimi ve alan tablosu.
 
-Bu dosyanın en değerli iddiası ALAN TABLOSU: fal pydantic tabanlı, yani
-BEYAN EDİLMEMİŞ bir alan göndermek 422 demek. Kling'in görsel→video ucu
-`aspect_ratio` ve `resolution` KABUL ETMİYOR (oranı ilk kareden türetiyor),
-metin ucu ise ediyor. Tabloyu tek yerde tutmazsak fark sessizce kayar.
+Bu dosyanın en değerli iddiası ALAN TABLOSU. 2026-09-14'te canlı uçtan
+ÖLÇÜLDÜ ki beyan edilmemiş bir alan 422 ÜRETMİYOR, SESSİZCE YOK SAYILIYOR —
+Kling'in görsel→video ucu, şemasında hiç olmayan `aspect_ratio` ile şema
+doğrulamasını geçti. Bu tabloyu gereksiz değil DAHA GEREKLİ kılıyor: 422
+kendini gösterir, sessiz yok sayım göstermez. Kullanıcı 9:16 seçer, tel kabul
+eder, video 16:9 döner ve hiçbir yerde hata okunmaz.
 
 Model örnekleri BURADA kuruluyor, `catalog`tan okunmuyor: gövde kurucusu
 katalog girdilerinden ÖNCE sınanabilir olmalı.
@@ -524,7 +532,13 @@ def test_wan_text_to_video_sends_aspect_ratio_and_resolution():
 
 
 def test_kling_IMAGE_to_video_sends_NEITHER_aspect_ratio_NOR_resolution():
-    """Kling'in i2v şemasında o iki alan HİÇ yok; göndermek 422 demek."""
+    """Kling'in i2v şemasında o iki alan HİÇ yok.
+
+    Göndermek 422 DEĞİL, SESSİZ SAPMA üretir (ölçüldü 2026-09-14): tel alanı
+    kabul eder, kullanır mı belli değil, kullanıcı seçtiği oranı aldığını
+    SANIR. Testin ölçtüğü şey gövdenin kendisi, telin cevabı değil — zaten
+    bu yüzden ölçülebilir.
+    """
     p = fal_client.build_payload(KLING, "kedi", "16:9", "1080p", 5, REFS)
     assert "aspect_ratio" not in p
     assert "resolution" not in p
@@ -547,11 +561,28 @@ def test_only_the_FIRST_reference_is_sent():
     assert base64.b64decode(p["image_url"].split(",", 1)[1]) == PNG
 
 
-def test_every_field_table_entry_is_a_known_model_id():
+def test_every_field_table_entry_declares_prompt_and_only_i2v_takes_image_url():
     """Tablo ile katalog ayrışırsa gövde SESSİZCE boşalır — mandal bu."""
     for model_id, (t2v, i2v) in fal_client.ALANLAR.items():
         assert "prompt" in t2v and "prompt" in i2v, model_id
         assert "image_url" in i2v and "image_url" not in t2v, model_id
+
+
+@pytest.mark.parametrize("tam_yol, uygulama", [
+    ("alibaba/wan-3.0/text-to-video", "alibaba/wan-3.0"),
+    ("alibaba/wan-3.0/image-to-video", "alibaba/wan-3.0"),
+    ("fal-ai/pixverse/c1/text-to-video", "fal-ai/pixverse"),
+    ("fal-ai/kling-video/v3/turbo/pro/text-to-video", "fal-ai/kling-video"),
+    ("fal-ai/kling-video/v3/turbo/pro/image-to-video", "fal-ai/kling-video"),
+])
+def test_the_queue_path_keeps_only_the_owner_and_app_segments(tam_yol, uygulama):
+    """ÖLÇÜLMÜŞ olgu (2026-09-14): yoklama adresi gönderim adresi DEĞİL.
+
+    Tam yolla kurulan adres 404 değil BOŞ GÖVDE döndürüyor — yani döngü
+    sessizce ölüyor ve üretim duvar saatine kadar bekliyor. Bu test o sessiz
+    kusurun mandalı.
+    """
+    assert fal_client.queue_app_path(tam_yol) == uygulama
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -585,13 +616,23 @@ hata yalnız o paketi kullanmaya çalışan kodda görünür.
 
 DOSYA KÖKTE ve DÜZ olmak ZORUNDA (Chaquopy; bkz. tests/test_android_packaging.py).
 
-ALAN TABLOSU (`ALANLAR`) bu dosyanın taşıyıcı kararı. fal FastAPI/pydantic
-tabanlı, yani BEYAN EDİLMEMİŞ alan 422 demek — "fazladan alan göndersek de
-yok sayılır" varsayımı burada YANLIŞ. Kling'in görsel→video ucu
-`aspect_ratio` ve `resolution` KABUL ETMİYOR (oranı ilk kareden türetiyor),
-metin ucu ise ediyor; katalog `sizes`ı yine beyan ediyor çünkü metin yolunda
-GERÇEK. Adaptör düzenleme yolunda onu sessizce değil, TABLOYA BAKARAK
-düşürüyor.
+ALAN TABLOSU (`ALANLAR`) bu dosyanın taşıyıcı kararı ve gerekçesi ÖLÇÜLDÜ
+(2026-09-14, canlı uç):
+
+  **Beyan edilmemiş alan 422 ÜRETMİYOR — SESSİZCE YOK SAYILIYOR.** Kling'in
+  görsel→video ucuna, şemasında hiç olmayan `aspect_ratio` gönderildi ve
+  istek şema doğrulamasını GEÇTİ. İlk tasarımın "fal pydantic tabanlı, yani
+  fazladan alan 422 demek" varsayımı YANLIŞ çıktı.
+
+Bu, tabloyu gereksiz kılmıyor — TAM TERSİ, daha gerekli kılıyor. 422 gürültülü
+bir hatadır ve kendini gösterir; sessiz yok sayım göstermez: kullanıcı 9:16
+seçer, tel isteği kabul eder, video 16:9 döner ve hiçbir yerde bir hata
+okunmaz. Bu deponun her yerde adlandırdığı SESSİZ SAPMA'nın tam kendisi.
+
+Kling'in görsel→video ucu `aspect_ratio` ve `resolution` alanlarını şemasında
+SAYMIYOR (oranı ilk kareden türetiyor), metin ucu ise sayıyor; katalog
+`sizes`ı yine beyan ediyor çünkü metin yolunda GERÇEK. Adaptör düzenleme
+yolunda onu sessizce değil, TABLOYA BAKARAK düşürüyor.
 """
 from __future__ import annotations
 
@@ -640,6 +681,36 @@ def wire_path_for(m: catalog.ImageModel, *, images) -> str:
     if images:
         return m.wire_model_edit or m.wire_model
     return m.wire_model
+
+
+# Kuyruk adresinin taşıdığı segment sayısı — ÖLÇÜLMÜŞ bir sabit.
+_UYGULAMA_SEGMENTI = 2
+
+
+def queue_app_path(wire_path: str) -> str:
+    """Kuyruk adreslerinin (`/requests/…`) kullandığı UYGULAMA yolu.
+
+    GÖNDERİM yolu ile YOKLAMA yolu AYNI DEĞİL ve bu 2026-09-14'te canlı uçtan
+    ölçüldü:
+
+        gönderim : queue.fal.run/fal-ai/kling-video/v3/turbo/pro/text-to-video
+        yoklama  : queue.fal.run/fal-ai/kling-video/requests/<id>/status
+
+    Yani kuyruk adresi tam uç yolunu DEĞİL, yalnız ilk iki segmenti
+    (sahip/uygulama) taşıyor; `v3/turbo/pro/text-to-video` düşüyor.
+
+    NEDEN BU KADAR ÖNEMLİ: tam yolla kurulan adres 404 DÖNDÜRMÜYOR, BOŞ GÖVDE
+    döndürüyor — yani döngü hatayla değil SESSİZCE ölüyor ve üretim duvar
+    saatine kadar bekliyor. Ölçümde PixVerse ve Kling'in izlemesi tam bu
+    yüzden 600 saniye boşa gitti; aynı `request_id`ler doğru adresle
+    sorgulandığında ZATEN tamamlanmıştı. İptal `PUT`'u da aynı sebeple 405
+    dönüyordu.
+
+    Bu, adresin GÖVDEDEN alınmama kararını (bkz. `_durum_url`) değiştirmiyor
+    — yalnız tabandan TÜRETME kuralını düzeltiyor.
+    """
+    parcalar = [p for p in wire_path.strip("/").split("/") if p]
+    return "/".join(parcalar[:_UYGULAMA_SEGMENTI])
 
 
 def _data_uri(png: bytes) -> str:
@@ -967,11 +1038,14 @@ def test_the_poll_and_result_urls_are_REBUILT_from_the_trusted_base():
                         client=client, credentials=CREDS)
     adresler = [c["url"] for c in client.calls]
     assert not any("evil.example" in u for u in adresler)
+    # GÖNDERİM yolu tam (`…/text-to-video`), YOKLAMA yolu yalnız ilk iki
+    # segment — ölçülmüş fark (bkz. `queue_app_path`).
+    assert adresler[0] == (
+        "https://queue.fal.run/alibaba/wan-3.0/text-to-video")
     assert adresler[1] == (
-        "https://queue.fal.run/alibaba/wan-3.0/text-to-video"
-        "/requests/abc123/status")
+        "https://queue.fal.run/alibaba/wan-3.0/requests/abc123/status")
     assert adresler[3] == (
-        "https://queue.fal.run/alibaba/wan-3.0/text-to-video/requests/abc123")
+        "https://queue.fal.run/alibaba/wan-3.0/requests/abc123")
 
 
 def test_the_download_step_carries_NO_credentials():
@@ -1119,12 +1193,12 @@ def _durum_url(taban: str, yol: str, rid: str) -> str:
     `api.eu`/`api.us` uçlarında olduğu gibi) değişecek tek yer bu iki
     fonksiyon. Belirti net olur: 404.
     """
-    return f"{taban}/{yol}/requests/{rid}/status"
+    return f"{taban}/{queue_app_path(yol)}/requests/{rid}/status"
 
 
 def _sonuc_url(taban: str, yol: str, rid: str) -> str:
     """`_durum_url`in ikizi; aynı gerekçe."""
-    return f"{taban}/{yol}/requests/{rid}"
+    return f"{taban}/{queue_app_path(yol)}/requests/{rid}"
 
 
 def _istek(client, method: str, url: str, key: str | None, *, read: float,

@@ -267,24 +267,34 @@ def test_the_submit_step_uses_the_Key_prefixed_authorization_header():
 
 
 def test_a_missing_request_id_fails_with_a_TURKISH_error():
+    """`"fal" in mesaj` TEK BAŞINA neredeyse boş bir iddiaydı: modüldeki HER
+    mesaj zaten "fal.ai" ile başlıyor. Asıl iddia mesajın HANGİ alanın
+    eksik olduğunu (`request_id`) da adıyla söylemesi."""
     client = FakeClient(FakeResponse(200, {"queue_position": 0}))
     with pytest.raises(ac.ImageError) as exc:
         fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
                             client=client, credentials=CREDS)
     assert "fal" in str(exc.value).lower()
+    assert "request_id" in str(exc.value)
 
 
 def test_a_hostile_request_id_is_REJECTED_before_any_url_is_built():
-    """Yola segment enjekte etmeyi deneyen bir id kabul edilmemeli."""
+    """Yola segment enjekte etmeyi deneyen bir id kabul edilmemeli.
+
+    Yalnız `pytest.raises` mandal DEĞİL: süzgeç kaldırılsa döngü gerçek
+    duvar saati bütçesini doldurup yine `ac.ImageError` atardı (yalnız
+    dakikalarca sürerek) — test yine geçerdi. Asıl iddia submit'ten SONRA
+    HİÇBİR yeni adresin kurulup çağrılmadığı."""
     client = FakeClient(FakeResponse(200, {"request_id": "../../../admin"}))
     with pytest.raises(ac.ImageError):
         fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
                             client=client, credentials=CREDS)
+    assert len(client.calls) == 1
 
 
 def test_COMPLETED_without_a_video_is_a_TURKISH_error_not_a_KeyError():
     """`azure_flux_client.decode_images`in kararı: sarmalanmayan bir KeyError
-    app.py'nin süzgeçinden geçer ve kullanıcı dakikalarca bekledikten sonra
+    app.py'nin süzgecinden geçer ve kullanıcı dakikalarca bekledikten sonra
     yalnızca 'Hata (500)' görür."""
     client = FakeClient(
         FakeResponse(200, {"request_id": "abc123"}),
@@ -295,6 +305,23 @@ def test_COMPLETED_without_a_video_is_a_TURKISH_error_not_a_KeyError():
         fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
                             client=client, credentials=CREDS)
     assert "video" in str(exc.value).lower()
+
+
+def test_a_failed_job_is_rejected_even_if_the_body_also_carries_a_video():
+    """`COMPLETED` başarı demek değil: `veo_client._operation_hatasi`nin
+    KOŞULSUZ kararının aynısı — düşmüş bir işin bayat/kısmi videosu, gövdede
+    görünse bile teslim edilmemeli. Önceki tur bunu `and not video` ile
+    yumuşatıyordu; bu test tam o dalı mandallıyor."""
+    client = FakeClient(
+        FakeResponse(200, {"request_id": "abc123"}),
+        FakeResponse(200, {"status": "COMPLETED"}),
+        FakeResponse(200, {"error": {"message": "iş düştü"},
+                           "video": {"url": "https://v3.fal.media/x.mp4"}}),
+    )
+    with pytest.raises(ac.ImageError) as exc:
+        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+                            client=client, credentials=CREDS)
+    assert "düştü" in str(exc.value)
 
 
 def test_the_wall_clock_budget_ends_the_loop_with_its_own_message(monkeypatch):
@@ -310,6 +337,38 @@ def test_the_wall_clock_budget_ends_the_loop_with_its_own_message(monkeypatch):
     assert "bitmedi" in str(exc.value).lower()
 
 
+def test_the_wall_clock_budget_is_shared_across_ALL_tours_not_reset_per_tour(
+        monkeypatch):
+    """`providers.total_budget` `n` ile ölçekleniyor ve docstring'i
+    "DÖNGÜNÜN duvar saati tavanı" diyor — HER turun kendi bütçesi değil,
+    turların TOPLAMI. Saat tur başına sıfırlansaydı 2 turluk bir üretimde
+    gerçek tavan `2×butce` olurdu.
+
+    `WAN` için `total_budget(WAN, 2) == 360.0` (`read_timeout_for`in
+    `images_per_request=1` dalı: `180 sn × n`). Saat: BAŞLANGIÇ 0.0
+    (`_uret`in `son_tarih`i hesapladığı an) → BİRİNCİ turun yoklaması 100.0
+    (bütçe içinde, tur BAŞARIYLA biter) → İKİNCİ turun yoklaması 400.0
+    (360'ı aşmış). Turlar arasında saat sıfırlanıyor olsaydı ikinci tur
+    kendi TAZE 360 sn'lik bütçesiyle 400'ü de bütçe içinde sayar, submit'ten
+    sonra bir yoklama GET'i daha atardı."""
+    saat = iter([0.0, 100.0, 400.0] + [10_000.0] * 20)
+    monkeypatch.setattr(fal_client, "_simdi", lambda: next(saat))
+    client = FakeClient(
+        FakeResponse(200, {"request_id": "tur1"}),
+        FakeResponse(200, {"status": "COMPLETED"}),
+        FakeResponse(200, {"video": {"url": "https://v3.fal.media/1.mp4"}}),
+        FakeResponse(200, content=MP4),
+        FakeResponse(200, {"request_id": "tur2"}),
+    )
+    with pytest.raises(ac.ImageError) as exc:
+        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 2,
+                            client=client, credentials=CREDS)
+    assert "bitmedi" in str(exc.value).lower()
+    # İKİNCİ tur SUBMIT'ten öteye geçmedi: son tarih paylaşılan bir mutlak
+    # an olduğu için yoklamanın İLK kontrolünde zaten dolmuştu.
+    assert len(client.calls) == 5
+
+
 def test_animate_uses_the_image_to_video_endpoint():
     client = FakeClient(*_kuyruk_yanitlari())
     fal_client.animate(WAN, "kedi", REFS, "16:9", "720p", 5, 1,
@@ -317,7 +376,25 @@ def test_animate_uses_the_image_to_video_endpoint():
     assert client.calls[0]["url"].endswith("/image-to-video")
 
 
+def test_animate_rejects_a_last_frame_since_none_of_the_three_wire_schemas_support_it():
+    """`last_frame` sözleşmede var ama fal'ın üç modelinin de i2v şemasında
+    `tail_image_url` yok (bkz. `animate`'in docstring'i) — ikinci kapı
+    burada, ağa hiç çıkmadan."""
+    with pytest.raises(ac.ImageError) as exc:
+        fal_client.animate(WAN, "kedi", REFS, "16:9", "720p", 5, 1,
+                           last_frame=b"\x89PNG")
+    assert "bitiş" in str(exc.value).lower()
+
+
 def test_a_download_redirect_is_followed_MANUALLY_and_capped():
+    """`follow_redirects` KULLANILMIYOR: yönlendirme ELLE izleniyor ve
+    `MAX_YONLENDIRME`yi aşınca kendi mesajıyla duruyor.
+
+    Yalnız TAVAN mesajı yeterli bir mandal DEĞİLDİ: biri `_indir`i
+    "düzeltip" ikinci atlayışta anahtar göndermeye başlasa ya da hedefi hiç
+    DEĞİŞTİRMESE de bu test hâlâ geçerdi. Asıl iddia ikinci indirme
+    çağrısının GERÇEKTEN yönlendirilen adrese gittiği ve kimlik taşımadığı.
+    """
     yanitlar = _kuyruk_yanitlari()[:-1] + [
         FakeResponse(302, headers={"location": "https://cdn.example/y.mp4"}),
     ]
@@ -326,3 +403,67 @@ def test_a_download_redirect_is_followed_MANUALLY_and_capped():
         fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
                             client=client, credentials=CREDS)
     assert "yönlendirme" in str(exc.value).lower()
+    # 4 kuyruk çağrısından (submit + 2 yoklama + sonuç) SONRAKİ indirme
+    # denemeleri.
+    indirme = client.calls[4:]
+    assert indirme[0]["url"] == "https://v3.fal.media/x.mp4"
+    assert indirme[1]["url"] == "https://cdn.example/y.mp4"
+    assert "Authorization" not in indirme[1]["headers"]
+
+
+def test_a_relative_redirect_location_is_resolved_against_the_current_url():
+    """`Location` GÖRECELİ de olabiliyor (RFC 7231); `urljoin` onu
+    mutlaklaştırıyor — bu davranış şimdiye kadar HİÇ sınanmamıştı."""
+    yanitlar = _kuyruk_yanitlari()[:-1] + [
+        FakeResponse(302, headers={"location": "/y.mp4"}),
+        FakeResponse(200, content=MP4),
+    ]
+    client = FakeClient(*yanitlar)
+    out = fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+                              client=client, credentials=CREDS)
+    assert out == [MP4]
+    assert client.calls[-1]["url"] == "https://v3.fal.media/y.mp4"
+
+
+def test_a_loopback_download_target_is_rejected_as_a_potential_SSRF():
+    """ANAHTARSIZLIK sızıntıyı kapatıyor ama HEDEFİ serbest bırakırsa bir
+    masaüstü uygulaması kendi loopback'ine GET atar ve dönen baytlar
+    kullanıcıya "video" diye teslim edilir — `_indir`in ikinci kapısı bu
+    ölçüyü kapatıyor."""
+    yanitlar = _kuyruk_yanitlari()[:-1]
+    yanitlar[3] = FakeResponse(200, {"video": {"url": "http://127.0.0.1:9/x.mp4"}})
+    client = FakeClient(*yanitlar)
+    with pytest.raises(ac.ImageError) as exc:
+        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+                            client=client, credentials=CREDS)
+    assert "ssrf" in str(exc.value).lower()
+    # İndirme GET'i HİÇ atılmadı: kapı ağa çıkmadan ÖNCE reddediyor.
+    assert len(client.calls) == 4
+
+
+def test_a_cloud_metadata_download_target_is_rejected_as_a_potential_SSRF():
+    """169.254.169.254 bulut meta-veri servislerinin (AWS/GCP/Azure IMDS)
+    adresi — SSRF'in klasik hedefi ve `is_link_local` süzgecinin ölçüsü."""
+    yanitlar = _kuyruk_yanitlari()[:-1]
+    yanitlar[3] = FakeResponse(
+        200, {"video": {"url": "http://169.254.169.254/latest/meta-data"}})
+    client = FakeClient(*yanitlar)
+    with pytest.raises(ac.ImageError) as exc:
+        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+                            client=client, credentials=CREDS)
+    assert "ssrf" in str(exc.value).lower()
+
+
+def test_a_redirect_to_a_loopback_address_is_rejected_too():
+    """Yönlendirme İLK adresi geçse bile YENİ hedefi de denetlemeli: kapı
+    yalnız girişte durmuyor, HER `urljoin` sonrasında tekrar çalışıyor."""
+    yanitlar = _kuyruk_yanitlari()[:-1] + [
+        FakeResponse(302, headers={"location": "http://127.0.0.1:9/evil"}),
+    ]
+    client = FakeClient(*yanitlar)
+    with pytest.raises(ac.ImageError) as exc:
+        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+                            client=client, credentials=CREDS)
+    assert "ssrf" in str(exc.value).lower()
+    # Yalnız İLK indirme denemesi yapıldı; loopback'e ikinci bir çağrı GİTMEDİ.
+    assert len(client.calls) == 5

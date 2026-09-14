@@ -488,7 +488,7 @@
       ],
       "ithal_eden": [],
       "katman": 5,
-      "satir": 508,
+      "satir": 624,
       "testler": [
         "tests/test_fal_client.py"
       ],

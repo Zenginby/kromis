@@ -307,6 +307,15 @@ def _istek(client, method: str, url: str, key: str | None, *, read: float,
 
     YÖNLENDİRME İZLENMİYOR (`follow_redirects` yok): `_indir` onu ELLE
     izliyor, çünkü httpx yönlendirmede özel başlıkları soymuyor.
+
+    ÜÇ İSTİSNA SARMALANIYOR, YALNIZ `TransportError` DEĞİL: `url` iki
+    yerde GÖVDEDEN geliyor (indirme adresi, `Location` başlığı) ve ikisi de
+    `httpx.InvalidURL` fırlatabilir — bu sınıf `TransportError`
+    HİYERARŞİSİNDE DEĞİL, düz bir `Exception` alt sınıfı, çünkü URL ayrıştırma
+    isteğin kendisinden ÖNCE patlıyor. `httpx.DecodingError` de aynı şekilde
+    dışarıda kalıyor (bozuk gzip/deflate gövdesi, yine gövdeyi yazan tarafın
+    elinde). Sarmalanmazlarsa üçü de `ac.ImageError`in docstring'indeki aynı
+    kadere düşer: `app.py`'nin süzgecinden GEÇİP ham 500 olurlar.
     """
     import httpx
     basliklar = {}
@@ -317,10 +326,13 @@ def _istek(client, method: str, url: str, key: str | None, *, read: float,
     try:
         return client.request(method, url, headers=basliklar, json=json,
                               timeout=ac.request_timeout(read))
-    except httpx.TransportError as exc:
+    except (httpx.TransportError, httpx.InvalidURL, httpx.DecodingError) as exc:
         # Mesaj `azure_client`tan geliyor, sağlayıcı adı düzeltiliyor:
         # "Azure'a bağlanılamadı" diyen bir metin kullanıcıyı Endpoint alanını
-        # kurcalamaya iter (`veo_client._istek`in aynı satırı).
+        # kurcalamaya iter (`veo_client._istek`in aynı satırı). `InvalidURL`/
+        # `DecodingError` `TimeoutException`/`TransportError` DEĞİL, yani
+        # `transport_error_message` bunları genel dala düşürüyor — o da
+        # Türkçe ve `ac.ImageError`, ham 500'den her hâlükârda iyi.
         raise ac.ImageError(
             ac.transport_error_message(exc, read).replace("Azure", "fal.ai")) from exc
 
@@ -337,7 +349,7 @@ def _video_url(sonuc: dict) -> str:
 
     BEKLENMEYEN ŞEKİL ham `KeyError` DEĞİL Türkçe `ImageError` üretiyor:
     `azure_flux_client.decode_images`in kararı — sarmalanmayan bir `KeyError`
-    `app.py`'nin süzgeçinden geçer ve kullanıcı dakikalarca bekledikten sonra
+    `app.py`'nin süzgecinden geçer ve kullanıcı dakikalarca bekledikten sonra
     yalnızca "Hata (500)" görür. Anahtarlar mesaja giriyor ki şekil
     değiştiğinde teşhis kullanıcının ekranında olsun.
     """
@@ -351,8 +363,58 @@ def _video_url(sonuc: dict) -> str:
     return str(url)
 
 
+# İndirme hedefinin uyması gereken şema. fal'ın CDN'i HER ZAMAN https
+# veriyor; düz `http` kabul etmek görünürde zararsız ama sessizce bir
+# ortadaki-adam saldırısına açık kapı bırakırdı — reddetmenin bedeli yok.
+_IZIN_VERILEN_SEMA = "https"
+
+
+def _guvenli_hedef_mi(url: str) -> bool:
+    """İndirme adresi bir SSRF açığına yol açıyor mu — açıyorsa REDDET.
+
+    ANAHTARSIZLIK (bkz. `_indir`'in docstring'i) ile bu kapı AYRI tehditleri
+    kapatıyor: biri "bu adrese giden istek kimlik TAŞIMASIN" diyor, bu ise
+    "bu adrese HİÇ istek gitmesin". İkisi de gerekli çünkü `url` YANIT
+    GÖVDESİNDEN (ya da `Location` başlığından) geliyor — kimliksiz bir GET
+    bile hedefi seçen tarafın işine yarar: bu MASAÜSTÜ bir uygulama, yani
+    loopback yüzeyi (`http://127.0.0.1:…`) gerçek, bulut meta-veri servisi
+    (`169.254.169.254`) de öyle. Gövde bu adreslerden birini yazarsa ve kapı
+    yoksa dönen baytlar kullanıcıya "video" diye teslim edilir.
+
+    `veo_client._google_konagi` bir ALLOWLIST taşıyordu çünkü Google'ın
+    indirme konağı SABİTTİ (`*.googleapis.com` vb.). Burada DENY-LIST:
+    fal'ın CDN konağı sabit değil (`v3.fal.media` gibi adlar sürüm/bölgeyle
+    değişebiliyor), bir allowlist yanlış konakları da reddedip döngüyü
+    sessizce kırardı. Yalnız özel/yerel aralıklar eleniyor, geri kalan her
+    şeye izin veriliyor.
+
+    AD ÇÖZÜMLEMESİ YAPILMIYOR (DNS'e HİÇ çıkılmıyor): bir sorgu hem yan
+    etkili hem de TOCTOU açığı taşır (çözümleme ile asıl istek arasında ad
+    başka bir IP'ye işaret edebilir). Yalnız adresin METNİ denetleniyor:
+    host bir literal IP ise `ipaddress` onu private/loopback/link-local diye
+    işaretliyor; sıradan bir alan adıysa (DNS'e hiç bakılmadığı için) izin
+    veriliyor.
+    """
+    import ipaddress
+    from urllib.parse import urlparse
+
+    parcalar = urlparse(url)
+    if parcalar.scheme != _IZIN_VERILEN_SEMA:
+        return False
+    konak = (parcalar.hostname or "").lower()
+    if not konak or konak == "localhost" or konak.endswith(".localhost"):
+        return False
+    try:
+        ip = ipaddress.ip_address(konak)
+    except ValueError:
+        return True  # literal IP DEĞİL: sıradan bir alan adı, izin ver.
+    return not (ip.is_loopback or ip.is_link_local or ip.is_private
+                or ip.is_unspecified or ip.is_reserved or ip.is_multicast)
+
+
 def _indir(client, url: str) -> bytes:
-    """MP4'ü indirir — ANAHTARSIZ ve yönlendirmeyi ELLE izleyerek.
+    """MP4'ü indirir — ANAHTARSIZ, HEDEFİ DENETLENMİŞ ve yönlendirmeyi ELLE
+    izleyerek.
 
     ANAHTARSIZ olması bu dosyanın ikinci güvenlik kararı: `url` YANIT
     GÖVDESİNDEN geliyor, yani hedef konağı gövdeyi yazan taraf seçiyor.
@@ -360,9 +422,30 @@ def _indir(client, url: str) -> bytes:
     gereksiz — göndermemek, sızma yolunu tamamen kapatıyor.
     (`veo_client._indir` Google konağında anahtarı gönderiyordu ve bu yüzden
     bir konak allowlist'i taşımak zorundaydı; burada ona gerek yok.)
+
+    HEDEF de AYRICA denetleniyor (`_guvenli_hedef_mi`) ve bu BAŞKA bir karar:
+    anahtarsızlık SIZINTIYI kapatıyor, hedef denetimi SSRF'i — `url` gövdeden
+    gelmeseydi ikisi de gereksizdi, ama geldiği için ikisi de gerekli; biri
+    ötekinin yerine geçmiyor. Denetim hem İLK adreste hem her `urljoin`
+    SONRASINDA çalışıyor: yönlendirme zinciri de ilk adres kadar güvenilmez,
+    aksi hâlde kapı yalnızca girişte durur, ikinci atlayışta atlanırdı.
     """
     from urllib.parse import urljoin
-    for _ in range(MAX_YONLENDIRME):
+
+    def _kapiya_sor(adres: str) -> str:
+        if not _guvenli_hedef_mi(adres):
+            raise ac.ImageError(
+                f"fal.ai videosu indirilemedi: hedef adres ({adres}) yerel "
+                "ya da özel bir ağa işaret ediyor; SSRF riski nedeniyle "
+                "reddedildi.")
+        return adres
+
+    url = _kapiya_sor(url)
+    # +1: İLK istek bir yönlendirme DEĞİL, döngü `MAX_YONLENDIRME` kadar
+    # yönlendirmeyi İZLESİN diye bir fazla dönüyor (`veo_client._indir`in
+    # aynı deseni) — aksi hâlde tavan mesajı "5" derken gerçekte yalnızca 4
+    # yönlendirme izlenmiş olurdu.
+    for _ in range(MAX_YONLENDIRME + 1):
         resp = _istek(client, "GET", url, None, read=DOWNLOAD_READ_TIMEOUT)
         if resp.status_code == 200:
             return resp.content
@@ -375,7 +458,7 @@ def _indir(client, url: str) -> bytes:
                 f"fal.ai videosu indirilemedi: {resp.status_code} "
                 "yönlendirmesi adres taşımıyor.")
         # GÖRECELİ adres de geçerli (RFC 7231); `urljoin` mutlaklaştırıyor.
-        url = urljoin(url, hedef)
+        url = _kapiya_sor(urljoin(url, hedef))
     raise ac.ImageError(
         f"fal.ai videosu indirilemedi: {MAX_YONLENDIRME} yönlendirmeden "
         "sonra hâlâ bitmedi.")
@@ -402,6 +485,13 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str,
     KİMLİK TEMBEL çözülüyor (`providers._azure_generate`in belgelenmiş
     kuralı). SON TARİH duvar saatiyle ölçülüyor, yoklama SAYISIYLA değil.
 
+    SON TARİH BİR KEZ, BURADA hesaplanıyor (`son_tarih`) ve HER tura AYNI
+    mutlak an olarak geçiyor — tur başına SIFIRLANMIYOR. `providers.
+    total_budget` zaten `n` ile ölçekliyor ve docstring'i "DÖNGÜNÜN duvar
+    saati tavanı" diyor, yani turların TOPLAMI: saat her turda sıfırlansaydı
+    gerçek tavan `n · butce` olurdu (bugün `max_n=1` olduğu için görünmez,
+    ama `total_budget`ın n-ile-çarpma kararını anlamsızlaştırırdı).
+
     DÖNGÜ adet başına ayrı istek atıyor (`images_per_request=1`). Bugün
     `max_n=1` olduğu için tek tur, ama yapısı tavan yükseldiği gün hazır.
     """
@@ -410,6 +500,7 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str,
     taban = base_url.rstrip("/")
     yol = wire_path_for(m, images=images).strip("/")
     butce = providers.total_budget(m, n)
+    son_tarih = _simdi() + butce
     payload = build_payload(m, prompt, size, quality, duration, images)
 
     import httpx
@@ -419,7 +510,8 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str,
     try:
         out: list[bytes] = []
         while len(out) < n:
-            out.append(_tek_uretim(client, key, taban, yol, payload, butce))
+            out.append(_tek_uretim(client, key, taban, yol, payload, butce,
+                                   son_tarih))
         return out[:n]
     finally:
         if owns:
@@ -427,8 +519,14 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str,
 
 
 def _tek_uretim(client, key: str, taban: str, yol: str, payload: dict,
-                butce: float) -> bytes:
-    """Tek bir kuyruk turu: submit → yokla → sonuç → indir."""
+                butce: float, son_tarih: float) -> bytes:
+    """Tek bir kuyruk turu: submit → yokla → sonuç → indir.
+
+    `son_tarih` ÇAĞIRANDAN (`_uret`) geliyor ve TÜM turlarda SABİT — bu
+    fonksiyon kendi saatini sıfırlamıyor (bkz. `_uret`'in gerekçesi). `butce`
+    yalnız zaman aşımı MESAJINDA "kaç saniyede bitmedi" diye göstermek için
+    taşınıyor, son tarih hesabına bir daha girmiyor.
+    """
     # ── 1. Submit ────────────────────────────────────────────────────────
     resp = _istek(client, "POST", f"{taban}/{yol}", key,
                   read=POLL_READ_TIMEOUT, json=payload)
@@ -446,23 +544,38 @@ def _tek_uretim(client, key: str, taban: str, yol: str, payload: dict,
     # `COMPLETED` olabilir ve uykuyla başlamak hazır sonucu bekletmek olurdu
     # (`veo_client`in aynı notu).
     durum_url = _durum_url(taban, yol, rid)
-    baslangic = _simdi()
     aralik = POLL_INTERVAL_START
     durum = ""
     while durum != DURUM_TAMAM:
-        gecen = _simdi() - baslangic
-        if gecen >= butce:
-            raise ac.ImageError(_timeout_message(gecen, butce))
+        kalan = son_tarih - _simdi()
+        if kalan <= 0:
+            raise ac.ImageError(_timeout_message(butce - kalan, butce))
         resp = _istek(client, "GET", durum_url, key, read=POLL_READ_TIMEOUT)
         if resp.status_code != 200:
             raise ac.ImageError(map_error(resp.status_code, _govde(resp)))
         govde = _govde(resp) or {}
         durum = str(govde.get("status") or "")
+        # TANINMAYAN ya da eksik `status` HATA sayılmıyor, "devam ediyor"
+        # sayılıyor: fal ileride `IN_QUEUE`/`IN_PROGRESS`/`COMPLETED` dışında
+        # bir ara durum eklerse döngü onu es geçip yoklamaya devam ediyor —
+        # tek ÇIKIŞ koşulu `COMPLETED`, tek HATA koşulu HTTP durumu ya da son
+        # tarih. Tek risk: iş gerçekten düşüp fal onu `COMPLETED` DIŞINDA bir
+        # durum adıyla (`FAILED` gibi) işaretlerse — belgede böyle bir durum
+        # görülmedi, o hâlde bu dal son tarih dolana kadar boşa yoklar.
         if durum == DURUM_TAMAM:
             break
-        _bekle(min(aralik, max(0.0, butce - gecen)))
+        _bekle(min(aralik, max(0.0, kalan)))
         aralik = min(aralik * POLL_BACKOFF, POLL_INTERVAL_MAX)
 
+    # SON TARİH yalnız SUBMIT + YOKLAMA'yı kapsıyor: `COMPLETED` görüldükten
+    # sonraki SONUÇ ve İNDİRME adımları bütçeye bir daha sokulmuyor, kendi
+    # OKUMA zaman aşımlarıyla sınırlı kalıyor (`POLL_READ_TIMEOUT`,
+    # `DOWNLOAD_READ_TIMEOUT` × yönlendirme tavanı). Bilinçli sadeleştirme:
+    # iş zaten `COMPLETED`, yani "vazgeçme" kararı anlamsızlaşıyor — kalan
+    # yolun tek riski yavaş bir indirme ve o da kendi tavanıyla sınırlı (en
+    # kötü hâl ~1110 sn: 30 sn sonuç + `MAX_YONLENDIRME + 1` = 6 indirme
+    # denemesinin her biri en çok `DOWNLOAD_READ_TIMEOUT` = 180 sn).
+    #
     # ── 3. Sonuç ─────────────────────────────────────────────────────────
     resp = _istek(client, "GET", _sonuc_url(taban, yol, rid), key,
                   read=POLL_READ_TIMEOUT)
@@ -471,14 +584,17 @@ def _tek_uretim(client, key: str, taban: str, yol: str, payload: dict,
     sonuc = _govde(resp) or {}
     # `COMPLETED` BAŞARI DEMEK DEĞİL: fal işin BİTTİĞİNİ söylüyor, iyi
     # bittiğini değil — düşen iş de `COMPLETED` olup gövdesinde `error`
-    # taşıyor (`veo_client`in `done: true` + video yok hâlinin ikizi).
+    # taşıyabiliyor. Denetim KOŞULSUZ: `veo_client._operation_hatasi`nin
+    # "iş düştüyse sonuç geçersiz, gövdede bir video görünse bile teslim
+    # edilmemeli" kararının aynısı — bayat/kısmi bir video, parayı zaten
+    # harcamış DÜŞMÜŞ bir işin üstünü örtmemeli.
     #
     # `map_error` BURADA ÇAĞRILMIYOR: onun sözleşmesi bir HTTP DURUM KODUNU
     # çevirmek ve buradaki yanıt 200 — `map_error(200, …)` genel "istek
     # başarısız (HTTP 200)" dalına düşer, yani kullanıcıya anlamsız bir
     # cümle gösterirdi. Gerekçe doğrudan yazılıyor.
     hata = detail_of(sonuc)
-    if hata and not (isinstance(sonuc, dict) and sonuc.get("video")):
+    if hata:
         raise ac.ImageError(f"fal.ai video üretmedi: {hata}")
 
     # ── 4. İndirme ───────────────────────────────────────────────────────

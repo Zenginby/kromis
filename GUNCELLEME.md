@@ -190,6 +190,12 @@ sonucu var:
 
 ---
 
+## Sürüm 0.23.1 — ne değişti
+
+- Küçük düzeltmeler ve iyileştirmeler.
+
+---
+
 ## Sürüm 0.23.0 — ne değişti
 
 - i18n(fal): fal.ai metinleri sözlüğe taşındı, telif başlığı ve dördüncü kart

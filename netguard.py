@@ -40,8 +40,17 @@ from __future__ import annotations
 # yazılabiliyor (`Host: [::1]:8765`) ve ikisi de aynı arayüzü gösteriyor.
 LOOPBACK_KONAKLAR = frozenset({"127.0.0.1", "localhost", "::1", "[::1]"})
 
+# İKİ DİLLİ, ve bu bir üslup tercihi değil ZORUNLULUK: bu gövde `sar`ın ASGI
+# sarmalından çıkıyor, yani FastAPI yığınına — dolayısıyla `app._dil_baglami`ye
+# — HİÇ girmiyor. `i18n.active()` burada her zaman yedek dile düşer, yani
+# `i18n.t` çağırmak İngilizce kullanan birine Türkçe bir cümle göstermek
+# olurdu. Ayarlar'daki dil düğmesinin iki dili birden taşıma gerekçesinin
+# aynısı (tests/test_i18n.py::test_the_language_button_is_not_translated):
+# doğru dili SEÇEMEDİĞİMİZ anda anlaşılmanın tek yolu ikisini de yazmak.
 _REDDEDILDI = (
-    "Bu sunucuya yalnızca uygulamanın kendi penceresi erişebilir.".encode("utf-8"))
+    "Bu sunucuya yalnızca uygulamanın kendi penceresi erişebilir. / "
+    "Only this app's own window can reach this server."
+).encode("utf-8")
 
 
 def konak_adi(host_basligi: str) -> str:

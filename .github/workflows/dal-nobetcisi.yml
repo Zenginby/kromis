@@ -1,0 +1,95 @@
+# Açık PR'lar `main`'le HÂLÂ birleşebiliyor mu — her main push'unda sorulur.
+#
+# NEDEN VAR (2026-09-15'te ölçüldü): PR #17'nin dalı, main'in i18n taşımasından
+# ÖNCE ayrılmıştı ve haftalarca çakışmalı kaldı. Asıl zarar çakışmanın kendisi
+# değildi. `ci.yml` yalnız `pull_request` ile tetikleniyor, GitHub ise çakışmalı
+# bir PR için birleştirme ref'ini ÜRETEMİYOR — yani o dalın on iki commit'inin
+# HİÇBİRİNDE tek bir check koşmadı: `gh api repos/.../commits/<sha>/check-runs`
+# hepsi için 0 döndürdü. Çakışma, deponun bütün kapılarını sessizce kapattı.
+#
+# NEDEN "DAL UCUNDA DA TEST KOŞ" ÇÖZMÜYOR: kırılan şey dalın kendisi değil
+# BİRLEŞMİŞ hâliydi — dalda main'in i18n testleri hiç yoktu, orada koşan bir
+# takım yeşil kalırdı. Birleşmiş hâl ancak çakışma kapandıktan sonra
+# sınanabiliyor. Yani tek gerçek çare çakışmayı GECİKTİRMEMEK; bu iş de onu
+# doğduğu gün görünür yapıyor.
+#
+# UCUZ OLMAK ZORUNDA: test koşmuyor, yalnızca `git merge-tree` ile kuru bir
+# birleştirme deniyor. Depo private ve dakika faturalanıyor (gerekçe ci.yml'in
+# başında yazılı).
+name: Dal nöbetçisi
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: dal-nobetcisi
+  cancel-in-progress: true
+
+jobs:
+  nobet:
+    name: Açık PR'ların birleşebilirliği
+    runs-on: ubuntu-latest
+    steps:
+      # TAM geçmiş: `merge-tree` iki tarafın ortak atasını bulmak zorunda,
+      # sığ bir klonda ata bulunamaz ve her PR yalancıktan çakışık görünürdü.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Kuru birleştirme
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          gh label create birlesmiyor --color B60205 \
+            --description "main ile çakışıyor (dal nöbetçisi işaretledi)" \
+            2>/dev/null || true
+
+          acik=$(gh pr list --state open --base main \
+                   --json number,headRefName,labels \
+                   --jq '.[] | "\(.number)\t\(.headRefName)\t\(([.labels[].name] | index("birlesmiyor")) != null)"')
+
+          if [ -z "$acik" ]; then
+            echo "Açık PR yok." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          { echo "| PR | dal | durum |"; echo "| --- | --- | --- |"; } \
+            >> "$GITHUB_STEP_SUMMARY"
+
+          while IFS=$'\t' read -r no dal isaretli; do
+            [ -z "${no:-}" ] && continue
+
+            # Çatal dalı burada YOK: `origin` yalnız bu depoyu tanıyor. Sessizce
+            # atlanıyor, çünkü bir çatal PR'ı nöbetçiyi kırmamalı.
+            if ! git fetch -q origin "$dal" 2>/dev/null; then
+              echo "| #$no | \`$dal\` | okunamadı (çatal?) |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            if git merge-tree --write-tree HEAD FETCH_HEAD >/dev/null 2>&1; then
+              if [ "$isaretli" = "true" ]; then
+                gh pr edit "$no" --remove-label birlesmiyor >/dev/null
+              fi
+              echo "| #$no | \`$dal\` | birleşiyor |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              # Yorum YALNIZCA geçişte: her main push'unda yenisini yazmak
+              # PR'ı okunamaz yapardı. Etiket kalıcı işaret, yorum tek seferlik
+              # haber.
+              if [ "$isaretli" != "true" ]; then
+                gh pr edit "$no" --add-label birlesmiyor >/dev/null
+                gh pr comment "$no" --body \
+                  "\`main\` ilerledi ve bu dal artık onunla çakışıyor. Çakışma açıkken GitHub birleştirme ref'ini üretemiyor, yani bu PR'da **hiçbir CI kapısı koşmuyor** — dal, çözülene kadar sınanmamış sayılır. \`git merge origin/main\` ile kapatılabilir." \
+                  >/dev/null
+              fi
+              echo "| #$no | \`$dal\` | **ÇAKIŞIYOR** |" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done <<< "$acik"

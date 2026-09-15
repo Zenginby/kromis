@@ -22,6 +22,7 @@ Depo geleneği: servis edilen artefakt doğrulanır (dosya değil), bu yüzden
 """
 
 import pathlib
+import subprocess
 import re
 
 from fastapi.testclient import TestClient
@@ -35,8 +36,23 @@ LEDGER = ROOT / "docs" / "flow-ui" / "id-defteri.md"
 # index.html'e yüklenme sırasıyla; sıra bağlayıcı (core.js başta $ tanımlıyor).
 # mobile.js EN SONDA: o da `$()` ile bir id'ye (#composer) bağlanıyor, yani
 # aynı sarkma riskini taşıyor ve bu dosyanın kapsamı dışında kalmamalı.
-JS_FILES = ("core.js", "folders.js", "assets.js", "palette.js", "settings.js",
-            "viewer.js", "chat.js", "mobile.js")
+#
+# i18n.js EN BAŞTA ve buraya SONRADAN girdi (v0.23). PR #12'de eklenmişti ve
+# listeye yazılmadığı için üst düzey adları bir tur boyunca hiç taranmadı —
+# üstelik en çakışmaya açık adı O tanımlıyor: tek harflik `t`. Yani kapının
+# kör noktası tam da en çok bakması gereken dosyadaydı. `KAPSAM_DISI` ile
+# `test_the_scan_covers_every_shipped_script` bunun tekrarını engelliyor.
+JS_FILES = ("i18n.js", "core.js", "folders.js", "assets.js", "palette.js",
+            "settings.js", "viewer.js", "chat.js", "mobile.js")
+
+# Taranmayan betikler — gerekçesiyle. Boş bırakılamaz bir defter: aşağıdaki
+# kapı, `static/` altındaki HER betiğin ya listede ya burada olmasını şart
+# koşuyor.
+KAPSAM_DISI = {
+    "pixel-canvas.js": "üçüncü parti (Ryan Mulligan, MIT); üst düzey adları "
+                       "bizim sözleşmemize tabi değil — tests/"
+                       "test_telif_basligi.py da onu ayrı tutuyor",
+}
 
 _TOP_LEVEL_DECLARATION_RE = re.compile(
     r"^(?:(?:async\s+)?function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=)", re.M
@@ -261,3 +277,43 @@ def test_go_disabled_tek_yerden_yaziliyor():
         f"#go.disabled birden fazla yerden yazılıyor: {yazanlar}")
     assert yazanlar[0].startswith("core.js"), (
         f"tek yazar core.js olmalı (syncGoGate), bulunan: {yazanlar[0]}")
+
+
+def test_the_scan_covers_every_shipped_script():
+    """ÖLÇÜLEN KUSUR: `static/i18n.js` bir tur boyunca hiç taranmadı.
+
+    PR #12'de eklendi, `JS_FILES`e yazılmadı ve kimse fark etmedi — çünkü liste
+    ELLE tutuluyordu ve listede olmayan dosyanın öntanımlı hâli "taranmaz"dı.
+    Oysa o dosya `index.html`de İLK yüklenen betik ve üst düzey `t` adını
+    tanımlıyor: bu dosyadaki "hiçbir üst düzey ad iki dosyada tanımlı değil"
+    iddiasının en çok ilgilendiği ad tam olarak oydu.
+
+    `tests/test_i18n.py::test_every_shipped_module_is_classified` ile aynı
+    kusur sınıfı ve aynı çözüm: liste kalıyor, ama artık EKSİKSİZ olmak
+    zorunda. Yeni bir betik ya taranır ya gerekçesiyle `KAPSAM_DISI`na yazılır.
+    """
+    izlenen = subprocess.run(["git", "-C", str(ROOT), "ls-files", "static/*.js"],
+                             check=True, capture_output=True, text=True).stdout
+    betikler = {y.split("/")[-1] for y in izlenen.split()}
+    assert len(betikler) > 5, f"kapsam şüpheli biçimde küçük: {len(betikler)}"
+
+    bilinen = set(JS_FILES) | set(KAPSAM_DISI)
+    assert not betikler - bilinen, (
+        "SINIFLANMAMIŞ betik. Üst düzey ad tanımlıyor ya da `$()` ile bir id'ye "
+        f"bağlanıyorsa `JS_FILES`e, değilse GEREKÇESİYLE `KAPSAM_DISI`na ekle: "
+        f"{sorted(betikler - bilinen)}")
+    assert not bilinen - betikler, (
+        f"artık var olmayan betik sayılıyor: {sorted(bilinen - betikler)}")
+    ikisinde = set(JS_FILES) & set(KAPSAM_DISI)
+    assert not ikisinde, f"iki listede birden: {sorted(ikisinde)}"
+
+
+def test_the_scan_follows_the_pages_load_order():
+    """`JS_FILES`in SIRASI bağlayıcı (dosyanın başındaki not). Sıra sayfadan
+    ayrışırsa "ilk tanımlayan kazanır" akıl yürütmesi sessizce yanlışlanır."""
+    html = TestClient(appmod.app).get("/").text
+    sayfada = [y for y in re.findall(r"/static/([a-z0-9_-]+\.js)", html)
+               if y not in KAPSAM_DISI]
+    assert sayfada == list(JS_FILES), (
+        "yüklenme sırası ayrışmış - sayfa: "
+        f"{sayfada} · liste: {list(JS_FILES)}")

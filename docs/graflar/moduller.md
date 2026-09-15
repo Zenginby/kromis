@@ -14,13 +14,13 @@ onun `ithal eden` sütunudur — okuma yönü budur.
 ```mermaid
 flowchart TD
   subgraph katman11["katman 11"]
-    n_android_main["android_main<br/>197 satır"]
+    n_android_main["android_main<br/>201 satır"]
   end
   subgraph katman10["katman 10"]
     n_desktop["desktop<br/>584 satır"]
   end
   subgraph katman9["katman 9"]
-    n_netguard["netguard<br/>160 satır"]
+    n_netguard["netguard<br/>169 satır"]
   end
   subgraph katman8["katman 8"]
     n_app["app<br/>2286 satır"]
@@ -232,7 +232,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 
 | modül | satır | katman | ithal ettiği | ithal eden | test |
 | --- | --- | --- | --- | --- | --- |
-| `android_main.py` | 197 | 11 | `app` (erteli), `desktop` (erteli), `errlog` (erteli), `paths` (erteli) | 0 | 2 |
+| `android_main.py` | 201 | 11 | `app` (erteli), `desktop` (erteli), `errlog` (erteli), `paths` (erteli) | 0 | 2 |
 | `app.py` | 2286 | 8 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `etiket`, `folders`, `guncelleme`, `i18n`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 35 |
 | `assets_store.py` | 205 | 3 | `i18n`, `jsonstore` | 3 | 9 |
 | `azure_client.py` | 458 | 3 | `i18n`, `paths`, `winsec` | 13 | 31 |
@@ -257,7 +257,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `i18n.py` | 305 | 2 | `paths` | 21 | 3 |
 | `jsonstore.py` | 83 | 0 | — | 8 | 1 |
 | `models.py` | 1058 | 4 | `azure_client`, `catalog`, `etiket`, `i18n`, `palette` | 3 | 14 |
-| `netguard.py` | 160 | 9 | `app` (erteli) | 1 | 1 |
+| `netguard.py` | 169 | 9 | `app` (erteli) | 1 | 1 |
 | `openai_chat.py` | 180 | 6 | `azure_client`, `catalog`, `chat_client`, `chat_prompt`, `credstore`, `etiket`, `i18n`, `providers` | 1 | 3 |
 | `openai_client.py` | 217 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
 | `palette.py` | 332 | 3 | `i18n` | 3 | 3 |

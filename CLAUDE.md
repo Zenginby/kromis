@@ -121,5 +121,15 @@ Kod okurken hemen görülür, yenisini yazarken de sürdürülmeli:
   gerekçeyi oku; hâlâ geçerliyse karar durur.
 * Türetilen her şeyin bekçisi bir testtir (sürüm literalleri, depo adresi,
   `encoding` sözleşmesi, satır sonları, artık depo haritası da).
+* Elle tutulan her KAPSAM listesinin bekçisi de bir testtir. Bir kapı "şu
+  dosyaları tara" diyorsa, listede olmayan dosyanın öntanımlı hâli *muaf*
+  demektir ve yeni gelen dosya kapıyı hiç görmeden geçer — `fal_client.py`
+  v0.23'te, `static/i18n.js` PR #12'de tam olarak böyle kaçtı. Liste elle
+  kalabilir (mekanik ölçüt çoğu yerde gürültü üretiyor, ölçüldü), ama
+  EKSİKSİZ olmak zorunda: her öğe ya taranan listede ya da GEREKÇESİYLE
+  muafiyet defterinde. Deyimi üç yerde görebilirsin —
+  `test_every_shipped_module_is_classified` (i18n),
+  `test_the_scan_covers_every_shipped_script` (id sözleşmesi),
+  `test_the_scan_actually_covers_the_files_that_matter` (telif).
 * Metin dosyası açan her çağrı `encoding` VERMEK ZORUNDA
   (`tests/test_encoding_contract.py`), satır sonları LF (`.gitattributes`).

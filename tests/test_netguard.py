@@ -182,6 +182,9 @@ def test_a_cross_origin_multipart_post_is_blocked(sunucu):
                    files={"file": ("x.png", b"\x89PNG", "image/png")})
     assert r.status_code == 403
     assert "yalnızca uygulamanın" in r.text
+    # İKİ DİLLİ gövdenin bekçisi: İngilizce yarısı düşerse, dil bağlamı hiç
+    # kurulmayan bu yanıt sessizce tek dile geri dönmüş olur.
+    assert "Only this app's own window" in r.text
 
 
 def test_a_rebound_hostname_is_blocked(sunucu):

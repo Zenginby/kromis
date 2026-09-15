@@ -862,11 +862,22 @@ VIDEO_DURATIONS: tuple[int, ...] = (4, 6, 8)
 FAL_VIDEO_ASPECT_RATIOS: tuple[str, ...] = ("16:9", "9:16", "1:1")
 
 # SIRA ANLAMLI (görsel modellerindeki kural) ve burada ARTAN MALİYETE göre:
-# ilk girdi varsayılan, yani `DEFAULT_VIDEO_MODEL` en UCUZ kademe. Görsel
-# tarafında varsayılan "en güçlü" (Azure'ın gpt-image-2'si), burada değil —
-# ayrımın sebebi fiyat farkının BÜYÜKLÜĞÜ: yanlışlıkla atılan tek bir tık
-# lite'ta 4 saniye için ~0,32 USD, kalite kademesinde ~1,60 USD. Bir
-# görselde o fark sentlerle ölçülüyordu.
+# ilk girdi varsayılan, yani `DEFAULT_VIDEO_MODEL` VEO AİLESİ İÇİNDE en ucuz
+# kademe. Görsel tarafında varsayılan "en güçlü" (Azure'ın gpt-image-2'si),
+# burada değil — ayrımın sebebi fiyat farkının BÜYÜKLÜĞÜ: yanlışlıkla atılan
+# tek bir tık lite'ta 4 saniye için ~0,32 USD, kalite kademesinde ~1,60 USD.
+# Bir görselde o fark sentlerle ölçülüyordu.
+#
+# BU İDDİA ARTIK KATALOG GENELİNDE DEĞİL: fal eklendikten sonra (aşağıdaki
+# fal bloğu) `fal-pixverse-c1` 13 kredi/sn ile Veo Lite'ın (16) ALTINA
+# iniyor — yani "varsayılan = katalogdaki mutlak en ucuz" YANLIŞ hâle geldi,
+# doğru olan iddia "varsayılan = Gemini bloğu içinde en ucuz". Varsayılan
+# yine de KAYMADI: gerekçesi artık "en ucuz" değil, "mevcut kullanıcının bir
+# sonraki tıkına dokunmamak" (fal ucuz olsa bile onu ayrı bir anahtar/kimlik
+# istiyor, sessiz bir varsayılan kaymasıyla bunu dayatmak yanlış olurdu).
+# İkisi de test mandallı: `test_the_default_video_model_is_the_CHEAPEST_tier`
+# iddiayı Gemini bloğuna süzüyor, `test_the_default_video_model_is_UNCHANGED`
+# id'nin kendisini dondurup değişmeme gerekçesini taşıyor.
 #
 # KREDİ ÇAPASI görsel tarafındakiyle AYNI: Azure `medium` = 8 kredi ≈ 0,04 USD,
 # yani 1 kredi ≈ 0,005 USD. Veo'nun yayınlanmış saniye fiyatları bu çapaya

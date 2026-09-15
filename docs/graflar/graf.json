@@ -264,7 +264,7 @@
         "veo_client"
       ],
       "katman": 0,
-      "satir": 1483,
+      "satir": 1494,
       "testler": [
         "tests/test_arena.py",
         "tests/test_arena_onyuz.py",

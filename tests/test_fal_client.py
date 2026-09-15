@@ -9,6 +9,14 @@ eder, video 16:9 döner ve hiçbir yerde hata okunmaz.
 
 Model örnekleri BURADA kuruluyor, `catalog`tan okunmuyor: gövde kurucusu
 katalog girdilerinden ÖNCE sınanabilir olmalı.
+
+İKİNCİ TUR (2026-09-15, tam OpenAPI şeması — bkz.
+`.superpowers/sdd/2026-09-14-fal-video-saglayicisi/olcum-uc-semalari.md`):
+tablo `TelBicimi` dataclass'ına taşındı, çünkü referans karenin GİTTİĞİ ad
+(`gorsel_alani`) ve sürenin telde DİZE mi TAMSAYI mı gittiği (`sure_dize`)
+de modele göre değişiyor — Wan'ın görsel ucu `image_url` DEĞİL
+`start_image_url` okuyor, Kling'in `duration`ı şemada STRING enum. Kod
+bugüne kadar üçüne de sabit `image_url`/`int` yazıyordu.
 """
 import base64
 
@@ -30,6 +38,9 @@ def _model(model_id, wire, wire_edit):
 WAN = _model("fal-wan-3-0",
              "alibaba/wan-3.0/text-to-video",
              "alibaba/wan-3.0/image-to-video")
+PIXVERSE = _model("fal-pixverse-c1",
+                   "fal-ai/pixverse/c1/text-to-video",
+                   "fal-ai/pixverse/c1/image-to-video")
 KLING = _model("fal-kling-v3-turbo-pro",
                "fal-ai/kling-video/v3/turbo/pro/text-to-video",
                "fal-ai/kling-video/v3/turbo/pro/image-to-video")
@@ -56,34 +67,96 @@ def test_kling_IMAGE_to_video_sends_NEITHER_aspect_ratio_NOR_resolution():
     kabul eder, kullanır mı belli değil, kullanıcı seçtiği oranı aldığını
     SANIR. Testin ölçtüğü şey gövdenin kendisi, telin cevabı değil — zaten
     bu yüzden ölçülebilir.
+
+    `duration` burada DİZE (`"5"`, F3 — 2026-09-15 ölçümü): Kling'in şeması
+    bu alanı STRING enum olarak tanımlıyor, `catalog.durations`tan gelen
+    Python `int` değil.
     """
     p = fal_client.build_payload(KLING, "kedi", "16:9", "1080p", 5, REFS)
     assert "aspect_ratio" not in p
     assert "resolution" not in p
     assert p["prompt"] == "kedi"
-    assert p["duration"] == 5
+    assert p["duration"] == "5"
+    assert isinstance(p["duration"], str)
 
 
 def test_the_reference_image_travels_as_a_base64_data_uri():
-    """Yükleme adımı YOK — `gemini_client`in inlineData duruşunun aynısı."""
+    """Yükleme adımı YOK — `gemini_client`in inlineData duruşunun aynısı.
+
+    WAN'ın referans kare alanı `start_image_url` (F1 — ölçüldü 2026-09-15).
+    """
     p = fal_client.build_payload(WAN, "kedi", "16:9", "720p", 5, REFS)
     onek = "data:image/png;base64,"
-    assert p["image_url"].startswith(onek)
-    assert base64.b64decode(p["image_url"][len(onek):]) == PNG
+    assert p["start_image_url"].startswith(onek)
+    assert base64.b64decode(p["start_image_url"][len(onek):]) == PNG
 
 
 def test_only_the_FIRST_reference_is_sent():
     """`max_refs=1`; fazlası app.animate'in kapısında zaten eleniyor."""
     p = fal_client.build_payload(WAN, "kedi", "16:9", "720p", 5,
                                  [("bir.png", PNG), ("iki.png", b"XX")])
-    assert base64.b64decode(p["image_url"].split(",", 1)[1]) == PNG
+    assert base64.b64decode(p["start_image_url"].split(",", 1)[1]) == PNG
 
 
-def test_every_field_table_entry_declares_prompt_and_only_i2v_takes_image_url():
-    """Tablo ile katalog ayrışırsa gövde SESSİZCE boşalır — mandal bu."""
-    for model_id, (t2v, i2v) in fal_client.ALANLAR.items():
-        assert "prompt" in t2v and "prompt" in i2v, model_id
-        assert "image_url" in i2v and "image_url" not in t2v, model_id
+def test_every_field_table_entry_declares_prompt_and_the_reference_field_is_a_member_of_gorsel():
+    """Tablo ile katalog ayrışırsa gövde SESSİZCE boşalır — mandal bu.
+
+    `gorsel_alani`in `gorsel` kümesinin ÜYESİ olmaması F1'in (Wan'ın
+    `start_image_url`u hiç gönderilmemesi) aynısının başka bir modelde
+    SESSİZ tekrarı olurdu — `TelBicimi.__post_init__` bunu ithal zamanında
+    da denetliyor, bu test üç modelin ÜÇÜNÜ ayrıca tarıyor.
+    """
+    for model_id, bicim in fal_client.ALANLAR.items():
+        assert "prompt" in bicim.metin and "prompt" in bicim.gorsel, model_id
+        assert bicim.gorsel_alani in bicim.gorsel, model_id
+        assert bicim.gorsel_alani not in bicim.metin, model_id
+
+
+def test_wan_image_to_video_sends_start_image_url_not_image_url():
+    """F1 (Critical, canlı 422 ile doğrulandı) — Wan'ın görsel ucu yalnız
+    `start_image_url`u ZORUNLU sayıyor; `image_url` adı şemada hiç yok. Kod
+    bu adı sabit `image_url` yazıyordu, yani Wan'ın görsel yolu HER istekte
+    `422 Field required: start_image_url` alıyordu."""
+    p = fal_client.build_payload(WAN, "kedi", "16:9", "720p", 5, REFS)
+    assert "start_image_url" in p
+    assert "image_url" not in p
+
+
+def test_pixverse_and_kling_image_to_video_still_send_image_url():
+    """Gerileme mandalı: F1'in düzeltmesi YALNIZ Wan'ı değiştirmeli —
+    PixVerse ve Kling gerçekten `image_url` okuyor (ölçüldü 2026-09-15)."""
+    for model in (PIXVERSE, KLING):
+        p = fal_client.build_payload(model, "kedi", "16:9", "720p", 5, REFS)
+        assert "image_url" in p, model.id
+        assert "start_image_url" not in p, model.id
+
+
+def test_wan_image_to_video_includes_aspect_ratio_pixverse_and_kling_do_not():
+    """F2 (Important, ölçüldü 2026-09-15) — Wan'ın görsel ucu `aspect_ratio`yu
+    KABUL ediyor (iki uçta da var, `resolution`un aksine); PixVerse ve
+    Kling'in görsel uçlarında bu alan şemada hiç yok. Eksik bırakmak 422
+    değil SESSİZ SAPMA üretirdi: kullanıcının seçtiği oran şemanın
+    `adaptive` varsayılanına sessizce düşerdi."""
+    p_wan = fal_client.build_payload(WAN, "kedi", "16:9", "720p", 5, REFS)
+    assert "aspect_ratio" in p_wan
+    for model in (PIXVERSE, KLING):
+        p = fal_client.build_payload(model, "kedi", "16:9", "720p", 5, REFS)
+        assert "aspect_ratio" not in p, model.id
+
+
+def test_kling_duration_travels_as_a_string_wan_and_pixverse_as_an_int():
+    """F3 (Important, tip uyuşmazlığı) — Kling'in İKİ ucunda da `duration`
+    şemada STRING enum (`"3".."15"`, varsayılan `"5"`); Wan ve PixVerse'te
+    şema tamsayı diyor. Canlı davranış ÖLÇÜLMEDİ (POST para harcardı):
+    düzeltme şemanın kendi beyanına dayanıyor, "422 alıyorduk" iddiası
+    DEĞİL."""
+    p_kling = fal_client.build_payload(KLING, "kedi", "16:9", "720p", 5, None)
+    assert p_kling["duration"] == "5"
+    assert isinstance(p_kling["duration"], str)
+    for model in (WAN, PIXVERSE):
+        p = fal_client.build_payload(model, "kedi", "16:9", "720p", 5, None)
+        assert p["duration"] == 5
+        assert isinstance(p["duration"], int)
 
 
 @pytest.mark.parametrize("tam_yol, uygulama", [

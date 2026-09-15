@@ -36,10 +36,26 @@ Kling'in görsel→video ucu `aspect_ratio` ve `resolution` alanlarını şemas�
 SAYMIYOR (oranı ilk kareden türetiyor), metin ucu ise sayıyor; katalog
 `sizes`ı yine beyan ediyor çünkü metin yolunda GERÇEK. Adaptör düzenleme
 yolunda onu sessizce değil, TABLOYA BAKARAK düşürüyor.
+
+İKİNCİ ÖLÇÜM TURU (2026-09-15, Görev 8'in canlı duman testinin ardından
+tam OpenAPI şeması — bkz.
+`.superpowers/sdd/2026-09-14-fal-video-saglayicisi/olcum-uc-semalari.md`)
+`ALANLAR`ın kendi VARSAYIMINI kırdı: referans karenin GİTTİĞİ ad üç modelde
+AYNI DEĞİL. PixVerse ve Kling gerçekten `image_url` okuyor, ama Wan'ın
+görsel→video ucu yalnız `start_image_url`u ZORUNLU sayıyor — `image_url`
+adı o şemada hiç yok. Kod bugüne kadar üçüne de sabit `image_url` yazıyordu,
+yani Wan'ın görsel yolu HER istekte `422 Field required: start_image_url`
+alıyordu. Aynı tur Wan'ın görsel ucunun `aspect_ratio`yu da kabul ettiğini
+(iki uçta da var, `resolution`un aksine) ve Kling'in `duration`ının şemada
+STRING enum (`"3".."15"`) olduğunu, kodun ise Python `int` gönderdiğini
+gösterdi. `TelBicimi` bu üç bulguyu taşıyor: `gorsel_alani` referans
+karenin adını, `sure_dize` süre alanının telde dize mi tamsayı mı gittiğini
+söylüyor — ikisi de modele göre değişiyor, tek bir sabit varsayılamaz.
 """
 from __future__ import annotations
 
 import base64
+import dataclasses
 import re
 import time
 
@@ -53,27 +69,77 @@ import providers
 # ile aynı olgu).
 PNG_MIME = "image/png"
 
-# model id → (metin→video alanları, görsel→video alanları).
+@dataclasses.dataclass(frozen=True)
+class TelBicimi:
+    """Bir modelin tel biçimi — hangi alan hangi ADLA ve hangi TİPLE gidiyor.
+
+    NEDEN tek dataclass, `gorsel_alani`/`sure_dize` için AYRI sözlükler DEĞİL:
+    ikisi de modelden modele değişiyor (2026-09-15 ölçümü, bkz. bu dosyanın
+    başlığı) ve `metin`/`gorsel` kümeleriyle SENKRONDA kalmaları gerekiyor.
+    Paralel sözlükler `build_payload`ın docstring'inin `if model_id == …`
+    zincirinden kaçınma gerekçesiyle AYNI hastalığı taşırdı: bir modeli
+    güncelleyip ötekini (ya da bir sözlüğü) unutmak kolaylaşırdı.
+    """
+
+    metin: frozenset[str]        # metin→video ucunun okuduğu adlar
+    gorsel: frozenset[str]       # görsel→video ucunun okuduğu adlar
+    gorsel_alani: str            # referans karenin GİTTİĞİ ad (modele göre değişir)
+    sure_dize: bool = False      # süre telde DİZE mi gidiyor (Kling)
+
+    def __post_init__(self) -> None:
+        # DEĞİŞMEZ: `gorsel_alani` `gorsel` kümesinin ÜYESİ olmak ZORUNDA —
+        # değilse `build_payload`ın adı süzen tek satırı referans kareyi
+        # SESSİZCE düşürür ve bu, F1'in (Wan'ın `start_image_url`u hiç
+        # gönderilmemesi) aynısının başka bir modelde SESSİZ biçimidir. Bu
+        # denetim `tests/test_fal_client.py`deki üç modelli mandalın
+        # ikinci, ithal-zamanlı kopyası: modül YÜKLENİRKEN patlar, testin
+        # unutulduğu/atlandığı bir çalıştırmada bile.
+        if self.gorsel_alani not in self.gorsel:
+            raise ValueError(
+                f"gorsel_alani={self.gorsel_alani!r} gorsel kümesinde yok: "
+                f"{sorted(self.gorsel)}")
+
+
+# model id → TelBicimi.
 #
 # KATALOGDA DEĞİL BURADA: katalog "bu model ne yapabiliyor" diyor (yetenek
-# beyanı, arayüz onu okuyor), bu tablo "bu uç hangi adı okuyor" (tel biçimi,
-# yalnız bu dosya okuyor). İkisini karıştırmak, arayüzün tel ayrıntısına
-# bağlanması demekti.
-ALANLAR: dict[str, tuple[frozenset[str], frozenset[str]]] = {
-    "fal-wan-3-0": (
-        frozenset({"prompt", "resolution", "aspect_ratio", "duration"}),
-        frozenset({"prompt", "image_url", "resolution", "duration"}),
+# beyanı, arayüz onu okuyor), bu tablo "bu uç hangi adı ve tipi okuyor" (tel
+# biçimi, yalnız bu dosya okuyor). İkisini karıştırmak, arayüzün tel
+# ayrıntısına bağlanması demekti.
+ALANLAR: dict[str, TelBicimi] = {
+    # Wan'ın görsel ucu `image_url` DEĞİL `start_image_url` okuyor — tek
+    # zorunlu alanı bu (ölçüldü 2026-09-15). Aynı uç `aspect_ratio`yu da
+    # kabul ediyor (`resolution`un aksine, iki uçta da var); önceki tabloda
+    # bu alan eksikti ve kullanıcının seçtiği oran sessizce şemanın
+    # `adaptive` varsayılanına düşüyordu.
+    "fal-wan-3-0": TelBicimi(
+        metin=frozenset({"prompt", "resolution", "aspect_ratio", "duration"}),
+        gorsel=frozenset({"prompt", "start_image_url", "resolution",
+                          "aspect_ratio", "duration"}),
+        gorsel_alani="start_image_url",
     ),
-    "fal-pixverse-c1": (
-        frozenset({"prompt", "resolution", "aspect_ratio", "duration"}),
-        frozenset({"prompt", "image_url", "resolution", "duration"}),
+    # PixVerse: `image_url` burada GERÇEKTEN doğru ad (Wan'dan farklı;
+    # ölçüldü 2026-09-15) ve `duration` şemada tamsayı — `sure_dize`
+    # varsayılanı (`False`) burada değişmiyor.
+    "fal-pixverse-c1": TelBicimi(
+        metin=frozenset({"prompt", "resolution", "aspect_ratio", "duration"}),
+        gorsel=frozenset({"prompt", "image_url", "resolution", "duration"}),
+        gorsel_alani="image_url",
     ),
     # Kling: `resolution` İKİ uçta da YOK (şema o alanı saymıyor; katalogda
     # `quality_hidden=True` ile tek sentetik jeton duruyor) ve `aspect_ratio`
-    # yalnız METİN ucunda var.
-    "fal-kling-v3-turbo-pro": (
-        frozenset({"prompt", "aspect_ratio", "duration"}),
-        frozenset({"prompt", "image_url", "duration"}),
+    # yalnız METİN ucunda var. `image_url` burada da gerçek ad (PixVerse
+    # gibi). `sure_dize=True`: şema `duration`ı STRING enum olarak
+    # tanımlıyor (`"3","4",…,"15"`, varsayılan `"5"`) — kodun
+    # `catalog.durations`tan okuduğu Python `int`i telde OLDUĞU GİBİ
+    # gönderirse şemanın beyan ettiği TİPLE uyuşmaz. Bu canlı 422 ile
+    # DOĞRULANMADI (POST para harcardı); düzeltme şemanın kendi beyanına
+    # dayanıyor, ölçülmüş bir hataya değil.
+    "fal-kling-v3-turbo-pro": TelBicimi(
+        metin=frozenset({"prompt", "aspect_ratio", "duration"}),
+        gorsel=frozenset({"prompt", "image_url", "duration"}),
+        gorsel_alani="image_url",
+        sure_dize=True,
     ),
 }
 
@@ -134,26 +200,31 @@ def _data_uri(png: bytes) -> str:
 
 def build_payload(m: catalog.ImageModel, prompt: str, size: str, quality: str,
                   duration: int, images) -> dict:
-    """İstek gövdesi — YALNIZ `ALANLAR`ın izin verdiği anahtarlar.
+    """İstek gövdesi — YALNIZ `ALANLAR`ın izin verdiği anahtarlar, adları ve
+    tipleriyle.
 
     Süzgeç `ALANLAR`dan geçiyor, `if model_id == …` zincirinden DEĞİL: zincir
     her yeni modelde büyür ve bir dalı unutmak, beyan edilmemiş alan göndermek
-    (422) ya da gerekli alanı düşürmek demekti.
+    (422) ya da gerekli alanı düşürmek demekti. Aynı gerekçeyle referans
+    karenin ADI (`bicim.gorsel_alani`) ve sürenin TİPİ (`bicim.sure_dize`)
+    de TABLODAN okunuyor, burada SABİT yazılmıyor — sabit bir `"image_url"`
+    ve sabit bir `int` tam olarak F1/F3'ün kökündeki satırlardı (Wan'ın
+    `start_image_url` beklemesi, Kling'in `duration`ı dize istemesi).
 
     `images` sıralı [(dosya_adı, png_baytları), ...]; YALNIZ İLKİ kullanılıyor
     (`max_refs=1`). Fazlası `app.animate`in kapısında zaten eleniyor, ama
     burada da kesiliyor — `providers.edit`in ikinci kapı disiplini.
     """
-    t2v, i2v = ALANLAR[m.id]
-    izin = i2v if images else t2v
+    bicim = ALANLAR[m.id]
+    izin = bicim.gorsel if images else bicim.metin
     tum = {
         "prompt": prompt,
         "aspect_ratio": size,
         "resolution": quality,
-        "duration": duration,
+        "duration": str(duration) if bicim.sure_dize else duration,
     }
     if images:
-        tum["image_url"] = _data_uri(images[0][1])
+        tum[bicim.gorsel_alani] = _data_uri(images[0][1])
     return {ad: deger for ad, deger in tum.items() if ad in izin}
 
 

@@ -69,6 +69,7 @@ import providers
 # ile aynı olgu).
 PNG_MIME = "image/png"
 
+
 @dataclasses.dataclass(frozen=True)
 class TelBicimi:
     """Bir modelin tel biçimi — hangi alan hangi ADLA ve hangi TİPLE gidiyor.

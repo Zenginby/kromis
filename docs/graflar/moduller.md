@@ -35,7 +35,7 @@ flowchart TD
     n_azure_flux_client["azure_flux_client<br/>292 satır"]
     n_azure_mai_client["azure_mai_client<br/>290 satır"]
     n_chat_client["chat_client<br/>188 satır"]
-    n_fal_client["fal_client<br/>759 satır"]
+    n_fal_client["fal_client<br/>760 satır"]
     n_gemini_client["gemini_client<br/>293 satır"]
     n_openai_client["openai_client<br/>215 satır"]
     n_prefs["prefs<br/>219 satır"]
@@ -62,7 +62,7 @@ flowchart TD
     n_storage["storage<br/>415 satır"]
   end
   subgraph katman0["katman 0"]
-    n_catalog["catalog<br/>1494 satır"]
+    n_catalog["catalog<br/>1501 satır"]
     n_composite["composite<br/>158 satır"]
     n_errlog["errlog<br/>114 satır"]
     n_jsonstore["jsonstore<br/>80 satır"]
@@ -205,7 +205,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `azure_flux_client.py` | 292 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `azure_mai_client.py` | 290 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `backup.py` | 187 | 3 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 1 | 1 |
-| `catalog.py` | 1494 | 0 | — | 14 | 27 |
+| `catalog.py` | 1501 | 0 | — | 14 | 27 |
 | `chat_client.py` | 188 | 4 | `azure_client`, `chat_prompt`, `models` | 3 | 3 |
 | `chat_prompt.py` | 358 | 2 | `paths` | 3 | 1 |
 | `chat_providers.py` | 124 | 6 | `azure_client`, `catalog`, `chat_client`, `credstore`, `openai_chat` | 1 | 2 |
@@ -215,7 +215,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `credstore.py` | 194 | 3 | `azure_client`, `catalog` | 10 | 4 |
 | `desktop.py` | 559 | 9 | `errlog`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli) | 1 | 2 |
 | `errlog.py` | 114 | 0 | — | 5 | 1 |
-| `fal_client.py` | 759 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 2 |
+| `fal_client.py` | 760 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 2 |
 | `folders.py` | 248 | 2 | `jsonstore`, `storage` | 3 | 4 |
 | `gemini_client.py` | 293 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `guncelleme.py` | 237 | 2 | `errlog`, `jsonstore`, `paths`, `version` | 1 | 4 |

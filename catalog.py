@@ -1012,7 +1012,14 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
     # Kling (3–15) ve PixVerse (1–15) şemalarında yazılı — Veo'nun 8 sn
     # tavanını aşan yeni yetenek (İKİ modelde birden — PixVerse'in kendi
     # notunun "tek model" demesi YANLIŞTI, düzeltildi). Wan'ın süresi 5·10'da
-    # kalıyor çünkü şeması aralık VERMİYOR. Kling'in `qualities`i tek sentetik
+    # TUTULUYOR — DÜZELTME (Görev 8, 2026-09-15): bu satır önceden "şeması
+    # aralık VERMİYOR" diyordu, bu YANLIŞTI. Ölçüm (`olcum-uc-semalari.md`)
+    # şemanın `duration` için PixVerse'inkine benzer bir tamsayı aralığı
+    # (`minimum: 2, maximum: 30`) verdiğini gösterdi; şema izin verirdi, ama
+    # katalog BİLİNÇLİ OLARAK yalnız 5 ve 10'u beyan ediyor — 15 sn'e (ya da
+    # daha uzununa) çıkarmak ayrı bir ölçüm/karar ister (test edilmemiş süre,
+    # fatura ve `poll_timeout` etkisi bu turda değerlendirilmedi). Kling'in
+    # `qualities`i tek sentetik
     # jeton (`quality_hidden=True`): şema `resolution` alanını hiç saymıyor,
     # yani gönderilecek bir değer yok ama `qualities` de boş bırakılamıyor
     # (bkz. o alanın yorumu).

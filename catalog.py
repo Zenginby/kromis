@@ -366,6 +366,7 @@ PROVIDER_LOGOS: dict[str, str] = {
     "gemini": "gemini.svg",
     "azure-mai": "microsoft.svg",
     "azure-flux": "blackforestlabs.svg",
+    "fal": "fal.svg",
 }
 
 # İşaret ARTIK MARKAYI SÖYLÜYOR, o yüzden etiketin de söylemesi gereksiz: şeritte
@@ -385,6 +386,13 @@ PROVIDER_BRANDS: dict[str, str] = {
     "anthropic": "Anthropic",
     "azure-mai": "Microsoft",
     "azure-flux": "Black Forest Labs",
+    # fal'ın modelleri kendi ÜRETİCİ adlarını taşıyor ("Alibaba · Wan 3.0",
+    # "PixVerse · C1", "Kling · V3 Turbo Pro"), "fal" ile BAŞLAMIYOR — yani
+    # `_strip_brand_prefix` burada hiç eşleşmiyor ve etiketler bütün kalıyor.
+    # Girdi yine de gerekli: `test_the_video_providers_all_have_a_LOGO`
+    # `m.provider in PROVIDER_BRANDS` istiyor ve `Credential(id="fal").label`
+    # ile aynı dizeyi kullanmak ikinci bir ad icat etmekten iyi.
+    "fal": "fal.ai",
 }
 
 
@@ -847,6 +855,12 @@ VIDEO_ASPECT_RATIOS: tuple[str, ...] = ("16:9", "9:16")
 # yetenek bayrağını ve kendi arayüz kontrolünü ister).
 VIDEO_DURATIONS: tuple[int, ...] = (4, 6, 8)
 
+# fal'ın kabul ettiği oranlar. `VIDEO_ASPECT_RATIOS` (Veo'nun ikilisi) ile
+# BİRLEŞTİRİLMEDİ: iki sağlayıcının kabulünü tek demete katlamak, birine oran
+# ekleyip ötekini unutmanın kapısı olurdu — `ASPECT_RATIOS`in on jetonunun
+# Veo'da kullanılmama gerekçesinin aynısı, bir eksen ötede.
+FAL_VIDEO_ASPECT_RATIOS: tuple[str, ...] = ("16:9", "9:16", "1:1")
+
 # SIRA ANLAMLI (görsel modellerindeki kural) ve burada ARTAN MALİYETE göre:
 # ilk girdi varsayılan, yani `DEFAULT_VIDEO_MODEL` en UCUZ kademe. Görsel
 # tarafında varsayılan "en güçlü" (Azure'ın gpt-image-2'si), burada değil —
@@ -948,6 +962,134 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         kind="video",
         note="En iyi Veo, 1080p açık. Saniyesi pahalı — süreye dikkat.",
     ),
+    # ── fal.ai (toplayıcı) ────────────────────────────────────────────
+    #
+    # SIRA Veo'dan SONRA (`DEFAULT_VIDEO_MODEL` değişmiyor, varsayılan hâlâ
+    # Veo Lite — gerekçesi `test_the_default_video_model_is_UNCHANGED`de:
+    # varsayılanı kaydırmak her kullanıcının bir sonraki tıkına dokunurdu),
+    # ama fal'ın KENDİ İÇİNDEKİ sırası artan maliyete göre.
+    #
+    # BU SIRA BRIEF'İN TAHMİNİYLE AYNI DEĞİL. Task 7'nin tasarım taslağı
+    # Wan · PixVerse · Kling sırasını 16 · 20 · 30 kredi varsayarak
+    # yazmıştı. Canlı ölçüm (design.md'nin "Ölçüm sonuçları" bölümü, aşağıda
+    # tekrar özetleniyor) PixVerse'in varsayılan kalitesinin (720p) Wan'ın
+    # varsayılan kalitesinden (720p) UCUZ olduğunu gösterdi — yani gerçek sıra
+    # PixVerse · Wan · Kling. Katalog ÖLÇÜMÜ yazıyor, brief'in tahminini değil
+    # (bkz. bu görevin talimatındaki "ÖLÇÜM KAZANIR" kuralı).
+    #
+    # KREDİ ÇAPASI Veo'yla AYNI (yukarıdaki blok): Azure `medium` = 8 kredi ≈
+    # 0,04 USD, yani 1 kredi ≈ 0,005 USD. Aşağıdaki `credits`/
+    # `credits_by_quality` değerleri fal.ai'nin yayınlanmış saniye
+    # fiyatlarından (design.md, 2026-09-14 canlı uçtan ölçüm tablosu, fal.ai
+    # model sayfaları kaynak) bu çapaya bölünerek türetildi — brief'in kendi
+    # tahmin ettiği rakamlar (Wan 16/16/24, PixVerse 20/32, Kling 30) DEĞİL:
+    #
+    #     Wan      480p $0,05/sn · 720p $0,10/sn · 1080p $0,20/sn → 10·20·40
+    #     PixVerse 720p $0,065/sn (sesli) · 1080p $0,120/sn (sesli) → 13·24
+    #     Kling    düz $0,14/sn, çözünürlükten BAĞIMSIZ             → 28
+    #
+    # PixVerse'İN SESLİ/SESSİZ AYRIMI ÖLÇÜLEMEDİ: fal.ai'nin fiyat sayfası bu
+    # modelde sessiz ve sesli için iki ayrı $/sn veriyor, ama
+    # `fal_client.ALANLAR`daki alan tablosunda bir ses anahtarı HİÇ YOK —
+    # adaptör hangi moda düştüğünü hiç sormuyor. Hangisinin telde geçerli
+    # olduğu bu turda test edilmedi, o yüzden YUKARI yuvarlandı (daha pahalı
+    # olan sesli rakam alındı): krediyi düşük göstermek kullanıcıyı ucuz sanıp
+    # tıklamaya davet ederdi. Bu tek çizgi bu bloktaki TEK tahmin — geri kalan
+    # her rakam ya doğrudan ölçüldü ya da fal'ın fiyat sayfasından okundu.
+    #
+    # BEYAN KURALI: yalnız fal'ın ŞEMASININ AÇIKÇA saydığı jetonlar. 15 sn
+    # Kling (3–15) ve PixVerse (1–15) şemalarında yazılı — Veo'nun 8 sn
+    # tavanını aşan yeni yetenek (İKİ modelde birden — PixVerse'in kendi
+    # notunun "tek model" demesi YANLIŞTI, düzeltildi). Wan'ın süresi 5·10'da
+    # kalıyor çünkü şeması aralık VERMİYOR. Kling'in `qualities`i tek sentetik
+    # jeton (`quality_hidden=True`): şema `resolution` alanını hiç saymıyor,
+    # yani gönderilecek bir değer yok ama `qualities` de boş bırakılamıyor
+    # (bkz. o alanın yorumu).
+    #
+    # ÖLÇÜLDÜ / ŞEMADAN — hangi jetonun hangi yoldan geldiği (design.md'nin
+    # ölçüm tablosu):
+    #   • CANLI TAMAMLANDI: her üçünün de 5 sn · 16:9 (tamamlanan videonun
+    #     çözünürlük oranıyla doğrulandı) · Wan'ın 480p'si.
+    #   • ŞEMADAN KABUL EDİLDİ (parayla yeniden sondalanmadı, şema AÇIKÇA
+    #     sayıyor): PixVerse/Kling'in 10-15 sn süreleri, üçünün de 1:1 oranı,
+    #     Wan/PixVerse'in 720p/1080p kaliteleri (fiyatları fal.ai model
+    #     sayfasından, canlı üretimle doğrulanmadı — yalnız Wan'ın 480p'si ve
+    #     PixVerse/Kling'in varsayılan kademesi gerçek bir üretimle tamamlandı).
+    #   • Wan'ın `duration=10`'u KUYRUKTA KABUL EDİLDİ ama jeton sondası iptal
+    #     edildiği için TAMAMLANMADI — yine de şema aralığı (5,10) zaten
+    #     kesin, ikinci bir kanıt yalnızca teyit.
+    ImageModel(
+        id="fal-pixverse-c1",
+        label="PixVerse · C1",
+        provider="fal",
+        wire_model="fal-ai/pixverse/c1/text-to-video",
+        wire_model_edit="fal-ai/pixverse/c1/image-to-video",
+        credential="fal",
+        sizes=FAL_VIDEO_ASPECT_RATIOS,
+        default_size="16:9",
+        qualities=("720p", "1080p"),
+        default_quality="720p",
+        durations=(5, 10, 15),
+        default_duration=5,
+        max_n=1,
+        images_per_request=1,
+        supports_edit=True,
+        max_refs=1,
+        supports_last_frame=False,
+        poll_timeout=600.0,
+        credits=13,
+        credits_by_quality=(("720p", 13), ("1080p", 24)),
+        kind="video",
+        note="En ucuz fal kademesi; 15 saniyeye kadar klip de üretebiliyor.",
+    ),
+    ImageModel(
+        id="fal-wan-3-0",
+        label="Alibaba · Wan 3.0",
+        provider="fal",
+        wire_model="alibaba/wan-3.0/text-to-video",
+        wire_model_edit="alibaba/wan-3.0/image-to-video",
+        credential="fal",
+        sizes=FAL_VIDEO_ASPECT_RATIOS,
+        default_size="16:9",
+        qualities=("480p", "720p", "1080p"),
+        default_quality="720p",
+        durations=(5, 10),
+        default_duration=5,
+        max_n=1,
+        images_per_request=1,
+        supports_edit=True,
+        max_refs=1,
+        supports_last_frame=False,
+        poll_timeout=420.0,
+        credits=20,
+        credits_by_quality=(("480p", 10), ("720p", 20), ("1080p", 40)),
+        kind="video",
+        note="480p seçersen saniye maliyeti PixVerse'in altına iner; "
+             "varsayılan 720p'de fal'ın orta kademesi.",
+    ),
+    ImageModel(
+        id="fal-kling-v3-turbo-pro",
+        label="Kling · V3 Turbo Pro",
+        provider="fal",
+        wire_model="fal-ai/kling-video/v3/turbo/pro/text-to-video",
+        wire_model_edit="fal-ai/kling-video/v3/turbo/pro/image-to-video",
+        credential="fal",
+        sizes=FAL_VIDEO_ASPECT_RATIOS,
+        default_size="16:9",
+        qualities=("1080p",),
+        quality_hidden=True,
+        durations=(5, 10, 15),
+        default_duration=5,
+        max_n=1,
+        images_per_request=1,
+        supports_edit=True,
+        max_refs=1,
+        supports_last_frame=False,
+        poll_timeout=600.0,
+        credits=28,
+        kind="video",
+        note="En iyi fal kademesi, 1080p ve lipsync. Saniyesi pahalı.",
+    ),
 )
 
 
@@ -1020,6 +1162,8 @@ QUALITY_LABELS: dict[str, str] = {
     # zaten öyle tanıyor.
     "720p": "720p · HD",
     "1080p": "1080p · Full HD",
+    # Wan 3.0'ın en ucuz kademesi (Veo'da karşılığı yok, fal'ın kendi ekseni).
+    "480p": "480p · SD",
     # FLUX.2-flex'in `steps`/`guidance` kademeleri. Sentetik bir jeton İSRAF
     # olurdu: belgelenmiş `steps` (≤50) ve `guidance` (1.5–10) kaliteyi
     # DOĞRUDAN belirliyor, yani burada gerçek bir eksen var (karar 4).

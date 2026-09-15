@@ -23,7 +23,7 @@
 | `credstore` | `test_credstore.py`, `test_playwright_studio.py`, `test_prefs.py`, `test_settings_route.py` |
 | `desktop` | `test_desktop.py`, `test_windows_acilis.py` |
 | `errlog` | `test_errlog.py` |
-| `fal_client` | `test_fal_client.py` |
+| `fal_client` | `test_fal_client.py`, `test_providers.py` |
 | `folders` | `test_folders.py`, `test_guvenlik_baslik.py`, `test_legacy_formats.py`, `test_playwright_studio.py` |
 | `gemini_client` | `test_gemini_client.py` |
 | `guncelleme` | `test_depo_adresi.py`, `test_guncelleme.py`, `test_guncelleme_route.py`, `test_playwright_guncelleme.py` |

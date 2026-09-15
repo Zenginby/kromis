@@ -2,7 +2,7 @@
 
 # Modül grafı
 
-44 Python modülü, 103 modül düzeyi + 12 erteli ithal kenarı.
+44 Python modülü, 103 modül düzeyi + 13 erteli ithal kenarı.
 
 Katman, o modülün depo içindeki en uzun bağımlılık zincirinin uzunluğu:
 **katman 0 hiçbir depo modülüne dayanmaz**, en üst katman uygulamanın
@@ -29,17 +29,17 @@ flowchart TD
     n_chat_providers["chat_providers<br/>124 satır"]
   end
   subgraph katman5["katman 5"]
-    n_fal_client["fal_client<br/>663 satır"]
     n_openai_chat["openai_chat<br/>179 satır"]
   end
   subgraph katman4["katman 4"]
     n_azure_flux_client["azure_flux_client<br/>292 satır"]
     n_azure_mai_client["azure_mai_client<br/>290 satır"]
     n_chat_client["chat_client<br/>188 satır"]
+    n_fal_client["fal_client<br/>663 satır"]
     n_gemini_client["gemini_client<br/>293 satır"]
     n_openai_client["openai_client<br/>215 satır"]
     n_prefs["prefs<br/>219 satır"]
-    n_providers["providers<br/>472 satır"]
+    n_providers["providers<br/>488 satır"]
     n_veo_client["veo_client<br/>590 satır"]
   end
   subgraph katman3["katman 3"]
@@ -62,7 +62,7 @@ flowchart TD
     n_storage["storage<br/>415 satır"]
   end
   subgraph katman0["katman 0"]
-    n_catalog["catalog<br/>1339 satır"]
+    n_catalog["catalog<br/>1483 satır"]
     n_composite["composite<br/>158 satır"]
     n_errlog["errlog<br/>114 satır"]
     n_jsonstore["jsonstore<br/>80 satır"]
@@ -174,6 +174,7 @@ flowchart TD
   n_providers --> n_credstore
   n_providers -.->|erteli| n_azure_flux_client
   n_providers -.->|erteli| n_azure_mai_client
+  n_providers -.->|erteli| n_fal_client
   n_providers -.->|erteli| n_gemini_client
   n_providers -.->|erteli| n_openai_client
   n_providers -.->|erteli| n_veo_client
@@ -191,7 +192,7 @@ Birbirini ithal eden öbekler. Kesikli (`erteli`) bir kenarla
 kırılmış döngü KUSUR DEĞİL — işlev içinde yapılan ithal, import
 anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 
-* azure_flux_client ↔ azure_mai_client ↔ gemini_client ↔ openai_client ↔ providers ↔ veo_client — erteli bir ithalle kırılmış
+* azure_flux_client ↔ azure_mai_client ↔ fal_client ↔ gemini_client ↔ openai_client ↔ providers ↔ veo_client — erteli bir ithalle kırılmış
 
 ## Modüller
 
@@ -204,7 +205,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `azure_flux_client.py` | 292 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `azure_mai_client.py` | 290 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `backup.py` | 187 | 3 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 1 | 1 |
-| `catalog.py` | 1339 | 0 | — | 14 | 27 |
+| `catalog.py` | 1483 | 0 | — | 14 | 27 |
 | `chat_client.py` | 188 | 4 | `azure_client`, `chat_prompt`, `models` | 3 | 3 |
 | `chat_prompt.py` | 358 | 2 | `paths` | 3 | 1 |
 | `chat_providers.py` | 124 | 6 | `azure_client`, `catalog`, `chat_client`, `credstore`, `openai_chat` | 1 | 2 |
@@ -214,7 +215,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `credstore.py` | 194 | 3 | `azure_client`, `catalog` | 10 | 4 |
 | `desktop.py` | 559 | 9 | `errlog`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli) | 1 | 2 |
 | `errlog.py` | 114 | 0 | — | 5 | 1 |
-| `fal_client.py` | 663 | 5 | `azure_client`, `catalog`, `credstore`, `providers` | 0 | 1 |
+| `fal_client.py` | 663 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 2 |
 | `folders.py` | 248 | 2 | `jsonstore`, `storage` | 3 | 4 |
 | `gemini_client.py` | 293 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `guncelleme.py` | 237 | 2 | `errlog`, `jsonstore`, `paths`, `version` | 1 | 4 |
@@ -227,7 +228,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `palette_store.py` | 93 | 1 | `jsonstore` | 3 | 3 |
 | `paths.py` | 286 | 1 | `errlog` | 6 | 3 |
 | `prefs.py` | 219 | 4 | `catalog`, `jsonstore`, `models` | 1 | 4 |
-| `providers.py` | 472 | 4 | `azure_client`, `catalog`, `credstore`, `azure_flux_client` (erteli), `azure_mai_client` (erteli), `gemini_client` (erteli), `openai_client` (erteli), `veo_client` (erteli) | 8 | 7 |
+| `providers.py` | 488 | 4 | `azure_client`, `catalog`, `credstore`, `azure_flux_client` (erteli), `azure_mai_client` (erteli), `fal_client` (erteli), `gemini_client` (erteli), `openai_client` (erteli), `veo_client` (erteli) | 8 | 7 |
 | `release_manifest.py` | 70 | 0 | — | 0 | 2 |
 | `screencolor.py` | 150 | 0 | — | 1 | 1 |
 | `storage.py` | 415 | 1 | `catalog`, `jsonstore` | 4 | 10 |
@@ -241,7 +242,6 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 Kimsenin ithal etmediği modüller. `app`, `desktop`, `android_main` uygulamanın giriş noktaları — geri kalanı ya bir betikten çağrılıyor ya da artık kullanılmıyor; ikincisi bir bulgudur.
 
 * `android_main` — giriş noktası
-* `fal_client` — ithal eden yok — kullanımı elle doğrulanmalı
 * `release_manifest` — ithal eden yok — kullanımı elle doğrulanmalı
 
 ## Yardımcılar (`tools/`)

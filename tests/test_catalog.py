@@ -468,13 +468,26 @@ def test_the_default_video_model_is_the_CHEAPEST_tier():
     """Görsel tarafında varsayılan "en güçlü"; burada değil — ayrımın sebebi
     fiyat farkının BÜYÜKLÜĞÜ: yanlışlıkla atılan tek bir tık lite'ta 4 saniye
     için ~0,32 USD, kalite kademesinde ~1,60 USD. Bir görselde o fark
-    sentlerle ölçülüyordu."""
-    varsayilan = catalog.video_model(catalog.DEFAULT_VIDEO_MODEL)
+    sentlerle ölçülüyordu.
 
-    assert varsayilan.credits == min(m.credits for m in catalog.VIDEO_MODELS)
+    GÖREV 7 İLE SÜZGEÇ EKLENDİ ("en ucuz" artık yalnız Gemini bloğunda
+    ölçülüyor): fal ölçüldüğünde PixVerse'in 720p'si (13 kredi) Veo Lite'ın
+    16'sından GERÇEKTEN ucuz çıktı — yani "varsayılan = katalogdaki en ucuz
+    GİRDİ" iddiası artık YANLIŞ, üçüncü taraf bir toplayıcı eklenince
+    kaçınılmaz olarak böyle. Varsayılanın Veo Lite'ta KALMASININ gerekçesi de
+    değişti: artık "en ucuz" değil, `test_the_default_video_model_is_UNCHANGED`
+    testinin söylediği gibi "mevcut kullanıcının bir sonraki tıkına
+    dokunmamak". Bu testin sorabileceği tek doğru soru "Veo ailesi kendi
+    içinde artan mı" — fal'ın kendi sırası ayrı testte
+    (`test_fal_video_models_are_ordered_by_ASCENDING_cost`) mandallı.
+    """
+    varsayilan = catalog.video_model(catalog.DEFAULT_VIDEO_MODEL)
+    gemini = [m for m in catalog.VIDEO_MODELS if m.provider == "gemini"]
+
+    assert varsayilan.credits == min(m.credits for m in gemini)
     # SIRA da artan maliyete göre: ilk girdi varsayılan.
     assert catalog.VIDEO_MODELS[0].id == catalog.DEFAULT_VIDEO_MODEL
-    krediler = [m.credits for m in catalog.VIDEO_MODELS]
+    krediler = [m.credits for m in gemini]
     assert krediler == sorted(krediler), f"sıra artan maliyette değil: {krediler}"
 
 
@@ -523,11 +536,24 @@ def test_a_ZERO_duration_never_zeroes_the_cost():
     assert catalog.cost_for(m, "720p", 1) == m.credits
 
 
-def test_the_video_aspect_ratios_are_a_SUBSET_of_the_documented_ones():
+def test_the_video_aspect_ratios_match_each_PROVIDERS_declared_set():
     """Veo yalnız iki oran kabul ediyor; `ASPECT_RATIOS`in onu buraya
-    KOPYALANMADI — doğrulanmamış bir jeton, arayüzde seçilebilir bir 400."""
+    KOPYALANMADI — doğrulanmamış bir jeton, arayüzde seçilebilir bir 400.
+
+    GÖREV 7 İLE SAĞLAYICI BAŞINA AYRIŞTI (eski adı
+    `..._are_a_SUBSET_of_the_documented_ones`, tek sağlayıcı varken
+    "eşit" ile "alt küme" aynı şeydi): fal `FAL_VIDEO_ASPECT_RATIOS` ile
+    BİLEREK bir jeton FAZLA beyan ediyor (`1:1`, `catalog.py`'nin
+    `FAL_VIDEO_ASPECT_RATIOS` yorumundaki gerekçeyle) — yani "her video
+    modelinin oranı Veo'nunkiyle birebir aynı" iddiası artık YANLIŞ. Asıl
+    korunan şey duruyor: her sağlayıcının seti KENDİ beyan ettiği demetle
+    birebir eşleşiyor ve o set dokümante edilmiş `ASPECT_RATIOS`ın dışına
+    taşmıyor.
+    """
     for m in catalog.VIDEO_MODELS:
-        assert set(m.sizes) == set(catalog.VIDEO_ASPECT_RATIOS)
+        beklenen = (catalog.FAL_VIDEO_ASPECT_RATIOS if m.provider == "fal"
+                    else catalog.VIDEO_ASPECT_RATIOS)
+        assert set(m.sizes) == set(beklenen), f"{m.id} kendi sağlayıcısının oran setiyle eşleşmiyor"
         assert set(m.sizes) <= set(catalog.ASPECT_RATIOS), (
             "video oranları GEOMETRY_LABELS'ın tanıdığı kümenin dışına çıktı — "
             "etiket çıplak jetona düşer")
@@ -733,8 +759,16 @@ def test_wire_model_edit_defaults_to_empty_on_every_existing_entry():
     Azure, OpenAI, Gemini, MAI, FLUX ve Veo'nun tamamı böyle. Bu test alanın
     varsayılanını mandallıyor: bir gün varsayılan değişirse on üç girdi
     sessizce başka bir uca gitmeye başlardı.
+
+    GÖREV 7 İLE SÜZGEÇ EKLENDİ: fal, metin→video ve görsel→video için AYRI
+    uçlar kullanan İLK sağlayıcı (`catalog.ImageModel.wire_model_edit`in
+    yorumundaki "fal.ai'da ... AYRI uçlar" notu), yani üç fal girdisi bu
+    alanı BİLEREK dolduruyor. Süzgeç onu dışarıda bırakıyor, geri kalan on üç
+    girdi için iddia AYNEN duruyor.
     """
     for m in catalog.IMAGE_MODELS + catalog.VIDEO_MODELS:
+        if m.provider == "fal":
+            continue
         assert m.wire_model_edit == "", f"{m.id} beklenmedik ikinci tel yolu"
 
 
@@ -772,3 +806,75 @@ def test_MALIYET_ustunlugu_iddia_eden_not_GERCEKTEN_en_ucuz():
             assert m.credits == en_cok, (
                 f"{m.id}: not 'en pahalı' diyor ama {m.credits} kredi "
                 f"(katalogdaki en çok {en_cok})")
+
+
+# ── fal.ai video modelleri (Görev 7) ────────────────────────────────────
+
+FAL_IDLER = ("fal-wan-3-0", "fal-pixverse-c1", "fal-kling-v3-turbo-pro")
+
+
+@pytest.mark.parametrize("model_id", FAL_IDLER)
+def test_every_fal_video_model_declares_BOTH_wire_endpoints(model_id):
+    """Boş `wire_model_edit`, düzenleme isteğini METİN ucuna göndermek —
+    yani telde 422 — demek olurdu."""
+    m = catalog.video_model(model_id)
+    assert m is not None, f"{model_id} katalogda yok"
+    assert m.supports_edit
+    assert m.wire_model_edit, f"{model_id} ikinci tel yolunu beyan etmiyor"
+    assert m.wire_model != m.wire_model_edit
+
+
+def test_the_default_video_model_is_UNCHANGED():
+    """Varsayılanı kaydırmak her kullanıcının bir sonraki tıkına dokunurdu."""
+    assert catalog.DEFAULT_VIDEO_MODEL == "gemini-veo-3-1-lite"
+
+
+def test_fal_video_models_are_ordered_by_ASCENDING_cost():
+    """Sıra ANLAMLI (görsel tarafının kuralı) ve burada artan maliyete göre."""
+    fal = [m for m in catalog.VIDEO_MODELS if m.provider == "fal"]
+    assert [m.credits for m in fal] == sorted(m.credits for m in fal)
+
+
+def test_fal_video_models_are_ordered_PIXVERSE_WAN_KLING():
+    """Görev 7'nin brief'i sırayı Wan · PixVerse · Kling (16 · 20 · 30 kredi
+    varsayarak) tahmin etmişti. Ölçüm (design.md'nin 'Ölçüm sonuçları'
+    bölümü) PixVerse'in 720p'sinin ($0,065/sn sesli tavanla bile 13 kredi)
+    Wan'ın 720p'sinden (0,10 USD/sn = 20 kredi) DAHA UCUZ olduğunu gösterdi —
+    yani varsayılan-kalite maliyetine göre gerçek sıra PixVerse < Wan < Kling.
+    Bu test o düzeltmeyi mandallıyor; brief'in tahmini artık geçersiz."""
+    fal_ids = [m.id for m in catalog.VIDEO_MODELS if m.provider == "fal"]
+    assert fal_ids == ["fal-pixverse-c1", "fal-wan-3-0", "fal-kling-v3-turbo-pro"]
+
+
+@pytest.mark.parametrize("model_id", FAL_IDLER)
+def test_fal_video_models_declare_no_last_frame(model_id):
+    """Üç modelin hiçbirinin i2v şemasında `tail_image_url` yok."""
+    assert catalog.video_model(model_id).supports_last_frame is False
+
+
+def test_fal_credits_are_derived_from_MEASURED_usd_per_second():
+    """Kredi ÇAPASI Veo'yla AYNI: Azure `medium` = 8 kredi ≈ 0,04 USD, yani
+    1 kredi ≈ 0,005 USD. Rakamlar brief'in tahmini DEĞİL,
+    docs/superpowers/specs/2026-09-14-fal-video-saglayicisi-design.md'nin
+    'Ölçüm sonuçları (2026-09-14, canlı uçtan)' tablosundaki USD/sn
+    değerlerinden (fal.ai model sayfaları) türetildi:
+
+        Wan     480p $0,05/sn·720p $0,10/sn·1080p $0,20/sn  → 10·20·40
+        PixVerse 720p $0,065/sn (sesli) ·1080p $0,120/sn (sesli) → 13·24
+        Kling   düz $0,14/sn (çözünürlükten bağımsız)        → 28
+
+    PixVerse'in sesli/sessiz ayrımı `fal_client.ALANLAR`da YOK (adaptör ses
+    alanı hiç göndermiyor) — hangisinin telde geçerli olduğu ölçülemedi, o
+    yüzden YUKARI yuvarlamak için daha pahalı (sesli) rakam alındı: krediyi
+    düşük göstermek kullanıcıyı ucuz sanıp tıklamaya davet ederdi.
+    """
+    wan = catalog.video_model("fal-wan-3-0")
+    pixverse = catalog.video_model("fal-pixverse-c1")
+    kling = catalog.video_model("fal-kling-v3-turbo-pro")
+
+    assert dict(wan.credits_by_quality) == {"480p": 10, "720p": 20, "1080p": 40}
+    assert wan.credits == 20
+    assert dict(pixverse.credits_by_quality) == {"720p": 13, "1080p": 24}
+    assert pixverse.credits == 13
+    assert kling.credits == 28
+    assert kling.credits_by_quality == ()

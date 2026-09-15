@@ -3,6 +3,7 @@
     [
       "azure_flux_client",
       "azure_mai_client",
+      "fal_client",
       "gemini_client",
       "openai_client",
       "providers",
@@ -263,7 +264,7 @@
         "veo_client"
       ],
       "katman": 0,
-      "satir": 1339,
+      "satir": 1483,
       "testler": [
         "tests/test_arena.py",
         "tests/test_arena_onyuz.py",
@@ -486,11 +487,14 @@
         "credstore",
         "providers"
       ],
-      "ithal_eden": [],
-      "katman": 5,
+      "ithal_eden": [
+        "providers"
+      ],
+      "katman": 4,
       "satir": 663,
       "testler": [
-        "tests/test_fal_client.py"
+        "tests/test_fal_client.py",
+        "tests/test_providers.py"
       ],
       "yol": "fal_client.py"
     },
@@ -755,6 +759,7 @@
       "erteli_ithal": [
         "azure_flux_client",
         "azure_mai_client",
+        "fal_client",
         "gemini_client",
         "openai_client",
         "veo_client"
@@ -775,7 +780,7 @@
         "veo_client"
       ],
       "katman": 4,
-      "satir": 472,
+      "satir": 488,
       "testler": [
         "tests/test_azure_flux_client.py",
         "tests/test_azure_mai_client.py",

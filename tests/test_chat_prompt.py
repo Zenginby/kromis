@@ -710,6 +710,14 @@ def test_the_model_menu_stays_within_its_budget():
     Katalogdaki HER model yapılandırılmışken ölçülüyor, yani en kötü hâl.
     Bir bütçe olmadan yeni bir model ya da yeni bir alan eklemek sessizce
     kalıcı maliyet ekler; bütçeyle bu bir KARAR oluyor.
+
+    GÖREV 7 İLE TAVAN 3200'DEN 3800'E YÜKSELTİLDİ: üç fal video girdisi
+    (kendi `durations`/`credits_by_quality` eksenleriyle) en kötü hâli 3728
+    karaktere çıkardı. Bu KARARIN kendisi — chat_prompt.py'de değişen bir
+    satır YOK, yalnız bu tavan. 3800 ölçülen değerin biraz üstünde, ileride
+    küçük bir not değişikliğine nefes payı bırakıyor ama sınırsız büyümeyi
+    engelliyor (docstring'in "bir bütçe olmadan… sessizce kalıcı maliyet
+    ekler" uyarısı hâlâ geçerli).
     """
     import catalog
 
@@ -720,7 +728,7 @@ def test_the_model_menu_stays_within_its_budget():
               "supports_last_frame": m.supports_last_frame, "credits": m.credits}
              for m in catalog.IMAGE_MODELS + catalog.VIDEO_MODELS]
     blok = chat_prompt._models_block(hepsi)
-    assert len(blok) <= 3200, f"menü bütçesi aşıldı: {len(blok)} karakter"
+    assert len(blok) <= 3800, f"menü bütçesi aşıldı: {len(blok)} karakter"
 
 
 def test_an_unconfigured_selection_is_flagged_and_a_configured_one_is_not():

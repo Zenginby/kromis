@@ -190,6 +190,26 @@ sonucu var:
 
 ---
 
+## Sürüm 0.23.0 — ne değişti
+
+- i18n(fal): fal.ai metinleri sözlüğe taşındı, telif başlığı ve dördüncü kart
+- main (v0.22.1) fal.ai dalina alindi
+- ölçülmemiş not iddiaları kaldırıldı, video notlarına mandal
+- Wan süre gerekçesi ölçümle düzeltildi, boş satır düzeni
+- tel alan adları modele göre — Wan start_image_url, Kling dize süre
+- kuyruk 202 Accepted'i kabul ediyor — submit/yoklama/sonuç 2xx
+- catalog.py:864-865'teki bayat "en ucuz" gerekçesi düzeltildi
+- fal.ai uc modelleri — PixVerse C1, Wan 3.0, Kling V3 Turbo Pro
+- SSRF kapısındaki IP literali kaçağı — alternatif IPv4 yazımları
+- indirmede SSRF kapısı, paylaşılan son tarih, koşulsuz COMPLETED hatası
+- kuyruk dongusu — adres tabandan kuruluyor, indirme anahtarsiz
+- hata cevirisi — üst düzey detail listesi, 402 bakiye ve 429 eşzamanlı dallari
+- gövde kurucusu ve uç-alan tablosu
+- fal.ai kimliği kataloğa girdi, anahtar forma geldi
+- ImageModel'e wire_model_edit — uçları ayrışmış sağlayıcı için ikinci tel yolu
+
+---
+
 ## Sürüm 0.22.1 — ne değişti
 
 - Küçük düzeltmeler ve iyileştirmeler.

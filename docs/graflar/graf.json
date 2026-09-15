@@ -491,7 +491,7 @@
         "providers"
       ],
       "katman": 4,
-      "satir": 663,
+      "satir": 688,
       "testler": [
         "tests/test_fal_client.py",
         "tests/test_providers.py"

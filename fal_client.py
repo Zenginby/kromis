@@ -344,6 +344,24 @@ def _govde(resp):
         return None
 
 
+def _basarili(resp) -> bool:
+    """Yanıt HTTP durumu BAŞARI mı — herhangi bir 2xx.
+
+    ÖLÇÜLMÜŞ OLGU: Görev 8'in canlı duman testi (2026-09-15) `POST
+    …/text-to-video`e `202 Accepted` aldı; Görev 1'in sondası aynı uçta bir
+    gün önce (2026-09-14) `200` görmüştü. fal ya YÜKE/kuyruk durumuna göre
+    ikisi arasında geçiyor ya da davranış değişti — hangisi olursa olsun kod
+    İKİSİNİ de kabul etmek ZORUNDA. Yalnız `== 200` denetimi 202'yi hataya
+    çevirip kullanıcıya 0,7 saniyede "HTTP 202" gösteriyordu; oysa 202 bir
+    KUYRUK API'sinde "kabul edildi" demek, hata değil.
+
+    TEK YÜKLEMDE toplanması BİLİNÇLİ: submit/yoklama/sonuç üç yerde de aynı
+    kural geçmeli, aksi hâlde biri gevşer biri katı kalır ve fal hangi
+    adımda hangi 2xx'i seçtiğine göre döngü yine sessizce kırılır.
+    """
+    return 200 <= resp.status_code < 300
+
+
 def _video_url(sonuc: dict) -> str:
     """Sonuç gövdesinden MP4 adresi.
 
@@ -567,9 +585,16 @@ def _tek_uretim(client, key: str, taban: str, yol: str, payload: dict,
     taşınıyor, son tarih hesabına bir daha girmiyor.
     """
     # ── 1. Submit ────────────────────────────────────────────────────────
+    # BAŞARI `_basarili` İLE (yalnız `== 200` DEĞİL): fal `202 Accepted` da
+    # döndürebiliyor (bkz. `_basarili`'in docstring'i) ve bu satır `rid`yi
+    # OKUYAN tek yer — katı `!= 200` kontrolü altında 202'lik bir gövde hiç
+    # `_govde(resp)`e uğramadan hataya çevriliyordu. PARA BOYUTU: iş fal
+    # tarafında gerçekten kuyruğa girip FATURALANMIŞ olsa bile `request_id`
+    # okunmazsa elimizde onu yoklayacak/iptal edecek hiçbir şey kalmıyordu —
+    # izlenemeyen, ödenmiş bir iş.
     resp = _istek(client, "POST", f"{taban}/{yol}", key,
                   read=POLL_READ_TIMEOUT, json=payload)
-    if resp.status_code != 200:
+    if not _basarili(resp):
         raise ac.ImageError(map_error(resp.status_code, _govde(resp)))
     kuyruk = _govde(resp) or {}
     rid = str(kuyruk.get("request_id") or "")
@@ -590,7 +615,7 @@ def _tek_uretim(client, key: str, taban: str, yol: str, payload: dict,
         if kalan <= 0:
             raise ac.ImageError(_timeout_message(butce - kalan, butce))
         resp = _istek(client, "GET", durum_url, key, read=POLL_READ_TIMEOUT)
-        if resp.status_code != 200:
+        if not _basarili(resp):
             raise ac.ImageError(map_error(resp.status_code, _govde(resp)))
         govde = _govde(resp) or {}
         durum = str(govde.get("status") or "")
@@ -618,7 +643,7 @@ def _tek_uretim(client, key: str, taban: str, yol: str, payload: dict,
     # ── 3. Sonuç ─────────────────────────────────────────────────────────
     resp = _istek(client, "GET", _sonuc_url(taban, yol, rid), key,
                   read=POLL_READ_TIMEOUT)
-    if resp.status_code != 200:
+    if not _basarili(resp):
         raise ac.ImageError(map_error(resp.status_code, _govde(resp)))
     sonuc = _govde(resp) or {}
     # `COMPLETED` BAŞARI DEMEK DEĞİL: fal işin BİTTİĞİNİ söylüyor, iyi

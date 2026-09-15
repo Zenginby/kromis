@@ -512,3 +512,80 @@ def test_a_decimal_IPv4_loopback_download_target_is_rejected_end_to_end():
                             client=client, credentials=CREDS)
     assert "ssrf" in str(exc.value).lower()
     assert len(client.calls) == 4
+
+
+# ── Üçüncü inceleme turu: fal 200 yerine 202 Accepted da döndürebiliyor ─────
+#
+# ÖLÇÜLMÜŞ OLGU: Görev 8'in canlı duman testi (2026-09-15) `POST
+# …/text-to-video`e `202 Accepted` aldı; Görev 1'in sondası aynı uçta bir gün
+# önce (2026-09-14) `200` görmüştü. Katı `== 200` denetimi 202'yi hataya
+# çevirip kullanıcıya 0,7 saniyede "HTTP 202" gösteriyordu — ve daha ciddisi,
+# `request_id`yi HİÇ OKUMUYORDU, yani iş fal tarafında FATURALANMIŞ olsa bile
+# izlenemez kalıyordu.
+
+
+@pytest.mark.parametrize("kod, beklenen", [
+    (199, False), (200, True), (202, True), (299, True),
+    (300, False), (404, False), (500, False),
+])
+def test_basarili_accepts_only_the_2xx_range(kod, beklenen):
+    """`_basarili`nin sınır değerleri: TEK yüklemde toplanması bilinçli —
+    submit/yoklama/sonuç üçü de aynı kuralı paylaşıyor."""
+    assert fal_client._basarili(FakeResponse(kod)) is beklenen
+
+
+def test_a_202_Accepted_submit_still_completes_the_happy_path():
+    """Submit `202` dönse bile mutlu yol SONUNA kadar gidip indirilen MP4
+    baytlarını döndürmeli — hata değil, kuyruğa kabul."""
+    yanitlar = _kuyruk_yanitlari()
+    yanitlar[0] = FakeResponse(202, {"request_id": "abc123"})
+    client = FakeClient(*yanitlar)
+    out = fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+                              client=client, credentials=CREDS)
+    assert out == [MP4]
+
+
+def test_the_request_id_is_read_from_a_202_submit_response_too():
+    """PARA BOYUTU: `request_id` 202'de okunmazsa iş FATURALANMIŞ ama
+    İZLENEMEZ kalırdı. Bu test yoklama adresinin GERÇEKTEN 202 gövdesinden
+    okunan `rid`den kurulduğunu ölçüyor."""
+    yanitlar = _kuyruk_yanitlari()
+    yanitlar[0] = FakeResponse(202, {"request_id": "abc123"})
+    client = FakeClient(*yanitlar)
+    fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+                        client=client, credentials=CREDS)
+    assert client.calls[1]["url"] == (
+        "https://queue.fal.run/alibaba/wan-3.0/requests/abc123/status")
+
+
+def test_a_202_poll_response_is_also_treated_as_success():
+    """Yoklama adımı da `202` dönebilir (fal'ın "hâlâ kuyrukta" kılığı) —
+    hata değil, döngü devam etmeli."""
+    yanitlar = _kuyruk_yanitlari()
+    yanitlar[1] = FakeResponse(202, {"status": "IN_QUEUE"})
+    client = FakeClient(*yanitlar)
+    out = fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+                              client=client, credentials=CREDS)
+    assert out == [MP4]
+
+
+def test_a_202_result_response_is_also_treated_as_success():
+    """Sonuç adımı da `202` dönebilir; video URL'i yine okunup indirilmeli."""
+    yanitlar = _kuyruk_yanitlari()
+    yanitlar[3] = FakeResponse(
+        202, {"video": {"url": "https://v3.fal.media/x.mp4"}})
+    client = FakeClient(*yanitlar)
+    out = fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+                              client=client, credentials=CREDS)
+    assert out == [MP4]
+
+
+def test_a_non_2xx_submit_response_is_still_rejected_as_an_error():
+    """Gevşetmenin HATA yolunu SESSİZCE AÇMADIĞININ mandalı: `_basarili`
+    yalnız 2xx'i kabul ediyor, 5xx (ve 3xx/4xx) hâlâ `ac.ImageError`e
+    çevriliyor."""
+    client = FakeClient(FakeResponse(500, {"detail": "upstream down"}))
+    with pytest.raises(ac.ImageError) as exc:
+        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+                            client=client, credentials=CREDS)
+    assert "500" in str(exc.value)

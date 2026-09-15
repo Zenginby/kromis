@@ -64,16 +64,21 @@ referansın yanına 3 ek referans görsel konabilir.
 ### Metinden video, tek tıkla canlandırma
 
 Composer'ın üçüncü modu video: Gemini · Veo 3.1'in üç kademesi (Lite / Fast /
-tam), 4–6–8 saniye, 16:9 veya 9:16. Anahtar görsel tarafıyla paylaşılır, yeni
-bir ayar alanı yok. Galerideki bir görseli ilk kare yapıp canlandırabilirsin;
-kayıt türev bağını korur.
+tam) ve fal.ai'nin üç modeli — Alibaba Wan 3.0, PixVerse C1, Kling V3 Turbo
+Pro. Veo 4–6–8 saniye sunarken PixVerse ve Kling **15 saniyeye kadar** klip
+üretebiliyor; oran ekseni de genişledi, üçü de 16:9/9:16'nın yanına **1:1**'i
+ekliyor. Veo'nun anahtarı görsel tarafıyla paylaşılır; fal kendi anahtarını
+Ayarlar'dan alır — ikisi de aynı composer'da, yeni bir ekran açılmadı.
+Galerideki bir görseli ilk kare yapıp canlandırabilirsin; kayıt türev bağını
+korur.
 
 ![Video modu: Veo 3.1 Lite ile üretilmiş 4 saniyelik video, oynatıcı ve kredi tahmini](docs/gorseller/video-modu.png)
 
 > [!WARNING]
 > Video üretimi **1–6 dakika sürer ve senkrondur** — sekmeyi kapatmak işi
-> kaybettirir. Veo'nun ücretsiz kademesi yoktur. **Bilinen kusur:** başlangıç ve
-> bitiş karesi BİRLİKTE verildiğinde istek `HTTP 400 — "your use case is
+> kaybettirir. Veo'nun ücretsiz kademesi yoktur; **fal.ai de ön ödemelidir**,
+> hesaba kredi yüklenmeden üretim başlamaz. **Bilinen kusur (Veo):** başlangıç
+> ve bitiş karesi BİRLİKTE verildiğinde istek `HTTP 400 — "your use case is
 > currently not supported"` ile düşüyor ([ölçümün kaydı](docs/ozellikler.md)).
 
 ### Klasörler, arama, toplu işlem

@@ -176,6 +176,30 @@ def test_the_queue_path_keeps_only_the_owner_and_app_segments(tam_yol, uygulama)
     assert fal_client.queue_app_path(tam_yol) == uygulama
 
 
+@pytest.mark.parametrize("tam_yol, uygulama", [
+    ("/alibaba/wan-3.0/text-to-video", "alibaba/wan-3.0"),
+    ("alibaba/wan-3.0/text-to-video/", "alibaba/wan-3.0"),
+    ("/alibaba/wan-3.0/text-to-video/", "alibaba/wan-3.0"),
+    ("//alibaba//wan-3.0//text-to-video//", "alibaba/wan-3.0"),
+    ("tek-segment", "tek-segment"),
+    ("", ""),
+])
+def test_the_queue_path_survives_boundary_input(tam_yol, uygulama):
+    """SINIR testi (park edilmiş borç, Görev 8'de mandallandı).
+
+    Bugün hiçbir gerçek `wire_model`/`wire_model_edit` literali baştaki/
+    sondaki `/` taşımıyor ya da iki segmentten az — `catalog.py`deki üç
+    modelin altı yolu da düz `sahip/uygulama/...` biçiminde. Ama fonksiyon
+    girdiyi doğrulamıyor, yalnız AYIKLIYOR: `wire_path.strip("/").split("/")`
+    boş parçaları eliyor, `parcalar[:_UYGULAMA_SEGMENTİ]` ise iki segmentten
+    az bir listede TASLAK vermiyor, ELİNDEKİYLE devam ediyor. Bu test bu
+    savunmacı davranışı MANDALLIYOR — hiçbir sürüm baştaki/sondaki `/`'i
+    ya da tek segmentli bir girdiyi görünce sessizce farklı bir adrese
+    savrulmasın.
+    """
+    assert fal_client.queue_app_path(tam_yol) == uygulama
+
+
 # ── Hata çevirisi ──────────────────────────────────────────────────────
 
 

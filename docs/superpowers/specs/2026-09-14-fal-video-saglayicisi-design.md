@@ -118,10 +118,20 @@ elle yazıyor. Forma adres alanı GİRMİYOR.
    döngüsü (`for cred in catalog.CREDENTIALS`) aynı env'i aynı "boş = dokunma"
    kuralıyla yazıyor. `replicate_api_token`, `comfyui_url` ve `ollama_url` o
    blokta KALIYOR, yani bloğun varlık gerekçesi bozulmuyor.
-2. Redaksiyon BEDAVA geliyor: `app._redact_validation_errors` gizli alan
-   adlarını `CREDENTIALS`tan türetiyor ve `Credential` docstring'i bunu zaten
-   "BYOK üçlüsünün redaksiyon dışında kalması, listenin elle tutulmasının
-   bedeliydi" diye yazıyor. `fal_key` bu turda o bedelden çıkıyor.
+2. **DÜZELTME (Görev 8, 2026-09-15):** bu maddenin önceki hâli "redaksiyon
+   BEDAVA geliyor, `fal_key` bu turda o bedelden çıkıyor" diyordu — bu YANLIŞ.
+   `app.py:125`'teki ÜÇÜNCÜ kapı (`_SECRET_SUFFIXES = ("_api_key", "_key",
+   "_token", "_secret")`) adı `_key` ile biten HER alanı, kataloğa girip
+   girmediğine BAKMAKSIZIN zaten redakte ediyordu; `fal_key` OKUMA
+   (doğrulama hatası) yolunda bu turdan ÖNCE de korunuyordu — `app.py`'nin
+   kendi yorumu bunu doğruluyor: "bugünkü `fal_key` / `replicate_api_token`
+   tam olarak bu kapıdan geçiyor". Kataloğa girmenin redaksiyona kattığı tek
+   şey, İKİNCİ kapının (`_SECRET_FIELDS`, `CREDENTIALS`tan türeyen ADLAR)
+   artık onu da AÇIKÇA listelemesi — üçüncü kapıyla ÖRTÜŞEN, yedek bir
+   koruma. Gerçek boşluk OKUMADA değil YAZMADAYDI: forma alan yoktu, sunucu
+   tarafında elle yazılmış bir dal vardı ve bu yüzden anahtar bugüne kadar
+   ancak `curl` ile yazılabiliyordu — kataloğa girmesinin asıl kazancı bu
+   yazma yolunu (ve arayüz alanını) açması.
 
 **Beklenmedik bulgu:** `fal_key`in bugün HİÇBİR arayüzü yok. API v0.2.0'dan
 beri kabul ediyor ama `static/index.html`'de alanı yok — yani bugün o anahtar
@@ -505,6 +515,16 @@ $0,14/sn'sinin diğer ikisinden pahalı çıkması bunun sebebi.
 
 Katalog literalleri (Görev 7) YALNIZ bu tablodan yazıldı.
 
+**EK ÖLÇÜM — kuyruk girişinin HTTP durumu SABİT DEĞİL (Görev 8, canlı duman
+testi).** Yukarıdaki sonda 2026-09-14'te `POST …/text-to-video`e `200`
+almıştı. Görev 8'in canlı duman testi bir gün sonra (2026-09-15) AYNI uca
+`202 Accepted` aldı. fal ya yüke/kuyruk durumuna göre ikisi arasında geçiyor
+ya da davranış değişti — hangisi olursa olsun kod herhangi bir `2xx`'i kabul
+etmek ZORUNDA (`fal_client._basarili`, yalnız `== 200` DEĞİL). İlk sürümde
+kod yalnız `200`ü başarı sayıyordu; bu, Görev 8'in bulduğu ve `a512029`'un
+kapattığı gerçek bir kusurdu (kaynak: bu spec'in yazıldığı gün atılan sonda
+201/202'yi hiç görmemişti, yani ilk tasarım bu davranışı ÖLÇMEDEN varsaydı).
+
 ## Riskler
 
 | risk | azaltma |
@@ -512,5 +532,64 @@ Katalog literalleri (Görev 7) YALNIZ bu tablodan yazıldı.
 | fal kuyruğu bölgeselleşirse yeniden kurulan adres yanlış hosta gider | Tek satır; `fal_client` başlığında işaretli. Belirti net: 404. |
 | Ölçüm bir jetonu yanlış çıkarırsa katalog yanlış beyan eder | Ölçüm planın İLK maddesi; literaller ondan sonra donuyor. |
 | Kredi tahmini gerçek fiyattan sapar | Yukarı yuvarlandı; ölçüm adımında fiyat sayfasından teyit. |
+| `fal_client._guvenli_hedef_mi` DNS ÇÖZMÜYOR (TOCTOU'dan kaçınmak için bilinçli) — yalnız adresin METNİ denetleniyor | Kabul edilmiş tasarım sınırı: `nip.io` gibi görünüşte sıradan ama loopback'e çözülen bir konak adı kapıdan METİN düzeyinde geçer (host literal bir IP ise private/loopback/link-local elenir, alan adıysa yalnız TLD'nin harfle başlaması denetlenir — bkz. `_alan_adi_mi`). Ad çözümlemesi yan etkili ve TOCTOU açığı taşıdığı için bilinçli olarak yapılmıyor. |
 | fal modelleri hızla ad değiştirir (`preview` kuyrukları) | `wire_model` ile `id` zaten AYRI (`ImageModel.id` docstring'i); geçmiş kayıtlar anlamsızlaşmıyor. |
 | Yeni hesabın 2 eşzamanlı istek sınırı kullanıcıyı şaşırtır | 429 için AYRI Türkçe metin. |
+
+## Ölçüm sonuçları (2026-09-15, Görev 8 — canlı duman testi, görsel→video)
+
+Görev 7'nin teslimi sonrası görsel→video hiç canlı sınanmamıştı. Görev 8 DÖRT
+turda tamamlandı (üçü düştü, dördüncüsü BAŞARILI oldu) — tam gidişat
+`.superpowers/sdd/2026-09-14-fal-video-saglayicisi/task-8-report-v3.md`de:
+1) `422 Field required: start_image_url` (Wan'ın alan adı `image_url` DEĞİLDİ
+— bu tasarımın "Uç → alan tablosu"ndaki Wan i2v satırı YANLIŞTI, kaynağı hiç
+canlı sınanmamış bir varsayımdı); alan adı `643f545`'te düzeltildi. 2) oturum
+sınırı (kod kusuru değil). 3) `422 Image dimensions are too small. Minimum
+dimensions are 240x240 pixels.` — düzeltilmiş alan adı DOĞRU gitti ama test
+görseli (8×8 piksel) fal'ın kendi alt sınırının altındaydı. 4) **BAŞARILI**:
+512×512 piksellik gerçek bir referans kareyle `POST /api/video/animate`
+(model `fal-wan-3-0`, 5 sn, 480p, 16:9) uçtan uca tamamlandı —
+
+| adım | HTTP durumu |
+| --- | --- |
+| submit | 200 |
+| yoklama (14 tur) | 13× 202, son turda 200 |
+| sonuç | 200 |
+| indirme (`v3b.fal.media`) | 200 |
+| `/api/video/animate` uç yanıtı | 200 |
+
+`request_id = 01a0a586-7de0-7d61-8bae-89cc60ab86c0`. Geçen süre 103,05 sn;
+MP4 1.543.287 bayt; `credits=50` (480p×5sn×10 kredi/sn), tahmini **0,25
+USD**. Bu, `643f545`'in `start_image_url` düzeltmesinin canlı üretimle UÇTAN
+UCA doğrulandığı anlamına geliyor.
+
+**(f) DÜRÜSTLÜK NOTU.** Üç modelden yalnız **Wan 3.0** canlı doğrulandı — iki
+yönde de (metin→video 2026-09-14, görsel→video 2026-09-15, yukarıdaki
+tablo). **PixVerse C1 ve Kling V3 Turbo Pro'nun tel alan adları yalnız fal'ın
+OpenAPI şemasından ölçüldü**
+(`.superpowers/sdd/2026-09-14-fal-video-saglayicisi/olcum-uc-semalari.md`,
+2026-09-15), canlı üretimle sınanmadı — ikisinin de görsel→video denemesi
+bütçe dışında kaldı (Kling 5 sn ~0,70 USD, PixVerse ~0,33 USD). Kling'in
+`duration`ının dize (`"5"` gibi) gitmesi de aynı şemaya dayanıyor, canlı bir
+422'ye değil.
+
+**(g) ÖLÇÜLEN SAĞLAYICI SINIRI.** PixVerse ve Kling'in görsel→video
+uçlarında `aspect_ratio` alanı ŞEMADA HİÇ YOK — oranı ilk kareden türetiyorlar
+(`olcum-uc-semalari.md`). Ama composer'ın oran seçici arayüzü canlandırma
+yönünde de bu iki model için oran sunuyor: kullanıcının seçtiği oran bu iki
+modelde TEL ÜZERİNDE ETKİSİZ (istek kabul edilir, video ilk karenin oranında
+döner). Wan'da böyle değil — Wan'ın i2v ucu `aspect_ratio`'yu gerçekten
+kabul ediyor (`fal_client.ALANLAR["fal-wan-3-0"].gorsel`). Arayüzü yöne göre
+kısmak (PixVerse/Kling animasyon modunda oran seçiciyi gizlemek) AYRI bir
+iş; bilinen sınır olarak burada duruyor, bu turda dokunulmadı.
+
+**(h) ÖLÇÜLEN SINIR — referans karenin ALT piksel boyutu.** fal,
+`start_image_url` (Wan) için görselin **en az 240×240 piksel** olmasını
+istiyor — 2026-09-15'te canlı ölçüldü (üçüncü deneme, madde 3 yukarıda).
+`app.py`nin `_to_png`/`_check_video_form`'u yüklenen görsel için yalnız
+DOSYA BOYUTU ve MIME'ı sınıyor, bir ALT piksel-boyutu denetimi YOK — yani
+küçük bir görsel yükleyen kullanıcı bugün fal'ın İngilizce 422 mesajını
+görür. Bu Görev 8'in yarattığı bir kusur DEĞİL ve Veo yolu da aynı açığı
+taşıyor; `app.py`yi tüm sağlayıcılar için değiştirmek bu görevin kapsamını
+aşardı. Bilinen sınır / ileride yapılacak iş olarak kayıtta duruyor, kod
+BU TURDA değiştirilmedi.

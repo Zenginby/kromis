@@ -353,8 +353,11 @@ Expected: FAIL — `StopIteration` (katalogda `fal` kimliği yok)
     # girmiyor.
     #
     # `FAL_KEY` YENİ DEĞİL: v0.2.0'dan beri `POST /api/settings`'te kabul
-    # ediliyordu ama kataloğa girmediği için hem redaksiyonun hem de formun
-    # DIŞINDAYDI — bugüne kadar yalnız `curl` ile yazılabiliyordu.
+    # ediliyordu ama kataloğa girmediği için FORMUN DIŞINDAYDI — bugüne kadar
+    # yalnız `curl` ile yazılabiliyordu. REDAKSİYONUN dışında değildi:
+    # `app._SECRET_SUFFIXES` adı `_key` ile biten her alanı kataloğa
+    # bakmaksızın zaten redakte ediyordu (bkz. Görev 8'in 2026-09-15
+    # düzeltmesi, design.md "Karar 2").
     #
     # `url_field=None` ve bu `azure_chat`in duruşunun aynısı: fal'da
     # kullanıcıya özel endpoint YOK, adres tek ve sabit. Vekil arkasına almak
@@ -390,9 +393,19 @@ Blok yorumunu güncelle — artık yalnız `replicate_api_token` için geçerli:
         #
         # `fal_key` BURADAN ÇIKTI: adaptörü geldi, kataloğa girdi ve yukarıdaki
         # `for cred in catalog.CREDENTIALS` döngüsü onu aynı env'e aynı
-        # "boş = dokunma" kuralıyla yazıyor — üstelik redaksiyonu da
-        # kendiliğinden kapsıyor.
+        # "boş = dokunma" kuralıyla yazıyor. (Redaksiyonu "kendiliğinden
+        # kapsıyor" DEMEK YANLIŞ olurdu — `_SECRET_SUFFIXES` onu zaten
+        # kapsıyordu; kazanılan şey YAZMA yolu, bkz. yukarıdaki not.)
 ```
+
+**DÜZELTME NOTU (Görev 8, 2026-09-15):** bu adımın kod yorumu taslağı
+(yukarıdaki fenced blok) yürürlükteki `app.py`'ye ("üstelik redaksiyonu da
+kendiliğinden kapsıyor") birebir bu hâliyle girdi ve o cümle YANLIŞ —
+redaksiyon `fal_key`i kataloğa girmeden ÖNCE de kapsıyordu
+(`_SECRET_SUFFIXES`, bkz. design.md "Karar 2"). Bu plan belgesindeki taslak
+düzeltildi; canlı `app.py`deki asıl yorum bu turun kapsamı DIŞINDA bırakıldı
+(brief yalnız iki belgeyi — design.md ve bu dosyayı — adlandırdı, kaynak
+dosyayı değil) ve ayrı bir iş olarak işaretlendi.
 
 - [ ] **Step 5: Run tests to verify they pass**
 

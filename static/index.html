@@ -1268,6 +1268,7 @@
         <option value="azure" selected>Azure OpenAI</option>
         <option value="openai">OpenAI</option>
         <option value="gemini">Google Gemini</option>
+        <option value="fal">fal.ai</option>
       </select>
 
       <!-- Her sağlayıcı AYRI blok, paylaşılan tek bir <input> DEĞİL: paylaşılan
@@ -1327,6 +1328,14 @@
         <p class="field-note">
           {{t:settings.gemini_hint}}
         </p>
+      </div>
+
+      <!-- fal.ai — yalnız VİDEO modelleri. Adres alanı YOK: fal'da
+           kullanıcıya özel endpoint yok (bkz. catalog.Credential id="fal"). -->
+      <div id="prov-fal" class="prov-fields" hidden>
+        <label for="set-fal-key">{{t:settings.fal_key}}</label>
+        <input id="set-fal-key" type="password" autocomplete="off"
+               spellcheck="false" placeholder="{{t:settings.fal_key_placeholder}}" />
       </div>
 
       </section>

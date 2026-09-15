@@ -132,6 +132,16 @@ def _veo_adapter():
     return (veo_client.generate, veo_client.animate)
 
 
+def _fal_adapter():
+    """`_veo_adapter`ın aynı gerekçesi: `fal_client` bu modülü import ediyor
+    (`total_budget`, `detail_of` ve iki paylaşılan yüklem için), yani modül
+    düzeyinde import etmek DÖNGÜ olurdu. Düz `import` ifadesi, yalnız
+    fonksiyon içinde — PyInstaller'ın statik analizi onu da görüyor, yani
+    `hiddenimports=[]` korunuyor."""
+    import fal_client
+    return (fal_client.generate, fal_client.animate)
+
+
 def _mai_adapter():
     """`_gemini_adapter`ın aynı gerekçesi: `azure_mai_client` bu modülü import
     ediyor (`read_timeout_for`, `detail_of`, `is_content_policy` için), yani
@@ -167,12 +177,18 @@ _ADAPTERS: dict[str, tuple] = {
     "azure-flux": _flux_adapter,
 }
 
-# provider → (generate_video, animate_video). Boş kalmayan tek anahtar bugün
-# `gemini`: OpenAI'nin Videos API'si 24 Eylül 2026'da kapanıyor (yerine gelen
-# ad YOK), Azure AI Foundry'de video barındırılmıyor, Anthropic'in video ucu
-# hiç yok. Gerekçenin uzunu `catalog.VIDEO_MODELS`in başlığında.
+# provider → (generate_video, animate_video). İKİ anahtar: doğrudan
+# `gemini` (Veo) ve TOPLAYICI `fal` (Wan · PixVerse · Kling). Ölü uçların
+# gerekçesi `catalog.VIDEO_MODELS`in başlığında duruyor — OpenAI'nin Videos
+# API'si kapanıyor, Azure AI Foundry'de video barındırılmıyor, Anthropic'in
+# video ucu hiç yok.
+#
+# `fal` BU TABLODA VAR, `_ADAPTERS`te YOK: bu turun kapsamı video ve görsel
+# yolunun telde ürettiği baytlar dokunulmadan kalıyor. Bu asimetri tam
+# olarak iki tablonun ayrı olma gerekçesi (bkz. dosya başlığı).
 _VIDEO_ADAPTERS: dict[str, tuple] = {
     "gemini": _veo_adapter,
+    "fal": _fal_adapter,
 }
 
 

@@ -248,11 +248,28 @@ def test_a_VIDEO_id_cannot_be_used_as_a_LAST_frame_either(client):
 def test_the_capability_flows_to_the_UI_as_its_OWN_key(client):
     """Arayüz "bitiş yuvasını çizeyim mi" sorusunu bu anahtardan soruyor.
     `max_refs`ten türetmek, ikinci referans ile son kareyi aynı sayının
-    arkasına saklamak olurdu."""
+    arkasına saklamak olurdu.
+
+    GÖREV 7 İLE SAĞLAYICIYA GÖRE AYRIŞTI: üç Veo girdisi hâlâ `True`
+    (Veo 3.1 ailesinin ortak yeteneği), fal'ın üç modeli ise `False` — yani
+    "her video modeli son kareyi alır" iddiası artık YANLIŞ (bkz.
+    `test_fal_video_models_declare_no_last_frame` ve `fal_client.animate`'in
+    kendi ikinci kapısı). İddia sağlayıcı başına doğru değere indi; görsel
+    taraf HİÇ değişmedi.
+
+    DÜZELTME (Görev 9, 2026-09-15): fal'ın `False` olma gerekçesi önceden
+    "üç modelin hiçbirinin i2v şemasında `tail_image_url` yok" diye
+    yazılıyordu — doğru ama BOŞ, çünkü o ad fal'da hiç kullanılmıyor. Ölçüm
+    Wan'ın i2v ucunda GERÇEK bir son-kare alanı (`end_image_url`) olduğunu
+    gösterdi; adaptör onu bu turda BİLİNÇLİ OLARAK göndermiyor. PixVerse ve
+    Kling'de ise gerçekten hiçbir son-kare alanı yok. Buradaki iddia
+    (`supports_last_frame` sağlayıcı başına doğru değere indi) etkilenmiyor.
+    """
     ayar = client.get("/api/settings").json()
 
     for m in ayar["video_models"]:
-        assert m["supports_last_frame"] is True, m["id"]
+        beklenen = m["provider"] != "fal"
+        assert m["supports_last_frame"] is beklenen, m["id"]
     for m in ayar["image_models"]:
         assert m["supports_last_frame"] is False, m["id"]
 

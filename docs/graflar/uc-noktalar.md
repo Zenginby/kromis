@@ -8,51 +8,51 @@
 
 | yöntem | yol | işlev (app.py) | modüller | ön yüz |
 | --- | --- | --- | --- | --- |
-| GET | `/` | `index`:2200 | `errlog`, `i18n`, `paths`, `version` | — |
-| GET | `/api/arena/{arena_id}` | `arena_round_route`:1762 | `paths`, `storage` | `chat.js` |
-| POST | `/api/arena/{arena_id}/winner` | `set_arena_winner_route`:1777 | `i18n`, `models`, `paths`, `storage` | `chat.js` |
-| GET | `/api/assets/{kind}` | `list_assets_route`:2104 | `assets_store`, `i18n`, `paths` | `assets.js` |
-| POST | `/api/assets/{kind}` | `upload_asset`:2082 | `assets_store`, `i18n`, `paths` | `assets.js` |
-| DELETE | `/api/assets/{kind}/{asset_id}` | `delete_asset_route`:2116 | `assets_store`, `i18n`, `paths` | `assets.js` |
-| POST | `/api/banner` | `add_banner`:2051 | `assets_store`, `i18n`, `models`, `paths`, `storage` | `assets.js` |
-| POST | `/api/banner/preview` | `preview_banner`:2043 | `assets_store`, `i18n`, `models`, `paths` | `assets.js` |
-| POST | `/api/chat` | `chat`:1402 | `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `credstore`, `etiket`, `i18n`, `models`, `paths`, `prefs` | `chat.js` |
-| DELETE | `/api/chats` | `delete_all_chats_route`:1590 | `chat_store`, `paths` | `chat.js` |
-| GET | `/api/chats` | `list_chats_route`:1552 | `chat_store`, `paths` | `chat.js` |
-| POST | `/api/chats` | `create_chat_route`:1566 | `chat_store`, `i18n`, `models`, `paths`, `prefs` | `chat.js` |
-| DELETE | `/api/chats/{chat_id}` | `delete_chat_route`:1622 | `chat_store`, `i18n`, `paths` | `chat.js` |
-| GET | `/api/chats/{chat_id}` | `get_chat_route`:1558 | `chat_store`, `i18n`, `paths` | `chat.js` |
-| PUT | `/api/chats/{chat_id}` | `update_chat_route`:1600 | `chat_store`, `i18n`, `models`, `paths`, `prefs` | `chat.js` |
+| GET | `/` | `index`:2210 | `errlog`, `i18n`, `paths`, `version` | — |
+| GET | `/api/arena/{arena_id}` | `arena_round_route`:1772 | `paths`, `storage` | `chat.js` |
+| POST | `/api/arena/{arena_id}/winner` | `set_arena_winner_route`:1787 | `i18n`, `models`, `paths`, `storage` | `chat.js` |
+| GET | `/api/assets/{kind}` | `list_assets_route`:2114 | `assets_store`, `i18n`, `paths` | `assets.js` |
+| POST | `/api/assets/{kind}` | `upload_asset`:2092 | `assets_store`, `i18n`, `paths` | `assets.js` |
+| DELETE | `/api/assets/{kind}/{asset_id}` | `delete_asset_route`:2126 | `assets_store`, `i18n`, `paths` | `assets.js` |
+| POST | `/api/banner` | `add_banner`:2061 | `assets_store`, `i18n`, `models`, `paths`, `storage` | `assets.js` |
+| POST | `/api/banner/preview` | `preview_banner`:2053 | `assets_store`, `i18n`, `models`, `paths` | `assets.js` |
+| POST | `/api/chat` | `chat`:1412 | `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `credstore`, `etiket`, `i18n`, `models`, `paths`, `prefs` | `chat.js` |
+| DELETE | `/api/chats` | `delete_all_chats_route`:1600 | `chat_store`, `paths` | `chat.js` |
+| GET | `/api/chats` | `list_chats_route`:1562 | `chat_store`, `paths` | `chat.js` |
+| POST | `/api/chats` | `create_chat_route`:1576 | `chat_store`, `i18n`, `models`, `paths`, `prefs` | `chat.js` |
+| DELETE | `/api/chats/{chat_id}` | `delete_chat_route`:1632 | `chat_store`, `i18n`, `paths` | `chat.js` |
+| GET | `/api/chats/{chat_id}` | `get_chat_route`:1568 | `chat_store`, `i18n`, `paths` | `chat.js` |
+| PUT | `/api/chats/{chat_id}` | `update_chat_route`:1610 | `chat_store`, `i18n`, `models`, `paths`, `prefs` | `chat.js` |
 | POST | `/api/edit` | `edit`:842 | `azure_client`, `catalog`, `chat_store`, `color_names`, `etiket`, `folders`, `i18n`, `models`, `palette`, `palette_store`, `paths`, `providers`, `storage` | `core.js` |
-| GET | `/api/folders` | `list_folders_route`:1630 | `folders`, `paths`, `storage` | `folders.js` |
-| POST | `/api/folders` | `create_folder_route`:1654 | `folders`, `i18n`, `models`, `paths` | `folders.js` |
-| DELETE | `/api/folders/{folder_id}` | `delete_folder_route`:1669 | `folders`, `i18n`, `paths`, `storage` | `folders.js` |
-| PATCH | `/api/folders/{folder_id}` | `rename_folder_route`:1726 | `folders`, `i18n`, `models`, `paths` | `folders.js` |
-| GET | `/api/folders/{folder_id}/download` | `download_folder_route`:1682 | `folders`, `i18n`, `paths` | `folders.js` |
+| GET | `/api/folders` | `list_folders_route`:1640 | `folders`, `paths`, `storage` | `folders.js` |
+| POST | `/api/folders` | `create_folder_route`:1664 | `folders`, `i18n`, `models`, `paths` | `folders.js` |
+| DELETE | `/api/folders/{folder_id}` | `delete_folder_route`:1679 | `folders`, `i18n`, `paths`, `storage` | `folders.js` |
+| PATCH | `/api/folders/{folder_id}` | `rename_folder_route`:1736 | `folders`, `i18n`, `models`, `paths` | `folders.js` |
+| GET | `/api/folders/{folder_id}/download` | `download_folder_route`:1692 | `folders`, `i18n`, `paths` | `folders.js` |
 | POST | `/api/generate` | `generate`:469 | `azure_client`, `catalog`, `chat_store`, `color_names`, `folders`, `i18n`, `models`, `palette`, `palette_store`, `paths`, `providers`, `storage` | `core.js` |
 | GET | `/api/guncelleme` | `get_guncelleme`:1131 | `guncelleme`, `paths`, `prefs` | `settings.js` |
 | POST | `/api/guncelleme` | `post_guncelleme`:1160 | `guncelleme`, `paths`, `prefs` | `settings.js` |
-| GET | `/api/history` | `history`:1740 | `folders`, `i18n`, `paths`, `storage` | `folders.js` |
-| DELETE | `/api/image/{image_id}` | `delete_image`:1793 | `i18n`, `paths`, `storage` | `core.js` |
-| PATCH | `/api/image/{image_id}` | `move_image`:1752 | `folders`, `i18n`, `models`, `paths`, `storage` | `core.js` |
-| DELETE | `/api/images` | `delete_images`:1813 | `i18n`, `models`, `paths`, `storage` | `folders.js` |
-| PATCH | `/api/images` | `move_images`:1802 | `folders`, `i18n`, `models`, `paths`, `storage` | `folders.js` |
-| POST | `/api/import` | `import_image`:1823 | `folders`, `i18n`, `paths`, `storage` | `folders.js` |
-| POST | `/api/logo` | `add_logo`:1976 | `assets_store`, `composite`, `i18n`, `models`, `paths`, `storage` | `assets.js` |
-| POST | `/api/logo/preview` | `preview_logo`:1967 | `assets_store`, `composite`, `i18n`, `models`, `paths` | `assets.js` |
-| GET | `/api/output/{image_id}/download` | `output_download`:2161 | `i18n`, `paths`, `storage` | `core.js` |
-| POST | `/api/palette/suggest` | `suggest_palettes`:1864 | `color_names`, `models`, `palette` | `palette.js` |
-| GET | `/api/palettes` | `list_palettes_route`:1895 | `palette_store`, `paths` | `palette.js` |
-| POST | `/api/palettes` | `create_palette_route`:1900 | `color_names`, `i18n`, `models`, `palette`, `palette_store`, `paths` | `palette.js` |
-| DELETE | `/api/palettes/{palette_id}` | `delete_palette_route`:1921 | `i18n`, `palette_store`, `paths` | `palette.js` |
-| GET | `/api/prefs` | `get_prefs_route`:1477 | `paths`, `prefs` | `chat.js`, `core.js`, `settings.js` |
-| POST | `/api/prefs` | `post_prefs_route`:1483 | `models`, `paths`, `prefs` | `chat.js`, `core.js`, `settings.js` |
+| GET | `/api/history` | `history`:1750 | `folders`, `i18n`, `paths`, `storage` | `folders.js` |
+| DELETE | `/api/image/{image_id}` | `delete_image`:1803 | `i18n`, `paths`, `storage` | `core.js` |
+| PATCH | `/api/image/{image_id}` | `move_image`:1762 | `folders`, `i18n`, `models`, `paths`, `storage` | `core.js` |
+| DELETE | `/api/images` | `delete_images`:1823 | `i18n`, `models`, `paths`, `storage` | `folders.js` |
+| PATCH | `/api/images` | `move_images`:1812 | `folders`, `i18n`, `models`, `paths`, `storage` | `folders.js` |
+| POST | `/api/import` | `import_image`:1833 | `folders`, `i18n`, `paths`, `storage` | `folders.js` |
+| POST | `/api/logo` | `add_logo`:1986 | `assets_store`, `composite`, `i18n`, `models`, `paths`, `storage` | `assets.js` |
+| POST | `/api/logo/preview` | `preview_logo`:1977 | `assets_store`, `composite`, `i18n`, `models`, `paths` | `assets.js` |
+| GET | `/api/output/{image_id}/download` | `output_download`:2171 | `i18n`, `paths`, `storage` | `core.js` |
+| POST | `/api/palette/suggest` | `suggest_palettes`:1874 | `color_names`, `models`, `palette` | `palette.js` |
+| GET | `/api/palettes` | `list_palettes_route`:1905 | `palette_store`, `paths` | `palette.js` |
+| POST | `/api/palettes` | `create_palette_route`:1910 | `color_names`, `i18n`, `models`, `palette`, `palette_store`, `paths` | `palette.js` |
+| DELETE | `/api/palettes/{palette_id}` | `delete_palette_route`:1931 | `i18n`, `palette_store`, `paths` | `palette.js` |
+| GET | `/api/prefs` | `get_prefs_route`:1487 | `paths`, `prefs` | `chat.js`, `core.js`, `settings.js` |
+| POST | `/api/prefs` | `post_prefs_route`:1493 | `models`, `paths`, `prefs` | `chat.js`, `core.js`, `settings.js` |
 | GET | `/api/settings` | `get_settings`:1096 | `azure_client`, `catalog`, `credstore`, `etiket`, `guncelleme`, `i18n`, `paths`, `prefs`, `version` | `settings.js` |
 | POST | `/api/settings` | `post_settings`:1187 | `azure_client`, `catalog`, `credstore`, `etiket`, `i18n`, `models`, `version` | `settings.js` |
 | POST | `/api/video` | `video`:508 | `azure_client`, `catalog`, `chat_store`, `folders`, `i18n`, `models`, `paths`, `providers`, `storage` | `core.js` |
 | POST | `/api/video/animate` | `animate`:615 | `azure_client`, `catalog`, `chat_store`, `etiket`, `folders`, `i18n`, `models`, `paths`, `providers`, `storage` | `core.js` |
-| GET | `/assets/{kind}/{filename}` | `asset_file`:2125 | `assets_store`, `i18n`, `paths` | `assets.js` |
-| GET | `/output/{filename}` | `output_file`:2137 | `i18n`, `paths`, `storage` | `assets.js`, `chat.js`, `core.js`, `folders.js`, `viewer.js` |
+| GET | `/assets/{kind}/{filename}` | `asset_file`:2135 | `assets_store`, `i18n`, `paths` | `assets.js` |
+| GET | `/output/{filename}` | `output_file`:2147 | `i18n`, `paths`, `storage` | `assets.js`, `chat.js`, `core.js`, `folders.js`, `viewer.js` |
 
 ## Öbek → modül
 

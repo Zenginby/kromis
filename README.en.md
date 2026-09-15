@@ -86,16 +86,21 @@ mode you can attach up to three extra reference images beside the main one.
 ### Video from text, or from an image you already made
 
 The composer's third mode is video: all three tiers of Gemini · Veo 3.1 (Lite /
-Fast / full), 4–6–8 seconds, 16:9 or 9:16. It shares the image side's key, so no
-new settings field appeared. You can also turn a gallery image into the first
-frame of a clip; the record keeps the link back to its parent.
+Fast / full) plus three fal.ai models — Alibaba Wan 3.0, PixVerse C1, Kling V3
+Turbo Pro. Veo tops out at 8 seconds; PixVerse and Kling can go **up to 15
+seconds**. The aspect-ratio axis widened too: all three fal models add **1:1**
+alongside 16:9/9:16. Veo shares the image side's key; fal reads its own key
+from Settings — both live in the same composer, no new screen appeared. You
+can also turn a gallery image into the first frame of a clip; the record keeps
+the link back to its parent.
 
 ![Video mode: a four-second clip generated with Veo 3.1 Lite, with player and credit estimate](docs/gorseller/video-modu.png)
 
 > [!WARNING]
 > Video generation **takes 1–6 minutes and is synchronous** — closing the tab
-> loses the job. Veo has no free tier. **Known defect:** when a start frame and an
-> end frame are supplied TOGETHER, the request fails with
+> loses the job. Veo has no free tier; **fal.ai is prepaid too** — generation
+> won't start until the account has credit. **Known defect (Veo):** when a
+> start frame and an end frame are supplied TOGETHER, the request fails with
 > `HTTP 400 — "your use case is currently not supported"`
 > ([the measurement](docs/ozellikler.md)).
 

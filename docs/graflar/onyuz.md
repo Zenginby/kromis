@@ -65,6 +65,6 @@ flowchart LR
 | `static/mobile.js` | 55 | 0 | — |
 | `static/palette.js` | 769 | 37 | `/api/palette/suggest`, `/api/palettes`, `/api/palettes/{}` |
 | `static/pixel-canvas.js` | 347 | 0 | — |
-| `static/settings.js` | 846 | 22 | `/api/guncelleme`, `/api/prefs`, `/api/settings` |
+| `static/settings.js` | 856 | 22 | `/api/guncelleme`, `/api/prefs`, `/api/settings` |
 | `static/viewer.js` | 507 | 0 | `/output/` |
 

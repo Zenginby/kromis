@@ -52,6 +52,48 @@ Kurulum ve çalıştırma: [KURULUM.md](../KURULUM.md) · depo haritası:
   üretiminde çalışan bir Gemini anahtarı, projesinde faturalandırma açık
   değilse burada reddediliyor — ve hata metni bunu açıkça söylüyor, "anahtarını
   kontrol et" demiyor.
+* **fal.ai: üç ek video modeli, Veo'nun eksenlerini aşıyor.** Toplayıcı
+  (`fal_client.py`), tek `FAL_KEY`, `credential="fal"`. Kendi ön ödemeli
+  uyarısı var (aşağıda) — Veo'nun "ücretsiz kademesi yok" uyarısının kardeşi.
+  - **Alibaba Wan 3.0** — 480p/720p/1080p, 5 veya 10 sn, oran 16:9·9:16·1:1.
+    **Metin→video CANLI DOĞRULANDI** (2026-09-14: 134,9 sn, 2.944.002 bayt).
+    **Görsel→video de CANLI DOĞRULANDI** (2026-09-15, Görev 8: 512×512
+    referans kareyle uçtan uca 103,05 sn'de tamamlandı, 1.543.287 baytlık MP4,
+    `credits=50` ≈ 0,25 USD, `request_id=01a0a586-7de0-7d61-8bae-89cc60ab86c0`) —
+    bu depoda görsel→video'nun canlı üretimle tamamlandığı İLK sağlayıcı
+    (Veo'nun bitiş-karesi kusuru yüzünden fal öncesi bu yol hiç kanıtlanmamıştı).
+    Bitiş karesi desteklemiyor.
+  - **PixVerse C1** — 720p/1080p, 5/10/15 sn (Veo'nun 8 sn tavanını aşan iki
+    modelden biri), oran 16:9·9:16·1:1. En ucuz fal kademesi. Metin→video
+    CANLI DOĞRULANDI (2026-09-14). **Görsel→video tel alan adı yalnız fal'ın
+    OpenAPI ŞEMASINDAN ölçüldü** (`image_url`), canlı üretimle sınanmadı —
+    bütçe dışı kaldı (~0,33 USD, ayrı bir tur gerekir). Bitiş karesi
+    desteklemiyor.
+  - **Kling V3 Turbo Pro** — 1080p (tek, gizli jeton — `resolution` alanı iki
+    uçta da YOK), 5/10/15 sn, oran yalnız METİN ucunda etkili. En
+    pahalı fal kademesi (saniyesi düz 0,14 USD, çözünürlükten bağımsız).
+    Metin→video CANLI DOĞRULANDI (2026-09-14). **Görsel→video tel alan adı VE
+    `duration`ın dize (`"5"`) gitmesi yalnız ŞEMADAN ölçüldü**, canlı üretimle
+    sınanmadı — bütçe dışı kaldı (~0,70 USD). Bitiş karesi desteklemiyor.
+  - **Kredi tarifesi** (1 kredi ≈ 0,005 USD, Azure'ın `medium` çapasından):
+    Wan 480p/720p/1080p → 10/20/40 kredi/sn; PixVerse 720p/1080p → 13/24
+    kredi/sn; Kling düz 28 kredi/sn (çözünürlükten bağımsız).
+  - ⚠️ **Bilinen sınır — ölçüldü (2026-09-15, Görev 8).** fal, referans kare
+    (Wan'da `start_image_url`) için görselin **en az 240×240 piksel**
+    olmasını istiyor; altında kalan bir görsel fal'ın kendi İngilizce `422`
+    mesajıyla ("Image dimensions are too small. Minimum dimensions are
+    240x240 pixels.") reddediliyor. `app.py` yüklenen görsel için yalnız
+    DOSYA BOYUTU ve MIME'ı sınıyor, bir ALT piksel-boyutu denetimi yok —
+    Veo yolunda da aynı açık var, arayüz bu sınırı önceden göstermiyor.
+    Kod bu turda değiştirilmedi (kapsam tüm sağlayıcıları etkiler, ayrı iş).
+  - ⚠️ **Bilinen sağlayıcı sınırı — ölçüldü (2026-09-15, Görev 8).** PixVerse
+    ve Kling'in görsel→video uçlarında `aspect_ratio` alanı şemada HİÇ YOK —
+    oranı ilk kareden türetiyorlar. Ama composer'ın oran seçici arayüzü
+    canlandırma yönünde de bu iki model için oran sunuyor: seçilen oran bu
+    iki modelde TEL ÜZERİNDE ETKİSİZ (istek kabul edilir, video ilk karenin
+    oranında döner, hiçbir hata görünmez). Wan'da böyle değil — Wan'ın i2v
+    ucu `aspect_ratio`'yu gerçekten kabul ediyor. Arayüzü yöne göre kısmak
+    ayrı bir iş; bu turda dokunulmadı.
 
 ### 📁 4. Klasörler & Medya Yönetimi
 
@@ -132,8 +174,13 @@ Kurulum ve çalıştırma: [KURULUM.md](../KURULUM.md) · depo haritası:
   - [x] **Yeni medya türü uçtan uca:** depo `.mp4` yazıyor (uzantı kaydın `kind`inden
         türetiliyor), galeri karosu ve döküm kartı `<video>` çiziyor, büyüteç
         oynatıyor, indirme doğru adı ve MIME'ı veriyor.
-  - [ ] Kling, Luma, Runway, Wan — fal.ai/Replicate kuyruk adaptörleriyle birlikte
-        (`FAL_KEY` / `REPLICATE_API_TOKEN` alanları duruyor, adaptör yok).
+  - [x] **fal.ai video toplayıcısı teslim edildi:** Alibaba Wan 3.0, PixVerse
+        C1, Kling V3 Turbo Pro — tek `FAL_KEY`, kuyruk adaptörü
+        `fal_client.py` (`providers._VIDEO_ADAPTERS`). Wan metin→video VE
+        görsel→video ikisi de CANLI doğrulandı (2026-09-14 / 2026-09-15);
+        PixVerse ve Kling'in tel alan adları yalnız OpenAPI şemasından
+        ölçüldü, canlı üretimle sınanmadı (bütçe dışı kaldı). Luma, Runway ve
+        Replicate (`REPLICATE_API_TOKEN` alanı duruyor, adaptör yok) hâlâ AÇIK.
   - [ ] İş kuyruğu: üretim bugün SENKRON, yani sekme yenilenirse iş kaybediliyor.
   - [ ] **İlk/son kare geçişi — ÖLÇÜLDÜ, ÇALIŞMIYOR.** `instances[0].lastFrame`
         alanı, katalogdaki `supports_last_frame` bayrağı ve ayar sayfasındaki iki

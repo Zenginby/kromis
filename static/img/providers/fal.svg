@@ -1,0 +1,22 @@
+<!-- fal.ai (video toplayicisi) · saglayici isareti.
+     KAYNAK YOK ve bu bilerek kaydediliyor: simple-icons ve iconify'da fal.ai
+     girdisi bulunmuyor, yani kardes dosyalardaki CC0 zinciri burada
+     kurulamiyor. Ureticinin tescilli isaretini elle yeniden cizmek yerine
+     SOYUT bir yer tutucu kullaniliyor (bir kum saati/kuyruk siluet - iki
+     ucgen orta noktada bulusuyor); amaci yalnizca satirin hangi saglayiciya
+     ait oldugunu ayirt ettirmek ve fal'in kuyruk tabanli mimarisine (bkz.
+     fal_client.py'nin basligi) gonderme yapmak. CC0 bir kaynak cikarsa
+     dosya oldugu gibi degistirilebilir, PROVIDER_LOGOS satiri ayni kalir.
+
+     TEK RENK ve renk DOSYADA sabit (fill), currentColor DEGIL: dosya <img> ile
+     yukleniyor ve <img> icerigi sayfanin rengini miras almaz. Sabit deger
+     tema katmanindaki fg (#e8eaed) ile ayni ve uygulamanin DORT temasi da
+     koyu, yani tek varyant hepsinde okunuyor. Bir gun acik tema gelirse dogru
+     yol mask-image + background: currentColor'a gecmek olur.
+
+     DIKKAT: bu yorumda cift tire (XML'de yasak) ve Turkce harf YOK, ikisi de
+     olcum sonucu. Ilk yazimda "fg" token'i cift tireyle yaziliydi; dosya
+     gecerli XML olmaktan cikti, tarayici 200 alip HICBIR SEY cizmedi ve
+     naturalWidth 0 kaldi. Sessiz kusur tam olarak buydu (bkz.
+     tests/test_provider_logos.py). -->
+<svg width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#e8eaed"><title>fal.ai</title><path d="M4 4h16l-8 8zM4 20h16l-8-8z"/></svg>

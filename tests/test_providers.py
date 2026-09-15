@@ -335,12 +335,14 @@ def test_the_video_table_is_SEPARATE_from_the_image_table():
     olarak öyle (görselde `gemini_client`, videoda `veo_client`). Tek tabloda
     bu "sağlayıcı → dörtlü demet" olurdu ve görsel adaptörü olmayan bir video
     sağlayıcısı iki boş yuva taşırdı."""
-    assert providers.video_adapter_ids() == frozenset({"gemini"})
+    # Görev 7: `fal` katıldı — TOPLAYICI, video tablosuna GİRİYOR, görsel
+    # tablosuna GİRMİYOR (bkz. `test_fal_is_registered_ONLY_in_the_video_table`).
+    assert providers.video_adapter_ids() == frozenset({"gemini", "fal"})
     # Görsel tablosu MAI'yle, şimdi FLUX'la BÜYÜDÜ; iki küme TAMAMEN ayrık
     # DEĞİL — `gemini` ikisinde birden var (bkz. bu testin kendi docstring'i).
     # İddia daha dar: her YENİ sağlayıcı (`azure-mai`, `azure-flux`) yalnız
     # görsel tarafında, video tablosuyla PAYLAŞILMIYOR — ikisinin de video
-    # ucu yok.
+    # ucu yok. `fal` de simetrik biçimde TERSİ: yalnız video tablosunda.
     assert providers.adapter_ids() == frozenset(
         {"azure", "openai", "gemini", "azure-mai", "azure-flux"})
 
@@ -406,3 +408,18 @@ def test_video_is_configured_reads_the_SHARED_gemini_credential():
     assert m.credential == "gemini"
     # Katalogda olmayan model için False, istisna DEĞİL.
     assert providers.video_is_configured("yok-boyle-bir-model") is False
+
+
+# ── fal.ai sevkiyatı (Görev 7) ───────────────────────────────────────────
+
+
+def test_fal_is_registered_ONLY_in_the_video_table():
+    """Görsel yolunun telde ürettiği baytlar bu turda DEĞİŞMİYOR."""
+    assert "fal" in providers.video_adapter_ids()
+    assert "fal" not in providers.adapter_ids()
+
+
+def test_the_fal_video_adapter_resolves_to_fal_client():
+    import fal_client
+    assert providers._video_pair("fal") == (fal_client.generate,
+                                            fal_client.animate)

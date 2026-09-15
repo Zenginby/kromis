@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """fal.ai kuyruk teli — Wan · PixVerse · Kling (VİDEO).
 
 Deponun BEŞİNCİ tel formatı ve ilk TOPLAYICISI: tek anahtar, çok marka.
@@ -62,6 +65,7 @@ import time
 import azure_client as ac
 import catalog
 import credstore
+import i18n
 import providers
 
 # Yüklenen referans karenin MIME'ı. `app._to_png` girdiyi koşulsuz PNG'ye
@@ -281,30 +285,21 @@ def map_error(status_code: int, body: dict | list | None) -> str:
     detail = detail_of(body)
     ek = f" {detail}" if detail else ""
     if status_code in (401, 403):
-        return ("fal.ai yetkilendirme hatası "
-                f"({status_code}): anahtar geçersiz ya da bu modele erişimi "
-                "yok. Ayarlar'dan yeniden kaydet." + ek)
+        return i18n.t("err.fal_denied", None, durum=status_code) + ek
     if status_code == 402:
-        return ("fal.ai bakiyesi yetersiz (402): fal ön ödemeli çalışıyor, "
-                "hesabına kredi yükleyip tekrar dene." + ek)
+        return i18n.t("err.fal_402") + ek
     if status_code == 404:
-        return ("fal.ai modeli bulunamadı (404): bu uç yeniden adlandırılmış "
-                "ya da kaldırılmış olabilir." + ek)
+        return i18n.t("err.fal_404") + ek
     if status_code == 429:
-        return ("fal.ai eşzamanlı istek sınırı (429): bir önceki üretim hâlâ "
-                "sürüyor olabilir. Yeni hesaplarda sınır ikidir; biraz "
-                "bekleyip tekrar dene." + ek)
+        return i18n.t("err.fal_429") + ek
     if providers.is_content_policy(detail):
-        return ("fal.ai isteği içerik kurallarıyla reddetti "
-                f"(HTTP {status_code}): prompt'u ya da referans görseli "
-                "değiştirip tekrar dene." + ek)
+        return i18n.t("err.fal_content_policy", None, durum=status_code) + ek
     if status_code == 400 and providers.is_invalid_key(detail):
-        return ("fal.ai anahtarı geçersiz (400): Ayarlar'dan yeniden "
-                "kaydet." + ek)
+        return i18n.t("err.fal_bad_key") + ek
     if status_code == 422:
-        return ("fal.ai isteği reddetti (422): "
-                + (detail or "gövdedeki alanlardan biri geçersiz."))
-    return f"fal.ai isteği başarısız (HTTP {status_code})." + ek
+        return i18n.t("err.fal_422", None,
+                      ayrinti=detail or i18n.t("err.fal_422_generic"))
+    return i18n.t("err.fal_failed", None, durum=status_code) + ek
 
 
 AUTH_HEADER = "Authorization"
@@ -447,9 +442,9 @@ def _video_url(sonuc: dict) -> str:
     url = video.get("url") if isinstance(video, dict) else None
     if not url:
         raise ac.ImageError(
-            "fal.ai video döndürmedi: yanıtta `video.url` yok "
-            f"(anahtarlar: {sorted(sonuc) if isinstance(sonuc, dict) else '—'}). "
-            "Üretim fal tarafında tamamlanmış ve ücretlendirilmiş olabilir.")
+            i18n.t("err.fal_no_video_url", None,
+                   anahtarlar=sorted(sonuc) if isinstance(sonuc, dict)
+                   else "—"))
     return str(url)
 
 
@@ -564,9 +559,7 @@ def _indir(client, url: str) -> bytes:
     def _kapiya_sor(adres: str) -> str:
         if not _guvenli_hedef_mi(adres):
             raise ac.ImageError(
-                f"fal.ai videosu indirilemedi: hedef adres ({adres}) yerel "
-                "ya da özel bir ağa işaret ediyor; SSRF riski nedeniyle "
-                "reddedildi.")
+                i18n.t("err.fal_ssrf", None, adres=adres))
         return adres
 
     url = _kapiya_sor(url)
@@ -580,27 +573,25 @@ def _indir(client, url: str) -> bytes:
             return resp.content
         if resp.status_code not in _YONLENDIRME_KODLARI:
             raise ac.ImageError(
-                f"fal.ai videosu indirilemedi (HTTP {resp.status_code}).")
+                i18n.t("err.fal_download_failed", None,
+                       durum=resp.status_code))
         hedef = resp.headers.get("location")
         if not hedef:
             raise ac.ImageError(
-                f"fal.ai videosu indirilemedi: {resp.status_code} "
-                "yönlendirmesi adres taşımıyor.")
+                i18n.t("err.fal_redirect_no_location", None,
+                       durum=resp.status_code))
         # GÖRECELİ adres de geçerli (RFC 7231); `urljoin` mutlaklaştırıyor.
         url = _kapiya_sor(urljoin(url, hedef))
     raise ac.ImageError(
-        f"fal.ai videosu indirilemedi: {MAX_YONLENDIRME} yönlendirmeden "
-        "sonra hâlâ bitmedi.")
+        i18n.t("err.fal_too_many_redirects", None, adet=MAX_YONLENDIRME))
 
 
 def _timeout_message(gecen: float, butce: float) -> str:
     """`veo_client._timeout_message`in ikizi ve aynı ÜCRET UYARISIYLA: iş fal
     tarafında tamamlanmış olabilir ve kullanıcı 'hata aldım, demek ki
     ücretlenmedim' diye düşünmemeli."""
-    return (f"fal.ai üretimi {gecen:.0f} saniyede bitmedi (tavan "
-            f"{butce:.0f} sn). Süreyi ya da çözünürlüğü düşürüp tekrar dene. "
-            "Not: üretim fal tarafında tamamlanmış ve ücretlendirilmiş "
-            "olabilir, yalnızca sonuç bu tarafa ulaşmadı.")
+    return i18n.t("err.fal_timeout", None, gecen=f"{gecen:.0f}",
+                  butce=f"{butce:.0f}")
 
 
 def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str,
@@ -672,8 +663,7 @@ def _tek_uretim(client, key: str, taban: str, yol: str, payload: dict,
     rid = str(kuyruk.get("request_id") or "")
     if not _REQUEST_ID.match(rid):
         raise ac.ImageError(
-            "fal.ai işi başlatılamadı: yanıttaki `request_id` yok ya da "
-            f"tanınmayan biçimde (anahtarlar: {sorted(kuyruk)}).")
+            i18n.t("err.fal_no_request_id", None, anahtarlar=sorted(kuyruk)))
 
     # ── 2. Yoklama ───────────────────────────────────────────────────────
     # Döngü UYKUYLA DEĞİL KONTROLLE başlıyor: kısa bir iş ilk yanıtta
@@ -731,7 +721,7 @@ def _tek_uretim(client, key: str, taban: str, yol: str, payload: dict,
     # cümle gösterirdi. Gerekçe doğrudan yazılıyor.
     hata = detail_of(sonuc)
     if hata:
-        raise ac.ImageError(f"fal.ai video üretmedi: {hata}")
+        raise ac.ImageError(i18n.t("err.fal_no_video", None, hata=hata))
 
     # ── 4. İndirme ───────────────────────────────────────────────────────
     return _indir(client, _video_url(sonuc))
@@ -761,6 +751,7 @@ def animate(m: catalog.ImageModel, prompt: str, images, size: str, quality: str,
     `providers.edit`in ikinci kapı disiplininin aynısı.
     """
     if last_frame is not None:
-        raise ac.ImageError(f"{m.label} bitiş görseli almıyor.")
+        raise ac.ImageError(
+            i18n.t("err.model_no_last_frame", None, model=m.label))
     return _uret(m, prompt, size, quality, duration, n, images,
                  client=client, credentials=credentials)

@@ -1060,7 +1060,7 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         credits=13,
         credits_by_quality=(("720p", 13), ("1080p", 24)),
         kind="video",
-        note="En ucuz fal kademesi; 15 saniyeye kadar klip de üretebiliyor.",
+        note="model.fal-pixverse-c1.note",
     ),
     ImageModel(
         id="fal-wan-3-0",
@@ -1084,8 +1084,7 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         credits=20,
         credits_by_quality=(("480p", 10), ("720p", 20), ("1080p", 40)),
         kind="video",
-        note="480p seçersen saniye maliyeti PixVerse'in altına iner; "
-             "varsayılan 720p'de fal'ın orta kademesi.",
+        note="model.fal-wan-3-0.note",
     ),
     ImageModel(
         id="fal-kling-v3-turbo-pro",
@@ -1115,8 +1114,7 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         # SENTETİK: şemada `resolution` alanı hiç yok, telde hiç gitmiyor,
         # çıktının gerçek çözünürlüğü ölçülmedi (bkz. `docs/ozellikler.md`nin
         # Kling satırı). Not artık yalnız ÖLÇÜLMÜŞ olanı söylüyor.
-        note="En pahalı fal kademesi (28 kredi/sn); çözünürlük seçilemiyor, "
-             "oran yalnız metin ucunda etkili.",
+        note="model.fal-kling-v3-turbo-pro.note",
     ),
 )
 

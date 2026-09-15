@@ -650,7 +650,8 @@ def test_the_readmes_still_explain_why_the_prompt_is_english():
 KULLANICIYA_KONUSAN = (
     "app.py", "assets_store.py", "azure_client.py", "azure_flux_client.py",
     "azure_mai_client.py", "catalog.py", "chat_client.py", "chat_providers.py",
-    "composite.py", "credstore.py", "etiket.py", "folders.py", "gemini_client.py",
+    "composite.py", "credstore.py", "etiket.py", "fal_client.py", "folders.py",
+    "gemini_client.py",
     "models.py", "openai_chat.py", "openai_client.py", "palette.py", "prefs.py",
     "providers.py", "storage.py", "veo_client.py",
 )
@@ -666,6 +667,12 @@ TURKCE_KALANLAR = {
     "görsel": "yönetmenin döküm bağlamı (models.result_note)",
     "düzenlendi": "yönetmenin döküm bağlamı (models.result_note)",
     "üretildi": "yönetmenin döküm bağlamı (models.result_note)",
+    # `fal_client.TelBicimi.__post_init__` İTHAL ZAMANINDA patlıyor ve metni
+    # GELİŞTİRİCİYE gidiyor: tablo kendi içinde tutarsızsa (görsel alanı,
+    # görsel kümesinde yok) uygulama hiç açılmıyor, yani bu cümleyi bir
+    # kullanıcı ekranda göremez. Çevirmek, `i18n`i katalog-öncesi bir ithal
+    # zincirine sokmak olurdu.
+    " gorsel kümesinde yok: ": "fal_client'ın ithal-zamanlı tablo denetimi",
 }
 
 

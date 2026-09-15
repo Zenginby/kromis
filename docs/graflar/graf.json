@@ -275,7 +275,7 @@
         "veo_client"
       ],
       "katman": 0,
-      "satir": 1460,
+      "satir": 1458,
       "testler": [
         "tests/test_arena.py",
         "tests/test_arena_onyuz.py",
@@ -530,13 +530,14 @@
         "azure_client",
         "catalog",
         "credstore",
+        "i18n",
         "providers"
       ],
       "ithal_eden": [
         "providers"
       ],
       "katman": 5,
-      "satir": 766,
+      "satir": 757,
       "testler": [
         "tests/test_fal_client.py",
         "tests/test_providers.py"
@@ -627,6 +628,7 @@
         "credstore",
         "desktop",
         "etiket",
+        "fal_client",
         "folders",
         "gemini_client",
         "models",

@@ -65,7 +65,7 @@ function applyConfigured(s) {
     for (const [alan, kimlik, bos] of [
       ["set-openai-key", "openai", "sk-…"],
       ["set-gemini-key", "gemini", "AIza…"],
-      ["set-fal-key", "fal", "fal anahtarı"],
+      ["set-fal-key", "fal", t("settings.fal_key_placeholder")],
     ]) {
       $(alan).placeholder = s.providers[kimlik]
         ? t("settings.key_saved_placeholder")

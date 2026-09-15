@@ -438,7 +438,7 @@ def test_playwright_ayarlar_paneli_ortadan_ve_ALANLARI_gosteriyor():
                 "dişliyle açılınca sağlayıcı seçimi düşüyor — bütün anahtar "
                 "kutuları gizlenir")
             gizli = page.evaluate(
-                """() => ["azure", "openai", "gemini"]
+                """() => ["azure", "openai", "gemini", "fal"]
                      .filter(p => !document.querySelector(`#prov-${p}`).hidden)""")
             assert gizli == ["azure"], f"görünen alan grubu beklenenden farklı: {gizli}"
 
@@ -458,7 +458,10 @@ def test_playwright_ayarlar_paneli_ortadan_ve_ALANLARI_gosteriyor():
             page.click("#set-provider-btn")
             page.wait_for_selector("#provider-modal:not([hidden])")
             kartlar = page.eval_on_selector_all("#provider-list input", "e => e.length")
-            assert kartlar == 3, f"sağlayıcı kartları çizilmedi: {kartlar}"
+            # DÖRT: azure · openai · gemini · fal. Sayı `settings.js`teki
+            # sağlayıcı listesinden geliyor, yani kart çizmeyi unutan bir
+            # sağlayıcı eklenirse burada düşüyor. fal 0.23'te girdi.
+            assert kartlar == 4, f"sağlayıcı kartları çizilmedi: {kartlar}"
             page.keyboard.press("Escape")
             # `state="attached"`: `[hidden]` bir öğe hiçbir zaman "visible"
             # olmuyor, yani varsayılan ölçütle bu satır zaman aşımına düşerdi.

@@ -19,6 +19,7 @@ import ast
 import json
 import os
 import re
+import subprocess
 
 from fastapi.testclient import TestClient
 
@@ -647,14 +648,47 @@ def test_the_readmes_still_explain_why_the_prompt_is_english():
 # `ValueError` kimi yerde 422 gövdesi, kimi yerde iç değişmez), yani otomatik
 # bir ölçüt ya gürültü üretir ya da yanlış susar. Yeni bir modül metin
 # döndürmeye başladığında buraya bir satır eklemek, o kararı GÖRÜNÜR yapıyor.
+#
+# ELLE ama EKSİKSİZ: aşağıdaki ikiz listeyle birlikte depodaki HER kök modülü
+# kapsamak zorunda (`test_every_shipped_module_is_classified`). Liste tek
+# başınayken yeni bir modülün öntanımlı hâli "muaf"tı ve `fal_client.py` tam
+# oradan kaçtı.
 KULLANICIYA_KONUSAN = (
-    "app.py", "assets_store.py", "azure_client.py", "azure_flux_client.py",
-    "azure_mai_client.py", "catalog.py", "chat_client.py", "chat_providers.py",
-    "composite.py", "credstore.py", "etiket.py", "fal_client.py", "folders.py",
-    "gemini_client.py",
-    "models.py", "openai_chat.py", "openai_client.py", "palette.py", "prefs.py",
-    "providers.py", "storage.py", "veo_client.py",
+    "android_main.py", "app.py", "assets_store.py", "azure_client.py",
+    "azure_flux_client.py", "azure_mai_client.py", "catalog.py",
+    "chat_client.py", "chat_providers.py", "color_names.py", "composite.py",
+    "credstore.py", "etiket.py", "fal_client.py", "folders.py",
+    "gemini_client.py", "models.py", "netguard.py", "openai_chat.py",
+    "openai_client.py", "palette.py", "prefs.py", "providers.py",
+    "storage.py", "veo_client.py",
 )
+
+# …ve kullanıcıya KONUŞMAYANLAR, her biri gerekçesiyle. Bu liste bir muafiyet
+# defteri: "taranmasın" demiyor, "burada taranacak bir şey YOK, sebebi şu"
+# diyor. Listedeki bir modül kullanıcıya konuşmaya başlarsa satırı yukarıya
+# taşınmalı — ve o an bu dosyayı okuyan birinin bakacağı tek yer burası.
+KULLANICIYA_KONUSMAYAN = {
+    "backup.py": "yedek dizini adı üretimi; tek Türkçe satırı imkânsız bir "
+                 "durumun `ValueError`'ı",
+    "chat_prompt.py": "metin MODELE gidiyor, ekrana değil — Yönetmen "
+                      "personası; `models.result_note` ile aynı sınıf",
+    "chat_store.py": "sohbet kayıt katmanı; dışarıya veri döndürüyor, cümle değil",
+    "desktop.py": "Türkçe satırları konsola basılan önyükleme dökümü; "
+                  "geliştiriciye gidiyor",
+    "errlog.py": "tanı günlüğü; dosyaya yazıyor, ekrana değil",
+    "guncelleme.py": "sürüm verisi ve `DURUM_*` KODLARI döndürüyor; o kodları "
+                     "cümleye çeviren yer ön yüz",
+    "i18n.py": "çeviri mekanizmasının KENDİSİ; metni sözlük taşıyor",
+    "jsonstore.py": "atomik JSON yazımı; metin üretmiyor",
+    "palette_store.py": "palet kayıt katmanı; metin üretmiyor",
+    "paths.py": "yol hesabı; tek Türkçe satırı `errlog`a gidiyor",
+    "release_manifest.py": "yayın manifesti; makine okuyor",
+    "screencolor.py": "damlalık köprüsü (yalnız `desktop.py` ithal ediyor); "
+                      "tek Türkçe satırı AppKit renk uzayı iç değişmezi",
+    "version.py": "sürüm literalleri",
+    "winclr.py": ".NET köprüsünün önyükleme dökümü; konsola basılıyor",
+    "winsec.py": "Windows ACL sarmalı; Türkçe satırları platform iç değişmezleri",
+}
 
 # Türkçe kalması KARAR olan dizeler — gerekçesiyle. Muafiyet DİZE düzeyinde,
 # dosya düzeyinde DEĞİL: bir dosyayı bütünüyle muaf tutmak, o dosyaya bir gün
@@ -673,6 +707,20 @@ TURKCE_KALANLAR = {
     # kullanıcı ekranda göremez. Çevirmek, `i18n`i katalog-öncesi bir ithal
     # zincirine sokmak olurdu.
     " gorsel kümesinde yok: ": "fal_client'ın ithal-zamanlı tablo denetimi",
+    # `netguard._REDDEDILDI` ve Android ikizi İKİ DİLLİ — çevrilmedikleri için
+    # değil, ÇEVRİLEMEDİKLERİ için: gövde ASGI sarmalından çıkıyor, FastAPI
+    # yığınına hiç girmiyor ve `app._dil_baglami` koşmadığı için `i18n.active()`
+    # her zaman yedek dile düşerdi. Ayarlar'daki dil düğmesiyle aynı çözüm.
+    "Bu sunucuya yalnızca uygulamanın kendi penceresi erişebilir. / "
+    "Only this app's own window can reach this server.":
+        "dil bağlamı ÖNCESİ 403 gövdesi (netguard)",
+    "Bu sunucuya yalnızca uygulama erişebilir. / "
+    "Only this app can reach this server.":
+        "dil bağlamı ÖNCESİ 403 gövdesi (android_main)",
+    # Kotlin tarafı `filesDir`i vermezse uygulama HİÇ açılmıyor; metin gömülü
+    # köprüyü yazan geliştiriciye gidiyor, ekrana değil.
+    "data_dir boş olamaz (Kotlin tarafı filesDir'i vermeli)":
+        "android_main'in açılış değişmezi",
 }
 
 
@@ -737,3 +785,53 @@ def test_the_exemption_list_has_no_dead_entry():
             bulunan |= {d for _, d in _turkce_sabitler(f.read())}
     olu = set(TURKCE_KALANLAR) - bulunan
     assert not olu, f"artık var olmayan dizeler muaf tutuluyor: {sorted(olu)}"
+
+
+# ── Kapının KAPSAMI ──────────────────────────────────────────────────
+
+def test_every_shipped_module_is_classified():
+    """ÖLÇÜLEN KUSUR: yeni bir modül kapıya HİÇ GİRMEDEN geçti.
+
+    `fal_client.py` v0.23'te geldi, on altı çevrilmemiş Türkçe cümle taşıdı ve
+    yukarıdaki tarama onu hiç görmedi — çünkü `KULLANICIYA_KONUSAN` bir
+    ALLOWLIST'ti ve listede olmayan dosya taranmıyordu. Kapının öntanımlı
+    cevabı "muaf"tı; yön yanlıştı. Aynı turda `tests/test_telif_basligi.py`
+    aynı dosyayı İLK GÜN yakaladı, çünkü onun kapsamı `git ls-files`ten
+    TÜRETİLİYOR ve üstünde bir de "kapsam gerçekten doluyor mu" bekçisi var.
+
+    LİSTE NEDEN KALKMIYOR: mekanik bir ölçütle değiştirmek ÖLÇÜLDÜ ve pahalı.
+    Kapsam dışındaki 18 modülde 73 Türkçe dize vardı ve neredeyse hepsi
+    geliştiriciye gidiyor (`desktop`/`winclr` önyükleme dökümü, `errlog`
+    satırları, iç değişmezler, `chat_prompt`in persona metni). Hepsini muaf
+    saymak muafiyet listesini okunamaz yapardı. Yani doğru araç liste;
+    düzeltilen şey YÖNÜ: artık her kök modül iki listeden birinde olmak
+    zorunda ve yeni bir modül, hangisi olduğuna karar verilene kadar takımı
+    kırmızı tutuyor.
+
+    `tools/` kapsam dışı ve bilinçli: geliştirici betikleri, pakete girmiyor
+    ve kullanıcıya konuşan bir yüzleri yok (telif kapısının `tests/` için
+    verdiği kararın aynısı).
+    """
+    izlenen = subprocess.run(["git", "-C", REPO, "ls-files", "*.py"],
+                             check=True, capture_output=True, text=True).stdout
+    kok = {y for y in izlenen.split() if "/" not in y}
+    # Bekçinin bekçisi: kalıp bir gün hiçbir şey döndürmezse iki liste de
+    # "eksiksiz" görünürdü (test_telif_basligi.py'deki aynı duruş).
+    assert len(kok) > 30, f"kapsam şüpheli biçimde küçük: {len(kok)}"
+
+    siniflanan = set(KULLANICIYA_KONUSAN) | set(KULLANICIYA_KONUSMAYAN)
+    assert not kok - siniflanan, (
+        "SINIFLANMAMIŞ modül. Kullanıcıya metin döndürüyorsa "
+        "`KULLANICIYA_KONUSAN`a, döndürmüyorsa GEREKÇESİYLE "
+        f"`KULLANICIYA_KONUSMAYAN`a ekle: {sorted(kok - siniflanan)}")
+    assert not siniflanan - kok, (
+        f"artık var olmayan dosya sınıflanıyor: {sorted(siniflanan - kok)}")
+    ikisinde = set(KULLANICIYA_KONUSAN) & set(KULLANICIYA_KONUSMAYAN)
+    assert not ikisinde, f"iki listede birden: {sorted(ikisinde)}"
+
+
+def test_no_module_is_excused_without_a_reason():
+    """Gerekçesiz muafiyet, muafiyet değil KÖR NOKTA: kararın NEDEN verildiğini
+    söylemeyen satır, o kararı gözden geçirilemez yapar."""
+    for ad, gerekce in KULLANICIYA_KONUSMAYAN.items():
+        assert gerekce.strip(), f"{ad}: gerekçe yazılmamış"

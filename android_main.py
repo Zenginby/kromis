@@ -105,8 +105,12 @@ class SessionCookieGuard:
                                 # alınmasın: token yenilendiğinde bayat bir 403
                                 # arayüzü kalıcı olarak kilitlerdi.
                                 (b"cache-control", b"no-store")]})
+        # İki dilli: `netguard._REDDEDILDI` ile AYNI gerekçe — bu gövde de ASGI
+        # katmanından çıkıyor ve `app._dil_baglami` hiç koşmuyor.
         await send({"type": "http.response.body",
-                    "body": "Bu sunucuya yalnızca uygulama erişebilir.".encode("utf-8")})
+                    "body": ("Bu sunucuya yalnızca uygulama erişebilir. / "
+                             "Only this app can reach this server."
+                             ).encode("utf-8")})
 
 
 def new_session_token() -> str:

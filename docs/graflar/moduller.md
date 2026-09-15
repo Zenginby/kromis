@@ -29,7 +29,7 @@ flowchart TD
     n_chat_providers["chat_providers<br/>124 satır"]
   end
   subgraph katman5["katman 5"]
-    n_fal_client["fal_client<br/>624 satır"]
+    n_fal_client["fal_client<br/>663 satır"]
     n_openai_chat["openai_chat<br/>179 satır"]
   end
   subgraph katman4["katman 4"]
@@ -214,7 +214,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `credstore.py` | 194 | 3 | `azure_client`, `catalog` | 10 | 4 |
 | `desktop.py` | 559 | 9 | `errlog`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli) | 1 | 2 |
 | `errlog.py` | 114 | 0 | — | 5 | 1 |
-| `fal_client.py` | 624 | 5 | `azure_client`, `catalog`, `credstore`, `providers` | 0 | 1 |
+| `fal_client.py` | 663 | 5 | `azure_client`, `catalog`, `credstore`, `providers` | 0 | 1 |
 | `folders.py` | 248 | 2 | `jsonstore`, `storage` | 3 | 4 |
 | `gemini_client.py` | 293 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `guncelleme.py` | 237 | 2 | `errlog`, `jsonstore`, `paths`, `version` | 1 | 4 |

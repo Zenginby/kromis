@@ -390,10 +390,13 @@ def _guvenli_hedef_mi(url: str) -> bool:
 
     AD ÇÖZÜMLEMESİ YAPILMIYOR (DNS'e HİÇ çıkılmıyor): bir sorgu hem yan
     etkili hem de TOCTOU açığı taşır (çözümleme ile asıl istek arasında ad
-    başka bir IP'ye işaret edebilir). Yalnız adresin METNİ denetleniyor:
-    host bir literal IP ise `ipaddress` onu private/loopback/link-local diye
-    işaretliyor; sıradan bir alan adıysa (DNS'e hiç bakılmadığı için) izin
-    veriliyor.
+    başka bir IP'ye işaret edebilir). Yalnız adresin METNİ denetleniyor: host
+    bir literal IP ise `ipaddress` onu private/loopback/link-local diye
+    işaretliyor; `ipaddress` REDDEDERSE de otomatik "sıradan alan adı, izin
+    ver" DENMİYOR — `ipaddress.ip_address()` yalnız NOKTALI-ONDALIK biçimi
+    tanıyor, alternatif IPv4 yazımlarını (bkz. `_alan_adi_mi`) da `ValueError`
+    ile reddediyor, yani o dal IP OLMAYANLA IP'nin TANINMAYAN YAZIMINI
+    ayıramıyor. İkinci bir denetim (`_alan_adi_mi`) bu ikisini ayırıyor.
     """
     import ipaddress
     from urllib.parse import urlparse
@@ -407,9 +410,45 @@ def _guvenli_hedef_mi(url: str) -> bool:
     try:
         ip = ipaddress.ip_address(konak)
     except ValueError:
-        return True  # literal IP DEĞİL: sıradan bir alan adı, izin ver.
+        return _alan_adi_mi(konak)
     return not (ip.is_loopback or ip.is_link_local or ip.is_private
                 or ip.is_unspecified or ip.is_reserved or ip.is_multicast)
+
+
+def _alan_adi_mi(konak: str) -> bool:
+    """`ipaddress.ip_address()`in reddettiği bir host GERÇEKTEN bir alan adı
+    mı — yoksa `ipaddress`in TANIMADIĞI alternatif bir IPv4 YAZIMI mı.
+
+    ÖLÇÜLMÜŞ AÇIK (2026-09-15, ikinci inceleme turu): `ipaddress.ip_address()`
+    yalnız noktalı-ondalık (`a.b.c.d`) biçimi tanıyor;
+
+        https://2130706433/x       (decimal: 127.0.0.1'in tek sayısı)
+        https://0x7f.1/x           (hex/ondalık karışık)
+        https://127.1/x            (kısaltılmış — eksik oktet)
+        https://017700000001/x     (oktal)
+
+    dördü de birer IP LİTERALİ ama `ipaddress` hepsini `ValueError` ile
+    reddediyor. İlk yazım bu reddi "sıradan bir alan adı" sanıp KAPIDAN
+    GEÇİRİYORDU. Bu bir teorik açık değil: bu depo macOS ve Android'e de
+    paketleniyor (`build.sh`, `kromis.spec`, Chaquopy) ve glibc'in
+    `getaddrinfo`si bu dört biçimi de `127.0.0.1`'e ÇÖZÜYOR — Windows'ta
+    `socket.getaddrinfo`nun aynısını çözememesi savunma DEĞİL, platforma
+    bağlı bir baypas hâlâ baypas.
+
+    KURAL: son etiket (TLD) bir HARFLE başlamalı. Sayısal biçimlerin
+    DÖRDÜ de bunu ihlal ediyor — `2130706433` ve `017700000001` TEK etiket ve
+    tamamı rakam; `0x7f.1` ve `127.1`'in son etiketi `1`. `v3.fal.media`,
+    `fal.media`, `xn--...` (IDNA) gibi gerçek alan adları TLD'si harfle
+    başladığı için geçiyor.
+
+    KÖK NOKTA (`v3.fal.media.`) doğrulamadan ÖNCE soyuluyor: DNS'te geçerli
+    bir biçim, onu reddetmek meşru bir adresi kırardı.
+    """
+    konak = konak.rstrip(".")
+    if not konak:
+        return False
+    son_etiket = konak.rsplit(".", 1)[-1]
+    return son_etiket[:1].isalpha()
 
 
 def _indir(client, url: str) -> bytes:

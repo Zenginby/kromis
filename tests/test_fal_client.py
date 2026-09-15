@@ -467,3 +467,48 @@ def test_a_redirect_to_a_loopback_address_is_rejected_too():
     assert "ssrf" in str(exc.value).lower()
     # Yalnız İLK indirme denemesi yapıldı; loopback'e ikinci bir çağrı GİTMEDİ.
     assert len(client.calls) == 5
+
+
+# ── İkinci inceleme turu: alternatif IPv4 yazımları da kapıdan reddedilmeli ──
+#
+# `ipaddress.ip_address()` yalnız noktalı-ondalık biçimi tanıyor; aşağıdaki
+# dördü de birer IP LİTERALİ (127.0.0.1'in eşdeğerleri) ama hepsi `ValueError`
+# ile reddediliyor. İlk yazım bu reddi "sıradan alan adı" sanıp GEÇİRİYORDU —
+# ve bu teorik değil: glibc'in `getaddrinfo`si (bu depo macOS/Android'e de
+# paketleniyor) bu dört biçimi de `127.0.0.1`'e ÇÖZÜYOR.
+@pytest.mark.parametrize("hedef", [
+    "https://2130706433/x",       # decimal
+    "https://0x7f.1/x",           # hex/ondalık karışık
+    "https://127.1/x",            # kısaltılmış (eksik oktet)
+    "https://017700000001/x",     # oktal
+])
+def test_alternative_IPv4_literal_spellings_of_loopback_are_also_rejected(hedef):
+    """`_alan_adi_mi`in "son etiket bir harfle başlamalı" kuralının mandalı:
+    dördü de ya tek etiket ve tamamen rakam ya da son etiketi rakamla
+    başlıyor — hiçbiri gerçek bir alan adı gibi GÖRÜNMÜYOR."""
+    assert fal_client._guvenli_hedef_mi(hedef) is False
+
+
+@pytest.mark.parametrize("hedef", [
+    "https://v3.fal.media/files/x.mp4",
+    "https://v3.fal.media./files/x.mp4",  # kök nokta — geçerli DNS biçimi
+])
+def test_legitimate_domain_names_still_pass_the_gate(hedef):
+    """Kapı sıkılaştırılırken meşru adları da ELEMEMELİ — `_alan_adi_mi`in
+    "son etiket harfle başlıyor mu" kuralı `media` (ve kök noktadan
+    soyulmuş hâli) için `True` dönüyor."""
+    assert fal_client._guvenli_hedef_mi(hedef) is True
+
+
+def test_a_decimal_IPv4_loopback_download_target_is_rejected_end_to_end():
+    """Birim testin (`_guvenli_hedef_mi`) yanına UÇTAN UCA bir ölçü: gövdede
+    `video.url` olarak decimal-loopback gelirse `generate` de reddetmeli,
+    yalnızca kapı işlevi değil."""
+    yanitlar = _kuyruk_yanitlari()[:-1]
+    yanitlar[3] = FakeResponse(200, {"video": {"url": "https://2130706433/x"}})
+    client = FakeClient(*yanitlar)
+    with pytest.raises(ac.ImageError) as exc:
+        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+                            client=client, credentials=CREDS)
+    assert "ssrf" in str(exc.value).lower()
+    assert len(client.calls) == 4

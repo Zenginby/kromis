@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """OpenAI görsel üretimi — `azure_client.py`'nin BİLİNÇLİ ikizi.
 
 `chat_client.py`'nin duruşunun aynısı ve aynı gerekçeyle: iki dosya aynı teli
@@ -27,6 +30,7 @@ import base64
 import azure_client as ac
 import catalog
 import credstore
+import i18n
 import providers
 
 # `azure_client.CONNECT_TIMEOUT` ve `read_timeout_for` PAYLAŞILIYOR: ağ
@@ -36,7 +40,7 @@ import providers
 
 def map_error(status_code: int, body: dict | list | None, *,
               wire_model: str | None = None) -> str:
-    """HTTP durumunu Türkçe mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
+    """HTTP durumunu mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
 
     `providers.detail_of` gövde şeklini çözüyor (dört sağlayıcı da
     `{"error": {"message": …}}` kullanıyor), ama metinler sağlayıcıya özgü
@@ -53,24 +57,22 @@ def map_error(status_code: int, body: dict | list | None, *,
     """
     detail = providers.detail_of(body)
     if status_code == 401:
-        return ("OpenAI yetkilendirme hatası (401): API anahtarı geçersiz veya "
-                "süresi dolmuş. Ayarlar'dan yeniden kaydet.")
+        return i18n.t("err.openai_401")
     if status_code == 403:
-        return ("OpenAI erişimi reddetti (403): hesabın bu modele erişimi "
-                "olmayabilir." + (f" {detail}" if detail else ""))
+        return i18n.t("err.openai_403") + (f" {detail}" if detail else "")
     if status_code == 429:
-        return ("OpenAI istek limiti aşıldı (429): biraz bekleyip tekrar dene. "
-                "Faturalandırma limitin de dolmuş olabilir.")
+        return i18n.t("err.openai_429")
     if status_code == 404:
-        return ("OpenAI bu modeli tanımıyor (404)"
-                + (f": {wire_model}." if wire_model else ".")
-                + " Model kalkmış olabilir — composer'daki şeritten başka bir "
-                "model seç." + (f" {detail}" if detail else ""))
+        return (i18n.t("err.openai_404")
+                        + (f": {wire_model}." if wire_model else ".")
+                        + " " + i18n.t("err.model_gone_pick_another")
+                        + (f" {detail}" if detail else ""))
     # ÇIPLAK `"content" in detail` DEĞİL: `Invalid value for 'content'` de 400
     # ve o bir şema hatası — bkz. providers.is_content_policy.
     if status_code == 400 and providers.is_content_policy(detail):
-        return "İçerik politikası reddi: prompt OpenAI tarafından engellendi."
-    return f"OpenAI isteği başarısız (HTTP {status_code})." + (f" {detail}" if detail else "")
+        return i18n.t("err.openai_content_policy")
+    return i18n.t("err.openai_failed", None, durum=status_code) + (
+        f" {detail}" if detail else "")
 
 
 def build_payload(prompt: str, size: str, quality: str, n: int, *,
@@ -110,7 +112,7 @@ def decode_images(response_json: dict, *, client=None) -> list[bytes]:
     """
     data = response_json.get("data")
     if not isinstance(data, list) or not data:
-        raise ac.ImageError("OpenAI yanıtı boş döndü (data yok). Tekrar deneyin.")
+        raise ac.ImageError(i18n.t("err.openai_empty"))
 
     import httpx
     owns = client is None
@@ -118,14 +120,14 @@ def decode_images(response_json: dict, *, client=None) -> list[bytes]:
     try:
         for item in data:
             if not isinstance(item, dict):
-                raise ac.ImageError("OpenAI yanıtı beklenmedik biçimde geldi.")
+                raise ac.ImageError(i18n.t("err.openai_unexpected"))
             if item.get("b64_json"):
                 out.append(base64.b64decode(item["b64_json"]))
                 continue
             url = item.get("url")
             if not url:
                 raise ac.ImageError(
-                    "OpenAI yanıtında ne b64_json ne url var — görsel alınamadı.")
+                    i18n.t("err.openai_no_payload"))
             if client is None:
                 client = httpx.Client()
             try:
@@ -136,7 +138,7 @@ def decode_images(response_json: dict, *, client=None) -> list[bytes]:
                     .replace("Azure", "OpenAI")) from exc
             if resp.status_code != 200:
                 raise ac.ImageError(
-                    f"OpenAI görsel bağlantısı indirilemedi (HTTP {resp.status_code}).")
+                    i18n.t("err.openai_download_failed", None, durum=resp.status_code))
             out.append(resp.content)
     finally:
         if owns and client is not None:

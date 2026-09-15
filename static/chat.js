@@ -1,3 +1,6 @@
+// Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+// GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+// Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 // Kromis — Prompt Yönetmeni: Türkçe sohbet → İngilizce gpt-image-2 prompt'u.
 //
 // Klasik script (ES module DEĞİL): bütün parçalar TEK global kapsamı paylaşır
@@ -131,7 +134,7 @@ function promptFigure(pre, parsed) {
   const copy = document.createElement("button");
   copy.type = "button";
   copy.className = "btn-ghost chat-prompt-btn";
-  copy.textContent = "Kopyala";
+  copy.textContent = t("chat.copy");
   copy.addEventListener("click", () => copyPrompt(parsed.prompt));
 
   const apply = document.createElement("button");
@@ -149,7 +152,7 @@ function promptFigure(pre, parsed) {
   // kapısına düşüyor ve gerekçe yazılıyor. Sessizce kaybolan bir düğme,
   // kullanıcının hiç açıklayamayacağı tek hâl olurdu.
   const hedefli = hedefCoz(parsed);
-  apply.textContent = hedefli ? hedefli.hedef.dugme : "Üret";
+  apply.textContent = t(hedefli ? hedefli.hedef.dugme : "composer.generate");
   apply.addEventListener("click", () => sohbettenUret(parsed));
 
   bar.append(label, copy, apply);
@@ -476,7 +479,7 @@ function ornekKutusu(ornek, sessiz) {
 
   if (typeof ornek.renk === "string" && HEX_RE.test(ornek.renk.trim())) {
     kutu.style.background = ornek.renk.trim();
-    adlandir(`örnek renk ${ornek.renk.trim()}`);
+    adlandir(t("chat.sample_colour", { hex: ornek.renk.trim() }));
     return kutu;
   }
   if (Array.isArray(ornek.renkler)) {
@@ -486,7 +489,7 @@ function ornekKutusu(ornek, sessiz) {
       .slice(0, 5);
     if (renkler.length < 2) return null;
     kutu.classList.add("chat-option-ornek-serit");
-    adlandir(`örnek renkler: ${renkler.join(", ")}`);
+    adlandir(t("chat.sample_colours", { renkler: renkler.join(", ") }));
     for (const r of renkler) {
       const dilim = document.createElement("span");
       dilim.style.background = r;
@@ -502,7 +505,7 @@ function ornekKutusu(ornek, sessiz) {
     // sayıdan kuruluyor, yani CSS'e model metni HİÇ geçmiyor. Etiket de aynı
     // iki sayıdan kuruluyor, ham dizeden değil.
     kutu.style.aspectRatio = `${Number(m[1])} / ${Number(m[2])}`;
-    adlandir(`örnek oran ${Number(m[1])}:${Number(m[2])}`);
+    adlandir(t("chat.sample_ratio", { en: Number(m[1]), boy: Number(m[2]) }));
     return kutu;
   }
   return null;
@@ -693,14 +696,14 @@ function axesValue(group) {
   const own = ownText(group);
   if (!secili && !own) return { content: "", display: "" };
   const sentence = [
-    takas.length ? `Şu parametreleri değiştir: ${takas.join("; ")}.` : "",
-    ekleme.length ? `Şunları da belirle: ${ekleme.join("; ")}.` : "",
+    takas.length ? t("chat.change_params", { liste: takas.join("; ") }) : "",
+    ekleme.length ? t("chat.also_set", { liste: ekleme.join("; ") }) : "",
   ].filter(Boolean).join(" ");
   // Kullanıcı noktalama koymadıysa biz koyuyoruz: yoksa serbest metin ile
   // kapanış cümlesi tek cümleye yapışıyor ("zemin daha sade Prompt'un geri
   // kalanını aynı tut") ve model sınırın nerede olduğunu tahmin etmek zorunda.
   const idea = own && !/[.!?…]$/.test(own) ? `${own}.` : own;
-  const content = [sentence, idea, "Prompt'un geri kalanını aynı tut."]
+  const content = [sentence, idea, t("chat.keep_the_rest")]
     .filter(Boolean).join(" ");
   // Eksen seçilmedi: `shown` boş, o yüzden aşağıdaki birleştirme kullanılamaz
   // (başa sarkan bir ayraç üretirdi). Pilde kullanıcının yazdığı metin duruyor.
@@ -740,7 +743,7 @@ function renderOptions(parsed) {
   const items = optionItems(parsed);
   if (!items.length) return null;
   const multi = spec.coklu !== false;
-  const group = answerGroup(String(spec.soru || "Seçenekler"), { radio: !multi });
+  const group = answerGroup(String(spec.soru || t("chat.options")), { radio: !multi });
 
   if (spec.soru) {
     const q = document.createElement("p");
@@ -761,16 +764,16 @@ function renderOptions(parsed) {
   }
   group.appendChild(chips);
 
-  const { own, input } = ownField("Bunlardan biri değilse kendi fikrini yaz",
-                                 "Kendi fikrim…");
+  const { own, input } = ownField(t("chat.own_idea_label"),
+                                 t("chat.own_idea_placeholder"));
   const send = document.createElement("button");
   send.type = "button";
   send.className = "primary chat-own-send";
-  send.textContent = "Devam et";
+  send.textContent = t("chat.continue");
 
   const submit = async () => {
     const { content, display } = optionsValue(group);
-    if (!content) { chatStatus("Bir seçenek seç ya da kendi fikrini yaz."); return; }
+    if (!content) { chatStatus(t("chat.pick_an_option")); return; }
     // Gönderim TEK yoldan: sınır kapıları, hata geri alma ve kaydetme
     // sendChat'te yaşıyor; ikinci bir gönderim yolu yazılmıyor.
     $("prompt").value = content;
@@ -841,7 +844,7 @@ function renderVariations(parsed) {
   const q = document.createElement("p");
   q.className = "chat-options-q";
   // Başlığı İSTEMCİ yazıyor: model prozada tekrarlamasın diye (yanıt uzunluğu).
-  q.textContent = "Varyasyonlar — birine tıkla, yönetmen prompt'u ona göre yazsın";
+  q.textContent = t("chat.variations_hint");
   group.appendChild(q);
 
   const chips = document.createElement("div");
@@ -850,8 +853,8 @@ function renderVariations(parsed) {
     const ad = item.ad.trim();
     const chip = actionChip(ad, item.istek.trim());
     chip.addEventListener("click", async () => {
-      $("prompt").value = `"${ad}" varyasyonunu uygula: ${item.istek.trim()}`;
-      if (await sendChat(`Varyasyon: ${ad}`)) lockOptions(group);
+      $("prompt").value = t("chat.apply_variation", { ad, istek: item.istek.trim() });
+      if (await sendChat(t("chat.variation_of", { ad }))) lockOptions(group);
     });
     chips.appendChild(chip);
   }
@@ -863,11 +866,11 @@ function renderParameters(parsed) {
   const axes = axisItems(parsed);
   if (!axes.length) return null;
 
-  const group = answerGroup("Ayarlanabilir parametreler");
+  const group = answerGroup(t("chat.parameters"));
   group.classList.add("chat-axes");
   const q = document.createElement("p");
   q.className = "chat-options-q";
-  q.textContent = "Ayarlanabilir parametreler — seç ya da kendi fikrini yaz";
+  q.textContent = t("chat.parameters_hint");
   group.appendChild(q);
 
   for (const axis of axes) {
@@ -900,7 +903,7 @@ function renderParameters(parsed) {
     } else {
       row.dataset.yeni = "1";
       now.className = "chat-axis-new";
-      now.textContent = "prompt'ta yok";
+      now.textContent = t("chat.not_in_prompt");
     }
     row.appendChild(now);
 
@@ -916,16 +919,16 @@ function renderParameters(parsed) {
     group.appendChild(row);
   }
 
-  const { own, input } = ownField("Listede yoksa kendi fikrini yaz",
-                                  "Örn. arka plan daha sade olsun…");
+  const { own, input } = ownField(t("chat.not_listed_label"),
+                                  t("chat.not_listed_placeholder"));
   const send = document.createElement("button");
   send.type = "button";
   send.className = "primary chat-own-send";
-  send.textContent = "Uygula";
+  send.textContent = t("common.apply");
 
   const submit = async () => {
     const { content, display } = axesValue(group);
-    if (!content) { chatStatus("Bir parametre seç ya da kendi fikrini yaz."); return; }
+    if (!content) { chatStatus(t("chat.pick_a_parameter")); return; }
     $("prompt").value = content;
     if (await sendChat(display)) lockOptions(group);
   };
@@ -952,8 +955,8 @@ function renderParameters(parsed) {
 // — iki ad uzayı yalnız iki üyede rastlaşıyor. Adı burada YAZMAK, o rastlantıyı
 // sözleşme sanmamak için.
 const HEDEF_MODLAR = {
-  image: { eksen: "image", dugme: "Görsel üret", ad: "Görsel" },
-  video: { eksen: "video", dugme: "Video üret", ad: "Video" },
+  image: { eksen: "image", dugme: "go.generate_image", ad: "common.image" },
+  video: { eksen: "video", dugme: "go.generate_video", ad: "common.video" },
 };
 
 /** Ayar bloğunun hedefi ve önerdiği model. → {hedef, model} | null.
@@ -1040,13 +1043,13 @@ function modelOnerisiniUygula(hedef, model) {
   // sütunun eksenlerini besliyor: öneriyi uygulamak kullanıcıya sessizce başka
   // bir şey vaat etmek olurdu.
   if (hedef.eksen === "image" && arenaAcik) {
-    return `${model.label} (arena açık — önce arenayı kapat)`;
+    return t("chat.model_arena_open", { model: model.label });
   }
   const eksen = MODEL_EKSENLERI[hedef.eksen];
   // SEÇİLEBİLİRLİK tek yerden soruluyor: `<select>`e giren küme de aynı
   // süzgeçten geçiyor, yani "listede var ama yazılamaz" hâli doğamıyor.
   if (!secilebilirler(eksen.liste(), "").some((m) => m.id === model.id)) {
-    return `${model.label} (anahtar yok — Ayarlar'dan ekle)`;
+    return t("chat.model_no_key", { model: model.label });
   }
   const secici = $(eksen.secici);
   if (secici.value === model.id) return "";   // aynı değere ikinci dokunuş SESSİZ
@@ -1067,18 +1070,17 @@ function applyToForm(parsed) {
   // değiştirmemeli: ya hep ya hiç.
   const cozum = hedefCoz(parsed);
   if (!cozum) {
-    chatStatus(`Yönetmen tanınmayan bir model bildirdi `
-      + `(${parsed.settings.model}) — hangi modeli kullanacağını tekrar sor.`);
+          chatStatus(t("chat.unknown_model", { model: parsed.settings.model }));
     return false;
   }
   if (!parsed.prompt) {
-    chatStatus("Yanıtta prompt bloğu bulunamadı — yönetmene prompt'u tekrar yazmasını söyle.");
+    chatStatus(t("chat.no_prompt_block"));
     return false;
   }
   if (parsed.prompt.length > MAX_PROMPT_CHARS) {
     // KIRPMA YOK: kırpılmış bir prompt sessizce BAŞKA bir görsel üretir.
-    chatStatus(`Prompt ${MAX_PROMPT_CHARS} karakter sınırını aşıyor `
-      + `(${parsed.prompt.length}). Yönetmene kısaltmasını söyle.`);
+    chatStatus(t("chat.prompt_over_limit",
+                 { sinir: MAX_PROMPT_CHARS, uzunluk: parsed.prompt.length }));
     return false;
   }
 
@@ -1124,9 +1126,9 @@ function applyToForm(parsed) {
   // SESSİZ SAPMA YASAK (palette applied:false ile aynı gerekçe): uygulanamayan
   // öneri açıkça söylenir, yoksa kullanıcı formda başka bir ayar görür ve
   // sonucu açıklayamaz.
-  statusEl.textContent = `Prompt ${hedef.ad} moduna aktarıldı.`
-    + (skipped.length ? ` Şu öneriler uygulanamadı: ${skipped.join(", ")}.`
-                        + " Üretimi elle başlatabilirsin." : "");
+  statusEl.textContent = t("chat.prompt_sent_to_mode", { mod: t(hedef.ad) })
+    + (skipped.length ? " " + t("chat.suggestions_skipped",
+                                { liste: skipped.join(", ") }) : "");
   return !skipped.length;
 }
 
@@ -1176,9 +1178,9 @@ function askDirector() {
 async function copyPrompt(text) {
   try {
     await navigator.clipboard.writeText(text);
-    chatStatus("Prompt kopyalandı.");
+    chatStatus(t("chat.prompt_copied"));
   } catch {
-    chatStatus("Kopyalanamadı — prompt bloğunu elle seçip kopyala.");
+    chatStatus(t("chat.copy_failed_prompt"));
   }
 }
 
@@ -1231,7 +1233,7 @@ function appendUser(msg) {
     tag.className = "chat-pick-tag";
     // Gerçek bir eleman, CSS `content` DEĞİL: ekran okuyucu etiketi güvenilir
     // biçimde okusun.
-    tag.textContent = "Seçim";
+    tag.textContent = t("chat.selection");
     const text = document.createElement("span");
     text.textContent = msg.display;   // ← model metni: yalnızca textContent
     div.append(tag, text);
@@ -1249,25 +1251,25 @@ function appendUser(msg) {
   const restoreBtn = document.createElement("button");
   restoreBtn.type = "button";
   restoreBtn.className = "chat-action-btn";
-  restoreBtn.title = "Metni düzenlemek üzere kutuya aktar";
+  restoreBtn.title = t("chat.restore_title");
   const editLabel = document.createElement("span");
-  editLabel.textContent = "Düzenle";
+  editLabel.textContent = t("chat.edit");
   restoreBtn.append(makeSvgIcon("M9 14L4 9l5-5M20 20v-7a4 4 0 0 0-4-4H4"), editLabel);
   restoreBtn.addEventListener("click", () => {
     $("prompt").value = msg.content;
     autoGrow($("prompt"));
     syncAskDirector();
     $("prompt").focus();
-    chatStatus("Metin düzenlenmek üzere kutuya aktarıldı.");
+    chatStatus(t("chat.restored"));
   });
 
   const copyBtn = document.createElement("button");
   copyBtn.type = "button";
   copyBtn.className = "chat-action-btn";
-  copyBtn.title = "Metni panoya kopyala";
+  copyBtn.title = t("chat.copy_title");
   const copyIcon = makeSvgIcon("M9 9h13v13H9zM5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1");
   const copyLabel = document.createElement("span");
-  copyLabel.textContent = "Kopyala";
+  copyLabel.textContent = t("chat.copy");
   copyBtn.append(copyIcon, copyLabel);
   copyBtn.addEventListener("click", async () => {
     try {
@@ -1275,13 +1277,13 @@ function appendUser(msg) {
       // İKİ geri bildirim, biri yedek değil: seçim pilinde (.chat-pick) etiket
       // gizli — iki düğme oraya sığmadığı için ikon-only (style.css). Etiket tek
       // onay olsaydı bir seçimi kopyalayan kullanıcı hiçbir şey görmezdi.
-      copyLabel.textContent = "Kopyalandı";
-      chatStatus("Panoya kopyalandı.");
+      copyLabel.textContent = t("chat.copied");
+      chatStatus(t("chat.copied_to_clipboard"));
       setTimeout(() => {
-        copyLabel.textContent = "Kopyala";
+        copyLabel.textContent = t("chat.copy");
       }, 2000);
     } catch {
-      chatStatus("Kopyalanamadı.");
+      chatStatus(t("chat.copy_failed"));
     }
   });
 
@@ -1310,12 +1312,16 @@ function appendUser(msg) {
 // bu yüzden burada da hata değil — ham hâliyle gösteriliyor.
 const SIZE_LABELS = { "1024x1024": "1024²", "1024x1536": "1024×1536",
                       "1536x1024": "1536×1024" };
-const QUALITY_LABELS = { low: "Düşük", medium: "Orta", high: "Yüksek",
-                         // Veo'nun `resolution` jetonları (v0.13).
+// İki tablo da ETİKET değil ANAHTAR taşıyor; çözüm `resultCaption`da.
+// `720p`/`1080p` ise ÇEVİRİ DEĞİL jeton: her dilde aynı yazılıyor, o yüzden
+// kataloğa girmiyorlar — `t()` bulamadığı anahtarı kendisi olarak döndürdüğü
+// için doğru davranış bedavaya geliyor.
+const QUALITY_LABELS = { low: "gen.quality_low", medium: "gen.quality_medium",
+                         high: "gen.quality_high",
                          "720p": "720p", "1080p": "1080p" };
-const RESULT_KIND_LABELS = { generate: "Üretildi", edit: "Düzenlendi",
-                             video: "Video üretildi",
-                             animate: "Canlandırıldı" };
+const RESULT_KIND_LABELS = { generate: "result.generated", edit: "result.edited",
+                             video: "result.video_generated",
+                             animate: "result.animated" };
 
 /** Bu sonuç kaydı VİDEO mu — kartın `<img>` mi `<video>` mü olacağı.
  *
@@ -1343,15 +1349,15 @@ function sonucVideoMu(msg) {
  */
 function resultCaption(msg) {
   const p = msg.params || {};
-  const parts = [RESULT_KIND_LABELS[p.kind] || "Üretildi"];
+    const parts = [t(RESULT_KIND_LABELS[p.kind] || "result.generated")];
   if (p.size) parts.push(SIZE_LABELS[p.size] || p.size);
-  if (p.quality) parts.push(QUALITY_LABELS[p.quality] || p.quality);
+    if (p.quality) parts.push(t(QUALITY_LABELS[p.quality] || p.quality));
   // SÜRE künyeye giriyor çünkü videoda o, faturayı belirleyen eksen (kredi
   // saniyeyle çarpılıyor) — "Video üretildi · 16:9 · 720p" yazan bir künye
   // dört saniyelik bir klibi sekiz saniyelikten ayırt edemezdi. Eski
   // kayıtlarda alan 0 (`ResultParams`ın varsayılanı) ve o zaman hiç
   // yazılmıyor: göç YOK.
-  if (p.duration) parts.push(`${p.duration} sn`);
+    if (p.duration) parts.push(t("result.seconds", { sure: p.duration }));
   parts.push(`x${(msg.image_ids || []).length}`);
   return parts.join(" · ");
 }
@@ -1429,7 +1435,7 @@ function resultThumb(imageId, index, caption, videoMu = false, oran = "") {
     media.remove();
     const ph = document.createElement("span");
     ph.className = "chat-media-ph";
-    ph.textContent = videoMu ? "Video silindi" : "Görsel silindi";
+    ph.textContent = t(videoMu ? "result.video_deleted" : "result.image_deleted");
     fig.append(ph);
     fig.classList.add("gone");
     fig.removeAttribute("tabindex");
@@ -1448,7 +1454,7 @@ function resultThumb(imageId, index, caption, videoMu = false, oran = "") {
     // <figure>), o yüzden ikisi de elle bağlanıyor.
     fig.tabIndex = 0;
     fig.setAttribute("role", "button");
-    fig.setAttribute("aria-label", `${caption} — büyüt`);
+    fig.setAttribute("aria-label", t("result.enlarge_aria", { kunye: caption }));
     const zoom = () => {
       if (fig.classList.contains("gone")) return;
       window.openViewer(src, caption, fig.getBoundingClientRect());
@@ -1465,7 +1471,7 @@ function resultThumb(imageId, index, caption, videoMu = false, oran = "") {
   const dl = document.createElement("button");
   dl.type = "button";
   dl.className = "chat-media-act";
-  dl.textContent = "İndir";
+  dl.textContent = t("common.download");
   dl.addEventListener("click", (e) => {
     e.stopPropagation();               // indirme büyüteci açmasın
     downloadImage(src, `${imageId}.${videoMu ? "mp4" : "png"}`);
@@ -1485,7 +1491,7 @@ function resultThumb(imageId, index, caption, videoMu = false, oran = "") {
     const refBtn = document.createElement("button");
     refBtn.type = "button";
     refBtn.className = "chat-media-act";
-    refBtn.textContent = "Referans Al";
+    refBtn.textContent = t("result.use_as_reference");
     refBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (typeof setGallerySourceById === "function") {
@@ -1555,7 +1561,7 @@ function arenaColumnCaption(msg, model) {
   const p = msg.params || {};
   const parts = [(model && (model.short_label || model.label)) || p.model || "Model"];
   if (p.size) parts.push(SIZE_LABELS[p.size] || p.size);
-  if (p.quality) parts.push(QUALITY_LABELS[p.quality] || p.quality);
+    if (p.quality) parts.push(t(QUALITY_LABELS[p.quality] || p.quality));
   return parts.join(" · ");
 }
 
@@ -1571,7 +1577,7 @@ async function markArenaWinner(row, arenaId, imageId) {
     await chatApi(`/api/arena/${encodeURIComponent(arenaId)}/winner`,
                   { method: "POST", body: { image_id: imageId } });
   } catch (e) {
-    chatStatus(`Kazanan işaretlenemedi: ${e.message}`);
+    chatStatus(t("arena.winner_failed", { hata: e.message }));
     return;
   }
   syncArenaWinner(row, imageId);
@@ -1637,7 +1643,7 @@ function arenaColumn(row, msg, arenaId) {
     btn.className = "btn-ghost arena-win";
     btn.dataset.imageId = ids[0];
     btn.setAttribute("aria-pressed", "false");
-    btn.textContent = "Kazanan";
+    btn.textContent = t("arena.winner");
     btn.addEventListener("click", () => markArenaWinner(row, arenaId, ids[0]));
     col.appendChild(btn);
   }
@@ -1692,7 +1698,7 @@ function appendBot(text) {
 
   const role = document.createElement("span");
   role.className = "chat-role";
-  role.textContent = "Yönetmen";
+  role.textContent = t("common.director");
   div.appendChild(role);
 
   renderMarkdownInto(div, text, parsed);
@@ -1719,20 +1725,20 @@ function appendBot(text) {
   const copyBtn = document.createElement("button");
   copyBtn.type = "button";
   copyBtn.className = "chat-action-btn";
-  copyBtn.title = "Yönetmen yanıtını panoya kopyala";
+  copyBtn.title = t("chat.copy_answer_title");
   const copyIcon = makeSvgIcon("M9 9h13v13H9zM5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1");
   const copyLabel = document.createElement("span");
-  copyLabel.textContent = "Kopyala";
+  copyLabel.textContent = t("chat.copy");
   copyBtn.append(copyIcon, copyLabel);
   copyBtn.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(text);
-      copyLabel.textContent = "Kopyalandı";
+      copyLabel.textContent = t("chat.copied");
       setTimeout(() => {
-        copyLabel.textContent = "Kopyala";
+        copyLabel.textContent = t("chat.copy");
       }, 2000);
     } catch {
-      chatStatus("Kopyalanamadı.");
+      chatStatus(t("chat.copy_failed"));
     }
   });
   actions.appendChild(copyBtn);
@@ -1774,9 +1780,10 @@ async function sendChat(display = "") {
   const message = input ? input.value.trim() : "";
   const label = (typeof display === "string" && display)
     ? display.replace(/\s+/g, " ").trim().slice(0, MAX_CHAT_DISPLAY_CHARS) : "";
-  if (!message) { chatStatus("Önce bir mesaj yaz."); return false; }
+  if (!message) { chatStatus(t("chat.write_a_message")); return false; }
   if (message.length > MAX_CHAT_MSG_CHARS) {
-    chatStatus(`Mesaj çok uzun (${message.length}/${MAX_CHAT_MSG_CHARS} karakter).`);
+    chatStatus(t("composer.message_too_long",
+                     { uzunluk: message.length, sinir: MAX_CHAT_MSG_CHARS }));
     return false;
   }
   // İKİ kapı, çünkü sunucuda da iki tane var: konuşma turu sayısı
@@ -1784,7 +1791,7 @@ async function sendChat(display = "") {
   // tek başına konuşma kapısı olarak sayılsaydı dökümdeki her sonuç kartı bir
   // tur çalar ve üretim yapan oturum ~8 turda kilitlenirdi.
   if (conversationIsFull() || transcriptIsFull(1)) {
-    chatStatus("Bu sohbet doldu (en fazla 12 tur). Üst şeritteki \"Yeni oturum\" ile devam et.");
+    chatStatus(t("chat.thread_full"));
     return false;
   }
   // Toplam, sunucunun `models._check_chat_total` ile AYNI şeyi sayıyor:
@@ -1800,8 +1807,7 @@ async function sendChat(display = "") {
     (n, m) => (m.role === RESULT_ROLE ? n
       : n + (m.content || "").length + (m.display || "").length), 0);
   if (used + message.length + label.length > MAX_CHAT_TOTAL_CHARS) {
-    chatStatus("Sohbet çok uzadı — soldaki \"Yeni sohbet\" ile devam et. (Son prompt'u "
-      + "kaybetmemek için önce prompt bloğundaki üret düğmesine bas.)");
+        chatStatus(t("chat.thread_too_long"));
     return false;
   }
 
@@ -1832,14 +1838,14 @@ async function sendChat(display = "") {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(detailText(err) || `Hata (${res.status})`);
+      throw new Error(detailText(err) || t("err.http", { durum: res.status }));
     }
     const { content, finish_reason } = await res.json();
     chatThread.push({ role: "assistant", content });
     appendBot(content);
     lockStaleOptions();
     chatStatus(finish_reason === "length"
-      ? "Yanıt uzunluk sınırında kesilmiş olabilir — kısa bir brief'le tekrar dene." : "");
+      ? t("chat.answer_truncated") : "");
     // Kaydetme EN SONDA ve turu düşürmüyor: başarısız olursa yanıt ekranda kalır
     // ve durum satırı bunu söyler (bkz. persistThread).
     await persistThread();
@@ -1879,7 +1885,7 @@ async function chatApi(path, { method = "GET", body } = {}) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    const e = new Error(detailText(err) || `Hata (${res.status})`);
+    const e = new Error(detailText(err) || t("err.http", { durum: res.status }));
     // Durum kodu METİNDEN okunamaz: `detail` varsa `${res.status}` hiç
     // yazılmıyor. 409'u (otomatik kayıt kapalı) beklenen bir durum olarak
     // ayırmak için kodun kendisi taşınıyor.
@@ -1943,13 +1949,12 @@ async function persistThread() {
     // "kaydedilemedi" tonuyla söylenirse her turda bir arıza sanılır. Yanıt
     // ekranda duruyor ve elle kaydetmek (yeniden adlandırma) hâlâ çalışıyor.
     if (e.status === 409) {
-      chatStatus("Otomatik kayıt kapalı — bu oturum diske yazılmadı. "
-        + "Ayarlar'dan açabilirsin.");
+          chatStatus(t("chat.autosave_off"));
       return;
     }
     // Tur DÜŞMÜYOR: yanıt ekranda ve bellekte duruyor, yalnız diske yazılamadı.
     // Sessiz geçilse kullanıcı sohbetin kaydedildiğini sanardı.
-    chatStatus(`Sohbet kaydedilemedi (${e.message}) — yanıt ekranda duruyor.`);
+    chatStatus(t("chat.save_failed", { hata: e.message }));
   }
 }
 
@@ -1978,8 +1983,7 @@ function transcriptHasRoom(slots) {
     // Üretimin KENDİSİ engellenmiyor: görsel diske yazılıyor ve Medya'da
     // duruyor. Sessiz sapma yasak (applyToForm geleneği), o yüzden döküme
     // girmediği açıkça söyleniyor.
-    chatStatus("Oturum doldu — bu üretim döküme eklenmedi. "
-      + "Üst şeritteki \"Yeni oturum\" ile devam et.");
+          chatStatus(t("chat.session_full"));
     return false;
   }
   return true;
@@ -2186,20 +2190,21 @@ function chatMenu(summary) {
   // `aria-haspopup="true"` tetikleyicide bir MENÜ vaat ediyor; rolleri
   // vermezsek ekran okuyucu iki düğmeli düz bir grup okur ve vaat tutulmaz.
   menu.setAttribute("role", "menu");
-  menu.setAttribute("aria-label", `${summary.title || "Adsız sohbet"} — işlemler`);
+  menu.setAttribute("aria-label",
+      t("chat.actions_aria", { ad: summary.title || t("chat.untitled") }));
 
   const rename = document.createElement("button");
   rename.type = "button";
   rename.className = "chat-menu-item";
   rename.setAttribute("role", "menuitem");
-  rename.textContent = "Yeniden adlandır";
+  rename.textContent = t("chat.rename");
   rename.addEventListener("click", () => { closeMenus(); renameChat(summary); });
 
   const remove = document.createElement("button");
   remove.type = "button";
   remove.className = "chat-menu-item chat-menu-danger";
   remove.setAttribute("role", "menuitem");
-  remove.textContent = "Sil";
+  remove.textContent = t("common.delete");
   remove.addEventListener("click", () => { closeMenus(); deleteChat(summary); });
 
   menu.append(rename, remove);
@@ -2219,7 +2224,7 @@ function chatItem(summary) {
   open.className = "chat-item-open";
   const title = document.createElement("span");
   title.className = "chat-item-title";
-  title.textContent = summary.title || "Adsız sohbet";
+  title.textContent = summary.title || t("chat.untitled");
   const meta = document.createElement("span");
   meta.className = "chat-item-meta";
   meta.textContent = shortStamp(summary.updated_at);
@@ -2231,9 +2236,9 @@ function chatItem(summary) {
   menuBtn.className = "chat-item-menu";
   menuBtn.setAttribute("aria-haspopup", "true");
   menuBtn.setAttribute("aria-expanded", "false");
-  menuBtn.setAttribute("aria-label", `${title.textContent} — işlemler`);
+  menuBtn.setAttribute("aria-label", t("chat.actions_aria", { ad: title.textContent }));
   menuBtn.dataset.chatId = summary.id;   // closeMenus odağı buraya geri veriyor
-  menuBtn.title = "İşlemler";
+  menuBtn.title = t("chat.actions");
   menuBtn.textContent = "⋯";
 
   const menu = chatMenu(summary);
@@ -2264,7 +2269,8 @@ function renderChatList() {
 // modunda üretilen görsel açık oturumun dökümüne düşüyor — kullanıcı hangi
 // oturumda olduğunu görmezse görsel bilmediği bir yere gitmiş olurdu.
 function syncSessionHeader(chat) {
-  $("session-title").textContent = chat ? (chat.title || "Adsız oturum") : "Yeni oturum";
+  $("session-title").textContent =
+      chat ? (chat.title || t("chat.untitled_session")) : t("session.new");
   $("session-stamp").textContent = chat ? shortStamp(chat.updated_at) : "";
 }
 
@@ -2276,11 +2282,10 @@ function syncSessionHeader(chat) {
  */
 async function deleteAllChats() {
   const count = chatSummaries.length;
-  if (!count) { chatStatus("Silinecek oturum yok."); return; }
-  const ok = await confirmDialog("Tüm oturumları sil",
-    `${count} oturum kalıcı olarak silinecek. Üretilen görseller SİLİNMEZ — `
-    + "yalnızca oturum dökümleri gider. Bu işlem geri alınamaz.",
-    { okLabel: "Tümünü sil" });
+  if (!count) { chatStatus(t("chat.nothing_to_delete")); return; }
+  const ok = await confirmDialog(t("sessions.delete_all"),
+    t("chat.delete_all_body", { adet: count }),
+    { okLabel: t("chat.delete_all_ok") });
   if (!ok) return;
   try {
     const { deleted } = await chatApi("/api/chats", { method: "DELETE" });
@@ -2288,9 +2293,9 @@ async function deleteAllChats() {
     chatSummaries = [];
     renderChatList();
     syncSessionHeader(null);
-    chatStatus(`${deleted} oturum silindi.`);
+    chatStatus(t("chat.sessions_deleted", { adet: deleted }));
   } catch (e) {
-    chatStatus(`Silinemedi: ${e.message}`);
+    chatStatus(t("chat.delete_failed", { hata: e.message }));
   }
 }
 
@@ -2328,11 +2333,11 @@ async function saveAutosavePref() {
     // kutucuk kullanıcıya yalan söylemesin.
     $("pref-autosave").checked = p.autosave_sessions !== false;
     $("settings-status").textContent = p.autosave_sessions
-      ? "Oturumlar otomatik kaydedilecek."
-      : "Otomatik kayıt kapatıldı — yalnızca elle kaydedilen oturumlar yazılır.";
+      ? t("settings.autosave_on_msg")
+      : t("settings.autosave_off_msg");
   } catch (e) {
     $("pref-autosave").checked = !on;   // gerçekleşmeyen değişikliği geri al
-    $("settings-status").textContent = `Tercih kaydedilemedi: ${e.message}`;
+    $("settings-status").textContent = t("prefs.write_failed", { hata: e.message });
   }
 }
 
@@ -2357,18 +2362,18 @@ async function saveDirectorGuidance() {
   // `finally` şart — hata dalında da açılmalı, yoksa bir ağ hatası düğmeyi
   // temelli kilitler.
   $("director-save").disabled = true;
-  $("director-status").textContent = "Kaydediliyor…";
+  $("director-status").textContent = t("common.saving");
   try {
     const p = await chatApi("/api/prefs",
       { method: "POST", body: { director_guidance: metin } });
     $("director-guidance").value = p.director_guidance || "";
     $("director-status").textContent = p.director_guidance
-      ? "Yönlendirme kaydedildi — bundan sonraki her turda geçerli."
-      : "Yönlendirme temizlendi.";
+      ? t("director.guidance_saved")
+      : t("director.guidance_cleared");
   } catch (e) {
     // Metin KUTUDA BIRAKILIYOR: kullanıcının yazdığını bir ağ hatası yüzünden
     // silmek, sendChat'in başarısızlık dalının reddettiği şeyin aynısı.
-    $("director-status").textContent = `Kaydedilemedi: ${e.message}`;
+    $("director-status").textContent = t("common.save_failed", { hata: e.message });
   } finally {
     $("director-save").disabled = false;
   }
@@ -2385,8 +2390,8 @@ async function saveGuncellemePref() {
       { method: "POST", body: { guncelleme_kontrolu: on } });
     $("pref-guncelleme").checked = p.guncelleme_kontrolu !== false;
     $("settings-status").textContent = p.guncelleme_kontrolu
-      ? "Yeni sürüm çıkınca haber verilecek."
-      : "Sürüm kontrolü kapatıldı — uygulama bu iş için ağa çıkmayacak.";
+      ? t("settings.update_check_on_msg")
+      : t("settings.update_check_off_msg");
     // Satır ANINDA gizlensin: kontrolü kapatıp açık kalan bir bildirim,
     // anahtarın işe yaramadığı izlenimi verir. Artık `uygulaGuncelleme`
     // üzerinden: satırla birlikte dişli düğmesindeki ROZET de sönmek zorunda —
@@ -2395,7 +2400,7 @@ async function saveGuncellemePref() {
     if (!p.guncelleme_kontrolu) uygulaGuncelleme(null);
   } catch (e) {
     $("pref-guncelleme").checked = !on;   // gerçekleşmeyen değişikliği geri al
-    $("settings-status").textContent = `Tercih kaydedilemedi: ${e.message}`;
+    $("settings-status").textContent = t("prefs.write_failed", { hata: e.message });
   }
 }
 
@@ -2408,7 +2413,7 @@ async function loadChats() {
     // Panel boş kalır ama sohbet ÇALIŞMAYA devam eder: liste bir kolaylık,
     // turun ön koşulu değil.
     $("chat-list-empty").hidden = false;
-    $("chat-list-empty").textContent = "Sohbet listesi alınamadı.";
+    $("chat-list-empty").textContent = t("chat.list_failed");
   }
 }
 
@@ -2422,7 +2427,7 @@ function resetThread() {
 }
 
 function newChat() {
-  if (chatBusy) { chatStatus("Yönetmen yanıtlıyor — bitmesini bekle."); return; }
+  if (chatBusy) { chatStatus(t("chat.director_busy")); return; }
   closeMenus();
   resetThread();
   renderChatList();                   // seçili işaret kalkar
@@ -2431,7 +2436,7 @@ function newChat() {
 }
 
 async function openChat(chatId) {
-  if (chatBusy) { chatStatus("Yönetmen yanıtlıyor — bitmesini bekle."); return; }
+  if (chatBusy) { chatStatus(t("chat.director_busy")); return; }
   closeMenus();
   if (chatId === currentChatId) { closeSidebarOnMobile(); return; }
   try {
@@ -2447,13 +2452,13 @@ async function openChat(chatId) {
     closeSidebarOnMobile();
     $("prompt").focus();
   } catch (e) {
-    chatStatus(`Sohbet açılamadı: ${e.message}`);
+    chatStatus(t("chat.open_failed", { hata: e.message }));
   }
 }
 
 async function renameChat(summary) {
-  const name = await promptDialog("Sohbeti yeniden adlandır",
-    "Kenar panelinde görünecek ad.", { okLabel: "Kaydet", initial: summary.title || "" });
+  const name = await promptDialog(t("chat.rename_title"),
+    t("chat.rename_body"), { okLabel: t("common.save"), initial: summary.title || "" });
   if (name === null) return;
   try {
     const { chat } = await chatApi(`/api/chats/${summary.id}`,
@@ -2461,21 +2466,21 @@ async function renameChat(summary) {
     upsertSummary(chat);              // dönen kayıt yeter, listeyi baştan çekme
     if (chat.id === currentChatId) syncSessionHeader(chat);
   } catch (e) {
-    chatStatus(`Yeniden adlandırılamadı: ${e.message}`);
+    chatStatus(t("chat.rename_failed", { hata: e.message }));
   }
 }
 
 async function deleteChat(summary) {
-  const ok = await confirmDialog("Sohbeti sil",
-    `"${summary.title || "Adsız sohbet"}" kalıcı olarak silinecek. Bu işlem geri alınamaz.`,
-    { okLabel: "Sil" });
+  const ok = await confirmDialog(t("chat.delete_title"),
+    t("chat.delete_body", { ad: summary.title || t("chat.untitled") }),
+    { okLabel: t("common.delete") });
   if (!ok) return;
   try {
     await chatApi(`/api/chats/${summary.id}`, { method: "DELETE" });
     if (summary.id === currentChatId) resetThread();
     dropSummary(summary.id);
   } catch (e) {
-    chatStatus(`Silinemedi: ${e.message}`);
+    chatStatus(t("chat.delete_failed", { hata: e.message }));
   }
 }
 
@@ -2553,12 +2558,13 @@ if ($("chats-rename")) {
   $("chats-rename").addEventListener("click", async () => {
     closeKebabMenu();
     if (!currentChatId) {
-      chatStatus("Yeniden adlandırılacak açık oturum yok.");
+      chatStatus(t("chat.no_open_session"));
       return;
     }
     const cur = chatSummaries.find((c) => c.id === currentChatId);
-    const title = await promptDialog("Oturumu yeniden adlandır",
-      "Yeni oturum başlığını girin.", { defaultValue: cur ? cur.title : "Yeni oturum", okLabel: "Kaydet" });
+    const title = await promptDialog(t("session.rename"),
+      t("chat.session_rename_body"),
+      { defaultValue: cur ? cur.title : t("session.new"), okLabel: t("common.save") });
     if (!title || !title.trim()) return;
     try {
       await chatApi(`/api/chats/${currentChatId}`, {
@@ -2568,9 +2574,9 @@ if ($("chats-rename")) {
       if (cur) cur.title = title.trim();
       $("session-title").textContent = title.trim();
       renderChatList();
-      chatStatus("Oturum yeniden adlandırıldı.");
+      chatStatus(t("chat.session_renamed"));
     } catch (e) {
-      chatStatus(`Adlandırılamadı: ${e.message}`);
+      chatStatus(t("chat.rename_failed", { hata: e.message }));
     }
   });
 }
@@ -2579,11 +2585,11 @@ if ($("chats-clear-current")) {
   $("chats-clear-current").addEventListener("click", async () => {
     closeKebabMenu();
     if (!chatThread.length) {
-      chatStatus("Temizlenecek mesaj yok.");
+      chatStatus(t("chat.nothing_to_clear"));
       return;
     }
-    const ok = await confirmDialog("Sohbeti temizle",
-      "Açık oturumdaki tüm mesaj dökümü temizlenecek. Üretilen görseller SİLİNMEZ.",
+    const ok = await confirmDialog(t("session.clear"),
+      t("chat.clear_body"),
       { okLabel: "Temizle" });
     if (!ok) return;
     resetThread();
@@ -2597,7 +2603,7 @@ if ($("chats-clear-current")) {
         console.error("Clearing thread failed:", e);
       }
     }
-    chatStatus("Sohbet dökümü temizlendi.");
+    chatStatus(t("chat.cleared"));
   });
 }
 

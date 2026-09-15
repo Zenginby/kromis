@@ -1,3 +1,6 @@
+// Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+// GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+// Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 // Kromis — üretim akışı: prompt, referans görseller, ilerleme, onay penceresi.
 //
 // Klasik script (ES module DEĞİL): bütün parçalar TEK global kapsamı paylaşır
@@ -86,19 +89,14 @@ function syncTabThumb() {
  * kalıcı bir talimat olarak durması, kullanıcının kaldırılmasını istediği
  * "gereksiz yazı"nın ta kendisi.
  */
+// Değerler ETİKET değil ANAHTAR (palette.js'teki HARMONY_KEYS'in gerekçesi):
+// `t()` okundukları yerde çağrılıyor, tabloda değil.
 const PROMPT_YER_TUTUCU = {
-  image: {
-    tam: "Ne üretmek istiyorsun? Görsel tarifi, renk veya tarz yaz…",
-    kisa: "Ne üretmek istiyorsun?",
-  },
-  video: {
-    tam: "Nasıl bir video? Sahneyi, kamera hareketini ve ışığı yaz…",
-    kisa: "Nasıl bir video?",
-  },
-  director: {
-    tam: "Yönetmen'e sor veya fikir danış… (öğeleri değiştir, sahne ekle)",
-    kisa: "Yönetmen'e sor…",
-  },
+  image: { tam: "composer.placeholder", kisa: "composer.placeholder_short" },
+  video: { tam: "composer.placeholder_video",
+           kisa: "composer.placeholder_video_short" },
+  director: { tam: "composer.placeholder_director",
+              kisa: "composer.placeholder_director_short" },
 };
 
 /** Mod → o modun sekme düğmesi. TEK eşleme, üç okuyan (`syncTabThumb`,
@@ -119,7 +117,7 @@ function syncPromptPlaceholder() {
   const prompt = $("prompt");
   if (!prompt) return;
   const metin = PROMPT_YER_TUTUCU[currentMode] || PROMPT_YER_TUTUCU.image;
-  prompt.placeholder = $("composer").dataset.sent ? metin.kisa : metin.tam;
+  prompt.placeholder = t($("composer").dataset.sent ? metin.kisa : metin.tam);
 }
 
 function setMode(modeName) {
@@ -488,7 +486,7 @@ function syncRunCost() {
     const sutunlar = arenaSutunlari();
     if (!sutunlar.length) { el.hidden = true; return; }
     const toplam = sutunlar.reduce((t, s) => t + (s.birim || 0), 0);
-    el.textContent = `≈ ${toplam} kredi · ${sutunlar.length} model`;
+    el.textContent = `${tc("gen.cost_one", "gen.cost_many", toplam)} · ${tc("gen.models_one", "gen.models_many", sutunlar.length)}`;
     el.hidden = false;
     return;
   }
@@ -510,7 +508,8 @@ function syncRunCost() {
     : 1;
   // `≈` bilerek: bu bir fatura değil, metadata — tilde bunu bir paragraf
   // açıklama yazmadan söylüyor.
-  el.textContent = `≈ ${birim * sure * Number($("n").value || 1)} kredi`;
+  el.textContent = tc("gen.cost_one", "gen.cost_many",
+                      birim * sure * Number($("n").value || 1));
   el.hidden = false;
 }
 
@@ -525,31 +524,31 @@ function syncRunCost() {
  * saklamak, #chat-gate'in reddettiği şeyin aynısı.
  */
 function goBlockReason() {
-  if (runBusy) return "Üretim sürüyor…";
+  if (runBusy) return t("gate.busy");
   if (currentMode === "director") {
     // Görsel dalının AYNI kademeleri. Öncesinde tek bir `chatConfigured`
     // boolean'ı vardı ve o yalnız AZURE'u ölçüyordu: yalnızca Gemini anahtarı
     // olan bir kullanıcıda yönetmen ölü bir düğmeyle açılırdı — `#go` kapısının
     // görsel tarafında v0.6'da düzeltilen kırılmanın aynısı.
-    if (!chatModels.length) return "Sohbet modeli listesi alınamadı.";
+    if (!chatModels.length) return t("gate.no_chat_list");
     // Liste DOLU ama seçim yok ⇒ hiçbirinin kimliği kayıtlı değil. Bu, filtre
     // anahtarsız modelleri gizlemeye başladığından beri ULAŞILABİLİR bir hâl
     // ve "seçilmedi" demek kullanıcıya yanlış bir iş verirdi (seçecek bir şey
     // yok); doğru iş Ayarlar'da.
     if (!currentChatModel) {
-      return "Kayıtlı sohbet kimliği yok — Ayarlar'dan ekle.";
+      return t("gate.no_chat_credential");
     }
     if (!currentChatModel.configured) {
-      return `${currentChatModel.label} için kimlik yok — Ayarlar'dan ekle.`;
+      return t("gate.model_no_credential", { model: currentChatModel.label });
     }
     return "";
   }
   if (currentMode === "video") {
     // Görsel dalının AYNI üç kademesi, ayrı liste üzerinde.
-    if (!videoModels.length) return "Video modeli listesi alınamadı.";
-    if (!currentVideoModel) return "Kayıtlı API anahtarı yok — Ayarlar'dan ekle.";
+    if (!videoModels.length) return t("gate.no_video_list");
+    if (!currentVideoModel) return t("gate.no_key");
     if (!currentVideoModel.configured) {
-      return `${currentVideoModel.label} için anahtar yok — Ayarlar'dan ekle.`;
+      return t("gate.model_no_key", { model: currentVideoModel.label });
     }
     // ARENA KAPISI. Burada öncesinde "arena dalı YOK: arena video modunda hiç
     // açılmıyor, olmayan bir durumu kollamak olurdu" yazılıydı ve YANLIŞTI —
@@ -565,55 +564,55 @@ function goBlockReason() {
     // modda görünmüyor: gerekçesi olan bir kapı, çaresi olmayan bir kapı
     // olmamalı.
     if (arenaAcik) {
-      return "Arena video modunda çalışmıyor — Görsel moduna geçip kapat.";
+      return t("gate.arena_not_in_video");
     }
     if (source && !currentVideoModel.supports_edit) {
-      return `${currentVideoModel.label} referans görselle çalışmıyor.`;
+      return t("gate.model_no_reference", { model: currentVideoModel.label });
     }
     // EK REFERANS video tarafında kabul edilmiyor: Veo'nun girdisi tek bir
     // İLK KARE (`max_refs=1`) ve sunucu da 422 döndürüyor. Kapı burada da
     // duruyor çünkü sessizce ilerlemek, dakikalarca bekleyip bir 422 görmek
     // olurdu — hem de referansları eklemenin bir işe yaradığını sanarak.
     if (extras.length) {
-      return `${currentVideoModel.label} tek referans görsel alıyor (ilk kare).`;
+      return t("gate.model_one_reference", { model: currentVideoModel.label });
     }
     // SON KARE tek başına anlamsız: neyin arasında geçiş yapılacağı yok.
     // Sunucu da 422 diyor (`app._check_video_form`in "tam olarak biri" kapısı
     // ana kareyi zorunlu tutuyor); kapı burada da duruyor çünkü sessizce
     // ilerlemek, prompt yazıp üretime basıp bir 422 görmek olurdu.
     if (sonKare && !source) {
-      return "Bitiş görseli tek başına kullanılamaz — bir başlangıç görseli de seç.";
+      return t("gate.last_frame_needs_first");
     }
     if (sonKare && !currentVideoModel.supports_last_frame) {
       // Bayat bir sekmede ya da model değiştirildikten sonra ulaşılabilir bir
       // hâl: yuva doluyken Veo 3.1 dışı bir modele geçmek.
-      return `${currentVideoModel.label} bitiş görseli almıyor.`;
+      return t("gate.model_no_last_frame", { model: currentVideoModel.label });
     }
     return "";
   }
-  if (!imageModels.length) return "Model listesi alınamadı.";
+  if (!imageModels.length) return t("gate.no_model_list");
   // Yönetmen dalının aynı gerekçesi (yukarısı).
-  if (!currentModel) return "Kayıtlı API anahtarı yok — Ayarlar'dan ekle.";
+  if (!currentModel) return t("gate.no_key");
   if (!currentModel.configured) {
-    return `${currentModel.label} için anahtar yok — Ayarlar'dan ekle.`;
+    return t("gate.model_no_key", { model: currentModel.label });
   }
   if (source && !currentModel.supports_edit) {
-    return `${currentModel.label} referans görselle çalışmıyor.`;
+    return t("gate.model_no_reference", { model: currentModel.label });
   }
   if (arenaAcik) {
     // Kapının sebebi yazılı: tek modelli bir arena sessizce sıradan bir
     // üretime dönüşseydi kullanıcı karşılaştırma beklerken tek sonuç alırdı.
     const idler = arenaSecimi();
-    if (idler.length < ARENA_MIN) return `Arena için en az ${ARENA_MIN} model seç.`;
+    if (idler.length < ARENA_MIN) return t("gate.arena_min", { adet: ARENA_MIN });
     // Sessizce sıradan bir düzenlemeye düşmek YASAK (uygulamanın genel
     // duruşu): kullanıcı arena açıkken referans eklerse ne olacağını
     // görmeli. Düzenleme arenası bilinçli olarak kapsam dışı.
-    if (source) return "Arena düzenlemeyle çalışmıyor — referansı kaldır.";
+    if (source) return t("gate.arena_no_edit");
     const anahtarsiz = idler
       .map((id) => imageModels.find((m) => m.id === id))
       .filter((m) => m && !m.configured);
     if (anahtarsiz.length) {
-      return `${anahtarsiz[0].label} için anahtar yok — Ayarlar'dan ekle.`;
+      return t("gate.model_no_key", { model: anahtarsiz[0].label });
     }
   }
   return "";
@@ -640,9 +639,9 @@ const GO_KISAYOL = "⌘/Ctrl + Enter";
 // kısayolun yaptığı iş tam olarak o düğmelere basmak; ikisi bir arada
 // duruyor ki "iki dosyada iki ad" kayması doğmasın.
 const MOD_KISAYOL = "⌘/Ctrl + J";
-$("tab-image").title = `Görsel modu · ${MOD_KISAYOL}`;
-$("tab-video").title = `Video modu · ${MOD_KISAYOL}`;
-$("tab-chat").title = `Yönetmen modu · ${MOD_KISAYOL}`;
+$("tab-image").title = `${t("composer.mode_image")} · ${MOD_KISAYOL}`;
+$("tab-video").title = `${t("composer.mode_video")} · ${MOD_KISAYOL}`;
+$("tab-chat").title = `${t("composer.mode_director")} · ${MOD_KISAYOL}`;
 
 function syncGoGate() {
   const sebep = goBlockReason();
@@ -763,8 +762,8 @@ function eksenleriDoldur(model, { announce = true } = {}) {
   syncSpecs();
   syncRunCost();
   if (announce && dusenler.length) {
-    statusEl.textContent = `${model.label} bu ayarları desteklemiyor, `
-      + `varsayılana düşüldü: ${dusenler.join(", ")}.`;
+    statusEl.textContent = t("gen.fell_back_to_defaults",
+                             { model: model.label, alanlar: dusenler.join(", ") });
   }
 }
 
@@ -814,7 +813,7 @@ function modelNotuYaz(model) {
     return;
   }
   $("model-note-text").textContent =
-    `${model.label} için API anahtarı kayıtlı değil.`;
+    t("gate.model_key_missing", { model: model.label });
   not.hidden = false;
 }
 
@@ -988,7 +987,8 @@ function modelKrediAraligi(m) {
   // 8 saniyelik bir klibin 128 kredi olduğunu SAKLARDI — yani karşılaştırma
   // için var olan etiket yanlış bir karşılaştırma sunardı. Ölçüt `durations`ın
   // boşluğu, ikinci bir birim alanı DEĞİL (aynı bilginin iki kopyası olurdu).
-  const birim = m.durations && m.durations.length ? "kredi/sn" : "kredi";
+  const birim = t(m.durations && m.durations.length
+                  ? "gen.credits_unit_per_sec" : "gen.credits_unit");
   const tarife = Object.values(m.credits_by_quality || {});
   return tarife.length
     ? `${Math.min(...tarife)}–${Math.max(...tarife)} ${birim}`
@@ -1014,7 +1014,7 @@ function modelKrediAraligi(m) {
 function modelSecenekMetni(m, kredi) {
   const ad = m.short_label || m.label;
   return (kredi ? `${ad} — ${modelKrediAraligi(m)}` : ad)
-    + (m.configured ? "" : " · kurulum gerekli");
+    + (m.configured ? "" : ` · ${t("model.setup_required")}`);
 }
 
 function renderModelOptions(zorunluId) {
@@ -1151,7 +1151,7 @@ function arenaKutucuk(kutucuk) {
   if (kutucuk.checked && !idler.includes(kutucuk.value)) {
     if (idler.length >= ARENA_MAX) {
       kutucuk.checked = false;
-      statusEl.textContent = `Arena en çok ${ARENA_MAX} model karşılaştırıyor.`;
+      statusEl.textContent = t("arena.max_models", { adet: ARENA_MAX });
       return;
     }
     idler.push(kutucuk.value);
@@ -1228,7 +1228,8 @@ function arenaUygula() {
   $("arena-toggle").setAttribute("aria-pressed", String(arenaAcik));
   $("arena-btn").hidden = !arenaAcik;
   $("model-pick").hidden = arenaAcik;
-  $("arena-btn-label").textContent = `${idler.length} model`;
+  $("arena-btn-label").textContent =
+    tc("gen.models_one", "gen.models_many", idler.length);
   // Adet arenada 1'e kilitli: sütun başına tek görsel karşılaştırmanın
   // kendisi. 4 model × 4 görsel hem ızgarayı hem faturayı okunmaz yapardı.
   $("spec-n").hidden = arenaAcik;
@@ -1240,8 +1241,8 @@ function arenaUygula() {
     if (ortak.length) {
       const dusen = fillAxis("size", ortak, undefined, ortak[0].value);
       if (dusen) {
-        statusEl.textContent = "Seçilen modellerin ortak oranı bu değil, "
-          + `${$("size").selectedOptions[0]?.textContent.trim()} seçildi.`;
+        statusEl.textContent = t("arena.common_ratio_used",
+          { oran: $("size").selectedOptions[0]?.textContent.trim() });
       }
     }
     if ($("n").value !== "1") $("n").value = "1";
@@ -1377,7 +1378,7 @@ async function savePref(body) {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   } catch (e) {
-    statusEl.textContent = `Tercih kaydedilemedi (seçim bu oturumda geçerli): ${e.message}`;
+    statusEl.textContent = t("prefs.save_failed", { hata: e.message });
   }
 }
 
@@ -1404,23 +1405,20 @@ async function savePref(body) {
 // ("Kayıtlı sohbet kimliği yok"); panel de aynı dili konuşmak zorunda, yoksa
 // aynı hâl iki yerde iki ayrı iş buyurur.
 const MODEL_BOS_PANEL = {
-  anahtar: "Kayıtlı API anahtarı yok. Ayarlar'dan bir sağlayıcının anahtarını "
-    + "kaydedince modelleri burada göreceksin.",
-  kimlik: "Kayıtlı sohbet kimliği yok. Ayarlar'dan bir sağlayıcının kimlik "
-    + "bilgilerini (anahtar, gerekiyorsa dağıtım adı) tamamlayınca modelleri "
-    + "burada göreceksin.",
+  anahtar: "model.empty_no_key",
+  kimlik: "model.empty_no_chat_credential",
 };
 
 const MODEL_EKSENLERI = {
   image: {
     secici: "model", dugme: "model-btn", etiket: "model-btn-label",
-    logo: "model-logo", baslik: "Görsel modeli", kredi: true,
+    logo: "model-logo", baslik: "model.image_title", kredi: true,
     bosMetin: MODEL_BOS_PANEL.anahtar,
     liste: () => imageModels,
   },
   chat: {
     secici: "chat-model", dugme: "chat-model-btn", etiket: "chat-model-btn-label",
-    logo: "chat-model-logo", baslik: "Yönetmen modeli", kredi: false,
+    logo: "chat-model-logo", baslik: "model.director_title", kredi: false,
     bosMetin: MODEL_BOS_PANEL.kimlik,
     liste: () => chatModels,
   },
@@ -1432,7 +1430,7 @@ const MODEL_EKSENLERI = {
   video: {
     secici: "video-model", dugme: "video-model-btn",
     etiket: "video-model-btn-label", logo: "video-model-logo",
-    baslik: "Video modeli", kredi: true,
+    baslik: "model.video_title", kredi: true,
     bosMetin: MODEL_BOS_PANEL.anahtar,
     liste: () => videoModels,
   },
@@ -1446,7 +1444,7 @@ const MODEL_EKSENLERI = {
   // dokunmuyor.
   arena: {
     secici: "arena-models", dugme: "arena-btn", etiket: "arena-btn-label",
-    logo: null, baslik: "Arena modelleri", kredi: true, coklu: true,
+    logo: null, baslik: "arena.models", kredi: true, coklu: true,
     // Arena görsel modellerini listeliyor, yani eksik olan da aynı şey.
     bosMetin: MODEL_BOS_PANEL.anahtar,
     liste: () => imageModels,
@@ -1486,7 +1484,7 @@ function syncModelChip(eksenAdi, model) {
   setModelLogo(eksen.logo, model);       // model yoksa işaret de yok
   $(eksen.etiket).textContent = model
     ? modelSecenekMetni(model, eksen.kredi)
-    : MODEL_BOS_METNI;
+    : t(MODEL_BOS_METNI);
   if (modelSheetEkseni === eksenAdi) {
     for (const r of $("model-sheet-list").querySelectorAll("input")) {
       r.checked = !!model && r.value === model.id;
@@ -1499,7 +1497,9 @@ function syncModelChip(eksenAdi, model) {
  * TEK dize, üç yer okuyor (çip · panel · testler) — ikinci bir yerde yeniden
  * kurulsaydı ikisi zamanla ayrışırdı; `modelSecenekMetni`nin aynı dersi.
  */
-const MODEL_BOS_METNI = "Model yok — Ayarlar";
+// Anahtar, metin DEĞİL: okuyan üç yer (`modelSecenekMetni`, panel, testler)
+// `t()`den geçiriyor.
+const MODEL_BOS_METNI = "model.none_settings";
 
 /** Kullanılabilir model KALMADIĞINDA şeridi ve notu boş hâle çeker.
  *
@@ -1525,7 +1525,7 @@ function modelBosHali(eksenAdi) {
   // "Kayıtlı API anahtarı yok" diyen bir uyarı göstermek olurdu.
   if ((eksenAdi === "image" || eksenAdi === "video")
       && currentMode === eksenAdi) {
-    $("model-note-text").textContent = "Kayıtlı API anahtarı yok.";
+    $("model-note-text").textContent = t("model.no_key_short");
     $("model-note").hidden = false;
   }
   // Panel YENİDEN ÇİZİLMİYOR: kartların tek çağıranı `openModelSheet` ve o
@@ -1583,7 +1583,7 @@ function renderModelCards(eksenAdi) {
     if (!m.configured) {
       const rozet = document.createElement("span");
       rozet.className = "model-row-badge";
-      rozet.textContent = "kurulum gerekli";
+      rozet.textContent = t("model.setup_required");
       ad.append(rozet);
     }
     metin.append(ad);
@@ -1630,7 +1630,7 @@ function renderModelCards(eksenAdi) {
   if (!kartlar.length) {
     const bos = document.createElement("p");
     bos.className = "model-sheet-empty";
-    bos.textContent = eksen.bosMetin;
+    bos.textContent = t(eksen.bosMetin);
     kartlar.push(bos);
   }
 
@@ -1659,7 +1659,7 @@ function openModelSheet(eksenAdi) {
 
   modelSheetEkseni = eksenAdi;
   $("model-sheet").dataset.axis = eksenAdi;
-  $("model-sheet-title").textContent = MODEL_EKSENLERI[eksenAdi].baslik;
+  $("model-sheet-title").textContent = t(MODEL_EKSENLERI[eksenAdi].baslik);
   renderModelCards(eksenAdi);
   openSheet("model-sheet");                       // tek kapı (yukarısı)
 
@@ -1794,7 +1794,14 @@ function syncSpecs() {
   $("specs-label").textContent = parts.join(" · ");
 }
 for (const id of ["size", "quality", "duration", "n"]) {
-  $(id).addEventListener("change", () => { syncSpecs(); syncRunCost(); });
+  // `renderFrames` de dinliyor ve YALNIZ süre yüzünden: kare notu artık
+  // süreye bakıyor (geçiş 8 sn istiyor), yani süre değiştiğinde not bayat
+  // kalırdı — kullanıcı 8'e çevirir, uyarı ekranda durmaya devam ederdi.
+  // Dört eksen için de çağrılıyor çünkü ayrı bir dal açmak, aynı satırın
+  // ikinci bir bakım noktası olurdu; `renderFrames` yan etkisiz ve ucuz.
+  $(id).addEventListener("change", () => {
+    syncSpecs(); syncRunCost(); renderFrames();
+  });
 }
 syncSpecs();
 
@@ -1881,13 +1888,15 @@ function submitComposer() {
   const promptVal = $("prompt").value.trim();
   if (currentMode === "image" || currentMode === "video") {
     if (promptVal.length > MAX_PROMPT_CHARS) {
-      statusEl.textContent = `İstem çok uzun (${promptVal.length}/${MAX_PROMPT_CHARS} karakter).`;
+      statusEl.textContent = t("composer.prompt_too_long",
+      { uzunluk: promptVal.length, sinir: MAX_PROMPT_CHARS });
       return;
     }
     run();
   } else {
     if (promptVal.length > 6000) {
-      statusEl.textContent = `Mesaj çok uzun (${promptVal.length}/6000 karakter).`;
+      statusEl.textContent = t("composer.message_too_long",
+      { uzunluk: promptVal.length, sinir: 6000 });
       return;
     }
     sendChat();
@@ -2082,8 +2091,8 @@ function downloadViaAnchor(url, filename) {
  */
 function kayitPaneliTuru(filename) {
   return String(filename || "").toLowerCase().endsWith(".mp4")
-    ? { description: "MP4 video", accept: { "video/mp4": [".mp4"] } }
-    : { description: "PNG görsel", accept: { "image/png": [".png"] } };
+    ? { description: t("download.mp4"), accept: { "video/mp4": [".mp4"] } }
+    : { description: t("download.png"), accept: { "image/png": [".png"] } };
 }
 
 // Kayıt panelini açar, seçilen dosyaya medyanın baytlarını yazar.
@@ -2113,13 +2122,13 @@ async function downloadImage(url, filename) {
     const stream = await handle.createWritable();
     await stream.write(await res.blob());
     await stream.close();
-    statusEl.textContent = `İndirildi: ${filename}`;
+    statusEl.textContent = t("download.done", { dosya: filename });
   } catch (e) {
     // Hem söyle hem kurtar: durum satırı büyüteç açıkken perdenin ARKASINDA
     // kalıyor, o yüzden tek başına yeterli değil — geri düşüş dosyayı hiç
     // olmazsa indirme klasörüne bırakır. `createWritable` yazmayı takas
     // dosyasında biriktirdiği için yarım dosya kalmaz.
-    statusEl.textContent = `İndirilemedi (${e.message}); indirme klasörüne kaydediliyor.`;
+    statusEl.textContent = t("download.failed", { hata: e.message });
     downloadViaAnchor(url, filename);
   }
 }
@@ -2168,25 +2177,25 @@ function renderSource() {
       chipImg.removeAttribute("src");
     }
     if (currentMode === "image") {
-      goBtn.textContent = extras.length ? "Görselleri birleştir" : "Görseli düzenle";
+      goBtn.textContent = t(extras.length ? "go.merge_images" : "go.edit_image");
     } else if (currentMode === "video") {
       // "Düzenle" DEĞİL "Canlandır": video tarafında referans görsel
       // değiştirilmiyor, HAREKETLENDİRİLİYOR — düğmenin metni kullanıcının
       // ne alacağını söylemek zorunda (`#go`nun dört durumlu metninin
       // kurulmuş kuralı).
-      goBtn.textContent = "Görseli canlandır";
+      goBtn.textContent = t("go.animate");
     } else {
-      goBtn.textContent = "Gönder";
+      goBtn.textContent = t("go.send");
     }
   } else {
     chip.hidden = true;
     if (chipImg) { chipImg.hidden = true; chipImg.removeAttribute("src"); }
     if (currentMode === "image") {
-      goBtn.textContent = "Üret";
+      goBtn.textContent = t("composer.generate");
     } else if (currentMode === "video") {
-      goBtn.textContent = "Video üret";
+      goBtn.textContent = t("go.generate_video");
     } else {
-      goBtn.textContent = "Gönder";
+      goBtn.textContent = t("go.send");
     }
   }
   // Ek görsel yalnızca bir ana görsel varken anlamlı. Video modunda şerit
@@ -2237,8 +2246,8 @@ function renderExtras() {
     del.type = "button";
     del.className = "extra-del";
     del.textContent = "×";
-    del.title = "Kaldır";
-    del.setAttribute("aria-label", `${item.label} kaldır`);
+    del.title = t("common.remove");
+    del.setAttribute("aria-label", t("common.remove_named", { ad: item.label }));
     del.addEventListener("click", () => removeExtra(item));
 
     const cell = document.createElement("div");
@@ -2283,14 +2292,14 @@ function extraBlockReason(rec) {
   // gizli olduğu için KALDIRILAMIYORDU: kullanıcı kilitli bir `#go` ile
   // göremediği bir ek arasında sıkışıyordu.
   if (currentMode === "video") {
-    return "Video tek referans görsel alıyor (ilk kare).";
+    return t("picker.video_one_reference");
   }
-  if (!source) return "Önce ana görseli seç.";
-  if (extraSlotsLeft() <= 0) return `En fazla ${MAX_EDIT_IMAGES} görsel gönderilebilir.`;
+  if (!source) return t("picker.pick_main_first");
+  if (extraSlotsLeft() <= 0) return t("picker.max_images", { adet: MAX_EDIT_IMAGES });
   if (!rec) return "";
-  if (source.kind === "gallery" && source.id === rec.id) return "Bu görsel zaten ana referans.";
+  if (source.kind === "gallery" && source.id === rec.id) return t("picker.already_main");
   if (extras.some((it) => it.kind === "gallery" && it.id === rec.id)) {
-    return "Bu görsel zaten ek referans listesinde.";
+    return t("picker.already_extra");
   }
   return "";
 }
@@ -2304,7 +2313,7 @@ function canAddExtra() {
 function addExtraUpload(file) {
   if (!canAddExtra()) return;
   if (!isAcceptedUpload(file)) {
-    statusEl.textContent = "PNG, JPEG veya WebP bir görsel seç.";
+    statusEl.textContent = t("library.bad_format");
     return;
   }
   extras = [...extras, { kind: "upload", file, label: file.name, src: URL.createObjectURL(file) }];
@@ -2334,11 +2343,11 @@ function addGalleryExtra(rec) {
 
 function setUploadSource(file) {
   if (!isAcceptedUpload(file)) {
-    statusEl.textContent = "PNG, JPEG veya WebP bir görsel seç.";
+    statusEl.textContent = t("library.bad_format");
     return;
   }
   clearUploadPreviewUrl();
-  source = { kind: "upload", file, label: `Yüklendi: ${file.name}` };
+  source = { kind: "upload", file, label: t("source.uploaded", { dosya: file.name }) };
   uploadPreviewUrl = URL.createObjectURL(file);
   setCurrentImage(null); // henüz sunucuda kayıt yok → bindirme uygulanamaz
   renderSource();
@@ -2347,7 +2356,8 @@ function setUploadSource(file) {
 function setGallerySource(rec) {
   clearUploadPreviewUrl();
   $("file-input").value = "";
-  source = { kind: "gallery", id: rec.id, label: `Referans: ${(rec.prompt || rec.id).slice(0, 40)}` };
+  source = { kind: "gallery", id: rec.id,
+             label: t("source.reference", { ad: (rec.prompt || rec.id).slice(0, 40) }) };
   // aynı görsel ek listesindeyse çift göndermemek için çıkar
   extras = extras.filter((it) => !(it.kind === "gallery" && it.id === rec.id));
   showPreview(rec);
@@ -2366,7 +2376,7 @@ function setGallerySourceById(id, prompt) {
     setGallerySource({ id, prompt: prompt || id, filename: `${id}.png` });
   }
   showSection("studio");
-  statusEl.textContent = "Görsel ana referans olarak ayarlandı.";
+  statusEl.textContent = t("source.set_as_main");
 }
 
 
@@ -2400,11 +2410,11 @@ function clearSonKare() {
 
 function setSonKareUpload(file) {
   if (!isAcceptedUpload(file)) {
-    statusEl.textContent = "PNG, JPEG veya WebP bir görsel seç.";
+    statusEl.textContent = t("library.bad_format");
     return;
   }
   clearSonKarePreviewUrl();
-  sonKare = { kind: "upload", file, label: `Yüklendi: ${file.name}` };
+  sonKare = { kind: "upload", file, label: t("source.uploaded", { dosya: file.name }) };
   sonKarePreviewUrl = URL.createObjectURL(file);
   renderFrames();
 }
@@ -2413,7 +2423,7 @@ function setSonKareGallery(rec) {
   clearSonKarePreviewUrl();
   $("last-frame-input").value = "";
   sonKare = { kind: "gallery", id: rec.id,
-              label: `Bitiş: ${(rec.prompt || rec.id).slice(0, 40)}` };
+              label: t("source.last_frame", { ad: (rec.prompt || rec.id).slice(0, 40) }) };
   renderFrames();
 }
 
@@ -2454,10 +2464,31 @@ function renderFrames() {
   // NOT SATIRI yalnız yapılacak bir iş varken doluyor. Boş bir yuva çifti
   // kendi başını anlatıyor ("Yok" + "Seç…"); orada bir cümle daha yazmak
   // panelin dört satırlık bütçesini gürültüye harcamak olurdu.
+  //
+  // SÜRE UYARISI İKİ KARE DOLUYKEN ve yalnız süre 8 sn DEĞİLKEN ekleniyor:
+  // Veo'nun geçiş yolu 8 saniyelik üretimde belgeleniyor ve arayüzün ön
+  // tanımlı süresi 4 (katalog: `default_duration`). Ölçülen kusur tam
+  // buydu — kullanıcı iki kareyi seçiyor, üretime basıyor ve Google'dan
+  // İngilizce bir 400 alıyordu (13 Eylül 2026).
+  //
+  // KAPI DEĞİL NOT, ve bu ayrım bilinçli: bu depoda Veo'nun hiçbir yolu
+  // canlı doğrulanmadı (veo_client'in "CANLI DOĞRULAMANIN DURUMU" notu).
+  // Doğrulanmamış bir sınırı `goBlockReason`a koymak, yanılırsak çalışan
+  // bir kombinasyonu erişilemez yapardı; not yanılırsa yalnızca fazladan
+  // bir cümle olur. Reddedilen istek ÜRETİM BAŞLATMIYOR, yani denemenin
+  // faturası da yok — `map_error`ın `err.veo_last_frame_400` metni aynı
+  // düğmeyi sunucu tarafında da gösteriyor.
+  //
+  // SÜRE 8 DEĞİLSE ölçütü `#duration`ın DEĞERİNDEN okunuyor, modelden
+  // değil: eksenin tek yazarı `eksenleriDoldur` ve seçili değeri o tutuyor
+  // (çipin `hidden`den okuma kuralının aynısı).
+  const gecis = !!(source && sonKare);
+  const sure = Number($("duration").value || 0);
   $("frames-note").textContent = (sonKare && !source)
-    ? "Bitiş görseli tek başına kullanılamaz — bir başlangıç görseli de seç."
-    : (source && sonKare)
-      ? "İki kare arasında geçiş üretilecek."
+    ? t("gate.last_frame_needs_first")
+    : gecis
+      ? t("gen.transition_between_frames")
+        + (sure && sure !== 8 ? ` ${t("gen.last_frame_wants_8s")}` : "")
       : "";
 }
 
@@ -2503,7 +2534,7 @@ async function runArena(prompt) {
   // bulunmayan bir id orada düşüyor (`filter(Boolean)`), yani ikisi ayrışabilir.
   const sutunlar = arenaSutunlari();
   if (sutunlar.length < ARENA_MIN) {
-    statusEl.textContent = `Arena için en az ${ARENA_MIN} model seç.`;
+    statusEl.textContent = t("gate.arena_min", { adet: ARENA_MIN });
     return;
   }
 
@@ -2519,7 +2550,7 @@ async function runArena(prompt) {
 
   runBusy = true;
   syncGoGate();
-  statusEl.textContent = `${sutunlar.length} model üretiyor…`;
+  statusEl.textContent = t("arena.generating", { adet: sutunlar.length });
 
   const sonuclar = new Array(sutunlar.length).fill(null);
   const hatalar = [];
@@ -2545,10 +2576,10 @@ async function runArena(prompt) {
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          throw new Error(detailText(err) || `Hata (${res.status})`);
+          throw new Error(detailText(err) || t("err.http", { durum: res.status }));
         }
         const { images } = await res.json();
-        if (!images.length) throw new Error("Sunucu görsel döndürmedi.");
+        if (!images.length) throw new Error(t("gen.server_returned_nothing"));
         const kayit = { image_ids: images.map((r) => r.id),
                         params: { kind: "generate", size: s.size,
                                   quality: s.quality, model: s.model.id,
@@ -2570,7 +2601,7 @@ async function runArena(prompt) {
     //
     // Özet döküm/geçmiş adımından ÖNCE yazılıyor: o adım patlarsa turun
     // sonucu yine ekranda kalmalı, hata metni aşağıda onun ARDINA ekleniyor.
-    const ozet = `${tutan.length}/${sutunlar.length} model üretti.`;
+    const ozet = t("arena.summary", { tutan: tutan.length, toplam: sutunlar.length });
     statusEl.textContent = hatalar.length ? `${ozet} ${hatalar.join(" · ")}` : ozet;
     if (!tutan.length) {
       // HİÇ sütun tutmadı: tur geçmişte kalmıyor ve prompt kutuya geri dönüyor
@@ -2588,7 +2619,8 @@ async function runArena(prompt) {
     // `catch`inde kalıyor). Görseller diskte, satır ekranda: söylenmezse
     // kullanıcı sayfayı yenileyene kadar EKSİK bir geçmiş görür ve bunu
     // açıklayamaz — "sessiz sapma yasak" duruşunun buradaki karşılığı.
-    statusEl.textContent = `${statusEl.textContent} Geçmiş yenilenemedi: ${e.message}`;
+    statusEl.textContent =
+      `${statusEl.textContent} ${t("history.refresh_failed", { hata: e.message })}`;
   } finally {
     runBusy = false;
     syncGoGate();   // kapının tek yazarı (run()'ın deseni)
@@ -2597,7 +2629,7 @@ async function runArena(prompt) {
 
 async function run() {
   const prompt = $("prompt").value.trim();
-  if (!prompt) { statusEl.textContent = "Önce bir prompt yaz."; return; }
+  if (!prompt) { statusEl.textContent = t("composer.write_a_prompt"); return; }
   // ARENA kendi akışı: N istek, N sütun, kısmi başarısızlık.
   if (arenaAcik) return runArena(prompt);
 
@@ -2733,14 +2765,14 @@ async function run() {
   // (index.html'in notu: "yüzde zaten uydurmaydı") ve Veo'nun operation'ı da
   // yüzde vermiyor, ama BEKLENEN SÜRE uydurma değil bir olgu.
   statusEl.textContent = videoMu
-    ? "Video üretiliyor — bir kaç dakika sürebilir, sekmeyi kapatma…"
-    : !editing ? "Üretiliyor…"
-    : extras.length ? "Görseller birleştiriliyor…" : "Düzenleniyor…";
+    ? t("gen.video_running")
+    : !editing ? t("gen.running")
+    : extras.length ? t("gen.merging") : t("gen.editing");
   try {
     const res = await request;
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(detailText(err) || `Hata (${res.status})`);
+      throw new Error(detailText(err) || t("err.http", { durum: res.status }));
     }
     const govde = await res.json();
     // ANAHTAR TÜRE GÖRE: sunucu videoyu `{"videos": …}` içinde döndürüyor ve
@@ -2752,8 +2784,10 @@ async function run() {
     if (images[0]) showPreview(images[0]);
     clearUploadPreviewUrl(); // sonuç sunucu URL'inden gösteriliyor; blob artık gereksiz
     statusEl.textContent = videoMu
-      ? (editing ? "Video hazır." : `${images.length} video üretildi.`)
-      : editing ? "Düzenleme tamam." : `${images.length} görsel üretildi.`;
+      ? (editing ? t("gen.video_ready")
+                 : tc("gen.videos_done_one", "gen.videos_done_many", images.length))
+      : editing ? t("gen.edit_done")
+                : tc("gen.images_done_one", "gen.images_done_many", images.length);
     // Bayat sunucu tespiti — /api/edit multipart olduğu için orada
     // extra="forbid" karşılığı YOK: Starlette bilinmeyen form alanını sessizce
     // atar ve 200 döner. Tek savunma yanıtın alanı geri YANKILAMASI.
@@ -2765,9 +2799,8 @@ async function run() {
     if (images[0] && images[0].model !== model) {
       // `undefined !== "azure-gpt-image-2"` eski bir sunucuda DOĞRU sonuç:
       // alanı hiç yankılamayan sunucu gerçekten de alanı yok saymıştır.
-      warnings.push(`Model uygulanmadı: "${model}" istendi, sunucu `
-        + `"${images[0].model || "bilinmiyor"}" ile üretti — sunucu eski sürüm `
-        + "görünüyor, ./run.sh ile yeniden başlat.");
+      warnings.push(t("gen.model_ignored", {
+        istenen: model, gelen: images[0].model || t("common.unknown") }));
     }
     // PALET UYARILARI YALNIZ GÖRSEL DALINDA: video ucu palet alanı hiç
     // kabul etmiyor (`VideoRequest` `extra="forbid"`), yani `pal.palette_hex`
@@ -2779,20 +2812,18 @@ async function run() {
       // ona göre olur (kredi süreyle çarpılıyor). Model yankısının aynı iki
       // yönlü gerekçesi.
       if (images[0] && images[0].duration !== duration) {
-        warnings.push(`Süre uygulanmadı: ${duration} sn istendi, sunucu `
-          + `${images[0].duration || "bilinmiyor"} sn ile üretti — sunucu eski `
-          + "sürüm görünüyor, ./run.sh ile yeniden başlat.");
+        warnings.push(t("gen.duration_ignored", {
+          istenen: duration, gelen: images[0].duration || t("common.unknown") }));
       }
     } else if (pal.palette_hex && images[0] && !images[0].palette) {
       warnings.push(
-        "Palet uygulanmadı: sunucu eski sürüm görünüyor — ./run.sh ile yeniden başlat.");
+        t("gen.palette_ignored"));
     } else if (images[0] && images[0].palette && images[0].palette.applied === false) {
       // Ek, prompt karakter sınırına sığmadığı için düşürüldü. Kayıtta palet
       // görünür ama prompt'a girmedi; söylenmezse kullanıcı renksiz sonucu
       // açıklayamaz. Eski kayıtlarda alan yok → `=== false` bilinçli.
       warnings.push(
-        "Palet prompt'a sığmadı (4000 karakter sınırı): görsel renk " +
-        "yönlendirmesi olmadan üretildi. Prompt'u kısaltıp tekrar dene.");
+        t("gen.palette_too_long"));
     }
     if (warnings.length) statusEl.textContent = warnings.join(" · ");
     // Sonuç kaydı döküme: konuşma ve üretilen görseller aynı akışta (tasarım §5).
@@ -2839,7 +2870,7 @@ let dialogResolve = null;      // açık diyaloğun resolve'u (kapalıysa null)
 let dialogMode = "confirm";
 let dialogPrevFocus = null;    // kapanışta odak buraya döner
 
-function openDialog({ mode = "confirm", title, desc = "", okLabel = "Onayla",
+function openDialog({ mode = "confirm", title, desc = "", okLabel = t("common.confirm"),
                       danger = false, initial = "" }) {
   closeDialog(mode === "prompt" ? null : false);   // üst üste açılmayı engelle
   dialogMode = mode;
@@ -2879,11 +2910,11 @@ function submitDialog() {
 
 function cancelDialog() { closeDialog(dialogMode === "prompt" ? null : false); }
 
-function confirmDialog(title, desc, { okLabel = "Sil" } = {}) {
+function confirmDialog(title, desc, { okLabel = t("common.delete") } = {}) {
   return openDialog({ mode: "confirm", title, desc, okLabel, danger: true });
 }
 
-function promptDialog(title, desc, { okLabel = "Oluştur", initial = "" } = {}) {
+function promptDialog(title, desc, { okLabel = t("common.create"), initial = "" } = {}) {
   return openDialog({ mode: "prompt", title, desc, okLabel, initial });
 }
 
@@ -2907,21 +2938,21 @@ document.addEventListener("keydown", (e) => {
 });
 
 async function deleteImage(rec) {
-  const ok = await confirmDialog("Görseli sil",
-    "Bu görsel diskten kalıcı olarak silinecek. Bu işlem geri alınamaz.");
+  const ok = await confirmDialog(t("image.delete_title"),
+    t("image.delete_body"));
   if (!ok) return;
-  statusEl.textContent = "Siliniyor…";
+  statusEl.textContent = t("common.deleting");
   try {
     const res = await fetch(`/api/image/${rec.id}`, { method: "DELETE" });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `Hata (${res.status})`);
+      throw new Error(err.detail || t("err.http", { durum: res.status }));
     }
     if (source && source.kind === "gallery" && source.id === rec.id) clearSource();
     extras = extras.filter((it) => !(it.kind === "gallery" && it.id === rec.id));
     if (currentImage && currentImage.id === rec.id) setCurrentImage(null);
     renderSource();
-    statusEl.textContent = "Silindi.";
+    statusEl.textContent = t("library.deleted");
     await loadHistory();
   } catch (e) {
     statusEl.textContent = e.message;

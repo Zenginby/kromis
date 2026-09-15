@@ -857,3 +857,43 @@ def test_the_persona_explains_the_generation_note_marker():
     assert models.RESULT_NOTE_PREFIX in _bundled_text(), (
         "personada üretim notlarının işareti tanıtılmıyor")
 
+
+
+# ── Arayüz dili (v0.21) ──────────────────────────────────────────────
+
+def test_the_language_block_is_absent_when_no_language_is_given():
+    """`build_system`ın "hepsi boşken bayt bayt aynı" sözü DÖRDÜNCÜ parça
+    eklenince de duruyor: dilsiz çağrı bugünkü metni birebir üretmeli."""
+    assert chat_prompt.build_system() == chat_prompt.load_instructions()
+
+
+def test_the_language_block_says_it_is_a_default_not_an_order():
+    """Persona'nın 1. kuralı kullanıcıyı İZLİYOR ("hangi dilde yazıyorsa").
+    Bu blok onu EZERSE kural ölür: Fransızca yazan kullanıcı Türkçe cevap
+    alırdı. Blok yalnız ilk mesajın dilsiz olduğu hâli dolduruyor."""
+    metin = chat_prompt.build_system(language="en")
+    assert chat_prompt.LANGUAGE_HEADING in metin
+    assert "**en**" in metin
+    bolum = metin.split(chat_prompt.LANGUAGE_HEADING, 1)[1]
+    assert "EZMİYOR" in bolum, "blok kendini bir dayatma gibi sunuyor"
+    assert "İngilizce" in bolum, "prompt'un dilinden söz etmiyor"
+
+
+def test_the_persona_no_longer_locks_the_conversation_to_turkish():
+    """README'nin "Türkçe anlat" iddiası BU DOSYADAN geliyordu. Sohbet modeli
+    hangi dili destekliyorsa o dil kullanılabilir; kilit kalktı.
+
+    İNGİLİZCE PROMPT KURALI KALIYOR ve bu bir tutarsızlık değil: o bir dil
+    tercihi değil, görsel modellerinin ölçülmüş davranışı.
+    """
+    persona = chat_prompt.load_instructions()
+    assert "Kullanıcıyla Türkçe konuş" not in persona, "dil kilidi duruyor"
+    assert "prompt'u HER ZAMAN İngilizce yaz" in persona, (
+        "İngilizce prompt kuralı da düşmüş — o kural dilden bağımsız")
+
+
+def test_the_route_passes_the_interface_language_to_the_persona():
+    """Bağlam rotada toplanıyor (`chat_prompt` `prefs`'e bakmıyor), yani
+    dilin oraya GİRDİĞİ tek yer bu sözlük."""
+    import app as appmod
+    assert "language" in appmod._director_context()

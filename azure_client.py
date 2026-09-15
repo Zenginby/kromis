@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Azure gpt-image-2 istemcisi.
 
 Kimlik iki dosyadan SIRAYLA okunur, ilk tam olan kazanır (bkz. `_candidate_paths`):
@@ -7,6 +10,7 @@ penceresi buraya yazar) → `~/.config/claude-tools/azure-gpt-image2.env` (payla
 from __future__ import annotations
 
 import base64
+import i18n
 import os
 import tempfile
 
@@ -41,12 +45,13 @@ def map_error(status_code: int, body: dict | None) -> str:
         elif isinstance(err, str):
             detail = err
     if status_code == 401:
-        return "Azure yetkilendirme hatası (401): API key geçersiz veya süresi dolmuş."
+        return i18n.t("err.azure_401")
     if status_code == 429:
-        return "İstek limiti aşıldı (429): biraz bekleyip tekrar deneyin."
+        return i18n.t("err.rate_limited")
     if status_code == 400 and "content" in detail.lower():
-        return "İçerik politikası reddi: prompt Azure tarafından engellendi."
-    return f"Azure isteği başarısız (HTTP {status_code})." + (f" {detail}" if detail else "")
+        return i18n.t("err.azure_content_policy")
+    return i18n.t("err.azure_failed", None, durum=status_code) + (
+        f" {detail}" if detail else "")
 
 
 # Uygulamaya özel kimlik dosyası (admin buradan yazar). Yoksa paylaşılan
@@ -129,7 +134,7 @@ AzureImageError = ImageError
 
 
 def transport_error_message(exc: Exception, timeout: float) -> str:
-    """httpx TAŞIMA hatasını kullanıcıya gösterilebilir Türkçe mesaja çevirir.
+    """httpx TAŞIMA hatasını kullanıcıya gösterilebilir bir mesaja çevirir.
 
     `map_error`'ın ikizi: o Azure'ın DÖNDÜĞÜ HTTP durumunu çevirir, bu ise yanıtın
     hiç gelmediği durumu. İkisi de aynı yere varmak zorunda — app.py Azure
@@ -148,15 +153,10 @@ def transport_error_message(exc: Exception, timeout: float) -> str:
         # ÜCRET UYARISI şart: zaman aşımı İSTEMCİNİN vazgeçmesidir, Azure'ın
         # değil. İstek karşı tarafta tamamlanmış ve faturalanmış olabilir;
         # kullanıcı "hata aldım, demek ki ücretlenmedim" diye düşünmemeli.
-        return (f"Azure {timeout:.0f} saniyede yanıt vermedi (zaman aşımı). "
-                "Yüksek kalite ve yüksek adet üretimi uzatır — adedi ya da "
-                "kaliteyi düşürüp tekrar dene. Not: istek Azure tarafında "
-                "tamamlanmış ve ücretlendirilmiş olabilir, yalnızca sonuç bu "
-                "tarafa ulaşmadı.")
+        return i18n.t("err.azure_timeout", None, saniye=f"{timeout:.0f}")
     if isinstance(exc, httpx.TransportError):
-        return ("Azure'a bağlanılamadı: internet bağlantını ve Ayarlar'daki "
-                f"endpoint adresini kontrol et. ({type(exc).__name__})")
-    return f"Azure isteği beklenmedik biçimde başarısız oldu: {type(exc).__name__}."
+        return i18n.t("err.azure_connect", None, hata=type(exc).__name__)
+    return i18n.t("err.azure_unexpected", None, hata=type(exc).__name__)
 
 
 def _parse_env_all(path: str) -> dict[str, str]:
@@ -296,7 +296,7 @@ def save_env(updates: dict[str, str], env_path: str | None = None) -> str:
         # Satır sonu taşıyan bir değer dosyaya İKİNCİ bir anahtar enjekte eder.
         # `chat_deployment` bir form alanı olduğu için bu guard bu yolda da şart.
         if any(c in str(value) for c in "\r\n"):
-            raise AzureImageError("Ayar değeri satır sonu karakteri içeremez.")
+            raise AzureImageError(i18n.t("err.setting_newline"))
 
     path = env_path if env_path is not None else APP_ENV_PATH
     try:
@@ -314,7 +314,7 @@ def save_credentials(api_key: str, base_url: str, env_path: str | None = None) -
     if not api_key or not base_url:
         raise AzureImageError("api_key ve base_url gerekli.")
     if any(c in s for s in (api_key, base_url) for c in "\r\n"):
-        raise AzureImageError("Kimlik bilgileri satır sonu karakteri içeremez.")
+        raise AzureImageError(i18n.t("err.credentials_newline"))
     check_base_url(base_url, "base_url")
     return save_env({IMAGE_KEY: api_key, IMAGE_URL: base_url}, env_path=env_path)
 
@@ -337,7 +337,7 @@ def check_base_url(url: str, label: str) -> None:
     burada kullanıcı adına vermek LAN'daki meşru bir kurulumu da keserdi.
     """
     if not (url or "").startswith(("http://", "https://")):
-        raise AzureImageError(f"{label} http:// veya https:// ile başlamalı.")
+        raise AzureImageError(i18n.t("err.needs_scheme", None, alan=label))
 
 
 def resolve_chat_credentials(env_path: str | None = None) -> tuple[str, str, str]:
@@ -414,7 +414,7 @@ def build_image_files(images: list[tuple[str, bytes]]):
     (httpx tekrarlanan alan için (name, value) tuple listesi kabul eder).
     """
     if not images:
-        raise AzureImageError("En az bir görsel gerekli.")
+        raise AzureImageError(i18n.t("err.need_an_image"))
     if len(images) == 1:
         filename, data = images[0]
         return {"image": (filename, data, "image/png")}

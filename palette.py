@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Tema renginden uyumlu palet üretimi ve prompt metni.
 
 Tamamen saf ve çevrimdışı: ağ yok, disk yok, global durum yok. Bir palet
@@ -14,6 +17,7 @@ token'larıyla yazılmış; aynı uzayda kalmak tutarlı.
 """
 from __future__ import annotations
 
+import i18n
 import math
 import re
 from collections.abc import Mapping, Sequence
@@ -90,10 +94,10 @@ def parse_hex(value: str) -> str:
     zaman 7 karakterlik `#rrggbb` gönderir, esneklik gereksiz yüzey açar.
     """
     if not isinstance(value, str):
-        raise ValueError("hex bir metin olmalı")
+        raise ValueError(i18n.t("err.hex_must_be_text"))
     m = _HEX_RE.fullmatch(value.strip())
     if not m:
-        raise ValueError(f"geçersiz hex: {value!r}")
+        raise ValueError(i18n.t("err.invalid_field_value", None, alan="hex", deger=repr(value)))
     return "#" + m.group(1).lower()
 
 
@@ -194,7 +198,7 @@ def harmony(seed_hex: str, mode: str) -> tuple[str, ...]:
     Deterministik ve çevrimdışı: aynı girdi her zaman aynı çıktıyı verir.
     """
     if mode not in MODES:
-        raise ValueError(f"geçersiz mod: {mode!r}")
+        raise ValueError(i18n.t("err.invalid_field_value", None, alan="mode", deger=repr(mode)))
     seed = parse_hex(seed_hex)
     lightness, chroma, hue = hex_to_oklch(seed)
 
@@ -315,9 +319,10 @@ def prompt_suffix(colors: Sequence[Mapping[str, str]], strength: str,
     if not colors:
         return ""
     if strength not in STRENGTHS:
-        raise ValueError(f"geçersiz güç: {strength!r}")
+        raise ValueError(i18n.t("err.invalid_field_value", None, alan="strength",
+                                deger=repr(strength)))
     if task not in TASKS:
-        raise ValueError(f"geçersiz görev: {task!r}")
+        raise ValueError(i18n.t("err.invalid_field_value", None, alan="task", deger=repr(task)))
     body = _TEMPLATES[(task, strength)].format(
         names=_join_names([str(c["name"]) for c in colors]),
         detailed=", ".join(f"{c['name']} ({c['hex']})" for c in colors),

@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 import app as appmod
 import models
 import version
+from tests.conftest import tr
 
 
 def test_index_served():
@@ -580,7 +581,7 @@ def test_static_assets_stay_cacheable():
     assert r.headers.get("etag"), "StaticFiles doğrulayıcı göndermeli"
 
 
-def test_index_read_failure_is_reported_in_turkish(monkeypatch, tmp_path):
+def test_index_read_failure_is_reported_in_the_interface_language(monkeypatch, tmp_path):
     """--windowed pakette stderr YOK: okunamayan index.html iz bırakmıyordu.
 
     FileResponse gönderim anında yakalanmayan bir RuntimeError'a düşüyordu →
@@ -592,7 +593,7 @@ def test_index_read_failure_is_reported_in_turkish(monkeypatch, tmp_path):
                         lambda d, t: (written.append(t), "hata.log")[1])
     r = TestClient(appmod.app).get("/")
     assert r.status_code == 500
-    assert "Arayüz yüklenemedi" in r.text
+    assert "The interface could not be loaded" in r.text
     assert "Traceback" not in r.text, "kullanıcıya traceback gösterilmez"
     assert written and "Traceback" in written[0], "hata.log'a traceback yazılmalı"
 
@@ -601,11 +602,17 @@ def test_settings_modal_shows_the_app_version():
     """Destek sorusu "hangi sürümdesiniz?" — cevabı arayüzde OLMALI.
 
     Yazan taraf artık `settings-version` id'siyle DEĞİL, `[data-app-version]`
-    seçicisiyle çalışıyor: sürüm iki yerde görünüyor (üst şeritteki pill +
-    Ayarlar'ın dibindeki satır) çünkü pill telefonda gizli. Bu iddia
+    seçicisiyle çalışıyor: sürüm ÜÇ yerde görünüyor (üst şeritteki pill,
+    Ayarlar'ın dibindeki satır, künye) çünkü pill telefonda gizli. Bu iddia
     mekanizmayla birlikte güncellendi ama gevşemedi — id'nin varlığını da,
-    yazımın gerçekten bağlandığını da hâlâ ölçüyor, üstüne İKİ hedefin de
+    yazımın gerçekten bağlandığını da hâlâ ölçüyor, üstüne ÜÇ hedefin de
     işaretli olduğunu ekliyor.
+
+    ÜÇÜNCÜ HEDEF, seçiciye geçmenin tam olarak vaat ettiği şey: künye
+    (`.settings-legal`, AGPL §13 için eklendi) yazan tarafa tek satır bile
+    eklemeden sürümü gösteriyor. Künyede sürümün DURMASI gerekiyor çünkü bir
+    ihlal iddiasında "hangi sürümden türetilmiş" sorusunun cevabı orası
+    (TELIF.md); bekçisi ise tests/test_lisans.py.
     """
     client = TestClient(appmod.app)
     html = client.get("/").text
@@ -613,8 +620,8 @@ def test_settings_modal_shows_the_app_version():
     # HTML yorumları AYIKLANIYOR: seçici yorumlarda da anlatılıyor ve onları
     # sayan bir iddia işaretin gerçekten öznitelik olarak durduğunu ölçmezdi.
     isaretsiz = re.sub(r"<!--.*?-->", "", html, flags=re.S)
-    # İki görünür hedef: üst şerit pill'i ve Ayarlar'ın dibi.
-    assert isaretsiz.count("data-app-version") == 2, \
+    # Üç görünür hedef: üst şerit pill'i, Ayarlar'ın dibi ve künye.
+    assert isaretsiz.count("data-app-version") == 3, \
         "sürüm hedeflerinden biri işaretsiz — orada '—' olarak kalır"
     assert 'querySelectorAll("[data-app-version]")' in \
         client.get("/static/settings.js").text
@@ -1483,7 +1490,8 @@ def test_an_addition_axis_is_marked_as_absent_from_the_prompt():
     govde = _strip_js_comments(body.group(1))
     assert "chat-axis-now" in govde, "takas rozeti düşmüş"
     assert "chat-axis-new" in govde, "ekleme rozeti yok — boş satır takas gibi görünür"
-    assert "prompt'ta yok" in govde, "ekleme ekseninin durumu ekranda yazmıyor"
+    assert "chat.not_in_prompt" in govde, "ekleme ekseninin durumu ekranda yazmıyor"
+    assert "prompt'ta yok" in tr("chat.not_in_prompt"), "durum cümlesi değişmiş"
     assert 'row.dataset.yeni = "1"' in govde, \
         "ekleme ekseni işaretlenmiyor — axesValue iki türü ayırt edemez"
     # Rozet TEK yerde eklenmeli: iki `appendChild` iki rozet çizerdi.
@@ -1505,10 +1513,15 @@ def test_the_two_axis_kinds_reach_the_model_with_different_verbs():
     govde = _strip_js_comments(body.group(1))
     assert "row.dataset.yeni ? ekleme : takas" in govde, \
         "eksen türü ayrıştırılmıyor"
-    assert "Şu parametreleri değiştir:" in govde, "takas cümlesi düşmüş"
-    assert "Şunları da belirle:" in govde, "ekleme cümlesi yok"
-    assert "Prompt'un geri kalanını aynı tut." in govde, \
+    # İddia ANAHTARA bakıyor (iki fiil AYRI iki cümle mi?), cümlenin yazımına
+    # değil; metnin gerçekten var olduğu `tr()` ile ayrıca ölçülüyor.
+    assert "chat.change_params" in govde, "takas cümlesi düşmüş"
+    assert "chat.also_set" in govde, "ekleme cümlesi yok"
+    assert "chat.keep_the_rest" in govde, \
         "kapanış disiplini düşmüş — tek eksen değişikliği prompt'u baştan yazdırır"
+    assert "değiştir" in tr("chat.change_params")
+    assert "belirle" in tr("chat.also_set")
+    assert "aynı tut" in tr("chat.keep_the_rest")
 
 
 def test_the_addition_badge_is_not_a_chip():
@@ -2119,7 +2132,7 @@ def test_library_upload_button_says_where_the_file_will_land():
         "yükleme düğmesinin etiketi ayrı bir öğe değil → hedef yazılamaz")
     js = _assets_js()
     assert "syncUploadLabel" in js, "etiketi hedefe göre yazan yol yok"
-    assert 'UPLOAD_LABEL[kind]' in js, "etiket hedeften türetilmiyor"
+    assert 'UPLOAD_LABEL_KEYS[kind]' in js, "etiket hedeften türetilmiyor"
     # Sekme değişimi de etiketi tazelemek zorunda; yoksa etiket yanlış türü
     # söyler ve yanlış söyleyen bir etiket hiç söylememekten kötüdür.
     handler = re.search(r'\$\("asset-tabs"\)\.addEventListener\("click".*?\n\}\);',
@@ -2179,7 +2192,7 @@ def test_the_gear_and_the_tools_view_are_different_doors():
     view = _section(_html(), "view-tools")
     for leaked in ("set-endpoint", "set-key", "set-chat-deployment"):
         assert leaked not in view, f"{leaked} Araçlar görünümüne sızmış"
-    assert "Ayarlar düğmesinden" in view, (
+    assert "from the Settings button" in view, (
         "kullanıcı Azure ayarlarının nerede olduğunu okuyamıyor")
 
 
@@ -2236,7 +2249,7 @@ def test_search_leaves_the_folder_boundary():
     label = re.search(r'<p id="search-label"[^>]*>\s*([^<]*)', html)
     assert label, "#search-label yok"
     assert "hidden" in label.group(0), "arama etiketi başlangıçta görünür"
-    assert "tüm klasörler" in label.group(1), "etiket kapsamı söylemiyor"
+    assert "all folders" in label.group(1), "etiket kapsamı söylemiyor"
     js = _folders_js()
     body = re.search(r"async function loadAllImages\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
     assert body, "loadAllImages() yok — arama tek klasörde kalıyor"
@@ -2378,17 +2391,28 @@ def test_theme_picker_really_writes_data_theme():
             assert tok in block, f"{tok} token'ı {theme} tema bloğunda yok"
 
 
-def test_theme_picker_admits_it_is_not_persisted_yet():
-    """Kalıcılık Adım 9'un arka uç işi; seçici onu VAAT ETMEMELİ.
+def test_theme_picker_no_longer_claims_the_choice_is_temporary():
+    """Bu test bir zamanlar TERSİNİ ölçüyordu ve o hâliyle BAYATLADI.
 
-    `SettingsRequest`'te tema alanı yok (models.py) — bir "Kaydet" düğmesi
-    koymak ya da sessiz kalmak, yeniden başlatınca sıfırlanan seçimi
-    kullanıcının hatası gibi gösterirdi.
+    Eski gerekçe şuydu: kalıcılık Adım 9'un arka uç işi, seçici onu vaat
+    etmemeli — o yüzden panelde "uygulamayı yeniden başlatınca varsayılana
+    döner" diyen bir satır aranıyordu. Adım 9 GELDİ: tema `POST /api/prefs`
+    ile prefs.json'a yazılıyor (settings.js `saveThemePref`) ve açılışta geri
+    okunuyor (chat.js `loadPrefs`). Yani panelde duran o satır kullanıcıya
+    YANLIŞ bilgi veriyordu — kalıcı bir ayarı "geçici" diye tanıtmak, o ayarı
+    hiç kullandırmamak demek.
+
+    Testin ESKİ kaçış kapısı ("tema ayara girdiyse bu testin gerekçesi de
+    bitmiştir") çalışmadı ve sebebi öğretici: tema `SettingsRequest`e değil
+    `PrefsRequest`e girdi, yani nöbetçi YANLIŞ modele bakıyordu ve bir yıl
+    boyunca sessizce doğru kaldı. Yeni iddia olguya bakıyor, modelin adına
+    değil.
     """
     sheet = _section(_html(), "look-sheet")
-    assert "yeniden başla" in sheet, "geçiciliği söyleyen satır yok"
-    assert "theme" not in models.SettingsRequest.model_fields, (
-        "tema ayara girdiyse bu testin gerekçesi de bitmiştir — Adım 9'da güncelle")
+    assert "yeniden başla" not in sheet, (
+        "panel tema seçimini hâlâ geçici gösteriyor — oysa prefs.json'a yazılıyor")
+    assert "theme" in models.PrefsRequest.model_fields, (
+        "tema tercihi kalktıysa panelin de yeniden 'geçici' demesi gerekir")
 
 
 def test_escape_keeps_a_slide_over_open_under_a_confirm_dialog():
@@ -2456,8 +2480,10 @@ def test_the_prompt_block_button_names_the_mode_not_a_form():
     assert "hedefli.hedef.dugme" in body.group(1), (
         "düğmenin adı hedeften okunmuyor")
     assert '"Görsel modunda üret"' not in js, "iki adımlı eski ad duruyor"
-    assert '"Görsel üret"' in js and '"Video üret"' in js, (
+    assert '"go.generate_image"' in js and '"go.generate_video"' in js, (
         "hedef tablosu iki modun düğme adını taşımıyor")
+    assert tr("go.generate_image") == "Görsel üret"
+    assert tr("go.generate_video") == "Video üret"
 
 
 def test_the_image_mode_button_pastes_the_prompt_and_switches_mode():
@@ -2473,8 +2499,11 @@ def test_the_image_mode_button_pastes_the_prompt_and_switches_mode():
     assert '$("prompt").value = parsed.prompt' in fn, "prompt composer'a basılmıyor"
     assert "setMode(hedef.eksen)" in fn, "mod HEDEFE alınmıyor"
     assert "forma aktarıldı" not in fn.lower(), "durum satırı hâlâ 'form' diyor"
-    assert "${hedef.ad} moduna aktarıldı" in fn, (
+    # Cümle artık katalogda; iddia HEDEFİN cümleye geçtiğini ölçüyor
+    # (`{ mod: t(hedef.ad) }`) ve cümlenin "mod"u gerçekten söylediğini.
+    assert "chat.prompt_sent_to_mode" in fn and "mod: t(hedef.ad)" in fn, (
         "durum satırı nereye aktarıldığını söylemiyor")
+    assert "moduna aktarıldı" in tr("chat.prompt_sent_to_mode")
 
 
 # ── Yönetmenin model önerisi ve tek tıklı üretim (v2.1) ─────────────────
@@ -2600,9 +2629,11 @@ def test_the_model_suggestion_names_its_THREE_refusals_separately():
         r"function modelOnerisiniUygula\([^)]*\)\s*\{(.*?)\n\}", _chat_js(), re.S)
     assert body, "modelOnerisiniUygula() bulunamadı"
     fn = body.group(1)
-    assert "arenaAcik" in fn and "arena açık" in fn
+    assert "arenaAcik" in fn and "chat.model_arena_open" in fn
+    assert "arena açık" in tr("chat.model_arena_open")
     assert "secilebilirler(" in fn, "seçilebilirlik ikinci kez kuruluyor"
-    assert "anahtar yok" in fn
+    assert "chat.model_no_key" in fn
+    assert "anahtar yok" in tr("chat.model_no_key")
     assert "MODEL_EKSENLERI[hedef.eksen]" in fn, "eksen tablosu atlanmış"
 
 
@@ -2874,7 +2905,7 @@ def test_the_thumbnail_click_is_no_longer_the_edit_shortcut():
     assert 'img.addEventListener("click"' not in body, (
         "küçük resmin gizli düzenleme kısayolu duruyor")
     # Konumsal: düğme önce doğar, eylemi setGallerySource'a gider, sonra şerit kurulur.
-    ref_label = body.find('"Referans"')
+    ref_label = body.find('t("media.reference")')
     set_source = body.find("setGallerySource(rec)")
     acts_class = body.find("acts.className")
     assert ref_label >= 0, '"Referans" düğmesi yok'
@@ -3232,7 +3263,7 @@ def test_the_plus_menu_offers_choosing_from_media():
     """
     menu = _section_div(_html(), "plus-menu")
     assert 'id="media-pick-btn"' in menu, "menüde Medya'dan seç yok"
-    assert "Medya'dan seç" in menu, "maddenin etiketi yok"
+    assert "Pick from Media" in menu, "maddenin etiketi yok"
     assert "<hr" in menu, "dosya yolu ile Medya yolu ayrılmamış"
     # Dördüncü madde eklenmedi: #file-input'a ikinci kapı yok.
     assert menu.count('type="file"') == 0, "menüye dosya girdisi kaçmış"
@@ -3941,17 +3972,21 @@ def test_the_picker_note_shows_the_reason_not_just_the_counter():
     # 2) Onay çağrı yerinde: ekleme başarılıysa fiil O AN yazılıyor.
     assert re.search(
         r"addGalleryExtra\(rec\).*?renderPickerSide\(\);\s*"
-        r'\$\("picker-note"\)\.textContent\s*=\s*`Eklendi', picker, re.S), (
-        "ekleme onayı verilmiyor: gerekçe kazanınca 'Eklendi' hiç görünmez")
+        r'\$\("picker-note"\)\.textContent\s*=\s*\n?\s*t\("picker\.added_count"',
+        picker, re.S), (
+        "ekleme onayı verilmiyor: gerekçe kazanınca onay hiç görünmez")
     # 3) DURAN okuma ile EYLEM onayı ayrı cümleler. Aynı dize kullanılırsa
     #    `why` boş olan HER karo "Eklendi" der — hiç eklenmemiş karoya geçen
     #    kullanıcı onu eklemiş sanır. `renderPickerSide`'ın dalı fiil taşımaz.
     yan = _balanced_body(picker, "function renderPickerSide()")
-    assert "`Eklendi" not in yan, (
+    assert "picker.added_count" not in yan, (
         "duran sayaç eylem onayıyla aynı cümleyi kullanıyor: hiç eklenmemiş "
-        "karoda 'Eklendi' yazar")
-    assert re.search(r"`Ek referans · \$\{extras\.length\}", yan), (
+        "karoda onay yazar")
+    assert "picker.extra_count" in yan, (
         "duran sayaç yok: ek varken kullanıcı kaç ek olduğunu göremiyor")
+    # İki cümle GERÇEKTEN ayrı olmalı; aynı metni iki anahtara yazmak
+    # yukarıdaki ayrımı sessizce geri alırdı.
+    assert tr("picker.added_count") != tr("picker.extra_count")
 
 
 def test_the_picker_separates_loading_and_failure_from_emptiness():
@@ -4052,8 +4087,9 @@ def test_the_extra_rejection_sentence_lives_in_exactly_one_place():
     """
     core = _strip_js_comments(_core_js())
     assert "function extraBlockReason(" in core, "tek kaynak fonksiyon yok"
-    assert core.count("Önce ana görseli seç") == 1, (
+    assert core.count("picker.pick_main_first") == 1, (
         "ret cümlesi birden çok yerde — biri güncellenince diğeri bayatlar")
+    assert "Önce ana görseli seç" in tr("picker.pick_main_first")
     assert "galeriden Düzenle" not in core, (
         "K26: artık var olmayan bir kurtuluş yolu tarif ediliyor")
     # canAddExtra ADIYLA yeniden kullanılıyor (silinip yeniden yazılmadı).
@@ -4459,9 +4495,9 @@ def test_cip_dugmesinin_adi_EKSENI_de_soyluyor():
     """
     html = re.sub(r"<!--.*?-->", "", _served(), flags=re.S)
     for tetik, etiket, deger, ad in (
-            ("model-btn", "model-label", "model-btn-label", "Görsel modeli"),
+            ("model-btn", "model-label", "model-btn-label", "Image model"),
             ("chat-model-btn", "chat-model-label", "chat-model-btn-label",
-             "Sohbet modeli")):
+             "Chat model")):
         acik = re.search(rf'<button[^>]*id="{tetik}"[^>]*>', html)
         assert acik, f"#{tetik} yok"
         assert f'aria-labelledby="{etiket} {deger}"' in acik.group(0), (
@@ -5782,7 +5818,7 @@ def test_yeni_surum_satiri_METINLE_anlatiyor():
     # Dilim `id`'den değil KAPSAYICI `<p`'den başlıyor: sınıf niteliği id'den
     # ÖNCE yazılı, yani id'den başlayan bir dilim onu hiç görmez.
     satir = html[html.rfind("<p", 0, bas):html.find("</p>", bas)]
-    assert "Yeni sürüm çıktı" in satir, "satır NEDEN göründüğünü söylemiyor"
+    assert "A new version is out" in satir, "satır NEDEN göründüğünü söylemiyor"
     assert 'id="settings-update-version"' in satir, "sürüm bağı yok"
     assert 'id="settings-update-link"' in satir, "indirme bağı yok"
 
@@ -5831,10 +5867,11 @@ def test_ayarlar_yonlendirmesi_TEK_SABITTEN_geliyor():
     (`aria-label="Ayarlar"`), yani `⚙` düğmenin görünüşünü YANLIŞ söylüyordu.
     """
     js = _strip_js_comments(_settings_js())
-    assert 'const AYARLAR_EKI = "(sağ üstteki Ayarlar düğmesi)";' in js, (
+    assert 'const AYARLAR_EKI = t("settings.button_suffix");' in js, (
         "Ayarlar eki sabiti yok")
-    assert js.count("(sağ üstteki") == 1, (
-        "metin sabitin DIŞINDA da yazılmış — nöbetçi ile yazan taraf "
+    assert tr("settings.button_suffix") == "(sağ üstteki Ayarlar düğmesi)"
+    assert js.count("settings.button_suffix") == 1, (
+        "anahtar sabitin DIŞINDA da okunuyor — nöbetçi ile yazan taraf "
         "birbirinden sessizce ayrılabilir")
     assert "${AYARLAR_EKI}" in js, "yazan taraf sabiti okumuyor"
     assert "includes(AYARLAR_EKI)" in js, "nöbetçi sabiti okumuyor"
@@ -5860,7 +5897,7 @@ def test_ayarlar_yonlendirmesi_TEK_SABITTEN_geliyor():
     bas = html.find('id="chat-gate"')
     assert bas > 0, "#chat-gate satırı yok"
     kapi = html[bas:html.find("</p>", bas)]
-    assert "Ayarlar düğmesi" in kapi, (
+    assert "Settings button" in kapi, (
         "kapı metni düğmeyi adıyla anlatmıyor — settings.js'in durum satırıyla "
         "aynı ekranda iki ayrı ad demek")
 
@@ -5873,7 +5910,7 @@ def test_ayarlar_yonlendirmesi_TEK_SABITTEN_geliyor():
 # mandalın işi "kökteki hiçbir belge ölçütün dışında kalmasın" ve orada geçecek
 # bir `⚙`, arayüzden düşmüş glifi geri getirme riskini birebir aynı taşıyor.
 _KULLANICI_BELGELERI = ("CLAUDE.md", "GUNCELLEME.md", "KURULUM.md",
-                        "README.en.md", "README.md")
+                        "MARKA.md", "README.en.md", "README.md", "TELIF.md")
 
 
 def test_belgeler_AYARLAR_dugmesini_glifle_anlatmiyor():

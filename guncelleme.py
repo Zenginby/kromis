@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Yeni bir sürüm çıktı mı? — GitHub'ın son yayınına bakan, sessiz kontrol.
 
 NEDEN VAR: paketler artık main'e giren her değişiklikte otomatik üretiliyor,
@@ -21,6 +24,9 @@ imzasız bir kendi kendini değiştirme yolu, uygulamaya açılmış bir kapıd�
      koymak paneli her açılışta bekletirdi. Kontrol arka planda koşuyor, rota
      yalnız ÖNBELLEĞE bakıyor: ilk açılışta cevap "bilmiyorum" (None) olur,
      birkaç saniye sonrakinde gerçek cevap gelir.
+     TEK İSTİSNA `simdi_kontrol_et()`: onu kullanıcı KENDİ başlatıyor ve
+     beklediği şey tam olarak cevap. Sözleşme AÇILIŞ yolunu koruyor, elle
+     basılan bir düğmeyi değil — gerekçe o işlevin başlığında.
   3. **Kullanıcı kapatabilir.** `prefs.guncelleme_kontrolu` kapalıysa ağa hiç
      çıkılmaz. Uygulamanın kullanıcının haberi olmadan dışarıya bağlanması,
      kapatılabilir olmadığı sürece savunulamaz.
@@ -75,6 +81,22 @@ ONBELLEK_DOSYASI = "guncelleme.json"
 # sınır IP başına — aynı ağdaki birkaç kullanıcı onu paylaşıyor.
 TTL_SANIYE = 24 * 60 * 60
 
+# BAŞARISIZ kontrolün geri çekilmesi — 24 saat DEĞİL, 30 dakika.
+#
+# Bir dönem başarısızlık da `zaman`ı damgalıyordu, yani tek bir zaman aşımı
+# kullanıcıyı tam bir gün kör bırakıyordu. Telefonda bu, masaüstünden çok daha
+# sık: `ZAMAN_ASIMI_SANIYE` 5 sn ve mobil veride (asansör, metro, uçak kipi,
+# captive portal) o sınır kolayca aşılıyor. 2026-09-12'de ölçüldü — v0.20.1
+# yayınlandı, telefon bildirimi hiç göstermedi; sebep kırık bir kod değil,
+# başarısız bir kontrolün başarılı bir kontrolle AYNI cezayı almasıydı.
+#
+# Ayrı sabit ŞART, `TTL_SANIYE`yi kısaltmak değil: ikisi iki ayrı şeyi ölçüyor.
+# `TTL_SANIYE` "elimizdeki cevap ne kadar tazedir", bu ise "başarısız bir
+# denemeden sonra ne kadar bekleyelim". Tek sayıya indirgemek, ağı olmayan bir
+# makinede her `/api/settings` çağrısının yeni bir iş parçacığı doğurmasına
+# (aslen bu damgalamanın DOĞUŞ sebebi) geri dönmek olurdu.
+HATA_TTL_SANIYE = 30 * 60
+
 # Zaman aşımı bilinçle kısa: bu çağrı hiçbir şeyi bloke etmiyor, ama bir
 # iş parçacığını dakikalarca asılı bırakmasının da anlamı yok.
 ZAMAN_ASIMI_SANIYE = 5.0
@@ -85,6 +107,20 @@ _KOSUYOR = False
 
 def _onbellek_yolu(output_dir: str) -> str:
     return os.path.join(output_dir, ONBELLEK_DOSYASI)
+
+
+def _zaman(deger: object) -> float:
+    """Önbellekteki bir zaman damgası — bozuksa 0 (yani "hiç").
+
+    `float(...)` çıplak bırakılamaz: bu dosya elle düzenlenebiliyor ve
+    `"zaman": "dün"` gibi bir değer `bilgi()`den ValueError olarak çıkıp
+    `/api/settings`i 500'e düşürürdü. Birinci sözleşme (asla exception
+    sızdırma) yalnız ağ yolunu değil, ÖNBELLEK yolunu da kapsıyor.
+    """
+    try:
+        return float(deger or 0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _oku(output_dir: str) -> dict:
@@ -180,18 +216,58 @@ def _sor() -> dict | None:
         return None
 
 
+def _son_basari(onbellek: dict) -> float:
+    """Son BAŞARILI kontrolün zamanı. `surum` yoksa cevap hiç alınmamıştır.
+
+    `surum` denetimi bir GÖÇ kapısı: eski düzende başarısız kontrol de `zaman`
+    yazıyordu, yani diskte "damgalı ama cevapsız" kayıtlar var. O damgayı
+    başarı saymak, düzeltilen kusuru bir tur daha yaşatırdı — kayıt yalnız
+    `surum` taşıyorsa anlamlıdır.
+    """
+    if not onbellek.get("surum"):
+        return 0.0
+    return _zaman(onbellek.get("zaman"))
+
+
+def _tazeleme_gerek(onbellek: dict) -> bool:
+    """İKİ kapı: cevap bayat MI, ve son denemenin üstünden yeterince geçti Mİ."""
+    simdi = time.time()
+    if simdi - _son_basari(onbellek) <= TTL_SANIYE:
+        return False                      # elimizdeki cevap hâlâ taze
+    return simdi - _zaman(onbellek.get("son_deneme")) > HATA_TTL_SANIYE
+
+
+def _kontrol_et(output_dir: str) -> bool:
+    """Tek bir kontrol turu. Başarılıysa True. ASLA fırlatmaz (1. sözleşme).
+
+    `_tazele`den AYRI bir işlev, çünkü elle tetiklenen kontrol (`simdi_kontrol_et`)
+    aynı turu iş parçacığı bayrağına DOKUNMADAN koşmak zorunda: `_tazele`nin
+    `finally`si `_KOSUYOR`u sıfırlıyor ve elle çağrı onu sıfırlasaydı, o sırada
+    koşan bir arka plan tazelemesinin bayrağını düşürüp ikinci bir iş
+    parçacığının doğmasına yol açardı.
+
+    `son_deneme` HER İKİ dalda da yazılıyor, `zaman` yalnız başarıda: geri
+    çekilmeyi ölçen damga ile cevabın tazeliğini ölçen damga aynı şey değil
+    (bkz. HATA_TTL_SANIYE).
+    """
+    sonuc = _sor()
+    simdi = time.time()
+    if sonuc is not None:
+        _yaz(output_dir, {"zaman": simdi, "son_deneme": simdi, **sonuc})
+        return True
+    # Başarısızlık da damgalanıyor — yoksa ağı olmayan bir makinede her
+    # `/api/settings` çağrısı yeni bir iş parçacığı başlatırdı. Ama damga
+    # `zaman` DEĞİL: elimizdeki cevabı tazelemedik, yalnız denedik.
+    mevcut = _oku(output_dir)
+    mevcut["son_deneme"] = simdi
+    _yaz(output_dir, mevcut)
+    return False
+
+
 def _tazele(output_dir: str) -> None:
     global _KOSUYOR
     try:
-        sonuc = _sor()
-        if sonuc is not None:
-            _yaz(output_dir, {"zaman": time.time(), **sonuc})
-        else:
-            # Başarısız kontrol de damgalanıyor: yoksa ağı olmayan bir makinede
-            # her `/api/settings` çağrısı yeni bir iş parçacığı başlatırdı.
-            mevcut = _oku(output_dir)
-            mevcut["zaman"] = time.time()
-            _yaz(output_dir, mevcut)
+        _kontrol_et(output_dir)
     finally:
         with _KILIT:
             _KOSUYOR = False
@@ -224,7 +300,7 @@ def bilgi(output_dir: str, *, izin: bool = True) -> dict | None:
         return None                       # üçüncü sözleşme: ağa hiç çıkma
 
     onbellek = _oku(output_dir)
-    if time.time() - float(onbellek.get("zaman") or 0) > TTL_SANIYE:
+    if _tazeleme_gerek(onbellek):
         _tazeleme_baslat(output_dir)
 
     uzak = str(onbellek.get("surum") or "")
@@ -235,3 +311,46 @@ def bilgi(output_dir: str, *, izin: bool = True) -> dict | None:
         # doğrulanmamış bir adresle girebilir.
         return {"surum": uzak, "url": _guvenli_url(onbellek.get("url"))}
     return None
+
+
+# Elle kontrolün sonucu. `bilgi()`nin `None`ı burada YETMİYOR: o, "zaten
+# güncelsin" ile "soramadım"ı aynı cevaba indiriyor ve arayüz için ikisi aynı
+# olabiliyordu (satır gizli kalır). Kullanıcının BASTIĞI bir düğmede ise fark
+# asıl bilginin kendisi — "kontrol ettim, güncelsin" bir cevap, sessizlik değil.
+DURUM_YENI = "yeni"
+DURUM_GUNCEL = "guncel"
+DURUM_HATA = "hata"
+DURUM_KAPALI = "kapali"
+
+
+def simdi_kontrol_et(output_dir: str, *, izin: bool = True) -> dict:
+    """Elle tetiklenen kontrol: TTL'i BAYPAS eder ve sonucu BEKLER.
+
+    `{"durum": …, "guncelleme": {…}|None}` döner.
+
+    İKİNCİ SÖZLEŞMEYİ (istek yolunu asla bekletme) BİLEREK UYGULAMIYOR ve bu
+    bir ihlal değil, sözleşmenin kapsamı: o kural `/api/settings`i, yani
+    uygulamanın AÇILIŞ yolunu koruyor — oraya 5 saniyelik bir ağ çağrısı koymak
+    paneli her açılışta bekletirdi. Burada isteği kullanıcı KENDİ başlatıyor ve
+    beklediği şey tam olarak cevap; arka plana atıp `None` dönmek, düğmeye
+    basınca hiçbir şey olmaması demek olurdu. Rota senkron, yani Starlette onu
+    threadpool'da koşturuyor: bekleyen istek olay döngüsünü tutmuyor.
+
+    TTL'İN BAYPAS EDİLMESİ BU UCUN VAR OLMA SEBEBİ: yayın hızı kontrol
+    aralığından hızlıysa (2026-09-12'de ölçüldü: ortalama 7.7 saatte bir yayın,
+    24 saatte bir kontrol) kullanıcının önbelleği taze ama cevabı bayat olur ve
+    beklemekten başka yolu kalmaz. Düğme o yolu açıyor.
+
+    Üçüncü sözleşme burada da geçerli: kontrol kapalıysa ağa HİÇ çıkılmıyor.
+    """
+    if not izin:
+        return {"durum": DURUM_KAPALI, "guncelleme": None}
+
+    if not _kontrol_et(output_dir):
+        return {"durum": DURUM_HATA, "guncelleme": None}
+
+    # `bilgi()` yeniden okuyor: karşılaştırmanın ve URL doğrulamasının tek
+    # kopyası orada kalsın — burada tekrarlanan bir `surum_daha_yeni` çağrısı,
+    # bir gün yalnız birinde düzeltilecek İKİNCİ bir kural olurdu.
+    g = bilgi(output_dir, izin=True)
+    return {"durum": DURUM_YENI if g else DURUM_GUNCEL, "guncelleme": g}

@@ -190,6 +190,47 @@ sonucu var:
 
 ---
 
+## Sürüm 0.22.1 — ne değişti
+
+- Küçük düzeltmeler ve iyileştirmeler.
+
+---
+
+## Sürüm 0.22.0 — ne değişti
+
+- ilk+son kare reddinde süreyi ADIYLA söyle
+- ön tanımlı arayüz dili İngilizce
+
+---
+
+## Sürüm 0.21.0 — ne değişti
+
+- Ayarlar → Hakkında'ya "Şimdi kontrol et" düğmesi eklendi: yeni sürümü beklemeden sorabilirsiniz. Ayrıca başarısız bir güncelleme kontrolü artık 24 saat değil 30 dakika sonra yeniden deneniyor — bağlantı bir an koptuğunda bildirim bir gün gecikmiyor.
+
+---
+
+## Sürüm 0.20.1 — ne değişti
+
+- CI kırmızısını kapat, dil seçimini açılır listeye çevir, kaçan metinleri topla
+- Planı sonuçla eşitle; İngilizce kapı cümlesini tarayıcıda ölçüp düzelt
+- Yönetmen'in dil kilidini kaldır, README'yi düzelt
+- Sunucu mesajlarını da sözlüğe taşı
+- Ayarlar'a dil seçici
+- Betiklerdeki arayüz metinlerini sözlüğe taşı
+- index.html'i çeviriye açan yer tutucular ve istemci sözlüğü
+- Dil tercihi ve sözlük altyapısı (i18n)
+- Çoklu dil desteği için plan belgesi
+
+---
+
+## Sürüm 0.20.0 — ne değişti
+
+- main (dal korumasi) lisans daline alindi
+- yeni kok belgeleri Ayarlar-glifi mandalinin listesine girdi
+- AGPL-3.0 gecisi, marka politikasi ve paket dogrulama
+
+---
+
 ## Sürüm 0.19.0 — ne değişti
 
 - playwright yalniz test isine kuruluyor, paket + tarayici tek adimda

@@ -176,7 +176,14 @@ jobs:
 
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add version.py README.md GUNCELLEME.md
+          # README.en.md LİSTEDE OLMAK ZORUNDA. `surum_yaz.py` onu zaten
+          # yazıyor (SURUM_DOSYALARI) ama buraya eklenmediği için yazdığı şey
+          # her koşuda sahnelenmeden ATILIYORDU: v0.19.0 yayımlandığında
+          # İngilizce sayfanın rozeti v0.18.0'da kalmıştı ve hiçbir test bunu
+          # görmüyordu — `test_version.py`'nin kaçak literal iddiası yalnız
+          # README.md'yi okuyor. Bekçisi artık var:
+          # tests/test_surum_yaz.py → test_surum_yazicisinin_yazdigi_her_dosya_sahneleniyor
+          git add version.py README.md README.en.md GUNCELLEME.md
           # `[skip ci]`: bu push kendi kendini yeniden tetiklemesin (birinci kat
           # koruma; ikincisi `karar` işindeki yazar kapısı).
           git commit -m "chore(surum): v$SURUM [skip ci]"
@@ -391,6 +398,72 @@ jobs:
       # gelinmiyor, yani "eksik yayın" diye bir ara durum yok. Taslak
       # yayımlanana kadar tag de yok: `--draft=false` onu `--target`taki
       # commit'e oluşturuyor.
+      # PAKET DOĞRULAMA — kullanıcının elindeki dosya GERÇEKTEN bu hattan mı
+      # çıktı?
+      #
+      # NEDEN VAR: uygulama public ve paketler imzasız (macOS'ta noter onayı,
+      # Windows'ta Authenticode yok — KURULUM.md Gatekeeper/SmartScreen
+      # adımlarını bu yüzden anlatıyor). İmzasız bir paket için "bu dosya
+      # bozulmamış ve benden geldi" diyebilmenin kalan tek yolu özet: biri
+      # `kromis-windows-x64.zip` adıyla içine bir şey koyduğu bir kopyayı
+      # başka bir yerde dağıtırsa, kullanıcı burada YAYIMLANMIŞ özetle
+      # karşılaştırıp anlayabilir. Özet yayının İÇİNDE durduğu için de
+      # kopyalanamaz: sahte paketi dağıtan kişi bu sayfayı değiştiremez.
+      #
+      # KAPIDAN SONRA: özet ancak "üç paket de yerinde" kanıtlandıktan sonra
+      # anlamlı. Sıra tersine dönerse eksik bir kümenin özeti üretilirdi.
+      #
+      # Dosya adları manifestten okunuyor, `*` ile DEĞİL: hem çıktı sırası
+      # kararlı oluyor hem de bir paket eksikse `sha256sum` kırmızıya düşüyor.
+      - name: Paketlerin SHA-256 özetini üret ve yayına ekle
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.taslak.outputs.tag }}
+        run: |
+          set -euo pipefail
+          ADLAR="$(python -c 'import release_manifest as m; print(" ".join(sorted(m.varliklar())))')"
+
+          mkdir -p ozet
+          gh release download "$TAG" --dir ozet --clobber
+          # Önceki yarım koşudan kalmış olabilir: kendi çıktısını özetlemesin.
+          rm -f ozet/SHA256SUMS.txt
+          ( cd ozet && sha256sum $ADLAR > SHA256SUMS.txt )
+          cat ozet/SHA256SUMS.txt
+
+          # `--clobber`: yarım kalmış bir koşunun yeniden koşulması hattın
+          # normal davranışı (taslak yeniden kullanılıyor), ikinci yükleme
+          # hata vermemeli.
+          gh release upload "$TAG" ozet/SHA256SUMS.txt --clobber
+
+          # Notlara doğrulama bölümü — özetin kullanıcıya GÖRÜNDÜĞÜ yer.
+          # `--generate-notes` gövdesi korunuyor: üzerine yazmak sürüm
+          # notlarını silerdi.
+          IMZA="## 🔐 Paket doğrulama"
+          GOVDE="$(gh release view "$TAG" --json body -q .body)"
+          if printf '%s' "$GOVDE" | grep -qF "$IMZA"; then
+            echo "doğrulama bölümü zaten var (yeniden koşu) — notlara dokunulmadı"
+            exit 0
+          fi
+          {
+            printf '%s\n\n' "$GOVDE"
+            printf '%s\n\n' "$IMZA"
+            printf 'Resmî paketler YALNIZCA bu depodan dağıtılır. İndirdiğin dosyanın\n'
+            printf 'bu hattan çıktığını doğrulamak için:\n\n'
+            printf '```sh\n'
+            printf '# macOS / Linux\nshasum -a 256 kromis-macOS-arm64.zip\n\n'
+            printf '# Windows (PowerShell)\nGet-FileHash .\\kromis-windows-x64.zip -Algorithm SHA256\n'
+            printf '```\n\n'
+            printf 'Beklenen değerler (`SHA256SUMS.txt` olarak da ekli):\n\n'
+            printf '```\n'
+            cat ozet/SHA256SUMS.txt
+            printf '```\n\n'
+            printf 'Özet tutmuyorsa dosya bu yayından gelmiyor demektir — kurma.\n'
+            printf 'Lisans: GNU AGPL-3.0. "Kromis" adı ve logosu lisansın kapsamı\n'
+            printf 'dışındadır (MARKA.md).\n'
+          } > notlar.md
+          gh release edit "$TAG" --notes-file notlar.md
+          echo "doğrulama bölümü yayın notlarına eklendi"
+
       - name: Taslağı yayımla (tag + üç paket, tek anda)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

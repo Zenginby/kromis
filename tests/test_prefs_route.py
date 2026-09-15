@@ -123,3 +123,24 @@ def test_secili_model_tercihi_gidip_geliyor(client):
 def test_bilinmeyen_model_tercihi_422(client):
     r = client.post("/api/prefs", json={"image_model": "yok-boyle-model"})
     assert r.status_code == 422
+
+
+def test_dil_tercihi_gidip_geliyor(client, out_dir):
+    """Ayarlar'daki dil seçicisinin uç tarafı.
+
+    `/api/settings` DEĞİL burası ve gerekçe bu dosyanın başlığında yazılı:
+    o uç `api_key` + `base_url` istiyor, yani dili çevirmek Azure hiç
+    yapılandırılmamış bir makinede imkânsız olurdu.
+    """
+    r = client.post("/api/prefs", json={"language": "en"})
+
+    assert r.status_code == 200, r.text
+    assert r.json()["language"] == "en"
+    assert client.get("/api/prefs").json()["language"] == "en"
+    assert prefs.read(out_dir)["language"] == "en"
+
+
+def test_bilinmeyen_dil_422(client):
+    """Sessiz kabul, arayüzü karşılığı olmayan bir sözlüğe düşürür ve ekran
+    baştan sona ham anahtar gösterir."""
+    assert client.post("/api/prefs", json={"language": "de"}).status_code == 422

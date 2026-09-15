@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """OpenAI-uyumlu SOHBET ucu — `chat_client.py`'nin BİLİNÇLİ ikizi.
 
 `openai_client.py`'nin `azure_client.py`'ye duruşunun aynısı ve aynı
@@ -48,6 +51,8 @@ import catalog
 import chat_client as cc
 import chat_prompt
 import credstore
+import i18n
+import etiket
 import providers
 
 # Zaman aşımı ve ağ-hatası metni `chat_client` ile PAYLAŞILIYOR
@@ -65,12 +70,12 @@ def _label(m: catalog.ChatModel) -> str:
     sağlayıcının adını değiştirince hatanın eski adı söylemesi demekti.
     """
     cred = catalog.credential(m.credential)
-    return cred.label if cred else m.provider
+    return etiket.label_of(cred) if cred else m.provider
 
 
 def map_error(status_code: int, body: dict | list | None, *, label: str,
               wire_model: str) -> str:
-    """HTTP durumunu Türkçe mesaja çevirir. `chat_client.map_error`'ın ikizi.
+    """HTTP durumunu mesaja çevirir. `chat_client.map_error`'ın ikizi.
 
     Gövde şeklini `providers.detail_of` çözüyor (dört sağlayıcı da
     `{"error": {"message": …}}` kullanıyor); ayrışan taraf metinler.
@@ -91,35 +96,31 @@ def map_error(status_code: int, body: dict | list | None, *, label: str,
     """
     detail = providers.detail_of(body)
     if status_code == 401:
-        return (f"{label} yetkilendirme hatası (401): API anahtarı geçersiz "
-                "veya süresi dolmuş. Ayarlar'dan yeniden kaydet.")
+        return i18n.t("err.provider_401", None, saglayici=label)
     if status_code == 403:
-        return (f"{label} erişimi reddetti (403): hesabın bu modele erişimi "
-                "olmayabilir." + (f" {detail}" if detail else ""))
+        return i18n.t("err.provider_403", None, saglayici=label) + (
+                f" {detail}" if detail else "")
     if status_code == 404:
-        return (f"{label} bu modeli tanımıyor (404): {wire_model}. "
-                "Model kalkmış olabilir — composer'daki şeritten başka bir "
-                "sohbet modeli seç.")
+        return i18n.t("err.provider_404", None, saglayici=label, model=wire_model)
     if status_code == 429:
-        return (f"{label} istek limiti aşıldı (429): biraz bekleyip tekrar "
-                "dene. Faturalandırma limitin de dolmuş olabilir.")
+        return i18n.t("err.provider_429", None, saglayici=label)
     if status_code == 400 and providers.is_invalid_key(detail):
         # SIRA ÖNEMLİ: içerik dalından ÖNCE. Google'ın anahtar hatası
         # `INVALID_ARGUMENT` durumuyla geliyor ve aynı gövdede "content"
         # geçen bir alan adı da bulunabiliyor — ters sırada anahtar hatası
         # "içerik reddi" diye okunurdu, yani kullanıcı çalışan promptunu
         # değiştirmeye çalışırdı.
-        return (f"{label} API anahtarı geçersiz (400): Ayarlar'dan yeniden "
-                "kaydet." + (f" {detail}" if detail else ""))
+        return i18n.t("err.provider_bad_key", None, saglayici=label) + (
+                    f" {detail}" if detail else "")
     # ÇIPLAK `"content" in detail` DEĞİL ve bu ölçülmüş bir yanlış pozitif:
     # Google şema hatasını `Unknown name "content": Cannot find field.` diye
     # anlatıyor ve o dize "İçerik politikası reddi" olarak gösteriliyordu —
     # kullanıcı engellenmeyen bir mesajı yeniden yazmaya çalışırdı
     # (bkz. providers.is_content_policy).
     if status_code == 400 and providers.is_content_policy(detail):
-        return f"İçerik politikası reddi: mesaj {label} tarafından engellendi."
-    return (f"{label} sohbet isteği başarısız (HTTP {status_code})."
-            + (f" {detail}" if detail else ""))
+        return i18n.t("err.provider_content_policy", None, saglayici=label)
+    return (i18n.t("err.provider_chat_failed", None, saglayici=label, durum=status_code)
+                + (f" {detail}" if detail else ""))
 
 
 def complete(m: catalog.ChatModel, messages: list[dict], *, client=None,
@@ -140,7 +141,7 @@ def complete(m: catalog.ChatModel, messages: list[dict], *, client=None,
         try:
             instructions = chat_prompt.load_instructions()
         except ValueError as e:
-            raise cc.ChatError(f"Prompt Yönetmeni talimatı yüklenemedi: {e}")
+            raise cc.ChatError(i18n.t("err.persona_load_failed", None, hata=e))
 
     label = _label(m)
     endpoint = base_url.rstrip("/") + m.endpoint_path

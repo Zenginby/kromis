@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Prompt Yönetmeni'nin sistem talimatını diskten yükler.
 
 İki aday, bu sırayla: kullanıcının ezme dosyası → pakete gömülü varsayılan.
@@ -43,8 +46,9 @@ import paths
 
 INSTRUCTIONS_FILE = "prompt-yonetmeni.md"
 # Boş ya da yarım kaydedilmiş bir dosya SESSİZCE persona'yı öldürür: model
-# talimatsız kalır, Türkçe konuşmayı ve çıktı formatını bırakır, kullanıcı da
-# "sohbet bozuldu" der. Uzunluk kapısı o sessiz kırılmayı gürültülüye çevirir.
+# talimatsız kalır, kullanıcının dilinde konuşmayı ve çıktı formatını bırakır,
+# kullanıcı da "sohbet bozuldu" der. Uzunluk kapısı o sessiz kırılmayı
+# gürültülüye çevirir.
 MIN_INSTRUCTIONS_CHARS = 500
 
 VIDEO_INSTRUCTIONS_FILE = "prompt-yonetmeni-video.md"
@@ -105,9 +109,9 @@ def load_video_instructions(*, paths_override: list[str] | None = None) -> str:
     """Video yönetmenliği bölümü; hiçbir aday geçerli değilse BOŞ DİZE.
 
     `load_instructions`ın aksine HATA YÜKSELTMİYOR ve ayrım bilinçli: görsel
-    persona yoksa özellik tümden ölü (talimatsız model Türkçe konuşmayı ve
-    çıktı formatını bırakır), video bölümü ise bir EKLENTİ — yokluğunda
-    yönetmen yalnız görsel bilen bugünkü hâline düşüyor. Bu, `_context_block`ın
+    persona yoksa özellik tümden ölü (talimatsız model kullanıcının dilinde
+    konuşmayı ve çıktı formatını bırakır), video bölümü ise bir EKLENTİ —
+    yokluğunda yönetmen yalnız görsel bilen bugünkü hâline düşüyor. Bu, `_context_block`ın
     "eksik anahtar sessizce atlanıyor, bugünkü davranış her zaman geçerli bir
     alt küme" kuralıyla AYNI sınıf.
 
@@ -130,6 +134,7 @@ MAX_GUIDANCE_CHARS = 1500
 # Başlıklar sabit ve testten okunuyor: modelin bölümleri ayırt edebilmesi
 # başlıkların KARARLI olmasına bağlı.
 CONTEXT_HEADING = "# Bu turun bağlamı"
+LANGUAGE_HEADING = "# Arayüz dili"
 MODELS_HEADING = "# Kullanılabilir modeller"
 GUIDANCE_HEADING = "# Kullanıcının kalıcı yönlendirmesi"
 
@@ -143,6 +148,33 @@ VIDEO_HEADING = "# Video yönetmenliği"
 # sökmek, çünkü çiti taşıyan bir satır kullanıcının yazdığı bir cümle de
 # olabilir ve onu tümden atmak bilgi kaybı olurdu.
 _FENCE = "<<<YONLENDIRME>>>"
+
+
+def _language_block(lang: str) -> str:
+    """Kullanıcının seçtiği ARAYÜZ dili — bir varsayılan, bir dayatma DEĞİL.
+
+    Persona'nın 1. kuralı "kullanıcı hangi dilde yazıyorsa o dilde konuş"
+    diyor ve doğru olan da bu: sohbet modeli hangi dili destekliyorsa o dil
+    kullanılabilir. Ama kuralın cevapsız bıraktığı bir hâl var — İLK mesaj
+    tek kelimelik ya da dilsiz olabiliyor ("Instagram", "1:1", bir hex kodu).
+    O turda modelin elinde hiçbir işaret yok ve eğitim verisinin çoğunluğuna
+    düşüyor, yani Türkçe arayüz kullanan birine İngilizce cevap verebiliyor.
+
+    Arayüz dili o boşluğu dolduran EN İYİ TAHMİN: kullanıcı onu bilerek
+    seçmiş. Blok bu yüzden "şu dilde konuş" demiyor, "işaret yoksa şuradan
+    başla" diyor — kullanıcı Fransızca yazdığı an kural yine kullanıcıyı
+    izliyor.
+    """
+    return "\n".join([
+        LANGUAGE_HEADING,
+        "",
+        f"Kullanıcının seçtiği arayüz dili: **{lang}**.",
+        "Kullanıcı hangi dilde yazıyorsa O DİLDE cevap vermeye devam et — bu",
+        "satır o kuralı EZMİYOR. Yalnızca ilk mesaj dilsizse (tek kelime, bir",
+        "sayı, bir hex kodu) hangi dilden başlayacağını söylüyor.",
+        "",
+        "`PROMPT` bloğu bundan ETKİLENMİYOR: prompt her zaman İngilizce.",
+    ])
 
 
 def _context_block(facts: dict) -> str:
@@ -315,10 +347,11 @@ def _models_block(rows: list[dict], *, secili_disarida: bool = False) -> str:
 
 
 def build_system(*, model_facts: dict | None = None, guidance: str = "",
-                 available_models: list[dict] | None = None) -> str:
+                 available_models: list[dict] | None = None,
+                 language: str = "") -> str:
     """Sistem mesajı: persona + bu turun bağlamı + model menüsü + video + yönlendirme.
 
-    ÜÇÜ DE boşken dönüş `load_instructions()` ile BAYT BAYT aynı — dikişler
+    DÖRDÜ DE boşken dönüş `load_instructions()` ile BAYT BAYT aynı — dikişler
     açılırken bugünkü davranışın değişmemesi şart, yoksa her kullanıcı
     ölçülmemiş bir persona değişikliği almış olurdu. `available_models` için
     `None` ile `[]` aynı sayılıyor (`guidance`ın `""` ile `"  \n "`i aynı
@@ -329,6 +362,11 @@ def build_system(*, model_facts: dict | None = None, guidance: str = "",
     sonda okunması korunuyor.
     """
     parcalar = [load_instructions()]
+    # Dil bloğu EN BAŞTA (persona'dan hemen sonra): sonraki her bölüm
+    # kullanıcıya gösterilecek metinden söz ediyor (`aciklama`, `istek`, kısa
+    # özet) ve hangi dilde yazılacağını önce okumak gerekiyor.
+    if language:
+        parcalar.append(_language_block(language))
     if model_facts:
         parcalar.append(_context_block(model_facts))
     satirlar = list(available_models or ())

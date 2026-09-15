@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Marka varlıklarını SVG kaynaklarından üretir: favicon, apple-touch-icon,
 Windows .ico ve macOS .iconset (PNG'ler; .icns'e çevirme build.sh'te `iconutil`
 ile olur, o araç yalnız macOS'ta var).

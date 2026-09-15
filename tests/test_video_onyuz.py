@@ -29,6 +29,7 @@ import app as appmod
 import catalog
 import models
 import storage
+from tests.conftest import tr
 
 
 def _metin(yol: str) -> str:
@@ -220,6 +221,37 @@ def test_the_START_frame_has_NO_second_state_variable():
     assert "{ deger: source," in _govde(js, "renderFrames")
 
 
+def test_the_frames_note_asks_for_8_SECONDS_when_a_transition_is_set_up():
+    """Ölçülmüş kusur (13 Eylül 2026): iki kare seçilip üretime basıldığında
+    Google 400 dönüyordu — Veo'nun geçiş yolu 8 saniyelik üretimde
+    belgeleniyor, arayüzün ön tanımlı süresi ise 4 (`default_duration`).
+
+    NOT, KAPI DEĞİL: bu depoda Veo'nun hiçbir yolu canlı doğrulanmadı, yani
+    sınırı `goBlockReason`a koymak yanılma ihtimalimizi kullanıcının
+    erişemediği bir kombinasyona çevirirdi. Reddedilen istek üretim de
+    başlatmıyor, yani yanlış denemenin faturası yok.
+    """
+    govde = _govde(_kodsuz(_core()), "renderFrames")
+
+    assert 't("gen.last_frame_wants_8s")' in govde, "süre ipucu yok"
+    # İpucu YALNIZ iki yuva da doluyken ve süre 8 DEĞİLKEN: tek başına duran
+    # bir bitiş görselinin sorunu süre değil, eksik başlangıç karesi.
+    assert "sure !== 8" in govde
+    assert "const gecis = !!(source && sonKare);" in govde
+
+
+def test_the_note_is_redrawn_when_the_DURATION_axis_changes():
+    """İpucu süreye baktığı an, süre değişiminde yeniden çizilmek ZORUNDA:
+    kullanıcı 8'e çevirir, uyarı ekranda durmaya devam ederdi — kendi
+    çözdüğü bir sorunu anlatan bir cümle."""
+    js = _kodsuz(_core())
+
+    m = re.search(r'for \(const id of \["size", "quality", "duration", "n"\]\)'
+                  r'\s*\{(.*?)\n\}', js, re.S)
+    assert m, "eksen dinleyicisi bulunamadı"
+    assert "renderFrames()" in m.group(1)
+
+
 def test_clearing_the_source_ALSO_clears_the_end_frame():
     """Son kare tek başına `#go`yu kilitliyor (`goBlockReason`). Başlangıcı
     temizleyip bitişi bırakmak, kullanıcıyı sessizce o kilide düşürmek
@@ -402,7 +434,9 @@ def test_the_UNIT_is_read_from_the_duration_list_not_a_second_field():
     js = _kodsuz(_core())
     govde = _govde(js, "modelKrediAraligi")
 
-    assert "kredi/sn" in govde
+    # Metin değil ANAHTAR aranıyor: birim artık sözlükte (`gen.credits_unit*`)
+    # ve testin iddiası zaten metnin kendisi değil, DOĞRU dalın seçilmesi.
+    assert "gen.credits_unit_per_sec" in govde
     assert "m.durations && m.durations.length" in govde
 
 
@@ -439,8 +473,10 @@ def test_the_deleted_media_probe_stays_the_ERROR_EVENT_for_both_types():
     govde = _govde(_kodsuz(_chat()), "resultThumb")
 
     assert 'media.addEventListener("error"' in govde
-    assert '"Video silindi"' in govde
-    assert '"Görsel silindi"' in govde
+    assert '"result.video_deleted"' in govde
+    assert '"result.image_deleted"' in govde
+    assert tr("result.video_deleted") == "Video silindi"
+    assert tr("result.image_deleted") == "Görsel silindi"
 
 
 def test_the_video_card_does_NOT_bind_a_zoom_click():
@@ -504,7 +540,8 @@ def test_the_status_line_WARNS_about_the_wait():
     duruyor (uydurma olurdu); BEKLENEN SÜRE ise bir olgu."""
     govde = _govde(_kodsuz(_core()), "run")
 
-    assert "sekmeyi kapatma" in govde
+    assert "gen.video_running" in govde
+    assert "sekmeyi kapatma" in tr("gen.video_running")
     assert "%" not in govde.split("statusEl.textContent = videoMu")[1][:200]
 
 
@@ -621,7 +658,8 @@ def test_the_gallery_tile_carries_a_DURATION_BADGE():
     govde = _govde(_kodsuz(_folders()), "renderGallery")
 
     assert "if (videoMu && !selectMode) {" in govde
-    assert "rec.duration ?" in govde
+    assert "rec.duration" in govde
+    assert "gen.duration_label" in govde, "rozet süreyi yazmıyor"
 
 
 def test_the_gallery_passes_the_TYPE_to_the_viewer():
@@ -819,7 +857,8 @@ def test_the_video_target_closes_the_ARENA_gate():
     video = dal[dal.index('currentMode === "video"'):]
     video = video[:video.index('if (!imageModels.length)')]
     assert "arenaAcik" in video, "video dalı arenayı hiç sormuyor"
-    assert "Görsel moduna" in video, "kullanıcıya çıkış yolu söylenmiyor"
+    assert "gate.arena_not_in_video" in video, "kullanıcıya çıkış yolu söylenmiyor"
+    assert "Görsel moduna" in tr("gate.arena_not_in_video")
 
 
 def test_the_director_can_target_the_VIDEO_mode():
@@ -866,7 +905,8 @@ def test_the_gate_REFUSES_an_extra_reference_in_video_mode():
     govde = _govde(_kodsuz(_core()), "goBlockReason")
 
     assert "if (extras.length) {" in govde
-    assert "tek referans görsel alıyor" in govde
+    assert "gate.model_one_reference" in govde
+    assert "tek referans görsel alıyor" in tr("gate.model_one_reference")
 
 
 def test_the_OVERLAY_button_is_closed_for_a_video_record():

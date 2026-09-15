@@ -116,7 +116,7 @@ def test_post_without_messages_is_422(client):
     r = client.post("/api/chats", json={"title": "boş"})
 
     assert r.status_code == 422
-    assert "mesaj" in r.json()["detail"].lower()
+    assert "message" in r.json()["detail"].lower()
 
 
 def test_post_rejects_a_system_message(client):
@@ -146,7 +146,7 @@ def test_post_rejects_a_thread_over_the_save_total_cap(client):
     r = _create(client, messages=thread)
 
     assert r.status_code == 422
-    assert "uzun" in str(r.json()["detail"])
+    assert "too long" in str(r.json()["detail"])
 
 
 def test_a_thread_at_the_completion_cap_plus_a_full_reply_still_saves(client):
@@ -302,7 +302,7 @@ def test_an_automatic_save_is_refused_while_the_switch_is_off(client, out_dir):
     r = client.post("/api/chats", json={"messages": THREAD})
 
     assert r.status_code == 409
-    assert "otomatik" in r.json()["detail"].lower()
+    assert "automatic" in r.json()["detail"].lower()
     assert client.get("/api/chats").json() == {"chats": []}, "kapalıyken diske yazıldı"
 
 

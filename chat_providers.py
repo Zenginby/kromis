@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Sohbet sağlayıcı sevk memuru — `providers.py`'nin sohbet tarafındaki eşi.
 
 Görsel tarafında bu ayrım v0.6'da kurulmuştu ve gerekçesi orada yazılı: model
@@ -39,6 +42,8 @@ import azure_client as ac
 import catalog
 import chat_client as cc
 import credstore
+import i18n
+import etiket
 import openai_chat
 
 
@@ -106,7 +111,8 @@ def _resolve(model_id: str) -> catalog.ChatModel:
         raise cc.ChatError(f"Bilinmeyen sohbet modeli: {model_id}")
     if m.provider not in _ADAPTERS:
         raise cc.ChatError(
-            f"{m.label} için sohbet adaptörü yok ({m.provider}).")
+            i18n.t("err.no_chat_adapter", None, model=etiket.label_of(m),
+                   saglayici=m.provider))
     return m
 
 

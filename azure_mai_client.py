@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Azure AI Foundry · MAI-Image ailesi — `/mai/v1/images/{generations,edits}`.
 
 `azure_client.py`'nin İKİZİ DEĞİL, KARDEŞİ: tel formatı gerçekten farklı ve
@@ -47,6 +50,7 @@ import base64
 import azure_client as ac
 import catalog
 import credstore
+import i18n
 import providers
 
 GENERATE_PATH = "/mai/v1/images/generations"
@@ -79,8 +83,7 @@ def split_size(token: str) -> tuple[int, int]:
         return int(genislik), int(yukseklik)
     except ValueError:
         raise ac.ImageError(
-            f"MAI geometri jetonunu anlamadı: {token} "
-            "(beklenen biçim: GENİŞLİKxYÜKSEKLİK).") from None
+            i18n.t("err.mai_bad_geometry", None, jeton=token)) from None
 
 
 def build_payload(prompt: str, size: str, *, api_model: str) -> dict:
@@ -111,12 +114,10 @@ def build_image_file(images):
     olurdu.
     """
     if not images:
-        raise ac.ImageError("En az bir görsel gerekli.")
+        raise ac.ImageError(i18n.t("err.need_an_image"))
     if len(images) > 1:
         raise ac.ImageError(
-            "MAI düzenlemede tek referans görsel alıyor; "
-            f"{len(images)} görsel gönderildi. Ek referansları kaldır ya da "
-            "gpt-image-2'ye geç.")
+            i18n.t("err.mai_one_reference", None, adet=len(images)))
     filename, data = images[0]
     return {"image": (filename, data, "image/png")}
 
@@ -132,19 +133,18 @@ def decode_images(response_json: dict) -> list[bytes]:
     """
     data = response_json.get("data")
     if not isinstance(data, list) or not data:
-        raise ac.ImageError("MAI yanıtı boş döndü (data yok). Tekrar deneyin.")
+        raise ac.ImageError(i18n.t("err.mai_empty"))
     out: list[bytes] = []
     for item in data:
         b64 = item.get("b64_json") if isinstance(item, dict) else None
         if not b64:
-            raise ac.ImageError(
-                "MAI yanıtı beklenmedik biçimde geldi (b64_json yok).")
+            raise ac.ImageError(i18n.t("err.mai_unexpected"))
         out.append(base64.b64decode(b64))
     return out
 
 
 def map_error(status_code: int, body: dict | list | None) -> str:
-    """HTTP durumunu Türkçe mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
+    """HTTP durumunu mesaja çevirir. ŞEKİL paylaşılıyor, METİN paylaşılmıyor.
 
     `providers.detail_of` gövde şeklini çözüyor — MAI'nin gövdesi
     (`error.code` + `message` + `details`) OpenAI şekline yeterince yakın.
@@ -158,18 +158,14 @@ def map_error(status_code: int, body: dict | list | None) -> str:
     """
     detail = providers.detail_of(body)
     if status_code == 401:
-        return ("Azure AI Foundry yetkilendirme hatası (401): api-key geçersiz "
-                "veya bu kaynağa ait değil. Ayarlar'dan yeniden kaydet.")
+        return i18n.t("err.foundry_401")
     if status_code == 404:
-        return ("MAI dağıtımı bulunamadı (404): bu model Foundry'de dağıtılmamış "
-                "olabilir, ya da Ayarlar'daki Foundry adresi başka bir kaynağı "
-                "gösteriyor." + (f" {detail}" if detail else ""))
+        return i18n.t("err.mai_404") + (f" {detail}" if detail else "")
     if status_code == 429:
-        return ("MAI kotası doldu (429): biraz bekleyip tekrar deneyin. "
-                "Adedi düşürmek de yardımcı olur.")
+        return i18n.t("err.mai_429")
     if providers.is_content_policy(detail):
-        return "İçerik politikası reddi: prompt MAI tarafından engellendi."
-    return (f"MAI isteği başarısız (HTTP {status_code})."
+        return i18n.t("err.mai_content_policy")
+    return (i18n.t("err.mai_failed", None, durum=status_code)
             + (f" {detail}" if detail else ""))
 
 

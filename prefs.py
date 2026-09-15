@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Kullanıcı tercihleri (gizli DEĞİL) ve prefs.json yönetimi.
 
 v2.0'da otomatik kayıt (karar D1) bir anahtar gerektirdi ve iki aday yer de
@@ -31,8 +34,9 @@ import json
 import os
 
 import catalog
+import i18n
 import jsonstore
-from models import ALLOWED_THEMES
+from models import ALLOWED_LANGUAGES, ALLOWED_THEMES
 
 PREFS_FILE = "prefs.json"
 
@@ -62,6 +66,26 @@ PREFS_FILE = "prefs.json"
 _SCHEMA: dict[str, tuple[object, type]] = {
     "autosave_sessions": (True, bool),
     "theme": ("mono", str),
+    # Arayüz dili (v0.21). Varsayılan İNGİLİZCE (v0.22'de "tr"den çevrildi) ve
+    # değer LİTERAL DEĞİL İTHAL: tek kaynak `i18n.DEFAULT` — iki yer ayrışırsa
+    # "hiç seçim yokken hangi dil" sorusunun, biri sunucu tarafında biri
+    # sözlükte olmak üzere iki cevabı olurdu.
+    #
+    # Ön tanımlı dil ile `i18n.FALLBACK` ARTIK AYNI DEĞİL ve bunun bir bedeli
+    # var: çevrilmemiş bir dize varsayılan kurulumda Türkçe görünür. Kapı
+    # çalışma anında değil testte (`tests/test_i18n.py` iki kataloğun
+    # anahtarlarını eşitliyor) — `chat_prompt.load_video_instructions`ın
+    # "kapı burada değil testte" ayrımının aynısı.
+    #
+    # Sistem/tarayıcı dilinden OTOMATİK ALGILAMA hâlâ yok ve bu kasıtlı:
+    # `app._dil_baglami`nin `Accept-Language` gerekçesi burada da geçerli —
+    # tercihin tek kaynağı diskteki bu dosya, yoksa kullanıcının seçimini
+    # sessizce ezen ikinci bir otorite doğardı.
+    #
+    # Anahtar burada, `credentials.env`'de DEĞİL: dosyanın başındaki iki
+    # gerekçe (bir arayüz tercihinin 0600 olmasının anlamı yok · anahtarı
+    # çevirmek Azure kimliğini yeniden yazmaya bağlanırdı) birebir geçerli.
+    "language": (i18n.DEFAULT, str),
     "guncelleme_kontrolu": (True, bool),
     "image_model": (catalog.DEFAULT_IMAGE_MODEL, str),
     # Video şeridinin seçimi. `image_model`in AYRI bir anahtarı ve bu
@@ -96,6 +120,12 @@ DEFAULTS = {name: default for name, (default, _) in _SCHEMA.items()}
 # yani anahtar BAŞINA bir kural onu ifade edemiyor (bkz. update()).
 _ENUMS: dict[str, tuple[str, ...]] = {
     "theme": ALLOWED_THEMES,
+    # `theme`in gerekçesi kelimesi kelimesine geçerli: elle yazılmış bir
+    # `language: "de"` buradan geçse arayüz karşılığı olmayan bir sözlüğe
+    # düşer ve ekran baştan sona ham ANAHTAR gösterirdi — sessiz ve teşhisi
+    # zor. `i18n.normalize` çalışma anında ayrıca koruyor ama o bir savunma;
+    # tercihin kendisinin geçerli kalması bu tablonun işi.
+    "language": ALLOWED_LANGUAGES,
     "image_model": catalog.image_model_ids(),
     "video_model": catalog.video_model_ids(),
     "chat_provider": catalog.chat_provider_ids(),
@@ -191,12 +221,12 @@ def update(values: dict, output_dir: str) -> dict:
     """
     for name, value in values.items():
         if name not in _SCHEMA:
-            raise ValueError(f"bilinmeyen tercih: {name}")
+            raise ValueError(i18n.t("err.unknown_pref", None, ad=name))
         if not isinstance(value, _SCHEMA[name][1]):
-            raise ValueError(f"tercih için geçersiz değer: {name}")
+            raise ValueError(i18n.t("err.bad_pref_type", None, ad=name))
         allowed = _ENUMS.get(name)
         if allowed is not None and value not in allowed:
-            raise ValueError(f"tercih için geçersiz {name} değeri: {value}")
+            raise ValueError(i18n.t("err.bad_pref_value", None, ad=name, deger=value))
 
     # `chat_model` ÇAPRAZ bir kural: geçerliliği `chat_provider`'a bağlı, yani
     # `_ENUMS` gibi anahtar-başına bir tablo onu ifade edemiyor. Kontrol
@@ -209,8 +239,8 @@ def update(values: dict, output_dir: str) -> dict:
         gecerli = [m.id for m in catalog.chat_models_for(provider)]
         if values["chat_model"] not in gecerli:
             raise ValueError(
-                f"tercih için geçersiz chat_model değeri: {values['chat_model']} "
-                f"({provider} sağlayıcısında yok)")
+                i18n.t("err.bad_pref_chat_model", None,
+                       model=values["chat_model"], saglayici=provider))
 
     if not values:
         return read(output_dir)

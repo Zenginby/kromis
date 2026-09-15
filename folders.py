@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Görsel klasörleri (koleksiyonlar) ve folders.json yönetimi.
 
 Klasörler diskte gerçek dizin DEĞİL: görseller `output/` altında düz durur ve
@@ -16,6 +19,7 @@ import re
 import uuid
 import zipfile
 
+import i18n
 import jsonstore
 import storage
 
@@ -193,13 +197,13 @@ def rename(folder_id: str, new_name: str, output_dir: str) -> dict | None:
 def export_zip(folder_id: str, output_dir: str) -> tuple[bytes, str]:
     """Klasörü ve tüm alt ağacını görselleriyle birlikte ZIP arşivi olarak üretir."""
     if not folder_id or not _SAFE_ID.fullmatch(folder_id):
-        raise ValueError("Geçersiz klasör id.")
+        raise ValueError(i18n.t("err.bad_folder_id"))
 
     all_folders = _read(output_dir)
     folder_map = {f["id"]: f for f in all_folders if f.get("id")}
     root_folder = folder_map.get(folder_id)
     if not root_folder:
-        raise ValueError("Klasör bulunamadı.")
+        raise ValueError(i18n.t("err.folder_missing"))
 
     root_name = root_folder.get("name", "klasor").strip()
 

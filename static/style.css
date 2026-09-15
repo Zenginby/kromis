@@ -1,3 +1,6 @@
+/* Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+   GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+   Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md). */
 /* ── Token köprüsü ───────────────────────────────────────────────────
  *
  * Eski token adları KORUNUYOR (55 KB CSS yeniden yazılmıyor) ama artık
@@ -1180,6 +1183,36 @@ body:has(.sheet.open) .scrim { display: block; }
    `width: 100%`ü onu düğmenin altına zaten iter, ama boşluğu bu satır veriyor. */
 .settings-update-row .btn-ghost { text-decoration: none; }
 .settings-update-steps { display: block; margin-top: 0.5rem; }
+
+/* "Şimdi kontrol et" satırı — düğme + durum yazısı YAN YANA, sarabilir.
+   Kart DEĞİL (.settings-update-row'un aksine): bu satır her zaman görünür ve
+   kart biçimi verilseydi, gerçekten bir şey söyleyen "yeni sürüm var" kartıyla
+   aynı ağırlıkta okunup onun vurgusunu düşürürdü — künyenin kart olmama
+   gerekçesinin aynısı.
+   `align-items: center` düğmeyi ve tek satırlık cevabı hizalıyor; `flex-wrap`
+   dar telefonda (mobile.css'in ölçtüğü 360px) yazıyı alt satıra indiriyor,
+   düğmeyi ezmek yerine. */
+.settings-update-check-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+  margin: 0.5rem 0 0;
+}
+
+/* Künye — panelin DİBİNDEKİ yasal kimlik (index.html'de gerekçesi yazılı).
+
+   Üstündeki içerikten `border-top` ile ayrılıyor, kart olarak DEĞİL:
+   `.settings-update-row` bir EYLEM kartı ve künyenin ondan ayırt edilebilmesi
+   gerekiyor — künye okunacak bir şey, tıklanacak bir şey değil. Kart biçimi
+   ikisini aynı ağırlıkta gösterip "Güncelle"nin çağrısını zayıflatırdı.
+
+   Bağlantılar `.settings-update-row a` ile AYNI çözümü alıyor ve gerekçesi de
+   aynı: biçimlenmemiş `<a>` bu yüzeyde ~1.3:1 kontrastla okunmuyor. Renk
+   `--text`ten, altı çizgi "tıklanır" işareti. */
+.settings-legal {
+  margin-top: 0.9rem; padding-top: 0.75rem;
+  border-top: 1px solid var(--control-border);
+  font-size: 0.72rem;
+}
+.settings-legal a { color: var(--text); text-decoration: underline; }
 
 .range-val { color: var(--text); font-variant-numeric: tabular-nums; font-size: 0.78rem; }
 .logo-controls input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; margin: 0.1rem 0 0.2rem; }

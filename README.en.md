@@ -1,7 +1,7 @@
 # Kromis Studio
 
-[![Release](https://img.shields.io/badge/version-v0.18.0-blue.svg)](https://github.com/Zenginby/kromis/releases/latest)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Release](https://img.shields.io/badge/version-v0.22.1-blue.svg)](https://github.com/Zenginby/kromis/releases/latest)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org/)
 [![Build & Test](https://github.com/Zenginby/kromis/actions/workflows/release.yml/badge.svg)](https://github.com/Zenginby/kromis/actions)
 
@@ -17,11 +17,15 @@ is no server in between.
 🇹🇷 [Türkçe](README.md) · 📦 [Installation](KURULUM.md) *(Turkish)* · 📖 [Full feature list](docs/ozellikler.md) *(Turkish)*
 
 > [!NOTE]
-> **The interface is Turkish only** — there is no language switch yet, so every
-> screenshot below shows Turkish labels. The Prompt Director takes your idea in
-> Turkish and writes the image prompt in English; the rest of the UI has not been
-> translated. The same is true of the in-repo documentation: this README is the
-> English entry point, the deeper documents are Turkish.
+> **The interface speaks English out of the box** (the default since v0.22) —
+> switch it in Settings → **Dil / Language** (the button is deliberately named
+> in both languages so you can find it from either side). The choice is saved
+> to disk, so it survives a restart; an installation that already picked a
+> language keeps it.
+>
+> The screenshots below still show the Turkish interface, and the in-repo
+> documentation is Turkish: this README is the English entry point, the deeper
+> documents are not translated.
 
 ![Kromis Studio — a generated image in the studio flow](docs/gorseller/uretim-sonucu.png)
 
@@ -50,14 +54,22 @@ when the version does.
 
 ---
 
-## ✨ What it does (v0.18.0)
+## ✨ What it does (v0.22.1)
 
 ### Say what you want; the Director writes the prompt
 
-Describe the idea in everyday Turkish. The Director turns it into an optimised
-English prompt plus the technical settings (size, quality, count), asks you about
-anything it had to guess using **clickable options**, and offers variations and
-parameter axes. One click sends the prompt you like to generation.
+Describe the idea in everyday language — **you get an answer in whatever
+language you wrote in**; the limit is whichever languages the chat model you
+picked as the Director supports. The Director turns it into an optimised
+**English** prompt plus the technical settings (size, quality, count), asks you
+about anything it had to guess using **clickable options**, and offers
+variations and parameter axes. One click sends the prompt you like to
+generation.
+
+The prompt being English is not a language preference but a measured behaviour:
+image models produce noticeably more faithful results when the same scene is
+described in English. Ask for a prompt in another language and the Director will
+give you one, with the English version alongside it.
 
 ![The Prompt Director: generated prompt, technical settings, variations and parameter axes](docs/gorseller/studyo-yonetmen.png)
 
@@ -178,4 +190,22 @@ are dead.
 
 ## 📜 License
 
-MIT — see [LICENSE](LICENSE).
+**GNU AGPL-3.0** — see [LICENSE](LICENSE).
+
+Use it, study it, change it, redistribute it. One thing is asked in return:
+**if you distribute a modified version, you must publish its source too.**
+Bundling it into a closed-source product, or closing the source and selling it
+as your own, violates the licence.
+
+Whatever you **create with** the app — images and videos — is entirely yours.
+The licence covers the code, not its output, and commercial use is unrestricted.
+
+* Copyright, the previous licence (the project was opened under MIT) and how to
+  report an infringement: [TELIF.md](TELIF.md)
+* **The "Kromis" name and logo are NOT covered by the licence.** Forking is
+  free; the name is not — with a concrete rename checklist: [MARKA.md](MARKA.md)
+* Third-party components and their notices: [NOTICE](NOTICE)
+
+The packages are distributed unsigned; every release publishes the SHA-256 of
+each package so you can verify that the file you downloaded really came from
+this repository — see [KURULUM.md](KURULUM.md).

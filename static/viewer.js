@@ -1,3 +1,6 @@
+// Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+// GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+// Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 // Kromis — görsel büyüteci (lightbox): yakınlaştırma + kaydırma.
 //
 // Klasik script (bkz. core.js başlığı) ve SON yüklenen dosya: yalnızca HTML'de
@@ -267,7 +270,7 @@
       vvid.setAttribute("aria-label", alt || "");
       // Sahne ETİKETİ de değişiyor: "Görseli büyüt" diyen bir diyalog adı,
       // ekran okuyucu kullanıcısına yanlış içeriği duyururdu.
-      stage.setAttribute("aria-label", "Videoyu oynat");
+      stage.setAttribute("aria-label", t("viewer.play_video"));
       syncActions(src);
       viewer.hidden = false;
       document.body.classList.add("viewer-open");
@@ -279,7 +282,7 @@
     }
     vvid.pause();
     vvid.removeAttribute("src");
-    stage.setAttribute("aria-label", "Görseli büyüt");
+    stage.setAttribute("aria-label", t("viewer.open"));
     vimg.src = src;
     vimg.alt = alt || "";
     syncActions(src);

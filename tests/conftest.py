@@ -28,6 +28,7 @@ yorumlayıcının ön koşulunu (`os.fchmod`) bir kez sınıyor. Gerekçesi orad
 """
 from __future__ import annotations
 
+import importlib.util
 import os
 import sys
 
@@ -35,6 +36,9 @@ import pytest
 
 import backup as backup_module
 import paths as paths_module
+# Hangi dosyaların E2E olduğu TEK yerde ölçülüyor; gerekçesi orada. Salt
+# kitaplık bir modül, yani takımın kendisi bir kuruluma bağlanmıyor.
+from tools.test_ortami import e2e_dosyalari
 
 _UNGUARDED_BACKUP_FILENAME = "test_backup.py"
 _UNGUARDED_MIGRATION_FILENAME = "test_paths.py"
@@ -47,6 +51,58 @@ ASGARI_PYTHON = (3, 13)
 
 # Kapıyı bilerek atlamanın yolu; mesajın kendi içinde de yazılı.
 ESKI_PYTHON_IZNI = "KROMIS_ALLOW_OLD_PYTHON"
+
+# E2E'nin ATLANMASINI yasaklayan ortam değişkeni. CI bunu "1" veriyor
+# (`_test.yml`), yani orada playwright kurulum adımı bir gün sessizce
+# kaybolursa takım "yeşil ama eksik" olmaz, KIRMIZI olur.
+E2E_ZORUNLU = "KROMIS_E2E_ZORUNLU"
+
+
+def _playwright_var() -> bool:
+    return importlib.util.find_spec("playwright") is not None
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config) -> None:
+    """E2E atlandıysa takımın SONUNDA bunu bağıra bağıra söyler.
+
+    NEDEN VAR (2026-09-13'te ölçüldü): `ci.yml` bu depoda dokuz kez kırmızıya
+    döndü ve SEKİZİNDE düşen testler `tests/test_playwright_*.py`
+    dosyalarındaydı. Playwright kurulu olmayan bir makinede o dosyalar
+    `importorskip` ile ATLANIYOR ve pytest son satırda yine "passed" diyor.
+    Kusur testlerde değil, SİNYALDE: "2531 passed, 11 skipped" cümlesi
+    E2E'nin hiç koşmadığını söylemiyordu.
+
+    NEDEN UYARI, KIRMIZI DEĞİL: playwright bilerek `requirements-dev.txt`te
+    DEĞİL — paketleme işleri o dosyayı kurup pytest'i tarayıcısız koşturuyor
+    ve orada atlama DOĞRU davranış (gerekçe: tests/test_playwright_kurulumu.py).
+    Yani her atlama bir kusur değil; kusur olan, atlamanın GÖRÜNMEMESİ.
+    Bilerek kırmızı isteyen için kapı ayrı: KROMIS_E2E_ZORUNLU=1.
+
+    NEDEN SAYI DEĞİL DOSYA ADI: modül düzeyindeki `importorskip` tüm dosyayı
+    tek bir "skipped" kaydına indiriyor, yani "kaç test atlandı" burada
+    dürüstçe söylenemez. Atlanan DOSYALAR söyleniyor.
+    """
+    if _playwright_var():
+        return
+    atlanan = e2e_dosyalari()
+    if not atlanan:
+        return
+    # Eyleme dönük kısımlar ASCII: bu satırlar cp1252 bir konsola boru ile
+    # yazıldığında Türkçe harfler `ı` kaçışlarına düşüyor (Faz 5 dersi,
+    # bkz. pytest_configure'ın gerekçesi) — komut okunur kalmalı.
+    terminalreporter.write_sep("=", "E2E ATLANDI: bu yesil, TAM yesil degil",
+                               yellow=True, bold=True)
+    terminalreporter.write_line(
+        "playwright kurulu olmadigi icin su dosyalar HIC kosmadi:")
+    for ad in atlanan:
+        terminalreporter.write_line(f"    tests/{ad}")
+    terminalreporter.write_line(
+        "Bu depodaki ilk-kosu CI kirmizilarinin cogu tam olarak bu dosyalardi: "
+        "arayuz metni, on tanimli dil ve DOM capasi degisiklikleri yalnizca "
+        "burada gorunuyor.")
+    terminalreporter.write_line("Ortami kur : python3 tools/test_ortami.py")
+    terminalreporter.write_line(f"Atlamayi hataya cevir: {E2E_ZORUNLU}=1")
+    terminalreporter.write_sep("=", yellow=True, bold=True)
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -84,6 +140,22 @@ def pytest_configure(config: pytest.Config) -> None:
     komutlar, ortam değişkeni — bu yüzden ASCII bırakıldı: kodlama ne olursa
     olsun onlar okunur kalıyor.
     """
+    # E2E KAPISI (gerekçesi pytest_terminal_summary'de): atlama açıkça
+    # yasaklandıysa takımı HİÇ başlatma. `_test.yml` bu değişkeni veriyor, yani
+    # CI'da playwright kurulum adımı bir gün sessizce kaybolursa kapı kapanır —
+    # `tests/test_playwright_kurulumu.py` workflow'un METNİNİ sınıyor, bu satır
+    # da onun GERÇEKTEN iş görüp görmediğini.
+    if os.environ.get(E2E_ZORUNLU) == "1" and not _playwright_var():
+        raise pytest.UsageError(
+            f"{E2E_ZORUNLU}=1 verildi ama playwright kurulu DEGIL: E2E "
+            "testleri atlanacakti."
+            "\n\n"
+            "COZUM: python3 tools/test_ortami.py"
+            "\n\n"
+            f"Atlamaya izin vermek icin {E2E_ZORUNLU} degiskenini kaldirin "
+            "(paketleme isleri pytest'i bilerek tarayicisiz kosturuyor)."
+        )
+
     if hasattr(os, "fchmod"):
         return
     if os.environ.get(ESKI_PYTHON_IZNI) == "1":
@@ -173,6 +245,34 @@ def _guard_against_real_migration(request: pytest.FixtureRequest,
     yield
 
 
+@pytest.fixture(autouse=True)
+def _dil_baglami_testler_arasinda_sizmasin():
+    """Her testi `i18n.FALLBACK` bağlamıyla başlatır.
+
+    BEŞİNCİ guard ve sebebi ÖLÇÜLDÜ (v0.22, ön tanımlı dil "en" olurken):
+    `app._dil_baglami` her istekte `i18n.set_active` çağırıyor ve `TestClient`
+    isteği kendi portalında koşturduğu için o değer ana bağlamda ASILI
+    KALIYOR. Yani bir `client.post(...)`tan sonra koşan HER test, bağlamı hiç
+    kurmadan `i18n.t(anahtar, None)` çağırdığında bir önceki testin dilini
+    görüyor — sıraya bağlı, dosya dışına taşan bir sızıntı.
+
+    Sızıntı ÖNCEDEN DE VARDI, yalnızca GÖRÜNMÜYORDU: ön tanımlı dil ile
+    kaynak dil aynı olduğu sürece sızan değer zaten beklenen değerdi. İkisi
+    ayrılınca `map_error`ı doğrudan çağıran testler (test_gemini_client ve
+    yedi ikizi) tek başına YEŞİL, takımın içinde KIRMIZI oldu — testin kendi
+    kusuru değil, bağlamın kusuru.
+
+    `FALLBACK`, `DEFAULT` DEĞİL: bu fixture'ın kurduğu şey "kullanıcı yok"
+    hâli ve `i18n._AKTIF`ın kendi varsayılanı da o (gerekçesi orada). Ürünün
+    ön tanımlı dilinin bekçisi ayrı: `test_prefs.py` varsayılanı,
+    `test_i18n.py` de hiç tercih yazılmamış bir kurulumun hangi dilde
+    servis edildiğini sınıyor.
+    """
+    import i18n
+    i18n.set_active(i18n.FALLBACK)
+    yield
+
+
 @pytest.fixture
 def fake_composite():
     """composite.composite_logo yerine geçer: girdiyi olduğu gibi döndürür.
@@ -184,3 +284,27 @@ def fake_composite():
         with open(base_path, "rb") as f:
             return f.read()
     return _fake_composite
+
+
+def tr(anahtar: str) -> str:
+    """Bir çeviri anahtarının TÜRKÇE metni — arayüz metnine bakan testler için.
+
+    Çoklu dil desteği (v0.21) arayüz metinlerini `static/*.js` ve
+    `static/index.html` içinden `bundled/i18n/*.json`a taşıdı. Bunu ölçen
+    testlerin İKİ farklı sorusu var ve ikisi ayrı yere bakmalı:
+
+      · "Bu dal DOĞRU cümleyi mi seçiyor?" → betikte ANAHTARI ara
+        (`t("gate.arena_no_edit")`). Metin değişse bile dal aynı kalır, yani
+        test cümlenin yazımına değil KARARA bakmış olur.
+      · "Cümle kullanıcıya şunu SÖYLÜYOR mu?" → metni buradan al. Anahtarın
+        kendisini kopyalamak yetmezdi: sözlükten silinmiş bir anahtar
+        `i18n.t` tarafından sessizce kendisine düşer ve test yine geçerdi.
+
+    İkincisi için doğrudan `i18n.t` çağrılabilirdi; bu sarmalayıcı ADIYLA
+    hangi soruyu sorduğunu söylüyor ve testlerin dile bağımlılığını tek bir
+    yerde topluyor.
+    """
+    import i18n
+    metin = i18n.t(anahtar, "tr")
+    assert metin != anahtar, f"sözlükte yok: {anahtar}"
+    return metin

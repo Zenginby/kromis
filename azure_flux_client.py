@@ -1,3 +1,6 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Azure AI Foundry · FLUX.2 (Black Forest Labs) — BFL yolu.
 
 `azure_mai_client`ın KARDEŞİ ama İKİZİ DEĞİL: aynı host, aynı `api-key`, ama
@@ -41,6 +44,7 @@ import base64
 import azure_client as ac
 import catalog
 import credstore
+import i18n
 import providers
 
 # Kimlik başlığı: `azure_mai_client.AUTH_HEADER`ın aynı gerekçesi ve aynı
@@ -93,8 +97,7 @@ def model_path(wire_model: str) -> str:
     yol = _MODEL_PATHS.get(wire_model)
     if yol is None:
         raise ac.ImageError(
-            f"FLUX yol eşlemesi yok: {wire_model}. Katalog ile "
-            "azure_flux_client._MODEL_PATHS ayrışmış.")
+            i18n.t("err.flux_no_path", None, model=wire_model))
     return yol
 
 
@@ -118,8 +121,7 @@ def split_size(token: str) -> tuple[int, int]:
         return int(genislik), int(yukseklik)
     except ValueError:
         raise ac.ImageError(
-            f"FLUX geometri jetonunu anlamadı: {token} "
-            "(beklenen biçim: GENİŞLİKxYÜKSEKLİK).") from None
+            i18n.t("err.flux_bad_geometry", None, jeton=token)) from None
 
 
 def quality_axis(quality: str) -> tuple[int, float] | None:
@@ -164,19 +166,18 @@ def decode_images(response_json: dict) -> list[bytes]:
     """
     data = response_json.get("data")
     if not isinstance(data, list) or not data:
-        raise ac.ImageError("FLUX yanıtı boş döndü (data yok). Tekrar deneyin.")
+        raise ac.ImageError(i18n.t("err.flux_empty"))
     out: list[bytes] = []
     for item in data:
         b64 = item.get("b64_json") if isinstance(item, dict) else None
         if not b64:
-            raise ac.ImageError(
-                "FLUX yanıtı beklenmedik biçimde geldi (b64_json yok).")
+            raise ac.ImageError(i18n.t("err.flux_unexpected"))
         out.append(base64.b64decode(b64))
     return out
 
 
 def map_error(status_code: int, body: dict | list | None) -> str:
-    """HTTP durumunu Türkçe mesaja çevirir.
+    """HTTP durumunu kullanıcıya gösterilebilir bir mesaja çevirir.
 
     422 KENDİ DALINDA ve bu dosyanın en çok işe yarayan yeri: FLUX'un
     doğrulayıcısı mesaj yerine `error.details[]` listesi döndürüyor ve o liste
@@ -192,19 +193,15 @@ def map_error(status_code: int, body: dict | list | None) -> str:
     """
     detail = providers.detail_of(body)
     if status_code == 401:
-        return ("Azure AI Foundry yetkilendirme hatası (401): api-key geçersiz "
-                "veya bu kaynağa ait değil. Ayarlar'dan yeniden kaydet.")
+        return i18n.t("err.foundry_401")
     if status_code == 404:
-        return ("FLUX dağıtımı bulunamadı (404): bu model Foundry'de "
-                "dağıtılmamış olabilir, ya da Ayarlar'daki Foundry adresi "
-                "başka bir kaynağı gösteriyor." + (f" {detail}" if detail else ""))
+        return i18n.t("err.flux_404") + (f" {detail}" if detail else "")
     if status_code == 422:
-        return ("FLUX isteği reddetti (422): "
-                + (detail or "gövdedeki alanlardan biri geçersiz."))
+        return (i18n.t("err.flux_422") + " "
+                + (detail or i18n.t("err.body_field_invalid")))
     if status_code == 429:
-        return ("FLUX kotası doldu (429): biraz bekleyip tekrar deneyin. "
-                "FLUX dağıtımlarının kapasitesi düşük.")
-    return (f"FLUX isteği başarısız (HTTP {status_code})."
+        return i18n.t("err.flux_429")
+    return (i18n.t("err.flux_failed", None, durum=status_code)
             + (f" {detail}" if detail else ""))
 
 

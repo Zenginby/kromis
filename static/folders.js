@@ -1,3 +1,6 @@
+// Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+// GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+// Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 // Kromis — klasörler (iç içe) ve galeri çoklu seçimi.
 //
 // Klasik script (ES module DEĞİL): bütün parçalar TEK global kapsamı paylaşır
@@ -31,7 +34,6 @@ function updateMediaRailCount() {
   if (!el) return;
   const suzgec = medyaTurSuzgeciAktif();
   const imgCount = gorunenMedya().length;
-  const birim = suzgec.birim;
   // ŞERİDİN İKİ YARISI DA EKRANI SAYIYOR (Tur L). Eskiden hiçbiri saymıyordu:
   // görsel yarısı arama tamamlanmadan okunuyordu (`syncFolderView` →
   // `renderFolders` sırası, `refreshSearch` sonra bitiyor) ve klasör yarısı
@@ -42,17 +44,21 @@ function updateMediaRailCount() {
   const foldCount = gorunenKlasorSayisi === null
     ? (folderCache ? folderCache.length : 0)
     : gorunenKlasorSayisi;
-  if (currentFolder) {
-    el.textContent = `${imgCount} ${birim}`;
-  } else {
-    el.textContent = `${foldCount} klasör · ${imgCount} ${birim}`;
-  }
+  // Sayı ve birim TEK anahtarda: Türkçe'de sayıdan sonra çoğul eki
+  // KULLANILMIYOR ("3 görsel"), İngilizce'de kullanılıyor ("3 images") — yani
+  // "{n}" + ayrı bir birim sözcüğü diziliminin doğru olması dil bilgisi
+  // sırasına dayanan bir rastlantı olurdu. `tc()` seçimi dile bırakıyor.
+  const medya = tc(`${suzgec.birim}_one`, `${suzgec.birim}_many`, imgCount);
+  el.textContent = currentFolder
+    ? medya
+    : `${tc("media.folders_one", "media.folders_many", foldCount)} · ${medya}`;
 }
 
 function toggleMediaSort() {
   mediaSortOrder = mediaSortOrder === "date" ? "name" : "date";
   if ($("media-sort-label")) {
-    $("media-sort-label").textContent = mediaSortOrder === "date" ? "Tarih" : "İsim";
+    $("media-sort-label").textContent =
+      t(mediaSortOrder === "date" ? "media.sort_date" : "media.sort_name");
   }
   renderFolders();
   renderGallery();
@@ -170,7 +176,7 @@ function klasorZinciriDugumu(folderId, sinif, parcalar = folderPathParts(folderI
   // başındaki boşluk kırpılıyor ve künye "Kampanyal…/ Bayram" diye okunurdu.
   yaprakEl.textContent = yaprak
     ? (ust ? KLASOR_AYRACI + yaprak : yaprak)
-    : "Klasörsüz";
+    : t("folders.unfiled_short");
   kap.appendChild(yaprakEl);
   return kap;
 }
@@ -211,12 +217,10 @@ const IMAGE_DND_TYPE = "application/x-gpt-image-id";
 // bir kontrolü tarif etti ve telefondan içe aktarmanın gerçekten hiçbir yolu
 // kalmadı. Düğme artık `#media-import-btn` olarak şeritte; cümle ile kontrol
 // birlikte yaşıyor (aynı kusurun kaydı: assets.js `assetEmptyText`).
-const FOLDER_HINT_DEFAULT = IS_TOUCH
-  ? 'Görselleri taşımak için "Seç" ile işaretleyip "Taşı…" düğmesini kullan.'
-  : "Bir görseli klasör kartına sürükleyip bırakarak taşıyabilirsin.";
-const FOLDER_HINT_IMPORT = IS_TOUCH
-  ? 'Cihazındaki bir görseli "Yükle" düğmesiyle içe aktarabilirsin.'
-  : 'Bilgisayarındaki bir görseli "Yükle" düğmesiyle, klasör kartına ya da bu alana bırakarak içe aktarabilirsin.';
+const FOLDER_HINT_DEFAULT = t(IS_TOUCH ? "folders.hint_move_touch"
+                                        : "folders.hint_move_mouse");
+const FOLDER_HINT_IMPORT = t(IS_TOUCH ? "folders.hint_import_touch"
+                                      : "folders.hint_import_mouse");
 
 function renderFolderHint() {
   const el = $("folder-hint");
@@ -232,7 +236,7 @@ function renderFolderHint() {
 function renderFolderTarget() {
   const el = $("folder-target");
   if (currentFolder) {
-    el.textContent = `Yeni görseller "${currentFolder.name}" klasörüne eklenecek.`;
+    el.textContent = t("folders.new_images_go_here", { klasor: currentFolder.name });
     el.hidden = false;
   } else {
     el.hidden = true;
@@ -263,8 +267,9 @@ function syncFolderView() {
   // kırıntı: "A / B / C" — cache henüz gelmediyse en azından klasörün adı
   $("gallery-title").textContent = inFolder
     ? (klasorZinciriEtiketi(folderPathParts(currentFolder.id)) || currentFolder.name)
-    : "Klasörler";
-  $("images-title").textContent = inFolder ? "Klasördeki görseller" : "Klasörsüz görseller";
+        : t("folders.title");
+  $("images-title").textContent =
+      t(inFolder ? "folders.images_in_folder" : "folders.unfiled");
   // Şerit klasör içinde de görünür: taşıma hedefleri oradan geliyor.
   renderFolderHint();
   renderFolderTarget();
@@ -274,11 +279,11 @@ function syncFolderView() {
 async function loadFolders() {
   try {
     const res = await fetch("/api/folders");
-    if (!res.ok) throw new Error(`Hata (${res.status})`);
+    if (!res.ok) throw new Error(t("err.http", { durum: res.status }));
     folderCache = (await res.json()).items || [];
   } catch {
     folderCache = [];
-    statusEl.textContent = "Klasörler alınamadı.";
+    statusEl.textContent = t("folders.load_failed");
   }
   // TEK satır, try/catch'in DIŞINDA: iki dal da diziyi KOŞULSUZ yeniden atıyor,
   // yani dal başına bir temizlik yazmak aynı işi ikizler ve üçüncü bir dal
@@ -305,12 +310,12 @@ async function moveImages(imageId, folderId, targetName) {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(typeof err.detail === "string" ? err.detail : `Hata (${res.status})`);
+      throw new Error(typeof err.detail === "string" ? err.detail : t("err.http", { durum: res.status }));
     }
     const { moved } = await res.json();
     statusEl.textContent = moved > 1
-      ? `${moved} görsel "${targetName}" içine taşındı.`
-      : `Görsel "${targetName}" içine taşındı.`;
+      ? t("folders.moved_many", { adet: moved, klasor: targetName })
+      : t("folders.moved_one", { klasor: targetName });
     selected.clear();   // taşınanlar bu görünümden düştü
     await Promise.all([loadFolders(), loadHistory()]);
   } catch (e) {
@@ -338,15 +343,16 @@ async function importFiles(fileList, folderId, targetName) {
   const overflow = images.length - batch.length;
   if (!batch.length) {
     statusEl.textContent = dropped.length
-      ? "PNG, JPEG veya WebP bir görsel bırak."
-      : "Bırakılan dosya okunamadı.";
+      ? t("folders.drop_bad_format")
+      : t("folders.drop_unreadable");
     return;
   }
 
   const failures = [];
   let done = 0;
   for (const file of batch) {
-    statusEl.textContent = `"${targetName}" içine aktarılıyor… ${done + 1}/${batch.length}`;
+    statusEl.textContent = t("folders.importing",
+          { klasor: targetName, sira: done + 1, toplam: batch.length });
     const fd = new FormData();
     fd.append("file", file);
     if (folderId) fd.append("folder_id", folderId);
@@ -354,7 +360,7 @@ async function importFiles(fileList, folderId, targetName) {
       const res = await fetch("/api/import", { method: "POST", body: fd });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(detailText(err) || `Hata (${res.status})`);
+        throw new Error(detailText(err) || t("err.http", { durum: res.status }));
       }
       done++;
     } catch (e) {
@@ -365,11 +371,11 @@ async function importFiles(fileList, folderId, targetName) {
 
   statusEl.textContent = [
     done
-      ? (done > 1 ? `${done} görsel "${targetName}" içine aktarıldı.`
-                  : `Görsel "${targetName}" içine aktarıldı.`)
-      : "Hiçbir görsel aktarılamadı.",
-    wrongType ? `${wrongType} dosya atlandı (PNG, JPEG veya WebP değil).` : null,
-    overflow ? `${overflow} dosya alınmadı (bir seferde en fazla ${MAX_IMPORT_FILES}).` : null,
+        ? (done > 1 ? t("folders.imported_many", { adet: done, klasor: targetName })
+                    : t("folders.imported_one", { klasor: targetName }))
+        : t("folders.imported_none"),
+      wrongType ? t("folders.import_skipped", { adet: wrongType }) : null,
+      overflow ? t("folders.import_overflow", { adet: overflow, sinir: MAX_IMPORT_FILES }) : null,
     failures.length ? failures.join(" · ") : null,
   ].filter(Boolean).join(" ");
   await Promise.all([loadFolders(), loadHistory()]);
@@ -448,13 +454,14 @@ function createFolderCell(f) {
   const count = document.createElement("span");
   count.className = "folder-count";
   count.textContent = f.child_count
-    ? `${f.count} görsel · ${f.child_count} klasör`
-    : `${f.count} görsel`;
+    ? `${tc("media.images_one", "media.images_many", f.count)} · `
+      + tc("media.folders_one", "media.folders_many", f.child_count)
+    : tc("media.images_one", "media.images_many", f.count);
 
   const open = document.createElement("button");
   open.type = "button";
   open.className = "folder-open";
-  open.title = `${f.name} klasörünü aç`;
+  open.title = t("folders.open_title", { klasor: f.name });
   open.appendChild(icon);
   open.appendChild(name);
   open.appendChild(count);
@@ -509,17 +516,17 @@ function renderFolders() {
   // hem çıkış hem de o seviyeye taşıma hedefi.
   if (currentFolder) {
     const parent = folderById(parentOf(currentFolder));
-    const upName = parent ? parent.name : "Klasörsüz";
+    const upName = parent ? parent.name : t("folders.unfiled_short");
     const out = document.createElement("button");
     out.type = "button";
     out.className = "folder-open folder-root";
-    out.title = `${upName} · buraya bırakarak bir üst seviyeye taşı`;
+    out.title = t("folders.drop_up_title", { hedef: upName });
     const label = document.createElement("span");
     label.className = "folder-name";
     label.textContent = parent ? `↑ ${upName}` : upName;
     const sub = document.createElement("span");
     sub.className = "folder-count";
-    sub.textContent = "buraya bırak → bir üst";
+    sub.textContent = t("folders.drop_up");
     out.appendChild(label);
     out.appendChild(sub);
     out.addEventListener("click", goUp);
@@ -542,8 +549,8 @@ function renderFolders() {
     const empty = document.createElement("p");
     empty.className = "folder-empty";
     empty.textContent = currentFolder
-      ? "Bu klasörde alt klasör yok · + Yeni klasör ile oluştur"
-      : "Henüz klasör yok · + Yeni klasör ile oluştur";
+      ? t("folders.no_subfolders")
+      : t("folders.no_folders");
     grid.appendChild(empty);
     updateMediaRailCount();
     return;
@@ -569,8 +576,9 @@ async function goUp() {
 }
 
 async function createFolder() {
-  const where = currentFolder ? `"${currentFolder.name}" içinde` : "kökte";
-  const name = await promptDialog("Yeni klasör", `Klasör ${where} oluşturulacak.`);
+  const name = await promptDialog(t("folders.new"), currentFolder
+    ? t("folders.create_in", { klasor: currentFolder.name })
+    : t("folders.create_at_root"));
   if (!name) return;
   try {
     const res = await fetch("/api/folders", {
@@ -580,9 +588,9 @@ async function createFolder() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(typeof err.detail === "string" ? err.detail : `Hata (${res.status})`);
+      throw new Error(typeof err.detail === "string" ? err.detail : t("err.http", { durum: res.status }));
     }
-    statusEl.textContent = "Klasör oluşturuldu.";
+    statusEl.textContent = t("folders.created");
     await loadFolders();
   } catch (e) {
     statusEl.textContent = e.message;
@@ -599,19 +607,20 @@ async function deleteCurrentFolder() {
   const subCount = Math.max(0, subtree.length - 1);
   const images = subtree.reduce((sum, f) => sum + (f.count || 0), 0);
   const parts = [
-    subCount ? `${subCount} alt klasör de silinecek.` : null,
-    images ? `${images} görsel SİLİNMEZ, klasörsüz hale döner.` : "İçinde görsel yok.",
+    subCount ? t("folders.delete_subfolders", { adet: subCount }) : null,
+    images ? t("folders.delete_images_kept", { adet: images })
+           : t("folders.delete_empty"),
   ].filter(Boolean);
-  const ok = await confirmDialog(`"${target.name}" klasörünü sil`, parts.join(" "),
-                                 { okLabel: "Klasörü sil" });
+  const ok = await confirmDialog(t("folders.delete_title", { klasor: target.name }),
+    parts.join(" "), { okLabel: t("folders.delete_ok") });
   if (!ok) return;
   try {
     const res = await fetch(`/api/folders/${target.id}`, { method: "DELETE" });
-    if (!res.ok) throw new Error(`Hata (${res.status})`);
+    if (!res.ok) throw new Error(t("err.http", { durum: res.status }));
     const { unfiled } = await res.json();
     statusEl.textContent = unfiled
-      ? `Klasör silindi · ${unfiled} görsel klasörsüz hale döndü.`
-      : "Klasör silindi.";
+      ? t("folders.deleted_with_unfiled", { adet: unfiled })
+      : t("folders.deleted");
     await goUp();   // silinen klasörün içindeydik → bir üst seviyeye çık
   } catch (e) {
     statusEl.textContent = e.message;
@@ -621,8 +630,8 @@ async function deleteCurrentFolder() {
 async function renameCurrentFolder() {
   if (!currentFolder) return;
   const target = currentFolder;
-  const newName = await promptDialog(`"${target.name}" klasörünü yeniden adlandır`,
-    "Yeni klasör adını girin.", { defaultValue: target.name, okLabel: "Kaydet" });
+  const newName = await promptDialog(t("folders.rename_title", { klasor: target.name }),
+    t("folders.rename_body"), { defaultValue: target.name, okLabel: t("common.save") });
   if (!newName || !newName.trim() || newName.trim() === target.name) return;
   try {
     const res = await fetch(`/api/folders/${target.id}`, {
@@ -630,7 +639,7 @@ async function renameCurrentFolder() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newName.trim() }),
     });
-    if (!res.ok) throw new Error(`Hata (${res.status})`);
+    if (!res.ok) throw new Error(t("err.http", { durum: res.status }));
     const { folder } = await res.json();
     currentFolder.name = folder.name;
     const found = folderById(target.id);
@@ -642,17 +651,17 @@ async function renameCurrentFolder() {
     // sonra YENİ adı aratınca hiçbir şey bulamaz, ESKİ adı aratınca sonuç
     // almaya devam eder — ve künyeler de eski adı yazmayı sürdürür.
     zincirBellegiSifirla();
-    statusEl.textContent = "Klasör yeniden adlandırıldı.";
+    statusEl.textContent = t("folders.renamed");
     syncFolderView();
   } catch (e) {
-    statusEl.textContent = `Yeniden adlandırılamadı: ${e.message}`;
+    statusEl.textContent = t("chat.rename_failed", { hata: e.message });
   }
 }
 
 async function downloadCurrentFolder() {
   if (!currentFolder) return;
   const target = currentFolder;
-  statusEl.textContent = `"${target.name}" klasörü ZIP olarak indiriliyor...`;
+  statusEl.textContent = t("folders.zip_downloading", { klasor: target.name });
   const url = `/api/folders/${target.id}/download`;
   downloadViaAnchor(url, `${target.name}.zip`);
 }
@@ -677,7 +686,7 @@ $("media-import-input").addEventListener("change", (e) => {
   // Hedef BULUNULAN yer: klasörün içindeysek o klasör, değilse kök. Bırakma
   // yolundaki `.gallery-wrap` kuralının aynısı.
   importFiles(dosyalar, currentFolder ? currentFolder.id : null,
-              currentFolder ? currentFolder.name : "Klasörsüz");
+                  currentFolder ? currentFolder.name : t("folders.unfiled_short"));
 });
 
 
@@ -713,7 +722,7 @@ function makeCheckbox(rec) {
   box.className = "card-check";
   const isOn = selected.has(rec.id);
   box.setAttribute("aria-pressed", String(isOn));
-  box.setAttribute("aria-label", isOn ? "Seçimi kaldır" : "Görseli seç");
+  box.setAttribute("aria-label", t(isOn ? "media.deselect" : "media.select_one"));
   // Tik SVG olarak çizilir; kare çerçeve CSS'ten gelir (glyph'e güvenmiyoruz)
   const tick = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   tick.setAttribute("viewBox", "0 0 24 24");
@@ -739,20 +748,20 @@ function syncSelectUI() {
   if (selectMode) {
     $("folder-hint").textContent = selected.size
       ? (IS_TOUCH
-        ? 'Seçili görselleri taşımak için "Taşı…" düğmesine dokun.'
-        : "Seçili görselleri taşımak için birini klasör kartına sürükle.")
-      : (IS_TOUCH
-        ? 'Görselleri seç, sonra "Taşı…" düğmesine dokun.'
-        : "Görselleri seç, sonra taşımak için birini klasör kartına sürükle.");
+          ? t("media.selected_move_touch")
+          : t("media.selected_move_mouse"))
+        : t(IS_TOUCH ? "media.select_then_move_touch"
+                     : "media.select_then_move_mouse");
   } else {
     renderFolderHint();   // seçim dışı metnin TEK kaynağı (taşıma + içe aktarma)
   }
   if (!selectMode) return;
 
   const total = gorunenMedya().length;
-  $("select-count").textContent = `${selected.size} seçili`;
+  $("select-count").textContent = t("media.selected_count", { adet: selected.size });
   const allSelected = total > 0 && selected.size === total;
-  $("select-all").textContent = allSelected ? "Seçimi temizle" : "Tümünü seç";
+  $("select-all").textContent =
+      t(allSelected ? "media.clear_selection" : "media.select_all");
   $("select-all").disabled = total === 0;
   $("select-delete").disabled = selected.size === 0;
   $("select-move").disabled = selected.size === 0;
@@ -779,13 +788,13 @@ function openMoveDialog() {
   const sayi = selected.size;
 
   $("move-desc").textContent = sayi > 1
-    ? `${sayi} görsel seçili hedefe taşınacak.`
-    : "Seçili görsel hedefe taşınacak.";
+    ? t("move.many_to_target", { adet: sayi })
+    : t("move.one_to_target");
 
   sec.replaceChildren();
   const kok = document.createElement("option");
   kok.value = "";
-  kok.textContent = "Klasörsüz (kök)";
+  kok.textContent = t("move.root");
   sec.appendChild(kok);
   // Tam yol yazılıyor: iç içe klasörlerde yalnız ad ("Ağustos") iki farklı
   // klasörde de aynı olabiliyor ve kullanıcı hangisini seçtiğini bilemezdi.
@@ -809,7 +818,7 @@ function closeMoveDialog() {
 async function confirmMove() {
   const sec = $("move-target");
   const folderId = sec.value || null;
-  const ad = sec.options[sec.selectedIndex]?.textContent || "kök";
+  const ad = sec.options[sec.selectedIndex]?.textContent || t("move.root_short");
   // `moveImages` seçim modunda TÜM seçimi taşıyor (ids'i kendisi kuruyor);
   // buradan tek bir id vermek yeterli ve taşıma mantığı tek yerde kalıyor.
   const ilk = [...selected][0];
@@ -822,10 +831,10 @@ async function confirmMove() {
 async function deleteSelected() {
   const ids = [...selected];
   if (!ids.length) return;
-  const ok = await confirmDialog(`${ids.length} görseli sil`,
-    `Seçili ${ids.length} görsel diskten kalıcı olarak silinecek. Bu işlem geri alınamaz.`);
+  const ok = await confirmDialog(t("media.delete_title", { adet: ids.length }),
+    t("media.delete_body", { adet: ids.length }));
   if (!ok) return;
-  statusEl.textContent = "Siliniyor…";
+  statusEl.textContent = t("common.deleting");
   try {
     const res = await fetch("/api/images", {
       method: "DELETE",
@@ -834,7 +843,7 @@ async function deleteSelected() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(typeof err.detail === "string" ? err.detail : `Hata (${res.status})`);
+      throw new Error(typeof err.detail === "string" ? err.detail : t("err.http", { durum: res.status }));
     }
     const { deleted } = await res.json();
     // silinenler referans/önizlemede duruyorsa oradan da düşür
@@ -843,7 +852,7 @@ async function deleteSelected() {
     if (currentImage && ids.includes(currentImage.id)) setCurrentImage(null);
     renderSource();
     selected.clear();
-    statusEl.textContent = `${deleted} görsel silindi.`;
+    statusEl.textContent = t("media.deleted_count", { adet: deleted });
     await Promise.all([loadFolders(), loadHistory()]);
   } catch (e) {
     statusEl.textContent = e.message;
@@ -1030,8 +1039,8 @@ const pickerFolderLabel = (id) => klasorZinciriEtiketi(folderPathParts(id));
 
 function pickerScopes() {
   return [
-    { key: "", label: "Tümü", icon: PICKER_ICONS.all, test: () => true },
-    { key: "none", label: "Klasörsüz", icon: PICKER_ICONS.loose,
+    { key: "", label: t("common.all"), icon: PICKER_ICONS.all, test: () => true },
+    { key: "none", label: t("folders.unfiled_short"), icon: PICKER_ICONS.loose,
       test: (r) => !r.folder_id },
     ...folderCache.map((f) => ({
       key: `f:${f.id}`, label: pickerFolderLabel(f.id), icon: PICKER_ICONS.folder,
@@ -1047,7 +1056,7 @@ function pickerScopes() {
       // tıklanınca boş ızgara açıyordu).
       test: (r) => r.folder_id === f.id,
     })),
-    { key: "imported", label: "İçe aktarılanlar", icon: PICKER_ICONS.imported,
+    { key: "imported", label: t("picker.scope_imported"), icon: PICKER_ICONS.imported,
       test: (r) => !!r.imported, crossing: true },
   ];
 }
@@ -1179,7 +1188,7 @@ function renderPickerGrid(scopes = pickerScopes()) {
     // Klasörsüz karoda da satır YAZILIYOR: künye "Klasörsüz" diyor ve yan
     // bölmenin "Klasör" satırı da öyle — ipucu ikisiyle aynı şeyi söylemeli,
     // yoksa yalnız o karolarda sessiz kalırdı.
-    tile.title = `${title}\n${klasorZinciriEtiketi(parcalar) || "Klasörsüz"}`;
+    tile.title = `${title}\n${klasorZinciriEtiketi(parcalar) || t("folders.unfiled_short")}`;
     tile.appendChild(img);
     if (rec.size) {
       const badge = document.createElement("span");
@@ -1217,10 +1226,10 @@ function renderPickerGrid(scopes = pickerScopes()) {
   // `hidden` aynı ölçümde suçsuz çıktı: `hidden = false` özniteliği zaten
   // yokken kaldırmak mutasyon üretmiyor (aynı koşuda sıfır attributes kaydı).
   const bosMetin =
-    pickerState === "loading" ? "Görseller yükleniyor…"
-    : pickerState === "error" ? "Görseller alınamadı."
-    : pickerQuery ? "Sonuç bulunamadı"
-    : "Bu kapsamda görsel yok";
+    pickerState === "loading" ? t("picker.loading")
+    : pickerState === "error" ? t("picker.load_failed")
+    : pickerQuery ? t("picker.no_results")
+    : t("picker.empty_scope");
   const bosKutu = $("picker-empty-text");
   if (bosKutu.textContent !== bosMetin) bosKutu.textContent = bosMetin;
 }
@@ -1272,9 +1281,11 @@ function renderPickerSide() {
   const meta = $("picker-meta");
   meta.innerHTML = "";
   const rows = rec
-    ? [["Klasör", folder ? pickerFolderLabel(folder.id) : "Klasörsüz"],
-       ["Boyut", rec.size || "—"],
-       ["Kaynak", rec.imported ? "İçe aktarıldı" : "Üretildi"]]
+    ? [[t("picker.meta_folder"),
+        folder ? pickerFolderLabel(folder.id) : t("folders.unfiled_short")],
+       [t("gen.size"), rec.size || "—"],
+       [t("picker.meta_source"),
+        t(rec.imported ? "picker.source_imported" : "result.generated")]]
     : [];
   for (const [key, value] of rows) {
     const label = document.createElement("span");
@@ -1291,7 +1302,7 @@ function renderPickerSide() {
   // Düğmenin FİİLİ hedeften: aynı düğme bitiş karesini de atıyor ve
   // "Referans yap" o dalda yanlış bir söz olurdu.
   $("picker-use-ref").textContent =
-    pickerHedef === "last" ? "Bitiş karesi yap" : "Referans yap";
+    t(pickerHedef === "last" ? "picker.as_last_frame" : "picker.as_reference");
   $("picker-use-ref").disabled = !rec;
   // "Ek olarak ekle" BİTİŞ KARESİ hedefinde hiç yok: ek referans video
   // modunda zaten kapalı ve burada ikinci bir eylem sunmak, kullanıcıyı
@@ -1317,7 +1328,9 @@ function renderPickerSide() {
   // düğmesiyle açıkça çelişen bir cümle. Kullanıcı hangisine inanacağını
   // bilemezdi.
   $("picker-note").textContent = pickerHedef === "last" ? ""
-    : (why || (extras.length ? `Ek referans · ${extras.length}/${MAX_EDIT_IMAGES - 1}` : ""));
+    : (why || (extras.length
+          ? t("picker.extra_count", { adet: extras.length, sinir: MAX_EDIT_IMAGES - 1 })
+          : ""));
 }
 
 // Adı `renderPicker` DEĞİL: `palette.js:96` aynı adı çoktan kullanıyor (renk
@@ -1530,7 +1543,8 @@ $("picker-use-extra").addEventListener("click", () => {
   // kullanıcı eyleminin işlediğini hiç göremezdi. Fiil ("Eklendi") YALNIZ burada
   // geçiyor; karo değişince not duran okumaya ("Ek referans · N/3") ya da
   // gerekçeye döner.
-  $("picker-note").textContent = `Eklendi · ${extras.length}/${MAX_EDIT_IMAGES - 1}`;
+  $("picker-note").textContent =
+      t("picker.added_count", { adet: extras.length, sinir: MAX_EDIT_IMAGES - 1 });
   // Odak SEÇİLİ KAROYA dönüyor, "Referans yap"a DEĞİL: o düğme seçiciyi
   // KAPATIYOR, yani ikinci kez Space'e basan kullanıcı ek eklemek yerine turu
   // bitirirdi. Karo, oradan bir sonraki karoya geçmenin de doğal başlangıcı.
@@ -1592,7 +1606,7 @@ async function loadHistory() {
   if (!res.ok) {
     // klasör başka bir sekmede silinmiş olabilir → köke düş
     if (currentFolder) { currentFolder = null; syncFolderView(); return loadHistory(); }
-    statusEl.textContent = "Geçmiş alınamadı.";
+    statusEl.textContent = t("history.load_failed");
     return;
   }
   const { images } = await res.json();
@@ -1638,10 +1652,14 @@ function kayitVideoMu(rec) {
 // çağrılarının tamamı `settings.js`in dibinde toplandığı için (dosya başı
 // sözleşmesi) değerlendirme anında TDZ hatası doğmaz.
 const MEDYA_TUR_SUZGECLERI = [
-  { key: "",         label: "Tümü",     birim: "görsel",   test: () => true },
-  { key: "image",    label: "Görsel",   birim: "görsel",   test: (r) => !kayitVideoMu(r) },
-  { key: "video",    label: "Video",    birim: "video",    test: (r) => kayitVideoMu(r) },
-  { key: "imported", label: "Yüklenen", birim: "yüklenen", test: (r) => !!r.imported },
+  // `label` ve `birim` ETİKET değil ANAHTAR (palette.js'teki HARMONY_KEYS'in
+  // gerekçesi). `birim` ayrıca bir ÖN EK: `updateMediaRailCount` ona `_one` /
+  // `_many` ekleyip `tc()`ye veriyor, çünkü sayıdan sonra çoğul eki Türkçe'de
+  // yok İngilizce'de var.
+  { key: "",         label: "common.all",          birim: "media.images",   test: () => true },
+  { key: "image",    label: "common.image",        birim: "media.images",   test: (r) => !kayitVideoMu(r) },
+  { key: "video",    label: "common.video",        birim: "media.videos",   test: (r) => kayitVideoMu(r) },
+  { key: "imported", label: "media.kind_uploaded", birim: "media.uploads",  test: (r) => !!r.imported },
 ];
 
 const medyaTurSuzgeciAktif = () =>
@@ -1663,7 +1681,9 @@ function renderGallery() {
     if (mediaSortOrder === "name") {
       const nameA = a.prompt || a.filename || a.id;
       const nameB = b.prompt || b.filename || b.id;
-      return nameA.localeCompare(nameB, "tr");
+      // Sıralama YERELİ arayüz dilinden: "tr" sabit yazılıydı ve İngilizce
+            // arayüzde Türkçe harf sırasını dayatırdı (ör. `ı` < `i`).
+            return nameA.localeCompare(nameB, KROMIS_DIL);
     }
     return (b.created_at || b.id || "").localeCompare(a.created_at || a.id || "");
   });
@@ -1675,10 +1695,10 @@ function renderGallery() {
       emptyEl.hidden = false;
       if (emptyText) {
         emptyText.textContent = medyaTurSuzgeci
-          ? `Bu görünümde "${medyaTurSuzgeciAktif().label}" bulunamadı.`
+          ? t("media.empty_filter", { suzgec: t(medyaTurSuzgeciAktif().label) })
           : (searchQuery
-            ? "Aramanızla eşleşen görsel bulunamadı."
-            : (currentFolder ? "Bu klasörde henüz görsel yok." : "Henüz görsel üretilmedi."));
+            ? t("media.empty_search")
+            : t(currentFolder ? "media.empty_folder" : "media.empty_all"));
       }
     } else {
       emptyEl.hidden = true;
@@ -1724,13 +1744,13 @@ function renderGallery() {
     // (bkz. FOLDER_HINT_DEFAULT). `title` zaten dokunmatikte hiç GÖRÜNMÜYOR,
     // ama ekran okuyucular okuyor — yanlış yönerge orada da yanlış.
     const tasimaIpucu = IS_TOUCH
-      ? '"Taşı…" ile klasöre taşı'
-      : "taşımak için klasöre sürükle";
+      ? t("media.tile_move_touch")
+      : t("media.tile_move_mouse");
     // Fiil TÜRE göre: bir videoyu "büyütmek" değil "oynatmak" isteniyor ve
     // büyüteç de gerçekten oynatıcıyı açıyor (viewer.js).
-    const eylemIpucu = videoMu ? "Oynatmak için tıkla" : "Büyütmek için tıkla";
+    const eylemIpucu = t(videoMu ? "media.tile_play" : "media.tile_enlarge");
     img.title = selectMode
-      ? `Seçmek için tıkla · seçili görselleri ${tasimaIpucu}`
+          ? t("media.tile_select_hint", { tasima: tasimaIpucu })
       : prompt
         ? `${prompt}\n\n${eylemIpucu} · ${tasimaIpucu}`
         : `${eylemIpucu} · ${tasimaIpucu}`;
@@ -1746,7 +1766,7 @@ function renderGallery() {
     // vermeli.
     downloadLink.setAttribute("href", indirmeAdresi(`/output/${rec.filename}`));
     downloadLink.setAttribute("download", rec.filename);
-    downloadLink.textContent = "İndir";
+    downloadLink.textContent = t("common.download");
     // HER ZAMAN araya giriliyor, `SUPPORTS_SAVE_PICKER` kontrolü YOK: eskiden
     // panel olmayan ortamda çıpanın kendi gezinmesine bırakılıyordu ve Android
     // WebView'de bu, indirmenin hiç olmaması demekti (app.py `output_download`).
@@ -1772,8 +1792,8 @@ function renderGallery() {
     let refBtn = null;
     if (!videoMu) {
       refBtn = document.createElement("button");
-      refBtn.textContent = "Referans";
-      refBtn.title = "Bu görseli ana referans yap";
+      refBtn.textContent = t("media.reference");
+      refBtn.title = t("media.tile_as_main_reference");
       refBtn.addEventListener("click", () => {
         showSection("studio");
         setGallerySource(rec);
@@ -1799,8 +1819,8 @@ function renderGallery() {
     const delBtn = document.createElement("button");
     delBtn.className = "card-del";
     delBtn.textContent = "×";
-    delBtn.title = "Sil";
-    delBtn.setAttribute("aria-label", videoMu ? "Videoyu sil" : "Görseli sil");
+    delBtn.title = t("common.delete");
+    delBtn.setAttribute("aria-label", t(videoMu ? "media.delete_video" : "media.delete_image"));
     delBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       deleteImage(rec);
@@ -1854,11 +1874,12 @@ function renderGallery() {
     // gerçek tarayıcıda koşan `test_playwright_studio.py` yakaladı.
     const kartParcalari = searchQuery ? folderPathParts(rec.folder_id) : null;
     const kartYolu = kartParcalari
-      ? (klasorZinciriEtiketi(kartParcalari) || "Klasörsüz") : "";
+          ? (klasorZinciriEtiketi(kartParcalari) || t("folders.unfiled_short")) : "";
     card.setAttribute("aria-label",
       `${prompt ? prompt.slice(0, 60) : rec.filename}`
       + (kartYolu ? ` — ${kartYolu}` : "")
-      + ` — ${selectMode ? "seç" : videoMu ? "oynat" : "büyüt"}`);
+      + ` — ${t(selectMode ? "media.action_select"
+                                : videoMu ? "media.action_play" : "media.action_enlarge")}`);
     card.addEventListener("keydown", (e) => {
       // Kart İÇİNDEKİ düğmeye basılan Enter kartı da tetiklemesin: olay
       // oradan köpürür ve tek tuş iki eylem çalıştırır. (chat.js:908-910'un
@@ -1875,7 +1896,7 @@ function renderGallery() {
     if (rec.imported && !selectMode) {
       const badge = document.createElement("span");
       badge.className = "card-badge";
-      badge.textContent = "içe aktarıldı";
+      badge.textContent = t("media.badge_imported");
       card.appendChild(badge);
     }
     // SÜRE ROZETİ: bir video karosu hareketsiz ilk karesiyle bir görselden
@@ -1886,7 +1907,9 @@ function renderGallery() {
     if (videoMu && !selectMode) {
       const badge = document.createElement("span");
       badge.className = "card-badge";
-      badge.textContent = rec.duration ? `video · ${rec.duration} sn` : "video";
+      badge.textContent = rec.duration
+        ? `video · ${t("gen.duration_label", { sn: rec.duration })}`
+        : "video";
       card.appendChild(badge);
     }
     // Arama sonucu kartı hangi klasörden geldiğini söyler (§4.1 künye kuralı):
@@ -2029,7 +2052,7 @@ if (galleryWrapEl) {
     if (!hasFiles(e)) return;
     e.preventDefault();
     importFiles(e.dataTransfer.files, currentFolder ? currentFolder.id : null,
-                currentFolder ? currentFolder.name : "Klasörsüz");
+                    currentFolder ? currentFolder.name : t("folders.unfiled_short"));
   });
 }
 

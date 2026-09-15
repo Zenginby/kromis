@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 
 import android_main
 import app as appmod
+from tests.conftest import tr
 
 
 @pytest.fixture(scope="module")
@@ -464,8 +465,12 @@ def test_the_selection_pill_actions_drop_to_their_own_row_as_icons(istemci):
     # Etiketler kalkıyor; erişilebilir ad `title`'dan geliyor (chat.js).
     assert ".chat-pick .chat-action-btn span { display: none; }" in css
     js = _metin(istemci, "/static/chat.js")
-    assert 'copyBtn.title = "Metni panoya kopyala"' in js
-    assert 'restoreBtn.title = "Metni düzenlemek üzere kutuya aktar"' in js
+    # Etiket gizlendiğinde geriye YALNIZ `title` kalıyor, yani bu iki satır
+    # ikonun erişilebilir adını taşıyor. İddia anahtara bakıyor; metnin
+    # gerçekten dolu olduğu `tr()` ile ölçülüyor.
+    assert 'copyBtn.title = t("chat.copy_title")' in js
+    assert 'restoreBtn.title = t("chat.restore_title")' in js
+    assert tr("chat.copy_title") and tr("chat.restore_title")
 
 
 def test_copy_feedback_survives_the_label_being_hidden(istemci):
@@ -477,8 +482,9 @@ def test_copy_feedback_survives_the_label_being_hidden(istemci):
     """
     js = _metin(istemci, "/static/chat.js")
     govde = js.split("copyBtn.addEventListener", 1)[1].split("\n  });", 1)[0]
-    assert 'copyLabel.textContent = "Kopyalandı"' in govde
-    assert 'chatStatus("Panoya kopyalandı.")' in govde
+    assert 'copyLabel.textContent = t("chat.copied")' in govde
+    assert 'chatStatus(t("chat.copied_to_clipboard"))' in govde
+    assert tr("chat.copied") and tr("chat.copied_to_clipboard")
 
 
 def test_the_selection_pill_tap_targets_do_not_overlap(istemci):
@@ -568,8 +574,8 @@ def test_the_move_dialog_reuses_the_single_move_path(istemci):
 def test_touch_hints_do_not_teach_drag_and_drop(istemci):
     """İpuçları girdi türüne göre değişmeli: dokunmatikte "sürükle" yanlış bilgi."""
     js = _metin(istemci, "/static/folders.js")
-    assert "const FOLDER_HINT_DEFAULT = IS_TOUCH" in js
-    assert "const FOLDER_HINT_IMPORT = IS_TOUCH" in js
+    assert "const FOLDER_HINT_DEFAULT = t(IS_TOUCH" in js
+    assert "const FOLDER_HINT_IMPORT = t(IS_TOUCH" in js
 
 # ── Izgara boyutu ───────────────────────────────────────────────────
 

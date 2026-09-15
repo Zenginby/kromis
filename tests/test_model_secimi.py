@@ -107,7 +107,7 @@ def test_modelin_azami_adedi_asilirsa_422(client, genis_katalog):
                                            "quality": "standard", "n": 2,
                                            "model": genis_katalog.id})
     assert r.status_code == 422
-    assert "en fazla 1" in r.text
+    assert "at most 1 images" in r.text
 
 
 def test_ayni_deger_BIR_modelde_gecerli_DIGERINDE_degil(client, genis_katalog):
@@ -185,7 +185,7 @@ def test_edit_duzenlemeyi_desteklemeyen_modeli_reddediyor(client, genis_katalog,
                     files={"file": _png()})
 
     assert r.status_code == 422
-    assert "referans görselle çalışmıyor" in r.text
+    assert "does not work with a reference image" in r.text
 
 
 def test_edit_adet_tavani_MODELDEN_geliyor_literal_4_ten_DEGIL(client, monkeypatch):
@@ -206,7 +206,7 @@ def test_edit_adet_tavani_MODELDEN_geliyor_literal_4_ten_DEGIL(client, monkeypat
                     files={"file": _png()})
 
     assert r.status_code == 422
-    assert "en fazla 2" in r.text, r.text
+    assert "at most 2 images" in r.text, r.text
     # Küresel tavan da DURUYOR: model daha cömert olsa bile MAX_IMAGES_PER_RUN
     # aşılamaz (o sayı aynı zamanda bir sonuç kaydının azami image_ids uzunluğu).
     comert = dataclasses.replace(catalog.IMAGE_MODELS[0], id="test-comert", max_n=99)
@@ -217,7 +217,7 @@ def test_edit_adet_tavani_MODELDEN_geliyor_literal_4_ten_DEGIL(client, monkeypat
                            "model": "test-comert"},
                      files={"file": _png()})
     assert r2.status_code == 422
-    assert f"1-{models.MAX_IMAGES_PER_RUN}" in r2.text, r2.text
+    assert f"between 1 and {models.MAX_IMAGES_PER_RUN}" in r2.text, r2.text
 
 
 # ── Yetenek kapısı iki uçta da AYNI ────────────────────────────────────
@@ -292,4 +292,4 @@ def test_ORAN_secen_modelde_PIKSEL_jetonu_reddediliyor(client, monkeypatch):
                                            "model": "gemini-nano-banana-2"})
 
     assert r.status_code == 422
-    assert "bu boyutu desteklemiyor" in r.text
+    assert "does not support this size" in r.text

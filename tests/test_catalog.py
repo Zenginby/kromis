@@ -848,7 +848,17 @@ def test_fal_video_models_are_ordered_PIXVERSE_WAN_KLING():
 
 @pytest.mark.parametrize("model_id", FAL_IDLER)
 def test_fal_video_models_declare_no_last_frame(model_id):
-    """Üç modelin hiçbirinin i2v şemasında `tail_image_url` yok."""
+    """Üçü de `supports_last_frame=False`.
+
+    DÜZELTME (Görev 9, 2026-09-15): bu gerekçe önceden "üç modelin hiçbirinin
+    i2v şemasında `tail_image_url` yok" diyordu — doğru ama BOŞ: o ad fal'da
+    hiç kullanılmayan bir isim. Görev 8'in tam OpenAPI şema ölçümü
+    (`olcum-uc-semalari.md`) Wan'ın i2v ucunda GERÇEK bir son-kare alanı
+    (`end_image_url`) olduğunu gösterdi — `fal_client.ALANLAR` onu bu turda
+    BİLİNÇLİ OLARAK göndermiyor, bayrak o yüzden dürüstçe `False`. PixVerse
+    ve Kling'in şemalarında ise gerçekten hiçbir son-kare alanı yok. Karar
+    (üçü de `False`) değişmedi, yalnız gerekçe düzeldi.
+    """
     assert catalog.video_model(model_id).supports_last_frame is False
 
 
@@ -878,3 +888,81 @@ def test_fal_credits_are_derived_from_MEASURED_usd_per_second():
     assert pixverse.credits == 13
     assert kling.credits == 28
     assert kling.credits_by_quality == ()
+
+
+# ── Görev 9 — video notları için mandal ─────────────────────────────────
+#
+# `test_MALIYET_ustunlugu_iddia_eden_not_GERCEKTEN_en_ucuz`in docstring'i
+# kendi ölçülmüş kusurunu kaydediyor: "iddiayı yazan görev ile onu
+# yanlışlayan görev aynı daldaydı ve iki görev incelemesi de göremedi, çünkü
+# not sözleşmesi ... KARŞILAŞTIRMAYA bakmıyordu." O mandal YALNIZ
+# `IMAGE_MODELS` üzerinde dönüyordu — Görev 7/8'in eklediği üç video notu
+# hiçbir kapının arkasında değildi. Görev 9'un kendi kusuru (Kling'in notunun
+# ölçülmemiş "1080p ve lipsync" iddiası) TAM OLARAK bu boşluğa düştü ve NİHAİ
+# İNCELEME de bunu ancak elle yakaladı. Aşağıdaki iki test o boşluğu kapatıyor.
+
+
+def test_MALIYET_ustunlugu_iddia_eden_VIDEO_notu_SAGLAYICI_ICINDE_dogru():
+    """Video notları BİLİNÇLİ OLARAK küresel değil AİLEYE göre konuşuyor:
+    `gemini-veo-3-1-lite` "En ucuz Veo" diyor, `fal-pixverse-c1` "En ucuz fal
+    kademesi" diyor. Küresel bir karşılaştırma YANLIŞ olurdu: Veo Lite 16
+    kredi ama katalogdaki mutlak en ucuz PixVerse'in 13'ü (`VIDEO_MODELS`
+    başlığındaki "BU İDDİA ARTIK KATALOG GENELİNDE DEĞİL" notu). Bu yüzden
+    görsel tarafının mandalından (yukarıda, TÜM `IMAGE_MODELS`i tek havuzda
+    karşılaştırır) FARKLI bir kapsam gerekiyor: burada karşılaştırma
+    `provider` (gemini/fal) İÇİNDE — notun kendisinin konuştuğu aile de bu.
+
+    Bu mandal video tarafında EKSİKTİ (I-2'nin yapısal yarısı, Görev 9): üç
+    video notu hiçbir kapının arkasında değildi, tam da yukarıdaki
+    docstring'in "iki görev incelemesi de göremedi" dediği desenin bu turda
+    BİREBİR tekrarı — bu kez Kling'in notunda.
+    """
+    for provider in {m.provider for m in catalog.VIDEO_MODELS}:
+        grup = [m for m in catalog.VIDEO_MODELS if m.provider == provider]
+        en_az = min(m.credits for m in grup)
+        en_cok = max(m.credits for m in grup)
+        for m in grup:
+            notu = m.note.lower()
+            if "en ucuz" in notu:
+                assert m.credits == en_az, (
+                    f"{m.id}: not 'en ucuz' diyor ama {m.credits} kredi "
+                    f"({provider} içinde en az {en_az})")
+            if "en pahalı" in notu:
+                assert m.credits == en_cok, (
+                    f"{m.id}: not 'en pahalı' diyor ama {m.credits} kredi "
+                    f"({provider} içinde en çok {en_cok})")
+
+
+_COZUNURLUK_JETONLARI = ("480p", "720p", "1080p")
+
+
+def test_COZUNURLUK_iddia_eden_VIDEO_notu_GORUNUR_bir_jetona_dayanir():
+    """Bir not bir çözünürlük jetonundan (480p/720p/1080p) söz ediyorsa, o
+    jeton modelin `qualities`inde OLMALI VE `quality_hidden` `False` OLMALI.
+
+    Gizli jeton (`quality_hidden=True`) arayüzün hiç göstermediği ve telin
+    hiç taşımadığı SENTETİK bir değer (bkz. `ImageModel.qualities`in
+    docstring'i) — onu notta vaat etmek I-2'nin ÖLÇÜLMÜŞ kusurunun ta
+    kendisiydi: Kling'in eski notu "1080p" diyordu, ama Kling'in
+    `qualities=("1080p",)` yalnız `quality_hidden=True` ile var olabiliyor
+    çünkü iki ucun da şemasında `resolution` alanı HİÇ yok — jeton telde hiç
+    gitmiyor, çıktının gerçek çözünürlüğü de ölçülmedi.
+
+    KANIT (Görev 9'un sağlama turu, task-9-report.md'de tam çıktısı var): bu
+    mandal yazılmadan ÖNCE mevcut altı video notu ondan geçirildi.
+    `gemini-veo-3-1`in notu "1080p açık" diyor ve `qualities=('720p',
+    '1080p')`, `quality_hidden=False` — GEÇTİ. Kling'in notu eski hâline
+    ("...1080p ve lipsync...") döndürülünce bu test KIRILDI — yani mandal
+    gerçekten mandal.
+    """
+    for m in catalog.VIDEO_MODELS:
+        notu = m.note.lower()
+        for jeton in _COZUNURLUK_JETONLARI:
+            if jeton not in notu:
+                continue
+            assert jeton in m.qualities, (
+                f"{m.id}: not {jeton!r} diyor ama qualities'te yok "
+                f"({m.qualities})")
+            assert m.quality_hidden is False, (
+                f"{m.id}: not {jeton!r} diyor ama quality_hidden=True — "
+                "telde hiç gitmeyen sentetik bir jetonu vaat ediyor")

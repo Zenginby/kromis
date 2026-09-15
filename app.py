@@ -1222,8 +1222,15 @@ def post_settings(req: SettingsRequest) -> dict:
         #
         # `fal_key` BURADAN ÇIKTI: adaptörü geldi, kataloğa girdi ve yukarıdaki
         # `for cred in catalog.CREDENTIALS` döngüsü onu aynı env'e aynı
-        # "boş = dokunma" kuralıyla yazıyor — üstelik redaksiyonu da
-        # kendiliğinden kapsıyor.
+        # "boş = dokunma" kuralıyla yazıyor.
+        #
+        # DÜZELTME (Görev 9, 2026-09-15): bu satır önceden "üstelik
+        # redaksiyonu da kendiliğinden kapsıyor" diyordu — bu YANLIŞTI.
+        # `fal_key` bu daldan ÖNCE de tam redakte ediliyordu: hem
+        # `/api/settings` `_CREDENTIAL_ROUTES`ta olduğu için (rota kapısı),
+        # hem `_key` soneki `_SECRET_SUFFIXES`te olduğu için (alan-adı
+        # kapısı). Katalog girdisinin getirdiği şey buradaki YAZMA yolu
+        # (form alanı + bu döngü) — redaksiyon değil, o zaten vardı.
         if req.replicate_api_token is not None and req.replicate_api_token.strip():
             updates["REPLICATE_API_TOKEN"] = req.replicate_api_token.strip()
         # Aynı şema kapısı burada da: bu ikisi katalog döngüsünün DIŞINDA

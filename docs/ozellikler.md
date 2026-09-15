@@ -70,7 +70,7 @@ Kurulum ve çalıştırma: [KURULUM.md](../KURULUM.md) · depo haritası:
     bütçe dışı kaldı (~0,33 USD, ayrı bir tur gerekir). Bitiş karesi
     desteklemiyor.
   - **Kling V3 Turbo Pro** — 1080p (tek, gizli jeton — `resolution` alanı iki
-    uçta da YOK), 5/10/15 sn, oran yalnız METİN ucunda seçilebiliyor. En
+    uçta da YOK), 5/10/15 sn, oran yalnız METİN ucunda etkili. En
     pahalı fal kademesi (saniyesi düz 0,14 USD, çözünürlükten bağımsız).
     Metin→video CANLI DOĞRULANDI (2026-09-14). **Görsel→video tel alan adı VE
     `duration`ın dize (`"5"`) gitmesi yalnız ŞEMADAN ölçüldü**, canlı üretimle

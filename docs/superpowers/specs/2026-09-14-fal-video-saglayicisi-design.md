@@ -56,9 +56,17 @@ kataloğa taşıyor.
   açardı").
 * **Veo 3.1'i fal üzerinden eklemek.** Zaten doğrudan katalogda; fal'dan
   geçirmek aynı modele marj eklemek olurdu.
-* **Son kare (`supports_last_frame`).** Üç modelin hiçbirinin i2v şemasında
-  `tail_image_url` yok. Bayrak `False`; uygulama tarafı
-  `providers.animate_video`'nun kapısıyla zaten korunuyor.
+* **Son kare (`supports_last_frame`).** Bayrak üçünde de `False`; uygulama
+  tarafı `providers.animate_video`'nun kapısıyla zaten korunuyor.
+  **DÜZELTME (Görev 9, 2026-09-15):** bu satır önceden "üç modelin hiçbirinin
+  i2v şemasında `tail_image_url` yok" diyordu — doğru ama BOŞ gerekçeydi,
+  çünkü `tail_image_url` fal'da hiç kullanılmayan bir ad; hiçbir modelin
+  şemasında böyle bir alan zaten yoktu. Görev 8'in tam OpenAPI şema ölçümü
+  (`olcum-uc-semalari.md`) Wan'ın i2v ucunda GERÇEKTEN bir son-kare alanı
+  olduğunu gösterdi: `end_image_url` (str|null, "son kare desteği VAR").
+  Karar yine de doğru: `fal_client.ALANLAR` bu turda `end_image_url`ı
+  BİLİNÇLİ OLARAK göndermiyor, yani bayrak dürüstçe `False`. PixVerse ve
+  Kling'in şemalarında ise gerçekten hiçbir son-kare alanı yok.
 * **`multi_prompt` / çok-çekimli storyboard** (Kling), `seed`, `cfg_scale`,
   `negative_prompt`, `enable_prompt_expansion`. Her biri YENİ bir eksen: istek
   modeli, form, `_check_video_form`, `ResultParams` ve sonuç kartı demek.
@@ -150,6 +158,19 @@ girdisinin ALTINA, artan maliyete göre ekleniyor.
 | `fal-pixverse-c1` | `fal-ai/pixverse/c1/text-to-video` · `…/image-to-video` | 16:9 · 9:16 · 1:1 | 720p · 1080p | 5 · 10 · 15 | 20 | 600 |
 | `fal-kling-v3-turbo-pro` | `fal-ai/kling-video/v3/turbo/pro/text-to-video` · `…/image-to-video` | 16:9 · 9:16 · 1:1 | 1080p (gizli) | 5 · 10 · 15 | 30 | 600 |
 
+**DÜZELTME (Görev 9, 2026-09-15):** yukarıdaki `credits`/sn sütunu (Wan 16 ·
+PixVerse 20 · Kling 30) ve dolayısıyla üstteki "fal girdileri ... artan
+maliyete göre ekleniyor" sırası (Wan · PixVerse · Kling) bu tasarımın İLK
+yazıldığı gündü — ölçümden ÖNCEKİ tahmindi. Görev 7'nin canlı/şema ölçümü
+(aşağıdaki "Ölçüm sonuçları" bölümü, `catalog.py`nin `VIDEO_MODELS` başlığı)
+gerçek rakamların **PixVerse 13 · Wan 20 · Kling 28** olduğunu gösterdi —
+sıra da buna göre **PixVerse · Wan · Kling**e döndü (`catalog.py`'deki
+gerçek dizilim ve `tests/test_catalog.py`nin
+`test_fal_video_models_are_ordered_PIXVERSE_WAN_KLING` mandalı). Eski
+tahmin SİLİNMEDİ, çünkü tasarımın o an aldığı kararı (Karar 4'ün YUKARI
+yuvarlama gerekçesi dahil) anlamak için hâlâ gerekli; ÜRETİM kodu şu an
+ölçülmüş rakamları kullanıyor.
+
 Üçü de: `provider="fal"`, `credential="fal"`, `kind="video"`, `max_n=1`,
 `images_per_request=1`, `supports_edit=True`, `max_refs=1`,
 `supports_last_frame=False`.
@@ -163,6 +184,15 @@ girdisinin ALTINA, artan maliyete göre ekleniyor.
 | `fal-pixverse-c1` | 720p → 20 · 1080p → 32 |
 | `fal-kling-v3-turbo-pro` | (yok — tek gizli jeton, taban `credits` geçerli) |
 
+**DÜZELTME (Görev 9, 2026-09-15):** bu tarife de yukarıdaki `credits`/sn
+sütunuyla AYNI ölçüm-öncesi tahmindi. Ölçüm sonrası gerçek tarife
+`catalog.py`nin `credits_by_quality` alanlarında ve
+`tests/test_catalog.py`nin
+`test_fal_credits_are_derived_from_MEASURED_usd_per_second` mandalında
+donuk: **Wan 480p→10 · 720p→20 · 1080p→40**, **PixVerse 720p→13 ·
+1080p→24**. Eski tahmin (Wan 10·16·24, PixVerse 20·32) burada duruyor ama
+ÜRETİM kodu bu satırı hiç okumadı — literaller doğrudan ölçümden yazıldı.
+
 ### Beyan kuralı
 
 **Yalnız şemanın AÇIKÇA saydığı jeton beyan ediliyor.** Bu, Veo'nun 1080p'sinin
@@ -175,6 +205,18 @@ seçilebilir bir 400, eksik beyan etmek ise yalnızca bir yeteneği kullanmamak"
   PixVerse'ün kataloğa girme gerekçesi.
 * **Wan'ın süresi yalnız 5 · 10**: şeması aralık VERMİYOR, yalnız varsayılanı
   (5) söylüyor.
+  **DÜZELTME (Görev 9, 2026-09-15):** bu satır da ölçüm-öncesi tahmindi ve
+  YANLIŞTI. Görev 8'in tam OpenAPI şema ölçümü
+  (`.superpowers/sdd/2026-09-14-fal-video-saglayicisi/olcum-uc-semalari.md`)
+  Wan'ın `duration` alanı için şemanın AÇIKÇA bir aralık (`minimum: 2,
+  maximum: 30`, tamsayı\|null) verdiğini gösterdi — "aralık VERMİYOR" iddiası
+  bayattı, kaynağı hiç canlı/şema ile sınanmamış bir varsayımdı. Katalog
+  BİLİNÇLİ OLARAK yine de yalnız 5 ve 10'u beyan ediyor (`catalog.py`nin
+  `VIDEO_MODELS` başlığı) — 15 sn'e (ya da şemanın izin verdiği 30 sn'e)
+  çıkarmak ayrı bir ölçüm/karar ister (test edilmemiş süre, fatura ve
+  `poll_timeout` etkisi bu turda değerlendirilmedi). Bu düzeltme `328defc`
+  ile katalog tarafında zaten yapılmıştı; bu belge o güne kadar geride
+  kalmıştı.
 * **Kling'in `resolution`'ı tek gizli jeton**: i2v şemasında o alan HİÇ yok,
   t2v şeması da enum vermiyor. Etiket kullanıcıya bilgi veriyor, telde
   gönderilmiyor (`quality_hidden=True`).

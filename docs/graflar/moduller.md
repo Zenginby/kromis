@@ -23,7 +23,7 @@ flowchart TD
     n_netguard["netguard<br/>157 satır"]
   end
   subgraph katman7["katman 7"]
-    n_app["app<br/>2187 satır"]
+    n_app["app<br/>2194 satır"]
   end
   subgraph katman6["katman 6"]
     n_chat_providers["chat_providers<br/>124 satır"]
@@ -35,7 +35,7 @@ flowchart TD
     n_azure_flux_client["azure_flux_client<br/>292 satır"]
     n_azure_mai_client["azure_mai_client<br/>290 satır"]
     n_chat_client["chat_client<br/>188 satır"]
-    n_fal_client["fal_client<br/>760 satır"]
+    n_fal_client["fal_client<br/>766 satır"]
     n_gemini_client["gemini_client<br/>293 satır"]
     n_openai_client["openai_client<br/>215 satır"]
     n_prefs["prefs<br/>219 satır"]
@@ -62,7 +62,7 @@ flowchart TD
     n_storage["storage<br/>415 satır"]
   end
   subgraph katman0["katman 0"]
-    n_catalog["catalog<br/>1501 satır"]
+    n_catalog["catalog<br/>1509 satır"]
     n_composite["composite<br/>158 satır"]
     n_errlog["errlog<br/>114 satır"]
     n_jsonstore["jsonstore<br/>80 satır"]
@@ -199,13 +199,13 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | modül | satır | katman | ithal ettiği | ithal eden | test |
 | --- | --- | --- | --- | --- | --- |
 | `android_main.py` | 194 | 10 | `app` (erteli), `desktop` (erteli), `errlog` (erteli), `paths` (erteli) | 0 | 2 |
-| `app.py` | 2187 | 7 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 32 |
+| `app.py` | 2194 | 7 | `assets_store`, `azure_client`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `color_names`, `composite`, `credstore`, `errlog`, `folders`, `guncelleme`, `models`, `palette`, `palette_store`, `paths`, `prefs`, `providers`, `storage`, `version` | 3 | 32 |
 | `assets_store.py` | 201 | 1 | `jsonstore` | 3 | 9 |
 | `azure_client.py` | 458 | 2 | `paths`, `winsec` | 13 | 30 |
 | `azure_flux_client.py` | 292 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `azure_mai_client.py` | 290 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `backup.py` | 187 | 3 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 1 | 1 |
-| `catalog.py` | 1501 | 0 | — | 14 | 27 |
+| `catalog.py` | 1509 | 0 | — | 14 | 27 |
 | `chat_client.py` | 188 | 4 | `azure_client`, `chat_prompt`, `models` | 3 | 3 |
 | `chat_prompt.py` | 358 | 2 | `paths` | 3 | 1 |
 | `chat_providers.py` | 124 | 6 | `azure_client`, `catalog`, `chat_client`, `credstore`, `openai_chat` | 1 | 2 |
@@ -215,7 +215,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `credstore.py` | 194 | 3 | `azure_client`, `catalog` | 10 | 4 |
 | `desktop.py` | 559 | 9 | `errlog`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli) | 1 | 2 |
 | `errlog.py` | 114 | 0 | — | 5 | 1 |
-| `fal_client.py` | 760 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 2 |
+| `fal_client.py` | 766 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 2 |
 | `folders.py` | 248 | 2 | `jsonstore`, `storage` | 3 | 4 |
 | `gemini_client.py` | 293 | 4 | `azure_client`, `catalog`, `credstore`, `providers` | 1 | 1 |
 | `guncelleme.py` | 237 | 2 | `errlog`, `jsonstore`, `paths`, `version` | 1 | 4 |

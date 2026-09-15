@@ -251,11 +251,19 @@ def test_the_capability_flows_to_the_UI_as_its_OWN_key(client):
     arkasına saklamak olurdu.
 
     GÖREV 7 İLE SAĞLAYICIYA GÖRE AYRIŞTI: üç Veo girdisi hâlâ `True`
-    (Veo 3.1 ailesinin ortak yeteneği), ama fal'ın üç modelinin hiçbirinin
-    i2v şemasında `tail_image_url` yok — yani "her video modeli son kareyi
-    alır" iddiası artık YANLIŞ (bkz. `test_fal_video_models_declare_no_last_frame`
-    ve `fal_client.animate`'in kendi ikinci kapısı). İddia sağlayıcı başına
-    doğru değere indi; görsel taraf HİÇ değişmedi.
+    (Veo 3.1 ailesinin ortak yeteneği), fal'ın üç modeli ise `False` — yani
+    "her video modeli son kareyi alır" iddiası artık YANLIŞ (bkz.
+    `test_fal_video_models_declare_no_last_frame` ve `fal_client.animate`'in
+    kendi ikinci kapısı). İddia sağlayıcı başına doğru değere indi; görsel
+    taraf HİÇ değişmedi.
+
+    DÜZELTME (Görev 9, 2026-09-15): fal'ın `False` olma gerekçesi önceden
+    "üç modelin hiçbirinin i2v şemasında `tail_image_url` yok" diye
+    yazılıyordu — doğru ama BOŞ, çünkü o ad fal'da hiç kullanılmıyor. Ölçüm
+    Wan'ın i2v ucunda GERÇEK bir son-kare alanı (`end_image_url`) olduğunu
+    gösterdi; adaptör onu bu turda BİLİNÇLİ OLARAK göndermiyor. PixVerse ve
+    Kling'de ise gerçekten hiçbir son-kare alanı yok. Buradaki iddia
+    (`supports_last_frame` sağlayıcı başına doğru değere indi) etkilenmiyor.
     """
     ayar = client.get("/api/settings").json()
 

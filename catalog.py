@@ -1106,7 +1106,15 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         poll_timeout=600.0,
         credits=28,
         kind="video",
-        note="En iyi fal kademesi, 1080p ve lipsync. Saniyesi pahalı.",
+        # DÜZELTME (Görev 9, 2026-09-15): bu not önceden "En iyi fal
+        # kademesi, 1080p ve lipsync" diyordu — İKİSİ DE ÖLÇÜLMEMİŞTİ.
+        # lipsync adaptörün hiçbir alanında yok (`fal_client.ALANLAR`), ve
+        # "1080p" `qualities`teki tek jeton ama `quality_hidden=True` ile
+        # SENTETİK: şemada `resolution` alanı hiç yok, telde hiç gitmiyor,
+        # çıktının gerçek çözünürlüğü ölçülmedi (bkz. `docs/ozellikler.md`nin
+        # Kling satırı). Not artık yalnız ÖLÇÜLMÜŞ olanı söylüyor.
+        note="En pahalı fal kademesi (28 kredi/sn); çözünürlük seçilemiyor, "
+             "oran yalnız metin ucunda etkili.",
     ),
 )
 

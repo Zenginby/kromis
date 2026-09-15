@@ -749,8 +749,14 @@ def animate(m: catalog.ImageModel, prompt: str, images, size: str, quality: str,
             credentials=None) -> list[bytes]:
     """`images`: sıralı [(dosya_adı, png_baytları), ...] — yalnız ilki kullanılıyor.
 
-    `last_frame` SÖZLEŞMEDE VAR ama bu sağlayıcıda DESTEKLENMİYOR: üç modelin
-    hiçbirinin i2v şemasında `tail_image_url` yok. Kapı `providers.animate_video`'da
+    `last_frame` SÖZLEŞMEDE VAR ama bu sağlayıcıda DESTEKLENMİYOR.
+    DÜZELTME (Görev 9, 2026-09-15): bu gerekçe önceden "üç modelin hiçbirinin
+    i2v şemasında `tail_image_url` yok" diyordu — doğru ama BOŞ: o ad fal'da
+    hiç kullanılmıyor. Görev 8'in tam şema ölçümü Wan'ın i2v ucunda GERÇEKTEN
+    bir son-kare alanı olduğunu gösterdi (`end_image_url`, son kare desteği
+    VAR); `ALANLAR` onu bu turda BİLİNÇLİ OLARAK göndermiyor, o yüzden bayrak
+    dürüstçe `False`. PixVerse ve Kling'in şemalarında ise gerçekten hiçbir
+    son-kare alanı yok. Kapı `providers.animate_video`'da
     (`supports_last_frame=False`) ve buradaki iddia onun İKİNCİ kapısı —
     `providers.edit`in ikinci kapı disiplininin aynısı.
     """

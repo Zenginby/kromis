@@ -76,7 +76,7 @@ mode you can attach up to three extra reference images beside the main one.
 The composer's third mode is video: all three tiers of Gemini · Veo 3.1 (Lite /
 Fast / full) plus three fal.ai models — Alibaba Wan 3.0, PixVerse C1, Kling V3
 Turbo Pro. Veo tops out at 8 seconds; PixVerse and Kling can go **up to 15
-seconds**. The aspect-ratio axis widened too: all six models now offer **1:1**
+seconds**. The aspect-ratio axis widened too: all three fal models add **1:1**
 alongside 16:9/9:16. Veo shares the image side's key; fal reads its own key
 from Settings — both live in the same composer, no new screen appeared. You
 can also turn a gallery image into the first frame of a clip; the record keeps

@@ -794,11 +794,12 @@ def test_the_context_is_gathered_outside_the_instruction_guard(client, fake_kwar
     ayrıca mandallanıyor.
     """
     import pathlib as _p
-    kaynak = (_p.Path(__file__).resolve().parent.parent / "app.py").read_text(
-        encoding="utf-8")
+    # Rota `routers/sohbet.py`de (Faz 0 / Adım 2); bağlamı `services.modeller` kuruyor.
+    kaynak = (_p.Path(__file__).resolve().parent.parent / "routers" / "sohbet.py"
+              ).read_text(encoding="utf-8")
     assert "instructions = chat_prompt.build_system(**baglam)" in kaynak, (
         "bağlam çağrısı `build_system`in argümanı olarak `try` içinde duruyor")
-    govde = kaynak.split("baglam = _director_context()", 1)
+    govde = kaynak.split("baglam = modeller.director_context()", 1)
     assert len(govde) == 2, "bağlam `try` öncesinde toplanmıyor"
     assert "try:" in govde[1].split("except ValueError", 1)[0], (
         "kapı bağlam toplamadan SONRA açılmıyor")

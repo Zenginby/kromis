@@ -6,8 +6,10 @@
 
 NEDEN VAR: bu depo onlarca Python modülü, kırka yakın HTTP uç noktası, bir
 tutam tarayıcı betiği ve altmıştan fazla test dosyasından oluşuyor; `app.py`
-tek başına deponun en büyük dosyası. (Güncel sayılar burada DEĞİL, üretilen
-`docs/graflar/README.md`'de — yoksa bu yorum ilk değişiklikte yanlışa döner.)
+Faz 0 / Adım 2'ye kadar tek başına deponun en büyük dosyasıydı, bugün rotalar
+`routers/`, yardımcılar `services/` altında. (Güncel sayılar burada DEĞİL,
+üretilen `docs/graflar/README.md`'de — yoksa bu yorum ilk değişiklikte
+yanlışa döner.)
 "Bu değişiklik neyi kırar?" sorusunun cevabı hiçbir yerde YAZILI DEĞİLDİ:
 her seferinde grep'le yeniden keşfediliyordu ve keşif eksik kalıyordu — örneğin
 `/api/history`'nin `folders` modülüne dokunduğu ancak `storage`'ı okuyan biri
@@ -59,6 +61,13 @@ GRAF_DIZINI = "docs/graflar"
 # ÖKSÜZ gibi görünmesinler diye adları burada yazılı.
 GIRIS_NOKTALARI = ("app", "desktop", "android_main")
 
+# Ürün kodunun PAKETLERİ (Faz 0 / Adım 2): rotalar `routers/`, rota dışı
+# mantık `services/` altında. Modül adı noktalı (`routers.uretim`), `tools.`
+# ve `tests.` ile aynı deyim. `__init__.py` sayılmıyor — yalnız docstring
+# taşıyor ve grafta "hiçbir şeyi ithal etmeyen, kimsenin ithal etmediği" bir
+# düğüm olarak gürültü olurdu.
+PAKETLER = ("routers", "services")
+
 
 # ─────────────────────────────────────────────────────────────────────
 #  Toplama — Python tarafı
@@ -69,12 +78,12 @@ def _oku(yol: str) -> str:
 
 
 def python_dosyalari() -> dict[str, str]:
-    """{modül adı: depo göreli yol} — kök, `tools/` ve `tests/` ayrı adlanır."""
+    """{modül adı: depo göreli yol} — kök; `routers/`, `services/`, `tools/`, `tests/` noktalı adlanır."""
     bulunan: dict[str, str] = {}
     for ad in sorted(os.listdir(KOK)):
         if ad.endswith(".py"):
             bulunan[ad[:-3]] = ad
-    for dizin in ("tools", "tests"):
+    for dizin in PAKETLER + ("tools", "tests"):
         tam = os.path.join(KOK, dizin)
         if not os.path.isdir(tam):
             continue
@@ -149,9 +158,17 @@ def ithaller(kaynak: str, yol: str, yerel: dict[str, str]) -> tuple[
 
 
 # ─────────────────────────────────────────────────────────────────────
-#  Toplama — HTTP uç noktaları (app.py)
+#  Toplama — HTTP uç noktaları (app.py + routers/)
 # ─────────────────────────────────────────────────────────────────────
 HTTP_YONTEMLERI = ("get", "post", "put", "delete", "patch", "head", "options")
+# Rota dekoratörünün sahibi: bileşim kökünde `app`, router modüllerinde
+# `router` (routers/__init__.py'nin sözleşmesi).
+ROTA_SAHIPLERI = ("app", "router")
+
+
+def _paket_modulu(ad: str) -> bool:
+    """`routers.x` / `services.x` mi — uç nokta sütununda GİZLENEN modüller."""
+    return ad.startswith(tuple(p + "." for p in PAKETLER))
 
 
 def _kullanilan_moduller(dugum, takma: dict[str, str],
@@ -165,52 +182,95 @@ def _kullanilan_moduller(dugum, takma: dict[str, str],
                 bulunan.add(mod)
         elif isinstance(d, ast.Name):
             # İki kaynak: `from models import GenerateRequest` gibi ad ithalleri
-            # (tür açıklamaları da buraya düşer) ve app.py'nin modül düzeyi
-            # sabitleri — `OUTPUT_DIR = paths.output_dir()`. İkincisi olmadan
-            # `GET /output/{filename}` rotası "hiçbir modüle dokunmuyor" gibi
-            # görünüyordu; oysa yolun tamamı paths'ten geliyor.
+            # (tür açıklamaları da buraya düşer) ve modülün kendi düzeyindeki
+            # sabitler — bölünmeden önce `OUTPUT_DIR = paths.output_dir()`.
+            # İkincisi olmadan `GET /output/{filename}` rotası "hiçbir modüle
+            # dokunmuyor" gibi görünüyordu; oysa yolun tamamı paths'ten geliyor.
+            # (Bugün o yol `services.yollar.output_dir()` gövdesinden, yani
+            # modüller arası kapanıştan geliyor — bkz. uc_noktalar.)
             bulunan |= ad_kaynaklari.get(d.id, set())
     return bulunan
 
 
-def uc_noktalar(kaynak: str, takma: dict[str, str],
-                ad_modul: dict[str, str]) -> list[dict]:
-    """app.py'deki rotaları, YARDIMCILARIYLA BİRLİKTE dokundukları modüllerle verir.
+def uc_noktalar(kaynaklar: dict[str, str], yollar: dict[str, str],
+                takmalar: dict[str, dict[str, str]],
+                ad_modul_leri: dict[str, dict[str, str]]) -> list[dict]:
+    """Rotaları, YARDIMCILARIYLA BİRLİKTE dokundukları kütüphane modülleriyle verir.
+
+    `kaynaklar` {modül adı: kaynak}: `app` (bileşim kökü) ve `routers.*` rota
+    tanımlayan, `services.*` yardımcıların yaşadığı modüller. Faz 0 / Adım
+    2'den önce bunların hepsi tek bir app.py'ydi.
 
     Neden kapanış (transitive) hesabı: `POST /api/generate` gövdesinde
-    `storage` adı hiç geçmiyor — kaydı `_kaydet_ve_dondur` gibi app.py içi bir
-    yardımcı yapıyor. Yalnız gövdeye bakan bir harita o kenarı KAÇIRIR ve
-    tam kaçırdığı yerde yanlış güven verir.
+    `storage` adı hiç geçmiyor — kaydı bir yardımcı yapıyor. Yalnız gövdeye
+    bakan bir harita o kenarı KAÇIRIR ve tam kaçırdığı yerde yanlış güven
+    verir. Bölünmeden sonra yardımcılar BAŞKA modüllerde: kapanış modül
+    sınırını `kapilar.check_folder(...)` gibi nitelikli çağrılar (takma ad →
+    hedef modüldeki işlev) ve `from services.x import f` biçimli ad ithalleri
+    üzerinden geçiyor. `yollar.output_dir()` böylece `paths`e, `check_session`
+    `chat_store`a varıyor — bölünmeden önceki sütunla aynı cevap.
+
+    `routers.*` / `services.*` SÜTUNDA GÖSTERİLMİYOR: onlar eski "app.py içi
+    yardımcı"nın yeni adresi; soru "bu rota hangi KÜTÜPHANE modülüne
+    dokunuyor" ve o soru paket sınırını umursamıyor. Hangi router'ın hangi
+    service'i ithal ettiği zaten moduller.md'de. Rotanın DOSYASI ayrı bir
+    sütunda — "bu uç nerede yaşıyor" sorusu bölünmeyle birlikte doğdu.
     """
-    agac = ast.parse(kaynak, filename="app.py")
-    islevler = {n.name: n for n in agac.body
-                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    agaclar = {mod: ast.parse(kaynak, filename=yollar[mod])
+               for mod, kaynak in sorted(kaynaklar.items())}
+    islevler: dict[tuple[str, str], ast.AST] = {}
+    for mod, agac in agaclar.items():
+        for n in agac.body:
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                islevler[(mod, n.name)] = n
 
-    ad_kaynaklari: dict[str, set[str]] = {ad: {mod} for ad, mod in ad_modul.items()}
-    for dugum in agac.body:
-        if isinstance(dugum, (ast.Assign, ast.AnnAssign)) and dugum.value is not None:
-            moduller = _kullanilan_moduller(dugum.value, takma, ad_kaynaklari)
-            if not moduller:
-                continue
-            hedefler = (dugum.targets if isinstance(dugum, ast.Assign)
-                        else [dugum.target])
-            for hedef in hedefler:
-                if isinstance(hedef, ast.Name):
-                    ad_kaynaklari.setdefault(hedef.id, set()).update(moduller)
+    # Modül düzeyi sabitlerin kaynakları — modül BAŞINA, çünkü aynı ad iki
+    # modülde iki farklı şeye bağlı olabilir.
+    ad_kaynaklari: dict[str, dict[str, set[str]]] = {}
+    for mod, agac in agaclar.items():
+        ak: dict[str, set[str]] = {ad: {m} for ad, m in ad_modul_leri[mod].items()}
+        for dugum in agac.body:
+            if isinstance(dugum, (ast.Assign, ast.AnnAssign)) and dugum.value is not None:
+                moduller = _kullanilan_moduller(dugum.value, takmalar[mod], ak)
+                if not moduller:
+                    continue
+                hedefler = (dugum.targets if isinstance(dugum, ast.Assign)
+                            else [dugum.target])
+                for hedef in hedefler:
+                    if isinstance(hedef, ast.Name):
+                        ak.setdefault(hedef.id, set()).update(moduller)
+        ad_kaynaklari[mod] = ak
 
-    dogrudan: dict[str, set[str]] = {}
-    ic_cagri: dict[str, set[str]] = {}
-    for ad, dugum in islevler.items():
-        dogrudan[ad] = _kullanilan_moduller(dugum, takma, ad_kaynaklari)
-        ic_cagri[ad] = {
-            d.func.id for d in ast.walk(dugum)
-            if isinstance(d, ast.Call) and isinstance(d.func, ast.Name)
-            and d.func.id in islevler and d.func.id != ad
-        }
+    def hedef_islev(mod: str, cagri: ast.Call) -> tuple[str, str] | None:
+        """Bu çağrı taranan modüllerden birindeki bir işleve mi gidiyor?"""
+        f = cagri.func
+        if isinstance(f, ast.Name):
+            if (mod, f.id) in islevler:
+                return (mod, f.id)
+            hedef_mod = ad_modul_leri[mod].get(f.id)       # from services.x import f
+            if hedef_mod and (hedef_mod, f.id) in islevler:
+                return (hedef_mod, f.id)
+        elif isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name):
+            hedef_mod = takmalar[mod].get(f.value.id)      # kapilar.check_folder(...)
+            if hedef_mod and (hedef_mod, f.attr) in islevler:
+                return (hedef_mod, f.attr)
+        return None
 
-    def kapanis(ad: str) -> tuple[set[str], list[str]]:
-        goruldu: set[str] = set()
-        yigin = [ad]
+    dogrudan: dict[tuple[str, str], set[str]] = {}
+    ic_cagri: dict[tuple[str, str], set[tuple[str, str]]] = {}
+    for anahtar, islev in islevler.items():
+        mod = anahtar[0]
+        dogrudan[anahtar] = _kullanilan_moduller(islev, takmalar[mod], ad_kaynaklari[mod])
+        ic_cagri[anahtar] = set()
+        for d in ast.walk(islev):
+            if isinstance(d, ast.Call):
+                cagrilan = hedef_islev(mod, d)
+                if cagrilan and cagrilan != anahtar:
+                    ic_cagri[anahtar].add(cagrilan)
+
+    def kapanis(anahtar: tuple[str, str]) -> tuple[set[str], int]:
+        goruldu: set[tuple[str, str]] = set()
+        yigin = [anahtar]
         moduller: set[str] = set()
         while yigin:
             su = yigin.pop()
@@ -219,30 +279,33 @@ def uc_noktalar(kaynak: str, takma: dict[str, str],
             goruldu.add(su)
             moduller |= dogrudan[su]
             yigin.extend(ic_cagri[su] - goruldu)
-        return moduller, sorted(goruldu - {ad})
+        return {m for m in moduller if not _paket_modulu(m)}, len(goruldu) - 1
 
     rotalar: list[dict] = []
-    for dugum in agac.body:
-        if not isinstance(dugum, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        for sus in dugum.decorator_list:
-            if not (isinstance(sus, ast.Call)
-                    and isinstance(sus.func, ast.Attribute)
-                    and isinstance(sus.func.value, ast.Name)
-                    and sus.func.value.id == "app"
-                    and sus.func.attr in HTTP_YONTEMLERI):
+    for mod, agac in agaclar.items():
+        for dugum in agac.body:
+            if not isinstance(dugum, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            if not (sus.args and isinstance(sus.args[0], ast.Constant)):
-                continue
-            moduller, yardimcilar = kapanis(dugum.name)
-            rotalar.append({
-                "yontem": sus.func.attr.upper(),
-                "yol": sus.args[0].value,
-                "islev": dugum.name,
-                "satir": dugum.lineno,
-                "moduller": sorted(moduller),
-                "yardimci_sayisi": len(yardimcilar),
-            })
+            for sus in dugum.decorator_list:
+                if not (isinstance(sus, ast.Call)
+                        and isinstance(sus.func, ast.Attribute)
+                        and isinstance(sus.func.value, ast.Name)
+                        and sus.func.value.id in ROTA_SAHIPLERI
+                        and sus.func.attr in HTTP_YONTEMLERI):
+                    continue
+                if not (sus.args and isinstance(sus.args[0], ast.Constant)):
+                    continue
+                moduller, yardimci_sayisi = kapanis((mod, dugum.name))
+                rotalar.append({
+                    "yontem": sus.func.attr.upper(),
+                    "yol": sus.args[0].value,
+                    "modul": mod,
+                    "dosya": yollar[mod],
+                    "islev": dugum.name,
+                    "satir": dugum.lineno,
+                    "moduller": sorted(moduller),
+                    "yardimci_sayisi": yardimci_sayisi,
+                })
     rotalar.sort(key=lambda r: (r["yol"], r["yontem"]))
     return rotalar
 
@@ -466,8 +529,10 @@ def graf_topla() -> dict:
     takmalar: dict[str, dict[str, str]] = {}
     ad_modul_leri: dict[str, dict[str, str]] = {}
     satirlar: dict[str, int] = {}
+    kaynaklar: dict[str, str] = {}
     for ad, yol in sorted(urun.items()):
         kaynak = _oku(yol)
+        kaynaklar[ad] = kaynak
         satirlar[ad] = len(kaynak.splitlines())
         kenarlar[ad], takmalar[ad], ad_modul_leri[ad] = ithaller(kaynak, yol, urun)
 
@@ -506,7 +571,11 @@ def graf_topla() -> dict:
     dongular = [obek for obek in gucel_bilesenler(duz) if len(obek) > 1]
     dongular.sort()
 
-    app_uc = uc_noktalar(_oku("app.py"), takmalar["app"], ad_modul_leri["app"])
+    # Uç nokta taraması: bileşim kökü + iki paket. `desktop`/`android_main`
+    # gibi kabuk modülleri rota tanımlamıyor; `tools.` zaten `urun`da değil.
+    uc_kaynaklar = {ad: k for ad, k in kaynaklar.items()
+                    if ad == "app" or _paket_modulu(ad)}
+    app_uc = uc_noktalar(uc_kaynaklar, urun, takmalar, ad_modul_leri)
     on = onyuz()
 
     # Tarayıcı çağrısı ↔ sunucu rotası eşlemesi. `önek` eşleşmesi ayrı
@@ -659,19 +728,24 @@ def moduller_md(g: dict) -> str:
 
 def uc_noktalar_md(g: dict) -> str:
     uc = g["uc_noktalar"]
+    dosyalar = sorted({r["dosya"] for r in uc})
     s = [UYARI, "", "# Uç nokta grafı", "",
-         f"`app.py` içinde {len(uc)} HTTP rotası. `modüller` sütunu, rotanın "
-         "gövdesinin VE app.py içi yardımcılarının dokunduğu depo modülleridir "
-         "— yani bir modülü değiştirirken hangi isteklerin sınanması gerektiği "
-         "burada yazılı. `ön yüz` sütunu o yolu çağıran tarayıcı betiği.", "",
+         f"{len(uc)} HTTP rotası, {len(dosyalar)} dosyada (`routers/` altındaki "
+         "alan router'ları; bileşim kökü `app.py` yalnız takıyor). `modüller` "
+         "sütunu, rotanın gövdesinin VE yardımcılarının (`services/`, aynı "
+         "router'daki özel işlevler) dokunduğu KÜTÜPHANE modülleridir — yani bir "
+         "modülü değiştirirken hangi isteklerin sınanması gerektiği burada "
+         "yazılı; `routers.*`/`services.*` bilerek sütunda yok (gerekçe: "
+         "tools/graf_uret.py, uc_noktalar). `ön yüz` sütunu o yolu çağıran "
+         "tarayıcı betiği.", "",
          "`paths` neredeyse her satırda görünüyor ve bu doğru: çıktı/varlık "
-         "dizinleri app.py'nin modül düzeyi sabitlerinden akıyor "
-         "(`OUTPUT_DIR = paths.output_dir()`) ve rotalar o sabiti depo "
-         "modüllerine geçiriyor — yani `paths.py`'ye dokunmak gerçekten "
-         "neredeyse her ucu etkiler.", ""]
+         "dizinleri `services/yollar.py` üzerinden `paths`ten akıyor ve rotalar "
+         "o değeri depo modüllerine geçiriyor — yani `paths.py`'ye dokunmak "
+         "gerçekten neredeyse her ucu etkiler.", ""]
     s += _tablo(
-        ["yöntem", "yol", "işlev (app.py)", "modüller", "ön yüz"],
-        [[r["yontem"], f"`{r['yol']}`", f"`{r['islev']}`:{r['satir']}",
+        ["yöntem", "yol", "dosya", "işlev", "modüller", "ön yüz"],
+        [[r["yontem"], f"`{r['yol']}`", f"`{r['dosya']}`",
+          f"`{r['islev']}`:{r['satir']}",
           ", ".join(f"`{m}`" for m in r["moduller"]) or "—",
           ", ".join(f"`{os.path.basename(o)}`" for o in r["onyuz"]) or "—"]
          for r in uc])
@@ -729,7 +803,7 @@ def onyuz_md(g: dict) -> str:
     s.append("")
     if g["eslesmeyen_cagrilar"]:
         s += ["## Hiçbir rotaya oturmayan çağrılar", "",
-              "Tarayıcı bu yolları çağırıyor ama `app.py`'de karşılığı yok — "
+              "Tarayıcı bu yolları çağırıyor ama `routers/` altında karşılığı yok — "
               "ya yol yanlış yazılmış ya da rota kaldırılmış. Her satır "
               "bakılması gereken bir bulgudur.", ""]
         for e in g["eslesmeyen_cagrilar"]:
@@ -976,7 +1050,8 @@ def _ilgili_dosya(yol: str) -> bool:
     if goreli.startswith(GRAF_DIZINI):
         return False           # grafın kendisi
     if goreli.endswith(".py"):
-        return "/" not in goreli or goreli.startswith(("tools/", "tests/"))
+        return "/" not in goreli or goreli.startswith(
+            tuple(f"{d}/" for d in PAKETLER + ("tools", "tests")))
     return goreli.startswith("static/") and goreli.endswith((".js", ".html", ".css"))
 
 

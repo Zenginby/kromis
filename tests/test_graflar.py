@@ -54,22 +54,43 @@ def test_the_scanner_is_not_blind():
 
     1. test yalnız "diskteki dosya = üretilen dosya" der; tarayıcı hiçbir şey
     görmese o eşitlik yine kurulur. Buradaki ölçümler bu yüzden grafın kendi
-    mantığını kullanmıyor: rotalar app.py'den regex'le, modüller dizin
-    listesinden sayılıyor.
+    mantığını kullanmıyor: rotalar app.py ve routers/*.py'den regex'le,
+    modüller dizin listesinden sayılıyor.
+
+    Rotalar `routers/` altında (Faz 0 / Adım 2) ve dekoratörün sahibi orada
+    `router`, kökte `app`. İkisi de sayılıyor: bölünme sırasında app.py'de
+    rota KALMAMASI ayrı bir kapının işi (tests/test_app_bolme.py), buradaki
+    soru "tarayıcı her rotayı görüyor mu".
     """
     g = gu.graf_topla()
 
-    with open(os.path.join(REPO, "app.py"), encoding="utf-8") as f:
-        app_kaynak = f.read()
-    beklenen_rota = len(re.findall(
-        r"^@app\.(?:get|post|put|delete|patch|head|options)\(",
-        app_kaynak, re.M))
+    rota_dosyalari = ["app.py"] + sorted(
+        f"routers/{a}" for a in os.listdir(os.path.join(REPO, "routers"))
+        if a.endswith(".py"))
+    beklenen_rota = 0
+    for yol in rota_dosyalari:
+        with open(os.path.join(REPO, yol), encoding="utf-8") as f:
+            beklenen_rota += len(re.findall(
+                r"^@(?:app|router)\.(?:get|post|put|delete|patch|head|options)\(",
+                f.read(), re.M))
     assert beklenen_rota > 0, "regex sayımı bozuk — testin kendisi anlamsız"
     assert len(g["uc_noktalar"]) == beklenen_rota
 
     kok_modul = {a[:-3] for a in os.listdir(REPO) if a.endswith(".py")}
     graf_modul = {m["ad"] for m in g["moduller"] if "." not in m["ad"]}
     assert graf_modul == kok_modul
+
+    # Paketler de görülüyor mu — `__init__.py` HARİÇ (gerekçesi gu.PAKETLER'de).
+    for paket in gu.PAKETLER:
+        diskteki = {f"{paket}.{a[:-3]}" for a in os.listdir(os.path.join(REPO, paket))
+                    if a.endswith(".py") and a != "__init__.py"}
+        assert diskteki, f"{paket}/ boş — tarama anlamsız"
+        graftaki = {m["ad"] for m in g["moduller"] if m["ad"].startswith(f"{paket}.")}
+        assert graftaki == diskteki, paket
+
+    # Her rota bir router dosyasına bağlı ve HİÇBİRİ artık app.py'de değil.
+    assert {r["dosya"] for r in g["uc_noktalar"]} <= set(rota_dosyalari)
+    assert "app.py" not in {r["dosya"] for r in g["uc_noktalar"]}
 
     js = {f"static/{a}" for a in os.listdir(os.path.join(REPO, "static"))
           if a.endswith(".js")}
@@ -162,7 +183,8 @@ def test_generated_files_declare_that_they_are_generated():
 
 def test_the_hook_only_reacts_to_files_that_can_change_the_graph():
     """Kanca kipi ilgisiz düzenlemede iş yapmamalı; ilgili olanı kaçırmamalı."""
-    ilgili = ["app.py", "tools/graf_uret.py", "tests/test_app.py",
+    ilgili = ["app.py", "routers/kok.py", "services/yollar.py",
+              "tools/graf_uret.py", "tests/test_app.py",
               "static/core.js", "static/index.html", "static/style.css"]
     ilgisiz = ["README.md", "GUNCELLEME.md", "docs/graflar/moduller.md",
                "android/app/build.gradle", "", "/etc/passwd"]

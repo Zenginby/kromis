@@ -39,7 +39,7 @@ main'e merge artık sürüm artırmaz; elle yayın yolu `Actions → Yayın`.
 
 ---
 
-## 2. `app.py` monolitini `routers/` + `services/` paketlerine böl
+## 2. `app.py` monolitini `routers/` + `services/` paketlerine böl ✅ (PR: `faz0/app-bolme`)
 
 **Kapsam.** 45 rota ve yardımcıları alan bazlı `APIRouter`lara taşınır
 (öneri: `routers/uretim.py` generate/edit/video/animate, `routers/galeri.py`
@@ -77,6 +77,19 @@ PR'da bir router (önce en bağımsızı `palet`), her adımda takım yeşil.
 
 **Çıkış ölçütü.** `app.py` < 300 satır, 45 rota `uc-noktalar.md`de aynı yol ve
 fiille görünüyor, hiçbir test `appmod.<rota yardımcısı>` yamalamıyor, takım yeşil.
+
+**Yapıldığında (2026-09-16) plandan sapmalar.** Router adı `palet` değil
+`paletler` (`services/palet.py` ile ad çakışması). Dizin ara çözümü
+`services/ayarlar.py` değil `services/yollar.py` (`routers/ayarlar.py`
+ile çakışırdı; `ayarlar` adı 4. görevin ayar nesnesine kalıyor) ve testler
+DEĞİŞMEDİ: `yollar.output_dir()` `app.OUTPUT_DIR`ı `sys.modules` üzerinden
+okuyor, 47+17+2 yama olduğu yerde çalışıyor — gerekçe o dosyanın başında.
+Yalnız YARDIMCI yamaları taşındı: `appmod._to_png` (16) → `services.gorsel.to_png`,
+`appmod._dil` (3) → `services.dil.aktif`, `_output_png_path`/`_read_png_file`/
+`MAX_IMAGE_PIXELS` (1'er) → `services.gorsel`. Bekçi: `tests/test_app_bolme.py`
+(satır tavanı, `@app.<fiil>` yok, katman yönü, her router takılı).
+`tools/graf_uret.py` kapanışı artık modüller ARASI yürüyor ve `uc-noktalar.md`nin
+`modüller` sütunu 45 rotada da bölünme öncesiyle birebir aynı çıktı (ölçüldü).
 
 ---
 

@@ -5,6 +5,7 @@ from PIL import Image
 
 import app as appmod
 import azure_client as ac
+from services import gorsel
 
 
 def _png_bytes(color=(255, 0, 0)):
@@ -135,7 +136,7 @@ def test_edit_unknown_source_404(tmp_path, monkeypatch):
 
 
 def test_edit_rejects_huge_dimensions(tmp_path, monkeypatch):
-    monkeypatch.setattr(appmod, "MAX_IMAGE_PIXELS", 100)  # tiny cap for the test
+    monkeypatch.setattr(gorsel, "MAX_IMAGE_PIXELS", 100)  # tiny cap for the test
     c = _client(tmp_path, monkeypatch)
     # _png_bytes() makes a 32x32 = 1024px image, exceeds the 100px cap
     r = c.post(

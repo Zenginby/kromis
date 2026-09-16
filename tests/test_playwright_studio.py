@@ -987,8 +987,12 @@ def _macenta_var_mi(png: bytes) -> bool:
     """
     from PIL import Image
     im = Image.open(io.BytesIO(png)).convert("RGB")
+    # `im.getdata()` DEĞİL: Pillow 12.3 onu kullanımdan kaldırdı (14'te siliniyor)
+    # ve takım bir gün DeprecationWarning'i hataya çevirirse ilk düşen yer bu
+    # olurdu. `tobytes()` her sürümde aynı: RGB'de art arda üçlü bayt.
+    ham = im.tobytes()
     return any(r > 200 and b > 150 and g < 80
-               for r, g, b in im.getdata())
+               for r, g, b in zip(ham[0::3], ham[1::3], ham[2::3]))
 
 
 def test_playwright_logo_onizlemesi_kare_OLMAYAN_tabanda_kirpilmiyor(tmp_path, dizinler):

@@ -23,6 +23,7 @@ from fastapi.testclient import TestClient
 import app as appmod
 import storage
 from services import ayar
+from tests import conftest
 from tools import graf_uret as gu
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -114,9 +115,9 @@ def test_every_router_module_is_included_in_the_app():
     unutulmuştur.
     """
     graftaki = {(r["yontem"], r["yol"]) for r in gu.graf_topla()["uc_noktalar"]}
-    calisan = {(yontem, r.path) for r in appmod.app.routes
-               if hasattr(r, "methods") for yontem in r.methods
-               if not r.path.startswith(("/docs", "/redoc", "/openapi"))}
+    # `appmod.app.routes` DEĞİL: FastAPI 0.137'den beri ağaç (bkz. conftest).
+    calisan = {(yontem, yol) for yontem, yol in conftest.duz_rotalar(appmod.app)
+               if not yol.startswith(("/docs", "/redoc", "/openapi"))}
     assert graftaki == calisan, (
         f"takılmamış: {sorted(graftaki - calisan)}; kaynakta olmayan: "
         f"{sorted(calisan - graftaki)}")

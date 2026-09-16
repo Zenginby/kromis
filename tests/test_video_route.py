@@ -518,24 +518,38 @@ def test_an_EMPTY_last_source_id_means_no_end_frame(client, monkeypatch):
     assert gorulen["last_frame"] is None
 
 
-def test_a_last_file_part_WITHOUT_a_filename_is_refused_BEFORE_the_route(client,
-                                                                        monkeypatch):
+def test_a_last_file_part_WITHOUT_a_filename_means_no_end_frame(client, monkeypatch):
     """Dosya tarafında ikiz bir süzgeç YOK ve olmamalı — mandallanan bu.
 
-    Starlette dosya adı olmayan bir parçayı `UploadFile` değil düz `str` olarak
-    çözüyor, declared `last_file: UploadFile | None` da onu rota gövdesine
-    varmadan 422 yapıyor (`_extra_refs`in ham formu okumasının gerekçesi tam
-    bu). Ana karenin `file` alanı da BİREBİR aynı davranıyor; `last_file` için
-    ayrı bir süzgeç açmak iki kardeş alanı sessizce ayrıştırmak olurdu.
-
-    Yani `last_source_id`in boş-dize normalleştirmesinin dosya tarafında bir
-    karşılığı yok — ve bu bir eksik değil, ölçülmüş bir sınır.
+    Adı olmayan bir dosya parçasını çerçeve rotaya VARMADAN çözüyor: Starlette
+    onu hâlâ boş `str` olarak ayrıştırıyor, FastAPI 0.141 ise boş dizeyi
+    `UploadFile | None` için `None` sayıyor. (0.115 onu 422 yapıyordu ve bu
+    test O davranışı mandallıyordu; Faz 0 / Adım 5'te ölçüm yenilendi.) İki
+    sürümde de ortak olan ve asıl korunan şey: `last_source_id`in boş-dize
+    normalleştirmesinin dosya tarafında bir karşılığı YOK, çünkü ana karenin
+    `file` alanı BİREBİR aynı yoldan geçiyor — `last_file` için ayrı bir süzgeç
+    açmak iki kardeş alanı sessizce ayrıştırmak olurdu.
     """
     monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
+    gorulen = _son_kare_yakala(monkeypatch)
 
     r = client.post("/api/video/animate", data=GECERLI,
                     files={"file": ("a.png", _png(), "image/png"),
                            "last_file": ("", b"", "application/octet-stream")})
+
+    assert r.status_code == 200, r.text
+    assert gorulen["last_frame"] is None
+
+
+def test_a_PLAIN_TEXT_last_file_part_is_refused_BEFORE_the_route(client, monkeypatch):
+    """Dosya alanına düz metin gelirse declared `UploadFile | None` onu rota
+    gövdesine varmadan 422 yapıyor — `gorsel.extra_refs`in ham formu okumasının
+    gerekçesi bu ve yukarıdaki testin "çerçeve süzüyor, rota değil" iddiasının
+    öteki yarısı."""
+    monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
+
+    r = client.post("/api/video/animate", data={**GECERLI, "last_file": "duz-metin"},
+                    files={"file": ("a.png", _png(), "image/png")})
 
     assert r.status_code == 422
     assert "last_file" in r.text

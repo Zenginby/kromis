@@ -29,7 +29,7 @@ flowchart TD
     n_routers_bindirme["routers.bindirme<br/>231 satır"]
     n_routers_galeri["routers.galeri<br/>334 satır"]
     n_routers_paletler["routers.paletler<br/>90 satır"]
-    n_routers_uretim["routers.uretim<br/>420 satır"]
+    n_routers_uretim["routers.uretim<br/>423 satır"]
   end
   subgraph katman8["katman 8"]
     n_routers_ayarlar["routers.ayarlar<br/>300 satır"]
@@ -392,7 +392,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `routers/kok.py` | 81 | 8 | `errlog`, `i18n`, `services.ayar`, `services.dil`, `version` | 1 | 0 |
 | `routers/paletler.py` | 90 | 9 | `color_names`, `i18n`, `models`, `palette`, `palette_store`, `services.ayar`, `services.dil`, `services.palet`, `services.zaman` | 1 | 0 |
 | `routers/sohbet.py` | 225 | 8 | `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `i18n`, `models`, `prefs`, `services.ayar`, `services.dil`, `services.modeller`, `services.zaman` | 1 | 0 |
-| `routers/uretim.py` | 420 | 9 | `azure_client`, `catalog`, `etiket`, `i18n`, `models`, `palette`, `providers`, `services.ayar`, `services.dil`, `services.gorsel`, `services.kapilar`, `services.palet`, `services.zaman`, `storage` | 1 | 0 |
+| `routers/uretim.py` | 423 | 9 | `azure_client`, `catalog`, `etiket`, `i18n`, `models`, `palette`, `providers`, `services.ayar`, `services.dil`, `services.gorsel`, `services.kapilar`, `services.palet`, `services.zaman`, `storage` | 1 | 0 |
 | `screencolor.py` | 149 | 0 | — | 1 | 1 |
 | `services/ayar.py` | 90 | 2 | `paths` | 9 | 2 |
 | `services/dil.py` | 149 | 7 | `i18n`, `services.ayar`, `services.tercih` | 11 | 2 |

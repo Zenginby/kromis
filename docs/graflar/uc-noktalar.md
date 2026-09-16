@@ -23,7 +23,7 @@
 | DELETE | `/api/chats/{chat_id}` | `routers/sohbet.py` | `delete_chat_route`:221 | `chat_store`, `i18n` | `chat.js` |
 | GET | `/api/chats/{chat_id}` | `routers/sohbet.py` | `get_chat_route`:155 | `chat_store`, `i18n` | `chat.js` |
 | PUT | `/api/chats/{chat_id}` | `routers/sohbet.py` | `update_chat_route`:198 | `chat_store`, `i18n`, `models`, `prefs` | `chat.js` |
-| POST | `/api/edit` | `routers/uretim.py` | `edit`:362 | `azure_client`, `catalog`, `chat_store`, `color_names`, `etiket`, `folders`, `i18n`, `models`, `palette`, `palette_store`, `providers`, `storage` | `core.js` |
+| POST | `/api/edit` | `routers/uretim.py` | `edit`:365 | `azure_client`, `catalog`, `chat_store`, `color_names`, `etiket`, `folders`, `i18n`, `models`, `palette`, `palette_store`, `providers`, `storage` | `core.js` |
 | GET | `/api/folders` | `routers/galeri.py` | `list_folders_route`:31 | `folders`, `storage` | `folders.js` |
 | POST | `/api/folders` | `routers/galeri.py` | `create_folder_route`:56 | `folders`, `i18n`, `models` | `folders.js` |
 | DELETE | `/api/folders/{folder_id}` | `routers/galeri.py` | `delete_folder_route`:73 | `folders`, `i18n`, `storage` | `folders.js` |

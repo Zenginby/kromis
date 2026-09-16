@@ -8,7 +8,7 @@ ve dokunacağın alanın grafı:
 | dokunduğun şey | ilk bakılacak graf |
 | --- | --- |
 | bir Python modülü | [docs/graflar/moduller.md](docs/graflar/moduller.md) — `ithal eden` sütunu değişikliğin etki alanıdır |
-| bir HTTP ucu / `app.py` | [docs/graflar/uc-noktalar.md](docs/graflar/uc-noktalar.md) — rota → modül → onu çağıran betik |
+| bir HTTP ucu / `routers/`, `services/` (bileşim kökü `app.py`) | [docs/graflar/uc-noktalar.md](docs/graflar/uc-noktalar.md) — rota → dosya → modül → onu çağıran betik |
 | `static/` altındaki bir betik | [docs/graflar/onyuz.md](docs/graflar/onyuz.md) — yükleme sırası, betikler arası çağrı, çağrılan uçlar |
 | ne sınanacak sorusu | [docs/graflar/testler.md](docs/graflar/testler.md) — modül → o modüle dokunan test dosyaları |
 | makineyle sorgu (grep/jq) | [docs/graflar/graf.json](docs/graflar/graf.json) |

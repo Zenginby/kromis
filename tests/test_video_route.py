@@ -29,6 +29,7 @@ from PIL import Image
 import app as appmod
 import azure_client as ac
 import catalog
+from services import gorsel
 
 MP4 = b"\x00\x00\x00\x20ftypmp42"
 GECERLI = {"prompt": "kedi koşuyor", "size": "16:9", "quality": "720p",
@@ -118,7 +119,7 @@ def test_the_reference_frame_path_records_the_PARENT(client):
     import azure_client as ac_mod
 
     with patch.object(ac_mod, "generate", lambda *a, **k: [_png()]):
-        with patch.object(appmod, "_to_png", lambda raw: _png()):
+        with patch.object(gorsel, "to_png", lambda raw: _png()):
             kaynak = client.post("/api/generate",
                                  json={"prompt": "kedi", "size": "1024x1024",
                                        "quality": "medium", "n": 1}) \
@@ -134,7 +135,7 @@ def test_the_reference_frame_path_records_the_PARENT(client):
 
 
 def test_an_UPLOADED_frame_is_accepted(client, monkeypatch):
-    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+    monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
 
     r = client.post("/api/video/animate", data=GECERLI,
                     files={"file": ("a.png", _png(), "image/png")})
@@ -164,7 +165,7 @@ def test_the_LAST_FRAME_reaches_the_dispatcher_as_PNG_bytes(client, monkeypatch)
     Katılsaydı `max_refs=1` kapısı (app.py'nin "en fazla N referans görsel"
     satırı) bitiş görseli seçen HER isteği 422 yapardı — yani yetenek eklenir
     eklenmez kendi kapısına takılırdı."""
-    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+    monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
     gorulen = _son_kare_yakala(monkeypatch)
 
     r = client.post("/api/video/animate", data=GECERLI,
@@ -178,7 +179,7 @@ def test_the_LAST_FRAME_reaches_the_dispatcher_as_PNG_bytes(client, monkeypatch)
 
 def test_WITHOUT_a_last_frame_the_dispatcher_sees_None(client, monkeypatch):
     """Bugünkü yol DEĞİŞMEDİ: bitiş görseli seçmeyen istek aynı istek."""
-    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+    monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
     gorulen = _son_kare_yakala(monkeypatch)
 
     r = client.post("/api/video/animate", data=GECERLI,
@@ -191,7 +192,7 @@ def test_WITHOUT_a_last_frame_the_dispatcher_sees_None(client, monkeypatch):
 def test_AT_MOST_ONE_of_last_file_or_last_source_id(client, monkeypatch):
     """Ana karenin "tam olarak biri" kapısının ikizi — tek farkı bitiş
     görselinin İSTEĞE BAĞLI olması, yani "hiçbiri" geçerli bir cevap."""
-    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+    monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
 
     r = client.post("/api/video/animate",
                     data={**GECERLI, "last_source_id": "beef1234beef"},
@@ -209,7 +210,7 @@ def test_a_last_frame_WITHOUT_a_first_frame_is_refused(client, monkeypatch):
     yüzden ayrı bir kural yazılmadı — ama davranışın mandallanması gerekiyor:
     ileride ana kare isteğe bağlı yapılırsa bu test kırılır ve kararı veren
     kişi bu yolu bilerek açmak zorunda kalır."""
-    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+    monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
 
     r = client.post("/api/video/animate", data=GECERLI,
                     files={"last_file": ("b.png", _png(), "image/png")})
@@ -220,7 +221,7 @@ def test_a_last_frame_WITHOUT_a_first_frame_is_refused(client, monkeypatch):
 def test_a_model_WITHOUT_the_capability_refuses_the_last_frame(client, monkeypatch):
     """Yetenek `supports_edit`ten AYRI: ilk kareyi alan bir model son kareyi
     almayabilir (Veo 3 ailesinin tamamı böyle)."""
-    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+    monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
     spec = catalog.video_model(catalog.DEFAULT_VIDEO_MODEL)
     monkeypatch.setattr(appmod.catalog, "video_model",
                         lambda mid: spec.__class__(
@@ -284,7 +285,7 @@ def test_the_capability_flows_to_the_UI_as_its_OWN_key(client):
 
 
 def _iki_uc(client, monkeypatch, **degisiklik):
-    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+    monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
     govde = {**GECERLI, **degisiklik}
     json_yanit = client.post("/api/video", json=govde)
     form_yanit = client.post("/api/video/animate", data=govde,
@@ -345,7 +346,7 @@ def test_MORE_THAN_ONE_reference_is_refused(client, monkeypatch):
     """Katalog `max_refs=1` diyor (ilk kare). Kapı `refs` toplandıktan SONRA:
     erken davranmak `_collect_edit_refs`in kendi 413/422 mesajlarını
     ikizlemek olurdu."""
-    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+    monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
     from unittest.mock import patch
 
     import azure_client as ac_mod
@@ -364,7 +365,7 @@ def test_MORE_THAN_ONE_reference_is_refused(client, monkeypatch):
 
 
 def test_EXACTLY_ONE_of_file_or_source_id_is_required(client, monkeypatch):
-    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+    monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
 
     hicbiri = client.post("/api/video/animate", data=GECERLI)
     ikisi = client.post("/api/video/animate",
@@ -402,9 +403,9 @@ def test_an_adapter_error_becomes_a_502_with_the_turkish_detail(
 
     monkeypatch.setattr(appmod.providers, "generate_video", boom)
     monkeypatch.setattr(appmod.providers, "animate_video", boom)
-    monkeypatch.setattr(appmod, "_output_png_path",
+    monkeypatch.setattr(gorsel, "output_png_path",
                         lambda i: __import__("os").devnull)
-    monkeypatch.setattr(appmod, "_read_png_file", lambda p: _png())
+    monkeypatch.setattr(gorsel, "read_png_file", lambda p: _png())
 
     r = client.post(yol, json=GECERLI) if not ek else client.post(yol, data={**GECERLI, **ek})
 
@@ -506,7 +507,7 @@ def test_an_EMPTY_last_source_id_means_no_end_frame(client, monkeypatch):
     `_extra_refs` galeri id'lerini tam bu yüzden `strip()` ile süzüyor; buradaki
     normalleştirme de kapıdan ÖNCE, yani kapı ile rota AYNI değeri görüyor.
     """
-    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+    monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
     gorulen = _son_kare_yakala(monkeypatch)
 
     r = client.post("/api/video/animate",
@@ -530,7 +531,7 @@ def test_a_last_file_part_WITHOUT_a_filename_is_refused_BEFORE_the_route(client,
     Yani `last_source_id`in boş-dize normalleştirmesinin dosya tarafında bir
     karşılığı yok — ve bu bir eksik değil, ölçülmüş bir sınır.
     """
-    monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
+    monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
 
     r = client.post("/api/video/animate", data=GECERLI,
                     files={"file": ("a.png", _png(), "image/png"),

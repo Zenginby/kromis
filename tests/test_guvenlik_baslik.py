@@ -18,6 +18,7 @@ ayrı ayrı sınanıyor:
      bu yoldan geçiyor.
   2. GİRİŞ — `FolderRequest`: kontrol karakteri taşıyan ad hiç kaydedilmez.
 """
+import glob
 import re
 
 import pytest
@@ -122,7 +123,11 @@ def test_no_route_builds_a_header_from_the_old_pattern():
 
     Kusurun kökü desenin İKİ yerde kopyalanmış olmasıydı; biri düzeltilip
     öteki unutulabilirdi. Tek yer `folders.safe_component`."""
-    for yol in ("app.py", "folders.py"):
+    # ZIP ucu `routers/galeri.py`de (Faz 0 / Adım 2); yine de app.py ve BÜTÜN
+    # router'lar taranıyor — desenin yeni bir rotada doğması da aynı kusur.
+    rotalar = sorted(glob.glob("routers/*.py"))
+    assert rotalar, "routers/ boş — tarama anlamsız"
+    for yol in ("app.py", "folders.py", *rotalar):
         with open(yol, encoding="utf-8") as f:
             kaynak = f.read()
         # Yorumlarda desen ANLATILIYOR (gerekçe orada yaşıyor); aranan şey

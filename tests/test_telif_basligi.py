@@ -12,7 +12,9 @@ geçmeden takımı yeşile döndüremiyor — yani AGPL §5a'nın istediği "kay
 söyle" adımı çatalda kendiliğinden hatırlatılıyor.
 
 KAPSAM = DAĞITILAN ilk-el kaynak:
-  * kökteki ve tools/ altındaki `.py`  (tests/ HARİÇ — pakete girmiyor),
+  * kökteki, `routers/`, `services/` ve `tools/` altındaki `.py`  (tests/
+    HARİÇ — pakete girmiyor); kapsam `git ls-files '*.py'`ten TÜRETİLİYOR,
+    yani yeni bir paket kendiliğinden girer,
   * `static/` altındaki `.js` ve `.css`,
   * `static/index.html`.
 

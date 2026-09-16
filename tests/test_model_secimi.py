@@ -14,6 +14,7 @@ import app as appmod
 import azure_client as ac
 import catalog
 import models
+from services import gorsel
 
 
 @pytest.fixture
@@ -148,7 +149,7 @@ def test_edit_model_alanini_kayda_YANKILIYOR(client, tmp_path, monkeypatch):
     aynısı, ama karşılaştırma DEĞERİN kendisi üzerinden: yanlış model sessizce
     geçerse kullanıcı hem beklediği estetiği hem doğru faturayı kaybeder.
     """
-    monkeypatch.setattr(appmod, "_to_png", lambda raw: b"\x89PNG")
+    monkeypatch.setattr(gorsel, "to_png", lambda raw: b"\x89PNG")
 
     r = client.post("/api/edit",
                     data={"prompt": "k", "size": "1024x1024", "quality": "medium",
@@ -162,7 +163,7 @@ def test_edit_model_alanini_kayda_YANKILIYOR(client, tmp_path, monkeypatch):
 
 def test_edit_model_alani_YOKKEN_varsayilana_dusuyor(client, monkeypatch):
     """Bugünkü arayüz alanı hiç göndermiyor; davranışı aynen almalı."""
-    monkeypatch.setattr(appmod, "_to_png", lambda raw: b"\x89PNG")
+    monkeypatch.setattr(gorsel, "to_png", lambda raw: b"\x89PNG")
 
     r = client.post("/api/edit",
                     data={"prompt": "k", "size": "1024x1024",
@@ -177,7 +178,7 @@ def test_edit_duzenlemeyi_desteklemeyen_modeli_reddediyor(client, genis_katalog,
                                                          monkeypatch):
     """Kataloğa `supports_edit=False` bir model girdiği gün canlı olacak yol;
     bugün fikstürle ölçülüyor (bkz. `genis_katalog`)."""
-    monkeypatch.setattr(appmod, "_to_png", lambda raw: b"\x89PNG")
+    monkeypatch.setattr(gorsel, "to_png", lambda raw: b"\x89PNG")
 
     r = client.post("/api/edit",
                     data={"prompt": "k", "size": "1024x1792", "quality": "standard",
@@ -196,7 +197,7 @@ def test_edit_adet_tavani_MODELDEN_geliyor_literal_4_ten_DEGIL(client, monkeypat
     modele bakmak: mesaj 2 diyorsa sayı gerçekten modelden geliyor. 4 ile test
     etmek, eski literal hâlâ yerinde olsa da geçerdi.
     """
-    monkeypatch.setattr(appmod, "_to_png", lambda raw: b"\x89PNG")
+    monkeypatch.setattr(gorsel, "to_png", lambda raw: b"\x89PNG")
     ikili = dataclasses.replace(catalog.IMAGE_MODELS[0], id="test-ikili", max_n=2)
     monkeypatch.setattr(catalog, "IMAGE_MODELS", catalog.IMAGE_MODELS + (ikili,))
 
@@ -237,7 +238,7 @@ def test_iki_ucun_yetenek_karari_AYRISMIYOR(client, monkeypatch, size, quality, 
     İki kopya yazılsa arayüz bir boyutu sunar, bir uçta geçer, diğerinde 422
     döner ve kullanıcı hangisinin doğru olduğunu bilemez.
     """
-    monkeypatch.setattr(appmod, "_to_png", lambda raw: b"\x89PNG")
+    monkeypatch.setattr(gorsel, "to_png", lambda raw: b"\x89PNG")
 
     json_ok = client.post("/api/generate",
                           json={"prompt": "k", "size": size, "quality": quality,

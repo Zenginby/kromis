@@ -27,6 +27,7 @@ import app as appmod
 import i18n
 import models
 import paths
+from services import dil
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 I18N_DIR = os.path.join(REPO, "bundled", "i18n")
@@ -319,7 +320,7 @@ def test_the_boot_failure_page_speaks_the_selected_language(monkeypatch):
     # ölçtüğü şeyi (çeviri) ortadan kaldırırdı — sayfa ham anahtar gösterip
     # yeşil kalabilirdi.
     monkeypatch.setattr(appmod, "STATIC_DIR", os.path.join(REPO, "yok-boyle-dizin"))
-    monkeypatch.setattr(appmod, "_dil", lambda: "en")
+    monkeypatch.setattr(dil, "aktif", lambda: "en")
     r = TestClient(appmod.app).get("/")
     assert r.status_code == 500
     assert "The interface could not be loaded" in r.text
@@ -392,9 +393,7 @@ def test_no_catalog_key_is_unused():
     olarak `.py` dosyaları da taranıyor.
     """
     py_anahtarlari = set()
-    for ad in sorted(os.listdir(REPO)):
-        if not ad.endswith(".py"):
-            continue
+    for ad in _urun_modulleri():
         with open(os.path.join(REPO, ad), encoding="utf-8") as f:
             py_anahtarlari |= set(_ANAHTAR_BICIMI.findall(f.read()))
     kullanilan = (_sablon_anahtarlari() | _betik_anahtarlari() | py_anahtarlari
@@ -411,7 +410,7 @@ def test_the_served_page_has_no_unsubstituted_translation_placeholder():
 
 
 def test_the_page_is_served_in_the_selected_language(monkeypatch):
-    monkeypatch.setattr(appmod, "_dil", lambda: "en")
+    monkeypatch.setattr(dil, "aktif", lambda: "en")
     html = TestClient(appmod.app).get("/").text
     assert '<html lang="en">' in html
     assert ">Studio<" in html and ">Stüdyo<" not in html
@@ -421,7 +420,7 @@ def test_the_dictionary_is_inlined_for_the_scripts(monkeypatch):
     """Betikler `window.KROMIS_I18N`i ÜST DÜZEYDE okuyabiliyor; bir `fetch`
     dönene kadar beklemek, sıranın başındaki i18n.js'in var olma sebebini
     ortadan kaldırırdı."""
-    monkeypatch.setattr(appmod, "_dil", lambda: "en")
+    monkeypatch.setattr(dil, "aktif", lambda: "en")
     html = TestClient(appmod.app).get("/").text
     assert 'window.KROMIS_LANG="en"' in html
     assert "window.KROMIS_I18N={" in html
@@ -653,14 +652,39 @@ def test_the_readmes_still_explain_why_the_prompt_is_english():
 # kapsamak zorunda (`test_every_shipped_module_is_classified`). Liste tek
 # başınayken yeni bir modülün öntanımlı hâli "muaf"tı ve `fal_client.py` tam
 # oradan kaçtı.
+# Ürün kodunun DİZİNLERİ: kök + Faz 0 / Adım 2'de doğan iki paket. `tools/`
+# ve `tests/` bilerek dışarıda (gerekçesi test_every_shipped_module_is_classified'da).
+# Hem sınıflandırma kapısı hem anahtar taraması bu listeyi kullanıyor: `app.py`
+# bölündüğünde `i18n.t("err.…")` çağrıları `routers/` altına taşındı ve yalnız
+# kökü tarayan bir `test_no_catalog_key_is_unused` her hata anahtarını "ölü"
+# sanırdı.
+URUN_PAKETLERI = ("routers", "services")
+
+
+def _urun_modulleri() -> list[str]:
+    """Kök ve paket altındaki ürün `.py` dosyaları, depo göreli yolla."""
+    yollar = [ad for ad in sorted(os.listdir(REPO)) if ad.endswith(".py")]
+    for paket in URUN_PAKETLERI:
+        yollar += [f"{paket}/{ad}" for ad in sorted(os.listdir(os.path.join(REPO, paket)))
+                   if ad.endswith(".py")]
+    return yollar
+
+
 KULLANICIYA_KONUSAN = (
-    "android_main.py", "app.py", "assets_store.py", "azure_client.py",
+    "android_main.py", "assets_store.py", "azure_client.py",
     "azure_flux_client.py", "azure_mai_client.py", "catalog.py",
     "chat_client.py", "chat_providers.py", "color_names.py", "composite.py",
     "credstore.py", "etiket.py", "fal_client.py", "folders.py",
     "gemini_client.py", "models.py", "netguard.py", "openai_chat.py",
     "openai_client.py", "palette.py", "prefs.py", "providers.py",
     "storage.py", "veo_client.py",
+    # Rotalar: `app.py`nin HTTPException metinleri buraya taşındı (Adım 2).
+    "routers/ayarlar.py", "routers/bindirme.py", "routers/galeri.py",
+    "routers/kok.py", "routers/paletler.py", "routers/sohbet.py",
+    "routers/uretim.py",
+    # Rota dışı ama kullanıcıya 4xx gövdesi üreten yardımcılar.
+    "services/gorsel.py", "services/kapilar.py", "services/modeller.py",
+    "services/palet.py",
 )
 
 # …ve kullanıcıya KONUŞMAYANLAR, her biri gerekçesiyle. Bu liste bir muafiyet
@@ -668,6 +692,8 @@ KULLANICIYA_KONUSAN = (
 # diyor. Listedeki bir modül kullanıcıya konuşmaya başlarsa satırı yukarıya
 # taşınmalı — ve o an bu dosyayı okuyan birinin bakacağı tek yer burası.
 KULLANICIYA_KONUSMAYAN = {
+    "app.py": "bileşim kökü (Faz 0 / Adım 2): FastAPI kurulumu, router "
+              "takma, mount — metin üreten her satır routers/ ve services/ altında",
     "backup.py": "yedek dizini adı üretimi; tek Türkçe satırı imkânsız bir "
                  "durumun `ValueError`'ı",
     "chat_prompt.py": "metin MODELE gidiyor, ekrana değil — Yönetmen "
@@ -688,6 +714,12 @@ KULLANICIYA_KONUSMAYAN = {
     "version.py": "sürüm literalleri",
     "winclr.py": ".NET köprüsünün önyükleme dökümü; konsola basılıyor",
     "winsec.py": "Windows ACL sarmalı; Türkçe satırları platform iç değişmezleri",
+    "routers/__init__.py": "yalnız paket docstring'i",
+    "services/__init__.py": "yalnız paket docstring'i",
+    "services/dil.py": "dil bağlamını KURAN ara katman; metni okumuyor, seçiyor",
+    "services/redaksiyon.py": "422 gövdesinden gizli değeri SİLİYOR; cümle üretmiyor",
+    "services/yollar.py": "veri dizini okuma kapısı; metin yok",
+    "services/zaman.py": "zaman damgası biçimi; metin yok",
 }
 
 # Türkçe kalması KARAR olan dizeler — gerekçesiyle. Muafiyet DİZE düzeyinde,
@@ -810,11 +842,14 @@ def test_every_shipped_module_is_classified():
 
     `tools/` kapsam dışı ve bilinçli: geliştirici betikleri, pakete girmiyor
     ve kullanıcıya konuşan bir yüzleri yok (telif kapısının `tests/` için
-    verdiği kararın aynısı).
+    verdiği kararın aynısı). `routers/` ve `services/` İÇERİDE (Faz 0 /
+    Adım 2): rotaların metni artık orada yaşıyor ve yalnız kökü sayan bir
+    kapı, `fal_client.py`nin kaçtığı deliği paket düzeyinde yeniden açardı.
     """
     izlenen = subprocess.run(["git", "-C", REPO, "ls-files", "*.py"],
                              check=True, capture_output=True, text=True).stdout
-    kok = {y for y in izlenen.split() if "/" not in y}
+    kok = {y for y in izlenen.split()
+           if "/" not in y or y.startswith(tuple(f"{p}/" for p in URUN_PAKETLERI))}
     # Bekçinin bekçisi: kalıp bir gün hiçbir şey döndürmezse iki liste de
     # "eksiksiz" görünürdü (test_telif_basligi.py'deki aynı duruş).
     assert len(kok) > 30, f"kapsam şüpheli biçimde küçük: {len(kok)}"

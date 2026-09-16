@@ -1,8 +1,22 @@
 # Yayın hattı
 
-**Kısa cevap: yayın almak için hiçbir şey yapmıyorsun.** `main`'e bir PR
-birleştir; sürüm artar, üç paket de derlenir ve hepsi yeşilse yayın kendiliğinden
-çıkar. Bu belge o hattın nasıl kurulduğunu ve nerede durabileceğini anlatıyor.
+> **2026-09-16 — PAKETLEME ELLE'YE ALINDI (Faz 0 / Adım 1).** Masaüstü ve
+> Android paketleri v0.23.1'de donduruldu; proje web-first ilerliyor
+> ([docs/faz0-web-first.md](faz0-web-first.md)). `release.yml`in `push: main`
+> tetiği kaldırıldı, tek tetik `workflow_dispatch`; `ci.yml`deki `kapsam`
+> kapısı ve üç paket işi silindi. Aşağıdaki anlatım hattın **kurulduğu günü**
+> kaydediyor ve hat elle tetiklendiğinde hâlâ birebir böyle çalışıyor — iç
+> yapısına dokunulmadı, `tests/test_release_manifest.py` onu aynı sertlikte
+> mandallıyor. Yeni değişmezin bekçisi `tests/test_paketleme_dondurma.py`:
+> push/PR ile tetiklenen hiçbir workflow paket derletemez. "PR'da ne koşuyor"
+> tablosunun bugünkü cevabı: pytest + sızıntı taraması + lint, her PR'da; paket
+> yok.
+
+**Kısa cevap (2026-09-16 öncesi): yayın almak için hiçbir şey yapmıyordun.**
+`main`'e bir PR birleştir; sürüm artar, üç paket de derlenir ve hepsi yeşilse
+yayın kendiliğinden çıkar. Bugün aynı hat Actions → *Yayın* → *Run workflow*
+ile elle çalıştırılıyor. Bu belge o hattın nasıl kurulduğunu ve nerede
+durabileceğini anlatıyor.
 
 ## Neden böyle kuruldu
 

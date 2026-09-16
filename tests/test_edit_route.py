@@ -1,9 +1,10 @@
 import io
+
 from fastapi.testclient import TestClient
 from PIL import Image
-import azure_client as ac
-import storage
+
 import app as appmod
+import azure_client as ac
 
 
 def _png_bytes(color=(255, 0, 0)):

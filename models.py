@@ -21,13 +21,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from pydantic import (BaseModel, ConfigDict, Field, field_validator,
-                      model_validator)
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-import azure_client as ac
 import catalog
-import i18n
 import etiket
+import i18n
 import palette
 
 MAX_PROMPT_CHARS = 4000    # kullanıcı prompt'u + palet eki
@@ -697,7 +695,7 @@ MAX_CHAT_RESULTS = 24
 MAX_CHAT_ITEMS = MAX_CHAT_MESSAGES + MAX_CHAT_RESULTS
 
 
-def _check_chat_total(messages: list["ChatMessage"], limit: int) -> list["ChatMessage"]:
+def _check_chat_total(messages: list[ChatMessage], limit: int) -> list[ChatMessage]:
     """Toplam karakter kapısı. Sınır ROTAYA GÖRE değişiyor (bkz. sabitler).
 
     Rol kuralı da paylaşılmıyor: tamamlamada son mesaj kullanıcıdan olmak ZORUNDA,
@@ -723,7 +721,7 @@ def _check_chat_total(messages: list["ChatMessage"], limit: int) -> list["ChatMe
     return messages
 
 
-def _check_chat_counts(messages: list["ChatMessage"]) -> list["ChatMessage"]:
+def _check_chat_counts(messages: list[ChatMessage]) -> list[ChatMessage]:
     """Konuşma turu sayısı kapısı — Türkçe, çünkü kullanıcıya görünüyor.
 
     Alan düzeyindeki `max_length` artık TOPLAM öğe sayısını (`MAX_CHAT_ITEMS`)
@@ -883,7 +881,7 @@ RESULT_NOTE_PREFIX = "[üretim]"
 MAX_RESULT_NOTE_CHARS = 240
 
 
-def result_note(m: "ChatMessage") -> str:
+def result_note(m: ChatMessage) -> str:
     """Bir sonuç kaydının tel karşılığı: "[üretim] 1 video üretildi · … · 8 sn".
 
     Yönetmen v2.0'dan beri ne YAZDIĞINI biliyordu ama ne ÜRETİLDİĞİNİ
@@ -926,7 +924,7 @@ def result_note(m: "ChatMessage") -> str:
     return (RESULT_NOTE_PREFIX + " " + " · ".join(parcalar))[:MAX_RESULT_NOTE_CHARS]
 
 
-def wire_messages(messages: list["ChatMessage"]) -> list[dict]:
+def wire_messages(messages: list[ChatMessage]) -> list[dict]:
     """Döküm → telin göreceği mesajlar. SÜZGEÇ DEĞİL, ÇEVİRMEN.
 
     Öncesinde rota bir liste kavrayışıyla `result` kayıtlarını DÜŞÜRÜYORDU;

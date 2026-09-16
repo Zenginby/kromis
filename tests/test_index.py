@@ -3,6 +3,7 @@ import re
 import subprocess
 
 from fastapi.testclient import TestClient
+
 import app as appmod
 import models
 import version

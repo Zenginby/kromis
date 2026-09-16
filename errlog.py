@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import datetime as _dt
 import os
-
 import re
 
 LOG_FILENAME = "hata.log"

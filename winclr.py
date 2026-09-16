@@ -55,8 +55,8 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 # NTFS'te bir dosyaya iliştirilen adlandırılmış akış, yolun sonuna ":ad"
 # eklenerek adresleniyor. `Unblock-File`'ın yaptığı şey de tam olarak bu

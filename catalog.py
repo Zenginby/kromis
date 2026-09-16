@@ -28,17 +28,20 @@ değeri (o dosyanın 50 satırlık yorumu bunu ÖLÇÜLMÜŞ bir değişmez say�
 korunuyor → Chaquopy de etkilenmiyor. `frozen=True`, deponun bugün modül
 düzeyindeki demetlerden aldığı değişmezlik garantisinin aynısını veriyor.
 
-DOSYA KÖKTE ve DÜZ olmak ZORUNDA — bir `providers/` alt paketi olamaz.
-`android/app/build.gradle` Chaquopy kaynak kümesini `include "*.py"` ile
-kuruyor, yani APK'ya YALNIZ kök düzeyindeki .py dosyaları giriyor. Bir alt
-paket masaüstünde çalışır, telefonda `ModuleNotFoundError` verir — ve o
-gradle satırının yorumu "yeni bir dizin eklendiğinde kimsenin bir şeyi
-hatırlaması gerekmiyor" derken tam olarak bunu kastediyor. Mandal:
-tests/test_android_packaging.py.
+DÜZ-MODÜL KISITI KALKTI (2026-09-16, Faz 0 / Adım 1). Bu dosya bir zamanlar
+"KÖKTE ve DÜZ olmak ZORUNDA" diyordu: `android/app/build.gradle` Chaquopy
+kaynak kümesini `include "*.py"` ile kuruyor, yani APK'ya YALNIZ kök
+düzeyindeki .py dosyaları giriyor ve bir `providers/` alt paketi masaüstünde
+çalışıp telefonda `ModuleNotFoundError` verirdi; `tests/test_android_packaging.py`
+bunu mandallıyordu. Masaüstü ve Android paketleri v0.23.1'de DONDURULDU
+(paketleme yalnız elle, bkz. docs/faz0-web-first.md) ve o mandal silindi:
+kod artık `routers/`, `services/` gibi paketlere taşınabilir. Katalog bugün
+hâlâ kökte düz bir dosya — alışkanlıktan değil, henüz taşınmadığı için.
+Android bir gün geri gelirse ince bir WebView kabuğu olarak gelir, Python
+çalışma zamanını taşımaz; kısıt o hâliyle de geri gelmez.
 """
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 
 

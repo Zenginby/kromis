@@ -42,6 +42,18 @@ is no server in between.
 Every link always points at the **latest release**, so the address does not change
 when the version does.
 
+> [!IMPORTANT]
+> **The desktop and Android builds are frozen at v0.23.1 (2026-09-16).**
+> The packages above stay downloadable and keep working: they are BYOK (your own
+> keys), they never talk to a Kromis server, so no server shutdown can break
+> them. But no further desktop or Android release will be cut automatically; the
+> project is moving **web-first** — a studio that runs in the browser, with
+> accounts and credits. Roadmap:
+> [docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md](docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md)
+> (Turkish); the first steps: [docs/faz0-web-first.md](docs/faz0-web-first.md)
+> (Turkish). If desktop/Android come back one day, they come back as thin
+> shells around the web app.
+
 > [!TIP]
 > The Android build is not on Play Store; the APK is sideloaded — and the phone
 > runs the FULL app: generation, editing, palettes and overlays all execute in the
@@ -172,9 +184,11 @@ python3 -m pytest tests/ -q   # full suite
 ./build.sh                    # PyInstaller output into dist/
 ```
 
-Releases need no manual step: merge a PR into `main`, the version is bumped, all
-three packages are built, and the release is cut only if every one of them is
-green. Details: [docs/yayin-hatti.md](docs/yayin-hatti.md) (Turkish).
+Packaging has been **manual since 2026-09-16**: merging into `main` no longer
+bumps the version or builds packages. When needed, Actions → *Yayın* → *Run
+workflow* runs the old pipeline unchanged (three packages, one release). Details:
+[docs/yayin-hatti.md](docs/yayin-hatti.md) (Turkish). Gates that run on every PR:
+pytest (E2E included), the leak scan, `ruff check`, `mypy` (informational for now).
 
 ---
 

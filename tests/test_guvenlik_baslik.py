@@ -25,7 +25,6 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 import app as appmod
-import azure_client as ac
 import folders
 from models import FolderRequest
 

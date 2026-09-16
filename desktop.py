@@ -46,7 +46,7 @@ import threading
 import time
 import traceback
 import webbrowser
-from typing import Callable
+from collections.abc import Callable
 
 import uvicorn
 from starlette.types import ASGIApp

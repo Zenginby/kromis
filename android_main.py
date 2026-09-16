@@ -110,7 +110,7 @@ class SessionCookieGuard:
         await send({"type": "http.response.body",
                     "body": ("Bu sunucuya yalnızca uygulama erişebilir. / "
                              "Only this app can reach this server."
-                             ).encode("utf-8")})
+                             ).encode()})
 
 
 def new_session_token() -> str:

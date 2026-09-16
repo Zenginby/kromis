@@ -10,6 +10,10 @@
 # sürümü version.py ile aynı mı, artifact adımı boş bir yükleme yaptı mı.
 #
 # Bu iş yayına DOKUNMAZ, yalnızca varlık yükler (bkz. release.yml → yayinla).
+#
+# DONDURULDU (2026-09-16, Faz 0 / Adım 1): bu paket v0.23.1'de dondu. Workflow
+# silinmedi ama artık hiçbir push/PR onu çağırmıyor — tek çağıran `release.yml`
+# ve o da yalnız `workflow_dispatch`. Gerekçe: docs/faz0-web-first.md.
 name: Windows paketi
 
 on:

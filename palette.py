@@ -17,10 +17,11 @@ token'larıyla yazılmış; aynı uzayda kalmak tutarlı.
 """
 from __future__ import annotations
 
-import i18n
 import math
 import re
 from collections.abc import Mapping, Sequence
+
+import i18n
 
 COLORS_PER_PALETTE = 5
 

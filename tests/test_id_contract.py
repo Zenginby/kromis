@@ -22,8 +22,8 @@ Depo geleneği: servis edilen artefakt doğrulanır (dosya değil), bu yüzden
 """
 
 import pathlib
-import subprocess
 import re
+import subprocess
 
 from fastapi.testclient import TestClient
 

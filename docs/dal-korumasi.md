@@ -94,10 +94,11 @@ Sıra ÖNEMLİ — önce bota yol açılır, sonra kural eklenir:
    * `Testler / Pytest takımı`
    * `Sızıntı taraması`
 
-   Üç paket işi (`macOS paketi / …`, `Windows paketi / …`, `Android paketi / …`)
-   zorunlu YAPILMAZ: `ci.yml`'de koşullular
-   (`if: needs.kapsam.outputs.paketle == 'evet'`) ve koşmayan bir kontrol PR'ı
-   süresiz "bekliyor"da bırakabilir.
+   Paket işleri zorunlu YAPILMAZ — 2026-09-16'dan beri `ci.yml`'de paket işi
+   zaten yok (paketleme elle, bkz. [yayin-hatti.md](yayin-hatti.md)); daha
+   önce de koşulluydular ve koşmayan bir kontrol PR'ı süresiz "bekliyor"da
+   bırakabilirdi. `Lint` işi eklenebilir; mypy adımı `continue-on-error`
+   olduğu için işin kendisi yeşil kalır.
 4. **"Require branches to be up to date" açılmaz:** her main commit'inde
    yeniden koşu demek, karşılığı yok — `release.yml` zaten paketlemeden önce
    tam takımı bir kez daha koşuyor.

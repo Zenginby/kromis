@@ -427,7 +427,7 @@ def _gecmis(son: str | None) -> tuple[list[str], list[str], list[str]]:
 
 def main() -> int:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    import version   # noqa: E402  (yol yukarıda kuruluyor)
+    import version  # noqa: E402  (yol yukarıda kuruluyor)
 
     taglar = _git("tag", "--list", "v*").splitlines()
     son = en_yeni_tag(taglar)

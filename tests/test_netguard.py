@@ -24,7 +24,6 @@ import uvicorn
 
 import netguard
 
-
 # ── Konak adı ayrıştırma ────────────────────────────────────────────
 
 @pytest.mark.parametrize("basligi,beklenen", [

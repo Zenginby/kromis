@@ -35,3 +35,11 @@ PyYAML>=6.0
 # İYİLEŞTİRME değil, o günkü gerçeğin KAYDI — iyileştirmenin kanıtı açılış
 # denetiminin yeşile dönmesi olacak.
 pyinstaller-hooks-contrib==2026.7
+
+# Lint ve tip denetimi — `pyproject.toml`daki `[tool.ruff]` / `[tool.mypy]`
+# ile birlikte okunur; CI'daki `lint` işi (ci.yml) ikisini de bu pinlerle
+# kuruyor. Yama hanesi deponun geleneğiyle serbest. ruff 0.x sürümlemesinde
+# MINOR kırıcı olabiliyor, o yüzden `0.16.*` bilinçli bir pencere: yeni bir
+# kural ancak pin ilerletildiğinde, yani diff'te GÖRÜNÜR bir kararla gelir.
+ruff==0.16.*
+mypy==2.3.*

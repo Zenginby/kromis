@@ -29,6 +29,18 @@ sunucu yok.
 
 Bağlantılar her zaman **en son yayına** gider; sürüm yükselince adres değişmez.
 
+> [!IMPORTANT]
+> **Masaüstü ve Android paketleri v0.23.1'de donduruldu (2026-09-16).**
+> Yukarıdaki paketler indirilebilir kalıyor ve çalışmaya devam ediyor: hepsi
+> BYOK'tur (kendi anahtarın), hiçbir Kromis sunucusuna bağlanmaz, yani bir
+> sunucunun kapanmasıyla bozulmaz. Ama bundan sonra otomatik yeni masaüstü ya
+> da Android sürümü ÇIKMAYACAK; proje **web-first** ilerliyor — tarayıcıda
+> çalışan, hesaplı ve kredili bir stüdyo. Yol haritası:
+> [docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md](docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md),
+> ilk adımların listesi: [docs/faz0-web-first.md](docs/faz0-web-first.md).
+> Masaüstü/Android bir gün geri gelirse web uygulamasını gösteren ince bir
+> kabuk olarak gelir.
+
 > [!TIP]
 > Android sürümü Play Store'da değil, APK doğrudan kurulur — ve telefonda TAM
 > çalışır: üretim, düzenleme, palet ve bindirme cihazdaki Python çalışma
@@ -177,9 +189,11 @@ python3 -m pytest tests/ -q
 ./build.sh          # PyInstaller çıktısı dist/ altına
 ```
 
-Yayın için elle yapılacak bir şey yok: `main`'e bir PR birleşince sürüm artar,
-üç paket birden derlenir ve hepsi yeşilse yayın tek seferde oluşur. Ayrıntı:
-[docs/yayin-hatti.md](docs/yayin-hatti.md).
+Paketleme 2026-09-16'dan beri **elle**: `main`'e merge artık sürüm artırmaz ve
+paket derlemez. Gerekirse Actions → *Yayın* → *Run workflow* hattı eskisi gibi
+çalıştırır (üç paket, tek yayın). Ayrıntı: [docs/yayin-hatti.md](docs/yayin-hatti.md).
+Her PR'da koşan kapılar: pytest (E2E dâhil), sızıntı taraması, `ruff check`,
+`mypy` (şimdilik bilgi amaçlı).
 
 ---
 

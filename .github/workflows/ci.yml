@@ -1,24 +1,27 @@
-# Her pull request'te testleri, paketlemeye dokunan PR'larda ÜÇ PAKETİ DE koşturur.
+# Her pull request'te ve main'e her push'ta testleri, sızıntı taramasını ve
+# lint'i koşturur.
 #
-# NEDEN VAR: bu depodaki paketleme işleri eskiden yalnız tag'e ya da elle
-# tetiklemeye bağlıydı. Bir PR'ın içeriği TAG ATILANA kadar hiçbir kapıdan
-# geçmiyordu ve tag atıldığı an ilk gerçek koşu doğrudan yayın yolunda oluyordu.
+# PAKETLEME BURADAN ÇIKTI (2026-09-16, Faz 0 / Adım 1 — web-first zemin).
+# 2026-08-28'den bu güne kadar `kapsam` işi PR'ın değiştirdiği yollara bakıp
+# `.spec`/`build.*`/`android/`/`requirements*`/workflow dokunan PR'larda üç
+# paketi (macOS, Windows, Android) de derletiyordu. Masaüstü ve Android
+# paketleri v0.23.1'de DONDURULDU: proje web-first ilerliyor
+# (docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md,
+# docs/faz0-web-first.md). Web tarafındaki her bağımlılık ve her workflow
+# değişikliği o kapıyı ateşleyecek ve her ateşleme ~40 dakika + macOS'ta 10x
+# faturalanan dakika demekti — üstelik dondurulmuş bir paket için.
 #
-# NEDEN ARTIK PAKETLER DE KOŞUYOR (ve neden yalnız bazı PR'larda):
-# `.spec`, `build.sh`, `build.ps1` ya da `android/` altına dokunan bir
-# değişikliğin kırdığı şey testlerde HİÇ görünmüyor — yalnız paketleme
-# aşamasında, dakikalarca süren bir işin sonunda görünüyor. Yayın artık main'e
-# merge ile tetiklendiği için o kırılmayı merge'den SONRA öğrenmek geç kalmak
-# demek. Yine de her PR'da koşmuyor: ilgisiz bir PR'ı 40 dakika bekletmenin
-# kimseye faydası yok.
+# Paketleme SİLİNMEDİ, ELLE'ye alındı: `_paket-*.yml` çağrılabilir
+# workflow'lar yerinde duruyor ve tek çağıranları artık `release.yml`
+# (yalnız `workflow_dispatch`). "Paketleme hâlâ ayakta mı" sorusunun cevabı
+# Actions → Yayın → Run workflow → `kuru_prova: true`. Bu değişmezi
+# `tests/test_paketleme_dondurma.py` mandallıyor: push/PR ile tetiklenen
+# hiçbir workflow bir paket workflow'unu çağıramaz.
 #
-# KAPSAMIN BEDELİ VAR, ÇÜNKÜ DEPO PRIVATE. Buradaki gerekçe bir zamanlar "depo
-# public olduğundan GitHub-hosted runner dakikaları faturalanmıyor, o yüzden
-# eski 'macOS dakikası 10x' gerekçesi artık geçerli değil" diyordu. 2026-08-28'de
-# ölçüldü: REST `visibility: private` döndürüyor — yani o cümle YANLIŞTI ve
-# workflow'ların kendi eski gerekçesi geri gelmişti; kapının her ateşlemesi üç
-# paket demek ve macOS dakikası 10x sayılıyor. Aşağıdaki yol listesi bu yüzden
-# bir maliyet kararı; hangi yolun neden listede olduğu orada tek tek yazılı.
+# Eski `kapsam` kapısının gerekçesi ve kusur geçmişi (v0.9.1 sığ çekim, taban
+# SHA kayması, 2026-08-28 daraltma) git geçmişinde (`tests/test_ci_paketleme_
+# kapisi.py`, bu commit'ten önce) ve docs/yayin-hatti.md'de duruyor;
+# paketleme otomatiğe geri dönerse önce oraya bakılmalı.
 name: CI
 
 on:
@@ -87,151 +90,43 @@ jobs:
           # .gitleaks.toml'da tek tek yazılı; dizin bütün olarak muaf değil.
           ./gitleaks git --no-banner --redact --config .gitleaks.toml .
 
-  # PR paketlemeye dokunuyor mu? Cevabı tek yerde üretip üç işe dağıtıyoruz.
-  kapsam:
-    name: Paketleme kapsamı
-    if: github.event_name == 'pull_request'
+  # Lint + tip denetimi — Faz 0'ın ilk kapısı.
+  #
+  # NEDEN ŞİMDİ: `app.py` paketlere bölünecek, bağımlılıklar taşınacak ve çok
+  # sayıda yeni modül gelecek; kullanılmayan ithal, tanımsız ad ve bozuk
+  # `except` zinciri o hacimde gözle yakalanmaz. Kural kümesi ve her kapatılan
+  # kuralın gerekçesi `pyproject.toml`da; pinler `requirements-dev.txt`te.
+  #
+  # `ruff format --check` BİLEREK YOK: ölçüldü, 141 dosyanın 12'si
+  # biçimlendiriciyle aynı fikirde. Biçimlendirme ayrı bir PR'ın kararı.
+  #
+  # mypy `continue-on-error: true`: bugün yüzlerce bulgu var ve hiçbiri bu
+  # PR'ın konusu değil. Sayı görünür olsun ama PR'ı kesmesin; taban temizlenip
+  # kural sıkılaştırıldığında bu satır kalkar (docs/faz0-web-first.md → 6).
+  #
+  # `requirements.txt` de kuruluyor: mypy üçüncü parti tipleri görmeden
+  # `ignore_missing_imports` her şeyi `Any` sayar ve sayı yanıltıcı düşer.
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      paketle: ${{ steps.bak.outputs.paketle }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
         with:
-          fetch-depth: 0
+          python-version: '3.14'
+          cache: pip
 
-      - name: Değişen yollara bak
-        id: bak
-        env:
-          ETIKETLER: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+      - name: Bağımlılıklar
         run: |
-          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
-          # Elle kaçış kapısı: paketlemeye dokunmayan ama yine de tam matris
-          # istenen PR'lar için.
-          if printf '%s' "$ETIKETLER" | grep -q 'tam-paket'; then
-            echo "tam-paket etiketi var — üç paket de koşacak"
-            echo "paketle=evet" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+      - name: ruff
+        run: ruff check .
 
-          # TABAN, MERGE COMMIT'İN KENDİ EBEVEYNLERİNDEN okunuyor. `pull_request`
-          # olayında checkout `refs/pull/N/merge`i alıyor, yani HEAD bir merge
-          # commit: `HEAD^1` tabanın tepesi, `HEAD^2` PR'ın başı. `A...B` üçlü
-          # nokta ortak atadan B'ye olan diff'i verdiği için `HEAD^1...HEAD^2`
-          # TAM OLARAK bu PR'ın değiştirdiği yollar — ne eksik ne fazla. Olay
-          # verisine, dal adına ve ek bir fetch'e ihtiyaç yok; iki commit de
-          # `fetch-depth: 0` sayesinde yerelde.
-          #
-          # Buradaki iki KUSUR sırayla yaşandı, ikisi de bu satırın gerekçesi:
-          #
-          #  1. v0.9.1'de (PR#50) taban dal ADINDAN okunuyordu ve öncesinde
-          #     sığ çekiliyordu:
-          #         git fetch --no-tags --depth=1 origin "$TABAN"
-          #         YOLLAR="$(git diff --name-only "origin/$TABAN...HEAD")"
-          #     Sığ çekim `.git/shallow` graftını yazıp dalı TEK commit'e
-          #     kırpıyor. PR'ı CI koşarken merge edersen dalın tepesi PR'ın
-          #     tabanının ötesine geçiyor (CI 19:26:25'te tetiklendi, merge
-          #     19:26:32'de main'e düştü) ve o tek commit'in ataları yerelde
-          #     olmadığı için ortak ata bulunamıyor:
-          #         fatal: origin/main...HEAD: no merge base   → exit 128
-          #     Bedeli iki katmanlı: kapı kırılınca `paketle` çıktısı BOŞ
-          #     kalıyor, yani üç paketleme işi de ATLANIYOR — `static/`
-          #     değişmiş bir PR paketleme kapısından hiç geçmemiş oluyor.
-          #
-          #  2. Düzeltmesi `${{ github.event.pull_request.base.sha }}` idi ve
-          #     kırılmayı bitirdi ama kapsamı fazla açtı: o SHA olayın
-          #     çekildiği andaki taban, HEAD ise merge ref'i her yeniden
-          #     hesaplandığında GÜNCEL tabanı içeriyor. Bir süre senkronlanmayan
-          #     PR'da ikisi ayrışıyor ve diff'e araya giren main commit'leri de
-          #     giriyordu — kapı "bu PR ne değiştirdi" sorusuna artık doğru
-          #     cevap vermiyordu (sonuç güvenli tarafa düşüyordu, o yüzden
-          #     sessiz). Merge commit'in ebeveynleri yarışmıyor: `HEAD^2` PR'ın
-          #     başı, `HEAD^1` de o merge'ün gördüğü taban.
-          #
-          # `if !` ile sarılı olması da bilinçli: HEAD bir merge commit değilse
-          # (`HEAD^2` yok — ör. checkout'a elle bir `ref:` verilirse) ya da diff
-          # başka bir sebeple kurulamazsa kapı KIRILMAK yerine güvenli tarafa
-          # düşüyor. Aşağıdaki yol listesinin geniş tutulmasıyla aynı tercih —
-          # gereksiz bir paketleme koşusunun bedeli bedava runner dakikası,
-          # atlamanın bedeli kırık bir yayın.
-          if ! YOLLAR="$(git diff --name-only HEAD^1...HEAD^2)"; then
-            echo "diff kurulamadı (HEAD^1...HEAD^2) — güvenli tarafa düşülüyor"
-            echo "paketle=evet" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "--- değişen yollar ---"
-          echo "$YOLLAR"
-
-          # Paketlemenin sonucunu değiştirebilecek her şey. Liste hâlâ GENİŞ
-          # tarafta: gereksiz bir koşunun bedeli dakika, atlamanın bedeli kırık
-          # bir yayın.
-          #
-          # `static/` ve `bundled/` 2026-08-28'de LİSTEDEN ÇIKARILDI ve sebebi
-          # ölçüldü, tahmin edilmedi: ikisi de pakete DİZİN BÜTÜN olarak giriyor
-          # (`kromis.spec` → datas=[('static','static'),('bundled','bundled')],
-          # `android/app/build.gradle` → into("resources/static"){from("../../static")}).
-          # Yani bu iki dizindeki bir İÇERİK değişikliği paketlemeyi kıramaz.
-          # Kırabilen tek sınıf, paket doğrulamalarının ADA GÖRE aradığı bir
-          # dosyanın silinmesi ya da yeniden adlandırılmasıydı.
-          #
-          # O güvence KAYBOLMADI, UCUZLADI: `tests/test_paket_icerik_listesi.py`
-          # aynı listeleri üç workflow'dan ayrıştırıp dosyaların depoda gerçekten
-          # durduğunu ölçüyor. Kapsam da GENİŞLEDİ — eski kapı yalnız `static/`
-          # değişen PR'larda ateşleniyordu, test her PR'da ve saniyenin altında
-          # koşuyor.
-          #
-          # `branding/` bilerek KALIYOR: onun içeriği dizin olarak değil ADA GÖRE
-          # okunuyor (spec `branding/kromis.ico`i, build.sh `branding/kromis.iconset`ten
-          # `.icns`i üretiyor), yani oradaki bir yeniden adlandırma gerçekten
-          # paketleme aşamasında patlar.
-          #
-          # `requirements-dev.txt` 2026-09-04'te EKLENDİ ve sebebi ölçüldü: o
-          # dosya `pyinstaller` ve `pyinstaller-hooks-contrib`i tutuyor, yani
-          # `Python.Runtime.dll`i ve WebView2 DLL'lerini pakete KOYAN hook'ları.
-          # Listede olmadığı sürece Windows paketinin içeriğini değiştiren bir PR
-          # hiçbir paket derletmeden geçiyordu — tam olarak bu kapının var olma
-          # sebebi olan sınıf.
-          #
-          # `static/`e dokunan bir PR'da yine de tam matris istenirse yol yukarıdaki
-          # `tam-paket` etiketi; kararın kendisi `tests/test_ci_paketleme_kapisi.py`de
-          # sentetik diff'lerle koşturuluyor.
-          if echo "$YOLLAR" | grep -qE '^(kromis\.spec|build\.sh|build\.ps1|requirements(-dev)?\.txt|android/|\.github/workflows/|branding/)'; then
-            KARAR=evet
-          else
-            KARAR=hayir
-          fi
-          echo "paketle=$KARAR" >> "$GITHUB_OUTPUT"
-          echo "karar: paketle=$KARAR"
-
-  # Üç paket de yayın yolundakiyle AYNI çağrılabilir workflow'u kullanıyor —
-  # yani PR'da yeşil olan şey, yayında koşacak şeyin ta kendisi. Ayrı bir
-  # "PR sürümü" olsaydı ikisi ayrışır ve bu kapı hiçbir şey kanıtlamazdı.
-  #
-  # `taslak` girdisi VERİLMİYOR (varsayılan boş): PR koşusu paketi derleyip
-  # doğruluyor ama hiçbir yere teslim etmiyor. Kapının sorusu zaten "paketleme
-  # ayakta mı"; teslim, yayın yolunun işi. Yan fayda ölçülü: 2026-08-28'de
-  # Actions varlık kotasını dolduran birikimin büyük kısmı PR koşularının
-  # kimsenin okumadığı paketleriydi. Bu satırın yokluğu sayesinde PR'lar artık
-  # o havuza hiç dokunmuyor.
-  paket-macos:
-    name: macOS paketi
-    needs: [test, kapsam]
-    if: needs.kapsam.outputs.paketle == 'evet'
-    uses: ./.github/workflows/_paket-macos.yml
-
-  paket-windows:
-    name: Windows paketi
-    needs: [test, kapsam]
-    if: needs.kapsam.outputs.paketle == 'evet'
-    uses: ./.github/workflows/_paket-windows.yml
-
-  paket-android:
-    name: Android paketi
-    needs: [test, kapsam]
-    if: needs.kapsam.outputs.paketle == 'evet'
-    uses: ./.github/workflows/_paket-android.yml
-    # `imza_zorunlu` VERİLMİYOR (varsayılan false): imzalama sırlarına erişimi
-    # olmayan bir çatalın PR'ı da bu kapıdan geçebilmeli. İmza zorunluluğu
-    # yayın yolunda, release.yml'de duruyor.
-    secrets: inherit
+      - name: mypy (şimdilik PR'ı kesmiyor)
+        continue-on-error: true
+        run: mypy .

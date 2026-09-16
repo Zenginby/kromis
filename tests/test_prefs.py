@@ -159,7 +159,7 @@ def test_theme_preference_persistence(tmp_path):
 
 
 def test_theme_validation_in_models():
-    from models import PrefsRequest, ALLOWED_THEMES
+    from models import ALLOWED_THEMES, PrefsRequest
     assert "ocean" in ALLOWED_THEMES
     req = PrefsRequest(theme="ocean")
     assert req.theme == "ocean"

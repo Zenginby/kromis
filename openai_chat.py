@@ -51,8 +51,8 @@ import catalog
 import chat_client as cc
 import chat_prompt
 import credstore
-import i18n
 import etiket
+import i18n
 import providers
 
 # Zaman aşımı ve ağ-hatası metni `chat_client` ile PAYLAŞILIYOR
@@ -149,7 +149,7 @@ def complete(m: catalog.ChatModel, messages: list[dict], *, client=None,
     headers = {"Authorization": f"Bearer {key}",
                "Content-Type": "application/json"}
 
-    import httpx   # bkz. chat_client.complete(): hata türleri için de gerekli
+    import httpx  # bkz. chat_client.complete(): hata türleri için de gerekli
     owns_client = client is None
     if owns_client:
         client = httpx.Client()

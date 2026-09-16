@@ -17,12 +17,43 @@ def test_dev_mode_paths_match_the_repo_layout():
     assert paths.static_dir() == os.path.join(paths.REPO_DIR, "static")
 
 
-def test_dev_mode_matches_app_module_constants():
-    """app.py'nin sabitleri paths.py ile aynı yerleri göstermeli."""
+def test_dev_mode_matches_the_app_settings_object():
+    """`app.state.ayarlar` (Faz 0 / Adım 4) paths.py ile aynı yerleri göstermeli."""
     import app as appmod
-    assert appmod.OUTPUT_DIR == paths.output_dir()
-    assert appmod.STATIC_DIR == paths.static_dir()
-    assert appmod.ASSETS_DIR == paths.assets_dir()
+    from services import ayar
+    assert appmod.app.state.ayarlar == ayar.Ayarlar.varsayilan()
+    assert appmod.app.state.ayarlar.data_dir == paths.data_dir()
+    assert appmod.app.state.ayarlar.output_dir == paths.output_dir()
+    assert appmod.app.state.ayarlar.static_dir == paths.static_dir()
+    assert appmod.app.state.ayarlar.assets_dir == paths.assets_dir()
+
+
+def test_kromis_data_dir_env_moves_the_writable_root_and_only_that(monkeypatch, tmp_path):
+    """`KROMIS_DATA_DIR=/veri` (web/konteyner, 4. görevin çıkış ölçütü).
+
+    Yazılabilir kök oraya iner, salt-okunur kaynak (`static/`) YERİNDE kalır:
+    konteynerde bind-mount edilen dizin veri dizinidir, paket içeriği değil.
+    Değişken frozen dalını da yener — açık işletmen kararı otomatik tahmini
+    ezmeli; tersi bir konteyner imajının sessizce imajın içine yazması olurdu.
+    """
+    from services import ayar
+    veri = str(tmp_path / "veri")
+    monkeypatch.setenv(paths.DATA_DIR_ENV, veri)
+    assert paths.data_dir() == veri
+    assert paths.output_dir() == os.path.join(veri, "output")
+    assert paths.assets_dir() == os.path.join(veri, "assets")
+    assert paths.static_dir() == os.path.join(paths.REPO_DIR, "static")
+    ayarlar = ayar.Ayarlar.varsayilan()
+    assert (ayarlar.data_dir, ayarlar.output_dir) == (veri, os.path.join(veri, "output"))
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    assert paths.data_dir() == veri
+
+
+def test_an_empty_kromis_data_dir_is_ignored(monkeypatch):
+    """Boş dize "ayarlanmadı" demek — `KROMIS_DATA_DIR=` yazan bir compose dosyası
+    kökü "" yapıp göreli yollara düşürmesin."""
+    monkeypatch.setenv(paths.DATA_DIR_ENV, "")
+    assert paths.data_dir() == paths.REPO_DIR
 
 
 def test_frozen_mode_writes_under_application_support(monkeypatch):

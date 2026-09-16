@@ -34,17 +34,7 @@ import providers
 import version
 from models import MAX_PROMPT_CHARS, GenerateRequest
 from routers import ayarlar, bindirme, galeri, kok, paletler, sohbet, uretim
-from services import dil, gorsel, modeller, palet, redaksiyon, zaman
-
-# Dizinler BURADA tanımlı ve router'lar onları `services.yollar` üzerinden
-# İSTEK ANINDA okuyor — çünkü testler bu üç adı 66 yerde bu modülde yamalıyor
-# (`monkeypatch.setattr(appmod, "OUTPUT_DIR", tmp_path)`). Gerekçenin tamamı
-# services/yollar.py'nin başında; Faz 0'ın 4. görevi bunları bir ayar
-# nesnesine taşıyacak.
-BASE_DIR = paths.REPO_DIR                    # geriye uyum: mevcut kullanımlar bozulmasın
-OUTPUT_DIR = paths.output_dir()
-STATIC_DIR = paths.static_dir()
-ASSETS_DIR = paths.assets_dir()
+from services import ayar, dil, gorsel, modeller, palet, redaksiyon, zaman
 
 
 @asynccontextmanager
@@ -76,24 +66,40 @@ async def _lifespan(app: FastAPI):
 
     `backup` MODÜL NİTELİĞİ üzerinden çağrılıyor (`from backup import …` değil):
     tests/conftest.py'nin gerçek-yedek koruması o niteliği yamalıyor.
+
+    Dizinler `app.state.ayarlar`dan (Faz 0 / Adım 4), `paths`ten DEĞİL:
+    testler o nesneyi geçici dizine yönlendiriyor ve açılışın açtığı/yedeklediği
+    yer de o olmalı — yoksa `with TestClient(app)` yine geliştiricinin gerçek
+    veri dizinine dokunurdu (2. görevin ölçtüğü sızıntı sınıfı).
     """
+    ayarlar: ayar.Ayarlar = app.state.ayarlar
     now = zaman.simdi()
     try:
-        paths.ensure_data_dirs()
+        paths.ensure_data_dirs(ayarlar.output_dir, ayarlar.assets_dir)
         backup.backup_manifests_if_version_changed(
-            paths.data_dir(), OUTPUT_DIR, ASSETS_DIR,
+            ayarlar.data_dir, ayarlar.output_dir, ayarlar.assets_dir,
             version=version.APP_VERSION, now=now)
         # Ölü `uploads` türünün göçü — YEDEKTEN SONRA, bilerek: göç kullanıcı
         # verisini yerinden oynatan tek açılış adımı, yani sürüm değişiminde
         # alınan yedek göç ÖNCESİ hâli taşımalı. Yeni kurulumda maliyeti tek
         # bir `isdir`; gerekçesi assets_store.migrate_legacy_uploads'ta.
-        assets_store.migrate_legacy_uploads(ASSETS_DIR)
+        assets_store.migrate_legacy_uploads(ayarlar.assets_dir)
     except Exception:
-        errlog.safe_append(paths.data_dir(), traceback.format_exc())
+        errlog.safe_append(ayarlar.data_dir, traceback.format_exc())
     yield
 
 
 app = FastAPI(title="Kromis Studio", lifespan=_lifespan)
+
+# AYAR NESNESİ — dizinlerin tek sahibi (Faz 0 / Adım 4; gerekçesi
+# services/ayar.py'de). Rotalar `Depends(ayar.ayarlar)` ile, ara katman ve
+# `_lifespan` `app.state` üzerinden okuyor; modül düzeyinde `OUTPUT_DIR` gibi
+# bir sabit ARTIK YOK ve `services/yollar.py`nin `sys.modules["app"]` bakışı
+# da onunla gitti. İthal anında kuruluyor (lifespan'da değil), çünkü bu saf
+# bir yol hesabı — dizin açmaz — ve `TestClient(app)`i `with`siz kullanan
+# testler lifespan'ı hiç koşturmuyor; nesne orada kurulsa her rota 500 verirdi.
+# Testler değiştirmek için `tests/conftest.py::dizinler` fixture'ını kullanır.
+app.state.ayarlar = ayar.Ayarlar.varsayilan()
 
 # Dil ara katmanı — `i18n._AKTIF`ın tek yazarı (gerekçesi services/dil.py'de).
 # Dekoratörün (`@app.middleware("http")`) çağrı biçimi; işlev başka dosyada
@@ -113,10 +119,10 @@ for _router in (uretim.router, ayarlar.router, sohbet.router, galeri.router,
 
 
 # static/ dosyalarını /static altında servis et (index route'undan sonra mount).
-# Geliştirmede STATIC_DIR git'te izlenen bir dizindir ama boş bir checkout'ta
+# Geliştirmede static dizini git'te izlenen bir dizindir ama boş bir checkout'ta
 # (taze klon) henüz yoksa StaticFiles mount'u import anında patlardı — bu
 # yüzden yalnızca geliştirmede garanti altına alınır. Paket içindeyken
-# (frozen) STATIC_DIR sys._MEIPASS altında PyInstaller'ın gömdüğü salt-okunur
+# (frozen) static dizini sys._MEIPASS altında PyInstaller'ın gömdüğü salt-okunur
 # bir dizindir: hem zaten var, hem de oraya os.makedirs YAZMA denemesi bile
 # yanlış — bu dal frozen'da hiç çalışmamalı.
 #
@@ -129,9 +135,15 @@ for _router in (uretim.router, ayarlar.router, sohbet.router, galeri.router,
 # Last-Modified gönderdiği için aynı URL'ye gelen istek loopback'te ucuz bir
 # 304'e düşüyor. Buraya no-store eklemek cache-buster mekanizmasının bütün
 # anlamını siler.
+#
+# Mount'un dizini İTHAL ANINDA bağlanıyor ve bu ayar nesnesinin istisnası:
+# StaticFiles bir alt uygulama, isteğe bağlı çözülemez. Zararsız — static/
+# kullanıcı verisi değil, paketle gelen içerik; Faz 1'de kiracıya göre
+# değişecek olan şey o değil. `index()` rotası ise şablonun dizinini istek
+# anında ayar nesnesinden okuyor (testler orayı yönlendiriyor).
 if not paths.is_frozen():
-    os.makedirs(STATIC_DIR, exist_ok=True)
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    os.makedirs(app.state.ayarlar.static_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=app.state.ayarlar.static_dir), name="static")
 
 
 # ── Geriye uyum: bu modülden OKUNAN adlar ─────────────────────────────────
@@ -142,13 +154,13 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 # bu bağı değil), `appmod.MAX_EDIT_IMAGES`. YAMALANAN yardımcılar (`_to_png`,
 # `_dil`) BİLEREK burada DEĞİL: `appmod._to_png = …` yeni yerini görmeyen ölü
 # bir yama olurdu; testler onları asıl yerinde yamalıyor
-# (`services.gorsel.to_png`, `services.dil.aktif`). Dizinler (yukarıda) bunun
-# istisnası ve mekanizması services/yollar.py'de yazılı.
+# (`services.gorsel.to_png`, `services.dil.aktif`). Dizinler de artık burada
+# DEĞİL (Faz 0 / Adım 4): `appmod.OUTPUT_DIR` yaması ayar nesnesini görmezdi;
+# testler `app.state.ayarlar`ı `tests/conftest.py::dizinler` ile değiştiriyor.
 #
-# Kalıcı değil: Faz 0'ın 4. görevi testleri ayar nesnesine geçirdiğinde bu
-# blok da küçülür. O güne kadar her satırın karşılığı bir test dosyası.
+# Her satırın karşılığı bir test dosyası; okunmayan ad buradan düşer.
 __all__ = [
-    "app", "BASE_DIR", "OUTPUT_DIR", "STATIC_DIR", "ASSETS_DIR",
+    "app",
     # depo modülleri — testler `appmod.<modül>` üstünden yamalıyor
     "assets_store", "backup", "catalog", "cc", "chat_prompt", "composite",
     "credstore", "errlog", "paths", "providers", "version",

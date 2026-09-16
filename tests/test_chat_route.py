@@ -14,9 +14,9 @@ import models
 
 
 @pytest.fixture
-def client(tmp_path, monkeypatch):
+def client(tmp_path, dizinler):
     # Kalıcılık YOK kararı mekanik olarak ölçülebilsin diye çıktı dizini izole.
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path / "output"))
+    dizinler(output_dir=str(tmp_path / "output"))
     return TestClient(appmod.app)
 
 
@@ -767,8 +767,9 @@ def test_a_mis_encoded_prefs_file_is_not_blamed_on_the_instruction_file(
     toplama `try`nin dışına çıktı (yanlış atıf gitti) ve `prefs._read_raw`
     kod çözme hatasını da yakalıyor (modülün "okuma yolu HOŞGÖRÜLÜ" sözü).
     """
-    os.makedirs(appmod.OUTPUT_DIR, exist_ok=True)
-    yol = os.path.join(appmod.OUTPUT_DIR, "prefs.json")
+    output_dir = appmod.app.state.ayarlar.output_dir     # `client` fixture'ı tmp_path'e yönlendirdi
+    os.makedirs(output_dir, exist_ok=True)
+    yol = os.path.join(output_dir, "prefs.json")
     # Türkçe bir tema adı cp1254'te yazıldığında UTF-8 çözücü düşüyor.
     with open(yol, "w", encoding="cp1254") as f:
         f.write('{"theme": "mono", "director_guidance": "düz çizgi üslubu"}')
@@ -799,7 +800,7 @@ def test_the_context_is_gathered_outside_the_instruction_guard(client, fake_kwar
               ).read_text(encoding="utf-8")
     assert "instructions = chat_prompt.build_system(**baglam)" in kaynak, (
         "bağlam çağrısı `build_system`in argümanı olarak `try` içinde duruyor")
-    govde = kaynak.split("baglam = modeller.director_context()", 1)
+    govde = kaynak.split("baglam = modeller.director_context(ayarlar.output_dir)", 1)
     assert len(govde) == 2, "bağlam `try` öncesinde toplanmıyor"
     assert "try:" in govde[1].split("except ValueError", 1)[0], (
         "kapı bağlam toplamadan SONRA açılmıyor")

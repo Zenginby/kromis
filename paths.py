@@ -11,10 +11,12 @@ PyInstaller'ın `sys._MEIPASS` dizinine bağlanır.
 Geliştirmede (frozen değilken) her iki kök de repo dizinidir — mevcut testlerin
 dayandığı yerleşim birebir korunur.
 
-DÖRT DAL var: Android → frozen-Windows → frozen-macOS → geliştirme. Android
-dalı EN ÖNDE, çünkü orada `sys.frozen` yok (Chaquopy sıradan bir CPython
-koşturuyor) ve dal sırası tersine olsa Android sessizce geliştirme dalına,
-yani APK'nın İÇİNDEKİ salt-okunur dizine yazmaya çalışırdı.
+DÖRT DAL var: Android → frozen-Windows → frozen-macOS → geliştirme; önlerinde
+bir de AÇIK kapı, `KROMIS_DATA_DIR` (web/konteyner, bkz. `DATA_DIR_ENV`).
+Android dalı otomatik dalların EN ÖNÜNDE, çünkü orada `sys.frozen` yok
+(Chaquopy sıradan bir CPython koşturuyor) ve dal sırası tersine olsa Android
+sessizce geliştirme dalına, yani APK'nın İÇİNDEKİ salt-okunur dizine yazmaya
+çalışırdı.
 """
 from __future__ import annotations
 
@@ -50,6 +52,14 @@ OLD_CONFIG_DIRNAME = "lumeo"
 # dokunmuyor.
 ANDROID_DATA_ENV = "KROMIS_ANDROID_DATA_DIR"
 ANDROID_RESOURCE_ENV = "KROMIS_ANDROID_RESOURCE_DIR"
+
+# Web dağıtımının veri kökü (Faz 0 / Adım 4): `KROMIS_DATA_DIR=/veri` verilirse
+# output/, assets/ ve manifest'ler oraya iner. Konteynerde ne Application
+# Support ne repo kökü anlamlı — bind-mount edilen tek bir dizin var ve onu
+# işletmen söyler. Değişken `data_dir`de EN ÖNDE bakılıyor: açık bir işletmen
+# kararı, dalların otomatik tahminini (frozen mı, Android mi) yenmeli.
+# `resource_dir`i ETKİLEMEZ: static/ ve bundled/ paketle gelir, veriyle değil.
+DATA_DIR_ENV = "KROMIS_DATA_DIR"
 
 
 def is_android() -> bool:
@@ -105,6 +115,9 @@ def data_dir() -> str:
     üretirdi. `APP_NAME` de EKLENMİYOR: `filesDir` zaten yalnız bu uygulamaya
     ait, uygulama adıyla ikinci bir kademe açmak boşuna derinlik olurdu.
     """
+    acik = os.environ.get(DATA_DIR_ENV)
+    if acik:
+        return acik
     if is_android():
         return _android_data_dir()
     if not is_frozen():
@@ -293,14 +306,21 @@ def _migrate_from_old_name() -> None:
                            credentials_path())
 
 
-def ensure_data_dirs() -> None:
+def ensure_data_dirs(*dizinler: str) -> None:
     """Yazılabilir dizinleri oluşturur; var olanlara dokunmaz.
 
     Göç `makedirs`'ten ÖNCE: gerekçe `_migrate_from_old_name`'de. Çağrı MODÜL
     GLOBAL'i üzerinden gidiyor, `from ... import` ile değil — testlerin
     (ve `tests/conftest.py`'nin gerçek `~/.config` ağacını koruyan guard'ının)
     onu değiştirebilmesi buna bağlı.
+
+    `dizinler` verilirse ONLAR açılır (web bileşim kökü `app.py` ayar
+    nesnesinin `output_dir`/`assets_dir`ini geçiyor — Faz 0 / Adım 4; ayar
+    nesnesi testte başka yere yönlendirilmişse açılan dizin de o olmalı).
+    Verilmezse bu modülün kendi çözdüğü çift: dondurulmuş kabuklar
+    (`desktop.py`, `android_main.py`) argümansız çağırıyor ve onlara
+    dokunulmuyor.
     """
     _migrate_from_old_name()
-    for path in (output_dir(), assets_dir()):
+    for path in dizinler or (output_dir(), assets_dir()):
         os.makedirs(path, exist_ok=True)

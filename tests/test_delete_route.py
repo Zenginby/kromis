@@ -4,14 +4,14 @@ import app as appmod
 import azure_client as ac
 
 
-def _client(tmp_path, monkeypatch):
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
+def _client(tmp_path, dizinler):
+    dizinler(output_dir=str(tmp_path))
     return TestClient(appmod.app)
 
 
-def test_delete_existing_image(tmp_path, monkeypatch):
+def test_delete_existing_image(tmp_path, monkeypatch, dizinler):
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG"])
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, dizinler)
     gen = c.post("/api/generate", json={"prompt": "cat", "size": "1024x1024",
                                         "quality": "low", "n": 1}).json()
     iid = gen["images"][0]["id"]
@@ -22,6 +22,6 @@ def test_delete_existing_image(tmp_path, monkeypatch):
     assert c.get("/api/history").json()["images"] == []
 
 
-def test_delete_unknown_returns_404(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_delete_unknown_returns_404(tmp_path, dizinler):
+    c = _client(tmp_path, dizinler)
     assert c.delete("/api/image/nope").status_code == 404

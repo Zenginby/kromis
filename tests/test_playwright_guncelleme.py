@@ -28,7 +28,6 @@ pytest.importorskip("playwright", reason="playwright kurulu değil — E2E testl
 
 from playwright.sync_api import sync_playwright
 
-import app as appmod
 import guncelleme
 import version
 from app import app
@@ -56,7 +55,7 @@ class _Sunucu(threading.Thread):
         self.server.should_exit = True
 
 
-def test_the_update_notice_appears_without_reloading_the_page(tmp_path, monkeypatch):
+def test_the_update_notice_appears_without_reloading_the_page(tmp_path, monkeypatch, dizinler):
     """ASIL İDDİA: arka plan kontrolü cevabı bulduğunda AÇIK sayfa onu gösteriyor.
 
     Kurgu tam olarak gerçek ilk açılış: önbellek bayat (`zaman: 0`), yani
@@ -67,7 +66,7 @@ def test_the_update_notice_appears_without_reloading_the_page(tmp_path, monkeypa
     şeyi GitHub'ın o anki yayınına bağlardı. Aradaki her şey (önbellek yazımı,
     iş parçacığı, uç nokta, yoklama, DOM) GERÇEK.
     """
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
+    dizinler(output_dir=str(tmp_path))
     monkeypatch.setattr(guncelleme, "_sor",
                         lambda: {"surum": YENI_SURUM, "url": YENI_URL})
     guncelleme._KOSUYOR = False
@@ -108,8 +107,7 @@ def test_the_update_notice_appears_without_reloading_the_page(tmp_path, monkeypa
         guncelleme._KOSUYOR = False
 
 
-def test_the_check_now_button_finds_a_release_the_cache_never_asked_for(
-        tmp_path, monkeypatch):
+def test_the_check_now_button_finds_a_release_the_cache_never_asked_for(tmp_path, monkeypatch, dizinler):
     """ASIL İDDİA: önbellek TAZE ama cevabı bayatken düğme yine de buluyor.
 
     Kurgu, 2026-09-12'de gerçekten yaşanan durum: telefonda kurulu sürüm
@@ -124,7 +122,7 @@ def test_the_check_now_button_finds_a_release_the_cache_never_asked_for(
     aynen geçerli — iki tarafta da "doğru" görünen kod, tarayıcıda hiçbir şey
     yapmayan bir düğme üretebiliyor.
     """
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
+    dizinler(output_dir=str(tmp_path))
     guncelleme._KOSUYOR = False
 
     # TAZE önbellek: kurulu sürüm en yenisi sanılıyor, tazeleme tetiklenmiyor.
@@ -180,11 +178,11 @@ def test_the_check_now_button_finds_a_release_the_cache_never_asked_for(
         guncelleme._KOSUYOR = False
 
 
-def test_the_check_now_button_answers_when_there_is_nothing_new(tmp_path, monkeypatch):
+def test_the_check_now_button_answers_when_there_is_nothing_new(tmp_path, monkeypatch, dizinler):
     """"Güncelsin" bir CEVAP, sessizlik değil. `bilgi()` bu durumu "soramadım"la
     aynı `None`a indiriyor; elle basılan bir düğmede farkı `durum` taşıyor ve
     ekranda görünmesi gereken şey de o."""
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
+    dizinler(output_dir=str(tmp_path))
     guncelleme._KOSUYOR = False
     monkeypatch.setattr(guncelleme, "_sor",
                         lambda: {"surum": version.APP_VERSION, "url": YENI_URL})

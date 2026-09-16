@@ -15,9 +15,8 @@ def _png(color=(30, 80, 200, 255), size=(64, 64)) -> bytes:
     return b.getvalue()
 
 
-def _setup(tmp_path, monkeypatch):
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path / "output"))
-    monkeypatch.setattr(appmod, "ASSETS_DIR", str(tmp_path / "assets"))
+def _setup(tmp_path, monkeypatch, dizinler):
+    dizinler(output_dir=str(tmp_path / "output"), assets_dir=str(tmp_path / "assets"))
     # gerçek PNG üret ki PIL banner bindirmesi çalışsın
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [_png(size=(256, 256))])
     c = TestClient(appmod.app)
@@ -28,8 +27,8 @@ def _setup(tmp_path, monkeypatch):
     return c, src_id, banner["id"]
 
 
-def test_banner_preview_returns_data_url_and_does_not_save(tmp_path, monkeypatch):
-    c, src_id, banner_id = _setup(tmp_path, monkeypatch)
+def test_banner_preview_returns_data_url_and_does_not_save(tmp_path, monkeypatch, dizinler):
+    c, src_id, banner_id = _setup(tmp_path, monkeypatch, dizinler)
     before = len(c.get("/api/history").json()["images"])
     r = c.post("/api/banner/preview", json={"id": src_id, "asset_id": banner_id, "edge": "top"})
     assert r.status_code == 200
@@ -38,8 +37,8 @@ def test_banner_preview_returns_data_url_and_does_not_save(tmp_path, monkeypatch
     assert after == before
 
 
-def test_banner_apply_creates_derivative(tmp_path, monkeypatch):
-    c, src_id, banner_id = _setup(tmp_path, monkeypatch)
+def test_banner_apply_creates_derivative(tmp_path, monkeypatch, dizinler):
+    c, src_id, banner_id = _setup(tmp_path, monkeypatch, dizinler)
     r = c.post("/api/banner", json={"id": src_id, "asset_id": banner_id})
     assert r.status_code == 200
     rec = r.json()["image"]
@@ -47,20 +46,20 @@ def test_banner_apply_creates_derivative(tmp_path, monkeypatch):
     assert (tmp_path / "output" / rec["filename"]).exists()
 
 
-def test_banner_rejects_bad_edge(tmp_path, monkeypatch):
-    c, src_id, banner_id = _setup(tmp_path, monkeypatch)
+def test_banner_rejects_bad_edge(tmp_path, monkeypatch, dizinler):
+    c, src_id, banner_id = _setup(tmp_path, monkeypatch, dizinler)
     r = c.post("/api/banner", json={"id": src_id, "asset_id": banner_id, "edge": "middle"})
     assert r.status_code == 422
 
 
-def test_banner_404_for_unknown_banner(tmp_path, monkeypatch):
-    c, src_id, _ = _setup(tmp_path, monkeypatch)
+def test_banner_404_for_unknown_banner(tmp_path, monkeypatch, dizinler):
+    c, src_id, _ = _setup(tmp_path, monkeypatch, dizinler)
     r = c.post("/api/banner", json={"id": src_id, "asset_id": "deadbeef01"})
     assert r.status_code == 404
 
 
-def test_banner_404_for_unknown_source(tmp_path, monkeypatch):
-    c, _, banner_id = _setup(tmp_path, monkeypatch)
+def test_banner_404_for_unknown_source(tmp_path, monkeypatch, dizinler):
+    c, _, banner_id = _setup(tmp_path, monkeypatch, dizinler)
     r = c.post("/api/banner", json={"id": "nope", "asset_id": banner_id})
     assert r.status_code == 404
 
@@ -70,10 +69,9 @@ BASE_COLOR = (30, 80, 200)      # _setup'ta üretilen zemin (RGB'ye çevrilmiş 
 BANNER_COLOR = (240, 40, 40)    # aşağıdaki testlerde kullanılan banner rengi
 
 
-def _setup_colored(tmp_path, monkeypatch):
+def _setup_colored(tmp_path, monkeypatch, dizinler):
     """256×256 mavi zemin + 400×40 kırmızı banner: piksel örneklemesi için."""
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path / "output"))
-    monkeypatch.setattr(appmod, "ASSETS_DIR", str(tmp_path / "assets"))
+    dizinler(output_dir=str(tmp_path / "output"), assets_dir=str(tmp_path / "assets"))
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [_png(BASE_COLOR + (255,), (256, 256))])
     c = TestClient(appmod.app)
     src_id = c.post("/api/generate", json={"prompt": "x", "size": "1024x1024",
@@ -95,8 +93,8 @@ def _close(actual, expected, tol=12):
     return all(abs(a - e) <= tol for a, e in zip(actual, expected))
 
 
-def test_banner_scale_and_right_align_places_strip_on_the_right(tmp_path, monkeypatch):
-    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch)
+def test_banner_scale_and_right_align_places_strip_on_the_right(tmp_path, monkeypatch, dizinler):
+    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch, dizinler)
     im = _preview_image(c, {"id": src_id, "asset_id": banner_id, "edge": "bottom",
                             "scale": 0.5, "align": "right", "margin": 0.0})
     # 256 genişlik * 0.5 = 128 px banner, 400x40 -> 128x13, alt kenara yapışık
@@ -105,16 +103,16 @@ def test_banner_scale_and_right_align_places_strip_on_the_right(tmp_path, monkey
     assert _close(im.getpixel((30, 250)), BASE_COLOR)      # sol alt: zemin (banner yok)
 
 
-def test_banner_left_align_places_strip_on_the_left(tmp_path, monkeypatch):
-    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch)
+def test_banner_left_align_places_strip_on_the_left(tmp_path, monkeypatch, dizinler):
+    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch, dizinler)
     im = _preview_image(c, {"id": src_id, "asset_id": banner_id, "edge": "bottom",
                             "scale": 0.5, "align": "left"})
     assert _close(im.getpixel((30, 250)), BANNER_COLOR)
     assert _close(im.getpixel((200, 250)), BASE_COLOR)
 
 
-def test_banner_margin_pushes_strip_away_from_edge(tmp_path, monkeypatch):
-    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch)
+def test_banner_margin_pushes_strip_away_from_edge(tmp_path, monkeypatch, dizinler):
+    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch, dizinler)
     im = _preview_image(c, {"id": src_id, "asset_id": banner_id, "edge": "bottom",
                             "scale": 1.0, "margin": 0.1})
     # 256 * 0.1 = 26 px boşluk -> en alt satır artık zemin, banner yukarı kaydı
@@ -122,9 +120,9 @@ def test_banner_margin_pushes_strip_away_from_edge(tmp_path, monkeypatch):
     assert _close(im.getpixel((128, 256 - 26 - 6)), BANNER_COLOR)
 
 
-def test_banner_defaults_match_full_width_behaviour(tmp_path, monkeypatch):
+def test_banner_defaults_match_full_width_behaviour(tmp_path, monkeypatch, dizinler):
     """Seçenek gönderilmeyen istek, açıkça varsayılan gönderilenle aynı çıktıyı vermeli."""
-    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch)
+    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch, dizinler)
     implicit = c.post("/api/banner/preview", json={"id": src_id, "asset_id": banner_id}).json()
     explicit = c.post("/api/banner/preview", json={
         "id": src_id, "asset_id": banner_id, "edge": "bottom",
@@ -132,33 +130,33 @@ def test_banner_defaults_match_full_width_behaviour(tmp_path, monkeypatch):
     assert implicit["b64"] == explicit["b64"]
 
 
-def test_banner_rejects_bad_align(tmp_path, monkeypatch):
-    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch)
+def test_banner_rejects_bad_align(tmp_path, monkeypatch, dizinler):
+    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch, dizinler)
     r = c.post("/api/banner", json={"id": src_id, "asset_id": banner_id, "align": "diagonal"})
     assert r.status_code == 422
 
 
-def test_banner_rejects_unknown_field_instead_of_silently_ignoring(tmp_path, monkeypatch):
+def test_banner_rejects_unknown_field_instead_of_silently_ignoring(tmp_path, monkeypatch, dizinler):
     """Sürüm uyuşmazlığı sessiz kalmamalı: bilinmeyen alan 422 vermeli.
 
     Pydantic varsayılanı bilinmeyen alanı yok sayar; bu yüzden bayat bir sunucu
     süreci yeni arayüzün seçeneklerini görmezden gelip değişmemiş görseli 200 ile
     döndürüyordu ("ayar çalışmıyor" belirtisi, hata mesajı yok).
     """
-    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch)
+    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch, dizinler)
     r = c.post("/api/banner/preview", json={"id": src_id, "asset_id": banner_id,
                                             "gelecekteki_secenek": 0.5})
     assert r.status_code == 422
 
 
-def test_logo_rejects_unknown_field(tmp_path, monkeypatch):
-    c, src_id, _ = _setup_colored(tmp_path, monkeypatch)
+def test_logo_rejects_unknown_field(tmp_path, monkeypatch, dizinler):
+    c, src_id, _ = _setup_colored(tmp_path, monkeypatch, dizinler)
     r = c.post("/api/logo/preview", json={"id": src_id, "gelecekteki_secenek": 1})
     assert r.status_code == 422
 
 
-def test_banner_rejects_out_of_range_scale_and_margin(tmp_path, monkeypatch):
-    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch)
+def test_banner_rejects_out_of_range_scale_and_margin(tmp_path, monkeypatch, dizinler):
+    c, src_id, banner_id = _setup_colored(tmp_path, monkeypatch, dizinler)
     for body in ({"scale": 0.05}, {"scale": 1.5}, {"margin": -0.1}, {"margin": 0.5}):
         r = c.post("/api/banner", json={"id": src_id, "asset_id": banner_id, **body})
         assert r.status_code == 422, body

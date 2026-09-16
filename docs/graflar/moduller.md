@@ -2,7 +2,7 @@
 
 # Modül grafı
 
-63 Python modülü, 236 modül düzeyi + 14 erteli ithal kenarı.
+63 Python modülü, 232 modül düzeyi + 14 erteli ithal kenarı.
 
 Katman, o modülün depo içindeki en uzun bağımlılık zincirinin uzunluğu:
 **katman 0 hiçbir depo modülüne dayanmaz**, en üst katman uygulamanın
@@ -23,25 +23,25 @@ flowchart TD
     n_netguard["netguard<br/>169 satır"]
   end
   subgraph katman10["katman 10"]
-    n_app["app<br/>174 satır"]
+    n_app["app<br/>186 satır"]
   end
   subgraph katman9["katman 9"]
-    n_routers_bindirme["routers.bindirme<br/>227 satır"]
-    n_routers_galeri["routers.galeri<br/>325 satır"]
-    n_routers_paletler["routers.paletler<br/>88 satır"]
-    n_routers_uretim["routers.uretim<br/>416 satır"]
+    n_routers_bindirme["routers.bindirme<br/>231 satır"]
+    n_routers_galeri["routers.galeri<br/>334 satır"]
+    n_routers_paletler["routers.paletler<br/>90 satır"]
+    n_routers_uretim["routers.uretim<br/>420 satır"]
   end
   subgraph katman8["katman 8"]
-    n_routers_ayarlar["routers.ayarlar<br/>299 satır"]
-    n_routers_kok["routers.kok<br/>82 satır"]
-    n_routers_sohbet["routers.sohbet<br/>223 satır"]
-    n_services_gorsel["services.gorsel<br/>138 satır"]
-    n_services_kapilar["services.kapilar<br/>70 satır"]
-    n_services_palet["services.palet<br/>177 satır"]
+    n_routers_ayarlar["routers.ayarlar<br/>300 satır"]
+    n_routers_kok["routers.kok<br/>81 satır"]
+    n_routers_sohbet["routers.sohbet<br/>225 satır"]
+    n_services_gorsel["services.gorsel<br/>140 satır"]
+    n_services_kapilar["services.kapilar<br/>75 satır"]
+    n_services_palet["services.palet<br/>181 satır"]
   end
   subgraph katman7["katman 7"]
     n_chat_providers["chat_providers<br/>130 satır"]
-    n_services_dil["services.dil<br/>147 satır"]
+    n_services_dil["services.dil<br/>149 satır"]
   end
   subgraph katman6["katman 6"]
     n_openai_chat["openai_chat<br/>180 satır"]
@@ -77,12 +77,12 @@ flowchart TD
     n_chat_prompt["chat_prompt<br/>396 satır"]
     n_guncelleme["guncelleme<br/>356 satır"]
     n_i18n["i18n<br/>305 satır"]
-    n_services_yollar["services.yollar<br/>53 satır"]
+    n_services_ayar["services.ayar<br/>90 satır"]
   end
   subgraph katman1["katman 1"]
     n_chat_store["chat_store<br/>256 satır"]
     n_palette_store["palette_store<br/>96 satır"]
-    n_paths["paths<br/>306 satır"]
+    n_paths["paths<br/>326 satır"]
     n_services_redaksiyon["services.redaksiyon<br/>63 satır"]
     n_storage["storage<br/>418 satır"]
   end
@@ -119,6 +119,7 @@ flowchart TD
   n_app --> n_routers_paletler
   n_app --> n_routers_sohbet
   n_app --> n_routers_uretim
+  n_app --> n_services_ayar
   n_app --> n_services_dil
   n_app --> n_services_gorsel
   n_app --> n_services_modeller
@@ -238,44 +239,43 @@ flowchart TD
   n_routers_ayarlar --> n_models
   n_routers_ayarlar --> n_paths
   n_routers_ayarlar --> n_prefs
+  n_routers_ayarlar --> n_services_ayar
   n_routers_ayarlar --> n_services_dil
   n_routers_ayarlar --> n_services_modeller
   n_routers_ayarlar --> n_services_tercih
-  n_routers_ayarlar --> n_services_yollar
   n_routers_ayarlar --> n_version
   n_routers_bindirme --> n_assets_store
   n_routers_bindirme --> n_composite
   n_routers_bindirme --> n_i18n
   n_routers_bindirme --> n_models
+  n_routers_bindirme --> n_services_ayar
   n_routers_bindirme --> n_services_dil
   n_routers_bindirme --> n_services_gorsel
   n_routers_bindirme --> n_services_kapilar
-  n_routers_bindirme --> n_services_yollar
   n_routers_bindirme --> n_services_zaman
   n_routers_bindirme --> n_storage
   n_routers_galeri --> n_folders
   n_routers_galeri --> n_i18n
   n_routers_galeri --> n_models
+  n_routers_galeri --> n_services_ayar
   n_routers_galeri --> n_services_dil
   n_routers_galeri --> n_services_gorsel
   n_routers_galeri --> n_services_kapilar
-  n_routers_galeri --> n_services_yollar
   n_routers_galeri --> n_services_zaman
   n_routers_galeri --> n_storage
   n_routers_kok --> n_errlog
   n_routers_kok --> n_i18n
-  n_routers_kok --> n_paths
+  n_routers_kok --> n_services_ayar
   n_routers_kok --> n_services_dil
-  n_routers_kok --> n_services_yollar
   n_routers_kok --> n_version
   n_routers_paletler --> n_color_names
   n_routers_paletler --> n_i18n
   n_routers_paletler --> n_models
   n_routers_paletler --> n_palette
   n_routers_paletler --> n_palette_store
+  n_routers_paletler --> n_services_ayar
   n_routers_paletler --> n_services_dil
   n_routers_paletler --> n_services_palet
-  n_routers_paletler --> n_services_yollar
   n_routers_paletler --> n_services_zaman
   n_routers_sohbet --> n_catalog
   n_routers_sohbet --> n_chat_client
@@ -285,9 +285,9 @@ flowchart TD
   n_routers_sohbet --> n_i18n
   n_routers_sohbet --> n_models
   n_routers_sohbet --> n_prefs
+  n_routers_sohbet --> n_services_ayar
   n_routers_sohbet --> n_services_dil
   n_routers_sohbet --> n_services_modeller
-  n_routers_sohbet --> n_services_yollar
   n_routers_sohbet --> n_services_zaman
   n_routers_uretim --> n_azure_client
   n_routers_uretim --> n_catalog
@@ -296,26 +296,25 @@ flowchart TD
   n_routers_uretim --> n_models
   n_routers_uretim --> n_palette
   n_routers_uretim --> n_providers
+  n_routers_uretim --> n_services_ayar
   n_routers_uretim --> n_services_dil
   n_routers_uretim --> n_services_gorsel
   n_routers_uretim --> n_services_kapilar
   n_routers_uretim --> n_services_palet
-  n_routers_uretim --> n_services_yollar
   n_routers_uretim --> n_services_zaman
   n_routers_uretim --> n_storage
+  n_services_ayar --> n_paths
   n_services_dil --> n_i18n
+  n_services_dil --> n_services_ayar
   n_services_dil --> n_services_tercih
-  n_services_dil --> n_services_yollar
   n_services_gorsel --> n_i18n
   n_services_gorsel --> n_services_dil
-  n_services_gorsel --> n_services_yollar
   n_services_gorsel --> n_storage
   n_services_kapilar --> n_assets_store
   n_services_kapilar --> n_chat_store
   n_services_kapilar --> n_folders
   n_services_kapilar --> n_i18n
   n_services_kapilar --> n_services_dil
-  n_services_kapilar --> n_services_yollar
   n_services_kapilar --> n_storage
   n_services_modeller --> n_azure_client
   n_services_modeller --> n_catalog
@@ -323,7 +322,6 @@ flowchart TD
   n_services_modeller --> n_etiket
   n_services_modeller --> n_i18n
   n_services_modeller --> n_prefs
-  n_services_modeller --> n_services_yollar
   n_services_modeller --> n_version
   n_services_palet --> n_color_names
   n_services_palet --> n_i18n
@@ -331,10 +329,8 @@ flowchart TD
   n_services_palet --> n_palette
   n_services_palet --> n_palette_store
   n_services_palet --> n_services_dil
-  n_services_palet --> n_services_yollar
   n_services_redaksiyon --> n_catalog
   n_services_tercih --> n_prefs
-  n_services_yollar --> n_paths
   n_storage --> n_catalog
   n_storage --> n_jsonstore
   n_veo_client --> n_azure_client
@@ -357,7 +353,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | modül | satır | katman | ithal ettiği | ithal eden | test |
 | --- | --- | --- | --- | --- | --- |
 | `android_main.py` | 201 | 13 | `app` (erteli), `desktop` (erteli), `errlog` (erteli), `paths` (erteli) | 0 | 2 |
-| `app.py` | 174 | 10 | `assets_store`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `composite`, `credstore`, `errlog`, `models`, `paths`, `providers`, `routers.ayarlar`, `routers.bindirme`, `routers.galeri`, `routers.kok`, `routers.paletler`, `routers.sohbet`, `routers.uretim`, `services.dil`, `services.gorsel`, `services.modeller`, `services.palet`, `services.redaksiyon`, `services.zaman`, `version` | 3 | 37 |
+| `app.py` | 186 | 10 | `assets_store`, `backup`, `catalog`, `chat_client`, `chat_prompt`, `composite`, `credstore`, `errlog`, `models`, `paths`, `providers`, `routers.ayarlar`, `routers.bindirme`, `routers.galeri`, `routers.kok`, `routers.paletler`, `routers.sohbet`, `routers.uretim`, `services.ayar`, `services.dil`, `services.gorsel`, `services.modeller`, `services.palet`, `services.redaksiyon`, `services.zaman`, `version` | 3 | 37 |
 | `assets_store.py` | 205 | 3 | `i18n`, `jsonstore` | 5 | 9 |
 | `azure_client.py` | 458 | 3 | `i18n`, `paths`, `winsec` | 14 | 30 |
 | `azure_flux_client.py` | 289 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
@@ -386,28 +382,28 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `openai_client.py` | 217 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
 | `palette.py` | 333 | 3 | `i18n` | 5 | 3 |
 | `palette_store.py` | 96 | 1 | `jsonstore` | 4 | 2 |
-| `paths.py` | 306 | 1 | `errlog` | 10 | 4 |
+| `paths.py` | 326 | 1 | `errlog` | 9 | 4 |
 | `prefs.py` | 268 | 5 | `catalog`, `i18n`, `jsonstore`, `models` | 5 | 7 |
 | `providers.py` | 501 | 5 | `azure_client`, `catalog`, `credstore`, `etiket`, `i18n`, `azure_flux_client` (erteli), `azure_mai_client` (erteli), `fal_client` (erteli), `gemini_client` (erteli), `openai_client` (erteli), `veo_client` (erteli) | 9 | 7 |
 | `release_manifest.py` | 92 | 0 | — | 0 | 3 |
-| `routers/ayarlar.py` | 299 | 8 | `azure_client`, `catalog`, `guncelleme`, `i18n`, `models`, `paths`, `prefs`, `services.dil`, `services.modeller`, `services.tercih`, `services.yollar`, `version` | 1 | 0 |
-| `routers/bindirme.py` | 227 | 9 | `assets_store`, `composite`, `i18n`, `models`, `services.dil`, `services.gorsel`, `services.kapilar`, `services.yollar`, `services.zaman`, `storage` | 1 | 0 |
-| `routers/galeri.py` | 325 | 9 | `folders`, `i18n`, `models`, `services.dil`, `services.gorsel`, `services.kapilar`, `services.yollar`, `services.zaman`, `storage` | 1 | 0 |
-| `routers/kok.py` | 82 | 8 | `errlog`, `i18n`, `paths`, `services.dil`, `services.yollar`, `version` | 1 | 0 |
-| `routers/paletler.py` | 88 | 9 | `color_names`, `i18n`, `models`, `palette`, `palette_store`, `services.dil`, `services.palet`, `services.yollar`, `services.zaman` | 1 | 0 |
-| `routers/sohbet.py` | 223 | 8 | `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `i18n`, `models`, `prefs`, `services.dil`, `services.modeller`, `services.yollar`, `services.zaman` | 1 | 0 |
-| `routers/uretim.py` | 416 | 9 | `azure_client`, `catalog`, `etiket`, `i18n`, `models`, `palette`, `providers`, `services.dil`, `services.gorsel`, `services.kapilar`, `services.palet`, `services.yollar`, `services.zaman`, `storage` | 1 | 0 |
+| `routers/ayarlar.py` | 300 | 8 | `azure_client`, `catalog`, `guncelleme`, `i18n`, `models`, `paths`, `prefs`, `services.ayar`, `services.dil`, `services.modeller`, `services.tercih`, `version` | 1 | 0 |
+| `routers/bindirme.py` | 231 | 9 | `assets_store`, `composite`, `i18n`, `models`, `services.ayar`, `services.dil`, `services.gorsel`, `services.kapilar`, `services.zaman`, `storage` | 1 | 0 |
+| `routers/galeri.py` | 334 | 9 | `folders`, `i18n`, `models`, `services.ayar`, `services.dil`, `services.gorsel`, `services.kapilar`, `services.zaman`, `storage` | 1 | 0 |
+| `routers/kok.py` | 81 | 8 | `errlog`, `i18n`, `services.ayar`, `services.dil`, `version` | 1 | 0 |
+| `routers/paletler.py` | 90 | 9 | `color_names`, `i18n`, `models`, `palette`, `palette_store`, `services.ayar`, `services.dil`, `services.palet`, `services.zaman` | 1 | 0 |
+| `routers/sohbet.py` | 225 | 8 | `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `chat_store`, `i18n`, `models`, `prefs`, `services.ayar`, `services.dil`, `services.modeller`, `services.zaman` | 1 | 0 |
+| `routers/uretim.py` | 420 | 9 | `azure_client`, `catalog`, `etiket`, `i18n`, `models`, `palette`, `providers`, `services.ayar`, `services.dil`, `services.gorsel`, `services.kapilar`, `services.palet`, `services.zaman`, `storage` | 1 | 0 |
 | `screencolor.py` | 149 | 0 | — | 1 | 1 |
-| `services/dil.py` | 147 | 7 | `i18n`, `services.tercih`, `services.yollar` | 11 | 2 |
-| `services/gorsel.py` | 138 | 8 | `i18n`, `services.dil`, `services.yollar`, `storage` | 4 | 3 |
-| `services/kapilar.py` | 70 | 8 | `assets_store`, `chat_store`, `folders`, `i18n`, `services.dil`, `services.yollar`, `storage` | 3 | 0 |
-| `services/modeller.py` | 295 | 6 | `azure_client`, `catalog`, `credstore`, `etiket`, `i18n`, `prefs`, `services.yollar`, `version` | 3 | 0 |
-| `services/palet.py` | 177 | 8 | `color_names`, `i18n`, `models`, `palette`, `palette_store`, `services.dil`, `services.yollar` | 3 | 0 |
+| `services/ayar.py` | 90 | 2 | `paths` | 9 | 2 |
+| `services/dil.py` | 149 | 7 | `i18n`, `services.ayar`, `services.tercih` | 11 | 2 |
+| `services/gorsel.py` | 140 | 8 | `i18n`, `services.dil`, `storage` | 4 | 3 |
+| `services/kapilar.py` | 75 | 8 | `assets_store`, `chat_store`, `folders`, `i18n`, `services.dil`, `storage` | 3 | 0 |
+| `services/modeller.py` | 295 | 6 | `azure_client`, `catalog`, `credstore`, `etiket`, `i18n`, `prefs`, `version` | 3 | 0 |
+| `services/palet.py` | 181 | 8 | `color_names`, `i18n`, `models`, `palette`, `palette_store`, `services.dil` | 3 | 0 |
 | `services/redaksiyon.py` | 63 | 1 | `catalog` | 1 | 0 |
 | `services/tercih.py` | 98 | 6 | `prefs` | 2 | 1 |
-| `services/yollar.py` | 53 | 2 | `paths` | 12 | 1 |
 | `services/zaman.py` | 17 | 0 | — | 6 | 0 |
-| `storage.py` | 418 | 1 | `catalog`, `jsonstore` | 8 | 8 |
+| `storage.py` | 418 | 1 | `catalog`, `jsonstore` | 8 | 9 |
 | `veo_client.py` | 629 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
 | `version.py` | 30 | 0 | — | 7 | 9 |
 | `winclr.py` | 337 | 0 | — | 1 | 1 |

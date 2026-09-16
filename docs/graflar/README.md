@@ -14,14 +14,14 @@
 
 ## Ölçüler
 
-* 63 Python modülü, 236 modül düzeyi ithal kenarı (14 erteli)
+* 63 Python modülü, 232 modül düzeyi ithal kenarı (14 erteli)
 * 45 HTTP uç noktası
 * 10 tarayıcı betiği, 28 betik-arası bağ
 * 95 test dosyası; 15 modülü hiçbir test ithal etmiyor, 13 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
 * 1 ithal döngüsü, 0 rotaya oturmayan tarayıcı çağrısı
 
 En büyük dosyalar: `catalog` (1461), `models` (1056), `fal_client` (757), `veo_client` (629), `desktop` (584).
-En çok ithal edilenler: `i18n` (32), `catalog` (20), `azure_client` (14), `services.yollar` (12), `credstore` (11).
+En çok ithal edilenler: `i18n` (32), `catalog` (20), `azure_client` (14), `credstore` (11), `services.dil` (11).
 
 ## Nasıl güncellenir
 
@@ -42,6 +42,7 @@ python3 tools/graf_uret.py --ozet     # tek ekranlık özet
 Harita çalışma anını değil KAYNAĞI okuyor. Bu bilinçli (bkz. tools/graf_uret.py'nin gerekçesi), ama sınırı var:
 
 * Dinamik gönderim (`getattr`, sözlükten çağrılan işlev) kenar üretmez.
+* `Depends(ayar.ayarlar)` ile gelen ayar nesnesi: rotanın `ayarlar.output_dir` okuması bir öznitelik erişimi, çağrı değil — uç nokta sütunu `paths`e varmaz. Dizinlerin kaynağı `app.py`deki `Ayarlar.varsayilan()`; `paths.py`ye dokunmak yine her ucu etkiler, harita bunu `app` → `services.ayar` → `paths` ithal kenarıyla gösterir, rota satırında değil.
 * Şablondan/yapılandırmadan gelen bağlar (ör. `.spec` dosyasının gizli ithalleri) burada yok.
 * Ön yüz kenarları AD eşleşmesine dayanıyor; küresel bir işlevle aynı adı taşıyan yerel bir değişken kenarı fazla sayabilir.
 * Test sütunu ithal ilişkisidir, satır kapsamı DEĞİLDİR.

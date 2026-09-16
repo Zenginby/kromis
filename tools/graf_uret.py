@@ -186,8 +186,10 @@ def _kullanilan_moduller(dugum, takma: dict[str, str],
             # sabitler — bölünmeden önce `OUTPUT_DIR = paths.output_dir()`.
             # İkincisi olmadan `GET /output/{filename}` rotası "hiçbir modüle
             # dokunmuyor" gibi görünüyordu; oysa yolun tamamı paths'ten geliyor.
-            # (Bugün o yol `services.yollar.output_dir()` gövdesinden, yani
-            # modüller arası kapanıştan geliyor — bkz. uc_noktalar.)
+            # (Faz 0 / Adım 4'ten beri dizin `Depends(ayar.ayarlar)` ile gelen
+            # nesnenin ÖZNİTELİĞİ — çağrı değil — ve `paths` kenarı yalnız
+            # `app.py`nin `Ayarlar.varsayilan()` çağrısında duruyor; rotanın
+            # satırında görünmez. Bkz. README'nin "görmediği şeyler" bölümü.)
             bulunan |= ad_kaynaklari.get(d.id, set())
     return bulunan
 
@@ -207,8 +209,11 @@ def uc_noktalar(kaynaklar: dict[str, str], yollar: dict[str, str],
     verir. Bölünmeden sonra yardımcılar BAŞKA modüllerde: kapanış modül
     sınırını `kapilar.check_folder(...)` gibi nitelikli çağrılar (takma ad →
     hedef modüldeki işlev) ve `from services.x import f` biçimli ad ithalleri
-    üzerinden geçiyor. `yollar.output_dir()` böylece `paths`e, `check_session`
-    `chat_store`a varıyor — bölünmeden önceki sütunla aynı cevap.
+    üzerinden geçiyor. `kapilar.check_folder(...)` böylece `folders`a,
+    `check_session` `chat_store`a varıyor — bölünmeden önceki sütunla aynı
+    cevap. TEK fark Adım 4'ten sonra `paths`: dizin artık bir çağrının değil
+    `Depends` ile gelen ayar nesnesinin özniteliği ve statik kapanış onu
+    izlemiyor (bilinçli; gerekçesi README'nin son bölümünde).
 
     `routers.*` / `services.*` SÜTUNDA GÖSTERİLMİYOR: onlar eski "app.py içi
     yardımcı"nın yeni adresi; soru "bu rota hangi KÜTÜPHANE modülüne
@@ -738,10 +743,13 @@ def uc_noktalar_md(g: dict) -> str:
          "yazılı; `routers.*`/`services.*` bilerek sütunda yok (gerekçe: "
          "tools/graf_uret.py, uc_noktalar). `ön yüz` sütunu o yolu çağıran "
          "tarayıcı betiği.", "",
-         "`paths` neredeyse her satırda görünüyor ve bu doğru: çıktı/varlık "
-         "dizinleri `services/yollar.py` üzerinden `paths`ten akıyor ve rotalar "
-         "o değeri depo modüllerine geçiriyor — yani `paths.py`'ye dokunmak "
-         "gerçekten neredeyse her ucu etkiler.", ""]
+         "`paths` satırlarda GÖRÜNMÜYOR ve bu bir kör nokta değil, kararın "
+         "kendisi (Faz 0 / Adım 4): çıktı/varlık dizinleri rotaya "
+         "`Depends(ayar.ayarlar)` ile gelen ayar nesnesinden okunuyor "
+         "(`ayarlar.output_dir`), yani bir öznitelik — çağrı değil. `paths`e "
+         "dokunmak yine neredeyse her ucu etkiler, ama tek bir kapıdan: "
+         "`app.py`deki `Ayarlar.varsayilan()`. Kiracıya göre dizin (Faz 1) "
+         "o kapının içini değiştirecek, bu tabloyu değil.", ""]
     s += _tablo(
         ["yöntem", "yol", "dosya", "işlev", "modüller", "ön yüz"],
         [[r["yontem"], f"`{r['yol']}`", f"`{r['dosya']}`",
@@ -896,6 +904,11 @@ def readme_md(g: dict) -> str:
          "Harita çalışma anını değil KAYNAĞI okuyor. Bu bilinçli (bkz. "
          "tools/graf_uret.py'nin gerekçesi), ama sınırı var:", "",
          "* Dinamik gönderim (`getattr`, sözlükten çağrılan işlev) kenar üretmez.",
+         "* `Depends(ayar.ayarlar)` ile gelen ayar nesnesi: rotanın `ayarlar.output_dir` "
+         "okuması bir öznitelik erişimi, çağrı değil — uç nokta sütunu `paths`e varmaz. "
+         "Dizinlerin kaynağı `app.py`deki `Ayarlar.varsayilan()`; `paths.py`ye dokunmak "
+         "yine her ucu etkiler, harita bunu `app` → `services.ayar` → `paths` ithal "
+         "kenarıyla gösterir, rota satırında değil.",
          "* Şablondan/yapılandırmadan gelen bağlar (ör. `.spec` dosyasının "
          "gizli ithalleri) burada yok.",
          "* Ön yüz kenarları AD eşleşmesine dayanıyor; küresel bir işlevle aynı "

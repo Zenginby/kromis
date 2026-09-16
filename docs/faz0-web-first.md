@@ -137,7 +137,7 @@ zamanlı), `tests/conftest.py` (önbellek testler arasında sıfırlanıyor),
 
 ---
 
-## 4. `OUTPUT_DIR` / `ASSETS_DIR` / `STATIC_DIR` → ayar nesnesi (bağımlılık enjeksiyonu)
+## 4. `OUTPUT_DIR` / `ASSETS_DIR` / `STATIC_DIR` → ayar nesnesi (bağımlılık enjeksiyonu) ✅ (PR: `faz0/dizin-enjeksiyonu`)
 
 **Kapsam.** `app.py:76-78` modül sabitleri (`paths.output_dir()` vb. ithal
 anında hesaplanıyor) yerine tek `Ayarlar` (pydantic-settings YOK — stdlib
@@ -157,6 +157,41 @@ fixture'a taşınmalı, yoksa 2'deki sızıntı sınıfı geri gelir.
 
 **Çıkış ölçütü.** `grep -rn 'setattr(appmod, "OUTPUT_DIR"' tests/` → 0;
 uygulama `KROMIS_DATA_DIR=/tmp/x` ile açılıp oraya yazıyor; takım yeşil.
+
+**Yapıldığında (2026-09-16) plandan sapmalar.** Modül adı `services/ayarlar.py`
+değil `services/ayar.py`: `routers/ayarlar.py` ile `app.py`de aynı satırda
+ithal edilince ad çakışırdı; parametre adı `ayarlar` kaldı
+(`ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)` → gövdede `ayarlar.output_dir`).
+`Ayarlar(data_dir, output_dir, assets_dir, static_dir)` donmuş `dataclass`,
+alanlar `str` (`Path` DEĞİL — depo `os.path.join` deyiminde, store'lar `str`
+alıyor, 60'tan fazla test `str(tmp_path)` veriyor; türü değiştirmek bu PR'ın
+konusu değildi). Nesne `app.state.ayarlar`da ve İTHAL ANINDA kuruluyor,
+lifespan'da değil: saf yol hesabı, dizin açmaz ve `TestClient(app)`i `with`siz
+kullanan testler lifespan'ı hiç koşturmuyor. `services/yollar.py` SİLİNDİ
+(`sys.modules["app"]` bakışıyla birlikte); `app.OUTPUT_DIR/STATIC_DIR/
+ASSETS_DIR/BASE_DIR` ve `__all__`daki adları kalktı — dışarıda okuyan yoktu
+(`desktop.py`, `android_main.py`, `netguard.py` yalnız `app.app` okuyor).
+Store'lara DOKUNULMADI; dizini artık ÇAĞIRAN veriyor: 45 rotanın 37'si
+`Depends(ayar.ayarlar)` alıyor, 7 service işlevi (`kapilar.check_folder`,
+`gorsel.output_png_path/output_media_path`, `palet.saved_palette/palette_prompt`,
+`modeller.director_context`) ve router yardımcıları dizini parametre olarak
+alıyor. Dil ara katmanı (`services/dil.py::coz`) `Depends` alamadığı için
+`ayar.ayarlar(request)`i doğrudan çağırıyor — okuma noktası tek.
+`paths.data_dir()` `KROMIS_DATA_DIR`ı EN ÖNDE okuyor (açık işletmen kararı
+frozen/Android tahminini yener; `resource_dir` etkilenmez);
+`paths.ensure_data_dirs(*dizinler)` isteğe bağlı dizin alıyor, lifespan ayar
+nesnesininkini geçiyor, dondurulmuş kabuklar argümansız çağırmaya devam
+ediyor. Testler: `tests/conftest.py::dizinler` TEK fixture (fabrika —
+`dizinler(output_dir=…, assets_dir=…)`; fabrika olması şart, testlerin yarısı
+`output_dir=tmp_path`, yarısı `tmp_path/"output"` yerleşimine iddia yazıyor)
+66 yamanın (47+17+2) yerine geçti; `tests/test_app_bolme.py` artık
+`sys.modules` okuyan modül yok + `app`te dizin sabiti yok + yönlendirme rotaya
+ulaşıyor iddialarını taşıyor. `tests/conftest.py`nin gerçek-dizin koruması
+yerinde: `_isolate_lifespan` (test_backup) `data_dir`i de ayar nesnesinden
+yönlendiriyor. Bilinen sonuç: `docs/graflar/uc-noktalar.md`nin `modüller`
+sütunundan `paths` düştü — dizin artık çağrı değil öznitelik, statik kapanış
+onu izlemiyor; gerekçe README'nin son bölümüne madde olarak eklendi.
+`.env.example` 8. göreve kaldı.
 
 ---
 

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
 import azure_client as ac
 import catalog
@@ -23,20 +23,20 @@ from models import (
     check_capabilities,
     check_video_capabilities,
 )
-from services import dil, gorsel, kapilar, palet, yollar, zaman
+from services import ayar, dil, gorsel, kapilar, palet, zaman
 
 router = APIRouter()
 
 
 @router.post("/api/generate")
-def generate(req: GenerateRequest) -> dict:
-    folder_id = kapilar.check_folder(req.folder_id)
+def generate(req: GenerateRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+    folder_id = kapilar.check_folder(req.folder_id, ayarlar.output_dir)
     session_id = kapilar.check_session(req.session_id)
     arena_id = kapilar.check_arena(req.arena_id)
     prompt_sent, pal = palet.palette_prompt(req.prompt, req.palette_hex, req.palette_mode,
                                             req.palette_strength, req.palette_id,
                                             drop=req.palette_drop,
-                                            task="generate")
+                                            task="generate", output_dir=ayarlar.output_dir)
     # `req.model` doğrulayıcıda NORMALLEŞTİRİLDİ (None → varsayılanın gerçek
     # id'si), yani doğrulanan değer ile kaydedilen değer ayrışamıyor.
     spec = catalog.image_model(req.model)
@@ -61,14 +61,14 @@ def generate(req: GenerateRequest) -> dict:
                            # Ek düştüyse metin prompt'un birebir aynısı; storage
                            # sözleşmesi "yalnızca farklıysa" diyor (bkz. save).
                            "prompt_sent": prompt_sent if pal and pal["applied"] else None},
-                     yollar.output_dir(), now=zaman.simdi())
+                     ayarlar.output_dir, now=zaman.simdi())
         for img in images
     ]
     return {"images": records}
 
 
 @router.post("/api/video")
-def video(req: VideoRequest) -> dict:
+def video(req: VideoRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     """Metin → video. `generate`in video ikizi.
 
     SENKRON ve bu bilinçli bir seçim, kaza değil: üretim 1-6 dakika sürüyor ve
@@ -90,7 +90,7 @@ def video(req: VideoRequest) -> dict:
 
     PALET ve ARENA yok; gerekçeleri `VideoRequest`in docstring'inde.
     """
-    folder_id = kapilar.check_folder(req.folder_id)
+    folder_id = kapilar.check_folder(req.folder_id, ayarlar.output_dir)
     session_id = kapilar.check_session(req.session_id)
     # `req.model` doğrulayıcıda NORMALLEŞTİRİLDİ (None → varsayılanın gerçek
     # id'si), yani doğrulanan değer ile kaydedilen değer ayrışamıyor.
@@ -109,7 +109,7 @@ def video(req: VideoRequest) -> dict:
                            "kind": "video", "duration": req.duration,
                            "model": req.model, "credits": kredi,
                            "prompt_sent": None},
-                     yollar.output_dir(), now=zaman.simdi())
+                     ayarlar.output_dir, now=zaman.simdi())
         for vid in videos
     ]
     # ANAHTAR `videos`, `images` DEĞİL: istemci yanıtın türünü gövdeden
@@ -193,6 +193,7 @@ async def animate(
     folder_id: str | None = Form(None),
     session_id: str | None = Form(None),
     model: str = Form(""),
+    ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
 ) -> dict:
     """Görsel → video: bir kareyi hareketlendirir.
 
@@ -227,9 +228,9 @@ async def animate(
                                  file, source_id, model,
                                  last_file, last_source_id)
     spec = catalog.video_model(model_id)
-    target_folder = kapilar.check_folder(folder_id)
+    target_folder = kapilar.check_folder(folder_id, ayarlar.output_dir)
     session = kapilar.check_session(session_id)
-    refs, parent_id = await _collect_edit_refs(request, file, source_id)
+    refs, parent_id = await _collect_edit_refs(request, file, source_id, ayarlar.output_dir)
     if len(refs) > spec.max_refs:
         raise HTTPException(
             status_code=422,
@@ -245,7 +246,7 @@ async def animate(
     # olarak göndermenin karşılığı yok (ana karenin aynı kararı).
     son_kare = None
     if last_source_id is not None:
-        son_kare = gorsel.read_png_file(gorsel.output_png_path(last_source_id))
+        son_kare = gorsel.read_png_file(gorsel.output_png_path(last_source_id, ayarlar.output_dir))
     elif last_file is not None:
         son_kare = await gorsel.read_upload_png(last_file)
 
@@ -263,7 +264,7 @@ async def animate(
                            "kind": "video", "duration": duration,
                            "model": model_id, "credits": kredi,
                            "prompt_sent": None},
-                     yollar.output_dir(), now=zaman.simdi())
+                     ayarlar.output_dir, now=zaman.simdi())
         for vid in videos
     ]
     return {"videos": records}
@@ -322,12 +323,13 @@ def _check_edit_form(prompt: str, size: str, quality: str, n: int,
 
 
 async def _collect_edit_refs(
-    request: Request, file: UploadFile | None, source_id: str | None,
+    request: Request, file: UploadFile | None, source_id: str | None, output_dir: str,
 ) -> tuple[list[tuple[str, bytes]], str | None]:
     """Azure'a gidecek referans görselleri toplar: `(refs, parent_id)`.
 
     Sıra sözleşme: ana görsel → ek yüklemeler → ek galeri görselleri. `parent_id`
     yalnızca ana görsel galeriden seçildiğinde dolu (türev zinciri buna bağlı).
+    Galeri id'leri `output_dir`de aranıyor — rotanın ayar nesnesinden geliyor.
     """
     extra_uploads, extra_ids = await gorsel.extra_refs(request)
     if 1 + len(extra_uploads) + len(extra_ids) > gorsel.MAX_EDIT_IMAGES:
@@ -342,7 +344,7 @@ async def _collect_edit_refs(
     refs: list[tuple[str, bytes]] = []
     if source_id is not None:
         sid = os.path.basename(source_id)
-        refs.append((f"{sid}.png", gorsel.read_png_file(gorsel.output_png_path(sid))))
+        refs.append((f"{sid}.png", gorsel.read_png_file(gorsel.output_png_path(sid, output_dir))))
         parent_id = sid
     else:
         refs.append(("upload.png", await gorsel.read_upload_png(file)))
@@ -351,7 +353,8 @@ async def _collect_edit_refs(
     for upload in extra_uploads:
         refs.append((f"ref{len(refs) + 1}.png", await gorsel.read_upload_png(upload)))
     for extra_id in extra_ids:
-        refs.append((f"ref{len(refs) + 1}.png", gorsel.read_png_file(gorsel.output_png_path(extra_id))))
+        refs.append((f"ref{len(refs) + 1}.png",
+                     gorsel.read_png_file(gorsel.output_png_path(extra_id, output_dir))))
     return refs, parent_id
 
 
@@ -380,6 +383,7 @@ async def edit(
     # bilinmeyen form alanını sessizce atıyor), o yüzden koruma yanıtın alanı
     # geri yankılamasıyla kuruluyor — bkz. _check_edit_form'un docstring'i.
     model: str = Form(""),
+    ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
 ) -> dict:
     """Ek referans görselleri (`extra_files` yüklemeleri, `extra_source_ids`
     galeri id'leri) form verisinden okunur — bkz. gorsel.extra_refs."""
@@ -389,15 +393,15 @@ async def edit(
     palette_hex = palet.check_palette_hex(palette_hex)
     drop = palet.check_palette_drop(palette_drop)
 
-    target_folder = kapilar.check_folder(folder_id)
+    target_folder = kapilar.check_folder(folder_id, ayarlar.output_dir)
     session = kapilar.check_session(session_id)
-    refs, parent_id = await _collect_edit_refs(request, file, source_id)
+    refs, parent_id = await _collect_edit_refs(request, file, source_id, ayarlar.output_dir)
 
     # task="edit": üretim ifadesi modele yeniden boyama söyler ve referans
     # görselin kompozisyonunu yok eder; düzenlemede istenen renk derecelendirmesi.
     prompt_sent, pal = palet.palette_prompt(prompt, palette_hex, palette_mode,
                                             palette_strength, palette_id, task="edit",
-                                            drop=drop)
+                                            output_dir=ayarlar.output_dir, drop=drop)
     try:
         images = providers.edit(model_id, prompt_sent, refs, size, quality, n)
     except ac.ImageError as e:
@@ -410,7 +414,7 @@ async def edit(
                            "palette": pal, "session_id": session,
                            "model": model_id, "credits": kredi,
                            "prompt_sent": prompt_sent if pal and pal["applied"] else None},
-                     yollar.output_dir(), now=zaman.simdi())
+                     ayarlar.output_dir, now=zaman.simdi())
         for img in images
     ]
     return {"images": records}

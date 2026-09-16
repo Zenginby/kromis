@@ -11,8 +11,8 @@ WebView `http://127.0.0.1:<port>` adresini yüklüyor.
 
 1. **Yolları AÇIYOR.** `paths.py`'nin Android dalı iki ortam değişkenine bakıyor
    ve bunlar `import app`'ten ÖNCE yazılmak zorunda: `app.py` modül düzeyinde
-   `OUTPUT_DIR`/`STATIC_DIR`/`ASSETS_DIR` sabitlerini hesaplıyor, yani sıra
-   ters olsa uygulama APK'nın salt-okunur içine bakardı. Değişkenleri Kotlin'e
+   ayar nesnesini (`app.state.ayarlar`, dizinler) `paths`ten hesaplıyor, yani
+   sıra ters olsa uygulama APK'nın salt-okunur içine bakardı. Değişkenleri Kotlin'e
    yazdırmak yerine burada, import'un hemen üstünde yazmak bu sırayı tek bir
    yerde ve gözle görülür kılıyor.
 

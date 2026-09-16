@@ -19,9 +19,8 @@ def _png(color=(30, 80, 200, 255), size=(64, 64)) -> bytes:
     return b.getvalue()
 
 
-def _client(tmp_path, monkeypatch, *, real_png=False):
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path / "output"))
-    monkeypatch.setattr(appmod, "ASSETS_DIR", str(tmp_path / "assets"))
+def _client(tmp_path, monkeypatch, dizinler, *, real_png=False):
+    dizinler(output_dir=str(tmp_path / "output"), assets_dir=str(tmp_path / "assets"))
     monkeypatch.setattr(ac, "generate",
                         lambda *a, **k: [_png(size=(256, 256)) if real_png else b"\x89PNG"])
     monkeypatch.setattr(ac, "edit", lambda *a, **k: [b"\x89PNG-edited"])
@@ -52,8 +51,8 @@ def _generate(c, folder_id=None, prompt="cat"):
 
 
 # ── klasör CRUD ─────────────────────────────────────────────────────────
-def test_create_and_list_folder(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_create_and_list_folder(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     fid = _new_folder(c, "Kurban 2026")
     items = c.get("/api/folders").json()["items"]
     assert [f["id"] for f in items] == [fid]
@@ -61,8 +60,8 @@ def test_create_and_list_folder(tmp_path, monkeypatch):
     assert items[0]["count"] == 0
 
 
-def test_folder_list_reports_image_count(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_folder_list_reports_image_count(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     fid = _new_folder(c)
     for _ in range(3):
         assert _generate(c, fid).status_code == 200
@@ -71,21 +70,21 @@ def test_folder_list_reports_image_count(tmp_path, monkeypatch):
     assert items[0]["count"] == 3
 
 
-def test_create_folder_rejects_blank_name(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_create_folder_rejects_blank_name(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     assert c.post("/api/folders", json={"name": ""}).status_code == 422
     assert c.post("/api/folders", json={"name": "   "}).status_code == 422
 
 
-def test_create_folder_rejects_unknown_field(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_create_folder_rejects_unknown_field(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     r = c.post("/api/folders", json={"name": "x", "color": "red"})
     assert r.status_code == 422
 
 
 # ── alt klasörler (parent_id) ───────────────────────────────────────────
-def test_create_subfolder_records_parent(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_create_subfolder_records_parent(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     parent = _new_folder(c, "Kurban")
     r = c.post("/api/folders", json={"name": "Afiş", "parent_id": parent})
     assert r.status_code == 200, r.text
@@ -99,15 +98,15 @@ def test_create_subfolder_records_parent(tmp_path, monkeypatch):
     assert items[child["id"]]["child_count"] == 0
 
 
-def test_create_subfolder_with_unknown_parent_404(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_create_subfolder_with_unknown_parent_404(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     r = c.post("/api/folders", json={"name": "Afiş", "parent_id": "deadbeef0123"})
     assert r.status_code == 404
 
 
-def test_subfolder_images_do_not_leak_into_parent(tmp_path, monkeypatch):
+def test_subfolder_images_do_not_leak_into_parent(tmp_path, monkeypatch, dizinler):
     """Ebeveynin içi yalnızca kendi görselleri; alt klasörünkiler ayrı kalır."""
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, monkeypatch, dizinler)
     parent = _new_folder(c, "Kurban")
     child = c.post("/api/folders", json={"name": "Afiş", "parent_id": parent}).json()["folder"]["id"]
     in_parent = _generate(c, parent, prompt="ebeveyn").json()["images"][0]["id"]
@@ -119,8 +118,8 @@ def test_subfolder_images_do_not_leak_into_parent(tmp_path, monkeypatch):
     assert items[parent]["count"] == 1 and items[child]["count"] == 1
 
 
-def test_delete_parent_removes_subtree_and_unfiles_all_images(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_delete_parent_removes_subtree_and_unfiles_all_images(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     parent = _new_folder(c, "Kurban")
     child = c.post("/api/folders", json={"name": "Afiş", "parent_id": parent}).json()["folder"]["id"]
     keep = _new_folder(c, "Kalan")
@@ -142,8 +141,8 @@ def test_delete_parent_removes_subtree_and_unfiles_all_images(tmp_path, monkeypa
         assert (tmp_path / "output" / rec["filename"]).exists()
 
 
-def test_delete_deep_chain_removes_every_level(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_delete_deep_chain_removes_every_level(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     a = _new_folder(c, "A")
     b = c.post("/api/folders", json={"name": "B", "parent_id": a}).json()["folder"]["id"]
     d = c.post("/api/folders", json={"name": "D", "parent_id": b}).json()["folder"]["id"]
@@ -153,8 +152,8 @@ def test_delete_deep_chain_removes_every_level(tmp_path, monkeypatch):
     assert c.get("/api/folders").json()["items"] == []
 
 
-def test_delete_subfolder_keeps_parent(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_delete_subfolder_keeps_parent(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     parent = _new_folder(c, "Kurban")
     child = c.post("/api/folders", json={"name": "Afiş", "parent_id": parent}).json()["folder"]["id"]
     c.delete(f"/api/folders/{child}")
@@ -162,8 +161,8 @@ def test_delete_subfolder_keeps_parent(tmp_path, monkeypatch):
     assert [f["id"] for f in items] == [parent]
 
 
-def test_rename_folder_route(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_rename_folder_route(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     fid = _new_folder(c, "Eski Ad")
     r = c.patch(f"/api/folders/{fid}", json={"name": "Yeni Ad"})
     assert r.status_code == 200
@@ -183,8 +182,8 @@ def test_rename_folder_route(tmp_path, monkeypatch):
     assert items[0]["child_count"] == 0
 
 
-def test_export_zip_and_download_route(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_export_zip_and_download_route(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     parent_id = _new_folder(c, "Ana Klasör")
     child_id = c.post("/api/folders", json={"name": "Alt Klasör", "parent_id": parent_id}).json()["folder"]["id"]
 
@@ -211,7 +210,7 @@ def test_export_zip_and_download_route(tmp_path, monkeypatch):
     assert c.get("/api/folders/deadbeef0000/download").status_code == 404
 
 
-def test_download_header_keeps_turkish_name(tmp_path, monkeypatch):
+def test_download_header_keeps_turkish_name(tmp_path, monkeypatch, dizinler):
     """Türkçe klasör adı `filename*` ile korunuyor; ASCII yedeği de duruyor.
 
     ASCII yedeği TEK BAŞINA yetmiyor: `encode("ascii", "ignore")` Türkçe
@@ -223,7 +222,7 @@ def test_download_header_keeps_turkish_name(tmp_path, monkeypatch):
     Yedek yine de ZORUNLU: `filename*` okumayan bir istemci hiç ad görmemek
     yerine kırpılmış adı görsün.
     """
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, monkeypatch, dizinler)
     fid = _new_folder(c, "Bağış Görselleri")
 
     cd = c.get(f"/api/folders/{fid}/download").headers["content-disposition"]
@@ -282,15 +281,15 @@ def test_export_zip_survives_corrupt_parent_cycle(tmp_path, monkeypatch):
 
 
 # ── görselleri klasöre kaydetme ve filtreleme ──────────────────────────
-def test_generate_into_folder_files_the_image(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_generate_into_folder_files_the_image(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     fid = _new_folder(c)
     rec = _generate(c, fid).json()["images"][0]
     assert rec["folder_id"] == fid
 
 
-def test_root_history_excludes_filed_images(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_root_history_excludes_filed_images(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     fid = _new_folder(c)
     filed = _generate(c, fid, prompt="klasörde").json()["images"][0]["id"]
     unfiled = _generate(c, prompt="kökte").json()["images"][0]["id"]
@@ -302,18 +301,18 @@ def test_root_history_excludes_filed_images(tmp_path, monkeypatch):
     assert folder_ids == [filed]
 
 
-def test_generate_with_unknown_folder_404(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_generate_with_unknown_folder_404(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     assert _generate(c, "deadbeef0123").status_code == 404
 
 
-def test_history_with_unknown_folder_404(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_history_with_unknown_folder_404(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     assert c.get("/api/history?folder_id=deadbeef0123").status_code == 404
 
 
-def test_edit_into_folder(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_edit_into_folder(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     fid = _new_folder(c)
     r = c.post("/api/edit",
                data={"prompt": "x", "size": "1024x1024", "quality": "low",
@@ -323,8 +322,8 @@ def test_edit_into_folder(tmp_path, monkeypatch):
     assert r.json()["images"][0]["folder_id"] == fid
 
 
-def test_edit_with_unknown_folder_404(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_edit_with_unknown_folder_404(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     r = c.post("/api/edit",
                data={"prompt": "x", "size": "1024x1024", "quality": "low",
                      "n": "1", "folder_id": "deadbeef0123"},
@@ -333,8 +332,8 @@ def test_edit_with_unknown_folder_404(tmp_path, monkeypatch):
 
 
 # ── türevler kaynağın klasörünü miras alır ─────────────────────────────
-def test_logo_derivative_inherits_source_folder(tmp_path, monkeypatch, fake_composite):
-    c = _client(tmp_path, monkeypatch)
+def test_logo_derivative_inherits_source_folder(tmp_path, monkeypatch, fake_composite, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     monkeypatch.setattr(appmod.composite, "composite_logo", fake_composite)
     fid = _new_folder(c)
     src_id = _generate(c, fid).json()["images"][0]["id"]
@@ -346,8 +345,8 @@ def test_logo_derivative_inherits_source_folder(tmp_path, monkeypatch, fake_comp
     assert rec["id"] in ids
 
 
-def test_banner_derivative_inherits_source_folder(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch, real_png=True)
+def test_banner_derivative_inherits_source_folder(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler, real_png=True)
     fid = _new_folder(c)
     src_id = _generate(c, fid).json()["images"][0]["id"]
     banner = astore.save_asset("banners", _png(size=(400, 60)), "footer",
@@ -357,8 +356,8 @@ def test_banner_derivative_inherits_source_folder(tmp_path, monkeypatch):
 
 
 # ── taşıma (sürükle-bırak ucu) ─────────────────────────────────────────
-def test_move_unfiled_image_into_folder(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_move_unfiled_image_into_folder(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     fid = _new_folder(c)
     rec = _generate(c).json()["images"][0]
     assert rec["folder_id"] is None
@@ -372,8 +371,8 @@ def test_move_unfiled_image_into_folder(tmp_path, monkeypatch):
     assert c.get("/api/folders").json()["items"][0]["count"] == 1
 
 
-def test_move_image_out_of_folder_to_root(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_move_image_out_of_folder_to_root(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     fid = _new_folder(c)
     rec = _generate(c, fid).json()["images"][0]
 
@@ -383,8 +382,8 @@ def test_move_image_out_of_folder_to_root(tmp_path, monkeypatch):
     assert [x["id"] for x in c.get("/api/history").json()["images"]] == [rec["id"]]
 
 
-def test_move_image_between_folders(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_move_image_between_folders(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     src, dst = _new_folder(c, "Kaynak"), _new_folder(c, "Hedef")
     rec = _generate(c, src).json()["images"][0]
 
@@ -393,9 +392,9 @@ def test_move_image_between_folders(tmp_path, monkeypatch):
     assert [x["id"] for x in c.get(f"/api/history?folder_id={dst}").json()["images"]] == [rec["id"]]
 
 
-def test_move_does_not_touch_the_file_or_provenance(tmp_path, monkeypatch, fake_composite):
+def test_move_does_not_touch_the_file_or_provenance(tmp_path, monkeypatch, fake_composite, dizinler):
     """Klasör yalnızca etiket: dosya adı/yolu ve parent_id değişmemeli."""
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, monkeypatch, dizinler)
     monkeypatch.setattr(appmod.composite, "composite_logo", fake_composite)
     fid = _new_folder(c)
     src_id = _generate(c).json()["images"][0]["id"]
@@ -409,28 +408,28 @@ def test_move_does_not_touch_the_file_or_provenance(tmp_path, monkeypatch, fake_
     assert (tmp_path / "output" / derived["filename"]).exists()
 
 
-def test_move_to_unknown_folder_404(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_move_to_unknown_folder_404(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     rec = _generate(c).json()["images"][0]
     assert c.patch(f"/api/image/{rec['id']}", json={"folder_id": "deadbeef0123"}).status_code == 404
 
 
-def test_move_unknown_image_404(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_move_unknown_image_404(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     fid = _new_folder(c)
     assert c.patch("/api/image/aabbccddeeff", json={"folder_id": fid}).status_code == 404
 
 
-def test_move_rejects_unknown_field(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_move_rejects_unknown_field(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     rec = _generate(c).json()["images"][0]
     r = c.patch(f"/api/image/{rec['id']}", json={"folder_id": None, "position": "top"})
     assert r.status_code == 422
 
 
 # ── çoklu seçim: toplu taşıma ve toplu silme ───────────────────────────
-def test_bulk_move_files_all_selected_images(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_bulk_move_files_all_selected_images(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     fid = _new_folder(c)
     ids = [_generate(c, prompt=f"g{i}").json()["images"][0]["id"] for i in range(3)]
     keep = _generate(c, prompt="kalan").json()["images"][0]["id"]
@@ -444,8 +443,8 @@ def test_bulk_move_files_all_selected_images(tmp_path, monkeypatch):
     assert [x["id"] for x in c.get("/api/history").json()["images"]] == [keep]
 
 
-def test_bulk_move_to_root_with_null_folder(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_bulk_move_to_root_with_null_folder(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     fid = _new_folder(c)
     ids = [_generate(c, fid, prompt=f"g{i}").json()["images"][0]["id"] for i in range(2)]
     assert c.patch("/api/images", json={"ids": ids, "folder_id": None}).json()["moved"] == 2
@@ -453,37 +452,37 @@ def test_bulk_move_to_root_with_null_folder(tmp_path, monkeypatch):
     assert len(c.get("/api/history").json()["images"]) == 2
 
 
-def test_bulk_move_counts_only_known_ids(tmp_path, monkeypatch):
+def test_bulk_move_counts_only_known_ids(tmp_path, monkeypatch, dizinler):
     """Bilinmeyen id sessizce atlanır; sayı gerçekten taşınanı verir."""
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, monkeypatch, dizinler)
     fid = _new_folder(c)
     real = _generate(c).json()["images"][0]["id"]
     r = c.patch("/api/images", json={"ids": [real, "aabbccddeeff"], "folder_id": fid})
     assert r.json()["moved"] == 1
 
 
-def test_bulk_move_with_no_known_ids_404(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_bulk_move_with_no_known_ids_404(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     assert c.patch("/api/images", json={"ids": ["aabbccddeeff"]}).status_code == 404
 
 
-def test_bulk_move_to_unknown_folder_404(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_bulk_move_to_unknown_folder_404(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     rec = _generate(c).json()["images"][0]
     r = c.patch("/api/images", json={"ids": [rec["id"]], "folder_id": "deadbeef0123"})
     assert r.status_code == 404
 
 
-def test_bulk_endpoints_reject_empty_and_unknown_fields(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_bulk_endpoints_reject_empty_and_unknown_fields(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     assert c.patch("/api/images", json={"ids": []}).status_code == 422
     assert c.request("DELETE", "/api/images", json={"ids": []}).status_code == 422
     r = c.patch("/api/images", json={"ids": ["aabbccddeeff"], "folder": "x"})
     assert r.status_code == 422
 
 
-def test_bulk_delete_removes_files_and_records(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_bulk_delete_removes_files_and_records(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     recs = [_generate(c, prompt=f"g{i}").json()["images"][0] for i in range(3)]
     keep = _generate(c, prompt="kalan").json()["images"][0]
     doomed = recs[:2]
@@ -499,16 +498,16 @@ def test_bulk_delete_removes_files_and_records(tmp_path, monkeypatch):
     assert (tmp_path / "output" / recs[2]["filename"]).exists()
 
 
-def test_bulk_delete_unknown_ids_404(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_bulk_delete_unknown_ids_404(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     _generate(c)
     assert c.request("DELETE", "/api/images",
                      json={"ids": ["aabbccddeeff"]}).status_code == 404
     assert len(c.get("/api/history").json()["images"]) == 1
 
 
-def test_bulk_delete_updates_folder_counts(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_bulk_delete_updates_folder_counts(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     fid = _new_folder(c)
     ids = [_generate(c, fid, prompt=f"g{i}").json()["images"][0]["id"] for i in range(3)]
     c.request("DELETE", "/api/images", json={"ids": ids[:2]})
@@ -533,8 +532,8 @@ def test_set_folder_guards_bad_image_id(tmp_path, monkeypatch):
 
 
 # ── klasör silme: görseller silinmez, köke döner ───────────────────────
-def test_delete_folder_unfiles_images_without_deleting_them(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_delete_folder_unfiles_images_without_deleting_them(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     fid = _new_folder(c)
     rec = _generate(c, fid).json()["images"][0]
 
@@ -549,13 +548,13 @@ def test_delete_folder_unfiles_images_without_deleting_them(tmp_path, monkeypatc
     assert rec["id"] in root_ids
 
 
-def test_delete_unknown_folder_404(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_delete_unknown_folder_404(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     assert c.delete("/api/folders/deadbeef0123").status_code == 404
 
 
-def test_delete_folder_leaves_other_folders_intact(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_delete_folder_leaves_other_folders_intact(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     keep = _new_folder(c, "Kalan")
     drop = _new_folder(c, "Silinen")
     kept_img = _generate(c, keep).json()["images"][0]["id"]
@@ -567,7 +566,7 @@ def test_delete_folder_leaves_other_folders_intact(tmp_path, monkeypatch):
 
 
 # ── geriye uyum ve dayanıklılık ────────────────────────────────────────
-def test_legacy_records_without_folder_id_are_treated_as_root(tmp_path, monkeypatch):
+def test_legacy_records_without_folder_id_are_treated_as_root(tmp_path, monkeypatch, dizinler):
     """v1.5 öncesi kayıtlarda folder_id alanı hiç yok — kök kabul edilmeli."""
     out = tmp_path / "output"
     out.mkdir(parents=True)
@@ -576,19 +575,19 @@ def test_legacy_records_without_folder_id_are_treated_as_root(tmp_path, monkeypa
          "size": "1024x1024", "quality": "low", "created_at": "2026-07-01T10:00:00",
          "parent_id": None},
     ]), encoding="utf-8")
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, monkeypatch, dizinler)
     ids = [r["id"] for r in c.get("/api/history").json()["images"]]
     assert ids == ["aabbccddeeff"]
 
 
-def test_legacy_folders_without_parent_id_are_treated_as_root(tmp_path, monkeypatch):
+def test_legacy_folders_without_parent_id_are_treated_as_root(tmp_path, monkeypatch, dizinler):
     """v1.6 kayıtlarında parent_id alanı hiç yok — kök klasör kabul edilmeli (migration yok)."""
     out = tmp_path / "output"
     out.mkdir(parents=True)
     (out / "folders.json").write_text(json.dumps([
         {"id": "aabbccddeeff", "name": "Eski klasör", "created_at": "2026-07-25T10:00:00"},
     ]), encoding="utf-8")
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, monkeypatch, dizinler)
     items = c.get("/api/folders").json()["items"]
     assert items[0]["parent_id"] is None
     assert items[0]["child_count"] == 0
@@ -597,17 +596,17 @@ def test_legacy_folders_without_parent_id_are_treated_as_root(tmp_path, monkeypa
     assert c.delete("/api/folders/aabbccddeeff").json()["unfiled"] == 1
 
 
-def test_corrupt_folders_file_is_tolerated(tmp_path, monkeypatch):
+def test_corrupt_folders_file_is_tolerated(tmp_path, monkeypatch, dizinler):
     out = tmp_path / "output"
     out.mkdir(parents=True)
     (out / "folders.json").write_text("{bozuk", encoding="utf-8")
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, monkeypatch, dizinler)
     assert c.get("/api/folders").json()["items"] == []
 
 
-def test_folder_id_format_guard(tmp_path, monkeypatch):
+def test_folder_id_format_guard(tmp_path, monkeypatch, dizinler):
     """Hex olmayan id hiçbir zaman var sayılmamalı (storage._SAFE_ID ile aynı guard)."""
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, monkeypatch, dizinler)
     _new_folder(c)
     for bad in ("../../etc", "not-hex", ""):
         assert not folders.exists(bad, str(tmp_path / "output"))
@@ -630,9 +629,9 @@ def test_descendants_of_unknown_folder_is_empty(tmp_path, monkeypatch):
 
 # ── İç içe klasör derinliği ─────────────────────────────────────────────────
 
-def test_folder_nesting_is_capped(tmp_path, monkeypatch):
+def test_folder_nesting_is_capped(tmp_path, monkeypatch, dizinler):
     """Sınırsız derinlik başlık şeridini taşırıyor ve geri dönüşü zorlaştırıyor."""
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, monkeypatch, dizinler)
     parent = None
     for level in range(appmod.MAX_FOLDER_DEPTH):
         r = c.post("/api/folders", json={"name": f"k{level}", "parent_id": parent})
@@ -643,8 +642,8 @@ def test_folder_nesting_is_capped(tmp_path, monkeypatch):
     assert str(appmod.MAX_FOLDER_DEPTH) in r.json()["detail"]
 
 
-def test_depth_of_a_root_folder_is_one(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_depth_of_a_root_folder_is_one(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     root = _new_folder(c)
     child = c.post("/api/folders", json={"name": "alt", "parent_id": root}
                    ).json()["folder"]["id"]
@@ -654,9 +653,9 @@ def test_depth_of_a_root_folder_is_one(tmp_path, monkeypatch):
     assert folders.depth("yoksa", out) == 0
 
 
-def test_depth_survives_a_broken_parent_chain(tmp_path, monkeypatch):
+def test_depth_survives_a_broken_parent_chain(tmp_path, monkeypatch, dizinler):
     """Elle bozulmuş folders.json sonsuz döngüye düşürmemeli (descendants ile aynı duruş)."""
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, monkeypatch, dizinler)
     root = _new_folder(c)
     out = str(tmp_path / "output")
     path = tmp_path / "output" / "folders.json"

@@ -36,6 +36,7 @@ import pytest
 
 import backup as backup_module
 import paths as paths_module
+from services import ayar
 
 # Hangi dosyaların E2E olduğu TEK yerde ölçülüyor; gerekçesi orada. Salt
 # kitaplık bir modül, yani takımın kendisi bir kuruluma bağlanmıyor.
@@ -271,8 +272,8 @@ def _dil_baglami_testler_arasinda_sizmasin():
 
     `tercih.sifirla()` da burada (Faz 0 / Adım 3) ve aynı sınıf sızıntı:
     kayıtlı tercih artık dosya imzalı bir önbellekten okunuyor. İki test aynı
-    dizini paylaşıp (`OUTPUT_DIR`ı yamalamayan E2E testleri geliştiricinin
-    gerçek `output/`unu kullanıyor) `prefs.read_stored`ı FARKLI dillerle
+    dizini paylaşıp (`dizinler` fixture'ını kullanmayan E2E testleri
+    geliştiricinin gerçek `output/`unu kullanıyor) `prefs.read_stored`ı FARKLI dillerle
     yamalarsa dosya ikisinde de değişmez ve ikinci test önbellekten
     birincinin dilini okurdu — `test_playwright_dil`in iki parametresi tam
     olarak bu çift.
@@ -282,6 +283,52 @@ def _dil_baglami_testler_arasinda_sizmasin():
     i18n.set_active(i18n.FALLBACK)
     tercih.sifirla()
     yield
+
+
+@pytest.fixture
+def dizinler(monkeypatch: pytest.MonkeyPatch):
+    """Uygulamanın veri dizinlerini bu test süresince YÖNLENDİRİR (Faz 0 / Adım 4).
+
+    Kullanımı: `dizinler(output_dir=str(tmp_path))`,
+    `dizinler(output_dir=…, assets_dir=…)`, `dizinler(static_dir=…)`,
+    `dizinler(data_dir=…)`. Verilmeyen alan olduğu gibi kalır; dönen `Ayarlar`
+    nesnesinden yollar okunabilir.
+
+    NEDEN TEK FİXTURE: Adım 4'e kadar 66 test `monkeypatch.setattr(appmod,
+    "OUTPUT_DIR", …)` yazıyordu ve router'lar o adı `sys.modules["app"]`
+    üzerinden okuyordu (services/yollar.py, artık yok). Dizinler artık
+    `app.state.ayarlar`daki donmuş `Ayarlar` nesnesinde; rotalar onu
+    `Depends(ayar.ayarlar)` ile alıyor, ara katman ve lifespan `app.state`ten
+    okuyor. Yani yamanın TEK hedefi var ve o hedef burada — bir testin başka
+    bir yolla dizin değiştirmesi (`paths`i yamalamak gibi) rotaya ULAŞMAZ.
+
+    NEDEN FABRİKA (çağrılabilir döndürüyor), sabit yerleşim DEĞİL: mevcut
+    testlerin yarısı `output_dir=tmp_path`, öteki yarısı `tmp_path/"output"`
+    yerleşimini kullanıyor ve dosya yollarına iddia yazıyor
+    (`tmp_path / "hata.log"`, `tmp_path / f"{id}.png"`). Tek bir yerleşim
+    dayatmak o iddiaların hepsini elle yeniden yazdırırdı; fabrika eski
+    yamayı bire bir karşılıyor.
+
+    NEDEN `dataclasses.replace` + `monkeypatch.setattr(app.state, …)`:
+    nesne donmuş (paylaşılan durum yanlışlıkla değişmesin), kopya alınıyor;
+    `monkeypatch` testin sonunda eski nesneyi geri koyuyor. Art arda iki
+    çağrı birikir (ikincisi birincinin kopyasından türer) ve LIFO geri alma
+    sırayı doğru kapatır.
+
+    `app` BURADA ithal ediliyor (modül başında değil): conftest'in kendisi
+    `import app` yaparsa her test dosyası — `paths`i tek başına sınayanlar
+    dâhil — bileşim kökünü ve 60 modülü yüklemiş olurdu.
+    """
+    import dataclasses
+
+    import app as appmod
+
+    def _yonlendir(**alanlar: str) -> ayar.Ayarlar:
+        yeni = dataclasses.replace(appmod.app.state.ayarlar, **alanlar)
+        monkeypatch.setattr(appmod.app.state, "ayarlar", yeni)
+        return yeni
+
+    return _yonlendir
 
 
 @pytest.fixture

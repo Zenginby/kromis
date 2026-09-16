@@ -253,36 +253,39 @@ def test_a_realistic_v18_tree_is_backed_up_byte_for_byte(tmp_path):
 
 # ── lifespan: bağlantı, sıra, hata izolasyonu ─────────────────────────────
 
-def _isolate_lifespan(monkeypatch, tmp_path):
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path / "output"))
-    monkeypatch.setattr(appmod, "ASSETS_DIR", str(tmp_path / "assets"))
-    monkeypatch.setattr(appmod.paths, "data_dir", lambda: str(tmp_path))
-    monkeypatch.setattr(appmod.paths, "ensure_data_dirs", lambda: None)
+def _isolate_lifespan(monkeypatch, tmp_path, dizinler):
+    # Üç dizin de ayar nesnesinden (Faz 0 / Adım 4): lifespan `paths.data_dir()`
+    # okumuyor, `app.state.ayarlar.data_dir` okuyor — yama oraya.
+    dizinler(data_dir=str(tmp_path), output_dir=str(tmp_path / "output"),
+             assets_dir=str(tmp_path / "assets"))
+    monkeypatch.setattr(appmod.paths, "ensure_data_dirs", lambda *dizinler: None)
     assert str(tmp_path) not in ("", "/"), "izolasyon kurulmadı"
 
 
-def test_backup_does_not_fire_on_plain_import(monkeypatch, tmp_path):
+def test_backup_does_not_fire_on_plain_import(monkeypatch, tmp_path, dizinler):
     """`import app` ve çıplak TestClient yan etkisiz kalmalı (I3 sözleşmesi)."""
-    _isolate_lifespan(monkeypatch, tmp_path)
+    _isolate_lifespan(monkeypatch, tmp_path, dizinler)
     recorder = MagicMock()
     monkeypatch.setattr(appmod.backup, "backup_manifests_if_version_changed", recorder)
     TestClient(appmod.app)
     recorder.assert_not_called()
 
 
-def test_backup_fires_once_on_lifespan_startup(monkeypatch, tmp_path):
-    _isolate_lifespan(monkeypatch, tmp_path)
+def test_backup_fires_once_on_lifespan_startup(monkeypatch, tmp_path, dizinler):
+    _isolate_lifespan(monkeypatch, tmp_path, dizinler)
     recorder = MagicMock(return_value=None)
     monkeypatch.setattr(appmod.backup, "backup_manifests_if_version_changed", recorder)
     with TestClient(appmod.app):
         recorder.assert_called_once()
     args, kwargs = recorder.call_args
-    assert args == (str(tmp_path), appmod.OUTPUT_DIR, appmod.ASSETS_DIR)
+    ayarlar = appmod.app.state.ayarlar
+    assert args == (str(tmp_path), ayarlar.output_dir, ayarlar.assets_dir)
+    assert ayarlar.output_dir == str(tmp_path / "output"), "yönlendirme lifespan'a ulaşmadı"
     assert kwargs["version"] == version.APP_VERSION
     assert kwargs["now"]
 
 
-def test_lifespan_survives_a_backup_error(monkeypatch, tmp_path):
+def test_lifespan_survives_a_backup_error(monkeypatch, tmp_path, dizinler):
     """Yedek bir EMNİYET özelliği — patlaması uygulamayı KİLİTLEMEMELİ.
 
     Yedek yüzünden uygulamaya giremeyen kullanıcının verisine arayüzden hiçbir
@@ -295,7 +298,7 @@ def test_lifespan_survives_a_backup_error(monkeypatch, tmp_path):
     kütüphanesine kopyalanması — ürün marka-nötr olunca kaldırıldı, o test de
     lifespan'daki sıra testiyle birlikte gitti.)
     """
-    _isolate_lifespan(monkeypatch, tmp_path)
+    _isolate_lifespan(monkeypatch, tmp_path, dizinler)
 
     def boom(*args, **kwargs):
         raise OSError("disk dolu (simüle)")

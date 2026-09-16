@@ -19,7 +19,7 @@ import i18n
 import palette
 import palette_store
 from models import MAX_PROMPT_CHARS, check_drop_indices
-from services import dil, yollar
+from services import dil
 
 
 def resolve_palette(seed: str, mode: str, *, offline: bool = False) -> list[dict]:
@@ -34,12 +34,12 @@ def resolve_palette(seed: str, mode: str, *, offline: bool = False) -> list[dict
         [{"hex": h, "name": n} for h, n in zip(hexes, names)])
 
 
-def saved_palette(palette_id: str | None) -> dict | None:
+def saved_palette(palette_id: str | None, output_dir: str) -> dict | None:
     """Kayıtlı paleti id ile bulur; yoksa None (hata DEĞİL — bkz. palette_prompt)."""
     if not palette_id:
         return None
     pid = os.path.basename(palette_id)
-    return next((p for p in palette_store.list_palettes(yollar.output_dir())
+    return next((p for p in palette_store.list_palettes(output_dir)
                  if p.get("id") == pid), None)
 
 
@@ -67,9 +67,13 @@ def saved_colors(saved: dict) -> list[dict]:
 
 
 def palette_prompt(prompt: str, seed: str | None, mode: str, strength: str,
-                   palette_id: str | None = None, *, task: str,
+                   palette_id: str | None = None, *, task: str, output_dir: str,
                    drop: Sequence[int] = ()) -> tuple[str, dict | None]:
     """Prompt'a renk yönlendirmesi ekler. Palet yoksa prompt aynen döner.
+
+    `output_dir` yalnız KAYITLI palet aranırken okunuyor (`saved_palette`);
+    anahtar-sözcük ve zorunlu, çünkü unutulması sessizce "kayıt yok" demek
+    olurdu ve o da bu işlevin bilerek hata SAYMADIĞI bir durum.
 
     KAYITLI palet kullanılıyorsa renkler/adlar kaydın DONDURULMUŞ halinden
     okunur. Bu, kullanıcının kütüphanede gördüğü adlarla prompt'a giden adların
@@ -97,7 +101,7 @@ def palette_prompt(prompt: str, seed: str | None, mode: str, strength: str,
     """
     if not seed:
         return prompt, None
-    saved = saved_palette(palette_id)
+    saved = saved_palette(palette_id, output_dir)
     if saved:
         mode = saved["mode"] if saved.get("mode") in palette.MODES else mode
         seed = safe_seed(saved.get("seed")) or seed

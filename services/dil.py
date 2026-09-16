@@ -35,7 +35,7 @@ from __future__ import annotations
 from fastapi import Request, Response
 
 import i18n
-from services import tercih, yollar
+from services import ayar, tercih
 
 # Tarayıcının taşıdığı dil seçimi. `POST /api/prefs` `language` yazdığında
 # aynı cevapla kuruluyor (routers/ayarlar.py → `cerez_yaz`); ön yüz çerezi
@@ -84,7 +84,9 @@ def coz(request: Request) -> str:
     for aday in (request.headers.get(BASLIK), request.cookies.get(CEREZ)):
         if aday in i18n.LANGUAGES:
             return aday
-    kayitli = tercih.dil(yollar.output_dir())
+    # Ara katman `Depends` alamaz; ayar nesnesi bağımlılık işlevinin KENDİSİ
+    # çağrılarak okunuyor — okuma noktası tek kalsın (gerekçesi services/ayar.py).
+    kayitli = tercih.dil(ayar.ayarlar(request).output_dir)
     if kayitli is not None:
         return kayitli
     return accept_language(request.headers.get("accept-language")) or i18n.DEFAULT

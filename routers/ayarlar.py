@@ -4,7 +4,7 @@
 """Ayarlar uçları: sağlayıcı kimlikleri, güncelleme denetimi, kullanıcı tercihleri."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 
 import azure_client as ac
 import catalog
@@ -14,13 +14,13 @@ import paths
 import prefs
 import version
 from models import PrefsRequest, SettingsRequest
-from services import dil, modeller, tercih, yollar
+from services import ayar, dil, modeller, tercih
 
 router = APIRouter()
 
 
 @router.get("/api/settings")
-def get_settings() -> dict:
+def get_settings(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     """Yapılandırma durumu + uygulama sürümü. API key asla dönmez.
 
     `version` BURADA birleştiriliyor, azure_client'ta DEĞİL: onun işi kimlik
@@ -45,7 +45,7 @@ def get_settings() -> dict:
     bakıyor, ağ çağrısı arka planda koşuyor (bkz. guncelleme.py'deki 2.
     sözleşme). İlk açılışta değeri `null` olur, sonrakinde dolar.
     """
-    output_dir = yollar.output_dir()
+    output_dir = ayarlar.output_dir
     return {**modeller.settings_payload(),
             "version": version.APP_VERSION,
             "guncelleme": guncelleme.bilgi(
@@ -56,7 +56,7 @@ def get_settings() -> dict:
 
 
 @router.get("/api/guncelleme")
-def get_guncelleme() -> dict:
+def get_guncelleme(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     """Yalnız güncelleme cevabı — `/api/settings`'in ARDIL okuması.
 
     NEDEN AYRI BİR UÇ: `guncelleme.bilgi()` bayat önbellekte tazelemeyi arka
@@ -80,13 +80,13 @@ def get_guncelleme() -> dict:
 
     İstek yolunu BEKLETMEZ — `/api/settings` ile aynı çağrı, aynı önbellek.
     """
-    output_dir = yollar.output_dir()
+    output_dir = ayarlar.output_dir
     return {"guncelleme": guncelleme.bilgi(
         output_dir, izin=prefs.read(output_dir)["guncelleme_kontrolu"])}
 
 
 @router.post("/api/guncelleme")
-def post_guncelleme() -> dict:
+def post_guncelleme(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     """"Şimdi kontrol et" — TTL'i baypas eden, SONUCU BEKLEYEN elle kontrol.
 
     NEDEN VAR: `GET` yalnız önbelleğe bakıyor ve önbellek 24 saat taze sayılıyor
@@ -108,7 +108,7 @@ def post_guncelleme() -> dict:
     Gövde `{"durum": …, "guncelleme": …}`; `durum` dört değerden biri
     (`guncelleme.DURUM_*`) ve arayüz her birini ayrı bir cümleye çeviriyor.
     """
-    output_dir = yollar.output_dir()
+    output_dir = ayarlar.output_dir
     return guncelleme.simdi_kontrol_et(
         output_dir, izin=prefs.read(output_dir)["guncelleme_kontrolu"])
 
@@ -259,13 +259,14 @@ def post_settings(req: SettingsRequest) -> dict:
 # ── Kullanıcı tercihleri ────────────────────────────────────────────────
 
 @router.get("/api/prefs")
-def get_prefs_route() -> dict:
+def get_prefs_route(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     """Tercihlerin birleşik görünümü (bkz. prefs.py). Gizli alan taşımıyor."""
-    return prefs.read(yollar.output_dir())
+    return prefs.read(ayarlar.output_dir)
 
 
 @router.post("/api/prefs")
-def post_prefs_route(req: PrefsRequest, response: Response) -> dict:
+def post_prefs_route(req: PrefsRequest, response: Response,
+                     ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     """Gönderilen tercihleri yazar, diğerlerine dokunmaz; yeni görünümü döndürür.
 
     Anahtar BİLEREK `/api/settings`'te DEĞİL: o uç kimlik formu ve `api_key` +
@@ -288,7 +289,7 @@ def post_prefs_route(req: PrefsRequest, response: Response) -> dict:
     """
     values = req.model_dump(exclude_none=True)
     try:
-        sonuc = prefs.update(values, yollar.output_dir())
+        sonuc = prefs.update(values, ayarlar.output_dir)
     except ValueError as e:
         # prefs katmanı da bilinmeyen anahtarı/yanlış türü reddediyor; buraya
         # düşmek pydantic ile prefs şemasının ayrışması demek olur.

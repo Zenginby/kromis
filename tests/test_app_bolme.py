@@ -18,16 +18,23 @@ import os
 import re
 
 import pytest
+from fastapi.testclient import TestClient
 
 import app as appmod
+import storage
+from services import ayar
 from tools import graf_uret as gu
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 2. görevin çıkış ölçütü "< 300" (docs/faz0-web-first.md). Bölünme günü 173
-# satır; pay, geriye-uyum bloğunun 4. görevde küçülmesini beklerken yeni bir
-# ara katman ya da mount eklenebilsin diye.
+# satır, 4. görevde (dizin sabitleri gitti, ayar nesnesi geldi) 175; pay, yeni
+# bir ara katman ya da mount eklenebilsin diye.
 APP_SATIR_TAVANI = 300
+
+# Bileşim kökü + iki paket: dizinlerin ve `sys.modules`ün ARANDIĞI kaynaklar.
+def _urun_dosyalari() -> list[str]:
+    return ["app.py"] + _paket_dosyalari("routers") + _paket_dosyalari("services")
 
 _ROTA_DEKORATORU = re.compile(
     r"^@app\.(?:get|post|put|delete|patch|head|options)\(", re.M)
@@ -52,6 +59,13 @@ def _ithal_ettigi_kok_modüller(yol: str) -> set[str]:
         elif isinstance(dugum, ast.ImportFrom) and dugum.level == 0 and dugum.module:
             bulunan.add(dugum.module.split(".")[0])
     return bulunan
+
+
+def _sys_modules_okuyor(kaynak: str, yol: str) -> bool:
+    """Kaynakta `sys.modules` ERİŞİMİ var mı (yorum/docstring sayılmaz)."""
+    return any(isinstance(d, ast.Attribute) and d.attr == "modules"
+               and isinstance(d.value, ast.Name) and d.value.id == "sys"
+               for d in ast.walk(ast.parse(kaynak, filename=yol)))
 
 
 def test_app_py_stays_a_thin_composition_root():
@@ -110,31 +124,79 @@ def test_every_router_module_is_included_in_the_app():
 
 
 def test_directories_are_read_at_request_time_not_bound_at_import():
-    """`OUTPUT_DIR`/`ASSETS_DIR`/`STATIC_DIR` adları router ve service'lerde GEÇMEZ.
+    """Hiçbir router/service dizini İTHAL ANINDA bağlamaz (Faz 0 / Adım 4).
 
-    Bir router `from app import OUTPUT_DIR` ya da `paths.output_dir()` ile kendi
-    kopyasını alırsa `monkeypatch.setattr(appmod, "OUTPUT_DIR", …)` o rotayı
-    ıskalar ve 47 test geliştiricinin gerçek veri dizinine yazar — 2. görevin
-    ölçtüğü sızıntı. Tek okuma noktası `services.yollar` (gerekçesi orada).
+    Üç yasak: (1) `OUTPUT_DIR`/`ASSETS_DIR`/`STATIC_DIR` adları — eski modül
+    sabitleri; (2) `paths.output_dir()`/`paths.assets_dir()` çağrısı — kendi
+    kopyasını alan bir router `app.state.ayarlar`ı ıskalar ve o rotayı sınayan
+    test geliştiricinin gerçek veri dizinine yazar (2. görevin ölçtüğü sızıntı
+    sınıfı); (3) bir modülün `app.py`yi `sys.modules` üzerinden adıyla
+    okuması — `services/yollar.py`nin geçici mekanizmasıydı, artık yok.
+    Tek istisna `services/ayar.py`: ayar nesnesini `paths`ten KURAN yer.
     """
-    for yol in _paket_dosyalari("routers") + _paket_dosyalari("services"):
+    for yol in _urun_dosyalari():
         kaynak = _oku(yol)
-        if yol == "services/yollar.py":
-            continue    # okuma noktasının kendisi
+        # AST'den, metinden DEĞİL: gerekçe yorumları eski mekanizmayı adıyla anıyor.
+        assert not _sys_modules_okuyor(kaynak, yol), (
+            f"{yol}: `sys.modules` okuyor — dizin (ya da başka bir şey) adıyla değil "
+            "`Depends(ayar.ayarlar)` ile gelir")
+        if yol in ("app.py", "services/ayar.py"):
+            continue    # bileşim kökü ve ayar nesnesini kuran modül
         for ad in ("OUTPUT_DIR", "ASSETS_DIR", "STATIC_DIR"):
             assert not re.search(rf"\b{ad}\b", kaynak), (
-                f"{yol}: `{ad}` sabitine bağlanıyor — `yollar.{ad.lower()}()` kullan")
+                f"{yol}: `{ad}` sabitine bağlanıyor — `ayarlar.{ad.lower()}` kullan")
         assert "paths.output_dir(" not in kaynak and "paths.assets_dir(" not in kaynak, (
-            f"{yol}: dizini doğrudan paths'ten okuyor — yamayı ıskalar")
+            f"{yol}: dizini doğrudan paths'ten okuyor — ayar nesnesini ıskalar")
 
 
-def test_patching_output_dir_on_app_reaches_the_routers(monkeypatch, tmp_path):
-    """Mekanizmanın kendisi: `app.OUTPUT_DIR` yaması `services.yollar`dan görünüyor."""
-    from services import yollar
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
-    assert yollar.output_dir() == str(tmp_path)
-    monkeypatch.setattr(appmod, "ASSETS_DIR", str(tmp_path / "a"))
-    assert yollar.assets_dir() == str(tmp_path / "a")
+def test_app_exposes_no_directory_constants():
+    """`appmod.OUTPUT_DIR = …` yamasının hedefi kalmadı; ad da kalmamalı.
+
+    Ad dursaydı eski alışkanlıkla yazılan bir yama sessizce hiçbir şeyi
+    değiştirmezdi — ölü yama kapısının (`_to_png`) dizin sürümü.
+    """
+    for ad in ("OUTPUT_DIR", "ASSETS_DIR", "STATIC_DIR", "BASE_DIR"):
+        assert not hasattr(appmod, ad), f"app.{ad} hâlâ var — ayar nesnesi app.state.ayarlar"
+    assert isinstance(appmod.app.state.ayarlar, ayar.Ayarlar)
+
+
+def test_every_route_that_touches_a_directory_declares_the_dependency():
+    """Dizin okuyan her rota `Depends(ayar.ayarlar)` ile ister; başka yol yok.
+
+    Sayı DEĞİL kapsam ölçülüyor: `ayarlar.` yazan her rota dosyasında bu ad
+    bir `Depends` parametresinden gelmeli. Rota dışı yardımcılar dizini
+    parametre alıyor, yani `ayarlar.` yalnız rota gövdelerinde görünür.
+    """
+    for yol in _paket_dosyalari("routers"):
+        kaynak = _oku(yol)
+        if "ayarlar." in kaynak:
+            assert "Depends(ayar.ayarlar)" in kaynak, f"{yol}: ayar nesnesini nereden alıyor?"
+
+
+def test_redirecting_the_settings_object_reaches_the_routers(tmp_path, dizinler):
+    """Mekanizmanın kendisi: `app.state.ayarlar` yönlendirmesi rotaya ULAŞIYOR.
+
+    `dizinler` fixture'ının bekçisi — fixture yamayı yanlış yere yazsa 60'tan
+    fazla test yeşil kalıp geliştiricinin gerçek `output/`una yazardı.
+    """
+    ayarlar = dizinler(output_dir=str(tmp_path / "output"))
+    storage.save(b"\x89PNG", {"prompt": "kanit", "size": "1024x1024", "quality": "low",
+                              "parent_id": None, "folder_id": None, "palette": None,
+                              "prompt_sent": None, "model": ""},
+                 ayarlar.output_dir, now="2026-09-16T00:00:00")
+    gorunen = TestClient(appmod.app).get("/api/history").json()["images"]
+    assert [g["prompt"] for g in gorunen] == ["kanit"]
+    assert (tmp_path / "output" / "history.json").is_file()
+
+
+def test_the_dependency_reads_the_live_settings_object(tmp_path, dizinler):
+    """`ayar.ayarlar(request)` her çağrıda `app.state`e bakıyor, kopya tutmuyor."""
+    from starlette.requests import Request
+    istek = Request({"type": "http", "app": appmod.app, "headers": []})
+    once = ayar.ayarlar(istek)
+    yeni = dizinler(assets_dir=str(tmp_path / "a"))
+    assert ayar.ayarlar(istek) is yeni and yeni is not once
+    assert ayar.ayarlar(istek).assets_dir == str(tmp_path / "a")
 
 
 def test_the_patched_helpers_are_not_re_exported_from_app():

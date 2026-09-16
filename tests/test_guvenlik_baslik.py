@@ -36,9 +36,8 @@ KOTU_AD = "kotu\r\nX-Injected: yes\r\n\r\nPWNED"
 KONTROL_KARAKTERLERI = ["\r", "\n", "\t", "\x00", "\x0b", "\x0c", "\x1b", "\x7f"]
 
 
-def _client(tmp_path, monkeypatch):
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path / "output"))
-    monkeypatch.setattr(appmod, "ASSETS_DIR", str(tmp_path / "assets"))
+def _client(tmp_path, dizinler):
+    dizinler(output_dir=str(tmp_path / "output"), assets_dir=str(tmp_path / "assets"))
     return TestClient(appmod.app)
 
 
@@ -82,21 +81,21 @@ def test_folder_request_accepts_visible_punctuation_and_emoji():
     assert FolderRequest(name="Müşteri #3 — logolar 🎨").name
 
 
-def test_create_folder_route_rejects_a_crlf_name(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_create_folder_route_rejects_a_crlf_name(tmp_path, dizinler):
+    c = _client(tmp_path, dizinler)
     assert c.post("/api/folders", json={"name": KOTU_AD}).status_code == 422
 
 
 # ── İkisi birlikte: uçtan uca ───────────────────────────────────────
 
-def test_download_header_has_no_line_break_even_for_a_stored_bad_name(
-        tmp_path, monkeypatch):
+def test_download_header_has_no_line_break_even_for_a_stored_bad_name(tmp_path, dizinler):
     """Depoda ZATEN böyle bir ad varsa (giriş kapısından önce açılmış klasör)
     indirme yine de çalışmalı ve başlık tek satır kalmalı."""
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, dizinler)
     # Rotayı ATLAYARAK doğrudan depoya yaz: giriş kapısı artık bunu geçirmiyor,
     # ama v0.x'te açılmış bir klasör diskte hâlâ böyle durabilir.
-    fid = folders.create(KOTU_AD, appmod.OUTPUT_DIR, now="2026-01-01T00:00:00")["id"]
+    fid = folders.create(KOTU_AD, appmod.app.state.ayarlar.output_dir,
+                         now="2026-01-01T00:00:00")["id"]
 
     r = c.get(f"/api/folders/{fid}/download")
 
@@ -107,10 +106,10 @@ def test_download_header_has_no_line_break_even_for_a_stored_bad_name(
     assert cd.startswith('attachment; filename="kotu_X-Injected_yes_PWNED.zip"')
 
 
-def test_download_header_still_carries_the_utf8_name(tmp_path, monkeypatch):
+def test_download_header_still_carries_the_utf8_name(tmp_path, dizinler):
     """Türkçe ad `filename*` tarafında AYNEN duruyor — düzeltme onu bozmadı."""
-    c = _client(tmp_path, monkeypatch)
-    fid = folders.create("Şubat Çalışması", appmod.OUTPUT_DIR,
+    c = _client(tmp_path, dizinler)
+    fid = folders.create("Şubat Çalışması", appmod.app.state.ayarlar.output_dir,
                          now="2026-01-01T00:00:00")["id"]
 
     cd = c.get(f"/api/folders/{fid}/download").headers["content-disposition"]

@@ -183,7 +183,7 @@ def test_generated_files_declare_that_they_are_generated():
 
 def test_the_hook_only_reacts_to_files_that_can_change_the_graph():
     """Kanca kipi ilgisiz düzenlemede iş yapmamalı; ilgili olanı kaçırmamalı."""
-    ilgili = ["app.py", "routers/kok.py", "services/yollar.py",
+    ilgili = ["app.py", "routers/kok.py", "services/ayar.py",
               "tools/graf_uret.py", "tests/test_app.py",
               "static/core.js", "static/index.html", "static/style.css"]
     ilgisiz = ["README.md", "GUNCELLEME.md", "docs/graflar/moduller.md",

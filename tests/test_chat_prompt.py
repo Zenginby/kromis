@@ -896,4 +896,4 @@ def test_the_route_passes_the_interface_language_to_the_persona():
     """Bağlam rotada toplanıyor (`chat_prompt` `prefs`'e bakmıyor), yani
     dilin oraya GİRDİĞİ tek yer bu sözlük."""
     import app as appmod
-    assert "language" in appmod._director_context()
+    assert "language" in appmod._director_context(appmod.app.state.ayarlar.output_dir)

@@ -15,13 +15,13 @@ def _png(color=(200, 30, 30, 255), size=(48, 24)) -> bytes:
     return b.getvalue()
 
 
-def _client(tmp_path, monkeypatch) -> TestClient:
-    monkeypatch.setattr(appmod, "ASSETS_DIR", str(tmp_path / "assets"))
+def _client(tmp_path, dizinler) -> TestClient:
+    dizinler(assets_dir=str(tmp_path / "assets"))
     return TestClient(appmod.app)
 
 
-def test_upload_lists_and_serves(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_upload_lists_and_serves(tmp_path, dizinler):
+    c = _client(tmp_path, dizinler)
     r = c.post("/api/assets/logos",
                files={"file": ("mylogo.png", _png(), "image/png")},
                data={"name": "Kurumsal"})
@@ -38,30 +38,30 @@ def test_upload_lists_and_serves(tmp_path, monkeypatch):
     assert served.headers["content-type"] == "image/png"
 
 
-def test_upload_derives_name_from_filename_when_blank(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_upload_derives_name_from_filename_when_blank(tmp_path, dizinler):
+    c = _client(tmp_path, dizinler)
     r = c.post("/api/assets/banners",
                files={"file": ("footer-bar.png", _png(), "image/png")})
     assert r.status_code == 200
     assert r.json()["asset"]["name"] == "footer-bar"
 
 
-def test_upload_rejects_non_image(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_upload_rejects_non_image(tmp_path, dizinler):
+    c = _client(tmp_path, dizinler)
     r = c.post("/api/assets/logos",
                files={"file": ("bad.png", b"not really a png", "image/png")})
     assert r.status_code == 422
 
 
-def test_unknown_kind_is_404(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_unknown_kind_is_404(tmp_path, dizinler):
+    c = _client(tmp_path, dizinler)
     assert c.get("/api/assets/evil").status_code == 404
     assert c.post("/api/assets/evil",
                   files={"file": ("x.png", _png(), "image/png")}).status_code == 404
 
 
-def test_delete_removes_asset(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_delete_removes_asset(tmp_path, dizinler):
+    c = _client(tmp_path, dizinler)
     rec = c.post("/api/assets/logos",
                  files={"file": ("l.png", _png(), "image/png")}).json()["asset"]
     assert c.delete(f"/api/assets/logos/{rec['id']}").status_code == 200
@@ -69,8 +69,8 @@ def test_delete_removes_asset(tmp_path, monkeypatch):
     assert c.delete(f"/api/assets/logos/{rec['id']}").status_code == 404
 
 
-def test_serve_rejects_traversal_and_manifest(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_serve_rejects_traversal_and_manifest(tmp_path, dizinler):
+    c = _client(tmp_path, dizinler)
     c.post("/api/assets/logos", files={"file": ("l.png", _png(), "image/png")})
     # manifest dosyası servis edilmez
     assert c.get(f"/assets/logos/{astore.MANIFEST_FILE}").status_code == 404
@@ -78,7 +78,7 @@ def test_serve_rejects_traversal_and_manifest(tmp_path, monkeypatch):
     assert c.get("/assets/logos/deadbeef.png").status_code == 404
 
 
-def test_the_dead_uploads_kind_is_no_longer_a_route(tmp_path, monkeypatch):
+def test_the_dead_uploads_kind_is_no_longer_a_route(tmp_path, dizinler):
     """`uploads` D9'da bir yükleme hedefiydi; artık ne hedef ne de tür.
 
     Bu test eskiden türe yükleyip listeliyordu. Tür ÖLÜ olduğu için (hedef ve
@@ -86,7 +86,7 @@ def test_the_dead_uploads_kind_is_no_longer_a_route(tmp_path, monkeypatch):
     şimdi kapının kendisi kapalı: uç 404. Eski varlıklar kaybolmuyor, açılışta
     `logos`a göçüyorlar — bekçisi tests/test_assets.py.
     """
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, dizinler)
     assert c.post("/api/assets/uploads",
                   files={"file": ("user_upload.png", _png(), "image/png")}
                   ).status_code == 404
@@ -94,8 +94,8 @@ def test_the_dead_uploads_kind_is_no_longer_a_route(tmp_path, monkeypatch):
     assert c.delete("/api/assets/uploads/deadbeef12ab").status_code == 404
 
 
-def test_list_all_assets_combines_kinds(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_list_all_assets_combines_kinds(tmp_path, dizinler):
+    c = _client(tmp_path, dizinler)
     r1 = c.post("/api/assets/logos", files={"file": ("l.png", _png(), "image/png")}).json()["asset"]
     r2 = c.post("/api/assets/mottos", files={"file": ("u.png", _png(), "image/png")}).json()["asset"]
 
@@ -116,7 +116,7 @@ def _eski_uploads_dizini(tmp_path):
          "created_at": "2026-01-01T10:00:00"}]), encoding="utf-8")
 
 
-def test_a_legacy_upload_becomes_a_usable_logo_after_startup(tmp_path, monkeypatch):
+def test_a_legacy_upload_becomes_a_usable_logo_after_startup(tmp_path, monkeypatch, dizinler):
     """Göç AÇILIŞTA gerçekten koşuyor ve varlık artık KULLANILABİLİR bir logo.
 
     `assets_store` tarafındaki birim testleri göçün kendisini ölçüyor; bu test
@@ -124,10 +124,9 @@ def test_a_legacy_upload_becomes_a_usable_logo_after_startup(tmp_path, monkeypat
     hiç çağrılmasaydı birim testleri yeşil kalır, kullanıcının varlığı ise
     ortadan kaybolurdu (tür artık listelenmiyor).
     """
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path / "output"))
-    monkeypatch.setattr(appmod, "ASSETS_DIR", str(tmp_path / "assets"))
-    monkeypatch.setattr(appmod.paths, "data_dir", lambda: str(tmp_path))
-    monkeypatch.setattr(appmod.paths, "ensure_data_dirs", lambda: None)
+    dizinler(data_dir=str(tmp_path), output_dir=str(tmp_path / "output"),
+             assets_dir=str(tmp_path / "assets"))
+    monkeypatch.setattr(appmod.paths, "ensure_data_dirs", lambda *dizinler: None)
     _eski_uploads_dizini(tmp_path)
 
     with TestClient(appmod.app) as c:
@@ -138,7 +137,7 @@ def test_a_legacy_upload_becomes_a_usable_logo_after_startup(tmp_path, monkeypat
     assert not (tmp_path / "assets" / "uploads").exists()
 
 
-def test_the_version_backup_runs_before_the_migration(tmp_path, monkeypatch):
+def test_the_version_backup_runs_before_the_migration(tmp_path, monkeypatch, dizinler):
     """SIRA: yedek göçten ÖNCE — yedeğin göç ÖNCESİ hâli taşıması için.
 
     Göç, açılışın kullanıcı verisini yerinden oynatan tek adımı. Sıra ters
@@ -146,10 +145,9 @@ def test_the_version_backup_runs_before_the_migration(tmp_path, monkeypatch):
     geri dönülecek bir nokta kalmazdı — yani yedek tam da en çok gerektiği
     sürümde işe yaramaz olurdu.
     """
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path / "output"))
-    monkeypatch.setattr(appmod, "ASSETS_DIR", str(tmp_path / "assets"))
-    monkeypatch.setattr(appmod.paths, "data_dir", lambda: str(tmp_path))
-    monkeypatch.setattr(appmod.paths, "ensure_data_dirs", lambda: None)
+    dizinler(data_dir=str(tmp_path), output_dir=str(tmp_path / "output"),
+             assets_dir=str(tmp_path / "assets"))
+    monkeypatch.setattr(appmod.paths, "ensure_data_dirs", lambda *dizinler: None)
     sira: list[str] = []
     monkeypatch.setattr(appmod.backup, "backup_manifests_if_version_changed",
                         lambda *a, **k: sira.append("yedek"))

@@ -18,8 +18,8 @@ from services import gorsel
 
 
 @pytest.fixture
-def client(tmp_path, monkeypatch):
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
+def client(tmp_path, monkeypatch, dizinler):
+    dizinler(output_dir=str(tmp_path))
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG"])
     monkeypatch.setattr(ac, "edit", lambda *a, **k: [b"\x89PNG"])
     return TestClient(appmod.app)

@@ -1114,7 +1114,7 @@
         "app"
       ],
       "katman": 9,
-      "satir": 420,
+      "satir": 423,
       "testler": [],
       "yol": "routers/uretim.py"
     },
@@ -2212,7 +2212,7 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 362,
+      "satir": 365,
       "yardimci_sayisi": 19,
       "yol": "/api/edit",
       "yontem": "POST"

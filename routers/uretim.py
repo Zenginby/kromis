@@ -219,10 +219,13 @@ async def animate(
     # Normalleştirme kapıdan ÖNCE: kapı ile rota AYNI değeri görmek zorunda.
     #
     # `last_file`in İKİZİ YOK ve gerekmiyor: dosya adı olmayan bir parçayı
-    # Starlette `str` olarak çözüyor, declared `UploadFile | None` da onu daha
-    # buraya varmadan 422 yapıyor (`gorsel.extra_refs`in ham formu okumasının
-    # gerekçesi tam bu). Ana karenin `file` alanı da aynı davranıyor — burada
-    # ayrı bir süzgeç açmak iki kardeş alanı sessizce ayrıştırırdı.
+    # çerçeve rotadan ÖNCE çözüyor. Starlette onu hâlâ boş `str` olarak
+    # ayrıştırıyor, FastAPI 0.141 ise boş dizeyi `UploadFile | None` için
+    # `None` sayıyor (0.115'te 422 oluyordu; Faz 0 / Adım 5'te pinler
+    # yükselirken ölçüm yenilendi). Dolu METİN gelen bir dosya alanı ise iki
+    # sürümde de 422 (`gorsel.extra_refs`in ham formu okumasının gerekçesi tam
+    # bu). Ana karenin `file` alanı da aynı yoldan geçiyor — burada ayrı bir
+    # süzgeç açmak iki kardeş alanı sessizce ayrıştırırdı.
     last_source_id = (last_source_id or "").strip() or None
     model_id = _check_video_form(prompt, size, quality, duration, n,
                                  file, source_id, model,

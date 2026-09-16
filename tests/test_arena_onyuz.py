@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 import app as appmod
 import catalog
-from tests.conftest import tr
+from tests.conftest import duz_rotalar, tr
 
 
 def _metin(yol: str) -> str:
@@ -57,7 +57,8 @@ def test_the_round_fans_out_from_the_client_not_the_server():
     assert 'fetch("/api/generate"' in govde, "üretim ucu çağrılmıyor"
     assert "Promise.all" in govde, "sütunlar paralel değil"
     # Sunucuda arena diye bir ÜRETİM ucu yok: turun yalnız etiketi ve kazananı var.
-    yollar = {r.path for r in appmod.app.routes if hasattr(r, "path")}
+    # `appmod.app.routes` DEĞİL: FastAPI 0.137'den beri ağaç (bkz. conftest).
+    yollar = {yol for _yontem, yol in duz_rotalar(appmod.app)}
     assert "/api/arena/{arena_id}/winner" in yollar
     assert not any(y.startswith("/api/arena") and y.endswith("generate") for y in yollar)
 

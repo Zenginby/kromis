@@ -68,7 +68,7 @@ jobs:
       # işletim sistemi kütüphanelerini de kuruyor; onlarsız chromium başlamıyor.
       - name: Playwright (paket + tarayıcı)
         run: |
-          pip install playwright==1.62.*
+          pip install playwright==1.63.*
           playwright install --with-deps chromium
 
       # `KROMIS_E2E_ZORUNLU`: E2E testleri ATLANIRSA takım kırmızıya döner.

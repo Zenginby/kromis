@@ -8,6 +8,8 @@ iddialar kozmetik değil.
 """
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -98,12 +100,17 @@ def test_lifespan_still_runs_behind_the_guard():
     uygulama telefonda boş bir galeriyle açılırdı.
     """
     izler: list[str] = []
-    app = FastAPI()
 
-    @app.on_event("startup")
-    def _basla():
+    # `@app.on_event("startup")` DEĞİL: Starlette 1.0 onu kaldırdı, FastAPI
+    # 0.128.3 yalnız uyumluluk için (DeprecationWarning ile) geri koydu.
+    # Sınanan şey aynı — kapı lifespan mesajlarını geçiriyor mu — ve
+    # uygulamanın kendisi de `app.py`de aynı `lifespan=` yolunu kullanıyor.
+    @asynccontextmanager
+    async def _lifespan(_app: FastAPI):
         izler.append("startup")
+        yield
 
+    app = FastAPI(lifespan=_lifespan)
     app.add_middleware(android_main.SessionCookieGuard, token="t")
     with TestClient(app):
         pass

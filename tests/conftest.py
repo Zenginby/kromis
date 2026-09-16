@@ -366,3 +366,36 @@ def tr(anahtar: str) -> str:
     metin = i18n.t(anahtar, "tr")
     assert metin != anahtar, f"sözlükte yok: {anahtar}"
     return metin
+
+
+def duz_rotalar(uygulama) -> list[tuple[str, str]]:
+    """Çalışan uygulamanın (YÖNTEM, yol) çiftleri — ağaç değil DÜZ liste.
+
+    NEDEN VAR (Faz 0 / Adım 5): FastAPI 0.137 `include_router`ı rotaları
+    kopyalamayı bıraktı; `app.routes` artık takılan her router için tek bir
+    `_IncludedRouter` düğümü taşıyor ve asıl rotalar onun
+    `original_router.routes` altında (iç içe include'larda daha da derinde).
+    0.115'te `app.routes` düz bir listeydi; onu doğrudan sayan iki test
+    (`test_app_bolme`, `test_arena_onyuz`) 0.141'de yalnız `/docs` ailesini
+    görüp kırmızıya döndü. Yürüyüş TEK yerde dursun ki bir sonraki iç yapı
+    değişikliği iki testi ayrı ayrı değil burayı kırsın.
+
+    Ön ek `include_context.prefix`ten toplanıyor: bugün `app.py` öneksiz
+    takıyor, ama öneksiz varsayan bir yürüyüş ilk `prefix=` ile sessizce
+    yanlış yol üretirdi. Belge rotaları (`/docs`, `/redoc`, `/openapi.json`)
+    ve `Mount`lar (yöntemsiz) çağıranın süzgecine bırakılıyor.
+    """
+    bulunan: list[tuple[str, str]] = []
+
+    def _yuru(rotalar, on_ek: str) -> None:
+        for r in rotalar:
+            ic = getattr(r, "original_router", None)
+            if ic is not None:                      # FastAPI ≥ 0.137 düğümü
+                baglam = getattr(r, "include_context", None)
+                _yuru(ic.routes, on_ek + (getattr(baglam, "prefix", "") or ""))
+                continue
+            for yontem in getattr(r, "methods", None) or ():
+                bulunan.append((yontem, on_ek + r.path))
+
+    _yuru(uygulama.routes, "")
+    return bulunan

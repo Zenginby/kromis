@@ -80,7 +80,7 @@ Bu modülleri hiçbir test dosyası ithal etmiyor. Dolaylı olarak sınanıyor o
 * `routers.kok` (81 satır)
 * `routers.paletler` (90 satır)
 * `routers.sohbet` (225 satır)
-* `routers.uretim` (420 satır)
+* `routers.uretim` (423 satır)
 * `services.kapilar` (75 satır)
 * `services.modeller` (295 satır)
 * `services.palet` (181 satır)

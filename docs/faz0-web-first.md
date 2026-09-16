@@ -195,7 +195,7 @@ onu izlemiyor; gerekçe README'nin son bölümüne madde olarak eklendi.
 
 ---
 
-## 5. Bağımlılık pinlerini yükselt: FastAPI / uvicorn / httpx / Pillow
+## 5. Bağımlılık pinlerini yükselt: FastAPI / uvicorn / httpx / Pillow ✅ (PR: `faz0/bagimlilik-pinleri`)
 
 **Kapsam.** `requirements.txt`: `fastapi==0.115.*` (2024), `uvicorn[standard]==0.32.*`,
 `httpx==0.27.*`, `Pillow==11.*`, `python-multipart==0.0.*` → güncel kararlı
@@ -219,6 +219,37 @@ Starlette `TestClient` çerez davranışı).
 
 **Çıkış ölçütü.** Pinler güncel, `pip install -r requirements.txt` temiz, tam
 takım yeşil, altın farkları PR'da açıklanmış.
+
+**Yapıldığında (2026-09-16) plandan sapmalar ve ölçümler.** Pinler:
+`fastapi 0.115.*→0.141.*` (dolaylı starlette 0.46.2→1.6.0), `uvicorn[standard]
+0.32.*→0.53.*`, `httpx 0.27.*→0.28.*`, `Pillow 11.*→12.*`, `pytest 8.*→9.*`;
+`_test.yml`de `playwright 1.62.*→1.63.*`. `python-multipart 0.0.*` zaten
+güncel (0.0.32); `pyinstaller-hooks-contrib 2026.7`, `ruff 0.16.*`, `mypy 2.3.*`
+zaten en son. `pyinstaller 6.21.*` BİLEREK yerinde: dondurulmuş paketleme
+kabuğuna ait (`kromis.spec`, v0.23.1). `requirements-web.txt` ayrımı
+yapılmadı — pywebview ve .NET köprüsü işaretçili pinleriyle `requirements.txt`te
+durdu; ayrım 8. göreve (Dockerfile) kaldı, iki farklı kurulum kümesi orada
+doğuyor. `android/app/build.gradle`deki pinler dondurulmuş, dokunulmadı.
+
+Kırılan dört yer, hepsi test tarafında (ürün kodunda yalnız bir yorum):
+(a) FastAPI 0.137 `include_router` kopyalamayı bıraktı, `app.routes` ağaç
+oldu → `tests/conftest.py::duz_rotalar` (`test_app_bolme`, `test_arena_onyuz`);
+(b) FastAPI 0.141 dosya adı BOŞ multipart parçasını `UploadFile | None` için
+`None` sayıyor (0.115: 422; Starlette hâlâ boş `str` ayrıştırıyor) →
+`test_video_route` yeniden yazıldı + "düz metin → 422" testi eklendi,
+`routers/uretim.py` yorumu düzeltildi; (c) Starlette 1.0 `on_event`i kaldırdı →
+`test_android_main` `lifespan=`e geçti; (d) Pillow 12.3 `Image.getdata()`i
+kullanımdan kaldırdı → `test_playwright_studio` `tobytes()`. Öngörülen riskler
+gerçekleşmedi: httpx `proxies=`/`app=` depoda yoktu, `MockTransport` yok
+(sahte istemciler elle), `tests/fixtures/logo` altınları bayt bayt aynı
+(yeniden üretim gerekmedi), TestClient çerez davranışı aynı, ön yüzün 15
+JSON `fetch`inin hepsi `Content-Type` veriyor (FastAPI 0.132 `strict_content_type`).
+Ölçüm: takım 2761→2762 test (yeni 422 testi), uyarı 7→4 (giden: `on_event` ×2,
+`websockets.legacy` ×2 — uvicorn 0.50 `websockets-sansio`ya geçti; gelen:
+`StarletteDeprecationWarning` — Starlette 1.6 test istemcisi için `httpx2`
+istiyor, `fastapi/testclient.py`den, üçüncü parti; takip: 6. görev), mypy 72
+bulgu / 25 dosya (`mypy .`; belge yazılırken 77, Adım 4 sonrası 75 — yükseliş
+sayıyı artırmadı), ruff temiz.
 
 ---
 

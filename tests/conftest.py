@@ -268,9 +268,19 @@ def _dil_baglami_testler_arasinda_sizmasin():
     ön tanımlı dilinin bekçisi ayrı: `test_prefs.py` varsayılanı,
     `test_i18n.py` de hiç tercih yazılmamış bir kurulumun hangi dilde
     servis edildiğini sınıyor.
+
+    `tercih.sifirla()` da burada (Faz 0 / Adım 3) ve aynı sınıf sızıntı:
+    kayıtlı tercih artık dosya imzalı bir önbellekten okunuyor. İki test aynı
+    dizini paylaşıp (`OUTPUT_DIR`ı yamalamayan E2E testleri geliştiricinin
+    gerçek `output/`unu kullanıyor) `prefs.read_stored`ı FARKLI dillerle
+    yamalarsa dosya ikisinde de değişmez ve ikinci test önbellekten
+    birincinin dilini okurdu — `test_playwright_dil`in iki parametresi tam
+    olarak bu çift.
     """
     import i18n
+    from services import tercih
     i18n.set_active(i18n.FALLBACK)
+    tercih.sifirla()
     yield
 
 

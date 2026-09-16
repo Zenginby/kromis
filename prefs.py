@@ -77,10 +77,12 @@ _SCHEMA: dict[str, tuple[object, type]] = {
     # anahtarlarını eşitliyor) — `chat_prompt.load_video_instructions`ın
     # "kapı burada değil testte" ayrımının aynısı.
     #
-    # Sistem/tarayıcı dilinden OTOMATİK ALGILAMA hâlâ yok ve bu kasıtlı:
-    # `app._dil_baglami`nin `Accept-Language` gerekçesi burada da geçerli —
-    # tercihin tek kaynağı diskteki bu dosya, yoksa kullanıcının seçimini
-    # sessizce ezen ikinci bir otorite doğardı.
+    # Tarayıcı dili (`Accept-Language`) Faz 0 / Adım 3'ten beri OKUNUYOR ama
+    # yalnız bu alan diskte HİÇ YAZILMAMIŞKEN (services/dil.py'deki zincir):
+    # kullanıcının seçimi hâlâ başlığı eziyor, tersi değil — "seçimi sessizce
+    # ezen ikinci bir otorite" kaygısının cevabı sırada. "Yazılmamış" ile
+    # "varsayılana eşit yazılmış" farkını `read()` gösteremez (varsayılanı
+    # doldurur); onun için `read_stored()` var.
     #
     # Anahtar burada, `credentials.env`'de DEĞİL: dosyanın başındaki iki
     # gerekçe (bir arayüz tercihinin 0600 olmasının anlamı yok · anahtarı
@@ -189,19 +191,36 @@ def read(output_dir: str) -> dict:
     olurdu. "Var mı?" katalogdan, "ulaşılabilir mi?" credstore'dan — ikisi ayrı
     soru ve yalnız ilki bir tercihi geçersiz kılıyor.
     """
-    stored = _read_raw(output_dir)
+    kayitli = read_stored(output_dir)
+    return {name: kayitli.get(name, default) for name, (default, _) in _SCHEMA.items()}
 
-    def _cozumle(name, default, expected):
+
+def read_stored(output_dir: str) -> dict:
+    """Yalnız AÇIKÇA yazılmış ve geçerli tercihler; varsayılan DOLDURULMAZ.
+
+    `read()` "hiç yazılmamış" ile "varsayılana eşit yazılmış"ı ayırt etmiyor
+    ve etmemeli — birleşik görünümün işi bu değil. Ama dil çözümü
+    (services/dil.py, Faz 0 / Adım 3) tam o farkı soruyor: tercih diskte
+    YOKSA sıra tarayıcının `Accept-Language` başlığına geçmeli; VARSA
+    (varsayılana eşit olsa bile) kullanıcının seçimi başlığı ezmeli.
+
+    Kapılar `read()` ile birebir aynı ve `read()` bunun üstünden geçiyor, iki
+    kopya yok: yanlış TÜR ve bilinmeyen DEĞER "yazılmamış" sayılır. Yani
+    elle yazılmış çöp bir `language: "de"` tarayıcı başlığını ezmez, başlık
+    onu ezer — çöp bir jetonun varsayılana düşmesinin doğal devamı.
+    Yan etkisiz: dosya yaratmaz, düzeltmez (bkz. `read()`).
+    """
+    stored = _read_raw(output_dir)
+    kayitli: dict = {}
+    for name, (_, expected) in _SCHEMA.items():
         value = stored.get(name)
         if not isinstance(value, expected):
-            return default
+            continue
         allowed = _ENUMS.get(name)
         if allowed is not None and value not in allowed:
-            return default
-        return value
-
-    return {name: _cozumle(name, default, expected)
-            for name, (default, expected) in _SCHEMA.items()}
+            continue
+        kayitli[name] = value
+    return kayitli
 
 
 def update(values: dict, output_dir: str) -> dict:

@@ -22,7 +22,7 @@
       ],
       "ithal": [],
       "ithal_eden": [],
-      "katman": 12,
+      "katman": 13,
       "satir": 201,
       "testler": [
         "tests/test_android_main.py",
@@ -65,7 +65,7 @@
         "desktop",
         "netguard"
       ],
-      "katman": 9,
+      "katman": 10,
       "satir": 174,
       "testler": [
         "tests/test_app.py",
@@ -79,6 +79,7 @@
         "tests/test_chat_route.py",
         "tests/test_chats_route.py",
         "tests/test_delete_route.py",
+        "tests/test_dil.py",
         "tests/test_edit_route.py",
         "tests/test_folders.py",
         "tests/test_fonts.py",
@@ -490,7 +491,7 @@
       "ithal_eden": [
         "android_main"
       ],
-      "katman": 11,
+      "katman": 12,
       "satir": 584,
       "testler": [
         "tests/test_desktop.py",
@@ -672,6 +673,7 @@
       "satir": 305,
       "testler": [
         "tests/test_catalog.py",
+        "tests/test_dil.py",
         "tests/test_i18n.py",
         "tests/test_playwright_dil.py"
       ],
@@ -748,7 +750,7 @@
       "ithal_eden": [
         "desktop"
       ],
-      "katman": 10,
+      "katman": 11,
       "satir": 169,
       "testler": [
         "tests/test_netguard.py"
@@ -883,12 +885,13 @@
         "desktop",
         "routers.ayarlar",
         "routers.sohbet",
-        "services.dil",
-        "services.modeller"
+        "services.modeller",
+        "services.tercih"
       ],
       "katman": 5,
-      "satir": 249,
+      "satir": 268,
       "testler": [
+        "tests/test_dil.py",
         "tests/test_i18n.py",
         "tests/test_index.py",
         "tests/test_playwright_dil.py",
@@ -966,14 +969,15 @@
         "prefs",
         "services.dil",
         "services.modeller",
+        "services.tercih",
         "services.yollar",
         "version"
       ],
       "ithal_eden": [
         "app"
       ],
-      "katman": 7,
-      "satir": 283,
+      "katman": 8,
+      "satir": 299,
       "testler": [],
       "yol": "routers/ayarlar.py"
     },
@@ -995,7 +999,7 @@
       "ithal_eden": [
         "app"
       ],
-      "katman": 8,
+      "katman": 9,
       "satir": 227,
       "testler": [],
       "yol": "routers/bindirme.py"
@@ -1017,7 +1021,7 @@
       "ithal_eden": [
         "app"
       ],
-      "katman": 8,
+      "katman": 9,
       "satir": 325,
       "testler": [],
       "yol": "routers/galeri.py"
@@ -1036,7 +1040,7 @@
       "ithal_eden": [
         "app"
       ],
-      "katman": 7,
+      "katman": 8,
       "satir": 82,
       "testler": [],
       "yol": "routers/kok.py"
@@ -1058,7 +1062,7 @@
       "ithal_eden": [
         "app"
       ],
-      "katman": 8,
+      "katman": 9,
       "satir": 88,
       "testler": [],
       "yol": "routers/paletler.py"
@@ -1110,7 +1114,7 @@
       "ithal_eden": [
         "app"
       ],
-      "katman": 8,
+      "katman": 9,
       "satir": 416,
       "testler": [],
       "yol": "routers/uretim.py"
@@ -1134,7 +1138,7 @@
       "erteli_ithal": [],
       "ithal": [
         "i18n",
-        "prefs",
+        "services.tercih",
         "services.yollar"
       ],
       "ithal_eden": [
@@ -1150,9 +1154,10 @@
         "services.kapilar",
         "services.palet"
       ],
-      "katman": 6,
-      "satir": 56,
+      "katman": 7,
+      "satir": 147,
       "testler": [
+        "tests/test_dil.py",
         "tests/test_i18n.py"
       ],
       "yol": "services/dil.py"
@@ -1172,7 +1177,7 @@
         "routers.galeri",
         "routers.uretim"
       ],
-      "katman": 7,
+      "katman": 8,
       "satir": 138,
       "testler": [
         "tests/test_edit_route.py",
@@ -1198,7 +1203,7 @@
         "routers.galeri",
         "routers.uretim"
       ],
-      "katman": 7,
+      "katman": 8,
       "satir": 70,
       "testler": [],
       "yol": "services/kapilar.py"
@@ -1243,7 +1248,7 @@
         "routers.paletler",
         "routers.uretim"
       ],
-      "katman": 7,
+      "katman": 8,
       "satir": 177,
       "testler": [],
       "yol": "services/palet.py"
@@ -1261,6 +1266,23 @@
       "satir": 63,
       "testler": [],
       "yol": "services/redaksiyon.py"
+    },
+    {
+      "ad": "services.tercih",
+      "erteli_ithal": [],
+      "ithal": [
+        "prefs"
+      ],
+      "ithal_eden": [
+        "routers.ayarlar",
+        "services.dil"
+      ],
+      "katman": 6,
+      "satir": 98,
+      "testler": [
+        "tests/test_dil.py"
+      ],
+      "yol": "services/tercih.py"
     },
     {
       "ad": "services.yollar",
@@ -1922,7 +1944,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 94,
+  "test_dosyasi_sayisi": 95,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",
@@ -2633,7 +2655,7 @@
         "static/settings.js"
       ],
       "satir": 268,
-      "yardimci_sayisi": 2,
+      "yardimci_sayisi": 4,
       "yol": "/api/prefs",
       "yontem": "POST"
     },

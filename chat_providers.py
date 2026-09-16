@@ -42,8 +42,8 @@ import azure_client as ac
 import catalog
 import chat_client as cc
 import credstore
-import i18n
 import etiket
+import i18n
 import openai_chat
 
 

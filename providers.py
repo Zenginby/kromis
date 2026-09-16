@@ -54,9 +54,12 @@ statik analizine dayanıyor ve o dosyanın 50 satırlık yorumu bunu ölçülmü
 değişmez sayıyor. Dinamik import o analizden kaçar ve paketlenmiş uygulamada
 adaptör bulunamaz.
 
-Bu dosya KÖKTE ve DÜZ — bir `providers/` PAKETİ olamaz. Android'in Chaquopy
-kaynak kümesi `include "*.py"` ile kurulu, yani alt paket APK'ya hiç girmez ve
-hata yalnız telefonda görünür (bkz. tests/test_android_packaging.py).
+Bu dosya kökte düz duruyor ama artık ZORUNDA DEĞİL (2026-09-16). Eski kısıt
+Android'in Chaquopy kaynak kümesinden geliyordu (`include "*.py"` → alt paket
+APK'ya hiç girmez, hata yalnız telefonda görünür). Masaüstü ve Android
+paketleri v0.23.1'de dondurulduğu için o kısıt ve mandalı
+(`tests/test_android_packaging.py`) kaldırıldı; bir `providers/` paketi
+bundan sonra serbest — gerekçe ve sıra: docs/faz0-web-first.md.
 """
 from __future__ import annotations
 

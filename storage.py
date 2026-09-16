@@ -16,8 +16,8 @@ kazancı estetik olan bir veri göçü olurdu.
 """
 from __future__ import annotations
 
-import json
 import contextlib
+import json
 import os
 import re
 import uuid

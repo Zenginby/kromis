@@ -50,7 +50,7 @@ LOOPBACK_KONAKLAR = frozenset({"127.0.0.1", "localhost", "::1", "[::1]"})
 _REDDEDILDI = (
     "Bu sunucuya yalnızca uygulamanın kendi penceresi erişebilir. / "
     "Only this app's own window can reach this server."
-).encode("utf-8")
+).encode()
 
 
 def konak_adi(host_basligi: str) -> str:

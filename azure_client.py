@@ -10,10 +10,10 @@ penceresi buraya yazar) → `~/.config/claude-tools/azure-gpt-image2.env` (payla
 from __future__ import annotations
 
 import base64
-import i18n
 import os
 import tempfile
 
+import i18n
 import paths
 import winsec
 
@@ -436,7 +436,7 @@ def edit(prompt, images, size, quality, n, *, client=None, credentials=None) -> 
     files = build_image_files(images)
 
     owns_client = client is None
-    import httpx   # bkz. generate(): hata türleri için enjekte istemcide de gerekli
+    import httpx  # bkz. generate(): hata türleri için enjekte istemcide de gerekli
     if owns_client:
         client = httpx.Client()
     read = read_timeout_for(n)

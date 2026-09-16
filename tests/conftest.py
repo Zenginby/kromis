@@ -36,6 +36,7 @@ import pytest
 
 import backup as backup_module
 import paths as paths_module
+
 # Hangi dosyaların E2E olduğu TEK yerde ölçülüyor; gerekçesi orada. Salt
 # kitaplık bir modül, yani takımın kendisi bir kuruluma bağlanmıyor.
 from tools.test_ortami import e2e_dosyalari

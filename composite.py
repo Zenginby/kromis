@@ -21,10 +21,11 @@ fixture'lar korunuyor: aynı dosya doğrudan geçildiğinde pikseller birebir ay
 """
 from __future__ import annotations
 
-import i18n
 import io
 
 from PIL import Image, ImageFilter
+
+import i18n
 
 # Gölgenin logoya göre kaydırması (px) — dış script'ten birebir taşındı;
 # golden fixture'lar bu iki sayıya bağlı, değiştirilirse yeniden üretilmeli.

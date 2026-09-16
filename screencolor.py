@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import sys
 import threading
-from typing import Callable
+from collections.abc import Callable
 
 # Kullanıcı seçiciyi açıp unutabilir; süresiz beklemek js_api thread'ini
 # sonsuza kadar tutar. Cömert ama sonlu.
@@ -71,11 +71,7 @@ def to_hex(ns_color) -> str:
 
     if srgb is None:
         raise ValueError("renk sRGB'ye dönüştürülemedi")
-    return "#{:02x}{:02x}{:02x}".format(
-        _clamp_component(srgb.redComponent()),
-        _clamp_component(srgb.greenComponent()),
-        _clamp_component(srgb.blueComponent()),
-    )
+    return f"#{_clamp_component(srgb.redComponent()):02x}{_clamp_component(srgb.greenComponent()):02x}{_clamp_component(srgb.blueComponent()):02x}"
 
 
 def show_sampler_on_main_thread(handler: Callable[[object | None], None]) -> None:

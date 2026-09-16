@@ -1,5 +1,7 @@
 import base64
+
 import pytest
+
 import azure_client as ac
 
 

@@ -9,14 +9,13 @@ Tests:
 """
 from __future__ import annotations
 
-import asyncio
 import io
 import os
 import socket
 import threading
 import time
+
 import pytest
-from fastapi import FastAPI
 import uvicorn
 
 # Playwright isteğe bağlı bir bağımlılık: CI derleme işlerinde (build-macos-arm64)
@@ -26,10 +25,10 @@ pytest.importorskip("playwright", reason="playwright kurulu değil — E2E testl
 
 from playwright.sync_api import sync_playwright
 
-from app import app
 import app as appmod
 import catalog
 import credstore
+from app import app
 
 
 def _ilk_kurulum_perdesini_kapat(page) -> None:
@@ -893,8 +892,9 @@ def _olcum_kutuphanesi(tmp_path, monkeypatch) -> dict[str, str]:
     kalıyor. `img.currentSrc.startsWith("data:")` iddiası o sessiz düşüşün
     bekçisi.
     """
-    import assets_store as astore
     from PIL import Image
+
+    import assets_store as astore
 
     out = str(tmp_path / "output")
     assets = str(tmp_path / "assets")
@@ -1126,9 +1126,10 @@ def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(
     "Kampanyalar / Bayram" 0 → 3. YEM klasör "Yılbaşı / Bayram" 0 → 0 kaldı:
     eşleşen ATA, ağaçta geçen herhangi bir ad değil.
     """
+    from PIL import Image
+
     import folders as fmod
     import storage
-    from PIL import Image
 
     out = str(tmp_path / "output")
     os.makedirs(out, exist_ok=True)

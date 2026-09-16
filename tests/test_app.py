@@ -1,7 +1,9 @@
 import os
+
 from fastapi.testclient import TestClient
-import azure_client as ac
+
 import app as appmod
+import azure_client as ac
 
 
 def _client(tmp_path, monkeypatch):

@@ -3,7 +3,6 @@ import json
 import zipfile
 from urllib.parse import quote
 
-
 from fastapi.testclient import TestClient
 from PIL import Image
 

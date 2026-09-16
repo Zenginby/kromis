@@ -21,6 +21,10 @@
 # SIRLAR: çağıranın `secrets: inherit` demesi ŞART. Reusable workflow sırları
 # kendiliğinden devralmaz; unutulursa keystore çözülemez ve `imza_zorunlu`
 # açıkken iş (doğru biçimde) kırmızıya düşer.
+#
+# DONDURULDU (2026-09-16, Faz 0 / Adım 1): bu paket v0.23.1'de dondu. Workflow
+# silinmedi ama artık hiçbir push/PR onu çağırmıyor — tek çağıran `release.yml`
+# ve o da yalnız `workflow_dispatch`. Gerekçe: docs/faz0-web-first.md.
 name: Android paketi
 
 on:

@@ -1,5 +1,11 @@
-# Yayın hattı — main'e giren her değişiklik için üç paketi de üretir ve TEK
-# seferde yayımlar.
+# Yayın hattı — ELLE tetiklenir; üç paketi de üretir ve TEK seferde yayımlar.
+#
+# DURUM (2026-09-16): masaüstü ve Android paketleri v0.23.1'de dondu; aşağıdaki
+# "main'e merge" anlatımı hattın KURULDUĞU günü kaydediyor, bugün tetik yalnız
+# `workflow_dispatch` (gerekçe `on:` bloğunda). Hattın iç yapısı — karar,
+# sürüm yazma, taslak, üç paket, tek yazıcı — bilerek DEĞİŞTİRİLMEDİ: elle
+# çalıştırıldığında eskisi gibi çalışır ve `tests/test_release_manifest.py`
+# onu aynı sertlikte mandallamaya devam ediyor.
 #
 # NE DEĞİŞTİ VE NEDEN
 # -------------------
@@ -27,8 +33,14 @@
 name: Yayın
 
 on:
-  push:
-    branches: [main]
+  # YALNIZ ELLE (2026-09-16, Faz 0 / Adım 1). `push: branches: [main]` tetiği
+  # kaldırıldı: masaüstü ve Android paketleri v0.23.1'de donduruldu, proje
+  # web-first ilerliyor (docs/faz0-web-first.md). main'e merge artık sürüm
+  # artırmaz, paket derlemez, yayın çıkarmaz. Hattın geri kalanı olduğu gibi
+  # duruyor — bir gün yeni bir masaüstü/Android sürümü gerekirse Actions →
+  # Yayın → Run workflow yeter; `kuru_prova: true` ile de yalnız "paketleme
+  # ayakta mı" sorusu cevaplanır. `tests/test_paketleme_dondurma.py` bu
+  # tetiğin geri gelmemesini mandallıyor.
   workflow_dispatch:
     inputs:
       surum:

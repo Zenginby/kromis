@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import azure_client as ac
 import chat_prompt
+
 # Yanıt sınırı `models`'ta yaşıyor çünkü ORASI onu zorunlu kılan yer
 # (`ChatMessage.content`); ikinci bir sabit iki sayının ayrışmasına davetiye
 # olurdu. Döngü yok: `models` yalnız `azure_client` ve `palette`'e bakıyor.
@@ -165,7 +166,7 @@ def complete(messages: list[dict], *, client=None, credentials=None,
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
 
     owns_client = client is None
-    import httpx   # bkz. azure_client.generate(): hata türleri için de gerekli
+    import httpx  # bkz. azure_client.generate(): hata türleri için de gerekli
     if owns_client:
         client = httpx.Client()
     try:

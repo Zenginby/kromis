@@ -1,0 +1,87 @@
+# Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+#
+# Lint ve tip denetimi yapılandırması — Faz 0 / Adım 1 (2026-09-16).
+#
+# NEDEN VAR: bu depoda bugüne kadar hiçbir lint/tip aracı yoktu
+# (`requirements.txt`in kendi yorumu "pyproject.toml/setup.cfg da yok" diyor
+# ve o cümle hâlâ doğru: burası bir PAKET tanımı değil, yalnız araç ayarı —
+# `[project]` tablosu bilerek yok, depo kurulabilir bir paket değil).
+# Web-first dönüşüm `app.py`yi paketlere bölecek, bağımlılıkları taşıyacak ve
+# çok sayıda yeni modül getirecek; o hacimde bir değişiklik, kullanılmayan
+# ithalleri ve bozuk isimleri gözle yakalamaya bırakılamaz.
+#
+# KURAL KÜMESİ TUTUCU: E (pycodestyle), F (pyflakes), I (isort), UP (pyupgrade),
+# B (bugbear). Aşağıdaki `ignore` listesi bu PR'da ÖLÇÜLEN mevcut ihlallerin
+# kaydıdır — her biri ayrı bir kararı beklediği için kod yerine burada
+# kapatıldı, böylece ilk PR'ın farkı okunabilir kaldı. Her satırın yanında
+# sayı ve gerekçe var; bir kural buradan çıkarıldığında kodun onunla temiz
+# olması gerekir (docs/faz0-web-first.md → 6. görev).
+#
+# `ruff format` HENÜZ kapıda DEĞİL: ölçüldü, 141 dosyanın 12'si biçimlendirici
+# ile aynı fikirde. Biçimlendirmeyi tek seferde uygulamak ~140 dosyalık bir
+# fark demek ve bu PR'ın konusu o değil — ayrı bir PR, ayrı bir karar.
+
+[tool.ruff]
+target-version = "py313"
+# 100: kodun bugünkü hâline en yakın sınır (88 üstü 1.750 satır, 100 üstü
+# ruff'ın saydığı biçimde 41 satır). E501 aşağıda geçici olarak kapalı, sınır
+# yine de yazılı dursun ki biçimlendirici ve editörler aynı sayıyı görsün.
+line-length = 100
+extend-exclude = [
+    "android",   # Kotlin/Gradle — Python yok, ama `srcDirs` altında .py aranmasın
+    "docs",      # üretilmiş graflar ve belgeler
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+    # 41 satır — uzun dizeler ve gerekçe yorumları. Ayrı PR'da elle kısaltılır.
+    "E501",
+    # 12 satır, hepsi tests/test_mobile.py'de tek bir blokta (`a; b; c` biçimi).
+    "E702",
+    # 4 yer (`l` adı). Yeniden adlandırma testlerin okunurluğunu değiştirir.
+    "E741",
+    # 5 yer — FastAPI'nin `File(...)`/`Form(...)` öntanımlı-argüman deyimi.
+    # Bu kural FastAPI kod tabanlarında evrensel olarak kapalıdır.
+    "B008",
+    # 17 yer — `raise ... from err` zincirleme. Adaptörlerdeki hata eşlemesi
+    # (`providers.detail_of`) istisna zincirini bilinçle kırıyor olabilir;
+    # tek tek gözden geçirilecek, mekanik düzeltme değil.
+    "B904",
+    # 11 yer — `zip(..., strict=)`. Uzunluk eşitsizliği anlamlı olan yerler
+    # tek tek değerlendirilecek.
+    "B905",
+    # 4 yer — `%` biçimlendirme; hepsi hata mesajı üretiminde, davranış aynı.
+    "UP031",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# `import catalog` bilerek dosyanın ortasında: üstündeki blok o ithalin
+# GEREKÇESİNİ anlatıyor ve gerekçe ithalin hemen üstünde durmalı.
+# `path` atanıp kullanılmıyor: `errlog.append`in dönüşü değil yan etkisi sınanıyor.
+"tests/test_errlog.py" = ["E402", "F841"]
+# `record` atanıp kullanılmıyor: `_create`in yan etkisi (diske yazım) sınanıyor.
+"tests/test_palette_store.py" = ["F841"]
+# Tek bir `lambda` ataması; `def`e çevirmek testin akışını bozar.
+"tests/test_playwright_studio.py" = ["E731"]
+# `oksuz` hesaplanıp kullanılmıyor — graf üreticisinde ayrıca ele alınacak
+# bir bulgu (çıktıya girmiyor mu, girmeli mi?). Üreticiye bu PR'da dokunulmuyor.
+"tools/graf_uret.py" = ["F841"]
+
+[tool.mypy]
+python_version = "3.13"
+# TABAN, `strict` DEĞİL: bugün hiçbir modülün tip iddiası denetlenmedi ve ilk
+# koşu yüzlerce bulgu üretiyor. CI'da `continue-on-error: true` ile koşuyor —
+# sayı düşürülüp sıfırlandığında kapı kapanır (docs/faz0-web-first.md → 6).
+ignore_missing_imports = true
+exclude = [
+    "^android/",
+    "^docs/",
+    "^build/",
+    "^dist/",
+    "^\\.venv/",
+]

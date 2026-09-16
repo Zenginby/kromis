@@ -6,40 +6,37 @@ from __future__ import annotations
 
 import base64
 import datetime as _dt
-import etiket
 import io
 import os
-import re
 import traceback
 from collections.abc import Sequence
 from contextlib import asynccontextmanager
 from urllib.parse import quote
 
-
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
-
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
+
 # Ham form değerleri Starlette'in UploadFile'ıdır; fastapi.UploadFile onun ALT
 # sınıfı olduğundan isinstance kontrolü taban sınıfa yapılmalı.
 from starlette.datastructures import UploadFile as FormUploadFile
 
 import assets_store
 import azure_client as ac
-import catalog
-import credstore
-import providers
 import backup
+import catalog
 import chat_client as cc
 import chat_prompt
 import chat_providers
 import chat_store
 import color_names
 import composite
+import credstore
 import errlog
+import etiket
 import folders
 import guncelleme
 import i18n
@@ -47,17 +44,33 @@ import palette
 import palette_store
 import paths
 import prefs
+import providers
 import storage
 import version
-from models import (MAX_CHAT_TITLE_CHARS, MAX_IMAGES_PER_RUN, MAX_PROMPT_CHARS,
-                    ArenaWinnerRequest,
-                    BannerRequest, BulkImagesRequest, BulkMoveRequest,
-                    ChatRequest, ChatSaveRequest, FolderRequest, GenerateRequest,
-                    LogoRequest, MoveImageRequest, PrefsRequest,
-                    SavePaletteRequest, SettingsRequest, SuggestRequest,
-                    VideoRequest, check_capabilities,
-                    check_drop_indices, check_video_capabilities,
-                    wire_messages)
+from models import (
+    MAX_CHAT_TITLE_CHARS,
+    MAX_IMAGES_PER_RUN,
+    MAX_PROMPT_CHARS,
+    ArenaWinnerRequest,
+    BannerRequest,
+    BulkImagesRequest,
+    BulkMoveRequest,
+    ChatRequest,
+    ChatSaveRequest,
+    FolderRequest,
+    GenerateRequest,
+    LogoRequest,
+    MoveImageRequest,
+    PrefsRequest,
+    SavePaletteRequest,
+    SettingsRequest,
+    SuggestRequest,
+    VideoRequest,
+    check_capabilities,
+    check_drop_indices,
+    check_video_capabilities,
+    wire_messages,
+)
 
 BASE_DIR = paths.REPO_DIR                    # geriye uyum: mevcut kullanımlar bozulmasın
 OUTPUT_DIR = paths.output_dir()

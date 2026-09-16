@@ -10,6 +10,10 @@
 # Bu iş yayına DOKUNMAZ, yalnızca varlık yükler. Yayını `release.yml`'deki tek
 # yazıcı oluşturuyor (gerekçe orada yazılı: iki ayrı yazıcı v0.4.2'de yayını
 # ~95 saniye boyunca eksik gösterdi).
+#
+# DONDURULDU (2026-09-16, Faz 0 / Adım 1): bu paket v0.23.1'de dondu. Workflow
+# silinmedi ama artık hiçbir push/PR onu çağırmıyor — tek çağıran `release.yml`
+# ve o da yalnız `workflow_dispatch`. Gerekçe: docs/faz0-web-first.md.
 name: macOS paketi
 
 on:

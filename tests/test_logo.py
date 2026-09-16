@@ -1,12 +1,11 @@
 import io
-import os
 
 from fastapi.testclient import TestClient
 from PIL import Image
 
-import azure_client as ac
 import app as appmod
 import assets_store as astore
+import azure_client as ac
 
 
 def _fake_composite_factory(recorder=None):

@@ -22,6 +22,11 @@
 # Chaquopy 17 sdist kurmuyor (`--only-binary` zorunlu), yani bu wheel olmadan
 # `import pydantic` cihazda hiç çalışmaz — FastAPI'nin tamamı buna bağlı.
 # Gerekçenin tamamı ve reddedilen alternatif: docs/android/pydantic-karari.md
+#
+# DONDURULDU (2026-09-16, Faz 0 / Adım 1): bu paket v0.23.1'de dondu. Workflow
+# silinmedi ama artık hiçbir push/PR ona ulaşmıyor — çağıranı `_paket-android.yml`
+# (o da yalnız `release.yml`in `workflow_dispatch`inden) ve buradaki elle tetik.
+# Gerekçe: docs/faz0-web-first.md.
 name: pydantic-core Android wheel
 
 on:

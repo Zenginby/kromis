@@ -18,8 +18,6 @@ import assets_store as astore
 import azure_client as ac
 import color_names as cn
 import palette
-import palette_store
-import storage
 
 SEED = "#c86a3c"
 # Gömülü tablo ÖNCE denendiği için ağ katmanı yalnızca tablonun yakın karşılığı

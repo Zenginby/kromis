@@ -23,8 +23,8 @@ Telin şekli `tests/test_veo_client.py`'de ölçülüyor.
 import io
 
 import pytest
-from PIL import Image
 from fastapi.testclient import TestClient
+from PIL import Image
 
 import app as appmod
 import azure_client as ac
@@ -113,8 +113,9 @@ def test_the_video_is_labelled_with_the_session_it_was_born_in(client):
 
 def test_the_reference_frame_path_records_the_PARENT(client):
     """Türev zinciri: galeriden canlandırılan bir video kaynağını taşıyor."""
-    import azure_client as ac_mod
     from unittest.mock import patch
+
+    import azure_client as ac_mod
 
     with patch.object(ac_mod, "generate", lambda *a, **k: [_png()]):
         with patch.object(appmod, "_to_png", lambda raw: _png()):
@@ -345,8 +346,9 @@ def test_MORE_THAN_ONE_reference_is_refused(client, monkeypatch):
     erken davranmak `_collect_edit_refs`in kendi 413/422 mesajlarını
     ikizlemek olurdu."""
     monkeypatch.setattr(appmod, "_to_png", lambda raw: _png())
-    import azure_client as ac_mod
     from unittest.mock import patch
+
+    import azure_client as ac_mod
     with patch.object(ac_mod, "generate", lambda *a, **k: [_png()]):
         kaynak = client.post("/api/generate",
                              json={"prompt": "kedi", "size": "1024x1024",

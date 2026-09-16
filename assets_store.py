@@ -11,12 +11,12 @@ manifest yazımı ve yazma kilidi jsonstore.py'de paylaşılıyor. Varlıklar t�
 """
 from __future__ import annotations
 
-import i18n
 import json
 import os
 import re
 import uuid
 
+import i18n
 import jsonstore
 
 MANIFEST_FILE = "index.json"

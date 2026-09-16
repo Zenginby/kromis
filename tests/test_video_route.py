@@ -37,8 +37,8 @@ GECERLI = {"prompt": "kedi koşuyor", "size": "16:9", "quality": "720p",
 
 
 @pytest.fixture
-def client(tmp_path, monkeypatch):
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
+def client(tmp_path, monkeypatch, dizinler):
+    dizinler(output_dir=str(tmp_path))
     monkeypatch.setattr(appmod.providers, "generate_video",
                         lambda *a, **k: [MP4])
     monkeypatch.setattr(appmod.providers, "animate_video",
@@ -404,7 +404,7 @@ def test_an_adapter_error_becomes_a_502_with_the_turkish_detail(
     monkeypatch.setattr(appmod.providers, "generate_video", boom)
     monkeypatch.setattr(appmod.providers, "animate_video", boom)
     monkeypatch.setattr(gorsel, "output_png_path",
-                        lambda i: __import__("os").devnull)
+                        lambda i, output_dir: __import__("os").devnull)
     monkeypatch.setattr(gorsel, "read_png_file", lambda p: _png())
 
     r = client.post(yol, json=GECERLI) if not ek else client.post(yol, data={**GECERLI, **ek})

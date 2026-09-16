@@ -8,7 +8,7 @@ import base64
 import io
 import os
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from PIL import Image
 
@@ -17,12 +17,12 @@ import composite
 import i18n
 import storage
 from models import BannerRequest, LogoRequest
-from services import dil, gorsel, kapilar, yollar, zaman
+from services import ayar, dil, gorsel, kapilar, zaman
 
 router = APIRouter()
 
 
-def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
+def _composite_logo(src_path: str, req: LogoRequest, assets_dir: str) -> bytes:
     """Logo/motto filigranını süreç içinde bindirir (composite.py).
 
     Bindirilecek görsel HER ZAMAN kullanıcının kütüphanesinden gelir. Eskiden
@@ -32,7 +32,7 @@ def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
     """
     if not req.asset_id:
         raise HTTPException(status_code=422, detail=i18n.t("err.pick_an_image", dil.aktif()))
-    overlay_path = assets_store.asset_path(req.asset_kind, req.asset_id, yollar.assets_dir())
+    overlay_path = assets_store.asset_path(req.asset_kind, req.asset_id, assets_dir)
     if overlay_path is None:
         raise HTTPException(status_code=404, detail=i18n.t("err.image_missing", dil.aktif()))
     try:
@@ -56,29 +56,29 @@ def _composite_logo(src_path: str, req: LogoRequest) -> bytes:
             detail=i18n.t("err.overlay_failed", dil.aktif(), hata=str(exc) or type(exc).__name__)) from exc
 
 
-def _logo_src_path(image_id: str) -> str:
-    return gorsel.output_png_path(image_id)
+def _logo_src_path(image_id: str, output_dir: str) -> str:
+    return gorsel.output_png_path(image_id, output_dir)
 
 
 @router.post("/api/logo/preview")
-def preview_logo(req: LogoRequest) -> dict:
+def preview_logo(req: LogoRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     """Seçeneklerle geçici bir logo önizlemesi üretir — diske/geçmişe KAYDETMEZ."""
-    src_path = _logo_src_path(req.id)
-    logo_bytes = _composite_logo(src_path, req)
+    src_path = _logo_src_path(req.id, ayarlar.output_dir)
+    logo_bytes = _composite_logo(src_path, req, ayarlar.assets_dir)
     b64 = base64.b64encode(logo_bytes).decode("ascii")
     return {"b64": f"data:image/png;base64,{b64}"}
 
 
 @router.post("/api/logo")
-def add_logo(req: LogoRequest) -> dict:
-    output_dir = yollar.output_dir()
-    src_path = _logo_src_path(req.id)
+def add_logo(req: LogoRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+    output_dir = ayarlar.output_dir
+    src_path = _logo_src_path(req.id, output_dir)
     src_id = os.path.basename(req.id)
 
     # kaynak metadata'sını history'den bul (prompt/size korunur)
     src_meta = next((h for h in storage.list_history(output_dir) if h["id"] == src_id), {})
 
-    logo_bytes = _composite_logo(src_path, req)
+    logo_bytes = _composite_logo(src_path, req, ayarlar.assets_dir)
     record = storage.save(
         logo_bytes,
         {"prompt": src_meta.get("prompt", ""), "size": src_meta.get("size", ""),
@@ -125,35 +125,36 @@ def _composite_banner(src_path: str, banner_path: str, edge: str,
     return out.getvalue()
 
 
-def _banner_asset_path(asset_id: str) -> str:
-    path = assets_store.asset_path("banners", asset_id, yollar.assets_dir())
+def _banner_asset_path(asset_id: str, assets_dir: str) -> str:
+    path = assets_store.asset_path("banners", asset_id, assets_dir)
     if path is None:
         raise HTTPException(status_code=404, detail=i18n.t("err.banner_missing", dil.aktif()))
     return path
 
 
-def _banner_bytes(src_path: str, req: BannerRequest) -> bytes:
-    return _composite_banner(src_path, _banner_asset_path(req.asset_id), req.edge,
+def _banner_bytes(src_path: str, req: BannerRequest, assets_dir: str) -> bytes:
+    return _composite_banner(src_path, _banner_asset_path(req.asset_id, assets_dir), req.edge,
                              req.scale, req.align, req.margin)
 
 
 @router.post("/api/banner/preview")
-def preview_banner(req: BannerRequest) -> dict:
+def preview_banner(req: BannerRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     """Banner'lı geçici bir önizleme üretir — diske/geçmişe KAYDETMEZ."""
-    banner_bytes = _banner_bytes(_logo_src_path(req.id), req)
+    banner_bytes = _banner_bytes(_logo_src_path(req.id, ayarlar.output_dir), req,
+                                 ayarlar.assets_dir)
     b64 = base64.b64encode(banner_bytes).decode("ascii")
     return {"b64": f"data:image/png;base64,{b64}"}
 
 
 @router.post("/api/banner")
-def add_banner(req: BannerRequest) -> dict:
-    output_dir = yollar.output_dir()
-    src_path = _logo_src_path(req.id)
+def add_banner(req: BannerRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+    output_dir = ayarlar.output_dir
+    src_path = _logo_src_path(req.id, output_dir)
     src_id = os.path.basename(req.id)
 
     src_meta = next((h for h in storage.list_history(output_dir) if h["id"] == src_id), {})
 
-    banner_bytes = _banner_bytes(src_path, req)
+    banner_bytes = _banner_bytes(src_path, req, ayarlar.assets_dir)
     record = storage.save(
         banner_bytes,
         {"prompt": src_meta.get("prompt", ""), "size": src_meta.get("size", ""),
@@ -176,6 +177,7 @@ async def upload_asset(
     request: Request,
     file: UploadFile = File(...),
     name: str = Form(""),
+    ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
 ) -> dict:
     """Bir logo/banner PNG'si yükler; doğrulayıp yeniden kodlar ve kütüphaneye ekler."""
     kapilar.check_asset_kind(kind)
@@ -188,15 +190,15 @@ async def upload_asset(
     image_bytes = gorsel.to_png(raw)  # şeffaflığı koruyan RGBA PNG'ye yeniden kodla
     stem = os.path.splitext(os.path.basename(file.filename or ""))[0]
     label = (name.strip() or stem or i18n.t("library.asset"))[:120]
-    record = assets_store.save_asset(kind, image_bytes, label, yollar.assets_dir(),
+    record = assets_store.save_asset(kind, image_bytes, label, ayarlar.assets_dir,
                                      now=zaman.simdi())
     return {"asset": record}
 
 
 @router.get("/api/assets/{kind}")
-def list_assets_route(kind: str) -> dict:
+def list_assets_route(kind: str, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     kapilar.check_asset_kind(kind, allow_all=True)
-    assets_dir = yollar.assets_dir()
+    assets_dir = ayarlar.assets_dir
     if kind == "all":
         all_items = []
         for k in assets_store.KINDS:
@@ -207,21 +209,23 @@ def list_assets_route(kind: str) -> dict:
 
 
 @router.delete("/api/assets/{kind}/{asset_id}")
-def delete_asset_route(kind: str, asset_id: str) -> dict:
+def delete_asset_route(kind: str, asset_id: str,
+                       ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     kapilar.check_asset_kind(kind)
-    removed = assets_store.delete_asset(kind, asset_id, yollar.assets_dir())
+    removed = assets_store.delete_asset(kind, asset_id, ayarlar.assets_dir)
     if not removed:
         raise HTTPException(status_code=404, detail=i18n.t("err.asset_missing", dil.aktif()))
     return {"deleted": os.path.basename(asset_id)}
 
 
 @router.get("/assets/{kind}/{filename}")
-def asset_file(kind: str, filename: str) -> FileResponse:
+def asset_file(kind: str, filename: str,
+               ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> FileResponse:
     kapilar.check_asset_kind(kind)
     safe = os.path.basename(filename)
     if not safe or safe in (".", "..") or safe == assets_store.MANIFEST_FILE:
         raise HTTPException(status_code=404, detail=i18n.t("err.not_found", dil.aktif()))
-    path = os.path.join(yollar.assets_dir(), kind, safe)
+    path = os.path.join(ayarlar.assets_dir, kind, safe)
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail=i18n.t("err.not_found", dil.aktif()))
     return FileResponse(path, media_type="image/png")

@@ -66,14 +66,13 @@ def _no_network(monkeypatch):
     cn.reset_breaker()
 
 
-def _client(tmp_path, monkeypatch, *, sent=None):
+def _client(tmp_path, monkeypatch, dizinler, *, sent=None):
     """v1.8 fixture ağacını tmp_path'e kopyalar ve istemci döndürür.
 
     `with` KULLANILMIYOR — lifespan bilerek koşmuyor (bkz. modül docstring'i).
     """
     shutil.copytree(FIXTURES, tmp_path, dirs_exist_ok=True)
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path / "output"))
-    monkeypatch.setattr(appmod, "ASSETS_DIR", str(tmp_path / "assets"))
+    dizinler(output_dir=str(tmp_path / "output"), assets_dir=str(tmp_path / "assets"))
     if sent is not None:
         def _fake_generate(prompt, size, quality, n=1, **kwargs):
             sent.append(prompt)
@@ -149,13 +148,13 @@ def test_frozen_palette_colors_still_carry_hex_and_name(tmp_path):
 
 # ── (ii) tüketici testleri: türetilmiş değerlere basıyorlar ───────────────
 
-def test_root_history_includes_the_record_without_a_folder_id_key(tmp_path, monkeypatch):
+def test_root_history_includes_the_record_without_a_folder_id_key(tmp_path, monkeypatch, dizinler):
     """Anahtarı HİÇ OLMAYAN pre-v1.6 kaydı kökte görünmek zorunda.
 
     app.py'deki `not r.get("folder_id")` ifadesi `r["folder_id"] is None`
     olursa bu kayıtta KeyError → 500 olur; süzme tersine dönerse kayıt kaybolur.
     """
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, monkeypatch, dizinler)
     ids = [r["id"] for r in c.get("/api/history").json()["images"]]
     assert ids == EXPECT["root_history_ids"]
     legacy_id = CASES["handmade"][0]
@@ -165,21 +164,21 @@ def test_root_history_includes_the_record_without_a_folder_id_key(tmp_path, monk
     assert "folder_id" not in legacy, "fixture bozulmuş: anahtar var olmamalı"
 
 
-def test_foldered_history_still_filters_by_the_frozen_folder_id(tmp_path, monkeypatch):
+def test_foldered_history_still_filters_by_the_frozen_folder_id(tmp_path, monkeypatch, dizinler):
     """Okuyucudaki bir yeniden adlandırma bu listeyi [] yapar."""
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, monkeypatch, dizinler)
     for folder_id, image_ids in EXPECT["foldered"].items():
         got = c.get(f"/api/history?folder_id={folder_id}").json()["images"]
         assert [r["id"] for r in got] == image_ids
 
 
-def test_folder_counts_are_derived_from_the_v18_fields(tmp_path, monkeypatch):
+def test_folder_counts_are_derived_from_the_v18_fields(tmp_path, monkeypatch, dizinler):
     """count ve child_count TÜRETİLMİŞ değerler — okuma tarafındaki dedektör.
 
     `>= 0` değil TAM sayı iddia ediliyor: folder_id/parent_id yeniden
     adlandırılırsa sayaçlar sessizce sıfırlanır.
     """
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, monkeypatch, dizinler)
     items = {f["id"]: f for f in c.get("/api/folders").json()["items"]}
     child = items[EXPECT["folders"]["child"]]
     root = items[EXPECT["folders"]["root"]]
@@ -188,27 +187,27 @@ def test_folder_counts_are_derived_from_the_v18_fields(tmp_path, monkeypatch):
     assert root["count"] == 0
 
 
-def test_legacy_folder_without_parent_id_key_reads_as_root(tmp_path, monkeypatch):
+def test_legacy_folder_without_parent_id_key_reads_as_root(tmp_path, monkeypatch, dizinler):
     """`parent_id` anahtarı olmayan klasör kök kabul edilmeli (app.py'deki
     `{"parent_id": None, **f}` varsayılanı)."""
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, monkeypatch, dizinler)
     items = {f["id"]: f for f in c.get("/api/folders").json()["items"]}
     legacy = items[EXPECT["folders"]["legacy_no_parent_id"]]
     assert legacy["parent_id"] is None
 
 
-def test_derivative_chain_survives(tmp_path, monkeypatch):
+def test_derivative_chain_survives(tmp_path, monkeypatch, dizinler):
     """parent_id türev zinciri: hedef kayıt aynı yanıt kümesinde olmalı."""
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, monkeypatch, dizinler)
     images = {r["id"]: r for r in c.get("/api/history").json()["images"]}
     derivative = images[EXPECT["derivative"]["id"]]
     assert derivative["parent_id"] == EXPECT["derivative"]["parent_id"]
     assert derivative["parent_id"] in images
 
 
-def test_history_record_palette_round_trips(tmp_path, monkeypatch):
+def test_history_record_palette_round_trips(tmp_path, monkeypatch, dizinler):
     """Kayıttaki palet dict'i (Türkçe adlar dahil) birebir geri gelmeli."""
-    c = _client(tmp_path, monkeypatch)
+    c = _client(tmp_path, monkeypatch, dizinler)
     images = {r["id"]: r for r in c.get("/api/history").json()["images"]}
     rec = images[EXPECT["palette_record_image_id"]]
     assert rec["palette"]["seed"] == EXPECT["palette"]["seed"]
@@ -218,8 +217,8 @@ def test_history_record_palette_round_trips(tmp_path, monkeypatch):
     assert rec["prompt_sent"] and rec["prompt_sent"] != rec["prompt"]
 
 
-def test_saved_palettes_are_listed_newest_first(tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_saved_palettes_are_listed_newest_first(tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     items = c.get("/api/palettes").json()["items"]
     assert len(items) == 2
     # en yeni başta: üretici "Sonbahar"ı ÖNCE yazdı → listede İKİNCİ
@@ -229,8 +228,8 @@ def test_saved_palettes_are_listed_newest_first(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("kind", LEGACY_ASSET_KINDS)
-def test_assets_still_listed_and_served(kind, tmp_path, monkeypatch):
-    c = _client(tmp_path, monkeypatch)
+def test_assets_still_listed_and_served(kind, tmp_path, monkeypatch, dizinler):
+    c = _client(tmp_path, monkeypatch, dizinler)
     items = c.get(f"/api/assets/{kind}").json()["items"]
     assert [a["id"] for a in items] == EXPECT["assets"][kind]
     for a in items:
@@ -239,7 +238,7 @@ def test_assets_still_listed_and_served(kind, tmp_path, monkeypatch):
         assert r.headers["content-type"] == "image/png"
 
 
-def test_saved_v18_palette_still_reaches_the_prompt_with_frozen_names(tmp_path, monkeypatch):
+def test_saved_v18_palette_still_reaches_the_prompt_with_frozen_names(tmp_path, monkeypatch, dizinler):
     """Task 3'ün en güçlü testi: sessiz düşüşü yakalayan tek iddia.
 
     app._palette_prompt kayıtlı paleti bulup DONDURULMUŞ renkleri
@@ -252,7 +251,7 @@ def test_saved_v18_palette_still_reaches_the_prompt_with_frozen_names(tmp_path, 
     prompt'u üretmeye devam eder") ancak böyle korunur.
     """
     sent = []
-    c = _client(tmp_path, monkeypatch, sent=sent)
+    c = _client(tmp_path, monkeypatch, dizinler, sent=sent)
     r = c.post("/api/generate", json={
         "prompt": "afiş", "size": "1024x1024", "quality": "high", "n": 1,
         "palette_hex": EXPECT["palette"]["seed"],

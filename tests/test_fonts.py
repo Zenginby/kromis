@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 import app as appmod
 
-STATIC = Path(appmod.STATIC_DIR)
+STATIC = Path(appmod.app.state.ayarlar.static_dir)
 FONTS = STATIC / "fonts"
 
 # Arayüz Türkçe: bu beş harf latin-ext'te, bu yedisi latin'de (fontTools ile

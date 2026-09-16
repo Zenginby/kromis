@@ -582,13 +582,13 @@ def test_static_assets_stay_cacheable():
     assert r.headers.get("etag"), "StaticFiles doğrulayıcı göndermeli"
 
 
-def test_index_read_failure_is_reported_in_the_interface_language(monkeypatch, tmp_path):
+def test_index_read_failure_is_reported_in_the_interface_language(monkeypatch, tmp_path, dizinler):
     """--windowed pakette stderr YOK: okunamayan index.html iz bırakmıyordu.
 
     FileResponse gönderim anında yakalanmayan bir RuntimeError'a düşüyordu →
     kullanıcı boş pencere görür, hata.log'a hiçbir şey yazılmaz.
     """
-    monkeypatch.setattr(appmod, "STATIC_DIR", str(tmp_path / "yok"))
+    dizinler(static_dir=str(tmp_path / "yok"))
     written = []
     monkeypatch.setattr(appmod.errlog, "safe_append",
                         lambda d, t: (written.append(t), "hata.log")[1])

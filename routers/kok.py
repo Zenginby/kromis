@@ -12,20 +12,19 @@ from __future__ import annotations
 import os
 import traceback
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse
 
 import errlog
 import i18n
-import paths
 import version
-from services import dil, yollar
+from services import ayar, dil
 
 router = APIRouter()
 
 
 @router.get("/")
-def index() -> HTMLResponse:
+def index(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> HTMLResponse:
     """index.html'i sürüm yerine konarak servis eder.
 
     Neden FileResponse DEĞİL, üç sebep:
@@ -56,10 +55,10 @@ def index() -> HTMLResponse:
     """
     dil_kodu = dil.aktif()
     try:
-        with open(os.path.join(yollar.static_dir(), "index.html"), encoding="utf-8") as f:
+        with open(os.path.join(ayarlar.static_dir, "index.html"), encoding="utf-8") as f:
             template = f.read()
     except OSError:
-        log_path = errlog.safe_append(paths.data_dir(), traceback.format_exc())
+        log_path = errlog.safe_append(ayarlar.data_dir, traceback.format_exc())
         # `<code>` etiketi BURADA, katalogda DEĞİL: `i18n.render`ın kaçışı
         # çeviri metnine HTML yazılmasını kasten imkânsız kılıyor (bkz. o
         # fonksiyonun docstring'i). Etiket şablon tarafında kalınca çevirmen

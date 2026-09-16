@@ -21,9 +21,9 @@ EN_TARAYICI = {"Accept-Language": "en-US,en;q=0.9"}
 
 
 @pytest.fixture
-def out_dir(tmp_path, monkeypatch):
+def out_dir(tmp_path, dizinler):
     path = str(tmp_path / "output")
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", path)
+    dizinler(output_dir=path)
     return path
 
 

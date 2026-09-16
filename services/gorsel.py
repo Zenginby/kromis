@@ -21,7 +21,7 @@ from starlette.datastructures import UploadFile as FormUploadFile
 
 import i18n
 import storage
-from services import dil, yollar
+from services import dil
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024          # dosya başına
 MAX_EDIT_IMAGES = 4                          # ana görsel + en fazla 3 ek referans
@@ -53,19 +53,21 @@ def to_png(raw: bytes) -> bytes:
     return out.getvalue()
 
 
-def output_png_path(image_id: str) -> str:
+def output_png_path(image_id: str, output_dir: str) -> str:
     """history id → output/<id>.png yolu. Geçersiz/bulunamayan id'de HTTPException(404).
 
-    Tek path-traversal guard'ı: id yalnızca basename'e indirilir.
+    Tek path-traversal guard'ı: id yalnızca basename'e indirilir. Dizin
+    çağıranın ayar nesnesinden geliyor (Faz 0 / Adım 4) — bu modül hangi
+    depoya baktığını kendisi bilmez, söyleneni okur.
     """
     safe = os.path.basename(image_id or "")
-    path = os.path.join(yollar.output_dir(), f"{safe}.png")
+    path = os.path.join(output_dir, f"{safe}.png")
     if not safe or not os.path.isfile(path):
         raise HTTPException(status_code=404, detail=i18n.t("err.source_image_missing", dil.aktif()))
     return path
 
 
-def output_media_path(media_id: str) -> str:
+def output_media_path(media_id: str, output_dir: str) -> str:
     """history id → output/<id>.<uzantı> yolu; bulunamayanda HTTPException(404).
 
     `output_png_path`in İKİZİ DEĞİL, KARDEŞİ — ve ikisinin ayrı durması
@@ -90,7 +92,7 @@ def output_media_path(media_id: str) -> str:
     basename'e indiriliyor.
     """
     safe = os.path.basename(media_id or "")
-    path = storage.media_path_of(safe, yollar.output_dir()) if safe else None
+    path = storage.media_path_of(safe, output_dir) if safe else None
     if path:
         return path
     raise HTTPException(status_code=404, detail=i18n.t("err.source_media_missing", dil.aktif()))

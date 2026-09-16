@@ -48,6 +48,7 @@
 | `routers.sohbet` | — |
 | `routers.uretim` | — |
 | `screencolor` | `test_screencolor.py` |
+| `services.ayar` | `test_app_bolme.py`, `test_paths.py` |
 | `services.dil` | `test_dil.py`, `test_i18n.py` |
 | `services.gorsel` | `test_edit_route.py`, `test_model_secimi.py`, `test_video_route.py` |
 | `services.kapilar` | — |
@@ -55,9 +56,8 @@
 | `services.palet` | — |
 | `services.redaksiyon` | — |
 | `services.tercih` | `test_dil.py` |
-| `services.yollar` | `test_app_bolme.py` |
 | `services.zaman` | — |
-| `storage` | `test_arena.py`, `test_chats_route.py`, `test_folders.py`, `test_legacy_formats.py`, `test_playwright_studio.py`, `test_storage.py`, `test_storage_delete.py`, `test_video_onyuz.py` |
+| `storage` | `test_app_bolme.py`, `test_arena.py`, `test_chats_route.py`, `test_folders.py`, `test_legacy_formats.py`, `test_playwright_studio.py`, `test_storage.py`, `test_storage_delete.py`, `test_video_onyuz.py` |
 | `tools.graf_uret` | `test_app_bolme.py`, `test_graflar.py` |
 | `tools.make_legacy_fixtures` | — |
 | `tools.make_logo_goldens` | — |
@@ -74,16 +74,16 @@
 
 Bu modülleri hiçbir test dosyası ithal etmiyor. Dolaylı olarak sınanıyor olabilirler (`import app` app'in ithal ettiği her şeyi çalıştırır), ama doğrudan bekçileri yok.
 
-* `routers.ayarlar` (299 satır)
-* `routers.bindirme` (227 satır)
-* `routers.galeri` (325 satır)
-* `routers.kok` (82 satır)
-* `routers.paletler` (88 satır)
-* `routers.sohbet` (223 satır)
-* `routers.uretim` (416 satır)
-* `services.kapilar` (70 satır)
+* `routers.ayarlar` (300 satır)
+* `routers.bindirme` (231 satır)
+* `routers.galeri` (334 satır)
+* `routers.kok` (81 satır)
+* `routers.paletler` (90 satır)
+* `routers.sohbet` (225 satır)
+* `routers.uretim` (420 satır)
+* `services.kapilar` (75 satır)
 * `services.modeller` (295 satır)
-* `services.palet` (177 satır)
+* `services.palet` (181 satır)
 * `services.redaksiyon` (63 satır)
 * `services.zaman` (17 satır)
 * `tools.make_legacy_fixtures` (210 satır)

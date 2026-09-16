@@ -19,7 +19,7 @@ import chat_providers
 import providers
 import version
 
-STATIC = Path(appmod.STATIC_DIR)
+STATIC = Path(appmod.app.state.ayarlar.static_dir)
 LOGOS = STATIC / "img" / "providers"
 
 

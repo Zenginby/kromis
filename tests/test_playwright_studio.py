@@ -25,7 +25,6 @@ pytest.importorskip("playwright", reason="playwright kurulu değil — E2E testl
 
 from playwright.sync_api import sync_playwright
 
-import app as appmod
 import catalog
 import credstore
 from app import app
@@ -878,7 +877,7 @@ def test_playwright_composer_GONDERIMDEN_SONRA_kuculuyor(monkeypatch):
 # ── Logo bindirme önizlemesi ────────────────────────────────────────
 
 
-def _olcum_kutuphanesi(tmp_path, monkeypatch) -> dict[str, str]:
+def _olcum_kutuphanesi(tmp_path, dizinler) -> dict[str, str]:
     """Ölçüm için gerçek PNG tabanlar + bir logo ve bir banner varlığı.
 
     `OUTPUT_DIR`/`ASSETS_DIR` sunucu THREAD'İ BAŞLAMADAN yönlendiriliyor:
@@ -899,8 +898,7 @@ def _olcum_kutuphanesi(tmp_path, monkeypatch) -> dict[str, str]:
     out = str(tmp_path / "output")
     assets = str(tmp_path / "assets")
     os.makedirs(out, exist_ok=True)
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", out)
-    monkeypatch.setattr(appmod, "ASSETS_DIR", assets)
+    dizinler(output_dir=out, assets_dir=assets)
 
     tabanlar = {}
     for ad, boyut in LOGO_ORANLARI.items():
@@ -993,8 +991,7 @@ def _macenta_var_mi(png: bytes) -> bool:
                for r, g, b in im.getdata())
 
 
-def test_playwright_logo_onizlemesi_kare_OLMAYAN_tabanda_kirpilmiyor(
-        tmp_path, monkeypatch):
+def test_playwright_logo_onizlemesi_kare_OLMAYAN_tabanda_kirpilmiyor(tmp_path, dizinler):
     """Kullanıcı bildirimi (28 Ağustos): kare olmayan görselde alt/yan konumlar
     önizlemede gözükmüyor.
 
@@ -1015,7 +1012,7 @@ def test_playwright_logo_onizlemesi_kare_OLMAYAN_tabanda_kirpilmiyor(
     Kare taban da +37.3 ile eşiğin üstünde; yatay taban (-41) kırpmıyordu, o
     yüzden "kare değilse" bir KATEGORİ değil EŞİK.
     """
-    tabanlar = _olcum_kutuphanesi(tmp_path, monkeypatch)
+    tabanlar = _olcum_kutuphanesi(tmp_path, dizinler)
     port = get_free_port()
     server = ServerThread(port)
     server.start()
@@ -1106,8 +1103,7 @@ def test_playwright_logo_onizlemesi_kare_OLMAYAN_tabanda_kirpilmiyor(
 # ── Arama: klasör zinciri ───────────────────────────────────────────
 
 
-def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(
-        tmp_path, monkeypatch):
+def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(tmp_path, dizinler):
     """Üst klasörün adı alt klasördeki görselleri VE sayaçları getiriyor.
 
     NEDEN DURUM ENJEKTE EDİLİYOR: arama %100 istemcide. Sunucuda arama ucu yok
@@ -1133,7 +1129,7 @@ def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(
 
     out = str(tmp_path / "output")
     os.makedirs(out, exist_ok=True)
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", out)
+    dizinler(output_dir=out)
 
     simdi = "2026-09-02T09:00:00"
     kampanyalar = fmod.create("Kampanyalar", out, parent_id=None, now=simdi)

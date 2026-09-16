@@ -34,7 +34,7 @@ FAZ 1 NOTU: kullanıcı hesabı geldiğinde "kayıtlı tercih" buradan değil
 hesaptan gelecek. Ara katmanın gördüğü tek şey `dil(output_dir)` imzası;
 değişecek yer bu dosyanın içi, zincir (services/dil.py) değil.
 
-Bu modül `prefs`'e bakıyor, `yollar`a DEĞİL: dizini çağıran veriyor.
+Bu modül `prefs`'e bakıyor, ayar nesnesine DEĞİL: dizini çağıran veriyor.
 Böylece testler bir `tmp_path`i doğrudan sorabiliyor ve önbellek anahtarı
 da o dizin — iki test iki ayrı dizinle birbirini göremiyor.
 """

@@ -11,14 +11,14 @@ from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 import color_names
 import i18n
 import palette
 import palette_store
 from models import SavePaletteRequest, SuggestRequest
-from services import dil, palet, yollar, zaman
+from services import ayar, dil, palet, zaman
 
 router = APIRouter()
 
@@ -55,12 +55,13 @@ def suggest_palettes(req: SuggestRequest) -> dict:
 
 
 @router.get("/api/palettes")
-def list_palettes_route() -> dict:
-    return {"items": palette_store.list_palettes(yollar.output_dir())}
+def list_palettes_route(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+    return {"items": palette_store.list_palettes(ayarlar.output_dir)}
 
 
 @router.post("/api/palettes")
-def create_palette_route(req: SavePaletteRequest) -> dict:
+def create_palette_route(req: SavePaletteRequest,
+                         ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     name = req.name.strip()
     if not name:
         raise HTTPException(status_code=422, detail=i18n.t("err.palette_name_required", dil.aktif()))
@@ -77,12 +78,13 @@ def create_palette_route(req: SavePaletteRequest) -> dict:
     # Kalıcı olarak daha az renkli bir paletin tek yolu bu (bkz. models.drop).
     colors = palet.drop_colors(colors, req.drop)
     return {"palette": palette_store.create(name, req.seed, req.mode, req.strength,
-                                            colors, yollar.output_dir(), now=zaman.simdi())}
+                                            colors, ayarlar.output_dir, now=zaman.simdi())}
 
 
 @router.delete("/api/palettes/{palette_id}")
-def delete_palette_route(palette_id: str) -> dict:
+def delete_palette_route(palette_id: str,
+                         ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     pid = os.path.basename(palette_id)
-    if not palette_store.delete(pid, yollar.output_dir()):
+    if not palette_store.delete(pid, ayarlar.output_dir):
         raise HTTPException(status_code=404, detail=i18n.t("err.palette_missing", dil.aktif()))
     return {"deleted": pid}

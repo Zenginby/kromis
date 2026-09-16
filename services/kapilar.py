@@ -16,14 +16,19 @@ import chat_store
 import folders
 import i18n
 import storage
-from services import dil, yollar
+from services import dil
 
 
-def check_folder(folder_id: str | None) -> str | None:
-    """Boş/None ise kök (None). Doluysa klasörün var olduğunu doğrular, yoksa 404."""
+def check_folder(folder_id: str | None, output_dir: str) -> str | None:
+    """Boş/None ise kök (None). Doluysa klasörün var olduğunu doğrular, yoksa 404.
+
+    `output_dir` ÇAĞIRANDAN geliyor (rotanın `Depends(ayar.ayarlar)`ı): bu
+    kapı VARLIK soruyor, yani diske bakıyor ve hangi diske bakacağını rotanın
+    ayarları söyler — süreç geneli bir okuma kapısı değil (Faz 0 / Adım 4).
+    """
     if not folder_id:
         return None
-    if not folders.exists(folder_id, yollar.output_dir()):
+    if not folders.exists(folder_id, output_dir):
         raise HTTPException(status_code=404, detail=i18n.t("err.folder_missing", dil.aktif()))
     return folder_id
 

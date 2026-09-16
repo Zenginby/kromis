@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 import catalog
 import chat_client as cc
@@ -16,13 +16,13 @@ import chat_store
 import i18n
 import prefs
 from models import MAX_CHAT_TITLE_CHARS, ChatRequest, ChatSaveRequest, wire_messages
-from services import dil, modeller, yollar, zaman
+from services import ayar, dil, modeller, zaman
 
 router = APIRouter()
 
 
 @router.post("/api/chat")
-def chat(req: ChatRequest) -> dict:
+def chat(req: ChatRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     """Prompt Yönetmeni: kullanıcının dilinde sohbet → İngilizce prompt.
 
     SENKRON `def` (bilinçli): httpx çağrısı bloklayıcı, Starlette bunu kendi
@@ -81,7 +81,7 @@ def chat(req: ChatRequest) -> dict:
         # "Prompt Yönetmeni talimatı yüklenemedi" okuyor, yani YANLIŞ dosyaya
         # yönlendiriliyordu — üstelik aynı arıza `GET /api/prefs`te çıplak
         # 500 veriyor, iki uç aynı kusur için iki farklı şey söylüyordu.
-        baglam = modeller.director_context()
+        baglam = modeller.director_context(ayarlar.output_dir)
         try:
             instructions = chat_prompt.build_system(**baglam)
         except ValueError as e:
@@ -100,7 +100,7 @@ def chat(req: ChatRequest) -> dict:
 # paketlenmiş .app'te geçmiş sessizce buharlaşırdı.
 
 
-def _guard_autosave(title: str | None) -> None:
+def _guard_autosave(title: str | None, output_dir: str) -> None:
     """Otomatik yazımı anahtar kapalıyken reddeder (409). Karar D1, güvence (c).
 
     Ayrımı taşıyan işaret zaten elde: **otomatik kaydın verecek bir ADI yok.**
@@ -117,7 +117,7 @@ def _guard_autosave(title: str | None) -> None:
     409, 422 değil: gövde geçerli, reddin sebebi kullanıcının AYARI. 403 de değil —
     yerel tek kullanıcılı bir uygulamada yetkilendirme çağrışımı yanlış olurdu.
     """
-    if title is None and not prefs.read(yollar.output_dir())["autosave_sessions"]:
+    if title is None and not prefs.read(output_dir)["autosave_sessions"]:
         raise HTTPException(status_code=409,
                             detail=i18n.t("err.autosave_off", dil.aktif()))
 
@@ -146,21 +146,22 @@ def _auto_title(messages: list[dict]) -> str:
 
 
 @router.get("/api/chats")
-def list_chats_route() -> dict:
+def list_chats_route(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     """Kenar panelinin listesi: başlıklar, gövdeler DEĞİL (bkz. chat_store)."""
-    return {"chats": chat_store.list_chats(yollar.output_dir())}
+    return {"chats": chat_store.list_chats(ayarlar.output_dir)}
 
 
 @router.get("/api/chats/{chat_id}")
-def get_chat_route(chat_id: str) -> dict:
-    rec = chat_store.get(os.path.basename(chat_id), yollar.output_dir())
+def get_chat_route(chat_id: str, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+    rec = chat_store.get(os.path.basename(chat_id), ayarlar.output_dir)
     if rec is None:
         raise HTTPException(status_code=404, detail=i18n.t("err.chat_missing", dil.aktif()))
     return {"chat": rec}
 
 
 @router.post("/api/chats")
-def create_chat_route(req: ChatSaveRequest) -> dict:
+def create_chat_route(req: ChatSaveRequest,
+                      ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     """Yeni kayıt. Gövde ZORUNLU, başlık DEĞİL (v2.0: otomatik kayıt).
 
     Başlık gelmediyse ilk mesajdan türetiliyor (`_auto_title`) — kural aynı
@@ -178,23 +179,24 @@ def create_chat_route(req: ChatSaveRequest) -> dict:
     if not req.messages:
         raise HTTPException(status_code=422, detail=i18n.t("err.nothing_to_save", dil.aktif()))
     messages = [m.model_dump(exclude_none=True) for m in req.messages]
-    _guard_autosave(req.title)
+    _guard_autosave(req.title, ayarlar.output_dir)
     title = req.title.strip() if req.title else _auto_title(messages)
-    return {"chat": chat_store.create(title, messages, yollar.output_dir(), now=zaman.simdi())}
+    return {"chat": chat_store.create(title, messages, ayarlar.output_dir, now=zaman.simdi())}
 
 
 @router.delete("/api/chats")
-def delete_all_chats_route() -> dict:
+def delete_all_chats_route(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     """Tüm oturumları siler (karar D1'in güvence b'si: "tümünü sil").
 
     Boş depoda 404 DEĞİL: tek kayıt silmede 404'ün anlamı "hangi kayıt?" sorusunun
     cevapsız kalması; burada soru yok, istenen durum zaten sağlanmış.
     """
-    return {"deleted": chat_store.delete_all(yollar.output_dir())}
+    return {"deleted": chat_store.delete_all(ayarlar.output_dir)}
 
 
 @router.put("/api/chats/{chat_id}")
-def update_chat_route(chat_id: str, req: ChatSaveRequest) -> dict:
+def update_chat_route(chat_id: str, req: ChatSaveRequest,
+                      ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     """Gövdeyi ve/veya başlığı değiştirir (tur sonu kaydı + yeniden adlandırma).
 
     Başlık BOŞ dizeyle gelirse reddedilir: adsız bir sohbet kenar panelinde
@@ -205,10 +207,10 @@ def update_chat_route(chat_id: str, req: ChatSaveRequest) -> dict:
         raise HTTPException(status_code=422, detail=i18n.t("err.chat_title_empty", dil.aktif()))
     # Gövde-yalnız `PUT` = tur sonu otomatik yazımı (bkz. _guard_autosave).
     if req.messages is not None:
-        _guard_autosave(req.title)
+        _guard_autosave(req.title, ayarlar.output_dir)
     messages = (None if req.messages is None
                 else [m.model_dump(exclude_none=True) for m in req.messages])
-    rec = chat_store.update(os.path.basename(chat_id), yollar.output_dir(),
+    rec = chat_store.update(os.path.basename(chat_id), ayarlar.output_dir,
                             messages=messages, title=title, now=zaman.simdi())
     if rec is None:
         raise HTTPException(status_code=404, detail=i18n.t("err.chat_missing", dil.aktif()))
@@ -216,8 +218,8 @@ def update_chat_route(chat_id: str, req: ChatSaveRequest) -> dict:
 
 
 @router.delete("/api/chats/{chat_id}")
-def delete_chat_route(chat_id: str) -> dict:
+def delete_chat_route(chat_id: str, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     cid = os.path.basename(chat_id)
-    if not chat_store.delete(cid, yollar.output_dir()):
+    if not chat_store.delete(cid, ayarlar.output_dir):
         raise HTTPException(status_code=404, detail=i18n.t("err.chat_missing", dil.aktif()))
     return {"deleted": cid}

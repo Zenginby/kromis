@@ -154,15 +154,14 @@ def test_the_client_side_fallback_matches_the_default():
         "istemci yedeği i18n.DEFAULT ile ayrışmış")
 
 
-def test_an_installation_with_no_stored_preference_is_served_in_english(tmp_path,
-                                                                       monkeypatch):
+def test_an_installation_with_no_stored_preference_is_served_in_english(tmp_path, dizinler):
     """UÇTAN UCA kapı: tercih dosyası HİÇ YOKKEN sayfa hangi dilde geliyor?
 
     Yukarıdaki iki test sabitlerin birbirini tuttuğunu söylüyor; bu, o
     sabitlerin gerçekten sayfaya ULAŞTIĞINI söylüyor — ara katman
     (`services.dil.dil_baglami`) tercihi okumayı bıraksa ötekiler yine yeşil kalırdı.
     """
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
+    dizinler(output_dir=str(tmp_path))
     html = TestClient(appmod.app).get("/").text
     assert '<html lang="en">' in html
     assert 'window.KROMIS_LANG="en"' in html
@@ -311,7 +310,7 @@ def test_the_js_payload_cannot_close_the_script_tag(tmp_path, monkeypatch):
 
 # ── Uçtan uca ────────────────────────────────────────────────────────
 
-def test_the_boot_failure_page_speaks_the_selected_language(monkeypatch):
+def test_the_boot_failure_page_speaks_the_selected_language(monkeypatch, dizinler):
     """Şablon okunamadığında çıkan sayfa da çevriliyor — mekanizmanın uçtan
     uca çalıştığının kanıtı. İngilizce arayüzde Türkçe bir çöküş sayfası,
     kullanıcının "bu uygulama bana mı ait" sorusunu sorduğu an olurdu."""
@@ -319,7 +318,7 @@ def test_the_boot_failure_page_speaks_the_selected_language(monkeypatch):
     # `builtins.open`ı patlatmak sözlüğü de okunamaz yapar ve test kendi
     # ölçtüğü şeyi (çeviri) ortadan kaldırırdı — sayfa ham anahtar gösterip
     # yeşil kalabilirdi.
-    monkeypatch.setattr(appmod, "STATIC_DIR", os.path.join(REPO, "yok-boyle-dizin"))
+    dizinler(static_dir=os.path.join(REPO, "yok-boyle-dizin"))
     monkeypatch.setattr(dil, "aktif", lambda: "en")
     r = TestClient(appmod.app).get("/")
     assert r.status_code == 500
@@ -548,13 +547,13 @@ def test_the_picker_reads_the_language_from_the_page_not_the_server():
 
 # ── Sunucu mesajları ─────────────────────────────────────────────────
 
-def test_a_route_error_speaks_the_selected_language(monkeypatch, tmp_path):
+def test_a_route_error_speaks_the_selected_language(tmp_path, dizinler):
     """Yarım bir çeviri en çok HATA ANINDA göze batar: İngilizce bir arayüzde
     Türkçe bir hata kutusu, kullanıcının "bu uygulama bana mı ait" sorusunu
     sorduğu an olurdu."""
     import prefs
     out = str(tmp_path / "output")
-    monkeypatch.setattr(appmod, "OUTPUT_DIR", out)
+    dizinler(output_dir=out)
     prefs.update({"language": "en"}, out)
     c = TestClient(appmod.app)
     assert c.delete("/api/image/yokboyle").json()["detail"] == "The image was not found."
@@ -719,7 +718,7 @@ KULLANICIYA_KONUSMAYAN = {
     "services/dil.py": "dil bağlamını KURAN ara katman; metni okumuyor, seçiyor",
     "services/redaksiyon.py": "422 gövdesinden gizli değeri SİLİYOR; cümle üretmiyor",
     "services/tercih.py": "kayıtlı tercihin önbellekli okuyucusu; veri döndürüyor, cümle değil",
-    "services/yollar.py": "veri dizini okuma kapısı; metin yok",
+    "services/ayar.py": "veri dizinlerinin ayar nesnesi ve `Depends` işlevi; metin yok",
     "services/zaman.py": "zaman damgası biçimi; metin yok",
 }
 

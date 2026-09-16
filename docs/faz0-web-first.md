@@ -93,7 +93,7 @@ Yalnız YARDIMCI yamaları taşındı: `appmod._to_png` (16) → `services.gorse
 
 ---
 
-## 3. Dilin (i18n) istek/hesap bağlamına taşınması
+## 3. Dilin (i18n) istek/hesap bağlamına taşınması ✅ (PR: `faz0/dil-tercihi`)
 
 **Kapsam.** `i18n._AKTIF` ZATEN bir `contextvars.ContextVar`
 (`i18n.py:121`; yazan `set_active` `i18n.py:126`, okuyan `i18n.py:138`) —
@@ -114,6 +114,26 @@ kaldığını sınıyor (v0.22 kararı) — çerezsiz ilk istek İngilizce kalma
 **Çıkış ölçütü.** Aynı süreçte eş zamanlı iki istek farklı dille doğru cevap
 alıyor (yeni test: iki `TestClient`, iki çerez); `prefs.json` okunmadan dil
 çözülüyor; takım yeşil.
+
+**Yapıldığında (2026-09-16) plandan sapmalar.** Zincir `services/dil.py::coz`:
+`X-Kromis-Lang` başlığı → `kromis_lang` çerezi → diskteki KAYITLI tercih →
+`Accept-Language` → `i18n.DEFAULT`. Plandaki "hesap tercihi" halkası Faz 1'e
+kaldı; takılacağı yer 3. halka (`services/tercih.py::dil`). Sapmalar:
+(a) `static/settings.js` DEĞİŞMEDİ — çerezi `POST /api/prefs` cevabı kuruyor
+(`routers/ayarlar.py`), ön yüz yazımdan sonra zaten `location.reload()`
+yapıyor ve yeni sayfa çerezle geliyor; betiğin çerez yazmasına gerek kalmadı.
+(b) `prefs.py` "yazar kalmaz" OLMADI — `language` hâlâ diske yazılıyor
+(çerezsiz istemci ve geriye dönük yol için) ve yeni `prefs.read_stored()`
+"hiç yazılmamış" ile "varsayılana eşit yazılmış"ı ayırıyor; `read()` onun
+üstünden geçiyor. (c) `prefs.json` istek başına OKUNMUYOR ama tümüyle
+devre dışı da değil: `services/tercih.py` dosya imzalı (`st_ino`,
+`st_mtime_ns`, `st_size`) bir önbellek — istek başına tek `stat`, rota
+yazınca `sifirla()`. Ölçü: 20 istekte ≤1 okuma (`tests/test_dil.py`).
+(d) Ön tanımlı dil hiç işaret yokken İngilizce KALDI; yeni olan şey yalnız
+tarayıcı başlığının diskte kayıt YOKKEN konuşması. Bekçiler: `tests/test_dil.py`
+(sıra, çerez öznitelikleri, önbellek bayatlamıyor, iki çerezli istemci eş
+zamanlı), `tests/conftest.py` (önbellek testler arasında sıfırlanıyor),
+`tests/test_playwright_dil.py` (kurgu `read_stored`ı da yamalıyor).
 
 ---
 

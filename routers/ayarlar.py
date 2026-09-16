@@ -4,7 +4,7 @@
 """Ayarlar uçları: sağlayıcı kimlikleri, güncelleme denetimi, kullanıcı tercihleri."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 
 import azure_client as ac
 import catalog
@@ -14,7 +14,7 @@ import paths
 import prefs
 import version
 from models import PrefsRequest, SettingsRequest
-from services import dil, modeller, yollar
+from services import dil, modeller, tercih, yollar
 
 router = APIRouter()
 
@@ -265,7 +265,7 @@ def get_prefs_route() -> dict:
 
 
 @router.post("/api/prefs")
-def post_prefs_route(req: PrefsRequest) -> dict:
+def post_prefs_route(req: PrefsRequest, response: Response) -> dict:
     """Gönderilen tercihleri yazar, diğerlerine dokunmaz; yeni görünümü döndürür.
 
     Anahtar BİLEREK `/api/settings`'te DEĞİL: o uç kimlik formu ve `api_key` +
@@ -273,11 +273,27 @@ def post_prefs_route(req: PrefsRequest) -> dict:
     zorunda kalırdı ve Azure hiç yapılandırılmamışken anahtar çevrilemez olurdu.
     Değer de tek yerden okunuyor (`/api/settings` onu YANSITMIYOR): iki uç aynı
     değeri döndürseydi ayrışabilirlerdi.
+
+    `language` yazıldığında cevap bir de ÇEREZ taşıyor (Faz 0 / Adım 3):
+    dil zinciri (services/dil.py) çerezi diskteki tercihten ÖNCE okuyor, yani
+    seçimi yapan tarayıcı bir sonraki isteğinde dilini kendisi getiriyor ve
+    Faz 1'de aynı süreçteki başka bir tarayıcının başka bir dil görmesinin
+    yolu açık. Ön yüz DEĞİŞMEDİ: `static/settings.js` yazımın ardından
+    `location.reload()` yapıyor, yeni sayfa çerezle geliyor.
+
+    `tercih.sifirla()` yazımdan hemen sonra: önbellek dosya imzasından
+    zaten anlardı, ama yazan ile okuyan aynı süreçteyken sözleşme mekanizmaya
+    tercih ediliyor (gerekçesi services/tercih.py'de). Yazım başarısızsa
+    (422) çağrılmıyor — düşürecek bir şey değişmedi.
     """
     values = req.model_dump(exclude_none=True)
     try:
-        return prefs.update(values, yollar.output_dir())
+        sonuc = prefs.update(values, yollar.output_dir())
     except ValueError as e:
         # prefs katmanı da bilinmeyen anahtarı/yanlış türü reddediyor; buraya
         # düşmek pydantic ile prefs şemasının ayrışması demek olur.
         raise HTTPException(status_code=422, detail=str(e))
+    tercih.sifirla()
+    if "language" in values:
+        dil.cerez_yaz(response, values["language"])
+    return sonuc

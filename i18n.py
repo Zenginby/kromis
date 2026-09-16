@@ -108,7 +108,7 @@ _lock = threading.Lock()
 # güncellemek demekti; üstelik o zincirdeki her yeni fonksiyon aynı
 # parametreyi unutmaya açık olurdu.
 #
-# TEK YAZAR `app`'in ara katmanı (`_dil_baglami`). İkinci bir yazar doğarsa
+# TEK YAZAR ara katman (`services.dil.dil_baglami`). İkinci bir yazar doğarsa
 # hangisinin son sözü söylediği çağrı sırasına kalırdı; `#go.disabled`ın "tek
 # yazar" kuralının aynısı.
 #

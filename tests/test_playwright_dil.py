@@ -85,9 +85,17 @@ def _kurgu(monkeypatch, dil: str) -> None:
                         lambda *a, **k: {c.id: True for c in catalog.CREDENTIALS})
     monkeypatch.setattr(credstore, "chat_configured_map",
                         lambda *a, **k: {m.id: True for m in catalog.CHAT_MODELS})
+    # İki okuyucu da yamalanıyor: `read` birleşik görünüm (`GET /api/prefs`),
+    # `read_stored` dil zincirinin okuduğu KAYITLI görünüm (services/tercih.py,
+    # Faz 0 / Adım 3). Yalnız ilki yamalansa sayfa hâlâ diskteki (yok) tercihe
+    # bakar ve kurgu dili hiç görmezdi. Önbellek testler arasında
+    # `tests/conftest.py` tarafından sıfırlanıyor.
     gercek = prefs.read
     monkeypatch.setattr(prefs, "read",
                         lambda *a, **k: {**gercek(*a, **k), "language": dil})
+    gercek_kayitli = prefs.read_stored
+    monkeypatch.setattr(prefs, "read_stored",
+                        lambda *a, **k: {**gercek_kayitli(*a, **k), "language": dil})
 
 
 def _tikla(page, secici: str) -> None:

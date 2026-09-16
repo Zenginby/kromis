@@ -160,7 +160,7 @@ def test_an_installation_with_no_stored_preference_is_served_in_english(tmp_path
 
     Yukarıdaki iki test sabitlerin birbirini tuttuğunu söylüyor; bu, o
     sabitlerin gerçekten sayfaya ULAŞTIĞINI söylüyor — ara katman
-    (`app._dil_baglami`) tercihi okumayı bıraksa ötekiler yine yeşil kalırdı.
+    (`services.dil.dil_baglami`) tercihi okumayı bıraksa ötekiler yine yeşil kalırdı.
     """
     monkeypatch.setattr(appmod, "OUTPUT_DIR", str(tmp_path))
     html = TestClient(appmod.app).get("/").text
@@ -718,6 +718,7 @@ KULLANICIYA_KONUSMAYAN = {
     "services/__init__.py": "yalnız paket docstring'i",
     "services/dil.py": "dil bağlamını KURAN ara katman; metni okumuyor, seçiyor",
     "services/redaksiyon.py": "422 gövdesinden gizli değeri SİLİYOR; cümle üretmiyor",
+    "services/tercih.py": "kayıtlı tercihin önbellekli okuyucusu; veri döndürüyor, cümle değil",
     "services/yollar.py": "veri dizini okuma kapısı; metin yok",
     "services/zaman.py": "zaman damgası biçimi; metin yok",
 }

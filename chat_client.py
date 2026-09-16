@@ -134,7 +134,9 @@ def extract_content(response_json: dict) -> tuple[str, str]:
         raise ChatError(i18n.t("err.chat_empty"))
     choice = choices[0] if isinstance(choices[0], dict) else {}
     finish_reason = str(choice.get("finish_reason") or "")
-    message = choice.get("message") if isinstance(choice.get("message"), dict) else {}
+    message = choice.get("message")
+    if not isinstance(message, dict):  # tek okuma: mypy iki ayrı `.get`i bağlamıyor
+        message = {}
     content = message.get("content")
     if not isinstance(content, str) or not content.strip():
         raise ChatError(i18n.t("err.chat_empty_content")

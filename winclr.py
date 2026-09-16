@@ -147,8 +147,10 @@ def _winreg_release() -> int | None:
     try:
         import winreg
 
-        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, _NET_ANAHTARI) as anahtar:
-            deger, _tur = winreg.QueryValueEx(anahtar, "Release")
+        # `winreg` typeshed'de yalnız win32; mypy `platform = "linux"` ile
+        # okuyor (pyproject.toml → [tool.mypy]), `is_supported()` kapısı üstte.
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, _NET_ANAHTARI) as anahtar:  # type: ignore[attr-defined]
+            deger, _tur = winreg.QueryValueEx(anahtar, "Release")  # type: ignore[attr-defined]
         return int(deger)
     except Exception:
         return None

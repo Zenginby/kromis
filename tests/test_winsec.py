@@ -98,7 +98,10 @@ def _sid_ile_dacl_kur(path: str, sid_ifadesi: str) -> None:
     `restrict_to_current_user` her zaman sayısal SID yazıyor, yani takma adlı
     hâli üretmenin başka yolu yok — runner'daki durum burada elle kuruluyor.
     """
-    winsec._set_dacl(path, f"D:P(A;;FA;;;{sid_ifadesi})")
+    # `_set_dacl` win32 dalında tanımlı; mypy `platform = "linux"` ile o dalı
+    # okumuyor (pyproject.toml → [tool.mypy]). Dosya zaten `skipif` ile Windows'a
+    # bağlı.
+    winsec._set_dacl(path, f"D:P(A;;FA;;;{sid_ifadesi})")  # type: ignore[attr-defined]
 
 
 def test_takma_adli_sid_ayni_hesabi_gosterirse_owner_only_sayilir(tmp_path):

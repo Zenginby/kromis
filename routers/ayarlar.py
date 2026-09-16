@@ -217,6 +217,9 @@ def post_settings(req: SettingsRequest) -> dict:
             # satır onu zaten "varsayılana dön" olarak geçirdi.
             if deger.strip():
                 ac.check_base_url(deger.strip(), cred.url_field)
+            # `url_field` varsa `url_env` de var — katalog değişmezi,
+            # `tests/test_catalog.py` mandallıyor; mypy iki alanın bağını göremez.
+            assert cred.url_env is not None
             updates[cred.url_env] = deger.strip()
 
         # Kataloğa girmemiş eski BYOK alanları. Katalog döngüsünün DIŞINDA

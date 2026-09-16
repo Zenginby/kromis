@@ -23,6 +23,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+from collections.abc import Callable
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -121,7 +122,7 @@ def _yaz(yol: str, metin: str) -> None:
 # tazelenir, İngilizcesi olduğu yerde kalırdı — ve bunu hiçbir şey kırmızıya
 # düşürmezdi: test_version.py'nin "kaçak literal" iddiası YALNIZ README.md'yi
 # okuyor. Bu tam olarak v0.4.1'de yaşanan kusurun ikinci dildeki kopyası.
-SURUM_DOSYALARI: tuple[tuple[str, object], ...] = (
+SURUM_DOSYALARI: tuple[tuple[str, Callable[[str, str], str]], ...] = (
     ("version.py", version_py_yaz),
     ("README.md", readme_yaz),
     ("README.en.md", readme_yaz),

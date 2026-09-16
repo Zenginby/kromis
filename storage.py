@@ -102,7 +102,11 @@ def valid_id(value: str | None) -> bool:
     SESSİZCE düşürülürdü — turun sütunları birbirini bulamaz, sebebi de
     hiçbir yerde görünmezdi (app._check_session'ın kuralı).
     """
-    return bool(value) and _SAFE_ID.fullmatch(value) is not None
+    # İki adım, tek `and` DEĞİL: `bool(value)` mypy için `str | None`u
+    # daraltmıyor, `if not value` daraltıyor. Davranış birebir.
+    if not value:
+        return False
+    return _SAFE_ID.fullmatch(value) is not None
 
 
 def _history_path(output_dir: str) -> str:
@@ -407,7 +411,8 @@ def delete(image_id: str, output_dir: str) -> bool:
         # `delete_many` ile aynı arama (bkz. `media_path_of`).
         file_path = media_path_of(image_id, output_dir)
         file_existed = file_path is not None
-        if file_existed:
+        # `if file_existed:` DEĞİL: mypy takma ad üzerinden daraltmıyor.
+        if file_path is not None:
             # delete_many ile aynı yarış: araya başka bir silme girebilir.
             with contextlib.suppress(FileNotFoundError):
                 os.remove(file_path)

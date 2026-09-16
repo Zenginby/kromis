@@ -37,6 +37,7 @@ import os
 import shutil
 import subprocess
 import sys
+from typing import Any
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
@@ -143,7 +144,7 @@ def main() -> int:
         asset_ids[kind] = [r["id"] for r in reversed(recs)]
 
     # ── ELLE yazılan legacy kayıtlar (yazıcıdan çıkamaz) ─────────────────
-    legacy_image = {
+    legacy_image: dict[str, Any] = {  # `parent_id: None` yüzünden `str | None` çıkarılıyordu
         "id": "aaaaaaaaaaaa",
         "filename": "aaaaaaaaaaaa.png",
         "prompt": "pre-v1.6 kaydı: folder_id/palette/prompt_sent anahtarları YOK",

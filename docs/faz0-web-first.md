@@ -253,7 +253,7 @@ sayıyı artırmadı), ruff temiz.
 
 ---
 
-## 6. mypy'yi kapıya çevir (kademeli sıkılaştırma) + ruff `ignore` listesini eritme
+## 6. mypy'yi kapıya çevir (kademeli sıkılaştırma) + ruff `ignore` listesini eritme ✅ mypy yarısı (PR: `faz0/mypy-zorunlu`)
 
 **Kapsam.** Bugün: mypy 77 bulgu / 24 dosya — `app.py` 22, `providers.py` 8,
 `winsec.py` 6 (dondurulmuş, `exclude`a alınabilir), `desktop.py` 4 (aynı),
@@ -277,6 +277,53 @@ zincirdeki `__cause__`ü de sansürlüyor mu, ölçülmeli.
 
 **Çıkış ölçütü.** `mypy .` 0 bulgu ve `continue-on-error` kalkmış;
 `[tool.ruff.lint] ignore` yalnız `B008` içeriyor.
+
+**Yapıldığında (2026-09-16) — mypy yarısı; ruff yarısı AYRI PR'a kaldı.**
+Taban 72 bulgu / 25 dosya (Adım 5 sonrası ölçüm), hepsi kapandı: `mypy .`
+0, `ci.yml` `lint` işinden `continue-on-error: true` kalktı. Kırılım koda
+göre — `arg-type` 21, `attr-defined` 15, `union-attr` 13, `name-defined` 6,
+`dict-item` 6, `index` 4, `operator` 3, `assignment` 3, `list-item` 1.
+Yola göre: **60 gerçek düzeltme** (daraltma, tip notu, eşdeğer yeniden
+yazım — hiçbiri davranış değiştirmiyor), **6 bulgu 5 satır `# type: ignore[...]`**
+ile gerekçeli (`guncelleme._zaman`: `float(object)` bilerek, `TypeError`
+yakalanıyor; `winclr` ×2 `winreg`, `desktop` `ctypes.windll`, `test_winsec`
+`_set_dacl`: typeshed bunları yalnız win32'de tanımlıyor), **6 bulgu tek
+modül muafiyeti** (`winsec`, `name-defined`: win32 dalı Linux'ta okunmaz;
+ruff F821 aynı kusuru platformdan bağımsız yakalıyor). Stub paketi
+GEREKMEDİ. Plandaki "dondurulmuş kabukları `exclude`a al" YAPILMADI ve
+yapılamazdı: `exclude` ithal edilen modülü susturmaz (mypy ithali izler),
+`ignore_errors` susturur ama görünmez — kabuk modüllerinin 12 bulgusu da
+düzeltildi.
+
+Düzeltmelerin biçimi, okurken şaşırtmasın diye: `routers/uretim.py`nin 18
+bulgusu doğrulayıcının ZATEN garantilediği iki değişmezin (`req.model`
+normalleştirildi, katalog kaydı var) tip düzeyindeki karşılığı olan 9
+`assert`; `providers`/`chat_providers`'ta `bool(m) and …` → `m is not None
+and …` (dataclass her zaman doğru, aynı anlam); `storage.valid_id`/
+`chat_store.valid_id` iki adıma açıldı; `_ADAPTERS` tabloları
+`tuple | Callable[[], tuple]`; `Image.LANCZOS` → `Image.Resampling.LANCZOS`
+(aynı değer, 1 — Pillow 12 modül sabitini tip dosyasından düşürdü;
+`tests/fixtures/logo` altınları bayt bayt aynı); `tests/test_desktop.py`nin
+sahte `webview` modüllerine nitelik `vars(m).update(...)` ile yazılıyor
+(typeshed `ModuleType`a yazımı tanımlamıyor); `tools/graf_uret.py`de aynı
+işlevde `str` olarak bağlanmış `hedef` adı yeniden kullanılıyordu → `rota`.
+
+Yapılandırma (`pyproject.toml` → `[tool.mypy]`): `platform = "linux"` (CI'ın
+platformu; yazılmasa Windows'ta koşan mypy `sys.platform == "win32"`
+dallarını okur, Linux'ta okumaz — aynı commit iki sayı verirdi ve platform
+gerekçeli ignore'lar Windows'ta "kullanılmıyor" hatasına dönerdi),
+`warn_unused_ignores`, `warn_redundant_casts`, `strict_equality`,
+`extra_checks`, `no_implicit_reexport` — hepsi ölçüldü, sıfır ek bulgu.
+`check_untyped_defs` AÇILMADI: ölçüldü, tek başına 393 bulgu / 63 dosya
+(imzasız test gövdeleri ve `_capabilities_fit_the_model` gibi imzasız
+doğrulayıcılar); `warn_return_any` +55, `warn_unreachable` +2
+(`screencolor.py:99`, `color_names.py:212`). Bunlar ve modül modül `strict`
+sıradaki kademe — ayrı PR. Bekçiler: `tests/test_mypy_kapisi.py`
+(bayraklar gevşemez, `ignore_errors` yok, muafiyet yalnız `winsec`/
+`name-defined`), `tests/test_paketleme_dondurma.py` (mypy adımı var ve
+`continue-on-error` yok). Ruff `ignore` listesinin eritilmesi (E501, B904,
+E702, B905, E741, UP031) bu PR'da YOK — `B904` için `errlog` redaksiyon
+ölçümü gerekiyor (yukarıdaki risk notu), ayrı PR.
 
 ---
 

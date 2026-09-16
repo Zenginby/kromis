@@ -38,8 +38,13 @@ def generate(req: GenerateRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)
                                             drop=req.palette_drop,
                                             task="generate", output_dir=ayarlar.output_dir)
     # `req.model` doğrulayıcıda NORMALLEŞTİRİLDİ (None → varsayılanın gerçek
-    # id'si), yani doğrulanan değer ile kaydedilen değer ayrışamıyor.
+    # id'si), yani doğrulanan değer ile kaydedilen değer ayrışamıyor. İki
+    # `assert` o sözleşmenin TİP düzeyindeki karşılığı: alan telde None
+    # alabildiği için `str | None` kalıyor ve katalog kaydı doğrulayıcının
+    # geçirdiği id için hiç None olamaz — mypy bunu göremez, burada daraltılıyor.
+    assert req.model is not None
     spec = catalog.image_model(req.model)
+    assert spec is not None
     try:
         images = providers.generate(req.model, prompt_sent, req.size,
                                     req.quality, req.n)
@@ -93,8 +98,11 @@ def video(req: VideoRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> d
     folder_id = kapilar.check_folder(req.folder_id, ayarlar.output_dir)
     session_id = kapilar.check_session(req.session_id)
     # `req.model` doğrulayıcıda NORMALLEŞTİRİLDİ (None → varsayılanın gerçek
-    # id'si), yani doğrulanan değer ile kaydedilen değer ayrışamıyor.
+    # id'si), yani doğrulanan değer ile kaydedilen değer ayrışamıyor; iki
+    # `assert` `generate`teki daraltmanın ikizi.
+    assert req.model is not None
     spec = catalog.video_model(req.model)
+    assert spec is not None
     try:
         videos = providers.generate_video(req.model, req.prompt, req.size,
                                           req.quality, req.duration, req.n)
@@ -138,6 +146,7 @@ def _check_video_form(prompt: str, size: str, quality: str, duration: int,
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     spec = catalog.video_model(model_id)
+    assert spec is not None  # `check_video_capabilities` aynı id'yi az önce katalogda buldu
     if not spec.supports_edit:
         raise HTTPException(status_code=422,
                             detail=i18n.t("err.model_no_reference", dil.aktif(), model=etiket.label_of(spec)))
@@ -231,6 +240,7 @@ async def animate(
                                  file, source_id, model,
                                  last_file, last_source_id)
     spec = catalog.video_model(model_id)
+    assert spec is not None  # `_check_video_form` id'yi katalogdan geçirdi
     target_folder = kapilar.check_folder(folder_id, ayarlar.output_dir)
     session = kapilar.check_session(session_id)
     refs, parent_id = await _collect_edit_refs(request, file, source_id, ayarlar.output_dir)
@@ -300,6 +310,7 @@ def _check_edit_form(prompt: str, size: str, quality: str, n: int,
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     spec = catalog.image_model(model_id)
+    assert spec is not None  # `check_capabilities` aynı id'yi az önce katalogda buldu
     if not spec.supports_edit:
         raise HTTPException(status_code=422,
                             detail=i18n.t("err.model_no_reference", dil.aktif(), model=etiket.label_of(spec)))
@@ -350,6 +361,10 @@ async def _collect_edit_refs(
         refs.append((f"{sid}.png", gorsel.read_png_file(gorsel.output_png_path(sid, output_dir))))
         parent_id = sid
     else:
+        # Form kapısı "tam olarak biri" dedi (`_check_edit_form` /
+        # `_check_video_form`): `source_id` yoksa `file` var. mypy iki
+        # parametre arasındaki o bağı göremez, daraltma burada.
+        assert file is not None
         refs.append(("upload.png", await gorsel.read_upload_png(file)))
         parent_id = None
 
@@ -393,6 +408,7 @@ async def edit(
     model_id = _check_edit_form(prompt, size, quality, n, file, source_id,
                                 palette_mode, palette_strength, model)
     spec = catalog.image_model(model_id)
+    assert spec is not None  # `_check_edit_form` id'yi katalogdan geçirdi
     palette_hex = palet.check_palette_hex(palette_hex)
     drop = palet.check_palette_drop(palette_drop)
 

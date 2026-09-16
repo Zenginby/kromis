@@ -2,7 +2,7 @@
 
 # Test haritası
 
-`tests/` altında 95 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
+`tests/` altında 96 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
 
 | modül | testler |
 | --- | --- |
@@ -74,19 +74,19 @@
 
 Bu modülleri hiçbir test dosyası ithal etmiyor. Dolaylı olarak sınanıyor olabilirler (`import app` app'in ithal ettiği her şeyi çalıştırır), ama doğrudan bekçileri yok.
 
-* `routers.ayarlar` (300 satır)
+* `routers.ayarlar` (303 satır)
 * `routers.bindirme` (231 satır)
 * `routers.galeri` (334 satır)
 * `routers.kok` (81 satır)
 * `routers.paletler` (90 satır)
 * `routers.sohbet` (225 satır)
-* `routers.uretim` (423 satır)
+* `routers.uretim` (439 satır)
 * `services.kapilar` (75 satır)
 * `services.modeller` (295 satır)
 * `services.palet` (181 satır)
 * `services.redaksiyon` (63 satır)
 * `services.zaman` (17 satır)
-* `tools.make_legacy_fixtures` (210 satır)
+* `tools.make_legacy_fixtures` (211 satır)
 * `tools.make_logo_goldens` (110 satır)
 * `tools.render_brand_assets` (115 satır)
 
@@ -102,6 +102,7 @@ Yukarıdaki tablonun kör noktası: sütun ithal ilişkisinden çıktığı içi
 * `tests/test_dal_korumasi.py`
 * `tests/test_dal_nobetcisi.py`
 * `tests/test_encoding_contract.py`
+* `tests/test_mypy_kapisi.py`
 * `tests/test_paket_icerik_listesi.py`
 * `tests/test_playwright_kurulumu.py`
 * `tests/test_python_surumu.py`

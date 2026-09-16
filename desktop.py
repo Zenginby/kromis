@@ -96,7 +96,9 @@ def start_server(asgi_app: ASGIApp, host: str = "127.0.0.1",
     # NEDENİ kaybolur. Burada geçici olarak yakalayıp önceki hook'a da
     # iletiyoruz (ör. pytest'in kendi excepthook'u — testlerdeki mevcut uyarı
     # davranışı bozulmasın diye) ve aşağıdaki RuntimeError'a ekliyoruz.
-    thread_exceptions: list[BaseException] = []
+    # `| None`: typeshed `ExceptHookArgs.exc_value`i None olabilir sayıyor;
+    # tüketen tek yer (`!r`) None'ı da yazabilir, süzmek gereksiz.
+    thread_exceptions: list[BaseException | None] = []
     previous_hook = threading.excepthook
 
     def _capture_thread_exception(args: threading.ExceptHookArgs) -> None:
@@ -200,7 +202,9 @@ def _alert_windows(title: str, message: str, *, kritik: bool = True) -> bool:
     # istasyonu yok); kurabildiyse basılan düğmenin kimliği. Sıfır demek
     # "hiç bloklamadı" demek ve tarayıcı yedeği tam olarak o bloklamaya
     # dayanıyor — dönüş değerini yutmak o yedeği sessizce boşa çıkarır.
-    return bool(ctypes.windll.user32.MessageBoxW(None, message, title, bayraklar))
+    # `windll` typeshed'de yalnız win32; mypy `platform = "linux"` ile okuyor
+    # (pyproject.toml → [tool.mypy]), çağıran zaten Windows dalında.
+    return bool(ctypes.windll.user32.MessageBoxW(None, message, title, bayraklar))  # type: ignore[attr-defined]
 
 
 def _uyari_goster(title: str, message: str, *, kritik: bool) -> bool:

@@ -124,7 +124,8 @@ def depth(folder_id: str, output_dir: str) -> int:
     if folder_id not in by_id:
         return 0
     seen: set[str] = set()
-    level, current = 0, folder_id
+    level = 0
+    current: str | None = folder_id  # `parent_id` kökte None
     while current and current in by_id and current not in seen:
         seen.add(current)
         level += 1
@@ -210,7 +211,7 @@ def export_zip(folder_id: str, output_dir: str) -> tuple[bytes, str]:
 
     def get_rel_path(fid: str) -> str:
         chain = []
-        curr = fid
+        curr: str | None = fid  # `parent_id` kökte None
         seen = set()
         while curr and curr in folder_map and curr not in seen:
             seen.add(curr)

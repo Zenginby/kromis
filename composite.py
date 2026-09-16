@@ -139,7 +139,7 @@ def composite_logo(base_path: str, *, logo_path: str,
 
     logo_w = int(base.width * scale)
     logo_h = int(logo.height * (logo_w / logo.width))
-    logo = logo.resize((logo_w, logo_h), Image.LANCZOS)
+    logo = logo.resize((logo_w, logo_h), Image.Resampling.LANCZOS)
 
     margin_px = int(base.width * margin)
     x, y = paste_position(base.width, base.height, logo_w, logo_h, position,

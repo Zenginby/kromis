@@ -41,7 +41,10 @@ class _FakeSettings(dict):
 def _fake_webview_module() -> types.ModuleType:
     """`_run()`'ın dokunduğu yüzeyi taşıyan sahte modül (pencere hiç açılmaz)."""
     module = types.ModuleType("webview")
-    module.settings = _FakeSettings(ALLOW_DOWNLOADS=False)
+    # `module.settings = …` DEĞİL: typeshed `ModuleType`a nitelik YAZMAYI
+    # tanımlamıyor (okuma `__getattr__` ile serbest) ve mypy her atamayı
+    # `attr-defined` sayıyor. `vars()` aynı sözlüğe yazıyor — davranış birebir.
+    vars(module).update(settings=_FakeSettings(ALLOW_DOWNLOADS=False))
     return module
 
 
@@ -508,12 +511,11 @@ def test_alert_failure_does_not_crash_main(monkeypatch, tmp_path, platform):
 def _pencere_patlatan_webview(hata: Exception) -> types.ModuleType:
     """`webview.start()` çağrısı patlayan sahte modül (Windows kusurunun eşi)."""
     fake = _fake_webview_module()
-    fake.create_window = lambda *a, **k: None
 
     def _start() -> None:
         raise hata
 
-    fake.start = _start
+    vars(fake).update(create_window=lambda *a, **k: None, start=_start)
     return fake
 
 
@@ -759,11 +761,11 @@ def _sahte_webview_guilib(renderer: str = "edgechromium"):
     `guilib = None` ile o niteliğin üstüne yazıyor.
     """
     paket = types.ModuleType("webview")
-    paket.guilib = None                     # ÇAKIŞMA: paketin niteliği None
+    vars(paket).update(guilib=None)         # ÇAKIŞMA: paketin niteliği None
     guilib = types.ModuleType("webview.guilib")
     secilen = types.ModuleType("webview.platforms.winforms")
-    secilen.renderer = renderer
-    guilib.initialize = lambda: secilen
+    vars(secilen).update(renderer=renderer)
+    vars(guilib).update(initialize=lambda: secilen)
     return paket, guilib
 
 

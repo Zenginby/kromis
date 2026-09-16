@@ -142,9 +142,15 @@ def test_ci_still_runs_the_test_suite_the_leak_scan_and_lint():
     assert str(isler["test"].get("uses", "")).endswith("_test.yml"), (
         "ci.yml test takımını `_test.yml` üzerinden koşturmuyor")
     assert "sizinti" in isler, "sızıntı taraması ci.yml'den düşmüş"
-    komutlar = "\n".join(str(a.get("run") or "") for a in isler["lint"].get("steps", []))
+    adimlar = isler["lint"].get("steps", [])
+    komutlar = "\n".join(str(a.get("run") or "") for a in adimlar)
     assert "ruff check" in komutlar, "lint işi ruff koşturmuyor"
     assert "mypy" in komutlar, "lint işi mypy koşturmuyor"
+    # Adım 6'dan (2026-09-16) beri mypy da KESİCİ: `continue-on-error: true`
+    # geri gelirse kapı sessizce bilgiye döner ve yeşil kalır — burada yakalanır.
+    kesmeyenler = [a.get("name") for a in adimlar
+                   if ("mypy" in str(a.get("run") or "")) and a.get("continue-on-error")]
+    assert not kesmeyenler, f"lint işinde mypy adımı PR'ı kesmiyor: {kesmeyenler}"
 
 
 # --------------------------------------------------------------------------

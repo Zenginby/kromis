@@ -74,10 +74,29 @@ ignore = [
 
 [tool.mypy]
 python_version = "3.13"
-# TABAN, `strict` DEĞİL: bugün hiçbir modülün tip iddiası denetlenmedi ve ilk
-# koşu yüzlerce bulgu üretiyor. CI'da `continue-on-error: true` ile koşuyor —
-# sayı düşürülüp sıfırlandığında kapı kapanır (docs/faz0-web-first.md → 6).
+# KAPI (Faz 0 / Adım 6, 2026-09-16): `mypy .` sıfır bulgu ve CI'daki `lint`
+# işi artık PR'ı kesiyor. Adım 1'deki 77 bulgu (Adım 5 sonrası 72) burada
+# kapandı; kırılım docs/faz0-web-first.md → 6'da. Bayraklar
+# `tests/test_mypy_kapisi.py` ile mandallı: biri sessizce gevşetilirse takım
+# kırmızı.
+#
+# `strict` HÂLÂ DEĞİL ve `check_untyped_defs` de yok — ölçüldü: ikincisi tek
+# başına 393 bulgu / 63 dosya (imzasız test gövdeleri), `warn_return_any` +55.
+# Sıradaki kademe o (aşağıdaki bayrak sıkılaştırma notu).
+#
+# `platform = "linux"`: CI'ın koştuğu yer. Yazılmasa mypy KOŞULAN makinenin
+# platformunu alır ve `sys.platform == "win32"` dalları (winsec, winclr,
+# desktop) Windows'ta okunur, Linux'ta okunmaz — aynı commit iki makinede iki
+# farklı sayı verirdi ve platform gerekçeli `# type: ignore`lar Windows'ta
+# "kullanılmıyor" hatasına dönerdi. Harita her yerde CI'ınki olsun.
+platform = "linux"
 ignore_missing_imports = true
+# Sıkılaştırma — hepsi ölçüldü, taban temizken sıfır ek bulgu:
+warn_unused_ignores = true     # gereksiz kalan `# type: ignore` hata olsun (bayat muafiyet kalmasın)
+warn_redundant_casts = true
+strict_equality = true         # `str == int` gibi hiç doğru olamayan karşılaştırmalar
+extra_checks = true
+no_implicit_reexport = true
 exclude = [
     "^android/",
     "^docs/",
@@ -85,3 +104,15 @@ exclude = [
     "^dist/",
     "^\\.venv/",
 ]
+
+# winsec: `if sys.platform == "win32":` dalı `platform = "linux"` altında
+# OKUNMAZ (mypy onu ölü sayar) ve orada tanımlanan `_set_dacl`,
+# `_current_user_sid`, `_get_dacl_sddl`, `_resolve_sid` dışarıdan çağrıldığında
+# `name-defined` çıkıyor — 6 bulgu, hepsi bu. Kod doğru: çağıranlar
+# `is_supported()` kapısının arkasında. Aynı kusuru (gerçekten tanımsız ad)
+# ruff F821 platformdan bağımsız yakalıyor, yani bu kapatma denetim boşluğu
+# açmıyor. Satır satır `# type: ignore` yerine modül kapsamı: beş satıra aynı
+# gerekçeyi yazmak okunurluğu bozuyor, gerekçe tek ve burada.
+[[tool.mypy.overrides]]
+module = "winsec"
+disable_error_code = ["name-defined"]

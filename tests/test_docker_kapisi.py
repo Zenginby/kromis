@@ -36,6 +36,7 @@ import shlex
 import yaml
 
 import catalog
+from services import cerez, db, koken, posta
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCKERFILE = os.path.join(KOK, "Dockerfile")
@@ -200,8 +201,12 @@ def _atamalar() -> list[tuple[str, str, bool]]:
     return sonuc
 
 
-# Altyapı değişkenleri — Faz 1 / 1 ile `DATABASE_URL` (services/db.py okuyor).
-ALTYAPI = {"KROMIS_DATA_DIR", "PORT", "DATABASE_URL"}
+# Altyapı değişkenleri — Faz 1 / 1 ile `DATABASE_URL` (services/db.py okuyor);
+# Faz 1 / 3 ile hesap ve e-posta: `KROMIS_KOKEN` (services/koken.py),
+# `KROMIS_POSTA`, `KROMIS_POSTA_GONDEREN`, `RESEND_API_KEY` (services/posta.py),
+# `KROMIS_GUVENLI_CEREZ` (services/cerez.py). Adlar KAYNAKTAN, elle değil.
+ALTYAPI = {"KROMIS_DATA_DIR", "PORT", db.DATABASE_URL_ENV, koken.KOKEN_ENV,
+           posta.POSTA_ENV, posta.GONDEREN_ENV, posta.RESEND_ANAHTAR_ENV, cerez.GUVENLI_ENV}
 
 
 def _katalog_adlari() -> set[str]:

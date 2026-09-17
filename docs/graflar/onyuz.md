@@ -19,6 +19,12 @@ Betikler küresel kapsamda, `static/index.html`'deki SIRAYLA yükleniyor — mod
 
 Stiller: `/static/fonts.css`, `/static/style.css`, `/static/flow-tokens.css`, `/static/mobile.css`
 
+## Öteki sayfalar
+
+Kendi belgesi olan sayfalar (ör. `/giris`): stüdyonun betikleri yüklenmez, yalnız aşağıdakiler — kapsam ayrı, adlar çakışmaz.
+
+* `static/giris.html` → betikler: `/static/i18n.js`, `/static/giris.js` · stiller: `/static/fonts.css`, `/static/flow-tokens.css`, `/static/giris.css`
+
 ## Betikler arası çağrı
 
 ```mermaid
@@ -39,6 +45,7 @@ flowchart LR
   n_folders_js["folders.js"] -->|20| n_core_js["core.js"]
   n_folders_js["folders.js"] -->|2| n_i18n_js["i18n.js"]
   n_folders_js["folders.js"] -->|1| n_palette_js["palette.js"]
+  n_giris_js["giris.js"] -->|1| n_i18n_js["i18n.js"]
   n_palette_js["palette.js"] -->|4| n_core_js["core.js"]
   n_palette_js["palette.js"] -->|1| n_folders_js["folders.js"]
   n_palette_js["palette.js"] -->|1| n_i18n_js["i18n.js"]
@@ -61,10 +68,11 @@ flowchart LR
 | `static/chat.js` | 2771 | 90 | `/api/arena/{}`, `/api/arena/{}/winner`, `/api/chat`, `/api/chats`, `/api/chats/{}`, `/api/prefs`, `/output/{}.${videoMu ` |
 | `static/core.js` | 3137 | 88 | `/api/edit`, `/api/generate`, `/api/image/{}`, `/api/output/{}/download`, `/api/prefs`, `/api/video`, `/api/video/animate`, `/output/`, `/output/{}`, `/output/{}.png` |
 | `static/folders.js` | 2172 | 60 | `/api/folders`, `/api/folders/{}`, `/api/folders/{}/download`, `/api/history`, `/api/images`, `/api/import`, `/output/{}`, `/output/{}${videoMu ` |
+| `static/giris.js` | 173 | 0 | `/api/hesap/ben`, `/api/hesap/dogrula`, `/api/hesap/giris`, `/api/hesap/kayit`, `/api/hesap/sifirla`, `/api/hesap/sifirla/dogrula` |
 | `static/i18n.js` | 84 | 2 | — |
 | `static/mobile.js` | 55 | 0 | — |
 | `static/palette.js` | 844 | 37 | `/api/palette/suggest`, `/api/palettes`, `/api/palettes/{}` |
 | `static/pixel-canvas.js` | 347 | 0 | — |
-| `static/settings.js` | 874 | 22 | `/api/guncelleme`, `/api/prefs`, `/api/settings` |
+| `static/settings.js` | 930 | 23 | `/api/guncelleme`, `/api/hesap/ben`, `/api/hesap/cikis`, `/api/prefs`, `/api/settings` |
 | `static/viewer.js` | 540 | 0 | `/output/` |
 

@@ -2,13 +2,13 @@
 
 # Uç nokta grafı
 
-46 HTTP rotası, 8 dosyada (`routers/` altındaki alan router'ları; bileşim kökü `app.py` yalnız takıyor). `modüller` sütunu, rotanın gövdesinin VE yardımcılarının (`services/`, aynı router'daki özel işlevler) dokunduğu KÜTÜPHANE modülleridir — yani bir modülü değiştirirken hangi isteklerin sınanması gerektiği burada yazılı; `routers.*`/`services.*` bilerek sütunda yok (gerekçe: tools/graf_uret.py, uc_noktalar). `ön yüz` sütunu o yolu çağıran tarayıcı betiği.
+54 HTTP rotası, 9 dosyada (`routers/` altındaki alan router'ları; bileşim kökü `app.py` yalnız takıyor). `modüller` sütunu, rotanın gövdesinin VE yardımcılarının (`services/`, aynı router'daki özel işlevler) dokunduğu KÜTÜPHANE modülleridir — yani bir modülü değiştirirken hangi isteklerin sınanması gerektiği burada yazılı; `routers.*`/`services.*` bilerek sütunda yok (gerekçe: tools/graf_uret.py, uc_noktalar). `ön yüz` sütunu o yolu çağıran tarayıcı betiği.
 
 `paths` satırlarda GÖRÜNMÜYOR ve bu bir kör nokta değil, kararın kendisi (Faz 0 / Adım 4): çıktı/varlık dizinleri rotaya `Depends(ayar.ayarlar)` ile gelen ayar nesnesinden okunuyor (`ayarlar.output_dir`), yani bir öznitelik — çağrı değil. `paths`e dokunmak yine neredeyse her ucu etkiler, ama tek bir kapıdan: `app.py`deki `Ayarlar.varsayilan()`. Kiracıya göre dizin (Faz 1) o kapının içini değiştirecek, bu tabloyu değil.
 
 | yöntem | yol | dosya | işlev | modüller | ön yüz |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/` | `routers/kok.py` | `index`:27 | `errlog`, `i18n`, `version` | — |
+| GET | `/` | `routers/kok.py` | `index`:26 | `errlog`, `i18n`, `version` | — |
 | GET | `/api/arena/{arena_id}` | `routers/galeri.py` | `arena_round_route`:170 | `storage` | `chat.js` |
 | POST | `/api/arena/{arena_id}/winner` | `routers/galeri.py` | `set_arena_winner_route`:185 | `i18n`, `models`, `storage` | `chat.js` |
 | GET | `/api/assets/{kind}` | `routers/bindirme.py` | `list_assets_route`:199 | `assets_store`, `i18n` | `assets.js` |
@@ -32,6 +32,13 @@
 | POST | `/api/generate` | `routers/uretim.py` | `generate`:32 | `azure_client`, `catalog`, `chat_store`, `color_names`, `folders`, `i18n`, `models`, `palette`, `palette_store`, `providers`, `storage` | `core.js` |
 | GET | `/api/guncelleme` | `routers/ayarlar.py` | `get_guncelleme`:59 | `guncelleme`, `prefs` | `settings.js` |
 | POST | `/api/guncelleme` | `routers/ayarlar.py` | `post_guncelleme`:89 | `guncelleme`, `prefs` | `settings.js` |
+| GET | `/api/hesap/ben` | `routers/hesap.py` | `ben`:237 | — | `giris.js`, `settings.js` |
+| POST | `/api/hesap/cikis` | `routers/hesap.py` | `cikis`:185 | — | `settings.js` |
+| POST | `/api/hesap/dogrula` | `routers/hesap.py` | `dogrula`:136 | `i18n`, `models` | `giris.js` |
+| POST | `/api/hesap/giris` | `routers/hesap.py` | `giris`:148 | `errlog`, `i18n`, `models` | `giris.js` |
+| POST | `/api/hesap/kayit` | `routers/hesap.py` | `kayit`:102 | `errlog`, `i18n`, `models` | `giris.js` |
+| POST | `/api/hesap/sifirla` | `routers/hesap.py` | `sifirla`:197 | `errlog`, `i18n`, `models` | `giris.js` |
+| POST | `/api/hesap/sifirla/dogrula` | `routers/hesap.py` | `sifirla_dogrula`:217 | `i18n`, `models` | `giris.js` |
 | GET | `/api/history` | `routers/galeri.py` | `history`:146 | `folders`, `i18n`, `storage` | `folders.js` |
 | DELETE | `/api/image/{image_id}` | `routers/galeri.py` | `delete_image`:202 | `i18n`, `storage` | `core.js` |
 | PATCH | `/api/image/{image_id}` | `routers/galeri.py` | `move_image`:159 | `folders`, `i18n`, `models`, `storage` | `core.js` |
@@ -52,6 +59,7 @@
 | POST | `/api/video` | `routers/uretim.py` | `video`:76 | `azure_client`, `catalog`, `chat_store`, `folders`, `i18n`, `models`, `providers`, `storage` | `core.js` |
 | POST | `/api/video/animate` | `routers/uretim.py` | `animate`:187 | `azure_client`, `catalog`, `chat_store`, `etiket`, `folders`, `i18n`, `models`, `providers`, `storage` | `core.js` |
 | GET | `/assets/{kind}/{filename}` | `routers/bindirme.py` | `asset_file`:222 | `assets_store`, `i18n` | `assets.js` |
+| GET | `/giris` | `routers/hesap.py` | `giris_sayfasi`:243 | `errlog`, `i18n`, `version` | — |
 | GET | `/health` | `routers/saglik.py` | `health`:95 | `version` | — |
 | GET | `/output/{filename}` | `routers/galeri.py` | `output_file`:274 | `i18n`, `storage` | `assets.js`, `chat.js`, `core.js`, `folders.js`, `viewer.js` |
 
@@ -123,6 +131,10 @@ flowchart LR
   n__api_guncelleme["/api/guncelleme"]
   n__api_guncelleme --> n_guncelleme["guncelleme"]
   n__api_guncelleme --> n_prefs["prefs"]
+  n__api_hesap["/api/hesap"]
+  n__api_hesap --> n_errlog["errlog"]
+  n__api_hesap --> n_i18n["i18n"]
+  n__api_hesap --> n_models["models"]
   n__api_history["/api/history"]
   n__api_history --> n_folders["folders"]
   n__api_history --> n_i18n["i18n"]
@@ -187,6 +199,10 @@ flowchart LR
   n__assets["/assets"]
   n__assets --> n_assets_store["assets_store"]
   n__assets --> n_i18n["i18n"]
+  n__giris["/giris"]
+  n__giris --> n_errlog["errlog"]
+  n__giris --> n_i18n["i18n"]
+  n__giris --> n_version["version"]
   n__health["/health"]
   n__health --> n_version["version"]
   n__output["/output"]
@@ -199,5 +215,6 @@ flowchart LR
 Bu rotaları `static/` altındaki hiçbir betik çağırmıyor. Sebebi meşru olabilir (masaüstü/Android kabuğu, tarayıcının doğrudan açtığı adres, indirme bağlantısı) — ama ölü bir rota da böyle görünür.
 
 * `GET /` → `index`
+* `GET /giris` → `giris_sayfasi`
 * `GET /health` → `health`
 

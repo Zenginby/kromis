@@ -32,6 +32,7 @@ import importlib.util
 import os
 import re
 import sys
+import threading
 
 import pytest
 
@@ -333,6 +334,29 @@ def _dil_baglami_testler_arasinda_sizmasin():
     from services import tercih
     i18n.set_active(i18n.FALLBACK)
     tercih.sifirla()
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _eski_e2e_sunuculari_kapansin():
+    """Önceki testin uvicorn iş parçacığı bitmeden yeni test başlamasın (Faz 1 / 3).
+
+    YEDİNCİ guard ve ölçüldü — tam takımda iki kez, iki yönde: E2E dosyaları
+    uvicorn'u daemon bir iş parçacığında koşturuyor ve `stop()` yalnız
+    `should_exit` diyor, BEKLEMİYOR. Uygulama nesnesi ve `app.state` süreçte
+    TEK; eski sunucunun geç kalan lifespan KAPANIŞI sonraki testin kurduğu
+    motoru siliyordu (`test_playwright_hesap` ilk istek `database_unavailable`),
+    geç kalan lifespan AÇILIŞI da sonraki testin postacısını eziyordu
+    (`test_posta` "kapanışta None" iddiası). `app.py` kendi motorunu kimlikle
+    düşürüyor (ilk emniyet); burası ikincisi: bir sonraki test başlamadan
+    önce hâlâ yaşayan her uvicorn iş parçacığı bitirilir. Bedeli sıfıra yakın
+    (`threading.enumerate` + `join`), E2E dışı testlerde eşleşen iş parçacığı
+    yok. Zaman aşımı: `stop()` denmemiş bir sunucu takımı asmasın.
+    """
+    import uvicorn
+    for t in threading.enumerate():
+        if isinstance(getattr(t, "server", None), uvicorn.Server) and t is not threading.current_thread():
+            t.join(timeout=10)
     yield
 
 

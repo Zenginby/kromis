@@ -19,6 +19,11 @@ CREDENTIAL_ROUTES = frozenset({"/api/settings"})
 # İkinci kapı: BAŞKA bir rotada geçebilecek gizli alan adları. Katalogdan
 # TÜRETİLİYOR, elle sayılmıyor.
 SECRET_FIELDS = frozenset({"api_key"}) | catalog.secret_field_names()
+# Hesap alanları (Faz 1 / 3): `parola` bir doğrulama hatasında (`"8 karakterden
+# kısa"`) `input` olarak gövdeye aynen dönerdi — kullanıcının yazdığı parola,
+# hata cevabında. `jeton` tek kullanımlık e-posta bağlantısı; 422'ye düşse bile
+# günlüğe ve cevaba girmesin. İkisi de bir soneke uymuyor, o yüzden adıyla.
+SECRET_FIELDS |= {"parola", "jeton"}
 # Üçüncü kapı: kataloğa hiç girmemiş alan da adının BİÇİMİNDEN yakalanıyor
 # (bugünkü `fal_key` / `replicate_api_token` tam olarak bu kapıdan geçiyor).
 SECRET_SUFFIXES = ("_api_key", "_key", "_token", "_secret")

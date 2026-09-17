@@ -1,0 +1,95 @@
+<!doctype html>
+<!-- Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+     GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+     Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+
+     Giriş sayfası (Faz 1 / 3. görev): giriş · kayıt · parolamı unuttum · yeni
+     parola. `index.html`den AYRI bir belge ve bilerek: stüdyo sayfası 286
+     metin çapası taşıyor (tests/test_index.py) ve oturumsuz bir ziyaretçiye
+     stüdyonun betiklerini indirmenin anlamı yok. Aynı yerleştirme
+     (services/sablon.py): sürüm, dil ve sözlük yer tutucuları ile `t:` çeviri
+     anahtarları — dil zinciri de aynı (X-Kromis-Lang → çerez → tercih → Accept-Language).
+
+     Betik sayısı iki: sözlük (i18n.js) ve sayfanın kendisi (giris.js). Stüdyo
+     betikleri YÜKLENMİYOR; giris.js bir IIFE içinde, küresel kapsama ad
+     bırakmıyor (tests/test_id_contract.py bu yüzden onu `KAPSAM_DISI`nda
+     tutuyor, gerekçesiyle). Yorum doctype'ın ALTINDA (index.html'in gerekçesi). -->
+<html lang="__APP_LANG__">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{{t:giris.title}}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=__APP_VERSION__" />
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico?v=__APP_VERSION__" />
+  <link rel="stylesheet" href="/static/fonts.css?v=__APP_VERSION__" />
+  <!-- Yalnız token katmanı + bu sayfanın kendi stili. style.css (55 KB, stüdyo
+       yerleşimi) BİLEREK yok: `body { overflow: hidden; height: 100dvh }` gibi
+       kuralları bir formun sayfasında yanlış, ve stüdyo bileşenlerinin hiçbiri
+       burada değil. Tokenlar aynı olduğu için iki sayfa aynı paleti taşıyor. -->
+  <link rel="stylesheet" href="/static/flow-tokens.css?v=__APP_VERSION__" />
+  <link rel="stylesheet" href="/static/giris.css?v=__APP_VERSION__" />
+</head>
+<body>
+  <main class="giris" aria-labelledby="giris-baslik">
+    <header class="giris-bas">
+      <h1 id="giris-baslik">{{t:giris.baslik}}</h1>
+      <p class="giris-alt">{{t:giris.alt_baslik}}</p>
+    </header>
+
+    <!-- `role="status"`: doğrulama sonucu, gönderim durumu ve hata metni
+         ekran okuyucuya kendiliğinden okunur; `hidden` boşken yer kaplamasın. -->
+    <p id="giris-mesaj" class="giris-mesaj" role="status" aria-live="polite" hidden></p>
+
+    <!-- TEK dinleyici, olay yetkilendirmeyle (settings.js'in `#settings-nav`
+         kalıbı): düğme başına bağ, dördüncü sekme eklendiğinde sessizce eksik
+         kalırdı. `yeni-parola` formunun sekmesi YOK: oraya yalnız e-posta
+         bağlantısından (`?sifirla=`) girilir. -->
+    <nav id="giris-sekmeler" class="giris-sekmeler" role="tablist">
+      <button type="button" role="tab" data-sekme="giris" aria-selected="true">{{t:giris.sekme_giris}}</button>
+      <button type="button" role="tab" data-sekme="kayit" aria-selected="false">{{t:giris.sekme_kayit}}</button>
+      <button type="button" role="tab" data-sekme="sifirla" aria-selected="false">{{t:giris.sekme_sifirla}}</button>
+    </nav>
+
+    <form id="form-giris" class="giris-form" data-sekme="giris">
+      <label for="giris-eposta">{{t:giris.eposta}}</label>
+      <input id="giris-eposta" name="eposta" type="email" autocomplete="email" required autofocus />
+      <label for="giris-parola">{{t:giris.parola}}</label>
+      <input id="giris-parola" name="parola" type="password" autocomplete="current-password" required />
+      <button type="submit" class="giris-birincil">{{t:giris.giris_dugme}}</button>
+    </form>
+
+    <form id="form-kayit" class="giris-form" data-sekme="kayit" hidden>
+      <label for="kayit-eposta">{{t:giris.eposta}}</label>
+      <input id="kayit-eposta" name="eposta" type="email" autocomplete="email" required />
+      <label for="kayit-parola">{{t:giris.parola}}</label>
+      <!-- `minlength`/`maxlength` sunucunun `models.PAROLA_EN_AZ/EN_COK`uyla
+           aynı; tarayıcı gereksiz bir tur atmasın. Asıl kapı sunucuda. -->
+      <input id="kayit-parola" name="parola" type="password" autocomplete="new-password"
+             minlength="8" maxlength="128" required />
+      <p class="giris-not">{{t:giris.parola_kurali}}</p>
+      <button type="submit" class="giris-birincil">{{t:giris.kayit_dugme}}</button>
+    </form>
+
+    <form id="form-sifirla" class="giris-form" data-sekme="sifirla" hidden>
+      <p class="giris-not">{{t:giris.sifirla_aciklama}}</p>
+      <label for="sifirla-eposta">{{t:giris.eposta}}</label>
+      <input id="sifirla-eposta" name="eposta" type="email" autocomplete="email" required />
+      <button type="submit" class="giris-birincil">{{t:giris.sifirla_dugme}}</button>
+    </form>
+
+    <form id="form-yeni-parola" class="giris-form" data-sekme="yeni-parola" hidden>
+      <h2 class="giris-alt-baslik">{{t:giris.yeni_parola_baslik}}</h2>
+      <label for="yeni-parola">{{t:giris.yeni_parola}}</label>
+      <input id="yeni-parola" name="parola" type="password" autocomplete="new-password"
+             minlength="8" maxlength="128" required />
+      <p class="giris-not">{{t:giris.parola_kurali}}</p>
+      <button type="submit" class="giris-birincil">{{t:giris.yeni_parola_dugme}}</button>
+    </form>
+  </main>
+
+  <!-- Sözlük ve dil, index.html ile aynı biçimde satır içi (gerekçesi i18n.js'in başında). -->
+  <script>window.KROMIS_LANG="__APP_LANG__";window.KROMIS_I18N=__APP_I18N__;</script>
+  <script src="/static/i18n.js?v=__APP_VERSION__"></script>
+  <script src="/static/giris.js?v=__APP_VERSION__"></script>
+</body>
+</html>

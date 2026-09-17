@@ -35,7 +35,7 @@ from __future__ import annotations
 from fastapi import Request, Response
 
 import i18n
-from services import ayar, tercih
+from services import ayar, cerez, tercih
 
 # Tarayıcının taşıdığı dil seçimi. `POST /api/prefs` `language` yazdığında
 # aynı cevapla kuruluyor (routers/ayarlar.py → `cerez_yaz`); ön yüz çerezi
@@ -129,13 +129,14 @@ def cerez_yaz(response: Response, dil_kodu: str) -> None:
 
     `httponly`: betiğin çerezi okumasına gerek yok (seçili dili sayfadan
     okuyor, `window.KROMIS_LANG`). `samesite=lax`: aynı siteden gelen
-    gezinmelerde taşınır, başka siteden POST'ta taşınmaz. `secure` YOK ve
-    bilinçli: uygulama bugün loopback `http://` üzerinde; `Secure` çerezi
-    düz HTTP'de tarayıcı saklamaz ve seçim sessizce kaybolurdu. HTTPS
-    arkasına çıkıldığında (Faz 1) buraya eklenecek — tek yer.
+    gezinmelerde taşınır, başka siteden POST'ta taşınmaz. `secure` kararı
+    BURADA DEĞİL, `services/cerez.py`de (Faz 1 / 3): dondurulmuş kabuk
+    loopback `http://` üzerinde ve orada `Secure` çerezi tarayıcı saklamaz —
+    seçim sessizce kaybolurdu; web'de (DATABASE_URL var) ise açık. Oturum
+    çerezi de aynı karardan okuyor — iki çerez ayrışamaz.
     """
     response.set_cookie(CEREZ, dil_kodu, max_age=CEREZ_OMRU, path="/",
-                        httponly=True, samesite="lax")
+                        httponly=True, samesite="lax", secure=cerez.guvenli())
 
 
 def aktif() -> str:

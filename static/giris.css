@@ -1,0 +1,126 @@
+/* Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+   GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+   Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md). */
+/* Giriş sayfası (Faz 1 / 3). Yalnız flow-tokens.css'in tokenlarına yaslanıyor;
+   style.css yüklenmiyor (gerekçesi giris.html'de). Ölçüler stüdyonun ayar
+   panelinden: kart yarıçapı --r-panel, alan yarıçapı --r-item, birincil düğme
+   pill. Tek sütun, ortalanmış kart; 360px'te kenar boşluğu 16px. */
+
+* { box-sizing: border-box; }
+
+html, body { min-height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 400 15px/1.5 var(--font-body, -apple-system, system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+}
+
+.giris {
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel, 24px);
+  padding: 28px 24px 24px;
+  box-shadow: var(--shadow, none);
+}
+
+.giris-bas { text-align: center; margin-bottom: 18px; }
+.giris-bas h1 {
+  margin: 0;
+  font: 600 1.5rem/1.2 var(--font-display, inherit);
+  letter-spacing: -0.01em;
+}
+.giris-alt { margin: 6px 0 0; color: var(--muted); font-size: 0.9rem; }
+
+/* Mesaj satırı: tür rengi `data-tur` ile (giris.js `mesajYaz`). `hidden`
+   boşken yer kaplamasın — `role=status` öğesi DOM'da kalıyor. */
+.giris-mesaj {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: var(--r-item, 12px);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+.giris-mesaj[hidden] { display: none; }
+.giris-mesaj[data-tur="hata"] { border-color: var(--danger); color: var(--fg); }
+.giris-mesaj[data-tur="basari"] { border-color: var(--border-strong); }
+
+/* Sekmeler: seçili olan dolgu alır (`aria-selected`), CSS tek kural. */
+.giris-sekmeler {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 18px;
+  background: var(--surface-2);
+  border-radius: var(--r-item, 12px);
+}
+.giris-sekmeler button {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: calc(var(--r-item, 12px) - 4px);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.giris-sekmeler button:hover { color: var(--fg); }
+.giris-sekmeler button[aria-selected="true"] {
+  background: var(--selected-strong, var(--surface-3));
+  color: var(--fg);
+}
+
+.giris-form { display: flex; flex-direction: column; gap: 6px; }
+.giris-form[hidden] { display: none; }
+.giris-form label { font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+.giris-form input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-item, 12px);
+  background: var(--surface-2);
+  color: var(--fg);
+  font: inherit;
+  outline: none;
+  transition: border-color var(--dur) var(--ease);
+}
+.giris-form input:focus-visible { border-color: var(--accent); }
+.giris-form input::placeholder { color: var(--placeholder); }
+
+.giris-not { margin: 2px 0 0; color: var(--muted); font-size: 0.8rem; line-height: 1.45; }
+.giris-alt-baslik { margin: 0 0 4px; font: 600 1.05rem/1.3 var(--font-display, inherit); }
+
+.giris-birincil {
+  margin-top: 16px;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: var(--r-pill, 999px);
+  background: var(--primary);
+  color: var(--on-primary);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity var(--dur) var(--ease);
+}
+.giris-birincil:hover { opacity: 0.92; }
+.giris-birincil:disabled { opacity: 0.55; cursor: progress; }
+.giris-birincil:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .giris-sekmeler button, .giris-form input, .giris-birincil { transition: none; }
+}

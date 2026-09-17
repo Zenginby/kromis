@@ -365,7 +365,7 @@ yüklüyor (CHECK değer kümeleri oradan) — kabul edilen bedel. README'ye gö
 
 ---
 
-## 3. Hesap: kayıt, giriş, e-posta doğrulama, parola sıfırlama, oturum çerezi (PR: `faz1/hesap`)
+## 3. Hesap: kayıt, giriş, e-posta doğrulama, parola sıfırlama, oturum çerezi ✅ (PR: `faz1/hesap`)
 
 **Kapsam.** Yeni `routers/hesap.py` — öneri 8 rota: `POST /api/hesap/kayit`,
 `POST /api/hesap/dogrula` (jeton), `POST /api/hesap/giris`,
@@ -449,6 +449,104 @@ varsayılanın AÇIK olduğunu sınar. Google OAuth BU PR'da YOK (aşağıda,
 **Çıkış ölçütü.** E2E: tarayıcıdan kayıt → e-posta → giriş → çıkış;
 çerezsiz `GET /api/history` 401; başka siteden gelen POST 403; 11.
 başarısız giriş 429; takım yeşil.
+
+**Yapıldığında (2026-09-17) ölçümler ve sapmalar.** Sekiz rota birebir
+(`routers/hesap.py`): `POST /api/hesap/{kayit,dogrula,giris,cikis,sifirla,
+sifirla/dogrula}`, `GET /api/hesap/ben`, `GET /giris`; rota sayısı **46 → 54**
+(`tests/test_app_bolme.py`). Hesap mantığı `services/hesap.py` (parola,
+oturum, jeton, sayaç — kullanıcıya konuşmaz), kapı `services/kimlik.py`
+(`aktif_kullanici`: bağımlılık, 401 JSON), çerez kararı `services/cerez.py`,
+köken kapısı `services/koken.py`, posta `services/posta.py`, sayfa yerleştirme
+`services/sablon.py` (yeni: `routers/kok.py`nin `index` gövdesi buraya taşındı —
+router'lar birbirini ithal edemez, `/giris` aynı işi istedi). **Sayılar:**
+parola argon2id (`pwdlib[argon2]==0.3.*`, 8-128, `models.PAROLA_EN_AZ/EN_COK`);
+oturum `kromis_oturum` `HttpOnly; SameSite=Lax; Path=/; Max-Age=30 gün`, kayan
+ömür `son_gorulme` 5 dk çözünürlükle (ilerlediğinde çerez de yeniden yazılır —
+bağımlılık `response: Response` alıyor); doğrulama jetonu **24 sa**, sıfırlama
+**1 sa** (belgede sayı yoktu), ikisi de tek kullanım (`kullanildi_at`) ve aynı
+amaçlı yeni jeton eskileri siler; hız sınırı e-posta 10 / IP 30 (15 dk, yalnız
+başarısız giriş), kayıt ve sıfırlama isteği IP 5 (1 sa) — bunun için
+`giris_denemeleri`ne `tur text NOT NULL DEFAULT 'giris'` + CHECK sütunu geldi
+(göç **`0002_deneme_turu`**, head değişti): tek sayaçta beş yanlış parola
+"parolamı unuttum"u da kilitlerdi. `Retry-After` pencere içindeki en eski
+denemenin çıkışına kalan saniye. Başarılı giriş o e-postanın sayacını siler.
+
+**Kararlar, belgenin açık bıraktığı ya da düzelttiği yerlerde:** (a) `Secure`
+bayrağı — öntanımlı "web modu" (`DATABASE_URL` var) ise AÇIK, dondurulmuş
+kabukta (loopback http, WKWebView/Safari Secure çerezi saklamaz) KAPALI; env
+`KROMIS_GUVENLI_CEREZ` ezer, `compose.yaml` `0` verir (Safari `localhost`ta
+bile saklamıyor). Dil çerezi de aynı karardan okuyor. E2E `http://127.0.0.1`de
+bayrağı GEVŞETMEDEN geçiyor: Chromium loopback'i güvenilir sayıyor (ölçüldü;
+Playwright'ın kendi `page.request` katmanı saymıyor, test bu yüzden sayfanın
+içinden `fetch` ediyor). (b) Köken kapısı `Sec-Fetch-Site` → `Origin` →
+`Referer` sırasıyla; ÜÇÜ DE YOKSA GEÇER — CSRF tarayıcı saldırısı, üç başlıksız
+istemci kurbanın çerezini taşıyamaz; aksi 178 `TestClient` çağrısını ve `curl`ü
+kırardı. `same-site` geçmez. 403 gövdesi KOD (`cross_origin_rejected`): ara
+katman dilden ÖNCE koşuyor (köken → dil → rota, `app.py`). `KROMIS_KOKEN` hem
+izin listesi hem e-posta bağlantı tabanı; yoksa isteğin kendi kökeni. (c)
+Başarısız girişin 401'i ve doğrulanmamış hesabın 403'ü `JSONResponse`,
+`HTTPException` DEĞİL: `db.oturum` istisnada rollback yapıyor, deneme kaydı
+(ve 403'te yeni jeton) geri alınırdı — 11. deneme hiç 429 vermezdi; bekçisi
+`test_the_login_route_persists_the_failure_it_reports`. (d) Numaralandırma:
+kayıt üç dalda da `{"ok": true}` ve üçünde de bir argon2 + bir posta çağrısı
+(doğrulanmış adrese "zaten hesabın var" iletisi — hem süre eşit hem sahibi
+bilgilendirir); giriş yanlış parola/bilinmeyen adres aynı 401 aynı sürede
+(`parola_dogru` sahte özete karşı da doğrular); sıfırlama bilinmeyen adrese
+ileti göndermez — gövde aynı, süre farkı posta sağlayıcısının gecikmesi kadar
+(bilinen, kabul edilen sınır). (e) Doğrulanmamış hesaba giriş (doğru parola)
+403 + doğrulama iletisini YENİDEN gönderir — ayrı "yeniden gönder" rotası yok;
+yeniden KAYIT da doğrulanmamış hesabın parolasını bu isteğinkiyle yeniler
+(sahiplik henüz kimsede değil). Sıfırlama adresi kanıtladığı için hesabı da
+doğrulanmış işaretler ve BÜTÜN oturumları düşürür. (f) `pydantic` `EmailStr`
+YOK (`email-validator` bağımlılığı): `x@y.z` biçimi + 254; adresin varlığını
+zaten ileti kanıtlar. `parola` ve `jeton` `services/redaksiyon.py`nin gizli
+alan kümesine girdi — 422 gövdesine parola sızmasın. (g) Posta seçimi:
+`KROMIS_POSTA` açık; yoksa `RESEND_API_KEY` doluysa `resend`, değilse `konsol`.
+`resend` deyip anahtarı unutan `BozukPostaci` alır: her gönderim 503 +
+`hata.log`, uygulama açılır ama "gönderdik" yalanı yok. Konsol iletiyi
+`posta.log`a (data_dir, `.gitignore`da) ve `app.state.postaci.son`a yazar —
+belgenin `app.state.son_posta`sı bu; postacı `app.state.postaci`da, lifespan
+kurar/kapatır. İleti dili: kayıtta isteğin dili (ve `kullanicilar.dil`e
+yazılır — zincirin 3. halkası 4. görevde okunur), sıfırlamada kullanıcının
+kayıtlı dili. Şablonlar düz metin, `posta.*` anahtarları. (h) Ön yüz:
+`static/giris.{html,js,css}` — üç sekme + bağlantıdan açılan "yeni parola"
+formu; `giris.js` IIFE (eslint her betiğe ötekilerin adlarını küresel veriyor,
+üst düzey `$` `no-redeclare`a düşerdi), `tests/test_id_contract.py`de
+gerekçeli `KAPSAM_DISI`, id bağları `tests/test_hesap.py`de. `?dogrula=`/
+`?sifirla=` parametresi POST'a çevrilip `history.replaceState` ile silinir.
+`style.css` yüklenmez (stüdyo yerleşimi), yalnız `flow-tokens.css` + kendi
+stili. `index.html`e DOKUNULMADI; `settings.js` "Hakkında" bölmesine DİNAMİK
+satır ekliyor (`GET /api/hesap/ben` → e-posta + "Çıkış yap", 401'de `/giris`
+bağlantısı, 503/ağ hatasında hiç). **`core.js`nin 401'de `/giris`e
+yönlendirmesi BU PR'DA YOK ve bilerek:** öteki 44 rota henüz kapının arkasında
+değil, stüdyo oturumsuz çalışıyor ve E2E takımı onu öyle sınıyor; yönlendirme
+kapıyla birlikte 4. görevde. (i) `.env.example`e beş değişken (`KROMIS_KOKEN`,
+`KROMIS_POSTA`, `KROMIS_POSTA_GONDEREN`, `RESEND_API_KEY`, `KROMIS_GUVENLI_CEREZ`),
+bekçi adları KAYNAKTAN okuyor (`koken.KOKEN_ENV` …). `pwdlib` 0.3.1 /
+argon2-cffi 25.1.0 / bindings 21.2.0 (`cp36-abi3`) / cffi 2.1.1 cp314 tekerleği
+PyPI'dan `--python-version 3.14` ile indirildi.
+
+**Testler:** `tests/test_hesap.py` (40: kayıt-doğrula-giriş-ben-çıkış; jeton
+tek kullanım ve süreli; yanlış parola = bilinmeyen adres; doğrulanmamış 403 +
+yeniden ileti; çerez bayrakları; kayan ömür 4 dk / 6 dk; süresi dolan oturum;
+11. giriş 429 + `Retry-After`, IP 30, başarı sayacı siler; kayıt/sıfırlama IP
+5; yeniden kayıt iki dalı; citext; sıfırlama akışı, çapraz jeton, bilinmeyen
+adres, doğrulanmamış hesap, ileti dili; 422 metinleri ve parola sızıntısı;
+posta hatası 503 + rollback; `Secure` kararı ve compose kapatması; rota
+envanteri = belgenin 8'i; `/giris` çevrili, yalnız iki betik; id bağları),
+`tests/test_koken.py` (24), `tests/test_posta.py` (22, Resend `MockTransport`,
+ağ yok), `tests/test_playwright_hesap.py` (E2E ×2 dil: form → konsol posta →
+bağlantı → giriş → stüdyo → Ayarlar'dan çıkış), `tests/test_tablolar.py` +
+`tur` CHECK'i, `tests/test_db.py` head `0002_deneme_turu`; `test_i18n.py`
+şablon taraması artık `static/*.html`, `test_telif_basligi.py` de. Graf
+üretici `static/*.html`in her birinin yükleme sırasını okuyor
+(`onyuz.sayfalar`, "Öteki sayfalar" bölümü) ve README'ye ara katmanların
+haritada görünmediği yazıldı. Tam takım (E2E + Postgres zorunlu):
+**3.160 geçti, 12 atlandı, 134 sn** (taban 3.051 / 12 / 110 sn; E2E koştu, DB atlaması 0). ruff, mypy, eslint, prettier temiz.
+**4. göreve kalan:** 44 rotaya `Depends(kimlik.aktif_kullanici)`, `GET /`nin
+302'si, `core.js` 401 → `/giris`, dil zincirinin 3. halkası `kullanicilar.dil`,
+autouse `kullanici` fixture'ı; bu PR hiçbir mevcut rotayı kapının arkasına
+almadı.
 
 ---
 

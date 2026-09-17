@@ -300,6 +300,17 @@ def test_check_constraints_accept_every_allowed_value_and_reject_the_rest(motor,
     _reddediyor(tablolar.Jeton(kullanici_id=kid, amac="giris", ozet=os.urandom(32),
                                bitis=text("now()")), "ck_jetonlar_amac_kumesi")
 
+    # Deneme türü (3. görev, göç 0002): üç sayaç geçer, dördüncü geçmez; öntanımlı `giris`.
+    for tur in tablolar.DENEME_TURLERI:
+        _kabul_ediyor(tablolar.GirisDenemesi(tur=tur, eposta="d@example.com"))
+    _reddediyor(tablolar.GirisDenemesi(tur="dogrulama", eposta="d@example.com"),
+                "ck_giris_denemeleri_tur_kumesi")
+    with Session(motor) as db:
+        db.add(tablolar.GirisDenemesi(eposta="d@example.com"))
+        db.flush()
+        assert db.scalar(text("SELECT tur FROM giris_denemeleri LIMIT 1")) == "giris"
+        db.rollback()
+
 
 def test_preferences_are_one_row_per_user(motor, temiz):
     with Session(motor) as db:

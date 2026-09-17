@@ -423,7 +423,17 @@ def onyuz() -> dict:
         yol: _cagrilan_yollar(metin) for yol, metin in sorted(kaynaklar.items())
     }
 
-    index = _oku("static/index.html")
+    # Her sayfanın kendi yükleme sırası (Faz 1 / 3'ten beri iki sayfa:
+    # index.html ve giris.html). `yukleme_sirasi`/`stiller` index.html'in —
+    # eski okuyucular (tests/test_onyuz_lint_kapisi.py) o anahtarlara bakıyor.
+    sayfalar = {}
+    for ad in sorted(a for a in os.listdir(dizin) if a.endswith(".html")):
+        html = _oku(f"static/{ad}")
+        sayfalar[f"static/{ad}"] = {
+            "betikler": [y.split("?", 1)[0] for y in _HTML_BETIK.findall(html)],
+            "stiller": [y.split("?", 1)[0] for y in _HTML_STIL.findall(html)],
+        }
+    index = sayfalar["static/index.html"]
     return {
         "betikler": [
             {"dosya": yol,
@@ -433,8 +443,9 @@ def onyuz() -> dict:
             for yol in sorted(kaynaklar)
         ],
         "kenarlar": kenarlar,
-        "yukleme_sirasi": [y.split("?", 1)[0] for y in _HTML_BETIK.findall(index)],
-        "stiller": [y.split("?", 1)[0] for y in _HTML_STIL.findall(index)],
+        "yukleme_sirasi": index["betikler"],
+        "stiller": index["stiller"],
+        "sayfalar": sayfalar,
     }
 
 
@@ -799,8 +810,18 @@ def onyuz_md(g: dict) -> str:
          "", "## Yükleme sırası", ""]
     for i, yol in enumerate(on["yukleme_sirasi"], 1):
         s.append(f"{i}. `{yol}`")
-    s += ["", "Stiller: " + ", ".join(f"`{y}`" for y in on["stiller"]), "",
-          "## Betikler arası çağrı", "", "```mermaid", "flowchart LR"]
+    s += ["", "Stiller: " + ", ".join(f"`{y}`" for y in on["stiller"]), ""]
+    oteki = {y: v for y, v in on.get("sayfalar", {}).items() if y != "static/index.html"}
+    if oteki:
+        s += ["## Öteki sayfalar", "",
+              "Kendi belgesi olan sayfalar (ör. `/giris`): stüdyonun betikleri "
+              "yüklenmez, yalnız aşağıdakiler — kapsam ayrı, adlar çakışmaz.", ""]
+        for yol, v in oteki.items():
+            s.append(f"* `{yol}` → betikler: "
+                     + (", ".join(f"`{b}`" for b in v["betikler"]) or "—")
+                     + " · stiller: " + (", ".join(f"`{b}`" for b in v["stiller"]) or "—"))
+        s.append("")
+    s += ["## Betikler arası çağrı", "", "```mermaid", "flowchart LR"]
     for k in on["kenarlar"]:
         kaynak, hedef = os.path.basename(k["kaynak"]), os.path.basename(k["hedef"])
         s.append(f'  {_kimlik(kaynak)}["{kaynak}"] -->|{len(k["adlar"])}| '
@@ -917,6 +938,10 @@ def readme_md(g: dict) -> str:
          "* Ön yüz kenarları AD eşleşmesine dayanıyor; küresel bir işlevle aynı "
          "adı taşıyan yerel bir değişken kenarı fazla sayabilir.",
          "* Test sütunu ithal ilişkisidir, satır kapsamı DEĞİLDİR.",
+         "* ARA KATMANLAR rota değil: `services/koken.py` (köken kapısı) ve "
+         "`services/dil.py` (dil bağlamı) her isteğin önünde koşuyor ama uç nokta "
+         "tablosunda satırları yok; sıraları (`köken → dil → rota`) `app.py`de "
+         "yazılı, harita yalnız `app` → `services.koken` ithal kenarını gösterir.",
          "* `alembic/` (göç betikleri) BİLEREK dışarıda: `env.py` yalnız `services.db`yi "
          "ithal eder, `versions/*.py` ise şema tarihçesidir — her göç bir modül olarak "
          "sayılsa harita şişer ve hiçbir kenar anlam taşımaz. Göç hattının bekçisi "

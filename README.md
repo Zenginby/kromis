@@ -199,6 +199,18 @@ anahtar adlarının envanteri `.env.example`da; yerel deneme için
 `docker compose up --build` (`compose.yaml`, yalnız geliştirme — kendi
 Postgres servisini getirir).
 
+Hesap (Faz 1 / 3): kayıt → e-posta doğrulama → giriş, sunucu tarafı oturum
+çerezi (`kromis_oturum`), parola sıfırlama. Giriş sayfası `/giris`, API
+`/api/hesap/*` (`docs/faz1-veritabani-hesaplar.md` § 3). Geliştirmede e-posta
+için hiçbir şey kurmak gerekmez: `RESEND_API_KEY` yokken **konsol arka ucu**
+devrede — iletiler `<veri kökü>/posta.log`a yazılır, doğrulama bağlantısı
+oradan kopyalanır (`tail -f posta.log`). Dağıtımda `KROMIS_POSTA=resend`,
+`RESEND_API_KEY`, `KROMIS_POSTA_GONDEREN` ve dış adres `KROMIS_KOKEN`
+(`https://…`; köken kapısı VE e-posta bağlantılarının tabanı). Çerezler web
+modunda (`DATABASE_URL` verilmişse) `Secure`; düz HTTP'de denemek için
+`KROMIS_GUVENLI_CEREZ=0` (compose bunu kendi veriyor). Bu sürümde stüdyo
+rotaları henüz oturum İSTEMİYOR — kapı 4. görevle geliyor.
+
 ### 3. Test
 
 ```bash

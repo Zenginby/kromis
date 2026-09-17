@@ -14,14 +14,14 @@
 
 ## Ölçüler
 
-* 67 Python modülü, 240 modül düzeyi ithal kenarı (14 erteli)
-* 46 HTTP uç noktası
-* 10 tarayıcı betiği, 28 betik-arası bağ
-* 101 test dosyası; 15 modülü hiçbir test ithal etmiyor, 14 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
+* 74 Python modülü, 270 modül düzeyi ithal kenarı (14 erteli)
+* 54 HTTP uç noktası
+* 11 tarayıcı betiği, 29 betik-arası bağ
+* 105 test dosyası; 17 modülü hiçbir test ithal etmiyor, 14 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
 * 1 ithal döngüsü, 0 rotaya oturmayan tarayıcı çağrısı
 
-En büyük dosyalar: `catalog` (1461), `models` (1056), `fal_client` (757), `veo_client` (629), `desktop` (588).
-En çok ithal edilenler: `i18n` (32), `catalog` (20), `azure_client` (14), `credstore` (11), `models` (11).
+En büyük dosyalar: `catalog` (1461), `models` (1127), `fal_client` (757), `veo_client` (629), `desktop` (588).
+En çok ithal edilenler: `i18n` (35), `catalog` (20), `azure_client` (14), `services.dil` (13), `models` (12).
 
 ## Nasıl güncellenir
 
@@ -46,5 +46,6 @@ Harita çalışma anını değil KAYNAĞI okuyor. Bu bilinçli (bkz. tools/graf_
 * Şablondan/yapılandırmadan gelen bağlar (ör. `.spec` dosyasının gizli ithalleri) burada yok.
 * Ön yüz kenarları AD eşleşmesine dayanıyor; küresel bir işlevle aynı adı taşıyan yerel bir değişken kenarı fazla sayabilir.
 * Test sütunu ithal ilişkisidir, satır kapsamı DEĞİLDİR.
+* ARA KATMANLAR rota değil: `services/koken.py` (köken kapısı) ve `services/dil.py` (dil bağlamı) her isteğin önünde koşuyor ama uç nokta tablosunda satırları yok; sıraları (`köken → dil → rota`) `app.py`de yazılı, harita yalnız `app` → `services.koken` ithal kenarını gösterir.
 * `alembic/` (göç betikleri) BİLEREK dışarıda: `env.py` yalnız `services.db`yi ithal eder, `versions/*.py` ise şema tarihçesidir — her göç bir modül olarak sayılsa harita şişer ve hiçbir kenar anlam taşımaz. Göç hattının bekçisi `tests/test_db.py` (upgrade/downgrade/check).
 

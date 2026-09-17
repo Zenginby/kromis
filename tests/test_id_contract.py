@@ -52,6 +52,10 @@ KAPSAM_DISI = {
     "pixel-canvas.js": "üçüncü parti (Ryan Mulligan, MIT); üst düzey adları "
                        "bizim sözleşmemize tabi değil — tests/"
                        "test_telif_basligi.py da onu ayrı tutuyor",
+    "giris.js": "AYRI sayfanın betiği (`/giris` → static/giris.html, Faz 1 / 3): "
+                "index.html'e yüklenmiyor, IIFE içinde ve küresel kapsama ad "
+                "bırakmıyor — buradaki 'aynı sayfa, tek kapsam' iddialarının hiçbiri "
+                "ona uygulanamaz. Kendi id bağları tests/test_hesap.py'de sınanıyor",
 }
 
 _TOP_LEVEL_DECLARATION_RE = re.compile(

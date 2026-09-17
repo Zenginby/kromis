@@ -872,3 +872,59 @@ loadAssets("banners");
 // Palet varsayılan olarak KAPALI: açılışta öneri istenmez, prompt'a hiçbir
 // şey eklenmez. Yalnızca kütüphane çekilir ki "Kayıtlı paletler" hazır olsun.
 loadPalettes();
+
+// ── Hesap (Faz 1 / 3) ────────────────────────────────────────────────
+//
+// Açılışta `GET /api/hesap/ben`: oturum varsa "Hakkında" bölmesinin başına
+// e-posta + "Çıkış yap"; 401'de `/giris` bağlantısı. Satır DİNAMİK kuruluyor,
+// index.html'e yazılmıyor: o belge 286 metin çapası taşıyor ve bu turda
+// dokunulmuyor (docs/faz1-veritabani-hesaplar.md → 3). 401'de YÖNLENDİRME
+// YOK — bilerek: öteki 44 rota henüz kapının arkasında değil (4. görev), yani
+// stüdyo oturumsuz da çalışıyor ve E2E takımı onu öyle sınıyor. Yönlendirme
+// kapıyla birlikte, aynı PR'da gelir. 503 (veri tabanı yok — dondurulmuş
+// kabuk) ve ağ hatasında satır hiç çizilmez: hesabın olmadığı bir kurulumda
+// "giriş yap" demek yanlış olurdu.
+async function hesapDurumunuYaz() {
+  const bolme = document.querySelector('#settings-modal .settings-pane[data-pane="about"]');
+  if (!bolme) return;
+  let res;
+  try {
+    res = await fetch("/api/hesap/ben");
+  } catch {
+    return;
+  }
+  if (!res.ok && res.status !== 401) return;
+  const satir = document.createElement("p");
+  satir.id = "settings-hesap";
+  satir.className = "field-note settings-hesap-row";
+  if (res.status === 401) {
+    const baglanti = document.createElement("a");
+    baglanti.href = "/giris";
+    baglanti.className = "btn-ghost";
+    baglanti.textContent = t("hesap.giris_baglantisi");
+    satir.append(baglanti);
+  } else {
+    const ben = await res.json();
+    const metin = document.createElement("span");
+    metin.textContent = t("hesap.oturum_acik", { eposta: ben.eposta });
+    const cikis = document.createElement("button");
+    cikis.type = "button";
+    cikis.id = "settings-cikis";
+    cikis.className = "btn-ghost";
+    cikis.textContent = t("hesap.cikis");
+    cikis.addEventListener("click", async () => {
+      cikis.disabled = true;
+      try {
+        await chatApi("/api/hesap/cikis", { method: "POST", body: {} });
+        // `replace`: çıkılan oturuma geri tuşuyla dönülmez.
+        window.location.replace("/giris");
+      } catch (e) {
+        cikis.disabled = false;
+        metin.textContent = t("hesap.cikis_hatasi", { hata: e.message });
+      }
+    });
+    satir.append(metin, " ", cikis);
+  }
+  bolme.prepend(satir);
+}
+hesapDurumunuYaz();

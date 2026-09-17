@@ -57,6 +57,16 @@ zorlamak yerine VAR OLAN ikiliyi playwright'ın aradığı ada bağlıyor. Ölç
 18 E2E testinin 18'i 54 saniyede yeşil. Yaklaşıklık olduğu da SÖYLENİYOR —
 tarayıcı yapısı CI'ınkiyle aynı değil, yani bu kapı CI'ın yerine geçmez; onun
 ilk koşusunu tahmin edilebilir yapar.
+
+POSTGRES (Faz 1 / 1. görev): CI'da takım bir Postgres servis konteyneriyle
+koşuyor (`_test.yml` → `KROMIS_TEST_DATABASE_URL`); yerelde `veritabani`
+fixture'ı makinedeki ikililerden geçici bir küme açıyor
+(`tools/gecici_postgres.py`). İkisi de yoksa DB testleri ATLANIR — E2E ile
+aynı sessiz kusur sınıfı, aynı üç mekanizma: bu aracın raporu, conftest'in
+son özeti, `KROMIS_E2E_ZORUNLU=1`in hatası. Bu araç Postgres KURMAZ (paket
+yöneticisi işi); yalnız var mı diye bakar, `--kontrol`de kümeyi gerçekten
+açıp kapatarak ("ikili var" ile "küme açılıyor" aynı şey değil: root, izin,
+eksik yardımcı kullanıcı) ve yoksa kurulum komutunu yazar.
 """
 from __future__ import annotations
 
@@ -66,6 +76,14 @@ import os
 import re
 import subprocess
 import sys
+
+# Betik olarak koşarken (`python3 tools/test_ortami.py`) `sys.path[0]` bu
+# dizin, `tools` paketi görünmez; conftest ise `tools.test_ortami` diye ithal
+# ediyor. İki yol da aynı modüle çıksın.
+try:
+    from tools import gecici_postgres
+except ImportError:                                   # betik kipi
+    import gecici_postgres  # type: ignore[no-redef]
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEST_WORKFLOW = os.path.join(KOK, ".github", "workflows", "_test.yml")
@@ -278,7 +296,19 @@ def durum(tarayiciyi_ac: bool = True) -> dict:
 
     d = {"yorumlayici": yorumlayici, "sozlesme": sozlesme, "asgari": asgari,
          "surum": "", "yeterli_python": False, "pytest": False,
-         "playwright": False, "tarayici": None, "tarayici_hatasi": ""}
+         "playwright": False, "tarayici": None, "tarayici_hatasi": "",
+         # Postgres: `"env"` (KROMIS_TEST_DATABASE_URL), ikili dizini ya da None.
+         # `postgres_acildi` yalnız kesin kipte ölçülüyor (tarayıcıyla aynı bütçe).
+         "postgres": gecici_postgres.kaynak(), "postgres_acildi": None,
+         "postgres_hatasi": ""}
+
+    if tarayiciyi_ac and d["postgres"] and d["postgres"] != "env":
+        try:
+            with gecici_postgres.GeciciKume(str(d["postgres"])):
+                d["postgres_acildi"] = True
+        except (RuntimeError, OSError) as hata:
+            d["postgres_acildi"] = False
+            d["postgres_hatasi"] = str(hata)
 
     moduller = _json_kos(yorumlayici, _MODUL_BETIGI, 60)
     if not moduller:
@@ -298,7 +328,8 @@ def durum(tarayiciyi_ac: bool = True) -> dict:
 
 def hazir(d: dict) -> bool:
     return bool(d["yeterli_python"] and d["pytest"] and d["playwright"]
-                and d["tarayici"] is not False)
+                and d["tarayici"] is not False
+                and d["postgres"] and d["postgres_acildi"] is not False)
 
 
 # --------------------------------------------------------------------- kurulum
@@ -436,6 +467,11 @@ def kur(sessiz: bool = False) -> int:
             return 1
         _tarayici_kur(yorumlayici, sozlesme, sessiz)
 
+    # Postgres KURULMAZ (paket yöneticisi işi, root ister); yalnız söylenir.
+    if not gecici_postgres.kaynak() and not sessiz:
+        print("PostgreSQL ikilisi yok — DB testleri atlanacak. Kur: "
+              + gecici_postgres.kurulum_yonergesi())
+
     d = durum()
     if not sessiz:
         print()
@@ -454,6 +490,12 @@ def kosma_komutu(d: dict) -> str:
     return f"{yorumlayici} -m pytest tests/ -q"
 
 
+def _postgres_kaynagi(d: dict) -> str:
+    if d["postgres"] == "env":
+        return gecici_postgres.TEST_URL_ENV
+    return f"gecici kume, ikililer: {d['postgres']}"
+
+
 def rapor(d: dict) -> str:
     satirlar = []
     asgari = ".".join(str(p) for p in d["asgari"])
@@ -466,9 +508,17 @@ def rapor(d: dict) -> str:
                         "dosyasi SESSIZCE atlanir")
     elif d["tarayici"] is False:
         satirlar.append("tarayici acilmiyor — E2E testleri duser")
+    if not d["postgres"]:
+        satirlar.append("PostgreSQL yok — DB testleri SESSIZCE atlanir. Kur: "
+                        + gecici_postgres.kurulum_yonergesi()
+                        + f"  (ya da {gecici_postgres.TEST_URL_ENV}=... verin)")
+    elif d["postgres_acildi"] is False:
+        satirlar.append("PostgreSQL ikilisi var ama gecici kume ACILMIYOR — DB testleri duser:\n      "
+                        + d["postgres_hatasi"].strip().replace("\n", "\n      ")[:600])
 
     if not satirlar:
-        return ("Test ortami hazir: E2E dahil tam takim kosabilir.\n"
+        return ("Test ortami hazir: E2E ve Postgres dahil tam takim kosabilir.\n"
+                f"    Postgres: hazir ({_postgres_kaynagi(d)})\n"
                 f"    {kosma_komutu(d)}")
     return ("Test ortami CI'inkiyle AYNI DEGIL:\n"
             + "\n".join("  - " + s for s in satirlar)
@@ -485,6 +535,11 @@ def _ozet(d: dict) -> str:
         return ("Test ortami kurulu gorunuyor. KURAL: degisikligi itmeden ONCE "
                 "E2E dahil tam takimi kos: " + kosma_komutu(d)
                 + "  (kesin denetim: python3 tools/test_ortami.py --kontrol)")
+    if d["yeterli_python"] and d["pytest"] and d["playwright"] and not d["postgres"]:
+        return ("Test ortami EKSIK: PostgreSQL yok, DB testleri sessizce atlanir "
+                "(Faz 1 karari: gercek Postgres, SQLite degil). Kur: "
+                + gecici_postgres.kurulum_yonergesi()
+                + " — sonra: python3 tools/test_ortami.py --kontrol")
     return (
         "Test ortami HAZIR DEGIL: `pytest tests/ -q` bu makinede ya hic kosmuyor "
         f"ya da {len(e2e_dosyalari())} E2E dosyasini sessizce atliyor. Bu depoda "

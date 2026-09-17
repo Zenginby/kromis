@@ -17,6 +17,11 @@ bir kusurun ya da spec'te yazılı bir gerekçenin karşılığı:
     "denemek için" doldurulup commit'lenirse gitleaks'ten önce burada düşer.
   * CI'daki `docker` işi imajı DERLER ve `/health`i SORAR ama İTMEZ: kayıt
     defteri yok, kimlik yok — Faz 1 kararı.
+  * Veri tabanı (Faz 1 / 1. görev): `/health` `db_reachable` ölçüyor ve DB'siz
+    konteyner 503 verir. Bu yüzden `compose.yaml`da bir `postgres` servisi,
+    CI'ın `docker` işinde bir Postgres servis konteyneri + `DATABASE_URL` var
+    ve `.env.example` değişkeni açıklıyor. Sonda 503'e ALIŞTIRILMADI — kapı
+    gevşetmek yerine konteynere gerçek DB verildi; burada mandallı.
 
 `.dockerignore` da sınanıyor: `tests/`, `android/`, `docs/`, `.venv/` bağlama
 girerse imaj şişer ve her test değişikliği katman önbelleğini boşa düşürür;
@@ -195,7 +200,8 @@ def _atamalar() -> list[tuple[str, str, bool]]:
     return sonuc
 
 
-ALTYAPI = {"KROMIS_DATA_DIR", "PORT"}
+# Altyapı değişkenleri — Faz 1 / 1 ile `DATABASE_URL` (services/db.py okuyor).
+ALTYAPI = {"KROMIS_DATA_DIR", "PORT", "DATABASE_URL"}
 
 
 def _katalog_adlari() -> set[str]:
@@ -243,6 +249,18 @@ def test_env_example_defaults_match_the_dockerfile():
     assert degerler["PORT"] == dict(_yonergeler()[::-1])["EXPOSE"]
 
 
+def test_env_example_names_the_database_url_the_app_reads_and_leaves_it_empty():
+    """Ad `services.db.DATABASE_URL_ENV` ile aynı (ikinci bir literal değil) ve
+    değer BOŞ: compose kendi adresini verir, şablon parola taşımaz."""
+    from services import db
+    degerler = {ad: deger for ad, deger, _ in _atamalar()}
+    assert db.DATABASE_URL_ENV in degerler
+    assert degerler[db.DATABASE_URL_ENV] == ""
+    metin = _oku(ENV_EXAMPLE)
+    assert "postgresql+psycopg://" in metin, "biçim örneği yok — geliştirici sürücü adını tahmin eder"
+    assert "db_reachable" in metin, "değişken yokken ne olduğu (503) yazılı olmalı"
+
+
 # --------------------------------------------------------------------------
 # compose.yaml
 # --------------------------------------------------------------------------
@@ -251,13 +269,39 @@ def test_compose_is_dev_only_builds_locally_and_mounts_the_data_volume():
     assert "YALNIZ YEREL GELİŞTİRME" in _oku(COMPOSE)
     veri = _yaml(COMPOSE)
     servisler = veri["services"]
-    assert list(servisler) == ["kromis"], list(servisler)
+    assert set(servisler) == {"kromis", "postgres"}, list(servisler)
     servis = servisler["kromis"]
     assert servis.get("build") == ".", "imaj yerelden derlenmeli, bir kayıt defterinden çekilmemeli"
     assert "image" not in servis
     assert "8765:8765" in servis.get("ports", [])
     baglar = [str(b) for b in servis.get("volumes", [])]
     assert any(b.endswith(":/data") for b in baglar), baglar
+
+
+def test_compose_gives_the_app_a_postgres_and_waits_for_it_to_be_healthy():
+    """DB'siz konteyner `/health` 503 verir; compose bunu kendi çözer (Faz 1 / 1).
+
+    `environment:` `env_file`i ezer — `.env`deki boş `DATABASE_URL=` bu
+    adresi gizleyemez. `service_healthy`: Postgres kabul etmeden uygulama
+    açılıp ilk saniyelerde sebepsiz 503 demesin. Göç burada KOŞMAZ (K6).
+    """
+    from services import db
+    veri = _yaml(COMPOSE)
+    kromis, postgres = veri["services"]["kromis"], veri["services"]["postgres"]
+    url = str(kromis.get("environment", {}).get(db.DATABASE_URL_ENV, ""))
+    assert url.startswith("postgresql+psycopg://") and "@postgres:" in url, url
+    assert kromis.get("depends_on", {}).get("postgres", {}).get("condition") == "service_healthy"
+    assert str(postgres.get("image", "")).startswith("postgres:17"), postgres.get("image")
+    assert "healthcheck" in postgres and "pg_isready" in str(postgres["healthcheck"].get("test"))
+    baglar = [str(b) for b in postgres.get("volumes", [])]
+    assert any(b.endswith("/var/lib/postgresql/data") for b in baglar), baglar
+    # Yalnız loopback yayınlanıyor: ağdaki başka makine dev Postgres'ini görmesin.
+    for port in postgres.get("ports", []):
+        assert str(port).startswith("127.0.0.1:"), port
+    # Yorum satırları atılıyor: gerekçe metni `alembic`i anıyor, komut anmıyor.
+    kod = "\n".join(s for s in _oku(COMPOSE).splitlines() if not s.lstrip().startswith("#"))
+    assert "alembic" not in kod, (
+        "göç compose'da koşturuluyor — açılışta göç yok (K6), 9. görevin `goc` servisi")
 
 
 # --------------------------------------------------------------------------
@@ -289,6 +333,30 @@ def test_ci_docker_job_never_pushes_or_logs_in():
     assert not any("login-action" in u or "build-push-action" in u for u in kullanilan), kullanilan
 
 
+def test_ci_docker_job_runs_the_container_against_a_postgres_service():
+    """Sonda `db_reachable` ölçtüğü için DB'siz konteyner 503 verir; iş kapıyı
+    GEVŞETMEDİ (503 kabul etmiyor), konteynere gerçek DB verdi (Faz 1 / 1).
+
+    `--network host`: servis konağın `localhost:5432`inde, `host.docker.internal`
+    Linux koşucuda yok. `DATABASE_URL` `-e` ile içeri, adı `services.db` ile aynı.
+    """
+    from services import db
+    is_ = _docker_isi()
+    servis = is_.get("services", {}).get("postgres")
+    assert servis, "docker işinde postgres servisi yok — konteyner 503 verir"
+    assert str(servis.get("image", "")).startswith("postgres:17"), servis.get("image")
+    assert "pg_isready" in str(servis.get("options", "")), "servis sağlık denetimi yok"
+    adimlar = [a for a in is_.get("steps", []) if "docker run" in str(a.get("run", ""))]
+    assert len(adimlar) == 1, adimlar
+    adim = adimlar[0]
+    assert "--network host" in adim["run"]
+    assert f"-e {db.DATABASE_URL_ENV}" in adim["run"]
+    url = str(adim.get("env", {}).get(db.DATABASE_URL_ENV, ""))
+    assert url.startswith("postgresql+psycopg://") and "localhost:5432" in url, url
+    # `curl -f` duruyor: 503 hâlâ kırmızı, sonda gevşetilmedi.
+    assert "curl -fsS" in adim["run"] and "/health" in adim["run"]
+
+
 def test_ci_docker_job_is_blocking_and_time_boxed():
     is_ = _docker_isi()
     assert not is_.get("continue-on-error")
@@ -303,5 +371,8 @@ def test_ci_docker_job_is_blocking_and_time_boxed():
 def test_the_readme_tells_developers_how_to_run_the_image_and_probe_health():
     metin = _oku(README)
     assert "docker build" in metin and "/health" in metin and "KROMIS_DATA_DIR" in metin
+    # Faz 1 / 1: sondanın DB ölçütü ve testlerin Postgres'i nereden aldığı yazılı.
+    assert "DATABASE_URL" in metin and "db_reachable" in metin
+    assert "KROMIS_TEST_DATABASE_URL" in metin and "tools/test_ortami.py" in metin
     # Adım 6'dan beri mypy KESİCİ; "bilgi amaçlı" cümlesi bayattı.
     assert "şimdilik bilgi amaçlı" not in metin

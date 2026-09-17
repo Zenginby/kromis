@@ -721,6 +721,8 @@ KULLANICIYA_KONUSMAYAN = {
     "services/redaksiyon.py": "422 gövdesinden gizli değeri SİLİYOR; cümle üretmiyor",
     "services/tercih.py": "kayıtlı tercihin önbellekli okuyucusu; veri döndürüyor, cümle değil",
     "services/ayar.py": "veri dizinlerinin ayar nesnesi ve `Depends` işlevi; metin yok",
+    "services/db.py": "veri tabanı motoru ve `Session` bağımlılığı (Faz 1 / 1); tek 503 "
+                      "`detail`i bir KOD (`database_unavailable`), cümleyi ön yüz kurar",
     "services/zaman.py": "zaman damgası biçimi; metin yok",
 }
 

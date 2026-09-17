@@ -30,16 +30,19 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
 import sys
 
 import pytest
 
 import backup as backup_module
 import paths as paths_module
-from services import ayar
+from services import ayar, db
 
-# Hangi dosyaların E2E olduğu TEK yerde ölçülüyor; gerekçesi orada. Salt
-# kitaplık bir modül, yani takımın kendisi bir kuruluma bağlanmıyor.
+# Salt kitaplık iki modül — takımın kendisi bir kuruluma bağlanmıyor:
+# hangi dosyaların E2E olduğu TEK yerde ölçülüyor (gerekçesi orada); geçici
+# Postgres kümesi de `tools/test_ortami.py --kontrol`ün açtığıyla aynı koddan.
+from tools import gecici_postgres
 from tools.test_ortami import e2e_dosyalari
 
 _UNGUARDED_BACKUP_FILENAME = "test_backup.py"
@@ -58,6 +61,15 @@ ESKI_PYTHON_IZNI = "KROMIS_ALLOW_OLD_PYTHON"
 # (`_test.yml`), yani orada playwright kurulum adımı bir gün sessizce
 # kaybolursa takım "yeşil ama eksik" olmaz, KIRMIZI olur.
 E2E_ZORUNLU = "KROMIS_E2E_ZORUNLU"
+
+# Postgres'e dokunan testlerin şablon veri tabanı: Alembic göçü BİR KEZ buraya
+# uygulanır, her test dosyası `CREATE DATABASE … TEMPLATE` ile temiz bir kopya
+# alır (TRUNCATE değil — kopya ~50 ms ve hiçbir tablo listesi tutmaz).
+DB_SABLON = "kromis_sablon"
+
+# `veritabani` fixture'ının Postgres bulamayıp ATLADIĞI test dosyaları —
+# `pytest_terminal_summary` bunları E2E ile aynı gürültüyle basar.
+_db_atlanan: set[str] = set()
 
 
 def _playwright_var() -> bool:
@@ -84,6 +96,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config) -> None:
     tek bir "skipped" kaydına indiriyor, yani "kaç test atlandı" burada
     dürüstçe söylenemez. Atlanan DOSYALAR söyleniyor.
     """
+    _db_atlama_ozeti(terminalreporter)
     if _playwright_var():
         return
     atlanan = e2e_dosyalari()
@@ -103,6 +116,31 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config) -> None:
         "arayuz metni, on tanimli dil ve DOM capasi degisiklikleri yalnizca "
         "burada gorunuyor.")
     terminalreporter.write_line("Ortami kur : python3 tools/test_ortami.py")
+    terminalreporter.write_line(f"Atlamayi hataya cevir: {E2E_ZORUNLU}=1")
+    terminalreporter.write_sep("=", yellow=True, bold=True)
+
+
+def _db_atlama_ozeti(terminalreporter) -> None:
+    """Postgres bulunamadığı için atlanan DB testleri — E2E uyarısının ikizi (Faz 1 / 1).
+
+    Aynı kusur sınıfı, aynı çare: `veritabani` fixture'ı Postgres yoksa
+    `pytest.skip` diyor ve pytest son satırda yine "passed" yazıyor. SQLite
+    ile yeşil kalıp Postgres'te kırmızıya dönen bir göç dosyası tam olarak bu
+    sessizlikte saklanırdı (docs/faz1-veritabani-hesaplar.md, K4). Dosya adı
+    basılıyor, sayı değil: skip fixture'da olduğu için "kaç test" burada
+    dürüstçe söylenemez.
+    """
+    if not _db_atlanan:
+        return
+    terminalreporter.write_sep("=", "POSTGRES YOK: DB testleri ATLANDI, bu yesil TAM yesil degil",
+                               yellow=True, bold=True)
+    terminalreporter.write_line(
+        "ne KROMIS_TEST_DATABASE_URL verildi ne de makinede PostgreSQL ikilisi var; "
+        "su dosyalardaki DB testleri HIC kosmadi:")
+    for ad in sorted(_db_atlanan):
+        terminalreporter.write_line(f"    tests/{ad}")
+    terminalreporter.write_line("Kur: " + gecici_postgres.kurulum_yonergesi())
+    terminalreporter.write_line("Denetle: python3 tools/test_ortami.py --kontrol")
     terminalreporter.write_line(f"Atlamayi hataya cevir: {E2E_ZORUNLU}=1")
     terminalreporter.write_sep("=", yellow=True, bold=True)
 
@@ -156,6 +194,19 @@ def pytest_configure(config: pytest.Config) -> None:
             "\n\n"
             f"Atlamaya izin vermek icin {E2E_ZORUNLU} degiskenini kaldirin "
             "(paketleme isleri pytest'i bilerek tarayicisiz kosturuyor)."
+        )
+    # AYNI KAPI, POSTGRES İÇİN (Faz 1 / 1. görev): değişkenin adı kaldı,
+    # anlamı "tam takım zorunlu"ya genişledi. CI'da Postgres servisi bir gün
+    # sessizce düşerse DB testleri atlanır ve takım yeşil kalırdı — burada
+    # kırmızı olur. Yerelde verilmiyor; orada atlamanın GÖRÜNMESİ yeter
+    # (`_db_atlama_ozeti`).
+    if os.environ.get(E2E_ZORUNLU) == "1" and gecici_postgres.kaynak() is None:
+        raise pytest.UsageError(
+            f"{E2E_ZORUNLU}=1 verildi ama Postgres YOK: ne "
+            f"{gecici_postgres.TEST_URL_ENV} verildi ne de makinede PostgreSQL "
+            "ikilisi (initdb/pg_ctl) var; DB testleri atlanacakti."
+            "\n\n"
+            "COZUM: " + gecici_postgres.kurulum_yonergesi()
         )
 
     if hasattr(os, "fchmod"):
@@ -283,6 +334,124 @@ def _dil_baglami_testler_arasinda_sizmasin():
     i18n.set_active(i18n.FALLBACK)
     tercih.sifirla()
     yield
+
+
+@pytest.fixture(autouse=True)
+def _guard_against_the_developers_real_database(monkeypatch: pytest.MonkeyPatch):
+    """Geliştiricinin kabuğundaki `DATABASE_URL` testlere SIZMASIN (Faz 1 / 1).
+
+    ALTINCI guard, Android/yedek/göç guard'larıyla aynı sınıf: `app._lifespan`
+    `DATABASE_URL`i `os.environ`dan okuyor ve `with TestClient(app)` kullanan
+    her test lifespan'ı koşturuyor. Kabukta gerçek bir bağlantı dizesi
+    duruyorsa (yerelde compose'un Postgres'i, ya da daha kötüsü yönetilen
+    bir sunucu) o testler ORAYA bağlanırdı — 2. görevden itibaren tablo
+    yaratıp silen göç testleri dâhil. Testin göreceği tek URL `veritabani`
+    fixture'ının kendisinin koyduğu URL.
+    """
+    monkeypatch.delenv(db.DATABASE_URL_ENV, raising=False)
+    yield
+
+
+def _yonetici_motor(url: str):
+    """`CREATE/DROP DATABASE` için AUTOCOMMIT + havuzsuz motor (ikisi de transaksiyon dışı ister)."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import NullPool
+    return create_engine(url, isolation_level="AUTOCOMMIT", poolclass=NullPool)
+
+
+def _veritabani_urlsi(yonetici_url: str, ad: str) -> str:
+    from sqlalchemy.engine import make_url
+    return make_url(yonetici_url).set(database=ad).render_as_string(hide_password=False)
+
+
+@pytest.fixture(scope="session")
+def pg_kume(request: pytest.FixtureRequest) -> str:
+    """Oturum boyunca TEK Postgres: `KROMIS_TEST_DATABASE_URL` ya da geçici küme.
+
+    Döneni bakım DB'sine süper kullanıcı bağlantısıdır; testler bunu DOĞRUDAN
+    kullanmaz, `veritabani` fixture'ı oradan kopya DB açar. Postgres HİÇ yoksa
+    `pytest.skip` — gürültüsü `_db_atlama_ozeti`de, hataya çevrilmesi
+    `pytest_configure`da (`KROMIS_E2E_ZORUNLU=1`).
+
+    Gerekçe (docs/faz1-veritabani-hesaplar.md, 1. görev): GERÇEK Postgres,
+    Docker'sız — CI'da servis konteyneri, yerelde makinedeki ikililerle
+    `initdb` + `pg_ctl` (`tools/gecici_postgres.py`; ölçüldü, açılış ~0,8 sn).
+    """
+    kaynak = gecici_postgres.kaynak()
+    if kaynak is None:
+        pytest.skip("Postgres yok: ne KROMIS_TEST_DATABASE_URL ne de initdb/pg_ctl "
+                    "(python3 tools/test_ortami.py --kontrol)")
+    if kaynak == "env":
+        return os.environ[gecici_postgres.TEST_URL_ENV]
+    kume = gecici_postgres.GeciciKume(kaynak)
+    request.addfinalizer(kume.kapat)
+    return kume.ac()
+
+
+@pytest.fixture(scope="session")
+def pg_sablon(pg_kume: str) -> str:
+    """Alembic göçü uygulanmış ŞABLON DB'nin adı — oturumda bir kez kurulur.
+
+    Önce `DROP … WITH (FORCE)`: geliştiricinin kalıcı bir sunucusunda
+    (`KROMIS_TEST_DATABASE_URL`) önceki koşunun şablonu durabilir ve eski bir
+    göç hâlini taşırdı. Geçici kümede boşa bir komut.
+    """
+    from alembic.config import Config
+    from sqlalchemy import text
+
+    from alembic import command
+
+    yonetici = _yonetici_motor(pg_kume)
+    try:
+        with yonetici.connect() as c:
+            c.execute(text(f"DROP DATABASE IF EXISTS {DB_SABLON} WITH (FORCE)"))
+            c.execute(text(f"CREATE DATABASE {DB_SABLON}"))
+        ayar_dosyasi = Config(os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), "alembic.ini"))
+        # URL `attributes` ile: env.py bunu `DATABASE_URL`den ÖNCE okuyor.
+        ayar_dosyasi.attributes["baglanti_dizesi"] = _veritabani_urlsi(pg_kume, DB_SABLON)
+        command.upgrade(ayar_dosyasi, "head")
+    finally:
+        yonetici.dispose()
+    return DB_SABLON
+
+
+@pytest.fixture(scope="module")
+def veritabani_url(request: pytest.FixtureRequest, pg_kume: str, pg_sablon: str):
+    """Bu test DOSYASINA ait temiz DB (şablonun kopyası); dosya bitince düşer.
+
+    Modül kapsamı bilinçli: dosya içindeki testler aynı DB'yi paylaşır (bir
+    dosya kendi düzenini kendi kurar), dosyalar arası SIFIR sızıntı.
+    """
+    from sqlalchemy import text
+
+    govde = re.sub(r"[^a-z0-9]+", "_", os.path.splitext(request.module.__name__.split(".")[-1])[0].lower())
+    ad = f"kromis_t_{govde}"[:56] + "_" + os.urandom(3).hex()
+    yonetici = _yonetici_motor(pg_kume)
+    with yonetici.connect() as c:
+        c.execute(text(f"CREATE DATABASE {ad} TEMPLATE {pg_sablon}"))
+    yield _veritabani_urlsi(pg_kume, ad)
+    with yonetici.connect() as c:
+        c.execute(text(f"DROP DATABASE IF EXISTS {ad} WITH (FORCE)"))
+    yonetici.dispose()
+
+
+@pytest.fixture
+def veritabani(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> str:
+    """Testin uygulaması GERÇEK bir Postgres'e bağlansın: `DATABASE_URL` bu dosyanın DB'sine.
+
+    Kullanımı: `with TestClient(app) as c` — motor lifespan'da kurulduğu için
+    (services/db.py) `with` ŞART; `with`siz `TestClient(app)` `db_reachable:
+    false` görür ve bu da bilerek sınanıyor (tests/test_health.py).
+
+    Postgres yoksa dosya adı `_db_atlanan`a yazılır ve test atlanır; skip'i
+    `pg_kume` atıyor, buradaki kayıt yalnız özetin dosya adını bilmesi için.
+    """
+    if gecici_postgres.kaynak() is None:
+        _db_atlanan.add(os.path.basename(str(request.node.fspath)))
+    url: str = request.getfixturevalue("veritabani_url")
+    monkeypatch.setenv(db.DATABASE_URL_ENV, url)
+    return url
 
 
 @pytest.fixture

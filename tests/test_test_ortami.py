@@ -143,6 +143,46 @@ def test_the_e2e_files_are_measured_not_listed():
     assert os.path.basename(__file__) not in bulunan
 
 
+def test_ci_gives_the_suite_a_postgres_service_and_tells_it_where(monkeypatch):
+    """`_test.yml`: Postgres servis konteyneri + `KROMIS_TEST_DATABASE_URL` (Faz 1 / 1).
+
+    K4: testte GERÇEK Postgres. Servis bir gün sessizce kalkarsa DB testleri
+    atlanırdı; `KROMIS_E2E_ZORUNLU=1` onu da hataya çeviriyor (conftest) —
+    bu test ise metnin kendisini mandallıyor. Değişken adı aracın okuduğuyla
+    AYNI (`gecici_postgres.TEST_URL_ENV`), ikinci bir literal değil; araç o
+    değişkeni görünce kaynağı `"env"` diye raporluyor.
+    """
+    from tools import gecici_postgres
+    isler = _ci()["jobs"]
+    servisler = [is_.get("services", {}).get("postgres") for is_ in isler.values()]
+    servis = next((s for s in servisler if s), None)
+    assert servis, "_test.yml'de postgres servisi yok"
+    assert str(servis.get("image", "")).startswith("postgres:17"), servis.get("image")
+    assert "pg_isready" in str(servis.get("options", "")), "servis sağlık denetimi yok"
+    pytest_adimlari = [a for a in _adimlar() if "pytest" in a.get("run", "")]
+    urller = [str(a.get("env", {}).get(gecici_postgres.TEST_URL_ENV, "")) for a in pytest_adimlari]
+    assert any(u.startswith("postgresql+psycopg://") and "localhost:5432" in u for u in urller), urller
+    monkeypatch.setenv(gecici_postgres.TEST_URL_ENV, urller[0])
+    assert gecici_postgres.kaynak() == "env"
+
+
+def test_the_readiness_check_requires_postgres_and_names_the_source():
+    """`hazir()` Postgres'siz ortamı hazır SAYMAZ; rapor kurulum komutunu yazar."""
+    from tools import gecici_postgres
+    d = {"yorumlayici": ortam.venv_python(), "sozlesme": ortam.ci_sozlesmesi(),
+         "asgari": ortam.asgari_python(), "surum": "3.13.0", "yeterli_python": True,
+         "pytest": True, "playwright": True, "tarayici": True, "tarayici_hatasi": "",
+         "postgres": None, "postgres_acildi": None, "postgres_hatasi": ""}
+    assert not ortam.hazir(d)
+    assert gecici_postgres.kurulum_yonergesi() in ortam.rapor(d)
+    d["postgres"] = "env"
+    assert ortam.hazir(d)
+    assert gecici_postgres.TEST_URL_ENV in ortam.rapor(d)
+    d["postgres"], d["postgres_acildi"], d["postgres_hatasi"] = "/usr/lib/postgresql/16/bin", False, "initdb basarisiz"
+    assert not ortam.hazir(d)
+    assert "initdb basarisiz" in ortam.rapor(d)
+
+
 def test_ci_forbids_skipping_the_e2e_tests():
     """CI'ın pytest adımı `KROMIS_E2E_ZORUNLU` veriyor mu?
 

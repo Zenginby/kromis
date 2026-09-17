@@ -3,6 +3,11 @@
 `GET /api/settings` `guncelleme_kontrolu` tercihini `tercihler` satırından okuyor
 (Faz 1 / 6) ve `/api/generate` medya satırı yazıyor (Faz 1 / 5): test kullanıcısı
 gerçek satır, `db.oturum` bu dosyanın motoruna bağlı — tests/conftest.py::depo_db.
+
+Faz 1 / 7: sağlayıcı kimlikleri `saglayici_kimlikleri`nde, kullanıcı başına,
+şifreli. `credentials.env` bu dosyada YOK — conftest'in guard'ı DB'li testlerde
+dosya okuyucuyu patlatıyor; "dahili doğrulama" iddiaları depodan okuyor
+(`_kimlikler`), rota cevabı yine anahtar taşımıyor.
 """
 import pytest
 from fastapi.testclient import TestClient
@@ -10,17 +15,22 @@ from fastapi.testclient import TestClient
 import app as appmod
 import azure_client as ac
 import catalog
+import credstore
 import models
 import version
+from services import depo_kimlik_bilgisi
 
 pytestmark = pytest.mark.usefixtures("depo_db")
 
 
 @pytest.fixture
-def client(tmp_path, monkeypatch):
-    monkeypatch.setattr(ac, "APP_ENV_PATH", str(tmp_path / "app" / "credentials.env"))
-    monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", str(tmp_path / "default.env"))
+def client():
     return TestClient(appmod.app)
+
+
+def _kimlikler(db_oturumu, kullanici) -> dict:
+    """Test kullanıcısının DB'deki kimlikleri, çözülmüş — rotanın `kimlik.KIMLIKLER` ile gördüğü sözlük."""
+    return depo_kimlik_bilgisi.oku(db_oturumu, kullanici.id)
 
 
 def test_get_settings_not_configured(client):
@@ -56,7 +66,7 @@ def test_post_settings_rejects_empty_key(client):
     assert r.status_code == 422
 
 
-def test_post_blank_key_keeps_existing(client):
+def test_post_blank_key_keeps_existing(client, db_oturumu, kullanici):
     # önce tam kayıt
     client.post("/api/settings", json={
         "api_key": "KEEPME", "base_url": "https://old/openai/v1/"})
@@ -65,9 +75,10 @@ def test_post_blank_key_keeps_existing(client):
     assert r.status_code == 200
     assert r.json()["endpoint"] == "https://new/openai/v1/"
     # mevcut key korunmuş olmalı (dahili doğrulama; response'ta yok)
-    key, url = ac.load_credentials()
+    key, url = credstore.resolve("azure_image", _kimlikler(db_oturumu, kullanici))
     assert key == "KEEPME"
     assert url == "https://new/openai/v1/"
+    assert "KEEPME" not in r.text
 
 
 def test_validation_error_does_not_echo_api_key(client):
@@ -187,14 +198,13 @@ def test_settings_expose_where_the_instructions_file_can_be_overridden(client):
         "chat-instructions-video.md")
 
 
-def test_settings_never_leak_a_hand_written_chat_api_key(client, tmp_path, monkeypatch):
-    """Ayrı bir sohbet anahtarı ELLE yazılabiliyor; uç onu asla yankılamamalı."""
-    envp = tmp_path / "app" / "credentials.env"
-    envp.parent.mkdir(parents=True, exist_ok=True)
-    envp.write_text("AZURE_IMAGE_API_KEY=K\n"
-                    "AZURE_IMAGE_BASE_URL=https://ep/openai/v1/\n"
-                    "AZURE_CHAT_API_KEY=CHATTOPSECRET\n"
-                    "AZURE_CHAT_DEPLOYMENT=gpt-5.6-luna\n", encoding="utf-8")
+def test_settings_never_leak_a_directly_written_chat_api_key(client, db_oturumu, kullanici):
+    """Ayrı bir sohbet anahtarı formun DIŞINDAN yazılabiliyor (içe aktarma aracı, DB'ye
+    doğrudan — eskiden dosyaya elle); uç onu asla yankılamamalı."""
+    depo_kimlik_bilgisi.yaz(db_oturumu, kullanici.id, {
+        "AZURE_IMAGE_API_KEY": "K", "AZURE_IMAGE_BASE_URL": "https://ep/openai/v1/",
+        "AZURE_CHAT_API_KEY": "CHATTOPSECRET", "AZURE_CHAT_DEPLOYMENT": "gpt-5.6-luna"})
+    db_oturumu.commit()
 
     r = client.get("/api/settings")
     assert "CHATTOPSECRET" not in r.text
@@ -316,18 +326,16 @@ def test_saglayici_anahtari_bos_gelirse_mevcut_KORUNUYOR(client):
     assert body["providers"]["gemini"] is True
 
 
-def test_adres_alani_bos_gelirse_varsayilana_donuyor(client):
+def test_adres_alani_bos_gelirse_varsayilana_donuyor(client, db_oturumu, kullanici):
     """Adres GİZLİ DEĞİL, o yüzden boş "varsayılana dön" demek — gizli
     anahtarların "boş = korunur" kuralının bilinçli tersi."""
     client.post("/api/settings", json={"openai_api_key": "sk-proj-DUMMY1234567890",
                                        "openai_base_url": "https://vekil.ornek/v1"})
-    import credstore
-    assert credstore.resolve("openai")[1] == "https://vekil.ornek/v1"
+    assert credstore.resolve("openai", _kimlikler(db_oturumu, kullanici))[1] == "https://vekil.ornek/v1"
 
     client.post("/api/settings", json={"openai_base_url": ""})
 
-    import catalog
-    assert (credstore.resolve("openai")[1]
+    assert (credstore.resolve("openai", _kimlikler(db_oturumu, kullanici))[1]
             == catalog.credential("openai").default_base_url)
 
 
@@ -425,23 +433,25 @@ def test_bos_adres_kayitli_endpointi_SILMIYOR(client):
     assert client.get("/api/settings").json()["endpoint"] == "https://ep/openai/v1/"
 
 
-def test_varsayilani_OLAN_saglayicida_bos_adres_hala_varsayilana_donuyor(client):
+def test_varsayilani_OLAN_saglayicida_bos_adres_hala_varsayilana_donuyor(client, db_oturumu, kullanici):
     """Üstteki kapı adres alanlarının tamamını dondurmamalı.
 
     Ayrım kataloğun kendisinden okunuyor: `default_base_url`ü olan kimlikte
     (openai/gemini/anthropic) düşülecek bir varsayılan VAR, o yüzden boş
     gönderim hâlâ "varsayılana dön" demek. Yalnız azure_image'de öyle bir
-    varsayılan yok ve boş adres "bağlantıyı kopar" demek olurdu.
+    varsayılan yok ve boş adres "bağlantıyı kopar" demek olurdu. DB'de boş
+    değer SATIRI SİLER (`depo_kimlik_bilgisi.yaz`): dosyadaki `AD=` ile aynı anlam.
     """
     client.post("/api/settings", json={
         "openai_api_key": "sk-K", "openai_base_url": "https://vekil.ornek/v1"})
-    assert ac.read_env_values().get("OPENAI_BASE_URL") == "https://vekil.ornek/v1"
+    assert _kimlikler(db_oturumu, kullanici).get("OPENAI_BASE_URL") == "https://vekil.ornek/v1"
 
     r = client.post("/api/settings", json={"openai_base_url": ""})
 
     assert r.status_code == 200, r.text
-    assert ac.read_env_values().get("OPENAI_BASE_URL") == "", \
+    assert "OPENAI_BASE_URL" not in _kimlikler(db_oturumu, kullanici), \
         "boş adres varsayılana dönmedi — vekil ayarı silinemez hâle geldi"
+    assert _kimlikler(db_oturumu, kullanici)["OPENAI_API_KEY"] == "sk-K", "anahtar yerinde"
 
 
 # ── Sohbet model kataloğu (v0.7) ───────────────────────────────────────
@@ -566,50 +576,49 @@ def test_YALNIZCA_GEMINI_anahtari_olan_kullanicida_yonetmen_ACIK(client):
     assert _sohbet(body, "openai-gpt-5.6-terra")["configured"] is False
 
 
-def test_AZURE_CLIENT_in_kendi_bayragi_DEGISMEDI(client):
-    """`ac.get_settings_status()`'in `chat_configured` alanı hâlâ "AZURE sohbeti
+def test_AZURE_CLIENT_in_kendi_bayragi_DEGISMEDI(client, db_oturumu, kullanici):
+    """`ac.settings_status_of(...)`in `chat_configured` alanı hâlâ "AZURE sohbeti
     hazır mı" sorusunu cevaplıyor; rota onu bilerek eziyor.
 
     İkisi karışırsa tests/test_settings.py'deki donmuş sözleşme ile rotanın
     yanıtı aynı adı iki farklı anlamda kullanır ve hangisinin okunduğu
-    çağıranın şansına kalır.
+    çağıranın şansına kalır. Web yolu gövdeyi sözlükle çağırır
+    (`credstore.settings_status`), dosya okuyan `get_settings_status` değil.
     """
     client.post("/api/settings", json={
         "api_key": "", "base_url": "", "gemini_api_key": "AIza-x"})
-    assert ac.get_settings_status()["chat_configured"] is False
+    kimlikler = _kimlikler(db_oturumu, kullanici)
+    assert ac.settings_status_of(kimlikler)["chat_configured"] is False
+    assert credstore.settings_status(kimlikler)["chat_configured"] is False
     assert client.get("/api/settings").json()["chat_configured"] is True
 
 
 # ── Azure AI Foundry adresi (MAI + FLUX) ───────────────────────────────
 
 
-def test_foundry_adresi_gidip_geliyor(client):
+def test_foundry_adresi_gidip_geliyor(client, db_oturumu, kullanici):
     """`post_settings`in adres döngüsü KATALOGDAN türetiliyor, elle
     sayılmıyor — yani yeni bir `url_field` rotada kod değişikliği İSTEMİYOR.
 
     Bu test o sözü ölçüyor: söz tutulmazsa alan sessizce hiç yazılmaz,
     kullanıcı "kaydettim" sanır ve üretim "adres çözülemedi" der.
     """
-    import credstore
-
     r = client.post("/api/settings", json={
         "api_key": "K", "base_url": "https://ai-ornek.openai.azure.com/openai/v1/",
         "azure_foundry_base_url": "https://ozel.ornek/foundry"})
 
     assert r.status_code == 200, r.text
-    assert credstore.resolve("azure_foundry")[1] == "https://ozel.ornek/foundry"
+    assert credstore.resolve("azure_foundry", _kimlikler(db_oturumu, kullanici))[1] == "https://ozel.ornek/foundry"
 
 
-def test_foundry_adresi_YOKKEN_gorselin_adresinden_turetiliyor(client):
+def test_foundry_adresi_YOKKEN_gorselin_adresinden_turetiliyor(client, db_oturumu, kullanici):
     """Kullanıcı hiçbir şey yazmadan MAI/FLUX çalışmalı: forma yeni bir
     ZORUNLU alan eklemek, bugün Azure'ı kurulu olan herkesi yeniden
     yapılandırmaya zorlamak olurdu."""
-    import credstore
-
     client.post("/api/settings", json={
         "api_key": "K", "base_url": "https://ai-ornek.openai.azure.com/openai/v1/"})
 
-    assert credstore.resolve("azure_foundry") == (
+    assert credstore.resolve("azure_foundry", _kimlikler(db_oturumu, kullanici)) == (
         "K", "https://ai-ornek.services.ai.azure.com")
 
 
@@ -624,15 +633,13 @@ def test_SEMASIZ_foundry_adresi_reddediliyor(client):
     assert r.status_code == 422
 
 
-def test_BOS_foundry_adresi_yazilmis_degeri_KORUYOR(client):
+def test_BOS_foundry_adresi_yazilmis_degeri_KORUYOR(client, db_oturumu, kullanici):
     """`default_base_url`ü olmayan kimlikte boş adres "varsayılana dön" değil
     "dokunmadım" demek (app.post_settings'in ölçülmüş veri kaybı düzeltmesi).
 
     İstemci alanı KOŞULSUZ gönderiyor, yani bu kural olmasa Foundry adresini
     yazan kullanıcı bir sonraki kayıtta onu kaybederdi.
     """
-    import credstore
-
     ilk = client.post("/api/settings", json={
         "api_key": "K", "base_url": "https://ai-ornek.openai.azure.com/openai/v1/",
         "azure_foundry_base_url": "https://ozel.ornek/foundry"})
@@ -645,7 +652,7 @@ def test_BOS_foundry_adresi_yazilmis_degeri_KORUYOR(client):
     bos = client.post("/api/settings", json={"azure_foundry_base_url": ""})
     assert bos.status_code == 200
 
-    assert credstore.resolve("azure_foundry")[1] == "https://ozel.ornek/foundry"
+    assert credstore.resolve("azure_foundry", _kimlikler(db_oturumu, kullanici))[1] == "https://ozel.ornek/foundry"
 
 
 def test_fal_key_is_written_through_the_catalog_loop():
@@ -669,20 +676,55 @@ def test_fal_key_is_redacted_from_validation_errors():
     assert "fal_key" in catalog.secret_field_names()
 
 
-def test_fal_key_kaydedilebiliyor_ve_credstore_ile_okunuyor(client):
+def test_fal_key_kaydedilebiliyor_ve_credstore_ile_okunuyor(client, db_oturumu, kullanici):
     """Gözden geçirenin tek sorusunun DOĞRUDAN kanıtı: kullanıcı fal anahtarını
     Ayarlar ucundan (`POST /api/settings`) kaydedebiliyor mu?
 
     `test_fal_key_is_written_through_the_catalog_loop` katalog GİRDİSİNİ
     doğruluyor; bu test rotanın UCTAN UCA çalıştığını — anahtarın gerçekten
-    `credentials.env`e yazılıp `credstore.resolve` ile geri okunabildiğini —
-    kanıtlıyor.
+    DB satırına yazılıp `credstore.resolve` ile geri okunabildiğini — kanıtlıyor.
     """
-    import credstore
-
     r = client.post("/api/settings", json={"fal_key": "fal-gizli-anahtar"})
     assert r.status_code == 200
     # Yanıt anahtarı SIZDIRMAMALI (yalnızca-yazılır formun sözleşmesi).
     assert "fal-gizli-anahtar" not in r.text
 
-    assert credstore.resolve("fal") == ("fal-gizli-anahtar", "https://queue.fal.run")
+    assert credstore.resolve("fal", _kimlikler(db_oturumu, kullanici)) == (
+        "fal-gizli-anahtar", "https://queue.fal.run")
+
+
+# ── Faz 1 / 7: kimlikler kullanıcı başına, şifreli, DB'de ──────────────
+
+
+def test_a_rejected_request_writes_nothing_at_all(client, db_oturumu, kullanici):
+    """Yazım TEK SEFERDE ve doğrulamaların ardından: geçersiz bir adres bütün gövdeyi düşürür.
+
+    Dosya günlerinde Azure önce yazılıyor, sonraki alanın 422'si onu geride
+    bırakıyordu; DB'de rota istisnayla çıkar, `db.oturum` geri alır.
+    """
+    r = client.post("/api/settings", json={
+        "api_key": "K", "base_url": "https://ep/openai/v1/",
+        "chat_deployment": "d", "gemini_api_key": "AIza-DUMMY",
+        "openai_base_url": "semasiz.adres/v1"})
+    assert r.status_code == 422
+    assert _kimlikler(db_oturumu, kullanici) == {}
+    assert client.get("/api/settings").json()["configured"] is False
+
+
+def test_the_stored_row_is_ciphertext_and_the_get_body_has_no_key_in_any_form(client, db_oturumu, kullanici):
+    """`pg_dump` görünümü: ham satırda anahtar yok, `GET` gövdesinde de yok — maskeli bile."""
+    from sqlalchemy import text
+    r = client.post("/api/settings", json={
+        "api_key": "COKGIZLI-AZURE-DUMMY-1234", "base_url": "https://ep/openai/v1/",
+        "openai_api_key": "sk-proj-COKGIZLI-DUMMY-5678"})
+    assert r.status_code == 200
+    ham = db_oturumu.execute(text(
+        "SELECT ad, sifreli_deger FROM saglayici_kimlikleri WHERE kullanici_id = :k"),
+        {"k": kullanici.id}).all()
+    assert {h.ad for h in ham} == {"AZURE_IMAGE_API_KEY", "AZURE_IMAGE_BASE_URL", "OPENAI_API_KEY"}
+    dokum = b"".join(bytes(h.sifreli_deger) for h in ham)
+    for parca in (b"COKGIZLI", b"1234", b"5678", b"sk-proj", b"https://ep"):
+        assert parca not in dokum, parca
+    govde = client.get("/api/settings").text
+    for parca in ("COKGIZLI", "1234", "5678", "sk-proj", "****"):
+        assert parca not in govde, parca

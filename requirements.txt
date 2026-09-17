@@ -31,6 +31,13 @@ psycopg[binary]==3.3.*
 # 3.14` ile doğrulandı (CI 3.14, imaj 3.13).
 pwdlib[argon2]==0.3.*
 
+# Sağlayıcı anahtarlarının şifrelenmesi (Faz 1 / 7. görev): Fernet + HKDF +
+# MultiFernet döndürme (services/sifre.py). ÇALIŞMA ZAMANI bağımlılığı — anahtar
+# olmadan `saglayici_kimlikleri` satırı ne yazılır ne okunur. Tekerlek
+# `cp311-abi3` (her CPython ≥ 3.11'e uyar): 2026-09-17'de `pip download
+# --python-version 3.14 --only-binary=:all:` ile doğrulandı (CI 3.14, imaj 3.13).
+cryptography==50.0.*
+
 # Windows .NET köprüsü — pywebview'ın KENDİ dolaylı bağımlılıkları
 # (`pythonnet; sys_platform=="win32"`), burada yalnız SÜRÜMLERİ sabitleniyor.
 #

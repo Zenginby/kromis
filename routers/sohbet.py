@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import os
 import uuid
+from collections.abc import Mapping
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -26,11 +27,17 @@ router = APIRouter()
 # okumuyor, `ayar.ayarlar` almıyor — kapı doğrudan `kimlik.aktif_kullanici`,
 # satırlar isteğin `Session`ında (`OTURUM`, commit `db.oturum`da).
 # `chat_store`/`prefs` buradan artık OKUNMAZ (bekçisi tests/test_galeri_db.py).
+#
+# `/api/chat` SAĞLAYICI KİMLİĞİ okuyor (Faz 1 / 7): `kimlik.KIMLIKLER`
+# kullanıcının şifreli satırlarını bir kez çözer; yönetmen bağlamı sözlüğü
+# açık alır, sohbet adaptörü ise isteğin bağlamından (`kimlik_baglami` —
+# gerekçesi orada: sevk memuru kimliği çağrıdan önce çözmez).
 
 
 @router.post("/api/chat")
 def chat(req: ChatRequest, db: Session = OTURUM,
-         kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+         kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+         kimlikler: Mapping[str, str] = kimlik.KIMLIKLER) -> dict:
     """Prompt Yönetmeni: kullanıcının dilinde sohbet → İngilizce prompt.
 
     SENKRON `def` (bilinçli): httpx çağrısı bloklayıcı, Starlette bunu kendi
@@ -85,7 +92,7 @@ def chat(req: ChatRequest, db: Session = OTURUM,
         # dosyasının hatasını yakalamalı; bağlamdan (tercih satırı, katalog)
         # gelen bir hata "talimat yüklenemedi" kılığına girmesin. (Bozuk
         # `prefs.json` senaryosu Faz 1 / 6'da kalktı — tercih DB'de.)
-        baglam = modeller.director_context(db, kullanici.id)
+        baglam = modeller.director_context(db, kullanici.id, kimlikler)
         try:
             instructions = chat_prompt.build_system(**baglam)
         except ValueError as e:

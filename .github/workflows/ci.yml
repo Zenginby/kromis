@@ -216,12 +216,20 @@ jobs:
       - name: docker build
         run: docker build -t kromis .
 
+      # `KROMIS_SECRET_KEY` (Faz 1 / 7): DB'li süreç şifreleme anahtarı olmadan
+      # AÇILMAZ (app._lifespan) — sonda 30 sn boyunca cevap alamaz ve iş
+      # kırmızı olurdu. Anahtar HER KOŞUDA ÜRETİLİYOR, workflow'a yazılmıyor:
+      # `env:`e sabit bir değer koymak git'te bir anahtar tutmak demekti
+      # (sızıntı taraması onu da bulurdu) ve bu iş yalnız "imaj açılıyor mu"
+      # diye soruyor, veriyi bir sonraki koşuya taşımıyor.
       - name: /health ve /
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/kromis
         run: |
           set -euo pipefail
-          docker run -d --name kromis --network host -e DATABASE_URL kromis
+          KROMIS_SECRET_KEY="$(python3 -c 'import secrets,base64;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())')"
+          export KROMIS_SECRET_KEY
+          docker run -d --name kromis --network host -e DATABASE_URL -e KROMIS_SECRET_KEY kromis
           trap 'echo "--- konteyner günlüğü ---"; docker logs kromis 2>&1 | tail -n 50; docker rm -f kromis >/dev/null' EXIT
           for _ in $(seq 1 30); do
             if govde="$(curl -fsS localhost:8765/health)"; then

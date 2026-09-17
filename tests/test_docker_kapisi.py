@@ -36,7 +36,7 @@ import shlex
 import yaml
 
 import catalog
-from services import cerez, db, koken, posta
+from services import cerez, db, koken, posta, sifre
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCKERFILE = os.path.join(KOK, "Dockerfile")
@@ -204,9 +204,11 @@ def _atamalar() -> list[tuple[str, str, bool]]:
 # Altyapı değişkenleri — Faz 1 / 1 ile `DATABASE_URL` (services/db.py okuyor);
 # Faz 1 / 3 ile hesap ve e-posta: `KROMIS_KOKEN` (services/koken.py),
 # `KROMIS_POSTA`, `KROMIS_POSTA_GONDEREN`, `RESEND_API_KEY` (services/posta.py),
-# `KROMIS_GUVENLI_CEREZ` (services/cerez.py). Adlar KAYNAKTAN, elle değil.
+# `KROMIS_GUVENLI_CEREZ` (services/cerez.py); Faz 1 / 7 ile şifreleme anahtarı
+# `KROMIS_SECRET_KEY` (services/sifre.py). Adlar KAYNAKTAN, elle değil.
 ALTYAPI = {"KROMIS_DATA_DIR", "PORT", db.DATABASE_URL_ENV, koken.KOKEN_ENV,
-           posta.POSTA_ENV, posta.GONDEREN_ENV, posta.RESEND_ANAHTAR_ENV, cerez.GUVENLI_ENV}
+           posta.POSTA_ENV, posta.GONDEREN_ENV, posta.RESEND_ANAHTAR_ENV, cerez.GUVENLI_ENV,
+           sifre.ANAHTAR_ENV}
 
 
 def _katalog_adlari() -> set[str]:
@@ -241,11 +243,25 @@ def test_every_env_example_variable_is_explained():
 
 
 def test_env_example_warns_that_provider_keys_are_not_read_from_the_environment():
-    """Uygulama anahtarları `credentials.env`den okur (azure_client.read_env_values),
-    `os.environ`dan değil; şablon bunu söylemezse `.env`e anahtar yazan kullanıcı
-    'neden çalışmıyor' der."""
+    """Uygulama anahtarları web'de kullanıcı başına DB'den okur (`saglayici_kimlikleri`,
+    Faz 1 / 7), masaüstünde `credentials.env`den; `os.environ`dan HİÇ değil. Şablon bunu
+    söylemezse `.env`e anahtar yazan kullanıcı 'neden çalışmıyor' der."""
     metin = _oku(ENV_EXAMPLE)
     assert "SÜREÇ ORTAMINDAN" in metin and "credentials.env" in metin
+    assert "saglayici_kimlikleri" in metin and "ŞİFRELİ" in metin
+    # Faz 0 / 8'in "ortamdan okuma (12-factor)" takibi burada KAPANDI diye yazılı olmalı.
+    assert "12-factor" in metin and "KAPANDI" in metin
+
+
+def test_env_example_requires_the_secret_key_and_shows_the_generation_command():
+    """`KROMIS_SECRET_KEY` (Faz 1 / 7): şablonda ADI var, DEĞERİ yok, ZORUNLU olduğu ve
+    nasıl üretileceği yazılı — `services/sifre.py`nin hata mesajıyla AYNI komut."""
+    degerler = {ad: deger for ad, deger, _ in _atamalar()}
+    assert sifre.ANAHTAR_ENV in degerler and degerler[sifre.ANAHTAR_ENV] == ""
+    metin = _oku(ENV_EXAMPLE)
+    assert "ZORUNLU" in metin and "AÇILMAZ" in metin
+    assert sifre.URETIM_KOMUTU in metin, "üretim komutu sifre.URETIM_KOMUTU ile birebir olmalı"
+    assert "AYRI SAKLANIR" in metin, "anahtar DB yedeğinden ayrı — belge §7/§9"
 
 
 def test_env_example_defaults_match_the_dockerfile():
@@ -307,6 +323,10 @@ def test_compose_gives_the_app_a_postgres_and_waits_for_it_to_be_healthy():
     kod = "\n".join(s for s in _oku(COMPOSE).splitlines() if not s.lstrip().startswith("#"))
     assert "alembic" not in kod, (
         "göç compose'da koşturuluyor — açılışta göç yok (K6), 9. görevin `goc` servisi")
+    # `KROMIS_SECRET_KEY` (Faz 1 / 7): compose değeri `.env`/kabuktan yorumlar, yoksa
+    # `:?` ile DURUR — dosyaya sabit anahtar YAZILMAZ (git'te anahtar demek).
+    anahtar = str(kromis.get("environment", {}).get(sifre.ANAHTAR_ENV, ""))
+    assert anahtar.startswith("${" + sifre.ANAHTAR_ENV + ":?"), anahtar
 
 
 # --------------------------------------------------------------------------
@@ -356,6 +376,11 @@ def test_ci_docker_job_runs_the_container_against_a_postgres_service():
     adim = adimlar[0]
     assert "--network host" in adim["run"]
     assert f"-e {db.DATABASE_URL_ENV}" in adim["run"]
+    # `KROMIS_SECRET_KEY` (Faz 1 / 7): DB'li süreç anahtarsız açılmaz; iş anahtarı
+    # her koşuda ÜRETİR, workflow'a yazmaz (sabit değer git'te bir anahtar olurdu).
+    assert f"-e {sifre.ANAHTAR_ENV}" in adim["run"]
+    assert "secrets.token_bytes(32)" in adim["run"], "anahtar üretilmiyor"
+    assert sifre.ANAHTAR_ENV not in (adim.get("env") or {}), "anahtar workflow'a sabit yazılmış"
     url = str(adim.get("env", {}).get(db.DATABASE_URL_ENV, ""))
     assert url.startswith("postgresql+psycopg://") and "localhost:5432" in url, url
     # `curl -f` duruyor: 503 hâlâ kırmızı, sonda gevşetilmedi.

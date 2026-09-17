@@ -151,3 +151,45 @@ def test_sansur_masum_metni_bozmuyor():
     """
     masum = "Görsel kaydedilemedi: dosya yok (boyut=12), KEY=ok, adres=/output"
     assert errlog.redact_secrets(masum) == masum
+
+
+# ── SQLAlchemy istisnaları (Faz 1 / 7) ───────────────────────────────────
+#
+# Bir `IntegrityError`/`DataError` mesajı ifadenin BÜTÜN bağlı parametrelerini
+# `[parameters: {...}]` ile taşıyor ve o blok `hata.log`a düşüyor. Değer
+# `AD=değer` biçiminde DEĞİL `'AD': 'değer'` biçiminde — 4. desen onu
+# görmüyordu; blok bütünüyle düşüyor (c deseni), sözlük biçimi de ayrıca (b').
+
+
+def test_a_sqlalchemy_error_message_loses_its_bound_parameters():
+    from sqlalchemy.exc import IntegrityError
+
+    hata = IntegrityError(
+        "INSERT INTO saglayici_kimlikleri (kullanici_id, ad, sifreli_deger) VALUES (%(k)s, %(ad)s, %(d)s)",
+        {"k": "a1b2", "ad": "OPENAI_API_KEY", "d": "DUZ-METIN-ANAHTAR-DUMMY-98765"},
+        Exception("duplicate key value violates unique constraint"))
+    metin = str(hata)
+    assert "DUZ-METIN-ANAHTAR-DUMMY-98765" in metin and "[parameters:" in metin, metin
+    sansurlu = errlog.redact_secrets(metin)
+    assert "DUZ-METIN-ANAHTAR-DUMMY-98765" not in sansurlu
+    assert "[parameters:" not in sansurlu, "blok bütünüyle düşmeli, değeri tanımaya çalışmamalı"
+    # Teşhis için gereken kısım DURUYOR: hangi ifade, hangi kısıt.
+    assert "INSERT INTO saglayici_kimlikleri" in sansurlu
+    assert "duplicate key value" in sansurlu
+
+
+@pytest.mark.parametrize("metin", [
+    "{'OPENAI_API_KEY': 'DUMMY-plain-value-12345'}",
+    '{"AZURE_IMAGE_API_KEY": "DUMMY-plain-value-12345"}',
+    "params={'FAL_KEY': 'DUMMY-plain-value-12345', 'n': 1}",
+])
+def test_the_dict_form_of_a_secret_name_is_redacted(metin):
+    sansurlu = errlog.redact_secrets(metin)
+    assert "DUMMY-plain-value-12345" not in sansurlu, sansurlu
+    assert "[REDACTED_API_KEY]" in sansurlu
+
+
+def test_a_dict_with_an_innocent_name_keeps_its_value():
+    """Aşırı sansür teşhisi öldürür: `size`/`prompt` gibi alanlar okunur kalmalı."""
+    masum = "{'prompt': 'kirmizi kedi', 'size': '1024x1024', 'folder_id': 'abcdef123456'}"
+    assert errlog.redact_secrets(masum) == masum

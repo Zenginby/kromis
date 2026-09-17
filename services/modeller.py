@@ -11,10 +11,10 @@ bu soru iki yerde iki cevap üretirdi.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 
 from sqlalchemy.orm import Session
 
-import azure_client as ac
 import catalog
 import credstore
 import etiket
@@ -129,13 +129,18 @@ def model_payload(m: catalog.ImageModel, cfg: dict, kisa: dict) -> dict:
     }
 
 
-def settings_payload() -> dict:
+def settings_payload(kimlikler: Mapping[str, str] | None = None) -> dict:
     """Kimlik DURUMU + hangi modeller var + hangileri kullanılabilir.
 
-    `ac.get_settings_status()` GENİŞLETİLMEDİ, üzerine BURADA ekleniyor —
-    `version`'ın aynı gerekçesi (o fonksiyonun docstring'i): `azure_client`'ın
-    işi kimlik bilgisi, hangi modellerin var olduğunu bilmesi gereksiz bir bağ
-    olurdu ve tests/test_settings.py'deki sözleşmesini genişletirdi. Mevcut
+    `kimlikler`: isteğin kullanıcısının çözülmüş sözlüğü (`kimlik.KIMLIKLER`);
+    rota açık veriyor, `None` isteğin bağlamı demek (credstore.degerler).
+
+    `ac.get_settings_status()`un gövdesi GENİŞLETİLMEDİ, üzerine BURADA
+    ekleniyor — `version`'ın aynı gerekçesi (o fonksiyonun docstring'i):
+    `azure_client`'ın işi kimlik bilgisi, hangi modellerin var olduğunu bilmesi
+    gereksiz bir bağ olurdu ve tests/test_settings.py'deki sözleşmesini
+    genişletirdi. Web'de o gövde sözlükten okunuyor (`credstore.settings_status`
+    → `ac.settings_status_of`; dosya okuyan işlev web yolunda çağrılmaz). Mevcut
     anahtarların HEPSİ adıyla ve anlamıyla korunuyor, yani `settings.js` ve
     tests/test_settings_route.py etkilenmiyor.
 
@@ -150,8 +155,8 @@ def settings_payload() -> dict:
     dönmüyor: `get_settings_status`'un sözleşmesi "API key'i ASLA döndürmez" ve
     "sadece son dört hane" o sözleşmenin öldüğü yerdir.
     """
-    cfg = credstore.configured_map()
-    chat_cfg = credstore.chat_configured_map()
+    cfg = credstore.configured_map(kimlikler)
+    chat_cfg = credstore.chat_configured_map(kimlikler)
     # Şeritte gösterilecek KISA adlar: sağlayıcı markası işaretle geldiği için
     # etiketten düşüyor. Liste bütününden hesaplanıyor (çakışma kuralı için),
     # o yüzden model başına değil bir kez (bkz. catalog.short_labels).
@@ -164,7 +169,7 @@ def settings_payload() -> dict:
     # `Veo 3.1` ile bir görsel modelini yan yana görmüyor).
     kisa_video = etiket.short_labels(catalog.VIDEO_MODELS)
     return {
-        **ac.get_settings_status(),
+        **credstore.settings_status(kimlikler),
         # {kimlik_id: bool}. Arayüz Ayarlar'daki sağlayıcı gruplarının
         # "Kayıtlı" durumunu buradan okuyor.
         "providers": cfg,
@@ -241,7 +246,8 @@ def model_facts(m: catalog.ImageModel) -> dict:
             "credits": m.credits}
 
 
-def director_context(db: Session, kullanici_id: uuid.UUID) -> dict:
+def director_context(db: Session, kullanici_id: uuid.UUID,
+                     kimlikler: Mapping[str, str] | None = None) -> dict:
     """Yönetmenin sistem mesajına giren TUR bağlamı: seçili model + menü + yönlendirme.
 
     Bağlamı burada toplamanın sebebi katman kuralı: `chat_prompt` yalnızca
@@ -271,8 +277,8 @@ def director_context(db: Session, kullanici_id: uuid.UUID) -> dict:
     gösterdiği küme ile yönetmenin gördüğü küme ayrışsaydı yönetmen
     kullanıcının ekranında olmayan bir modeli önerirdi — o fonksiyonun var
     olma gerekçesi tam olarak bu ikiliği önlemek. `credstore.configured_map()`
-    de altı kimliği BİR kez çözüyor; model başına `providers.is_configured`
-    çağırmak aynı dosyayı on üç kez okumak olurdu.
+    de altı kimliği BİR kez çözüyor; `kimlikler` rotanın `kimlik.KIMLIKLER`
+    ile aldığı sözlük (DB'ye bir kez gidildi), model başına yeniden sorulmaz.
 
     `selected` `model_facts`in İÇİNDE değil çünkü o bir MODEL olgusu değil bu
     TURUN olgusu — aynı sözlüğün iki bağlamda kullanılabilmesinin şartı bu
@@ -281,7 +287,7 @@ def director_context(db: Session, kullanici_id: uuid.UUID) -> dict:
     """
     p = depo_tercih.oku(db, kullanici_id)
     m = catalog.image_model(p["image_model"])
-    cfg = credstore.configured_map()
+    cfg = credstore.configured_map(kimlikler)
     secili = {p["image_model"], p["video_model"]}
     # GÖRSEL + VİDEO tek listede: `catalog.video_model`in "birleşik arama YOK"
     # kuralı id ile ARAMA hakkında (yanlış türü doğru sanan bir çağıranı

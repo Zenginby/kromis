@@ -20,6 +20,8 @@ değerler ayrışırsa arayüz sohbeti açar, ilk mesaj 502 döner ve sebebi gö
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import azure_client as ac
 import chat_prompt
 
@@ -27,6 +29,7 @@ import chat_prompt
 # (`ChatMessage.content`); ikinci bir sabit iki sayının ayrışmasına davetiye
 # olurdu. Döngü yok: `models` yalnız `azure_client` ve `palette`'e bakıyor.
 import i18n
+import kimlik_baglami
 import models
 
 # Okuma zaman aşımı. ~16,5 bin karakter sistem talimatı + akıl yürüten dağıtım
@@ -66,14 +69,36 @@ def map_error(status_code: int, body: dict | None) -> str:
         f" {detail}" if detail else "")
 
 
-def load_credentials(env_path: str | None = None) -> tuple[str, str, str]:
-    """(key, base_url, deployment). Sohbet key/url'si yoksa GÖRSEL olanlara düşer."""
-    key, base_url, deployment = ac.resolve_chat_credentials(env_path)
+def credentials_of(values: Mapping[str, str]) -> tuple[str, str, str]:
+    """(key, base_url, deployment) SÖZLÜKTEN; sohbet key/url'si yoksa GÖRSEL olanlara düşer.
+
+    İki kapı burada: kimlik eksikse ve dağıtım adı boşsa Türkçe `ChatError` —
+    dosya yolu (`load_credentials`) ile web yolu aynı cümleleri kurar.
+    """
+    key, base_url, deployment = ac.chat_credentials_of(values)
     if not key or not base_url:
         raise ChatError(i18n.t("err.azure_credentials_missing"))
     if not deployment:
         raise ChatError(i18n.t("err.chat_deployment_missing"))
     return key, base_url, deployment
+
+
+def load_credentials(env_path: str | None = None) -> tuple[str, str, str]:
+    """`credentials_of`un DOSYA okuyan sarmalı — dondurulmuş kabuk."""
+    return credentials_of(ac.read_env_values(env_path))
+
+
+def _varsayilan_kimlik() -> tuple[str, str, str]:
+    """`credentials` verilmediğinde: istek bağlamı (web, DB'den çözülmüş sözlük) ya da dosya.
+
+    `azure_client._varsayilan_kimlik`in ikizi ve aynı gerekçe: sevk memuru
+    (`chat_providers._azure_complete`) kimliği çağrıdan önce çözmez, rota
+    testleri `cc.complete`i yamalıyor; ayrım stub'ın ARKASINDA, burada.
+    """
+    kimlikler = kimlik_baglami.aktif()
+    if kimlikler is not None:
+        return credentials_of(kimlikler)
+    return load_credentials()
 
 
 def build_payload(messages: list[dict], deployment: str, instructions: str) -> dict:
@@ -156,7 +181,7 @@ def extract_content(response_json: dict) -> tuple[str, str]:
 def complete(messages: list[dict], *, client=None, credentials=None,
              instructions: str | None = None) -> dict:
     """Tek turda tamamlama. `{"content": str, "finish_reason": str}` döndürür."""
-    key, base_url, deployment = credentials if credentials is not None else load_credentials()
+    key, base_url, deployment = credentials if credentials is not None else _varsayilan_kimlik()
     if instructions is None:
         try:
             instructions = chat_prompt.load_instructions()

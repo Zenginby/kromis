@@ -59,6 +59,7 @@ DEPOLAR = {
     "services/depo_medya.py": 9, "services/depo_klasor.py": 4,
     "services/depo_sohbet.py": 3, "services/depo_palet.py": 2,
     "services/depo_varlik.py": 3, "services/depo_tercih.py": 1,
+    "services/depo_kimlik_bilgisi.py": 4,   # Faz 1 / 7
 }
 DONDURULMUS = {"storage": storage, "folders": folders, "chat_store": chat_store,
                "palette_store": palette_store, "assets_store": assets_store, "prefs": prefs}
@@ -83,6 +84,22 @@ MANIFEST_ISLEVLERI = {
                      "_manifest_path", "_kind_dir"),
     "prefs": ("read", "read_stored", "update", "_read_raw", "_write", "_prefs_path"),
 }
+
+
+# Kimlik DOSYASININ işlevleri (Faz 1 / 7, belge §7 çıkış ölçütü): web yolunda
+# ÇAĞRILMAZ — kimlik kullanıcı başına DB'den (`depo_kimlik_bilgisi`), dosya
+# dondurulmuş kabuğun ve `tools/ice_aktar.py`nin. Modülden bağımsız AD listesi:
+# `ac.load_credentials` de `cc.load_credentials` de yakalanır. Saf ikizleri
+# (`credentials_of`, `chat_credentials_of`, `settings_status_of`, `check_base_url`)
+# serbest — dosya okumazlar.
+KIMLIK_DOSYASI_ISLEVLERI = frozenset({
+    "credentials_path", "shared_credentials_path",           # paths
+    "save_env", "save_credentials", "read_env_values", "load_credentials",
+    "resolve_chat_credentials", "get_settings_status",       # azure_client / chat_client
+    "_parse_env_all", "_parse_env_file", "_candidate_paths", "_first_complete_credentials",
+})
+# Web yolu: bileşim kökü + paketler + kimliği çözen/sevk eden kök modüller.
+KIMLIK_WEB_MODULLERI = ("credstore.py", "chat_providers.py", "providers.py")
 
 
 def _oku(yol: str) -> str:
@@ -118,6 +135,38 @@ def test_no_web_module_calls_a_manifest_function_of_storage_or_folders():
                 for takma in dugum.names:
                     assert takma.name not in MANIFEST_ISLEVLERI[dugum.module], (
                         f"{yol}: `from {dugum.module} import {takma.name}` — manifest işlevi")
+
+
+def test_no_web_module_calls_a_credentials_file_function():
+    """Belge §7 çıkış ölçütü: `credentials.env` web yolunda hiç açılmıyor — kaynak taraması.
+
+    AST, metin DEĞİL (manifest bekçisiyle aynı gerekçe): yorumlar eski işlevleri
+    adıyla anıyor. Aranan şey ÇAĞRI (`x.save_env(`, `load_credentials(`) ya da
+    `from … import <işlev>`. Çalışma zamanı ikizi conftest'te:
+    `_web_yolunda_kimlik_dosyasi_acilmaz` DB'li testlerde dosya okuyucuyu patlatır.
+    """
+    for yol in _web_yolu_dosyalari() + list(KIMLIK_WEB_MODULLERI):
+        agac = ast.parse(_oku(yol))
+        for dugum in ast.walk(agac):
+            if isinstance(dugum, ast.Call):
+                ad = (dugum.func.attr if isinstance(dugum.func, ast.Attribute)
+                      else dugum.func.id if isinstance(dugum.func, ast.Name) else None)
+                assert ad not in KIMLIK_DOSYASI_ISLEVLERI, (
+                    f"{yol}:{dugum.lineno}: `{ad}(` — kimlik dosyası web yolunda okunmaz/yazılmaz "
+                    "(depo_kimlik_bilgisi / credstore kullan)")
+            if isinstance(dugum, ast.ImportFrom) and dugum.module in ("azure_client", "chat_client", "paths"):
+                for takma in dugum.names:
+                    assert takma.name not in KIMLIK_DOSYASI_ISLEVLERI, (
+                        f"{yol}: `from {dugum.module} import {takma.name}` — kimlik dosyası işlevi")
+
+
+def test_the_credentials_file_function_list_still_names_real_functions():
+    """Bekçinin bekçisi: liste `azure_client`/`chat_client`/`paths`teki gerçek adları saymalı."""
+    import chat_client
+    import paths
+    for ad in KIMLIK_DOSYASI_ISLEVLERI:
+        assert any(callable(getattr(m, ad, None)) for m in (ac, chat_client, paths)), (
+            f"{ad} hiçbir modülde yok — listeyi güncelle")
 
 
 def test_the_manifest_function_list_still_matches_the_frozen_modules():

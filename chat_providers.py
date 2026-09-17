@@ -23,11 +23,12 @@ değiştirmek olurdu.
 adaptör onu bedavaya alıyor.
 
 AZURE YOLU BAYT BAYT DEĞİŞMİYOR. `_azure_complete` model tanımını DÜŞÜRÜP
-`chat_client.complete`'e aynen devrediyor: o dosya dağıtım adını kendi içinde,
-tembel biçimde çözüyor (`load_credentials`) ve rota testlerinin tamamı
-`appmod.cc.complete`'i monkeypatch ediyor. Kimliği burada erken çözmek, tam
-olarak `providers._azure_generate`'in docstring'inde ölçülmüş kırılmayı
-tekrarlardı: stub'lanmış bir çağrı bile gerçek bir `credentials.env` isterdi.
+`chat_client.complete`'e aynen devrediyor: o dosya kimliği kendi içinde,
+tembel biçimde çözüyor (web'de isteğin sözlüğünden — `kimlik_baglami`;
+bağlamsızsa dosyadan) ve rota testlerinin tamamı `appmod.cc.complete`'i
+monkeypatch ediyor. Kimliği burada erken çözmek, tam olarak
+`providers._azure_generate`'in docstring'inde ölçülmüş kırılmayı
+tekrarlardı: stub'lanmış bir çağrı bile gerçek bir kimlik isterdi.
 
 Adaptörler modül düzeyinde STATİK import ediliyor, `importlib` ile DEĞİL
 (`kromis.spec`'in `hiddenimports=[]` değeri PyInstaller'ın statik
@@ -38,9 +39,8 @@ tests/test_android_packaging.py).
 """
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
-import azure_client as ac
 import catalog
 import chat_client as cc
 import credstore
@@ -90,17 +90,17 @@ def adapter_ids() -> frozenset[str]:
     return frozenset(_ADAPTERS)
 
 
-def wire_model_of(m: catalog.ChatModel, env_path: str | None = None) -> str:
-    """Sağlayıcıya GİDEN ad. Azure'da ortamdan, ötekilerde katalogdan.
+def wire_model_of(m: catalog.ChatModel, kimlikler: Mapping[str, str] | None = None) -> str:
+    """Sağlayıcıya GİDEN ad. Azure'da kullanıcının kimlik sözlüğünden, ötekilerde katalogdan.
 
-    Katalog yaprak olduğu için ortama BAKAMIYOR (dosya G/Ç yok); okuma bu
-    yüzden burada. `credstore.chat_is_configured` aynı env değerine bakıyor ama
-    yalnız "boş mu" diye — iki taraf ayrışırsa arayüz modeli kurulu gösterir ve
-    ilk mesaj 404 döner, o yüzden ikisi de TEK env adını (`wire_from_env`)
-    kataloğun kendisinden okuyor.
+    Katalog yaprak olduğu için kimliğe BAKAMIYOR; okuma bu yüzden burada.
+    `credstore.chat_is_configured` aynı değere bakıyor ama yalnız "boş mu"
+    diye — iki taraf ayrışırsa arayüz modeli kurulu gösterir ve ilk mesaj 404
+    döner, o yüzden ikisi de TEK adı (`wire_from_env`) kataloğun kendisinden
+    okuyor. `kimlikler=None` isteğin sözlüğü demek (credstore.degerler).
     """
     if m.wire_from_env:
-        return ac.read_env_values(env_path).get(m.wire_from_env, "").strip()
+        return credstore.degerler(kimlikler).get(m.wire_from_env, "").strip()
     return m.wire_model
 
 
@@ -118,11 +118,11 @@ def _resolve(model_id: str) -> catalog.ChatModel:
     return m
 
 
-def is_configured(model_id: str, env_path: str | None = None) -> bool:
+def is_configured(model_id: str, kimlikler: Mapping[str, str] | None = None) -> bool:
     """Modelin kimliği (ve gerekiyorsa dağıtım adı) girilmiş mi."""
     m = catalog.chat_model(model_id)
     # `is not None`, `bool(m)` DEĞİL — `providers.is_configured`ın gerekçesi.
-    return m is not None and credstore.chat_is_configured(m, env_path)
+    return m is not None and credstore.chat_is_configured(m, kimlikler)
 
 
 def complete(model_id: str, messages: list[dict], *, client=None,

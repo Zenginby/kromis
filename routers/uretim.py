@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -35,12 +36,19 @@ router = APIRouter()
 # (commit `db.oturum`da, rota döner dönmez). Kullanıcı `ayar.ayarlar`ın içindeki
 # kapıyla aynı nesne (FastAPI bağımlılık önbelleği), ek sorgu yok. İki `async
 # def` rota (`edit`, `animate`) DB'ye `run_in_threadpool` ile gidiyor.
+#
+# Dört rota SAĞLAYICI KİMLİĞİ okuyor (Faz 1 / 7): `kimlik.KIMLIKLER` kullanıcının
+# şifreli satırlarını bir kez çözer ve isteğin bağlamına bağlar; adaptörler
+# kimliği oradan, TEMBEL çözer (`credentials=None` düşmesi — gerekçesi
+# providers._azure_generate ve kimlik_baglami). `kimlikler` imzada dursun ki
+# hangi rotanın anahtar okuduğu imzasında okunsun (bekçi tests/test_kimlik.py).
 
 
 @router.post("/api/generate")
 def generate(req: GenerateRequest, db: Session = OTURUM,
              ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-             kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+             kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+             kimlikler: Mapping[str, str] = kimlik.KIMLIKLER) -> dict:
     folder_id = kapilar.check_folder(req.folder_id, db, kullanici.id)
     session_id = kapilar.check_session(req.session_id)
     arena_id = kapilar.check_arena(req.arena_id)
@@ -87,7 +95,8 @@ def generate(req: GenerateRequest, db: Session = OTURUM,
 @router.post("/api/video")
 def video(req: VideoRequest, db: Session = OTURUM,
           ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-          kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+          kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+          kimlikler: Mapping[str, str] = kimlik.KIMLIKLER) -> dict:
     """Metin → video. `generate`in video ikizi.
 
     SENKRON ve bu bilinçli bir seçim, kaza değil: üretim 1-6 dakika sürüyor ve
@@ -220,6 +229,7 @@ async def animate(
     db: Session = OTURUM,
     ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
     kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+    kimlikler: Mapping[str, str] = kimlik.KIMLIKLER,
 ) -> dict:
     """Görsel → video: bir kareyi hareketlendirir.
 
@@ -423,6 +433,7 @@ async def edit(
     db: Session = OTURUM,
     ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
     kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+    kimlikler: Mapping[str, str] = kimlik.KIMLIKLER,
 ) -> dict:
     """Ek referans görselleri (`extra_files` yüklemeleri, `extra_source_ids`
     galeri id'leri) form verisinden okunur — bkz. gorsel.extra_refs."""

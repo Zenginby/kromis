@@ -13,6 +13,7 @@ import pytest
 import catalog
 import chat_client as cc
 import chat_providers
+import kimlik_baglami
 import openai_chat
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
@@ -48,10 +49,10 @@ def test_adaptorler_STATIK_import_ediliyor():
 def test_AZURE_yolu_chat_client_e_model_DUSURULEREK_gidiyor(monkeypatch):
     """Kayıtlı Azure kullanıcısı için sıfır davranış değişikliği güvencesi.
 
-    `chat_client.complete` dağıtım adını KENDİ İÇİNDE, tembel biçimde çözüyor
-    (`load_credentials`). Sevk memuru kimliği erken çözseydi rota testlerinin
-    tamamı düşerdi: hepsi `appmod.cc.complete`'i yamalıyor ve hiçbiri gerçek bir
-    `credentials.env` yazmıyor — `providers._azure_generate`'in docstring'inde
+    `chat_client.complete` kimliği KENDİ İÇİNDE, tembel biçimde çözüyor (web'de
+    isteğin bağlamından, `kimlik_baglami`). Sevk memuru kimliği erken çözseydi
+    rota testlerinin tamamı düşerdi: hepsi `appmod.cc.complete`'i yamalıyor ve
+    hiçbiri kimlik kurmuyor — `providers._azure_generate`'in docstring'inde
     ölçülmüş kırılmanın aynısı.
     """
     cagrilar = []
@@ -106,48 +107,47 @@ def test_ADAPTORSUZ_saglayici_SESSIZCE_azureye_dusmuyor(monkeypatch):
 # ── Ad çözümü ──────────────────────────────────────────────────────────
 
 
-def test_AZURE_nun_adi_ORTAMDAN_okunuyor(tmp_path):
-    env = tmp_path / "credentials.env"
-    env.write_text("AZURE_CHAT_DEPLOYMENT=  gpt-5.6-luna  \n", encoding="utf-8")
+def test_AZURE_nun_adi_KIMLIK_SOZLUGUNDEN_okunuyor():
+    """Faz 1 / 7: ad `credentials.env`den değil, kullanıcının çözülmüş sözlüğünden."""
     m = catalog.chat_model(catalog.DEFAULT_CHAT_MODEL)
 
     # Kırpma ölçülüyor: kullanıcı kutuya boşluklu yapıştırıyor ve `credstore`
     # "boş mu" sorusunu da kırparak soruyor — ikisi ayrışırsa arayüz modeli
     # kurulu gösterir, istek 404 döner.
-    assert chat_providers.wire_model_of(m, str(env)) == "gpt-5.6-luna"
+    assert chat_providers.wire_model_of(m, {"AZURE_CHAT_DEPLOYMENT": "  gpt-5.6-luna  "}) == "gpt-5.6-luna"
+    # Sözlük verilmediyse isteğin bağlamı; bağlam da yoksa boş (credstore.degerler).
+    assert chat_providers.wire_model_of(m) == ""
+    jeton = kimlik_baglami.bagla({"AZURE_CHAT_DEPLOYMENT": "baglamdan"})
+    try:
+        assert chat_providers.wire_model_of(m) == "baglamdan"
+    finally:
+        kimlik_baglami.coz(jeton)
 
 
-def test_OTEKILERIN_adi_KATALOGDAN_geliyor(tmp_path):
-    """Ortamda hiçbir şey olmasa da ad hazır: aranan bir env değişkeninin
-    yokluğu OpenAI/Gemini'yi sessizce kapatırdı."""
-    env = tmp_path / "credentials.env"
-    env.write_text("", encoding="utf-8")
+def test_OTEKILERIN_adi_KATALOGDAN_geliyor():
+    """Sözlükte hiçbir şey olmasa da ad hazır: aranan bir adın yokluğu
+    OpenAI/Gemini'yi sessizce kapatırdı."""
     m = catalog.chat_model("gemini-3.7-flash")
-    assert chat_providers.wire_model_of(m, str(env)) == "gemini-3.7-flash"
+    assert chat_providers.wire_model_of(m, {}) == "gemini-3.7-flash"
 
 
 # ── Kurulu mu ──────────────────────────────────────────────────────────
 
 
-def test_AZURE_modeli_DAGITIM_ADI_olmadan_kurulu_SAYILMIYOR(tmp_path):
+def test_AZURE_modeli_DAGITIM_ADI_olmadan_kurulu_SAYILMIYOR():
     """Kimliği tam, dağıtımı boş: istek 404 döner. Arayüz "kurulu" gösterirse
     kullanıcı yönetmeni açar, ilk mesaj 502 olur ve sebebi görünmez."""
-    env = tmp_path / "credentials.env"
-    env.write_text("AZURE_IMAGE_API_KEY=K\n"
-                   "AZURE_IMAGE_BASE_URL=https://ep/openai/v1/\n", encoding="utf-8")
-    assert chat_providers.is_configured(catalog.DEFAULT_CHAT_MODEL, str(env)) is False
+    kimlik = {"AZURE_IMAGE_API_KEY": "K", "AZURE_IMAGE_BASE_URL": "https://ep/openai/v1/"}
+    assert chat_providers.is_configured(catalog.DEFAULT_CHAT_MODEL, kimlik) is False
 
-    env.write_text("AZURE_IMAGE_API_KEY=K\n"
-                   "AZURE_IMAGE_BASE_URL=https://ep/openai/v1/\n"
-                   "AZURE_CHAT_DEPLOYMENT=gpt-5.6-luna\n", encoding="utf-8")
-    assert chat_providers.is_configured(catalog.DEFAULT_CHAT_MODEL, str(env)) is True
+    kimlik["AZURE_CHAT_DEPLOYMENT"] = "gpt-5.6-luna"
+    assert chat_providers.is_configured(catalog.DEFAULT_CHAT_MODEL, kimlik) is True
 
 
-def test_UYUMLU_modeller_YALNIZ_anahtar_istiyor(tmp_path):
-    env = tmp_path / "credentials.env"
-    env.write_text("GEMINI_API_KEY=AIza\n", encoding="utf-8")
-    assert chat_providers.is_configured("gemini-3.7-flash", str(env)) is True
-    assert chat_providers.is_configured("openai-gpt-5.6-terra", str(env)) is False
+def test_UYUMLU_modeller_YALNIZ_anahtar_istiyor():
+    kimlik = {"GEMINI_API_KEY": "AIza"}
+    assert chat_providers.is_configured("gemini-3.7-flash", kimlik) is True
+    assert chat_providers.is_configured("openai-gpt-5.6-terra", kimlik) is False
 
 
 def test_KATALOGDA_OLMAYAN_model_kurulu_sayilmiyor():

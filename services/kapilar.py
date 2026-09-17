@@ -9,26 +9,30 @@ denetlediği her işlevin başında yazılı — ayrım bilinçli ve gerekçeli.
 """
 from __future__ import annotations
 
+import uuid
+
 from fastapi import HTTPException
+from sqlalchemy.orm import Session
 
 import assets_store
 import chat_store
-import folders
 import i18n
 import storage
-from services import dil
+from services import depo_klasor, dil
 
 
-def check_folder(folder_id: str | None, output_dir: str) -> str | None:
-    """Boş/None ise kök (None). Doluysa klasörün var olduğunu doğrular, yoksa 404.
+def check_folder(folder_id: str | None, db: Session, kullanici_id: uuid.UUID) -> str | None:
+    """Boş/None ise kök (None). Doluysa klasörün BU KULLANICININ olduğunu doğrular, yoksa 404.
 
-    `output_dir` ÇAĞIRANDAN geliyor (rotanın `Depends(ayar.ayarlar)`ı): bu
-    kapı VARLIK soruyor, yani diske bakıyor ve hangi diske bakacağını rotanın
-    ayarları söyler — süreç geneli bir okuma kapısı değil (Faz 0 / Adım 4).
+    `(db, kullanici_id)` ÇAĞIRANDAN geliyor (rotanın `OTURUM`u ve kapının
+    çözdüğü kullanıcı): bu kapı VARLIK soruyor, yani depoya bakıyor ve hangi
+    kullanıcının klasörlerine bakacağını rota söyler — süreç geneli bir okuma
+    kapısı değil (Faz 0 / 4; Faz 1 / 5'te `output_dir` → `klasorler` satırı).
+    Başkasının klasörü "yok" sayılır: 403 id uzayını sızdırırdı.
     """
     if not folder_id:
         return None
-    if not folders.exists(folder_id, output_dir):
+    if not depo_klasor.var_mi(db, kullanici_id, folder_id):
         raise HTTPException(status_code=404, detail=i18n.t("err.folder_missing", dil.aktif()))
     return folder_id
 

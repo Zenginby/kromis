@@ -21,6 +21,7 @@ import os
 import re
 import subprocess
 
+import pytest
 from fastapi.testclient import TestClient
 
 import app as appmod
@@ -28,6 +29,10 @@ import i18n
 import models
 import paths
 from services import dil
+
+# Galeri/klasör/üretim rotaları DB'de (Faz 1 / 5): test kullanıcısı gerçek satır,
+# `db.oturum` bu dosyanın motoruna bağlı — gerekçe tests/conftest.py::depo_db.
+pytestmark = pytest.mark.usefixtures("depo_db")
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 I18N_DIR = os.path.join(REPO, "bundled", "i18n")
@@ -737,6 +742,10 @@ KULLANICIYA_KONUSMAYAN = {
     "services/db.py": "veri tabanı motoru ve `Session` bağımlılığı (Faz 1 / 1); tek 503 "
                       "`detail`i bir KOD (`database_unavailable`), cümleyi ön yüz kurar",
     "services/zaman.py": "zaman damgası biçimi; metin yok",
+    "services/depo_medya.py": "medya deposu (Faz 1 / 5): SQL ve dosya; kullanıcıya konuşmaz, "
+                              "404'ü rota kurar",
+    "services/depo_klasor.py": "klasör deposu (Faz 1 / 5): `folders.export_zip`in i18n'li "
+                               "ValueError'ı yerine None döner, metni rota kurar",
     "services/tablolar.py": "veri modeli (Faz 1 / 2): tablo, sütun, kısıt tanımları; metin yok — "
                             "CHECK değer kümeleri bile kodun sabitleri, cümle değil",
     "routers/kok.py": "`/` rotası; yerleştirme ve 500 metni `services/sablon.py`ye "

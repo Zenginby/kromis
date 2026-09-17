@@ -29,6 +29,15 @@ kütüphanesi "yeni kayıtlar file / eski kayıtlar filename" diye bölünür.
 LIFESPAN KOŞTURULMUYOR (çıplak TestClient, `with` YOK): bu rotalar açılıştan
 hiçbir şey istemiyor ve lifespan'ı koşturmak şema testine sürüm-değişimi
 yedeklemesini (backup.py) bulaştırırdı. Bkz. tests/test_backup.py.
+
+FAZ 1 / 5 — GALERİ VE KLASÖRLER DB'DE: `history.json`/`folders.json`ı web yolu
+artık okumuyor; onları okuyacak tek şey içe aktarma aracı (8. görev). Bu
+dosyanın (ii) tüketici testleri eski fixture kayıtlarını o aracın yazacağı
+şekilde DB'ye TOHUMLAR (`_db_tohumla`: `.get()` ile okunur, eksik anahtar NULL,
+12 haneli id korunur, liste sırası ekleme sırası) ve aynı türetilmiş değerleri
+rotadan ölçer. (i) ailesine iki ikiz eklendi: DB satırının JSON dökümü de
+v1.8'in anahtar kümesini KAYBEDEMEZ (belge §5: "DB satırının JSON'a dökümü
+aynı alanları vermeli"). Palet ve varlık dosyaları hâlâ diskten (6. görev).
 """
 import json
 import os
@@ -44,6 +53,11 @@ import color_names as cn
 import folders
 import palette_store
 import storage
+from services import depo_klasor, depo_medya, tablolar, zaman
+
+# Galeri/klasör/üretim rotaları DB'de (Faz 1 / 5): test kullanıcısı gerçek satır,
+# `db.oturum` bu dosyanın motoruna bağlı — gerekçe tests/conftest.py::depo_db.
+pytestmark = pytest.mark.usefixtures("depo_db")
 
 FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "v18")
 
@@ -81,11 +95,41 @@ def _client(tmp_path, monkeypatch, dizinler, *, sent=None):
     return TestClient(appmod.app)
 
 
+def _fixture(path_parts: tuple[str, ...]) -> list[dict]:
+    with open(os.path.join(FIXTURES, *path_parts), encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _db_tohumla(db, kullanici_id) -> None:
+    """v1.8 `history.json` + `folders.json` → `medya`/`klasorler` satırları, içe aktarma aracının deseniyle.
+
+    Eksik anahtar NULL (`.get()`), id 12 haneli aynen, liste sırası ekleme
+    sırası (`olusturuldu` = taban + sıra µs — manifest listesinin sırası
+    galeride "en yeni üstte" demekti, fixture'ın `created_at`ları buna
+    uymuyor: elle yazılan kayıtlar eski tarihli ama listenin sonunda).
+    Klasörler önce (FK), sonra görseller.
+    """
+    taban = zaman.an()
+    for i, f in enumerate(_fixture(("output", "folders.json"))):
+        db.add(tablolar.Klasor(id=f["id"], kullanici_id=kullanici_id, name=f["name"],
+                               parent_id=f.get("parent_id"),
+                               olusturuldu=taban.replace(microsecond=i)))
+    db.flush()
+    for i, r in enumerate(_fixture(("output", "history.json"))):
+        db.add(tablolar.Medya(
+            id=r["id"], kullanici_id=kullanici_id, filename=r["filename"],
+            prompt=r.get("prompt", ""), size=r.get("size", ""), quality=r.get("quality", ""),
+            parent_id=r.get("parent_id"), folder_id=r.get("folder_id"),
+            palette=r.get("palette"), prompt_sent=r.get("prompt_sent"),
+            model=r.get("model") or "", credits=int(r.get("credits") or 0),
+            olusturuldu=taban.replace(microsecond=100 + i)))
+    db.commit()
+
+
 # ── (i) anahtar-üstkümesi: gerçek yeniden-adlandırma dedektörü ────────────
 
 def _legacy_keys(path_parts: tuple[str, ...]) -> set[str]:
-    with open(os.path.join(FIXTURES, *path_parts), encoding="utf-8") as f:
-        return set(json.load(f)[0])
+    return set(_fixture(path_parts)[0])
 
 
 def test_history_writer_still_writes_every_v18_field(tmp_path):
@@ -110,6 +154,30 @@ def test_folders_writer_still_writes_every_v18_field(tmp_path):
                               now="2026-07-29T00:00:00")
     assert not (legacy - set(produced)), \
         f"v1.8 alanları kayboldu: {sorted(legacy - set(produced))}"
+
+
+def test_the_media_row_dump_still_carries_every_v18_field(tmp_path, db_oturumu, kullanici):
+    """DB ikizi (Faz 1 / 5): `depo_medya.kaydet`in döktüğü kayıt da v1.8 anahtarlarını taşır.
+
+    `storage.save` dondurulmuş kabuk için duruyor; web yolunun yazıcısı artık
+    bu. İkisi ayrı ayrı ölçülüyor ki biri ötekinden sessizce ayrışamasın —
+    sıra dâhil (`list(dict)`): ön yüz sıraya bakmıyor ama eşitlik ucuz ve
+    ayrışmanın ilk belirtisi.
+    """
+    legacy = _legacy_keys(("output", "history.json"))
+    meta = {"prompt": "p", "size": "1024x1024", "quality": "high"}
+    eski = storage.save(b"x", dict(meta), str(tmp_path / "eski"), now="2026-07-29T00:00:00")
+    yeni = depo_medya.kaydet(db_oturumu, kullanici.id, b"x", dict(meta), str(tmp_path / "yeni"))
+    assert not (legacy - set(yeni)), f"v1.8 alanları DB dökümünde kayboldu: {sorted(legacy - set(yeni))}"
+    assert list(eski) == list(yeni), "iki yazıcının anahtar sırası ayrıştı"
+
+
+def test_the_folder_row_dump_still_carries_every_v18_field(tmp_path, db_oturumu, kullanici):
+    legacy = _legacy_keys(("output", "folders.json"))
+    eski = folders.create("x", str(tmp_path), parent_id=None, now="2026-07-29T00:00:00")
+    yeni = depo_klasor.olustur(db_oturumu, kullanici.id, "x", parent_id=None)
+    assert not (legacy - set(yeni)), f"v1.8 alanları DB dökümünde kayboldu: {sorted(legacy - set(yeni))}"
+    assert list(eski) == list(yeni)
 
 
 def test_palette_writer_still_writes_every_v18_field(tmp_path):
@@ -148,37 +216,42 @@ def test_frozen_palette_colors_still_carry_hex_and_name(tmp_path):
 
 # ── (ii) tüketici testleri: türetilmiş değerlere basıyorlar ───────────────
 
-def test_root_history_includes_the_record_without_a_folder_id_key(tmp_path, monkeypatch, dizinler):
-    """Anahtarı HİÇ OLMAYAN pre-v1.6 kaydı kökte görünmek zorunda.
+def test_root_history_includes_the_record_without_a_folder_id_key(tmp_path, monkeypatch, dizinler,
+                                                                  db_oturumu, kullanici):
+    """Anahtarı HİÇ OLMAYAN pre-v1.6 kaydı (DB'de NULL) kökte görünmek zorunda.
 
-    app.py'deki `not r.get("folder_id")` ifadesi `r["folder_id"] is None`
-    olursa bu kayıtta KeyError → 500 olur; süzme tersine dönerse kayıt kaybolur.
+    Süzgeç `folder_id IS NULL`; tersine dönerse kayıt kaybolur. Fixture'ın
+    kendisi de doğrulanıyor: elle yazılan kayıtta anahtar gerçekten yok.
     """
     c = _client(tmp_path, monkeypatch, dizinler)
+    _db_tohumla(db_oturumu, kullanici.id)
     ids = [r["id"] for r in c.get("/api/history").json()["images"]]
     assert ids == EXPECT["root_history_ids"]
     legacy_id = CASES["handmade"][0]
     assert legacy_id in ids
-    legacy = next(r for r in c.get("/api/history").json()["images"]
-                  if r["id"] == legacy_id)
-    assert "folder_id" not in legacy, "fixture bozulmuş: anahtar var olmamalı"
+    ham = next(r for r in _fixture(("output", "history.json")) if r["id"] == legacy_id)
+    assert "folder_id" not in ham, "fixture bozulmuş: anahtar var olmamalı"
 
 
-def test_foldered_history_still_filters_by_the_frozen_folder_id(tmp_path, monkeypatch, dizinler):
+def test_foldered_history_still_filters_by_the_frozen_folder_id(tmp_path, monkeypatch, dizinler,
+                                                                db_oturumu, kullanici):
     """Okuyucudaki bir yeniden adlandırma bu listeyi [] yapar."""
     c = _client(tmp_path, monkeypatch, dizinler)
+    _db_tohumla(db_oturumu, kullanici.id)
     for folder_id, image_ids in EXPECT["foldered"].items():
         got = c.get(f"/api/history?folder_id={folder_id}").json()["images"]
         assert [r["id"] for r in got] == image_ids
 
 
-def test_folder_counts_are_derived_from_the_v18_fields(tmp_path, monkeypatch, dizinler):
+def test_folder_counts_are_derived_from_the_v18_fields(tmp_path, monkeypatch, dizinler,
+                                                       db_oturumu, kullanici):
     """count ve child_count TÜRETİLMİŞ değerler — okuma tarafındaki dedektör.
 
     `>= 0` değil TAM sayı iddia ediliyor: folder_id/parent_id yeniden
     adlandırılırsa sayaçlar sessizce sıfırlanır.
     """
     c = _client(tmp_path, monkeypatch, dizinler)
+    _db_tohumla(db_oturumu, kullanici.id)
     items = {f["id"]: f for f in c.get("/api/folders").json()["items"]}
     child = items[EXPECT["folders"]["child"]]
     root = items[EXPECT["folders"]["root"]]
@@ -187,27 +260,30 @@ def test_folder_counts_are_derived_from_the_v18_fields(tmp_path, monkeypatch, di
     assert root["count"] == 0
 
 
-def test_legacy_folder_without_parent_id_key_reads_as_root(tmp_path, monkeypatch, dizinler):
-    """`parent_id` anahtarı olmayan klasör kök kabul edilmeli (app.py'deki
-    `{"parent_id": None, **f}` varsayılanı)."""
+def test_legacy_folder_without_parent_id_key_reads_as_root(tmp_path, monkeypatch, dizinler,
+                                                           db_oturumu, kullanici):
+    """`parent_id` anahtarı olmayan klasör (DB'de NULL) kök kabul edilmeli."""
     c = _client(tmp_path, monkeypatch, dizinler)
+    _db_tohumla(db_oturumu, kullanici.id)
     items = {f["id"]: f for f in c.get("/api/folders").json()["items"]}
     legacy = items[EXPECT["folders"]["legacy_no_parent_id"]]
     assert legacy["parent_id"] is None
 
 
-def test_derivative_chain_survives(tmp_path, monkeypatch, dizinler):
+def test_derivative_chain_survives(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     """parent_id türev zinciri: hedef kayıt aynı yanıt kümesinde olmalı."""
     c = _client(tmp_path, monkeypatch, dizinler)
+    _db_tohumla(db_oturumu, kullanici.id)
     images = {r["id"]: r for r in c.get("/api/history").json()["images"]}
     derivative = images[EXPECT["derivative"]["id"]]
     assert derivative["parent_id"] == EXPECT["derivative"]["parent_id"]
     assert derivative["parent_id"] in images
 
 
-def test_history_record_palette_round_trips(tmp_path, monkeypatch, dizinler):
-    """Kayıttaki palet dict'i (Türkçe adlar dahil) birebir geri gelmeli."""
+def test_history_record_palette_round_trips(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
+    """Kayıttaki palet dict'i (Türkçe adlar dahil, JSONB'den) birebir geri gelmeli."""
     c = _client(tmp_path, monkeypatch, dizinler)
+    _db_tohumla(db_oturumu, kullanici.id)
     images = {r["id"]: r for r in c.get("/api/history").json()["images"]}
     rec = images[EXPECT["palette_record_image_id"]]
     assert rec["palette"]["seed"] == EXPECT["palette"]["seed"]

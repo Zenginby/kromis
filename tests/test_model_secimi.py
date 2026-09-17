@@ -16,6 +16,10 @@ import catalog
 import models
 from services import gorsel
 
+# Galeri/klasör/üretim rotaları DB'de (Faz 1 / 5): test kullanıcısı gerçek satır,
+# `db.oturum` bu dosyanın motoruna bağlı — gerekçe tests/conftest.py::depo_db.
+pytestmark = pytest.mark.usefixtures("depo_db")
+
 
 @pytest.fixture
 def client(tmp_path, monkeypatch, dizinler):

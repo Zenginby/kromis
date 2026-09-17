@@ -21,7 +21,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app as appmod
-import storage
 from services import ayar
 from tests import conftest
 from tools import graf_uret as gu
@@ -178,20 +177,23 @@ def test_every_route_that_touches_a_directory_declares_the_dependency():
                 f"{yol}: ayar nesnesini nereden alıyor?")
 
 
-def test_redirecting_the_settings_object_reaches_the_routers(tmp_path, dizinler):
+@pytest.mark.usefixtures("depo_db")
+def test_redirecting_the_settings_object_reaches_the_routers(tmp_path, dizinler, monkeypatch):
     """Mekanizmanın kendisi: `app.state.ayarlar` yönlendirmesi rotaya ULAŞIYOR.
 
     `dizinler` fixture'ının bekçisi — fixture yamayı yanlış yere yazsa 60'tan
-    fazla test yeşil kalıp geliştiricinin gerçek `output/`una yazardı.
+    fazla test yeşil kalıp geliştiricinin gerçek `output/`una yazardı. Kanıt
+    üretim rotasının yazdığı DOSYA (Faz 1 / 5: kayıt DB'de, dosya `ayarlar.output_dir`de).
     """
-    ayarlar = dizinler(output_dir=str(tmp_path / "output"))
-    storage.save(b"\x89PNG", {"prompt": "kanit", "size": "1024x1024", "quality": "low",
-                              "parent_id": None, "folder_id": None, "palette": None,
-                              "prompt_sent": None, "model": ""},
-                 ayarlar.output_dir, now="2026-09-16T00:00:00")
-    gorunen = TestClient(appmod.app).get("/api/history").json()["images"]
+    import azure_client as ac
+    monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG"])
+    dizinler(output_dir=str(tmp_path / "output"))
+    c = TestClient(appmod.app)
+    kayit = c.post("/api/generate", json={"prompt": "kanit", "size": "1024x1024",
+                                          "quality": "low", "n": 1}).json()["images"][0]
+    gorunen = c.get("/api/history").json()["images"]
     assert [g["prompt"] for g in gorunen] == ["kanit"]
-    assert (tmp_path / "output" / "history.json").is_file()
+    assert (tmp_path / "output" / kayit["filename"]).is_file()
 
 
 def test_the_dependency_reads_the_live_settings_object(tmp_path, dizinler, kullanici):

@@ -33,8 +33,7 @@ from sqlalchemy.orm import Session
 import app as appmod
 import i18n
 import prefs
-import storage
-from services import ayar, cerez, hesap, kimlik
+from services import ayar, cerez, depo_medya, hesap, kimlik
 from services.tablolar import Kullanici
 
 pytestmark = pytest.mark.gercek_kimlik
@@ -55,6 +54,20 @@ ACIK_ROTALAR: dict[tuple[str, str], str] = {
 
 # Oturumsuz cevabı 302 olan (tarayıcı gezinmesi) rotalar; geri kalan kapılılar 401 JSON.
 SAYFALAR = {("GET", "/")}
+
+# Kapılı ama DİZİN OKUMAYAN rotalar — kapıyı `ayar.ayarlar` üzerinden değil doğrudan
+# alırlar. Belgenin dört istisnası (§4) + Faz 1 / 5'te DB'ye taşınan ve dosyaya
+# dokunmayan galeri/klasör rotaları (satır okur/yazar, `output_dir` istemez).
+# Dosyaya dokunanlar (`/output/*`, indirme, silme, üretim, içe aktarma) listede
+# DEĞİL: onlar `ayarlar.output_dir`i almaya devam ediyor.
+DIZINSIZ_KAPILI = {
+    ("POST", "/api/settings"), ("POST", "/api/palette/suggest"),
+    ("GET", "/api/hesap/ben"), ("POST", "/api/hesap/cikis"),
+    ("GET", "/api/folders"), ("POST", "/api/folders"), ("PATCH", "/api/folders/{folder_id}"),
+    ("DELETE", "/api/folders/{folder_id}"),   # görseller köke döner, dosya taşınmaz/silinmez
+    ("GET", "/api/history"), ("PATCH", "/api/image/{image_id}"), ("PATCH", "/api/images"),
+    ("GET", "/api/arena/{arena_id}"), ("POST", "/api/arena/{arena_id}/winner"),
+}
 
 KAPI = {kimlik.aktif_kullanici, kimlik.sayfa_kullanicisi}
 
@@ -134,9 +147,10 @@ def test_a_directory_reading_route_takes_the_user_scoped_settings_never_the_shar
         if ayar.genel in cagrilar:
             assert (y, p) in ACIK or (y, p) in SAYFALAR, f"{y} {p}: kapılı rota paylaşılan ayarı alıyor"
         if (y, p) in KAPILI and (y, p) not in SAYFALAR and ayar.ayarlar not in cagrilar:
-            assert (y, p) in {("POST", "/api/settings"), ("POST", "/api/palette/suggest"),
-                              ("GET", "/api/hesap/ben"), ("POST", "/api/hesap/cikis")}, (
-                f"{y} {p}: dizin okumayan kapılı rota — belgenin dört istisnasından biri değil")
+            assert (y, p) in DIZINSIZ_KAPILI, (
+                f"{y} {p}: dizin okumayan kapılı rota — `DIZINSIZ_KAPILI` listesinde değil")
+        if (y, p) in DIZINSIZ_KAPILI:
+            assert ayar.ayarlar not in cagrilar, f"{y} {p}: dizin okumuyor deniyor ama ayar nesnesi alıyor"
 
 
 # ── Kapının davranışı ────────────────────────────────────────────────
@@ -221,6 +235,8 @@ def test_two_users_have_separate_directories_and_never_see_each_others_media(ist
     a, b = _oturumlu(a_jeton), _oturumlu(b_jeton)
     assert a.get("/api/history").json()["images"] == []
     assert b.get("/api/history").json()["images"] == []
+    # Dizin, dizin OKUYAN ilk istekte açılır (`ayar.ayarlar`); `/api/history` artık DB'den (Faz 1 / 5).
+    assert a.get("/output/yok.png").status_code == b.get("/output/yok.png").status_code == 404
 
     # Dizin yerleşimi: <data_dir>/kullanicilar/<uuid>/{output,assets}; kök 0o700.
     a_ayar = appmod.app.state.ayarlar.kullanici_icin(a_id)
@@ -235,11 +251,14 @@ def test_two_users_have_separate_directories_and_never_see_each_others_media(ist
     kok = tmp_path / "kullanicilar" / str(a_id)
     assert stat.S_IMODE(kok.stat().st_mode) == 0o700
 
-    # A'nın görseli: A görür, B ne listede ne dosyada ne indirmede görür.
-    kayit = storage.save(b"\x89PNG", {"prompt": "A'nin gorseli", "size": "1024x1024",
-                                      "quality": "low", "parent_id": None, "folder_id": None,
-                                      "palette": None, "prompt_sent": None, "model": ""},
-                         a_ayar.output_dir, now="2026-09-17T00:00:00")
+    # A'nın görseli (satır + dosya, Faz 1 / 5): A görür, B ne listede ne dosyada ne indirmede görür.
+    with Session(appmod.app.state.motor) as db:
+        kayit = depo_medya.kaydet(db, a_id, b"\x89PNG",
+                                  {"prompt": "A'nin gorseli", "size": "1024x1024",
+                                   "quality": "low", "parent_id": None, "folder_id": None,
+                                   "palette": None, "prompt_sent": None, "model": ""},
+                                  a_ayar.output_dir)
+        db.commit()
     assert [g["prompt"] for g in a.get("/api/history").json()["images"]] == ["A'nin gorseli"]
     assert b.get("/api/history").json()["images"] == []
     assert a.get(f"/output/{kayit['filename']}").status_code == 200
@@ -249,9 +268,32 @@ def test_two_users_have_separate_directories_and_never_see_each_others_media(ist
     assert a.get(f"/output/{kayit['filename']}").status_code == 200, "B'nin denemesi A'nın dosyasına dokunmadı"
     assert not (tmp_path / "output").exists(), "paylaşılan output/ web yolunda hiç açılmadı"
 
+    # Klasörler de (Faz 1 / 5): A'nın klasörü B'ye "yok" — 404, 403 değil (id uzayı sızmaz).
+    klasor = a.post("/api/folders", json={"name": "A'nin klasoru"}).json()["folder"]["id"]
+    assert a.patch(f"/api/image/{kayit['id']}", json={"folder_id": klasor}).status_code == 200
+    assert [f["id"] for f in a.get("/api/folders").json()["items"]] == [klasor]
+    assert b.get("/api/folders").json()["items"] == []
+    assert b.get(f"/api/history?folder_id={klasor}").status_code == 404
+    assert b.patch(f"/api/folders/{klasor}", json={"name": "calinti"}).status_code == 404
+    assert b.get(f"/api/folders/{klasor}/download").status_code == 404
+    assert b.post("/api/folders", json={"name": "alt", "parent_id": klasor}).status_code == 404
+    assert b.patch(f"/api/image/{kayit['id']}", json={"folder_id": None}).status_code == 404
+    assert b.request("PATCH", "/api/images", json={"ids": [kayit["id"]], "folder_id": None}).status_code == 404
+    assert b.request("DELETE", "/api/images", json={"ids": [kayit["id"]]}).status_code == 404
+    assert b.delete(f"/api/folders/{klasor}").status_code == 404
+    assert a.get("/api/folders").json()["items"][0]["count"] == 1, "B'nin denemeleri A'nın klasörüne dokunmadı"
+    assert a.get(f"/api/history?folder_id={klasor}").json()["images"][0]["id"] == kayit["id"]
+    assert not (tmp_path / "kullanicilar" / str(b_id) / "output" / "history.json").exists()
+    assert not (tmp_path / "kullanicilar" / str(a_id) / "output" / "folders.json").exists()
+
 
 def test_resolving_the_user_costs_exactly_one_query_per_request(istemci):
-    """Belge: `oturumlar ⋈ kullanicilar` TEK sorgu; ayar nesnesi, dil halkası ve rota onu paylaşır."""
+    """Belge: `oturumlar ⋈ kullanicilar` TEK sorgu; ayar nesnesi, dil halkası ve rota onu paylaşır.
+
+    Faz 1 / 5'ten sonra `/api/history` İKİ sorgu: kimlik (1) + `medya` listesi (1) —
+    rotanın kendi `Depends(kimlik.aktif_kullanici)`ı ve `OTURUM`u ek sorgu
+    GETİRMEZ (FastAPI bağımlılık önbelleği, aynı `Session`). `/` hâlâ 1.
+    """
     _, jeton, _ = _kullanici_ac(dil="tr")
     c = _oturumlu(jeton)
     sayac: list[str] = []
@@ -263,7 +305,8 @@ def test_resolving_the_user_costs_exactly_one_query_per_request(istemci):
     event.listen(motor, "before_cursor_execute", _say)
     try:
         assert c.get("/api/history").status_code == 200
-        assert len(sayac) == 1 and "oturumlar" in sayac[0] and "kullanicilar" in sayac[0], sayac
+        assert len(sayac) == 2 and "oturumlar" in sayac[0] and "kullanicilar" in sayac[0], sayac
+        assert "medya" in sayac[1] and "kullanici_id" in sayac[1], sayac
         sayac.clear()
         assert c.get("/", follow_redirects=False).status_code == 200
         assert len(sayac) == 1, sayac

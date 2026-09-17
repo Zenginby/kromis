@@ -1164,34 +1164,35 @@ def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(verita
     """
     from PIL import Image
 
-    import folders as fmod
-    import storage
+    from services import depo_klasor, depo_medya
 
     # Kullanıcının kendi `output/`u (Faz 1 / 4) — `tmp_path / "output"` artık sunucunun okuduğu yer değil.
+    # Kayıtlar DB'de (Faz 1 / 5): tohum `oturum.db()` ile, manifest yazmak sunucuya görünmez.
     oturum = e2e_oturum()
     out = oturum.ayarlar().output_dir
-
-    simdi = "2026-09-02T09:00:00"
-    kampanyalar = fmod.create("Kampanyalar", out, parent_id=None, now=simdi)
-    bayram = fmod.create("Bayram", out, parent_id=kampanyalar["id"], now=simdi)
-    yilbasi = fmod.create("Yılbaşı", out, parent_id=None, now=simdi)
-    # YEM: aynı yaprak adı, BAŞKA bir ata. "kampanyalar" sorgusunda 0 kalmalı.
-    yem = fmod.create("Bayram", out, parent_id=yilbasi["id"], now=simdi)
+    kid = oturum.kullanici_id
 
     buf = io.BytesIO()
     Image.new("RGB", (64, 64), (30, 30, 30)).save(buf, "PNG")
     ham = buf.getvalue()
 
-    def koy(prompt: str, folder_id) -> None:
-        storage.save(ham, {"prompt": prompt, "size": "1024x1024",
-                           "quality": "medium", "folder_id": folder_id},
-                     out, now=simdi)
+    with oturum.db() as db:
+        kampanyalar = depo_klasor.olustur(db, kid, "Kampanyalar", parent_id=None)
+        bayram = depo_klasor.olustur(db, kid, "Bayram", parent_id=kampanyalar["id"])
+        yilbasi = depo_klasor.olustur(db, kid, "Yılbaşı", parent_id=None)
+        # YEM: aynı yaprak adı, BAŞKA bir ata. "kampanyalar" sorgusunda 0 kalmalı.
+        yem = depo_klasor.olustur(db, kid, "Bayram", parent_id=yilbasi["id"])
 
-    for i in range(3):
-        koy(f"bayram gorsel {i}", bayram["id"])
-    for i in range(2):
-        koy(f"yem gorsel {i}", yem["id"])
-    koy("kokteki gorsel", None)
+        def koy(prompt: str, folder_id) -> None:
+            depo_medya.kaydet(db, kid, ham, {"prompt": prompt, "size": "1024x1024",
+                                             "quality": "medium", "folder_id": folder_id}, out)
+
+        for i in range(3):
+            koy(f"bayram gorsel {i}", bayram["id"])
+        for i in range(2):
+            koy(f"yem gorsel {i}", yem["id"])
+        koy("kokteki gorsel", None)
+        db.commit()
 
     port = get_free_port()
     server = ServerThread(port)

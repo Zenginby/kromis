@@ -352,6 +352,15 @@ class Medya(Base):
     arena_id: Mapped[str | None] = mapped_column(Text)
     kind: Mapped[str | None] = mapped_column(Text)
     duration: Mapped[int | None] = mapped_column(Integer)
+    # ARENA KAZANANI (Faz 1 / 5, göç `0003_arena_win`): envanterin 17 alanı
+    # `storage.save`in yazdıklarıydı; bu alanı `storage.set_arena_winner` SONRADAN
+    # yazıyor (`{**r, "arena_win": True}`) ve envanter onu görmedi. Koşullu
+    # alanların disiplini aynen: NULL/false = "işaret yok", JSON'a dökülmez;
+    # `True` = turun kazananı. Tur başına tek kazanan uygulamada
+    # (`depo_medya.arena_kazanani` tek UPDATE'te kardeşleri NULL'lar), kısıtta
+    # değil — kısmi UNIQUE `(arena_id) WHERE arena_win` içe aktarılan eski
+    # verideki olası çift işareti reddedip 8. görevin aracını durdururdu.
+    arena_win: Mapped[bool | None] = mapped_column(Boolean)
     olusturuldu: Mapped[dt.datetime] = _olusturuldu()
 
 

@@ -7,6 +7,8 @@ from __future__ import annotations
 import os
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
+from sqlalchemy.orm import Session
 
 import azure_client as ac
 import catalog
@@ -14,7 +16,6 @@ import etiket
 import i18n
 import palette
 import providers
-import storage
 from models import (
     MAX_IMAGES_PER_RUN,
     MAX_PROMPT_CHARS,
@@ -23,14 +24,24 @@ from models import (
     check_capabilities,
     check_video_capabilities,
 )
-from services import ayar, dil, gorsel, kapilar, palet, zaman
+from services import ayar, depo_medya, dil, gorsel, kapilar, kimlik, palet, zaman
+from services.db import OTURUM
+from services.tablolar import Kullanici
 
 router = APIRouter()
 
+# Üretilen medyanın kaydı DB'de (Faz 1 / 5): dört rota `depo_medya.kaydet`e
+# yazıyor — dosya kullanıcının `output_dir`ine, satır isteğin `Session`ına
+# (commit `db.oturum`da, rota döner dönmez). Kullanıcı `ayar.ayarlar`ın içindeki
+# kapıyla aynı nesne (FastAPI bağımlılık önbelleği), ek sorgu yok. İki `async
+# def` rota (`edit`, `animate`) DB'ye `run_in_threadpool` ile gidiyor.
+
 
 @router.post("/api/generate")
-def generate(req: GenerateRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
-    folder_id = kapilar.check_folder(req.folder_id, ayarlar.output_dir)
+def generate(req: GenerateRequest, db: Session = OTURUM,
+             ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+             kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+    folder_id = kapilar.check_folder(req.folder_id, db, kullanici.id)
     session_id = kapilar.check_session(req.session_id)
     arena_id = kapilar.check_arena(req.arena_id)
     prompt_sent, pal = palet.palette_prompt(req.prompt, req.palette_hex, req.palette_mode,
@@ -54,7 +65,8 @@ def generate(req: GenerateRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)
     # bir turun tamamını her satıra yazmak toplamı dörde katlardı.
     kredi = catalog.cost_for(spec, req.quality)
     records = [
-        storage.save(img, {"prompt": req.prompt, "size": req.size,
+        depo_medya.kaydet(db, kullanici.id, img,
+                          {"prompt": req.prompt, "size": req.size,
                            "quality": req.quality, "parent_id": None,
                            "folder_id": folder_id, "palette": pal,
                            "session_id": session_id,
@@ -66,14 +78,16 @@ def generate(req: GenerateRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)
                            # Ek düştüyse metin prompt'un birebir aynısı; storage
                            # sözleşmesi "yalnızca farklıysa" diyor (bkz. save).
                            "prompt_sent": prompt_sent if pal and pal["applied"] else None},
-                     ayarlar.output_dir, now=zaman.simdi())
+                          ayarlar.output_dir, now=zaman.an())
         for img in images
     ]
     return {"images": records}
 
 
 @router.post("/api/video")
-def video(req: VideoRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def video(req: VideoRequest, db: Session = OTURUM,
+          ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+          kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """Metin → video. `generate`in video ikizi.
 
     SENKRON ve bu bilinçli bir seçim, kaza değil: üretim 1-6 dakika sürüyor ve
@@ -95,7 +109,7 @@ def video(req: VideoRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> d
 
     PALET ve ARENA yok; gerekçeleri `VideoRequest`in docstring'inde.
     """
-    folder_id = kapilar.check_folder(req.folder_id, ayarlar.output_dir)
+    folder_id = kapilar.check_folder(req.folder_id, db, kullanici.id)
     session_id = kapilar.check_session(req.session_id)
     # `req.model` doğrulayıcıda NORMALLEŞTİRİLDİ (None → varsayılanın gerçek
     # id'si), yani doğrulanan değer ile kaydedilen değer ayrışamıyor; iki
@@ -110,14 +124,15 @@ def video(req: VideoRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> d
         raise HTTPException(status_code=502, detail=str(e))
     kredi = catalog.cost_for(spec, req.quality, duration=req.duration)
     records = [
-        storage.save(vid, {"prompt": req.prompt, "size": req.size,
+        depo_medya.kaydet(db, kullanici.id, vid,
+                          {"prompt": req.prompt, "size": req.size,
                            "quality": req.quality, "parent_id": None,
                            "folder_id": folder_id, "palette": None,
                            "session_id": session_id,
                            "kind": "video", "duration": req.duration,
                            "model": req.model, "credits": kredi,
                            "prompt_sent": None},
-                     ayarlar.output_dir, now=zaman.simdi())
+                          ayarlar.output_dir, now=zaman.an())
         for vid in videos
     ]
     # ANAHTAR `videos`, `images` DEĞİL: istemci yanıtın türünü gövdeden
@@ -202,7 +217,9 @@ async def animate(
     folder_id: str | None = Form(None),
     session_id: str | None = Form(None),
     model: str = Form(""),
+    db: Session = OTURUM,
     ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+    kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
 ) -> dict:
     """Görsel → video: bir kareyi hareketlendirir.
 
@@ -217,7 +234,7 @@ async def animate(
     Referans PNG'ye çevriliyor (`gorsel.to_png`, `_collect_edit_refs`in içinde)
     ve `source_id` yolu `gorsel.output_png_path`ten okuyor — o işlev PNG'de
     çakılı KALIYOR ve bu doğru: bir videoyu ilk kare olarak göndermek anlamsız,
-    404 doğru cevap (bkz. `gorsel.output_media_path`in docstring'i).
+    404 doğru cevap (servis yolu `depo_medya.dosya_yolu`, uzantıyı ARAR).
     """
     # BOŞ FORM ALANI "VERİLMEDİ" DEMEK. Bütün alanlarını koşulsuz serileştiren
     # bir istemci `last_source_id=""` yolluyor ve `is not None` onu "bitiş
@@ -241,7 +258,7 @@ async def animate(
                                  last_file, last_source_id)
     spec = catalog.video_model(model_id)
     assert spec is not None  # `_check_video_form` id'yi katalogdan geçirdi
-    target_folder = kapilar.check_folder(folder_id, ayarlar.output_dir)
+    target_folder = await run_in_threadpool(kapilar.check_folder, folder_id, db, kullanici.id)
     session = kapilar.check_session(session_id)
     refs, parent_id = await _collect_edit_refs(request, file, source_id, ayarlar.output_dir)
     if len(refs) > spec.max_refs:
@@ -271,13 +288,15 @@ async def animate(
 
     kredi = catalog.cost_for(spec, quality, duration=duration)
     records = [
-        storage.save(vid, {"prompt": prompt, "size": size, "quality": quality,
-                           "parent_id": parent_id, "folder_id": target_folder,
-                           "palette": None, "session_id": session,
-                           "kind": "video", "duration": duration,
-                           "model": model_id, "credits": kredi,
-                           "prompt_sent": None},
-                     ayarlar.output_dir, now=zaman.simdi())
+        await run_in_threadpool(
+            depo_medya.kaydet, db, kullanici.id, vid,
+            {"prompt": prompt, "size": size, "quality": quality,
+             "parent_id": parent_id, "folder_id": target_folder,
+             "palette": None, "session_id": session,
+             "kind": "video", "duration": duration,
+             "model": model_id, "credits": kredi,
+             "prompt_sent": None},
+            ayarlar.output_dir, now=zaman.an())
         for vid in videos
     ]
     return {"videos": records}
@@ -401,7 +420,9 @@ async def edit(
     # bilinmeyen form alanını sessizce atıyor), o yüzden koruma yanıtın alanı
     # geri yankılamasıyla kuruluyor — bkz. _check_edit_form'un docstring'i.
     model: str = Form(""),
+    db: Session = OTURUM,
     ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+    kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
 ) -> dict:
     """Ek referans görselleri (`extra_files` yüklemeleri, `extra_source_ids`
     galeri id'leri) form verisinden okunur — bkz. gorsel.extra_refs."""
@@ -412,7 +433,7 @@ async def edit(
     palette_hex = palet.check_palette_hex(palette_hex)
     drop = palet.check_palette_drop(palette_drop)
 
-    target_folder = kapilar.check_folder(folder_id, ayarlar.output_dir)
+    target_folder = await run_in_threadpool(kapilar.check_folder, folder_id, db, kullanici.id)
     session = kapilar.check_session(session_id)
     refs, parent_id = await _collect_edit_refs(request, file, source_id, ayarlar.output_dir)
 
@@ -428,12 +449,14 @@ async def edit(
 
     kredi = catalog.cost_for(spec, quality)
     records = [
-        storage.save(img, {"prompt": prompt, "size": size, "quality": quality,
-                           "parent_id": parent_id, "folder_id": target_folder,
-                           "palette": pal, "session_id": session,
-                           "model": model_id, "credits": kredi,
-                           "prompt_sent": prompt_sent if pal and pal["applied"] else None},
-                     ayarlar.output_dir, now=zaman.simdi())
+        await run_in_threadpool(
+            depo_medya.kaydet, db, kullanici.id, img,
+            {"prompt": prompt, "size": size, "quality": quality,
+             "parent_id": parent_id, "folder_id": target_folder,
+             "palette": pal, "session_id": session,
+             "model": model_id, "credits": kredi,
+             "prompt_sent": prompt_sent if pal and pal["applied"] else None},
+            ayarlar.output_dir, now=zaman.an())
         for img in images
     ]
     return {"images": records}

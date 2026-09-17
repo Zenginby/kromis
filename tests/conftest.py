@@ -477,6 +477,56 @@ def veritabani(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) 
     return url
 
 
+@pytest.fixture(scope="module")
+def veritabani_motor(veritabani_url: str):
+    """Bu dosyanın DB'sine bağlı motor — `depo_db`/`db_oturumu` ve `kullanici` fixture'ının DB kipi.
+
+    Uygulamanın `app.state.motor`u DEĞİL: 37 dosyanın `TestClient(app)`i
+    `with`siz, yani lifespan koşmuyor ve motor yok. Depo rotaları (Faz 1 / 5)
+    yine de bir `Session` istiyor; bu motor onu `db.oturum` override'ı üzerinden
+    veriyor. Modül kapsamı `veritabani_url` ile aynı: dosya bitince `dispose`,
+    sonra DB düşer (`WITH (FORCE)` açık bağlantıya takılmaz, ama havuz yine de
+    kapansın).
+    """
+    from sqlalchemy import create_engine
+    motor = create_engine(veritabani_url, pool_size=2, max_overflow=3)
+    yield motor
+    motor.dispose()
+
+
+@pytest.fixture
+def depo_db(veritabani: str, veritabani_motor):
+    """Galeri/klasör rotalarını sınayan dosyaların OPT-IN kapısı (Faz 1 / 5).
+
+    Kullanımı modül başında: `pytestmark = pytest.mark.usefixtures("depo_db")`.
+    Etkisi `kullanici` fixture'ında: test kullanıcısı DB'ye GERÇEK bir satır
+    olarak yazılır (`medya.kullanici_id` FK'sı sahte bir uuid'yi reddeder) ve
+    `db.oturum` bu dosyanın motoruna bağlı bir `Session` verir — `TestClient(app)`
+    `with`siz kalır, 178 çağrı değişmez. Döneni motor.
+
+    `veritabani`nin kendisine bağlanmıyor ve bilerek: `veritabani`yi DOĞRUDAN
+    isteyen dosyalar (`test_db.py`, `test_health.py`, `test_tablolar.py`) motoru
+    ve `db.oturum`u kendileri sınıyor; override oraya sızsa "commit hatası 500
+    olur" gibi iddialar sahte bir oturuma karşı koşardı.
+    """
+    return veritabani_motor
+
+
+@pytest.fixture
+def db_oturumu(depo_db):
+    """Doğrudan DB'ye tohum yazan/okuyan testler için `Session` (test kullanıcısıyla aynı DB).
+
+    `expire_on_commit=False`: test `commit()` sonra da döndürdüğü kayıtları
+    okuyabilsin. Commit TESTİN işi — rota o satırı görmek zorundaysa tohumdan
+    sonra `db_oturumu.commit()` çağrılır (iki ayrı bağlantı; commit'lenmemiş
+    satır rotaya görünmez).
+    """
+    from sqlalchemy.orm import Session
+    with Session(depo_db, expire_on_commit=False) as oturum:
+        yield oturum
+        oturum.rollback()
+
+
 # Kimlik kapısını GERÇEKTEN sınayan dosyalar için işaret (aşağıdaki `kullanici`
 # fixture'ı bunu görünce override kurmaz): hesap testleri, kapı testleri ve
 # E2E dosyaları — orada tarayıcı gerçek bir oturum çerezi taşıyor.
@@ -521,6 +571,17 @@ def kullanici(request: pytest.FixtureRequest):
     tarayıcıya koyar (belge §4: "her testte formu doldurmak değil — form akışı
     `test_playwright_hesap.py`nin işi").
 
+    DB KİPİ (Faz 1 / 5) — dosya `depo_db`yi istiyorsa (`usefixtures`): galeri,
+    klasör, üretim ve bindirme rotaları artık `medya`/`klasorler` satırı yazıyor
+    ve `kullanici_id` FK'sı sahte bir uuid'yi reddeder. O zaman test kullanıcısı
+    aynı e-postayla GERÇEK bir satır olur (öncekisi silinir — CASCADE önceki
+    testin medya/klasörlerini de götürür, her test temiz başlar; e-posta
+    sabit kalır ki `TEST_KULLANICISI_EPOSTA` okuyan iddialar değişmesin) ve
+    dördüncü override `db.oturum`u bu dosyanın motoruna bağlar: `TestClient(app)`
+    `with`siz, lifespan'sız, motorsuz kalır. Override'ın commit/rollback kuralı
+    `db.oturum`unkiyle aynı (dönüşte commit, istisnada rollback) — aksi hâlde
+    rota testleri üretimde olmayan bir "yarım yazım" davranışını yeşil görürdü.
+
     `dependency_overrides` uygulama nesnesi üzerinde KÜRESEL — bir sonraki test
     başlamadan temizleniyor; kirli kalan bir override `gercek_kimlik`li dosyanın
     401 iddiasını sessizce geçirirdi.
@@ -538,6 +599,31 @@ def kullanici(request: pytest.FixtureRequest):
                                  parola_ozeti=None, dogrulandi_at=hesap.simdi(),
                                  is_admin=False, dil=None)
 
+    yamalar: dict[Callable[..., Any], Callable[..., Any]] = {}
+    if "depo_db" in request.fixturenames:
+        from sqlalchemy import delete
+        from sqlalchemy.orm import Session
+
+        motor = request.getfixturevalue("depo_db")
+        # `expire_on_commit=False`: nesne oturum kapanınca da `id`/`dil` taşısın
+        # (rota `kullanici.id` okuyor, `POST /api/prefs` `kullanici.dil` yazıyor).
+        with Session(motor, expire_on_commit=False) as s:
+            s.execute(delete(Kullanici).where(Kullanici.eposta == TEST_KULLANICISI_EPOSTA))
+            s.add(test_kullanicisi)
+            s.commit()
+
+        def _db_oturumu():
+            with Session(motor) as oturum:
+                try:
+                    yield oturum
+                except BaseException:
+                    oturum.rollback()
+                    raise
+                else:
+                    oturum.commit()
+
+        yamalar[db.oturum] = _db_oturumu
+
     # `istek: Request` notu ŞART ve `Request` MODÜL düzeyinde ithal: FastAPI
     # notsuz bir parametreyi sorgu parametresi sayar; bu dosya `from __future__
     # import annotations` ile yazıldığı için not bir DİZE ve FastAPI onu
@@ -549,9 +635,8 @@ def kullanici(request: pytest.FixtureRequest):
     def _paylasilan(istek: Request, _kullanici=Depends(kimlik.aktif_kullanici)):
         return appmod.app.state.ayarlar
 
-    yamalar: dict[Callable[..., Any], Callable[..., Any]] = {
-        kimlik.aktif_kullanici: _oturumlu, kimlik.sayfa_kullanicisi: _oturumlu,
-        ayar.ayarlar: _paylasilan}
+    yamalar.update({kimlik.aktif_kullanici: _oturumlu, kimlik.sayfa_kullanicisi: _oturumlu,
+                    ayar.ayarlar: _paylasilan})
     appmod.app.dependency_overrides.update(yamalar)
     try:
         yield test_kullanicisi
@@ -563,10 +648,21 @@ def kullanici(request: pytest.FixtureRequest):
 class E2EOturum:
     """`e2e_oturum`un döndürdüğü şey: DB'de gerçek bir kullanıcı + oturum satırı, ham jeton elde."""
 
-    def __init__(self, kullanici_id, eposta: str, jeton: str):
+    def __init__(self, kullanici_id, eposta: str, jeton: str, motor=None):
         self.kullanici_id = kullanici_id
         self.eposta = eposta
         self.jeton = jeton
+        self._motor = motor
+
+    def db(self):
+        """Bu kullanıcının DB'sine `Session` — E2E'nin galeri/klasör TOHUMU için (Faz 1 / 5).
+
+        Sunucu `medya`/`klasorler`i DB'den okuyor; `storage.save`/`folders.create`
+        ile kullanıcı dizinine yazılan manifest artık görünmez. Kullanımı:
+        `with oturum.db() as db: depo_klasor.olustur(db, oturum.kullanici_id, …); db.commit()`.
+        """
+        from sqlalchemy.orm import Session
+        return Session(self._motor, expire_on_commit=False)
 
     def cerez(self, sayfa_veya_baglam, taban: str) -> None:
         """Oturum çerezini tarayıcıya koyar — `page` ya da `BrowserContext` alır.
@@ -625,7 +721,7 @@ def e2e_oturum(veritabani: str, tmp_path, dizinler):
             jeton = hesap.oturum_ac(db, k, None, "e2e", an)
             kullanici_id = k.id
             db.commit()
-        return E2EOturum(kullanici_id, eposta, jeton)
+        return E2EOturum(kullanici_id, eposta, jeton, motor)
 
     yield _ac
     motor.dispose()

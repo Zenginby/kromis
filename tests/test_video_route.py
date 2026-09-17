@@ -31,6 +31,10 @@ import azure_client as ac
 import catalog
 from services import gorsel
 
+# Galeri/klasör/üretim rotaları DB'de (Faz 1 / 5): test kullanıcısı gerçek satır,
+# `db.oturum` bu dosyanın motoruna bağlı — gerekçe tests/conftest.py::depo_db.
+pytestmark = pytest.mark.usefixtures("depo_db")
+
 MP4 = b"\x00\x00\x00\x20ftypmp42"
 GECERLI = {"prompt": "kedi koşuyor", "size": "16:9", "quality": "720p",
            "duration": 4}

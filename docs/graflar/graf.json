@@ -125,6 +125,7 @@
         "backup",
         "routers.bindirme",
         "services.kapilar",
+        "services.tablolar",
         "tools.make_legacy_fixtures"
       ],
       "katman": 3,
@@ -138,7 +139,8 @@
         "tests/test_legacy_formats.py",
         "tests/test_logo.py",
         "tests/test_palette_route.py",
-        "tests/test_playwright_studio.py"
+        "tests/test_playwright_studio.py",
+        "tests/test_tablolar.py"
       ],
       "yol": "assets_store.py"
     },
@@ -406,7 +408,8 @@
       "satir": 258,
       "testler": [
         "tests/test_chat_store.py",
-        "tests/test_chats_route.py"
+        "tests/test_chats_route.py",
+        "tests/test_tablolar.py"
       ],
       "yol": "chat_store.py"
     },
@@ -588,7 +591,8 @@
         "tests/test_folders.py",
         "tests/test_guvenlik_baslik.py",
         "tests/test_legacy_formats.py",
-        "tests/test_playwright_studio.py"
+        "tests/test_playwright_studio.py",
+        "tests/test_tablolar.py"
       ],
       "yol": "folders.py"
     },
@@ -725,7 +729,8 @@
         "routers.paletler",
         "routers.sohbet",
         "routers.uretim",
-        "services.palet"
+        "services.palet",
+        "services.tablolar"
       ],
       "katman": 4,
       "satir": 1056,
@@ -743,6 +748,7 @@
         "tests/test_prefs.py",
         "tests/test_prefs_route.py",
         "tests/test_settings_route.py",
+        "tests/test_tablolar.py",
         "tests/test_video_onyuz.py"
       ],
       "yol": "models.py"
@@ -846,7 +852,8 @@
       "satir": 96,
       "testler": [
         "tests/test_legacy_formats.py",
-        "tests/test_palette_store.py"
+        "tests/test_palette_store.py",
+        "tests/test_tablolar.py"
       ],
       "yol": "palette_store.py"
     },
@@ -1328,6 +1335,21 @@
       "yol": "services/redaksiyon.py"
     },
     {
+      "ad": "services.tablolar",
+      "erteli_ithal": [],
+      "ithal": [
+        "assets_store",
+        "models"
+      ],
+      "ithal_eden": [],
+      "katman": 5,
+      "satir": 454,
+      "testler": [
+        "tests/test_tablolar.py"
+      ],
+      "yol": "services/tablolar.py"
+    },
+    {
       "ad": "services.tercih",
       "erteli_ithal": [],
       "ithal": [
@@ -1389,6 +1411,7 @@
         "tests/test_playwright_studio.py",
         "tests/test_storage.py",
         "tests/test_storage_delete.py",
+        "tests/test_tablolar.py",
         "tests/test_video_onyuz.py"
       ],
       "yol": "storage.py"
@@ -1999,7 +2022,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 100,
+  "test_dosyasi_sayisi": 101,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",

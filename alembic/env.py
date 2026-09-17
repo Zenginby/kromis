@@ -17,10 +17,11 @@ Bağlantı dizesi ÖNCELİK SIRASIYLA:
 İkisi de yoksa açık bir hata: sessizce SQLite'a ya da localhost'a düşmek,
 "göç koştu" sanılan bir hiçlik üretir.
 
-`target_metadata` BU GÖREVDE BOŞ `MetaData()`: tablo yok, ilk göç yalnız
-`alembic_version`ı doğuruyor. `None` bırakılsaydı `alembic check` "MetaData
-yok" diye durur; boş meta ile "No new upgrade operations detected" der — yani
-kapı bugünden çalışıyor, 2. görev buraya `tablolar.Base.metadata` koyar.
+`target_metadata` = `services.tablolar.Base.metadata` (2. görevden beri; 1.
+görevde boş `MetaData()` idi ki `alembic check` ilk günden koşabilsin). Model
+ithal ediliyor, yani `alembic` komutu `models`/`catalog`ı da yükler — göç
+aracının uygulama kodunu görmesi kaçınılmaz, çünkü CHECK değer kümeleri o
+sabitlerden okunuyor (services/tablolar.py, "ENUM'LAR CHECK İLE").
 """
 from __future__ import annotations
 
@@ -28,7 +29,7 @@ import os
 import sys
 from logging.config import fileConfig
 
-from sqlalchemy import MetaData, engine_from_config, pool
+from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
@@ -36,13 +37,13 @@ KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if KOK not in sys.path:
     sys.path.insert(0, KOK)
 
-from services import db  # noqa: E402  — `sys.path` üstte kuruldu, gerekçesi docstring'de
+from services import db, tablolar  # noqa: E402  — `sys.path` üstte kuruldu, gerekçesi docstring'de
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = MetaData()
+target_metadata = tablolar.Base.metadata
 
 
 def _url() -> str:

@@ -218,6 +218,20 @@ basılır; `KROMIS_E2E_ZORUNLU=1` (CI) atlamayı hataya çevirir. Postgres kurma
 `sudo apt install postgresql` / `brew install postgresql@17`; Windows'ta
 `KROMIS_TEST_DATABASE_URL` zorunlu.
 
+Şema değişikliği (Faz 1 / 2'den beri): tablolar `services/tablolar.py`de,
+göçler `alembic/versions/` altında; `alembic.ini` URL'yi `DATABASE_URL`den okur.
+
+```bash
+DATABASE_URL=postgresql+psycopg://… .venv/bin/alembic upgrade head   # şemayı kur / güncelle
+DATABASE_URL=… .venv/bin/alembic check                               # model = göç mü? (CI kapısı: tests/test_tablolar.py)
+DATABASE_URL=… .venv/bin/alembic revision --autogenerate -m "kisa aciklama" --rev-id 0002_kisa_aciklama
+```
+
+Üretilen dosyayı ELLE gözden geçir (`0001_veri_modeli.py`nin başlığı ne
+düzeltildiğini sayıyor: uzantı, tablo sırası, ad); `downgrade` da çalışmalı —
+test dosyası ileri-geri-ileri döngüsünü sınıyor. CHECK kısıtı değişiklikleri
+`alembic check`te GÖRÜNMEZ; her izinli değeri yazan test onun için.
+
 Ön yüz lint/biçim (CI'daki `lint-onyuz` işi aynısını koşar; Node 22):
 
 ```bash

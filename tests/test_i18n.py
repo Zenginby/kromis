@@ -724,6 +724,8 @@ KULLANICIYA_KONUSMAYAN = {
     "services/db.py": "veri tabanı motoru ve `Session` bağımlılığı (Faz 1 / 1); tek 503 "
                       "`detail`i bir KOD (`database_unavailable`), cümleyi ön yüz kurar",
     "services/zaman.py": "zaman damgası biçimi; metin yok",
+    "services/tablolar.py": "veri modeli (Faz 1 / 2): tablo, sütun, kısıt tanımları; metin yok — "
+                            "CHECK değer kümeleri bile kodun sabitleri, cümle değil",
 }
 
 # Türkçe kalması KARAR olan dizeler — gerekçesiyle. Muafiyet DİZE düzeyinde,

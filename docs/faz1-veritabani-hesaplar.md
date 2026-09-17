@@ -249,7 +249,7 @@ bu PR'da değil (9. görev).
 
 ---
 
-## 2. Veri modeli ve ilk göç — kullanıcı, oturum, 7 iş tablosu (PR: `faz1/veri-modeli`)
+## 2. Veri modeli ve ilk göç — kullanıcı, oturum, 7 iş tablosu ✅ (PR: `faz1/veri-modeli`)
 
 **Kapsam.** `services/tablolar.py` (SQLAlchemy 2 `DeclarativeBase`, `Mapped[]`
 tip notları — mypy kapısı açık, `tests/test_mypy_kapisi.py`) ve ilk gerçek
@@ -315,6 +315,53 @@ araçta sorun çıkarır.
 **Çıkış ölçütü.** `alembic upgrade head && alembic downgrade base && alembic
 upgrade head` temiz; `alembic check` "no new upgrade operations"; 11 tablo;
 takım yeşil.
+
+**Yapıldığında (2026-09-17) ölçümler ve sapmalar.** `services/tablolar.py`
+(454 satır, çoğu gerekçe): **11 tablo, 89 sütun, 13 indeks, 10 CHECK, 11 FK, 4
+UNIQUE**, hepsi `MetaData(naming_convention)` ile adlı (`pk_/fk_/uq_/ck_/ix_`) —
+adsız kısıt `alembic check`i her koşuda kırmızı yapar ve `downgrade`da
+düşürülemez. Göç `0001_veri_modeli` `alembic revision --autogenerate` ile
+üretildi ve ELLE dört yerde düzeltildi (dosyanın başlığında tek tek):
+`CREATE EXTENSION IF NOT EXISTS citext` başa (autogenerate uzantı görmez;
+uzantısız `upgrade` ilk tabloda düşüyordu), tablo sırası hesap → iş ve FK
+bağımlılığına göre (autogenerate `medya`yı en sona, `giris_denemeleri`ni başa
+koymuştu), dosya adı (`--rev-id` + `file_template` slug'ı iki kez yazdı), auto
+işaretleri. `downgrade` 11 tabloyu ve uzantıyı düşürür; ileri-geri-ileri +
+`check` temiz (ölçüldü: geçici kümede döngü ~1 sn). **Kararlar, belgenin açık
+bıraktığı yerlerde:** (a) sütun adları — bugünkü JSON/API alanı olan her sütun
+adını KORUR (`filename`, `folder_id`, `palette`, `theme` …; 5-6. görevin
+satır→JSON dökümü eşlemesiz çıkar, alan-kaybı bekçisi sütun adlarını sayar),
+yalnız DB'de yaşayanlar Türkçe (`kullanici_id`, `olusturuldu`/`guncellendi`,
+belgenin adlandırdığı `mesajlar` ve `tur`); (b) enum'lar Postgres `ENUM`
+tipiyle DEĞİL `text + CHECK` — `jetonlar.amac` dâhil (ALTER TYPE'ın transaksiyon
+ve DROP TYPE dertleri yok; değer kümeleri `models.ALLOWED_THEMES/LANGUAGES`,
+`assets_store.KINDS`ten okunuyor); `image_model`/`video_model`/`chat_provider`/
+`chat_model` CHECK'siz (katalog değişince göç istemek yanlış yer); (c) bağlar —
+`klasorler.parent_id` CASCADE (`delete_tree`), `medya.folder_id` SET NULL
+(`unfile_folders`), `medya.parent_id`/`session_id`/`arena_id` FK DEĞİL (üçü de
+bugün sarkabiliyor, FK anlamı değiştirirdi); (d) `tercihler` PK =
+`kullanici_id` (ayrı id yok, "1 satır" DB'de), `saglayici_kimlikleri` PK =
+`(kullanici_id, ad)`; ikisinde `(kullanici_id, olusturuldu)` indeksi YOK — PK
+zaten `kullanici_id` ile başlıyor, belgenin "hepsinde" cümlesi beş liste
+tablosunda birebir uygulandı; (e) `kullanicilar.dil` NULL'lanabilir (NULL =
+hiç seçmedi, zincir tarayıcıya düşer) ve `CHECK dil IN ('tr','en')`;
+`medya.filename` UNIQUE (`/output/{filename}` sorgusu); `medya.duration int`
+(storage `int(...)` yazıyor). **Bekçiler** (`tests/test_tablolar.py`, 16 test):
+`IS_TABLOLARI` ↔ belgenin "İş tabloları, envanterden birebir:" cümlesi ↔
+`Base.metadata` üç küme eşit; yedi iş tablosunda `kullanici_id NOT NULL` +
+CASCADE FK + önde `kullanici_id` olan indeks/PK; beş liste tablosunda
+`(kullanici_id, olusturuldu)` + `id` CHECK'i; `ID_KALIBI` beş deponun
+`_SAFE_ID`siyle birebir; her CHECK'in İZİNLİ HER değeri gerçekten yazılıyor —
+`alembic check` CHECK kısıtlarını karşılaştırmadığı için `ALLOWED_THEMES`e
+eklenen tema aksi hâlde sessizce göçsüz kalırdı; citext benzersizliği
+(`Ali@…` = `ali@…`), kullanıcı silme yedi tabloyu boşaltıyor, klasör silme
+görseli köke düşürüyor, JSONB gidiş-dönüş + `->` operatörü, `guncellendi`
+ilerliyor, downgrade tablo VE uzantı bırakmıyor. `tests/test_db.py` head
+literali tek yerde (`BAS`), `tests/test_i18n.py` `services/tablolar.py`yi
+"konuşmayan" saydı. Rota sayısı 46 DEĞİŞMEDİ. `alembic/env.py` artık
+`tablolar.Base.metadata` okuyor, yani `alembic` komutu `models`/`catalog`ı
+yüklüyor (CHECK değer kümeleri oradan) — kabul edilen bedel. README'ye göç
+üretme adımı yazıldı.
 
 ---
 

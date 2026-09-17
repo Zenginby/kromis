@@ -714,6 +714,8 @@ KULLANICIYA_KONUSMAYAN = {
     "winclr.py": ".NET köprüsünün önyükleme dökümü; konsola basılıyor",
     "winsec.py": "Windows ACL sarmalı; Türkçe satırları platform iç değişmezleri",
     "routers/__init__.py": "yalnız paket docstring'i",
+    "routers/saglik.py": "sağlık sondası (`/health`): makine okuyan JSON — ok/version/"
+                         "data_dir_writable; cümle yok, okuyucu HEALTHCHECK/orkestratör",
     "services/__init__.py": "yalnız paket docstring'i",
     "services/dil.py": "dil bağlamını KURAN ara katman; metni okumuyor, seçiyor",
     "services/redaksiyon.py": "422 gövdesinden gizli değeri SİLİYOR; cümle üretmiyor",

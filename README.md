@@ -177,6 +177,21 @@ modüller, HTTP uçları, `static/` betikleri ve testler arası bağlar kaynakta
 
 Tarayıcıda `http://127.0.0.1:8765` açılır.
 
+Konteynerde (web sürümü; `Dockerfile` ve gerekçeleri depoda):
+
+```bash
+docker build -t kromis .
+docker run -p 8765:8765 -v kromis-data:/data kromis
+curl localhost:8765/health     # {"ok": true, "version": "…", "data_dir_writable": true}
+```
+
+Yazılabilir veri kökü `KROMIS_DATA_DIR` (imajda `/data`, bkz. `paths.py`):
+output/, assets/, manifest'ler ve — `HOME` da oraya bağlı olduğu için —
+Ayarlar panelinin yazdığı `credentials.env`. Konak dizini bağlanacaksa dizin
+uid 10001'e ait olmalı; yazılamıyorsa `/health` 503 döner. Ortam değişkenleri
+ve sağlayıcı anahtar adlarının envanteri `.env.example`da; yerel deneme için
+`docker compose up --build` (`compose.yaml`, yalnız geliştirme).
+
 ### 3. Test
 
 ```bash
@@ -201,7 +216,7 @@ Paketleme 2026-09-16'dan beri **elle**: `main`'e merge artık sürüm artırmaz 
 paket derlemez. Gerekirse Actions → *Yayın* → *Run workflow* hattı eskisi gibi
 çalıştırır (üç paket, tek yayın). Ayrıntı: [docs/yayin-hatti.md](docs/yayin-hatti.md).
 Her PR'da koşan kapılar: pytest (E2E dâhil), sızıntı taraması, `ruff check`,
-`mypy` (şimdilik bilgi amaçlı).
+`mypy` (Adım 6'dan beri kesici), eslint + prettier, `docker build` + `/health`.
 
 ---
 

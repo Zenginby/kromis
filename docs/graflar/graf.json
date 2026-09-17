@@ -50,6 +50,7 @@
         "routers.galeri",
         "routers.kok",
         "routers.paletler",
+        "routers.saglik",
         "routers.sohbet",
         "routers.uretim",
         "services.ayar",
@@ -86,6 +87,7 @@
         "tests/test_fonts.py",
         "tests/test_guncelleme_route.py",
         "tests/test_guvenlik_baslik.py",
+        "tests/test_health.py",
         "tests/test_i18n.py",
         "tests/test_id_contract.py",
         "tests/test_import_route.py",
@@ -297,6 +299,7 @@
         "tests/test_chat_providers.py",
         "tests/test_chat_route.py",
         "tests/test_credstore.py",
+        "tests/test_docker_kapisi.py",
         "tests/test_errlog.py",
         "tests/test_fal_client.py",
         "tests/test_gemini_client.py",
@@ -1067,6 +1070,23 @@
       "yol": "routers/paletler.py"
     },
     {
+      "ad": "routers.saglik",
+      "erteli_ithal": [],
+      "ithal": [
+        "services.ayar",
+        "version"
+      ],
+      "ithal_eden": [
+        "app"
+      ],
+      "katman": 3,
+      "satir": 96,
+      "testler": [
+        "tests/test_health.py"
+      ],
+      "yol": "routers/saglik.py"
+    },
+    {
       "ad": "routers.sohbet",
       "erteli_ithal": [],
       "ithal": [
@@ -1145,6 +1165,7 @@
         "routers.galeri",
         "routers.kok",
         "routers.paletler",
+        "routers.saglik",
         "routers.sohbet",
         "routers.uretim",
         "services.dil"
@@ -1471,6 +1492,7 @@
         "guncelleme",
         "routers.ayarlar",
         "routers.kok",
+        "routers.saglik",
         "services.modeller",
         "tools.surum_karari"
       ],
@@ -1480,6 +1502,7 @@
         "tests/test_backup.py",
         "tests/test_guncelleme.py",
         "tests/test_guncelleme_route.py",
+        "tests/test_health.py",
         "tests/test_index.py",
         "tests/test_playwright_guncelleme.py",
         "tests/test_provider_logos.py",
@@ -1940,7 +1963,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 97,
+  "test_dosyasi_sayisi": 99,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",
@@ -2720,6 +2743,19 @@
       "satir": 222,
       "yardimci_sayisi": 2,
       "yol": "/assets/{kind}/{filename}",
+      "yontem": "GET"
+    },
+    {
+      "dosya": "routers/saglik.py",
+      "islev": "health",
+      "modul": "routers.saglik",
+      "moduller": [
+        "version"
+      ],
+      "onyuz": [],
+      "satir": 85,
+      "yardimci_sayisi": 1,
+      "yol": "/health",
       "yontem": "GET"
     },
     {

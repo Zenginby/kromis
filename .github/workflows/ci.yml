@@ -166,3 +166,41 @@ jobs:
 
       - name: prettier
         run: npx prettier --check static/
+
+  # Konteyner imajı — Faz 0 / Adım 8 (2026-09-17).
+  #
+  # İmaj DERLENİR ve AÇILIR, İTİLMEZ: kayıt defteri, kimlik ve etiketleme
+  # düzeni Faz 1'in dağıtım kararı. Bu işin sorusu tek: `docker build .`
+  # geçiyor mu ve konteyner `/health`e 30 sn içinde 200 veriyor mu (yazılabilir
+  # veri dizini dâhil — 503 olsaydı `curl -f` düşerdi). `/` de soruluyor:
+  # `static/`/`bundled/` bağlamdan yanlışlıkla dışlanırsa (`.dockerignore`)
+  # sonda yeşil kalır ama arayüz 500 verir. Bekçisi tests/test_docker_kapisi.py
+  # (iş var, derliyor, soruyor, itmiyor, kesici, zaman sınırlı).
+  #
+  # `trap`: sonda düşerse konteynerin günlüğü koşu günlüğüne yazılır — "30 sn
+  # içinde 200 gelmedi"nin sebebi genellikle uvicorn'un ilk satırlarında.
+  docker:
+    name: Docker imajı
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: docker build
+        run: docker build -t kromis .
+
+      - name: /health ve /
+        run: |
+          set -euo pipefail
+          docker run -d --name kromis -p 8765:8765 kromis
+          trap 'echo "--- konteyner günlüğü ---"; docker logs kromis 2>&1 | tail -n 50; docker rm -f kromis >/dev/null' EXIT
+          for _ in $(seq 1 30); do
+            if govde="$(curl -fsS localhost:8765/health)"; then
+              echo "/health: $govde"
+              curl -fsS -o /dev/null localhost:8765/ && echo "/: 200"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "/health 30 sn içinde 200 vermedi" >&2
+          exit 1

@@ -1362,7 +1362,8 @@
       "satir": 1075,
       "testler": [
         "tests/test_app_bolme.py",
-        "tests/test_graflar.py"
+        "tests/test_graflar.py",
+        "tests/test_onyuz_lint_kapisi.py"
       ],
       "yol": "tools/graf_uret.py"
     },
@@ -1551,7 +1552,7 @@
           "/output/{}"
         ],
         "dosya": "static/assets.js",
-        "satir": 561,
+        "satir": 586,
         "tanim": 25
       },
       {
@@ -1565,7 +1566,7 @@
           "/output/{}.${videoMu "
         ],
         "dosya": "static/chat.js",
-        "satir": 2665,
+        "satir": 2771,
         "tanim": 90
       },
       {
@@ -1582,7 +1583,7 @@
           "/output/{}.png"
         ],
         "dosya": "static/core.js",
-        "satir": 2961,
+        "satir": 3137,
         "tanim": 88
       },
       {
@@ -1597,13 +1598,13 @@
           "/output/{}${videoMu "
         ],
         "dosya": "static/folders.js",
-        "satir": 2063,
+        "satir": 2172,
         "tanim": 60
       },
       {
         "cagrilan_yollar": [],
         "dosya": "static/i18n.js",
-        "satir": 83,
+        "satir": 84,
         "tanim": 2
       },
       {
@@ -1619,7 +1620,7 @@
           "/api/palettes/{}"
         ],
         "dosya": "static/palette.js",
-        "satir": 769,
+        "satir": 844,
         "tanim": 37
       },
       {
@@ -1635,7 +1636,7 @@
           "/api/settings"
         ],
         "dosya": "static/settings.js",
-        "satir": 856,
+        "satir": 874,
         "tanim": 22
       },
       {
@@ -1643,7 +1644,7 @@
           "/output/"
         ],
         "dosya": "static/viewer.js",
-        "satir": 507,
+        "satir": 540,
         "tanim": 0
       }
     ],
@@ -1939,7 +1940,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 96,
+  "test_dosyasi_sayisi": 97,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",

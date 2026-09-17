@@ -54,7 +54,6 @@ function isAcceptedUpload(file) {
   return !karsiKanit;
 }
 
-
 // Sunucudaki models.MAX_PROMPT_CHARS ile AYNI olmak zorunda (MAX_EDIT_IMAGES
 // geleneği): yönetmenin ürettiği prompt buraya sığmıyorsa forma yazmak yerine
 // kısaltılması isteniyor — sunucu aksi halde 422 döner.
@@ -93,10 +92,8 @@ function syncTabThumb() {
 // `t()` okundukları yerde çağrılıyor, tabloda değil.
 const PROMPT_YER_TUTUCU = {
   image: { tam: "composer.placeholder", kisa: "composer.placeholder_short" },
-  video: { tam: "composer.placeholder_video",
-           kisa: "composer.placeholder_video_short" },
-  director: { tam: "composer.placeholder_director",
-              kisa: "composer.placeholder_director_short" },
+  video: { tam: "composer.placeholder_video", kisa: "composer.placeholder_video_short" },
+  director: { tam: "composer.placeholder_director", kisa: "composer.placeholder_director_short" },
 };
 
 /** Mod → o modun sekme düğmesi. TEK eşleme, üç okuyan (`syncTabThumb`,
@@ -107,8 +104,7 @@ const PROMPT_YER_TUTUCU = {
  * `aria-pressed`ının sessizce yanlış kalması demekti — ekran okuyucu
  * kullanıcısına "Görsel modu seçili" derken composer video üretiyor olurdu.
  */
-const MOD_SEKMELERI = { image: "tab-image", video: "tab-video",
-                        director: "tab-chat" };
+const MOD_SEKMELERI = { image: "tab-image", video: "tab-video", director: "tab-chat" };
 
 /** Yer tutucunun TEK yazarı. İki çağıranı var (mod değişimi ve ilk gönderim)
  * ve ikisi de aynı iki değişkeni okuyor — metin iki yerde kurulsaydı ayrışırdı.
@@ -177,8 +173,12 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(syncTabThu
 const APP = document.querySelector(".app");
 
 // Ray bölümü → görünüm eşlemesi.
-const SECTION_VIEWS = { studio: "view-studio", media: "view-media",
-                        library: "view-library", tools: "view-tools" };
+const SECTION_VIEWS = {
+  studio: "view-studio",
+  media: "view-media",
+  library: "view-library",
+  tools: "view-tools",
+};
 
 function showSection(name) {
   currentSection = name;
@@ -224,15 +224,20 @@ window.geriTusu = function () {
   //    `stopImmediatePropagation` ile zaten çözüyor. Burada ikinci bir öncelik
   //    sırası kurmak iki mantığın ayrışmasına ve "geri bazen yanlış paneli
   //    kapatıyor" hatasına açık olurdu.
-  const acik = document.querySelector(".sheet.open")
-            || document.querySelector(".modal:not([hidden])")
-            || document.querySelector(".popover:not([hidden])")
-            || document.querySelector(".chat-menu:not([hidden])")
-            || document.querySelector("#chats-kebab-menu:not([hidden])");
+  const acik =
+    document.querySelector(".sheet.open") ||
+    document.querySelector(".modal:not([hidden])") ||
+    document.querySelector(".popover:not([hidden])") ||
+    document.querySelector(".chat-menu:not([hidden])") ||
+    document.querySelector("#chats-kebab-menu:not([hidden])");
   if (acik) {
-    document.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "Escape", bubbles: true, cancelable: true,
-    }));
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
     return true;
   }
 
@@ -341,7 +346,8 @@ $("shell-scrim").addEventListener("click", closeSheets);
 // ÖNCE kayıtlı, yani o çağrı bunu durduramaz — guard'sız tek Escape iki
 // katmanı birden kapatırdı.
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && $("confirm-modal").hidden && document.querySelector(".sheet.open")) closeSheets();
+  if (e.key === "Escape" && $("confirm-modal").hidden && document.querySelector(".sheet.open"))
+    closeSheets();
 });
 
 // ── (+) menüsü ──
@@ -358,7 +364,9 @@ function closePlusMenu() {
 document.addEventListener("click", (e) => {
   if (!e.target.closest(".plus-wrap")) closePlusMenu();
 });
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePlusMenu(); });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closePlusMenu();
+});
 // Menüdeki düğmeler kendi dinleyicilerini folders.js'te kuruyor; burada yalnız
 // menünün kapanması eklenir (aynı düğümde birden çok dinleyici sorun değil).
 // media-pick-btn de burada: menü kapanmazsa modalın ARKASINDA açık kalıyor
@@ -381,8 +389,8 @@ for (const id of ["upload-btn", "extra-add-btn", "media-pick-btn"]) {
 // ayna kaçınılmaz olarak bayatlar (Gemini'nin jetonları `WxH` biçiminde bile
 // değil, doğrudan `16:9`). Artık oran da etiket de sunucudan geliyor:
 // GET /api/settings → image_models[].sizes[].{value,label,ratio}.
-let imageModels = [];      // sunucudan gelen katalog
-let currentModel = null;   // seçili tanım (imageModels'ten bir öğe)
+let imageModels = []; // sunucudan gelen katalog
+let currentModel = null; // seçili tanım (imageModels'ten bir öğe)
 // Video ekseninin İKİZ değişkenleri. `imageModels`/`currentModel`e
 // KATILMIYORLAR ve gerekçe `catalog.VIDEO_MODELS`in ayrı bir demet olma
 // gerekçesinin aynısı: `imageModels`i okuyan beş yer (renderModelOptions,
@@ -417,12 +425,12 @@ function aktifModel() {
   if (currentMode === "image") return currentModel;
   return null;
 }
-let runBusy = false;       // üretim sürüyor mu — #go kapısının bir girdisi
+let runBusy = false; // üretim sürüyor mu — #go kapısının bir girdisi
 // Yönetmenin karşılığı: aynı yuvada, aynı desende (bkz. applyChatModels).
 // Burada yaşamak ZORUNDA çünkü `goBlockReason` bu dosyanın üst düzeyinde
 // çağrılan `syncGoGate` üzerinden ikisini de okuyor ve chat.js EN SONDA
 // yükleniyor — orada tanımlansa açılıştaki ilk çağrı TDZ hatası verirdi.
-let chatModels = [];       // sunucudan gelen sohbet kataloğu
+let chatModels = []; // sunucudan gelen sohbet kataloğu
 let currentChatModel = null;
 
 /** `<select>`i sunucudan gelen seçeneklerle yeniden kurar ve DEĞERİ TAŞIR.
@@ -443,19 +451,27 @@ function fillAxis(selectId, options, desired, fallback) {
   const onceki = desired !== undefined ? desired : el.value;
   const oncekiRatio = [...el.options].find((o) => o.value === onceki)?.dataset.ratio;
 
-  el.replaceChildren(...options.map((opt) => {
-    const o = document.createElement("option");
-    o.value = opt.value;
-    // `textContent`: etiket sunucudan geliyor ve sunucu metni DOM'a yalnız bu
-    // kapıdan giriyor (dosya genelindeki duruş).
-    o.textContent = opt.label;
-    if (opt.ratio) o.dataset.ratio = opt.ratio;
-    return o;
-  }));
+  el.replaceChildren(
+    ...options.map((opt) => {
+      const o = document.createElement("option");
+      o.value = opt.value;
+      // `textContent`: etiket sunucudan geliyor ve sunucu metni DOM'a yalnız bu
+      // kapıdan giriyor (dosya genelindeki duruş).
+      o.textContent = opt.label;
+      if (opt.ratio) o.dataset.ratio = opt.ratio;
+      return o;
+    }),
+  );
 
-  if (options.some((o) => o.value === onceki)) { el.value = onceki; return null; }
+  if (options.some((o) => o.value === onceki)) {
+    el.value = onceki;
+    return null;
+  }
   const ayniOran = oncekiRatio && options.find((o) => o.ratio === oncekiRatio);
-  if (ayniOran) { el.value = ayniOran.value; return null; }
+  if (ayniOran) {
+    el.value = ayniOran.value;
+    return null;
+  }
   el.value = fallback;
   // Eski değer zaten boşsa (ilk çizim) bildirilecek bir sapma yok.
   return onceki ? onceki : null;
@@ -484,17 +500,26 @@ function syncRunCost() {
   // gösterilen fiyat ile gönderilen istek aynı çeviriyi kullanıyor.
   if (arenaAcik) {
     const sutunlar = arenaSutunlari();
-    if (!sutunlar.length) { el.hidden = true; return; }
+    if (!sutunlar.length) {
+      el.hidden = true;
+      return;
+    }
     const toplam = sutunlar.reduce((t, s) => t + (s.birim || 0), 0);
     el.textContent = `${tc("gen.cost_one", "gen.cost_many", toplam)} · ${tc("gen.models_one", "gen.models_many", sutunlar.length)}`;
     el.hidden = false;
     return;
   }
   const model = aktifModel();
-  if (!model) { el.hidden = true; return; }
+  if (!model) {
+    el.hidden = true;
+    return;
+  }
   const tarife = model.credits_by_quality || {};
   const birim = tarife[$("quality").value] ?? model.credits;
-  if (birim === undefined || birim === null) { el.hidden = true; return; }
+  if (birim === undefined || birim === null) {
+    el.hidden = true;
+    return;
+  }
   // SÜRE ÇARPANI: video modellerinde `credits` SANİYE BAŞINA (bkz.
   // catalog.ImageModel.credits) ve çarpan `catalog.cost_for`un yaptığının
   // birebir aynısı — iki taraf aynı çarpımı yapmak zorunda, yoksa kullanıcı
@@ -503,13 +528,11 @@ function syncRunCost() {
   // Birim SORULMUYOR, `durations`ın BOŞLUĞUNDAN okunuyor: sunucu ikinci bir
   // "bu tarife saniyelik mi" alanı göndermiyor ve göndermemeli — aynı bilginin
   // iki kopyası olurdu (bkz. app._model_payload'ın `credits` yorumu).
-  const sure = model.durations && model.durations.length
-    ? Number($("duration").value || 0) || 1
-    : 1;
+  const sure =
+    model.durations && model.durations.length ? Number($("duration").value || 0) || 1 : 1;
   // `≈` bilerek: bu bir fatura değil, metadata — tilde bunu bir paragraf
   // açıklama yazmadan söylüyor.
-  el.textContent = tc("gen.cost_one", "gen.cost_many",
-                      birim * sure * Number($("n").value || 1));
+  el.textContent = tc("gen.cost_one", "gen.cost_many", birim * sure * Number($("n").value || 1));
   el.hidden = false;
 }
 
@@ -652,8 +675,7 @@ function syncGoGate() {
   // Kilitliyken SEBEP yazılıyor, kısayol değil: çalışmayan bir düğmenin
   // kısayolunu duyurmak, kilidin neden orada olduğunu saklamak olurdu
   // (#chat-gate'in reddettiği şeyin aynısı).
-  $("go").title = sebep
-    || `${$("go").textContent.trim()} · ${GO_KISAYOL}`;
+  $("go").title = sebep || `${$("go").textContent.trim()} · ${GO_KISAYOL}`;
 }
 
 /** Şeridin sağlayıcı işaretini seçili modele göre çizer.
@@ -686,8 +708,10 @@ function setModelLogo(imgId, model) {
  * açma (`arenaUygula`). İki kopyadan biri modelin tavanını unutabilirdi.
  */
 function adetSecenekleri(model) {
-  return Array.from({ length: model.max_n },
-                    (_, i) => ({ value: String(i + 1), label: String(i + 1) }));
+  return Array.from({ length: model.max_n }, (_, i) => ({
+    value: String(i + 1),
+    label: String(i + 1),
+  }));
 }
 
 /** `#duration` ekseninin seçenekleri. Süre taşımayan modelde boş dizi.
@@ -700,8 +724,7 @@ function adetSecenekleri(model) {
  * kullanıcının seçtiği süre sessizce geri alınırdı.
  */
 function sureSecenekleri(model) {
-  return (model.durations || []).map((d) => ({ value: String(d.value),
-                                               label: d.label }));
+  return (model.durations || []).map((d) => ({ value: String(d.value), label: d.label }));
 }
 
 /** `#specs-sheet`in eksenlerini VERİLEN modele göre doldurur.
@@ -729,8 +752,12 @@ function eksenleriDoldur(model, { announce = true } = {}) {
   // kuruyor ve okunma sırası "oran · çözünürlük · süre · adet".
   const sureli = !!(model.durations && model.durations.length);
   if (sureli) {
-    const d = fillAxis("duration", sureSecenekleri(model), undefined,
-                       String(model.default_duration));
+    const d = fillAxis(
+      "duration",
+      sureSecenekleri(model),
+      undefined,
+      String(model.default_duration),
+    );
     if (d) dusenler.push(`${axisLabel("duration")} ${d}`);
   }
   const nn = fillAxis("n", adetSecenekleri(model), undefined, "1");
@@ -756,14 +783,15 @@ function eksenleriDoldur(model, { announce = true } = {}) {
   $("spec-n").hidden = model.max_n <= 1;
   // Eksenin ADI modele göre değişiyor: piksel boyutu seçen model "Boyut",
   // oran seçen model "Oran" diyor. chat.js'in atlanan-öneri metni buradan okuyor.
-  $("label-size").textContent =
-    model.sizes.some((o) => o.value.includes("x")) ? "Boyut" : "Oran";
+  $("label-size").textContent = model.sizes.some((o) => o.value.includes("x")) ? "Boyut" : "Oran";
 
   syncSpecs();
   syncRunCost();
   if (announce && dusenler.length) {
-    statusEl.textContent = t("gen.fell_back_to_defaults",
-                             { model: model.label, alanlar: dusenler.join(", ") });
+    statusEl.textContent = t("gen.fell_back_to_defaults", {
+      model: model.label,
+      alanlar: dusenler.join(", "),
+    });
   }
 }
 
@@ -812,8 +840,7 @@ function modelNotuYaz(model) {
     not.hidden = true;
     return;
   }
-  $("model-note-text").textContent =
-    t("gate.model_key_missing", { model: model.label });
+  $("model-note-text").textContent = t("gate.model_key_missing", { model: model.label });
   not.hidden = false;
 }
 
@@ -825,7 +852,10 @@ function applyModel(id, { announce = true } = {}) {
   // kullanıcı sonsuza kadar yüklenen bir şerit görüyordu. `currentModel` de
   // sıfırlanıyor, yoksa katalog daralınca ESKİ model seçili sanılırdı.
   if (!model) {
-    if (!id) { currentModel = null; modelBosHali("image"); }
+    if (!id) {
+      currentModel = null;
+      modelBosHali("image");
+    }
     return;
   }
   currentModel = model;
@@ -862,7 +892,6 @@ function applyModel(id, { announce = true } = {}) {
   syncGoGate();
 }
 
-
 /** Seçili VİDEO modelini uygular. `applyModel`in ikizi.
  *
  * AYRI bir işlev, `applyModel`e bir tür parametresi eklemek DEĞİL: o işlev
@@ -878,7 +907,10 @@ function applyVideoModel(id, { announce = true } = {}) {
   const model = videoModels.find((m) => m.id === id);
   if (!model) {
     // `applyModel`in boş hâlinin ikizi; gerekçesi orada.
-    if (!id) { currentVideoModel = null; modelBosHali("video"); }
+    if (!id) {
+      currentVideoModel = null;
+      modelBosHali("video");
+    }
     return null;
   }
   currentVideoModel = model;
@@ -987,8 +1019,9 @@ function modelKrediAraligi(m) {
   // 8 saniyelik bir klibin 128 kredi olduğunu SAKLARDI — yani karşılaştırma
   // için var olan etiket yanlış bir karşılaştırma sunardı. Ölçüt `durations`ın
   // boşluğu, ikinci bir birim alanı DEĞİL (aynı bilginin iki kopyası olurdu).
-  const birim = t(m.durations && m.durations.length
-                  ? "gen.credits_unit_per_sec" : "gen.credits_unit");
+  const birim = t(
+    m.durations && m.durations.length ? "gen.credits_unit_per_sec" : "gen.credits_unit",
+  );
   const tarife = Object.values(m.credits_by_quality || {});
   return tarife.length
     ? `${Math.min(...tarife)}–${Math.max(...tarife)} ${birim}`
@@ -1013,36 +1046,42 @@ function modelKrediAraligi(m) {
  */
 function modelSecenekMetni(m, kredi) {
   const ad = m.short_label || m.label;
-  return (kredi ? `${ad} — ${modelKrediAraligi(m)}` : ad)
-    + (m.configured ? "" : ` · ${t("model.setup_required")}`);
+  return (
+    (kredi ? `${ad} — ${modelKrediAraligi(m)}` : ad) +
+    (m.configured ? "" : ` · ${t("model.setup_required")}`)
+  );
 }
 
 function renderModelOptions(zorunluId) {
   const el = $("model");
-  el.replaceChildren(...secilebilirler(imageModels, zorunluId).map((m) => {
-    const o = document.createElement("option");
-    o.value = m.id;
-    // Maliyet ve kurulum durumu ETİKETTE: karşılaştırma ("hangisi ucuz?")
-    // burada yapılıyor ve native bir <option> yalnız metin taşıyabiliyor.
-    o.textContent = modelSecenekMetni(m, true);
-    // Tanıtım notu `title`da: <option> görsel taşıyamıyor ve bu liste artık
-    // KULLANICIYA GÖRÜNMÜYOR (değer tutucu; seçim #model-sheet'te). Satır yine
-    // de duruyor: `title` bedava ve <select> bir gün geri görünür olursa bilgi
-    // onunla birlikte geri gelir. Notun GÖRÜNEN yeri panelin kart satırı.
-    if (m.note) o.title = m.note;
-    return o;
-  }));
+  el.replaceChildren(
+    ...secilebilirler(imageModels, zorunluId).map((m) => {
+      const o = document.createElement("option");
+      o.value = m.id;
+      // Maliyet ve kurulum durumu ETİKETTE: karşılaştırma ("hangisi ucuz?")
+      // burada yapılıyor ve native bir <option> yalnız metin taşıyabiliyor.
+      o.textContent = modelSecenekMetni(m, true);
+      // Tanıtım notu `title`da: <option> görsel taşıyamıyor ve bu liste artık
+      // KULLANICIYA GÖRÜNMÜYOR (değer tutucu; seçim #model-sheet'te). Satır yine
+      // de duruyor: `title` bedava ve <select> bir gün geri görünür olursa bilgi
+      // onunla birlikte geri gelir. Notun GÖRÜNEN yeri panelin kart satırı.
+      if (m.note) o.title = m.note;
+      return o;
+    }),
+  );
 }
 
 function renderVideoModelOptions(zorunluId) {
   const el = $("video-model");
-  el.replaceChildren(...secilebilirler(videoModels, zorunluId).map((m) => {
-    const o = document.createElement("option");
-    o.value = m.id;
-    o.textContent = modelSecenekMetni(m, true);
-    if (m.note) o.title = m.note;
-    return o;
-  }));
+  el.replaceChildren(
+    ...secilebilirler(videoModels, zorunluId).map((m) => {
+      const o = document.createElement("option");
+      o.value = m.id;
+      o.textContent = modelSecenekMetni(m, true);
+      if (m.note) o.title = m.note;
+      return o;
+    }),
+  );
 }
 
 /** Katalog + hangi modellerin kullanılabilir olduğunu sunucudan çeker.
@@ -1129,14 +1168,16 @@ function arenaSecimi() {
 /** Kümenin seçeneklerini katalogdan çizer; seçili olanlar korunur. */
 function renderArenaOptions() {
   const secili = new Set(arenaSecimi());
-  $("arena-models").replaceChildren(...imageModels.map((m) => {
-    const o = document.createElement("option");
-    o.value = m.id;
-    // Ad kurgusu görsel şeridiyle TEK kaynaktan (`modelSecenekMetni`).
-    o.textContent = modelSecenekMetni(m, true);
-    o.selected = secili.has(m.id);
-    return o;
-  }));
+  $("arena-models").replaceChildren(
+    ...imageModels.map((m) => {
+      const o = document.createElement("option");
+      o.value = m.id;
+      // Ad kurgusu görsel şeridiyle TEK kaynaktan (`modelSecenekMetni`).
+      o.textContent = modelSecenekMetni(m, true);
+      o.selected = secili.has(m.id);
+      return o;
+    }),
+  );
 }
 
 /** Panelde bir kutucuğa dokunuldu: kümeye gir ya da çık.
@@ -1177,12 +1218,10 @@ function arenaSecimiYaz(idler) {
  * prompt'u aynı koşulda koşturmak arenanın tanımı.
  */
 function arenaOrtakBoyutlar(idler) {
-  const modeller = idler.map((id) => imageModels.find((m) => m.id === id))
-                        .filter(Boolean);
+  const modeller = idler.map((id) => imageModels.find((m) => m.id === id)).filter(Boolean);
   if (!modeller.length) return [];
   const [ilk, ...digerleri] = modeller;
-  return ilk.sizes.filter(
-    (s) => digerleri.every((m) => m.sizes.some((o) => o.ratio === s.ratio)));
+  return ilk.sizes.filter((s) => digerleri.every((m) => m.sizes.some((o) => o.ratio === s.ratio)));
 }
 
 /** Arena sütunları: model başına ÇEVRİLMİŞ eksen + birim kredi.
@@ -1200,19 +1239,28 @@ function arenaOrtakBoyutlar(idler) {
  */
 function arenaSutunlari() {
   const oran = $("size").selectedOptions[0]?.dataset.ratio || $("size").value;
-  const sira = Math.max(0, [...$("quality").options]
-    .findIndex((o) => o.value === $("quality").value));
-  return arenaSecimi().map((id) => {
-    const m = imageModels.find((x) => x.id === id);
-    if (!m || !m.sizes.length || !m.qualities.length) return null;
-    const boyut = m.sizes.find((s) => s.ratio === oran)
-                  || m.sizes.find((s) => s.value === m.default_size)
-                  || m.sizes[0];
-    const kalite = m.qualities[Math.min(sira, m.qualities.length - 1)];
-    const tarife = m.credits_by_quality || {};
-    return { model: m, size: boyut.value, quality: kalite.value,
-             birim: tarife[kalite.value] ?? m.credits };
-  }).filter(Boolean);
+  const sira = Math.max(
+    0,
+    [...$("quality").options].findIndex((o) => o.value === $("quality").value),
+  );
+  return arenaSecimi()
+    .map((id) => {
+      const m = imageModels.find((x) => x.id === id);
+      if (!m || !m.sizes.length || !m.qualities.length) return null;
+      const boyut =
+        m.sizes.find((s) => s.ratio === oran) ||
+        m.sizes.find((s) => s.value === m.default_size) ||
+        m.sizes[0];
+      const kalite = m.qualities[Math.min(sira, m.qualities.length - 1)];
+      const tarife = m.credits_by_quality || {};
+      return {
+        model: m,
+        size: boyut.value,
+        quality: kalite.value,
+        birim: tarife[kalite.value] ?? m.credits,
+      };
+    })
+    .filter(Boolean);
 }
 
 /** Arena durumunun görünen her sonucunun TEK yazarı.
@@ -1228,8 +1276,7 @@ function arenaUygula() {
   $("arena-toggle").setAttribute("aria-pressed", String(arenaAcik));
   $("arena-btn").hidden = !arenaAcik;
   $("model-pick").hidden = arenaAcik;
-  $("arena-btn-label").textContent =
-    tc("gen.models_one", "gen.models_many", idler.length);
+  $("arena-btn-label").textContent = tc("gen.models_one", "gen.models_many", idler.length);
   // Adet arenada 1'e kilitli: sütun başına tek görsel karşılaştırmanın
   // kendisi. 4 model × 4 görsel hem ızgarayı hem faturayı okunmaz yapardı.
   $("spec-n").hidden = arenaAcik;
@@ -1241,8 +1288,9 @@ function arenaUygula() {
     if (ortak.length) {
       const dusen = fillAxis("size", ortak, undefined, ortak[0].value);
       if (dusen) {
-        statusEl.textContent = t("arena.common_ratio_used",
-          { oran: $("size").selectedOptions[0]?.textContent.trim() });
+        statusEl.textContent = t("arena.common_ratio_used", {
+          oran: $("size").selectedOptions[0]?.textContent.trim(),
+        });
       }
     }
     if ($("n").value !== "1") $("n").value = "1";
@@ -1272,7 +1320,11 @@ $("arena-toggle").addEventListener("click", () => {
   arenaAcik = !arenaAcik;
   // Kapatırken açık arena paneli de kapanıyor: kapalı bir arenanın "hangi
   // modeller" listesi ekranda asılı kalırdı.
-  if (!arenaAcik) { closeSheets(); arenaUygula(); return; }
+  if (!arenaAcik) {
+    closeSheets();
+    arenaUygula();
+    return;
+  }
   // AÇILIŞ TOHUMU: küme boşsa o anki model birinci sütun olarak giriyor —
   // boş bir arena "hangi modeller" sorusunu cevapsız bırakırdı. Panel de
   // hemen açılıyor, çünkü tek modelli arena diye bir şey yok ve kullanıcının
@@ -1284,8 +1336,6 @@ $("arena-toggle").addEventListener("click", () => {
   }
   openModelSheet("arena");
 });
-
-
 
 // ── Prompt Yönetmeni'nin model şeridi ────────────────────────────────
 //
@@ -1300,16 +1350,18 @@ $("arena-toggle").addEventListener("click", () => {
 
 function renderChatModelOptions(zorunluId) {
   const el = $("chat-model");
-  el.replaceChildren(...secilebilirler(chatModels, zorunluId).map((m) => {
-    const o = document.createElement("option");
-    o.value = m.id;
-    // `textContent`: sunucudan gelen hiçbir şey innerHTML'e girmiyor.
-    // Ad kurgusu görsel şeridiyle TEK kaynaktan (`modelSecenekMetni`);
-    // `false` = kredi yok, gerekçesi o fonksiyonun notunda.
-    o.textContent = modelSecenekMetni(m, false);
-    if (m.note) o.title = m.note;
-    return o;
-  }));
+  el.replaceChildren(
+    ...secilebilirler(chatModels, zorunluId).map((m) => {
+      const o = document.createElement("option");
+      o.value = m.id;
+      // `textContent`: sunucudan gelen hiçbir şey innerHTML'e girmiyor.
+      // Ad kurgusu görsel şeridiyle TEK kaynaktan (`modelSecenekMetni`);
+      // `false` = kredi yok, gerekçesi o fonksiyonun notunda.
+      o.textContent = modelSecenekMetni(m, false);
+      if (m.note) o.title = m.note;
+      return o;
+    }),
+  );
 }
 
 /** Seçili sohbet modelini uygular. `applyModel`in yönetmen karşılığı.
@@ -1331,7 +1383,10 @@ function applyChatModel(id) {
   const model = chatModels.find((m) => m.id === id);
   // `applyModel`in boş hâlinin ikizi; gerekçesi orada.
   if (!model) {
-    if (!id) { currentChatModel = null; modelBosHali("chat"); }
+    if (!id) {
+      currentChatModel = null;
+      modelBosHali("chat");
+    }
     return null;
   }
   currentChatModel = model;
@@ -1411,14 +1466,22 @@ const MODEL_BOS_PANEL = {
 
 const MODEL_EKSENLERI = {
   image: {
-    secici: "model", dugme: "model-btn", etiket: "model-btn-label",
-    logo: "model-logo", baslik: "model.image_title", kredi: true,
+    secici: "model",
+    dugme: "model-btn",
+    etiket: "model-btn-label",
+    logo: "model-logo",
+    baslik: "model.image_title",
+    kredi: true,
     bosMetin: MODEL_BOS_PANEL.anahtar,
     liste: () => imageModels,
   },
   chat: {
-    secici: "chat-model", dugme: "chat-model-btn", etiket: "chat-model-btn-label",
-    logo: "chat-model-logo", baslik: "model.director_title", kredi: false,
+    secici: "chat-model",
+    dugme: "chat-model-btn",
+    etiket: "chat-model-btn-label",
+    logo: "chat-model-logo",
+    baslik: "model.director_title",
+    kredi: false,
     bosMetin: MODEL_BOS_PANEL.kimlik,
     liste: () => chatModels,
   },
@@ -1428,9 +1491,12 @@ const MODEL_EKSENLERI = {
   // metni. `kredi: true` çünkü tarife var; birimi (`kredi/sn`)
   // `modelKrediAraligi` söylüyor.
   video: {
-    secici: "video-model", dugme: "video-model-btn",
-    etiket: "video-model-btn-label", logo: "video-model-logo",
-    baslik: "model.video_title", kredi: true,
+    secici: "video-model",
+    dugme: "video-model-btn",
+    etiket: "video-model-btn-label",
+    logo: "video-model-logo",
+    baslik: "model.video_title",
+    kredi: true,
     bosMetin: MODEL_BOS_PANEL.anahtar,
     liste: () => videoModels,
   },
@@ -1443,8 +1509,13 @@ const MODEL_EKSENLERI = {
   // `arenaUygula` yazıyor (tek yazar), `syncModelChip` bu eksene hiç
   // dokunmuyor.
   arena: {
-    secici: "arena-models", dugme: "arena-btn", etiket: "arena-btn-label",
-    logo: null, baslik: "arena.models", kredi: true, coklu: true,
+    secici: "arena-models",
+    dugme: "arena-btn",
+    etiket: "arena-btn-label",
+    logo: null,
+    baslik: "arena.models",
+    kredi: true,
+    coklu: true,
     // Arena görsel modellerini listeliyor, yani eksik olan da aynı şey.
     bosMetin: MODEL_BOS_PANEL.anahtar,
     liste: () => imageModels,
@@ -1481,10 +1552,8 @@ function syncModelChip(eksenAdi, model) {
   // bu yorum o dizeleri taşımıyor, çünkü sayan bir tripwire'ı bir yorum da
   // kandırabilir (deponun daha önce ödediği bir bedel; bkz. index.html'deki
   // `<b id="model-btn-label">` notu).
-  setModelLogo(eksen.logo, model);       // model yoksa işaret de yok
-  $(eksen.etiket).textContent = model
-    ? modelSecenekMetni(model, eksen.kredi)
-    : t(MODEL_BOS_METNI);
+  setModelLogo(eksen.logo, model); // model yoksa işaret de yok
+  $(eksen.etiket).textContent = model ? modelSecenekMetni(model, eksen.kredi) : t(MODEL_BOS_METNI);
   if (modelSheetEkseni === eksenAdi) {
     for (const r of $("model-sheet-list").querySelectorAll("input")) {
       r.checked = !!model && r.value === model.id;
@@ -1523,8 +1592,7 @@ function modelBosHali(eksenAdi) {
   // AKTİF MOD KAPISI: video ekseni açılışta da boş olabiliyor (anahtar yok)
   // ve o an mod "image" — notu o anda yazmak, görsel modeli çalışırken
   // "Kayıtlı API anahtarı yok" diyen bir uyarı göstermek olurdu.
-  if ((eksenAdi === "image" || eksenAdi === "video")
-      && currentMode === eksenAdi) {
+  if ((eksenAdi === "image" || eksenAdi === "video") && currentMode === eksenAdi) {
     $("model-note-text").textContent = t("model.no_key_short");
     $("model-note").hidden = false;
   }
@@ -1652,8 +1720,7 @@ function openModelSheet(eksenAdi) {
   // İKİNCİ TIK KAPATIYOR — #specs-btn'in kalıbının aynısı. Çip açık bir panelin
   // altında duruyor (panel ekranın dibinde, çip composer'da) ve tıklanabilir
   // kalıyor: kapanmayan bir tetikleyici "bastım, hiçbir şey olmadı" demek.
-  const acilacak = !($("model-sheet").classList.contains("open")
-                     && modelSheetEkseni === eksenAdi);
+  const acilacak = !($("model-sheet").classList.contains("open") && modelSheetEkseni === eksenAdi);
   closeSheets();
   if (!acilacak) return;
 
@@ -1661,7 +1728,7 @@ function openModelSheet(eksenAdi) {
   $("model-sheet").dataset.axis = eksenAdi;
   $("model-sheet-title").textContent = t(MODEL_EKSENLERI[eksenAdi].baslik);
   renderModelCards(eksenAdi);
-  openSheet("model-sheet");                       // tek kapı (yukarısı)
+  openSheet("model-sheet"); // tek kapı (yukarısı)
 
   // SIRA BAĞLAYICI ve sessiz bir kırılmanın mandalı: `openSheet` İÇİNDE
   // `closeSheets` koşuyor ve o `sheetTetik`i null'a çekiyor. Atama
@@ -1690,7 +1757,10 @@ $("model-sheet-list").addEventListener("change", (e) => {
   const eksen = MODEL_EKSENLERI[modelSheetEkseni];
   // Çoklu eksende yönlendirilecek tek bir değer yok: kutucuk kümeye giriyor
   // ya da çıkıyor (bkz. arenaKutucuk).
-  if (eksen.coklu) { arenaKutucuk(e.target); return; }
+  if (eksen.coklu) {
+    arenaKutucuk(e.target);
+    return;
+  }
   const secici = $(eksen.secici);
   // AYNI DEĞERE ikinci dokunuş sessiz: native <select> de değişmeyen bir
   // değer için `change` atmıyor. Bu satır olmadan aynı karta her dokunuş
@@ -1800,7 +1870,9 @@ for (const id of ["size", "quality", "duration", "n"]) {
   // Dört eksen için de çağrılıyor çünkü ayrı bir dal açmak, aynı satırın
   // ikinci bir bakım noktası olurdu; `renderFrames` yan etkisiz ve ucuz.
   $(id).addEventListener("change", () => {
-    syncSpecs(); syncRunCost(); renderFrames();
+    syncSpecs();
+    syncRunCost();
+    renderFrames();
   });
 }
 syncSpecs();
@@ -1865,8 +1937,8 @@ function syncComposerSatirlari() {
  */
 function composerKuculsun() {
   $("composer").dataset.sent = "true";
-  syncPromptPlaceholder();   // uzun talimat işini bitirdi
-  syncComposerSatirlari();   // …ve satır sayısını SONRA ölçüyor
+  syncPromptPlaceholder(); // uzun talimat işini bitirdi
+  syncComposerSatirlari(); // …ve satır sayısını SONRA ölçüyor
 }
 
 // Odak ekseni: kutu odağa gelince tam boy, odaktan çıkınca (gönderim olduysa)
@@ -1888,15 +1960,19 @@ function submitComposer() {
   const promptVal = $("prompt").value.trim();
   if (currentMode === "image" || currentMode === "video") {
     if (promptVal.length > MAX_PROMPT_CHARS) {
-      statusEl.textContent = t("composer.prompt_too_long",
-      { uzunluk: promptVal.length, sinir: MAX_PROMPT_CHARS });
+      statusEl.textContent = t("composer.prompt_too_long", {
+        uzunluk: promptVal.length,
+        sinir: MAX_PROMPT_CHARS,
+      });
       return;
     }
     run();
   } else {
     if (promptVal.length > 6000) {
-      statusEl.textContent = t("composer.message_too_long",
-      { uzunluk: promptVal.length, sinir: 6000 });
+      statusEl.textContent = t("composer.message_too_long", {
+        uzunluk: promptVal.length,
+        sinir: 6000,
+      });
       return;
     }
     sendChat();
@@ -2090,7 +2166,9 @@ function downloadViaAnchor(url, filename) {
  * PNG'ye düşüyor, yani bugünkü davranış (tek tür) bayt bayt korunuyor.
  */
 function kayitPaneliTuru(filename) {
-  return String(filename || "").toLowerCase().endsWith(".mp4")
+  return String(filename || "")
+    .toLowerCase()
+    .endsWith(".mp4")
     ? { description: t("download.mp4"), accept: { "video/mp4": [".mp4"] } }
     : { description: t("download.png"), accept: { "image/png": [".png"] } };
 }
@@ -2100,7 +2178,10 @@ async function downloadImage(url, filename) {
   // Köprü varsa panel HİÇ denenmiyor: Android'de `showSaveFilePicker` zaten yok,
   // ama bir gün gelirse kayıt paneli köprünün sessizce devre dışı kalması demek
   // olurdu — indirmenin telefonda çalışmasının tek garantisi köprü.
-  if (!SUPPORTS_SAVE_PICKER || androidKoprusu()) { downloadViaAnchor(url, filename); return; }
+  if (!SUPPORTS_SAVE_PICKER || androidKoprusu()) {
+    downloadViaAnchor(url, filename);
+    return;
+  }
 
   let handle;
   try {
@@ -2189,7 +2270,10 @@ function renderSource() {
     }
   } else {
     chip.hidden = true;
-    if (chipImg) { chipImg.hidden = true; chipImg.removeAttribute("src"); }
+    if (chipImg) {
+      chipImg.hidden = true;
+      chipImg.removeAttribute("src");
+    }
     if (currentMode === "image") {
       goBtn.textContent = t("composer.generate");
     } else if (currentMode === "video") {
@@ -2206,8 +2290,7 @@ function renderSource() {
   // kilitliyor. Şerit koşulsuz gizlense kullanıcı göremediği bir eki
   // kaldırmak zorunda kalırdı. Ekleme yolu ayrıca kapalı (`extraBlockReason`,
   // `#extra-add-btn`), yani şerit yalnız bir SİLME yüzeyi olarak duruyor.
-  $("extra-row").hidden =
-    !source || (currentMode === "video" && extras.length === 0);
+  $("extra-row").hidden = !source || (currentMode === "video" && extras.length === 0);
   renderExtras();
   // Palet notu referans görsel varken değişir (üretim ≠ düzenleme ifadesi)
   renderPalettePanel();
@@ -2257,9 +2340,7 @@ function renderExtras() {
     cell.appendChild(del);
     strip.appendChild(cell);
   }
-  $("extra-count").textContent = extras.length
-    ? `${extras.length}/${MAX_EDIT_IMAGES - 1}`
-    : "";
+  $("extra-count").textContent = extras.length ? `${extras.length}/${MAX_EDIT_IMAGES - 1}` : "";
   // Düğme MOD ekseninde de kapanıyor (gerekçe `extraBlockReason`da): açık bir
   // "+ Ek", video modunda kullanıcıya ekleyebileceğini söyleyip sonra üretimi
   // kilitlemek olurdu — `#extra-row`un gizlenme gerekçesinin aynısı.
@@ -2306,7 +2387,10 @@ function extraBlockReason(rec) {
 
 function canAddExtra() {
   const why = extraBlockReason(null);
-  if (why) { statusEl.textContent = why; return false; }
+  if (why) {
+    statusEl.textContent = why;
+    return false;
+  }
   return true;
 }
 
@@ -2332,11 +2416,15 @@ function addExtraUpload(file) {
 function addGalleryExtra(rec) {
   const why = extraBlockReason(rec);
   if (why) return why;
-  extras = [...extras, {
-    kind: "gallery", id: rec.id,
-    label: (rec.prompt || rec.id).slice(0, 40),
-    src: `/output/${rec.filename}`,
-  }];
+  extras = [
+    ...extras,
+    {
+      kind: "gallery",
+      id: rec.id,
+      label: (rec.prompt || rec.id).slice(0, 40),
+      src: `/output/${rec.filename}`,
+    },
+  ];
   renderSource();
   return "";
 }
@@ -2356,8 +2444,11 @@ function setUploadSource(file) {
 function setGallerySource(rec) {
   clearUploadPreviewUrl();
   $("file-input").value = "";
-  source = { kind: "gallery", id: rec.id,
-             label: t("source.reference", { ad: (rec.prompt || rec.id).slice(0, 40) }) };
+  source = {
+    kind: "gallery",
+    id: rec.id,
+    label: t("source.reference", { ad: (rec.prompt || rec.id).slice(0, 40) }),
+  };
   // aynı görsel ek listesindeyse çift göndermemek için çıkar
   extras = extras.filter((it) => !(it.kind === "gallery" && it.id === rec.id));
   showPreview(rec);
@@ -2367,9 +2458,10 @@ function setGallerySource(rec) {
 }
 
 function setGallerySourceById(id, prompt) {
-  const rec = (typeof historyCache !== "undefined" && historyCache)
-    ? historyCache.find((r) => r.id === id)
-    : null;
+  const rec =
+    typeof historyCache !== "undefined" && historyCache
+      ? historyCache.find((r) => r.id === id)
+      : null;
   if (rec) {
     setGallerySource(rec);
   } else {
@@ -2378,8 +2470,6 @@ function setGallerySourceById(id, prompt) {
   showSection("studio");
   statusEl.textContent = t("source.set_as_main");
 }
-
-
 
 function clearSource() {
   clearUploadPreviewUrl();
@@ -2422,8 +2512,11 @@ function setSonKareUpload(file) {
 function setSonKareGallery(rec) {
   clearSonKarePreviewUrl();
   $("last-frame-input").value = "";
-  sonKare = { kind: "gallery", id: rec.id,
-              label: t("source.last_frame", { ad: (rec.prompt || rec.id).slice(0, 40) }) };
+  sonKare = {
+    kind: "gallery",
+    id: rec.id,
+    label: t("source.last_frame", { ad: (rec.prompt || rec.id).slice(0, 40) }),
+  };
   renderFrames();
 }
 
@@ -2440,16 +2533,28 @@ function setSonKareGallery(rec) {
  */
 function renderFrames() {
   const yuvalar = [
-    { deger: source, onizleme: uploadPreviewUrl, img: "first-frame-img",
-      bos: "first-frame-empty", sil: "first-frame-clear" },
-    { deger: sonKare, onizleme: sonKarePreviewUrl, img: "last-frame-img",
-      bos: "last-frame-empty", sil: "last-frame-clear" },
+    {
+      deger: source,
+      onizleme: uploadPreviewUrl,
+      img: "first-frame-img",
+      bos: "first-frame-empty",
+      sil: "first-frame-clear",
+    },
+    {
+      deger: sonKare,
+      onizleme: sonKarePreviewUrl,
+      img: "last-frame-img",
+      bos: "last-frame-empty",
+      sil: "last-frame-clear",
+    },
   ];
   for (const y of yuvalar) {
     const img = $(y.img);
-    const adres = !y.deger ? ""
-      : y.deger.kind === "upload" ? (y.onizleme || "")
-      : `/output/${encodeURIComponent(y.deger.id)}.png`;
+    const adres = !y.deger
+      ? ""
+      : y.deger.kind === "upload"
+        ? y.onizleme || ""
+        : `/output/${encodeURIComponent(y.deger.id)}.png`;
     if (adres) {
       img.src = adres;
       img.alt = y.deger.label;
@@ -2484,12 +2589,13 @@ function renderFrames() {
   // (çipin `hidden`den okuma kuralının aynısı).
   const gecis = !!(source && sonKare);
   const sure = Number($("duration").value || 0);
-  $("frames-note").textContent = (sonKare && !source)
-    ? t("gate.last_frame_needs_first")
-    : gecis
-      ? t("gen.transition_between_frames")
-        + (sure && sure !== 8 ? ` ${t("gen.last_frame_wants_8s")}` : "")
-      : "";
+  $("frames-note").textContent =
+    sonKare && !source
+      ? t("gate.last_frame_needs_first")
+      : gecis
+        ? t("gen.transition_between_frames") +
+          (sure && sure !== 8 ? ` ${t("gen.last_frame_wants_8s")}` : "")
+        : "";
 }
 
 // Tek eylem: referans varsa düzenle, yoksa üret
@@ -2501,10 +2607,14 @@ function renderFrames() {
  * gruplamak için, kimlik uzayı da tura özel.
  */
 function arenaKimlik() {
-  const ham = (typeof crypto !== "undefined" && crypto.randomUUID)
-    ? crypto.randomUUID().replace(/-/g, "")
-    : Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2);
-  return ham.replace(/[^0-9a-f]/g, "").slice(0, 12).padEnd(12, "0");
+  const ham =
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID().replace(/-/g, "")
+      : Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2);
+  return ham
+    .replace(/[^0-9a-f]/g, "")
+    .slice(0, 12)
+    .padEnd(12, "0");
 }
 
 /** ARENA TURU: aynı prompt, N model, N PARALEL istek.
@@ -2528,7 +2638,10 @@ async function runArena(prompt) {
   // görürken. Kapının tek sahibi `goBlockReason`; burada ikinci bir kopyası
   // kurulmuyor, olduğu gibi soruluyor.
   const engel = goBlockReason();
-  if (engel) { statusEl.textContent = engel; return; }
+  if (engel) {
+    statusEl.textContent = engel;
+    return;
+  }
   // Sayı kapıdan SONRA da ölçülüyor, çünkü kapı SEÇİMİ sayıyor
   // (`arenaSecimi`) ama koşacak olan sütunlar `arenaSutunlari` — katalogda
   // bulunmayan bir id orada düşüyor (`filter(Boolean)`), yani ikisi ayrışabilir.
@@ -2540,7 +2653,7 @@ async function runArena(prompt) {
 
   $("prompt").value = "";
   autoGrow($("prompt"));
-  composerKuculsun();   // kutu boşaldı ⇒ gönderim KABUL EDİLDİ
+  composerKuculsun(); // kutu boşaldı ⇒ gönderim KABUL EDİLDİ
   syncAskDirector();
 
   const pal = readPaletteOpts();
@@ -2560,40 +2673,54 @@ async function runArena(prompt) {
   // #go'yu sayfa yenilenene kadar "Üretim sürüyor…" diye kilitliyordu —
   // görseller çoktan diske düşmüşken, yani kilidin sebebi de yalan.
   try {
-    await Promise.all(sutunlar.map(async (s, i) => {
-      try {
-        const res = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          // Adet sütun başına 1 (bkz. arenaUygula). `arena_id` bayat bir
-          // sunucuda `extra="forbid"`e takılıp 422 döner ve `detailText` bunu
-          // Türkçe bir "sunucu eski sürüm" mesajına çeviriyor — sessiz sapma yok.
-          body: JSON.stringify({ prompt, size: s.size, quality: s.quality, n: 1,
-                                 model: s.model.id, arena_id: arenaId,
-                                 folder_id: currentFolder ? currentFolder.id : null,
-                                 ...(sessionId ? { session_id: sessionId } : {}),
-                                 ...pal }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(detailText(err) || t("err.http", { durum: res.status }));
+    await Promise.all(
+      sutunlar.map(async (s, i) => {
+        try {
+          const res = await fetch("/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            // Adet sütun başına 1 (bkz. arenaUygula). `arena_id` bayat bir
+            // sunucuda `extra="forbid"`e takılıp 422 döner ve `detailText` bunu
+            // Türkçe bir "sunucu eski sürüm" mesajına çeviriyor — sessiz sapma yok.
+            body: JSON.stringify({
+              prompt,
+              size: s.size,
+              quality: s.quality,
+              n: 1,
+              model: s.model.id,
+              arena_id: arenaId,
+              folder_id: currentFolder ? currentFolder.id : null,
+              ...(sessionId ? { session_id: sessionId } : {}),
+              ...pal,
+            }),
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(detailText(err) || t("err.http", { durum: res.status }));
+          }
+          const { images } = await res.json();
+          if (!images.length) throw new Error(t("gen.server_returned_nothing"));
+          const kayit = {
+            image_ids: images.map((r) => r.id),
+            params: {
+              kind: "generate",
+              size: s.size,
+              quality: s.quality,
+              model: s.model.id,
+              arena_id: arenaId,
+            },
+          };
+          sonuclar[i] = kayit;
+          fillArenaSlot(pending, i, kayit, arenaId);
+          // Önizleme İLK BİTENE değil ilk SÜTUNA ait: sıra kullanıcının seçtiği
+          // sıra ve yarışın hızlısı, karşılaştırmanın birincisi değil.
+          if (i === 0) showPreview(images[0]);
+        } catch (e) {
+          hatalar.push(`${s.model.short_label || s.model.label}: ${e.message}`);
+          failArenaSlot(pending, i, e.message);
         }
-        const { images } = await res.json();
-        if (!images.length) throw new Error(t("gen.server_returned_nothing"));
-        const kayit = { image_ids: images.map((r) => r.id),
-                        params: { kind: "generate", size: s.size,
-                                  quality: s.quality, model: s.model.id,
-                                  arena_id: arenaId } };
-        sonuclar[i] = kayit;
-        fillArenaSlot(pending, i, kayit, arenaId);
-        // Önizleme İLK BİTENE değil ilk SÜTUNA ait: sıra kullanıcının seçtiği
-        // sıra ve yarışın hızlısı, karşılaştırmanın birincisi değil.
-        if (i === 0) showPreview(images[0]);
-      } catch (e) {
-        hatalar.push(`${s.model.short_label || s.model.label}: ${e.message}`);
-        failArenaSlot(pending, i, e.message);
-      }
-    }));
+      }),
+    );
 
     const tutan = sonuclar.filter(Boolean);
     // Sayı ÖNCE, sebep sonra: "2/3" turun sonucunu tek bakışta veriyor, düşen
@@ -2619,25 +2746,26 @@ async function runArena(prompt) {
     // `catch`inde kalıyor). Görseller diskte, satır ekranda: söylenmezse
     // kullanıcı sayfayı yenileyene kadar EKSİK bir geçmiş görür ve bunu
     // açıklayamaz — "sessiz sapma yasak" duruşunun buradaki karşılığı.
-    statusEl.textContent =
-      `${statusEl.textContent} ${t("history.refresh_failed", { hata: e.message })}`;
+    statusEl.textContent = `${statusEl.textContent} ${t("history.refresh_failed", { hata: e.message })}`;
   } finally {
     runBusy = false;
-    syncGoGate();   // kapının tek yazarı (run()'ın deseni)
+    syncGoGate(); // kapının tek yazarı (run()'ın deseni)
   }
 }
 
 async function run() {
   const prompt = $("prompt").value.trim();
-  if (!prompt) { statusEl.textContent = t("composer.write_a_prompt"); return; }
+  if (!prompt) {
+    statusEl.textContent = t("composer.write_a_prompt");
+    return;
+  }
   // ARENA kendi akışı: N istek, N sütun, kısmi başarısızlık.
   if (arenaAcik) return runArena(prompt);
 
   $("prompt").value = "";
   autoGrow($("prompt"));
-  composerKuculsun();   // kutu boşaldı ⇒ gönderim KABUL EDİLDİ
+  composerKuculsun(); // kutu boşaldı ⇒ gönderim KABUL EDİLDİ
   syncAskDirector();
-
 
   const size = $("size").value;
   const quality = $("quality").value;
@@ -2714,10 +2842,16 @@ async function run() {
       request = fetch("/api/video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, size, quality, duration,
-                               n: parseInt(n, 10), model,
-                               folder_id: currentFolder ? currentFolder.id : null,
-                               ...(sessionId ? { session_id: sessionId } : {}) }),
+        body: JSON.stringify({
+          prompt,
+          size,
+          quality,
+          duration,
+          n: parseInt(n, 10),
+          model,
+          folder_id: currentFolder ? currentFolder.id : null,
+          ...(sessionId ? { session_id: sessionId } : {}),
+        }),
       });
     }
   } else if (editing) {
@@ -2749,10 +2883,16 @@ async function run() {
       headers: { "Content-Type": "application/json" },
       // `session_id` KOŞULLU: oturum yoksa alan hiç gönderilmiyor, böylece
       // gövde bugünküyle bayt bayt aynı kalıyor (palet dalının gerekçesi).
-      body: JSON.stringify({ prompt, size, quality, n: parseInt(n, 10), model,
-                             folder_id: currentFolder ? currentFolder.id : null,
-                             ...(sessionId ? { session_id: sessionId } : {}),
-                             ...pal }),
+      body: JSON.stringify({
+        prompt,
+        size,
+        quality,
+        n: parseInt(n, 10),
+        model,
+        folder_id: currentFolder ? currentFolder.id : null,
+        ...(sessionId ? { session_id: sessionId } : {}),
+        ...pal,
+      }),
     });
   }
 
@@ -2766,8 +2906,11 @@ async function run() {
   // yüzde vermiyor, ama BEKLENEN SÜRE uydurma değil bir olgu.
   statusEl.textContent = videoMu
     ? t("gen.video_running")
-    : !editing ? t("gen.running")
-    : extras.length ? t("gen.merging") : t("gen.editing");
+    : !editing
+      ? t("gen.running")
+      : extras.length
+        ? t("gen.merging")
+        : t("gen.editing");
   try {
     const res = await request;
     if (!res.ok) {
@@ -2784,10 +2927,12 @@ async function run() {
     if (images[0]) showPreview(images[0]);
     clearUploadPreviewUrl(); // sonuç sunucu URL'inden gösteriliyor; blob artık gereksiz
     statusEl.textContent = videoMu
-      ? (editing ? t("gen.video_ready")
-                 : tc("gen.videos_done_one", "gen.videos_done_many", images.length))
-      : editing ? t("gen.edit_done")
-                : tc("gen.images_done_one", "gen.images_done_many", images.length);
+      ? editing
+        ? t("gen.video_ready")
+        : tc("gen.videos_done_one", "gen.videos_done_many", images.length)
+      : editing
+        ? t("gen.edit_done")
+        : tc("gen.images_done_one", "gen.images_done_many", images.length);
     // Bayat sunucu tespiti — /api/edit multipart olduğu için orada
     // extra="forbid" karşılığı YOK: Starlette bilinmeyen form alanını sessizce
     // atar ve 200 döner. Tek savunma yanıtın alanı geri YANKILAMASI.
@@ -2799,8 +2944,12 @@ async function run() {
     if (images[0] && images[0].model !== model) {
       // `undefined !== "azure-gpt-image-2"` eski bir sunucuda DOĞRU sonuç:
       // alanı hiç yankılamayan sunucu gerçekten de alanı yok saymıştır.
-      warnings.push(t("gen.model_ignored", {
-        istenen: model, gelen: images[0].model || t("common.unknown") }));
+      warnings.push(
+        t("gen.model_ignored", {
+          istenen: model,
+          gelen: images[0].model || t("common.unknown"),
+        }),
+      );
     }
     // PALET UYARILARI YALNIZ GÖRSEL DALINDA: video ucu palet alanı hiç
     // kabul etmiyor (`VideoRequest` `extra="forbid"`), yani `pal.palette_hex`
@@ -2812,18 +2961,20 @@ async function run() {
       // ona göre olur (kredi süreyle çarpılıyor). Model yankısının aynı iki
       // yönlü gerekçesi.
       if (images[0] && images[0].duration !== duration) {
-        warnings.push(t("gen.duration_ignored", {
-          istenen: duration, gelen: images[0].duration || t("common.unknown") }));
+        warnings.push(
+          t("gen.duration_ignored", {
+            istenen: duration,
+            gelen: images[0].duration || t("common.unknown"),
+          }),
+        );
       }
     } else if (pal.palette_hex && images[0] && !images[0].palette) {
-      warnings.push(
-        t("gen.palette_ignored"));
+      warnings.push(t("gen.palette_ignored"));
     } else if (images[0] && images[0].palette && images[0].palette.applied === false) {
       // Ek, prompt karakter sınırına sığmadığı için düşürüldü. Kayıtta palet
       // görünür ama prompt'a girmedi; söylenmezse kullanıcı renksiz sonucu
       // açıklayamaz. Eski kayıtlarda alan yok → `=== false` bilinçli.
-      warnings.push(
-        t("gen.palette_too_long"));
+      warnings.push(t("gen.palette_too_long"));
     }
     if (warnings.length) statusEl.textContent = warnings.join(" · ");
     // Sonuç kaydı döküme: konuşma ve üretilen görseller aynı akışta (tasarım §5).
@@ -2840,13 +2991,19 @@ async function run() {
     // chat.js `resultThumb`). İkinci bir tür alanı AÇILMADI çünkü
     // `ResultParams` `extra="forbid"` taşıyor ve yeni bir zorunlu alan bütün
     // eski oturumları kaydedilemez kılardı.
-    await appendResultTurn(pending, images.map((r) => r.id),
-                           { kind: videoMu ? (editing ? "animate" : "video")
-                                           : editing ? "edit" : "generate",
-                             size, quality, model,
-                             // Süre yalnız video kaydında anlamlı; görselde 0
-                             // ve `ResultParams`ın varsayılanı da o.
-                             ...(videoMu ? { duration } : {}) });
+    await appendResultTurn(
+      pending,
+      images.map((r) => r.id),
+      {
+        kind: videoMu ? (editing ? "animate" : "video") : editing ? "edit" : "generate",
+        size,
+        quality,
+        model,
+        // Süre yalnız video kaydında anlamlı; görselde 0
+        // ve `ResultParams`ın varsayılanı da o.
+        ...(videoMu ? { duration } : {}),
+      },
+    );
     await loadHistory();
   } catch (e) {
     // BAŞARISIZ TUR GEÇMİŞTE KALMAZ (sendChat'in kuralı): kalsaydı döküme
@@ -2859,20 +3016,26 @@ async function run() {
     statusEl.textContent = e.message;
   } finally {
     runBusy = false;
-    syncGoGate();   // kapının tek yazarı — yapılandırma/mod/model hepsini birden görüyor
+    syncGoGate(); // kapının tek yazarı — yapılandırma/mod/model hepsini birden görüyor
   }
 }
 
 // ── Onay / ad sorma penceresi ────────────────────────────────────────
 // Tek temalı modal, native confirm() ve prompt()'un yerine geçer:
 // confirmDialog → Promise<boolean>, promptDialog → Promise<string|null>.
-let dialogResolve = null;      // açık diyaloğun resolve'u (kapalıysa null)
+let dialogResolve = null; // açık diyaloğun resolve'u (kapalıysa null)
 let dialogMode = "confirm";
-let dialogPrevFocus = null;    // kapanışta odak buraya döner
+let dialogPrevFocus = null; // kapanışta odak buraya döner
 
-function openDialog({ mode = "confirm", title, desc = "", okLabel = t("common.confirm"),
-                      danger = false, initial = "" }) {
-  closeDialog(mode === "prompt" ? null : false);   // üst üste açılmayı engelle
+function openDialog({
+  mode = "confirm",
+  title,
+  desc = "",
+  okLabel = t("common.confirm"),
+  danger = false,
+  initial = "",
+}) {
+  closeDialog(mode === "prompt" ? null : false); // üst üste açılmayı engelle
   dialogMode = mode;
   $("confirm-title").textContent = title;
   const descEl = $("confirm-desc");
@@ -2887,8 +3050,15 @@ function openDialog({ mode = "confirm", title, desc = "", okLabel = t("common.co
   if (mode === "prompt") input.value = initial;
   dialogPrevFocus = document.activeElement;
   $("confirm-modal").hidden = false;
-  if (mode === "prompt") { input.focus(); input.select(); } else { ok.focus(); }
-  return new Promise((resolve) => { dialogResolve = resolve; });
+  if (mode === "prompt") {
+    input.focus();
+    input.select();
+  } else {
+    ok.focus();
+  }
+  return new Promise((resolve) => {
+    dialogResolve = resolve;
+  });
 }
 
 function closeDialog(value) {
@@ -2904,11 +3074,16 @@ function closeDialog(value) {
 function submitDialog() {
   if (dialogMode !== "prompt") return closeDialog(true);
   const value = $("confirm-input").value.trim();
-  if (!value) { $("confirm-input").focus(); return; }   // boş adla kapanma
+  if (!value) {
+    $("confirm-input").focus();
+    return;
+  } // boş adla kapanma
   closeDialog(value);
 }
 
-function cancelDialog() { closeDialog(dialogMode === "prompt" ? null : false); }
+function cancelDialog() {
+  closeDialog(dialogMode === "prompt" ? null : false);
+}
 
 function confirmDialog(title, desc, { okLabel = t("common.delete") } = {}) {
   return openDialog({ mode: "confirm", title, desc, okLabel, danger: true });
@@ -2924,7 +3099,10 @@ $("confirm-modal").addEventListener("click", (e) => {
   if (e.target.hasAttribute("data-confirm-close")) cancelDialog();
 });
 $("confirm-input").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") { e.preventDefault(); submitDialog(); }
+  if (e.key === "Enter") {
+    e.preventDefault();
+    submitDialog();
+  }
 });
 // En üstteki katman: Escape yalnızca BU pencereyi kapatır. stopImmediatePropagation
 // şart — aksi halde aynı olayda sonra çalışan modal handler'ları "confirm kapandı"
@@ -2938,8 +3116,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 async function deleteImage(rec) {
-  const ok = await confirmDialog(t("image.delete_title"),
-    t("image.delete_body"));
+  const ok = await confirmDialog(t("image.delete_title"), t("image.delete_body"));
   if (!ok) return;
   statusEl.textContent = t("common.deleting");
   try {
@@ -2958,4 +3135,3 @@ async function deleteImage(rec) {
     statusEl.textContent = e.message;
   }
 }
-

@@ -31,11 +31,11 @@
   const MIN_SCALE = 1;
   const MAX_SCALE = 8;
   const DOUBLE_CLICK_SCALE = 2;
-  const WHEEL_K = 0.0015;      // fare tekerleği: yumuşak adım
-  const PINCH_K = 0.01;        // trackpad pinch (ctrl'lü wheel): 1:1'e yakın his
-  const ARROW_STEP = 60;       // px — klavye okuyla kaydırma
-  const RUBBER = 0.35;         // sınır ötesi direnç katsayısı (apple-design §9)
-  const SETTLE_MS = 220;       // bırakınca sınıra oturma süresi
+  const WHEEL_K = 0.0015; // fare tekerleği: yumuşak adım
+  const PINCH_K = 0.01; // trackpad pinch (ctrl'lü wheel): 1:1'e yakın his
+  const ARROW_STEP = 60; // px — klavye okuyla kaydırma
+  const RUBBER = 0.35; // sınır ötesi direnç katsayısı (apple-design §9)
+  const SETTLE_MS = 220; // bırakınca sınıra oturma süresi
 
   let scale = 1;
   let tx = 0;
@@ -45,9 +45,9 @@
   let grabX = 0;
   let grabY = 0;
   let rafId = 0;
-  let openerRect = null;   // açılışta tıklanan küçük resmin ekrandaki yeri
-  let kayit = null;        // ekrandaki medyanın SUNUCU kaydı (yoksa null)
-  let videoKipi = false;   // ekranda video var mı (zoom/pan kapalı)
+  let openerRect = null; // açılışta tıklanan küçük resmin ekrandaki yeri
+  let kayit = null; // ekrandaki medyanın SUNUCU kaydı (yoksa null)
+  let videoKipi = false; // ekranda video var mı (zoom/pan kapalı)
 
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -140,7 +140,9 @@
     vimg.style.transition = `transform ${SETTLE_MS}ms var(--ease)`;
     clampPan();
     render();
-    setTimeout(() => { vimg.style.transition = ""; }, SETTLE_MS);
+    setTimeout(() => {
+      vimg.style.transition = "";
+    }, SETTLE_MS);
   }
 
   // --- açılış / kapanış -----------------------------------------------------
@@ -167,7 +169,9 @@
     try {
       const path = new URL(src, location.href).pathname;
       if (path.startsWith("/output/")) ad = decodeURIComponent(path.slice("/output/".length));
-    } catch { ad = ""; }
+    } catch {
+      ad = "";
+    }
     if (!ad) return null;
     return { id: ad.replace(/\.(png|mp4)$/i, ""), filename: ad };
   }
@@ -234,8 +238,7 @@
    * "İndir" DURUYOR — o soru türe bağlı değil.
    */
   function zoomKontrolleri(goster) {
-    for (const id of ["viewer-zoom-out", "viewer-zoom-pct", "viewer-zoom-in",
-                      "viewer-fit"]) {
+    for (const id of ["viewer-zoom-out", "viewer-zoom-pct", "viewer-zoom-in", "viewer-fit"]) {
       $(id).hidden = !goster;
     }
   }
@@ -300,15 +303,16 @@
       if (to.width > 0 && to.height > 0) {
         const sx = from.width / to.width;
         const sy = from.height / to.height;
-        const dx = (from.left + from.width / 2) - (to.left + to.width / 2);
-        const dy = (from.top + from.height / 2) - (to.top + to.height / 2);
+        const dx = from.left + from.width / 2 - (to.left + to.width / 2);
+        const dy = from.top + from.height / 2 - (to.top + to.height / 2);
         vimg.style.transition = "none";
-        vimg.style.transform =
-          `translate3d(${dx}px, ${dy}px, 0) scale(${Math.min(sx, sy)})`;
+        vimg.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(${Math.min(sx, sy)})`;
         requestAnimationFrame(() => {
           vimg.style.transition = "transform 260ms var(--ease)";
           render();
-          setTimeout(() => { vimg.style.transition = ""; }, 260);
+          setTimeout(() => {
+            vimg.style.transition = "";
+          }, 260);
         });
       }
     }
@@ -352,11 +356,15 @@
   // preventDefault ZORUNLU: WKWebView'da ctrl'lü wheel (trackpad pinch)
   // engellenmezse TÜM sayfayı zoom'lar — uygulama arayüzü bozulur ve
   // kullanıcının bunu geri alması zor.
-  stage.addEventListener("wheel", (e) => {
-    e.preventDefault();
-    const k = e.ctrlKey ? PINCH_K : WHEEL_K;
-    zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * k));
-  }, { passive: false });
+  stage.addEventListener(
+    "wheel",
+    (e) => {
+      e.preventDefault();
+      const k = e.ctrlKey ? PINCH_K : WHEEL_K;
+      zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * k));
+    },
+    { passive: false },
+  );
 
   stage.addEventListener("dblclick", (e) => {
     if (scale > 1) fit();
@@ -371,7 +379,7 @@
     panning = true;
     pointerId = e.pointerId;
     vimg.setPointerCapture(pointerId);
-    grabX = e.clientX - tx;   // yakalama offset'i korunur (apple-design §2)
+    grabX = e.clientX - tx; // yakalama offset'i korunur (apple-design §2)
     grabY = e.clientY - ty;
     vimg.style.transition = "";
     stage.classList.add("panning");
@@ -426,41 +434,49 @@
     };
   }
 
-  stage.addEventListener("pointerdown", (e) => {
-    if (e.pointerType !== "touch") return;
-    dokunuslar.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (dokunuslar.size !== 2) return;
-    endPan();                       // tek parmak kaydırması pinch'e devrediyor
-    const m = pinchOlc();
-    pinchUzaklik = m.d;
-    pinchX = m.x;
-    pinchY = m.y;
-  }, true);
+  stage.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (e.pointerType !== "touch") return;
+      dokunuslar.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (dokunuslar.size !== 2) return;
+      endPan(); // tek parmak kaydırması pinch'e devrediyor
+      const m = pinchOlc();
+      pinchUzaklik = m.d;
+      pinchX = m.x;
+      pinchY = m.y;
+    },
+    true,
+  );
 
-  stage.addEventListener("pointermove", (e) => {
-    if (e.pointerType !== "touch" || !dokunuslar.has(e.pointerId)) return;
-    dokunuslar.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (dokunuslar.size !== 2) return;
-    e.preventDefault();
+  stage.addEventListener(
+    "pointermove",
+    (e) => {
+      if (e.pointerType !== "touch" || !dokunuslar.has(e.pointerId)) return;
+      dokunuslar.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (dokunuslar.size !== 2) return;
+      e.preventDefault();
 
-    const m = pinchOlc();
-    // İki parmağın ORTASI sabit kalacak şekilde ölçekle — `zoomAt`in imleç
-    // altındaki noktayı sabitleyen mantığının birebir aynısı.
-    if (pinchUzaklik > 0 && m.d > 0) zoomAt(m.x, m.y, m.d / pinchUzaklik);
+      const m = pinchOlc();
+      // İki parmağın ORTASI sabit kalacak şekilde ölçekle — `zoomAt`in imleç
+      // altındaki noktayı sabitleyen mantığının birebir aynısı.
+      if (pinchUzaklik > 0 && m.d > 0) zoomAt(m.x, m.y, m.d / pinchUzaklik);
 
-    // Parmakların ORTAK kayması = kaydırma. Ayrı bir jest değil: gerçek
-    // nesnelerde de iki parmakla hem ölçekleyip hem sürüklenir.
-    if (scale > 1) {
-      const b = panBounds();
-      tx = clamp(tx + (m.x - pinchX), -b.x, b.x);
-      ty = clamp(ty + (m.y - pinchY), -b.y, b.y);
-      schedule();
-    }
+      // Parmakların ORTAK kayması = kaydırma. Ayrı bir jest değil: gerçek
+      // nesnelerde de iki parmakla hem ölçekleyip hem sürüklenir.
+      if (scale > 1) {
+        const b = panBounds();
+        tx = clamp(tx + (m.x - pinchX), -b.x, b.x);
+        ty = clamp(ty + (m.y - pinchY), -b.y, b.y);
+        schedule();
+      }
 
-    pinchUzaklik = m.d;
-    pinchX = m.x;
-    pinchY = m.y;
-  }, true);
+      pinchUzaklik = m.d;
+      pinchX = m.x;
+      pinchY = m.y;
+    },
+    true,
+  );
 
   function dokunusBitti(e) {
     if (!dokunuslar.has(e.pointerId)) return;
@@ -468,7 +484,7 @@
     if (dokunuslar.size >= 2) return;
     if (pinchUzaklik > 0) {
       pinchUzaklik = 0;
-      pinchBitis = Date.now();      // aşağıdaki kapatma muhafızı için
+      pinchBitis = Date.now(); // aşağıdaki kapatma muhafızı için
       settle();
     }
   }
@@ -491,11 +507,28 @@
 
   document.addEventListener("keydown", (e) => {
     if (viewer.hidden) return;
-    if (e.key === "Escape") { close(); return; }
-    if (e.key === "+" || e.key === "=") { e.preventDefault(); zoomCentered(1.4); return; }
-    if (e.key === "-") { e.preventDefault(); zoomCentered(1 / 1.4); return; }
-    if (e.key === "0") { e.preventDefault(); fit(); return; }
-    const step = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[e.key];
+    if (e.key === "Escape") {
+      close();
+      return;
+    }
+    if (e.key === "+" || e.key === "=") {
+      e.preventDefault();
+      zoomCentered(1.4);
+      return;
+    }
+    if (e.key === "-") {
+      e.preventDefault();
+      zoomCentered(1 / 1.4);
+      return;
+    }
+    if (e.key === "0") {
+      e.preventDefault();
+      fit();
+      return;
+    }
+    const step = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[
+      e.key
+    ];
     if (step && scale > 1) {
       e.preventDefault();
       tx += step[0] * ARROW_STEP;

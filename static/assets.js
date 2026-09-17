@@ -35,17 +35,19 @@ const ASSET_EMPTY_KEYS = {
 // tablo) ve düğmenin ETİKETİ hedefi söylüyor, yani bir daha görünmez bir
 // varsayılana dönüşemez. Bekçisi tests/test_index.py.
 const UPLOAD_TARGET = {
-  all: "logos",       // "Tümü" bir hedef değil; en sık kullanılan türe düşer
+  all: "logos", // "Tümü" bir hedef değil; en sık kullanılan türe düşer
   logos: "logos",
   mottos: "mottos",
   banners: "banners",
 };
 const UPLOAD_LABEL_KEYS = {
-  logos: "library.upload_logo", mottos: "library.upload_motto",
+  logos: "library.upload_logo",
+  mottos: "library.upload_motto",
   banners: "library.upload_banner",
 };
 const UPLOAD_DONE_KEYS = {
-  logos: "library.added_logo", mottos: "library.added_motto",
+  logos: "library.added_logo",
+  mottos: "library.added_motto",
   banners: "library.added_banner",
 };
 // Tür ADI ayrı bir tablo ve bu bir tekrar DEĞİL: düğme etiketinden ilk kelimeyi
@@ -53,7 +55,8 @@ const UPLOAD_DONE_KEYS = {
 // çalışıyordu, İngilizce'de "Upload" verirdi. Dil bilgisi sırasına dayanan bir
 // çıkarım, çeviriyle birlikte sessizce yanlışa döner.
 const ASSET_KIND_KEYS = {
-  logos: "library.kind_logo_one", mottos: "library.kind_motto_one",
+  logos: "library.kind_logo_one",
+  mottos: "library.kind_motto_one",
   banners: "library.kind_banner_one",
 };
 
@@ -70,15 +73,13 @@ function uploadTargetKind() {
  */
 function assetEmptyText(kind) {
   const baslik = t(ASSET_EMPTY_KEYS[kind] || "library.empty_all");
-  return t("library.empty_hint",
-           { baslik, dugme: t(UPLOAD_LABEL_KEYS[uploadTargetKind()]) });
+  return t("library.empty_hint", { baslik, dugme: t(UPLOAD_LABEL_KEYS[uploadTargetKind()]) });
 }
 
 function syncUploadLabel() {
   const kind = uploadTargetKind();
   $("asset-upload-label").textContent = t(UPLOAD_LABEL_KEYS[kind]);
-  $("asset-upload-btn").title =
-    t("library.upload_btn_title", { tur: t(ASSET_KIND_KEYS[kind]) });
+  $("asset-upload-btn").title = t("library.upload_btn_title", { tur: t(ASSET_KIND_KEYS[kind]) });
 }
 
 const OVERLAY_EMPTY_KEYS = {
@@ -98,7 +99,9 @@ const OVERLAY_PICK_KEYS = {
   banner: "overlay.pick_banner",
 };
 
-function assetStatus(msg) { $("asset-status").textContent = msg || ""; }
+function assetStatus(msg) {
+  $("asset-status").textContent = msg || "";
+}
 
 async function loadAssets(kind) {
   try {
@@ -164,7 +167,9 @@ async function uploadAsset(kind, file) {
     const res = await fetch(`/api/assets/${kind}`, { method: "POST", body: fd });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(typeof err.detail === "string" ? err.detail : t("err.http", { durum: res.status }));
+      throw new Error(
+        typeof err.detail === "string" ? err.detail : t("err.http", { durum: res.status }),
+      );
     }
     // Hangi türe gittiğini SÖYLÜYOR: "Eklendi." tek başına, varlığın
     // kullanılamaz bir türe düştüğü hâlde de aynı cümleyi yazıyordu.
@@ -176,8 +181,7 @@ async function uploadAsset(kind, file) {
 }
 
 async function deleteAssetItem(kind, id) {
-  const ok = await confirmDialog(t("library.delete_title"),
-    t("library.delete_body"));
+  const ok = await confirmDialog(t("library.delete_title"), t("library.delete_body"));
   if (!ok) return;
   try {
     const res = await fetch(`/api/assets/${kind}/${id}`, { method: "DELETE" });
@@ -200,7 +204,7 @@ $("asset-tabs").addEventListener("click", (e) => {
   selectInGroup("#asset-tabs", btn);
   assetPanelKind = btn.dataset.akind;
   assetStatus("");
-  syncUploadLabel();   // sekme hedefi de değiştirir; etiket bayat kalmasın
+  syncUploadLabel(); // sekme hedefi de değiştirir; etiket bayat kalmasın
   renderAssetPanel();
 });
 $("asset-upload-btn").addEventListener("click", () => $("asset-file-input").click());
@@ -232,8 +236,8 @@ $("library-btn").addEventListener("click", () => {
 
 // ── Bindirme modalı: logo VEYA banner + canlı önizleme ──────────────
 let logoId = null;
-let rawPreviewSrc = "";                                 // ham (bindirmesiz) görsel URL'i
-let overlayMode = "logo";                               // "logo" | "motto" | "banner"
+let rawPreviewSrc = ""; // ham (bindirmesiz) görsel URL'i
+let overlayMode = "logo"; // "logo" | "motto" | "banner"
 // logo/motto/banner: id|null — üçü de kullanıcı kütüphanesinden gelir.
 // Logonun eskiden "builtin" adlı bir dördüncü hâli vardı (pakete gömülü yerleşik
 // logo çifti); uygulama marka-nötr olduğundan kaldırıldı.
@@ -257,8 +261,7 @@ function formatOffset(value) {
 }
 
 function readOffsetSliders() {
-  return { x: parseInt($("logo-offset-x").value, 10),
-           y: parseInt($("logo-offset-y").value, 10) };
+  return { x: parseInt($("logo-offset-x").value, 10), y: parseInt($("logo-offset-y").value, 10) };
 }
 
 function writeOffsetSliders({ x, y }) {
@@ -320,7 +323,11 @@ function syncBannerLabels() {
   // %100'de yatayda boş alan yok → hizalama matematiksel olarak etkisiz.
   // Ölü kontrole basılmasın diye kilitlenir ve nedeni yazılır.
   const fullWidth = scale >= 100;
-  $("banner-align").querySelectorAll("button").forEach((b) => { b.disabled = fullWidth; });
+  $("banner-align")
+    .querySelectorAll("button")
+    .forEach((b) => {
+      b.disabled = fullWidth;
+    });
   $("banner-align-note").hidden = !fullWidth;
 }
 
@@ -329,11 +336,14 @@ function renderOverlayPicker() {
   wrap.innerHTML = "";
   const options = [];
   if (overlayMode === "logo") {
-    for (const it of assetCache.logos) options.push({ id: it.id, name: it.name, src: `/assets/logos/${it.filename}` });
+    for (const it of assetCache.logos)
+      options.push({ id: it.id, name: it.name, src: `/assets/logos/${it.filename}` });
   } else if (overlayMode === "motto") {
-    for (const it of assetCache.mottos) options.push({ id: it.id, name: it.name, src: `/assets/mottos/${it.filename}` });
+    for (const it of assetCache.mottos)
+      options.push({ id: it.id, name: it.name, src: `/assets/mottos/${it.filename}` });
   } else {
-    for (const it of assetCache.banners) options.push({ id: it.id, name: it.name, src: `/assets/banners/${it.filename}` });
+    for (const it of assetCache.banners)
+      options.push({ id: it.id, name: it.name, src: `/assets/banners/${it.filename}` });
   }
   if (!options.length) {
     const hint = document.createElement("p");
@@ -394,7 +404,10 @@ function openLogoModal(rec) {
   $("banner-only").hidden = true;
   selectInGroup("#logo-grid", document.querySelector('#logo-grid button[data-pos="bottom-right"]'));
   selectInGroup("#banner-edge", document.querySelector('#banner-edge button[data-edge="bottom"]'));
-  selectInGroup("#banner-align", document.querySelector('#banner-align button[data-align="center"]'));
+  selectInGroup(
+    "#banner-align",
+    document.querySelector('#banner-align button[data-align="center"]'),
+  );
   $("logo-size").value = 14;
   $("logo-shadow").value = 47;
   $("logo-blur").value = 6;
@@ -422,7 +435,7 @@ function closeLogoModal() {
 function overlayNeedsAsset() {
   if (overlayMode === "motto") return !selectedAsset.motto;
   if (overlayMode === "banner") return !selectedAsset.banner;
-  return !selectedAsset.logo;   // yerleşik logo yok: kütüphaneden seçim şart
+  return !selectedAsset.logo; // yerleşik logo yok: kütüphaneden seçim şart
 }
 
 async function fetchOverlayPreview() {
@@ -444,7 +457,9 @@ async function fetchOverlayPreview() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(typeof err.detail === "string" ? err.detail : t("err.http", { durum: res.status }));
+      throw new Error(
+        typeof err.detail === "string" ? err.detail : t("err.http", { durum: res.status }),
+      );
     }
     const { b64 } = await res.json();
     if (token !== logoPreviewToken) return; // daha yeni bir önizleme devraldı
@@ -463,8 +478,11 @@ function refreshLogoPreview() {
   logoPreviewTimer = setTimeout(fetchOverlayPreview, 220);
 }
 
-const OVERLAY_DONE_KEYS = { logo: "library.added_logo", motto: "library.added_motto",
-                            banner: "library.added_banner" };
+const OVERLAY_DONE_KEYS = {
+  logo: "library.added_logo",
+  motto: "library.added_motto",
+  banner: "library.added_banner",
+};
 
 async function applyOverlay() {
   if (!logoId) return;
@@ -484,7 +502,9 @@ async function applyOverlay() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(typeof err.detail === "string" ? err.detail : t("err.http", { durum: res.status }));
+      throw new Error(
+        typeof err.detail === "string" ? err.detail : t("err.http", { durum: res.status }),
+      );
     }
     const { image } = await res.json();
     const doneText = t(OVERLAY_DONE_KEYS[overlayMode] || "library.added");
@@ -522,7 +542,10 @@ $("banner-align").addEventListener("click", (e) => {
   refreshLogoPreview();
 });
 ["logo-size", "logo-shadow", "logo-blur"].forEach((id) =>
-  $(id).addEventListener("input", () => { syncLogoLabels(); refreshLogoPreview(); })
+  $(id).addEventListener("input", () => {
+    syncLogoLabels();
+    refreshLogoPreview();
+  }),
 );
 // Kaydırma slider'ları yukarıdaki listeye KATILMIYOR: ayrıca overlayOffset'e
 // yazmaları gerek. Mod guard'ı savunma amaçlı — banner modunda #logo-only
@@ -533,7 +556,7 @@ $("banner-align").addEventListener("click", (e) => {
     if (overlayOffset[overlayMode]) overlayOffset[overlayMode] = readOffsetSliders();
     syncLogoLabels();
     refreshLogoPreview();
-  })
+  }),
 );
 // Bipolar bir slider'da fareyle tam 0'a dönmek zor (ok tuşları 1 birim
 // adımlıyor, o yol açık ama tek tıkla dönüş de olmalı).
@@ -544,7 +567,10 @@ $("logo-offset-reset").addEventListener("click", () => {
   refreshLogoPreview();
 });
 ["banner-scale", "banner-margin"].forEach((id) =>
-  $(id).addEventListener("input", () => { syncBannerLabels(); refreshLogoPreview(); })
+  $(id).addEventListener("input", () => {
+    syncBannerLabels();
+    refreshLogoPreview();
+  }),
 );
 // Sol paneldeki "Logo ekle": bindirmeyi önizlemedeki görsele uygular
 $("logo-add-btn").addEventListener("click", () => {
@@ -558,4 +584,3 @@ $("logo-modal").addEventListener("click", (e) => {
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && $("confirm-modal").hidden && !$("logo-modal").hidden) closeLogoModal();
 });
-

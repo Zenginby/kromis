@@ -1,0 +1,24 @@
+# prettier yalnız static/*.js biçimlendiriyor (Faz 0 / Adım 7). Gerekçeler:
+#
+#   * static/pixel-canvas.js — üçüncü parti (Ryan Mulligan, MIT). Başkasının
+#     dosyasını yeniden yazmak yok; tests/test_telif_basligi.py ile aynı duruş.
+#   * static/*.css ve static/index.html — tests/test_index.py servis edilen
+#     HTML/CSS METNİNE iddia yazıyor (286 test); biçimlendirme o iddiaları
+#     içerik değişmeden kırar. Karar Faz 1'in çerçeve seçimiyle birlikte
+#     (docs/superpowers/specs/2026-09-17-onyuz-paketleme.md).
+#   * static/fonts/ — ikili + OFL.txt.
+#   * docs/graflar/ — tools/graf_uret.py üretiyor; biçimlendirilirse --kontrol
+#     kırmızıya döner.
+static/pixel-canvas.js
+static/*.css
+static/*.html
+static/fonts/
+docs/
+node_modules/
+.venv/
+dist/
+build/
+android/
+tests/
+bundled/
+package-lock.json

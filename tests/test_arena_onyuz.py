@@ -10,6 +10,7 @@ tarayıcı ölçümü Playwright dosyasının işi (CI'da koşmuyor).
 """
 import re
 
+import pytest
 from fastapi.testclient import TestClient
 
 import app as appmod
@@ -120,6 +121,7 @@ def test_the_axis_translation_lives_in_exactly_one_place():
         "üretim isteği çeviriyi kendi başına kuruyor")
 
 
+@pytest.mark.usefixtures("depo_db")   # `/api/settings` tercih satırını okuyor (Faz 1 / 6)
 def test_size_is_translated_through_the_ratio_the_server_publishes():
     """Modellerin boyut JETONLARI farklı (`1024x1536` ↔ `2:3`); ortak olan ORAN.
 

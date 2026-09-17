@@ -12,16 +12,21 @@ from __future__ import annotations
 import os
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
 import color_names
 import i18n
 import palette
-import palette_store
 from models import SavePaletteRequest, SuggestRequest
-from services import ayar, dil, kimlik, palet, zaman
+from services import depo_palet, dil, kimlik, palet, zaman
+from services.db import OTURUM
 from services.tablolar import Kullanici
 
 router = APIRouter()
+
+# Paletler DB'de (Faz 1 / 6): üç kütüphane rotası dizin okumuyor, `ayar.ayarlar`
+# almıyor — kapı doğrudan, satırlar isteğin `Session`ında. `palette_store`
+# buradan okunmaz (bekçisi tests/test_galeri_db.py).
 
 
 @router.post("/api/palette/suggest")
@@ -60,13 +65,14 @@ def suggest_palettes(req: SuggestRequest,
 
 
 @router.get("/api/palettes")
-def list_palettes_route(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
-    return {"items": palette_store.list_palettes(ayarlar.output_dir)}
+def list_palettes_route(db: Session = OTURUM,
+                        kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+    return {"items": depo_palet.listele(db, kullanici.id)}
 
 
 @router.post("/api/palettes")
-def create_palette_route(req: SavePaletteRequest,
-                         ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def create_palette_route(req: SavePaletteRequest, db: Session = OTURUM,
+                         kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     name = req.name.strip()
     if not name:
         raise HTTPException(status_code=422, detail=i18n.t("err.palette_name_required", dil.aktif()))
@@ -82,14 +88,14 @@ def create_palette_route(req: SavePaletteRequest,
     # prompt'a gider ve sonraki kullanımlarda çıkarma göndermek gerekmez.
     # Kalıcı olarak daha az renkli bir paletin tek yolu bu (bkz. models.drop).
     colors = palet.drop_colors(colors, req.drop)
-    return {"palette": palette_store.create(name, req.seed, req.mode, req.strength,
-                                            colors, ayarlar.output_dir, now=zaman.simdi())}
+    return {"palette": depo_palet.olustur(db, kullanici.id, name, req.seed, req.mode,
+                                          req.strength, colors, now=zaman.an())}
 
 
 @router.delete("/api/palettes/{palette_id}")
-def delete_palette_route(palette_id: str,
-                         ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def delete_palette_route(palette_id: str, db: Session = OTURUM,
+                         kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     pid = os.path.basename(palette_id)
-    if not palette_store.delete(pid, ayarlar.output_dir):
+    if not depo_palet.sil(db, kullanici.id, pid):
         raise HTTPException(status_code=404, detail=i18n.t("err.palette_missing", dil.aktif()))
     return {"deleted": pid}

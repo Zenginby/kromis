@@ -27,6 +27,10 @@ import app as appmod
 import guncelleme
 import version
 
+# `guncelleme_kontrolu` tercihi `tercihler` satırından (Faz 1 / 6); önbellek
+# dosyası (`guncelleme.json`) hâlâ diskte — gerekçe tests/conftest.py::depo_db.
+pytestmark = pytest.mark.usefixtures("depo_db")
+
 
 @pytest.fixture(autouse=True)
 def _bayragi_sifirla():

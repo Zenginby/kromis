@@ -1,16 +1,24 @@
 """`/api/chats` — kayıtlı sohbet rotaları (v1.15).
 
-Kalıcılığın kendisi tests/test_chat_store.py'de; burada ölçülen şey rota
-sözleşmesi: 404'ler, 422 kapıları ve `POST /api/chat`'in (tamamlama)
-BU yolla karışmadığı.
+Kalıcılığın kendisi tests/test_sohbet_db.py'de (eski `chat_store` için
+tests/test_chat_store.py); burada ölçülen şey rota sözleşmesi: 404'ler, 422
+kapıları ve `POST /api/chat`'in (tamamlama) BU yolla karışmadığı.
+
+Kayıt `sohbetler` satırı (Faz 1 / 6): test kullanıcısı gerçek satır, `db.oturum`
+bu dosyanın motoruna bağlı — gerekçe tests/conftest.py::depo_db. Depoya doğrudan
+bakan iddialar `depo_sohbet.bul(db_oturumu, kullanici.id, …)` ile; `chats.json`
+kullanıcı dizininde HİÇ oluşmaz.
 """
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 
 import app as appmod
-import chat_store
 import models
-import storage
+from services import depo_medya, depo_sohbet
+
+pytestmark = pytest.mark.usefixtures("depo_db")
 
 THREAD = [{"role": "user", "content": "kare instagram görseli"},
           {"role": "assistant", "content": "hangi mecra?"}]
@@ -35,14 +43,15 @@ def _create(client, title="kare görsel", messages=None):
 
 # ── Oluşturma ───────────────────────────────────────────────────────────
 
-def test_post_creates_a_chat_and_returns_the_record(client, out_dir):
+def test_post_creates_a_chat_and_returns_the_record(client, out_dir, db_oturumu, kullanici):
     r = _create(client)
 
     assert r.status_code == 200
     chat = r.json()["chat"]
     assert chat["title"] == "kare görsel"
     assert chat["messages"] == THREAD
-    assert chat_store.get(chat["id"], out_dir) == chat
+    assert depo_sohbet.bul(db_oturumu, kullanici.id, chat["id"]) == chat
+    assert not os.path.exists(os.path.join(out_dir, "chats.json")), "manifest web yolunda yazıldı"
 
 
 def test_post_without_a_title_is_an_automatic_save(client):
@@ -210,23 +219,23 @@ def test_get_with_a_path_traversal_id_is_404(client):
 
 # ── Güncelleme ──────────────────────────────────────────────────────────
 
-def test_put_replaces_the_thread(client, out_dir):
+def test_put_replaces_the_thread(client, db_oturumu, kullanici):
     chat_id = _create(client).json()["chat"]["id"]
     longer = THREAD + [{"role": "user", "content": "daha sıcak"}]
 
     r = client.put(f"/api/chats/{chat_id}", json={"messages": longer})
 
     assert r.status_code == 200
-    assert chat_store.get(chat_id, out_dir)["messages"] == longer
+    assert depo_sohbet.bul(db_oturumu, kullanici.id, chat_id)["messages"] == longer
 
 
-def test_put_renames_without_sending_the_thread(client, out_dir):
+def test_put_renames_without_sending_the_thread(client, db_oturumu, kullanici):
     chat_id = _create(client).json()["chat"]["id"]
 
     r = client.put(f"/api/chats/{chat_id}", json={"title": "yeni ad"})
 
     assert r.status_code == 200
-    saved = chat_store.get(chat_id, out_dir)
+    saved = depo_sohbet.bul(db_oturumu, kullanici.id, chat_id)
     assert saved["title"] == "yeni ad"
     assert saved["messages"] == THREAD      # gövdeye dokunulmadı
 
@@ -252,7 +261,7 @@ def test_put_rejects_an_unknown_field(client):
 
 # ── Silme ───────────────────────────────────────────────────────────────
 
-def test_delete_removes_the_chat_and_is_404_the_second_time(client, out_dir):
+def test_delete_removes_the_chat_and_is_404_the_second_time(client, db_oturumu, kullanici):
     chat_id = _create(client).json()["chat"]["id"]
 
     first = client.delete(f"/api/chats/{chat_id}")
@@ -260,7 +269,7 @@ def test_delete_removes_the_chat_and_is_404_the_second_time(client, out_dir):
 
     assert first.status_code == 200 and first.json() == {"deleted": chat_id}
     assert second.status_code == 404
-    assert chat_store.get(chat_id, out_dir) is None
+    assert depo_sohbet.bul(db_oturumu, kullanici.id, chat_id) is None
 
 
 # ── v2.0: "tümünü sil" (karar D1'in ikinci güvencesi) ───────────────────
@@ -317,7 +326,7 @@ def test_a_named_save_still_works_while_the_switch_is_off(client):
         == ["elle kaydettim"]
 
 
-def test_an_automatic_body_update_is_refused_while_the_switch_is_off(client, out_dir):
+def test_an_automatic_body_update_is_refused_while_the_switch_is_off(client, db_oturumu, kullanici):
     """Tur sonu yazımı da gövde-yalnız bir `PUT`: anahtar kapalıysa o da durur.
 
     Yalnız `POST` kapatılsaydı anahtar yarım çalışırdı — açıkken başlamış bir
@@ -330,10 +339,10 @@ def test_an_automatic_body_update_is_refused_while_the_switch_is_off(client, out
         {"role": "user", "content": "devam"}]})
 
     assert r.status_code == 409
-    assert chat_store.get(cid, out_dir)["messages"] == THREAD
+    assert depo_sohbet.bul(db_oturumu, kullanici.id, cid)["messages"] == THREAD
 
 
-def test_renaming_still_works_while_the_switch_is_off(client, out_dir):
+def test_renaming_still_works_while_the_switch_is_off(client, db_oturumu, kullanici):
     """Yeniden adlandırma kullanıcının kendi eylemi — anahtarla ilgisi yok."""
     cid = _create(client).json()["chat"]["id"]
     client.post("/api/prefs", json={"autosave_sessions": False})
@@ -341,7 +350,7 @@ def test_renaming_still_works_while_the_switch_is_off(client, out_dir):
     r = client.put(f"/api/chats/{cid}", json={"title": "yeni ad"})
 
     assert r.status_code == 200
-    assert chat_store.get(cid, out_dir)["title"] == "yeni ad"
+    assert depo_sohbet.bul(db_oturumu, kullanici.id, cid)["title"] == "yeni ad"
 
 
 def test_deleting_still_works_while_the_switch_is_off(client):
@@ -399,7 +408,7 @@ def test_a_saved_selection_label_round_trips_through_the_store(client):
     assert got[1].get("display") is None
 
 
-def test_saving_a_plain_thread_adds_no_null_display_to_the_file(client, out_dir):
+def test_saving_a_plain_thread_adds_no_null_display_to_the_file(client, db_oturumu, kullanici):
     """`exclude_none` olmadan her mesaja `"display": null` yazılırdı.
 
     Eski sohbetlerin gövdesi sebepsiz büyür ve gövde eşitliğini ölçen testler
@@ -408,7 +417,7 @@ def test_saving_a_plain_thread_adds_no_null_display_to_the_file(client, out_dir)
     """
     cid = _create(client).json()["chat"]["id"]
 
-    stored = chat_store.get(cid, out_dir)
+    stored = depo_sohbet.bul(db_oturumu, kullanici.id, cid)
 
     assert stored["messages"] == THREAD, "kaydedilen gövde girdiyle birebir değil"
     for m in stored["messages"]:
@@ -464,20 +473,22 @@ def test_the_list_carries_the_cover_for_the_side_panel(client):
         "sohbet": None, "üretimli": "aaaa1111aaaa"}
 
 
-def test_a_deleted_image_leaves_the_transcript_readable(client, out_dir):
-    """`storage.delete_many` dökümdeki `image_id`'yi SARKIK bırakıyor — kasten.
+def test_a_deleted_image_leaves_the_transcript_readable(client, out_dir, db_oturumu, kullanici):
+    """`depo_medya.sil_coklu` dökümdeki `image_id`'yi SARKIK bırakıyor — kasten.
 
     Sunucu kaydı budamıyor: budasa oturum "burada iki görsel üretmiştim"
     bilgisini kaybederdi. Sarkan id'yi arayüz "görsel silindi" yer tutucusuyla
     çiziyor (tasarım §5); bu testin ölçtüğü şey sunucunun kendi payı —
     döküm 200 dönmeye devam eder ve id'ler olduğu gibi kalır.
     """
-    gen = storage.save(b"\x89PNG", {"prompt": "cat", "size": "1024x1024",
-                                    "quality": "low", "parent_id": None},
-                       out_dir, now="2026-08-07T10:00:00")
+    gen = depo_medya.kaydet(db_oturumu, kullanici.id, b"\x89PNG",
+                            {"prompt": "cat", "size": "1024x1024", "quality": "low",
+                             "parent_id": None}, out_dir)
+    db_oturumu.commit()
     cid = _create(client, messages=THREAD + [_result(gen["id"])]).json()["chat"]["id"]
 
-    assert storage.delete_many([gen["id"]], out_dir) == 1
+    assert depo_medya.sil_coklu(db_oturumu, kullanici.id, [gen["id"]], out_dir) == 1
+    db_oturumu.commit()
 
     r = client.get(f"/api/chats/{cid}")
     assert r.status_code == 200

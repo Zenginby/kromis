@@ -14,13 +14,14 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 import app as appmod
-import assets_store as astore
 import azure_client as ac
 import color_names as cn
 import palette
+from services import depo_varlik, tablolar
 
-# Galeri/klasör/üretim rotaları DB'de (Faz 1 / 5): test kullanıcısı gerçek satır,
-# `db.oturum` bu dosyanın motoruna bağlı — gerekçe tests/conftest.py::depo_db.
+# Galeri/klasör/üretim rotaları (Faz 1 / 5) ve paletler/varlıklar (Faz 1 / 6) DB'de:
+# test kullanıcısı gerçek satır, `db.oturum` bu dosyanın motoruna bağlı —
+# gerekçe tests/conftest.py::depo_db.
 pytestmark = pytest.mark.usefixtures("depo_db")
 
 SEED = "#c86a3c"
@@ -229,12 +230,26 @@ def test_save_rejects_bad_payloads(tmp_path, monkeypatch, payload, dizinler):
     assert client.post("/api/palettes", json=payload).status_code == 422
 
 
-def test_corrupt_palettes_file_is_tolerated(tmp_path, monkeypatch, dizinler):
+def test_a_stray_palettes_file_is_never_read(tmp_path, monkeypatch, dizinler):
+    """Faz 1 / 6: `palettes.json` web yolunda AÇILMAZ — bozuk da olsa, dolu da olsa.
+
+    Eskiden bu test bozuk dosyanın hoş görüldüğünü ölçüyordu; bugün dosya
+    hiç okunmuyor, kayıt `paletler` satırı. Dolu bir dosya da listede
+    görünmez: içe aktarma aracının (8. görev) işi.
+    """
     client, _ = _client(tmp_path, monkeypatch, dizinler)
     out = tmp_path / "output"
     out.mkdir(parents=True, exist_ok=True)
-    (out / "palettes.json").write_text("{bozuk", encoding="utf-8")
+    (out / "palettes.json").write_text(
+        json.dumps([{"id": "a1b2c3d4e5f6", "name": "Diskte", "seed": SEED, "mode": "triad",
+                     "strength": "balanced", "colors": [], "created_at": "2026-01-01T00:00:00"}]),
+        encoding="utf-8")
     assert client.get("/api/palettes").json()["items"] == []
+    saved = client.post("/api/palettes", json={"name": "DB", "seed": SEED,
+                                               "mode": "triad"}).json()["palette"]
+    assert [p["id"] for p in client.get("/api/palettes").json()["items"]] == [saved["id"]]
+    assert (out / "palettes.json").read_text(encoding="utf-8").startswith("[{\"id\": \"a1b2"), (
+        "web yolu dosyaya yazdı")
 
 
 # ── Asıl kanıt: ek Azure'a giden metne ulaşıyor mu ──────────────────────────
@@ -460,14 +475,17 @@ def test_edit_also_honors_a_saved_palette_id(tmp_path, monkeypatch, dizinler):
 
 # ── Türevler ve eski kayıtlar ───────────────────────────────────────────────
 
-def test_logo_derivative_inherits_the_palette(tmp_path, monkeypatch, fake_composite, dizinler):
+def test_logo_derivative_inherits_the_palette(tmp_path, monkeypatch, fake_composite, dizinler,
+                                              db_oturumu, kullanici):
     client, _ = _client(tmp_path, monkeypatch, dizinler, real_png=True)
     monkeypatch.setattr(appmod.composite, "composite_logo", fake_composite)
 
     src = _gen(client, palette_hex=SEED, palette_mode="triad").json()["images"][0]
-    # Yerleşik logo kaldırıldı: bindirme artık kütüphaneden bir varlık istiyor.
-    asset = astore.save_asset("logos", b"\x89PNG-logo", "logo",
-                              str(tmp_path / "assets"), now="2026-07-23T10:00:00")
+    # Yerleşik logo kaldırıldı: bindirme artık kütüphaneden bir varlık istiyor
+    # (satır + dosya, Faz 1 / 6 — tohum `db_oturumu` ile, commit ŞART).
+    asset = depo_varlik.kaydet(db_oturumu, kullanici.id, "logos", b"\x89PNG-logo", "logo",
+                               str(tmp_path / "assets"))
+    db_oturumu.commit()
     r = client.post("/api/logo", json={"id": src["id"], "asset_id": asset["id"]})
     assert r.status_code == 200, r.text
     assert r.json()["image"]["palette"]["seed"] == SEED
@@ -490,31 +508,34 @@ def test_legacy_history_records_without_palette_are_tolerated(tmp_path, monkeypa
     assert record.get("palette") is None
 
 
-# ── Bozuk palettes.json ─────────────────────────────────────────────────────
+# ── Bozuk palet satırı ──────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("broken", [
     {"mode": "bogus", "colors": []},                    # geçersiz mod
     {"seed": "kırmızı", "colors": []},                  # geçersiz hex
-    {"mode": None, "seed": None, "colors": []},         # alanlar boş
+    # Alanlar boş: sütunlar NOT NULL, yani DB'de "None" olamaz — içe aktarılan
+    # bozuk kaydın alabileceği en yakın hâl boş dize (o da geçersiz).
+    {"mode": "", "seed": "", "colors": []},
     {"colors": [{"hex": "#c86a3c"}]},                   # ad yok
-    {"colors": "yeşil"},                                # liste bile değil
+    {"colors": "yeşil"},                                # liste bile değil (JSONB kabul eder)
     {"colors": [{"name": "copper orange"}]},            # hex yok
 ])
-def test_a_corrupt_saved_palette_does_not_break_generation(tmp_path, monkeypatch, broken, dizinler):
-    """Elle düzenlenmiş/bozulmuş kayıt üretimi 500'e düşürmemeli.
+def test_a_corrupt_saved_palette_does_not_break_generation(tmp_path, monkeypatch, broken, dizinler,
+                                                           db_oturumu, kullanici):
+    """Bozuk bir palet SATIRI üretimi 500'e düşürmemeli.
 
-    Bütün okuma katmanları bozuk JSON'da boş listeye düşüyor (palette_store._read,
-    storage._read_history, folders._read); kaydın İÇERİĞİ tek istisnaydı:
-    `mode`/`seed` doğrudan palette.harmony'ye gidiyor, ValueID yakalanmadan
-    500 dönüyordu. Silinmiş palet zaten bloke etmiyor (bkz. yukarıdaki test) —
-    bozuk palet de etmemeli.
+    Eskiden elle düzenlenmiş `palettes.json`dan geliyordu; bugün içe aktarma
+    aracı (8. görev) eski dosyayı olduğu gibi taşıyor, yani aynı çöp DB'de
+    durabilir. Kaydın İÇERİĞİ hâlâ tek istisna: `mode`/`seed` doğrudan
+    palette.harmony'ye gidiyor, ValueError yakalanmadan 500 dönüyordu.
+    Silinmiş palet zaten bloke etmiyor (bkz. yukarıdaki test) — bozuk palet de
+    etmemeli. Tohum doğrudan `tablolar.Palet` (depo geçerli veri yazıyor).
     """
     client, sent = _client(tmp_path, monkeypatch, dizinler)
-    output = tmp_path / "output"
-    output.mkdir(parents=True, exist_ok=True)
     record = {"id": "a1b2c3d4e5f6", "name": "Bozuk", "seed": SEED,
               "mode": "triad", "strength": "balanced", **broken}
-    (output / "palettes.json").write_text(json.dumps([record]), encoding="utf-8")
+    db_oturumu.add(tablolar.Palet(kullanici_id=kullanici.id, **record))
+    db_oturumu.commit()
 
     r = _gen(client, palette_hex=SEED, palette_mode="analogic",
              palette_id="a1b2c3d4e5f6")
@@ -632,7 +653,8 @@ def test_palette_drop_tolerates_repeated_indices(tmp_path, monkeypatch, dizinler
     assert pal["dropped"] == [2]
 
 
-def test_palette_drop_indexes_a_saved_palettes_frozen_colors(tmp_path, monkeypatch, dizinler):
+def test_palette_drop_indexes_a_saved_palettes_frozen_colors(tmp_path, monkeypatch, dizinler,
+                                                              db_oturumu, kullanici):
     """KAYITLI palette indeksler DONMUŞ listeye göre çözülmeli.
 
     Kayıt 4 renkle donmuşsa (kullanıcı çıkarıp kaydetmişse) indeks 3 o
@@ -640,13 +662,12 @@ def test_palette_drop_indexes_a_saved_palettes_frozen_colors(tmp_path, monkeypat
     yüzden `colors` çözüldükten SONRA, tek noktada uygulanıyor.
     """
     client, sent = _client(tmp_path, monkeypatch, dizinler)
-    output = tmp_path / "output"
-    output.mkdir(parents=True, exist_ok=True)
+    # Donmuş 3 renkli kayıt doğrudan satır olarak (Faz 1 / 6; içe aktarılmış gibi).
     frozen = [{"hex": "#111111", "name": "bir"}, {"hex": "#222222", "name": "iki"},
               {"hex": "#333333", "name": "üç"}]
-    record = {"id": "a1b2c3d4e5f6", "name": "Donmuş", "seed": SEED,
-              "mode": "triad", "strength": "balanced", "colors": frozen}
-    (output / "palettes.json").write_text(json.dumps([record]), encoding="utf-8")
+    db_oturumu.add(tablolar.Palet(id="a1b2c3d4e5f6", kullanici_id=kullanici.id, name="Donmuş",
+                                  seed=SEED, mode="triad", strength="balanced", colors=frozen))
+    db_oturumu.commit()
 
     r = _gen(client, palette_hex=SEED, palette_mode="analogic",
              palette_id="a1b2c3d4e5f6", palette_drop=[1])
@@ -655,20 +676,20 @@ def test_palette_drop_indexes_a_saved_palettes_frozen_colors(tmp_path, monkeypat
     assert "#222222" not in sent[0], "donmuş listenin ikincisi çıkarılmadı"
 
 
-def test_palette_drop_rejects_emptying_a_saved_palette(tmp_path, monkeypatch, dizinler):
+def test_palette_drop_rejects_emptying_a_saved_palette(tmp_path, monkeypatch, dizinler,
+                                                        db_oturumu, kullanici):
     """Donmuş liste 5'ten kısa olabilir; model sınırı tek başına yetmez.
 
     3 renkli bir kayıtta [0,1,2] model doğrulamasını GEÇER (5'ten az) ama
     sonuç boş palet olur. İkinci kapı çözümlemeden sonra.
     """
     client, _ = _client(tmp_path, monkeypatch, dizinler)
-    output = tmp_path / "output"
-    output.mkdir(parents=True, exist_ok=True)
+    # Donmuş 3 renkli kayıt doğrudan satır olarak (Faz 1 / 6; içe aktarılmış gibi).
     frozen = [{"hex": "#111111", "name": "bir"}, {"hex": "#222222", "name": "iki"},
               {"hex": "#333333", "name": "üç"}]
-    record = {"id": "a1b2c3d4e5f6", "name": "Donmuş", "seed": SEED,
-              "mode": "triad", "strength": "balanced", "colors": frozen}
-    (output / "palettes.json").write_text(json.dumps([record]), encoding="utf-8")
+    db_oturumu.add(tablolar.Palet(id="a1b2c3d4e5f6", kullanici_id=kullanici.id, name="Donmuş",
+                                  seed=SEED, mode="triad", strength="balanced", colors=frozen))
+    db_oturumu.commit()
 
     r = _gen(client, palette_hex=SEED, palette_mode="analogic",
              palette_id="a1b2c3d4e5f6", palette_drop=[0, 1, 2])

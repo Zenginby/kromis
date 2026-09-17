@@ -928,7 +928,7 @@ def _olcum_kutuphanesi(oturum) -> dict[str, str]:
     """
     from PIL import Image
 
-    import assets_store as astore
+    from services import depo_varlik
 
     ayarlar = oturum.ayarlar()
     out, assets = ayarlar.output_dir, ayarlar.assets_dir
@@ -940,13 +940,16 @@ def _olcum_kutuphanesi(oturum) -> dict[str, str]:
         Image.new("RGB", boyut, (40, 44, 52)).save(os.path.join(out, dosya), "PNG")
         tabanlar[ad] = dosya
 
-    for tur, boyut in (("logos", (240, 60)), ("banners", (1024, 120))):
-        buf = io.BytesIO()
-        # Macenta: LANCZOS küçültmesi, PNG yeniden kodlaması ve tarayıcı
-        # ölçeklemesinden sonra bile r>200 & b>200 & g<80 kalıyor.
-        Image.new("RGBA", boyut, (255, 0, 200, 255)).save(buf, format="PNG")
-        astore.save_asset(tur, buf.getvalue(), f"olcum {tur}", assets,
-                          now="2026-09-02T10:00:00")
+    # Varlıklar satır + dosya (Faz 1 / 6): tohum kullanıcının `Session`ıyla,
+    # manifest yazmak sunucuya görünmez.
+    with oturum.db() as db:
+        for tur, boyut in (("logos", (240, 60)), ("banners", (1024, 120))):
+            buf = io.BytesIO()
+            # Macenta: LANCZOS küçültmesi, PNG yeniden kodlaması ve tarayıcı
+            # ölçeklemesinden sonra bile r>200 & b>200 & g<80 kalıyor.
+            Image.new("RGBA", boyut, (255, 0, 200, 255)).save(buf, format="PNG")
+            depo_varlik.kaydet(db, oturum.kullanici_id, tur, buf.getvalue(), f"olcum {tur}", assets)
+        db.commit()
     return tabanlar
 
 

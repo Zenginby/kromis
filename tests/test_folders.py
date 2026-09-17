@@ -8,11 +8,10 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 import app as appmod
-import assets_store as astore
 import azure_client as ac
 import folders
 import storage
-from services import depo_klasor, tablolar
+from services import depo_klasor, depo_varlik, tablolar
 
 # Galeri/klasör/üretim rotaları DB'de (Faz 1 / 5): test kullanıcısı gerçek satır,
 # `db.oturum` bu dosyanın motoruna bağlı — gerekçe tests/conftest.py::depo_db.
@@ -33,14 +32,16 @@ def _client(tmp_path, monkeypatch, dizinler, *, real_png=False):
     return TestClient(appmod.app)
 
 
-def _logo_asset(tmp_path):
+def _logo_asset(tmp_path, db_oturumu, kullanici):
     """Bindirme için kütüphaneye bir logo koyar (yerleşik logo kaldırıldı).
 
-    `_client` ASSETS_DIR'i tmp_path/assets'e yönlendiriyor; kayıt oraya yazılıyor.
+    `_client` ASSETS_DIR'i tmp_path/assets'e yönlendiriyor; dosya oraya, satır
+    `varliklar`a (Faz 1 / 6) — commit ŞART, rota ayrı bağlantıdan okuyor.
     """
-    return astore.save_asset("logos", b"\x89PNG-logo", "logo",
-                             str(tmp_path / "assets"),
-                             now="2026-07-23T10:00:00")["id"]
+    kayit = depo_varlik.kaydet(db_oturumu, kullanici.id, "logos", b"\x89PNG-logo", "logo",
+                               str(tmp_path / "assets"))
+    db_oturumu.commit()
+    return kayit["id"]
 
 
 def _new_folder(c, name="Kurban"):
@@ -338,25 +339,27 @@ def test_edit_with_unknown_folder_404(tmp_path, monkeypatch, dizinler):
 
 
 # ── türevler kaynağın klasörünü miras alır ─────────────────────────────
-def test_logo_derivative_inherits_source_folder(tmp_path, monkeypatch, fake_composite, dizinler):
+def test_logo_derivative_inherits_source_folder(tmp_path, monkeypatch, fake_composite, dizinler,
+                                                db_oturumu, kullanici):
     c = _client(tmp_path, monkeypatch, dizinler)
     monkeypatch.setattr(appmod.composite, "composite_logo", fake_composite)
     fid = _new_folder(c)
     src_id = _generate(c, fid).json()["images"][0]["id"]
     rec = c.post("/api/logo", json={"id": src_id,
-                                    "asset_id": _logo_asset(tmp_path)}).json()["image"]
+                                    "asset_id": _logo_asset(tmp_path, db_oturumu, kullanici)}).json()["image"]
     assert rec["folder_id"] == fid
     # ve klasör görünümünde çıkar
     ids = [r["id"] for r in c.get(f"/api/history?folder_id={fid}").json()["images"]]
     assert rec["id"] in ids
 
 
-def test_banner_derivative_inherits_source_folder(tmp_path, monkeypatch, dizinler):
+def test_banner_derivative_inherits_source_folder(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     c = _client(tmp_path, monkeypatch, dizinler, real_png=True)
     fid = _new_folder(c)
     src_id = _generate(c, fid).json()["images"][0]["id"]
-    banner = astore.save_asset("banners", _png(size=(400, 60)), "footer",
-                               str(tmp_path / "assets"), now="2026-07-25T10:00:00")
+    banner = depo_varlik.kaydet(db_oturumu, kullanici.id, "banners", _png(size=(400, 60)), "footer",
+                                str(tmp_path / "assets"))
+    db_oturumu.commit()
     rec = c.post("/api/banner", json={"id": src_id, "asset_id": banner["id"]}).json()["image"]
     assert rec["folder_id"] == fid
 
@@ -398,14 +401,15 @@ def test_move_image_between_folders(tmp_path, monkeypatch, dizinler):
     assert [x["id"] for x in c.get(f"/api/history?folder_id={dst}").json()["images"]] == [rec["id"]]
 
 
-def test_move_does_not_touch_the_file_or_provenance(tmp_path, monkeypatch, fake_composite, dizinler):
+def test_move_does_not_touch_the_file_or_provenance(tmp_path, monkeypatch, fake_composite, dizinler,
+                                                     db_oturumu, kullanici):
     """Klasör yalnızca etiket: dosya adı/yolu ve parent_id değişmemeli."""
     c = _client(tmp_path, monkeypatch, dizinler)
     monkeypatch.setattr(appmod.composite, "composite_logo", fake_composite)
     fid = _new_folder(c)
     src_id = _generate(c).json()["images"][0]["id"]
     derived = c.post("/api/logo", json={"id": src_id,
-                                        "asset_id": _logo_asset(tmp_path)}).json()["image"]
+                                        "asset_id": _logo_asset(tmp_path, db_oturumu, kullanici)}).json()["image"]
 
     c.patch(f"/api/image/{derived['id']}", json={"folder_id": fid})
     moved = c.get(f"/api/history?folder_id={fid}").json()["images"][0]

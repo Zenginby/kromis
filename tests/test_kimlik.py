@@ -57,9 +57,11 @@ SAYFALAR = {("GET", "/")}
 
 # Kapılı ama DİZİN OKUMAYAN rotalar — kapıyı `ayar.ayarlar` üzerinden değil doğrudan
 # alırlar. Belgenin dört istisnası (§4) + Faz 1 / 5'te DB'ye taşınan ve dosyaya
-# dokunmayan galeri/klasör rotaları (satır okur/yazar, `output_dir` istemez).
-# Dosyaya dokunanlar (`/output/*`, indirme, silme, üretim, içe aktarma) listede
-# DEĞİL: onlar `ayarlar.output_dir`i almaya devam ediyor.
+# dokunmayan galeri/klasör rotaları + Faz 1 / 6'da taşınan sohbet, palet, tercih
+# ve varlık LİSTESİ rotaları (satır okur/yazar, `output_dir`/`assets_dir` istemez).
+# Dosyaya dokunanlar (`/output/*`, `/assets/*`, indirme, silme, üretim, içe
+# aktarma, varlık yükleme/silme, bindirme) ve `guncelleme.json` okuyan üç
+# güncelleme rotası listede DEĞİL: onlar ayar nesnesini almaya devam ediyor.
 DIZINSIZ_KAPILI = {
     ("POST", "/api/settings"), ("POST", "/api/palette/suggest"),
     ("GET", "/api/hesap/ben"), ("POST", "/api/hesap/cikis"),
@@ -67,6 +69,14 @@ DIZINSIZ_KAPILI = {
     ("DELETE", "/api/folders/{folder_id}"),   # görseller köke döner, dosya taşınmaz/silinmez
     ("GET", "/api/history"), ("PATCH", "/api/image/{image_id}"), ("PATCH", "/api/images"),
     ("GET", "/api/arena/{arena_id}"), ("POST", "/api/arena/{arena_id}/winner"),
+    # Faz 1 / 6
+    ("POST", "/api/chat"),                    # tur bağlamı `tercihler`den
+    ("GET", "/api/chats"), ("POST", "/api/chats"), ("DELETE", "/api/chats"),
+    ("GET", "/api/chats/{chat_id}"), ("PUT", "/api/chats/{chat_id}"),
+    ("DELETE", "/api/chats/{chat_id}"),
+    ("GET", "/api/palettes"), ("POST", "/api/palettes"), ("DELETE", "/api/palettes/{palette_id}"),
+    ("GET", "/api/prefs"), ("POST", "/api/prefs"),
+    ("GET", "/api/assets/{kind}"),            # yalnız satır; dosya yolları ayar ister
 }
 
 KAPI = {kimlik.aktif_kullanici, kimlik.sayfa_kullanicisi}
@@ -77,6 +87,16 @@ YOL_DEGERLERI = {"image_id": "abcdef123456", "folder_id": "abcdef123456",
                  "chat_id": "abcdef123456", "palette_id": "abcdef123456",
                  "asset_id": "abcdef123456", "arena_id": "abcdef123456",
                  "kind": "logos", "filename": "abcdef123456.png"}
+
+
+def _png() -> bytes:
+    """Yükleme rotası gerçek bir PNG istiyor (`gorsel.to_png` yeniden kodluyor)."""
+    import io
+
+    from PIL import Image
+    tampon = io.BytesIO()
+    Image.new("RGBA", (8, 8), (200, 30, 30, 255)).save(tampon, "PNG")
+    return tampon.getvalue()
 
 
 def _rotalar() -> list[tuple[str, str, APIRoute]]:
@@ -286,13 +306,45 @@ def test_two_users_have_separate_directories_and_never_see_each_others_media(ist
     assert not (tmp_path / "kullanicilar" / str(b_id) / "output" / "history.json").exists()
     assert not (tmp_path / "kullanicilar" / str(a_id) / "output" / "folders.json").exists()
 
+    # Sohbet, palet, varlık, tercih de (Faz 1 / 6): A yazar, B ne listede görür ne
+    # id'siyle ulaşır (404); tercih kullanıcı başına, B'ninki varsayılanda kalır.
+    sohbet = a.post("/api/chats", json={"title": "A sohbeti", "messages": [
+        {"role": "user", "content": "kare"}]}).json()["chat"]["id"]
+    palet = a.post("/api/palettes", json={"name": "A paleti", "seed": "#c86a3c",
+                                          "mode": "triad"}).json()["palette"]["id"]
+    varlik = a.post("/api/assets/logos", files={"file": ("l.png", _png(), "image/png")}).json()["asset"]
+    assert a.post("/api/prefs", json={"theme": "amber", "autosave_sessions": False}).status_code == 200
+    assert [c["title"] for c in a.get("/api/chats").json()["chats"]] == ["A sohbeti"]
+    assert b.get("/api/chats").json() == {"chats": []}
+    assert b.get(f"/api/chats/{sohbet}").status_code == 404
+    assert b.put(f"/api/chats/{sohbet}", json={"title": "calinti"}).status_code == 404
+    assert b.delete(f"/api/chats/{sohbet}").status_code == 404
+    assert b.get("/api/palettes").json()["items"] == []
+    assert b.delete(f"/api/palettes/{palet}").status_code == 404
+    assert b.get("/api/assets/all").json()["items"] == []
+    assert b.get(f"/assets/logos/{varlik['filename']}").status_code == 404
+    assert b.delete(f"/api/assets/logos/{varlik['id']}").status_code == 404
+    assert b.post("/api/logo/preview", json={"id": kayit["id"], "asset_id": varlik["id"]}).status_code == 404
+    assert b.get("/api/prefs").json()["theme"] == "mono"
+    assert a.get("/api/prefs").json()["theme"] == "amber"
+    assert a.get(f"/api/chats/{sohbet}").json()["chat"]["title"] == "A sohbeti"
+    assert [p["id"] for p in a.get("/api/palettes").json()["items"]] == [palet]
+    assert a.get(f"/assets/logos/{varlik['filename']}").status_code == 200
+    a_kok = tmp_path / "kullanicilar" / str(a_id)
+    for dosya in ("output/chats.json", "output/palettes.json", "output/prefs.json",
+                  "assets/logos/index.json"):
+        assert not (a_kok / dosya).exists(), f"{dosya} web yolunda yazıldı"
+    assert sorted(p.name for p in (a_kok / "assets" / "logos").iterdir()) == [varlik["filename"]]
+
 
 def test_resolving_the_user_costs_exactly_one_query_per_request(istemci):
     """Belge: `oturumlar ⋈ kullanicilar` TEK sorgu; ayar nesnesi, dil halkası ve rota onu paylaşır.
 
     Faz 1 / 5'ten sonra `/api/history` İKİ sorgu: kimlik (1) + `medya` listesi (1) —
     rotanın kendi `Depends(kimlik.aktif_kullanici)`ı ve `OTURUM`u ek sorgu
-    GETİRMEZ (FastAPI bağımlılık önbelleği, aynı `Session`). `/` hâlâ 1.
+    GETİRMEZ (FastAPI bağımlılık önbelleği, aynı `Session`). `/` hâlâ 1: dil
+    zinciri `tercihler`e BAKMAZ (Faz 1 / 6 — Faz 0 / 3'ün "≤1 dosya okuma"
+    ölçüsünün DB karşılığı: tercih için 0 ek sorgu). `GET /api/prefs` 2.
     """
     _, jeton, _ = _kullanici_ac(dil="tr")
     c = _oturumlu(jeton)
@@ -310,6 +362,9 @@ def test_resolving_the_user_costs_exactly_one_query_per_request(istemci):
         sayac.clear()
         assert c.get("/", follow_redirects=False).status_code == 200
         assert len(sayac) == 1, sayac
+        sayac.clear()
+        assert c.get("/api/prefs").status_code == 200
+        assert len(sayac) == 2 and "tercihler" in sayac[1] and "kullanici_id" in sayac[1], sayac
     finally:
         event.remove(motor, "before_cursor_execute", _say)
 

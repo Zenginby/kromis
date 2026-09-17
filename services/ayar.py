@@ -22,8 +22,11 @@ ve ikisi de aynı donmuş `Ayarlar` sınıfından —
   olmadan kullanıcı yok, dizini de yok) ve `GET /` (yalnız `static_dir`).
 * `ayarlar(request, kullanici)` — bu isteğin KULLANICISININ yerleşimi:
 
-      <data_dir>/kullanicilar/<uuid>/output   ← history.json, medya, prefs, sohbet, palet
-      <data_dir>/kullanicilar/<uuid>/assets   ← logo/afiş/motto kütüphanesi
+      <data_dir>/kullanicilar/<uuid>/output   ← medya dosyaları, guncelleme.json
+      <data_dir>/kullanicilar/<uuid>/assets   ← logo/afiş/motto DOSYALARI (<tur>/<id>.png)
+
+  Manifestler (history/folders/chats/palettes/prefs/index.json) burada ARTIK
+  YOK — kayıtlar DB'de (Faz 1 / 5-6), dizinde yalnız dosyalar duruyor.
 
   `data_dir` ve `static_dir` AYNI kalır (belge: "data_dir aynı, static_dir
   aynı"). Kullanıcı `Depends(kimlik.aktif_kullanici)` ile gelir — yani
@@ -76,7 +79,7 @@ from services.tablolar import Kullanici
 KULLANICILAR_DIZINI = "kullanicilar"
 
 # Bu süreçte açılmış kullanıcı kökleri (tam yol): ilk istekten sonra dizin
-# sistemine bir daha sorulmaz. Kilit `services/tercih.py`nin önbelleğiyle aynı
+# sistemine bir daha sorulmaz. Kilit `i18n._lock`un önbelleğiyle aynı
 # gerekçe: iki istek aynı anda ilk kez gelebilir.
 _acilanlar: set[str] = set()
 _kilit = threading.Lock()

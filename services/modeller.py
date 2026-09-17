@@ -10,13 +10,17 @@ bu soru iki yerde iki cevap üretirdi.
 """
 from __future__ import annotations
 
+import uuid
+
+from sqlalchemy.orm import Session
+
 import azure_client as ac
 import catalog
 import credstore
 import etiket
 import i18n
-import prefs
 import version
+from services import depo_tercih
 
 
 def model_available(configured: bool, plan: str) -> bool:
@@ -237,24 +241,25 @@ def model_facts(m: catalog.ImageModel) -> dict:
             "credits": m.credits}
 
 
-def director_context(output_dir: str) -> dict:
+def director_context(db: Session, kullanici_id: uuid.UUID) -> dict:
     """Yönetmenin sistem mesajına giren TUR bağlamı: seçili model + menü + yönlendirme.
 
     Bağlamı burada toplamanın sebebi katman kuralı: `chat_prompt` yalnızca
-    diski okuyor (katman 1, tek bağımlılığı `paths`) ve `catalog`/`prefs`'e
-    bakması onu yukarı çekerdi. Rotada ikisi de hâlihazırda var. Tercihin
-    okunduğu dizin rotanın ayar nesnesinden geliyor (Faz 0 / Adım 4).
+    diski okuyor (katman 1, tek bağımlılığı `paths`) ve `catalog`/tercih
+    deposuna bakması onu yukarı çekerdi. Rotada ikisi de hâlihazırda var.
+    Tercih KULLANICININ satırından (`tercihler`, Faz 1 / 6): rota isteğin
+    `Session`ını ve kapının çözdüğü kullanıcıyı veriyor.
 
     MODEL BURADA TERCİHTEN okunuyor ve bu, `/api/chat` kararının ("model
     istekten, tercihlerden DEĞİL") istisnası değil TAMAMLAYANI: o karar
     yönetmenin konuşacağı SOHBET modeliyle ilgili ve tel üzerinde geliyor;
     buradaki ise kullanıcının üretimde kullanacağı GÖRSEL modeli, yani
     yönetmenin hangi jetonları önerebileceği. İstemci onu bu uçta göndermiyor
-    (`ChatRequest` `extra="forbid"`) ve göndermesi de gerekmiyor: `prefs.json`
-    o seçimin zaten TEK kaynağı (bkz. prefs.py'nin "hangi modeli İSTİYORUM"
-    kuralı).
+    (`ChatRequest` `extra="forbid"`) ve göndermesi de gerekmiyor: tercih
+    satırı o seçimin zaten TEK kaynağı (bkz. prefs.py'nin "hangi modeli
+    İSTİYORUM" kuralı).
 
-    Bilinmeyen/bayat bir tercih sessizce bağlamsız kalıyor — `prefs.read`
+    Bilinmeyen/bayat bir tercih sessizce bağlamsız kalıyor — `depo_tercih.oku`
     katalog üyeliğini zaten kapıyor, ama `image_model` yine None dönebilir ve
     o durumda doğru davranış bugünkü davranıştır: bağlamsız persona.
 
@@ -274,7 +279,7 @@ def director_context(output_dir: str) -> dict:
     ayrım. İki tercih birden işaretleniyor: video modu Yönetmen'e kapalı
     olmadığı için kullanıcının video seçimi de "seçili" sayılmalı.
     """
-    p = prefs.read(output_dir)
+    p = depo_tercih.oku(db, kullanici_id)
     m = catalog.image_model(p["image_model"])
     cfg = credstore.configured_map()
     secili = {p["image_model"], p["video_model"]}

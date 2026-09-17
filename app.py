@@ -21,8 +21,6 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 
-import assets_store
-import backup
 import catalog
 import chat_client as cc
 import chat_prompt
@@ -31,17 +29,16 @@ import credstore
 import errlog
 import paths
 import providers
-import version
 from models import MAX_PROMPT_CHARS, GenerateRequest
 from routers import ayarlar, bindirme, galeri, hesap, kok, paletler, saglik, sohbet, uretim
-from services import ayar, db, dil, gorsel, kimlik, koken, modeller, palet, posta, redaksiyon, zaman
+from services import ayar, db, dil, gorsel, kimlik, koken, modeller, palet, posta, redaksiyon
 
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     """Sunucu başlarken çalışır — import anında DEĞİL.
 
-    Dizin açma ve yedek gerçek dosya sistemine dokunduğu için modül kapsamında
+    Dizin açma gerçek dosya sistemine dokunduğu için modül kapsamında
     çalışmamalı: app'i yalnızca import eden bir test ya da betik kullanıcının
     gerçek veri dizinini (frozen'da ~/Library/Application Support/...)
     yaratmasın, assets/'ine yazmasın.
@@ -49,28 +46,23 @@ async def _lifespan(app: FastAPI):
     Guard'ın gerekçesi: patlarsa (izinsiz Application Support, dolu disk) tek
     başına pencereyi engellememeli — guard olmadan uvicorn'un startup()'ı asla
     bitmez, desktop.py 15 sn sonra hata verir ve kullanıcı hiçbir pencere
-    görmez. Yazma yollarının hepsi (storage, assets_store, folders,
-    palette_store) kendi `makedirs`'ini zaten yapıyor, yani hata gerçekten
-    kalıcıysa kullanıcı istek başına anlaşılır bir hata görür; açılmayan bir
-    uygulamadan iyidir. Hata hata.log'a yazılır, uygulama yine de açılır.
+    görmez. Dosya yazan depolar (`depo_medya`, `depo_varlik`) kendi
+    `makedirs`'ini zaten yapıyor, yani hata gerçekten kalıcıysa kullanıcı istek
+    başına anlaşılır bir hata görür; açılmayan bir uygulamadan iyidir. Hata
+    hata.log'a yazılır, uygulama yine de açılır.
 
-    Yedek bir EMNİYET özelliği olduğu için "başarısızsa durdur" cazibesi var;
-    YAPILMIYOR — yedek yüzünden uygulamaya giremeyen kullanıcının verisine
-    arayüzden hiçbir yolu kalmaz, bu loglanmış-ama-alınmamış bir yedekten
-    kesinlikle kötüdür.
-
-    NOT: Burada bir İKİNCİ adım vardı — `seed.seed_builtin_logos`
-    pakete gömülü yerleşik logo çiftini kullanıcının kütüphanesine kopyalardı.
-    Uygulama marka-nötr olduğundan o modül tamamen kaldırıldı; kütüphane artık
-    boş başlar ve kullanıcı kendi logosunu yükler.
-
-    `backup` MODÜL NİTELİĞİ üzerinden çağrılıyor (`from backup import …` değil):
-    tests/conftest.py'nin gerçek-yedek koruması o niteliği yamalıyor.
+    İKİ ADIM BURADAN ÇIKTI (Faz 1 / 6): `backup.backup_manifests_if_version_changed`
+    — yedeklenecek manifest kalmadı (galeri, klasör, sohbet, palet, varlık,
+    tercih DB'de), DB yedeği platformun işi (9. görev); ve
+    `assets_store.migrate_legacy_uploads` — ölü `uploads` türünü içe aktarma
+    aracı taşıyacak (8. görev), web yolunda manifest okunmaz. İkisinin modülü
+    dondurulmuş kabuk için duruyor. Daha önce bir üçüncüsü de vardı:
+    `seed.seed_builtin_logos` (marka-nötr olunca kalktı).
 
     Dizinler `app.state.ayarlar`dan (Faz 0 / Adım 4), `paths`ten DEĞİL:
-    testler o nesneyi geçici dizine yönlendiriyor ve açılışın açtığı/yedeklediği
-    yer de o olmalı — yoksa `with TestClient(app)` yine geliştiricinin gerçek
-    veri dizinine dokunurdu (2. görevin ölçtüğü sızıntı sınıfı).
+    testler o nesneyi geçici dizine yönlendiriyor ve açılışın açtığı yer de
+    o olmalı — yoksa `with TestClient(app)` yine geliştiricinin gerçek veri
+    dizinine dokunurdu (2. görevin ölçtüğü sızıntı sınıfı).
 
     VERİ TABANI MOTORU DA BURADA KURULUR (Faz 1 / 1. görev; gerekçesi
     services/db.py): `DATABASE_URL` verilmişse `app.state.motor`a tek bir
@@ -87,7 +79,6 @@ async def _lifespan(app: FastAPI):
     e-posta isteyen rota 503 der, sebep `hata.log`da.
     """
     ayarlar: ayar.Ayarlar = app.state.ayarlar
-    now = zaman.simdi()
     try:
         url = db.baglanti_dizesi()
         app.state.motor = db.motor_kur(url) if url else None
@@ -98,14 +89,6 @@ async def _lifespan(app: FastAPI):
     postaci = app.state.postaci = posta.postaci_kur(ayarlar.data_dir)
     try:
         paths.ensure_data_dirs(ayarlar.output_dir, ayarlar.assets_dir)
-        backup.backup_manifests_if_version_changed(
-            ayarlar.data_dir, ayarlar.output_dir, ayarlar.assets_dir,
-            version=version.APP_VERSION, now=now)
-        # Ölü `uploads` türünün göçü — YEDEKTEN SONRA, bilerek: göç kullanıcı
-        # verisini yerinden oynatan tek açılış adımı, yani sürüm değişiminde
-        # alınan yedek göç ÖNCESİ hâli taşımalı. Yeni kurulumda maliyeti tek
-        # bir `isdir`; gerekçesi assets_store.migrate_legacy_uploads'ta.
-        assets_store.migrate_legacy_uploads(ayarlar.assets_dir)
     except Exception:
         errlog.safe_append(ayarlar.data_dir, traceback.format_exc())
     try:
@@ -227,8 +210,8 @@ app.mount("/static", StaticFiles(directory=app.state.ayarlar.static_dir), name="
 __all__ = [
     "app",
     # depo modülleri — testler `appmod.<modül>` üstünden yamalıyor
-    "assets_store", "backup", "catalog", "cc", "chat_prompt", "composite",
-    "credstore", "errlog", "paths", "providers", "version",
+    "catalog", "cc", "chat_prompt", "composite",
+    "credstore", "errlog", "paths", "providers",
     # sabitler
     "MAX_UPLOAD_BYTES", "MAX_EDIT_IMAGES", "MAX_REQUEST_BYTES",
     "MAX_IMAGE_PIXELS", "MAX_FOLDER_DEPTH", "MAX_PROMPT_CHARS",

@@ -737,7 +737,6 @@ KULLANICIYA_KONUSMAYAN = {
     "services/__init__.py": "yalnız paket docstring'i",
     "services/dil.py": "dil bağlamını KURAN ara katman; metni okumuyor, seçiyor",
     "services/redaksiyon.py": "422 gövdesinden gizli değeri SİLİYOR; cümle üretmiyor",
-    "services/tercih.py": "kayıtlı tercihin önbellekli okuyucusu; veri döndürüyor, cümle değil",
     "services/ayar.py": "veri dizinlerinin ayar nesnesi ve `Depends` işlevi; metin yok",
     "services/db.py": "veri tabanı motoru ve `Session` bağımlılığı (Faz 1 / 1); tek 503 "
                       "`detail`i bir KOD (`database_unavailable`), cümleyi ön yüz kurar",
@@ -746,6 +745,11 @@ KULLANICIYA_KONUSMAYAN = {
                               "404'ü rota kurar",
     "services/depo_klasor.py": "klasör deposu (Faz 1 / 5): `folders.export_zip`in i18n'li "
                                "ValueError'ı yerine None döner, metni rota kurar",
+    "services/depo_sohbet.py": "sohbet deposu (Faz 1 / 6): SQL; veri döndürür, 404'ü rota kurar",
+    "services/depo_palet.py": "palet deposu (Faz 1 / 6): SQL; veri döndürür, cümle değil",
+    "services/depo_varlik.py": "varlık deposu (Faz 1 / 6): SQL ve dosya; kullanıcıya konuşmaz",
+    "services/depo_tercih.py": "tercih deposu (Faz 1 / 6): `prefs.update`in i18n'li ValueError'ı "
+                               "yerine ANAHTAR taşıyan `GecersizTercih`, cümleyi rota kurar",
     "services/tablolar.py": "veri modeli (Faz 1 / 2): tablo, sütun, kısıt tanımları; metin yok — "
                             "CHECK değer kümeleri bile kodun sabitleri, cümle değil",
     "routers/kok.py": "`/` rotası; yerleştirme ve 500 metni `services/sablon.py`ye "

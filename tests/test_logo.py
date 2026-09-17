@@ -5,8 +5,8 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 import app as appmod
-import assets_store as astore
 import azure_client as ac
+from services import depo_varlik
 
 # Galeri/klasör/üretim rotaları DB'de (Faz 1 / 5): test kullanıcısı gerçek satır,
 # `db.oturum` bu dosyanın motoruna bağlı — gerekçe tests/conftest.py::depo_db.
@@ -27,18 +27,19 @@ def _fake_composite_factory(recorder=None):
     return fake_composite
 
 
-def _logo_asset(tmp_path, dizinler, *, png: bytes = b"\x89PNG-logo",
+def _logo_asset(tmp_path, dizinler, db_oturumu, kullanici, *, png: bytes = b"\x89PNG-logo",
                 kind: str = "logos") -> str:
     """Kütüphaneye bir varlık koyar, id'sini döndürür; `assets_dir`i de yönlendirir.
 
     Yerleşik logo kaldırıldığından /api/logo HER ZAMAN bir `asset_id`
     istiyor (bkz. models.LogoRequest) — bu yüzden bindirme yapan hemen her test
-    önce kütüphaneye bir şey koymak zorunda.
+    önce kütüphaneye bir şey koymak zorunda. Varlık satır + dosya (Faz 1 / 6):
+    tohum `db_oturumu` ile ve commit ŞART, rota ayrı bağlantıdan okuyor.
     """
     assets_dir = str(tmp_path / "assets")
     dizinler(assets_dir=assets_dir)
-    rec = astore.save_asset(kind, png, "test varlığı", assets_dir,
-                            now="2026-07-23T10:00:00")
+    rec = depo_varlik.kaydet(db_oturumu, kullanici.id, kind, png, "test varlığı", assets_dir)
+    db_oturumu.commit()
     return rec["id"]
 
 
@@ -55,12 +56,12 @@ def _make_source(c):
     return gen["images"][0]["id"]
 
 
-def test_logo_creates_derivative(tmp_path, monkeypatch, dizinler):
+def test_logo_creates_derivative(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     dizinler(output_dir=str(tmp_path))
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
     monkeypatch.setattr(appmod.composite, "composite_logo", _fake_composite_factory())
 
-    asset_id = _logo_asset(tmp_path, dizinler)
+    asset_id = _logo_asset(tmp_path, dizinler, db_oturumu, kullanici)
     c = TestClient(appmod.app)
     src_id = _make_source(c)
     r = c.post("/api/logo", json={"id": src_id, "asset_id": asset_id})
@@ -70,13 +71,13 @@ def test_logo_creates_derivative(tmp_path, monkeypatch, dizinler):
     assert (tmp_path / rec["filename"]).read_bytes() == b"\x89PNG-base+LOGO"
 
 
-def test_logo_passes_options_to_composite(tmp_path, monkeypatch, dizinler):
+def test_logo_passes_options_to_composite(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     dizinler(output_dir=str(tmp_path))
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
     calls = []
     monkeypatch.setattr(appmod.composite, "composite_logo", _fake_composite_factory(calls))
 
-    asset_id = _logo_asset(tmp_path, dizinler)
+    asset_id = _logo_asset(tmp_path, dizinler, db_oturumu, kullanici)
     c = TestClient(appmod.app)
     src_id = _make_source(c)
     r = c.post("/api/logo", json={
@@ -90,12 +91,12 @@ def test_logo_passes_options_to_composite(tmp_path, monkeypatch, dizinler):
     assert kw["shadow_blur"] == 10
 
 
-def test_logo_preview_returns_data_url_and_does_not_save(tmp_path, monkeypatch, dizinler):
+def test_logo_preview_returns_data_url_and_does_not_save(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     dizinler(output_dir=str(tmp_path))
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
     monkeypatch.setattr(appmod.composite, "composite_logo", _fake_composite_factory())
 
-    asset_id = _logo_asset(tmp_path, dizinler)
+    asset_id = _logo_asset(tmp_path, dizinler, db_oturumu, kullanici)
     c = TestClient(appmod.app)
     src_id = _make_source(c)
     before = len(c.get("/api/history").json()["images"])
@@ -152,7 +153,7 @@ def test_logo_without_asset_id_is_rejected(tmp_path, monkeypatch, dizinler):
     assert called == []
 
 
-def test_logo_asset_id_is_passed_as_the_overlay(tmp_path, monkeypatch, dizinler):
+def test_logo_asset_id_is_passed_as_the_overlay(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     dizinler(output_dir=str(tmp_path / "output"), assets_dir=str(tmp_path / "assets"))
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
     calls = []
@@ -160,8 +161,9 @@ def test_logo_asset_id_is_passed_as_the_overlay(tmp_path, monkeypatch, dizinler)
 
     c = TestClient(appmod.app)
     src_id = _make_source(c)
-    asset = astore.save_asset("logos", b"\x89PNG-logo", "özel", str(tmp_path / "assets"),
-                              now="2026-07-23T10:00:00")
+    asset = depo_varlik.kaydet(db_oturumu, kullanici.id, "logos", b"\x89PNG-logo", "özel",
+                               str(tmp_path / "assets"))
+    db_oturumu.commit()
 
     r = c.post("/api/logo", json={"id": src_id, "asset_id": asset["id"]})
     assert r.status_code == 200
@@ -179,7 +181,7 @@ def test_logo_asset_id_404_for_unknown_asset(tmp_path, monkeypatch, dizinler):
     assert r.status_code == 404
 
 
-def test_motto_placement_resolves_from_mottos_library(tmp_path, monkeypatch, dizinler):
+def test_motto_placement_resolves_from_mottos_library(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     """Motto = logo tarzı konumlanabilir bindirme, ama 'mottos' kütüphanesinden."""
     dizinler(output_dir=str(tmp_path / "output"), assets_dir=str(tmp_path / "assets"))
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
@@ -188,25 +190,27 @@ def test_motto_placement_resolves_from_mottos_library(tmp_path, monkeypatch, diz
 
     c = TestClient(appmod.app)
     src_id = _make_source(c)
-    motto = astore.save_asset("mottos", b"\x89PNG-motto", "motto", str(tmp_path / "assets"),
-                              now="2026-07-23T10:00:00")
+    motto = depo_varlik.kaydet(db_oturumu, kullanici.id, "mottos", b"\x89PNG-motto", "motto",
+                               str(tmp_path / "assets"))
+    db_oturumu.commit()
 
     r = c.post("/api/logo", json={"id": src_id, "asset_id": motto["id"],
                                   "asset_kind": "mottos", "position": "center"})
     assert r.status_code == 200
     assert calls[-1]["logo_path"].endswith(f"{motto['id']}.png")
     # motto id'si logos kütüphanesinde yok → yalnızca mottos'tan çözülebildi
-    assert astore.asset_path("logos", motto["id"], str(tmp_path / "assets")) is None
+    assert depo_varlik.dosya_yolu(db_oturumu, kullanici.id, "logos", motto["id"],
+                                  str(tmp_path / "assets")) is None
 
 
-def test_logo_passes_offset_to_composite(tmp_path, monkeypatch, dizinler):
+def test_logo_passes_offset_to_composite(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     """Izgara noktasından sapma composite'e ORAN olarak geçmeli."""
     dizinler(output_dir=str(tmp_path))
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
     calls = []
     monkeypatch.setattr(appmod.composite, "composite_logo", _fake_composite_factory(calls))
 
-    asset_id = _logo_asset(tmp_path, dizinler)
+    asset_id = _logo_asset(tmp_path, dizinler, db_oturumu, kullanici)
     c = TestClient(appmod.app)
     src_id = _make_source(c)
     r = c.post("/api/logo", json={"id": src_id, "asset_id": asset_id,
@@ -217,14 +221,14 @@ def test_logo_passes_offset_to_composite(tmp_path, monkeypatch, dizinler):
     assert kw["offset_y"] == -0.05
 
 
-def test_logo_defaults_send_zero_offset(tmp_path, monkeypatch, dizinler):
+def test_logo_defaults_send_zero_offset(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     """Alan gönderilmezse sıfır gitmeli — eski istemci birebir eski çıktıyı alır."""
     dizinler(output_dir=str(tmp_path))
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
     calls = []
     monkeypatch.setattr(appmod.composite, "composite_logo", _fake_composite_factory(calls))
 
-    asset_id = _logo_asset(tmp_path, dizinler)
+    asset_id = _logo_asset(tmp_path, dizinler, db_oturumu, kullanici)
     c = TestClient(appmod.app)
     src_id = _make_source(c)
     assert c.post("/api/logo",
@@ -240,7 +244,7 @@ def test_logo_rejects_out_of_range_offset(tmp_path, dizinler):
     assert c.post("/api/logo", json={"id": "x", "offset_y": -0.9}).status_code == 422
 
 
-def test_motto_offset_also_reaches_composite(tmp_path, monkeypatch, dizinler):
+def test_motto_offset_also_reaches_composite(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     """Motto logo ile aynı paneli paylaşıyor; kaydırma onda da çalışmalı.
 
     Arayüz tarafında ortak panel yeterli görünüyor ama sunucu sözleşmesinin de
@@ -254,8 +258,9 @@ def test_motto_offset_also_reaches_composite(tmp_path, monkeypatch, dizinler):
 
     c = TestClient(appmod.app)
     src_id = _make_source(c)
-    motto = astore.save_asset("mottos", b"\x89PNG-motto", "motto", str(tmp_path / "assets"),
-                              now="2026-07-23T10:00:00")
+    motto = depo_varlik.kaydet(db_oturumu, kullanici.id, "mottos", b"\x89PNG-motto", "motto",
+                               str(tmp_path / "assets"))
+    db_oturumu.commit()
 
     r = c.post("/api/logo", json={"id": src_id, "asset_id": motto["id"],
                                   "asset_kind": "mottos", "position": "bottom-center",
@@ -266,7 +271,7 @@ def test_motto_offset_also_reaches_composite(tmp_path, monkeypatch, dizinler):
     assert (kw["offset_x"], kw["offset_y"]) == (-0.12, 0.04)
 
 
-def test_offset_actually_moves_the_output(tmp_path, monkeypatch, dizinler):
+def test_offset_actually_moves_the_output(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     """Mock YOK: kaydırmalı ve kaydırmasız bindirmenin PİKSELLERİ farklı olmalı.
 
     Uçtan uca kanıt. Yalnız kwargs'ı ölçen testler yeşil kalırken uç offset'i
@@ -279,7 +284,7 @@ def test_offset_actually_moves_the_output(tmp_path, monkeypatch, dizinler):
     Image.new("RGB", (320, 240), (200, 60, 60)).save(buf, format="PNG")
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [buf.getvalue()])
 
-    asset_id = _logo_asset(tmp_path, dizinler, png=_real_png())
+    asset_id = _logo_asset(tmp_path, dizinler, db_oturumu, kullanici, png=_real_png())
     c = TestClient(appmod.app)
     src_id = _make_source(c)
 
@@ -302,7 +307,7 @@ def test_logo_rejects_bad_asset_kind(tmp_path, monkeypatch, dizinler):
     assert r.status_code == 422
 
 
-def test_composite_failure_becomes_500(tmp_path, monkeypatch, dizinler):
+def test_composite_failure_becomes_500(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     dizinler(output_dir=str(tmp_path))
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG-base"])
 
@@ -310,7 +315,7 @@ def test_composite_failure_becomes_500(tmp_path, monkeypatch, dizinler):
         raise OSError("logo dosyası okunamadı")
     monkeypatch.setattr(appmod.composite, "composite_logo", boom)
 
-    asset_id = _logo_asset(tmp_path, dizinler)
+    asset_id = _logo_asset(tmp_path, dizinler, db_oturumu, kullanici)
     c = TestClient(appmod.app)
     src_id = _make_source(c)
     r = c.post("/api/logo", json={"id": src_id, "asset_id": asset_id})
@@ -318,7 +323,7 @@ def test_composite_failure_becomes_500(tmp_path, monkeypatch, dizinler):
     assert "The overlay failed" in r.json()["detail"]
 
 
-def test_unexpected_composite_error_also_becomes_500(tmp_path, monkeypatch, dizinler):
+def test_unexpected_composite_error_also_becomes_500(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     """OSError/ValueError olmayan hatalar da Türkçe 500'e dönmeli.
 
     `Image.DecompressionBombError` doğrudan `Exception`'dan türüyor: dar bir
@@ -332,7 +337,7 @@ def test_unexpected_composite_error_also_becomes_500(tmp_path, monkeypatch, dizi
         raise Image.DecompressionBombError("görsel çok büyük (simüle)")
     monkeypatch.setattr(appmod.composite, "composite_logo", boom)
 
-    asset_id = _logo_asset(tmp_path, dizinler)
+    asset_id = _logo_asset(tmp_path, dizinler, db_oturumu, kullanici)
     c = TestClient(appmod.app)
     src_id = _make_source(c)
     r = c.post("/api/logo", json={"id": src_id, "asset_id": asset_id})
@@ -340,7 +345,7 @@ def test_unexpected_composite_error_also_becomes_500(tmp_path, monkeypatch, dizi
     assert "The overlay failed" in r.json()["detail"]
 
 
-def test_logo_end_to_end_with_real_compositing(tmp_path, monkeypatch, dizinler):
+def test_logo_end_to_end_with_real_compositing(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     """composite.composite_logo hiç mocklanmadan, kütüphaneden gerçek bir logoyla çalışır.
 
     Logo bindirme Azure'a çıkmaz; yalnızca azure_client.generate mocklanır (ağ
@@ -355,7 +360,7 @@ def test_logo_end_to_end_with_real_compositing(tmp_path, monkeypatch, dizinler):
     src_bytes = buf.getvalue()
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [src_bytes])
 
-    asset_id = _logo_asset(tmp_path, dizinler, png=_real_png())
+    asset_id = _logo_asset(tmp_path, dizinler, db_oturumu, kullanici, png=_real_png())
     c = TestClient(appmod.app)
     src_id = _make_source(c)
 
@@ -375,7 +380,7 @@ def test_logo_end_to_end_with_real_compositing(tmp_path, monkeypatch, dizinler):
     assert out_bytes != src_bytes
 
 
-def test_bindirme_KAYNAGIN_modelini_devraliyor(tmp_path, monkeypatch, dizinler):
+def test_bindirme_KAYNAGIN_modelini_devraliyor(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     """Bindirme TÜREV: kendi başına bir üretim değil.
 
     `folder_id`, `palette` ve `prompt_sent` gibi model de kaynaktan
@@ -397,7 +402,7 @@ def test_bindirme_KAYNAGIN_modelini_devraliyor(tmp_path, monkeypatch, dizinler):
         credits=7, images_per_request=1, supports_edit=True)
     monkeypatch.setattr(catalog, "IMAGE_MODELS", catalog.IMAGE_MODELS + (baska,))
 
-    asset_id = _logo_asset(tmp_path, dizinler)
+    asset_id = _logo_asset(tmp_path, dizinler, db_oturumu, kullanici)
     c = TestClient(appmod.app)
     src = c.post("/api/generate", json={"prompt": "cat", "size": "1024x1024",
                                         "quality": "medium", "n": 1,

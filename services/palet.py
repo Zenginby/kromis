@@ -10,16 +10,17 @@ GİDEN adın birebir aynı olması bu ortaklığa bağlı.
 from __future__ import annotations
 
 import os
+import uuid
 from collections.abc import Sequence
 
 from fastapi import HTTPException
+from sqlalchemy.orm import Session
 
 import color_names
 import i18n
 import palette
-import palette_store
 from models import MAX_PROMPT_CHARS, check_drop_indices
-from services import dil
+from services import depo_palet, dil
 
 
 def resolve_palette(seed: str, mode: str, *, offline: bool = False) -> list[dict]:
@@ -34,20 +35,23 @@ def resolve_palette(seed: str, mode: str, *, offline: bool = False) -> list[dict
         [{"hex": h, "name": n} for h, n in zip(hexes, names)])
 
 
-def saved_palette(palette_id: str | None, output_dir: str) -> dict | None:
-    """Kayıtlı paleti id ile bulur; yoksa None (hata DEĞİL — bkz. palette_prompt)."""
+def saved_palette(db: Session, kullanici_id: uuid.UUID, palette_id: str | None) -> dict | None:
+    """Kullanıcının kayıtlı paletini id ile bulur; yoksa None (hata DEĞİL — bkz. palette_prompt).
+
+    `(db, kullanici_id)` Faz 1 / 6: kayıt `paletler` satırı; başkasının paleti
+    de "yok" sayılır ve üretim `(seed, mode)`dan yeniden hesaplar.
+    """
     if not palette_id:
         return None
-    pid = os.path.basename(palette_id)
-    return next((p for p in palette_store.list_palettes(output_dir)
-                 if p.get("id") == pid), None)
+    return depo_palet.bul(db, kullanici_id, os.path.basename(palette_id))
 
 
-# palettes.json elle düzenlenebilir bir dosya. Okuma katmanı bozuk JSON'a
-# dayanıklı (palette_store._read), ama kaydın İÇERİĞİ de doğrulanmalı: `mode`
-# ve `seed` doğrudan palette.harmony'ye gidiyor ve orada ValueError üretip
-# üretimi 500'e düşürüyordu. Bozuk alan sessizce yok sayılır ve istekle gelen
-# değere düşülür — silinmiş palet nasıl bloke etmiyorsa bozuk palet de etmemeli.
+# Kaydın İÇERİĞİ doğrulanmalı (eskiden `palettes.json` elle düzenlenebilirdi;
+# bugün `colors` JSONB ve içe aktarma aracı eski dosyayı olduğu gibi taşıyor):
+# `mode` ve `seed` doğrudan palette.harmony'ye gidiyor ve orada ValueError
+# üretip üretimi 500'e düşürüyordu. Bozuk alan sessizce yok sayılır ve istekle
+# gelen değere düşülür — silinmiş palet nasıl bloke etmiyorsa bozuk palet de
+# etmemeli.
 
 def safe_seed(value) -> str | None:
     """Kayıttan gelen tohum hex'i; geçersizse None."""
@@ -67,11 +71,11 @@ def saved_colors(saved: dict) -> list[dict]:
 
 
 def palette_prompt(prompt: str, seed: str | None, mode: str, strength: str,
-                   palette_id: str | None = None, *, task: str, output_dir: str,
-                   drop: Sequence[int] = ()) -> tuple[str, dict | None]:
+                   palette_id: str | None = None, *, task: str, db: Session,
+                   kullanici_id: uuid.UUID, drop: Sequence[int] = ()) -> tuple[str, dict | None]:
     """Prompt'a renk yönlendirmesi ekler. Palet yoksa prompt aynen döner.
 
-    `output_dir` yalnız KAYITLI palet aranırken okunuyor (`saved_palette`);
+    `(db, kullanici_id)` yalnız KAYITLI palet aranırken okunuyor (`saved_palette`);
     anahtar-sözcük ve zorunlu, çünkü unutulması sessizce "kayıt yok" demek
     olurdu ve o da bu işlevin bilerek hata SAYMADIĞI bir durum.
 
@@ -101,7 +105,7 @@ def palette_prompt(prompt: str, seed: str | None, mode: str, strength: str,
     """
     if not seed:
         return prompt, None
-    saved = saved_palette(palette_id, output_dir)
+    saved = saved_palette(db, kullanici_id, palette_id)
     if saved:
         mode = saved["mode"] if saved.get("mode") in palette.MODES else mode
         seed = safe_seed(saved.get("seed")) or seed

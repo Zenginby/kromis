@@ -1,11 +1,20 @@
+"""`/api/assets/{kind}` ve `/assets/{kind}/{filename}` — varlık kütüphanesi rotaları.
+
+Kayıt `varliklar` satırı, dosya kullanıcının `assets_dir`inde (Faz 1 / 6):
+test kullanıcısı gerçek satır, `db.oturum` bu dosyanın motoruna bağlı —
+gerekçe tests/conftest.py::depo_db. `index.json` web yolunda hiç yazılmaz.
+"""
 import io
 import json
+import os
 
+import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
 import app as appmod
-import assets_store as astore
+
+pytestmark = pytest.mark.usefixtures("depo_db")
 
 
 def _png(color=(200, 30, 30, 255), size=(48, 24)) -> bytes:
@@ -36,6 +45,8 @@ def test_upload_lists_and_serves(tmp_path, dizinler):
     served = c.get(f"/assets/logos/{rec['filename']}")
     assert served.status_code == 200
     assert served.headers["content-type"] == "image/png"
+    # Manifest YOK: dizinde yalnız dosya (Faz 1 / 6 çıkış ölçütü).
+    assert sorted(os.listdir(tmp_path / "assets" / "logos")) == [rec["filename"]]
 
 
 def test_upload_derives_name_from_filename_when_blank(tmp_path, dizinler):
@@ -69,13 +80,16 @@ def test_delete_removes_asset(tmp_path, dizinler):
     assert c.delete(f"/api/assets/logos/{rec['id']}").status_code == 404
 
 
-def test_serve_rejects_traversal_and_manifest(tmp_path, dizinler):
+def test_serve_rejects_traversal_and_a_file_without_a_row(tmp_path, dizinler):
+    """Servis yolunun gerçeği `varliklar` satırı: eski `index.json` adı da, diskte
+    duran ama satırı olmayan bir dosya da 404 (`/output/{filename}` kararı)."""
     c = _client(tmp_path, dizinler)
     c.post("/api/assets/logos", files={"file": ("l.png", _png(), "image/png")})
-    # manifest dosyası servis edilmez
-    assert c.get(f"/assets/logos/{astore.MANIFEST_FILE}").status_code == 404
-    # bilinmeyen dosya
-    assert c.get("/assets/logos/deadbeef.png").status_code == 404
+    (tmp_path / "assets" / "logos" / "index.json").write_text("[]", encoding="utf-8")
+    assert c.get("/assets/logos/index.json").status_code == 404
+    (tmp_path / "assets" / "logos" / "deadbeef0000.png").write_bytes(_png())
+    assert c.get("/assets/logos/deadbeef0000.png").status_code == 404
+    assert c.get("/assets/logos/..%2F..%2Fetc%2Fpasswd").status_code == 404
 
 
 def test_the_dead_uploads_kind_is_no_longer_a_route(tmp_path, dizinler):
@@ -83,8 +97,9 @@ def test_the_dead_uploads_kind_is_no_longer_a_route(tmp_path, dizinler):
 
     Bu test eskiden türe yükleyip listeliyordu. Tür ÖLÜ olduğu için (hedef ve
     sekme kaldırılmıştı, oraya düşen varlık hiçbir bindirmede kullanılamıyordu)
-    şimdi kapının kendisi kapalı: uç 404. Eski varlıklar kaybolmuyor, açılışta
-    `logos`a göçüyorlar — bekçisi tests/test_assets.py.
+    şimdi kapının kendisi kapalı: uç 404. Eski varlıklar kaybolmuyor: içe
+    aktarma aracı (8. görev) `assets_store.migrate_legacy_uploads` ile `logos`a
+    taşıyor — bekçisi tests/test_assets.py; web yolu göçü ÇAĞIRMAZ (aşağıda).
     """
     c = _client(tmp_path, dizinler)
     assert c.post("/api/assets/uploads",
@@ -116,13 +131,10 @@ def _eski_uploads_dizini(tmp_path):
          "created_at": "2026-01-01T10:00:00"}]), encoding="utf-8")
 
 
-def test_a_legacy_upload_becomes_a_usable_logo_after_startup(tmp_path, monkeypatch, dizinler):
-    """Göç AÇILIŞTA gerçekten koşuyor ve varlık artık KULLANILABİLİR bir logo.
-
-    `assets_store` tarafındaki birim testleri göçün kendisini ölçüyor; bu test
-    onun lifespan'a BAĞLI olduğunu ölçüyor. İkisi ayrı: göç kusursuz yazılıp
-    hiç çağrılmasaydı birim testleri yeşil kalır, kullanıcının varlığı ise
-    ortadan kaybolurdu (tür artık listelenmiyor).
+def test_startup_leaves_a_legacy_uploads_directory_alone(tmp_path, monkeypatch, dizinler):
+    """Lifespan `migrate_legacy_uploads` ÇAĞIRMAZ (Faz 1 / 6): manifest okuyan tek
+    yol içe aktarma aracı. Eski `uploads/` ağacı açılıştan sonra da yerinde ve
+    kütüphane boş — göç web sürecinin işi değil, aracın işi.
     """
     dizinler(data_dir=str(tmp_path), output_dir=str(tmp_path / "output"),
              assets_dir=str(tmp_path / "assets"))
@@ -130,29 +142,7 @@ def test_a_legacy_upload_becomes_a_usable_logo_after_startup(tmp_path, monkeypat
     _eski_uploads_dizini(tmp_path)
 
     with TestClient(appmod.app) as c:
-        items = c.get("/api/assets/logos").json()["items"]
-        assert [i["name"] for i in items] == ["D9'dan kalma"]
-        # Asıl kazanç: bindirmenin okuduğu türde ve dosyası servis edilebiliyor.
-        assert c.get(f"/assets/logos/{items[0]['filename']}").status_code == 200
-    assert not (tmp_path / "assets" / "uploads").exists()
-
-
-def test_the_version_backup_runs_before_the_migration(tmp_path, monkeypatch, dizinler):
-    """SIRA: yedek göçten ÖNCE — yedeğin göç ÖNCESİ hâli taşıması için.
-
-    Göç, açılışın kullanıcı verisini yerinden oynatan tek adımı. Sıra ters
-    olsaydı sürüm değişiminde alınan yedek zaten göçmüş hâli dondururdu ve
-    geri dönülecek bir nokta kalmazdı — yani yedek tam da en çok gerektiği
-    sürümde işe yaramaz olurdu.
-    """
-    dizinler(data_dir=str(tmp_path), output_dir=str(tmp_path / "output"),
-             assets_dir=str(tmp_path / "assets"))
-    monkeypatch.setattr(appmod.paths, "ensure_data_dirs", lambda *dizinler: None)
-    sira: list[str] = []
-    monkeypatch.setattr(appmod.backup, "backup_manifests_if_version_changed",
-                        lambda *a, **k: sira.append("yedek"))
-    monkeypatch.setattr(appmod.assets_store, "migrate_legacy_uploads",
-                        lambda *a, **k: sira.append("goc"))
-    with TestClient(appmod.app):
-        pass
-    assert sira == ["yedek", "goc"]
+        assert c.get("/api/assets/logos").json()["items"] == []
+    assert (tmp_path / "assets" / "uploads" / "aaaaaaaa1111.png").is_file()
+    assert (tmp_path / "assets" / "uploads" / "index.json").is_file()
+    assert not (tmp_path / "assets" / "logos").exists()

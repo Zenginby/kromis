@@ -1,4 +1,9 @@
-"""/api/settings route'ları: durum okuma + write-only kaydetme."""
+"""/api/settings route'ları: durum okuma + write-only kaydetme.
+
+`GET /api/settings` `guncelleme_kontrolu` tercihini `tercihler` satırından okuyor
+(Faz 1 / 6) ve `/api/generate` medya satırı yazıyor (Faz 1 / 5): test kullanıcısı
+gerçek satır, `db.oturum` bu dosyanın motoruna bağlı — tests/conftest.py::depo_db.
+"""
 import pytest
 from fastapi.testclient import TestClient
 
@@ -7,6 +12,8 @@ import azure_client as ac
 import catalog
 import models
 import version
+
+pytestmark = pytest.mark.usefixtures("depo_db")
 
 
 @pytest.fixture
@@ -255,7 +262,6 @@ def test_gizli_alan_adi_gizli_OLMAYAN_bir_rotada_da_redakte_ediliyor():
     assert not appmod._is_secret_loc(["body", "comfyui_url"])
 
 
-@pytest.mark.usefixtures("depo_db")   # `/api/generate` `Session` istiyor; 422 ondan sonra (Faz 1 / 5)
 def test_generate_422_si_hatali_degeri_HALA_gosteriyor(client):
     """Redaksiyonun genelleşmesi gizli olmayan rotaları ETKİLEMEMELİ.
 

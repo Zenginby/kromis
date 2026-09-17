@@ -8,12 +8,16 @@ kendisiyle taşınabildiği (iki istemci, iki çerez).
 
 Hesabın dili conftest'in autouse `kullanici` fixture'ından geliyor
 (`kullanici.dil = "tr"`): override üretim yolundaki `kimlik.bagla`yı çağırıyor,
-yani 3. halka burada da GERÇEK koddan geçiyor — yalnız kullanıcı DB'den değil
-fixture'dan. DB'den okunan hâli (`gercek_kimlik`) tests/test_kimlik.py sınıyor.
-`services/tercih.py`nin kendi birim testleri en altta duruyor: modül web
-yolundan çıktı ama dondurulmuş kabuk için yaşıyor (6. görevde kararı).
+yani 3. halka burada da GERÇEK koddan geçiyor — kullanıcı `depo_db` ile
+gerçek bir satır, `POST /api/prefs` tercihi `tercihler`e yazıyor (Faz 1 / 6).
+Kapının DB'den okunan hâli (`gercek_kimlik`) tests/test_kimlik.py'de.
+`services/tercih.py` (dosya imzalı `prefs.json` önbelleği) Faz 1 / 6'da
+SİLİNDİ: web yolunda okuyucusu kalmamıştı. Faz 0 / 3'ün "20 istekte ≤1 okuma"
+ölçüsü artık "istek başına 1 sorgu (oturum), tercih için 0 ek sorgu" —
+sayımı tests/test_kimlik.py::test_resolving_the_user_costs_exactly_one_query_per_request.
 """
 import concurrent.futures
+import os
 import re
 
 import pytest
@@ -22,7 +26,9 @@ from fastapi.testclient import TestClient
 import app as appmod
 import i18n
 import prefs
-from services import dil, tercih
+from services import db, depo_tercih, dil
+
+pytestmark = pytest.mark.usefixtures("depo_db")
 
 TR_TARAYICI = {"Accept-Language": "tr-TR,tr;q=0.9,en;q=0.5"}
 EN_TARAYICI = {"Accept-Language": "en-US,en;q=0.9"}
@@ -107,7 +113,6 @@ def test_an_invalid_account_language_falls_through_to_the_browser(client, kullan
     assert _sayfa_dili(client.get("/", headers=TR_TARAYICI)) == "tr"
 
 
-@pytest.mark.usefixtures("depo_db")   # `DELETE /api/image` artık `Session` istiyor (Faz 1 / 5)
 def test_the_chain_reaches_route_errors_through_dil_aktif(client, kullanici):
     """Rotalar `dil.aktif()` okumaya devam ediyor (API sabit) ve o değer
     zincirden geliyor: çerezli istekte hata metni çerezin dilinde, çerezsizde
@@ -172,7 +177,8 @@ def test_the_accept_language_parser(baslik, beklenen):
 
 # ── Çerez ─────────────────────────────────────────────────────────────
 
-def test_saving_the_language_sets_the_cookie_and_the_next_request_carries_it(client, out_dir, kullanici):
+def test_saving_the_language_sets_the_cookie_and_the_next_request_carries_it(
+        client, out_dir, kullanici, db_oturumu):
     """Ön yüz değişmedi: `settings.js` yazımdan sonra `location.reload()`
     yapıyor; yeni sayfa çerezle geldiği için dil tarayıcıdan geliyor."""
     cevap = client.post("/api/prefs", json={"language": "tr"})
@@ -180,14 +186,19 @@ def test_saving_the_language_sets_the_cookie_and_the_next_request_carries_it(cli
     assert client.cookies.get(dil.CEREZ) == "tr"
     assert _sayfa_dili(client.get("/", headers=EN_TARAYICI)) == "tr"
     # …ve HESAP da yazıldı (Faz 1 / 4): çerezsiz bir istemci (aynı hesabın
-    # başka cihazı) 3. halkadan görür. Tercih dosyası da yazılıyor — `GET
-    # /api/prefs` onu gösteriyor; DB'ye taşınması 6. görev.
+    # başka cihazı) 3. halkadan görür. Tercih SATIRI da yazılıyor (Faz 1 / 6) —
+    # `GET /api/prefs` onu gösteriyor; dosyaya hiçbir şey yazılmıyor.
     assert kullanici.dil == "tr"
-    assert prefs.read(out_dir)["language"] == "tr"
+    assert depo_tercih.kayitli(db_oturumu, kullanici.id)["language"] == "tr"
+    assert not os.path.exists(os.path.join(out_dir, prefs.PREFS_FILE))
     assert _sayfa_dili(TestClient(appmod.app).get("/", headers=EN_TARAYICI)) == "tr"
 
 
-def test_the_cookie_attributes_are_long_lived_http_only_and_site_wide(client):
+def test_the_cookie_attributes_are_long_lived_http_only_and_site_wide(client, monkeypatch):
+    # Dondurulmuş kabuk hâli: `DATABASE_URL` yok (loopback http). `depo_db` onu
+    # motor için veriyor ama rota `db.oturum` override'ıyla çalışıyor, ortam
+    # değişkenini yalnız `cerez.guvenli` okuyor — burada kaldırınca kabuk kipi.
+    monkeypatch.delenv(db.DATABASE_URL_ENV, raising=False)
     cevap = client.post("/api/prefs", json={"language": "en"})
     baslik = cevap.headers["set-cookie"].lower()
     assert baslik.startswith(f"{dil.CEREZ}=en;")
@@ -218,16 +229,18 @@ def test_the_web_chain_never_reads_the_preference_file(client, out_dir, kullanic
     """`prefs.json`da `tr` dursa da sayfa tarayıcının dilinde: dosya hiç açılmıyor.
 
     Faz 0 / 3'ün "20 istekte ≤1 okuma" ölçüsü burada "0 okuma"ya indi: 3.
-    halka DB'den (fixture'dan) geliyor, `services/tercih.py` ve `prefs.read_stored`
-    istek yolunda çağrılmıyor — çağrılırsa yama patlatır."""
+    halka hesabın satırından geliyor, dondurulmuş `prefs.read_stored` istek
+    yolunda çağrılmıyor — çağrılırsa yama patlatır. Tercih deposu da
+    OKUNMUYOR (`depo_tercih.kayitli` patlatılıyor): dil zinciri `tercihler`e
+    değil `kullanicilar.dil`e bakar, tercih için ek sorgu SIFIR."""
     prefs.update({"language": "tr"}, out_dir)
     assert kullanici.dil is None
 
     def patlat(*a, **k):
-        raise AssertionError("dil zinciri tercih dosyasını okudu")
+        raise AssertionError("dil zinciri tercih dosyasını/deposunu okudu")
 
     monkeypatch.setattr(prefs, "read_stored", patlat)
-    monkeypatch.setattr(tercih, "dil", patlat)
+    monkeypatch.setattr(depo_tercih, "kayitli", patlat)
     for _ in range(5):
         assert _sayfa_dili(client.get("/", headers=EN_TARAYICI)) == "en"
     assert _sayfa_dili(client.get("/")) == i18n.DEFAULT
@@ -244,15 +257,7 @@ def test_a_write_through_the_route_is_visible_to_a_cookieless_client_at_once(cli
     assert _sayfa_dili(oteki.get("/")) == "en"
 
 
-# ── services/tercih.py — dondurulmuş kabuk için duran birim ──────────
-
-def test_the_cache_is_keyed_by_directory(tmp_path):
-    a, b = str(tmp_path / "a"), str(tmp_path / "b")
-    prefs.update({"language": "tr"}, a)
-    prefs.update({"language": "en"}, b)
-    assert tercih.dil(a) == "tr" and tercih.dil(b) == "en"
-    assert tercih.dil(str(tmp_path / "yok")) is None
-
+# ── prefs.read_stored — dondurulmuş kabuk için duran birim ────────────
 
 def test_read_stored_returns_only_what_is_actually_and_validly_written(tmp_path):
     out = str(tmp_path)

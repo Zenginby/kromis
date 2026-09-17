@@ -47,7 +47,7 @@ def generate(req: GenerateRequest, db: Session = OTURUM,
     prompt_sent, pal = palet.palette_prompt(req.prompt, req.palette_hex, req.palette_mode,
                                             req.palette_strength, req.palette_id,
                                             drop=req.palette_drop,
-                                            task="generate", output_dir=ayarlar.output_dir)
+                                            task="generate", db=db, kullanici_id=kullanici.id)
     # `req.model` doğrulayıcıda NORMALLEŞTİRİLDİ (None → varsayılanın gerçek
     # id'si), yani doğrulanan değer ile kaydedilen değer ayrışamıyor. İki
     # `assert` o sözleşmenin TİP düzeyindeki karşılığı: alan telde None
@@ -441,7 +441,7 @@ async def edit(
     # görselin kompozisyonunu yok eder; düzenlemede istenen renk derecelendirmesi.
     prompt_sent, pal = palet.palette_prompt(prompt, palette_hex, palette_mode,
                                             palette_strength, palette_id, task="edit",
-                                            output_dir=ayarlar.output_dir, drop=drop)
+                                            db=db, kullanici_id=kullanici.id, drop=drop)
     try:
         images = providers.edit(model_id, prompt_sent, refs, size, quality, n)
     except ac.ImageError as e:

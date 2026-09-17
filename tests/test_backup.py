@@ -1,9 +1,8 @@
 """Sürüm değişiminde manifest yedeği (backup.py).
 
-Bu dosya tests/conftest.py'deki yedek guard'ından MUAF (bkz. o dosyanın
-docstring'i): gerçek fonksiyonu çalıştırması gerekiyor. Bu yüzden lifespan
-testleri `paths.data_dir`'i tmp_path'e yönlendirmek ZORUNDA — yoksa
-geliştiricinin repo köküne yedek ve damga yazılır.
+DONDURULMUŞ KABUK (Faz 1 / 6): web yolu bu modülü artık çağırmıyor — manifest
+kalmadı, veri DB'de. Birim testleri masaüstü paketinin yedeği için duruyor;
+lifespan bağını ölçen testler en altta yeni sözleşmeye döndü (ithal YOK).
 
 FİXTURE AYRIMI KASITLI: bu dosya tests/fixtures/v18/ ağacını genel girdi olarak
 KULLANMAZ. backup.py hiç ayrıştırma yapmadığı için testleri yalnızca *bazı
@@ -17,8 +16,8 @@ Her test SABİT `now` ile: hiçbir dizin adı bugünün tarihine bağlı olması
 """
 import json
 import os
+import pathlib
 import shutil
-from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -26,7 +25,6 @@ from fastapi.testclient import TestClient
 import app as appmod
 import assets_store
 import backup
-import version
 
 NOW = "2026-07-30T12:00:00"
 FIXTURES_V18 = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -251,73 +249,57 @@ def test_a_realistic_v18_tree_is_backed_up_byte_for_byte(tmp_path):
             assert a.read() == b.read(), rel
 
 
-# ── lifespan: bağlantı, sıra, hata izolasyonu ─────────────────────────────
+# ── lifespan: yedek ARTIK ÇAĞRILMIYOR (Faz 1 / 6) ─────────────────────────
+#
+# Bu bölüm dört testle lifespan'ın yedeği tam bir kez, modül niteliği üzerinden
+# çağırdığını ve hatasını yuttuğunu ölçüyordu. Manifestler DB'ye taşındı
+# (docs/faz1-veritabani-hesaplar.md §6): yedeklenecek dosya kalmadı, DB yedeği
+# platformun işi (9. görev). Yukarıdaki birim testleri dondurulmuş masaüstü
+# kabuğu için duruyor; buradaki iki test yeni sözleşmeyi tutuyor — `app.py`
+# `backup`ı hiç ithal etmez ve açılış adımı patlasa da uygulama açılır.
 
 def _isolate_lifespan(monkeypatch, tmp_path, dizinler):
     # Üç dizin de ayar nesnesinden (Faz 0 / Adım 4): lifespan `paths.data_dir()`
     # okumuyor, `app.state.ayarlar.data_dir` okuyor — yama oraya.
     dizinler(data_dir=str(tmp_path), output_dir=str(tmp_path / "output"),
              assets_dir=str(tmp_path / "assets"))
-    monkeypatch.setattr(appmod.paths, "ensure_data_dirs", lambda *dizinler: None)
     assert str(tmp_path) not in ("", "/"), "izolasyon kurulmadı"
 
 
-def test_backup_does_not_fire_on_plain_import(monkeypatch, tmp_path, dizinler):
-    """`import app` ve çıplak TestClient yan etkisiz kalmalı (I3 sözleşmesi)."""
-    _isolate_lifespan(monkeypatch, tmp_path, dizinler)
-    recorder = MagicMock()
-    monkeypatch.setattr(appmod.backup, "backup_manifests_if_version_changed", recorder)
-    TestClient(appmod.app)
-    recorder.assert_not_called()
+def test_the_app_no_longer_imports_or_calls_the_backup_module():
+    """Web yolunda `backup` YOK: ne ithal ne çağrı (AST — yorumlar adı anabilir).
+
+    conftest'in eski `_guard_against_real_backups` fixture'ı bu yüzden kalktı:
+    yamalanacak bir çağrı kalmadı. Bir gün geri gelirse önce o guard geri gelmeli
+    (geliştiricinin repo köküne yedek yazma sızıntısı, conftest başlığı).
+    """
+    import ast
+    kaynak = (pathlib.Path(__file__).resolve().parent.parent / "app.py").read_text(encoding="utf-8")
+    for dugum in ast.walk(ast.parse(kaynak)):
+        if isinstance(dugum, ast.Import):
+            assert all(a.name != "backup" for a in dugum.names), "app.py `backup` ithal ediyor"
+        if isinstance(dugum, ast.ImportFrom):
+            assert dugum.module != "backup", "app.py `from backup import …` yapıyor"
+    assert not hasattr(appmod, "backup") and "backup" not in appmod.__all__
 
 
-def test_backup_fires_once_on_lifespan_startup(monkeypatch, tmp_path, dizinler):
-    _isolate_lifespan(monkeypatch, tmp_path, dizinler)
-    recorder = MagicMock(return_value=None)
-    monkeypatch.setattr(appmod.backup, "backup_manifests_if_version_changed", recorder)
-    with TestClient(appmod.app):
-        recorder.assert_called_once()
-    args, kwargs = recorder.call_args
-    ayarlar = appmod.app.state.ayarlar
-    assert args == (str(tmp_path), ayarlar.output_dir, ayarlar.assets_dir)
-    assert ayarlar.output_dir == str(tmp_path / "output"), "yönlendirme lifespan'a ulaşmadı"
-    assert kwargs["version"] == version.APP_VERSION
-    assert kwargs["now"]
+def test_lifespan_survives_a_startup_error(monkeypatch, tmp_path, dizinler):
+    """Açılış adımı patlasa da uygulama AÇILIR, hata `hata.log`a düşer.
 
-
-def test_lifespan_survives_a_backup_error(monkeypatch, tmp_path, dizinler):
-    """Yedek bir EMNİYET özelliği — patlaması uygulamayı KİLİTLEMEMELİ.
-
-    Yedek yüzünden uygulamaya giremeyen kullanıcının verisine arayüzden hiçbir
-    yolu kalmaz; bu, loglanmış-ama-alınmamış bir yedekten kesinlikle kötüdür.
-    Guard olmadan uvicorn'un startup()'ı hiç bitmez ve kullanıcı boş bir pencere
-    görür. Hata hata.log'a düşer, uygulama yine de servis verir.
-
-    (Buranın bir kardeşi vardı: yedek hatasının TOHUMLAMAYI düşürmediğini
-    ölçen test. Tohumlama — pakete gömülü yerleşik logoların kullanıcı
-    kütüphanesine kopyalanması — ürün marka-nötr olunca kaldırıldı, o test de
-    lifespan'daki sıra testiyle birlikte gitti.)
+    Eskiden yedeğin hatasıyla ölçülüyordu; adım gitti, guard'ın gerekçesi
+    kalıyor: guard olmadan uvicorn'un startup()'ı hiç bitmez ve kullanıcı boş
+    bir pencere görür. Kalan tek adım `paths.ensure_data_dirs` — onu patlatıyoruz.
     """
     _isolate_lifespan(monkeypatch, tmp_path, dizinler)
 
     def boom(*args, **kwargs):
         raise OSError("disk dolu (simüle)")
 
-    monkeypatch.setattr(appmod.backup, "backup_manifests_if_version_changed", boom)
+    monkeypatch.setattr(appmod.paths, "ensure_data_dirs", boom)
 
     with TestClient(appmod.app) as client:
-        assert client.get("/api/settings").status_code == 200
+        assert client.get("/health").status_code in (200, 503)
 
     log = tmp_path / "hata.log"
     assert log.is_file()
     assert "disk dolu" in log.read_text(encoding="utf-8")
-
-
-def test_app_calls_backup_through_the_module_attribute(monkeypatch, tmp_path):
-    """`from backup import ...` conftest guard'ını sessizce devre dışı bırakır.
-
-    Guard çağrı anında modül attribute'una bakıyor; app.py bir yerel isme
-    bağlarsa her test koşusu geliştiricinin repo köküne yedek yazabilir hale
-    gelir. Bu yüzden import biçimi de sözleşmenin parçası.
-    """
-    assert appmod.backup is backup

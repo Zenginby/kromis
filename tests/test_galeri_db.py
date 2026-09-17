@@ -19,6 +19,12 @@ Dört soru, dört aile:
 
 Rota düzeyindeki iki-kullanıcı izolasyonu tests/test_kimlik.py'de (gerçek
 çerezle); burada depo katmanı ve şekil. Postgres GERÇEK (`depo_db`).
+
+FAZ 1 / 6: (i) ve (ii) aileleri altı depo modülüne ve altı dondurulmuş depoya
+genişledi — `chat_store`/`palette_store`/`assets_store`/`prefs`in manifest
+işlevleri de web yolunda çağrılamaz, `depo_sohbet`/`depo_palet`/`depo_varlik`/
+`depo_tercih` de aynı imza ve süzgeç sözleşmesini taşır. O dört deponun (iii)
+ve (iv) aileleri kendi dosyalarında: tests/test_{sohbet,palet,varlik,tercih}_db.py.
 """
 from __future__ import annotations
 
@@ -35,26 +41,47 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 import app as appmod
+import assets_store
 import azure_client as ac
+import chat_store
 import folders
+import palette_store
+import prefs
 import storage
 from services import depo_klasor, depo_medya, hesap, tablolar, zaman
 
 pytestmark = pytest.mark.usefixtures("depo_db")
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEPOLAR = ("services/depo_medya.py", "services/depo_klasor.py")
+# Depo modülü → sorgu kuran EN AZ kaç işlev bekleniyor (bekçinin bekçisi: sıfıra
+# düşen bir tarama "hepsi süzüyor" derdi). Sayılar kaynağın bugünkü hâli.
+DEPOLAR = {
+    "services/depo_medya.py": 9, "services/depo_klasor.py": 4,
+    "services/depo_sohbet.py": 3, "services/depo_palet.py": 2,
+    "services/depo_varlik.py": 3, "services/depo_tercih.py": 1,
+}
+DONDURULMUS = {"storage": storage, "folders": folders, "chat_store": chat_store,
+               "palette_store": palette_store, "assets_store": assets_store, "prefs": prefs}
 
-# `storage`/`folders`ün MANİFESTE dokunan işlevleri — web yolunda çağrılamaz.
+# Dondurulmuş depoların MANİFESTE dokunan işlevleri — web yolunda çağrılamaz.
 # Saf yardımcılar (`ext_for`, `media_path_of`, `media_type_for`, `valid_id`,
-# `safe_component`, `MEDIA_TYPES`) listede DEĞİL: onlar dosya adı/MIME kararı,
-# `history.json`la ilgileri yok.
+# `safe_component`, `MEDIA_TYPES`, `cover_from`, `KINDS`, `_SCHEMA`, `_ENUMS`,
+# `DEFAULTS`) listede DEĞİL: onlar dosya adı/MIME/şema kararı, manifestle
+# ilgileri yok — depo modülleri onları ithal ediyor, kopyalamıyor.
 MANIFEST_ISLEVLERI = {
     "storage": ("save", "list_history", "set_folder", "set_folder_many", "delete",
                 "delete_many", "unfile_folder", "unfile_folders", "arena_round",
                 "set_arena_winner", "_read_history", "_write_history", "_history_path"),
     "folders": ("create", "list_folders", "exists", "depth", "descendants", "delete_tree",
                 "rename", "export_zip", "_read", "_write", "_folders_path"),
+    # Faz 1 / 6
+    "chat_store": ("create", "list_chats", "get", "update", "delete", "delete_all",
+                   "_read", "_write", "_chats_path"),
+    "palette_store": ("create", "list_palettes", "delete", "_read", "_write", "_palettes_path"),
+    "assets_store": ("save_asset", "list_assets", "asset_path", "delete_asset",
+                     "migrate_legacy_uploads", "_read_manifest", "_write_manifest",
+                     "_manifest_path", "_kind_dir"),
+    "prefs": ("read", "read_stored", "update", "_read_raw", "_write", "_prefs_path"),
 }
 
 
@@ -94,11 +121,17 @@ def test_no_web_module_calls_a_manifest_function_of_storage_or_folders():
 
 
 def test_the_manifest_function_list_still_matches_the_frozen_modules():
-    """Bekçinin bekçisi: liste `storage`/`folders`teki gerçek adları saymalı (yeniden adlandırma görünür)."""
+    """Bekçinin bekçisi: liste dondurulmuş modüllerdeki gerçek adları saymalı (yeniden adlandırma görünür)."""
+    assert set(MANIFEST_ISLEVLERI) == set(DONDURULMUS)
     for modul, adlar in MANIFEST_ISLEVLERI.items():
-        kaynak = {storage: storage, folders: folders}[storage if modul == "storage" else folders]
         for ad in adlar:
-            assert callable(getattr(kaynak, ad, None)), f"{modul}.{ad} yok — listeyi güncelle"
+            assert callable(getattr(DONDURULMUS[modul], ad, None)), f"{modul}.{ad} yok — listeyi güncelle"
+
+
+def test_the_repository_list_matches_the_files_on_disk():
+    """`services/depo_*.py` diskte ne varsa listede o var — yeni depo bekçisiz kalmaz."""
+    diskte = sorted(os.path.relpath(p, REPO) for p in glob.glob(os.path.join(REPO, "services", "depo_*.py")))
+    assert diskte == sorted(DEPOLAR), f"listeyi güncelle: {diskte}"
 
 
 # ── (i) sahiplik süzgeci: kaynak ───────────────────────────────────────
@@ -129,7 +162,7 @@ def _sahip_suzgeci_var(islev: ast.FunctionDef) -> bool:
     return False
 
 
-@pytest.mark.parametrize("yol", DEPOLAR)
+@pytest.mark.parametrize("yol", sorted(DEPOLAR))
 def test_every_query_building_function_filters_by_the_owner(yol):
     """Sorgu kuran her işlev `kullanici_id` parametresi alır VE onu süzgece koyar.
 
@@ -138,19 +171,19 @@ def test_every_query_building_function_filters_by_the_owner(yol):
     de yoksa o işlev başkasının satırına dokunabiliyor demek.
     """
     sorgulu = [f for f in _islevler(yol) if _sorgu_kuruyor(f)]
-    # Bekçinin bekçisi: `depo_klasor` sorguyu dört yerde kuruyor (`_sahibin`, `var_mi`,
-    # `_agac`, `agaci_sil`; gerisi `_sahibin`den türetiyor) — sıfıra düşen bir tarama
-    # "hepsi süzüyor" derdi.
-    assert len(sorgulu) >= 4, f"{yol}: taranan işlev şüpheli biçimde az ({len(sorgulu)})"
+    assert len(sorgulu) >= DEPOLAR[yol], f"{yol}: taranan işlev şüpheli biçimde az ({len(sorgulu)})"
     for f in sorgulu:
         parametreler = [a.arg for a in f.args.args + f.args.kwonlyargs]
         assert "kullanici_id" in parametreler, f"{yol}::{f.name} `kullanici_id` almıyor"
         assert _sahip_suzgeci_var(f), f"{yol}::{f.name} sorgusunda sahip süzgeci yok"
 
 
-@pytest.mark.parametrize("yol", DEPOLAR)
+@pytest.mark.parametrize("yol", sorted(DEPOLAR))
 def test_every_public_function_takes_the_session_and_the_owner_first(yol):
-    """İmza sözleşmesi: `(db, kullanici_id, …)` — `output_dir`in yerine geçen şey (belge §2/§5)."""
+    """İmza sözleşmesi: `(db, kullanici_id, …)` — `output_dir`in yerine geçen şey (belge §2/§5).
+
+    Sınıf gövdesindeki `__init__` (depo_tercih.GecersizTercih) alt çizgiyle başlıyor, taranmaz.
+    """
     for f in _islevler(yol):
         if f.name.startswith("_") or f.name == "safe_component":
             continue

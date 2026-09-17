@@ -4,12 +4,23 @@ Anahtar BİLEREK `/api/settings`'te değil: o uç kimlik formu ve `api_key` +
 `base_url` istiyor. Otomatik kayıt anahtarını oraya koymak, bir anahtarı
 çevirmenin Azure kimliğini yeniden yazması demekti — hem gereksiz bir yazım hem
 de Azure hiç yapılandırılmamışken anahtarın çevrilemez olması.
+
+Tercihler `tercihler` satırında (Faz 1 / 6): test kullanıcısı gerçek satır,
+`db.oturum` bu dosyanın motoruna bağlı — gerekçe tests/conftest.py::depo_db.
+Şema (`prefs.DEFAULTS`/`_SCHEMA`) dondurulmuş `prefs`ten okunmaya devam
+ediyor: depo aynı kaynağı ithal ediyor, iki liste yok. `prefs.json` kullanıcı
+dizininde HİÇ oluşmaz.
 """
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 
 import app as appmod
 import prefs
+from services import depo_tercih
+
+pytestmark = pytest.mark.usefixtures("depo_db")
 
 
 @pytest.fixture
@@ -36,13 +47,15 @@ def test_get_reports_the_defaults(client):
     assert client.get("/api/prefs").json() == prefs.DEFAULTS
 
 
-def test_post_turns_autosave_off_and_get_reflects_it(client, out_dir):
+def test_post_turns_autosave_off_and_get_reflects_it(client, out_dir, db_oturumu, kullanici):
     r = client.post("/api/prefs", json={"autosave_sessions": False})
 
     assert r.status_code == 200
     assert r.json() == {**prefs.DEFAULTS, "autosave_sessions": False}
     assert client.get("/api/prefs").json()["autosave_sessions"] is False
-    assert prefs.read(out_dir)["autosave_sessions"] is False
+    assert depo_tercih.oku(db_oturumu, kullanici.id)["autosave_sessions"] is False
+    assert depo_tercih.kayitli(db_oturumu, kullanici.id) == {"autosave_sessions": False}
+    assert not os.path.exists(os.path.join(out_dir, prefs.PREFS_FILE)), "tercih dosyaya yazıldı"
 
 
 def test_a_field_that_is_not_sent_is_not_touched(client):
@@ -125,7 +138,7 @@ def test_bilinmeyen_model_tercihi_422(client):
     assert r.status_code == 422
 
 
-def test_dil_tercihi_gidip_geliyor(client, out_dir):
+def test_dil_tercihi_gidip_geliyor(client, out_dir, db_oturumu, kullanici):
     """Ayarlar'daki dil seçicisinin uç tarafı.
 
     `/api/settings` DEĞİL burası ve gerekçe bu dosyanın başlığında yazılı:
@@ -137,7 +150,7 @@ def test_dil_tercihi_gidip_geliyor(client, out_dir):
     assert r.status_code == 200, r.text
     assert r.json()["language"] == "en"
     assert client.get("/api/prefs").json()["language"] == "en"
-    assert prefs.read(out_dir)["language"] == "en"
+    assert depo_tercih.oku(db_oturumu, kullanici.id)["language"] == "en"
 
 
 def test_bilinmeyen_dil_422(client):

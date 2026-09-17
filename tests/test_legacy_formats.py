@@ -37,7 +37,15 @@ dosyanın (ii) tüketici testleri eski fixture kayıtlarını o aracın yazacağ
 12 haneli id korunur, liste sırası ekleme sırası) ve aynı türetilmiş değerleri
 rotadan ölçer. (i) ailesine iki ikiz eklendi: DB satırının JSON dökümü de
 v1.8'in anahtar kümesini KAYBEDEMEZ (belge §5: "DB satırının JSON'a dökümü
-aynı alanları vermeli"). Palet ve varlık dosyaları hâlâ diskten (6. görev).
+aynı alanları vermeli").
+
+FAZ 1 / 6 — SOHBET, PALET, VARLIK, TERCİH DE DB'DE: `palettes.json` ve
+`assets/*/index.json` da web yolunda okunmuyor. `_db_tohumla` onları da
+`paletler`/`varliklar`a tohumluyor (aynı desen: eksik anahtar NULL, 12 haneli
+id, `kind` → `tur`, liste sırası → `olusturuldu`), (i) ailesine iki DB ikizi
+daha eklendi (`depo_palet.olustur`/`depo_varlik.kaydet` dökümleri v1.8
+anahtarlarını taşır). Varlık DOSYALARI hâlâ fixture ağacından kopyalanıyor:
+servis yolu satır VE dosya istiyor.
 """
 import json
 import os
@@ -53,7 +61,7 @@ import color_names as cn
 import folders
 import palette_store
 import storage
-from services import depo_klasor, depo_medya, tablolar, zaman
+from services import depo_klasor, depo_medya, depo_palet, depo_varlik, tablolar, zaman
 
 # Galeri/klasör/üretim rotaları DB'de (Faz 1 / 5): test kullanıcısı gerçek satır,
 # `db.oturum` bu dosyanın motoruna bağlı — gerekçe tests/conftest.py::depo_db.
@@ -101,13 +109,13 @@ def _fixture(path_parts: tuple[str, ...]) -> list[dict]:
 
 
 def _db_tohumla(db, kullanici_id) -> None:
-    """v1.8 `history.json` + `folders.json` → `medya`/`klasorler` satırları, içe aktarma aracının deseniyle.
+    """v1.8 manifestleri → `medya`/`klasorler`/`paletler`/`varliklar` satırları, içe aktarma aracının deseniyle.
 
     Eksik anahtar NULL (`.get()`), id 12 haneli aynen, liste sırası ekleme
     sırası (`olusturuldu` = taban + sıra µs — manifest listesinin sırası
     galeride "en yeni üstte" demekti, fixture'ın `created_at`ları buna
     uymuyor: elle yazılan kayıtlar eski tarihli ama listenin sonunda).
-    Klasörler önce (FK), sonra görseller.
+    Klasörler önce (FK), sonra görseller; paletler ve varlıklar bağımsız.
     """
     taban = zaman.an()
     for i, f in enumerate(_fixture(("output", "folders.json"))):
@@ -123,6 +131,16 @@ def _db_tohumla(db, kullanici_id) -> None:
             palette=r.get("palette"), prompt_sent=r.get("prompt_sent"),
             model=r.get("model") or "", credits=int(r.get("credits") or 0),
             olusturuldu=taban.replace(microsecond=100 + i)))
+    for i, p in enumerate(_fixture(("output", "palettes.json"))):
+        db.add(tablolar.Palet(id=p["id"], kullanici_id=kullanici_id, name=p.get("name", ""),
+                              seed=p.get("seed", ""), mode=p.get("mode", ""),
+                              strength=p.get("strength", ""), colors=p.get("colors") or [],
+                              olusturuldu=taban.replace(microsecond=200 + i)))
+    for kind in LEGACY_ASSET_KINDS:
+        for i, a in enumerate(_fixture(("assets", kind, "index.json"))):
+            db.add(tablolar.Varlik(id=a["id"], kullanici_id=kullanici_id, filename=a["filename"],
+                                   name=a.get("name", ""), tur=kind,
+                                   olusturuldu=taban.replace(microsecond=300 + i)))
     db.commit()
 
 
@@ -189,6 +207,17 @@ def test_palette_writer_still_writes_every_v18_field(tmp_path):
         f"v1.8 alanları kayboldu: {sorted(legacy - set(produced))}"
 
 
+def test_the_palette_row_dump_still_carries_every_v18_field(tmp_path, db_oturumu, kullanici):
+    """DB ikizi (Faz 1 / 6): `depo_palet.olustur`un dökümü de v1.8 anahtarlarını, aynı sırada taşır."""
+    legacy = _legacy_keys(("output", "palettes.json"))
+    renkler = [{"hex": "#c86a3c", "name": "Kiremit"}]
+    eski = palette_store.create("x", "#c86a3c", "triad", "balanced", renkler,
+                                str(tmp_path), now="2026-07-29T00:00:00")
+    yeni = depo_palet.olustur(db_oturumu, kullanici.id, "x", "#c86a3c", "triad", "balanced", renkler)
+    assert not (legacy - set(yeni)), f"v1.8 alanları DB dökümünde kayboldu: {sorted(legacy - set(yeni))}"
+    assert list(eski) == list(yeni), "iki yazıcının anahtar sırası ayrıştı"
+
+
 LEGACY_ASSET_KINDS = ("logos", "banners", "mottos")
 
 
@@ -199,6 +228,17 @@ def test_asset_writer_still_writes_every_v18_field(kind, tmp_path):
                                        now="2026-07-29T00:00:00")
     assert not (legacy - set(produced)), \
         f"v1.8 alanları kayboldu: {sorted(legacy - set(produced))}"
+
+
+@pytest.mark.parametrize("kind", LEGACY_ASSET_KINDS)
+def test_the_asset_row_dump_still_carries_every_v18_field(kind, tmp_path, db_oturumu, kullanici):
+    """DB ikizi (Faz 1 / 6): `tur` sütunu dökümde yine `kind` — ön yüz o adı okuyor."""
+    legacy = _legacy_keys(("assets", kind, "index.json"))
+    eski = assets_store.save_asset(kind, b"x", "ad", str(tmp_path / "eski"), now="2026-07-29T00:00:00")
+    yeni = depo_varlik.kaydet(db_oturumu, kullanici.id, kind, b"x", "ad", str(tmp_path / "yeni"))
+    assert not (legacy - set(yeni)), f"v1.8 alanları DB dökümünde kayboldu: {sorted(legacy - set(yeni))}"
+    assert list(eski) == list(yeni)
+    assert yeni["kind"] == kind
 
 
 def test_frozen_palette_colors_still_carry_hex_and_name(tmp_path):
@@ -293,8 +333,9 @@ def test_history_record_palette_round_trips(tmp_path, monkeypatch, dizinler, db_
     assert rec["prompt_sent"] and rec["prompt_sent"] != rec["prompt"]
 
 
-def test_saved_palettes_are_listed_newest_first(tmp_path, monkeypatch, dizinler):
+def test_saved_palettes_are_listed_newest_first(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     c = _client(tmp_path, monkeypatch, dizinler)
+    _db_tohumla(db_oturumu, kullanici.id)
     items = c.get("/api/palettes").json()["items"]
     assert len(items) == 2
     # en yeni başta: üretici "Sonbahar"ı ÖNCE yazdı → listede İKİNCİ
@@ -304,8 +345,10 @@ def test_saved_palettes_are_listed_newest_first(tmp_path, monkeypatch, dizinler)
 
 
 @pytest.mark.parametrize("kind", LEGACY_ASSET_KINDS)
-def test_assets_still_listed_and_served(kind, tmp_path, monkeypatch, dizinler):
+def test_assets_still_listed_and_served(kind, tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
+    """Satır tohumdan, DOSYA fixture ağacından: servis yolu ikisini birden istiyor."""
     c = _client(tmp_path, monkeypatch, dizinler)
+    _db_tohumla(db_oturumu, kullanici.id)
     items = c.get(f"/api/assets/{kind}").json()["items"]
     assert [a["id"] for a in items] == EXPECT["assets"][kind]
     for a in items:
@@ -314,7 +357,8 @@ def test_assets_still_listed_and_served(kind, tmp_path, monkeypatch, dizinler):
         assert r.headers["content-type"] == "image/png"
 
 
-def test_saved_v18_palette_still_reaches_the_prompt_with_frozen_names(tmp_path, monkeypatch, dizinler):
+def test_saved_v18_palette_still_reaches_the_prompt_with_frozen_names(tmp_path, monkeypatch, dizinler,
+                                                                        db_oturumu, kullanici):
     """Task 3'ün en güçlü testi: sessiz düşüşü yakalayan tek iddia.
 
     app._palette_prompt kayıtlı paleti bulup DONDURULMUŞ renkleri
@@ -328,6 +372,7 @@ def test_saved_v18_palette_still_reaches_the_prompt_with_frozen_names(tmp_path, 
     """
     sent = []
     c = _client(tmp_path, monkeypatch, dizinler, sent=sent)
+    _db_tohumla(db_oturumu, kullanici.id)
     r = c.post("/api/generate", json={
         "prompt": "afiş", "size": "1024x1024", "quality": "high", "n": 1,
         "palette_hex": EXPECT["palette"]["seed"],

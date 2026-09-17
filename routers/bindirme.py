@@ -7,24 +7,32 @@ from __future__ import annotations
 import base64
 import io
 import os
+import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from PIL import Image
 from sqlalchemy.orm import Session
 
-import assets_store
 import composite
 import i18n
 from models import BannerRequest, LogoRequest
-from services import ayar, depo_medya, dil, gorsel, kapilar, kimlik, zaman
+from services import ayar, depo_medya, depo_varlik, dil, gorsel, kapilar, kimlik, zaman
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
 router = APIRouter()
 
+# Varlık kütüphanesi DB'de (Faz 1 / 6): kayıt `varliklar` satırı, dosya
+# kullanıcının `assets_dir`inde aynı yerleşimle. Bindirilecek varlık satır VE
+# dosya ister (`depo_varlik.dosya_yolu`); `assets_store` buradan okunmaz
+# (bekçisi tests/test_galeri_db.py). Önizleme rotaları da bu yüzden `Session`
+# alıyor: bindirdikleri varlığı DB'den buluyorlar, diske yazmıyorlar.
 
-def _composite_logo(src_path: str, req: LogoRequest, assets_dir: str) -> bytes:
+
+def _composite_logo(src_path: str, req: LogoRequest, db: Session, kullanici_id: uuid.UUID,
+                    assets_dir: str) -> bytes:
     """Logo/motto filigranını süreç içinde bindirir (composite.py).
 
     Bindirilecek görsel HER ZAMAN kullanıcının kütüphanesinden gelir. Eskiden
@@ -34,7 +42,8 @@ def _composite_logo(src_path: str, req: LogoRequest, assets_dir: str) -> bytes:
     """
     if not req.asset_id:
         raise HTTPException(status_code=422, detail=i18n.t("err.pick_an_image", dil.aktif()))
-    overlay_path = assets_store.asset_path(req.asset_kind, req.asset_id, assets_dir)
+    overlay_path = depo_varlik.dosya_yolu(db, kullanici_id, req.asset_kind,
+                                          os.path.basename(req.asset_id), assets_dir)
     if overlay_path is None:
         raise HTTPException(status_code=404, detail=i18n.t("err.image_missing", dil.aktif()))
     try:
@@ -63,10 +72,12 @@ def _logo_src_path(image_id: str, output_dir: str) -> str:
 
 
 @router.post("/api/logo/preview")
-def preview_logo(req: LogoRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def preview_logo(req: LogoRequest, db: Session = OTURUM,
+                 ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+                 kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """Seçeneklerle geçici bir logo önizlemesi üretir — diske/geçmişe KAYDETMEZ."""
     src_path = _logo_src_path(req.id, ayarlar.output_dir)
-    logo_bytes = _composite_logo(src_path, req, ayarlar.assets_dir)
+    logo_bytes = _composite_logo(src_path, req, db, kullanici.id, ayarlar.assets_dir)
     b64 = base64.b64encode(logo_bytes).decode("ascii")
     return {"b64": f"data:image/png;base64,{b64}"}
 
@@ -83,7 +94,7 @@ def add_logo(req: LogoRequest, db: Session = OTURUM,
     # dosya `{}` — bindirme yine yapılır, alanlar boş kalır (eski davranış).
     src_meta = depo_medya.bul(db, kullanici.id, src_id) or {}
 
-    logo_bytes = _composite_logo(src_path, req, ayarlar.assets_dir)
+    logo_bytes = _composite_logo(src_path, req, db, kullanici.id, ayarlar.assets_dir)
     record = depo_medya.kaydet(
         db, kullanici.id, logo_bytes,
         {"prompt": src_meta.get("prompt", ""), "size": src_meta.get("size", ""),
@@ -130,23 +141,29 @@ def _composite_banner(src_path: str, banner_path: str, edge: str,
     return out.getvalue()
 
 
-def _banner_asset_path(asset_id: str, assets_dir: str) -> str:
-    path = assets_store.asset_path("banners", asset_id, assets_dir)
+def _banner_asset_path(asset_id: str, db: Session, kullanici_id: uuid.UUID,
+                       assets_dir: str) -> str:
+    path = depo_varlik.dosya_yolu(db, kullanici_id, "banners", os.path.basename(asset_id),
+                                  assets_dir)
     if path is None:
         raise HTTPException(status_code=404, detail=i18n.t("err.banner_missing", dil.aktif()))
     return path
 
 
-def _banner_bytes(src_path: str, req: BannerRequest, assets_dir: str) -> bytes:
-    return _composite_banner(src_path, _banner_asset_path(req.asset_id, assets_dir), req.edge,
-                             req.scale, req.align, req.margin)
+def _banner_bytes(src_path: str, req: BannerRequest, db: Session, kullanici_id: uuid.UUID,
+                  assets_dir: str) -> bytes:
+    return _composite_banner(src_path, _banner_asset_path(req.asset_id, db, kullanici_id,
+                                                          assets_dir),
+                             req.edge, req.scale, req.align, req.margin)
 
 
 @router.post("/api/banner/preview")
-def preview_banner(req: BannerRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def preview_banner(req: BannerRequest, db: Session = OTURUM,
+                   ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+                   kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """Banner'lı geçici bir önizleme üretir — diske/geçmişe KAYDETMEZ."""
     banner_bytes = _banner_bytes(_logo_src_path(req.id, ayarlar.output_dir), req,
-                                 ayarlar.assets_dir)
+                                 db, kullanici.id, ayarlar.assets_dir)
     b64 = base64.b64encode(banner_bytes).decode("ascii")
     return {"b64": f"data:image/png;base64,{b64}"}
 
@@ -161,7 +178,7 @@ def add_banner(req: BannerRequest, db: Session = OTURUM,
 
     src_meta = depo_medya.bul(db, kullanici.id, src_id) or {}
 
-    banner_bytes = _banner_bytes(src_path, req, ayarlar.assets_dir)
+    banner_bytes = _banner_bytes(src_path, req, db, kullanici.id, ayarlar.assets_dir)
     record = depo_medya.kaydet(
         db, kullanici.id, banner_bytes,
         {"prompt": src_meta.get("prompt", ""), "size": src_meta.get("size", ""),
@@ -184,9 +201,14 @@ async def upload_asset(
     request: Request,
     file: UploadFile = File(...),
     name: str = Form(""),
+    db: Session = OTURUM,
     ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+    kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
 ) -> dict:
-    """Bir logo/banner PNG'si yükler; doğrulayıp yeniden kodlar ve kütüphaneye ekler."""
+    """Bir logo/banner PNG'si yükler; doğrulayıp yeniden kodlar ve kütüphaneye ekler.
+
+    `async def` rota: DB çağrısı `run_in_threadpool` ile (belge §1'in sürücü kararı).
+    """
     kapilar.check_asset_kind(kind)
     content_length = request.headers.get("content-length")
     if content_length is not None and content_length.isdigit() and int(content_length) > gorsel.MAX_UPLOAD_BYTES:
@@ -197,42 +219,42 @@ async def upload_asset(
     image_bytes = gorsel.to_png(raw)  # şeffaflığı koruyan RGBA PNG'ye yeniden kodla
     stem = os.path.splitext(os.path.basename(file.filename or ""))[0]
     label = (name.strip() or stem or i18n.t("library.asset"))[:120]
-    record = assets_store.save_asset(kind, image_bytes, label, ayarlar.assets_dir,
-                                     now=zaman.simdi())
+    record = await run_in_threadpool(depo_varlik.kaydet, db, kullanici.id, kind, image_bytes,
+                                     label, ayarlar.assets_dir, now=zaman.an())
     return {"asset": record}
 
 
 @router.get("/api/assets/{kind}")
-def list_assets_route(kind: str, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def list_assets_route(kind: str, db: Session = OTURUM,
+                      kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+    """Bir türün ya da (`all`) hepsinin varlıkları, en yeni başta; dizin okumaz (yalnız satır)."""
     kapilar.check_asset_kind(kind, allow_all=True)
-    assets_dir = ayarlar.assets_dir
-    if kind == "all":
-        all_items = []
-        for k in assets_store.KINDS:
-            all_items.extend(assets_store.list_assets(k, assets_dir))
-        all_items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
-        return {"items": all_items}
-    return {"items": assets_store.list_assets(kind, assets_dir)}
+    return {"items": depo_varlik.listele(db, kullanici.id, None if kind == "all" else kind)}
 
 
 @router.delete("/api/assets/{kind}/{asset_id}")
-def delete_asset_route(kind: str, asset_id: str,
-                       ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def delete_asset_route(kind: str, asset_id: str, db: Session = OTURUM,
+                       ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+                       kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     kapilar.check_asset_kind(kind)
-    removed = assets_store.delete_asset(kind, asset_id, ayarlar.assets_dir)
-    if not removed:
+    aid = os.path.basename(asset_id)
+    if not depo_varlik.sil(db, kullanici.id, kind, aid, ayarlar.assets_dir):
         raise HTTPException(status_code=404, detail=i18n.t("err.asset_missing", dil.aktif()))
-    return {"deleted": os.path.basename(asset_id)}
+    return {"deleted": aid}
 
 
 @router.get("/assets/{kind}/{filename}")
-def asset_file(kind: str, filename: str,
-               ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> FileResponse:
+def asset_file(kind: str, filename: str, db: Session = OTURUM,
+               ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+               kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> FileResponse:
+    """Kütüphane karosunun görseli. Dosya adı kullanıcının `varliklar` satırında ARANIYOR
+    (Faz 1 / 6): satırı yoksa dosya diskte dursa bile 404 — `/output/{filename}`in kararı.
+    Eski `index.json` adı da bu yüzden ayrıca yasaklanmıyor: hiçbir satır o adı taşımaz."""
     kapilar.check_asset_kind(kind)
     safe = os.path.basename(filename)
-    if not safe or safe in (".", "..") or safe == assets_store.MANIFEST_FILE:
+    if not safe or safe in (".", ".."):
         raise HTTPException(status_code=404, detail=i18n.t("err.not_found", dil.aktif()))
-    path = os.path.join(ayarlar.assets_dir, kind, safe)
-    if not os.path.isfile(path):
+    path = depo_varlik.dosya_yolu_adiyla(db, kullanici.id, kind, safe, ayarlar.assets_dir)
+    if path is None:
         raise HTTPException(status_code=404, detail=i18n.t("err.not_found", dil.aktif()))
     return FileResponse(path, media_type="image/png")

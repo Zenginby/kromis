@@ -3,6 +3,10 @@
 Fixture `appmod.cc.complete`'i, yani MODÜL NİTELİĞİNİ monkeypatch ediyor:
 conftest.py'nin başındaki uyarının aynısı — `from chat_client import complete`
 yazılsaydı bu guard sessizce boşa çıkardı ve testler gerçek Azure'a giderdi.
+
+Yönetmenin tur bağlamı (seçili model, yönlendirme) `tercihler` satırından
+(Faz 1 / 6): test kullanıcısı gerçek satır, `db.oturum` bu dosyanın motoruna
+bağlı — gerekçe tests/conftest.py::depo_db.
 """
 import os
 
@@ -11,6 +15,8 @@ from fastapi.testclient import TestClient
 
 import app as appmod
 import models
+
+pytestmark = pytest.mark.usefixtures("depo_db")
 
 
 @pytest.fixture
@@ -692,7 +698,7 @@ def test_the_route_builds_the_system_message_itself(client, fake_kwargs):
 def test_the_saved_guidance_reaches_the_wire(client, fake_kwargs):
     """Çekmeceye yazılan metin HER turda sistem mesajında olmalı.
 
-    Özelliğin tamamı bu satıra bağlı: yönlendirme `prefs.json`'a yazılıyor ama
+    Özelliğin tamamı bu satıra bağlı: yönlendirme tercih satırına yazılıyor ama
     oradan sistem mesajına taşınmazsa kullanıcı bir kutuya yazıp hiçbir şeyin
     değişmediğini görür.
     """
@@ -723,7 +729,7 @@ def test_the_context_block_names_the_selected_image_model(client, fake_kwargs):
     İkisi ayrı eksen: sohbet modeli yönetmenin KİM olduğunu, görsel modeli
     yönetmenin hangi jetonları önerebileceğini belirliyor. İkincisi bu uçta
     tel üzerinde HİÇ gelmiyor (`ChatRequest` `extra="forbid"`), o yüzden
-    `prefs.json`'dan okunmak zorunda.
+    tercih satırından okunmak zorunda.
     """
     import catalog
     _post(client, [{"role": "user", "content": "kare görsel"}])
@@ -750,49 +756,35 @@ def test_a_missing_instruction_file_becomes_the_same_502(client, monkeypatch):
 
 
 
-def test_a_mis_encoded_prefs_file_is_not_blamed_on_the_instruction_file(
-        client, fake_kwargs, monkeypatch):
-    """Bozuk prefs.json, yönetmenin TALİMAT dosyasının suçu gibi görünüyordu.
+def test_a_stray_preference_file_is_never_read_by_the_director(client, fake_kwargs):
+    """Kullanıcı dizinindeki `prefs.json` — bozuk ya da dolu — turu ETKİLEMEZ (Faz 1 / 6).
 
-    Elle düzenlenmiş bir prefs.json (modülün beklediği bir durum — bkz.
-    `prefs.read`'in `theme: "neon"` notu) cp1254 kaydedilmişse `json.load`
-    UTF-8 çözerken `UnicodeDecodeError` atıyor ve o bir `ValueError` ALT
-    SINIFI. `_director_context()` çağrısı `except ValueError` dalının İÇİNDE
-    olduğu sürece kullanıcı 502 ile "Prompt Yönetmeni talimatı yüklenemedi"
-    okuyordu, yani hiç bozulmamış bir dosyaya yönlendiriliyordu. Üstelik aynı
-    arıza `GET /api/prefs`te çıplak 500 veriyordu: iki uç aynı kusur için iki
-    ayrı şey söylüyordu.
-
-    İki dokunuş birlikte ölçülüyor çünkü tek başına biri yetmiyor: bağlam
-    toplama `try`nin dışına çıktı (yanlış atıf gitti) ve `prefs._read_raw`
-    kod çözme hatasını da yakalıyor (modülün "okuma yolu HOŞGÖRÜLÜ" sözü).
+    Bu testin atası cp1254 kaydedilmiş bir `prefs.json`un turu düşürüp suçu
+    talimat dosyasına attığı kusuru ölçüyordu. Tercih artık `tercihler`
+    satırında; dosya web yolunda hiç açılmıyor. Dolu bir dosyadaki yönlendirme
+    de sistem mesajına GİRMEZ — girerse okuyan bir yol geri gelmiş demektir.
     """
     output_dir = appmod.app.state.ayarlar.output_dir     # `client` fixture'ı tmp_path'e yönlendirdi
     os.makedirs(output_dir, exist_ok=True)
     yol = os.path.join(output_dir, "prefs.json")
-    # Türkçe bir tema adı cp1254'te yazıldığında UTF-8 çözücü düşüyor.
     with open(yol, "w", encoding="cp1254") as f:
-        f.write('{"theme": "mono", "director_guidance": "düz çizgi üslubu"}')
+        f.write('{"theme": "mono", "director_guidance": "düz çizgi üslubu DİSKTEN"}')
 
     r = client.post("/api/chat", json={"messages": [{"role": "user", "content": "kedi"}]})
 
-    assert r.status_code == 200, (
-        f"bozuk prefs.json turu düşürüyor: {r.status_code} {r.text}")
-    assert "talimatı yüklenemedi" not in r.text, (
-        "bozuk prefs.json talimat dosyasının suçu gibi raporlanıyor")
-    # Tur YİNE personayla gidiyor: bağlam bir kolaylık, kaybı sohbeti düşürmez.
+    assert r.status_code == 200, r.text
     assert fake_kwargs[0]["instructions"], "sistem mesajı hiç kurulmamış"
-    # Ve aynı dosya prefs ucunu da düşürmüyor: iki uç artık aynı şeyi diyor.
-    assert client.get("/api/prefs").status_code == 200
+    assert "DİSKTEN" not in fake_kwargs[0]["instructions"], "tercih dosyası okunmuş"
+    assert client.get("/api/prefs").json()["director_guidance"] == ""
 
 
 def test_the_context_is_gathered_outside_the_instruction_guard(client, fake_kwargs):
-    """TRIPWIRE: `_director_context()` `try`nin İÇİNE geri taşınmamalı.
+    """TRIPWIRE: `director_context()` `try`nin İÇİNE geri taşınmamalı.
 
-    Yukarıdaki test davranışı ölçüyor ama yalnız BİR arıza türüyle
-    (`UnicodeDecodeError`). `prefs`/`catalog` yolundan gelecek başka bir
-    `ValueError` de aynı yanlış atıfla raporlanırdı; kapının yeri o yüzden
-    ayrıca mandallanıyor.
+    `except ValueError` yalnız talimat dosyasının hatasını yakalamalı: bağlamdan
+    (tercih satırı, katalog) gelen bir hata "talimat yüklenemedi" kılığına
+    girerse kullanıcı hiç bozulmamış bir dosyaya yönlendirilir. Kapının yeri
+    o yüzden ayrıca mandallanıyor.
     """
     import pathlib as _p
     # Rota `routers/sohbet.py`de (Faz 0 / Adım 2); bağlamı `services.modeller` kuruyor.
@@ -800,7 +792,7 @@ def test_the_context_is_gathered_outside_the_instruction_guard(client, fake_kwar
               ).read_text(encoding="utf-8")
     assert "instructions = chat_prompt.build_system(**baglam)" in kaynak, (
         "bağlam çağrısı `build_system`in argümanı olarak `try` içinde duruyor")
-    govde = kaynak.split("baglam = modeller.director_context(ayarlar.output_dir)", 1)
+    govde = kaynak.split("baglam = modeller.director_context(db, kullanici.id)", 1)
     assert len(govde) == 2, "bağlam `try` öncesinde toplanmıyor"
     assert "try:" in govde[1].split("except ValueError", 1)[0], (
         "kapı bağlam toplamadan SONRA açılmıyor")

@@ -38,9 +38,12 @@ modül kalıyor):
   422 doğrulama hatası kapıdan SONRA gelir (FastAPI alt bağımlılıkları gövde
   doğrulamasından önce çözüyor), yani hesabın dilinde.
 
-`services/tercih.py` (dosya imzalı `prefs.json` okuyucusu) web yolunda ARTIK
-OKUNMUYOR — çıkış ölçütü "dil DB'den geliyor (`prefs.json` okunmuyor)". Modül
-dondurulmuş kabuk için duruyor, kararı 6. görevde (`prefs` ile birlikte).
+`services/tercih.py` (dosya imzalı `prefs.json` okuyucusu) Faz 1 / 4'te web
+yolundan çıktı — çıkış ölçütü "dil DB'den geliyor (`prefs.json` okunmuyor)" —
+ve Faz 1 / 6'da SİLİNDİ: tercihler `tercihler` tablosuna taşındı
+(services/depo_tercih.py), dosya imzalı bir önbelleğin okuyucusu kalmadı. Dil
+zinciri `tercihler.language`a da BAKMAZ: hesabın dili `kullanicilar.dil`,
+kapı onu zaten getiriyor — tercih için ek sorgu sıfır.
 
 `Accept-Language` ÖNCEDEN BİLEREK okunmuyordu ("kaynak tek olmalı; tarayıcı
 çoğu zaman pywebview'ın penceresi, başlık kullanıcının tercihi bile değil").
@@ -82,8 +85,9 @@ async def dil_baglami(request: Request, call_next):
     Tek bir okuma noktası (`aktif`), yazarı tek modül.
 
     Disk YOK, sorgu YOK: bu ara katman yalnız başlık ve çerez okuyor. Faz 0'ın
-    `services/tercih.py` önbelleği burada okunuyordu; hesabın dili artık kimlik
-    kapısının zaten getirdiği satırdan geliyor (modül başlığı).
+    `services/tercih.py` önbelleği (Faz 1 / 6'da silindi) burada okunuyordu;
+    hesabın dili artık kimlik kapısının zaten getirdiği satırdan geliyor
+    (modül başlığı).
     """
     acik = acik_secim(request)
     request.state.dil_acik = acik is not None

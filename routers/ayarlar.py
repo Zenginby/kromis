@@ -5,23 +5,30 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Response
+from sqlalchemy.orm import Session
 
 import azure_client as ac
 import catalog
 import guncelleme
 import i18n
 import paths
-import prefs
 import version
 from models import PrefsRequest, SettingsRequest
-from services import ayar, dil, kimlik, modeller
+from services import ayar, depo_tercih, dil, kimlik, modeller, zaman
+from services.db import OTURUM
 from services.tablolar import Kullanici
 
 router = APIRouter()
 
+# Tercihler DB'de (Faz 1 / 6): `guncelleme_kontrolu` kullanıcının `tercihler`
+# satırından; `guncelleme.json` önbelleği ise DİSKTE kalıyor (kullanıcı verisi
+# değil, GitHub Releases cevabı — belge §6), o yüzden üç güncelleme rotası
+# `ayarlar.output_dir`i almaya devam ediyor. `prefs` buradan okunmaz.
+
 
 @router.get("/api/settings")
-def get_settings(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def get_settings(db: Session = OTURUM, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+                 kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """Yapılandırma durumu + uygulama sürümü. API key asla dönmez.
 
     `version` BURADA birleştiriliyor, azure_client'ta DEĞİL: onun işi kimlik
@@ -46,18 +53,19 @@ def get_settings(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     bakıyor, ağ çağrısı arka planda koşuyor (bkz. guncelleme.py'deki 2.
     sözleşme). İlk açılışta değeri `null` olur, sonrakinde dolar.
     """
-    output_dir = ayarlar.output_dir
     return {**modeller.settings_payload(),
             "version": version.APP_VERSION,
             "guncelleme": guncelleme.bilgi(
-                output_dir, izin=prefs.read(output_dir)["guncelleme_kontrolu"]),
+                ayarlar.output_dir,
+                izin=depo_tercih.oku(db, kullanici.id)["guncelleme_kontrolu"]),
             "chat_instructions_path": paths.chat_instructions_override(),
             "chat_video_instructions_path":
                 paths.chat_video_instructions_override()}
 
 
 @router.get("/api/guncelleme")
-def get_guncelleme(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def get_guncelleme(db: Session = OTURUM, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+                   kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """Yalnız güncelleme cevabı — `/api/settings`'in ARDIL okuması.
 
     NEDEN AYRI BİR UÇ: `guncelleme.bilgi()` bayat önbellekte tazelemeyi arka
@@ -81,13 +89,13 @@ def get_guncelleme(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
 
     İstek yolunu BEKLETMEZ — `/api/settings` ile aynı çağrı, aynı önbellek.
     """
-    output_dir = ayarlar.output_dir
     return {"guncelleme": guncelleme.bilgi(
-        output_dir, izin=prefs.read(output_dir)["guncelleme_kontrolu"])}
+        ayarlar.output_dir, izin=depo_tercih.oku(db, kullanici.id)["guncelleme_kontrolu"])}
 
 
 @router.post("/api/guncelleme")
-def post_guncelleme(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def post_guncelleme(db: Session = OTURUM, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+                    kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """"Şimdi kontrol et" — TTL'i baypas eden, SONUCU BEKLEYEN elle kontrol.
 
     NEDEN VAR: `GET` yalnız önbelleğe bakıyor ve önbellek 24 saat taze sayılıyor
@@ -109,9 +117,8 @@ def post_guncelleme(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
     Gövde `{"durum": …, "guncelleme": …}`; `durum` dört değerden biri
     (`guncelleme.DURUM_*`) ve arayüz her birini ayrı bir cümleye çeviriyor.
     """
-    output_dir = ayarlar.output_dir
     return guncelleme.simdi_kontrol_et(
-        output_dir, izin=prefs.read(output_dir)["guncelleme_kontrolu"])
+        ayarlar.output_dir, izin=depo_tercih.oku(db, kullanici.id)["guncelleme_kontrolu"])
 
 
 @router.post("/api/settings")
@@ -269,14 +276,14 @@ def post_settings(req: SettingsRequest,
 # ── Kullanıcı tercihleri ────────────────────────────────────────────────
 
 @router.get("/api/prefs")
-def get_prefs_route(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
-    """Tercihlerin birleşik görünümü (bkz. prefs.py). Gizli alan taşımıyor."""
-    return prefs.read(ayarlar.output_dir)
+def get_prefs_route(db: Session = OTURUM,
+                    kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+    """Tercihlerin birleşik görünümü (bkz. depo_tercih). Gizli alan taşımıyor."""
+    return depo_tercih.oku(db, kullanici.id)
 
 
 @router.post("/api/prefs")
-def post_prefs_route(req: PrefsRequest, response: Response,
-                     ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+def post_prefs_route(req: PrefsRequest, response: Response, db: Session = OTURUM,
                      kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """Gönderilen tercihleri yazar, diğerlerine dokunmaz; yeni görünümü döndürür.
 
@@ -292,22 +299,20 @@ def post_prefs_route(req: PrefsRequest, response: Response,
     tarayıcı bir sonraki isteğinde dilini kendisi getiriyor; aynı hesabın
     çerezsiz başka bir cihazı ise 3. halkadan, DB'den alıyor. Yazım
     `kullanici.dil = …` — bu nesne kapının çözdüğü, isteğin `Session`ına
-    bağlı satır; commit `db.oturum`da, rota döner dönmez (ayrı `db`
-    parametresi gerekmiyor). `prefs.json`daki `language` da yazılmaya devam
-    ediyor (`GET /api/prefs` onu gösteriyor; DB'ye taşınması 6. görev). Ön
-    yüz DEĞİŞMEDİ: `static/settings.js` yazımın ardından `location.reload()`
-    yapıyor, yeni sayfa çerezle geliyor.
-
-    `services/tercih.py`nin önbelleği artık burada düşürülmüyor: dil zinciri
-    o dosyayı okumuyor (Faz 1 / 4), düşürülecek bir okuyucu kalmadı.
+    bağlı satır; commit `db.oturum`da, rota döner dönmez. `tercihler.language`
+    da yazılıyor (`GET /api/prefs` onu gösteriyor, Faz 1 / 6) — iki sütun, iki
+    okuyucu: dil zinciri hesabı, tercih paneli tercihi okur. Ön yüz DEĞİŞMEDİ:
+    `static/settings.js` yazımın ardından `location.reload()` yapıyor, yeni
+    sayfa çerezle geliyor.
     """
     values = req.model_dump(exclude_none=True)
     try:
-        sonuc = prefs.update(values, ayarlar.output_dir)
-    except ValueError as e:
-        # prefs katmanı da bilinmeyen anahtarı/yanlış türü reddediyor; buraya
-        # düşmek pydantic ile prefs şemasının ayrışması demek olur.
-        raise HTTPException(status_code=422, detail=str(e))
+        sonuc = depo_tercih.guncelle(db, kullanici.id, values, now=zaman.an())
+    except depo_tercih.GecersizTercih as e:
+        # Depo da bilinmeyen anahtarı/yanlış türü/çapraz kuralı reddediyor
+        # (`chat_model` ↔ `chat_provider` yalnız burada); cümleyi rota kurar,
+        # depo yalnız anahtarı taşır (konuşmayan katman).
+        raise HTTPException(status_code=422, detail=i18n.t(e.kod, dil.aktif(), **e.alanlar))
     if "language" in values:
         dil.cerez_yaz(response, values["language"])
         kullanici.dil = values["language"]

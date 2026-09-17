@@ -11,6 +11,7 @@ import re
 import xml.dom.minidom
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 import app as appmod
@@ -120,6 +121,7 @@ def test_dosyalar_STATIC_altinda_servis_ediliyor():
         assert "svg" in r.headers["content-type"], r.headers["content-type"]
 
 
+@pytest.mark.usefixtures("depo_db")   # `/api/settings` tercih satırını okuyor (Faz 1 / 6)
 def test_API_her_modelde_isaret_ADRESI_donduruyor():
     """Adresi SUNUCU kuruyor: istemcide sağlayıcı adı sayılmıyor, dize
     birleştirilmiyor. `?v=` cache-buster'ı `index()`in tek deseninden geliyor —

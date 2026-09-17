@@ -8,6 +8,8 @@ yüzden gömülü dosya her açılışta yeniden okunuyor, kopyalanmıyor.
 import os
 import re
 
+import pytest
+
 import chat_prompt
 import paths
 
@@ -892,8 +894,9 @@ def test_the_persona_no_longer_locks_the_conversation_to_turkish():
         "İngilizce prompt kuralı da düşmüş — o kural dilden bağımsız")
 
 
-def test_the_route_passes_the_interface_language_to_the_persona():
-    """Bağlam rotada toplanıyor (`chat_prompt` `prefs`'e bakmıyor), yani
-    dilin oraya GİRDİĞİ tek yer bu sözlük."""
+@pytest.mark.usefixtures("depo_db")
+def test_the_route_passes_the_interface_language_to_the_persona(db_oturumu, kullanici):
+    """Bağlam rotada toplanıyor (`chat_prompt` tercih deposuna bakmıyor), yani
+    dilin oraya GİRDİĞİ tek yer bu sözlük. Tercih satırdan (Faz 1 / 6): `Session` gerekiyor."""
     import app as appmod
-    assert "language" in appmod._director_context(appmod.app.state.ayarlar.output_dir)
+    assert "language" in appmod._director_context(db_oturumu, kullanici.id)

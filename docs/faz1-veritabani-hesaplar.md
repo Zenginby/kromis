@@ -903,7 +903,7 @@ satır atomik değil — `kaydet` satır düşerse dosya artık kalır, `tools/a
 
 ---
 
-## 6. Sohbet, palet, varlık, tercih → DB; `backup.py` web yolundan çıkar (PR: `faz1/sohbet-palet-varlik-db`)
+## 6. Sohbet, palet, varlık, tercih → DB; `backup.py` web yolundan çıkar ✅ (PR: `faz1/sohbet-palet-varlik-db`)
 
 **Kapsam.** `chat_store` → `services/depo/sohbet.py` (`sohbetler`, `mesajlar`
 JSONB; `cover_from`/`message_count` türetimi aynı; `list_chats` `updated_at
@@ -945,6 +945,104 @@ DB'den okur; web'de kapatma kararı sahibin (aşağıda).
 **Çıkış ölçütü.** Kullanıcı dizininde `chats.json`/`palettes.json`/`index.json`/
 `prefs.json` YOK; `_lifespan` `backup`/`tercih` çağırmıyor; 33 rota aynı
 gövdeler; takım yeşil.
+
+**Yapıldığında (2026-09-17) ölçümler ve sapmalar.** Dört depo modülü DÜZ ADLA
+(5. görevin kararı, `tools/graf_uret.py` tek kademe görüyor): **`services/depo_sohbet.py`**
+(`olustur/listele/bul/guncelle/sil/hepsini_sil`), **`depo_palet.py`**
+(`olustur/listele/bul/sil`), **`depo_varlik.py`** (`kaydet/listele/dosya_yolu/
+dosya_yolu_adiyla/sil`), **`depo_tercih.py`** (`oku/kayitli/guncelle`) — hepsi
+`(db, kullanici_id, …)`, her sorguda sahip süzgeci, başkasının kaydı 404 (bekçi
+`tests/test_galeri_db.py`, altı depoya genişledi; diskteki `depo_*.py` listesi
+ile birebir). Dondurulmuş dört depo (`chat_store`/`palette_store`/`assets_store`/
+`prefs`) DURUYOR; saf yardımcıları ithal ediliyor, kopya yok: `chat_store.valid_id`/
+`cover_from`, `palette_store._SAFE_ID`, `assets_store.KINDS`/`_SAFE_ID`,
+**`prefs._SCHEMA`/`_ENUMS`** (tercih şeması TEK kaynak — `GET /api/prefs`in
+anahtar kümesi/sırası `prefs.DEFAULTS` ile birebir, `test_prefs_route`in
+`PrefsRequest ⊇ _SCHEMA` bekçisi aynı kaynağa bakıyor). Manifest okuyan/yazan
+işlevleri (`create/list_*/get/update/delete/…`, `save_asset/asset_path/
+migrate_legacy_uploads/…`, `read/read_stored/update`) web yolunda ÇAĞRILMAZ —
+AST bekçisi `MANIFEST_ISLEVLERI` dört modülle genişledi. **Rotalar (10 + 5 +
+9 + 9 → hepsi, 54 DEĞİŞMEDİ):** `routers/sohbet.py` 7 (`/api/chat` + 6 sohbet
+rotası), `paletler.py` 3, `ayarlar.py` 5 (`/api/settings` GET, `/api/guncelleme`
+GET/POST, `/api/prefs` GET/POST), `bindirme.py` 9 (4 varlık rotası + 2 önizleme
++ 2 bindirme + `/assets/{kind}/{filename}`); `uretim.py` 2 (`palette_prompt`in
+`db=, kullanici_id=` anahtar sözcükleri). `services/palet.saved_palette(db,
+kullanici_id, palette_id)`, `services/modeller.director_context(db, kullanici_id)`.
+Dizin okumayan 17 rota daha `ayar.ayarlar` almıyor (`DIZINSIZ_KAPILI` 13 → 30:
+`/api/chat`, sohbet ×6, palet ×3, `/api/prefs` ×2, `GET /api/assets/{kind}`);
+üç güncelleme rotası ve dosyaya dokunan varlık/bindirme rotaları ayar nesnesini
+sürdürüyor. `services/tercih.py` SİLİNDİ; `backup` ve `assets_store` `app.py`den
+çıktı (`migrate_legacy_uploads` da: manifest okuyan tek yol içe aktarma aracı,
+bekçisi `test_assets_route.py::test_startup_leaves_a_legacy_uploads_directory_alone`);
+conftest'in `_guard_against_real_backups` fixture'ı gerekçesiyle kaldırıldı
+(yamalanacak çağrı kalmadı; `test_backup.py`nin 4 lifespan testi → 2: "app.py
+`backup`ı ithal etmez" AST bekçisi ve "açılış adımı patlasa da uygulama
+açılır" — birim testleri 13, dosya 15).
+
+**Şema: göç GELMEDİ.** Dört yazıcının (`chat_store.create`, `palette_store.create`,
+`assets_store.save_asset`, `prefs.update`) her alanı 2. görevin tablolarında
+karşılığını buldu (`cover_image_id` türetilir, sütun değil); `head` `0003_arena_win`.
+
+**Kararlar, belgenin açık bıraktığı yerlerde:** (a) ZAMAN 5. görevle aynı —
+`olusturuldu`/`guncellendi` Python'dan (`zaman.an()`, mikrosaniyeli), JSON
+`created_at`/`updated_at` `zaman.damga()` ile eski biçimde; `depo_sohbet.guncelle`
+`guncellendi`yi AÇIKÇA yazıyor (ORM `onupdate=now()` Postgres saatini yazardı,
+iki saat ayrışırdı); boş güncelleme (`messages`/`title` yok) satıra dokunmaz
+(`chat_store.update`in gerekçesi). Sıra `guncellendi DESC, olusturuldu DESC`.
+(b) ŞEKİL — dört dökümün üst düzey anahtar SIRASI eski yazıcılarla birebir
+(bekçiler `list(dict)` eşitliği); `messages`/`colors` içindeki SÖZLÜKLERİN
+anahtar sırası JSONB'nin (Postgres nesne anahtarlarını kendi sırasında saklar)
+— ön yüz alanları adıyla okuyor, dizinin sırası korunuyor; 5. görevin `palette`
+JSONB'siyle aynı durum. (c) VARLIK servis yolu `/output/{filename}` kararına
+hizalandı: `/assets/{kind}/{filename}` ve bindirme (`_composite_logo`,
+`_banner_asset_path`) artık SATIR VE dosya ister — `assets_store.asset_path`in
+"yalnız diske bak" kuralı web'de yok; satırı olmayan `index.json`/artık dosya
+404. Önizleme rotaları bu yüzden `Session` alıyor (diske yazmıyorlar, varlığı
+DB'den buluyorlar). (d) TERCİH deposu KONUŞMAZ: `prefs.update`in `ValueError(i18n.t)`
+yerine `GecersizTercih(kod, **alanlar)` — cümleyi rota `i18n.t(e.kod, dil.aktif(),
+**e.alanlar)` ile kurar; reddettiği küme `prefs.update`inkiyle bir (parite
+testi, dört i18n anahtarı). Bayat `image_model` DB'de durur (CHECK yok), `oku`
+varsayılana düşer, satır düzeltilmez — `prefs.read`in yan etkisizlik sözü.
+(e) `guncelleme.json` YERİNDE (kullanıcının `output_dir`i, 4. görevden beri):
+belge "diskte kalır" dedi, taşıma/kapatma 9. görevin; yalnız `izin` DB'den.
+(f) `/api/logo/preview`, `/api/banner/preview`, `/api/settings` ve güncelleme
+rotaları ilk kez `kimlik.aktif_kullanici`yi DOĞRUDAN alıyor (ayar nesnesinin
+yanında) — kapı sayısı 47 değişmedi, FastAPI önbelleği aynı nesneyi veriyor.
+
+**Testler.** Yeni **`tests/test_sohbet_db.py`** (9), **`test_palet_db.py`** (6),
+**`test_varlik_db.py`** (9), **`test_tercih_db.py`** (11): şekil eşitliği eski
+yazıcıyla (sıra dâhil), özet alanları `_SUMMARY_FIELDS` ile bir, damga biçimi,
+sıra, boş güncelleme, dondurulmuş `colors` (ad çözücü yamalanınca bile aynı),
+dosya yerleşimi + manifest yok, geçersiz tür ne diske ne DB'ye (CHECK `uploads`u
+reddediyor), satır+dosya silme sözleşmesi, NULL = hiç yazılmamış / varsayılana
+eşit yazılmış ayrımı, red paritesi, bayat model, iki kullanıcı depo düzeyinde
+izole, hesap silinince CASCADE, 12/32 haneli id. Rota dosyaları `depo_db`ye
+alındı ve depodan doğruluyor: `test_chats_route` (`depo_sohbet.bul`, `chats.json`
+yok), `test_palette_route` (bozuk palet SATIRI tohumu; "bozuk `palettes.json`"
+testi "dosya HİÇ okunmaz"a döndü), `test_assets_route` (`index.json`
+sunulmaz/yazılmaz; lifespan göçü çağırmaz), `test_prefs_route`, `test_chat_route`
+(bozuk `prefs.json` testi "dosya okunmaz"a döndü; tripwire `director_context(db,
+kullanici.id)`), `test_settings_route`, `test_guncelleme_route`, `test_logo`/
+`test_banner`/`test_playwright_studio` (varlık tohumu `depo_varlik.kaydet`),
+`test_arena_onyuz`/`test_provider_logos` (`/api/settings` tek test), `test_dil`
+(modül `depo_db`; `tercih` testleri gitti; "≤1 okuma" → `prefs.read_stored` VE
+`depo_tercih.kayitli` patlatılıyor: dil zinciri tercihe hiç bakmaz),
+`test_chat_prompt`. `test_legacy_formats.py`: `_db_tohumla` palet + varlık
+tohumluyor, (i) ailesine iki DB ikizi daha. `test_kimlik.py`: `DIZINSIZ_KAPILI`
++17, iki kullanıcı testi sohbet/palet/varlık/tercihle (B'ye 9 uçta 404, A'nın
+dizininde dört manifest yok), sorgu sayımı `GET /api/prefs` 2 (kimlik + tercih)
+ve `/` 1 (tercih için 0 ek sorgu). `test_i18n`: dört depo `KULLANICIYA_KONUSMAYAN`da,
+`services/tercih.py` listeden çıktı. Eski depo testleri (`test_chat_store` 30,
+`test_palette_store` 14, `test_assets` 17, `test_prefs` 27) AYNEN duruyor.
+
+**7. göreve kalan:** `/api/settings`in kimlik dosyası (`credentials.env`) —
+`post_settings` hâlâ `ac.save_env`; `credstore.configured_map()` süreç geneli.
+**8. göreve not:** `_db_tohumla` artık dört depoyu da tohumluyor (palet
+`colors` olduğu gibi, varlık `kind` → `tur`, ölü `uploads` türü `logos`a —
+CHECK başka türü reddediyor); eski `prefs.json` → `tercihler`: yalnız
+`read_stored`un geçtiği alanlar, gerisi NULL. **9. göreve borç:** `guncelleme.json`
+kullanıcı dizininde; DB yedeği; varlık dosya + satır atomik değil (5. görevle
+aynı sınıf).
 
 ---
 

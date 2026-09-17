@@ -6,22 +6,22 @@ belgelediği standart kalıptır; bunu kullanan HERHANGİ bir test dosyası
 lifespan'ı tetikler ve lifespan'daki yan etkiler GERÇEK dosya sistemine
 (geliştiricinin repo kökündeki assets/ ve output/ dizinlerine) yazar.
 
-Lifespan'da bugün İKİ yan etki var: backup.py'nin sürüm-değişimi yedeği ve
-(2026-09-10'dan beri) `paths._migrate_from_old_name` — eski `Lumeo` adıyla
-açılmış kullanıcı dizinlerini yeni ada taşıyan göç. İkisinin de guard'ı
-aşağıda, ikisi de kendi bekçi dosyasında muaf.
-Geliştiricinin repo kökünde gerçek `output/history.json` ve `assets/*/index.json`
-dosyaları VAR, yani `with TestClient(app)` kullanan tek bir test
-`<repo>/backups/bilinmeyen-<bugün>/` ve `<repo>/.last-version` bırakırdı. O
-kaçak damga, geliştiricinin KENDİ uygulamasının bir sonraki sürüm yedeğini bir
-daha hiç almamasına yol açar. Aşağıdaki autouse fixture varsayılanı güvenli
-yapıyor; yedeğin KENDİSİNİ test eden dosya (tests/test_backup.py) muaf tutuluyor
-çünkü gerçek fonksiyonu koşturmak zorunda.
+Lifespan'da bugün BİR yan etki var: (2026-09-10'dan beri)
+`paths._migrate_from_old_name` — eski `Lumeo` adıyla açılmış kullanıcı
+dizinlerini yeni ada taşıyan göç. Guard'ı aşağıda, kendi bekçi dosyasında muaf.
 
-TARİHÇE: burada İKİNCİ bir guard vardı — `seed.seed_builtin_logos` pakete gömülü
-yerleşik logoları kullanıcı kütüphanesine kopyalıyor ve `.logos-seeded`'i repo
-kökünde bırakıyordu. Uygulama marka-nötr olunca seed.py tümüyle kaldırıldı, o
-guard da onunla birlikte gitti.
+TARİHÇE — iki guard daha vardı, ikisi de korudukları yan etkiyle birlikte gitti:
+* `backup.backup_manifests_if_version_changed` (Faz 1 / 6'ya kadar): geliştiricinin
+  repo kökünde gerçek `output/history.json` ve `assets/*/index.json` dosyaları
+  VARDI, yani `with TestClient(app)` kullanan tek bir test `<repo>/backups/…` ve
+  `<repo>/.last-version` bırakır, o kaçak damga da geliştiricinin bir sonraki
+  sürüm yedeğini bir daha hiç almamasına yol açardı. Lifespan artık yedek
+  ÇAĞIRMIYOR (manifest kalmadı, veri DB'de — docs/faz1-veritabani-hesaplar.md §6),
+  yani yamalanacak çağrı yok; guard anlamsızlaştı ve kaldırıldı. Bekçisi
+  tests/test_backup.py: `app.py` `backup`ı ithal etmez.
+* `seed.seed_builtin_logos`: pakete gömülü yerleşik logoları kullanıcı
+  kütüphanesine kopyalıyor ve `.logos-seeded`'i repo kökünde bırakıyordu.
+  Uygulama marka-nötr olunca seed.py tümüyle kaldırıldı.
 
 Aşağıdaki `pytest_configure` bir fixture DEĞİL: takım koşmadan önce
 yorumlayıcının ön koşulunu (`os.fchmod`) bir kez sınıyor. Gerekçesi orada.
@@ -39,7 +39,6 @@ from typing import Any
 import pytest
 from fastapi import Depends, Request
 
-import backup as backup_module
 import paths as paths_module
 from services import ayar, db
 
@@ -49,7 +48,6 @@ from services import ayar, db
 from tools import gecici_postgres
 from tools.test_ortami import e2e_dosyalari
 
-_UNGUARDED_BACKUP_FILENAME = "test_backup.py"
 _UNGUARDED_MIGRATION_FILENAME = "test_paths.py"
 
 # Bu deponun ASGARİ Python sürümü — TEK tanım. README'nin "Gereksinimler"
@@ -264,27 +262,11 @@ def _guard_against_leaking_android_env():
 
 
 @pytest.fixture(autouse=True)
-def _guard_against_real_backups(request: pytest.FixtureRequest,
-                                monkeypatch: pytest.MonkeyPatch):
-    """Varsayılan olarak sürüm-değişimi yedeğini no-op yapar (bkz. modül docstring'i).
-
-    app.py bu fonksiyonu MODÜL ATTRIBUTE'u üzerinden çağırmak zorunda —
-    `from backup import ...` bu guard'ı sessizce devre dışı bırakır.
-    """
-    if os.path.basename(str(request.node.fspath)) == _UNGUARDED_BACKUP_FILENAME:
-        yield
-        return
-    monkeypatch.setattr(backup_module, "backup_manifests_if_version_changed",
-                        lambda *a, **k: None)
-    yield
-
-
-@pytest.fixture(autouse=True)
 def _guard_against_real_migration(request: pytest.FixtureRequest,
                                   monkeypatch: pytest.MonkeyPatch):
     """Ad göçünü varsayılan olarak no-op yapar (2026-09-10).
 
-    DÖRDÜNCÜ guard, yedek guard'ıyla aynı sınıf bir tehdide karşı:
+    DÖRDÜNCÜ guard, (kaldırılan) yedek guard'ıyla aynı sınıf bir tehdide karşı:
     `paths.ensure_data_dirs()` artık `_migrate_from_old_name()` çağırıyor ve o
     fonksiyon geliştiricinin GERÇEK `~/.config/lumeo/credentials.env` dosyasını
     `~/.config/kromis/` altına taşıyor. `with TestClient(app)` kullanan tek bir
@@ -328,8 +310,8 @@ def _dil_baglami_testler_arasinda_sizmasin():
     `tercih.sifirla()` BURADAYDI (Faz 0 / Adım 3) ve Faz 1 / 4'te çıktı: dil
     zinciri `services/tercih.py`nin dosya imzalı önbelleğini artık okumuyor
     (3. halka `kullanicilar.dil`, services/dil.py), yani testler arasında
-    sızacak bir önbellek okuyucusu kalmadı. Modülün kendi birim testleri
-    (`tests/test_dil.py`) her çağrıda ayrı `tmp_path` kullanıyor.
+    sızacak bir önbellek okuyucusu kalmadı; Faz 1 / 6'da modülün kendisi de
+    silindi (tercihler DB'de, `services/depo_tercih.py`).
     """
     import i18n
     i18n.set_active(i18n.FALLBACK)
@@ -496,7 +478,7 @@ def veritabani_motor(veritabani_url: str):
 
 @pytest.fixture
 def depo_db(veritabani: str, veritabani_motor):
-    """Galeri/klasör rotalarını sınayan dosyaların OPT-IN kapısı (Faz 1 / 5).
+    """Depo rotalarını (galeri, klasör, sohbet, palet, varlık, tercih) sınayan dosyaların OPT-IN kapısı (Faz 1 / 5-6).
 
     Kullanımı modül başında: `pytestmark = pytest.mark.usefixtures("depo_db")`.
     Etkisi `kullanici` fixture'ında: test kullanıcısı DB'ye GERÇEK bir satır

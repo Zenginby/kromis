@@ -743,7 +743,7 @@ sonucu, kabuğun ince WebView'a dönüşü Faz 1 dışı notunda.
 
 ---
 
-## 5. Galeri ve klasörler → DB: `medya`, `klasorler` (PR: `faz1/galeri-db`)
+## 5. Galeri ve klasörler → DB: `medya`, `klasorler` ✅ (PR: `faz1/galeri-db`)
 
 **Kapsam.** `storage.py` ve `folders.py`nin JSON tarafı DB'ye taşınır;
 MEDYA DOSYALARI DİSKTE KALIR (kullanıcı dizininde, 4. görev). Yeni
@@ -789,6 +789,117 @@ taşınır.
 (bekçi: test kullanıcı dizininde bu dosyaların OLMADIĞINI sınar); 31 rota
 aynı gövdeleri döndürüyor (`tests/test_legacy_formats.py` alan kümesi);
 iki kullanıcı izolasyonu 4'teki testte yeniden doğrulanıyor; takım yeşil.
+
+**Yapıldığında (2026-09-17) ölçümler ve sapmalar.** İki depo modülü
+**`services/depo_medya.py`** ve **`services/depo_klasor.py`** — belgenin
+`services/depo/{medya,klasor}.py` alt paketi DEĞİL, düz ad, ve bilerek:
+`tools/graf_uret.py` bugün yalnız tek kademe (`services/<ad>.py`) görüyor
+(alt paket 9. görevin listesinde); alt paket açmak haritayı bu PR'da kör
+bırakırdı. `storage.py`/`folders.py` DURUYOR (dondurulmuş kabuk +
+`tools/ice_aktar.py`); saf yardımcıları (`MEDIA_TYPES`, `ext_for`,
+`media_path_of`, `media_type_for`, `valid_id`, `_SAFE_ID`, `safe_component`)
+depo modülleri oradan ithal ediyor, kopya yok; manifest okuyan/yazan 24
+işlevin web yolunda (`app.py`, `routers/`, `services/`) ÇAĞRILMAMASI AST
+bekçisiyle (`tests/test_galeri_db.py::test_no_web_module_calls_a_manifest_function_of_storage_or_folders`),
+`gorsel.output_media_path` (yalnız diske bakan servis yolu) silindi — yerine
+`depo_medya.dosya_yolu`/`dosya_yolu_adiyla`: satır VE dosya, biri yoksa 404.
+**Rotalar (19 + 12 → hepsi):** `routers/galeri.py` 15 (`/api/folders` ×5,
+`/api/history`, `/api/image/{id}` PATCH/DELETE, `/api/images` PATCH/DELETE,
+`/api/arena/{id}` GET + `winner`, `/api/import`, `/output/{filename}`,
+`/api/output/{id}/download`), `uretim.py` 4 (`generate`, `video`, `animate`,
+`edit` — YAZANLAR DÂHİL: dört üretim rotası `depo_medya.kaydet`e yazıyor),
+`bindirme.py` 2 (`/api/logo`, `/api/banner`: kaynağın meta'sı `depo_medya.bul`).
+Her rota `db: Session = OTURUM` + `kullanici: Kullanici = Depends(kimlik.aktif_kullanici)`
+alıyor; ikincisi `ayar.ayarlar`ın içindeki kapıyla AYNI nesne (FastAPI
+bağımlılık önbelleği) — ölçüldü: `/api/history` **2 sorgu** (kimlik + `medya`),
+`/` 1 (`test_resolving_the_user_costs_exactly_one_query_per_request` 1 → 2'ye
+güncellendi). Dosyaya dokunmayan 9 rota (`/api/folders` ×4, `/api/history`,
+`/api/image` PATCH, `/api/images` PATCH, `/api/arena` ×2) artık `ayar.ayarlar`
+ALMIYOR — `tests/test_kimlik.py::DIZINSIZ_KAPILI` listesi belgenin dört
+istisnasını bunlarla genişletti, bekçisi iki yönlü (listedeki alan almaz,
+almayan listede). Üç `async def` rota (`edit`, `animate`, `import`) DB'ye
+`run_in_threadpool` ile (1. görev kararı). `kapilar.check_folder(folder_id,
+db, kullanici_id)`. Rota sayısı **54 DEĞİŞMEDİ**, `index.html`/`static/`
+DOKUNULMADI.
+
+**Şema: bir göç geldi — `0003_arena_win`.** Envanter `storage.save`in 12 + 5
+alanını saydı; `arena_win`i `save` değil `set_arena_winner` SONRADAN yazıyor
+ve liste onu görmedi. `medya.arena_win boolean NULL`, kısıtsız (kısmi UNIQUE
+içe aktarılan eski verideki olası çift işareti reddederdi); tur başına tek
+kazanan tek `UPDATE … SET arena_win = (id = :kazanan) WHERE arena_id = :tur`
+(storage'ın tek-yazım gerekçesi aynen). `head` 0002 → 0003
+(`tests/test_db.py::BAS`), ileri-geri-ileri + `alembic check` temiz.
+
+**Kararlar, belgenin açık bıraktığı yerlerde:** (a) ZAMAN — `olusturuldu`
+`timestamptz` MİKROSANİYELİ, Python'dan (`zaman.an()`), Postgres `now()`
+DEĞİL: `/api/generate` n=4 dört satırı aynı transaksiyonda aynı saniyede
+yazıyor, `now()` dördüne aynı anı verir ve galeri "en yeni üstte"/arena
+"üretim sırası" kaybolurdu (`test_four_records_written_in_the_same_second_keep_their_production_order`).
+JSON `created_at` `zaman.damga()` ile eski biçimde birebir (yerel saat,
+saniye, dilimsiz — `folders.js` `localeCompare` ile sıralıyor; bekçisi
+`test_created_at_keeps_the_manifest_format_to_the_second`). (b) KİMLİK — yeni
+satırlar `uuid4().hex` (32 hane, belge §2), dosya adı `{id}{uzantı}`; 12
+haneli eski id aynı kapıdan geçiyor (test). (c) ŞEKİL — `_json` dökümü
+`storage.save` kaydıyla anahtar SIRASI dâhil eşit, koşullu 5 alan + `arena_win`
+yalnız doluysa (NULL/false = anahtar yok); bekçi iki yazıcıyı yan yana koşturup
+`list(dict)` eşitliği arıyor. (d) SİLME sözleşmesi korunuyor: satır önce,
+dosya sonra; "kaydı olmayan dosya" ve "dosyası olmayan kayıt" ikisi de
+silinmiş sayılır; `sil_coklu` satırları tek `DELETE … RETURNING`, dosyaları
+tek tek. (e) Klasör silme: `altagac` → `klasorden_cikar` (açık `UPDATE`,
+`unfiled` sayısı FK'nın SET NULL yan etkisinden okunamaz) → `agaci_sil` (tek
+`DELETE … IN`, aynı transaksiyon). Ağaç yürüyüşü Python'da (`SELECT id,
+parent_id` tek sorgu, `folders.depth/descendants`ın ziyaret-kümeli yürüyüşü
+birebir — kendi kendinin ebeveyni olan bozuk zincirde 1 döner, CTE `N`
+dönerdi). (f) Depo katmanı KONUŞMAZ: `folders.export_zip`in `ValueError(i18n.t)`i
+yerine `zip_disa_aktar` `None` döner, 404'ü rota kurar; iki modül
+`test_i18n.py`de "konuşmayan". (g) 403 YOK: başkasının kaydı "yok" (404) —
+403 id uzayını sızdırır. `jsonstore.lock_for` yok, yarış `UPDATE … WHERE`de.
+
+**Testler.** conftest'e üç fixture: `veritabani_motor` (modül; dosyanın DB'sine
+motor), **`depo_db`** (OPT-IN, `pytestmark = pytest.mark.usefixtures("depo_db")`
+— autouse `kullanici` fixture'ı bunu görünce test kullanıcısını GERÇEK satır
+yazar [önceki silinir, CASCADE önceki testin verisini götürür, e-posta sabit]
+ve dördüncü override `db.oturum`u o motora bağlar: 178 `TestClient(app)` çağrısı
+`with`siz kalır; `veritabani`yi doğrudan isteyen `test_db/health/tablolar`a
+sızmaz), `db_oturumu` (tohum yazan testlerin `Session`ı); `E2EOturum.db()`.
+14 rota test dosyası `depo_db`ye alındı (`test_folders/arena/app/delete_route/
+edit_route/video_route/logo/banner/import_route/model_secimi/palette_route/
+guvenlik_baslik/legacy_formats/i18n`), iki tekil test işaretle (`test_dil`,
+`test_app_bolme`). `test_folders.py`nin manifest dosyası yazan 3 testi DB
+tohumuyla yeniden yazıldı, biri (`corrupt folders.json`) yerini "web yolu
+manifest dosyası HİÇ açmaz" bekçisine bıraktı; `storage`/`folders`ün saf birim
+testleri (aynı dosyada 5, `test_storage*.py`, `test_arena.py`nin depo testleri)
+dondurulmuş kabuk için AYNEN duruyor. `test_legacy_formats.py`: (ii) tüketici
+testleri v1.8 fixture'ını içe aktarma aracının deseniyle DB'ye tohumluyor
+(`_db_tohumla`: `.get()`, eksik anahtar NULL, 12 haneli id, liste sırası),
+(i) ailesine iki DB ikizi (satır dökümü v1.8 anahtarlarını taşır, sıra eşit).
+Yeni **`tests/test_galeri_db.py`** (16): AST bekçileri (manifest çağrısı yok;
+sorgu kuran her depo işlevi `kullanici_id` alır VE süzgece koyar; imza
+`(db, kullanici_id, …)`), iki kullanıcı depo düzeyinde 20 işlevde izole, şekil
+eşitliği ×2, `created_at` biçimi, ağaç silme SET NULL/CASCADE, satır+dosya
+silme sözleşmesi, toplu silme sayımı, servis yolu satır+dosya ister,
+mikrosaniye sırası, arena kazananı, 12/32 haneli id. `test_kimlik.py`nin iki
+kullanıcı testi klasör rotalarıyla genişledi (B'ye 10 uçta 404, A'nın verisi
+yerinde, manifest dosyası yok). E2E `test_playwright_studio.py` tohumu
+`oturum.db()` + depo ile; 4 E2E dosyası DB'li galeriyle geçiyor.
+Tam takım (E2E + Postgres zorunlu): **3.255 geçti, 12 atlandı, 164 sn** (taban
+3.229 / 12 / 149 sn; E2E koştu, DB atlaması 0). ruff, mypy (193 dosya), eslint,
+prettier temiz; graflar güncel (76 modül, 54 uç, 107 test dosyası). Canlı
+doğrulama (geçici küme + `alembic upgrade head` → `0003_arena_win` + uvicorn +
+curl, iki hesap): A klasör açar + `/api/import` → `count:1`; B `/api/folders`
+`[]`, `/api/history` `[]`, A'nın klasörüne `?folder_id=`/PATCH/download/DELETE
+ve A'nın görseline `/output/…`/DELETE **404**; B kendi klasörünü açar, A onu
+görmez; A klasörünü siler → `{"deleted":[…],"folders":1,"unfiled":1}`, görsel
+kökte; DB'de `a: 1 medya/0 klasör`, `b: 0/1`; diskte yalnız
+`kullanicilar/<A>/output/<id>.png` — `history.json`/`folders.json` yok.
+
+**6. göreve kalan:** `palette_store`/`assets_store`/`chat_store`/`prefs`
+diskte (üretim rotaları `palet.palette_prompt(output_dir=…)`i hâlâ dizinle
+çağırıyor); dizin okumayan rotalar listesi (`DIZINSIZ_KAPILI`) o görevde
+büyür. **8. göreve not:** `arena_win` de göçecek alan (envanter dışıydı);
+`_db_tohumla`nın deseni (eksik anahtar NULL, liste sırası → `olusturuldu`
+sırası, 12 haneli id korunur) aracın iskeleti. **9. göreve borç:** dosya +
+satır atomik değil — `kaydet` satır düşerse dosya artık kalır, `tools/artik_dosya.py`.
 
 ---
 

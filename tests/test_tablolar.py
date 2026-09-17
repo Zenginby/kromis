@@ -1,5 +1,10 @@
 """Veri modeli — `services/tablolar.py` + `alembic/versions/0001_veri_modeli.py` (Faz 1 / 2. görev).
 
+Faz 2 / 1 iki tablo ekledi (`isler`, `isciler`; göç `0004_isler`): `isler`
+sekizinci iş tablosu, `isciler` üçüncü sınıf — ne hesap ne iş, PLATFORMUN
+(kullanıcı sütunu yok). Kuyruk davranışı tests/test_kuyruk.py'de; burada
+yalnız şema, kısıt ve sınıflandırma.
+
 Hepsi GERÇEK Postgres'e karşı (`veritabani` fixture'ı): sınanan şeylerin
 çoğu — citext eşitliği, `ON DELETE CASCADE`/`SET NULL`, JSONB gidiş-dönüş,
 `CHECK`in gerçekten reddetmesi — SQLite'ta ya yok ya farklı (K4). Göç hattının
@@ -41,8 +46,12 @@ from services import tablolar
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BELGE = os.path.join(REPO, "docs", "faz1-veritabani-hesaplar.md")
+BELGE_FAZ2 = os.path.join(REPO, "docs", "faz2-kuyruk-anahtarlar-depolama.md")
 
 HESAP_TABLOLARI = {"kullanicilar", "oturumlar", "jetonlar", "giris_denemeleri"}
+# Ne hesap ne iş: platformun kendi satırları (Faz 2 / 1). `kullanici_id` YOK,
+# kiracı süzgeci anlamsız — o yüzden `IS_TABLOLARI` bekçisinin dışında.
+ALTYAPI_TABLOLARI = {"isciler"}
 
 # Belgenin "Kimlik kararı"ndaki beş liste tablosu: `id text` + `_SAFE_ID` CHECK'i
 # + `(kullanici_id, olusturuldu)` indeksi. `tercihler` (PK = kullanici_id) ve
@@ -74,7 +83,7 @@ def _kullanici(db: Session, eposta: str = "ali@example.com") -> tablolar.Kullani
 
 
 def _her_is_tablosuna_bir_satir(db: Session, k: tablolar.Kullanici) -> None:
-    """Yedi iş tablosunun her birine, birbirine bağlı biçimde, bir satır."""
+    """Sekiz iş tablosunun her birine, birbirine bağlı biçimde, bir satır."""
     klasor = tablolar.Klasor(id=uuid.uuid4().hex, kullanici_id=k.id, name="K")
     db.add(klasor)
     db.flush()
@@ -91,6 +100,8 @@ def _her_is_tablosuna_bir_satir(db: Session, k: tablolar.Kullanici) -> None:
         tablolar.Tercih(kullanici_id=k.id, theme="mono"),
         tablolar.SaglayiciKimligi(kullanici_id=k.id, ad="OPENAI_API_KEY",
                                   sifreli_deger=b"gAAAA", anahtar_surumu=1),
+        tablolar.Is(kullanici_id=k.id, tur="generate", istek={"prompt": "p"}, model="m",
+                    kredi_tahmini=1),
     ])
     db.flush()
 
@@ -106,21 +117,30 @@ def _sayimlar(motor) -> dict[str, int]:
 def test_the_business_table_registry_matches_the_document_inventory():
     """`IS_TABLOLARI` elle tutulan bir kapsam listesi; belgedeki envanter onun bekçisi.
 
-    Belge (§2) iş tablolarını "İş tabloları, envanterden birebir:" cümlesinde
-    sayıyor; buradaki küme oradan okunuyor. Modelde tablo eklenip belgeye ya
-    da listeye yazılmazsa üç küme birbirinden ayrılır ve burada görünür.
+    Faz 1 belgesi (§2) yedi iş tablosunu "İş tabloları, envanterden birebir:"
+    cümlesinde sayıyor; Faz 2 belgesi (§1, "Dokunulan") sekizinciyi
+    "`IS_TABLOLARI` bekçi listesi 7 → 8: `isler`" diye ekliyor ve `isciler`i
+    "DEĞİL — kullanıcı satırı yok" diye dışarıda bırakıyor. Üç küme (iki belge,
+    liste, model) birbirinden ayrılırsa burada görünür.
     """
     with open(BELGE, encoding="utf-8") as f:
         belge = f.read()
     m = re.search(r"İş tabloları, envanterden birebir:(.*?)— hepsinde", belge, re.S)
     assert m, "belgede 'İş tabloları, envanterden birebir:' cümlesi yok"
     belgedeki = set(re.findall(r"`(\w+)`", m.group(1)))
+    with open(BELGE_FAZ2, encoding="utf-8") as f:
+        belge2 = f.read()
+    m2 = re.search(r"`IS_TABLOLARI` bekçi listesi 7\s*→ 8: `(\w+)`", belge2)
+    assert m2, "Faz 2 belgesinde '`IS_TABLOLARI` bekçi listesi 7 → 8: `…`' cümlesi yok"
+    belgedeki.add(m2.group(1))
+    m3 = re.search(r"`(\w+)` DEĞİL — kullanıcı satırı yok", belge2)
+    assert m3 and {m3.group(1)} == ALTYAPI_TABLOLARI, "Faz 2 belgesinin dışarıda bıraktığı tablo ↔ ALTYAPI_TABLOLARI"
     assert belgedeki == set(tablolar.IS_TABLOLARI), (
         f"belge ↔ IS_TABLOLARI ayrıştı: {belgedeki ^ set(tablolar.IS_TABLOLARI)}")
     modeldeki = set(tablolar.Base.metadata.tables)
-    assert modeldeki == HESAP_TABLOLARI | set(tablolar.IS_TABLOLARI), (
-        f"modelde sınıflanmamış tablo: {modeldeki ^ (HESAP_TABLOLARI | set(tablolar.IS_TABLOLARI))}")
-    assert len(modeldeki) == 11, "belgenin çıkış ölçütü: 11 tablo"
+    siniflanan = HESAP_TABLOLARI | ALTYAPI_TABLOLARI | set(tablolar.IS_TABLOLARI)
+    assert modeldeki == siniflanan, f"modelde sınıflanmamış tablo: {modeldeki ^ siniflanan}"
+    assert len(modeldeki) == 13, "Faz 2 / 1'in çıkış ölçütü: 13 tablo"
 
 
 def test_the_sql_id_pattern_is_the_safe_id_regex_of_every_json_store():
@@ -137,7 +157,7 @@ def test_the_sql_id_pattern_is_the_safe_id_regex_of_every_json_store():
 
 
 def test_every_business_table_carries_the_owner_column_its_fk_and_its_index():
-    """Çok kiracılılık üç şey ister, yedi tablonun yedisinde: sütun, CASCADE FK, önde `kullanici_id` olan indeks."""
+    """Çok kiracılılık üç şey ister, sekiz tablonun sekizinde: sütun, CASCADE FK, önde `kullanici_id` olan indeks."""
     for ad in tablolar.IS_TABLOLARI:
         t = tablolar.Base.metadata.tables[ad]
         sutun = t.c["kullanici_id"]
@@ -188,7 +208,7 @@ def test_citext_makes_email_uniqueness_case_insensitive(motor, temiz):
 
 
 def test_deleting_a_user_cascades_to_every_business_table(motor, temiz):
-    """Hesap silinince yedi tablodaki satırları da gider; başka kullanıcının satırı kalır."""
+    """Hesap silinince sekiz tablodaki satırları da gider; başka kullanıcının satırı kalır."""
     with Session(motor) as db:
         ali = _kullanici(db, "ali@example.com")
         veli = _kullanici(db, "veli@example.com")
@@ -311,6 +331,26 @@ def test_check_constraints_accept_every_allowed_value_and_reject_the_rest(motor,
         assert db.scalar(text("SELECT tur FROM giris_denemeleri LIMIT 1")) == "giris"
         db.rollback()
 
+    # İş türü ve durumu (Faz 2 / 1, göç 0004): dört rota geçer, `chat` geçmez
+    # (senkron kalıyor); beş durum geçer, altıncısı geçmez; öntanımlı `bekliyor`.
+    def _is(**alan) -> tablolar.Is:
+        alanlar: dict = {"kullanici_id": kid, "tur": "generate", "istek": {}, "model": "m",
+                         "kredi_tahmini": 0}
+        alanlar.update(alan)
+        return tablolar.Is(**alanlar)
+
+    for tur in tablolar.IS_TURLERI:
+        _kabul_ediyor(_is(tur=tur))
+    _reddediyor(_is(tur="chat"), "ck_isler_tur_kumesi")
+    for durum in tablolar.IS_DURUMLARI:
+        _kabul_ediyor(_is(durum=durum))
+    _reddediyor(_is(durum="askida"), "ck_isler_durum_kumesi")
+    with Session(motor) as db:
+        db.add(_is())
+        db.flush()
+        assert db.scalar(text("SELECT durum FROM isler LIMIT 1")) == "bekliyor"
+        db.rollback()
+
 
 def test_preferences_are_one_row_per_user(motor, temiz):
     with Session(motor) as db:
@@ -369,7 +409,7 @@ def test_updated_at_moves_when_a_row_changes(motor, temiz):
 
 
 def test_downgrade_to_base_leaves_no_table_and_no_extension_behind(veritabani):
-    """Geri alma TEMİZ: 11 tablo ve `citext` uzantısı gider, `upgrade` yeniden kurar.
+    """Geri alma TEMİZ: 13 tablo ve `citext` uzantısı gider, `upgrade` yeniden kurar.
 
     `test_db.py`nin döngü testi `alembic_version`a bakıyor; burası şemanın
     kendisine — bir tablo `downgrade`da unutulsa orada görünmez, burada görünür.

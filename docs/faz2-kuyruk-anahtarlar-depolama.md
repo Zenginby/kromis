@@ -109,7 +109,7 @@ Adlar ÖNERİ (deponun yeni kod geleneği Türkçe, ASCII: `isler`, `isciler`,
 
 ---
 
-## 1. İş tablosu ve kuyruk ilkelleri — `isler`, `isciler`, `services/kuyruk.py` (PR: `faz2/is-tablosu-kuyruk`)
+## 1. İş tablosu ve kuyruk ilkelleri — `isler`, `isciler`, `services/kuyruk.py` ✅ (PR: `faz2/is-tablosu-kuyruk`)
 
 **Kapsam.** Davranış DEĞİŞMEZ; yalnız şema + kuyruk katmanı + bekçileri. İki
 tablo (`services/tablolar.py`, göç `0004_isler`):
@@ -195,6 +195,57 @@ demek). `kredi_tahmini` TAHMİN — gerçek maliyet Faz 3'ün mutabakat kalemi.
 **Çıkış ölçütü.** `alembic upgrade head && downgrade base && upgrade head`
 temiz, `alembic check` boş; 13 tablo; iki eş zamanlı alıcı testi 100 tekrarda
 çift alım 0; takım yeşil.
+
+**Yapıldığında (2026-09-17) ölçümler ve sapmalar.** `services/tablolar.py`
++2 sınıf (`Is`, `Isci`; 571 satır), **13 tablo**; `isler` 14 sütun, 2 CHECK
+(`ck_isler_tur_kumesi`, `ck_isler_durum_kumesi` — değer kümeleri
+`IS_TURLERI`/`IS_DURUMLARI` sabitlerinden, Faz 1 / 2'nin `text + CHECK`
+kararı aynen), 1 FK (CASCADE), 3 indeks — ikisi KISMİ (`ix_isler_kuyruk`
+`WHERE durum = 'bekliyor'`, `ix_isler_kullanici_aktif` `WHERE durum IN
+('bekliyor','calisiyor')`); `isciler` 6 sütun, kısıtsız. Göç `0004_isler`
+elle yazıldı (0001'in biçimi), ileri-geri-ileri + `alembic check` temiz
+(geçici kümede ölçüldü, `tools/goc.py` → `0004_isler (head)`). **Kararlar,
+belgenin açık bıraktığı yerlerde:** (a) `isler.isci_id` FK DEĞİL — işçi
+kapanışta kendi satırını siliyor, işin "kim koştu" kaydı işçi gidince de
+durmalı (SET NULL onu silerdi, CASCADE işi); (b) `durum` geçiş kuralı
+UYGULAMADA DEĞİL `WHERE`de: `kalp`/`bitir`/`dusur` yalnız `calisiyor`,
+`iptal` yalnız `bekliyor` satırı değiştirir, aksi 0 satır → `False` — yarış
+Postgres'in satır kilidinde çözülür, bayat düşürülmüş işi geç kalan işçi
+`bitti`ye çeviremez (test: `test_a_late_worker_cannot_resurrect_…`; işçi o
+`False`ta ürettiği nesneyi siler — 3. görevin telafisi); (c) `iptal` ve
+`ekle` `an=` anahtar parametresi aldı (belgedeki imzaya ek, öntanımlı
+`zaman.an()`): `iptal` `bitti`yi yazıyor ("ne zaman kapandı" tek sütun),
+testler saatle oynamıyor; (d) `listele(since)` "o andan beri DEĞİŞENLER" —
+`GREATEST(olusturuldu, basladi, bitti) > since` (SSE `Last-Event-ID`nin
+sorusu; `kalp_atisi` sayılmaz, istemciye görünmez); (e) `dusur` metni
+`errlog.redact_secrets`ten geçiriyor — redaksiyon YAZAN yerde, çağıranda
+değil (unutulacak yer bir tane); (f) `_json` anahtarları sütun adları
+(`id, tur, durum, model, kredi_tahmini, olusturuldu, basladi, bitti, sonuc,
+hata`; `istek`/`isci_id`/`kalp_atisi` yok), damgalar `zaman.damga` ile
+`medya.created_at` biçiminde; (g) `bayatlari_dusur`un metni `BAYAT_HATASI =
+"isci yanit vermiyor"` bir KOD, modül `test_i18n`de "konuşmayan"; (h) işçi
+yardımcıları `isci_kaydet/isci_kalp/isci_sil` asgari (3. görevin ihtiyacı),
+`al` `RETURNING`i `populate_existing` ile okuyor (aynı `Session`in bayat
+`bekliyor` kopyası dönmesin). **Kiracı bekçisi** (`tests/test_galeri_db.py`):
+`DEPOLAR` sekizinci depoya çıktı (`services/kuyruk.py`, `depo_*` kalıbının
+dışında → `EK_DEPOLAR`), işçi tarafı için **`KIRACISIZ` defteri** açıldı
+(8 işlev, her biri gerekçeli; bekçinin bekçisi muaf işlevin `kullanici_id`
+ALMADIĞINI sınar — 7. görevin `depo_admin` muafiyeti aynı deftere yazılır).
+**Testler:** yeni `tests/test_kuyruk.py` **24 test** (deterministik iki
+`Session` testi: A alır commit'lemez, B alır, 100 tur, **çift alım 0**;
+iş parçacıklı ikizi 60 iş; kilitli satırda bekleme < 1 sn; iptal ↔ alım
+yarışı: iptal kilidi bekler ve 0 satır görür; FIFO mikrosaniye; geçişler;
+bayat eşiği kesin küçük; `_json` sızıntısı kaynak + çalışma zamanı; iki
+kullanıcı izole ama kuyruk küresel FIFO; CASCADE; kısmi indeksler
+`pg_indexes`te gerçekten `WHERE`li; ileri-geri-ileri + `check`).
+`test_tablolar` 13 tablo + `ALTYAPI_TABLOLARI = {isciler}` + iki yeni CHECK
+kümesi; `test_db.py::BAS` → `0004_isler`. **Canlı duman** (geçici küme):
+`goc.py` → head `0004_isler`, 13 tablo; `downgrade base && upgrade head`
+temiz; 20 iş, iki iş parçacığı → 8 + 12 = 20 farklı, çift 0. **Alembic
+notu:** `alembic check` kısmi indeksin `WHERE`ini KARŞILAŞTIRMIYOR (CHECK'ler
+gibi) — bekçisi `test_the_queue_indexes_are_partial_in_the_database`
+(`pg_indexes.indexdef`). Rota sayısı **54 DEĞİŞMEDİ**, `static/` DOKUNULMADI,
+davranış değişikliği YOK.
 
 ---
 
@@ -916,6 +967,8 @@ belgelerde platform başına iki süreç tablosu; takım yeşil.
 
 ## Sahibin karar noktaları — öneri ve gerekçe
 
+**Sahibin kararı (2026-09-17, Slack): K1–K11 öneriler AYNEN kabul edildi.**
+
 | # | konu | öneri | neden | alternatif ve bedeli |
 | --- | --- | --- | --- | --- |
 | K1 | Kuyruk arka ucu | **Postgres `FOR UPDATE SKIP LOCKED`** (`isler` tablosu), Redis/ARQ/Celery YOK; `kuyruk.py` arayüzü arka uçtan bağımsız | İş listesi/geçmiş/admin zaten kalıcı satır istiyor — Redis ikinci doğruluk kaynağı olur; hacim dakikada onlarca iş; test zemini (gerçek Postgres) hazır; Upstash komut başına ücret + bağlantı sınırı, bekleyen işçiye ters; bir servis, bir sır, bir yedek daha az | Upstash + ARQ: alım gecikmesi ~0 (bizde 1 sn), DB'de sorgu yükü yok; bedeli iki depo tutarlılığı, `redis:7` + sahte CI'da, `_test.yml`e servis, `giris_denemeleri`nin taşınması. Ölçüm gerekçe verirse `kuyruk_redis.py` aynı imzayla |
@@ -929,6 +982,22 @@ belgelerde platform başına iki süreç tablosu; takım yeşil.
 | K9 | RLS rol modeli | **`FORCE ROW LEVEL SECURITY`** + `SET LOCAL app.kullanici_id`/`app.rol` her transaksiyonda; uygulama rolü tablo sahibi olsa da politika işler | Yönetilen Postgres tek rol veriyor, sahip RLS'i atlar; `SET LOCAL` pooler'ın transaksiyon modunu geçer | Ayrı uygulama rolü (sahip değil): `FORCE` gerekmez ama iki rol + `GRANT` yönetimi + platformda ikinci kullanıcı açma (her yerde mümkün değil) |
 | K10 | Hata izleme | **Sentry SaaS**, `sentry-sdk` (2 MB), yalnız `SENTRY_DSN` verilmişse; `before_send` redaksiyon, PII/gövde kapalı; DSN + hesap SAHİBİN | Yönetilen karara uygun, ücretsiz kademe kapalı betaya yeter, FastAPI/SQLAlchemy entegrasyonu hazır | GlitchTip (kendine barındırma) yönetilen karara ters; yalnız günlük: iz var ama gruplama/uyarı yok |
 | K11 | Uygulama platformu (Faz 1 / K6 açık bırakmıştı; işçi seçimi zorluyor) | **Fly.io**: tek imajdan `[processes]` web + isci, `release_command` (`tools/goc.py`), `kill_timeout` 300 sn'ye kadar, bölge seçimi (küresel kitle) | İki süreç tek yapılandırma dosyasında; uzun işe en çok kapanış süresi; Faz 1'in göç deseni birebir oturuyor | Railway/Render: panelden ikinci servis, aynı imaj; kapanış ~30 sn (6 dk'lık iş dağıtımda kesin kaybolur); pre-deploy komutu var. Sahibin hesabı/tercihi belirler; belge üçünü de yazar |
+
+**Barındırma kararı (2026-09-17).** Sahip, Faz 2–4 boyunca YÖNETİLEN
+platformda kalmayı kabul etti: Fly.io (K11'in önerisi — tek imajdan web +
+işçi süreçleri, `release_command`, uzun işe yeten `kill_timeout`), yanında
+Neon Postgres, Cloudflare R2 ve Sentry'nin ücretsiz kademeleri. NEDEN: bu
+fazların işi ürünün kendisi (kuyruk, işçi, anahtarlar, ödeme); bir VPS'in
+işletme yükü — yama, yedek, TLS, ikinci süreç için süpervizör, disk dolması
+— aynı kişinin aynı saatlerinden gider ve bugün ölçülebilir bir kazancı yok:
+ödeyen kullanıcı yokken sabit maliyet zaten sıfıra yakın, ölçek yok. Ücretsiz
+kademelerin sınırları (Neon'un uyuyan hesaplama, R2'nin 10 GB'ı, Sentry'nin
+olay kotası) kapalı betaya yeter ve aşıldığında sayı görünür. **"Hetzner VPS +
+Coolify" Faz 5'in maliyet kararı olarak kayda geçti:** ödeyen kullanıcı olunca
+aylık platform faturası ile bir VPS'in fiyatı + işletme saati yan yana
+konulur; o gün taşınmayı kolaylaştıran şey bu fazın kararları — imaj tek,
+göç dağıtım öncesi komutta, medya nesne depolamada, sırlar ortamda — yani
+platforma özgü hiçbir şey kodda yok.
 
 ---
 

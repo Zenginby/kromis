@@ -28,7 +28,7 @@ from tools import goc
 pytestmark = pytest.mark.usefixtures("veritabani")
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BAS = "0003_arena_win"
+BAS = "0004_isler"
 
 
 def _surum(url: str) -> str | None:

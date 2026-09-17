@@ -33,7 +33,7 @@ import paths
 import providers
 import version
 from models import MAX_PROMPT_CHARS, GenerateRequest
-from routers import ayarlar, bindirme, galeri, kok, paletler, sohbet, uretim
+from routers import ayarlar, bindirme, galeri, kok, paletler, saglik, sohbet, uretim
 from services import ayar, dil, gorsel, modeller, palet, redaksiyon, zaman
 
 
@@ -114,7 +114,7 @@ app.exception_handler(RequestValidationError)(redaksiyon.redact_validation_error
 # (bkz. routers/__init__.py). Sıra rota eşleşmesini etkilemiyor — hiçbir iki
 # kalıp aynı yol+fiili paylaşmıyor — ama okunurluk için eski app.py sırası.
 for _router in (uretim.router, ayarlar.router, sohbet.router, galeri.router,
-                paletler.router, bindirme.router, kok.router):
+                paletler.router, bindirme.router, kok.router, saglik.router):
     app.include_router(_router)
 
 

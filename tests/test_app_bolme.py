@@ -121,7 +121,7 @@ def test_every_router_module_is_included_in_the_app():
     assert graftaki == calisan, (
         f"takılmamış: {sorted(graftaki - calisan)}; kaynakta olmayan: "
         f"{sorted(calisan - graftaki)}")
-    assert len(graftaki) == 45, "rota sayısı değişti — bilinçliyse bu sayıyı güncelle"
+    assert len(graftaki) == 46, "rota sayısı değişti — bilinçliyse bu sayıyı güncelle"
 
 
 def test_directories_are_read_at_request_time_not_bound_at_import():

@@ -1,0 +1,31 @@
+# YALNIZ YEREL GELİŞTİRME İÇİN (Faz 0 / Adım 8) — üretim dağıtımı değil.
+#
+# Burada ne TLS, ne kimlik, ne yeniden başlatma politikası, ne kaynak sınırı
+# var; hepsi Faz 1'in dağıtım kararlarıyla birlikte gelir. Dosyanın işi tek:
+# `docker compose up --build` deyip `http://localhost:8765`i ve `/health`i
+# görmek — imaj gerçekten açılıyor mu, veri birimi gerçekten yazılıyor mu.
+#
+#   cp .env.example .env      # isteğe bağlı; yoksa Dockerfile'ın varsayılanları
+#   docker compose up --build
+#   curl localhost:8765/health
+#
+# `env_file` `required: false`: `.env` yoksa compose şikâyet etmesin
+# (Compose v2.24+). Dosya yalnız KROMIS_DATA_DIR/PORT gibi altyapı
+# değişkenlerini taşır; sağlayıcı anahtarları SÜREÇ ORTAMINDAN OKUNMUYOR —
+# gerekçesi .env.example'da.
+services:
+  kromis:
+    build: .
+    ports:
+      - "8765:8765"
+    volumes:
+      # Adlandırılmış birim, bind-mount DEĞİL: birim ilk bağlanışta imajdaki
+      # `/data`nın sahipliğini (uid 10001) alır ve yazılabilir doğar. Bir
+      # konak dizini bağlanacaksa önce `chown 10001` — yoksa `/health` 503.
+      - kromis-data:/data
+    env_file:
+      - path: .env
+        required: false
+
+volumes:
+  kromis-data:

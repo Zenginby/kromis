@@ -390,7 +390,7 @@ aynı). Sonraki: `tools/graf_uret.py` betik-arası kenarı yorumsuz metinden
 
 ---
 
-## 8. `Dockerfile` + `/health` + `.env.example`
+## 8. `Dockerfile` + `/health` + `.env.example` ✅ (PR: `faz0/docker-health`)
 
 **Kapsam.** Çok aşamalı `Dockerfile` (python:3.13-slim; `uvicorn app:app
 --host 0.0.0.0` — `netguard:korumali_app` fabrikası DEĞİL: `run.sh:38`deki
@@ -416,6 +416,73 @@ yazılıyor, yani `KROMIS_DATA_DIR` altındaki dizin yazılabilir olmalı;
 
 **Çıkış ölçütü.** `docker build . && docker run -p 8765:8765 kromis` sonra
 `curl /health` 200 ve `/` arayüzü açılıyor; CI `docker build` yeşil; takım yeşil.
+
+**Yapıldığında (2026-09-17) ölçümler ve sapmalar.** Rota `routers/kok.py`ye
+DEĞİL yeni `routers/saglik.py`ye kondu: kökün okuyucusu tarayıcı, sondanın
+okuyucusu `HEALTHCHECK`/orkestratör; iki gerekçe kümesi aynı dosyada
+birbirini okutmasın (`tests/test_i18n.py`de "kullanıcıya konuşmayan",
+`tests/test_app_bolme.py` rota sayısı 45 → **46**). Gövde
+`{"ok", "version", "data_dir_writable"}`; yazılamayan veri dizini **503**
+(200 + `ok:false` değil — sondayı okuyanların çoğu yalnız durum koduna
+bakıyor; gövde yine tam dönüyor), `Cache-Control: no-store`. Yazılabilirlik
+`os.access` ile DEĞİL `tempfile.mkstemp` + 1 bayt yazım + silme ile
+ölçülüyor: root'ta `access(2)` bitlere bakıp her zaman "evet" der (bu takım
+CI'da ve Claude Code konteynerinde root koşuyor), salt okunur bind-mount ve
+dolu disk de bitlerde görünmez. Aynı sebeple `tests/test_health.py`nin
+"yazılamaz" senaryoları root'ta da kırmızıya dönen iki yolla kuruldu (dizin
+yerine düz dosya, hiç olmayan yol); klasik `chmod 0o500` root/Windows'ta
+atlanıyor. Sonda iz bırakmıyor (bekçisi var). Canlı doğrulama uvicorn ile:
+`/health` → `{"ok":true,"version":"0.23.1","data_dir_writable":true}` 200,
+`/` 200; `KROMIS_DATA_DIR` bir DOSYAYA gösterildiğinde 503 +
+`data_dir_writable:false`.
+
+`Dockerfile` iki aşama, ikisi de `python:3.13-slim` (deponun asgari
+Python'u; `alpine` değil — Pillow/pydantic-core/uvloop manylinux tekerleği),
+`useradd --uid 10001`, `VOLUME /data`, `EXPOSE 8765`, `HEALTHCHECK` standart
+kütüphaneyle (`urllib`; `slim`de curl yok, kurmak bir apt katmanı), CMD
+`sh -c "exec uvicorn app:app --host 0.0.0.0 --port ${PORT:-8765}"`. İki
+sapma, ikisi de kayıtta: (a) **`HOME=/data`** — spec'in risk notu kimlik
+dosyasını `KROMIS_DATA_DIR` altında sanıyordu, oysa `paths.credentials_path`
+`~/.config/kromis/credentials.env` diyor; `HOME` konteyner katmanında kalsa
+Ayarlar panelinden girilen her anahtar konteyner yeniden yaratıldığında yok
+olurdu. `HOME=/data` ile dosya `/data/.config/kromis/credentials.env`e iniyor
+(0o700/0o600 aynı). (b) **`requirements-web.txt` YOK** — ölçüldü: dosyadaki
+web dışı paketler Linux'ta `pytest` 3,5 MB + `pywebview`/`bottle`/
+`proxy_tools` 2,6 MB ≈ **6 MB**; `pythonnet`/`clr-loader` `win32`
+işaretçisiyle zaten kurulmuyor. İkinci pin listesi + eşitlik bekçisi 6 MB için
+fazla; imaj küçültülecekse ilk aday orası. `.dockerignore` bağlamı `COPY .`
+ile alıp imaja girmemesi gerekeni GEREKÇESİYLE dışlıyor (testler, belgeler,
+paketleme, `tools/`, yerel `.env`/`output/`/`assets/`; kök `*.md` — `bundled/
+prompts/*.md` kalıyor, kalıplar köke göre).
+
+`.env.example` iki bölüm: altyapı (`KROMIS_DATA_DIR`, `PORT` — compose
+`env_file` ile sürece giriyor) ve sağlayıcı adları (`catalog.CREDENTIALS`ın
+`key_env`/`url_env`i + `ChatModel.wire_from_env`: 15 ad). Şablon AÇIKÇA
+söylüyor: uygulama sağlayıcı anahtarlarını SÜREÇ ORTAMINDAN OKUMUYOR
+(`azure_client.read_env_values` yalnız dosya okuyor), satırlar
+`credentials.env`in biçimini ve ad envanterini belgeliyor. Ortamdan okuma
+(12-factor) bilinçle bu PR'da DEĞİL: masaüstünde kabuk ortamındaki bir
+anahtarın Kromis'e sızması kimlik davranışını değiştirir — Faz 1 kararı.
+`compose.yaml` yalnız yerel geliştirme (adlandırılmış birim, `env_file`
+`required: false`). CI'da yeni **`docker`** işi: `docker build -t kromis .`,
+`docker run`, 30 sn içinde `curl -f /health` + `/`, `trap` ile günlük ve
+temizlik; İTMİYOR. Bekçi `tests/test_docker_kapisi.py` (22 test: her aşama
+`python:3.13-slim`, `netguard`/`--factory` yok, root değil, `VOLUME`/`EXPOSE`/
+`HEALTHCHECK`/`HOME`, apt/curl yok, `requirements.txt`in kendisi;
+`.dockerignore` dışlaması ve KORUMASI; `.env.example` ad kümesi == katalog,
+hiçbir anahtar değeri yok, her değişken açıklamalı, ortam uyarısı var,
+varsayılanlar Dockerfile'la aynı; compose dev-only; `docker` işi derliyor,
+soruyor, itmiyor, kesici, zaman sınırlı; README `docker build` + `/health` +
+`KROMIS_DATA_DIR`, bayat "mypy şimdilik bilgi amaçlı" cümlesi gitti).
+
+**Ölçülmeyen:** imaj boyutu ve yerel `docker build`. Geliştirme konteynerinin
+ağ vekili Docker Hub'ın ve ECR aynasının CDN'ini (`production.cloudfront.
+docker.com`, `d2glxqk2uabbnd.cloudfront.net`) politika gereği 403'lüyor; taban
+imaj çekilemedi, `docker build --check` bile metadata'da düşüyor. İlk gerçek
+derleme CI'daki `docker` işi; boyut orada `docker image ls` ile okunup buraya
+yazılmalı. Sonraki: anahtarların ortamdan okunması (Faz 1, yukarıda);
+`/health`e ikinci ölçüt gelince (ör. kimlik dosyası okunabilirliği) `ok`
+hepsinin VE'si olur, alan adları değişmez.
 
 ---
 

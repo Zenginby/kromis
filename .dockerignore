@@ -1,0 +1,75 @@
+# Docker derleme bağlamından ÇIKARILANLAR (Faz 0 / Adım 8).
+#
+# `Dockerfile` bağlamın tamamını `COPY . /app` ile alıyor — yeni bir kök modül
+# ya da `routers/` dosyası için burayı düzenlemek gerekmesin. Bedeli şu liste:
+# imaja girmesi YANLIŞ olan her şey burada adıyla yazılı. İki sınıf var:
+#
+#  * Pakete ait OLMAYAN içerik: testler, belgeler, dondurulmuş masaüstü/Android
+#    paketleme dosyaları, geliştirici araçları. İmajı şişirmekten çok, bir gün
+#    `docker build`ın "tests/ değişti" diye katman önbelleğini boşa
+#    düşürmesini önlemek için.
+#  * Yerel SIR ve VERİ: `.env`, geliştirme dizinindeki `output/`/`assets/`
+#    (dev'de data_dir() == repo kökü, bkz. paths.py), `hata.log`. Bunlar
+#    bağlama girseydi `docker build` onları imaj katmanına yazardı — ve bir
+#    imaj katmanı, silinen dosyayı da taşır.
+#
+# Bekçisi tests/test_docker_kapisi.py (tests/, android/, docs/, .venv/,
+# node_modules/, .git/ ve .env burada olmak ZORUNDA).
+
+# --- sürüm denetimi ve araç önbellekleri ---
+.git
+.github
+.gitattributes
+.gitignore
+.gitleaks.toml
+.graphifyignore
+.claude
+.venv
+.mypy_cache
+.ruff_cache
+.pytest_cache
+__pycache__
+*.pyc
+
+# --- testler, belgeler, geliştirici araçları ---
+tests
+docs
+tools
+node_modules
+package.json
+package-lock.json
+eslint.config.js
+eslint.paylasilan-adlar.json
+.prettierrc
+.prettierignore
+pyproject.toml
+requirements-dev.txt
+run.sh
+# YALNIZ kök dizindeki .md dosyaları: .dockerignore kalıpları köke göre eşleşir
+# (`**/*.md` DEĞİL) — `bundled/prompts/*.md` uygulamanın okuduğu Yönetmen
+# personası ve imajda KALMALI (bekçisi test_docker_kapisi.py).
+*.md
+
+# --- dondurulmuş masaüstü / Android paketleme ---
+android
+build
+dist
+build.sh
+build.ps1
+*.spec
+branding
+
+# --- yerel sır ve veri ---
+.env
+.env.example
+output
+assets
+backups
+hata.log
+.last-version
+.logos-seeded
+
+# --- konteyner tanımlarının kendisi imaja girmez ---
+Dockerfile
+.dockerignore
+compose.yaml

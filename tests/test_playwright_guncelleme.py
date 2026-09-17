@@ -38,6 +38,23 @@ from app import app
 # dosyası oraya yazılıyor, `tmp_path`in köküne değil.
 pytestmark = pytest.mark.gercek_kimlik
 
+
+@pytest.fixture(autouse=True)
+def _dondurulmus_kabuk_kipi(monkeypatch):
+    """İlk üç test DONDURULMUŞ KABUĞUN arayüzünü ölçüyor (Faz 1 / 9).
+
+    `veritabani` `DATABASE_URL` veriyor ve o, web bayrağı (`guncelleme.web_yapisi`);
+    sunucu aynı süreçte koştuğu için modül özniteliğini yamamak yeter. Web
+    kipinin E2E bekçisi aşağıda, kendi `web_kipi` fixture'ıyla (autouse'tan
+    sonra kurulur, kazanır). Gerekçenin tamamı tests/test_guncelleme_route.py.
+    """
+    monkeypatch.setattr(guncelleme, "web_yapisi", lambda: False)
+
+
+@pytest.fixture
+def web_kipi(monkeypatch):
+    monkeypatch.setattr(guncelleme, "web_yapisi", lambda: True)
+
 YENI_SURUM = "99.0.0"
 YENI_URL = f"{guncelleme.GECERLI_URL_ONEKI}releases/tag/v{YENI_SURUM}"
 
@@ -230,3 +247,59 @@ def test_the_check_now_button_answers_when_there_is_nothing_new(monkeypatch, ver
         sunucu.stop()
         guncelleme._KOSUYOR = False
 
+
+
+def test_on_the_web_build_the_update_ui_is_hidden_and_the_page_never_asks(
+        monkeypatch, veritabani, e2e_oturum, web_kipi):
+    """Web yapısı (Faz 1 / 9): "şimdi kontrol et" satırı, tercih anahtarı ve ipucu
+    GİZLİ; rozet yok; sayfa `/api/guncelleme`yi HİÇ sormuyor (yoklama da kapalı);
+    bayat önbellek yerinde ve yeniden yazılmamış.
+
+    Kurgu kabuk testinin aynısı (bayat `zaman: 0` + GitHub'a cevap verecek `_sor`):
+    kabukta 3. saniyede rozet gelirdi — burada 4 saniye sonra hâlâ hiçbir istek yok.
+    `index.html` DEĞİŞMEDİ: çapalar `settings.js`in `webKipineGec`inin bulduğu
+    ebeveynler; test de aynı yoldan bakıyor.
+    """
+    oturum = e2e_oturum()
+    out = oturum.ayarlar().output_dir
+    monkeypatch.setattr(guncelleme, "_sor",
+                        lambda: {"surum": YENI_SURUM, "url": YENI_URL})
+    guncelleme._KOSUYOR = False
+    onbellek = os.path.join(out, guncelleme.ONBELLEK_DOSYASI)
+    with open(onbellek, "w", encoding="utf-8") as f:
+        f.write('{"zaman": 0}')
+
+    port = _bos_port()
+    sunucu = _Sunucu(port)
+    sunucu.start()
+    time.sleep(1.0)
+    try:
+        with sync_playwright() as p:
+            tarayici = p.chromium.launch(headless=True)
+            sayfa = tarayici.new_page()
+            istekler: list[str] = []
+            sayfa.on("request", lambda r: istekler.append(r.url) if "/api/guncelleme" in r.url else None)
+            oturum.cerez(sayfa, f"http://127.0.0.1:{port}")
+            sayfa.goto(f"http://127.0.0.1:{port}")
+            sayfa.wait_for_selector("#view-studio")
+            sayfa.wait_for_selector("#settings-modal.open")     # anahtarsız kurulum: kendiliğinden
+            sayfa.click('#settings-nav [data-pane="about"]')
+
+            assert sayfa.eval_on_selector("#settings-update-check", "el => el.closest('p').hidden") is True
+            assert sayfa.eval_on_selector("#pref-guncelleme", "el => el.closest('label').hidden") is True
+            assert sayfa.eval_on_selector(
+                "#pref-guncelleme", "el => el.closest('label').nextElementSibling.hidden") is True
+            assert sayfa.eval_on_selector("#settings-update", "el => el.hidden") is True
+            # Sürüm satırı DURUYOR: kapanan denetim, kimlik değil.
+            assert sayfa.inner_text("#settings-modal [data-app-version]").strip() == version.APP_VERSION
+
+            time.sleep(4.0)                                    # kabukta ilk yoklama 3. saniyede
+            assert istekler == [], "web'de sayfa /api/guncelleme'yi sordu"
+            assert not sayfa.eval_on_selector("#settings-btn", "el => el.classList.contains('has-update')")
+            with open(onbellek, encoding="utf-8") as f:
+                assert f.read() == '{"zaman": 0}', "önbellek web'de yeniden yazıldı"
+
+            tarayici.close()
+    finally:
+        sunucu.stop()
+        guncelleme._KOSUYOR = False

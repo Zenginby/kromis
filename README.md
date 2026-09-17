@@ -193,9 +193,11 @@ output/, assets/ ve `hata.log`; `HOME` da oraya bağlı. Konak dizini
 bağlanacaksa dizin uid 10001'e ait olmalı; yazılamıyorsa `/health` 503 döner.
 Veri tabanı `DATABASE_URL` ile (PostgreSQL, `postgresql+psycopg://…`;
 `services/db.py`): verilmemişse ya da sunucuya ulaşılamıyorsa uygulama yine
-açılır ama `/health` `db_reachable: false` ile 503 döner. Şema
-`alembic upgrade head` ile kurulur (`alembic.ini` URL'yi aynı değişkenden
-okur). Sağlayıcı anahtarları (Ayarlar paneli) kullanıcı başına ŞİFRELİ olarak
+açılır ama `/health` `db_reachable: false` ile 503 döner. Şema dağıtım
+ÖNCESİ `python tools/goc.py` ile kurulur (`alembic upgrade head`in
+sarmalayıcısı, imajda; konteyner açılışında DEĞİL — platformun release/
+pre-deploy komutu, compose'ta `goc` servisi; `docs/isletme.md`). Sağlayıcı
+anahtarları (Ayarlar paneli) kullanıcı başına ŞİFRELİ olarak
 DB'de durur; şifreleme anahtarı `KROMIS_SECRET_KEY` ZORUNLU — DB'li süreç onsuz
 açılmaz, üstteki komut yenisini üretir ve DB yedeğinden AYRI saklanmalı
 (kaybolursa kayıtlı anahtarlar okunamaz; `services/sifre.py`). Ortam

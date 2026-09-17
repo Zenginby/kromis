@@ -20,11 +20,32 @@
 # vb.) ve `DATABASE_URL` ortamdan gelir. `environment:` `env_file`i EZER:
 # `.env`e `DATABASE_URL=` boş bile yazılsa uygulama bu adresi görür.
 # `depends_on … service_healthy`: uygulama Postgres kabul etmeden açılmasın,
-# yoksa ilk saniyelerde sonda sebepsiz 503 der. Göç (`alembic upgrade head`)
-# BURADA KOŞMUYOR — 9. görevin `goc` servisi (K6: açılışta göç yok).
+# yoksa ilk saniyelerde sonda sebepsiz 503 der.
+#
+# GÖÇ AYRI SERVİSTE (Faz 1 / 9, K6): `goc` aynı imajla `python tools/goc.py`
+# koşturur ve biter; `kromis` onu `service_completed_successfully` ile bekler.
+# Uygulama konteynerinin CMD'si YALNIZ uvicorn — iki replika aynı anda açılırsa
+# iki `alembic upgrade` yarışır, Alembic kilit tutmaz. Bu düzen yönetilen
+# platformların "dağıtım öncesi komut"unun yerel ikizi (Fly `release_command`,
+# Railway/Render pre-deploy; KURULUM.md). `KROMIS_GOC_ACILISTA=1` gibi bir
+# "açılışta göç" bayrağı BİLEREK YOK: tek replikada rahat, ikincisinde tuzak.
+# `image: kromis` iki serviste de aynı ad: compose ikinci derlemeyi önbellekten
+# alır, iki farklı imaj adı iki farklı derleme gibi görünürdü.
 services:
+  goc:
+    build: .
+    image: kromis
+    command: ["python", "tools/goc.py"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://kromis:kromis@postgres:5432/kromis
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   kromis:
     build: .
+    image: kromis
     ports:
       - "8765:8765"
     volumes:
@@ -54,6 +75,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      goc:
+        condition: service_completed_successfully
 
   postgres:
     image: postgres:17-alpine

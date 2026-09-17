@@ -634,7 +634,9 @@
     },
     {
       "ad": "guncelleme",
-      "erteli_ithal": [],
+      "erteli_ithal": [
+        "services.db"
+      ],
       "ithal": [
         "errlog",
         "jsonstore",
@@ -645,7 +647,7 @@
         "routers.ayarlar"
       ],
       "katman": 2,
-      "satir": 360,
+      "satir": 379,
       "testler": [
         "tests/test_depo_adresi.py",
         "tests/test_guncelleme.py",
@@ -1043,7 +1045,7 @@
         "app"
       ],
       "katman": 9,
-      "satir": 347,
+      "satir": 367,
       "testler": [],
       "yol": "routers/ayarlar.py"
     },
@@ -1275,12 +1277,14 @@
         "routers.saglik",
         "routers.uretim",
         "services.sablon",
+        "tools.artik_dosya",
         "tools.ice_aktar"
       ],
       "katman": 8,
       "satir": 165,
       "testler": [
         "tests/test_app_bolme.py",
+        "tests/test_artik_dosya.py",
         "tests/test_hesap.py",
         "tests/test_kimlik.py",
         "tests/test_paths.py"
@@ -1315,6 +1319,7 @@
       "ithal": [],
       "ithal_eden": [
         "app",
+        "guncelleme",
         "routers.ayarlar",
         "routers.bindirme",
         "routers.galeri",
@@ -1325,15 +1330,22 @@
         "routers.uretim",
         "services.cerez",
         "services.kimlik",
+        "tools.anahtar_dondur",
+        "tools.artik_dosya",
+        "tools.goc",
         "tools.ice_aktar",
         "tools.kullanici"
       ],
       "katman": 0,
       "satir": 174,
       "testler": [
+        "tests/test_anahtar_dondur.py",
+        "tests/test_artik_dosya.py",
         "tests/test_db.py",
         "tests/test_dil.py",
         "tests/test_docker_kapisi.py",
+        "tests/test_goc.py",
+        "tests/test_guncelleme_route.py",
         "tests/test_ice_aktar.py",
         "tests/test_kullanici_cli.py"
       ],
@@ -1351,11 +1363,13 @@
       "ithal_eden": [
         "routers.ayarlar",
         "services.kimlik",
+        "tools.anahtar_dondur",
         "tools.ice_aktar"
       ],
       "katman": 6,
       "satir": 143,
       "testler": [
+        "tests/test_anahtar_dondur.py",
         "tests/test_ice_aktar.py",
         "tests/test_kimlik_bilgisi_db.py",
         "tests/test_settings_route.py",
@@ -1405,6 +1419,7 @@
       "katman": 6,
       "satir": 336,
       "testler": [
+        "tests/test_artik_dosya.py",
         "tests/test_chats_route.py",
         "tests/test_galeri_db.py",
         "tests/test_ice_aktar.py",
@@ -1492,6 +1507,7 @@
       "katman": 6,
       "satir": 135,
       "testler": [
+        "tests/test_artik_dosya.py",
         "tests/test_banner.py",
         "tests/test_folders.py",
         "tests/test_legacy_formats.py",
@@ -1571,6 +1587,8 @@
       "katman": 6,
       "satir": 292,
       "testler": [
+        "tests/test_anahtar_dondur.py",
+        "tests/test_artik_dosya.py",
         "tests/test_galeri_db.py",
         "tests/test_hesap.py",
         "tests/test_ice_aktar.py",
@@ -1761,11 +1779,13 @@
       "ithal_eden": [
         "app",
         "services.depo_kimlik_bilgisi",
+        "tools.anahtar_dondur",
         "tools.ice_aktar"
       ],
       "katman": 0,
       "satir": 151,
       "testler": [
+        "tests/test_anahtar_dondur.py",
         "tests/test_docker_kapisi.py",
         "tests/test_ice_aktar.py",
         "tests/test_kimlik_bilgisi_db.py",
@@ -1799,12 +1819,16 @@
         "services.depo_varlik",
         "services.hesap",
         "services.kimlik",
+        "tools.anahtar_dondur",
+        "tools.artik_dosya",
         "tools.ice_aktar",
         "tools.kullanici"
       ],
       "katman": 5,
       "satir": 477,
       "testler": [
+        "tests/test_anahtar_dondur.py",
+        "tests/test_artik_dosya.py",
         "tests/test_folders.py",
         "tests/test_galeri_db.py",
         "tests/test_hesap.py",
@@ -1869,6 +1893,7 @@
         "routers.galeri",
         "services.depo_medya",
         "services.kapilar",
+        "tools.artik_dosya",
         "tools.ice_aktar",
         "tools.make_legacy_fixtures"
       ],
@@ -1888,6 +1913,40 @@
       "yol": "storage.py"
     },
     {
+      "ad": "tools.anahtar_dondur",
+      "erteli_ithal": [],
+      "ithal": [
+        "services.db",
+        "services.depo_kimlik_bilgisi",
+        "services.sifre",
+        "services.tablolar"
+      ],
+      "ithal_eden": [],
+      "katman": 7,
+      "satir": 138,
+      "testler": [
+        "tests/test_anahtar_dondur.py"
+      ],
+      "yol": "tools/anahtar_dondur.py"
+    },
+    {
+      "ad": "tools.artik_dosya",
+      "erteli_ithal": [],
+      "ithal": [
+        "services.ayar",
+        "services.db",
+        "services.tablolar",
+        "storage"
+      ],
+      "ithal_eden": [],
+      "katman": 9,
+      "satir": 261,
+      "testler": [
+        "tests/test_artik_dosya.py"
+      ],
+      "yol": "tools/artik_dosya.py"
+    },
+    {
       "ad": "tools.gecici_postgres",
       "erteli_ithal": [],
       "ithal": [],
@@ -1902,12 +1961,26 @@
       "yol": "tools/gecici_postgres.py"
     },
     {
+      "ad": "tools.goc",
+      "erteli_ithal": [],
+      "ithal": [
+        "services.db"
+      ],
+      "ithal_eden": [],
+      "katman": 1,
+      "satir": 121,
+      "testler": [
+        "tests/test_goc.py"
+      ],
+      "yol": "tools/goc.py"
+    },
+    {
       "ad": "tools.graf_uret",
       "erteli_ithal": [],
       "ithal": [],
       "ithal_eden": [],
       "katman": 0,
-      "satir": 1104,
+      "satir": 1118,
       "testler": [
         "tests/test_app_bolme.py",
         "tests/test_graflar.py",
@@ -2245,8 +2318,8 @@
           "/api/settings"
         ],
         "dosya": "static/settings.js",
-        "satir": 932,
-        "tanim": 23
+        "satir": 958,
+        "tanim": 24
       },
       {
         "cagrilan_yollar": [
@@ -2589,7 +2662,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 115,
+  "test_dosyasi_sayisi": 118,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",
@@ -2980,7 +3053,7 @@
       "onyuz": [
         "static/settings.js"
       ],
-      "satir": 87,
+      "satir": 97,
       "yardimci_sayisi": 3,
       "yol": "/api/guncelleme",
       "yontem": "GET"
@@ -2996,7 +3069,7 @@
       "onyuz": [
         "static/settings.js"
       ],
-      "satir": 117,
+      "satir": 132,
       "yardimci_sayisi": 3,
       "yol": "/api/guncelleme",
       "yontem": "POST"
@@ -3341,7 +3414,7 @@
         "static/core.js",
         "static/settings.js"
       ],
-      "satir": 307,
+      "satir": 327,
       "yardimci_sayisi": 3,
       "yol": "/api/prefs",
       "yontem": "GET"
@@ -3361,7 +3434,7 @@
         "static/core.js",
         "static/settings.js"
       ],
-      "satir": 314,
+      "satir": 334,
       "yardimci_sayisi": 9,
       "yol": "/api/prefs",
       "yontem": "POST"
@@ -3383,7 +3456,7 @@
       "onyuz": [
         "static/settings.js"
       ],
-      "satir": 49,
+      "satir": 57,
       "yardimci_sayisi": 7,
       "yol": "/api/settings",
       "yontem": "GET"
@@ -3404,7 +3477,7 @@
       "onyuz": [
         "static/settings.js"
       ],
-      "satir": 145,
+      "satir": 165,
       "yardimci_sayisi": 14,
       "yol": "/api/settings",
       "yontem": "POST"

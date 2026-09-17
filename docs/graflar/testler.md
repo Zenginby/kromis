@@ -2,7 +2,7 @@
 
 # Test haritası
 
-`tests/` altında 115 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
+`tests/` altında 118 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
 
 | modül | testler |
 | --- | --- |
@@ -51,19 +51,19 @@
 | `routers.sohbet` | — |
 | `routers.uretim` | — |
 | `screencolor` | `test_screencolor.py` |
-| `services.ayar` | `test_app_bolme.py`, `test_hesap.py`, `test_kimlik.py`, `test_paths.py` |
+| `services.ayar` | `test_app_bolme.py`, `test_artik_dosya.py`, `test_hesap.py`, `test_kimlik.py`, `test_paths.py` |
 | `services.cerez` | `test_docker_kapisi.py`, `test_hesap.py`, `test_kimlik.py`, `test_playwright_hesap.py` |
-| `services.db` | `test_db.py`, `test_dil.py`, `test_docker_kapisi.py`, `test_ice_aktar.py`, `test_kullanici_cli.py` |
-| `services.depo_kimlik_bilgisi` | `test_ice_aktar.py`, `test_kimlik_bilgisi_db.py`, `test_settings_route.py`, `test_sifre.py` |
+| `services.db` | `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_db.py`, `test_dil.py`, `test_docker_kapisi.py`, `test_goc.py`, `test_guncelleme_route.py`, `test_ice_aktar.py`, `test_kullanici_cli.py` |
+| `services.depo_kimlik_bilgisi` | `test_anahtar_dondur.py`, `test_ice_aktar.py`, `test_kimlik_bilgisi_db.py`, `test_settings_route.py`, `test_sifre.py` |
 | `services.depo_klasor` | `test_folders.py`, `test_galeri_db.py`, `test_guvenlik_baslik.py`, `test_legacy_formats.py`, `test_playwright_studio.py` |
-| `services.depo_medya` | `test_chats_route.py`, `test_galeri_db.py`, `test_ice_aktar.py`, `test_kimlik.py`, `test_legacy_formats.py`, `test_playwright_studio.py` |
+| `services.depo_medya` | `test_artik_dosya.py`, `test_chats_route.py`, `test_galeri_db.py`, `test_ice_aktar.py`, `test_kimlik.py`, `test_legacy_formats.py`, `test_playwright_studio.py` |
 | `services.depo_palet` | `test_legacy_formats.py`, `test_palet_db.py` |
 | `services.depo_sohbet` | `test_chats_route.py`, `test_sohbet_db.py` |
 | `services.depo_tercih` | `test_dil.py`, `test_ice_aktar.py`, `test_prefs_route.py`, `test_tercih_db.py` |
-| `services.depo_varlik` | `test_banner.py`, `test_folders.py`, `test_legacy_formats.py`, `test_logo.py`, `test_palette_route.py`, `test_playwright_studio.py`, `test_varlik_db.py` |
+| `services.depo_varlik` | `test_artik_dosya.py`, `test_banner.py`, `test_folders.py`, `test_legacy_formats.py`, `test_logo.py`, `test_palette_route.py`, `test_playwright_studio.py`, `test_varlik_db.py` |
 | `services.dil` | `test_dil.py`, `test_i18n.py`, `test_koken.py` |
 | `services.gorsel` | `test_edit_route.py`, `test_model_secimi.py`, `test_video_route.py` |
-| `services.hesap` | `test_galeri_db.py`, `test_hesap.py`, `test_ice_aktar.py`, `test_kimlik.py`, `test_kimlik_bilgisi_db.py`, `test_kullanici_cli.py`, `test_palet_db.py`, `test_playwright_hesap.py`, `test_sohbet_db.py`, `test_tercih_db.py`, `test_varlik_db.py` |
+| `services.hesap` | `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_galeri_db.py`, `test_hesap.py`, `test_ice_aktar.py`, `test_kimlik.py`, `test_kimlik_bilgisi_db.py`, `test_kullanici_cli.py`, `test_palet_db.py`, `test_playwright_hesap.py`, `test_sohbet_db.py`, `test_tercih_db.py`, `test_varlik_db.py` |
 | `services.kapilar` | — |
 | `services.kimlik` | `test_kimlik.py` |
 | `services.koken` | `test_docker_kapisi.py`, `test_hesap.py`, `test_koken.py`, `test_playwright_hesap.py` |
@@ -72,11 +72,14 @@
 | `services.posta` | `test_docker_kapisi.py`, `test_hesap.py`, `test_playwright_hesap.py`, `test_posta.py` |
 | `services.redaksiyon` | — |
 | `services.sablon` | — |
-| `services.sifre` | `test_docker_kapisi.py`, `test_ice_aktar.py`, `test_kimlik_bilgisi_db.py`, `test_sifre.py` |
-| `services.tablolar` | `test_folders.py`, `test_galeri_db.py`, `test_hesap.py`, `test_ice_aktar.py`, `test_kimlik.py`, `test_kimlik_bilgisi_db.py`, `test_kullanici_cli.py`, `test_legacy_formats.py`, `test_palet_db.py`, `test_palette_route.py`, `test_playwright_hesap.py`, `test_sohbet_db.py`, `test_tablolar.py`, `test_tercih_db.py`, `test_varlik_db.py` |
+| `services.sifre` | `test_anahtar_dondur.py`, `test_docker_kapisi.py`, `test_ice_aktar.py`, `test_kimlik_bilgisi_db.py`, `test_sifre.py` |
+| `services.tablolar` | `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_folders.py`, `test_galeri_db.py`, `test_hesap.py`, `test_ice_aktar.py`, `test_kimlik.py`, `test_kimlik_bilgisi_db.py`, `test_kullanici_cli.py`, `test_legacy_formats.py`, `test_palet_db.py`, `test_palette_route.py`, `test_playwright_hesap.py`, `test_sohbet_db.py`, `test_tablolar.py`, `test_tercih_db.py`, `test_varlik_db.py` |
 | `services.zaman` | `test_galeri_db.py`, `test_ice_aktar.py`, `test_kimlik_bilgisi_db.py`, `test_legacy_formats.py`, `test_palet_db.py`, `test_sohbet_db.py`, `test_varlik_db.py` |
 | `storage` | `test_arena.py`, `test_folders.py`, `test_galeri_db.py`, `test_ice_aktar.py`, `test_legacy_formats.py`, `test_storage.py`, `test_storage_delete.py`, `test_tablolar.py`, `test_video_onyuz.py` |
+| `tools.anahtar_dondur` | `test_anahtar_dondur.py` |
+| `tools.artik_dosya` | `test_artik_dosya.py` |
 | `tools.gecici_postgres` | `test_test_ortami.py` |
+| `tools.goc` | `test_goc.py` |
 | `tools.graf_uret` | `test_app_bolme.py`, `test_graflar.py`, `test_onyuz_lint_kapisi.py` |
 | `tools.ice_aktar` | `test_ice_aktar.py` |
 | `tools.kullanici` | `test_kullanici_cli.py` |
@@ -95,7 +98,7 @@
 
 Bu modülleri hiçbir test dosyası ithal etmiyor. Dolaylı olarak sınanıyor olabilirler (`import app` app'in ithal ettiği her şeyi çalıştırır), ama doğrudan bekçileri yok.
 
-* `routers.ayarlar` (347 satır)
+* `routers.ayarlar` (367 satır)
 * `routers.bindirme` (260 satır)
 * `routers.galeri` (358 satır)
 * `routers.kok` (40 satır)

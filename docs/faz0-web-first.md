@@ -480,7 +480,10 @@ ağ vekili Docker Hub'ın ve ECR aynasının CDN'ini (`production.cloudfront.
 docker.com`, `d2glxqk2uabbnd.cloudfront.net`) politika gereği 403'lüyor; taban
 imaj çekilemedi, `docker build --check` bile metadata'da düşüyor. İlk gerçek
 derleme CI'daki `docker` işi; boyut orada `docker image ls` ile okunup buraya
-yazılmalı. Sonraki: anahtarların ortamdan okunması (Faz 1, yukarıda);
+yazılmalı. **Faz 1 / 9 (2026-09-17):** `docker` işi artık `docker build`ın
+hemen ardından `docker image ls kromis` basıyor — sayı her koşunun "docker
+build" adımı günlüğünde ("imaj boyutu: kromis:latest …"); ilk okunan değer
+buraya yazılacak. Sonraki: anahtarların ortamdan okunması (Faz 1, yukarıda);
 `/health`e ikinci ölçüt gelince (ör. kimlik dosyası okunabilirliği) `ok`
 hepsinin VE'si olur, alan adları değişmez.
 

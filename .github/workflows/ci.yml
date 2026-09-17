@@ -192,6 +192,16 @@ jobs:
   # (`host.docker.internal` Linux koşucuda yok); `-p` bu kipte anlamsız,
   # uvicorn zaten konağın 8765'inde. Aynı imaj `docker compose up` ile de
   # `postgres` servisine bağlanıyor (compose.yaml).
+  #
+  # GÖÇ ADIMI (Faz 1 / 9): bir platformun yaptığı sırayla — önce imajdan
+  # `python tools/goc.py` (dağıtım öncesi komut, boş DB → head), SONRA
+  # uygulama konteyneri. Göç ayrı `docker run --rm`: uygulama CMD'si göç
+  # koşturmuyor (K6), yani bu adım olmadan konteyner boş şemaya açılır ve
+  # `/giris` 500 verirdi — adım hem `goc.py`nin imajda olduğunu hem şemanın
+  # gerçekten kurulduğunu ölçüyor. `/giris` de soruluyor: `/` oturumsuz 302
+  # `/giris`e gider (kimlik kapısı), sayfanın kendisi 200 vermeli.
+  # `docker image ls`: imaj boyutu ilk kez burada ÖLÇÜLÜYOR (Faz 0 / 8'in
+  # açık bıraktığı sayı; docs/faz0-web-first.md → 8) — tek satır, iddia yok.
   docker:
     name: Docker imajı
     runs-on: ubuntu-latest
@@ -214,7 +224,19 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: docker build
-        run: docker build -t kromis .
+        run: |
+          docker build -t kromis .
+          docker image ls kromis --format 'imaj boyutu: {{.Repository}}:{{.Tag}} {{.Size}}'
+
+      # Dağıtım öncesi komut — platformun `release_command`inin CI'daki ikizi.
+      - name: Göç (python tools/goc.py)
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/kromis
+        run: |
+          set -euo pipefail
+          docker run --rm --network host -e DATABASE_URL kromis python tools/goc.py
+          # İkinci koşu idempotent: head'te "yapılacak bir şey yok", çıkış 0.
+          docker run --rm --network host -e DATABASE_URL kromis python tools/goc.py
 
       # `KROMIS_SECRET_KEY` (Faz 1 / 7): DB'li süreç şifreleme anahtarı olmadan
       # AÇILMAZ (app._lifespan) — sonda 30 sn boyunca cevap alamaz ve iş
@@ -222,7 +244,7 @@ jobs:
       # `env:`e sabit bir değer koymak git'te bir anahtar tutmak demekti
       # (sızıntı taraması onu da bulurdu) ve bu iş yalnız "imaj açılıyor mu"
       # diye soruyor, veriyi bir sonraki koşuya taşımıyor.
-      - name: /health ve /
+      - name: /health ve /giris
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/kromis
         run: |
@@ -234,7 +256,9 @@ jobs:
           for _ in $(seq 1 30); do
             if govde="$(curl -fsS localhost:8765/health)"; then
               echo "/health: $govde"
-              curl -fsS -o /dev/null localhost:8765/ && echo "/: 200"
+              curl -fsS -o /dev/null localhost:8765/giris && echo "/giris: 200"
+              # `/` oturumsuz 302 → `/giris`; `-L` izler, sayfa 200 vermeli.
+              curl -fsSL -o /dev/null localhost:8765/ && echo "/ → /giris: 200"
               exit 0
             fi
             sleep 1

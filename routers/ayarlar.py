@@ -27,6 +27,14 @@ router = APIRouter()
 # değil, GitHub Releases cevabı — belge §6), o yüzden üç güncelleme rotası
 # `ayarlar.output_dir`i almaya devam ediyor. `prefs` buradan okunmaz.
 #
+# Güncelleme denetimi WEB'DE KAPALI (Faz 1 / 9, sahibin 2026-09-17 kararı):
+# `guncelleme.web_yapisi()` doğruysa üç rota modüle hiç inmez — ağa çıkılmaz,
+# `guncelleme.json` yazılmaz — ve gövdeye `web: true` işareti koyar. 404 DEĞİL:
+# rota dondurulmuş kabuk için duruyor ve ön yüz (`settings.js`) aynı yolu
+# çağırıyor; 404 orada "kontrol yapılamadı" cümlesi üretirdi, işaret ise
+# düğmeyi ve tercih anahtarını gizletiyor. `GET /api/settings`te `guncelleme`
+# alanı KALIYOR (`null`) — `uygulaGuncelleme(null)` satırı ve rozeti söndürür.
+#
 # Sağlayıcı kimlikleri de DB'de (Faz 1 / 7): kullanıcı başına, şifreli
 # (`saglayici_kimlikleri`, services/depo_kimlik_bilgisi.py). `credentials.env`
 # web yolunda YOK — `ac.save_env`/`load_credentials` buradan çağrılmaz (bekçi
@@ -73,9 +81,11 @@ def get_settings(db: Session = OTURUM, ayarlar: ayar.Ayarlar = Depends(ayar.ayar
     bakıyor, ağ çağrısı arka planda koşuyor (bkz. guncelleme.py'deki 2.
     sözleşme). İlk açılışta değeri `null` olur, sonrakinde dolar.
     """
+    web = guncelleme.web_yapisi()
     return {**modeller.settings_payload(kimlikler),
             "version": version.APP_VERSION,
-            "guncelleme": guncelleme.bilgi(
+            "web": web,
+            "guncelleme": None if web else guncelleme.bilgi(
                 ayarlar.output_dir,
                 izin=depo_tercih.oku(db, kullanici.id)["guncelleme_kontrolu"]),
             "chat_instructions_path": paths.chat_instructions_override(),
@@ -108,7 +118,12 @@ def get_guncelleme(db: Session = OTURUM, ayarlar: ayar.Ayarlar = Depends(ayar.ay
     kullanıcının o sırada doldurduğu alanları ezerdi.
 
     İstek yolunu BEKLETMEZ — `/api/settings` ile aynı çağrı, aynı önbellek.
+
+    Web yapısında `{"web": true}` (gerekçe modül başında): önbellek okunmaz,
+    tazeleme başlatılmaz.
     """
+    if guncelleme.web_yapisi():
+        return {"web": True}
     return {"guncelleme": guncelleme.bilgi(
         ayarlar.output_dir, izin=depo_tercih.oku(db, kullanici.id)["guncelleme_kontrolu"])}
 
@@ -136,7 +151,12 @@ def post_guncelleme(db: Session = OTURUM, ayarlar: ayar.Ayarlar = Depends(ayar.a
 
     Gövde `{"durum": …, "guncelleme": …}`; `durum` dört değerden biri
     (`guncelleme.DURUM_*`) ve arayüz her birini ayrı bir cümleye çeviriyor.
+
+    Web yapısında `{"web": true}` ve AĞA ÇIKILMAZ — GET ile aynı işaret; düğme
+    orada zaten gizli, bu dal bayat bir sekmenin POST'u için.
     """
+    if guncelleme.web_yapisi():
+        return {"web": True}
     return guncelleme.simdi_kontrol_et(
         ayarlar.output_dir, izin=depo_tercih.oku(db, kullanici.id)["guncelleme_kontrolu"])
 

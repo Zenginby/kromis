@@ -335,9 +335,22 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
    1c bölümündeki komutla üret, **DB yedeğinden AYRI** sakla — kaybolursa
    kayıtlı anahtarlar okunamaz) ve `KROMIS_DATA_DIR` (medya dosyalarının
    kökü; konteynerde `/data`).
-2. **Şema:** `DATABASE_URL=… alembic upgrade head` (konteyner açılışında
-   DEĞİL, dağıtım öncesi tek seferlik adım — iki replika aynı anda göç
-   koşturmasın).
+2. **Şema — dağıtım ÖNCESİ komut, konteyner açılışı DEĞİL:**
+
+   ```sh
+   DATABASE_URL=… python tools/goc.py
+   ```
+
+   `alembic upgrade head`in sarmalayıcısı; sonda `mevcut 0003_… (head)` basar,
+   head'teyse "zaten head'te" der (0 ile çıkar, her dağıtımda koşturulur).
+   Uygulama konteyneri göç koşturmaz — iki replika aynı anda açılırsa iki göç
+   yarışır. Bu yüzden komutu platformun **dağıtım öncesi komutuna** yaz, yeni
+   sürüm ancak o 0 verirse açılır: Fly.io `fly.toml` → `[deploy]`
+   `release_command = "python tools/goc.py"`; Railway → *Pre-deploy command*;
+   Render → *Pre-Deploy Command*. Yerel `docker compose up` bunu kendi yapar:
+   `goc` servisi göçü koşturup biter, `kromis` onu bekler
+   (`service_completed_successfully`). Yedek, anahtar ve geri yükleme düzeni
+   ayrı belgede: [docs/isletme.md](docs/isletme.md).
 3. **İlk kullanıcı** — kayıt → e-posta doğrulama akışı posta servisi ister;
    ilk hesap onsuz açılır ve DOĞRULANMIŞ yazılır:
 
@@ -373,7 +386,14 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
    (`output/` kökte) araç yine çalışır — kullanıcı dizini ayrı bir alt klasör.
 5. Uygulamayı aç (`uvicorn app:app` ya da `docker compose up`), `/giris`ten
    3. adımdaki hesapla gir; Medya, klasörler, oturumlar, paletler, kütüphane ve
-   Ayarlar'daki anahtarlar eski uygulamadakiyle aynı görünmeli.
+   Ayarlar'daki anahtarlar eski uygulamadakiyle aynı görünmeli. Ayarlar'ın
+   dibindeki "yeni sürüm" satırı ve "şimdi kontrol et" düğmesi web'de YOK:
+   GitHub sürüm denetimi web sürümünde kapalı (sunucuyu sen güncelliyorsun),
+   sürüm satırı duruyor.
+6. **Bakım:** `DATABASE_URL=… KROMIS_DATA_DIR=… python tools/artik_dosya.py`
+   DB'de satırı olmayan medya dosyalarını listeler (`--sil --evet` siler);
+   `KROMIS_SECRET_KEY` döndürme `tools/anahtar_dondur.py` ile — ikisi de
+   [docs/isletme.md](docs/isletme.md)'de.
 
 ---
 

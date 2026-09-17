@@ -68,6 +68,14 @@ GIRIS_NOKTALARI = ("app", "desktop", "android_main")
 # düğüm olarak gürültü olurdu.
 PAKETLER = ("routers", "services")
 
+# Depoda `.py` taşıyan ama haritaya BİLEREK girmeyen dizinler (Faz 1 / 9):
+# `alembic/versions/*.py` şema tarihçesi — her göç bir "modül" sayılsa 84
+# modüllük harita göç sayısı kadar şişer ve o düğümlerin tek kenarı
+# `alembic` olur, hiçbir soruya cevap vermez. `env.py` de burada: yalnız
+# `services.db`/`tablolar`ı ithal ediyor, o bağ README'de yazılı. Bekçisi
+# `tests/test_graflar.py` (dizin diskte var, haritada yok).
+DISLANAN_DIZINLER = ("alembic",)
+
 
 # ─────────────────────────────────────────────────────────────────────
 #  Toplama — Python tarafı
@@ -78,7 +86,11 @@ def _oku(yol: str) -> str:
 
 
 def python_dosyalari() -> dict[str, str]:
-    """{modül adı: depo göreli yol} — kök; `routers/`, `services/`, `tools/`, `tests/` noktalı adlanır."""
+    """{modül adı: depo göreli yol} — kök; `routers/`, `services/`, `tools/`, `tests/` noktalı adlanır.
+
+    `DISLANAN_DIZINLER` taranmaz — liste açık olsun diye burada anılıyor;
+    tarama zaten yalnız adı geçen dizinlere iniyor.
+    """
     bulunan: dict[str, str] = {}
     for ad in sorted(os.listdir(KOK)):
         if ad.endswith(".py"):
@@ -942,10 +954,12 @@ def readme_md(g: dict) -> str:
          "`services/dil.py` (dil bağlamı) her isteğin önünde koşuyor ama uç nokta "
          "tablosunda satırları yok; sıraları (`köken → dil → rota`) `app.py`de "
          "yazılı, harita yalnız `app` → `services.koken` ithal kenarını gösterir.",
-         "* `alembic/` (göç betikleri) BİLEREK dışarıda: `env.py` yalnız `services.db`yi "
+         "* `alembic/` (göç betikleri) BİLEREK dışarıda (`tools/graf_uret.py` "
+         "`DISLANAN_DIZINLER`): `env.py` yalnız `services.db`/`services.tablolar`ı "
          "ithal eder, `versions/*.py` ise şema tarihçesidir — her göç bir modül olarak "
-         "sayılsa harita şişer ve hiçbir kenar anlam taşımaz. Göç hattının bekçisi "
-         "`tests/test_db.py` (upgrade/downgrade/check).",
+         "sayılsa harita göç sayısı kadar şişer ve hiçbir kenar anlam taşımaz. Göç "
+         "hattının bekçisi `tests/test_db.py` (upgrade/downgrade/check), dağıtım öncesi "
+         "koşucusu `tools/goc.py` (o haritada, `tools.` altında).",
          ""]
     return "\n".join(s) + "\n"
 

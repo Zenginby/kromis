@@ -34,7 +34,20 @@ __pycache__
 # --- testler, belgeler, geliştirici araçları ---
 tests
 docs
-tools
+# `tools/` İMAJDA (Faz 1 / 9): operatör araçları konteynerin içinde koşuyor —
+# `goc.py` platformun dağıtım öncesi komutu, `kullanici.py`/`ice_aktar.py`/
+# `artik_dosya.py`/`anahtar_dondur.py` `fly ssh console` / `docker compose run`
+# ile. Yalnız geliştirici araçları adıyla dışarıda; yeni bir araç öntanımlı
+# olarak İMAJA GİRER (operatör aracı olma ihtimali daha yüksek, eksik kalması
+# ise ancak dağıtımda görünür).
+tools/graf_uret.py
+tools/test_ortami.py
+tools/gecici_postgres.py
+tools/surum_karari.py
+tools/surum_yaz.py
+tools/make_legacy_fixtures.py
+tools/make_logo_goldens.py
+tools/render_brand_assets.py
 node_modules
 package.json
 package-lock.json

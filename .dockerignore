@@ -36,8 +36,8 @@ tests
 docs
 # `tools/` İMAJDA (Faz 1 / 9): operatör araçları konteynerin içinde koşuyor —
 # `goc.py` platformun dağıtım öncesi komutu, `kullanici.py`/`ice_aktar.py`/
-# `artik_dosya.py`/`anahtar_dondur.py` `fly ssh console` / `docker compose run`
-# ile. Yalnız geliştirici araçları adıyla dışarıda; yeni bir araç öntanımlı
+# `artik_dosya.py`/`anahtar_dondur.py`/`medya_tasi.py` `fly ssh console` /
+# `docker compose run` ile. Yalnız geliştirici araçları adıyla dışarıda; yeni bir araç öntanımlı
 # olarak İMAJA GİRER (operatör aracı olma ihtimali daha yüksek, eksik kalması
 # ise ancak dağıtımda görünür).
 tools/graf_uret.py

@@ -35,6 +35,14 @@ Kullanıcı başına özet basılır (dosya sayısı, artık sayısı, boyut).
 2 ortam (`DATABASE_URL` yok, sunucuya ulaşılamıyor) · 3 bitti ama artık
 dosya DURUYOR (kuru koşuda bulundu ya da silinemedi) — cron'un "temiz mi"
 sorusunu çıkış kodundan okuması için (`tools/ice_aktar.py`nin 3'üyle aynı sınıf).
+
+KOVA KİPİ (Faz 2 / 2): `KROMIS_NESNE_DEPO_*` dördü doluysa disk yerine kova
+taranır — `depo.listele("kullanicilar/")` bir kez, anahtarlar `kullanicilar/
+<uuid>/output/<ad>` ve `…/assets/<tur>/<ad>` diye çözülür, aynı satırlarla
+karşılaştırılır, `--sil` `depo.sil(anahtar)` çağırır. Veri kökü dizini o kipte
+ARANMAZ (uygulama da diske yazmıyor). Kalan her şey — çıkış kodları, onay,
+özet — iki kipte aynı. Kök çözüm 3. görevde: işçi nesne → satır → commit
+akışının tamamına sahip olup düşen satırın nesnesini kendisi siler.
 """
 from __future__ import annotations
 
@@ -54,7 +62,7 @@ from sqlalchemy import select  # noqa: E402
 from sqlalchemy.exc import SQLAlchemyError  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
-from services import ayar, db  # noqa: E402
+from services import ayar, db, dosya  # noqa: E402
 from services.tablolar import Kullanici, Medya, Varlik  # noqa: E402
 from storage import MEDIA_TYPES  # noqa: E402
 
@@ -74,12 +82,16 @@ class KullaniciOzeti:
     hesap_var: bool
     dosya: int = 0
     medya_degil: int = 0
-    artiklar: list[str] = dataclasses.field(default_factory=list)   # mutlak yollar
+    artiklar: list[str] = dataclasses.field(default_factory=list)   # mutlak yollar; kovada anahtarlar
+    boyutlar: dict[str, int] = dataclasses.field(default_factory=dict)   # kova kipi: anahtar → bayt
 
     @property
     def artik_bayt(self) -> int:
         toplam = 0
         for yol in self.artiklar:
+            if yol in self.boyutlar:
+                toplam += self.boyutlar[yol]
+                continue
             try:
                 toplam += os.path.getsize(yol)
             except OSError:
@@ -93,6 +105,7 @@ class Rapor:
     atlanan_dizinler: list[str] = dataclasses.field(default_factory=list)   # UUID olmayan adlar
     silinen: int = 0
     silinemeyen: list[str] = dataclasses.field(default_factory=list)
+    kova: str | None = None      # kova kipinde kovanın adı; diskte None
 
     @property
     def artiklar(self) -> list[str]:
@@ -172,13 +185,59 @@ def tara(oturum: Session, genel: ayar.Ayarlar) -> Rapor:
     return rapor
 
 
-def sil(rapor: Rapor) -> None:
-    """Raporda ARTIK diye listelenenleri siler — başka hiçbir yolu değil."""
+def tara_kova(oturum: Session, depo: dosya.NesneDepo) -> Rapor:
+    """Kova kipi: `kullanicilar/` önekini bir kez listeler, anahtarları kullanıcıya ayırır.
+
+    Anahtar biçimi `kullanicilar/<uuid>/output/<ad>` ya da `…/assets/<tur>/<ad>`;
+    başka biçim (fazla/eksik parça) "medya değil" sayılır — araç anlamadığı bir
+    nesneyi silmez. UUID olmayan ikinci parça `atlanan_dizinler`e.
+    """
+    rapor = Rapor(kova=depo.istemci.kova)
+    onek = ayar.KULLANICILAR_DIZINI + "/"
+    gruplar: dict[str, list[dosya.Nesne]] = {}
+    for nesne in depo.listele(onek):
+        parcalar = nesne.anahtar.split("/")
+        if len(parcalar) < 3 or parcalar[0] != ayar.KULLANICILAR_DIZINI:
+            continue
+        gruplar.setdefault(parcalar[1], []).append(nesne)
+    for ad in sorted(gruplar):
+        kimlik = _uuid(ad)
+        if kimlik is None:
+            rapor.atlanan_dizinler.append(ad)
+            continue
+        hesap_var = oturum.get(Kullanici, kimlik) is not None
+        medya_adlari, varlik_adlari = _satirdaki_adlar(oturum, kimlik)
+        ozet = KullaniciOzeti(kullanici_id=kimlik, hesap_var=hesap_var)
+        for nesne in gruplar[ad]:
+            parcalar = nesne.anahtar.split("/")
+            ozet.dosya += 1
+            if parcalar[2] == "output" and len(parcalar) == 4:
+                satirdakiler = medya_adlari
+            elif parcalar[2] == "assets" and len(parcalar) == 5:
+                satirdakiler = varlik_adlari.get(parcalar[3], set())
+            else:
+                ozet.medya_degil += 1
+                continue
+            if os.path.splitext(parcalar[-1])[1].lower() not in MEDYA_UZANTILARI:
+                ozet.medya_degil += 1
+                continue
+            if parcalar[-1] not in satirdakiler:
+                ozet.artiklar.append(nesne.anahtar)
+                ozet.boyutlar[nesne.anahtar] = nesne.boyut
+        rapor.kullanicilar.append(ozet)
+    return rapor
+
+
+def sil(rapor: Rapor, depo: dosya.Depo | None = None) -> None:
+    """Raporda ARTIK diye listelenenleri siler — başka hiçbir yolu değil. Kova kipinde `depo.sil`."""
     for yol in rapor.artiklar:
         try:
-            os.remove(yol)
+            if depo is not None:
+                depo.sil(yol)
+            else:
+                os.remove(yol)
             rapor.silinen += 1
-        except OSError:
+        except (OSError, dosya.DosyaHatasi):
             rapor.silinemeyen.append(yol)
 
 
@@ -193,13 +252,13 @@ def _onay(evet: bool) -> bool:
 
 
 def _yazdir(rapor: Rapor, kok: str) -> None:
-    print(f"veri koku: {kok}")
+    print(f"kova: {rapor.kova}" if rapor.kova else f"veri koku: {kok}")
     for k in rapor.kullanicilar:
         etiket = "" if k.hesap_var else "  (HESABI YOK — satirlar CASCADE ile dusmus, dosyalar kalmis)"
         print(f"{k.kullanici_id}: {k.dosya} dosya, {len(k.artiklar)} artik "
               f"({k.artik_bayt} bayt), {k.medya_degil} medya degil{etiket}")
         for yol in k.artiklar:
-            print(f"  artik: {os.path.relpath(yol, kok)}")
+            print(f"  artik: {yol if rapor.kova else os.path.relpath(yol, kok)}")
     for ad in rapor.atlanan_dizinler:
         print(f"atlandi (UUID degil): kullanicilar/{ad}")
     print(f"toplam: {len(rapor.kullanicilar)} kullanici, {len(rapor.artiklar)} artik dosya")
@@ -209,7 +268,8 @@ def _ayristirici() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="artik_dosya.py",
         description="DB'de satiri olmayan medya/varlik dosyalarini listeler (ontanimli --kuru), "
-                    "--sil ile siler. DATABASE_URL + KROMIS_DATA_DIR ile.")
+                    "--sil ile siler. DATABASE_URL + KROMIS_DATA_DIR ile; KROMIS_NESNE_DEPO_* "
+                    "doluysa disk yerine kovayi tarar.")
     p.add_argument("--veri-dizini", default=None,
                    help="web surumunun KROMIS_DATA_DIR'i; verilmezse ortamdaki KROMIS_DATA_DIR / paths.data_dir()")
     p.add_argument("--kuru", action="store_true", default=True,
@@ -228,16 +288,25 @@ def main(argv: list[str]) -> int:
     genel = ayar.Ayarlar.varsayilan()
     if args.veri_dizini:
         genel = dataclasses.replace(genel, data_dir=os.path.abspath(args.veri_dizini))
-    if not os.path.isdir(genel.data_dir):
+    try:
+        depo = dosya.depo_kur(genel.data_dir)
+    except dosya.YapilandirmaHatasi as hata:
+        print(str(hata), file=sys.stderr)
+        return CIKIS_ORTAM
+    kova = depo if isinstance(depo, dosya.NesneDepo) else None
+    if kova is None and not os.path.isdir(genel.data_dir):
         print(f"veri koku yok: {genel.data_dir}", file=sys.stderr)
         return CIKIS_KULLANICI
 
     motor = db.motor_kur(url)
     try:
         with Session(motor) as oturum:
-            rapor = tara(oturum, genel)
+            rapor = tara_kova(oturum, kova) if kova is not None else tara(oturum, genel)
     except SQLAlchemyError as hata:
         print(f"veri tabani hatasi ({type(hata).__name__}): {str(hata).splitlines()[0]}", file=sys.stderr)
+        return CIKIS_ORTAM
+    except dosya.DosyaHatasi as hata:
+        print(f"kova hatasi: {hata}", file=sys.stderr)
         return CIKIS_ORTAM
     finally:
         motor.dispose()
@@ -250,7 +319,7 @@ def main(argv: list[str]) -> int:
         return CIKIS_ARTIK_VAR
     if not _onay(args.evet):
         return CIKIS_KULLANICI
-    sil(rapor)
+    sil(rapor, kova)
     print(f"silindi: {rapor.silinen}")
     for yol in rapor.silinemeyen:
         print(f"silinemedi: {yol}", file=sys.stderr)

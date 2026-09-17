@@ -22,6 +22,7 @@ fixture'lar korunuyor: aynı dosya doğrudan geçildiğinde pikseller birebir ay
 from __future__ import annotations
 
 import io
+from typing import BinaryIO
 
 from PIL import Image, ImageFilter
 
@@ -110,12 +111,16 @@ def paste_position(img_w: int, img_h: int, logo_w: int, logo_h: int,
             _clamp_px(y + offset_y_px, img_h - logo_h))
 
 
-def composite_logo(base_path: str, *, logo_path: str,
+def composite_logo(base_path: str | BinaryIO, *, logo_path: str | BinaryIO,
                    position: str = "bottom-right",
                    scale: float = 0.14, margin: float = 0.03,
                    shadow_alpha: int = 120, shadow_blur: int = 6,
                    offset_x: float = 0.0, offset_y: float = 0.0) -> bytes:
     """Filigranı bindirip sonuç PNG'yi bayt olarak döndürür (diske yazmaz).
+
+    İki girdi de yol YA DA açık ikili akış (`io.BytesIO`): web yolu görseli
+    depodan bayt olarak okuyor (Faz 2 / 2, kovada dosya yolu yok), dondurulmuş
+    kabuk yol veriyor — `Image.open` ikisini de aynı biçimde açar.
 
     `offset_x`/`offset_y`: ızgara noktasından sapma, görsel kenarının ORANI
     olarak (+ sağ/aşağı, − sol/yukarı). Oran, piksel değil: 1024² ile

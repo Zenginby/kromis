@@ -11,14 +11,14 @@ import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from PIL import Image
 from sqlalchemy.orm import Session
 
 import composite
 import i18n
 from models import BannerRequest, LogoRequest
-from services import ayar, depo_medya, depo_varlik, dil, gorsel, kapilar, kimlik, zaman
+from services import ayar, depo_medya, depo_varlik, dil, dosya, gorsel, kapilar, kimlik, zaman
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
@@ -29,10 +29,17 @@ router = APIRouter()
 # dosya ister (`depo_varlik.dosya_yolu`); `assets_store` buradan okunmaz
 # (bekçisi tests/test_galeri_db.py). Önizleme rotaları da bu yüzden `Session`
 # alıyor: bindirdikleri varlığı DB'den buluyorlar, diske yazmıyorlar.
+#
+# Dosyanın YERİ bir `Depo` (Faz 2 / 2, services/dosya.py): kaynak görsel ve
+# bindirilecek varlık depodan BAYT olarak okunur (`gorsel.read_png_file`,
+# `depo.oku`) ve `composite`e `io.BytesIO` ile verilir — kovada dosya yolu
+# yok, 10 MB tavanı (`gorsel.MAX_UPLOAD_BYTES`) belleği karşılıyor. Sonuç
+# `depo_medya.kaydet(depo=…)` ile aynı depoya. `/assets/{kind}/{filename}`
+# kovada 302 → ön imzalı URL, yerelde `FileResponse` (galeri.py'nin kararı).
 
 
 def _composite_logo(src_path: str, req: LogoRequest, db: Session, kullanici_id: uuid.UUID,
-                    assets_dir: str) -> bytes:
+                    assets_dir: str, depo: dosya.Depo) -> bytes:
     """Logo/motto filigranını süreç içinde bindirir (composite.py).
 
     Bindirilecek görsel HER ZAMAN kullanıcının kütüphanesinden gelir. Eskiden
@@ -43,13 +50,13 @@ def _composite_logo(src_path: str, req: LogoRequest, db: Session, kullanici_id: 
     if not req.asset_id:
         raise HTTPException(status_code=422, detail=i18n.t("err.pick_an_image", dil.aktif()))
     overlay_path = depo_varlik.dosya_yolu(db, kullanici_id, req.asset_kind,
-                                          os.path.basename(req.asset_id), assets_dir)
+                                          os.path.basename(req.asset_id), assets_dir, depo=depo)
     if overlay_path is None:
         raise HTTPException(status_code=404, detail=i18n.t("err.image_missing", dil.aktif()))
     try:
         return composite.composite_logo(
-            src_path,
-            logo_path=overlay_path,
+            io.BytesIO(gorsel.read_png_file(src_path, depo=depo)),
+            logo_path=io.BytesIO(depo.oku(overlay_path)),
             position=req.position, scale=req.size,
             shadow_alpha=req.shadow_alpha, shadow_blur=req.shadow_blur,
             offset_x=req.offset_x, offset_y=req.offset_y,
@@ -67,17 +74,18 @@ def _composite_logo(src_path: str, req: LogoRequest, db: Session, kullanici_id: 
             detail=i18n.t("err.overlay_failed", dil.aktif(), hata=str(exc) or type(exc).__name__)) from exc
 
 
-def _logo_src_path(image_id: str, output_dir: str) -> str:
-    return gorsel.output_png_path(image_id, output_dir)
+def _logo_src_path(image_id: str, output_dir: str, depo: dosya.Depo) -> str:
+    return gorsel.output_png_path(image_id, output_dir, depo=depo)
 
 
 @router.post("/api/logo/preview")
 def preview_logo(req: LogoRequest, db: Session = OTURUM,
                  ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-                 kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+                 kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+                 depo: dosya.Depo = Depends(dosya.depo)) -> dict:
     """Seçeneklerle geçici bir logo önizlemesi üretir — diske/geçmişe KAYDETMEZ."""
-    src_path = _logo_src_path(req.id, ayarlar.output_dir)
-    logo_bytes = _composite_logo(src_path, req, db, kullanici.id, ayarlar.assets_dir)
+    src_path = _logo_src_path(req.id, ayarlar.output_dir, depo)
+    logo_bytes = _composite_logo(src_path, req, db, kullanici.id, ayarlar.assets_dir, depo)
     b64 = base64.b64encode(logo_bytes).decode("ascii")
     return {"b64": f"data:image/png;base64,{b64}"}
 
@@ -85,16 +93,17 @@ def preview_logo(req: LogoRequest, db: Session = OTURUM,
 @router.post("/api/logo")
 def add_logo(req: LogoRequest, db: Session = OTURUM,
              ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-             kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+             kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+             depo: dosya.Depo = Depends(dosya.depo)) -> dict:
     output_dir = ayarlar.output_dir
-    src_path = _logo_src_path(req.id, output_dir)
+    src_path = _logo_src_path(req.id, output_dir, depo)
     src_id = os.path.basename(req.id)
 
     # Kaynağın meta'sı `medya` satırından (prompt/size korunur); kaydı olmayan
     # dosya `{}` — bindirme yine yapılır, alanlar boş kalır (eski davranış).
     src_meta = depo_medya.bul(db, kullanici.id, src_id) or {}
 
-    logo_bytes = _composite_logo(src_path, req, db, kullanici.id, ayarlar.assets_dir)
+    logo_bytes = _composite_logo(src_path, req, db, kullanici.id, ayarlar.assets_dir, depo)
     record = depo_medya.kaydet(
         db, kullanici.id, logo_bytes,
         {"prompt": src_meta.get("prompt", ""), "size": src_meta.get("size", ""),
@@ -108,14 +117,16 @@ def add_logo(req: LogoRequest, db: Session = OTURUM,
          # değil. Geçilmezse kayda varsayılan model yazılırdı — Nano Banana ile
          # üretilmiş bir görselin logolu hâli "azure-gpt-image-2" görünürdü.
          "model": src_meta.get("model")},
-        output_dir, now=zaman.an(),
+        output_dir, now=zaman.an(), depo=depo,
     )
     return {"image": record}
 
 
-def _composite_banner(src_path: str, banner_path: str, edge: str,
+def _composite_banner(src_path: str | io.BytesIO, banner_path: str | io.BytesIO, edge: str,
                       scale: float = 1.0, align: str = "center", margin: float = 0.0) -> bytes:
     """Banner'ı ölçekleyip üst/alt kenara bindirir (en-boy oranı korunur).
+
+    Girdiler yol ya da açık ikili akış (`composite.composite_logo`nun aynı kararı).
 
     Logo filigranından farklı: köşe değil, yatay şerit. `scale` görsel genişliğinin
     oranı (1.0 = tam genişlik), `align` artan boşluğun paylaşımı, `margin` seçilen
@@ -142,28 +153,30 @@ def _composite_banner(src_path: str, banner_path: str, edge: str,
 
 
 def _banner_asset_path(asset_id: str, db: Session, kullanici_id: uuid.UUID,
-                       assets_dir: str) -> str:
+                       assets_dir: str, depo: dosya.Depo) -> str:
     path = depo_varlik.dosya_yolu(db, kullanici_id, "banners", os.path.basename(asset_id),
-                                  assets_dir)
+                                  assets_dir, depo=depo)
     if path is None:
         raise HTTPException(status_code=404, detail=i18n.t("err.banner_missing", dil.aktif()))
     return path
 
 
 def _banner_bytes(src_path: str, req: BannerRequest, db: Session, kullanici_id: uuid.UUID,
-                  assets_dir: str) -> bytes:
-    return _composite_banner(src_path, _banner_asset_path(req.asset_id, db, kullanici_id,
-                                                          assets_dir),
+                  assets_dir: str, depo: dosya.Depo) -> bytes:
+    banner_path = _banner_asset_path(req.asset_id, db, kullanici_id, assets_dir, depo)
+    return _composite_banner(io.BytesIO(gorsel.read_png_file(src_path, depo=depo)),
+                             io.BytesIO(depo.oku(banner_path)),
                              req.edge, req.scale, req.align, req.margin)
 
 
 @router.post("/api/banner/preview")
 def preview_banner(req: BannerRequest, db: Session = OTURUM,
                    ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-                   kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+                   kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+                   depo: dosya.Depo = Depends(dosya.depo)) -> dict:
     """Banner'lı geçici bir önizleme üretir — diske/geçmişe KAYDETMEZ."""
-    banner_bytes = _banner_bytes(_logo_src_path(req.id, ayarlar.output_dir), req,
-                                 db, kullanici.id, ayarlar.assets_dir)
+    banner_bytes = _banner_bytes(_logo_src_path(req.id, ayarlar.output_dir, depo), req,
+                                 db, kullanici.id, ayarlar.assets_dir, depo)
     b64 = base64.b64encode(banner_bytes).decode("ascii")
     return {"b64": f"data:image/png;base64,{b64}"}
 
@@ -171,14 +184,15 @@ def preview_banner(req: BannerRequest, db: Session = OTURUM,
 @router.post("/api/banner")
 def add_banner(req: BannerRequest, db: Session = OTURUM,
                ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-               kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+               kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+               depo: dosya.Depo = Depends(dosya.depo)) -> dict:
     output_dir = ayarlar.output_dir
-    src_path = _logo_src_path(req.id, output_dir)
+    src_path = _logo_src_path(req.id, output_dir, depo)
     src_id = os.path.basename(req.id)
 
     src_meta = depo_medya.bul(db, kullanici.id, src_id) or {}
 
-    banner_bytes = _banner_bytes(src_path, req, db, kullanici.id, ayarlar.assets_dir)
+    banner_bytes = _banner_bytes(src_path, req, db, kullanici.id, ayarlar.assets_dir, depo)
     record = depo_medya.kaydet(
         db, kullanici.id, banner_bytes,
         {"prompt": src_meta.get("prompt", ""), "size": src_meta.get("size", ""),
@@ -190,7 +204,7 @@ def add_banner(req: BannerRequest, db: Session = OTURUM,
          # değil. Geçilmezse kayda varsayılan model yazılırdı — Nano Banana ile
          # üretilmiş bir görselin logolu hâli "azure-gpt-image-2" görünürdü.
          "model": src_meta.get("model")},
-        output_dir, now=zaman.an(),
+        output_dir, now=zaman.an(), depo=depo,
     )
     return {"image": record}
 
@@ -204,6 +218,7 @@ async def upload_asset(
     db: Session = OTURUM,
     ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
     kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+    depo: dosya.Depo = Depends(dosya.depo),
 ) -> dict:
     """Bir logo/banner PNG'si yükler; doğrulayıp yeniden kodlar ve kütüphaneye ekler.
 
@@ -220,7 +235,7 @@ async def upload_asset(
     stem = os.path.splitext(os.path.basename(file.filename or ""))[0]
     label = (name.strip() or stem or i18n.t("library.asset"))[:120]
     record = await run_in_threadpool(depo_varlik.kaydet, db, kullanici.id, kind, image_bytes,
-                                     label, ayarlar.assets_dir, now=zaman.an())
+                                     label, ayarlar.assets_dir, now=zaman.an(), depo=depo)
     return {"asset": record}
 
 
@@ -235,10 +250,11 @@ def list_assets_route(kind: str, db: Session = OTURUM,
 @router.delete("/api/assets/{kind}/{asset_id}")
 def delete_asset_route(kind: str, asset_id: str, db: Session = OTURUM,
                        ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-                       kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+                       kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+                       depo: dosya.Depo = Depends(dosya.depo)) -> dict:
     kapilar.check_asset_kind(kind)
     aid = os.path.basename(asset_id)
-    if not depo_varlik.sil(db, kullanici.id, kind, aid, ayarlar.assets_dir):
+    if not depo_varlik.sil(db, kullanici.id, kind, aid, ayarlar.assets_dir, depo=depo):
         raise HTTPException(status_code=404, detail=i18n.t("err.asset_missing", dil.aktif()))
     return {"deleted": aid}
 
@@ -246,15 +262,21 @@ def delete_asset_route(kind: str, asset_id: str, db: Session = OTURUM,
 @router.get("/assets/{kind}/{filename}")
 def asset_file(kind: str, filename: str, db: Session = OTURUM,
                ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-               kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> FileResponse:
+               kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+               depo: dosya.Depo = Depends(dosya.depo)) -> Response:
     """Kütüphane karosunun görseli. Dosya adı kullanıcının `varliklar` satırında ARANIYOR
     (Faz 1 / 6): satırı yoksa dosya diskte dursa bile 404 — `/output/{filename}`in kararı.
-    Eski `index.json` adı da bu yüzden ayrıca yasaklanmıyor: hiçbir satır o adı taşımaz."""
+    Eski `index.json` adı da bu yüzden ayrıca yasaklanmıyor: hiçbir satır o adı taşımaz.
+    Kovada 302 → ön imzalı URL (15 dk, `Cache-Control: private`), yerelde `FileResponse`
+    — `/output/{filename}`in Faz 2 / 2 kararı (routers/galeri.py::_medya_cevabi)."""
     kapilar.check_asset_kind(kind)
     safe = os.path.basename(filename)
     if not safe or safe in (".", ".."):
         raise HTTPException(status_code=404, detail=i18n.t("err.not_found", dil.aktif()))
-    path = depo_varlik.dosya_yolu_adiyla(db, kullanici.id, kind, safe, ayarlar.assets_dir)
+    path = depo_varlik.dosya_yolu_adiyla(db, kullanici.id, kind, safe, ayarlar.assets_dir, depo=depo)
     if path is None:
         raise HTTPException(status_code=404, detail=i18n.t("err.not_found", dil.aktif()))
+    url = depo.url(path, dosya.URL_SURESI)
+    if url is not None:
+        return RedirectResponse(url, status_code=302, headers={"Cache-Control": dosya.CACHE_CONTROL})
     return FileResponse(path, media_type="image/png")

@@ -48,7 +48,7 @@ fazlasını verdiği durumlar var, her satırda yazılı.
 | parça | nerede | yedeği kimin, nasıl | neden ayrı |
 | --- | --- | --- | --- |
 | **Veri tabanı** — hesaplar, oturumlar, medya/klasör/sohbet/palet/varlık SATIRLARI, tercihler, ŞİFRELİ sağlayıcı anahtarları | PostgreSQL (`DATABASE_URL`) | Yönetilen Postgres'te (Neon, Supabase, Fly Postgres, RDS) **platformun PITR'ı** — açık olduğunu ve saklama süresini PANELDEN doğrula, varsayılan bazı planlarda kapalı. Kendi Postgres'inde `pg_dump -Fc "$DATABASE_URL" > kromis-$(date +%F).dump` cron'u + dosyanın başka bir makineye/kovaya kopyası | Satırlar dosyayı GÖSTERİR (`medya.filename`), dosya DB'de değil: DB yedeği tek başına galeriyi geri getirmez |
-| **Medya dizini** — `KROMIS_DATA_DIR/kullanicilar/<uuid>/{output,assets}` (PNG/MP4 dosyaları) | Kalıcı birim (`/data`) | **Birim anlık görüntüsü** (Fly volume snapshot, bulut disk snapshot) ya da `rsync`/`rclone` ile nesne depolamaya; günlük | Dosyalar DB'siz anlamsız (hangisi kimin, hangi klasörde — hepsi satırda); DB dosyasız yarım. İkisi AYNI ANDAN olmazsa artık dosya ya da kırık bağlantı doğar — `tools/artik_dosya.py` bunu bulur (§ 4) |
+| **Medya** — `kullanicilar/<uuid>/{output,assets}` (PNG/MP4 dosyaları): yerel diskte (`KROMIS_DATA_DIR`, compose) YA DA aynı anahtarla S3/R2 kovasında (`KROMIS_NESNE_DEPO_*`, Faz 2 / 2 — çok makineli dağıtımda zorunlu) | Kalıcı birim (`/data`) ya da kova | Diskte: **birim anlık görüntüsü** (Fly volume snapshot, bulut disk snapshot) ya da `rsync`/`rclone`; günlük. Kovada: **R2 nesne sürümlemesi** (bucket versioning, panelden aç) + isteğe bağlı ikinci kovaya `rclone sync` — düzeni Faz 2 / 10 yazar | Dosyalar DB'siz anlamsız (hangisi kimin, hangi klasörde — hepsi satırda); DB dosyasız yarım. İkisi AYNI ANDAN olmazsa artık dosya ya da kırık bağlantı doğar — `tools/artik_dosya.py` bunu iki yerde de bulur (§ 4) |
 | **`KROMIS_SECRET_KEY`** — sağlayıcı anahtarlarını şifreleyen kök | Yalnız ortam değişkeni (platform sırları) | **ÜÇÜNCÜ bir yer**, öteki ikisinden ayrı: bir parola kasası (1Password/Bitwarden kasası, ya da basılı zarf). DB yedeğinin YANINA yazılmaz | DB yedeğiyle yan yana duran anahtar, yedeği ele geçirene bütün kullanıcıların sağlayıcı anahtarlarını düz metin verir. Kaybolursa `saglayici_kimlikleri` sütunu hiç okunamaz — kullanıcılar anahtarlarını yeniden girer, başka çare yok |
 
 Yedeklenmeyenler, bilerek: `hata.log`/`posta.log` (tanı, veri değil), oturum
@@ -103,6 +103,12 @@ Satırı olan dosyaya hiç dokunmaz; medya uzantısı taşımayan dosyaları
 (`guncelleme.json` gibi) "medya değil" diye sayar, silmez. Haftalık cron makul;
 geri yükleme tatbikatının da son adımı (aşağıda).
 
+Medya kovadaysa (`KROMIS_NESNE_DEPO_*` dördü dolu, Faz 2 / 2) aynı komut aynı
+değişkenlerle **kovayı** tarar (`kullanicilar/` öneki bir kez listelenir,
+anahtarlar satırlarla karşılaştırılır, `--sil` nesneyi kovadan siler); veri
+kökü dizini o kipte aranmaz. Yerelden kovaya taşıma `tools/medya_tasi.py`
+(KURULUM.md → Web sürümü → 7).
+
 ## 5. Geri yükleme tatbikatı — iskelet (Faz 5'in kalemi)
 
 Yedek, geri yüklenebildiği ölçüde yedektir. Aşağıdaki adımlar ÜRETİME DEĞİL
@@ -139,8 +145,9 @@ bu iskeleti doldurur ve ölçtüğü süreleri buraya yazar.
 
 ## 6. Bu belgeye girmeyenler (ve nereye ait oldukları)
 
-* Nesne depolama (R2/S3) — Faz 2: medya oraya taşınınca 2. bölümün "medya
-  dizini" satırı kovanın sürüm/çoğaltma ayarı olur.
+* Nesne depolama (R2/S3) — Faz 2 / 2 ile GELDİ (2. bölümün medya satırı iki
+  yeri de yazıyor); kovanın sürümleme/çoğaltma düzeni ve platform sırları
+  Faz 2 / 10'un kalemi.
 * Yapısal loglama, Sentry, uyarı eşikleri — Faz 2.
 * Kredi defteri yedeği — Faz 3 (tablo yok).
 * Kimlik/oturum kaydının KVKK/GDPR saklama süresi — Faz 4.

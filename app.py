@@ -35,6 +35,7 @@ from services import (
     ayar,
     db,
     dil,
+    dosya,
     gorsel,
     kimlik,
     koken,
@@ -164,6 +165,14 @@ app.state.motor = None
 # burada var olsun ki lifespan'sız süreçte hesap rotaları `AttributeError`
 # değil 503 (`mail_unavailable`) versin.
 app.state.postaci = None
+
+# DOSYA DEPOSU — ayar nesnesi gibi İTHAL ANINDA (Faz 2 / 2; gerekçesi
+# services/dosya.py): `KROMIS_NESNE_DEPO_*` dördü doluysa R2/S3 kovası, boşsa
+# yerel disk (`data_dir` kökü). Yarım yapılandırma `YapilandirmaHatasi` ile
+# ithali DURDURUR — sessizce diske düşen bir dağıtım işçi gelince "üretildi
+# ama görünmüyor" olurdu. Nesne kurulurken ağa çıkılmaz (`httpx.Client` tembel).
+# Rotalar `Depends(dosya.depo)` ile okur; testler `app.state.dosya`yı yamalar.
+app.state.dosya = dosya.depo_kur(app.state.ayarlar.data_dir)
 
 # Dil ara katmanı — `i18n._AKTIF`ın tek yazarı (gerekçesi services/dil.py'de).
 # Dekoratörün (`@app.middleware("http")`) çağrı biçimi; işlev başka dosyada

@@ -748,6 +748,10 @@ KULLANICIYA_KONUSMAYAN = {
     "services/depo_sohbet.py": "sohbet deposu (Faz 1 / 6): SQL; veri döndürür, 404'ü rota kurar",
     "services/depo_palet.py": "palet deposu (Faz 1 / 6): SQL; veri döndürür, cümle değil",
     "services/depo_varlik.py": "varlık deposu (Faz 1 / 6): SQL ve dosya; kullanıcıya konuşmaz",
+    "services/dosya.py": "dosya deposu soyutlaması (Faz 2 / 2): yerel disk / kova; hataları "
+                         "kod (`DosyaHatasi`), 404 metnini rota kurar",
+    "services/nesne_depo.py": "S3/R2 istemcisi (Faz 2 / 2): SigV4 ve HTTP; hata mesajı "
+                              "OPERATÖRE (yöntem + durum kodu), arayüze cümle yok",
     "services/depo_tercih.py": "tercih deposu (Faz 1 / 6): `prefs.update`in i18n'li ValueError'ı "
                                "yerine ANAHTAR taşıyan `GecersizTercih`, cümleyi rota kurar",
     "services/tablolar.py": "veri modeli (Faz 1 / 2): tablo, sütun, kısıt tanımları; metin yok — "

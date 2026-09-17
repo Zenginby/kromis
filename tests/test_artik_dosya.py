@@ -171,3 +171,81 @@ def test_an_empty_data_root_is_clean(tmp_path, capsys):
     kok.mkdir()
     assert artik_dosya.main(["--veri-dizini", str(kok)]) == artik_dosya.CIKIS_TAMAM
     assert "0 kullanici, 0 artik" in capsys.readouterr().out
+
+
+# ── kova kipi (Faz 2 / 2) ────────────────────────────────────────────
+#
+# Aynı üç durum kovada: satırsız nesne, hesabı silinmiş kullanıcının nesneleri,
+# bilinmeyen tür/biçim; dokunulmayanlar: satırlı nesne, medya olmayan anahtar.
+# Sahte S3 imza doğruluyor; araç depoyu `dosya.depo_kur`dan alır, test onu
+# sahteye bağlar (ortam değişkenleri conftest'te süpürülü).
+
+def _kova_kurgusu(db_oturumu, kullanici, tmp_path):
+    from services import dosya, nesne_depo
+    from tests.sahte_s3 import SahteS3
+
+    kimlik = nesne_depo.Kimlik("AKID", "GIZLI", "auto")
+    sahte = SahteS3("kova", kimlik)
+    depo = dosya.NesneDepo(nesne_depo.S3Istemci("https://hesap.r2.example", "kova", kimlik,
+                                                istemci=sahte.istemci()), str(tmp_path))
+    kok = str(tmp_path)
+    ozel = ayar.Ayarlar(data_dir=kok, output_dir=os.path.join(kok, "output"),
+                        assets_dir=os.path.join(kok, "assets"), static_dir="").kullanici_icin(kullanici.id)
+    satirli = []
+    for kayit in (depo_medya.kaydet(db_oturumu, kullanici.id, PNG + b"1", {"prompt": "a"}, ozel.output_dir, depo=depo),
+                  depo_medya.kaydet(db_oturumu, kullanici.id, b"\x00mp4", {"prompt": "v", "kind": "video"},
+                                    ozel.output_dir, depo=depo)):
+        satirli.append(f"kullanicilar/{kullanici.id}/output/{kayit['filename']}")
+    v = depo_varlik.kaydet(db_oturumu, kullanici.id, "logos", PNG + b"L", "Logo", ozel.assets_dir, depo=depo)
+    satirli.append(f"kullanicilar/{kullanici.id}/assets/logos/{v['filename']}")
+    db_oturumu.commit()
+    artik = [f"kullanicilar/{kullanici.id}/output/deadbeef0001deadbeef0001deadbeef.png",
+             f"kullanicilar/{kullanici.id}/output/deadbeef0002.mp4",
+             f"kullanicilar/{kullanici.id}/assets/logos/deadbeef0003.png",
+             f"kullanicilar/{kullanici.id}/assets/uploads/eski.png",
+             f"kullanicilar/{uuid.uuid4()}/output/hayalet.png"]
+    medya_degil = [f"kullanicilar/{kullanici.id}/output/guncelleme.json",
+                   f"kullanicilar/{kullanici.id}/output/derin/dizin/x.png"]   # biçim dışı anahtar
+    for anahtar in artik + medya_degil:
+        depo.istemci.koy(anahtar, PNG, "image/png")
+    depo.istemci.koy("kullanicilar/eski-yedek/output/y.png", PNG, "image/png")
+    return depo, sahte, set(satirli), set(artik), set(medya_degil)
+
+
+def test_bucket_mode_lists_exactly_the_stray_objects_and_deletes_only_them(tmp_path, monkeypatch, db_oturumu,
+                                                                            kullanici, capsys):
+    from services import dosya
+    depo, sahte, satirli, artik, medya_degil = _kova_kurgusu(db_oturumu, kullanici, tmp_path)
+    monkeypatch.setattr(dosya, "depo_kur", lambda kok, **k: depo)
+
+    # Kova kipinde veri kökü dizini ARANMAZ: olmayan bir dizin verilse de tarama kovaya gider.
+    assert artik_dosya.main(["--veri-dizini", str(tmp_path / "yok")]) == artik_dosya.CIKIS_ARTIK_VAR
+    out = capsys.readouterr().out
+    assert out.startswith("kova: kova")
+    listelenen = {s.split("artik: ", 1)[1].strip() for s in out.splitlines() if "artik: " in s}
+    assert listelenen == artik
+    assert f"{kullanici.id}: 9 dosya, 4 artik" in out and "2 medya degil" in out
+    assert "HESABI YOK" in out and "atlandi (UUID degil): kullanicilar/eski-yedek" in out
+    assert "toplam: 2 kullanici, 5 artik dosya" in out
+    assert set(sahte.nesneler) >= satirli | artik | medya_degil, "kuru koşu hiçbir şey silmez"
+
+    assert artik_dosya.main(["--veri-dizini", str(tmp_path), "--sil", "--evet"]) == artik_dosya.CIKIS_TAMAM
+    assert "silindi: 5" in capsys.readouterr().out
+    kalan = set(sahte.nesneler)
+    assert not (kalan & artik) and satirli <= kalan and medya_degil <= kalan
+    assert "kullanicilar/eski-yedek/output/y.png" in kalan
+    # Satırlı nesneler hâlâ satırdan bulunuyor.
+    ozel = ayar.Ayarlar(data_dir=str(tmp_path), output_dir="", assets_dir="", static_dir="").kullanici_icin(kullanici.id)
+    for satir in db_oturumu.scalars(select(Medya).where(Medya.kullanici_id == kullanici.id)):
+        assert depo_medya.dosya_yolu(db_oturumu, kullanici.id, satir.id, ozel.output_dir, depo=depo)
+
+    assert artik_dosya.main(["--veri-dizini", str(tmp_path)]) == artik_dosya.CIKIS_TAMAM
+    assert "0 artik dosya" in capsys.readouterr().out
+
+
+def test_a_half_configured_bucket_is_an_environment_error(tmp_path, monkeypatch, capsys, kullanici):
+    from services import dosya
+    monkeypatch.setenv(dosya.URL_ENV, "https://hesap.r2.example")
+    monkeypatch.setenv(dosya.KOVA_ENV, "kova")
+    assert artik_dosya.main(["--veri-dizini", str(tmp_path)]) == artik_dosya.CIKIS_ORTAM
+    assert "eksik" in capsys.readouterr().err

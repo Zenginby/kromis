@@ -45,7 +45,7 @@ import shlex
 import yaml
 
 import catalog
-from services import cerez, db, koken, posta, sifre
+from services import cerez, db, dosya, koken, posta, sifre
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCKERFILE = os.path.join(KOK, "Dockerfile")
@@ -202,7 +202,8 @@ def test_dockerignore_keeps_everything_the_app_serves_or_imports():
     assert os.path.exists(os.path.join(KOK, "bundled", "prompts", "prompt-yonetmeni.md"))
 
 
-OPERATOR_ARACLARI = ("goc", "kullanici", "ice_aktar", "artik_dosya", "anahtar_dondur")
+# `medya_tasi` (Faz 2 / 2): yerel medyayı kovaya taşır — konteyner içinden, `/data` birimine bakar.
+OPERATOR_ARACLARI = ("goc", "kullanici", "ice_aktar", "artik_dosya", "anahtar_dondur", "medya_tasi")
 
 
 def test_dockerignore_ships_the_operator_tools_and_only_the_dev_tools_stay_out():
@@ -246,10 +247,13 @@ def _atamalar() -> list[tuple[str, str, bool]]:
 # Faz 1 / 3 ile hesap ve e-posta: `KROMIS_KOKEN` (services/koken.py),
 # `KROMIS_POSTA`, `KROMIS_POSTA_GONDEREN`, `RESEND_API_KEY` (services/posta.py),
 # `KROMIS_GUVENLI_CEREZ` (services/cerez.py); Faz 1 / 7 ile şifreleme anahtarı
-# `KROMIS_SECRET_KEY` (services/sifre.py). Adlar KAYNAKTAN, elle değil.
+# `KROMIS_SECRET_KEY` (services/sifre.py); Faz 2 / 2 ile nesne depolama
+# `KROMIS_NESNE_DEPO_{URL,KOVA,ANAHTAR_ID,GIZLI,BOLGE}` (services/dosya.py).
+# Adlar KAYNAKTAN, elle değil.
 ALTYAPI = {"KROMIS_DATA_DIR", "PORT", db.DATABASE_URL_ENV, koken.KOKEN_ENV,
            posta.POSTA_ENV, posta.GONDEREN_ENV, posta.RESEND_ANAHTAR_ENV, cerez.GUVENLI_ENV,
-           sifre.ANAHTAR_ENV}
+           sifre.ANAHTAR_ENV,
+           dosya.URL_ENV, dosya.KOVA_ENV, dosya.ANAHTAR_ID_ENV, dosya.GIZLI_ENV, dosya.BOLGE_ENV}
 
 
 def _katalog_adlari() -> set[str]:

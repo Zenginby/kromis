@@ -25,7 +25,7 @@ from models import (
     check_capabilities,
     check_video_capabilities,
 )
-from services import ayar, depo_medya, dil, gorsel, kapilar, kimlik, palet, zaman
+from services import ayar, depo_medya, dil, dosya, gorsel, kapilar, kimlik, palet, zaman
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
@@ -42,13 +42,19 @@ router = APIRouter()
 # kimliği oradan, TEMBEL çözer (`credentials=None` düşmesi — gerekçesi
 # providers._azure_generate ve kimlik_baglami). `kimlikler` imzada dursun ki
 # hangi rotanın anahtar okuduğu imzasında okunsun (bekçi tests/test_kimlik.py).
+#
+# Dosyanın YERİ bir `Depo` (Faz 2 / 2, services/dosya.py): dört rota
+# `Depends(dosya.depo)` alır, sonucu `depo_medya.kaydet(depo=…)` ile o depoya
+# yazar (nesne → satır → flush), referans görselleri `gorsel.read_png_file`
+# ile o depodan okur. 3. görevde bu gövdeler işçiye taşınır; depo aynı kalır.
 
 
 @router.post("/api/generate")
 def generate(req: GenerateRequest, db: Session = OTURUM,
              ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
              kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
-             kimlikler: Mapping[str, str] = kimlik.KIMLIKLER) -> dict:
+             kimlikler: Mapping[str, str] = kimlik.KIMLIKLER,
+             depo: dosya.Depo = Depends(dosya.depo)) -> dict:
     folder_id = kapilar.check_folder(req.folder_id, db, kullanici.id)
     session_id = kapilar.check_session(req.session_id)
     arena_id = kapilar.check_arena(req.arena_id)
@@ -86,7 +92,7 @@ def generate(req: GenerateRequest, db: Session = OTURUM,
                            # Ek düştüyse metin prompt'un birebir aynısı; storage
                            # sözleşmesi "yalnızca farklıysa" diyor (bkz. save).
                            "prompt_sent": prompt_sent if pal and pal["applied"] else None},
-                          ayarlar.output_dir, now=zaman.an())
+                          ayarlar.output_dir, now=zaman.an(), depo=depo)
         for img in images
     ]
     return {"images": records}
@@ -96,7 +102,8 @@ def generate(req: GenerateRequest, db: Session = OTURUM,
 def video(req: VideoRequest, db: Session = OTURUM,
           ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
           kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
-          kimlikler: Mapping[str, str] = kimlik.KIMLIKLER) -> dict:
+          kimlikler: Mapping[str, str] = kimlik.KIMLIKLER,
+          depo: dosya.Depo = Depends(dosya.depo)) -> dict:
     """Metin → video. `generate`in video ikizi.
 
     SENKRON ve bu bilinçli bir seçim, kaza değil: üretim 1-6 dakika sürüyor ve
@@ -141,7 +148,7 @@ def video(req: VideoRequest, db: Session = OTURUM,
                            "kind": "video", "duration": req.duration,
                            "model": req.model, "credits": kredi,
                            "prompt_sent": None},
-                          ayarlar.output_dir, now=zaman.an())
+                          ayarlar.output_dir, now=zaman.an(), depo=depo)
         for vid in videos
     ]
     # ANAHTAR `videos`, `images` DEĞİL: istemci yanıtın türünü gövdeden
@@ -230,6 +237,7 @@ async def animate(
     ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
     kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
     kimlikler: Mapping[str, str] = kimlik.KIMLIKLER,
+    depo: dosya.Depo = Depends(dosya.depo),
 ) -> dict:
     """Görsel → video: bir kareyi hareketlendirir.
 
@@ -270,7 +278,7 @@ async def animate(
     assert spec is not None  # `_check_video_form` id'yi katalogdan geçirdi
     target_folder = await run_in_threadpool(kapilar.check_folder, folder_id, db, kullanici.id)
     session = kapilar.check_session(session_id)
-    refs, parent_id = await _collect_edit_refs(request, file, source_id, ayarlar.output_dir)
+    refs, parent_id = await _collect_edit_refs(request, file, source_id, ayarlar.output_dir, depo)
     if len(refs) > spec.max_refs:
         raise HTTPException(
             status_code=422,
@@ -286,7 +294,8 @@ async def animate(
     # olarak göndermenin karşılığı yok (ana karenin aynı kararı).
     son_kare = None
     if last_source_id is not None:
-        son_kare = gorsel.read_png_file(gorsel.output_png_path(last_source_id, ayarlar.output_dir))
+        son_kare = gorsel.read_png_file(
+            gorsel.output_png_path(last_source_id, ayarlar.output_dir, depo=depo), depo=depo)
     elif last_file is not None:
         son_kare = await gorsel.read_upload_png(last_file)
 
@@ -306,7 +315,7 @@ async def animate(
              "kind": "video", "duration": duration,
              "model": model_id, "credits": kredi,
              "prompt_sent": None},
-            ayarlar.output_dir, now=zaman.an())
+            ayarlar.output_dir, now=zaman.an(), depo=depo)
         for vid in videos
     ]
     return {"videos": records}
@@ -367,12 +376,13 @@ def _check_edit_form(prompt: str, size: str, quality: str, n: int,
 
 async def _collect_edit_refs(
     request: Request, file: UploadFile | None, source_id: str | None, output_dir: str,
+    depo: dosya.Depo,
 ) -> tuple[list[tuple[str, bytes]], str | None]:
     """Azure'a gidecek referans görselleri toplar: `(refs, parent_id)`.
 
     Sıra sözleşme: ana görsel → ek yüklemeler → ek galeri görselleri. `parent_id`
     yalnızca ana görsel galeriden seçildiğinde dolu (türev zinciri buna bağlı).
-    Galeri id'leri `output_dir`de aranıyor — rotanın ayar nesnesinden geliyor.
+    Galeri id'leri `output_dir`de, `depo`da aranıyor — ikisi de rotadan geliyor.
     """
     extra_uploads, extra_ids = await gorsel.extra_refs(request)
     if 1 + len(extra_uploads) + len(extra_ids) > gorsel.MAX_EDIT_IMAGES:
@@ -387,7 +397,8 @@ async def _collect_edit_refs(
     refs: list[tuple[str, bytes]] = []
     if source_id is not None:
         sid = os.path.basename(source_id)
-        refs.append((f"{sid}.png", gorsel.read_png_file(gorsel.output_png_path(sid, output_dir))))
+        refs.append((f"{sid}.png",
+                     gorsel.read_png_file(gorsel.output_png_path(sid, output_dir, depo=depo), depo=depo)))
         parent_id = sid
     else:
         # Form kapısı "tam olarak biri" dedi (`_check_edit_form` /
@@ -401,7 +412,8 @@ async def _collect_edit_refs(
         refs.append((f"ref{len(refs) + 1}.png", await gorsel.read_upload_png(upload)))
     for extra_id in extra_ids:
         refs.append((f"ref{len(refs) + 1}.png",
-                     gorsel.read_png_file(gorsel.output_png_path(extra_id, output_dir))))
+                     gorsel.read_png_file(gorsel.output_png_path(extra_id, output_dir, depo=depo),
+                                          depo=depo)))
     return refs, parent_id
 
 
@@ -434,6 +446,7 @@ async def edit(
     ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
     kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
     kimlikler: Mapping[str, str] = kimlik.KIMLIKLER,
+    depo: dosya.Depo = Depends(dosya.depo),
 ) -> dict:
     """Ek referans görselleri (`extra_files` yüklemeleri, `extra_source_ids`
     galeri id'leri) form verisinden okunur — bkz. gorsel.extra_refs."""
@@ -446,7 +459,7 @@ async def edit(
 
     target_folder = await run_in_threadpool(kapilar.check_folder, folder_id, db, kullanici.id)
     session = kapilar.check_session(session_id)
-    refs, parent_id = await _collect_edit_refs(request, file, source_id, ayarlar.output_dir)
+    refs, parent_id = await _collect_edit_refs(request, file, source_id, ayarlar.output_dir, depo)
 
     # task="edit": üretim ifadesi modele yeniden boyama söyler ve referans
     # görselin kompozisyonunu yok eder; düzenlemede istenen renk derecelendirmesi.
@@ -467,7 +480,7 @@ async def edit(
              "palette": pal, "session_id": session,
              "model": model_id, "credits": kredi,
              "prompt_sent": prompt_sent if pal and pal["applied"] else None},
-            ayarlar.output_dir, now=zaman.an())
+            ayarlar.output_dir, now=zaman.an(), depo=depo)
         for img in images
     ]
     return {"images": records}

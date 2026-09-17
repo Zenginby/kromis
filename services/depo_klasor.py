@@ -30,16 +30,17 @@ köke döner — rota sayıyı bilmek istediği için `depo_medya.klasorden_cika
 from __future__ import annotations
 
 import datetime as dt
-import io
 import os
 import uuid
 import zipfile
+from collections.abc import Iterator
+from typing import IO, cast
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from folders import _SAFE_ID, safe_component
-from services import depo_medya, zaman
+from services import depo_medya, dosya, zaman
 from services.tablolar import Klasor
 
 __all__ = ["olustur", "listele", "var_mi", "derinlik", "altagac", "agaci_sil",
@@ -158,12 +159,20 @@ def yeniden_adlandir(db: Session, kullanici_id: uuid.UUID, folder_id: str | None
 
 
 def zip_disa_aktar(db: Session, kullanici_id: uuid.UUID, folder_id: str | None,
-                   output_dir: str) -> tuple[bytes, str] | None:
-    """Klasör + alt ağacı, görselleriyle ZIP; `(baytlar, kök adı)`. Klasör yoksa None.
+                   output_dir: str, *, depo: dosya.Depo | None = None) -> tuple[Iterator[bytes], str] | None:
+    """Klasör + alt ağacı, görselleriyle ZIP; `(bayt üreticisi, kök adı)`. Klasör yoksa None.
 
     `folders.export_zip`in ikizi; farkı hata biçimi: o `ValueError(i18n.t(…))`
     fırlatıyordu, burası konuşmuyor (depo katmanı kullanıcıya metin üretmez —
     `services/hesap.py` ile aynı karar), rota 404'ü kendi kurar.
+
+    AKIŞLA (Faz 2 / 2): bir klasördeki videolar yüzlerce MB olabilir ve kovada
+    dururken ZIP'i biz kuruyoruz (K7'nin tek istisnası) — bütününü belleğe
+    almak yerine dosya dosya `depo.oku_akis` → `zipfile` → üretici. DB'ye
+    dokunan her şey (klasör ağacı, kayıt listesi) ÜRETİCİDEN ÖNCE, burada:
+    `StreamingResponse` gövdeyi rota döndükten sonra çekiyor ve isteğin
+    `Session`ı o sırada kapanmış olabilir. Depoda bulunmayan dosya atlanır
+    (eski `os.path.exists` kararı).
     """
     if not folder_id or not _gecerli(folder_id):
         return None
@@ -189,20 +198,35 @@ def zip_disa_aktar(db: Session, kullanici_id: uuid.UUID, folder_id: str | None,
     agac = altagac(db, kullanici_id, folder_id)
     agac_kumesi = set(agac)
     kayitlar = depo_medya.klasorlerde(db, kullanici_id, agac)
+    dizinler = [_goreli_yol(fid) for fid in agac]
+    girdiler: list[tuple[str, str]] = []   # (arşiv adı, depo yolu)
+    for kayit in kayitlar:
+        ad = kayit.get("filename")
+        if not ad:
+            continue
+        kf = kayit.get("folder_id")
+        dizin = _goreli_yol(kf if isinstance(kf, str) and kf in agac_kumesi else folder_id)
+        girdiler.append((f"{dizin}/{ad}", os.path.join(output_dir, ad)))
+    secilen = depo or dosya.YEREL
 
-    tampon = io.BytesIO()
-    with zipfile.ZipFile(tampon, "w", zipfile.ZIP_DEFLATED) as zf:
-        for fid in agac:
-            goreli = _goreli_yol(fid)
-            if goreli:
-                zf.writestr(f"{goreli}/", b"")
-        for kayit in kayitlar:
-            ad = kayit.get("filename")
-            if not ad:
-                continue
-            kaynak = os.path.join(output_dir, ad)
-            if os.path.exists(kaynak):
-                kf = kayit.get("folder_id")
-                dizin = _goreli_yol(kf if isinstance(kf, str) and kf in agac_kumesi else folder_id)
-                zf.write(kaynak, arcname=f"{dizin}/{ad}")
-    return tampon.getvalue(), kok_adi
+    def _uret() -> Iterator[bytes]:
+        akis = dosya.YazmaTamponu()
+        # `ZipFile` `IO[bytes]` ister; tampon o protokolün yazma yüzü (write/flush) — typeshed
+        # imzası tam nesneyi istiyor, çalışma zamanı yalnız bu iki adı çağırıyor.
+        with zipfile.ZipFile(cast("IO[bytes]", akis), "w", zipfile.ZIP_DEFLATED) as zf:
+            for goreli in dizinler:
+                if goreli:
+                    zf.writestr(f"{goreli}/", b"")
+            for arsiv_adi, yol in girdiler:
+                if not secilen.var(yol):
+                    continue
+                bilgi = zipfile.ZipInfo(arsiv_adi)
+                bilgi.compress_type = zipfile.ZIP_DEFLATED   # `zf.write`in eski kipi; PNG/MP4 zaten sıkışık
+                with zf.open(bilgi, "w", force_zip64=True) as hedef:
+                    for parca in secilen.oku_akis(yol):
+                        hedef.write(parca)
+                        yield akis.bosalt()
+            yield akis.bosalt()
+        yield akis.bosalt()
+
+    return _uret(), kok_adi

@@ -60,6 +60,9 @@ MUAF = {
     ("webbrowser", "open"),
     ("jsonstore", "write_text"),
     ("jsonstore", "read_text"),
+    # `zipfile.ZipFile.open(bilgi, "w")`: arşiv içine İKİLİ akış açar, `encoding`
+    # parametresi yok (services/depo_klasor.py'nin akışlı ZIP'i, Faz 2 / 2).
+    ("zf", "open"),
 }
 
 METIN_METOTLARI = {"read_text", "write_text"}

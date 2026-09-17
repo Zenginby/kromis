@@ -21,10 +21,13 @@ dosya sonra satır (`kaydet`), silmede önce satır sonra dosya. `asset_path`in
 dosya ister (`dosya_yolu`), satırı silinmiş bir dosya sunulmaz — 5. görevin
 `/output/{filename}` kararının aynısı. `assets_store.delete_asset`in "kaydı
 olmayan dosya da silinmiş sayılır" sözleşmesi korunuyor.
+
+DOSYANIN YERİ BİR `Depo` (Faz 2 / 2): `depo=` parametresi `depo_medya`nınkiyle
+aynı sözleşme — rota söyler (yerel disk ya da kova), söylemeyen `dosya.YEREL`e
+düşer; `assets_dir` yolun öneki, sıra nesne → satır → `flush`.
 """
 from __future__ import annotations
 
-import contextlib
 import datetime as dt
 import os
 import uuid
@@ -33,7 +36,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from assets_store import _SAFE_ID, KINDS
-from services import zaman
+from services import dosya, zaman
 from services.tablolar import Varlik
 
 __all__ = ["kaydet", "listele", "dosya_yolu", "dosya_yolu_adiyla", "sil", "KINDS"]
@@ -56,7 +59,8 @@ def _sahibin(kullanici_id: uuid.UUID):
 
 
 def kaydet(db: Session, kullanici_id: uuid.UUID, tur: str, veri: bytes, name: str,
-           assets_dir: str, *, now: dt.datetime | None = None) -> dict:
+           assets_dir: str, *, now: dt.datetime | None = None,
+           depo: dosya.Depo | None = None) -> dict:
     """PNG'yi `<assets_dir>/<tur>/<id>.png`e yazar, satırı ekler; `index.json` kaydını döndürür.
 
     `tur` çağıran tarafından doğrulanmış olmalı (rota 404 verir); yine de
@@ -64,12 +68,9 @@ def kaydet(db: Session, kullanici_id: uuid.UUID, tur: str, veri: bytes, name: st
     """
     if tur not in KINDS:
         raise ValueError(tur)
-    tur_dizini = os.path.join(assets_dir, tur)
-    os.makedirs(tur_dizini, exist_ok=True)
     kimlik = uuid.uuid4().hex
     filename = f"{kimlik}.png"
-    with open(os.path.join(tur_dizini, filename), "wb") as f:
-        f.write(veri)
+    (depo or dosya.YEREL).yaz(os.path.join(assets_dir, tur, filename), veri, "image/png")
     v = Varlik(id=kimlik, kullanici_id=kullanici_id, filename=filename, name=name, tur=tur,
                olusturuldu=now if now is not None else zaman.an())
     db.add(v)
@@ -93,22 +94,22 @@ def _satir(db: Session, kullanici_id: uuid.UUID, tur: str, asset_id: str | None)
     return db.scalar(_sahibin(kullanici_id).where(Varlik.tur == tur, Varlik.id == asset_id))
 
 
-def _dosya(assets_dir: str, tur: str, filename: str) -> str | None:
+def _dosya(assets_dir: str, tur: str, filename: str, depo: dosya.Depo | None) -> str | None:
     yol = os.path.join(assets_dir, tur, filename)
-    return yol if os.path.isfile(yol) else None
+    return yol if (depo or dosya.YEREL).var(yol) else None
 
 
 def dosya_yolu(db: Session, kullanici_id: uuid.UUID, tur: str, asset_id: str | None,
-               assets_dir: str) -> str | None:
-    """BİNDİRME yolu: kullanıcının satırı VE diskteki dosya; biri yoksa None."""
+               assets_dir: str, *, depo: dosya.Depo | None = None) -> str | None:
+    """BİNDİRME yolu: kullanıcının satırı VE depodaki dosya; biri yoksa None."""
     v = _satir(db, kullanici_id, tur, asset_id)
     if v is None:
         return None
-    return _dosya(assets_dir, tur, v.filename)
+    return _dosya(assets_dir, tur, v.filename, depo)
 
 
 def dosya_yolu_adiyla(db: Session, kullanici_id: uuid.UUID, tur: str, filename: str,
-                      assets_dir: str) -> str | None:
+                      assets_dir: str, *, depo: dosya.Depo | None = None) -> str | None:
     """SERVİS yolu (`/assets/{kind}/{filename}`): dosya adı kullanıcının satırında mı, dosya duruyor mu."""
     if tur not in KINDS or not filename:
         return None
@@ -116,20 +117,16 @@ def dosya_yolu_adiyla(db: Session, kullanici_id: uuid.UUID, tur: str, filename: 
                                             Varlik.tur == tur, Varlik.filename == filename))
     if var is None:
         return None
-    return _dosya(assets_dir, tur, filename)
+    return _dosya(assets_dir, tur, filename, depo)
 
 
 def sil(db: Session, kullanici_id: uuid.UUID, tur: str, asset_id: str | None,
-        assets_dir: str) -> bool:
+        assets_dir: str, *, depo: dosya.Depo | None = None) -> bool:
     """Satır + dosya; ikisinden biri vardıysa True (`assets_store.delete_asset` sözleşmesi)."""
     if tur not in KINDS or not _gecerli(asset_id):
         return False
     sonuc = db.execute(delete(Varlik).where(Varlik.kullanici_id == kullanici_id,
                                             Varlik.tur == tur, Varlik.id == asset_id))
     satir_vardi = int(getattr(sonuc, "rowcount", 0) or 0) > 0
-    yol = os.path.join(assets_dir, tur, f"{asset_id}.png")
-    dosya_vardi = os.path.isfile(yol)
-    if dosya_vardi:
-        with contextlib.suppress(FileNotFoundError):
-            os.remove(yol)
+    dosya_vardi = (depo or dosya.YEREL).sil(os.path.join(assets_dir, tur, f"{asset_id}.png"))
     return satir_vardi or dosya_vardi

@@ -14,10 +14,10 @@
 
 ## Ölçüler
 
-* 88 Python modülü, 342 modül düzeyi ithal kenarı (15 erteli)
+* 91 Python modülü, 355 modül düzeyi ithal kenarı (15 erteli)
 * 54 HTTP uç noktası
 * 11 tarayıcı betiği, 29 betik-arası bağ
-* 119 test dosyası; 14 modülü hiçbir test ithal etmiyor, 14 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
+* 123 test dosyası; 14 modülü hiçbir test ithal etmiyor, 14 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
 * 1 ithal döngüsü, 0 rotaya oturmayan tarayıcı çağrısı
 
 En büyük dosyalar: `catalog` (1461), `models` (1127), `fal_client` (757), `veo_client` (629), `desktop` (588).

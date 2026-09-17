@@ -22,6 +22,9 @@ def _fake_composite_factory(recorder=None):
     def fake_composite(base_path, **kwargs):
         if recorder is not None:
             recorder.append(kwargs)
+        # Kaynak depodan bayt olarak gelir (`io.BytesIO`, Faz 2 / 2); yol da geçsin.
+        if hasattr(base_path, "read"):
+            return base_path.read() + b"+LOGO"
         with open(base_path, "rb") as f:
             return f.read() + b"+LOGO"
     return fake_composite
@@ -167,7 +170,8 @@ def test_logo_asset_id_is_passed_as_the_overlay(tmp_path, monkeypatch, dizinler,
 
     r = c.post("/api/logo", json={"id": src_id, "asset_id": asset["id"]})
     assert r.status_code == 200
-    assert calls[-1]["logo_path"].endswith(f"{asset['id']}.png")
+    # Bindirilen varlık depodan BAYT olarak gelir (Faz 2 / 2): yol değil içerik ölçülür.
+    assert calls[-1]["logo_path"].getvalue() == b"\x89PNG-logo"
 
 
 def test_logo_asset_id_404_for_unknown_asset(tmp_path, monkeypatch, dizinler):
@@ -197,7 +201,7 @@ def test_motto_placement_resolves_from_mottos_library(tmp_path, monkeypatch, diz
     r = c.post("/api/logo", json={"id": src_id, "asset_id": motto["id"],
                                   "asset_kind": "mottos", "position": "center"})
     assert r.status_code == 200
-    assert calls[-1]["logo_path"].endswith(f"{motto['id']}.png")
+    assert calls[-1]["logo_path"].getvalue() == b"\x89PNG-motto"
     # motto id'si logos kütüphanesinde yok → yalnızca mottos'tan çözülebildi
     assert depo_varlik.dosya_yolu(db_oturumu, kullanici.id, "logos", motto["id"],
                                   str(tmp_path / "assets")) is None
@@ -267,7 +271,7 @@ def test_motto_offset_also_reaches_composite(tmp_path, monkeypatch, dizinler, db
                                   "offset_x": -0.12, "offset_y": 0.04})
     assert r.status_code == 200
     kw = calls[-1]
-    assert kw["logo_path"].endswith(f"{motto['id']}.png")
+    assert kw["logo_path"].getvalue() == b"\x89PNG-motto"
     assert (kw["offset_x"], kw["offset_y"]) == (-0.12, 0.04)
 
 

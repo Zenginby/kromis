@@ -394,6 +394,55 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
    DB'de satırı olmayan medya dosyalarını listeler (`--sil --evet` siler);
    `KROMIS_SECRET_KEY` döndürme `tools/anahtar_dondur.py` ile — ikisi de
    [docs/isletme.md](docs/isletme.md)'de.
+7. **Nesne depolama (isteğe bağlı, işçi süreci gelince ZORUNLU).** Medya
+   dosyaları öntanımlı olarak `KROMIS_DATA_DIR` altındaki diskte durur; bu,
+   tek makinede (`docker compose`) yeter. Uygulama ve işçi ayrı makinelerde
+   koşacaksa ortak disk yok — medya S3 uyumlu bir kovaya taşınır
+   (Cloudflare R2 önerilen: çıkış ücreti sıfır). Kod `boto3` taşımaz, imzayı
+   kendisi atar; kovaya CORS gerekmez, `/output/*` ve `/assets/*` 302 ile 15
+   dakikalık imzalı adrese yönlenir (tarayıcı takip eder, `<video>` ileri
+   sarmayı doğrudan kovadan yapar).
+
+   *Kova ve jeton (Cloudflare panosu):* **R2 → Create bucket** (ad: ör.
+   `kromis`, konum otomatik) → **Manage R2 API Tokens → Create API token** →
+   izin **Object Read & Write**, kapsam **yalnız bu kova** → *Access Key ID*
+   ve *Secret Access Key* bir kez gösterilir, parola kasasına yaz. Uç nokta
+   panonun sağında: `https://<hesap-id>.r2.cloudflarestorage.com` (kova adı
+   URL'de YOK). Dört değişken (`.env.example` her birini açıklıyor):
+
+   ```sh
+   KROMIS_NESNE_DEPO_URL=https://<hesap-id>.r2.cloudflarestorage.com
+   KROMIS_NESNE_DEPO_KOVA=kromis
+   KROMIS_NESNE_DEPO_ANAHTAR_ID=…
+   KROMIS_NESNE_DEPO_GIZLI=…
+   ```
+
+   Dördü de boşsa disk, dördü de doluysa kova; **yarısı doluysa uygulama
+   açılmaz** (sessizce diske düşen bir dağıtım işçi gelince "üretildi ama
+   görünmüyor" olurdu). `KROMIS_NESNE_DEPO_BOLGE` yalnız R2 dışı S3 için.
+
+   *Sıra: araç → değişkenler → dağıt.* Yereldeki dosyaları aynı anahtarla
+   (`kullanicilar/<uuid>/…`) kovaya önce **`--kuru`** ile say, sonra yükle;
+   araç idempotent (ikinci koşu 0 yükler), yereli **silmez**:
+
+   ```sh
+   KROMIS_NESNE_DEPO_URL=… KROMIS_NESNE_DEPO_KOVA=… KROMIS_NESNE_DEPO_ANAHTAR_ID=… KROMIS_NESNE_DEPO_GIZLI=… \
+     python tools/medya_tasi.py --kaynak /data --kuru     # kaç dosya, kaç bayt; çıkış 3 = yüklenecek var
+   …  python tools/medya_tasi.py --kaynak /data            # yükle, HEAD ile doğrula; çıkış 0 = hepsi kovada
+   ```
+
+   Sonra dört değişkeni platforma yaz, dağıt ve canlı doğrula: giriş yapmış
+   bir tarayıcıdan bir galeri görselini aç (ağ sekmesinde `/output/<ad>` →
+   **302**, ardından `r2.cloudflarestorage.com` adresinden 200); ya da
+   çerezle `curl -sI -b "kromis_oturum=…" https://<alan>/output/<ad>` — `HTTP/2
+   302` ve `location: https://<hesap-id>.r2.cloudflarestorage.com/kromis/
+   kullanicilar/…?X-Amz-Algorithm=…` görülmeli; `curl -s -o /dev/null -w
+   '%{http_code}' '<location>'` 200 verir, `-H 'Range: bytes=0-7'` ile 206.
+   Bir video oynatıp ileri sar, bir klasörü ZIP indir, bir görsel içe aktar
+   ve logo bindir — hepsi kovaya yazar. Bakım aracı kovayı da tarar: aynı
+   dört değişkenle `python tools/artik_dosya.py` "kova: kromis … 0 artik"
+   demeli. Doğrulama bitince yerel `kullanicilar/` dizinini arşivle; artık
+   okunmuyor.
 
 ---
 

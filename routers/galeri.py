@@ -9,7 +9,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
 from sqlalchemy.orm import Session
 
 import i18n
@@ -21,7 +21,7 @@ from models import (
     FolderRequest,
     MoveImageRequest,
 )
-from services import ayar, depo_klasor, depo_medya, dil, gorsel, kapilar, kimlik, zaman
+from services import ayar, depo_klasor, depo_medya, dil, dosya, gorsel, kapilar, kimlik, zaman
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
@@ -34,6 +34,12 @@ router = APIRouter()
 # `ayar.ayarlar`ın içindeki kapıyla aynı nesne, ek sorgu yok. `storage`/`folders`
 # manifestleri bu dosyadan artık OKUNMAZ; `storage`dan yalnız MIME tablosu
 # (`media_type_for`) geliyor.
+#
+# Dosyanın YERİ bir `Depo` (Faz 2 / 2, services/dosya.py): dosyaya dokunan her
+# rota `Depends(dosya.depo)` ile sürecin deposunu alır ve depo işlevlerine
+# `depo=` diye geçirir; `ayarlar.output_dir` yolun öneki olarak duruyor.
+# Servis rotaları (`/output/*`, indirme) kovada 302 → 15 dk ön imzalı URL (K7),
+# yerelde `FileResponse`; ZIP uygulamadan akar (`StreamingResponse`).
 
 MAX_FOLDER_DEPTH = 5                         # iç içe klasör kademesi
 
@@ -95,13 +101,19 @@ def delete_folder_route(folder_id: str, db: Session = OTURUM,
 @router.get("/api/folders/{folder_id}/download")
 def download_folder_route(folder_id: str, db: Session = OTURUM,
                           ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-                          kullanici: Kullanici = Depends(kimlik.aktif_kullanici)):
-    """Klasörü ve alt klasörlerini görselleriyle birlikte ZIP olarak indirir."""
+                          kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+                          depo: dosya.Depo = Depends(dosya.depo)):
+    """Klasörü ve alt klasörlerini görselleriyle birlikte ZIP olarak indirir.
+
+    ZIP UYGULAMADAN AKAR ve K7'nin (302) tek istisnası: arşivi biz kuruyoruz,
+    kovada hazır duran bir nesne yok. `StreamingResponse`: bir klasördeki
+    videolar yüzlerce MB olabilir, bütünü bellekte tutulmaz (services/depo_klasor.py).
+    """
     fid = os.path.basename(folder_id)
-    paket = depo_klasor.zip_disa_aktar(db, kullanici.id, fid, ayarlar.output_dir)
+    paket = depo_klasor.zip_disa_aktar(db, kullanici.id, fid, ayarlar.output_dir, depo=depo)
     if paket is None:
         raise HTTPException(status_code=404, detail=i18n.t("err.folder_missing", dil.aktif()))
-    zip_bytes, folder_name = paket
+    zip_akisi, folder_name = paket
 
     # Süzgeç ARTIK TEK YERDE (`folders.safe_component`; `depo_klasor` yeniden
     # dışa açıyor). Buradaki kopya
@@ -132,7 +144,7 @@ def download_folder_route(folder_id: str, db: Session = OTURUM,
         "Content-Disposition": f'attachment; filename="{safe_ascii}.zip"; filename*=UTF-8\'\'{encoded_utf8}.zip'
     }
 
-    return Response(content=zip_bytes, media_type="application/zip", headers=headers)
+    return StreamingResponse(zip_akisi, media_type="application/zip", headers=headers)
 
 
 @router.patch("/api/folders/{folder_id}")
@@ -205,9 +217,10 @@ def set_arena_winner_route(arena_id: str, req: ArenaWinnerRequest, db: Session =
 @router.delete("/api/image/{image_id}")
 def delete_image(image_id: str, db: Session = OTURUM,
                  ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-                 kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+                 kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+                 depo: dosya.Depo = Depends(dosya.depo)) -> dict:
     iid = os.path.basename(image_id)
-    removed = depo_medya.sil(db, kullanici.id, iid, ayarlar.output_dir)
+    removed = depo_medya.sil(db, kullanici.id, iid, ayarlar.output_dir, depo=depo)
     if not removed:
         raise HTTPException(status_code=404, detail=i18n.t("err.image_missing", dil.aktif()))
     return {"deleted": iid}
@@ -228,10 +241,11 @@ def move_images(req: BulkMoveRequest, db: Session = OTURUM,
 @router.delete("/api/images")
 def delete_images(req: BulkImagesRequest, db: Session = OTURUM,
                   ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-                  kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+                  kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+                  depo: dosya.Depo = Depends(dosya.depo)) -> dict:
     """Seçili görselleri siler (kayıt + dosya)."""
     ids = [os.path.basename(i) for i in req.ids]
-    deleted = depo_medya.sil_coklu(db, kullanici.id, ids, ayarlar.output_dir)
+    deleted = depo_medya.sil_coklu(db, kullanici.id, ids, ayarlar.output_dir, depo=depo)
     if not deleted:
         raise HTTPException(status_code=404, detail=i18n.t("err.image_missing", dil.aktif()))
     return {"deleted": deleted}
@@ -243,7 +257,8 @@ async def import_image(request: Request,
                        folder_id: str | None = Form(None),
                        db: Session = OTURUM,
                        ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-                       kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+                       kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+                       depo: dosya.Depo = Depends(dosya.depo)) -> dict:
     """Bilgisayardan sürüklenen bir görseli galeriye (isteğe bağlı klasöre) aktarır.
 
     ÜRETİMDEN DOĞMAYAN ilk kayıt türü: prompt yok, palet yok, Azure'a hiç
@@ -279,15 +294,35 @@ async def import_image(request: Request,
          # BOŞ bilerek: bu görsel başka bir araçta üretildi, bir modeli yok.
          # (bkz. storage.save → "model")
          "model": ""},
-        ayarlar.output_dir, now=zaman.an(),
+        ayarlar.output_dir, now=zaman.an(), depo=depo,
     )
     return {"image": record}
+
+
+def _medya_cevabi(yol: str, depo: dosya.Depo, *, indirme_adi: str | None = None) -> Response:
+    """Dosyayı SUN: kovada 302 → ön imzalı URL, yerelde `FileResponse` (K7).
+
+    302'nin gerekçesi: `<img>`/`<video>` yönlendirmeyi takip eder, `<video>`nun
+    aralık (Range) istekleri doğrudan R2'ye gider — uygulama süreci bayt
+    taşımaz, R2'nin sıfır çıkış ücreti ancak böyle gerçekleşir. `Cache-Control:
+    private, max-age=600`: aynı sekmede aynı görsel 10 dk boyunca yeniden
+    sorulmaz (URL 15 dk yaşıyor; önbellek ömürden kısa ki bayat adres
+    hiç kullanılmasın); `private`, çünkü adres sahibine özel. `indirme_adi`
+    kovada `response-content-disposition` ile R2'ye, yerelde `FileResponse`un
+    `filename`ine gider — iki yolda da tarayıcı aynı `attachment` başlığını görür.
+    """
+    url = depo.url(yol, dosya.URL_SURESI, indirme_adi=indirme_adi)
+    ad = os.path.basename(yol)
+    if url is not None:
+        return RedirectResponse(url, status_code=302, headers={"Cache-Control": dosya.CACHE_CONTROL})
+    return FileResponse(yol, media_type=storage.media_type_for(ad), filename=indirme_adi)
 
 
 @router.get("/output/{filename}")
 def output_file(filename: str, db: Session = OTURUM,
                 ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-                kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> FileResponse:
+                kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+                depo: dosya.Depo = Depends(dosya.depo)) -> Response:
     """Depodaki medyayı ÇİZİM için sunar (inline, indirme başlığı YOK).
 
     Tür ARTIK TÜRETİLİYOR: v0.13'e kadar `image/png` çakılıydı ve o doğruydu
@@ -304,20 +339,24 @@ def output_file(filename: str, db: Session = OTURUM,
     Dosya adı `medya.filename`de ARANIYOR (Faz 1 / 5): kullanıcının satırı
     yoksa dosya diskte dursa bile 404 — servis yolunun gerçeği DB satırı,
     dizin değil (bkz. depo_medya.dosya_yolu_adiyla).
+
+    Kovada 302 → ön imzalı URL, yerelde `FileResponse` (Faz 2 / 2, `_medya_cevabi`);
+    sahiplik süzgeci iki yolda da AYNI satır sorgusu — başkasının dosyası 404.
     """
     safe = os.path.basename(filename)
     if not safe or safe in (".", ".."):
         raise HTTPException(status_code=404, detail=i18n.t("err.not_found", dil.aktif()))
-    path = depo_medya.dosya_yolu_adiyla(db, kullanici.id, safe, ayarlar.output_dir)
+    path = depo_medya.dosya_yolu_adiyla(db, kullanici.id, safe, ayarlar.output_dir, depo=depo)
     if path is None:
         raise HTTPException(status_code=404, detail=i18n.t("err.not_found", dil.aktif()))
-    return FileResponse(path, media_type=storage.media_type_for(safe))
+    return _medya_cevabi(path, depo)
 
 
 @router.get("/api/output/{image_id}/download")
 def output_download(image_id: str, db: Session = OTURUM,
                     ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-                    kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> FileResponse:
+                    kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+                    depo: dosya.Depo = Depends(dosya.depo)) -> Response:
     """Aynı PNG, ama `Content-Disposition: attachment` ile — İNDİRME yolu.
 
     NEDEN AYRI BİR UÇ, `/output/{filename}`e başlık eklemek yerine: o adres aynı
@@ -343,16 +382,16 @@ def output_download(image_id: str, db: Session = OTURUM,
     `depo_medya.dosya_yolu` `_SAFE_ID`den geçirip kullanıcının satırını arar;
     satır ya da dosya yoksa 404 burada.
 
-    TÜR VE DOSYA ADI, DİSKTEKİ DOSYADAN geliyor — `image_id`ye uzantı
+    TÜR VE DOSYA ADI SATIRDAKİ DOSYA ADINDAN geliyor — `image_id`ye uzantı
     EKLENMİYOR. Fark v0.13'te gerçek oldu: `f"{id}.png"` yazan bir indirme,
     bir videoyu `.png` adıyla teslim ederdi ve dosya kullanıcının
-    diskinde açılmayan bir şey olurdu. Adı diskteki gerçeğe bağlamak, aynı
+    diskinde açılmayan bir şey olurdu. Adı kayıttaki gerçeğe bağlamak, aynı
     zamanda `download` özniteliğiyle (`folders.js` onu `rec.filename`den
-    veriyor) tek bir gerçeği paylaşmak demek.
+    veriyor) tek bir gerçeği paylaşmak demek. Kovada aynı ad
+    `response-content-disposition` ile ön imzalı URL'ye gömülür (302).
     """
-    path = depo_medya.dosya_yolu(db, kullanici.id, os.path.basename(image_id), ayarlar.output_dir)
+    path = depo_medya.dosya_yolu(db, kullanici.id, os.path.basename(image_id), ayarlar.output_dir,
+                                 depo=depo)
     if path is None:
         raise HTTPException(status_code=404, detail=i18n.t("err.source_media_missing", dil.aktif()))
-    ad = os.path.basename(path)
-    return FileResponse(path, media_type=storage.media_type_for(ad),
-                        filename=ad)
+    return _medya_cevabi(path, depo, indirme_adi=os.path.basename(path))

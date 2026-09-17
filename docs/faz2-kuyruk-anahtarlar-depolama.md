@@ -96,8 +96,8 @@ Adlar ÖNERİ (deponun yeni kod geleneği Türkçe, ASCII: `isler`, `isciler`,
 | Üretim 4 rotada, istek içinde, 1-10 dk açık bağlantı; sonuç `{"images"\|"videos"}` 200 | `routers/uretim.py:47-473` | Rota isteği DOĞRULAR, `isler`e satır yazar, **202 `{"is": {...}}`** döner; sağlayıcı çağrısı işçide | 1, 3, 4 |
 | İş kaydı YOK — biten iş yalnız `medya` satırı, düşen iş yalnız `hata.log` | — | `isler` tablosu: durum, istek, sonuç, hata (redakte), süre, tahminî kredi; 30 gün saklama | 1, 10 |
 | Bekleme: `await fetch`, shimmer, süre metni; sekme yenilenince iş kayıp | `static/core.js:2873-2948` | `GET /api/isler` + SSE `GET /api/isler/akis`; `static/isler.js` iş paneli; yenilemede aktif işler geri gelir | 4, 5 |
-| Medya dosyası yerel disk `kullanicilar/<uuid>/output`, `FileResponse` | `services/depo_medya.py:113`, `routers/galeri.py:288` | Nesne depolama (R2/S3), aynı anahtar yolu; `/output/{filename}` **302 imzalı URL**; yerel disk compose/test için kalır | 2 |
-| Dosya + satır atomik değil, `tools/artik_dosya.py` arkadan topluyor | Faz 1 / 5, 9 | İşçi akışın tamamına sahip: nesne → satır → commit, satır düşerse nesne SİLİNİR (telafi); `artik_dosya.py` kovayı tarar | 2, 3 |
+| Medya dosyası yerel disk `kullanicilar/<uuid>/output`, `FileResponse` | `services/depo_medya.py:113`, `routers/galeri.py:288` | Nesne depolama (R2/S3), aynı anahtar yolu; `/output/{filename}` **302 imzalı URL**; yerel disk compose/test için kalır | 2 ✅ |
+| Dosya + satır atomik değil, `tools/artik_dosya.py` arkadan topluyor | Faz 1 / 5, 9 | İşçi akışın tamamına sahip: nesne → satır → commit, satır düşerse nesne SİLİNİR (telafi); `artik_dosya.py` kovayı tarar | 2 ✅ (kova taraması), 3 |
 | Sağlayıcı anahtarı yalnız kullanıcının (DB, şifreli) | `services/kimlik.py:146`, `depo_kimlik_bilgisi` | Kullanıcı → **platform (ortam sırrı)** → yok; `GET /api/settings` kaynağı söyler | 6 |
 | Harcama sınırı YOK | — | Kullanıcı başına eş zamanlı iş (4), saatlik iş, günlük kredi tavanı (platform anahtarlı işler); admin ezer | 4, 6, 8 |
 | Kiracı ayrımı yalnız uygulama süzgeci (`WHERE kullanici_id`) | `tests/test_galeri_db.py` AST bekçisi | + Postgres RLS ikinci kat: `SET LOCAL app.kullanici_id`, 8 iş tablosunda politika, FORCE | 7 |
@@ -249,7 +249,7 @@ davranış değişikliği YOK.
 
 ---
 
-## 2. Medya nesne depolamaya — `services/nesne_depo.py` (S3/R2, SigV4, httpx), `/output` → 302 imzalı URL, `tools/medya_tasi.py` (PR: `faz2/nesne-depolama`)
+## 2. Medya nesne depolamaya — `services/nesne_depo.py` (S3/R2, SigV4, httpx), `/output` → 302 imzalı URL, `tools/medya_tasi.py` ✅ (PR: `faz2/nesne-depolama`)
 
 **Kapsam.** Medyanın YERİ değişir, rotaların şekli değişmez; üretim hâlâ
 senkron (3-4. görev). Soyutlama **`services/dosya.py`** — `yaz(anahtar, bayt,
@@ -352,6 +352,136 @@ medya özel).
 `<video>` oynuyor ve ileri sarıyor, ZIP indiriliyor, `POST /api/import` +
 `/api/logo` kovaya yazıyor, `artik_dosya.py` kovada 0 artık; başkasının
 dosyası 404; yerel dizinde `output/` boş.
+
+**Yapıldığında (2026-09-17) ölçümler ve sapmalar.** Yeni `services/dosya.py`
+(328 satır: `Depo` protokolü — `yaz/oku/oku_akis/sil/var/url/listele` —,
+`YerelDepo`, `NesneDepo`, `depo_kur`, `Depends(dosya.depo)`, akışlı ZIP
+tamponu) ve `services/nesne_depo.py` (317 satır: SigV4 saf işlevler +
+`S3Istemci`: `koy/al/al_akis/bas/sil/listele/imzali_url`); **0 yeni
+bağımlılık** (`hmac`/`hashlib`/`xml.etree` + depodaki `httpx`). **SigV4 dört
+AWS vektörüyle bayt bayt doğrulandı** (GET + Range, PUT + gövde özeti + `$`
+kodlaması, ön imzalı GET, ListObjects sorgusu — ilk denemede dördü de
+tuttu). Ölçüler: **rota 54 DEĞİŞMEDİ**, `static/` DOKUNULMADI (`<img>`/
+`<video>` 302'yi kendisi izliyor, `onyuz.md`de URL varsayımı yok), modül 88 →
+91, test dosyası 119 → 123, takım **3.413 → 3.506 geçti, 12 atlandı, 189 sn**
+(E2E + Postgres zorunlu). Yeni testler: `test_nesne_depo` 14, `test_dosya` 19
+(iki depo PARAMETRİK, aynı senaryo), `test_dosya_rotalari` 13 (gerçek Postgres
++ imza DOĞRULAYAN sahte S3), `test_medya_tasi` 7, `test_artik_dosya` +2 (kova
+kipi). **Canlı duman** (geçici küme + uvicorn, bu makinede): yerel kipte
+`/output` 200 `FileResponse` aynen; sahte S3 sunucusuna (`tests/sahte_s3.py`
+HTTP kipi, imza doğrulaması AÇIK) karşı `medya_tasi --kuru` çıkış 3 → gerçek
+koşu 1 yüklendi → `--kuru` çıkış 0; `/output` **302** `Cache-Control: private,
+max-age=600`, `Location` GET 200, **`Range: bytes=0-7` → 206** doğrudan
+kovadan; indirme 302 + `response-content-disposition`; import + logo bindirme
++ varlık yükleme kovaya yazdı (4 nesne), diske hiçbir şey düşmedi;
+`artik_dosya` kova kipi 0 artık, bırakılan artık `--sil --evet` ile silindi;
+23 istek, 0 imza reddi.
+
+**Kararlar, belgenin açık bıraktığı yerlerde:** (a) YOL ↔ ANAHTAR çevirisi
+DEPODA: rotalar bugün ne yazıyorsa onu verir (`os.path.join(ayarlar.output_dir,
+ad)`), `NesneDepo` `data_dir`i düşürüp `kullanicilar/<uuid>/output/<ad>`
+anahtarını üretir — 42 rotanın `ayarlar.output_dir` okuması ve depo
+modüllerinin `output_dir` parametresi DEĞİŞMEDİ, anlamı "önek" oldu (belgenin
+vaadi); `kok` dışı mutlak yol kovada `DosyaHatasi` (programlama hatası),
+yerelde geçer (testlerin `tmp_path`i). (b) `depo=` PARAMETRESİ İSTEĞE BAĞLI,
+öntanımlısı yerel disk (`dosya.YEREL`): 60'tan fazla test `depo_medya.kaydet(…,
+out)` diye doğrudan çağırıyor ve bugünkü davranışı ölçüyor; bedeli "unutulan
+depo diske yazar" — bekçisi kaynak taraması
+(`test_every_file_touching_call_in_the_routers_names_the_depo`: üç router
+dosyasında 12 işlevin her çağrısı, `run_in_threadpool(...)` biçimi dâhil,
+`depo=` söylemek zorunda). (c) `app.state.dosya` İTHAL ANINDA (`ayarlar`
+gibi), lifespan'da DEĞİL — `with`siz `TestClient(app)` lifespan koşturmuyor;
+YARIM yapılandırma ithali durdurur (`YapilandirmaHatasi`, eksik adları
+söyler): sessizce diske düşen dağıtım işçi gelince "üretildi ama görünmüyor"
+olurdu (`KROMIS_SECRET_KEY`nin duruşu). conftest `pytest_configure`
+`KROMIS_NESNE_DEPO_*`ı süpürür — geliştiricinin kabuğundaki gerçek R2 değeri
+178 rota testini gerçek kovaya yazdırmasın. (d) SATIR VE NESNE, iki depoda da:
+servis/indirme/referans yolları `depo.var()` sorar (kovada HEAD) — Faz 1 /
+5'in sözleşmesi korunur, "satırı var nesnesi yok" JSON 404 kalır (302 sonrası
+R2'nin XML 404'ü değil); bedeli küçük resim başına bir HEAD, 302'nin 10 dk
+önbelleği yineleri tutar; ağır ölçülürse tek satır düşer. (e) Dosya adı
+SATIRDAN (`medya.filename`): Faz 1 / 5 uzantıyı `media_path_of` ile diskte
+deniyordu, kovada her deneme bir HEAD olurdu; satırsız silme (eski "kaydı
+olmayan dosya da silinmiş sayılır" sözleşmesi) iki uzantıyı depo üstünden
+dener. (f) ZIP GERÇEKTEN AKIYOR: `Depo.oku_akis` (belgede yoktu) + `zipfile`
+aranamayan akışta (`YazmaTamponu`, `write`/`flush`; `test_galeri_db`nin imza
+bekçisi depo modülünde sınıf istemediği için `dosya.py`de) →
+`StreamingResponse`; DB'ye dokunan her şey üreticiden ÖNCE (isteğin `Session`ı
+akış sırasında kapanmış olabilir). (g) Bindirme/düzenleme BAYT okur:
+`composite.composite_logo` ve `_composite_banner` yol YA DA `io.BytesIO`
+alır (`Image.open` ikisini de açar; dondurulmuş kabuk yol vermeye devam
+eder); iki test sahtesi (`fake_composite`, `_fake_composite_factory`) buna
+uyarlandı, üç logo testi yol yerine İÇERİK ölçer. (h) `medya_tasi` `--sil`
+TAŞIMAZ (belge sayıyordu): görev tanımı "yereli hiç silmez" dedi ve
+`ice_aktar`ın "kaynak dokunulmaz" kuralı aynı yöne — yerel kopyayı sahibi
+canlı doğrulamadan sonra kendisi arşivler; çıkış 3 = "iş kaldı" (kuru koşuda
+yüklenecek var / gerçek koşuda doğrulanamayan var), idempotenlik HEAD +
+boyut. (i) `tools/ice_aktar.py` DOKUNULMADI, bilerek: eski uygulamanın
+verisini `KROMIS_DATA_DIR`a kopyalar (yerel), sonra `medya_tasi` kovaya taşır
+— tek yön, iki araç; içe aktarmaya bir depo dalı eklemek "araç → değişkenler →
+dağıt" sırasını bulandırırdı. (j) Path-style adres (`https://<uç>/<kova>/
+<anahtar>`), bölge `auto`; `S3Istemci` `PUT`ta `content-type` + `content-length`
+imzalar, hata mesajına S3 gövdesini YAZMAZ (istek kimliği ve anahtar id
+yansır), `Kimlik.gizli` `repr` dışı. (k) Sahte S3 (`tests/sahte_s3.py`) imzayı
+YENİDEN HESAPLAYIP doğrular (`Authorization` ve `X-Amz-Signature`; süre
+kontrolü dâhil) — döngüsel değil: istemcinin imzaladığı küme ile gönderdiği
+küme aynı mı; tek çekirdek, iki adaptör (`MockTransport` testte, `http.server`
+dumanda). (l) `.env.example` +5 (`KROMIS_NESNE_DEPO_{URL,KOVA,ANAHTAR_ID,GIZLI,
+BOLGE}`, `ALTYAPI` bekçisi 9 → 14), `medya_tasi` `OPERATOR_ARACLARI`nda
+(imajda), `compose.yaml` DOKUNULMADI (yerel disk, yorum gerekmedi — yorum
+`.env.example`da). Bilinen bedel: `KROMIS_NESNE_DEPO_BOLGE` yalnız R2 dışı
+S3 için anlamlı.
+
+**Sahibin adımı — gerçek R2 kovasında canlı doğrulama (CI'dan ve bu
+konteynerden erişilemiyor).** Kod sahte S3'e karşı yeşil ve SigV4 AWS
+vektörleriyle doğrulandı; R2'nin ÖZEL davranışı (jeton kapsamı, `auto` bölge,
+`response-content-disposition`ı ön imzalı sorgudan okuması) ancak gerçek
+kovada görünür. Sıra:
+
+1. **Kova + jeton:** Cloudflare panosu → R2 → *Create bucket* (`kromis`) →
+   *Manage R2 API Tokens* → *Create API token*: izin **Object Read & Write**,
+   kapsam **yalnız bu kova**; *Access Key ID* ve *Secret Access Key* bir kez
+   gösterilir, parola kasasına. Uç nokta `https://<hesap-id>.r2.cloudflarestorage.com`
+   (hesap id panonun sağında; kova adı URL'de YOK). CORS gerekmez.
+2. **Değişkenler** (platform sırlarına, `.env.example`deki açıklamalarla):
+   `KROMIS_NESNE_DEPO_URL`, `_KOVA=kromis`, `_ANAHTAR_ID`, `_GIZLI`; `_BOLGE`
+   boş (= `auto`).
+3. **Taşıma, dağıtımdan ÖNCE**, aynı dört değişkenle konteyner içinden ya da
+   `/data`ya erişen bir kabuktan:
+   `python tools/medya_tasi.py --kaynak /data --kuru` (sayı; çıkış 3 =
+   yüklenecek var) → `python tools/medya_tasi.py --kaynak /data` (çıkış 0 =
+   hepsi kovada, her nesne HEAD ile doğrulandı) → `--kuru` yeniden: `0
+   yuklenecek`.
+4. **Dağıt** (dört değişken sürece girmiş olmalı; yarısı girmişse uygulama
+   açılmaz ve `uvicorn` eksik adları söyler — kasıtlı).
+5. **Canlı denetim**, giriş yapmış bir tarayıcıdan ya da çerezle `curl`:
+   `curl -sI -b "kromis_oturum=<çerez>" https://<alan>/output/<dosya>` →
+   `HTTP/2 302`, `cache-control: private, max-age=600`, `location: https://
+   <hesap-id>.r2.cloudflarestorage.com/kromis/kullanicilar/<uuid>/output/<dosya>
+   ?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=…&X-Amz-Date=…&X-Amz-Expires=900&
+   X-Amz-Signature=…&X-Amz-SignedHeaders=host`; sonra
+   `curl -s -o /dev/null -w '%{http_code} %{content_type}\n' '<location>'` →
+   `200 image/png` (ya da `video/mp4`); `curl -s -o /dev/null -w '%{http_code}\n'
+   -H 'Range: bytes=0-7' '<location>'` → `206`. Galeride bir görsel açılıyor,
+   bir video oynuyor ve ileri sarıyor (ağ sekmesinde aralık istekleri
+   `r2.cloudflarestorage.com`a), `GET /api/output/<id>/download` 302 →
+   tarayıcı `attachment` ile indiriyor, bir klasör ZIP iniyor (bu tek istek
+   uygulamadan akar), `POST /api/import` + `/api/logo` + `/api/assets/logos`
+   kovaya yazıyor (R2 panosunda `kullanicilar/<uuid>/…` görünür), başkasının
+   `filename`i 404. Sonra `python tools/artik_dosya.py` aynı değişkenlerle
+   `kova: kromis … 0 artik dosya` (çıkış 0).
+6. **Sonuç bu belgeye** ("Yapıldığında"nın altına bir satır: tarih, kaç dosya
+   taşındı, 302/206 görüldü); yerel `/data/kullanicilar/` arşivlenir — artık
+   okunmuyor. Bir şey tutmazsa geri dönüş dört değişkeni silmek: yerel disk
+   yerinde duruyor (`medya_tasi` silmedi).
+
+**3. göreve devredilen.** İşçi `dosya.depo_kur(data_dir)` ile aynı depoyu
+kurar ve `depo_medya.kaydet(…, depo=…)` çağırır; `Depo` arayüzü anahtarla
+(`kullanicilar/<uuid>/…`) da konuşur, işçi `Ayarlar.varsayilan().kullanici_icin(uid)`
+yollarını verebilir. Referans nesneleri (`istek` JSONB'deki anahtarlar) `depo.oku`
+ile okunur; düşen satırın nesnesi `depo.sil` ile telafi edilir (bugün
+`artik_dosya` topluyor). `compose.yaml`ın `isci` servisi yerel kipte AYNI
+birimi paylaşmak zorunda (`/data`), platformda kova.
 
 ---
 

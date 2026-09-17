@@ -917,6 +917,10 @@ def readme_md(g: dict) -> str:
          "* Ön yüz kenarları AD eşleşmesine dayanıyor; küresel bir işlevle aynı "
          "adı taşıyan yerel bir değişken kenarı fazla sayabilir.",
          "* Test sütunu ithal ilişkisidir, satır kapsamı DEĞİLDİR.",
+         "* `alembic/` (göç betikleri) BİLEREK dışarıda: `env.py` yalnız `services.db`yi "
+         "ithal eder, `versions/*.py` ise şema tarihçesidir — her göç bir modül olarak "
+         "sayılsa harita şişer ve hiçbir kenar anlam taşımaz. Göç hattının bekçisi "
+         "`tests/test_db.py` (upgrade/downgrade/check).",
          ""]
     return "\n".join(s) + "\n"
 

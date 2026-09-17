@@ -2,12 +2,12 @@
 
 # Test haritası
 
-`tests/` altında 99 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
+`tests/` altında 100 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
 
 | modül | testler |
 | --- | --- |
 | `android_main` | `test_android_main.py`, `test_mobile.py` |
-| `app` | `test_app.py`, `test_app_bolme.py`, `test_arena.py`, `test_arena_onyuz.py`, `test_assets_route.py`, `test_backup.py`, `test_banner.py`, `test_chat_prompt.py`, `test_chat_route.py`, `test_chats_route.py`, `test_delete_route.py`, `test_dil.py`, `test_edit_route.py`, `test_folders.py`, `test_fonts.py`, `test_guncelleme_route.py`, `test_guvenlik_baslik.py`, `test_health.py`, `test_i18n.py`, `test_id_contract.py`, `test_import_route.py`, `test_index.py`, `test_legacy_formats.py`, `test_logo.py`, `test_mobile.py`, `test_model_secimi.py`, `test_palette_route.py`, `test_paths.py`, `test_playwright_dil.py`, `test_playwright_guncelleme.py`, `test_playwright_studio.py`, `test_prefs_route.py`, `test_provider_logos.py`, `test_search_predicate.py`, `test_settings_route.py`, `test_shimmer.py`, `test_video_onyuz.py`, `test_video_route.py` |
+| `app` | `test_app.py`, `test_app_bolme.py`, `test_arena.py`, `test_arena_onyuz.py`, `test_assets_route.py`, `test_backup.py`, `test_banner.py`, `test_chat_prompt.py`, `test_chat_route.py`, `test_chats_route.py`, `test_db.py`, `test_delete_route.py`, `test_dil.py`, `test_edit_route.py`, `test_folders.py`, `test_fonts.py`, `test_guncelleme_route.py`, `test_guvenlik_baslik.py`, `test_health.py`, `test_i18n.py`, `test_id_contract.py`, `test_import_route.py`, `test_index.py`, `test_legacy_formats.py`, `test_logo.py`, `test_mobile.py`, `test_model_secimi.py`, `test_palette_route.py`, `test_paths.py`, `test_playwright_dil.py`, `test_playwright_guncelleme.py`, `test_playwright_studio.py`, `test_prefs_route.py`, `test_provider_logos.py`, `test_search_predicate.py`, `test_settings_route.py`, `test_shimmer.py`, `test_video_onyuz.py`, `test_video_route.py` |
 | `assets_store` | `test_assets.py`, `test_assets_route.py`, `test_backup.py`, `test_banner.py`, `test_folders.py`, `test_legacy_formats.py`, `test_logo.py`, `test_palette_route.py`, `test_playwright_studio.py` |
 | `azure_client` | `test_app.py`, `test_arena.py`, `test_azure_client.py`, `test_azure_client_edit.py`, `test_azure_client_http.py`, `test_azure_flux_client.py`, `test_azure_mai_client.py`, `test_banner.py`, `test_catalog.py`, `test_chat_client.py`, `test_credstore.py`, `test_delete_route.py`, `test_edit_route.py`, `test_fal_client.py`, `test_folders.py`, `test_gemini_client.py`, `test_i18n.py`, `test_import_route.py`, `test_legacy_formats.py`, `test_logo.py`, `test_model_secimi.py`, `test_openai_client.py`, `test_palette_route.py`, `test_paths.py`, `test_prefs.py`, `test_providers.py`, `test_settings.py`, `test_settings_route.py`, `test_veo_client.py`, `test_video_route.py` |
 | `azure_flux_client` | `test_azure_flux_client.py` |
@@ -50,6 +50,7 @@
 | `routers.uretim` | — |
 | `screencolor` | `test_screencolor.py` |
 | `services.ayar` | `test_app_bolme.py`, `test_paths.py` |
+| `services.db` | `test_db.py`, `test_docker_kapisi.py` |
 | `services.dil` | `test_dil.py`, `test_i18n.py` |
 | `services.gorsel` | `test_edit_route.py`, `test_model_secimi.py`, `test_video_route.py` |
 | `services.kapilar` | — |
@@ -59,6 +60,7 @@
 | `services.tercih` | `test_dil.py` |
 | `services.zaman` | — |
 | `storage` | `test_app_bolme.py`, `test_arena.py`, `test_chats_route.py`, `test_folders.py`, `test_legacy_formats.py`, `test_playwright_studio.py`, `test_storage.py`, `test_storage_delete.py`, `test_video_onyuz.py` |
+| `tools.gecici_postgres` | `test_test_ortami.py` |
 | `tools.graf_uret` | `test_app_bolme.py`, `test_graflar.py`, `test_onyuz_lint_kapisi.py` |
 | `tools.make_legacy_fixtures` | — |
 | `tools.make_logo_goldens` | — |
@@ -67,7 +69,7 @@
 | `tools.surum_yaz` | `test_release_manifest.py`, `test_surum_yaz.py` |
 | `tools.test_ortami` | `test_test_ortami.py` |
 | `veo_client` | `test_veo_client.py` |
-| `version` | `test_backup.py`, `test_guncelleme.py`, `test_guncelleme_route.py`, `test_health.py`, `test_index.py`, `test_playwright_guncelleme.py`, `test_provider_logos.py`, `test_release_manifest.py`, `test_settings_route.py`, `test_version.py` |
+| `version` | `test_backup.py`, `test_db.py`, `test_guncelleme.py`, `test_guncelleme_route.py`, `test_health.py`, `test_index.py`, `test_playwright_guncelleme.py`, `test_provider_logos.py`, `test_release_manifest.py`, `test_settings_route.py`, `test_version.py` |
 | `winclr` | `test_winclr.py` |
 | `winsec` | `test_settings.py`, `test_winsec.py` |
 

@@ -29,6 +29,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    # GERÇEK Postgres (Faz 1 / 1. görev, docs/faz1-veritabani-hesaplar.md K4):
+    # DB testleri SQLite'a değil bir Postgres servis konteynerine koşuyor —
+    # JSONB/citext/timestamptz/kilit davranışı yalnız orada görünür. `postgres:17-alpine`
+    # `compose.yaml`daki geliştirme servisiyle aynı major. Sağlık denetimi ŞART:
+    # Actions servisi ayağa kalkmadan adımları başlatabilir, ilk `CREATE DATABASE`
+    # "connection refused" ile düşerdi.
+    #
+    # Yerelde bu servis yok; `tests/conftest.py` makinedeki ikililerden geçici
+    # bir küme açıyor (`tools/gecici_postgres.py`). İki yol aynı fixture'a çıkıyor.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -84,7 +108,16 @@ jobs:
       # olmayan bir makinede takımın geri kalanı yine koşabilmeli — orada
       # doğru davranış atlamak, yanlış olan atlamanın görünmemesiydi ve onu
       # `tests/conftest.py`nin sonundaki uyarı kapatıyor.
+      #
+      # `KROMIS_TEST_DATABASE_URL` (Faz 1 / 1): yukarıdaki servisin süper kullanıcı
+      # adresi. Fixture buradan şablon DB ve test dosyası başına birer kopya
+      # açıyor (`CREATE DATABASE`). ÜRETİM değişkeni `DATABASE_URL` DEĞİL,
+      # bilerek: geliştiricinin kabuğundaki gerçek bir `DATABASE_URL`
+      # testin `CREATE/DROP DATABASE` koşturduğu yer olmamalı. Servis bir gün
+      # sessizce kalkarsa `KROMIS_E2E_ZORUNLU=1` DB atlamasını da HATAYA çevirir
+      # (`tests/conftest.py::pytest_configure`) — yani kapı yine kapanır.
       - name: Pytest
         env:
           KROMIS_E2E_ZORUNLU: "1"
+          KROMIS_TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/postgres
         run: pytest tests/ -q

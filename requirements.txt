@@ -6,6 +6,22 @@ Pillow==12.*
 python-multipart==0.0.*
 pywebview==6.2.*
 
+# Veri tabanı katmanı (Faz 1 / 1. görev, docs/faz1-veritabani-hesaplar.md):
+# SQLAlchemy 2 + Alembic + psycopg 3. Üçü de ÇALIŞMA ZAMANI bağımlılığı —
+# `requirements-dev.txt`e DEĞİL: sürücü olmadan uygulama açılır ama `/health`
+# `db_reachable:false` ile 503 verir, yani konteyner imajına girmek zorunda.
+#
+# NEDEN psycopg 3, asyncpg DEĞİL: 46 rotanın 41'i senkron `def` ve Starlette
+# threadpool'unda koşuyor; asyncpg yalnız async motor demekti. psycopg 3 tek
+# sürücüyle hem `Engine` hem `AsyncEngine` açıyor (`postgresql+psycopg`).
+# `[binary]` extra'sı kendi libpq'sunu taşıyan tekerleği kurar (ölçüldü:
+# `psycopg_binary.libs/libpq-*.so.5` tekerleğin içinde) — `slim` imaja
+# `libpq-dev` + derleyici katmanı gerekmiyor. cp313 ve cp314 tekerlekleri
+# PyPI'da doğrulandı (CI 3.14, imaj 3.13).
+SQLAlchemy==2.0.*
+alembic==1.20.*
+psycopg[binary]==3.3.*
+
 # Windows .NET köprüsü — pywebview'ın KENDİ dolaylı bağımlılıkları
 # (`pythonnet; sys_platform=="win32"`), burada yalnız SÜRÜMLERİ sabitleniyor.
 #

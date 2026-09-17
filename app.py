@@ -34,7 +34,7 @@ import providers
 import version
 from models import MAX_PROMPT_CHARS, GenerateRequest
 from routers import ayarlar, bindirme, galeri, kok, paletler, saglik, sohbet, uretim
-from services import ayar, dil, gorsel, modeller, palet, redaksiyon, zaman
+from services import ayar, db, dil, gorsel, modeller, palet, redaksiyon, zaman
 
 
 @asynccontextmanager
@@ -71,9 +71,24 @@ async def _lifespan(app: FastAPI):
     testler o nesneyi geçici dizine yönlendiriyor ve açılışın açtığı/yedeklediği
     yer de o olmalı — yoksa `with TestClient(app)` yine geliştiricinin gerçek
     veri dizinine dokunurdu (2. görevin ölçtüğü sızıntı sınıfı).
+
+    VERİ TABANI MOTORU DA BURADA KURULUR (Faz 1 / 1. görev; gerekçesi
+    services/db.py): `DATABASE_URL` verilmişse `app.state.motor`a tek bir
+    `Engine`, kapanışta `dispose`. İthal anında DEĞİL — `TestClient(app)`i
+    `with`siz kullanan 37 test dosyası Postgres'siz açılabilmeli. Kurulamazsa
+    (bozuk URL) aynı guard: hata `hata.log`a, uygulama açılır, `/health`
+    `db_reachable:false` ile 503 der — açılmayan uygulamadan iyidir ve sonda
+    sebebi söyler. `create_engine` bağlanmaz; sunucunun yokluğu ilk istekte
+    ya da sondada görünür, açılışı bekletmez.
     """
     ayarlar: ayar.Ayarlar = app.state.ayarlar
     now = zaman.simdi()
+    try:
+        url = db.baglanti_dizesi()
+        app.state.motor = db.motor_kur(url) if url else None
+    except Exception:
+        app.state.motor = None
+        errlog.safe_append(ayarlar.data_dir, traceback.format_exc())
     try:
         paths.ensure_data_dirs(ayarlar.output_dir, ayarlar.assets_dir)
         backup.backup_manifests_if_version_changed(
@@ -86,7 +101,16 @@ async def _lifespan(app: FastAPI):
         assets_store.migrate_legacy_uploads(ayarlar.assets_dir)
     except Exception:
         errlog.safe_append(ayarlar.data_dir, traceback.format_exc())
-    yield
+    try:
+        yield
+    finally:
+        # Kapanışta havuz kapanır ve `motor` `None`a döner: bir sonraki
+        # `with TestClient(app)` (ya da yeniden açılış) eskimiş, belki
+        # düşürülmüş bir DB'ye bağlı motoru bulmamalı.
+        motor = app.state.motor
+        app.state.motor = None
+        if motor is not None:
+            motor.dispose()
 
 
 app = FastAPI(title="Kromis Studio", lifespan=_lifespan)
@@ -100,6 +124,12 @@ app = FastAPI(title="Kromis Studio", lifespan=_lifespan)
 # testler lifespan'ı hiç koşturmuyor; nesne orada kurulsa her rota 500 verirdi.
 # Testler değiştirmek için `tests/conftest.py::dizinler` fixture'ını kullanır.
 app.state.ayarlar = ayar.Ayarlar.varsayilan()
+
+# VERİ TABANI MOTORU — ithal anında YOK (`None`), `_lifespan` kurar (Faz 1 /
+# 1. görev, gerekçesi services/db.py). Buradaki atama yalnız adın var olması
+# için: `/health` lifespan koşmamış bir süreçte de cevap vermeli ve o cevap
+# `db_reachable:false` olmalı, `AttributeError` değil.
+app.state.motor = None
 
 # Dil ara katmanı — `i18n._AKTIF`ın tek yazarı (gerekçesi services/dil.py'de).
 # Dekoratörün (`@app.middleware("http")`) çağrı biçimi; işlev başka dosyada

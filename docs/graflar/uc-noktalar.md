@@ -52,7 +52,7 @@
 | POST | `/api/video` | `routers/uretim.py` | `video`:76 | `azure_client`, `catalog`, `chat_store`, `folders`, `i18n`, `models`, `providers`, `storage` | `core.js` |
 | POST | `/api/video/animate` | `routers/uretim.py` | `animate`:187 | `azure_client`, `catalog`, `chat_store`, `etiket`, `folders`, `i18n`, `models`, `providers`, `storage` | `core.js` |
 | GET | `/assets/{kind}/{filename}` | `routers/bindirme.py` | `asset_file`:222 | `assets_store`, `i18n` | `assets.js` |
-| GET | `/health` | `routers/saglik.py` | `health`:85 | `version` | — |
+| GET | `/health` | `routers/saglik.py` | `health`:95 | `version` | — |
 | GET | `/output/{filename}` | `routers/galeri.py` | `output_file`:274 | `i18n`, `storage` | `assets.js`, `chat.js`, `core.js`, `folders.js`, `viewer.js` |
 
 ## Öbek → modül

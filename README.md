@@ -182,22 +182,41 @@ Konteynerde (web sürümü; `Dockerfile` ve gerekçeleri depoda):
 
 ```bash
 docker build -t kromis .
-docker run -p 8765:8765 -v kromis-data:/data kromis
-curl localhost:8765/health     # {"ok": true, "version": "…", "data_dir_writable": true}
+docker run -p 8765:8765 -v kromis-data:/data \
+  -e DATABASE_URL=postgresql+psycopg://kullanici:parola@konak:5432/kromis kromis
+curl localhost:8765/health     # {"ok": true, "version": "…", "data_dir_writable": true, "db_reachable": true}
 ```
 
 Yazılabilir veri kökü `KROMIS_DATA_DIR` (imajda `/data`, bkz. `paths.py`):
 output/, assets/, manifest'ler ve — `HOME` da oraya bağlı olduğu için —
 Ayarlar panelinin yazdığı `credentials.env`. Konak dizini bağlanacaksa dizin
-uid 10001'e ait olmalı; yazılamıyorsa `/health` 503 döner. Ortam değişkenleri
-ve sağlayıcı anahtar adlarının envanteri `.env.example`da; yerel deneme için
-`docker compose up --build` (`compose.yaml`, yalnız geliştirme).
+uid 10001'e ait olmalı; yazılamıyorsa `/health` 503 döner. Veri tabanı
+`DATABASE_URL` ile (PostgreSQL, `postgresql+psycopg://…`; `services/db.py`):
+verilmemişse ya da sunucuya ulaşılamıyorsa uygulama yine açılır ama `/health`
+`db_reachable: false` ile 503 döner. Şema `alembic upgrade head` ile kurulur
+(`alembic.ini` URL'yi aynı değişkenden okur). Ortam değişkenleri ve sağlayıcı
+anahtar adlarının envanteri `.env.example`da; yerel deneme için
+`docker compose up --build` (`compose.yaml`, yalnız geliştirme — kendi
+Postgres servisini getirir).
 
 ### 3. Test
 
 ```bash
-python3 -m pytest tests/ -q
+python3 tools/test_ortami.py            # bir kez: .venv + playwright + Postgres denetimi
+python3 tools/test_ortami.py --kontrol  # "Postgres: hazir" demeli
+.venv/bin/python -m pytest tests/ -q
 ```
+
+Testler **gerçek PostgreSQL** ister (SQLite yok — JSONB/citext/kilit
+davranışı yalnız orada görünür). Kaynağı sırayla: `KROMIS_TEST_DATABASE_URL`
+verilmişse o sunucu (CI böyle: `_test.yml` bir `postgres:17` servisi
+kaldırır; süper kullanıcı gerekir, fixture `CREATE DATABASE` koşturur),
+yoksa makinedeki `initdb`/`pg_ctl` ile Unix soketinde geçici bir küme
+(`tools/gecici_postgres.py`, ~1 sn; root'ta `postgres` yardımcı kullanıcısıyla).
+İkisi de yoksa DB testleri atlanır ve takımın sonunda gürültülü bir uyarı
+basılır; `KROMIS_E2E_ZORUNLU=1` (CI) atlamayı hataya çevirir. Postgres kurmak:
+`sudo apt install postgresql` / `brew install postgresql@17`; Windows'ta
+`KROMIS_TEST_DATABASE_URL` zorunlu.
 
 Ön yüz lint/biçim (CI'daki `lint-onyuz` işi aynısını koşar; Node 22):
 

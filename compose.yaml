@@ -13,6 +13,15 @@
 # (Compose v2.24+). Dosya yalnız KROMIS_DATA_DIR/PORT gibi altyapı
 # değişkenlerini taşır; sağlayıcı anahtarları SÜREÇ ORTAMINDAN OKUNMUYOR —
 # gerekçesi .env.example'da.
+#
+# POSTGRES (Faz 1 / 1. görev): `/health` artık `db_reachable` ölçüyor, DB'siz
+# konteyner 503 verir. `postgres:17-alpine` yalnız geliştirme için — parola
+# `kromis`, TLS yok, birim yerel; üretimde yönetilen Postgres (Neon/Supabase
+# vb.) ve `DATABASE_URL` ortamdan gelir. `environment:` `env_file`i EZER:
+# `.env`e `DATABASE_URL=` boş bile yazılsa uygulama bu adresi görür.
+# `depends_on … service_healthy`: uygulama Postgres kabul etmeden açılmasın,
+# yoksa ilk saniyelerde sonda sebepsiz 503 der. Göç (`alembic upgrade head`)
+# BURADA KOŞMUYOR — 9. görevin `goc` servisi (K6: açılışta göç yok).
 services:
   kromis:
     build: .
@@ -26,6 +35,30 @@ services:
     env_file:
       - path: .env
         required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://kromis:kromis@postgres:5432/kromis
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: kromis
+      POSTGRES_PASSWORD: kromis
+      POSTGRES_DB: kromis
+    ports:
+      # Yalnız loopback: konakta `uvicorn app:app` ya da `alembic` koşturan
+      # geliştirici `localhost:5432`e bağlanabilsin, ağdaki başka kimse değil.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - kromis-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kromis -d kromis"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   kromis-data:
+  kromis-postgres:

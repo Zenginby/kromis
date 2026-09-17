@@ -11,7 +11,8 @@ sınıyor. Kredi, kuyruk, ödeme ve nesne depolama BU FAZDA YOK (gerekçeler
 başına yeşil ve geri alınabilir; her PR'da testler + `docs/graflar` aynı
 commit'te. Sıra bağımlılığa göre: **1 → 2 → 3 → 4**, sonra **5 ve 6** (4'e
 dayanır, birbirinden bağımsız), **7** (4'e dayanır), **8** (5-7 bittiğinde),
-**9** her an başlayıp 8 ile biter.
+**9** her an başlayıp 8 ile biter; **3b** (Google ile giriş) isteğe bağlı, 3'e
+dayanır, ucuzsa Faz 1 içinde (sahibin 2026-09-17 kararı).
 
 Ölçüler bu belge yazılırken alındı (`f178ce9`, Faz 0 tamamı main'de):
 
@@ -84,7 +85,7 @@ değişmez. Bu gözlem 2. ve 8. görevin göç tasarımını belirliyor.
 
 ---
 
-## 1. Veri tabanı zemini — SQLAlchemy 2 + Alembic + PostgreSQL, testte GERÇEK Postgres (PR: `faz1/veritabani-zemini`)
+## 1. Veri tabanı zemini — SQLAlchemy 2 + Alembic + PostgreSQL, testte GERÇEK Postgres ✅ (PR: `faz1/veritabani-zemini`)
 
 **Kapsam.** `requirements.txt`e `SQLAlchemy==2.0.*`, `alembic==1.20.*`,
 `psycopg[binary]==3.3.*`. Yeni `services/db.py`: `DATABASE_URL`den
@@ -165,6 +166,86 @@ Python 3.14 için `psycopg-binary` tekerleği.
 boş DB'de geçiyor; CI'da Postgres servisi ayakta ve takım onu kullanıyor
 (atlanan DB testi 0); yerelde `tools/test_ortami.py --kontrol` "Postgres:
 hazır" diyor; takım yeşil.
+
+**Yapıldığında (2026-09-17) ölçümler ve sapmalar.** Pinler `SQLAlchemy==2.0.*`
+(2.0.54), `alembic==1.20.*` (1.20.0), `psycopg[binary]==3.3.*` (3.3.5 +
+`psycopg-binary` 3.3.5); cp313 VE cp314 tekerlekleri PyPI'dan indirilerek
+doğrulandı, `psycopg_binary.libs/libpq-*.so.5` tekerleğin içinde — `Dockerfile`
+DEĞİŞMEDİ (libpq katmanı gerekmiyor; imaj boyutu bu makinede ölçülemedi, Docker
+yok — CI'ın `docker` işi derliyor). `services/db.py`: `DATABASE_URL_ENV`,
+`baglanti_dizesi()` (boş = yok), `motor_kur()` (`pool_size=2`, `max_overflow=3`,
+`pool_pre_ping`, libpq `connect_timeout=2`), `motor_varsa(request)`,
+`erisilebilir(motor, 1.0)`, `oturum(request)` ve **`OTURUM = Depends(oturum,
+scope="function")`**. Kapsam sözcüğü PLANDA YOKTU ve zorunlu çıktı: FastAPI
+0.118+ `yield` bağımlılığının çıkış kodunu ÖNTANIMLI olarak cevap
+GÖNDERİLDİKTEN sonra koşturuyor — commit orada patlasa istemci 200 almış
+olurdu; `function` kapsamı commit'i rota döner dönmez, cevap kurulmadan
+koşturur (bekçisi `test_a_failing_commit_becomes_a_500_not_a_silent_200`).
+Sondanın "1 sn zaman aşımı" cümlesi CEVAP BÜTÇESİ olarak uygulandı: libpq
+`connect_timeout` asgarisi 2 sn (daha küçüğü 2'ye yuvarlanıyor), kara deliğe
+giden TCP onu da aşabilir; `SELECT 1` ayrı iş parçacığında, `result(timeout=1)`
+dolarsa `False`, vazgeçilen iş parçacığı libpq zaman aşımında kendi biter
+(ölçüldü: asılı sahte motorla sonda 0,3 sn bütçede dönüyor). `Ayarlar`a alan
+EKLENMEDİ (plan böyleydi); motor `app.state.motor`da, `_lifespan` kurar
+(URL yoksa `None`, bozuk URL `hata.log`a + `None`, uygulama açılır),
+kapanışta `dispose` + `None` — ardışık `with TestClient(app)`ler düşürülmüş
+bir DB'nin motorunu görmesin.
+
+`/health` gövdesi `{"ok","version","data_dir_writable","db_reachable"}`,
+`ok` VE, 503 kuralı aynı. **Karar:** `DATABASE_URL` verilmemişse
+`db_reachable:false` → 503, ayrı bir `null` değeri YOK — veri tabanı olmadan
+bu uygulama hesap açamaz, "yapılandırılmamış ama sağlıklı" diye bir durum
+yok. Bu kararın bedeli CI'ın `docker` işine düştü: DB'siz konteyner 503 verip
+işi kırmızıya çevirirdi; sonda 503'e ALIŞTIRILMADI, iş 9. görevden öne alınan
+Postgres servisiyle koşuyor (`--network host`, `-e DATABASE_URL`, `curl -f`
+aynen). `alembic.ini` URL taşımıyor (`env.py` `config.attributes["baglanti_dizesi"]`
+→ `DATABASE_URL`; ikisi de yoksa değişkenin adıyla `SystemExit`),
+`target_metadata` boş `MetaData()` — böylece `alembic check` BUGÜNDEN
+çalışıyor ("no new upgrade operations"; 2. görev buraya `tablolar.Base.metadata`
+koyar), ilk göç `0000_zemin` boş (`upgrade`/`downgrade` `pass`), `script.py.mako`
+telif başlıklı; `alembic/` `git ls-files` ile telif kapısına kendiliğinden
+girdi, `docs/graflar` dışında (README'nin "görmediği şeyler" listesine
+gerekçesiyle yazıldı).
+
+**Test fixture'ı dört kademe** (`tests/conftest.py`): `pg_kume` (oturum;
+`KROMIS_TEST_DATABASE_URL` varsa o, yoksa `tools/gecici_postgres.py`
+`GeciciKume`) → `pg_sablon` (oturum; `DROP … WITH (FORCE)` + `CREATE DATABASE
+kromis_sablon` + `alembic upgrade head` bir kez) → `veritabani_url` (modül;
+`CREATE DATABASE kromis_t_<dosya>_<hex> TEMPLATE kromis_sablon`, dosya bitince
+düşer) → `veritabani` (test; `DATABASE_URL`i `monkeypatch.setenv`). Autouse
+altıncı guard `DATABASE_URL`i her testte ortamdan SİLİYOR — geliştiricinin
+kabuğundaki gerçek adres `with TestClient(app)`e sızmasın. **Sapma:** küme
+açma kodu `tools/test_ortami.py`ye DEĞİL yeni `tools/gecici_postgres.py`ye
+kondu (salt kitaplık, 200 satır, hem conftest hem test_ortami ithal ediyor);
+`test_ortami.py --kontrol` kümeyi GERÇEKTEN açıp kapatıyor ("ikili var" ≠
+"küme açılıyor") ve "Postgres: hazir (gecici kume, ikililer:
+/usr/lib/postgresql/16/bin)" diyor; `--ozet` (kanca) yalnız ikiliye bakıyor.
+Root'ta yardımcı kullanıcı `su` ile DEĞİL `subprocess.run(user=, group=)` ile
+(paketin `postgres` hesabı, yoksa `nobody`); soket dizini `/tmp/kromis-pg-*/soket`
+(`sun_path` 107 bayt — uzun `TMPDIR`de düz `/tmp`), `listen_addresses=''`
+(port yok), `--auth=trust`, `--no-sync` + `fsync=off`. **Ölçüldü:** küme açılışı
+**0,7-0,8 sn** (initdb dâhil), kapanış 0,1 sn; şablon göçü + dosya başına
+kopya ile takım **105,8 → 109,5 sn** (+4 sn); **3.000 → 3.032 geçti, 12
+atlandı** (atlanan DB testi 0). Dosya sayıları: `tests/test_health.py` 8 → 11
+(200 bekleyen testler artık `with TestClient` + `veritabani`; Faz 0'ın
+lifespan'sız `_client()`i tek bir şeyi sınıyor — lifespan koşmamış süreçte
+sonda 503 + `db_reachable:false` ile yine CEVAP VERİYOR), yeni `tests/test_db.py`
+19 (ithal motor kurmaz; kapalı port 503; bozuk URL açılışı durdurmaz;
+`oturum` commit/rollback/404-rollback/commit-hatası-500 GERÇEK Postgres'te;
+`upgrade → downgrade base → upgrade`; `alembic check`; URL'siz alembic durur),
+`test_docker_kapisi.py` +3, `test_test_ortami.py` +2; `tests/test_i18n.py`
+`services/db.py`yi "konuşmayan" saydı (tek `detail` bir KOD:
+`database_unavailable`). `.env.example`e `DATABASE_URL=` (BOŞ; compose
+`environment:` kendi adresini verir ve `env_file`i ezer), `compose.yaml`a
+`postgres:17-alpine` (yalnız `127.0.0.1:5432`, `pg_isready` sağlık denetimi,
+`depends_on … service_healthy`, göç YOK — K6). `KROMIS_E2E_ZORUNLU=1` artık
+Postgres yokluğunu da `UsageError` yapıyor (adı kaldı, anlamı genişledi);
+yerelde eksikse conftest E2E uyarısının ikizini basıyor. Canlı doğrulama:
+`uvicorn app:app` + geçici küme → `/health` 200
+`{"ok":true,"version":"0.23.1","data_dir_writable":true,"db_reachable":true}`;
+küme kapatıldı → 503 `{"ok":false,…,"db_reachable":false}`. Windows'ta geçici
+küme yok (`KROMIS_TEST_DATABASE_URL` zorunlu — README'de yazılı); `tools/goc.py`
+bu PR'da değil (9. görev).
 
 ---
 
@@ -321,6 +402,54 @@ varsayılanın AÇIK olduğunu sınar. Google OAuth BU PR'da YOK (aşağıda,
 **Çıkış ölçütü.** E2E: tarayıcıdan kayıt → e-posta → giriş → çıkış;
 çerezsiz `GET /api/history` 401; başka siteden gelen POST 403; 11.
 başarısız giriş 429; takım yeşil.
+
+---
+
+## 3b. Google ile giriş (opsiyonel) — OIDC, sahibin Google Cloud istemcisiyle (PR: `faz1/google-giris`)
+
+**Kapsam.** Sahibin 2026-09-17 kararı: "Faz 1 içinde, UCUZSA". Ucuz olan
+yol OIDC'nin standart akışı, SDK'sız: `GET /api/hesap/google` (durum +
+PKCE üretir, çerezde tutar, `accounts.google.com/o/oauth2/v2/auth`a 302) ve
+`GET /api/hesap/google/geri` (kod → `oauth2.googleapis.com/token` `httpx`
+ile, `id_token` doğrulaması Google'ın JWKS'iyle — `authlib==1.6.*` bunu
+hazır verir ve `httpx` istemcisiyle çalışır; elle JWT doğrulaması YAZILMAZ,
+imza/`aud`/`iss`/`exp` denetimi bir kütüphanenin işidir). Doğrulanmış
+`email` + `sub` ile hesap: e-posta `kullanicilar`da varsa o kullanıcı
+(Google `email_verified:true` ise parola hesabına bağlanır — hesap ele
+geçirme yolu YOK, çünkü Google adresin sahibini doğruladı), yoksa
+`parola_ozeti NULL` ve `dogrulandi_at = now` ile yeni satır; sonra 3.
+görevin AYNI oturum çerezi (`kromis_oturum`) — Google jetonu saklanmaz,
+yenilenmez, yalnız kimlik için bir kez kullanılır. `kullanicilar`a
+`google_sub text UNIQUE NULL` sütunu (küçük göç `0002_google_sub`).
+`static/giris.html`e "Google ile devam et" düğmesi (yalnız
+`KROMIS_GOOGLE_ISTEMCI_ID` verilmişse görünür — `GET /api/hesap/ben`in yanına
+`GET /api/hesap/saglayicilar` `{"google": bool}`). Sahibin işi: Google Cloud
+projesinde OAuth istemcisi (web uygulaması türü), yetkili yönlendirme adresi
+`https://<alan>/api/hesap/google/geri` (yerelde `http://localhost:8765/…`),
+istemci kimliği + gizli anahtar → `KROMIS_GOOGLE_ISTEMCI_ID`,
+`KROMIS_GOOGLE_ISTEMCI_SIRRI` (`.env.example`e açıklamalı, bekçi aynı).
+
+**Dokunulan.** `routers/hesap.py` (+2 rota, 54 → 56; `tests/test_app_bolme.py`),
+`services/kimlik.py` (Google kimliğinden kullanıcı bulma/açma), yeni
+`services/google_oidc.py`, `alembic/versions/0002_google_sub.py`,
+`static/giris.{html,js}`, `bundled/i18n/{tr,en}.json` (+3 anahtar),
+`requirements.txt` (`authlib==1.6.*`), `.env.example`, yeni
+`tests/test_google_giris.py` (sahte Google: `httpx.MockTransport` ile token
+ucu + kendi ürettiğimiz JWKS/`id_token`; durum uyuşmazlığı 400; doğrulanmamış
+e-posta bağlanmaz; var olan hesaba bağlanma; yeni hesap açılışı; sırlar
+`GET /api/settings`e sızmaz), `docs/graflar/*`.
+
+**Risk.** Orta: dış bağımlılık (Google Cloud projesi, yönlendirme adresi
+alan adına bağlı — alan adı Faz 5'te kesinleşiyor, yerelde `localhost`)
+ve kimlik yüzeyi. Küçültme: standart OIDC + hazır doğrulayıcı, PKCE, tek
+kullanımlık `state`, jeton saklanmıyor, e-posta ile hesap birleştirme
+YALNIZ `email_verified`. Ucuz değilse (authlib 3.14 tekerleği sorun çıkarır,
+Google istemcisi gecikir) Faz 5'e ertelenir — 3. görev bundan bağımsız.
+
+**Çıkış ölçütü.** Yerelde gerçek bir Google hesabıyla `/giris` → Google →
+geri → `/` açılıyor ve `GET /api/hesap/ben` aynı kullanıcıyı veriyor; aynı
+e-postanın parola hesabıyla Google hesabı TEK satır; `KROMIS_GOOGLE_*` yokken
+düğme yok ve rotalar 404; takım yeşil.
 
 ---
 
@@ -609,11 +738,21 @@ görünüyor; ikinci koşu 0 yeni satır; takım yeşil.
   "credentials.env biçimi — dondurulmuş masaüstü/Android sürümü ve
   `tools/ice_aktar.py --kimlik-dosyasi` için; web sürümü bunları DB'de
   tutar". Bekçi testin katalog eşitliği aynen.
-* **CI.** `_test.yml`: `services: postgres:17-alpine` + `KROMIS_TEST_DATABASE_URL`;
-  `ci.yml` `docker` işi: konteyner artık `DATABASE_URL` ister — iş bir
-  Postgres servisiyle koşar, `/health` `db_reachable:true` bekler
-  (`curl -f` 503'te düşer, aynı mekanizma). `tests/test_test_ortami.py`
-  yeni adımı `_test.yml`le eşitler.
+* **CI.** ~~`_test.yml`: `services: postgres:17-alpine` + `KROMIS_TEST_DATABASE_URL`;
+  `ci.yml` `docker` işi: konteyner artık `DATABASE_URL` ister~~ — İKİSİ DE
+  1. GÖREVLE GELDİ (zorunlu oldu: `/health` DB'siz 503 verince `docker` işi
+  kırmızıya dönerdi; sonda gevşetilmedi, konteynere Postgres verildi —
+  `ci.yml`deki yorum). Burada kalan: `goc` servisi/release command ile
+  uyum ve `tests/test_docker_kapisi.py`nin o adımı görmesi.
+* **`guncelleme.py` web'de KAPALI** (sahibin 2026-09-17 kararı). GitHub
+  Releases denetimi dondurulmuş masaüstü/Android için anlamlı; web'de "yeni
+  sürüm var" yanlış pozitif ve dış ağa gereksiz çıkış. `GET /api/guncelleme`
+  web yapısında `{"web": true}` döner (`KROMIS_WEB=1` ya da `DATABASE_URL`
+  varlığı — tek bayrak, `services/db.py`nin okuduğuyla aynı kaynak), ön yüz
+  düğmeyi ve `prefs.guncelleme_kontrolu` anahtarını gizler; `guncelleme.json`
+  önbelleği web'de hiç yazılmaz. Modül ve 3 rotası dondurulmuş kabuk için
+  DURUR; bekçi test web bayrağıyla ağa çıkılmadığını (sahte `httpx`
+  taşıyıcısı çağrılmıyor) sınar.
 * **Artık dosya taraması.** `tools/artik_dosya.py`: kullanıcı dizinlerinde
   DB'de satırı olmayan medya dosyalarını listeler (`--sil` ile siler) —
   5. görevin "dosya + satır atomik değil" borcu.
@@ -669,17 +808,23 @@ ilk kullanıcı yaratılıp giriliyor; CI'ın 5 işi yeşil; takım yeşil.
 | # | konu | öneri | neden | alternatif ve bedeli |
 | --- | --- | --- | --- | --- |
 | K1 | ORM / göç aracı | **SQLAlchemy 2.0 + Alembic**, senkron `Session`, sürücü **psycopg 3** | 41/46 rota senkron `def`, threadpool'da; psycopg 3 sync+async tek sürücü; Alembic `check` ile "model = göç" bekçisi | asyncpg: async-only, 41 rota yeniden yazılır. SQLModel: Pydantic v2 ile tablo/istek modelini birleştirir ama `models.py`nin `extra="forbid"` istek modelleri zaten var, iki dünya karışır. Ham SQL: göç ve tip notu elle |
-| K2 | Kimlik doğrulama yöntemi | **E-posta + parola (argon2id) + e-posta doğrulama + sıfırlama**; Google OAuth isteğe bağlı 10. görev | Küresel kitle, e-posta evrensel; parola yolu doğrulama e-postasını zaten gerektiriyor, sıfırlama aynı altyapı; OAuth ek bir dış bağımlılık (Google Cloud projesi, redirect URI, gizli anahtar) | Sihirli bağlantı (parolasız): daha az kod ama her giriş e-posta bekler, posta sağlayıcısı kesintisi = giriş kesintisi. OAuth-first: parolasız ama Google'a bağımlı, kurumsal e-postası Google olmayan kullanıcı dışarıda |
+| K2 | Kimlik doğrulama yöntemi | **E-posta + parola (argon2id) + e-posta doğrulama + sıfırlama**; Google ile giriş isteğe bağlı **3b. görev** (Faz 1 içinde, ucuzsa — sahibin 2026-09-17 eki) | Küresel kitle, e-posta evrensel; parola yolu doğrulama e-postasını zaten gerektiriyor, sıfırlama aynı altyapı; OAuth ek bir dış bağımlılık (Google Cloud projesi, redirect URI, gizli anahtar) | Sihirli bağlantı (parolasız): daha az kod ama her giriş e-posta bekler, posta sağlayıcısı kesintisi = giriş kesintisi. OAuth-first: parolasız ama Google'a bağımlı, kurumsal e-postası Google olmayan kullanıcı dışarıda |
 | K3 | Oturum vs JWT | **Sunucu oturumu (DB) + HttpOnly SameSite=Lax çerez** | İptal tek `DELETE`; tek köken, jeton taşınacak üçüncü taraf yok; spec'in JWT'si 2026-08'de "ayrı API + mobil" varsayımıyla yazıldı, web-first o varsayımı kaldırdı | JWT: istek başına DB sorgusu yok (biz zaten kullanıcıyı çekiyoruz — dil için), ama kara liste tablosu gerekir; ikisinin toplamı oturum tablosundan fazla |
 | K4 | Testte SQLite mi Postgres mi | **Postgres** — CI servis konteyneri, yerelde ikililerden geçici küme, yoksa gürültülü atlama, `KROMIS_E2E_ZORUNLU=1` hata | JSONB/citext/timestamptz/eş zamanlılık SQLite'ta yok; Faz 0'ın "atlanan test = yeşil değil" dersi ölçülü (8/9). Bu makinede Postgres 16.13 ikilileri var ve küme açıldı; Docker imajı çekilemiyor | SQLite: kurulumsuz, ama göç dosyaları iki lehçede yazılır ve Postgres'e özgü kusur yalnız CI'da görünür — Faz 0'ın kırmızılarının aynısı |
 | K5 | Medya dosyalarının yeri | **Faz 1'de yerel disk**, `KROMIS_DATA_DIR/kullanicilar/<uuid>/`; S3/R2 **Faz 2** (kuyrukla birlikte) | Worker yok — medyayı yazan hâlâ istek; `FileResponse` çalışıyor; yönetilen platformlarda kalıcı birim var; tek replika kabul. Nesne depolama gelince yazan taraf worker olacak, o zaman tek seferde | R2 şimdi: yol haritası Faz 1'de sayıyor (sapma, aşağıda); bedeli imzalı URL + yükleme akışı + 5 rota daha ve iki kez dokunma (Faz 2'de worker yine değiştirir) |
 | K6 | Göçlerin çalıştığı yer | **Platformun dağıtım öncesi komutu** (`tools/goc.py`); konteyner açılışında DEĞİL | İki replika yarışı; yönetilen platformların hepsinde release command var | Açılışta `alembic upgrade`: tek replikada kolay, ölçek çıkınca tuzak; Alembic kilit tutmaz |
 | K7 | E-posta sağlayıcısı | **Resend** (API + httpx, EU bölgesi, ücretsiz kademe 3.000/ay, alan adı doğrulaması SPF/DKIM) — DIŞ ve ileride ÜCRETLİ bağımlılık, hesap + DNS kaydı sahibin | Depo zaten httpx; SDK yok; `konsol` arka ucu testleri ağdan bağımsız kılar | Postmark (işlemsel e-postada güvenilirlik, ücretsiz 100/ay), SES (en ucuz, kurulumu en ağır, IAM). SMTP genel arayüz (`smtplib`) ile her sağlayıcı — ama API hata cevapları daha okunur |
 
-Bunlara ek, daha küçük iki soru: `guncelleme.py`/`GET /api/guncelleme`
-web'de kapatılsın mı (öneri: Faz 1'de dokunma, Faz 2'de "web sürümü" için
-rota `{"web": true}` döner ve ön yüz düğmeyi gizler); Google OAuth Faz 1'in
-10. görevi olsun mu (öneri: hayır, Faz 5 kapalı beta geri bildirimine göre).
+**Sahibin kararları (2026-09-17, Slack).** Yedi önerinin yedisi de (K1-K7)
+olduğu gibi kabul edildi. İki ek: (a) `guncelleme.py` web yapısında
+KAPATILIR — 9. göreve girdi (yukarıda, "`guncelleme.py` web'de KAPALI");
+(b) Google ile giriş Faz 1 içinde denenir, UCUZSA — 3b. görev olarak
+eklendi, 3'e dayanır, pahalıya çıkarsa Faz 5'e kayar.
+
+Bunlara ek, daha küçük iki soru VARDI ve ikisi de yukarıdaki kararla kapandı:
+`guncelleme.py`/`GET /api/guncelleme` web'de kapatılsın mı (öneri "Faz 2'de"
+idi, karar: Faz 1 / 9. görev); Google OAuth Faz 1'e girsin mi (öneri "hayır"
+idi, karar: isteğe bağlı 3b, ucuzsa).
 
 ---
 
@@ -719,14 +864,16 @@ rota `{"web": true}` döner ve ön yüz düğmeyi gizler); Google OAuth Faz 1'in
   Sentry** → Faz 2.
 * **Stripe, abonelik yaşam döngüsü, KVKK/GDPR metinleri, hesap silme akışı,
   veri dışa aktarma** → Faz 4. `kullanicilar.silindi_at` sütunu yer tutucu.
-* **Google OAuth** → isteğe bağlı, sahibin kararı (K2).
+* **Google OAuth** → Faz 1 içinde isteğe bağlı **3b. görev** (sahibin
+  2026-09-17 kararı: ucuzsa); pahalıya çıkarsa Faz 5.
 * **`chat-instructions.md` / `chat-instructions-video.md` ezmeleri**
   (`paths.py:177`, `chat_prompt.py:63`): web'de kullanıcı sunucu dosyası
   düzenleyemez; `director_guidance` tercihi (DB'de) kullanıcı özelleştirmesini
   karşılıyor. Ezme dosyaları dondurulmuş kabuk için kalır; web'de
   `GET /api/settings`in `chat_instructions_path` alanı (`routers/ayarlar.py:53`)
   anlamsız — Faz 2'de "persona düzenleme" özelliği olur ya da alan düşer.
-* **`guncelleme.py` web'de** (yukarıdaki küçük soru).
+* **`guncelleme.py` web'de** → KAPALI, 9. görevde (sahibin 2026-09-17
+  kararı); modül dondurulmuş kabuk için durur.
 * **Ön yüz çerçevesi / ES modül** (Faz 0 / 7 kararı): bu fazda iki statik
   sayfa vanilla; karar Faz 2'nin iş listesi arayüzüyle.
 * **Dondurulmuş kabuk testleri** (~190 + bu fazda kalan eski depo testleri

@@ -54,6 +54,7 @@
         "routers.sohbet",
         "routers.uretim",
         "services.ayar",
+        "services.db",
         "services.dil",
         "services.gorsel",
         "services.modeller",
@@ -68,7 +69,7 @@
         "netguard"
       ],
       "katman": 10,
-      "satir": 186,
+      "satir": 216,
       "testler": [
         "tests/test_app.py",
         "tests/test_app_bolme.py",
@@ -80,6 +81,7 @@
         "tests/test_chat_prompt.py",
         "tests/test_chat_route.py",
         "tests/test_chats_route.py",
+        "tests/test_db.py",
         "tests/test_delete_route.py",
         "tests/test_dil.py",
         "tests/test_edit_route.py",
@@ -1074,13 +1076,14 @@
       "erteli_ithal": [],
       "ithal": [
         "services.ayar",
+        "services.db",
         "version"
       ],
       "ithal_eden": [
         "app"
       ],
       "katman": 3,
-      "satir": 96,
+      "satir": 112,
       "testler": [
         "tests/test_health.py"
       ],
@@ -1177,6 +1180,22 @@
         "tests/test_paths.py"
       ],
       "yol": "services/ayar.py"
+    },
+    {
+      "ad": "services.db",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [
+        "app",
+        "routers.saglik"
+      ],
+      "katman": 0,
+      "satir": 174,
+      "testler": [
+        "tests/test_db.py",
+        "tests/test_docker_kapisi.py"
+      ],
+      "yol": "services/db.py"
     },
     {
       "ad": "services.dil",
@@ -1375,12 +1394,26 @@
       "yol": "storage.py"
     },
     {
+      "ad": "tools.gecici_postgres",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [
+        "tools.test_ortami"
+      ],
+      "katman": 0,
+      "satir": 255,
+      "testler": [
+        "tests/test_test_ortami.py"
+      ],
+      "yol": "tools/gecici_postgres.py"
+    },
+    {
       "ad": "tools.graf_uret",
       "erteli_ithal": [],
       "ithal": [],
       "ithal_eden": [],
       "katman": 0,
-      "satir": 1075,
+      "satir": 1079,
       "testler": [
         "tests/test_app_bolme.py",
         "tests/test_graflar.py",
@@ -1453,10 +1486,12 @@
     {
       "ad": "tools.test_ortami",
       "erteli_ithal": [],
-      "ithal": [],
+      "ithal": [
+        "tools.gecici_postgres"
+      ],
       "ithal_eden": [],
-      "katman": 0,
-      "satir": 529,
+      "katman": 1,
+      "satir": 584,
       "testler": [
         "tests/test_test_ortami.py"
       ],
@@ -1500,6 +1535,7 @@
       "satir": 30,
       "testler": [
         "tests/test_backup.py",
+        "tests/test_db.py",
         "tests/test_guncelleme.py",
         "tests/test_guncelleme_route.py",
         "tests/test_health.py",
@@ -1963,7 +1999,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 99,
+  "test_dosyasi_sayisi": 100,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",
@@ -2753,8 +2789,8 @@
         "version"
       ],
       "onyuz": [],
-      "satir": 85,
-      "yardimci_sayisi": 1,
+      "satir": 95,
+      "yardimci_sayisi": 2,
       "yol": "/health",
       "yontem": "GET"
     },

@@ -33,8 +33,8 @@ import paths
 import providers
 import version
 from models import MAX_PROMPT_CHARS, GenerateRequest
-from routers import ayarlar, bindirme, galeri, kok, paletler, saglik, sohbet, uretim
-from services import ayar, db, dil, gorsel, modeller, palet, redaksiyon, zaman
+from routers import ayarlar, bindirme, galeri, hesap, kok, paletler, saglik, sohbet, uretim
+from services import ayar, db, dil, gorsel, koken, modeller, palet, posta, redaksiyon, zaman
 
 
 @asynccontextmanager
@@ -80,6 +80,11 @@ async def _lifespan(app: FastAPI):
     `db_reachable:false` ile 503 der — açılmayan uygulamadan iyidir ve sonda
     sebebi söyler. `create_engine` bağlanmaz; sunucunun yokluğu ilk istekte
     ya da sondada görünür, açılışı bekletmez.
+
+    POSTACI DA BURADA (Faz 1 / 3, gerekçesi services/posta.py): `KROMIS_POSTA`
+    / `RESEND_API_KEY` ortamdan bir kez okunur, `app.state.postaci`ya konur.
+    Yanlış yapılandırma uygulamayı DURDURMAZ — `BozukPostaci` gelir ve ilk
+    e-posta isteyen rota 503 der, sebep `hata.log`da.
     """
     ayarlar: ayar.Ayarlar = app.state.ayarlar
     now = zaman.simdi()
@@ -89,6 +94,8 @@ async def _lifespan(app: FastAPI):
     except Exception:
         app.state.motor = None
         errlog.safe_append(ayarlar.data_dir, traceback.format_exc())
+    motor = app.state.motor
+    postaci = app.state.postaci = posta.postaci_kur(ayarlar.data_dir)
     try:
         paths.ensure_data_dirs(ayarlar.output_dir, ayarlar.assets_dir)
         backup.backup_manifests_if_version_changed(
@@ -107,10 +114,18 @@ async def _lifespan(app: FastAPI):
         # Kapanışta havuz kapanır ve `motor` `None`a döner: bir sonraki
         # `with TestClient(app)` (ya da yeniden açılış) eskimiş, belki
         # düşürülmüş bir DB'ye bağlı motoru bulmamalı.
-        motor = app.state.motor
-        app.state.motor = None
-        if motor is not None:
+        #
+        # YALNIZ KENDİ KURDUĞUNU düşürür (kimlik karşılaştırması). ÖLÇÜLDÜ
+        # (Faz 1 / 3, tam takımda): E2E dosyaları uvicorn'u ayrı bir iş
+        # parçacığında koşturuyor ve `stop()` beklemiyor; önceki dosyanın
+        # sunucusu kapanışını bitirirken sonraki dosyanın sunucusu çoktan
+        # açılmış ve motorunu koymuş oluyordu. Koşulsuz `= None` yeni motoru
+        # da siliyor, ilk istek `database_unavailable` alıyordu.
+        if motor is not None and app.state.motor is motor:
+            app.state.motor = None
             motor.dispose()
+        if app.state.postaci is postaci:
+            app.state.postaci = None
 
 
 app = FastAPI(title="Kromis Studio", lifespan=_lifespan)
@@ -131,10 +146,22 @@ app.state.ayarlar = ayar.Ayarlar.varsayilan()
 # `db_reachable:false` olmalı, `AttributeError` değil.
 app.state.motor = None
 
+# POSTACI — motor gibi ithal anında YOK, `_lifespan` kurar (Faz 1 / 3). Ad
+# burada var olsun ki lifespan'sız süreçte hesap rotaları `AttributeError`
+# değil 503 (`mail_unavailable`) versin.
+app.state.postaci = None
+
 # Dil ara katmanı — `i18n._AKTIF`ın tek yazarı (gerekçesi services/dil.py'de).
 # Dekoratörün (`@app.middleware("http")`) çağrı biçimi; işlev başka dosyada
 # durduğu için dekoratör olarak yazılamıyor.
 app.middleware("http")(dil.dil_baglami)
+
+# Köken kapısı (CSRF'nin ikinci katı, Faz 1 / 3; gerekçesi services/koken.py).
+# DİL'DEN SONRA EKLENİYOR ve bu sırayı belirliyor: Starlette son eklenen ara
+# katmanı EN DIŞA koyar, yani istek önce buradan geçer, sonra dile, sonra
+# rotaya (belge §3: "köken → dil → rota"). Reddedilen istek dil bağlamını
+# hiç kurmaz — 403 gövdesinin bir KOD olmasının sebebi de bu.
+app.middleware("http")(koken.koken_kapisi)
 
 # Doğrulama hatasından gizli değerin silinmesi (gerekçesi services/redaksiyon.py'de).
 # Ara katmanla aynı biçim: dekoratörün çağrı hâli.
@@ -144,7 +171,7 @@ app.exception_handler(RequestValidationError)(redaksiyon.redact_validation_error
 # (bkz. routers/__init__.py). Sıra rota eşleşmesini etkilemiyor — hiçbir iki
 # kalıp aynı yol+fiili paylaşmıyor — ama okunurluk için eski app.py sırası.
 for _router in (uretim.router, ayarlar.router, sohbet.router, galeri.router,
-                paletler.router, bindirme.router, kok.router, saglik.router):
+                paletler.router, bindirme.router, hesap.router, kok.router, saglik.router):
     app.include_router(_router)
 
 

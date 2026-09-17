@@ -123,6 +123,13 @@ ID_KALIBI = r"^[0-9a-f]{8,32}$"
 # `jetonlar.amac`ın değer kümesi — e-posta doğrulama ve parola sıfırlama (3. görev).
 JETON_AMACLARI: tuple[str, ...] = ("eposta_dogrulama", "parola_sifirlama")
 
+# `giris_denemeleri.tur`un değer kümesi (3. görev, göç `0002_deneme_turu`).
+# Üç sayaç aynı tabloda ama AYRI sayılır: başarısız giriş (e-posta 10 / IP 30,
+# 15 dk), kayıt isteği ve sıfırlama isteği (IP 5, 1 sa). Tek sayaçta
+# olsalardı parolasını beş kez yanlış yazan kullanıcı "parolamı unuttum"u da
+# kilitli bulurdu — tam olarak ihtiyacı olan kapıyı.
+DENEME_TURLERI: tuple[str, ...] = ("giris", "kayit", "sifirlama")
+
 # Yedi iş tablosu — belgenin envanteriyle birebir; bekçi test bu kümenin her
 # üyesinde `kullanici_id` + FK + indeks arar ve kümenin belgeyle eşit olduğunu
 # sınar. Hesap tabloları burada DEĞİL: onlarda sahiplik sütunu ya yok
@@ -269,14 +276,21 @@ class GirisDenemesi(Base):
     sayaç da ayırt etmez). `eposta` citext: `kullanicilar.eposta` ile aynı
     eşitlik kuralı. İki indeks iki sayaç: e-posta başına ve IP başına, ikisi
     de "son 15 dk" penceresinde — `zaman` ikinci sütun.
+
+    `tur` (3. görev): `giris` / `kayit` / `sifirlama` — üç ayrı sayaç, tek
+    tablo (gerekçesi `DENEME_TURLERI`nin üstünde). Öntanımlı `giris`: sütun
+    0001'deki satırların üstüne göçle geldi ve o satırların hepsi başarısız
+    girişti (başka yazan yoktu).
     """
     __tablename__ = "giris_denemeleri"
     __table_args__ = (
+        CheckConstraint("tur IN " + _sql_kumesi(DENEME_TURLERI), name="tur_kumesi"),
         Index("ix_giris_denemeleri_eposta_zaman", "eposta", "zaman"),
         Index("ix_giris_denemeleri_ip_zaman", "ip", "zaman"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    tur: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'giris'"))
     eposta: Mapped[str] = mapped_column(pg.CITEXT, nullable=False)
     ip: Mapped[str | None] = mapped_column(pg.INET)
     zaman: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False,

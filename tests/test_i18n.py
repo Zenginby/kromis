@@ -329,8 +329,16 @@ def test_the_boot_failure_page_speaks_the_selected_language(monkeypatch, dizinle
 # ── Şablon ↔ katalog ─────────────────────────────────────────────────
 
 def _sablon_anahtarlari():
-    with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
-        return set(i18n._PLACEHOLDER.findall(f.read()))
+    """`static/*.html` içindeki `{{t:…}}` anahtarları — HER sayfa (Faz 1 / 3'ten
+    beri iki sayfa var: index.html ve giris.html). Yalnız index.html'i tarayan
+    hâli giriş sayfasının anahtarlarını "ölü" sanırdı."""
+    bulunan = set()
+    for ad in sorted(os.listdir(STATIC)):
+        if not ad.endswith(".html"):
+            continue
+        with open(os.path.join(STATIC, ad), encoding="utf-8") as f:
+            bulunan |= set(i18n._PLACEHOLDER.findall(f.read()))
+    return bulunan
 
 
 # Anahtar BİÇİMİ: `bolum.ad` — en az bir nokta, küçük harf/rakam/alt çizgi.
@@ -679,11 +687,14 @@ KULLANICIYA_KONUSAN = (
     "storage.py", "veo_client.py",
     # Rotalar: `app.py`nin HTTPException metinleri buraya taşındı (Adım 2).
     "routers/ayarlar.py", "routers/bindirme.py", "routers/galeri.py",
-    "routers/kok.py", "routers/paletler.py", "routers/sohbet.py",
+    "routers/hesap.py", "routers/paletler.py", "routers/sohbet.py",
     "routers/uretim.py",
     # Rota dışı ama kullanıcıya 4xx gövdesi üreten yardımcılar.
     "services/gorsel.py", "services/kapilar.py", "services/modeller.py",
     "services/palet.py",
+    # Faz 1 / 3: kimlik kapısının 401 metni, e-posta gövdeleri, sayfa şablonunun
+    # 500 metni (`boot.load_failed.*` — `routers/kok.py`den buraya taşındı).
+    "services/kimlik.py", "services/posta.py", "services/sablon.py",
 )
 
 # …ve kullanıcıya KONUŞMAYANLAR, her biri gerekçesiyle. Bu liste bir muafiyet
@@ -726,6 +737,14 @@ KULLANICIYA_KONUSMAYAN = {
     "services/zaman.py": "zaman damgası biçimi; metin yok",
     "services/tablolar.py": "veri modeli (Faz 1 / 2): tablo, sütun, kısıt tanımları; metin yok — "
                             "CHECK değer kümeleri bile kodun sabitleri, cümle değil",
+    "routers/kok.py": "`/` rotası; yerleştirme ve 500 metni `services/sablon.py`ye "
+                      "taşındı (Faz 1 / 3), burada yalnız çağrı kaldı",
+    "services/cerez.py": "çerez adı ve bayrakları (Faz 1 / 3); metin yok",
+    "services/koken.py": "köken kapısı (Faz 1 / 3): 403 gövdesi bir KOD "
+                         "(`cross_origin_rejected`) — dil ara katmanından ÖNCE koşuyor, "
+                         "cümle kuramaz; `services/db.py` ile aynı karar",
+    "services/hesap.py": "hesap katmanı (Faz 1 / 3): özet, oturum, jeton, sayaç — "
+                         "`None`/`bool`/sayı döndürüyor, cümleyi routers/hesap.py kuruyor",
 }
 
 # Türkçe kalması KARAR olan dizeler — gerekçesiyle. Muafiyet DİZE düzeyinde,

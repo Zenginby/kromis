@@ -48,6 +48,7 @@
         "routers.ayarlar",
         "routers.bindirme",
         "routers.galeri",
+        "routers.hesap",
         "routers.kok",
         "routers.paletler",
         "routers.saglik",
@@ -57,8 +58,10 @@
         "services.db",
         "services.dil",
         "services.gorsel",
+        "services.koken",
         "services.modeller",
         "services.palet",
+        "services.posta",
         "services.redaksiyon",
         "services.zaman",
         "version"
@@ -69,7 +72,7 @@
         "netguard"
       ],
       "katman": 10,
-      "satir": 216,
+      "satir": 243,
       "testler": [
         "tests/test_app.py",
         "tests/test_app_bolme.py",
@@ -90,10 +93,12 @@
         "tests/test_guncelleme_route.py",
         "tests/test_guvenlik_baslik.py",
         "tests/test_health.py",
+        "tests/test_hesap.py",
         "tests/test_i18n.py",
         "tests/test_id_contract.py",
         "tests/test_import_route.py",
         "tests/test_index.py",
+        "tests/test_koken.py",
         "tests/test_legacy_formats.py",
         "tests/test_logo.py",
         "tests/test_mobile.py",
@@ -102,7 +107,9 @@
         "tests/test_paths.py",
         "tests/test_playwright_dil.py",
         "tests/test_playwright_guncelleme.py",
+        "tests/test_playwright_hesap.py",
         "tests/test_playwright_studio.py",
+        "tests/test_posta.py",
         "tests/test_prefs_route.py",
         "tests/test_provider_logos.py",
         "tests/test_search_predicate.py",
@@ -518,7 +525,9 @@
         "desktop",
         "guncelleme",
         "paths",
-        "routers.kok"
+        "routers.hesap",
+        "services.posta",
+        "services.sablon"
       ],
       "katman": 0,
       "satir": 116,
@@ -668,15 +677,18 @@
         "routers.ayarlar",
         "routers.bindirme",
         "routers.galeri",
-        "routers.kok",
+        "routers.hesap",
         "routers.paletler",
         "routers.sohbet",
         "routers.uretim",
         "services.dil",
         "services.gorsel",
         "services.kapilar",
+        "services.kimlik",
         "services.modeller",
         "services.palet",
+        "services.posta",
+        "services.sablon",
         "veo_client"
       ],
       "katman": 2,
@@ -684,8 +696,11 @@
       "testler": [
         "tests/test_catalog.py",
         "tests/test_dil.py",
+        "tests/test_hesap.py",
         "tests/test_i18n.py",
-        "tests/test_playwright_dil.py"
+        "tests/test_playwright_dil.py",
+        "tests/test_playwright_hesap.py",
+        "tests/test_posta.py"
       ],
       "yol": "i18n.py"
     },
@@ -726,6 +741,7 @@
         "routers.ayarlar",
         "routers.bindirme",
         "routers.galeri",
+        "routers.hesap",
         "routers.paletler",
         "routers.sohbet",
         "routers.uretim",
@@ -733,7 +749,7 @@
         "services.tablolar"
       ],
       "katman": 4,
-      "satir": 1056,
+      "satir": 1127,
       "testler": [
         "tests/test_catalog.py",
         "tests/test_chat_client.py",
@@ -742,6 +758,7 @@
         "tests/test_chats_route.py",
         "tests/test_composite.py",
         "tests/test_guvenlik_baslik.py",
+        "tests/test_hesap.py",
         "tests/test_i18n.py",
         "tests/test_index.py",
         "tests/test_model_secimi.py",
@@ -1039,20 +1056,45 @@
       "yol": "routers/galeri.py"
     },
     {
-      "ad": "routers.kok",
+      "ad": "routers.hesap",
       "erteli_ithal": [],
       "ithal": [
         "errlog",
         "i18n",
+        "models",
         "services.ayar",
+        "services.cerez",
+        "services.db",
         "services.dil",
-        "version"
+        "services.hesap",
+        "services.kimlik",
+        "services.koken",
+        "services.posta",
+        "services.sablon",
+        "services.tablolar"
       ],
       "ithal_eden": [
         "app"
       ],
-      "katman": 8,
-      "satir": 81,
+      "katman": 9,
+      "satir": 245,
+      "testler": [
+        "tests/test_posta.py"
+      ],
+      "yol": "routers/hesap.py"
+    },
+    {
+      "ad": "routers.kok",
+      "erteli_ithal": [],
+      "ithal": [
+        "services.ayar",
+        "services.sablon"
+      ],
+      "ithal_eden": [
+        "app"
+      ],
+      "katman": 9,
+      "satir": 28,
       "testler": [],
       "yol": "routers/kok.py"
     },
@@ -1173,20 +1215,44 @@
         "routers.ayarlar",
         "routers.bindirme",
         "routers.galeri",
+        "routers.hesap",
         "routers.kok",
         "routers.paletler",
         "routers.saglik",
         "routers.sohbet",
         "routers.uretim",
-        "services.dil"
+        "services.dil",
+        "services.sablon"
       ],
       "katman": 2,
       "satir": 90,
       "testler": [
         "tests/test_app_bolme.py",
+        "tests/test_hesap.py",
         "tests/test_paths.py"
       ],
       "yol": "services/ayar.py"
+    },
+    {
+      "ad": "services.cerez",
+      "erteli_ithal": [],
+      "ithal": [
+        "services.db"
+      ],
+      "ithal_eden": [
+        "routers.hesap",
+        "services.dil",
+        "services.hesap",
+        "services.kimlik"
+      ],
+      "katman": 1,
+      "satir": 82,
+      "testler": [
+        "tests/test_docker_kapisi.py",
+        "tests/test_hesap.py",
+        "tests/test_playwright_hesap.py"
+      ],
+      "yol": "services/cerez.py"
     },
     {
       "ad": "services.db",
@@ -1194,7 +1260,10 @@
       "ithal": [],
       "ithal_eden": [
         "app",
-        "routers.saglik"
+        "routers.hesap",
+        "routers.saglik",
+        "services.cerez",
+        "services.kimlik"
       ],
       "katman": 0,
       "satir": 174,
@@ -1210,6 +1279,7 @@
       "ithal": [
         "i18n",
         "services.ayar",
+        "services.cerez",
         "services.tercih"
       ],
       "ithal_eden": [
@@ -1217,19 +1287,22 @@
         "routers.ayarlar",
         "routers.bindirme",
         "routers.galeri",
-        "routers.kok",
+        "routers.hesap",
         "routers.paletler",
         "routers.sohbet",
         "routers.uretim",
         "services.gorsel",
         "services.kapilar",
-        "services.palet"
+        "services.kimlik",
+        "services.palet",
+        "services.sablon"
       ],
       "katman": 7,
-      "satir": 149,
+      "satir": 150,
       "testler": [
         "tests/test_dil.py",
-        "tests/test_i18n.py"
+        "tests/test_i18n.py",
+        "tests/test_koken.py"
       ],
       "yol": "services/dil.py"
     },
@@ -1257,6 +1330,24 @@
       "yol": "services/gorsel.py"
     },
     {
+      "ad": "services.hesap",
+      "erteli_ithal": [],
+      "ithal": [
+        "services.cerez",
+        "services.tablolar"
+      ],
+      "ithal_eden": [
+        "routers.hesap",
+        "services.kimlik"
+      ],
+      "katman": 6,
+      "satir": 292,
+      "testler": [
+        "tests/test_hesap.py"
+      ],
+      "yol": "services/hesap.py"
+    },
+    {
       "ad": "services.kapilar",
       "erteli_ithal": [],
       "ithal": [
@@ -1276,6 +1367,43 @@
       "satir": 75,
       "testler": [],
       "yol": "services/kapilar.py"
+    },
+    {
+      "ad": "services.kimlik",
+      "erteli_ithal": [],
+      "ithal": [
+        "i18n",
+        "services.cerez",
+        "services.db",
+        "services.dil",
+        "services.hesap",
+        "services.tablolar"
+      ],
+      "ithal_eden": [
+        "routers.hesap"
+      ],
+      "katman": 8,
+      "satir": 51,
+      "testler": [],
+      "yol": "services/kimlik.py"
+    },
+    {
+      "ad": "services.koken",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [
+        "app",
+        "routers.hesap"
+      ],
+      "katman": 0,
+      "satir": 133,
+      "testler": [
+        "tests/test_docker_kapisi.py",
+        "tests/test_hesap.py",
+        "tests/test_koken.py",
+        "tests/test_playwright_hesap.py"
+      ],
+      "yol": "services/koken.py"
     },
     {
       "ad": "services.modeller",
@@ -1321,6 +1449,27 @@
       "yol": "services/palet.py"
     },
     {
+      "ad": "services.posta",
+      "erteli_ithal": [],
+      "ithal": [
+        "errlog",
+        "i18n"
+      ],
+      "ithal_eden": [
+        "app",
+        "routers.hesap"
+      ],
+      "katman": 3,
+      "satir": 187,
+      "testler": [
+        "tests/test_docker_kapisi.py",
+        "tests/test_hesap.py",
+        "tests/test_playwright_hesap.py",
+        "tests/test_posta.py"
+      ],
+      "yol": "services/posta.py"
+    },
+    {
       "ad": "services.redaksiyon",
       "erteli_ithal": [],
       "ithal": [
@@ -1330,9 +1479,28 @@
         "app"
       ],
       "katman": 1,
-      "satir": 63,
+      "satir": 68,
       "testler": [],
       "yol": "services/redaksiyon.py"
+    },
+    {
+      "ad": "services.sablon",
+      "erteli_ithal": [],
+      "ithal": [
+        "errlog",
+        "i18n",
+        "services.ayar",
+        "services.dil",
+        "version"
+      ],
+      "ithal_eden": [
+        "routers.hesap",
+        "routers.kok"
+      ],
+      "katman": 8,
+      "satir": 68,
+      "testler": [],
+      "yol": "services/sablon.py"
     },
     {
       "ad": "services.tablolar",
@@ -1341,10 +1509,15 @@
         "assets_store",
         "models"
       ],
-      "ithal_eden": [],
+      "ithal_eden": [
+        "routers.hesap",
+        "services.hesap",
+        "services.kimlik"
+      ],
       "katman": 5,
-      "satir": 454,
+      "satir": 468,
       "testler": [
+        "tests/test_hesap.py",
         "tests/test_tablolar.py"
       ],
       "yol": "services/tablolar.py"
@@ -1436,7 +1609,7 @@
       "ithal": [],
       "ithal_eden": [],
       "katman": 0,
-      "satir": 1079,
+      "satir": 1104,
       "testler": [
         "tests/test_app_bolme.py",
         "tests/test_graflar.py",
@@ -1549,9 +1722,9 @@
         "desktop",
         "guncelleme",
         "routers.ayarlar",
-        "routers.kok",
         "routers.saglik",
         "services.modeller",
+        "services.sablon",
         "tools.surum_karari"
       ],
       "katman": 0,
@@ -1562,6 +1735,7 @@
         "tests/test_guncelleme.py",
         "tests/test_guncelleme_route.py",
         "tests/test_health.py",
+        "tests/test_hesap.py",
         "tests/test_index.py",
         "tests/test_playwright_guncelleme.py",
         "tests/test_provider_logos.py",
@@ -1684,6 +1858,19 @@
         "tanim": 60
       },
       {
+        "cagrilan_yollar": [
+          "/api/hesap/ben",
+          "/api/hesap/dogrula",
+          "/api/hesap/giris",
+          "/api/hesap/kayit",
+          "/api/hesap/sifirla",
+          "/api/hesap/sifirla/dogrula"
+        ],
+        "dosya": "static/giris.js",
+        "satir": 173,
+        "tanim": 0
+      },
+      {
         "cagrilan_yollar": [],
         "dosya": "static/i18n.js",
         "satir": 84,
@@ -1714,12 +1901,14 @@
       {
         "cagrilan_yollar": [
           "/api/guncelleme",
+          "/api/hesap/ben",
+          "/api/hesap/cikis",
           "/api/prefs",
           "/api/settings"
         ],
         "dosya": "static/settings.js",
-        "satir": 874,
-        "tanim": 22
+        "satir": 930,
+        "tanim": 23
       },
       {
         "cagrilan_yollar": [
@@ -1901,6 +2090,13 @@
       },
       {
         "adlar": [
+          "t"
+        ],
+        "hedef": "static/i18n.js",
+        "kaynak": "static/giris.js"
+      },
+      {
+        "adlar": [
           "closeSheets",
           "confirmDialog",
           "openSheet",
@@ -2002,6 +2198,39 @@
         "kaynak": "static/viewer.js"
       }
     ],
+    "sayfalar": {
+      "static/giris.html": {
+        "betikler": [
+          "/static/i18n.js",
+          "/static/giris.js"
+        ],
+        "stiller": [
+          "/static/fonts.css",
+          "/static/flow-tokens.css",
+          "/static/giris.css"
+        ]
+      },
+      "static/index.html": {
+        "betikler": [
+          "/static/i18n.js",
+          "/static/pixel-canvas.js",
+          "/static/core.js",
+          "/static/folders.js",
+          "/static/assets.js",
+          "/static/palette.js",
+          "/static/settings.js",
+          "/static/viewer.js",
+          "/static/chat.js",
+          "/static/mobile.js"
+        ],
+        "stiller": [
+          "/static/fonts.css",
+          "/static/style.css",
+          "/static/flow-tokens.css",
+          "/static/mobile.css"
+        ]
+      }
+    },
     "stiller": [
       "/static/fonts.css",
       "/static/style.css",
@@ -2022,7 +2251,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 101,
+  "test_dosyasi_sayisi": 105,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",
@@ -2034,8 +2263,8 @@
         "version"
       ],
       "onyuz": [],
-      "satir": 27,
-      "yardimci_sayisi": 1,
+      "satir": 26,
+      "yardimci_sayisi": 2,
       "yol": "/",
       "yontem": "GET"
     },
@@ -2442,6 +2671,116 @@
       "yontem": "POST"
     },
     {
+      "dosya": "routers/hesap.py",
+      "islev": "ben",
+      "modul": "routers.hesap",
+      "moduller": [],
+      "onyuz": [
+        "static/giris.js",
+        "static/settings.js"
+      ],
+      "satir": 237,
+      "yardimci_sayisi": 1,
+      "yol": "/api/hesap/ben",
+      "yontem": "GET"
+    },
+    {
+      "dosya": "routers/hesap.py",
+      "islev": "cikis",
+      "modul": "routers.hesap",
+      "moduller": [],
+      "onyuz": [
+        "static/settings.js"
+      ],
+      "satir": 185,
+      "yardimci_sayisi": 5,
+      "yol": "/api/hesap/cikis",
+      "yontem": "POST"
+    },
+    {
+      "dosya": "routers/hesap.py",
+      "islev": "dogrula",
+      "modul": "routers.hesap",
+      "moduller": [
+        "i18n",
+        "models"
+      ],
+      "onyuz": [
+        "static/giris.js"
+      ],
+      "satir": 136,
+      "yardimci_sayisi": 5,
+      "yol": "/api/hesap/dogrula",
+      "yontem": "POST"
+    },
+    {
+      "dosya": "routers/hesap.py",
+      "islev": "giris",
+      "modul": "routers.hesap",
+      "moduller": [
+        "errlog",
+        "i18n",
+        "models"
+      ],
+      "onyuz": [
+        "static/giris.js"
+      ],
+      "satir": 148,
+      "yardimci_sayisi": 29,
+      "yol": "/api/hesap/giris",
+      "yontem": "POST"
+    },
+    {
+      "dosya": "routers/hesap.py",
+      "islev": "kayit",
+      "modul": "routers.hesap",
+      "moduller": [
+        "errlog",
+        "i18n",
+        "models"
+      ],
+      "onyuz": [
+        "static/giris.js"
+      ],
+      "satir": 102,
+      "yardimci_sayisi": 23,
+      "yol": "/api/hesap/kayit",
+      "yontem": "POST"
+    },
+    {
+      "dosya": "routers/hesap.py",
+      "islev": "sifirla",
+      "modul": "routers.hesap",
+      "moduller": [
+        "errlog",
+        "i18n",
+        "models"
+      ],
+      "onyuz": [
+        "static/giris.js"
+      ],
+      "satir": 197,
+      "yardimci_sayisi": 19,
+      "yol": "/api/hesap/sifirla",
+      "yontem": "POST"
+    },
+    {
+      "dosya": "routers/hesap.py",
+      "islev": "sifirla_dogrula",
+      "modul": "routers.hesap",
+      "moduller": [
+        "i18n",
+        "models"
+      ],
+      "onyuz": [
+        "static/giris.js"
+      ],
+      "satir": 217,
+      "yardimci_sayisi": 8,
+      "yol": "/api/hesap/sifirla/dogrula",
+      "yontem": "POST"
+    },
+    {
       "dosya": "routers/galeri.py",
       "islev": "history",
       "modul": "routers.galeri",
@@ -2695,7 +3034,7 @@
         "static/settings.js"
       ],
       "satir": 271,
-      "yardimci_sayisi": 2,
+      "yardimci_sayisi": 4,
       "yol": "/api/prefs",
       "yontem": "POST"
     },
@@ -2802,6 +3141,21 @@
       "satir": 222,
       "yardimci_sayisi": 2,
       "yol": "/assets/{kind}/{filename}",
+      "yontem": "GET"
+    },
+    {
+      "dosya": "routers/hesap.py",
+      "islev": "giris_sayfasi",
+      "modul": "routers.hesap",
+      "moduller": [
+        "errlog",
+        "i18n",
+        "version"
+      ],
+      "onyuz": [],
+      "satir": 243,
+      "yardimci_sayisi": 2,
+      "yol": "/giris",
       "yontem": "GET"
     },
     {

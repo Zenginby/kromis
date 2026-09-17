@@ -19,6 +19,7 @@ geldi; ayrım `None` varsayılanıyla kuruldu (bkz. alanın yorumu).
 """
 from __future__ import annotations
 
+import re
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -1054,3 +1055,73 @@ class BannerRequest(BaseModel):
         if v not in BANNER_ALIGNS:
             raise ValueError(i18n.t("err.invalid_field", None, alan="align"))
         return v
+
+
+# ── Hesap istekleri (Faz 1 / 3. görev) ────────────────────────────────
+
+# Parola uzunluğu — NIST 800-63B: alt sınır 8, üst sınır rahat (128), BAŞKA
+# KURAL YOK (karakter sınıfı, süre sonu). Sayılar burada, `services/hesap.py`
+# buradan okuyor: doğrulayan ile özetleyen aynı sınırı görsün.
+PAROLA_EN_AZ = 8
+PAROLA_EN_COK = 128
+
+# RFC 5321'in adres üst sınırı; biçim denetimi BİLEREK gevşek (`x@y.z`):
+# adresin gerçekten var olduğunu ancak doğrulama iletisi kanıtlar, katı bir
+# regex ise geçerli adresleri (yeni TLD'ler, `+` etiketleri) reddeder.
+EPOSTA_EN_COK = 254
+_EPOSTA = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def check_eposta(v: str) -> str:
+    """Boşluğu kırpar, biçimi denetler; büyük/küçük harf DB'nin işi (citext)."""
+    v = v.strip()
+    if len(v) > EPOSTA_EN_COK or not _EPOSTA.match(v):
+        raise ValueError(i18n.t("err.hesap_gecersiz_eposta"))
+    return v
+
+
+def check_parola(v: str) -> str:
+    """Yalnız uzunluk. Kırpılmıyor: baştaki/sondaki boşluk parolanın parçasıdır."""
+    if not PAROLA_EN_AZ <= len(v) <= PAROLA_EN_COK:
+        raise ValueError(i18n.t("err.hesap_parola_uzunluk", None,
+                                en_az=PAROLA_EN_AZ, en_cok=PAROLA_EN_COK))
+    return v
+
+
+class KayitIstegi(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    eposta: str
+    parola: str
+
+    _eposta_ok = field_validator("eposta")(check_eposta)
+    _parola_ok = field_validator("parola")(check_parola)
+
+
+class GirisIstegi(BaseModel):
+    """Girişte parola uzunluğu DENETLENMEZ: yanlış uzunluk da "e-posta ya da
+    parola hatalı" cevabını almalı, 422 ile ayrı bir sinyal vermemeli. Üst
+    sınır yalnız argon2'ye megabaytlık girdi gitmesin diye."""
+    model_config = ConfigDict(extra="forbid")
+    eposta: str
+    parola: str = Field(min_length=1, max_length=1024)
+
+    _eposta_ok = field_validator("eposta")(check_eposta)
+
+
+class SifirlamaIstegi(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    eposta: str
+
+    _eposta_ok = field_validator("eposta")(check_eposta)
+
+
+class JetonIstegi(BaseModel):
+    """E-posta bağlantısındaki ham jeton (`secrets.token_urlsafe(32)` → 43 karakter)."""
+    model_config = ConfigDict(extra="forbid")
+    jeton: str = Field(min_length=16, max_length=256)
+
+
+class YeniParolaIstegi(JetonIstegi):
+    parola: str
+
+    _parola_ok = field_validator("parola")(check_parola)

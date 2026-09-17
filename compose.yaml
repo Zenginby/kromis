@@ -37,6 +37,12 @@ services:
         required: false
     environment:
       DATABASE_URL: postgresql+psycopg://kromis:kromis@postgres:5432/kromis
+      # Çerezlerin `Secure` bayrağı burada KAPALI (Faz 1 / 3; services/cerez.py):
+      # compose `http://localhost:8765`te düz HTTP ve Safari orada Secure
+      # çerezi saklamıyor — oturum açılır, çerez düşer, kullanıcı hep 401
+      # görürdü. YALNIZ bu dosyada; TLS arkasındaki dağıtımda bu satır yok.
+      # Posta arka ucu boş bırakılıyor: anahtar yoksa konsol (`posta.log`).
+      KROMIS_GUVENLI_CEREZ: "0"
     depends_on:
       postgres:
         condition: service_healthy

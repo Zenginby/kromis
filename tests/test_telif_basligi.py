@@ -15,8 +15,7 @@ KAPSAM = DAĞITILAN ilk-el kaynak:
   * kökteki, `routers/`, `services/` ve `tools/` altındaki `.py`  (tests/
     HARİÇ — pakete girmiyor); kapsam `git ls-files '*.py'`ten TÜRETİLİYOR,
     yani yeni bir paket kendiliğinden girer,
-  * `static/` altındaki `.js` ve `.css`,
-  * `static/index.html`.
+  * `static/` altındaki `.js`, `.css` ve `.html` (index.html, giris.html).
 
 KAPSAM DIŞI ve bilinçli:
   * `static/pixel-canvas.js` — ÜÇÜNCÜ PARTİ (Ryan Mulligan, MIT). Başkasının
@@ -61,8 +60,9 @@ def _izlenen(*kaliplar: str) -> list[str]:
 
 def _kapsam() -> list[str]:
     yollar = [y for y in _izlenen("*.py") if not y.startswith("tests/")]
-    yollar += _izlenen("static/*.js", "static/*.css")
-    yollar.append("static/index.html")
+    # `static/*.html`: index.html ve giris.html (Faz 1 / 3) — yeni bir sayfa
+    # kendiliğinden girer, `.py` kalıbıyla aynı duruş.
+    yollar += _izlenen("static/*.js", "static/*.css", "static/*.html")
     return sorted(set(yollar) - {UCUNCU_PARTI})
 
 

@@ -143,7 +143,9 @@ def test_the_cookie_attributes_are_long_lived_http_only_and_site_wide(client):
     assert baslik.startswith(f"{dil.CEREZ}=en;")
     assert "httponly" in baslik and "samesite=lax" in baslik and "path=/" in baslik
     assert f"max-age={dil.CEREZ_OMRU}" in baslik
-    # `Secure` BİLEREK yok (loopback http) — gerekçesi services/dil.py::cerez_yaz.
+    # `Secure` bu testte yok ve bu doğru: `DATABASE_URL` verilmemiş (dondurulmuş
+    # kabuk, loopback http) — karar services/cerez.py'de, web modundaki açık hâli
+    # tests/test_hesap.py sınıyor.
     assert "secure" not in baslik
 
 

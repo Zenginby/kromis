@@ -1431,7 +1431,7 @@ adımı; `tools/kullanici.py`nin `--admin` bayrağını okuyan bir admin rotası
 
 ---
 
-## 9. Operasyon: göçlerin çalışma yeri, giriş betiği, yedek, `.env.example`, CI (PR: `faz1/operasyon`)
+## 9. Operasyon: göçlerin çalışma yeri, giriş betiği, yedek, `.env.example`, CI ✅ (PR: `faz1/operasyon`)
 
 **Kapsam.**
 
@@ -1495,6 +1495,109 @@ olabilir — `host.docker.internal` yerine `--network host` ve `localhost`.
 **Çıkış ölçütü.** Boş bir Postgres + boş birim ile `docker compose up`:
 göç koşuyor, uygulama açılıyor, `/health` 200, `/giris` açılıyor, CLI ile
 ilk kullanıcı yaratılıp giriliyor; CI'ın 5 işi yeşil; takım yeşil.
+
+**Yapıldığında (2026-09-17) ölçümler ve sapmalar.** Üç yeni araç, hepsi
+`tools/kullanici.py`nin çıkış kodu ailesinde (0 · 1 kullanıcı · 2 ortam) ve
+`services.db.baglanti_dizesi()` ile: **`tools/goc.py`** (`alembic upgrade
+head`; URL `config.attributes["baglanti_dizesi"]` üzerinden — `env.py`nin 1.
+önceliği; boş DB → `mevcut bos → hedef 0003_arena_win`, head'te "zaten head'te",
+göç düşerse 1 ve `alembic_version` yerinde, ulaşılamayan sunucu 2 iz sürmeden),
+**`tools/artik_dosya.py`** (`--kuru` öntanımlı, `--sil` onay ister, `--evet`
+cron için; TTY yoksa ve `--evet` yoksa 1; **3** = artık dosya DURUYOR —
+`ice_aktar`ın 3'üyle aynı sınıf; yalnız medya uzantıları, `guncelleme.json`
+"medya değil" sayılır ve silinmez; hesabı silinmiş kullanıcının dizini
+"HESABI YOK" işaretiyle bütünüyle artık; UUID olmayan dizin atlanır),
+**`tools/anahtar_dondur.py`** — belge "ONLY if §7 asked" demişti, §7'nin kaydı
+açıkça istiyor (toplu sarmalayıcı olmadan eski anahtar hiç düşürülemez):
+`depo_kimlik_bilgisi.dondur`u bekleyen her kullanıcı için çağırır, parmak izi
+başına kalan satırı basar, çözülemeyen satırda 1 ve hiçbir şey yazmaz.
+`tools/` bu yüzden **İMAJA GİRDİ** (`.dockerignore`: geliştirici araçları adıyla
+dışarıda, yeni bir araç öntanımlı içeride — bekçi `OPERATOR_ARACLARI` iki kümeyi
+eşitliyor). `compose.yaml`: `goc` servisi (`image: kromis` iki serviste, aynı
+derleme), `kromis` `service_completed_successfully` bekler; `Dockerfile` CMD
+değişmedi, yalnız gerekçe yorumu; açılışta göç bayrağı yok ve `test_docker_kapisi`
+`KROMIS_GOC*` adını ENV/şablonda yasaklıyor. CI `docker` işi: derle → `docker
+image ls` (boyut ilk kez ölçülüyor, sayı CI günlüğünde) → `docker run --rm
+--network host … python tools/goc.py` İKİ KEZ (boş DB → head, idempotenlik) →
+konteyner → `/health` + `/giris` + `/`(-L). `_test.yml` dokunulmadı.
+
+**`guncelleme.py` web'de kapalı:** bayrak `guncelleme.web_yapisi()` =
+`db.baglanti_dizesi() is not None` (`cerez.guvenli` ile aynı ölçüt; `services.db`
+ERTELİ ithal — kabuk SQLAlchemy'yi bu bayrak için yüklemesin); `KROMIS_WEB`
+YOK. Kapı ROTADA (`routers/ayarlar.py`): `GET`/`POST /api/guncelleme` → `{"web":
+true}` (404 DEĞİL: ön yüz aynı yolu çağırıyor, 404 orada "kontrol yapılamadı"
+cümlesi üretirdi), `GET /api/settings` → `"web": true, "guncelleme": null`
+(alan kalıyor: `uygulaGuncelleme(null)` rozeti söndürür; kabukta `"web": false`,
+`/api/guncelleme` gövdesi değişmedi). Ön yüz `settings.js`: `s.web === true` →
+`webKipineGec()` — "şimdi kontrol et" `<p>`si, `pref-guncelleme` `<label>`i ve
+ardındaki ipucu `<p>` gizli, `yoklaGuncelleme` çağrılmaz; `index.html`
+DEĞİŞMEDİ (çapalar ebeveynler), `test_index.py` dokunulmadı, i18n anahtarı
+eklenmedi/silinmedi. Bekçiler: `test_guncelleme_route.py` (sahte `httpx.get` +
+`_sor` kaydedici sıfır çağrı, bayat önbellek yeniden yazılmaz, taze kurulumda
+dosya hiç doğmaz, kabuk gövdeleri aynı, bayrak yalnız `DATABASE_URL`);
+`test_playwright_guncelleme.py` (web kipinde üç çapa gizli, 4 sn'de sıfır
+`/api/guncelleme` isteği, rozet yok, sürüm satırı duruyor). **Test kararı:**
+`depo_db`/`veritabani` `DATABASE_URL` verdiği için bu iki dosyanın eski testleri
+web kipine düşerdi; kabuk yolu silinmediğinden (v0.23.1) autouse fixture
+`web_yapisi`i KAPATIYOR, web testleri kendi `web_kipi` fixture'ıyla açıyor.
+
+**`.env.example`** son hâli: 1. bölüm web'in `os.environ`dan okuduğu 9
+değişkenin tamamı, sırayla (veri kökü — "web'de `kullanicilar/<uuid>` kökü"
+notuyla —, port, DB, anahtar, köken, posta ×3, çerez); 2. bölüm başlığı
+belgedeki cümleyle birebir. Bekçi genişledi: `test_the_infra_set_is_exactly_
+what_the_web_build_reads_from_the_environment` kaynağı `os.environ` literalleri
+için tarar ve `ALTYAPI`nın alt kümesi olduğunu ister (kod adları sabitten
+okuyor, literal tarama yalnız alt kümeyi görür — eşitlik değil). Kodun okuduğu
+küme belgedekiyle aynı çıktı (+`KROMIS_GUVENLI_CEREZ`, 3. görevde gelmişti).
+
+**`tools/graf_uret.py`:** `alembic/` zaten haritada değildi (tarama yalnız adı
+geçen dizinlere iniyor) — dışlama `DISLANAN_DIZINLER = ("alembic",)` ile AÇIK
+hâle geldi, README satırı genişledi, bekçi `test_the_migration_scripts_are_
+deliberately_outside_the_map` (dizin diskte `.py` taşıyor, haritada yok).
+`services/depo/` alt paketi kalemi **düştü**: 5. görev düz `depo_*.py` seçti,
+alt paket yok. Yeni `docs/isletme.md`: üç yedek / üç yer tablosu, platform
+başına release command tablosu, dört adımlı anahtar döndürme, yedi adımlı geri
+yükleme tatbikatı iskeleti (Faz 5 doldurur), 4 bekçi iddiası
+`test_docker_kapisi`de. `KURULUM.md` web bölümü 2. adım `tools/goc.py` + platform
+komutları, 5. adıma "web'de güncelleme satırı yok", 6. adım bakım araçları.
+
+Tam takım (E2E + Postgres zorunlu): **3.413 geçti, 12 atlandı, 180 sn** (taban 3.376 / 12; +37 test).
+ruff, mypy, eslint, prettier temiz; graflar güncel. **Canlı doğrulama**
+(Docker yok — imaj CI'da derlenir): geçici küme boş DB → `tools/goc.py` →
+`0003_arena_win (head)`, ikinci koşu "zaten head'te"; uvicorn + `/health` 200;
+`kullanici.py olustur` → giriş → `GET /api/guncelleme` `{"web": true}`,
+`GET /api/settings` `web: true, guncelleme: null`, kullanıcı dizininde
+`guncelleme.json` YOK; artık dosya tohumu → `artik_dosya.py` çıkış 3 ve
+listede yalnız o, `--sil --evet` yalnız onu siler, ikinci koşu 0.
+
+---
+
+## Faz 1 kapanış (2026-09-17)
+
+Dokuz görevin dokuzu da main'de: **PR #28** zemin (§1), **#29** veri modeli
+(§2), **#30** hesap (§3), **#31** istek bağlamı (§4), **#32** galeri/klasör
+(§5), **#33** sohbet/palet/varlık/tercih (§6), **#34** BYOK anahtarları (§7),
+**#35** içe aktarma + ilk kullanıcı (§8) ve bu PR (§9). Çıkış ölçütü ("iki
+kullanıcı aynı sunucuda birbirinin verisini göremiyor, E2E sınıyor") §4-§7'nin
+iki kullanıcı testleriyle karşılandı; şema `0003_arena_win`, 54 rota, 47'si
+kimlik kapısının arkasında.
+
+**Ertelenen, gerekçesiyle:** 3b Google ile giriş — isteğe bağlıydı, Faz 1
+içinde denenmedi (posta + parola yolu tek başına yetiyor; Google Cloud
+istemcisi sahibin hesabını ister) → hâlâ isteğe bağlı, sıradaki aday; platform
+sahipli sağlayıcı anahtarları → Faz 2 (kredi tarifesiyle birlikte anlam
+kazanıyor); admin arayüzü / admin rotası (`is_admin` bayrağı hazır) → Faz 2+;
+R2/S3, kuyruk, SSE, RLS ikinci katı, Redis, yapısal loglama → Faz 2 (yukarıda
+"Faz 1 dışı").
+
+**İleri taşınan takipler:** imaj boyutu (artık CI günlüğünde okunur; ilk sayı
+`docs/faz0-web-first.md` § 8'e yazılacak), ilk geri yükleme tatbikatı
+(`docs/isletme.md` § 5 iskeleti; Faz 5 kalemi), sahibin gerçek verisinin
+`ice_aktar --kuru` sayıları, yönetilen Postgres pooler davranışı (RLS notu),
+Python 3.14 tekerlekleri (CI'da görünür), `GET /api/settings`in web'de anlamsız
+`chat_instructions_path` alanı (Faz 2 persona kararı), dosya + satır
+atomikliği (kök çözüm nesne depolama + worker ile Faz 2'de; bugün
+`artik_dosya.py` arkadan topluyor).
 
 ---
 
@@ -1600,5 +1703,6 @@ idi, karar: isteğe bağlı 3b, ucuzsa).
 * **Dondurulmuş kabuk testleri** (~190 + bu fazda kalan eski depo testleri
   ~200): silinmez, kabuk ince WebView'a dönüştüğü gün toptan gider.
 * **Ölçülmeyen:** sahibin gerçek veri hacmi (bu makinede `output/` boş),
-  imaj boyutu (Faz 0 / 8'den devam), yönetilen Postgres'in pooler
-  davranışı (RLS notu), Python 3.14 tekerlekleri (CI'da görünür).
+  imaj boyutu (9. görevden beri CI `docker` işi `docker image ls` ile basıyor;
+  sayı belgeye henüz yazılmadı), yönetilen Postgres'in pooler davranışı (RLS
+  notu), Python 3.14 tekerlekleri (CI'da görünür).

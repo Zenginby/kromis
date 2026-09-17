@@ -73,6 +73,6 @@ flowchart LR
 | `static/mobile.js` | 55 | 0 | — |
 | `static/palette.js` | 844 | 37 | `/api/palette/suggest`, `/api/palettes`, `/api/palettes/{}` |
 | `static/pixel-canvas.js` | 347 | 0 | — |
-| `static/settings.js` | 932 | 23 | `/api/guncelleme`, `/api/hesap/ben`, `/api/hesap/cikis`, `/api/prefs`, `/api/settings` |
+| `static/settings.js` | 958 | 24 | `/api/guncelleme`, `/api/hesap/ben`, `/api/hesap/cikis`, `/api/prefs`, `/api/settings` |
 | `static/viewer.js` | 540 | 0 | `/output/` |
 

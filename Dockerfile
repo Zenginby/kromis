@@ -85,6 +85,13 @@ USER kromis
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD ["python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/health' % os.environ.get('PORT', '8765'), timeout=4)"]
 
+# GÖÇ BURADA YOK (Faz 1 / 9, K6): CMD `alembic upgrade head && uvicorn` DEĞİL.
+# İki replika aynı anda açılırsa iki `upgrade` yarışır (Alembic kilit tutmaz);
+# şema dağıtım ÖNCESİ tek seferlik komutla kurulur — `python tools/goc.py`,
+# imajda duruyor (`.dockerignore` `tools/`u içeride bırakıyor). Fly
+# `release_command`, Railway/Render pre-deploy, yerelde compose'un `goc`
+# servisi (KURULUM.md, docs/isletme.md). "Açılışta göç" bayrağı bilerek yok.
+#
 # `uvicorn app:app`, `--factory netguard:korumali_app` DEĞİL — `run.sh`in
 # aksine. `netguard` masaüstü kabuğunun kapısı: yalnız loopback `Host`
 # başlığını ve pencerenin kendi `Origin`ini kabul eder (netguard.py). Bir

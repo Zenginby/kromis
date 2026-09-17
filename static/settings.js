@@ -118,6 +118,18 @@ function applyConfigured(s) {
   // ya da zaten en yeni sürümdeyiz (bkz. guncelleme.py → bilgi()).
   if (s && s.guncelleme !== undefined) uygulaGuncelleme(s.guncelleme);
 
+  // ── Web yapısı: güncelleme denetimi KAPALI ──
+  // Sunucu `web: true` diyorsa (GET /api/settings; DATABASE_URL verilmiş —
+  // routers/ayarlar.py) "şimdi kontrol et" satırı, tercih anahtarı ve onun
+  // ipucu gizleniyor: web'de sunucuyu işleten güncelliyor, kullanıcıya
+  // "yeni sürüm var" demek yapamayacağı bir iş söylemek olurdu. `=== true`:
+  // POST /api/settings yanıtında alan YOK (`version` guard'ıyla aynı sebep),
+  // alan hiç gelmezse (bayat sunucu) hiçbir şey gizlenmez. index.html
+  // DEĞİŞMİYOR (dondurulmuş kabuk aynı sayfayı kullanıyor): çapalar
+  // düğmenin ve anahtarın kendi `<p>`/`<label>` ebeveyni, ipucu etiketin
+  // hemen ardındaki `<p>` — anahtarla aynı bloğun parçası.
+  if (s && s.web === true) webKipineGec();
+
   // ── Prompt Yönetmeni kapısı ──
   // Sekmenin KENDİSİ kilitlenmiyor: kilitli bir sekme "neden kapalı" bilgisini
   // de saklar. Yalnızca "Gönder" kilitli ve panelde açıklama görünüyor.
@@ -164,6 +176,18 @@ function uygulaGuncelleme(g) {
     : t("settings.title");
   dis.title = etiket;
   dis.setAttribute("aria-label", etiket);
+}
+
+/** Web yapısında güncelleme arayüzünü gizler (gerekçe `applyConfigured`ta). */
+function webKipineGec() {
+  const kontrol = $("settings-update-check");
+  if (kontrol) kontrol.closest("p").hidden = true;
+  const anahtar = $("pref-guncelleme");
+  if (!anahtar) return;
+  const etiket = anahtar.closest("label");
+  etiket.hidden = true;
+  const ipucu = etiket.nextElementSibling;
+  if (ipucu && ipucu.classList.contains("field-note")) ipucu.hidden = true;
 }
 
 /** "Şimdi kontrol et" — TTL'i baypas eden, cevabı BEKLEYEN elle kontrol.
@@ -261,7 +285,9 @@ async function loadSettings(openIfMissing) {
     applyConfigured(s);
     // Cevap henüz yoksa ardıl yoklama (gerekçe: yoklaGuncelleme'nin başlığı).
     // `s.guncelleme` doluysa gereksiz — üç istek, zaten bilinen bir cevap için.
-    if (!s.guncelleme) yoklaGuncelleme();
+    // Web yapısında (`s.web`) hiç: sunucu `{"web": true}` döner, yoklamak üç
+    // boş istek olurdu.
+    if (!s.guncelleme && s.web !== true) yoklaGuncelleme();
     // Kapı `configured`e BAKMIYOR: o bayrak yalnız AZURE'u ölçüyor ve
     // yalnızca OpenAI anahtarı olan kullanıcıya her açılışta Ayarlar
     // panelini zorla açıyordu — tam olarak 180342a'nın kapatmaya çalıştığı

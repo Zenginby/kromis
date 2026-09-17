@@ -23,9 +23,18 @@ bir kusurun ya da spec'te yazılı bir gerekçenin karşılığı:
     ve `.env.example` değişkeni açıklıyor. Sonda 503'e ALIŞTIRILMADI — kapı
     gevşetmek yerine konteynere gerçek DB verildi; burada mandallı.
 
+  * Göç DAĞITIM ÖNCESİ komut (Faz 1 / 9, K6): imajın CMD'si yalnız uvicorn,
+    `tools/goc.py` imajda; compose'ta ayrı `goc` servisi, CI'ın `docker` işi
+    konteyneri açmadan önce onu koşturuyor — bir platformun yaptığı sırayla.
+    "Açılışta göç" bayrağı yok ve olmamalı (iki replika yarışı).
+  * İşletme belgesi `docs/isletme.md` (Faz 1 / 9): DB / medya / anahtar üç
+    ayrı yedek, anahtar döndürme, geri yükleme tatbikatı — kod değil, ama
+    yokluğu ilk felakette görünür.
+
 `.dockerignore` da sınanıyor: `tests/`, `android/`, `docs/`, `.venv/` bağlama
 girerse imaj şişer ve her test değişikliği katman önbelleğini boşa düşürür;
-`.env`/`output/` girerse yerel sır ve veri imaj katmanına yazılır.
+`.env`/`output/` girerse yerel sır ve veri imaj katmanına yazılır; `tools/`
+ise İÇERİDE kalmak zorunda — operatör araçları konteynerde koşuyor.
 """
 from __future__ import annotations
 
@@ -45,6 +54,8 @@ COMPOSE = os.path.join(KOK, "compose.yaml")
 ENV_EXAMPLE = os.path.join(KOK, ".env.example")
 CI_YML = os.path.join(KOK, ".github", "workflows", "ci.yml")
 README = os.path.join(KOK, "README.md")
+KURULUM = os.path.join(KOK, "KURULUM.md")
+ISLETME = os.path.join(KOK, "docs", "isletme.md")
 
 
 def _oku(yol: str) -> str:
@@ -114,6 +125,17 @@ def test_the_image_runs_the_bare_app_not_the_desktop_netguard_factory():
     assert "${PORT" in cmd[0], "port .env.example'daki PORT'tan gelmeli"
 
 
+def test_the_image_never_migrates_on_startup_and_has_no_flag_for_it():
+    """K6: CMD `alembic upgrade && uvicorn` DEĞİL — iki replika yarışır (Alembic kilit
+    tutmaz). Göç `tools/goc.py` ile dağıtım öncesi; "açılışta göç" bayrağı bilerek YOK."""
+    metin = _kod_metni()
+    assert "alembic" not in metin and "goc.py" not in metin, "imaj açılışta göç koşturuyor"
+    assert not any(ad.startswith("KROMIS_GOC") for ad in _env()), "açılışta göç bayrağı eklenmiş"
+    assert not any(ad.startswith("KROMIS_GOC") for ad, _, _ in _atamalar()), ".env.example'a göç bayrağı girmiş"
+    # Gerekçe Dockerfile'da yazılı: bir gün "kolaylık" diye eklenmesin.
+    assert "tools/goc.py" in _oku(DOCKERFILE) and "replika" in _oku(DOCKERFILE)
+
+
 def test_the_image_runs_as_a_non_root_user():
     kullanicilar = [arg for yonerge, arg in _yonergeler() if yonerge == "USER"]
     assert kullanicilar, "USER yönergesi yok — uygulama root olarak koşar"
@@ -172,12 +194,31 @@ def test_dockerignore_keeps_everything_the_app_serves_or_imports():
     """`COPY . /app` bağlamın tamamını aldığı için dışlama listesi kaynağı
     yutmamalı: static/ ve bundled/ olmadan uygulama açılır ama `/` 500 verir."""
     yasak = {"static", "bundled", "routers", "services", "requirements.txt",
-             "app.py", "LICENSE", "NOTICE"} & _dislananlar()
+             "app.py", "LICENSE", "NOTICE", "alembic", "alembic.ini", "tools"} & _dislananlar()
     assert not yasak, f".dockerignore uygulamanın parçasını dışlıyor: {sorted(yasak)}"
     # `*.py` gibi bir kalıp da aynı sonucu verirdi; `**/*.md` ise
     # `bundled/prompts/*.md`yi (Yönetmen personası) yutardı — kök `*.md` yutmaz.
     assert not any(k in ("*.py", "*", "**/*.md", "**/*") for k in _dislananlar())
     assert os.path.exists(os.path.join(KOK, "bundled", "prompts", "prompt-yonetmeni.md"))
+
+
+OPERATOR_ARACLARI = ("goc", "kullanici", "ice_aktar", "artik_dosya", "anahtar_dondur")
+
+
+def test_dockerignore_ships_the_operator_tools_and_only_the_dev_tools_stay_out():
+    """`tools/` İMAJDA (Faz 1 / 9): `goc.py` platformun dağıtım öncesi komutu, ötekiler
+    konteyner içinden koşuyor. Dışlama ADIYLA ve yalnız geliştirici araçları; listede
+    olmayan yeni bir araç imaja GİRER. Her `tools/*.py` iki kümeden tam birinde."""
+    dislanan = _dislananlar()
+    for ad in OPERATOR_ARACLARI:
+        assert os.path.exists(os.path.join(KOK, "tools", f"{ad}.py")), ad
+        assert f"tools/{ad}.py" not in dislanan, f"{ad} operatör aracı — imajda kalmalı"
+    dev = {a for a in dislanan if a.startswith("tools/")}
+    diskteki = {f"tools/{a}" for a in os.listdir(os.path.join(KOK, "tools"))
+                if a.endswith(".py") and a != "__init__.py"}
+    assert dev <= diskteki, f"olmayan dosya dışlanıyor: {sorted(dev - diskteki)}"
+    assert diskteki - dev == {f"tools/{ad}.py" for ad in OPERATOR_ARACLARI}, (
+        "yeni tools/*.py: ya OPERATOR_ARACLARI'na ya .dockerignore'a, gerekçesiyle")
 
 
 # --------------------------------------------------------------------------
@@ -217,6 +258,40 @@ def _katalog_adlari() -> set[str]:
     adlar |= {c.url_env for c in catalog.CREDENTIALS if c.url_env}
     adlar |= {m.wire_from_env for m in catalog.CHAT_MODELS if m.wire_from_env}
     return adlar
+
+
+def _kodun_okudugu_adlar() -> set[str]:
+    """Ürün kodunun `os.environ`dan okuduğu değişkenler — kaynağı regex'le tarayarak.
+
+    `ALTYAPI` elle kurulu bir küme; bu tarama onun bekçisi: kod yeni bir
+    değişken okumaya başlar da şablona girmezse burada görünür. Dondurulmuş
+    kabuğun/Android'in kendi değişkenleri (`KROMIS_ANDROID_*`, `LOCALAPPDATA`)
+    web'e ait değil, `paths.py`nin platform dalları — dışarıda.
+    """
+    adlar: set[str] = set()
+    for kok, _, dosyalar in os.walk(KOK):
+        goreli = os.path.relpath(kok, KOK)
+        if goreli.split(os.sep)[0] in ("tests", "tools", "android", "docs", ".venv", "node_modules",
+                                       "alembic", ".git", "build", "dist"):
+            continue
+        for ad in dosyalar:
+            if ad.endswith(".py"):
+                adlar |= set(re.findall(r"os\.environ(?:\.get)?\(\s*\"([A-Z][A-Z0-9_]+)\"",
+                                        _oku(os.path.join(kok, ad))))
+    return adlar
+
+
+def test_the_infra_set_is_exactly_what_the_web_build_reads_from_the_environment():
+    """Bekçinin bekçisi: `ALTYAPI` sabitleri kaynaktan geliyor ama KÜME elle;
+    kaynak taraması onunla bir olmalı (platform dalları hariç, gerekçe yukarıda)."""
+    okunan = _kodun_okudugu_adlar()
+    platform = {"LOCALAPPDATA"}
+    beklenen = {ad for ad in okunan if not ad.startswith("KROMIS_ANDROID_")} - platform
+    # Kod çoğu adı sabit üzerinden okuyor (`os.environ.get(DATABASE_URL_ENV)`); bu
+    # tarama yalnız DİZE literalli okumaları görür — o yüzden alt küme, eşitlik değil.
+    assert beklenen <= ALTYAPI, f"kodun okuduğu ama şablonda olmayan: {sorted(beklenen - ALTYAPI)}"
+    for ad in ALTYAPI:
+        assert ad in _oku(ENV_EXAMPLE), ad
 
 
 def test_env_example_lists_exactly_the_infra_vars_and_the_catalog_names():
@@ -262,6 +337,22 @@ def test_env_example_requires_the_secret_key_and_shows_the_generation_command():
     assert "ZORUNLU" in metin and "AÇILMAZ" in metin
     assert sifre.URETIM_KOMUTU in metin, "üretim komutu sifre.URETIM_KOMUTU ile birebir olmalı"
     assert "AYRI SAKLANIR" in metin, "anahtar DB yedeğinden ayrı — belge §7/§9"
+    assert "tools/anahtar_dondur.py" in metin and "docs/isletme.md" in metin
+
+
+def test_env_example_has_its_final_shape_infra_first_then_the_credentials_file_format():
+    """Faz 1 / 9: 1. bölüm web'in okuduğu HER şey (sıra: veri kökü, port, DB, anahtar,
+    köken, posta, çerez), 2. bölüm başlığı `credentials.env` biçimi olduğunu söyler —
+    web bunları DB'de tutar. Şablonu okuyan işletmen önce kendi işini görür."""
+    adlar = [ad for ad, _, _ in _atamalar()]
+    altyapi_sirasi = [ad for ad in adlar if ad in ALTYAPI]
+    assert altyapi_sirasi == adlar[:len(ALTYAPI)], "altyapı değişkenleri en başta ve bir arada değil"
+    assert altyapi_sirasi[:4] == ["KROMIS_DATA_DIR", "PORT", db.DATABASE_URL_ENV, sifre.ANAHTAR_ENV]
+    metin = _oku(ENV_EXAMPLE)
+    assert ("credentials.env biçimi — dondurulmuş masaüstü/Android sürümü ve "
+            "`tools/ice_aktar.py --kimlik-dosyasi` için; web sürümü bunları DB'de tutar") in metin
+    assert "kullanicilar/<uuid>" in metin, "KROMIS_DATA_DIR'ın web'deki yerleşimi yazılı olmalı"
+    assert "tools/goc.py" in metin, "şemanın dağıtım öncesi komutla kurulduğu yazılı olmalı"
 
 
 def test_env_example_defaults_match_the_dockerfile():
@@ -290,10 +381,12 @@ def test_compose_is_dev_only_builds_locally_and_mounts_the_data_volume():
     assert "YALNIZ YEREL GELİŞTİRME" in _oku(COMPOSE)
     veri = _yaml(COMPOSE)
     servisler = veri["services"]
-    assert set(servisler) == {"kromis", "postgres"}, list(servisler)
+    assert set(servisler) == {"kromis", "goc", "postgres"}, list(servisler)
     servis = servisler["kromis"]
     assert servis.get("build") == ".", "imaj yerelden derlenmeli, bir kayıt defterinden çekilmemeli"
-    assert "image" not in servis
+    # `image:` yalnız YEREL bir ad olabilir (iki servis aynı derlemeyi paylaşsın);
+    # `/` ya da `:` taşıyan bir ad kayıt defterine işaret eder.
+    assert not any(c in str(servis.get("image", "")) for c in "/:"), servis.get("image")
     assert "8765:8765" in servis.get("ports", [])
     baglar = [str(b) for b in servis.get("volumes", [])]
     assert any(b.endswith(":/data") for b in baglar), baglar
@@ -321,8 +414,25 @@ def test_compose_gives_the_app_a_postgres_and_waits_for_it_to_be_healthy():
         assert str(port).startswith("127.0.0.1:"), port
     # Yorum satırları atılıyor: gerekçe metni `alembic`i anıyor, komut anmıyor.
     kod = "\n".join(s for s in _oku(COMPOSE).splitlines() if not s.lstrip().startswith("#"))
-    assert "alembic" not in kod, (
-        "göç compose'da koşturuluyor — açılışta göç yok (K6), 9. görevin `goc` servisi")
+    assert "alembic" not in kod, "göç `alembic` ile değil `tools/goc.py` ile — tek sarmalayıcı"
+    assert "goc.py" not in str(kromis.get("command", "")), "uygulama servisi göç koşturuyor (K6)"
+
+
+def test_compose_runs_the_migration_in_its_own_service_and_the_app_waits_for_it():
+    """Faz 1 / 9, K6: `goc` aynı imajla `python tools/goc.py` koşturup biter; `kromis`
+    onu `service_completed_successfully` ile bekler. Platformların "dağıtım öncesi
+    komut"unun yerel ikizi — uygulama konteyneri hiçbir zaman göç koşturmaz."""
+    veri = _yaml(COMPOSE)
+    goc, kromis = veri["services"]["goc"], veri["services"]["kromis"]
+    assert goc.get("build") == "." and goc.get("image") == kromis.get("image"), "aynı imaj olmalı"
+    komut = goc.get("command")
+    assert komut == ["python", "tools/goc.py"], komut
+    assert goc.get("depends_on", {}).get("postgres", {}).get("condition") == "service_healthy"
+    assert kromis.get("depends_on", {}).get("goc", {}).get("condition") == "service_completed_successfully"
+    assert str(goc.get("environment", {}).get(db.DATABASE_URL_ENV, "")) == str(
+        kromis["environment"][db.DATABASE_URL_ENV]), "göç uygulamanın DB'sine gitmeli"
+    assert "ports" not in goc and "volumes" not in goc, "göç servisi ne port açar ne birim bağlar"
+    assert str(goc.get("restart", "no")) == "no", "biten bir iş yeniden başlatılmaz"
     # `KROMIS_SECRET_KEY` (Faz 1 / 7): compose değeri `.env`/kabuktan yorumlar, yoksa
     # `:?` ile DURUR — dosyaya sabit anahtar YAZILMAZ (git'te anahtar demek).
     anahtar = str(kromis.get("environment", {}).get(sifre.ANAHTAR_ENV, ""))
@@ -371,7 +481,7 @@ def test_ci_docker_job_runs_the_container_against_a_postgres_service():
     assert servis, "docker işinde postgres servisi yok — konteyner 503 verir"
     assert str(servis.get("image", "")).startswith("postgres:17"), servis.get("image")
     assert "pg_isready" in str(servis.get("options", "")), "servis sağlık denetimi yok"
-    adimlar = [a for a in is_.get("steps", []) if "docker run" in str(a.get("run", ""))]
+    adimlar = [a for a in is_.get("steps", []) if "docker run -d" in str(a.get("run", ""))]
     assert len(adimlar) == 1, adimlar
     adim = adimlar[0]
     assert "--network host" in adim["run"]
@@ -385,6 +495,29 @@ def test_ci_docker_job_runs_the_container_against_a_postgres_service():
     assert url.startswith("postgresql+psycopg://") and "localhost:5432" in url, url
     # `curl -f` duruyor: 503 hâlâ kırmızı, sonda gevşetilmedi.
     assert "curl -fsS" in adim["run"] and "/health" in adim["run"]
+    assert "/giris" in adim["run"], "giriş sayfası da sorulmalı — şema kurulmadıysa orada görünür"
+
+
+def test_ci_docker_job_migrates_from_the_image_before_starting_the_container():
+    """Faz 1 / 9: göç adımı bir platformun yaptığı sırayla — `docker run --rm … python
+    tools/goc.py` (dağıtım öncesi komut) ÖNCE, uygulama konteyneri SONRA; aynı
+    Postgres, aynı `--network host`. İkinci koşu idempotenliği ölçüyor. İmaj boyutu
+    da burada okunuyor (Faz 0 / 8'in ölçülmeyen sayısı)."""
+    from services import db
+    adimlar = _docker_isi().get("steps", [])
+    komutlar = [str(a.get("run") or "") for a in adimlar]
+    goc = [i for i, k in enumerate(komutlar) if "tools/goc.py" in k]
+    sonda = [i for i, k in enumerate(komutlar) if "docker run -d" in k]
+    derleme = [i for i, k in enumerate(komutlar) if "docker build" in k]
+    assert len(goc) == 1 and len(sonda) == 1 and len(derleme) == 1, komutlar
+    assert derleme[0] < goc[0] < sonda[0], "sıra: derle → göç → aç"
+    adim = adimlar[goc[0]]
+    assert adim["run"].count("docker run --rm --network host -e DATABASE_URL kromis python tools/goc.py") == 2, (
+        "göç iki kez koşmalı: ilki boş DB → head, ikincisi idempotenlik")
+    assert str(adim.get("env", {}).get(db.DATABASE_URL_ENV, "")) == str(
+        adimlar[sonda[0]]["env"][db.DATABASE_URL_ENV]), "göç ve uygulama aynı DB'ye gitmeli"
+    assert "set -euo pipefail" in adim["run"], "göç düşerse adım da düşmeli"
+    assert "docker image ls" in komutlar[derleme[0]], "imaj boyutu basılmıyor"
 
 
 def test_ci_docker_job_is_blocking_and_time_boxed():
@@ -406,3 +539,40 @@ def test_the_readme_tells_developers_how_to_run_the_image_and_probe_health():
     assert "KROMIS_TEST_DATABASE_URL" in metin and "tools/test_ortami.py" in metin
     # Adım 6'dan beri mypy KESİCİ; "bilgi amaçlı" cümlesi bayattı.
     assert "şimdilik bilgi amaçlı" not in metin
+    # Faz 1 / 9: şema `tools/goc.py` ile, açılışta değil.
+    assert "tools/goc.py" in metin
+
+
+# --------------------------------------------------------------------------
+# KURULUM.md ve docs/isletme.md — işletme belgeleri (Faz 1 / 9)
+# --------------------------------------------------------------------------
+
+def test_the_install_guide_names_the_pre_deploy_migration_command_per_platform():
+    """İşletmen göçü nereye koyacağını buradan öğreniyor: platformların komut
+    adları ve compose akışı yazılı olmalı; `alembic upgrade head`i açılışa koyan
+    bir yönerge kalmamalı."""
+    metin = _oku(KURULUM)
+    assert "tools/goc.py" in metin
+    for platform in ("release_command", "Railway", "Render"):
+        assert platform in metin, platform
+    assert "service_completed_successfully" in metin or "goc" in metin
+    assert "docs/isletme.md" in metin
+    assert "tools/artik_dosya.py" in metin
+
+
+def test_the_operations_doc_separates_the_three_backups_and_has_a_restore_drill():
+    """docs/isletme.md: DB yedeği platformun (PITR / pg_dump), medya dizini AYRI,
+    `KROMIS_SECRET_KEY` ÜÇÜNCÜ yerde; anahtar döndürme `tools/anahtar_dondur.py` ile;
+    geri yükleme tatbikatı adımlı (Faz 5'in kalemi için iskelet)."""
+    assert os.path.exists(ISLETME), "docs/isletme.md yok"
+    metin = _oku(ISLETME)
+    for parca in ("pg_dump", "PITR", sifre.ANAHTAR_ENV, "kullanicilar/", "tatbikat",
+                  "tools/anahtar_dondur.py", "tools/goc.py", "tools/artik_dosya.py",
+                  "release_command"):
+        assert parca in metin, parca
+    # Üç yedek, üç yer: anahtar ne DB'nin ne medyanın yanında.
+    assert "ÜÇÜNCÜ" in metin or "üçüncü" in metin
+    # Tatbikat adımları numaralı ve doğrulanacak şeyler yazılı.
+    assert re.search(r"^\s*1\.\s", metin, re.M) and "doğrula" in metin.lower()
+    # Aynı kural şablonda da: anahtar yedekten ayrı.
+    assert "AYRI SAKLANIR" in _oku(ENV_EXAMPLE)

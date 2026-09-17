@@ -105,6 +105,25 @@ _KILIT = threading.Lock()
 _KOSUYOR = False
 
 
+def web_yapisi() -> bool:
+    """Web sürümü mü? — bu kontrol orada KAPALI (sahibin 2026-09-17 kararı, Faz 1 / 9).
+
+    GitHub Releases denetimi dondurulmuş masaüstü/Android paketi için anlamlı:
+    kullanıcı kendi paketini indirir. Web'de sunucuyu işleten güncelliyor;
+    "yeni sürüm var" satırı kullanıcıya yapamayacağı bir iş söyler (yanlış
+    pozitif) ve her açılış dış ağa gereksiz bir istek olur. Bayrak TEK ve
+    ÖDÜNÇ: `DATABASE_URL` verilmişse web (`services.cerez.guvenli`nin ölçütüyle
+    aynı) — ikinci bir `KROMIS_WEB` bayrağı iki ölçütün bir gün ayrışması demekti.
+    Kapı rotada (routers/ayarlar.py): üç güncelleme rotası bu modüle hiç
+    inmez, `guncelleme.json` da yazılmaz. `services.db` burada ERTELİ ithal:
+    modül dondurulmuş kabukta da yükleniyor ve SQLAlchemy'yi bu bayrak için
+    ithal anında yüklemek gereksiz.
+    """
+    from services import db
+
+    return db.baglanti_dizesi() is not None
+
+
 def _onbellek_yolu(output_dir: str) -> str:
     return os.path.join(output_dir, ONBELLEK_DOSYASI)
 

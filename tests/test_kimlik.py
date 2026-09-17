@@ -392,11 +392,15 @@ def test_resolving_the_user_costs_exactly_one_query_per_request(istemci):
         assert c.get("/api/prefs").status_code == 200
         assert len(sayac) == 2 and "tercihler" in sayac[1] and "kullanici_id" in sayac[1], sayac
         # Faz 1 / 7: `GET /api/settings` 3 — kimlik (1) + `saglayici_kimlikleri` (1, bir kez;
-        # altı sağlayıcı ve N model için yeniden sorulmaz) + `tercihler` (1).
+        # altı sağlayıcı ve N model için yeniden sorulmaz) + `tercihler` (1). Faz 1 / 9'dan
+        # beri WEB'DE 2: `tercihler` yalnız `guncelleme_kontrolu` için okunuyordu ve
+        # güncelleme denetimi web'de kapalı (guncelleme.web_yapisi; DATABASE_URL = web) —
+        # o sorgu hiç atılmıyor. Kabukta 3 sürer, bu kurgu web.
         sayac.clear()
         assert c.get("/api/settings").status_code == 200
-        assert len(sayac) == 3, sayac
+        assert len(sayac) == 2, sayac
         assert sum("saglayici_kimlikleri" in q and "kullanici_id" in q for q in sayac) == 1, sayac
+        assert not any("tercihler" in q for q in sayac), "web'de tercih okunmaz — denetim kapalı"
     finally:
         event.remove(motor, "before_cursor_execute", _say)
 

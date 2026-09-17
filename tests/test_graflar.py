@@ -101,6 +101,25 @@ def test_the_scanner_is_not_blind():
         assert r["islev"] and r["satir"] > 0, r
 
 
+def test_the_migration_scripts_are_deliberately_outside_the_map():
+    """`alembic/` diskte `.py` taşıyor ama haritada YOK (Faz 1 / 9).
+
+    Bekçinin iki yüzü: dizin gerçekten var ve göç dosyası taşıyor (yoksa
+    dışlama anlamsız), harita onlardan hiçbirini modül saymıyor. README'nin
+    "görmediği şeyler" listesi gerekçeyi yazıyor; o satır düşerse burada değil,
+    `test_committed_graphs_are_identical_to_a_fresh_scan`ta görünür.
+    """
+    for dizin in gu.DISLANAN_DIZINLER:
+        yol = os.path.join(REPO, dizin)
+        assert any(a.endswith(".py") for _, _, dosyalar in os.walk(yol) for a in dosyalar), dizin
+    g = gu.graf_topla()
+    for dizin in gu.DISLANAN_DIZINLER:
+        assert not any(m["ad"] == dizin or m["ad"].startswith(f"{dizin}.") for m in g["moduller"]), dizin
+        assert not any(m["yol"].startswith(f"{dizin}/") for m in g["moduller"]), dizin
+    assert "alembic" in gu.DISLANAN_DIZINLER
+    assert "BİLEREK dışarıda" in gu.readme_md(g)
+
+
 def test_every_counted_test_file_is_visible_somewhere_in_the_map():
     """Sayılan her test dosyası haritada BİR YERDE görünmeli.
 

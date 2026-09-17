@@ -183,6 +183,14 @@ Tarayıcıda `http://127.0.0.1:8765` açılır.
 python3 -m pytest tests/ -q
 ```
 
+Ön yüz lint/biçim (CI'daki `lint-onyuz` işi aynısını koşar; Node 22):
+
+```bash
+npm ci                          # eslint + prettier, package-lock.json'daki sürümlerle
+npx eslint static/              # dosyalar arası adlar: eslint.paylasilan-adlar.json
+npx prettier --check static/    # düzeltmek için: npx prettier --write static/
+```
+
 ### 4. Derle ve yayınla
 
 ```bash

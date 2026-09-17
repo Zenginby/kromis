@@ -27,12 +27,12 @@
 // üretime özel" duruşuyla tutarlı.
 let onizlemeCikarilan = new Set();
 
-let activePalette = null;      // { seed, mode, colors:[{hex,name}], name, id, dropped } | null
+let activePalette = null; // { seed, mode, colors:[{hex,name}], name, id, dropped } | null
 let paletteStrength = "balanced";
-let paletteCache = [];         // GET /api/palettes
+let paletteCache = []; // GET /api/palettes
 let paletteTab = "new";
-let suggestions = [];          // son öneri seti
-let suggestSeed = "";          // önerilerin ÜRETİLDİĞİ tohum (input'tan değil, sunucudan)
+let suggestions = []; // son öneri seti
+let suggestSeed = ""; // önerilerin ÜRETİLDİĞİ tohum (input'tan değil, sunucudan)
 let selectedSuggestion = null; // seçili harmoni modu
 let suggestTimer = null;
 let suggestToken = 0;
@@ -51,9 +51,11 @@ const HARMONY_KEYS = {
 // HARMONY_KEYS'in ikizi, aynı adlandırma gerekçesiyle. Çözüm OKUNDUĞU yerde
 // yapılıyor: burada `t()` çağırmak, sözlüğü modül yüklenirken tek bir dile
 // çakmak olurdu ve dil değişiminde bayat kalırdı.
-const STRENGTH_KEYS = { hint: "palette.strength_hint",
-                        balanced: "palette.strength_balanced",
-                        strict: "palette.strength_strict" };
+const STRENGTH_KEYS = {
+  hint: "palette.strength_hint",
+  balanced: "palette.strength_balanced",
+  strict: "palette.strength_strict",
+};
 const DEFAULT_SEED = "#c86a3c";
 
 // ── Renk seçici (HSV karesi + ton kaydırıcısı) ───────────────────────
@@ -67,11 +69,20 @@ let pick = { h: 24, s: 0.7, v: 0.78 };
 
 function hsvToRgb(h, s, v) {
   const c = v * s;
-  const hp = ((((h % 360) + 360) % 360) / 60);
+  const hp = (((h % 360) + 360) % 360) / 60;
   const x = c * (1 - Math.abs((hp % 2) - 1));
   const [r, g, b] =
-    hp < 1 ? [c, x, 0] : hp < 2 ? [x, c, 0] : hp < 3 ? [0, c, x] :
-    hp < 4 ? [0, x, c] : hp < 5 ? [x, 0, c] : [c, 0, x];
+    hp < 1
+      ? [c, x, 0]
+      : hp < 2
+        ? [x, c, 0]
+        : hp < 3
+          ? [0, c, x]
+          : hp < 4
+            ? [0, x, c]
+            : hp < 5
+              ? [x, 0, c]
+              : [c, 0, x];
   const m = v - c;
   return [r + m, g + m, b + m].map((n) => Math.round(n * 255));
 }
@@ -83,7 +94,7 @@ function rgbToHsv(r, g, b) {
   const d = max - min;
   let h = null; // akromatik: ton tanımsız (bkz. setPickFromHex)
   if (d) {
-    if (max === rn) h = (((gn - bn) / d) % 6 + 6) % 6;
+    if (max === rn) h = ((((gn - bn) / d) % 6) + 6) % 6;
     else if (max === gn) h = (bn - rn) / d + 2;
     else h = (rn - gn) / d + 4;
     h *= 60;
@@ -102,7 +113,9 @@ function rgbToHex([r, g, b]) {
   return "#" + [r, g, b].map((n) => n.toString(16).padStart(2, "0")).join("");
 }
 
-function pickHex() { return rgbToHex(hsvToRgb(pick.h, pick.s, pick.v)); }
+function pickHex() {
+  return rgbToHex(hsvToRgb(pick.h, pick.s, pick.v));
+}
 
 function setPickFromHex(hex) {
   const rgb = hexToRgb(hex);
@@ -120,8 +133,14 @@ function renderPicker({ syncHexField = true } = {}) {
   field.style.background =
     `linear-gradient(0deg, #000, transparent),` +
     `linear-gradient(90deg, #fff, hsl(${pick.h} 100% 50%))`;
-  field.setAttribute("aria-valuetext", t("palette.field_valuetext", {
-    doygunluk: Math.round(pick.s * 100), parlaklik: Math.round(pick.v * 100), hex }));
+  field.setAttribute(
+    "aria-valuetext",
+    t("palette.field_valuetext", {
+      doygunluk: Math.round(pick.s * 100),
+      parlaklik: Math.round(pick.v * 100),
+      hex,
+    }),
+  );
   const thumb = $("palette-field-thumb");
   thumb.style.left = `${pick.s * 100}%`;
   thumb.style.top = `${(1 - pick.v) * 100}%`;
@@ -142,8 +161,12 @@ function setPickFromPoint(clientX, clientY) {
   scheduleSuggest();
 }
 
-function paletteStatus(msg) { $("palette-status").textContent = msg || ""; }
-function paletteModalStatus(msg) { $("palette-modal-status").textContent = msg || ""; }
+function paletteStatus(msg) {
+  $("palette-status").textContent = msg || "";
+}
+function paletteModalStatus(msg) {
+  $("palette-modal-status").textContent = msg || "";
+}
 
 /** 422 gövdesi bir dizi olabiliyor; `err.detail` doğrudan basılırsa çöp çıkar. */
 function detailText(err) {
@@ -154,7 +177,10 @@ function detailText(err) {
   if (d.some((e) => e && e.type === "extra_forbidden")) {
     return t("err.extra_forbidden");
   }
-  return d.map((e) => (e && e.msg) || "").filter(Boolean).join("; ");
+  return d
+    .map((e) => (e && e.msg) || "")
+    .filter(Boolean)
+    .join("; ");
 }
 
 /** Renk örneği şeridi. Örneklerin ÜSTÜNE metin yazılmaz — bkz. style.css notu. */
@@ -173,8 +199,10 @@ function detailText(err) {
 // `secili`: kart seçili DEĞİLSE kutucuğa dokunmak rengi çıkarmaz, o paleti
 // SEÇER (bkz. `onizlemeCikarmayiCevir`). Etiket bunu söylemek zorunda, yoksa
 // ekran okuyucu kullanıcısına "paletten çıkar" vaat edilip palet seçilirdi.
-function swatchRow(colors, { interactive = false, dropped = null, onToggle = null,
-                             secili = true } = {}) {
+function swatchRow(
+  colors,
+  { interactive = false, dropped = null, onToggle = null, secili = true } = {},
+) {
   const row = document.createElement("span");
   row.className = "palette-sw-row";
   (colors || []).forEach((c, index) => {
@@ -193,9 +221,11 @@ function swatchRow(colors, { interactive = false, dropped = null, onToggle = nul
       sw.type = "button";
       // Bilgi renk algısına bağlı olmasın: durum hem aria-pressed hem metinde.
       sw.setAttribute("aria-pressed", String(isDropped));
-      sw.setAttribute("aria-label", `${c.name} ${c.hex} — ` + t(
-        !secili ? "palette.sw_pick" : (isDropped ? "palette.sw_restore"
-                                                 : "palette.sw_drop")));
+      sw.setAttribute(
+        "aria-label",
+        `${c.name} ${c.hex} — ` +
+          t(!secili ? "palette.sw_pick" : isDropped ? "palette.sw_restore" : "palette.sw_drop"),
+      );
       // `stopPropagation` ŞART: seçim tıklaması sarmalayıcı <div>'de dinleniyor
       // (renderSuggestions / renderPaletteLibrary) ve kutucuk tıklaması oraya
       // baloncuklanırsa her çıkarma aynı anda bir "seçim" olarak da sayılırdı.
@@ -233,22 +263,27 @@ function renderPalettePanel() {
   // (swatchRow notu). `dropped` yine geçiliyor — üstü çizili kutucuklar hangi
   // rengin çıktığını göstermeye devam ediyor, aşağıdaki `4/5 renk` sayacıyla
   // birlikte.
-  holder.appendChild(swatchRow(activePalette.colors, {
-    dropped: activePalette.dropped,
-  }));
+  holder.appendChild(
+    swatchRow(activePalette.colors, {
+      dropped: activePalette.dropped,
+    }),
+  );
 
   const total = (activePalette.colors || []).length;
   const kept = total - activePalette.dropped.size;
   // Sayaç YALNIZCA bir şey çıkarıldığında görünüyor: her zaman "5/5" yazmak
   // kullanıcıya taşımadığı bir bilgiyi sürekli okutur.
   const count = activePalette.dropped.size
-    ? ` · ${t("palette.kept_count", { kalan: kept, toplam: total })}` : "";
+    ? ` · ${t("palette.kept_count", { kalan: kept, toplam: total })}`
+    : "";
   $("palette-label").textContent =
     `${paletteTitleOf(activePalette)} · ${t(STRENGTH_KEYS[paletteStrength])}${count}`;
 
   $("palette-strength-row").hidden = false;
-  selectInGroup("#palette-strength",
-    document.querySelector(`#palette-strength button[data-strength="${paletteStrength}"]`));
+  selectInGroup(
+    "#palette-strength",
+    document.querySelector(`#palette-strength button[data-strength="${paletteStrength}"]`),
+  );
 
   // Aynı palet iki farklı ifadeyle gidiyor: üretimde "bu renkleri kullan",
   // düzenlemede "renkleri kaydır, kompozisyonu koru". Kullanıcı hangisinin
@@ -284,8 +319,15 @@ function readPaletteOpts() {
 // Çıkarma O ÜRETİME özel: yeni palet seçilince sıfırlanır. Kalıcı olarak daha
 // az renkli bir palet isteyen kullanıcı çıkarıp KAYDEDİYOR — kayıt donmuş renk
 // listesi tuttuğu için o palet 4 renkle donar (bkz. sunucudaki SavePaletteRequest.drop).
-function applyPalette({ seed, mode, colors, name = "", strength = null, id = null,
-                       dropped = null }) {
+function applyPalette({
+  seed,
+  mode,
+  colors,
+  name = "",
+  strength = null,
+  id = null,
+  dropped = null,
+}) {
   // KOPYA, referans DEĞİL: `dropped` olarak önizleme kümesi geliyor ve o küme
   // panel yeniden açıldığında değişmeye devam ediyor. Referans tutulsa panelde
   // bir renge dokunmak, uygulanmış paleti sessizce değiştirirdi.
@@ -383,8 +425,15 @@ async function fetchSuggestions() {
  * `cikarilabilir` yalnız öneri kartlarında true: kayıtlı paletin renkleri kayıt
  * anında donduruluyor (palette_store.py), oradan renk çıkarmak anlamsız olurdu.
  */
-function makeChoiceButton({ title, colors, subtitle, cikarilabilir = false,
-                            dropped = null, secili = false, onToggle = null }) {
+function makeChoiceButton({
+  title,
+  colors,
+  subtitle,
+  cikarilabilir = false,
+  dropped = null,
+  secili = false,
+  onToggle = null,
+}) {
   const kart = document.createElement("div");
   kart.className = "palette-choice";
   const names = (colors || []).map((c) => c.name).join(", ");
@@ -400,9 +449,9 @@ function makeChoiceButton({ title, colors, subtitle, cikarilabilir = false,
   titleEl.className = "palette-choice-title";
   titleEl.textContent = title;
   kart.appendChild(titleEl);
-  kart.appendChild(swatchRow(colors, cikarilabilir
-    ? { interactive: true, dropped, onToggle, secili }
-    : {}));
+  kart.appendChild(
+    swatchRow(colors, cikarilabilir ? { interactive: true, dropped, onToggle, secili } : {}),
+  );
 
   const sub = document.createElement("span");
   sub.className = "palette-choice-names";
@@ -529,13 +578,20 @@ function renderPaletteLibrary() {
     const btn = makeChoiceButton({
       title: rec.name,
       colors: rec.colors,
-      subtitle: `${t(HARMONY_KEYS[rec.mode] || rec.mode)} · ` +
-                `${t(STRENGTH_KEYS[rec.strength] || rec.strength)}`,
+      subtitle:
+        `${t(HARMONY_KEYS[rec.mode] || rec.mode)} · ` +
+        `${t(STRENGTH_KEYS[rec.strength] || rec.strength)}`,
     });
     btn.addEventListener("click", () => {
       // Kayıttaki renkler zaten dondurulmuş — yeniden hesaplamaya gerek yok.
-      applyPalette({ seed: rec.seed, mode: rec.mode, colors: rec.colors,
-                     name: rec.name, strength: rec.strength, id: rec.id });
+      applyPalette({
+        seed: rec.seed,
+        mode: rec.mode,
+        colors: rec.colors,
+        name: rec.name,
+        strength: rec.strength,
+        id: rec.id,
+      });
       closePaletteModal();
     });
     cell.appendChild(btn);
@@ -546,7 +602,10 @@ function renderPaletteLibrary() {
     del.setAttribute("aria-label", t("palette.delete_named", { ad: rec.name }));
     del.title = t("palette.delete");
     del.textContent = "×";
-    del.addEventListener("click", (e) => { e.stopPropagation(); deletePalette(rec); });
+    del.addEventListener("click", (e) => {
+      e.stopPropagation();
+      deletePalette(rec);
+    });
     cell.appendChild(del);
 
     grid.appendChild(cell);
@@ -556,17 +615,15 @@ function renderPaletteLibrary() {
 async function savePalette() {
   const item = currentSuggestion();
   if (!item) return;
-  const name = await promptDialog(
-    t("palette.save_title"),
-    t("palette.save_body"),
-    { okLabel: t("common.save") });
+  const name = await promptDialog(t("palette.save_title"), t("palette.save_body"), {
+    okLabel: t("common.save"),
+  });
   if (!name) return;
   try {
     const res = await fetch("/api/palettes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, seed: suggestSeed, mode: item.mode,
-                             strength: paletteStrength }),
+      body: JSON.stringify({ name, seed: suggestSeed, mode: item.mode, strength: paletteStrength }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -574,8 +631,14 @@ async function savePalette() {
     }
     const saved = (await res.json()).palette;
     await loadPalettes();
-    applyPalette({ seed: saved.seed, mode: saved.mode, colors: saved.colors,
-                   name: saved.name, strength: saved.strength, id: saved.id });
+    applyPalette({
+      seed: saved.seed,
+      mode: saved.mode,
+      colors: saved.colors,
+      name: saved.name,
+      strength: saved.strength,
+      id: saved.id,
+    });
     closePaletteModal();
   } catch (e) {
     paletteModalStatus(e.message);
@@ -585,7 +648,8 @@ async function savePalette() {
 async function deletePalette(rec) {
   const ok = await confirmDialog(
     t("palette.delete_title", { ad: rec.name }),
-    t("palette.delete_body"));
+    t("palette.delete_body"),
+  );
   if (!ok) return;
   try {
     const res = await fetch(`/api/palettes/${rec.id}`, { method: "DELETE" });
@@ -603,8 +667,10 @@ function setPaletteTab(tab) {
   paletteTab = tab;
   $("palette-new").hidden = tab !== "new";
   $("palette-saved").hidden = tab !== "saved";
-  selectInGroup("#palette-tabs",
-    document.querySelector(`#palette-tabs button[data-ptab="${tab}"]`));
+  selectInGroup(
+    "#palette-tabs",
+    document.querySelector(`#palette-tabs button[data-ptab="${tab}"]`),
+  );
   if (tab === "saved") renderPaletteLibrary();
 }
 
@@ -626,7 +692,9 @@ function openPaletteModal() {
   fetchSuggestions();
 }
 
-function closePaletteModal() { closeSheets(); }
+function closePaletteModal() {
+  closeSheets();
+}
 
 $("palette-btn").addEventListener("click", openPaletteModal);
 // Araçlar görünümündeki kart da aynı paneli açıyor (tasarım §4.1).
@@ -639,8 +707,12 @@ $("palette-apply").addEventListener("click", () => {
   if (!item) return;
   // Tohum sunucunun döndürdüğü normalize edilmiş değer — arada input
   // değiştiyse önerilerle tutarsız bir palet uygulanmasın.
-  applyPalette({ seed: suggestSeed, mode: item.mode, colors: item.colors,
-                 dropped: onizlemeCikarilan });
+  applyPalette({
+    seed: suggestSeed,
+    mode: item.mode,
+    colors: item.colors,
+    dropped: onizlemeCikarilan,
+  });
   closePaletteModal();
 });
 
@@ -674,8 +746,10 @@ const PICK_STEP_BIG = 0.1;
 paletteField.addEventListener("keydown", (e) => {
   const step = e.shiftKey ? PICK_STEP_BIG : PICK_STEP;
   const moves = {
-    ArrowLeft: [-step, 0], ArrowRight: [step, 0],
-    ArrowUp: [0, step], ArrowDown: [0, -step],
+    ArrowLeft: [-step, 0],
+    ArrowRight: [step, 0],
+    ArrowUp: [0, step],
+    ArrowDown: [0, -step],
   };
   const move = moves[e.key];
   if (!move) return;
@@ -720,8 +794,7 @@ $("palette-seed-hex").addEventListener("blur", () => renderPicker());
 // düğme "tıklıyorum, hiçbir şey olmuyor" durumuna düşer.
 
 function nativeScreenPicker() {
-  return window.pywebview && window.pywebview.api
-    && window.pywebview.api.pick_screen_color;
+  return window.pywebview && window.pywebview.api && window.pywebview.api.pick_screen_color;
 }
 
 async function pickScreenColor() {
@@ -734,7 +807,7 @@ async function pickScreenColor() {
 
 function enableEyedropper() {
   const btn = $("palette-eyedrop");
-  if (btn.dataset.wired) return;      // iki yoklama birden geçmesin
+  if (btn.dataset.wired) return; // iki yoklama birden geçmesin
   btn.dataset.wired = "1";
   btn.hidden = false;
   btn.addEventListener("click", async () => {
@@ -742,7 +815,10 @@ function enableEyedropper() {
       const hex = await pickScreenColor();
       // Native yol iptalde null döner (istisna DEĞİL); EyeDropper ise
       // fırlatır. İki sözleşme de "seçim yok" demek, ikisi de sessiz.
-      if (hex && setPickFromHex(hex)) { renderPicker(); scheduleSuggest(); }
+      if (hex && setPickFromHex(hex)) {
+        renderPicker();
+        scheduleSuggest();
+      }
     } catch {
       // Kullanıcı Esc ile vazgeçti — hata değil, sessizce geç.
     }
@@ -766,4 +842,3 @@ $("palette-strength").addEventListener("click", (e) => {
   paletteStrength = btn.dataset.strength;
   renderPalettePanel();
 });
-

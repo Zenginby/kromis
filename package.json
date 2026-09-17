@@ -1,0 +1,16 @@
+{
+  "name": "kromis-onyuz-araclari",
+  "private": true,
+  "description": "Ön yüz lint/biçim araçları (eslint + prettier). Çalışma zamanı bağımlılığı YOK: static/ altındaki betikler tarayıcıya olduğu gibi gidiyor; bu paket yalnız CI'daki lint-onyuz işi ve geliştirici makinesi için.",
+  "scripts": {
+    "lint": "eslint static/",
+    "format:check": "prettier --check static/",
+    "format": "prettier --write static/"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.10.0",
+    "globals": "17.12.0",
+    "prettier": "3.9.7"
+  }
+}

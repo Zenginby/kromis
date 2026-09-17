@@ -1,0 +1,130 @@
+{
+  "_neden": "static/ betikleri tek küresel kapsamda yükleniyor (docs/graflar/onyuz.md); bir betiğin tanımladığı ve BAŞKA bir betiğin kullandığı üst düzey adlar burada. eslint.config.js bu listeyi okur ve her dosyaya ÖTEKİ dosyaların adlarını `globals` olarak verir; kendi adları verilmez, böylece `no-redeclare` iki dosyada aynı adı yakalar. Bekçi: tests/test_onyuz_lint_kapisi.py (her ad tanımlı, her ad başka dosyada kullanılıyor, graf kenarlarıyla tutarlı).",
+  "paylasilan": {
+    "static/assets.js": [
+      "loadAssets",
+      "openLogoModal"
+    ],
+    "static/chat.js": [
+      "appendResultTurn",
+      "beginArenaTurn",
+      "beginResultTurn",
+      "chatApi",
+      "dropPendingTurn",
+      "failArenaSlot",
+      "fillArenaSlot",
+      "finishArenaTurn",
+      "openSessionId",
+      "sendChat",
+      "syncAskDirector"
+    ],
+    "static/core.js": [
+      "$",
+      "IS_TOUCH",
+      "MAX_EDIT_IMAGES",
+      "MAX_PROMPT_CHARS",
+      "MODEL_EKSENLERI",
+      "addExtraUpload",
+      "addGalleryExtra",
+      "applyChatModel",
+      "applyChatModels",
+      "applyModel",
+      "applyModels",
+      "applyVideoModel",
+      "applyVideoModels",
+      "arenaAcik",
+      "autoGrow",
+      "axisLabel",
+      "canAddExtra",
+      "chatModels",
+      "clearSonKare",
+      "clearSource",
+      "closeSheets",
+      "composerKuculsun",
+      "confirmDialog",
+      "currentChatModel",
+      "currentImage",
+      "currentModel",
+      "currentVideoModel",
+      "deleteImage",
+      "downloadImage",
+      "downloadViaAnchor",
+      "extraBlockReason",
+      "extras",
+      "goBlockReason",
+      "imageModels",
+      "indirmeAdresi",
+      "isAcceptedUpload",
+      "openSheet",
+      "promptDialog",
+      "renderSource",
+      "runBusy",
+      "secilebilirler",
+      "secilecek",
+      "setCurrentImage",
+      "setGallerySource",
+      "setGallerySourceById",
+      "setMode",
+      "setSonKareGallery",
+      "setSonKareUpload",
+      "setUploadSource",
+      "sheetTetik",
+      "showPreview",
+      "showSection",
+      "source",
+      "statusEl",
+      "submitComposer",
+      "syncGoGate",
+      "syncRunCost",
+      "syncSpecs",
+      "videoModels"
+    ],
+    "static/folders.js": [
+      "currentFolder",
+      "historyCache",
+      "loadFolders",
+      "loadHistory",
+      "selectInGroup",
+      "syncFolderView"
+    ],
+    "static/i18n.js": [
+      "KROMIS_DIL",
+      "t",
+      "tc"
+    ],
+    "static/palette.js": [
+      "detailText",
+      "loadPalettes",
+      "readPaletteOpts",
+      "renderPalettePanel"
+    ],
+    "static/settings.js": [
+      "applyTheme",
+      "openSettings",
+      "seciliModelTercihi",
+      "seciliSohbetModeliTercihi",
+      "seciliVideoModeliTercihi",
+      "uygulaGuncelleme"
+    ]
+  },
+  "yazilabilir": [
+    "currentModel",
+    "currentVideoModel",
+    "extras",
+    "imageModels",
+    "runBusy",
+    "seciliModelTercihi",
+    "seciliSohbetModeliTercihi",
+    "seciliVideoModeliTercihi",
+    "sheetTetik",
+    "videoModels"
+  ],
+  "iyimser_kancalar": {
+    "syncSendButton": "static/settings.js `typeof syncSendButton === \"function\"` ile yoklayıp çağırıyor; bugün hiçbir betik tanımlamıyor. Tanımlanırsa buradan çıkar, `paylasilan`a girer."
+  },
+  "graf_fazla_sayimlari": {
+    "arenaSecimi": "static/chat.js yalnız YORUMDA anıyor (`arenaSecimi()` sürüyor…); tools/graf_uret.py betik-arası kenarı yorumsuz metinden değil ham metinden çıkarıyor, o yüzden kenar var ama kod çağrısı yok.",
+    "run": "static/chat.js yalnız YORUMDA anıyor (`run()`ın \"Üretiliyor…\"su); kod çağrısı yok — aynı sınıf.",
+    "goUp": "static/core.js yalnız YORUMDA anıyor (`goUp()`u ikinci bir çağrandan…); kod çağrısı yok — aynı sınıf."
+  }
+}

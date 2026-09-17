@@ -120,7 +120,9 @@ def test_the_palette_card_is_not_a_button_so_its_swatches_can_be():
     hatta tıklanır gibi durur. Bu yüzden mandal burada.
     """
     js = TestClient(appmod.app).get("/static/palette.js").text
-    govde = re.search(r"function makeChoiceButton\(\{(.*?)\n\}", js, re.S)
+    # Biçimden bağımsız: prettier (Faz 0 / Adım 7) uzun parametre nesnesini ve
+    # çağrı argümanlarını satırlara bölüyor; iddia GÖVDEYİ arıyor, satır şeklini değil.
+    govde = re.search(r"function makeChoiceButton\(\{.*?\}\)\s*\{(.*?)\n\}", js, re.S)
     assert govde, "makeChoiceButton() bulunamadı"
     assert 'createElement("div")' in govde.group(1), "kart hâlâ <button>"
     assert "palette-choice-pick" in govde.group(1), "gerilmiş seçim düğmesi yok"
@@ -186,7 +188,9 @@ def test_dropping_a_colour_survives_until_the_palette_is_applied():
     dokunmak, uygulanmış paleti kullanıcının haberi olmadan değiştirirdi.
     """
     js = TestClient(appmod.app).get("/static/palette.js").text
-    uygula = re.search(r"function applyPalette\(\{(.*?)\n\}", js, re.S)
+    # Biçimden bağımsız: prettier (Faz 0 / Adım 7) uzun parametre nesnesini ve
+    # çağrı argümanlarını satırlara bölüyor; iddia GÖVDEYİ arıyor, satır şeklini değil.
+    uygula = re.search(r"function applyPalette\(\{.*?\}\)\s*\{(.*?)\n\}", js, re.S)
     assert uygula, "applyPalette() bulunamadı"
     assert "new Set(dropped || [])" in uygula.group(1), (
         "önizleme çıkarmaları uygulamaya taşınmıyor ya da referansla taşınıyor")
@@ -393,7 +397,9 @@ def test_viewer_wheel_handler_prevents_the_default_page_zoom():
     sessizce yok sayılır, yani çağrının VARLIĞI tek başına yetmiyor.
     """
     js = TestClient(appmod.app).get("/static/viewer.js").text
-    block = re.search(r'addEventListener\("wheel".*?\}\s*,\s*\{([^}]*)\}', js, re.S)
+    # Biçimden bağımsız: prettier (Faz 0 / Adım 7) uzun parametre nesnesini ve
+    # çağrı argümanlarını satırlara bölüyor; iddia GÖVDEYİ arıyor, satır şeklini değil.
+    block = re.search(r'addEventListener\(\s*"wheel".*?\}\s*,\s*\{([^}]*)\}', js, re.S)
     assert block, "wheel dinleyicisi bulunamadı"
     assert "preventDefault" in block.group(0), "wheel varsayılanı engellenmiyor"
     assert re.search(r"passive:\s*false", block.group(1)), (
@@ -1658,7 +1664,9 @@ def test_a_machine_block_that_breaks_its_contract_is_still_shown_to_the_user():
     js = _chat_js()
     body = re.search(r"function renderMarkdownInto\([^)]*\)\s*\{(.*?)\n\}", js, re.S)
     assert body, "renderMarkdownInto() bulunamadı"
-    skip = re.search(r"const skip = new Set\(\[(.*?)\]", body.group(1), re.S)
+    # Biçimden bağımsız: prettier (Faz 0 / Adım 7) uzun parametre nesnesini ve
+    # çağrı argümanlarını satırlara bölüyor; iddia GÖVDEYİ arıyor, satır şeklini değil.
+    skip = re.search(r"const skip = new Set\(\s*\[(.*?)\]", body.group(1), re.S)
     assert skip, "atlama kümesi bulunamadı"
     # ÜÇ satırın üçü de koşullu. Seçenek satırı bir süre koşulsuzdu ve o
     # zaman doğruydu (madde düz dizeydi, `String(raw)` her madde için bir çip
@@ -2978,7 +2986,9 @@ def test_a_gallery_card_is_reachable_by_keyboard():
     body = _render_gallery_body()
     assert "card.tabIndex = 0" in body, "kart klavyeyle odaklanamıyor"
     assert 'card.setAttribute("role", "button")' in body, "kart düğme olarak duyurulmuyor"
-    assert 'card.setAttribute("aria-label"' in body, "kartın erişilebilir adı yok"
+    # Biçimden bağımsız: prettier (Faz 0 / Adım 7) uzun parametre nesnesini ve
+    # çağrı argümanlarını satırlara bölüyor; iddia GÖVDEYİ arıyor, satır şeklini değil.
+    assert re.search(r'card\.setAttribute\(\s*"aria-label"', body), "kartın erişilebilir adı yok"
     keydown = _balanced_body(body, 'card.addEventListener("keydown"')
     assert '"Enter"' in keydown and '" "' in keydown, "Enter/Space bağlı değil"
     assert "e.target !== card" in keydown, (
@@ -3913,7 +3923,9 @@ def test_both_folder_captions_go_through_the_same_chain_node():
     # `aria-label` taşıyor ve açık etiket, içindeki metnin erişilebilir ada
     # katılmasını ENGELLİYOR. Yani bu yüzeyde gerekçe doğru değildi ve rozet
     # hiç kimseye okunmuyordu: inceleme bulgusu, mandalı bu.
-    etiket = re.search(r'card\.setAttribute\("aria-label",(.*?)\);', galeri, re.S)
+    # Biçimden bağımsız: prettier (Faz 0 / Adım 7) uzun parametre nesnesini ve
+    # çağrı argümanlarını satırlara bölüyor; iddia GÖVDEYİ arıyor, satır şeklini değil.
+    etiket = re.search(r'card\.setAttribute\(\s*"aria-label",(.*?)\);', galeri, re.S)
     assert etiket, "kartın erişilebilir adı yok"
     assert "kartYolu" in etiket.group(1), (
         "zincir erişilebilir ada girmiyor: açık aria-label rozetin metnini "
@@ -6255,14 +6267,16 @@ def test_SAGLAYICI_PENCERESININ_escape_muhafizi_YAKALAMA_evresinde():
     ekranda tek fark, Ayarlar'ın da kapanması.
     """
     js = _strip_js_comments(_js("settings.js"))
-    parca = js.split('document.addEventListener("keydown"')
+    # Biçimden bağımsız: prettier (Faz 0 / Adım 7) uzun parametre nesnesini ve
+    # çağrı argümanlarını satırlara bölüyor; iddia GÖVDEYİ arıyor, satır şeklini değil.
+    parca = re.split(r'document\.addEventListener\(\s*"keydown"', js)
     assert len(parca) == 2, (
         f"settings.js'te tam bir Escape dinleyicisi bekleniyor, {len(parca) - 1} var")
     govde = parca[1]
     assert '$("provider-modal").hidden' in govde, "muhafız pencereye bakmıyor"
     assert "stopImmediatePropagation" in govde, "alttaki katman durdurulmuyor"
     kapanis = govde.split("closeProviderModal();", 1)[1].lstrip()
-    assert kapanis.startswith("}, true);"), (
+    assert re.match(r"\}\s*,\s*true\s*,?\s*\);", kapanis), (
         "dinleyici yakalama evresinde kayıtlı değil (`, true` yok) — "
         "core.js'in dinleyicisi ÖNCE koşar ve Ayarlar da kapanır")
 

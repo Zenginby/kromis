@@ -2,7 +2,7 @@
 
 # Test haritası
 
-`tests/` altında 96 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
+`tests/` altında 97 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
 
 | modül | testler |
 | --- | --- |
@@ -58,7 +58,7 @@
 | `services.tercih` | `test_dil.py` |
 | `services.zaman` | — |
 | `storage` | `test_app_bolme.py`, `test_arena.py`, `test_chats_route.py`, `test_folders.py`, `test_legacy_formats.py`, `test_playwright_studio.py`, `test_storage.py`, `test_storage_delete.py`, `test_video_onyuz.py` |
-| `tools.graf_uret` | `test_app_bolme.py`, `test_graflar.py` |
+| `tools.graf_uret` | `test_app_bolme.py`, `test_graflar.py`, `test_onyuz_lint_kapisi.py` |
 | `tools.make_legacy_fixtures` | — |
 | `tools.make_logo_goldens` | — |
 | `tools.render_brand_assets` | — |

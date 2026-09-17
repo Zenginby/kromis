@@ -131,3 +131,38 @@ jobs:
 
       - name: mypy
         run: mypy .
+
+  # Ön yüz lint + biçim kapısı — Faz 0 / Adım 7 (2026-09-17).
+  #
+  # `static/` altındaki betikler modül değil, tek küresel kapsamda yükleniyor
+  # (docs/graflar/onyuz.md); bu yüzden eslint her dosyaya öteki dosyaların
+  # üst düzey adlarını `eslint.paylasilan-adlar.json`dan alıyor — kural ve
+  # defter gerekçesi `eslint.config.js`te, bekçisi `tests/test_onyuz_lint_kapisi.py`
+  # (defter tanımla/kullanımla tutarlı, kurallar gevşemez, bu iş kesici).
+  #
+  # `npm ci` (install DEĞİL): kilit dosyasındaki sürümleri kurar, farklıysa
+  # kırmızı — CI'ın koştuğu eslint/prettier geliştiricininkiyle aynı. Node
+  # majoru PİNLİ: eslint 10 `engines` alanıyla ^20.19/^22.13/>=24 istiyor,
+  # pinsiz bir `setup-node` bir gün başka bir şey kurar ve kapı sebepsiz
+  # kırmızıya döner. Python tarafındaki `lint` işinden AYRI iş: iki araç
+  # zincirinin kurulumu birbirini beklemesin, düşen taraf adından okunsun.
+  lint-onyuz:
+    name: Lint (ön yüz)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Bağımlılıklar
+        run: npm ci
+
+      - name: eslint
+        run: npx eslint static/
+
+      - name: prettier
+        run: npx prettier --check static/

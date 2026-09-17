@@ -218,7 +218,9 @@ def test_the_START_frame_has_NO_second_state_variable():
     # Başlangıç için `ilkKare` diye bir ikiz YOK.
     assert "let ilkKare" not in js
     assert "renderFrames()" in _govde(js, "renderSource")
-    assert "{ deger: source," in _govde(js, "renderFrames")
+    # Biçimden bağımsız: prettier (Faz 0 / Adım 7) nesne literalini ve üçlü
+    # ifadeyi satırlara bölüyor; iddia KODU arıyor, satır şeklini değil.
+    assert re.search(r"\{\s*deger: source,", _govde(js, "renderFrames"))
 
 
 def test_the_frames_note_asks_for_8_SECONDS_when_a_transition_is_set_up():
@@ -1045,11 +1047,12 @@ def test_the_EXTRA_reference_reason_is_SILENT_in_the_end_frame_branch():
     """
     govde = _govde(_kodsuz(_folders()), "renderPickerSide")
 
-    assert '$("picker-note").textContent = pickerHedef === "last" ? ""' in govde
     # Sayaç da susuyor: o da aynı düğmenin okuması.
+    # Biçimden bağımsız: prettier (Faz 0 / Adım 7) nesne literalini ve üçlü
+    # ifadeyi satırlara bölüyor; iddia KODU arıyor, satır şeklini değil.
     assert re.search(
-        r'"picker-note"\)\.textContent = pickerHedef === "last" \? ""\s*'
-        r': \(why \|\|', govde)
+        r'\$\("picker-note"\)\.textContent =\s*pickerHedef === "last"\s*\?\s*""\s*'
+        r':\s*\(?why \|\|', govde)
 
 
 def test_the_END_FRAME_file_input_is_RESET_after_every_change():

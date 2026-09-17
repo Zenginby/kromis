@@ -15,7 +15,7 @@
 // API key hiçbir zaman sunucudan çekilmez/gösterilmez; sadece yazılır.
 // Dağıtım adı GİZLİ DEĞİL: GET'ten geliyor ve forma önceden doluyor.
 let configured = false;
-let chatConfigured = false;   // chat.js okuyor (o dosya BUNDAN SONRA yükleniyor)
+let chatConfigured = false; // chat.js okuyor (o dosya BUNDAN SONRA yükleniyor)
 
 /** Kullanıcıyı Ayarlar'a yönlendiren ek — düğmenin ADIYLA, glifle DEĞİL.
  *  Öncesinde "(sağ üstteki ⚙)" yazıyordu ve iki kusuru vardı: (1) üst şeritteki
@@ -67,9 +67,7 @@ function applyConfigured(s) {
       ["set-gemini-key", "gemini", "AIza…"],
       ["set-fal-key", "fal", t("settings.fal_key_placeholder")],
     ]) {
-      $(alan).placeholder = s.providers[kimlik]
-        ? t("settings.key_saved_placeholder")
-        : bos;
+      $(alan).placeholder = s.providers[kimlik] ? t("settings.key_saved_placeholder") : bos;
     }
     // Bayraklar SAKLANIYOR: kartlar pencere açıldığında çiziliyor ve o an
     // elde yalnız bu sözlük oluyor. Kaydet'ten sonra applyConfigured yeniden
@@ -161,8 +159,9 @@ function uygulaGuncelleme(g) {
   const dis = $("settings-btn");
   if (!dis) return;
   dis.classList.toggle("has-update", varMi);
-  const etiket = varMi ? t("settings.btn_update_available", { surum: g.surum })
-                       : t("settings.title");
+  const etiket = varMi
+    ? t("settings.btn_update_available", { surum: g.surum })
+    : t("settings.title");
   dis.title = etiket;
   dis.setAttribute("aria-label", etiket);
 }
@@ -245,7 +244,7 @@ async function yoklaGuncelleme(sira = 0) {
     const { guncelleme } = await (await fetch("/api/guncelleme")).json();
     if (guncelleme && guncelleme.surum) {
       uygulaGuncelleme(guncelleme);
-      return;                                   // bulundu: yoklama biter
+      return; // bulundu: yoklama biter
     }
   } catch {
     // Sessiz: guncelleme.py'nin 1. sözleşmesinin ön yüzdeki karşılığı. Bir
@@ -319,8 +318,8 @@ function saglayiciLogosu(deger) {
   // görünmüyor ve tek başına o listeye bakmak fal'ın işaretini kalıcı olarak
   // kaybettirirdi. Kusur sessiz olurdu — kutu boş kalır, konsolda bir şey
   // yazmaz (test_provider_logos.py'nin başlığındaki sınıfın aynısı).
-  const m = imageModels.find((x) => x.provider === deger)
-         || videoModels.find((x) => x.provider === deger);
+  const m =
+    imageModels.find((x) => x.provider === deger) || videoModels.find((x) => x.provider === deger);
   return m && m.logo;
 }
 
@@ -388,7 +387,10 @@ function syncProviderPick(secili) {
   $("set-provider-label").textContent = secenek ? secenek.textContent : t("settings.pick_provider");
   const kutu = $("set-provider-ic");
   const logo = saglayiciLogosu(secili);
-  if (!logo) { kutu.replaceChildren(); return; }
+  if (!logo) {
+    kutu.replaceChildren();
+    return;
+  }
   const img = document.createElement("img");
   img.src = logo;
   img.alt = "";
@@ -548,11 +550,15 @@ $("provider-list").addEventListener("change", (e) => {
 // evresinde yazılan bir `stopImmediatePropagation` onu DURDURAMAZ ve tek
 // Escape hem pencereyi hem arkasındaki Ayarlar'ı kapatırdı. Aynı desen
 // folders.js'teki taşıma penceresi için de kurulu.
-document.addEventListener("keydown", (e) => {
-  if (e.key !== "Escape" || $("provider-modal").hidden) return;
-  e.stopImmediatePropagation();
-  closeProviderModal();
-}, true);
+document.addEventListener(
+  "keydown",
+  (e) => {
+    if (e.key !== "Escape" || $("provider-modal").hidden) return;
+    e.stopImmediatePropagation();
+    closeProviderModal();
+  },
+  true,
+);
 
 function openSettings(provider) {
   // Gizli alanların HEPSİ temizleniyor (write-only): kayıtlı anahtar hiçbir
@@ -604,7 +610,10 @@ function openSettings(provider) {
 // Sağlayıcı penceresi de kapanıyor: normalde perdesi Ayarlar'ı örttüğü için
 // ikisi birlikte kapanmıyor, ama "Kaydet" 550ms sonra kendiliğinden kapatıyor
 // (saveSettings) — o yolla açık bir pencere sahipsiz kalırdı.
-function closeSettings() { closeProviderModal(); closeSheets(); }
+function closeSettings() {
+  closeProviderModal();
+  closeSheets();
+}
 
 async function saveSettings() {
   const base_url = $("set-endpoint").value.trim();
@@ -614,9 +623,13 @@ async function saveSettings() {
   // OpenAI anahtarı eklemeye çalışan kullanıcıya BAŞKA bir sağlayıcı hakkında
   // konuşuyordu — sunucu tarafındaki aynı kilidin istemci yarısı.
   if ($("set-provider").value === "azure") {
-    if (!base_url) { st.textContent = t("settings.endpoint_required"); return; }
+    if (!base_url) {
+      st.textContent = t("settings.endpoint_required");
+      return;
+    }
     if (!configured && !api_key.trim()) {
-      st.textContent = t("settings.key_required"); return;
+      st.textContent = t("settings.key_required");
+      return;
     }
   }
 
@@ -632,19 +645,22 @@ async function saveSettings() {
       // Boş gizli alan "mevcut korunur" demek (sunucunun kuralı), o yüzden
       // her sağlayıcının alanı KOŞULSUZ gönderilebiliyor — istemcinin hangi
       // grubun açık olduğuna göre dallanmasına gerek yok.
-      body: JSON.stringify({ api_key, base_url,
-                             chat_deployment: $("set-chat-deployment").value.trim(),
-                             // Adres alanı KOŞULSUZ gidiyor, gizli alanlarla
-                             // aynı gerekçeyle: sunucu "alan yok" ile "boş"
-                             // arasında ayrım yapıyor ve boş değer
-                             // `default_base_url`ü olmayan kimlikte
-                             // "dokunmadım" demek (app.post_settings). Yani
-                             // yazılmış bir Foundry adresi bir sonraki
-                             // kayıtta silinmiyor.
-                             azure_foundry_base_url: $("set-foundry-url").value.trim(),
-                             openai_api_key: $("set-openai-key").value,
-                             gemini_api_key: $("set-gemini-key").value,
-                             fal_key: $("set-fal-key").value }),
+      body: JSON.stringify({
+        api_key,
+        base_url,
+        chat_deployment: $("set-chat-deployment").value.trim(),
+        // Adres alanı KOŞULSUZ gidiyor, gizli alanlarla
+        // aynı gerekçeyle: sunucu "alan yok" ile "boş"
+        // arasında ayrım yapıyor ve boş değer
+        // `default_base_url`ü olmayan kimlikte
+        // "dokunmadım" demek (app.post_settings). Yani
+        // yazılmış bir Foundry adresi bir sonraki
+        // kayıtta silinmiyor.
+        azure_foundry_base_url: $("set-foundry-url").value.trim(),
+        openai_api_key: $("set-openai-key").value,
+        gemini_api_key: $("set-gemini-key").value,
+        fal_key: $("set-fal-key").value,
+      }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -746,10 +762,13 @@ function syncLanguagePicker() {
 async function saveLanguagePref(dil) {
   const durum = $("language-status");
   const yazili = ($("prompt").value || "").trim();
-  if (yazili && !await confirmDialog(t("settings.language_unsaved"),
-                                     t("settings.language_unsaved_body"),
-                                     { okLabel: t("settings.language_switch_ok") })) {
-    syncLanguagePicker();          // gerçekleşmeyen değişikliği geri al
+  if (
+    yazili &&
+    !(await confirmDialog(t("settings.language_unsaved"), t("settings.language_unsaved_body"), {
+      okLabel: t("settings.language_switch_ok"),
+    }))
+  ) {
+    syncLanguagePicker(); // gerçekleşmeyen değişikliği geri al
     return;
   }
   durum.textContent = t("settings.language_switching");
@@ -809,8 +828,7 @@ async function loadModelPref() {
     if (p.video_model) {
       seciliVideoModeliTercihi = p.video_model;
       if (videoModels.length) {
-        applyVideoModel(secilecek(videoModels, seciliVideoModeliTercihi, ""),
-                        { announce: false });
+        applyVideoModel(secilecek(videoModels, seciliVideoModeliTercihi, ""), { announce: false });
       }
     }
     if (!p.image_model) return;

@@ -60,8 +60,9 @@ function t(anahtar, degiskenler) {
   const metin = KROMIS_SOZLUK[anahtar];
   if (metin === undefined) return anahtar;
   if (!degiskenler) return metin;
-  return metin.replace(I18N_DEGISKEN,
-    (tam, ad) => (ad in degiskenler ? String(degiskenler[ad]) : tam));
+  return metin.replace(I18N_DEGISKEN, (tam, ad) =>
+    ad in degiskenler ? String(degiskenler[ad]) : tam,
+  );
 }
 
 /** Sayıya göre tekil/çoğul seçen ince bir sarmalayıcı.

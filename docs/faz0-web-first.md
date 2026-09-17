@@ -327,7 +327,7 @@ E702, B905, E741, UP031) bu PR'da YOK — `B904` için `errlog` redaksiyon
 
 ---
 
-## 7. Ön yüz: eslint + prettier, paketleme (bundler) kararı
+## 7. Ön yüz: eslint + prettier, paketleme (bundler) kararı ✅ (PR: `faz0/onyuz-araclari`)
 
 **Kapsam.** `static/` 10 betik / ~10.900 satır, `static/index.html:1967-1988`
 11 `<script>` etiketi, modül sistemi yok, tek küresel kapsam
@@ -351,6 +351,42 @@ bir Node aracı aynı süreyi ödeyebilir).
 **Çıkış ölçütü.** `npx eslint static/` ve `npx prettier --check static/`
 CI'da yeşil; bundler kararı bir `docs/superpowers/specs/…-onyuz-paketleme.md`
 belgesiyle kayda geçmiş.
+
+**Yapıldığında (2026-09-17) ölçümler ve sapmalar.** Yalnız (a); (b)
+`docs/superpowers/specs/2026-09-17-onyuz-paketleme.md`de karara bağlandı:
+ES modül/paketleyici Faz 1'in çerçeve kararıyla birlikte, testlerde
+değişmesi gerekenlerin envanteri o belgede. eslint **10.x** (9.x kayıt
+tarihinde "artık desteklenmiyor" uyarısı veriyor; düz yapılandırma ikisinde
+aynı), prettier 3.x, `globals`; tam pin + `package-lock.json`, CI `npm ci`.
+Taban, yalnız tarayıcı küreselleriyle: **1060 hata** — 1035 `no-undef` (92
+ayrı ad, hepsi başka betikte tanımlı) + 25 `no-unused-vars` (23'ü başka
+betikten çağrılan üst düzey işlev). Kural `off`a çekilmedi: dosyalar arası
+adlar `eslint.paylasilan-adlar.json`a yazıldı (7 tanımlayan dosya, 91 ad;
+10'u `writable` — başka dosyanın atadığı; 1 iyimser kanca `syncSendButton`;
+haritanın 3 fazla sayımı gerekçesiyle) ve `eslint.config.js` her betiğe yalnız
+ÖTEKİ betiklerin adlarını veriyor — yan kazanç: `no-redeclare` iki dosyada
+aynı adı yakalıyor. `no-unused-vars` `vars: "local"` (üst düzey ölü ad
+denetimi bekçi teste taşındı: bugün 0). Sonuç **0 hata, 0 uyarı**;
+`eslint --fix` hiçbir şey değiştirmedi; elle 2 düzeltme (`chat.js`:
+hiç okunmayan `settingsBlock` değişkeni silindi, `catch (e)` → `catch`).
+Prettier: yalnız `printWidth: 100`, ölçüldü — 80: 2823, 100: 2182, 120: 1978
+fark satırı (ekle+sil); geri kalan varsayılan (çift tırnak, noktalı virgül,
+2 boşluk — dosyaların bugünkü stili). 8 dosya, +1352/−809 satır; `mobile.js`
+zaten uyumlu, `pixel-canvas.js` üçüncü parti (kapsam dışı, `.prettierignore`).
+`static/*.css` ve `index.html` prettier KAPSAMINDA DEĞİL (`test_index.py`
+metin iddiaları; karar Faz 1'e). `tests/test_index.py`'de 7, `tests/test_video_onyuz.py`'de 2 — **9 regex** biçimden
+bağımsız hâle getirildi (`function f({` parametre nesnesi satırlara bölündü,
+`addEventListener(\n "wheel"`, `new Set(\n [`, `card.setAttribute(\n
+"aria-label"`, settings.js `keydown` + `}, true);` kapanışı, `{ deger: source,` nesnesi, `picker-note`
+üçlü ifadesi) — niyet aynı,
+`// prettier-ignore` ile beş çok satırlı işlevi biçimsiz dondurmak yerine.
+Bekçi: `tests/test_onyuz_lint_kapisi.py` (defterdeki her ad tanımlı ve başka
+dosyada kullanılıyor, tek dosyada; yazılabilirler gerçekten atanıyor; kanca
+yalnız `typeof` ile yoklanıyor; graf kenarlarıyla tutarlılık; ölü üst düzey ad
+yok; kurallar `off`/`warn` değil; `lint-onyuz` işi iki komutla kesici, Node
+majoru pinli; `package.json` private, `dependencies` yok, pinler tam ve kilitle
+aynı). Sonraki: `tools/graf_uret.py` betik-arası kenarı yorumsuz metinden
+çıkarsın (3 fazla sayım kalkar) — ayrı, küçük PR.
 
 ---
 

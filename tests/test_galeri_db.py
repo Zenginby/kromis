@@ -25,6 +25,12 @@ genişledi — `chat_store`/`palette_store`/`assets_store`/`prefs`in manifest
 işlevleri de web yolunda çağrılamaz, `depo_sohbet`/`depo_palet`/`depo_varlik`/
 `depo_tercih` de aynı imza ve süzgeç sözleşmesini taşır. O dört deponun (iii)
 ve (iv) aileleri kendi dosyalarında: tests/test_{sohbet,palet,varlik,tercih}_db.py.
+
+FAZ 2 / 1: sekizinci depo `services/kuyruk.py` — kullanıcı tarafı aynı imza ve
+süzgeç sözleşmesini taşır; işçi tarafı (`al`, `kalp`, `bitir`, `dusur`,
+`bayatlari_dusur`, `isci_*`) KİRACISIZ ve bunun defteri `KIRACISIZ`: işçi
+platformun, kimsenin değil — muaf işlev `kullanici_id` ALMAZ (alsa süzmesi
+gerekirdi), ilk parametresi `db`. Kuyruğun anlamı tests/test_kuyruk.py'de.
 """
 from __future__ import annotations
 
@@ -60,6 +66,26 @@ DEPOLAR = {
     "services/depo_sohbet.py": 3, "services/depo_palet.py": 2,
     "services/depo_varlik.py": 3, "services/depo_tercih.py": 1,
     "services/depo_kimlik_bilgisi.py": 4,   # Faz 1 / 7
+    "services/kuyruk.py": 10,               # Faz 2 / 1 (3 kullanıcı + 7 işçi tarafı; `ekle`/`isci_kaydet` `db.add`)
+}
+# `depo_*.py` kalıbının DIŞINDA kalan depolar — `test_the_repository_list_matches_the_files_on_disk`
+# bunları da bekler; kalıba uymayan yeni bir depo buraya yazılmadan listeye giremez.
+EK_DEPOLAR = ("services/kuyruk.py",)
+# Kiracısız işlevler (Faz 2 / 1): işçi işi kimliğiyle sürer, kullanıcıyı bilmez —
+# `al` kuyruğun BAŞINI alır (küresel FIFO, kimin işi olduğuna bakmaz), ötekiler
+# `al`ın verdiği `is_id`/`isci_id` ile çalışır. Her ad gerekçesiyle; bekçinin
+# bekçisi adların gerçek olduğunu ve muaf işlevin `kullanici_id` ALMADIĞINI sınar.
+KIRACISIZ = {
+    "services/kuyruk.py": {
+        "al": "işçi kuyruğun başındaki işi alır; kiracı süzgeci FIFO'yu bozar",
+        "kalp": "işçi elindeki işin kalp atışı; `is_id` `al`dan geldi",
+        "bitir": "işçi elindeki işi kapatır; `is_id` `al`dan geldi",
+        "dusur": "işçi elindeki işi düşürür; `is_id` `al`dan geldi",
+        "bayatlari_dusur": "periyodik bakım: bütün kiracıların bayat işleri",
+        "isci_kaydet": "`isciler` tablosunda kullanıcı sütunu yok",
+        "isci_kalp": "`isciler` tablosunda kullanıcı sütunu yok",
+        "isci_sil": "`isciler` tablosunda kullanıcı sütunu yok",
+    },
 }
 DONDURULMUS = {"storage": storage, "folders": folders, "chat_store": chat_store,
                "palette_store": palette_store, "assets_store": assets_store, "prefs": prefs}
@@ -180,7 +206,22 @@ def test_the_manifest_function_list_still_matches_the_frozen_modules():
 def test_the_repository_list_matches_the_files_on_disk():
     """`services/depo_*.py` diskte ne varsa listede o var — yeni depo bekçisiz kalmaz."""
     diskte = sorted(os.path.relpath(p, REPO) for p in glob.glob(os.path.join(REPO, "services", "depo_*.py")))
-    assert diskte == sorted(DEPOLAR), f"listeyi güncelle: {diskte}"
+    assert sorted(diskte + list(EK_DEPOLAR)) == sorted(DEPOLAR), f"listeyi güncelle: {diskte}"
+    for yol in EK_DEPOLAR:
+        assert os.path.isfile(os.path.join(REPO, yol)), yol
+
+
+def test_the_tenantless_function_list_names_real_functions_that_take_no_owner():
+    """Muafiyet defterinin bekçisi: ad gerçek, işlev `kullanici_id` almıyor (alsa süzmesi gerekirdi)."""
+    for yol, adlar in KIRACISIZ.items():
+        assert yol in DEPOLAR, yol
+        islevler = {f.name: f for f in _islevler(yol)}
+        for ad, gerekce in adlar.items():
+            assert gerekce.strip(), f"{yol}::{ad} gerekçesiz"
+            assert ad in islevler, f"{yol}::{ad} yok — defteri güncelle"
+            parametreler = [a.arg for a in islevler[ad].args.args + islevler[ad].args.kwonlyargs]
+            assert "kullanici_id" not in parametreler, (
+                f"{yol}::{ad} `kullanici_id` alıyor — kiracısız değil, muafiyeti kaldır")
 
 
 # ── (i) sahiplik süzgeci: kaynak ───────────────────────────────────────
@@ -221,7 +262,10 @@ def test_every_query_building_function_filters_by_the_owner(yol):
     """
     sorgulu = [f for f in _islevler(yol) if _sorgu_kuruyor(f)]
     assert len(sorgulu) >= DEPOLAR[yol], f"{yol}: taranan işlev şüpheli biçimde az ({len(sorgulu)})"
+    muaf = KIRACISIZ.get(yol, {})
     for f in sorgulu:
+        if f.name in muaf:
+            continue
         parametreler = [a.arg for a in f.args.args + f.args.kwonlyargs]
         assert "kullanici_id" in parametreler, f"{yol}::{f.name} `kullanici_id` almıyor"
         assert _sahip_suzgeci_var(f), f"{yol}::{f.name} sorgusunda sahip süzgeci yok"
@@ -237,6 +281,9 @@ def test_every_public_function_takes_the_session_and_the_owner_first(yol):
         if f.name.startswith("_") or f.name == "safe_component":
             continue
         adlar = [a.arg for a in f.args.args]
+        if f.name in KIRACISIZ.get(yol, {}):
+            assert adlar[:1] == ["db"], f"{yol}::{f.name}{adlar}"
+            continue
         assert adlar[:2] == ["db", "kullanici_id"], f"{yol}::{f.name}{adlar}"
 
 

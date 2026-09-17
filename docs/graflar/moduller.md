@@ -2,7 +2,7 @@
 
 # Modül grafı
 
-87 Python modülü, 339 modül düzeyi + 15 erteli ithal kenarı.
+88 Python modülü, 342 modül düzeyi + 15 erteli ithal kenarı.
 
 Katman, o modülün depo içindeki en uzun bağımlılık zincirinin uzunluğu:
 **katman 0 hiçbir depo modülüne dayanmaz**, en üst katman uygulamanın
@@ -59,6 +59,7 @@ flowchart TD
     n_services_depo_tercih["services.depo_tercih<br/>112 satır"]
     n_services_depo_varlik["services.depo_varlik<br/>135 satır"]
     n_services_hesap["services.hesap<br/>292 satır"]
+    n_services_kuyruk["services.kuyruk<br/>256 satır"]
   end
   subgraph katman5["katman 5"]
     n_azure_flux_client["azure_flux_client<br/>289 satır"]
@@ -69,7 +70,7 @@ flowchart TD
     n_openai_client["openai_client<br/>217 satır"]
     n_prefs["prefs<br/>268 satır"]
     n_providers["providers<br/>508 satır"]
-    n_services_tablolar["services.tablolar<br/>477 satır"]
+    n_services_tablolar["services.tablolar<br/>571 satır"]
     n_veo_client["veo_client<br/>629 satır"]
   end
   subgraph katman4["katman 4"]
@@ -411,6 +412,9 @@ flowchart TD
   n_services_kimlik --> n_services_dil
   n_services_kimlik --> n_services_hesap
   n_services_kimlik --> n_services_tablolar
+  n_services_kuyruk --> n_errlog
+  n_services_kuyruk --> n_services_tablolar
+  n_services_kuyruk --> n_services_zaman
   n_services_modeller --> n_catalog
   n_services_modeller --> n_credstore
   n_services_modeller --> n_etiket
@@ -470,7 +474,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `composite.py` | 165 | 3 | `i18n` | 2 | 1 |
 | `credstore.py` | 228 | 4 | `azure_client`, `catalog`, `etiket`, `i18n`, `kimlik_baglami` | 11 | 6 |
 | `desktop.py` | 588 | 13 | `errlog`, `i18n`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli), `prefs` (erteli) | 1 | 2 |
-| `errlog.py` | 129 | 0 | — | 8 | 1 |
+| `errlog.py` | 129 | 0 | — | 9 | 1 |
 | `etiket.py` | 118 | 3 | `catalog`, `i18n` | 7 | 1 |
 | `fal_client.py` | 757 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 2 |
 | `folders.py` | 253 | 3 | `i18n`, `jsonstore`, `storage` | 3 | 5 |
@@ -511,18 +515,19 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `services/depo_varlik.py` | 135 | 6 | `assets_store`, `services.tablolar`, `services.zaman` | 1 | 8 |
 | `services/dil.py` | 194 | 3 | `i18n`, `services.cerez` | 13 | 3 |
 | `services/gorsel.py` | 117 | 4 | `i18n`, `services.dil` | 4 | 3 |
-| `services/hesap.py` | 292 | 6 | `services.cerez`, `services.tablolar` | 4 | 13 |
+| `services/hesap.py` | 292 | 6 | `services.cerez`, `services.tablolar` | 4 | 14 |
 | `services/kapilar.py` | 79 | 8 | `assets_store`, `chat_store`, `i18n`, `services.depo_klasor`, `services.dil`, `storage` | 3 | 0 |
 | `services/kimlik.py` | 171 | 7 | `i18n`, `kimlik_baglami`, `services.cerez`, `services.db`, `services.depo_kimlik_bilgisi`, `services.dil`, `services.hesap`, `services.tablolar` | 10 | 1 |
 | `services/koken.py` | 133 | 0 | — | 2 | 4 |
+| `services/kuyruk.py` | 256 | 6 | `errlog`, `services.tablolar`, `services.zaman` | 0 | 1 |
 | `services/modeller.py` | 306 | 7 | `catalog`, `credstore`, `etiket`, `i18n`, `services.depo_tercih`, `version` | 3 | 0 |
 | `services/palet.py` | 185 | 7 | `color_names`, `i18n`, `models`, `palette`, `services.depo_palet`, `services.dil` | 3 | 1 |
 | `services/posta.py` | 187 | 3 | `errlog`, `i18n` | 2 | 4 |
 | `services/redaksiyon.py` | 68 | 1 | `catalog` | 1 | 0 |
 | `services/sablon.py` | 68 | 9 | `errlog`, `i18n`, `services.ayar`, `services.dil`, `version` | 2 | 0 |
 | `services/sifre.py` | 151 | 0 | — | 4 | 5 |
-| `services/tablolar.py` | 477 | 5 | `assets_store`, `models` | 22 | 17 |
-| `services/zaman.py` | 45 | 0 | — | 14 | 7 |
+| `services/tablolar.py` | 571 | 5 | `assets_store`, `models` | 23 | 18 |
+| `services/zaman.py` | 45 | 0 | — | 15 | 8 |
 | `storage.py` | 423 | 1 | `catalog`, `jsonstore` | 8 | 9 |
 | `veo_client.py` | 629 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
 | `version.py` | 30 | 0 | — | 7 | 11 |
@@ -536,6 +541,7 @@ Kimsenin ithal etmediği modüller. `app`, `desktop`, `android_main` uygulamanı
 * `android_main` — giriş noktası
 * `backup` — ithal eden yok — kullanımı elle doğrulanmalı
 * `release_manifest` — ithal eden yok — kullanımı elle doğrulanmalı
+* `services.kuyruk` — ithal eden yok — kullanımı elle doğrulanmalı
 
 ## Yardımcılar (`tools/`)
 

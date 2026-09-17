@@ -1,7 +1,7 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
 # GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
 # Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
-"""Veri modeli — 11 tablo, SQLAlchemy 2 `DeclarativeBase` (Faz 1 / 2. görev).
+"""Veri modeli — 13 tablo, SQLAlchemy 2 `DeclarativeBase` (Faz 1 / 2. görev; Faz 2 / 1: `isler`, `isciler`).
 
 Bu modül ŞEMANIN tek tanımı: Alembic `alembic/env.py`de `Base.metadata`yı
 okur, `alembic check` göç dosyalarının bu tanımdan ayrışmadığını sınar
@@ -13,6 +13,10 @@ yedisi bugünkü JSON depolarının karşılığı (docs/faz1-veritabani-hesapla
 "Envanter"): `medya` ← history.json, `klasorler` ← folders.json, `sohbetler`
 ← chats.json, `paletler` ← palettes.json, `varliklar` ← assets/*/index.json,
 `tercihler` ← prefs.json, `saglayici_kimlikleri` ← credentials.env.
+İki tablo Faz 2 / 1'in (docs/faz2-kuyruk-anahtarlar-depolama.md §1): `isler`
+(üretim kuyruğu ve iş geçmişi — bugün istek içinde koşan sağlayıcı çağrısının
+kaydı) ve `isciler` (işçi süreçlerinin kalp atışı). Kuyruk arka ucu Postgres'in
+kendisi (`FOR UPDATE SKIP LOCKED`, K1), Redis değil; sorgular `services/kuyruk.py`de.
 
 SÜTUN ADLARI — iki dil, tek kural. Bugünkü JSON kaydında da API gövdesinde
 de var olan alanlar ADINI KORUR (`filename`, `prompt`, `folder_id`, `palette`,
@@ -130,13 +134,28 @@ JETON_AMACLARI: tuple[str, ...] = ("eposta_dogrulama", "parola_sifirlama")
 # kilitli bulurdu — tam olarak ihtiyacı olan kapıyı.
 DENEME_TURLERI: tuple[str, ...] = ("giris", "kayit", "sifirlama")
 
-# Yedi iş tablosu — belgenin envanteriyle birebir; bekçi test bu kümenin her
+# `isler.tur` — dört üretim rotasının adı (`routers/uretim.py`: generate, edit,
+# video, animate). İşçi (Faz 2 / 3) hangi sağlayıcı işlevini çağıracağını
+# buradan seçer; sohbet BİLEREK yok — `/api/chat` saniyeler sürer, senkron kalır.
+IS_TURLERI: tuple[str, ...] = ("generate", "edit", "video", "animate")
+
+# `isler.durum` — ön yüzün ve admin'in okuduğu SÖZLEŞME, CHECK'te kilitli:
+# sessizce eklenen bir durum ön yüzde "bilinmeyen" demek, o yüzden eklemek göç
+# ister (belge §1, "Risk"). Geçişler: bekliyor → calisiyor → bitti | hata;
+# bekliyor → iptal. `calisiyor` iptal EDİLMEZ (sağlayıcı çoktan faturalandı) ve
+# `hata`dan geri kuyruğa dönüş YOK (K8: çift fatura riski).
+IS_DURUMLARI: tuple[str, ...] = ("bekliyor", "calisiyor", "bitti", "hata", "iptal")
+DURUM_BEKLIYOR, DURUM_CALISIYOR, DURUM_BITTI, DURUM_HATA, DURUM_IPTAL = IS_DURUMLARI
+
+# Sekiz iş tablosu — belgenin envanteriyle birebir; bekçi test bu kümenin her
 # üyesinde `kullanici_id` + FK + indeks arar ve kümenin belgeyle eşit olduğunu
 # sınar. Hesap tabloları burada DEĞİL: onlarda sahiplik sütunu ya yok
 # (`kullanicilar`, `giris_denemeleri`) ya da anlamı başka (`oturumlar`).
+# `isciler` de DEĞİL (Faz 2 / 1): işçi süreci bir kullanıcının değil
+# platformun — satırında `kullanici_id` yok, kiracı süzgeci anlamsız.
 IS_TABLOLARI: tuple[str, ...] = (
     "medya", "klasorler", "sohbetler", "paletler", "varliklar",
-    "tercihler", "saglayici_kimlikleri",
+    "tercihler", "saglayici_kimlikleri", "isler",
 )
 
 ADLANDIRMA = {
@@ -475,3 +494,78 @@ class SaglayiciKimligi(Base):
     anahtar_surumu: Mapped[int] = mapped_column(Integer, nullable=False)
     olusturuldu: Mapped[dt.datetime] = _olusturuldu()
     guncellendi: Mapped[dt.datetime] = _guncellendi()
+
+
+# ─────────────────────────────────────────────────────────── kuyruk
+
+class Is(Base):
+    """Üretim işi — kuyruk satırı VE iş geçmişi tek tabloda (Faz 2 / 1, K1).
+
+    Bugün `routers/uretim.py` sağlayıcı çağrısını isteğin içinde koşturuyor;
+    4. görevde rota bu satırı yazıp 202 dönecek, işçi (3) `services/kuyruk.al`
+    ile alacak. Kuyruk okuması `durum='bekliyor'` satırlarını `olusturuldu`
+    sırasıyla tarar — kısmi indeks `ix_isler_kuyruk` tam bunun için, bitmiş
+    binlerce satırı hiç görmez. `ix_isler_kullanici_aktif` (kısmi, bekliyor +
+    calisiyor) 4. görevin "kullanıcı başına eş zamanlı iş" sayacı.
+
+    `istek` doğrulanmış istek gövdesi (`GenerateRequest.model_dump()` ya da
+    multipart alanları + girdi nesnelerinin anahtarları) — DIŞARIYA DÖKÜLMEZ
+    (`kuyruk._json`): prompt ve klasör zaten `medya`da. `sonuc` `{"medya":
+    [id, …]}` — kayıtların kendisi değil, satırlar `medya`da. `hata`
+    `errlog.redact_secrets`ten geçmiş metin. `model` ve `kredi_tahmini`
+    (`catalog.cost_for` × n, sıraya girerken) 6. görevin günlük tavanının ve
+    Faz 3 defterinin okuduğu iki alan — TAHMİN, gerçek maliyet Faz 3'ün işi.
+
+    `isci_id` FK DEĞİL ve bilerek: işçi kapanışta kendi `isciler` satırını
+    siler; biten işin "kim koştu" kaydı işçi gidince de durmalı (SET NULL onu
+    silerdi, CASCADE işi). Zaman damgaları Python'dan (`zaman.an()`, Faz 1 / 5
+    kararı: mikrosaniye, sıralama); `server_default` yalnız ham SQL yazan bir
+    yol için emniyet.
+    """
+    __tablename__ = "isler"
+    __table_args__ = (
+        CheckConstraint("tur IN " + _sql_kumesi(IS_TURLERI), name="tur_kumesi"),
+        CheckConstraint("durum IN " + _sql_kumesi(IS_DURUMLARI), name="durum_kumesi"),
+        _sahip_indeksi("isler"),
+        Index("ix_isler_kuyruk", "durum", "olusturuldu",
+              postgresql_where=text("durum = 'bekliyor'")),
+        Index("ix_isler_kullanici_aktif", "kullanici_id", "olusturuldu",
+              postgresql_where=text("durum IN ('bekliyor', 'calisiyor')")),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    kullanici_id: Mapped[uuid.UUID] = _kullanici_fk()
+    tur: Mapped[str] = mapped_column(Text, nullable=False)
+    durum: Mapped[str] = mapped_column(Text, nullable=False,
+                                       server_default=text("'bekliyor'"))
+    istek: Mapped[dict[str, object]] = mapped_column(pg.JSONB, nullable=False)
+    sonuc: Mapped[dict[str, object] | None] = mapped_column(pg.JSONB)
+    hata: Mapped[str | None] = mapped_column(Text)
+    model: Mapped[str] = mapped_column(Text, nullable=False)
+    kredi_tahmini: Mapped[int] = mapped_column(Integer, nullable=False)
+    isci_id: Mapped[uuid.UUID | None] = mapped_column(pg.UUID(as_uuid=True))
+    olusturuldu: Mapped[dt.datetime] = _olusturuldu()
+    basladi: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    bitti: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    kalp_atisi: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Isci(Base):
+    """İşçi süreci — açılışta satır yazar, 30 sn'de bir `son_kalp` günceller, kapanışta siler.
+
+    Kullanıcı sütunu YOK: işçi platformun, kiracının değil (`IS_TABLOLARI`
+    dışında). `/health`in `worker_alive`ı (Faz 2 / 9) ve admin sayfası (8)
+    buradan okur; `es_zamanli` işçinin aynı anda kaç iş aldığı (4'ün
+    varsayımı, sağlayıcı gecikmesiyle ölçülür). `surum` `version.APP_VERSION`:
+    dağıtım sırasında eski ve yeni sürüm yan yana koşar, admin hangisinin
+    kaldığını görür.
+    """
+    __tablename__ = "isciler"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    konak: Mapped[str] = mapped_column(Text, nullable=False)
+    surum: Mapped[str] = mapped_column(Text, nullable=False)
+    basladi: Mapped[dt.datetime] = _olusturuldu()
+    son_kalp: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False,
+                                                  server_default=text("now()"))
+    es_zamanli: Mapped[int] = mapped_column(Integer, nullable=False)

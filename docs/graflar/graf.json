@@ -534,6 +534,7 @@
         "guncelleme",
         "paths",
         "routers.hesap",
+        "services.kuyruk",
         "services.posta",
         "services.sablon"
       ],
@@ -1595,6 +1596,7 @@
         "tests/test_kimlik.py",
         "tests/test_kimlik_bilgisi_db.py",
         "tests/test_kullanici_cli.py",
+        "tests/test_kuyruk.py",
         "tests/test_palet_db.py",
         "tests/test_playwright_hesap.py",
         "tests/test_sohbet_db.py",
@@ -1673,6 +1675,22 @@
         "tests/test_playwright_hesap.py"
       ],
       "yol": "services/koken.py"
+    },
+    {
+      "ad": "services.kuyruk",
+      "erteli_ithal": [],
+      "ithal": [
+        "errlog",
+        "services.tablolar",
+        "services.zaman"
+      ],
+      "ithal_eden": [],
+      "katman": 6,
+      "satir": 256,
+      "testler": [
+        "tests/test_kuyruk.py"
+      ],
+      "yol": "services/kuyruk.py"
     },
     {
       "ad": "services.modeller",
@@ -1819,13 +1837,14 @@
         "services.depo_varlik",
         "services.hesap",
         "services.kimlik",
+        "services.kuyruk",
         "tools.anahtar_dondur",
         "tools.artik_dosya",
         "tools.ice_aktar",
         "tools.kullanici"
       ],
       "katman": 5,
-      "satir": 477,
+      "satir": 571,
       "testler": [
         "tests/test_anahtar_dondur.py",
         "tests/test_artik_dosya.py",
@@ -1836,6 +1855,7 @@
         "tests/test_kimlik.py",
         "tests/test_kimlik_bilgisi_db.py",
         "tests/test_kullanici_cli.py",
+        "tests/test_kuyruk.py",
         "tests/test_legacy_formats.py",
         "tests/test_palet_db.py",
         "tests/test_palette_route.py",
@@ -1865,6 +1885,7 @@
         "services.depo_sohbet",
         "services.depo_tercih",
         "services.depo_varlik",
+        "services.kuyruk",
         "tools.ice_aktar"
       ],
       "katman": 0,
@@ -1873,6 +1894,7 @@
         "tests/test_galeri_db.py",
         "tests/test_ice_aktar.py",
         "tests/test_kimlik_bilgisi_db.py",
+        "tests/test_kuyruk.py",
         "tests/test_legacy_formats.py",
         "tests/test_palet_db.py",
         "tests/test_sohbet_db.py",
@@ -2662,7 +2684,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 118,
+  "test_dosyasi_sayisi": 119,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",

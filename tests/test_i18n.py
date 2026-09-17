@@ -765,6 +765,8 @@ KULLANICIYA_KONUSMAYAN = {
                          "cümle kuramaz; `services/db.py` ile aynı karar",
     "services/hesap.py": "hesap katmanı (Faz 1 / 3): özet, oturum, jeton, sayaç — "
                          "`None`/`bool`/sayı döndürüyor, cümleyi routers/hesap.py kuruyor",
+    "services/kuyruk.py": "iş kuyruğu ilkelleri (Faz 2 / 1): SQL; satır/`bool`/sayı döndürür, "
+                          "`hata` sütununa yazdığı `isci yanit vermiyor` bir KOD, cümleyi ön yüz kurar",
 }
 
 # Türkçe kalması KARAR olan dizeler — gerekçesiyle. Muafiyet DİZE düzeyinde,

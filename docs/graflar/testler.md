@@ -2,7 +2,7 @@
 
 # Test haritası
 
-`tests/` altında 118 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
+`tests/` altında 119 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
 
 | modül | testler |
 | --- | --- |
@@ -63,18 +63,19 @@
 | `services.depo_varlik` | `test_artik_dosya.py`, `test_banner.py`, `test_folders.py`, `test_legacy_formats.py`, `test_logo.py`, `test_palette_route.py`, `test_playwright_studio.py`, `test_varlik_db.py` |
 | `services.dil` | `test_dil.py`, `test_i18n.py`, `test_koken.py` |
 | `services.gorsel` | `test_edit_route.py`, `test_model_secimi.py`, `test_video_route.py` |
-| `services.hesap` | `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_galeri_db.py`, `test_hesap.py`, `test_ice_aktar.py`, `test_kimlik.py`, `test_kimlik_bilgisi_db.py`, `test_kullanici_cli.py`, `test_palet_db.py`, `test_playwright_hesap.py`, `test_sohbet_db.py`, `test_tercih_db.py`, `test_varlik_db.py` |
+| `services.hesap` | `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_galeri_db.py`, `test_hesap.py`, `test_ice_aktar.py`, `test_kimlik.py`, `test_kimlik_bilgisi_db.py`, `test_kullanici_cli.py`, `test_kuyruk.py`, `test_palet_db.py`, `test_playwright_hesap.py`, `test_sohbet_db.py`, `test_tercih_db.py`, `test_varlik_db.py` |
 | `services.kapilar` | — |
 | `services.kimlik` | `test_kimlik.py` |
 | `services.koken` | `test_docker_kapisi.py`, `test_hesap.py`, `test_koken.py`, `test_playwright_hesap.py` |
+| `services.kuyruk` | `test_kuyruk.py` |
 | `services.modeller` | — |
 | `services.palet` | `test_palet_db.py` |
 | `services.posta` | `test_docker_kapisi.py`, `test_hesap.py`, `test_playwright_hesap.py`, `test_posta.py` |
 | `services.redaksiyon` | — |
 | `services.sablon` | — |
 | `services.sifre` | `test_anahtar_dondur.py`, `test_docker_kapisi.py`, `test_ice_aktar.py`, `test_kimlik_bilgisi_db.py`, `test_sifre.py` |
-| `services.tablolar` | `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_folders.py`, `test_galeri_db.py`, `test_hesap.py`, `test_ice_aktar.py`, `test_kimlik.py`, `test_kimlik_bilgisi_db.py`, `test_kullanici_cli.py`, `test_legacy_formats.py`, `test_palet_db.py`, `test_palette_route.py`, `test_playwright_hesap.py`, `test_sohbet_db.py`, `test_tablolar.py`, `test_tercih_db.py`, `test_varlik_db.py` |
-| `services.zaman` | `test_galeri_db.py`, `test_ice_aktar.py`, `test_kimlik_bilgisi_db.py`, `test_legacy_formats.py`, `test_palet_db.py`, `test_sohbet_db.py`, `test_varlik_db.py` |
+| `services.tablolar` | `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_folders.py`, `test_galeri_db.py`, `test_hesap.py`, `test_ice_aktar.py`, `test_kimlik.py`, `test_kimlik_bilgisi_db.py`, `test_kullanici_cli.py`, `test_kuyruk.py`, `test_legacy_formats.py`, `test_palet_db.py`, `test_palette_route.py`, `test_playwright_hesap.py`, `test_sohbet_db.py`, `test_tablolar.py`, `test_tercih_db.py`, `test_varlik_db.py` |
+| `services.zaman` | `test_galeri_db.py`, `test_ice_aktar.py`, `test_kimlik_bilgisi_db.py`, `test_kuyruk.py`, `test_legacy_formats.py`, `test_palet_db.py`, `test_sohbet_db.py`, `test_varlik_db.py` |
 | `storage` | `test_arena.py`, `test_folders.py`, `test_galeri_db.py`, `test_ice_aktar.py`, `test_legacy_formats.py`, `test_storage.py`, `test_storage_delete.py`, `test_tablolar.py`, `test_video_onyuz.py` |
 | `tools.anahtar_dondur` | `test_anahtar_dondur.py` |
 | `tools.artik_dosya` | `test_artik_dosya.py` |

@@ -38,6 +38,8 @@ tests/test_android_packaging.py).
 """
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import azure_client as ac
 import catalog
 import chat_client as cc
@@ -77,7 +79,7 @@ def _openai_complete(m, messages, *, client=None, credentials=None,
 # yanıt şeklini kullanıyor. Ayrışan iki şey (yol ve hata metnindeki ad)
 # KATALOGDAN okunuyor (`endpoint_path`, `Credential.label`), yani üçüncü bir
 # uyumlu sağlayıcı tek katalog girdisiyle ekleniyor.
-_ADAPTERS: dict[str, object] = {
+_ADAPTERS: dict[str, Callable[..., dict]] = {
     "azure": _azure_complete,
     "openai": _openai_complete,
     "gemini": _openai_complete,
@@ -119,7 +121,8 @@ def _resolve(model_id: str) -> catalog.ChatModel:
 def is_configured(model_id: str, env_path: str | None = None) -> bool:
     """Modelin kimliği (ve gerekiyorsa dağıtım adı) girilmiş mi."""
     m = catalog.chat_model(model_id)
-    return bool(m) and credstore.chat_is_configured(m, env_path)
+    # `is not None`, `bool(m)` DEĞİL — `providers.is_configured`ın gerekçesi.
+    return m is not None and credstore.chat_is_configured(m, env_path)
 
 
 def complete(model_id: str, messages: list[dict], *, client=None,

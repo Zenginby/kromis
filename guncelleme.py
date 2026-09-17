@@ -118,7 +118,11 @@ def _zaman(deger: object) -> float:
     sızdırma) yalnız ağ yolunu değil, ÖNBELLEK yolunu da kapsıyor.
     """
     try:
-        return float(deger or 0)
+        # `object` → `float()` mypy için bir tür hatası, burada ise sözleşmenin
+        # kendisi: her tür bilerek kabul ediliyor ve `float`ın reddettiği
+        # aşağıdaki `except`e düşüyor. Parametreyi daraltmak (`str | float`)
+        # o kapıyı tip denetçisine taşırdı — davranış aynı kalsın diye yok sayılıyor.
+        return float(deger or 0)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return 0.0
 

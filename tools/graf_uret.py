@@ -601,9 +601,12 @@ def graf_topla() -> dict:
             if not hedefler:
                 eslesmeyen.append({"dosya": betik["dosya"], "yol": cagri})
                 continue
-            for hedef in hedefler:
-                if betik["dosya"] not in hedef["onyuz"]:
-                    hedef["onyuz"].append(betik["dosya"])
+            # `rota`, `hedef` DEĞİL: `hedef` aynı işlevde yukarıda `str`
+            # olarak bağlanmış (test haritası döngüsü) ve mypy bir adın türünü
+            # ilk bağlanışından alıyor.
+            for rota in hedefler:
+                if betik["dosya"] not in rota["onyuz"]:
+                    rota["onyuz"].append(betik["dosya"])
 
     return {
         "surum": 1,

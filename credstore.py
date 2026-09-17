@@ -114,6 +114,9 @@ def resolve(cred_id: str, env_path: str | None = None) -> tuple[str, str]:
         # kullanan kurulum), boşsa görselin adresinden türetiliyor. Tersi
         # olsaydı kullanıcının yazdığı adres sessizce yok sayılırdı.
         values = _values(env_path)
+        # Katalogdaki `azure_foundry` kaydının adresi KULLANICI GİRDİSİ
+        # (`url_env` dolu); mypy alanı genel `str | None` görüyor.
+        assert cred.url_env is not None
         key = values.get(cred.key_env) or values.get(ac.IMAGE_KEY, "")
         url = (values.get(cred.url_env, "").strip()
                or derive_foundry_base_url(values.get(ac.IMAGE_URL, "")))

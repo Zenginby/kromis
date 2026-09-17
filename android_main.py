@@ -33,6 +33,7 @@ import os
 import secrets
 import threading
 import traceback
+from typing import Any
 
 # Çerezin adı JS'te HİÇ geçmiyor — 27 fetch çağrısının hepsi göreli olduğu için
 # tarayıcı çerezi kendiliğinden gönderiyor. Bu yüzden ad yalnızca iki tarafın
@@ -43,7 +44,9 @@ SESSION_COOKIE = "kromis_session"
 # portu tarayıp deneyebilir; bu uzunlukta deneme yanılma anlamsız.
 _TOKEN_BYTES = 32
 
-_state: dict[str, object] = {}
+# `Any`, `object` DEĞİL: `stop()` sunucunun `should_exit`ini yazıyor ve testler
+# buraya sahte nesneler koyuyor; `object` o yazımı tip düzeyinde yasaklıyordu.
+_state: dict[str, Any] = {}
 
 # Token ve kimlik katmanı SÜREÇ ömürlü, sunucu ömürlü DEĞİL.
 #

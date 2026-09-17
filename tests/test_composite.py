@@ -15,6 +15,7 @@ kaydırmış demektir, dış script ile satır satır karşılaştırılmalı.
 import io
 import json
 import os
+from typing import Any
 
 import pytest
 from PIL import Image
@@ -184,7 +185,7 @@ def test_offset_changes_the_rendered_pixels() -> None:
     sürükler ve hiçbir şey olmaz.
     """
     base = os.path.join(FIXTURES, "base-light.png")
-    shared = {"logo_path": LOGO_BLUE}
+    shared: dict[str, Any] = {"logo_path": LOGO_BLUE}  # `**shared` sayısal alanlara da açılıyor
     plain = composite.composite_logo(base, **shared)
     moved = composite.composite_logo(base, offset_x=-0.1, offset_y=-0.1, **shared)
 

@@ -110,7 +110,7 @@ def _composite_banner(src_path: str, banner_path: str, edge: str,
     banner = Image.open(banner_path).convert("RGBA")
     target_w = max(1, round(base.width * scale))
     target_h = max(1, round(banner.height * (target_w / banner.width)))
-    banner = banner.resize((target_w, target_h), Image.LANCZOS)
+    banner = banner.resize((target_w, target_h), Image.Resampling.LANCZOS)
 
     free_x = base.width - target_w
     x = 0 if align == "left" else (free_x if align == "right" else free_x // 2)

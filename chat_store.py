@@ -81,7 +81,9 @@ def valid_id(chat_id: str | None) -> bool:
     Ayrı bir fonksiyon çünkü `/api/generate` de bunu soruyor: bir görsel kaydına
     yazılacak `session_id` aynı kapıdan geçmek zorunda (bkz. app._check_session).
     """
-    return bool(chat_id) and _SAFE_ID.fullmatch(chat_id) is not None
+    if not chat_id:  # iki adım: `bool(x) and …` mypy için daraltmıyor (storage.valid_id)
+        return False
+    return _SAFE_ID.fullmatch(chat_id) is not None
 
 
 def cover_from(messages: list[dict]) -> str | None:

@@ -127,7 +127,9 @@ def test_turkish_letters_are_split_across_the_two_files_as_measured():
 
     def ranges(face: str) -> list[tuple[int, int]]:
         out = []
-        for token in re.search(r"unicode-range:([^;]+);", face, re.S).group(1).split(","):
+        aralik = re.search(r"unicode-range:([^;]+);", face, re.S)
+        assert aralik is not None, f"unicode-range yok: {face[:80]!r}"
+        for token in aralik.group(1).split(","):
             token = token.strip()
             lo, _, hi = token[2:].partition("-")
             out.append((int(lo, 16), int(hi or lo, 16)))

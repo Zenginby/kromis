@@ -63,6 +63,8 @@ bundan sonra serbest — gerekçe ve sıra: docs/faz0-web-first.md.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import azure_client as ac
 import catalog
 import credstore
@@ -164,7 +166,7 @@ def _flux_adapter():
     return (azure_flux_client.generate, azure_flux_client.edit)
 
 
-_ADAPTERS: dict[str, tuple] = {
+_ADAPTERS: dict[str, tuple | Callable[[], tuple]] = {
     "azure": (_azure_generate, _azure_edit),
     # Değer bir ÇAĞRILABİLİR döndürücü olabiliyor (döngüyü kıran geç bağlama);
     # `_pair` ikisini de karşılıyor.
@@ -189,7 +191,7 @@ _ADAPTERS: dict[str, tuple] = {
 # `fal` BU TABLODA VAR, `_ADAPTERS`te YOK: bu turun kapsamı video ve görsel
 # yolunun telde ürettiği baytlar dokunulmadan kalıyor. Bu asimetri tam
 # olarak iki tablonun ayrı olma gerekçesi (bkz. dosya başlığı).
-_VIDEO_ADAPTERS: dict[str, tuple] = {
+_VIDEO_ADAPTERS: dict[str, tuple | Callable[[], tuple]] = {
     "gemini": _veo_adapter,
     "fal": _fal_adapter,
 }
@@ -431,7 +433,9 @@ def is_content_policy(detail: str) -> bool:
 def is_configured(model_id: str) -> bool:
     """Modelin kimliği girilmiş mi. Katalogda olmayan model için False."""
     m = catalog.image_model(model_id)
-    return bool(m) and credstore.is_configured(m.credential)
+    # `is not None`, `bool(m)` DEĞİL: ikisi aynı şeyi söylüyor (dataclass
+    # örneği her zaman doğru) ama mypy yalnız ilkini daraltıyor.
+    return m is not None and credstore.is_configured(m.credential)
 
 
 def generate(model_id: str, prompt: str, size: str, quality: str, n: int,
@@ -469,7 +473,7 @@ def video_is_configured(model_id: str) -> bool:
     aranan bir şey olurdu.
     """
     m = catalog.video_model(model_id)
-    return bool(m) and credstore.is_configured(m.credential)
+    return m is not None and credstore.is_configured(m.credential)
 
 
 def generate_video(model_id: str, prompt: str, size: str, quality: str,

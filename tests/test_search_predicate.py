@@ -121,6 +121,7 @@ def _kosturucu(govde: str) -> dict:
     kapısı.
     """
     betik = _kaynak() + "\n" + govde
+    assert NODE is not None  # modül `skipif`i node yoksa buraya hiç gelmiyor; mypy o bayrağı göremez
     sonuc = subprocess.run([NODE, "-e", betik], capture_output=True,
                            text=True, timeout=NODE_ZAMAN_ASIMI)
     assert sonuc.returncode == 0, f"node düştü:\n{sonuc.stderr}"

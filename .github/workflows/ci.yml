@@ -100,9 +100,11 @@ jobs:
   # `ruff format --check` BİLEREK YOK: ölçüldü, 141 dosyanın 12'si
   # biçimlendiriciyle aynı fikirde. Biçimlendirme ayrı bir PR'ın kararı.
   #
-  # mypy `continue-on-error: true`: bugün yüzlerce bulgu var ve hiçbiri bu
-  # PR'ın konusu değil. Sayı görünür olsun ama PR'ı kesmesin; taban temizlenip
-  # kural sıkılaştırıldığında bu satır kalkar (docs/faz0-web-first.md → 6).
+  # mypy da KAPI (Faz 0 / Adım 6, 2026-09-16): Adım 1'de `continue-on-error:
+  # true` ile bilgi amaçlı koşuyordu (77 bulgu), taban sıfırlandı ve satır
+  # kalktı. `tests/test_paketleme_dondurma.py` bu adımın kesici kaldığını,
+  # `tests/test_mypy_kapisi.py` de `[tool.mypy]` bayraklarının gevşemediğini
+  # mandallıyor.
   #
   # `requirements.txt` de kuruluyor: mypy üçüncü parti tipleri görmeden
   # `ignore_missing_imports` her şeyi `Any` sayar ve sayı yanıltıcı düşer.
@@ -127,6 +129,5 @@ jobs:
       - name: ruff
         run: ruff check .
 
-      - name: mypy (şimdilik PR'ı kesmiyor)
-        continue-on-error: true
+      - name: mypy
         run: mypy .

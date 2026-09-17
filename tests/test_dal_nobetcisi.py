@@ -35,6 +35,7 @@ def test_the_watchdog_wakes_on_every_push_to_main(is_: dict):
     olarak budur. Zamanlanmış bir iş aynı şeyi saatler sonra söylerdi."""
     # PyYAML `on:` anahtarını BOOLEAN True'ya çeviriyor (YAML 1.1 mirası).
     tetik = is_.get("on") or is_.get(True)
+    assert tetik is not None, "workflow'da `on:` yok"
     assert tetik["push"]["branches"] == ["main"], tetik
     assert "workflow_dispatch" in tetik, "elle tetikleme yolu kapanmış"
 

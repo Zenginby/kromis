@@ -31,6 +31,13 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # reddedilir (ECONNREFUSED) — "sunucu yok" senaryosu saniye beklemez.
 KAPALI_PORT_URL = "postgresql+psycopg://kimse@127.0.0.1:1/yok"
 
+# Göç hattının BAŞI — her yeni göçte burası güncellenir (tek yer). Aşağıdaki
+# testler "head'e çıktı mı" sorusunu bu dizeyle soruyor; `ScriptDirectory`den
+# okumak testi göç dosyalarına göre yumuşatır ve yanlış bir `down_revision`
+# zinciri görünmez olurdu.
+BAS = "0001_veri_modeli"
+ZINCIR = ["0001_veri_modeli", "0000_zemin"]
+
 
 # ──────────────────────────────────────────────────── Postgres GEREKMEYEN
 
@@ -170,14 +177,14 @@ def test_the_session_dependency_runs_its_exit_code_before_the_response_is_sent()
     assert db.OTURUM.dependency is db.oturum
 
 
-def test_the_alembic_config_loads_and_names_the_single_root_revision():
-    """`alembic.ini` + `alembic/` okunuyor; ilk göç tek başına kök (`0000_zemin`)."""
+def test_the_alembic_config_loads_and_names_the_revision_chain():
+    """`alembic.ini` + `alembic/` okunuyor; hat tek kollu: `0000_zemin` → `0001_veri_modeli`."""
     from alembic.config import Config
     from alembic.script import ScriptDirectory
     cfg = Config(os.path.join(REPO, "alembic.ini"))
     betikler = ScriptDirectory.from_config(cfg)
-    assert betikler.get_heads() == ["0000_zemin"]
-    assert [r.revision for r in betikler.walk_revisions()] == ["0000_zemin"]
+    assert betikler.get_heads() == [BAS]
+    assert [r.revision for r in betikler.walk_revisions()] == ZINCIR
     assert cfg.get_main_option("sqlalchemy.url") is None, (
         "URL alembic.ini'ye yazılmış — tek kaynak DATABASE_URL (services/db.py)")
 
@@ -202,7 +209,7 @@ def test_the_fixture_gives_a_real_postgres_with_the_migration_applied(veritabani
     try:
         with motor.connect() as c:
             assert c.execute(text("SELECT version()")).scalar_one().startswith("PostgreSQL")
-            assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0000_zemin"
+            assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == BAS
     finally:
         motor.dispose()
 
@@ -225,13 +232,17 @@ def test_alembic_upgrade_downgrade_upgrade_is_clean_on_an_empty_database(veritab
             assert c.execute(text("SELECT count(*) FROM alembic_version")).scalar_one() == 0
         command.upgrade(cfg, "head")
         with motor.connect() as c:
-            assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0000_zemin"
+            assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == BAS
     finally:
         motor.dispose()
 
 
 def test_alembic_check_reports_no_drift_between_model_and_migration(veritabani):
-    """`alembic check`: model (bugün boş MetaData) ile göç ayrışmamış — 2. görevin kapısı bugünden."""
+    """`alembic check`: model (`services/tablolar.py`) ile göç ayrışmamış.
+
+    1. görevde boş `MetaData` ile yazıldı ki kapı ilk günden koşsun; 2. görev
+    gerçek şemayı getirdi. Şemanın kendisini sınayan testler `tests/test_tablolar.py`de.
+    """
     from alembic.config import Config
 
     from alembic import command

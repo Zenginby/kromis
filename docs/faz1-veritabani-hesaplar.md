@@ -598,7 +598,7 @@ düğme yok ve rotalar 404; takım yeşil.
 
 ---
 
-## 4. İstek bağlamı: `services/kimlik.py` kapısı, kullanıcı başına `Ayarlar`, dil zinciri (PR: `faz1/istek-baglami`)
+## 4. İstek bağlamı: `services/kimlik.py` kapısı, kullanıcı başına `Ayarlar`, dil zinciri ✅ (PR: `faz1/istek-baglami`)
 
 **Kapsam.** Faz 0'ın bıraktığı iki kapı dolduruluyor:
 
@@ -657,6 +657,89 @@ oturumu da sağlar (çerez değil override — `index` rotası `aktif_kullanici`
 **Çıkış ölçütü.** İki kullanıcı, aynı süreç, aynı anda: A `history`sinde
 B'nin görselini görmüyor, `/output/<B'nin dosyası>` A'ya 404; oturumsuz
 44 rota 401, `/` 302; dil DB'den geliyor (`prefs.json` okunmuyor); takım yeşil.
+
+**Yapıldığında (2026-09-17) ölçümler ve sapmalar.** Kapı **47 rota**: 44
+stüdyo + `GET /` (302) + `GET /api/hesap/ben` + `POST /api/hesap/cikis`; açık
+**7**: `GET /health`, `GET /giris`, `POST /api/hesap/{kayit,dogrula,giris,
+sifirla,sifirla/dogrula}` — liste `tests/test_kimlik.py::ACIK_ROTALAR`da
+GEREKÇESİYLE, bekçisi her rotanın YA kapılı YA listede olduğunu sınıyor (54 =
+47 + 7; CLAUDE.md §5 deyimi). Rota sayısı 54 DEĞİŞMEDİ, `index.html`e
+dokunulmadı. Belgenin "44 imzaya `Depends(kimlik.aktif_kullanici)`" cümlesi
+DAHA KISA bir yoldan karşılandı: `ayar.ayarlar(request, kullanici =
+Depends(kimlik.aktif_kullanici))` — ayar nesnesi kullanıcıya göre kurulduğu
+için kapı onun İÇİNDE, yani `Depends(ayar.ayarlar)` yazan 42 rota tek satır
+eklenmeden kapılı ve "dizin isteyen rota kimin dizinini istediğini söyler";
+dizin okumayan iki rota (`POST /api/settings`, `POST /api/palette/suggest`)
+kapıyı doğrudan alıyor. Bunun bedeli ikinci bir ayar bağımlılığı: **`ayar.genel`**
+(paylaşılan `app.state.ayarlar`, oturum istemez) — `/health`, `/giris`, hesap
+rotaları (kayıt olmadan kullanıcı dizini yok) ve `GET /` (yalnız `static_dir`)
+onu alıyor; bekçi test kapılı bir rotanın `genel`i, açık bir rotanın
+`ayarlar`ı almadığını sınıyor. `Ayarlar`a alan EKLENMEDİ (4 dize):
+`kullanici_icin(id)` → `<data_dir>/kullanicilar/<uuid>/{output,assets}`
+(`str(uuid)`, tireli — `GET /api/hesap/ben`in `id`siyle aynı yazım),
+`data_dir`/`static_dir` aynı; kullanıcı kökü **0o700**, ilk istekte açılır,
+süreç başına bir kez (`_acilanlar`); `paths.ensure_data_dirs` DEĞİL — o eski ad
+göçünü de koşturuyor. `GET /`nin 302'si `kimlik.sayfa_kullanicisi` + `GirisSayfasi`
+istisnası + `app.py`de işleyici (`RedirectResponse`, `no-store`); `?sonra=` YOK
+(belge "302 `/giris`" diyor, tek sayfa `/`). Ön yüz: `core.js` `window.fetch`i
+TEK noktadan sarıyor (35 çağrı yerine tek kapı), 401'de `/giris?sonra=<yol>`;
+`giris.js` `sonra`yı yalnız `/` ile başlayan, `//` ile başlamayan, ters bölü
+taşımayan bir yolsa kullanıyor (açık yönlendirici değil; E2E beş girdiyle).
+
+**Dil zinciri:** 3. halka `kullanicilar.dil`, `services/tercih.py` web yolundan
+ÇIKTI (modül dondurulmuş kabuk için duruyor, birim testleri `test_dil.py`nin
+sonunda; kararı 6. görevde). Halka ara katmanda DEĞİL kapıda uygulanıyor
+(`kimlik.bagla` → `dil.kullanici_dili`): ara katman kullanıcıyı sorgulasa ikinci
+bir `Session` ve ayrılmış bir `Kullanici` gerekirdi; kapı zaten tek sorguyla
+getiriyor (ek sorgu SIFIR — `test_resolving_the_user_costs_exactly_one_query_per_request`
+`before_cursor_execute` sayıyor: `/api/history` ve `/` 1 sorgu). Bunun için
+`aktif_kullanici` **`async def`** oldu: `i18n._AKTIF` bir `ContextVar` ve
+FastAPI senkron bağımlılığı havuzda KOPYA bağlamla koşturuyor — orada yapılan
+`set_active` rotaya ulaşmıyor (ölçüldü); DB sorgusu `run_in_threadpool` ile.
+Ara katman 1-2. halkanın konuştuğunu `request.state.dil_acik`a yazıyor, kapı
+yalnız o susmuşsa hesabın dilini uygular. `POST /api/prefs` `language` →
+çerez + `kullanici.dil` (kapının çözdüğü, isteğin `Session`ına bağlı satır;
+commit `db.oturum`da) + `prefs.json` (hâlâ; 6. görev taşır). Kapıdan ÖNCE
+üretilen cevaplar (köken 403 — kod; oturumsuz 401) hesabın dilini görmez, 422
+görür (alt bağımlılıklar gövde doğrulamasından önce).
+
+**Testler:** conftest autouse **`kullanici`**: üç `dependency_overrides`
+(`aktif_kullanici`, `sayfa_kullanicisi` → geçici `Kullanici`, `kimlik.bagla`
+üzerinden — 3. halka orada da işler; `ayar.ayarlar` → paylaşılan yerleşim,
+üretimdeki gibi kapıya bağımlı) — 37 dosyanın 178 `TestClient` çağrısı ve
+`test_index`in 4 `c.get("/")`ü DEĞİŞMEDİ. Opt-out `@pytest.mark.gercek_kimlik`
+(pyproject'te kayıtlı): `test_hesap.py`, yeni `test_kimlik.py`, dört
+`test_playwright_*.py`. Yeni `tests/test_kimlik.py` (59: açık liste bekçisi,
+302-yalnız-`/`, `genel`/`ayarlar` yer bekçisi, 47 kapılı rotanın her biri
+çerezsiz 401 + i18n `detail` ×2 dil, sahte çerez, `/` 302 → `/giris` 200 →
+oturumla 200, iki kullanıcı iki dizin + medya/indirme/silme 404 + 0o700 +
+paylaşılan `output/` hiç açılmadı, tek sorgu, dil DB'den ve `prefs.json`
+okunmuyor, `POST /api/prefs` DB'ye yazıyor / 422 yazmıyor, `bagla` birimi,
+DB'siz 503). `test_dil.py` zinciri hesabın diliyle yeniden (40; `coz` beş halka tablosu; "20 istekte ≤1
+okuma" → "0 okuma": `read_stored`/`tercih.dil` yamayla patlatılıyor).
+`test_app_bolme.py` `ayar.genel`i tanıyor; `test_i18n.py`nin rota-hatası-dil testi hesabın diliyle. E2E: `e2e_oturum` fixture'ı
+(conftest) DB'ye doğrulanmış kullanıcı + oturum yazıp `context.add_cookies` ile
+çerezi koyuyor, `data_dir`i `tmp_path`e çekiyor (dev'de `data_dir` repo kökü —
+`kullanicilar/` `.gitignore`a girdi); 18 stüdyo/dil/güncelleme testi çerezle
+koşuyor, dosya tohumlayan üçü kullanıcının `oturum.ayarlar().output_dir`ine
+yazıyor; `test_playwright_dil` dili `prefs` yamasıyla değil `e2e_oturum(dil=…)`
+ile kuruyor. Yeni E2E: `/giris?sonra=` × 5 (aynı köken aynen; `//`, `https://`,
+ters bölü, göreli → `/`) + çerez silinince `fetch` 401 → `/giris?sonra=<yol>`.
+**E2E süresi:** 20 test 68,9 sn (main) → 25 test **78,2 sn** (bu dal, aynı
+makine, dört dosya tek koşu): +9,3 sn'nin 8,7'si yeni `sonra` testinin beş
+parametresi (her biri kendi sunucusu + tarayıcısı, ~1,7 sn); çerezle koşan 20
+eski teste düşen pay ≈ **+0,6 sn** — DB kopyası + kullanıcı/oturum satırı test
+başına ~30 ms. Tam takım (E2E + Postgres
+zorunlu): **3.229 geçti, 12 atlandı, 149 sn** (taban 3.160 / 12 / 134 sn; E2E koştu, DB atlaması 0). ruff, mypy, eslint, prettier
+temiz; graflar güncel. Canlı doğrulama (geçici küme + uvicorn + curl): `GET /`
+302 `/giris`; `GET /api/history` 401 `{"detail":"You need to sign in for this."}`;
+`/giris` ve `/health` 200; iki hesap kayıt → `posta.log` → doğrula → giriş; A
+`/api/history` 200, `/` 200; B'nin kaydettiği palet A'nın listesinde YOK;
+`$DATA/kullanicilar/<A>` ve `<B>` 0o700, `palettes.json` yalnız B'nin
+`output/`unda. **Bilinen sonuç:** web sürümü `DATABASE_URL`siz stüdyoyu açmaz
+(`oturum` 503 `database_unavailable`) — dondurulmuş kabuk bu dalda hesapsız
+çalışmıyor; belge §1'in "veri tabanı olmadan hesap açamaz" kararının doğrudan
+sonucu, kabuğun ince WebView'a dönüşü Faz 1 dışı notunda.
 
 ---
 

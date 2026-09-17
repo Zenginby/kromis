@@ -33,8 +33,11 @@ import os
 import re
 import sys
 import threading
+from collections.abc import Callable
+from typing import Any
 
 import pytest
+from fastapi import Depends, Request
 
 import backup as backup_module
 import paths as paths_module
@@ -322,18 +325,14 @@ def _dil_baglami_testler_arasinda_sizmasin():
     `test_i18n.py` de hiç tercih yazılmamış bir kurulumun hangi dilde
     servis edildiğini sınıyor.
 
-    `tercih.sifirla()` da burada (Faz 0 / Adım 3) ve aynı sınıf sızıntı:
-    kayıtlı tercih artık dosya imzalı bir önbellekten okunuyor. İki test aynı
-    dizini paylaşıp (`dizinler` fixture'ını kullanmayan E2E testleri
-    geliştiricinin gerçek `output/`unu kullanıyor) `prefs.read_stored`ı FARKLI dillerle
-    yamalarsa dosya ikisinde de değişmez ve ikinci test önbellekten
-    birincinin dilini okurdu — `test_playwright_dil`in iki parametresi tam
-    olarak bu çift.
+    `tercih.sifirla()` BURADAYDI (Faz 0 / Adım 3) ve Faz 1 / 4'te çıktı: dil
+    zinciri `services/tercih.py`nin dosya imzalı önbelleğini artık okumuyor
+    (3. halka `kullanicilar.dil`, services/dil.py), yani testler arasında
+    sızacak bir önbellek okuyucusu kalmadı. Modülün kendi birim testleri
+    (`tests/test_dil.py`) her çağrıda ayrı `tmp_path` kullanıyor.
     """
     import i18n
-    from services import tercih
     i18n.set_active(i18n.FALLBACK)
-    tercih.sifirla()
     yield
 
 
@@ -476,6 +475,160 @@ def veritabani(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) 
     url: str = request.getfixturevalue("veritabani_url")
     monkeypatch.setenv(db.DATABASE_URL_ENV, url)
     return url
+
+
+# Kimlik kapısını GERÇEKTEN sınayan dosyalar için işaret (aşağıdaki `kullanici`
+# fixture'ı bunu görünce override kurmaz): hesap testleri, kapı testleri ve
+# E2E dosyaları — orada tarayıcı gerçek bir oturum çerezi taşıyor.
+GERCEK_KIMLIK = "gercek_kimlik"
+
+TEST_KULLANICISI_EPOSTA = "test@example.com"
+
+
+@pytest.fixture(autouse=True)
+def kullanici(request: pytest.FixtureRequest):
+    """Her test "oturum açmış" bir kullanıcıyla koşar (Faz 1 / 4) — DB'siz, çerezsiz.
+
+    NEDEN VAR: 4. görev 47 rotayı kimlik kapısının arkasına aldı
+    (`kimlik.aktif_kullanici` / `sayfa_kullanicisi`) ve ayar nesnesi artık
+    KULLANICIYA göre kuruluyor (`ayar.ayarlar` → `<data_dir>/kullanicilar/<uuid>/…`).
+    37 dosyanın 178 `TestClient` çağrısı bu iki şeyi bilmiyor: çerez
+    taşımıyor, Postgres istemiyor ve `dizinler(output_dir=tmp_path)` deyip
+    `tmp_path / "x.png"`e iddia yazıyor. Faz 0 / 4'te 66 yamanın tek
+    fixture'a inmesinin aynısı: üç `dependency_overrides` girdisi, 178 çağrı
+    değişmeden geçer —
+
+      * `kimlik.aktif_kullanici` ve `kimlik.sayfa_kullanicisi` → geçici bir
+        `Kullanici` nesnesi (DB satırı DEĞİL; `id` rastgele, testler arasında
+        sızmaz). Override `kimlik.bagla`yı çağırıyor ki üretim yolunun bağladığı
+        iki şey — `request.state.kullanici` ve dil zincirinin 3. halkası
+        (`kullanici.dil`) — burada da bağlansın: bir test `kullanici.dil = "tr"`
+        deyip sayfanın dilini ölçebiliyor (tests/test_dil.py).
+      * `ayar.ayarlar` → `app.state.ayarlar` (paylaşılan yerleşim). Yani test
+        kullanıcısının dizinleri TAM OLARAK `dizinler(...)`in gösterdiği yerler:
+        eski iddialar aynen geçerli. Üretimdeki gibi `aktif_kullanici`ye
+        BAĞIMLI (yukarıdaki override'a düşer): yoksa 42 rotada kullanıcı hiç
+        bağlanmaz, `kullanici.dil` sayfada işler ama API hatasında işlemezdi
+        (ölçüldü: `test_the_chain_reaches_route_errors_through_dil_aktif`).
+        Kullanıcıya göre dizin türetimi (`kullanici_icin`) ve kapının kendisi
+        bu override'ın ARKASINDA kalıyor ve onları ölçen dosyalar override'sız
+        koşuyor (aşağıda).
+
+    OPT-OUT `@pytest.mark.gercek_kimlik` (modül düzeyinde `pytestmark`):
+    tests/test_hesap.py, tests/test_kimlik.py ve `tests/test_playwright_*.py`.
+    Orada `TestClient`/tarayıcı GERÇEK çerez taşır, `veritabani` fixture'ı
+    Postgres'i verir; E2E için `e2e_oturum` DB'ye kullanıcı yazıp çerezi
+    tarayıcıya koyar (belge §4: "her testte formu doldurmak değil — form akışı
+    `test_playwright_hesap.py`nin işi").
+
+    `dependency_overrides` uygulama nesnesi üzerinde KÜRESEL — bir sonraki test
+    başlamadan temizleniyor; kirli kalan bir override `gercek_kimlik`li dosyanın
+    401 iddiasını sessizce geçirirdi.
+    """
+    if request.node.get_closest_marker(GERCEK_KIMLIK):
+        yield None
+        return
+    import uuid
+
+    import app as appmod
+    from services import hesap, kimlik
+    from services.tablolar import Kullanici
+
+    test_kullanicisi = Kullanici(id=uuid.uuid4(), eposta=TEST_KULLANICISI_EPOSTA,
+                                 parola_ozeti=None, dogrulandi_at=hesap.simdi(),
+                                 is_admin=False, dil=None)
+
+    # `istek: Request` notu ŞART ve `Request` MODÜL düzeyinde ithal: FastAPI
+    # notsuz bir parametreyi sorgu parametresi sayar; bu dosya `from __future__
+    # import annotations` ile yazıldığı için not bir DİZE ve FastAPI onu
+    # işlevin modül küreselinde çözüyor — yerel ithal görünmez, sonuç yine
+    # "zorunlu sorgu parametresi" ve her istek 422 (ölçüldü, iki kez).
+    async def _oturumlu(istek: Request):
+        return kimlik.bagla(istek, test_kullanicisi)
+
+    def _paylasilan(istek: Request, _kullanici=Depends(kimlik.aktif_kullanici)):
+        return appmod.app.state.ayarlar
+
+    yamalar: dict[Callable[..., Any], Callable[..., Any]] = {
+        kimlik.aktif_kullanici: _oturumlu, kimlik.sayfa_kullanicisi: _oturumlu,
+        ayar.ayarlar: _paylasilan}
+    appmod.app.dependency_overrides.update(yamalar)
+    try:
+        yield test_kullanicisi
+    finally:
+        for anahtar in yamalar:
+            appmod.app.dependency_overrides.pop(anahtar, None)
+
+
+class E2EOturum:
+    """`e2e_oturum`un döndürdüğü şey: DB'de gerçek bir kullanıcı + oturum satırı, ham jeton elde."""
+
+    def __init__(self, kullanici_id, eposta: str, jeton: str):
+        self.kullanici_id = kullanici_id
+        self.eposta = eposta
+        self.jeton = jeton
+
+    def cerez(self, sayfa_veya_baglam, taban: str) -> None:
+        """Oturum çerezini tarayıcıya koyar — `page` ya da `BrowserContext` alır.
+
+        `url` ile: Playwright alanı/yolu oradan türetir; `secure` düz http'de
+        `False` kalır ve tarayıcı çerezi loopback'e taşır. Sunucu bayrağa
+        bakmaz, jetona bakar.
+        """
+        from services import cerez as cerez_modulu
+        baglam = getattr(sayfa_veya_baglam, "context", sayfa_veya_baglam)
+        baglam.add_cookies([{"name": cerez_modulu.OTURUM_CEREZI, "value": self.jeton,
+                             "url": taban}])
+
+    def ayarlar(self) -> ayar.Ayarlar:
+        """Bu kullanıcının dizinleri (`ayar.Ayarlar.kullanici_icin`), AÇILMIŞ hâlde."""
+        import app as appmod
+        ozel = appmod.app.state.ayarlar.kullanici_icin(self.kullanici_id)
+        os.makedirs(ozel.output_dir, exist_ok=True)
+        os.makedirs(ozel.assets_dir, exist_ok=True)
+        return ozel
+
+
+@pytest.fixture
+def e2e_oturum(veritabani: str, tmp_path, dizinler):
+    """E2E için oturum: DB'ye doğrulanmış kullanıcı + oturum yazar, çerezi tarayıcıya verir.
+
+    Kullanımı: `oturum = e2e_oturum()` (isteğe bağlı `dil="tr"`), sonra
+    `page.goto`dan ÖNCE `oturum.cerez(page, taban)`. Sunucu aynı süreçte
+    (`ServerThread`) ve `DATABASE_URL`i `veritabani` fixture'ı verdi, yani
+    kapı GERÇEK: çerezsiz sayfa 302 `/giris`e giderdi.
+
+    `data_dir` burada `tmp_path`e çekiliyor ve bu ŞART: kullanıcı dizinleri
+    `<data_dir>/kullanicilar/<uuid>/` altında açılıyor ve dev'de `data_dir`
+    REPO KÖKÜ — fixture'sız bir E2E testi depoya `kullanicilar/` bırakırdı
+    (2. görevin ölçtüğü sızıntı sınıfı). Dosya tohumlayan testler dizini
+    `oturum.ayarlar().output_dir`den okur, `tmp_path / "output"`tan değil.
+    """
+    import uuid
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from services import hesap
+    from services.tablolar import Kullanici
+
+    dizinler(data_dir=str(tmp_path))
+    motor = create_engine(veritabani)
+
+    def _ac(dil: str | None = None) -> E2EOturum:
+        eposta = f"e2e-{uuid.uuid4().hex[:8]}@example.com"
+        an = hesap.simdi()
+        with Session(motor) as db:
+            k = Kullanici(eposta=eposta, parola_ozeti=None, dogrulandi_at=an, dil=dil)
+            db.add(k)
+            db.flush()
+            jeton = hesap.oturum_ac(db, k, None, "e2e", an)
+            kullanici_id = k.id
+            db.commit()
+        return E2EOturum(kullanici_id, eposta, jeton)
+
+    yield _ac
+    motor.dispose()
 
 
 @pytest.fixture

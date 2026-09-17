@@ -17,6 +17,7 @@ kimlikten bağımsız).
 from __future__ import annotations
 
 import json
+import os
 import socket
 import threading
 import time
@@ -31,6 +32,11 @@ from playwright.sync_api import sync_playwright
 import guncelleme
 import version
 from app import app
+
+# Kapı GERÇEK (Faz 1 / 4): oturum `e2e_oturum`dan; `guncelleme.json` önbelleği
+# kullanıcının kendi `output/`unda (`ayar.ayarlar` kullanıcıya göre) — kurgu
+# dosyası oraya yazılıyor, `tmp_path`in köküne değil.
+pytestmark = pytest.mark.gercek_kimlik
 
 YENI_SURUM = "99.0.0"
 YENI_URL = f"{guncelleme.GECERLI_URL_ONEKI}releases/tag/v{YENI_SURUM}"
@@ -55,7 +61,7 @@ class _Sunucu(threading.Thread):
         self.server.should_exit = True
 
 
-def test_the_update_notice_appears_without_reloading_the_page(tmp_path, monkeypatch, dizinler):
+def test_the_update_notice_appears_without_reloading_the_page(monkeypatch, veritabani, e2e_oturum):
     """ASIL İDDİA: arka plan kontrolü cevabı bulduğunda AÇIK sayfa onu gösteriyor.
 
     Kurgu tam olarak gerçek ilk açılış: önbellek bayat (`zaman: 0`), yani
@@ -66,11 +72,13 @@ def test_the_update_notice_appears_without_reloading_the_page(tmp_path, monkeypa
     şeyi GitHub'ın o anki yayınına bağlardı. Aradaki her şey (önbellek yazımı,
     iş parçacığı, uç nokta, yoklama, DOM) GERÇEK.
     """
-    dizinler(output_dir=str(tmp_path))
+    oturum = e2e_oturum()
+    out = oturum.ayarlar().output_dir
     monkeypatch.setattr(guncelleme, "_sor",
                         lambda: {"surum": YENI_SURUM, "url": YENI_URL})
     guncelleme._KOSUYOR = False
-    (tmp_path / guncelleme.ONBELLEK_DOSYASI).write_text('{"zaman": 0}', encoding="utf-8")
+    with open(os.path.join(out, guncelleme.ONBELLEK_DOSYASI), "w", encoding="utf-8") as f:
+        f.write('{"zaman": 0}')
 
     port = _bos_port()
     sunucu = _Sunucu(port)
@@ -80,6 +88,7 @@ def test_the_update_notice_appears_without_reloading_the_page(tmp_path, monkeypa
         with sync_playwright() as p:
             tarayici = p.chromium.launch(headless=True)
             sayfa = tarayici.new_page()
+            oturum.cerez(sayfa, f"http://127.0.0.1:{port}")
             sayfa.goto(f"http://127.0.0.1:{port}")
             sayfa.wait_for_selector("#view-studio")
 
@@ -107,7 +116,7 @@ def test_the_update_notice_appears_without_reloading_the_page(tmp_path, monkeypa
         guncelleme._KOSUYOR = False
 
 
-def test_the_check_now_button_finds_a_release_the_cache_never_asked_for(tmp_path, monkeypatch, dizinler):
+def test_the_check_now_button_finds_a_release_the_cache_never_asked_for(monkeypatch, veritabani, e2e_oturum):
     """ASIL İDDİA: önbellek TAZE ama cevabı bayatken düğme yine de buluyor.
 
     Kurgu, 2026-09-12'de gerçekten yaşanan durum: telefonda kurulu sürüm
@@ -122,13 +131,14 @@ def test_the_check_now_button_finds_a_release_the_cache_never_asked_for(tmp_path
     aynen geçerli — iki tarafta da "doğru" görünen kod, tarayıcıda hiçbir şey
     yapmayan bir düğme üretebiliyor.
     """
-    dizinler(output_dir=str(tmp_path))
+    oturum = e2e_oturum()
+    out = oturum.ayarlar().output_dir
     guncelleme._KOSUYOR = False
 
     # TAZE önbellek: kurulu sürüm en yenisi sanılıyor, tazeleme tetiklenmiyor.
-    (tmp_path / guncelleme.ONBELLEK_DOSYASI).write_text(
-        json.dumps({"zaman": time.time(), "son_deneme": time.time(),
-                    "surum": version.APP_VERSION}), encoding="utf-8")
+    with open(os.path.join(out, guncelleme.ONBELLEK_DOSYASI), "w", encoding="utf-8") as f:
+        f.write(json.dumps({"zaman": time.time(), "son_deneme": time.time(),
+                            "surum": version.APP_VERSION}))
 
     soruldu = []
 
@@ -146,6 +156,7 @@ def test_the_check_now_button_finds_a_release_the_cache_never_asked_for(tmp_path
         with sync_playwright() as p:
             tarayici = p.chromium.launch(headless=True)
             sayfa = tarayici.new_page()
+            oturum.cerez(sayfa, f"http://127.0.0.1:{port}")
             sayfa.goto(f"http://127.0.0.1:{port}")
             sayfa.wait_for_selector("#view-studio")
             # Modal KENDİLİĞİNDEN açılıyor (anahtarsız kurulumda
@@ -178,11 +189,11 @@ def test_the_check_now_button_finds_a_release_the_cache_never_asked_for(tmp_path
         guncelleme._KOSUYOR = False
 
 
-def test_the_check_now_button_answers_when_there_is_nothing_new(tmp_path, monkeypatch, dizinler):
+def test_the_check_now_button_answers_when_there_is_nothing_new(monkeypatch, veritabani, e2e_oturum):
     """"Güncelsin" bir CEVAP, sessizlik değil. `bilgi()` bu durumu "soramadım"la
     aynı `None`a indiriyor; elle basılan bir düğmede farkı `durum` taşıyor ve
     ekranda görünmesi gereken şey de o."""
-    dizinler(output_dir=str(tmp_path))
+    oturum = e2e_oturum()
     guncelleme._KOSUYOR = False
     monkeypatch.setattr(guncelleme, "_sor",
                         lambda: {"surum": version.APP_VERSION, "url": YENI_URL})
@@ -195,6 +206,7 @@ def test_the_check_now_button_answers_when_there_is_nothing_new(tmp_path, monkey
         with sync_playwright() as p:
             tarayici = p.chromium.launch(headless=True)
             sayfa = tarayici.new_page()
+            oturum.cerez(sayfa, f"http://127.0.0.1:{port}")
             sayfa.goto(f"http://127.0.0.1:{port}")
             sayfa.wait_for_selector("#view-studio")
             # Modal KENDİLİĞİNDEN açılıyor (anahtarsız kurulumda

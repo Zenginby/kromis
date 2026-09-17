@@ -15,6 +15,14 @@
 // paylaşılan ad defterine girecek bir şey; tests/test_id_contract.py bu dosyayı
 // o gerekçeyle `KAPSAM_DISI`nda tutuyor, id bağlarını tests/test_hesap.py sınıyor.
 //
+// GİRİŞTEN SONRA NEREYE (`?sonra=`): stüdyo betiği 401 görünce buraya
+// `?sonra=<bıraktığı yol>` ile gelir (static/core.js); giriş başarılıysa oraya
+// dönülür. Kapı `hedef()`: değer YALNIZ aynı kökene ait bir yol olabilir —
+// `/` ile başlar, `//` ile başlamaz (şemasız dış adres), ters bölü taşımaz
+// (tarayıcılar `/\evil.com`u `//evil.com` okur). Aksi hâlde `/`. Yoksa bu
+// sayfa bir "açık yönlendirici" olurdu: `/giris?sonra=https://sahte.site`
+// bağlantısı gerçek giriş sayfasından sahte siteye taşırdı.
+//
 // E-POSTA BAĞLANTILARI GET, İŞLEM POST: bağlantı `/giris?dogrula=<jeton>` ya da
 // `/giris?sifirla=<jeton>` — sayfa parametreyi okur, POST'a çevirir ve adres
 // çubuğundan SİLER (`history.replaceState`): jeton tarayıcı geçmişinde, `Referer`
@@ -95,10 +103,18 @@
 
   let sifirlamaJetonu = null;
 
+  /** Girişten sonra gidilecek yol: `?sonra=` geçerli ve aynı kökense o, değilse `/`. */
+  function hedef() {
+    const sonra = new URLSearchParams(window.location.search).get("sonra");
+    if (typeof sonra !== "string" || !sonra.startsWith("/")) return "/";
+    if (sonra.startsWith("//") || sonra.includes("\\")) return "/";
+    return sonra;
+  }
+
   formBagla(el("form-giris"), async (veri) => {
     await gonder("/api/hesap/giris", { eposta: veri.get("eposta"), parola: veri.get("parola") });
     // `replace`: giriş sayfası geri tuşuyla dönülecek bir yer değil.
-    window.location.replace("/");
+    window.location.replace(hedef());
   });
 
   formBagla(el("form-kayit"), async (veri) => {
@@ -160,7 +176,7 @@
     try {
       const res = await fetch("/api/hesap/ben");
       if (res.ok) {
-        window.location.replace("/");
+        window.location.replace(hedef());
         return;
       }
     } catch {

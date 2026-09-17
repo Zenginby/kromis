@@ -14,7 +14,8 @@ import paths
 import prefs
 import version
 from models import PrefsRequest, SettingsRequest
-from services import ayar, dil, modeller, tercih
+from services import ayar, dil, kimlik, modeller
+from services.tablolar import Kullanici
 
 router = APIRouter()
 
@@ -114,8 +115,14 @@ def post_guncelleme(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
 
 
 @router.post("/api/settings")
-def post_settings(req: SettingsRequest) -> dict:
-    """Sağlayıcı kimliklerini yalnızca-yazılır kaydeder; durumu döndürür (key'siz).
+def post_settings(req: SettingsRequest,
+                  kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+    """KAPI DOĞRUDAN (Faz 1 / 4): bu rota dizin okumuyor (`ayar.ayarlar` yok), kimlik
+    dosyasına yazıyor — anonim bir istek başkasının anahtarını ezmesin;
+    `kullanici` bu yüzden imzada, gövdede okunmuyor (7. görev kullanıcıya göre
+    anahtarla birlikte okuyacak).
+
+    Sağlayıcı kimliklerini yalnızca-yazılır kaydeder; durumu döndürür (key'siz).
 
     Gizli alanda boş değer "mevcut korunur" demek — istemci kayıtlı anahtarı hiç
     görmediği için boş bir kutu "sildim" değil "dokunmadım"dır. Adres
@@ -269,7 +276,8 @@ def get_prefs_route(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
 
 @router.post("/api/prefs")
 def post_prefs_route(req: PrefsRequest, response: Response,
-                     ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+                     ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+                     kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """Gönderilen tercihleri yazar, diğerlerine dokunmaz; yeni görünümü döndürür.
 
     Anahtar BİLEREK `/api/settings`'te DEĞİL: o uç kimlik formu ve `api_key` +
@@ -278,17 +286,20 @@ def post_prefs_route(req: PrefsRequest, response: Response,
     Değer de tek yerden okunuyor (`/api/settings` onu YANSITMIYOR): iki uç aynı
     değeri döndürseydi ayrışabilirlerdi.
 
-    `language` yazıldığında cevap bir de ÇEREZ taşıyor (Faz 0 / Adım 3):
-    dil zinciri (services/dil.py) çerezi diskteki tercihten ÖNCE okuyor, yani
-    seçimi yapan tarayıcı bir sonraki isteğinde dilini kendisi getiriyor ve
-    Faz 1'de aynı süreçteki başka bir tarayıcının başka bir dil görmesinin
-    yolu açık. Ön yüz DEĞİŞMEDİ: `static/settings.js` yazımın ardından
-    `location.reload()` yapıyor, yeni sayfa çerezle geliyor.
+    `language` yazıldığında cevap bir de ÇEREZ taşıyor (Faz 0 / Adım 3) VE
+    `kullanicilar.dil` güncelleniyor (Faz 1 / 4): dil zinciri
+    (services/dil.py) çerezi hesabın dilinden ÖNCE okuyor, yani seçimi yapan
+    tarayıcı bir sonraki isteğinde dilini kendisi getiriyor; aynı hesabın
+    çerezsiz başka bir cihazı ise 3. halkadan, DB'den alıyor. Yazım
+    `kullanici.dil = …` — bu nesne kapının çözdüğü, isteğin `Session`ına
+    bağlı satır; commit `db.oturum`da, rota döner dönmez (ayrı `db`
+    parametresi gerekmiyor). `prefs.json`daki `language` da yazılmaya devam
+    ediyor (`GET /api/prefs` onu gösteriyor; DB'ye taşınması 6. görev). Ön
+    yüz DEĞİŞMEDİ: `static/settings.js` yazımın ardından `location.reload()`
+    yapıyor, yeni sayfa çerezle geliyor.
 
-    `tercih.sifirla()` yazımdan hemen sonra: önbellek dosya imzasından
-    zaten anlardı, ama yazan ile okuyan aynı süreçteyken sözleşme mekanizmaya
-    tercih ediliyor (gerekçesi services/tercih.py'de). Yazım başarısızsa
-    (422) çağrılmıyor — düşürecek bir şey değişmedi.
+    `services/tercih.py`nin önbelleği artık burada düşürülmüyor: dil zinciri
+    o dosyayı okumuyor (Faz 1 / 4), düşürülecek bir okuyucu kalmadı.
     """
     values = req.model_dump(exclude_none=True)
     try:
@@ -297,7 +308,7 @@ def post_prefs_route(req: PrefsRequest, response: Response,
         # prefs katmanı da bilinmeyen anahtarı/yanlış türü reddediyor; buraya
         # düşmek pydantic ile prefs şemasının ayrışması demek olur.
         raise HTTPException(status_code=422, detail=str(e))
-    tercih.sifirla()
     if "language" in values:
         dil.cerez_yaz(response, values["language"])
+        kullanici.dil = values["language"]
     return sonuc

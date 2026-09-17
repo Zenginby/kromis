@@ -10,6 +10,10 @@ gerçekten taşındığını ölçüyor, bayrağı gevşeterek değil şemayı d
 `client=("203.0.113.5", …)`: IP tabanlı hız sınırı gerçek bir adres ister
 (`inet` sütunu `"testclient"`i reddeder) ve iki farklı IP'yi ayırt edebilmek
 için adres testin elinde olmalı.
+
+`gercek_kimlik` (Faz 1 / 4): conftest'in autouse `kullanici` override'ı bu
+dosyada KURULMAZ — "çerezsiz `ben` 401" gibi iddialar kapının kendisini
+ölçüyor, sahte bir kullanıcıyla anlamsız kalırdı.
 """
 from __future__ import annotations
 
@@ -28,6 +32,8 @@ import models
 from services import cerez, hesap, koken, posta
 from services.tablolar import GirisDenemesi, Jeton, Kullanici, Oturum
 from tests import conftest
+
+pytestmark = pytest.mark.gercek_kimlik
 
 EPOSTA = "ali@example.com"
 PAROLA = "cok-gizli-parola"
@@ -488,9 +494,14 @@ def test_the_secure_flag_defaults_on_in_web_mode_and_off_in_the_frozen_shell(mon
     assert cerez.guvenli() is False, "boş = öntanımlı kural"
 
 
-def test_the_language_cookie_follows_the_same_decision(istemci, tmp_path, dizinler):
-    """İki çerez tek karar: web modunda dil çerezi de `Secure` (services/cerez.py)."""
-    dizinler(output_dir=str(tmp_path / "out"))
+def test_the_language_cookie_follows_the_same_decision(istemci):
+    """İki çerez tek karar: web modunda dil çerezi de `Secure` (services/cerez.py).
+
+    Önce giriş: `/api/prefs` kapının arkasında (Faz 1 / 4), tercih dosyası da
+    kullanıcının kendi dizinine (`tmp_path/kullanicilar/<uuid>/output`) iniyor —
+    `dizinler(output_dir=…)` artık burada bir şey yönlendirmiyor."""
+    _hazir_hesap(istemci)
+    assert _giris(istemci).status_code == 200
     cevap = istemci.post("/api/prefs", json={"language": "tr"})
     assert cevap.status_code == 200
     assert "secure" in cevap.headers["set-cookie"].lower()

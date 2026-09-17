@@ -876,14 +876,16 @@ loadPalettes();
 // ── Hesap (Faz 1 / 3) ────────────────────────────────────────────────
 //
 // Açılışta `GET /api/hesap/ben`: oturum varsa "Hakkında" bölmesinin başına
-// e-posta + "Çıkış yap"; 401'de `/giris` bağlantısı. Satır DİNAMİK kuruluyor,
-// index.html'e yazılmıyor: o belge 286 metin çapası taşıyor ve bu turda
-// dokunulmuyor (docs/faz1-veritabani-hesaplar.md → 3). 401'de YÖNLENDİRME
-// YOK — bilerek: öteki 44 rota henüz kapının arkasında değil (4. görev), yani
-// stüdyo oturumsuz da çalışıyor ve E2E takımı onu öyle sınıyor. Yönlendirme
-// kapıyla birlikte, aynı PR'da gelir. 503 (veri tabanı yok — dondurulmuş
-// kabuk) ve ağ hatasında satır hiç çizilmez: hesabın olmadığı bir kurulumda
-// "giriş yap" demek yanlış olurdu.
+// e-posta + "Çıkış yap". Satır DİNAMİK kuruluyor, index.html'e yazılmıyor: o
+// belge 286 metin çapası taşıyor ve bu turda dokunulmuyor
+// (docs/faz1-veritabani-hesaplar.md → 3). 401 ARTIK BURAYA DÜŞMEZ (Faz 1 / 4):
+// `core.js`in `window.fetch` sarmalı 401'i görür görmez `/giris?sonra=`e
+// gidiyor ve sunucu `GET /`yi oturumsuz zaten 302'liyor — yani bu betik
+// koşuyorsa oturum var. `/giris` bağlantısı dalı yine de duruyor: sarmal bir
+// gün kaldırılır ya da yönlendirme engellenirse (gömülü çerçeve) kullanıcı
+// bir çıkış yolu görsün. 503 (veri tabanı yok — dondurulmuş kabuk) ve ağ
+// hatasında satır hiç çizilmez: hesabın olmadığı bir kurulumda "giriş yap"
+// demek yanlış olurdu.
 async function hesapDurumunuYaz() {
   const bolme = document.querySelector('#settings-modal .settings-pane[data-pane="about"]');
   if (!bolme) return;

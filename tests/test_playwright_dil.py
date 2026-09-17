@@ -31,8 +31,11 @@ from playwright.sync_api import sync_playwright
 import catalog
 import credstore
 import i18n
-import prefs
 from app import app
+
+# Kapı GERÇEK (Faz 1 / 4): oturum çerezi `e2e_oturum`dan; dil de oradan —
+# `kullanicilar.dil` zincirin 3. halkası, `prefs.json` web yolunda okunmuyor.
+pytestmark = pytest.mark.gercek_kimlik
 
 # Ekranda anahtar arayan tarama. `value` de okunuyor: kusurun ilk görüldüğü
 # yer bir `placeholder`dı ve `<option>`/`<input>` değerleri de metin taşıyor.
@@ -73,29 +76,20 @@ class _Sunucu(threading.Thread):
         self.server.should_exit = True
 
 
-def _kurgu(monkeypatch, dil: str) -> None:
+def _kurgu(monkeypatch) -> None:
     """Öncül KURGUYLA kuruluyor, makineden umulmuyor.
 
     `test_playwright_studio._tum_kimlikler_kayitli`nin gerekçesinin aynısı:
     anahtarsız bir sunucuda model şeridi boş açılıyor ve taranacak metnin
-    yarısı hiç çizilmiyor. Dil de aynı sebeple kurgulanıyor — geliştiricinin
-    kendi `prefs.json`una dokunmadan.
+    yarısı hiç çizilmiyor. Dil ARTIK BURADA DEĞİL: Faz 0'da `prefs.read` ve
+    `read_stored` yamalanıyordu; Faz 1 / 4'te zincirin 3. halkası hesabın dili
+    (`kullanicilar.dil`) ve `e2e_oturum(dil=…)` onu DB'ye yazıyor — sayfa
+    gerçek yoldan, kullanıcının kayıtlı diliyle çiziliyor.
     """
     monkeypatch.setattr(credstore, "configured_map",
                         lambda *a, **k: {c.id: True for c in catalog.CREDENTIALS})
     monkeypatch.setattr(credstore, "chat_configured_map",
                         lambda *a, **k: {m.id: True for m in catalog.CHAT_MODELS})
-    # İki okuyucu da yamalanıyor: `read` birleşik görünüm (`GET /api/prefs`),
-    # `read_stored` dil zincirinin okuduğu KAYITLI görünüm (services/tercih.py,
-    # Faz 0 / Adım 3). Yalnız ilki yamalansa sayfa hâlâ diskteki (yok) tercihe
-    # bakar ve kurgu dili hiç görmezdi. Önbellek testler arasında
-    # `tests/conftest.py` tarafından sıfırlanıyor.
-    gercek = prefs.read
-    monkeypatch.setattr(prefs, "read",
-                        lambda *a, **k: {**gercek(*a, **k), "language": dil})
-    gercek_kayitli = prefs.read_stored
-    monkeypatch.setattr(prefs, "read_stored",
-                        lambda *a, **k: {**gercek_kayitli(*a, **k), "language": dil})
 
 
 def _tikla(page, secici: str) -> None:
@@ -112,13 +106,14 @@ def _tikla(page, secici: str) -> None:
 
 
 @pytest.mark.parametrize("dil", i18n.LANGUAGES)
-def test_no_dictionary_key_reaches_the_screen(monkeypatch, dil):
+def test_no_dictionary_key_reaches_the_screen(monkeypatch, dil, veritabani, e2e_oturum):
     """ASIL İDDİA: kullanıcı hiçbir yerde "composer.placeholder" okumuyor.
 
     İki dilde birden koşuyor çünkü eksik anahtar dile göre değişebilir: bir
     katalogda olup ötekinde olmayan anahtar, yalnız o dilde sızardı.
     """
-    _kurgu(monkeypatch, dil)
+    _kurgu(monkeypatch)
+    oturum = e2e_oturum(dil=dil)
     anahtarlar = set(i18n.catalog(dil))
     port = _bos_port()
     sunucu = _Sunucu(port)
@@ -130,7 +125,9 @@ def test_no_dictionary_key_reaches_the_screen(monkeypatch, dil):
         with sync_playwright() as p:
             tarayici = p.chromium.launch(headless=True)
             sayfa = tarayici.new_page()
+            oturum.cerez(sayfa, f"http://127.0.0.1:{port}")
             sayfa.goto(f"http://127.0.0.1:{port}")
+            assert sayfa.get_attribute("html", "lang") == dil, "sayfa hesabın dilinde çizildi"
             sayfa.wait_for_selector("#view-studio")
             sayfa.wait_for_function(
                 '() => { const m = document.querySelector("#model");'

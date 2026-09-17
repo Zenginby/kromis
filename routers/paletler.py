@@ -18,14 +18,19 @@ import i18n
 import palette
 import palette_store
 from models import SavePaletteRequest, SuggestRequest
-from services import ayar, dil, palet, zaman
+from services import ayar, dil, kimlik, palet, zaman
+from services.tablolar import Kullanici
 
 router = APIRouter()
 
 
 @router.post("/api/palette/suggest")
-def suggest_palettes(req: SuggestRequest) -> dict:
-    """Tohum renkten altı harmoni önerisi. Diske hiçbir şey yazmaz.
+def suggest_palettes(req: SuggestRequest,
+                     kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+    """KAPI DOĞRUDAN (Faz 1 / 4): veri okumaz ama `thecolorapi.com`a çıkıyor —
+    anonim istek kotayı yer (belge §4). `kullanici` imzada, gövdede okunmuyor.
+
+    Tohum renkten altı harmoni önerisi. Diske hiçbir şey yazmaz.
 
     İsimlendirme burada bilinçli olarak ÇEVRİMDIŞI: keşif sırasında 30 rengi
     thecolorapi'ye sormak ölçülen 2.5 sn'lik bir bekleme getiriyor ve kazanç

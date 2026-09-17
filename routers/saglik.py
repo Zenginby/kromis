@@ -92,12 +92,14 @@ def veri_dizini_yazilabilir(dizin: str) -> bool:
 
 
 @router.get("/health")
-def health(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+def health(ayarlar: ayar.Ayarlar = Depends(ayar.genel),
            motor: Engine | None = Depends(db.motor_varsa)) -> JSONResponse:
     """Sağlık sondası: yazılabilir veri dizini VE ulaşılabilir DB → 200, değilse 503.
 
     `motor_varsa` (`oturum` DEĞİL): motor yokluğu bu rota için hata değil
     raporlanacak durum — `oturum` 503 fırlatır ve gövde eksik kalırdı.
+    `ayar.genel` (`ayarlar` DEĞİL): sonda oturum taşımaz ve sorduğu şey
+    paylaşılan veri kökünün yazılabilirliği, bir kullanıcının dizini değil.
 
     `Cache-Control: no-store`: bir ara vekil (reverse proxy) bu cevabı
     önbelleğe alırsa sonda dakikalarca bayat bir "sağlıklı" okur.

@@ -72,6 +72,14 @@ ignore = [
 # bir bulgu (çıktıya girmiyor mu, girmeli mi?). Üreticiye bu PR'da dokunulmuyor.
 "tools/graf_uret.py" = ["F841"]
 
+[tool.pytest.ini_options]
+# `gercek_kimlik`: kimlik kapısını override'sız sınayan dosyaların işareti —
+# tanımı ve gerekçesi tests/conftest.py::kullanici. Kayıtsız işaret pytest'te
+# uyarı üretir; uyarıyı susturmak değil, işareti ADIYLA kayda geçirmek amaç.
+markers = [
+    "gercek_kimlik: kimlik kapısı GERÇEK — autouse `kullanici` override'ı kurulmaz (tests/conftest.py)",
+]
+
 [tool.mypy]
 python_version = "3.13"
 # KAPI (Faz 0 / Adım 6, 2026-09-16): `mypy .` sıfır bulgu ve CI'daki `lint`

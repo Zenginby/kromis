@@ -8,9 +8,10 @@ import os
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, Response
+from sqlalchemy.orm import Session
 
-import folders
 import i18n
 import storage
 from models import (
@@ -20,27 +21,34 @@ from models import (
     FolderRequest,
     MoveImageRequest,
 )
-from services import ayar, dil, gorsel, kapilar, zaman
+from services import ayar, depo_klasor, depo_medya, dil, gorsel, kapilar, kimlik, zaman
+from services.db import OTURUM
+from services.tablolar import Kullanici
 
 router = APIRouter()
+
+# Galeri ve klasörler DB'de (Faz 1 / 5): her rota isteğin `Session`ını (`OTURUM`,
+# commit `db.oturum`da) ve kapının çözdüğü kullanıcıyı alır. `kullanici`
+# `Depends(kimlik.aktif_kullanici)` ile ikinci kez İSTENMİYOR gibi görünse de
+# FastAPI aynı bağımlılığı istek başına bir kez çözer (`use_cache`) —
+# `ayar.ayarlar`ın içindeki kapıyla aynı nesne, ek sorgu yok. `storage`/`folders`
+# manifestleri bu dosyadan artık OKUNMAZ; `storage`dan yalnız MIME tablosu
+# (`media_type_for`) geliyor.
 
 MAX_FOLDER_DEPTH = 5                         # iç içe klasör kademesi
 
 
 @router.get("/api/folders")
-def list_folders_route(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def list_folders_route(db: Session = OTURUM,
+                       kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """Tüm klasörler (düz liste) + görsel ve alt klasör sayıları.
 
     Hiyerarşi `parent_id` ile taşınır; arayüz şeridi buna göre süzer, böylece
-    sayaçlar ve sürükle-bırak hedefleri tek istekte tazelenir.
+    sayaçlar ve sürükle-bırak hedefleri tek istekte tazelenir. İki sorgu:
+    klasörler ve `GROUP BY folder_id` sayaçları; alt klasör sayısı listeden.
     """
-    output_dir = ayarlar.output_dir
-    counts: dict[str, int] = {}
-    for rec in storage.list_history(output_dir):
-        fid = rec.get("folder_id")
-        if fid:
-            counts[fid] = counts.get(fid, 0) + 1
-    items = folders.list_folders(output_dir)
+    counts = depo_medya.klasor_sayilari(db, kullanici.id)
+    items = depo_klasor.listele(db, kullanici.id)
     child_counts: dict[str, int] = {}
     for f in items:
         pid = f.get("parent_id")
@@ -53,56 +61,55 @@ def list_folders_route(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
 
 
 @router.post("/api/folders")
-def create_folder_route(req: FolderRequest,
-                        ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def create_folder_route(req: FolderRequest, db: Session = OTURUM,
+                        kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     name = req.name.strip()
     if not name:
         raise HTTPException(status_code=422, detail=i18n.t("err.folder_name_required", dil.aktif()))
-    parent_id = kapilar.check_folder(req.parent_id, ayarlar.output_dir)
+    parent_id = kapilar.check_folder(req.parent_id, db, kullanici.id)
     # Sınırsız derinlik başlık şeridini taşırıyor ve köke dönüşü zorlaştırıyor;
     # yeniden ebeveynleme olmadığı için tek kapı burası.
-    if parent_id and folders.depth(parent_id, ayarlar.output_dir) >= MAX_FOLDER_DEPTH:
+    if parent_id and depo_klasor.derinlik(db, kullanici.id, parent_id) >= MAX_FOLDER_DEPTH:
         raise HTTPException(
             status_code=422,
             detail=i18n.t("err.folder_depth", dil.aktif(), adet=MAX_FOLDER_DEPTH))
-    return {"folder": folders.create(name, ayarlar.output_dir, parent_id=parent_id,
-                                     now=zaman.simdi())}
+    return {"folder": depo_klasor.olustur(db, kullanici.id, name, parent_id=parent_id,
+                                          now=zaman.an())}
 
 
 @router.delete("/api/folders/{folder_id}")
-def delete_folder_route(folder_id: str,
-                        ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def delete_folder_route(folder_id: str, db: Session = OTURUM,
+                        kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """Klasörü ve alt klasörlerini siler; GÖRSELLER silinmez, klasörsüz (kök) hale döner."""
-    output_dir = ayarlar.output_dir
     fid = os.path.basename(folder_id)
     # Sıra önemli: önce ağacı çöz (yoksa 404), sonra görselleri çıkar, sonra kayıtları sil.
-    doomed = folders.descendants(fid, output_dir)
+    # Üçü aynı transaksiyonda (`db.oturum`), yani arada okuyan yarım ağaç görmez.
+    doomed = depo_klasor.altagac(db, kullanici.id, fid)
     if not doomed:
         raise HTTPException(status_code=404, detail=i18n.t("err.folder_missing", dil.aktif()))
-    unfiled = storage.unfile_folders(doomed, output_dir)
-    deleted = folders.delete_tree(fid, output_dir)
+    unfiled = depo_medya.klasorden_cikar(db, kullanici.id, doomed)
+    deleted = depo_klasor.agaci_sil(db, kullanici.id, fid)
     return {"deleted": deleted, "folders": len(deleted), "unfiled": unfiled}
 
 
 @router.get("/api/folders/{folder_id}/download")
-def download_folder_route(folder_id: str,
-                          ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)):
+def download_folder_route(folder_id: str, db: Session = OTURUM,
+                          ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+                          kullanici: Kullanici = Depends(kimlik.aktif_kullanici)):
     """Klasörü ve alt klasörlerini görselleriyle birlikte ZIP olarak indirir."""
-    output_dir = ayarlar.output_dir
     fid = os.path.basename(folder_id)
-    if not folders.exists(fid, output_dir):
+    paket = depo_klasor.zip_disa_aktar(db, kullanici.id, fid, ayarlar.output_dir)
+    if paket is None:
         raise HTTPException(status_code=404, detail=i18n.t("err.folder_missing", dil.aktif()))
-    try:
-        zip_bytes, folder_name = folders.export_zip(fid, output_dir)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    zip_bytes, folder_name = paket
 
-    # Süzgeç ARTIK TEK YERDE (`folders.safe_component`). Buradaki kopya
+    # Süzgeç ARTIK TEK YERDE (`folders.safe_component`; `depo_klasor` yeniden
+    # dışa açıyor). Buradaki kopya
     # `[^\w\s-]` deseniyle CR/LF'yi KORUYORDU ve klasör adı doğrudan bu
     # başlığın DEĞERİNE giriyordu — gerekçenin tamamı o fonksiyonun başında.
     # `filename*` tarafında böyle bir açık hiç yoktu: `quote` satır sonunu
     # zaten `%0D%0A` olarak kaçırıyor.
-    safe_ascii = folders.safe_component(folder_name)
+    safe_ascii = depo_klasor.safe_component(folder_name)
     safe_ascii = safe_ascii.encode("ascii", "ignore").decode("ascii") or "klasor"
     encoded_utf8 = quote(folder_name)
     # SIRA RFC 6266'nın ÖNERDİĞİ gibi: tırnaklı `filename` önce, `filename*`
@@ -129,45 +136,42 @@ def download_folder_route(folder_id: str,
 
 
 @router.patch("/api/folders/{folder_id}")
-def rename_folder_route(folder_id: str, req: FolderRequest,
-                        ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def rename_folder_route(folder_id: str, req: FolderRequest, db: Session = OTURUM,
+                        kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """Klasör adını değiştirir."""
     fid = os.path.basename(folder_id)
     name = req.name.strip()
     if not name:
         raise HTTPException(status_code=422, detail=i18n.t("err.folder_name_required", dil.aktif()))
-    updated = folders.rename(fid, name, ayarlar.output_dir)
+    updated = depo_klasor.yeniden_adlandir(db, kullanici.id, fid, name)
     if not updated:
         raise HTTPException(status_code=404, detail=i18n.t("err.folder_missing", dil.aktif()))
     return {"folder": updated}
 
 
 @router.get("/api/history")
-def history(folder_id: str | None = None,
-            ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def history(folder_id: str | None = None, db: Session = OTURUM,
+            kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """folder_id yoksa yalnızca klasörsüz görseller (kök), varsa o klasörünkiler."""
-    items = storage.list_history(ayarlar.output_dir)
     if folder_id:
-        kapilar.check_folder(folder_id, ayarlar.output_dir)
-        items = [r for r in items if r.get("folder_id") == folder_id]
-    else:
-        items = [r for r in items if not r.get("folder_id")]
-    return {"images": items}
+        kapilar.check_folder(folder_id, db, kullanici.id)
+    return {"images": depo_medya.listele(db, kullanici.id, folder_id=folder_id or None)}
 
 
 @router.patch("/api/image/{image_id}")
-def move_image(image_id: str, req: MoveImageRequest,
-               ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def move_image(image_id: str, req: MoveImageRequest, db: Session = OTURUM,
+               kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """Görseli bir klasöre taşır (folder_id=None ise köke). Dosya taşınmaz."""
-    target = kapilar.check_folder(req.folder_id, ayarlar.output_dir)
+    target = kapilar.check_folder(req.folder_id, db, kullanici.id)
     iid = os.path.basename(image_id)
-    if not storage.set_folder(iid, target, ayarlar.output_dir):
+    if not depo_medya.klasor_ata(db, kullanici.id, iid, target):
         raise HTTPException(status_code=404, detail=i18n.t("err.image_missing", dil.aktif()))
     return {"id": iid, "folder_id": target}
 
 
 @router.get("/api/arena/{arena_id}")
-def arena_round_route(arena_id: str, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def arena_round_route(arena_id: str, db: Session = OTURUM,
+                      kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """Turun kayıtları, sütun sırasında. Bilinmeyen turda boş liste.
 
     Döküm arena satırını KENDİ kayıtlarından çiziyor; bu uç yalnızca "kazanan
@@ -178,51 +182,56 @@ def arena_round_route(arena_id: str, ayarlar: ayar.Ayarlar = Depends(ayar.ayarla
     404 YOK: silinmiş bir tur, boş bir tur gibi okunuyor — döküm satırı yine
     çizilebilir olmalı (sarkan id'nin yer tutucu davranışıyla aynı duruş).
     """
-    return {"images": storage.arena_round(os.path.basename(arena_id), ayarlar.output_dir)}
+    return {"images": depo_medya.arena_turu(db, kullanici.id, os.path.basename(arena_id))}
 
 
 @router.post("/api/arena/{arena_id}/winner")
-def set_arena_winner_route(arena_id: str, req: ArenaWinnerRequest,
-                           ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def set_arena_winner_route(arena_id: str, req: ArenaWinnerRequest, db: Session = OTURUM,
+                           kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """Arena turunun kazananını işaretler; tur başına TEK kazanan.
 
     Elenen sonuç SİLİNMİYOR — işaret bir tercih kaydı, bir çöp kutusu değil:
     kullanıcı iki gün sonra ötekini indirebilmeli. Depoda tek yazımla
-    yapılıyor (bkz. storage.set_arena_winner).
+    yapılıyor (bkz. depo_medya.arena_kazanani).
     """
     aid = os.path.basename(arena_id)
     iid = os.path.basename(req.image_id)
-    if not storage.set_arena_winner(aid, iid, ayarlar.output_dir):
+    if not depo_medya.arena_kazanani(db, kullanici.id, aid, iid):
         raise HTTPException(status_code=404,
                             detail=i18n.t("err.arena_or_image_missing", dil.aktif()))
     return {"arena_id": aid, "winner": iid}
 
 
 @router.delete("/api/image/{image_id}")
-def delete_image(image_id: str, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def delete_image(image_id: str, db: Session = OTURUM,
+                 ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+                 kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     iid = os.path.basename(image_id)
-    removed = storage.delete(iid, ayarlar.output_dir)
+    removed = depo_medya.sil(db, kullanici.id, iid, ayarlar.output_dir)
     if not removed:
         raise HTTPException(status_code=404, detail=i18n.t("err.image_missing", dil.aktif()))
     return {"deleted": iid}
 
 
 @router.patch("/api/images")
-def move_images(req: BulkMoveRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def move_images(req: BulkMoveRequest, db: Session = OTURUM,
+                kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """Seçili görselleri bir klasöre taşır (folder_id=None ise köke). Dosya taşınmaz."""
-    target = kapilar.check_folder(req.folder_id, ayarlar.output_dir)
+    target = kapilar.check_folder(req.folder_id, db, kullanici.id)
     ids = [os.path.basename(i) for i in req.ids]
-    moved = storage.set_folder_many(ids, target, ayarlar.output_dir)
+    moved = depo_medya.klasor_ata_coklu(db, kullanici.id, ids, target)
     if not moved:
         raise HTTPException(status_code=404, detail=i18n.t("err.image_missing", dil.aktif()))
     return {"moved": moved, "folder_id": target}
 
 
 @router.delete("/api/images")
-def delete_images(req: BulkImagesRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
-    """Seçili görselleri siler (dosya + kayıt)."""
+def delete_images(req: BulkImagesRequest, db: Session = OTURUM,
+                  ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+                  kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+    """Seçili görselleri siler (kayıt + dosya)."""
     ids = [os.path.basename(i) for i in req.ids]
-    deleted = storage.delete_many(ids, ayarlar.output_dir)
+    deleted = depo_medya.sil_coklu(db, kullanici.id, ids, ayarlar.output_dir)
     if not deleted:
         raise HTTPException(status_code=404, detail=i18n.t("err.image_missing", dil.aktif()))
     return {"deleted": deleted}
@@ -232,12 +241,14 @@ def delete_images(req: BulkImagesRequest, ayarlar: ayar.Ayarlar = Depends(ayar.a
 async def import_image(request: Request,
                        file: UploadFile = File(...),
                        folder_id: str | None = Form(None),
-                       ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+                       db: Session = OTURUM,
+                       ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+                       kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """Bilgisayardan sürüklenen bir görseli galeriye (isteğe bağlı klasöre) aktarır.
 
     ÜRETİMDEN DOĞMAYAN ilk kayıt türü: prompt yok, palet yok, Azure'a hiç
     çıkılmaz. Dosya `gorsel.read_upload_png` ile doğrulanıp PNG'ye YENİDEN
-    KODLANIR — `/output/{filename}`, `storage.delete` ve `gorsel.output_png_path`
+    KODLANIR — `/output/{filename}`, `depo_medya.sil` ve `gorsel.output_png_path`
     dosyanın `{id}.png` olduğunu varsayıyor; JPEG olduğu gibi kaydedilirse
     kayıt görünür ama görsel açılmaz.
 
@@ -245,33 +256,38 @@ async def import_image(request: Request,
     10 MB'ı okumak boşuna iş.
 
     Dosya başına TEK istek: arayüz çoklu bırakmayı sıraya koyuyor. Toplu bir uç
-    yok, çünkü `storage.save` her kayıtta history.json'ın tamamını yeniden
-    yazıyor ve eşzamanlılık kayıp güncelleme üretir.
+    yok — o kısıt `history.json`ın tam-dosya yazımından geliyordu (Faz 1 / 5'te
+    kalktı), ama arayüzün sırası ve tek dosyalık gövde sözleşmesi duruyor.
+
+    `async def` rota: DB çağrıları `run_in_threadpool` ile (senkron sürücü olay
+    döngüsünü kilitlemesin — belge §1'in sürücü kararı, §5'in 5 async rota notu).
     """
     content_length = request.headers.get("content-length")
     if content_length is not None and content_length.isdigit() and int(content_length) > gorsel.MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail=i18n.t("err.file_too_big", dil.aktif()))
-    target_folder = kapilar.check_folder(folder_id, ayarlar.output_dir)
+    target_folder = await run_in_threadpool(kapilar.check_folder, folder_id, db, kullanici.id)
     png = await gorsel.read_upload_png(file)
 
     # Dosya adı yalnızca ETİKET (galeri başlığı/alt metni); kayıt adı uuid'den
     # geliyor. basename yol parçalarını düşürür, kırpma başlığı taşırmaz.
     label = os.path.basename(file.filename or "").strip()[:120] or i18n.t("media.imported_image", dil.aktif())
-    record = storage.save(
-        png,
+    record = await run_in_threadpool(
+        depo_medya.kaydet, db, kullanici.id, png,
         {"prompt": label, "size": gorsel.png_dimensions(png), "quality": "",
          "parent_id": None, "folder_id": target_folder,
          "palette": None, "prompt_sent": None, "imported": True,
          # BOŞ bilerek: bu görsel başka bir araçta üretildi, bir modeli yok.
          # (bkz. storage.save → "model")
          "model": ""},
-        ayarlar.output_dir, now=zaman.simdi(),
+        ayarlar.output_dir, now=zaman.an(),
     )
     return {"image": record}
 
 
 @router.get("/output/{filename}")
-def output_file(filename: str, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> FileResponse:
+def output_file(filename: str, db: Session = OTURUM,
+                ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+                kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> FileResponse:
     """Depodaki medyayı ÇİZİM için sunar (inline, indirme başlığı YOK).
 
     Tür ARTIK TÜRETİLİYOR: v0.13'e kadar `image/png` çakılıydı ve o doğruydu
@@ -284,19 +300,24 @@ def output_file(filename: str, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) ->
     `Content-Disposition` HÂLÂ YOK ve bu adres hâlâ her galeri küçük resminin
     `src`i — indirme yolu ayrı bir uç (`output_download`) ve gerekçesi orada
     yazılı.
+
+    Dosya adı `medya.filename`de ARANIYOR (Faz 1 / 5): kullanıcının satırı
+    yoksa dosya diskte dursa bile 404 — servis yolunun gerçeği DB satırı,
+    dizin değil (bkz. depo_medya.dosya_yolu_adiyla).
     """
     safe = os.path.basename(filename)
     if not safe or safe in (".", ".."):
         raise HTTPException(status_code=404, detail=i18n.t("err.not_found", dil.aktif()))
-    path = os.path.join(ayarlar.output_dir, safe)
-    if not os.path.isfile(path):
+    path = depo_medya.dosya_yolu_adiyla(db, kullanici.id, safe, ayarlar.output_dir)
+    if path is None:
         raise HTTPException(status_code=404, detail=i18n.t("err.not_found", dil.aktif()))
     return FileResponse(path, media_type=storage.media_type_for(safe))
 
 
 @router.get("/api/output/{image_id}/download")
-def output_download(image_id: str,
-                    ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> FileResponse:
+def output_download(image_id: str, db: Session = OTURUM,
+                    ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+                    kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> FileResponse:
     """Aynı PNG, ama `Content-Disposition: attachment` ile — İNDİRME yolu.
 
     NEDEN AYRI BİR UÇ, `/output/{filename}`e başlık eklemek yerine: o adres aynı
@@ -318,8 +339,9 @@ def output_download(image_id: str,
     dosya adını da frontend veriyor. Bu uç orada yalnız köprünün indirdiği adres
     olarak kalıyor.
 
-    Path-traversal guard'ı yeniden yazılmıyor: `gorsel.output_media_path` servis
-    yolunun tek kapısı ve 404'ü de o veriyor.
+    Path-traversal guard'ı yeniden yazılmıyor: id `basename`e iner ve
+    `depo_medya.dosya_yolu` `_SAFE_ID`den geçirip kullanıcının satırını arar;
+    satır ya da dosya yoksa 404 burada.
 
     TÜR VE DOSYA ADI, DİSKTEKİ DOSYADAN geliyor — `image_id`ye uzantı
     EKLENMİYOR. Fark v0.13'te gerçek oldu: `f"{id}.png"` yazan bir indirme,
@@ -328,7 +350,9 @@ def output_download(image_id: str,
     zamanda `download` özniteliğiyle (`folders.js` onu `rec.filename`den
     veriyor) tek bir gerçeği paylaşmak demek.
     """
-    path = gorsel.output_media_path(image_id, ayarlar.output_dir)
+    path = depo_medya.dosya_yolu(db, kullanici.id, os.path.basename(image_id), ayarlar.output_dir)
+    if path is None:
+        raise HTTPException(status_code=404, detail=i18n.t("err.source_media_missing", dil.aktif()))
     ad = os.path.basename(path)
     return FileResponse(path, media_type=storage.media_type_for(ad),
                         filename=ad)

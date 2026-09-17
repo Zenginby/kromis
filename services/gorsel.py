@@ -20,7 +20,6 @@ from PIL import Image
 from starlette.datastructures import UploadFile as FormUploadFile
 
 import i18n
-import storage
 from services import dil
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024          # dosya başına
@@ -59,43 +58,21 @@ def output_png_path(image_id: str, output_dir: str) -> str:
     Tek path-traversal guard'ı: id yalnızca basename'e indirilir. Dizin
     çağıranın ayar nesnesinden geliyor (Faz 0 / Adım 4) — bu modül hangi
     depoya baktığını kendisi bilmez, söyleneni okur.
+
+    PNG'de ÇAKILI ve bu bilinçli: REFERANS okuma yolu (`/api/edit`in
+    `source_id`si, logo/afiş bindirmeleri, video için ilk kare) — bir MP4'ü
+    referans görsel olarak sağlayıcıya göndermek anlamsız, bir videonun
+    id'siyle çağrıldığında 404 doğru cevap. SERVİS yolu (`/output/{filename}`,
+    indirme ucu) buranın kardeşi değil artık: Faz 1 / 5'te `depo_medya.dosya_yolu*`
+    oldu — kullanıcının `medya` satırını arıyor, uzantıyı `storage.media_path_of`
+    ile deniyor (Faz 0'ın `output_media_path`i yalnız diske bakıyordu; dizin
+    tek kullanıcınındı).
     """
     safe = os.path.basename(image_id or "")
     path = os.path.join(output_dir, f"{safe}.png")
     if not safe or not os.path.isfile(path):
         raise HTTPException(status_code=404, detail=i18n.t("err.source_image_missing", dil.aktif()))
     return path
-
-
-def output_media_path(media_id: str, output_dir: str) -> str:
-    """history id → output/<id>.<uzantı> yolu; bulunamayanda HTTPException(404).
-
-    `output_png_path`in İKİZİ DEĞİL, KARDEŞİ — ve ikisinin ayrı durması
-    bilinçli:
-
-      • `output_png_path` REFERANS okuma yolu (`/api/edit`in `source_id`si,
-        logo/afiş bindirmeleri, video için ilk kare). Orada PNG olmak bir
-        VARSAYIM değil ŞART: bir MP4'ü referans görsel olarak sağlayıcıya
-        göndermek anlamsız. O yüzden o işlev PNG'de çakılı KALIYOR ve bir
-        videonun id'siyle çağrıldığında 404 vermeye devam ediyor — doğru
-        cevap bu.
-      • Bu işlev SERVİS yolu (`/output/{filename}` ve indirme ucu), yani
-        kullanıcının görmek/indirmek istediği her şey.
-
-    Uzantı DENENİYOR, `history.json` OKUNMUYOR: manifesti okumak her küçük
-    resim isteğinde bir dosya kilidi ve tam bir JSON ayrıştırması demekti
-    (galeri tek ekranda onlarca istek atıyor). Aramanın KENDİSİ `storage`da
-    (`media_path_of`) çünkü silme yolu da aynı soruyu soruyor — iki yerde iki
-    döngü, birine tür eklenip ötekinin unutulmasının kapısı olurdu.
-
-    Path-traversal guard'ı `output_png_path`in aynısı: id yalnızca
-    basename'e indiriliyor.
-    """
-    safe = os.path.basename(media_id or "")
-    path = storage.media_path_of(safe, output_dir) if safe else None
-    if path:
-        return path
-    raise HTTPException(status_code=404, detail=i18n.t("err.source_media_missing", dil.aktif()))
 
 
 def read_png_file(path: str) -> bytes:

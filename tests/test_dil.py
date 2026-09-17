@@ -107,6 +107,7 @@ def test_an_invalid_account_language_falls_through_to_the_browser(client, kullan
     assert _sayfa_dili(client.get("/", headers=TR_TARAYICI)) == "tr"
 
 
+@pytest.mark.usefixtures("depo_db")   # `DELETE /api/image` artık `Session` istiyor (Faz 1 / 5)
 def test_the_chain_reaches_route_errors_through_dil_aktif(client, kullanici):
     """Rotalar `dil.aktif()` okumaya devam ediyor (API sabit) ve o değer
     zincirden geliyor: çerezli istekte hata metni çerezin dilinde, çerezsizde

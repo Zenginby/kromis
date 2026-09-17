@@ -1,11 +1,16 @@
 import io
 
+import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
 import app as appmod
 import assets_store as astore
 import azure_client as ac
+
+# Galeri/klasör/üretim rotaları DB'de (Faz 1 / 5): test kullanıcısı gerçek satır,
+# `db.oturum` bu dosyanın motoruna bağlı — gerekçe tests/conftest.py::depo_db.
+pytestmark = pytest.mark.usefixtures("depo_db")
 
 
 def _png(color=(30, 80, 200, 255), size=(64, 64)) -> bytes:

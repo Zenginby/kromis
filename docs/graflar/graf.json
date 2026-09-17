@@ -91,6 +91,7 @@
         "tests/test_edit_route.py",
         "tests/test_folders.py",
         "tests/test_fonts.py",
+        "tests/test_galeri_db.py",
         "tests/test_guncelleme_route.py",
         "tests/test_guvenlik_baslik.py",
         "tests/test_health.py",
@@ -181,6 +182,7 @@
       "satir": 458,
       "testler": [
         "tests/test_app.py",
+        "tests/test_app_bolme.py",
         "tests/test_arena.py",
         "tests/test_azure_client.py",
         "tests/test_azure_client_edit.py",
@@ -195,6 +197,7 @@
         "tests/test_edit_route.py",
         "tests/test_fal_client.py",
         "tests/test_folders.py",
+        "tests/test_galeri_db.py",
         "tests/test_gemini_client.py",
         "tests/test_i18n.py",
         "tests/test_import_route.py",
@@ -295,6 +298,7 @@
         "routers.ayarlar",
         "routers.sohbet",
         "routers.uretim",
+        "services.depo_medya",
         "services.modeller",
         "services.redaksiyon",
         "storage",
@@ -592,17 +596,16 @@
       ],
       "ithal_eden": [
         "backup",
-        "routers.galeri",
-        "services.kapilar",
+        "services.depo_klasor",
         "tools.make_legacy_fixtures"
       ],
       "katman": 3,
       "satir": 253,
       "testler": [
         "tests/test_folders.py",
+        "tests/test_galeri_db.py",
         "tests/test_guvenlik_baslik.py",
         "tests/test_legacy_formats.py",
-        "tests/test_playwright_studio.py",
         "tests/test_tablolar.py"
       ],
       "yol": "folders.py"
@@ -1023,17 +1026,20 @@
         "i18n",
         "models",
         "services.ayar",
+        "services.db",
+        "services.depo_medya",
         "services.dil",
         "services.gorsel",
         "services.kapilar",
-        "services.zaman",
-        "storage"
+        "services.kimlik",
+        "services.tablolar",
+        "services.zaman"
       ],
       "ithal_eden": [
         "app"
       ],
       "katman": 9,
-      "satir": 231,
+      "satir": 238,
       "testler": [],
       "yol": "routers/bindirme.py"
     },
@@ -1041,13 +1047,17 @@
       "ad": "routers.galeri",
       "erteli_ithal": [],
       "ithal": [
-        "folders",
         "i18n",
         "models",
         "services.ayar",
+        "services.db",
+        "services.depo_klasor",
+        "services.depo_medya",
         "services.dil",
         "services.gorsel",
         "services.kapilar",
+        "services.kimlik",
+        "services.tablolar",
         "services.zaman",
         "storage"
       ],
@@ -1055,7 +1065,7 @@
         "app"
       ],
       "katman": 9,
-      "satir": 334,
+      "satir": 358,
       "testler": [],
       "yol": "routers/galeri.py"
     },
@@ -1183,18 +1193,21 @@
         "palette",
         "providers",
         "services.ayar",
+        "services.db",
+        "services.depo_medya",
         "services.dil",
         "services.gorsel",
         "services.kapilar",
+        "services.kimlik",
         "services.palet",
-        "services.zaman",
-        "storage"
+        "services.tablolar",
+        "services.zaman"
       ],
       "ithal_eden": [
         "app"
       ],
       "katman": 9,
-      "satir": 439,
+      "satir": 462,
       "testler": [],
       "yol": "routers/uretim.py"
     },
@@ -1271,8 +1284,11 @@
       "ithal": [],
       "ithal_eden": [
         "app",
+        "routers.bindirme",
+        "routers.galeri",
         "routers.hesap",
         "routers.saglik",
+        "routers.uretim",
         "services.cerez",
         "services.kimlik"
       ],
@@ -1283,6 +1299,55 @@
         "tests/test_docker_kapisi.py"
       ],
       "yol": "services/db.py"
+    },
+    {
+      "ad": "services.depo_klasor",
+      "erteli_ithal": [],
+      "ithal": [
+        "folders",
+        "services.depo_medya",
+        "services.tablolar",
+        "services.zaman"
+      ],
+      "ithal_eden": [
+        "routers.galeri",
+        "services.kapilar"
+      ],
+      "katman": 7,
+      "satir": 208,
+      "testler": [
+        "tests/test_folders.py",
+        "tests/test_galeri_db.py",
+        "tests/test_guvenlik_baslik.py",
+        "tests/test_legacy_formats.py",
+        "tests/test_playwright_studio.py"
+      ],
+      "yol": "services/depo_klasor.py"
+    },
+    {
+      "ad": "services.depo_medya",
+      "erteli_ithal": [],
+      "ithal": [
+        "catalog",
+        "services.tablolar",
+        "services.zaman",
+        "storage"
+      ],
+      "ithal_eden": [
+        "routers.bindirme",
+        "routers.galeri",
+        "routers.uretim",
+        "services.depo_klasor"
+      ],
+      "katman": 6,
+      "satir": 336,
+      "testler": [
+        "tests/test_galeri_db.py",
+        "tests/test_kimlik.py",
+        "tests/test_legacy_formats.py",
+        "tests/test_playwright_studio.py"
+      ],
+      "yol": "services/depo_medya.py"
     },
     {
       "ad": "services.dil",
@@ -1320,8 +1385,7 @@
       "erteli_ithal": [],
       "ithal": [
         "i18n",
-        "services.dil",
-        "storage"
+        "services.dil"
       ],
       "ithal_eden": [
         "app",
@@ -1330,7 +1394,7 @@
         "routers.uretim"
       ],
       "katman": 4,
-      "satir": 140,
+      "satir": 117,
       "testler": [
         "tests/test_edit_route.py",
         "tests/test_model_secimi.py",
@@ -1352,6 +1416,7 @@
       "katman": 6,
       "satir": 292,
       "testler": [
+        "tests/test_galeri_db.py",
         "tests/test_hesap.py",
         "tests/test_kimlik.py",
         "tests/test_playwright_hesap.py"
@@ -1364,8 +1429,8 @@
       "ithal": [
         "assets_store",
         "chat_store",
-        "folders",
         "i18n",
+        "services.depo_klasor",
         "services.dil",
         "storage"
       ],
@@ -1374,8 +1439,8 @@
         "routers.galeri",
         "routers.uretim"
       ],
-      "katman": 4,
-      "satir": 75,
+      "katman": 8,
+      "satir": 79,
       "testler": [],
       "yol": "services/kapilar.py"
     },
@@ -1393,9 +1458,12 @@
       "ithal_eden": [
         "app",
         "routers.ayarlar",
+        "routers.bindirme",
+        "routers.galeri",
         "routers.hesap",
         "routers.kok",
         "routers.paletler",
+        "routers.uretim",
         "services.ayar"
       ],
       "katman": 7,
@@ -1529,18 +1597,27 @@
       ],
       "ithal_eden": [
         "routers.ayarlar",
+        "routers.bindirme",
+        "routers.galeri",
         "routers.hesap",
         "routers.kok",
         "routers.paletler",
+        "routers.uretim",
         "services.ayar",
+        "services.depo_klasor",
+        "services.depo_medya",
         "services.hesap",
         "services.kimlik"
       ],
       "katman": 5,
-      "satir": 468,
+      "satir": 477,
       "testler": [
+        "tests/test_folders.py",
+        "tests/test_galeri_db.py",
         "tests/test_hesap.py",
         "tests/test_kimlik.py",
+        "tests/test_legacy_formats.py",
+        "tests/test_palette_route.py",
         "tests/test_playwright_hesap.py",
         "tests/test_tablolar.py"
       ],
@@ -1570,11 +1647,16 @@
         "routers.galeri",
         "routers.paletler",
         "routers.sohbet",
-        "routers.uretim"
+        "routers.uretim",
+        "services.depo_klasor",
+        "services.depo_medya"
       ],
       "katman": 0,
-      "satir": 17,
-      "testler": [],
+      "satir": 45,
+      "testler": [
+        "tests/test_galeri_db.py",
+        "tests/test_legacy_formats.py"
+      ],
       "yol": "services/zaman.py"
     },
     {
@@ -1587,23 +1669,19 @@
       "ithal_eden": [
         "backup",
         "folders",
-        "routers.bindirme",
         "routers.galeri",
-        "routers.uretim",
-        "services.gorsel",
+        "services.depo_medya",
         "services.kapilar",
         "tools.make_legacy_fixtures"
       ],
       "katman": 1,
       "satir": 423,
       "testler": [
-        "tests/test_app_bolme.py",
         "tests/test_arena.py",
         "tests/test_chats_route.py",
         "tests/test_folders.py",
-        "tests/test_kimlik.py",
+        "tests/test_galeri_db.py",
         "tests/test_legacy_formats.py",
-        "tests/test_playwright_studio.py",
         "tests/test_storage.py",
         "tests/test_storage_delete.py",
         "tests/test_tablolar.py",
@@ -2273,7 +2351,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 106,
+  "test_dosyasi_sayisi": 107,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",
@@ -2300,8 +2378,8 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 170,
-      "yardimci_sayisi": 0,
+      "satir": 173,
+      "yardimci_sayisi": 5,
       "yol": "/api/arena/{arena_id}",
       "yontem": "GET"
     },
@@ -2317,8 +2395,8 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 185,
-      "yardimci_sayisi": 1,
+      "satir": 189,
+      "yardimci_sayisi": 3,
       "yol": "/api/arena/{arena_id}/winner",
       "yontem": "POST"
     },
@@ -2333,7 +2411,7 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 199,
+      "satir": 206,
       "yardimci_sayisi": 2,
       "yol": "/api/assets/{kind}",
       "yontem": "GET"
@@ -2349,7 +2427,7 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 175,
+      "satir": 182,
       "yardimci_sayisi": 4,
       "yol": "/api/assets/{kind}",
       "yontem": "POST"
@@ -2365,7 +2443,7 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 212,
+      "satir": 219,
       "yardimci_sayisi": 2,
       "yol": "/api/assets/{kind}/{asset_id}",
       "yontem": "DELETE"
@@ -2376,6 +2454,7 @@
       "modul": "routers.bindirme",
       "moduller": [
         "assets_store",
+        "catalog",
         "i18n",
         "models",
         "storage"
@@ -2383,8 +2462,8 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 150,
-      "yardimci_sayisi": 7,
+      "satir": 155,
+      "yardimci_sayisi": 14,
       "yol": "/api/banner",
       "yontem": "POST"
     },
@@ -2400,7 +2479,7 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 141,
+      "satir": 146,
       "yardimci_sayisi": 6,
       "yol": "/api/banner/preview",
       "yontem": "POST"
@@ -2536,19 +2615,17 @@
         "chat_store",
         "color_names",
         "etiket",
-        "folders",
         "i18n",
         "models",
         "palette",
         "palette_store",
-        "providers",
-        "storage"
+        "providers"
       ],
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 380,
-      "yardimci_sayisi": 19,
+      "satir": 399,
+      "yardimci_sayisi": 18,
       "yol": "/api/edit",
       "yontem": "POST"
     },
@@ -2556,15 +2633,12 @@
       "dosya": "routers/galeri.py",
       "islev": "list_folders_route",
       "modul": "routers.galeri",
-      "moduller": [
-        "folders",
-        "storage"
-      ],
+      "moduller": [],
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 31,
-      "yardimci_sayisi": 0,
+      "satir": 42,
+      "yardimci_sayisi": 5,
       "yol": "/api/folders",
       "yontem": "GET"
     },
@@ -2580,8 +2654,8 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 56,
-      "yardimci_sayisi": 3,
+      "satir": 64,
+      "yardimci_sayisi": 10,
       "yol": "/api/folders",
       "yontem": "POST"
     },
@@ -2591,14 +2665,13 @@
       "modul": "routers.galeri",
       "moduller": [
         "folders",
-        "i18n",
-        "storage"
+        "i18n"
       ],
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 73,
-      "yardimci_sayisi": 1,
+      "satir": 81,
+      "yardimci_sayisi": 7,
       "yol": "/api/folders/{folder_id}",
       "yontem": "DELETE"
     },
@@ -2614,8 +2687,8 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 132,
-      "yardimci_sayisi": 1,
+      "satir": 139,
+      "yardimci_sayisi": 6,
       "yol": "/api/folders/{folder_id}",
       "yontem": "PATCH"
     },
@@ -2630,8 +2703,8 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 88,
-      "yardimci_sayisi": 1,
+      "satir": 96,
+      "yardimci_sayisi": 10,
       "yol": "/api/folders/{folder_id}/download",
       "yontem": "GET"
     },
@@ -2655,8 +2728,8 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 32,
-      "yardimci_sayisi": 11,
+      "satir": 41,
+      "yardimci_sayisi": 16,
       "yol": "/api/generate",
       "yontem": "POST"
     },
@@ -2808,14 +2881,13 @@
       "modul": "routers.galeri",
       "moduller": [
         "folders",
-        "i18n",
-        "storage"
+        "i18n"
       ],
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 146,
-      "yardimci_sayisi": 2,
+      "satir": 153,
+      "yardimci_sayisi": 8,
       "yol": "/api/history",
       "yontem": "GET"
     },
@@ -2830,8 +2902,8 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 202,
-      "yardimci_sayisi": 1,
+      "satir": 206,
+      "yardimci_sayisi": 5,
       "yol": "/api/image/{image_id}",
       "yontem": "DELETE"
     },
@@ -2848,8 +2920,8 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 159,
-      "yardimci_sayisi": 2,
+      "satir": 162,
+      "yardimci_sayisi": 7,
       "yol": "/api/image/{image_id}",
       "yontem": "PATCH"
     },
@@ -2865,8 +2937,8 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 222,
-      "yardimci_sayisi": 1,
+      "satir": 229,
+      "yardimci_sayisi": 4,
       "yol": "/api/images",
       "yontem": "DELETE"
     },
@@ -2883,8 +2955,8 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 211,
-      "yardimci_sayisi": 2,
+      "satir": 217,
+      "yardimci_sayisi": 7,
       "yol": "/api/images",
       "yontem": "PATCH"
     },
@@ -2893,15 +2965,13 @@
       "islev": "import_image",
       "modul": "routers.galeri",
       "moduller": [
-        "folders",
-        "i18n",
-        "storage"
+        "i18n"
       ],
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 232,
-      "yardimci_sayisi": 6,
+      "satir": 241,
+      "yardimci_sayisi": 5,
       "yol": "/api/import",
       "yontem": "POST"
     },
@@ -2911,6 +2981,7 @@
       "modul": "routers.bindirme",
       "moduller": [
         "assets_store",
+        "catalog",
         "composite",
         "i18n",
         "models",
@@ -2919,8 +2990,8 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 73,
-      "yardimci_sayisi": 5,
+      "satir": 75,
+      "yardimci_sayisi": 12,
       "yol": "/api/logo",
       "yontem": "POST"
     },
@@ -2937,7 +3008,7 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 64,
+      "satir": 66,
       "yardimci_sayisi": 4,
       "yol": "/api/logo/preview",
       "yontem": "POST"
@@ -2953,8 +3024,8 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 298,
-      "yardimci_sayisi": 2,
+      "satir": 318,
+      "yardimci_sayisi": 5,
       "yol": "/api/output/{image_id}/download",
       "yontem": "GET"
     },
@@ -3121,8 +3192,8 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 76,
-      "yardimci_sayisi": 4,
+      "satir": 88,
+      "yardimci_sayisi": 9,
       "yol": "/api/video",
       "yontem": "POST"
     },
@@ -3135,17 +3206,15 @@
         "catalog",
         "chat_store",
         "etiket",
-        "folders",
         "i18n",
         "models",
-        "providers",
-        "storage"
+        "providers"
       ],
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 187,
-      "yardimci_sayisi": 11,
+      "satir": 202,
+      "yardimci_sayisi": 10,
       "yol": "/api/video/animate",
       "yontem": "POST"
     },
@@ -3160,7 +3229,7 @@
       "onyuz": [
         "static/assets.js"
       ],
-      "satir": 222,
+      "satir": 229,
       "yardimci_sayisi": 2,
       "yol": "/assets/{kind}/{filename}",
       "yontem": "GET"
@@ -3208,8 +3277,8 @@
         "static/folders.js",
         "static/viewer.js"
       ],
-      "satir": 274,
-      "yardimci_sayisi": 1,
+      "satir": 288,
+      "yardimci_sayisi": 2,
       "yol": "/output/{filename}",
       "yontem": "GET"
     }

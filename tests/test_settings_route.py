@@ -255,6 +255,7 @@ def test_gizli_alan_adi_gizli_OLMAYAN_bir_rotada_da_redakte_ediliyor():
     assert not appmod._is_secret_loc(["body", "comfyui_url"])
 
 
+@pytest.mark.usefixtures("depo_db")   # `/api/generate` `Session` istiyor; 422 ondan sonra (Faz 1 / 5)
 def test_generate_422_si_hatali_degeri_HALA_gosteriyor(client):
     """Redaksiyonun genelleşmesi gizli olmayan rotaları ETKİLEMEMELİ.
 

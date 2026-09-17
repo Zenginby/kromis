@@ -28,6 +28,11 @@ from pydantic import ValidationError
 import app as appmod
 import folders
 from models import FolderRequest
+from services import depo_klasor
+
+# Galeri/klasör/üretim rotaları DB'de (Faz 1 / 5): test kullanıcısı gerçek satır,
+# `db.oturum` bu dosyanın motoruna bağlı — gerekçe tests/conftest.py::depo_db.
+pytestmark = pytest.mark.usefixtures("depo_db")
 
 # Denemenin kendisi: iki satır sonu + araya sıkıştırılmış sahte bir başlık.
 KOTU_AD = "kotu\r\nX-Injected: yes\r\n\r\nPWNED"
@@ -88,14 +93,15 @@ def test_create_folder_route_rejects_a_crlf_name(tmp_path, dizinler):
 
 # ── İkisi birlikte: uçtan uca ───────────────────────────────────────
 
-def test_download_header_has_no_line_break_even_for_a_stored_bad_name(tmp_path, dizinler):
+def test_download_header_has_no_line_break_even_for_a_stored_bad_name(tmp_path, dizinler,
+                                                                      db_oturumu, kullanici):
     """Depoda ZATEN böyle bir ad varsa (giriş kapısından önce açılmış klasör)
     indirme yine de çalışmalı ve başlık tek satır kalmalı."""
     c = _client(tmp_path, dizinler)
     # Rotayı ATLAYARAK doğrudan depoya yaz: giriş kapısı artık bunu geçirmiyor,
-    # ama v0.x'te açılmış bir klasör diskte hâlâ böyle durabilir.
-    fid = folders.create(KOTU_AD, appmod.app.state.ayarlar.output_dir,
-                         now="2026-01-01T00:00:00")["id"]
+    # ama v0.x'te açılmış bir klasör içe aktarıldığında DB'de böyle durabilir.
+    fid = depo_klasor.olustur(db_oturumu, kullanici.id, KOTU_AD)["id"]
+    db_oturumu.commit()
 
     r = c.get(f"/api/folders/{fid}/download")
 
@@ -106,11 +112,11 @@ def test_download_header_has_no_line_break_even_for_a_stored_bad_name(tmp_path, 
     assert cd.startswith('attachment; filename="kotu_X-Injected_yes_PWNED.zip"')
 
 
-def test_download_header_still_carries_the_utf8_name(tmp_path, dizinler):
+def test_download_header_still_carries_the_utf8_name(tmp_path, dizinler, db_oturumu, kullanici):
     """Türkçe ad `filename*` tarafında AYNEN duruyor — düzeltme onu bozmadı."""
     c = _client(tmp_path, dizinler)
-    fid = folders.create("Şubat Çalışması", appmod.app.state.ayarlar.output_dir,
-                         now="2026-01-01T00:00:00")["id"]
+    fid = depo_klasor.olustur(db_oturumu, kullanici.id, "Şubat Çalışması")["id"]
+    db_oturumu.commit()
 
     cd = c.get(f"/api/folders/{fid}/download").headers["content-disposition"]
 

@@ -3,6 +3,7 @@ import json
 import zipfile
 from urllib.parse import quote
 
+import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
@@ -11,6 +12,11 @@ import assets_store as astore
 import azure_client as ac
 import folders
 import storage
+from services import depo_klasor, tablolar
+
+# Galeri/klasör/üretim rotaları DB'de (Faz 1 / 5): test kullanıcısı gerçek satır,
+# `db.oturum` bu dosyanın motoruna bağlı — gerekçe tests/conftest.py::depo_db.
+pytestmark = pytest.mark.usefixtures("depo_db")
 
 
 def _png(color=(30, 80, 200, 255), size=(64, 64)) -> bytes:
@@ -566,28 +572,34 @@ def test_delete_folder_leaves_other_folders_intact(tmp_path, monkeypatch, dizinl
 
 
 # ── geriye uyum ve dayanıklılık ────────────────────────────────────────
-def test_legacy_records_without_folder_id_are_treated_as_root(tmp_path, monkeypatch, dizinler):
-    """v1.5 öncesi kayıtlarda folder_id alanı hiç yok — kök kabul edilmeli."""
-    out = tmp_path / "output"
-    out.mkdir(parents=True)
-    (out / "history.json").write_text(json.dumps([
-        {"id": "aabbccddeeff", "filename": "aabbccddeeff.png", "prompt": "eski",
-         "size": "1024x1024", "quality": "low", "created_at": "2026-07-01T10:00:00",
-         "parent_id": None},
-    ]), encoding="utf-8")
+#
+# Faz 1 / 5'e kadar bu üç test eski biçimli `history.json`/`folders.json`ı
+# kullanıcı dizinine yazıp rotanın okumasını sınıyordu. Web yolu manifesti
+# artık HİÇ okumuyor (belge §5 çıkış ölçütü; bekçisi aşağıda ve
+# tests/test_galeri_db.py); eski kaydın DB'deki karşılığı "12 haneli id +
+# NULL alan" — içe aktarma aracının (8. görev) yazacağı şekil. Testler o
+# şekli tohumluyor: eski davranışın sınadığı şey (kök kabul, hedef alınabilme,
+# silinebilme) aynen ölçülüyor.
+def test_legacy_records_without_folder_id_are_treated_as_root(tmp_path, monkeypatch, dizinler,
+                                                              db_oturumu, kullanici):
+    """v1.5 öncesi kayıt: 12 haneli id, `folder_id` NULL — kökte görünmeli."""
     c = _client(tmp_path, monkeypatch, dizinler)
+    db_oturumu.add(tablolar.Medya(id="aabbccddeeff", kullanici_id=kullanici.id,
+                                  filename="aabbccddeeff.png", prompt="eski", size="1024x1024",
+                                  quality="low", model="", credits=0))
+    db_oturumu.commit()
     ids = [r["id"] for r in c.get("/api/history").json()["images"]]
     assert ids == ["aabbccddeeff"]
+    kayit = c.get("/api/history").json()["images"][0]
+    assert kayit["folder_id"] is None and "kind" not in kayit and "imported" not in kayit
 
 
-def test_legacy_folders_without_parent_id_are_treated_as_root(tmp_path, monkeypatch, dizinler):
-    """v1.6 kayıtlarında parent_id alanı hiç yok — kök klasör kabul edilmeli (migration yok)."""
-    out = tmp_path / "output"
-    out.mkdir(parents=True)
-    (out / "folders.json").write_text(json.dumps([
-        {"id": "aabbccddeeff", "name": "Eski klasör", "created_at": "2026-07-25T10:00:00"},
-    ]), encoding="utf-8")
+def test_legacy_folders_without_parent_id_are_treated_as_root(tmp_path, monkeypatch, dizinler,
+                                                              db_oturumu, kullanici):
+    """v1.6 klasörü: 12 haneli id, `parent_id` NULL — kök klasör; hedef alınabilir, silinebilir."""
     c = _client(tmp_path, monkeypatch, dizinler)
+    db_oturumu.add(tablolar.Klasor(id="aabbccddeeff", kullanici_id=kullanici.id, name="Eski klasör"))
+    db_oturumu.commit()
     items = c.get("/api/folders").json()["items"]
     assert items[0]["parent_id"] is None
     assert items[0]["child_count"] == 0
@@ -596,20 +608,27 @@ def test_legacy_folders_without_parent_id_are_treated_as_root(tmp_path, monkeypa
     assert c.delete("/api/folders/aabbccddeeff").json()["unfiled"] == 1
 
 
-def test_corrupt_folders_file_is_tolerated(tmp_path, monkeypatch, dizinler):
-    out = tmp_path / "output"
-    out.mkdir(parents=True)
-    (out / "folders.json").write_text("{bozuk", encoding="utf-8")
+def test_the_web_path_never_writes_the_manifest_files(tmp_path, monkeypatch, dizinler):
+    """Belge §5 çıkış ölçütü: `history.json`/`folders.json` kullanıcı dizininde HİÇ açılmaz.
+
+    Klasör açan, üreten, taşıyan ve silen bir tur sonunda dizinde yalnız medya
+    dosyası kalmalı — manifest görünürse bir rota eski depoya geri düşmüş demek.
+    """
     c = _client(tmp_path, monkeypatch, dizinler)
-    assert c.get("/api/folders").json()["items"] == []
+    fid = _new_folder(c)
+    rec = _generate(c, fid).json()["images"][0]
+    c.patch(f"/api/image/{rec['id']}", json={"folder_id": None})
+    c.delete(f"/api/folders/{fid}")
+    kalan = sorted(p.name for p in (tmp_path / "output").iterdir())
+    assert kalan == [rec["filename"]], kalan
 
 
-def test_folder_id_format_guard(tmp_path, monkeypatch, dizinler):
+def test_folder_id_format_guard(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     """Hex olmayan id hiçbir zaman var sayılmamalı (storage._SAFE_ID ile aynı guard)."""
     c = _client(tmp_path, monkeypatch, dizinler)
     _new_folder(c)
     for bad in ("../../etc", "not-hex", ""):
-        assert not folders.exists(bad, str(tmp_path / "output"))
+        assert not depo_klasor.var_mi(db_oturumu, kullanici.id, bad)
     assert _generate(c, "../../etc").status_code == 404
 
 
@@ -642,24 +661,22 @@ def test_folder_nesting_is_capped(tmp_path, monkeypatch, dizinler):
     assert str(appmod.MAX_FOLDER_DEPTH) in r.json()["detail"]
 
 
-def test_depth_of_a_root_folder_is_one(tmp_path, monkeypatch, dizinler):
+def test_depth_of_a_root_folder_is_one(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
     c = _client(tmp_path, monkeypatch, dizinler)
     root = _new_folder(c)
     child = c.post("/api/folders", json={"name": "alt", "parent_id": root}
                    ).json()["folder"]["id"]
-    out = str(tmp_path / "output")
-    assert folders.depth(root, out) == 1
-    assert folders.depth(child, out) == 2
-    assert folders.depth("yoksa", out) == 0
+    assert depo_klasor.derinlik(db_oturumu, kullanici.id, root) == 1
+    assert depo_klasor.derinlik(db_oturumu, kullanici.id, child) == 2
+    assert depo_klasor.derinlik(db_oturumu, kullanici.id, "yoksa") == 0
 
 
-def test_depth_survives_a_broken_parent_chain(tmp_path, monkeypatch, dizinler):
-    """Elle bozulmuş folders.json sonsuz döngüye düşürmemeli (descendants ile aynı duruş)."""
+def test_depth_survives_a_broken_parent_chain(tmp_path, monkeypatch, dizinler, db_oturumu, kullanici):
+    """Elle bozulmuş zincir (kendi kendinin ebeveyni — FK buna izin verir) sonsuz döngüye düşürmemeli."""
     c = _client(tmp_path, monkeypatch, dizinler)
     root = _new_folder(c)
-    out = str(tmp_path / "output")
-    path = tmp_path / "output" / "folders.json"
-    items = json.loads(path.read_text(encoding="utf-8"))
-    items[0]["parent_id"] = items[0]["id"]  # kendi kendinin ebeveyni
-    path.write_text(json.dumps(items), encoding="utf-8")
-    assert folders.depth(root, out) >= 1  # dönmeli, asılmamalı
+    k = db_oturumu.get(tablolar.Klasor, root)
+    k.parent_id = root  # kendi kendinin ebeveyni
+    db_oturumu.commit()
+    assert depo_klasor.derinlik(db_oturumu, kullanici.id, root) >= 1  # dönmeli, asılmamalı
+    assert depo_klasor.altagac(db_oturumu, kullanici.id, root) == [root]

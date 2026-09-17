@@ -19,6 +19,10 @@ import azure_client as ac
 import color_names as cn
 import palette
 
+# Galeri/klasör/üretim rotaları DB'de (Faz 1 / 5): test kullanıcısı gerçek satır,
+# `db.oturum` bu dosyanın motoruna bağlı — gerekçe tests/conftest.py::depo_db.
+pytestmark = pytest.mark.usefixtures("depo_db")
+
 SEED = "#c86a3c"
 # Gömülü tablo ÖNCE denendiği için ağ katmanı yalnızca tablonun yakın karşılığı
 # olmayan renkler için çalışır. Bu tohumun her paletinde en az bir boşluk var.
@@ -469,16 +473,15 @@ def test_logo_derivative_inherits_the_palette(tmp_path, monkeypatch, fake_compos
     assert r.json()["image"]["palette"]["seed"] == SEED
 
 
-def test_legacy_history_records_without_palette_are_tolerated(tmp_path, monkeypatch, dizinler):
-    """Eski kayıtlarda alan hiç yok — geçiş (migration) gerekmemeli."""
+def test_legacy_history_records_without_palette_are_tolerated(tmp_path, monkeypatch, dizinler,
+                                                              db_oturumu, kullanici):
+    """Eski kayıtlarda alan hiç yok (DB'de NULL, içe aktarma öyle yazar) — geçiş gerekmemeli."""
+    from services import tablolar
     client, _ = _client(tmp_path, monkeypatch, dizinler)
-    out = tmp_path / "output"
-    out.mkdir(parents=True, exist_ok=True)
-    (out / "history.json").write_text(json.dumps([{
-        "id": "abc123abc123", "filename": "abc123abc123.png", "prompt": "eski",
-        "size": "1024x1024", "quality": "medium", "created_at": "2025-01-01T00:00:00",
-        "parent_id": None,
-    }]), encoding="utf-8")
+    db_oturumu.add(tablolar.Medya(id="abc123abc123", kullanici_id=kullanici.id,
+                                  filename="abc123abc123.png", prompt="eski", size="1024x1024",
+                                  quality="medium", model="", credits=0))
+    db_oturumu.commit()
 
     r = client.get("/api/history")
     assert r.status_code == 200, r.text

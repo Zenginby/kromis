@@ -11,13 +11,15 @@ import os
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from PIL import Image
+from sqlalchemy.orm import Session
 
 import assets_store
 import composite
 import i18n
-import storage
 from models import BannerRequest, LogoRequest
-from services import ayar, dil, gorsel, kapilar, zaman
+from services import ayar, depo_medya, dil, gorsel, kapilar, kimlik, zaman
+from services.db import OTURUM
+from services.tablolar import Kullanici
 
 router = APIRouter()
 
@@ -70,17 +72,20 @@ def preview_logo(req: LogoRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)
 
 
 @router.post("/api/logo")
-def add_logo(req: LogoRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def add_logo(req: LogoRequest, db: Session = OTURUM,
+             ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+             kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     output_dir = ayarlar.output_dir
     src_path = _logo_src_path(req.id, output_dir)
     src_id = os.path.basename(req.id)
 
-    # kaynak metadata'sını history'den bul (prompt/size korunur)
-    src_meta = next((h for h in storage.list_history(output_dir) if h["id"] == src_id), {})
+    # Kaynağın meta'sı `medya` satırından (prompt/size korunur); kaydı olmayan
+    # dosya `{}` — bindirme yine yapılır, alanlar boş kalır (eski davranış).
+    src_meta = depo_medya.bul(db, kullanici.id, src_id) or {}
 
     logo_bytes = _composite_logo(src_path, req, ayarlar.assets_dir)
-    record = storage.save(
-        logo_bytes,
+    record = depo_medya.kaydet(
+        db, kullanici.id, logo_bytes,
         {"prompt": src_meta.get("prompt", ""), "size": src_meta.get("size", ""),
          "quality": src_meta.get("quality", ""), "parent_id": src_id,
          # türev, kaynağın klasöründe kalır
@@ -92,7 +97,7 @@ def add_logo(req: LogoRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) ->
          # değil. Geçilmezse kayda varsayılan model yazılırdı — Nano Banana ile
          # üretilmiş bir görselin logolu hâli "azure-gpt-image-2" görünürdü.
          "model": src_meta.get("model")},
-        output_dir, now=zaman.simdi(),
+        output_dir, now=zaman.an(),
     )
     return {"image": record}
 
@@ -147,16 +152,18 @@ def preview_banner(req: BannerRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayar
 
 
 @router.post("/api/banner")
-def add_banner(req: BannerRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> dict:
+def add_banner(req: BannerRequest, db: Session = OTURUM,
+               ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
+               kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     output_dir = ayarlar.output_dir
     src_path = _logo_src_path(req.id, output_dir)
     src_id = os.path.basename(req.id)
 
-    src_meta = next((h for h in storage.list_history(output_dir) if h["id"] == src_id), {})
+    src_meta = depo_medya.bul(db, kullanici.id, src_id) or {}
 
     banner_bytes = _banner_bytes(src_path, req, ayarlar.assets_dir)
-    record = storage.save(
-        banner_bytes,
+    record = depo_medya.kaydet(
+        db, kullanici.id, banner_bytes,
         {"prompt": src_meta.get("prompt", ""), "size": src_meta.get("size", ""),
          "quality": src_meta.get("quality", ""), "parent_id": src_id,
          "folder_id": src_meta.get("folder_id"),  # türev, kaynağın klasöründe kalır
@@ -166,7 +173,7 @@ def add_banner(req: BannerRequest, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)
          # değil. Geçilmezse kayda varsayılan model yazılırdı — Nano Banana ile
          # üretilmiş bir görselin logolu hâli "azure-gpt-image-2" görünürdü.
          "model": src_meta.get("model")},
-        output_dir, now=zaman.simdi(),
+        output_dir, now=zaman.an(),
     )
     return {"image": record}
 

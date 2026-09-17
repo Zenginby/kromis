@@ -2,14 +2,14 @@
 
 # Test haritası
 
-`tests/` altında 106 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
+`tests/` altında 107 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
 
 | modül | testler |
 | --- | --- |
 | `android_main` | `test_android_main.py`, `test_mobile.py` |
-| `app` | `test_app.py`, `test_app_bolme.py`, `test_arena.py`, `test_arena_onyuz.py`, `test_assets_route.py`, `test_backup.py`, `test_banner.py`, `test_chat_prompt.py`, `test_chat_route.py`, `test_chats_route.py`, `test_db.py`, `test_delete_route.py`, `test_dil.py`, `test_edit_route.py`, `test_folders.py`, `test_fonts.py`, `test_guncelleme_route.py`, `test_guvenlik_baslik.py`, `test_health.py`, `test_hesap.py`, `test_i18n.py`, `test_id_contract.py`, `test_import_route.py`, `test_index.py`, `test_kimlik.py`, `test_koken.py`, `test_legacy_formats.py`, `test_logo.py`, `test_mobile.py`, `test_model_secimi.py`, `test_palette_route.py`, `test_paths.py`, `test_playwright_dil.py`, `test_playwright_guncelleme.py`, `test_playwright_hesap.py`, `test_playwright_studio.py`, `test_posta.py`, `test_prefs_route.py`, `test_provider_logos.py`, `test_search_predicate.py`, `test_settings_route.py`, `test_shimmer.py`, `test_video_onyuz.py`, `test_video_route.py` |
+| `app` | `test_app.py`, `test_app_bolme.py`, `test_arena.py`, `test_arena_onyuz.py`, `test_assets_route.py`, `test_backup.py`, `test_banner.py`, `test_chat_prompt.py`, `test_chat_route.py`, `test_chats_route.py`, `test_db.py`, `test_delete_route.py`, `test_dil.py`, `test_edit_route.py`, `test_folders.py`, `test_fonts.py`, `test_galeri_db.py`, `test_guncelleme_route.py`, `test_guvenlik_baslik.py`, `test_health.py`, `test_hesap.py`, `test_i18n.py`, `test_id_contract.py`, `test_import_route.py`, `test_index.py`, `test_kimlik.py`, `test_koken.py`, `test_legacy_formats.py`, `test_logo.py`, `test_mobile.py`, `test_model_secimi.py`, `test_palette_route.py`, `test_paths.py`, `test_playwright_dil.py`, `test_playwright_guncelleme.py`, `test_playwright_hesap.py`, `test_playwright_studio.py`, `test_posta.py`, `test_prefs_route.py`, `test_provider_logos.py`, `test_search_predicate.py`, `test_settings_route.py`, `test_shimmer.py`, `test_video_onyuz.py`, `test_video_route.py` |
 | `assets_store` | `test_assets.py`, `test_assets_route.py`, `test_backup.py`, `test_banner.py`, `test_folders.py`, `test_legacy_formats.py`, `test_logo.py`, `test_palette_route.py`, `test_playwright_studio.py`, `test_tablolar.py` |
-| `azure_client` | `test_app.py`, `test_arena.py`, `test_azure_client.py`, `test_azure_client_edit.py`, `test_azure_client_http.py`, `test_azure_flux_client.py`, `test_azure_mai_client.py`, `test_banner.py`, `test_catalog.py`, `test_chat_client.py`, `test_credstore.py`, `test_delete_route.py`, `test_edit_route.py`, `test_fal_client.py`, `test_folders.py`, `test_gemini_client.py`, `test_i18n.py`, `test_import_route.py`, `test_legacy_formats.py`, `test_logo.py`, `test_model_secimi.py`, `test_openai_client.py`, `test_palette_route.py`, `test_paths.py`, `test_prefs.py`, `test_providers.py`, `test_settings.py`, `test_settings_route.py`, `test_veo_client.py`, `test_video_route.py` |
+| `azure_client` | `test_app.py`, `test_app_bolme.py`, `test_arena.py`, `test_azure_client.py`, `test_azure_client_edit.py`, `test_azure_client_http.py`, `test_azure_flux_client.py`, `test_azure_mai_client.py`, `test_banner.py`, `test_catalog.py`, `test_chat_client.py`, `test_credstore.py`, `test_delete_route.py`, `test_edit_route.py`, `test_fal_client.py`, `test_folders.py`, `test_galeri_db.py`, `test_gemini_client.py`, `test_i18n.py`, `test_import_route.py`, `test_legacy_formats.py`, `test_logo.py`, `test_model_secimi.py`, `test_openai_client.py`, `test_palette_route.py`, `test_paths.py`, `test_prefs.py`, `test_providers.py`, `test_settings.py`, `test_settings_route.py`, `test_veo_client.py`, `test_video_route.py` |
 | `azure_flux_client` | `test_azure_flux_client.py` |
 | `azure_mai_client` | `test_azure_mai_client.py` |
 | `backup` | `test_backup.py` |
@@ -25,7 +25,7 @@
 | `errlog` | `test_errlog.py` |
 | `etiket` | `test_catalog.py` |
 | `fal_client` | `test_fal_client.py`, `test_providers.py` |
-| `folders` | `test_folders.py`, `test_guvenlik_baslik.py`, `test_legacy_formats.py`, `test_playwright_studio.py`, `test_tablolar.py` |
+| `folders` | `test_folders.py`, `test_galeri_db.py`, `test_guvenlik_baslik.py`, `test_legacy_formats.py`, `test_tablolar.py` |
 | `gemini_client` | `test_gemini_client.py` |
 | `guncelleme` | `test_depo_adresi.py`, `test_guncelleme.py`, `test_guncelleme_route.py`, `test_lisans.py`, `test_playwright_guncelleme.py` |
 | `i18n` | `test_catalog.py`, `test_dil.py`, `test_hesap.py`, `test_i18n.py`, `test_kimlik.py`, `test_playwright_dil.py`, `test_playwright_hesap.py`, `test_posta.py` |
@@ -53,9 +53,11 @@
 | `services.ayar` | `test_app_bolme.py`, `test_hesap.py`, `test_kimlik.py`, `test_paths.py` |
 | `services.cerez` | `test_docker_kapisi.py`, `test_hesap.py`, `test_kimlik.py`, `test_playwright_hesap.py` |
 | `services.db` | `test_db.py`, `test_docker_kapisi.py` |
+| `services.depo_klasor` | `test_folders.py`, `test_galeri_db.py`, `test_guvenlik_baslik.py`, `test_legacy_formats.py`, `test_playwright_studio.py` |
+| `services.depo_medya` | `test_galeri_db.py`, `test_kimlik.py`, `test_legacy_formats.py`, `test_playwright_studio.py` |
 | `services.dil` | `test_dil.py`, `test_i18n.py`, `test_koken.py` |
 | `services.gorsel` | `test_edit_route.py`, `test_model_secimi.py`, `test_video_route.py` |
-| `services.hesap` | `test_hesap.py`, `test_kimlik.py`, `test_playwright_hesap.py` |
+| `services.hesap` | `test_galeri_db.py`, `test_hesap.py`, `test_kimlik.py`, `test_playwright_hesap.py` |
 | `services.kapilar` | — |
 | `services.kimlik` | `test_kimlik.py` |
 | `services.koken` | `test_docker_kapisi.py`, `test_hesap.py`, `test_koken.py`, `test_playwright_hesap.py` |
@@ -64,10 +66,10 @@
 | `services.posta` | `test_docker_kapisi.py`, `test_hesap.py`, `test_playwright_hesap.py`, `test_posta.py` |
 | `services.redaksiyon` | — |
 | `services.sablon` | — |
-| `services.tablolar` | `test_hesap.py`, `test_kimlik.py`, `test_playwright_hesap.py`, `test_tablolar.py` |
+| `services.tablolar` | `test_folders.py`, `test_galeri_db.py`, `test_hesap.py`, `test_kimlik.py`, `test_legacy_formats.py`, `test_palette_route.py`, `test_playwright_hesap.py`, `test_tablolar.py` |
 | `services.tercih` | `test_dil.py` |
-| `services.zaman` | — |
-| `storage` | `test_app_bolme.py`, `test_arena.py`, `test_chats_route.py`, `test_folders.py`, `test_kimlik.py`, `test_legacy_formats.py`, `test_playwright_studio.py`, `test_storage.py`, `test_storage_delete.py`, `test_tablolar.py`, `test_video_onyuz.py` |
+| `services.zaman` | `test_galeri_db.py`, `test_legacy_formats.py` |
+| `storage` | `test_arena.py`, `test_chats_route.py`, `test_folders.py`, `test_galeri_db.py`, `test_legacy_formats.py`, `test_storage.py`, `test_storage_delete.py`, `test_tablolar.py`, `test_video_onyuz.py` |
 | `tools.gecici_postgres` | `test_test_ortami.py` |
 | `tools.graf_uret` | `test_app_bolme.py`, `test_graflar.py`, `test_onyuz_lint_kapisi.py` |
 | `tools.make_legacy_fixtures` | — |
@@ -86,18 +88,17 @@
 Bu modülleri hiçbir test dosyası ithal etmiyor. Dolaylı olarak sınanıyor olabilirler (`import app` app'in ithal ettiği her şeyi çalıştırır), ama doğrudan bekçileri yok.
 
 * `routers.ayarlar` (314 satır)
-* `routers.bindirme` (231 satır)
-* `routers.galeri` (334 satır)
+* `routers.bindirme` (238 satır)
+* `routers.galeri` (358 satır)
 * `routers.kok` (40 satır)
 * `routers.paletler` (95 satır)
 * `routers.sohbet` (225 satır)
-* `routers.uretim` (439 satır)
-* `services.kapilar` (75 satır)
+* `routers.uretim` (462 satır)
+* `services.kapilar` (79 satır)
 * `services.modeller` (295 satır)
 * `services.palet` (181 satır)
 * `services.redaksiyon` (68 satır)
 * `services.sablon` (68 satır)
-* `services.zaman` (17 satır)
 * `tools.make_legacy_fixtures` (211 satır)
 * `tools.make_logo_goldens` (110 satır)
 * `tools.render_brand_assets` (115 satır)

@@ -9,13 +9,13 @@
 | yöntem | yol | dosya | işlev | modüller | ön yüz |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/` | `routers/kok.py` | `index`:27 | `errlog`, `i18n`, `version` | — |
-| GET | `/api/arena/{arena_id}` | `routers/galeri.py` | `arena_round_route`:170 | `storage` | `chat.js` |
-| POST | `/api/arena/{arena_id}/winner` | `routers/galeri.py` | `set_arena_winner_route`:185 | `i18n`, `models`, `storage` | `chat.js` |
-| GET | `/api/assets/{kind}` | `routers/bindirme.py` | `list_assets_route`:199 | `assets_store`, `i18n` | `assets.js` |
-| POST | `/api/assets/{kind}` | `routers/bindirme.py` | `upload_asset`:175 | `assets_store`, `i18n` | `assets.js` |
-| DELETE | `/api/assets/{kind}/{asset_id}` | `routers/bindirme.py` | `delete_asset_route`:212 | `assets_store`, `i18n` | `assets.js` |
-| POST | `/api/banner` | `routers/bindirme.py` | `add_banner`:150 | `assets_store`, `i18n`, `models`, `storage` | `assets.js` |
-| POST | `/api/banner/preview` | `routers/bindirme.py` | `preview_banner`:141 | `assets_store`, `i18n`, `models` | `assets.js` |
+| GET | `/api/arena/{arena_id}` | `routers/galeri.py` | `arena_round_route`:173 | `storage` | `chat.js` |
+| POST | `/api/arena/{arena_id}/winner` | `routers/galeri.py` | `set_arena_winner_route`:189 | `i18n`, `models`, `storage` | `chat.js` |
+| GET | `/api/assets/{kind}` | `routers/bindirme.py` | `list_assets_route`:206 | `assets_store`, `i18n` | `assets.js` |
+| POST | `/api/assets/{kind}` | `routers/bindirme.py` | `upload_asset`:182 | `assets_store`, `i18n` | `assets.js` |
+| DELETE | `/api/assets/{kind}/{asset_id}` | `routers/bindirme.py` | `delete_asset_route`:219 | `assets_store`, `i18n` | `assets.js` |
+| POST | `/api/banner` | `routers/bindirme.py` | `add_banner`:155 | `assets_store`, `catalog`, `i18n`, `models`, `storage` | `assets.js` |
+| POST | `/api/banner/preview` | `routers/bindirme.py` | `preview_banner`:146 | `assets_store`, `i18n`, `models` | `assets.js` |
 | POST | `/api/chat` | `routers/sohbet.py` | `chat`:25 | `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `credstore`, `etiket`, `i18n`, `models`, `prefs` | `chat.js` |
 | DELETE | `/api/chats` | `routers/sohbet.py` | `delete_all_chats_route`:188 | `chat_store` | `chat.js` |
 | GET | `/api/chats` | `routers/sohbet.py` | `list_chats_route`:149 | `chat_store` | `chat.js` |
@@ -23,13 +23,13 @@
 | DELETE | `/api/chats/{chat_id}` | `routers/sohbet.py` | `delete_chat_route`:221 | `chat_store`, `i18n` | `chat.js` |
 | GET | `/api/chats/{chat_id}` | `routers/sohbet.py` | `get_chat_route`:155 | `chat_store`, `i18n` | `chat.js` |
 | PUT | `/api/chats/{chat_id}` | `routers/sohbet.py` | `update_chat_route`:198 | `chat_store`, `i18n`, `models`, `prefs` | `chat.js` |
-| POST | `/api/edit` | `routers/uretim.py` | `edit`:380 | `azure_client`, `catalog`, `chat_store`, `color_names`, `etiket`, `folders`, `i18n`, `models`, `palette`, `palette_store`, `providers`, `storage` | `core.js` |
-| GET | `/api/folders` | `routers/galeri.py` | `list_folders_route`:31 | `folders`, `storage` | `folders.js` |
-| POST | `/api/folders` | `routers/galeri.py` | `create_folder_route`:56 | `folders`, `i18n`, `models` | `folders.js` |
-| DELETE | `/api/folders/{folder_id}` | `routers/galeri.py` | `delete_folder_route`:73 | `folders`, `i18n`, `storage` | `folders.js` |
-| PATCH | `/api/folders/{folder_id}` | `routers/galeri.py` | `rename_folder_route`:132 | `folders`, `i18n`, `models` | `folders.js` |
-| GET | `/api/folders/{folder_id}/download` | `routers/galeri.py` | `download_folder_route`:88 | `folders`, `i18n` | `folders.js` |
-| POST | `/api/generate` | `routers/uretim.py` | `generate`:32 | `azure_client`, `catalog`, `chat_store`, `color_names`, `folders`, `i18n`, `models`, `palette`, `palette_store`, `providers`, `storage` | `core.js` |
+| POST | `/api/edit` | `routers/uretim.py` | `edit`:399 | `azure_client`, `catalog`, `chat_store`, `color_names`, `etiket`, `i18n`, `models`, `palette`, `palette_store`, `providers` | `core.js` |
+| GET | `/api/folders` | `routers/galeri.py` | `list_folders_route`:42 | — | `folders.js` |
+| POST | `/api/folders` | `routers/galeri.py` | `create_folder_route`:64 | `folders`, `i18n`, `models` | `folders.js` |
+| DELETE | `/api/folders/{folder_id}` | `routers/galeri.py` | `delete_folder_route`:81 | `folders`, `i18n` | `folders.js` |
+| PATCH | `/api/folders/{folder_id}` | `routers/galeri.py` | `rename_folder_route`:139 | `folders`, `i18n`, `models` | `folders.js` |
+| GET | `/api/folders/{folder_id}/download` | `routers/galeri.py` | `download_folder_route`:96 | `folders`, `i18n` | `folders.js` |
+| POST | `/api/generate` | `routers/uretim.py` | `generate`:41 | `azure_client`, `catalog`, `chat_store`, `color_names`, `folders`, `i18n`, `models`, `palette`, `palette_store`, `providers`, `storage` | `core.js` |
 | GET | `/api/guncelleme` | `routers/ayarlar.py` | `get_guncelleme`:60 | `guncelleme`, `prefs` | `settings.js` |
 | POST | `/api/guncelleme` | `routers/ayarlar.py` | `post_guncelleme`:90 | `guncelleme`, `prefs` | `settings.js` |
 | GET | `/api/hesap/ben` | `routers/hesap.py` | `ben`:244 | — | `giris.js`, `settings.js` |
@@ -39,15 +39,15 @@
 | POST | `/api/hesap/kayit` | `routers/hesap.py` | `kayit`:109 | `errlog`, `i18n`, `models` | `giris.js` |
 | POST | `/api/hesap/sifirla` | `routers/hesap.py` | `sifirla`:204 | `errlog`, `i18n`, `models` | `giris.js` |
 | POST | `/api/hesap/sifirla/dogrula` | `routers/hesap.py` | `sifirla_dogrula`:224 | `i18n`, `models` | `giris.js` |
-| GET | `/api/history` | `routers/galeri.py` | `history`:146 | `folders`, `i18n`, `storage` | `folders.js` |
-| DELETE | `/api/image/{image_id}` | `routers/galeri.py` | `delete_image`:202 | `i18n`, `storage` | `core.js` |
-| PATCH | `/api/image/{image_id}` | `routers/galeri.py` | `move_image`:159 | `folders`, `i18n`, `models`, `storage` | `core.js` |
-| DELETE | `/api/images` | `routers/galeri.py` | `delete_images`:222 | `i18n`, `models`, `storage` | `folders.js` |
-| PATCH | `/api/images` | `routers/galeri.py` | `move_images`:211 | `folders`, `i18n`, `models`, `storage` | `folders.js` |
-| POST | `/api/import` | `routers/galeri.py` | `import_image`:232 | `folders`, `i18n`, `storage` | `folders.js` |
-| POST | `/api/logo` | `routers/bindirme.py` | `add_logo`:73 | `assets_store`, `composite`, `i18n`, `models`, `storage` | `assets.js` |
-| POST | `/api/logo/preview` | `routers/bindirme.py` | `preview_logo`:64 | `assets_store`, `composite`, `i18n`, `models` | `assets.js` |
-| GET | `/api/output/{image_id}/download` | `routers/galeri.py` | `output_download`:298 | `i18n`, `storage` | `core.js` |
+| GET | `/api/history` | `routers/galeri.py` | `history`:153 | `folders`, `i18n` | `folders.js` |
+| DELETE | `/api/image/{image_id}` | `routers/galeri.py` | `delete_image`:206 | `i18n`, `storage` | `core.js` |
+| PATCH | `/api/image/{image_id}` | `routers/galeri.py` | `move_image`:162 | `folders`, `i18n`, `models`, `storage` | `core.js` |
+| DELETE | `/api/images` | `routers/galeri.py` | `delete_images`:229 | `i18n`, `models`, `storage` | `folders.js` |
+| PATCH | `/api/images` | `routers/galeri.py` | `move_images`:217 | `folders`, `i18n`, `models`, `storage` | `folders.js` |
+| POST | `/api/import` | `routers/galeri.py` | `import_image`:241 | `i18n` | `folders.js` |
+| POST | `/api/logo` | `routers/bindirme.py` | `add_logo`:75 | `assets_store`, `catalog`, `composite`, `i18n`, `models`, `storage` | `assets.js` |
+| POST | `/api/logo/preview` | `routers/bindirme.py` | `preview_logo`:66 | `assets_store`, `composite`, `i18n`, `models` | `assets.js` |
+| GET | `/api/output/{image_id}/download` | `routers/galeri.py` | `output_download`:318 | `i18n`, `storage` | `core.js` |
 | POST | `/api/palette/suggest` | `routers/paletler.py` | `suggest_palettes`:28 | `color_names`, `models`, `palette` | `palette.js` |
 | GET | `/api/palettes` | `routers/paletler.py` | `list_palettes_route`:63 | `palette_store` | `palette.js` |
 | POST | `/api/palettes` | `routers/paletler.py` | `create_palette_route`:68 | `color_names`, `i18n`, `models`, `palette`, `palette_store` | `palette.js` |
@@ -56,12 +56,12 @@
 | POST | `/api/prefs` | `routers/ayarlar.py` | `post_prefs_route`:278 | `models`, `prefs` | `chat.js`, `core.js`, `settings.js` |
 | GET | `/api/settings` | `routers/ayarlar.py` | `get_settings`:24 | `azure_client`, `catalog`, `credstore`, `etiket`, `guncelleme`, `i18n`, `paths`, `prefs`, `version` | `settings.js` |
 | POST | `/api/settings` | `routers/ayarlar.py` | `post_settings`:118 | `azure_client`, `catalog`, `credstore`, `etiket`, `i18n`, `models`, `version` | `settings.js` |
-| POST | `/api/video` | `routers/uretim.py` | `video`:76 | `azure_client`, `catalog`, `chat_store`, `folders`, `i18n`, `models`, `providers`, `storage` | `core.js` |
-| POST | `/api/video/animate` | `routers/uretim.py` | `animate`:187 | `azure_client`, `catalog`, `chat_store`, `etiket`, `folders`, `i18n`, `models`, `providers`, `storage` | `core.js` |
-| GET | `/assets/{kind}/{filename}` | `routers/bindirme.py` | `asset_file`:222 | `assets_store`, `i18n` | `assets.js` |
+| POST | `/api/video` | `routers/uretim.py` | `video`:88 | `azure_client`, `catalog`, `chat_store`, `folders`, `i18n`, `models`, `providers`, `storage` | `core.js` |
+| POST | `/api/video/animate` | `routers/uretim.py` | `animate`:202 | `azure_client`, `catalog`, `chat_store`, `etiket`, `i18n`, `models`, `providers` | `core.js` |
+| GET | `/assets/{kind}/{filename}` | `routers/bindirme.py` | `asset_file`:229 | `assets_store`, `i18n` | `assets.js` |
 | GET | `/giris` | `routers/hesap.py` | `giris_sayfasi`:250 | `errlog`, `i18n`, `version` | — |
 | GET | `/health` | `routers/saglik.py` | `health`:95 | `version` | — |
-| GET | `/output/{filename}` | `routers/galeri.py` | `output_file`:274 | `i18n`, `storage` | `assets.js`, `chat.js`, `core.js`, `folders.js`, `viewer.js` |
+| GET | `/output/{filename}` | `routers/galeri.py` | `output_file`:288 | `i18n`, `storage` | `assets.js`, `chat.js`, `core.js`, `folders.js`, `viewer.js` |
 
 ## Öbek → modül
 
@@ -80,6 +80,7 @@ flowchart LR
   n__api_assets --> n_i18n["i18n"]
   n__api_banner["/api/banner"]
   n__api_banner --> n_assets_store["assets_store"]
+  n__api_banner --> n_catalog["catalog"]
   n__api_banner --> n_i18n["i18n"]
   n__api_banner --> n_models["models"]
   n__api_banner --> n_storage["storage"]
@@ -104,18 +105,15 @@ flowchart LR
   n__api_edit --> n_chat_store["chat_store"]
   n__api_edit --> n_color_names["color_names"]
   n__api_edit --> n_etiket["etiket"]
-  n__api_edit --> n_folders["folders"]
   n__api_edit --> n_i18n["i18n"]
   n__api_edit --> n_models["models"]
   n__api_edit --> n_palette["palette"]
   n__api_edit --> n_palette_store["palette_store"]
   n__api_edit --> n_providers["providers"]
-  n__api_edit --> n_storage["storage"]
   n__api_folders["/api/folders"]
   n__api_folders --> n_folders["folders"]
   n__api_folders --> n_i18n["i18n"]
   n__api_folders --> n_models["models"]
-  n__api_folders --> n_storage["storage"]
   n__api_generate["/api/generate"]
   n__api_generate --> n_azure_client["azure_client"]
   n__api_generate --> n_catalog["catalog"]
@@ -138,7 +136,6 @@ flowchart LR
   n__api_history["/api/history"]
   n__api_history --> n_folders["folders"]
   n__api_history --> n_i18n["i18n"]
-  n__api_history --> n_storage["storage"]
   n__api_image["/api/image"]
   n__api_image --> n_folders["folders"]
   n__api_image --> n_i18n["i18n"]
@@ -150,11 +147,10 @@ flowchart LR
   n__api_images --> n_models["models"]
   n__api_images --> n_storage["storage"]
   n__api_import["/api/import"]
-  n__api_import --> n_folders["folders"]
   n__api_import --> n_i18n["i18n"]
-  n__api_import --> n_storage["storage"]
   n__api_logo["/api/logo"]
   n__api_logo --> n_assets_store["assets_store"]
+  n__api_logo --> n_catalog["catalog"]
   n__api_logo --> n_composite["composite"]
   n__api_logo --> n_i18n["i18n"]
   n__api_logo --> n_models["models"]

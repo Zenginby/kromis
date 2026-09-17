@@ -51,6 +51,7 @@ when the version does.
 > accounts and credits. Roadmap:
 > [docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md](docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md)
 > (Turkish); the first steps: [docs/faz0-web-first.md](docs/faz0-web-first.md)
+> (Turkish), then database and accounts: [docs/faz1-veritabani-hesaplar.md](docs/faz1-veritabani-hesaplar.md)
 > (Turkish). If desktop/Android come back one day, they come back as thin
 > shells around the web app.
 

@@ -34,7 +34,7 @@ import providers
 import version
 from models import MAX_PROMPT_CHARS, GenerateRequest
 from routers import ayarlar, bindirme, galeri, hesap, kok, paletler, saglik, sohbet, uretim
-from services import ayar, db, dil, gorsel, koken, modeller, palet, posta, redaksiyon, zaman
+from services import ayar, db, dil, gorsel, kimlik, koken, modeller, palet, posta, redaksiyon, zaman
 
 
 @asynccontextmanager
@@ -138,6 +138,9 @@ app = FastAPI(title="Kromis Studio", lifespan=_lifespan)
 # bir yol hesabı — dizin açmaz — ve `TestClient(app)`i `with`siz kullanan
 # testler lifespan'ı hiç koşturmuyor; nesne orada kurulsa her rota 500 verirdi.
 # Testler değiştirmek için `tests/conftest.py::dizinler` fixture'ını kullanır.
+# Faz 1 / 4'ten beri bu nesne sürecin PAYLAŞILAN yerleşimi (`ayar.genel`);
+# kullanıcıya göre `output_dir`/`assets_dir` `ayar.ayarlar`ın içinde türetiliyor
+# (`<data_dir>/kullanicilar/<uuid>/…`), rotalar aynı imzayla okumaya devam ediyor.
 app.state.ayarlar = ayar.Ayarlar.varsayilan()
 
 # VERİ TABANI MOTORU — ithal anında YOK (`None`), `_lifespan` kurar (Faz 1 /
@@ -166,6 +169,11 @@ app.middleware("http")(koken.koken_kapisi)
 # Doğrulama hatasından gizli değerin silinmesi (gerekçesi services/redaksiyon.py'de).
 # Ara katmanla aynı biçim: dekoratörün çağrı hâli.
 app.exception_handler(RequestValidationError)(redaksiyon.redact_validation_errors)
+
+# Oturumsuz TARAYICI GEZİNMESİ → 302 `/giris` (Faz 1 / 4; gerekçesi
+# services/kimlik.py). API rotalarının 401'i FastAPI'nin kendi HTTPException
+# işleyicisinden geliyor, burada yalnız sayfa yönlendirmesinin istisnası var.
+app.exception_handler(kimlik.GirisSayfasi)(kimlik.giris_sayfasina)
 
 # Router'lar ÖNEKSİZ takılıyor: yollar her rotanın üstünde birebir yazılı
 # (bkz. routers/__init__.py). Sıra rota eşleşmesini etkilemiyor — hiçbir iki

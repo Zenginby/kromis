@@ -29,6 +29,12 @@ import catalog
 import credstore
 from app import app
 
+# Kapı GERÇEK (Faz 1 / 4): sunucu aynı süreçte, `veritabani` fixture'ı Postgres'i
+# verir, `e2e_oturum` DB'ye kullanıcı yazıp çerezi tarayıcıya koyar (conftest).
+# conftest'in autouse override'ı burada KURULMAZ — kurulsa çerez anlamsız
+# olurdu ve bu dosya "oturumlu stüdyo"yu değil "kapısız stüdyo"yu ölçerdi.
+pytestmark = pytest.mark.gercek_kimlik
+
 
 def _ilk_kurulum_perdesini_kapat(page) -> None:
     """İlk kurulumda kendiliğinden açılan Ayarlar panelini kapatır.
@@ -144,10 +150,11 @@ class ServerThread(threading.Thread):
         self.server.should_exit = True
 
 
-def test_playwright_studio_single_thread_flow():
+def test_playwright_studio_single_thread_flow(veritabani, e2e_oturum):
     port = get_free_port()
     server = ServerThread(port)
     server.start()
+    oturum = e2e_oturum()
     time.sleep(1.0)  # Wait for server to start
 
     base_url = f"http://127.0.0.1:{port}"
@@ -158,6 +165,8 @@ def test_playwright_studio_single_thread_flow():
             page = browser.new_page()
 
             # 1. Open Studio application
+            oturum.cerez(page, base_url)
+
             page.goto(base_url)
             page.wait_for_selector("#view-studio")
 
@@ -245,7 +254,7 @@ def test_playwright_studio_single_thread_flow():
         server.stop()
 
 
-def test_playwright_model_sheet_alttan_aciliyor(monkeypatch):
+def test_playwright_model_sheet_alttan_aciliyor(monkeypatch, veritabani, e2e_oturum):
     """Alttan açılan model seçicisinin tarayıcı sözleşmesi.
 
     Buradaki dört iddia yalnız GERÇEK bir tarayıcıda ölçülebiliyor ve
@@ -269,6 +278,7 @@ def test_playwright_model_sheet_alttan_aciliyor(monkeypatch):
     port = get_free_port()
     server = ServerThread(port)
     server.start()
+    oturum = e2e_oturum()
     time.sleep(1.0)
     base_url = f"http://127.0.0.1:{port}"
 
@@ -279,6 +289,9 @@ def test_playwright_model_sheet_alttan_aciliyor(monkeypatch):
             prefs_posts = []
             page.on("request", lambda r: prefs_posts.append(r.url)
                     if r.method == "POST" and "/api/prefs" in r.url else None)
+
+            oturum.cerez(page, base_url)
+
 
             page.goto(base_url)
             # Yardımcı KALIYOR ama artık asıl işi KATALOĞU BEKLEMEK: bu test
@@ -376,7 +389,7 @@ def test_playwright_model_sheet_alttan_aciliyor(monkeypatch):
         server.stop()
 
 
-def test_playwright_ayarlar_paneli_ortadan_ve_ALANLARI_gosteriyor():
+def test_playwright_ayarlar_paneli_ortadan_ve_ALANLARI_gosteriyor(veritabani, e2e_oturum):
     """Dişliyle açılan Ayarlar: ORTADAN geliyor VE sağlayıcı alanları görünüyor.
 
     İkinci yarısı bu turda bulunan bir kırılmanın mandalı ve kırılma bu
@@ -392,6 +405,7 @@ def test_playwright_ayarlar_paneli_ortadan_ve_ALANLARI_gosteriyor():
     port = get_free_port()
     server = ServerThread(port)
     server.start()
+    oturum = e2e_oturum()
     time.sleep(1.0)
     base_url = f"http://127.0.0.1:{port}"
 
@@ -399,6 +413,8 @@ def test_playwright_ayarlar_paneli_ortadan_ve_ALANLARI_gosteriyor():
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={"width": 390, "height": 844})
+            oturum.cerez(page, base_url)
+
             page.goto(base_url)
             # `state="attached"`: seçici artık `.sr-only` (değeri tutan kutu
             # gizli, görünen yüz `#set-provider-btn`) ve varsayılan "visible"
@@ -485,7 +501,7 @@ def test_playwright_ayarlar_paneli_ortadan_ve_ALANLARI_gosteriyor():
         server.stop()
 
 
-def test_playwright_yukleme_hedefi_ve_ek_gorsel_kapisi():
+def test_playwright_yukleme_hedefi_ve_ek_gorsel_kapisi(veritabani, e2e_oturum):
     """İki sessiz kusurun tarayıcıdaki hâli — ikisi de DİSKE HİÇ DOKUNMADAN.
 
     Statik bekçileri `tests/test_index.py`'de; buradaki iddia kaynağın değil
@@ -507,12 +523,15 @@ def test_playwright_yukleme_hedefi_ve_ek_gorsel_kapisi():
     port = get_free_port()
     server = ServerThread(port)
     server.start()
+    oturum = e2e_oturum()
     time.sleep(1.0)
 
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
+            oturum.cerez(page, f"http://127.0.0.1:{port}")
+
             page.goto(f"http://127.0.0.1:{port}")
             page.wait_for_selector("#view-studio")
             _ilk_kurulum_perdesini_kapat(page)
@@ -550,7 +569,7 @@ def test_playwright_yukleme_hedefi_ve_ek_gorsel_kapisi():
         server.stop()
 
 
-def test_playwright_secilen_dosya_kapisi_TELEFONUN_gercegine_dayaniyor():
+def test_playwright_secilen_dosya_kapisi_TELEFONUN_gercegine_dayaniyor(veritabani, e2e_oturum):
     """`isAcceptedUpload` doğruluk tablosu — TARAYICIDA, saf işlev olarak.
 
     Bu kapının kusuru yalnız telefonda görünüyordu: Android WebView `File.type`ı
@@ -569,6 +588,7 @@ def test_playwright_secilen_dosya_kapisi_TELEFONUN_gercegine_dayaniyor():
     port = get_free_port()
     server = ServerThread(port)
     server.start()
+    oturum = e2e_oturum()
     time.sleep(1.0)
 
     # (ad, tür, beklenen) — telefonun gerçek ürettiği hâller ve karşı kanıtlar.
@@ -588,6 +608,8 @@ def test_playwright_secilen_dosya_kapisi_TELEFONUN_gercegine_dayaniyor():
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
+            oturum.cerez(page, f"http://127.0.0.1:{port}")
+
             page.goto(f"http://127.0.0.1:{port}")
             page.wait_for_selector("#view-studio")
             _ilk_kurulum_perdesini_kapat(page)
@@ -607,7 +629,7 @@ def test_playwright_secilen_dosya_kapisi_TELEFONUN_gercegine_dayaniyor():
         server.stop()
 
 
-def test_playwright_secim_modunda_karonun_ortasi_gercekten_seciyor():
+def test_playwright_secim_modunda_karonun_ortasi_gercekten_seciyor(veritabani, e2e_oturum):
     """Seçim modunda karonun ORTASINA basmak seçmeli — TARAYICIDA ölçülüyor.
 
     Kusur telefonda klasöre taşımayı tümden imkânsız kılıyordu ve statik bir
@@ -627,12 +649,15 @@ def test_playwright_secim_modunda_karonun_ortasi_gercekten_seciyor():
     port = get_free_port()
     server = ServerThread(port)
     server.start()
+    oturum = e2e_oturum()
     time.sleep(1.0)
 
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={"width": 390, "height": 780})
+            oturum.cerez(page, f"http://127.0.0.1:{port}")
+
             page.goto(f"http://127.0.0.1:{port}")
             page.wait_for_selector("#view-studio")
             _ilk_kurulum_perdesini_kapat(page)
@@ -687,7 +712,7 @@ def test_playwright_secim_modunda_karonun_ortasi_gercekten_seciyor():
         server.stop()
 
 
-def test_playwright_buyutecte_logo_ekle_kayitli_gorselde_beliriyor():
+def test_playwright_buyutecte_logo_ekle_kayitli_gorselde_beliriyor(veritabani, e2e_oturum):
     """Büyeteçteki "Logo ekle" yalnız KAYITLI bir görselde görünmeli.
 
     İki yarım, ikisi de tarayıcıda: düğme `/output/…` taşıyan bir kaynakta
@@ -701,12 +726,15 @@ def test_playwright_buyutecte_logo_ekle_kayitli_gorselde_beliriyor():
     port = get_free_port()
     server = ServerThread(port)
     server.start()
+    oturum = e2e_oturum()
     time.sleep(1.0)
 
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
+            oturum.cerez(page, f"http://127.0.0.1:{port}")
+
             page.goto(f"http://127.0.0.1:{port}")
             page.wait_for_selector("#view-studio")
             _ilk_kurulum_perdesini_kapat(page)
@@ -729,7 +757,7 @@ def test_playwright_buyutecte_logo_ekle_kayitli_gorselde_beliriyor():
         server.stop()
 
 
-def test_playwright_anahtarsiz_acilis_BOS_HALI_anlatiyor(monkeypatch):
+def test_playwright_anahtarsiz_acilis_BOS_HALI_anlatiyor(monkeypatch, veritabani, e2e_oturum):
     """Anahtar yokken şerit ve panel BOŞ HÂLİ anlatıyor, boş kalmıyor.
 
     Bu, kullanıcı isteğinin ("API key'i girilmeyen modeller gözükmesin")
@@ -750,12 +778,15 @@ def test_playwright_anahtarsiz_acilis_BOS_HALI_anlatiyor(monkeypatch):
     port = get_free_port()
     server = ServerThread(port)
     server.start()
+    oturum = e2e_oturum()
     time.sleep(1.0)
 
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={"width": 390, "height": 844})
+            oturum.cerez(page, f"http://127.0.0.1:{port}")
+
             page.goto(f"http://127.0.0.1:{port}")
             page.wait_for_selector("#view-studio")
             # Ayarlar KENDİLİĞİNDEN açılıyor: kullanıcının çıkmaz sokakta
@@ -796,7 +827,7 @@ def test_playwright_anahtarsiz_acilis_BOS_HALI_anlatiyor(monkeypatch):
         server.stop()
 
 
-def test_playwright_composer_GONDERIMDEN_SONRA_kuculuyor(monkeypatch):
+def test_playwright_composer_GONDERIMDEN_SONRA_kuculuyor(monkeypatch, veritabani, e2e_oturum):
     """"Prompt gönderdikten sonra chat kısmı küçülsün" — ölçülen şey YÜKSEKLİK.
 
     Yalnız tarayıcıda ölçülebilir: küçülmeyi yapan `min-height` ve onu geri
@@ -809,12 +840,15 @@ def test_playwright_composer_GONDERIMDEN_SONRA_kuculuyor(monkeypatch):
     port = get_free_port()
     server = ServerThread(port)
     server.start()
+    oturum = e2e_oturum()
     time.sleep(1.0)
 
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={"width": 1280, "height": 860})
+            oturum.cerez(page, f"http://127.0.0.1:{port}")
+
             page.goto(f"http://127.0.0.1:{port}")
             page.wait_for_selector("#view-studio")
             _ilk_kurulum_perdesini_kapat(page)
@@ -877,13 +911,14 @@ def test_playwright_composer_GONDERIMDEN_SONRA_kuculuyor(monkeypatch):
 # ── Logo bindirme önizlemesi ────────────────────────────────────────
 
 
-def _olcum_kutuphanesi(tmp_path, dizinler) -> dict[str, str]:
+def _olcum_kutuphanesi(oturum) -> dict[str, str]:
     """Ölçüm için gerçek PNG tabanlar + bir logo ve bir banner varlığı.
 
-    `OUTPUT_DIR`/`ASSETS_DIR` sunucu THREAD'İ BAŞLAMADAN yönlendiriliyor:
-    `ServerThread` uygulamayı aynı süreçte koşturuyor ve uçlar (`output_file`,
-    `_composite_logo`) yolu modül üzerinden ÇAĞRI ANINDA okuyor. Geliştiricinin
-    kendi kütüphanesine dokunulmuyor.
+    Dizinler OTURUMUN KULLANICISININ dizinleri (Faz 1 / 4: `ayar.ayarlar`
+    kullanıcıya göre, `<data_dir>/kullanicilar/<uuid>/…`; `e2e_oturum` `data_dir`i
+    `tmp_path`e çekti). Sunucu THREAD'İ BAŞLAMADAN tohumlanıyor: `ServerThread`
+    uygulamayı aynı süreçte koşturuyor ve uçlar yolu ÇAĞRI ANINDA okuyor.
+    Geliştiricinin kendi kütüphanesine dokunulmuyor.
 
     Varlıklar sayfa yüklenmeden önce kaydediliyor ve bu ŞART: `assetCache.logos`
     boş kalırsa `overlayNeedsAsset()` kısa devre yapıyor, sunucuya hiç
@@ -895,10 +930,8 @@ def _olcum_kutuphanesi(tmp_path, dizinler) -> dict[str, str]:
 
     import assets_store as astore
 
-    out = str(tmp_path / "output")
-    assets = str(tmp_path / "assets")
-    os.makedirs(out, exist_ok=True)
-    dizinler(output_dir=out, assets_dir=assets)
+    ayarlar = oturum.ayarlar()
+    out, assets = ayarlar.output_dir, ayarlar.assets_dir
 
     tabanlar = {}
     for ad, boyut in LOGO_ORANLARI.items():
@@ -995,7 +1028,7 @@ def _macenta_var_mi(png: bytes) -> bool:
                for r, g, b in zip(ham[0::3], ham[1::3], ham[2::3]))
 
 
-def test_playwright_logo_onizlemesi_kare_OLMAYAN_tabanda_kirpilmiyor(tmp_path, dizinler):
+def test_playwright_logo_onizlemesi_kare_OLMAYAN_tabanda_kirpilmiyor(veritabani, e2e_oturum):
     """Kullanıcı bildirimi (28 Ağustos): kare olmayan görselde alt/yan konumlar
     önizlemede gözükmüyor.
 
@@ -1016,7 +1049,8 @@ def test_playwright_logo_onizlemesi_kare_OLMAYAN_tabanda_kirpilmiyor(tmp_path, d
     Kare taban da +37.3 ile eşiğin üstünde; yatay taban (-41) kırpmıyordu, o
     yüzden "kare değilse" bir KATEGORİ değil EŞİK.
     """
-    tabanlar = _olcum_kutuphanesi(tmp_path, dizinler)
+    oturum = e2e_oturum()
+    tabanlar = _olcum_kutuphanesi(oturum)
     port = get_free_port()
     server = ServerThread(port)
     server.start()
@@ -1026,6 +1060,8 @@ def test_playwright_logo_onizlemesi_kare_OLMAYAN_tabanda_kirpilmiyor(tmp_path, d
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={"width": 390, "height": 844})
+            oturum.cerez(page, f"http://127.0.0.1:{port}")
+
             page.goto(f"http://127.0.0.1:{port}")
             page.wait_for_selector("#view-studio")
             _ilk_kurulum_perdesini_kapat(page)
@@ -1107,7 +1143,7 @@ def test_playwright_logo_onizlemesi_kare_OLMAYAN_tabanda_kirpilmiyor(tmp_path, d
 # ── Arama: klasör zinciri ───────────────────────────────────────────
 
 
-def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(tmp_path, dizinler):
+def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(veritabani, e2e_oturum):
     """Üst klasörün adı alt klasördeki görselleri VE sayaçları getiriyor.
 
     NEDEN DURUM ENJEKTE EDİLİYOR: arama %100 istemcide. Sunucuda arama ucu yok
@@ -1131,9 +1167,9 @@ def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(tmp_pa
     import folders as fmod
     import storage
 
-    out = str(tmp_path / "output")
-    os.makedirs(out, exist_ok=True)
-    dizinler(output_dir=out)
+    # Kullanıcının kendi `output/`u (Faz 1 / 4) — `tmp_path / "output"` artık sunucunun okuduğu yer değil.
+    oturum = e2e_oturum()
+    out = oturum.ayarlar().output_dir
 
     simdi = "2026-09-02T09:00:00"
     kampanyalar = fmod.create("Kampanyalar", out, parent_id=None, now=simdi)
@@ -1166,6 +1202,8 @@ def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(tmp_pa
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={"width": 1280, "height": 900})
+            oturum.cerez(page, f"http://127.0.0.1:{port}")
+
             page.goto(f"http://127.0.0.1:{port}")
             page.wait_for_selector("#view-studio")
             _ilk_kurulum_perdesini_kapat(page)
@@ -1267,7 +1305,7 @@ def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(tmp_pa
         server.stop()
 
 
-def test_playwright_yonetmen_cekmecesi_SAGDAN_aciliyor(monkeypatch):
+def test_playwright_yonetmen_cekmecesi_SAGDAN_aciliyor(monkeypatch, veritabani, e2e_oturum):
     """Yönetmen ayarları çekmecesinin tarayıcı sözleşmesi.
 
     Kaynak taramasının göremediği beş şey burada ölçülüyor:
@@ -1288,6 +1326,7 @@ def test_playwright_yonetmen_cekmecesi_SAGDAN_aciliyor(monkeypatch):
     port = get_free_port()
     server = ServerThread(port)
     server.start()
+    oturum = e2e_oturum()
     time.sleep(1.0)
     base_url = f"http://127.0.0.1:{port}"
 
@@ -1298,6 +1337,9 @@ def test_playwright_yonetmen_cekmecesi_SAGDAN_aciliyor(monkeypatch):
             prefs_posts = []
             page.on("request", lambda r: prefs_posts.append(r.url)
                     if r.method == "POST" and "/api/prefs" in r.url else None)
+
+            oturum.cerez(page, base_url)
+
 
             page.goto(base_url)
             _ilk_kurulum_perdesini_kapat(page)
@@ -1432,7 +1474,7 @@ A flat vector illustration of a tea glass on a plain cream background.
 """
 
 
-def test_playwright_aciklamali_oneri_karti_CIZILIYOR_ve_degeri_karismiyor():
+def test_playwright_aciklamali_oneri_karti_CIZILIYOR_ve_degeri_karismiyor(veritabani, e2e_oturum):
     """Açıklamalı öneri kartının tarayıcı sözleşmesi.
 
     Kaynak taraması bunların HİÇBİRİNİ göremiyor:
@@ -1453,6 +1495,7 @@ def test_playwright_aciklamali_oneri_karti_CIZILIYOR_ve_degeri_karismiyor():
     port = get_free_port()
     server = ServerThread(port)
     server.start()
+    oturum = e2e_oturum()
     time.sleep(1.0)
     base_url = f"http://127.0.0.1:{port}"
 
@@ -1460,6 +1503,8 @@ def test_playwright_aciklamali_oneri_karti_CIZILIYOR_ve_degeri_karismiyor():
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={"width": 390, "height": 844})
+            oturum.cerez(page, base_url)
+
             page.goto(base_url)
             _ilk_kurulum_perdesini_kapat(page)
             page.click("#tab-chat")

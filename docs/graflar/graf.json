@@ -22,7 +22,7 @@
       ],
       "ithal": [],
       "ithal_eden": [],
-      "katman": 13,
+      "katman": 14,
       "satir": 204,
       "testler": [
         "tests/test_android_main.py",
@@ -58,6 +58,7 @@
         "services.db",
         "services.dil",
         "services.gorsel",
+        "services.kimlik",
         "services.koken",
         "services.modeller",
         "services.palet",
@@ -71,8 +72,8 @@
         "desktop",
         "netguard"
       ],
-      "katman": 10,
-      "satir": 243,
+      "katman": 11,
+      "satir": 251,
       "testler": [
         "tests/test_app.py",
         "tests/test_app_bolme.py",
@@ -98,6 +99,7 @@
         "tests/test_id_contract.py",
         "tests/test_import_route.py",
         "tests/test_index.py",
+        "tests/test_kimlik.py",
         "tests/test_koken.py",
         "tests/test_legacy_formats.py",
         "tests/test_logo.py",
@@ -507,7 +509,7 @@
       "ithal_eden": [
         "android_main"
       ],
-      "katman": 12,
+      "katman": 13,
       "satir": 588,
       "testler": [
         "tests/test_desktop.py",
@@ -698,6 +700,7 @@
         "tests/test_dil.py",
         "tests/test_hesap.py",
         "tests/test_i18n.py",
+        "tests/test_kimlik.py",
         "tests/test_playwright_dil.py",
         "tests/test_playwright_hesap.py",
         "tests/test_posta.py"
@@ -779,7 +782,7 @@
       "ithal_eden": [
         "desktop"
       ],
-      "katman": 11,
+      "katman": 12,
       "satir": 169,
       "testler": [
         "tests/test_netguard.py"
@@ -923,7 +926,7 @@
         "tests/test_dil.py",
         "tests/test_i18n.py",
         "tests/test_index.py",
-        "tests/test_playwright_dil.py",
+        "tests/test_kimlik.py",
         "tests/test_prefs.py",
         "tests/test_prefs_route.py",
         "tests/test_video_onyuz.py"
@@ -998,15 +1001,16 @@
         "prefs",
         "services.ayar",
         "services.dil",
+        "services.kimlik",
         "services.modeller",
-        "services.tercih",
+        "services.tablolar",
         "version"
       ],
       "ithal_eden": [
         "app"
       ],
-      "katman": 8,
-      "satir": 303,
+      "katman": 9,
+      "satir": 314,
       "testler": [],
       "yol": "routers/ayarlar.py"
     },
@@ -1076,8 +1080,8 @@
       "ithal_eden": [
         "app"
       ],
-      "katman": 9,
-      "satir": 245,
+      "katman": 10,
+      "satir": 252,
       "testler": [
         "tests/test_posta.py"
       ],
@@ -1088,13 +1092,15 @@
       "erteli_ithal": [],
       "ithal": [
         "services.ayar",
-        "services.sablon"
+        "services.kimlik",
+        "services.sablon",
+        "services.tablolar"
       ],
       "ithal_eden": [
         "app"
       ],
-      "katman": 9,
-      "satir": 28,
+      "katman": 10,
+      "satir": 40,
       "testler": [],
       "yol": "routers/kok.py"
     },
@@ -1109,14 +1115,16 @@
         "palette_store",
         "services.ayar",
         "services.dil",
+        "services.kimlik",
         "services.palet",
+        "services.tablolar",
         "services.zaman"
       ],
       "ithal_eden": [
         "app"
       ],
       "katman": 9,
-      "satir": 90,
+      "satir": 95,
       "testler": [],
       "yol": "routers/paletler.py"
     },
@@ -1131,8 +1139,8 @@
       "ithal_eden": [
         "app"
       ],
-      "katman": 3,
-      "satir": 112,
+      "katman": 9,
+      "satir": 114,
       "testler": [
         "tests/test_health.py"
       ],
@@ -1158,7 +1166,7 @@
       "ithal_eden": [
         "app"
       ],
-      "katman": 8,
+      "katman": 9,
       "satir": 225,
       "testler": [],
       "yol": "routers/sohbet.py"
@@ -1208,7 +1216,9 @@
       "ad": "services.ayar",
       "erteli_ithal": [],
       "ithal": [
-        "paths"
+        "paths",
+        "services.kimlik",
+        "services.tablolar"
       ],
       "ithal_eden": [
         "app",
@@ -1221,14 +1231,14 @@
         "routers.saglik",
         "routers.sohbet",
         "routers.uretim",
-        "services.dil",
         "services.sablon"
       ],
-      "katman": 2,
-      "satir": 90,
+      "katman": 8,
+      "satir": 162,
       "testler": [
         "tests/test_app_bolme.py",
         "tests/test_hesap.py",
+        "tests/test_kimlik.py",
         "tests/test_paths.py"
       ],
       "yol": "services/ayar.py"
@@ -1250,6 +1260,7 @@
       "testler": [
         "tests/test_docker_kapisi.py",
         "tests/test_hesap.py",
+        "tests/test_kimlik.py",
         "tests/test_playwright_hesap.py"
       ],
       "yol": "services/cerez.py"
@@ -1278,9 +1289,7 @@
       "erteli_ithal": [],
       "ithal": [
         "i18n",
-        "services.ayar",
-        "services.cerez",
-        "services.tercih"
+        "services.cerez"
       ],
       "ithal_eden": [
         "app",
@@ -1297,8 +1306,8 @@
         "services.palet",
         "services.sablon"
       ],
-      "katman": 7,
-      "satir": 150,
+      "katman": 3,
+      "satir": 190,
       "testler": [
         "tests/test_dil.py",
         "tests/test_i18n.py",
@@ -1320,7 +1329,7 @@
         "routers.galeri",
         "routers.uretim"
       ],
-      "katman": 8,
+      "katman": 4,
       "satir": 140,
       "testler": [
         "tests/test_edit_route.py",
@@ -1343,7 +1352,9 @@
       "katman": 6,
       "satir": 292,
       "testler": [
-        "tests/test_hesap.py"
+        "tests/test_hesap.py",
+        "tests/test_kimlik.py",
+        "tests/test_playwright_hesap.py"
       ],
       "yol": "services/hesap.py"
     },
@@ -1363,7 +1374,7 @@
         "routers.galeri",
         "routers.uretim"
       ],
-      "katman": 8,
+      "katman": 4,
       "satir": 75,
       "testler": [],
       "yol": "services/kapilar.py"
@@ -1380,11 +1391,18 @@
         "services.tablolar"
       ],
       "ithal_eden": [
-        "routers.hesap"
+        "app",
+        "routers.ayarlar",
+        "routers.hesap",
+        "routers.kok",
+        "routers.paletler",
+        "services.ayar"
       ],
-      "katman": 8,
-      "satir": 51,
-      "testler": [],
+      "katman": 7,
+      "satir": 132,
+      "testler": [
+        "tests/test_kimlik.py"
+      ],
       "yol": "services/kimlik.py"
     },
     {
@@ -1443,7 +1461,7 @@
         "routers.paletler",
         "routers.uretim"
       ],
-      "katman": 8,
+      "katman": 5,
       "satir": 181,
       "testler": [],
       "yol": "services/palet.py"
@@ -1497,7 +1515,7 @@
         "routers.hesap",
         "routers.kok"
       ],
-      "katman": 8,
+      "katman": 9,
       "satir": 68,
       "testler": [],
       "yol": "services/sablon.py"
@@ -1510,7 +1528,11 @@
         "models"
       ],
       "ithal_eden": [
+        "routers.ayarlar",
         "routers.hesap",
+        "routers.kok",
+        "routers.paletler",
+        "services.ayar",
         "services.hesap",
         "services.kimlik"
       ],
@@ -1518,6 +1540,8 @@
       "satir": 468,
       "testler": [
         "tests/test_hesap.py",
+        "tests/test_kimlik.py",
+        "tests/test_playwright_hesap.py",
         "tests/test_tablolar.py"
       ],
       "yol": "services/tablolar.py"
@@ -1528,10 +1552,7 @@
       "ithal": [
         "prefs"
       ],
-      "ithal_eden": [
-        "routers.ayarlar",
-        "services.dil"
-      ],
+      "ithal_eden": [],
       "katman": 6,
       "satir": 98,
       "testler": [
@@ -1580,6 +1601,7 @@
         "tests/test_arena.py",
         "tests/test_chats_route.py",
         "tests/test_folders.py",
+        "tests/test_kimlik.py",
         "tests/test_legacy_formats.py",
         "tests/test_playwright_studio.py",
         "tests/test_storage.py",
@@ -1839,8 +1861,8 @@
           "/output/{}.png"
         ],
         "dosya": "static/core.js",
-        "satir": 3137,
-        "tanim": 88
+        "satir": 3170,
+        "tanim": 89
       },
       {
         "cagrilan_yollar": [
@@ -1867,7 +1889,7 @@
           "/api/hesap/sifirla/dogrula"
         ],
         "dosya": "static/giris.js",
-        "satir": 173,
+        "satir": 189,
         "tanim": 0
       },
       {
@@ -1907,7 +1929,7 @@
           "/api/settings"
         ],
         "dosya": "static/settings.js",
-        "satir": 930,
+        "satir": 932,
         "tanim": 23
       },
       {
@@ -2251,7 +2273,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 105,
+  "test_dosyasi_sayisi": 106,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",
@@ -2263,7 +2285,7 @@
         "version"
       ],
       "onyuz": [],
-      "satir": 26,
+      "satir": 27,
       "yardimci_sayisi": 2,
       "yol": "/",
       "yontem": "GET"
@@ -2649,7 +2671,7 @@
       "onyuz": [
         "static/settings.js"
       ],
-      "satir": 59,
+      "satir": 60,
       "yardimci_sayisi": 0,
       "yol": "/api/guncelleme",
       "yontem": "GET"
@@ -2665,7 +2687,7 @@
       "onyuz": [
         "static/settings.js"
       ],
-      "satir": 89,
+      "satir": 90,
       "yardimci_sayisi": 0,
       "yol": "/api/guncelleme",
       "yontem": "POST"
@@ -2679,7 +2701,7 @@
         "static/giris.js",
         "static/settings.js"
       ],
-      "satir": 237,
+      "satir": 244,
       "yardimci_sayisi": 1,
       "yol": "/api/hesap/ben",
       "yontem": "GET"
@@ -2692,7 +2714,7 @@
       "onyuz": [
         "static/settings.js"
       ],
-      "satir": 185,
+      "satir": 192,
       "yardimci_sayisi": 5,
       "yol": "/api/hesap/cikis",
       "yontem": "POST"
@@ -2708,7 +2730,7 @@
       "onyuz": [
         "static/giris.js"
       ],
-      "satir": 136,
+      "satir": 143,
       "yardimci_sayisi": 5,
       "yol": "/api/hesap/dogrula",
       "yontem": "POST"
@@ -2725,7 +2747,7 @@
       "onyuz": [
         "static/giris.js"
       ],
-      "satir": 148,
+      "satir": 155,
       "yardimci_sayisi": 29,
       "yol": "/api/hesap/giris",
       "yontem": "POST"
@@ -2742,7 +2764,7 @@
       "onyuz": [
         "static/giris.js"
       ],
-      "satir": 102,
+      "satir": 109,
       "yardimci_sayisi": 23,
       "yol": "/api/hesap/kayit",
       "yontem": "POST"
@@ -2759,7 +2781,7 @@
       "onyuz": [
         "static/giris.js"
       ],
-      "satir": 197,
+      "satir": 204,
       "yardimci_sayisi": 19,
       "yol": "/api/hesap/sifirla",
       "yontem": "POST"
@@ -2775,7 +2797,7 @@
       "onyuz": [
         "static/giris.js"
       ],
-      "satir": 217,
+      "satir": 224,
       "yardimci_sayisi": 8,
       "yol": "/api/hesap/sifirla/dogrula",
       "yontem": "POST"
@@ -2948,7 +2970,7 @@
       "onyuz": [
         "static/palette.js"
       ],
-      "satir": 27,
+      "satir": 28,
       "yardimci_sayisi": 0,
       "yol": "/api/palette/suggest",
       "yontem": "POST"
@@ -2963,7 +2985,7 @@
       "onyuz": [
         "static/palette.js"
       ],
-      "satir": 58,
+      "satir": 63,
       "yardimci_sayisi": 0,
       "yol": "/api/palettes",
       "yontem": "GET"
@@ -2982,7 +3004,7 @@
       "onyuz": [
         "static/palette.js"
       ],
-      "satir": 63,
+      "satir": 68,
       "yardimci_sayisi": 4,
       "yol": "/api/palettes",
       "yontem": "POST"
@@ -2998,7 +3020,7 @@
       "onyuz": [
         "static/palette.js"
       ],
-      "satir": 85,
+      "satir": 90,
       "yardimci_sayisi": 1,
       "yol": "/api/palettes/{palette_id}",
       "yontem": "DELETE"
@@ -3015,7 +3037,7 @@
         "static/core.js",
         "static/settings.js"
       ],
-      "satir": 265,
+      "satir": 272,
       "yardimci_sayisi": 0,
       "yol": "/api/prefs",
       "yontem": "GET"
@@ -3033,8 +3055,8 @@
         "static/core.js",
         "static/settings.js"
       ],
-      "satir": 271,
-      "yardimci_sayisi": 4,
+      "satir": 278,
+      "yardimci_sayisi": 3,
       "yol": "/api/prefs",
       "yontem": "POST"
     },
@@ -3056,7 +3078,7 @@
       "onyuz": [
         "static/settings.js"
       ],
-      "satir": 23,
+      "satir": 24,
       "yardimci_sayisi": 4,
       "yol": "/api/settings",
       "yontem": "GET"
@@ -3077,7 +3099,7 @@
       "onyuz": [
         "static/settings.js"
       ],
-      "satir": 117,
+      "satir": 118,
       "yardimci_sayisi": 5,
       "yol": "/api/settings",
       "yontem": "POST"
@@ -3153,7 +3175,7 @@
         "version"
       ],
       "onyuz": [],
-      "satir": 243,
+      "satir": 250,
       "yardimci_sayisi": 2,
       "yol": "/giris",
       "yontem": "GET"

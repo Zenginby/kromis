@@ -555,17 +555,19 @@ def test_the_picker_reads_the_language_from_the_page_not_the_server():
 
 # ── Sunucu mesajları ─────────────────────────────────────────────────
 
-def test_a_route_error_speaks_the_selected_language(tmp_path, dizinler):
+def test_a_route_error_speaks_the_selected_language(tmp_path, dizinler, kullanici):
     """Yarım bir çeviri en çok HATA ANINDA göze batar: İngilizce bir arayüzde
     Türkçe bir hata kutusu, kullanıcının "bu uygulama bana mı ait" sorusunu
-    sorduğu an olurdu."""
-    import prefs
-    out = str(tmp_path / "output")
-    dizinler(output_dir=out)
-    prefs.update({"language": "en"}, out)
+    sorduğu an olurdu.
+
+    Seçili dil HESABIN dili (Faz 1 / 4, `kullanicilar.dil`; test kullanıcısı
+    conftest'in `kullanici` fixture'ı) — `prefs.json`daki `language` web
+    yolunda artık okunmuyor."""
+    dizinler(output_dir=str(tmp_path / "output"))
     c = TestClient(appmod.app)
+    kullanici.dil = "en"
     assert c.delete("/api/image/yokboyle").json()["detail"] == "The image was not found."
-    prefs.update({"language": "tr"}, out)
+    kullanici.dil = "tr"
     assert c.delete("/api/image/yokboyle").json()["detail"] == "Görsel bulunamadı."
 
 

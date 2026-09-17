@@ -163,16 +163,19 @@ def test_app_exposes_no_directory_constants():
 
 
 def test_every_route_that_touches_a_directory_declares_the_dependency():
-    """Dizin okuyan her rota `Depends(ayar.ayarlar)` ile ister; başka yol yok.
+    """Dizin okuyan her rota ayar nesnesini `Depends(ayar.ayarlar)` ya da `Depends(ayar.genel)` ile ister.
 
     Sayı DEĞİL kapsam ölçülüyor: `ayarlar.` yazan her rota dosyasında bu ad
     bir `Depends` parametresinden gelmeli. Rota dışı yardımcılar dizini
     parametre alıyor, yani `ayarlar.` yalnız rota gövdelerinde görünür.
+    İki bağımlılık (Faz 1 / 4): `ayarlar` kullanıcıya göre ve kapılı, `genel`
+    paylaşılan ve açık — hangisinin nerede meşru olduğu tests/test_kimlik.py'nin işi.
     """
     for yol in _paket_dosyalari("routers"):
         kaynak = _oku(yol)
         if "ayarlar." in kaynak:
-            assert "Depends(ayar.ayarlar)" in kaynak, f"{yol}: ayar nesnesini nereden alıyor?"
+            assert "Depends(ayar.ayarlar)" in kaynak or "Depends(ayar.genel)" in kaynak, (
+                f"{yol}: ayar nesnesini nereden alıyor?")
 
 
 def test_redirecting_the_settings_object_reaches_the_routers(tmp_path, dizinler):
@@ -191,14 +194,18 @@ def test_redirecting_the_settings_object_reaches_the_routers(tmp_path, dizinler)
     assert (tmp_path / "output" / "history.json").is_file()
 
 
-def test_the_dependency_reads_the_live_settings_object(tmp_path, dizinler):
-    """`ayar.ayarlar(request)` her çağrıda `app.state`e bakıyor, kopya tutmuyor."""
+def test_the_dependency_reads_the_live_settings_object(tmp_path, dizinler, kullanici):
+    """`ayar.genel(request)` her çağrıda `app.state`e bakıyor, kopya tutmuyor;
+    `ayar.ayarlar` da ondan türüyor (kullanıcı kökü altında, `data_dir` aynı)."""
     from starlette.requests import Request
     istek = Request({"type": "http", "app": appmod.app, "headers": []})
-    once = ayar.ayarlar(istek)
-    yeni = dizinler(assets_dir=str(tmp_path / "a"))
-    assert ayar.ayarlar(istek) is yeni and yeni is not once
-    assert ayar.ayarlar(istek).assets_dir == str(tmp_path / "a")
+    once = ayar.genel(istek)
+    yeni = dizinler(assets_dir=str(tmp_path / "a"), data_dir=str(tmp_path))
+    assert ayar.genel(istek) is yeni and yeni is not once
+    assert ayar.genel(istek).assets_dir == str(tmp_path / "a")
+    ozel = ayar.ayarlar(istek, kullanici)
+    assert ozel.data_dir == str(tmp_path) and ozel.static_dir == yeni.static_dir
+    assert ozel.assets_dir == str(tmp_path / "kullanicilar" / str(kullanici.id) / "assets")
 
 
 def test_the_patched_helpers_are_not_re_exported_from_app():

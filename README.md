@@ -208,8 +208,20 @@ oradan kopyalanır (`tail -f posta.log`). Dağıtımda `KROMIS_POSTA=resend`,
 `RESEND_API_KEY`, `KROMIS_POSTA_GONDEREN` ve dış adres `KROMIS_KOKEN`
 (`https://…`; köken kapısı VE e-posta bağlantılarının tabanı). Çerezler web
 modunda (`DATABASE_URL` verilmişse) `Secure`; düz HTTP'de denemek için
-`KROMIS_GUVENLI_CEREZ=0` (compose bunu kendi veriyor). Bu sürümde stüdyo
-rotaları henüz oturum İSTEMİYOR — kapı 4. görevle geliyor.
+`KROMIS_GUVENLI_CEREZ=0` (compose bunu kendi veriyor).
+
+Kimlik kapısı (Faz 1 / 4): `/health`, `/giris` ve hesap açma/giriş/sıfırlama
+uçları dışında HER rota oturum ister — API'de 401 JSON, `GET /`de 302 `/giris`
+(`services/kimlik.py`; hangi rotanın açık olduğu `tests/test_kimlik.py`de
+gerekçesiyle). Kullanıcı verisi kullanıcıya göre ayrılır:
+`<veri kökü>/kullanicilar/<uuid>/{output,assets}` (`services/ayar.py`; kök
+0o700, ilk istekte açılır); `output/` ve `assets/` artık yalnız dondurulmuş
+kabuğun tek kullanıcılı yerleşimi. Arayüz dili sırayla `X-Kromis-Lang`
+başlığı → `kromis_lang` çerezi → hesabın dili (`kullanicilar.dil`, Ayarlar'dan
+seçilince yazılır) → `Accept-Language` → İngilizce; `prefs.json`daki dil web'de
+okunmaz. Sonuç: web sürümü `DATABASE_URL` OLMADAN stüdyoyu açmaz (oturum yok →
+`database_unavailable` 503) — veri tabanı olmadan hesap, hesap olmadan stüdyo
+yok (belge §1'in kararı).
 
 ### 3. Test
 

@@ -17,12 +17,24 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse
 
-from services import ayar, sablon
+from services import ayar, kimlik, sablon
+from services.tablolar import Kullanici
 
 router = APIRouter()
 
 
 @router.get("/")
-def index(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> HTMLResponse:
-    """index.html'i sürüm, dil ve sözlük yerine konarak servis eder (services/sablon.py)."""
+def index(kullanici: Kullanici = Depends(kimlik.sayfa_kullanicisi),
+          ayarlar: ayar.Ayarlar = Depends(ayar.genel)) -> HTMLResponse:
+    """index.html'i sürüm, dil ve sözlük yerine konarak servis eder (services/sablon.py).
+
+    KAPI (Faz 1 / 4): oturumsuz ziyaretçi **302 `/giris`** alır —
+    `kimlik.sayfa_kullanicisi`, API rotalarının 401'i değil; bu tarayıcı
+    GEZİNMESİ olan tek rota (gerekçesi services/kimlik.py). Kullanıcı
+    bağımlılığı ÖNCE: FastAPI alt bağımlılıkları imza sırasıyla çözüyor ve
+    kapı ilk soru olmalı. Ayar nesnesi `ayar.genel`: sayfanın okuduğu tek
+    dizin paylaşılan `static_dir`, kullanıcı dizini burada gerekmiyor —
+    `ayar.ayarlar` kapıyı 401'le taşırdı. Dil zincirinin 3. halkası
+    (`kullanicilar.dil`) kapıda uygulanıyor, yani sayfa hesabın dilinde çizilir.
+    """
     return sablon.sayfa(ayarlar, "index.html")

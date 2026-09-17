@@ -4,6 +4,10 @@
 # kullanıcı verisi; bu adda başka iç dizin yok.
 /output/
 /assets/
+# Kullanıcı başına veri dizinleri (Faz 1 / 4, services/ayar.py): dev'de
+# data_dir() repo kökü, yani DATABASE_URL ile çalıştırılan uygulama
+# `kullanicilar/<uuid>/{output,assets}`i buraya açar — output/ ile aynı sebep.
+/kullanicilar/
 .venv/
 __pycache__/
 *.pyc

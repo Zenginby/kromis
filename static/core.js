@@ -12,6 +12,39 @@
 
 const $ = (id) => document.getElementById(id);
 const statusEl = $("status");
+
+// ── Kimlik kapısı (Faz 1 / 4) ────────────────────────────────────────
+// Sunucudaki 47 rota oturum istiyor ve oturumsuz cevap 401 JSON — 302 değil,
+// çünkü `fetch` yönlendirmeyi takip eder ve JSON bekleyen çağrı HTML alırdı
+// (services/kimlik.py). Yani "oturum düştü → giriş sayfasına" kararı ÖN
+// YÜZÜN işi. Stüdyo betiklerinde 35 `fetch(` çağrısı var; her birine
+// `if (res.status === 401)` yazmak 35 yerde aynı satır ve 36.'sında unutulmuş
+// bir kapı demek. Onun yerine `window.fetch` TEK noktadan sarılıyor: her
+// cevap önce buradan geçer, 401 gören sarmal giriş sayfasına gider ve cevabı
+// yine döndürür (çağıran kendi hata yolunu koşturur; sayfa zaten gidiyor).
+//
+// `?sonra=<yol>`: giriş bittiğinde kullanıcı bıraktığı yere dönsün
+// (static/giris.js okur ve yalnız AYNI KÖKENE ait bir yolsa kullanır — açık
+// yönlendirme kapısı orada). Sunucunun `GET /` için verdiği 302 `?sonra=`
+// taşımaz: tek sayfa `/`, belge öyle diyor.
+//
+// Neden `bind(window)`: `fetch`in `this`i `window` olmalı; çıplak bir
+// referansla çağrılırsa bazı tarayıcılar "Illegal invocation" fırlatır.
+// Neden `Request` girdisi ve seçenekler OLDUĞU GİBİ iletiliyor: sarmal
+// argümanları yorumlamaz, yalnız cevabın durum koduna bakar.
+const GIRIS_SAYFASI = "/giris";
+function girisSayfasinaGit() {
+  const sonra = window.location.pathname + window.location.search;
+  window.location.replace(`${GIRIS_SAYFASI}?sonra=${encodeURIComponent(sonra)}`);
+}
+{
+  const gercekFetch = window.fetch.bind(window);
+  window.fetch = async (girdi, secenekler) => {
+    const res = await gercekFetch(girdi, secenekler);
+    if (res.status === 401) girisSayfasinaGit();
+    return res;
+  };
+}
 const ACCEPTED_UPLOAD_TYPES = ["image/png", "image/jpeg", "image/webp"];
 // Aynı üç türün UZANTI karşılığı. `isAcceptedUpload`ın var oluş sebebi burada.
 const ACCEPTED_UPLOAD_EXTS = [".png", ".jpg", ".jpeg", ".webp"];

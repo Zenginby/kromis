@@ -17,6 +17,7 @@ import re
 import socket
 import threading
 import time
+from urllib.parse import quote
 
 import pytest
 import uvicorn
@@ -29,6 +30,10 @@ from playwright.sync_api import sync_playwright
 import i18n
 from app import app
 from services import cerez, koken, posta
+
+# Kapı GERÇEK: bu dosya kapının kendisini (form → çerez → stüdyo → çıkış → 401)
+# ölçüyor; conftest'in autouse override'ı burada kurulmaz (Faz 1 / 4).
+pytestmark = pytest.mark.gercek_kimlik
 
 EPOSTA = "e2e@example.com"
 PAROLA = "e2e-parolasi-123"
@@ -162,6 +167,73 @@ def test_register_verify_login_and_logout_through_the_browser(
             page.wait_for_selector("#form-giris:not([hidden])")
             assert page.evaluate("() => fetch('/api/hesap/ben').then((r) => r.status)") == 401
             assert cerez.OTURUM_CEREZI not in {c["name"] for c in baglam.cookies()}
+            tarayici.close()
+    finally:
+        sunucu.stop()
+        sunucu.join(timeout=5)
+
+
+def _dogrulanmis_hesap(veritabani_url: str) -> None:
+    """DB'ye doğrudan doğrulanmış hesap: bu test formun kayıt akışını değil `?sonra=` kapısını ölçüyor."""
+    from sqlalchemy.orm import Session
+
+    from services import hesap
+    from services.tablolar import Kullanici
+
+    motor = create_engine(veritabani_url)
+    with Session(motor) as db:
+        db.execute(text("TRUNCATE kullanicilar CASCADE"))
+        db.execute(text("TRUNCATE giris_denemeleri"))
+        db.add(Kullanici(eposta=EPOSTA, parola_ozeti=hesap.parola_ozeti(PAROLA),
+                         dogrulandi_at=hesap.simdi()))
+        db.commit()
+    motor.dispose()
+
+
+@pytest.mark.parametrize("sonra, beklenen", [
+    ("/?sekme=galeri", "/?sekme=galeri"),          # aynı kökene ait yol: aynen
+    ("//evil.example/", "/"),                       # şemasız dış adres: /
+    ("https://evil.example/", "/"),                 # şemalı dış adres: /
+    ("/\\evil.example/", "/"),                    # ters bölü — tarayıcı `//` okur: /
+    ("galeri", "/"),                                # göreli: /
+])
+def test_after_login_the_page_returns_only_to_a_same_origin_path(
+        sonra, beklenen, veritabani, monkeypatch, tmp_path, dizinler):
+    """`/giris?sonra=` (core.js 401 sarmalı yazar) — açık yönlendirici DEĞİL (static/giris.js `hedef`).
+
+    Kapının kendisi JavaScript'te; sunucuya bakan hiçbir test onu göremez,
+    yalnız tarayıcıda ölçülür. Dış adresler için iddia "sayfa BİZDE kaldı":
+    `page.url` `taban + "/"`; `evil.example` çözülmez, gerçekten oraya gitseydi
+    `wait_for_url` düşerdi.
+    """
+    for ad in (posta.POSTA_ENV, posta.RESEND_ANAHTAR_ENV, koken.KOKEN_ENV, cerez.GUVENLI_ENV):
+        monkeypatch.delenv(ad, raising=False)
+    dizinler(data_dir=str(tmp_path))
+    _dogrulanmis_hesap(veritabani)
+    port = _bos_port()
+    sunucu = _Sunucu(port)
+    sunucu.start()
+    _bekle(port)
+    taban = f"http://127.0.0.1:{port}"
+    try:
+        with sync_playwright() as p:
+            tarayici = p.chromium.launch(headless=True)
+            page = tarayici.new_page()
+            page.goto(f"{taban}/giris?sonra=" + quote(sonra, safe=""))
+            page.wait_for_selector("#form-giris:not([hidden])")
+            page.fill("#giris-eposta", EPOSTA)
+            page.fill("#giris-parola", PAROLA)
+            page.click("#form-giris button[type=submit]")
+            page.wait_for_url(f"{taban}{beklenen}")
+            page.wait_for_selector("#view-studio")
+            assert page.url == f"{taban}{beklenen}"
+
+            # Oturum düşerse stüdyo `/giris?sonra=<bulunduğu yol>`e gider (core.js sarmalı):
+            # çerezi tarayıcıdan silip bir API çağrısı yaptırıyoruz.
+            page.context.clear_cookies(name=cerez.OTURUM_CEREZI)
+            page.evaluate("() => fetch('/api/history')")
+            page.wait_for_url(f"{taban}/giris?sonra=*")
+            assert page.url == f"{taban}/giris?sonra=" + quote(beklenen, safe="")
             tarayici.close()
     finally:
         sunucu.stop()

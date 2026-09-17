@@ -8,6 +8,13 @@ sifirla/dogrula}`, `GET /api/hesap/ben`, `GET /giris`. HTTP burada (gövde,
 durum kodu, çerez, cümle); hesap mantığı `services/hesap.py`de, posta
 `services/posta.py`de, kapı `services/kimlik.py`de.
 
+AYAR NESNESİ `ayar.genel` (Faz 1 / 4): bu rotaların altısı oturum İSTEMEZ —
+kayıt olmadan kullanıcı, kullanıcı olmadan kullanıcı dizini yok; okudukları
+tek şey paylaşılan `data_dir` (`hata.log`) ve `static_dir` (`/giris`).
+`ayar.ayarlar` kullanıcıya göre kurulur ve kapıyı içinde taşır; burada o
+kapı ya anlamsız (kayıt) ya da tam tersi (giriş) olurdu. `ben` ve `cikis`
+kapıyı `kimlik.aktif_kullanici` ile doğrudan alıyor.
+
 KULLANICI NUMARALANDIRMASINA KARŞI üç cevap AYNI (belge: "kayıt ve sıfırlama
 cevapları e-posta var/yok ayırt ETMEZ"): `kayit` yeni hesapta da, var olan
 doğrulanmamış hesapta da, var olan DOĞRULANMIŞ hesapta da `{"ok": true}` der
@@ -100,7 +107,7 @@ def _dogrulama_gonder(request: Request, db: Session, kullanici: Kullanici,
 
 @router.post("/api/hesap/kayit")
 def kayit(req: KayitIstegi, request: Request,
-          ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar), db: Session = OTURUM) -> dict:
+          ayarlar: ayar.Ayarlar = Depends(ayar.genel), db: Session = OTURUM) -> dict:
     """Hesap açar (doğrulanmamış) ve doğrulama bağlantısını gönderir. Cevap her dalda aynı.
 
     Var olan DOĞRULANMAMIŞ hesaba yeniden kayıt: parola ve dil bu isteğinkiyle
@@ -146,7 +153,7 @@ def dogrula(req: JetonIstegi, db: Session = OTURUM) -> dict:
 
 @router.post("/api/hesap/giris", response_model=None)
 def giris(req: GirisIstegi, request: Request,
-          ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar), db: Session = OTURUM) -> Response:
+          ayarlar: ayar.Ayarlar = Depends(ayar.genel), db: Session = OTURUM) -> Response:
     """Parola doğruysa oturum açar, çerezi kurar, `ben` gövdesini döner.
 
     Sıra bilinçli: önce kilit (429), sonra parola (401 — hem yanlış parola hem
@@ -195,7 +202,7 @@ def cikis(request: Request, response: Response,
 
 @router.post("/api/hesap/sifirla")
 def sifirla(req: SifirlamaIstegi, request: Request,
-            ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar), db: Session = OTURUM) -> dict:
+            ayarlar: ayar.Ayarlar = Depends(ayar.genel), db: Session = OTURUM) -> dict:
     """"Parolamı unuttum": hesap varsa sıfırlama bağlantısı gider; cevap her durumda aynı."""
     an = hesap.simdi()
     ip = hesap.ip_adresi(request)
@@ -240,6 +247,6 @@ def ben(kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
 
 
 @router.get("/giris")
-def giris_sayfasi(ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar)) -> HTMLResponse:
+def giris_sayfasi(ayarlar: ayar.Ayarlar = Depends(ayar.genel)) -> HTMLResponse:
     """`static/giris.html` — `index` ile aynı yerleştirme (services/sablon.py), aynı dil zinciri."""
     return sablon.sayfa(ayarlar, "giris.html")

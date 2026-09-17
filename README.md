@@ -38,7 +38,8 @@ Bağlantılar her zaman **en son yayına** gider; sürüm yükselince adres değ
 > çalışan, hesaplı ve kredili bir stüdyo. Yol haritası:
 > [docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md](docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md),
 > ilk adımların listesi: [docs/faz0-web-first.md](docs/faz0-web-first.md),
-> veri tabanı ve hesaplar: [docs/faz1-veritabani-hesaplar.md](docs/faz1-veritabani-hesaplar.md).
+> veri tabanı ve hesaplar: [docs/faz1-veritabani-hesaplar.md](docs/faz1-veritabani-hesaplar.md),
+> kuyruk, platform anahtarları ve nesne depolama: [docs/faz2-kuyruk-anahtarlar-depolama.md](docs/faz2-kuyruk-anahtarlar-depolama.md).
 > Masaüstü/Android bir gün geri gelirse web uygulamasını gösteren ince bir
 > kabuk olarak gelir.
 

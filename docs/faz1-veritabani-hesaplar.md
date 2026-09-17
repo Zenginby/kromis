@@ -1599,6 +1599,8 @@ Python 3.14 tekerlekleri (CI'da görünür), `GET /api/settings`in web'de anlams
 atomikliği (kök çözüm nesne depolama + worker ile Faz 2'de; bugün
 `artik_dosya.py` arkadan topluyor).
 
+**Sonraki faz:** [faz2-kuyruk-anahtarlar-depolama.md](faz2-kuyruk-anahtarlar-depolama.md) — iş kuyruğu ve işçi, nesne depolama, platform anahtarları ve kota, RLS ikinci katı, admin, yapısal günlük; yukarıdaki "Faz 2" devirlerinin her biri orada bir görevin "Faz 1'den devralınan" satırında.
+
 ---
 
 ## Test stratejisi — kesişen kararlar (her görevin "Dokunulan"ında tek tek var)

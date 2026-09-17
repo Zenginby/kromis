@@ -1259,7 +1259,7 @@ başlığı bu görevde zaten değişti (§9'un "başlığı değişir" kalemi k
 
 ---
 
-## 8. İçe aktarma ve ilk kullanıcı: `tools/ice_aktar.py`, `tools/kullanici.py`, `is_admin` (PR: `faz1/ice-aktarma`)
+## 8. İçe aktarma ve ilk kullanıcı: `tools/ice_aktar.py`, `tools/kullanici.py`, `is_admin` ✅ (PR: `faz1/ice-aktarma`)
 
 **Kapsam.** İki CLI, ikisi de `services/db.py` üzerinden, uygulama
 ayakta olmadan çalışır:
@@ -1302,6 +1302,132 @@ kendini nasıl görüyorsa öyle).
 **Çıkış ölçütü.** Sahibin `KROMIS_DATA_DIR`ı tek komutla bir hesaba iniyor,
 galeri/klasör/sohbet/palet/varlık/tercih/anahtar hepsi arayüzde aynı
 görünüyor; ikinci koşu 0 yeni satır; takım yeşil.
+
+**Yapıldığında (2026-09-17) ölçümler ve sapmalar.** İki CLI, ikisi de
+`services.db.motor_kur(DATABASE_URL)` ile uygulama kapalıyken; çıkış kodları
+ortak: 0 tamam · 1 kullanıcı hatası (hiçbir şey yazılmadı) · 2 ortam
+(`DATABASE_URL`/`KROMIS_SECRET_KEY` yok, DB yok) · 3 yalnız içe aktarmada,
+"bitti ama bozuk kayıt atlandı". **`tools/kullanici.py`**: `olustur --eposta
+[--admin] [--dil tr|en] [--parola-stdin]` ve `oturum-dusur --eposta`. Parola
+argüman DEĞİL (kabuk geçmişi), TTY'de `getpass` iki kez, betikte
+`--parola-stdin` ilk satır (yalnız satır sonu kırpılır — boşluk parolanın
+parçası, `models.check_parola`). Kural kümesi web ile TEK: `models.check_eposta/
+check_parola`, `hesap.kullanici_olustur` (argon2id), `hesap.dogrulandi(now)`,
+`hesap.oturumlari_dusur`; var olan e-posta (citext: `Ali@` = `ali@`) 1 ile
+çıkar ve satıra dokunmaz; parola DB'ye bağlanmadan önce alınır. `--dil`
+öntanımlı `None` (zincir tarayıcı başlığına düşer). **`tools/ice_aktar.py
+--kaynak --eposta [--kimlik-dosyasi] [--hedef] [--kuru] [--yeniden]`**:
+`--hedef` belgede yoktu, eklendi — web'in `KROMIS_DATA_DIR`i (öntanımlı
+`paths.data_dir()`); test ve "kaynak = hedefin kökü" senaryosu için gerekli
+(sahip aynı `/data`ya hem eski `output/`u hem `kullanicilar/`ı koyabilir —
+araç `realpath` eşitliğinde durur, alt dizinse çalışır).
+
+**Kararlar, belgenin açık bıraktığı yerlerde:** (a) ÇAKIŞAN ID TÜRETİLİR,
+`uuid4().hex` DEĞİL — `sha256(kullanici_id|tablo|eski)[:32]` (`turet`).
+Gerekçe idempotenlik: aynı kaynağı iki hesaba yüklemek her id'yi çakıştırır;
+rastgele id ikinci koşuda ikinci bir kopya açar, türetilmiş id aynı hedefi
+bulur ve "var olan" der (test: çakışmalı koşunun ikincisi 0 yeni). Türetilmiş
+id de başkasınınsa araç durur (`IceAktarmaHatasi`), uydurmaz. Yeniden yazılan
+başvurular: `klasorler.parent_id`, `medya.folder_id/parent_id/session_id`,
+`chats.messages[].image_ids`, arena kardeşleri (`arena_id` başkasında varsa
+tur bütünüyle `turet(…, "arena", …)`; `arena_win` korunur). `filename`
+küresel UNIQUE: id çakışmasa da dosya adı doluysa id türetilir (elle düzenlenmiş
+manifest). (b) TEK TRANSAKSİYON, depo başına değil: depolar birbirine bağlı
+(`folder_id` FK, `session_id`, `image_ids`), yarım hesap hiç yüklenmemişten
+kötü; sıra klasörler (ebeveyn önce, FK anlık) → sohbet id haritası → medya →
+sohbet satırları → palet → varlık → tercih → kimlik. Dosya + satır atomik
+değil (5-6. görevlerin kararı): kopya önce, satır sonra; hata/commit düşmesinde
+bu koşuda hedefe YENİ yazılan dosyalar silinir (`temizle`), kaynak asla.
+`--kuru` aynı yolu koşturur — satırlar `flush` edilir ki FK/UNIQUE kuru koşuda
+da görünsün — sonda `rollback`, dizin bile açılmaz (test: `hedef/` yok).
+(c) ZAMAN: eski `created_at` yerel saat sayılır (`fromisoformat` → `astimezone`),
+mikrosaniyeye LİSTE SIRASI yazılır — eski galeri liste sırasıyla gösteriyordu,
+aynı saniyedeki arena sütunları sırayı korur; `zaman.damga(olusturuldu) ==
+created_at` (test, saniyeye kadar birebir). (d) YOKLUK NULL, `_db_tohumla`nın
+deseni: `imported`/`session_id`/`arena_id`/`kind`/`duration`/`arena_win`
+yalnız doluysa; `model` yoksa `""` (içe aktarımın "üreteni yok" değeri),
+`credits` yoksa 0. (e) ONARIM ≠ BOZUKLUK — `dusurulen` sütunu: sarkan
+`folder_id`/`parent_id` (FK reddederdi; eski uygulama o kaydı hiçbir listede
+göstermiyordu, köke almak geri kazandırır), döngülü ebeveyn zinciri, bilinmeyen
+kimlik adı, geçersiz tercih alanı, sağlayıcıyla uyumsuz `chat_model`; kayıt
+gelir, çıkış 0. `bozuk`: sözlük olmayan kayıt, `_SAFE_ID`den geçmeyen id,
+zorunlu alan (`name`/`filename`/`messages`) eksik, JSON olmayan dosya — kayıt
+kayıt raporlanır (stderr), depo sürer, çıkış 3. Kaynakta dosyası olmayan medya
+satırı yine yazılır ve `dosya eksik` sayılır (servis yolu 404 verir, kayıt
+kaybolmaz). (f) TERCİH: yalnız `prefs.read_stored`un geçirdiği alanlar (tek
+kural kümesi, kopya yok), `depo_tercih.guncelle` ile; `language` ayrıca
+`kullanicilar.dil`e (dil zinciri onu okuyor, `tercihler.language`ı değil —
+services/dil.py) ve yalnız `dil` NULL'sa (web'de seçim ezilmez). Satır varsa
+`--yeniden`siz atlanır. (g) KİMLİK: `azure_client.read_env_values(yol)` (tek
+dosya, birleşik görünüm yok — aday listesi yalnız verilen yol),
+`depo_kimlik_bilgisi.ADLAR` dışı adlar bildirilir ve düşer, boş değer yazılmaz,
+var olan ad `--yeniden`siz atlanır, yazım `depo_kimlik_bilgisi.yaz`
+(Fernet); `KROMIS_SECRET_KEY` yalnız `--kimlik-dosyasi` verildiğinde ve HER
+ŞEYDEN ÖNCE denetlenir (anahtarsız koşu hiçbir depoya dokunmadan 2). Hiçbir
+çıktıya değer yazılmaz (test stdout+stderr'ı tarıyor). (h) Ölü `uploads` →
+`logos` (`assets_store.LEGACY_TARGET`); `--yeniden` "kaynak kazanır": var olan
+satır ezilir, dosya yeniden kopyalanır, kaynakta olmayan satır SİLİNMEZ (test:
+web'de açılan satır durur). (i) `cover_image_id` yazılmaz, `_json` türetir
+(6. görev). Özet tablosu depo başına 7 sütun: aktarılan / var olan / yeni id /
+ezilen / dosya eksik / düşürülen / bozuk — test aracın bastığı tabloyu okuyor,
+operatörün gördüğü ile ölçülen aynı.
+
+**Bekçiler.** `tools/` `graf_uret`in "Yardımcılar" bölümünde (iki yeni modül,
+kenarları görünüyor); telif başlığı (`git ls-files` kapsamı), `encoding`
+sözleşmesi (bütün `.py`), `test_syntax_warnings` kendiliğinden kapsadı; i18n
+sınıflandırması `tools/`u bilerek dışarıda tutuyor (gerekçesi orada), AST
+manifest/kimlik bekçileri web yolunu tarıyor — araç o dosyaları açan TEK meşru
+yer, conftest'in çalışma zamanı tuzağını (`_parse_env_all` patlar) kimlik testi
+özgün işlevi geri koyarak geçiyor. **Testler.** Yeni `tests/test_ice_aktar.py`
+(16): v1.8 fixture + güncel yazıcılarla üretilmiş katman (arena/video/oturum/
+içe aktarılmış, `chat_store.create`, `prefs.update`, ölü `uploads`) → satırlar
+alan alan kaynağa eşit VE `_json` dökümü kaynak anahtar kümesini kaybetmiyor,
+dosyalar bayt bayt, kök 0o700, liste sırası; başkasının satırıyla çakışan
+klasör/medya/sohbet/arena → türetilmiş id + bütün başvurular (`folder_id`,
+`parent_id`, `image_ids`, `session_id`, arena kardeşleri) + ikinci koşu 0 yeni;
+`turet` belirlenimci/`ID_KALIBI`; ikinci koşu 0 yeni; `--yeniden` ezer ama
+silmez; `--kuru` ne satır ne dizin; bozuk kayıt ×3 + bozuk `palettes.json` →
+gerisi gelir, çıkış 3; sarkan klasör → NULL + düşürülen; dosyası eksik satır;
+kimlik dosyası → Fernet satırlar (`gAAAA…`, düz metin yok), `oku` geri verir,
+bilinmeyen ad düşer, çıktıda değer yok, ikinci koşu atlar; anahtarsız 2 ve
+hiçbir yazım; hesap/kaynak/dosya yok → 1; `DATABASE_URL` yok → 2; betik kipi
+`--help`. Yeni `tests/test_kullanici_cli.py` (9): doğrulanmış + argon2id +
+`hesap.parola_dogru` (boşluk kırpılmaz), `--admin --dil`, citext çift e-posta
+1 ve satıra dokunmaz, geçersiz e-posta/kısa parola/boş stdin 1, TTY yolu iki
+kez sorar ve uyuşmazlığı reddeder, `oturum-dusur` 3 oturumu düşürür ve düşen
+çerez `oturum_dogrula`da tanınmaz, `DATABASE_URL` yok → 2, kaynak taraması
+(web kurallarını çağırıyor, `--parola` yok), betik kipi `--help`.
+Tam takım (E2E + Postgres zorunlu): **3.376 geçti, 12 atlandı, 172 sn** (taban 3.351 / 12; +25 test).
+ruff, mypy (209 dosya), eslint, prettier (`static/`) temiz; graflar güncel
+(84 modül, 54 uç, 115 test dosyası).
+
+**Canlı doğrulama** (geçici küme + `alembic upgrade head` → `0003_arena_win`):
+`kullanici.py olustur --admin --dil tr --parola-stdin` → `olusturuldu … admin:
+evet, dogrulanmis: evet`; ikinci `olustur` aynı adrese → çıkış 1, "zaten
+kayitli". Örnek tek kullanıcılı dizin (v1.8 fixture + arena turu 2 sütun/1
+kazanan + sohbet + `prefs.json` + `credentials.env` 3 ad + yabancı ad):
+`ice_aktar --kuru` → klasörler 3 / medya 7 / sohbetler 1 / paletler 2 /
+varlıklar 4 / tercihler 3 / kimlikler 3 (+1 düşürülen `YABANCI`), veri dizini
+BOŞ; gerçek koşu aynı sayılar, çıkış 0; ikinci koşu hepsi "var olan", 0
+aktarılan. uvicorn + `POST /api/hesap/giris` → `is_admin: true, dil: tr`;
+`/api/history` kök 6 kayıt (liste sırası korunmuş: arena sütunları başta, elle
+yazılan pre-v1.6 kaydı sonda), `?folder_id=` 1, `/api/folders` 3 (Instagram
+count 1), `/api/arena/<tur>` 2 sütun, kazanan işaretli, `/api/chats` 1 (kapak
+türetilmiş), `/api/palettes` 2, `/api/assets/{logos,banners,mottos}` 2/1/1 ve
+dosyaları 200, `/output/<ad>` 6/6 200, `/api/prefs` `theme: ocean, language: tr,
+autosave: false`, `/api/settings` `configured: true` + endpoint (anahtar yok);
+`oturum-dusur` → "1 oturum dusuruldu", aynı çerezle `/api/hesap/ben` **401**.
+Veri dizininde `credentials.env`/manifest yok, yalnız `kullanicilar/<uuid>/
+{output,assets}` dosyaları. Sahibin gerçek verisi bu makinede yok; `--kuru`
+ilk koşuda sayıları verecek.
+
+**9. göreve kalan:** `tools/goc.py` (release command), `guncelleme.py` web'de
+kapalı, `tools/artik_dosya.py` (içe aktarma düşerse `temizle` yalnız bu koşunun
+dosyalarını siler; commit sonrası artık dosya olmaz, ama `depo_medya.kaydet`in
+borcu aynen), `docs/isletme.md` yedek/anahtar ayrımı, `.env.example`e
+`KROMIS_DATA_DIR`ın "web'de `kullanicilar/` kökü" notu, CI/compose'da göç
+adımı; `tools/kullanici.py`nin `--admin` bayrağını okuyan bir admin rotası yok
+(Faz 2+).
 
 ---
 

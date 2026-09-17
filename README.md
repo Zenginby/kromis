@@ -227,6 +227,30 @@ okunmaz. Sonuç: web sürümü `DATABASE_URL` OLMADAN stüdyoyu açmaz (oturum y
 `database_unavailable` 503) — veri tabanı olmadan hesap, hesap olmadan stüdyo
 yok (belge §1'in kararı).
 
+İlk kullanıcı ve içe aktarma (Faz 1 / 8) — ikisi de uygulama kapalıyken,
+`DATABASE_URL` ile çalışan CLI'lar (`tools/`; pakete girmez):
+
+```bash
+DATABASE_URL=… .venv/bin/python tools/kullanici.py olustur --eposta ali@ornek.com --admin   # parola TTY'den, iki kez; e-posta DOĞRULANMIŞ yazılır
+DATABASE_URL=… .venv/bin/python tools/kullanici.py oturum-dusur --eposta ali@ornek.com      # sızan çerez: bütün oturumlar düşer
+DATABASE_URL=… KROMIS_SECRET_KEY=… KROMIS_DATA_DIR=/data .venv/bin/python tools/ice_aktar.py \
+    --kaynak ~/Library/Application\ Support/Kromis --eposta ali@ornek.com \
+    --kimlik-dosyasi ~/.config/kromis/credentials.env --kuru                                # önce KURU: sayılar, yazım yok
+```
+
+`kullanici.py olustur`: parola argüman DEĞİL (kabuk geçmişi), betikte
+`--parola-stdin`; kurallar web ile aynı (`models.check_eposta/check_parola`,
+`services/hesap.py`); var olan e-posta 1 ile çıkar, hiçbir şey yazmaz.
+`ice_aktar.py`: tek kullanıcılı yerleşimi (`output/*.json`, `assets/*/index.json`,
+ölü `uploads/`, `prefs.json`; kimlik dosyası `--kimlik-dosyasi` ile ayrı) bir
+hesaba yükler — dosyalar `kullanicilar/<uuid>/` altına KOPYALANIR, kaynak
+dokunulmaz; 12 haneli id'ler korunur, başkasının satırıyla çakışan id
+türetilir ve başvurular (`parent_id`, `folder_id`, `session_id`, `image_ids`,
+arena kardeşleri) izler; ikinci koşu 0 yeni satır (`--yeniden` var olanı
+kaynaktan ezer); bozuk kayıt raporlanır, araç sürer, çıkış kodu 3. Tek
+transaksiyon: yarım hesap kalmaz. Ayrıntı `tools/ice_aktar.py` başlığı ve
+[KURULUM.md → Web sürümü](KURULUM.md#web-sürümü-sunucu-kurulumu).
+
 ### 3. Test
 
 ```bash

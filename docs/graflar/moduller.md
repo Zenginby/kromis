@@ -2,7 +2,7 @@
 
 # Modül grafı
 
-82 Python modülü, 314 modül düzeyi + 14 erteli ithal kenarı.
+84 Python modülü, 330 modül düzeyi + 14 erteli ithal kenarı.
 
 Katman, o modülün depo içindeki en uzun bağımlılık zincirinin uzunluğu:
 **katman 0 hiçbir depo modülüne dayanmaz**, en üst katman uygulamanın
@@ -455,8 +455,8 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | --- | --- | --- | --- | --- | --- |
 | `android_main.py` | 204 | 14 | `app` (erteli), `desktop` (erteli), `errlog` (erteli), `paths` (erteli) | 0 | 2 |
 | `app.py` | 262 | 11 | `catalog`, `chat_client`, `chat_prompt`, `composite`, `credstore`, `errlog`, `models`, `paths`, `providers`, `routers.ayarlar`, `routers.bindirme`, `routers.galeri`, `routers.hesap`, `routers.kok`, `routers.paletler`, `routers.saglik`, `routers.sohbet`, `routers.uretim`, `services.ayar`, `services.db`, `services.dil`, `services.gorsel`, `services.kimlik`, `services.koken`, `services.modeller`, `services.palet`, `services.posta`, `services.redaksiyon`, `services.sifre` | 3 | 46 |
-| `assets_store.py` | 205 | 3 | `i18n`, `jsonstore` | 5 | 6 |
-| `azure_client.py` | 518 | 3 | `i18n`, `kimlik_baglami`, `paths`, `winsec` | 12 | 31 |
+| `assets_store.py` | 205 | 3 | `i18n`, `jsonstore` | 6 | 7 |
+| `azure_client.py` | 518 | 3 | `i18n`, `kimlik_baglami`, `paths`, `winsec` | 13 | 32 |
 | `azure_flux_client.py` | 289 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
 | `azure_mai_client.py` | 286 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
 | `backup.py` | 190 | 4 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 0 | 1 |
@@ -464,7 +464,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `chat_client.py` | 218 | 5 | `azure_client`, `chat_prompt`, `i18n`, `kimlik_baglami`, `models` | 4 | 4 |
 | `chat_prompt.py` | 396 | 2 | `paths` | 4 | 1 |
 | `chat_providers.py` | 133 | 7 | `catalog`, `chat_client`, `credstore`, `etiket`, `i18n`, `openai_chat` | 1 | 2 |
-| `chat_store.py` | 258 | 1 | `jsonstore` | 3 | 4 |
+| `chat_store.py` | 258 | 1 | `jsonstore` | 3 | 5 |
 | `color_names.py` | 421 | 4 | `palette` | 2 | 3 |
 | `composite.py` | 165 | 3 | `i18n` | 2 | 1 |
 | `credstore.py` | 228 | 4 | `azure_client`, `catalog`, `etiket`, `i18n`, `kimlik_baglami` | 11 | 6 |
@@ -478,14 +478,14 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `i18n.py` | 305 | 2 | `paths` | 35 | 9 |
 | `jsonstore.py` | 83 | 0 | — | 8 | 1 |
 | `kimlik_baglami.py` | 56 | 0 | — | 4 | 2 |
-| `models.py` | 1127 | 4 | `catalog`, `etiket`, `i18n`, `palette` | 12 | 17 |
+| `models.py` | 1127 | 4 | `catalog`, `etiket`, `i18n`, `palette` | 13 | 18 |
 | `netguard.py` | 169 | 12 | `app` (erteli) | 1 | 1 |
 | `openai_chat.py` | 180 | 6 | `azure_client`, `catalog`, `chat_client`, `chat_prompt`, `credstore`, `etiket`, `i18n`, `providers` | 1 | 3 |
 | `openai_client.py` | 217 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
 | `palette.py` | 333 | 3 | `i18n` | 5 | 3 |
 | `palette_store.py` | 96 | 1 | `jsonstore` | 3 | 5 |
 | `paths.py` | 326 | 1 | `errlog` | 9 | 5 |
-| `prefs.py` | 268 | 5 | `catalog`, `i18n`, `jsonstore`, `models` | 2 | 9 |
+| `prefs.py` | 268 | 5 | `catalog`, `i18n`, `jsonstore`, `models` | 3 | 10 |
 | `providers.py` | 508 | 5 | `azure_client`, `catalog`, `credstore`, `etiket`, `i18n`, `azure_flux_client` (erteli), `azure_mai_client` (erteli), `fal_client` (erteli), `gemini_client` (erteli), `openai_client` (erteli), `veo_client` (erteli) | 9 | 7 |
 | `release_manifest.py` | 92 | 0 | — | 0 | 3 |
 | `routers/ayarlar.py` | 347 | 9 | `azure_client`, `catalog`, `guncelleme`, `i18n`, `models`, `paths`, `services.ayar`, `services.db`, `services.depo_kimlik_bilgisi`, `services.depo_tercih`, `services.dil`, `services.kimlik`, `services.modeller`, `services.tablolar`, `services.zaman`, `version` | 1 | 0 |
@@ -498,19 +498,19 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `routers/sohbet.py` | 240 | 8 | `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `i18n`, `models`, `services.db`, `services.depo_sohbet`, `services.depo_tercih`, `services.dil`, `services.kimlik`, `services.modeller`, `services.tablolar`, `services.zaman` | 1 | 0 |
 | `routers/uretim.py` | 473 | 9 | `azure_client`, `catalog`, `etiket`, `i18n`, `models`, `palette`, `providers`, `services.ayar`, `services.db`, `services.depo_medya`, `services.dil`, `services.gorsel`, `services.kapilar`, `services.kimlik`, `services.palet`, `services.tablolar`, `services.zaman` | 1 | 0 |
 | `screencolor.py` | 149 | 0 | — | 1 | 1 |
-| `services/ayar.py` | 165 | 8 | `paths`, `services.kimlik`, `services.tablolar` | 9 | 4 |
+| `services/ayar.py` | 165 | 8 | `paths`, `services.kimlik`, `services.tablolar` | 10 | 4 |
 | `services/cerez.py` | 82 | 1 | `services.db` | 4 | 4 |
-| `services/db.py` | 174 | 0 | — | 11 | 3 |
-| `services/depo_kimlik_bilgisi.py` | 143 | 6 | `catalog`, `services.sifre`, `services.tablolar`, `services.zaman` | 2 | 3 |
+| `services/db.py` | 174 | 0 | — | 13 | 5 |
+| `services/depo_kimlik_bilgisi.py` | 143 | 6 | `catalog`, `services.sifre`, `services.tablolar`, `services.zaman` | 3 | 4 |
 | `services/depo_klasor.py` | 208 | 7 | `folders`, `services.depo_medya`, `services.tablolar`, `services.zaman` | 2 | 5 |
-| `services/depo_medya.py` | 336 | 6 | `catalog`, `services.tablolar`, `services.zaman`, `storage` | 4 | 5 |
+| `services/depo_medya.py` | 336 | 6 | `catalog`, `services.tablolar`, `services.zaman`, `storage` | 4 | 6 |
 | `services/depo_palet.py` | 82 | 6 | `palette_store`, `services.tablolar`, `services.zaman` | 2 | 2 |
 | `services/depo_sohbet.py` | 143 | 6 | `chat_store`, `services.tablolar`, `services.zaman` | 1 | 2 |
-| `services/depo_tercih.py` | 112 | 6 | `catalog`, `prefs`, `services.tablolar`, `services.zaman` | 3 | 3 |
+| `services/depo_tercih.py` | 112 | 6 | `catalog`, `prefs`, `services.tablolar`, `services.zaman` | 4 | 4 |
 | `services/depo_varlik.py` | 135 | 6 | `assets_store`, `services.tablolar`, `services.zaman` | 1 | 7 |
 | `services/dil.py` | 194 | 3 | `i18n`, `services.cerez` | 13 | 3 |
 | `services/gorsel.py` | 117 | 4 | `i18n`, `services.dil` | 4 | 3 |
-| `services/hesap.py` | 292 | 6 | `services.cerez`, `services.tablolar` | 2 | 9 |
+| `services/hesap.py` | 292 | 6 | `services.cerez`, `services.tablolar` | 4 | 11 |
 | `services/kapilar.py` | 79 | 8 | `assets_store`, `chat_store`, `i18n`, `services.depo_klasor`, `services.dil`, `storage` | 3 | 0 |
 | `services/kimlik.py` | 171 | 7 | `i18n`, `kimlik_baglami`, `services.cerez`, `services.db`, `services.depo_kimlik_bilgisi`, `services.dil`, `services.hesap`, `services.tablolar` | 10 | 1 |
 | `services/koken.py` | 133 | 0 | — | 2 | 4 |
@@ -519,10 +519,10 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `services/posta.py` | 187 | 3 | `errlog`, `i18n` | 2 | 4 |
 | `services/redaksiyon.py` | 68 | 1 | `catalog` | 1 | 0 |
 | `services/sablon.py` | 68 | 9 | `errlog`, `i18n`, `services.ayar`, `services.dil`, `version` | 2 | 0 |
-| `services/sifre.py` | 151 | 0 | — | 2 | 3 |
-| `services/tablolar.py` | 477 | 5 | `assets_store`, `models` | 18 | 13 |
-| `services/zaman.py` | 45 | 0 | — | 13 | 6 |
-| `storage.py` | 423 | 1 | `catalog`, `jsonstore` | 6 | 8 |
+| `services/sifre.py` | 151 | 0 | — | 3 | 4 |
+| `services/tablolar.py` | 477 | 5 | `assets_store`, `models` | 20 | 15 |
+| `services/zaman.py` | 45 | 0 | — | 14 | 7 |
+| `storage.py` | 423 | 1 | `catalog`, `jsonstore` | 7 | 9 |
 | `veo_client.py` | 629 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
 | `version.py` | 30 | 0 | — | 7 | 11 |
 | `winclr.py` | 339 | 0 | — | 1 | 1 |
@@ -544,6 +544,24 @@ Pakete girmiyor, çalışma zamanına dokunmuyor (bkz. tools/__init__.py).
 flowchart LR
   n_tools_gecici_postgres["tools.gecici_postgres"]
   n_tools_graf_uret["tools.graf_uret"]
+  n_tools_ice_aktar["tools.ice_aktar"]
+  n_tools_ice_aktar --> n_assets_store["assets_store"]
+  n_tools_ice_aktar --> n_azure_client["azure_client"]
+  n_tools_ice_aktar --> n_prefs["prefs"]
+  n_tools_ice_aktar --> n_services_ayar["services.ayar"]
+  n_tools_ice_aktar --> n_services_db["services.db"]
+  n_tools_ice_aktar --> n_services_depo_kimlik_bilgisi["services.depo_kimlik_bilgisi"]
+  n_tools_ice_aktar --> n_services_depo_tercih["services.depo_tercih"]
+  n_tools_ice_aktar --> n_services_hesap["services.hesap"]
+  n_tools_ice_aktar --> n_services_sifre["services.sifre"]
+  n_tools_ice_aktar --> n_services_tablolar["services.tablolar"]
+  n_tools_ice_aktar --> n_services_zaman["services.zaman"]
+  n_tools_ice_aktar --> n_storage["storage"]
+  n_tools_kullanici["tools.kullanici"]
+  n_tools_kullanici --> n_models["models"]
+  n_tools_kullanici --> n_services_db["services.db"]
+  n_tools_kullanici --> n_services_hesap["services.hesap"]
+  n_tools_kullanici --> n_services_tablolar["services.tablolar"]
   n_tools_make_legacy_fixtures["tools.make_legacy_fixtures"]
   n_tools_make_legacy_fixtures --> n_assets_store["assets_store"]
   n_tools_make_legacy_fixtures --> n_folders["folders"]

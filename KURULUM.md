@@ -12,6 +12,9 @@ Prompt Yönetmeni) iki sistemde aynıdır.
 | Windows 10/11 (64-bit) | `kromis-windows-x64.zip` |
 | Android 8.0+ (arm64) | `kromis-android-arm64.apk` |
 
+**Sunucuya (web) kuruyorsan** bu adımların hiçbiri sana değil:
+[Web sürümü](#web-sürümü-sunucu-kurulumu) bölümüne git.
+
 **Telefona kuruyorsan** aşağıdaki 1. ve 2. adımları atla, doğrudan
 [Android (sideload)](#android-sideload) bölümüne git — 3., 4. ve 5. adımlar
 (Azure kimliği, Prompt Yönetmeni, kullanım) üç sistemde de aynıdır.
@@ -317,6 +320,60 @@ Telefona özgü iki fark:
 - **İndirdiğim görseli galeride bulamıyorum:** Galeri uygulaması yeni klasörü
   görmek için biraz gecikebilir; Dosyalar uygulamasından
   `Resimler/Kromis` klasörüne bak.
+
+---
+
+## Web sürümü (sunucu kurulumu)
+
+Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
+çok kullanıcılı web olarak açan kişi için. Geliştirici ayrıntıları
+[README → Geliştirici rehberi](README.md#-geliştirici-rehberi).
+
+1. **PostgreSQL** ve üç ortam değişkeni (`.env.example` her birini açıklıyor):
+   `DATABASE_URL` (`postgresql+psycopg://kullanici:parola@konak:5432/kromis`),
+   `KROMIS_SECRET_KEY` (sağlayıcı anahtarlarını şifreleyen kök; `.env.example`
+   1c bölümündeki komutla üret, **DB yedeğinden AYRI** sakla — kaybolursa
+   kayıtlı anahtarlar okunamaz) ve `KROMIS_DATA_DIR` (medya dosyalarının
+   kökü; konteynerde `/data`).
+2. **Şema:** `DATABASE_URL=… alembic upgrade head` (konteyner açılışında
+   DEĞİL, dağıtım öncesi tek seferlik adım — iki replika aynı anda göç
+   koşturmasın).
+3. **İlk kullanıcı** — kayıt → e-posta doğrulama akışı posta servisi ister;
+   ilk hesap onsuz açılır ve DOĞRULANMIŞ yazılır:
+
+   ```sh
+   DATABASE_URL=… python tools/kullanici.py olustur --eposta sen@ornek.com --admin
+   ```
+
+   Parola ekranda iki kez sorulur, argümanla verilmez (kabuk geçmişine
+   düşerdi). `--dil tr` hesabın dilini yazar; `--admin` yalnız bir bayrak
+   (bugün admin arayüzü yok). Çerezinin sızdığından şüphelenirsen
+   `python tools/kullanici.py oturum-dusur --eposta sen@ornek.com` o hesabın
+   bütün oturumlarını düşürür.
+4. **Eski verini taşı** (masaüstü/Android'de ürettiğin geçmiş, klasörler,
+   oturumlar, paletler, logo/afiş kütüphanesi, tercihler ve sağlayıcı
+   anahtarların). Kaynak, eski uygulamanın veri klasörü (5. adımdaki tablo:
+   `~/Library/Application Support/Kromis` ya da `%LOCALAPPDATA%\Kromis`);
+   kimlik dosyası ayrı verilir (3. adımdaki yol). **Önce `--kuru`:** hiçbir
+   şey yazmaz, depo başına sayıları basar.
+
+   ```sh
+   DATABASE_URL=… KROMIS_SECRET_KEY=… KROMIS_DATA_DIR=/data \
+     python tools/ice_aktar.py --kaynak "~/Library/Application Support/Kromis" \
+       --eposta sen@ornek.com --kimlik-dosyasi ~/.config/kromis/credentials.env --kuru
+   ```
+
+   Sayılar beklediğin gibiyse `--kuru`yu kaldırıp aynı komutu koştur.
+   Dosyalar `KROMIS_DATA_DIR/kullanicilar/<hesap>/` altına **kopyalanır**,
+   kaynak klasöre dokunulmaz — taşıma bittikten sonra eskisini kendin
+   arşivlersin. Aynı komutu ikinci kez koşturmak güvenli: var olan kayıtlar
+   atlanır (0 yeni satır); `--yeniden` var olanı kaynaktakiyle ezer. Bozuk bir
+   kayıt varsa araç onu bildirir, gerisini yükler ve 3 ile çıkar; 0 "her şey
+   geldi" demek. Kaynak klasör web'in `KROMIS_DATA_DIR`i ile aynıysa
+   (`output/` kökte) araç yine çalışır — kullanıcı dizini ayrı bir alt klasör.
+5. Uygulamayı aç (`uvicorn app:app` ya da `docker compose up`), `/giris`ten
+   3. adımdaki hesapla gir; Medya, klasörler, oturumlar, paletler, kütüphane ve
+   Ayarlar'daki anahtarlar eski uygulamadakiyle aynı görünmeli.
 
 ---
 

@@ -133,6 +133,7 @@
         "services.depo_varlik",
         "services.kapilar",
         "services.tablolar",
+        "tools.ice_aktar",
         "tools.make_legacy_fixtures"
       ],
       "katman": 3,
@@ -141,6 +142,7 @@
         "tests/test_assets.py",
         "tests/test_backup.py",
         "tests/test_galeri_db.py",
+        "tests/test_ice_aktar.py",
         "tests/test_legacy_formats.py",
         "tests/test_tablolar.py",
         "tests/test_varlik_db.py"
@@ -168,6 +170,7 @@
         "providers",
         "routers.ayarlar",
         "routers.uretim",
+        "tools.ice_aktar",
         "veo_client"
       ],
       "katman": 3,
@@ -192,6 +195,7 @@
         "tests/test_galeri_db.py",
         "tests/test_gemini_client.py",
         "tests/test_i18n.py",
+        "tests/test_ice_aktar.py",
         "tests/test_import_route.py",
         "tests/test_legacy_formats.py",
         "tests/test_logo.py",
@@ -416,6 +420,7 @@
       "testler": [
         "tests/test_chat_store.py",
         "tests/test_galeri_db.py",
+        "tests/test_ice_aktar.py",
         "tests/test_sohbet_db.py",
         "tests/test_tablolar.py"
       ],
@@ -768,7 +773,8 @@
         "routers.sohbet",
         "routers.uretim",
         "services.palet",
-        "services.tablolar"
+        "services.tablolar",
+        "tools.kullanici"
       ],
       "katman": 4,
       "satir": 1127,
@@ -782,6 +788,7 @@
         "tests/test_guvenlik_baslik.py",
         "tests/test_hesap.py",
         "tests/test_i18n.py",
+        "tests/test_ice_aktar.py",
         "tests/test_index.py",
         "tests/test_model_secimi.py",
         "tests/test_prefs.py",
@@ -937,7 +944,8 @@
       ],
       "ithal_eden": [
         "desktop",
-        "services.depo_tercih"
+        "services.depo_tercih",
+        "tools.ice_aktar"
       ],
       "katman": 5,
       "satir": 268,
@@ -945,6 +953,7 @@
         "tests/test_dil.py",
         "tests/test_galeri_db.py",
         "tests/test_i18n.py",
+        "tests/test_ice_aktar.py",
         "tests/test_index.py",
         "tests/test_kimlik.py",
         "tests/test_prefs.py",
@@ -1265,7 +1274,8 @@
         "routers.kok",
         "routers.saglik",
         "routers.uretim",
-        "services.sablon"
+        "services.sablon",
+        "tools.ice_aktar"
       ],
       "katman": 8,
       "satir": 165,
@@ -1314,14 +1324,18 @@
         "routers.sohbet",
         "routers.uretim",
         "services.cerez",
-        "services.kimlik"
+        "services.kimlik",
+        "tools.ice_aktar",
+        "tools.kullanici"
       ],
       "katman": 0,
       "satir": 174,
       "testler": [
         "tests/test_db.py",
         "tests/test_dil.py",
-        "tests/test_docker_kapisi.py"
+        "tests/test_docker_kapisi.py",
+        "tests/test_ice_aktar.py",
+        "tests/test_kullanici_cli.py"
       ],
       "yol": "services/db.py"
     },
@@ -1336,11 +1350,13 @@
       ],
       "ithal_eden": [
         "routers.ayarlar",
-        "services.kimlik"
+        "services.kimlik",
+        "tools.ice_aktar"
       ],
       "katman": 6,
       "satir": 143,
       "testler": [
+        "tests/test_ice_aktar.py",
         "tests/test_kimlik_bilgisi_db.py",
         "tests/test_settings_route.py",
         "tests/test_sifre.py"
@@ -1391,6 +1407,7 @@
       "testler": [
         "tests/test_chats_route.py",
         "tests/test_galeri_db.py",
+        "tests/test_ice_aktar.py",
         "tests/test_kimlik.py",
         "tests/test_legacy_formats.py",
         "tests/test_playwright_studio.py"
@@ -1448,12 +1465,14 @@
       "ithal_eden": [
         "routers.ayarlar",
         "routers.sohbet",
-        "services.modeller"
+        "services.modeller",
+        "tools.ice_aktar"
       ],
       "katman": 6,
       "satir": 112,
       "testler": [
         "tests/test_dil.py",
+        "tests/test_ice_aktar.py",
         "tests/test_prefs_route.py",
         "tests/test_tercih_db.py"
       ],
@@ -1545,15 +1564,19 @@
       ],
       "ithal_eden": [
         "routers.hesap",
-        "services.kimlik"
+        "services.kimlik",
+        "tools.ice_aktar",
+        "tools.kullanici"
       ],
       "katman": 6,
       "satir": 292,
       "testler": [
         "tests/test_galeri_db.py",
         "tests/test_hesap.py",
+        "tests/test_ice_aktar.py",
         "tests/test_kimlik.py",
         "tests/test_kimlik_bilgisi_db.py",
+        "tests/test_kullanici_cli.py",
         "tests/test_palet_db.py",
         "tests/test_playwright_hesap.py",
         "tests/test_sohbet_db.py",
@@ -1737,12 +1760,14 @@
       "ithal": [],
       "ithal_eden": [
         "app",
-        "services.depo_kimlik_bilgisi"
+        "services.depo_kimlik_bilgisi",
+        "tools.ice_aktar"
       ],
       "katman": 0,
       "satir": 151,
       "testler": [
         "tests/test_docker_kapisi.py",
+        "tests/test_ice_aktar.py",
         "tests/test_kimlik_bilgisi_db.py",
         "tests/test_sifre.py"
       ],
@@ -1773,7 +1798,9 @@
         "services.depo_tercih",
         "services.depo_varlik",
         "services.hesap",
-        "services.kimlik"
+        "services.kimlik",
+        "tools.ice_aktar",
+        "tools.kullanici"
       ],
       "katman": 5,
       "satir": 477,
@@ -1781,8 +1808,10 @@
         "tests/test_folders.py",
         "tests/test_galeri_db.py",
         "tests/test_hesap.py",
+        "tests/test_ice_aktar.py",
         "tests/test_kimlik.py",
         "tests/test_kimlik_bilgisi_db.py",
+        "tests/test_kullanici_cli.py",
         "tests/test_legacy_formats.py",
         "tests/test_palet_db.py",
         "tests/test_palette_route.py",
@@ -1811,12 +1840,14 @@
         "services.depo_palet",
         "services.depo_sohbet",
         "services.depo_tercih",
-        "services.depo_varlik"
+        "services.depo_varlik",
+        "tools.ice_aktar"
       ],
       "katman": 0,
       "satir": 45,
       "testler": [
         "tests/test_galeri_db.py",
+        "tests/test_ice_aktar.py",
         "tests/test_kimlik_bilgisi_db.py",
         "tests/test_legacy_formats.py",
         "tests/test_palet_db.py",
@@ -1838,6 +1869,7 @@
         "routers.galeri",
         "services.depo_medya",
         "services.kapilar",
+        "tools.ice_aktar",
         "tools.make_legacy_fixtures"
       ],
       "katman": 1,
@@ -1846,6 +1878,7 @@
         "tests/test_arena.py",
         "tests/test_folders.py",
         "tests/test_galeri_db.py",
+        "tests/test_ice_aktar.py",
         "tests/test_legacy_formats.py",
         "tests/test_storage.py",
         "tests/test_storage_delete.py",
@@ -1881,6 +1914,48 @@
         "tests/test_onyuz_lint_kapisi.py"
       ],
       "yol": "tools/graf_uret.py"
+    },
+    {
+      "ad": "tools.ice_aktar",
+      "erteli_ithal": [],
+      "ithal": [
+        "assets_store",
+        "azure_client",
+        "prefs",
+        "services.ayar",
+        "services.db",
+        "services.depo_kimlik_bilgisi",
+        "services.depo_tercih",
+        "services.hesap",
+        "services.sifre",
+        "services.tablolar",
+        "services.zaman",
+        "storage"
+      ],
+      "ithal_eden": [],
+      "katman": 9,
+      "satir": 751,
+      "testler": [
+        "tests/test_ice_aktar.py"
+      ],
+      "yol": "tools/ice_aktar.py"
+    },
+    {
+      "ad": "tools.kullanici",
+      "erteli_ithal": [],
+      "ithal": [
+        "models",
+        "services.db",
+        "services.hesap",
+        "services.tablolar"
+      ],
+      "ithal_eden": [],
+      "katman": 7,
+      "satir": 172,
+      "testler": [
+        "tests/test_kullanici_cli.py"
+      ],
+      "yol": "tools/kullanici.py"
     },
     {
       "ad": "tools.make_legacy_fixtures",
@@ -2514,7 +2589,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 113,
+  "test_dosyasi_sayisi": 115,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",

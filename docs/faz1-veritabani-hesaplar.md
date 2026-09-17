@@ -1046,7 +1046,7 @@ aynı sınıf).
 
 ---
 
-## 7. BYOK anahtarları kullanıcı başına, şifreli: `credentials.env` → `saglayici_kimlikleri` (PR: `faz1/kimlik-bilgileri`)
+## 7. BYOK anahtarları kullanıcı başına, şifreli: `credentials.env` → `saglayici_kimlikleri` ✅ (PR: `faz1/kimlik-bilgileri`)
 
 **Kapsam.** Bugün: `POST /api/settings` (`routers/ayarlar.py:117`, imza
 `models.SettingsRequest` `models.py:316`, 15 alan) `ac.save_env`
@@ -1098,6 +1098,164 @@ istek kendi anahtarıyla çıkıyor (sahte istemci hangi anahtarı gördüğün�
 kaydeder); DB dökümünde (`pg_dump`) hiçbir anahtar düz metin değil; web
 yolunda `credentials.env` hiç açılmıyor (bekçi: `credentials_path` çağrısı
 `routers/`/`services/`te yok); takım yeşil.
+
+**Yapıldığında (2026-09-17) ölçümler ve sapmalar.** Üç yeni modül:
+**`services/sifre.py`** (Fernet; `KROMIS_SECRET_KEY` 32 bayt urlsafe base64,
+virgülle liste EN YENİSİ BAŞTA, HKDF `info=b"kromis:kimlik"` ile alt anahtar,
+`MultiFernet` ile okuma/`rotate`; `Sifreci`, `sifreci()` değere göre `lru_cache`,
+`dogrula_ortam()`, `AnahtarHatasi`/`SifreHatasi` — operatöre Türkçe, komutlar
+ASCII), **`services/depo_kimlik_bilgisi.py`** (DÜZ AD, 5-6. görevlerin kararı:
+`oku/yaz/sil/dondur`, `(db, kullanici_id, …)`, her sorguda sahip süzgeci —
+`test_galeri_db`nin AST bekçisi yedi depoya çıktı; `ADLAR` = katalog
+`key_env`/`url_env`/`wire_from_env` (`.env.example`in bekçisiyle aynı küme) +
+`ESKI_BYOK` (`REPLICATE_API_TOKEN`, `COMFYUI_URL`, `OLLAMA_URL` — `GET
+/api/settings`in `has_replicate_token`/`comfyui_url`/`ollama_url` alanları o
+adları okuyor, gövde değişmesin diye envantere girdiler; bilinmeyen ad
+`ValueError`), **`kimlik_baglami.py`** (kökte YAPRAK, aşağıda). `credstore`
+işlevleri `env_path` yerine `kimlikler: Mapping[str, str] | None` alıyor
+(`resolve/is_configured/chat_is_configured/chat_configured_map/configured_map`
++ yeni `settings_status`, `degerler`); dosya OKUMUYOR — azure_image için
+`ac.credentials_of`, azure_chat için `ac.chat_credentials_of`: `azure_client`a
+üç SAF ikiz girdi (`credentials_of`, `chat_credentials_of`, `settings_status_of`),
+dosya okuyan `load_credentials`/`resolve_chat_credentials`/`get_settings_status`
+gövdelerini onlara devretti (davranış bayt bayt, `test_settings.py` 29 aynen).
+`chat_client.credentials_of` aynı biçimde. **Şema: göç GELMEDİ** — 2. görevin
+tablosu (`kullanici_id, ad, sifreli_deger bytea, anahtar_surumu, olusturuldu,
+guncellendi`) belgenin beş sütununu artı `olusturuldu`yu zaten taşıyordu; `head`
+`0003_arena_win`. **Rotalar (54 DEĞİŞMEDİ):** `GET/POST /api/settings`,
+`POST /api/chat`, dört üretim rotası `kimlik.KIMLIKLER` bağımlılığını taşıyor
+(`services/kimlik.py::kimlik_bilgileri`: kullanıcının satırları istek başına
+BİR kez `run_in_threadpool` ile çözülür → `request.state.kimlikler` +
+`kimlik_baglami`; `yield` + `scope="function"`, rota dönünce bağlam çözülür);
+`GET /api/settings` **3 sorgu** (kimlik + `saglayici_kimlikleri` + `tercihler`;
+`test_kimlik.py`). `POST /api/settings` doğrulaması aynı (`check_base_url`
+saf, satır sonu kapısı rotada `_satir_sonu_yok` — `err.credentials_newline`/
+`err.setting_newline` aynı cümleler, `ac.ImageError` → 422 aynen), yazım
+`depo_kimlik_bilgisi.yaz` ile TEK SEFERDE ve bütün doğrulamalardan SONRA:
+dosya günlerinde Azure önce yazılıp sonraki alanın 422'si onu geride
+bırakabiliyordu, şimdi 422 dönen istek hiçbir alanı yazmaz (yeni test). Cevap
+DB'den yeniden okunan sözlükle kurulur; GET/POST gövdeleri aynı anahtarlar,
+anahtar HİÇ dönmez (maskeli de değil — `test_settings_route` 59 test, 2 yeni).
+
+**Belgeden SAPMA — adaptörlere `resolve(cred_id, kimlikler)` DEĞİL, istek
+bağlamı.** Belge sözlüğün adaptörlere parametreyle inmesini yazıyordu. Ölçülen
+engel `providers._azure_generate`in 104 testlik dersi: sevk memuru kimliği
+çağrıdan ÖNCE çözerse `ac.generate`/`cc.complete`i yamalayan rota testleri
+(test_app, test_edit_route, test_logo, test_chat_route … ~15 dosya) ve
+`test_providers.py::test_azure_yolu_kimligi_ONCEDEN_cozmuyor` mandalı düşer;
+sekiz adaptörün imzasına parametre eklemek de aynı testleri ve adaptör
+testlerini dolaşırdı. Çözüm `services/dil.py`nin deyimi: **`kimlik_baglami`**
+(ContextVar; `bagla/coz/aktif`) — bağımlılık isteğin görevinde bağlar, senkron
+rota threadpool'a bağlamın KOPYASIYLA gider; `credstore.degerler(None)` ve
+`azure_client.generate/edit` ile `chat_client.complete`in `credentials=None`
+düşmesi (`_varsayilan_kimlik`) bağlama bakar, bağlam yoksa dondurulmuş kabuğun
+dosyasına. Yaprak ve kökte: `credstore → azure_client` kenarı zaten var,
+bağlam ikisinden birinde dursa döngü olurdu. Rota düzeyinde sözlük yine AÇIK
+(`settings_payload(kimlikler)`, `director_context(db, kullanici_id, kimlikler)`)
+ve hangi rotanın anahtar okuduğu imzasında (`KIMLIK_OKUYAN`, iki yönlü bekçi).
+Kaçak dosya okuması İKİ bekçiyle kapalı: AST (`test_galeri_db`:
+`KIMLIK_DOSYASI_ISLEVLERI` — `credentials_path`, `save_env`, `read_env_values`,
+`load_credentials`, `resolve_chat_credentials`, `get_settings_status` … `app.py`,
+`routers/`, `services/`, `credstore`, `chat_providers`, `providers`te çağrılamaz)
+ve ÇALIŞMA ZAMANI (conftest `_web_yolunda_kimlik_dosyasi_acilmaz`: `depo_db`/
+`veritabani` isteyen her testte `azure_client._parse_env_all` patlar).
+
+**Kararlar, belgenin açık bıraktığı yerlerde:** (a) `anahtar_surumu` SIRA
+NUMARASI DEĞİL PARMAK İZİ — kök anahtarın SHA-256'sının ilk 4 baytı (31 bit,
+`integer`a sığar): sıra numarası liste değişince (yeni başa, eski sondan
+düşer) kayar ve satırdaki sayı anlamını yitirirdi; operatör `SELECT
+anahtar_surumu, count(*)` ile hangi anahtarın kullanımda olduğunu görür,
+`sifre.parmak_izi()` elindekini hesaplar. Yazım hep ilk anahtarla; `dondur`
+güncel olmayanları `MultiFernet.rotate` ile (düz metni açmadan) yeniden
+şifreler, `guncellendi`ye dokunmaz (Core `UPDATE`te mevcut değer SET'e
+yazılıyor — sütunun `onupdate=now()`u aksi hâlde kazanırdı). (b) BOŞ = SİL:
+`save_env`de `AD=` kalır ve okuma boşu yapılandırılmamış sayardı; DB'de satır
+gider, `oku` sözlüğünde anahtar yok, `credstore` `.get(ad, "")` ile okuyor —
+anlam aynı, `pg_dump`ta ölü satır yok. (c) KAPI DB'Lİ SÜREÇTE: `KROMIS_SECRET_KEY`
+`DATABASE_URL` verilmişse zorunlu (`app._lifespan`, guard'sız — `AnahtarHatasi`
+`hata.log`a yazılır ve yükselir, uvicorn "Application startup failed" der);
+DB'siz süreçte (dondurulmuş kabuk, `/health` sondası) kapı yok — okunacak satır
+da yok. `KROMIS_GUVENLI_CEREZ`in "DATABASE_URL = web" kuralıyla aynı ölçüt.
+(d) `.env.example`: 2. bölüm KALDIRILMADI — bekçi ad kümesini katalogla
+eşitliyor ve adlar artık `saglayici_kimlikleri.ad`ın envanteri; başlık "AD
+ENVANTERİ — değer yazılmaz" oldu. Faz 0 / 8'in "ortamdan okuma (12-factor)"
+takibi burada KAPANDI diye yazılı: web'de anahtar ne dosyadan ne ortamdan —
+ortamdaki tek anahtar herkese ortak olurdu, BYOK kullanıcı başına; platform
+sahipli anahtar Faz 2. Yeni `1c` bölümü `KROMIS_SECRET_KEY` (zorunlu, üretim
+komutu `sifre.URETIM_KOMUTU` ile birebir — bekçi, "DB yedeğinden AYRI").
+(e) CI: takımın anahtarı TEK kaynaktan, `tests/conftest.py`
+(`_sifre_anahtari_ve_kimlik_baglami`, autouse `setenv`) — `_test.yml`e ikinci
+bir değer yazılmadı (iki kaynak ayrışır, yerel koşu CI'a bağımlı olmaz);
+sahte anahtar kaynakta BASE64 OLARAK YOK, `b"DUMMY-kromis-test-anahtari-00000"`
+(32 bayt) çalışma anında kodlanıyor — `.gitleaks.toml`a satır GEREKMEDİ (blob
+kaynakta yok, düz dize `DUMMY` kuralıyla muaf; "liste BÜYÜMEMELİ"). `ci.yml`
+`docker` işi anahtarı her koşuda ÜRETİR (`secrets.token_bytes(32)`),
+workflow'a yazmaz (bekçi: `-e KROMIS_SECRET_KEY` var, `env:`de değer yok);
+`compose.yaml` `${KROMIS_SECRET_KEY:?…}` — `.env`/kabuktan, yoksa ilk komutta
+durur, dosyada anahtar yok. (f) `Dockerfile` `HOME=/data` KALDI, yorum yeniden
+yazıldı (kimlik dosyası web'de yok; `~`ye yazan öbür şeyler ve dondurulmuş
+kabuğun yolu için). (g) `errlog.redact_secrets` iki desen daha: SQLAlchemy
+`[parameters: {...}]` bloğu BÜTÜNÜYLE (değer tanınmaya çalışılmaz; SQL ve
+psycopg cümlesi duruyor) ve sözlük biçimi `'AD_KEY': 'değer'` (4. desen `=`e
+çakılıydı) — `test_errlog.py` `IntegrityError` senaryosu + 3 sözlük biçimi +
+masum sözlük. (h) `requirements.txt` `cryptography==50.0.*` (`cp311-abi3`
+tekerleği 3.13 ve 3.14'e uyar, `pip download --python-version 3.14` ile
+doğrulandı).
+
+**Testler.** Yeni **`tests/test_sifre.py`** (15): gidiş-dönüş (jetonda düz
+metin yok, Türkçe/boş dize, IV farkı), yanlış kök → `SifreHatasi` Türkçe ve
+değersiz, HKDF (kök doğrudan Fernet'e verilmiyor), döndürme ("yeni,eski": eski
+okunur, yazım yeni, `rotate` sonrası eski düşer), parmak izi sabitliği, ortam
+ayrıştırma (virgül, boşluk, dolgusuz base64, önbellek değere göre), 6 bozuk
+biçim → `AnahtarHatasi` + üretim komutu, **DB'li uygulama anahtarsız
+AÇILMAZ / DB'siz açılır**, ham satır yalnız Fernet jetonu (`sk-`/`DUMMY` yok,
+sürüm parmak izi). Yeni **`tests/test_kimlik_bilgisi_db.py`** (7): boş
+kullanıcı, gidiş-dönüş + `configured_map` boolean, ezme yalnız kendi
+damgasını oynatır, boş = sil (`sil` var/yok), iki kullanıcı depo düzeyinde
+izole + CASCADE, ad envanteri = katalog + eski BYOK (bilinmeyen `ValueError`;
+kataloğa giren ad eski listeden çıkar bekçisi), döndürme (yalnız yeni anahtar
+→ `SifreHatasi`, "yeni,eski" → okunur, `dondur` 2 satır ve `guncellendi`
+sabit, eski düşer). `test_settings_route.py` `credentials.env`siz (fixture
+`APP_ENV_PATH` yamaları gitti; "dahili doğrulama" `depo_kimlik_bilgisi.oku` +
+`credstore.resolve(…, kimlikler)`; elle yazılan sohbet anahtarı → DB'ye
+doğrudan yazılan; `ac.get_settings_status()` → `settings_status_of(kimlikler)`;
+2 yeni: 422 hiçbir şey yazmaz, ham satır şifreli + GET gövdesinde hiçbir biçimde
+anahtar yok). `test_credstore.py` sözlükle (26; 4 yeni: bağlamsız hiçbir şey
+yapılandırılmamış VE dosya okunmaz, bağlam bağlıyken sözlüksüz çağrı onu görür,
+açık sözlük bağlamı ezer, `settings_status` dokuz alan). `test_chat_providers.py`
+`wire_model_of`/`is_configured` sözlükle (+ bağlam). `test_chat_route.py`
+`configured_map` stub'ları `*a, **k`, tripwire `director_context(db,
+kullanici.id, kimlikler)`. `test_prefs.py` tek test `is_configured(…, {})`.
+**`test_kimlik.py`**: `KIMLIK_OKUYAN` (7 rota, iki yönlü), `GET /api/settings`
+3 sorgu, **çıkış ölçütü testi**: A ve B `POST /api/settings` ile farklı Azure
+anahtarı yazar, sahte `httpx.Client` `Authorization` başlığını kaydeder —
+`[A, B, A]`; kimliksiz üretim 502 (`AZURE_IMAGE_API_KEY` adıyla) ve dosyaya
+düşmez; üçüncü kullanıcı hiçbir şeyi kurulu görmez; ham satırlar kullanıcı
+başına ayrı ve şifreli; `credentials.env` hiçbir yerde yazılmadı.
+`test_galeri_db.py`: `DEPOLAR` 7, `KIMLIK_DOSYASI_ISLEVLERI` AST bekçisi +
+bekçinin bekçisi. `test_docker_kapisi.py`: `ALTYAPI` += `sifre.ANAHTAR_ENV`,
+`.env.example` uyarısı (`saglayici_kimlikleri`, `ŞİFRELİ`, "12-factor …
+KAPANDI"), yeni "anahtar zorunlu + üretim komutu birebir", CI `docker` işi
+`-e KROMIS_SECRET_KEY` + üretim + `env:`de yok, compose `${…:?`.
+`test_i18n.py`: üç modül `KULLANICIYA_KONUSMAYAN`da (sifre operatöre konuşur).
+Eski dosya testleri (`test_settings.py` 29, `test_azure_client*.py`,
+`test_chat_client.py`nin `load_credentials` testleri) AYNEN duruyor —
+dondurulmuş kabuk ve 8. görevin `tools/ice_aktar.py`si onları kullanacak.
+Tam takım (E2E + Postgres zorunlu): **3.351 geçti, 12 atlandı, 171 sn** (taban `main` 3.318 toplanan = 3.306 geçen + 12 atlanan; +45 test; E2E koştu, DB atlaması 0). ruff, mypy (205 dosya), eslint,
+prettier (`static/`) temiz; graflar güncel (82 modül, 54 uç, 113 test dosyası).
+Canlı doğrulama (geçici küme + `alembic upgrade head` → `0003_arena_win` +
+uvicorn, iki hesap): anahtarsız `uvicorn app:app` çıkış kodu 3, son satır `services.sifre.AnahtarHatasi: KROMIS_SECRET_KEY verilmedi … onsuz uygulama ACILMAZ … Uret: python -c …`, `hata.log` yazıldı; anahtarla `/health` 200 `db_reachable:true`; A `POST /api/settings` (sahte Azure + Gemini) → `configured:true`, cevapta anahtar yok; `GET` A `true`/endpoint A, B `false`/`null`; ham `SELECT` üç satır `gAAAAAB…` Fernet jetonu, anahtar/adres düz metin değil, hepsi A'nın, `anahtar_surumu` parmak izi; B kendi anahtarını yazar, A'nınki yerinde; A boş gizli alan gönderir, Gemini korunur; B `/api/generate` sahte adrese kendi anahtarıyla çıkar (ağ yok → 502 bağlantı); veri dizininde `credentials.env`/`.config` YOK.
+
+**8. göreve kalan:** `tools/ice_aktar.py --kimlik-dosyasi`: eski
+`credentials.env`i `azure_client.read_env_values(yol)` ile okuyup
+`depo_kimlik_bilgisi.yaz(db, kullanici_id, …)` ile yazar — `ADLAR` dışındaki
+adları (dosyaya elle yazılmış yabancı değişkenler) ya bildirip düşürür ya
+listeye alır; kaynak dosya web yolunda değil, aracın işi. **9. göreve
+borç:** `KROMIS_SECRET_KEY` DB yedeğinden ayrı saklama tatbikatı
+(`docs/isletme.md`), anahtar döndürme akışı (yeni anahtar başa → dağıt →
+`dondur` bütün kullanıcılar için — bugün kullanıcı başına işlev var, toplu
+sarmalayıcı yok → `tools/anahtar_dondur.py` adayı), `.env.example` 2. bölüm
+başlığı bu görevde zaten değişti (§9'un "başlığı değişir" kalemi kapandı).
 
 ---
 

@@ -63,7 +63,7 @@ bundan sonra serbest — gerekçe ve sıra: docs/faz0-web-first.md.
 """
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
 import azure_client as ac
 import catalog
@@ -87,12 +87,15 @@ def _azure_generate(m, prompt, size, quality, n, *, client=None, credentials=Non
     testlerinin tamamı `ac.generate`'i monkeypatch'liyor ve kimliği HİÇ
     yapılandırmıyor — çünkü bugünkü `ac.generate` kimliği kendi İÇİNDE, tembel
     biçimde çözüyor. Erken çözüm o tembelliği bozuyor ve stub'lanmış bir
-    çağrının bile gerçek bir `credentials.env` istemesine yol açıyordu.
+    çağrının bile gerçek bir kimlik istemesine yol açıyordu.
     Testlerin ölçtüğü şey doğruydu: çözümü öne almak davranış DEĞİŞİKLİĞİ.
-    Azure'ın iki dosyalı düşmesi de böylece tek bir yerde kalıyor.
+    Web'de (Faz 1 / 7) `ac.generate` `credentials=None` görünce isteğin
+    sözlüğüne bakıyor (`kimlik_baglami`, rota `kimlik.KIMLIKLER` ile bağlar);
+    tembellik korunuyor, dosya yolu yalnız bağlamsız dondurulmuş kabukta.
 
     Yeni adaptörler kendi kimliğini `credstore.resolve(m.credential)` ile
-    çözüyor — aynı tembellikle, yani kendi istek fonksiyonlarının içinde.
+    çözüyor — aynı tembellikle, yani kendi istek fonksiyonlarının içinde;
+    `credstore` da açık sözlük verilmediğinde isteğin bağlamına bakıyor.
     """
     return ac.generate(prompt, size, quality, n, client=client, credentials=credentials)
 
@@ -430,12 +433,12 @@ def is_content_policy(detail: str) -> bool:
     return any(isaret in alt for isaret in _ICERIK_REDDI)
 
 
-def is_configured(model_id: str) -> bool:
+def is_configured(model_id: str, kimlikler: Mapping[str, str] | None = None) -> bool:
     """Modelin kimliği girilmiş mi. Katalogda olmayan model için False."""
     m = catalog.image_model(model_id)
     # `is not None`, `bool(m)` DEĞİL: ikisi aynı şeyi söylüyor (dataclass
     # örneği her zaman doğru) ama mypy yalnız ilkini daraltıyor.
-    return m is not None and credstore.is_configured(m.credential)
+    return m is not None and credstore.is_configured(m.credential, kimlikler)
 
 
 def generate(model_id: str, prompt: str, size: str, quality: str, n: int,
@@ -457,7 +460,7 @@ def edit(model_id: str, prompt: str, images, size: str, quality: str, n: int,
                                 client=client, credentials=credentials)
 
 
-def video_is_configured(model_id: str) -> bool:
+def video_is_configured(model_id: str, kimlikler: Mapping[str, str] | None = None) -> bool:
     """`is_configured`ın video ikizi. Katalogda olmayan model için False.
 
     ÜRETİMDE ÇAĞIRANI YOK ve bu not okurun onu aramasını önlemek için: iki
@@ -473,7 +476,7 @@ def video_is_configured(model_id: str) -> bool:
     aranan bir şey olurdu.
     """
     m = catalog.video_model(model_id)
-    return m is not None and credstore.is_configured(m.credential)
+    return m is not None and credstore.is_configured(m.credential, kimlikler)
 
 
 def generate_video(model_id: str, prompt: str, size: str, quality: str,

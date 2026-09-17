@@ -51,16 +51,27 @@ TESTLERDE: `tests/conftest.py::kullanici` (autouse) iki bağımlılığı da
 `TestClient` çağrısı değişmeden geçiyor; override `bagla()`yı çağırıyor ki 3.
 halka orada da işlesin. Kapının KENDİSİNİ sınayan dosyalar `gercek_kimlik`
 işaretiyle override'sız koşuyor.
+
+ÜÇÜNCÜ BAĞIMLILIK — `kimlik_bilgileri` / `KIMLIKLER` (Faz 1 / 7): kullanıcının
+SAĞLAYICI kimlikleri (`saglayici_kimlikleri`, şifreli) istek başına BİR kez
+çözülür, `request.state.kimlikler`e ve `kimlik_baglami`na konur; rota
+dönünce bağlam çözülür. Yalnız sağlayıcı anahtarı okuyan rotalar taşır
+(`/api/settings`, `/api/chat`, dört üretim rotası) — hangi rotanın anahtar
+okuduğu İMZASINDA yazılı, bekçisi tests/test_kimlik.py. Override YOK: test
+kullanıcısı `depo_db` kipinde gerçek satır, sözlüğü gerçekten DB'den çözülür.
 """
 from __future__ import annotations
 
-from fastapi import HTTPException, Request, Response
+from collections.abc import AsyncIterator, Mapping
+
+from fastapi import Depends, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 import i18n
-from services import cerez, dil, hesap
+import kimlik_baglami
+from services import cerez, depo_kimlik_bilgisi, dil, hesap
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
@@ -130,3 +141,31 @@ async def giris_sayfasina(request: Request, exc: GirisSayfasi) -> RedirectRespon
     """`GirisSayfasi` işleyicisi — app.py takıyor. `no-store`: vekil oturumsuz 302'yi saklamasın."""
     return RedirectResponse(GIRIS_SAYFASI, status_code=302,
                             headers={"Cache-Control": "no-store"})
+
+
+async def kimlik_bilgileri(request: Request, db: Session = OTURUM,
+                           kullanici: Kullanici = Depends(aktif_kullanici),
+                           ) -> AsyncIterator[Mapping[str, str]]:
+    """FastAPI bağımlılığı: bu isteğin kullanıcısının sağlayıcı kimlikleri, çözülmüş düz sözlük.
+
+    DB'den bir kez (`depo_kimlik_bilgisi.oku`, `run_in_threadpool` — senkron
+    sürücü olay döngüsünü kilitlemesin), `request.state.kimlikler`e ve
+    `kimlik_baglami`na. `yield`: bağlam rota döner dönmez, AYNI görevde
+    çözülür (`scope="function"`, `db.OTURUM`un gerekçesi) — TestClient'ın
+    portalı istekler arasında bağlamı taşıyabiliyor (conftest'in dil sızıntısı
+    dersi), yani "kendiliğinden biter" diye bırakılmaz. Aynı istekte ikinci
+    kez sormaz (`request.state` önbelleği, `_coz`un deseni).
+    """
+    mevcut: Mapping[str, str] | None = getattr(request.state, "kimlikler", None)
+    if mevcut is None:
+        mevcut = await run_in_threadpool(depo_kimlik_bilgisi.oku, db, kullanici.id)
+        request.state.kimlikler = mevcut
+    jeton = kimlik_baglami.bagla(mevcut)
+    try:
+        yield mevcut
+    finally:
+        kimlik_baglami.coz(jeton)
+
+
+# Rotaların kullanacağı TEK biçim — `scope="function"` ŞART (gerekçe yukarıda).
+KIMLIKLER = Depends(kimlik_bilgileri, scope="function")

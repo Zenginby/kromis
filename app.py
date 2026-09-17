@@ -31,7 +31,19 @@ import paths
 import providers
 from models import MAX_PROMPT_CHARS, GenerateRequest
 from routers import ayarlar, bindirme, galeri, hesap, kok, paletler, saglik, sohbet, uretim
-from services import ayar, db, dil, gorsel, kimlik, koken, modeller, palet, posta, redaksiyon
+from services import (
+    ayar,
+    db,
+    dil,
+    gorsel,
+    kimlik,
+    koken,
+    modeller,
+    palet,
+    posta,
+    redaksiyon,
+    sifre,
+)
 
 
 @asynccontextmanager
@@ -77,10 +89,26 @@ async def _lifespan(app: FastAPI):
     / `RESEND_API_KEY` ortamdan bir kez okunur, `app.state.postaci`ya konur.
     Yanlış yapılandırma uygulamayı DURDURMAZ — `BozukPostaci` gelir ve ilk
     e-posta isteyen rota 503 der, sebep `hata.log`da.
+
+    TEK İSTİSNA — `KROMIS_SECRET_KEY` (Faz 1 / 7, services/sifre.py): web'de
+    (`DATABASE_URL` verilmiş süreç) anahtar yoksa ya da bozuksa uygulama
+    AÇILMAZ; guard YOK, bilerek. Öteki iki adımın "açılmayan uygulamadan iyidir"
+    gerekçesi burada tersine döner: anahtarsız açılan bir süreç sağlayıcı
+    kimliği yazamaz/okuyamaz ve sessiz bir varsayılan anahtar, şifreli sütunu
+    herkesin okuduğu bir sütuna çevirir. Hata `hata.log`a da yazılır, sonra
+    yükselir — uvicorn "Application startup failed" der ve çıkar. DB'siz
+    süreçte (dondurulmuş kabuk, `/health` sondası) kapı yok: orada okunacak
+    kimlik satırı da yok.
     """
     ayarlar: ayar.Ayarlar = app.state.ayarlar
+    url = db.baglanti_dizesi()
+    if url:
+        try:
+            sifre.dogrula_ortam()
+        except sifre.AnahtarHatasi:
+            errlog.safe_append(ayarlar.data_dir, traceback.format_exc())
+            raise
     try:
-        url = db.baglanti_dizesi()
         app.state.motor = db.motor_kur(url) if url else None
     except Exception:
         app.state.motor = None

@@ -507,7 +507,7 @@ def test_only_configured_models_reach_the_directors_menu(
     """
     import catalog
     monkeypatch.setattr(appmod.credstore, "configured_map",
-                        lambda: {"gemini": True})
+                        lambda *a, **k: {"gemini": True})
 
     _post(client, [{"role": "user", "content": "bir klip"}])
     ids = _menu_ids(fake_kwargs[0]["instructions"])
@@ -528,7 +528,7 @@ def test_the_menu_and_the_ui_ask_the_same_visibility_question(
     ikiliği önlemek için tek bir kapı.
     """
     monkeypatch.setattr(appmod.credstore, "configured_map",
-                        lambda: {"gemini": True, "openai": True})
+                        lambda *a, **k: {"gemini": True, "openai": True})
 
     _post(client, [{"role": "user", "content": "kare görsel"}])
     ids = _menu_ids(fake_kwargs[0]["instructions"])
@@ -550,12 +550,12 @@ def test_the_video_instructions_only_ship_when_a_video_model_is_configured(
     VH = appmod.chat_prompt.VIDEO_HEADING
 
     monkeypatch.setattr(appmod.credstore, "configured_map",
-                        lambda: {"azure_image": True})
+                        lambda *a, **k: {"azure_image": True})
     _post(client, [{"role": "user", "content": "kare görsel"}])
     assert VH not in fake_kwargs[0]["instructions"], "videosuz kurulumda geldi"
 
     monkeypatch.setattr(appmod.credstore, "configured_map",
-                        lambda: {"gemini": True})
+                        lambda *a, **k: {"gemini": True})
     _post(client, [{"role": "user", "content": "bir klip"}])
     assert VH in fake_kwargs[1]["instructions"], "video modeli varken gelmedi"
 
@@ -569,7 +569,7 @@ def test_an_unconfigured_selected_model_is_flagged_to_the_director(
     bir öneri yazar ve kullanıcı sebebini hiçbir yerde göremez.
     """
     monkeypatch.setattr(appmod.credstore, "configured_map",
-                        lambda: {"gemini": True})
+                        lambda *a, **k: {"gemini": True})
 
     _post(client, [{"role": "user", "content": "kare görsel"}])
     talimat = fake_kwargs[0]["instructions"]
@@ -586,7 +586,7 @@ def test_a_setup_without_video_tells_the_director_to_name_the_missing_key(
     yapamadığını sanıyor.
     """
     monkeypatch.setattr(appmod.credstore, "configured_map",
-                        lambda: {"azure_image": True})
+                        lambda *a, **k: {"azure_image": True})
 
     _post(client, [{"role": "user", "content": "kare görsel"}])
     talimat = fake_kwargs[0]["instructions"]
@@ -792,7 +792,7 @@ def test_the_context_is_gathered_outside_the_instruction_guard(client, fake_kwar
               ).read_text(encoding="utf-8")
     assert "instructions = chat_prompt.build_system(**baglam)" in kaynak, (
         "bağlam çağrısı `build_system`in argümanı olarak `try` içinde duruyor")
-    govde = kaynak.split("baglam = modeller.director_context(db, kullanici.id)", 1)
+    govde = kaynak.split("baglam = modeller.director_context(db, kullanici.id, kimlikler)", 1)
     assert len(govde) == 2, "bağlam `try` öncesinde toplanmıyor"
     assert "try:" in govde[1].split("except ValueError", 1)[0], (
         "kapı bağlam toplamadan SONRA açılmıyor")

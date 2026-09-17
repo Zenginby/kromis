@@ -755,6 +755,11 @@ KULLANICIYA_KONUSMAYAN = {
     "routers/kok.py": "`/` rotası; yerleştirme ve 500 metni `services/sablon.py`ye "
                       "taşındı (Faz 1 / 3), burada yalnız çağrı kaldı",
     "services/cerez.py": "çerez adı ve bayrakları (Faz 1 / 3); metin yok",
+    "services/sifre.py": "şifreleme (Faz 1 / 7): hataları OPERATÖRE gidiyor (uvicorn günlüğü, "
+                         "`hata.log`), kullanıcıya değil — anahtar yokken uygulama hiç açılmıyor",
+    "services/depo_kimlik_bilgisi.py": "sağlayıcı kimlik deposu (Faz 1 / 7): SQL ve şifreleme; "
+                                       "değer döndürür, cümle rotanın (`routers/ayarlar.py`)",
+    "kimlik_baglami.py": "isteğin kimlik sözlüğünün ContextVar'ı (Faz 1 / 7); metin yok",
     "services/koken.py": "köken kapısı (Faz 1 / 3): 403 gövdesi bir KOD "
                          "(`cross_origin_rejected`) — dil ara katmanından ÖNCE koşuyor, "
                          "cümle kuramaz; `services/db.py` ile aynı karar",

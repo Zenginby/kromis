@@ -51,6 +51,19 @@ _KEY_PATTERNS = [
     # değil — `anthropic-version` gibi bir komşu bir gün deseni daraltırsa
     # sessizce açık kalırlardı.
     re.compile(r"(x-goog-api-key|x-api-key|api-key|authorization):\s*(Bearer\s*)?[a-zA-Z0-9_.-]{16,}", re.IGNORECASE),
+    # (b') SÖZLÜK biçimi — `'AD': 'değer'` / `"AD": "değer"` (Faz 1 / 7). Bir
+    # SQLAlchemy istisnası `[parameters: {...}]` ile, bir `repr(dict)` ya da
+    # JSON gövdesi anahtarı `AD=değer` değil `'AD': 'değer'` diye taşır ve 4.
+    # desen iki nokta üstüne çakılmıyordu. Ad kuralı aynı (BÜYÜK_HARF + KEY/
+    # TOKEN/SECRET), değer tırnak içinde ne varsa.
+    re.compile(r"['\"][A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)['\"]\s*:\s*['\"][^'\"]{8,}['\"]"),
+    # (c) SQLAlchemy'nin bağlı parametre dökümü — `[parameters: {...}]` blokunun
+    # TAMAMI. Bir `IntegrityError`/`DataError` mesajı ifadenin bütün
+    # parametrelerini taşıyor; `saglayici_kimlikleri`nde değer şifreli jeton
+    # ama `ad` sütunu ile aynı satırda ve gelecekteki bir tabloda değer düz
+    # olabilir. Blok teşhis için gerekli DEĞİL (SQL'in kendisi ve psycopg'nin
+    # cümlesi yeterli), o yüzden değerine bakılmadan bütünüyle düşüyor.
+    re.compile(r"\[parameters: .*\]"),
 ]
 
 

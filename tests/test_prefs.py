@@ -253,31 +253,25 @@ def test_bozuk_deger_okurken_diske_YAZILMIYOR(tmp_path):
     assert json.loads((tmp_path / "prefs.json").read_text(encoding="utf-8")) == bozuk
 
 
-def test_yapilandirilmamis_model_secili_KALIYOR(tmp_path, monkeypatch):
+def test_yapilandirilmamis_model_secili_KALIYOR(tmp_path):
     """"Var mı?" katalogdan, "ulaşılabilir mi?" credstore'dan — ayrı sorular.
 
     Anahtarı girilmemiş bir modeli tercihten DÜŞÜRMEK, kullanıcı Gemini'yi
     seçip anahtarı sonra kaydettiğinde seçimini sessizce Azure'a döndürürdü.
 
-    KİMLİK YOLLARI İZOLE EDİLİYOR ve bu satırlar bedava değil: ilk yazımda
-    yoktular ve test, geliştiricinin makinesinde GERÇEK bir
-    `~/.config/kromis/credentials.env` oluştuğu anda düştü (tarayıcıda elle
-    doğrulama yapılırken tam bu oldu). O hâliyle iddia "anahtar yokken" değil
-    "geliştiricinin makinesinde anahtar yokken" diyordu — conftest.py'nin
-    "kaçak damga" guard'larıyla aynı sınıf sızıntı. `DEFAULT_ENV_PATH` de
-    kapatılıyor: paylaşılan `claude-tools` dosyası varsa Azure oradan
-    yapılandırılmış görünürdü.
+    KİMLİK AÇIKÇA BOŞ VERİLİYOR: Faz 1 / 7'ye kadar burada `APP_ENV_PATH`/
+    `DEFAULT_ENV_PATH` tmp'ye çekiliyordu, çünkü test geliştiricinin makinesinde
+    GERÇEK bir `~/.config/kromis/credentials.env` oluştuğu anda düşmüştü
+    (conftest.py'nin "kaçak damga" guard'larıyla aynı sınıf sızıntı). `credstore`
+    artık dosya okumuyor — kimlik istek başına çözülen bir sözlük; boş sözlük
+    "anahtar yok" demek ve iddia makineden bağımsız.
     """
-    import azure_client as ac
     import credstore
-
-    monkeypatch.setattr(ac, "APP_ENV_PATH", str(tmp_path / "kimlik" / "credentials.env"))
-    monkeypatch.setattr(ac, "DEFAULT_ENV_PATH", str(tmp_path / "yok.env"))
 
     prefs.update({"image_model": catalog.DEFAULT_IMAGE_MODEL}, str(tmp_path))
 
     spec = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
-    assert credstore.is_configured(spec.credential) is False
+    assert credstore.is_configured(spec.credential, {}) is False
     assert prefs.read(str(tmp_path))["image_model"] == catalog.DEFAULT_IMAGE_MODEL
 
 

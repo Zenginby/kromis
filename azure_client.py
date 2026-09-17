@@ -12,8 +12,10 @@ from __future__ import annotations
 import base64
 import os
 import tempfile
+from collections.abc import Mapping
 
 import i18n
+import kimlik_baglami
 import paths
 import winsec
 
@@ -210,11 +212,51 @@ def _first_complete_credentials(env_path: str | None) -> tuple[str, str] | None:
     return None
 
 
+# Dosya yolu ile sözlük yolu AYNI cümleyi söylüyor: kullanıcı iki yoldan hangisinin
+# koştuğunu bilmez, hatanın da bilmemesi gerekir.
+_KIMLIK_EKSIK = "Kimlik bilgileri eksik: AZURE_IMAGE_API_KEY / AZURE_IMAGE_BASE_URL."
+
+
 def load_credentials(env_path: str | None = None) -> tuple[str, str]:
+    """DOSYADAN (key, url) — dondurulmuş kabuk ve `tools/ice_aktar.py`; web yolu `credentials_of`."""
     creds = _first_complete_credentials(env_path)
     if creds is None:
-        raise AzureImageError("Kimlik bilgileri eksik: AZURE_IMAGE_API_KEY / AZURE_IMAGE_BASE_URL.")
+        raise AzureImageError(_KIMLIK_EKSIK)
     return creds
+
+
+def _tam_kimlik(values: Mapping[str, str]) -> tuple[str, str] | None:
+    """`_first_complete_credentials`ın sözlük ikizi: ikisi de doluysa (key, url), yoksa None."""
+    key, url = values.get(IMAGE_KEY, ""), values.get(IMAGE_URL, "")
+    return (key, url) if key and url else None
+
+
+def credentials_of(values: Mapping[str, str]) -> tuple[str, str]:
+    """`load_credentials`ın SAF ikizi (Faz 1 / 7): verilen sözlükten (key, url); eksikse aynı hata.
+
+    Dosya okumaz. Web yolu kimliği DB'den çözülmüş düz sözlükle geliyor
+    (`kimlik_baglami`, `credstore`); iki dosyalı düşme sırası orada yok —
+    kullanıcı başına tek kaynak var.
+    """
+    creds = _tam_kimlik(values)
+    if creds is None:
+        raise AzureImageError(_KIMLIK_EKSIK)
+    return creds
+
+
+def _varsayilan_kimlik() -> tuple[str, str]:
+    """`credentials` verilmediğinde: istek bağlamı varsa DB'den çözülmüş sözlük (web), yoksa dosya.
+
+    Ayrım BURADA, sevk memurunda DEĞİL: `providers._azure_generate` kimliği
+    çağrıdan önce çözmez (104 testlik ders, orada yazılı) ve rota testleri
+    `ac.generate`i yamalıyor. Web isteğinde bağlam her zaman bağlı
+    (`kimlik.KIMLIKLER`), yani bu sürece dosya yolu hiç görünmez; bağlamsız
+    çağıran dondurulmuş kabuk ve doğrudan birim testleri.
+    """
+    kimlikler = kimlik_baglami.aktif()
+    if kimlikler is not None:
+        return credentials_of(kimlikler)
+    return load_credentials()
 
 
 def read_env_values(env_path: str | None = None) -> dict[str, str]:
@@ -340,27 +382,45 @@ def check_base_url(url: str, label: str) -> None:
         raise AzureImageError(i18n.t("err.needs_scheme", None, alan=label))
 
 
-def resolve_chat_credentials(env_path: str | None = None) -> tuple[str, str, str]:
-    """(key, base_url, deployment) — eksik alanlar BOŞ dize, hata YÜKSELTİLMEZ.
+def chat_credentials_of(values: Mapping[str, str]) -> tuple[str, str, str]:
+    """(key, base_url, deployment) SÖZLÜKTEN — eksik alanlar BOŞ dize, hata YÜKSELTİLMEZ.
 
     Sohbetin kendi anahtarları varsa onlar, yoksa görselin kimliği kullanılır
     (canlı doğrulandı: iki dağıtım aynı kaynakta, aynı anahtarla çalışıyor).
 
     Çözüm BURADA, `chat_client`'ta değil: `get_settings_status`'un arayüzde
     açtığı kapı ile isteğin gerçekten kullandığı değerler ayrışırsa arayüz
-    sohbeti açar, ilk mesaj 502 döner ve sebebi görünmez olur.
+    sohbeti açar, ilk mesaj 502 döner ve sebebi görünmez olur. Dosya yolu
+    (`resolve_chat_credentials`) ve web yolu (`credstore`) AYNI işlevi çağırır.
     """
-    values = read_env_values(env_path)
     key = values.get(CHAT_KEY) or values.get(IMAGE_KEY, "")
     url = values.get(CHAT_URL) or values.get(IMAGE_URL, "")
     return key, url, values.get(CHAT_DEPLOYMENT, "")
 
 
+def resolve_chat_credentials(env_path: str | None = None) -> tuple[str, str, str]:
+    """`chat_credentials_of`un DOSYA okuyan sarmalı — dondurulmuş kabuk."""
+    return chat_credentials_of(read_env_values(env_path))
+
+
 def get_settings_status(env_path: str | None = None) -> dict:
-    """Yapılandırma durumu — API key'i ASLA döndürmez, sadece status/endpoint'i açar."""
-    creds = _first_complete_credentials(env_path)
-    chat_key, chat_url, chat_deployment = resolve_chat_credentials(env_path)
-    env_vals = read_env_values(env_path)
+    """Yapılandırma durumu DOSYADAN — API key'i ASLA döndürmez, sadece status/endpoint'i açar."""
+    return settings_status_of(read_env_values(env_path), _first_complete_credentials(env_path))
+
+
+def settings_status_of(values: Mapping[str, str],
+                       creds: tuple[str, str] | None = None) -> dict:
+    """`get_settings_status`un SAF gövdesi: aynı dokuz alan, verilen sözlükten (Faz 1 / 7).
+
+    `creds` verilmezse sözlükten türetilir (`_tam_kimlik`). Dosya yolu onu
+    `_first_complete_credentials`tan ayrıca veriyor: iki dosyalı düşmede
+    "tam kimlik" tek dosyada aranır, birleşik görünümde değil — davranış
+    bayt bayt korunuyor (tests/test_settings.py).
+    """
+    if creds is None:
+        creds = _tam_kimlik(values)
+    chat_key, chat_url, chat_deployment = chat_credentials_of(values)
+    env_vals = values
     return {
         "configured": creds is not None,
         "endpoint": creds[1] if creds is not None else None,
@@ -376,7 +436,7 @@ def get_settings_status(env_path: str | None = None) -> dict:
 
 
 def generate(prompt, size, quality, n, *, client=None, credentials=None) -> list[bytes]:
-    key, base_url = credentials if credentials else load_credentials()
+    key, base_url = credentials if credentials else _varsayilan_kimlik()
     endpoint = base_url.rstrip("/") + "/images/generations"
     payload = build_payload(prompt, size, quality, n)
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
@@ -423,7 +483,7 @@ def build_image_files(images: list[tuple[str, bytes]]):
 
 def edit(prompt, images, size, quality, n, *, client=None, credentials=None) -> list[bytes]:
     """`images`: sıralı [(filename, png_bytes), ...] — ilk görsel ana referanstır."""
-    key, base_url = credentials if credentials is not None else load_credentials()
+    key, base_url = credentials if credentials is not None else _varsayilan_kimlik()
     endpoint = base_url.rstrip("/") + "/images/edits"
     headers = {"Authorization": f"Bearer {key}"}  # Content-Type YOK: multipart client set eder
     data = {

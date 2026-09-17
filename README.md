@@ -183,21 +183,25 @@ Konteynerde (web sürümü; `Dockerfile` ve gerekçeleri depoda):
 ```bash
 docker build -t kromis .
 docker run -p 8765:8765 -v kromis-data:/data \
-  -e DATABASE_URL=postgresql+psycopg://kullanici:parola@konak:5432/kromis kromis
+  -e DATABASE_URL=postgresql+psycopg://kullanici:parola@konak:5432/kromis \
+  -e KROMIS_SECRET_KEY="$(python3 -c 'import secrets,base64;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())')" kromis
 curl localhost:8765/health     # {"ok": true, "version": "…", "data_dir_writable": true, "db_reachable": true}
 ```
 
 Yazılabilir veri kökü `KROMIS_DATA_DIR` (imajda `/data`, bkz. `paths.py`):
-output/, assets/, manifest'ler ve — `HOME` da oraya bağlı olduğu için —
-Ayarlar panelinin yazdığı `credentials.env`. Konak dizini bağlanacaksa dizin
-uid 10001'e ait olmalı; yazılamıyorsa `/health` 503 döner. Veri tabanı
-`DATABASE_URL` ile (PostgreSQL, `postgresql+psycopg://…`; `services/db.py`):
-verilmemişse ya da sunucuya ulaşılamıyorsa uygulama yine açılır ama `/health`
-`db_reachable: false` ile 503 döner. Şema `alembic upgrade head` ile kurulur
-(`alembic.ini` URL'yi aynı değişkenden okur). Ortam değişkenleri ve sağlayıcı
-anahtar adlarının envanteri `.env.example`da; yerel deneme için
-`docker compose up --build` (`compose.yaml`, yalnız geliştirme — kendi
-Postgres servisini getirir).
+output/, assets/ ve `hata.log`; `HOME` da oraya bağlı. Konak dizini
+bağlanacaksa dizin uid 10001'e ait olmalı; yazılamıyorsa `/health` 503 döner.
+Veri tabanı `DATABASE_URL` ile (PostgreSQL, `postgresql+psycopg://…`;
+`services/db.py`): verilmemişse ya da sunucuya ulaşılamıyorsa uygulama yine
+açılır ama `/health` `db_reachable: false` ile 503 döner. Şema
+`alembic upgrade head` ile kurulur (`alembic.ini` URL'yi aynı değişkenden
+okur). Sağlayıcı anahtarları (Ayarlar paneli) kullanıcı başına ŞİFRELİ olarak
+DB'de durur; şifreleme anahtarı `KROMIS_SECRET_KEY` ZORUNLU — DB'li süreç onsuz
+açılmaz, üstteki komut yenisini üretir ve DB yedeğinden AYRI saklanmalı
+(kaybolursa kayıtlı anahtarlar okunamaz; `services/sifre.py`). Ortam
+değişkenleri ve sağlayıcı anahtar adlarının envanteri `.env.example`da; yerel
+deneme için `docker compose up --build` (`compose.yaml`, yalnız geliştirme —
+kendi Postgres servisini getirir, `KROMIS_SECRET_KEY`i `.env`den ister).
 
 Hesap (Faz 1 / 3): kayıt → e-posta doğrulama → giriş, sunucu tarafı oturum
 çerezi (`kromis_oturum`), parola sıfırlama. Giriş sayfası `/giris`, API

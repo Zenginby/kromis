@@ -16,22 +16,22 @@
 | DELETE | `/api/assets/{kind}/{asset_id}` | `routers/bindirme.py` | `delete_asset_route`:236 | `assets_store`, `i18n` | `assets.js` |
 | POST | `/api/banner` | `routers/bindirme.py` | `add_banner`:172 | `assets_store`, `catalog`, `i18n`, `models`, `storage` | `assets.js` |
 | POST | `/api/banner/preview` | `routers/bindirme.py` | `preview_banner`:161 | `assets_store`, `i18n`, `models` | `assets.js` |
-| POST | `/api/chat` | `routers/sohbet.py` | `chat`:32 | `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `credstore`, `etiket`, `i18n`, `models`, `prefs` | `chat.js` |
-| DELETE | `/api/chats` | `routers/sohbet.py` | `delete_all_chats_route`:194 | — | `chat.js` |
-| GET | `/api/chats` | `routers/sohbet.py` | `list_chats_route`:153 | `chat_store` | `chat.js` |
-| POST | `/api/chats` | `routers/sohbet.py` | `create_chat_route`:169 | `chat_store`, `i18n`, `models`, `prefs` | `chat.js` |
-| DELETE | `/api/chats/{chat_id}` | `routers/sohbet.py` | `delete_chat_route`:228 | `chat_store`, `i18n` | `chat.js` |
-| GET | `/api/chats/{chat_id}` | `routers/sohbet.py` | `get_chat_route`:160 | `chat_store`, `i18n` | `chat.js` |
-| PUT | `/api/chats/{chat_id}` | `routers/sohbet.py` | `update_chat_route`:205 | `chat_store`, `i18n`, `models`, `prefs` | `chat.js` |
-| POST | `/api/edit` | `routers/uretim.py` | `edit`:399 | `azure_client`, `catalog`, `chat_store`, `color_names`, `etiket`, `i18n`, `models`, `palette`, `palette_store`, `providers` | `core.js` |
+| POST | `/api/chat` | `routers/sohbet.py` | `chat`:38 | `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `credstore`, `etiket`, `i18n`, `models`, `prefs` | `chat.js` |
+| DELETE | `/api/chats` | `routers/sohbet.py` | `delete_all_chats_route`:201 | — | `chat.js` |
+| GET | `/api/chats` | `routers/sohbet.py` | `list_chats_route`:160 | `chat_store` | `chat.js` |
+| POST | `/api/chats` | `routers/sohbet.py` | `create_chat_route`:176 | `chat_store`, `i18n`, `models`, `prefs` | `chat.js` |
+| DELETE | `/api/chats/{chat_id}` | `routers/sohbet.py` | `delete_chat_route`:235 | `chat_store`, `i18n` | `chat.js` |
+| GET | `/api/chats/{chat_id}` | `routers/sohbet.py` | `get_chat_route`:167 | `chat_store`, `i18n` | `chat.js` |
+| PUT | `/api/chats/{chat_id}` | `routers/sohbet.py` | `update_chat_route`:212 | `chat_store`, `i18n`, `models`, `prefs` | `chat.js` |
+| POST | `/api/edit` | `routers/uretim.py` | `edit`:409 | `azure_client`, `catalog`, `chat_store`, `color_names`, `etiket`, `i18n`, `models`, `palette`, `palette_store`, `providers` | `core.js` |
 | GET | `/api/folders` | `routers/galeri.py` | `list_folders_route`:42 | — | `folders.js` |
 | POST | `/api/folders` | `routers/galeri.py` | `create_folder_route`:64 | `folders`, `i18n`, `models` | `folders.js` |
 | DELETE | `/api/folders/{folder_id}` | `routers/galeri.py` | `delete_folder_route`:81 | `folders`, `i18n` | `folders.js` |
 | PATCH | `/api/folders/{folder_id}` | `routers/galeri.py` | `rename_folder_route`:139 | `folders`, `i18n`, `models` | `folders.js` |
 | GET | `/api/folders/{folder_id}/download` | `routers/galeri.py` | `download_folder_route`:96 | `folders`, `i18n` | `folders.js` |
-| POST | `/api/generate` | `routers/uretim.py` | `generate`:41 | `azure_client`, `catalog`, `chat_store`, `color_names`, `folders`, `i18n`, `models`, `palette`, `palette_store`, `providers`, `storage` | `core.js` |
-| GET | `/api/guncelleme` | `routers/ayarlar.py` | `get_guncelleme`:67 | `guncelleme`, `prefs` | `settings.js` |
-| POST | `/api/guncelleme` | `routers/ayarlar.py` | `post_guncelleme`:97 | `guncelleme`, `prefs` | `settings.js` |
+| POST | `/api/generate` | `routers/uretim.py` | `generate`:48 | `azure_client`, `catalog`, `chat_store`, `color_names`, `folders`, `i18n`, `models`, `palette`, `palette_store`, `providers`, `storage` | `core.js` |
+| GET | `/api/guncelleme` | `routers/ayarlar.py` | `get_guncelleme`:87 | `guncelleme`, `prefs` | `settings.js` |
+| POST | `/api/guncelleme` | `routers/ayarlar.py` | `post_guncelleme`:117 | `guncelleme`, `prefs` | `settings.js` |
 | GET | `/api/hesap/ben` | `routers/hesap.py` | `ben`:244 | — | `giris.js`, `settings.js` |
 | POST | `/api/hesap/cikis` | `routers/hesap.py` | `cikis`:192 | — | `settings.js` |
 | POST | `/api/hesap/dogrula` | `routers/hesap.py` | `dogrula`:143 | `i18n`, `models` | `giris.js` |
@@ -52,12 +52,12 @@
 | GET | `/api/palettes` | `routers/paletler.py` | `list_palettes_route`:68 | — | `palette.js` |
 | POST | `/api/palettes` | `routers/paletler.py` | `create_palette_route`:74 | `color_names`, `i18n`, `models`, `palette` | `palette.js` |
 | DELETE | `/api/palettes/{palette_id}` | `routers/paletler.py` | `delete_palette_route`:96 | `i18n`, `palette_store` | `palette.js` |
-| GET | `/api/prefs` | `routers/ayarlar.py` | `get_prefs_route`:279 | `prefs` | `chat.js`, `core.js`, `settings.js` |
-| POST | `/api/prefs` | `routers/ayarlar.py` | `post_prefs_route`:286 | `catalog`, `i18n`, `models`, `prefs` | `chat.js`, `core.js`, `settings.js` |
-| GET | `/api/settings` | `routers/ayarlar.py` | `get_settings`:30 | `azure_client`, `catalog`, `credstore`, `etiket`, `guncelleme`, `i18n`, `paths`, `prefs`, `version` | `settings.js` |
-| POST | `/api/settings` | `routers/ayarlar.py` | `post_settings`:125 | `azure_client`, `catalog`, `credstore`, `etiket`, `i18n`, `models`, `version` | `settings.js` |
-| POST | `/api/video` | `routers/uretim.py` | `video`:88 | `azure_client`, `catalog`, `chat_store`, `folders`, `i18n`, `models`, `providers`, `storage` | `core.js` |
-| POST | `/api/video/animate` | `routers/uretim.py` | `animate`:202 | `azure_client`, `catalog`, `chat_store`, `etiket`, `i18n`, `models`, `providers` | `core.js` |
+| GET | `/api/prefs` | `routers/ayarlar.py` | `get_prefs_route`:307 | `prefs` | `chat.js`, `core.js`, `settings.js` |
+| POST | `/api/prefs` | `routers/ayarlar.py` | `post_prefs_route`:314 | `catalog`, `i18n`, `models`, `prefs` | `chat.js`, `core.js`, `settings.js` |
+| GET | `/api/settings` | `routers/ayarlar.py` | `get_settings`:49 | `catalog`, `credstore`, `etiket`, `guncelleme`, `i18n`, `paths`, `prefs`, `version` | `settings.js` |
+| POST | `/api/settings` | `routers/ayarlar.py` | `post_settings`:145 | `azure_client`, `catalog`, `credstore`, `etiket`, `i18n`, `models`, `version` | `settings.js` |
+| POST | `/api/video` | `routers/uretim.py` | `video`:96 | `azure_client`, `catalog`, `chat_store`, `folders`, `i18n`, `models`, `providers`, `storage` | `core.js` |
+| POST | `/api/video/animate` | `routers/uretim.py` | `animate`:211 | `azure_client`, `catalog`, `chat_store`, `etiket`, `i18n`, `models`, `providers` | `core.js` |
 | GET | `/assets/{kind}/{filename}` | `routers/bindirme.py` | `asset_file`:247 | `assets_store`, `i18n` | `assets.js` |
 | GET | `/giris` | `routers/hesap.py` | `giris_sayfasi`:250 | `errlog`, `i18n`, `version` | — |
 | GET | `/health` | `routers/saglik.py` | `health`:95 | `version` | — |

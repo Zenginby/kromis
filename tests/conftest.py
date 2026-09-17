@@ -39,8 +39,10 @@ from typing import Any
 import pytest
 from fastapi import Depends, Request
 
+import azure_client as azure_module
+import kimlik_baglami
 import paths as paths_module
-from services import ayar, db
+from services import ayar, db, sifre
 
 # Salt kitaplık iki modül — takımın kendisi bir kuruluma bağlanmıyor:
 # hangi dosyaların E2E olduğu TEK yerde ölçülüyor (gerekçesi orada); geçici
@@ -72,6 +74,21 @@ DB_SABLON = "kromis_sablon"
 # `veritabani` fixture'ının Postgres bulamayıp ATLADIĞI test dosyaları —
 # `pytest_terminal_summary` bunları E2E ile aynı gürültüyle basar.
 _db_atlanan: set[str] = set()
+
+# Takımın `KROMIS_SECRET_KEY`i (Faz 1 / 7) — SAHTE ve KAYNAKTA DÜZ METİN OLARAK
+# YOK: değer 32 baytlık şu dizenin base64'ü, çalışma anında kuruluyor. Base64
+# blobu kaynağa yazılsa sızıntı taraması onu bir anahtar sanırdı ve muafiyet
+# listesi büyürdü (.gitleaks.toml "liste BÜYÜMEMELİ" diyor); `DUMMY` damgalı
+# düz dize ise ilk kuralla zaten muaf. İkincisi döndürme testleri için "eski"
+# anahtar. Tam 32 bayt: `sifre.kok_anahtarlar` uzunluğu sayıyor.
+TEST_KOK_ANAHTARI = b"DUMMY-kromis-test-anahtari-00000"
+TEST_ESKI_KOK_ANAHTARI = b"DUMMY-kromis-eski-anahtar-000000"
+
+
+def sifre_anahtari(*kokler: bytes) -> str:
+    """Kök bayt(lar)ından `KROMIS_SECRET_KEY` değeri — virgülle, en yenisi başta."""
+    import base64
+    return ",".join(base64.urlsafe_b64encode(k).decode() for k in kokler)
 
 
 def _playwright_var() -> bool:
@@ -338,6 +355,55 @@ def _eski_e2e_sunuculari_kapansin():
     for t in threading.enumerate():
         if isinstance(getattr(t, "server", None), uvicorn.Server) and t is not threading.current_thread():
             t.join(timeout=10)
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _sifre_anahtari_ve_kimlik_baglami(monkeypatch: pytest.MonkeyPatch):
+    """Her test sahte bir `KROMIS_SECRET_KEY` ile ve BOŞ kimlik bağlamıyla başlar (Faz 1 / 7).
+
+    ANAHTAR: `depo_kimlik_bilgisi` her okuma/yazmada `sifre.sifreci()` ile ortamı
+    okuyor ve `app._lifespan` DB'li süreçte anahtarsız AÇILMIYOR — yani
+    `depo_db`/`veritabani` kullanan her dosya ve E2E sunucuları anahtarı
+    bekliyor. Tek kaynak BURASI (CI'a ikinci bir değer yazılmadı: iki kaynak
+    ayrışır, yerel koşu CI'a bağımlı olmaz). Geliştiricinin kabuğundaki GERÇEK
+    bir anahtar da testlere sızmaz: `setenv` onu bu test süresince ezer.
+    Anahtarın kendisini sınayan testler `monkeypatch.delenv/setenv` ile ezer.
+
+    BAĞLAM: `kimlik_baglami` bir ContextVar ve TestClient'ın portalı istekler
+    arasında bağlamı taşıyabiliyor (`_dil_baglami_testler_arasinda_sizmasin`ın
+    ölçtüğü sızıntı sınıfı). Bağımlılık rota dönünce çözüyor; burası ikinci
+    emniyet — bir önceki testin sözlüğü sonrakine görünmesin.
+    """
+    monkeypatch.setenv(sifre.ANAHTAR_ENV, sifre_anahtari(TEST_KOK_ANAHTARI))
+    kimlik_baglami.sifirla()
+    yield
+    kimlik_baglami.sifirla()
+
+
+@pytest.fixture(autouse=True)
+def _web_yolunda_kimlik_dosyasi_acilmaz(request: pytest.FixtureRequest,
+                                        monkeypatch: pytest.MonkeyPatch):
+    """DB'li testlerde `credentials.env` AÇILAMAZ: `azure_client._parse_env_all` patlar (Faz 1 / 7).
+
+    Belge §7 çıkış ölçütü: web yolunda kimlik dosyası hiç açılmıyor. AST bekçisi
+    (tests/test_galeri_db.py) çağrıyı kaynakta arıyor; bu guard ÇALIŞMA ZAMANINI
+    ölçüyor — dolaylı bir yol (bir adaptörün `credentials=None` düşmesi, bir
+    yardımcının eski okuyucuyu çağırması) dosyaya inerse rota testi kırmızı
+    olur, sessizce geçmez. Yalnız `depo_db`/`veritabani` isteyen dosyalarda:
+    dondurulmuş kabuğun dosya testleri (`test_settings.py`, `test_chat_client.py`
+    …) o okuyucuyu bilerek kullanıyor.
+    """
+    if not {"depo_db", "veritabani"} & set(request.fixturenames):
+        yield
+        return
+
+    def _patlat(path: str) -> dict[str, str]:
+        raise AssertionError(
+            f"web yolunda kimlik DOSYASI açıldı: {path} — kimlikler DB'den gelir "
+            "(services/depo_kimlik_bilgisi.py); bkz. docs/faz1-veritabani-hesaplar.md §7")
+
+    monkeypatch.setattr(azure_module, "_parse_env_all", _patlat)
     yield
 
 

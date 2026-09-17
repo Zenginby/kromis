@@ -4,6 +4,8 @@
 """Ayarlar uçları: sağlayıcı kimlikleri, güncelleme denetimi, kullanıcı tercihleri."""
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
@@ -14,7 +16,7 @@ import i18n
 import paths
 import version
 from models import PrefsRequest, SettingsRequest
-from services import ayar, depo_tercih, dil, kimlik, modeller, zaman
+from services import ayar, depo_kimlik_bilgisi, depo_tercih, dil, kimlik, modeller, zaman
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
@@ -24,11 +26,29 @@ router = APIRouter()
 # satırından; `guncelleme.json` önbelleği ise DİSKTE kalıyor (kullanıcı verisi
 # değil, GitHub Releases cevabı — belge §6), o yüzden üç güncelleme rotası
 # `ayarlar.output_dir`i almaya devam ediyor. `prefs` buradan okunmaz.
+#
+# Sağlayıcı kimlikleri de DB'de (Faz 1 / 7): kullanıcı başına, şifreli
+# (`saglayici_kimlikleri`, services/depo_kimlik_bilgisi.py). `credentials.env`
+# web yolunda YOK — `ac.save_env`/`load_credentials` buradan çağrılmaz (bekçi
+# tests/test_galeri_db.py); `azure_client`tan yalnız saf kapılar (`check_base_url`)
+# ve ad sabitleri okunuyor. Kullanıcının sözlüğü `kimlik.KIMLIKLER` ile gelir.
+
+
+def _satir_sonu_yok(degerler: Iterable[str], anahtar: str) -> None:
+    """`save_env`/`save_credentials`ın satır sonu kapısı — cümleleri AYNI i18n anahtarlarından.
+
+    Dosyaya İKİNCİ bir anahtar enjekte etme tehlikesi DB'de yok, ama kapı
+    kalıyor: `chat_deployment` bir form alanı, satır sonlu bir değer telde
+    başlığa girer ve kullanıcının okuduğu 422 cümlesi değişmemeli.
+    """
+    if any(c in str(deger) for deger in degerler for c in "\r\n"):
+        raise ac.AzureImageError(i18n.t(anahtar))
 
 
 @router.get("/api/settings")
 def get_settings(db: Session = OTURUM, ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-                 kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+                 kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+                 kimlikler: Mapping[str, str] = kimlik.KIMLIKLER) -> dict:
     """Yapılandırma durumu + uygulama sürümü. API key asla dönmez.
 
     `version` BURADA birleştiriliyor, azure_client'ta DEĞİL: onun işi kimlik
@@ -53,7 +73,7 @@ def get_settings(db: Session = OTURUM, ayarlar: ayar.Ayarlar = Depends(ayar.ayar
     bakıyor, ağ çağrısı arka planda koşuyor (bkz. guncelleme.py'deki 2.
     sözleşme). İlk açılışta değeri `null` olur, sonrakinde dolar.
     """
-    return {**modeller.settings_payload(),
+    return {**modeller.settings_payload(kimlikler),
             "version": version.APP_VERSION,
             "guncelleme": guncelleme.bilgi(
                 ayarlar.output_dir,
@@ -122,12 +142,12 @@ def post_guncelleme(db: Session = OTURUM, ayarlar: ayar.Ayarlar = Depends(ayar.a
 
 
 @router.post("/api/settings")
-def post_settings(req: SettingsRequest,
-                  kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
-    """KAPI DOĞRUDAN (Faz 1 / 4): bu rota dizin okumuyor (`ayar.ayarlar` yok), kimlik
-    dosyasına yazıyor — anonim bir istek başkasının anahtarını ezmesin;
-    `kullanici` bu yüzden imzada, gövdede okunmuyor (7. görev kullanıcıya göre
-    anahtarla birlikte okuyacak).
+def post_settings(req: SettingsRequest, db: Session = OTURUM,
+                  kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+                  kimlikler: Mapping[str, str] = kimlik.KIMLIKLER) -> dict:
+    """KAPI DOĞRUDAN (Faz 1 / 4): bu rota dizin okumuyor (`ayar.ayarlar` yok);
+    kullanıcının KENDİ kimlik satırlarına yazıyor (Faz 1 / 7) — `kullanici`
+    imzada, `kimlikler` onun DB'den çözülmüş mevcut sözlüğü.
 
     Sağlayıcı kimliklerini yalnızca-yazılır kaydeder; durumu döndürür (key'siz).
 
@@ -141,9 +161,12 @@ def post_settings(req: SettingsRequest,
     başka bir sağlayıcının anahtarını girmek isteyen kullanıcı hiçbir şey
     kaydedemiyordu.
 
-    Sohbet dağıtımı ve öteki sağlayıcılar, görsel kimliği doğrulamadan GEÇTİKTEN
-    SONRA yazılıyor: geçersiz bir endpoint'le gelen istek hiçbir şey yazmadan
-    422 dönmeli.
+    YAZIM TEK SEFERDE ve doğrulamaların HEPSİNDEN SONRA: dosya günlerinde Azure
+    kimliği önce doğrulanıp yazılıyor, öteki alanlar ardından geliyordu (geçersiz
+    bir adresle gelen istek dağıtım adını yazmadan 422 dönüyordu); DB'de bütün
+    güncellemeler bir sözlükte toplanır ve `depo_kimlik_bilgisi.yaz` bir kez
+    çağrılır — 422 dönen istek HİÇBİR alanı yazmaz, rota istisnayla çıktığı
+    için `db.oturum` zaten geri alır.
     """
     api_key = req.api_key.strip()
     base_url = (req.base_url or "").strip()
@@ -155,12 +178,10 @@ def post_settings(req: SettingsRequest,
     # sağlayıcının önündeki en somut engel buydu.
     azure_hedefli = bool(api_key or base_url)
 
-    # Mevcut Azure kimliği. Hata YÜKSELTİLMİYOR: Azure'ın hiç yapılandırılmamış
-    # olması artık bir hata durumu değil, sıradan bir başlangıç hâli.
-    try:
-        mevcut_key, mevcut_url = ac.load_credentials()
-    except ac.ImageError:
-        mevcut_key, mevcut_url = "", ""
+    # Mevcut Azure kimliği kullanıcının sözlüğünden. Azure'ın hiç
+    # yapılandırılmamış olması bir hata durumu değil, sıradan bir başlangıç hâli.
+    mevcut_key = kimlikler.get(ac.IMAGE_KEY, "")
+    mevcut_url = kimlikler.get(ac.IMAGE_URL, "")
     # "Boş = mevcut korunur" kuralı KORUNUYOR (v1.x davranışı).
     api_key = api_key or mevcut_key
     base_url = base_url or mevcut_url
@@ -174,12 +195,15 @@ def post_settings(req: SettingsRequest,
             raise HTTPException(status_code=422, detail=i18n.t("err.first_setup_base_url", dil.aktif()))
 
     try:
-        # Kimlik doğrulaması DİĞER alanların yazımından ÖNCE: geçersiz bir
-        # endpoint'le gelen istek hiçbir şey yazmadan 422 dönmeli
-        # (tests/test_settings_route.py bu sırayı sabitliyor).
+        updates: dict[str, str] = {}
+        # Görsel kimliğinin kapıları `ac.save_credentials`ınkiler, aynı sırayla:
+        # satır sonu, sonra şema. Geçersiz bir endpoint'le gelen istek hiçbir
+        # şey yazmadan 422 döner (tests/test_settings_route.py bu sırayı sabitliyor).
         if azure_hedefli and api_key and base_url:
-            ac.save_credentials(api_key, base_url)
-        updates = {}
+            _satir_sonu_yok((api_key, base_url), "err.credentials_newline")
+            ac.check_base_url(base_url, "base_url")
+            updates[ac.IMAGE_KEY] = api_key
+            updates[ac.IMAGE_URL] = base_url
 
         if req.chat_deployment is not None:
             updates[ac.CHAT_DEPLOYMENT] = req.chat_deployment.strip()
@@ -205,14 +229,13 @@ def post_settings(req: SettingsRequest,
         # değil "bağlantıyı kopar" demek olurdu. O yüzden boş kutu, gizli
         # alanlarla AYNI kuralı izliyor: "dokunmadım".
         #
-        # Gerekçe simetri değil, ÖLÇÜLEN veri kaybı: yukarıdaki
-        # `save_credentials` boş `base_url`de bilerek atlanıp mevcut
-        # endpoint'i KORUYOR, ama bu döngü hemen ardından onu "" ile
-        # eziyordu — tek istekte biri koruyup öteki siliyordu. İstemci
-        # `base_url`i KOŞULSUZ gönderiyor (static/settings.js → saveSettings)
-        # ve boş-adres kapısı yalnız sağlayıcı "azure" seçiliyken kuruluyor,
-        # yani yalnızca OpenAI anahtarı kaydeden bir kullanıcı çalışan Azure
-        # kurulumunu 200 alarak siliyordu.
+        # Gerekçe simetri değil, ÖLÇÜLEN veri kaybı: yukarıdaki Azure bloğu boş
+        # `base_url`de bilerek atlanıp mevcut endpoint'i KORUYOR, ama bu döngü
+        # hemen ardından onu "" ile eziyordu — tek istekte biri koruyup öteki
+        # siliyordu. İstemci `base_url`i KOŞULSUZ gönderiyor (static/settings.js
+        # → saveSettings) ve boş-adres kapısı yalnız sağlayıcı "azure" seçiliyken
+        # kuruluyor, yani yalnızca OpenAI anahtarı kaydeden bir kullanıcı çalışan
+        # Azure kurulumunu 200 alarak siliyordu.
         #
         # Yetenek KAYBI yok: boş endpoint hiçbir zaman "bağlantıyı kes"
         # gestürü değildi — istemci onu "Endpoint gerekli." ile reddediyor.
@@ -236,13 +259,14 @@ def post_settings(req: SettingsRequest,
             assert cred.url_env is not None
             updates[cred.url_env] = deger.strip()
 
-        # Kataloğa girmemiş eski BYOK alanları. Katalog döngüsünün DIŞINDA
-        # bilerek: bunların henüz bir modeli ve adaptörü yok, kataloğa yazmak
-        # "bağlı" gibi görünmelerine yol açardı. Yazma yolu korunuyor çünkü
-        # v0.2.0'dan beri kaydediliyorlar ve veri kaybı olmamalı.
+        # Kataloğa girmemiş eski BYOK alanları (`depo_kimlik_bilgisi.ESKI_BYOK`).
+        # Katalog döngüsünün DIŞINDA bilerek: bunların henüz bir modeli ve
+        # adaptörü yok, kataloğa yazmak "bağlı" gibi görünmelerine yol açardı.
+        # Yazma yolu korunuyor çünkü v0.2.0'dan beri kaydediliyorlar ve veri
+        # kaybı olmamalı.
         #
         # `fal_key` BURADAN ÇIKTI: adaptörü geldi, kataloğa girdi ve yukarıdaki
-        # `for cred in catalog.CREDENTIALS` döngüsü onu aynı env'e aynı
+        # `for cred in catalog.CREDENTIALS` döngüsü onu aynı ada aynı
         # "boş = dokunma" kuralıyla yazıyor.
         #
         # DÜZELTME (Görev 9, 2026-09-15): bu satır önceden "üstelik
@@ -266,11 +290,15 @@ def post_settings(req: SettingsRequest,
                 ac.check_base_url(req.ollama_url.strip(), "ollama_url")
             updates["OLLAMA_URL"] = req.ollama_url.strip()
 
+        # `save_env`in kapısı: satır sonlu değer hiçbir alanda yazılmaz.
+        _satir_sonu_yok(updates.values(), "err.setting_newline")
         if updates:
-            ac.save_env(updates)
+            depo_kimlik_bilgisi.yaz(db, kullanici.id, updates, now=zaman.an())
     except ac.ImageError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    return modeller.settings_payload()
+    # Cevap YAZILANI yansıtır: sözlük DB'den yeniden okunur (aynı `Session`,
+    # flush edildi) — bellekteki birleştirme değil, gerçekten saklanan hâl.
+    return modeller.settings_payload(depo_kimlik_bilgisi.oku(db, kullanici.id))
 
 
 # ── Kullanıcı tercihleri ────────────────────────────────────────────────

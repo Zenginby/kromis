@@ -34,7 +34,7 @@ import app as appmod
 import i18n
 import prefs
 from services import ayar, cerez, depo_medya, hesap, kimlik
-from services.tablolar import Kullanici
+from services.tablolar import Kullanici, SaglayiciKimligi
 
 pytestmark = pytest.mark.gercek_kimlik
 
@@ -80,6 +80,17 @@ DIZINSIZ_KAPILI = {
 }
 
 KAPI = {kimlik.aktif_kullanici, kimlik.sayfa_kullanicisi}
+
+# SAĞLAYICI KİMLİĞİ okuyan rotalar (Faz 1 / 7): `kimlik.KIMLIKLER` taşırlar —
+# kullanıcının şifreli satırları istek başına bir kez çözülür. Liste iki yönlü
+# bekçili: listedeki taşır, taşıyan listede. Öteki 47 rota anahtar okumaz ve
+# okumamalı — sözlüğü boşuna çözmek her isteğe bir sorgu + N Fernet çözümü eklerdi.
+KIMLIK_OKUYAN = {
+    ("GET", "/api/settings"), ("POST", "/api/settings"),   # durum + yazım
+    ("POST", "/api/chat"),                                  # yönetmen bağlamı + sohbet adaptörü
+    ("POST", "/api/generate"), ("POST", "/api/edit"),       # görsel adaptörleri
+    ("POST", "/api/video"), ("POST", "/api/video/animate"), # video adaptörleri
+}
 
 # Yol parametrelerinin doldurulacağı geçerli biçimli değerler: kapı gövdeden
 # ve doğrulamadan ÖNCE koşuyor, ama yol eşleşmesi için biçim doğru olmalı.
@@ -171,6 +182,21 @@ def test_a_directory_reading_route_takes_the_user_scoped_settings_never_the_shar
                 f"{y} {p}: dizin okumayan kapılı rota — `DIZINSIZ_KAPILI` listesinde değil")
         if (y, p) in DIZINSIZ_KAPILI:
             assert ayar.ayarlar not in cagrilar, f"{y} {p}: dizin okumuyor deniyor ama ayar nesnesi alıyor"
+
+
+def test_only_the_routes_that_talk_to_a_provider_resolve_the_credentials():
+    """Belge §7: kimlik sözlüğü `Depends` ile, yalnız okuyan rotada — imzada yazılı, bağlam kapı değil."""
+    def _cagrilar(dependant) -> set:
+        s = {alt.call for alt in dependant.dependencies}
+        for alt in dependant.dependencies:
+            s |= _cagrilar(alt)
+        return s
+
+    okuyan = {(y, p) for y, p, r in _rotalar() if kimlik.kimlik_bilgileri in _cagrilar(r.dependant)}
+    assert okuyan == KIMLIK_OKUYAN, (
+        f"listede olmayan okuyucu: {sorted(okuyan - KIMLIK_OKUYAN)}; "
+        f"listede ama okumuyor: {sorted(KIMLIK_OKUYAN - okuyan)}")
+    assert KIMLIK_OKUYAN <= KAPILI, "kimlik okuyan rota kapısız olamaz"
 
 
 # ── Kapının davranışı ────────────────────────────────────────────────
@@ -365,8 +391,91 @@ def test_resolving_the_user_costs_exactly_one_query_per_request(istemci):
         sayac.clear()
         assert c.get("/api/prefs").status_code == 200
         assert len(sayac) == 2 and "tercihler" in sayac[1] and "kullanici_id" in sayac[1], sayac
+        # Faz 1 / 7: `GET /api/settings` 3 — kimlik (1) + `saglayici_kimlikleri` (1, bir kez;
+        # altı sağlayıcı ve N model için yeniden sorulmaz) + `tercihler` (1).
+        sayac.clear()
+        assert c.get("/api/settings").status_code == 200
+        assert len(sayac) == 3, sayac
+        assert sum("saglayici_kimlikleri" in q and "kullanici_id" in q for q in sayac) == 1, sayac
     finally:
         event.remove(motor, "before_cursor_execute", _say)
+
+
+# ── Faz 1 / 7: iki kullanıcı, iki Azure anahtarı, her istek kendi anahtarıyla ──
+
+
+class _SahteAzure:
+    """`httpx.Client`in yerine: `Authorization` başlığını kaydeder, tek görsel döndürür.
+
+    `ac.generate` istemciyi kendi açıyor (`credentials=None` yolu — tam olarak
+    web'in yolu) ve başlığı `Bearer <key>` diye kuruyor; hangi anahtarın TELE
+    çıktığını görebilen tek yer burası.
+    """
+    gorulen: list[str] = []
+
+    def __init__(self, *a, **k):
+        pass
+
+    def post(self, url, headers=None, json=None, timeout=None, **k):
+        _SahteAzure.gorulen.append((headers or {}).get("Authorization", ""))
+        import base64
+
+        class _Cevap:
+            status_code = 200
+
+            @staticmethod
+            def json():
+                return {"data": [{"b64_json": base64.b64encode(b"\x89PNG-sahte").decode()}]}
+        return _Cevap()
+
+    def close(self):
+        pass
+
+
+def test_two_users_generate_with_their_own_azure_key_and_the_row_is_ciphertext(istemci, tmp_path, monkeypatch):
+    """Belge §7 çıkış ölçütü: A ve B farklı anahtarla üretir, her istek KENDİ anahtarıyla
+    çıkar (sahte istemci başlığı kaydeder); DB dökümünde anahtar düz metin değil;
+    `credentials.env` hiç açılmaz (conftest guard'ı `veritabani`li dosyada aktif)."""
+    import httpx
+    monkeypatch.setattr(httpx, "Client", _SahteAzure)
+    _SahteAzure.gorulen.clear()
+    a_id, a_jeton, _ = _kullanici_ac()
+    b_id, b_jeton, _ = _kullanici_ac()
+    a, b = _oturumlu(a_jeton), _oturumlu(b_jeton)
+
+    # Kimlik yokken üretim 502 ve dosyaya DÜŞÜLMEZ (guard patlatırdı → 500 olurdu).
+    r = a.post("/api/generate", json={"prompt": "kedi", "size": "1024x1024", "quality": "low", "n": 1})
+    assert r.status_code == 502, r.text
+    assert "AZURE_IMAGE_API_KEY" in r.json()["detail"]
+
+    assert a.post("/api/settings", json={"api_key": "A-DUMMY-ANAHTAR", "base_url": "https://a/openai/v1/"}).status_code == 200
+    assert b.post("/api/settings", json={"api_key": "B-DUMMY-ANAHTAR", "base_url": "https://b/openai/v1/"}).status_code == 200
+    assert a.get("/api/settings").json()["endpoint"] == "https://a/openai/v1/"
+    assert b.get("/api/settings").json()["endpoint"] == "https://b/openai/v1/"
+    assert a.get("/api/settings").json()["providers"]["azure_image"] is True
+
+    for c in (a, b, a):
+        r = c.post("/api/generate", json={"prompt": "kedi", "size": "1024x1024", "quality": "low", "n": 1})
+        assert r.status_code == 200, r.text
+    assert _SahteAzure.gorulen == ["Bearer A-DUMMY-ANAHTAR", "Bearer B-DUMMY-ANAHTAR", "Bearer A-DUMMY-ANAHTAR"]
+    assert len(a.get("/api/history").json()["images"]) == 2
+    assert len(b.get("/api/history").json()["images"]) == 1
+
+    # Üçüncü kullanıcı hiçbir şey görmez; B'nin anahtarını silmesi A'ya dokunmaz.
+    _, c_jeton, _ = _kullanici_ac()
+    assert _oturumlu(c_jeton).get("/api/settings").json()["providers"]["azure_image"] is False
+
+    # pg_dump görünümü: ham satırlar şifreli, `ad` düz, kullanıcı başına ayrı.
+    with Session(appmod.app.state.motor) as db:
+        satirlar = db.execute(select(SaglayiciKimligi.kullanici_id, SaglayiciKimligi.ad,
+                                     SaglayiciKimligi.sifreli_deger)).all()
+    assert {(r.kullanici_id, r.ad) for r in satirlar} == {
+        (a_id, "AZURE_IMAGE_API_KEY"), (a_id, "AZURE_IMAGE_BASE_URL"),
+        (b_id, "AZURE_IMAGE_API_KEY"), (b_id, "AZURE_IMAGE_BASE_URL")}
+    dokum = b"".join(bytes(r.sifreli_deger) for r in satirlar)
+    for parca in (b"A-DUMMY", b"B-DUMMY", b"ANAHTAR", b"https://a", b"https://b"):
+        assert parca not in dokum, parca
+    assert not any(p.name == "credentials.env" for p in tmp_path.rglob("*")), "web yolunda dosya yazıldı"
 
 
 # ── Dil zincirinin 3. halkası DB'den ─────────────────────────────────

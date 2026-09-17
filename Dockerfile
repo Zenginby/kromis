@@ -38,14 +38,18 @@ RUN /opt/venv/bin/pip install -r /tmp/requirements.txt
 
 FROM python:3.13-slim
 
-# HOME=/data, BİLEREK: uygulamanın kimlik dosyası `~/.config/kromis/
-# credentials.env` (paths.credentials_path) ve web'de anahtarlar Ayarlar
-# panelinden `POST /api/settings` ile oraya YAZILIYOR. `HOME` konteynerin
-# kendi katmanında kalsaydı kullanıcının girdiği her anahtar konteyner
-# yeniden yaratıldığında yok olurdu. Böylece kimlik dosyası da veri birimine
-# iniyor: `/data/.config/kromis/credentials.env` (0o700 dizin + 0o600 dosya,
-# `azure_client._atomic_write`). Sağlayıcı anahtarları SÜREÇ ORTAMINDAN
-# OKUNMUYOR — bkz. .env.example'daki uyarı.
+# HOME=/data, BİLEREK ve HÂLÂ: Faz 1 / 7'ye kadar gerekçe kimlik dosyasıydı
+# (`~/.config/kromis/credentials.env`, `POST /api/settings` oraya yazıyordu);
+# artık sağlayıcı anahtarları kullanıcı başına ŞİFRELİ olarak DB'de
+# (`saglayici_kimlikleri`, services/depo_kimlik_bilgisi.py) ve web yolu o
+# dosyayı hiç açmıyor. Satır yine duruyor, gerekçesi ZAYIFLADI ama bitmedi:
+# `HOME` konteynerin kendi katmanında kalsa `~`ye yazan her şey (pip/uvicorn
+# önbellekleri, `paths.credentials_path`ın dondurulmuş kabuk için hâlâ ürettiği
+# yol) konteyner yeniden yaratıldığında yok olur ve yazılamayan bir `~`
+# beklenmedik yerlerde 500 üretir. Veri birimine bağlı tek ev dizini, sürpriz
+# bırakmıyor. Sağlayıcı anahtarları SÜREÇ ORTAMINDAN OKUNMUYOR — bkz.
+# .env.example'daki uyarı; ŞİFRELEME anahtarı ise ortamdan: `KROMIS_SECRET_KEY`
+# ZORUNLU, yoksa uygulama açılmaz (app._lifespan, services/sifre.py).
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH" \

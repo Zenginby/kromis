@@ -61,7 +61,8 @@
         "services.modeller",
         "services.palet",
         "services.posta",
-        "services.redaksiyon"
+        "services.redaksiyon",
+        "services.sifre"
       ],
       "ithal_eden": [
         "android_main",
@@ -69,7 +70,7 @@
         "netguard"
       ],
       "katman": 11,
-      "satir": 234,
+      "satir": 262,
       "testler": [
         "tests/test_app.py",
         "tests/test_app_bolme.py",
@@ -114,6 +115,7 @@
         "tests/test_search_predicate.py",
         "tests/test_settings_route.py",
         "tests/test_shimmer.py",
+        "tests/test_sifre.py",
         "tests/test_video_onyuz.py",
         "tests/test_video_route.py"
       ],
@@ -150,6 +152,7 @@
       "erteli_ithal": [],
       "ithal": [
         "i18n",
+        "kimlik_baglami",
         "paths",
         "winsec"
       ],
@@ -157,7 +160,6 @@
         "azure_flux_client",
         "azure_mai_client",
         "chat_client",
-        "chat_providers",
         "credstore",
         "fal_client",
         "gemini_client",
@@ -166,11 +168,10 @@
         "providers",
         "routers.ayarlar",
         "routers.uretim",
-        "services.modeller",
         "veo_client"
       ],
       "katman": 3,
-      "satir": 458,
+      "satir": 518,
       "testler": [
         "tests/test_app.py",
         "tests/test_app_bolme.py",
@@ -198,7 +199,6 @@
         "tests/test_openai_client.py",
         "tests/test_palette_route.py",
         "tests/test_paths.py",
-        "tests/test_prefs.py",
         "tests/test_providers.py",
         "tests/test_settings.py",
         "tests/test_settings_route.py",
@@ -287,6 +287,7 @@
         "routers.ayarlar",
         "routers.sohbet",
         "routers.uretim",
+        "services.depo_kimlik_bilgisi",
         "services.depo_medya",
         "services.depo_tercih",
         "services.modeller",
@@ -312,6 +313,7 @@
         "tests/test_gemini_client.py",
         "tests/test_i18n.py",
         "tests/test_index.py",
+        "tests/test_kimlik_bilgisi_db.py",
         "tests/test_logo.py",
         "tests/test_model_secimi.py",
         "tests/test_openai_chat.py",
@@ -338,6 +340,7 @@
         "azure_client",
         "chat_prompt",
         "i18n",
+        "kimlik_baglami",
         "models"
       ],
       "ithal_eden": [
@@ -347,10 +350,11 @@
         "routers.sohbet"
       ],
       "katman": 5,
-      "satir": 193,
+      "satir": 218,
       "testler": [
         "tests/test_chat_client.py",
         "tests/test_chat_providers.py",
+        "tests/test_galeri_db.py",
         "tests/test_openai_chat.py"
       ],
       "yol": "chat_client.py"
@@ -378,7 +382,6 @@
       "ad": "chat_providers",
       "erteli_ithal": [],
       "ithal": [
-        "azure_client",
         "catalog",
         "chat_client",
         "credstore",
@@ -461,7 +464,8 @@
         "azure_client",
         "catalog",
         "etiket",
-        "i18n"
+        "i18n",
+        "kimlik_baglami"
       ],
       "ithal_eden": [
         "app",
@@ -477,9 +481,10 @@
         "veo_client"
       ],
       "katman": 4,
-      "satir": 201,
+      "satir": 228,
       "testler": [
         "tests/test_credstore.py",
+        "tests/test_kimlik_bilgisi_db.py",
         "tests/test_playwright_dil.py",
         "tests/test_playwright_studio.py",
         "tests/test_prefs.py",
@@ -528,7 +533,7 @@
         "services.sablon"
       ],
       "katman": 0,
-      "satir": 116,
+      "satir": 129,
       "testler": [
         "tests/test_errlog.py"
       ],
@@ -725,6 +730,24 @@
       "yol": "jsonstore.py"
     },
     {
+      "ad": "kimlik_baglami",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [
+        "azure_client",
+        "chat_client",
+        "credstore",
+        "services.kimlik"
+      ],
+      "katman": 0,
+      "satir": 56,
+      "testler": [
+        "tests/test_chat_providers.py",
+        "tests/test_credstore.py"
+      ],
+      "yol": "kimlik_baglami.py"
+    },
+    {
       "ad": "models",
       "erteli_ithal": [],
       "ithal": [
@@ -897,6 +920,7 @@
       "testler": [
         "tests/test_android_main.py",
         "tests/test_chat_prompt.py",
+        "tests/test_galeri_db.py",
         "tests/test_i18n.py",
         "tests/test_paths.py"
       ],
@@ -959,7 +983,7 @@
         "veo_client"
       ],
       "katman": 5,
-      "satir": 505,
+      "satir": 508,
       "testler": [
         "tests/test_azure_flux_client.py",
         "tests/test_azure_mai_client.py",
@@ -997,6 +1021,7 @@
         "paths",
         "services.ayar",
         "services.db",
+        "services.depo_kimlik_bilgisi",
         "services.depo_tercih",
         "services.dil",
         "services.kimlik",
@@ -1009,7 +1034,7 @@
         "app"
       ],
       "katman": 9,
-      "satir": 319,
+      "satir": 347,
       "testler": [],
       "yol": "routers/ayarlar.py"
     },
@@ -1175,7 +1200,7 @@
         "app"
       ],
       "katman": 8,
-      "satir": 233,
+      "satir": 240,
       "testler": [],
       "yol": "routers/sohbet.py"
     },
@@ -1205,7 +1230,7 @@
         "app"
       ],
       "katman": 9,
-      "satir": 462,
+      "satir": 473,
       "testler": [],
       "yol": "routers/uretim.py"
     },
@@ -1299,6 +1324,28 @@
         "tests/test_docker_kapisi.py"
       ],
       "yol": "services/db.py"
+    },
+    {
+      "ad": "services.depo_kimlik_bilgisi",
+      "erteli_ithal": [],
+      "ithal": [
+        "catalog",
+        "services.sifre",
+        "services.tablolar",
+        "services.zaman"
+      ],
+      "ithal_eden": [
+        "routers.ayarlar",
+        "services.kimlik"
+      ],
+      "katman": 6,
+      "satir": 143,
+      "testler": [
+        "tests/test_kimlik_bilgisi_db.py",
+        "tests/test_settings_route.py",
+        "tests/test_sifre.py"
+      ],
+      "yol": "services/depo_kimlik_bilgisi.py"
     },
     {
       "ad": "services.depo_klasor",
@@ -1506,6 +1553,7 @@
         "tests/test_galeri_db.py",
         "tests/test_hesap.py",
         "tests/test_kimlik.py",
+        "tests/test_kimlik_bilgisi_db.py",
         "tests/test_palet_db.py",
         "tests/test_playwright_hesap.py",
         "tests/test_sohbet_db.py",
@@ -1540,8 +1588,10 @@
       "erteli_ithal": [],
       "ithal": [
         "i18n",
+        "kimlik_baglami",
         "services.cerez",
         "services.db",
+        "services.depo_kimlik_bilgisi",
         "services.dil",
         "services.hesap",
         "services.tablolar"
@@ -1559,7 +1609,7 @@
         "services.ayar"
       ],
       "katman": 7,
-      "satir": 132,
+      "satir": 171,
       "testler": [
         "tests/test_kimlik.py"
       ],
@@ -1587,7 +1637,6 @@
       "ad": "services.modeller",
       "erteli_ithal": [],
       "ithal": [
-        "azure_client",
         "catalog",
         "credstore",
         "etiket",
@@ -1601,7 +1650,7 @@
         "routers.sohbet"
       ],
       "katman": 7,
-      "satir": 300,
+      "satir": 306,
       "testler": [],
       "yol": "services/modeller.py"
     },
@@ -1683,6 +1732,23 @@
       "yol": "services/sablon.py"
     },
     {
+      "ad": "services.sifre",
+      "erteli_ithal": [],
+      "ithal": [],
+      "ithal_eden": [
+        "app",
+        "services.depo_kimlik_bilgisi"
+      ],
+      "katman": 0,
+      "satir": 151,
+      "testler": [
+        "tests/test_docker_kapisi.py",
+        "tests/test_kimlik_bilgisi_db.py",
+        "tests/test_sifre.py"
+      ],
+      "yol": "services/sifre.py"
+    },
+    {
       "ad": "services.tablolar",
       "erteli_ithal": [],
       "ithal": [
@@ -1699,6 +1765,7 @@
         "routers.sohbet",
         "routers.uretim",
         "services.ayar",
+        "services.depo_kimlik_bilgisi",
         "services.depo_klasor",
         "services.depo_medya",
         "services.depo_palet",
@@ -1715,6 +1782,7 @@
         "tests/test_galeri_db.py",
         "tests/test_hesap.py",
         "tests/test_kimlik.py",
+        "tests/test_kimlik_bilgisi_db.py",
         "tests/test_legacy_formats.py",
         "tests/test_palet_db.py",
         "tests/test_palette_route.py",
@@ -1737,6 +1805,7 @@
         "routers.paletler",
         "routers.sohbet",
         "routers.uretim",
+        "services.depo_kimlik_bilgisi",
         "services.depo_klasor",
         "services.depo_medya",
         "services.depo_palet",
@@ -1748,6 +1817,7 @@
       "satir": 45,
       "testler": [
         "tests/test_galeri_db.py",
+        "tests/test_kimlik_bilgisi_db.py",
         "tests/test_legacy_formats.py",
         "tests/test_palet_db.py",
         "tests/test_sohbet_db.py",
@@ -2444,7 +2514,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 111,
+  "test_dosyasi_sayisi": 113,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",
@@ -2595,7 +2665,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 32,
+      "satir": 38,
       "yardimci_sayisi": 6,
       "yol": "/api/chat",
       "yontem": "POST"
@@ -2608,7 +2678,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 194,
+      "satir": 201,
       "yardimci_sayisi": 1,
       "yol": "/api/chats",
       "yontem": "DELETE"
@@ -2623,7 +2693,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 153,
+      "satir": 160,
       "yardimci_sayisi": 5,
       "yol": "/api/chats",
       "yontem": "GET"
@@ -2641,7 +2711,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 169,
+      "satir": 176,
       "yardimci_sayisi": 10,
       "yol": "/api/chats",
       "yontem": "POST"
@@ -2657,7 +2727,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 228,
+      "satir": 235,
       "yardimci_sayisi": 2,
       "yol": "/api/chats/{chat_id}",
       "yontem": "DELETE"
@@ -2673,7 +2743,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 160,
+      "satir": 167,
       "yardimci_sayisi": 6,
       "yol": "/api/chats/{chat_id}",
       "yontem": "GET"
@@ -2691,7 +2761,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 205,
+      "satir": 212,
       "yardimci_sayisi": 11,
       "yol": "/api/chats/{chat_id}",
       "yontem": "PUT"
@@ -2715,7 +2785,7 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 399,
+      "satir": 409,
       "yardimci_sayisi": 23,
       "yol": "/api/edit",
       "yontem": "POST"
@@ -2819,7 +2889,7 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 41,
+      "satir": 48,
       "yardimci_sayisi": 20,
       "yol": "/api/generate",
       "yontem": "POST"
@@ -2835,7 +2905,7 @@
       "onyuz": [
         "static/settings.js"
       ],
-      "satir": 67,
+      "satir": 87,
       "yardimci_sayisi": 3,
       "yol": "/api/guncelleme",
       "yontem": "GET"
@@ -2851,7 +2921,7 @@
       "onyuz": [
         "static/settings.js"
       ],
-      "satir": 97,
+      "satir": 117,
       "yardimci_sayisi": 3,
       "yol": "/api/guncelleme",
       "yontem": "POST"
@@ -3196,7 +3266,7 @@
         "static/core.js",
         "static/settings.js"
       ],
-      "satir": 279,
+      "satir": 307,
       "yardimci_sayisi": 3,
       "yol": "/api/prefs",
       "yontem": "GET"
@@ -3216,7 +3286,7 @@
         "static/core.js",
         "static/settings.js"
       ],
-      "satir": 286,
+      "satir": 314,
       "yardimci_sayisi": 9,
       "yol": "/api/prefs",
       "yontem": "POST"
@@ -3226,7 +3296,6 @@
       "islev": "get_settings",
       "modul": "routers.ayarlar",
       "moduller": [
-        "azure_client",
         "catalog",
         "credstore",
         "etiket",
@@ -3239,7 +3308,7 @@
       "onyuz": [
         "static/settings.js"
       ],
-      "satir": 30,
+      "satir": 49,
       "yardimci_sayisi": 7,
       "yol": "/api/settings",
       "yontem": "GET"
@@ -3260,8 +3329,8 @@
       "onyuz": [
         "static/settings.js"
       ],
-      "satir": 125,
-      "yardimci_sayisi": 5,
+      "satir": 145,
+      "yardimci_sayisi": 14,
       "yol": "/api/settings",
       "yontem": "POST"
     },
@@ -3282,7 +3351,7 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 88,
+      "satir": 96,
       "yardimci_sayisi": 9,
       "yol": "/api/video",
       "yontem": "POST"
@@ -3303,7 +3372,7 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 202,
+      "satir": 211,
       "yardimci_sayisi": 10,
       "yol": "/api/video/animate",
       "yontem": "POST"

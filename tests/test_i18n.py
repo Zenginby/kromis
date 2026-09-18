@@ -702,6 +702,10 @@ KULLANICIYA_KONUSAN = (
     # Faz 1 / 3: kimlik kapısının 401 metni, e-posta gövdeleri, sayfa şablonunun
     # 500 metni (`boot.load_failed.*` — `routers/kok.py`den buraya taşındı).
     "services/kimlik.py", "services/posta.py", "services/sablon.py",
+    # Faz 2 / 3: işçi `hata` sütununa KULLANICIYA gösterilecek metni yazar —
+    # sağlayıcı hatasını aynen (adaptör zaten çevirmiş) ve eksik girdi nesnesi
+    # için rotanın 404 metnini (`err.source_image_missing`), kullanıcının dilinde.
+    "services/isci.py",
 )
 
 # …ve kullanıcıya KONUŞMAYANLAR, her biri gerekçesiyle. Bu liste bir muafiyet
@@ -771,6 +775,8 @@ KULLANICIYA_KONUSMAYAN = {
                          "`None`/`bool`/sayı döndürüyor, cümleyi routers/hesap.py kuruyor",
     "services/kuyruk.py": "iş kuyruğu ilkelleri (Faz 2 / 1): SQL; satır/`bool`/sayı döndürür, "
                           "`hata` sütununa yazdığı `isci yanit vermiyor` bir KOD, cümleyi ön yüz kurar",
+    "isci.py": "işçi sürecinin bileşim kökü (Faz 2 / 3): kapılar, iş parçacıkları, kalp "
+               "atışı, SIGTERM; çıktısı stdout'a ASCII, OPERATÖRE — işin metni services/isci.py'de",
 }
 
 # Türkçe kalması KARAR olan dizeler — gerekçesiyle. Muafiyet DİZE düzeyinde,

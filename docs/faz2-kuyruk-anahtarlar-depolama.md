@@ -485,7 +485,7 @@ birimi paylaşmak zorunda (`/data`), platformda kova.
 
 ---
 
-## 3. İşçi süreci — `isci.py`, `services/isci.py`: al → üret → yaz → bitir; compose `isci` servisi (PR: `faz2/isci`)
+## 3. İşçi süreci — `isci.py`, `services/isci.py`: al → üret → yaz → bitir; compose `isci` servisi ✅ (PR: `faz2/isci`)
 
 **Kapsam.** İkinci süreç. Giriş noktası kökte **`isci.py`** (`app.py` web'in
 girişi nasılsa bu da işçinin: `python isci.py`; `Dockerfile` CMD DEĞİŞMEZ,
@@ -563,6 +563,84 @@ kendi bağlantısında; (c) SIGTERM'de yarım iş — K8.
 **Çıkış ölçütü.** compose'ta `docker compose up`: `isci` açılıyor, `isciler`de
 satır, kalp ilerliyor; testte `kuyruk.ekle` + `tek_tur` → `medya` satırı + nesne;
 telafi testi geçiyor; takım yeşil.
+
+**Yapıldığında (2026-09-18) ölçümler ve sapmalar.** Yeni `services/isci.py`
+(425 satır: `kos`, `tek_tur`, `siradakini_al`, `kalp_turu`, `es_zamanli`/
+`kalp_esigi`, `_YazimIzi` telafi sarmalayıcısı) ve kökte `isci.py` (258
+satır: kapılar → motor → `isciler` satırı → N iş parçacığı + kalp iş
+parçacığı → SIGTERM/SIGINT ile temiz kapanış; `--tek-tur`; testler/duman için
+gizli `--kalp-araligi`). `Dockerfile` CMD DEĞİŞMEDİ; `compose.yaml` 3 → 4
+servis (`isci`: `image: kromis`, `command: ["python", "isci.py"]`, göçü
+bekler, web ile aynı `/data` birimi, port yok); `.env.example` +2
+(`KROMIS_ISCI_ES_ZAMANLI`, `KROMIS_IS_KALP_ESIGI_SN`; `ALTYAPI` bekçisi 14 →
+16); `services/db.py::motor_kur` `pool_size=` aldı (öntanımlı 2, işçi
+`es_zamanli + 1`); `services/kuyruk.py` DOKUNULMADI (ilkeller yetti);
+`tools/graf_uret.py` `GIRIS_NOKTALARI`na `isci` (ikinci bileşim kökü, README
+notu). Ölçüler: modül 91 → 93, test dosyası 123 → 124, rota **54 DEĞİŞMEDİ**,
+`static/` DOKUNULMADI, takım **3.506 → 3.545 geçti, 12 atlandı, 199 sn** (E2E +
+Postgres zorunlu); ruff/mypy temiz. Yeni `tests/test_isci.py` **35 test** (dört tür; kredi
+katalogtan, tahmin değil; `prompt_sent` rotanın; n satır sıralı; telafi üç
+yoldan — FK düşüşü, `bitir` düşüşü, bayat düşürülmüş iş; nesne → satır →
+`bitir` → tek commit sırası olay dinleyicisiyle; redakte sağlayıcı hatası;
+beklenmeyen istisna KOD + `hata.log`; bilinmeyen model; eksik girdi ve
+sağlayıcı hatası kullanıcının dilinde (tr/en parametrik); dil seçmemiş
+kullanıcı `i18n.DEFAULT`; `[A, B]` kimlik bekçisi + istisnada da çözülme;
+çağrı sırasında `pool.checkedout() == 0`; iki işçi iki iş; kalp ilerler ve
+bayatı düşürür; ortam değişkeni ayrıştırma; kaynak taraması "web'in
+kapıları işçide"; alt süreç: anahtarsız/URL'siz 2, yarım kova 2, bozuk
+eş zamanlılık 2, `--tek-tur` boş kuyrukta 0 ve `isciler`e yazmaz, `--tek-tur`
+gerçek süreçte kimliksiz işi `hata`ya indirir, tam süreç kaydolur → kalp
+ilerler → SIGTERM → 0 ve satır silinir). **Canlı duman** (geçici küme, bu
+makine): `goc.py` → `0004_isler`; sahte sağlayıcıyla `isci.main(["--tek-tur"])`
+→ iş `bitti`, `sonuc.medya` 2 id, 2 `medya` satırı = diskte 2 nesne;
+gerçek `python isci.py` → `isciler` satırı (`es_zamanli=2`), 1 sn'de kalp
+ilerledi, SIGTERM → "yeni is alinmiyor, eldeki 0 is bitirilecek" → çıkış 0,
+satır silindi, `hata.log` yok.
+
+**Kararlar, belgenin açık bıraktığı yerlerde:** (a) `istek` SÖZLEŞMESİ
+`services/isci.py`nin başında yazılı ve 4. görevin girdisi: ortak `prompt,
+size, quality, n, folder_id, session_id`; generate `arena_id, palette,
+prompt_sent`; edit `girdiler [{"ad", "anahtar"}], parent_id, palette,
+prompt_sent`; video `duration`; animate `girdiler, parent_id, duration,
+son_kare`. `anahtar` depo YOLU (kök göreli, `kullanicilar/<uuid>/isler/…`),
+`ad` adaptöre giden dosya adı (`abc123.png`, `upload.png`, `refN.png` —
+rotanın bugünkü adları). Model `isler.model`den. (b) TELAFİ SARMALAYICIYLA:
+`depo_medya.kaydet` dosya adını içinde üretiyor ve flush düşerse adı
+söyleyemez; `_YazimIzi` depoyu sarar, yazılan yolları tutar, düşüşte hepsini
+siler — `kaydet`in imzası değişmedi. (c) `kos` ÜÇ KISA OTURUM açar (kullanıcı +
+kimlik okuması; yazım; düşüş) ve sağlayıcı çağrısı boyunca hiçbirini —
+`siradakini_al` satırı commit'ten ÖNCE `expunge` eder (yoksa
+`expire_on_commit` ilk öznitelik okumasında bağlantı açardı). (d) Dil:
+`kullanicilar.dil`, NULL ise `i18n.DEFAULT` (belge `FALLBACK`ı ima ediyordu;
+`i18n`in kendi ayrımı "kullanıcı seçmemiş" ≠ "kullanıcı yok" ve burada
+kullanıcı var). Dil ve kimlik bağlamı `finally`de sıfırlanır. (e) Beklenmeyen
+istisnanın `hata` metni `beklenmeyen hata: <TürAdı>` — mesaj değil (yol ve
+parametre sızdırabilir), iz `hata.log`da; sağlayıcı hatası (`ImageError`)
+günlüğe YAZILMAZ (beklenen hata, `hata` sütunu yeter). (f) Eksik girdi
+nesnesi rotanın 404 metniyle (`err.source_image_missing`) `hata` — modül bu
+tek yerde kullanıcıya konuşur, `test_i18n`de KONUŞAN listesinde. (g)
+Girdi nesneleri işçi tarafından SİLİNMEZ (belge 4. göreve "iş bitince
+silinir" yazmış): silme kararı rotanın — "yeniden gönder" (5) aynı
+nesneleri kullanabilir, `artik_dosya.py` `isler/` önekini tarar. (h) Kalp iş
+parçacığı `bayatlari_dusur`u da çağırır (eşik `KROMIS_IS_KALP_ESIGI_SN`):
+ölen işçinin işini yaşayan işçi `hata`ya çeker, 10. görevin bakımı aynı
+işlevi çağırır. (i) İş parçacığı döngüsü istisnada ÖLMEZ (iz + 1 sn +
+devam): sessizce düşen kapasite en geç görünen kusur. (j) `hata`ya düşen
+işin nesnesi de SİLİNİR (telafi her yolda), yani düşen iş disk/kovada iz
+bırakmaz. (k) Günlük stdout'a tek satır ASCII (`isci: …`), 9. görev JSON'a
+çevirir; `isciler.konak` `socket.gethostname()`, `surum` `version.APP_VERSION`.
+
+**4. göreve devredilen.** Rotalar sağlayıcıyı çağırmaz: doğrulama aynen →
+multipart girdiler `depo.yaz("kullanicilar/<uuid>/isler/<is_id>/<ad>")` →
+`palet.palette_prompt` (`prompt_sent`, `pal`) ve `catalog.cost_for × n`
+(`kredi_tahmini`) ROTADA → `kuyruk.ekle(db, kullanici.id, tur, istek, model,
+kredi_tahmini)` → **202** `{"is": kuyruk._json(is)}`. `istek` yukarıdaki (a)
+sözleşmesiyle; `girdiler[0]` ana referans, `parent_id` galeriden seçildiyse.
+Test deseni: sağlayıcıyı yamala (`providers.generate` …) → `POST` 202 →
+`isci.tek_tur(db, depo, ayarlar=…)` → `GET /api/history`de kayıt; conftest'e
+`uret_ve_bitir(client, …)` yardımcısı. `tek_tur`ün `ayarlar`ı testte
+`app.state.ayarlar`, depo `app.state.dosya`. Girdi nesnelerinin ömrü rotanın
+kararı (g). E2E fixture'ına `tek_tur` döngüsü iş parçacığı (belge §4).
 
 ---
 

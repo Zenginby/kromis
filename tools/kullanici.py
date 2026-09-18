@@ -51,7 +51,7 @@ from sqlalchemy.exc import SQLAlchemyError  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
 import models  # noqa: E402
-from services import db, hesap  # noqa: E402
+from services import db, hesap, kiraci  # noqa: E402
 from services.tablolar import Oturum  # noqa: E402
 
 CIKIS_TAMAM = 0
@@ -143,7 +143,11 @@ def main(argv: list[str]) -> int:
 
     motor = db.motor_kur(url)
     try:
-        with Session(motor) as oturum:
+        # `app.rol = 'admin'` (RLS, Faz 2 / 7): iki komut da hesap tablolarında
+        # (`kullanicilar`, `oturumlar`) ve onlar politikasız — bağlam bugün bir şey
+        # değiştirmez, ama araç platformun elidir ve rolü açıkça taşır: yarın bir
+        # iş tablosuna dokunan komut (8. görevin tavanı) bağlamsız kalmasın.
+        with kiraci.baglam(rol=kiraci.ADMIN), Session(motor) as oturum:
             if args.komut == "olustur":
                 assert parola is not None
                 kimlik = olustur(oturum, eposta, parola, admin=args.admin, dil=args.dil)

@@ -389,7 +389,11 @@ def test_resolving_the_user_costs_exactly_one_query_per_request(istemci):
     sayac: list[str] = []
 
     def _say(conn, cursor, statement, parameters, context, executemany):
-        sayac.append(statement)
+        # `set_config('app.kullanici_id' …)` (Faz 2 / 7) bir SORGU değil, transaksiyonun
+        # kiracı bağlaması: kimlik çözülür çözülmez aynı transaksiyona yazılır ve tablo
+        # okumaz. Sayılmaz; varlığı ve yeri tests/test_rls.py'de ölçülüyor.
+        if "set_config" not in statement:
+            sayac.append(statement)
 
     motor = appmod.app.state.motor
     event.listen(motor, "before_cursor_execute", _say)

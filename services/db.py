@@ -52,6 +52,17 @@ bağlantı sınırı düşük (Neon/Supabase kendi pooler'ını öne koyuyor) ve
 uygulamanın tek replikası istek başına bir bağlantıyı saniyeden kısa tutuyor.
 `pool_pre_ping`: yönetilen servisler boşta kalan bağlantıyı sessizce kapatıyor;
 ping olmadan ilk istek "server closed the connection" ile düşer.
+
+KİRACI BAĞLAMI TRANSAKSİYONUN İLK İFADESİ (Faz 2 / 7): `Session` sınıfının
+`after_begin` olayı `kiraci.uygula(baglanti)` çağırır — bağlamda bir kullanıcı
+ya da `admin` rolü varsa `set_config('app.kullanici_id' / 'app.rol', …, true)`
+(= `SET LOCAL`) transaksiyonun başında gider, RLS politikası (`0006_rls`)
+onu okur. SINIF düzeyinde: bu süreçteki HER `Session` — rotanın `oturum`u,
+işçinin `Session(motor)`u, araçların oturumu, SSE'nin kısa oturumları — aynı
+kancadan geçer; `sessionmaker` yok, kancayı unutacak ikinci bir kurucu da
+yok. Bağlam yoksa kanca SUSAR: açık rotalar ve `/health` hesap tablolarında
+ve politikasız, onlara gidiş-dönüş eklemek boşa. Kimlik çözüldükten SONRA
+aynı transaksiyona yazılan bağlam `services/kimlik.py`de (`kiraci.uygula(db)`).
 """
 from __future__ import annotations
 
@@ -61,8 +72,10 @@ from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as GelecekZamanAsimi
 
 from fastapi import Depends, HTTPException, Request
-from sqlalchemy import Engine, create_engine, text
-from sqlalchemy.orm import Session
+from sqlalchemy import Connection, Engine, create_engine, event, text
+from sqlalchemy.orm import Session, SessionTransaction
+
+from services import kiraci
 
 # Bağlantı dizesinin ortam değişkeni — `postgresql+psycopg://kullanici:parola@konak/db`.
 # `.env.example`, `compose.yaml` ve CI aynı adı kullanıyor (bekçisi
@@ -177,3 +190,19 @@ def oturum(request: Request) -> Iterator[Session]:
 # Rotaların kullanacağı TEK biçim — `Depends(db.oturum)` yazılmaz, çünkü
 # öntanımlı kapsam commit'i cevaptan SONRAYA bırakır (gerekçe modül başında).
 OTURUM = Depends(oturum, scope="function")
+
+
+def kiraci_bagla(session: Session, transaction: SessionTransaction, connection: Connection) -> None:
+    """`Session.after_begin` dinleyicisi: kiracı bağlamı transaksiyonun ilk ifadesi olsun (gerekçe modül başında).
+
+    Modül düzeyinde bir işlev, lambda değil: tests/test_rls.py `event.contains`
+    ile kancanın GERÇEKTEN takılı olduğunu sınıyor — adı olmayan bir dinleyici
+    sınanamaz. Bağlam yoksa `uygula` hiçbir şey göndermez.
+    """
+    kiraci.uygula(connection)
+
+
+# İthal anında, sınıfa: `services.db`yi ithal eden her süreç (web, işçi,
+# araçlar, testler) kancayı alır; `Session(motor)` yazan hiçbir yer onu
+# bilmek zorunda değil.
+event.listen(Session, "after_begin", kiraci_bagla)

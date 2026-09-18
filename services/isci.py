@@ -72,6 +72,17 @@ kullanıcıya konuşan bir hata: rotanın 404 metniyle (`err.source_image_missin
 Girdi nesneleri (`girdiler`, `son_kare`) iş bitince SİLİNMEZ — karar 4.
 görevin (rota yazıyor, "yeniden gönder" aynı nesneleri kullanabilir;
 `artik_dosya.py` `isler/` önekini tarar). İşçi yalnız okur.
+
+KİRACI BAĞLAMI, İKİ ROL (Faz 2 / 7, RLS): işçi platformun ama her iş bir
+kiracının. Kuyruk tarafı — `siradakini_al` (`kuyruk.al`: kuyruğun başı kimin
+olursa olsun) ve `kalp_turu` (bütün kiracıların bayat işleri) — `app.rol =
+'admin'` ile koşar: admin politikası `isler`de SELECT + UPDATE verir, ikisinin
+ihtiyacı tam bu. `kos` ise işin `kullanici_id`sini bağlar: kimlik okuması,
+medya satırı ve `bitir`/`dusur` o kiracının transaksiyonlarında — işçiye
+BYPASSRLS verilmedi, çünkü o zaman işçide yazılan ham bir sorgu yine her
+kiracıyı görürdü; bağlı işçi yanlışlıkla bile tek kiracının satırına dokunur.
+Bağlam `kiraci.baglam(...)` ile ve `with` içinde: aynı iş parçacığı bir
+sonraki işi başka kiracı için koşturur (yukarıdaki `[A, B]` dersi).
 """
 from __future__ import annotations
 
@@ -97,6 +108,7 @@ from services import (
     depo_medya,
     dil,
     dosya,
+    kiraci,
     kuyruk,
     platform_anahtari,
     zaman,
@@ -173,13 +185,21 @@ def siradakini_al(db: Session, isci_id: uuid.UUID, an: dt.datetime) -> Is | None
     sütunları taşır, DB'ye bir daha sormaz. Commit alımı kalıcı kılar: bu
     işçi düşerse satır `calisiyor`da kalır ve bayat düşürme onu `hata` yapar
     (K8), `bekliyor`a dönmez.
+
+    `app.rol = 'admin'` ile (RLS, Faz 2 / 7): kuyruğun başı herhangi bir
+    kiracının; sahip politikası altında işçi yalnız bağlı kullanıcının işini
+    görürdü, bağlamsız hiçbirini. `oturum=db`: çağıran `db`yi daha önce
+    kullanmışsa transaksiyon açıktır ve `after_begin` kancası geçmiştir
+    (testlerin `db_oturumu`su; işçi döngüsü her turda taze oturum açar, orada
+    kanca yeter).
     """
-    is_ = kuyruk.al(db, isci_id, an)
-    if is_ is None:
-        db.rollback()
-        return None
-    db.expunge(is_)
-    db.commit()
+    with kiraci.baglam(rol=kiraci.ADMIN, oturum=db):
+        is_ = kuyruk.al(db, isci_id, an)
+        if is_ is None:
+            db.rollback()
+            return None
+        db.expunge(is_)
+        db.commit()
     return is_
 
 
@@ -372,6 +392,16 @@ def kos(is_: Is, oturum_ac: Callable[[], Session], depo: dosya.Depo, ayarlar: ay
     def bitis() -> dt.datetime:
         return an if an is not None else zaman.an()
 
+    # İşin KİRACISI `_kos` boyunca bağlı: `oturum_ac()` ile açılan her oturumun
+    # ilk ifadesi `SET LOCAL app.kullanici_id` olur (services/db.py kancası) —
+    # kimlik okuması, medya satırı, `bitir`/`dusur` hep o kullanıcının satırında.
+    with kiraci.baglam(kullanici_id=is_.kullanici_id):
+        return _kos(is_, oturum_ac, depo, ayarlar, bitis)
+
+
+def _kos(is_: Is, oturum_ac: Callable[[], Session], depo: dosya.Depo, ayarlar: ayar.Ayarlar,
+         bitis: Callable[[], dt.datetime]) -> bool:
+    """`kos`un gövdesi, kiracı bağlı hâlde (sarmalayıcı yukarıda)."""
     with oturum_ac() as db:
         kullanici = db.get(Kullanici, is_.kullanici_id)
         # Değerler oturum KAPANMADAN kopyalanıyor: kapanış nesneyi ayırır ve
@@ -438,10 +468,13 @@ def kalp_turu(db: Session, isci_id: uuid.UUID, is_idleri: Iterable[uuid.UUID], a
     dakikalarca bloklar ve çağıran iş parçacığı kalp atamaz. Kendi oturumu,
     kendi commit'i. Bayat düşürme burada: ölen bir işçinin işini yaşayan bir
     işçi `hata`ya çeker — 10. görevin periyodik bakımı aynı işlevi çağırır.
+    `app.rol = 'admin'` ile (RLS): eldeki işler ve bayatlar her kiracının;
+    `isciler` politikasız, rol ona dokunmaz.
     """
-    kuyruk.isci_kalp(db, isci_id, an)
-    for is_id in is_idleri:
-        kuyruk.kalp(db, is_id, an)
-    dusen = kuyruk.bayatlari_dusur(db, an, esik)
-    db.commit()
+    with kiraci.baglam(rol=kiraci.ADMIN, oturum=db):
+        kuyruk.isci_kalp(db, isci_id, an)
+        for is_id in is_idleri:
+            kuyruk.kalp(db, is_id, an)
+        dusen = kuyruk.bayatlari_dusur(db, an, esik)
+        db.commit()
     return dusen

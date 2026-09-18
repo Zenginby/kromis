@@ -69,7 +69,7 @@ from sqlalchemy.exc import SQLAlchemyError  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
 from routers.uretim import ISLER_DIZINI  # noqa: E402
-from services import ayar, db, dosya  # noqa: E402
+from services import ayar, db, dosya, kiraci  # noqa: E402
 from services.tablolar import Is, Kullanici, Medya, Varlik  # noqa: E402
 from storage import MEDIA_TYPES  # noqa: E402
 
@@ -330,7 +330,10 @@ def main(argv: list[str]) -> int:
 
     motor = db.motor_kur(url)
     try:
-        with Session(motor) as oturum:
+        # `app.rol = 'admin'` (RLS, Faz 2 / 7): tarama BÜTÜN kullanıcıların satırını
+        # okur; bağlamsız bir oturum politika altında 0 satır görür ve her dosyayı
+        # "artık" sayardı — silme kipinde felaket. Admin politikası yalnız okur, yeter.
+        with kiraci.baglam(rol=kiraci.ADMIN), Session(motor) as oturum:
             rapor = tara_kova(oturum, kova) if kova is not None else tara(oturum, genel)
     except SQLAlchemyError as hata:
         print(f"veri tabani hatasi ({type(hata).__name__}): {str(hata).splitlines()[0]}", file=sys.stderr)

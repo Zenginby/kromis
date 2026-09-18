@@ -670,7 +670,7 @@ def test_every_frontend_script_is_loaded_and_in_order():
     önceki dosyalarda tanımlı adlara dokunuyor.
     """
     client = TestClient(appmod.app)
-    order = ["core.js", "folders.js", "assets.js", "palette.js", "settings.js",
+    order = ["core.js", "folders.js", "assets.js", "palette.js", "isler.js", "settings.js",
              "viewer.js", "chat.js"]
     html = client.get("/").text
     positions = [html.find(f"/static/{name}") for name in order]
@@ -678,6 +678,18 @@ def test_every_frontend_script_is_loaded_and_in_order():
     assert positions == sorted(positions), "script sırası bozulmuş"
     for name in order:
         assert client.get(f"/static/{name}").status_code == 200, name
+
+
+def test_the_jobs_panel_anchors_are_served():
+    """İş paneli (Faz 2 / 5): isler.js bu id'lere yükleme anında `$()` ile bağlanıyor;
+    biri kaybolursa panel kurulmaz ve 202 ile kuyruğa giden iş ekranda görünmez.
+    Tetik `aria-controls` ile panele bakıyor ki `closeSheets` onu türetsin."""
+    html = TestClient(appmod.app).get("/").text
+    for element_id in ("isler-btn", "isler-sayac", "isler-sheet", "isler-close",
+                       "isler-durum", "isler-liste", "isler-bos"):
+        assert f'id="{element_id}"' in html, element_id
+    assert re.search(r'id="isler-btn"[^>]*aria-controls="isler-sheet"', html)
+    assert 'id="isler-sheet" class="sheet sheet-right"' in html
 
 
 # ── Prompt Yönetmeni (v1.13) ───────────────────────────────────────────

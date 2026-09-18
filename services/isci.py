@@ -350,9 +350,19 @@ def kos(is_: Is, oturum_ac: Callable[[], Session], depo: dosya.Depo, ayarlar: ay
     (ya da iş bu arada bayat düşürülmüştü). `oturum_ac` her çağrıda YENİ bir
     `Session` verir (`lambda: Session(motor)`); bu işlev onu üç kısa pencerede
     açar — kullanıcı/kimlik okuması, sonuç yazımı, düşüş — ve sağlayıcı
-    çağrısı boyunca hiç açmaz. `an` verilmezse bitiş anı `zaman.an()`.
+    çağrısı boyunca hiç açmaz.
+
+    BİTİŞ ANI BİTİŞTE ÖLÇÜLÜR (`an` verilmemişse). 3. görevde `zaman.an()`
+    işlevin BAŞINDA alınıp `bitti` sütununa yazılıyordu — yani `bitti ≈ basladi`,
+    sağlayıcı dakikalarca sürse de. Faz 2 / 5'in E2E'si bunu ölçtü: SSE akışı
+    "değişen iş"i `GREATEST(olusturuldu, basladi, bitti) > since` ile soruyor
+    ve başlangıcına damgalanmış bir bitiş hiçbir `since`in ötesine geçmiyor —
+    işçi işi bitiriyor, panel `calisiyor`da donuyordu. Panelin geçen süresi de
+    aynı sütunu okur. `an` verilmişse (testler) aynen kullanılır.
     """
-    bitis = an if an is not None else zaman.an()
+    def bitis() -> dt.datetime:
+        return an if an is not None else zaman.an()
+
     with oturum_ac() as db:
         kullanici = db.get(Kullanici, is_.kullanici_id)
         # Değerler oturum KAPANMADAN kopyalanıyor: kapanış nesneyi ayırır ve
@@ -361,7 +371,7 @@ def kos(is_: Is, oturum_ac: Callable[[], Session], depo: dosya.Depo, ayarlar: ay
         kimlikler = depo_kimlik_bilgisi.oku(db, is_.kullanici_id) if kullanici is not None else {}
     if kullanici is None:
         # Hesap silinmiş: CASCADE işi de götürür, `dusur` 0 satır görür; yine de denenir.
-        return _dusur(oturum_ac, is_.id, KULLANICI_YOK_HATASI, bitis, ayarlar.data_dir)
+        return _dusur(oturum_ac, is_.id, KULLANICI_YOK_HATASI, bitis(), ayarlar.data_dir)
 
     jeton = kimlik_baglami.bagla(kimlikler)
     i18n.set_active(dil_kodu or i18n.DEFAULT)
@@ -370,15 +380,15 @@ def kos(is_: Is, oturum_ac: Callable[[], Session], depo: dosya.Depo, ayarlar: ay
             sonuclar = _uret(is_, depo)
         except ac.ImageError as e:
             # Redaksiyon `kuyruk.dusur`da (yazan yerde).
-            _dusur(oturum_ac, is_.id, str(e), bitis, ayarlar.data_dir)
+            _dusur(oturum_ac, is_.id, str(e), bitis(), ayarlar.data_dir)
             return False
         except Exception as e:
             errlog.safe_append(ayarlar.data_dir,
                                f"is {is_.id} ({is_.tur}) beklenmeyen hata:\n{traceback.format_exc()}")
-            _dusur(oturum_ac, is_.id, f"{BEKLENMEYEN_HATASI}: {type(e).__name__}", bitis,
+            _dusur(oturum_ac, is_.id, f"{BEKLENMEYEN_HATASI}: {type(e).__name__}", bitis(),
                    ayarlar.data_dir)
             return False
-        return _yaz(is_, sonuclar, oturum_ac, depo, ayarlar, bitis)
+        return _yaz(is_, sonuclar, oturum_ac, depo, ayarlar, bitis())
     finally:
         # HER yolda: bir sonraki işin sahibi başka biri.
         kimlik_baglami.coz(jeton)

@@ -2974,4 +2974,58 @@ body.viewer-open { overflow: hidden; }
   margin: 0;
 }
 
-
+/* ── İş paneli (Faz 2 / 5; static/isler.js) ─────────────────────────────
+   Sağ sheet'in içinde bir liste: satır = tür · model · durum · süre, altında
+   duruma göre önizleme / hata metni / eylem düğmesi. Durum RENGİ `data-durum`
+   üzerinden, sınıf çoğaltmadan — betik tek özniteliği yazıyor, tema da ondan
+   okuyor. Rozet dişlinin `.has-update` noktasının SAYILI ikizi. */
+.isler-sayac {
+  position: absolute; top: 3px; right: 1px; min-width: 16px; height: 16px;
+  padding: 0 4px; border-radius: 999px; box-shadow: 0 0 0 2px var(--bg);
+  background: var(--accent); color: var(--on-accent);
+  font: 600 10px/16px var(--font-display, system-ui, sans-serif); text-align: center;
+}
+.isler-sayac[hidden] { display: none; }
+/* 429 uyarısı: tetik kısa süre vurgulanır ki kullanıcı cümlenin nerede
+   durduğunu görsün (panel kapalıyken de). */
+#isler-btn.is-uyari { color: var(--danger); }
+.isler-durum {
+  margin: 0 0 12px; padding: 8px 10px; border-radius: 12px;
+  background: var(--panel-2); color: var(--muted); font-size: 13px;
+}
+.isler-durum[hidden] { display: none; }
+.isler-bos { margin: 0; color: var(--muted); font-size: 13px; }
+.isler-bos[hidden] { display: none; }
+.isler-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.is-satir {
+  padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--hairline); background: var(--panel-2);
+  display: grid; gap: 8px;
+}
+.is-bas { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; font-size: 13px; }
+.is-tur { font-weight: 600; }
+.is-model { color: var(--muted); }
+.is-durum { margin-left: auto; font-size: 12px; }
+.is-sure { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.is-satir[data-durum="calisiyor"] .is-durum { color: var(--accent); }
+.is-satir[data-durum="bitti"] .is-durum { color: var(--ok, var(--accent)); }
+.is-satir[data-durum="hata"] .is-durum { color: var(--danger); }
+.is-satir[data-durum="iptal"] .is-durum { color: var(--muted); }
+.is-satir[data-durum="bekliyor"] .is-durum { color: var(--muted); }
+.is-hata { margin: 0; color: var(--danger); font-size: 12px; overflow-wrap: anywhere; }
+.is-onizleme { display: flex; gap: 6px; }
+.is-onizleme img, .is-onizleme video {
+  width: 56px; height: 56px; object-fit: cover; border-radius: 8px;
+  cursor: pointer; background: var(--bg);
+}
+.is-eylem {
+  justify-self: start; padding: 5px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--hairline); background: var(--panel); color: var(--text);
+  font: 500 12px/1.4 var(--font-display, system-ui, sans-serif);
+}
+.is-eylem:hover { border-color: var(--accent); color: var(--accent); }
+.is-eylem:disabled { opacity: 0.5; cursor: default; }
+/* Arena turu: 2-4 sütun bir grup — başlık + iç liste. */
+.is-grup { display: grid; gap: 6px; }
+.is-grup-baslik { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+.is-grup-liste { padding-left: 10px; border-left: 2px solid var(--hairline); }

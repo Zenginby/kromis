@@ -1183,8 +1183,10 @@ function applyToForm(parsed) {
  * sormayan bir giriş noktası, kapının metnini ölü bir cümleye çevirir ve
  * ÜCRETLİ bir isteği sessizce yollar.
  *
- * MEŞGULİYET için yeni bayrak gerekmiyor: `run()` `runBusy`yı kuruyor ve
- * `goBlockReason`ın ilk satırı onu okuyor. Düğmeler `disabled` da EDİLMİYOR —
+ * MEŞGULİYET için yeni bayrak gerekmiyor: sohbet turu `runBusy`yı `setChatBusy`
+ * ile kuruyor ve `goBlockReason` onu okuyor (üretim tarafında kilit yok artık —
+ * Faz 2 / 5: iş kuyruğa gidiyor, #go gönderimde 1 sn soğuyor). Düğmeler
+ * `disabled` da EDİLMİYOR —
  * kapı zamanla değişiyor (anahtar sonradan girilir, üretim biter) ve eski bir
  * dökümde donmuş bir `disabled` yanlış bir söz olurdu.
  */

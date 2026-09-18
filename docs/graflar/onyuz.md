@@ -12,10 +12,11 @@ Betikler küresel kapsamda, `static/index.html`'deki SIRAYLA yükleniyor — mod
 4. `/static/folders.js`
 5. `/static/assets.js`
 6. `/static/palette.js`
-7. `/static/settings.js`
-8. `/static/viewer.js`
-9. `/static/chat.js`
-10. `/static/mobile.js`
+7. `/static/isler.js`
+8. `/static/settings.js`
+9. `/static/viewer.js`
+10. `/static/chat.js`
+11. `/static/mobile.js`
 
 Stiller: `/static/fonts.css`, `/static/style.css`, `/static/flow-tokens.css`, `/static/mobile.css`
 
@@ -46,6 +47,10 @@ flowchart LR
   n_folders_js["folders.js"] -->|2| n_i18n_js["i18n.js"]
   n_folders_js["folders.js"] -->|1| n_palette_js["palette.js"]
   n_giris_js["giris.js"] -->|1| n_i18n_js["i18n.js"]
+  n_isler_js["isler.js"] -->|3| n_core_js["core.js"]
+  n_isler_js["isler.js"] -->|1| n_folders_js["folders.js"]
+  n_isler_js["isler.js"] -->|1| n_i18n_js["i18n.js"]
+  n_isler_js["isler.js"] -->|1| n_palette_js["palette.js"]
   n_palette_js["palette.js"] -->|4| n_core_js["core.js"]
   n_palette_js["palette.js"] -->|1| n_folders_js["folders.js"]
   n_palette_js["palette.js"] -->|1| n_i18n_js["i18n.js"]
@@ -65,11 +70,12 @@ flowchart LR
 | betik | satır | üst düzey tanım | çağırdığı sunucu yolları |
 | --- | --- | --- | --- |
 | `static/assets.js` | 586 | 25 | `/api/assets/{}`, `/api/assets/{}/{}`, `/api/banner`, `/api/banner/preview`, `/api/logo`, `/api/logo/preview`, `/assets/banners/{}`, `/assets/logos/{}`, `/assets/mottos/{}`, `/assets/{}/{}`, `/output/{}` |
-| `static/chat.js` | 2771 | 90 | `/api/arena/{}`, `/api/arena/{}/winner`, `/api/chat`, `/api/chats`, `/api/chats/{}`, `/api/prefs`, `/output/{}.${videoMu ` |
-| `static/core.js` | 3246 | 92 | `/api/edit`, `/api/generate`, `/api/history`, `/api/image/{}`, `/api/isler/{}`, `/api/output/{}/download`, `/api/prefs`, `/api/video`, `/api/video/animate`, `/output/`, `/output/{}`, `/output/{}.png` |
+| `static/chat.js` | 2773 | 90 | `/api/arena/{}`, `/api/arena/{}/winner`, `/api/chat`, `/api/chats`, `/api/chats/{}`, `/api/prefs`, `/output/{}.${videoMu ` |
+| `static/core.js` | 3226 | 91 | `/api/edit`, `/api/generate`, `/api/image/{}`, `/api/output/{}/download`, `/api/prefs`, `/api/video`, `/api/video/animate`, `/output/`, `/output/{}`, `/output/{}.png` |
 | `static/folders.js` | 2172 | 60 | `/api/folders`, `/api/folders/{}`, `/api/folders/{}/download`, `/api/history`, `/api/images`, `/api/import`, `/output/{}`, `/output/{}${videoMu ` |
 | `static/giris.js` | 189 | 0 | `/api/hesap/ben`, `/api/hesap/dogrula`, `/api/hesap/giris`, `/api/hesap/kayit`, `/api/hesap/sifirla`, `/api/hesap/sifirla/dogrula` |
 | `static/i18n.js` | 84 | 2 | — |
+| `static/isler.js` | 505 | 1 | `/api/hesap/ben`, `/api/history`, `/api/isler`, `/api/isler/akis`, `/api/isler/{}/iptal`, `/api/isler/{}/yeniden`, `/output/{}${videoMu ` |
 | `static/mobile.js` | 55 | 0 | — |
 | `static/palette.js` | 844 | 37 | `/api/palette/suggest`, `/api/palettes`, `/api/palettes/{}` |
 | `static/pixel-canvas.js` | 347 | 0 | — |

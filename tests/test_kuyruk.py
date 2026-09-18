@@ -405,13 +405,16 @@ def test_listing_is_newest_first_limited_and_filtered_by_the_last_change(db_otur
 
 
 def test_the_dump_carries_the_contract_fields_and_never_the_request_body(db_oturumu, kullanici):
-    """`_json`: on anahtar, `istek` YOK (prompt/klasör `medya`da, referans anahtarları iç iş), damgalar `medya` biçiminde."""
+    """`_json`: on iki anahtar, `istek` YOK (prompt/klasör `medya`da, referans anahtarları iç iş),
+    damgalar `medya` biçiminde. `arena_id`/`folder_id` `istek`ten dökülen iki alan (Faz 2 / 5:
+    panel gruplaması ve önizlemenin klasörü) — ikisi de `medya`da zaten görünür, prompt değil."""
     is_ = kuyruk.ekle(db_oturumu, kullanici.id, "edit", {"prompt": "GİZLİ", "kaynaklar": ["k1"]}, "m", 8,
                       an=_an())
     db_oturumu.commit()
     dokum = kuyruk.listele(db_oturumu, kullanici.id)[0]
     assert list(dokum) == ["id", "tur", "durum", "model", "kredi_tahmini", "olusturuldu",
-                           "basladi", "bitti", "sonuc", "hata"]
+                           "basladi", "bitti", "sonuc", "hata", "arena_id", "folder_id"]
+    assert dokum["arena_id"] is None and dokum["folder_id"] is None
     assert "istek" not in dokum and "GİZLİ" not in repr(dokum) and "isci_id" not in dokum
     assert dokum["id"] == str(is_.id) and dokum["olusturuldu"] == zaman.damga(_an())
     assert dokum["basladi"] is None and dokum["bitti"] is None and dokum["sonuc"] is None
@@ -421,10 +424,15 @@ def test_the_dump_carries_the_contract_fields_and_never_the_request_body(db_otur
     dokum = kuyruk.listele(db_oturumu, kullanici.id)[0]
     assert dokum["basladi"] == zaman.damga(_an(5)) and dokum["bitti"] == zaman.damga(_an(9))
     assert dokum["sonuc"] == {"medya": ["ab12cd34ef56"]} and dokum["durum"] == "bitti"
-    # Kaynak düzeyinde de: `_json`ın gövdesinde `istek` adı hiç geçmez.
+    # Kaynak düzeyinde de: `_json` `istek`ten yalnız İKİ anahtar okur (`.get("arena_id")`,
+    # `.get("folder_id")` — Faz 2 / 5), başka hiçbir anahtar değil; `kalp_atisi`/`isci_id` hiç.
     govde = ast.parse(inspect.getsource(kuyruk._json))
     adlar = {d.attr for d in ast.walk(govde) if isinstance(d, ast.Attribute)}
-    assert "istek" not in adlar and "kalp_atisi" not in adlar and "isci_id" not in adlar
+    assert "kalp_atisi" not in adlar and "isci_id" not in adlar
+    okunan = {c.args[0].value for c in ast.walk(govde)
+              if isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) and c.func.attr == "get"
+              and c.args and isinstance(c.args[0], ast.Constant)}
+    assert okunan == {"arena_id", "folder_id"}, okunan
 
 
 def test_two_users_are_isolated_at_the_repository_layer(db_oturumu, kullanici):

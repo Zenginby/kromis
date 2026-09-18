@@ -1476,6 +1476,22 @@ yapılamaz).** Neon/Supabase/Fly'daki `DATABASE_URL` rolüyle bir kez:
 kromis_uygulama …` yolu (göç sahip rolüyle, uygulama yeni rolle). Sonucu bu
 paragrafın altına bir satır (tarih, sağlayıcı, rol adı, üç cevap).
 
+**Ölçülen — 2026-09-18, Railway'de GEÇİCİ bir Postgres (18.6), prova.**
+Servisin kutudan verdiği rol `postgres`: `rolsuper = t`, `rolbypassrls = t`.
+Yani `FORCE` orada İŞLEMEZ; üstelik boş bir tabloda `count(*)` yine 0 döndüğü
+için o kapı tohum yokken hiçbir şey kanıtlamaz (ölçüldü — önce bir satır yaz,
+sonra say). KURULUM.md'nin ayrı rol yolu aynı DB'de baştan sona prova edildi:
+göç `postgres` ile koştu, `CREATE ROLE kromis_uygulama LOGIN …` + `GRANT` +
+`ALTER DEFAULT PRIVILEGES`, uygulama yeni rolle bağlandı — altı kapı da yeşil
+(`f | f`, sekiz tabloda `ENABLE`+`FORCE`, 24 politika, tohumlanan satır
+bağlamsız **0** / `app.kullanici_id` bağlıyken **1**). Bu, sağlayıcı seçimini
+bağlayan bir bulgu: Railway'e dağıtılırsa ayrı uygulama rolü YEDEK DEĞİL,
+zorunlu yol. Canlının kendi satırı (gerçek dağıtımın sağlayıcısı ve rolü)
+hâlâ bekliyor. Provanın iki adımı da artık araç: `tools/rls_kontrol.py`
+(okur, altı kapı, çıkış 0/1/2) ve `tools/uygulama_rolu.py` (`--kuru`,
+`--tohum`); bekçileri `tests/test_rls_kontrol.py`, canlıda koşma biçimi
+KURULUM.md 1. adımda.
+
 ---
 
 ## 8. Admin: `kimlik.admin_kullanici`, `/admin` sayfası, `/api/admin/*` — kullanıcılar, kuyruk, metrikler, tavan, iptal, oturum düşürme (PR: `faz2/admin`)

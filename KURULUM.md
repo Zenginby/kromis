@@ -341,20 +341,38 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
    atlar ve kiracı yalıtımının ikinci katı sessizce kapanır (tablonun SAHİBİ
    olması sorun değil: göç `FORCE ROW LEVEL SECURITY` koyuyor). Yönetilen
    servislerin verdiği öntanımlı rol çoğu zaman süper kullanıcı değil, ama
-   bazıları `BYPASSRLS` taşır — bir kez sor:
+   bazıları `BYPASSRLS` taşır — Railway'inki ölçüldü (2026-09-18), `postgres`
+   rolü İKİSİNİ DE taşıyor ve orada ayrı rol zorunlu. Bir kez sor:
+
+   ```sh
+   DATABASE_URL=… python tools/rls_kontrol.py --kullanici <bir hesabin uuid'si>
+   ```
+
+   Altı kapıyı birden koşar (rol nitelikleri, `SET ROLE` ile ulaşılabilen
+   atlayıcı rol, sekiz tabloda `ENABLE`+`FORCE`, 24 politika, bağlamsız 0,
+   bağlamlı n); çıkış 0 = rol temiz. `psql` varsa aynı iki soruyu elle de
+   sorabilirsin:
 
    ```sh
    psql "${DATABASE_URL/+psycopg/}" -c "SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user"
    psql "${DATABASE_URL/+psycopg/}" -c "SELECT count(*) FROM medya"   # bağlamsız: 0 olmalı
    ```
 
-   İkisi de `f` ve sayım 0 ise rol doğru. Değilse ayrı bir rol aç ve
-   uygulamaya onu ver (göç sahip rolüyle koşmaya devam eder):
-   `CREATE ROLE kromis_uygulama LOGIN PASSWORD '…'; GRANT USAGE ON SCHEMA
-   public TO kromis_uygulama; GRANT SELECT, INSERT, UPDATE, DELETE ON ALL
-   TABLES IN SCHEMA public TO kromis_uygulama;` (yeni göçün yarattığı tablo
-   için `ALTER DEFAULT PRIVILEGES … GRANT … TO kromis_uygulama`). Neden ve
-   ne ölçüldüğü: docs/faz2-kuyruk-anahtarlar-depolama.md §7.
+   İkisi de `f` ve sayım 0 ise rol doğru. Dikkat: `medya` BOŞKEN o 0 hiçbir
+   şey kanıtlamaz (ölçüldü) — taze bir DB'de önce bir satır yaz (aşağıdaki
+   `--tohum`), sonra say. Kırmızıysa ayrı bir rol aç ve uygulamaya onu ver
+   (göç sahip rolüyle koşmaya devam eder):
+
+   ```sh
+   DATABASE_URL=… KROMIS_ROL_PAROLA=… python tools/uygulama_rolu.py --tohum
+   ```
+
+   Rolü açar, `GRANT`ları ve `ALTER DEFAULT PRIVILEGES`i (sonraki göçlerin
+   tabloları da yeni role açık doğsun diye) verir, yeni rolün de RLS'i
+   atlamadığını doğrular ve uygulamaya yazacağın `DATABASE_URL`i basar;
+   `--kuru` hiçbir şey yazmadan koşacağı DDL'i gösterir, `--tohum` yalnız
+   `medya` boşsa tek bir satır yazar. Sonra kontrolü YENİ dizeyle tekrar
+   koştur. Neden ve ne ölçüldüğü: docs/faz2-kuyruk-anahtarlar-depolama.md §7.
 2. **Şema — dağıtım ÖNCESİ komut, konteyner açılışı DEĞİL:**
 
    ```sh

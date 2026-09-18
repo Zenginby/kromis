@@ -2,7 +2,7 @@
 
 # Modül grafı
 
-97 Python modülü, 412 modül düzeyi + 15 erteli ithal kenarı.
+99 Python modülü, 418 modül düzeyi + 15 erteli ithal kenarı.
 
 Katman, o modülün depo içindeki en uzun bağımlılık zincirinin uzunluğu:
 **katman 0 hiçbir depo modülüne dayanmaz**, en üst katman uygulamanın
@@ -578,7 +578,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `screencolor.py` | 149 | 0 | — | 1 | 1 |
 | `services/ayar.py` | 165 | 9 | `paths`, `services.kimlik`, `services.tablolar` | 14 | 8 |
 | `services/cerez.py` | 82 | 2 | `services.db` | 4 | 5 |
-| `services/db.py` | 208 | 1 | `services.kiraci` | 19 | 11 |
+| `services/db.py` | 208 | 1 | `services.kiraci` | 21 | 11 |
 | `services/depo_kimlik_bilgisi.py` | 143 | 6 | `catalog`, `services.sifre`, `services.tablolar`, `services.zaman` | 6 | 7 |
 | `services/depo_klasor.py` | 232 | 7 | `folders`, `services.depo_medya`, `services.dosya`, `services.tablolar`, `services.zaman` | 2 | 5 |
 | `services/depo_medya.py` | 356 | 6 | `catalog`, `services.dosya`, `services.tablolar`, `services.zaman`, `storage` | 4 | 8 |
@@ -589,11 +589,11 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `services/dil.py` | 194 | 3 | `i18n`, `services.cerez` | 16 | 4 |
 | `services/dosya.py` | 328 | 1 | `services.nesne_depo` | 12 | 7 |
 | `services/gorsel.py` | 123 | 4 | `i18n`, `services.dil`, `services.dosya` | 4 | 3 |
-| `services/hesap.py` | 292 | 6 | `services.cerez`, `services.tablolar` | 4 | 18 |
+| `services/hesap.py` | 292 | 6 | `services.cerez`, `services.tablolar` | 5 | 18 |
 | `services/isci.py` | 480 | 10 | `azure_client`, `catalog`, `errlog`, `i18n`, `kimlik_baglami`, `providers`, `services.ayar`, `services.depo_kimlik_bilgisi`, `services.depo_medya`, `services.dil`, `services.dosya`, `services.kiraci`, `services.kuyruk`, `services.nesne_depo`, `services.platform_anahtari`, `services.tablolar`, `services.zaman` | 1 | 6 |
 | `services/kapilar.py` | 165 | 8 | `assets_store`, `catalog`, `chat_store`, `credstore`, `etiket`, `i18n`, `services.depo_klasor`, `services.dil`, `services.kuyruk`, `services.platform_anahtari`, `storage` | 4 | 4 |
 | `services/kimlik.py` | 195 | 8 | `i18n`, `kimlik_baglami`, `services.cerez`, `services.db`, `services.depo_kimlik_bilgisi`, `services.dil`, `services.hesap`, `services.kiraci`, `services.platform_anahtari`, `services.tablolar` | 11 | 3 |
-| `services/kiraci.py` | 176 | 0 | — | 7 | 1 |
+| `services/kiraci.py` | 176 | 0 | — | 9 | 2 |
 | `services/koken.py` | 133 | 0 | — | 2 | 4 |
 | `services/kota.py` | 170 | 6 | `i18n`, `services.dil`, `services.tablolar`, `services.zaman` | 2 | 2 |
 | `services/kuyruk.py` | 304 | 6 | `errlog`, `services.tablolar`, `services.zaman` | 5 | 6 |
@@ -605,7 +605,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `services/redaksiyon.py` | 68 | 1 | `catalog` | 1 | 0 |
 | `services/sablon.py` | 68 | 10 | `errlog`, `i18n`, `services.ayar`, `services.dil`, `version` | 2 | 0 |
 | `services/sifre.py` | 151 | 0 | — | 5 | 5 |
-| `services/tablolar.py` | 587 | 5 | `assets_store`, `models` | 26 | 25 |
+| `services/tablolar.py` | 587 | 5 | `assets_store`, `models` | 27 | 25 |
 | `services/zaman.py` | 45 | 0 | — | 18 | 9 |
 | `storage.py` | 423 | 1 | `catalog`, `jsonstore` | 9 | 9 |
 | `veo_client.py` | 629 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
@@ -677,10 +677,18 @@ flowchart LR
   n_tools_medya_tasi --> n_services_dosya["services.dosya"]
   n_tools_medya_tasi --> n_storage["storage"]
   n_tools_render_brand_assets["tools.render_brand_assets"]
+  n_tools_rls_kontrol["tools.rls_kontrol"]
+  n_tools_rls_kontrol --> n_services_db["services.db"]
+  n_tools_rls_kontrol --> n_services_kiraci["services.kiraci"]
   n_tools_surum_karari["tools.surum_karari"]
   n_tools_surum_karari --> n_version["version"]
   n_tools_surum_yaz["tools.surum_yaz"]
   n_tools_test_ortami["tools.test_ortami"]
   n_tools_test_ortami --> n_tools_gecici_postgres["tools.gecici_postgres"]
+  n_tools_uygulama_rolu["tools.uygulama_rolu"]
+  n_tools_uygulama_rolu --> n_services_db["services.db"]
+  n_tools_uygulama_rolu --> n_services_hesap["services.hesap"]
+  n_tools_uygulama_rolu --> n_services_kiraci["services.kiraci"]
+  n_tools_uygulama_rolu --> n_services_tablolar["services.tablolar"]
 ```
 

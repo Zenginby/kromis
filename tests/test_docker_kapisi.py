@@ -205,7 +205,11 @@ def test_dockerignore_keeps_everything_the_app_serves_or_imports():
 
 
 # `medya_tasi` (Faz 2 / 2): yerel medyayı kovaya taşır — konteyner içinden, `/data` birimine bakar.
-OPERATOR_ARACLARI = ("goc", "kullanici", "ice_aktar", "artik_dosya", "anahtar_dondur", "medya_tasi")
+# `rls_kontrol` + `uygulama_rolu` (Faz 2 / 7): canlı `DATABASE_URL` rolünü ölçer ve
+# gerekirse RLS'i atlamayan rolü açar — ikisi de tam o bağlantının olduğu yerden,
+# yani platformun kabuğundan/konteynerden koşuyor (KURULUM.md 1. adım).
+OPERATOR_ARACLARI = ("goc", "kullanici", "ice_aktar", "artik_dosya", "anahtar_dondur",
+                     "medya_tasi", "rls_kontrol", "uygulama_rolu")
 
 
 def test_dockerignore_ships_the_operator_tools_and_only_the_dev_tools_stay_out():

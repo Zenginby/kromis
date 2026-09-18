@@ -57,7 +57,8 @@ HESAP_TABLOLARI = {"kullanicilar", "oturumlar", "jetonlar", "giris_denemeleri"}
 # bekçisi `test_every_tool_that_opens_a_session_binds_a_tenant_context`
 # (dosya sisteminden türetilen kümeyle karşılaştırılır; `medya_tasi.py` ve
 # `goc.py` oturum açmaz — biri yalnız dosya taşır, öteki Alembic'e devreder).
-BAGLAM_TASIYAN_ARACLAR = {"anahtar_dondur.py", "artik_dosya.py", "ice_aktar.py", "kullanici.py"}
+BAGLAM_TASIYAN_ARACLAR = {"anahtar_dondur.py", "artik_dosya.py", "ice_aktar.py",
+                          "kullanici.py", "uygulama_rolu.py"}
 
 
 # ────────────────────────────────────────────────────────── fixture'lar

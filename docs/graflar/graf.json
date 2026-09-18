@@ -1435,7 +1435,9 @@
         "tools.artik_dosya",
         "tools.goc",
         "tools.ice_aktar",
-        "tools.kullanici"
+        "tools.kullanici",
+        "tools.rls_kontrol",
+        "tools.uygulama_rolu"
       ],
       "katman": 1,
       "satir": 208,
@@ -1731,7 +1733,8 @@
         "routers.hesap",
         "services.kimlik",
         "tools.ice_aktar",
-        "tools.kullanici"
+        "tools.kullanici",
+        "tools.uygulama_rolu"
       ],
       "katman": 6,
       "satir": 292,
@@ -1874,12 +1877,15 @@
         "tools.anahtar_dondur",
         "tools.artik_dosya",
         "tools.ice_aktar",
-        "tools.kullanici"
+        "tools.kullanici",
+        "tools.rls_kontrol",
+        "tools.uygulama_rolu"
       ],
       "katman": 0,
       "satir": 176,
       "testler": [
-        "tests/test_rls.py"
+        "tests/test_rls.py",
+        "tests/test_rls_kontrol.py"
       ],
       "yol": "services/kiraci.py"
     },
@@ -2146,7 +2152,8 @@
         "tools.anahtar_dondur",
         "tools.artik_dosya",
         "tools.ice_aktar",
-        "tools.kullanici"
+        "tools.kullanici",
+        "tools.uygulama_rolu"
       ],
       "katman": 5,
       "satir": 587,
@@ -2427,6 +2434,21 @@
       "yol": "tools/render_brand_assets.py"
     },
     {
+      "ad": "tools.rls_kontrol",
+      "erteli_ithal": [],
+      "ithal": [
+        "services.db",
+        "services.kiraci"
+      ],
+      "ithal_eden": [],
+      "katman": 2,
+      "satir": 165,
+      "testler": [
+        "tests/test_rls_kontrol.py"
+      ],
+      "yol": "tools/rls_kontrol.py"
+    },
+    {
       "ad": "tools.surum_karari",
       "erteli_ithal": [
         "version"
@@ -2466,6 +2488,23 @@
         "tests/test_test_ortami.py"
       ],
       "yol": "tools/test_ortami.py"
+    },
+    {
+      "ad": "tools.uygulama_rolu",
+      "erteli_ithal": [],
+      "ithal": [
+        "services.db",
+        "services.hesap",
+        "services.kiraci",
+        "services.tablolar"
+      ],
+      "ithal_eden": [],
+      "katman": 7,
+      "satir": 210,
+      "testler": [
+        "tests/test_rls_kontrol.py"
+      ],
+      "yol": "tools/uygulama_rolu.py"
     },
     {
       "ad": "veo_client",
@@ -3070,7 +3109,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 129,
+  "test_dosyasi_sayisi": 130,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",

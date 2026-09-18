@@ -22,6 +22,29 @@ görevde boş `MetaData()` idi ki `alembic check` ilk günden koşabilsin). Mode
 ithal ediliyor, yani `alembic` komutu `models`/`catalog`ı da yükler — göç
 aracının uygulama kodunu görmesi kaçınılmaz, çünkü CHECK değer kümeleri o
 sabitlerden okunuyor (services/tablolar.py, "ENUM'LAR CHECK İLE").
+
+`alembic.ini`NİN GEREKÇELERİ BURADA, orada DEĞİL — çünkü o dosya ASCII olmak
+ZORUNDA: Alembic onu kendi okuyor ve `encoding="locale"` veriyor
+(`alembic/config.py`), yani Türkçe Windows'ta cp1254. Tek bir ASCII dışı bayt
+bütün göç yolunu `UnicodeDecodeError` ile düşürüyordu ve `depo_db` üzerinden
+DB'ye dokunan HER test kırmızıya dönüyordu — 2026-09-18'de ölçüldü: 1024 hata.
+CI'ın yereli UTF-8 olduğu için orada hiç görünmedi, yani kusur yalnız
+geliştirici makinesinde yaşıyordu. Bekçisi
+`tests/test_db.py::test_alembic_ini_is_ascii_only`. Taşınan gerekçeler:
+
+* **`sqlalchemy.url` o dosyada YOK ve bilerek.** Bağlantı dizesi tek
+  kaynaktan, `DATABASE_URL` ortam değişkeninden okunuyor (yukarıdaki öncelik
+  sırası). Dosyaya yazılmış bir URL ya bayat kalır ya bir parola taşır; ikisi
+  de bu depoda ölçülmüş kusur sınıfı.
+* **Çağrı biçimi:**
+  `DATABASE_URL=postgresql+psycopg://… alembic upgrade head` ve
+  `DATABASE_URL=… alembic check` (model = göç mü? 2. görevden itibaren
+  anlamlı).
+* **Göçler NEREDE koşar:** dağıtım öncesi tek seferlik komutta (9. görev,
+  `tools/goc.py`), konteyner açılışında DEĞİL — iki replika yarışır.
+* **`file_template = %%(rev)s_%%(slug)s`:** dosya adı `NNNN_slug.py` olsun ki
+  sıra dosya listesinde okunsun (`0000_zemin.py`, `0001_…`); `revision` alanı
+  da aynı dizeyi taşıyor.
 """
 from __future__ import annotations
 
@@ -41,7 +64,14 @@ from services import db, tablolar  # noqa: E402  — `sys.path` üstte kuruldu, 
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # `encoding` ZORUNLU (CLAUDE.md § 5) ve burada teorik değil: `alembic.ini`
+    # başında Türkçe telif bildirimi taşıyor ("lisans DIŞIDIR"), `fileConfig`
+    # ise verilmezse dosyayı YERELİN kod sayfasıyla açıyor. Türkçe Windows'ta
+    # (cp1254) `Ş`nin ikinci baytı 0x9e tanımsız ve çağrı `UnicodeDecodeError`
+    # veriyor — göç koşan her yol düşüyor, yani `depo_db` fixture'ı üzerinden
+    # DB'ye dokunan BÜTÜN takım. Ölçüldü 2026-09-18: 1024 hata. Linux/macOS'ta
+    # yerel zaten UTF-8 olduğu için CI bunu HİÇ görmüyor.
+    fileConfig(config.config_file_name, encoding="utf-8")
 
 target_metadata = tablolar.Base.metadata
 

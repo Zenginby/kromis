@@ -2259,7 +2259,7 @@
         "tools.test_ortami"
       ],
       "katman": 0,
-      "satir": 255,
+      "satir": 274,
       "testler": [
         "tests/test_test_ortami.py"
       ],

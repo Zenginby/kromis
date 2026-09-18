@@ -67,6 +67,16 @@ MUAF = {
 
 METIN_METOTLARI = {"read_text", "write_text"}
 
+# `open` DIŞINDA, düz adla çağrılan ama metin dosyası açan işlevler.
+# `logging.config.fileConfig` `alembic/env.py`ye `from … import fileConfig`
+# ile giriyor, yani AST'de düz bir `Name`: ne `open` dalı ne `.attr` dalı onu
+# görüyordu ve sözleşme tam da kendi kusurunu kaçırdı — `alembic.ini` Türkçe
+# telif bildirimi taşıyor, Türkçe Windows'ta (cp1254) okunamıyor ve göç koşan
+# HER yol düşüyordu (ölçüldü 2026-09-18: 1024 hata; CI'ın yereli UTF-8 olduğu
+# için orada hiç görünmedi). `encoding=` parametresini Python 3.10'dan beri
+# alıyor, yani muafiyet değil ihlal.
+DUZ_AD_METIN_CAGRILARI = {"fileConfig"}
+
 
 def _python_dosyalari():
     for kok, dizinler, dosyalar in os.walk(REPO):
@@ -97,6 +107,9 @@ def ihlaller(kaynak: str, yol: str = "<kaynak>"):
 
         if isinstance(f, ast.Name) and f.id == "open":
             ad, metinsel = "open", False
+        elif isinstance(f, ast.Name) and f.id in DUZ_AD_METIN_CAGRILARI:
+            # İkili kipi yok: metin dosyası açtığı kesin, `encoding` her zaman anlamlı.
+            ad, metinsel = f.id, True
         elif isinstance(f, ast.Attribute) and (
                 f.attr == "open" or f.attr in METIN_METOTLARI):
             sahip = f.value.id if isinstance(f.value, ast.Name) else None

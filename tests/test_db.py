@@ -189,6 +189,25 @@ def test_the_alembic_config_loads_and_names_the_revision_chain():
         "URL alembic.ini'ye yazılmış — tek kaynak DATABASE_URL (services/db.py)")
 
 
+def test_alembic_ini_is_ascii_only():
+    """`alembic.ini` ASCII OLMAK ZORUNDA — Alembic onu `encoding="locale"` ile okuyor.
+
+    Kusur ölçüldü (2026-09-18, Türkçe Windows): dosyanın telif başlığındaki
+    `Ş` cp1254'te tanımsız bir bayt (0x9e) taşıyor, `Config(...)` daha
+    `env.py`ye sıra gelmeden `UnicodeDecodeError` veriyor ve `depo_db`
+    üzerinden DB'ye dokunan BÜTÜN takım (1024 test) hata veriyordu. Linux ve
+    macOS'ta yerel zaten UTF-8 olduğu için CI bunu HİÇ görmez — yani bu kapı
+    yalnız geliştirici makinesini koruyor ve bu yüzden VAR: kapı olmasa
+    dosyaya bir daha Türkçe yorum yazıldığında kusur sessizce geri gelirdi.
+    Gerekçelerin Türkçe anlatımı `alembic/env.py`nin docstring'inde.
+    """
+    ham = open(os.path.join(REPO, "alembic.ini"), "rb").read()
+    disarda = [(i, bayt) for i, bayt in enumerate(ham) if bayt > 127]
+    assert not disarda, (
+        f"alembic.ini ASCII olmalı; ASCII dışı ilk baytlar: {disarda[:5]} "
+        "(gerekçe bu testin docstring'inde, metin alembic/env.py'ye taşınır)")
+
+
 def test_alembic_refuses_to_run_without_a_connection_string(monkeypatch):
     """Sessizce bir varsayılana düşmek yok: URL yoksa açık hata, hangi değişkenin adıyla."""
     from alembic.config import Config

@@ -408,8 +408,8 @@ def test_an_adapter_error_becomes_a_502_with_the_turkish_detail(
     monkeypatch.setattr(appmod.providers, "generate_video", boom)
     monkeypatch.setattr(appmod.providers, "animate_video", boom)
     monkeypatch.setattr(gorsel, "output_png_path",
-                        lambda i, output_dir: __import__("os").devnull)
-    monkeypatch.setattr(gorsel, "read_png_file", lambda p: _png())
+                        lambda i, output_dir, **k: __import__("os").devnull)
+    monkeypatch.setattr(gorsel, "read_png_file", lambda p, **k: _png())
 
     r = client.post(yol, json=GECERLI) if not ek else client.post(yol, data={**GECERLI, **ek})
 

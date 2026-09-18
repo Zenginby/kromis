@@ -228,6 +228,16 @@ def pytest_configure(config: pytest.Config) -> None:
             "COZUM: " + gecici_postgres.kurulum_yonergesi()
         )
 
+    # NESNE DEPOLAMA ORTAMI TESTE SIZMASIN (Faz 2 / 2): `app.state.dosya` İTHAL
+    # ANINDA `KROMIS_NESNE_DEPO_*`tan kuruluyor (services/dosya.py); geliştiricinin
+    # kabuğunda gerçek R2 değerleri dururken takım koşsa 178 rota testi GERÇEK
+    # kovaya yazardı. Fixture geç kalır (ithal toplama sırasında), o yüzden
+    # burada — `_guard_against_the_developers_real_database`in ithal-öncesi ikizi.
+    # Nesne depolamayı sınayan testler depoyu `app.state.dosya`ya kendileri koyar.
+    for ad in list(os.environ):
+        if ad.startswith("KROMIS_NESNE_DEPO_"):
+            os.environ.pop(ad)
+
     if hasattr(os, "fchmod"):
         return
     if os.environ.get(ESKI_PYTHON_IZNI) == "1":
@@ -828,7 +838,11 @@ def fake_composite():
     tests/test_folders.py ve tests/test_palette_route.py'de birebir aynı
     (`_fake_composite`) olarak duruyordu — buraya taşındı.
     """
-    def _fake_composite(base_path: str, **kwargs) -> bytes:
+    def _fake_composite(base_path, **kwargs) -> bytes:
+        # Rota kaynağı depodan BAYT olarak okuyup `io.BytesIO` veriyor (Faz 2 / 2);
+        # dondurulmuş kabuk hâlâ yol verir — ikisi de geçsin.
+        if hasattr(base_path, "read"):
+            return base_path.read()
         with open(base_path, "rb") as f:
             return f.read()
     return _fake_composite

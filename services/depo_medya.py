@@ -33,6 +33,17 @@ satırı sonra dosyayı siler: satır gidince dosyaya ulaşan yol kalmıyor.
 korunuyor — dosya kullanıcının KENDİ dizininde aranıyor, yani kimlik kapısı
 dizinin kendisi.
 
+DOSYANIN YERİ BİR `Depo` (Faz 2 / 2, services/dosya.py): yazan/okuyan/silen
+her işlev `depo=` alır — rotalar `Depends(dosya.depo)` ile gelen nesneyi
+verir (yerel disk ya da R2 kovası), vermeyen çağıran (testlerin doğrudan
+çağrıları) bugünkü diske düşer (`dosya.YEREL`). `output_dir` PARAMETRESİ
+DURUYOR ve anlamı "yolun öneki": `os.path.join(output_dir, filename)` yerelde
+dosyanın yolu, kovada `data_dir`e göre anahtar (çeviri depoda). Sıra AYNI:
+nesne → satır → `flush`. Uzantı `media_path_of` ile diskte ARANMIYOR artık —
+kovada denemek anahtar başına bir HEAD olurdu; dosya adı satırda
+(`filename`), gerçek o. Silme yolu satır bulamazsa eski sözleşme için iki
+uzantıyı da dener (`_dosyayi_sil`).
+
 ZAMAN: satır `olusturuldu timestamptz` (mikrosaniyeli, `zaman.an()`); JSON
 `created_at` `zaman.damga()` ile eski biçimde (gerekçe services/zaman.py).
 Sıralama `olusturuldu`dan: liste EN YENİ ÜSTTE (`list_history`in ters
@@ -40,7 +51,6 @@ kronolojisi), arena turu ÜRETİM SIRASINDA (sütunlar soldan sağa).
 """
 from __future__ import annotations
 
-import contextlib
 import datetime as dt
 import os
 import uuid
@@ -50,9 +60,9 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 import catalog
-from services import zaman
+from services import dosya, zaman
 from services.tablolar import Medya
-from storage import _SAFE_ID, ext_for, media_path_of
+from storage import _SAFE_ID, MEDIA_TYPES, ext_for, media_type_for
 
 # `storage.py`den yeniden dışa açılıyor: rotalar MIME'ı ve uzantı kararını hâlâ
 # `storage.MEDIA_TYPES`/`media_type_for`dan okuyor (o tablonun yorumu orada).
@@ -111,7 +121,7 @@ def _etkilenen(sonuc: object) -> int:
 
 
 def kaydet(db: Session, kullanici_id: uuid.UUID, veri: bytes, meta: dict, output_dir: str,
-           *, now: dt.datetime | None = None) -> dict:
+           *, now: dt.datetime | None = None, depo: dosya.Depo | None = None) -> dict:
     """Medyayı kullanıcının dizinine yazar, satırı ekler; `history.json` kaydının aynısını döndürür.
 
     `meta` → sütun eşlemesi `storage.save`in kurallarıyla birebir (gerekçeleri
@@ -124,11 +134,12 @@ def kaydet(db: Session, kullanici_id: uuid.UUID, veri: bytes, meta: dict, output
     tam uuid alır. Dosya adı `{id}{uzantı}`, `filename` UNIQUE.
     """
     an = now if now is not None else zaman.an()
-    os.makedirs(output_dir, exist_ok=True)
     kimlik = uuid.uuid4().hex
     filename = f"{kimlik}{ext_for(meta.get('kind'))}"
-    with open(os.path.join(output_dir, filename), "wb") as f:
-        f.write(veri)
+    # ÖNCE NESNE, SONRA SATIR (belge §2): satır düşerse nesne artık kalır ve
+    # `tools/artik_dosya.py` onu bulur; tersi (satır var, nesne yok) galeride
+    # kırık bir kutu olurdu ve hiçbir araç onu aramıyor.
+    (depo or dosya.YEREL).yaz(os.path.join(output_dir, filename), veri, media_type_for(filename))
     satir = Medya(
         id=kimlik,
         kullanici_id=kullanici_id,
@@ -196,24 +207,27 @@ def bul(db: Session, kullanici_id: uuid.UUID, image_id: str) -> dict | None:
     return _json(m) if m is not None else None
 
 
-def dosya_yolu(db: Session, kullanici_id: uuid.UUID, image_id: str, output_dir: str) -> str | None:
-    """İNDİRME yolu: kullanıcının satırı VE diskte duran dosya; biri yoksa None.
+def dosya_yolu(db: Session, kullanici_id: uuid.UUID, image_id: str, output_dir: str,
+               *, depo: dosya.Depo | None = None) -> str | None:
+    """İNDİRME yolu: kullanıcının satırı VE depoda duran dosya; biri yoksa None.
 
-    Uzantı `media_path_of` ile aranıyor (tür kayıttan da okunabilirdi, ama
-    silme yolu aynı aramayı yapıyor ve iki döngü birine tür eklenip ötekinin
-    unutulmasının kapısı olurdu). Satır ŞART: Faz 0'ın `gorsel.output_media_path`i
-    yalnız diske bakıyordu, çünkü dizin tek kullanıcınındı; bugün dizin de
-    kullanıcıya özel ama servis yolunun gerçeği DB satırı — satırı silinmiş
-    (artık) bir dosya indirilemez.
+    Dosya adı SATIRDAN (`filename`) — Faz 1 / 5 uzantıyı `media_path_of` ile
+    diskte deniyordu (silme yoluyla tek döngü); kovada her deneme bir HEAD
+    olurdu ve satır adı zaten taşıyor. Satır ŞART: Faz 0'ın
+    `gorsel.output_media_path`i yalnız diske bakıyordu, çünkü dizin tek
+    kullanıcınındı; bugün servis yolunun gerçeği DB satırı — satırı silinmiş
+    (artık) bir dosya indirilemez. Depoda VAR MI da soruluyor (kovada HEAD;
+    gerekçesi services/dosya.py): dosyası silinmiş bir satır 404.
     """
     m = _satir(db, kullanici_id, image_id)
     if m is None:
         return None
-    return media_path_of(m.id, output_dir)
+    yol = os.path.join(output_dir, m.filename)
+    return yol if (depo or dosya.YEREL).var(yol) else None
 
 
 def dosya_yolu_adiyla(db: Session, kullanici_id: uuid.UUID, filename: str,
-                      output_dir: str) -> str | None:
+                      output_dir: str, *, depo: dosya.Depo | None = None) -> str | None:
     """ÇİZİM yolu (`/output/{filename}`): `filename` sütunu kullanıcının mı, dosya duruyor mu.
 
     Dosya adı yalnız `basename` olarak gelir (rota indirger); burada ayrıca
@@ -227,7 +241,7 @@ def dosya_yolu_adiyla(db: Session, kullanici_id: uuid.UUID, filename: str,
     if var is None:
         return None
     yol = os.path.join(output_dir, filename)
-    return yol if os.path.isfile(yol) else None
+    return yol if (depo or dosya.YEREL).var(yol) else None
 
 
 def klasor_ata(db: Session, kullanici_id: uuid.UUID, image_id: str, folder_id: str | None) -> bool:
@@ -269,40 +283,46 @@ def klasorden_cikar(db: Session, kullanici_id: uuid.UUID, folder_ids: Iterable[s
     return _etkilenen(sonuc)
 
 
-def _dosyayi_sil(image_id: str, output_dir: str) -> bool:
-    """Kullanıcının dizinindeki `{id}.{uzantı}` dosyasını siler; vardıysa True."""
-    yol = media_path_of(image_id, output_dir)
-    if yol is None:
-        return False
-    # Bulma ile `remove` arasında dosya kaybolabilir (aynı görseli iki sekmeden
-    # silmek yeter). Sonuç zaten istenen: dosya yok.
-    with contextlib.suppress(FileNotFoundError):
-        os.remove(yol)
-    return True
+def _dosyayi_sil(image_id: str, output_dir: str, depo: dosya.Depo, filename: str | None) -> bool:
+    """Kullanıcının dizinindeki `{id}.{uzantı}` dosyasını siler; vardıysa True.
+
+    Ad satırdan geldiyse tek silme; satır yoktu ama sözleşme "kaydı olmayan
+    dosya da silinmiş sayılır" diyorsa (`storage.delete`) uzantılar denenir —
+    `media_path_of`un aramasının depo üstünden ikizi (yerelde `isfile`,
+    kovada HEAD; satırsız silme nadir yol, bedeli kabul).
+    """
+    if filename is not None:
+        return depo.sil(os.path.join(output_dir, filename))
+    vardi = False
+    for uzanti in MEDIA_TYPES:
+        vardi = depo.sil(os.path.join(output_dir, f"{image_id}{uzanti}")) or vardi
+    return vardi
 
 
-def sil(db: Session, kullanici_id: uuid.UUID, image_id: str, output_dir: str) -> bool:
+def sil(db: Session, kullanici_id: uuid.UUID, image_id: str, output_dir: str,
+        *, depo: dosya.Depo | None = None) -> bool:
     """Satır + dosya; ikisinden biri vardıysa True (`storage.delete` sözleşmesi)."""
     if not _gecerli(image_id):
         return False
-    satir_vardi = _etkilenen(db.execute(delete(Medya)
-                                        .where(Medya.kullanici_id == kullanici_id,
-                                               Medya.id == image_id))) > 0
-    dosya_vardi = _dosyayi_sil(image_id, output_dir)
-    return satir_vardi or dosya_vardi
+    adlar = list(db.scalars(delete(Medya)
+                            .where(Medya.kullanici_id == kullanici_id, Medya.id == image_id)
+                            .returning(Medya.filename)))
+    dosya_vardi = _dosyayi_sil(image_id, output_dir, depo or dosya.YEREL, adlar[0] if adlar else None)
+    return bool(adlar) or dosya_vardi
 
 
 def sil_coklu(db: Session, kullanici_id: uuid.UUID, image_ids: Iterable[str],
-              output_dir: str) -> int:
+              output_dir: str, *, depo: dosya.Depo | None = None) -> int:
     """Birden çok görseli siler (satırlar tek `DELETE`, dosyalar tek tek); silinen sayı."""
     hedefler = {iid for iid in image_ids if _gecerli(iid)}
     if not hedefler:
         return 0
-    silinen = set(db.scalars(delete(Medya)
-                             .where(Medya.kullanici_id == kullanici_id, Medya.id.in_(hedefler))
-                             .returning(Medya.id)))
+    adlar: dict[str, str] = {iid: ad for iid, ad in db.execute(
+        delete(Medya).where(Medya.kullanici_id == kullanici_id, Medya.id.in_(hedefler))
+        .returning(Medya.id, Medya.filename))}
+    silinen = set(adlar)
     for iid in hedefler:
-        if _dosyayi_sil(iid, output_dir):
+        if _dosyayi_sil(iid, output_dir, depo or dosya.YEREL, adlar.get(iid)):
             silinen.add(iid)
     return len(silinen)
 

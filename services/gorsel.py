@@ -20,7 +20,7 @@ from PIL import Image
 from starlette.datastructures import UploadFile as FormUploadFile
 
 import i18n
-from services import dil
+from services import dil, dosya
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024          # dosya başına
 MAX_EDIT_IMAGES = 4                          # ana görsel + en fazla 3 ek referans
@@ -52,12 +52,13 @@ def to_png(raw: bytes) -> bytes:
     return out.getvalue()
 
 
-def output_png_path(image_id: str, output_dir: str) -> str:
+def output_png_path(image_id: str, output_dir: str, *, depo: dosya.Depo | None = None) -> str:
     """history id → output/<id>.png yolu. Geçersiz/bulunamayan id'de HTTPException(404).
 
     Tek path-traversal guard'ı: id yalnızca basename'e indirilir. Dizin
     çağıranın ayar nesnesinden geliyor (Faz 0 / Adım 4) — bu modül hangi
-    depoya baktığını kendisi bilmez, söyleneni okur.
+    depoya baktığını kendisi bilmez, söyleneni okur; VAR MI sorusunu da
+    söylenen depoya sorar (Faz 2 / 2: kovada HEAD, yerelde `isfile`).
 
     PNG'de ÇAKILI ve bu bilinçli: REFERANS okuma yolu (`/api/edit`in
     `source_id`si, logo/afiş bindirmeleri, video için ilk kare) — bir MP4'ü
@@ -70,14 +71,19 @@ def output_png_path(image_id: str, output_dir: str) -> str:
     """
     safe = os.path.basename(image_id or "")
     path = os.path.join(output_dir, f"{safe}.png")
-    if not safe or not os.path.isfile(path):
+    if not safe or not (depo or dosya.YEREL).var(path):
         raise HTTPException(status_code=404, detail=i18n.t("err.source_image_missing", dil.aktif()))
     return path
 
 
-def read_png_file(path: str) -> bytes:
-    with open(path, "rb") as f:
-        return f.read()
+def read_png_file(path: str, *, depo: dosya.Depo | None = None) -> bytes:
+    """Referans görselin baytları, söylenen depodan (kovada GET). 10 MB tavanı
+    (`MAX_UPLOAD_BYTES`) yüklemede uygulanıyor, depodaki dosya zaten o kapıdan geçmiş
+    ya da sağlayıcının ürettiği bir PNG — bellek için yeter (belge §2)."""
+    try:
+        return (depo or dosya.YEREL).oku(path)
+    except dosya.DosyaYok:
+        raise HTTPException(status_code=404, detail=i18n.t("err.source_image_missing", dil.aktif()))
 
 
 async def read_upload_png(upload: FormUploadFile) -> bytes:

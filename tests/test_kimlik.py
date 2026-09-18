@@ -33,7 +33,7 @@ from sqlalchemy.orm import Session
 import app as appmod
 import i18n
 import prefs
-from services import ayar, cerez, depo_medya, hesap, kimlik
+from services import ayar, cerez, depo_medya, hesap, isci, kimlik
 from services.tablolar import Kullanici, SaglayiciKimligi
 
 pytestmark = pytest.mark.gercek_kimlik
@@ -77,19 +77,22 @@ DIZINSIZ_KAPILI = {
     ("GET", "/api/palettes"), ("POST", "/api/palettes"), ("DELETE", "/api/palettes/{palette_id}"),
     ("GET", "/api/prefs"), ("POST", "/api/prefs"),
     ("GET", "/api/assets/{kind}"),            # yalnız satır; dosya yolları ayar ister
+    # Faz 2 / 4: iş uçları — `isler` satırı okur/yazar, dizine dokunmaz (sonuç
+    # dosyaları `GET /api/history` + `/output/*` üzerinden).
+    ("GET", "/api/isler"), ("GET", "/api/isler/{is_id}"), ("POST", "/api/isler/{is_id}/iptal"),
 }
 
 KAPI = {kimlik.aktif_kullanici, kimlik.sayfa_kullanicisi}
 
 # SAĞLAYICI KİMLİĞİ okuyan rotalar (Faz 1 / 7): `kimlik.KIMLIKLER` taşırlar —
 # kullanıcının şifreli satırları istek başına bir kez çözülür. Liste iki yönlü
-# bekçili: listedeki taşır, taşıyan listede. Öteki 47 rota anahtar okumaz ve
+# bekçili: listedeki taşır, taşıyan listede. Öteki rotalar anahtar okumaz ve
 # okumamalı — sözlüğü boşuna çözmek her isteğe bir sorgu + N Fernet çözümü eklerdi.
+# Dört ÜRETİM rotası Faz 2 / 4'te listeden ÇIKTI: sağlayıcıyı artık işçi çağırıyor
+# ve kimliği o çözüyor (services/isci.py `kos`); rota kuyruğa yazıp 202 döner.
 KIMLIK_OKUYAN = {
     ("GET", "/api/settings"), ("POST", "/api/settings"),   # durum + yazım
     ("POST", "/api/chat"),                                  # yönetmen bağlamı + sohbet adaptörü
-    ("POST", "/api/generate"), ("POST", "/api/edit"),       # görsel adaptörleri
-    ("POST", "/api/video"), ("POST", "/api/video/animate"), # video adaptörleri
 }
 
 # Yol parametrelerinin doldurulacağı geçerli biçimli değerler: kapı gövdeden
@@ -97,7 +100,8 @@ KIMLIK_OKUYAN = {
 YOL_DEGERLERI = {"image_id": "abcdef123456", "folder_id": "abcdef123456",
                  "chat_id": "abcdef123456", "palette_id": "abcdef123456",
                  "asset_id": "abcdef123456", "arena_id": "abcdef123456",
-                 "kind": "logos", "filename": "abcdef123456.png"}
+                 "kind": "logos", "filename": "abcdef123456.png",
+                 "is_id": "00000000-0000-4000-8000-000000000000"}   # `uuid.UUID` yol parametresi
 
 
 def _png() -> bytes:
@@ -151,7 +155,7 @@ def test_every_route_is_either_gated_or_openly_listed_with_a_reason():
         f"kapısız ama listede olmayan: {sorted(ACIK - set(ACIK_ROTALAR))}; "
         f"listede ama kapılı: {sorted(set(ACIK_ROTALAR) - ACIK)}")
     assert all(gerekce.strip() for gerekce in ACIK_ROTALAR.values())
-    assert len(KAPILI) == 47 and len(ACIK) == 7 and len(KAPILI | ACIK) == 54, (
+    assert len(KAPILI) == 50 and len(ACIK) == 7 and len(KAPILI | ACIK) == 57, (   # +3 iş rotası (Faz 2 / 4)
         "rota sayısı ya da kapı sayısı değişti — bilinçliyse belgeyi ve bu sayıları güncelle")
 
 
@@ -436,6 +440,24 @@ class _SahteAzure:
         pass
 
 
+def _uret(c: TestClient) -> dict:
+    """`POST /api/generate` → 202 → işçi turu (`isci.tek_tur`, gerçek kullanıcı yerleşimi) → işin son hâli.
+
+    conftest'in `uret_ve_bitir`i DEĞİL: o yardımcı paylaşılan yerleşime yazar
+    (`kullanici` override'ının ikizi), bu dosya ise kullanıcıya göre dizinleri
+    ve kimlik bağlamını GERÇEK hâliyle ölçüyor — işçi `app.state.ayarlar`ın
+    `kullanici_icin`iyle koşar, kimliği `kos` DB'den çözer.
+    """
+    r = c.post("/api/generate", json={"prompt": "kedi", "size": "1024x1024", "quality": "low", "n": 1})
+    assert r.status_code == 202, r.text
+    is_id = uuid.UUID(r.json()["is"]["id"])
+    with Session(appmod.app.state.motor) as db:
+        assert isci.tek_tur(db, appmod.app.state.dosya, ayarlar=appmod.app.state.ayarlar)
+    cevap = c.get(f"/api/isler/{is_id}")
+    assert cevap.status_code == 200, cevap.text
+    return cevap.json()["is"]
+
+
 def test_two_users_generate_with_their_own_azure_key_and_the_row_is_ciphertext(istemci, tmp_path, monkeypatch):
     """Belge §7 çıkış ölçütü: A ve B farklı anahtarla üretir, her istek KENDİ anahtarıyla
     çıkar (sahte istemci başlığı kaydeder); DB dökümünde anahtar düz metin değil;
@@ -447,10 +469,11 @@ def test_two_users_generate_with_their_own_azure_key_and_the_row_is_ciphertext(i
     b_id, b_jeton, _ = _kullanici_ac()
     a, b = _oturumlu(a_jeton), _oturumlu(b_jeton)
 
-    # Kimlik yokken üretim 502 ve dosyaya DÜŞÜLMEZ (guard patlatırdı → 500 olurdu).
-    r = a.post("/api/generate", json={"prompt": "kedi", "size": "1024x1024", "quality": "low", "n": 1})
-    assert r.status_code == 502, r.text
-    assert "AZURE_IMAGE_API_KEY" in r.json()["detail"]
+    # Kimlik yokken iş `hata` ve dosyaya DÜŞÜLMEZ (guard patlatırdı → beklenmeyen
+    # hata kodu olurdu). Rota 202 döner, sağlayıcı yolu işçide (Faz 2 / 4).
+    is_ = _uret(a)
+    assert is_["durum"] == "hata", is_
+    assert "AZURE_IMAGE_API_KEY" in is_["hata"]
 
     assert a.post("/api/settings", json={"api_key": "A-DUMMY-ANAHTAR", "base_url": "https://a/openai/v1/"}).status_code == 200
     assert b.post("/api/settings", json={"api_key": "B-DUMMY-ANAHTAR", "base_url": "https://b/openai/v1/"}).status_code == 200
@@ -459,8 +482,8 @@ def test_two_users_generate_with_their_own_azure_key_and_the_row_is_ciphertext(i
     assert a.get("/api/settings").json()["providers"]["azure_image"] is True
 
     for c in (a, b, a):
-        r = c.post("/api/generate", json={"prompt": "kedi", "size": "1024x1024", "quality": "low", "n": 1})
-        assert r.status_code == 200, r.text
+        is_ = _uret(c)
+        assert is_["durum"] == "bitti", is_
     assert _SahteAzure.gorulen == ["Bearer A-DUMMY-ANAHTAR", "Bearer B-DUMMY-ANAHTAR", "Bearer A-DUMMY-ANAHTAR"]
     assert len(a.get("/api/history").json()["images"]) == 2
     assert len(b.get("/api/history").json()["images"]) == 1

@@ -1,22 +1,21 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
 # GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
 # Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
-"""Üretim uçları: görsel üret/düzenle, video üret/canlandır."""
+"""Üretim uçları: görsel üret/düzenle, video üret/canlandır — hepsi 202, iş kuyruğa (Faz 2 / 4)."""
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
-import azure_client as ac
 import catalog
 import etiket
 import i18n
 import palette
-import providers
 from models import (
     MAX_IMAGES_PER_RUN,
     MAX_PROMPT_CHARS,
@@ -25,36 +24,90 @@ from models import (
     check_capabilities,
     check_video_capabilities,
 )
-from services import ayar, depo_medya, dil, dosya, gorsel, kapilar, kimlik, palet, zaman
+from services import ayar, dil, dosya, gorsel, kapilar, kimlik, kuyruk, palet
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
 router = APIRouter()
 
-# Üretilen medyanın kaydı DB'de (Faz 1 / 5): dört rota `depo_medya.kaydet`e
-# yazıyor — dosya kullanıcının `output_dir`ine, satır isteğin `Session`ına
-# (commit `db.oturum`da, rota döner dönmez). Kullanıcı `ayar.ayarlar`ın içindeki
-# kapıyla aynı nesne (FastAPI bağımlılık önbelleği), ek sorgu yok. İki `async
-# def` rota (`edit`, `animate`) DB'ye `run_in_threadpool` ile gidiyor.
+# DÖRT ROTA SAĞLAYICIYI ÇAĞIRMAZ (Faz 2 / 4; docs/faz2-kuyruk-anahtarlar-depolama.md §4).
+# Faz 1'e kadar üretim isteğin İÇİNDE koşuyordu: 1-6 dakika açık bağlantı,
+# sekme yenilenirse iş kayıp (aşağıdaki `video` docstring'i o günün kaydı).
+# Şimdi gövde üç adım: bugünkü doğrulamanın TAMAMI aynen (pydantic,
+# `_check_edit_form`/`_check_video_form`, `check_folder`, palet kapıları,
+# 413/422 metinleri — bayt bayt) → multipart girdiler depoya
+# (`kullanicilar/<uuid>/isler/<is_id>/<ad>`) → `kuyruk.ekle` → **202**
+# `{"is": kuyruk._json(is)}`. Sağlayıcı çağrısı, `medya` satırı ve kredi
+# hesabı işçide (services/isci.py `kos`); rota yalnız `kredi_tahmini`
+# (`catalog.cost_for × n`) ve `prompt_sent` (`palet.palette_prompt`) hesaplar,
+# çünkü ikisi de kullanıcının O ANKİ paletine/kataloğa bağlı ve palet sonradan
+# silinse iş değişmemeli (`istek` sözleşmesi services/isci.py'nin başında).
 #
-# Dört rota SAĞLAYICI KİMLİĞİ okuyor (Faz 1 / 7): `kimlik.KIMLIKLER` kullanıcının
-# şifreli satırlarını bir kez çözer ve isteğin bağlamına bağlar; adaptörler
-# kimliği oradan, TEMBEL çözer (`credentials=None` düşmesi — gerekçesi
-# providers._azure_generate ve kimlik_baglami). `kimlikler` imzada dursun ki
-# hangi rotanın anahtar okuduğu imzasında okunsun (bekçi tests/test_kimlik.py).
+# SIRA BİLİNÇLİ: doğrulama → eş zamanlılık kapısı (`check_is_tavani`, 429) →
+# girdi nesneleri → satır. 422 alacak istek 429 ile maskelenmez; 429 alacak
+# istek depoya nesne bırakmaz; satır ancak nesneler yazıldıysa doğar (nesne
+# yazımı düşerse istek 500, satır yok, işçi hiç görmez). `is_id` rotada
+# üretilir (`uuid4`) ve `kuyruk.ekle`ye verilir: anahtar id'yi taşır.
 #
-# Dosyanın YERİ bir `Depo` (Faz 2 / 2, services/dosya.py): dört rota
-# `Depends(dosya.depo)` alır, sonucu `depo_medya.kaydet(depo=…)` ile o depoya
-# yazar (nesne → satır → flush), referans görselleri `gorsel.read_png_file`
-# ile o depodan okur. 3. görevde bu gövdeler işçiye taşınır; depo aynı kalır.
+# GİRDİ NESNELERİ İŞ BİTİNCE SİLİNMEZ (§3 kararı (g); belge §4'ün "iş bitince
+# silinir" satırından bilinçli sapma): "yeniden gönder" (5. görev) aynı
+# nesneleri kullanır, 30 günlük saklama (10. görev) ve `tools/artik_dosya.py`
+# (`isler/` öneki) siler. İşçi yalnız okur.
+#
+# `kimlikler` İMZADAN ÇIKTI: sağlayıcı kimliğini işçi çözer (`kos`), rota
+# artık anahtar okumaz — her istekte bir sorgu + N Fernet çözümü boşa
+# giderdi (tests/test_kimlik.py `KIMLIK_OKUYAN` iki yönlü bekçi).
+# `ayarlar` KALDI: `edit`/`animate` referansları `ayarlar.output_dir`den
+# okur; `generate`/`video`da bağımlılık kullanıcı dizinlerini ilk istekte
+# açar (`ayar._dizinleri_ac`, 0o700 kök) — işçi o dizine yazar ve rota
+# kullanıcı verisine dokunan bir rota olarak sınıflanır (test_kimlik).
+#
+# Bayat SUNUCU tespiti (core.js "yanıt alanı geri yankılıyor mu") 202
+# gövdesindeki `is.model` ve iş bitince `medya.model` üzerinden sürer.
+
+# Girdi nesnelerinin depo anahtarı: `kullanicilar/<uuid>/isler/<is_id>/<ad>` —
+# kök göreli (`Depo` sözleşmesi), web ve işçi süreçleri farklı `data_dir`
+# bağlasa da aynı anahtar. `ad` adaptöre giden dosya adı (`abc123.png`,
+# `upload.png`, `refN.png` — `_collect_edit_refs`in bugünkü adları).
+ISLER_DIZINI = "isler"
 
 
-@router.post("/api/generate")
+def _girdi_anahtari(kullanici_id: uuid.UUID, is_id: uuid.UUID, ad: str) -> str:
+    return f"{ayar.KULLANICILAR_DIZINI}/{kullanici_id}/{ISLER_DIZINI}/{is_id}/{ad}"
+
+
+def _girdileri_yaz(depo: dosya.Depo, kullanici_id: uuid.UUID, is_id: uuid.UUID,
+                   refs: list[tuple[str, bytes]]) -> list[dict[str, str]]:
+    """`[(ad, bayt), …]` → depoya yazar, `istek.girdiler` sözleşmesini (`{"ad", "anahtar"}`) döndürür.
+
+    Hepsi PNG: `_collect_edit_refs` her referansı `gorsel.to_png`ten geçiriyor.
+    """
+    girdiler = []
+    for ad, veri in refs:
+        anahtar = _girdi_anahtari(kullanici_id, is_id, ad)
+        depo.yaz(anahtar, veri, "image/png")
+        girdiler.append({"ad": ad, "anahtar": anahtar})
+    return girdiler
+
+
+def _siraya_koy(db: Session, kullanici_id: uuid.UUID, tur: str, istek: dict[str, Any],
+                model: str, kredi_tahmini: int, is_id: uuid.UUID | None = None) -> dict:
+    """`kuyruk.ekle` → 202 gövdesi. `istek` DÖKÜLMEZ (`_json`): prompt ve girdi anahtarları içeride."""
+    is_ = kuyruk.ekle(db, kullanici_id, tur, istek, model, kredi_tahmini, is_id=is_id)
+    return {"is": kuyruk._json(is_)}
+
+
+def _ortak_istek(prompt: str, size: str, quality: str, n: int, folder_id: str | None,
+                 session_id: str | None) -> dict[str, Any]:
+    """Dört türün ortak alanları (services/isci.py `istek` sözleşmesi, "ortak" satırı)."""
+    return {"prompt": prompt, "size": size, "quality": quality, "n": n,
+            "folder_id": folder_id, "session_id": session_id}
+
+
+@router.post("/api/generate", status_code=202)
 def generate(req: GenerateRequest, db: Session = OTURUM,
              ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-             kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
-             kimlikler: Mapping[str, str] = kimlik.KIMLIKLER,
-             depo: dosya.Depo = Depends(dosya.depo)) -> dict:
+             kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     folder_id = kapilar.check_folder(req.folder_id, db, kullanici.id)
     session_id = kapilar.check_session(req.session_id)
     arena_id = kapilar.check_arena(req.arena_id)
@@ -70,58 +123,40 @@ def generate(req: GenerateRequest, db: Session = OTURUM,
     assert req.model is not None
     spec = catalog.image_model(req.model)
     assert spec is not None
-    try:
-        images = providers.generate(req.model, prompt_sent, req.size,
-                                    req.quality, req.n)
-    except ac.ImageError as e:
-        raise HTTPException(status_code=502, detail=str(e))
-    # Maliyet GÖRSEL BAŞINA yazılıyor: kayıt tek bir görselin kaydı ve n=4'lük
-    # bir turun tamamını her satıra yazmak toplamı dörde katlardı.
-    kredi = catalog.cost_for(spec, req.quality)
-    records = [
-        depo_medya.kaydet(db, kullanici.id, img,
-                          {"prompt": req.prompt, "size": req.size,
-                           "quality": req.quality, "parent_id": None,
-                           "folder_id": folder_id, "palette": pal,
-                           "session_id": session_id,
-                           # Turun sütunları AYRI isteklerle geliyor (istemci
-                           # fan-out'u; bkz. models.GenerateRequest.arena_id) —
-                           # onları birbirine bağlayan tek şey bu etiket.
-                           "arena_id": arena_id,
-                           "model": req.model, "credits": kredi,
-                           # Ek düştüyse metin prompt'un birebir aynısı; storage
-                           # sözleşmesi "yalnızca farklıysa" diyor (bkz. save).
-                           "prompt_sent": prompt_sent if pal and pal["applied"] else None},
-                          ayarlar.output_dir, now=zaman.an(), depo=depo)
-        for img in images
-    ]
-    return {"images": records}
+    kapilar.check_is_tavani(db, kullanici.id)
+    # TAHMİN görsel başına maliyet × adet; işçi gerçek maliyeti satır başına
+    # yazar (`isci._kredi`), bu sayı 6. görevin günlük tavanı için.
+    kredi_tahmini = catalog.cost_for(spec, req.quality) * req.n
+    istek = {**_ortak_istek(req.prompt, req.size, req.quality, req.n, folder_id, session_id),
+             # Turun sütunları AYRI isteklerle geliyor (istemci fan-out'u; bkz.
+             # models.GenerateRequest.arena_id) — onları birbirine bağlayan tek şey bu etiket.
+             "arena_id": arena_id, "palette": pal, "prompt_sent": prompt_sent}
+    return _siraya_koy(db, kullanici.id, "generate", istek, req.model, kredi_tahmini)
 
 
-@router.post("/api/video")
+@router.post("/api/video", status_code=202)
 def video(req: VideoRequest, db: Session = OTURUM,
           ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-          kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
-          kimlikler: Mapping[str, str] = kimlik.KIMLIKLER,
-          depo: dosya.Depo = Depends(dosya.depo)) -> dict:
+          kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """Metin → video. `generate`in video ikizi.
 
-    SENKRON ve bu bilinçli bir seçim, kaza değil: üretim 1-6 dakika sürüyor ve
-    istek o süre boyunca açık kalıyor. Emsali depoda zaten var — Azure'ın n=4
-    üretimi `180+120·3` = 540 saniyelik bir okuma bütçesiyle çalışıyor
-    (`azure_client.read_timeout_for`). Yoklamanın adaptörün İÇİNDE olması,
-    `providers` sözleşmesini (`list[bytes]`) bozmadan bu yolu açıyor;
-    `catalog.poll_timeout` alanının ilk yorumu da tam olarak bu günü tarif
-    ediyordu.
+    Faz 1'de SENKRONDU ve bu bilinçli bir seçimdi, kaza değil: üretim 1-6
+    dakika sürüyor ve istek o süre boyunca açık kalıyordu. Emsali depoda
+    zaten vardı — Azure'ın n=4 üretimi `180+120·3` = 540 saniyelik bir okuma
+    bütçesiyle çalışıyor (`azure_client.read_timeout_for`). Yoklamanın
+    adaptörün İÇİNDE olması, `providers` sözleşmesini (`list[bytes]`) bozmadan
+    bu yolu açıyor; `catalog.poll_timeout` alanının ilk yorumu da tam olarak
+    bu günü tarif ediyordu.
     Bilinen bedeli: sekme yenilenirse iş kaybediliyor ve ilerleme yüzde
-    olarak gösterilemiyor. İkincisi zaten deponun kayıtlı kararı
-    (`index.html`in "yüzde uydurmaydı" notu); ilkinin cevabı bir iş kuyruğu ve
-    o ayrı bir madde.
+    olarak gösterilemiyordu. İkincisi zaten deponun kayıtlı kararı
+    (`index.html`in "yüzde uydurmaydı" notu); ilkinin cevabı bir iş kuyruğu
+    ve o ayrı bir maddeydi — BU madde (Faz 2 / 4): rota 202 döner, dakikalar
+    işçide geçer (services/isci.py), adaptörün iç yoklaması aynen orada.
 
     `def`, `async def` DEĞİL — `generate` ve `chat` ile aynı gerekçe: Starlette
-    senkron rotayı iş parçacığı havuzunda koşturuyor, yani bloklayan httpx
-    çağrısı olay döngüsünü dondurmuyor. `async def` içinde aynı çağrı bütün
-    sunucuyu kilitlerdi ve burada süre dakikalarla ölçülüyor.
+    senkron rotayı iş parçacığı havuzunda koşturuyor; gövde artık kısa ama
+    DB'ye gidiyor (klasör kapısı, sayaç, satır) ve senkron sürücü olay
+    döngüsünü kilitlemesin.
 
     PALET ve ARENA yok; gerekçeleri `VideoRequest`in docstring'inde.
     """
@@ -133,29 +168,11 @@ def video(req: VideoRequest, db: Session = OTURUM,
     assert req.model is not None
     spec = catalog.video_model(req.model)
     assert spec is not None
-    try:
-        videos = providers.generate_video(req.model, req.prompt, req.size,
-                                          req.quality, req.duration, req.n)
-    except ac.ImageError as e:
-        raise HTTPException(status_code=502, detail=str(e))
-    kredi = catalog.cost_for(spec, req.quality, duration=req.duration)
-    records = [
-        depo_medya.kaydet(db, kullanici.id, vid,
-                          {"prompt": req.prompt, "size": req.size,
-                           "quality": req.quality, "parent_id": None,
-                           "folder_id": folder_id, "palette": None,
-                           "session_id": session_id,
-                           "kind": "video", "duration": req.duration,
-                           "model": req.model, "credits": kredi,
-                           "prompt_sent": None},
-                          ayarlar.output_dir, now=zaman.an(), depo=depo)
-        for vid in videos
-    ]
-    # ANAHTAR `videos`, `images` DEĞİL: istemci yanıtın türünü gövdeden
-    # okuyor ve `{"images": …}` döndürmek, bayat bir istemcinin videoyu
-    # `<img>` olarak çizmesine yol açardı — sessiz bir bozuk resim. Ayrı
-    # anahtar, eski istemcide YÜKSEK SESLE "images undefined" demek.
-    return {"videos": records}
+    kapilar.check_is_tavani(db, kullanici.id)
+    kredi_tahmini = catalog.cost_for(spec, req.quality, duration=req.duration) * req.n
+    istek = {**_ortak_istek(req.prompt, req.size, req.quality, req.n, folder_id, session_id),
+             "duration": req.duration}
+    return _siraya_koy(db, kullanici.id, "video", istek, req.model, kredi_tahmini)
 
 
 def _check_video_form(prompt: str, size: str, quality: str, duration: int,
@@ -214,7 +231,7 @@ def _check_video_form(prompt: str, size: str, quality: str, duration: int,
     return model_id
 
 
-@router.post("/api/video/animate")
+@router.post("/api/video/animate", status_code=202)
 async def animate(
     request: Request,
     prompt: str = Form(...),
@@ -236,7 +253,6 @@ async def animate(
     db: Session = OTURUM,
     ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
     kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
-    kimlikler: Mapping[str, str] = kimlik.KIMLIKLER,
     depo: dosya.Depo = Depends(dosya.depo),
 ) -> dict:
     """Görsel → video: bir kareyi hareketlendirir.
@@ -253,6 +269,9 @@ async def animate(
     ve `source_id` yolu `gorsel.output_png_path`ten okuyor — o işlev PNG'de
     çakılı KALIYOR ve bu doğru: bir videoyu ilk kare olarak göndermek anlamsız,
     404 doğru cevap (servis yolu `depo_medya.dosya_yolu`, uzantıyı ARAR).
+
+    Referans ve son kare depoya `isler/<is_id>/` altına yazılır, işçi oradan
+    okur (`istek.girdiler`, `istek.son_kare`) — rota baytı adaptöre değil depoya taşır.
     """
     # BOŞ FORM ALANI "VERİLMEDİ" DEMEK. Bütün alanlarını koşulsuz serileştiren
     # bir istemci `last_source_id=""` yolluyor ve `is not None` onu "bitiş
@@ -299,26 +318,19 @@ async def animate(
     elif last_file is not None:
         son_kare = await gorsel.read_upload_png(last_file)
 
-    try:
-        videos = providers.animate_video(model_id, prompt, refs, size, quality,
-                                         duration, n, last_frame=son_kare)
-    except ac.ImageError as e:
-        raise HTTPException(status_code=502, detail=str(e))
-
-    kredi = catalog.cost_for(spec, quality, duration=duration)
-    records = [
-        await run_in_threadpool(
-            depo_medya.kaydet, db, kullanici.id, vid,
-            {"prompt": prompt, "size": size, "quality": quality,
-             "parent_id": parent_id, "folder_id": target_folder,
-             "palette": None, "session_id": session,
-             "kind": "video", "duration": duration,
-             "model": model_id, "credits": kredi,
-             "prompt_sent": None},
-            ayarlar.output_dir, now=zaman.an(), depo=depo)
-        for vid in videos
-    ]
-    return {"videos": records}
+    await run_in_threadpool(kapilar.check_is_tavani, db, kullanici.id)
+    is_id = uuid.uuid4()
+    # Son kare `girdiler`in DIŞINDA, kendi anahtarıyla (`istek.son_kare`): işçi
+    # `girdiler`i referans listesi, `son_kare`yi `last_frame` olarak verir —
+    # yukarıdaki "refs'e katılmıyor" kararının depo karşılığı.
+    yazilacak = refs + ([("son_kare.png", son_kare)] if son_kare is not None else [])
+    girdiler = await run_in_threadpool(_girdileri_yaz, depo, kullanici.id, is_id, yazilacak)
+    kredi_tahmini = catalog.cost_for(spec, quality, duration=duration) * n
+    istek = {**_ortak_istek(prompt, size, quality, n, target_folder, session),
+             "girdiler": girdiler[:len(refs)], "parent_id": parent_id, "duration": duration,
+             "son_kare": girdiler[len(refs)] if son_kare is not None else None}
+    return await run_in_threadpool(_siraya_koy, db, kullanici.id, "animate", istek, model_id,
+                                   kredi_tahmini, is_id)
 
 
 def _check_edit_form(prompt: str, size: str, quality: str, n: int,
@@ -417,7 +429,7 @@ async def _collect_edit_refs(
     return refs, parent_id
 
 
-@router.post("/api/edit")
+@router.post("/api/edit", status_code=202)
 async def edit(
     request: Request,
     prompt: str = Form(...),
@@ -445,7 +457,6 @@ async def edit(
     db: Session = OTURUM,
     ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
     kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
-    kimlikler: Mapping[str, str] = kimlik.KIMLIKLER,
     depo: dosya.Depo = Depends(dosya.depo),
 ) -> dict:
     """Ek referans görselleri (`extra_files` yüklemeleri, `extra_source_ids`
@@ -463,24 +474,16 @@ async def edit(
 
     # task="edit": üretim ifadesi modele yeniden boyama söyler ve referans
     # görselin kompozisyonunu yok eder; düzenlemede istenen renk derecelendirmesi.
-    prompt_sent, pal = palet.palette_prompt(prompt, palette_hex, palette_mode,
-                                            palette_strength, palette_id, task="edit",
-                                            db=db, kullanici_id=kullanici.id, drop=drop)
-    try:
-        images = providers.edit(model_id, prompt_sent, refs, size, quality, n)
-    except ac.ImageError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+    prompt_sent, pal = await run_in_threadpool(
+        palet.palette_prompt, prompt, palette_hex, palette_mode, palette_strength, palette_id,
+        task="edit", db=db, kullanici_id=kullanici.id, drop=drop)
 
-    kredi = catalog.cost_for(spec, quality)
-    records = [
-        await run_in_threadpool(
-            depo_medya.kaydet, db, kullanici.id, img,
-            {"prompt": prompt, "size": size, "quality": quality,
-             "parent_id": parent_id, "folder_id": target_folder,
-             "palette": pal, "session_id": session,
-             "model": model_id, "credits": kredi,
-             "prompt_sent": prompt_sent if pal and pal["applied"] else None},
-            ayarlar.output_dir, now=zaman.an(), depo=depo)
-        for img in images
-    ]
-    return {"images": records}
+    await run_in_threadpool(kapilar.check_is_tavani, db, kullanici.id)
+    is_id = uuid.uuid4()
+    girdiler = await run_in_threadpool(_girdileri_yaz, depo, kullanici.id, is_id, refs)
+    kredi_tahmini = catalog.cost_for(spec, quality) * n
+    istek = {**_ortak_istek(prompt, size, quality, n, target_folder, session),
+             "girdiler": girdiler, "parent_id": parent_id,
+             "palette": pal, "prompt_sent": prompt_sent}
+    return await run_in_threadpool(_siraya_koy, db, kullanici.id, "edit", istek, model_id,
+                                   kredi_tahmini, is_id)

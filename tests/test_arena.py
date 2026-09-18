@@ -30,50 +30,50 @@ def client(tmp_path, monkeypatch, dizinler):
     return TestClient(appmod.app)
 
 
-def _uret(client, **ek):
+def _uret(uret_ve_bitir, client, **ek):
     govde = {"prompt": "kedi", "size": "1024x1024", "quality": "medium", "n": 1}
     govde.update(ek)
-    return client.post("/api/generate", json=govde)
+    return uret_ve_bitir(client, "/api/generate", json=govde)
 
 
 # ── Etiket ─────────────────────────────────────────────────────────────
 
 
-def test_arena_id_reaches_the_record(client):
-    r = _uret(client, arena_id=ARENA)
+def test_arena_id_reaches_the_record(client, uret_ve_bitir):
+    r = _uret(uret_ve_bitir, client, arena_id=ARENA)
 
     assert r.status_code == 200, r.text
     assert r.json()["images"][0]["arena_id"] == ARENA
 
 
-def test_a_plain_run_carries_no_arena_key_at_all(client):
+def test_a_plain_run_carries_no_arena_key_at_all(client, uret_ve_bitir):
     """Arena DIŞI üretim bugünküyle bayt bayt aynı kalıyor.
 
     `session_id`/`imported` ile aynı koşullu desen: alanın YOKLUĞU "arena değil"
     demek. `"arena_id": null` yazmak history.json'ın tamamını değiştirirdi ve
     eski-biçim testlerinin kovaladığı şey tam olarak bu.
     """
-    kayit = _uret(client).json()["images"][0]
+    kayit = _uret(uret_ve_bitir, client).json()["images"][0]
 
     assert "arena_id" not in kayit
     assert "arena_win" not in kayit
 
 
-def test_an_empty_arena_id_is_not_an_arena(client):
+def test_an_empty_arena_id_is_not_an_arena(client, uret_ve_bitir):
     """Boş dize = alan gönderilmemiş gibi. İstemcinin koşullu gövdesinin karşılığı."""
-    assert "arena_id" not in _uret(client, arena_id="").json()["images"][0]
+    assert "arena_id" not in _uret(uret_ve_bitir, client, arena_id="").json()["images"][0]
 
 
-def test_a_malformed_arena_id_is_rejected_loudly(client):
+def test_a_malformed_arena_id_is_rejected_loudly(client, uret_ve_bitir):
     """Sessizce düşürmek seçenek değil: sütunlar birbirini bulamaz ve sebebi görünmez."""
-    r = _uret(client, arena_id="../kacis")
+    r = _uret(uret_ve_bitir, client, arena_id="../kacis")
 
     assert r.status_code == 422
     assert "arena_id" in r.json()["detail"]
 
 
 def test_two_models_in_one_round_share_the_tag_and_keep_their_own_credit(
-        client, monkeypatch):
+        client, monkeypatch, uret_ve_bitir):
     """Defterin kabul ölçütü: iki üretim tek turda, künyelerinde model + kredi.
 
     Kayıt başına TEK model, TEK kredi — turun ortak yanı yalnızca `arena_id`.
@@ -82,9 +82,9 @@ def test_two_models_in_one_round_share_the_tag_and_keep_their_own_credit(
     """
     monkeypatch.setattr(appmod.providers, "generate", lambda *a, **k: [b"\x89PNG"])
 
-    azure = _uret(client, arena_id=ARENA, model="azure-gpt-image-2",
+    azure = _uret(uret_ve_bitir, client, arena_id=ARENA, model="azure-gpt-image-2",
                   quality="medium").json()["images"][0]
-    gemini = _uret(client, arena_id=ARENA, model="gemini-nano-banana-pro",
+    gemini = _uret(uret_ve_bitir, client, arena_id=ARENA, model="gemini-nano-banana-pro",
                    size="1:1", quality="2K").json()["images"][0]
 
     assert azure["arena_id"] == gemini["arena_id"] == ARENA
@@ -101,11 +101,11 @@ def test_two_models_in_one_round_share_the_tag_and_keep_their_own_credit(
 
 
 @pytest.fixture
-def tur(client, monkeypatch):
+def tur(client, monkeypatch, uret_ve_bitir):
     """İki sütunlu bitmiş bir arena turu döndürür: (client, [kayıt, kayıt])."""
     monkeypatch.setattr(appmod.providers, "generate", lambda *a, **k: [b"\x89PNG"])
-    a = _uret(client, arena_id=ARENA, model="azure-gpt-image-2").json()["images"][0]
-    b = _uret(client, arena_id=ARENA, model="openai-gpt-image-2").json()["images"][0]
+    a = _uret(uret_ve_bitir, client, arena_id=ARENA, model="azure-gpt-image-2").json()["images"][0]
+    b = _uret(uret_ve_bitir, client, arena_id=ARENA, model="openai-gpt-image-2").json()["images"][0]
     return client, [a, b]
 
 
@@ -148,13 +148,13 @@ def test_marking_the_same_winner_twice_is_idempotent(tur):
     assert _kayitlar(client) == ilk
 
 
-def test_a_winner_from_another_round_is_a_404(tur):
+def test_a_winner_from_another_round_is_a_404(tur, uret_ve_bitir):
     """Görsel VAR ama o turun içinde değil: sessiz bir no-op yerine 404.
 
     Sessiz kalsaydı istemci işareti çizer, yenilemede kaybolurdu.
     """
     client, (a, _) = tur
-    baska = _uret(client, arena_id="cccc3333dddd").json()["images"][0]
+    baska = _uret(uret_ve_bitir, client, arena_id="cccc3333dddd").json()["images"][0]
 
     r = client.post(f"/api/arena/{ARENA}/winner", json={"image_id": baska["id"]})
 

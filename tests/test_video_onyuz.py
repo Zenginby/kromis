@@ -519,8 +519,12 @@ def test_the_run_branch_sends_the_right_endpoint_and_kind():
 
     assert 'fetch("/api/video"' in govde
     assert 'fetch("/api/video/animate"' in govde
-    # Yanıt anahtarı da türe göre okunuyor.
-    assert "videoMu ? govde.videos : govde.images" in govde
+    # Yanıt 202 + iş (Faz 2 / 4): dört tür AYNI iş kaydından okunuyor — yanıt
+    # anahtarı türe göre ayrışmıyor artık (`{"videos": …}` 202 gövdesinde yok),
+    # sonuç `isiBekle` → `isSonuclari` ile galeri kayıtlarından geliyor.
+    assert "yanittakiIs(await res.json())" in govde
+    assert "isSonuclari(await isiBekle(is.id), folderId)" in govde
+    assert "govde.videos" not in govde
     # Döküm `kind`i dört değerli.
     assert 'videoMu ? (editing ? "animate" : "video")' in govde
 

@@ -20,7 +20,7 @@ import uuid
 import pytest
 from sqlalchemy import func, select
 
-from services import ayar, db, depo_medya, depo_varlik, hesap
+from services import ayar, db, depo_medya, depo_varlik, hesap, kuyruk
 from services.tablolar import Medya, Varlik
 from tools import artik_dosya
 
@@ -68,6 +68,13 @@ def kurgu(tmp_path, db_oturumu, kullanici) -> Kurgu:
     k._yaz(os.path.join(out, "deadbeef0002.mp4"), k.artik)
     k._yaz(os.path.join(assets, "logos", "deadbeef0003.png"), k.artik)
     k._yaz(os.path.join(assets, "uploads", "eski.png"), k.artik)          # bilinmeyen tür dizini
+    # Girdi nesneleri (Faz 2 / 4): satırlı işin girdisi DURUR (karar (g)), satırsız işin girdisi artık.
+    is_ = kuyruk.ekle(db_oturumu, k.kullanici_id, "edit", {"prompt": "e"}, "m", 1)
+    db_oturumu.commit()
+    isler = os.path.join(k.ozel.kullanici_koku(k.kullanici_id), "isler")
+    k._yaz(os.path.join(isler, str(is_.id), "upload.png"), k.satirli)
+    k._yaz(os.path.join(isler, str(is_.id), "ref2.png"), k.satirli)
+    k._yaz(os.path.join(isler, str(uuid.uuid4()), "upload.png"), k.artik)
     # Medya değil: dokunulmaz.
     k._yaz(os.path.join(out, "guncelleme.json"), k.medya_degil, b'{"zaman": 0}')
     k._yaz(os.path.join(out, ".DS_Store"), k.medya_degil, b"\x00")
@@ -102,10 +109,11 @@ def test_the_dry_run_lists_exactly_the_stray_files_and_touches_nothing(kurgu, ca
     assert _sayilar(kurgu.oturum, kurgu.kullanici_id) == once
     assert "hicbir sey silinmedi" in out
     # Özet satırları: kullanıcı başına, hesabı olmayan dizin işaretli, UUID olmayan atlandı.
-    assert f"{kurgu.kullanici_id}: 9 dosya, 4 artik" in out and "2 medya degil" in out
+    # 12 dosya = 9 (medya/varlık) + 3 girdi nesnesi (2 satırlı iş, 1 satırsız — Faz 2 / 4).
+    assert f"{kurgu.kullanici_id}: 12 dosya, 5 artik" in out and "2 medya degil" in out
     assert "HESABI YOK" in out
     assert "atlandi (UUID degil): kullanicilar/eski-yedek" in out
-    assert "toplam: 2 kullanici, 5 artik dosya" in out
+    assert "toplam: 2 kullanici, 6 artik dosya" in out
 
 
 def test_sil_without_a_tty_and_without_evet_refuses_and_deletes_nothing(kurgu, monkeypatch, capsys):
@@ -118,7 +126,7 @@ def test_sil_without_a_tty_and_without_evet_refuses_and_deletes_nothing(kurgu, m
 def test_sil_with_evet_removes_only_the_strays_and_the_second_run_finds_nothing(kurgu, capsys):
     once = _sayilar(kurgu.oturum, kurgu.kullanici_id)
     assert _kos(kurgu, "--sil", "--evet") == artik_dosya.CIKIS_TAMAM
-    assert "silindi: 5" in capsys.readouterr().out
+    assert "silindi: 6" in capsys.readouterr().out
     assert not any(os.path.exists(y) for y in kurgu.artik)
     assert all(os.path.exists(y) for y in kurgu.satirli), "satırı olan dosyaya dokunuldu"
     assert all(os.path.exists(y) for y in kurgu.medya_degil), "medya olmayan dosya silindi"
@@ -198,11 +206,16 @@ def _kova_kurgusu(db_oturumu, kullanici, tmp_path):
         satirli.append(f"kullanicilar/{kullanici.id}/output/{kayit['filename']}")
     v = depo_varlik.kaydet(db_oturumu, kullanici.id, "logos", PNG + b"L", "Logo", ozel.assets_dir, depo=depo)
     satirli.append(f"kullanicilar/{kullanici.id}/assets/logos/{v['filename']}")
+    is_ = kuyruk.ekle(db_oturumu, kullanici.id, "edit", {"prompt": "e"}, "m", 1)
     db_oturumu.commit()
+    # Girdi nesneleri (Faz 2 / 4): satırlı işin girdisi durur, satırsız işinki artık.
+    satirli.append(f"kullanicilar/{kullanici.id}/isler/{is_.id}/upload.png")
+    depo.istemci.koy(satirli[-1], PNG, "image/png")
     artik = [f"kullanicilar/{kullanici.id}/output/deadbeef0001deadbeef0001deadbeef.png",
              f"kullanicilar/{kullanici.id}/output/deadbeef0002.mp4",
              f"kullanicilar/{kullanici.id}/assets/logos/deadbeef0003.png",
              f"kullanicilar/{kullanici.id}/assets/uploads/eski.png",
+             f"kullanicilar/{kullanici.id}/isler/{uuid.uuid4()}/upload.png",
              f"kullanicilar/{uuid.uuid4()}/output/hayalet.png"]
     medya_degil = [f"kullanicilar/{kullanici.id}/output/guncelleme.json",
                    f"kullanicilar/{kullanici.id}/output/derin/dizin/x.png"]   # biçim dışı anahtar
@@ -224,13 +237,13 @@ def test_bucket_mode_lists_exactly_the_stray_objects_and_deletes_only_them(tmp_p
     assert out.startswith("kova: kova")
     listelenen = {s.split("artik: ", 1)[1].strip() for s in out.splitlines() if "artik: " in s}
     assert listelenen == artik
-    assert f"{kullanici.id}: 9 dosya, 4 artik" in out and "2 medya degil" in out
+    assert f"{kullanici.id}: 11 dosya, 5 artik" in out and "2 medya degil" in out
     assert "HESABI YOK" in out and "atlandi (UUID degil): kullanicilar/eski-yedek" in out
-    assert "toplam: 2 kullanici, 5 artik dosya" in out
+    assert "toplam: 2 kullanici, 6 artik dosya" in out
     assert set(sahte.nesneler) >= satirli | artik | medya_degil, "kuru koşu hiçbir şey silmez"
 
     assert artik_dosya.main(["--veri-dizini", str(tmp_path), "--sil", "--evet"]) == artik_dosya.CIKIS_TAMAM
-    assert "silindi: 5" in capsys.readouterr().out
+    assert "silindi: 6" in capsys.readouterr().out
     kalan = set(sahte.nesneler)
     assert not (kalan & artik) and satirli <= kalan and medya_degil <= kalan
     assert "kullanicilar/eski-yedek/output/y.png" in kalan

@@ -14,6 +14,7 @@ import os
 import socket
 import threading
 import time
+import traceback
 
 import pytest
 import uvicorn
@@ -136,17 +137,68 @@ def get_free_port() -> int:
         return s.getsockname()[1]
 
 
+class IsciThread(threading.Thread):
+    """E2E'nin İŞÇİSİ: `isci.tek_tur` döngüsü, sunucuyla aynı süreçte (Faz 2 / 4).
+
+    Üretim rotaları 202 döner ve sonucu bir işçi yazar (services/isci.py);
+    tarayıcı akışı "üret → galeri" ancak kuyruğu boşaltan biri varsa biter.
+    Süreç DEĞİL iş parçacığı (belge §3/§4: "testlerde işçi süreç değil
+    işlev"): sağlayıcı yaması (`monkeypatch`) aynı süreçte işlesin, port ve
+    alt süreç yönetimi olmasın. Kuyruk GERÇEK (aynı Postgres), depo ve
+    yerleşim sunucununkiler (`app.state.dosya`, `app.state.ayarlar` — E2E
+    fixture'ı ikisini de `tmp_path`e çekti). Boş kuyrukta 0,2 sn uyur; hata
+    döngüyü ÖLDÜRMEZ (izi basar, sürer) — sessizce duran işçi, 30 sn sonra
+    "galeri boş" diye düşen ve sebebini söylemeyen bir test demek.
+    """
+
+    def __init__(self):
+        super().__init__(daemon=True)
+        self.dur = threading.Event()
+
+    def run(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+
+        from services import db as db_modulu
+        from services import isci
+
+        motor = create_engine(os.environ[db_modulu.DATABASE_URL_ENV], pool_size=1, max_overflow=1)
+        try:
+            while not self.dur.is_set():
+                kostu = False
+                try:
+                    with Session(motor) as oturum:
+                        kostu = isci.tek_tur(oturum, app.state.dosya, ayarlar=app.state.ayarlar)
+                except Exception:      # noqa: BLE001 — işçi döngüsü istisnada ölmez (services/isci.py kararı)
+                    traceback.print_exc()
+                if not kostu:
+                    self.dur.wait(0.2)
+        finally:
+            motor.dispose()
+
+    def stop(self):
+        self.dur.set()
+
+
 class ServerThread(threading.Thread):
+    """uvicorn + işçi, ikisi de daemon iş parçacığı; `stop()` ikisini de durdurur."""
+
     def __init__(self, port: int):
         super().__init__(daemon=True)
         self.port = port
         self.config = uvicorn.Config(app=app, host="127.0.0.1", port=port, log_level="warning")
         self.server = uvicorn.Server(self.config)
+        self.isci = IsciThread()
+
+    def start(self):
+        super().start()
+        self.isci.start()
 
     def run(self):
         self.server.run()
 
     def stop(self):
+        self.isci.stop()
         self.server.should_exit = True
 
 

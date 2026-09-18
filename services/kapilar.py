@@ -6,10 +6,18 @@
 Hepsi aynı sözleşmeyi paylaşıyor: boş/None → "yok" (None), dolu → doğrula,
 geçersizse HTTPException. Hangi kapının VARLIK, hangisinin yalnız BİÇİM
 denetlediği her işlevin başında yazılı — ayrım bilinçli ve gerekçeli.
+
+Beşinci kapı başka türden (Faz 2 / 4): `check_is_tavani` bir kimlik değil
+bir SAYI denetler — kullanıcının aynı anda sırada/işçide tutabileceği iş
+sayısı. Rotalar sağlayıcıyı çağırmayı bıraktı ve 202 ile döndü; sınırsız
+sıraya yazma, tek kullanıcının kuyruğu (ve platform parasını, 6. görev)
+tek başına doldurması demekti.
 """
 from __future__ import annotations
 
+import os
 import uuid
+from collections.abc import Mapping
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -18,7 +26,19 @@ import assets_store
 import chat_store
 import i18n
 import storage
-from services import depo_klasor, dil
+from services import depo_klasor, dil, kuyruk
+
+# Kullanıcı başına eş zamanlı (`bekliyor` + `calisiyor`) iş tavanı — `.env.example`
+# aynı adı buradan okur (bekçisi tests/test_docker_kapisi.py `ALTYAPI`).
+# 4, çünkü arena turu istemci fan-out'uyla 2-4 AYRI istek (core.js `runArena`) ve
+# dördüncü sütunun 429 yemesi turu "3/4" diye bitirirdi. Küresel işçi kapasitesi
+# ayrı bir kapı (`KROMIS_ISCI_ES_ZAMANLI` × işçi sayısı, services/isci.py).
+ES_ZAMANLI_IS_ENV = "KROMIS_KULLANICI_ES_ZAMANLI_IS"
+ES_ZAMANLI_IS_VARSAYILAN = 4
+# 429'un `Retry-After`ı (sn), belge §4'ün sayısı: sağlayıcı çağrısı saniyelerle
+# değil dakikalarla ölçülüyor, daha sık gelen bir yeniden deneme aynı cevabı
+# alırdı; istemci (core.js) bunu bir ipucu olarak okur, uyumak zorunda değil.
+RETRY_AFTER_SN = 30
 
 
 def check_folder(folder_id: str | None, db: Session, kullanici_id: uuid.UUID) -> str | None:
@@ -77,3 +97,35 @@ def check_asset_kind(kind: str, *, allow_all: bool = False) -> None:
         return
     if kind not in assets_store.KINDS:
         raise HTTPException(status_code=404, detail=i18n.t("err.unknown_kind", dil.aktif()))
+
+
+def es_zamanli_is_tavani(ortam: Mapping[str, str] | None = None) -> int:
+    """`KROMIS_KULLANICI_ES_ZAMANLI_IS`; boşsa 4. Bozuk değer YÜKSEK SESLE: sessizce 4'e
+    düşen bir tavan, operatörün "10 yaptım" sanmasıyla biterdi."""
+    ham = ((os.environ if ortam is None else ortam).get(ES_ZAMANLI_IS_ENV) or "").strip()
+    if not ham:
+        return ES_ZAMANLI_IS_VARSAYILAN
+    try:
+        deger = int(ham)
+    except ValueError as e:
+        raise ValueError(f"{ES_ZAMANLI_IS_ENV} tam sayi olmali, verilen: {ham!r}") from e
+    if deger < 1:
+        raise ValueError(f"{ES_ZAMANLI_IS_ENV} en az 1 olmali, verilen: {deger}")
+    return deger
+
+
+def check_is_tavani(db: Session, kullanici_id: uuid.UUID) -> None:
+    """Kullanıcının aktif işi tavana ulaşmışsa 429 + `Retry-After`; değilse sessiz.
+
+    Sayım `kuyruk.aktif_sayisi` (`bekliyor` + `calisiyor`): bitmiş/düşmüş/iptal
+    işler sayılmaz — geçmiş bir ceza değil, o anki yük. Kapı doğrulamanın
+    SONUNDA ve girdi nesnesi yazılmadan ÖNCE koşar: 422 alacak bir istek 429
+    ile maskelenmesin, 429 alacak bir istek depoya nesne bırakmasın. Her
+    istekte ortamı yeniden okur (süreç başına bir kez okumak testte
+    yamalanamazdı; bir `os.environ.get` ölçülecek bedel değil).
+    """
+    tavan = es_zamanli_is_tavani()
+    if kuyruk.aktif_sayisi(db, kullanici_id) >= tavan:
+        raise HTTPException(status_code=429,
+                            detail=i18n.t("err.is_kuyrugu_dolu", dil.aktif(), tavan=tavan),
+                            headers={"Retry-After": str(RETRY_AFTER_SN)})

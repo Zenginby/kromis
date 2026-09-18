@@ -14,14 +14,14 @@
 
 ## Ölçüler
 
-* 93 Python modülü, 379 modül düzeyi ithal kenarı (15 erteli)
-* 54 HTTP uç noktası
+* 94 Python modülü, 385 modül düzeyi ithal kenarı (15 erteli)
+* 57 HTTP uç noktası
 * 11 tarayıcı betiği, 29 betik-arası bağ
-* 124 test dosyası; 15 modülü hiçbir test ithal etmiyor, 14 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
+* 125 test dosyası; 15 modülü hiçbir test ithal etmiyor, 14 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
 * 1 ithal döngüsü, 0 rotaya oturmayan tarayıcı çağrısı
 
 En büyük dosyalar: `catalog` (1461), `models` (1127), `fal_client` (757), `veo_client` (629), `desktop` (588).
-En çok ithal edilenler: `i18n` (36), `catalog` (24), `services.tablolar` (24), `services.db` (18), `services.zaman` (17).
+En çok ithal edilenler: `i18n` (37), `services.tablolar` (25), `catalog` (24), `services.db` (19), `services.zaman` (16).
 
 ## Nasıl güncellenir
 

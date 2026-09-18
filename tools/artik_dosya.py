@@ -19,7 +19,13 @@ Bu araç ikisini de bulur.
 NE TARANIR: `<veri kökü>/kullanicilar/<uuid>/output/*` (`medya.filename`e
 karşı) ve `assets/<tur>/*` (`varliklar.filename`e karşı, `tur` = dizin adı;
 `assets_store.KINDS` dışındaki dizinler de taranır — eski `uploads` gibi bir
-dizin oraya nasıl gelmişse gelsin, satırı yoktur). Yalnız MEDYA uzantıları
+dizin oraya nasıl gelmişse gelsin, satırı yoktur); Faz 2 / 4'ten beri bir de
+`isler/<is_id>/*` (`isler.id`ye karşı): üretim rotalarının yazdığı GİRDİ
+nesneleri (referans görseller, son kare). Girdi işi bitince silinmez (§3
+kararı (g): "yeniden gönder" onları kullanır), yani `isler` satırı DURDUKÇA
+girdi artık DEĞİLDİR — 30 günlük saklama (10. görev) satırı düşürünce buraya
+artık diye düşer; satırsız bir `isler/<id>/` dizini (commit düşmüş istek,
+silinmiş hesap) hemen artıktır. Yalnız MEDYA uzantıları
 (`storage.MEDIA_TYPES` + varlıkların `.png`i): `guncelleme.json` gibi bir
 önbellek ya da `.DS_Store` artık dosya SAYILMAZ, "medya değil" diye sayılır ve
 hiç silinmez — aracın işi medya, başka bir dosyayı silmek onun kararı değil.
@@ -62,8 +68,9 @@ from sqlalchemy import select  # noqa: E402
 from sqlalchemy.exc import SQLAlchemyError  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
+from routers.uretim import ISLER_DIZINI  # noqa: E402
 from services import ayar, db, dosya  # noqa: E402
-from services.tablolar import Kullanici, Medya, Varlik  # noqa: E402
+from services.tablolar import Is, Kullanici, Medya, Varlik  # noqa: E402
 from storage import MEDIA_TYPES  # noqa: E402
 
 CIKIS_TAMAM = 0
@@ -137,6 +144,11 @@ def _satirdaki_adlar(oturum: Session, kullanici_id: uuid.UUID) -> tuple[set[str]
     return medya, varliklar
 
 
+def _satirdaki_isler(oturum: Session, kullanici_id: uuid.UUID) -> set[str]:
+    """Bu kullanıcının `isler.id` kümesi (dize): `isler/<is_id>/` dizininin satırı var mı sorusu."""
+    return {str(i) for i in oturum.scalars(select(Is.id).where(Is.kullanici_id == kullanici_id))}
+
+
 def _kullaniciyi_tara(oturum: Session, genel: ayar.Ayarlar, kullanici_id: uuid.UUID) -> KullaniciOzeti:
     ozel = genel.kullanici_icin(kullanici_id)
     hesap_var = oturum.get(Kullanici, kullanici_id) is not None
@@ -163,6 +175,19 @@ def _kullaniciyi_tara(oturum: Session, genel: ayar.Ayarlar, kullanici_id: uuid.U
         tur_dizini = os.path.join(ozel.assets_dir, tur)
         for ad in _dosyalar(tur_dizini):
             _ele(tur_dizini, ad, varlik_adlari.get(tur, set()))
+    # Girdi nesneleri (Faz 2 / 4): `isler/<is_id>/<ad>` — ölçüt dosya adı değil
+    # DİZİN adı (iş id'si); satırı olan işin bütün girdileri durur.
+    isler_dizini = os.path.join(ozel.kullanici_koku(kullanici_id), ISLER_DIZINI)
+    satirli_isler = _satirdaki_isler(oturum, kullanici_id)
+    try:
+        is_dizinleri = sorted(a for a in os.listdir(isler_dizini)
+                              if os.path.isdir(os.path.join(isler_dizini, a)))
+    except FileNotFoundError:
+        is_dizinleri = []
+    for is_id in is_dizinleri:
+        is_dizini = os.path.join(isler_dizini, is_id)
+        for ad in _dosyalar(is_dizini):
+            _ele(is_dizini, ad, set(_dosyalar(is_dizini)) if is_id in satirli_isler else set())
     return ozet
 
 
@@ -188,9 +213,10 @@ def tara(oturum: Session, genel: ayar.Ayarlar) -> Rapor:
 def tara_kova(oturum: Session, depo: dosya.NesneDepo) -> Rapor:
     """Kova kipi: `kullanicilar/` önekini bir kez listeler, anahtarları kullanıcıya ayırır.
 
-    Anahtar biçimi `kullanicilar/<uuid>/output/<ad>` ya da `…/assets/<tur>/<ad>`;
-    başka biçim (fazla/eksik parça) "medya değil" sayılır — araç anlamadığı bir
-    nesneyi silmez. UUID olmayan ikinci parça `atlanan_dizinler`e.
+    Anahtar biçimi `kullanicilar/<uuid>/output/<ad>`, `…/assets/<tur>/<ad>` ya da
+    `…/isler/<is_id>/<ad>` (girdi nesneleri, ölçüt iş satırı); başka biçim
+    (fazla/eksik parça) "medya değil" sayılır — araç anlamadığı bir nesneyi
+    silmez. UUID olmayan ikinci parça `atlanan_dizinler`e.
     """
     rapor = Rapor(kova=depo.istemci.kova)
     onek = ayar.KULLANICILAR_DIZINI + "/"
@@ -207,6 +233,7 @@ def tara_kova(oturum: Session, depo: dosya.NesneDepo) -> Rapor:
             continue
         hesap_var = oturum.get(Kullanici, kimlik) is not None
         medya_adlari, varlik_adlari = _satirdaki_adlar(oturum, kimlik)
+        satirli_isler = _satirdaki_isler(oturum, kimlik)
         ozet = KullaniciOzeti(kullanici_id=kimlik, hesap_var=hesap_var)
         for nesne in gruplar[ad]:
             parcalar = nesne.anahtar.split("/")
@@ -215,6 +242,9 @@ def tara_kova(oturum: Session, depo: dosya.NesneDepo) -> Rapor:
                 satirdakiler = medya_adlari
             elif parcalar[2] == "assets" and len(parcalar) == 5:
                 satirdakiler = varlik_adlari.get(parcalar[3], set())
+            elif parcalar[2] == ISLER_DIZINI and len(parcalar) == 5:
+                # Girdi nesnesi: iş satırı varsa bu nesne "satırlı" (adı ne olursa olsun).
+                satirdakiler = {parcalar[-1]} if parcalar[3] in satirli_isler else set()
             else:
                 ozet.medya_degil += 1
                 continue

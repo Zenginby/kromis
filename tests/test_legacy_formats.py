@@ -358,7 +358,7 @@ def test_assets_still_listed_and_served(kind, tmp_path, monkeypatch, dizinler, d
 
 
 def test_saved_v18_palette_still_reaches_the_prompt_with_frozen_names(tmp_path, monkeypatch, dizinler,
-                                                                        db_oturumu, kullanici):
+                                                                        db_oturumu, kullanici, uret_ve_bitir):
     """Task 3'ün en güçlü testi: sessiz düşüşü yakalayan tek iddia.
 
     app._palette_prompt kayıtlı paleti bulup DONDURULMUŞ renkleri
@@ -373,7 +373,7 @@ def test_saved_v18_palette_still_reaches_the_prompt_with_frozen_names(tmp_path, 
     sent = []
     c = _client(tmp_path, monkeypatch, dizinler, sent=sent)
     _db_tohumla(db_oturumu, kullanici.id)
-    r = c.post("/api/generate", json={
+    r = uret_ve_bitir(c, "/api/generate", json={
         "prompt": "afiş", "size": "1024x1024", "quality": "high", "n": 1,
         "palette_hex": EXPECT["palette"]["seed"],
         "palette_mode": EXPECT["palette"]["mode"],

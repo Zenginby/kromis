@@ -120,8 +120,9 @@ def test_every_router_module_is_included_in_the_app():
     assert graftaki == calisan, (
         f"takılmamış: {sorted(graftaki - calisan)}; kaynakta olmayan: "
         f"{sorted(calisan - graftaki)}")
-    # 46 (Faz 0) + 8 hesap rotası (Faz 1 / 3: docs/faz1-veritabani-hesaplar.md §3).
-    assert len(graftaki) == 54, "rota sayısı değişti — bilinçliyse bu sayıyı güncelle"
+    # 46 (Faz 0) + 8 hesap rotası (Faz 1 / 3: docs/faz1-veritabani-hesaplar.md §3)
+    # + 3 iş rotası (Faz 2 / 4: docs/faz2-kuyruk-anahtarlar-depolama.md §4).
+    assert len(graftaki) == 57, "rota sayısı değişti — bilinçliyse bu sayıyı güncelle"
 
 
 def test_directories_are_read_at_request_time_not_bound_at_import():
@@ -178,7 +179,7 @@ def test_every_route_that_touches_a_directory_declares_the_dependency():
 
 
 @pytest.mark.usefixtures("depo_db")
-def test_redirecting_the_settings_object_reaches_the_routers(tmp_path, dizinler, monkeypatch):
+def test_redirecting_the_settings_object_reaches_the_routers(tmp_path, dizinler, monkeypatch, uret_ve_bitir):
     """Mekanizmanın kendisi: `app.state.ayarlar` yönlendirmesi rotaya ULAŞIYOR.
 
     `dizinler` fixture'ının bekçisi — fixture yamayı yanlış yere yazsa 60'tan
@@ -189,7 +190,7 @@ def test_redirecting_the_settings_object_reaches_the_routers(tmp_path, dizinler,
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG"])
     dizinler(output_dir=str(tmp_path / "output"))
     c = TestClient(appmod.app)
-    kayit = c.post("/api/generate", json={"prompt": "kanit", "size": "1024x1024",
+    kayit = uret_ve_bitir(c, "/api/generate", json={"prompt": "kanit", "size": "1024x1024",
                                           "quality": "low", "n": 1}).json()["images"][0]
     gorunen = c.get("/api/history").json()["images"]
     assert [g["prompt"] for g in gorunen] == ["kanit"]

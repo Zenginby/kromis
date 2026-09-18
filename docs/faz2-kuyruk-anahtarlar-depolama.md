@@ -644,7 +644,7 @@ kararı (g). E2E fixture'ına `tek_tur` döngüsü iş parçacığı (belge §4)
 
 ---
 
-## 4. Üretim rotaları 202 döner; `GET /api/isler`, iptal; kullanıcı başına eş zamanlı iş; `core.js` asgari uyum (PR: `faz2/uretim-202`)
+## 4. Üretim rotaları 202 döner; `GET /api/isler`, iptal; kullanıcı başına eş zamanlı iş; `core.js` asgari uyum ✅ (PR: `faz2/uretim-202`)
 
 **Kapsam.** Dört rota (`routers/uretim.py`) sağlayıcıyı ÇAĞIRMAZ: bugünkü
 doğrulamanın tamamı (pydantic, `_check_edit_form`/`_check_video_form`,
@@ -709,6 +709,100 @@ Girdi nesneleri: iş bitince/düşünce silinir, `artik_dosya.py` `isler/`
 **Çıkış ölçütü.** Tarayıcıdan üretim bugünkü gibi bitiyor (E2E), sunucu
 günlüğünde sağlayıcı çağrısı yalnız işçide; `POST /api/generate` 50 ms
 altında 202 (sağlayıcı yamalı ölçüm); 5. eş zamanlı iş 429; takım yeşil.
+
+**Yapıldığında (2026-09-18) ölçümler ve sapmalar.** `routers/uretim.py`
+dört gövde kısaldı (`providers`, `azure_client`, `depo_medya`, `zaman`
+ithalleri gitti; üç yardımcı — `_check_edit_form`, `_check_video_form`,
+`_collect_edit_refs` — bayt bayt yerinde; yeni `_girdileri_yaz`,
+`_siraya_koy`, `_ortak_istek`, `ISLER_DIZINI`); yeni `routers/isler.py` (3
+rota, 100 satır); `services/kapilar.py` +`check_is_tavani`/
+`es_zamanli_is_tavani` (429 + `Retry-After: 30`, `err.is_kuyrugu_dolu`);
+`services/kuyruk.py` KÜÇÜK dokunuş (belge "dokunulmaz" demiyordu, 3. görev
+dokunmamıştı): `ekle(is_id=…)`, `listele(durumlar=…)`, yeni `bul` — üçü de
+rotanın ihtiyacı, işçi tarafı aynen. `static/core.js` +`isiBekle`/
+`yanittakiIs`/`isSonuclari` (2 sn yoklama; `run` ve `runArena` yanıtı işe,
+işi kayıtlara çevirir; `runBusy`/durum metni, `showPreview`, `fillArenaSlot`,
+gövde ifadeleri AYNEN; `index.html` DOKUNULMADI). `bundled/i18n/{tr,en}.json`
++7 (`err.is_kuyrugu_dolu`, `err.is_bulunamadi`, `err.is_iptal_edilemez`,
+`err.bad_since`, `gen.job_failed`, `gen.job_cancelled`,
+`gen.no_job_in_response`); `.env.example` +1 (`KROMIS_KULLANICI_ES_ZAMANLI_IS`,
+`ALTYAPI` 16 → 17). `tools/artik_dosya.py` `isler/<is_id>/` önekini iki kipte
+de tarar (ölçüt DOSYA ADI değil İŞ SATIRI: satırı olan işin girdileri durur).
+Ölçüler: rota **54 → 57**, modül 93 → 94, test dosyası 124 → 125, takım
+**3.545 → 3.583 geçti, 12 atlandı, 206 sn** (E2E + Postgres zorunlu);
+ruff/mypy/eslint/prettier temiz. **Gecikme:** yamalı sağlayıcıyla `POST
+/api/generate` 20 istekte **ortanca 8,1 ms** (en iyi 7,4, en kötü 9,5; bu
+makine, Postgres aynı konteynerde) — 50 ms ölçütünün altında; iddia 250 ms
+(CI gürültüsüne pay). **Test dokunuşu:** 15 dosya `c.post("/api/generate"…)`
+→ `uret_ve_bitir(c, "/api/generate"…)` (conftest yardımcısı POST → 202 →
+`isci.tek_tur` → `IsSonucu`: eski yanıtın ŞEKLİNDE — `bitti` 200 +
+`{"images"|"videos": kayıtlar}`, `hata` 502 + `detail`, 202 dışı yanıt
+olduğu gibi — eski iddialar TEK SATIR değişerek durdu; işçi paylaşılan
+yerleşime yazar, `_PaylasilanYerlesim`, `kullanici` override'ının ikizi);
+`test_kimlik` kendi işçi turunu GERÇEK yerleşimle koşar. Yeni
+`tests/test_isler_route.py` **32 test** (202 gövdesi + `istek` dökülmez;
+doğrulama 10 parametrik hâl AYNI kodlarla ve iş/nesne yazmaz; 413; kaynak
+bekçisi "rota `providers`ı ithal etmez"; girdiler `isler/<is_id>/` altında
+adaptör sırasıyla, son kare ayrı; girdiler iş bitince DURUR; galeri
+referansı `parent_id` + kopya; liste en yeni üstte / aktifler + son 50 /
+`since` + 422; tekil ve iptal, başkasının işi 404, biçimsiz id 422, çalışan
+ve bitmiş iş 409; 5. iş 429 + `Retry-After` + i18n, 429 nesne bırakmaz;
+arena 4 sütun; tavan ortamdan ve bozuk değer yüksek sesle; sayaç kullanıcı
+başına; gecikme; gerçek yerleşimde işçi kullanıcı dizinine yazar).
+`tests/test_playwright_studio.py` `ServerThread` yanına `IsciThread`
+(`tek_tur` döngüsü, aynı süreç, gerçek kuyruk, boşta 0,2 sn) — 13 E2E
+aynen geçti, tarayıcı akışı üret → galeri işçi üzerinden bitiyor.
+**Canlı duman** (geçici küme, bu makine): `goc.py` → `uvicorn` + AYRI süreçte
+`python isci.py` (sağlayıcı `sitecustomize` ile yamalı, repo'ya dokunmadan) →
+`POST /api/generate` **202, 27,9 ms** (soğuk ilk istek, gerçek uvicorn) →
+işçi günlüğü "is aldi … is bitti" → `GET /api/isler/{id}` `bitti`,
+`sonuc.medya` 1 id → `GET /api/history` 1 kayıt = diskte
+`kullanicilar/<uuid>/output/` altında 1 nesne → `GET /api/isler` 1 iş →
+SIGTERM → işçi 0 ile kapandı. Web sürecinin günlüğünde sağlayıcıya dair tek
+satır yok: çağrı yalnız işçide.
+
+**Kararlar, belgenin açık bıraktığı yerlerde:** (a) GİRDİ NESNELERİNİN ÖMRÜ —
+§3 kararı (g) uygulandı, bu bölümün "iş bitince silinir" satırından BİLİNÇLİ
+SAPMA: işçi silmez, rota silmez; "yeniden gönder" (5) aynı nesneleri kullanır,
+saklama (10) satırla birlikte düşürür, `artik_dosya.py` satırsız `isler/<id>/`
+dizinini artık sayar. Test "yazılır ve iş bitince silinir" değil "yazılır ve
+DURUR" diye ölçüyor. (b) `kimlikler` dört üretim rotasının İMZASINDAN ÇIKTI:
+kimliği işçi çözer (`kos`); rotada tutmak her isteğe bir sorgu + N Fernet
+çözümü eklerdi (`KIMLIK_OKUYAN` bekçisinin kendi gerekçesi). Bedeli: anahtarı
+olmayan kullanıcı 502 yerine `hata`lı bir iş görür (aynı metin); erken "anahtar
+yok" kapısı 6. görevin platform anahtarıyla birlikte düşünülmeli. (c) `ayarlar`
+`generate`/`video`da KALDI (dizin okumasalar da): bağımlılık kullanıcı
+dizinlerini ilk istekte açar ve rota `test_kimlik`te "kullanıcı verisine
+dokunan" sınıfında kalır; `DIZINSIZ_KAPILI` yalnız 3 iş rotasıyla büyüdü
+(belgenin "+3"ü). (d) SIRA: doğrulama → 429 kapısı → girdi nesneleri → satır
+(`is_id` rotada `uuid4`, `kuyruk.ekle(is_id=…)`): 422 alacak istek 429 ile
+maskelenmez, 429 alacak istek nesne bırakmaz, satır ancak nesneler yazıldıysa
+doğar. (e) `GET /api/isler` öntanımlısı "aktifler + son 50" İKİ sorgu
+(`listele(durumlar=AKTIF_DURUMLAR)` ayrı): 51. sıraya düşmüş `bekliyor` iş
+kaybolmasın; `since` `zaman.damga` biçimi ya da dilimli ISO, bozuksa 422
+(`err.bad_since`). (f) 202 gövdesinde `{"videos": …}` anahtarı yok, tür
+`is.tur`; ön yüzde `videoMu ? govde.videos : govde.images` gitti, dört tür
+aynı iş kaydından okunur (`test_video_onyuz` çapası buna göre). (g) `dizinler`
+fixture'ı `data_dir` yönlendirilince `app.state.dosya`yı da oraya çeker
+(yalnız `YerelDepo`): rota kök göreli anahtarla yazıyor, depo repo kökünde
+kalsa testler depoya `kullanicilar/` bırakırdı. (h) `_PaylasilanYerlesim`
+işçiye verilen ayar nesnesi — `kullanici_icin` kendini döndürür; gerçek
+türetim `test_kimlik`/`test_isci`/E2E'de ölçülüyor. **Bilinen ara durum:**
+sekme yenilenirse iş sürer, ekran onu göstermez (galeri yenilenince sonuç
+orada); yoklama düşerse (ağ) prompt kutuya döner, iş yine sürer — ikisi 5'te
+kapanır. Sağlayıcı yamalanmamış bir kurulumda anahtarsız üretim artık 502
+değil `hata`lı iş (test_kimlik bunu ölçüyor).
+
+**5. göreve devredilen.** SSE `GET /api/isler/akis` (yoklama yedek yol olarak
+kalır; `since` ve `listele(durumlar=…)` hazır); `static/isler.js` paneli
+(liste/tekil/iptal uçları hazır, `iptal` yalnız `bekliyor`); "yeniden gönder"
+— girdi nesneleri `isler/<is_id>/` altında duruyor, `istek` satırda, yeni iş
+aynı anahtarları `girdiler`e kopyalayabilir (nesne kopyası mı referans mı,
+saklama (10) ile birlikte kararlaştırılır); sekme yenilemeye dayanıklılık
+(`bekliyor`/`calisiyor` işleri açılışta panele çekmek, biten işi galeriye
+düşürmek); `core.js`teki `isiBekle`/`isSonuclari` panel gelince SSE'nin
+arkasına geçer ya da kalkar; 429'un `Retry-After`ını okuyan istemci davranışı
+(bugün yalnız metin gösteriyor).
 
 ---
 

@@ -2268,6 +2268,73 @@ function setCurrentImage(rec) {
   $("logo-add-btn").disabled = !rec || rec.kind === "video";
 }
 
+// ── İş yoklaması (Faz 2 / 4) ─────────────────────────────────────────
+// Üretim rotaları artık sağlayıcıyı çağırmıyor: 202 + bir `is` kaydı
+// dönüyor, üretimi ayrı bir işçi süreci yapıyor (services/isci.py). Sonuç
+// için `GET /api/isler/{id}` 2 sn'de bir yoklanır; `bitti` olunca
+// `sonuc.medya` id'leri `GET /api/history`den kayıt olarak çekilir ve
+// bugünkü `showPreview`/`loadHistory` akışına AYNI şekilde girer. Bu asgari
+// uyum: iş paneli, SSE akışı ve sekme yenilemeye dayanıklılık 5. görevin
+// (docs/faz2-kuyruk-anahtarlar-depolama.md §5). Bilinen ara durum: sekme
+// yenilenirse iş sürer ama bu ekran onu artık göstermez — galeri yenilenince
+// sonuç orada.
+//
+// Yoklama aralığı 2 sn: üretim dakikalarla ölçülüyor, daha sık sormak
+// yalnız sunucuya yük; daha seyrek sormak ise en kısa üretimde bile
+// görünür bir gecikme (kullanıcı sonucu saniyeler geç görürdü).
+const IS_YOKLAMA_MS = 2000;
+
+/** İş bitene kadar yoklar; `bitti` işi döndürür, `hata`/`iptal` fırlatır.
+ *
+ * `hata` metni sunucudan geliyor ve zaten kullanıcının dilinde (işçi
+ * `kullanicilar.dil` ile çeviriyor) — burada yalnız çerçeveleniyor.
+ * Yoklamanın kendisi düşerse (ağ, 404, 401 → sarmal giriş sayfasına
+ * gider) hata `run`ın catch'ine düşer: prompt kutuya döner, iş sunucuda
+ * sürer (5'te panel onu gösterecek).
+ */
+async function isiBekle(isId) {
+  for (;;) {
+    const res = await fetch(`/api/isler/${encodeURIComponent(isId)}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(detailText(err) || t("err.http", { durum: res.status }));
+    }
+    const { is } = await res.json();
+    if (is.durum === "bitti") return is;
+    if (is.durum === "hata") {
+      throw new Error(t("gen.job_failed", { hata: is.hata || t("common.unknown") }));
+    }
+    if (is.durum === "iptal") throw new Error(t("gen.job_cancelled"));
+    await new Promise((r) => setTimeout(r, IS_YOKLAMA_MS));
+  }
+}
+
+/** 202 gövdesinden işi okur; `is` yoksa sunucu eski (202 öncesi) demek. */
+function yanittakiIs(govde) {
+  if (!govde || !govde.is || !govde.is.id) throw new Error(t("gen.no_job_in_response"));
+  return govde.is;
+}
+
+/** Biten işin `sonuc.medya` id'lerini galeri kayıtları olarak çeker, iş sırasıyla.
+ *
+ * `GET /api/history` klasöre göre süzüyor (kökte yalnız klasörsüzler), o
+ * yüzden işin gönderildiği klasör soruluyor — gönderimden sonra kullanıcı
+ * başka klasöre geçmiş olabilir, `currentFolder` değil gönderim anındaki
+ * değer. Kayıt şekli eski `{"images": [...]}` yanıtınınkiyle aynı
+ * (`depo_medya._json`), yani aşağıdaki akış (önizleme, yankı denetimi,
+ * döküm turu) DEĞİŞMEDİ.
+ */
+async function isSonuclari(is, folderId) {
+  const ids = (is.sonuc && is.sonuc.medya) || [];
+  const res = await fetch(
+    folderId ? `/api/history?folder_id=${encodeURIComponent(folderId)}` : "/api/history",
+  );
+  if (!res.ok) throw new Error(t("err.http", { durum: res.status }));
+  const { images } = await res.json();
+  const kayitlar = new Map(images.map((r) => [r.id, r]));
+  return ids.map((id) => kayitlar.get(id)).filter(Boolean);
+}
+
 function showPreview(rec) {
   setCurrentImage(rec);
 }
@@ -2692,6 +2759,8 @@ async function runArena(prompt) {
   const pal = readPaletteOpts();
   const sessionId = openSessionId();
   const arenaId = arenaKimlik();
+  // Gönderim anındaki klasör: sonuçlar `isSonuclari` ile buradan okunur.
+  const folderId = currentFolder ? currentFolder.id : null;
   const pending = beginArenaTurn(prompt, sutunlar);
 
   runBusy = true;
@@ -2731,7 +2800,10 @@ async function runArena(prompt) {
             const err = await res.json().catch(() => ({}));
             throw new Error(detailText(err) || t("err.http", { durum: res.status }));
           }
-          const { images } = await res.json();
+          // 202: sütunun işi kuyrukta; sütun ancak iş bitince dolar
+          // (`sonuclar[i]` yoklamanın sonuna kaydı, `fillArenaSlot` aynen).
+          const is = yanittakiIs(await res.json());
+          const images = await isSonuclari(await isiBekle(is.id), folderId);
           if (!images.length) throw new Error(t("gen.server_returned_nothing"));
           const kayit = {
             image_ids: images.map((r) => r.id),
@@ -2820,6 +2892,9 @@ async function run() {
   // sessizce kaybolur. Palet kapalıyken {} döner, böylece gövde bugünküyle
   // bayt bayt aynı kalır ve extra="forbid" boş bir alan görmez.
   const pal = readPaletteOpts();
+  // Gönderim anındaki klasör: iş bitince sonuçlar `isSonuclari` ile buradan
+  // okunur (gövdelerdeki `folder_id` ifadeleri aynen duruyor).
+  const folderId = currentFolder ? currentFolder.id : null;
 
   // ── Birleşik oturum (tasarım §5 · §4.2) ──
   // Görsel modu artık kendi oturumunu BAŞLATIYOR (Adım 8, K10'un ikinci yarısı):
@@ -2950,13 +3025,14 @@ async function run() {
       const err = await res.json().catch(() => ({}));
       throw new Error(detailText(err) || t("err.http", { durum: res.status }));
     }
-    const govde = await res.json();
-    // ANAHTAR TÜRE GÖRE: sunucu videoyu `{"videos": …}` içinde döndürüyor ve
-    // bu ayrım bilinçli (bkz. app.video'nun notu) — `images` sanmak, bayat bir
-    // istemcinin videoyu `<img>` olarak çizmesine yol açardı. Burada ikisi
-    // aynı değişkende buluşuyor çünkü kayıtların ŞEKLİ aynı; ayrışan tek şey
-    // dökümün `kind`i (aşağısı).
-    const images = videoMu ? govde.videos : govde.images;
+    // 202: iş kuyrukta. Durum metni ("Üretiliyor…" / video süresi) yoklama
+    // boyunca AYNEN duruyor — kullanıcı için değişen bir şey yok, üretim
+    // yalnız başka bir süreçte. Dört tür de aynı iş kaydından okunuyor;
+    // görsel/video ayrımı kayıtların ŞEKLİNİ değil dökümün `kind`ini
+    // etkiliyor (aşağısı) — Faz 1'in `{"videos": …}` anahtarı 202 gövdesinde
+    // artık yok, tür `is.tur`da.
+    const is = yanittakiIs(await res.json());
+    const images = await isSonuclari(await isiBekle(is.id), folderId);
     if (images[0]) showPreview(images[0]);
     clearUploadPreviewUrl(); // sonuç sunucu URL'inden gösteriliyor; blob artık gereksiz
     statusEl.textContent = videoMu

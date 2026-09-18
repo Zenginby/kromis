@@ -44,7 +44,7 @@ from sqlalchemy import func, select  # noqa: E402
 from sqlalchemy.exc import SQLAlchemyError  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
-from services import db, depo_kimlik_bilgisi, sifre  # noqa: E402
+from services import db, depo_kimlik_bilgisi, kiraci, sifre  # noqa: E402
 from services.tablolar import SaglayiciKimligi  # noqa: E402
 
 CIKIS_TAMAM = 0
@@ -105,7 +105,10 @@ def main(argv: list[str]) -> int:
 
     motor = db.motor_kur(url)
     try:
-        with Session(motor) as oturum:
+        # `app.rol = 'admin'` (RLS, Faz 2 / 7): döndürme HER kullanıcının
+        # `saglayici_kimlikleri` satırını okur ve GÜNCELLER — admin politikasının
+        # verdiği iki şey tam bunlar; bağlamsız oturum 0 satır görüp "hepsi güncel" derdi.
+        with kiraci.baglam(rol=kiraci.ADMIN), Session(motor) as oturum:
             once = surum_dagilimi(oturum)
             sonuc = dondur_hepsini(oturum, kuru=args.kuru)
             if args.kuru:

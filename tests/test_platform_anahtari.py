@@ -202,6 +202,8 @@ def test_the_settings_query_count_does_not_grow_with_the_platform_merge(client, 
     finally:
         event.remove(depo_db, "before_cursor_execute", _say)
     assert sum("saglayici_kimlikleri" in q for q in sayac) == 1, sayac
+    # Kiracı bağlaması (Faz 2 / 7) kimlik sorgusu DEĞİL: transaksiyon başına bir `set_config`.
+    assert sum("set_config" in q for q in sayac) == 1, sayac
 
 
 # ── (iv) uçtan uca: işçi platform anahtarıyla çıkıyor ───────────────────

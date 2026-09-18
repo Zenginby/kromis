@@ -335,6 +335,26 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
    1c bölümündeki komutla üret, **DB yedeğinden AYRI** sakla — kaybolursa
    kayıtlı anahtarlar okunamaz) ve `KROMIS_DATA_DIR` (medya dosyalarının
    kökü; konteynerde `/data`).
+
+   **Uygulama rolü (RLS, Faz 2 / 7):** `DATABASE_URL`deki rol **süper
+   kullanıcı ya da `BYPASSRLS` OLMAMALI** — ikisi de satır düzeyi güvenliği
+   atlar ve kiracı yalıtımının ikinci katı sessizce kapanır (tablonun SAHİBİ
+   olması sorun değil: göç `FORCE ROW LEVEL SECURITY` koyuyor). Yönetilen
+   servislerin verdiği öntanımlı rol çoğu zaman süper kullanıcı değil, ama
+   bazıları `BYPASSRLS` taşır — bir kez sor:
+
+   ```sh
+   psql "${DATABASE_URL/+psycopg/}" -c "SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user"
+   psql "${DATABASE_URL/+psycopg/}" -c "SELECT count(*) FROM medya"   # bağlamsız: 0 olmalı
+   ```
+
+   İkisi de `f` ve sayım 0 ise rol doğru. Değilse ayrı bir rol aç ve
+   uygulamaya onu ver (göç sahip rolüyle koşmaya devam eder):
+   `CREATE ROLE kromis_uygulama LOGIN PASSWORD '…'; GRANT USAGE ON SCHEMA
+   public TO kromis_uygulama; GRANT SELECT, INSERT, UPDATE, DELETE ON ALL
+   TABLES IN SCHEMA public TO kromis_uygulama;` (yeni göçün yarattığı tablo
+   için `ALTER DEFAULT PRIVILEGES … GRANT … TO kromis_uygulama`). Neden ve
+   ne ölçüldüğü: docs/faz2-kuyruk-anahtarlar-depolama.md §7.
 2. **Şema — dağıtım ÖNCESİ komut, konteyner açılışı DEĞİL:**
 
    ```sh

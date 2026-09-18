@@ -43,7 +43,7 @@ from fastapi import Depends, Request
 import azure_client as azure_module
 import kimlik_baglami
 import paths as paths_module
-from services import ayar, db, sifre
+from services import ayar, db, kiraci, sifre
 
 # Salt kitaplık iki modül — takımın kendisi bir kuruluma bağlanmıyor:
 # hangi dosyaların E2E olduğu TEK yerde ölçülüyor (gerekçesi orada); geçici
@@ -388,8 +388,11 @@ def _sifre_anahtari_ve_kimlik_baglami(monkeypatch: pytest.MonkeyPatch):
     """
     monkeypatch.setenv(sifre.ANAHTAR_ENV, sifre_anahtari(TEST_KOK_ANAHTARI))
     kimlik_baglami.sifirla()
+    kiraci.sifirla()
     yield
     kimlik_baglami.sifirla()
+    # Kiracı bağlamı da bir ContextVar (Faz 2 / 7) ve aynı sızıntı sınıfına açık.
+    kiraci.sifirla()
 
 
 @pytest.fixture(autouse=True)
@@ -703,9 +706,17 @@ def kullanici(request: pytest.FixtureRequest):
     yamalar.update({kimlik.aktif_kullanici: _oturumlu, kimlik.sayfa_kullanicisi: _oturumlu,
                     ayar.ayarlar: _paylasilan})
     appmod.app.dependency_overrides.update(yamalar)
+    # KİRACI BAĞLAMI (Faz 2 / 7) iki yerde bağlanır ve ikisi de gerekli: rota tarafı
+    # `kimlik.bagla` üzerinden (override onu çağırıyor; isteğin görevinde), TEST
+    # tarafı BURADA — testin kendi iş parçacığında açtığı oturumlar (`db_oturumu`,
+    # `Session(depo_db)`) TestClient'ın portal iş parçacığını görmez, kendi
+    # bağlamını taşır. Takım süper kullanıcıyla koşuyor, politika burada görünmez
+    # (FORCE süper kullanıcıyı kapsamaz); yalıtım ikinci rolle tests/test_rls.py'de.
+    kiraci_jetonu = kiraci.bagla(kullanici_id=test_kullanicisi.id)
     try:
         yield test_kullanicisi
     finally:
+        kiraci.coz(kiraci_jetonu)
         for anahtar in yamalar:
             appmod.app.dependency_overrides.pop(anahtar, None)
 

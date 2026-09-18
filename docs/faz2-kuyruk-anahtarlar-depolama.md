@@ -1278,7 +1278,7 @@ testlerinin yanına); deyimin örnekleri § 5'te sayılı.
 
 ---
 
-## 7. RLS ikinci kat — `SET LOCAL app.kullanici_id`, 8 iş tablosunda politika, FORCE; işçi ve admin rolü (PR: `faz2/rls`)
+## 7. RLS ikinci kat — `SET LOCAL app.kullanici_id`, 8 iş tablosunda politika, FORCE; işçi ve admin rolü ✅ (PR: `faz2/rls`)
 
 **Kapsam.** Faz 1 / 2'nin "şema RLS'e hazır, politika Faz 2/3'te" notu. Göç
 `0006_rls`: 7 Faz 1 iş tablosu + `isler` için `ALTER TABLE … ENABLE ROW LEVEL
@@ -1337,6 +1337,143 @@ her sorguya `kullanici_id = …` ekler, indeksler zaten o sütunla başlıyor
 5 araç bağlamla koşuyor (bekçi); `alembic` döngüsü temiz; canlı: iki hesap,
 `psql`de uygulama rolüyle `SELECT count(*) FROM medya` → yalnız `SET
 app.kullanici_id` sonrası satır; takım yeşil.
+
+**Yapıldığında (2026-09-18).** Göç `0006_rls`: 7 Faz 1 tablosu + `isler`,
+her birinde `ENABLE` + `FORCE ROW LEVEL SECURITY` ve ÜÇ politika (24
+politika): `sahip` (ALL; `USING` = `WITH CHECK` = `kullanici_id =
+NULLIF(current_setting('app.kullanici_id', true), '')::uuid`),
+`yonetici_okur` (SELECT) ve `yonetici_gunceller` (UPDATE)
+`current_setting('app.rol', true) = 'admin'`; hepsi PERMISSIVE — admin
+bağlamı kendi satırını da görür, sahip yazımı sürer. Downgrade politikaları
+düşürür, `NO FORCE` + `DISABLE`; `alembic check` politikaları GÖRMEZ (kısmi
+indeks/CHECK gibi), bekçisi `pg_policies`. Yeni **`services/kiraci.py`**
+(yaprak): `Baglam(kullanici_id, rol)` ContextVar'ı, `bagla/coz/aktif/sifirla`
+(`kimlik_baglami` deseni), `baglam()` context manager (işçinin `with`i),
+`uygula(Session | Connection)` — TEK ifade `SELECT set_config('app.kullanici_id',
+:k, true), set_config('app.rol', :r, true)` (`SET` bind parametresi almıyor,
+`set_config(…, true)` = `SET LOCAL`; iki ayar bir gidiş-dönüş), `IS_TABLOLARI`
+(8). **`services/db.py`**: `Session` SINIFINA `after_begin` dinleyicisi
+`kiraci_bagla` (adı var: `event.contains` ile sınanıyor; süreçteki her
+`Session` — rota, işçi, araç, SSE'nin kısa oturumları — aynı kancadan geçer,
+`sessionmaker` yok); bağlam yoksa SUSAR (açık rotalar/`/health` gidiş-dönüş
+ödemez). **`services/kimlik.py`**: `bagla` kiracıyı da bağlar (override'lı
+3.100 test bu yoldan), `_coz` çözdükten sonra `kiraci.uygula(db)`.
+**`services/isci.py`**: `siradakini_al` ve `kalp_turu` `rol=admin` (+
+`uygula(db)`: çağıranın oturumu açık transaksiyon taşıyabilir), `kos` işin
+`kullanici_id`si `with` içinde — BYPASSRLS değil. Araçlar: `artik_dosya`,
+`anahtar_dondur`, `kullanici` admin; `ice_aktar` aktarılan kullanıcı.
+`tools/goc.py` dokunulmadı. `KURULUM.md` uygulama rolü notu (+ `psql`
+denetimi). `.env.example`/`compose.yaml` değişmedi (ortam değişkeni yok).
+
+SAPMALAR: (a) `NULLIF(…, '')` belgede yoktu: `''::uuid` dönüşüm HATASI
+verirdi (bağlamsız her sorgu 500) ve `set_config(ad, NULL, true)` Postgres
+sürümüne göre farklı davranıyor — modül her zaman dize yazar, politika boş
+dizeyi "bağlı değil" sayar. (b) Admin için İKİ politika: tek `CREATE POLICY`
+`FOR SELECT` ve `FOR UPDATE`yi birden alamaz (`ALL` DELETE/INSERT de verirdi).
+(c) `ice_aktar` admin DEĞİL aktarılan kullanıcıyı bağlar: admin politikası
+INSERT vermez ve araç tek hesabın satırlarını yazar. (d) `medya_tasi.py`
+bağlam TAŞIMAZ — DB'ye hiç bağlanmıyor (dosya → kova); "5 araç" 4 oldu,
+bekçi `Session(` açan araçları dosya sisteminden türetip listeyle
+karşılaştırıyor. (e) `after_begin` tek başına gerçek yolda YETMİYOR: kanca
+kimlik sorgusunda ateşleniyor ve kullanıcı o an bilinmiyor; `_coz` bağlamı
+aynı transaksiyona `uygula(db)` ile sonradan yazar. Override'lı test yolunda
+ilk sorgu rotanın, kanca yeter. `uygula` taze oturumda susar (kanca
+yazacak, ifade iki kez gitmesin), açık transaksiyona yazar. (f) "47 kapılı
+rota bağlamla koşuyor" bekçisi 47 istek DEĞİL: `test_kimlik` her rotanın
+kapılı ya da gerekçeli açık olduğunu zaten sınıyor ve kapının TEK çözüm
+noktası `_coz`; bekçi orada ölçüyor — gerçek girişte `before_cursor_execute`
+izi tam `[oturumlar ⋈ kullanicilar, set_config(<kullanıcı>), medya]` —
+artı `kimlik.bagla` birimi ve uygulama rolüyle rota testi. (g) SÜPER
+KULLANICI TUZAĞI (belgenin "CI süper kullanıcı rol yaratabilir" notu):
+takımın motoru süper kullanıcı ve `FORCE` onu KAPSAMAZ — öteki 3.650 test
+politikayı hiç görmez; yalıtım `kromis_rls_test` NOLOGIN rolü + her
+bağlantıda `SET ROLE` ile ölçülür (COMMIT şart: `SET ROLE` transaksiyonel,
+havuz iadesinin rollback'i rolü geri alıyordu — ölçüldü). Bir test bu tuzağı
+yeşil olarak belgeliyor (`test_the_superuser_bypasses_…`). conftest bağlamı
+yine bağlar — rota tarafı `kimlik.bagla`, test tarafı `kullanici` fixture'ı
+(TestClient'ın portal iş parçacığı testin bağlamını görmez, iki yer gerekli).
+(h) `test_kimlik` "tek sorgu" ve `test_platform_anahtari` sayaçları
+`set_config`i SAYMIYOR: sorgu değil, transaksiyonun bağlaması. (i) Web
+yolunda bağlam jetonu saklanmıyor (`dil`in `i18n` deseni; görev bağlamı
+istekle ölür), testler arası emniyet conftest `kiraci.sifirla`.
+
+MALİYET (ölçüldü, geçici küme): bağlamlı transaksiyon başına +1 gidiş-dönüş
+(`set_config`; bağlamsızda 0). `EXPLAIN ANALYZE`, `medya` 1.000 + 1.000
+satır, liste sorgusu (`kullanici_id = … AND folder_id IS NULL ORDER BY
+olusturuldu DESC LIMIT 50`): iki rolde de **`Index Scan Backward using
+ix_medya_kullanici_olusturuldu`**, politika `Filter`a ekleniyor
+(`current_setting('app.rol') = 'admin' OR kullanici_id = NULLIF(…)`); yürütme
+0,072 ms ↔ 0,027 ms (politikasız), planlama 0,35 ↔ 0,17 ms; satır tahmini
+503 ↔ 1001 (OR seçiciliği yarıya indiriyor, indeks kararı değişmiyor).
+Faz 1 / 2'nin "indeksler `kullanici_id` ile başlar" kararı burada karşılığını
+veriyor: politika ek tarama üretmiyor.
+
+TESTLER: takım 3.655 → 3.676 toplanan (+21; 3.664 geçti, 12 atlanan —
+hepsi platforma bağlı: Windows DACL/NTFS ve root izin bitleri; 3 dk 43 sn).
+Yeni `tests/test_rls.py` (21): 8 tablo + FORCE
+(üç kaynak eşit: `IS_TABLOLARI`, göç literali, metadata'nın `kullanici_id`
+taşıyan − hesap kümesi; politika yalnız iş tablolarında), 24 politika
+`pg_policies` (ad, komut, PERMISSIVE, `NULLIF`), downgrade → 0 politika / RLS
+kapalı → upgrade → 24 + `check`; süper kullanıcı atlar (tuzak); bağsız 0
+satır hata yok; sahip yalnız kendi satırı (8 tabloda); boş dize dönüşüm
+hatası değil; başkasının id'siyle INSERT `42501` "row-level security";
+başkasına UPDATE/DELETE 0 satır, kendi 1; admin okur (2) ve günceller (1),
+DELETE 0, INSERT reddi, admin + kullanıcı birlikte; `SET LOCAL` commit'le
+düşer ve AYNI havuz bağlantısı (`pool_size=1`, DBAPI kimliği eşit) kiracısız;
+kanca `Session`da kayıtlı ve bağlamsız susar; aynı `Session` üç transaksiyon
+üç kiracı (iz `[set_config, select] × 3`, parametrede id/`admin`); `uygula`
+taze/açık/bağlamsız; `kimlik.bagla` birimi; gerçek giriş izi (3 ifade);
+kapılı rota (`/api/history`, `/api/isler`) uygulama rolüyle kendi satırları,
+isteğin ilk ifadesi bağlama, B'nin id'si hiçbir ifadede yok; SSE akışı
+(`/api/isler/akis`, kendi kısa oturumları `run_in_threadpool`da) uygulama
+rolüyle yalnız A'nın işini yazar — bağlam havuz kopyasına taşınıyor; işçi B'nin
+işini admin olarak alır ve B olarak yazar (iz sırası `set_config(admin) <
+UPDATE isler < set_config(B)`), dış bağlam korunur, test kullanıcısının id'si
+işçinin hiçbir ifadesine sızmaz; kalp turu bayat işi admin olarak düşürür;
+araç kaynak bekçisi (`Session(` ⇒ `kiraci.baglam(`; küme = 4). Güncellenen:
+`test_db`/`test_goc` `BAS = "0006_rls"` + zincir, `test_kuyruk` literal,
+`test_kimlik`/`test_platform_anahtari` sayaç (+ "bir `set_config`" iddiası),
+`test_i18n` sınıflandırma (`services/kiraci.py` konuşmayan), conftest.
+
+DUMAN (2026-09-18; geçici Postgres, `tools/goc.py` → `0006_rls` (8 FORCE,
+24 politika), LOGIN rolü `kromis_uygulama` `rolsuper=f rolbypassrls=f` +
+GRANT, uvicorn ve `isci.py` BU ROLLE, sağlayıcı yamalı, sahte platform
+anahtarı ortamda): `/health` 200; A `GET /api/settings` `kaynaklar.azure_image
+= platform`; A `POST /api/generate` 202 (19 ms), işçi `is aldi → is bitti`,
+`GET /api/isler/{id}` `bitti`, `anahtar_kaynagi = platform`; A history **1** /
+B history **0**; B `GET /api/isler` boş, B → A'nın işi **404**; B üretir →
+1 / 1, `GET /api/isler` ikisinde yalnız kendi işi; `psql -U kromis_uygulama`:
+`SELECT count(*) FROM medya` → **0**, `SET app.kullanici_id = '<A>'` → **1**,
+`SET app.rol = 'admin'` → 2; `tools/artik_dosya.py` uygulama rolüyle `2
+kullanici, 0 artik dosya` (admin bağlamı olmasaydı 2 dosya "artık" görünür,
+`--sil` onları silerdi); platform anahtarı iki sürecin günlüğünde yok.
+
+**8. göreve devredilen.** (1) `kimlik.admin_kullanici` `aktif_kullanici` +
+`is_admin` üstüne `kiraci.bagla(kullanici_id=…, rol=kiraci.ADMIN)` bağlar ve
+`kiraci.uygula(db)` çağırır (`_coz`un deseni: transaksiyon açık) — admin
+rotası hem kendi satırını hem herkesinkini görür, iptal/tavan UPDATE'i
+`yonetici_gunceller`den geçer; admin SİLME ve EKLEME politikası yok, admin
+rotası gerekiyorsa göç `0007`. (2) `kullanicilar.gunluk_kredi_tavani`:
+`kullanicilar` politikasız (hesap tablosu, kimlik çözülmeden okunur) — tavan
+yazımı rotada `is_admin` kapısıyla; DB katında istenirse `GRANT UPDATE
+(gunluk_kredi_tavani) ON kullanicilar TO <admin rolü>` + uygulama rolünden
+`REVOKE UPDATE (gunluk_kredi_tavani)` — iki ayrı DB rolü gerekir, bugün tek
+rol var; öneri: rota kapısı yeter, sütun GRANT'ı ancak ikinci rol açılırsa.
+(3) `GET /api/kota` (belge §6 devri) sahip bağlamında `kota.gunluk_durum`
+aynen çalışır. (4) `KIRACISIZ` defterine (`test_galeri_db`) `depo_admin`
+girişi 8'in kendisi açar; bu görev defteri değiştirmedi. (5) Admin metrikleri
+(`/api/admin/isler`, `metrikler`) ham `select(Is)` yazacak — admin bağlamı
+olmadan BOŞ döner, sızmaz: test_rls'in "bağsız 0 satır" iddiası oranın
+kırılma sınıfını belgeliyor. (6) İki DB rolü (göç sahibi + uygulama) canlıda
+ayrılırsa `ALTER DEFAULT PRIVILEGES` gerekli — KURULUM notunda.
+
+**Sahibin adımı — canlıda uygulama rolünün RLS'i atlamadığını görmek (CI'dan
+yapılamaz).** Neon/Supabase/Fly'daki `DATABASE_URL` rolüyle bir kez:
+`SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user`
+→ `f | f`; `SELECT count(*) FROM medya` → `0`; `SET app.kullanici_id =
+'<kendi id>'` → kendi sayın. Biri tutmuyorsa KURULUM.md'deki `CREATE ROLE
+kromis_uygulama …` yolu (göç sahip rolüyle, uygulama yeni rolle). Sonucu bu
+paragrafın altına bir satır (tarih, sağlayıcı, rol adı, üç cevap).
 
 ---
 

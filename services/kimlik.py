@@ -78,7 +78,7 @@ from sqlalchemy.orm import Session
 
 import i18n
 import kimlik_baglami
-from services import cerez, depo_kimlik_bilgisi, dil, hesap, platform_anahtari
+from services import cerez, depo_kimlik_bilgisi, dil, hesap, kiraci, platform_anahtari
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
@@ -96,15 +96,25 @@ class GirisSayfasi(Exception):
 
 
 def bagla(request: Request, kullanici: Kullanici) -> Kullanici:
-    """Çözülen kullanıcıyı isteğe bağlar: `request.state.kullanici` + dil zincirinin 3. halkası.
+    """Çözülen kullanıcıyı isteğe bağlar: `request.state.kullanici` + dil zincirinin 3. halkası + kiracı.
 
     `_coz`un son adımı ve test override'ının ÇAĞIRDIĞI tek üretim işlevi:
     dil halkası burada olmasa override'lı 3.100 test kullanıcının dilini hiç
     görmez, kapının kendisini sınayan 40 test görürdü — iki yolun aynı yerden
     geçmesi, yolların ayrışmamasının garantisi.
+
+    KİRACI (Faz 2 / 7): `kiraci.bagla(kullanici_id=…)` isteğin görevinde —
+    rota havuza giderken kopyasını alır ve rotanın ilk sorgusu transaksiyonu
+    başlatırken `db.kiraci_bagla` kancası `SET LOCAL app.kullanici_id`i yazar
+    (override'lı yolda ilk sorgu rotanınkidir). Gerçek yolda transaksiyon
+    kimlik sorgusuyla ÇOKTAN başlamış; `_coz` bağlamı aynı transaksiyona
+    `kiraci.uygula(db)` ile sonradan yazar. Jeton saklanmıyor: bağlam isteğin
+    görevine ait ve görevle ölür (`dil.kullanici_dili`nin `i18n` deseni);
+    testler arası emniyet tests/conftest.py'de (`kiraci.sifirla`).
     """
     request.state.kullanici = kullanici
     dil.kullanici_dili(request, kullanici.dil)
+    kiraci.bagla(kullanici_id=kullanici.id)
     return kullanici
 
 
@@ -122,7 +132,12 @@ async def _coz(request: Request, response: Response, db: Session) -> Kullanici |
     kullanici, yenilendi = sonuc
     if yenilendi:
         cerez.oturum_yaz(response, ham)
-    return bagla(request, kullanici)
+    bagla(request, kullanici)
+    # Kimlik sorgusu transaksiyonu başlattı, `after_begin` bağlamsız geçti (kullanıcı
+    # o an bilinmiyordu): kiracı AYNI transaksiyona şimdi yazılır — rotanın iş
+    # tablosu sorguları bunun ardından gelir. Senkron sürücü, havuz iş parçacığında.
+    await run_in_threadpool(kiraci.uygula, db)
+    return kullanici
 
 
 async def aktif_kullanici(request: Request, response: Response,

@@ -111,7 +111,16 @@ from sqlalchemy.orm import Session  # noqa: E402
 import assets_store  # noqa: E402
 import azure_client  # noqa: E402
 import prefs  # noqa: E402
-from services import ayar, db, depo_kimlik_bilgisi, depo_tercih, hesap, sifre, zaman  # noqa: E402
+from services import (  # noqa: E402
+    ayar,
+    db,
+    depo_kimlik_bilgisi,
+    depo_tercih,
+    hesap,
+    kiraci,
+    sifre,
+    zaman,
+)
 from services.tablolar import Klasor, Kullanici, Medya, Palet, Sohbet, Tercih, Varlik  # noqa: E402
 from storage import _SAFE_ID  # noqa: E402
 
@@ -720,16 +729,21 @@ def main(argv: list[str]) -> int:
             if os.path.realpath(os.path.join(kaynak, "output")) == os.path.realpath(ozel.output_dir):
                 print("kaynak ile hedef ayni dizin; kopyalanacak bir sey yok", file=sys.stderr)
                 return CIKIS_KULLANICI
-            rapor = aktar(oturum, kullanici, kaynak, ozel, kimlik_dosyasi=args.kimlik_dosyasi,
-                          kuru=args.kuru, yeniden=args.yeniden)
-            if args.kuru:
-                oturum.rollback()
-            else:
-                try:
-                    oturum.commit()
-                except BaseException:
-                    temizle(rapor.kopyalananlar)
-                    raise
+            # KİRACI = aktarılan hesap, admin rolü DEĞİL (RLS, Faz 2 / 7): araç tek bir
+            # kullanıcının satırlarını YAZAR ve admin politikası INSERT vermez.
+            # `oturum=`: `kullanici_bul` transaksiyonu çoktan başlattı, `after_begin`
+            # kancası geçti — bağlam aynı transaksiyona şimdi yazılır.
+            with kiraci.baglam(kullanici_id=kullanici_id, oturum=oturum):
+                rapor = aktar(oturum, kullanici, kaynak, ozel, kimlik_dosyasi=args.kimlik_dosyasi,
+                              kuru=args.kuru, yeniden=args.yeniden)
+                if args.kuru:
+                    oturum.rollback()
+                else:
+                    try:
+                        oturum.commit()
+                    except BaseException:
+                        temizle(rapor.kopyalananlar)
+                        raise
     except IceAktarmaHatasi as hata:
         print(str(hata), file=sys.stderr)
         return CIKIS_KULLANICI

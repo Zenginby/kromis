@@ -775,6 +775,8 @@ KULLANICIYA_KONUSMAYAN = {
     "services/depo_kimlik_bilgisi.py": "sağlayıcı kimlik deposu (Faz 1 / 7): SQL ve şifreleme; "
                                        "değer döndürür, cümle rotanın (`routers/ayarlar.py`)",
     "kimlik_baglami.py": "isteğin kimlik sözlüğünün ContextVar'ı (Faz 1 / 7); metin yok",
+    "services/kiraci.py": "kiracı bağlamının ContextVar'ı ve `set_config` ifadesi (Faz 2 / 7); "
+                          "metin yok",
     "services/koken.py": "köken kapısı (Faz 1 / 3): 403 gövdesi bir KOD "
                          "(`cross_origin_rejected`) — dil ara katmanından ÖNCE koşuyor, "
                          "cümle kuramaz; `services/db.py` ile aynı karar",

@@ -2,7 +2,7 @@
 
 # Test haritası
 
-`tests/` altında 129 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
+`tests/` altında 130 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
 
 | modül | testler |
 | --- | --- |
@@ -70,7 +70,7 @@
 | `services.isci` | `test_docker_kapisi.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik.py`, `test_playwright_studio.py`, `test_rls.py` |
 | `services.kapilar` | `test_docker_kapisi.py`, `test_isler_route.py`, `test_kota.py`, `test_platform_anahtari.py` |
 | `services.kimlik` | `test_isler_route.py`, `test_kimlik.py`, `test_rls.py` |
-| `services.kiraci` | `test_rls.py` |
+| `services.kiraci` | `test_rls.py`, `test_rls_kontrol.py` |
 | `services.koken` | `test_docker_kapisi.py`, `test_hesap.py`, `test_koken.py`, `test_playwright_hesap.py` |
 | `services.kota` | `test_docker_kapisi.py`, `test_kota.py` |
 | `services.kuyruk` | `test_artik_dosya.py`, `test_isci.py`, `test_isler_route.py`, `test_kota.py`, `test_kuyruk.py`, `test_rls.py` |
@@ -96,9 +96,11 @@
 | `tools.make_logo_goldens` | — |
 | `tools.medya_tasi` | `test_medya_tasi.py` |
 | `tools.render_brand_assets` | — |
+| `tools.rls_kontrol` | `test_rls_kontrol.py` |
 | `tools.surum_karari` | `test_surum_karari.py` |
 | `tools.surum_yaz` | `test_release_manifest.py`, `test_surum_yaz.py` |
 | `tools.test_ortami` | `test_test_ortami.py` |
+| `tools.uygulama_rolu` | `test_rls_kontrol.py` |
 | `veo_client` | `test_veo_client.py` |
 | `version` | `test_db.py`, `test_guncelleme.py`, `test_guncelleme_route.py`, `test_health.py`, `test_hesap.py`, `test_index.py`, `test_playwright_guncelleme.py`, `test_provider_logos.py`, `test_release_manifest.py`, `test_settings_route.py`, `test_version.py` |
 | `winclr` | `test_winclr.py` |

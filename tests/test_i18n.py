@@ -696,6 +696,8 @@ KULLANICIYA_KONUSAN = (
     "routers/ayarlar.py", "routers/bindirme.py", "routers/galeri.py",
     "routers/hesap.py", "routers/paletler.py", "routers/sohbet.py",
     "routers/uretim.py",
+    # Faz 2 / 4: iş uçları — 404/409/422 metinleri (`err.is_*`, `err.bad_since`).
+    "routers/isler.py",
     # Rota dışı ama kullanıcıya 4xx gövdesi üreten yardımcılar.
     "services/gorsel.py", "services/kapilar.py", "services/modeller.py",
     "services/palet.py",

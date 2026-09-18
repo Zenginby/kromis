@@ -33,8 +33,9 @@ import os
 import re
 import sys
 import threading
+import uuid
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi import Depends, Request
@@ -822,13 +823,117 @@ def dizinler(monkeypatch: pytest.MonkeyPatch):
     import dataclasses
 
     import app as appmod
+    from services import dosya
 
     def _yonlendir(**alanlar: str) -> ayar.Ayarlar:
         yeni = dataclasses.replace(appmod.app.state.ayarlar, **alanlar)
         monkeypatch.setattr(appmod.app.state, "ayarlar", yeni)
+        # `data_dir` yönlendirilince DEPO da oraya (Faz 2 / 4): `app.state.dosya`
+        # ithal anında `YerelDepo(paths.data_dir())` kuruldu ve dev'de o kök
+        # REPO KÖKÜ. Üretim rotaları girdi nesnelerini KÖK GÖRELİ anahtarla
+        # yazıyor (`kullanicilar/<uuid>/isler/…`); depo yerinde kalsa E2E ve
+        # `uret_ve_bitir` testleri depoya `kullanicilar/` bırakırdı (Faz 1 /
+        # 2'nin ölçtüğü sızıntı sınıfı). Yalnız yerel depo: nesne depo
+        # yamalanmış bir testin kendi kararı.
+        if "data_dir" in alanlar and isinstance(appmod.app.state.dosya, dosya.YerelDepo):
+            monkeypatch.setattr(appmod.app.state, "dosya", dosya.YerelDepo(alanlar["data_dir"]))
         return yeni
 
     return _yonlendir
+
+
+class _PaylasilanYerlesim(ayar.Ayarlar):
+    """`kullanici_icin` KENDİNİ döndüren ayar nesnesi — `uret_ve_bitir`in işçiye verdiği yerleşim.
+
+    `kullanici` fixture'ının `ayar.ayarlar` override'ının işçi tarafı: rota
+    testleri `dizinler(output_dir=tmp_path)` deyip `tmp_path / f"{id}.png"`e
+    iddia yazıyor ve rota o dizine yazıyordu. Üretim artık işçide
+    (`isci._yaz` → `ayarlar.kullanici_icin(uid).output_dir`); işçi de aynı
+    paylaşılan dizine yazsın ki eski iddialar aynen dursun. Kullanıcıya göre
+    dizin türetimi override'ın ARKASINDA kalıyor — onu ölçen dosyalar
+    (`test_kimlik`, `test_isci`) gerçek `Ayarlar` ile koşuyor.
+    """
+
+    def kullanici_icin(self, kullanici_id) -> ayar.Ayarlar:
+        return self
+
+
+class IsSonucu:
+    """`uret_ve_bitir`in döndürdüğü şey: eski `TestClient` yanıtının ŞEKLİNDE, kuyruk üstünden.
+
+    Rota 202 + iş döndürüyor, sonucu işçi yazıyor (Faz 2 / 4). 104 rota testi
+    `r = c.post(...); r.status_code == 200; r.json()["images"]` deyimiyle
+    yazılmıştı; bu nesne o üç iddiayı aynen karşılar ki eski testler tek
+    satır (`c.post` → `uret_ve_bitir(c, …)`) değişerek dursun:
+
+      * `status_code` — iş `bitti` ise **200** (eski mutlu yol), `hata` ise
+        **502** (eski "sağlayıcı hatası → 502" eşlemesi; `json()["detail"]`
+        işin `hata` metni). POST 202 vermediyse (422/413/404/429) GERÇEK
+        yanıt olduğu gibi döner, bu sınıf hiç kurulmaz.
+      * `json()` — `{"images": [kayıt, …]}` görsel türlerinde, `{"videos": …}`
+        video türlerinde (rotanın eski anahtar kararı, `test_video_route`).
+        Kayıtlar `GET /api/history`nin döktüğü sözlükler (`depo_medya.bul`),
+        `sonuc.medya` sırasıyla.
+      * `is` — işin son hâli (`kuyruk._json`), yeni iddialar için.
+    """
+
+    def __init__(self, is_: dict, kayitlar: list[dict]):
+        self.is_ = is_
+        self.kayitlar = kayitlar
+        self.status_code = 200 if is_["durum"] == "bitti" else 502
+        self.text = f"is {is_['id']} {is_['durum']}: {is_.get('hata')!r}"
+
+    def json(self) -> dict:
+        if self.is_["durum"] != "bitti":
+            return {"detail": self.is_.get("hata") or ""}
+        anahtar = "videos" if self.is_["tur"] in ("video", "animate") else "images"
+        return {anahtar: self.kayitlar}
+
+
+@pytest.fixture
+def uret_ve_bitir(request: pytest.FixtureRequest, tmp_path, dizinler):
+    """POST üretim rotası → 202 → `isci.tek_tur` → sonuç kayıtları (Faz 2 / 4; belge §4'ün test deseni).
+
+    Kullanımı: `r = uret_ve_bitir(c, "/api/generate", json={...})` — `c.post`un
+    yerine, aynı argümanlarla. Dönen `IsSonucu` eski yanıtın şeklinde (üstte).
+    Sağlayıcı testin yaması (`ac.generate`, `providers.*`); işçi onu
+    `providers` üzerinden çağırır, yani eski yamalar aynen işler.
+
+    `depo_db` ŞART (modülün `pytestmark`ı): işçi `Session`ı bu dosyanın
+    motorundan açılır (`tek_tur(db, …)` alım için, yazım `db.get_bind()`ten).
+    `data_dir` `tmp_path`e çekilir (girdi nesneleri `kullanicilar/<uuid>/isler/`
+    altına, depo da oraya — `dizinler`in kuralı); `output_dir` testin
+    bıraktığı yerde kalır ve işçi ORAYA yazar (`_PaylasilanYerlesim`).
+    """
+    import dataclasses
+
+    from sqlalchemy.orm import Session
+
+    import app as appmod
+    from services import depo_medya, isci, kuyruk, tablolar
+
+    motor = request.getfixturevalue("depo_db")
+    dizinler(data_dir=str(tmp_path))
+
+    def _calistir(client, yol: str, **istek) -> Any:
+        cevap = client.post(yol, **istek)
+        if cevap.status_code != 202:
+            return cevap
+        is_id = cevap.json()["is"]["id"]
+        yerlesim = _PaylasilanYerlesim(**dataclasses.asdict(appmod.app.state.ayarlar))
+        with Session(motor) as db:
+            kostu = isci.tek_tur(db, appmod.app.state.dosya, ayarlar=yerlesim)
+            assert kostu, "kuyrukta iş yoktu — 202 döndü ama satır commit'lenmedi mi?"
+        with Session(motor) as db:
+            satir = db.get(tablolar.Is, uuid.UUID(is_id))
+            assert satir is not None
+            is_ = kuyruk._json(satir)
+            medya = cast(list[str], (satir.sonuc or {}).get("medya") or [])
+            kayitlar = [k for k in (depo_medya.bul(db, satir.kullanici_id, m) for m in medya)
+                        if k is not None]
+        return IsSonucu(is_, kayitlar)
+
+    return _calistir
 
 
 @pytest.fixture

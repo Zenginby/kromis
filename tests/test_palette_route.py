@@ -63,10 +63,10 @@ def _client(tmp_path, monkeypatch, dizinler, *, real_png=False):
     return TestClient(appmod.app), sent
 
 
-def _gen(client, **extra):
+def _gen(uret_ve_bitir, client, **extra):
     body = {"prompt": "kurban afişi", "size": "1024x1024", "quality": "medium", "n": 1}
     body.update(extra)
-    return client.post("/api/generate", json=body)
+    return uret_ve_bitir(client, "/api/generate", json=body)
 
 
 # ── /api/palette/suggest ────────────────────────────────────────────────────
@@ -254,9 +254,9 @@ def test_a_stray_palettes_file_is_never_read(tmp_path, monkeypatch, dizinler):
 
 # ── Asıl kanıt: ek Azure'a giden metne ulaşıyor mu ──────────────────────────
 
-def test_generate_appends_the_palette_to_the_prompt_sent_to_azure(tmp_path, monkeypatch, dizinler):
+def test_generate_appends_the_palette_to_the_prompt_sent_to_azure(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     client, sent = _client(tmp_path, monkeypatch, dizinler)
-    r = _gen(client, palette_hex=SEED, palette_mode="triad", palette_strength="balanced")
+    r = _gen(uret_ve_bitir, client, palette_hex=SEED, palette_mode="triad", palette_strength="balanced")
     assert r.status_code == 200, r.text
     assert len(sent) == 1
     assert sent[0].startswith("kurban afişi")
@@ -266,10 +266,10 @@ def test_generate_appends_the_palette_to_the_prompt_sent_to_azure(tmp_path, monk
         assert hex_color in sent[0]
 
 
-def test_generate_without_a_palette_sends_the_prompt_verbatim(tmp_path, monkeypatch, dizinler):
+def test_generate_without_a_palette_sends_the_prompt_verbatim(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """Gerileme testi: palet kullanılmadığında katman tamamen atıl olmalı."""
     client, sent = _client(tmp_path, monkeypatch, dizinler)
-    r = _gen(client)
+    r = _gen(uret_ve_bitir, client)
     assert r.status_code == 200, r.text
     assert sent == ["kurban afişi"]
     record = r.json()["images"][0]
@@ -277,18 +277,18 @@ def test_generate_without_a_palette_sends_the_prompt_verbatim(tmp_path, monkeypa
     assert record["prompt_sent"] is None
 
 
-def test_generate_stores_the_user_prompt_not_the_augmented_one(tmp_path, monkeypatch, dizinler):
+def test_generate_stores_the_user_prompt_not_the_augmented_one(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """`prompt` alanı galeri başlıklarını ve türev kopyalamayı besliyor."""
     client, sent = _client(tmp_path, monkeypatch, dizinler)
-    record = _gen(client, palette_hex=SEED, palette_mode="analogic").json()["images"][0]
+    record = _gen(uret_ve_bitir, client, palette_hex=SEED, palette_mode="analogic").json()["images"][0]
     assert record["prompt"] == "kurban afişi"
     assert record["prompt_sent"] == sent[0]
     assert record["prompt_sent"] != record["prompt"]
 
 
-def test_generate_snapshots_the_palette_in_history(tmp_path, monkeypatch, dizinler):
+def test_generate_snapshots_the_palette_in_history(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     client, _ = _client(tmp_path, monkeypatch, dizinler)
-    record = _gen(client, palette_hex=SEED, palette_mode="quad",
+    record = _gen(uret_ve_bitir, client, palette_hex=SEED, palette_mode="quad",
                   palette_strength="strict").json()["images"][0]
     pal = record["palette"]
     assert pal["seed"] == SEED
@@ -298,9 +298,9 @@ def test_generate_snapshots_the_palette_in_history(tmp_path, monkeypatch, dizinl
 
 
 @pytest.mark.parametrize("strength", palette.STRENGTHS)
-def test_every_strength_produces_a_distinct_prompt(tmp_path, monkeypatch, strength, dizinler):
+def test_every_strength_produces_a_distinct_prompt(tmp_path, monkeypatch, strength, dizinler, uret_ve_bitir):
     client, sent = _client(tmp_path, monkeypatch, dizinler)
-    _gen(client, palette_hex=SEED, palette_strength=strength)
+    _gen(uret_ve_bitir, client, palette_hex=SEED, palette_strength=strength)
     # Beklenen metni gerçek çözümleme yolundan kur — mantığı testte
     # kopyalamak dedupe gibi bir adımı atlayıp yanlış yeşil verirdi.
     expected = palette.prompt_suffix(
@@ -309,20 +309,20 @@ def test_every_strength_produces_a_distinct_prompt(tmp_path, monkeypatch, streng
     assert sent[0] == "kurban afişi" + expected
 
 
-def test_generation_never_calls_the_naming_network(tmp_path, monkeypatch, dizinler):
+def test_generation_never_calls_the_naming_network(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """Üretim yolunun yapısal garantisi: thecolorapi üretimi hiç etkilemez."""
     client, sent = _client(tmp_path, monkeypatch, dizinler)
     monkeypatch.setattr(cn, "_fetch_name",
                         lambda h: pytest.fail("üretim yolunda ağ çağrısı"))
-    assert _gen(client, palette_hex=SEED).status_code == 200
+    assert _gen(uret_ve_bitir, client, palette_hex=SEED).status_code == 200
     assert "Color direction" in sent[0]
 
 
-def test_palette_suffix_is_dropped_when_the_prompt_is_already_at_the_limit(tmp_path, monkeypatch, dizinler):
+def test_palette_suffix_is_dropped_when_the_prompt_is_already_at_the_limit(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """Palet üretimi ASLA bloke etmemeli; ek düşer, kullanıcı metni kırpılmaz."""
     client, sent = _client(tmp_path, monkeypatch, dizinler)
     long_prompt = "a" * appmod.MAX_PROMPT_CHARS
-    r = client.post("/api/generate", json={
+    r = uret_ve_bitir(client, "/api/generate", json={
         "prompt": long_prompt, "size": "1024x1024", "quality": "medium", "n": 1,
         "palette_hex": SEED})
     assert r.status_code == 200, r.text
@@ -340,10 +340,10 @@ def test_palette_suffix_is_dropped_when_the_prompt_is_already_at_the_limit(tmp_p
     assert record["prompt_sent"] is None
 
 
-def test_an_applied_palette_is_marked_as_applied(tmp_path, monkeypatch, dizinler):
+def test_an_applied_palette_is_marked_as_applied(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """`applied` bayrağının karşı ucu: normal yolda True olmalı."""
     client, _ = _client(tmp_path, monkeypatch, dizinler)
-    record = _gen(client, palette_hex=SEED, palette_mode="triad").json()["images"][0]
+    record = _gen(uret_ve_bitir, client, palette_hex=SEED, palette_mode="triad").json()["images"][0]
     assert record["palette"]["applied"] is True
 
 
@@ -351,20 +351,20 @@ def test_an_applied_palette_is_marked_as_applied(tmp_path, monkeypatch, dizinler
     ("palette_hex", "#GGGGGG"), ("palette_hex", "zzz"),
     ("palette_mode", "kaleidoscope"), ("palette_strength", "loud"),
 ])
-def test_generate_rejects_bad_palette_fields(tmp_path, monkeypatch, field, bad, dizinler):
+def test_generate_rejects_bad_palette_fields(tmp_path, monkeypatch, field, bad, dizinler, uret_ve_bitir):
     client, _ = _client(tmp_path, monkeypatch, dizinler)
-    assert _gen(client, **{field: bad}).status_code == 422
+    assert _gen(uret_ve_bitir, client, **{field: bad}).status_code == 422
 
 
-def test_generate_rejects_unknown_field(tmp_path, monkeypatch, dizinler):
+def test_generate_rejects_unknown_field(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """Yeni eklenen extra="forbid": bayat sunucu sessiz kalmasın."""
     client, _ = _client(tmp_path, monkeypatch, dizinler)
-    assert _gen(client, palette_hexx=SEED).status_code == 422
+    assert _gen(uret_ve_bitir, client, palette_hexx=SEED).status_code == 422
 
 
-def test_empty_palette_hex_means_no_palette(tmp_path, monkeypatch, dizinler):
+def test_empty_palette_hex_means_no_palette(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     client, sent = _client(tmp_path, monkeypatch, dizinler)
-    r = _gen(client, palette_hex="")
+    r = _gen(uret_ve_bitir, client, palette_hex="")
     assert r.status_code == 200, r.text
     assert sent == ["kurban afişi"]
     assert r.json()["images"][0]["palette"] is None
@@ -372,36 +372,36 @@ def test_empty_palette_hex_means_no_palette(tmp_path, monkeypatch, dizinler):
 
 # ── /api/edit ───────────────────────────────────────────────────────────────
 
-def _edit(client, **extra):
+def _edit(uret_ve_bitir, client, **extra):
     data = {"prompt": "arka planı sadeleştir", "size": "1024x1024",
             "quality": "medium", "n": "1"}
     data.update(extra)
-    return client.post("/api/edit", data=data,
+    return uret_ve_bitir(client, "/api/edit", data=data,
                        files={"file": ("r.png", _png(), "image/png")})
 
 
-def test_edit_appends_the_palette_and_uses_edit_framing(tmp_path, monkeypatch, dizinler):
+def test_edit_appends_the_palette_and_uses_edit_framing(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """En kritik ayrım: üretim ifadesi referans görselin kompozisyonunu yok eder."""
     client, sent = _client(tmp_path, monkeypatch, dizinler)
-    r = _edit(client, palette_hex=SEED, palette_mode="complement")
+    r = _edit(uret_ve_bitir, client, palette_hex=SEED, palette_mode="complement")
     assert r.status_code == 200, r.text
     assert sent[0].startswith("arka planı sadeleştir")
     assert "composition" in sent[0]
     assert "do not repaint or move anything" in sent[0].lower()
 
 
-def test_edit_without_a_palette_sends_the_prompt_verbatim(tmp_path, monkeypatch, dizinler):
+def test_edit_without_a_palette_sends_the_prompt_verbatim(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     client, sent = _client(tmp_path, monkeypatch, dizinler)
-    r = _edit(client)
+    r = _edit(uret_ve_bitir, client)
     assert r.status_code == 200, r.text
     assert sent == ["arka planı sadeleştir"]
     assert r.json()["images"][0]["palette"] is None
 
 
-def test_edit_echoes_the_palette_so_a_stale_server_is_detectable(tmp_path, monkeypatch, dizinler):
+def test_edit_echoes_the_palette_so_a_stale_server_is_detectable(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """multipart'ta extra="forbid" yok; arayüz bayat sunucuyu bu yankıyla anlar."""
     client, _ = _client(tmp_path, monkeypatch, dizinler)
-    record = _edit(client, palette_hex=SEED, palette_mode="triad").json()["images"][0]
+    record = _edit(uret_ve_bitir, client, palette_hex=SEED, palette_mode="triad").json()["images"][0]
     assert record["palette"]["seed"] == SEED
     assert record["palette"]["mode"] == "triad"
 
@@ -410,14 +410,14 @@ def test_edit_echoes_the_palette_so_a_stale_server_is_detectable(tmp_path, monke
     ("palette_hex", "#GGGGGG"), ("palette_mode", "kaleidoscope"),
     ("palette_strength", "loud"),
 ])
-def test_edit_rejects_bad_palette_fields(tmp_path, monkeypatch, field, bad, dizinler):
+def test_edit_rejects_bad_palette_fields(tmp_path, monkeypatch, field, bad, dizinler, uret_ve_bitir):
     client, _ = _client(tmp_path, monkeypatch, dizinler)
-    assert _edit(client, **{field: bad}).status_code == 422
+    assert _edit(uret_ve_bitir, client, **{field: bad}).status_code == 422
 
 
 # ── Kayıtlı paletin dondurulmuş adları ──────────────────────────────────────
 
-def test_saved_palette_frozen_names_are_used_in_the_prompt(tmp_path, monkeypatch, dizinler):
+def test_saved_palette_frozen_names_are_used_in_the_prompt(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """Kütüphanede görünen ad ile prompt'a giden ad ayrışmamalı.
 
     Palet çevrimiçi adlarla kaydedilir; sonra önbellek temizlenir (sunucu
@@ -431,17 +431,17 @@ def test_saved_palette_frozen_names_are_used_in_the_prompt(tmp_path, monkeypatch
 
     cn.reset_breaker()  # önbellek boş: yeniden hesaplama betimleyiciye düşerdi
     monkeypatch.setattr(cn, "_fetch_name", lambda h: None)
-    _gen(client, palette_hex=GAP_SEED, palette_mode="triad", palette_id=saved["id"])
+    _gen(uret_ve_bitir, client, palette_hex=GAP_SEED, palette_mode="triad", palette_id=saved["id"])
     for color in saved["colors"]:
         assert color["name"] in sent[0]
 
 
-def test_saved_palette_id_wins_over_a_mismatched_mode(tmp_path, monkeypatch, dizinler):
+def test_saved_palette_id_wins_over_a_mismatched_mode(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """Kayıt kaynak: id verilmişse kaydın modu/renkleri geçerli."""
     client, sent = _client(tmp_path, monkeypatch, dizinler)
     saved = client.post("/api/palettes", json={"name": "Marka", "seed": SEED,
                                               "mode": "quad"}).json()["palette"]
-    record = _gen(client, palette_hex="#2e5fa3", palette_mode="triad",
+    record = _gen(uret_ve_bitir, client, palette_hex="#2e5fa3", palette_mode="triad",
                   palette_id=saved["id"]).json()["images"][0]
     assert record["palette"]["mode"] == "quad"
     assert record["palette"]["seed"] == SEED
@@ -449,24 +449,24 @@ def test_saved_palette_id_wins_over_a_mismatched_mode(tmp_path, monkeypatch, diz
     assert record["palette"]["name"] == "Marka"
 
 
-def test_a_deleted_palette_does_not_block_generation(tmp_path, monkeypatch, dizinler):
+def test_a_deleted_palette_does_not_block_generation(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """Silinmiş palet hata vermez, (seed, mode)'dan yeniden hesaplanır."""
     client, sent = _client(tmp_path, monkeypatch, dizinler)
-    r = _gen(client, palette_hex=SEED, palette_mode="triad",
+    r = _gen(uret_ve_bitir, client, palette_hex=SEED, palette_mode="triad",
              palette_id="deadbeefcafe")
     assert r.status_code == 200, r.text
     assert "Color direction" in sent[0]
     assert r.json()["images"][0]["palette"]["mode"] == "triad"
 
 
-def test_edit_also_honors_a_saved_palette_id(tmp_path, monkeypatch, dizinler):
+def test_edit_also_honors_a_saved_palette_id(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     client, sent = _client(tmp_path, monkeypatch, dizinler)
     monkeypatch.setattr(cn, "_fetch_name", lambda h: "Harlequin")
     saved = client.post("/api/palettes", json={"name": "Marka", "seed": GAP_SEED,
                                               "mode": "complement"}).json()["palette"]
     cn.reset_breaker()
     monkeypatch.setattr(cn, "_fetch_name", lambda h: None)
-    r = _edit(client, palette_hex=GAP_SEED, palette_id=saved["id"])
+    r = _edit(uret_ve_bitir, client, palette_hex=GAP_SEED, palette_id=saved["id"])
     assert r.status_code == 200, r.text
     assert "composition" in sent[0]
     for color in saved["colors"]:
@@ -476,11 +476,11 @@ def test_edit_also_honors_a_saved_palette_id(tmp_path, monkeypatch, dizinler):
 # ── Türevler ve eski kayıtlar ───────────────────────────────────────────────
 
 def test_logo_derivative_inherits_the_palette(tmp_path, monkeypatch, fake_composite, dizinler,
-                                              db_oturumu, kullanici):
+                                              db_oturumu, kullanici, uret_ve_bitir):
     client, _ = _client(tmp_path, monkeypatch, dizinler, real_png=True)
     monkeypatch.setattr(appmod.composite, "composite_logo", fake_composite)
 
-    src = _gen(client, palette_hex=SEED, palette_mode="triad").json()["images"][0]
+    src = _gen(uret_ve_bitir, client, palette_hex=SEED, palette_mode="triad").json()["images"][0]
     # Yerleşik logo kaldırıldı: bindirme artık kütüphaneden bir varlık istiyor
     # (satır + dosya, Faz 1 / 6 — tohum `db_oturumu` ile, commit ŞART).
     asset = depo_varlik.kaydet(db_oturumu, kullanici.id, "logos", b"\x89PNG-logo", "logo",
@@ -521,7 +521,7 @@ def test_legacy_history_records_without_palette_are_tolerated(tmp_path, monkeypa
     {"colors": [{"name": "copper orange"}]},            # hex yok
 ])
 def test_a_corrupt_saved_palette_does_not_break_generation(tmp_path, monkeypatch, broken, dizinler,
-                                                           db_oturumu, kullanici):
+                                                           db_oturumu, kullanici, uret_ve_bitir):
     """Bozuk bir palet SATIRI üretimi 500'e düşürmemeli.
 
     Eskiden elle düzenlenmiş `palettes.json`dan geliyordu; bugün içe aktarma
@@ -537,7 +537,7 @@ def test_a_corrupt_saved_palette_does_not_break_generation(tmp_path, monkeypatch
     db_oturumu.add(tablolar.Palet(kullanici_id=kullanici.id, **record))
     db_oturumu.commit()
 
-    r = _gen(client, palette_hex=SEED, palette_mode="analogic",
+    r = _gen(uret_ve_bitir, client, palette_hex=SEED, palette_mode="analogic",
              palette_id="a1b2c3d4e5f6")
     assert r.status_code == 200, r.text
     assert "Color direction" in sent[0]
@@ -562,12 +562,12 @@ def _colors_of(seed=SEED, mode="analogic"):
     return appmod._resolve_palette(seed, mode, offline=True)
 
 
-def test_palette_drop_removes_only_the_named_indices(tmp_path, monkeypatch, dizinler):
+def test_palette_drop_removes_only_the_named_indices(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     client, sent = _client(tmp_path, monkeypatch, dizinler)
     colors = _colors_of()
     dropped, kept = colors[2], colors[:2] + colors[3:]
 
-    r = _gen(client, palette_hex=SEED, palette_mode="analogic", palette_drop=[2])
+    r = _gen(uret_ve_bitir, client, palette_hex=SEED, palette_mode="analogic", palette_drop=[2])
     assert r.status_code == 200, r.text
 
     assert dropped["hex"] not in sent[0], "çıkarılan renk hâlâ prompt'ta"
@@ -575,7 +575,7 @@ def test_palette_drop_removes_only_the_named_indices(tmp_path, monkeypatch, dizi
         assert color["hex"] in sent[0], f"kalan renk düştü: {color['hex']}"
 
 
-def test_palette_drop_preserves_the_order_of_the_survivors(tmp_path, monkeypatch, dizinler):
+def test_palette_drop_preserves_the_order_of_the_survivors(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """Sıra prompt'ta ANLAM taşıyor: "baştaki renkler geniş alanlara, sondaki
     küçük vurgu olarak" (palette._ORDER_CUE). Ortadan bir renk çıkarılınca
     kalanlar yeniden dizilmemeli, yoksa kullanıcının gördüğü şerit ile modele
@@ -585,19 +585,19 @@ def test_palette_drop_preserves_the_order_of_the_survivors(tmp_path, monkeypatch
     colors = _colors_of()
     kept = colors[:1] + colors[2:4]      # 1 ve 4 çıkarıldı
 
-    r = _gen(client, palette_hex=SEED, palette_mode="analogic", palette_drop=[1, 4])
+    r = _gen(uret_ve_bitir, client, palette_hex=SEED, palette_mode="analogic", palette_drop=[1, 4])
     assert r.status_code == 200, r.text
 
     positions = [sent[0].index(c["hex"]) for c in kept]
     assert positions == sorted(positions), "kalan renklerin sırası değişti"
 
 
-def test_palette_drop_is_echoed_in_the_record(tmp_path, monkeypatch, dizinler):
+def test_palette_drop_is_echoed_in_the_record(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """Kayıt hem KALANLARI (çip/galeri onu gösteriyor) hem çıkarılan
     indeksleri taşımalı — ikincisi olmadan geçmişten aynı durum kurulamaz.
     """
     client, _ = _client(tmp_path, monkeypatch, dizinler)
-    r = _gen(client, palette_hex=SEED, palette_mode="analogic", palette_drop=[3, 0])
+    r = _gen(uret_ve_bitir, client, palette_hex=SEED, palette_mode="analogic", palette_drop=[3, 0])
     assert r.status_code == 200, r.text
 
     pal = r.json()["images"][0]["palette"]
@@ -606,14 +606,14 @@ def test_palette_drop_is_echoed_in_the_record(tmp_path, monkeypatch, dizinler):
     assert pal["applied"] is True
 
 
-def test_no_drop_leaves_the_record_and_prompt_untouched(tmp_path, monkeypatch, dizinler):
+def test_no_drop_leaves_the_record_and_prompt_untouched(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """GERİLEME BEKÇİSİ: alan gönderilmeyince her şey v1.10'daki gibi.
 
     Bu özellik palet yolunun en sıcak noktasına dokunuyor; varsayılan davranışın
     birebir korunduğu ayrıca çivilenmeli.
     """
     client, sent = _client(tmp_path, monkeypatch, dizinler)
-    r = _gen(client, palette_hex=SEED, palette_mode="analogic")
+    r = _gen(uret_ve_bitir, client, palette_hex=SEED, palette_mode="analogic")
     assert r.status_code == 200, r.text
 
     pal = r.json()["images"][0]["palette"]
@@ -624,29 +624,29 @@ def test_no_drop_leaves_the_record_and_prompt_untouched(tmp_path, monkeypatch, d
 
 
 @pytest.mark.parametrize("drop", [[0, 1, 2, 3, 4], [4, 3, 2, 1, 0]])
-def test_palette_drop_rejects_dropping_every_color(tmp_path, monkeypatch, drop, dizinler):
+def test_palette_drop_rejects_dropping_every_color(tmp_path, monkeypatch, drop, dizinler, uret_ve_bitir):
     """Hepsi çıkarılırsa prompt_suffix boş metin döner ve kullanıcı renksiz
     sonucu açıklayamaz — tam olarak `applied: False` bayrağının var olma
     nedeni olan sessiz sapma. Gürültülü 422 tercih edildi.
     """
     client, _ = _client(tmp_path, monkeypatch, dizinler)
-    r = _gen(client, palette_hex=SEED, palette_mode="analogic", palette_drop=drop)
+    r = _gen(uret_ve_bitir, client, palette_hex=SEED, palette_mode="analogic", palette_drop=drop)
     assert r.status_code == 422, r.text
 
 
 @pytest.mark.parametrize("drop", [[5], [-1], [0, 99]])
-def test_palette_drop_rejects_out_of_range_index(tmp_path, monkeypatch, drop, dizinler):
+def test_palette_drop_rejects_out_of_range_index(tmp_path, monkeypatch, drop, dizinler, uret_ve_bitir):
     client, _ = _client(tmp_path, monkeypatch, dizinler)
-    r = _gen(client, palette_hex=SEED, palette_mode="analogic", palette_drop=drop)
+    r = _gen(uret_ve_bitir, client, palette_hex=SEED, palette_mode="analogic", palette_drop=drop)
     assert r.status_code == 422, r.text
 
 
-def test_palette_drop_tolerates_repeated_indices(tmp_path, monkeypatch, dizinler):
+def test_palette_drop_tolerates_repeated_indices(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """Aynı indeks iki kez gelirse küme gibi davranılır — istemci hatası
     yüzünden üretim bloke edilmemeli (silinmiş/bozuk paletteki duruşun aynısı).
     """
     client, _ = _client(tmp_path, monkeypatch, dizinler)
-    r = _gen(client, palette_hex=SEED, palette_mode="analogic", palette_drop=[2, 2])
+    r = _gen(uret_ve_bitir, client, palette_hex=SEED, palette_mode="analogic", palette_drop=[2, 2])
     assert r.status_code == 200, r.text
     pal = r.json()["images"][0]["palette"]
     assert len(pal["colors"]) == palette.COLORS_PER_PALETTE - 1
@@ -654,7 +654,7 @@ def test_palette_drop_tolerates_repeated_indices(tmp_path, monkeypatch, dizinler
 
 
 def test_palette_drop_indexes_a_saved_palettes_frozen_colors(tmp_path, monkeypatch, dizinler,
-                                                              db_oturumu, kullanici):
+                                                              db_oturumu, kullanici, uret_ve_bitir):
     """KAYITLI palette indeksler DONMUŞ listeye göre çözülmeli.
 
     Kayıt 4 renkle donmuşsa (kullanıcı çıkarıp kaydetmişse) indeks 3 o
@@ -669,7 +669,7 @@ def test_palette_drop_indexes_a_saved_palettes_frozen_colors(tmp_path, monkeypat
                                   seed=SEED, mode="triad", strength="balanced", colors=frozen))
     db_oturumu.commit()
 
-    r = _gen(client, palette_hex=SEED, palette_mode="analogic",
+    r = _gen(uret_ve_bitir, client, palette_hex=SEED, palette_mode="analogic",
              palette_id="a1b2c3d4e5f6", palette_drop=[1])
     assert r.status_code == 200, r.text
     assert "#111111" in sent[0] and "#333333" in sent[0]
@@ -677,7 +677,7 @@ def test_palette_drop_indexes_a_saved_palettes_frozen_colors(tmp_path, monkeypat
 
 
 def test_palette_drop_rejects_emptying_a_saved_palette(tmp_path, monkeypatch, dizinler,
-                                                        db_oturumu, kullanici):
+                                                        db_oturumu, kullanici, uret_ve_bitir):
     """Donmuş liste 5'ten kısa olabilir; model sınırı tek başına yetmez.
 
     3 renkli bir kayıtta [0,1,2] model doğrulamasını GEÇER (5'ten az) ama
@@ -691,12 +691,12 @@ def test_palette_drop_rejects_emptying_a_saved_palette(tmp_path, monkeypatch, di
                                   seed=SEED, mode="triad", strength="balanced", colors=frozen))
     db_oturumu.commit()
 
-    r = _gen(client, palette_hex=SEED, palette_mode="analogic",
+    r = _gen(uret_ve_bitir, client, palette_hex=SEED, palette_mode="analogic",
              palette_id="a1b2c3d4e5f6", palette_drop=[0, 1, 2])
     assert r.status_code == 422, r.text
 
 
-def test_edit_parses_comma_separated_palette_drop(tmp_path, monkeypatch, dizinler):
+def test_edit_parses_comma_separated_palette_drop(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """Multipart yolu: arayüz diziyi FormData'ya "0,3" olarak yazıyor.
 
     core.js paleti genel bir döngüyle (`Object.entries`) forma basıyor — orada
@@ -707,7 +707,7 @@ def test_edit_parses_comma_separated_palette_drop(tmp_path, monkeypatch, dizinle
     client, sent = _client(tmp_path, monkeypatch, dizinler)
     colors = _colors_of(mode="complement")
 
-    r = _edit(client, palette_hex=SEED, palette_mode="complement",
+    r = _edit(uret_ve_bitir, client, palette_hex=SEED, palette_mode="complement",
               palette_drop="0,3")
     assert r.status_code == 200, r.text
     assert colors[0]["hex"] not in sent[0]
@@ -717,23 +717,23 @@ def test_edit_parses_comma_separated_palette_drop(tmp_path, monkeypatch, dizinle
 
 
 @pytest.mark.parametrize("bad", ["abc", "0;3", "1.5", "0,,3", "0,99"])
-def test_edit_rejects_a_malformed_palette_drop(tmp_path, monkeypatch, bad, dizinler):
+def test_edit_rejects_a_malformed_palette_drop(tmp_path, monkeypatch, bad, dizinler, uret_ve_bitir):
     client, _ = _client(tmp_path, monkeypatch, dizinler)
-    r = _edit(client, palette_hex=SEED, palette_mode="complement", palette_drop=bad)
+    r = _edit(uret_ve_bitir, client, palette_hex=SEED, palette_mode="complement", palette_drop=bad)
     assert r.status_code == 422, r.text
 
 
-def test_edit_treats_an_empty_palette_drop_as_no_drop(tmp_path, monkeypatch, dizinler):
+def test_edit_treats_an_empty_palette_drop_as_no_drop(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """Arayüz hiçbir şey çıkarılmadığında alanı hiç göndermiyor; boş dize de
     (ör. elle kurulmuş bir istek) "çıkarma yok" demek — 422 değil.
     """
     client, sent = _client(tmp_path, monkeypatch, dizinler)
-    r = _edit(client, palette_hex=SEED, palette_mode="complement", palette_drop="")
+    r = _edit(uret_ve_bitir, client, palette_hex=SEED, palette_mode="complement", palette_drop="")
     assert r.status_code == 200, r.text
     assert r.json()["images"][0]["palette"]["dropped"] == []
 
 
-def test_saving_a_palette_freezes_only_the_survivors(tmp_path, monkeypatch, dizinler):
+def test_saving_a_palette_freezes_only_the_survivors(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """Kalıcı 4 renkli palet yolu: çıkar → kaydet.
 
     Kayıt donmuş `colors` tuttuğu için (palette_store başlığı) 4 renkle donar
@@ -752,7 +752,7 @@ def test_saving_a_palette_freezes_only_the_survivors(tmp_path, monkeypatch, dizi
 
     # Kaydedilen palet ÇIKARMASIZ kullanıldığında da 4 renk gitmeli.
     client2, sent2 = _client(tmp_path, monkeypatch, dizinler)
-    r2 = _gen(client2, palette_hex=SEED, palette_mode="triad",
+    r2 = _gen(uret_ve_bitir, client2, palette_hex=SEED, palette_mode="triad",
               palette_id=saved["id"])
     assert r2.status_code == 200, r2.text
     assert full[2]["hex"] not in sent2[0]

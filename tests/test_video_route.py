@@ -59,9 +59,9 @@ def _png() -> bytes:
 # ── Mutlu yol ──────────────────────────────────────────────────────────
 
 
-def test_the_response_key_is_VIDEOS_not_images(client):
+def test_the_response_key_is_VIDEOS_not_images(client, uret_ve_bitir):
     """Bayat bir istemci videoyu `<img>` olarak çizmesin: anahtar AYRI."""
-    r = client.post("/api/video", json=GECERLI)
+    r = uret_ve_bitir(client, "/api/video", json=GECERLI)
 
     assert r.status_code == 200, r.text
     govde = r.json()
@@ -69,8 +69,8 @@ def test_the_response_key_is_VIDEOS_not_images(client):
     assert "images" not in govde
 
 
-def test_the_record_carries_the_KIND_and_the_DURATION(client, tmp_path):
-    r = client.post("/api/video", json=GECERLI)
+def test_the_record_carries_the_KIND_and_the_DURATION(client, tmp_path, uret_ve_bitir):
+    r = uret_ve_bitir(client, "/api/video", json=GECERLI)
     rec = r.json()["videos"][0]
 
     assert rec["kind"] == "video"
@@ -80,24 +80,24 @@ def test_the_record_carries_the_KIND_and_the_DURATION(client, tmp_path):
     assert (tmp_path / rec["filename"]).read_bytes() == MP4
 
 
-def test_the_model_defaults_to_the_catalogs_video_default(client):
+def test_the_model_defaults_to_the_catalogs_video_default(client, uret_ve_bitir):
     """`model` göndermeyen bir istek varsayılan VİDEO modeline gidiyor —
     görselin varsayılanına DEĞİL."""
-    rec = client.post("/api/video", json=GECERLI).json()["videos"][0]
+    rec = uret_ve_bitir(client, "/api/video", json=GECERLI).json()["videos"][0]
 
     assert rec["model"] == catalog.DEFAULT_VIDEO_MODEL
     assert rec["model"] != catalog.DEFAULT_IMAGE_MODEL
 
 
-def test_the_credit_cost_is_MULTIPLIED_by_the_duration(client):
+def test_the_credit_cost_is_MULTIPLIED_by_the_duration(client, uret_ve_bitir):
     """Video modellerinde `credits` SANİYE BAŞINA (bkz.
     catalog.ImageModel.credits). Kayda ÜRETİM ANINDAKİ çözülmüş tam sayı
     yazılıyor, katalog işaretçisi değil — tarife değişince geçmiş retroaktif
     olarak yeniden yazılmasın."""
     spec = catalog.video_model(catalog.DEFAULT_VIDEO_MODEL)
 
-    dort = client.post("/api/video", json=GECERLI).json()["videos"][0]
-    sekiz = client.post("/api/video", json={**GECERLI, "duration": 8}) \
+    dort = uret_ve_bitir(client, "/api/video", json=GECERLI).json()["videos"][0]
+    sekiz = uret_ve_bitir(client, "/api/video", json={**GECERLI, "duration": 8}) \
                   .json()["videos"][0]
 
     assert dort["credits"] == spec.credits * 4
@@ -105,18 +105,18 @@ def test_the_credit_cost_is_MULTIPLIED_by_the_duration(client):
     assert sekiz["credits"] == dort["credits"] * 2
 
 
-def test_the_video_is_labelled_with_the_session_it_was_born_in(client):
+def test_the_video_is_labelled_with_the_session_it_was_born_in(client, uret_ve_bitir):
     """`/api/generate`in aynı sözleşmesi: oturum etiketi koşullu yazılıyor."""
-    icinde = client.post("/api/video", json={**GECERLI,
+    icinde = uret_ve_bitir(client, "/api/video", json={**GECERLI,
                                              "session_id": "beef1234beef"}) \
                    .json()["videos"][0]
-    disinda = client.post("/api/video", json=GECERLI).json()["videos"][0]
+    disinda = uret_ve_bitir(client, "/api/video", json=GECERLI).json()["videos"][0]
 
     assert icinde["session_id"] == "beef1234beef"
     assert "session_id" not in disinda
 
 
-def test_the_reference_frame_path_records_the_PARENT(client):
+def test_the_reference_frame_path_records_the_PARENT(client, uret_ve_bitir):
     """Türev zinciri: galeriden canlandırılan bir video kaynağını taşıyor."""
     from unittest.mock import patch
 
@@ -124,12 +124,12 @@ def test_the_reference_frame_path_records_the_PARENT(client):
 
     with patch.object(ac_mod, "generate", lambda *a, **k: [_png()]):
         with patch.object(gorsel, "to_png", lambda raw: _png()):
-            kaynak = client.post("/api/generate",
+            kaynak = uret_ve_bitir(client, "/api/generate",
                                  json={"prompt": "kedi", "size": "1024x1024",
                                        "quality": "medium", "n": 1}) \
                            .json()["images"][0]
 
-    r = client.post("/api/video/animate",
+    r = uret_ve_bitir(client, "/api/video/animate",
                     data={**GECERLI, "source_id": kaynak["id"]})
 
     assert r.status_code == 200, r.text
@@ -138,10 +138,10 @@ def test_the_reference_frame_path_records_the_PARENT(client):
     assert rec["kind"] == "video"
 
 
-def test_an_UPLOADED_frame_is_accepted(client, monkeypatch):
+def test_an_UPLOADED_frame_is_accepted(client, monkeypatch, uret_ve_bitir):
     monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
 
-    r = client.post("/api/video/animate", data=GECERLI,
+    r = uret_ve_bitir(client, "/api/video/animate", data=GECERLI,
                     files={"file": ("a.png", _png(), "image/png")})
 
     assert r.status_code == 200, r.text
@@ -163,7 +163,7 @@ def _son_kare_yakala(monkeypatch):
     return gorulen
 
 
-def test_the_LAST_FRAME_reaches_the_dispatcher_as_PNG_bytes(client, monkeypatch):
+def test_the_LAST_FRAME_reaches_the_dispatcher_as_PNG_bytes(client, monkeypatch, uret_ve_bitir):
     """Bitiş görseli `refs`e KATILMIYOR, kendi argümanı olarak gidiyor.
 
     Katılsaydı `max_refs=1` kapısı (app.py'nin "en fazla N referans görsel"
@@ -172,7 +172,7 @@ def test_the_LAST_FRAME_reaches_the_dispatcher_as_PNG_bytes(client, monkeypatch)
     monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
     gorulen = _son_kare_yakala(monkeypatch)
 
-    r = client.post("/api/video/animate", data=GECERLI,
+    r = uret_ve_bitir(client, "/api/video/animate", data=GECERLI,
                     files={"file": ("a.png", _png(), "image/png"),
                            "last_file": ("b.png", _png(), "image/png")})
 
@@ -181,24 +181,24 @@ def test_the_LAST_FRAME_reaches_the_dispatcher_as_PNG_bytes(client, monkeypatch)
     assert gorulen["last_frame"].startswith(b"\x89PNG")
 
 
-def test_WITHOUT_a_last_frame_the_dispatcher_sees_None(client, monkeypatch):
+def test_WITHOUT_a_last_frame_the_dispatcher_sees_None(client, monkeypatch, uret_ve_bitir):
     """Bugünkü yol DEĞİŞMEDİ: bitiş görseli seçmeyen istek aynı istek."""
     monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
     gorulen = _son_kare_yakala(monkeypatch)
 
-    r = client.post("/api/video/animate", data=GECERLI,
+    r = uret_ve_bitir(client, "/api/video/animate", data=GECERLI,
                     files={"file": ("a.png", _png(), "image/png")})
 
     assert r.status_code == 200, r.text
     assert gorulen["last_frame"] is None
 
 
-def test_AT_MOST_ONE_of_last_file_or_last_source_id(client, monkeypatch):
+def test_AT_MOST_ONE_of_last_file_or_last_source_id(client, monkeypatch, uret_ve_bitir):
     """Ana karenin "tam olarak biri" kapısının ikizi — tek farkı bitiş
     görselinin İSTEĞE BAĞLI olması, yani "hiçbiri" geçerli bir cevap."""
     monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
 
-    r = client.post("/api/video/animate",
+    r = uret_ve_bitir(client, "/api/video/animate",
                     data={**GECERLI, "last_source_id": "beef1234beef"},
                     files={"file": ("a.png", _png(), "image/png"),
                            "last_file": ("b.png", _png(), "image/png")})
@@ -207,7 +207,7 @@ def test_AT_MOST_ONE_of_last_file_or_last_source_id(client, monkeypatch):
     assert "last_file" in r.text
 
 
-def test_a_last_frame_WITHOUT_a_first_frame_is_refused(client, monkeypatch):
+def test_a_last_frame_WITHOUT_a_first_frame_is_refused(client, monkeypatch, uret_ve_bitir):
     """Son kare tek başına anlamsız: neyin arasında geçiş yapılacağı yok.
 
     Kapı ANA KARENİN kapısından geliyor (`file` ya da `source_id` zorunlu), bu
@@ -216,13 +216,13 @@ def test_a_last_frame_WITHOUT_a_first_frame_is_refused(client, monkeypatch):
     kişi bu yolu bilerek açmak zorunda kalır."""
     monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
 
-    r = client.post("/api/video/animate", data=GECERLI,
+    r = uret_ve_bitir(client, "/api/video/animate", data=GECERLI,
                     files={"last_file": ("b.png", _png(), "image/png")})
 
     assert r.status_code == 422
 
 
-def test_a_model_WITHOUT_the_capability_refuses_the_last_frame(client, monkeypatch):
+def test_a_model_WITHOUT_the_capability_refuses_the_last_frame(client, monkeypatch, uret_ve_bitir):
     """Yetenek `supports_edit`ten AYRI: ilk kareyi alan bir model son kareyi
     almayabilir (Veo 3 ailesinin tamamı böyle)."""
     monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
@@ -231,7 +231,7 @@ def test_a_model_WITHOUT_the_capability_refuses_the_last_frame(client, monkeypat
                         lambda mid: spec.__class__(
                             **{**spec.__dict__, "supports_last_frame": False}))
 
-    r = client.post("/api/video/animate", data=GECERLI,
+    r = uret_ve_bitir(client, "/api/video/animate", data=GECERLI,
                     files={"file": ("a.png", _png(), "image/png"),
                            "last_file": ("b.png", _png(), "image/png")})
 
@@ -239,12 +239,12 @@ def test_a_model_WITHOUT_the_capability_refuses_the_last_frame(client, monkeypat
     assert "does not take a last frame" in r.text
 
 
-def test_a_VIDEO_id_cannot_be_used_as_a_LAST_frame_either(client):
+def test_a_VIDEO_id_cannot_be_used_as_a_LAST_frame_either(client, uret_ve_bitir):
     """Ana karenin aynı kararı: `_output_png_path` uzantıyı ÇAKILI tutuyor ve
     bir MP4'ü kare olarak göndermenin karşılığı yok."""
-    video = client.post("/api/video", json=GECERLI).json()["videos"][0]
+    video = uret_ve_bitir(client, "/api/video", json=GECERLI).json()["videos"][0]
 
-    r = client.post("/api/video/animate",
+    r = uret_ve_bitir(client, "/api/video/animate",
                     data={**GECERLI, "last_source_id": video["id"]},
                     files={"file": ("a.png", _png(), "image/png")})
 
@@ -288,11 +288,11 @@ def test_the_capability_flows_to_the_UI_as_its_OWN_key(client):
 # demekti.
 
 
-def _iki_uc(client, monkeypatch, **degisiklik):
+def _iki_uc(uret_ve_bitir, client, monkeypatch, **degisiklik):
     monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
     govde = {**GECERLI, **degisiklik}
-    json_yanit = client.post("/api/video", json=govde)
-    form_yanit = client.post("/api/video/animate", data=govde,
+    json_yanit = uret_ve_bitir(client, "/api/video", json=govde)
+    form_yanit = uret_ve_bitir(client, "/api/video/animate", data=govde,
                              files={"file": ("a.png", _png(), "image/png")})
     return json_yanit, form_yanit
 
@@ -308,8 +308,8 @@ def _iki_uc(client, monkeypatch, **degisiklik):
     ({"model": "yok-boyle-bir-model"}, "unknown video model"),
 ])
 def test_both_endpoints_refuse_the_same_bad_token(client, monkeypatch,
-                                                  degisiklik, beklenen):
-    json_yanit, form_yanit = _iki_uc(client, monkeypatch, **degisiklik)
+                                                  degisiklik, beklenen, uret_ve_bitir):
+    json_yanit, form_yanit = _iki_uc(uret_ve_bitir, client, monkeypatch, **degisiklik)
 
     assert json_yanit.status_code == 422, json_yanit.text
     assert form_yanit.status_code == 422, form_yanit.text
@@ -317,7 +317,7 @@ def test_both_endpoints_refuse_the_same_bad_token(client, monkeypatch,
     assert beklenen in form_yanit.text
 
 
-def test_the_aspect_ratios_offered_are_ONLY_the_ones_veo_documents(client):
+def test_the_aspect_ratios_offered_are_ONLY_the_ones_veo_documents(client, uret_ve_bitir):
     """`catalog.ASPECT_RATIOS`in on jetonu video tarafında KULLANILMIYOR:
     Veo yalnız iki oran kabul ediyor ve ötekiler telde 400 demek, yani
     arayüzde seçilebilir bir hata."""
@@ -325,28 +325,28 @@ def test_the_aspect_ratios_offered_are_ONLY_the_ones_veo_documents(client):
 
     for oran in catalog.ASPECT_RATIOS:
         beklenen = 200 if oran in spec.sizes else 422
-        r = client.post("/api/video", json={**GECERLI, "size": oran})
+        r = uret_ve_bitir(client, "/api/video", json={**GECERLI, "size": oran})
         assert r.status_code == beklenen, f"{oran}: {r.status_code}"
 
 
-def test_the_json_endpoint_REFUSES_palette_fields(client):
+def test_the_json_endpoint_REFUSES_palette_fields(client, uret_ve_bitir):
     """`VideoRequest` `extra="forbid"` taşıyor ve palet alanı YOK: palet bir
     GÖRSEL prompt eki (bkz. o sınıfın gerekçesi). Sessizce yok saymak,
     kullanıcıya çalışmayan bir çip göstermek olurdu."""
-    r = client.post("/api/video", json={**GECERLI, "palette_hex": "#ff0000"})
+    r = uret_ve_bitir(client, "/api/video", json={**GECERLI, "palette_hex": "#ff0000"})
 
     assert r.status_code == 422
 
 
-def test_the_json_endpoint_REFUSES_an_arena_id(client):
+def test_the_json_endpoint_REFUSES_an_arena_id(client, uret_ve_bitir):
     """Arena video tarafında KAPSAM DIŞI: tek tıkla N tane dakikalarca süren
     ve saniyesi faturalanan üretim, kendi kararını ister."""
-    r = client.post("/api/video", json={**GECERLI, "arena_id": "beef1234beef"})
+    r = uret_ve_bitir(client, "/api/video", json={**GECERLI, "arena_id": "beef1234beef"})
 
     assert r.status_code == 422
 
 
-def test_MORE_THAN_ONE_reference_is_refused(client, monkeypatch):
+def test_MORE_THAN_ONE_reference_is_refused(client, monkeypatch, uret_ve_bitir):
     """Katalog `max_refs=1` diyor (ilk kare). Kapı `refs` toplandıktan SONRA:
     erken davranmak `_collect_edit_refs`in kendi 413/422 mesajlarını
     ikizlemek olurdu."""
@@ -355,12 +355,12 @@ def test_MORE_THAN_ONE_reference_is_refused(client, monkeypatch):
 
     import azure_client as ac_mod
     with patch.object(ac_mod, "generate", lambda *a, **k: [_png()]):
-        kaynak = client.post("/api/generate",
+        kaynak = uret_ve_bitir(client, "/api/generate",
                              json={"prompt": "kedi", "size": "1024x1024",
                                    "quality": "medium", "n": 1}) \
                        .json()["images"][0]
 
-    r = client.post("/api/video/animate",
+    r = uret_ve_bitir(client, "/api/video/animate",
                     data={**GECERLI, "extra_source_ids": kaynak["id"]},
                     files={"file": ("a.png", _png(), "image/png")})
 
@@ -368,11 +368,11 @@ def test_MORE_THAN_ONE_reference_is_refused(client, monkeypatch):
     assert "reference images" in r.text
 
 
-def test_EXACTLY_ONE_of_file_or_source_id_is_required(client, monkeypatch):
+def test_EXACTLY_ONE_of_file_or_source_id_is_required(client, monkeypatch, uret_ve_bitir):
     monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
 
-    hicbiri = client.post("/api/video/animate", data=GECERLI)
-    ikisi = client.post("/api/video/animate",
+    hicbiri = uret_ve_bitir(client, "/api/video/animate", data=GECERLI)
+    ikisi = uret_ve_bitir(client, "/api/video/animate",
                         data={**GECERLI, "source_id": "beef1234beef"},
                         files={"file": ("a.png", _png(), "image/png")})
 
@@ -380,13 +380,13 @@ def test_EXACTLY_ONE_of_file_or_source_id_is_required(client, monkeypatch):
     assert ikisi.status_code == 422
 
 
-def test_a_VIDEO_id_cannot_be_used_as_a_reference_frame(client):
+def test_a_VIDEO_id_cannot_be_used_as_a_reference_frame(client, uret_ve_bitir):
     """`app._output_png_path` uzantıyı ÇAKILI tutuyor ve bu doğru: bir MP4'ü
     ilk kare olarak sağlayıcıya göndermek anlamsız, 404 doğru cevap
     (bkz. `_output_media_path`in docstring'i)."""
-    video = client.post("/api/video", json=GECERLI).json()["videos"][0]
+    video = uret_ve_bitir(client, "/api/video", json=GECERLI).json()["videos"][0]
 
-    r = client.post("/api/video/animate",
+    r = uret_ve_bitir(client, "/api/video/animate",
                     data={**GECERLI, "source_id": video["id"]})
 
     assert r.status_code == 404
@@ -400,8 +400,10 @@ def test_a_VIDEO_id_cannot_be_used_as_a_reference_frame(client):
     ("/api/video/animate", {"source_id": "yok"}),
 ])
 def test_an_adapter_error_becomes_a_502_with_the_turkish_detail(
-        client, monkeypatch, yol, ek):
-    """`/api/generate`in aynı sözleşmesi: tek istisna türü, tek kapı, 502."""
+        client, monkeypatch, yol, ek, uret_ve_bitir):
+    """`/api/generate`in aynı sözleşmesi: tek istisna türü, tek kapı — iş `hata`, metin
+    kullanıcıya (Faz 2 / 4: rota 202, sağlayıcı hatası işçide; `uret_ve_bitir`
+    o hâli eski 502 şeklinde verir)."""
     def boom(*a, **k):
         raise ac.ImageError("Veo erişimi reddedildi (403): ÜCRETSİZ KADEMESİ YOK.")
 
@@ -411,7 +413,8 @@ def test_an_adapter_error_becomes_a_502_with_the_turkish_detail(
                         lambda i, output_dir, **k: __import__("os").devnull)
     monkeypatch.setattr(gorsel, "read_png_file", lambda p, **k: _png())
 
-    r = client.post(yol, json=GECERLI) if not ek else client.post(yol, data={**GECERLI, **ek})
+    r = (uret_ve_bitir(client, yol, json=GECERLI) if not ek
+         else uret_ve_bitir(client, yol, data={**GECERLI, **ek}))
 
     assert r.status_code == 502
     assert "ÜCRETSİZ KADEMESİ YOK" in r.json()["detail"]
@@ -420,12 +423,12 @@ def test_an_adapter_error_becomes_a_502_with_the_turkish_detail(
 # ── Servis ve indirme ──────────────────────────────────────────────────
 
 
-def test_the_drawing_route_serves_VIDEO_MP4(client):
+def test_the_drawing_route_serves_VIDEO_MP4(client, uret_ve_bitir):
     """v0.13'e kadar `image/png` ÇAKILIYDI ve tek tür varken doğruydu. MP4
     gelince çakılı tür sessiz bir kırılma olurdu: tarayıcı `image/png` diyen
     bir gövdeyi resim olarak çizmeye çalışır, `<video>` hiçbir şey oynatmaz
     ve konsolda bir hata bile çıkmaz."""
-    rec = client.post("/api/video", json=GECERLI).json()["videos"][0]
+    rec = uret_ve_bitir(client, "/api/video", json=GECERLI).json()["videos"][0]
 
     r = client.get(f"/output/{rec['filename']}")
 
@@ -435,11 +438,11 @@ def test_the_drawing_route_serves_VIDEO_MP4(client):
     assert "attachment" not in r.headers.get("content-disposition", "")
 
 
-def test_the_download_route_uses_the_MP4_name_and_type(client):
+def test_the_download_route_uses_the_MP4_name_and_type(client, uret_ve_bitir):
     """Ad DİSKTEKİ dosyadan geliyor, `image_id`ye uzantı EKLENMİYOR:
     `f"{id}.png"` yazan bir indirme videoyu açılmayan bir adla teslim
     ederdi."""
-    rec = client.post("/api/video", json=GECERLI).json()["videos"][0]
+    rec = uret_ve_bitir(client, "/api/video", json=GECERLI).json()["videos"][0]
 
     r = client.get(f"/api/output/{rec['id']}/download")
 
@@ -451,12 +454,12 @@ def test_the_download_route_uses_the_MP4_name_and_type(client):
     assert r.content == MP4
 
 
-def test_the_IMAGE_paths_are_untouched(client, monkeypatch):
+def test_the_IMAGE_paths_are_untouched(client, monkeypatch, uret_ve_bitir):
     """"Kayıtlı kullanıcı için sıfır davranış değişikliği": görsel kaydı
     `kind`/`duration` alanlarını HİÇ taşımıyor ve hâlâ `image/png` sunuluyor."""
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG"])
 
-    rec = client.post("/api/generate", json={"prompt": "kedi",
+    rec = uret_ve_bitir(client, "/api/generate", json={"prompt": "kedi",
                                              "size": "1024x1024",
                                              "quality": "medium", "n": 1}) \
                 .json()["images"][0]
@@ -498,7 +501,7 @@ def test_the_duration_axis_is_EMPTY_for_image_models(client):
         assert m["default_duration"] in [d["value"] for d in m["durations"]]
 
 
-def test_an_EMPTY_last_source_id_means_no_end_frame(client, monkeypatch):
+def test_an_EMPTY_last_source_id_means_no_end_frame(client, monkeypatch, uret_ve_bitir):
     """Boş form alanı "verilmedi" demek — "verildi ama boş" değil.
 
     Bütün alanlarını koşulsuz serileştiren bir istemci `last_source_id=""`
@@ -514,7 +517,7 @@ def test_an_EMPTY_last_source_id_means_no_end_frame(client, monkeypatch):
     monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
     gorulen = _son_kare_yakala(monkeypatch)
 
-    r = client.post("/api/video/animate",
+    r = uret_ve_bitir(client, "/api/video/animate",
                     data={**GECERLI, "last_source_id": "   "},
                     files={"file": ("a.png", _png(), "image/png")})
 
@@ -522,7 +525,7 @@ def test_an_EMPTY_last_source_id_means_no_end_frame(client, monkeypatch):
     assert gorulen["last_frame"] is None
 
 
-def test_a_last_file_part_WITHOUT_a_filename_means_no_end_frame(client, monkeypatch):
+def test_a_last_file_part_WITHOUT_a_filename_means_no_end_frame(client, monkeypatch, uret_ve_bitir):
     """Dosya tarafında ikiz bir süzgeç YOK ve olmamalı — mandallanan bu.
 
     Adı olmayan bir dosya parçasını çerçeve rotaya VARMADAN çözüyor: Starlette
@@ -537,7 +540,7 @@ def test_a_last_file_part_WITHOUT_a_filename_means_no_end_frame(client, monkeypa
     monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
     gorulen = _son_kare_yakala(monkeypatch)
 
-    r = client.post("/api/video/animate", data=GECERLI,
+    r = uret_ve_bitir(client, "/api/video/animate", data=GECERLI,
                     files={"file": ("a.png", _png(), "image/png"),
                            "last_file": ("", b"", "application/octet-stream")})
 
@@ -545,14 +548,14 @@ def test_a_last_file_part_WITHOUT_a_filename_means_no_end_frame(client, monkeypa
     assert gorulen["last_frame"] is None
 
 
-def test_a_PLAIN_TEXT_last_file_part_is_refused_BEFORE_the_route(client, monkeypatch):
+def test_a_PLAIN_TEXT_last_file_part_is_refused_BEFORE_the_route(client, monkeypatch, uret_ve_bitir):
     """Dosya alanına düz metin gelirse declared `UploadFile | None` onu rota
     gövdesine varmadan 422 yapıyor — `gorsel.extra_refs`in ham formu okumasının
     gerekçesi bu ve yukarıdaki testin "çerçeve süzüyor, rota değil" iddiasının
     öteki yarısı."""
     monkeypatch.setattr(gorsel, "to_png", lambda raw: _png())
 
-    r = client.post("/api/video/animate", data={**GECERLI, "last_file": "duz-metin"},
+    r = uret_ve_bitir(client, "/api/video/animate", data={**GECERLI, "last_file": "duz-metin"},
                     files={"file": ("a.png", _png(), "image/png")})
 
     assert r.status_code == 422

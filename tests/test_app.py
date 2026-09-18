@@ -16,22 +16,22 @@ def _client(tmp_path, dizinler):
     return TestClient(appmod.app)
 
 
-def test_generate_happy_path(tmp_path, monkeypatch, dizinler):
+def test_generate_happy_path(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG"])
     c = _client(tmp_path, dizinler)
-    r = c.post("/api/generate", json={"prompt": "cat", "size": "1024x1024",
+    r = uret_ve_bitir(c, "/api/generate", json={"prompt": "cat", "size": "1024x1024",
                                       "quality": "medium", "n": 1})
     assert r.status_code == 200
     imgs = r.json()["images"]
     assert len(imgs) == 1 and imgs[0]["prompt"] == "cat"
 
 
-def test_generate_labels_the_image_with_the_session_it_was_born_in(tmp_path, monkeypatch, dizinler):
+def test_generate_labels_the_image_with_the_session_it_was_born_in(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """Birleşik döküm: oturum içinde üretilen görsel o oturumu taşır."""
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG", b"\x89PNG2"])
     c = _client(tmp_path, dizinler)
 
-    r = c.post("/api/generate", json={"prompt": "cat", "size": "1024x1024",
+    r = uret_ve_bitir(c, "/api/generate", json={"prompt": "cat", "size": "1024x1024",
                                       "quality": "medium", "n": 2,
                                       "session_id": "beef1234beef"})
 
@@ -39,18 +39,18 @@ def test_generate_labels_the_image_with_the_session_it_was_born_in(tmp_path, mon
     assert [i["session_id"] for i in r.json()["images"]] == ["beef1234beef"] * 2
 
 
-def test_generate_without_a_session_writes_no_session_key(tmp_path, monkeypatch, dizinler):
+def test_generate_without_a_session_writes_no_session_key(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """Medya'dan doğrudan üretim ve otomatik kayıt KAPALI hâli: etiket yok."""
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG"])
     c = _client(tmp_path, dizinler)
 
-    r = c.post("/api/generate", json={"prompt": "cat", "size": "1024x1024",
+    r = uret_ve_bitir(c, "/api/generate", json={"prompt": "cat", "size": "1024x1024",
                                       "quality": "medium", "n": 1})
 
     assert "session_id" not in r.json()["images"][0]
 
 
-def test_generate_rejects_a_malformed_session_id(tmp_path, monkeypatch, dizinler):
+def test_generate_rejects_a_malformed_session_id(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """Biçim kapısı VAR, varlık kapısı YOK (bkz. app._check_session).
 
     Sessizce düşürmek olmaz: kullanıcı üretimini oturumda göremez ve sebebi
@@ -59,14 +59,14 @@ def test_generate_rejects_a_malformed_session_id(tmp_path, monkeypatch, dizinler
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG"])
     c = _client(tmp_path, dizinler)
 
-    r = c.post("/api/generate", json={"prompt": "cat", "size": "1024x1024",
+    r = uret_ve_bitir(c, "/api/generate", json={"prompt": "cat", "size": "1024x1024",
                                       "quality": "medium", "n": 1,
                                       "session_id": "../../etc/passwd"})
 
     assert r.status_code == 422
 
 
-def test_generate_accepts_a_session_that_is_not_saved_yet(tmp_path, monkeypatch, dizinler):
+def test_generate_accepts_a_session_that_is_not_saved_yet(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """Etiket BİLEREK zayıf: chats.json'da karşılığı olmayan id de yazılır.
 
     Varlık kapısı konsaydı — `_check_folder`'ın yaptığı gibi — oturum kaydı
@@ -78,7 +78,7 @@ def test_generate_accepts_a_session_that_is_not_saved_yet(tmp_path, monkeypatch,
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG"])
     c = _client(tmp_path, dizinler)
 
-    r = c.post("/api/generate", json={"prompt": "cat", "size": "1024x1024",
+    r = uret_ve_bitir(c, "/api/generate", json={"prompt": "cat", "size": "1024x1024",
                                       "quality": "medium", "n": 1,
                                       "session_id": "0123456789ab"})
 
@@ -86,28 +86,28 @@ def test_generate_accepts_a_session_that_is_not_saved_yet(tmp_path, monkeypatch,
     assert r.json()["images"][0]["session_id"] == "0123456789ab"
 
 
-def test_generate_rejects_bad_size(tmp_path, dizinler):
+def test_generate_rejects_bad_size(tmp_path, dizinler, uret_ve_bitir):
     c = _client(tmp_path, dizinler)
-    r = c.post("/api/generate", json={"prompt": "x", "size": "99x99",
+    r = uret_ve_bitir(c, "/api/generate", json={"prompt": "x", "size": "99x99",
                                       "quality": "medium", "n": 1})
     assert r.status_code == 422
 
 
-def test_generate_maps_azure_error(tmp_path, monkeypatch, dizinler):
+def test_generate_maps_azure_error(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     def boom(*a, **k):
         raise ac.AzureImageError("Azure isteği başarısız (HTTP 429).")
     monkeypatch.setattr(ac, "generate", boom)
     c = _client(tmp_path, dizinler)
-    r = c.post("/api/generate", json={"prompt": "x", "size": "1024x1024",
+    r = uret_ve_bitir(c, "/api/generate", json={"prompt": "x", "size": "1024x1024",
                                       "quality": "medium", "n": 1})
     assert r.status_code == 502
     assert "429" in r.json()["detail"]
 
 
-def test_history_returns_saved(tmp_path, monkeypatch, dizinler):
+def test_history_returns_saved(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG"])
     c = _client(tmp_path, dizinler)
-    c.post("/api/generate", json={"prompt": "cat", "size": "1024x1024",
+    uret_ve_bitir(c, "/api/generate", json={"prompt": "cat", "size": "1024x1024",
                                   "quality": "low", "n": 1})
     r = c.get("/api/history")
     assert r.status_code == 200 and len(r.json()["images"]) == 1
@@ -136,7 +136,7 @@ def test_output_missing_file_returns_404(tmp_path, dizinler):
 # çalıştığı için başlığın düşmesi hiçbir yerde fark edilmezdi.
 
 
-def test_the_download_endpoint_marks_the_png_as_an_attachment(tmp_path, monkeypatch, dizinler):
+def test_the_download_endpoint_marks_the_png_as_an_attachment(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """`/api/output/{id}/download` indirmeyi İNDİRME olarak işaretlemek zorunda.
 
     Dosya adı da buradan geliyor: Android tarafı adı
@@ -147,7 +147,7 @@ def test_the_download_endpoint_marks_the_png_as_an_attachment(tmp_path, monkeypa
     """
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG"])
     c = _client(tmp_path, dizinler)
-    rec = c.post("/api/generate", json={"prompt": "cat", "size": "1024x1024",
+    rec = uret_ve_bitir(c, "/api/generate", json={"prompt": "cat", "size": "1024x1024",
                                         "quality": "medium", "n": 1}).json()["images"][0]
 
     r = c.get(f"/api/output/{rec['id']}/download")
@@ -159,7 +159,7 @@ def test_the_download_endpoint_marks_the_png_as_an_attachment(tmp_path, monkeypa
     assert r.content == b"\x89PNG"
 
 
-def test_the_drawing_route_stays_inline(tmp_path, monkeypatch, dizinler):
+def test_the_drawing_route_stays_inline(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     """`/output/{filename}` `attachment` DEMEMELİ — o adres bir ÇİZİM adresi.
 
     Aynı adres her galeri küçük resminin ve büyüteç görselinin `<img src>`'i.
@@ -169,7 +169,7 @@ def test_the_drawing_route_stays_inline(tmp_path, monkeypatch, dizinler):
     """
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG"])
     c = _client(tmp_path, dizinler)
-    rec = c.post("/api/generate", json={"prompt": "cat", "size": "1024x1024",
+    rec = uret_ve_bitir(c, "/api/generate", json={"prompt": "cat", "size": "1024x1024",
                                         "quality": "medium", "n": 1}).json()["images"][0]
 
     r = c.get(f"/output/{rec['filename']}")

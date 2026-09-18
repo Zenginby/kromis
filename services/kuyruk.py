@@ -65,7 +65,7 @@ from services.tablolar import (
 )
 
 __all__ = ["ekle", "al", "kalp", "bitir", "dusur", "iptal", "bayatlari_dusur",
-           "aktif_sayisi", "listele", "isci_kaydet", "isci_kalp", "isci_sil",
+           "aktif_sayisi", "listele", "bul", "isci_kaydet", "isci_kalp", "isci_sil",
            "BAYAT_HATASI", "AKTIF_DURUMLAR"]
 
 # `bayatlari_dusur`un `hata` sütununa yazdığı KOD — cümle değil (gerekçe üstte).
@@ -110,16 +110,24 @@ def _json(is_: Is) -> dict[str, Any]:
 # ─────────────────────────────────────────────────── kullanıcı tarafı
 
 def ekle(db: Session, kullanici_id: uuid.UUID, tur: str, istek: dict[str, Any], model: str,
-         kredi_tahmini: int, *, an: dt.datetime | None = None) -> Is:
+         kredi_tahmini: int, *, an: dt.datetime | None = None,
+         is_id: uuid.UUID | None = None) -> Is:
     """İşi kuyruğa koyar (`bekliyor`); satırı döndürür (`_json` ile dökülür).
 
     `flush`: CHECK (`tur`), FK ve NOT NULL burada patlasın — rota 202
     döndükten sonra commit'te değil. `kredi_tahmini` çağıranın hesabı
     (`catalog.cost_for` × n): bu modül kataloğu bilmez, sayıyı saklar.
+
+    `is_id` (Faz 2 / 4): rota girdi nesnelerini `kullanicilar/<uuid>/isler/<is_id>/…`
+    anahtarına işi YAZMADAN ÖNCE koyar (`istek.girdiler` o anahtarları taşır),
+    yani id'yi satırdan önce bilmek zorunda. Verilmezse DB'nin varsayılanı
+    (`gen_random_uuid`), bugünkü davranış.
     """
     satir = Is(kullanici_id=kullanici_id, tur=tur, durum=DURUM_BEKLIYOR, istek=istek,
                model=model, kredi_tahmini=kredi_tahmini,
                olusturuldu=an if an is not None else zaman.an())
+    if is_id is not None:
+        satir.id = is_id
     db.add(satir)
     db.flush()
     return satir
@@ -150,7 +158,7 @@ def aktif_sayisi(db: Session, kullanici_id: uuid.UUID) -> int:
 
 
 def listele(db: Session, kullanici_id: uuid.UUID, *, since: dt.datetime | None = None,
-            limit: int = 50) -> list[dict[str, Any]]:
+            limit: int = 50, durumlar: tuple[str, ...] | None = None) -> list[dict[str, Any]]:
     """Kullanıcının işleri, EN YENİ ÜSTTE; `since` verilmişse yalnız o andan sonra DEĞİŞENLER.
 
     "Değişme" = `olusturuldu`/`basladi`/`bitti`nin en büyüğü (`GREATEST` NULL'u
@@ -158,12 +166,23 @@ def listele(db: Session, kullanici_id: uuid.UUID, *, since: dt.datetime | None =
     sorar ve bir iş üç anda değişir — sıraya girince, alınınca, kapanınca.
     `kalp_atisi` sayılmaz: istemciye görünen bir şey değiştirmez. `limit`
     çağıranın; öntanımlı 50 iş paneli için, geçmiş sayfalaması 4. görevin.
+    `durumlar` (Faz 2 / 4): yalnız bu durumdaki işler — `GET /api/isler`in
+    öntanımlı görünümü "aktifler + son 50" ve 51. sıraya düşmüş bir `bekliyor`
+    iş listeden kaybolmasın diye aktifler AYRI çekilir (`AKTIF_DURUMLAR`).
     """
     sorgu = select(Is).where(Is.kullanici_id == kullanici_id)
     if since is not None:
         sorgu = sorgu.where(func.greatest(Is.olusturuldu, Is.basladi, Is.bitti) > since)
+    if durumlar is not None:
+        sorgu = sorgu.where(Is.durum.in_(durumlar))
     sorgu = sorgu.order_by(Is.olusturuldu.desc()).limit(limit)
     return [_json(i) for i in db.scalars(sorgu)]
+
+
+def bul(db: Session, kullanici_id: uuid.UUID, is_id: uuid.UUID) -> dict[str, Any] | None:
+    """Tek iş, `_json` ile; başkasının işi ve olmayan iş aynı `None` (rota 404 kurar, 403 değil)."""
+    satir = db.scalar(select(Is).where(Is.kullanici_id == kullanici_id, Is.id == is_id))
+    return _json(satir) if satir is not None else None
 
 
 # ────────────────────────────────────────────────────── işçi tarafı

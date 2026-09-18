@@ -272,13 +272,13 @@ def test_gizli_alan_adi_gizli_OLMAYAN_bir_rotada_da_redakte_ediliyor():
     assert not appmod._is_secret_loc(["body", "comfyui_url"])
 
 
-def test_generate_422_si_hatali_degeri_HALA_gosteriyor(client):
+def test_generate_422_si_hatali_degeri_HALA_gosteriyor(client, uret_ve_bitir):
     """Redaksiyonun genelleşmesi gizli olmayan rotaları ETKİLEMEMELİ.
 
     Kapı rotaya bakıyor ve `/api/generate` o listede değil; kullanıcının
     "hangi boyutu yanlış yazdım" sorusunun cevabı bu gövdede yaşıyor.
     """
-    r = client.post("/api/generate", json={"prompt": "kedi", "size": "yok-boyle-boyut",
+    r = uret_ve_bitir(client, "/api/generate", json={"prompt": "kedi", "size": "yok-boyle-boyut",
                                            "quality": "medium", "n": 1})
     assert r.status_code == 422
     assert "yok-boyle-boyut" in r.text, "geçersiz değer teşhis için gövdede kalmalı"

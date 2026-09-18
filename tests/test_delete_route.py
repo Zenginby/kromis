@@ -14,10 +14,10 @@ def _client(tmp_path, dizinler):
     return TestClient(appmod.app)
 
 
-def test_delete_existing_image(tmp_path, monkeypatch, dizinler):
+def test_delete_existing_image(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [b"\x89PNG"])
     c = _client(tmp_path, dizinler)
-    gen = c.post("/api/generate", json={"prompt": "cat", "size": "1024x1024",
+    gen = uret_ve_bitir(c, "/api/generate", json={"prompt": "cat", "size": "1024x1024",
                                         "quality": "low", "n": 1}).json()
     iid = gen["images"][0]["id"]
 

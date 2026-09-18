@@ -400,25 +400,25 @@ def _client(tmp_path, monkeypatch, dizinler) -> TestClient:
     return TestClient(appmod.app)
 
 
-def _uret(c, folder_id=None, **ek):
+def _uret(uret_ve_bitir, c, folder_id=None, **ek):
     govde = {"prompt": "kedi", "size": "1024x1024", "quality": "low", "n": 1, **ek}
     if folder_id:
         govde["folder_id"] = folder_id
-    r = c.post("/api/generate", json=govde)
+    r = uret_ve_bitir(c, "/api/generate", json=govde)
     assert r.status_code == 200, r.text
     return r.json()["images"]
 
 
 def test_deleting_a_folder_tree_unfiles_media_and_cascades_subfolders(tmp_path, monkeypatch, dizinler,
-                                                                     db_oturumu, kullanici):
+                                                                     db_oturumu, kullanici, uret_ve_bitir):
     """Rota: `deleted` ağacın tamamı (üstten alta), `unfiled` görsel sayısı; DB: satırlar gitti, `folder_id` NULL, dosyalar duruyor."""
     c = _client(tmp_path, monkeypatch, dizinler)
     kok = c.post("/api/folders", json={"name": "Kok"}).json()["folder"]["id"]
     cocuk = c.post("/api/folders", json={"name": "Cocuk", "parent_id": kok}).json()["folder"]["id"]
     torun = c.post("/api/folders", json={"name": "Torun", "parent_id": cocuk}).json()["folder"]["id"]
     kardes = c.post("/api/folders", json={"name": "Kardes"}).json()["folder"]["id"]
-    gorseller = [_uret(c, fid)[0] for fid in (kok, cocuk, torun, torun)]
-    kardesin = _uret(c, kardes)[0]
+    gorseller = [_uret(uret_ve_bitir, c, fid)[0] for fid in (kok, cocuk, torun, torun)]
+    kardesin = _uret(uret_ve_bitir, c, kardes)[0]
 
     r = c.delete(f"/api/folders/{kok}")
     assert r.status_code == 200, r.text
@@ -436,9 +436,9 @@ def test_deleting_a_folder_tree_unfiles_media_and_cascades_subfolders(tmp_path, 
 
 
 def test_deleting_media_removes_the_row_and_the_file_in_that_order_contract(tmp_path, monkeypatch, dizinler,
-                                                                             db_oturumu, kullanici):
+                                                                             db_oturumu, kullanici, uret_ve_bitir):
     c = _client(tmp_path, monkeypatch, dizinler)
-    g = _uret(c)[0]
+    g = _uret(uret_ve_bitir, c)[0]
     dosya = tmp_path / "output" / g["filename"]
     assert dosya.is_file() and db_oturumu.get(tablolar.Medya, g["id"]) is not None
 
@@ -458,9 +458,9 @@ def test_deleting_media_removes_the_row_and_the_file_in_that_order_contract(tmp_
 
 
 def test_bulk_delete_counts_rows_and_stray_files_like_the_manifest_store(tmp_path, monkeypatch, dizinler,
-                                                                        db_oturumu, kullanici):
+                                                                        db_oturumu, kullanici, uret_ve_bitir):
     c = _client(tmp_path, monkeypatch, dizinler)
-    a, b = _uret(c)[0], _uret(c)[0]
+    a, b = _uret(uret_ve_bitir, c)[0], _uret(uret_ve_bitir, c)[0]
     (tmp_path / "output" / "deadbeef0000.png").write_bytes(b"x")
     r = c.request("DELETE", "/api/images", json={"ids": [a["id"], b["id"], "deadbeef0000",
                                                          "yokboyle", "../kacis"]})
@@ -510,11 +510,11 @@ def test_four_records_written_in_the_same_second_keep_their_production_order(db_
 
 
 def test_the_arena_winner_is_one_per_round_and_only_the_winner_carries_the_key(tmp_path, monkeypatch,
-                                                                                dizinler, db_oturumu, kullanici):
+                                                                                dizinler, db_oturumu, kullanici, uret_ve_bitir):
     c = _client(tmp_path, monkeypatch, dizinler)
     tur = "aaaa1111bbbb"
-    a, b = _uret(c, arena_id=tur)[0], _uret(c, arena_id=tur)[0]
-    disarda = _uret(c)[0]
+    a, b = _uret(uret_ve_bitir, c, arena_id=tur)[0], _uret(uret_ve_bitir, c, arena_id=tur)[0]
+    disarda = _uret(uret_ve_bitir, c)[0]
     assert "arena_win" not in a and "arena_win" not in b
 
     assert c.post(f"/api/arena/{tur}/winner", json={"image_id": a["id"]}).json() == {"arena_id": tur, "winner": a["id"]}

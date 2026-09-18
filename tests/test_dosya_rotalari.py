@@ -75,16 +75,16 @@ def c(kova) -> TestClient:
     return TestClient(appmod.app)
 
 
-def _uret(c: TestClient) -> dict:
-    r = c.post("/api/generate", json={"prompt": "kedi", "size": "1024x1024", "quality": "medium", "n": 1})
+def _uret(uret_ve_bitir, c: TestClient) -> dict:
+    r = uret_ve_bitir(c, "/api/generate", json={"prompt": "kedi", "size": "1024x1024", "quality": "medium", "n": 1})
     assert r.status_code == 200, r.text
     return r.json()["images"][0]
 
 
 # ── yazım ─────────────────────────────────────────────────────────────
 
-def test_generate_writes_the_object_under_the_users_key_and_nothing_to_disk(c, kova, tmp_path):
-    kayit = _uret(c)
+def test_generate_writes_the_object_under_the_users_key_and_nothing_to_disk(c, kova, tmp_path, uret_ve_bitir):
+    kayit = _uret(uret_ve_bitir, c)
     assert kova.anahtarlar() == [f"{kova.onek}/output/{kayit['filename']}"]
     veri, mime = kova.sahte.nesneler[kova.anahtarlar()[0]]
     assert veri.startswith(PNG_MAGIC) and mime == "image/png"
@@ -92,7 +92,7 @@ def test_generate_writes_the_object_under_the_users_key_and_nothing_to_disk(c, k
         p.is_file() for p in (tmp_path / "kullanicilar").rglob("*")), "kovalı kipte diske dosya düşmez"
 
 
-def test_the_object_is_put_before_the_row_is_flushed(c, kova, db_oturumu):
+def test_the_object_is_put_before_the_row_is_flushed(c, kova, db_oturumu, uret_ve_bitir):
     """Belge §2: nesne → satır → flush. Satır düşerse nesne artık kalır (artik_dosya bulur);
     tersi galeride kırık bir kutu olurdu ve kimse aramıyor."""
     sira: list[str] = []
@@ -109,7 +109,7 @@ def test_the_object_is_put_before_the_row_is_flushed(c, kova, db_oturumu):
     kova.depo.yaz = _yaz
     event.listen(Session, "before_flush", _flush)
     try:
-        _uret(c)
+        _uret(uret_ve_bitir, c)
     finally:
         event.remove(Session, "before_flush", _flush)
     assert sira == ["nesne", "satir"]
@@ -127,8 +127,8 @@ def test_import_and_asset_upload_write_to_the_bucket(c, kova, kullanici):
 
 # ── servis: 302 ─────────────────────────────────────────────────────
 
-def test_output_redirects_to_a_presigned_url_that_serves_the_bytes(c, kova):
-    kayit = _uret(c)
+def test_output_redirects_to_a_presigned_url_that_serves_the_bytes(c, kova, uret_ve_bitir):
+    kayit = _uret(uret_ve_bitir, c)
     r = c.get(f"/output/{kayit['filename']}", follow_redirects=False)
     assert r.status_code == 302
     assert r.headers["cache-control"] == "private, max-age=600"
@@ -143,17 +143,17 @@ def test_output_redirects_to_a_presigned_url_that_serves_the_bytes(c, kova):
     assert hedef.headers["content-type"] == "image/png"
 
 
-def test_a_range_request_on_the_presigned_url_reaches_the_bucket_directly(c, kova):
+def test_a_range_request_on_the_presigned_url_reaches_the_bucket_directly(c, kova, uret_ve_bitir):
     """`<video>` ileri sarma: aralık isteği 302'nin hedefine gider, uygulama bayt taşımaz."""
-    kayit = _uret(c)
+    kayit = _uret(uret_ve_bitir, c)
     r = c.get(f"/output/{kayit['filename']}", follow_redirects=False)
     parca = kova.sahte.istemci().get(r.headers["location"], headers={"Range": "bytes=0-7"})
     assert parca.status_code == 206 and parca.content == PNG_MAGIC
     assert parca.headers["content-range"].startswith("bytes 0-7/")
 
 
-def test_download_redirects_with_the_filename_as_an_attachment(c, kova):
-    kayit = _uret(c)
+def test_download_redirects_with_the_filename_as_an_attachment(c, kova, uret_ve_bitir):
+    kayit = _uret(uret_ve_bitir, c)
     r = c.get(f"/api/output/{kayit['id']}/download", follow_redirects=False)
     assert r.status_code == 302 and r.headers["cache-control"] == "private, max-age=600"
     sorgu = {k: v[0] for k, v in parse_qs(urlsplit(r.headers["location"]).query).items()}
@@ -173,8 +173,8 @@ def test_asset_serving_redirects_too(c, kova):
     assert c.get("/assets/banners/deadbeef0000.png").status_code == 404
 
 
-def test_ownership_is_still_the_row_and_a_missing_object_is_404_not_a_broken_redirect(c, kova, db_oturumu, kullanici):
-    kayit = _uret(c)
+def test_ownership_is_still_the_row_and_a_missing_object_is_404_not_a_broken_redirect(c, kova, db_oturumu, kullanici, uret_ve_bitir):
+    kayit = _uret(uret_ve_bitir, c)
     # Başkasının satırı: B'nin dosyası kovada dursa da bu kullanıcıya 404 (id uzayı sızmaz).
     b = tablolar.Kullanici(eposta=f"b-{uuid.uuid4().hex[:8]}@example.com", parola_ozeti=None,
                            dogrulandi_at=hesap.simdi())
@@ -195,8 +195,8 @@ def test_ownership_is_still_the_row_and_a_missing_object_is_404_not_a_broken_red
 
 # ── okuyanlar: bindirme, düzenleme, ZIP, silme ───────────────────────
 
-def test_logo_overlay_reads_source_and_asset_from_the_bucket_and_writes_the_result_back(c, kova, monkeypatch):
-    kaynak = _uret(c)
+def test_logo_overlay_reads_source_and_asset_from_the_bucket_and_writes_the_result_back(c, kova, monkeypatch, uret_ve_bitir):
+    kaynak = _uret(uret_ve_bitir, c)
     logo = c.post("/api/assets/logos", files={"file": ("l.png", _png((8, 8), (0, 0, 255)), "image/png")}).json()["asset"]
     gorulen: list[bytes] = []
 
@@ -222,8 +222,8 @@ def test_logo_overlay_reads_source_and_asset_from_the_bucket_and_writes_the_resu
     assert kova.sahte.nesneler[f"{kova.onek}/output/{r.json()['image']['filename']}"][0].startswith(PNG_MAGIC)
 
 
-def test_edit_reads_the_reference_from_the_bucket(c, kova, monkeypatch):
-    kaynak = _uret(c)
+def test_edit_reads_the_reference_from_the_bucket(c, kova, monkeypatch, uret_ve_bitir):
+    kaynak = _uret(uret_ve_bitir, c)
     alinan: list[list[str]] = []
 
     def _edit(model, prompt, refs, size, quality, n):
@@ -231,20 +231,20 @@ def test_edit_reads_the_reference_from_the_bucket(c, kova, monkeypatch):
         assert all(veri.startswith(PNG_MAGIC) for _, veri in refs)
         return [_png((4, 4))]
     monkeypatch.setattr(appmod.providers, "edit", _edit)
-    r = c.post("/api/edit", data={"prompt": "mavi yap", "size": "1024x1024", "quality": "medium", "n": 1,
+    r = uret_ve_bitir(c, "/api/edit", data={"prompt": "mavi yap", "size": "1024x1024", "quality": "medium", "n": 1,
                                   "source_id": kaynak["id"]})
     assert r.status_code == 200, r.text
     assert alinan == [[f"{kaynak['id']}.png"]]
     assert r.json()["images"][0]["parent_id"] == kaynak["id"]
     # Kovada olmayan referans 404 (HEAD): sessiz bir boş referans değil.
-    r = c.post("/api/edit", data={"prompt": "x", "size": "1024x1024", "quality": "medium", "n": 1,
+    r = uret_ve_bitir(c, "/api/edit", data={"prompt": "x", "size": "1024x1024", "quality": "medium", "n": 1,
                                   "source_id": "deadbeef0000"})
     assert r.status_code == 404
 
 
-def test_folder_zip_streams_the_files_out_of_the_bucket(c, kova):
+def test_folder_zip_streams_the_files_out_of_the_bucket(c, kova, uret_ve_bitir):
     klasor = c.post("/api/folders", json={"name": "Tatil"}).json()["folder"]
-    kayit = _uret(c)
+    kayit = _uret(uret_ve_bitir, c)
     assert c.patch(f"/api/image/{kayit['id']}", json={"folder_id": klasor["id"]}).status_code == 200
     r = c.get(f"/api/folders/{klasor['id']}/download")
     assert r.status_code == 200 and r.headers["content-type"] == "application/zip"
@@ -260,8 +260,8 @@ def test_folder_zip_streams_the_files_out_of_the_bucket(c, kova):
         assert kayit["filename"] not in " ".join(zf.namelist()) and zf.testzip() is None
 
 
-def test_delete_removes_the_object_and_the_bulk_variant_too(c, kova):
-    a, b = _uret(c), _uret(c)
+def test_delete_removes_the_object_and_the_bulk_variant_too(c, kova, uret_ve_bitir):
+    a, b = _uret(uret_ve_bitir, c), _uret(uret_ve_bitir, c)
     assert len(kova.anahtarlar()) == 2
     assert c.delete(f"/api/image/{a['id']}").status_code == 200
     assert kova.anahtarlar() == [f"{kova.onek}/output/{b['filename']}"]
@@ -275,12 +275,12 @@ def test_delete_removes_the_object_and_the_bulk_variant_too(c, kova):
 
 # ── karşıt: yerel dal aynı rotada 200 `FileResponse` ────────────────
 
-def test_the_same_route_serves_a_file_response_on_the_local_disk(tmp_path, monkeypatch, dizinler):
+def test_the_same_route_serves_a_file_response_on_the_local_disk(tmp_path, monkeypatch, dizinler, uret_ve_bitir):
     dizinler(output_dir=str(tmp_path))
     assert isinstance(appmod.app.state.dosya, dosya.YerelDepo)
     monkeypatch.setattr(ac, "generate", lambda *a, **k: [_png()])
     c = TestClient(appmod.app)
-    kayit = _uret(c)
+    kayit = _uret(uret_ve_bitir, c)
     assert (tmp_path / kayit["filename"]).exists()
     r = c.get(f"/output/{kayit['filename']}", follow_redirects=False)
     assert r.status_code == 200 and r.content.startswith(PNG_MAGIC) and "location" not in r.headers

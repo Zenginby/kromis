@@ -45,7 +45,7 @@ import shlex
 import yaml
 
 import catalog
-from services import cerez, db, dosya, isci, koken, posta, sifre
+from services import cerez, db, dosya, isci, kapilar, koken, posta, sifre
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCKERFILE = os.path.join(KOK, "Dockerfile")
@@ -252,13 +252,14 @@ def _atamalar() -> list[tuple[str, str, bool]]:
 # `KROMIS_SECRET_KEY` (services/sifre.py); Faz 2 / 2 ile nesne depolama
 # `KROMIS_NESNE_DEPO_{URL,KOVA,ANAHTAR_ID,GIZLI,BOLGE}` (services/dosya.py);
 # Faz 2 / 3 ile işçi süreci `KROMIS_ISCI_ES_ZAMANLI`, `KROMIS_IS_KALP_ESIGI_SN`
-# (services/isci.py — yalnız `isci.py` okur, ama aynı imaj ve aynı şablon).
-# Adlar KAYNAKTAN, elle değil.
+# (services/isci.py — yalnız `isci.py` okur, ama aynı imaj ve aynı şablon);
+# Faz 2 / 4 ile kullanıcı başına eş zamanlı iş tavanı `KROMIS_KULLANICI_ES_ZAMANLI_IS`
+# (services/kapilar.py). Adlar KAYNAKTAN, elle değil.
 ALTYAPI = {"KROMIS_DATA_DIR", "PORT", db.DATABASE_URL_ENV, koken.KOKEN_ENV,
            posta.POSTA_ENV, posta.GONDEREN_ENV, posta.RESEND_ANAHTAR_ENV, cerez.GUVENLI_ENV,
            sifre.ANAHTAR_ENV,
            dosya.URL_ENV, dosya.KOVA_ENV, dosya.ANAHTAR_ID_ENV, dosya.GIZLI_ENV, dosya.BOLGE_ENV,
-           isci.ES_ZAMANLI_ENV, isci.KALP_ESIGI_ENV}
+           isci.ES_ZAMANLI_ENV, isci.KALP_ESIGI_ENV, kapilar.ES_ZAMANLI_IS_ENV}
 
 
 def _katalog_adlari() -> set[str]:

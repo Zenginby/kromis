@@ -47,6 +47,7 @@
         "routers.bindirme",
         "routers.galeri",
         "routers.hesap",
+        "routers.isler",
         "routers.kok",
         "routers.paletler",
         "routers.saglik",
@@ -100,6 +101,7 @@
         "tests/test_id_contract.py",
         "tests/test_import_route.py",
         "tests/test_index.py",
+        "tests/test_isler_route.py",
         "tests/test_kimlik.py",
         "tests/test_koken.py",
         "tests/test_legacy_formats.py",
@@ -172,7 +174,6 @@
         "openai_client",
         "providers",
         "routers.ayarlar",
-        "routers.uretim",
         "services.isci",
         "tools.ice_aktar",
         "veo_client"
@@ -203,6 +204,7 @@
         "tests/test_ice_aktar.py",
         "tests/test_import_route.py",
         "tests/test_isci.py",
+        "tests/test_isler_route.py",
         "tests/test_legacy_formats.py",
         "tests/test_logo.py",
         "tests/test_model_secimi.py",
@@ -325,6 +327,7 @@
         "tests/test_i18n.py",
         "tests/test_index.py",
         "tests/test_isci.py",
+        "tests/test_isler_route.py",
         "tests/test_kimlik_bilgisi_db.py",
         "tests/test_logo.py",
         "tests/test_model_secimi.py",
@@ -698,6 +701,7 @@
         "routers.bindirme",
         "routers.galeri",
         "routers.hesap",
+        "routers.isler",
         "routers.paletler",
         "routers.sohbet",
         "routers.uretim",
@@ -720,6 +724,7 @@
         "tests/test_hesap.py",
         "tests/test_i18n.py",
         "tests/test_isci.py",
+        "tests/test_isler_route.py",
         "tests/test_kimlik.py",
         "tests/test_playwright_dil.py",
         "tests/test_playwright_hesap.py",
@@ -1025,7 +1030,6 @@
         "gemini_client",
         "openai_chat",
         "openai_client",
-        "routers.uretim",
         "services.isci",
         "veo_client"
       ],
@@ -1037,6 +1041,7 @@
         "tests/test_catalog.py",
         "tests/test_gemini_client.py",
         "tests/test_isci.py",
+        "tests/test_isler_route.py",
         "tests/test_provider_logos.py",
         "tests/test_providers.py",
         "tests/test_veo_client.py"
@@ -1169,6 +1174,25 @@
       "yol": "routers/hesap.py"
     },
     {
+      "ad": "routers.isler",
+      "erteli_ithal": [],
+      "ithal": [
+        "i18n",
+        "services.db",
+        "services.dil",
+        "services.kimlik",
+        "services.kuyruk",
+        "services.tablolar"
+      ],
+      "ithal_eden": [
+        "app"
+      ],
+      "katman": 8,
+      "satir": 102,
+      "testler": [],
+      "yol": "routers/isler.py"
+    },
+    {
       "ad": "routers.kok",
       "erteli_ithal": [],
       "ithal": [
@@ -1258,30 +1282,28 @@
       "ad": "routers.uretim",
       "erteli_ithal": [],
       "ithal": [
-        "azure_client",
         "catalog",
         "etiket",
         "i18n",
         "models",
         "palette",
-        "providers",
         "services.ayar",
         "services.db",
-        "services.depo_medya",
         "services.dil",
         "services.dosya",
         "services.gorsel",
         "services.kapilar",
         "services.kimlik",
+        "services.kuyruk",
         "services.palet",
-        "services.tablolar",
-        "services.zaman"
+        "services.tablolar"
       ],
       "ithal_eden": [
-        "app"
+        "app",
+        "tools.artik_dosya"
       ],
       "katman": 9,
-      "satir": 486,
+      "satir": 489,
       "testler": [],
       "yol": "routers/uretim.py"
     },
@@ -1330,6 +1352,7 @@
         "tests/test_artik_dosya.py",
         "tests/test_hesap.py",
         "tests/test_isci.py",
+        "tests/test_isler_route.py",
         "tests/test_kimlik.py",
         "tests/test_paths.py"
       ],
@@ -1369,6 +1392,7 @@
         "routers.bindirme",
         "routers.galeri",
         "routers.hesap",
+        "routers.isler",
         "routers.paletler",
         "routers.saglik",
         "routers.sohbet",
@@ -1392,7 +1416,8 @@
         "tests/test_goc.py",
         "tests/test_guncelleme_route.py",
         "tests/test_ice_aktar.py",
-        "tests/test_kullanici_cli.py"
+        "tests/test_kullanici_cli.py",
+        "tests/test_playwright_studio.py"
       ],
       "yol": "services/db.py"
     },
@@ -1462,7 +1487,6 @@
       "ithal_eden": [
         "routers.bindirme",
         "routers.galeri",
-        "routers.uretim",
         "services.depo_klasor",
         "services.isci"
       ],
@@ -1583,6 +1607,7 @@
         "routers.bindirme",
         "routers.galeri",
         "routers.hesap",
+        "routers.isler",
         "routers.paletler",
         "routers.sohbet",
         "routers.uretim",
@@ -1681,6 +1706,7 @@
         "tests/test_hesap.py",
         "tests/test_ice_aktar.py",
         "tests/test_isci.py",
+        "tests/test_isler_route.py",
         "tests/test_kimlik.py",
         "tests/test_kimlik_bilgisi_db.py",
         "tests/test_kullanici_cli.py",
@@ -1720,7 +1746,10 @@
       "satir": 425,
       "testler": [
         "tests/test_docker_kapisi.py",
-        "tests/test_isci.py"
+        "tests/test_isci.py",
+        "tests/test_isler_route.py",
+        "tests/test_kimlik.py",
+        "tests/test_playwright_studio.py"
       ],
       "yol": "services/isci.py"
     },
@@ -1733,6 +1762,7 @@
         "i18n",
         "services.depo_klasor",
         "services.dil",
+        "services.kuyruk",
         "storage"
       ],
       "ithal_eden": [
@@ -1741,8 +1771,11 @@
         "routers.uretim"
       ],
       "katman": 8,
-      "satir": 79,
-      "testler": [],
+      "satir": 131,
+      "testler": [
+        "tests/test_docker_kapisi.py",
+        "tests/test_isler_route.py"
+      ],
       "yol": "services/kapilar.py"
     },
     {
@@ -1764,6 +1797,7 @@
         "routers.bindirme",
         "routers.galeri",
         "routers.hesap",
+        "routers.isler",
         "routers.kok",
         "routers.paletler",
         "routers.sohbet",
@@ -1805,12 +1839,17 @@
       ],
       "ithal_eden": [
         "isci",
-        "services.isci"
+        "routers.isler",
+        "routers.uretim",
+        "services.isci",
+        "services.kapilar"
       ],
       "katman": 6,
-      "satir": 256,
+      "satir": 275,
       "testler": [
+        "tests/test_artik_dosya.py",
         "tests/test_isci.py",
+        "tests/test_isler_route.py",
         "tests/test_kuyruk.py"
       ],
       "yol": "services/kuyruk.py"
@@ -1966,6 +2005,7 @@
         "routers.bindirme",
         "routers.galeri",
         "routers.hesap",
+        "routers.isler",
         "routers.kok",
         "routers.paletler",
         "routers.sohbet",
@@ -1998,6 +2038,7 @@
         "tests/test_hesap.py",
         "tests/test_ice_aktar.py",
         "tests/test_isci.py",
+        "tests/test_isler_route.py",
         "tests/test_kimlik.py",
         "tests/test_kimlik_bilgisi_db.py",
         "tests/test_kullanici_cli.py",
@@ -2024,7 +2065,6 @@
         "routers.galeri",
         "routers.paletler",
         "routers.sohbet",
-        "routers.uretim",
         "services.depo_kimlik_bilgisi",
         "services.depo_klasor",
         "services.depo_medya",
@@ -2104,6 +2144,7 @@
       "ad": "tools.artik_dosya",
       "erteli_ithal": [],
       "ithal": [
+        "routers.uretim",
         "services.ayar",
         "services.db",
         "services.dosya",
@@ -2111,8 +2152,8 @@
         "storage"
       ],
       "ithal_eden": [],
-      "katman": 9,
-      "satir": 330,
+      "katman": 10,
+      "satir": 360,
       "testler": [
         "tests/test_artik_dosya.py"
       ],
@@ -2429,7 +2470,9 @@
         "cagrilan_yollar": [
           "/api/edit",
           "/api/generate",
+          "/api/history",
           "/api/image/{}",
+          "/api/isler/{}",
           "/api/output/{}/download",
           "/api/prefs",
           "/api/video",
@@ -2439,8 +2482,8 @@
           "/output/{}.png"
         ],
         "dosya": "static/core.js",
-        "satir": 3170,
-        "tanim": 89
+        "satir": 3246,
+        "tanim": 92
       },
       {
         "cagrilan_yollar": [
@@ -2851,7 +2894,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 124,
+  "test_dosyasi_sayisi": 125,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",
@@ -3108,22 +3151,18 @@
       "islev": "edit",
       "modul": "routers.uretim",
       "moduller": [
-        "azure_client",
         "catalog",
         "chat_store",
-        "color_names",
         "etiket",
         "i18n",
         "models",
-        "palette",
-        "palette_store",
-        "providers"
+        "palette"
       ],
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 421,
-      "yardimci_sayisi": 23,
+      "satir": 433,
+      "yardimci_sayisi": 12,
       "yol": "/api/edit",
       "yontem": "POST"
     },
@@ -3211,7 +3250,6 @@
       "islev": "generate",
       "modul": "routers.uretim",
       "moduller": [
-        "azure_client",
         "catalog",
         "chat_store",
         "color_names",
@@ -3220,14 +3258,13 @@
         "models",
         "palette",
         "palette_store",
-        "providers",
         "storage"
       ],
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 53,
-      "yardimci_sayisi": 20,
+      "satir": 108,
+      "yardimci_sayisi": 26,
       "yol": "/api/generate",
       "yontem": "POST"
     },
@@ -3382,6 +3419,7 @@
         "i18n"
       ],
       "onyuz": [
+        "static/core.js",
         "static/folders.js"
       ],
       "satir": 165,
@@ -3471,6 +3509,47 @@
       "satir": 255,
       "yardimci_sayisi": 5,
       "yol": "/api/import",
+      "yontem": "POST"
+    },
+    {
+      "dosya": "routers/isler.py",
+      "islev": "isleri_listele",
+      "modul": "routers.isler",
+      "moduller": [
+        "i18n"
+      ],
+      "onyuz": [],
+      "satir": 57,
+      "yardimci_sayisi": 6,
+      "yol": "/api/isler",
+      "yontem": "GET"
+    },
+    {
+      "dosya": "routers/isler.py",
+      "islev": "is_getir",
+      "modul": "routers.isler",
+      "moduller": [
+        "i18n"
+      ],
+      "onyuz": [
+        "static/core.js"
+      ],
+      "satir": 81,
+      "yardimci_sayisi": 6,
+      "yol": "/api/isler/{is_id}",
+      "yontem": "GET"
+    },
+    {
+      "dosya": "routers/isler.py",
+      "islev": "is_iptal",
+      "modul": "routers.isler",
+      "moduller": [
+        "i18n"
+      ],
+      "onyuz": [],
+      "satir": 88,
+      "yardimci_sayisi": 9,
+      "yol": "/api/isler/{is_id}/iptal",
       "yontem": "POST"
     },
     {
@@ -3676,20 +3755,17 @@
       "islev": "video",
       "modul": "routers.uretim",
       "moduller": [
-        "azure_client",
         "catalog",
         "chat_store",
         "folders",
         "i18n",
-        "models",
-        "providers",
-        "storage"
+        "models"
       ],
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 102,
-      "yardimci_sayisi": 9,
+      "satir": 138,
+      "yardimci_sayisi": 15,
       "yol": "/api/video",
       "yontem": "POST"
     },
@@ -3698,18 +3774,16 @@
       "islev": "animate",
       "modul": "routers.uretim",
       "moduller": [
-        "azure_client",
         "catalog",
         "chat_store",
         "etiket",
         "i18n",
-        "models",
-        "providers"
+        "models"
       ],
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 218,
+      "satir": 235,
       "yardimci_sayisi": 10,
       "yol": "/api/video/animate",
       "yontem": "POST"

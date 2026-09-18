@@ -30,7 +30,7 @@ import errlog
 import paths
 import providers
 from models import MAX_PROMPT_CHARS, GenerateRequest
-from routers import ayarlar, bindirme, galeri, hesap, kok, paletler, saglik, sohbet, uretim
+from routers import ayarlar, bindirme, galeri, hesap, isler, kok, paletler, saglik, sohbet, uretim
 from services import (
     ayar,
     db,
@@ -198,7 +198,7 @@ app.exception_handler(kimlik.GirisSayfasi)(kimlik.giris_sayfasina)
 # Router'lar ÖNEKSİZ takılıyor: yollar her rotanın üstünde birebir yazılı
 # (bkz. routers/__init__.py). Sıra rota eşleşmesini etkilemiyor — hiçbir iki
 # kalıp aynı yol+fiili paylaşmıyor — ama okunurluk için eski app.py sırası.
-for _router in (uretim.router, ayarlar.router, sohbet.router, galeri.router,
+for _router in (uretim.router, isler.router, ayarlar.router, sohbet.router, galeri.router,
                 paletler.router, bindirme.router, hesap.router, kok.router, saglik.router):
     app.include_router(_router)
 

@@ -121,8 +121,9 @@ def test_every_router_module_is_included_in_the_app():
         f"takılmamış: {sorted(graftaki - calisan)}; kaynakta olmayan: "
         f"{sorted(calisan - graftaki)}")
     # 46 (Faz 0) + 8 hesap rotası (Faz 1 / 3: docs/faz1-veritabani-hesaplar.md §3)
-    # + 3 iş rotası (Faz 2 / 4: docs/faz2-kuyruk-anahtarlar-depolama.md §4).
-    assert len(graftaki) == 59, "rota sayısı değişti — bilinçliyse bu sayıyı güncelle"
+    # + 3 iş rotası (Faz 2 / 4) + 2 (Faz 2 / 5) + 8 admin/kota (Faz 2 / 8:
+    # docs/faz2-kuyruk-anahtarlar-depolama.md §8 — `/admin`, 6 `/api/admin/*`, `/api/kota`).
+    assert len(graftaki) == 67, "rota sayısı değişti — bilinçliyse bu sayıyı güncelle"
 
 
 def test_directories_are_read_at_request_time_not_bound_at_import():

@@ -2989,6 +2989,9 @@ body.viewer-open { overflow: hidden; }
 /* 429 uyarısı: tetik kısa süre vurgulanır ki kullanıcı cümlenin nerede
    durduğunu görsün (panel kapalıyken de). */
 #isler-btn.is-uyari { color: var(--danger); }
+/* Panelin başındaki "günlük kalan" satırı (Faz 2 / 8, isler.js kotaCiz). */
+.isler-kota { color: var(--muted); font-size: 0.8rem; margin: 0 0 8px; }
+.isler-kota[hidden] { display: none; }
 .isler-durum {
   margin: 0 0 12px; padding: 8px 10px; border-radius: 12px;
   background: var(--panel-2); color: var(--muted); font-size: 13px;

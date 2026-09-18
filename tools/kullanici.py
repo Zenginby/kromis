@@ -6,13 +6,18 @@
 
     DATABASE_URL=… python tools/kullanici.py olustur --eposta ali@ornek.com [--admin] [--dil tr]
     DATABASE_URL=… python tools/kullanici.py oturum-dusur --eposta ali@ornek.com
+    DATABASE_URL=… python tools/kullanici.py admin --eposta ali@ornek.com [--kaldir]
 
 NEDEN VAR: web sürümünde hesap açmak kayıt → e-posta doğrulama akışından
 geçiyor (routers/hesap.py) ve o akış bir posta servisi istiyor. İlk kullanıcı
 (sahip) posta servisi kurulmadan girebilmeli; `olustur` bu yüzden e-postayı
 DOĞRULANMIŞ yazar (`dogrulandi_at = now`). `--admin` `is_admin=true` yazar —
-bugün onu okuyan tek şey `GET /api/hesap/ben`; admin arayüzü ve admin rotası
-YOK, bayrak ileriye dönük.
+Faz 2 / 8'den beri onu okuyan `kimlik.admin_kullanici` kapısı (`/admin`,
+`/api/admin/*`). Var olan hesabı sonradan admin yapmanın (ya da bayrağı
+kaldırmanın) yolu `admin` komutu: canlıda ilk admin sahibin KENDİ hesabıdır ve
+o hesap çoktan açılmıştır; `UPDATE kullanicilar …`ı elle yazdırmak yerine
+araç. Admin adminliği KENDİNDEN kaldırabilir — son admin bekçisi yok, bilerek:
+CLI DB'ye doğrudan bağlanır, bayrak aynı komutla geri gelir.
 
 PAROLA ARGÜMAN DEĞİL: `--parola` diye bir seçenek yok ve olmayacak — kabuk
 geçmişine (`~/.bash_history`, `ps`) düşerdi. TTY'de `getpass` iki kez sorar;
@@ -98,6 +103,17 @@ def olustur(oturum: Session, eposta: str, parola: str, *, admin: bool, dil: str 
     return str(kullanici.id)
 
 
+def admin_yap(oturum: Session, eposta: str, *, admin: bool) -> bool:
+    """`is_admin` bayrağını yazar; önceki değeri döner (çıktı "değişti/zaten öyleydi" desin). Kullanıcı yoksa hata."""
+    kullanici = hesap.kullanici_bul(oturum, eposta)
+    if kullanici is None:
+        raise KullaniciHatasi(f"{eposta} diye bir kullanici yok.")
+    onceki = bool(kullanici.is_admin)
+    kullanici.is_admin = admin
+    oturum.flush()
+    return onceki
+
+
 def oturum_dusur(oturum: Session, eposta: str) -> int:
     """Kullanıcının bütün oturumlarını siler; kaç oturum düştüğünü döner."""
     kullanici = hesap.kullanici_bul(oturum, eposta)
@@ -116,13 +132,16 @@ def _ayristirici() -> argparse.ArgumentParser:
     alt = p.add_subparsers(dest="komut", required=True)
     o = alt.add_parser("olustur", help="dogrulanmis yeni hesap; parola TTY'den sorulur")
     o.add_argument("--eposta", required=True)
-    o.add_argument("--admin", action="store_true", help="is_admin=true (bugun yalniz /api/hesap/ben okur)")
+    o.add_argument("--admin", action="store_true", help="is_admin=true (/admin ve /api/admin/* kapisi)")
     o.add_argument("--dil", choices=models.ALLOWED_LANGUAGES, default=None,
                    help="hesabin dili; verilmezse tarayici basligina dusulur")
     o.add_argument("--parola-stdin", action="store_true",
                    help="parolayi standart girdinin ilk satirindan oku (betik/test); TTY'de sorulmaz")
     d = alt.add_parser("oturum-dusur", help="kullanicinin BUTUN oturumlarini sil (sizan cerez)")
     d.add_argument("--eposta", required=True)
+    a = alt.add_parser("admin", help="var olan hesabi admin yap (is_admin=true); --kaldir bayragi dusurur")
+    a.add_argument("--eposta", required=True)
+    a.add_argument("--kaldir", action="store_true", help="is_admin=false yaz")
     return p
 
 
@@ -154,6 +173,12 @@ def main(argv: list[str]) -> int:
                 oturum.commit()
                 print(f"olusturuldu: {eposta} (id {kimlik}, admin: {'evet' if args.admin else 'hayir'}, "
                       f"dogrulanmis: evet)")
+            elif args.komut == "admin":
+                onceki = admin_yap(oturum, eposta, admin=not args.kaldir)
+                oturum.commit()
+                yeni = "hayir" if args.kaldir else "evet"
+                degisti = "degisti" if onceki == args.kaldir else "zaten oyleydi"
+                print(f"{eposta}: admin = {yeni} ({degisti})")
             else:
                 sayi = oturum_dusur(oturum, eposta)
                 oturum.commit()

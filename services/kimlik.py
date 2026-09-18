@@ -66,14 +66,29 @@ platform → yok; rota ve adaptörler TEK sözlük görür, `kaynaklar` öznitel
 "hangisi kimden" sorusunu taşır (`isler.anahtar_kaynagi`). Dört üretim rotası
 ve yeniden gönderim bu bağımlılığı geri aldı: "anahtar yok" kapısı sıraya
 yazmadan ÖNCE, rotada bir kez sorulur (services/kapilar.py `check_anahtar`).
+
+ADMİN KAPISI (Faz 2 / 8): `admin_kullanici` = `aktif_kullanici` + `is_admin`,
+değilse **403** — 404 DEĞİL: admin varlığı gizli bilgi değil, `/admin` yolu
+zaten görünür; 404 "yok" derdi ve bir yanlış yetkilendirmeyi teşhis edilmez
+kılardı. Kapı KİRACIYI DA DEĞİŞTİRİR: `kiraci.bagla(kullanici_id=…,
+rol=ADMIN)` + `kiraci.uygula(db)` aynı transaksiyona (`_coz`un deseni) —
+RLS politikası `app.rol = 'admin'` ile herkesin satırını okur ve günceller
+(`yonetici_okur`/`yonetici_gunceller`, 0006_rls). Bu bağlama OLMADAN admin
+rotası uygulama rolünde SESSİZCE BOŞ döner: `SELECT` başkasının satırını
+görmez, hata da vermez (tests/test_admin.py bunu iki yönden ölçüyor —
+bağlamsız ham sorgu boş, kapılı rota dolu). `admin_sayfasi` sayfa ikizi:
+oturumsuz 302 `/giris`, admin değilse 403 HTML (`YetkiYok` → `yetki_yok_sayfasi`,
+`GirisSayfasi`nın aynı deseni). `/api/admin/*` HER rotasının bu kapıyı
+taşıdığını tests/test_kimlik.py `ADMIN_ROTALAR` bekçisi sınar.
 """
 from __future__ import annotations
 
+import html
 from collections.abc import AsyncIterator, Mapping
 
 from fastapi import Depends, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 import i18n
@@ -163,6 +178,56 @@ async def giris_sayfasina(request: Request, exc: GirisSayfasi) -> RedirectRespon
     """`GirisSayfasi` işleyicisi — app.py takıyor. `no-store`: vekil oturumsuz 302'yi saklamasın."""
     return RedirectResponse(GIRIS_SAYFASI, status_code=302,
                             headers={"Cache-Control": "no-store"})
+
+
+class YetkiYok(Exception):
+    """Admin OLMAYAN bir kullanıcının tarayıcı gezinmesiyle `/admin`e gelişi — işleyicisi `yetki_yok_sayfasi` (403 HTML).
+
+    `HTTPException(403)` DEĞİL: FastAPI onu JSON gövdeye çevirir ve adres
+    çubuğuna `/admin` yazan bir insan ham JSON okurdu. API rotalarının 403'ü
+    ise JSON kalır (`admin_kullanici`) — `fetch` çağrısı `detail` okur.
+    """
+
+
+async def _admin_bagla(db: Session, kullanici: Kullanici) -> None:
+    """Admin bağlamı: `app.rol = 'admin'` + kendi id'si (rota kendi satırını da görür), aynı transaksiyona.
+
+    `_coz`un deseni: kimlik sorgusu transaksiyonu başlatmış ve kancaya rol
+    yokken yazılmış; `uygula` aynı transaksiyona ROLLÜ hâli yazar (test
+    override'ında oturum tazedir, `uygula` susar ve `after_begin` kancası
+    bu — artık rollü — bağlamı ilk sorguda yazar).
+    """
+    kiraci.bagla(kullanici_id=kullanici.id, rol=kiraci.ADMIN)
+    await run_in_threadpool(kiraci.uygula, db)
+
+
+async def admin_kullanici(db: Session = OTURUM,
+                          kullanici: Kullanici = Depends(aktif_kullanici)) -> Kullanici:
+    """FastAPI bağımlılığı (API): oturumun kullanıcısı admin ise o; değilse 403 JSON, oturumsuz 401."""
+    if not kullanici.is_admin:
+        raise HTTPException(status_code=403,
+                            detail=i18n.t("err.admin_gerekli", dil.aktif()))
+    await _admin_bagla(db, kullanici)
+    return kullanici
+
+
+async def admin_sayfasi(db: Session = OTURUM,
+                        kullanici: Kullanici = Depends(sayfa_kullanicisi)) -> Kullanici:
+    """FastAPI bağımlılığı (HTML sayfa): admin ise kullanıcı; oturumsuz 302 `/giris`, admin değilse 403 HTML."""
+    if not kullanici.is_admin:
+        raise YetkiYok()
+    await _admin_bagla(db, kullanici)
+    return kullanici
+
+
+async def yetki_yok_sayfasi(request: Request, exc: YetkiYok) -> HTMLResponse:
+    """`YetkiYok` işleyicisi — app.py takıyor. Tek cümle, isteğin dilinde; `no-store` (kişiye özel cevap)."""
+    metin = html.escape(i18n.t("admin.yetki_yok", dil.aktif()), quote=False)
+    geri = html.escape(i18n.t("admin.studyo", dil.aktif()), quote=False)
+    return HTMLResponse(
+        f'<!doctype html><html lang="{dil.aktif()}"><meta charset="utf-8">'
+        f'<title>403</title><h1>403</h1><p>{metin}</p><p><a href="/">{geri}</a></p></html>',
+        status_code=403, headers={"Cache-Control": "no-store"})
 
 
 async def kimlik_bilgileri(request: Request, db: Session = OTURUM,

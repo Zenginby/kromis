@@ -67,6 +67,7 @@ DEPOLAR = {
     "services/depo_varlik.py": 3, "services/depo_tercih.py": 1,
     "services/depo_kimlik_bilgisi.py": 4,   # Faz 1 / 7
     "services/kuyruk.py": 10,               # Faz 2 / 1 (3 kullanıcı + 7 işçi tarafı; `ekle`/`isci_kaydet` `db.add`)
+    "services/depo_admin.py": 10,           # Faz 2 / 8 (hepsi kiracısız — `KIRACISIZ_MODULLER`)
 }
 # `depo_*.py` kalıbının DIŞINDA kalan depolar — `test_the_repository_list_matches_the_files_on_disk`
 # bunları da bekler; kalıba uymayan yeni bir depo buraya yazılmadan listeye giremez.
@@ -86,6 +87,16 @@ KIRACISIZ = {
         "isci_kalp": "`isciler` tablosunda kullanıcı sütunu yok",
         "isci_sil": "`isciler` tablosunda kullanıcı sütunu yok",
     },
+}
+# Kiracısız MODÜLLER (Faz 2 / 8): işlev işlev değil bütünüyle muaf, gerekçesiyle.
+# Bekçinin bekçisi: dosya var, DEPOLAR'da sayılı, hiçbir işlevi `kullanici_id`
+# ALMIYOR (alsa süzmesi gerekirdi — hedef kullanıcı `hedef_id`dir), sorgu kuran
+# her işlevin ilk parametresi `db`. RLS bu modülü de kapsar: admin bağlamı
+# olmadan sorguları boş döner (tests/test_admin.py, belge §7 kırılma sınıfı (a)).
+KIRACISIZ_MODULLER = {
+    "services/depo_admin.py": "admin sorguları: kullanıcı listesi, kuyruk, metrikler, tavan, "
+                              "iptal — admin HER kiracının satırını görür; kapı rotadaki "
+                              "`kimlik.admin_kullanici` (403) ve DB'de `app.rol='admin'` politikası",
 }
 DONDURULMUS = {"storage": storage, "folders": folders, "chat_store": chat_store,
                "palette_store": palette_store, "assets_store": assets_store, "prefs": prefs}
@@ -211,6 +222,18 @@ def test_the_repository_list_matches_the_files_on_disk():
         assert os.path.isfile(os.path.join(REPO, yol)), yol
 
 
+def test_the_tenantless_module_list_names_real_repositories_whose_functions_take_no_owner():
+    """Modül muafiyetinin bekçisi (Faz 2 / 8): gerekçe dolu, dosya DEPOLAR'da, hiçbir işlev `kullanici_id` almıyor."""
+    for yol, gerekce in KIRACISIZ_MODULLER.items():
+        assert gerekce.strip(), f"{yol} gerekçesiz"
+        assert yol in DEPOLAR, f"{yol} DEPOLAR'da değil"
+        assert yol not in KIRACISIZ, f"{yol} hem modül hem işlev muafiyetinde"
+        for f in _islevler(yol):
+            parametreler = [a.arg for a in f.args.args + f.args.kwonlyargs]
+            assert "kullanici_id" not in parametreler, (
+                f"{yol}::{f.name} `kullanici_id` alıyor — kiracısız modülde hedef `hedef_id`dir")
+
+
 def test_the_tenantless_function_list_names_real_functions_that_take_no_owner():
     """Muafiyet defterinin bekçisi: ad gerçek, işlev `kullanici_id` almıyor (alsa süzmesi gerekirdi)."""
     for yol, adlar in KIRACISIZ.items():
@@ -264,7 +287,7 @@ def test_every_query_building_function_filters_by_the_owner(yol):
     assert len(sorgulu) >= DEPOLAR[yol], f"{yol}: taranan işlev şüpheli biçimde az ({len(sorgulu)})"
     muaf = KIRACISIZ.get(yol, {})
     for f in sorgulu:
-        if f.name in muaf:
+        if f.name in muaf or yol in KIRACISIZ_MODULLER:
             continue
         parametreler = [a.arg for a in f.args.args + f.args.kwonlyargs]
         assert "kullanici_id" in parametreler, f"{yol}::{f.name} `kullanici_id` almıyor"
@@ -281,6 +304,11 @@ def test_every_public_function_takes_the_session_and_the_owner_first(yol):
         if f.name.startswith("_") or f.name == "safe_component":
             continue
         adlar = [a.arg for a in f.args.args]
+        if yol in KIRACISIZ_MODULLER:
+            # Sorgu kuran işlev `db` ile başlar; saf biçimleyici (`is_dokumu`) oturum almaz.
+            if _sorgu_kuruyor(f):
+                assert adlar[:1] == ["db"], f"{yol}::{f.name}{adlar}"
+            continue
         if f.name in KIRACISIZ.get(yol, {}):
             assert adlar[:1] == ["db"], f"{yol}::{f.name}{adlar}"
             continue

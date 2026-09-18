@@ -52,7 +52,8 @@ from services.tablolar import DURUM_IPTAL, Is, Kullanici
 
 __all__ = ["SAATLIK_IS_ENV", "SAATLIK_IS_VARSAYILAN", "SAATLIK_PENCERE",
            "GUNLUK_KREDI_ENV", "GUNLUK_KREDI_VARSAYILAN", "GUNLUK_PENCERE",
-           "saatlik_is_tavani", "gunluk_kredi_tavani", "saatlik_bekleme", "gunluk_durum",
+           "saatlik_is_tavani", "gunluk_kredi_tavani", "saatlik_durum", "saatlik_bekleme",
+           "gunluk_durum",
            "check_saatlik", "check_gunluk"]
 
 # `.env.example` 1. bölüm aynı adları buradan okur (bekçisi tests/test_docker_kapisi.py `ALTYAPI`).
@@ -94,15 +95,27 @@ def _bekleme_sn(en_eski: dt.datetime, pencere: dt.timedelta, an: dt.datetime) ->
     return max(1, int((en_eski + pencere - an).total_seconds()) + 1)
 
 
+def saatlik_durum(db: Session, kullanici_id: uuid.UUID, an: dt.datetime | None = None,
+                  ) -> tuple[int, dt.datetime | None]:
+    """Son 60 dk'da sıraya alınan iş sayısı (`iptal` hariç) ve en eskisinin anı — `gunluk_durum`un saatlik ikizi.
+
+    `saatlik_bekleme` bundan türer; `GET /api/kota` (Faz 2 / 8, belge §6 devri)
+    sayıyı ve pencerenin açılışını doğrudan buradan okur.
+    """
+    an = an if an is not None else zaman.an()
+    sayi, en_eski = db.execute(
+        select(func.count(), func.min(Is.olusturuldu))
+        .where(Is.kullanici_id == kullanici_id, Is.durum != DURUM_IPTAL,
+               Is.olusturuldu > an - SAATLIK_PENCERE)).one()
+    return int(sayi or 0), en_eski
+
+
 def saatlik_bekleme(db: Session, kullanici_id: uuid.UUID, an: dt.datetime | None = None,
                     *, tavan: int | None = None) -> int | None:
     """Son 60 dk'daki iş sayısı tavana ulaştıysa beklenecek saniye; değilse `None`."""
     an = an if an is not None else zaman.an()
     tavan = tavan if tavan is not None else saatlik_is_tavani()
-    sayi, en_eski = db.execute(
-        select(func.count(), func.min(Is.olusturuldu))
-        .where(Is.kullanici_id == kullanici_id, Is.durum != DURUM_IPTAL,
-               Is.olusturuldu > an - SAATLIK_PENCERE)).one()
+    sayi, en_eski = saatlik_durum(db, kullanici_id, an)
     if sayi < tavan or en_eski is None:
         return None
     return _bekleme_sn(en_eski, SAATLIK_PENCERE, an)

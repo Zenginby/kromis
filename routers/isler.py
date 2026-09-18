@@ -1,7 +1,7 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
 # GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
 # Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
-"""İş uçları: kullanıcının üretim işleri — liste, tekil, iptal, akış, yeniden gönder (Faz 2 / 4-5).
+"""İş uçları: kullanıcının üretim işleri — liste, tekil, iptal, akış, yeniden gönder; kota (Faz 2 / 4-5, 8).
 
 Üretim rotaları (routers/uretim.py) 202 ile bir `is` döndürüyor; tarayıcı
 sonucu buradan izler. 4. görevde izleme core.js'in 2 sn yoklamasıydı
@@ -123,6 +123,34 @@ def isleri_listele(since: str | None = None, db: Session = OTURUM,
         # (`olusturuldu` `zaman.damga` biçimi — sözlük sırası, dize sırasıyla aynı).
         isler.sort(key=lambda i: i["olusturuldu"] or "", reverse=True)
     return {"isler": isler}
+
+
+@router.get("/api/kota")
+def kota_durumu(db: Session = OTURUM,
+                kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+    """Kullanıcının kotası (Faz 2 / 8; belge §6 devri): günlük kalan kredi, saatlik iş sayısı, pencerelerin açılışı.
+
+    `services/kota.py`nin İKİ kapısıyla aynı sorgular (`gunluk_durum`,
+    `saatlik_durum`) — panel "günlük kalan"ı buradan okur (static/isler.js),
+    kapının 429'unu beklemeden. Tavan kullanıcının ezmesi (`gunluk_kredi_tavani`)
+    ya da ortam; `kalan` yalnız PLATFORM anahtarıyla koşan işlere karşı anlamlı
+    (kendi anahtarı sayılmaz, services/kota.py). `acilis`: pencere içindeki en
+    eski sayılan işin düşeceği an (`zaman.damga`), sayılan iş yoksa `None`.
+    """
+    def _acilis(en_eski: dt.datetime | None, pencere: dt.timedelta) -> str | None:
+        return zaman.damga(en_eski + pencere) if en_eski is not None else None
+
+    an = zaman.an()
+    gunluk_tavan = (kullanici.gunluk_kredi_tavani if kullanici.gunluk_kredi_tavani is not None
+                    else kota.gunluk_kredi_tavani())
+    toplam, gunluk_en_eski = kota.gunluk_durum(db, kullanici.id, an)
+    sayi, saatlik_en_eski = kota.saatlik_durum(db, kullanici.id, an)
+    return {
+        "gunluk": {"tavan": gunluk_tavan, "kullanilan": toplam, "kalan": max(0, gunluk_tavan - toplam),
+                   "acilis": _acilis(gunluk_en_eski, kota.GUNLUK_PENCERE)},
+        "saatlik": {"tavan": kota.saatlik_is_tavani(), "sayi": sayi,
+                    "acilis": _acilis(saatlik_en_eski, kota.SAATLIK_PENCERE)},
+    }
 
 
 def _akis_sorgusu(motor: Engine, kullanici_id: uuid.UUID, since: dt.datetime | None) -> list[dict]:

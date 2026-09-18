@@ -51,6 +51,7 @@ const kromisIsler = (() => {
 
   const AKIS_YOLU = "/api/isler/akis";
   const LISTE_YOLU = "/api/isler";
+  const KOTA_YOLU = "/api/kota";
   // Yedek yoklama aralığı (belge §5: 3 sn) ve akışın "düştü" sayılacağı eşik.
   const YOKLAMA_MS = 3000;
   const DUSUS_ESIGI = 3;
@@ -94,12 +95,33 @@ const kromisIsler = (() => {
   const liste = $("isler-liste");
   const bosYazi = $("isler-bos");
   const durumSatiri = $("isler-durum");
+  const kotaSatiri = $("isler-kota");
   const dugme = $("isler-btn");
   const sayac = $("isler-sayac");
 
   function durumYaz(metin) {
     durumSatiri.textContent = metin || "";
     durumSatiri.hidden = !metin;
+  }
+
+  /** Panelin başındaki "günlük kalan" (Faz 2 / 8; `GET /api/kota`): panel
+   *  açılırken ve bir iş kapanınca bir kez sorulur — kapının 429'unu beklemeden
+   *  kullanıcı kaç kredisi kaldığını görür. `yukle`ye BAĞLI DEĞİL: yedek yoklama
+   *  onu 3 sn'de bir çağırıyor, kota her turda sorulmasın. Hata sessiz: satır
+   *  gizli kalır, panel işini yapar. */
+  async function kotaCiz() {
+    try {
+      const res = await fetch(KOTA_YOLU);
+      if (!res.ok) return;
+      const { gunluk } = await res.json();
+      kotaSatiri.textContent = t("isler.gunluk_kalan", {
+        kalan: gunluk.kalan,
+        tavan: gunluk.tavan,
+      });
+      kotaSatiri.hidden = false;
+    } catch {
+      /* ağ hatası: satır gizli kalır */
+    }
   }
 
   /** Model etiketi katalogdan (`etiket`): şeritler sunucunun `label`ını taşıyor;
@@ -364,6 +386,7 @@ const kromisIsler = (() => {
    *  Galeri yenilemesi geri çağrıdan BAĞIMSIZ — yenilenmiş bir sekmede geri
    *  çağrı yok ama ürün var; `loadHistory` yoksa (ayrı sayfa) sessiz. */
   async function kapanis(is) {
+    kotaCiz();
     const baglam = baglamlar.get(is.id);
     baglamlar.delete(is.id);
     if (is.durum === "bitti") {
@@ -519,6 +542,7 @@ const kromisIsler = (() => {
     closeSheets();
     if (acilacak) {
       ciz(); // model etiketleri katalog geldikten sonra doğru okunsun
+      kotaCiz();
       openSheet("isler-sheet");
       dugme.setAttribute("aria-expanded", "true");
       sheetTetik = dugme;

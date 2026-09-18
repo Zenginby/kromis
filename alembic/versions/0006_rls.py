@@ -26,12 +26,15 @@ ile okunur: `current_setting(ad, true)` ayar yoksa NULL verir, uygulama
 eşleşmez, DÖNÜŞÜM HATASI DEĞİL (`''::uuid` hata verirdi ve bağlamsız her
 sorgu 500 olurdu; istenen 0 satır).
 
-FORCE ŞART: yönetilen Postgres'te (Neon, Supabase, Fly) uygulama rolü çoğu
-zaman tablonun SAHİBİ (tek rol veriyorlar) ve sahip RLS'i öntanımlı ATLAR —
-`FORCE` olmadan politika hiç işlemezdi. FORCE süper kullanıcıyı ve BYPASSRLS
-rolünü YİNE kapsamaz: test takımı süper kullanıcıyla koşuyor ve orada politika
-görünmez; yalıtım iddiaları tests/test_rls.py'de ikinci bir rolle ölçülür,
-canlıda rolün ikisi de olmadığı `pg_roles`tan doğrulanır (KURULUM.md).
+FORCE ŞART: yönetilen Postgres'te uygulama rolü çoğu zaman tablonun da SAHİBİ
+(bazı sağlayıcılar tek rol veriyor: göç ve uygulama aynı rolle bağlanıyor) ve
+sahip RLS'i öntanımlı ATLAR — `FORCE` olmadan politika hiç işlemezdi. FORCE
+süper kullanıcıyı ve BYPASSRLS rolünü YİNE kapsamaz — ve bazı sağlayıcılar
+kutudan tam da öyle bir rol veriyor (Railway'de ölçüldü, 2026-09-18: `postgres`
+rolü ikisini de taşıyor; KURULUM.md'nin ayrı rol yolu orada zorunlu). Test
+takımı süper kullanıcıyla koşuyor ve orada politika görünmez; yalıtım
+iddiaları tests/test_rls.py'de ikinci bir rolle ölçülür, canlıda rolün ikisi de
+olmadığı `pg_roles`tan doğrulanır (`tools/rls_kontrol.py`, KURULUM.md).
 
 KAPSAM `kullanici_id` taşıyan ve hesap tablosu OLMAYAN her tablo: Faz 1'in
 yedisi + `isler`. Hesap tabloları (`kullanicilar`, `oturumlar`, `jetonlar`,

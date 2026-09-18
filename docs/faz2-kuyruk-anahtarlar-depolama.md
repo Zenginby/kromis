@@ -1288,7 +1288,7 @@ SECURITY; … FORCE ROW LEVEL SECURITY; CREATE POLICY sahip ON <tablo> USING
 (aynı)`; admin okuması için ikinci politika `USING (current_setting('app.rol',
 true) = 'admin')` yalnız `SELECT` ve `UPDATE` (8. görevin tavan/iptal
 yazımları). `FORCE`: yönetilen Postgres'te uygulama rolü çoğu zaman tablonun
-SAHİBİ (tek rol veriyorlar) ve sahip RLS'i öntanımlı ATLAR — `FORCE`
+SAHİBİ (bazı sağlayıcılar tek rol veriyor) ve sahip RLS'i öntanımlı ATLAR — `FORCE`
 olmadan politika hiç işlemezdi (Faz 1'in "rol modeli netleşince" sorusunun
 cevabı: netleşmesini beklemeden `FORCE`). Uygulama: `services/db.oturum`
 `Session` `after_begin` olayında `SET LOCAL app.kullanici_id = :id` (istek
@@ -1469,7 +1469,8 @@ kırılma sınıfını belgeliyor. (6) İki DB rolü (göç sahibi + uygulama) c
 ayrılırsa `ALTER DEFAULT PRIVILEGES` gerekli — KURULUM notunda.
 
 **Sahibin adımı — canlıda uygulama rolünün RLS'i atlamadığını görmek (CI'dan
-yapılamaz).** Neon/Supabase/Fly'daki `DATABASE_URL` rolüyle bir kez:
+yapılamaz).** Sağlayıcının (hangisi olursa: Neon, Supabase, Fly, Railway…)
+verdiği `DATABASE_URL` rolüyle bir kez:
 `SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user`
 → `f | f`; `SELECT count(*) FROM medya` → `0`; `SET app.kullanici_id =
 '<kendi id>'` → kendi sayın. Biri tutmuyorsa KURULUM.md'deki `CREATE ROLE
@@ -1494,7 +1495,7 @@ KURULUM.md 1. adımda.
 
 ---
 
-## 8. Admin: `kimlik.admin_kullanici`, `/admin` sayfası, `/api/admin/*` — kullanıcılar, kuyruk, metrikler, tavan, iptal, oturum düşürme (PR: `faz2/admin`)
+## 8. Admin: `kimlik.admin_kullanici`, `/admin` sayfası, `/api/admin/*` — kullanıcılar, kuyruk, metrikler, tavan, iptal, oturum düşürme ✅ (PR: `faz2/admin`)
 
 **Kapsam.** `is_admin` bayrağının ilk okuyucusu. `services/kimlik.admin_kullanici`
 (`aktif_kullanici` + `is_admin` değilse **403** — 404 değil: admin varlığı
@@ -1550,6 +1551,150 @@ gönderemez — Faz 3-4.
 **Çıkış ölçütü.** Admin hesabı `/admin`de kullanıcıları ve kuyruğu görüyor,
 bir kullanıcının tavanını değiştiriyor ve o kullanıcının 429'u yeni tavana
 göre geliyor; admin olmayan 403; takım yeşil.
+
+**Yapıldığında (2026-09-18).** **`services/kimlik.py`**: `admin_kullanici`
+(`aktif_kullanici` + `is_admin`, değilse **403 JSON** `err.admin_gerekli`;
+oturumsuz 401 kapının kendisinden) ve `admin_sayfasi` (`sayfa_kullanicisi` +
+`is_admin`, değilse `YetkiYok` → `yetki_yok_sayfasi` **403 HTML**, isteğin
+dilinde, `no-store`; oturumsuz 302 `/giris`). İkisi de `_admin_bagla` ile
+`kiraci.bagla(kullanici_id=<admin>, rol=ADMIN)` + `kiraci.uygula(db)` — 7'nin
+devri (1) aynen: gerçek yolda kimlik sorgusunun transaksiyonuna İKİNCİ bir
+`set_config` (rollü), override'lı test yolunda taze oturum → kanca. Yeni
+**`routers/admin.py`** yedi rota: `GET /admin` (`sablon.sayfa(…, "admin.html")`,
+`ayar.genel`), `GET /api/admin/kullanicilar` (`?q=` e-postada ILIKE — joker
+kaçışlı, `?sayfa=&adet=` 50/200; satırda e-posta, kayıt, son görülme,
+`is_admin`, doğrulandı, tavan, son 24 sa PLATFORM kredisi, aktif iş),
+`GET /api/admin/isler` (`?durum=`, son 200 + özet: bekleyen/çalışan/son 24 sa
+hata/en eski bekleyenin yaşı; bilinmeyen durum 422), `GET /api/admin/metrikler`,
+`POST …/{id}/tavan` (`{"tavan": n | null}`, 1 ≤ n ≤ 1e9; 404/422),
+`POST …/{id}/oturum-dusur` (`hesap.oturumlari_dusur`, cevap düşen sayı),
+`POST /api/admin/isler/{id}/iptal` (bekleyen → `iptal`; çalışan 409, olmayan
+404). Yeni **`services/depo_admin.py`**: on sorgu kuran işlev, HİÇBİRİ
+`kullanici_id` almaz (hedef kullanıcı `hedef_id`), sözlük döner, `kuyruk._json`
++ `kullanici_id`/`eposta` (admin de `istek`i görmez). Metrikler dört
+`isler`/`isciler` sorgusu: kuyruk derinliği ve çalışan, en eski bekleyen (sn),
+son 1 sa / 24 sa iş-hata-oran (TEK sorgu, `CASE`), son 24 sa platform kredisi,
+model başına adet/p50/p95 (`percentile_cont(…) WITHIN GROUP (ORDER BY
+extract(epoch FROM bitti - basladi))`, son 24 sa biten işler), `isciler`
+(`canli` = son kalp 90 sn içinde; bayat satır listede kalır, `canli:false`).
+**`GET /api/kota`** (routers/isler.py; §6 devri): `kota.gunluk_durum` +
+yeni `kota.saatlik_durum` (`saatlik_bekleme` ondan türer) → günlük
+tavan/kullanılan/kalan/açılış, saatlik tavan/sayı/açılış. **Ön yüz**:
+`static/admin.{html,css,js}` — `giris.*` deyimi (ayrı belge, IIFE,
+`flow-tokens.css`, `KAPSAM_DISI`), üç sekme, 30 sn yenileme +
+`visibilitychange`, 401 → `/giris?sonra=/admin`; `settings.js` Hakkında'da
+`is_admin` ise `/admin` bağlantısı ve "Kendi anahtarımı sil"in üstünde
+`settings.kendi_anahtar_kullaniliyor` notu (sahibe söz); `isler.js` panelin
+başında `isler.gunluk_kalan` satırı (`GET /api/kota`; panel açılırken ve iş
+kapanınca — yedek yoklamanın 3 sn'sine BAĞLANMADI). i18n +62 anahtar (tr/en).
+**`tools/kullanici.py admin --eposta … [--kaldir]`**: var olan hesabı admin
+yapar (sahibin adımı). `app.py`: `admin.router`, `YetkiYok` işleyicisi,
+`gunluk.kur()`. Belgeler: KURULUM.md, `0006_rls` docstring ve §7 "Sahibin
+adımı" sağlayıcı-nötr ("bazı sağlayıcılar … Railway'de ölçüldü").
+
+SAPMALAR: (a) Rota **59 → 67** (belge "58 → 65" demişti: sayım 59'dan
+başlıyordu ve `GET /api/kota` sekizinci rota). (b) Admin iptali
+`services/kuyruk.py`ye DEĞİL `depo_admin.is_iptal`e yazıldı: `kuyruk`un iki
+imzası (kullanıcı/işçi) ve `KIRACISIZ` işlev defteri olduğu gibi kaldı, admin
+yazımları tek modülde. (c) Bekçi muafiyeti `KIRACISIZ = {"depo_admin"}`
+biçiminde değil, yeni **`KIRACISIZ_MODULLER`** defteri (`test_galeri_db`):
+modül bütünüyle, gerekçesiyle; bekçinin bekçisi hiçbir işlevin `kullanici_id`
+almadığını ve sorgu kuranın `db` ile başladığını sınar — `depo_*.py` kalıbı
+dosyayı `DEPOLAR`a zaten zorluyor (10 işlev). (d) **`services/gunluk.py`
+BURADA doğdu** (9'un adı): duman ölçtü — uvicorn yalnız kendi günlükçülerini
+kurar, `logging.getLogger("kromis.admin").info(...)` satırı son çare işleyicide
+DÜŞÜYORDU (web çıktısında 0 `olay=admin.*`). `kur()` `kromis` ad alanına tek
+stdout işleyicisi + INFO + `propagate=False`; biçim düz `k=v`, JSON 9'un işi.
+(e) 403 HTML sayfası şablonsuz tek cümle + stüdyo bağlantısı (`sablon.sayfa`
+statik dosya ister; iki cümlelik cevap için dosya açmadım). (f) `td { display:
+flex }` E2E'de düğmeyi "görünmez" saydı (hücre tablodan düşüyor) — kontroller
+hücre içinde bir `div.admin-islem`de. (g) Admin kendi oturumlarını da
+düşürebilir ve `kullanici.py admin --kaldir` son admini de düşürür — bekçi yok,
+bilerek: her ikisi CLI/DB'den geri alınır. (h) Kullanıcı listesi `q`
+aramasında `%`/`_` kaçırılır (düz metin arama). (i) `hata_24sa` özeti
+`bitti` penceresine bakar (hatanın anı), metriklerin hata sayısı ise
+`olusturuldu` penceresine (o pencerede sıraya girenlerin kaçı düştü) — iki soru,
+iki süzgeç, ikisi de yazılı.
+
+TESTLER: takım 3.676 → 3.740 toplanan (+64; 12 atlanan aynı platform testleri;
+E2E dâhil, ~4 dk 25 sn). Yeni `tests/test_admin.py` (26): 6 admin rotası ×
+admin olmayan 403 JSON (iki dilde) + `/admin` 403 HTML + oturumsuz 302; kapı
+`Baglam(admin_id, ADMIN)` bağlar (casus); sayfa tr/en çevrili, yalnız
+`i18n.js`+`admin.js`, `admin.css`; admin.js'in id bağları sayfada, rotalar
+betikte, 30 sn literal; settings.js/isler.js kaynak bekçileri; kullanıcı
+listesi türetilmiş alanlar (BYOK ve iptal sayılmaz, 24 sa dışı sayılmaz) +
+arama (joker düz) + sayfalama + 422; tavan yaz/sil/422/404 + günlük satırı;
+**gerçek çerezle** tavan → kullanıcının bir sonraki işi 429 YENİ tavanla, null
+→ 202, `/api/kota` aynı sayıları söyler; **gerçek çerezle** oturum düşürme →
+401, adminin çerezi durur; kuyruk görünümü sahip + özet + `?durum=` + 422;
+admin iptali bekleyen 200 / çalışan 409 / ikinci iptal 409 / olmayan 404, K8
+(çalışana dokunmaz), kullanıcı rotası hâlâ 404; metrikler tohumla (p50 15 /
+p95 28,5 dört süreden, 8 iş / 1 hata / 0,125, platform kredisi BYOK'suz, canlı
+ve bayat işçi) + saf p50/p95 ([10, 20, 30] → 20 / 29); `GET /api/kota` boş ve
+dolu (iptal sayılmaz, BYOK günlüğe girmez saatliğe girer, başkası sayılmaz,
+ezme tavan, aşımda 0); **RLS**: uygulama rolüyle (`test_rls.uygulama_motoru`,
+`SET ROLE`) bağlamsız `depo_admin` sorguları BOŞ, yalnız kullanıcı → kendi
+satırı, admin bağlamı → herkes, bağlamsız UPDATE 0 satır; kapılı admin
+rotaları aynı rolle herkesin işini listeler, iptal `yonetici_gunceller`den
+geçer, tavan/oturum yazılır, admin olmayan 403; `gunluk.kur` tek işleyici,
+lifespan ikinciyi eklemez, satır stdout akımına düşer; defter bekçisi. Yeni
+`tests/test_playwright_admin.py` (1): admin olmayan 403 HTML (en) → admin
+`/admin` (tr) kullanıcılar sekmesi → tavan 500 yaz (DB'de) → kuyruk sekmesi
+(sahip, özet) → metrikler (6 kart, işçi listesi). Güncellenen: `test_kimlik`
+(`SAYFALAR` + `/admin`, `DIZINSIZ_KAPILI` + 7, `YOL_DEGERLERI` `kullanici_id`,
+60 kapılı / 67, yeni `ADMIN_ROTALAR` iki yönlü bekçi — 401 parametrik testi
+6 admin rotasını kendiliğinden aldı), `test_app_bolme` 67, `test_galeri_db`
+(`DEPOLAR` + `KIRACISIZ_MODULLER` + bekçi), `test_id_contract` (`admin.js`
+`KAPSAM_DISI`), `test_i18n` (`routers/admin.py` konuşan; `depo_admin.py`,
+`gunluk.py` konuşmayan), `test_kullanici_cli` (+1 `admin`).
+
+DUMAN (2026-09-18; geçici Postgres 16, `tools/goc.py` → `0006_rls` head,
+`tools/uygulama_rolu.py --tohum` → `kromis_uygulama` `rolsuper=f
+rolbypassrls=f`, üç hesap `tools/kullanici.py olustur` (biri `--admin`) aynı
+rolle, uvicorn ve `isci.py` BU ROLLE, platform Azure anahtarı ortamda —
+sağlayıcı adresi yönlendirilemez bir IP ki iş `calisiyor`da kalsın):
+`/health` 200; admin olmayan A → 6 admin rotasında **403 JSON**, `/admin`
+**403 HTML**, oturumsuz `/admin` **302**; admin `/admin` tr ve en **200**
+çevrili (`{{t:` yok); kullanıcı listesi 4 (tohum hesabı dâhil); A `POST
+/api/generate` **202** (`kredi_tahmini 8`, `platform`); B'nin bekleyen işini
+admin iptal etti **200**, B `iptal` görüyor; admin A'ya `tavan=8` → A'nın
+sonraki işi **429** (`Retry-After 86400`), `GET /api/kota` `{tavan 8,
+kullanilan 8, kalan 0, acilis …}`; `tavan=null` → **202**; `isci.py` başladı,
+iki işi aldı (`es_zamanli 2`), çalışan işe admin iptali **409**; metrikler
+`kuyruk {0, 2}`, `son_1sa {2, 0, 0.0}`, `platform_kredi 16`, 1 canlı işçi; A'nın
+oturumu düşürüldü → A `ben` **401**, admin 200; uygulama rolüyle `SELECT
+count(*) FROM isler` bağlamsız **0**, `set_config('app.rol','admin')` → **3**;
+web çıktısında **4** `olay=admin.*` satırı (`is_iptal`, `tavan=8`,
+`tavan=None`, `oturum_dusur adet=1`), platform anahtarı hiçbir çıktıda yok.
+
+**9. göreve devredilen.** (1) `services/gunluk.py::kur` düz `k=v` yazıyor;
+9 JSON biçimleyiciyi (`{"ts","seviye","olay","mesaj","istek_id",…}`) buraya
+takar ve `routers/admin.py`nin `olay=admin.* admin=… hedef=…` satırlarını
+alanlara çevirir — adlar bugünkü `k` anahtarları (`olay`, `admin`, `hedef`,
+`tavan`, `adet`, `is`, `sahip`). (2) `/health`in `worker_alive`ı `isciler.
+son_kalp`i `depo_admin.CANLI_ESIK` (90 sn) ile aynı eşikte okusun; iki yerde
+iki eşik olmasın. (3) 10'a: kapanmadan ölen işçinin `isciler` satırı sonsuza
+dek kalır (`canli:false`) — bayat düşürme turu `son_kalp < an - esik` satırları
+da silsin. (4) Admin sayfasında çalışan işin süresi 30 sn'lik yenilemeyle
+tazelenir (isler.js'in 1 sn tik'i yok); gerekirse. (5) "Günlük kalan" satırı
+BYOK kullanıcısına da görünür (platform tavanı onu bağlamaz) — `kaynaklar`
+hepsi `kullanici` ise gizlemek isteniyorsa `GET /api/settings` okunur. (6)
+§7'nin "platform literali üç yerde" notu açık duruyor (`kota.py` düz dize;
+`depo_admin` sabiti kullanıyor). (7) Sütun düzeyi `GRANT UPDATE
+(gunluk_kredi_tavani)` ancak ikinci DB rolü açılırsa (§7 devri 2, değişmedi).
+
+**Sahibin adımı — kendi hesabını admin yapmak (canlıda bir kez).**
+Uygulamanın `DATABASE_URL`iyle:
+
+```sh
+DATABASE_URL=… python tools/kullanici.py admin --eposta <kendi e-postan>
+```
+
+`<eposta>: admin = evet (degisti)` basar. Sonra Ayarlar → Hakkında'da
+"Yönetim" bağlantısı (ya da doğrudan `/admin`): üç sekme dolu görünmeli;
+admin olmayan bir hesapla `/admin` 403 demeli. Geri almak: `--kaldir`.
+Platform günlüğünde `olay=admin.*` satırları görünmüyorsa süreç `app.py`nin
+lifespan'ından geçmiyor demektir (`gunluk.kur` orada).
 
 ---
 

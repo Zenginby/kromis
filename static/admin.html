@@ -1,0 +1,128 @@
+<!doctype html>
+<!-- Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+     GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+     Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+
+     Yönetim sayfası (Faz 2 / 8): kullanıcılar · kuyruk · metrikler. `giris.html`in
+     deyimi — ayrı belge, aynı yerleştirme (services/sablon.py: sürüm, dil,
+     sözlük, `t:` anahtarları), stüdyo betikleri YÜKLENMİYOR; admin.js bir IIFE
+     (tests/test_id_contract.py `KAPSAM_DISI`, id bağları tests/test_admin.py).
+     Sunucu kapısı `kimlik.admin_sayfasi`: oturumsuz 302 `/giris`, admin değilse
+     403 — bu belge yalnız admin'e servis edilir; yine de veri burada değil,
+     `/api/admin/*` cevaplarında (her biri kendi kapısını taşır).
+
+     Tablolar `<table>`: veri satır/sütun ve ekran okuyucu başlık ilişkisini
+     oradan alır. Satırlar betikle doldurulur; başlıklar burada çevrilir. -->
+<html lang="__APP_LANG__">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{{t:admin.title}}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=__APP_VERSION__" />
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico?v=__APP_VERSION__" />
+  <link rel="stylesheet" href="/static/fonts.css?v=__APP_VERSION__" />
+  <link rel="stylesheet" href="/static/flow-tokens.css?v=__APP_VERSION__" />
+  <link rel="stylesheet" href="/static/admin.css?v=__APP_VERSION__" />
+</head>
+<body>
+  <main class="admin" aria-labelledby="admin-baslik">
+    <header class="admin-bas">
+      <div>
+        <h1 id="admin-baslik">{{t:admin.baslik}}</h1>
+        <p class="admin-alt">{{t:admin.alt_baslik}}</p>
+      </div>
+      <div class="admin-bas-sag">
+        <span id="admin-yenilendi" class="admin-yenilendi"></span>
+        <a href="/" class="admin-baglanti">{{t:admin.studyo}}</a>
+      </div>
+    </header>
+
+    <p id="admin-mesaj" class="admin-mesaj" role="status" aria-live="polite" hidden></p>
+
+    <nav id="admin-sekmeler" class="admin-sekmeler" role="tablist">
+      <button type="button" role="tab" data-sekme="kullanicilar" aria-selected="true">{{t:admin.sekme_kullanicilar}}</button>
+      <button type="button" role="tab" data-sekme="kuyruk" aria-selected="false">{{t:admin.sekme_kuyruk}}</button>
+      <button type="button" role="tab" data-sekme="metrikler" aria-selected="false">{{t:admin.sekme_metrikler}}</button>
+    </nav>
+
+    <section id="sekme-kullanicilar" class="admin-sekme" data-sekme="kullanicilar">
+      <div class="admin-arac">
+        <input id="admin-ara" type="search" placeholder="{{t:admin.ara}}" aria-label="{{t:admin.ara}}" autocomplete="off" />
+        <span id="admin-toplam" class="admin-not"></span>
+        <button type="button" id="admin-onceki" class="admin-dugme">{{t:admin.onceki}}</button>
+        <button type="button" id="admin-sonraki" class="admin-dugme">{{t:admin.sonraki}}</button>
+      </div>
+      <div class="admin-tablo-kap">
+        <table class="admin-tablo">
+          <thead>
+            <tr>
+              <th>{{t:admin.sutun_eposta}}</th>
+              <th>{{t:admin.sutun_kayit}}</th>
+              <th>{{t:admin.sutun_son_gorulme}}</th>
+              <th>{{t:admin.sutun_tavan}}</th>
+              <th>{{t:admin.sutun_kredi_24sa}}</th>
+              <th>{{t:admin.sutun_aktif_is}}</th>
+              <th>{{t:admin.sutun_islem}}</th>
+            </tr>
+          </thead>
+          <tbody id="admin-kullanicilar"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="sekme-kuyruk" class="admin-sekme" data-sekme="kuyruk" hidden>
+      <div class="admin-arac">
+        <select id="admin-durum" aria-label="{{t:admin.sutun_durum}}">
+          <option value="">{{t:admin.durum_hepsi}}</option>
+          <option value="bekliyor">{{t:isler.durum_bekliyor}}</option>
+          <option value="calisiyor">{{t:isler.durum_calisiyor}}</option>
+          <option value="bitti">{{t:isler.durum_bitti}}</option>
+          <option value="hata">{{t:isler.durum_hata}}</option>
+          <option value="iptal">{{t:isler.durum_iptal}}</option>
+        </select>
+        <span id="admin-kuyruk-ozet" class="admin-not"></span>
+      </div>
+      <div class="admin-tablo-kap">
+        <table class="admin-tablo">
+          <thead>
+            <tr>
+              <th>{{t:admin.sutun_eposta}}</th>
+              <th>{{t:admin.sutun_tur}}</th>
+              <th>{{t:admin.sutun_model}}</th>
+              <th>{{t:admin.sutun_durum}}</th>
+              <th>{{t:admin.sutun_olusturuldu}}</th>
+              <th>{{t:admin.sutun_sure}}</th>
+              <th>{{t:admin.sutun_islem}}</th>
+            </tr>
+          </thead>
+          <tbody id="admin-isler"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="sekme-metrikler" class="admin-sekme" data-sekme="metrikler" hidden>
+      <div id="admin-kartlar" class="admin-kartlar"></div>
+      <h2 class="admin-alt-baslik">{{t:admin.metrik_modeller}}</h2>
+      <div class="admin-tablo-kap">
+        <table class="admin-tablo">
+          <thead>
+            <tr>
+              <th>{{t:admin.sutun_model}}</th>
+              <th>{{t:admin.sutun_adet}}</th>
+              <th>{{t:admin.sutun_p50}}</th>
+              <th>{{t:admin.sutun_p95}}</th>
+            </tr>
+          </thead>
+          <tbody id="admin-modeller"></tbody>
+        </table>
+      </div>
+      <h2 class="admin-alt-baslik">{{t:admin.metrik_isciler}}</h2>
+      <ul id="admin-isciler" class="admin-isciler"></ul>
+    </section>
+  </main>
+
+  <script>window.KROMIS_LANG="__APP_LANG__";window.KROMIS_I18N=__APP_I18N__;</script>
+  <script src="/static/i18n.js?v=__APP_VERSION__"></script>
+  <script src="/static/admin.js?v=__APP_VERSION__"></script>
+</body>
+</html>

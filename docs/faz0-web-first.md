@@ -482,8 +482,11 @@ imaj çekilemedi, `docker build --check` bile metadata'da düşüyor. İlk gerç
 derleme CI'daki `docker` işi; boyut orada `docker image ls` ile okunup buraya
 yazılmalı. **Faz 1 / 9 (2026-09-17):** `docker` işi artık `docker build`ın
 hemen ardından `docker image ls kromis` basıyor — sayı her koşunun "docker
-build" adımı günlüğünde ("imaj boyutu: kromis:latest …"); ilk okunan değer
-buraya yazılacak. Sonraki: anahtarların ortamdan okunması (Faz 1, yukarıda);
+build" adımı günlüğünde ("imaj boyutu: kromis:latest …"). **İlk ölçüm
+(PR #36, 2026-09-17): 284 MB** — `python:3.13-slim` tabanı + venv (Pillow,
+uvloop, psycopg-binary, cryptography, SQLAlchemy) + 2,2 MB bağlam; Dockerfile
+başlığındaki "küçültülmek istenirse ilk aday" notu (pytest/pywebview ~6 MB)
+hâlâ geçerli ve hâlâ değmiyor. Sonraki: anahtarların ortamdan okunması (Faz 1, yukarıda);
 `/health`e ikinci ölçüt gelince (ör. kimlik dosyası okunabilirliği) `ok`
 hepsinin VE'si olur, alan adları değişmez.
 

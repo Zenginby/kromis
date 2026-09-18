@@ -348,6 +348,17 @@ class SettingsRequest(BaseModel):
     # alanı YOK — aynı `AZURE_IMAGE_API_KEY` üç yüzeyde de geçiyor.
     azure_foundry_base_url: str | None = Field(default=None, max_length=500)
 
+    # KENDİ anahtarını SİL (Faz 2 / 6): katalog kimlik id'leri (`azure_image`,
+    # `openai`, `gemini`, `fal` …) — o kimliğin anahtar VE adres satırları
+    # silinir, kullanıcı platformun anahtarına düşer (varsa). AYRI bir alan,
+    # "boş gizli kutu" DEĞİL: yalnızca-yazılır formda boş kutu "dokunmadım"
+    # demek ve istemci her sağlayıcının kutusunu koşulsuz gönderiyor — boşu
+    # silme saymak, Gemini anahtarı kaydeden kullanıcının OpenAI anahtarını
+    # silmek olurdu (test_saglayici_anahtari_bos_gelirse_mevcut_KORUNUYOR).
+    # Depo katmanının "boş = sil" anlamı (depo_kimlik_bilgisi.yaz) korunuyor:
+    # rota bu listeyi oraya boş değer olarak taşır. Bilinmeyen id 422.
+    anahtar_sil: list[str] | None = Field(default=None, max_length=20)
+
 
 
 ALLOWED_THEMES = ("mono", "ocean", "amber", "viola")

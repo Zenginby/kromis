@@ -36,7 +36,7 @@ import prefs
 from services import ayar, cerez, depo_medya, hesap, isci, kimlik
 from services.tablolar import Kullanici, SaglayiciKimligi
 
-pytestmark = pytest.mark.gercek_kimlik
+pytestmark = [pytest.mark.gercek_kimlik, pytest.mark.gercek_anahtar]
 
 HTTPS = "https://testserver"
 
@@ -91,11 +91,16 @@ KAPI = {kimlik.aktif_kullanici, kimlik.sayfa_kullanicisi}
 # kullanıcının şifreli satırları istek başına bir kez çözülür. Liste iki yönlü
 # bekçili: listedeki taşır, taşıyan listede. Öteki rotalar anahtar okumaz ve
 # okumamalı — sözlüğü boşuna çözmek her isteğe bir sorgu + N Fernet çözümü eklerdi.
-# Dört ÜRETİM rotası Faz 2 / 4'te listeden ÇIKTI: sağlayıcıyı artık işçi çağırıyor
-# ve kimliği o çözüyor (services/isci.py `kos`); rota kuyruğa yazıp 202 döner.
+# Dört ÜRETİM rotası Faz 2 / 4'te listeden ÇIKTI (sağlayıcıyı işçi çağırıyor, kimliği o
+# çözüyor) ve Faz 2 / 6'da GERİ GELDİ: "anahtar yok" kapısı (kullanıcı → platform → yok)
+# rotada bir kez sorulur, kaynağı satıra yazılır (`anahtar_kaynagi`); yeniden gönderim
+# de bir iş doğurduğu için aynı kapıdan geçer.
 KIMLIK_OKUYAN = {
     ("GET", "/api/settings"), ("POST", "/api/settings"),   # durum + yazım
     ("POST", "/api/chat"),                                  # yönetmen bağlamı + sohbet adaptörü
+    ("POST", "/api/generate"), ("POST", "/api/edit"),       # anahtar kapısı (Faz 2 / 6)
+    ("POST", "/api/video"), ("POST", "/api/video/animate"),
+    ("POST", "/api/isler/{is_id}/yeniden"),
 }
 
 # Yol parametrelerinin doldurulacağı geçerli biçimli değerler: kapı gövdeden
@@ -472,11 +477,12 @@ def test_two_users_generate_with_their_own_azure_key_and_the_row_is_ciphertext(i
     b_id, b_jeton, _ = _kullanici_ac()
     a, b = _oturumlu(a_jeton), _oturumlu(b_jeton)
 
-    # Kimlik yokken iş `hata` ve dosyaya DÜŞÜLMEZ (guard patlatırdı → beklenmeyen
-    # hata kodu olurdu). Rota 202 döner, sağlayıcı yolu işçide (Faz 2 / 4).
-    is_ = _uret(a)
-    assert is_["durum"] == "hata", is_
-    assert "AZURE_IMAGE_API_KEY" in is_["hata"]
+    # Kimlik yokken (ne kullanıcı ne platform) rota 409 ve iş HİÇ doğmaz (Faz 2 / 6'nın
+    # erken kapısı; 4. görevde 202 + `hata`lı iş idi). Dosyaya DÜŞÜLMEZ (guard patlatırdı).
+    r = a.post("/api/generate", json={"prompt": "kedi", "size": "1024x1024", "quality": "low", "n": 1})
+    assert r.status_code == 409, r.text
+    assert "AZURE_IMAGE_API_KEY" in r.json()["detail"]
+    assert a.get("/api/isler").json()["isler"] == []
 
     assert a.post("/api/settings", json={"api_key": "A-DUMMY-ANAHTAR", "base_url": "https://a/openai/v1/"}).status_code == 200
     assert b.post("/api/settings", json={"api_key": "B-DUMMY-ANAHTAR", "base_url": "https://b/openai/v1/"}).status_code == 200
@@ -487,6 +493,7 @@ def test_two_users_generate_with_their_own_azure_key_and_the_row_is_ciphertext(i
     for c in (a, b, a):
         is_ = _uret(c)
         assert is_["durum"] == "bitti", is_
+        assert is_["anahtar_kaynagi"] == "kullanici"
     assert _SahteAzure.gorulen == ["Bearer A-DUMMY-ANAHTAR", "Bearer B-DUMMY-ANAHTAR", "Bearer A-DUMMY-ANAHTAR"]
     assert len(a.get("/api/history").json()["images"]) == 2
     assert len(b.get("/api/history").json()["images"]) == 1

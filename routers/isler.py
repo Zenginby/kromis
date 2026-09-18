@@ -60,7 +60,7 @@ import asyncio
 import datetime as dt
 import json
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
@@ -68,8 +68,9 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
+import catalog
 import i18n
-from services import dil, kapilar, kimlik, kuyruk, zaman
+from services import dil, kapilar, kimlik, kota, kuyruk, platform_anahtari, zaman
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
@@ -232,7 +233,8 @@ def is_iptal(is_id: uuid.UUID, db: Session = OTURUM,
 
 @router.post("/api/isler/{is_id}/yeniden", status_code=202)
 def is_yeniden(is_id: uuid.UUID, db: Session = OTURUM,
-               kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+               kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+               kimlikler: Mapping[str, str] = kimlik.KIMLIKLER) -> dict:
     """`hata`/`iptal` bir işi AYNI `istek`le yeni bir iş olarak kuyruğa koyar; 202 + yeni `is`.
 
     Neden sunucuda: `istek` (prompt, girdi anahtarları) `_json`la dökülmüyor
@@ -248,9 +250,14 @@ def is_yeniden(is_id: uuid.UUID, db: Session = OTURUM,
     `arena_id` DÜŞER: tur çoktan kapandı, beşinci bir sütun `fillArenaSlot`ın
     beklediği bir şey değil — yeniden gönderilen iş tek başına koşar.
 
-    Sıra üretim rotalarınınki: kaynak yok → 404; durum uymuyor → 409; tavan →
-    429 (`check_is_tavani`); satır. `kredi_tahmini` eski satırdan (aynı model,
-    aynı adet); işçi gerçek maliyeti yine kendi yazar.
+    Sıra üretim rotalarınınki (routers/uretim.py `_kapilar`): kaynak yok → 404;
+    durum uymuyor → 409; anahtar yok → 409; eş zamanlılık / saatlik iş /
+    günlük kredi → 429; satır. Yeniden gönderim de bir iş doğurur, yani kotayı
+    ve anahtar kapısını ATLAYAMAZ — aksi hâlde "hata → yeniden gönder" döngüsü
+    tavanın arka kapısı olurdu. `anahtar_kaynagi` eski satırdan KOPYALANMAZ,
+    yeniden çözülür: kullanıcı arada kendi anahtarını girmiş (ya da silmiş)
+    olabilir. `kredi_tahmini` eski satırdan (aynı model, aynı adet); işçi
+    gerçek maliyeti yine kendi yazar.
     """
     eski = kuyruk.satir(db, kullanici.id, is_id)
     if eski is None:
@@ -258,9 +265,18 @@ def is_yeniden(is_id: uuid.UUID, db: Session = OTURUM,
     if eski.durum not in kuyruk.KAPANMIS_DURUMLAR:
         raise HTTPException(status_code=409,
                             detail=i18n.t("err.is_yeniden_gonderilemez", dil.aktif(), durum=eski.durum))
+    spec = catalog.image_model(eski.model) or catalog.video_model(eski.model)
+    # Katalogdan düşmüş bir model: anahtar kapısı soracak kimlik yok, işçi zaten
+    # "bilinmeyen model" ile düşürür (test_isci); kaynak `kullanici` sayılır ki
+    # platform toplamına girmesin.
+    kaynak = (kapilar.check_anahtar(spec.credential, kimlikler) if spec is not None
+              else platform_anahtari.KAYNAK_KULLANICI)
     kapilar.check_is_tavani(db, kullanici.id)
+    kota.check_saatlik(db, kullanici.id)
+    kota.check_gunluk(db, kullanici, eski.kredi_tahmini, kaynak)
     istek = dict(eski.istek or {})
     if istek.get("arena_id") is not None:
         istek["arena_id"] = None
-    yeni = kuyruk.ekle(db, kullanici.id, eski.tur, istek, eski.model, eski.kredi_tahmini)
+    yeni = kuyruk.ekle(db, kullanici.id, eski.tur, istek, eski.model, eski.kredi_tahmini,
+                       anahtar_kaynagi=kaynak)
     return {"is": kuyruk._json(yeni)}

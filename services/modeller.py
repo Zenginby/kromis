@@ -20,7 +20,7 @@ import credstore
 import etiket
 import i18n
 import version
-from services import depo_tercih
+from services import depo_tercih, platform_anahtari
 
 
 def model_available(configured: bool, plan: str) -> bool:
@@ -154,8 +154,18 @@ def settings_payload(kimlikler: Mapping[str, str] | None = None) -> dict:
     de öyle. Anahtarın son dört hanesi, uzunluğu ya da maskelenmiş hâli DE
     dönmüyor: `get_settings_status`'un sözleşmesi "API key'i ASLA döndürmez" ve
     "sadece son dört hane" o sözleşmenin öldüğü yerdir.
+
+    `kaynaklar` (Faz 2 / 6): `{kimlik_id: "kullanici" | "platform" | null}` —
+    `providers`ın yanında "kurulu ama KİMİN anahtarıyla" sorusu. Ayarlar paneli
+    "platform sağlıyor — kendi anahtarını girersen o kullanılır" satırını ve
+    "kendi anahtarımı sil" düğmesini bundan kurar. Değer yine yok.
     """
     cfg = credstore.configured_map(kimlikler)
+    # `None` = isteğin bağlamı (credstore.degerler): bağlamdaki nesne `kimlik_bilgileri`nin
+    # kurduğu `Kimlikler`, yani kaynaklar da onunla geliyor.
+    sozluk = credstore.degerler(kimlikler)
+    kaynaklar = {c.id: (platform_anahtari.kaynak(c.id, sozluk) if cfg.get(c.id) else None)
+                 for c in catalog.CREDENTIALS}
     chat_cfg = credstore.chat_configured_map(kimlikler)
     # Şeritte gösterilecek KISA adlar: sağlayıcı markası işaretle geldiği için
     # etiketten düşüyor. Liste bütününden hesaplanıyor (çakışma kuralı için),
@@ -173,6 +183,7 @@ def settings_payload(kimlikler: Mapping[str, str] | None = None) -> dict:
         # {kimlik_id: bool}. Arayüz Ayarlar'daki sağlayıcı gruplarının
         # "Kayıtlı" durumunu buradan okuyor.
         "providers": cfg,
+        "kaynaklar": kaynaklar,
         "default_image_model": catalog.DEFAULT_IMAGE_MODEL,
         # Video şeridi. ANAHTARIN AYRI OLMASI şart: `image_models`a katmak,
         # bugün o listeyi okuyan her yerin (model kartları, arena sütun

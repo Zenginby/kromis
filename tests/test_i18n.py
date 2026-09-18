@@ -701,6 +701,8 @@ KULLANICIYA_KONUSAN = (
     # Rota dışı ama kullanıcıya 4xx gövdesi üreten yardımcılar.
     "services/gorsel.py", "services/kapilar.py", "services/modeller.py",
     "services/palet.py",
+    # Faz 2 / 6: kota kapıları — 429 gövdesi (`err.saatlik_is_tavani`, `err.gunluk_kredi_tavani`).
+    "services/kota.py",
     # Faz 1 / 3: kimlik kapısının 401 metni, e-posta gövdeleri, sayfa şablonunun
     # 500 metni (`boot.load_failed.*` — `routers/kok.py`den buraya taşındı).
     "services/kimlik.py", "services/posta.py", "services/sablon.py",
@@ -747,6 +749,9 @@ KULLANICIYA_KONUSMAYAN = {
     "services/db.py": "veri tabanı motoru ve `Session` bağımlılığı (Faz 1 / 1); tek 503 "
                       "`detail`i bir KOD (`database_unavailable`), cümleyi ön yüz kurar",
     "services/zaman.py": "zaman damgası biçimi; metin yok",
+    "services/platform_anahtari.py": "platform anahtarı birleştirmesi (Faz 2 / 6): ortam okur, sözlük "
+                                     "döndürür; tek metni OPERATÖRE giden bir günlük uyarısı "
+                                     "(bilinmeyen `KROMIS_PLATFORM_X`), cümleyi kullanıcıya rota kurar",
     "services/depo_medya.py": "medya deposu (Faz 1 / 5): SQL ve dosya; kullanıcıya konuşmaz, "
                               "404'ü rota kurar",
     "services/depo_klasor.py": "klasör deposu (Faz 1 / 5): `folders.export_zip`in i18n'li "

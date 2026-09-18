@@ -35,8 +35,8 @@ KAPALI_PORT_URL = "postgresql+psycopg://kimse@127.0.0.1:1/yok"
 # testler "head'e çıktı mı" sorusunu bu dizeyle soruyor; `ScriptDirectory`den
 # okumak testi göç dosyalarına göre yumuşatır ve yanlış bir `down_revision`
 # zinciri görünmez olurdu.
-BAS = "0004_isler"
-ZINCIR = ["0004_isler", "0003_arena_win", "0002_deneme_turu", "0001_veri_modeli", "0000_zemin"]
+BAS = "0005_kota"
+ZINCIR = ["0005_kota", "0004_isler", "0003_arena_win", "0002_deneme_turu", "0001_veri_modeli", "0000_zemin"]
 
 
 # ──────────────────────────────────────────────────── Postgres GEREKMEYEN

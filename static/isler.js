@@ -73,6 +73,14 @@ const kromisIsler = (() => {
     animate: "isler.tur_animate",
   };
   const VIDEO_TURLERI = new Set(["video", "animate"]);
+  // `hata` sütununa yazılan KODLAR (cümle değil): services/kuyruk.py `BAYAT_HATASI`,
+  // services/isci.py `BEKLENMEYEN_HATASI` (": <TürAdı>" eki) ve `KULLANICI_YOK_HATASI`.
+  // Cümleyi ön yüz kurar (Faz 2 / 6); kod harfiyen — bekçisi tests/test_isler_route.py.
+  const HATA_KODLARI = [
+    ["isci yanit vermiyor", "isler.hata_bayat"],
+    ["beklenmeyen hata", "isler.hata_beklenmeyen"],
+    ["kullanici yok", "isler.hata_kullanici_yok"],
+  ];
 
   const isler = new Map(); // id → sunucudan gelen son hâl
   const baglamlar = new Map(); // id → { bitince, hatada } — yalnız bu sekmede
@@ -151,6 +159,15 @@ const kromisIsler = (() => {
     return detailText(govde) || t("err.http", { durum });
   }
 
+  /** `hata` sütunu: bir KOD ise i18n cümlesi, değilse sağlayıcının (çevrilmiş) metni aynen. */
+  function hataCumlesi(hata) {
+    for (const [kod, anahtar] of HATA_KODLARI) {
+      if (hata === kod) return t(anahtar, { kod: "" });
+      if (hata.startsWith(kod + ":")) return t(anahtar, { kod: hata.slice(kod.length + 1).trim() });
+    }
+    return hata;
+  }
+
   async function gonder(yol) {
     const res = await fetch(yol, { method: "POST" });
     const govde = await res.json().catch(() => ({}));
@@ -220,6 +237,25 @@ const kromisIsler = (() => {
     bas.append(tur, model, durum, sure);
     li.appendChild(bas);
 
+    // Kredi TAHMİNİ (`kredi_tahmini`, rota yazıyor; Faz 2 / 6) ve anahtarın
+    // kaynağı: platformun anahtarıyla koşan iş günlük kotaya sayılır, kendi
+    // anahtarıyla koşan sayılmaz — kullanıcı hangisi olduğunu satırda görsün.
+    if (Number.isFinite(is.kredi_tahmini)) {
+      const alt = document.createElement("div");
+      alt.className = "is-alt";
+      const kredi = document.createElement("span");
+      kredi.className = "is-kredi";
+      kredi.textContent = t("isler.kredi", { kredi: is.kredi_tahmini });
+      alt.appendChild(kredi);
+      if (is.anahtar_kaynagi === "platform") {
+        const kaynak = document.createElement("span");
+        kaynak.className = "is-kaynak";
+        kaynak.textContent = t("isler.platform_anahtari");
+        alt.appendChild(kaynak);
+      }
+      li.appendChild(alt);
+    }
+
     if (is.durum === "bitti") {
       const kutu = onizleme(is);
       if (kutu) li.appendChild(kutu);
@@ -227,7 +263,7 @@ const kromisIsler = (() => {
       if (is.hata) {
         const p = document.createElement("p");
         p.className = "is-hata";
-        p.textContent = is.hata;
+        p.textContent = hataCumlesi(is.hata);
         li.appendChild(p);
       }
       const yeniden = document.createElement("button");
@@ -354,7 +390,7 @@ const kromisIsler = (() => {
     const mesaj =
       is.durum === "iptal"
         ? t("gen.job_cancelled")
-        : t("gen.job_failed", { hata: is.hata || t("common.unknown") });
+        : t("gen.job_failed", { hata: is.hata ? hataCumlesi(is.hata) : t("common.unknown") });
     if (baglam && typeof baglam.hatada === "function") baglam.hatada(mesaj);
   }
 

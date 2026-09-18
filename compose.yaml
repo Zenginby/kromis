@@ -11,8 +11,11 @@
 #
 # `env_file` `required: false`: `.env` yoksa compose şikâyet etmesin
 # (Compose v2.24+). Dosya yalnız KROMIS_DATA_DIR/PORT gibi altyapı
-# değişkenlerini taşır; sağlayıcı anahtarları SÜREÇ ORTAMINDAN OKUNMUYOR —
-# gerekçesi .env.example'da.
+# değişkenlerini taşır; KULLANICI anahtarları SÜREÇ ORTAMINDAN OKUNMUYOR —
+# gerekçesi .env.example'da. PLATFORMUN anahtarı ise (Faz 2 / 6,
+# `KROMIS_PLATFORM_<AD>`, .env.example 1d) yerelde `.env`den gelir: `env_file`
+# onu HEM `kromis` HEM `isci` servisine taşır (ikisi de okur), platformda aynı
+# ad sır olarak girilir.
 #
 # POSTGRES (Faz 1 / 1. görev): `/health` artık `db_reachable` ölçüyor, DB'siz
 # konteyner 503 verir. `postgres:17-alpine` yalnız geliştirme için — parola

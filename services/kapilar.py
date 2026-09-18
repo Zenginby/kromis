@@ -12,6 +12,15 @@ bir SAYI denetler — kullanıcının aynı anda sırada/işçide tutabileceği 
 sayısı. Rotalar sağlayıcıyı çağırmayı bıraktı ve 202 ile döndü; sınırsız
 sıraya yazma, tek kullanıcının kuyruğu (ve platform parasını, 6. görev)
 tek başına doldurması demekti.
+
+Altıncı kapı `check_anahtar` (Faz 2 / 6): seçilen modelin sağlayıcısına
+ULAŞILABİLİYOR mu — kullanıcının kendi anahtarı ya da platformun. 4. ve 5.
+görevde anahtarsız kullanıcı 202 alıp panelde `hata`lı bir iş görüyordu
+("Kimlik bilgileri eksik…", duman testinin ilk turu); şimdi cevap 409 ve iş
+HİÇ doğmaz — `hata` satırı o günden sonra yalnız gerçek sağlayıcı hatasını
+taşır. Kapı `credstore.is_configured`u çağırır (arayüzün "kurulu" dediğiyle
+rotanın kabul ettiği ayrışmasın; credstore'un var olma gerekçesi) ve işin
+`anahtar_kaynagi`ni döndürür. Kota kapıları services/kota.py'de.
 """
 from __future__ import annotations
 
@@ -23,10 +32,13 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 import assets_store
+import catalog
 import chat_store
+import credstore
+import etiket
 import i18n
 import storage
-from services import depo_klasor, dil, kuyruk
+from services import depo_klasor, dil, kuyruk, platform_anahtari
 
 # Kullanıcı başına eş zamanlı (`bekliyor` + `calisiyor`) iş tavanı — `.env.example`
 # aynı adı buradan okur (bekçisi tests/test_docker_kapisi.py `ALTYAPI`).
@@ -129,3 +141,25 @@ def check_is_tavani(db: Session, kullanici_id: uuid.UUID) -> None:
         raise HTTPException(status_code=429,
                             detail=i18n.t("err.is_kuyrugu_dolu", dil.aktif(), tavan=tavan),
                             headers={"Retry-After": str(RETRY_AFTER_SN)})
+
+
+def check_anahtar(cred_id: str, kimlikler: Mapping[str, str]) -> str:
+    """Bu kimlikle üretilebiliyor mu; evetse işin `anahtar_kaynagi`, hayırsa 409.
+
+    409 (çakışma: hesabın durumu isteği karşılamıyor), 502 DEĞİL — 502
+    sağlayıcının cevabıydı (Faz 1), burada sağlayıcıya hiç gidilmiyor; 422 de
+    değil, istek biçimce doğru. Cümle sağlayıcının ADINI ve ortam değişkenini
+    söyler (`credstore.resolve`ın kararı): kullanıcı Ayarlar'da neyi arayacağını
+    bilmeli. Kaynak `None` çıkarsa (`is_configured` geçti ama anahtar adı
+    eşlenemedi — bugün olmayan bir katalog durumu) `kullanici` sayılır: platform
+    parasını harcamadan sayılmasın diye değil, tavanı gevşetmesin diye — o iş
+    günlük toplama girmez ama sahibin de anahtarı değildir.
+    """
+    if not credstore.is_configured(cred_id, kimlikler):
+        cred = catalog.credential(cred_id)
+        raise HTTPException(
+            status_code=409,
+            detail=i18n.t("err.anahtar_yok", dil.aktif(),
+                          kimlik=etiket.label_of(cred) if cred is not None else cred_id,
+                          env=cred.key_env if cred is not None else cred_id))
+    return platform_anahtari.kaynak(cred_id, kimlikler) or platform_anahtari.KAYNAK_KULLANICI

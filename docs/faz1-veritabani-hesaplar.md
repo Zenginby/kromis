@@ -1518,7 +1518,8 @@ eşitliyor). `compose.yaml`: `goc` servisi (`image: kromis` iki serviste, aynı
 derleme), `kromis` `service_completed_successfully` bekler; `Dockerfile` CMD
 değişmedi, yalnız gerekçe yorumu; açılışta göç bayrağı yok ve `test_docker_kapisi`
 `KROMIS_GOC*` adını ENV/şablonda yasaklıyor. CI `docker` işi: derle → `docker
-image ls` (boyut ilk kez ölçülüyor, sayı CI günlüğünde) → `docker run --rm
+image ls` (boyut ilk kez ölçüldü: **284 MB**, PR #36'nın `docker` işi;
+docs/faz0-web-first.md § 8) → `docker run --rm
 --network host … python tools/goc.py` İKİ KEZ (boş DB → head, idempotenlik) →
 konteyner → `/health` + `/giris` + `/`(-L). `_test.yml` dokunulmadı.
 
@@ -1591,8 +1592,8 @@ kazanıyor); admin arayüzü / admin rotası (`is_admin` bayrağı hazır) → F
 R2/S3, kuyruk, SSE, RLS ikinci katı, Redis, yapısal loglama → Faz 2 (yukarıda
 "Faz 1 dışı").
 
-**İleri taşınan takipler:** imaj boyutu (artık CI günlüğünde okunur; ilk sayı
-`docs/faz0-web-first.md` § 8'e yazılacak), ilk geri yükleme tatbikatı
+**İleri taşınan takipler:** imaj boyutunun izlenmesi (ilk ölçüm 284 MB, her
+`docker` koşusunda basılıyor; belgeye yazıldı), ilk geri yükleme tatbikatı
 (`docs/isletme.md` § 5 iskeleti; Faz 5 kalemi), sahibin gerçek verisinin
 `ice_aktar --kuru` sayıları, yönetilen Postgres pooler davranışı (RLS notu),
 Python 3.14 tekerlekleri (CI'da görünür), `GET /api/settings`in web'de anlamsız
@@ -1706,6 +1707,6 @@ idi, karar: isteğe bağlı 3b, ucuzsa).
 * **Dondurulmuş kabuk testleri** (~190 + bu fazda kalan eski depo testleri
   ~200): silinmez, kabuk ince WebView'a dönüştüğü gün toptan gider.
 * **Ölçülmeyen:** sahibin gerçek veri hacmi (bu makinede `output/` boş),
-  imaj boyutu (9. görevden beri CI `docker` işi `docker image ls` ile basıyor;
-  sayı belgeye henüz yazılmadı), yönetilen Postgres'in pooler davranışı (RLS
+  ~~imaj boyutu~~ (ölçüldü: 284 MB, PR #36; `docker` işi her koşuda basıyor),
+  yönetilen Postgres'in pooler davranışı (RLS
   notu), Python 3.14 tekerlekleri (CI'da görünür).

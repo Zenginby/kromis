@@ -1805,6 +1805,12 @@ platforma özgü hiçbir şey kodda yok.
 * **Çok parçalı (multipart) S3 yüklemesi, CDN özel alan adı, görsel dönüşüm** —
   gerekmedi/ürün kararı yok.
 * **Dondurulmuş kabuk testleri** (~390) silinmez; `YerelDepo` kabuğun yolu.
+* **Stüdyo arayüzü — sahibin ileriye dönük notları (2026-09-18):** composer
+  düzeni, göstergeler, gezinme, arena işareti, araçlar sayfası →
+  [studyo-guncelleme-plani.md](studyo-guncelleme-plani.md); saf ön yüz bloğu
+  K3'ün yeniden bakış noktasına (Faz 4) ya da sahibin seçeceği ara faza,
+  kredi göstergesi Faz 3'e önerildi. İş panelindeki "sayaç 180'den başlıyor"
+  gözlemi orada — saat dilimi adayı, 10'un `isler.js` dokunuşuna kalem.
 * **Ölçülmeyen:** gerçek R2'de 302 + `<video>` aralık davranışı (canlı
   doğrulamada), Fly/Railway/Render kapanış süreleri (10'da yazılır), takım
   süresi artışı, işçi başına makul eş zamanlılık (4 varsayım; sağlayıcı

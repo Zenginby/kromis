@@ -507,6 +507,51 @@ def _akis_hizli(monkeypatch, *, kalp: float = 60.0, azami: float = 3.0, ortusme:
     monkeypatch.setattr(isler_rotasi, "AKIS_ORTUSME_SN", ortusme)
 
 
+def _bekle(kosul, ne: str, *, tavan: float = 8.0) -> None:
+    """Koşul sağlanınca HEMEN döner; sağlanmazsa `ne`yi söyleyerek düşer.
+
+    Sabit uykunun yerine: uyku "o kadar sürede olur" diye TAHMİN ediyordu,
+    tahmin de takımın yükü altında tutmuyordu (ölçüm aşağıdaki testin
+    başında). Tavan akışın `azami` ömründen KÜÇÜK olmalı — koşul hiç gelmezse
+    test düşer, akış yine kendi ömründe kapanır ve arkada asılı bir iş
+    parçacığı kalmaz."""
+    son = time.perf_counter() + tavan
+    while not kosul():
+        if time.perf_counter() >= son:
+            raise AssertionError(f"{tavan:g} sn içinde olmadı: {ne}")
+        time.sleep(0.01)
+
+
+class _TurKaydi:
+    """Akış döngüsünün her TURUNU kaydeder: o turun sorgusu hangi işi hangi durumda gördü.
+
+    Akışı DIŞARIDAN izlemenin tek yolu bu. `TestClient` gövdeyi portalda
+    sonuna kadar toplayıp öyle veriyor (`_AkisOkuyucu`) — ölçüldü: satırların
+    hepsi akış KAPANDIĞI an geliyor, yani "olay geldi mi" diye beklenemiyor,
+    beklenecek şey turun kendisi. Kayıt sorgu DÖNDÜKTEN sonra yazılır: koşul
+    sağlandığında o turun sorgusu gerçekten koşmuştur (sonrası sıraya girer)."""
+
+    def __init__(self) -> None:
+        self.turlar: list[list[tuple[str, str]]] = []
+
+    def gordu(self, is_id: str, durum: str) -> bool:
+        return any((is_id, durum) in tur for tur in self.turlar)
+
+
+def _turlari_kaydet(monkeypatch) -> _TurKaydi:
+    """`_akis_sorgusu`nu SARAR (davranışı değişmez), turları `_TurKaydi`ye yazar."""
+    kayit = _TurKaydi()
+    gercek = isler_rotasi._akis_sorgusu
+
+    def sarmal(motor, kullanici_id, since):
+        isler = gercek(motor, kullanici_id, since)
+        kayit.turlar.append([(i["id"], i["durum"]) for i in isler])
+        return isler
+
+    monkeypatch.setattr(isler_rotasi, "_akis_sorgusu", sarmal)
+    return kayit
+
+
 def _olaylar(satirlar) -> list[dict]:
     """SSE metnindeki `event: is` olaylarının `data` gövdeleri, sırayla."""
     olaylar: list[dict] = []
@@ -544,16 +589,59 @@ class _AkisOkuyucu(threading.Thread):
 
 def test_the_stream_sends_the_active_jobs_first_and_then_every_change(c, depo_db, monkeypatch):
     """İlk tur aktifler (geçmişi istemci listeden aldı), sonra yalnız değişenler;
-    aynı hâl ikinci kez YAZILMAZ; başlıklar vekil tamponunu kapatıyor."""
-    _akis_hizli(monkeypatch, azami=1.5)
+    aynı hâl ikinci kez YAZILMAZ; başlıklar vekil tamponunu kapatıyor.
+
+    ÖLÇÜLEN KUSUR (2026-09-18, tam takım): test üç sabiti saat yerine
+    koyuyordu, üçü de yükte kırılıyordu. Boşta bile: aynı gövde arka arkaya
+    on iki kez koşturuldu, DÖRDÜ düştü.
+      * `sleep(0.4)` "ilk tur yazıldı" sayıyordu — ilk sorgu geç kalırsa akış
+        işi ilk turda zaten `bitti` görür, olay TEK olur (üretildi).
+      * `azami=1.5` işçiyle YARIŞIYORDU — işçinin turu uzarsa akış daha
+        `calisiyor`dayken kendini kapatır (üretildi).
+      * Ve asıl çoğunluk: `calisiyor` GÖRÜLMEZ varsayımı. İşçi işi alırken
+        `calisiyor`u COMMIT'liyor (services/isci.py `siradakini_al`), yani o
+        hâl dışarıdan gerçekten görünür; sağlayıcı yaması ~30 ms sürüyordu,
+        akış 50 ms'de bir soruyordu — bir turun o pencereye düşüp düşmemesi
+        yazı tura. Akış dört sonucun dördünde de DOĞRU davranıyordu; yanlış
+        olan, meşru bir değişikliğin görünmemesini bekleyen testti.
+    Bekleme artık sabit süreye değil TURUN KENDİSİNE bakıyor, ara hâl de
+    kazara görünmez olmak yerine BİLE BİLE gözleniyor: sağlayıcı birkaç tur
+    boyu uyur, `calisiyor` kesin yakalanır. Böylece "aynı hâl ikinci kez
+    yazılmaz" da ilk kez gerçekten sınanıyor — o turların hepsi aynı satırı
+    döndürür, olay bir tane çıkar.
+    """
+    turlar = _turlari_kaydet(monkeypatch)
+    # Ömür bol: kapanmayı artık sabit süre değil, bitişi GÖREN tur tetikliyor.
+    # Örtüşme üretimdeki gibi sıfırdan büyük: damga Python'da yazılıp commit
+    # biraz sonra geliyor ve sıfır örtüşmede araya düşen bir tur `bitti`
+    # satırını temelli kaçırabilir (gerekçe routers/isler.py modül başında).
+    _akis_hizli(monkeypatch, azami=20.0, ortusme=0.5)
+
+    def uyuyan(m, p, s, q, n, **k):
+        time.sleep(0.3)             # birkaç yoklama turu: `calisiyor` penceresi turdan geniş
+        return [PNG] * n
+
+    monkeypatch.setattr(providers, "generate", uyuyan)
     is_id = c.post("/api/generate", json=GORSEL).json()["is"]["id"]
 
     okuyucu = _AkisOkuyucu(c)
     okuyucu.start()
-    time.sleep(0.4)                 # ilk tur (bekliyor) yazıldı, döngü uyuyor
-    assert _tek_tur(depo_db)        # akış AÇIKKEN işçi işi bitirir
-    okuyucu.join(timeout=10)
-    assert not okuyucu.is_alive(), "akış azami ömürde kapanmadı"
+    try:
+        _bekle(lambda: turlar.gordu(is_id, "bekliyor"), "ilk tur işi `bekliyor` görsün")
+        assert _tek_tur(depo_db)    # akış AÇIKKEN işçi işi bitirir
+        _bekle(lambda: turlar.gordu(is_id, "calisiyor"), "bir tur işi `calisiyor` görsün")
+        _bekle(lambda: turlar.gordu(is_id, "bitti"), "bir tur işin bittiğini görsün")
+    finally:
+        # Akış yine KENDİ kapanır (dışarıdan kesmek portalda asılı kalıyor), yalnız
+        # ömür sınırı artık geldi: olay turun sorgusundan SONRA yazılıyor, sınır bir
+        # SONRAKİ turun başında okunuyor — sıfırlamak son olayı kesmez.
+        # `finally`: test DÜŞSE DE akış kapansın. Yoksa `monkeypatch` çözülür,
+        # `AKIS_AZAMI_SN` 600'e döner ve okuyucu arka planda dakikalarca
+        # yoklamaya devam eder — düşen bir test takımın geri kalanını da
+        # bulandırırdı (sabit ömür bu sızıntıyı 1,5 sn'de kesiyordu).
+        monkeypatch.setattr(isler_rotasi, "AKIS_AZAMI_SN", 0.0)
+        okuyucu.join(timeout=10)
+    assert not okuyucu.is_alive(), "azami ömür sıfırlanınca akış kendini kapatmadı"
 
     assert okuyucu.durum == 200
     assert okuyucu.basliklar["content-type"].startswith("text/event-stream")
@@ -561,11 +649,12 @@ def test_the_stream_sends_the_active_jobs_first_and_then_every_change(c, depo_db
     assert okuyucu.basliklar["x-accel-buffering"] == "no"
     assert okuyucu.satirlar[0] == "retry: 100", "yeniden bağlanma ipucu ilk satır: başlıklar hemen gitsin"
     olaylar = _olaylar(okuyucu.satirlar)
-    assert [o["id"] for o in olaylar] == [is_id, is_id], "bekliyor → bitti: iki hâl, ikisi de tek kez"
-    assert [o["durum"] for o in olaylar] == ["bekliyor", "bitti"]
-    assert olaylar[1]["sonuc"]["medya"] and olaylar[1]["basladi"] and olaylar[1]["bitti"]
+    assert [o["id"] for o in olaylar] == [is_id] * 3, "yalnız bu iş; her hâl tek kez"
+    assert [o["durum"] for o in olaylar] == ["bekliyor", "calisiyor", "bitti"], (
+        "ilk tur aktif işi verir, sonrası HER değişiklik — ve yalnız değişiklik")
+    assert olaylar[2]["sonuc"]["medya"] and olaylar[2]["basladi"] and olaylar[2]["bitti"]
     assert all(o["_id"] for o in olaylar), "her olayın `id:`si var (Last-Event-ID buradan)"
-    assert olaylar[0]["_id"] < olaylar[1]["_id"], "id sorgu anı: artan"
+    assert olaylar[0]["_id"] < olaylar[1]["_id"] < olaylar[2]["_id"], "id sorgu anı: artan"
 
 
 def test_since_and_last_event_id_resume_the_stream_from_that_moment(c, monkeypatch):
@@ -629,22 +718,40 @@ def test_the_stream_route_is_gated_reads_no_directory_and_holds_no_connection_wh
     """Kapı `aktif_kullanici` (401 sözleşmesi tests/test_kimlik.py'de her rota için ölçülüyor);
     `ayar.ayarlar` yok (`DIZINSIZ_KAPILI`). Havuz: akış AÇIKKEN isteğin bağlantısı havuza
     dönmüş olmalı (`pool_size=2`) — turlar arasında `checkedout() == 0`, tests/test_isci.py'nin
-    "sağlayıcı çağrısında bağlantı yok" ölçümünün ikizi."""
+    "sağlayıcı çağrısında bağlantı yok" ölçümünün ikizi.
+
+    ÖLÇÜLEN KUSUR (2026-09-18): havuz ölçümü TEK örnekti ve örnek turun
+    sorgusuna denk gelebiliyordu — 600 örnek alındı, 86'sı (%14) 1 gösterdi.
+    Bir turun `Session`ı havuzdan bağlantı alır (kısa, ~10 ms); o ana düşen
+    bir örneğin 1 görmesi akışın bağlantı TUTTUĞU anlamına gelmez, testin
+    kendi cümlesi de "turlar ARASINDA" diyor. `sleep(0.4)` de kardeşiyle
+    aynı kusuru taşıyordu (gerekçe orada).
+
+    Ölçüt şu: bağlantıyı akış boyunca tutan bir rota hiçbir örnekte 0
+    göstermezdi. O yüzden havuzun boşaldığı bir AN bekleniyor, ve o anın
+    akışın ortası olduğu ardından gelen bir turla kanıtlanıyor."""
     from services import ayar
     (rota,) = [r for r in isler_rotasi.router.routes if getattr(r, "path", "") == "/api/isler/akis"]
     cagrilar = {alt.call for alt in rota.dependant.dependencies}
     assert kimlik.aktif_kullanici in cagrilar
     assert ayar.ayarlar not in cagrilar
 
-    _akis_hizli(monkeypatch, azami=1.0)
+    turlar = _turlari_kaydet(monkeypatch)
+    _akis_hizli(monkeypatch, azami=20.0)
     c.post("/api/generate", json=GORSEL)
     okuyucu = _AkisOkuyucu(c)
     okuyucu.start()
-    time.sleep(0.4)                 # akış açık, ilk tur yazılmış, döngü uykuda
-    tutulan = depo_db.pool.checkedout()
-    okuyucu.join(timeout=10)
+    try:
+        _bekle(lambda: len(turlar.turlar) >= 1, "akışın ilk turu koşsun")
+        _bekle(lambda: depo_db.pool.checkedout() == 0,
+               "akış açıkken havuz boşalsın (bağlantı akış boyunca tutuluyor olmasın)")
+        gorulen = len(turlar.turlar)
+        # Boş havuzu gördüğümüz an akışın ORTASIYDI: ardından bir tur daha geldi.
+        _bekle(lambda: len(turlar.turlar) > gorulen, "ölçümden sonra akış bir tur daha koşsun")
+    finally:
+        monkeypatch.setattr(isler_rotasi, "AKIS_AZAMI_SN", 0.0)   # gerekçe kardeş testte
+        okuyucu.join(timeout=10)
     assert okuyucu.durum == 200 and _olaylar(okuyucu.satirlar)
-    assert tutulan == 0, f"akış açıkken havuzdan tutulan bağlantı: {tutulan}"
 
 
 # ── (vii) yeniden gönder ────────────────────────────────────────────────

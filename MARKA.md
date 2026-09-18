@@ -12,6 +12,10 @@ Bir lisans (AGPL) kodun nasıl kullanılacağını söyler. Marka hakkı, bir ü
 harfiyen uyan bir çatal bile, adı "Kromis" kaldığı sürece bu politikayı ihlal
 eder.
 
+> Adın kendisinin nereden geldiği, hangi ticaret unvanıyla ve hangi alan
+> adlarıyla ilişkilendiği ayrı bir belgede:
+> [docs/marka-ve-unvan.md](docs/marka-ve-unvan.md).
+
 ## Kapsam
 
 Aşağıdakiler telif sahibine ait ve [LICENSE](LICENSE)'ın verdiği izinlerin

@@ -1,6 +1,7 @@
 # Faz 1 — veri tabanı ve hesaplar: görev listesi
 
 **Tarih:** 2026-09-17 · **Karar:** çok kullanıcılı web (Alperen Zengin, Slack, 2026-09-16: küresel kitle · modele göre kredi, abonelik paketiyle satılır, Stripe önce · yönetilen barındırma · web-first) · **Önceki faz:** [faz0-web-first.md](faz0-web-first.md) (8/8 ✅)
+**Not (2026-09-18):** yukarıdaki karardaki "Stripe önce" maddesi **MoR/Polar** ile güncellendi → [master design](superpowers/specs/2026-08-10-saas-transformation-master-design.md) "Ödeme Altyapısı" maddesi. Türkiye'den Stripe'a doğrudan hesap açılamıyor; uluslararası satış Merchant of Record üzerinden. Karar kaydı tarihî olduğu için satırın kendisi değiştirilmedi.
 **Üst belge:** [superpowers/specs/2026-08-10-saas-transformation-master-design.md](superpowers/specs/2026-08-10-saas-transformation-master-design.md) — sapmalar bu belgenin sonunda tek tek yazılı.
 
 Faz 1'in amacı, Faz 0'ın kurduğu zeminin (router'lar, ayar nesnesi, istek
@@ -1688,8 +1689,8 @@ idi, karar: isteğe bağlı 3b, ucuzsa).
 * **İş kuyruğu, SSE, iş listesi, platform sahipli anahtarlar, Redis, hız
   sınırının Redis'e taşınması, R2/S3, RLS ikinci katı, yapısal loglama,
   Sentry** → Faz 2.
-* **Stripe, abonelik yaşam döngüsü, KVKK/GDPR metinleri, hesap silme akışı,
-  veri dışa aktarma** → Faz 4. `kullanicilar.silindi_at` sütunu yer tutucu.
+* **Ödeme (MoR/Polar), abonelik yaşam döngüsü, KVKK/GDPR metinleri, hesap
+  silme akışı, veri dışa aktarma** → Faz 4. `kullanicilar.silindi_at` sütunu yer tutucu.
 * **Google OAuth** → Faz 1 içinde isteğe bağlı **3b. görev** (sahibin
   2026-09-17 kararı: ucuzsa); pahalıya çıkarsa Faz 5.
 * **`chat-instructions.md` / `chat-instructions-video.md` ezmeleri**

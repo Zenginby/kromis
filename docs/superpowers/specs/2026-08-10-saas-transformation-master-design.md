@@ -181,7 +181,37 @@ graph TD
     `catalog.ImageModel.credits` alanının birimi `kind`e bağlı ve ayrım
     `cost_for`da yaşıyor.)*
 - **Filigran & Kredi Kuralları:** Ücretsiz deneme katmanı (filigranlı), Ücretli katmanlar (filigransız + ticari haklar), Devredilmeyen devirli aylık kredi mantığı (no-rollover).
-- **Ödeme Altyapısı:** Stripe / PaynKolay entegrasyonu.
+- **Ödeme Altyapısı: Merchant of Record (MoR).** Satıcı Türkiye'de olduğu için
+  Stripe'a doğrudan hesap açılamıyor (Stripe Managed Payments'ın desteklenen ülke
+  listesinde de Türkiye yok); tek Stripe yolu Atlas ile ABD'de ayrı tüzel kişilik
+  kurmak. Bu yüzden uluslararası satış **MoR** üzerinden yapılacak: MoR hukuken
+  satıcı yerine geçer, dünya çapında KDV/VAT/GST'yi hesaplayıp beyan eder, bize net
+  bakiyeyi öder; biz de MoR'a tek bir hizmet ihracı faturası keseriz. Yerel sanal POS
+  (iyzico/PayTR/PaynKolay) bu yükümlülüğü üstlenmez ve zorunlu 3D Secure yabancı
+  kartların çoğunu reddeder — o yüzden MoR'un yerine değil, istenirse TR içi TRY +
+  taksit satışı için İKİNCİ AYAK olarak eklenir.
+  - **Seçilen:** Polar.sh (Starter, %5 + 50¢; uluslararası kart +%1,5; dispute $15).
+    Gerekçe: Türkiye'ye Stripe Connect Express ile ödeme yapıyor, kredi/usage-based
+    faturalama (events → meters → metered price, Meter Credits Benefit) native,
+    resmî Python SDK'sı var, tek seferlik kredi paketi ve hazır müşteri portalı
+    sunuyor. Ciro ~1.000 USD/ay'ı geçince Pro plan (%3,8 + 40¢) ucuzluyor.
+  - **Yedek:** Paddle (köklü ama TRY yok, aylık tek payout, $15 sabit SWIFT ücreti).
+    Creem/Dodo daha ucuz ama genç; Lemon Squeezy Stripe'a taşındığı için yeni proje
+    için başlanmaz.
+  - **Uyarı — hesap riski:** Polar'ın kabul edilebilir kullanım politikasında AI
+    üretim araçları "ek incelemeye tabi" kategoride; NSFW, face swap/deepfake, ses
+    klonlama ve telif/marka ihlali üreten kullanım YASAK. Kullanım şartlarına ve
+    moderasyona bunlar açıkça yazılmadan yayına çıkılmaz.
+  - **Mimari kuralı:** MoR iş mantığına gömülmez. Tek gerçek kaynak atomik kredi
+    ledger'ı; sağlayıcı yalnız onu besleyen bir adaptör. Webhook'ta idempotency
+    (sağlayıcının event id'si) zorunlu — çift kredi yüklemesi en sık görülen hata.
+    Kredi tarifesi sağlayıcıda değil kendi katalogumuzda durur.
+  - **Türkiye tarafı (mali müşavir teyidiyle):** hizmet ihracatı kazanç indirimi
+    29/04/2026 tarihli 11257 sayılı Cumhurbaşkanı Kararı ile 1/1/2026'dan itibaren
+    %80 → %100 (GVK 89/13, KVK 10/1-ğ); yazılım kapsamda. Şart: kazancın beyanname
+    süresine kadar Türkiye'ye getirilmesi ve muhasebede ayrıştırma. Hizmet ihracı
+    KDV'den istisna; iade için paranın yurt dışından geldiğinin belgesi (DAB veya
+    banka kaydı) gerekir. TR içi satışlar bu kapsamda DEĞİL, ayrı tutulur.
 - **Teslim edilen: kredi tarifesinin kendisi.** Her katalog girdisi kendi kredisini
   taşıyor ve üretim anındaki çözülmüş değer kayda yazılıyor (tarife sonradan değişince
   geçmiş yeniden yazılmasın diye). Çapa ölçülü: Azure `medium` = 8 kredi ≈ 0,04 USD,

@@ -53,7 +53,20 @@ ACIK_ROTALAR: dict[tuple[str, str], str] = {
 }
 
 # Oturumsuz cevabı 302 olan (tarayıcı gezinmesi) rotalar; geri kalan kapılılar 401 JSON.
-SAYFALAR = {("GET", "/")}
+# `/admin` (Faz 2 / 8): `kimlik.admin_sayfasi` → `sayfa_kullanicisi` üstüne `is_admin`.
+SAYFALAR = {("GET", "/"), ("GET", "/admin")}
+
+# ADMİN ROTALARI (Faz 2 / 8): `/api/admin/` altındaki HER rota `kimlik.admin_kullanici`
+# taşır — liste iki yönlü bekçili (`test_every_admin_route_carries_the_admin_gate_and_only_they_do`):
+# listede olmayan bir `/api/admin/*` rotası kırmızı (öntanımlı "kapılı" DEĞİL, CLAUDE.md §5),
+# admin kapısı taşıyan ama listede olmayan rota da.
+ADMIN_ROTALAR = {
+    ("GET", "/api/admin/kullanicilar"), ("GET", "/api/admin/isler"),
+    ("GET", "/api/admin/metrikler"),
+    ("POST", "/api/admin/kullanicilar/{kullanici_id}/tavan"),
+    ("POST", "/api/admin/kullanicilar/{kullanici_id}/oturum-dusur"),
+    ("POST", "/api/admin/isler/{is_id}/iptal"),
+}
 
 # Kapılı ama DİZİN OKUMAYAN rotalar — kapıyı `ayar.ayarlar` üzerinden değil doğrudan
 # alırlar. Belgenin dört istisnası (§4) + Faz 1 / 5'te DB'ye taşınan ve dosyaya
@@ -83,6 +96,9 @@ DIZINSIZ_KAPILI = {
     # Faz 2 / 5: SSE akışı (yalnız `isler` sorgusu, kendi kısa oturumlarıyla) ve
     # yeniden gönder (eski satırın `istek`ini yeni satıra kopyalar; nesne yazmaz).
     ("GET", "/api/isler/akis"), ("POST", "/api/isler/{is_id}/yeniden"),
+    # Faz 2 / 8: kota durumu (`isler` sayımı) ve admin uçları (`kullanicilar`/`isler`/
+    # `isciler`/`oturumlar` satırları; sayfa rotası `/admin` SAYFALAR'da, `ayar.genel` alır).
+    ("GET", "/api/kota"), *ADMIN_ROTALAR,
 }
 
 KAPI = {kimlik.aktif_kullanici, kimlik.sayfa_kullanicisi}
@@ -109,7 +125,8 @@ YOL_DEGERLERI = {"image_id": "abcdef123456", "folder_id": "abcdef123456",
                  "chat_id": "abcdef123456", "palette_id": "abcdef123456",
                  "asset_id": "abcdef123456", "arena_id": "abcdef123456",
                  "kind": "logos", "filename": "abcdef123456.png",
-                 "is_id": "00000000-0000-4000-8000-000000000000"}   # `uuid.UUID` yol parametresi
+                 "is_id": "00000000-0000-4000-8000-000000000000",    # `uuid.UUID` yol parametresi
+                 "kullanici_id": "00000000-0000-4000-8000-000000000001"}
 
 
 def _png() -> bytes:
@@ -158,13 +175,36 @@ ACIK = {(y, p) for y, p, r in _rotalar() if not _kapilar(r.dependant)}
 # ── Bekçi: her rota ya kapılı ya gerekçeli açık ─────────────────────
 
 def test_every_route_is_either_gated_or_openly_listed_with_a_reason():
-    """Belge §4: 54 − 7 açık = 47 kapılı (44 stüdyo + `/` + `ben` + `cikis`)."""
+    """Belge §4: 54 − 7 açık = 47 kapılı (44 stüdyo + `/` + `ben` + `cikis`); Faz 2 ile 60."""
     assert ACIK == set(ACIK_ROTALAR), (
         f"kapısız ama listede olmayan: {sorted(ACIK - set(ACIK_ROTALAR))}; "
         f"listede ama kapılı: {sorted(set(ACIK_ROTALAR) - ACIK)}")
     assert all(gerekce.strip() for gerekce in ACIK_ROTALAR.values())
-    assert len(KAPILI) == 52 and len(ACIK) == 7 and len(KAPILI | ACIK) == 59, (   # +3 iş rotası (Faz 2 / 4), +2 (Faz 2 / 5)
+    # +3 iş rotası (Faz 2 / 4), +2 (Faz 2 / 5), +8 (Faz 2 / 8: `/admin`, 6 `/api/admin/*`, `/api/kota`)
+    assert len(KAPILI) == 60 and len(ACIK) == 7 and len(KAPILI | ACIK) == 67, (
         "rota sayısı ya da kapı sayısı değişti — bilinçliyse belgeyi ve bu sayıları güncelle")
+
+
+def test_every_admin_route_carries_the_admin_gate_and_only_they_do():
+    """Belge §8: `/api/admin/*` HER rota `kimlik.admin_kullanici` taşır; `/admin` sayfası `admin_sayfasi`.
+
+    İki yönlü: `/api/admin/` altında kapısız rota kırmızı (aktif_kullanici yetmez —
+    o 401 verir ama admin OLMAYAN kullanıcıyı geçirir); admin kapısı taşıyan ama
+    listede olmayan rota da kırmızı (listeyi güncelle, belgeye yaz).
+    """
+    def _cagrilar(dependant) -> set:
+        s = {alt.call for alt in dependant.dependencies}
+        for alt in dependant.dependencies:
+            s |= _cagrilar(alt)
+        return s
+    admin_api = {(y, p) for y, p, r in _rotalar() if kimlik.admin_kullanici in _cagrilar(r.dependant)}
+    altinda = {(y, p) for y, p, r in _rotalar() if p.startswith("/api/admin/")}
+    assert admin_api == ADMIN_ROTALAR == altinda, (
+        f"kapısız admin rotası: {sorted(altinda - admin_api)}; "
+        f"listede olmayan admin kapılı rota: {sorted(admin_api - ADMIN_ROTALAR)}")
+    sayfalar = {(y, p) for y, p, r in _rotalar() if kimlik.admin_sayfasi in _cagrilar(r.dependant)}
+    assert sayfalar == {("GET", "/admin")}
+    assert ADMIN_ROTALAR <= KAPILI and ADMIN_ROTALAR <= DIZINSIZ_KAPILI
 
 
 def test_only_the_studio_page_uses_the_redirecting_gate():

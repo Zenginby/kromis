@@ -122,6 +122,26 @@ def test_oturum_dusur_revokes_every_session_and_prints_the_count(veritabani_moto
     assert "diye bir kullanici yok" in capsys.readouterr().err
 
 
+def test_admin_flips_the_flag_on_an_existing_user_reports_whether_it_changed_and_kaldir_reverts(
+        veritabani_motor, monkeypatch, capsys):
+    """Faz 2 / 8: canlıdaki ilk admin sahibin var olan hesabı — `UPDATE` yazdırmak yerine komut."""
+    eposta = "yonetici@example.com"    # dosyanın DB'si paylaşılıyor: `EPOSTA` öteki testlerin
+    assert _olustur(monkeypatch, eposta=eposta) == cli.CIKIS_TAMAM
+    capsys.readouterr()
+    assert cli.main(["admin", "--eposta", eposta]) == cli.CIKIS_TAMAM
+    assert f"{eposta}: admin = evet (degisti)" in capsys.readouterr().out
+    with Session(veritabani_motor) as s:
+        assert s.scalars(select(tablolar.Kullanici).where(tablolar.Kullanici.eposta == eposta)).one().is_admin is True
+    assert cli.main(["admin", "--eposta", eposta]) == cli.CIKIS_TAMAM
+    assert "zaten oyleydi" in capsys.readouterr().out
+    assert cli.main(["admin", "--eposta", eposta, "--kaldir"]) == cli.CIKIS_TAMAM
+    assert f"{eposta}: admin = hayir (degisti)" in capsys.readouterr().out
+    with Session(veritabani_motor) as s:
+        assert s.scalars(select(tablolar.Kullanici).where(tablolar.Kullanici.eposta == eposta)).one().is_admin is False
+    assert cli.main(["admin", "--eposta", "yok@example.com"]) == cli.CIKIS_KULLANICI
+    assert "diye bir kullanici yok" in capsys.readouterr().err
+
+
 def test_without_database_url_the_tool_exits_2(monkeypatch, capsys):
     monkeypatch.delenv(db.DATABASE_URL_ENV)
     _stdin(monkeypatch, PAROLA + "\n")

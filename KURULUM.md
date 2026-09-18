@@ -340,9 +340,10 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
    kullanıcı ya da `BYPASSRLS` OLMAMALI** — ikisi de satır düzeyi güvenliği
    atlar ve kiracı yalıtımının ikinci katı sessizce kapanır (tablonun SAHİBİ
    olması sorun değil: göç `FORCE ROW LEVEL SECURITY` koyuyor). Yönetilen
-   servislerin verdiği öntanımlı rol çoğu zaman süper kullanıcı değil, ama
-   bazıları `BYPASSRLS` taşır — Railway'inki ölçüldü (2026-09-18), `postgres`
-   rolü İKİSİNİ DE taşıyor ve orada ayrı rol zorunlu. Bir kez sor:
+   servislerin kutudan verdiği rol sağlayıcıya göre değişir ve bazıları süper
+   kullanıcı ya da `BYPASSRLS` rol verir — Railway'inki ölçüldü (2026-09-18):
+   `postgres` rolü İKİSİNİ DE taşıyor, orada ayrı rol zorunlu. Sağlayıcı ne
+   verirse versin varsayma, bir kez sor:
 
    ```sh
    DATABASE_URL=… python tools/rls_kontrol.py --kullanici <bir hesabin uuid'si>

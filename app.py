@@ -30,13 +30,26 @@ import errlog
 import paths
 import providers
 from models import MAX_PROMPT_CHARS, GenerateRequest
-from routers import ayarlar, bindirme, galeri, hesap, isler, kok, paletler, saglik, sohbet, uretim
+from routers import (
+    admin,
+    ayarlar,
+    bindirme,
+    galeri,
+    hesap,
+    isler,
+    kok,
+    paletler,
+    saglik,
+    sohbet,
+    uretim,
+)
 from services import (
     ayar,
     db,
     dil,
     dosya,
     gorsel,
+    gunluk,
     kimlik,
     koken,
     modeller,
@@ -102,6 +115,10 @@ async def _lifespan(app: FastAPI):
     kimlik satırı da yok.
     """
     ayarlar: ayar.Ayarlar = app.state.ayarlar
+    # `kromis.*` günlükçülerine stdout işleyicisi (Faz 2 / 8; gerekçesi services/gunluk.py):
+    # uvicorn yalnız kendi günlükçülerini kurar, admin `olay=admin.*` satırları
+    # bu olmadan hiçbir yere yazılmıyordu (ölçüldü). 9. görev biçimi JSON'a çevirir.
+    gunluk.kur()
     url = db.baglanti_dizesi()
     if url:
         try:
@@ -194,12 +211,16 @@ app.exception_handler(RequestValidationError)(redaksiyon.redact_validation_error
 # services/kimlik.py). API rotalarının 401'i FastAPI'nin kendi HTTPException
 # işleyicisinden geliyor, burada yalnız sayfa yönlendirmesinin istisnası var.
 app.exception_handler(kimlik.GirisSayfasi)(kimlik.giris_sayfasina)
+# Admin OLMAYAN kullanıcının `/admin` gezinmesi → 403 HTML (Faz 2 / 8; gerekçesi
+# services/kimlik.py `YetkiYok`). API rotalarının 403'ü JSON ve kapının kendisinden.
+app.exception_handler(kimlik.YetkiYok)(kimlik.yetki_yok_sayfasi)
 
 # Router'lar ÖNEKSİZ takılıyor: yollar her rotanın üstünde birebir yazılı
 # (bkz. routers/__init__.py). Sıra rota eşleşmesini etkilemiyor — hiçbir iki
 # kalıp aynı yol+fiili paylaşmıyor — ama okunurluk için eski app.py sırası.
 for _router in (uretim.router, isler.router, ayarlar.router, sohbet.router, galeri.router,
-                paletler.router, bindirme.router, hesap.router, kok.router, saglik.router):
+                paletler.router, bindirme.router, hesap.router, admin.router, kok.router,
+                saglik.router):
     app.include_router(_router)
 
 

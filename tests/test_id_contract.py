@@ -56,6 +56,9 @@ KAPSAM_DISI = {
                 "index.html'e yüklenmiyor, IIFE içinde ve küresel kapsama ad "
                 "bırakmıyor — buradaki 'aynı sayfa, tek kapsam' iddialarının hiçbiri "
                 "ona uygulanamaz. Kendi id bağları tests/test_hesap.py'de sınanıyor",
+    "admin.js": "AYRI sayfanın betiği (`/admin` → static/admin.html, Faz 2 / 8): giris.js ile "
+                "aynı gerekçe — index.html'e yüklenmiyor, IIFE, küresel ad bırakmıyor. Kendi id "
+                "bağları tests/test_admin.py'de sınanıyor",
 }
 
 _TOP_LEVEL_DECLARATION_RE = re.compile(

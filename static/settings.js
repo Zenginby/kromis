@@ -355,6 +355,16 @@ function platformNotlariniCiz() {
       not.textContent = t("settings.platform_sagliyor");
       kok.appendChild(not);
     }
+    // Kendi anahtarı kayıtlıyken düğmenin üstünde bir cümle (Faz 2 / 8): "Kendi
+    // anahtarımı sil" tek başına bir TALİMAT gibi okunuyordu (sahibin geri
+    // bildirimi); not, düğmenin bir DURUMU değiştirdiğini söyler.
+    let kendi = kok.querySelector(".kendi-anahtar-notu");
+    if (!kendi) {
+      kendi = document.createElement("p");
+      kendi.className = "field-note kendi-anahtar-notu";
+      kendi.textContent = t("settings.kendi_anahtar_kullaniliyor");
+      kok.appendChild(kendi);
+    }
     let sil = kok.querySelector(".anahtar-sil");
     if (!sil) {
       sil = document.createElement("button");
@@ -366,6 +376,7 @@ function platformNotlariniCiz() {
     }
     const kaynak = saglayiciKaynagi[kimlik] || null;
     not.hidden = kaynak !== "platform";
+    kendi.hidden = kaynak !== "kullanici";
     sil.hidden = kaynak !== "kullanici";
   }
 }
@@ -1033,6 +1044,16 @@ async function hesapDurumunuYaz() {
       }
     });
     satir.append(metin, " ", cikis);
+    // Admin ise `/admin` bağlantısı (Faz 2 / 8): bayrağı `ben` taşıyor, sayfa
+    // kendi kapısını sunucuda sorar — burada göstermemek yalnız görünürlük.
+    if (ben.is_admin) {
+      const admin = document.createElement("a");
+      admin.href = "/admin";
+      admin.id = "settings-admin";
+      admin.className = "btn-ghost";
+      admin.textContent = t("hesap.admin_baglantisi");
+      satir.append(" ", admin);
+    }
   }
   bolme.prepend(satir);
 }

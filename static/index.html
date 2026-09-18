@@ -1086,6 +1086,8 @@
       <button type="button" id="isler-close" class="modal-x" aria-label="{{t:common.close}}">×</button>
     </div>
     <div class="sheet-body isler-govde">
+      <!-- Günlük kalan kredi (Faz 2 / 8): isler.js `GET /api/kota` ile doldurur, boşken gizli. -->
+      <p id="isler-kota" class="isler-kota" hidden></p>
       <p id="isler-durum" class="isler-durum" role="status" hidden></p>
       <ul id="isler-liste" class="isler-liste" aria-live="polite"></ul>
       <p id="isler-bos" class="isler-bos">{{t:isler.empty}}</p>

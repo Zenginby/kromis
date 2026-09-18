@@ -1,0 +1,415 @@
+// Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+// GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+// Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+//
+// Yönetim sayfasının betiği (Faz 2 / 8) — static/admin.html'in tek betiği
+// (i18n.js dışında). Üç sekme, üç okuma ucu, üç yazma ucu:
+//   GET  /api/admin/kullanicilar?q=&sayfa=   · POST /api/admin/kullanicilar/{id}/tavan
+//   GET  /api/admin/isler?durum=             · POST /api/admin/kullanicilar/{id}/oturum-dusur
+//   GET  /api/admin/metrikler                · POST /api/admin/isler/{id}/iptal
+//
+// IIFE İÇİNDE (giris.js'in gerekçesi): eslint her static/*.js dosyasına öteki
+// betiklerin üst düzey adlarını küresel veriyor; kapalı kapsam çakışmayı ve
+// paylaşılan ad defterine girmeyi önler. tests/test_id_contract.py bu dosyayı
+// `KAPSAM_DISI`nda tutar, id bağlarını tests/test_admin.py sınar.
+//
+// 401 → /giris?sonra=/admin (core.js'in sarmalı burada yok, sayfa kendi bakar);
+// 403 → mesaj satırı (admin bayrağı bu arada düşmüş olabilir). Açık sekme
+// 30 sn'de bir yenilenir (belge §8); gizli sekmede zamanlayıcı durmaz ama
+// `visibilitychange` görünür olunca bir kez erken çeker.
+(() => {
+  "use strict";
+
+  const el = (id) => document.getElementById(id);
+  const mesaj = el("admin-mesaj");
+  const SEKMELER = ["kullanicilar", "kuyruk", "metrikler"];
+  const YENILEME_MS = 30000;
+  const SAYFA_ADEDI = 50;
+  // Durum/tür etiketleri isler.js'in aynı anahtarları — tablo hâlinde, çünkü
+  // tests/test_i18n.py anahtarı DİZE olarak arar (birleştirilen anahtar görünmez).
+  const DURUM_ANAHTARI = {
+    bekliyor: "isler.durum_bekliyor",
+    calisiyor: "isler.durum_calisiyor",
+    bitti: "isler.durum_bitti",
+    hata: "isler.durum_hata",
+    iptal: "isler.durum_iptal",
+  };
+  const TUR_ANAHTARI = {
+    generate: "isler.tur_generate",
+    edit: "isler.tur_edit",
+    video: "isler.tur_video",
+    animate: "isler.tur_animate",
+  };
+
+  let sekme = "kullanicilar";
+  let sayfa = 1;
+  let toplam = 0;
+  let aramaZamanlayici = null;
+
+  function mesajYaz(metin, tur) {
+    mesaj.textContent = metin || "";
+    mesaj.hidden = !metin;
+    mesaj.dataset.tur = tur || "bilgi";
+  }
+
+  /** `zaman.damga` biçimi (`2026-09-18T12:00:00`) → `2026-09-18 12:00`; yoksa tire. */
+  function tarih(damga) {
+    return damga ? damga.replace("T", " ").slice(0, 16) : "—";
+  }
+
+  function detayMetni(govde, durum) {
+    const d = govde && govde.detail;
+    if (typeof d === "string") return d;
+    if (Array.isArray(d)) {
+      const m = d
+        .map((e) => (e && e.msg) || "")
+        .filter(Boolean)
+        .join(" ");
+      if (m) return m;
+    }
+    return t("admin.hata_genel", { durum });
+  }
+
+  async function istek(yol, secenekler) {
+    let res;
+    try {
+      res = await fetch(yol, secenekler);
+    } catch {
+      throw new Error(t("admin.baglanti_yok"));
+    }
+    if (res.status === 401) {
+      window.location.replace("/giris?sonra=" + encodeURIComponent("/admin"));
+      throw new Error(t("admin.hata_genel", { durum: 401 }));
+    }
+    const veri = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(detayMetni(veri, res.status));
+    return veri;
+  }
+
+  function gonder(yol, govde) {
+    return istek(yol, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(govde || {}),
+    });
+  }
+
+  function yenilendiYaz() {
+    const saat = new Date().toTimeString().slice(0, 8);
+    el("admin-yenilendi").textContent = t("admin.yenilendi", { saat });
+  }
+
+  function hucre(metin, sinif) {
+    const td = document.createElement("td");
+    td.textContent = metin;
+    if (sinif) td.className = sinif;
+    return td;
+  }
+
+  /** Düğme/kutu taşıyan hücre: `td` tablo hücresi KALIR, esnek yerleşim içteki
+   *  `div`de — `td { display: flex }` hücreyi tablodan düşürüp ölçüsüz bırakıyordu
+   *  (ölçüldü: E2E'de düğme "görünmez" sayıldı). */
+  function islemHucresi(...cocuklar) {
+    const td = document.createElement("td");
+    const kap = document.createElement("div");
+    kap.className = "admin-islem";
+    kap.append(...cocuklar);
+    td.append(kap);
+    return td;
+  }
+
+  function dugme(metin, tiklandi, tehlike) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "admin-dugme";
+    b.textContent = metin;
+    if (tehlike) b.dataset.tehlike = "1";
+    b.addEventListener("click", async () => {
+      b.disabled = true;
+      try {
+        await tiklandi();
+      } catch (err) {
+        mesajYaz(err.message, "hata");
+      } finally {
+        b.disabled = false;
+      }
+    });
+    return b;
+  }
+
+  function bosSatir(tbody, sutun) {
+    const tr = document.createElement("tr");
+    tr.className = "admin-bos";
+    const td = hucre(t("admin.bos"));
+    td.colSpan = sutun;
+    tr.append(td);
+    tbody.replaceChildren(tr);
+  }
+
+  // ── Kullanıcılar ───────────────────────────────────────────────────
+
+  function kullaniciSatiri(k) {
+    const tr = document.createElement("tr");
+    tr.dataset.id = k.id;
+    const eposta = hucre(k.eposta);
+    if (k.is_admin) {
+      const rozet = document.createElement("span");
+      rozet.className = "admin-rozet";
+      rozet.textContent = t("admin.rozet_admin");
+      eposta.append(rozet);
+    }
+    if (!k.dogrulandi) {
+      const rozet = document.createElement("span");
+      rozet.className = "admin-rozet";
+      rozet.dataset.tur = "uyari";
+      rozet.textContent = t("admin.rozet_dogrulanmamis");
+      eposta.append(rozet);
+    }
+    const kutu = document.createElement("input");
+    kutu.type = "number";
+    kutu.min = "1";
+    kutu.step = "1";
+    kutu.placeholder = t("admin.tavan_ontanimli");
+    kutu.value = k.gunluk_kredi_tavani === null ? "" : String(k.gunluk_kredi_tavani);
+    kutu.setAttribute("aria-label", t("admin.sutun_tavan"));
+    const yaz = dugme(t("admin.tavan_yaz"), async () => {
+      const deger = kutu.value.trim() === "" ? null : Number(kutu.value);
+      await gonder(`/api/admin/kullanicilar/${k.id}/tavan`, { tavan: deger });
+      mesajYaz(t("admin.tavan_yazildi"), "basari");
+      await kullanicilariYukle();
+    });
+    const sil = dugme(t("admin.tavan_sil"), async () => {
+      await gonder(`/api/admin/kullanicilar/${k.id}/tavan`, { tavan: null });
+      mesajYaz(t("admin.tavan_yazildi"), "basari");
+      await kullanicilariYukle();
+    });
+    sil.hidden = k.gunluk_kredi_tavani === null;
+    const tavan = islemHucresi(kutu, yaz, sil);
+    const islem = islemHucresi(
+      dugme(
+        t("admin.oturum_dusur"),
+        async () => {
+          const cevap = await gonder(`/api/admin/kullanicilar/${k.id}/oturum-dusur`);
+          mesajYaz(t("admin.oturum_dusuruldu", { adet: cevap.dusurulen }), "basari");
+          await kullanicilariYukle();
+        },
+        true,
+      ),
+    );
+    tr.append(
+      eposta,
+      hucre(tarih(k.olusturuldu)),
+      hucre(tarih(k.son_gorulme)),
+      tavan,
+      hucre(String(k.kredi_24sa)),
+      hucre(String(k.aktif_is)),
+      islem,
+    );
+    return tr;
+  }
+
+  async function kullanicilariYukle() {
+    const q = el("admin-ara").value.trim();
+    const yol =
+      `/api/admin/kullanicilar?sayfa=${sayfa}&adet=${SAYFA_ADEDI}` +
+      (q ? `&q=${encodeURIComponent(q)}` : "");
+    const veri = await istek(yol);
+    toplam = veri.toplam;
+    const tbody = el("admin-kullanicilar");
+    if (!veri.kullanicilar.length) bosSatir(tbody, 7);
+    else tbody.replaceChildren(...veri.kullanicilar.map(kullaniciSatiri));
+    el("admin-toplam").textContent = t("admin.toplam", { toplam, sayfa });
+    el("admin-onceki").disabled = sayfa <= 1;
+    el("admin-sonraki").disabled = sayfa * SAYFA_ADEDI >= toplam;
+    yenilendiYaz();
+  }
+
+  // ── Kuyruk ─────────────────────────────────────────────────────────
+
+  function sure(is) {
+    if (!is.basladi) return "—";
+    const bitis = is.bitti ? new Date(is.bitti) : new Date();
+    const sn = Math.max(0, Math.round((bitis - new Date(is.basladi)) / 1000));
+    return t("isler.sure_sn", { sn });
+  }
+
+  function isSatiri(is) {
+    const tr = document.createElement("tr");
+    tr.dataset.id = is.id;
+    tr.dataset.durum = is.durum;
+    const durum = hucre(t(DURUM_ANAHTARI[is.durum] || is.durum), "admin-durum");
+    durum.dataset.durum = is.durum;
+    const islem = islemHucresi();
+    if (is.durum === "bekliyor") {
+      islem.firstChild.append(
+        dugme(
+          t("admin.iptal"),
+          async () => {
+            await gonder(`/api/admin/isler/${is.id}/iptal`);
+            mesajYaz(t("admin.iptal_edildi"), "basari");
+            await kuyruguYukle();
+          },
+          true,
+        ),
+      );
+    }
+    tr.append(
+      hucre(is.eposta || is.kullanici_id),
+      hucre(t(TUR_ANAHTARI[is.tur] || is.tur)),
+      hucre(is.model),
+      durum,
+      hucre(tarih(is.olusturuldu)),
+      hucre(sure(is)),
+      islem,
+    );
+    return tr;
+  }
+
+  async function kuyruguYukle() {
+    const durum = el("admin-durum").value;
+    const veri = await istek(
+      "/api/admin/isler" + (durum ? `?durum=${encodeURIComponent(durum)}` : ""),
+    );
+    const tbody = el("admin-isler");
+    if (!veri.isler.length) bosSatir(tbody, 7);
+    else tbody.replaceChildren(...veri.isler.map(isSatiri));
+    const o = veri.ozet;
+    el("admin-kuyruk-ozet").textContent = t("admin.kuyruk_ozet", {
+      bekleyen: o.bekleyen,
+      calisan: o.calisan,
+      hata: o.hata_24sa,
+      sn: o.en_eski_bekleyen_sn === null ? 0 : o.en_eski_bekleyen_sn,
+    });
+    yenilendiYaz();
+  }
+
+  // ── Metrikler ──────────────────────────────────────────────────────
+
+  function kart(etiket, deger, alt) {
+    const div = document.createElement("div");
+    div.className = "admin-kart";
+    const e = document.createElement("span");
+    e.className = "admin-kart-etiket";
+    e.textContent = etiket;
+    const d = document.createElement("span");
+    d.className = "admin-kart-deger";
+    d.textContent = String(deger);
+    div.append(e, d);
+    if (alt) {
+      const a = document.createElement("span");
+      a.className = "admin-kart-alt";
+      a.textContent = alt;
+      div.append(a);
+    }
+    return div;
+  }
+
+  function pencereMetni(p) {
+    return t("admin.metrik_is_hata", {
+      is: p.is,
+      hata: p.hata,
+      oran: Math.round(p.hata_orani * 1000) / 10,
+    });
+  }
+
+  async function metrikleriYukle() {
+    const m = await istek("/api/admin/metrikler");
+    el("admin-kartlar").replaceChildren(
+      kart(t("admin.metrik_kuyruk"), m.kuyruk.derinlik),
+      kart(t("admin.metrik_calisan"), m.kuyruk.calisan),
+      kart(
+        t("admin.metrik_en_eski"),
+        m.kuyruk.en_eski_bekleyen_sn === null ? "—" : m.kuyruk.en_eski_bekleyen_sn,
+      ),
+      kart(t("admin.metrik_son_1sa"), m.son_1sa.is, pencereMetni(m.son_1sa)),
+      kart(t("admin.metrik_son_24sa"), m.son_24sa.is, pencereMetni(m.son_24sa)),
+      kart(t("admin.metrik_platform_kredi"), m.son_24sa.platform_kredi),
+    );
+    const modeller = el("admin-modeller");
+    if (!m.modeller.length) bosSatir(modeller, 4);
+    else {
+      modeller.replaceChildren(
+        ...m.modeller.map((s) => {
+          const tr = document.createElement("tr");
+          tr.append(
+            hucre(s.model),
+            hucre(String(s.adet)),
+            hucre(String(s.p50_sn)),
+            hucre(String(s.p95_sn)),
+          );
+          return tr;
+        }),
+      );
+    }
+    const isciler = el("admin-isciler");
+    if (!m.isciler.length) {
+      const li = document.createElement("li");
+      li.textContent = t("admin.isci_yok");
+      isciler.replaceChildren(li);
+    } else {
+      isciler.replaceChildren(
+        ...m.isciler.map((i) => {
+          const li = document.createElement("li");
+          li.dataset.canli = String(i.canli);
+          li.textContent = `${i.konak} · v${i.surum} · ×${i.es_zamanli} · ${tarih(i.son_kalp)} · ${t(i.canli ? "admin.canli" : "admin.bayat")}`;
+          return li;
+        }),
+      );
+    }
+    yenilendiYaz();
+  }
+
+  // ── Sekmeler ve yenileme ───────────────────────────────────────────
+
+  const YUKLEYICI = {
+    kullanicilar: kullanicilariYukle,
+    kuyruk: kuyruguYukle,
+    metrikler: metrikleriYukle,
+  };
+
+  async function yenile() {
+    try {
+      await YUKLEYICI[sekme]();
+    } catch (err) {
+      mesajYaz(err.message, "hata");
+    }
+  }
+
+  function sekmeAc(ad) {
+    sekme = ad;
+    for (const s of SEKMELER) el("sekme-" + s).hidden = s !== ad;
+    for (const d of document.querySelectorAll("#admin-sekmeler [data-sekme]")) {
+      d.setAttribute("aria-selected", String(d.dataset.sekme === ad));
+    }
+    mesajYaz("");
+    yenile();
+  }
+
+  el("admin-sekmeler").addEventListener("click", (e) => {
+    const d = e.target.closest("[data-sekme]");
+    if (d) sekmeAc(d.dataset.sekme);
+  });
+  el("admin-ara").addEventListener("input", () => {
+    clearTimeout(aramaZamanlayici);
+    aramaZamanlayici = setTimeout(() => {
+      sayfa = 1;
+      yenile();
+    }, 300);
+  });
+  el("admin-onceki").addEventListener("click", () => {
+    sayfa = Math.max(1, sayfa - 1);
+    yenile();
+  });
+  el("admin-sonraki").addEventListener("click", () => {
+    sayfa += 1;
+    yenile();
+  });
+  el("admin-durum").addEventListener("change", yenile);
+  setInterval(yenile, YENILEME_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") yenile();
+  });
+
+  mesajYaz(t("admin.yukleniyor"), "bilgi");
+  sekmeAc("kullanicilar");
+})();

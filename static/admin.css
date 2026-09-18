@@ -1,0 +1,142 @@
+/* Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+   GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+   Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md). */
+/* Yönetim sayfası (Faz 2 / 8). giris.css'in kararı: yalnız flow-tokens.css
+   tokenları, style.css yok (stüdyo yerleşimi bir tablo sayfasında yanlış).
+   Tek sütun, geniş kart (tablolar için 1100px), dar ekranda tablo yatay kayar. */
+
+* { box-sizing: border-box; }
+
+html, body { min-height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 400 14px/1.5 var(--font-body, -apple-system, system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  padding: 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+}
+
+.admin {
+  max-width: 1100px;
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel, 24px);
+  padding: 24px;
+  box-shadow: var(--shadow, none);
+}
+
+.admin-bas { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; }
+.admin-bas h1 { margin: 0; font: 600 1.4rem/1.2 var(--font-display, inherit); letter-spacing: -0.01em; }
+.admin-alt { margin: 4px 0 0; color: var(--muted); font-size: 0.9rem; }
+.admin-bas-sag { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.admin-yenilendi { color: var(--muted); font-size: 0.78rem; }
+.admin-baglanti { color: var(--fg); font-size: 0.88rem; }
+
+/* Mesaj satırı: giris.css'in `data-tur` kalıbı. */
+.admin-mesaj {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: var(--r-item, 12px);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.admin-mesaj[hidden] { display: none; }
+.admin-mesaj[data-tur="hata"] { border-color: var(--danger); }
+.admin-mesaj[data-tur="basari"] { border-color: var(--border-strong); }
+
+.admin-sekmeler {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 16px;
+  background: var(--surface-2);
+  border-radius: var(--r-item, 12px);
+  max-width: 480px;
+}
+.admin-sekmeler button {
+  flex: 1;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: calc(var(--r-item, 12px) - 4px);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.admin-sekmeler button:hover { color: var(--fg); }
+.admin-sekmeler button[aria-selected="true"] { background: var(--selected-strong, var(--surface-3)); color: var(--fg); }
+
+.admin-sekme[hidden] { display: none; }
+
+.admin-arac { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.admin-arac input, .admin-arac select, .admin-tablo input {
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-item, 12px);
+  background: var(--surface-2);
+  color: var(--fg);
+  font: inherit;
+  outline: none;
+}
+.admin-arac input { min-width: 240px; }
+.admin-arac input:focus-visible, .admin-arac select:focus-visible, .admin-tablo input:focus-visible { border-color: var(--accent); }
+.admin-not { color: var(--muted); font-size: 0.85rem; }
+
+.admin-dugme {
+  padding: 7px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-pill, 999px);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.admin-dugme:hover { background: var(--surface-2); }
+.admin-dugme:disabled { opacity: 0.45; cursor: not-allowed; }
+.admin-dugme[data-tehlike] { border-color: var(--danger); }
+
+.admin-tablo-kap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-item, 12px); }
+.admin-tablo { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.admin-tablo th, .admin-tablo td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; vertical-align: middle; }
+.admin-tablo th { color: var(--muted); font-weight: 500; background: var(--surface-2); }
+.admin-tablo tr:last-child td { border-bottom: 0; }
+.admin-tablo input[type="number"] { width: 96px; padding: 5px 8px; }
+.admin-islem { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.admin-bos td { color: var(--muted); text-align: center; }
+
+.admin-rozet {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: var(--r-pill, 999px);
+  background: var(--accent-subtle, var(--surface-3));
+  color: var(--fg);
+  font-size: 0.72rem;
+}
+.admin-rozet[data-tur="uyari"] { background: var(--surface-3); color: var(--muted); }
+
+/* İş durumu rengi: yalnız iki uç (hata, çalışıyor) — gerisi metin. */
+.admin-durum[data-durum="hata"] { color: var(--danger); }
+.admin-durum[data-durum="calisiyor"] { color: var(--accent); }
+
+.admin-kartlar { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-bottom: 18px; }
+.admin-kart { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-item, 12px); background: var(--surface-2); }
+.admin-kart-etiket { display: block; color: var(--muted); font-size: 0.78rem; }
+.admin-kart-deger { display: block; font: 600 1.3rem/1.2 var(--font-display, inherit); margin-top: 2px; }
+.admin-kart-alt { display: block; color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
+
+.admin-alt-baslik { margin: 18px 0 8px; font: 600 1rem/1.3 var(--font-display, inherit); }
+.admin-isciler { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 0.86rem; }
+.admin-isciler li { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-item, 12px); display: flex; gap: 10px; flex-wrap: wrap; }
+.admin-isciler li[data-canli="false"] { color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-sekmeler button { transition: none; }
+}

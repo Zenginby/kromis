@@ -698,6 +698,8 @@ KULLANICIYA_KONUSAN = (
     "routers/uretim.py",
     # Faz 2 / 4: iş uçları — 404/409/422 metinleri (`err.is_*`, `err.bad_since`).
     "routers/isler.py",
+    # Faz 2 / 8: admin uçları — 404/409/422 metinleri (`err.kullanici_bulunamadi`, `err.is_durumu_gecersiz`).
+    "routers/admin.py",
     # Rota dışı ama kullanıcıya 4xx gövdesi üreten yardımcılar.
     "services/gorsel.py", "services/kapilar.py", "services/modeller.py",
     "services/palet.py",
@@ -758,6 +760,9 @@ KULLANICIYA_KONUSMAYAN = {
                                "ValueError'ı yerine None döner, metni rota kurar",
     "services/depo_sohbet.py": "sohbet deposu (Faz 1 / 6): SQL; veri döndürür, 404'ü rota kurar",
     "services/depo_palet.py": "palet deposu (Faz 1 / 6): SQL; veri döndürür, cümle değil",
+    "services/depo_admin.py": "admin deposu (Faz 2 / 8): SQL; sözlük döndürür, 404/409 metnini rota kurar",
+    "services/gunluk.py": "günlük kurulumu (Faz 2 / 8): `kromis.*` günlükçülerine stdout işleyicisi; "
+                          "satırlar operatöre gider, biçim `k=v`",
     "services/depo_varlik.py": "varlık deposu (Faz 1 / 6): SQL ve dosya; kullanıcıya konuşmaz",
     "services/dosya.py": "dosya deposu soyutlaması (Faz 2 / 2): yerel disk / kova; hataları "
                          "kod (`DosyaHatasi`), 404 metnini rota kurar",

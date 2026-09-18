@@ -1,6 +1,7 @@
 # Faz 2 — iş kuyruğu, platform anahtarları ve nesne depolama: görev listesi
 
 **Tarih:** 2026-09-17 · **Karar:** çok kullanıcılı web (Alperen Zengin, Slack, 2026-09-16: küresel kitle · modele göre kredi, abonelik paketiyle satılır, Stripe önce · yönetilen barındırma — örnek yığın Supabase/Neon + Upstash + Cloudflare R2 + Fly.io/Railway/Render "uygulama + worker" · web-first) · **Önceki faz:** [faz1-veritabani-hesaplar.md](faz1-veritabani-hesaplar.md) (9/9 ✅, PR #28-#36)
+**Not (2026-09-18):** yukarıdaki karardaki "Stripe önce" maddesi **MoR/Polar** ile güncellendi → [master design](superpowers/specs/2026-08-10-saas-transformation-master-design.md) "Ödeme Altyapısı" maddesi. Türkiye'den Stripe'a doğrudan hesap açılamıyor; uluslararası satış Merchant of Record üzerinden. Karar kaydı tarihî olduğu için satırın kendisi değiştirilmedi.
 **Üst belge:** [superpowers/specs/2026-08-10-saas-transformation-master-design.md](superpowers/specs/2026-08-10-saas-transformation-master-design.md) §1-§3, §5 — sapmalar bu belgenin sonunda tek tek yazılı. **Yol haritası kartı (Faz 2):** "Redis + worker; generate/edit/video uçları job oluşturup 202 döner · job durumu için SSE veya polling; ön yüzde iş listesi ve sekme yenilemeye dayanıklılık · platform sahipli sağlayıcı anahtarları için secret manager; isteğe bağlı kullanıcı BYOK · kullanıcı başına eşzamanlılık limiti ve rate limiting · yapısal loglama + Sentry + temel metrikler" — **çıkış kriteri:** "6 dakikalık video işi sekme kapansa da tamamlanıyor; sağlayıcı harcaması kullanıcı başına sınırlı."
 
 Faz 2'nin amacı, Faz 1'in kurduğu hesabın ve veri tabanının üstüne **üretimi
@@ -1782,8 +1783,8 @@ platforma özgü hiçbir şey kodda yok.
   denetiminin yerine, "onayla" `bitir`in içine oturur.
 * **Filigran (ücretsiz katman), tarife-maliyet mutabakatı ve marj raporu** →
   Faz 3. `isler.bitti - basladi` ve model sütunu raporun ham verisi.
-* **Stripe, webhook, abonelik yaşam döngüsü, vergi, e-Arşiv** → **Faz 4**;
-  kart açıkça orada, sahibin "Stripe önce" kararı sırayı değiştirmiyor.
+* **Ödeme (MoR/Polar), webhook, abonelik yaşam döngüsü, vergi, e-Arşiv** →
+  **Faz 4**; kart açıkça orada, sahibin "ödeme önce" kararı sırayı değiştirmiyor.
 * **KVKK/GDPR: gizlilik metni, rıza, hesap silme, veri dışa aktarma, saklama
   süreleri** → Faz 4. `isler.istek.prompt` ve `kullanicilar.silindi_at` yer
   tutucular; iş saklama 30 gün (10) o kararın öncülü, kesin süre orada.

@@ -996,7 +996,7 @@ Yoklamadan akışa GERİ DÖNÜŞ yok (karar (g)); vekil arkasında uzun oturuml
 
 ---
 
-## 6. Platform sahipli sağlayıcı anahtarları (ortam sırrı) + kullanıcı BYOK; kota: saatlik iş, günlük kredi tavanı (PR: `faz2/platform-anahtarlari-kota`)
+## 6. Platform sahipli sağlayıcı anahtarları (ortam sırrı) + kullanıcı BYOK; kota: saatlik iş, günlük kredi tavanı ✅ (PR: `faz2/platform-anahtarlari-kota`)
 
 **Kapsam.** Çıkış kriterinin ikinci yarısı. **Anahtarlar:** işçi ve web
 süreci ortamdan `KROMIS_PLATFORM_<AD>` okur — `<AD>` `depo_kimlik_bilgisi.ADLAR`ın
@@ -1081,6 +1081,174 @@ düşük kalır — Faz 3 düzeltir.
 (sahibin gerçek anahtarıyla canlı, bir görsel); kendi anahtarını giren onunla
 çıkıyor (sahte istemci kaydı); 2.001. kredi 429; `pg_dump`/günlük/cevapta
 anahtar yok; takım yeşil.
+
+**Yapıldığında (2026-09-18).** Yeni `services/platform_anahtari.py`:
+`ADLAR = depo_kimlik_bilgisi.ADLAR − ESKI_BYOK` (katalogdan türeyen 15 ad;
+bekçi kümeyi kataloğun üç alanından yeniden kurar), `platform_sozlugu(ortam)`
+her çağrıda ortamı okur (süreç başına bir kez okumak testte yamalanamazdı —
+`kapilar.es_zamanli_is_tavani`nın kararı), bilinmeyen `KROMIS_PLATFORM_X` bir
+kez `logging.warning` (değer yok, tanınan adlar var), `birlestir(kullanici) →
+(sözlük, kaynaklar)` ad ad kullanıcı → platform → yok, `Kimlikler(dict)` +
+`.kaynaklar` (rota "hangi anahtarla" sorusunu buradan cevaplar; düz sözlük
+gelirse her ad `kullanici` sayılır), `kaynak(cred_id, kimlikler)` anahtar
+adının kaynağı — `azure_chat`/`azure_foundry` görselin anahtarına düşer
+(`credstore.resolve`ın aynı düşmesi), ADRES sayılmaz. Yeri belgenin dediği
+iki kapı: `kimlik.kimlik_bilgileri` (`request.state.kimlikler` artık
+birleşik nesne; DB sorgusu değişmedi — test_kimlik'in "GET /api/settings 2
+sorgu" ölçüsü duruyor) ve `isci.kos` (`birlestir(depo_kimlik_bilgisi.oku(…))`).
+Adaptörler ve `credstore` dokunulmadı.
+
+"ANAHTAR YOK" KAPISI `kapilar.check_anahtar(cred_id, kimlikler) → kaynak`:
+`credstore.is_configured` (arayüzün "kurulu" dediğiyle rotanın kabul ettiği
+ayrışmasın) → değilse **409** `err.anahtar_yok` (sağlayıcı adı + ortam
+değişkeni; 502 değil — sağlayıcıya gidilmedi, 422 değil — istek biçimce
+doğru). Dört üretim rotası `kimlik.KIMLIKLER`i GERİ ALDI (4. görevde çıkmıştı;
+gerekçe `routers/uretim.py` başında, `KIMLIK_OKUYAN` +5) ve `POST
+/api/isler/{id}/yeniden` de aynı zincirden geçer — yeniden gönderim iş
+doğurur, kotanın arka kapısı olamaz; `anahtar_kaynagi` eski satırdan
+KOPYALANMAZ, yeniden çözülür. Zincir `routers/uretim.py::_kapilar`: doğrulama
+→ anahtar (409) → eş zamanlılık (429) → saatlik (429) → günlük (429) → girdi
+nesneleri → satır. Anahtarsız istek kotaya hiç sayılmaz (iş doğmaz).
+
+KOTA `services/kota.py` (`hesap._bekleme`nin ikizi): `saatlik_bekleme` —
+`count, min(olusturuldu)` son 60 dk, `durum != 'iptal'`; `Retry-After` en eski
+işin pencereden çıkışı +1 sn; gövde `err.saatlik_is_tavani` (tavan, dakika).
+`gunluk_durum` — `sum(kredi_tahmini)` son 24 sa, `anahtar_kaynagi =
+'platform'`, `iptal` hariç; `hata` SAYILIR (faturalanmış olabilir, K8'in
+kuşkusu); toplam + tahmin > tavan → 429, gövde tavan/kalan/tahmin/pencerenin
+açılış tarihi-saati (`zaman.damga`), `Retry-After` en eski sayılan işin
+düşüşü; tavan `kullanicilar.gunluk_kredi_tavani` (NULL → ortam). Eşitlik
+GEÇER (1.992 + 8 = 2.000 → 202; 2.001. kredi 429 — ölçüldü). Eski (kaynaksız)
+satır sayılmaz. Yeni indeks yok: iki sorgu da `ix_isler_kullanici_olusturuldu`.
+Göç `0005_kota`: `isler.anahtar_kaynagi text` + `ck_isler_anahtar_kaynagi_kumesi`,
+`kullanicilar.gunluk_kredi_tavani int`; `alembic check` temiz, ileri-geri-ileri
+yeşil; `kuyruk.ekle(…, anahtar_kaynagi=)`, `_json` +1 alan (13).
+
+`GET/POST /api/settings`: `kaynaklar: {kimlik: "kullanici" | "platform" | null}`
+`providers`ın yanında (`services/modeller.py`; anahtar yine yok — bekçi ekilen
+platform anahtarını `r.text`te arar); `chat_instructions_path` VE
+`chat_video_instructions_path` web'de `null` (aynı sınıf: sunucunun diski),
+kabukta aynen. SAPMA — "boş gönderim siler" YAPILMADI: rotanın bugünkü kuralı
+gizli alanda boş = "dokunmadım" (yalnızca-yazılır form; istemci her kutuyu
+koşulsuz gönderiyor — boşu silme saymak Gemini anahtarı kaydedenin OpenAI
+anahtarını silmek olurdu, `test_saglayici_anahtari_bos_gelirse_mevcut_KORUNUYOR`).
+Belgenin "boş = sil" dediği şey DEPO katmanının anlamı ve o korunuyor: yeni
+`SettingsRequest.anahtar_sil: list[kimlik_id]` kimliğin anahtar + adres
+satırlarını boş değerle yazar (Azure'da ikisi birlikte — yalnız anahtar
+silinse kullanıcının adresi platformun anahtarıyla eşleşir ve istek yanlış
+hosta giderdi), kullanıcı platforma düşer; bilinmeyen id 422, aynı istekte
+değer de gelmişse silme kazanır. `settings.js`: `#prov-<p>` gruplarına
+dinamik "platform sağlıyor — kendi anahtarını girersen o kullanılır" notu
+(kaynak `platform`) ve "kendi anahtarımı sil" düğmesi (kaynak `kullanici`;
+`POST {anahtar_sil: [kimlik]}`), sağlayıcı kartı rozeti üç hâl; index.html
+DEĞİŞMEDİ. `isler.js`: satırda "~N kredi" (+ "platform anahtarı" işareti),
+`hata` kodları i18n cümlesine (`HATA_KODLARI` — bekçi `test_isler_route`
+Python sabitleriyle harfiyen eşler); kota 429'ları core.js'in mevcut
+`kromisIsler.uyar(mesaj, retryAfter)` yolundan geçer, cümle sunucudan.
+"Panelin başına günlük kalan" YAPILMADI: yeni bir uç ister, 8. görevin admin
+metrikleriyle birlikte düşünülür. i18n +12 (tr/en).
+
+`.env.example`: 1. bölüm +2 (`KROMIS_SAATLIK_IS_TAVANI`, `KROMIS_GUNLUK_KREDI_TAVANI`,
+öntanımlılarıyla), yeni **1d** bölümü `KROMIS_PLATFORM_` + katalog adları
+(15 atama, hepsi boş; bekçi öneki katalogla kurar, ALTYAPI'nın ardından ve 2.
+bölümün önünde olduğunu sınar); başlık "12-factor … KAPANDI" cümlesi KULLANICI
+anahtarına daraltıldı. `compose.yaml` yorumu: platform anahtarı yerelde
+`.env`den, `env_file` iki servise (`kromis`, `isci`) taşır.
+
+TESTLER: takım 3.617 → 3.652. Yeni `tests/test_platform_anahtari.py` (13: sıra,
+boş değer, `kaynak` düşmeleri, katalog eşitliği, bilinmeyen ad bir kez ve
+değersiz, `GET /api/settings` kaynak + sızmaz, kendi anahtarı ezer / sil →
+platforma düşer / boş kutu dokunmaz, Azure'da anahtar + adres birlikte,
+bilinmeyen id 422 hiçbir şey yazmaz, sorgu sayısı büyümez, işçi
+`[platform, kullanici, platform]` + DB dökümü/`hata.log`/günlük/cevap taraması,
+anahtarsız 409 ve iş yok, kapı birimi), `tests/test_kota.py` (14: 61. iş 429 +
+`Retry-After: 601`, 60. geçer / iptal sayılmaz, pencere `zaman.an()` ile
+kayar, ortam + bozuk değer, BYOK'a da uygulanır + yalnız bu kullanıcı,
+2.001. kredi 429 gövdede kalan + açılış, kalan gerçek (küçük iş sığar), BYOK /
+eski satır / iptal sayılmaz ama `hata` sayılır, BYOK'lu kullanıcı hiç durmaz,
+kullanıcı ezmesi, günlük pencere kayar, kapı SIRASI, multipart 429 nesne
+bırakmaz, yeniden gönderim aynı kapılar). Güncellenen: `test_kimlik`
+(`KIMLIK_OKUYAN` +5; anahtarsız kullanıcı 409, iş yok; `gercek_anahtar`),
+`test_settings_route` (talimat yolu web'de null / kabukta dosya),
+`test_isler_route` (+`anahtar_kaynagi`; panel kod eşlemesi bekçisi),
+`test_kuyruk` (13 anahtar; göç literali), `test_tablolar` (CHECK), `test_db` /
+`test_goc` (`BAS = "0005_kota"`, zincir), `test_docker_kapisi` (ALTYAPI +2,
+1d bekçisi), `test_i18n` (kota konuşan, platform_anahtari konuşmayan).
+CONFTEST: autouse `_anahtar_kapisi` `kapilar.check_anahtar`ı `"kullanici"`
+döndüren bir yamayla örter — 26 test dosyasının üretim çağrıları anahtar
+bilmiyor (sağlayıcı yamalı, kimlik satırı yok) ve hepsi 409 alırdı; `kullanici`
+fixture'ının kimlik kapısı için yaptığının ikizi, opt-out
+`@pytest.mark.gercek_anahtar` (üç dosya). Ortama sahte platform anahtarı
+eklemek seçilmedi: `providers` her yerde `true` olur, "kurulu değil" ölçen
+iddialar kırılırdı. ÖLÇÜLEN TUZAK: `depo_db` Alembic'i aynı süreçte koşturur
+ve `alembic/env.py`nin `fileConfig`i o ana kadar yaratılmış günlükçüleri
+KAPATIR (`disable_existing_loggers`) — "bir kez uyarır" testi günlükçüyü
+yeniden açar; üretimde göç ayrı süreçte, sorun yok.
+
+DUMAN (2026-09-18; geçici Postgres + `tools/goc.py` → `0005_kota` + uvicorn +
+`isci.py` ayrı süreçler, sahte `KROMIS_PLATFORM_AZURE_IMAGE_API_KEY` ortamda,
+sağlayıcı yamalı): anahtarsız kullanıcı `GET /api/settings` →
+`providers.azure_image = true`, `kaynaklar.azure_image = "platform"`,
+`chat_instructions_path = null`; `POST /api/generate` → 202 (22 ms), 202
+gövdesinde `anahtar_kaynagi = "platform"`; işçi `bitti`, DB satırı `('bitti',
+'platform', 4)`. Ortam silinip iki süreç yeniden açılınca aynı kullanıcı
+`kaynaklar.azure_image = null`, `POST /api/generate` **409** ("Azure OpenAI ·
+görsel için kayıtlı anahtar yok …"), `isler` sayısı değişmedi (1).
+`KROMIS_SAATLIK_IS_TAVANI=2` ile (1 eski + 2 yeni) `[202, 429, 429]`,
+`Retry-After: 3597`, gövde "Saatlik iş kotası doldu (2 iş/saat); yaklaşık 60
+dk sonra yeniden dene." Ekilen anahtar iki sürecin stdout'unda (3,2 KB) ve 12
+cevabın hiçbirinde yok.
+
+**Sahibin adımı — platform anahtarını gerçek sırla canlıya almak (CI'dan
+yapılamaz).** Kod sahte anahtara karşı yeşil; parayı harcayan adım sahibin:
+
+1. **Hangi sağlayıcı fonlanacak?** Katalogun adları (bekçi aynı kümeyi
+   kurar; `.env.example` 1d): `KROMIS_PLATFORM_AZURE_IMAGE_API_KEY` +
+   `KROMIS_PLATFORM_AZURE_IMAGE_BASE_URL` (Azure'da ikisi birlikte; MAI/FLUX
+   aynı anahtarla, `KROMIS_PLATFORM_AZURE_FOUNDRY_BASE_URL` yalnız ayrı
+   kaynak/vekilse), `KROMIS_PLATFORM_AZURE_CHAT_API_KEY` /
+   `_AZURE_CHAT_BASE_URL` / `_AZURE_CHAT_DEPLOYMENT` (yönetmen; boşsa
+   görselin anahtarına düşer), `KROMIS_PLATFORM_OPENAI_API_KEY`
+   (`_OPENAI_BASE_URL` yalnız vekil), `KROMIS_PLATFORM_GEMINI_API_KEY`
+   (görsel + Veo; `_GEMINI_BASE_URL` yalnız vekil),
+   `KROMIS_PLATFORM_ANTHROPIC_API_KEY` (`_ANTHROPIC_BASE_URL`),
+   `KROMIS_PLATFORM_FAL_KEY` (`_FAL_BASE_URL`). Yalnız istediğin satırlar;
+   boş kalan sağlayıcı yalnız BYOK ("yapılandırılmamış", bugünkü gibi).
+2. **Tavanlar** (isteğe bağlı, öntanımlı 60 iş/saat ve 2.000 kredi/gün ≈ 10
+   USD/gün/kullanıcı): `KROMIS_SAATLIK_IS_TAVANI`, `KROMIS_GUNLUK_KREDI_TAVANI`.
+   Muhafazakâr başla; admin (8) kullanıcı başına ezecek.
+3. **Sırları platforma gir** (Fly `secrets set`, Railway/Render env — şifreli
+   saklanır, sürece ortam olarak gelir), HEM web HEM işçi sürecine (ikisi de
+   okur; compose'ta `env_file` ikisine taşıyor). Göç dağıtım öncesi komutla
+   (`python tools/goc.py` → `0005_kota`), sonra dağıt.
+4. **Canlı denetim:** anahtar girmemiş bir kullanıcıyla gir → Ayarlar'da o
+   sağlayıcının kartı "platform sağlıyor", alanın altında aynı not;
+   `GET /api/settings` `kaynaklar.<kimlik> = "platform"` (anahtar hiçbir
+   alanda yok); bir görsel üret → 202, iş paneli satırında "~N kredi ·
+   platform anahtarı", iş `bitti`, `GET /api/isler/{id}` `anahtar_kaynagi =
+   "platform"`; kendi anahtarını gir → sonraki iş `kullanici`; "kendi
+   anahtarımı sil" → yine `platform`. Sağlayıcı panosunda faturanın platform
+   anahtarına düştüğünü bir kez gör.
+5. **Sonuç bu belgeye** ("Yapıldığında"nın altına bir satır: tarih, sağlayıcı,
+   ilk günün kredi toplamı). Geri dönüş: sırrı silmek — anahtarsız kullanıcı
+   yine 409 alır, BYOK sürer.
+
+**7. göreve devredilen.** RLS ikinci kat (`0006_rls`): `SET LOCAL
+app.kullanici_id` ile politika 8 iş tablosunda; bu görevin İKİ yeni sütunu
+politika istemez ama ROL ister — `isler.anahtar_kaynagi` sahibin satırında
+(kiracı süzgeci `kullanici_id`den geliyor), `kullanicilar.gunluk_kredi_tavani`
+ise `kullanicilar`da: kullanıcı KENDİ tavanını okuyabilir (rota
+`kullanici.gunluk_kredi_tavani` okuyor, kimlik sorgusuyla geliyor) ama
+YAZAMAMALI — yazan yalnız admin rolü (8), politika `kullanicilar`ı zaten
+kapsam dışında tutuyorsa sütun düzeyinde `GRANT UPDATE (gunluk_kredi_tavani)`
+admin'e. İşçi rolü: `kos` kullanıcının kimliklerini `SET LOCAL`sız okuyor
+(`depo_kimlik_bilgisi.oku(db, is_.kullanici_id)`) — işçi ya BYPASSRLS ya da
+işin `kullanici_id`sini `SET LOCAL` ile bağlar (ikincisi doğru olan: işçi
+platformun, ama her iş bir kiracının). Kota sorguları (`kota.saatlik_bekleme`,
+`gunluk_durum`) `kullanici_id` süzgeçli, politika altında aynen çalışır.
+Platform anahtarı DB'de değil, RLS'in konusu değil. Ayrıca 8'e: "panelin
+başına günlük kalan" için `GET /api/kota` (kalan kredi, saatlik sayı,
+pencerelerin açılışı) — admin metrikleriyle aynı sorgular.
 
 ---
 

@@ -45,7 +45,7 @@ import shlex
 import yaml
 
 import catalog
-from services import cerez, db, dosya, isci, kapilar, koken, posta, sifre
+from services import cerez, db, dosya, isci, kapilar, koken, kota, platform_anahtari, posta, sifre
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCKERFILE = os.path.join(KOK, "Dockerfile")
@@ -254,12 +254,14 @@ def _atamalar() -> list[tuple[str, str, bool]]:
 # Faz 2 / 3 ile işçi süreci `KROMIS_ISCI_ES_ZAMANLI`, `KROMIS_IS_KALP_ESIGI_SN`
 # (services/isci.py — yalnız `isci.py` okur, ama aynı imaj ve aynı şablon);
 # Faz 2 / 4 ile kullanıcı başına eş zamanlı iş tavanı `KROMIS_KULLANICI_ES_ZAMANLI_IS`
-# (services/kapilar.py). Adlar KAYNAKTAN, elle değil.
+# (services/kapilar.py); Faz 2 / 6 ile iki kota tavanı `KROMIS_SAATLIK_IS_TAVANI`,
+# `KROMIS_GUNLUK_KREDI_TAVANI` (services/kota.py). Adlar KAYNAKTAN, elle değil.
 ALTYAPI = {"KROMIS_DATA_DIR", "PORT", db.DATABASE_URL_ENV, koken.KOKEN_ENV,
            posta.POSTA_ENV, posta.GONDEREN_ENV, posta.RESEND_ANAHTAR_ENV, cerez.GUVENLI_ENV,
            sifre.ANAHTAR_ENV,
            dosya.URL_ENV, dosya.KOVA_ENV, dosya.ANAHTAR_ID_ENV, dosya.GIZLI_ENV, dosya.BOLGE_ENV,
-           isci.ES_ZAMANLI_ENV, isci.KALP_ESIGI_ENV, kapilar.ES_ZAMANLI_IS_ENV}
+           isci.ES_ZAMANLI_ENV, isci.KALP_ESIGI_ENV, kapilar.ES_ZAMANLI_IS_ENV,
+           kota.SAATLIK_IS_ENV, kota.GUNLUK_KREDI_ENV}
 
 
 def _katalog_adlari() -> set[str]:
@@ -268,6 +270,12 @@ def _katalog_adlari() -> set[str]:
     adlar |= {c.url_env for c in catalog.CREDENTIALS if c.url_env}
     adlar |= {m.wire_from_env for m in catalog.CHAT_MODELS if m.wire_from_env}
     return adlar
+
+
+def _platform_adlari() -> set[str]:
+    """1d bölümü (Faz 2 / 6): `KROMIS_PLATFORM_` + katalog adı — öneki de katalogla kuruyoruz,
+    `platform_anahtari.ADLAR`ı kopyalamıyoruz (o kümenin kendi bekçisi test_platform_anahtari)."""
+    return {platform_anahtari.ONEK + ad for ad in _katalog_adlari()}
 
 
 def _kodun_okudugu_adlar() -> set[str]:
@@ -307,7 +315,7 @@ def test_the_infra_set_is_exactly_what_the_web_build_reads_from_the_environment(
 def test_env_example_lists_exactly_the_infra_vars_and_the_catalog_names():
     adlar = [ad for ad, _, _ in _atamalar()]
     assert len(adlar) == len(set(adlar)), "yinelenen ad"
-    beklenen = ALTYAPI | _katalog_adlari()
+    beklenen = ALTYAPI | _katalog_adlari() | _platform_adlari()
     assert len(beklenen) > 10, "katalog şüpheli biçimde küçük"  # bekçinin bekçisi
     assert set(adlar) == beklenen, (
         f"eksik: {sorted(beklenen - set(adlar))}, fazla: {sorted(set(adlar) - beklenen)}")
@@ -328,14 +336,33 @@ def test_every_env_example_variable_is_explained():
 
 
 def test_env_example_warns_that_provider_keys_are_not_read_from_the_environment():
-    """Uygulama anahtarları web'de kullanıcı başına DB'den okur (`saglayici_kimlikleri`,
-    Faz 1 / 7), masaüstünde `credentials.env`den; `os.environ`dan HİÇ değil. Şablon bunu
-    söylemezse `.env`e anahtar yazan kullanıcı 'neden çalışmıyor' der."""
+    """KULLANICI anahtarını web kullanıcı başına DB'den okur (`saglayici_kimlikleri`,
+    Faz 1 / 7), masaüstünde `credentials.env`den; 2. bölümün adlarıyla `os.environ`dan
+    HİÇ değil. Şablon bunu söylemezse `.env`e `GEMINI_API_KEY=` yazan 'neden çalışmıyor'
+    der. Ortamdan okunan tek anahtar PLATFORMUN (Faz 2 / 6) ve o ayrı önekle, 1d'de."""
     metin = _oku(ENV_EXAMPLE)
     assert "SÜREÇ ORTAMINDAN" in metin and "credentials.env" in metin
     assert "saglayici_kimlikleri" in metin and "ŞİFRELİ" in metin
-    # Faz 0 / 8'in "ortamdan okuma (12-factor)" takibi burada KAPANDI diye yazılı olmalı.
+    # Faz 0 / 8'in "ortamdan okuma (12-factor)" takibi kullanıcı anahtarı için KAPANDI diye
+    # yazılı olmalı; platform anahtarı 1d'ye işaret etmeli.
     assert "12-factor" in metin and "KAPANDI" in metin
+    assert platform_anahtari.ONEK in metin and "1d" in metin
+
+
+def test_env_example_section_1d_is_the_catalog_names_with_the_platform_prefix_and_no_value():
+    """Faz 2 / 6: 1d bölümü her katalog adını `KROMIS_PLATFORM_` önekiyle sayar, hepsi boş,
+    ALTYAPI'dan sonra ve 2. bölümden önce; iki kota tavanı 1. bölümde (ALTYAPI) ve
+    öntanımlıları (60 / 2000) açıklamasında yazılı."""
+    adlar = [ad for ad, _, _ in _atamalar()]
+    platform = [ad for ad in adlar if ad.startswith(platform_anahtari.ONEK)]
+    assert set(platform) == _platform_adlari()
+    ilk, son = adlar.index(platform[0]), adlar.index(platform[-1])
+    assert ilk == len(ALTYAPI), "1d bölümü ALTYAPI'nın hemen ardından başlamalı"
+    assert adlar[ilk:son + 1] == platform, "1d bölümü bir arada değil"
+    assert all(deger == "" for ad, deger, _ in _atamalar() if ad.startswith(platform_anahtari.ONEK))
+    metin = _oku(ENV_EXAMPLE)
+    assert str(kota.SAATLIK_IS_VARSAYILAN) in metin and str(kota.GUNLUK_KREDI_VARSAYILAN) in metin
+    assert "kullanıcının kendi satırı → buradaki değer → yok" in metin, "çözüm sırası yazılı olmalı"
 
 
 def test_env_example_requires_the_secret_key_and_shows_the_generation_command():

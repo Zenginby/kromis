@@ -345,6 +345,11 @@ def test_check_constraints_accept_every_allowed_value_and_reject_the_rest(motor,
     for durum in tablolar.IS_DURUMLARI:
         _kabul_ediyor(_is(durum=durum))
     _reddediyor(_is(durum="askida"), "ck_isler_durum_kumesi")
+    # Anahtar kaynağı (Faz 2 / 6, göç 0005): iki değer geçer, NULL geçer (eski satır), üçüncüsü geçmez.
+    for kaynak in tablolar.ANAHTAR_KAYNAKLARI:
+        _kabul_ediyor(_is(anahtar_kaynagi=kaynak))
+    _kabul_ediyor(_is(anahtar_kaynagi=None))
+    _reddediyor(_is(anahtar_kaynagi="havuz"), "ck_isler_anahtar_kaynagi_kumesi")
     with Session(motor) as db:
         db.add(_is())
         db.flush()

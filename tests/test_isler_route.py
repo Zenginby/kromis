@@ -127,8 +127,9 @@ def test_generate_answers_202_with_the_job_and_no_provider_call(c, monkeypatch):
     spec = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
     assert is_["kredi_tahmini"] == catalog.cost_for(spec, "medium") * 3
     assert is_["sonuc"] is None and is_["hata"] is None and is_["basladi"] is None
-    assert set(is_) == {"id", "tur", "durum", "model", "kredi_tahmini", "olusturuldu", "basladi",
-                        "bitti", "sonuc", "hata", "arena_id", "folder_id"}, "`istek` (prompt, anahtarlar) dökülmez"
+    assert set(is_) == {"id", "tur", "durum", "model", "kredi_tahmini", "anahtar_kaynagi", "olusturuldu",
+                        "basladi", "bitti", "sonuc", "hata", "arena_id", "folder_id"}, "`istek` (prompt, anahtarlar) dökülmez"
+    assert is_["anahtar_kaynagi"] == "kullanici", "conftest'in anahtar kapısı yaması `kullanici` der (Faz 2 / 6)"
     assert is_["arena_id"] is None and is_["folder_id"] is None, (
         "`istek`ten dökülen iki alan: tur etiketi (panel gruplaması) ve klasör (önizleme)")
     assert "kedi" not in r.text
@@ -747,3 +748,19 @@ def test_resubmit_drops_the_arena_id_because_the_round_is_over(c, depo_db, monke
     assert yeni["arena_id"] is None
     satir = next(s for s in _isler(depo_db) if str(s.id) == yeni["id"])
     assert satir.istek["arena_id"] is None and satir.istek["prompt"] == "kedi"
+
+
+# ── Faz 2 / 6: panelin `hata` kodları eşlemesi ─────────────────────────
+
+def test_the_panel_maps_every_hata_code_the_server_writes():
+    """`hata` sütununa yazılan üç KOD (cümle değil) panelde i18n cümlesine çevrilir; isler.js
+    kodları HARFİYEN taşımak zorunda — Python sabiti değişir de betik değişmezse kullanıcı
+    ham kodu görür. Sabitler kaynaktan, betik metinden okunuyor."""
+    with open(os.path.join(REPO, "static", "isler.js"), encoding="utf-8") as f:
+        betik = f.read()
+    for kod, anahtar in ((kuyruk.BAYAT_HATASI, "isler.hata_bayat"),
+                         (isci.BEKLENMEYEN_HATASI, "isler.hata_beklenmeyen"),
+                         (isci.KULLANICI_YOK_HATASI, "isler.hata_kullanici_yok")):
+        assert f'["{kod}", "{anahtar}"]' in betik, (kod, anahtar)
+    # İşçi beklenmeyen hatayı `KOD: TürAdı` yazar (services/isci.py); betik `:` ile ayırıyor.
+    assert 'startsWith(kod + ":")' in betik

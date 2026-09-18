@@ -110,6 +110,8 @@ def _json(is_: Is) -> dict[str, Any]:
         "durum": is_.durum,
         "model": is_.model,
         "kredi_tahmini": is_.kredi_tahmini,
+        # Faz 2 / 6: panel "platform anahtarıyla" işaretini, sahibi doğrulamasını buradan okur.
+        "anahtar_kaynagi": is_.anahtar_kaynagi,
         "olusturuldu": _damga(is_.olusturuldu),
         "basladi": _damga(is_.basladi),
         "bitti": _damga(is_.bitti),
@@ -124,7 +126,7 @@ def _json(is_: Is) -> dict[str, Any]:
 
 def ekle(db: Session, kullanici_id: uuid.UUID, tur: str, istek: dict[str, Any], model: str,
          kredi_tahmini: int, *, an: dt.datetime | None = None,
-         is_id: uuid.UUID | None = None) -> Is:
+         is_id: uuid.UUID | None = None, anahtar_kaynagi: str | None = None) -> Is:
     """İşi kuyruğa koyar (`bekliyor`); satırı döndürür (`_json` ile dökülür).
 
     `flush`: CHECK (`tur`), FK ve NOT NULL burada patlasın — rota 202
@@ -135,9 +137,13 @@ def ekle(db: Session, kullanici_id: uuid.UUID, tur: str, istek: dict[str, Any], 
     anahtarına işi YAZMADAN ÖNCE koyar (`istek.girdiler` o anahtarları taşır),
     yani id'yi satırdan önce bilmek zorunda. Verilmezse DB'nin varsayılanı
     (`gen_random_uuid`), bugünkü davranış.
+
+    `anahtar_kaynagi` (Faz 2 / 6): rotanın çözdüğü kaynak (`kullanici` |
+    `platform`); günlük kredi tavanı yalnız `platform` satırlarını toplar
+    (services/kota.py). Bu modül çözmez, saklar — CHECK bilinmeyen değeri reddeder.
     """
     satir = Is(kullanici_id=kullanici_id, tur=tur, durum=DURUM_BEKLIYOR, istek=istek,
-               model=model, kredi_tahmini=kredi_tahmini,
+               model=model, kredi_tahmini=kredi_tahmini, anahtar_kaynagi=anahtar_kaynagi,
                olusturuldu=an if an is not None else zaman.an())
     if is_id is not None:
         satir.id = is_id

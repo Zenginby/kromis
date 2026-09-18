@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import os
 import uuid
+from collections.abc import Mapping
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
@@ -24,7 +25,7 @@ from models import (
     check_capabilities,
     check_video_capabilities,
 )
-from services import ayar, dil, dosya, gorsel, kapilar, kimlik, kuyruk, palet
+from services import ayar, dil, dosya, gorsel, kapilar, kimlik, kota, kuyruk, palet
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
@@ -43,20 +44,25 @@ router = APIRouter()
 # çünkü ikisi de kullanıcının O ANKİ paletine/kataloğa bağlı ve palet sonradan
 # silinse iş değişmemeli (`istek` sözleşmesi services/isci.py'nin başında).
 #
-# SIRA BİLİNÇLİ: doğrulama → eş zamanlılık kapısı (`check_is_tavani`, 429) →
-# girdi nesneleri → satır. 422 alacak istek 429 ile maskelenmez; 429 alacak
-# istek depoya nesne bırakmaz; satır ancak nesneler yazıldıysa doğar (nesne
-# yazımı düşerse istek 500, satır yok, işçi hiç görmez). `is_id` rotada
-# üretilir (`uuid4`) ve `kuyruk.ekle`ye verilir: anahtar id'yi taşır.
+# SIRA BİLİNÇLİ (Faz 2 / 6 ile dört kapı, `_kapilar`): doğrulama → "anahtar
+# yok" (409) → eş zamanlılık (429) → saatlik iş (429) → günlük kredi (429) →
+# girdi nesneleri → satır. 422 alacak istek 409/429 ile maskelenmez; anahtarsız
+# istek kotaya hiç sayılmaz (iş doğmaz); 429 alacak istek depoya nesne
+# bırakmaz; satır ancak nesneler yazıldıysa doğar (nesne yazımı düşerse istek
+# 500, satır yok, işçi hiç görmez). `is_id` rotada üretilir (`uuid4`) ve
+# `kuyruk.ekle`ye verilir: anahtar id'yi taşır.
 #
 # GİRDİ NESNELERİ İŞ BİTİNCE SİLİNMEZ (§3 kararı (g); belge §4'ün "iş bitince
 # silinir" satırından bilinçli sapma): "yeniden gönder" (5. görev) aynı
 # nesneleri kullanır, 30 günlük saklama (10. görev) ve `tools/artik_dosya.py`
 # (`isler/` öneki) siler. İşçi yalnız okur.
 #
-# `kimlikler` İMZADAN ÇIKTI: sağlayıcı kimliğini işçi çözer (`kos`), rota
-# artık anahtar okumaz — her istekte bir sorgu + N Fernet çözümü boşa
-# giderdi (tests/test_kimlik.py `KIMLIK_OKUYAN` iki yönlü bekçi).
+# `kimlikler` İMZAYA GERİ GELDİ (Faz 2 / 6; 4. görevde çıkmıştı, çünkü rota
+# anahtar okumuyordu ve sorgu + N Fernet çözümü boşa gidiyordu): "anahtar
+# yok" kapısı çözüm sırasını (kullanıcı → platform → yok) rotada BİR kez
+# sorar ve sonucu (`anahtar_kaynagi`) satıra yazar — günlük kredi tavanı o
+# sütunu toplar. İşçi yine kendi çözer (`kos`; iş dakikalar sonra koşar,
+# kullanıcı arada anahtar girmiş olabilir). tests/test_kimlik.py `KIMLIK_OKUYAN`.
 # `ayarlar` KALDI: `edit`/`animate` referansları `ayarlar.output_dir`den
 # okur; `generate`/`video`da bağımlılık kullanıcı dizinlerini ilk istekte
 # açar (`ayar._dizinleri_ac`, 0o700 kök) — işçi o dizine yazar ve rota
@@ -91,10 +97,28 @@ def _girdileri_yaz(depo: dosya.Depo, kullanici_id: uuid.UUID, is_id: uuid.UUID,
 
 
 def _siraya_koy(db: Session, kullanici_id: uuid.UUID, tur: str, istek: dict[str, Any],
-                model: str, kredi_tahmini: int, is_id: uuid.UUID | None = None) -> dict:
+                model: str, kredi_tahmini: int, is_id: uuid.UUID | None = None,
+                anahtar_kaynagi: str | None = None) -> dict:
     """`kuyruk.ekle` → 202 gövdesi. `istek` DÖKÜLMEZ (`_json`): prompt ve girdi anahtarları içeride."""
-    is_ = kuyruk.ekle(db, kullanici_id, tur, istek, model, kredi_tahmini, is_id=is_id)
+    is_ = kuyruk.ekle(db, kullanici_id, tur, istek, model, kredi_tahmini, is_id=is_id,
+                      anahtar_kaynagi=anahtar_kaynagi)
     return {"is": kuyruk._json(is_)}
+
+
+def _kapilar(db: Session, kullanici: Kullanici, cred_id: str, kimlikler: Mapping[str, str],
+             kredi_tahmini: int) -> str:
+    """Dört rotanın ortak kapı zinciri (sıra dosya başında); işin `anahtar_kaynagi`ni döndürür.
+
+    Doğrulamadan SONRA, girdi nesnesi yazılmadan ÖNCE çağrılır. Anahtar kapısı
+    en başta: anahtarsız kullanıcı kota sayaçlarına hiç dokunmaz ve 429 yerine
+    sebebini (409) okur. Günlük kredi kapısı kaynağı bilmek zorunda — yalnız
+    `platform` sayılır (services/kota.py), o yüzden zincirin sonunda.
+    """
+    kaynak = kapilar.check_anahtar(cred_id, kimlikler)
+    kapilar.check_is_tavani(db, kullanici.id)
+    kota.check_saatlik(db, kullanici.id)
+    kota.check_gunluk(db, kullanici, kredi_tahmini, kaynak)
+    return kaynak
 
 
 def _ortak_istek(prompt: str, size: str, quality: str, n: int, folder_id: str | None,
@@ -107,7 +131,8 @@ def _ortak_istek(prompt: str, size: str, quality: str, n: int, folder_id: str | 
 @router.post("/api/generate", status_code=202)
 def generate(req: GenerateRequest, db: Session = OTURUM,
              ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-             kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+             kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+             kimlikler: Mapping[str, str] = kimlik.KIMLIKLER) -> dict:
     folder_id = kapilar.check_folder(req.folder_id, db, kullanici.id)
     session_id = kapilar.check_session(req.session_id)
     arena_id = kapilar.check_arena(req.arena_id)
@@ -123,21 +148,23 @@ def generate(req: GenerateRequest, db: Session = OTURUM,
     assert req.model is not None
     spec = catalog.image_model(req.model)
     assert spec is not None
-    kapilar.check_is_tavani(db, kullanici.id)
     # TAHMİN görsel başına maliyet × adet; işçi gerçek maliyeti satır başına
-    # yazar (`isci._kredi`), bu sayı 6. görevin günlük tavanı için.
+    # yazar (`isci._kredi`), bu sayı günlük kredi tavanının (services/kota.py) girdisi.
     kredi_tahmini = catalog.cost_for(spec, req.quality) * req.n
+    kaynak = _kapilar(db, kullanici, spec.credential, kimlikler, kredi_tahmini)
     istek = {**_ortak_istek(req.prompt, req.size, req.quality, req.n, folder_id, session_id),
              # Turun sütunları AYRI isteklerle geliyor (istemci fan-out'u; bkz.
              # models.GenerateRequest.arena_id) — onları birbirine bağlayan tek şey bu etiket.
              "arena_id": arena_id, "palette": pal, "prompt_sent": prompt_sent}
-    return _siraya_koy(db, kullanici.id, "generate", istek, req.model, kredi_tahmini)
+    return _siraya_koy(db, kullanici.id, "generate", istek, req.model, kredi_tahmini,
+                       anahtar_kaynagi=kaynak)
 
 
 @router.post("/api/video", status_code=202)
 def video(req: VideoRequest, db: Session = OTURUM,
           ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
-          kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+          kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+          kimlikler: Mapping[str, str] = kimlik.KIMLIKLER) -> dict:
     """Metin → video. `generate`in video ikizi.
 
     Faz 1'de SENKRONDU ve bu bilinçli bir seçimdi, kaza değil: üretim 1-6
@@ -168,11 +195,12 @@ def video(req: VideoRequest, db: Session = OTURUM,
     assert req.model is not None
     spec = catalog.video_model(req.model)
     assert spec is not None
-    kapilar.check_is_tavani(db, kullanici.id)
     kredi_tahmini = catalog.cost_for(spec, req.quality, duration=req.duration) * req.n
+    kaynak = _kapilar(db, kullanici, spec.credential, kimlikler, kredi_tahmini)
     istek = {**_ortak_istek(req.prompt, req.size, req.quality, req.n, folder_id, session_id),
              "duration": req.duration}
-    return _siraya_koy(db, kullanici.id, "video", istek, req.model, kredi_tahmini)
+    return _siraya_koy(db, kullanici.id, "video", istek, req.model, kredi_tahmini,
+                       anahtar_kaynagi=kaynak)
 
 
 def _check_video_form(prompt: str, size: str, quality: str, duration: int,
@@ -254,6 +282,7 @@ async def animate(
     ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
     kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
     depo: dosya.Depo = Depends(dosya.depo),
+    kimlikler: Mapping[str, str] = kimlik.KIMLIKLER,
 ) -> dict:
     """Görsel → video: bir kareyi hareketlendirir.
 
@@ -318,19 +347,20 @@ async def animate(
     elif last_file is not None:
         son_kare = await gorsel.read_upload_png(last_file)
 
-    await run_in_threadpool(kapilar.check_is_tavani, db, kullanici.id)
+    kredi_tahmini = catalog.cost_for(spec, quality, duration=duration) * n
+    kaynak = await run_in_threadpool(_kapilar, db, kullanici, spec.credential, kimlikler,
+                                     kredi_tahmini)
     is_id = uuid.uuid4()
     # Son kare `girdiler`in DIŞINDA, kendi anahtarıyla (`istek.son_kare`): işçi
     # `girdiler`i referans listesi, `son_kare`yi `last_frame` olarak verir —
     # yukarıdaki "refs'e katılmıyor" kararının depo karşılığı.
     yazilacak = refs + ([("son_kare.png", son_kare)] if son_kare is not None else [])
     girdiler = await run_in_threadpool(_girdileri_yaz, depo, kullanici.id, is_id, yazilacak)
-    kredi_tahmini = catalog.cost_for(spec, quality, duration=duration) * n
     istek = {**_ortak_istek(prompt, size, quality, n, target_folder, session),
              "girdiler": girdiler[:len(refs)], "parent_id": parent_id, "duration": duration,
              "son_kare": girdiler[len(refs)] if son_kare is not None else None}
     return await run_in_threadpool(_siraya_koy, db, kullanici.id, "animate", istek, model_id,
-                                   kredi_tahmini, is_id)
+                                   kredi_tahmini, is_id, kaynak)
 
 
 def _check_edit_form(prompt: str, size: str, quality: str, n: int,
@@ -458,6 +488,7 @@ async def edit(
     ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar),
     kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
     depo: dosya.Depo = Depends(dosya.depo),
+    kimlikler: Mapping[str, str] = kimlik.KIMLIKLER,
 ) -> dict:
     """Ek referans görselleri (`extra_files` yüklemeleri, `extra_source_ids`
     galeri id'leri) form verisinden okunur — bkz. gorsel.extra_refs."""
@@ -478,12 +509,13 @@ async def edit(
         palet.palette_prompt, prompt, palette_hex, palette_mode, palette_strength, palette_id,
         task="edit", db=db, kullanici_id=kullanici.id, drop=drop)
 
-    await run_in_threadpool(kapilar.check_is_tavani, db, kullanici.id)
+    kredi_tahmini = catalog.cost_for(spec, quality) * n
+    kaynak = await run_in_threadpool(_kapilar, db, kullanici, spec.credential, kimlikler,
+                                     kredi_tahmini)
     is_id = uuid.uuid4()
     girdiler = await run_in_threadpool(_girdileri_yaz, depo, kullanici.id, is_id, refs)
-    kredi_tahmini = catalog.cost_for(spec, quality) * n
     istek = {**_ortak_istek(prompt, size, quality, n, target_folder, session),
              "girdiler": girdiler, "parent_id": parent_id,
              "palette": pal, "prompt_sent": prompt_sent}
     return await run_in_threadpool(_siraya_koy, db, kullanici.id, "edit", istek, model_id,
-                                   kredi_tahmini, is_id)
+                                   kredi_tahmini, is_id, kaynak)

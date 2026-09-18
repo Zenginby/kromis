@@ -147,6 +147,13 @@ IS_TURLERI: tuple[str, ...] = ("generate", "edit", "video", "animate")
 IS_DURUMLARI: tuple[str, ...] = ("bekliyor", "calisiyor", "bitti", "hata", "iptal")
 DURUM_BEKLIYOR, DURUM_CALISIYOR, DURUM_BITTI, DURUM_HATA, DURUM_IPTAL = IS_DURUMLARI
 
+# `isler.anahtar_kaynagi` — iş HANGİ anahtarla koştu (Faz 2 / 6, göç `0005_kota`):
+# kullanıcının kendi satırı ya da platformun ortam sırrı (`services/platform_anahtari.py`).
+# Rota sıraya alırken yazar; günlük kredi tavanı YALNIZ `platform` satırlarını
+# toplar (BYOK kendi parası). NULL = 6. görevden önceki satır (kaynağı bilinmiyor,
+# sayılmaz). CHECK'te kilitli: üçüncü bir kaynak (ör. kurumsal havuz) göç ister.
+ANAHTAR_KAYNAKLARI: tuple[str, ...] = ("kullanici", "platform")
+
 # Sekiz iş tablosu — belgenin envanteriyle birebir; bekçi test bu kümenin her
 # üyesinde `kullanici_id` + FK + indeks arar ve kümenin belgeyle eşit olduğunu
 # sınar. Hesap tabloları burada DEĞİL: onlarda sahiplik sütunu ya yok
@@ -235,6 +242,10 @@ class Kullanici(Base):
     dogrulandi_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     dil: Mapped[str | None] = mapped_column(Text)
+    # Günlük kredi tavanı EZMESİ (Faz 2 / 6, göç `0005_kota`): NULL = ortamın
+    # öntanımlısı (`KROMIS_GUNLUK_KREDI_TAVANI`, services/kota.py); dolu değer bu
+    # kullanıcıya özel tavan — admin 8. görevde yazar, bugün yalnız okunur.
+    gunluk_kredi_tavani: Mapped[int | None] = mapped_column(Integer)
     olusturuldu: Mapped[dt.datetime] = _olusturuldu()
     guncellendi: Mapped[dt.datetime] = _guncellendi()
     silindi_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
@@ -515,6 +526,7 @@ class Is(Base):
     `errlog.redact_secrets`ten geçmiş metin. `model` ve `kredi_tahmini`
     (`catalog.cost_for` × n, sıraya girerken) 6. görevin günlük tavanının ve
     Faz 3 defterinin okuduğu iki alan — TAHMİN, gerçek maliyet Faz 3'ün işi.
+    `anahtar_kaynagi` (Faz 2 / 6) o tavanın süzgeci: yalnız `platform` toplanır.
 
     `isci_id` FK DEĞİL ve bilerek: işçi kapanışta kendi `isciler` satırını
     siler; biten işin "kim koştu" kaydı işçi gidince de durmalı (SET NULL onu
@@ -526,6 +538,8 @@ class Is(Base):
     __table_args__ = (
         CheckConstraint("tur IN " + _sql_kumesi(IS_TURLERI), name="tur_kumesi"),
         CheckConstraint("durum IN " + _sql_kumesi(IS_DURUMLARI), name="durum_kumesi"),
+        CheckConstraint("anahtar_kaynagi IN " + _sql_kumesi(ANAHTAR_KAYNAKLARI),
+                        name="anahtar_kaynagi_kumesi"),
         _sahip_indeksi("isler"),
         Index("ix_isler_kuyruk", "durum", "olusturuldu",
               postgresql_where=text("durum = 'bekliyor'")),
@@ -543,6 +557,8 @@ class Is(Base):
     hata: Mapped[str | None] = mapped_column(Text)
     model: Mapped[str] = mapped_column(Text, nullable=False)
     kredi_tahmini: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Hangi anahtarla koşacak/koştu (`ANAHTAR_KAYNAKLARI`); NULL yalnız eski satırlarda.
+    anahtar_kaynagi: Mapped[str | None] = mapped_column(Text)
     isci_id: Mapped[uuid.UUID | None] = mapped_column(pg.UUID(as_uuid=True))
     olusturuldu: Mapped[dt.datetime] = _olusturuldu()
     basladi: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))

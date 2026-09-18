@@ -73,6 +73,11 @@ function applyConfigured(s) {
     // elde yalnız bu sözlük oluyor. Kaydet'ten sonra applyConfigured yeniden
     // koştuğu için rozetler de kendiliğinden tazeleniyor.
     saglayiciDurumu = s.providers;
+    // KAYNAK (Faz 2 / 6): `providers` "kurulu mu", `kaynaklar` "kimin
+    // anahtarıyla" — `kullanici` | `platform` | null. Aynı yanıtta, aynı
+    // guard'la: GET ve POST ikisini de taşıyor (services/modeller.py).
+    if (s.kaynaklar !== undefined) saglayiciKaynagi = s.kaynaklar || {};
+    platformNotlariniCiz();
     syncProviderPick($("set-provider").value);
   }
 
@@ -144,8 +149,9 @@ function applyConfigured(s) {
   // OKUNMUYOR: Ayarlar'daki "Prompt Yönetmeni · talimat" bölümü kaldırıldı
   // (11 Eylül 2026, kullanıcı kararı) — iki satır salt-okunur birer dosya
   // yolu gösteriyordu ve kullanıcının panelde yapabileceği bir şey yoktu.
-  // Sunucu alanları döndürmeye devam ediyor (app.get_settings); yalnız
-  // ekrandaki kopyaları gitti.
+  // Sunucu alanları döndürmeye devam ediyor (routers/ayarlar.py) — web'de
+  // `null` (Faz 2 / 6: yol sunucunun diski, kullanıcının değil), kabukta
+  // dosya yolu; ekranda okuyan bir satır olmadığı için gizlenecek şey yok.
 }
 
 /** "Yeni sürüm çıktı" satırı + dişli düğmesindeki rozet — İKİ yüzey, TEK kaynak.
@@ -320,6 +326,73 @@ async function loadSettings(openIfMissing) {
  *  `/api/settings` döndüğünde geliyor — iki ayrı zaman. `seciliModelTercihi`
  *  ile aynı desen. */
 let saglayiciDurumu = {};
+/** `GET /api/settings` → `kaynaklar` ({kimlik: "kullanici" | "platform" | null}, Faz 2 / 6). */
+let saglayiciKaynagi = {};
+
+/** Sağlayıcı grubunun altına "platform sağlıyor" notu ve "kendi anahtarımı sil"
+ *  düğmesi — index.html DEĞİŞMİYOR (çapalar `#prov-<p>` grupları), elemanlar
+ *  ilk çizimde yaratılıp sonra yalnız gizlenip gösteriliyor.
+ *
+ *  Not yalnız kaynak `platform`ken: kullanıcı kutuyu boş bırakabilir, üretim
+ *  platformun anahtarıyla çıkar; kendi anahtarını girerse o kazanır (sunucunun
+ *  çözüm sırası, services/platform_anahtari.py). Düğme yalnız kaynak
+ *  `kullanici`yken: yalnızca-yazılır formda kutuyu boşaltmak "dokunmadım"
+ *  demek (saveSettings'in gerekçesi), yani anahtarı geri almanın tek yolu
+ *  açık bir eylem — `POST /api/settings` `anahtar_sil: [kimlik]`. */
+function platformNotlariniCiz() {
+  for (const [grup, kimlik] of [
+    ["prov-azure", "azure_image"],
+    ["prov-openai", "openai"],
+    ["prov-gemini", "gemini"],
+    ["prov-fal", "fal"],
+  ]) {
+    const kok = $(grup);
+    if (!kok) continue;
+    let not = kok.querySelector(".platform-notu");
+    if (!not) {
+      not = document.createElement("p");
+      not.className = "field-note platform-notu";
+      not.textContent = t("settings.platform_sagliyor");
+      kok.appendChild(not);
+    }
+    let sil = kok.querySelector(".anahtar-sil");
+    if (!sil) {
+      sil = document.createElement("button");
+      sil.type = "button";
+      sil.className = "btn-secondary anahtar-sil";
+      sil.textContent = t("settings.anahtar_sil");
+      sil.addEventListener("click", () => anahtariSil(kimlik, sil));
+      kok.appendChild(sil);
+    }
+    const kaynak = saglayiciKaynagi[kimlik] || null;
+    not.hidden = kaynak !== "platform";
+    sil.hidden = kaynak !== "kullanici";
+  }
+}
+
+/** Kullanıcının KENDİ anahtarını siler; sunucu yeni durumu döndürür (platforma düşmüş olabilir). */
+async function anahtariSil(kimlik, dugme) {
+  const st = $("settings-status");
+  dugme.disabled = true;
+  st.textContent = t("common.saving");
+  try {
+    const res = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ anahtar_sil: [kimlik] }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || t("err.http", { durum: res.status }));
+    }
+    applyConfigured(await res.json());
+    st.textContent = t("settings.anahtar_silindi");
+  } catch (e) {
+    st.textContent = e.message;
+  } finally {
+    dugme.disabled = false;
+  }
+}
 
 /** Seçicideki değer → `providers` sözlüğündeki kimlik. Azure'ın SEÇİCİ değeri
  *  `azure`, KİMLİĞİ `azure_image` ve ikisi aynı şey değil: eşitlemek rozeti
@@ -384,7 +457,15 @@ function renderProviderCards() {
     ad.textContent = o.textContent;
     const rozet = document.createElement("span");
     rozet.className = "model-row-badge";
-    rozet.textContent = t(saglayiciKayitli(o.value) ? "settings.saved" : "settings.not_saved");
+    // Üç hâl (Faz 2 / 6): kendi anahtarı kayıtlı / platform sağlıyor / yok.
+    const kaynak = saglayiciKaynagi[SAGLAYICI_KIMLIGI[o.value] || o.value] || null;
+    rozet.textContent = t(
+      kaynak === "platform"
+        ? "settings.platform_badge"
+        : saglayiciKayitli(o.value)
+          ? "settings.saved"
+          : "settings.not_saved",
+    );
     ad.append(rozet);
     metin.append(ad);
 

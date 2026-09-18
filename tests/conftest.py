@@ -591,6 +591,12 @@ def db_oturumu(depo_db):
 # E2E dosyaları — orada tarayıcı gerçek bir oturum çerezi taşıyor.
 GERCEK_KIMLIK = "gercek_kimlik"
 
+# "Anahtar yok" kapısını (services/kapilar.py `check_anahtar`, Faz 2 / 6) GERÇEKTEN
+# sınayan dosyalar için işaret — aşağıdaki `_anahtar_kapisi` fixture'ı bunu
+# görünce kapıyı yamalamaz: tests/test_platform_anahtari.py, tests/test_kota.py,
+# tests/test_kimlik.py (iki kullanıcı, iki anahtar).
+GERCEK_ANAHTAR = "gercek_anahtar"
+
 TEST_KULLANICISI_EPOSTA = "test@example.com"
 
 
@@ -702,6 +708,33 @@ def kullanici(request: pytest.FixtureRequest):
     finally:
         for anahtar in yamalar:
             appmod.app.dependency_overrides.pop(anahtar, None)
+
+
+@pytest.fixture(autouse=True)
+def _anahtar_kapisi(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch):
+    """Her test "seçili modelin anahtarı var" öncülüyle koşar (Faz 2 / 6) — kapı yamalı.
+
+    NEDEN VAR: 6. görev dört üretim rotasına ve yeniden gönderime "anahtar
+    yok → 409, iş doğmaz" kapısını koydu (`kapilar.check_anahtar`). 26 test
+    dosyasının üretim çağrıları anahtar bilmiyor: sağlayıcıyı yamalıyor, DB'de
+    kimlik satırı yazmıyor, ortamda platform anahtarı yok — hepsi 409 alırdı.
+    `kullanici` fixture'ının kimlik kapısı için yaptığı şeyin ikizi: yaygın
+    çağrı yerleri değişmeden geçer, kapının KENDİSİNİ ölçen dosyalar
+    `@pytest.mark.gercek_anahtar` ile yamasız koşar. Yama `"kullanici"`
+    döndürür: o satırlar günlük kredi toplamına girmez (platform parası
+    değil) ve `anahtar_kaynagi` CHECK'ten geçer.
+
+    ORTAMA ANAHTAR EKLEMEK seçilmedi (ölçüldü): her sağlayıcıya sahte bir
+    platform anahtarı vermek `GET /api/settings`in `providers`ını her yerde
+    `true` yapar ve "kurulu değil" ölçen 30+ iddiayı kırardı — kapıyı
+    yamalamak ise yalnız kapıya dokunur.
+    """
+    if request.node.get_closest_marker(GERCEK_ANAHTAR):
+        yield
+        return
+    from services import kapilar
+    monkeypatch.setattr(kapilar, "check_anahtar", lambda *a, **k: "kullanici")
+    yield
 
 
 class E2EOturum:

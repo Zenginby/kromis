@@ -184,14 +184,19 @@ def test_chat_deployment_is_not_written_when_the_credentials_are_rejected(client
     assert client.get("/api/settings").json()["chat_deployment"] == ""
 
 
-def test_settings_expose_where_the_instructions_file_can_be_overridden(client):
-    """Ezme yolu keşfedilebilir olmalı: yoksa özellik var ama kimse bulamaz.
+def test_settings_expose_where_the_instructions_file_can_be_overridden_only_in_the_shell(client, monkeypatch):
+    """Ezme yolu KABUKTA keşfedilebilir (yoksa özellik var ama kimse bulamaz); WEB'DE `null`
+    (Faz 2 / 6): yol sunucunun diskinde, bütün hesaplara ortak bir dosya — kullanıcıya
+    yazılabilir bir yer göstermek yanlış olurdu. Alan DÜŞMEZ (`guncelleme: null` deseni).
 
     İKİ yol var çünkü video bölümü ayrı bir dosya (sistem mesajına yalnız video
-    modeli yapılandırılmışken giriyor). İkincisi panele yazılmazsa video
-    personasını özelleştirmek isteyen kullanıcı dosyanın ADINI hiçbir yerde
-    göremez — birincinin var olma gerekçesinin aynısı.
+    modeli yapılandırılmışken giriyor); ikisi aynı kuralı izler.
     """
+    body = client.get("/api/settings").json()          # bu dosya DB'li = web
+    assert body["web"] is True
+    assert body["chat_instructions_path"] is None and body["chat_video_instructions_path"] is None
+    import guncelleme
+    monkeypatch.setattr(guncelleme, "web_yapisi", lambda: False)
     body = client.get("/api/settings").json()
     assert body["chat_instructions_path"].endswith("chat-instructions.md")
     assert body["chat_video_instructions_path"].endswith(

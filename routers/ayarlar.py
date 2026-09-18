@@ -16,7 +16,16 @@ import i18n
 import paths
 import version
 from models import PrefsRequest, SettingsRequest
-from services import ayar, depo_kimlik_bilgisi, depo_tercih, dil, kimlik, modeller, zaman
+from services import (
+    ayar,
+    depo_kimlik_bilgisi,
+    depo_tercih,
+    dil,
+    kimlik,
+    modeller,
+    platform_anahtari,
+    zaman,
+)
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
@@ -77,6 +86,13 @@ def get_settings(db: Session = OTURUM, ayarlar: ayar.Ayarlar = Depends(ayar.ayar
     uç nokta arayüze ikinci bir istek ekler ve ikisi ayrı zamanlarda gelirse
     panel bir an "0.4.2 — güncel" deyip sonra fikir değiştirirdi.
 
+    WEB'DE İKİ TALİMAT YOLU `null` (Faz 2 / 6): yol sunucunun `KROMIS_DATA_DIR`i
+    altında bir dosya — kullanıcının erişemediği bir makinede, üstelik bütün
+    hesaplara ortak. Dondurulmuş kabukta aynen döner (kullanıcı dosyayı
+    düzenleyebilir). Alan DÜŞÜRÜLMEZ (`guncelleme: null` deseni, Faz 1 / 9):
+    bayat bir istemci `undefined` yerine `null` görür; persona düzenleme bir
+    ürün özelliği olarak Faz 3+'ın notu.
+
     Bu alan istek yolunu BEKLETMEZ: `guncelleme.bilgi()` yalnız önbelleğe
     bakıyor, ağ çağrısı arka planda koşuyor (bkz. guncelleme.py'deki 2.
     sözleşme). İlk açılışta değeri `null` olur, sonrakinde dolar.
@@ -88,9 +104,9 @@ def get_settings(db: Session = OTURUM, ayarlar: ayar.Ayarlar = Depends(ayar.ayar
             "guncelleme": None if web else guncelleme.bilgi(
                 ayarlar.output_dir,
                 izin=depo_tercih.oku(db, kullanici.id)["guncelleme_kontrolu"]),
-            "chat_instructions_path": paths.chat_instructions_override(),
+            "chat_instructions_path": None if web else paths.chat_instructions_override(),
             "chat_video_instructions_path":
-                paths.chat_video_instructions_override()}
+                None if web else paths.chat_video_instructions_override()}
 
 
 @router.get("/api/guncelleme")
@@ -310,6 +326,21 @@ def post_settings(req: SettingsRequest, db: Session = OTURUM,
                 ac.check_base_url(req.ollama_url.strip(), "ollama_url")
             updates["OLLAMA_URL"] = req.ollama_url.strip()
 
+        # KENDİ ANAHTARINI SİL (Faz 2 / 6; gerekçe models.SettingsRequest.anahtar_sil):
+        # kimliğin anahtar + adres satırları boş değerle yazılır = depo siler
+        # (`depo_kimlik_bilgisi.yaz`in "boş = sil" anlamı). Aynı istekte aynı
+        # kimliğe değer de gelmişse SİLME KAZANIR: kullanıcı "sil" dedi, kutuda
+        # kalan eski bir yazım onu geri getirmesin. Bilinmeyen id 422 — istemci
+        # id'yi `providers`/`kaynaklar` sözlüğünden alıyor, elden yazmıyor.
+        for cred_id in req.anahtar_sil or []:
+            silinecek = catalog.credential(cred_id)
+            if silinecek is None:
+                raise HTTPException(status_code=422,
+                                    detail=i18n.t("err.unknown_credential", dil.aktif(), kimlik=cred_id))
+            updates[silinecek.key_env] = ""
+            if silinecek.url_env:
+                updates[silinecek.url_env] = ""
+
         # `save_env`in kapısı: satır sonlu değer hiçbir alanda yazılmaz.
         _satir_sonu_yok(updates.values(), "err.setting_newline")
         if updates:
@@ -317,8 +348,11 @@ def post_settings(req: SettingsRequest, db: Session = OTURUM,
     except ac.ImageError as e:
         raise HTTPException(status_code=422, detail=str(e))
     # Cevap YAZILANI yansıtır: sözlük DB'den yeniden okunur (aynı `Session`,
-    # flush edildi) — bellekteki birleştirme değil, gerçekten saklanan hâl.
-    return modeller.settings_payload(depo_kimlik_bilgisi.oku(db, kullanici.id))
+    # flush edildi) — bellekteki birleştirme değil, gerçekten saklanan hâl;
+    # platform anahtarıyla tamamlanır ki `providers`/`kaynaklar` GET'le aynı
+    # şeyi söylesin (anahtarını silen kullanıcı platforma DÜŞTÜĞÜNÜ hemen görür).
+    return modeller.settings_payload(
+        platform_anahtari.kimlikler(depo_kimlik_bilgisi.oku(db, kullanici.id)))
 
 
 # ── Kullanıcı tercihleri ────────────────────────────────────────────────

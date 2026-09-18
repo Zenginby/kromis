@@ -91,7 +91,16 @@ import errlog
 import i18n
 import kimlik_baglami
 import providers
-from services import ayar, depo_kimlik_bilgisi, depo_medya, dil, dosya, kuyruk, zaman
+from services import (
+    ayar,
+    depo_kimlik_bilgisi,
+    depo_medya,
+    dil,
+    dosya,
+    kuyruk,
+    platform_anahtari,
+    zaman,
+)
 from services.nesne_depo import Nesne
 from services.tablolar import (
     IS_TURLERI,
@@ -368,7 +377,10 @@ def kos(is_: Is, oturum_ac: Callable[[], Session], depo: dosya.Depo, ayarlar: ay
         # Değerler oturum KAPANMADAN kopyalanıyor: kapanış nesneyi ayırır ve
         # süresi geçmiş bir öznitelik okuması `DetachedInstanceError` olurdu.
         dil_kodu = kullanici.dil if kullanici is not None else None
-        kimlikler = depo_kimlik_bilgisi.oku(db, is_.kullanici_id) if kullanici is not None else {}
+        # Platform anahtarıyla TAMAMLANMIŞ sözlük (Faz 2 / 6): rota `anahtar_kaynagi`ni
+        # sıraya alırken yazdı, işçi aynı çözüm sırasıyla (kullanıcı → platform) koşar.
+        kimlikler, _ = (platform_anahtari.birlestir(depo_kimlik_bilgisi.oku(db, is_.kullanici_id))
+                        if kullanici is not None else ({}, {}))
     if kullanici is None:
         # Hesap silinmiş: CASCADE işi de götürür, `dusur` 0 satır görür; yine de denenir.
         return _dusur(oturum_ac, is_.id, KULLANICI_YOK_HATASI, bitis(), ayarlar.data_dir)

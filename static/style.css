@@ -3005,6 +3005,10 @@ body.viewer-open { overflow: hidden; }
 .is-bas { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; font-size: 13px; }
 .is-tur { font-weight: 600; }
 .is-model { color: var(--muted); }
+/* Faz 2 / 6: satırın ikinci hattı — kredi tahmini ve (platformsa) anahtarın kaynağı. */
+.is-alt { display: flex; gap: 8px; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.is-kaynak::before { content: "·"; margin-right: 8px; }
+.platform-notu, .anahtar-sil { margin-top: 0.4rem; }
 .is-durum { margin-left: auto; font-size: 12px; }
 .is-sure { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .is-satir[data-durum="calisiyor"] .is-durum { color: var(--accent); }

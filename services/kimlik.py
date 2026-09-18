@@ -59,6 +59,13 @@ dönünce bağlam çözülür. Yalnız sağlayıcı anahtarı okuyan rotalar ta�
 (`/api/settings`, `/api/chat`, dört üretim rotası) — hangi rotanın anahtar
 okuduğu İMZASINDA yazılı, bekçisi tests/test_kimlik.py. Override YOK: test
 kullanıcısı `depo_db` kipinde gerçek satır, sözlüğü gerçekten DB'den çözülür.
+
+PLATFORM ANAHTARI (Faz 2 / 6): kullanıcının sözlüğü DB'den çıkar çıkmaz
+`platform_anahtari.kimlikler(...)` ile tamamlanır — ad ad kullanıcı →
+platform → yok; rota ve adaptörler TEK sözlük görür, `kaynaklar` özniteliği
+"hangisi kimden" sorusunu taşır (`isler.anahtar_kaynagi`). Dört üretim rotası
+ve yeniden gönderim bu bağımlılığı geri aldı: "anahtar yok" kapısı sıraya
+yazmadan ÖNCE, rotada bir kez sorulur (services/kapilar.py `check_anahtar`).
 """
 from __future__ import annotations
 
@@ -71,7 +78,7 @@ from sqlalchemy.orm import Session
 
 import i18n
 import kimlik_baglami
-from services import cerez, depo_kimlik_bilgisi, dil, hesap
+from services import cerez, depo_kimlik_bilgisi, dil, hesap, platform_anahtari
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
@@ -158,7 +165,9 @@ async def kimlik_bilgileri(request: Request, db: Session = OTURUM,
     """
     mevcut: Mapping[str, str] | None = getattr(request.state, "kimlikler", None)
     if mevcut is None:
-        mevcut = await run_in_threadpool(depo_kimlik_bilgisi.oku, db, kullanici.id)
+        kullanicinin = await run_in_threadpool(depo_kimlik_bilgisi.oku, db, kullanici.id)
+        # Platform anahtarıyla TAMAMLANMIŞ sözlük (Faz 2 / 6): ortam okuması ucuz, DB'ye ek sorgu yok.
+        mevcut = platform_anahtari.kimlikler(kullanicinin)
         request.state.kimlikler = mevcut
     jeton = kimlik_baglami.bagla(mevcut)
     try:

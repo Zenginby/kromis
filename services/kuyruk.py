@@ -65,8 +65,8 @@ from services.tablolar import (
 )
 
 __all__ = ["ekle", "al", "kalp", "bitir", "dusur", "iptal", "bayatlari_dusur",
-           "aktif_sayisi", "listele", "bul", "isci_kaydet", "isci_kalp", "isci_sil",
-           "BAYAT_HATASI", "AKTIF_DURUMLAR"]
+           "aktif_sayisi", "listele", "bul", "satir", "isci_kaydet", "isci_kalp", "isci_sil",
+           "BAYAT_HATASI", "AKTIF_DURUMLAR", "KAPANMIS_DURUMLAR"]
 
 # `bayatlari_dusur`un `hata` sütununa yazdığı KOD — cümle değil (gerekçe üstte).
 BAYAT_HATASI = "isci yanit vermiyor"
@@ -74,6 +74,10 @@ BAYAT_HATASI = "isci yanit vermiyor"
 # "Aktif" = kuyrukta ya da işçide; eş zamanlılık sayacı ve kısmi indeks
 # `ix_isler_kullanici_aktif` aynı iki değeri sayar.
 AKTIF_DURUMLAR: tuple[str, ...] = (DURUM_BEKLIYOR, DURUM_CALISIYOR)
+# Sonuçsuz kapanmış işler — "yeniden gönder" (Faz 2 / 5) yalnız bunlardan
+# doğar: `bitti` işin sonucu galeride duruyor, ikinci kez koşturmak çift
+# fatura (K8); aktif iş zaten sırada.
+KAPANMIS_DURUMLAR: tuple[str, ...] = (DURUM_HATA, DURUM_IPTAL)
 
 
 def _etkilenen(sonuc: object) -> int:
@@ -92,7 +96,14 @@ def _json(is_: Is) -> dict[str, Any]:
     kaydının ikizi değil, koruyacak eski ad yok. Zaman damgaları `medya`nın
     `created_at`iyle aynı biçimde (`zaman.damga`), ön yüz tek sıralama kuralı
     bilsin.
+
+    `arena_id` ve `folder_id` `istek`in İÇİNDEN dökülen İKİ alan (Faz 2 / 5):
+    iş paneli aynı turun 2-4 sütununu sekme yenilendikten sonra da gruplayabilsin
+    ve biten işin önizlemesini doğru klasörün `GET /api/history`sinden çekebilsin
+    (kök yalnız klasörsüzleri veriyor) — ikisi de `medya` kaydında zaten galeriye
+    çıkıyor, gizli bir şey değil. Prompt ve girdi anahtarları içeride kalır.
     """
+    istek = is_.istek if isinstance(is_.istek, dict) else {}
     return {
         "id": str(is_.id),
         "tur": is_.tur,
@@ -104,6 +115,8 @@ def _json(is_: Is) -> dict[str, Any]:
         "bitti": _damga(is_.bitti),
         "sonuc": is_.sonuc,
         "hata": is_.hata,
+        "arena_id": istek.get("arena_id"),
+        "folder_id": istek.get("folder_id"),
     }
 
 
@@ -179,10 +192,20 @@ def listele(db: Session, kullanici_id: uuid.UUID, *, since: dt.datetime | None =
     return [_json(i) for i in db.scalars(sorgu)]
 
 
+def satir(db: Session, kullanici_id: uuid.UUID, is_id: uuid.UUID) -> Is | None:
+    """Kullanıcının bir iş SATIRI (ORM), sahip süzgeçli; yoksa/başkasınınsa `None`.
+
+    `bul`dan farkı `istek`i taşıması: "yeniden gönder" (Faz 2 / 5) eski işin
+    `istek`ini yeni satıra kopyalar ve o sözlük `_json`la DÖKÜLMEZ — istemci
+    hiç görmez, kopya sunucuda kalır. Rota dışına çıkmayan tek çağrı yeri o.
+    """
+    return db.scalar(select(Is).where(Is.kullanici_id == kullanici_id, Is.id == is_id))
+
+
 def bul(db: Session, kullanici_id: uuid.UUID, is_id: uuid.UUID) -> dict[str, Any] | None:
     """Tek iş, `_json` ile; başkasının işi ve olmayan iş aynı `None` (rota 404 kurar, 403 değil)."""
-    satir = db.scalar(select(Is).where(Is.kullanici_id == kullanici_id, Is.id == is_id))
-    return _json(satir) if satir is not None else None
+    s = satir(db, kullanici_id, is_id)
+    return _json(s) if s is not None else None
 
 
 # ────────────────────────────────────────────────────── işçi tarafı

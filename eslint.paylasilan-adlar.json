@@ -92,6 +92,9 @@
       "t",
       "tc"
     ],
+    "static/isler.js": [
+      "kromisIsler"
+    ],
     "static/palette.js": [
       "detailText",
       "loadPalettes",

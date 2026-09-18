@@ -80,6 +80,9 @@ DIZINSIZ_KAPILI = {
     # Faz 2 / 4: iş uçları — `isler` satırı okur/yazar, dizine dokunmaz (sonuç
     # dosyaları `GET /api/history` + `/output/*` üzerinden).
     ("GET", "/api/isler"), ("GET", "/api/isler/{is_id}"), ("POST", "/api/isler/{is_id}/iptal"),
+    # Faz 2 / 5: SSE akışı (yalnız `isler` sorgusu, kendi kısa oturumlarıyla) ve
+    # yeniden gönder (eski satırın `istek`ini yeni satıra kopyalar; nesne yazmaz).
+    ("GET", "/api/isler/akis"), ("POST", "/api/isler/{is_id}/yeniden"),
 }
 
 KAPI = {kimlik.aktif_kullanici, kimlik.sayfa_kullanicisi}
@@ -155,7 +158,7 @@ def test_every_route_is_either_gated_or_openly_listed_with_a_reason():
         f"kapısız ama listede olmayan: {sorted(ACIK - set(ACIK_ROTALAR))}; "
         f"listede ama kapılı: {sorted(set(ACIK_ROTALAR) - ACIK)}")
     assert all(gerekce.strip() for gerekce in ACIK_ROTALAR.values())
-    assert len(KAPILI) == 50 and len(ACIK) == 7 and len(KAPILI | ACIK) == 57, (   # +3 iş rotası (Faz 2 / 4)
+    assert len(KAPILI) == 52 and len(ACIK) == 7 and len(KAPILI | ACIK) == 59, (   # +3 iş rotası (Faz 2 / 4), +2 (Faz 2 / 5)
         "rota sayısı ya da kapı sayısı değişti — bilinçliyse belgeyi ve bu sayıları güncelle")
 
 

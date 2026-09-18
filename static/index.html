@@ -166,6 +166,21 @@
             <path d="M12 5v14"></path><path d="M5 12h14"></path>
           </svg>
         </button>
+        <!-- İş paneli tetiği (Faz 2 / 5): üretim 202 ile kuyruğa gidiyor, sıra ve
+             sonuç sağdan açılan #isler-sheet'te (static/isler.js). Rozet aktif iş
+             sayısı — dişlinin güncelleme noktasıyla aynı yüzey mantığı: bildirim
+             panel açılmadan görünmeli. `aria-controls` closeSheets'in türettiği
+             tetik listesine kendiliğinden giriyor. -->
+        <button id="isler-btn" class="icon-btn" type="button"
+                aria-controls="isler-sheet" aria-expanded="false"
+                aria-label="{{t:isler.title}}" title="{{t:isler.title}}">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 6h10"></path><path d="M4 12h16"></path><path d="M4 18h12"></path>
+            <circle cx="18" cy="6" r="2"></circle>
+          </svg>
+          <span id="isler-sayac" class="isler-sayac" hidden></span>
+        </button>
         <button id="settings-btn" class="icon-btn" type="button" aria-label="{{t:settings.title}}" title="{{t:settings.title}}">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1060,6 +1075,23 @@
        kalıcı yönlendirmeyi istedi. Soru sıklığı, varsayılan üslup/dil ve öneri
        yoğunluğu anahtarları aynı `.sheet-body`ye eklenecek — çekmece açıldığı
        için ikinci bir yüzey gerektirmiyorlar. -->
+  <!-- İş paneli (Faz 2 / 5): her iş bir satır — tür, model etiketi, durum, geçen
+       süre; bitince küçük önizleme, hatada metin + "yeniden gönder", beklerken
+       "iptal". Satırları static/isler.js çiziyor (SSE `GET /api/isler/akis`,
+       yedek yol 3 sn yoklama); burada yalnız çerçeve — id'ler betiğin `$()`
+       bağları, tests/test_id_contract.py kapsamında. -->
+  <aside id="isler-sheet" class="sheet sheet-right" aria-label="{{t:isler.title}}">
+    <div class="sheet-head">
+      <h2>{{t:isler.title}}</h2>
+      <button type="button" id="isler-close" class="modal-x" aria-label="{{t:common.close}}">×</button>
+    </div>
+    <div class="sheet-body isler-govde">
+      <p id="isler-durum" class="isler-durum" role="status" hidden></p>
+      <ul id="isler-liste" class="isler-liste" aria-live="polite"></ul>
+      <p id="isler-bos" class="isler-bos">{{t:isler.empty}}</p>
+    </div>
+  </aside>
+
   <aside id="director-sheet" class="sheet sheet-right" aria-label="{{t:director.settings_title}}">
     <div class="sheet-head">
       <h2>{{t:director.settings_title}}</h2>
@@ -1979,6 +2011,12 @@
   <script src="/static/folders.js?v=__APP_VERSION__"></script>
   <script src="/static/assets.js?v=__APP_VERSION__"></script>
   <script src="/static/palette.js?v=__APP_VERSION__"></script>
+  <!-- İş paneli settings.js'ten ÖNCE: core.js `run()` içinde `kromisIsler`e
+       olay anında dokunuyor (sıra serbest), ama settings.js'in dibindeki
+       açılış çağrıları galeriyi yüklerken panelin de kurulmuş olması gerekiyor —
+       biten bir iş `loadHistory`yi oradan tetikliyor. Kendi bağımlılıkları
+       ($, t, openSheet, detailText) yukarıda. -->
+  <script src="/static/isler.js?v=__APP_VERSION__"></script>
   <script src="/static/settings.js?v=__APP_VERSION__"></script>
   <script src="/static/viewer.js?v=__APP_VERSION__"></script>
   <script src="/static/chat.js?v=__APP_VERSION__"></script>

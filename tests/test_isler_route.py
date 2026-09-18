@@ -17,13 +17,27 @@ docs/faz2-kuyruk-anahtarlar-depolama.md §4'ün rota tarafı. Sağlayıcı YAMAL
 
 Artı bir ölçüm: yamalı sağlayıcıyla `POST /api/generate` gecikmesi (çıkış
 ölçütü 50 ms; iddia CI gürültüsüne pay bırakır, değer belgeye yazılır).
+
+Faz 2 / 5 iki soru daha ekledi (belge §5):
+
+  (vi)  SSE AKIŞI `GET /api/isler/akis` — ilk turda aktif işler, sonra yalnız
+        DEĞİŞENLER; `?since=` ve `Last-Event-ID` aynı yerden sürer; `: kalp`
+        yorumu; azami ömürde akış kendini kapatır; yalnız sahibin işleri;
+        `no-store` + `X-Accel-Buffering: no`. Zamanlar modül sabiti, testler
+        saniyenin altına çeker (`TestClient.stream` ile satır satır okunur).
+  (vii) YENİDEN GÖNDER `POST /api/isler/{id}/yeniden` — `hata`/`iptal` iş →
+        aynı `istek`le yeni `bekliyor` iş (202), girdi nesneleri REFERANS
+        (kopya yok), `arena_id` düşer; aktif/bitmiş iş 409, başkasının 404,
+        tavan 429.
 """
 from __future__ import annotations
 
 import datetime as dt
 import io
+import json
 import os
 import re
+import threading
 import time
 import uuid
 
@@ -38,7 +52,8 @@ import azure_client as ac
 import catalog
 import i18n
 import providers
-from services import ayar, hesap, isci, kapilar, kuyruk, tablolar
+from routers import isler as isler_rotasi
+from services import ayar, hesap, isci, kapilar, kimlik, kuyruk, tablolar
 
 pytestmark = pytest.mark.usefixtures("depo_db")
 
@@ -113,7 +128,9 @@ def test_generate_answers_202_with_the_job_and_no_provider_call(c, monkeypatch):
     assert is_["kredi_tahmini"] == catalog.cost_for(spec, "medium") * 3
     assert is_["sonuc"] is None and is_["hata"] is None and is_["basladi"] is None
     assert set(is_) == {"id", "tur", "durum", "model", "kredi_tahmini", "olusturuldu", "basladi",
-                        "bitti", "sonuc", "hata"}, "`istek` (prompt, anahtarlar) dökülmez"
+                        "bitti", "sonuc", "hata", "arena_id", "folder_id"}, "`istek` (prompt, anahtarlar) dökülmez"
+    assert is_["arena_id"] is None and is_["folder_id"] is None, (
+        "`istek`ten dökülen iki alan: tur etiketi (panel gruplaması) ve klasör (önizleme)")
     assert "kedi" not in r.text
 
 
@@ -461,3 +478,272 @@ def test_the_worker_writes_into_the_users_own_directory_when_given_the_real_layo
     ozel = ayar.Ayarlar.kullanici_icin(appmod.app.state.ayarlar, kullanici.id)
     assert ozel.output_dir == str(tmp_path / "kullanicilar" / str(kullanici.id) / "output")
     assert len(os.listdir(ozel.output_dir)) == 1
+
+
+def test_the_finish_stamp_is_taken_when_the_job_finishes_not_when_it_starts(c, depo_db, monkeypatch):
+    """ÖLÇÜLEN KUSUR (Faz 2 / 5 E2E): işçi `bitti`ye işin BAŞINDA aldığı anı yazıyordu; akışın
+    `since` sorgusu (`GREATEST(olusturuldu, basladi, bitti)`) bitişi hiç görmüyor, panel
+    `calisiyor`da donuyordu. Sağlayıcı 0,4 sn uyur; `bitti - basladi` en az o kadar."""
+    def uyuyan(*a, **k):
+        time.sleep(0.4)
+        return [PNG]
+    monkeypatch.setattr(providers, "generate", uyuyan)
+    is_id = c.post("/api/generate", json=GORSEL).json()["is"]["id"]
+    assert _tek_tur(depo_db)
+    satir = next(s for s in _isler(depo_db) if str(s.id) == is_id)
+    assert satir.durum == "bitti"
+    assert (satir.bitti - satir.basladi).total_seconds() >= 0.35, (satir.basladi, satir.bitti)
+
+
+# ── (vi) SSE akışı ──────────────────────────────────────────────────────
+
+def _akis_hizli(monkeypatch, *, kalp: float = 60.0, azami: float = 3.0, ortusme: float = 0.0):
+    """Akışın zamanlarını test ölçeğine çeker: sorgu 0,05 sn, ömür `azami` (akış KENDİ kapanır —
+    TestClient'ta açık bir akışı dışarıdan kesmek portalda asılı kalabilir)."""
+    monkeypatch.setattr(isler_rotasi, "AKIS_YOKLAMA_SN", 0.05)
+    monkeypatch.setattr(isler_rotasi, "AKIS_KALP_SN", kalp)
+    monkeypatch.setattr(isler_rotasi, "AKIS_AZAMI_SN", azami)
+    monkeypatch.setattr(isler_rotasi, "AKIS_ORTUSME_SN", ortusme)
+
+
+def _olaylar(satirlar) -> list[dict]:
+    """SSE metnindeki `event: is` olaylarının `data` gövdeleri, sırayla."""
+    olaylar: list[dict] = []
+    olay: dict[str, str] = {}
+    for satir in satirlar:
+        if satir == "":
+            if olay.get("event") == "is":
+                olaylar.append({**json.loads(olay["data"]), "_id": olay.get("id")})
+            olay = {}
+        elif ":" in satir and not satir.startswith(":"):
+            alan, deger = satir.split(":", 1)
+            olay[alan] = deger.strip()
+    return olaylar
+
+
+class _AkisOkuyucu(threading.Thread):
+    """Akışı AYRI iş parçacığında okur: `TestClient` gövdeyi portalda SONUNA KADAR toplayıp
+    öyle döndürüyor (starlette.testclient `BytesIO`), yani akış açıkken test gövdesinden
+    araya girmenin tek yolu isteği başka bir iş parçacığına vermek. Uygulama portalda
+    koşarken ana iş parçacığı işçiyi çalıştırır, sonra `join` ile satırları alır."""
+
+    def __init__(self, c: TestClient, **istek):
+        super().__init__(daemon=True)
+        self.c, self.istek = c, istek
+        self.basliklar: dict = {}
+        self.durum = 0
+        self.satirlar: list[str] = []
+
+    def run(self):
+        with self.c.stream("GET", "/api/isler/akis", **self.istek) as r:
+            self.durum = r.status_code
+            self.basliklar = dict(r.headers)
+            self.satirlar = list(r.iter_lines())
+
+
+def test_the_stream_sends_the_active_jobs_first_and_then_every_change(c, depo_db, monkeypatch):
+    """İlk tur aktifler (geçmişi istemci listeden aldı), sonra yalnız değişenler;
+    aynı hâl ikinci kez YAZILMAZ; başlıklar vekil tamponunu kapatıyor."""
+    _akis_hizli(monkeypatch, azami=1.5)
+    is_id = c.post("/api/generate", json=GORSEL).json()["is"]["id"]
+
+    okuyucu = _AkisOkuyucu(c)
+    okuyucu.start()
+    time.sleep(0.4)                 # ilk tur (bekliyor) yazıldı, döngü uyuyor
+    assert _tek_tur(depo_db)        # akış AÇIKKEN işçi işi bitirir
+    okuyucu.join(timeout=10)
+    assert not okuyucu.is_alive(), "akış azami ömürde kapanmadı"
+
+    assert okuyucu.durum == 200
+    assert okuyucu.basliklar["content-type"].startswith("text/event-stream")
+    assert okuyucu.basliklar["cache-control"] == "no-store"
+    assert okuyucu.basliklar["x-accel-buffering"] == "no"
+    assert okuyucu.satirlar[0] == "retry: 100", "yeniden bağlanma ipucu ilk satır: başlıklar hemen gitsin"
+    olaylar = _olaylar(okuyucu.satirlar)
+    assert [o["id"] for o in olaylar] == [is_id, is_id], "bekliyor → bitti: iki hâl, ikisi de tek kez"
+    assert [o["durum"] for o in olaylar] == ["bekliyor", "bitti"]
+    assert olaylar[1]["sonuc"]["medya"] and olaylar[1]["basladi"] and olaylar[1]["bitti"]
+    assert all(o["_id"] for o in olaylar), "her olayın `id:`si var (Last-Event-ID buradan)"
+    assert olaylar[0]["_id"] < olaylar[1]["_id"], "id sorgu anı: artan"
+
+
+def test_since_and_last_event_id_resume_the_stream_from_that_moment(c, monkeypatch):
+    _akis_hizli(monkeypatch, azami=0.3)
+    a = c.post("/api/generate", json=GORSEL).json()["is"]
+    time.sleep(1.1)   # `since` karşılaştırması damga çözünürlüğünde kesin olsun
+    sinir = dt.datetime.now(dt.UTC).astimezone().isoformat()
+    time.sleep(0.05)
+    b = c.post("/api/generate", json=GORSEL).json()["is"]
+
+    with c.stream("GET", "/api/isler/akis", params={"since": sinir}) as r:
+        olaylar = _olaylar(r.iter_lines())
+    assert [o["id"] for o in olaylar] == [b["id"]], "`since` yalnız sonrasını verir (a değil)"
+
+    with c.stream("GET", "/api/isler/akis", headers={"Last-Event-ID": sinir}) as r:
+        olaylar = _olaylar(r.iter_lines())
+    assert [o["id"] for o in olaylar] == [b["id"]], "tarayıcının yeniden bağlanışı aynı yerden sürer"
+
+    # Başlık `?since=`in ÖNÜNDE: ikisi birden gelirse tarayıcının bildiği an kazanır.
+    with c.stream("GET", "/api/isler/akis", params={"since": "2000-01-01T00:00:00"},
+                  headers={"Last-Event-ID": sinir}) as r:
+        olaylar = _olaylar(r.iter_lines())
+    assert [o["id"] for o in olaylar] == [b["id"]]
+    assert a["id"] not in {o["id"] for o in olaylar}
+
+    r = c.get("/api/isler/akis", params={"since": "dun"})
+    assert r.status_code == 422, "bozuk `since` 422 (listeyle aynı kural)"
+
+
+def test_the_stream_writes_a_heartbeat_comment_and_closes_itself_at_max_age(c, monkeypatch):
+    """Vekiller boş bağlantıyı kesiyor → `: kalp`; uzun ömürlü bağlantı sızmasın → akış kendi kapanır."""
+    _akis_hizli(monkeypatch, kalp=0.05, azami=0.4)
+    t0 = time.perf_counter()
+    with c.stream("GET", "/api/isler/akis") as r:
+        satirlar = list(r.iter_lines())
+    gecen = time.perf_counter() - t0
+    assert ": kalp" in satirlar
+    assert not _olaylar(satirlar), "iş yokken olay yok, yalnız kalp"
+    assert 0.4 <= gecen < 3.0, f"akış azami ömürde kapanmadı: {gecen:.2f} sn"
+
+
+def test_the_stream_carries_only_the_owners_jobs(c, depo_db, monkeypatch):
+    _akis_hizli(monkeypatch, azami=0.3)
+    benim = c.post("/api/generate", json=GORSEL).json()["is"]["id"]
+    with Session(depo_db) as db:
+        baska = tablolar.Kullanici(eposta=f"b-{uuid.uuid4().hex[:8]}@example.com", parola_ozeti=None,
+                                   dogrulandi_at=hesap.simdi(), dil=None)
+        db.add(baska)
+        db.flush()
+        kuyruk.ekle(db, baska.id, "generate", {"prompt": "gizli"}, "m", 1)
+        db.commit()
+
+    with c.stream("GET", "/api/isler/akis") as r:
+        olaylar = _olaylar(r.iter_lines())
+    assert [o["id"] for o in olaylar] == [benim]
+    assert "gizli" not in json.dumps(olaylar)
+
+
+def test_the_stream_route_is_gated_reads_no_directory_and_holds_no_connection_while_streaming(
+        c, depo_db, monkeypatch):
+    """Kapı `aktif_kullanici` (401 sözleşmesi tests/test_kimlik.py'de her rota için ölçülüyor);
+    `ayar.ayarlar` yok (`DIZINSIZ_KAPILI`). Havuz: akış AÇIKKEN isteğin bağlantısı havuza
+    dönmüş olmalı (`pool_size=2`) — turlar arasında `checkedout() == 0`, tests/test_isci.py'nin
+    "sağlayıcı çağrısında bağlantı yok" ölçümünün ikizi."""
+    from services import ayar
+    (rota,) = [r for r in isler_rotasi.router.routes if getattr(r, "path", "") == "/api/isler/akis"]
+    cagrilar = {alt.call for alt in rota.dependant.dependencies}
+    assert kimlik.aktif_kullanici in cagrilar
+    assert ayar.ayarlar not in cagrilar
+
+    _akis_hizli(monkeypatch, azami=1.0)
+    c.post("/api/generate", json=GORSEL)
+    okuyucu = _AkisOkuyucu(c)
+    okuyucu.start()
+    time.sleep(0.4)                 # akış açık, ilk tur yazılmış, döngü uykuda
+    tutulan = depo_db.pool.checkedout()
+    okuyucu.join(timeout=10)
+    assert okuyucu.durum == 200 and _olaylar(okuyucu.satirlar)
+    assert tutulan == 0, f"akış açıkken havuzdan tutulan bağlantı: {tutulan}"
+
+
+# ── (vii) yeniden gönder ────────────────────────────────────────────────
+
+def _hata_ver(monkeypatch):
+    def boom(*a, **k):
+        raise ac.AzureImageError("Azure isteği başarısız (HTTP 500).")
+    monkeypatch.setattr(providers, "edit", boom)
+    monkeypatch.setattr(providers, "generate", boom)
+
+
+def test_a_failed_job_is_resubmitted_with_the_same_request_and_the_same_input_objects(
+        c, depo_db, tmp_path, kullanici, monkeypatch):
+    """Karar: girdi nesneleri KOPYALANMAZ — yeni iş eski `isler/<id>/` anahtarlarına referans verir."""
+    _hata_ver(monkeypatch)
+    r = c.post("/api/edit", data={"prompt": "mavi", "size": "1024x1024", "quality": "low", "n": "1"},
+               files={"file": ("in.png", _png(), "image/png")})
+    eski_id = r.json()["is"]["id"]
+    assert _tek_tur(depo_db)
+    assert c.get(f"/api/isler/{eski_id}").json()["is"]["durum"] == "hata"
+
+    r = c.post(f"/api/isler/{eski_id}/yeniden")
+
+    assert r.status_code == 202, r.text
+    yeni = r.json()["is"]
+    assert yeni["id"] != eski_id and yeni["durum"] == "bekliyor" and yeni["tur"] == "edit"
+    assert yeni["model"] == c.get(f"/api/isler/{eski_id}").json()["is"]["model"]
+    satirlar = {str(s.id): s for s in _isler(depo_db)}
+    assert satirlar[yeni["id"]].istek == satirlar[eski_id].istek, "aynı `istek`, prompt dâhil"
+    assert satirlar[yeni["id"]].istek["girdiler"][0]["anahtar"].endswith(f"isler/{eski_id}/upload.png")
+    assert _girdi_dizini(tmp_path, kullanici.id, yeni["id"]) == [], "yeni işin kendi dizini yok: referans"
+    assert satirlar[yeni["id"]].kredi_tahmini == satirlar[eski_id].kredi_tahmini
+    assert "mavi" not in r.text, "`istek` 202 gövdesinde de dökülmez"
+
+    # Sağlayıcı düzelince yeni iş eski girdiyle koşar ve biter.
+    monkeypatch.setattr(providers, "edit", lambda m, p, r, s, q, n, **k: [PNG] * n)
+    assert _tek_tur(depo_db)
+    assert c.get(f"/api/isler/{yeni['id']}").json()["is"]["durum"] == "bitti"
+    assert len(c.get("/api/history").json()["images"]) == 1
+
+
+def test_a_cancelled_job_can_be_resubmitted_but_an_active_or_finished_one_cannot(c, depo_db):
+    iptal = c.post("/api/generate", json=GORSEL).json()["is"]["id"]
+    assert c.post(f"/api/isler/{iptal}/iptal").status_code == 200
+    assert c.post(f"/api/isler/{iptal}/yeniden").status_code == 202
+
+    bekleyen = c.post("/api/generate", json=GORSEL).json()["is"]["id"]
+    r = c.post(f"/api/isler/{bekleyen}/yeniden")
+    assert r.status_code == 409 and "bekliyor" in r.json()["detail"]
+
+    with Session(depo_db) as db:
+        for _ in range(2):        # iki bekleyen: yeniden gönderilmiş + bekleyen
+            assert kuyruk.al(db, uuid.uuid4(), dt.datetime.now(dt.UTC)) is not None
+        db.commit()
+    assert c.post(f"/api/isler/{bekleyen}/yeniden").status_code == 409, "çalışan iş de 409"
+
+    biten = c.post("/api/generate", json=GORSEL).json()["is"]["id"]
+    assert _tek_tur(depo_db)
+    assert c.get(f"/api/isler/{biten}").json()["is"]["durum"] == "bitti"
+    assert c.post(f"/api/isler/{biten}/yeniden").status_code == 409, "bitmiş iş: sonuç galeride, çift fatura yok"
+    assert c.post(f"/api/isler/{uuid.uuid4()}/yeniden").status_code == 404
+    assert c.post("/api/isler/bu-uuid-degil/yeniden").status_code == 422
+
+
+def test_resubmitting_someone_elses_job_is_404(c, depo_db):
+    with Session(depo_db) as db:
+        baska = tablolar.Kullanici(eposta=f"b-{uuid.uuid4().hex[:8]}@example.com", parola_ozeti=None,
+                                   dogrulandi_at=hesap.simdi(), dil=None)
+        db.add(baska)
+        db.flush()
+        is_ = kuyruk.ekle(db, baska.id, "generate", {"prompt": "gizli"}, "m", 1)
+        kuyruk.iptal(db, baska.id, is_.id)
+        baskasinin = str(is_.id)
+        db.commit()
+    assert c.post(f"/api/isler/{baskasinin}/yeniden").status_code == 404
+    assert len(_isler(depo_db)) == 1, "404 satır doğurmaz"
+
+
+def test_resubmit_counts_against_the_concurrency_cap(c, depo_db, monkeypatch):
+    _hata_ver(monkeypatch)
+    dusen = c.post("/api/generate", json=GORSEL).json()["is"]["id"]
+    assert _tek_tur(depo_db)
+    for _ in range(kapilar.ES_ZAMANLI_IS_VARSAYILAN):
+        assert c.post("/api/generate", json=GORSEL).status_code == 202
+
+    r = c.post(f"/api/isler/{dusen}/yeniden")
+
+    assert r.status_code == 429 and r.headers["Retry-After"] == str(kapilar.RETRY_AFTER_SN)
+    assert len(_isler(depo_db)) == 5, "429 satır doğurmaz"
+
+
+def test_resubmit_drops_the_arena_id_because_the_round_is_over(c, depo_db, monkeypatch):
+    _hata_ver(monkeypatch)
+    arena = "aaaa1111bbbb"
+    is_ = c.post("/api/generate", json={**GORSEL, "arena_id": arena}).json()["is"]
+    assert is_["arena_id"] == arena, "`_json` turun etiketini taşır (panel gruplaması)"
+    assert _tek_tur(depo_db)
+
+    yeni = c.post(f"/api/isler/{is_['id']}/yeniden").json()["is"]
+
+    assert yeni["arena_id"] is None
+    satir = next(s for s in _isler(depo_db) if str(s.id) == yeni["id"])
+    assert satir.istek["arena_id"] is None and satir.istek["prompt"] == "kedi"

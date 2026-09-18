@@ -458,7 +458,25 @@ function aktifModel() {
   if (currentMode === "image") return currentModel;
   return null;
 }
-let runBusy = false; // üretim sürüyor mu — #go kapısının bir girdisi
+// SOHBET (Yönetmen) turu sürüyor mu — #go kapısının bir girdisi. chat.js
+// `setChatBusy` ile yazıyor. Faz 2 / 5'e kadar `run()`/`runArena()` da bunu
+// bir ÜRETİM KİLİDİ olarak kuruyordu; kalktı: üretim 202 ile kuyruğa gidiyor,
+// birden fazla iş sıraya girebilir (tavan sunucuda 429, panelde okunur —
+// static/isler.js). Ad `runBusy` kaldı: chat.js ve eslint defteri onu taşıyor.
+let runBusy = false;
+// Çift tıklamanın karşılığı (kilit kalkınca #go serbest; belge §5 risk (c)):
+// gönderim KABUL EDİLİNCE düğme 1 sn soğur — ikinci tık iki iş açmasın.
+// Sunucunun 429'u ikinci savunma.
+let goSoguk = false;
+const GO_SOGUMA_MS = 1000;
+function goSogut() {
+  goSoguk = true;
+  syncGoGate();
+  setTimeout(() => {
+    goSoguk = false;
+    syncGoGate();
+  }, GO_SOGUMA_MS);
+}
 // Yönetmenin karşılığı: aynı yuvada, aynı desende (bkz. applyChatModels).
 // Burada yaşamak ZORUNDA çünkü `goBlockReason` bu dosyanın üst düzeyinde
 // çağrılan `syncGoGate` üzerinden ikisini de okuyor ve chat.js EN SONDA
@@ -580,6 +598,7 @@ function syncRunCost() {
  * saklamak, #chat-gate'in reddettiği şeyin aynısı.
  */
 function goBlockReason() {
+  if (goSoguk) return t("gate.sent");
   if (runBusy) return t("gate.busy");
   if (currentMode === "director") {
     // Görsel dalının AYNI kademeleri. Öncesinde tek bir `chatConfigured`
@@ -2268,71 +2287,20 @@ function setCurrentImage(rec) {
   $("logo-add-btn").disabled = !rec || rec.kind === "video";
 }
 
-// ── İş yoklaması (Faz 2 / 4) ─────────────────────────────────────────
-// Üretim rotaları artık sağlayıcıyı çağırmıyor: 202 + bir `is` kaydı
-// dönüyor, üretimi ayrı bir işçi süreci yapıyor (services/isci.py). Sonuç
-// için `GET /api/isler/{id}` 2 sn'de bir yoklanır; `bitti` olunca
-// `sonuc.medya` id'leri `GET /api/history`den kayıt olarak çekilir ve
-// bugünkü `showPreview`/`loadHistory` akışına AYNI şekilde girer. Bu asgari
-// uyum: iş paneli, SSE akışı ve sekme yenilemeye dayanıklılık 5. görevin
-// (docs/faz2-kuyruk-anahtarlar-depolama.md §5). Bilinen ara durum: sekme
-// yenilenirse iş sürer ama bu ekran onu artık göstermez — galeri yenilenince
-// sonuç orada.
-//
-// Yoklama aralığı 2 sn: üretim dakikalarla ölçülüyor, daha sık sormak
-// yalnız sunucuya yük; daha seyrek sormak ise en kısa üretimde bile
-// görünür bir gecikme (kullanıcı sonucu saniyeler geç görürdü).
-const IS_YOKLAMA_MS = 2000;
-
-/** İş bitene kadar yoklar; `bitti` işi döndürür, `hata`/`iptal` fırlatır.
- *
- * `hata` metni sunucudan geliyor ve zaten kullanıcının dilinde (işçi
- * `kullanicilar.dil` ile çeviriyor) — burada yalnız çerçeveleniyor.
- * Yoklamanın kendisi düşerse (ağ, 404, 401 → sarmal giriş sayfasına
- * gider) hata `run`ın catch'ine düşer: prompt kutuya döner, iş sunucuda
- * sürer (5'te panel onu gösterecek).
- */
-async function isiBekle(isId) {
-  for (;;) {
-    const res = await fetch(`/api/isler/${encodeURIComponent(isId)}`);
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(detailText(err) || t("err.http", { durum: res.status }));
-    }
-    const { is } = await res.json();
-    if (is.durum === "bitti") return is;
-    if (is.durum === "hata") {
-      throw new Error(t("gen.job_failed", { hata: is.hata || t("common.unknown") }));
-    }
-    if (is.durum === "iptal") throw new Error(t("gen.job_cancelled"));
-    await new Promise((r) => setTimeout(r, IS_YOKLAMA_MS));
-  }
-}
+// ── İş teslimi (Faz 2 / 4-5) ─────────────────────────────────────────
+// Üretim rotaları sağlayıcıyı çağırmıyor: 202 + bir `is` kaydı dönüyor,
+// üretimi ayrı bir işçi süreci yapıyor (services/isci.py). 4. görevde sonuç
+// buradan 2 sn'de bir yoklanıyordu (`isiBekle`/`isSonuclari`); 5. görevde o
+// yoklama KALKTI — iş panele teslim edilir (`kromisIsler.kaydetIs`,
+// static/isler.js), bitişi SSE akışı getirir ve panel bu dosyanın geri
+// çağrısını (`bitince`/`hatada`) çalıştırır. İki izleyici aynı işi iki kez
+// soracaktı; sekme yenilenirse geri çağrı gider, iş panelde kalır, galeri
+// yine yenilenir (belge §5).
 
 /** 202 gövdesinden işi okur; `is` yoksa sunucu eski (202 öncesi) demek. */
 function yanittakiIs(govde) {
   if (!govde || !govde.is || !govde.is.id) throw new Error(t("gen.no_job_in_response"));
   return govde.is;
-}
-
-/** Biten işin `sonuc.medya` id'lerini galeri kayıtları olarak çeker, iş sırasıyla.
- *
- * `GET /api/history` klasöre göre süzüyor (kökte yalnız klasörsüzler), o
- * yüzden işin gönderildiği klasör soruluyor — gönderimden sonra kullanıcı
- * başka klasöre geçmiş olabilir, `currentFolder` değil gönderim anındaki
- * değer. Kayıt şekli eski `{"images": [...]}` yanıtınınkiyle aynı
- * (`depo_medya._json`), yani aşağıdaki akış (önizleme, yankı denetimi,
- * döküm turu) DEĞİŞMEDİ.
- */
-async function isSonuclari(is, folderId) {
-  const ids = (is.sonuc && is.sonuc.medya) || [];
-  const res = await fetch(
-    folderId ? `/api/history?folder_id=${encodeURIComponent(folderId)}` : "/api/history",
-  );
-  if (!res.ok) throw new Error(t("err.http", { durum: res.status }));
-  const { images } = await res.json();
-  const kayitlar = new Map(images.map((r) => [r.id, r]));
-  return ids.map((id) => kayitlar.get(id)).filter(Boolean);
 }
 
 function showPreview(rec) {
@@ -2759,21 +2727,17 @@ async function runArena(prompt) {
   const pal = readPaletteOpts();
   const sessionId = openSessionId();
   const arenaId = arenaKimlik();
-  // Gönderim anındaki klasör: sonuçlar `isSonuclari` ile buradan okunur.
-  const folderId = currentFolder ? currentFolder.id : null;
   const pending = beginArenaTurn(prompt, sutunlar);
 
-  runBusy = true;
-  syncGoGate();
+  goSogut();
   statusEl.textContent = t("arena.generating", { adet: sutunlar.length });
 
   const sonuclar = new Array(sutunlar.length).fill(null);
   const hatalar = [];
-  // `try/finally` `run()`ın deseni ve AYNI gerekçeyle: `runBusy = false` düz
-  // akışta duruyordu, oysa aşağıdaki `finishArenaTurn`/`loadHistory` kendi
-  // try/catch'ini TUTMUYOR. Orada kopan bir bağlantı `runBusy`i true bırakıp
-  // #go'yu sayfa yenilenene kadar "Üretim sürüyor…" diye kilitliyordu —
-  // görseller çoktan diske düşmüşken, yani kilidin sebebi de yalan.
+  // `#go` KİLİDİ YOK (Faz 2 / 5): tur sürerken başka bir iş sıraya girebilir,
+  // sınır sunucuda (429). Eskiden `runBusy` `finally`de bırakılıyordu; kilit
+  // kalkınca `finally` de kalktı — döküm/geçmiş adımının düşüşü aşağıdaki
+  // `catch`te yine söyleniyor.
   try {
     await Promise.all(
       sutunlar.map(async (s, i) => {
@@ -2798,12 +2762,21 @@ async function runArena(prompt) {
           });
           if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            throw new Error(detailText(err) || t("err.http", { durum: res.status }));
+            const mesaj = detailText(err) || t("err.http", { durum: res.status });
+            if (res.status === 429) kromisIsler.uyar(mesaj, res.headers.get("Retry-After"));
+            throw new Error(mesaj);
           }
-          // 202: sütunun işi kuyrukta; sütun ancak iş bitince dolar
-          // (`sonuclar[i]` yoklamanın sonuna kaydı, `fillArenaSlot` aynen).
+          // 202: sütunun işi kuyrukta, panele teslim; sütun ancak iş bitince
+          // dolar — bitişi SSE akışı getirir, panel bu sözü çözer (`bitince`
+          // kayıtlarla, `hatada` mesajla). Turun 2-4 işi aynı `arena_id`yi
+          // taşıyor, panel onları grup olarak çiziyor; `fillArenaSlot` aynen.
           const is = yanittakiIs(await res.json());
-          const images = await isSonuclari(await isiBekle(is.id), folderId);
+          const images = await new Promise((resolve, reject) =>
+            kromisIsler.kaydetIs(is, {
+              bitince: (_is, kayitlar) => resolve(kayitlar),
+              hatada: (mesaj) => reject(new Error(mesaj)),
+            }),
+          );
           if (!images.length) throw new Error(t("gen.server_returned_nothing"));
           const kayit = {
             image_ids: images.map((r) => r.id),
@@ -2852,9 +2825,6 @@ async function runArena(prompt) {
     // kullanıcı sayfayı yenileyene kadar EKSİK bir geçmiş görür ve bunu
     // açıklayamaz — "sessiz sapma yasak" duruşunun buradaki karşılığı.
     statusEl.textContent = `${statusEl.textContent} ${t("history.refresh_failed", { hata: e.message })}`;
-  } finally {
-    runBusy = false;
-    syncGoGate(); // kapının tek yazarı (run()'ın deseni)
   }
 }
 
@@ -2892,9 +2862,8 @@ async function run() {
   // sessizce kaybolur. Palet kapalıyken {} döner, böylece gövde bugünküyle
   // bayt bayt aynı kalır ve extra="forbid" boş bir alan görmez.
   const pal = readPaletteOpts();
-  // Gönderim anındaki klasör: iş bitince sonuçlar `isSonuclari` ile buradan
-  // okunur (gövdelerdeki `folder_id` ifadeleri aynen duruyor).
-  const folderId = currentFolder ? currentFolder.id : null;
+  // Gönderim anındaki klasör gövdelerde (`folder_id`); iş bitince sonuçları
+  // panel işin kendi `folder_id`sinden okur (`kromisIsler`), burada tutulmaz.
 
   // ── Birleşik oturum (tasarım §5 · §4.2) ──
   // Görsel modu artık kendi oturumunu BAŞLATIYOR (Adım 8, K10'un ikinci yarısı):
@@ -3004,8 +2973,7 @@ async function run() {
     });
   }
 
-  runBusy = true;
-  syncGoGate();
+  goSogut();
   // VİDEO metni SÜREYİ SÖYLÜYOR ve bu bir süsleme değil: üretim dakikalarca
   // sürüyor, senkron istek o süre boyunca açık kalıyor ve ekranda yalnız
   // shimmer var. "Üretiliyor…" yazan bir satır, kullanıcıya donmuş bir
@@ -3019,20 +2987,23 @@ async function run() {
       : extras.length
         ? t("gen.merging")
         : t("gen.editing");
-  try {
-    const res = await request;
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(detailText(err) || t("err.http", { durum: res.status }));
-    }
-    // 202: iş kuyrukta. Durum metni ("Üretiliyor…" / video süresi) yoklama
-    // boyunca AYNEN duruyor — kullanıcı için değişen bir şey yok, üretim
-    // yalnız başka bir süreçte. Dört tür de aynı iş kaydından okunuyor;
-    // görsel/video ayrımı kayıtların ŞEKLİNİ değil dökümün `kind`ini
-    // etkiliyor (aşağısı) — Faz 1'in `{"videos": …}` anahtarı 202 gövdesinde
-    // artık yok, tür `is.tur`da.
-    const is = yanittakiIs(await res.json());
-    const images = await isSonuclari(await isiBekle(is.id), folderId);
+  // BAŞARISIZ TUR GEÇMİŞTE KALMAZ (sendChat'in kuralı): kalsaydı döküme
+  // cevapsız bir kullanıcı turu düşer, yeniden denemek onu ikinci kez
+  // eklerdi. Prompt kutuya döner. İki yerden çağrılıyor: istek düşerse
+  // (aşağıdaki catch) ve iş `hata`/`iptal` kapanırsa (panelin geri çağrısı).
+  const geriAl = (mesaj) => {
+    dropPendingTurn(pending);
+    $("prompt").value = prompt;
+    autoGrow($("prompt"));
+    syncAskDirector();
+    statusEl.textContent = mesaj;
+  };
+  // İŞ BİTİNCE (panelin geri çağrısı, SSE ile): önizleme, yankı denetimi,
+  // döküm kaydı, galeri — 4. görevde yoklamanın ardında duran akış AYNEN,
+  // yalnız tetik değişti. `images` galeri kayıtları, iş sırasıyla (panel
+  // `GET /api/history`den çekti; klasör işin kendisinden).
+  const bitince = async (is, images) => {
+    if (!images.length) throw new Error(t("gen.server_returned_nothing"));
     if (images[0]) showPreview(images[0]);
     clearUploadPreviewUrl(); // sonuç sunucu URL'inden gösteriliyor; blob artık gereksiz
     statusEl.textContent = videoMu
@@ -3114,18 +3085,27 @@ async function run() {
       },
     );
     await loadHistory();
+  };
+  try {
+    const res = await request;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const mesaj = detailText(err) || t("err.http", { durum: res.status });
+      // 429: eş zamanlılık tavanı (services/kapilar.py). Cümle burada, ipucu
+      // (`Retry-After`) panelde — kullanıcı sırayı orada görüyor.
+      if (res.status === 429) kromisIsler.uyar(mesaj, res.headers.get("Retry-After"));
+      throw new Error(mesaj);
+    }
+    // 202: iş kuyrukta, panele TESLİM. Durum metni ("Üretiliyor…" / video
+    // süresi) iş bitene kadar AYNEN duruyor — kullanıcı için değişen bir şey
+    // yok, üretim yalnız başka bir süreçte. Dört tür de aynı iş kaydından
+    // okunuyor; görsel/video ayrımı kayıtların ŞEKLİNİ değil dökümün
+    // `kind`ini etkiliyor (`bitince`) — Faz 1'in `{"videos": …}` anahtarı 202
+    // gövdesinde artık yok, tür `is.tur`da.
+    const is = yanittakiIs(await res.json());
+    kromisIsler.kaydetIs(is, { bitince, hatada: geriAl });
   } catch (e) {
-    // BAŞARISIZ TUR GEÇMİŞTE KALMAZ (sendChat'in kuralı): kalsaydı döküme
-    // cevapsız bir kullanıcı turu düşer, yeniden denemek onu ikinci kez
-    // eklerdi. Prompt kutuda duruyor — core.js kutuyu hiç temizlemiyor.
-    dropPendingTurn(pending);
-    $("prompt").value = prompt;
-    autoGrow($("prompt"));
-    syncAskDirector();
-    statusEl.textContent = e.message;
-  } finally {
-    runBusy = false;
-    syncGoGate(); // kapının tek yazarı — yapılandırma/mod/model hepsini birden görüyor
+    geriAl(e.message);
   }
 }
 

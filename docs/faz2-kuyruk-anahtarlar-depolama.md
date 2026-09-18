@@ -806,7 +806,7 @@ arkasına geçer ya da kalkar; 429'un `Retry-After`ını okuyan istemci davranı
 
 ---
 
-## 5. İş listesi: SSE `GET /api/isler/akis`, `static/isler.js` paneli, sekme yenilemeye dayanıklılık; ön yüz çerçevesi kararı (PR: `faz2/is-listesi-sse`)
+## 5. İş listesi: SSE `GET /api/isler/akis`, `static/isler.js` paneli, sekme yenilemeye dayanıklılık; ön yüz çerçevesi kararı ✅ (PR: `faz2/is-listesi-sse`)
 
 **Kapsam.** Çıkış kriterinin ilk yarısı. **Sunucu:** `GET /api/isler/akis` —
 `text/event-stream`, `async def`, `Last-Event-ID`/`?since=` ile kaldığı
@@ -881,6 +881,118 @@ sunucu 429. E2E süresi: sahte sağlayıcının 8 sn uykusu tek testte, ölçül
 (gerçek 6 dk video yerine 8 sn sahte — süre değil süreç sınanıyor; canlı
 doğrulama sahibin anahtarıyla gerçek bir videoda bir kez); yenilemede aktif
 işler panelde; SSE düşerse yoklama sürüyor; takım yeşil.
+
+**Yapıldığında (2026-09-18).** `routers/isler.py` +2 rota (belge "+1"
+diyordu, sapma aşağıda): `GET /api/isler/akis` — `async def`,
+`StreamingResponse(text/event-stream)`, `Cache-Control: no-store`,
+`X-Accel-Buffering: no`; döngü `AKIS_YOKLAMA_SN` (1,5) sn'de bir
+`run_in_threadpool(_akis_sorgusu)` ve `Session` YALNIZ sorgu süresince açık
+(isteğin `OTURUM`u imzada, ama yalnız motoru vermek için: `scope="function"`
+onu rota dönerken kapatıyor; test akış açıkken `pool.checkedout() == 0`
+ölçüyor); değişen iş `id: <sorgu anı, ISO µs>` + `event: is` + JSON, aynı hâl
+ikinci kez yazılmaz; `: kalp` 15 sn, akış 10 dk'da kendini kapatır;
+`Last-Event-ID` başlığı `?since=`in önünde, ikisi `_since`ten (bozuk 422).
+Üç zaman + örtüşme MODÜL SABİTİ (env değil; `.env.example`/`ALTYAPI`
+büyümedi), testler `monkeypatch` ile 0,05 sn'ye çeker. Ve `POST
+/api/isler/{id}/yeniden` (202): `hata`/`iptal` işi aynı `istek`le yeni satır;
+aktif/bitmiş 409 (`err.is_yeniden_gonderilemez`), başkasının 404, tavan 429.
+`kuyruk.satir` (ORM satırı, sahip süzgeçli; `istek`i taşıyan tek okuma),
+`KAPANMIS_DURUMLAR`; `_json` `istek`ten İKİ alan döker — `arena_id` (panel
+gruplaması) ve `folder_id` (önizlemenin klasörü), ikisi de `medya`da zaten
+görünür; prompt ve anahtarlar içeride (test_kuyruk'un kaynak bekçisi artık
+"`.get` ile yalnız bu iki anahtar" diye ölçüyor). Yeni `static/isler.js`
+(505 satır, IIFE, tek üst düzey ad `kromisIsler`): açılışta `GET /api/isler`
+→ `EventSource` → satır başına tür/model etiketi/durum/geçen süre, `bitti`de
+önizleme (`GET /api/history?folder_id=`), `hata`da metin + "yeniden gönder",
+`bekliyor`da "iptal"; aktif iş rozeti üst şeritte (`#isler-btn`), panel sağ
+sheet (`#isler-sheet`); `open` görmeden üç düşüş ya da CLOSED → 3 sn yoklama;
+`onerror`da `GET /api/hesap/ben` (401 → `/giris`, core.js sarmalı). `core.js`:
+`isiBekle`/`isSonuclari`/`IS_YOKLAMA_MS` KALKTI, 202 → `kromisIsler.kaydetIs(is,
+{bitince, hatada})`; `run()`ın sonuç akışı (önizleme, yankı denetimi, döküm,
+galeri) `bitince` geri çağrısına taşındı, `runArena` sütun başına aynı sözü
+bekliyor (`fillArenaSlot` aynen); `runBusy` artık yalnız SOHBET turunun
+bayrağı (chat.js yazıyor), üretim kilidi yok; #go gönderim kabul edilince
+1 sn soğur (`goSogut`, `gate.sent`); 429 cümlesi durum satırında, `Retry-After`
+ipucu panelde (`kromisIsler.uyar`). `index.html`: 1 `<script>` (palette →
+**isler** → settings), 1 panel kökü + 1 tetik düğmesi (belgenin "bir çapa"sı
+iki eleman oldu: sheet deseninde tetik panelden ayrı yaşıyor). i18n **+21**
+(`isler.*` 19, `gate.sent`, `err.is_yeniden_gonderilemez`); eslint defteri
+`static/isler.js: [kromisIsler]`; `test_id_contract.JS_FILES` +1 (sıra
+sayfayla). Ölçüler: rota **57 → 59**, betik 11 → 12, betik-arası bağ 29 → 33,
+test dosyası 125 → 126, takım **3.583 → 3.605 geçti, 12
+atlandı, 250 sn** (E2E + Postgres zorunlu); ruff/mypy/eslint/prettier
+temiz. **E2E** (`tests/test_playwright_isler.py`, 4 test, 37,8 sn): (1) 8 sn
+uyuyan sağlayıcı, iş gönder, SAYFA KAPAT, işçi bitirir, yeni sayfa → panelde
+`bitti` + önizleme, galeride 1 kart — **9,7 sn** (8 sn uyku dâhil); (2) iki
+iş sırada (#go kilit değil), yenileme sonrası ikisi de panelde, ikisi de SSE
+ile `bitti`, galeride 2 kart; (3) sağlayıcı düşer → satır `hata` + düğme →
+`yeniden` → ikinci satır, düzelen sağlayıcıyla `bitti`, prompt kutuya
+dönmüş; (4) `/api/isler/akis` tarayıcıda kesilir → üç düşüş → yoklama
+mesajı → iş yine `bitti`. `tests/test_isler_route.py` 32 → 43 (+akış 6,
++yeniden 5, +bitiş damgası 1). **Canlı duman** (geçici küme, `goc.py`,
+uvicorn + AYRI süreçte `python isci.py`, sağlayıcı `sitecustomize` ile
+yamalı): `curl -N` çerezli akış → `retry: 3000` → `POST /api/generate` 202
+(18 ms) → akışta `bekliyor` → `calisiyor` → `bitti` (`sonuc.medya` 1 id) →
+`: kalp` → `GET /api/history` 1 kayıt; çerezsiz akış 401; SIGTERM → işçi 0.
+
+**Ölçülen kusur (3. görevden):** işçi `bitti` sütununa işin BAŞINDA aldığı
+anı yazıyordu (`kos` → `bitis = zaman.an()` en üstte) — `bitti ≈ basladi`,
+sağlayıcı dakikalarca sürse de. E2E (2) yakaladı: akışın `since` sorgusu
+`GREATEST(olusturuldu, basladi, bitti) > since` ve başlangıcına damgalanmış
+bir bitiş hiçbir `since`in ötesine geçmiyor; işçi bitiriyor, panel
+`calisiyor`da donuyordu. Düzeltme `services/isci.py`: bitiş anı BİTİŞTE
+ölçülür (`an` verilmişse aynen — testler); bekçisi
+`test_the_finish_stamp_is_taken_when_the_job_finishes_not_when_it_starts`.
+
+**Kararlar, belgenin açık bıraktığı yerlerde:** (a) "YENİDEN GÖNDER"
+SUNUCUDA ve bu ikinci rotanın gerekçesi: `istek` §4 sözleşmesiyle dökülmüyor
+ve üretim rotaları anahtar değil bayt/galeri id'si alıyor — istemcinin "aynı
+isteği yeniden POST etmesi" ya `istek`i dökmek ya girdi baytlarını tarayıcıda
+saklamak demekti (yenilemede kaybolur). Rota 57 → 58 yerine **59**. (b) GİRDİ
+NESNELERİ: KOPYA DEĞİL REFERANS — yeni işin `istek.girdiler`i eski
+`isler/<eski_id>/…` anahtarlarına bakar, yeni işin kendi dizini yok (test
+ölçüyor). Kopya her yeniden gönderimde referans görselleri ikinci kez yazmak
+demekti; bedeli saklamaya (10) düşer: bir işin dizini ancak ona bakan hiçbir
+satır kalmadığında silinir (`artik_dosya.py`nin ölçütü zaten satır). (c)
+`arena_id` yeniden gönderimde DÜŞER: tur kapandı, beşinci sütun
+`fillArenaSlot`ın beklediği bir şey değil. (d) Akışın İLK TURU aktifler +
+son 30 sn'de değişenler (`AKIS_ILK_PENCERE_SN`): yalnız aktifler yetmiyordu,
+E2E ölçtü — liste → bağlanma arasında biten iş ilk turda gelmiyor, sonraki
+turlar da "bağlandıktan sonra"yı soruyordu. (e) `since` ÖRTÜŞMELİ
+(`AKIS_ORTUSME_SN` 2 sn): damga Python'da yazılıp commit sonra geliyor;
+yinelenen olay zararsız (istemci id'ye göre çizer, sunucu aynı hâli ikinci
+kez yazmaz). (f) `retry: 3000` ilk satır: başlıklar hemen gider, tarayıcı
+`open` görür, yeniden bağlanma aralığı sunucunun sözü. (g) YOKLAMAYA GEÇİŞ
+kalıcı (bu sekmede akış bir daha denenmez): "üç düşüş" zaten ortamın
+söylediği şey, tekrar denemek aynı düşüşü tekrar yaşatır; yenileme sıfırlar.
+(h) `TestClient` akışı SONUNA KADAR tamponluyor (starlette `BytesIO`): akış
+açıkken araya girmek için testler isteği ayrı iş parçacığına veriyor
+(`_AkisOkuyucu`), akış `AKIS_AZAMI_SN`de kendi kapanıyor. (i) SIRA BAĞLAYICI:
+`/api/isler/akis` `/api/isler/{is_id}`ten ÖNCE tanımlı — Starlette `{is_id}`i
+"akis"e de eşler ve UUID doğrulaması eşleşmeden SONRA 422 verir (ölçüldü).
+**Bilinen ara durum:** arena turu yenilenen sekmede panelde GRUP olarak
+görünür ama döküm satırı (chat.js `pending`) gider — ürün galeride,
+karşılaştırma sütunları `GET /api/arena/{id}` ile yeniden çizilebilir (bugün
+çizilmiyor). Panelin model etiketi katalog (`imageModels`) geldikten sonra
+doğru okunur; ilk çizimde id görünebilir, panel açılışında yeniden çizilir.
+
+**6. göreve devredilen.** (1) "ANAHTAR YOK" ERKEN KAPISI: anahtarsız
+kullanıcı bugün 202 alıp panelde `hata`lı bir iş görüyor (duman testinin
+ilk turu tam bunu gösterdi: "Kimlik bilgileri eksik …") — platform anahtarı
+gelince çözüm sırası (kullanıcı → platform → yok) rotada bir kez sorulur ve
+"yok" 4xx döner, iş hiç doğmaz; panelin `hata` satırı o gün yalnız gerçek
+sağlayıcı hatasını taşır. (2) SAATLİK İŞ TAVANI 429'unun panelde okunması:
+`kromisIsler.uyar(mesaj, retryAfter)` bugün eş zamanlılık 429'unu gösteriyor;
+saatlik kotanın `Retry-After`ı dakikalarla ölçülecek, aynı kapıdan geçer ama
+metin "kota" demeli (yeni i18n anahtarı, `err.*` sunucudan). (3) GÜNLÜK KREDİ
+TAVANI panelde: `kredi_tahmini` satırda var, panel henüz yazmıyor — kota
+gelince satıra "~N kredi" ve panelin başına günlük kalan. (4) `hata` KODLARI
+(`BAYAT_HATASI`, `BEKLENMEYEN_HATASI`, `KULLANICI_YOK_HATASI`) panelde ham
+görünüyor; cümleyi ön yüz kurmalı (i18n eşlemesi) — 6 ya da 10. (5) SAKLAMA
+(10): yeniden gönderim referans verdiği için `isler/<id>/` dizini "ona bakan
+satır kaldı mı" ölçütüyle silinir; `artik_dosya.py` bunu bilmeli. (6)
+Yoklamadan akışa GERİ DÖNÜŞ yok (karar (g)); vekil arkasında uzun oturumlar
+ölçülürse yeniden düşünülür.
 
 ---
 

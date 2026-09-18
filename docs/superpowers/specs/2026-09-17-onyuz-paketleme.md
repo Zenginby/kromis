@@ -2,7 +2,8 @@
 
 **Tarih:** 2026-09-17
 **Durum:** karar verildi — Faz 0'da yalnız lint/biçim; ES modül + paketleyici
-sorusu Faz 1'in çerçeve kararıyla birlikte
+sorusu Faz 1'in çerçeve kararıyla birlikte → **2026-09 kararı (aşağıda):
+vanilla SÜRER, yeniden bakış Faz 4**
 **Bağlam:** docs/faz0-web-first.md → 7; docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md
 
 ## Ölçülen durum
@@ -97,3 +98,34 @@ Geçiş yapıldığında aynı PR'da ele alınmalı — hepsi kaynak metnine ba�
   değişmez; yalnız JS bağı tarayan iddialar yeni yolu öğrenir.
 * `.prettierignore`'daki `static/*.css` ve `static/*.html` muafiyeti o gün
   yeniden sorulur (bugün `test_index.py`nin CSS/HTML metin iddiaları yüzünden).
+
+## 2026-09 kararı: vanilla SÜRER, yeniden bakış Faz 4 (Faz 2 / 5, PR `faz2/is-listesi-sse`)
+
+Faz 0 / 7 ve Faz 1 bu kararı "iş listesi/SSE arayüzüyle" bıraktı; o arayüz
+bu PR'da yazıldı ve karar ölçüyle verildi (docs/faz2-kuyruk-anahtarlar-depolama.md
+§5, K3).
+
+**Ölçü.** İş paneli `static/isler.js` **505 satır** (üçte biri gerekçe
+yorumu), `giris.js`nin deyimiyle: IIFE, `fetch`/`EventSource`, DOM — tek üst
+düzey ad (`kromisIsler`), `index.html`e tek `<script>` satırı, eslint
+defterine tek girdi. Admin sayfası (Faz 2 / 8) aynı deyimle ~300 satır
+tahmin ediliyor. `static/` toplamı 12 betik (pixel-canvas dâhil), 11.900
+satır civarı. Bu iki sayfa için çerçeve + paketleyici:
+
+* Docker'a bir **Node derleme aşaması** (imaj boyutu ve derleme süresi;
+  bugün imaj yalnız Python), CI'da `lint-onyuz`un yanına **ikinci bir derleme
+  işi**, `routers/kok.py`nin `?v=__APP_VERSION__` yerine içerik hash'li çıktı
+  servis etmesi.
+* `tests/test_index.py`nin 286+ metin iddiası, `tests/test_id_contract.py`nin
+  üst düzey ad bekçisi, `tests/test_onyuz_lint_kapisi.py` + defter,
+  `tools/graf_uret.py`nin betik-arası kenar tarayıcısı — hepsi yukarıdaki
+  envanterdeki gibi yeniden tasarlanır. 650 satırlık iki sayfa için değil.
+* Vanilla'nın bugün ödediği bedel görünür ve küçük: dosyalar arası adlar
+  defterde (bu PR +1 ad), `t()` anahtarları tabloda (i18n taraması), her
+  yeni yüzey için `index.html`e elle çapa.
+
+**Karar.** Vanilla sürer. Yeniden bakış noktası **Faz 4**: fatura / plan /
+hesap sayfaları geldiğinde sayfa sayısı ve FORM yoğunluğu ölçülür (durum
+yönetimi ve doğrulama tekrarı vanilla'da pahalılaşan şey odur); o gün
+yukarıdaki "Faz 1'de değişmek zorunda olanlar" envanteri aynen geçerli, artı
+`static/isler.js`in `EventSource` yaşam döngüsü ve `kromisIsler` sözleşmesi.

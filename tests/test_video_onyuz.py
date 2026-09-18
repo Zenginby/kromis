@@ -520,10 +520,12 @@ def test_the_run_branch_sends_the_right_endpoint_and_kind():
     assert 'fetch("/api/video"' in govde
     assert 'fetch("/api/video/animate"' in govde
     # Yanıt 202 + iş (Faz 2 / 4): dört tür AYNI iş kaydından okunuyor — yanıt
-    # anahtarı türe göre ayrışmıyor artık (`{"videos": …}` 202 gövdesinde yok),
-    # sonuç `isiBekle` → `isSonuclari` ile galeri kayıtlarından geliyor.
+    # anahtarı türe göre ayrışmıyor artık (`{"videos": …}` 202 gövdesinde yok).
+    # Faz 2 / 5: iş panele teslim, sonuç kayıtları panelin `bitince` geri
+    # çağrısıyla geliyor (SSE) — 4. görevin yoklaması (`isiBekle`) yok.
     assert "yanittakiIs(await res.json())" in govde
-    assert "isSonuclari(await isiBekle(is.id), folderId)" in govde
+    assert "kromisIsler.kaydetIs(is, { bitince, hatada: geriAl })" in govde
+    assert "isiBekle" not in govde
     assert "govde.videos" not in govde
     # Döküm `kind`i dört değerli.
     assert 'videoMu ? (editing ? "animate" : "video")' in govde

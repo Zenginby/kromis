@@ -250,19 +250,19 @@ def test_the_keyboard_path_asks_the_WHOLE_gate_not_just_the_column_count():
         "kapı istek gönderildikten sonra soruluyor")
 
 
-def test_a_stalled_history_refresh_does_not_wedge_the_go_button():
-    """`runBusy` `finally`de bırakılıyor (`run()`ın deseni).
+def test_the_round_holds_no_go_lock_and_the_summary_comes_before_the_transcript_step():
+    """`runBusy` kilidi turdan KALKTI (Faz 2 / 5): iş 202 ile kuyruğa gidiyor, panel
+    (static/isler.js) bitişi getiriyor; tur sürerken başka iş sıraya girebilir.
+    Kilidin yerini gönderim anındaki 1 sn soğuma aldı (`goSogut`, çift tıklama).
 
-    `finishArenaTurn`/`loadHistory` kendi try/catch'ini tutmuyor: düz akışta
-    sıfırlanan bir kilit, kopan bağlantıda #go'yu sayfa yenilenene kadar
-    "Üretim sürüyor…" diye kapalı bırakıyordu — görseller diske düşmüşken.
+    Eski iddia "`runBusy = false` `finally`de" idi — kopan bir bağlantının #go'yu
+    kilitli bırakması artık yapısal olarak imkânsız: kilit yok.
     """
     govde = _kodsuz(_govde(_core(), "runArena"))
-    kuyruk = govde.split("} finally {")
-    assert len(kuyruk) == 2, "tur `finally` kullanmıyor"
-    assert "runBusy = false" in kuyruk[1], "kilit `finally` dışında bırakılıyor"
-    assert "runBusy = false" not in kuyruk[0], (
-        "kilit ayrıca düz akışta da bırakılıyor — ikinci bir sahip")
+    assert "runBusy" not in govde, "tur hâlâ üretim kilidi kuruyor"
+    assert "goSogut()" in govde, "çift tıklamaya karşı soğuma yok"
+    assert "kromisIsler.kaydetIs(is, {" in govde, "sütunun işi panele teslim edilmiyor"
+    assert "isiBekle" not in govde, "4. görevin yoklaması kalmış — iki izleyici aynı işi sorar"
     # Özet, patlayabilen döküm adımından ÖNCE yazılıyor: tur sonucu ekranda kalsın.
     assert govde.index("arena.summary") < govde.index("finishArenaTurn(pending"), (
         "tur özeti döküm adımından sonra yazılıyor — o adım patlarsa sonuç kaybolur")

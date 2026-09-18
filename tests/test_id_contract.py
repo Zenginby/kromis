@@ -43,7 +43,7 @@ LEDGER = ROOT / "docs" / "flow-ui" / "id-defteri.md"
 # kör noktası tam da en çok bakması gereken dosyadaydı. `KAPSAM_DISI` ile
 # `test_the_scan_covers_every_shipped_script` bunun tekrarını engelliyor.
 JS_FILES = ("i18n.js", "core.js", "folders.js", "assets.js", "palette.js",
-            "settings.js", "viewer.js", "chat.js", "mobile.js")
+            "isler.js", "settings.js", "viewer.js", "chat.js", "mobile.js")
 
 # Taranmayan betikler — gerekçesiyle. Boş bırakılamaz bir defter: aşağıdaki
 # kapı, `static/` altındaki HER betiğin ya listede ya burada olmasını şart

@@ -102,6 +102,19 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://kromis:kromis@postgres:5432/kromis
       KROMIS_SECRET_KEY: ${KROMIS_SECRET_KEY:?KROMIS_SECRET_KEY gerekli - .env.example'daki komutla uretip .env'e yazin}
+    # İMAJIN SAĞLIK DENETİMİ BURADA KAPALI ve gerekçesi bu servisin tanımında
+    # zaten yazılı: işçi PORT AÇMAZ. Dockerfile'ın HEALTHCHECK'i
+    # `http://127.0.0.1:${PORT}/health` çağırıyor — web için doğru, işçide
+    # HİÇBİR ZAMAN yanıt veremez. Aynı imaj kullanıldığı için denetim de miras
+    # alınıyordu ve kap ilk günden beri "unhealthy" görünüyordu (ölçüldü
+    # 2026-09-18: `FailingStreak: 60`, süreç ise sağlam). Bedeli yalnız
+    # yanıltıcı bir etiket değil: yönetilen platformda sağlıksız kap yeniden
+    # başlatma döngüsüne girer ve işçi eldeki işi FATURALANMIŞ hâlde bırakır.
+    # `--tek-tur` bir denetim DEĞİL: kuyruktan gerçekten iş alıp sağlayıcıyı
+    # çağırır, yani 30 saniyede bir para harcardı. İşçinin canlılık ölçütü
+    # `isciler.son_kalp` satırı (KURULUM.md → Web sürümü, 8. adım).
+    healthcheck:
+      disable: true
     depends_on:
       postgres:
         condition: service_healthy

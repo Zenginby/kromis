@@ -289,8 +289,16 @@ def _kodun_okudugu_adlar() -> set[str]:
     adlar: set[str] = set()
     for kok, _, dosyalar in os.walk(KOK):
         goreli = os.path.relpath(kok, KOK)
+        # `.claude` ATLAMA LİSTESİNDE, çünkü Claude Code oturumları depoya
+        # `.claude/worktrees/<ad>/` altında TAM bir çalışma ağacı (kendi
+        # `.venv`iyle birlikte) bırakıyor: ölçüldü 2026-09-18, 3.313 `.py`.
+        # Tarama oraya indiğinde üçüncü parti paketlerin okuduğu değişkenleri
+        # (`PYINSTALLER_*`, `PIP_*`, `WEBSOCKETS_*`, `XDG_*`) "ürün kodu
+        # okuyor" sanıp `.env.example`da arıyor ve takım YERELDE kırmızıya
+        # dönüyordu. CI'da böyle bir dizin hiç oluşmadığı için kusur yalnız
+        # geliştirici makinesinde görünüyor — yani CI yeşilken yerel kırmızı.
         if goreli.split(os.sep)[0] in ("tests", "tools", "android", "docs", ".venv", "node_modules",
-                                       "alembic", ".git", "build", "dist"):
+                                       "alembic", ".git", ".claude", "build", "dist"):
             continue
         for ad in dosyalar:
             if ad.endswith(".py"):
@@ -496,6 +504,12 @@ def test_compose_runs_the_worker_from_the_same_image_on_the_same_volume_after_th
     assert web_birim and web_birim[0] in [str(b) for b in isci_s.get("volumes", [])], \
         "işçi web ile aynı /data birimini paylaşmalı (yerel kipte ortak disk)"
     assert "ports" not in isci_s, "işçi port açmaz"
+    # Port açmamanın DOĞRUDAN sonucu: imajın `/health` yoklayan HEALTHCHECK'i
+    # işçide hiçbir zaman yanıt alamaz, o yüzden bu serviste KAPALI olmak
+    # zorunda. Kapatılmazsa kap kalıcı "unhealthy" görünür (2026-09-18'de
+    # ölçüldü) ve yönetilen platformda yeniden başlatma döngüsüne girer.
+    assert isci_s.get("healthcheck", {}).get("disable") is True, \
+        "işçi port açmadığı için imajın /health denetimi bu serviste kapatılmalı"
     # Dockerfile CMD hâlâ web: ikinci süreç komutla ayrılır, ikinci imajla değil.
     cmd = [arg for yonerge, arg in _yonergeler() if yonerge == "CMD"]
     assert cmd and "uvicorn" in cmd[-1] and "isci" not in cmd[-1], cmd

@@ -1250,6 +1250,32 @@ Platform anahtarı DB'de değil, RLS'in konusu değil. Ayrıca 8'e: "panelin
 başına günlük kalan" için `GET /api/kota` (kalan kredi, saatlik sayı,
 pencerelerin açılışı) — admin metrikleriyle aynı sorgular.
 
+**7'de yolu üstündeyken toparlanacak: `"platform"` değeri ÜÇ yerde elle
+yazılı.** 6. görevden kalan bir tutarsızlık; 7 zaten `kota` sorgularına
+dokunacağı için ayrı bir PR'a değmez:
+
+| yer | bugünkü hâli |
+| --- | --- |
+| `services/platform_anahtari.py:62` | `KAYNAK_PLATFORM = "platform"` — sabitin kendisi |
+| `services/tablolar.py:155` | `ANAHTAR_KAYNAKLARI = ("kullanici", "platform")` — CHECK'i kuran küme, sabiti İTHAL ETMİYOR |
+| `services/kota.py:122` ve `:151` | `Is.anahtar_kaynagi == "platform"` / `!= "platform"` — düz dize |
+
+Zararı bugün yok (üçü de aynı dizeyi söylüyor) ama bu deponun § 5 kuralına
+aykırı: türetilebilen bir değerin tek kaynağı olur ve bekçisi bir testtir.
+Somut risk, kümeye üçüncü bir kaynak eklendiğinde (belge bunu öngörüyor:
+"üçüncü bir kaynak — ör. kurumsal havuz — göç ister"): CHECK ve göç
+güncellenir, `kota`nın iki süzgeci sessizce eski dizede kalır ve yeni kaynakla
+koşan işler günlük tavana HİÇ sayılmaz — yani kapı, tam da platform parasını
+koruduğu yerde açılır. Kusur o gün sayacın eksik saymasıyla, faturadan geri
+okunarak bulunur.
+
+İstenen: `kota` iki noktada `platform_anahtari.KAYNAK_PLATFORM`u kullansın,
+`tablolar.ANAHTAR_KAYNAKLARI` de kümeyi o sabitlerden kursun
+(`(KAYNAK_KULLANICI, KAYNAK_PLATFORM)`) — ithal yönü zaten bu tarafa akıyor,
+çevrim doğmuyor. Bekçisi, `ANAHTAR_KAYNAKLARI` ile `platform_anahtari`nin iki
+sabitini karşılaştıran bir test (`tests/test_kota.py`, "kapı sırası"
+testlerinin yanına); deyimin örnekleri § 5'te sayılı.
+
 ---
 
 ## 7. RLS ikinci kat — `SET LOCAL app.kullanici_id`, 8 iş tablosunda politika, FORCE; işçi ve admin rolü (PR: `faz2/rls`)

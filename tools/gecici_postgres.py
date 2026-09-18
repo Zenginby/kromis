@@ -48,12 +48,20 @@ from __future__ import annotations
 import atexit
 import glob
 import os
-import pwd
 import shutil
 import subprocess
 import sys
 import tempfile
 from urllib.parse import quote
+
+# `pwd` POSIX'te var, Windows'ta YOK — ve buradaki tek kullanıcısı
+# `_yardimci_kullanici`, o da Windows'ta ilk satırda `None` dönüyor. Koşulsuz
+# ithal edilirse modül Windows'ta ithal edilemez; `tests/conftest.py` bunu
+# ithal ettiği için pytest CONFTEST'te düşer ve takım HİÇ toplanmaz — yani
+# "Windows'ta gecici kume yok, KROMIS_TEST_DATABASE_URL verin" yönergesi
+# (`kurulum_yonergesi`) hiç okunamadan hata veriyordu. Ölçüldü 2026-09-18.
+if sys.platform != "win32":
+    import pwd
 
 # CI'ın (ya da geliştiricinin) hazır bir sunucu verdiği değişken. Süper
 # kullanıcı yetkisi ister: fixture şablon DB'yi ve test dosyası başına birer
@@ -107,8 +115,19 @@ def kurulum_yonergesi() -> str:
     if sys.platform == "darwin":
         return "brew install postgresql@17"
     if os.name == "nt":
+        # KONAK `127.0.0.1`, `localhost` DEGIL — ve bu bir uslup tercihi degil,
+        # olculmus bir bedel (2026-09-18, bu makine): compose Postgres'i yalniz
+        # IPv4 loopback'e bagliyor ("127.0.0.1:5432:5432", gerekcesi
+        # compose.yaml'da: agdaki baska kimse baglanamasin). Windows ise
+        # `localhost`u ONCE `::1`e cozuyor, orada dinleyici olmadigi icin
+        # baglanti `connect_timeout` dolana kadar bekliyor ve ancak sonra IPv4'e
+        # dusuyor: TEK baglanti 45,04 sn, ayni kume `127.0.0.1` ile 0,02 sn.
+        # Takim her test dosyasi icin ayri DB acip bagladigindan bu bedel
+        # yuzlerce kez odeniyor ve kosum "takilmis" gibi gorunuyor.
         return (f"Windows'ta gecici kume yok: {TEST_URL_ENV}="
-                "postgresql+psycopg://postgres:...@localhost:5432/postgres verin")
+                "postgresql+psycopg://postgres:...@127.0.0.1:5432/postgres verin "
+                "(konak 127.0.0.1 olmali; localhost IPv6'ya dusup her baglantiya "
+                "connect_timeout kadar bekletir)")
     return "sudo apt install postgresql   # ya da: dnf install postgresql-server"
 
 

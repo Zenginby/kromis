@@ -58,8 +58,10 @@ KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GRAF_DIZINI = "docs/graflar"
 
 # Uygulamanın gerçek giriş noktaları — "kimse ithal etmiyor" listesinde
-# ÖKSÜZ gibi görünmesinler diye adları burada yazılı.
-GIRIS_NOKTALARI = ("app", "desktop", "android_main")
+# ÖKSÜZ gibi görünmesinler diye adları burada yazılı. `isci` (Faz 2 / 3)
+# ikinci bileşim kökü: web `app.py`den, işçi süreci `isci.py`den açılır
+# (`python isci.py`); ikisi aynı `services/` katmanına dayanır, rota tanımlamaz.
+GIRIS_NOKTALARI = ("app", "isci", "desktop", "android_main")
 
 # Ürün kodunun PAKETLERİ (Faz 0 / Adım 2): rotalar `routers/`, rota dışı
 # mantık `services/` altında. Modül adı noktalı (`routers.uretim`), `tools.`
@@ -950,6 +952,11 @@ def readme_md(g: dict) -> str:
          "* Ön yüz kenarları AD eşleşmesine dayanıyor; küresel bir işlevle aynı "
          "adı taşıyan yerel bir değişken kenarı fazla sayabilir.",
          "* Test sütunu ithal ilişkisidir, satır kapsamı DEĞİLDİR.",
+         "* İKİ BİLEŞİM KÖKÜ (Faz 2 / 3): `app.py` web sürecinin, `isci.py` işçi "
+         "sürecinin girişi (`python isci.py`; compose `isci` servisi). Uç nokta "
+         "tablosu yalnız `app`ı tarar — işçi rota tanımlamaz, kuyruktan okur "
+         "(`services/isci.py` → `services/kuyruk.py`); bir rota ile işçi arasındaki "
+         "bağ HTTP değil `isler` tablosudur ve harita onu kenar olarak göstermez.",
          "* ARA KATMANLAR rota değil: `services/koken.py` (köken kapısı) ve "
          "`services/dil.py` (dil bağlamı) her isteğin önünde koşuyor ama uç nokta "
          "tablosunda satırları yok; sıraları (`köken → dil → rota`) `app.py`de "

@@ -45,7 +45,7 @@ import shlex
 import yaml
 
 import catalog
-from services import cerez, db, dosya, koken, posta, sifre
+from services import cerez, db, dosya, isci, koken, posta, sifre
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCKERFILE = os.path.join(KOK, "Dockerfile")
@@ -193,8 +193,10 @@ def test_dockerignore_excludes_tests_docs_android_venv_and_local_secrets():
 def test_dockerignore_keeps_everything_the_app_serves_or_imports():
     """`COPY . /app` bağlamın tamamını aldığı için dışlama listesi kaynağı
     yutmamalı: static/ ve bundled/ olmadan uygulama açılır ama `/` 500 verir."""
+    # `isci.py` (Faz 2 / 3): işçi sürecinin girişi, aynı imajdan `python isci.py` ile
+    # açılır — bağlamdan düşerse `docker compose up` `isci` servisi hiç başlamaz.
     yasak = {"static", "bundled", "routers", "services", "requirements.txt",
-             "app.py", "LICENSE", "NOTICE", "alembic", "alembic.ini", "tools"} & _dislananlar()
+             "app.py", "isci.py", "LICENSE", "NOTICE", "alembic", "alembic.ini", "tools"} & _dislananlar()
     assert not yasak, f".dockerignore uygulamanın parçasını dışlıyor: {sorted(yasak)}"
     # `*.py` gibi bir kalıp da aynı sonucu verirdi; `**/*.md` ise
     # `bundled/prompts/*.md`yi (Yönetmen personası) yutardı — kök `*.md` yutmaz.
@@ -248,12 +250,15 @@ def _atamalar() -> list[tuple[str, str, bool]]:
 # `KROMIS_POSTA`, `KROMIS_POSTA_GONDEREN`, `RESEND_API_KEY` (services/posta.py),
 # `KROMIS_GUVENLI_CEREZ` (services/cerez.py); Faz 1 / 7 ile şifreleme anahtarı
 # `KROMIS_SECRET_KEY` (services/sifre.py); Faz 2 / 2 ile nesne depolama
-# `KROMIS_NESNE_DEPO_{URL,KOVA,ANAHTAR_ID,GIZLI,BOLGE}` (services/dosya.py).
+# `KROMIS_NESNE_DEPO_{URL,KOVA,ANAHTAR_ID,GIZLI,BOLGE}` (services/dosya.py);
+# Faz 2 / 3 ile işçi süreci `KROMIS_ISCI_ES_ZAMANLI`, `KROMIS_IS_KALP_ESIGI_SN`
+# (services/isci.py — yalnız `isci.py` okur, ama aynı imaj ve aynı şablon).
 # Adlar KAYNAKTAN, elle değil.
 ALTYAPI = {"KROMIS_DATA_DIR", "PORT", db.DATABASE_URL_ENV, koken.KOKEN_ENV,
            posta.POSTA_ENV, posta.GONDEREN_ENV, posta.RESEND_ANAHTAR_ENV, cerez.GUVENLI_ENV,
            sifre.ANAHTAR_ENV,
-           dosya.URL_ENV, dosya.KOVA_ENV, dosya.ANAHTAR_ID_ENV, dosya.GIZLI_ENV, dosya.BOLGE_ENV}
+           dosya.URL_ENV, dosya.KOVA_ENV, dosya.ANAHTAR_ID_ENV, dosya.GIZLI_ENV, dosya.BOLGE_ENV,
+           isci.ES_ZAMANLI_ENV, isci.KALP_ESIGI_ENV}
 
 
 def _katalog_adlari() -> set[str]:
@@ -385,7 +390,7 @@ def test_compose_is_dev_only_builds_locally_and_mounts_the_data_volume():
     assert "YALNIZ YEREL GELİŞTİRME" in _oku(COMPOSE)
     veri = _yaml(COMPOSE)
     servisler = veri["services"]
-    assert set(servisler) == {"kromis", "goc", "postgres"}, list(servisler)
+    assert set(servisler) == {"kromis", "goc", "isci", "postgres"}, list(servisler)
     servis = servisler["kromis"]
     assert servis.get("build") == ".", "imaj yerelden derlenmeli, bir kayıt defterinden çekilmemeli"
     # `image:` yalnız YEREL bir ad olabilir (iki servis aynı derlemeyi paylaşsın);
@@ -441,6 +446,31 @@ def test_compose_runs_the_migration_in_its_own_service_and_the_app_waits_for_it(
     # `:?` ile DURUR — dosyaya sabit anahtar YAZILMAZ (git'te anahtar demek).
     anahtar = str(kromis.get("environment", {}).get(sifre.ANAHTAR_ENV, ""))
     assert anahtar.startswith("${" + sifre.ANAHTAR_ENV + ":?"), anahtar
+
+
+def test_compose_runs_the_worker_from_the_same_image_on_the_same_volume_after_the_migration():
+    """Faz 2 / 3: `isci` servisi aynı imajla `python isci.py` koşturur (Dockerfile CMD
+    değişmez — platform ikinci süreci bu komutla açar). Web ile AYNI `/data` birimi:
+    yerel kipte medya diskte, işçinin yazdığını web ancak aynı dizinden görür. Göçü
+    bekler: şemasız açılan işçi `isciler`e yazamaz. Aynı DB, aynı anahtar kapısı
+    (`:?` — anahtarsız işçi de açılmaz); port yok (dışarıdan konuşulmaz)."""
+    veri = _yaml(COMPOSE)
+    isci_s, kromis = veri["services"]["isci"], veri["services"]["kromis"]
+    assert isci_s.get("build") == "." and isci_s.get("image") == kromis.get("image"), "aynı imaj olmalı"
+    assert isci_s.get("command") == ["python", "isci.py"], isci_s.get("command")
+    assert isci_s.get("depends_on", {}).get("goc", {}).get("condition") == "service_completed_successfully"
+    assert isci_s.get("depends_on", {}).get("postgres", {}).get("condition") == "service_healthy"
+    assert str(isci_s.get("environment", {}).get(db.DATABASE_URL_ENV, "")) == str(
+        kromis["environment"][db.DATABASE_URL_ENV]), "işçi uygulamanın DB'sine gitmeli"
+    anahtar = str(isci_s.get("environment", {}).get(sifre.ANAHTAR_ENV, ""))
+    assert anahtar.startswith("${" + sifre.ANAHTAR_ENV + ":?"), anahtar
+    web_birim = [str(b) for b in kromis.get("volumes", []) if str(b).endswith(":/data")]
+    assert web_birim and web_birim[0] in [str(b) for b in isci_s.get("volumes", [])], \
+        "işçi web ile aynı /data birimini paylaşmalı (yerel kipte ortak disk)"
+    assert "ports" not in isci_s, "işçi port açmaz"
+    # Dockerfile CMD hâlâ web: ikinci süreç komutla ayrılır, ikinci imajla değil.
+    cmd = [arg for yonerge, arg in _yonergeler() if yonerge == "CMD"]
+    assert cmd and "uvicorn" in cmd[-1] and "isci" not in cmd[-1], cmd
 
 
 # --------------------------------------------------------------------------

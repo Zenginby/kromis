@@ -88,15 +88,20 @@ def baglanti_dizesi() -> str | None:
     return os.environ.get(DATABASE_URL_ENV) or None
 
 
-def motor_kur(url: str) -> Engine:
+def motor_kur(url: str, *, pool_size: int = 2) -> Engine:
     """Süreç geneli TEK motor. Bağlanmaz — ilk bağlantı ilk `connect`te.
 
     `connect_args={"connect_timeout": …}` psycopg'ye (libpq) gidiyor: sunucu
     yoksa istek saniyeler içinde hata alsın, sonsuza dek beklemesin.
+
+    `pool_size` öntanımlı 2 (web; gerekçe modül başında). İşçi süreci (Faz 2 / 3,
+    `isci.py`) kendi motorunu `es_zamanli + 1` ile kurar: her iş parçacığı
+    alım/yazım anında bir bağlantı tutar, kalp atışı kendi bağlantısında —
+    sağlayıcı çağrısı SIRASINDA hiçbiri bağlantı tutmaz (services/isci.py).
     """
     return create_engine(
         url,
-        pool_size=2,
+        pool_size=pool_size,
         max_overflow=3,
         pool_pre_ping=True,
         pool_timeout=10,

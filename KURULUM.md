@@ -443,6 +443,39 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
    dört değişkenle `python tools/artik_dosya.py` "kova: kromis … 0 artik"
    demeli. Doğrulama bitince yerel `kullanicilar/` dizinini arşivle; artık
    okunmuyor.
+8. **İşçi süreci** (Faz 2 / 3). Üretim işleri (görsel üret/düzenle, video
+   üret/canlandır) web sürecinde değil ayrı bir işçide koşar: rota işi
+   `isler` tablosuna yazar, işçi kuyruktan alır, sağlayıcıyı çağırır, sonucu
+   depoya ve `medya`ya yazar. İşçi AYNI imajdan, başka komutla açılır —
+   `Dockerfile` CMD değişmez, ikinci süreç `python isci.py`:
+
+   ```sh
+   DATABASE_URL=… KROMIS_SECRET_KEY=… KROMIS_DATA_DIR=/data python isci.py
+   ```
+
+   Yerel `docker compose up` bunu kendi yapar (`isci` servisi; göçü bekler,
+   web ile aynı `/data` birimini paylaşır). Platformda ikinci bir süreç/servis
+   olarak tanımlanır: Fly.io `fly.toml` → `[processes]` `isci = "python isci.py"`
+   (web `app`in yanına), Railway/Render → aynı repo ve imajla ikinci servis,
+   *Start Command* `python isci.py`. İşçi web'in **üç değişkenini aynen**
+   ister (`DATABASE_URL`, `KROMIS_SECRET_KEY` — anahtarsız işçi de açılmaz,
+   çözeceği satır var —, `KROMIS_DATA_DIR`) ve ayrı makinedeyse 7. adımdaki
+   dört nesne depolama değişkenini (ortak disk yok: işçinin yazdığı MP4'ü web
+   ancak kovadan görür; yarım yapılandırma işçiyi de açmaz). İsteğe bağlı iki
+   ayar (`.env.example`): `KROMIS_ISCI_ES_ZAMANLI` aynı anda kaç iş (öntanımlı
+   4; her iş bir sağlayıcı çağrısı, bağlantı havuzu `4 + 1`),
+   `KROMIS_IS_KALP_ESIGI_SN` kalbi bu kadar saniye susan işin `hata` sayılması
+   (öntanımlı 300). Açılışta `isciler` tablosuna satır yazar, 30 sn'de bir kalp
+   atar, kapanışta siler; günlüğü stdout'a tek satırlık ASCII. **Kapanış
+   SIGTERM:** yeni iş almayı bırakır, eldeki işi BİTİRİR (sağlayıcı çağrısı
+   faturalandı), sonra çıkar — platformun kapanış süresini (Fly
+   `kill_timeout`, compose `stop_grace_period`) en uzun sağlayıcı çağrısına
+   göre ver (video 10 dk'ya kadar); süre yetmezse iş `calisiyor`da kalır ve
+   başka bir işçinin kalp turu onu `hata` yapar, kullanıcı panelden yeniden
+   gönderir (otomatik yeniden deneme YOK: çift fatura riski). Sağlık
+   denetimi: `python isci.py --tek-tur` bir iş alıp çıkar, kuyruk boşsa 0 ile
+   döner — CI'ın `docker` işi bunu koşturur; işçinin ayakta olduğunu `isciler`
+   satırının `son_kalp`inden okursun (`/health`e `worker_alive` alanı 9. görevde).
 
 ---
 

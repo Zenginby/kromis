@@ -199,6 +199,25 @@ def test_ci_forbids_skipping_the_e2e_tests():
         "E2E atlanırsa CI yine yeşil kalır")
 
 
+def test_ci_forbids_skipping_the_posix_tests():
+    """Üsttekinin kardeşi: CI'ın pytest adımı `KROMIS_POSIX_ZORUNLU` veriyor mu?
+
+    POSIX varsayan dokuz test Windows'ta ATLANIYOR
+    (`tests/conftest.py::posix_gerekir`) ve bu iş Linux'ta koşuyor, yani orada
+    atlanmamaları gerekiyor. İşaretin koşulu bir gün bozulup Linux'ta da
+    atlamaya başlarsa bu değişken takımı HİÇ başlatmaz; olmazsa dokuz test
+    sessizce kaybolur ve iş yine "passed" der. İşaretin DOĞRU testlerin üstünde
+    durduğunu `tests/test_posix_isareti.py` ölçüyor — o defteri, bu koşan
+    ortamı sınıyor.
+    """
+    pytest_adimlari = [a for a in _adimlar() if "pytest" in a.get("run", "")]
+    assert pytest_adimlari, "_test.yml pytest koşturmuyor"
+    assert any(str(a.get("env", {}).get(conftest.POSIX_ZORUNLU, "")) == "1"
+               for a in pytest_adimlari), (
+        f"pytest adımı {conftest.POSIX_ZORUNLU}=1 vermiyor: "
+        "POSIX varsayan testler atlanırsa CI yine yeşil kalır")
+
+
 def test_claude_md_points_at_the_setup_tool():
     """Deponun ilk okunan dosyası aracı GÖSTERMELİ.
 

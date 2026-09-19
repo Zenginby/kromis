@@ -65,6 +65,7 @@ from services import (
     tablolar,
     zaman,
 )
+from tests.conftest import posix_gerekir
 
 pytestmark = pytest.mark.usefixtures("depo_db")
 
@@ -946,6 +947,9 @@ def test_tek_tur_flag_runs_a_queued_job_end_to_end_in_the_real_process(veritaban
     assert not (tmp_path / "kullanicilar").exists(), "düşen iş nesne bırakmaz"
 
 
+@posix_gerekir(
+    "SIGTERM: Windows'ta `Popen.send_signal(SIGTERM)` `TerminateProcess` — "
+    "işçinin sinyal eli hiç koşmuyor, süreç 1 ile ölüyor")
 def test_the_process_registers_a_worker_row_beats_and_exits_cleanly_on_sigterm(veritabani_url, depo_db,
                                                                               tmp_path):
     """`isciler` satırı açılışta, `son_kalp` ilerler (aralık testte 0,2 sn), SIGTERM → 0 ve satır silinir."""
@@ -990,6 +994,9 @@ def test_the_process_registers_a_worker_row_beats_and_exits_cleanly_on_sigterm(v
     assert not (tmp_path / "hata.log").exists(), hata
 
 
+@posix_gerekir(
+    "SIGTERM: Windows'ta `Popen.send_signal(SIGTERM)` `TerminateProcess` — "
+    "işçinin sinyal eli hiç koşmuyor, süreç 1 ile ölüyor")
 def test_the_process_runs_a_maintenance_turn_at_startup_and_then_on_its_interval(veritabani_url, depo_db,
                                                                                   db_oturumu, kullanici, tmp_path):
     """Faz 2 / 10: ölü işçinin satırı ve süresi dolmuş iş, yeni işçi kalkar kalkmaz gider (açılış turu);
@@ -1043,6 +1050,9 @@ def test_the_process_runs_a_maintenance_turn_at_startup_and_then_on_its_interval
     assert not (tmp_path / "hata.log").exists(), hata
 
 
+@posix_gerekir(
+    "SIGTERM: Windows'ta `Popen.send_signal(SIGTERM)` `TerminateProcess` — "
+    "boşaltma penceresi hiç açılmıyor, süreç eldeki işle birlikte anında ölüyor")
 def test_the_process_keeps_beating_after_sigterm_until_the_draining_job_finishes(veritabani_url, depo_db,
                                                                                  db_oturumu, kullanici, tmp_path):
     """Gerçek süreç, yavaş sağlayıcı (4 sn): iş `calisiyor`ken SIGTERM → süreç kapanmaz, `son_kalp` ve
@@ -1089,6 +1099,9 @@ def test_the_process_keeps_beating_after_sigterm_until_the_draining_job_finishes
     assert not (tmp_path / "hata.log").exists(), hata
 
 
+@posix_gerekir(
+    "SIGTERM: Windows'ta `Popen.send_signal(SIGTERM)` `TerminateProcess` — "
+    "işçinin sinyal eli hiç koşmuyor, süreç 1 ile ölüyor")
 def test_the_process_rewrites_its_worker_row_when_it_disappears_underneath_it(veritabani_url, depo_db, tmp_path):
     """Satır dışarıdan silinir (başka işçinin ölü süpürmesi, admin): bir sonraki kalp turu onu AYNI `id`
     ve `basladi`yla geri yazar, `olay=isci.yeniden_kaydoldu` (WARNING) düşer; kapanışta yine silinir."""

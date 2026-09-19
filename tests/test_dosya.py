@@ -17,6 +17,7 @@ import pytest
 from fastapi import Request
 
 from services import dosya, nesne_depo
+from tests.conftest import posix_gerekir
 from tests.sahte_s3 import SahteS3
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -78,6 +79,9 @@ def test_url_is_none_on_disk_and_a_presigned_link_in_the_bucket(tmp_path):
     assert "X-Amz-Expires=900" in url and "response-content-disposition=" in url
 
 
+@posix_gerekir(
+    "`os.sep`: kök dışı anahtar MUTLAK yol (Windows'ta ters bölülü), önek ise "
+    "`_anahtar(dizin) + '/'` ile kuruluyor — iki ayraç tutmuyor, `listele` boş dönüyor")
 def test_a_bucket_depo_refuses_an_absolute_path_outside_its_root(tmp_path):
     nesne = _nesne(str(tmp_path / "veri"))
     with pytest.raises(dosya.DosyaHatasi):

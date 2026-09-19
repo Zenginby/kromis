@@ -35,6 +35,7 @@ import i18n
 import prefs
 from services import ayar, cerez, depo_medya, hesap, isci, kimlik
 from services.tablolar import Kullanici, SaglayiciKimligi
+from tests.conftest import posix_gerekir
 
 pytestmark = [pytest.mark.gercek_kimlik, pytest.mark.gercek_anahtar]
 
@@ -327,6 +328,9 @@ def test_the_login_page_is_served_to_a_logged_in_user_too(istemci):
 
 # ── Çıkış ölçütü: iki kullanıcı, aynı süreç ──────────────────────────
 
+@posix_gerekir(
+    "POSIX izin bitleri: kullanıcı kökü 0o700 bekleniyor, Windows'ta "
+    "`S_IMODE` 0o777 (511) veriyor")
 def test_two_users_have_separate_directories_and_never_see_each_others_media(istemci, tmp_path):
     a_id, a_jeton, _ = _kullanici_ac()
     b_id, b_jeton, _ = _kullanici_ac()

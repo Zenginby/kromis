@@ -116,8 +116,24 @@ jobs:
       # testin `CREATE/DROP DATABASE` koşturduğu yer olmamalı. Servis bir gün
       # sessizce kalkarsa `KROMIS_E2E_ZORUNLU=1` DB atlamasını da HATAYA çevirir
       # (`tests/conftest.py::pytest_configure`) — yani kapı yine kapanır.
+
+      # `KROMIS_POSIX_ZORUNLU`: POSIX varsayan testler ATLANIRSA takım kırmızıya
+      # döner. `KROMIS_E2E_ZORUNLU`nun kardeşi, aynı gerekçe ayrı bir kusur
+      # için.
+      #
+      # O dokuz test Windows'ta ATLANIYOR (tests/conftest.py::posix_gerekir):
+      # izin bitleri, SIGTERM ve `time.tzset` orada gerçekten yok. Bu iş
+      # `ubuntu-latest`te koşuyor, yani burada ATLANMAMALARI gerekiyor —
+      # işaretin koşulu (`POSIX_ATLANACAK`) bir gün bozulup Linux'ta da
+      # atlamaya başlarsa bu değişken takımı hiç başlatmaz. Değişken olmasaydı
+      # dokuz test sessizce kaybolur ve iş yine "passed" derdi: kapı yok olur
+      # ama yeşil kalırdı — `KROMIS_E2E_ZORUNLU`nun kapattığı kusurun ta
+      # kendisi. İşaretin DOĞRU testlerin üstünde durduğunu ayrıca
+      # `tests/test_posix_isareti.py` ölçüyor; biri defteri, bu değişken koşan
+      # ortamı sınıyor.
       - name: Pytest
         env:
           KROMIS_E2E_ZORUNLU: "1"
+          KROMIS_POSIX_ZORUNLU: "1"
           KROMIS_TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/postgres
         run: pytest tests/ -q

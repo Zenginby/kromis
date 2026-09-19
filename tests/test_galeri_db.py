@@ -55,6 +55,7 @@ import palette_store
 import prefs
 import storage
 from services import depo_klasor, depo_medya, hesap, tablolar, zaman
+from tests.conftest import posix_gerekir
 
 pytestmark = pytest.mark.usefixtures("depo_db")
 
@@ -222,6 +223,9 @@ def test_the_manifest_function_list_still_matches_the_frozen_modules():
             assert callable(getattr(DONDURULMUS[modul], ad, None)), f"{modul}.{ad} yok — listeyi güncelle"
 
 
+@posix_gerekir(
+    "`os.sep`: elle tutulan `DEPOLAR` listesi `services/depo_*.py` yazıyor, "
+    "`os.path.relpath` Windows'ta aynı yolu ters bölüyle döndürüyor")
 def test_the_repository_list_matches_the_files_on_disk():
     """`services/depo_*.py` diskte ne varsa listede o var — yeni depo bekçisiz kalmaz."""
     diskte = sorted(os.path.relpath(p, REPO) for p in glob.glob(os.path.join(REPO, "services", "depo_*.py")))

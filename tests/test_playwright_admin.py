@@ -81,7 +81,10 @@ def test_the_admin_walks_the_three_tabs_and_sets_a_users_cap_while_a_non_admin_g
             # `.value` özelliği, `value` özniteliği değil (betik özelliği yazıyor) — CSS seçici görmez.
             page.wait_for_function(
                 f'document.querySelector(\'#admin-kullanicilar tr[data-id="{kullanici.kullanici_id}"] input\').value === "500"')
-            assert satir.get_by_role("button", name=i18n.t("admin.tavan_sil", "tr")).is_visible()
+            # `is_visible()` DEĞİL, bekle: yukarıdaki koşul ESKİ satırda da doğru (kutuya 500 az önce
+            # yazıldı) ve `kullanicilariYukle` yeniden çizmeden önce okunabiliyor — yüklü makinede
+            # takım koşusunda "Öntanımlıya dön" hâlâ eski satırın gizli düğmesiydi (ölçüldü, 2026-09-19).
+            satir.get_by_role("button", name=i18n.t("admin.tavan_sil", "tr")).wait_for(state="visible")
 
             # 4. Kuyruk sekmesi: B'nin işi sahibiyle (durumu işçiye bağlı), özet satırı çevrili ve dolu.
             page.click('#admin-sekmeler [data-sekme="kuyruk"]')

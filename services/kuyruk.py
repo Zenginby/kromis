@@ -36,6 +36,21 @@ ZAMAN PARAMETRE (`an`), Python'dan: `zaman.an()` mikrosaniyeli ve sıralanabilir
 saatle oynamaz, `an` verir (`hesap.simdi()` deseni). `ekle` `an` almadan da
 çağrılabilir (rota `zaman.an()` demek zorunda kalmasın).
 
+SAKLAMA VE BAKIM (Faz 2 / 10) da burada, üç ilkel: `saklama_sahipleri` +
+`eskileri_sil` (kapanmış — `bitti`/`hata`/`iptal` — ve `bitti` 30 günden eski
+satırlar), `olu_iscileri_sil` (kalbi susmuş `isciler` satırı: kapanmadan ölen
+işçi kendi satırını silemez, `worker_alive:false` sonsuza dek kalırdı — 9'un
+devri), `girdi_referanslari` + `mevcut_isler` (silinen işin `isler/<id>/`
+girdi dizini ancak ona bakan hiçbir satır kalmadığında silinir — "yeniden
+gönder" eski işin girdilerine REFERANS verir, kopyalamaz; 5'in devri).
+`eskileri_sil` KULLANICI İMZASINDA (`db, kullanici_id, …`) ve bilerek: RLS
+admin politikası SELECT + UPDATE verir, DELETE VERMEZ (0006_rls; admin rotası
+silmez — 7'nin kararı, tests/test_rls.py mandallı). Bakım turu sahipleri admin
+bağlamında bulur, her birinin satırlarını o kiracının bağlamında siler
+(services/isci.py `bakim_turu`). `medya` satırlarına DOKUNULMAZ: `isler.sonuc`
+yalnız id listesi, ürün galeride durur. Nesne silme bu modülde değil (DB
+katmanı depo bilmez), `bakim_turu`nda.
+
 KONUŞMAZ: kullanıcıya cümle yok. `hata` sütununa yazılan metin sağlayıcı
 hatasının `errlog.redact_secrets`ten geçmiş hâli (redaksiyon YAZAN yerde,
 çağıranda değil — unutulacak yer bir tane olsun) ve `BAYAT_HATASI` bir KOD
@@ -45,15 +60,17 @@ görsellerin anahtarları iç iş.
 """
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 import uuid
+from collections.abc import Collection, Mapping
 from typing import Any
 
-from sqlalchemy import Connection, delete, func, select, update
+from sqlalchemy import Connection, delete, func, select, text, update
 from sqlalchemy.orm import Session
 
 import errlog
-from services import zaman
+from services import ayar, zaman
 from services.tablolar import (
     DURUM_BEKLIYOR,
     DURUM_BITTI,
@@ -66,7 +83,9 @@ from services.tablolar import (
 
 __all__ = ["ekle", "al", "kalp", "bitir", "dusur", "iptal", "bayatlari_dusur", "bekleyen_ozeti",
            "aktif_sayisi", "listele", "bul", "satir", "isci_kaydet", "isci_kalp", "isci_sil",
-           "isci_son_kalp", "BAYAT_HATASI", "AKTIF_DURUMLAR", "KAPANMIS_DURUMLAR"]
+           "isci_son_kalp", "saklama_sahipleri", "eskileri_sil", "olu_iscileri_sil",
+           "girdi_referanslari", "mevcut_isler", "SilinenIs",
+           "BAYAT_HATASI", "AKTIF_DURUMLAR", "KAPANMIS_DURUMLAR", "BITMIS_DURUMLAR"]
 
 # `bayatlari_dusur`un `hata` sütununa yazdığı KOD — cümle değil (gerekçe üstte).
 BAYAT_HATASI = "isci yanit vermiyor"
@@ -78,6 +97,11 @@ AKTIF_DURUMLAR: tuple[str, ...] = (DURUM_BEKLIYOR, DURUM_CALISIYOR)
 # doğar: `bitti` işin sonucu galeride duruyor, ikinci kez koşturmak çift
 # fatura (K8); aktif iş zaten sırada.
 KAPANMIS_DURUMLAR: tuple[str, ...] = (DURUM_HATA, DURUM_IPTAL)
+# Saklamanın (Faz 2 / 10) sildiği durumlar: sonuçlu ya da sonuçsuz, KAPANMIŞ olan
+# her şey — `bitti` sütunu üçünde de kapanış anı. Aktif iş (`bekliyor`/`calisiyor`)
+# yaşı ne olursa olsun silinmez: bayat düşürme onu önce `hata` yapar, saklama
+# 30 gün sonra alır.
+BITMIS_DURUMLAR: tuple[str, ...] = (DURUM_BITTI, DURUM_HATA, DURUM_IPTAL)
 
 
 def _etkilenen(sonuc: object) -> int:
@@ -86,16 +110,19 @@ def _etkilenen(sonuc: object) -> int:
 
 
 def _damga(t: dt.datetime | None) -> str | None:
-    return zaman.damga(t) if t is not None else None
+    return zaman.damga_utc(t) if t is not None else None
 
 
 def _json(is_: Is) -> dict[str, Any]:
     """Satır → dışarıya dökülen sözlük. `istek` YOK, `isci_id`/`kalp_atisi` YOK (iç iş).
 
     Anahtarlar sütun adları (Türkçe, ASCII): bu tablo bugünkü hiçbir JSON
-    kaydının ikizi değil, koruyacak eski ad yok. Zaman damgaları `medya`nın
-    `created_at`iyle aynı biçimde (`zaman.damga`), ön yüz tek sıralama kuralı
-    bilsin.
+    kaydının ikizi değil, koruyacak eski ad yok. Zaman damgaları DİLİMLİ, UTC,
+    `Z` sonekli (`zaman.damga_utc`, Faz 2 / 10) — `medya`nın dilimsiz
+    `created_at`i DEĞİL: iş paneli `basladi`yi tarayıcının `new Date()`iyle
+    karşılaştırıyor ve dilimsiz dize tarayıcının kendi saati sayılıyordu (UTC+3'te
+    sayaç 180 dk'dan başlıyordu — ölçüldü, docs/studyo-guncelleme-plani.md B3).
+    Sıralama dizesi hâlâ dize (`localeCompare`): bütün damgalar aynı ofsette.
 
     `arena_id` ve `folder_id` `istek`in İÇİNDEN dökülen İKİ alan (Faz 2 / 5):
     iş paneli aynı turun 2-4 sütununu sekme yenilendikten sonra da gruplayabilsin
@@ -317,12 +344,147 @@ def isci_son_kalp(db: Session | Connection) -> dt.datetime | None:
 
 
 def isci_kalp(db: Session, isci_id: uuid.UUID, an: dt.datetime) -> bool:
-    """30 sn'de bir `son_kalp = an`; `False` = satır yok (admin düşürmüş ya da kayıt hiç olmamış)."""
+    """30 sn'de bir `son_kalp = an`; `False` = satır yok (admin düşürmüş, ölü sayılıp süpürülmüş ya da kayıt hiç olmamış)."""
     sonuc = db.execute(update(Isci).where(Isci.id == isci_id).values(son_kalp=an))
     return _etkilenen(sonuc) > 0
+
+
+@dataclasses.dataclass(frozen=True)
+class IsciKaydi:
+    """Bir işçi satırının kimlik alanları — `isci_yeniden_kaydet` satırı bunlarla ve ESKİ `id`yle yeniden yazar."""
+    konak: str
+    surum: str
+    es_zamanli: int
+    basladi: dt.datetime
+
+
+def isci_yeniden_kaydet(db: Session, isci_id: uuid.UUID, kayit: IsciKaydi, an: dt.datetime) -> None:
+    """Kalp turu satırı bulamadı: aynı `id` ve `basladi` ile yeniden yazar, `son_kalp = an`.
+
+    Satır işçi yaşarken de silinebilir: `olu_iscileri_sil` `son_kalp < an - esik`
+    satırı süpürür ve 5 dk'lık bir DB kesintisi, uzun bir duraklama ya da
+    dağıtımda yeni işçinin açılış turu (boşalan eskinin son kalbi eşiği
+    aşmışsa) yaşayan işçinin satırını götürür. `isci_kaydet` DEĞİL: kimlik
+    aynı kalmalı — `isler.isci_id` bu `id`yi taşır ve `/admin` işçiyi tek
+    satır olarak görmeli; `basladi` de gerçek açılış. Çağıran `isci_kalp`
+    `False` dönünce çağırır; iki ifade arasında yarış yok — silecek olan
+    yalnız eski `son_kalp`e bakar, yeni satırınki `an`.
+    """
+    db.add(Isci(id=isci_id, konak=kayit.konak, surum=kayit.surum, es_zamanli=kayit.es_zamanli,
+                basladi=kayit.basladi, son_kalp=an))
+    db.flush()
 
 
 def isci_sil(db: Session, isci_id: uuid.UUID) -> bool:
     """Kapanışta satır silinir; `isler.isci_id` kalır (FK yok — "kim koştu" kaydı durur)."""
     sonuc = db.execute(delete(Isci).where(Isci.id == isci_id))
     return _etkilenen(sonuc) > 0
+
+
+# ────────────────────────────────────────────────────── saklama ve bakım (Faz 2 / 10)
+
+@dataclasses.dataclass(frozen=True)
+class SilinenIs:
+    """`eskileri_sil`in sildiği bir satırın nesne silme için gereken izi.
+
+    `girdi_dizinleri`: bu işin KENDİ girdi dizini (`kullanicilar/<u>/isler/<id>/`)
+    + `istek`inin referans verdiği dizinler (yeniden gönderilmiş iş eskisinin
+    dizinine bakar). Satır gitti; dizinlerden hangisinin silineceğine çağıran
+    `girdi_referanslari`/`mevcut_isler` ile karar verir.
+    """
+    kullanici_id: uuid.UUID
+    is_id: uuid.UUID
+    girdi_dizinleri: frozenset[str]
+
+
+def _girdi_anahtarlari(istek: Mapping[str, Any] | None) -> list[str]:
+    """`istek.girdiler[*].anahtar` + `istek.son_kare.anahtar` — rota sözleşmesinin (Faz 2 / 4) iki yeri."""
+    if not isinstance(istek, Mapping):
+        return []
+    anahtarlar = [str(g["anahtar"]) for g in istek.get("girdiler") or [] if isinstance(g, Mapping) and "anahtar" in g]
+    son = istek.get("son_kare")
+    if isinstance(son, Mapping) and "anahtar" in son:
+        anahtarlar.append(str(son["anahtar"]))
+    return anahtarlar
+
+
+def _eski_kosulu(an: dt.datetime, saklama: dt.timedelta):
+    """Kapanmış VE `bitti` saklama süresinden eski — `saklama_sahipleri` ve `eskileri_sil` aynı süzgeç."""
+    return (Is.durum.in_(BITMIS_DURUMLAR), Is.bitti.is_not(None), Is.bitti < an - saklama)
+
+
+def saklama_sahipleri(db: Session, an: dt.datetime, saklama: dt.timedelta) -> list[uuid.UUID]:
+    """Saklama süresi dolmuş kapanmış işi olan kullanıcılar — bütün kiracılar (`app.rol='admin'` bağlamı).
+
+    Silme kullanıcı bağlamı ister (admin politikası DELETE vermez, modül başı);
+    bu sorgu bakım turuna "kimin bağlamında silinecek" listesini verir.
+    """
+    return list(db.scalars(select(Is.kullanici_id).where(*_eski_kosulu(an, saklama)).distinct()
+                           .order_by(Is.kullanici_id)))
+
+
+def eskileri_sil(db: Session, kullanici_id: uuid.UUID, an: dt.datetime,
+                 saklama: dt.timedelta) -> list[SilinenIs]:
+    """Kullanıcının kapanmış ve `bitti < an - saklama` işlerini siler; her silinenin izi (`DELETE … RETURNING`).
+
+    Kullanıcı imzası (`db, kullanici_id`): çağıran o kiracının bağlamında
+    (`kiraci.baglam(kullanici_id=…)`) — sahip politikası siler, admin silemez.
+    `medya`ya dokunmaz (`isler.sonuc` yalnız id listesi). Aktif ve tam sınırdaki
+    (`bitti == an - saklama`) satır kalır: sınır KESİN küçük, bayat düşürmenin
+    `<`üyle aynı deyim. Girdi NESNELERİ burada silinmez: çağıran
+    `girdi_dizinleri`ni `girdi_referanslari`/`mevcut_isler` ile eler.
+    """
+    ifade = (delete(Is).where(Is.kullanici_id == kullanici_id, *_eski_kosulu(an, saklama))
+             .returning(Is.kullanici_id, Is.id, Is.istek))
+    silinenler = []
+    for kid, is_id, istek in db.execute(ifade):
+        dizinler = {ayar.is_dizini(kid, is_id)} | {ayar.girdi_dizini(a) for a in _girdi_anahtarlari(istek)}
+        silinenler.append(SilinenIs(kid, is_id, frozenset(dizinler)))
+    return silinenler
+
+
+def girdi_referanslari(db: Session, kullanici_id: uuid.UUID | None = None) -> set[str]:
+    """Kalan satırların `istek`inde referans verilen girdi ANAHTARLARI (bütün satırlar; `kullanici_id` verilirse onunkiler).
+
+    Postgres'in JSONB işlevleriyle tek sorgu: `girdiler` dizisi açılır
+    (`jsonb_array_elements`), `son_kare` ayrı. `CAST(:kid AS uuid)`: psycopg
+    sunucu tarafı bağlamada `NULL` parametrenin tipini çözemiyor
+    (`AmbiguousParameter`, ölçüldü) — tip metinde açık. `kullanici_id`siz çağrı bütün
+    kiracıların (`app.rol='admin'`): silinen işin dizinine BAŞKA bir kiracının
+    işi referans veremez (anahtar kullanıcı kökü altında), ama süzgeç yine
+    sorguda dursun — `tools/artik_dosya.py` kullanıcı kullanıcı tarar.
+    """
+    # `jsonb_array_elements` dizi olmayan bir değerde HATA verir ("cannot extract
+    # elements from a scalar"): `girdiler` JSON `null` (SQL NULL değil — `COALESCE`
+    # onu görmez) ya da bir dize olan TEK satır her bakım turunu düşürürdü, hem de
+    # satırlar silinip dizinler öksüz kaldıktan sonra. `jsonb_typeof` süzer.
+    sorgu = text("""
+        SELECT DISTINCT g->>'anahtar' FROM isler,
+               jsonb_array_elements(CASE WHEN jsonb_typeof(istek->'girdiler') = 'array'
+                                         THEN istek->'girdiler' ELSE '[]'::jsonb END) AS g
+         WHERE (CAST(:kid AS uuid) IS NULL OR kullanici_id = CAST(:kid AS uuid)) AND g ? 'anahtar'
+        UNION
+        SELECT DISTINCT istek->'son_kare'->>'anahtar' FROM isler
+         WHERE (CAST(:kid AS uuid) IS NULL OR kullanici_id = CAST(:kid AS uuid)) AND istek->'son_kare' ? 'anahtar'
+    """).bindparams(kid=str(kullanici_id) if kullanici_id is not None else None)
+    return {str(a) for a in db.scalars(sorgu) if a}
+
+
+def mevcut_isler(db: Session, is_idleri: Collection[uuid.UUID]) -> set[uuid.UUID]:
+    """Verilen id'lerden HÂLÂ satırı olanlar — silinen işin dizinine sahibi olan satır var mı sorusu."""
+    if not is_idleri:
+        return set()
+    return set(db.scalars(select(Is.id).where(Is.id.in_(list(is_idleri)))))
+
+
+def olu_iscileri_sil(db: Session, an: dt.datetime, esik: dt.timedelta) -> int:
+    """`son_kalp < an - esik` olan `isciler` satırlarını siler; silinen sayı.
+
+    Kapanmadan ölen işçi (SIGKILL, `kill_timeout` aşımı, konak kaybı) `isci_sil`e
+    varamaz ve satırı `worker_alive:false` üretmeye devam eder (9'un devri).
+    Eşik kalp eşiğinin KENDİSİ (`KROMIS_IS_KALP_ESIGI_SN`, 300): işi bayat sayan
+    süre işçiyi de ölü sayar — ikinci bir eşik olmasın. `isciler` politikasız,
+    bağlam gerekmez; `isler.isci_id` kalır (FK yok — "kim koştu" kaydı durur).
+    """
+    sonuc = db.execute(delete(Isci).where(Isci.son_kalp < an - esik))
+    return _etkilenen(sonuc)

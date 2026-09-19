@@ -52,7 +52,10 @@ from services import depo_kimlik_bilgisi
 __all__ = ["ONEK", "ADLAR", "KAYNAK_KULLANICI", "KAYNAK_PLATFORM", "Kimlikler",
            "platform_sozlugu", "birlestir", "kimlikler", "kaynak", "bilinmeyenleri_sifirla"]
 
-_log = logging.getLogger(__name__)
+# `kromis.platform`, `__name__` DEĞİL (Faz 2 / 10; 9'un devri 6): `services.platform_anahtari`
+# `kromis.*` ad alanının dışındaydı ve "bilinmeyen KROMIS_PLATFORM_X" uyarısı JSON
+# işleyiciye değil kök günlükçüye düşüyordu — platform günlüğünde düz metin, redaksiyonsuz.
+_log = logging.getLogger("kromis.platform")
 
 # Ortam değişkeni öneki: `KROMIS_PLATFORM_` + katalog adı (`KROMIS_PLATFORM_FAL_KEY`).
 ONEK = "KROMIS_PLATFORM_"

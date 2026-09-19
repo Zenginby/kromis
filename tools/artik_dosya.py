@@ -23,8 +23,13 @@ dizin oraya nasıl gelmişse gelsin, satırı yoktur); Faz 2 / 4'ten beri bir de
 `isler/<is_id>/*` (`isler.id`ye karşı): üretim rotalarının yazdığı GİRDİ
 nesneleri (referans görseller, son kare). Girdi işi bitince silinmez (§3
 kararı (g): "yeniden gönder" onları kullanır), yani `isler` satırı DURDUKÇA
-girdi artık DEĞİLDİR — 30 günlük saklama (10. görev) satırı düşürünce buraya
-artık diye düşer; satırsız bir `isler/<id>/` dizini (commit düşmüş istek,
+girdi artık DEĞİLDİR — ve "satır" iki anlamda (Faz 2 / 10): dizinin KENDİ
+işi YA DA o dizine `istek.girdiler`/`son_kare` ile REFERANS veren başka bir iş
+(yeniden gönderilen iş eskisinin girdilerini kopyalamaz, gösterir; `kuyruk.
+girdi_referanslari`). Ölçüt yalnız kendi satırı olsaydı 30 günlük saklama
+eski işi silince yeniden gönderilmiş işin girdileri "artık" sayılır ve
+silinirdi. Saklama (`services/isci.py bakim_turu`) referanssız dizini kendisi
+siler; satırsız ve referanssız bir `isler/<id>/` dizini (commit düşmüş istek,
 silinmiş hesap) hemen artıktır. Yalnız MEDYA uzantıları
 (`storage.MEDIA_TYPES` + varlıkların `.png`i): `guncelleme.json` gibi bir
 önbellek ya da `.DS_Store` artık dosya SAYILMAZ, "medya değil" diye sayılır ve
@@ -68,8 +73,8 @@ from sqlalchemy import select  # noqa: E402
 from sqlalchemy.exc import SQLAlchemyError  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
-from routers.uretim import ISLER_DIZINI  # noqa: E402
-from services import ayar, db, dosya, kiraci  # noqa: E402
+from services import ayar, db, dosya, kiraci, kuyruk  # noqa: E402
+from services.ayar import ISLER_DIZINI  # noqa: E402
 from services.tablolar import Is, Kullanici, Medya, Varlik  # noqa: E402
 from storage import MEDIA_TYPES  # noqa: E402
 
@@ -145,8 +150,13 @@ def _satirdaki_adlar(oturum: Session, kullanici_id: uuid.UUID) -> tuple[set[str]
 
 
 def _satirdaki_isler(oturum: Session, kullanici_id: uuid.UUID) -> set[str]:
-    """Bu kullanıcının `isler.id` kümesi (dize): `isler/<is_id>/` dizininin satırı var mı sorusu."""
-    return {str(i) for i in oturum.scalars(select(Is.id).where(Is.kullanici_id == kullanici_id))}
+    """Bu kullanıcının "satırlı" iş dizinleri (dize id): kendi `isler.id`si olanlar + başka bir işin
+    `istek`inde referans verilenler (Faz 2 / 10; gerekçe modül başında)."""
+    kendi = {str(i) for i in oturum.scalars(select(Is.id).where(Is.kullanici_id == kullanici_id))}
+    onek = f"{ayar.KULLANICILAR_DIZINI}/{kullanici_id}/{ISLER_DIZINI}/"
+    referansli = {a[len(onek):].split("/", 1)[0]
+                  for a in kuyruk.girdi_referanslari(oturum, kullanici_id) if a.startswith(onek)}
+    return kendi | referansli
 
 
 def _kullaniciyi_tara(oturum: Session, genel: ayar.Ayarlar, kullanici_id: uuid.UUID) -> KullaniciOzeti:

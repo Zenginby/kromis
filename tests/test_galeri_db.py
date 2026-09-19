@@ -66,7 +66,7 @@ DEPOLAR = {
     "services/depo_sohbet.py": 3, "services/depo_palet.py": 2,
     "services/depo_varlik.py": 3, "services/depo_tercih.py": 1,
     "services/depo_kimlik_bilgisi.py": 4,   # Faz 1 / 7
-    "services/kuyruk.py": 12,               # Faz 2 / 1 (3 kullanıcı + 9 işçi/sonda tarafı; `ekle`/`isci_kaydet` `db.add`)
+    "services/kuyruk.py": 16,               # Faz 2 / 1 (3 kullanıcı + 9 işçi/sonda tarafı; `ekle`/`isci_kaydet` `db.add`); Faz 2 / 10 +4 saklama/bakım
     "services/depo_admin.py": 10,           # Faz 2 / 8 (hepsi kiracısız — `KIRACISIZ_MODULLER`)
 }
 # `depo_*.py` kalıbının DIŞINDA kalan depolar — `test_the_repository_list_matches_the_files_on_disk`
@@ -86,8 +86,14 @@ KIRACISIZ = {
         "bekleyen_ozeti": "periyodik uyarı (Faz 2 / 9): bütün kiracıların bekleyen işi — derinlik ve en eski yaş",
         "isci_kaydet": "`isciler` tablosunda kullanıcı sütunu yok",
         "isci_kalp": "`isciler` tablosunda kullanıcı sütunu yok",
+        "isci_yeniden_kaydet": "`isciler` tablosunda kullanıcı sütunu yok; kalp turu silinmiş kendi satırını aynı `id`yle geri yazar",
         "isci_sil": "`isciler` tablosunda kullanıcı sütunu yok",
         "isci_son_kalp": "`isciler` tablosunda kullanıcı sütunu yok; `/health` `worker_alive` (Faz 2 / 9)",
+        "saklama_sahipleri": "periyodik bakım (Faz 2 / 10): saklama süresi dolmuş işi olan BÜTÜN kiracılar — "
+                             "silme sonra her kiracının kendi bağlamında (`eskileri_sil` kullanıcı imzalı)",
+        "olu_iscileri_sil": "`isciler` tablosunda kullanıcı sütunu yok; ölü işçi satırı (Faz 2 / 10)",
+        "mevcut_isler": "periyodik bakım (Faz 2 / 10): silinen işin dizinine sahip satır kaldı mı — id kümesi, "
+                        "kiracıdan bağımsız (dizin adı kullanıcı kökünü zaten taşır)",
     },
 }
 # Kiracısız MODÜLLER (Faz 2 / 8): işlev işlev değil bütünüyle muaf, gerekçesiyle.

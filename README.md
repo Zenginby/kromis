@@ -198,7 +198,9 @@ Veri tabanı `DATABASE_URL` ile (PostgreSQL, `postgresql+psycopg://…`;
 açılır ama `/health` `db_reachable: false` ile 503 döner. Şema dağıtım
 ÖNCESİ `python tools/goc.py` ile kurulur (`alembic upgrade head`in
 sarmalayıcısı, imajda; konteyner açılışında DEĞİL — platformun release/
-pre-deploy komutu, compose'ta `goc` servisi; `docs/isletme.md`). Sağlayıcı
+pre-deploy komutu, compose'ta `goc` servisi; `docs/isletme.md`). Üretim
+işleri ayrı İŞÇİ sürecinde (`python isci.py`, aynı imaj; platformda ikinci
+süreç, kapanış ve saklama düzeni `docs/isletme.md` § 7-9). Sağlayıcı
 anahtarları (Ayarlar paneli) kullanıcı başına ŞİFRELİ olarak
 DB'de durur; şifreleme anahtarı `KROMIS_SECRET_KEY` ZORUNLU — DB'li süreç onsuz
 açılmaz, üstteki komut yenisini üretir ve DB yedeğinden AYRI saklanmalı

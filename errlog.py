@@ -42,10 +42,14 @@ _KEY_PATTERNS = [
     # önekinin harf düzeni sabit ve `re.IGNORECASE` "aiza" ile başlayan sıradan
     # Türkçe metni de sansürleyebilirdi.
     re.compile(r"AIza[0-9A-Za-z_-]{30,}"),
-    # AD=değer. `[A-Z][A-Z0-9_]*` + KEY/TOKEN/SECRET: ad biçimine bağlı, listeye
-    # değil. IGNORECASE YOK — küçük harf bir `key=` sıradan bir sorgu dizesi
-    # olabilir ve ad kuralının anlamı BÜYÜK HARF env adı olmasıydı.
-    re.compile(r"\b[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)\s*=\s*['\"]?[a-zA-Z0-9_.-]{8,}['\"]?"),
+    # AD=değer ve AD: değer. `[A-Z][A-Z0-9_]*` + KEY/TOKEN/SECRET: ad biçimine bağlı,
+    # listeye değil. IGNORECASE YOK — küçük harf bir `key=` sıradan bir sorgu dizesi
+    # olabilir ve ad kuralının anlamı BÜYÜK HARF env adı olmasıydı. İKİ NOKTA da
+    # (Faz 2 / 10, 9'un devri): bir YAML/`env` dökümü, bir `print(f"{AD}: {deger}")`
+    # ya da platform panelinin kopyaladığı `KROMIS_PLATFORM_FAL_KEY: değer` satırı
+    # `=` taşımıyor ve desen 4'ten kaçıyordu (ölçüldü; sözlük biçimi (b') tırnak
+    # istediği için onu da yakalamıyordu).
+    re.compile(r"\b[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET)\s*[=:]\s*['\"]?[a-zA-Z0-9_.-]{8,}['\"]?"),
     # Başlıklar. `x-goog-api-key` ve `x-api-key` AÇIKÇA yazılı: ikisi de bugün
     # `api-key` alt dizesi sayesinde tesadüfen eşleşiyor, ama tesadüf sözleşme
     # değil — `anthropic-version` gibi bir komşu bir gün deseni daraltırsa

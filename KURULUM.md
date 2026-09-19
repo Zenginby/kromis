@@ -482,6 +482,15 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
    dört değişkenle `python tools/artik_dosya.py` "kova: kromis … 0 artik"
    demeli. Doğrulama bitince yerel `kullanicilar/` dizinini arşivle; artık
    okunmuyor.
+
+   *Kova ayarları (Faz 2 / 10; bir kez, Cloudflare panosu → kova → Settings):*
+   **özel** kalsın (public access ve r2.dev kapalı — okuma 15 dk'lık imzalı
+   URL'yle), **Object versioning (nesne sürümleme): açık** (silinen/ezilen nesne geri alınabilir;
+   medya yedeğin bu), **yaşam döngüsü kuralı:** önek `kullanicilar/` için
+   "delete noncurrent versions after 30 days" (sürüm geçmişi sonsuza dek
+   şişmesin). Girdi nesnelerinin (`isler/<id>/`) temizliği kovada değil
+   işçide (8. adımdaki saklama). İsteğe bağlı ikinci kovaya `rclone sync`
+   ve gerekçeleri [docs/isletme.md § 8](docs/isletme.md).
 8. **İşçi süreci** (Faz 2 / 3). Üretim işleri (görsel üret/düzenle, video
    üret/canlandır) web sürecinde değil ayrı bir işçide koşar: rota işi
    `isler` tablosuna yazar, işçi kuyruktan alır, sağlayıcıyı çağırır, sonucu
@@ -493,28 +502,40 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
    ```
 
    Yerel `docker compose up` bunu kendi yapar (`isci` servisi; göçü bekler,
-   web ile aynı `/data` birimini paylaşır). Platformda ikinci bir süreç/servis
-   olarak tanımlanır: Fly.io `fly.toml` → `[processes]` `isci = "python isci.py"`
-   (web `app`in yanına), Railway/Render → aynı repo ve imajla ikinci servis,
-   *Start Command* `python isci.py`. İşçi web'in **üç değişkenini aynen**
+   web ile aynı `/data` birimini paylaşır, `stop_grace_period: 60s`).
+   Platformda ikinci bir süreç/servis olarak tanımlanır: Fly.io `fly.toml` →
+   `[processes]` `isci = "python isci.py"` (web `app`in yanına), işçiye ayrı
+   `[[vm]]`, `kill_timeout = "300s"` (Fly'ın tavanı) ve `[http_service]`
+   yalnız `app`e — tam örnek ve Railway/Render karşılıkları
+   [docs/isletme.md § 7](docs/isletme.md); Railway/Render → aynı repo ve
+   imajla ikinci servis, *Start Command* `python isci.py` (Render'da tür
+   *Background Worker*). İşçi web'in **üç değişkenini aynen**
    ister (`DATABASE_URL`, `KROMIS_SECRET_KEY` — anahtarsız işçi de açılmaz,
    çözeceği satır var —, `KROMIS_DATA_DIR`) ve ayrı makinedeyse 7. adımdaki
    dört nesne depolama değişkenini (ortak disk yok: işçinin yazdığı MP4'ü web
-   ancak kovadan görür; yarım yapılandırma işçiyi de açmaz). İsteğe bağlı iki
+   ancak kovadan görür; yarım yapılandırma işçiyi de açmaz). İsteğe bağlı üç
    ayar (`.env.example`): `KROMIS_ISCI_ES_ZAMANLI` aynı anda kaç iş (öntanımlı
    4; her iş bir sağlayıcı çağrısı, bağlantı havuzu `4 + 1`),
    `KROMIS_IS_KALP_ESIGI_SN` kalbi bu kadar saniye susan işin `hata` sayılması
-   (öntanımlı 300). Açılışta `isciler` tablosuna satır yazar, 30 sn'de bir kalp
-   atar, kapanışta siler; günlüğü stdout'a tek satırlık ASCII. **Kapanış
-   SIGTERM:** yeni iş almayı bırakır, eldeki işi BİTİRİR (sağlayıcı çağrısı
-   faturalandı), sonra çıkar — platformun kapanış süresini (Fly
-   `kill_timeout`, compose `stop_grace_period`) en uzun sağlayıcı çağrısına
-   göre ver (video 10 dk'ya kadar); süre yetmezse iş `calisiyor`da kalır ve
-   başka bir işçinin kalp turu onu `hata` yapar, kullanıcı panelden yeniden
-   gönderir (otomatik yeniden deneme YOK: çift fatura riski). Sağlık
-   denetimi: `python isci.py --tek-tur` bir iş alıp çıkar, kuyruk boşsa 0 ile
-   döner — CI'ın `docker` işi bunu koşturur; işçinin ayakta olduğunu web'in
-   `/health` gövdesindeki `worker_alive` alanından okursun (9. adım).
+   (öntanımlı 300), `KROMIS_IS_SAKLAMA_GUN` kapanmış iş satırlarının kaç gün
+   saklanacağı (öntanımlı 30). Açılışta `isciler` tablosuna satır yazar, 30
+   sn'de bir kalp atar, kapanışta siler; günlüğü stdout'a satır başına JSON
+   (9. adım). **Kapanış SIGTERM:** yeni iş almayı bırakır, eldeki işi BİTİRİR
+   (sağlayıcı çağrısı faturalandı), sonra çıkar — platformun kapanış süresini
+   (Fly `kill_timeout`, compose `stop_grace_period`) en uzun sağlayıcı
+   çağrısına göre ver (video 10 dk'ya kadar; Fly'ın tavanı 300 sn, yani uzun
+   video işi dağıtımda kaybedilebilir — bilinen sınır); süre yetmezse iş
+   `calisiyor`da kalır ve başka bir işçinin kalp turu onu `hata` yapar,
+   kullanıcı panelden yeniden gönderir (otomatik yeniden deneme YOK: çift
+   fatura riski). **Bakım işçinin içinde, ayrı cron yok (Faz 2 / 10):**
+   açılışta ve 5 dk'da bir kapanmış ve `KROMIS_IS_SAKLAMA_GUN` günden eski
+   iş satırlarını siler (galeri ürünlerine dokunmaz; silinen işin referans
+   görselleri yalnız başka iş onlara bakmıyorsa gider), kalbi susmuş ölü
+   işçi satırlarını düşürür (`/health` `worker_alive` doğruyu söylesin);
+   günlükte `olay=bakim`. Sağlık denetimi: `python isci.py --tek-tur` bir iş
+   alıp çıkar, kuyruk boşsa 0 ile döner — CI'ın `docker` işi bunu koşturur;
+   işçinin ayakta olduğunu web'in `/health` gövdesindeki `worker_alive`
+   alanından okursun (9. adım).
 9. **Günlük, istek kimliği, `/health`, Sentry** (Faz 2 / 9). İki süreç de
    stdout'a **satır başına bir JSON nesnesi** yazar (`ts`, `seviye`, `logger`,
    `mesaj`, sonra alanlar); platformun günlük ekranı/toplayıcısı alanlara
@@ -526,6 +547,13 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
    biçim için `KROMIS_GUNLUK_BICIMI=metin`; başka bir değer uygulamayı
    AÇMAZ. uvicorn'un kendi erişim günlüğü imajda kapalı (`--no-access-log`);
    kendi komutunla açıyorsan aynı bayrağı ver, yoksa her istek iki kez yazılır.
+   Üçüncü parti uyarıları (SQLAlchemy, httpx) ve uvicorn'un yaşam döngüsü /
+   istisna satırları da aynı JSON akımında ve redakte (Faz 2 / 10) — yalnız
+   açılışın ilk iki uvicorn satırı stderr'de düz metin.
+
+   *Günlük işletme — dağıt, geri al, sağlık, uyarı, saklama:* tek yerde,
+   [docs/isletme.md § 7-9](docs/isletme.md) (iki süreç tablosu, `fly.toml`
+   örneği, kova düzeni, ilk üretim koşusu kontrol listesi).
 
    *İstek kimliği:* her cevapta `X-Request-ID` başlığı döner; vekil (Fly,
    Cloudflare, Railway) gelen isteğe bir kimlik koyduysa o kullanılır, yoksa

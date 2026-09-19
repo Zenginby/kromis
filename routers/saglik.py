@@ -129,6 +129,9 @@ def isci_durumu(motor: Engine | None, an: dt.datetime | None = None) -> tuple[bo
 
     `worker_alive` = son kalp `an - CANLI_ESIK`ten YENİ (admin metriklerinin
     `canli` ölçütüyle birebir aynı karşılaştırma). Bilinmiyorsa `None`.
+    Damga `zaman.damga_utc` (UTC, `Z`): API'nin öteki damgalarıyla (`/api/isler*`,
+    `/api/admin/*`) aynı biçim — dilimsiz bir değer sondayı okuyan makinenin
+    saatine göre kayardı.
     """
     sonuc = db.sor(motor, _sonda_sorgusu)
     if sonuc is None:
@@ -139,7 +142,7 @@ def isci_durumu(motor: Engine | None, an: dt.datetime | None = None) -> tuple[bo
     if son_kalp is None:
         return True, False, None
     simdi = an if an is not None else zaman.an()
-    return True, son_kalp > simdi - depo_admin.CANLI_ESIK, zaman.damga(son_kalp)
+    return True, son_kalp > simdi - depo_admin.CANLI_ESIK, zaman.damga_utc(son_kalp)
 
 
 @router.get("/health")

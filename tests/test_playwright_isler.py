@@ -16,6 +16,10 @@ düşüp düşmediğini, sekmenin kapanıp açılmasını göremez):
   4. SSE DÜŞERSE YOKLAMA SÜRÜYOR: `/api/isler/akis` tarayıcıda kesilir
      (`page.route` abort), üç düşüşten sonra panel yedek yola geçer ve iş yine
      `bitti`ye ulaşır.
+  5. SAYAÇ SUNUCUNUN DOĞUSUNDAKİ TARAYICIDA 0'DAN BAŞLIYOR (Faz 2 / 10, "180"
+     kusuru): sunucu süreci UTC'de, tarayıcı `Europe/Istanbul` — `basladi`
+     dilimli UTC (`Z`) geldiği için geçen süre saniyelerle ölçülür, "180:00"
+     değil. Yalnız tarayıcı ölçebilir: `new Date()` tarayıcının dilimindedir.
 
 Sunucu ve işçi `tests/test_playwright_studio.py`nin `ServerThread`/`IsciThread`
 ikilisi — aynı süreç, gerçek kuyruk (Postgres), sağlayıcı `monkeypatch`.
@@ -25,6 +29,8 @@ belgeye yazıldı (§5 "Yapıldığında").
 from __future__ import annotations
 
 import io
+import os
+import re
 import threading
 import time
 
@@ -309,3 +315,63 @@ def test_when_the_stream_is_cut_the_panel_falls_back_to_polling_and_still_finish
             browser.close()
     finally:
         server.stop()
+
+
+def test_the_elapsed_counter_starts_near_zero_in_a_browser_three_hours_east_of_the_server(
+        monkeypatch, veritabani, e2e_oturum):
+    """"180" kusuru (docs/studyo-guncelleme-plani.md B3; Faz 2 / 10): sunucu UTC, tarayıcı UTC+3.
+
+    Eski yük dilimsiz `zaman.damga` dizesiydi; tarayıcı onu kendi yerel saati okuyor, `basladi`
+    3 saat geriye kayıyor ve panel `sureMetni`yle "180:00" açılıyordu. Sunucunun dilimi burada
+    `TZ=UTC` + `tzset` ile üretimdeki gibi sabitlenir (`zaman.an()` `astimezone()` yerel dilimi
+    C kütüphanesinden okur), tarayıcı bağlamı `timezone_id="Europe/Istanbul"`. İddia: `calisiyor`
+    satırın `.is-sure` metni "N s(n)" ve N < 60 — `dk:ss` biçimi (saat farkı) hiç görünmez.
+    """
+    eski_tz = os.environ.get("TZ")
+    monkeypatch.setenv("TZ", "UTC")
+    time.tzset()
+    _tum_kimlikler_kayitli(monkeypatch)
+    monkeypatch.setattr(providers, "generate", _uyuyan_saglayici(6.0))
+    port = get_free_port()
+    server = ServerThread(port)
+    server.start()
+    oturum = e2e_oturum()
+    time.sleep(1.0)
+    taban = f"http://127.0.0.1:{port}"
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            baglam = browser.new_context(viewport={"width": 1280, "height": 860},
+                                         timezone_id="Europe/Istanbul")
+            page = baglam.new_page()
+            assert page.evaluate("new Date().getTimezoneOffset()") == -180, "tarayıcı UTC+3 değil"
+            _studyo(page, taban, oturum)
+            _gonder(page, "saat dilimi")
+            _paneli_ac(page)
+            page.wait_for_selector(PANEL_SATIR + '[data-durum="calisiyor"]', timeout=15000)
+            # Sayaç saniyede bir tazelenir; iki okuma da saniye biçiminde ve küçük olmalı.
+            okumalar = []
+            for _ in range(2):
+                okumalar.append(page.eval_on_selector(PANEL_SATIR + " .is-sure", "e => e.textContent"))
+                time.sleep(1.1)
+            for metin in okumalar:
+                e = re.fullmatch(r"(\d+) sn?", metin)
+                assert e, f"sayaç saniye biçiminde değil (saat dilimi farkı?): {metin!r}"
+                assert int(e.group(1)) < 60, f"sayaç dakikalarla açıldı: {metin!r}"
+            # Yük gerçekten dilimli UTC: panelin okuduğu `basladi` `Z` ile bitiyor.
+            basladi = page.evaluate(
+                "async () => (await (await fetch('/api/isler')).json()).isler[0].basladi")
+            assert basladi and basladi.endswith("Z"), basladi
+            _paneldekiler_bitsin(page, oturum, 1)
+            son = page.eval_on_selector(PANEL_SATIR + " .is-sure", "e => e.textContent")
+            e = re.fullmatch(r"(\d+) sn?", son)
+            assert e and 4 <= int(e.group(1)) <= 20, f"biten işin süresi sağlayıcının 6 sn'sine yakın olmalı: {son!r}"
+            browser.close()
+    finally:
+        server.stop()
+        if eski_tz is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = eski_tz
+        time.tzset()

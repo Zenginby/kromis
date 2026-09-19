@@ -179,7 +179,25 @@ mekanizması **büyük olasılıkla saat dilimi**, sayaç hatası değil:
   (`isoformat()` `+00:00`/`Z` ile) vermek — `an()` `Date`'e dilimli dize
   verir, sıralama dizesi (`localeCompare`) de aynı ofsetle bozulmaz; ya da
   `_json`a `gecen_sn` eklemek. İkisi de `zaman.py`nin belgelenmiş "tek
-  biçim" kararına dokunur, önce o gerekçe okunur. **Yeri:** Faz 2 / 10'un
+  biçim" kararına dokunur, önce o gerekçe okunur.
+
+  **Yapıldı (2026-09-19, Faz 2 / 10, PR `faz2/operasyon`):** mekanizma
+  E2E'de DOĞRULANDI — sunucu `TZ=UTC`, Playwright bağlamı
+  `timezone_id="Europe/Istanbul"`; eski yükle sayaç dakikalarla açılıyordu.
+  Seçilen çözüm birincisi: `services/zaman.py`ye üçüncü biçim `damga_utc()`
+  (`2026-09-19T12:00:00Z`), `kuyruk._json` (`/api/isler*`, SSE) ve
+  `depo_admin` (`/api/admin/*`) damgaları onunla dökülüyor; `Z` seçildi
+  (`+00:00` değil) ki `localeCompare` sıralaması sunucunun dilimi ne olursa
+  olsun kronolojik kalsın. `isler.js an()` değişmedi (dilimli dizeyi zaten
+  doğru okuyor), `admin.js tarih()` artık `Date` üzerinden yerel saatte
+  yazıyor. `gecen_sn` ELENDİ: sunucu saati istemciye ikinci bir yoldan
+  taşınırdı ve `bitti − basladi` zaten iki damgadan çıkıyor. `zaman.py`nin
+  "tek biçim" kararı galeri `created_at`i için DURUYOR (o dize üç betikte ve
+  dondurulmuş kabukta dilimsiz okunuyor); "az önce/bugün" gösterimindeki aynı
+  sınıf kayma bu blokta açık kalem (B2'nin yanına). Bekçiler:
+  `tests/test_isler_route.py` (yük `Z` ile bitiyor, `since` geri dönüşü),
+  `tests/test_kuyruk.py`, `tests/test_playwright_isler.py` (5. test).
+  **Yeri:** Faz 2 / 10'un
   `static/isler.js` dokunuşu (belgede "Dokunulan"da) — ya da B2 ile birlikte
   ayrı küçük PR. Faz 3'ün `bitti − basladi` marj raporu sunucu tarafında
   hesaplanır, bundan etkilenmez.
@@ -296,7 +314,7 @@ mekanizması **büyük olasılıkla saat dilimi**, sayaç hatası değil:
 | grup | ne | neden orada | öneri |
 | --- | --- | --- | --- |
 | B1 (gerçek kredi / bakiye) | tur maliyeti + kalan kredi | defter, rezerve/onayla, gerçek tarife Faz 3'te; bugünkü `#run-cost` tahmindir ve zaten var | **Faz 3** (konum değişikliği arayüz bloğunda) |
-| B2 + B3 | süre göstergesi; "180" gözlemi | yalnız `isler.basladi/bitti` ister (var); Faz 2 / 10 `isler.js`e zaten dokunuyor | **Faz 2 / 10'a küçük kalem** ya da hemen ardından ayrı küçük PR |
+| B2 + B3 | süre göstergesi; "180" gözlemi | yalnız `isler.basladi/bitti` ister (var); Faz 2 / 10 `isler.js`e zaten dokunuyor | **B3 Faz 2 / 10'da YAPILDI** (yük dilimli UTC; B3 altındaki "Yapıldı"); B2 (composer'da süre göstergesi) arayüz bloğunda |
 | A1-A5, C1-C2, D1, E1 | composer düzeni, gezinme, arena işareti, görünümün taşınması | saf ön yüz, sunucu değişmez; tasarım §4.1-4.2 kararlarını günceller; E2E çapaları toplu yeniden yazılır | **"Stüdyo arayüz yenilemesi" tek blok** — doğal yeri **Faz 4** (K3: ön yüz çerçevesine yeniden bakış orada; çerçeve değişecekse bu blok o çerçevede yazılır) **ya da** sahibin seçtiği Faz 2 → 3 arası mini faz (vanilla ile) |
 | E2 + E3 | hızlı araçlar ve yan şerit | sağlayıcı çağrısı + kredi düşümü + katalog türü | **Faz 3** ürün araçları kartına ek |
 | F | medya düzenleme | ayrı ürün, ayrı altyapı | **Faz 5+**, kendi spec'i |

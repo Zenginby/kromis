@@ -531,9 +531,10 @@ def test_the_quota_endpoint_reports_daily_remaining_and_hourly_count_for_the_sig
     g = c.get("/api/kota").json()
     from services import zaman as z
     assert g["gunluk"] == {"tavan": 300, "kullanilan": 150, "kalan": 150,
-                           "acilis": z.damga(AN - dt.timedelta(hours=5) + kota.GUNLUK_PENCERE)}
+                           "acilis": z.damga_utc(AN - dt.timedelta(hours=5) + kota.GUNLUK_PENCERE)}
     assert g["saatlik"] == {"tavan": kota.SAATLIK_IS_VARSAYILAN, "sayi": 2,
-                            "acilis": z.damga(AN - dt.timedelta(minutes=10) + kota.SAATLIK_PENCERE)}
+                            "acilis": z.damga_utc(AN - dt.timedelta(minutes=10) + kota.SAATLIK_PENCERE)}
+    assert g["gunluk"]["acilis"].endswith("Z") and g["saatlik"]["acilis"].endswith("Z"), "dilimli, öteki damgalar gibi"
     kullanici.gunluk_kredi_tavani = 100
     assert c.get("/api/kota").json()["gunluk"]["kalan"] == 0, "aşımda eksiye düşmez"
 

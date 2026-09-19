@@ -19,6 +19,20 @@ Postgres'in `now()`u da olmazdı: transaksiyonun başlangıç anı, dört satır
 aynı. `damga()` yerel saate çevirip diliminden soyar, yani `created_at`
 istemcinin bugüne kadar gördüğü dizeyle birebir aynı biçimde kalır
 (`static/folders.js` bu dizeyi `localeCompare` ile sıralıyor).
+
+ÜÇÜNCÜ BİÇİM, YİNE TEK KAYNAK (Faz 2 / 10): `damga_utc()` — UTC, saniye,
+sonu `Z` (`2026-09-19T12:00:00Z`). "Tek biçim" kararı `created_at` için
+duruyor: o dize masaüstünden beri istemcide dilimsiz okunuyor ve sunucuyla
+aynı makinede anlamı var. İş uçları (`/api/isler*`, `/api/admin/*`) o
+varsayımın DÜŞTÜĞÜ yer: web konteyneri UTC'de, kullanıcı başka dilimde ve
+`static/isler.js` `basladi`yi `new Date()` ile KARŞILAŞTIRIYOR — dilimsiz
+`2026-09-18T18:44:25`i tarayıcı kendi yerel saati sayıyor, UTC+3'teki
+kullanıcı paneli "180:00"la açılıyordu (ölçüldü, docs/studyo-guncelleme-plani.md
+B3). Dilimli dize `Date`e tek bir ANI söyler; `Z` seçildi (`+00:00` değil)
+ki `localeCompare` sıralaması (isler.js `ciz`) sunucunun dilimi değişse de
+kronolojik kalsın — bütün dizeler aynı ofsette. Galeri `created_at`i BU PR'DA
+DEĞİŞMEDİ (aynı sınıf kusur "az önce/bugün" gösteriminde var, ama o dizeyi
+okuyan üç betik ve dondurulmuş kabuk var; kalem docs/faz2 §10).
 """
 from __future__ import annotations
 
@@ -43,3 +57,15 @@ def damga(t: _dt.datetime) -> str:
     if t.tzinfo is not None:
         t = t.astimezone()
     return t.replace(tzinfo=None).isoformat(timespec="seconds")
+
+
+def damga_utc(t: _dt.datetime) -> str:
+    """Bir anı UTC'de, saniye çözünürlüğünde ve `Z` sonekiyle döker (`2026-09-19T12:00:00Z`).
+
+    Dilimsiz (naive) gelen değer `damga()`daki gibi yerel saat sayılır, sonra
+    UTC'ye çevrilir. `fromisoformat` 3.11'den beri `Z`yi okur; `routers/isler.py
+    _since` bu dizeyi geri aldığında dilimli görür ve `astimezone()` çağırmaz.
+    """
+    if t.tzinfo is None:
+        t = t.astimezone()
+    return t.astimezone(_dt.UTC).replace(tzinfo=None).isoformat(timespec="seconds") + "Z"

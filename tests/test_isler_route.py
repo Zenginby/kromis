@@ -341,6 +341,28 @@ def test_since_returns_only_what_changed_after_that_moment(c, depo_db):
     assert c.get("/api/isler", params={"since": "dun-aksam"}).status_code == 422
 
 
+def test_job_timestamps_are_timezone_aware_utc_so_the_browser_reads_one_instant(c, depo_db):
+    """"180" kusuru (Faz 2 / 10; docs/studyo-guncelleme-plani.md B3): `zaman.damga`nın DİLİMSİZ
+    dizesi tarayıcıda yerel saat sayılıyor ve UTC'deki sunucunun `basladi`si UTC+3'te 3 saat
+    geride okunuyordu. Yük artık `Z` sonekli UTC (`zaman.damga_utc`); aynı dize `?since=`e
+    geri verilince dilimli okunur (sunucunun yerel dilimine kaydırılmaz) ve aynı işi bulur."""
+    is_ = c.post("/api/generate", json=GORSEL).json()["is"]
+    for alan in ("olusturuldu",):
+        assert is_[alan].endswith("Z") and "+" not in is_[alan], is_[alan]
+        an = dt.datetime.fromisoformat(is_[alan])
+        assert an.tzinfo is not None and an.utcoffset() == dt.timedelta(0)
+        assert abs((dt.datetime.now(dt.UTC) - an).total_seconds()) < 5, "gerçek an, saat dilimi kaymış değil"
+    assert _tek_tur(depo_db)
+    kapali = c.get(f"/api/isler/{is_['id']}").json()["is"]
+    assert kapali["basladi"].endswith("Z") and kapali["bitti"].endswith("Z")
+    assert dt.datetime.fromisoformat(kapali["basladi"]) <= dt.datetime.fromisoformat(kapali["bitti"])
+    # Dizeyi geri ver: dilimli okunur, işi bulur (saniyeye kırpılmış damga örtüşür: `>`).
+    sonra = c.get("/api/isler", params={"since": is_["olusturuldu"]}).json()["isler"]
+    assert [i["id"] for i in sonra] == [is_["id"]]
+    # Dilimsiz `since` hâlâ kabul (eski istemci): sunucu yereli sayılır, 422 değil.
+    assert c.get("/api/isler", params={"since": "2000-01-01T00:00:00"}).status_code == 200
+
+
 def test_a_single_job_is_readable_by_its_owner_only(c, depo_db, kullanici):
     is_id = c.post("/api/generate", json=GORSEL).json()["is"]["id"]
     with Session(depo_db) as db:

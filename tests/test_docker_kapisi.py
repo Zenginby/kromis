@@ -274,12 +274,13 @@ def _atamalar() -> list[tuple[str, str, bool]]:
 # (services/kapilar.py); Faz 2 / 6 ile iki kota tavanı `KROMIS_SAATLIK_IS_TAVANI`,
 # `KROMIS_GUNLUK_KREDI_TAVANI` (services/kota.py); Faz 2 / 9 ile günlük biçimi
 # `KROMIS_GUNLUK_BICIMI` (services/gunluk.py) ve Sentry `SENTRY_DSN`,
-# `SENTRY_ENVIRONMENT` (services/hata_izleme.py; web VE işçi). Adlar KAYNAKTAN, elle değil.
+# `SENTRY_ENVIRONMENT` (services/hata_izleme.py; web VE işçi); Faz 2 / 10 ile iş saklama
+# `KROMIS_IS_SAKLAMA_GUN` (services/isci.py `bakim_turu`). Adlar KAYNAKTAN, elle değil.
 ALTYAPI = {"KROMIS_DATA_DIR", "PORT", db.DATABASE_URL_ENV, koken.KOKEN_ENV,
            posta.POSTA_ENV, posta.GONDEREN_ENV, posta.RESEND_ANAHTAR_ENV, cerez.GUVENLI_ENV,
            sifre.ANAHTAR_ENV,
            dosya.URL_ENV, dosya.KOVA_ENV, dosya.ANAHTAR_ID_ENV, dosya.GIZLI_ENV, dosya.BOLGE_ENV,
-           isci.ES_ZAMANLI_ENV, isci.KALP_ESIGI_ENV, kapilar.ES_ZAMANLI_IS_ENV,
+           isci.ES_ZAMANLI_ENV, isci.KALP_ESIGI_ENV, isci.SAKLAMA_ENV, kapilar.ES_ZAMANLI_IS_ENV,
            kota.SAATLIK_IS_ENV, kota.GUNLUK_KREDI_ENV,
            gunluk.BICIM_ENV, hata_izleme.DSN_ENV, hata_izleme.ORTAM_ENV}
 
@@ -530,6 +531,9 @@ def test_compose_runs_the_worker_from_the_same_image_on_the_same_volume_after_th
     # ölçüldü) ve yönetilen platformda yeniden başlatma döngüsüne girer.
     assert isci_s.get("healthcheck", {}).get("disable") is True, \
         "işçi port açmadığı için imajın /health denetimi bu serviste kapatılmalı"
+    # Kapanış süresi (Faz 2 / 10): compose'un öntanımlı 10 sn'si bir görsel işini bile
+    # bitirmeye yetmez, SIGKILL işi `calisiyor`da bırakır; belge 60 sn der.
+    assert str(isci_s.get("stop_grace_period", "")) == "60s", isci_s.get("stop_grace_period")
     # Dockerfile CMD hâlâ web: ikinci süreç komutla ayrılır, ikinci imajla değil.
     cmd = [arg for yonerge, arg in _yonergeler() if yonerge == "CMD"]
     assert cmd and "uvicorn" in cmd[-1] and "isci" not in cmd[-1], cmd
@@ -584,9 +588,13 @@ def test_ci_docker_job_runs_the_container_against_a_postgres_service():
     assert f"-e {db.DATABASE_URL_ENV}" in adim["run"]
     # `KROMIS_SECRET_KEY` (Faz 1 / 7): DB'li süreç anahtarsız açılmaz; iş anahtarı
     # her koşuda ÜRETİR, workflow'a yazmaz (sabit değer git'te bir anahtar olurdu).
+    # Faz 2 / 10: üretim ayrı bir adımda (`$GITHUB_ENV`), işçi ve web aynı anahtarı alır.
     assert f"-e {sifre.ANAHTAR_ENV}" in adim["run"]
-    assert "secrets.token_bytes(32)" in adim["run"], "anahtar üretilmiyor"
-    assert sifre.ANAHTAR_ENV not in (adim.get("env") or {}), "anahtar workflow'a sabit yazılmış"
+    uretim = [a for a in is_.get("steps", []) if "secrets.token_bytes(32)" in str(a.get("run", ""))]
+    assert len(uretim) == 1 and "GITHUB_ENV" in uretim[0]["run"], "anahtar tek adımda üretilip ortama yazılmalı"
+    assert is_["steps"].index(uretim[0]) < is_["steps"].index(adim), "anahtar konteynerden önce üretilmeli"
+    for a in is_.get("steps", []):
+        assert sifre.ANAHTAR_ENV not in (a.get("env") or {}), "anahtar workflow'a sabit yazılmış"
     url = str(adim.get("env", {}).get(db.DATABASE_URL_ENV, ""))
     assert url.startswith("postgresql+psycopg://") and "localhost:5432" in url, url
     # `curl -f` duruyor: 503 hâlâ kırmızı, sonda gevşetilmedi.
@@ -614,6 +622,30 @@ def test_ci_docker_job_migrates_from_the_image_before_starting_the_container():
         adimlar[sonda[0]]["env"][db.DATABASE_URL_ENV]), "göç ve uygulama aynı DB'ye gitmeli"
     assert "set -euo pipefail" in adim["run"], "göç düşerse adım da düşmeli"
     assert "docker image ls" in komutlar[derleme[0]], "imaj boyutu basılmıyor"
+
+
+def test_ci_docker_job_runs_the_worker_once_from_the_image_and_checks_the_worker_alive_field():
+    """Faz 2 / 10: göçten SONRA, web konteynerinden ÖNCE aynı imajdan `python isci.py --tek-tur`
+    (boş kuyruk → 0; işçi girişi imajda ve web'in kapılarından geçiyor). Sonda `/health`
+    gövdesinde `worker_alive` ALANINI arar (Faz 2 / 9 sözleşmesi) — değerini değil, tek tur
+    işçi çıktı. `_test.yml` DEĞİŞMEZ (belge §10)."""
+    from services import db
+    adimlar = _docker_isi().get("steps", [])
+    komutlar = [str(a.get("run") or "") for a in adimlar]
+    goc = [i for i, k in enumerate(komutlar) if "tools/goc.py" in k]
+    isci_adim = [i for i, k in enumerate(komutlar) if "isci.py --tek-tur" in k]
+    sonda = [i for i, k in enumerate(komutlar) if "docker run -d" in k]
+    assert len(isci_adim) == 1, komutlar
+    assert goc[0] < isci_adim[0] < sonda[0], "sıra: göç → işçi → web"
+    adim = adimlar[isci_adim[0]]
+    assert "docker run --rm --network host" in adim["run"] and f"-e {db.DATABASE_URL_ENV}" in adim["run"]
+    assert f"-e {sifre.ANAHTAR_ENV}" in adim["run"], "işçi de anahtarsız açılmaz (isci.py)"
+    assert "set -euo pipefail" in adim["run"]
+    assert str(adim.get("env", {}).get(db.DATABASE_URL_ENV, "")) == str(
+        adimlar[sonda[0]]["env"][db.DATABASE_URL_ENV]), "işçi web'in DB'sine gitmeli"
+    assert "worker_alive" in komutlar[sonda[0]], "sonda `worker_alive` alanını sormuyor"
+    test_yml = _oku(os.path.join(KOK, ".github", "workflows", "_test.yml"))
+    assert "isci.py" not in test_yml, "_test.yml değişmez: işçi orada işlev düzeyinde sınanıyor"
 
 
 def test_ci_docker_job_is_blocking_and_time_boxed():
@@ -672,3 +704,25 @@ def test_the_operations_doc_separates_the_three_backups_and_has_a_restore_drill(
     assert re.search(r"^\s*1\.\s", metin, re.M) and "doğrula" in metin.lower()
     # Aynı kural şablonda da: anahtar yedekten ayrı.
     assert "AYRI SAKLANIR" in _oku(ENV_EXAMPLE)
+
+
+def test_the_install_guide_and_operations_doc_cover_the_two_process_deployment_and_retention():
+    """Faz 2 / 10: platform başına iki süreç tablosu (Fly `[processes]` + `kill_timeout`, Railway/
+    Render ikinci servis, compose `stop_grace_period`), R2 kova düzeni (özel, sürümleme, yaşam
+    döngüsü, isteğe bağlı `rclone`), iş saklama (`KROMIS_IS_SAKLAMA_GUN`, referanssız girdi
+    dizini), bayat düşürme ve ölü işçi satırı, yedek tablosunda `isler`/`isciler` ve platform
+    sırları, geri yükleme tatbikatının kova adımı, işletme akışı (dağıt, geri al, sağlık, günlük)."""
+    isletme = _oku(ISLETME)
+    for parca in ("[processes]", "kill_timeout", "isci = \"python isci.py\"", "[[vm]]", "release_command",
+                  "Railway", "Render", "stop_grace_period", "SIGTERM",
+                  "sürümleme", "isler/", "rclone", "KROMIS_IS_SAKLAMA_GUN", isci.KALP_ESIGI_ENV,
+                  "isciler", "worker_alive", platform_anahtari.ONEK, dosya.GIZLI_ENV,
+                  "geri al", "olay=bakim", "boşalt"):
+        assert parca in isletme, parca
+    kurulum = _oku(KURULUM)
+    for parca in ("kill_timeout", "[processes]", "KROMIS_IS_SAKLAMA_GUN", "sürümleme", "yaşam döngüsü",
+                  "stop_grace_period"):
+        assert parca in kurulum, parca
+    # Şablon saklama değişkenini açıklıyor ve boş bırakıyor.
+    satir = [a for a in _atamalar() if a[0] == isci.SAKLAMA_ENV]
+    assert satir and satir[0][1] == "" and satir[0][2], satir

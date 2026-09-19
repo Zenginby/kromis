@@ -18,6 +18,11 @@ Dört soru:
         hesap silinince işler gider, işçi satırları kalır.
   (iv)  ŞEMA — ileri-geri-ileri + `alembic check` boş; kısmi indeksler
         gerçekten kısmi.
+  (v)   SAKLAMA VE BAKIM (Faz 2 / 10) — `eskileri_sil` yalnız kapanmış ve
+        30 günden eski satırları, yalnız verilen kullanıcının; `SilinenIs`
+        kendi girdi dizinini ve referans verdiği dizinleri taşır;
+        `girdi_referanslari`/`mevcut_isler` nesne süpürmesinin iki sorusu;
+        `olu_iscileri_sil` kalbi eşikten uzun susan işçi satırını düşürür.
 """
 from __future__ import annotations
 
@@ -35,7 +40,7 @@ from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from services import hesap, kuyruk, tablolar, zaman
+from services import ayar, hesap, kuyruk, tablolar, zaman
 
 pytestmark = pytest.mark.usefixtures("depo_db")
 
@@ -417,13 +422,15 @@ def test_the_dump_carries_the_contract_fields_and_never_the_request_body(db_otur
     assert dokum["arena_id"] is None and dokum["folder_id"] is None
     assert dokum["anahtar_kaynagi"] is None, "`ekle` kaynak verilmeden çağrıldı (Faz 2 / 6: rota verir)"
     assert "istek" not in dokum and "GİZLİ" not in repr(dokum) and "isci_id" not in dokum
-    assert dokum["id"] == str(is_.id) and dokum["olusturuldu"] == zaman.damga(_an())
+    # Damgalar DİLİMLİ UTC, `Z` sonekli (Faz 2 / 10): panel `new Date()` ile karşılaştırıyor.
+    assert dokum["id"] == str(is_.id) and dokum["olusturuldu"] == zaman.damga_utc(_an()) == "2026-09-17T12:00:00Z"
     assert dokum["basladi"] is None and dokum["bitti"] is None and dokum["sonuc"] is None
     kuyruk.al(db_oturumu, ISCI, _an(5))
     kuyruk.bitir(db_oturumu, is_.id, {"medya": ["ab12cd34ef56"]}, _an(9))
     db_oturumu.commit()
     dokum = kuyruk.listele(db_oturumu, kullanici.id)[0]
-    assert dokum["basladi"] == zaman.damga(_an(5)) and dokum["bitti"] == zaman.damga(_an(9))
+    assert dokum["basladi"] == zaman.damga_utc(_an(5)) and dokum["bitti"] == zaman.damga_utc(_an(9))
+    assert dokum["basladi"].endswith("Z") and dt.datetime.fromisoformat(dokum["bitti"]) == _an(9)
     assert dokum["sonuc"] == {"medya": ["ab12cd34ef56"]} and dokum["durum"] == "bitti"
     # Kaynak düzeyinde de: `_json` `istek`ten yalnız İKİ anahtar okur (`.get("arena_id")`,
     # `.get("folder_id")` — Faz 2 / 5), başka hiçbir anahtar değil; `kalp_atisi`/`isci_id` hiç.
@@ -487,6 +494,133 @@ def test_worker_registration_heartbeat_and_deregistration(db_oturumu, kullanici)
     db_oturumu.commit()
     db_oturumu.expire_all()
     assert db_oturumu.get(tablolar.Is, is_id).isci_id == isci.id, "FK yok: 'kim koştu' kaydı durur"
+
+
+# ── (v) saklama ve bakım (Faz 2 / 10) ─────────────────────────────────
+
+SAKLAMA = dt.timedelta(days=30)
+# Bakım anı: sabit başlangıçtan 40 gün sonra — "30 günden eski" ile "taze" arası yer kalsın.
+BAKIM_ANI = _an(40 * 86400)
+
+
+def _kapat(db: Session, is_id: uuid.UUID, durum: str, bitti: dt.datetime) -> None:
+    """Satırı doğrudan kapatır (`al` FIFO'nun başını alır, belirli bir işi değil): `durum`, `bitti`."""
+    db.execute(text("UPDATE isler SET durum = :d, bitti = :b, isci_id = :i WHERE id = :id"),
+               {"d": durum, "b": bitti, "i": ISCI if durum != "iptal" else None, "id": is_id})
+
+
+def test_retention_deletes_only_closed_jobs_older_than_the_window_and_only_the_owners(db_oturumu, kullanici):
+    """`eskileri_sil`: kapanmış (`bitti`/`hata`/`iptal`) VE `bitti < an - saklama` — üçü de gider;
+    tam sınırdaki, taze kapanan, `bekliyor` ve `calisiyor` KALIR; başka kullanıcının eski işi
+    kullanıcı imzası yüzünden DOKUNULMAZ (RLS'te de ancak o kiracının bağlamında silinebilir).
+    `saklama_sahipleri` iki sahibi de sayar; ikinci çağrı 0 (idempotent)."""
+    b = _ikinci_kullanici(db_oturumu)
+    eski_bitti, eski_hata, eski_iptal, sinir, taze, bekleyen, calisan = _ekle(db_oturumu, kullanici.id, 7,
+                                                                          adim=1.0)
+    (b_eski,) = _ekle(db_oturumu, b, bas=100)
+    eski_an = BAKIM_ANI - SAKLAMA - dt.timedelta(seconds=1)
+    _kapat(db_oturumu, eski_bitti, "bitti", eski_an)
+    _kapat(db_oturumu, eski_hata, "hata", eski_an)
+    _kapat(db_oturumu, eski_iptal, "iptal", eski_an)
+    _kapat(db_oturumu, sinir, "bitti", BAKIM_ANI - SAKLAMA)          # tam sınır: `<` kesin, kalır
+    _kapat(db_oturumu, taze, "hata", BAKIM_ANI - dt.timedelta(days=1))
+    # `calisan` eski bir kalple `calisiyor`: yaşı ne olursa olsun saklama ona dokunmaz (bayat düşürmenin işi).
+    db_oturumu.execute(text("UPDATE isler SET durum = 'calisiyor', basladi = :a, kalp_atisi = :a, isci_id = :i "
+                            "WHERE id = :id"), {"a": _an(0), "i": ISCI, "id": calisan})
+    _kapat(db_oturumu, b_eski, "bitti", eski_an)
+    db_oturumu.commit()
+
+    assert kuyruk.saklama_sahipleri(db_oturumu, BAKIM_ANI, SAKLAMA) == sorted([kullanici.id, b])
+    silinenler = kuyruk.eskileri_sil(db_oturumu, kullanici.id, BAKIM_ANI, SAKLAMA)
+    db_oturumu.commit()
+    assert {s.is_id for s in silinenler} == {eski_bitti, eski_hata, eski_iptal}
+    assert all(s.kullanici_id == kullanici.id for s in silinenler)
+    kalan = set(db_oturumu.scalars(select(tablolar.Is.id)))
+    assert kalan == {sinir, taze, bekleyen, calisan, b_eski}, "sınır, taze ve aktifler durur; B'nin işi dokunulmaz"
+    assert kuyruk.eskileri_sil(db_oturumu, kullanici.id, BAKIM_ANI, SAKLAMA) == [], "idempotent"
+    assert kuyruk.saklama_sahipleri(db_oturumu, BAKIM_ANI, SAKLAMA) == [b]
+    assert [s.is_id for s in kuyruk.eskileri_sil(db_oturumu, b, BAKIM_ANI, SAKLAMA)] == [b_eski]
+    db_oturumu.commit()
+    assert kuyruk.saklama_sahipleri(db_oturumu, BAKIM_ANI, SAKLAMA) == []
+
+
+def test_a_deleted_job_reports_its_own_input_directory_and_the_ones_its_request_references(db_oturumu, kullanici):
+    """`SilinenIs.girdi_dizinleri`: kendi `isler/<id>/` dizini + `istek.girdiler`/`son_kare`
+    anahtarlarının dizinleri (yeniden gönderilen iş eskisinin girdilerine bakar, Faz 2 / 5);
+    `girdi_referanslari` KALAN satırların anahtarlarını verir (isteğe bağlı kullanıcı süzgeci),
+    `mevcut_isler` hangi id'lerin hâlâ satırı var — nesne süpürmesi ikisini sorar (services/isci.py)."""
+    b = _ikinci_kullanici(db_oturumu)
+    eski = uuid.uuid4()
+    referans = ayar.is_dizini(kullanici.id, eski) + "upload.png"
+    yeniden = kuyruk.ekle(db_oturumu, kullanici.id, "animate",
+                          {"prompt": "p", "girdiler": [{"ad": "upload.png", "anahtar": referans}],
+                           "son_kare": {"ad": "son_kare.png", "anahtar": ayar.is_dizini(kullanici.id, eski) + "son_kare.png"}},
+                          "m", 4, an=_an())
+    kendi = kuyruk.ekle(db_oturumu, kullanici.id, "edit", {"prompt": "p", "girdiler": [
+        {"ad": "ref1.png", "anahtar": "KENDI"}]}, "m", 4, an=_an(1))
+    kendi.istek = {**kendi.istek, "girdiler": [{"ad": "ref1.png", "anahtar": ayar.is_dizini(kullanici.id, kendi.id) + "ref1.png"}]}
+    b_is = kuyruk.ekle(db_oturumu, b, "edit", {"prompt": "p", "girdiler": [{"ad": "x.png", "anahtar": ayar.is_dizini(b, uuid.uuid4()) + "x.png"}]},
+                       "m", 4, an=_an(2))
+    duz = kuyruk.ekle(db_oturumu, kullanici.id, "generate", {"prompt": "p"}, "m", 4, an=_an(3))
+    db_oturumu.commit()
+
+    hepsi = kuyruk.girdi_referanslari(db_oturumu)
+    assert hepsi == {referans, ayar.is_dizini(kullanici.id, eski) + "son_kare.png",
+                     ayar.is_dizini(kullanici.id, kendi.id) + "ref1.png", b_is.istek["girdiler"][0]["anahtar"]}
+    assert kuyruk.girdi_referanslari(db_oturumu, b) == {b_is.istek["girdiler"][0]["anahtar"]}
+    assert kuyruk.girdi_referanslari(db_oturumu, uuid.uuid4()) == set()
+    assert kuyruk.mevcut_isler(db_oturumu, [yeniden.id, eski, duz.id]) == {yeniden.id, duz.id}
+    assert kuyruk.mevcut_isler(db_oturumu, []) == set()
+    assert kuyruk._girdi_anahtarlari(yeniden.istek) == [referans, ayar.is_dizini(kullanici.id, eski) + "son_kare.png"]
+    assert kuyruk._girdi_anahtarlari(None) == [] and kuyruk._girdi_anahtarlari({"girdiler": [{"ad": "anahtarsiz"}]}) == []
+
+    _kapat(db_oturumu, yeniden.id, "hata", BAKIM_ANI - SAKLAMA - dt.timedelta(days=1))
+    db_oturumu.commit()
+    (silinen,) = kuyruk.eskileri_sil(db_oturumu, kullanici.id, BAKIM_ANI, SAKLAMA)
+    db_oturumu.commit()
+    assert silinen.is_id == yeniden.id and silinen.kullanici_id == kullanici.id
+    assert silinen.girdi_dizinleri == {ayar.is_dizini(kullanici.id, yeniden.id), ayar.is_dizini(kullanici.id, eski)}
+    assert kuyruk.girdi_referanslari(db_oturumu, kullanici.id) == {
+        ayar.is_dizini(kullanici.id, kendi.id) + "ref1.png"}, "silinen satırın referansları listeden düştü"
+
+
+def test_input_references_tolerate_a_request_whose_girdiler_is_not_an_array(db_oturumu, kullanici):
+    """`jsonb_array_elements` skalerde HATA verir ("cannot extract elements from a scalar"): `girdiler`
+    JSON `null` (SQL NULL değil — `COALESCE` görmez), dize ya da nesne olan TEK satır her bakım turunu
+    düşürürdü, hem de satırlar silinip dizinler öksüz kaldıktan sonra. `jsonb_typeof` süzer; `son_kare`
+    `null` da sorun değil (`?` skalerde `false`)."""
+    referans = ayar.is_dizini(kullanici.id, uuid.uuid4()) + "upload.png"
+    kuyruk.ekle(db_oturumu, kullanici.id, "edit", {"prompt": "p", "girdiler": [{"ad": "upload.png", "anahtar": referans}]},
+                "m", 4, an=_an())
+    kuyruk.ekle(db_oturumu, kullanici.id, "generate", {"prompt": "p", "girdiler": None, "son_kare": None}, "m", 4, an=_an(1))
+    kuyruk.ekle(db_oturumu, kullanici.id, "generate", {"prompt": "p", "girdiler": "bozuk"}, "m", 4, an=_an(2))
+    kuyruk.ekle(db_oturumu, kullanici.id, "generate", {"prompt": "p", "girdiler": {"anahtar": "nesne/degil.png"}}, "m", 4, an=_an(3))
+    db_oturumu.commit()
+    assert kuyruk.girdi_referanslari(db_oturumu) == {referans}
+    assert kuyruk.girdi_referanslari(db_oturumu, kullanici.id) == {referans}
+
+
+def test_dead_worker_rows_are_removed_past_the_heartbeat_threshold_and_live_ones_stay(db_oturumu, kullanici):
+    """9'un devri: SIGKILL'le ölen işçi kendi satırını silemez; `olu_iscileri_sil` `son_kalp < an - esik`
+    satırları düşürür (eşik bayat İŞ eşiğinin kendisi), tam sınır ve taze kalp kalır; `isler.isci_id` durur."""
+    olu = kuyruk.isci_kaydet(db_oturumu, "olu-konak", "0.0.0", 1, _an(0))
+    sinir = kuyruk.isci_kaydet(db_oturumu, "sinir-konak", "0.0.0", 1, _an(0))
+    canli = kuyruk.isci_kaydet(db_oturumu, "canli-konak", "0.0.0", 1, _an(0))
+    db_oturumu.commit()
+    (is_id,) = _ekle(db_oturumu, kullanici.id)
+    kuyruk.al(db_oturumu, olu.id, _an(1))
+    an = _an(1000)
+    kuyruk.isci_kalp(db_oturumu, olu.id, an - ESIK - dt.timedelta(microseconds=1))
+    kuyruk.isci_kalp(db_oturumu, sinir.id, an - ESIK)
+    kuyruk.isci_kalp(db_oturumu, canli.id, an - dt.timedelta(seconds=30))
+    db_oturumu.commit()
+    assert kuyruk.olu_iscileri_sil(db_oturumu, an, ESIK) == 1
+    db_oturumu.commit()
+    assert set(db_oturumu.scalars(select(tablolar.Isci.konak))) == {"sinir-konak", "canli-konak"}
+    assert kuyruk.olu_iscileri_sil(db_oturumu, an, ESIK) == 0, "idempotent"
+    db_oturumu.expire_all()
+    assert db_oturumu.get(tablolar.Is, is_id).isci_id == olu.id, "FK yok: 'kim koştu' kaydı durur"
+    assert kuyruk.isci_son_kalp(db_oturumu) == an - dt.timedelta(seconds=30), "/health canlıyı görür"
 
 
 # ── (iv) şema ──────────────────────────────────────────────────────────

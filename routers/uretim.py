@@ -74,12 +74,13 @@ router = APIRouter()
 # Girdi nesnelerinin depo anahtarı: `kullanicilar/<uuid>/isler/<is_id>/<ad>` —
 # kök göreli (`Depo` sözleşmesi), web ve işçi süreçleri farklı `data_dir`
 # bağlasa da aynı anahtar. `ad` adaptöre giden dosya adı (`abc123.png`,
-# `upload.png`, `refN.png` — `_collect_edit_refs`in bugünkü adları).
-ISLER_DIZINI = "isler"
+# `upload.png`, `refN.png` — `_collect_edit_refs`in bugünkü adları). Dizin adı
+# `services/ayar.py`de (Faz 2 / 10: saklama ve artık taraması aynı öneki okur).
+ISLER_DIZINI = ayar.ISLER_DIZINI
 
 
 def _girdi_anahtari(kullanici_id: uuid.UUID, is_id: uuid.UUID, ad: str) -> str:
-    return f"{ayar.KULLANICILAR_DIZINI}/{kullanici_id}/{ISLER_DIZINI}/{is_id}/{ad}"
+    return ayar.is_dizini(kullanici_id, is_id) + ad
 
 
 def _girdileri_yaz(depo: dosya.Depo, kullanici_id: uuid.UUID, is_id: uuid.UUID,

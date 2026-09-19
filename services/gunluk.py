@@ -48,11 +48,28 @@ belgenin (§9) istediği şeye çevirdi:
 `kur` İKİ KEZ ÇAĞRILABİLİR (testler, `TestClient(app)` her `with`te lifespan
 koşturur): işleyici zaten varsa ikincisi eklenmez. `akim` parametresi test
 için (StringIO); üretimde `sys.stdout`. Köke YAYILMAZ (`propagate = False` —
-uvicorn kökü yapılandırırsa aynı satır iki kez basılmasın); uvicorn'un kendi
-yaşam döngüsü satırları (`Started server process`) stderr'e düz metin gider,
-erişim günlüğü KAPALI (`--no-access-log`, Dockerfile) — erişim satırını
-`istek_kimligi` yazar, iki satır aynı şeyi söylemesin. Kullanıcıya konuşmaz:
-satırlar operatöre gider (tests/test_i18n.py sınıflandırması).
+aynı satır iki kez basılmasın). Kullanıcıya konuşmaz: satırlar operatöre gider
+(tests/test_i18n.py sınıflandırması).
+
+KÖK GÜNLÜKÇÜ VE UVICORN (Faz 2 / 10; 9'un devri 1): `kromis.*` dışındaki her
+şey — SQLAlchemy havuz uyarıları, httpx, uvicorn'un "Exception in ASGI
+application" izi — 9'da stderr'e DÜZ METİN ve REDAKSİYONSUZ düşüyordu: Python'un
+son çare işleyicisi WARNING+'ı olduğu gibi basar, uvicorn kendi günlükçülerine
+kendi işleyicisini takar. Şimdi `kur` köke de bir işleyici takar (aynı
+biçimleyici, aynı redaksiyon; kökün seviyesi WARNING kalır — üçüncü parti
+INFO'su hâlâ susar) ve uvicorn'un iki günlükçüsünün (`uvicorn`, `uvicorn.error`; `uvicorn.access`
+değil — sabitin yanında) işleyicilerini boşaltıp köke yayar: yaşam döngüsü
+satırları (`Application startup complete`, INFO — uvicorn'un günlükçü seviyesi
+INFO, kök işleyicinin seviyesi yok) ve ASGI izi (ERROR, `hata` alanında,
+redakte) artık stdout'ta JSON. TEK AKIM — lifespan'dan ÖNCEKİ iki satır
+(`Started server process`, `Waiting for application startup`) hariç: `kur`
+henüz koşmamış, uvicorn'un stderr işleyicisi duruyor (ölçüldü, 2 satır). İşleyici `sys.stdout`u EMIT anında çözer
+(`_StdoutIsleyici`): pytest her testte `sys.stdout`u değiştirir ve kuruluşta
+yakalanan bir akım sonraki testte kapanmış olurdu ("I/O operation on closed
+file"). Alembic'in `fileConfig`i (testler, aynı süreç) kökün işleyicilerini
+SİLER; `kur` işaretli işleyiciyi görmediğinde yeniden takar. Erişim günlüğü
+KAPALI (`--no-access-log`, Dockerfile) — erişim satırını `istek_kimligi`
+yazar, iki satır aynı şeyi söylemesin.
 """
 from __future__ import annotations
 
@@ -71,12 +88,23 @@ from typing import IO, Any
 
 import errlog
 
-__all__ = ["KOK", "BICIM_ENV", "BICIM_JSON", "BICIM_METIN", "BICIMLER", "GIZLI_AD", "MASKE",
-           "JsonBicimleyici", "MetinBicimleyici", "bicim", "bicimleyici", "kur",
-           "bagla", "coz", "baglam", "aktif", "sifirla", "olay", "alanlar"]
+__all__ = ["KOK", "KOK_ISARETI", "UVICORN_GUNLUKCULERI", "BICIM_ENV", "BICIM_JSON", "BICIM_METIN",
+           "BICIMLER", "GIZLI_AD", "MASKE", "JsonBicimleyici", "MetinBicimleyici", "bicim",
+           "bicimleyici", "kur", "kok_isleyicisi", "bagla", "coz", "baglam", "aktif", "sifirla",
+           "olay", "alanlar"]
 
-# `kromis.<alan>` — bu deponun bütün günlükçüleri bu ad altında; alan admin/istek/is/isci.
+# `kromis.<alan>` — bu deponun bütün günlükçüleri bu ad altında; alan admin/istek/is/isci/platform.
 KOK = "kromis"
+# Kök günlükçüye taktığımız işleyicinin öznitelik işareti: `kur` ikinci kez
+# çağrılınca ya da Alembic kökü silip yeniden kurunca "bizimki var mı" buradan okunur.
+KOK_ISARETI = "kromis_kok_isleyicisi"
+# İşleyicileri boşaltılıp köke yayılan uvicorn günlükçüleri (gerekçe modül başında).
+# `uvicorn.access` YOK ve bilerek: uvicorn `--no-access-log`u o günlükçünün
+# işleyicisini silip `propagate=False` yaparak uygular; onu köke yaysaydık
+# kapatılan erişim satırı JSON olarak GERİ gelirdi (ölçüldü, 2026-09-19 dumanı:
+# `GET /health` iki kez — bizim `olay=istek` ve uvicorn'unki). Bayrak verilmezse
+# uvicorn'un erişim satırı kendi işleyicisinden düz metin gider (KURULUM.md 9).
+UVICORN_GUNLUKCULERI: tuple[str, ...] = ("uvicorn", "uvicorn.error")
 
 BICIM_ENV = "KROMIS_GUNLUK_BICIMI"
 BICIM_JSON = "json"
@@ -205,6 +233,56 @@ class MetinBicimleyici(logging.Formatter):
 
 # ────────────────────────────────────────────────────────── kurulum
 
+class _StdoutIsleyici(logging.StreamHandler):
+    """`StreamHandler`, akımı verilmemişse `sys.stdout`u HER EMİTTE yeniden çözen.
+
+    Neden (modül başı): pytest `sys.stdout`u test başına değiştirir; kuruluş
+    anında yakalanan nesne bir sonraki testte kapanmıştır. Sabit akım (`akim`
+    verilmiş: testlerin StringIO'su) aynen tutulur.
+    """
+
+    def __init__(self, akim: IO[str] | None = None) -> None:
+        self._sabit = akim
+        super().__init__(akim if akim is not None else sys.stdout)
+
+    @property
+    def stream(self) -> IO[str]:
+        return self._sabit if self._sabit is not None else sys.stdout
+
+    @stream.setter
+    def stream(self, deger: IO[str]) -> None:
+        # `StreamHandler.__init__` ve `setStream` buraya yazar; sabit akım verilmişse onu güncelle,
+        # verilmemişse yazılanı yut — dinamik `sys.stdout` kalsın.
+        if self._sabit is not None:
+            self._sabit = deger
+
+
+def kok_isleyicisi() -> logging.Handler | None:
+    """Kökteki BİZİM işleyici (işaretli), yoksa `None`."""
+    for h in logging.getLogger().handlers:
+        if getattr(h, KOK_ISARETI, False):
+            return h
+    return None
+
+
+def _koku_kur(akim: IO[str] | None, bicimleyici_nesnesi: logging.Formatter) -> None:
+    """Köke işaretli işleyici (yoksa) + uvicorn günlükçülerini köke yay (gerekçe modül başında)."""
+    if kok_isleyicisi() is None:
+        isleyici = _StdoutIsleyici(akim)
+        isleyici.setFormatter(bicimleyici_nesnesi)
+        setattr(isleyici, KOK_ISARETI, True)
+        # Seviye YOK (NOTSET): süzgeç günlükçüde — kökün WARNING'i üçüncü partiyi
+        # susturur, uvicorn'un INFO'su kendi günlükçüsünün seviyesiyle geçer.
+        logging.getLogger().addHandler(isleyici)
+    for ad in UVICORN_GUNLUKCULERI:
+        gunlukcu = logging.getLogger(ad)
+        gunlukcu.handlers.clear()
+        gunlukcu.propagate = True
+        # Alembic `fileConfig` (testlerde aynı süreç) var olan günlükçüleri KAPATIR; `kromis.*` için
+        # `kur` ne yapıyorsa uvicorn'unkiler için de: yoksa yaşam döngüsü satırı sessizce yutulur.
+        gunlukcu.disabled = False
+
+
 def bicim(ortam: Mapping[str, str] | None = None) -> str:
     """`KROMIS_GUNLUK_BICIMI` — boşsa `json`; tanınmayan değer `ValueError` (gerekçe modül başında)."""
     ortam = os.environ if ortam is None else ortam
@@ -227,11 +305,13 @@ def kur(akim: IO[str] | None = None, *, bicim_adi: str | None = None) -> logging
     """
     kok = logging.getLogger(KOK)
     if not kok.handlers:
-        isleyici = logging.StreamHandler(akim or sys.stdout)
+        isleyici: logging.Handler = _StdoutIsleyici(akim)
         isleyici.setFormatter(bicimleyici(bicim_adi or bicim()))
         kok.addHandler(isleyici)
     kok.setLevel(logging.INFO)
     kok.propagate = False
+    # Kök + uvicorn (Faz 2 / 10): aynı biçimleyici nesnesi — biçim adı ortamdan bir kez okundu.
+    _koku_kur(akim, kok.handlers[0].formatter or bicimleyici(bicim_adi or bicim()))
     # Aynı süreçte koşan Alembic `fileConfig` (testler) daha önce yaratılmış günlükçüleri
     # kapatabilir; kurulum onları yeniden açar — üretimde göç ayrı süreç, zararsız.
     kok.disabled = False

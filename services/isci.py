@@ -83,6 +83,41 @@ BYPASSRLS verilmedi, çünkü o zaman işçide yazılan ham bir sorgu yine her
 kiracıyı görürdü; bağlı işçi yanlışlıkla bile tek kiracının satırına dokunur.
 Bağlam `kiraci.baglam(...)` ile ve `with` içinde: aynı iş parçacığı bir
 sonraki işi başka kiracı için koşturur (yukarıdaki `[A, B]` dersi).
+
+KALP TURU satırı bulamazsa (`isci_kalp` `False`) ve çağıran kimliği
+vermişse (`kayit`) satırı aynı `id`yle YENİDEN YAZAR: `olu_iscileri_sil`
+yaşayan bir işçinin satırını da götürebilir (5 dk kalp atamamış — DB
+kesintisi, uzun duraklama — ya da dağıtımda boşalan eskinin satırını yeni
+işçinin açılış turu silmiş). Süreç yaşıyor ve iş koşturuyorsa `/health`
+onu ölü göstermemeli; `KalpOzeti.yeniden_kaydoldu` çağırana söyler, olay
+oradan (`isci.py`, `olay=isci.yeniden_kaydoldu`).
+
+BAKIM TURU (Faz 2 / 10): `bakim_turu` işçinin AYRI bakım iş parçacığında
+AÇILIŞTA ve sonra `BAKIM_ARALIGI_SN`de (5 dk) bir koşar — kalp iş
+parçacığında değil (bir tur nesne başına ağa çıkar ve dakikalar sürebilir;
+kalp o sürede susarsa eldeki işler bayat düşer — gerekçe `isci.py` başında),
+ayrı cron da yok, işçi zaten sürekli koşan tek süreç. Üç iş: (1) SAKLAMA — kapanmış ve `bitti` 30 günden
+(`KROMIS_IS_SAKLAMA_GUN`) eski `isler` satırları silinir; sahipler admin
+bağlamında bulunur (`kuyruk.saklama_sahipleri`), satırlar HER KİRACININ KENDİ
+bağlamında silinir (`kuyruk.eskileri_sil`: admin politikası DELETE vermez,
+0006_rls); (2) GİRDİ NESNELERİ — silinen işin `isler/<id>/` dizini ancak ona
+bakan hiçbir satır kalmadığında silinir: "yeniden gönder" (Faz 2 / 5) eski
+işin girdilerine REFERANS verir, kopyalamaz; kalan satırların referansları
+(`kuyruk.girdi_referanslari`) ve dizinin kendi satırı (`kuyruk.mevcut_isler`)
+sorulur, ikisi de yoksa `depo.listele(onek)` → `depo.sil` — aday dizinin
+KİRACISI silinen işin sahibi değilse (`ayar.is_dizini_coz`) aday bile
+olmaz, `olay=bakim.yabanci_dizin` (WARNING) düşer: `istek`i bugün yalnız
+sunucu yazıyor ve yeniden gönderim sahibin anahtarlarını kopyalıyor, yani
+bu dal bugün boş; derinlikli savunma, bir gün bir anahtar sızsa saklama
+başka kiracının dizinini silmesin; (3) ÖLÜ İŞÇİ
+SATIRLARI — `son_kalp` kalp eşiğinden eski `isciler` satırı silinir
+(`kuyruk.olu_iscileri_sil`): SIGKILL/`kill_timeout` aşımıyla ölen işçi kendi
+satırını silemez ve `/health` `worker_alive:false` sonsuza dek kalırdı (9'un
+devri); açılıştaki tur bunu YENİ işçi kalkar kalkmaz kapatır — tek işçili
+dağıtımda (K11) ölü satırı silecek başka işçi yok. Bayat İŞ düşürme buraya
+TAŞINMADI: `kalp_turu` onu 30 sn'de bir zaten yapıyor (belge 5 dk der; daha
+sık olması kullanıcıya daha erken "hata" demek, bedeli yok). `medya`ya
+dokunulmaz (`isler.sonuc` yalnız id listesi).
 """
 from __future__ import annotations
 
@@ -94,7 +129,7 @@ import time
 import traceback
 import uuid
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from typing import Any
+from typing import Any, NamedTuple
 
 from sqlalchemy.orm import Session
 
@@ -125,10 +160,11 @@ from services.tablolar import (
 )
 
 __all__ = ["ES_ZAMANLI_ENV", "ES_ZAMANLI_VARSAYILAN", "KALP_ESIGI_ENV", "KALP_ESIGI_VARSAYILAN",
+           "SAKLAMA_ENV", "SAKLAMA_VARSAYILAN_GUN", "BAKIM_ARALIGI_SN",
            "KALP_ARALIGI_SN", "YOKLAMA_ARALIGI_SN", "BEKLENMEYEN_HATASI", "KULLANICI_YOK_HATASI",
            "UYARI_KUYRUK_DERINLIGI", "UYARI_EN_ESKI_BEKLEYEN_SN",
-           "es_zamanli", "kalp_esigi", "siradakini_al", "kos", "tek_tur", "kalp_turu",
-           "kuyruk_uyarisi"]
+           "es_zamanli", "kalp_esigi", "saklama", "siradakini_al", "kos", "tek_tur", "kalp_turu",
+           "KalpOzeti", "kuyruk_uyarisi", "bakim_turu", "BakimOzeti"]
 
 # Aynı anda kaç iş (iş parçacığı) — `.env.example`, `compose.yaml` ve `isci.py`
 # aynı adı buradan okur (bekçisi tests/test_docker_kapisi.py `ALTYAPI`).
@@ -139,10 +175,19 @@ ES_ZAMANLI_VARSAYILAN = 4
 # parçacığında 30 sn'de bir atıyor — 10 atış kaçırmak işçinin öldüğü demek.
 KALP_ESIGI_ENV = "KROMIS_IS_KALP_ESIGI_SN"
 KALP_ESIGI_VARSAYILAN = 300
+# Kapanmış iş satırı bu kadar gün sonra silinir (belge §10: 30; Faz 4'ün KVKK
+# saklama kararı `istek.prompt`u da kapsar, kesin süre orada). `.env.example`
+# ve `ALTYAPI` bekçisi aynı adı buradan okur.
+SAKLAMA_ENV = "KROMIS_IS_SAKLAMA_GUN"
+SAKLAMA_VARSAYILAN_GUN = 30
 # Kalp atışı aralığı ve boş kuyrukta yoklama aralığı (belge §3: 30 sn / 1 sn;
 # `LISTEN/NOTIFY` yok — senkron sürücüde ayrı bağlantı ister, 1 sn dakikalık işte görünmez).
 KALP_ARALIGI_SN = 30.0
 YOKLAMA_ARALIGI_SN = 1.0
+# Bakım turunun aralığı (belge §10: 5 dk). Sabit, ortamdan değil: saklama ve
+# ölü satır silme dakikalarla ölçülür, ayarlanacak bir şey yok; testler ve duman
+# `isci.py --bakim-araligi` ile kısaltır.
+BAKIM_ARALIGI_SN = 300.0
 
 # `hata` sütununa yazılan KODLAR — cümle değil (kuyruk.BAYAT_HATASI'nın duruşu):
 # cümleyi ön yüz kurar, metin sızıntı taşımasın diye istisna MESAJI değil TÜRÜ yazılır.
@@ -190,6 +235,12 @@ def kalp_esigi(ortam: Mapping[str, str] | None = None) -> dt.timedelta:
     """`KROMIS_IS_KALP_ESIGI_SN` (öntanımlı 300) — `kuyruk.bayatlari_dusur`un eşiği."""
     return dt.timedelta(seconds=_tam_sayi(os.environ if ortam is None else ortam,
                                           KALP_ESIGI_ENV, KALP_ESIGI_VARSAYILAN))
+
+
+def saklama(ortam: Mapping[str, str] | None = None) -> dt.timedelta:
+    """`KROMIS_IS_SAKLAMA_GUN` (öntanımlı 30) — `bakim_turu`nun saklama süresi; bozuk/0 → `ValueError`."""
+    return dt.timedelta(days=_tam_sayi(os.environ if ortam is None else ortam,
+                                       SAKLAMA_ENV, SAKLAMA_VARSAYILAN_GUN))
 
 
 # ────────────────────────────────────────────────────────── alım
@@ -503,24 +554,35 @@ def tek_tur(db: Session, depo: dosya.Depo, an: dt.datetime | None = None, *,
 
 # ────────────────────────────────────────────────────────── kalp
 
+class KalpOzeti(NamedTuple):
+    """`kalp_turu`nun sonucu: bayat düşürülen iş sayısı ve işçi satırı yeniden yazıldı mı."""
+    dusen: int
+    yeniden_kaydoldu: bool
+
+
 def kalp_turu(db: Session, isci_id: uuid.UUID, is_idleri: Iterable[uuid.UUID], an: dt.datetime,
-              esik: dt.timedelta) -> int:
-    """Kalp atışı iş parçacığının bir turu: işçi satırı + eldeki işler + bayat düşürme; düşürülen sayı.
+              esik: dt.timedelta, kayit: kuyruk.IsciKaydi | None = None) -> KalpOzeti:
+    """Kalp atışı iş parçacığının bir turu: işçi satırı + eldeki işler + bayat düşürme; `KalpOzeti`.
 
     AYRI iş parçacığında koşar (belge §3): sağlayıcı çağrısı adaptörün içinde
     dakikalarca bloklar ve çağıran iş parçacığı kalp atamaz. Kendi oturumu,
     kendi commit'i. Bayat düşürme burada: ölen bir işçinin işini yaşayan bir
     işçi `hata`ya çeker — 10. görevin periyodik bakımı aynı işlevi çağırır.
     `app.rol = 'admin'` ile (RLS): eldeki işler ve bayatlar her kiracının;
-    `isciler` politikasız, rol ona dokunmaz.
+    `isciler` politikasız, rol ona dokunmaz. İşçi satırı yoksa ve `kayit`
+    verilmişse satır aynı kimlikle yeniden yazılır (gerekçe modül başında);
+    `kayit`sız çağrı (testler, `--tek-tur` yolu) eski davranış: yok say.
     """
+    yeniden = False
     with kiraci.baglam(rol=kiraci.ADMIN, oturum=db):
-        kuyruk.isci_kalp(db, isci_id, an)
+        if not kuyruk.isci_kalp(db, isci_id, an) and kayit is not None:
+            kuyruk.isci_yeniden_kaydet(db, isci_id, kayit, an)
+            yeniden = True
         for is_id in is_idleri:
             kuyruk.kalp(db, is_id, an)
         dusen = kuyruk.bayatlari_dusur(db, an, esik)
         db.commit()
-    return dusen
+    return KalpOzeti(dusen, yeniden)
 
 
 def kuyruk_uyarisi(db: Session, an: dt.datetime) -> dict[str, Any] | None:
@@ -540,3 +602,79 @@ def kuyruk_uyarisi(db: Session, an: dt.datetime) -> dict[str, Any] | None:
         return None
     return {"derinlik": derinlik, "en_eski_bekleyen_sn": en_eski,
             "esik_derinlik": UYARI_KUYRUK_DERINLIGI, "esik_en_eski_sn": UYARI_EN_ESKI_BEKLEYEN_SN}
+
+
+# ────────────────────────────────────────────────────────── bakım
+
+class BakimOzeti(dict[str, int]):
+    """`bakim_turu`nun döndürdüğü sayılar: `silinen_is`, `silinen_nesne`, `korunan_dizin`, `silinen_isci`.
+
+    Sözlük (günlük alanı olarak düz yazılsın); `__bool__` "bir şey yapıldı mı":
+    işçi olayı yalnız bir şey silindiğinde düşürür (`bayat`ın deyimi — boş turda
+    5 dk'da bir satır gürültüdür).
+    """
+
+    def __bool__(self) -> bool:
+        return any(self.values())
+
+
+def _dizini_sil(depo: dosya.Depo, onek: str) -> int:
+    """Dizin önekinin altındaki her nesneyi siler; silinen sayı. Silme hatası turu durdurmaz (artık kalırsa `artik_dosya` bulur)."""
+    silinen = 0
+    for nesne in list(depo.listele(onek)):
+        with contextlib.suppress(Exception):
+            if depo.sil(nesne.anahtar):
+                silinen += 1
+    return silinen
+
+
+def bakim_turu(db: Session, depo: dosya.Depo, an: dt.datetime, esik: dt.timedelta,
+               saklama_suresi: dt.timedelta) -> BakimOzeti:
+    """Bir bakım turu: saklama (satır + referanssız girdi dizini) ve ölü işçi satırları; özet sayılar.
+
+    Sıra ve bağlamlar (gerekçe modül başında): sahipler ADMIN bağlamında
+    bulunur; her kiracının satırları O KİRACININ bağlamında silinir ve commit
+    edilir (kiracı başına bir transaksiyon — biri düşerse ötekiler durur);
+    sonra ADMIN bağlamında kalan referanslar ve mevcut satırlar okunur, ona
+    göre dizinler silinir. Ölü işçi satırı politikasız, bağlam gerekmez.
+    `an`/`esik`/`saklama_suresi` çağıranın (testler saatle oynamaz).
+    """
+    ozet = BakimOzeti(silinen_is=0, silinen_nesne=0, korunan_dizin=0, silinen_isci=0)
+    with kiraci.baglam(rol=kiraci.ADMIN, oturum=db):
+        sahipler = kuyruk.saklama_sahipleri(db, an, saklama_suresi)
+        ozet["silinen_isci"] = kuyruk.olu_iscileri_sil(db, an, esik)
+        db.commit()
+    silinenler: list[kuyruk.SilinenIs] = []
+    for kullanici_id in sahipler:
+        with kiraci.baglam(kullanici_id=kullanici_id, oturum=db):
+            silinenler += kuyruk.eskileri_sil(db, kullanici_id, an, saklama_suresi)
+            db.commit()
+    ozet["silinen_is"] = len(silinenler)
+    if not silinenler:
+        return ozet
+    # Yalnız rotanın biçimindeki dizinler aday (`ayar.is_dizini_coz`): elle yazılmış
+    # bir `istek`in tanınmayan anahtarı `foo/bar.png` → `foo/` gibi bir öneke çözülür ve
+    # onun altını körlemesine silmek bu turun işi değil. Dizinin kiracısı silinen işin
+    # sahibi değilse de aday değil (gerekçe modül başında): uyarı düşer, dizin durur.
+    adaylar: dict[str, uuid.UUID] = {}
+    for s in silinenler:
+        for d in sorted(s.girdi_dizinleri):
+            coz = ayar.is_dizini_coz(d)
+            if coz is None:
+                continue
+            if coz.kullanici_id != s.kullanici_id:
+                gunluk.olay(_gunluk, "bakim.yabanci_dizin", "silinen isin istegi baska kiracinin dizinine bakiyor, dokunulmadi",
+                            seviye=logging.WARNING, is_id=str(s.is_id), kullanici_id=str(s.kullanici_id),
+                            dizin=d)
+                continue
+            adaylar[d] = coz.is_id
+    with kiraci.baglam(rol=kiraci.ADMIN, oturum=db):
+        referansli = {ayar.girdi_dizini(a) for a in kuyruk.girdi_referanslari(db)}
+        sahipli = kuyruk.mevcut_isler(db, list(adaylar.values()))
+        db.rollback()
+    for dizin, is_id in sorted(adaylar.items()):
+        if dizin in referansli or is_id in sahipli:
+            ozet["korunan_dizin"] += 1
+            continue
+        ozet["silinen_nesne"] += _dizini_sil(depo, dizin)
+    return ozet

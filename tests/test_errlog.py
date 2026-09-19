@@ -193,3 +193,23 @@ def test_a_dict_with_an_innocent_name_keeps_its_value():
     """Aşırı sansür teşhisi öldürür: `size`/`prompt` gibi alanlar okunur kalmalı."""
     masum = "{'prompt': 'kirmizi kedi', 'size': '1024x1024', 'folder_id': 'abcdef123456'}"
     assert errlog.redact_secrets(masum) == masum
+
+
+@pytest.mark.parametrize("metin", [
+    "KROMIS_PLATFORM_FAL_KEY: DUMMY-plain-value-12345",
+    "OPENAI_API_KEY : DUMMY-plain-value-12345",
+    "GEMINI_API_KEY:DUMMY-plain-value-12345",
+    "AZURE_IMAGE_API_KEY: 'DUMMY-plain-value-12345'",
+])
+def test_the_colon_form_of_a_secret_name_is_redacted(metin):
+    """Faz 2 / 10 (9'un devri): bir `env` dökümü, YAML ya da `print(f"{AD}: {deger}")` satırı
+    `=` taşımaz; tırnaksız `AD: değer` sözlük deseninden (b') de kaçıyordu — 4. desen `[=:]`."""
+    sansurlu = errlog.redact_secrets(metin)
+    assert "DUMMY-plain-value-12345" not in sansurlu, sansurlu
+    assert "[REDACTED_API_KEY]" in sansurlu
+
+
+def test_the_colon_form_leaves_ordinary_header_and_field_lines_alone():
+    """İki nokta HER satırda var: yalnız BÜYÜK_HARF + KEY/TOKEN/SECRET adı sansürlenir."""
+    masum = "Content-Type: application/json\nsize: 1024x1024\nSECRET: kisa\nfolder_id: abcdef123456"
+    assert errlog.redact_secrets(masum) == masum

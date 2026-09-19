@@ -139,9 +139,12 @@ const kromisIsler = (() => {
     return id || "";
   }
 
-  /** `zaman.damga` biçimi (`2026-09-18T12:00:00`, yerel saat, dilimsiz): tarayıcı
-   *  dilimsiz ISO'yu yerel saat okur — sunucuyla aynı makine saati varsayımı,
-   *  galerinin `created_at`i için de geçerli. */
+  /** `zaman.damga_utc` biçimi (`2026-09-18T12:00:00Z`, UTC, dilimli): `Date` tek bir
+   *  ANI okur, tarayıcının dilimi ne olursa olsun. Eskiden `zaman.damga`nın dilimsiz
+   *  dizesi geliyordu ve tarayıcı onu KENDİ yerel saati sayıyordu — sunucu UTC,
+   *  kullanıcı UTC+3 iken `sureMetni` 3 saat fazla gösteriyor, panel "180:00"la
+   *  açılıyordu (Faz 2 / 10; docs/studyo-guncelleme-plani.md B3). Galerinin
+   *  `created_at`i hâlâ dilimsiz, onu bu işlev okumaz. */
   function an(damga) {
     if (!damga) return null;
     const d = new Date(damga);

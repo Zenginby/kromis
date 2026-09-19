@@ -202,6 +202,17 @@ jobs:
   # `/giris`e gider (kimlik kapısı), sayfanın kendisi 200 vermeli.
   # `docker image ls`: imaj boyutu ilk kez burada ÖLÇÜLÜYOR (Faz 0 / 8'in
   # açık bıraktığı sayı; docs/faz0-web-first.md → 8) — tek satır, iddia yok.
+  #
+  # İŞÇİ ADIMI (Faz 2 / 10): göçten sonra, web konteynerinden önce aynı imajdan
+  # `python isci.py --tek-tur` — kuyruk boş, bir iş almadan 0 ile çıkar. Sınanan
+  # şey işçi girişinin İMAJDA olduğu ve web'in kapılarından (DATABASE_URL,
+  # KROMIS_SECRET_KEY, depo yapılandırması) geçip DB'ye ulaştığı; `_test.yml`in
+  # işlev düzeyi testleri sürecin kendisini konteynerde göremez. Sonda adımı
+  # `/health` gövdesinde `worker_alive` ALANINI arar (değerini değil: tek tur
+  # işçi çıktı, satır yazmadı, alan `false`) — alan yoksa 9'un sözleşmesi
+  # kırılmış demek. `KROMIS_SECRET_KEY` bir kez üretilip `$GITHUB_ENV`e yazılır
+  # (bu koşuya özel, atılır): işçi ve web aynı anahtarla açılsın — iki ayrı
+  # anahtar da çalışırdı (CI'da çözülecek satır yok) ama gerçeğin ikizi bu.
   docker:
     name: Docker imajı
     runs-on: ubuntu-latest
@@ -239,23 +250,36 @@ jobs:
           docker run --rm --network host -e DATABASE_URL kromis python tools/goc.py
 
       # `KROMIS_SECRET_KEY` (Faz 1 / 7): DB'li süreç şifreleme anahtarı olmadan
-      # AÇILMAZ (app._lifespan) — sonda 30 sn boyunca cevap alamaz ve iş
-      # kırmızı olurdu. Anahtar HER KOŞUDA ÜRETİLİYOR, workflow'a yazılmıyor:
-      # `env:`e sabit bir değer koymak git'te bir anahtar tutmak demekti
-      # (sızıntı taraması onu da bulurdu) ve bu iş yalnız "imaj açılıyor mu"
-      # diye soruyor, veriyi bir sonraki koşuya taşımıyor.
+      # AÇILMAZ (app._lifespan; işçi de — isci.py) — sonda 30 sn boyunca cevap
+      # alamaz ve iş kırmızı olurdu. Anahtar HER KOŞUDA ÜRETİLİYOR, workflow'a
+      # yazılmıyor: `env:`e sabit bir değer koymak git'te bir anahtar tutmak
+      # demekti (sızıntı taraması onu da bulurdu) ve bu iş yalnız "imaj
+      # açılıyor mu" diye soruyor, veriyi bir sonraki koşuya taşımıyor.
+      - name: KROMIS_SECRET_KEY (bu koşuya özel)
+        run: |
+          set -euo pipefail
+          echo "KROMIS_SECRET_KEY=$(python3 -c 'import secrets,base64;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())')" >> "$GITHUB_ENV"
+
+      # İşçi (Faz 2 / 10): aynı imaj, ikinci süreç; boş kuyrukta bir tur ve 0.
+      - name: İşçi (python isci.py --tek-tur)
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/kromis
+        run: |
+          set -euo pipefail
+          docker run --rm --network host -e DATABASE_URL -e KROMIS_SECRET_KEY kromis python isci.py --tek-tur
+
       - name: /health ve /giris
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/kromis
         run: |
           set -euo pipefail
-          KROMIS_SECRET_KEY="$(python3 -c 'import secrets,base64;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())')"
-          export KROMIS_SECRET_KEY
           docker run -d --name kromis --network host -e DATABASE_URL -e KROMIS_SECRET_KEY kromis
           trap 'echo "--- konteyner günlüğü ---"; docker logs kromis 2>&1 | tail -n 50; docker rm -f kromis >/dev/null' EXIT
           for _ in $(seq 1 30); do
             if govde="$(curl -fsS localhost:8765/health)"; then
               echo "/health: $govde"
+              # `worker_alive` ALANI var mı (Faz 2 / 9 sözleşmesi); tek tur işçi çıktı, değer `false`.
+              printf '%s' "$govde" | python3 -c 'import json,sys; g=json.load(sys.stdin); assert "worker_alive" in g, g; print("worker_alive alanı:", g["worker_alive"])'
               curl -fsS -o /dev/null localhost:8765/giris && echo "/giris: 200"
               # `/` oturumsuz 302 → `/giris`; `-L` izler, sayfa 200 vermeli.
               curl -fsSL -o /dev/null localhost:8765/ && echo "/ → /giris: 200"

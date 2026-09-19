@@ -13,6 +13,25 @@
 # commit, ~3.4 MB, 405 ms) aşağıdaki listeyi üretti: bulguların hepsi bilerek
 # sahte sabitler, depoda gerçek bir sırrın izi YOK.
 
+# BU TARAMANIN GÖRMEDİĞİ ŞEY — `.env` TÜREVLERİ (2026-09-19):
+#
+# `gitleaks git` GEÇMİŞİ okuyor, çalışma ağacını DEĞİL (yukarıdaki karar).
+# Bunun kaçınılmaz öteki yüzü: commit'lenmemiş bir dosya bu taramaya HİÇ
+# görünmez. `.env` düzenlenirken oluşan `.env.yedek-20260919` — içinde
+# `KROMIS_PLATFORM_*` anahtarları, `KROMIS_NESNE_DEPO_GIZLI` ve `SENTRY_DSN`
+# vardı — tam olarak öyle bir dosyaydı: `git status`ta untracked duruyordu ve
+# tarama onu ancak indekse girip commit'lendiğinde, yani sır çoktan geçmişe
+# yerleştiğinde görebilirdi. Tarama bir ağ değil, SON duraktır.
+#
+# Bu yüzden o dosyalar ayrı bir kapıyla, daha girmeden durduruluyor:
+# `.gitignore`daki `.env*` + `!.env.example` çifti; bekçisi
+# tests/test_env_yok_sayma.py. İkisi yedek DEĞİL ardışık — biri girmeyi,
+# öteki girmiş olanı yakalıyor.
+#
+# Buraya bir yol muafiyeti EKLENMEDİ ve eklenmemeli: yok sayılan dosya
+# commit edilmediği sürece taramanın önüne zaten çıkmıyor; bir gün
+# `--force` ile commit edilirse de taranması TAM OLARAK istediğimiz şey.
+
 [extend]
 useDefault = true
 

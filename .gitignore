@@ -11,7 +11,20 @@
 .venv/
 __pycache__/
 *.pyc
-.env
+# `.env*`, `.env` DEĞİL: `.env` yalnız adın TAMAMINI eşler. 2026-09-19'da
+# `.env` düzenlenirken alınan `.env.yedek-20260919` tam bu yüzden `git status`ta
+# untracked çıktı — içinde `KROMIS_PLATFORM_*` anahtarları,
+# `KROMIS_NESNE_DEPO_GIZLI` ve `SENTRY_DSN` vardı. Sızıntı taraması
+# (`.gitleaks.toml`) GEÇMİŞİ tarıyor, yani böyle bir dosyayı ancak
+# commit'lendikten SONRA görür; kapı bir adım önce, burada durmalı.
+#
+# `.env.example` İZLENİYOR: `.env` sözleşmesinin şablonu ve
+# tests/test_docker_kapisi.py anahtar adlarını ondan okuyor. Aşağıdaki
+# `.claude/*` çiftindeki dizine-inme sorunu burada YOK — `.env*` bir DOSYA
+# kalıbı, olumsuzlama işini görüyor. İkisini de tests/test_env_yok_sayma.py
+# ölçüyor.
+.env*
+!.env.example
 .DS_Store
 # Dev'de data_dir() == REPO_DIR: gerçek uygulamayı repodan çalıştırmak
 # bunları repo köküne yazar (bkz. paths.py).

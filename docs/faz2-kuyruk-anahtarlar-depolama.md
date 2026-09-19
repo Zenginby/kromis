@@ -1698,7 +1698,7 @@ lifespan'ından geçmiyor demektir (`gunluk.kur` orada).
 
 ---
 
-## 9. Yapısal günlük (JSON satır, istek/iş kimliği), Sentry (isteğe bağlı), `/health` `worker_alive` (PR: `faz2/gunluk-sentry`)
+## 9. Yapısal günlük (JSON satır, istek/iş kimliği), Sentry (isteğe bağlı), `/health` `worker_alive` ✅ (PR: `faz2/gunluk-sentry`)
 
 **Kapsam.** `services/gunluk.py` — standart `logging` üzerine JSON biçimleyici:
 `{"ts","seviye","olay","mesaj","istek_id","is_id","kullanici_id","sure_ms",
@@ -1758,6 +1758,205 @@ de redakte. Bağımlılık DIŞ ve isteğe bağlı.
 **Çıkış ölçütü.** `uvicorn` stdout'u satır başına geçerli JSON, `X-Request-ID`
 cevapta, işçi satırları `is_id` taşıyor; sahte DSN'le bellek taşıyıcısında
 olay ve olayda anahtar yok; `/health` gövdesinde `worker_alive`; takım yeşil.
+
+**Yapıldığında (2026-09-19).** **`services/gunluk.py`** (8'in kurulumu büyüdü):
+`JsonBicimleyici` — satır başına bir nesne, sıra `ts` (UTC ISO 8601) → `seviye`
+→ `logger` → `mesaj` → BAĞLAM alanları → kaydın `extra=` alanları → `hata` (iz
+metni); `MetinBicimleyici` (`ts SEVİYE logger mesaj k=v …`);
+`KROMIS_GUNLUK_BICIMI` `json` (öntanımlı) | `metin`, başka değer `ValueError`
+(web açılmaz, işçi 2 — yazım hatası sessizce JSON'a düşmesin); bağlam bir
+`ContextVar` (`bagla`/`coz`/`baglam`, iç içe BİRLEŞİR — `kiraci.py` deyimi);
+`olay(gunlukcu, ad, **alanlar)` yardımcısı (`is_=` → `is`: anahtar sözcük);
+`kur` idempotent, `kromis` köküne tek işleyici, `propagate=False`. Redaksiyon
+`errlog.redact_secrets` — DEĞER DEĞER (mesaj, her alan, iç içe sözlük/liste,
+iz), serileştirilmiş satıra DEĞİL: ölçüldü, sözlük deseni `"AD": "değer"`
+eşleşmeyi anahtarıyla siliyor ve JSON'u bozuyordu; ek kural adı
+KEY/TOKEN/SECRET ile biten ALAN adının değeri biçimine bakılmadan maskelenir
+(`GIZLI_AD`, `errlog`un 4. deseninin ad yarısı — kısa/atipik anahtar çıplak
+desenden kaçar). **`services/istek_kimligi.py`**: gelen `X-Request-ID`
+(`^[A-Za-z0-9._:/+=-]{1,128}$`, değilse yenisi — istek reddedilmez) ya da
+`uuid4`; cevaba başlık, `request.state.istek_id`, günlük bağlamına `istek_id`,
+Sentry etiketi; erişim satırı `olay=istek` (`yontem`, `rota` = yol, sorgu
+dizesi YOK, `durum`, `sure_ms`, `kullanici_id`) istek sonunda, `/health` ve
+`/static/*` DEBUG (`SESSIZ_YOLLAR`), rota istisna fırlatırsa `durum=500` ile
+yine yazılır; **en dış** ara katman (`istek kimliği → köken → dil → rota`,
+köken 403'ü de kimlik taşır). `Dockerfile` CMD `--no-access-log`.
+**`services/hata_izleme.py`** (Sentry; yeni ad, aşağıda sapma (b)): `kur(surec=)`
+DSN yoksa `False` ve `sentry_sdk` HİÇ ithal edilmez (tembel); varsa `init(
+release=kromis@<sürüm>, environment=SENTRY_ENVIRONMENT, send_default_pii=False,
+max_request_body_size="never", before_send=before_breadcrumb=redakte,
+integrations=[Starlette, FastApi, Sqlalchemy, Logging(INFO→breadcrumb,
+ERROR→olay)])` + `surec` etiketi (`web`/`isci`); `redakte` olayın her dizesini
+`errlog.redact_secrets`ten geçirir, gizli AD'lı sözlük anahtarını maskeler ve
+`logentry.params`ı DÜŞÜRÜR (ölçüldü: `logger.error("OPENAI_API_KEY=%s", d)`
+satırında `formatted` yakalanır ama `params`ta değer adsız kalıyordu); bozuk DSN
+`kromis.sentry`ye ERROR, açılış durmaz; `is_baglami(is_id, kullanici_id)`
+(`isolation_scope` + `set_tag`), `etiketle`, `istisna_bildir`, `kapat` (test);
+kurulu değilken hepsi no-op. `requirements.txt` `sentry-sdk==2.*` (saf Python).
+**`services/kimlik.py::bagla`** `request.state.kullanici_id` de yazar
+(ölçüldü: erişim satırı istek bitince yazılıyor, oturum kapalı, `kullanici.id`
+okuması `DetachedInstanceError`). **`routers/admin.py`** üç olay `gunluk.olay`
+ile yapısal (`olay`, `admin`, `hedef`/`is`/`sahip`, `tavan`/`adet`). **İşçi**:
+`services/isci.py` `siradakini_al` → `is.alindi` (`is_id`, `kullanici_id`,
+`tur`, `model`, `isci_id`, `bekleme_ms`); `kos` iş boyunca `gunluk.baglam(is_id,
+kullanici_id)` + `hata_izleme.is_baglami` → `is.basladi` (`anahtar_kaynagi`),
+`is.bitti`/`is.hata` (`sure_ms` duvar saati); beklenmeyen istisna `is.istisna`
+(ERROR, `hata` izi) + `hata.log` (kalır) + Sentry; `kuyruk_uyarisi(db, an)` —
+`kuyruk.bekleyen_ozeti` (tek sorgu, admin bağlamı) `isletme.md` § 6 eşikleri
+(`UYARI_KUYRUK_DERINLIGI` 20, `UYARI_EN_ESKI_BEKLEYEN_SN` 600) aşılınca alanlar
+döner; `isci.py` kalp turunda (30 sn) `olay=uyari` WARNING, koşul sürdükçe her
+turda (kenar tetiklemeli değil: uyarı kuralları "N dakikada K olay" sayar).
+`isci.py` `_yaz`/stderr YOK: `gunluk.kur()` ilk iş (bozuk biçim adı: tek satır
+stderr + 2), `hata_izleme.kur(surec="isci")`, olaylar `isci.basladi/sinyal/
+kapandi/tek_tur/hata/istisna`, `bayat` — TEK akım, stdout. **`/health`**:
+`worker_alive` (son kalp `an - depo_admin.CANLI_ESIK`ten yeni; admin
+metriklerinin `canli`siyle aynı karşılaştırma) + `worker_last_heartbeat`
+(`zaman.damga`); motor yok / DB yok → ikisi `null`; `isciler` yok (göç
+koşmamış) → `db_reachable` true, işçi `null`; `ok`a GİRMEZ. `db.sor(motor,
+sorgu, zaman_asimi)` — eski `erisilebilir`in iş parçacıklı bütçesi genelleşti,
+`SELECT 1` ve `kuyruk.isci_son_kalp` AYNI bağlantıda; `erisilebilir` sarmalayıcı.
+`.env.example` +3 (`KROMIS_GUNLUK_BICIMI`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT`;
+1. bölümün sonunda, `ALTYAPI` bekçisi); KURULUM.md 9. adım; README `/health`
+örneği; `isletme.md` § 6 satırı kapandı (eşikler ve uyarı kuralının yeri).
+
+SAPMALAR: (a) `SENTRY_ENVIRONMENT` kod tarafından AÇIKÇA okunur (SDK zaten
+okurdu) — `.env.example`in "kodun okuduğu değişkenlerin TAMAMI" sözleşmesi
+başka türlü belgelenemezdi. (b) Sentry `services/gunluk.py`de değil ayrı
+modülde (`hata_izleme.py`): günlük her süreçte koşar, Sentry isteğe bağlı ve
+tembel; aynı dosyada `import sentry_sdk`in tembelliğini okumak zorlaşırdı.
+(c) `/health` işçi damgası alanı `worker_last_heartbeat` (İngilizce): gövdenin
+öteki alanları İngilizce, tek Türkçe alan karışırdı. (d) Erişim satırında rota
+KALIBI yok (`/api/isler/{is_id}` gibi): Starlette bu sürümde `scope["route"]`
+yazmıyor, `rota` alanı gerçek yol. (e) Akan cevapta (SSE) erişim satırı
+BAŞLIKLAR gönderilince yazılır, `sure_ms` başlıklara kadar — akış dakikalarca
+açık ve kopan bağlantıda hiç yazılmaması daha kötü. (f) İş `sure_ms`
+`perf_counter` (duvar saati), `an` değil: testler `an`ı sabitliyor. (g)
+`logentry.params` Sentry olayından düşer (yukarıda, ölçüldü). (h) Uvicorn'un
+yaşam döngüsü satırları stderr'de düz metin kalır (`Started server process`);
+stdout tamamı JSON — çıkış ölçütü stdout için. (i) Kök günlükçüye işleyici
+TAKILMADI: üçüncü parti WARNING'ler Python'un son çare işleyicisinden stderr'e
+düşmeye devam eder; `kromis.*` dışını JSON'a almak 10'a not (aşağıda). (j)
+`routers/saglik.py` artık `depo_admin`, `kuyruk`, `zaman` ithal ediyor (eşik
+tek yerde dursun diye — devir 2). (k) Kuyruk uyarısı işçi BAŞINA: N işçi N
+satır/30 sn; tek işçi kararı (K11) altında sorun değil, yazıldı.
+
+TESTLER: takım 3.740 → 3.793 toplanan (+53; E2E dâhil, tam takım bu makinede
+koştu). Yeni `tests/test_gunluk.py` (30): JSON satırın ilk dört alanı ve sıra,
+bağlam birleşme/çözülme (with ve jeton), `hata` alanı, `olay` yardımcısı ve
+`is_` → `is`, metin biçimi, `KROMIS_GUNLUK_BICIMI` (boş/metin/bozuk), `kur`
+idempotent ve ortamdan biçim; redaksiyon: tohumlanmış anahtar mesaj/alan/iç
+içe/iz/metin hiçbirinde yok, gizli AD'lı alan maskeli, katalogdaki HER gizli
+env adı (parametrik, 7) üç biçimde, redaksiyon sonrası JSON geçerli; istek
+kimliği: gelen korunur ve cevapta / üretilen uuid4 / bozuk (boş, boşluklu,
+129 karakter, satır sonu) değiştirilir / erişim satırı alanları ve sorgu
+dizesi yok / kullanıcı id (DB) / `/health` ve `/static` DEBUG, `/yok` INFO /
+rota içinde bağlam ve sonrasında yok / istisna → `durum=500` / köken 403'ü
+kimlik taşır / ara katman sırası / Dockerfile `--no-access-log`; işçi:
+`tek_tur` → `is.alindi/basladi/bitti` hepsinde `is_id`, düşen iş `is.hata` ve
+anahtar çıktıda yok, beklenmeyen istisna `is.istisna` izli, kuyruk uyarısı
+(boş susar / taze iş susar / 11 dk'lık iş uyarır / 21 iş uyarır / sabitler 20
+ve 600), `isci.py` süreci JSON satır ve bozuk biçim adı 2. Yeni
+`tests/test_sentry.py` (10): DSN yokken taze süreçte `sys.modules`ta
+`sentry_sdk` yok; DSN'le seçenekler (PII kapalı, gövde `never`, sürüm, ortam,
+iki redaksiyon kancası, dört entegrasyon); ERROR satırı → olay, anahtar ve
+adsız param yok; breadcrumb ve istisna değeri redakte; `redakte` yapı korur;
+iş kapsamı `is_id`/`kullanici_id` etiketi ve yalıtım; rota istisnası GERÇEK
+ara katman yığınıyla Sentry'ye `istek_id` etiketiyle; bozuk DSN günlüğe, süreç
+durmaz; no-op yardımcılar; env adları ve pin. `tests/test_health.py` (+3, 11
+→ 14): taze kalp → true + damga; eşiğin dışı false (200 kalır) ve içi true
+(`CANLI_ESIK` sınırı); motorsuz `null`, tablo yokken `(True, None, None)`;
+`GOVDE_ALANLARI` +2, tam gövde iddiaları `ISCISIZ`/`BILINMIYOR`. Güncellenen:
+`test_admin` (yakalayıcı yapısal alanlar + `istek_id` her satırda; lifespan
+testi JSON satırı ve aynı `istek_id`li erişim satırı; **zaman bombası
+düzeltildi:** metrik testi sabit `AN` (2026-09-18) ile tohumluyordu, rota
+gerçek saatle son 24 saate bakıyor — bir gün sonra kendiliğinden kırmızıya
+dönmüştü, ölçüldü 2026-09-19), `test_isci` (süreç testleri JSON satır
+ayrıştırır: kapı hataları `olay=isci.hata` stdout'ta, `--tek-tur` olayı,
+dolu kuyrukta dört olay `is_id`li, SIGTERM üç olay), `test_koken` (sıra),
+`test_i18n` (+2 konuşmayan), `test_galeri_db` (`kuyruk` 12 işlev, +2
+kiracısız), `test_docker_kapisi` (`ALTYAPI` +3).
+
+DUMAN (2026-09-19; geçici Postgres 16, `tools/goc.py` → `0006_rls` head, iki
+hesap `tools/kullanici.py olustur --parola-stdin`, `uvicorn … --no-access-log`
+ve `isci.py --kalp-araligi 1`, `KROMIS_GUNLUK_BICIMI=json`, sahte
+`KROMIS_PLATFORM_OPENAI_API_KEY=sk-DUMAN…`, `SENTRY_DSN` yerel bir taslak
+HTTP sunucusuna): web stdout **7 satır, hepsi JSON**; işçi stdout **5 satır,
+hepsi JSON**, stderr boş; uvicorn'un yaşam döngüsü satırları stderr'de.
+`GET /api/isler` `X-Request-ID: duman-istek-1` → cevapta aynı başlık, satır:
+
+```json
+{"ts": "2026-09-19T13:37:19.050+00:00", "seviye": "INFO", "logger": "kromis.istek", "mesaj": "istek", "istek_id": "duman-istek-1", "olay": "istek", "yontem": "GET", "rota": "/api/isler", "durum": 200, "sure_ms": 13.8, "kullanici_id": "987edb5a-…"}
+```
+
+başlıksız istek → üretilen uuid4 cevapta. Admin tavan:
+
+```json
+{"ts": "2026-09-19T13:37:19.083+00:00", "seviye": "INFO", "logger": "kromis.admin", "mesaj": "admin.tavan", "istek_id": "duman-admin-1", "olay": "admin.tavan", "admin": "73b760b3-…", "hedef": "987edb5a-…", "tavan": 8}
+```
+
+İşçi (bozuk istekli iş: `size` yok → `KeyError` → `hata`, 70 ms):
+
+```json
+{"ts": "…", "seviye": "INFO", "logger": "kromis.is", "mesaj": "is.alindi", "olay": "is.alindi", "is_id": "36ef695f-…", "kullanici_id": "987edb5a-…", "tur": "generate", "model": "<katalog model id>", "isci_id": "8f22bfab-…", "bekleme_ms": 730}
+{"ts": "…", "seviye": "ERROR", "logger": "kromis.is", "mesaj": "is beklenmeyen hata", "is_id": "36ef695f-…", "kullanici_id": "987edb5a-…", "olay": "is.istisna", "tur": "generate", "hata": "Traceback (most recent call last):\n  … KeyError: 'size'"}
+{"ts": "…", "seviye": "INFO", "logger": "kromis.is", "mesaj": "is.hata", "is_id": "36ef695f-…", "kullanici_id": "987edb5a-…", "olay": "is.hata", "tur": "generate", "model": "<katalog model id>", "sure_ms": 70}
+```
+
+(`isci.basladi` ile açıldı, `is.basladi` arada; beş satırın hepsi `is_id`li
+ya da süreç olayı.) `/health` işçi canlıyken `{"ok": true, …, "worker_alive":
+true, "worker_last_heartbeat": "2026-09-19T13:37:17"}`; işçi SIGKILL + `son_kalp`
+120 sn geriye → **200** `"worker_alive": false, "worker_last_heartbeat":
+"2026-09-19T13:35:21"` (`ok` değişmedi). Sahte anahtar ve adsız sahte değer iki
+sürecin stdout/stderr'inde de YOK; `hata.log` yazıldı (iz, kalır). Sentry
+taslak sunucusu `/api/1/envelope/` üzerinden **2 olay**: işçinin istisnası
+`tags {surec: isci, is_id: 36ef695f-…, kullanici_id: …}`, `release kromis@0.23.1`,
+`environment duman`, `request` alanı yok; `capture_message("anahtar sk-DUMAN… ve
+OPENAI_API_KEY=<DUMMY değer>")` → `"anahtar [REDACTED_API_KEY] ve
+[REDACTED_API_KEY]"` (belgeye değer yazılmadı: sızıntı taraması `AD=değer`
+biçimini anahtar sayar ve geçmişi tarar — .gitleaks.toml). DSN'siz taze süreçte `app` + lifespan + `/health` sonrası
+`'sentry_sdk' in sys.modules` → **False**.
+
+**10. göreve devredilen.** (1) Kök günlükçü: `kromis.*` dışındaki WARNING+
+(SQLAlchemy havuz, httpx) hâlâ stderr'e düz metin; uvicorn'un "Exception in
+ASGI application" izi de öyle ve REDAKSİYONSUZ — istenirse `gunluk.kur` köke
+WARNING'de ikinci bir JSON işleyicisi takar (Alembic `fileConfig` ve pytest
+`caplog` ile etkileşimi ölçülerek). (2) Sentry'nin Starlette entegrasyonu
+`Starlette.__call__`ı sınıf düzeyinde yamalar (lifespan'da `init` geç değil,
+ölçüldü: rota istisnası olay oldu); `patch_middlewares`/`get_request_handler`
+yamaları ise yığın ve rotalar kurulduktan sonra gelir — istek başlıkları/
+işlem izleri (performance) istenirse `init` uvicorn'dan önce (ör. `app.py`
+modül düzeyinde, DSN varsa) taşınır; bugün gerekmiyor. (3) `isciler` bayat
+satırı: kapanmadan ölen işçinin satırı `worker_alive:false` üretmeye devam
+eder — 10'un bakım turu (`son_kalp < an - esik` silme, 8'in devri 3) aynen.
+(4) `uyari` olayı işçi başına ve her turda (sapma (k)); Sentry uyarı kuralı
+"5 dk'da ≥ 1" ile başlasın. (5) CI `docker` işine `isci.py --tek-tur` (10'un
+kalemi): işçinin JSON satırı orada da görünür, `/health` `worker_alive` alanı
+kontrolü eklenebilir. (6) `services/platform_anahtari.py`nin `logging.getLogger(
+__name__)` günlükçüsü (`services.platform_anahtari`) `kromis.*` dışında — kök
+işleyici (1) gelene kadar o uyarı satırı stderr'e düz metin; `kromis.platform`a
+taşınması tek satır. (7) `sure_ms` erişim satırında SSE için başlıklara kadar
+(sapma (e)); akış ömrü istenirse `BaseHTTPMiddleware` yerine saf ASGI ara
+katman gerekir.
+
+**Sahibin adımı — Sentry (isteğe bağlı, canlıda bir kez).** (1) sentry.io'da
+ücretsiz hesap → *Create Project* → platform **Python → FastAPI**, ad
+`kromis`. (2) *Settings → Projects → kromis → Client Keys (DSN)*: DSN'i kopyala
+(`https://<anahtar>@<org>.ingest.sentry.io/<proje>`). (3) Platformda **web
+VE işçi** servislerinin ikisine de sır olarak `SENTRY_DSN=<dsn>`, istersen
+`SENTRY_ENVIRONMENT=production`; dağıt. Açılışta günlükte `sentry` satırı
+GÖRÜNMEZ (sessiz kurulum); bozuksa `olay=sentry.hata` ERROR satırı görünür.
+(4) Doğrula: bir test hatası üret — en kolayı geçici bir iş: `DATABASE_URL=…
+python -c "…kuyruk.ekle(…, {'prompt': 'x'}, …)"` (dumandaki gibi `size`siz
+istek) ya da yerelde `python -c "from services import hata_izleme; import
+sentry_sdk; hata_izleme.kur(surec='deneme'); sentry_sdk.capture_message('deneme');
+sentry_sdk.flush()"` `SENTRY_DSN` ile; 1 dk içinde *Issues*'ta `kromis@<sürüm>`
+sürümü, `surec` etiketiyle görünmeli, `request` gövdesi ve çerez OLMAMALI.
+(5) *Alerts → Create Alert*: "Issues: yeni sorun → e-posta" ve isteğe bağlı
+"`uyari` içeren olay 5 dk'da ≥ 1" (kuyruk eşikleri, `isletme.md` § 6); hata
+oranı için "hata sayısı 1 saatte ≥ 10". (6) Kapatmak: `SENTRY_DSN`i sil,
+yeniden dağıt — paket ithal bile edilmez. Günlük biçimi için sahibin işi yok:
+platform günlüğünde satırlar JSON; yerelde okunur istiyorsan
+`KROMIS_GUNLUK_BICIMI=metin`.
 
 ---
 

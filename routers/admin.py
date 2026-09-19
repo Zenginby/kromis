@@ -18,9 +18,10 @@ SÜZGEÇSİZ (gerekçesi orada); bu dosya HTTP'yi kurar — durum kodu, gövde,
 i18n'li `detail`.
 
 ADMİN YAZIMI GÜNLÜĞE, `denetim` TABLOSUNA DEĞİL (belge §8): üç yazım (tavan,
-oturum düşürme, iptal) `logging` ile `olay=admin.*` satırı düşürür — kim
-(admin id), kime/neye (hedef), ne. 9. görevin yapısal günlüğü bu satırları
-JSON'a çevirecek; Faz 4'ün KVKK/GDPR kalemi denetim tablosu isterse gelir.
+oturum düşürme, iptal) `gunluk.olay` ile `olay=admin.*` satırı düşürür — kim
+(`admin`), kime/neye (`hedef`/`is`/`sahip`), ne (`tavan`/`adet`) — yapısal
+alanlar olarak (Faz 2 / 9: JSON satır, `istek_id` bağlamdan gelir; biçim
+services/gunluk.py). Faz 4'ün KVKK/GDPR kalemi denetim tablosu isterse gelir.
 
 DİZİN OKUMAZLAR: ayar nesnesi almazlar (`DIZINSIZ_KAPILI`); sayfa rotası
 `ayar.genel` (paylaşılan `static_dir`, `routers/kok.py`nin kararı).
@@ -36,13 +37,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 import i18n
-from services import ayar, depo_admin, dil, hesap, kimlik, sablon, zaman
+from services import ayar, depo_admin, dil, gunluk, hesap, kimlik, sablon, zaman
 from services.db import OTURUM
 from services.tablolar import IS_DURUMLARI, Kullanici
 
 router = APIRouter()
 
-# `olay=admin.*` satırlarının kaynağı; 9. görev biçimleyiciyi bu ada da takar.
+# `olay=admin.*` satırlarının kaynağı; işleyici ve biçim `kromis` kökünde (gunluk.kur).
 _gunluk = logging.getLogger("kromis.admin")
 
 
@@ -103,7 +104,7 @@ def tavan(kullanici_id: uuid.UUID, req: TavanIstegi, db: Session = OTURUM,
     """Günlük kredi tavanını yazar/siler; kullanıcının bir sonraki işi yeni tavana göre 429 alır (services/kota.py)."""
     hedef = _hedef(db, kullanici_id)
     depo_admin.tavan_yaz(db, hedef.id, req.tavan)
-    _gunluk.info("olay=admin.tavan admin=%s hedef=%s tavan=%s", admin.id, hedef.id, req.tavan)
+    gunluk.olay(_gunluk, "admin.tavan", admin=str(admin.id), hedef=str(hedef.id), tavan=req.tavan)
     return {"id": str(hedef.id), "gunluk_kredi_tavani": req.tavan}
 
 
@@ -114,7 +115,7 @@ def oturum_dusur(kullanici_id: uuid.UUID, db: Session = OTURUM,
     hedef = _hedef(db, kullanici_id)
     sayi = depo_admin.oturum_sayisi(db, hedef.id)
     hesap.oturumlari_dusur(db, hedef.id)
-    _gunluk.info("olay=admin.oturum_dusur admin=%s hedef=%s adet=%d", admin.id, hedef.id, sayi)
+    gunluk.olay(_gunluk, "admin.oturum_dusur", admin=str(admin.id), hedef=str(hedef.id), adet=sayi)
     return {"id": str(hedef.id), "dusurulen": sayi}
 
 
@@ -130,5 +131,6 @@ def is_iptal(is_id: uuid.UUID, db: Session = OTURUM,
     if not iptal_edildi:
         raise HTTPException(status_code=409,
                             detail=i18n.t("err.is_iptal_edilemez", dil.aktif(), durum=satir.durum))
-    _gunluk.info("olay=admin.is_iptal admin=%s is=%s sahip=%s", admin.id, satir.id, satir.kullanici_id)
+    gunluk.olay(_gunluk, "admin.is_iptal", admin=str(admin.id), is_=str(satir.id),
+                sahip=str(satir.kullanici_id))
     return {"is": depo_admin.is_dokumu(satir)}

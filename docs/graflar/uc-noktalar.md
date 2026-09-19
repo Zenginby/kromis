@@ -9,13 +9,13 @@
 | yöntem | yol | dosya | işlev | modüller | ön yüz |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/` | `routers/kok.py` | `index`:27 | `errlog`, `i18n`, `version` | — |
-| GET | `/admin` | `routers/admin.py` | `admin_sayfasi`:57 | `errlog`, `i18n`, `version` | — |
-| GET | `/api/admin/isler` | `routers/admin.py` | `isler`:76 | `i18n` | `admin.js` |
-| POST | `/api/admin/isler/{is_id}/iptal` | `routers/admin.py` | `is_iptal`:122 | `i18n` | `admin.js` |
-| GET | `/api/admin/kullanicilar` | `routers/admin.py` | `kullanicilar`:64 | — | `admin.js` |
-| POST | `/api/admin/kullanicilar/{kullanici_id}/oturum-dusur` | `routers/admin.py` | `oturum_dusur`:111 | `i18n` | `admin.js` |
-| POST | `/api/admin/kullanicilar/{kullanici_id}/tavan` | `routers/admin.py` | `tavan`:101 | `i18n` | `admin.js` |
-| GET | `/api/admin/metrikler` | `routers/admin.py` | `metrikler`:86 | — | `admin.js` |
+| GET | `/admin` | `routers/admin.py` | `admin_sayfasi`:58 | `errlog`, `i18n`, `version` | — |
+| GET | `/api/admin/isler` | `routers/admin.py` | `isler`:77 | `i18n` | `admin.js` |
+| POST | `/api/admin/isler/{is_id}/iptal` | `routers/admin.py` | `is_iptal`:123 | `i18n` | `admin.js` |
+| GET | `/api/admin/kullanicilar` | `routers/admin.py` | `kullanicilar`:65 | — | `admin.js` |
+| POST | `/api/admin/kullanicilar/{kullanici_id}/oturum-dusur` | `routers/admin.py` | `oturum_dusur`:112 | `i18n` | `admin.js` |
+| POST | `/api/admin/kullanicilar/{kullanici_id}/tavan` | `routers/admin.py` | `tavan`:102 | `i18n` | `admin.js` |
+| GET | `/api/admin/metrikler` | `routers/admin.py` | `metrikler`:87 | — | `admin.js` |
 | GET | `/api/arena/{arena_id}` | `routers/galeri.py` | `arena_round_route`:185 | `storage` | `chat.js` |
 | POST | `/api/arena/{arena_id}/winner` | `routers/galeri.py` | `set_arena_winner_route`:201 | `i18n`, `models`, `storage` | `chat.js` |
 | GET | `/api/assets/{kind}` | `routers/bindirme.py` | `list_assets_route`:243 | `assets_store`, `i18n` | `assets.js` |
@@ -73,7 +73,7 @@
 | POST | `/api/video/animate` | `routers/uretim.py` | `animate`:263 | `catalog`, `chat_store`, `etiket`, `i18n`, `models` | `core.js` |
 | GET | `/assets/{kind}/{filename}` | `routers/bindirme.py` | `asset_file`:263 | `assets_store`, `i18n` | `assets.js` |
 | GET | `/giris` | `routers/hesap.py` | `giris_sayfasi`:250 | `errlog`, `i18n`, `version` | — |
-| GET | `/health` | `routers/saglik.py` | `health`:95 | `version` | — |
+| GET | `/health` | `routers/saglik.py` | `health`:146 | `version` | — |
 | GET | `/output/{filename}` | `routers/galeri.py` | `output_file`:322 | `i18n`, `storage` | `assets.js`, `chat.js`, `core.js`, `folders.js`, `isler.js`, `viewer.js` |
 
 ## Öbek → modül

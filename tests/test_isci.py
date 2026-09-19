@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import json
 import os
 import signal
 import subprocess
@@ -618,24 +619,38 @@ def _kos(argv: list[str], ortam: dict[str, str]) -> subprocess.CompletedProcess[
                           capture_output=True, text=True, encoding="utf-8", timeout=120)
 
 
+def _olaylar(cikti: str) -> list[dict]:
+    """Sürecin stdout'u satır başına JSON (Faz 2 / 9; services/gunluk.py) — her satır açılmak ZORUNDA."""
+    return [json.loads(s) for s in cikti.splitlines() if s.strip()]
+
+
+def _hata_mesaji(sonuc: subprocess.CompletedProcess[str]) -> str:
+    """Kapı hatası JSON satırıyla stdout'a düşer (`olay=isci.hata`, ERROR); stderr boş kalır."""
+    hatalar = [o for o in _olaylar(sonuc.stdout) if o.get("olay") == "isci.hata"]
+    assert hatalar and sonuc.stderr == "", (sonuc.stdout, sonuc.stderr)
+    assert all(o["seviye"] == "ERROR" for o in hatalar)
+    return hatalar[-1]["mesaj"]
+
+
 def test_the_process_refuses_to_start_without_the_secret_key_or_the_database_url(veritabani_url, tmp_path):
     """Web'in TEK istisnası işçide de: anahtarsız açılmaz (çözeceği satır var) — çıkış 2, adı söyler."""
     ortam = _ortam(veritabani_url, tmp_path)
     ortam.pop("KROMIS_SECRET_KEY", None)
     sonuc = _kos(["--tek-tur"], ortam)
     assert sonuc.returncode == 2, sonuc.stderr
-    assert "KROMIS_SECRET_KEY" in sonuc.stderr and "ACILMAZ" in sonuc.stderr
+    mesaj = _hata_mesaji(sonuc)
+    assert "KROMIS_SECRET_KEY" in mesaj and "ACILMAZ" in mesaj
     assert (tmp_path / "hata.log").exists(), "iz hata.log'a da (app._lifespan gibi)"
 
     sonuc = _kos(["--tek-tur"], _ortam(None, tmp_path))
-    assert sonuc.returncode == 2 and "DATABASE_URL" in sonuc.stderr
+    assert sonuc.returncode == 2 and "DATABASE_URL" in _hata_mesaji(sonuc)
 
 
 def test_the_process_refuses_a_half_configured_object_store_and_a_bad_concurrency_value(veritabani_url, tmp_path):
     sonuc = _kos(["--tek-tur"], _ortam(veritabani_url, tmp_path, KROMIS_NESNE_DEPO_URL="https://x.example"))
-    assert sonuc.returncode == 2 and "yarim" in sonuc.stderr, sonuc.stderr
+    assert sonuc.returncode == 2 and "yarim" in _hata_mesaji(sonuc), sonuc.stdout
     sonuc = _kos([], _ortam(veritabani_url, tmp_path, KROMIS_ISCI_ES_ZAMANLI="0"))
-    assert sonuc.returncode == 2 and "KROMIS_ISCI_ES_ZAMANLI" in sonuc.stderr, sonuc.stderr
+    assert sonuc.returncode == 2 and "KROMIS_ISCI_ES_ZAMANLI" in _hata_mesaji(sonuc), sonuc.stdout
 
 
 def test_tek_tur_flag_exits_zero_on_an_empty_queue_without_registering_a_worker(veritabani_url, depo_db,
@@ -643,7 +658,8 @@ def test_tek_tur_flag_exits_zero_on_an_empty_queue_without_registering_a_worker(
     """CI `docker` işinin koşturacağı komut (10. görev): boş kuyrukta 0, `isciler`e satır yazmaz."""
     sonuc = _kos(["--tek-tur"], _ortam(veritabani_url, tmp_path))
     assert sonuc.returncode == 0, sonuc.stderr
-    assert "kuyruk bos" in sonuc.stdout
+    (olay,) = _olaylar(sonuc.stdout)
+    assert (olay["olay"], olay["mesaj"], olay["kostu"]) == ("isci.tek_tur", "kuyruk bos", False)
     with depo_db.connect() as c:
         assert c.execute(text("SELECT count(*) FROM isciler")).scalar_one() == 0
 
@@ -655,7 +671,10 @@ def test_tek_tur_flag_runs_a_queued_job_end_to_end_in_the_real_process(veritaban
     is_id = _ekle(db_oturumu, kullanici.id)
     sonuc = _kos(["--tek-tur"], _ortam(veritabani_url, tmp_path))
     assert sonuc.returncode == 0, sonuc.stderr
-    assert "bir is kostu" in sonuc.stdout
+    olaylar = _olaylar(sonuc.stdout)
+    assert [o["olay"] for o in olaylar] == ["is.alindi", "is.basladi", "is.hata", "isci.tek_tur"], olaylar
+    assert olaylar[-1]["mesaj"] == "bir is kostu" and olaylar[-1]["kostu"] is True
+    assert all(o["is_id"] == str(is_id) for o in olaylar[:3]), "iş satırları `is_id` taşır"
     is_ = _is(db_oturumu, is_id)
     assert is_.durum == "hata" and is_.hata and "AZURE_IMAGE_API_KEY" in is_.hata
     assert not (tmp_path / "kullanicilar").exists(), "düşen iş nesne bırakmaz"
@@ -697,6 +716,9 @@ def test_the_process_registers_a_worker_row_beats_and_exits_cleanly_on_sigterm(v
             surec.kill()
             surec.wait(timeout=10)
     assert surec.returncode == 0, hata
-    assert "basladi id=" in cikti and "kapandi" in cikti and "sinyal 15" in cikti, cikti
+    olaylar = _olaylar(cikti)
+    assert [o["olay"] for o in olaylar] == ["isci.basladi", "isci.sinyal", "isci.kapandi"], cikti
+    assert olaylar[0]["es_zamanli"] == 2 and olaylar[0]["konak"] and olaylar[1]["sinyal"] == 15
+    assert olaylar[0]["isci_id"] == olaylar[2]["isci_id"]
     assert _satir() is None, "kapanışta satır silinir"
     assert not (tmp_path / "hata.log").exists(), hata

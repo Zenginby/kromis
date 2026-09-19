@@ -280,7 +280,9 @@ def test_health_reports_db_reachable_true_and_200_with_a_live_database(tmp_path,
         cevap = c.get("/health")
     assert cevap.status_code == 200
     assert cevap.json() == {"ok": True, "version": version.APP_VERSION,
-                            "data_dir_writable": True, "db_reachable": True}
+                            "data_dir_writable": True, "db_reachable": True,
+                            # Faz 2 / 9: işçi satırı yok → canlı değil, kalp yok (tests/test_health.py).
+                            "worker_alive": False, "worker_last_heartbeat": None}
 
 
 def _oturumlu_uygulama(veritabani: str) -> FastAPI:

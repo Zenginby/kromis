@@ -761,8 +761,12 @@ KULLANICIYA_KONUSMAYAN = {
     "services/depo_sohbet.py": "sohbet deposu (Faz 1 / 6): SQL; veri döndürür, 404'ü rota kurar",
     "services/depo_palet.py": "palet deposu (Faz 1 / 6): SQL; veri döndürür, cümle değil",
     "services/depo_admin.py": "admin deposu (Faz 2 / 8): SQL; sözlük döndürür, 404/409 metnini rota kurar",
-    "services/gunluk.py": "günlük kurulumu (Faz 2 / 8): `kromis.*` günlükçülerine stdout işleyicisi; "
-                          "satırlar operatöre gider, biçim `k=v`",
+    "services/gunluk.py": "yapısal günlük (Faz 2 / 8-9): `kromis.*` günlükçülerine stdout işleyicisi, "
+                          "JSON satır biçimleyici, bağlam; satırlar operatöre gider",
+    "services/istek_kimligi.py": "istek kimliği ara katmanı (Faz 2 / 9): `X-Request-ID` ve erişim "
+                                 "satırı; başlık adı ve günlük alanları ASCII, cümle yok",
+    "services/hata_izleme.py": "Sentry kurulumu (Faz 2 / 9): tek metni OPERATÖRE giden kurulum "
+                               "hatası satırı; kullanıcıya hiçbir şey göstermez",
     "services/depo_varlik.py": "varlık deposu (Faz 1 / 6): SQL ve dosya; kullanıcıya konuşmaz",
     "services/dosya.py": "dosya deposu soyutlaması (Faz 2 / 2): yerel disk / kova; hataları "
                          "kod (`DosyaHatasi`), 404 metnini rota kurar",

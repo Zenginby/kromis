@@ -29,6 +29,7 @@ yapar (`admin` fixture'ı: nesne + satır). Kullanıcının SATIRINI okuyan yoll
 from __future__ import annotations
 
 import datetime as dt
+import json
 import logging
 import os
 import re
@@ -54,6 +55,7 @@ from services import (
     kuyruk,
     platform_anahtari,
     tablolar,
+    zaman,
 )
 from services.tablolar import Kullanici
 from tests.test_kimlik import ADMIN_ROTALAR, YOL_DEGERLERI
@@ -93,14 +95,23 @@ def admin(depo_db, kullanici) -> Kullanici:
 
 
 class _Yakalayici(logging.Handler):
-    """`kromis.admin` kayıtları — pytest'in `caplog`u yerine doğrudan işleyici: kök yapılandırmadan bağımsız."""
+    """`kromis.admin` kayıtları — pytest'in `caplog`u yerine doğrudan işleyici: kök yapılandırmadan bağımsız.
+
+    Faz 2 / 9'dan beri olay YAPISAL: `satirlar` her kaydın alanlarını sözlük olarak
+    tutar (`gunluk.alanlar` — JSON satıra girenin aynısı), mesaj değil.
+    """
 
     def __init__(self) -> None:
         super().__init__(level=logging.INFO)
-        self.satirlar: list[str] = []
+        self.satirlar: list[dict] = []
 
     def emit(self, record: logging.LogRecord) -> None:
-        self.satirlar.append(record.getMessage())
+        from services import gunluk
+        alanlar = gunluk.alanlar(record)
+        # `istek_id` bağlamdan gelir ve her satırda VAR (istek kimliği ara katmanı); değeri
+        # isteğe göre değişir, testler olayın kendi alanlarına bakar.
+        assert alanlar.pop("istek_id", None), "admin olayı istek bağlamı dışında yazıldı"
+        self.satirlar.append(alanlar)
 
 
 @pytest.fixture
@@ -306,8 +317,10 @@ def test_writing_a_cap_updates_the_row_and_null_clears_it_and_bad_input_is_422_o
     yok = c.post(f"/api/admin/kullanicilar/{uuid.uuid4()}/tavan", json={"tavan": 5})
     assert yok.status_code == 404 and yok.json()["detail"] == i18n.t("err.kullanici_bulunamadi", "en")
     assert c.post("/api/admin/kullanicilar/abc/tavan", json={"tavan": 5}).status_code == 422
-    assert gunluk.satirlar[0] == f"olay=admin.tavan admin={admin.id} hedef={b.id} tavan=500", gunluk.satirlar
-    assert gunluk.satirlar[1] == f"olay=admin.tavan admin={admin.id} hedef={b.id} tavan=None"
+    assert gunluk.satirlar[0] == {"olay": "admin.tavan", "admin": str(admin.id), "hedef": str(b.id),
+                                  "tavan": 500}, gunluk.satirlar
+    assert gunluk.satirlar[1] == {"olay": "admin.tavan", "admin": str(admin.id), "hedef": str(b.id),
+                                  "tavan": None}
     assert len(gunluk.satirlar) == 2, "422/404 günlüğe düşmez — yazım olmadı"
 
 
@@ -389,7 +402,8 @@ def test_dropping_a_users_sessions_kills_their_cookie_and_leaves_the_admins(depo
         assert a.get("/api/hesap/ben").status_code == 200, "adminin oturumu durur"
         assert a.post(f"/api/admin/kullanicilar/{b_id}/oturum-dusur").json()["dusurulen"] == 0
         assert a.post(f"/api/admin/kullanicilar/{uuid.uuid4()}/oturum-dusur").status_code == 404
-    assert gunluk.satirlar[0] == f"olay=admin.oturum_dusur admin={a_id} hedef={b_id} adet=2"
+    assert gunluk.satirlar[0] == {"olay": "admin.oturum_dusur", "admin": str(a_id), "hedef": str(b_id),
+                                  "adet": 2}
 
 
 # ──────────────────────────────────────────────────────────────── kuyruk
@@ -436,7 +450,8 @@ def test_the_admin_cancels_another_users_waiting_job_but_not_a_running_one(c, de
         assert s.get(tablolar.Is, cal).durum == "calisiyor", "çalışan işe dokunulmadı (K8)"
     yok = c.post(f"/api/admin/isler/{uuid.uuid4()}/iptal")
     assert yok.status_code == 404 and yok.json()["detail"] == i18n.t("err.is_bulunamadi", "en")
-    assert gunluk.satirlar == [f"olay=admin.is_iptal admin={admin.id} is={bek} sahip={b.id}"], "409/404 günlüğe düşmez"
+    assert gunluk.satirlar == [{"olay": "admin.is_iptal", "admin": str(admin.id), "is": str(bek),
+                                "sahip": str(b.id)}], "409/404 günlüğe düşmez"
     # Kullanıcının kendi iptali başkasının işine hâlâ 404 (routers/isler.py değişmedi).
     kullanici_c = TestClient(appmod.app)
     admin.is_admin = False
@@ -556,7 +571,10 @@ def test_admin_routes_under_the_application_role_see_and_change_other_users_rows
     motor = request.getfixturevalue("uygulama_motoru")
     b = _ikinci(depo_db, oturum=True)
     bek = _is(depo_db, b.id, durum="bekliyor")
-    _is(depo_db, admin.id, durum="bitti", sure_sn=3)
+    # Metrik rotası GERÇEK saatle (`an` almıyor) son 24 saate bakar: sabit `AN` (2026-09-18) ile
+    # tohumlanan iş bir gün sonra pencerenin dışına düştü ve test kendiliğinden kırmızıya döndü
+    # (ölçüldü 2026-09-19). Rotanın saatine göre tohumla.
+    _is(depo_db, admin.id, durum="bitti", sure_sn=3, an=zaman.an() - dt.timedelta(minutes=1))
 
     def _uygulama_oturumu():
         with Session(motor) as s:
@@ -608,9 +626,13 @@ def test_the_lifespan_wires_a_stdout_handler_so_admin_event_lines_actually_reach
         assert len(kok.handlers) == 1
         b = _ikinci(depo_db)
         assert TestClient(appmod.app).post(f"/api/admin/kullanicilar/{b.id}/tavan", json={"tavan": 7}).status_code == 200
-        satirlar = akim.getvalue().splitlines()
-        assert len(satirlar) == 1 and satirlar[0].endswith(
-            f"INFO kromis.admin olay=admin.tavan admin={admin.id} hedef={b.id} tavan=7"), satirlar
+        # Faz 2 / 9: satır JSON, alanlar yapısal, `istek_id` bağlamdan; erişim satırı da aynı akımda.
+        satirlar = [json.loads(s) for s in akim.getvalue().splitlines()]
+        (olay,) = [s for s in satirlar if s["logger"] == "kromis.admin"]
+        assert (olay["seviye"], olay["olay"], olay["admin"], olay["hedef"], olay["tavan"]) == (
+            "INFO", "admin.tavan", str(admin.id), str(b.id), 7), olay
+        (erisim,) = [s for s in satirlar if s["logger"] == "kromis.istek"]
+        assert erisim["istek_id"] == olay["istek_id"] and erisim["durum"] == 200
     finally:
         for h in list(kok.handlers):
             kok.removeHandler(h)

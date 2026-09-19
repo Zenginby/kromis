@@ -38,8 +38,13 @@ KAPANIŞ: SIGTERM/SIGINT → almayı bırak, eldeki işleri BİTİR (sağlayıc�
 satırını sil ve çık. Platformun `kill_timeout`ı yetmezse iş `calisiyor`da
 kalır ve bayat düşürme onu `hata` yapar (K8; süreler 10. görevde).
 
-GÜNLÜK stdout'a, ASCII, tek satır (`goc.py`nin duruşu): platform günlüğü
-okuyor; 9. görev bunu JSON satıra çevirir. Türkçe yorum, ASCII çıktı.
+GÜNLÜK stdout'a, satır başına JSON (Faz 2 / 9; services/gunluk.py, web ile
+aynı kurulum ve biçim, `KROMIS_GUNLUK_BICIMI=metin` yerelde okunur): süreç
+olayları `kromis.isci` (`isci.basladi/sinyal/kapandi`, `bayat`, `uyari`), iş
+olayları `kromis.is` (`is.alindi/basladi/bitti/hata`, `is_id` bağlamda —
+services/isci.py). Kapı hataları da aynı akıma ERROR olarak düşer; TEK akım,
+stderr yok (platform ikisini ayrı toplar, bölmenin kazancı yok). Sentry
+web'le aynı `hata_izleme.kur` (DSN varsa). Türkçe yorum, ASCII çıktı.
 
 ÇIKIŞ KODLARI öteki araçlarla bir (`tools/goc.py`): 0 tamam · 1 çalışma
 zamanı (işçi satırı yazılamadı) · 2 ortam (`DATABASE_URL`/anahtar/depo).
@@ -47,6 +52,7 @@ zamanı (işçi satırı yazılamadı) · 2 ortam (`DATABASE_URL`/anahtar/depo).
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import signal
 import socket
@@ -55,20 +61,28 @@ import threading
 import traceback
 import uuid
 from types import FrameType
+from typing import Any
 
 from sqlalchemy.orm import Session
 
 import errlog
 import version
-from services import ayar, db, dosya, isci, kuyruk, sifre, zaman
+from services import ayar, db, dosya, gunluk, hata_izleme, isci, kuyruk, sifre, zaman
 
 CIKIS_TAMAM = 0
 CIKIS_CALISMA = 1
 CIKIS_ORTAM = 2
 
+_gunluk = logging.getLogger("kromis.isci")
 
-def _yaz(mesaj: str, *, hata: bool = False) -> None:
-    print(f"isci: {mesaj}", file=sys.stderr if hata else sys.stdout, flush=True)
+
+def _olay(ad: str, mesaj: str | None = None, *, seviye: int = logging.INFO, **alanlar: Any) -> None:
+    gunluk.olay(_gunluk, ad, mesaj, seviye=seviye, **alanlar)
+
+
+def _hata(mesaj: str, **alanlar: Any) -> None:
+    """Kapı/çalışma hatası: ERROR satırı (`olay=isci.hata`), çıkış kodu çağıranın."""
+    _olay("isci.hata", mesaj, seviye=logging.ERROR, **alanlar)
 
 
 class Surec:
@@ -107,9 +121,11 @@ class Surec:
 
     # ── iş parçacıkları ──
 
-    def _gunluk(self, baslik: str) -> None:
+    def _istisna(self, baslik: str) -> None:
+        """Etkin `except`ten: iz `hata.log`a (belge §9: kalır), stdout'a JSON `hata` alanıyla, Sentry'ye."""
         errlog.safe_append(self.ayarlar.data_dir, f"isci {baslik}:\n{traceback.format_exc()}")
-        _yaz(f"{baslik} (iz: hata.log)", hata=True)
+        _gunluk.exception(baslik, extra={"olay": "isci.istisna"})
+        hata_izleme.istisna_bildir()
 
     def dongu(self) -> None:
         """Bir iş parçacığının ömrü: durdurma bayrağına kadar al → kos."""
@@ -120,7 +136,7 @@ class Surec:
                 with Session(motor) as oturum:
                     is_ = isci.siradakini_al(oturum, self.isci_id, zaman.an())
             except Exception:
-                self._gunluk("alim dustu")
+                self._istisna("alim dustu")
                 self.durdur.wait(isci.YOKLAMA_ARALIGI_SN)
                 continue
             if is_ is None:
@@ -128,14 +144,14 @@ class Surec:
                 continue
             with self._kilit:
                 self._eldekiler.add(is_.id)
-            _yaz(f"is aldi id={is_.id} tur={is_.tur} model={is_.model}")
+            # `is.alindi` `siradakini_al`da, `is.basladi/bitti/hata` `kos`ta (services/isci.py).
             try:
-                bitti = isci.kos(is_, lambda: Session(motor), self.depo, self.ayarlar)
-                _yaz(f"is {'bitti' if bitti else 'hata'} id={is_.id}")
+                isci.kos(is_, lambda: Session(motor), self.depo, self.ayarlar)
             except Exception:
                 # `kos` kendi istisnalarını yutuyor; buraya varan şey onun dışındaki
                 # bir kırılma (ör. `hata.log` yazılamadı). Döngü ölmez.
-                self._gunluk(f"is {is_.id} beklenmeyen kirilma")
+                with gunluk.baglam(is_id=str(is_.id)):
+                    self._istisna("is beklenmeyen kirilma")
             finally:
                 with self._kilit:
                     self._eldekiler.discard(is_.id)
@@ -147,12 +163,17 @@ class Surec:
             with self._kilit:
                 eldekiler = list(self._eldekiler)
             try:
+                an = zaman.an()
                 with Session(self.motor) as oturum:
-                    dusen = isci.kalp_turu(oturum, self.isci_id, eldekiler, zaman.an(), self.esik)
+                    dusen = isci.kalp_turu(oturum, self.isci_id, eldekiler, an, self.esik)
+                    uyari = isci.kuyruk_uyarisi(oturum, an)
                 if dusen:
-                    _yaz(f"bayat is dusuruldu: {dusen}")
+                    _olay("bayat", seviye=logging.WARNING, adet=dusen)
+                if uyari:
+                    # docs/isletme.md § 6 eşikleri; Sentry uyarı kuralı bu satıra bağlanır.
+                    _olay("uyari", "kuyruk esigi asildi", seviye=logging.WARNING, **uyari)
             except Exception:
-                self._gunluk("kalp atisi dustu")
+                self._istisna("kalp atisi dustu")
 
     def eldeki_sayisi(self) -> int:
         with self._kilit:
@@ -162,7 +183,8 @@ class Surec:
 def _sinyal_kur(surec: Surec) -> None:
     def _dur(sinyal: int, _cerceve: FrameType | None) -> None:
         if not surec.durdur.is_set():
-            _yaz(f"sinyal {sinyal}: yeni is alinmiyor, eldeki {surec.eldeki_sayisi()} is bitirilecek")
+            _olay("isci.sinyal", "yeni is alinmiyor, eldekiler bitirilecek", sinyal=sinyal,
+                  eldeki=surec.eldeki_sayisi())
         surec.durdur.set()
 
     signal.signal(signal.SIGTERM, _dur)
@@ -173,25 +195,25 @@ def hazirla(*, tek_tur: bool, kalp_araligi: float) -> Surec | int:
     """Kapılar sırayla; hepsi geçerse `Surec`, geçmezse çıkış kodu (mesaj stderr'e)."""
     url = db.baglanti_dizesi()
     if not url:
-        _yaz(f"{db.DATABASE_URL_ENV} verilmedi: isci veri tabanisiz calisamaz", hata=True)
+        _hata(f"{db.DATABASE_URL_ENV} verilmedi: isci veri tabanisiz calisamaz")
         return CIKIS_ORTAM
     ayarlar = ayar.Ayarlar.varsayilan()
     try:
         sifre.dogrula_ortam()
     except sifre.AnahtarHatasi as e:
         errlog.safe_append(ayarlar.data_dir, traceback.format_exc())
-        _yaz(str(e), hata=True)
+        _hata(str(e))
         return CIKIS_ORTAM
     try:
         depo = dosya.depo_kur(ayarlar.data_dir)
     except dosya.YapilandirmaHatasi as e:
-        _yaz(str(e), hata=True)
+        _hata(str(e))
         return CIKIS_ORTAM
     try:
         es_zamanli = 1 if tek_tur else isci.es_zamanli()
         esik = isci.kalp_esigi()
     except ValueError as e:
-        _yaz(str(e), hata=True)
+        _hata(str(e))
         return CIKIS_ORTAM
     motor = db.motor_kur(url, pool_size=es_zamanli + 1)
     return Surec(motor, depo, ayarlar, es_zamanli, esik, kalp_araligi)
@@ -206,6 +228,15 @@ def main(argv: list[str]) -> int:
                              metavar="SN", help=argparse.SUPPRESS)
     secenekler = ayristirici.parse_args(argv)
 
+    # Günlük İLK: kapı hataları da JSON satır olsun. Biçim adı bozuksa işleyici
+    # yok, tek satır düz metin stderr'e ve çıkış 2 (öteki ortam hatalarıyla bir).
+    try:
+        gunluk.kur()
+    except ValueError as e:
+        print(f"isci: {e}", file=sys.stderr, flush=True)
+        return CIKIS_ORTAM
+    hata_izleme.kur(surec="isci")
+
     surec = hazirla(tek_tur=secenekler.tek_tur, kalp_araligi=secenekler.kalp_araligi)
     if isinstance(surec, int):
         return surec
@@ -216,19 +247,19 @@ def main(argv: list[str]) -> int:
                 kostu = isci.tek_tur(oturum, surec.depo, ayarlar=surec.ayarlar)
         finally:
             surec.motor.dispose()
-        _yaz("tek tur: " + ("bir is kostu" if kostu else "kuyruk bos"))
+        _olay("isci.tek_tur", "bir is kostu" if kostu else "kuyruk bos", kostu=kostu)
         return CIKIS_TAMAM
 
     try:
         isci_id = surec.kaydol()
     except Exception as e:
-        _yaz(f"isci satiri yazilamadi ({type(e).__name__}): veri tabanina ulasilamiyor "
-             f"ya da sema kurulmamis (python tools/goc.py)", hata=True)
+        _hata(f"isci satiri yazilamadi ({type(e).__name__}): veri tabanina ulasilamiyor "
+              f"ya da sema kurulmamis (python tools/goc.py)")
         surec.motor.dispose()
         return CIKIS_ORTAM
     _sinyal_kur(surec)
-    _yaz(f"basladi id={isci_id} konak={socket.gethostname()} surum={version.APP_VERSION} "
-         f"es_zamanli={surec.es_zamanli} depo={surec.depo!r} pid={os.getpid()}")
+    _olay("isci.basladi", isci_id=str(isci_id), konak=socket.gethostname(), surum=version.APP_VERSION,
+          es_zamanli=surec.es_zamanli, depo=repr(surec.depo), pid=os.getpid())
 
     parcaciklar = [threading.Thread(target=surec.dongu, name=f"kromis-isci-{i}", daemon=True)
                    for i in range(surec.es_zamanli)]
@@ -248,9 +279,9 @@ def main(argv: list[str]) -> int:
         try:
             surec.kaydi_sil()
         except Exception:
-            _yaz("isci satiri silinemedi (bayat kalir; /health worker_alive bunu gorur)", hata=True)
+            _hata("isci satiri silinemedi (bayat kalir; /health worker_alive bunu gorur)")
         surec.motor.dispose()
-    _yaz("kapandi")
+    _olay("isci.kapandi", isci_id=str(surec.isci_id))
     return CIKIS_TAMAM
 
 

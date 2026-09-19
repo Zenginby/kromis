@@ -45,7 +45,20 @@ import shlex
 import yaml
 
 import catalog
-from services import cerez, db, dosya, isci, kapilar, koken, kota, platform_anahtari, posta, sifre
+from services import (
+    cerez,
+    db,
+    dosya,
+    gunluk,
+    hata_izleme,
+    isci,
+    kapilar,
+    koken,
+    kota,
+    platform_anahtari,
+    posta,
+    sifre,
+)
 
 KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCKERFILE = os.path.join(KOK, "Dockerfile")
@@ -259,13 +272,16 @@ def _atamalar() -> list[tuple[str, str, bool]]:
 # (services/isci.py — yalnız `isci.py` okur, ama aynı imaj ve aynı şablon);
 # Faz 2 / 4 ile kullanıcı başına eş zamanlı iş tavanı `KROMIS_KULLANICI_ES_ZAMANLI_IS`
 # (services/kapilar.py); Faz 2 / 6 ile iki kota tavanı `KROMIS_SAATLIK_IS_TAVANI`,
-# `KROMIS_GUNLUK_KREDI_TAVANI` (services/kota.py). Adlar KAYNAKTAN, elle değil.
+# `KROMIS_GUNLUK_KREDI_TAVANI` (services/kota.py); Faz 2 / 9 ile günlük biçimi
+# `KROMIS_GUNLUK_BICIMI` (services/gunluk.py) ve Sentry `SENTRY_DSN`,
+# `SENTRY_ENVIRONMENT` (services/hata_izleme.py; web VE işçi). Adlar KAYNAKTAN, elle değil.
 ALTYAPI = {"KROMIS_DATA_DIR", "PORT", db.DATABASE_URL_ENV, koken.KOKEN_ENV,
            posta.POSTA_ENV, posta.GONDEREN_ENV, posta.RESEND_ANAHTAR_ENV, cerez.GUVENLI_ENV,
            sifre.ANAHTAR_ENV,
            dosya.URL_ENV, dosya.KOVA_ENV, dosya.ANAHTAR_ID_ENV, dosya.GIZLI_ENV, dosya.BOLGE_ENV,
            isci.ES_ZAMANLI_ENV, isci.KALP_ESIGI_ENV, kapilar.ES_ZAMANLI_IS_ENV,
-           kota.SAATLIK_IS_ENV, kota.GUNLUK_KREDI_ENV}
+           kota.SAATLIK_IS_ENV, kota.GUNLUK_KREDI_ENV,
+           gunluk.BICIM_ENV, hata_izleme.DSN_ENV, hata_izleme.ORTAM_ENV}
 
 
 def _katalog_adlari() -> set[str]:

@@ -50,6 +50,8 @@ from services import (
     dosya,
     gorsel,
     gunluk,
+    hata_izleme,
+    istek_kimligi,
     kimlik,
     koken,
     modeller,
@@ -115,10 +117,11 @@ async def _lifespan(app: FastAPI):
     kimlik satırı da yok.
     """
     ayarlar: ayar.Ayarlar = app.state.ayarlar
-    # `kromis.*` günlükçülerine stdout işleyicisi (Faz 2 / 8; gerekçesi services/gunluk.py):
-    # uvicorn yalnız kendi günlükçülerini kurar, admin `olay=admin.*` satırları
-    # bu olmadan hiçbir yere yazılmıyordu (ölçüldü). 9. görev biçimi JSON'a çevirir.
+    # JSON günlük (Faz 2 / 8-9; services/gunluk.py). Guard YOK: tanınmayan `KROMIS_GUNLUK_BICIMI`
+    # açılışı durdurur (yazım hatası sessizce JSON'a düşmesin). Sentry yalnız `SENTRY_DSN`
+    # varsa (K10; services/hata_izleme.py): DSN yoksa paket ithal edilmez, bozuk DSN günlüğe.
     gunluk.kur()
+    hata_izleme.kur(surec="web")
     url = db.baglanti_dizesi()
     if url:
         try:
@@ -202,6 +205,10 @@ app.middleware("http")(dil.dil_baglami)
 # rotaya (belge §3: "köken → dil → rota"). Reddedilen istek dil bağlamını
 # hiç kurmaz — 403 gövdesinin bir KOD olmasının sebebi de bu.
 app.middleware("http")(koken.koken_kapisi)
+
+# İstek kimliği (Faz 2 / 9; gerekçesi services/istek_kimligi.py) EN SON = EN DIŞ katman,
+# köken 403'ünü de kapsar: istek kimliği → köken → dil → rota (bekçisi tests/test_koken.py).
+app.middleware("http")(istek_kimligi.istek_kimligi)
 
 # Doğrulama hatasından gizli değerin silinmesi (gerekçesi services/redaksiyon.py'de).
 # Ara katmanla aynı biçim: dekoratörün çağrı hâli.

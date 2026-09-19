@@ -187,7 +187,7 @@ docker build -t kromis .
 docker run -p 8765:8765 -v kromis-data:/data \
   -e DATABASE_URL=postgresql+psycopg://kullanici:parola@konak:5432/kromis \
   -e KROMIS_SECRET_KEY="$(python3 -c 'import secrets,base64;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())')" kromis
-curl localhost:8765/health     # {"ok": true, "version": "…", "data_dir_writable": true, "db_reachable": true}
+curl localhost:8765/health     # {"ok": true, "version": "…", "data_dir_writable": true, "db_reachable": true, "worker_alive": false, "worker_last_heartbeat": null}
 ```
 
 Yazılabilir veri kökü `KROMIS_DATA_DIR` (imajda `/data`, bkz. `paths.py`):

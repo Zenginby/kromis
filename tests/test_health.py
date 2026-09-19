@@ -1,9 +1,11 @@
 """`GET /health` — konteynerin sondası (Faz 0 / Adım 8 + Faz 1 / 1. görev, routers/saglik.py).
 
-Sonda dört şey söylüyor: ayakta mı (200/503), hangi sürüm, veri dizinine
-yazılabiliyor mu, veri tabanına ulaşılabiliyor mu. `ok` son ikisinin VE'si ve
+Sonda beş şey söylüyor: ayakta mı (200/503), hangi sürüm, veri dizinine
+yazılabiliyor mu, veri tabanına ulaşılabiliyor mu, işçi canlı mı (Faz 2 / 9:
+`worker_alive` + `worker_last_heartbeat`). `ok` dizin ve DB'nin VE'si ve
 durum kodu `ok`u izliyor: `HEALTHCHECK` ve orkestratör gövdeyi okumadan
 anlasın; gövde yine de tam döner ki insan NEYİN sağlıksız olduğunu okusun.
+İşçi `ok`a GİRMEZ (belge §9): işçinin düşmesi web'i yeniden başlattırmamalı.
 
 VERİ TABANI ÖLÇÜTÜ TESTLERİ NASIL DEĞİŞTİRDİ (Faz 1 / 1): motor lifespan'da
 kuruluyor (services/db.py), yani 200 bekleyen her test artık `with
@@ -25,6 +27,7 @@ denemesi kullanmasının gerekçesi de tam olarak bu (routers/saglik.py).
 """
 from __future__ import annotations
 
+import datetime as dt
 import os
 import re
 import stat
@@ -33,9 +36,12 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 import version
 from routers import saglik
+from services import depo_admin, kuyruk, zaman
 
 
 def _client() -> TestClient:
@@ -54,7 +60,12 @@ def istemci(veritabani) -> Iterator[TestClient]:
         yield c
 
 
-GOVDE_ALANLARI = {"ok", "version", "data_dir_writable", "db_reachable"}
+GOVDE_ALANLARI = {"ok", "version", "data_dir_writable", "db_reachable", "worker_alive",
+                  "worker_last_heartbeat"}
+# İşçi satırı olmayan, ulaşılabilir DB: canlı değil, kalp yok.
+ISCISIZ = {"worker_alive": False, "worker_last_heartbeat": None}
+# Motor yok / DB yok: cevap BİLİNMİYOR, "hayır" değil.
+BILINMIYOR = {"worker_alive": None, "worker_last_heartbeat": None}
 
 
 def test_health_is_200_with_the_documented_body_when_the_data_dir_is_writable(tmp_path, dizinler, istemci):
@@ -62,7 +73,7 @@ def test_health_is_200_with_the_documented_body_when_the_data_dir_is_writable(tm
     cevap = istemci.get("/health")
     assert cevap.status_code == 200
     assert cevap.json() == {"ok": True, "version": version.APP_VERSION,
-                            "data_dir_writable": True, "db_reachable": True}
+                            "data_dir_writable": True, "db_reachable": True, **ISCISIZ}
 
 
 def test_health_reports_the_apps_version_constant_not_a_second_literal(tmp_path, dizinler, istemci):
@@ -90,7 +101,7 @@ def test_health_is_503_when_the_data_dir_is_a_regular_file(tmp_path, dizinler, i
     cevap = istemci.get("/health")
     assert cevap.status_code == 503
     assert cevap.json() == {"ok": False, "version": version.APP_VERSION,
-                            "data_dir_writable": False, "db_reachable": True}
+                            "data_dir_writable": False, "db_reachable": True, **ISCISIZ}
 
 
 def test_health_is_503_when_the_data_dir_does_not_exist_and_does_not_create_it(tmp_path, dizinler, istemci):
@@ -137,7 +148,7 @@ def test_health_still_answers_without_a_lifespan_and_says_the_database_is_unreac
     cevap = _client().get("/health")
     assert cevap.status_code == 503
     assert cevap.json() == {"ok": False, "version": version.APP_VERSION,
-                            "data_dir_writable": True, "db_reachable": False}
+                            "data_dir_writable": True, "db_reachable": False, **BILINMIYOR}
 
 
 def test_health_is_503_when_only_the_database_is_missing(tmp_path, dizinler, monkeypatch):
@@ -155,7 +166,7 @@ def test_health_is_503_when_only_the_database_is_missing(tmp_path, dizinler, mon
         cevap = c.get("/health")
     assert cevap.status_code == 503
     assert cevap.json() == {"ok": False, "version": version.APP_VERSION,
-                            "data_dir_writable": True, "db_reachable": False}
+                            "data_dir_writable": True, "db_reachable": False, **BILINMIYOR}
 
 
 def test_the_health_body_has_exactly_the_documented_fields(tmp_path, dizinler, istemci):
@@ -173,3 +184,69 @@ def test_the_probe_helper_answers_from_the_filesystem_alone(tmp_path):
     assert saglik.veri_dizini_yazilabilir(str(dosya)) is False
     assert saglik.veri_dizini_yazilabilir(str(tmp_path / "yok")) is False
     assert sorted(os.listdir(tmp_path)) == ["dosya"]
+
+
+# ── worker_alive (Faz 2 / 9) ───────────────────────────────────────────────
+
+@pytest.fixture
+def isciler(veritabani_motor) -> Iterator[Session]:
+    """Bu dosyanın DB'sine `isciler` satırı yazmak için oturum; test sonunda tablo boşalır."""
+    with Session(veritabani_motor) as s:
+        yield s
+        s.rollback()
+        s.execute(text("DELETE FROM isciler"))
+        s.commit()
+
+
+def test_worker_alive_is_true_with_a_fresh_heartbeat_and_the_body_names_it(tmp_path, dizinler, istemci, isciler):
+    dizinler(data_dir=str(tmp_path))
+    an = zaman.an()
+    kuyruk.isci_kaydet(isciler, "konak-a", version.APP_VERSION, 2, an - dt.timedelta(minutes=10))
+    isciler.execute(text("UPDATE isciler SET son_kalp = :an"), {"an": an - dt.timedelta(seconds=30)})
+    isciler.commit()
+    govde = istemci.get("/health").json()
+    assert govde["ok"] is True and govde["worker_alive"] is True
+    assert govde["worker_last_heartbeat"] == zaman.damga(an - dt.timedelta(seconds=30))
+
+
+def test_worker_alive_is_false_past_the_shared_threshold_and_ok_is_unaffected(tmp_path, dizinler, istemci, isciler):
+    """Eşik `depo_admin.CANLI_ESIK`in KENDİSİ (90 sn): admin sayfası "canlı" derken sonda "ölü" demesin.
+    İşçi ölü → yine 200: işçinin sağlığı web'in sağlığı değil (belge §9)."""
+    dizinler(data_dir=str(tmp_path))
+    an = zaman.an()
+    kuyruk.isci_kaydet(isciler, "konak-b", version.APP_VERSION, 1, an - dt.timedelta(hours=1))
+    isciler.execute(text("UPDATE isciler SET son_kalp = :an"),
+                    {"an": an - depo_admin.CANLI_ESIK - dt.timedelta(seconds=5)})
+    isciler.commit()
+    cevap = istemci.get("/health")
+    assert cevap.status_code == 200
+    govde = cevap.json()
+    assert govde["ok"] is True and govde["worker_alive"] is False
+    assert govde["worker_last_heartbeat"] == zaman.damga(an - depo_admin.CANLI_ESIK - dt.timedelta(seconds=5))
+    # Eşiğin hemen içi canlı: sınır `>`, `depo_admin.metrikler`in `canli`siyle aynı karşılaştırma.
+    isciler.execute(text("UPDATE isciler SET son_kalp = :an"),
+                    {"an": an - depo_admin.CANLI_ESIK + dt.timedelta(seconds=20)})
+    isciler.commit()
+    assert istemci.get("/health").json()["worker_alive"] is True
+
+
+def test_worker_alive_is_null_when_there_is_no_engine_or_the_table_is_missing(tmp_path, dizinler, monkeypatch):
+    """Motor yok → `null` (bilinmiyor). Tablo yok (göç koşmamış) → `db_reachable` yine true, işçi `null`."""
+    dizinler(data_dir=str(tmp_path))
+    assert _client().get("/health").json()["worker_alive"] is None
+    assert saglik.isci_durumu(None) == (False, None, None)
+
+    class _Baglanti:
+        def execute(self, ifade):
+            class _S:
+                def scalar_one(self_inner):
+                    return 1
+            if "SELECT 1" in str(ifade):
+                return _S()
+            raise RuntimeError("relation isciler does not exist")
+
+        def rollback(self) -> None:
+            pass
+    from services import db
+    monkeypatch.setattr(db, "sor", lambda motor, sorgu, *a, **k: sorgu(_Baglanti()))
+    assert saglik.isci_durumu(object()) == (True, None, None)

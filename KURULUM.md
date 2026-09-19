@@ -513,8 +513,46 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
    başka bir işçinin kalp turu onu `hata` yapar, kullanıcı panelden yeniden
    gönderir (otomatik yeniden deneme YOK: çift fatura riski). Sağlık
    denetimi: `python isci.py --tek-tur` bir iş alıp çıkar, kuyruk boşsa 0 ile
-   döner — CI'ın `docker` işi bunu koşturur; işçinin ayakta olduğunu `isciler`
-   satırının `son_kalp`inden okursun (`/health`e `worker_alive` alanı 9. görevde).
+   döner — CI'ın `docker` işi bunu koşturur; işçinin ayakta olduğunu web'in
+   `/health` gövdesindeki `worker_alive` alanından okursun (9. adım).
+9. **Günlük, istek kimliği, `/health`, Sentry** (Faz 2 / 9). İki süreç de
+   stdout'a **satır başına bir JSON nesnesi** yazar (`ts`, `seviye`, `logger`,
+   `mesaj`, sonra alanlar); platformun günlük ekranı/toplayıcısı alanlara
+   açar. Her HTTP isteği bir satır (`olay=istek`: `yontem`, `rota`, `durum`,
+   `sure_ms`, `kullanici_id`, `istek_id`); her iş dört satır (`is.alindi` →
+   `is.basladi` → `is.bitti`/`is.hata`, hepsinde `is_id` + `kullanici_id` +
+   `model` + `sure_ms`) — "bu iş ne oldu" sorusu `grep <is_id>`. Anahtarlar
+   hiçbir satıra girmez (aynı redaksiyon `hata.log`unkiyle). Yerelde okunur
+   biçim için `KROMIS_GUNLUK_BICIMI=metin`; başka bir değer uygulamayı
+   AÇMAZ. uvicorn'un kendi erişim günlüğü imajda kapalı (`--no-access-log`);
+   kendi komutunla açıyorsan aynı bayrağı ver, yoksa her istek iki kez yazılır.
+
+   *İstek kimliği:* her cevapta `X-Request-ID` başlığı döner; vekil (Fly,
+   Cloudflare, Railway) gelen isteğe bir kimlik koyduysa o kullanılır, yoksa
+   üretilir. Kullanıcı "şu istek hata verdi" dediğinde tarayıcının ağ
+   sekmesindeki başlık ile günlükteki `istek_id` aynı dizedir.
+
+   *`/health`:* gövdeye `worker_alive` (son 90 sn içinde kalp atan bir işçi
+   satırı var mı) ve `worker_last_heartbeat` (ISO 8601) eklendi; DB'ye
+   ulaşılamıyorsa ikisi `null`. **`ok`a ve durum koduna GİRMEZ:** işçi ölüyken
+   web 200 verir — işçinin düşmesi web'i yeniden başlattırmamalı. Platformun
+   sağlık denetimi durum koduna baksın (200/503); işçi için uyarı kuralı
+   gövdeye (`worker_alive:false` beş dakikadır sürüyorsa bildir) ya da işçinin
+   kendi günlüğüne (`isci.basladi` sonrası satır yoksa) bağlanır. Kuyruk
+   birikirse (derinlik > 20 ya da en eski bekleyen > 10 dk) işçi 30 sn'de bir
+   `olay=uyari` (WARNING) düşürür — [docs/isletme.md](docs/isletme.md) § 6.
+
+   *Sentry (isteğe bağlı):* `SENTRY_DSN` verilmişse web ve işçi istisnaları
+   ve ERROR satırlarını Sentry'ye gönderir (PII kapalı, istek gövdesi hiç,
+   olaydaki her dize redaksiyondan geçer; `surec` etiketi `web`/`isci`, işçide
+   `is_id` etiketi, web'de `istek_id`). DSN yoksa paket ithal bile edilmez.
+   Kurulum: Sentry'de proje aç (Platform: Python → FastAPI) → *Client Keys
+   (DSN)* → değeri platformda **web ve işçi** servislerinin ikisine de
+   `SENTRY_DSN` olarak yaz, istersen `SENTRY_ENVIRONMENT=production`; dağıt.
+   Doğrula: işçiye bozuk bir iş ver ya da geçici olarak bir hata fırlat, Sentry
+   *Issues*'ta `kromis@<sürüm>` etiketiyle görünmeli. Kapatmak: değişkeni sil,
+   yeniden dağıt. Uyarı kuralları (`uyari` olayı, hata oranı) Sentry
+   panelinde *Alerts* altında tanımlanır, kodda değil.
 
 ---
 

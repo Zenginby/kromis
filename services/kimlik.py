@@ -128,6 +128,11 @@ def bagla(request: Request, kullanici: Kullanici) -> Kullanici:
     testler arası emniyet tests/conftest.py'de (`kiraci.sifirla`).
     """
     request.state.kullanici = kullanici
+    # Kimlik AYRICA düz değer olarak (Faz 2 / 9): erişim satırı (services/istek_kimligi.py)
+    # istek BİTTİKTEN sonra yazılıyor; o an oturum kapanmış, nesne ayrılmış ve süresi
+    # geçmiş bir `kullanici.id` okuması `DetachedInstanceError` (ölçüldü). uuid kopyası
+    # oturumdan bağımsız.
+    request.state.kullanici_id = kullanici.id
     dil.kullanici_dili(request, kullanici.dil)
     kiraci.bagla(kullanici_id=kullanici.id)
     return kullanici

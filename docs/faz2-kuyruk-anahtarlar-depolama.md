@@ -2051,8 +2051,9 @@ SİLİNECEKTİ (kurgu testi o durumu taşıyor). **compose** `isci` →
 göç ×2 → **`docker run --rm … kromis python isci.py --tek-tur`** (boş kuyruk,
 0) → web konteyneri → `/health` gövdesinde `worker_alive` ALANI (Python
 `assert`), `/giris`, `/`; `_test.yml` değişmedi (test mandallı). İmaj boyutu
-bu PR'ın CI koşusundan okunur ve aşağıya yazılır (bu makinede Docker
-daemon'u yok). **`.env.example`** +1 (`KROMIS_IS_SAKLAMA_GUN`; `ALTYAPI`
+bu PR'ın CI koşusundan (run 35451425252): **281 MB** — Faz 1 sonunda 284 MB'tı;
+`sentry-sdk` (+2 MB beklenen) taban imajın güncellenmesiyle dengelendi, takip
+kapanır (bu makinede Docker daemon'u yok, sayı CI'dan). **`.env.example`** +1 (`KROMIS_IS_SAKLAMA_GUN`; `ALTYAPI`
 bekçisi). **"180" düzeltmesi (studyo-guncelleme-plani.md B3):**
 `services/zaman.py::damga_utc` (UTC, saniye, `Z`) — `kuyruk._json`
 (`/api/isler*`, SSE) ve `depo_admin` (`/api/admin/*`) damgaları dilimli;

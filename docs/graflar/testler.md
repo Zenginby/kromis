@@ -56,7 +56,7 @@
 | `screencolor` | `test_screencolor.py` |
 | `services.ayar` | `test_app_bolme.py`, `test_artik_dosya.py`, `test_gunluk.py`, `test_hesap.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik.py`, `test_kuyruk.py`, `test_paths.py`, `test_rls.py` |
 | `services.cerez` | `test_admin.py`, `test_docker_kapisi.py`, `test_hesap.py`, `test_kimlik.py`, `test_playwright_hesap.py`, `test_rls.py` |
-| `services.db` | `test_admin.py`, `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_db.py`, `test_dil.py`, `test_docker_kapisi.py`, `test_goc.py`, `test_guncelleme_route.py`, `test_health.py`, `test_ice_aktar.py`, `test_kullanici_cli.py`, `test_playwright_studio.py`, `test_rls.py` |
+| `services.db` | `test_admin.py`, `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_db.py`, `test_dil.py`, `test_docker_kapisi.py`, `test_goc.py`, `test_guncelleme_route.py`, `test_health.py`, `test_ice_aktar.py`, `test_isci.py`, `test_kullanici_cli.py`, `test_playwright_studio.py`, `test_rls.py` |
 | `services.depo_admin` | `test_admin.py`, `test_health.py` |
 | `services.depo_kimlik_bilgisi` | `test_anahtar_dondur.py`, `test_ice_aktar.py`, `test_isci.py`, `test_kimlik_bilgisi_db.py`, `test_platform_anahtari.py`, `test_settings_route.py`, `test_sifre.py` |
 | `services.depo_klasor` | `test_folders.py`, `test_galeri_db.py`, `test_guvenlik_baslik.py`, `test_legacy_formats.py`, `test_playwright_studio.py` |
@@ -115,7 +115,7 @@
 
 Bu modülleri hiçbir test dosyası ithal etmiyor. Dolaylı olarak sınanıyor olabilirler (`import app` app'in ithal ettiği her şeyi çalıştırır), ama doğrudan bekçileri yok.
 
-* `isci` (322 satır)
+* `isci` (382 satır)
 * `routers.admin` (136 satır)
 * `routers.ayarlar` (401 satır)
 * `routers.bindirme` (282 satır)

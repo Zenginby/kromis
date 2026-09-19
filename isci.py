@@ -31,22 +31,40 @@ DÖNGÜ: `KROMIS_ISCI_ES_ZAMANLI` (öntanımlı 4) iş parçacığı, her biri
 düşürme) — sağlayıcı çağrısı adaptörün içinde dakikalarca bloklar, çağıran
 iş parçacığı atamaz. Bir iş parçacığında beklenmeyen istisna (DB düştü,
 ağ) döngüyü ÖLDÜRMEZ: iz `hata.log`a, 1 sn uyku, devam — ölen bir iş
-parçacığı sessizce kapasite düşürürdü.
+parçacığı sessizce kapasite düşürürdü. Kalp turu `isciler` satırını
+bulamazsa onu YENİDEN YAZAR (`olay=isci.yeniden_kaydoldu`): başka bir
+işçinin ölü satır süpürmesi, 5 dk'lık bir DB kesintisi ya da dağıtımda yeni
+işçinin açılış turu boşalan eskinin satırını silmiş olabilir — süreç
+yaşıyor ve iş koşturuyorsa `/health` onu ölü göstermemeli, kapanıştaki
+`kaydi_sil` de sessizce 0 satıra düşmemeli.
 
-BAKIM (Faz 2 / 10): kalp iş parçacığı açılışta bir kez ve sonra 5 dk'da bir
-(`isci.BAKIM_ARALIGI_SN`) `isci.bakim_turu` çağırır — 30 günlük saklama
-(`KROMIS_IS_SAKLAMA_GUN`; kapanmış satır + referanssız girdi dizini) ve ölü
-`isciler` satırları (kalp eşiği). Açılıştaki tur bilerek: tek işçili
+BAKIM (Faz 2 / 10): AYRI bir bakım iş parçacığı açılışta bir kez ve sonra 5
+dk'da bir (`isci.BAKIM_ARALIGI_SN`) `isci.bakim_turu` çağırır — 30 günlük
+saklama (`KROMIS_IS_SAKLAMA_GUN`; kapanmış satır + referanssız girdi dizini)
+ve ölü `isciler` satırları (kalp eşiği). Kalp iş parçacığında DEĞİL, çünkü
+bir tur nesne başına bir `listele` + bir `sil` ile ağa çıkıyor ve birikmiş
+bir kuyrukta dakikalar sürebilir: kalp o sürede atamazdı, eldeki işlerin
+`kalp_atisi` 300 sn'yi aşınca başka bir işçi onları `hata`ya çeker ve
+sonuçları çöpe giderdi (`bitir` 0 satır), 90 sn'de `/health` bu işçiyi ölü
+gösterir, 300 sn'de satırı silinirdi. Açılıştaki tur bilerek: tek işçili
 dağıtımda (K11) SIGKILL'le ölen önceki işçinin satırını silecek başka işçi
 yok, yenisi kalkar kalkmaz siler ve `/health` `worker_alive` doğruyu söyler.
 Bir şey silinince `olay=bakim` (sayılar), boş turda satır yok. Ayrı cron YOK.
 
-KAPANIŞ: SIGTERM/SIGINT → almayı bırak, eldeki işleri BİTİR (sağlayıcı
-çağrısı faturalandı, yarıda kesmek sonucu çöpe atmak), sonra `isciler`
-satırını sil ve çık. Platformun `kill_timeout`ı yetmezse iş `calisiyor`da
-kalır ve bayat düşürme onu `hata` yapar (K8; süreler docs/isletme.md § 7:
-Fly `kill_timeout` 300 sn, compose `stop_grace_period` 60 sn — en uzun
-sağlayıcı çağrısı (video, 600 sn) ikisini de aşabilir, bilinen sınır).
+KAPANIŞ: SIGTERM/SIGINT → almayı bırak (`durdur`), eldeki işleri BİTİR
+(sağlayıcı çağrısı faturalandı, yarıda kesmek sonucu çöpe atmak) — KALP BU
+SÜREDE ATMAYI SÜRDÜRÜR: iki ayrı bayrak var, kalp ve bakım `kapat`a bakar ve
+`kapat` ancak iş parçacıkları boşaldığında kalkar. Tek bayrakla kalp
+SIGTERM'de susuyordu; boşaltma `kill_timeout`a (Fly 300 sn) kadar sürebilir
+ve son kalp SIGTERM'den ≤ 30 sn önce atılmışsa 270. saniyeden sonra biten
+bir iş yeni işçinin bayat düşürmesine yakalanıp `hata` oluyordu — belge § 7
+"300 sn'lik iş sığar" derken sığmıyordu. Sonra kalp ve bakım iş
+parçacıkları beklenir (`KAPANIS_BEKLEME_SN`; yarım bakım turu varsa
+uyarı, hata değil), `isciler` satırı silinir, motor kapanır, çıkış 0.
+Platformun `kill_timeout`ı yetmezse iş `calisiyor`da kalır ve bayat düşürme
+onu `hata` yapar (K8; süreler docs/isletme.md § 7: Fly `kill_timeout` 300 sn,
+compose `stop_grace_period` 60 sn — en uzun sağlayıcı çağrısı (video, 600 sn)
+ikisini de aşabilir, bilinen sınır).
 
 GÜNLÜK stdout'a, satır başına JSON (Faz 2 / 9; services/gunluk.py, web ile
 aynı kurulum ve biçim, `KROMIS_GUNLUK_BICIMI=metin` yerelde okunur): süreç
@@ -68,7 +86,6 @@ import signal
 import socket
 import sys
 import threading
-import time
 import traceback
 import uuid
 from types import FrameType
@@ -85,6 +102,12 @@ CIKIS_CALISMA = 1
 CIKIS_ORTAM = 2
 
 _gunluk = logging.getLogger("kromis.isci")
+
+# Kapanışta kalp ve bakım iş parçacıklarına verilen süre (her birine). Kalp turu
+# saniyeler; bakım turu ağa çıkar ve yarım kalabilir — beklemeden `dispose`
+# etmek turu "bakim turu dustu" iziyle `hata.log`a düşürürdü, oysa kapanışta
+# yarım kalan tur kusur değil (bir sonraki işçi kaldığı yerden süpürür).
+KAPANIS_BEKLEME_SN = 15.0
 
 
 def _olay(ad: str, mesaj: str | None = None, *, seviye: int = logging.INFO, **alanlar: Any) -> None:
@@ -109,8 +132,15 @@ class Surec:
         self.kalp_araligi = kalp_araligi
         self.saklama = saklama
         self.bakim_araligi = bakim_araligi
+        # İKİ bayrak (gerekçe modül başında, KAPANIŞ): `durdur` = yeni iş alma
+        # (SIGTERM anında kalkar); `kapat` = kalp ve bakım da dursun (eldeki
+        # işler bittikten SONRA kalkar). Kalp `durdur`a baksaydı boşaltma
+        # sırasında susardı.
         self.durdur = threading.Event()
+        self.kapat = threading.Event()
         self.isci_id: uuid.UUID | None = None
+        # Satırın kimliği — kalp turu satırı bulamazsa aynı `id` ve `basladi`yla yeniden yazar.
+        self.kayit: kuyruk.IsciKaydi | None = None
         # Eldeki işlerin id'leri — kalp atışı bunları `kalp_atisi`yle diri tutar.
         self._eldekiler: set[uuid.UUID] = set()
         self._kilit = threading.Lock()
@@ -118,11 +148,14 @@ class Surec:
     # ── kayıt ──
 
     def kaydol(self) -> uuid.UUID:
+        an = zaman.an()
+        kayit = kuyruk.IsciKaydi(konak=socket.gethostname(), surum=version.APP_VERSION,
+                                 es_zamanli=self.es_zamanli, basladi=an)
         with Session(self.motor) as oturum:
-            satir = kuyruk.isci_kaydet(oturum, socket.gethostname(), version.APP_VERSION,
-                                       self.es_zamanli, zaman.an())
+            satir = kuyruk.isci_kaydet(oturum, kayit.konak, kayit.surum, kayit.es_zamanli, an)
             oturum.commit()
             self.isci_id = satir.id
+        self.kayit = kayit
         return self.isci_id
 
     def kaydi_sil(self) -> None:
@@ -177,34 +210,82 @@ class Surec:
             if ozet:
                 _olay("bakim", "saklama ve olu isci satirlari", **ozet)
         except Exception:
+            if self.kapat.is_set():
+                # Kapanış turu yarıda kesti (motor kapandı): kusur değil, iz değil — uyarı yeter.
+                _olay("bakim", "kapanista yarim kaldi", seviye=logging.WARNING)
+                return
             self._istisna("bakim turu dustu")
 
+    def bakim_dongusu(self) -> None:
+        """Bakım iş parçacığı: açılışta bir tur, sonra `bakim_araligi`de bir — kalpten AYRI (gerekçe modül başında)."""
+        self.bakim()
+        while not self.kapat.wait(self.bakim_araligi):
+            self.bakim()
+
     def kalp(self) -> None:
-        """Kalp atışı iş parçacığı: `kalp_araligi` saniyede bir `isci.kalp_turu`; `bakim_araligi`de bir `bakim`."""
+        """Kalp atışı iş parçacığı: `kalp_araligi` saniyede bir `isci.kalp_turu`, `kapat`a kadar (SIGTERM'den sonra da)."""
         assert self.isci_id is not None
-        son_bakim = time.monotonic()
-        while not self.durdur.wait(self.kalp_araligi):
+        while not self.kapat.wait(self.kalp_araligi):
             with self._kilit:
                 eldekiler = list(self._eldekiler)
             try:
                 an = zaman.an()
                 with Session(self.motor) as oturum:
-                    dusen = isci.kalp_turu(oturum, self.isci_id, eldekiler, an, self.esik)
+                    ozet = isci.kalp_turu(oturum, self.isci_id, eldekiler, an, self.esik, kayit=self.kayit)
                     uyari = isci.kuyruk_uyarisi(oturum, an)
-                if dusen:
-                    _olay("bayat", seviye=logging.WARNING, adet=dusen)
+                if ozet.yeniden_kaydoldu:
+                    _olay("isci.yeniden_kaydoldu", "isciler satiri yoktu, ayni kimlikle yeniden yazildi",
+                          seviye=logging.WARNING, isci_id=str(self.isci_id), eldeki=len(eldekiler))
+                if ozet.dusen:
+                    _olay("bayat", seviye=logging.WARNING, adet=ozet.dusen)
                 if uyari:
                     # docs/isletme.md § 6 eşikleri; Sentry uyarı kuralı bu satıra bağlanır.
                     _olay("uyari", "kuyruk esigi asildi", seviye=logging.WARNING, **uyari)
             except Exception:
                 self._istisna("kalp atisi dustu")
-            if time.monotonic() - son_bakim >= self.bakim_araligi:
-                son_bakim = time.monotonic()
-                self.bakim()
 
     def eldeki_sayisi(self) -> int:
         with self._kilit:
             return len(self._eldekiler)
+
+    def calistir(self) -> None:
+        """Ana döngü: iş parçacıkları + kalp + bakım açılır, eldekiler bitene dek beklenir, kapanış SIRALANIR.
+
+        `main`in gövdesi; testler süreç açmadan, `durdur`u kendileri kaldırarak
+        çağırır. Sıra: `durdur` (zaten kalkmış olabilir) → `kapat` → kalp ve
+        bakım beklenir (`KAPANIS_BEKLEME_SN`) → satır silinir → motor kapanır.
+        Kalp `kapat`a kadar atar: eldeki işler boşalırken `kalp_atisi` taze
+        kalır (gerekçe modül başında, KAPANIŞ).
+        """
+        assert self.isci_id is not None
+        parcaciklar = [threading.Thread(target=self.dongu, name=f"kromis-isci-{i}", daemon=True)
+                       for i in range(self.es_zamanli)]
+        kalp = threading.Thread(target=self.kalp, name="kromis-isci-kalp", daemon=True)
+        bakim = threading.Thread(target=self.bakim_dongusu, name="kromis-isci-bakim", daemon=True)
+        # Bakım ÖNCE: açılış turu hemen başlasın (gerekçe modül başında), ama işleri ve kalbi bekletmesin.
+        bakim.start()
+        for p in parcaciklar:
+            p.start()
+        kalp.start()
+        # `join()` süresiz beklerse sinyal işleyici ana iş parçacığında koşamaz;
+        # kısa aralıklarla yoklanıyor.
+        try:
+            while any(p.is_alive() for p in parcaciklar):
+                for p in parcaciklar:
+                    p.join(timeout=0.5)
+        finally:
+            self.durdur.set()
+            self.kapat.set()
+            kalp.join(timeout=KAPANIS_BEKLEME_SN)
+            bakim.join(timeout=KAPANIS_BEKLEME_SN)
+            if bakim.is_alive():
+                _olay("bakim", "kapanista bitmedi, beklenmedi", seviye=logging.WARNING,
+                      bekleme_sn=KAPANIS_BEKLEME_SN)
+            try:
+                self.kaydi_sil()
+            except Exception:
+                _hata("isci satiri silinemedi (bayat kalir; /health worker_alive bunu gorur)")
+            self.motor.dispose()
 
 
 def _sinyal_kur(surec: Surec) -> None:
@@ -291,29 +372,8 @@ def main(argv: list[str]) -> int:
     _sinyal_kur(surec)
     _olay("isci.basladi", isci_id=str(isci_id), konak=socket.gethostname(), surum=version.APP_VERSION,
           es_zamanli=surec.es_zamanli, depo=repr(surec.depo), pid=os.getpid())
-    # Açılışta bir bakım turu (gerekçe modül başında): önceki işçinin ölü satırı hemen gitsin.
-    surec.bakim()
-
-    parcaciklar = [threading.Thread(target=surec.dongu, name=f"kromis-isci-{i}", daemon=True)
-                   for i in range(surec.es_zamanli)]
-    kalp = threading.Thread(target=surec.kalp, name="kromis-isci-kalp", daemon=True)
-    for p in parcaciklar:
-        p.start()
-    kalp.start()
-    # `join()` süresiz beklerse sinyal işleyici ana iş parçacığında koşamaz;
-    # kısa aralıklarla yoklanıyor.
-    try:
-        while any(p.is_alive() for p in parcaciklar):
-            for p in parcaciklar:
-                p.join(timeout=0.5)
-    finally:
-        surec.durdur.set()
-        kalp.join(timeout=5)
-        try:
-            surec.kaydi_sil()
-        except Exception:
-            _hata("isci satiri silinemedi (bayat kalir; /health worker_alive bunu gorur)")
-        surec.motor.dispose()
+    # Açılış bakım turu, iş parçacıkları, kalp, boşaltma ve kapanış sırası `Surec.calistir`da.
+    surec.calistir()
     _olay("isci.kapandi", isci_id=str(surec.isci_id))
     return CIKIS_TAMAM
 

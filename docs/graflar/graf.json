@@ -781,7 +781,7 @@
       ],
       "ithal_eden": [],
       "katman": 12,
-      "satir": 322,
+      "satir": 382,
       "testler": [],
       "yol": "isci.py"
     },
@@ -1504,6 +1504,7 @@
         "tests/test_guncelleme_route.py",
         "tests/test_health.py",
         "tests/test_ice_aktar.py",
+        "tests/test_isci.py",
         "tests/test_kullanici_cli.py",
         "tests/test_playwright_studio.py",
         "tests/test_rls.py"
@@ -1915,7 +1916,7 @@
         "isci"
       ],
       "katman": 11,
-      "satir": 643,
+      "satir": 664,
       "testler": [
         "tests/test_docker_kapisi.py",
         "tests/test_gunluk.py",
@@ -2102,7 +2103,7 @@
         "tools.artik_dosya"
       ],
       "katman": 10,
-      "satir": 459,
+      "satir": 485,
       "testler": [
         "tests/test_admin.py",
         "tests/test_artik_dosya.py",

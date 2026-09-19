@@ -84,9 +84,19 @@ kiracıyı görürdü; bağlı işçi yanlışlıkla bile tek kiracının satır
 Bağlam `kiraci.baglam(...)` ile ve `with` içinde: aynı iş parçacığı bir
 sonraki işi başka kiracı için koşturur (yukarıdaki `[A, B]` dersi).
 
-BAKIM TURU (Faz 2 / 10): `bakim_turu` işçinin kalp iş parçacığında AÇILIŞTA ve
-sonra `BAKIM_ARALIGI_SN`de (5 dk) bir koşar — ayrı cron yok, işçi zaten
-sürekli koşan tek süreç. Üç iş: (1) SAKLAMA — kapanmış ve `bitti` 30 günden
+KALP TURU satırı bulamazsa (`isci_kalp` `False`) ve çağıran kimliği
+vermişse (`kayit`) satırı aynı `id`yle YENİDEN YAZAR: `olu_iscileri_sil`
+yaşayan bir işçinin satırını da götürebilir (5 dk kalp atamamış — DB
+kesintisi, uzun duraklama — ya da dağıtımda boşalan eskinin satırını yeni
+işçinin açılış turu silmiş). Süreç yaşıyor ve iş koşturuyorsa `/health`
+onu ölü göstermemeli; `KalpOzeti.yeniden_kaydoldu` çağırana söyler, olay
+oradan (`isci.py`, `olay=isci.yeniden_kaydoldu`).
+
+BAKIM TURU (Faz 2 / 10): `bakim_turu` işçinin AYRI bakım iş parçacığında
+AÇILIŞTA ve sonra `BAKIM_ARALIGI_SN`de (5 dk) bir koşar — kalp iş
+parçacığında değil (bir tur nesne başına ağa çıkar ve dakikalar sürebilir;
+kalp o sürede susarsa eldeki işler bayat düşer — gerekçe `isci.py` başında),
+ayrı cron da yok, işçi zaten sürekli koşan tek süreç. Üç iş: (1) SAKLAMA — kapanmış ve `bitti` 30 günden
 (`KROMIS_IS_SAKLAMA_GUN`) eski `isler` satırları silinir; sahipler admin
 bağlamında bulunur (`kuyruk.saklama_sahipleri`), satırlar HER KİRACININ KENDİ
 bağlamında silinir (`kuyruk.eskileri_sil`: admin politikası DELETE vermez,
@@ -114,7 +124,7 @@ import time
 import traceback
 import uuid
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from typing import Any
+from typing import Any, NamedTuple
 
 from sqlalchemy.orm import Session
 
@@ -149,7 +159,7 @@ __all__ = ["ES_ZAMANLI_ENV", "ES_ZAMANLI_VARSAYILAN", "KALP_ESIGI_ENV", "KALP_ES
            "KALP_ARALIGI_SN", "YOKLAMA_ARALIGI_SN", "BEKLENMEYEN_HATASI", "KULLANICI_YOK_HATASI",
            "UYARI_KUYRUK_DERINLIGI", "UYARI_EN_ESKI_BEKLEYEN_SN",
            "es_zamanli", "kalp_esigi", "saklama", "siradakini_al", "kos", "tek_tur", "kalp_turu",
-           "kuyruk_uyarisi", "bakim_turu", "BakimOzeti"]
+           "KalpOzeti", "kuyruk_uyarisi", "bakim_turu", "BakimOzeti"]
 
 # Aynı anda kaç iş (iş parçacığı) — `.env.example`, `compose.yaml` ve `isci.py`
 # aynı adı buradan okur (bekçisi tests/test_docker_kapisi.py `ALTYAPI`).
@@ -539,24 +549,35 @@ def tek_tur(db: Session, depo: dosya.Depo, an: dt.datetime | None = None, *,
 
 # ────────────────────────────────────────────────────────── kalp
 
+class KalpOzeti(NamedTuple):
+    """`kalp_turu`nun sonucu: bayat düşürülen iş sayısı ve işçi satırı yeniden yazıldı mı."""
+    dusen: int
+    yeniden_kaydoldu: bool
+
+
 def kalp_turu(db: Session, isci_id: uuid.UUID, is_idleri: Iterable[uuid.UUID], an: dt.datetime,
-              esik: dt.timedelta) -> int:
-    """Kalp atışı iş parçacığının bir turu: işçi satırı + eldeki işler + bayat düşürme; düşürülen sayı.
+              esik: dt.timedelta, kayit: kuyruk.IsciKaydi | None = None) -> KalpOzeti:
+    """Kalp atışı iş parçacığının bir turu: işçi satırı + eldeki işler + bayat düşürme; `KalpOzeti`.
 
     AYRI iş parçacığında koşar (belge §3): sağlayıcı çağrısı adaptörün içinde
     dakikalarca bloklar ve çağıran iş parçacığı kalp atamaz. Kendi oturumu,
     kendi commit'i. Bayat düşürme burada: ölen bir işçinin işini yaşayan bir
     işçi `hata`ya çeker — 10. görevin periyodik bakımı aynı işlevi çağırır.
     `app.rol = 'admin'` ile (RLS): eldeki işler ve bayatlar her kiracının;
-    `isciler` politikasız, rol ona dokunmaz.
+    `isciler` politikasız, rol ona dokunmaz. İşçi satırı yoksa ve `kayit`
+    verilmişse satır aynı kimlikle yeniden yazılır (gerekçe modül başında);
+    `kayit`sız çağrı (testler, `--tek-tur` yolu) eski davranış: yok say.
     """
+    yeniden = False
     with kiraci.baglam(rol=kiraci.ADMIN, oturum=db):
-        kuyruk.isci_kalp(db, isci_id, an)
+        if not kuyruk.isci_kalp(db, isci_id, an) and kayit is not None:
+            kuyruk.isci_yeniden_kaydet(db, isci_id, kayit, an)
+            yeniden = True
         for is_id in is_idleri:
             kuyruk.kalp(db, is_id, an)
         dusen = kuyruk.bayatlari_dusur(db, an, esik)
         db.commit()
-    return dusen
+    return KalpOzeti(dusen, yeniden)
 
 
 def kuyruk_uyarisi(db: Session, an: dt.datetime) -> dict[str, Any] | None:

@@ -344,9 +344,35 @@ def isci_son_kalp(db: Session | Connection) -> dt.datetime | None:
 
 
 def isci_kalp(db: Session, isci_id: uuid.UUID, an: dt.datetime) -> bool:
-    """30 sn'de bir `son_kalp = an`; `False` = satır yok (admin düşürmüş ya da kayıt hiç olmamış)."""
+    """30 sn'de bir `son_kalp = an`; `False` = satır yok (admin düşürmüş, ölü sayılıp süpürülmüş ya da kayıt hiç olmamış)."""
     sonuc = db.execute(update(Isci).where(Isci.id == isci_id).values(son_kalp=an))
     return _etkilenen(sonuc) > 0
+
+
+@dataclasses.dataclass(frozen=True)
+class IsciKaydi:
+    """Bir işçi satırının kimlik alanları — `isci_yeniden_kaydet` satırı bunlarla ve ESKİ `id`yle yeniden yazar."""
+    konak: str
+    surum: str
+    es_zamanli: int
+    basladi: dt.datetime
+
+
+def isci_yeniden_kaydet(db: Session, isci_id: uuid.UUID, kayit: IsciKaydi, an: dt.datetime) -> None:
+    """Kalp turu satırı bulamadı: aynı `id` ve `basladi` ile yeniden yazar, `son_kalp = an`.
+
+    Satır işçi yaşarken de silinebilir: `olu_iscileri_sil` `son_kalp < an - esik`
+    satırı süpürür ve 5 dk'lık bir DB kesintisi, uzun bir duraklama ya da
+    dağıtımda yeni işçinin açılış turu (boşalan eskinin son kalbi eşiği
+    aşmışsa) yaşayan işçinin satırını götürür. `isci_kaydet` DEĞİL: kimlik
+    aynı kalmalı — `isler.isci_id` bu `id`yi taşır ve `/admin` işçiyi tek
+    satır olarak görmeli; `basladi` de gerçek açılış. Çağıran `isci_kalp`
+    `False` dönünce çağırır; iki ifade arasında yarış yok — silecek olan
+    yalnız eski `son_kalp`e bakar, yeni satırınki `an`.
+    """
+    db.add(Isci(id=isci_id, konak=kayit.konak, surum=kayit.surum, es_zamanli=kayit.es_zamanli,
+                basladi=kayit.basladi, son_kalp=an))
+    db.flush()
 
 
 def isci_sil(db: Session, isci_id: uuid.UUID) -> bool:

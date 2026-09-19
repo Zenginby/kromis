@@ -86,6 +86,7 @@ KIRACISIZ = {
         "bekleyen_ozeti": "periyodik uyarı (Faz 2 / 9): bütün kiracıların bekleyen işi — derinlik ve en eski yaş",
         "isci_kaydet": "`isciler` tablosunda kullanıcı sütunu yok",
         "isci_kalp": "`isciler` tablosunda kullanıcı sütunu yok",
+        "isci_yeniden_kaydet": "`isciler` tablosunda kullanıcı sütunu yok; kalp turu silinmiş kendi satırını aynı `id`yle geri yazar",
         "isci_sil": "`isciler` tablosunda kullanıcı sütunu yok",
         "isci_son_kalp": "`isciler` tablosunda kullanıcı sütunu yok; `/health` `worker_alive` (Faz 2 / 9)",
         "saklama_sahipleri": "periyodik bakım (Faz 2 / 10): saklama süresi dolmuş işi olan BÜTÜN kiracılar — "

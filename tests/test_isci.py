@@ -3,9 +3,11 @@
 Hepsi GERÇEK Postgres'e karşı (`depo_db`), sağlayıcı YAMALI (`providers.*` →
 sahte bayt; 104 rota testinin deyimi), depo yerel disk (`YerelDepo(tmp_path)`).
 Belge §3'ün "testlerde işçi süreç DEĞİL işlev" kararı: süreç yok, port yok,
-uyku yok — yalnız son üç test `isci.py`yi alt süreç olarak açar (anahtarsız
-açılmaz, `--tek-tur` boş kuyrukta 0, SIGTERM temiz kapanış), çünkü kapılar ve
-sinyal ancak süreçte ölçülür.
+uyku yok — yalnız (v)'nin süreç testleri `isci.py`yi alt süreç olarak açar
+(anahtarsız açılmaz, `--tek-tur` boş kuyrukta 0, SIGTERM temiz kapanış, boşaltma
+sırasında kalp, silinen satırın yeniden yazılması), çünkü kapılar ve sinyal
+ancak süreçte ölçülür; `Surec.calistir`ın iş parçacığı düzeni ise süreçsiz,
+sahte `kos`la ölçülür (aynı bölüm).
 
 Beş soru:
 
@@ -18,7 +20,8 @@ Beş soru:
         KOD + `hata.log`; metin KULLANICININ dilinde; eksik girdi 404 metni.
   (iv)  BAĞLAM — kimlik iş başına bağlanır ve ÇÖZÜLÜR (`[A, B]`); dil sıfırlanır;
         sağlayıcı çağrısı sırasında havuzdan bağlantı tutulmaz; iki işçi iki iş;
-        kalp ilerler ve bayatı düşürür.
+        kalp ilerler ve bayatı düşürür; işçi satırı yokken kalp onu aynı kimlikle
+        yeniden yazar.
   (v)   SÜREÇ — `isci.py` web'in kapılarını taşır; anahtarsız 2; `--tek-tur`
         boş kuyrukta 0, dolu kuyrukta işi koşturur; `isciler` satırı + kalp +
         SIGTERM → 0 ve satır silinir.
@@ -27,11 +30,14 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import importlib
 import json
 import os
 import signal
 import subprocess
 import sys
+import textwrap
+import threading
 import time
 import uuid
 
@@ -47,6 +53,7 @@ import kimlik_baglami
 import providers
 from services import (
     ayar,
+    db,
     depo_kimlik_bilgisi,
     depo_medya,
     dil,
@@ -562,7 +569,7 @@ def test_heartbeat_advances_the_worker_row_and_every_running_job(db_oturumu, kul
     kuyruk.al(db_oturumu, satir.id, _an(0))
     kuyruk.al(db_oturumu, satir.id, _an(0))
     db_oturumu.commit()
-    assert isci.kalp_turu(db_oturumu, satir.id, [a, b], _an(30), ESIK) == 0
+    assert isci.kalp_turu(db_oturumu, satir.id, [a, b], _an(30), ESIK) == (0, False)
     db_oturumu.expire_all()
     assert db_oturumu.get(tablolar.Isci, satir.id).son_kalp == _an(30)
     assert (_is(db_oturumu, a).kalp_atisi, _is(db_oturumu, b).kalp_atisi) == (_an(30), _an(30))
@@ -578,10 +585,37 @@ def test_heartbeat_drops_jobs_whose_heart_stopped_beyond_the_threshold(db_oturum
     kuyruk.al(db_oturumu, satir.id, _an(0))          # benim işim (FIFO: ilk eklenen)
     kuyruk.al(db_oturumu, olu_isci, _an(0))          # ölen işçinin işi
     db_oturumu.commit()
-    assert isci.kalp_turu(db_oturumu, satir.id, [benim], _an(200), ESIK) == 0
-    assert isci.kalp_turu(db_oturumu, satir.id, [benim], _an(400), ESIK) == 1
+    assert isci.kalp_turu(db_oturumu, satir.id, [benim], _an(200), ESIK).dusen == 0
+    assert isci.kalp_turu(db_oturumu, satir.id, [benim], _an(400), ESIK).dusen == 1
     assert (_is(db_oturumu, benim).durum, _is(db_oturumu, olen).durum) == ("calisiyor", "hata")
     assert _is(db_oturumu, olen).hata == kuyruk.BAYAT_HATASI
+
+
+def test_the_heartbeat_rewrites_a_missing_worker_row_with_the_same_identity_only_when_given_one(
+        db_oturumu, kullanici):
+    """Yaşayan işçinin satırı gidebilir (başka işçinin `olu_iscileri_sil`i, 5 dk'lık kesinti,
+    dağıtımda yeni işçinin açılış turu): `kayit` verilmişse kalp turu satırı AYNI `id` ve
+    `basladi`yla yeniden yazar ve bunu söyler; `kayit`sız çağrı eski davranış — yok sayar."""
+    satir = kuyruk.isci_kaydet(db_oturumu, "konak", "0.0.0", 2, _an())
+    db_oturumu.commit()
+    isci_id = satir.id
+    kayit = kuyruk.IsciKaydi(konak="konak", surum="0.0.0", es_zamanli=2, basladi=_an())
+    assert isci.kalp_turu(db_oturumu, isci_id, [], _an(30), ESIK, kayit=kayit) == (0, False), "satır varken yalnız kalp"
+    kuyruk.isci_sil(db_oturumu, isci_id)
+    db_oturumu.commit()
+    # Silinen nesne bu oturumun kimlik haritasında duruyor; işçi her turu YENİ oturumda koşar,
+    # burada aynı anahtarla yeniden `add` edilebilsin diye haritadan çıkarılıyor.
+    db_oturumu.expunge(satir)
+    assert isci.kalp_turu(db_oturumu, isci_id, [], _an(60), ESIK) == (0, False), "kimlik verilmedi: eski davranış"
+    db_oturumu.commit()
+    assert list(db_oturumu.scalars(select(tablolar.Isci.id))) == [], "kimliksiz tur satır yazmaz"
+    ozet = isci.kalp_turu(db_oturumu, isci_id, [], _an(90), ESIK, kayit=kayit)
+    assert ozet == (0, True) and ozet.yeniden_kaydoldu is True
+    yeni = db_oturumu.get(tablolar.Isci, isci_id)
+    assert yeni is not None
+    assert (yeni.konak, yeni.surum, yeni.es_zamanli, yeni.basladi, yeni.son_kalp) == ("konak", "0.0.0", 2, _an(), _an(90))
+    assert isci.kalp_turu(db_oturumu, isci_id, [], _an(120), ESIK, kayit=kayit) == (0, False), "bir kez yazıldı, sonrası kalp"
+    assert kuyruk.isci_son_kalp(db_oturumu) == _an(120), "/health yeniden yazılan satırı görür"
 
 
 def test_concurrency_and_threshold_come_from_the_environment_with_defaults_and_refuse_nonsense():
@@ -698,9 +732,70 @@ def test_the_entry_point_carries_the_same_gates_as_the_web_and_sizes_its_own_poo
     for parca in ("sifre.dogrula_ortam()", "dosya.depo_kur(", "db.motor_kur(url, pool_size=es_zamanli + 1)",
                   "signal.SIGTERM", "signal.SIGINT", "kuyruk.isci_kaydet(", "kuyruk.isci_sil(",
                   "isci.kalp_turu(", "isci.siradakini_al(", "isci.kos(", "isci.tek_tur(",
-                  "isci.bakim_turu(", "isci.saklama()"):
+                  "isci.bakim_turu(", "isci.saklama()", "kayit=self.kayit", "self.kapat.wait(",
+                  'name="kromis-isci-bakim"'):
         assert parca in kaynak, parca
     assert "uvicorn" not in kaynak and "FastAPI" not in kaynak, "işçi web değil: rota yok, port yok"
+
+
+def test_the_heartbeat_keeps_beating_after_stop_while_a_job_drains_and_shutdown_is_ordered(
+        veritabani_url, depo_db, db_oturumu, kullanici, depo, yerlesim, tmp_path, monkeypatch):
+    """`Surec.calistir` süreçsiz, sahte (bloklayan) `kos`la: `durdur` kalktıktan (SIGTERM) sonra
+    eldeki iş bitene dek `isciler.son_kalp` ve işin `kalp_atisi` İLERLEMEYİ SÜRDÜRÜR — tek bayrakla
+    kalp SIGTERM'de susuyordu ve 300 sn'ye yakın boşalan iş yeni işçinin bayat düşürmesine
+    yakalanıyordu. Kapanış sırası: iş bitti → `kapat` → kalp/bakım beklendi → satır silindi.
+    Açılış bakım turu bu düzenin içinde bir kez koşar."""
+    surec_modulu = importlib.import_module("isci")
+    is_id = _ekle(db_oturumu, kullanici.id)
+    basladi, birak = threading.Event(), threading.Event()
+    kosulan: list[uuid.UUID] = []
+
+    def sahte_kos(is_, oturum_ac, depo_, ayarlar, **k):
+        kosulan.append(is_.id)
+        basladi.set()
+        assert birak.wait(30), "test işi serbest bırakmadı"
+        return True
+
+    bakimlar: list[int] = []
+    gercek_bakim = isci.bakim_turu
+
+    def sayan_bakim(*a, **k):
+        bakimlar.append(1)
+        return gercek_bakim(*a, **k)
+
+    monkeypatch.setattr(isci, "kos", sahte_kos)
+    monkeypatch.setattr(isci, "bakim_turu", sayan_bakim)
+    motor = db.motor_kur(veritabani_url, pool_size=2)
+    surec = surec_modulu.Surec(motor, depo, yerlesim, 1, ESIK, 0.05, SAKLAMA, 3600.0)
+    surec.kaydol()
+
+    def _son_kalp():
+        with depo_db.connect() as c:
+            return c.execute(text("SELECT son_kalp FROM isciler WHERE id = :i"), {"i": surec.isci_id}).scalar_one_or_none()
+
+    def _kalp_atisi():
+        with depo_db.connect() as c:
+            return c.execute(text("SELECT kalp_atisi FROM isler WHERE id = :i"), {"i": is_id}).scalar_one()
+
+    ana = threading.Thread(target=surec.calistir, name="test-calistir")
+    ana.start()
+    try:
+        assert basladi.wait(30), "iş alınmadı"
+        surec.durdur.set()                       # SIGTERM işleyicisinin yaptığı tek şey
+        kalp1, atis1 = _son_kalp(), _kalp_atisi()
+        time.sleep(0.4)
+        kalp2, atis2 = _son_kalp(), _kalp_atisi()
+        assert ana.is_alive() and not surec.kapat.is_set(), "iş sürüyor: kapanış başlamamalı"
+        assert kalp1 is not None and kalp2 is not None and kalp2 > kalp1, "durdur'dan sonra işçi kalbi sustu"
+        assert atis1 is not None and atis2 > atis1, "durdur'dan sonra işin kalp_atisi tazelenmedi"
+    finally:
+        birak.set()
+        ana.join(30)
+    assert not ana.is_alive() and surec.kapat.is_set()
+    assert kosulan == [is_id]
+    assert _son_kalp() is None, "kapanışta satır silinir"
+    assert bakimlar == [1], "açılış bakım turu bir kez, kalpten ayrı"
+    assert not (tmp_path / "hata.log").exists()
 
 
 def _ortam(url: str | None, tmp_path, **ek: str) -> dict[str, str]:
@@ -721,6 +816,29 @@ def _kos(argv: list[str], ortam: dict[str, str]) -> subprocess.CompletedProcess[
 def _olaylar(cikti: str) -> list[dict]:
     """Sürecin stdout'u satır başına JSON (Faz 2 / 9; services/gunluk.py) — her satır açılmak ZORUNDA."""
     return [json.loads(s) for s in cikti.splitlines() if s.strip()]
+
+
+def _yavas_saglayici(tmp_path, saniye: float) -> str:
+    """Alt sürece `sitecustomize` ile yamalı sağlayıcı: `providers.generate` `saniye` uyur, sonra PNG döner.
+
+    Gerçek süreçte sağlayıcıyı `monkeypatch`leyemeyiz; `PYTHONPATH`in başındaki
+    dizinden gelen `sitecustomize` yorumlayıcı açılırken koşar ve `isci.py`
+    ithal etmeden önce modül özniteliğini değiştirir (`_uret` onu çağrı anında
+    okur). Ağa çıkılmaz, iş `bitti`ye varır — boşaltma penceresi ölçülebilir.
+    """
+    kanca = tmp_path / "kanca"
+    kanca.mkdir()
+    (kanca / "sitecustomize.py").write_text(textwrap.dedent(f"""
+        import time
+        import providers
+
+        def _yavas(model_id, prompt, size, quality, n, **k):
+            time.sleep({saniye!r})
+            return [{PNG!r}] * n
+
+        providers.generate = _yavas
+    """), encoding="utf-8")
+    return str(kanca) + os.pathsep + REPO
 
 
 def _hata_mesaji(sonuc: subprocess.CompletedProcess[str]) -> str:
@@ -873,4 +991,91 @@ def test_the_process_runs_a_maintenance_turn_at_startup_and_then_on_its_interval
     assert bakimlar[0]["silinen_isci"] == 1 and bakimlar[0]["silinen_is"] == 1 and bakimlar[0]["silinen_nesne"] == 0
     assert len(bakimlar) == 2 and bakimlar[1]["silinen_is"] == 1, "boş turlar olay düşürmez, dolu ikinci tur düşürür"
     assert _sayilar() == (0, 0), "kapanışta kendi satırı da silindi"
+    assert not (tmp_path / "hata.log").exists(), hata
+
+
+def test_the_process_keeps_beating_after_sigterm_until_the_draining_job_finishes(veritabani_url, depo_db,
+                                                                                 db_oturumu, kullanici, tmp_path):
+    """Gerçek süreç, yavaş sağlayıcı (4 sn): iş `calisiyor`ken SIGTERM → süreç kapanmaz, `son_kalp` ve
+    işin `kalp_atisi` SIGTERM'den sonra da ilerler, iş `bitti`ye varır (medya satırı + nesne), sonra 0.
+    Olay sırası: `isci.sinyal` → `is.bitti` → `isci.kapandi`."""
+    is_id = _ekle(db_oturumu, kullanici.id)
+    ortam = _ortam(veritabani_url, tmp_path, KROMIS_ISCI_ES_ZAMANLI="1", PYTHONPATH=_yavas_saglayici(tmp_path, 4.0))
+    surec = subprocess.Popen([sys.executable, "isci.py", "--kalp-araligi", "0.2"], cwd=REPO, env=ortam,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8")
+    try:
+        def _is_satiri():
+            with depo_db.connect() as c:
+                return c.execute(text("SELECT durum, kalp_atisi FROM isler WHERE id = :i"), {"i": is_id}).one()
+
+        def _son_kalp():
+            with depo_db.connect() as c:
+                return c.execute(text("SELECT max(son_kalp) FROM isciler")).scalar_one()
+
+        son = time.monotonic() + 30
+        while time.monotonic() < son and _is_satiri().durum != "calisiyor":
+            assert surec.poll() is None, surec.stderr.read() if surec.stderr else ""
+            time.sleep(0.1)
+        assert _is_satiri().durum == "calisiyor", "iş 30 sn içinde alınmadı"
+        surec.send_signal(signal.SIGTERM)
+        kalp1, atis1 = _son_kalp(), _is_satiri().kalp_atisi
+        time.sleep(1.0)
+        assert surec.poll() is None, "eldeki iş sürüyor: süreç SIGTERM'de kapanmamalı"
+        kalp2, atis2 = _son_kalp(), _is_satiri().kalp_atisi
+        assert kalp2 > kalp1, "SIGTERM'den sonra işçi kalbi sustu"
+        assert atis2 > atis1, "SIGTERM'den sonra işin kalp_atisi tazelenmedi (bayat düşürmeye açık)"
+        cikti, hata = surec.communicate(timeout=30)
+    finally:
+        if surec.poll() is None:
+            surec.kill()
+            surec.wait(timeout=10)
+    assert surec.returncode == 0, hata
+    is_ = _is(db_oturumu, is_id)
+    assert is_.durum == "bitti" and is_.sonuc and len(is_.sonuc["medya"]) == 1, is_.hata
+    adlar = [o["olay"] for o in _olaylar(cikti)]
+    assert adlar[0] == "isci.basladi" and adlar[-1] == "isci.kapandi", adlar
+    assert adlar.index("isci.sinyal") < adlar.index("is.bitti") < adlar.index("isci.kapandi"), adlar
+    assert "bayat" not in adlar, "boşalan iş bayat düşürülmedi"
+    assert _son_kalp() is None, "kapanışta satır silinir"
+    assert not (tmp_path / "hata.log").exists(), hata
+
+
+def test_the_process_rewrites_its_worker_row_when_it_disappears_underneath_it(veritabani_url, depo_db, tmp_path):
+    """Satır dışarıdan silinir (başka işçinin ölü süpürmesi, admin): bir sonraki kalp turu onu AYNI `id`
+    ve `basladi`yla geri yazar, `olay=isci.yeniden_kaydoldu` (WARNING) düşer; kapanışta yine silinir."""
+    surec = subprocess.Popen([sys.executable, "isci.py", "--kalp-araligi", "0.2"], cwd=REPO,
+                             env=_ortam(veritabani_url, tmp_path, KROMIS_ISCI_ES_ZAMANLI="1"),
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8")
+    try:
+        def _satir():
+            with depo_db.connect() as c:
+                return c.execute(text("SELECT id, basladi, son_kalp FROM isciler")).first()
+
+        son = time.monotonic() + 30
+        while time.monotonic() < son and _satir() is None:
+            assert surec.poll() is None, surec.stderr.read() if surec.stderr else ""
+            time.sleep(0.1)
+        ilk = _satir()
+        assert ilk is not None, "işçi 30 sn içinde kaydolmadı"
+        with depo_db.begin() as c:
+            c.execute(text("DELETE FROM isciler"))
+        son = time.monotonic() + 15
+        while time.monotonic() < son and _satir() is None:
+            time.sleep(0.05)
+        yeni = _satir()
+        assert yeni is not None, "silinen satır kalp turunda geri yazılmadı"
+        assert (yeni.id, yeni.basladi) == (ilk.id, ilk.basladi), "aynı kimlik, gerçek açılış anı"
+        assert yeni.son_kalp > ilk.son_kalp
+        surec.send_signal(signal.SIGTERM)
+        cikti, hata = surec.communicate(timeout=30)
+    finally:
+        if surec.poll() is None:
+            surec.kill()
+            surec.wait(timeout=10)
+    assert surec.returncode == 0, hata
+    olaylar = _olaylar(cikti)
+    yeniden = [o for o in olaylar if o["olay"] == "isci.yeniden_kaydoldu"]
+    assert len(yeniden) == 1 and yeniden[0]["seviye"] == "WARNING" and yeniden[0]["isci_id"] == str(ilk.id), cikti
+    assert [o["olay"] for o in olaylar][-1] == "isci.kapandi"
+    assert _satir() is None, "kapanışta satır silinir"
     assert not (tmp_path / "hata.log").exists(), hata

@@ -245,8 +245,11 @@ fonlanan sağlayıcıların `KROMIS_PLATFORM_*` anahtarları, isteğe bağlı
 
 **Kapanış (SIGTERM) ne yapar.** İşçi yeni iş almayı bırakır, ELDEKİ işleri
 BİTİRİR (sağlayıcı çağrısı çoktan faturalandı — yarıda kesmek sonucu çöpe
-atmak), `isciler` satırını siler, 0 ile çıkar; boşta işçi ~0,1 sn'de kapanır
-(ölçüldü). `kill_timeout` yetmezse platform SIGKILL gönderir: iş `calisiyor`da
+atmak) ve **bu sürede kalp atmayı SÜRDÜRÜR** (`isciler.son_kalp` + eldeki
+işlerin `kalp_atisi`; kalp ancak işler boşalınca durur — yoksa 270. saniyeden
+sonra biten bir iş yeni işçinin bayat düşürmesine yakalanır ve sonucu çöpe
+giderdi), sonra `isciler` satırını siler, 0 ile çıkar; boşta işçi ~0,1 sn'de
+kapanır (ölçüldü). `kill_timeout` yetmezse platform SIGKILL gönderir: iş `calisiyor`da
 kalır, yaşayan işçinin (ya da yenisinin) kalp turu `KROMIS_IS_KALP_ESIGI_SN`
 (300 sn) sonra onu `hata` ("isci yanit vermiyor") yapar, kullanıcı panelden
 yeniden gönderir — otomatik yeniden deneme YOK (K8: çift fatura riski). Ölen
@@ -346,13 +349,20 @@ sinyal/kapandi`, `bayat` (düşürülen iş sayısı), `bakim` (aşağıda), `uy
 kodda değil, panelde.
 
 **İş saklama ve bayat düşürme — ayrı cron YOK.** İşçi zaten sürekli koşan tek
-süreç; kalp iş parçacığı iki şeyi yapar:
+süreç; iki ayrı iş parçacığı iki şeyi yapar (ayrı, çünkü bakım turu nesne
+başına ağa çıkar ve birikmiş kuyrukta dakikalar sürebilir — kalp o sürede
+susarsa eldeki işler bayat düşer, `/health` işçiyi ölü gösterir):
 
-* **Her 30 sn (kalp turu):** `isciler.son_kalp`, eldeki işlerin `kalp_atisi`,
-  ve kalbi `KROMIS_IS_KALP_ESIGI_SN` (300) saniyeden uzun susan HER
-  `calisiyor` iş → `hata` ("isci yanit vermiyor"; K8, yeniden kuyruğa alınmaz).
-  Günlükte `olay=bayat adet=N`.
-* **Açılışta bir kez ve sonra her 5 dk (bakım turu, `olay=bakim`):**
+* **Her 30 sn (kalp turu, kalp iş parçacığı):** `isciler.son_kalp`, eldeki
+  işlerin `kalp_atisi`, ve kalbi `KROMIS_IS_KALP_ESIGI_SN` (300) saniyeden
+  uzun susan HER `calisiyor` iş → `hata` ("isci yanit vermiyor"; K8, yeniden
+  kuyruğa alınmaz). Günlükte `olay=bayat adet=N`. İşçinin kendi `isciler`
+  satırı YOKSA (başka işçinin ölü süpürmesi, 5 dk'lık DB kesintisi, dağıtımda
+  yeni işçinin açılış turu boşalan eskinin satırını sildi) aynı `id`yle
+  yeniden yazılır — `olay=isci.yeniden_kaydoldu` (WARNING); yaşayan işçi
+  `worker_alive:false` üretmez, kapanışta silecek satırı bulur.
+* **Açılışta bir kez ve sonra her 5 dk (bakım turu, bakım iş parçacığı,
+  `olay=bakim`):**
   (1) `bitti`/`hata`/`iptal` durumundaki ve kapanışı `KROMIS_IS_SAKLAMA_GUN`
   (30) günden eski `isler` satırları silinir — `medya` satırlarına ve
   üretilen görsellere DOKUNULMAZ (`isler.sonuc` yalnız id listesi, ürün

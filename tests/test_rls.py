@@ -522,7 +522,7 @@ def test_the_worker_heartbeat_drops_stale_jobs_of_every_tenant_as_admin(uygulama
                        "basladi, kalp_atisi) VALUES (:k, 'generate', 'calisiyor', '{}', 'm', 1, :t, :t, :t)"),
                   {"k": ikinci, "t": an - dt.timedelta(minutes=30)})
     with Session(uygulama_motoru) as s:
-        assert isci.kalp_turu(s, uuid.uuid4(), [], an, dt.timedelta(minutes=5)) == 1
+        assert isci.kalp_turu(s, uuid.uuid4(), [], an, dt.timedelta(minutes=5)).dusen == 1
     with depo_db.connect() as c:
         assert c.execute(text("SELECT durum, hata FROM isler")).one() == ("hata", kuyruk.BAYAT_HATASI)
 

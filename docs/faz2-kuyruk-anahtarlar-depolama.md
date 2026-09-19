@@ -2020,9 +2020,10 @@ göç, web, işçi açılıyor, `/health` `worker_alive:true`; CI 5 iş yeşil;
 belgelerde platform başına iki süreç tablosu; takım yeşil.
 
 **Yapıldığında (2026-09-19).** **Bakım turu** — `services/isci.py::bakim_turu(db,
-depo, an, esik, saklama)`: işçinin kalp iş parçacığında AÇILIŞTA bir kez ve
-sonra `BAKIM_ARALIGI_SN` (300) saniyede bir (`isci.py` `Surec.bakim`; testler
-ve duman için gizli `--bakim-araligi`). Üç iş, `BakimOzeti` sayılarıyla
+depo, an, esik, saklama)`: işçinin AYRI bakım iş parçacığında AÇILIŞTA bir kez
+ve sonra `BAKIM_ARALIGI_SN` (300) saniyede bir (`isci.py` `Surec.bakim_dongusu`;
+kod incelemesi sonrası kalp iş parçacığından ayrıldı, aşağıda; testler ve
+duman için gizli `--bakim-araligi`). Üç iş, `BakimOzeti` sayılarıyla
 (`silinen_is`, `silinen_nesne`, `korunan_dizin`, `silinen_isci`), bir şey
 silinmişse `olay=bakim`, boş turda satır yok: (1) SAKLAMA —
 `kuyruk.saklama_sahipleri` (admin bağlamı: süresi dolmuş kapanmış işi olan
@@ -2108,6 +2109,35 @@ compose up` çıkış ölçütü BU MAKİNEDE KOŞULMADI (Docker istemcisi var, 
 yok); CI `docker` işi aynı sırayı (göç → işçi → web → `/health`) servis
 Postgres'iyle koşuyor. (i) `tools/graf_uret.py`ye dokunulmadı: "bileşim kökü
 ikiye çıkar" 3. görevde yapılmıştı.
+
+**Kod incelemesi sonrası (2026-09-19).** Üç işçi kusuru, üçü de `isci.py`nin
+iş parçacığı düzeninde ve üçü de gözlemlenmeden önce ölçülebilir hâle
+getirildi (tests/test_isci.py; `Surec.calistir` artık `main`den ayrı ve
+süreçsiz, sahte `kos`la sınanıyor): (1) **Bakım turu kalp iş parçacığındaydı**
+— bir tur nesne başına `depo.listele` + `depo.sil` ile ağa çıkıyor ve birikmiş
+kuyrukta dakikalar sürebiliyor; o sürede kalp susuyor, eldeki işlerin
+`kalp_atisi` 300 sn'yi aşınca başka bir işçi onları `hata`ya çekip sonuçlarını
+çöpe atıyor (`bitir` 0 satır), 90 sn'de `/health` işçiyi ölü gösteriyor, 300
+sn'de satırı siliniyordu → ayrı `kromis-isci-bakim` iş parçacığı
+(`Surec.bakim_dongusu`: açılış turu + aralık), kalp yalnız kalp. (2) **Kalp
+SIGTERM'de susuyordu** — tek bayrak (`durdur`) hem alımı hem kalbi
+durduruyordu, iş parçacıkları ise `kill_timeout`a (Fly 300 sn) kadar
+boşalıyor; son kalp SIGTERM'den ≤ 30 sn önce atılmışsa 270. saniyeden sonra
+biten iş yeni işçinin bayat düşürmesine yakalanıyordu — § 7'nin "300 sn'lik
+iş sığar" cümlesi sığmıyordu → ikinci bayrak `kapat`: kalp ve bakım ona
+bakar, `kapat` ancak iş parçacıkları boşalınca kalkar; kapanış sırası `kapat`
+→ kalp/bakım beklenir (`KAPANIS_BEKLEME_SN` 15; yarım bakım turu uyarı, iz
+değil) → satır silinir → motor kapanır (E2E: yavaş sağlayıcı `sitecustomize`
+ile yamalı, SIGTERM sonrası `son_kalp` ve `kalp_atisi` ilerler, iş `bitti`).
+(3) **`isci_kalp`in `False`ı yok sayılıyordu** — `olu_iscileri_sil` yaşayan
+bir işçinin satırını da götürebilir (5 dk kalp atamamış: DB kesintisi;
+dağıtımda boşalan eskinin satırını yeni işçinin açılış turu sildi) ve işçi
+kapanışa kadar `worker_alive:false` üretiyor, `kaydi_sil` sessizce 0 satıra
+düşüyordu → `kalp_turu(..., kayit=IsciKaydi)` satırı bulamazsa
+`kuyruk.isci_yeniden_kaydet` ile AYNI `id` ve `basladi`yla yeniden yazar,
+`KalpOzeti.yeniden_kaydoldu` → `olay=isci.yeniden_kaydoldu` (WARNING);
+`kayit`sız çağrı (testler) eski davranış. Belge: `isletme.md` § 7 (kapanışta
+kalp sürer) ve § 9 (iki iş parçacığı, yeniden yazma).
 
 TESTLER: takım **3.793 → 3.812** toplanan (+19; E2E dâhil, tam takım bu
 makinede koştu). `test_kuyruk` +3 (saklama: yalnız kapanmış ve eski, sınır

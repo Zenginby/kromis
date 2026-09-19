@@ -1696,6 +1696,28 @@ admin olmayan bir hesapla `/admin` 403 demeli. Geri almak: `--kaldir`.
 Platform günlüğünde `olay=admin.*` satırları görünmüyorsa süreç `app.py`nin
 lifespan'ından geçmiyor demektir (`gunluk.kur` orada).
 
+**Yerel prova 2026-09-19 — 26 kontrol, hepsi yeşil; canlının satırı bekliyor.**
+§7'nin Railway provasının deyimi: adım canlıya çıkmadan önce baştan sona
+compose Postgres'inde (`0006_rls`) koşturuldu, ölçülenler burada. CLI dört
+yolda da belgedeki gibi davrandı: `admin = evet (degisti)` · aynı komut ikinci
+kez `zaten oyleydi` (idempotent) · `--kaldir` sonrası `/admin` 403'e döndü ve
+`ben.is_admin` false oldu · olmayan e-posta **çıkış 1**, hiçbir şey yazmadan.
+Kapı: anonim `/admin` 302 → `/giris`, admin olmayan hesap `/admin` ve üç API
+ucunda 403, admin 200 + **üç sekme de dolu** (`data-sekme` üçü, çevrilmemiş
+`{{t:}}` kalmamış). Yazma uçları: tavan 500 yaz → listede görünür → `None` ile
+silinir; `oturum-dusur` 2 oturum düşürdü ve o hesabın sonraki isteği 401 aldı;
+aynı yazmayı admin olmayan denediğinde 403.
+
+İKİ ŞEY ÖLÇÜLDÜ, İKİSİ DE BELGEYİ DÜZELTİYOR: (1) `is_admin` bayrağını ön yüze
+`GET /api/settings` DEĞİL `GET /api/hesap/ben` taşıyor (`routers/hesap.py:96`;
+`static/settings.js:1049` `ben.is_admin` okuyor) — "Ayarlar → Hakkında'da
+bağlantı" cümlesi doğru, ama bayrağı arayan `/api/settings`e bakıp bulamaz.
+(2) `olay=admin.*` satırları yalnız admin YAZMA eylemlerinde düşüyor; salt
+okunur gezinme yalnız `olay=istek` üretiyor. Yani yukarıdaki "görünmüyorsa
+lifespan'dan geçmiyor" ölçütü ancak bir tavan/iptal/oturum-düşürme
+yapıldıktan sonra geçerli — üç satır da `istek_id` + `admin` + `hedef` + değer
+taşıyor (`kromis.admin` günlükçüsü).
+
 ---
 
 ## 9. Yapısal günlük (JSON satır, istek/iş kimliği), Sentry (isteğe bağlı), `/health` `worker_alive` ✅ (PR: `faz2/gunluk-sentry`)
@@ -1957,6 +1979,46 @@ oranı için "hata sayısı 1 saatte ≥ 10". (6) Kapatmak: `SENTRY_DSN`i sil,
 yeniden dağıt — paket ithal bile edilmez. Günlük biçimi için sahibin işi yok:
 platform günlüğünde satırlar JSON; yerelde okunur istiyorsan
 `KROMIS_GUNLUK_BICIMI=metin`.
+
+**Yerel prova 2026-09-19 — 22 kontrol, hepsi yeşil; platform sırrı (3. madde)
+canlıyla birlikte §10'a kalıyor.** Sentry hesabı açıldı, proje `kromis`, DSN
+`.env`de (**EU bölgesi**: konak `o…ingest.de.sentry.io` — `sentry.io`nun
+ABD çıpası değil; kayıt sırasında seçilen bölge DSN'e giriyor ve sonradan
+değişmiyor, KVKK tarafı için bu satır burada duruyor). Ölçülenler:
+
+* **DSN'siz sözü tutuyor:** `kur()` `False` döndü ve `sys.modules`ta
+  `sentry_sdk` YOK — tembel ithal çalışma anında da doğrulandı, yalnız testte
+  değil.
+* **DSN'liyken seçenekler:** `send_default_pii=False`, `max_request_body_size
+  ="never"`, `release=kromis@0.23.1` (tek literal, `version.APP_VERSION`),
+  `environment` `.env`den, `before_send` ve `before_breadcrumb` ikisi de takılı;
+  entegrasyonlarda `fastapi`, `starlette`, `sqlalchemy` üçü de var.
+* **Redaksiyon üç kanalda birden:** `before_send`e sahte `sk-…` anahtarı taşıyan
+  bir olay verildi; mesaj, istisna değeri VE breadcrumb üçünde de
+  `[REDACTED_API_KEY]` çıktı (SQLAlchemy breadcrumb'ı §9'un yazdığı risk —
+  kapının çalıştığı burada görüldü).
+* **Gerçek gönderim:** üç olay (mesaj, gerçek istisna, `is_baglami` etiketli
+  olay) ingest'e kabul edildi, `sentry_sdk.errors` günlükçüsü tek satır hata
+  basmadı.
+* **Açılış sessiz:** web ve işçi DSN'liyken kalktı, ikisinin de günlüğünde
+  `sentry` geçen SIFIR satır ve `olay=sentry.hata` yok — belgedeki "sessiz
+  kurulum" aynen.
+* **Uyarı kuralları (5. madde) kuruldu** 2026-09-19: yeni sorun → e-posta;
+  hata sayısı 1 saatte ≥ 10. Kalan tek şey bu kuralların canlı trafikte
+  susmadığını görmek — o da ilk üretim koşusuyla (§10).
+* **Sentry dışı §9:** `X-Request-ID` üretiliyor, cevaba konuyor, **dışarıdan
+  geleni koruyor** (platform vekili deseni) ve her istekte ayrı; `/health`
+  işçi kalkınca `worker_alive` false → true (damga geldi) ama `ok` true kaldı;
+  işçi günlüğü de JSON (`olay=isci.basladi`, `isci_id`, `konak`, `pid`);
+  `KROMIS_GUNLUK_BICIMI=metin` okunur satırı veriyor.
+
+BİR TUZAK ÖLÇÜLDÜ: uvicorn'un erişim satırı `--no-access-log` BAYRAĞIYLA
+kapanıyor (`Dockerfile:111`), `gunluk.kur()` ile değil — gerekçesi
+`services/gunluk.py:101-106`da yazılı. Bayraksız `python -m uvicorn app:app`
+ile kaldırılan bir süreçte her istek İKİ KEZ görünüyor (bizim `olay=istek`
+JSON'ı + uvicorn'un düz metni); bayrak eklenince uvicorn tarafı 0'a indi.
+Yerelde elle koştururken bu ayrımı unutmamak lazım, yoksa "günlük çift
+basıyor" diye olmayan bir kusur aranıyor.
 
 ---
 
@@ -2252,10 +2314,19 @@ RLS ve admin bekçileri). Şema `0003_arena_win` → `0006_rls` (3 göç). Rota 
 **Sahibin canlıda bekleyen adımları** (her biri ilgili bölümün "Sahibin
 adımı"nda adım adım): üretim DB rolünün RLS'i atlamadığı (`tools/rls_kontrol.py`,
 §7 — Railway'de prova yapıldı, canlının satırı bekliyor); kendi hesabını
-admin yapmak (§8); Sentry DSN (§9, isteğe bağlı); ilk üretim koşusu kontrol
-listesi (§10 — `fly.toml`, sırlar, kova ayarları, kapanış süresi ölçümü).
-YAPILDI: platform anahtarları sırda (§6), R2 kovası ve taşıma (§2), Railway
-DB provası (§7).
+admin yapmak (§8 — **yerelde prova edildi 2026-09-19**, 26 kontrol yeşil);
+Sentry DSN (§9, isteğe bağlı — **hesap açıldı, DSN `.env`de, 22 kontrol
+yeşil**; platformun sırrına yazmak canlıyla birlikte); ilk üretim koşusu
+kontrol listesi (§10 — `fly.toml`, sırlar, kova ayarları, kapanış süresi
+ölçümü). YAPILDI: platform anahtarları sırda (§6), R2 kovası ve taşıma (§2),
+Railway DB provası (§7).
+
+**Provalar neden canlının yerini tutmuyor** (§7'nin bıraktığı ders, §8-§9'da
+aynen geçerli): prova yalnız KODUN doğru davrandığını gösterir, dağıtımın
+kendisini değil. §8'de canlının kendi `DATABASE_URL`i ve gerçek e-postası,
+§9'da DSN'in platformun sır deposuna **web VE işçi** servislerinin İKİSİNE de
+yazılması hâlâ yapılmadı — ikincisi §10'un kontrol listesine bağlı, çünkü
+bugün ortada `fly.toml` yok (o dosya sahibin, depoya konmuyor).
 
 **Açık kalemler (Faz 3+):** dağıtımda çalışan uzun işin kaybı → Faz 5
 "boşalt sonra dağıt"; sağlayıcı idempotency anahtarı yok (K8 kalır); galeri

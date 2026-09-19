@@ -104,7 +104,12 @@ bağlamında silinir (`kuyruk.eskileri_sil`: admin politikası DELETE vermez,
 bakan hiçbir satır kalmadığında silinir: "yeniden gönder" (Faz 2 / 5) eski
 işin girdilerine REFERANS verir, kopyalamaz; kalan satırların referansları
 (`kuyruk.girdi_referanslari`) ve dizinin kendi satırı (`kuyruk.mevcut_isler`)
-sorulur, ikisi de yoksa `depo.listele(onek)` → `depo.sil`; (3) ÖLÜ İŞÇİ
+sorulur, ikisi de yoksa `depo.listele(onek)` → `depo.sil` — aday dizinin
+KİRACISI silinen işin sahibi değilse (`ayar.is_dizini_coz`) aday bile
+olmaz, `olay=bakim.yabanci_dizin` (WARNING) düşer: `istek`i bugün yalnız
+sunucu yazıyor ve yeniden gönderim sahibin anahtarlarını kopyalıyor, yani
+bu dal bugün boş; derinlikli savunma, bir gün bir anahtar sızsa saklama
+başka kiracının dizinini silmesin; (3) ÖLÜ İŞÇİ
 SATIRLARI — `son_kalp` kalp eşiğinden eski `isciler` satırı silinir
 (`kuyruk.olu_iscileri_sil`): SIGKILL/`kill_timeout` aşımıyla ölen işçi kendi
 satırını silemez ve `/health` `worker_alive:false` sonsuza dek kalırdı (9'un
@@ -647,11 +652,22 @@ def bakim_turu(db: Session, depo: dosya.Depo, an: dt.datetime, esik: dt.timedelt
     ozet["silinen_is"] = len(silinenler)
     if not silinenler:
         return ozet
-    # Yalnız rotanın biçimindeki dizinler aday (`ayar.is_dizini_ayristir`): elle yazılmış
+    # Yalnız rotanın biçimindeki dizinler aday (`ayar.is_dizini_coz`): elle yazılmış
     # bir `istek`in tanınmayan anahtarı `foo/bar.png` → `foo/` gibi bir öneke çözülür ve
-    # onun altını körlemesine silmek bu turun işi değil.
-    adaylar = {d: i for d in {d for s in silinenler for d in s.girdi_dizinleri}
-               if (i := ayar.is_dizini_ayristir(d)) is not None}
+    # onun altını körlemesine silmek bu turun işi değil. Dizinin kiracısı silinen işin
+    # sahibi değilse de aday değil (gerekçe modül başında): uyarı düşer, dizin durur.
+    adaylar: dict[str, uuid.UUID] = {}
+    for s in silinenler:
+        for d in sorted(s.girdi_dizinleri):
+            coz = ayar.is_dizini_coz(d)
+            if coz is None:
+                continue
+            if coz.kullanici_id != s.kullanici_id:
+                gunluk.olay(_gunluk, "bakim.yabanci_dizin", "silinen isin istegi baska kiracinin dizinine bakiyor, dokunulmadi",
+                            seviye=logging.WARNING, is_id=str(s.is_id), kullanici_id=str(s.kullanici_id),
+                            dizin=d)
+                continue
+            adaylar[d] = coz.is_id
     with kiraci.baglam(rol=kiraci.ADMIN, oturum=db):
         referansli = {ayar.girdi_dizini(a) for a in kuyruk.girdi_referanslari(db)}
         sahipli = kuyruk.mevcut_isler(db, list(adaylar.values()))

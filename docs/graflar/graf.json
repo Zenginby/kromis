@@ -1254,7 +1254,7 @@
         "app"
       ],
       "katman": 12,
-      "satir": 310,
+      "satir": 312,
       "testler": [
         "tests/test_isler_route.py",
         "tests/test_rls.py"
@@ -1317,7 +1317,7 @@
         "app"
       ],
       "katman": 12,
-      "satir": 166,
+      "satir": 169,
       "testler": [
         "tests/test_gunluk.py",
         "tests/test_health.py",
@@ -1422,7 +1422,7 @@
         "tools.medya_tasi"
       ],
       "katman": 9,
-      "satir": 209,
+      "satir": 226,
       "testler": [
         "tests/test_app_bolme.py",
         "tests/test_artik_dosya.py",
@@ -1916,7 +1916,7 @@
         "isci"
       ],
       "katman": 11,
-      "satir": 664,
+      "satir": 680,
       "testler": [
         "tests/test_docker_kapisi.py",
         "tests/test_gunluk.py",
@@ -2103,7 +2103,7 @@
         "tools.artik_dosya"
       ],
       "katman": 10,
-      "satir": 485,
+      "satir": 490,
       "testler": [
         "tests/test_admin.py",
         "tests/test_artik_dosya.py",
@@ -4068,7 +4068,7 @@
       "onyuz": [
         "static/isler.js"
       ],
-      "satir": 207,
+      "satir": 209,
       "yardimci_sayisi": 4,
       "yol": "/api/isler/akis",
       "yontem": "GET"
@@ -4083,7 +4083,7 @@
       "onyuz": [
         "static/isler.js"
       ],
-      "satir": 238,
+      "satir": 240,
       "yardimci_sayisi": 7,
       "yol": "/api/isler/{is_id}",
       "yontem": "GET"
@@ -4098,7 +4098,7 @@
       "onyuz": [
         "static/isler.js"
       ],
-      "satir": 245,
+      "satir": 247,
       "yardimci_sayisi": 10,
       "yol": "/api/isler/{is_id}/iptal",
       "yontem": "POST"
@@ -4116,7 +4116,7 @@
       "onyuz": [
         "static/isler.js"
       ],
-      "satir": 263,
+      "satir": 265,
       "yardimci_sayisi": 22,
       "yol": "/api/isler/{is_id}/yeniden",
       "yontem": "POST"
@@ -4411,7 +4411,7 @@
         "version"
       ],
       "onyuz": [],
-      "satir": 146,
+      "satir": 149,
       "yardimci_sayisi": 5,
       "yol": "/health",
       "yontem": "GET"

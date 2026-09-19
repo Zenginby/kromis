@@ -135,10 +135,12 @@ def kota_durumu(db: Session = OTURUM,
     kapının 429'unu beklemeden. Tavan kullanıcının ezmesi (`gunluk_kredi_tavani`)
     ya da ortam; `kalan` yalnız PLATFORM anahtarıyla koşan işlere karşı anlamlı
     (kendi anahtarı sayılmaz, services/kota.py). `acilis`: pencere içindeki en
-    eski sayılan işin düşeceği an (`zaman.damga`), sayılan iş yoksa `None`.
+    eski sayılan işin düşeceği an (`zaman.damga_utc` — öteki API damgalarıyla
+    aynı dilimli biçim; tarayıcı `Date`e verirse doğru okur), sayılan iş yoksa
+    `None`.
     """
     def _acilis(en_eski: dt.datetime | None, pencere: dt.timedelta) -> str | None:
-        return zaman.damga(en_eski + pencere) if en_eski is not None else None
+        return zaman.damga_utc(en_eski + pencere) if en_eski is not None else None
 
     an = zaman.an()
     gunluk_tavan = (kullanici.gunluk_kredi_tavani if kullanici.gunluk_kredi_tavani is not None

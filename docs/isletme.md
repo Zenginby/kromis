@@ -368,7 +368,9 @@ susarsa eldeki işler bayat düşer, `/health` işçiyi ölü gösterir):
   üretilen görsellere DOKUNULMAZ (`isler.sonuc` yalnız id listesi, ürün
   galeride durur; aktif iş yaşı ne olursa olsun silinmez). (2) Silinen işin
   `isler/<id>/` girdi dizini yalnız ona bakan hiçbir satır kalmadıysa
-  kovadan/diskten silinir (yeniden gönderilen iş eski dizine referans verir).
+  kovadan/diskten silinir (yeniden gönderilen iş eski dizine referans verir);
+  silinen işin `istek`i BAŞKA kiracının dizinine bakıyorsa o dizine dokunulmaz,
+  `olay=bakim.yabanci_dizin` (WARNING) düşer — bugün olmaması gereken bir şey.
   (3) `son_kalp` kalp eşiğinden eski `isciler` satırları silinir — SIGKILL ya
   da `kill_timeout` aşımıyla ölen işçi kendi satırını silemez ve
   `worker_alive:false` sonsuza dek kalırdı; açılıştaki tur yeni işçi kalkar

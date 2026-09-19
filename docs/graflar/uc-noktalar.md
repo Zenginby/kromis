@@ -53,10 +53,10 @@
 | PATCH | `/api/images` | `routers/galeri.py` | `move_images`:230 | `folders`, `i18n`, `models`, `storage` | `folders.js` |
 | POST | `/api/import` | `routers/galeri.py` | `import_image`:255 | `i18n` | `folders.js` |
 | GET | `/api/isler` | `routers/isler.py` | `isleri_listele`:112 | `i18n` | `isler.js` |
-| GET | `/api/isler/akis` | `routers/isler.py` | `isleri_akit`:207 | `i18n` | `isler.js` |
-| GET | `/api/isler/{is_id}` | `routers/isler.py` | `is_getir`:238 | `i18n` | `isler.js` |
-| POST | `/api/isler/{is_id}/iptal` | `routers/isler.py` | `is_iptal`:245 | `i18n` | `isler.js` |
-| POST | `/api/isler/{is_id}/yeniden` | `routers/isler.py` | `is_yeniden`:263 | `catalog`, `credstore`, `etiket`, `i18n` | `isler.js` |
+| GET | `/api/isler/akis` | `routers/isler.py` | `isleri_akit`:209 | `i18n` | `isler.js` |
+| GET | `/api/isler/{is_id}` | `routers/isler.py` | `is_getir`:240 | `i18n` | `isler.js` |
+| POST | `/api/isler/{is_id}/iptal` | `routers/isler.py` | `is_iptal`:247 | `i18n` | `isler.js` |
+| POST | `/api/isler/{is_id}/yeniden` | `routers/isler.py` | `is_yeniden`:265 | `catalog`, `credstore`, `etiket`, `i18n` | `isler.js` |
 | GET | `/api/kota` | `routers/isler.py` | `kota_durumu`:129 | — | `isler.js` |
 | POST | `/api/logo` | `routers/bindirme.py` | `add_logo`:94 | `assets_store`, `catalog`, `composite`, `i18n`, `models`, `storage` | `assets.js` |
 | POST | `/api/logo/preview` | `routers/bindirme.py` | `preview_logo`:82 | `assets_store`, `composite`, `i18n`, `models` | `assets.js` |
@@ -73,7 +73,7 @@
 | POST | `/api/video/animate` | `routers/uretim.py` | `animate`:264 | `catalog`, `chat_store`, `etiket`, `i18n`, `models` | `core.js` |
 | GET | `/assets/{kind}/{filename}` | `routers/bindirme.py` | `asset_file`:263 | `assets_store`, `i18n` | `assets.js` |
 | GET | `/giris` | `routers/hesap.py` | `giris_sayfasi`:250 | `errlog`, `i18n`, `version` | — |
-| GET | `/health` | `routers/saglik.py` | `health`:146 | `version` | — |
+| GET | `/health` | `routers/saglik.py` | `health`:149 | `version` | — |
 | GET | `/output/{filename}` | `routers/galeri.py` | `output_file`:322 | `i18n`, `storage` | `assets.js`, `chat.js`, `core.js`, `folders.js`, `isler.js`, `viewer.js` |
 
 ## Öbek → modül

@@ -21,7 +21,7 @@ Beş soru:
   (iv)  BAĞLAM — kimlik iş başına bağlanır ve ÇÖZÜLÜR (`[A, B]`); dil sıfırlanır;
         sağlayıcı çağrısı sırasında havuzdan bağlantı tutulmaz; iki işçi iki iş;
         kalp ilerler ve bayatı düşürür; işçi satırı yokken kalp onu aynı kimlikle
-        yeniden yazar.
+        yeniden yazar; bakım turu başka kiracının dizinine dokunmaz.
   (v)   SÜREÇ — `isci.py` web'in kapılarını taşır; anahtarsız 2; `--tek-tur`
         boş kuyrukta 0, dolu kuyrukta işi koşturur; `isciler` satırı + kalp +
         SIGTERM → 0 ve satır silinir.
@@ -32,6 +32,7 @@ import dataclasses
 import datetime as dt
 import importlib
 import json
+import logging
 import os
 import signal
 import subprocess
@@ -715,6 +716,54 @@ def test_the_maintenance_turn_frees_a_referenced_directory_once_the_last_referre
     assert ozet["silinen_is"] == 1 and ozet["silinen_nesne"] == 1 and ozet["korunan_dizin"] == 0
     assert not depo.var(ayar.is_dizini(kullanici.id, a) + "upload.png")
     assert depo.var("foo/bar.png"), "tanınmayan anahtar biçimi süpürülmez"
+
+
+class _Yakala(logging.Handler):
+    """`kromis.*` köke yayılmaz (services/gunluk.py); olay kayıtları doğrudan günlükçüden toplanır."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.kayitlar: list[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.kayitlar.append(record)
+
+
+def test_the_maintenance_turn_leaves_another_tenants_directory_alone_even_if_a_deleted_request_points_at_it(
+        db_oturumu, kullanici, depo, yerlesim):
+    """Derinlikli savunma: silinen işin `istek`i BAŞKA kiracının `isler/<id>/` dizinine bakıyorsa o
+    dizin aday olmaz (referanssız ve satırsız olsa bile), `olay=bakim.yabanci_dizin` uyarısı düşer;
+    işin kendi dizini yine gider. Bugün `istek`i yalnız sunucu yazar — bu dal boş; kapı yine dursun."""
+    yabanci = _ikinci_kullanici(db_oturumu)
+    yabanci_is = uuid.uuid4()
+    yabanci_dizin = ayar.is_dizini(yabanci, yabanci_is)
+    depo.yaz(yabanci_dizin + "gizli.png", PNG, "image/png")
+    b = _girdili(db_oturumu, kullanici.id, depo)
+    db_oturumu.execute(text("UPDATE isler SET istek = jsonb_set(istek, '{girdiler}', (istek->'girdiler') || CAST(:ek AS jsonb)) "
+                            "WHERE id = :id"),
+                       {"ek": json.dumps([{"ad": "gizli.png", "anahtar": yabanci_dizin + "gizli.png"}]), "id": b})
+    _kapat(db_oturumu, b, "bitti", BAKIM_ANI - SAKLAMA - dt.timedelta(days=1))
+    yakala = _Yakala()
+    gunlukcu = logging.getLogger("kromis.is")
+    # Aynı süreçte koşmuş Alembic `fileConfig` (şablon DB) günlükçüyü KAPATMIŞ olabilir;
+    # `gunluk.kur` üretimde açar (services/gunluk.py), burada kurulum yok — elle.
+    kapaliydi, gunlukcu.disabled = gunlukcu.disabled, False
+    gunlukcu.addHandler(yakala)
+    try:
+        ozet = isci.bakim_turu(db_oturumu, depo, BAKIM_ANI, ESIK, SAKLAMA)
+    finally:
+        gunlukcu.removeHandler(yakala)
+        gunlukcu.disabled = kapaliydi
+    assert ozet == {"silinen_is": 1, "silinen_nesne": 1, "korunan_dizin": 0, "silinen_isci": 0}
+    assert not depo.var(ayar.is_dizini(kullanici.id, b) + "upload.png"), "işin kendi dizini gider"
+    assert depo.var(yabanci_dizin + "gizli.png"), "başka kiracının dizinine dokunulmaz"
+    (uyari,) = [k for k in yakala.kayitlar if getattr(k, "olay", None) == "bakim.yabanci_dizin"]
+    assert uyari.levelno == logging.WARNING
+    assert (uyari.dizin, uyari.is_id, uyari.kullanici_id) == (yabanci_dizin, str(b), str(kullanici.id))
+    # Çözücü iki kimliği de verir; tanınmayan biçim `None` (eski `is_dizini_ayristir` yalnız iş kimliği).
+    assert ayar.is_dizini_coz(yabanci_dizin) == (yabanci, yabanci_is)
+    assert ayar.is_dizini_ayristir(yabanci_dizin) == yabanci_is
+    assert ayar.is_dizini_coz("foo/") is None and ayar.is_dizini_coz(f"kullanicilar/{yabanci}/isler/x/") is None
 
 
 # ── (v) süreç ───────────────────────────────────────────────────────────

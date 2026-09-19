@@ -206,7 +206,8 @@ def test_worker_alive_is_true_with_a_fresh_heartbeat_and_the_body_names_it(tmp_p
     isciler.commit()
     govde = istemci.get("/health").json()
     assert govde["ok"] is True and govde["worker_alive"] is True
-    assert govde["worker_last_heartbeat"] == zaman.damga(an - dt.timedelta(seconds=30))
+    assert govde["worker_last_heartbeat"] == zaman.damga_utc(an - dt.timedelta(seconds=30))
+    assert govde["worker_last_heartbeat"].endswith("Z"), "öteki API damgalarıyla aynı dilimli biçim"
 
 
 def test_worker_alive_is_false_past_the_shared_threshold_and_ok_is_unaffected(tmp_path, dizinler, istemci, isciler):
@@ -222,7 +223,7 @@ def test_worker_alive_is_false_past_the_shared_threshold_and_ok_is_unaffected(tm
     assert cevap.status_code == 200
     govde = cevap.json()
     assert govde["ok"] is True and govde["worker_alive"] is False
-    assert govde["worker_last_heartbeat"] == zaman.damga(an - depo_admin.CANLI_ESIK - dt.timedelta(seconds=5))
+    assert govde["worker_last_heartbeat"] == zaman.damga_utc(an - depo_admin.CANLI_ESIK - dt.timedelta(seconds=5))
     # Eşiğin hemen içi canlı: sınır `>`, `depo_admin.metrikler`in `canli`siyle aynı karşılaştırma.
     isciler.execute(text("UPDATE isciler SET son_kalp = :an"),
                     {"an": an - depo_admin.CANLI_ESIK + dt.timedelta(seconds=20)})

@@ -2099,9 +2099,9 @@ uygulamada (bakım turu, referans ölçütüyle) — kova tarafında yalnız sü
 geçmişi kuralı. (d) `fly.toml` depoya KONMADI (Dokunulan listesinde yok; bir
 platforma bağlanır ve sahibin bölge/boyut kararlarını taşır) — tam örnek
 `isletme.md` § 7'de, sahip kopyalar. (e) `/health` `worker_last_heartbeat`
-ve `/api/kota` `acilis` dilimsiz `zaman.damga` KALDI: operatör/`curl`
-okuyor, tarayıcı `Date`e vermiyor; iki uç bir gün tarayıcıda karşılaştırılırsa
-`damga_utc`ye geçer. (f) Bakım turu AÇILIŞTA da koşar (belge yalnız "5 dk'da
+ve `/api/kota` `acilis` önce dilimsiz `zaman.damga`da bırakılmıştı
+(operatör/`curl` okuyor diye); kod incelemesi API'nin geri kalanıyla tutarsız
+buldu ve ikisi de `damga_utc`ye geçti (aşağıda, "Kod incelemesi sonrası"). (f) Bakım turu AÇILIŞTA da koşar (belge yalnız "5 dk'da
 bir"): tek işçili dağıtımda SIGKILL'le ölen önceki işçinin satırını silecek
 başka işçi yok; açılış turu `/health`i yeni işçi kalkar kalkmaz düzeltir. (g)
 `uvicorn.access` köke yayılmadı (ölçülen gerekçe yukarıda). (h) `docker
@@ -2137,7 +2137,20 @@ düşüyordu → `kalp_turu(..., kayit=IsciKaydi)` satırı bulamazsa
 `kuyruk.isci_yeniden_kaydet` ile AYNI `id` ve `basladi`yla yeniden yazar,
 `KalpOzeti.yeniden_kaydoldu` → `olay=isci.yeniden_kaydoldu` (WARNING);
 `kayit`sız çağrı (testler) eski davranış. Belge: `isletme.md` § 7 (kapanışta
-kalp sürer) ve § 9 (iki iş parçacığı, yeniden yazma).
+kalp sürer) ve § 9 (iki iş parçacığı, yeniden yazma). Üç küçük bulgu daha:
+(4) `/health` `worker_last_heartbeat` ve `/api/kota` `acilis` `damga_utc`ye
+(UTC, `Z`) — bu PR'da API'nin öteki damgaları dilimli olmuştu, ikisi dilimsiz
+kalmıştı (yukarıdaki (e) sapması geri alındı; `routers/isler.py _since` `Z`yi
+zaten okuyor, `acilis` istemcide okunmuyor). (5) Saklama turunda aday dizinin
+KİRACISI silinen işin sahibiyle karşılaştırılır (`ayar.is_dizini_coz` iki
+kimliği verir; `is_dizini_ayristir` onun üstünde durur): farklıysa aday olmaz,
+`olay=bakim.yabanci_dizin` (WARNING). Bugün `istek`i yalnız sunucu yazıyor, dal
+boş — derinlikli savunma, test var. (6) `kuyruk.girdi_referanslari`nın
+`jsonb_array_elements`i `COALESCE` yerine `jsonb_typeof(...) = 'array'`
+süzgeciyle: `girdiler` JSON `null` (SQL NULL değil), dize ya da nesne olan tek
+satır "cannot extract elements from a scalar" ile HER turu düşürürdü, hem de
+satırlar silinip dizinler öksüz kaldıktan sonra; `tools/artik_dosya.py` aynı
+işlevi çağırır, ölçüt tek yerde. DB testi `null`/dize/nesne satırlarıyla.
 
 TESTLER: takım **3.793 → 3.812** toplanan (+19; E2E dâhil, tam takım bu
 makinede koştu). `test_kuyruk` +3 (saklama: yalnız kapanmış ve eski, sınır

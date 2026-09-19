@@ -69,6 +69,7 @@ import re
 import threading
 import uuid
 from dataclasses import dataclass
+from typing import NamedTuple
 
 from fastapi import Depends, Request
 
@@ -153,22 +154,38 @@ def girdi_dizini(anahtar: str) -> str:
 
 
 # `is_dizini`nin ürettiği biçim — tersine çevirmek için (aşağıda).
-_IS_DIZINI = re.compile(rf"^{KULLANICILAR_DIZINI}/[0-9a-f-]{{36}}/{ISLER_DIZINI}/([0-9a-f-]{{36}})/$")
+_IS_DIZINI = re.compile(rf"^{KULLANICILAR_DIZINI}/([0-9a-f-]{{36}})/{ISLER_DIZINI}/([0-9a-f-]{{36}})/$")
 
 
-def is_dizini_ayristir(dizin: str) -> uuid.UUID | None:
-    """`is_dizini`nin tersi: `kullanicilar/<u>/isler/<id>/` → `<id>`; başka biçim `None`.
+class IsDizini(NamedTuple):
+    """`is_dizini_coz`ün sonucu: dizinin kiracısı ve işi."""
+    kullanici_id: uuid.UUID
+    is_id: uuid.UUID
+
+
+def is_dizini_coz(dizin: str) -> IsDizini | None:
+    """`is_dizini`nin tersi: `kullanicilar/<u>/isler/<id>/` → (`<u>`, `<id>`); başka biçim `None`.
 
     Saklama turu yalnız bu biçimdeki dizinleri süpürür: elle yazılmış bir
     `istek`in tanınmayan anahtarı (`foo/bar.png` → `foo/`) körlemesine silinmez.
+    Kiracı da döner: tur, silinen işin `istek`inden gelen dizinin O İŞİN
+    sahibine ait olduğunu doğrular (services/isci.py) — bugün `istek`i yalnız
+    sunucu yazıyor, ama bir gün başka bir kiracının anahtarı sızsa saklama
+    onun dizinini silmesin.
     """
     e = _IS_DIZINI.match(dizin)
     if e is None:
         return None
     try:
-        return uuid.UUID(e.group(1))
+        return IsDizini(uuid.UUID(e.group(1)), uuid.UUID(e.group(2)))
     except ValueError:
         return None
+
+
+def is_dizini_ayristir(dizin: str) -> uuid.UUID | None:
+    """`is_dizini_coz`ün yalnız iş kimliği; biçim tanınmazsa `None`."""
+    coz = is_dizini_coz(dizin)
+    return coz.is_id if coz is not None else None
 
 
 def genel(request: Request) -> Ayarlar:

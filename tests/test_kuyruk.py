@@ -584,6 +584,22 @@ def test_a_deleted_job_reports_its_own_input_directory_and_the_ones_its_request_
         ayar.is_dizini(kullanici.id, kendi.id) + "ref1.png"}, "silinen satırın referansları listeden düştü"
 
 
+def test_input_references_tolerate_a_request_whose_girdiler_is_not_an_array(db_oturumu, kullanici):
+    """`jsonb_array_elements` skalerde HATA verir ("cannot extract elements from a scalar"): `girdiler`
+    JSON `null` (SQL NULL değil — `COALESCE` görmez), dize ya da nesne olan TEK satır her bakım turunu
+    düşürürdü, hem de satırlar silinip dizinler öksüz kaldıktan sonra. `jsonb_typeof` süzer; `son_kare`
+    `null` da sorun değil (`?` skalerde `false`)."""
+    referans = ayar.is_dizini(kullanici.id, uuid.uuid4()) + "upload.png"
+    kuyruk.ekle(db_oturumu, kullanici.id, "edit", {"prompt": "p", "girdiler": [{"ad": "upload.png", "anahtar": referans}]},
+                "m", 4, an=_an())
+    kuyruk.ekle(db_oturumu, kullanici.id, "generate", {"prompt": "p", "girdiler": None, "son_kare": None}, "m", 4, an=_an(1))
+    kuyruk.ekle(db_oturumu, kullanici.id, "generate", {"prompt": "p", "girdiler": "bozuk"}, "m", 4, an=_an(2))
+    kuyruk.ekle(db_oturumu, kullanici.id, "generate", {"prompt": "p", "girdiler": {"anahtar": "nesne/degil.png"}}, "m", 4, an=_an(3))
+    db_oturumu.commit()
+    assert kuyruk.girdi_referanslari(db_oturumu) == {referans}
+    assert kuyruk.girdi_referanslari(db_oturumu, kullanici.id) == {referans}
+
+
 def test_dead_worker_rows_are_removed_past_the_heartbeat_threshold_and_live_ones_stay(db_oturumu, kullanici):
     """9'un devri: SIGKILL'le ölen işçi kendi satırını silemez; `olu_iscileri_sil` `son_kalp < an - esik`
     satırları düşürür (eşik bayat İŞ eşiğinin kendisi), tam sınır ve taze kalp kalır; `isler.isci_id` durur."""

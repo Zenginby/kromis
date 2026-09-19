@@ -454,9 +454,14 @@ def girdi_referanslari(db: Session, kullanici_id: uuid.UUID | None = None) -> se
     işi referans veremez (anahtar kullanıcı kökü altında), ama süzgeç yine
     sorguda dursun — `tools/artik_dosya.py` kullanıcı kullanıcı tarar.
     """
+    # `jsonb_array_elements` dizi olmayan bir değerde HATA verir ("cannot extract
+    # elements from a scalar"): `girdiler` JSON `null` (SQL NULL değil — `COALESCE`
+    # onu görmez) ya da bir dize olan TEK satır her bakım turunu düşürürdü, hem de
+    # satırlar silinip dizinler öksüz kaldıktan sonra. `jsonb_typeof` süzer.
     sorgu = text("""
         SELECT DISTINCT g->>'anahtar' FROM isler,
-               jsonb_array_elements(COALESCE(istek->'girdiler', '[]'::jsonb)) AS g
+               jsonb_array_elements(CASE WHEN jsonb_typeof(istek->'girdiler') = 'array'
+                                         THEN istek->'girdiler' ELSE '[]'::jsonb END) AS g
          WHERE (CAST(:kid AS uuid) IS NULL OR kullanici_id = CAST(:kid AS uuid)) AND g ? 'anahtar'
         UNION
         SELECT DISTINCT istek->'son_kare'->>'anahtar' FROM isler

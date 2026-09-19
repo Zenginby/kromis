@@ -1,6 +1,6 @@
 # Faz 3 — Kredi defteri, tarife–maliyet mutabakatı, planlar ve filigran: görev listesi
 
-**Tarih:** 2026-09-19 · **Karar:** bekliyor — K1–K11 aşağıda sahibin onayına sunuldu (öneri; kabul edilince bu satır tarih ve kaynakla güncellenir) · **Önceki faz:** [faz2-kuyruk-anahtarlar-depolama.md](faz2-kuyruk-anahtarlar-depolama.md) (10/10 ✅, kapanış 2026-09-19, PR #37–#52)
+**Tarih:** 2026-09-19 · **Karar:** K1–K11 öneriler AYNEN kabul edildi — 2026-09-19 20:23 UTC, Slack #code ("kabul ediyorum") · **Önceki faz:** [faz2-kuyruk-anahtarlar-depolama.md](faz2-kuyruk-anahtarlar-depolama.md) (10/10 ✅, kapanış 2026-09-19, PR #37–#52)
 **Üst belge:** [superpowers/specs/2026-08-10-saas-transformation-master-design.md](superpowers/specs/2026-08-10-saas-transformation-master-design.md) §5 **"Faz 5"** bölümü (`:170-221`) — sapmalar bu belgenin sonunda tek tek yazılı. **Numaralama tuzağı:** master spec'in "Faz 5"i ürün yol haritasının SaaS kartı; bu belge SaaS dönüşümünün İÇ dizisindeki Faz 3'tür (Faz 0 web-first → Faz 1 DB/hesap → Faz 2 kuyruk → **Faz 3 kredi defteri** → Faz 4 ödeme/KVKK → Faz 5 işletme; [studyo-guncelleme-plani.md](studyo-guncelleme-plani.md):4). Kartın ilgili satırları: "Filigran & Kredi Kuralları: ücretsiz deneme katmanı (filigranlı), ücretli katmanlar (filigransız + ticari haklar), devredilmeyen aylık kredi (no-rollover)" (`:183`); "Tek gerçek kaynak atomik kredi ledger'ı… Webhook'ta idempotency zorunlu… Kredi tarifesi… kendi katalogumuzda durur" (`:205-208`); "Bugün YALNIZ metadata: bakiye düşülmüyor, üretim engellenmiyor" (`:215-219`). **Çıkış kriteri (bu belgenin sonunda tam metin):** ücretsiz kullanıcı platform anahtarıyla iş verir → bakiyesi düşer → iş biter → gerçek maliyetle onaylanır, fark iade; hata/iptal tam iade; ücretsiz görselde filigran; SUM(defter) == bakiye; admin marj tablosu dolu.
 
 Faz 3'ün amacı, Faz 2'nin kurduğu kuyruk + platform anahtarı + günlük tavan
@@ -545,7 +545,7 @@ ile gösterir. Kontrol: ücretsiz test hesabıyla bir görsel, indir, bak.
   bulması (liste elle değil, katalogdan; not silinince test sayıyı düşürür —
   CLAUDE.md § 5).
 
-**Yan kanal, imza değişimi DEĞİL (K8).** `-> list[bytes]` beş istemci + 
+**Yan kanal, imza değişimi DEĞİL (K8).** `-> list[bytes]` beş istemci +
 `providers.py` + işçi + ~40 test dosyasının yamaladığı sözleşme (Faz 1 / 7'nin
 104 testlik dersi). `list[Sonuc]`e çevirmek hepsine dokunur ve bugün taşınacak
 veri iki alan. `ContextVar` yan kanalı kimlik bağlamının zaten kullandığı
@@ -741,8 +741,7 @@ tablosu dolu → RLS bekçileri **9 tablo**, `kredi_hareketleri`de dört politik
 
 ## Sahibin karar noktaları — öneri ve gerekçe
 
-**Sahibin kararı: BEKLİYOR** — K1–K11 aşağıda öneri; kabul/değişiklik
-tarih ve kaynakla (Slack) bu satıra yazılır, görevler ondan sonra açılır.
+**Sahibin kararı (2026-09-19 20:23 UTC, Slack #code): K1–K11 öneriler AYNEN kabul edildi** — aşağıdaki tablo artık karar; görevler bu sırayla açılır (ilk PR `faz3/kredi-defteri`).
 
 | # | konu | öneri | neden | alternatif ve bedeli |
 | --- | --- | --- | --- | --- |

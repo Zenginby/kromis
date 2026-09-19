@@ -108,12 +108,13 @@ def test_every_unsafe_method_is_gated(yontem):
 
 # ── Yerleşim ─────────────────────────────────────────────────────────
 
-def test_the_gate_is_the_outermost_middleware_before_language():
-    """Belge §3: köken → dil → rota. Starlette listede İLK olanı en dışa koyar."""
+def test_the_gate_sits_right_inside_the_request_id_layer_and_before_language():
+    """Belge §3 → §9: istek kimliği → köken → dil → rota. Starlette listede İLK olanı en dışa koyar;
+    kimlik katmanı dışta ki köken 403'ü de `X-Request-ID` ve erişim satırı taşısın."""
+    from services import dil, istek_kimligi
     zincir = [m.kwargs.get("dispatch") for m in appmod.app.user_middleware]
-    assert zincir[0] is koken.koken_kapisi, zincir
-    from services import dil
-    assert dil.dil_baglami in zincir and zincir.index(dil.dil_baglami) > 0
+    assert zincir[0] is istek_kimligi.istek_kimligi and zincir[1] is koken.koken_kapisi, zincir
+    assert dil.dil_baglami in zincir and zincir.index(dil.dil_baglami) > 1
 
 
 def _istek(basliklar: dict[str, str], scheme: str = "http", host: str = "testserver") -> Request:

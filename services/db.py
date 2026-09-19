@@ -67,9 +67,10 @@ aynı transaksiyona yazılan bağlam `services/kimlik.py`de (`kiraci.uygula(db)`
 from __future__ import annotations
 
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as GelecekZamanAsimi
+from typing import TypeVar
 
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy import Connection, Engine, create_engine, event, text
@@ -131,6 +132,42 @@ def motor_varsa(request: Request) -> Engine | None:
     return getattr(request.app.state, "motor", None)
 
 
+# `TypeVar`, PEP 695 `def sor[T]` DEĞİL: `tools/graf_uret.py` sistem Python'uyla
+# (3.11 olabilir) `ast.parse` ediyor ve yeni sözdizimini okuyamıyor (ölçüldü).
+_T = TypeVar("_T")
+
+
+def sor(motor: Engine | None, sorgu: Callable[[Connection], _T],  # noqa: UP047 — gerekçe üstte
+        zaman_asimi: float = SONDA_ZAMAN_ASIMI_SN) -> _T | None:
+    """`sorgu(baglanti)`yı `zaman_asimi` saniye bütçesiyle koşturur; motor yoksa, süre dolarsa ya da düşerse `None`.
+
+    Sondanın çekirdeği (gerekçe modül başında): `erisilebilir` `SELECT 1`i,
+    `routers/saglik.py` işçi kalbini aynı bütçeyle buradan sorar. Çağrı başına
+    bir iş parçacığı: asılı kalan bir deneme sonraki sondayı bloke etmesin.
+    `shutdown(wait=False)`: vazgeçilen iş parçacığı libpq zaman aşımında kendi
+    biter, biz onu beklemeyiz. Sorgunun kendisi `None` dönerse çağıran onu
+    "düştü"den ayıramaz — sonda sorguları bu yüzden `None` DÖNMEZ (bool/demet).
+    """
+    if motor is None:
+        return None
+
+    def _sor() -> _T:
+        with motor.connect() as baglanti:
+            return sorgu(baglanti)
+
+    yurutucu = ThreadPoolExecutor(max_workers=1, thread_name_prefix="kromis-db-sonda")
+    try:
+        return yurutucu.submit(_sor).result(timeout=zaman_asimi)
+    except GelecekZamanAsimi:
+        return None
+    except Exception:
+        # OperationalError (sunucu yok, parola yanlış), DBAPIError, ne olursa
+        # olsun: sonda "ulaşılamıyor" der, sebebi uvicorn günlüğüne düşer.
+        return None
+    finally:
+        yurutucu.shutdown(wait=False)
+
+
 def erisilebilir(motor: Engine | None, zaman_asimi: float = SONDA_ZAMAN_ASIMI_SN) -> bool:
     """`SELECT 1` `zaman_asimi` saniye içinde cevaplandı mı? (gerekçe modül başında)
 
@@ -138,27 +175,7 @@ def erisilebilir(motor: Engine | None, zaman_asimi: float = SONDA_ZAMAN_ASIMI_SN
     bir süreç, veri tabanına ULAŞAMIYOR demektir — sondanın söylemesi gereken
     tam olarak bu.
     """
-    if motor is None:
-        return False
-
-    def _sor() -> bool:
-        with motor.connect() as baglanti:
-            return baglanti.execute(text("SELECT 1")).scalar_one() == 1
-
-    # Çağrı başına bir iş parçacığı: asılı kalan bir deneme sonraki sondayı
-    # bloke etmesin. `shutdown(wait=False)`: vazgeçilen iş parçacığı libpq
-    # zaman aşımında kendi biter, biz onu beklemeyiz.
-    yurutucu = ThreadPoolExecutor(max_workers=1, thread_name_prefix="kromis-db-sonda")
-    try:
-        return yurutucu.submit(_sor).result(timeout=zaman_asimi)
-    except GelecekZamanAsimi:
-        return False
-    except Exception:
-        # OperationalError (sunucu yok, parola yanlış), DBAPIError, ne olursa
-        # olsun: sonda "ulaşılamıyor" der, sebebi uvicorn günlüğüne düşer.
-        return False
-    finally:
-        yurutucu.shutdown(wait=False)
+    return sor(motor, lambda b: b.execute(text("SELECT 1")).scalar_one() == 1, zaman_asimi) is True
 
 
 def oturum(request: Request) -> Iterator[Session]:

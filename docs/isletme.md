@@ -148,6 +148,15 @@ bu iskeleti doldurur ve ölçtüğü süreleri buraya yazar.
 * Nesne depolama (R2/S3) — Faz 2 / 2 ile GELDİ (2. bölümün medya satırı iki
   yeri de yazıyor); kovanın sürümleme/çoğaltma düzeni ve platform sırları
   Faz 2 / 10'un kalemi.
-* Yapısal loglama, Sentry, uyarı eşikleri — Faz 2.
+* Yapısal loglama, Sentry, uyarı eşikleri — Faz 2 / 9 ile GELDİ: iki süreç
+  stdout'a satır başına JSON yazar (`istek_id`/`is_id` bağlamda; biçim
+  `KROMIS_GUNLUK_BICIMI`), Sentry yalnız `SENTRY_DSN` verilmişse (redakte,
+  PII kapalı), `/health` `worker_alive` (90 sn eşiği, `ok`a girmez). **Uyarı
+  eşikleri:** kuyruk derinliği > 20 ya da en eski bekleyen > 10 dk → işçinin
+  kalp turu (30 sn) `olay=uyari` (WARNING) düşürür, koşul sürdükçe her turda.
+  Uyarının BİLDİRİMİ kodda değil: Sentry *Alerts* → "issue/log içeren olay
+  sayısı ≥ 1 / 5 dk, `uyari` süzgeciyle" ya da platform günlüğünün metin
+  uyarısı; `worker_alive:false` için `/health` gövdesini okuyan bir uptime
+  sondası. KURULUM.md → Web sürümü, 9. adım.
 * Kredi defteri yedeği — Faz 3 (tablo yok).
 * Kimlik/oturum kaydının KVKK/GDPR saklama süresi — Faz 4.

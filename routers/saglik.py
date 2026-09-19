@@ -11,7 +11,8 @@ uptime sondası; gövdesi cümle değil MAKİNE OKUYAN JSON ve dil bağlamıyla,
 kodunu aynı dosyada tutmak, birinin gerekçesini ötekinin okumasına zorlardı.
 (`tests/test_i18n.py` bu modülü bu yüzden "kullanıcıya konuşmayan" sayıyor.)
 
-NE RAPORLAR: `{"ok", "version", "data_dir_writable", "db_reachable"}`.
+NE RAPORLAR: `{"ok", "version", "data_dir_writable", "db_reachable", "worker_alive",
+"worker_last_heartbeat"}`.
 
 * `version` — hangi imajın ayakta olduğunu SORUYA cevap: kayan bir `latest`
   etiketinin arkasında ne koştuğunu tek `curl` söylesin.
@@ -28,8 +29,22 @@ NE RAPORLAR: `{"ok", "version", "data_dir_writable", "db_reachable"}`.
   (`null`) DEĞİL, bilerek: veri tabanı olmadan bu uygulama kullanıcı
   hesabı açamaz; sondanın "sağlıklı" demesi için bir sebep yok.
 
+* `worker_alive` (Faz 2 / 9) — `isciler` tablosunda son kalbi `CANLI_ESIK`
+  (90 sn; `services/depo_admin.py`nin sabiti, admin sayfasının "canlı"
+  ölçütüyle AYNI eşik, iki yerde iki sayı olmasın) içinde bir işçi satırı var
+  mı. `worker_last_heartbeat` o en son kalp (ISO 8601 UTC; satır yoksa
+  `null`). Motor yoksa ya da DB'ye ulaşılamıyorsa İKİSİ DE `null`: cevap
+  bilinmiyor, "hayır" değil. `isciler` tablosu yoksa (göç koşmamış) yine
+  `null` — `db_reachable` bundan etkilenmez, o alanın anlamı `SELECT 1`.
+  Aynı bağlantı, aynı 1 sn'lik bütçe (`db.sor`): sonda iki kez kapı çalmaz.
+
 `ok` İKİ ölçütün VE'si — Faz 0 / 8'in notu ("ikinci bir ölçüt gelince `ok`
-hepsinin VE'si olur, alan adları değişmez") burada yerine geldi.
+hepsinin VE'si olur, alan adları değişmez") burada yerine geldi. **`worker_alive`
+`ok`a GİRMEZ** (belge §9): işçinin düşmesi web sürecini "sağlıksız" yapıp
+platformun WEB'i yeniden başlatmasına yol açmamalı — işçinin sağlığı işçinin
+kalbi, platform onu kendi yeniden başlatır; `/health`i işçi için okuyan bir
+uyarı kuralı GÖVDEYE bakar (`worker_alive:false`), durum koduna değil
+(KURULUM.md → Web sürümü, 9. adım).
 
 NEDEN 503, "200 + ok:false" DEĞİL: sondayı okuyan şeylerin çoğu (Docker
 `HEALTHCHECK`, Kubernetes readiness, uptime servisleri) gövdeyi değil DURUM
@@ -40,15 +55,16 @@ olduğunu okusun.
 """
 from __future__ import annotations
 
+import datetime as dt
 import os
 import tempfile
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
-from sqlalchemy import Engine
+from sqlalchemy import Connection, Engine, text
 
 import version
-from services import ayar, db
+from services import ayar, db, depo_admin, kuyruk, zaman
 
 router = APIRouter()
 
@@ -91,6 +107,41 @@ def veri_dizini_yazilabilir(dizin: str) -> bool:
     return True
 
 
+def _sonda_sorgusu(baglanti: Connection) -> tuple[dt.datetime | None, bool]:
+    """Tek bağlantıda: `SELECT 1`, sonra işçilerin son kalbi. Döner: (son kalp, kalp okunabildi).
+
+    `SELECT 1` düşerse istisna `db.sor`a çıkar → `None` → `db_reachable:false`;
+    dönebildiyse DB ulaşılabilir. Kalp sorgusu düşerse (`isciler` yok: göç
+    koşmamış) ikinci öğe `False` — DB ulaşılabilir, işçi durumu bilinmiyor.
+    `rollback`: Postgres düşen ifadeden sonra transaksiyonu bozuk sayar;
+    bağlantı havuza temiz dönsün.
+    """
+    baglanti.execute(text("SELECT 1")).scalar_one()
+    try:
+        return kuyruk.isci_son_kalp(baglanti), True
+    except Exception:
+        baglanti.rollback()
+        return None, False
+
+
+def isci_durumu(motor: Engine | None, an: dt.datetime | None = None) -> tuple[bool, bool | None, str | None]:
+    """(`db_reachable`, `worker_alive`, `worker_last_heartbeat`) — gövdenin DB'den gelen üç alanı.
+
+    `worker_alive` = son kalp `an - CANLI_ESIK`ten YENİ (admin metriklerinin
+    `canli` ölçütüyle birebir aynı karşılaştırma). Bilinmiyorsa `None`.
+    """
+    sonuc = db.sor(motor, _sonda_sorgusu)
+    if sonuc is None:
+        return False, None, None
+    son_kalp, okundu = sonuc
+    if not okundu:
+        return True, None, None
+    if son_kalp is None:
+        return True, False, None
+    simdi = an if an is not None else zaman.an()
+    return True, son_kalp > simdi - depo_admin.CANLI_ESIK, zaman.damga(son_kalp)
+
+
 @router.get("/health")
 def health(ayarlar: ayar.Ayarlar = Depends(ayar.genel),
            motor: Engine | None = Depends(db.motor_varsa)) -> JSONResponse:
@@ -105,10 +156,11 @@ def health(ayarlar: ayar.Ayarlar = Depends(ayar.genel),
     önbelleğe alırsa sonda dakikalarca bayat bir "sağlıklı" okur.
     """
     yazilabilir = veri_dizini_yazilabilir(ayarlar.data_dir)
-    db_erisilebilir = db.erisilebilir(motor)
+    db_erisilebilir, isci_canli, son_kalp = isci_durumu(motor)
     ok = yazilabilir and db_erisilebilir
     return JSONResponse(
         {"ok": ok, "version": version.APP_VERSION,
-         "data_dir_writable": yazilabilir, "db_reachable": db_erisilebilir},
+         "data_dir_writable": yazilabilir, "db_reachable": db_erisilebilir,
+         "worker_alive": isci_canli, "worker_last_heartbeat": son_kalp},
         status_code=200 if ok else 503,
         headers={"Cache-Control": "no-store"})

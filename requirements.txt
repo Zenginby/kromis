@@ -38,6 +38,15 @@ pwdlib[argon2]==0.3.*
 # --python-version 3.14 --only-binary=:all:` ile doğrulandı (CI 3.14, imaj 3.13).
 cryptography==50.0.*
 
+# Hata izleme (Faz 2 / 9, K10): Sentry SDK — yalnız `SENTRY_DSN` verilmişse
+# ithal edilir ve kurulur (services/hata_izleme.py, tembel); DSN yoksa süreç
+# paketi hiç yüklemez. Yine de ÇALIŞMA ZAMANI dosyasında: imajda hazır dursun
+# ki sahibin DSN'i panelden girmesi yeni imaj istemesin. Saf Python tekerleği
+# (`py3-none-any`), cp313/cp314 sorunu yok; ~2 MB. Yama ve MINOR serbest
+# (`2.*`): 2.x API'si (`max_request_body_size`, `isolation_scope`) tests/
+# test_sentry.py ile mandallı, kırıcı bir 3.0 ancak pin ilerletilince gelir.
+sentry-sdk==2.*
+
 # Windows .NET köprüsü — pywebview'ın KENDİ dolaylı bağımlılıkları
 # (`pythonnet; sys_platform=="win32"`), burada yalnız SÜRÜMLERİ sabitleniyor.
 #

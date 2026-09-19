@@ -88,7 +88,9 @@ from __future__ import annotations
 
 import contextlib
 import datetime as dt
+import logging
 import os
+import time
 import traceback
 import uuid
 from collections.abc import Callable, Iterable, Iterator, Mapping
@@ -108,6 +110,8 @@ from services import (
     depo_medya,
     dil,
     dosya,
+    gunluk,
+    hata_izleme,
     kiraci,
     kuyruk,
     platform_anahtari,
@@ -122,7 +126,9 @@ from services.tablolar import (
 
 __all__ = ["ES_ZAMANLI_ENV", "ES_ZAMANLI_VARSAYILAN", "KALP_ESIGI_ENV", "KALP_ESIGI_VARSAYILAN",
            "KALP_ARALIGI_SN", "YOKLAMA_ARALIGI_SN", "BEKLENMEYEN_HATASI", "KULLANICI_YOK_HATASI",
-           "es_zamanli", "kalp_esigi", "siradakini_al", "kos", "tek_tur", "kalp_turu"]
+           "UYARI_KUYRUK_DERINLIGI", "UYARI_EN_ESKI_BEKLEYEN_SN",
+           "es_zamanli", "kalp_esigi", "siradakini_al", "kos", "tek_tur", "kalp_turu",
+           "kuyruk_uyarisi"]
 
 # Aynı anda kaç iş (iş parçacığı) — `.env.example`, `compose.yaml` ve `isci.py`
 # aynı adı buradan okur (bekçisi tests/test_docker_kapisi.py `ALTYAPI`).
@@ -142,6 +148,18 @@ YOKLAMA_ARALIGI_SN = 1.0
 # cümleyi ön yüz kurar, metin sızıntı taşımasın diye istisna MESAJI değil TÜRÜ yazılır.
 BEKLENMEYEN_HATASI = "beklenmeyen hata"
 KULLANICI_YOK_HATASI = "kullanici yok"
+
+# Uyarı eşikleri (docs/isletme.md § 6, Faz 2 / 9): kuyruk derinliği BUNDAN ÇOK ya
+# da en eski bekleyen BUNDAN ESKİ ise kalp turu `olay=uyari` (WARNING) düşürür —
+# işçi yetişmiyor ya da hiç yok. Sentry'de bu satıra bağlı uyarı kuralı
+# sahibin panelinde (belge §9 "Sahibin adımı"). Sabit, ortamdan değil: eşikler
+# belgenin sayısı; değişirse belgeyle birlikte değişsin.
+UYARI_KUYRUK_DERINLIGI = 20
+UYARI_EN_ESKI_BEKLEYEN_SN = 10 * 60
+
+# İş olaylarının günlükçüsü (`is.alindi/basladi/bitti/hata`, `uyari`); işleyici ve
+# biçim `kromis` kökünde (gunluk.kur — web lifespan'ı ve `isci.py` kurar).
+_gunluk = logging.getLogger("kromis.is")
 
 
 class _IsArtikCalismiyor(Exception):
@@ -200,6 +218,11 @@ def siradakini_al(db: Session, isci_id: uuid.UUID, an: dt.datetime) -> Is | None
             return None
         db.expunge(is_)
         db.commit()
+    # `is_id` bağlam DEĞİL, alan: bağlamı `kos` kurar (alım ile koşum ayrı çağrılar).
+    # `bekleme_ms`: sıraya girişten alınışa — "işçi yetişiyor mu" sorusunun ham sayısı.
+    gunluk.olay(_gunluk, "is.alindi", is_id=str(is_.id), kullanici_id=str(is_.kullanici_id),
+                tur=is_.tur, model=is_.model, isci_id=str(isci_id),
+                bekleme_ms=round((an - is_.olusturuldu).total_seconds() * 1000))
     return is_
 
 
@@ -366,6 +389,9 @@ def _yaz(is_: Is, sonuclar: list[bytes], oturum_ac: Callable[[], Session], depo:
         errlog.safe_append(ayarlar.data_dir,
                            f"is {is_.id} ({is_.tur}) satir/commit dustu, nesneler silindi:\n"
                            f"{traceback.format_exc()}")
+        _gunluk.exception("is satir/commit dustu, nesneler silindi",
+                          extra={"olay": "is.istisna", "tur": is_.tur})
+        hata_izleme.istisna_bildir()
         _dusur(oturum_ac, is_.id, f"{BEKLENMEYEN_HATASI}: {type(e).__name__}", an, ayarlar.data_dir)
         return False
     return True
@@ -395,8 +421,21 @@ def kos(is_: Is, oturum_ac: Callable[[], Session], depo: dosya.Depo, ayarlar: ay
     # İşin KİRACISI `_kos` boyunca bağlı: `oturum_ac()` ile açılan her oturumun
     # ilk ifadesi `SET LOCAL app.kullanici_id` olur (services/db.py kancası) —
     # kimlik okuması, medya satırı, `bitir`/`dusur` hep o kullanıcının satırında.
-    with kiraci.baglam(kullanici_id=is_.kullanici_id):
-        return _kos(is_, oturum_ac, depo, ayarlar, bitis)
+    # GÜNLÜK BAĞLAMI da iş boyunca (Faz 2 / 9): bu blokta yazılan HER satır
+    # (`is.basladi/bitti/hata`, depo hataları, iz) `is_id` + `kullanici_id`
+    # taşır; Sentry kuruluysa aynı ikili iş kapsamının etiketi (`set_tag`).
+    # Süre DUVAR SAATİ (`perf_counter`), `an` DEĞİL: testler `an`ı sabitliyor,
+    # `sure_ms` yine gerçek geçen süreyi söylesin.
+    baslangic = time.perf_counter()
+    with (kiraci.baglam(kullanici_id=is_.kullanici_id),
+          gunluk.baglam(is_id=str(is_.id), kullanici_id=str(is_.kullanici_id)),
+          hata_izleme.is_baglami(is_.id, is_.kullanici_id)):
+        gunluk.olay(_gunluk, "is.basladi", tur=is_.tur, model=is_.model,
+                    anahtar_kaynagi=is_.anahtar_kaynagi)
+        bitti = _kos(is_, oturum_ac, depo, ayarlar, bitis)
+        gunluk.olay(_gunluk, "is.bitti" if bitti else "is.hata", tur=is_.tur, model=is_.model,
+                    sure_ms=round((time.perf_counter() - baslangic) * 1000))
+        return bitti
 
 
 def _kos(is_: Is, oturum_ac: Callable[[], Session], depo: dosya.Depo, ayarlar: ayar.Ayarlar,
@@ -425,8 +464,12 @@ def _kos(is_: Is, oturum_ac: Callable[[], Session], depo: dosya.Depo, ayarlar: a
             _dusur(oturum_ac, is_.id, str(e), bitis(), ayarlar.data_dir)
             return False
         except Exception as e:
+            # İz üç yere: `hata.log` (belge §9: kalır), stdout JSON (`hata` alanı,
+            # `is_id` bağlamdan) ve Sentry (kuruluysa). Kullanıcıya yalnız KOD.
             errlog.safe_append(ayarlar.data_dir,
                                f"is {is_.id} ({is_.tur}) beklenmeyen hata:\n{traceback.format_exc()}")
+            _gunluk.exception("is beklenmeyen hata", extra={"olay": "is.istisna", "tur": is_.tur})
+            hata_izleme.istisna_bildir()
             _dusur(oturum_ac, is_.id, f"{BEKLENMEYEN_HATASI}: {type(e).__name__}", bitis(),
                    ayarlar.data_dir)
             return False
@@ -478,3 +521,22 @@ def kalp_turu(db: Session, isci_id: uuid.UUID, is_idleri: Iterable[uuid.UUID], a
         dusen = kuyruk.bayatlari_dusur(db, an, esik)
         db.commit()
     return dusen
+
+
+def kuyruk_uyarisi(db: Session, an: dt.datetime) -> dict[str, Any] | None:
+    """Eşik aşıldıysa uyarı alanları (`derinlik`, `en_eski_bekleyen_sn`, `esik_*`), değilse `None`.
+
+    Kalp turuyla aynı iş parçacığında, 30 sn'de bir (`isci.py`); TEK sorgu
+    (`kuyruk.bekleyen_ozeti`). Koşul sürdükçe HER turda yeniden düşer, kenar
+    tetiklemeli değil: Sentry/toplayıcı uyarı kuralları "son N dakikada K
+    olay" sayar ve tek satır susan bir kuralı uyandırmaz; bedeli işçi başına
+    en çok 120 satır/saat, o da yalnız işler birikirken. `app.rol='admin'`:
+    bütün kiracıların bekleyeni (RLS).
+    """
+    with kiraci.baglam(rol=kiraci.ADMIN, oturum=db):
+        derinlik, en_eski = kuyruk.bekleyen_ozeti(db, an)
+        db.rollback()
+    if derinlik <= UYARI_KUYRUK_DERINLIGI and (en_eski is None or en_eski <= UYARI_EN_ESKI_BEKLEYEN_SN):
+        return None
+    return {"derinlik": derinlik, "en_eski_bekleyen_sn": en_eski,
+            "esik_derinlik": UYARI_KUYRUK_DERINLIGI, "esik_en_eski_sn": UYARI_EN_ESKI_BEKLEYEN_SN}

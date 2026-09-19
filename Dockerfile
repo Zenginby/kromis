@@ -101,4 +101,11 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # değil. `0.0.0.0`: konteynerin ağ ad alanında loopback dışarıdan görünmez.
 # Kabuk biçimi (`sh -c`) `${PORT}`ün genişlemesi için; `exec` uvicorn'un PID
 # 1 olması ve SIGTERM'i doğrudan alması için.
-CMD ["sh", "-c", "exec uvicorn app:app --host 0.0.0.0 --port ${PORT:-8765}"]
+#
+# `--no-access-log` (Faz 2 / 9): erişim satırını uygulama yazar
+# (services/istek_kimligi.py — JSON, `istek_id`, süre, kullanıcı, `X-Request-ID`
+# ile eşleşir); uvicorn'unki aynı isteği ikinci kez ve yapısız söylerdi.
+# uvicorn'un yaşam döngüsü satırları (`Started server process`) stderr'e düz
+# metin gitmeye devam eder; uygulama günlüğü stdout'ta satır başına JSON
+# (`KROMIS_GUNLUK_BICIMI`, .env.example).
+CMD ["sh", "-c", "exec uvicorn app:app --host 0.0.0.0 --port ${PORT:-8765} --no-access-log"]

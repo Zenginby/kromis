@@ -49,7 +49,7 @@ import datetime as dt
 import uuid
 from typing import Any
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import Connection, delete, func, select, update
 from sqlalchemy.orm import Session
 
 import errlog
@@ -64,9 +64,9 @@ from services.tablolar import (
     Isci,
 )
 
-__all__ = ["ekle", "al", "kalp", "bitir", "dusur", "iptal", "bayatlari_dusur",
+__all__ = ["ekle", "al", "kalp", "bitir", "dusur", "iptal", "bayatlari_dusur", "bekleyen_ozeti",
            "aktif_sayisi", "listele", "bul", "satir", "isci_kaydet", "isci_kalp", "isci_sil",
-           "BAYAT_HATASI", "AKTIF_DURUMLAR", "KAPANMIS_DURUMLAR"]
+           "isci_son_kalp", "BAYAT_HATASI", "AKTIF_DURUMLAR", "KAPANMIS_DURUMLAR"]
 
 # `bayatlari_dusur`un `hata` sütununa yazdığı KOD — cümle değil (gerekçe üstte).
 BAYAT_HATASI = "isci yanit vermiyor"
@@ -284,12 +284,36 @@ def bayatlari_dusur(db: Session, an: dt.datetime, esik: dt.timedelta) -> int:
     return _etkilenen(sonuc)
 
 
+def bekleyen_ozeti(db: Session, an: dt.datetime) -> tuple[int, int | None]:
+    """Kuyruk derinliği (`bekliyor` sayısı) ve en eski bekleyenin yaşı (sn; kuyruk boşsa `None`) — TEK sorgu.
+
+    İşçinin kalp turu (services/isci.py `kuyruk_uyarisi`, Faz 2 / 9) 30 sn'de
+    bir sorar ve `isletme.md` § 6 eşiklerini aşınca `uyari` olayı düşürür;
+    admin metrikleri aynı iki sayıyı `depo_admin.metrikler`de `calisan`la
+    birlikte hesaplar. Bütün kiracıların işi: çağıran `app.rol='admin'`
+    bağlamında koşar (kalp turuyla aynı transaksiyon), yoksa RLS 0 döner.
+    """
+    derinlik, en_eski = db.execute(
+        select(func.count(), func.min(Is.olusturuldu)).where(Is.durum == DURUM_BEKLIYOR)).one()
+    yas = int((an - en_eski).total_seconds()) if en_eski is not None else None
+    return int(derinlik or 0), yas
+
+
 def isci_kaydet(db: Session, konak: str, surum: str, es_zamanli: int, an: dt.datetime) -> Isci:
     """İşçi açılışta: kendi satırı (`basladi = son_kalp = an`); `id` DB'den, işçi onu `al`a taşır."""
     satir = Isci(konak=konak, surum=surum, es_zamanli=es_zamanli, basladi=an, son_kalp=an)
     db.add(satir)
     db.flush()
     return satir
+
+
+def isci_son_kalp(db: Session | Connection) -> dt.datetime | None:
+    """Bütün işçilerin EN SON kalbi; satır yoksa `None` — `/health` `worker_alive` bunu `CANLI_ESIK`le okur.
+
+    `Connection` de alır: sonda (`routers/saglik.py`) `Session` açmaz, `SELECT 1`
+    ile aynı bağlantıda sorar. `isciler` politikasız, bağlam gerekmez.
+    """
+    return db.execute(select(func.max(Isci.son_kalp))).scalar_one()
 
 
 def isci_kalp(db: Session, isci_id: uuid.UUID, an: dt.datetime) -> bool:

@@ -60,6 +60,8 @@
         "services.dosya",
         "services.gorsel",
         "services.gunluk",
+        "services.hata_izleme",
+        "services.istek_kimligi",
         "services.kimlik",
         "services.koken",
         "services.modeller",
@@ -74,7 +76,7 @@
         "netguard"
       ],
       "katman": 12,
-      "satir": 292,
+      "satir": 299,
       "testler": [
         "tests/test_admin.py",
         "tests/test_app.py",
@@ -97,6 +99,7 @@
         "tests/test_fonts.py",
         "tests/test_galeri_db.py",
         "tests/test_guncelleme_route.py",
+        "tests/test_gunluk.py",
         "tests/test_guvenlik_baslik.py",
         "tests/test_health.py",
         "tests/test_hesap.py",
@@ -124,6 +127,7 @@
         "tests/test_provider_logos.py",
         "tests/test_rls.py",
         "tests/test_search_predicate.py",
+        "tests/test_sentry.py",
         "tests/test_settings_route.py",
         "tests/test_shimmer.py",
         "tests/test_sifre.py",
@@ -206,6 +210,7 @@
         "tests/test_folders.py",
         "tests/test_galeri_db.py",
         "tests/test_gemini_client.py",
+        "tests/test_gunluk.py",
         "tests/test_i18n.py",
         "tests/test_ice_aktar.py",
         "tests/test_import_route.py",
@@ -335,6 +340,7 @@
         "tests/test_errlog.py",
         "tests/test_fal_client.py",
         "tests/test_gemini_client.py",
+        "tests/test_gunluk.py",
         "tests/test_i18n.py",
         "tests/test_index.py",
         "tests/test_isci.py",
@@ -560,6 +566,8 @@
         "isci",
         "paths",
         "routers.hesap",
+        "services.gunluk",
+        "services.hata_izleme",
         "services.isci",
         "services.kuyruk",
         "services.posta",
@@ -763,6 +771,8 @@
         "services.ayar",
         "services.db",
         "services.dosya",
+        "services.gunluk",
+        "services.hata_izleme",
         "services.isci",
         "services.kuyruk",
         "services.sifre",
@@ -771,7 +781,7 @@
       ],
       "ithal_eden": [],
       "katman": 11,
-      "satir": 258,
+      "satir": 289,
       "testler": [],
       "yol": "isci.py"
     },
@@ -1062,6 +1072,7 @@
         "tests/test_azure_mai_client.py",
         "tests/test_catalog.py",
         "tests/test_gemini_client.py",
+        "tests/test_gunluk.py",
         "tests/test_isci.py",
         "tests/test_isler_route.py",
         "tests/test_kota.py",
@@ -1096,6 +1107,7 @@
         "services.db",
         "services.depo_admin",
         "services.dil",
+        "services.gunluk",
         "services.hesap",
         "services.kimlik",
         "services.sablon",
@@ -1106,7 +1118,7 @@
         "app"
       ],
       "katman": 11,
-      "satir": 134,
+      "satir": 136,
       "testler": [],
       "yol": "routers/admin.py"
     },
@@ -1296,15 +1308,20 @@
       "ithal": [
         "services.ayar",
         "services.db",
+        "services.depo_admin",
+        "services.kuyruk",
+        "services.zaman",
         "version"
       ],
       "ithal_eden": [
         "app"
       ],
       "katman": 10,
-      "satir": 114,
+      "satir": 166,
       "testler": [
-        "tests/test_health.py"
+        "tests/test_gunluk.py",
+        "tests/test_health.py",
+        "tests/test_sentry.py"
       ],
       "yol": "routers/saglik.py"
     },
@@ -1409,6 +1426,7 @@
       "testler": [
         "tests/test_app_bolme.py",
         "tests/test_artik_dosya.py",
+        "tests/test_gunluk.py",
         "tests/test_hesap.py",
         "tests/test_isci.py",
         "tests/test_isler_route.py",
@@ -1473,7 +1491,7 @@
         "tools.uygulama_rolu"
       ],
       "katman": 1,
-      "satir": 208,
+      "satir": 225,
       "testler": [
         "tests/test_admin.py",
         "tests/test_anahtar_dondur.py",
@@ -1483,6 +1501,7 @@
         "tests/test_docker_kapisi.py",
         "tests/test_goc.py",
         "tests/test_guncelleme_route.py",
+        "tests/test_health.py",
         "tests/test_ice_aktar.py",
         "tests/test_kullanici_cli.py",
         "tests/test_playwright_studio.py",
@@ -1501,12 +1520,14 @@
         "services.zaman"
       ],
       "ithal_eden": [
-        "routers.admin"
+        "routers.admin",
+        "routers.saglik"
       ],
       "katman": 8,
       "satir": 262,
       "testler": [
-        "tests/test_admin.py"
+        "tests/test_admin.py",
+        "tests/test_health.py"
       ],
       "yol": "services/depo_admin.py"
     },
@@ -1715,6 +1736,7 @@
       "satir": 194,
       "testler": [
         "tests/test_dil.py",
+        "tests/test_gunluk.py",
         "tests/test_i18n.py",
         "tests/test_isci.py",
         "tests/test_koken.py"
@@ -1748,6 +1770,7 @@
         "tests/test_docker_kapisi.py",
         "tests/test_dosya.py",
         "tests/test_dosya_rotalari.py",
+        "tests/test_gunluk.py",
         "tests/test_isci.py",
         "tests/test_medya_tasi.py",
         "tests/test_rls.py"
@@ -1780,16 +1803,47 @@
     {
       "ad": "services.gunluk",
       "erteli_ithal": [],
-      "ithal": [],
-      "ithal_eden": [
-        "app"
+      "ithal": [
+        "errlog"
       ],
-      "katman": 0,
-      "satir": 55,
+      "ithal_eden": [
+        "app",
+        "isci",
+        "routers.admin",
+        "services.hata_izleme",
+        "services.isci",
+        "services.istek_kimligi"
+      ],
+      "katman": 1,
+      "satir": 252,
       "testler": [
-        "tests/test_admin.py"
+        "tests/test_admin.py",
+        "tests/test_docker_kapisi.py",
+        "tests/test_gunluk.py"
       ],
       "yol": "services/gunluk.py"
+    },
+    {
+      "ad": "services.hata_izleme",
+      "erteli_ithal": [],
+      "ithal": [
+        "errlog",
+        "services.gunluk",
+        "version"
+      ],
+      "ithal_eden": [
+        "app",
+        "isci",
+        "services.isci",
+        "services.istek_kimligi"
+      ],
+      "katman": 2,
+      "satir": 187,
+      "testler": [
+        "tests/test_docker_kapisi.py",
+        "tests/test_sentry.py"
+      ],
+      "yol": "services/hata_izleme.py"
     },
     {
       "ad": "services.hesap",
@@ -1846,6 +1900,8 @@
         "services.depo_medya",
         "services.dil",
         "services.dosya",
+        "services.gunluk",
+        "services.hata_izleme",
         "services.kiraci",
         "services.kuyruk",
         "services.nesne_depo",
@@ -1857,9 +1913,10 @@
         "isci"
       ],
       "katman": 10,
-      "satir": 480,
+      "satir": 542,
       "testler": [
         "tests/test_docker_kapisi.py",
+        "tests/test_gunluk.py",
         "tests/test_isci.py",
         "tests/test_isler_route.py",
         "tests/test_kimlik.py",
@@ -1867,6 +1924,25 @@
         "tests/test_rls.py"
       ],
       "yol": "services/isci.py"
+    },
+    {
+      "ad": "services.istek_kimligi",
+      "erteli_ithal": [],
+      "ithal": [
+        "services.gunluk",
+        "services.hata_izleme"
+      ],
+      "ithal_eden": [
+        "app"
+      ],
+      "katman": 3,
+      "satir": 112,
+      "testler": [
+        "tests/test_gunluk.py",
+        "tests/test_koken.py",
+        "tests/test_sentry.py"
+      ],
+      "yol": "services/istek_kimligi.py"
     },
     {
       "ad": "services.kapilar",
@@ -1930,7 +2006,7 @@
         "services.ayar"
       ],
       "katman": 8,
-      "satir": 260,
+      "satir": 265,
       "testler": [
         "tests/test_isler_route.py",
         "tests/test_kimlik.py",
@@ -1974,6 +2050,7 @@
       "satir": 133,
       "testler": [
         "tests/test_docker_kapisi.py",
+        "tests/test_gunluk.py",
         "tests/test_hesap.py",
         "tests/test_koken.py",
         "tests/test_playwright_hesap.py"
@@ -2014,16 +2091,19 @@
       "ithal_eden": [
         "isci",
         "routers.isler",
+        "routers.saglik",
         "routers.uretim",
         "services.depo_admin",
         "services.isci",
         "services.kapilar"
       ],
       "katman": 6,
-      "satir": 304,
+      "satir": 328,
       "testler": [
         "tests/test_admin.py",
         "tests/test_artik_dosya.py",
+        "tests/test_gunluk.py",
+        "tests/test_health.py",
         "tests/test_isci.py",
         "tests/test_isler_route.py",
         "tests/test_kota.py",
@@ -2283,6 +2363,7 @@
         "routers.galeri",
         "routers.isler",
         "routers.paletler",
+        "routers.saglik",
         "routers.sohbet",
         "services.depo_admin",
         "services.depo_kimlik_bilgisi",
@@ -2302,6 +2383,8 @@
       "testler": [
         "tests/test_admin.py",
         "tests/test_galeri_db.py",
+        "tests/test_gunluk.py",
+        "tests/test_health.py",
         "tests/test_ice_aktar.py",
         "tests/test_kimlik_bilgisi_db.py",
         "tests/test_kota.py",
@@ -2624,6 +2707,7 @@
         "isci",
         "routers.ayarlar",
         "routers.saglik",
+        "services.hata_izleme",
         "services.modeller",
         "services.sablon",
         "tools.surum_karari"
@@ -2641,6 +2725,7 @@
         "tests/test_playwright_guncelleme.py",
         "tests/test_provider_logos.py",
         "tests/test_release_manifest.py",
+        "tests/test_sentry.py",
         "tests/test_settings_route.py",
         "tests/test_version.py"
       ],
@@ -3230,7 +3315,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 132,
+  "test_dosyasi_sayisi": 134,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",
@@ -3257,7 +3342,7 @@
         "version"
       ],
       "onyuz": [],
-      "satir": 57,
+      "satir": 58,
       "yardimci_sayisi": 2,
       "yol": "/admin",
       "yontem": "GET"
@@ -3272,7 +3357,7 @@
       "onyuz": [
         "static/admin.js"
       ],
-      "satir": 76,
+      "satir": 77,
       "yardimci_sayisi": 8,
       "yol": "/api/admin/isler",
       "yontem": "GET"
@@ -3287,8 +3372,8 @@
       "onyuz": [
         "static/admin.js"
       ],
-      "satir": 122,
-      "yardimci_sayisi": 9,
+      "satir": 123,
+      "yardimci_sayisi": 10,
       "yol": "/api/admin/isler/{is_id}/iptal",
       "yontem": "POST"
     },
@@ -3300,7 +3385,7 @@
       "onyuz": [
         "static/admin.js"
       ],
-      "satir": 64,
+      "satir": 65,
       "yardimci_sayisi": 5,
       "yol": "/api/admin/kullanicilar",
       "yontem": "GET"
@@ -3315,8 +3400,8 @@
       "onyuz": [
         "static/admin.js"
       ],
-      "satir": 111,
-      "yardimci_sayisi": 5,
+      "satir": 112,
+      "yardimci_sayisi": 6,
       "yol": "/api/admin/kullanicilar/{kullanici_id}/oturum-dusur",
       "yontem": "POST"
     },
@@ -3330,8 +3415,8 @@
       "onyuz": [
         "static/admin.js"
       ],
-      "satir": 101,
-      "yardimci_sayisi": 5,
+      "satir": 102,
+      "yardimci_sayisi": 6,
       "yol": "/api/admin/kullanicilar/{kullanici_id}/tavan",
       "yontem": "POST"
     },
@@ -3343,7 +3428,7 @@
       "onyuz": [
         "static/admin.js"
       ],
-      "satir": 86,
+      "satir": 87,
       "yardimci_sayisi": 6,
       "yol": "/api/admin/metrikler",
       "yontem": "GET"
@@ -4319,8 +4404,8 @@
         "version"
       ],
       "onyuz": [],
-      "satir": 95,
-      "yardimci_sayisi": 2,
+      "satir": 146,
+      "yardimci_sayisi": 5,
       "yol": "/health",
       "yontem": "GET"
     },

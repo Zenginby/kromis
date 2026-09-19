@@ -75,6 +75,16 @@ def kurgu(tmp_path, db_oturumu, kullanici) -> Kurgu:
     k._yaz(os.path.join(isler, str(is_.id), "upload.png"), k.satirli)
     k._yaz(os.path.join(isler, str(is_.id), "ref2.png"), k.satirli)
     k._yaz(os.path.join(isler, str(uuid.uuid4()), "upload.png"), k.artik)
+    # Faz 2 / 10: yeniden gönderilmiş iş, SİLİNMİŞ (saklama) eski işin dizinine referans verir —
+    # dizinin kendi satırı yok ama ona bakan satır var, girdisi ARTIK DEĞİL (kuyruk.girdi_referanslari).
+    silinmis = uuid.uuid4()
+    kuyruk.ekle(db_oturumu, k.kullanici_id, "animate",
+                {"prompt": "y", "girdiler": [{"ad": "upload.png", "anahtar": ayar.is_dizini(k.kullanici_id, silinmis) + "upload.png"}],
+                 "son_kare": {"ad": "son_kare.png", "anahtar": ayar.is_dizini(k.kullanici_id, silinmis) + "son_kare.png"}},
+                "m", 1)
+    db_oturumu.commit()
+    k._yaz(os.path.join(isler, str(silinmis), "upload.png"), k.satirli)
+    k._yaz(os.path.join(isler, str(silinmis), "son_kare.png"), k.satirli)
     # Medya değil: dokunulmaz.
     k._yaz(os.path.join(out, "guncelleme.json"), k.medya_degil, b'{"zaman": 0}')
     k._yaz(os.path.join(out, ".DS_Store"), k.medya_degil, b"\x00")
@@ -109,8 +119,9 @@ def test_the_dry_run_lists_exactly_the_stray_files_and_touches_nothing(kurgu, ca
     assert _sayilar(kurgu.oturum, kurgu.kullanici_id) == once
     assert "hicbir sey silinmedi" in out
     # Özet satırları: kullanıcı başına, hesabı olmayan dizin işaretli, UUID olmayan atlandı.
-    # 12 dosya = 9 (medya/varlık) + 3 girdi nesnesi (2 satırlı iş, 1 satırsız — Faz 2 / 4).
-    assert f"{kurgu.kullanici_id}: 12 dosya, 5 artik" in out and "2 medya degil" in out
+    # 14 dosya = 9 (medya/varlık) + 5 girdi nesnesi (2 satırlı iş, 1 satırsız — Faz 2 / 4 —,
+    # 2 satırı silinmiş ama yeniden gönderilen işin referans verdiği dizinde — Faz 2 / 10).
+    assert f"{kurgu.kullanici_id}: 14 dosya, 5 artik" in out and "2 medya degil" in out
     assert "HESABI YOK" in out
     assert "atlandi (UUID degil): kullanicilar/eski-yedek" in out
     assert "toplam: 2 kullanici, 6 artik dosya" in out

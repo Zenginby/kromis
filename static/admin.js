@@ -53,8 +53,17 @@
   }
 
   /** `zaman.damga` biçimi (`2026-09-18T12:00:00`) → `2026-09-18 12:00`; yoksa tire. */
+  /** Sunucunun damgası UTC ve dilimli (`zaman.damga_utc`, Faz 2 / 10); gösterim
+   *  yöneticinin YEREL saatinde `YYYY-AA-GG SS:DD`. `toLocaleString` değil: biçim
+   *  tarayıcının diline göre değişir, tablo sütunu sabit genişlikte kalsın. Süre
+   *  sayacı (`sureMetni`) da aynı dizeyi `Date`e verir — dilimsiz dize orada
+   *  saat dilimi farkı kadar yanlış süre gösteriyordu (isler.js `an` yorumu). */
   function tarih(damga) {
-    return damga ? damga.replace("T", " ").slice(0, 16) : "—";
+    if (!damga) return "—";
+    const d = new Date(damga);
+    if (Number.isNaN(d.getTime())) return damga;
+    const iki = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${iki(d.getMonth() + 1)}-${iki(d.getDate())} ${iki(d.getHours())}:${iki(d.getMinutes())}`;
   }
 
   function detayMetni(govde, durum) {

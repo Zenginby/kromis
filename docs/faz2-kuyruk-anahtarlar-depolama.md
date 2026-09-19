@@ -1960,7 +1960,7 @@ platform günlüğünde satırlar JSON; yerelde okunur istiyorsan
 
 ---
 
-## 10. Operasyon: platformda işçi süreci, SIGTERM/`kill_timeout`, R2 kovası düzeni, iş saklama (30 gün), bayat düşürme, CI `docker` işine işçi, belgeler (PR: `faz2/operasyon`)
+## 10. Operasyon: platformda işçi süreci, SIGTERM/`kill_timeout`, R2 kovası düzeni, iş saklama (30 gün), bayat düşürme, CI `docker` işine işçi, belgeler ✅ (PR: `faz2/operasyon`)
 
 **Kapsam.** Kod tarafı küçük, asıl iş YAML ve belge (Faz 1 / 9'un deseni):
 
@@ -2018,6 +2018,214 @@ kullanır (zaten var).
 **Çıkış ölçütü.** Boş Postgres + boş kova (sahte) ile `docker compose up`:
 göç, web, işçi açılıyor, `/health` `worker_alive:true`; CI 5 iş yeşil;
 belgelerde platform başına iki süreç tablosu; takım yeşil.
+
+**Yapıldığında (2026-09-19).** **Bakım turu** — `services/isci.py::bakim_turu(db,
+depo, an, esik, saklama)`: işçinin kalp iş parçacığında AÇILIŞTA bir kez ve
+sonra `BAKIM_ARALIGI_SN` (300) saniyede bir (`isci.py` `Surec.bakim`; testler
+ve duman için gizli `--bakim-araligi`). Üç iş, `BakimOzeti` sayılarıyla
+(`silinen_is`, `silinen_nesne`, `korunan_dizin`, `silinen_isci`), bir şey
+silinmişse `olay=bakim`, boş turda satır yok: (1) SAKLAMA —
+`kuyruk.saklama_sahipleri` (admin bağlamı: süresi dolmuş kapanmış işi olan
+kiracılar) → her kiracı için KENDİ bağlamında `kuyruk.eskileri_sil(db,
+kullanici_id, an, saklama)` (`DELETE … RETURNING`, `BITMIS_DURUMLAR` =
+bitti/hata/iptal, `bitti < an - saklama`, sınır kesin; `KROMIS_IS_SAKLAMA_GUN`
+öntanımlı 30, `isci.saklama()`); (2) GİRDİ NESNELERİ — silinen işin kendi
+`isler/<id>/` dizini + `istek.girdiler`/`son_kare`nin dizinleri aday; kalan
+satırların referansları (`kuyruk.girdi_referanslari`, JSONB tek sorgu) ve
+dizinin kendi satırı (`kuyruk.mevcut_isler`) yoksa `depo.listele(onek)` →
+`depo.sil`; yalnız `kullanicilar/<u>/isler/<id>/` biçimindeki dizinler aday
+(elle yazılmış bir `istek`in `foo/bar.png`i `foo/`yu sildirmez, test var); (3)
+ÖLÜ İŞÇİ — `kuyruk.olu_iscileri_sil(db, an, esik)`: `son_kalp < an - esik`,
+eşik kalp eşiğinin KENDİSİ (`KROMIS_IS_KALP_ESIGI_SN`; 9'un devri 3, ikinci
+eşik yok). `medya`ya dokunulmaz (test ölçüyor). Bayat İŞ düşürme 30 sn'lik
+kalp turunda KALDI (belge 5 dk der; daha sık olması kullanıcıya daha erken
+"hata", bedeli yok). `services/ayar.py`ye `ISLER_DIZINI` + `is_dizini(kid,
+is_id)` (rota, saklama ve `artik_dosya` aynı öneki okur; `routers/uretim.py`
+sabiti oradan alır). **`tools/artik_dosya.py`** ölçütü genişledi (6'nın devri
+5): `isler/<id>/` dizini "kendi satırı VAR ya da başka bir işin `istek`i ona
+REFERANS veriyor" ise satırlıdır — eskiden yalnız kendi satırına bakıyordu ve
+saklama eski işi silince yeniden gönderilmiş işin girdileri artık sayılıp
+SİLİNECEKTİ (kurgu testi o durumu taşıyor). **compose** `isci` →
+`stop_grace_period: 60s` (öntanımlı 10 sn bir görsel işini bile bitirmez).
+**CI `docker`** işi: `KROMIS_SECRET_KEY` bir adımda üretilip `$GITHUB_ENV`e →
+göç ×2 → **`docker run --rm … kromis python isci.py --tek-tur`** (boş kuyruk,
+0) → web konteyneri → `/health` gövdesinde `worker_alive` ALANI (Python
+`assert`), `/giris`, `/`; `_test.yml` değişmedi (test mandallı). İmaj boyutu
+bu PR'ın CI koşusundan okunur ve aşağıya yazılır (bu makinede Docker
+daemon'u yok). **`.env.example`** +1 (`KROMIS_IS_SAKLAMA_GUN`; `ALTYAPI`
+bekçisi). **"180" düzeltmesi (studyo-guncelleme-plani.md B3):**
+`services/zaman.py::damga_utc` (UTC, saniye, `Z`) — `kuyruk._json`
+(`/api/isler*`, SSE) ve `depo_admin` (`/api/admin/*`) damgaları dilimli;
+`admin.js tarih()` `Date` üzerinden yerel saat; `isler.js an()` yalnız yorum
+(dilimli dizeyi zaten doğru okur); `routers/isler.py _since` dilimli dizeyi
+kaydırmaz (zaten öyleydi). Galeri `created_at`i DEĞİŞMEDİ (üç betik +
+dondurulmuş kabuk dilimsiz okuyor; "az önce/bugün" kayması açık kalem,
+studyo planı). **Günlük (9'un devirleri 1 ve 6):** `gunluk.kur` KÖKE de
+işaretli bir JSON işleyicisi takar (`KOK_ISARETI`; kökün seviyesi WARNING
+kalır — üçüncü parti INFO susar) ve `uvicorn`/`uvicorn.error` günlükçülerini
+boşaltıp köke yayar → "Exception in ASGI application" izi ve yaşam döngüsü
+satırları stdout'ta JSON, redakte; `uvicorn.access` DOKUNULMAZ (ölçüldü:
+`--no-access-log` o günlükçüyü işleyicisiz + `propagate=False` bırakıyor,
+köke yaysaydık kapatılan erişim satırı JSON olarak geri geliyordu — dumanda
+`/health` iki kez göründü); işleyici `sys.stdout`u emit anında çözer
+(`_StdoutIsleyici`: pytest stdout'u test başına değiştiriyor); Alembic
+`fileConfig` kökü silerse `kur` yeniden takar. `services/platform_anahtari.py`
+günlükçüsü `kromis.platform`. **`errlog.redact_secrets`** 4. desen `[=:]`:
+`AD: değer` biçimi (env dökümü, YAML, `print(f"{AD}: …")`) da maskelenir
+(9'un devri). **Belgeler:** `docs/isletme.md` § 7 (platform başına iki süreç
+tablosu — Fly seçilen, `fly.toml` örneği `kill_timeout = "300s"`, `[[vm]]`,
+`[http_service] processes = ["app"]`; Railway/Render ikinci servis; compose),
+§ 8 (kova düzeni: özel, sürümleme, yaşam döngüsü, isteğe bağlı `rclone`), § 9
+(dağıt → geri al → sağlık → günlük → uyarı → saklama/bayat/ölü işçi + ilk
+üretim koşusu kontrol listesi); § 2 tablosuna `isler`/`isciler` ve **platform
+sırları** satırı (kasada kopya); § 5 tatbikatının 4. adımı "kova duruyor /
+sürümleme / ikinci kova". KURULUM.md 7 (kova ayarları), 8 (iki süreç,
+`kill_timeout`, saklama), 9 (günlük akımı, § 7-9 işaretçisi); README işçi
+işaretçisi. `docs/graflar` yenilendi (README'nin "iki bileşim kökü" notu
+3'ten beri var — `GIRIS_NOKTALARI` `isci`yi sayıyor, `tools/graf_uret.py`
+değişmedi).
+
+SAPMALAR: (a) `eskileri_sil` KULLANICI İMZALI ve kiracı başına transaksiyon:
+RLS admin politikası DELETE vermez (0006_rls; `tests/test_rls.py`
+"admin politikası DELETE vermez" mandallı) — yeni bir `yonetici_siler`
+politikası (göç, 24 → 25 politika, `rls_kontrol` sayacı) yerine sahip
+bağlamında silme seçildi: 7'nin "admin silmez" kararı durur, göç yok. (b)
+Bayat düşürme 30 sn'de (belge: 5 dk'lık bakımın içinde) — yukarıda. (c) R2
+"`isler/` öneki 7 gün" yaşam döngüsü kuralı YAZILAMAZ: R2/S3 önek süzgeci
+anahtarın BAŞINDAN eşleşir ve önde kullanıcı uuid'si var; girdi temizliği
+uygulamada (bakım turu, referans ölçütüyle) — kova tarafında yalnız sürüm
+geçmişi kuralı. (d) `fly.toml` depoya KONMADI (Dokunulan listesinde yok; bir
+platforma bağlanır ve sahibin bölge/boyut kararlarını taşır) — tam örnek
+`isletme.md` § 7'de, sahip kopyalar. (e) `/health` `worker_last_heartbeat`
+ve `/api/kota` `acilis` dilimsiz `zaman.damga` KALDI: operatör/`curl`
+okuyor, tarayıcı `Date`e vermiyor; iki uç bir gün tarayıcıda karşılaştırılırsa
+`damga_utc`ye geçer. (f) Bakım turu AÇILIŞTA da koşar (belge yalnız "5 dk'da
+bir"): tek işçili dağıtımda SIGKILL'le ölen önceki işçinin satırını silecek
+başka işçi yok; açılış turu `/health`i yeni işçi kalkar kalkmaz düzeltir. (g)
+`uvicorn.access` köke yayılmadı (ölçülen gerekçe yukarıda). (h) `docker
+compose up` çıkış ölçütü BU MAKİNEDE KOŞULMADI (Docker istemcisi var, daemon
+yok); CI `docker` işi aynı sırayı (göç → işçi → web → `/health`) servis
+Postgres'iyle koşuyor. (i) `tools/graf_uret.py`ye dokunulmadı: "bileşim kökü
+ikiye çıkar" 3. görevde yapılmıştı.
+
+TESTLER: takım **3.793 → 3.812** toplanan (+19; E2E dâhil, tam takım bu
+makinede koştu). `test_kuyruk` +3 (saklama: yalnız kapanmış ve eski, sınır
+kesin, sahip süzgeci, idempotent, `saklama_sahipleri`; `SilinenIs` dizinleri +
+`girdi_referanslari`/`mevcut_isler`/`_girdi_anahtarlari`; ölü işçi satırı —
+eşik kesin, `isci_id` durur, `/health` canlıyı görür), dump testi `damga_utc`
+ve `Z`. `test_isci` +3 (bakım turu: A/B/C/D kurgusu — referanslı dizin
+korunur, referanssız gider, `medya` durur, ölü işçi gider, boş tur `False`;
+son referans düşünce dizin serbest + tanınmayan anahtar süpürülmez; SÜREÇ:
+açılış turu ölü satırı ve eski işi siler, `olay=bakim` sayıları, aralıklı
+ikinci tur, SIGTERM 0) + `saklama()` env + kaynak taraması `bakim_turu`.
+`test_isler_route` +1 (yük `Z`, UTC, gerçek an; `since` geri dönüşü; dilimsiz
+`since` hâlâ kabul). `test_errlog` +2 (iki nokta biçimi 4 örnek; masum
+başlık/alan satırları aynen). `test_gunluk` +4 (üçüncü parti WARNING → JSON
+redakte, INFO susar; uvicorn günlükçüleri boşaltılıp köke — `uvicorn.access`
+hariç, kapatılmış erişim satırı sızmaz; kök işleyici tek ve `fileConfig`
+sonrası geri gelir, dinamik stdout; platform günlükçüsü `kromis.platform`).
+`test_docker_kapisi` +2 (CI işçi adımı: sıra göç → işçi → web, aynı DB,
+anahtar, `worker_alive`, `_test.yml` değişmez; KURULUM + isletme iddiaları +
+`.env.example` saklama satırı) ve mevcut üçü güncel (`ALTYAPI` +1,
+`stop_grace_period`, anahtar üretimi ayrı adımda). `test_artik_dosya` kurgusu
++2 dosya (silinmiş işin dizinine referans veren yeniden gönderim → satırlı;
+sayılar 12 → 14). `test_playwright_isler` +1 (5. tarayıcı gerçeği: sunucu
+`TZ=UTC` + `tzset`, bağlam `Europe/Istanbul`, sayaç "N s" ve N < 60, biten iş
+4-20 s, yük `Z`; 11,8 sn). `test_galeri_db` `kuyruk` 12 → 16 sorgu kuran
+işlev, `KIRACISIZ` +3 gerekçeli. `test_platform_anahtari` kendi işleyicisiyle
+(günlükçü adı değişti, `kromis` köke yayılmıyor).
+
+DUMAN (2026-09-19; geçici Postgres 16, `tools/goc.py` → `0006_rls` head,
+`uvicorn … --no-access-log` + `isci.py --kalp-araligi 1 --bakim-araligi 10`,
+`KROMIS_IS_KALP_ESIGI_SN=5`, `KROMIS_IS_SAKLAMA_GUN=30`, `TZ=UTC`; SQL ile
+tohum: A eski/`bitti`/kendi girdisi, B taze/`hata`/A'nın dizinine referans, C
+eski/`iptal`/kendi girdisi, D `calisiyor` — kalbi 2 dk önce susmuş ölü işçinin
+işi — ve ölü `isciler` satırı): işçi açılış bakımı `{"silinen_is": 2,
+"silinen_nesne": 1, "korunan_dizin": 1, "silinen_isci": 1}` — A ve C satırı
+gitti, **A'nın dizini durdu (B bakıyor), C'nin nesnesi silindi**; 5 sn sonra
+kalp turu `bayat adet=1` → D `hata` "isci yanit vermiyor". `/health`: işçi
+yokken `worker_alive:false`; işçi kalkınca `true`; **SIGKILL** + `son_kalp` 120
+sn geriye → `false`, ölü satır duruyor; **yeni işçi** açılış bakımı
+`silinen_isci:1` → `true`. **SIGTERM** boşta işçi → çıkış 0, **0,12 sn**,
+stderr boş, olaylar `isci.basladi → bakim → isci.sinyal → isci.kapandi`,
+kapanışta kendi satırı silindi. Web: stdout **13 satır JSON** (uvicorn'un
+`Application startup complete`, `Uvicorn running on …` dâhil), stderr yalnız
+lifespan öncesi **2 satır** (`Started server process`, `Waiting for
+application startup`). E2E tarayıcı testi "180"i ölçtü: `TZ=UTC` sunucu +
+`Europe/Istanbul` tarayıcı, sayaç "N s", N < 60.
+
+**Sahibin adımı — ilk üretim koşusu (canlıda bir kez; `isletme.md` § 9'un
+kontrol listesi).** (1) `fly.toml`: § 7'deki örneği kopyala; `primary_region`,
+`[[vm]]` boyutları ve `kill_timeout = "300s"` senin; `[http_service]`
+yalnız `app`. (2) Sırlar `fly secrets set …` ile iki sürece: `DATABASE_URL`
+(ayrı uygulama rolüyle — `tools/rls_kontrol.py` yeşil, KURULUM.md 1),
+`KROMIS_SECRET_KEY`, `KROMIS_KOKEN=https://<alan>`, dört `KROMIS_NESNE_DEPO_*`,
+posta üçlüsü, fonladığın `KROMIS_PLATFORM_*` (yapıldı), isteğe bağlı
+`SENTRY_DSN`; her birinin kasada kopyası (§ 2). İsteğe bağlı sayılar:
+`KROMIS_ISCI_ES_ZAMANLI` (4), `KROMIS_IS_KALP_ESIGI_SN` (300),
+`KROMIS_IS_SAKLAMA_GUN` (30) — öntanımlılar kapalı betaya yeter. (3) Kova
+ayarları bir kez (§ 8 / KURULUM 7): özel, sürümleme açık, `kullanicilar/`
+sürüm geçmişi 30 gün. (4) `fly deploy` → `release_command` göçü koşturur;
+`fly logs` JSON satırlar; `curl https://<alan>/health` → `ok:true`,
+`worker_alive:true` (işçi ilk kalbini atınca). (5) Admin bayrağı
+(`tools/kullanici.py admin`, §8), `/admin` → işçiler sekmesinde `canlı`.
+(6) Bir görsel işi: panelde sayaç 0'dan sayar, `bitti`, galeride görsel
+(302 → R2). (7) İşçiyi `fly machine restart` ile kapat: günlükte
+`isci.sinyal … isci.kapandi`, yeniden kalkışta `isci.basladi` (+ `bakim`
+yalnız bir şey silindiyse). (8) Kapanış süresini ölç ve buraya yaz (Railway'e
+gidilirse panelden okunan değer § 7 tablosuna). Sonucu bu paragrafın altına
+bir satır (tarih, platform, bölge, `/health` gövdesi, imaj boyutu).
+
+---
+
+## Faz 2 kapanış (2026-09-19)
+
+**Ne çıktı — 10/10, on PR + iki yan PR:**
+
+| # | görev | PR |
+| --- | --- | --- |
+| plan | bu belge | #37 |
+| 1 | `isler`/`isciler`, `services/kuyruk.py` (`FOR UPDATE SKIP LOCKED`) | #38 |
+| 2 | nesne depolama (`nesne_depo.py` SigV4 + `dosya.py`), 302 imzalı URL, `medya_tasi.py` | #39 |
+| 3 | işçi süreci `isci.py` / `services/isci.py`, compose `isci` | #40 |
+| 4 | üretim rotaları 202, `GET /api/isler`, iptal, eş zamanlılık tavanı | #41 |
+| 5 | SSE `/api/isler/akis`, `static/isler.js` paneli, yeniden gönder | #42 |
+| 6 | platform anahtarları (`KROMIS_PLATFORM_*`) + BYOK, saatlik/günlük kota | #43 |
+| 7 | RLS ikinci kat (`0006_rls`), `SET LOCAL`, FORCE | #45; canlı kontrol araçları `rls_kontrol.py`/`uygulama_rolu.py` (sahibin provası) #48 |
+| 8 | admin: `/admin`, `/api/admin/*` | #49 |
+| 9 | JSON günlük, istek/iş kimliği, Sentry, `/health worker_alive` | #51 |
+| 10 | operasyon: bakım turu (saklama, ölü işçi), CI'da işçi, `isletme.md` § 7-9, "180" düzeltmesi | bu PR (`faz2/operasyon`) |
+| — | stüdyo güncelleme planı (sahibin notları, B3 "180" gözlemi) | #47 |
+| — | ödeme MoR/Polar notu ve marka | #46 |
+
+Çıkış kriteri ("6 dakikalık video işi sekme kapansa da tamamlanıyor;
+sağlayıcı harcaması kullanıcı başına sınırlı") 5 ve 6'da karşılandı (E2E 8
+sn'lik sahte iş, süreç sınandı; günlük kredi tavanı + saatlik iş tavanı).
+Takım 3.413 (Faz 1 sonu) → **3.812** (+399; belge +~240 tahmin etmişti, fark
+RLS ve admin bekçileri). Şema `0003_arena_win` → `0006_rls` (3 göç). Rota 54
+→ 67. Tarayıcı betiği 11 → 13. Modül 87 → 104.
+
+**Sahibin canlıda bekleyen adımları** (her biri ilgili bölümün "Sahibin
+adımı"nda adım adım): üretim DB rolünün RLS'i atlamadığı (`tools/rls_kontrol.py`,
+§7 — Railway'de prova yapıldı, canlının satırı bekliyor); kendi hesabını
+admin yapmak (§8); Sentry DSN (§9, isteğe bağlı); ilk üretim koşusu kontrol
+listesi (§10 — `fly.toml`, sırlar, kova ayarları, kapanış süresi ölçümü).
+YAPILDI: platform anahtarları sırda (§6), R2 kovası ve taşıma (§2), Railway
+DB provası (§7).
+
+**Açık kalemler (Faz 3+):** dağıtımda çalışan uzun işin kaybı → Faz 5
+"boşalt sonra dağıt"; sağlayıcı idempotency anahtarı yok (K8 kalır); galeri
+`created_at`inin dilimsiz dizesi ("az önce/bugün" kayması) → stüdyo arayüz
+bloğu; kök günlükçüde lifespan öncesi iki uvicorn satırı stderr'de; kredi
+defteri (Faz 3) — `isler.kredi_tahmini`/`anahtar_kaynagi` ilk müşterisi;
+KVKK saklama süreleri (Faz 4) — 30 gün öncül; e-posta ile iş bitti bildirimi
+(ürün kararı); `LISTEN/NOTIFY`/Redis yalnız ölçüm isterse; imaj boyutu her
+PR'da CI'dan okunur, iddia yok; Faz 1 / K4'ün "Docker'sız makine" kısıtı
+sürüyor (compose çıkış ölçütü CI'da).
+
+**Sonraki:** Faz 3 planı (kredi defteri, planlar, filigran, tarife-maliyet
+mutabakatı; stüdyo planındaki B1/E2-E3 kalemleri) ayrı belge ve PR olarak —
+bu belgenin "Faz 2 dışı" bölümü onun girdi listesi.
 
 ---
 

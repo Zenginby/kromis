@@ -65,6 +65,7 @@ from __future__ import annotations
 
 import dataclasses
 import os
+import re
 import threading
 import uuid
 from dataclasses import dataclass
@@ -77,6 +78,12 @@ from services.tablolar import Kullanici
 
 # Kullanıcı dizinlerinin `data_dir` altındaki kökü.
 KULLANICILAR_DIZINI = "kullanicilar"
+# Üretim işlerinin GİRDİ nesnelerinin kullanıcı kökü altındaki dizini (Faz 2 / 4):
+# `kullanicilar/<uuid>/isler/<is_id>/<ad>`. Adı üç yer okur — rota yazar
+# (routers/uretim.py), saklama siler (services/isci.py `bakim_turu`), artık
+# taraması sayar (tools/artik_dosya.py); sabit burada ki `services/` `routers/`ı
+# ithal etmesin (katman sırası, docs/graflar/moduller.md).
+ISLER_DIZINI = "isler"
 
 # Bu süreçte açılmış kullanıcı kökleri (tam yol): ilk istekten sonra dizin
 # sistemine bir daha sorulmaz. Kilit `i18n._lock`un önbelleğiyle aynı
@@ -125,6 +132,43 @@ class Ayarlar:
         kok = self.kullanici_koku(kullanici_id)
         return dataclasses.replace(self, output_dir=os.path.join(kok, "output"),
                                    assets_dir=os.path.join(kok, "assets"))
+
+
+def is_dizini(kullanici_id: uuid.UUID, is_id: uuid.UUID) -> str:
+    """Bir işin girdi nesnelerinin depo ÖNEKİ, sondaki `/` ile: `kullanicilar/<uuid>/isler/<is_id>/`.
+
+    Depo anahtarı (`Depo` sözleşmesi, kök göreli, `/` ile) — dosya yolu değil;
+    `Depo.listele(onek)` ve `startswith` karşılaştırmaları bu dizeyle yapılır.
+    """
+    return f"{KULLANICILAR_DIZINI}/{kullanici_id}/{ISLER_DIZINI}/{is_id}/"
+
+
+def girdi_dizini(anahtar: str) -> str:
+    """Girdi ANAHTARI → dizin öneki: `kullanicilar/<u>/isler/<id>/<ad>` → `kullanicilar/<u>/isler/<id>/`.
+
+    `ad` `/` taşımaz (adaptöre giden dosya adı), yani dizin son `/`e kadar olan
+    kısım. Saklama (`services/isci.py`) ve `kuyruk.SilinenIs` aynı öneki üretir.
+    """
+    return anahtar.rsplit("/", 1)[0] + "/"
+
+
+# `is_dizini`nin ürettiği biçim — tersine çevirmek için (aşağıda).
+_IS_DIZINI = re.compile(rf"^{KULLANICILAR_DIZINI}/[0-9a-f-]{{36}}/{ISLER_DIZINI}/([0-9a-f-]{{36}})/$")
+
+
+def is_dizini_ayristir(dizin: str) -> uuid.UUID | None:
+    """`is_dizini`nin tersi: `kullanicilar/<u>/isler/<id>/` → `<id>`; başka biçim `None`.
+
+    Saklama turu yalnız bu biçimdeki dizinleri süpürür: elle yazılmış bir
+    `istek`in tanınmayan anahtarı (`foo/bar.png` → `foo/`) körlemesine silinmez.
+    """
+    e = _IS_DIZINI.match(dizin)
+    if e is None:
+        return None
+    try:
+        return uuid.UUID(e.group(1))
+    except ValueError:
+        return None
 
 
 def genel(request: Request) -> Ayarlar:

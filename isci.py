@@ -33,10 +33,20 @@ iş parçacığı atamaz. Bir iş parçacığında beklenmeyen istisna (DB düş
 ağ) döngüyü ÖLDÜRMEZ: iz `hata.log`a, 1 sn uyku, devam — ölen bir iş
 parçacığı sessizce kapasite düşürürdü.
 
+BAKIM (Faz 2 / 10): kalp iş parçacığı açılışta bir kez ve sonra 5 dk'da bir
+(`isci.BAKIM_ARALIGI_SN`) `isci.bakim_turu` çağırır — 30 günlük saklama
+(`KROMIS_IS_SAKLAMA_GUN`; kapanmış satır + referanssız girdi dizini) ve ölü
+`isciler` satırları (kalp eşiği). Açılıştaki tur bilerek: tek işçili
+dağıtımda (K11) SIGKILL'le ölen önceki işçinin satırını silecek başka işçi
+yok, yenisi kalkar kalkmaz siler ve `/health` `worker_alive` doğruyu söyler.
+Bir şey silinince `olay=bakim` (sayılar), boş turda satır yok. Ayrı cron YOK.
+
 KAPANIŞ: SIGTERM/SIGINT → almayı bırak, eldeki işleri BİTİR (sağlayıcı
 çağrısı faturalandı, yarıda kesmek sonucu çöpe atmak), sonra `isciler`
 satırını sil ve çık. Platformun `kill_timeout`ı yetmezse iş `calisiyor`da
-kalır ve bayat düşürme onu `hata` yapar (K8; süreler 10. görevde).
+kalır ve bayat düşürme onu `hata` yapar (K8; süreler docs/isletme.md § 7:
+Fly `kill_timeout` 300 sn, compose `stop_grace_period` 60 sn — en uzun
+sağlayıcı çağrısı (video, 600 sn) ikisini de aşabilir, bilinen sınır).
 
 GÜNLÜK stdout'a, satır başına JSON (Faz 2 / 9; services/gunluk.py, web ile
 aynı kurulum ve biçim, `KROMIS_GUNLUK_BICIMI=metin` yerelde okunur): süreç
@@ -58,6 +68,7 @@ import signal
 import socket
 import sys
 import threading
+import time
 import traceback
 import uuid
 from types import FrameType
@@ -89,13 +100,15 @@ class Surec:
     """Süreç durumu: motor, depo, işçi kimliği, eldeki işler, durdurma bayrağı."""
 
     def __init__(self, motor, depo: dosya.Depo, ayarlar: ayar.Ayarlar, es_zamanli: int,
-                 esik, kalp_araligi: float) -> None:
+                 esik, kalp_araligi: float, saklama, bakim_araligi: float) -> None:
         self.motor = motor
         self.depo = depo
         self.ayarlar = ayarlar
         self.es_zamanli = es_zamanli
         self.esik = esik
         self.kalp_araligi = kalp_araligi
+        self.saklama = saklama
+        self.bakim_araligi = bakim_araligi
         self.durdur = threading.Event()
         self.isci_id: uuid.UUID | None = None
         # Eldeki işlerin id'leri — kalp atışı bunları `kalp_atisi`yle diri tutar.
@@ -156,9 +169,20 @@ class Surec:
                 with self._kilit:
                     self._eldekiler.discard(is_.id)
 
+    def bakim(self) -> None:
+        """Bir bakım turu (services/isci.py `bakim_turu`); bir şey silindiyse `olay=bakim`. Hata turu öldürmez."""
+        try:
+            with Session(self.motor) as oturum:
+                ozet = isci.bakim_turu(oturum, self.depo, zaman.an(), self.esik, self.saklama)
+            if ozet:
+                _olay("bakim", "saklama ve olu isci satirlari", **ozet)
+        except Exception:
+            self._istisna("bakim turu dustu")
+
     def kalp(self) -> None:
-        """Kalp atışı iş parçacığı: `kalp_araligi` saniyede bir `isci.kalp_turu`."""
+        """Kalp atışı iş parçacığı: `kalp_araligi` saniyede bir `isci.kalp_turu`; `bakim_araligi`de bir `bakim`."""
         assert self.isci_id is not None
+        son_bakim = time.monotonic()
         while not self.durdur.wait(self.kalp_araligi):
             with self._kilit:
                 eldekiler = list(self._eldekiler)
@@ -174,6 +198,9 @@ class Surec:
                     _olay("uyari", "kuyruk esigi asildi", seviye=logging.WARNING, **uyari)
             except Exception:
                 self._istisna("kalp atisi dustu")
+            if time.monotonic() - son_bakim >= self.bakim_araligi:
+                son_bakim = time.monotonic()
+                self.bakim()
 
     def eldeki_sayisi(self) -> int:
         with self._kilit:
@@ -191,7 +218,7 @@ def _sinyal_kur(surec: Surec) -> None:
     signal.signal(signal.SIGINT, _dur)
 
 
-def hazirla(*, tek_tur: bool, kalp_araligi: float) -> Surec | int:
+def hazirla(*, tek_tur: bool, kalp_araligi: float, bakim_araligi: float) -> Surec | int:
     """Kapılar sırayla; hepsi geçerse `Surec`, geçmezse çıkış kodu (mesaj stderr'e)."""
     url = db.baglanti_dizesi()
     if not url:
@@ -212,11 +239,12 @@ def hazirla(*, tek_tur: bool, kalp_araligi: float) -> Surec | int:
     try:
         es_zamanli = 1 if tek_tur else isci.es_zamanli()
         esik = isci.kalp_esigi()
+        saklama = isci.saklama()
     except ValueError as e:
         _hata(str(e))
         return CIKIS_ORTAM
     motor = db.motor_kur(url, pool_size=es_zamanli + 1)
-    return Surec(motor, depo, ayarlar, es_zamanli, esik, kalp_araligi)
+    return Surec(motor, depo, ayarlar, es_zamanli, esik, kalp_araligi, saklama, bakim_araligi)
 
 
 def main(argv: list[str]) -> int:
@@ -225,6 +253,8 @@ def main(argv: list[str]) -> int:
                              help="bir is al, kostur ve cik; bos kuyrukta hemen 0")
     # Testler ve duman için: 30 sn'lik kalp atışını beklemeden gözlemlenebilsin.
     ayristirici.add_argument("--kalp-araligi", type=float, default=isci.KALP_ARALIGI_SN,
+                             metavar="SN", help=argparse.SUPPRESS)
+    ayristirici.add_argument("--bakim-araligi", type=float, default=isci.BAKIM_ARALIGI_SN,
                              metavar="SN", help=argparse.SUPPRESS)
     secenekler = ayristirici.parse_args(argv)
 
@@ -237,7 +267,8 @@ def main(argv: list[str]) -> int:
         return CIKIS_ORTAM
     hata_izleme.kur(surec="isci")
 
-    surec = hazirla(tek_tur=secenekler.tek_tur, kalp_araligi=secenekler.kalp_araligi)
+    surec = hazirla(tek_tur=secenekler.tek_tur, kalp_araligi=secenekler.kalp_araligi,
+                    bakim_araligi=secenekler.bakim_araligi)
     if isinstance(surec, int):
         return surec
 
@@ -260,6 +291,8 @@ def main(argv: list[str]) -> int:
     _sinyal_kur(surec)
     _olay("isci.basladi", isci_id=str(isci_id), konak=socket.gethostname(), surum=version.APP_VERSION,
           es_zamanli=surec.es_zamanli, depo=repr(surec.depo), pid=os.getpid())
+    # Açılışta bir bakım turu (gerekçe modül başında): önceki işçinin ölü satırı hemen gitsin.
+    surec.bakim()
 
     parcaciklar = [threading.Thread(target=surec.dongu, name=f"kromis-isci-{i}", daemon=True)
                    for i in range(surec.es_zamanli)]

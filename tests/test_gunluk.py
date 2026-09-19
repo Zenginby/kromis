@@ -170,6 +170,107 @@ def test_kur_installs_exactly_one_handler_with_the_chosen_format_and_is_idempote
             KOK_GUNLUKCU.addHandler(h)
 
 
+# ── (i-b) kök günlükçü ve uvicorn (Faz 2 / 10) ──────────────────────────
+
+@pytest.fixture
+def kok_temiz() -> Iterator[None]:
+    """Kökün ve uvicorn günlükçülerinin işleyici/yayılma durumunu test sonunda geri koyar."""
+    kok = logging.getLogger()
+    eski_kok = list(kok.handlers)
+    eski_uvicorn = {ad: (list(logging.getLogger(ad).handlers), logging.getLogger(ad).propagate,
+                         logging.getLogger(ad).level, logging.getLogger(ad).disabled)
+                    for ad in (*gunluk.UVICORN_GUNLUKCULERI, "uvicorn.access")}
+    for h in eski_kok:
+        kok.removeHandler(h)
+    try:
+        yield
+    finally:
+        for h in list(kok.handlers):
+            kok.removeHandler(h)
+        for h in eski_kok:
+            kok.addHandler(h)
+        for ad, (isleyiciler, yayilma, seviye, kapali) in eski_uvicorn.items():
+            g = logging.getLogger(ad)
+            g.handlers[:] = isleyiciler
+            g.propagate = yayilma
+            g.setLevel(seviye)
+            g.disabled = kapali
+
+
+def test_third_party_warnings_reach_stdout_as_redacted_json_lines_and_their_info_stays_silent(kok_temiz):
+    """9'da SQLAlchemy/httpx WARNING'i Python'un son çare işleyicisinden stderr'e düz ve REDAKSİYONSUZ
+    düşüyordu; `kur` köke aynı biçimleyiciyi takar. Kökün seviyesi WARNING kalır: üçüncü partinin
+    INFO'su (httpx her isteği INFO yazar) akıma girmez."""
+    akim = io.StringIO()
+    gunluk.kur(akim)
+    logging.getLogger("sqlalchemy.pool").warning("havuz doldu OPENAI_API_KEY=DUMMY-plain-value-12345")
+    logging.getLogger("httpx").info("HTTP Request: GET https://x.example")
+    satirlar = [json.loads(s) for s in akim.getvalue().splitlines()]
+    assert len(satirlar) == 1, akim.getvalue()
+    assert satirlar[0]["logger"] == "sqlalchemy.pool" and satirlar[0]["seviye"] == "WARNING"
+    assert "DUMMY-plain-value-12345" not in akim.getvalue() and "[REDACTED_API_KEY]" in satirlar[0]["mesaj"]
+
+
+def test_uvicorns_loggers_are_stripped_and_propagate_so_the_asgi_traceback_is_json_and_redacted(kok_temiz):
+    """uvicorn kendi günlükçülerine kendi işleyicisini takar (stderr, düz metin): "Exception in ASGI
+    application" izi anahtar taşıyabilir ve redaksiyonsuz çıkıyordu. `kur` üç günlükçünün
+    işleyicilerini boşaltır ve köke yayar; INFO seviyeleri uvicorn'un koyduğu gibi geçer."""
+    for ad in (*gunluk.UVICORN_GUNLUKCULERI, "uvicorn.access"):
+        g = logging.getLogger(ad)
+        g.addHandler(logging.StreamHandler(io.StringIO()))
+        g.propagate = False
+        g.setLevel(logging.INFO)
+        g.disabled = True      # Alembic `fileConfig`in bıraktığı hâl (takımda ölçüldü): `kur` açmalı
+    akim = io.StringIO()
+    gunluk.kur(akim)
+    for ad in gunluk.UVICORN_GUNLUKCULERI:
+        assert logging.getLogger(ad).handlers == [] and logging.getLogger(ad).propagate is True, ad
+    # `uvicorn.access` DOKUNULMAZ: `--no-access-log` onu işleyicisiz + `propagate=False` bırakır;
+    # köke yaysaydık kapatılan erişim satırı JSON olarak geri gelirdi (ölçüldü).
+    erisim = logging.getLogger("uvicorn.access")
+    erisim.handlers.clear()
+    erisim.propagate = False
+    gunluk.kur(akim)
+    assert erisim.propagate is False and "uvicorn.access" not in gunluk.UVICORN_GUNLUKCULERI
+    erisim.info('127.0.0.1 - "GET /health HTTP/1.1" 200')
+    assert akim.getvalue() == "", "kapatılmış erişim günlüğü köke sızmaz"
+    logging.getLogger("uvicorn.error").info("Started server process [1]")
+    try:
+        raise RuntimeError("iz FAL_KEY=DUMMY-plain-value-12345")
+    except RuntimeError:
+        logging.getLogger("uvicorn.error").exception("Exception in ASGI application")
+    satirlar = [json.loads(s) for s in akim.getvalue().splitlines()]
+    assert [(s["logger"], s["seviye"]) for s in satirlar] == [("uvicorn.error", "INFO"), ("uvicorn.error", "ERROR")]
+    assert "RuntimeError" in satirlar[1]["hata"] and "DUMMY-plain-value-12345" not in akim.getvalue()
+
+
+def test_the_root_handler_is_installed_once_and_comes_back_after_alembic_wipes_the_root(kok_temiz, monkeypatch):
+    """İdempotent: iki `kur` tek işaretli işleyici. Alembic `fileConfig` (testlerde aynı süreç) kökün
+    işleyicilerini siler — bir sonraki `kur` bizimkini görmez ve yeniden takar. Akım verilmemişse
+    işleyici `sys.stdout`u EMİT ANINDA çözer: pytest'in değiştirdiği stdout'a yazar, kapanmış eskiye değil."""
+    gunluk.kur(io.StringIO())
+    gunluk.kur(io.StringIO())
+    isaretli = [h for h in logging.getLogger().handlers if getattr(h, gunluk.KOK_ISARETI, False)]
+    assert len(isaretli) == 1 and gunluk.kok_isleyicisi() is isaretli[0]
+    logging.getLogger().handlers.clear()          # `fileConfig`in yaptığı
+    assert gunluk.kok_isleyicisi() is None
+    gunluk.kur(io.StringIO())
+    assert gunluk.kok_isleyicisi() is not None
+    # Dinamik stdout: kromis kökünün işleyicisi StringIO'ya sabit, kökünki `sys.stdout`a.
+    logging.getLogger().handlers.clear()
+    gunluk.kur()
+    yeni_stdout = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", yeni_stdout)
+    logging.getLogger("ucuncu.parti").warning("dinamik")
+    assert json.loads(yeni_stdout.getvalue())["mesaj"] == "dinamik"
+
+
+def test_the_platform_key_logger_lives_under_the_kromis_namespace():
+    """9'un devri 6: `services.platform_anahtari` günlükçüsü `kromis.*` dışındaydı, uyarısı JSON'a girmiyordu."""
+    from services import platform_anahtari
+    assert platform_anahtari._log.name == "kromis.platform"
+
+
 # ── (ii) redaksiyon ──────────────────────────────────────────────────────
 
 def test_a_seeded_key_never_reaches_the_line_wherever_it_sits():

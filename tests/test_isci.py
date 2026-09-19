@@ -45,7 +45,18 @@ import catalog
 import i18n
 import kimlik_baglami
 import providers
-from services import ayar, depo_kimlik_bilgisi, dil, dosya, hesap, isci, kuyruk, tablolar
+from services import (
+    ayar,
+    depo_kimlik_bilgisi,
+    depo_medya,
+    dil,
+    dosya,
+    hesap,
+    isci,
+    kuyruk,
+    tablolar,
+    zaman,
+)
 
 pytestmark = pytest.mark.usefixtures("depo_db")
 
@@ -574,6 +585,9 @@ def test_heartbeat_drops_jobs_whose_heart_stopped_beyond_the_threshold(db_oturum
 
 
 def test_concurrency_and_threshold_come_from_the_environment_with_defaults_and_refuse_nonsense():
+    assert isci.saklama({}) == dt.timedelta(days=30) and isci.saklama({isci.SAKLAMA_ENV: "7"}) == dt.timedelta(days=7)
+    with pytest.raises(ValueError, match=isci.SAKLAMA_ENV):
+        isci.saklama({isci.SAKLAMA_ENV: "0"})
     assert isci.es_zamanli({}) == 4 and isci.es_zamanli({isci.ES_ZAMANLI_ENV: " "}) == 4
     assert isci.es_zamanli({isci.ES_ZAMANLI_ENV: "2"}) == 2
     assert isci.kalp_esigi({}) == dt.timedelta(seconds=300)
@@ -583,6 +597,90 @@ def test_concurrency_and_threshold_come_from_the_environment_with_defaults_and_r
             isci.es_zamanli({isci.ES_ZAMANLI_ENV: kotu})
     with pytest.raises(ValueError, match=isci.KALP_ESIGI_ENV):
         isci.kalp_esigi({isci.KALP_ESIGI_ENV: "0"})
+
+
+# ── (iv-b) bakım turu (Faz 2 / 10) ─────────────────────────────────────
+
+SAKLAMA = dt.timedelta(days=30)
+BAKIM_ANI = _an(40 * 86400)
+
+
+def _girdili(db: Session, kullanici_id: uuid.UUID, depo: dosya.Depo, *, kaynak: uuid.UUID | None = None,
+             adlar: tuple[str, ...] = ("upload.png",)) -> uuid.UUID:
+    """`edit` işi: girdileri KENDİ dizinine yazar; `kaynak` verilmişse o işin dizinine REFERANS verir (yeniden gönderim)."""
+    is_id = uuid.uuid4()
+    dizin = ayar.is_dizini(kullanici_id, kaynak if kaynak is not None else is_id)
+    girdiler = [{"ad": ad, "anahtar": dizin + ad} for ad in adlar]
+    if kaynak is None:
+        for g in girdiler:
+            depo.yaz(g["anahtar"], PNG, "image/png")
+    kuyruk.ekle(db, kullanici_id, "edit", {"prompt": "e", "size": "1024x1024", "quality": "medium", "n": 1,
+                                           "girdiler": girdiler, "parent_id": None},
+                GORSEL, 1, an=_an(), is_id=is_id)
+    db.commit()
+    return is_id
+
+
+def _kapat(db: Session, is_id: uuid.UUID, durum: str, bitti: dt.datetime) -> None:
+    db.execute(text("UPDATE isler SET durum = :d, bitti = :b WHERE id = :id"), {"d": durum, "b": bitti, "id": is_id})
+    db.commit()
+
+
+def test_the_maintenance_turn_deletes_expired_rows_and_only_the_unreferenced_input_directories(
+        db_oturumu, kullanici, depo, yerlesim):
+    """Saklama + nesne süpürmesi + ölü işçi, tek turda (services/isci.py `bakim_turu`):
+
+    A (eski, kapanmış, girdileri kendi dizininde) — B yeniden gönderilmiş, A'nın dizinine
+    REFERANS veriyor ve taze → A'nın SATIRI gider, DİZİNİ KALIR (B bakıyor). C (eski, kapanmış,
+    kendi girdileri, kimse bakmıyor) → satır ve nesneleri gider. D taze → kalır. `medya`
+    dokunulmaz. Ölü işçi satırı gider, canlı kalır. Boş ikinci tur `False` (olay düşmez)."""
+    a = _girdili(db_oturumu, kullanici.id, depo, adlar=("upload.png", "ref2.png"))
+    b = _girdili(db_oturumu, kullanici.id, depo, kaynak=a, adlar=("upload.png", "ref2.png"))
+    c = _girdili(db_oturumu, kullanici.id, depo, adlar=("upload.png",))
+    d = _girdili(db_oturumu, kullanici.id, depo)
+    eski_an = BAKIM_ANI - SAKLAMA - dt.timedelta(days=1)
+    _kapat(db_oturumu, a, "bitti", eski_an)
+    _kapat(db_oturumu, b, "hata", BAKIM_ANI - dt.timedelta(hours=1))
+    _kapat(db_oturumu, c, "iptal", eski_an)
+    medya = depo_medya.kaydet(db_oturumu, kullanici.id, PNG, {"prompt": "urun"}, yerlesim.kullanici_icin(kullanici.id).output_dir, depo=depo)
+    olu = kuyruk.isci_kaydet(db_oturumu, "olu", "0.0.0", 1, _an())
+    canli = kuyruk.isci_kaydet(db_oturumu, "canli", "0.0.0", 1, _an())
+    kuyruk.isci_kalp(db_oturumu, olu.id, BAKIM_ANI - ESIK - dt.timedelta(seconds=1))
+    kuyruk.isci_kalp(db_oturumu, canli.id, BAKIM_ANI - dt.timedelta(seconds=10))
+    db_oturumu.commit()
+
+    ozet = isci.bakim_turu(db_oturumu, depo, BAKIM_ANI, ESIK, SAKLAMA)
+
+    assert ozet == {"silinen_is": 2, "silinen_nesne": 1, "korunan_dizin": 1, "silinen_isci": 1} and bool(ozet)
+    db_oturumu.expire_all()
+    assert set(db_oturumu.scalars(select(tablolar.Is.id))) == {b, d}
+    assert depo.var(ayar.is_dizini(kullanici.id, a) + "upload.png") and depo.var(ayar.is_dizini(kullanici.id, a) + "ref2.png"), (
+        "A'nın dizini B'nin referansı yüzünden durur")
+    assert not depo.var(ayar.is_dizini(kullanici.id, c) + "upload.png"), "C'ye kimse bakmıyor: nesnesi gitti"
+    assert depo.var(ayar.is_dizini(kullanici.id, d) + "upload.png")
+    assert [k.konak for k in db_oturumu.scalars(select(tablolar.Isci))] == ["canli"]
+    assert db_oturumu.get(tablolar.Medya, medya["id"]) is not None and depo.var(
+        f"{ayar.KULLANICILAR_DIZINI}/{kullanici.id}/output/{medya['filename']}"), "ürün galeride durur"
+    bos = isci.bakim_turu(db_oturumu, depo, BAKIM_ANI, ESIK, SAKLAMA)
+    assert not bos and dict(bos) == {"silinen_is": 0, "silinen_nesne": 0, "korunan_dizin": 0, "silinen_isci": 0}
+
+
+def test_the_maintenance_turn_frees_a_referenced_directory_once_the_last_referrer_expires(
+        db_oturumu, kullanici, depo, yerlesim):
+    """A silinmiş (satırı yok), B ona bakıyordu; B de süresini doldurunca A'nın dizini — kendi satırı
+    olmayan ama B'nin `istek`inden gelen aday — bu turda gider. Tanınmayan biçimde bir anahtar
+    (`foo/bar.png`) ise adaya bile girmez: körlemesine bir `foo/` silinmez."""
+    a = uuid.uuid4()
+    depo.yaz(ayar.is_dizini(kullanici.id, a) + "upload.png", PNG, "image/png")
+    depo.yaz("foo/bar.png", PNG, "image/png")
+    b = _girdili(db_oturumu, kullanici.id, depo, kaynak=a)
+    db_oturumu.execute(text("UPDATE isler SET istek = istek || :ek WHERE id = :id"),
+                       {"ek": '{"son_kare": {"ad": "bar.png", "anahtar": "foo/bar.png"}}', "id": b})
+    _kapat(db_oturumu, b, "hata", BAKIM_ANI - SAKLAMA - dt.timedelta(seconds=1))
+    ozet = isci.bakim_turu(db_oturumu, depo, BAKIM_ANI, ESIK, SAKLAMA)
+    assert ozet["silinen_is"] == 1 and ozet["silinen_nesne"] == 1 and ozet["korunan_dizin"] == 0
+    assert not depo.var(ayar.is_dizini(kullanici.id, a) + "upload.png")
+    assert depo.var("foo/bar.png"), "tanınmayan anahtar biçimi süpürülmez"
 
 
 # ── (v) süreç ───────────────────────────────────────────────────────────
@@ -599,7 +697,8 @@ def test_the_entry_point_carries_the_same_gates_as_the_web_and_sizes_its_own_poo
     kaynak = _kaynak("isci.py")
     for parca in ("sifre.dogrula_ortam()", "dosya.depo_kur(", "db.motor_kur(url, pool_size=es_zamanli + 1)",
                   "signal.SIGTERM", "signal.SIGINT", "kuyruk.isci_kaydet(", "kuyruk.isci_sil(",
-                  "isci.kalp_turu(", "isci.siradakini_al(", "isci.kos(", "isci.tek_tur("):
+                  "isci.kalp_turu(", "isci.siradakini_al(", "isci.kos(", "isci.tek_tur(",
+                  "isci.bakim_turu(", "isci.saklama()"):
         assert parca in kaynak, parca
     assert "uvicorn" not in kaynak and "FastAPI" not in kaynak, "işçi web değil: rota yok, port yok"
 
@@ -721,4 +820,57 @@ def test_the_process_registers_a_worker_row_beats_and_exits_cleanly_on_sigterm(v
     assert olaylar[0]["es_zamanli"] == 2 and olaylar[0]["konak"] and olaylar[1]["sinyal"] == 15
     assert olaylar[0]["isci_id"] == olaylar[2]["isci_id"]
     assert _satir() is None, "kapanışta satır silinir"
+    assert not (tmp_path / "hata.log").exists(), hata
+
+
+def test_the_process_runs_a_maintenance_turn_at_startup_and_then_on_its_interval(veritabani_url, depo_db,
+                                                                                  db_oturumu, kullanici, tmp_path):
+    """Faz 2 / 10: ölü işçinin satırı ve süresi dolmuş iş, yeni işçi kalkar kalkmaz gider (açılış turu);
+    `olay=bakim` sayıları söyler; sonra `--bakim-araligi`de bir tekrar (ikinci süresi dolmuş satır da gider)."""
+    with Session(depo_db) as s:
+        olu = kuyruk.isci_kaydet(s, "olu-konak", "0.0.0", 1, zaman.an() - dt.timedelta(hours=2))
+        kuyruk.isci_kalp(s, olu.id, zaman.an() - dt.timedelta(hours=1))
+        s.commit()
+    eski = _ekle(db_oturumu, kullanici.id)
+    db_oturumu.execute(text("UPDATE isler SET durum = 'hata', bitti = :b WHERE id = :id"),
+                       {"b": zaman.an() - dt.timedelta(days=31), "id": eski})
+    db_oturumu.commit()
+
+    def _sayilar():
+        with depo_db.connect() as c:
+            return (c.execute(text("SELECT count(*) FROM isciler")).scalar_one(),
+                    c.execute(text("SELECT count(*) FROM isler")).scalar_one())
+
+    surec = subprocess.Popen([sys.executable, "isci.py", "--kalp-araligi", "0.2", "--bakim-araligi", "0.5"],
+                             cwd=REPO, env=_ortam(veritabani_url, tmp_path, KROMIS_ISCI_ES_ZAMANLI="1"),
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8")
+    try:
+        son = time.monotonic() + 30
+        while time.monotonic() < son and _sayilar() != (1, 0):
+            assert surec.poll() is None, surec.stderr.read() if surec.stderr else ""
+            time.sleep(0.1)
+        assert _sayilar() == (1, 0), "açılış turu ölü satırı ve eski işi silmedi"
+        # İkinci tur: aralık dolduktan sonra yeni bir eski satır da gider.
+        ikinci = _ekle(db_oturumu, kullanici.id)
+        db_oturumu.execute(text("UPDATE isler SET durum = 'iptal', bitti = :b WHERE id = :id"),
+                           {"b": zaman.an() - dt.timedelta(days=31), "id": ikinci})
+        db_oturumu.commit()
+        son = time.monotonic() + 15
+        while time.monotonic() < son and _sayilar() != (1, 0):
+            time.sleep(0.1)
+        assert _sayilar() == (1, 0), "aralıklı tur koşmadı"
+        surec.send_signal(signal.SIGTERM)
+        cikti, hata = surec.communicate(timeout=30)
+    finally:
+        if surec.poll() is None:
+            surec.kill()
+            surec.wait(timeout=10)
+    assert surec.returncode == 0, hata
+    olaylar = _olaylar(cikti)
+    adlar = [o["olay"] for o in olaylar]
+    assert adlar[:2] == ["isci.basladi", "bakim"] and adlar[-2:] == ["isci.sinyal", "isci.kapandi"], adlar
+    bakimlar = [o for o in olaylar if o["olay"] == "bakim"]
+    assert bakimlar[0]["silinen_isci"] == 1 and bakimlar[0]["silinen_is"] == 1 and bakimlar[0]["silinen_nesne"] == 0
+    assert len(bakimlar) == 2 and bakimlar[1]["silinen_is"] == 1, "boş turlar olay düşürmez, dolu ikinci tur düşürür"
+    assert _sayilar() == (0, 0), "kapanışta kendi satırı da silindi"
     assert not (tmp_path / "hata.log").exists(), hata

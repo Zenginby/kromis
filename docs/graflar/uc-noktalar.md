@@ -30,13 +30,13 @@
 | DELETE | `/api/chats/{chat_id}` | `routers/sohbet.py` | `delete_chat_route`:235 | `chat_store`, `i18n` | `chat.js` |
 | GET | `/api/chats/{chat_id}` | `routers/sohbet.py` | `get_chat_route`:167 | `chat_store`, `i18n` | `chat.js` |
 | PUT | `/api/chats/{chat_id}` | `routers/sohbet.py` | `update_chat_route`:212 | `chat_store`, `i18n`, `models`, `prefs` | `chat.js` |
-| POST | `/api/edit` | `routers/uretim.py` | `edit`:463 | `catalog`, `chat_store`, `etiket`, `i18n`, `models`, `palette` | `core.js` |
+| POST | `/api/edit` | `routers/uretim.py` | `edit`:464 | `catalog`, `chat_store`, `etiket`, `i18n`, `models`, `palette` | `core.js` |
 | GET | `/api/folders` | `routers/galeri.py` | `list_folders_route`:48 | — | `folders.js` |
 | POST | `/api/folders` | `routers/galeri.py` | `create_folder_route`:70 | `folders`, `i18n`, `models` | `folders.js` |
 | DELETE | `/api/folders/{folder_id}` | `routers/galeri.py` | `delete_folder_route`:87 | `folders`, `i18n` | `folders.js` |
 | PATCH | `/api/folders/{folder_id}` | `routers/galeri.py` | `rename_folder_route`:151 | `folders`, `i18n`, `models` | `folders.js` |
 | GET | `/api/folders/{folder_id}/download` | `routers/galeri.py` | `download_folder_route`:102 | `folders`, `i18n` | `folders.js` |
-| POST | `/api/generate` | `routers/uretim.py` | `generate`:132 | `catalog`, `chat_store`, `color_names`, `credstore`, `etiket`, `folders`, `i18n`, `models`, `palette`, `palette_store`, `storage` | `core.js` |
+| POST | `/api/generate` | `routers/uretim.py` | `generate`:133 | `catalog`, `chat_store`, `color_names`, `credstore`, `etiket`, `folders`, `i18n`, `models`, `palette`, `palette_store`, `storage` | `core.js` |
 | GET | `/api/guncelleme` | `routers/ayarlar.py` | `get_guncelleme`:113 | `guncelleme`, `prefs` | `settings.js` |
 | POST | `/api/guncelleme` | `routers/ayarlar.py` | `post_guncelleme`:148 | `guncelleme`, `prefs` | `settings.js` |
 | GET | `/api/hesap/ben` | `routers/hesap.py` | `ben`:244 | — | `giris.js`, `isler.js`, `settings.js` |
@@ -69,8 +69,8 @@
 | POST | `/api/prefs` | `routers/ayarlar.py` | `post_prefs_route`:368 | `catalog`, `i18n`, `models`, `prefs` | `chat.js`, `core.js`, `settings.js` |
 | GET | `/api/settings` | `routers/ayarlar.py` | `get_settings`:66 | `catalog`, `credstore`, `etiket`, `guncelleme`, `i18n`, `paths`, `prefs`, `version` | `settings.js` |
 | POST | `/api/settings` | `routers/ayarlar.py` | `post_settings`:181 | `azure_client`, `catalog`, `credstore`, `etiket`, `i18n`, `models`, `version` | `settings.js` |
-| POST | `/api/video` | `routers/uretim.py` | `video`:164 | `catalog`, `chat_store`, `credstore`, `etiket`, `folders`, `i18n`, `models` | `core.js` |
-| POST | `/api/video/animate` | `routers/uretim.py` | `animate`:263 | `catalog`, `chat_store`, `etiket`, `i18n`, `models` | `core.js` |
+| POST | `/api/video` | `routers/uretim.py` | `video`:165 | `catalog`, `chat_store`, `credstore`, `etiket`, `folders`, `i18n`, `models` | `core.js` |
+| POST | `/api/video/animate` | `routers/uretim.py` | `animate`:264 | `catalog`, `chat_store`, `etiket`, `i18n`, `models` | `core.js` |
 | GET | `/assets/{kind}/{filename}` | `routers/bindirme.py` | `asset_file`:263 | `assets_store`, `i18n` | `assets.js` |
 | GET | `/giris` | `routers/hesap.py` | `giris_sayfasi`:250 | `errlog`, `i18n`, `version` | — |
 | GET | `/health` | `routers/saglik.py` | `health`:146 | `version` | — |

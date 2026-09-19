@@ -76,7 +76,9 @@ _BIR_GUN = dt.timedelta(hours=24)
 
 
 def _damga(t: dt.datetime | None) -> str | None:
-    return zaman.damga(t) if t is not None else None
+    """Dilimli UTC (`Z`), `kuyruk._json`la aynı (Faz 2 / 10): admin.js süreyi `new Date(basladi)`
+    ile hesaplar ve dilimsiz dize tarayıcının dilimi kadar yanlış süre veriyordu."""
+    return zaman.damga_utc(t) if t is not None else None
 
 
 def _saniye(baslangic: dt.datetime | None, an: dt.datetime) -> int | None:
@@ -247,7 +249,7 @@ def metrikler(db: Session, an: dt.datetime | None = None) -> dict[str, Any]:
     isciler = db.scalars(select(Isci).order_by(Isci.basladi)).all()
     son_1sa, son_24sa = _pencereler(db, an)
     return {
-        "an": zaman.damga(an),
+        "an": zaman.damga_utc(an),
         "kuyruk": {"derinlik": int(bekleyen or 0), "calisan": int(calisan or 0),
                    "en_eski_bekleyen_sn": _saniye(en_eski, an)},
         "son_1sa": son_1sa,

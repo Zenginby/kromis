@@ -88,12 +88,18 @@ services:
   # ikisi ayrı makinede koşar ve ortak zemin nesne depolama (`KROMIS_NESNE_DEPO_*`,
   # .env.example). Göçü bekler (`goc` → `service_completed_successfully`): şema
   # kurulmadan açılan işçi `isciler`e yazamaz ve çıkar. Port açmaz: dışarıdan
-  # konuşulmaz, yalnız DB ile. Kapanış SIGTERM: eldeki işi bitirir, sonra çıkar
-  # (`stop_grace_period` sağlayıcı çağrısının süresine göre; 10. görev).
+  # konuşulmaz, yalnız DB ile. Kapanış SIGTERM: eldeki işi bitirir, sonra çıkar.
+  # `stop_grace_period` (Faz 2 / 10): compose'un öntanımlısı 10 sn — bir görsel
+  # işi bile o sürede bitmez ve SIGKILL işi `calisiyor`da bırakır (bayat düşürme
+  # 5 dk sonra `hata` yapar, K8). 60 sn yerel geliştirme için: görsel işleri
+  # sığar, dakikalık video işi yine kaybolur — platformda Fly `kill_timeout`
+  # 300 sn (docs/isletme.md § 7), o da 10 dk'lık video çağrısını aşmaz, bilinen
+  # sınır; "boşalt sonra dağıt" Faz 5.
   isci:
     build: .
     image: kromis
     command: ["python", "isci.py"]
+    stop_grace_period: 60s
     volumes:
       - kromis-data:/data
     env_file:

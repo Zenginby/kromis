@@ -109,21 +109,37 @@ def test_the_platform_name_set_is_exactly_the_catalogs_and_excludes_the_legacy_b
     assert platform_anahtari.ONEK == "KROMIS_PLATFORM_"
 
 
-def test_an_unknown_platform_variable_is_reported_once_and_ignored_without_its_value(caplog):
+def test_an_unknown_platform_variable_is_reported_once_and_ignored_without_its_value():
     # `depo_db` fixture'ı Alembic'i AYNI süreçte koşturuyor ve `alembic/env.py`nin `fileConfig`i
     # o ana kadar yaratılmış her günlükçüyü KAPATIYOR (`disable_existing_loggers`) — modül
     # günlükçüsü de dâhil (ölçüldü: kayıt sıfır). Üretimde göç ayrı süreçte (tools/goc.py),
-    # sorun yalnız testin; burada yeniden açılıyor.
-    logging.getLogger("services.platform_anahtari").disabled = False
+    # sorun yalnız testin; burada yeniden açılıyor. Günlükçü `kromis.platform` (Faz 2 / 10) ve
+    # `kromis` kökü köke YAYILMAZ (gunluk.kur) — caplog kökte dinler; kendi işleyicimizi takıyoruz.
+    gunlukcu = logging.getLogger("kromis.platform")
+    gunlukcu.disabled = False
+    kayitlar: list[logging.LogRecord] = []
+
+    class _Topla(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            kayitlar.append(record)
+
+    isleyici = _Topla(logging.WARNING)
+    gunlukcu.addHandler(isleyici)
+    eski_seviye = gunlukcu.level
+    gunlukcu.setLevel(logging.WARNING)
     ortam = {"KROMIS_PLATFORM_GEMINI_KEY": "YANLIS-AD-DEGERI-xyz", "KROMIS_PLATFORM_FAL_KEY": "p-fal"}
-    with caplog.at_level(logging.WARNING, logger="services.platform_anahtari"):
+    try:
         assert platform_anahtari.platform_sozlugu(ortam) == {"FAL_KEY": "p-fal"}
         assert platform_anahtari.platform_sozlugu(ortam) == {"FAL_KEY": "p-fal"}
         assert platform_anahtari.platform_sozlugu(ortam) == {"FAL_KEY": "p-fal"}
-    uyarilar = [r for r in caplog.records if "KROMIS_PLATFORM_GEMINI_KEY" in r.getMessage()]
+    finally:
+        gunlukcu.removeHandler(isleyici)
+        gunlukcu.setLevel(eski_seviye)
+    uyarilar = [r for r in kayitlar if "KROMIS_PLATFORM_GEMINI_KEY" in r.getMessage()]
     assert len(uyarilar) == 1, "bilinmeyen ad her okumada değil BİR kez bildirilir"
     assert "FAL_KEY" in uyarilar[0].getMessage(), "uyarı tanınan adları sayar (yazım yardımı)"
-    assert "YANLIS-AD-DEGERI" not in caplog.text and "p-fal" not in caplog.text, "değer günlüğe girmez"
+    metin = "\n".join(r.getMessage() for r in kayitlar)
+    assert "YANLIS-AD-DEGERI" not in metin and "p-fal" not in metin, "değer günlüğe girmez"
 
 
 # ── (iii) GET/POST /api/settings ────────────────────────────────────────

@@ -73,8 +73,13 @@ build.ps1
 branding
 
 # --- yerel sır ve veri ---
-.env
-.env.example
+# `.env*`, `.env` DEĞİL: `.env` yalnız adın TAMAMINI eşler (.gitignore'daki
+# gerekçenin aynısı). `.env.yedek-20260919` gibi bir yedek yerel `docker build`
+# / `fly deploy` bağlamında `COPY . /app` (Dockerfile) ile imaj katmanına
+# girerdi; CI temiz klondan kurduğu için orada hiç görünmedi, .gitignore ise
+# yalnız git'i korur, bağlamı değil. Kalıp `.env.example`ı da dışlıyor: imaj
+# ortamı platformdan okur, şablonu değil (bekçisi tests/test_docker_kapisi.py).
+.env*
 output
 assets
 backups

@@ -1693,8 +1693,9 @@ DATABASE_URL=… python tools/kullanici.py admin --eposta <kendi e-postan>
 `<eposta>: admin = evet (degisti)` basar. Sonra Ayarlar → Hakkında'da
 "Yönetim" bağlantısı (ya da doğrudan `/admin`): üç sekme dolu görünmeli;
 admin olmayan bir hesapla `/admin` 403 demeli. Geri almak: `--kaldir`.
-Platform günlüğünde `olay=admin.*` satırları görünmüyorsa süreç `app.py`nin
-lifespan'ından geçmiyor demektir (`gunluk.kur` orada).
+Bir tavan/iptal/oturum-düşürme yaptıktan sonra platform günlüğünde
+`olay=admin.*` satırı görünmüyorsa süreç `app.py`nin lifespan'ından geçmiyor
+demektir (`gunluk.kur` orada); salt okunur gezinme yalnız `olay=istek` üretir.
 
 **Yerel prova 2026-09-19 — 26 kontrol, hepsi yeşil; canlının satırı bekliyor.**
 §7'nin Railway provasının deyimi: adım canlıya çıkmadan önce baştan sona
@@ -1713,10 +1714,9 @@ aynı yazmayı admin olmayan denediğinde 403.
 `static/settings.js:1049` `ben.is_admin` okuyor) — "Ayarlar → Hakkında'da
 bağlantı" cümlesi doğru, ama bayrağı arayan `/api/settings`e bakıp bulamaz.
 (2) `olay=admin.*` satırları yalnız admin YAZMA eylemlerinde düşüyor; salt
-okunur gezinme yalnız `olay=istek` üretiyor. Yani yukarıdaki "görünmüyorsa
-lifespan'dan geçmiyor" ölçütü ancak bir tavan/iptal/oturum-düşürme
-yapıldıktan sonra geçerli — üç satır da `istek_id` + `admin` + `hedef` + değer
-taşıyor (`kromis.admin` günlükçüsü).
+okunur gezinme yalnız `olay=istek` üretiyor. Yukarıdaki ölçüt buna göre
+yerinde düzeltildi (2026-09-19, inceleme notu) — üç satır da `istek_id` +
+`admin` + `hedef` + değer taşıyor (`kromis.admin` günlükçüsü).
 
 ---
 

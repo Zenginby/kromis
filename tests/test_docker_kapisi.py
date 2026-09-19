@@ -198,8 +198,11 @@ def _dislananlar() -> set[str]:
 
 
 def test_dockerignore_excludes_tests_docs_android_venv_and_local_secrets():
+    # `.env*`, `.env` DEĞİL: yalın `.env` adın tamamını eşler, `.env.yedek-…`
+    # gibi bir yedek yerel `docker build`de `COPY . /app` ile imaja girerdi —
+    # .gitignore'la aynı kusur (tests/test_env_yok_sayma.py), burada bağlam için.
     eksik = {"tests", "android", "docs", ".venv", "node_modules", ".git",
-             ".env", "output", "assets", "hata.log"} - _dislananlar()
+             ".env*", "output", "assets", "hata.log"} - _dislananlar()
     assert not eksik, f".dockerignore'da yok: {sorted(eksik)}"
 
 

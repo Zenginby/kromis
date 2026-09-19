@@ -139,6 +139,11 @@ def test_no_tracked_file_is_hidden_by_the_ignore_rules():
     gizlenen = subprocess.run(
         ["git", "-C", REPO, "check-ignore", "--no-index", "--stdin", "-z"],
         input=izlenen.stdout, capture_output=True)
+    # `_yok_sayiliyor` ile aynı sebep: bozuk bir git çağrısı boş stdout verir ve
+    # aşağıdaki iddia sahte yeşile döner. 1 = hiçbiri yok sayılmıyor (beklenen).
+    assert gizlenen.returncode in (0, 1), (
+        f"git check-ignore --stdin hata verdi (çıkış {gizlenen.returncode}): "
+        f"{gizlenen.stderr.decode('utf-8', 'replace').strip()}")
     adlar = [y for y in gizlenen.stdout.decode("utf-8").split("\0") if y]
     assert not adlar, (
         "izlendiği hâlde yok sayılan dosya(lar) var — `.gitignore` fazla "

@@ -2,7 +2,7 @@
 
 # Modül grafı
 
-104 Python modülü, 452 modül düzeyi + 15 erteli ithal kenarı.
+105 Python modülü, 455 modül düzeyi + 15 erteli ithal kenarı.
 
 Katman, o modülün depo içindeki en uzun bağımlılık zincirinin uzunluğu:
 **katman 0 hiçbir depo modülüne dayanmaz**, en üst katman uygulamanın
@@ -63,6 +63,7 @@ flowchart TD
   end
   subgraph katman6["katman 6"]
     n_openai_chat["openai_chat<br/>180 satır"]
+    n_services_defter["services.defter<br/>306 satır"]
     n_services_depo_kimlik_bilgisi["services.depo_kimlik_bilgisi<br/>143 satır"]
     n_services_depo_medya["services.depo_medya<br/>356 satır"]
     n_services_depo_palet["services.depo_palet<br/>82 satır"]
@@ -81,7 +82,7 @@ flowchart TD
     n_openai_client["openai_client<br/>217 satır"]
     n_prefs["prefs<br/>268 satır"]
     n_providers["providers<br/>508 satır"]
-    n_services_tablolar["services.tablolar<br/>587 satır"]
+    n_services_tablolar["services.tablolar<br/>688 satır"]
     n_veo_client["veo_client<br/>629 satır"]
   end
   subgraph katman4["katman 4"]
@@ -126,7 +127,7 @@ flowchart TD
     n_kimlik_baglami["kimlik_baglami<br/>56 satır"]
     n_release_manifest["release_manifest<br/>92 satır"]
     n_screencolor["screencolor<br/>149 satır"]
-    n_services_kiraci["services.kiraci<br/>176 satır"]
+    n_services_kiraci["services.kiraci<br/>191 satır"]
     n_services_koken["services.koken<br/>133 satır"]
     n_services_nesne_depo["services.nesne_depo<br/>317 satır"]
     n_services_sifre["services.sifre<br/>151 satır"]
@@ -429,6 +430,9 @@ flowchart TD
   n_services_ayar --> n_services_tablolar
   n_services_cerez --> n_services_db
   n_services_db --> n_services_kiraci
+  n_services_defter --> n_services_gunluk
+  n_services_defter --> n_services_tablolar
+  n_services_defter --> n_services_zaman
   n_services_depo_admin --> n_services_kota
   n_services_depo_admin --> n_services_kuyruk
   n_services_depo_admin --> n_services_platform_anahtari
@@ -621,6 +625,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `services/ayar.py` | 226 | 9 | `paths`, `services.kimlik`, `services.tablolar` | 16 | 10 |
 | `services/cerez.py` | 82 | 2 | `services.db` | 4 | 6 |
 | `services/db.py` | 225 | 1 | `services.kiraci` | 22 | 14 |
+| `services/defter.py` | 306 | 6 | `services.gunluk`, `services.tablolar`, `services.zaman` | 0 | 1 |
 | `services/depo_admin.py` | 264 | 11 | `services.kota`, `services.kuyruk`, `services.platform_anahtari`, `services.tablolar`, `services.zaman` | 2 | 2 |
 | `services/depo_kimlik_bilgisi.py` | 143 | 6 | `catalog`, `services.sifre`, `services.tablolar`, `services.zaman` | 6 | 7 |
 | `services/depo_klasor.py` | 232 | 7 | `folders`, `services.depo_medya`, `services.dosya`, `services.tablolar`, `services.zaman` | 2 | 5 |
@@ -632,17 +637,17 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `services/dil.py` | 194 | 3 | `i18n`, `services.cerez` | 17 | 5 |
 | `services/dosya.py` | 328 | 1 | `services.nesne_depo` | 12 | 8 |
 | `services/gorsel.py` | 123 | 4 | `i18n`, `services.dil`, `services.dosya` | 4 | 3 |
-| `services/gunluk.py` | 332 | 1 | `errlog` | 6 | 3 |
+| `services/gunluk.py` | 332 | 1 | `errlog` | 7 | 3 |
 | `services/hata_izleme.py` | 187 | 2 | `errlog`, `services.gunluk`, `version` | 4 | 2 |
-| `services/hesap.py` | 292 | 6 | `services.cerez`, `services.tablolar` | 6 | 19 |
+| `services/hesap.py` | 292 | 6 | `services.cerez`, `services.tablolar` | 6 | 20 |
 | `services/isci.py` | 680 | 11 | `azure_client`, `catalog`, `errlog`, `i18n`, `kimlik_baglami`, `providers`, `services.ayar`, `services.depo_kimlik_bilgisi`, `services.depo_medya`, `services.dil`, `services.dosya`, `services.gunluk`, `services.hata_izleme`, `services.kiraci`, `services.kuyruk`, `services.nesne_depo`, `services.platform_anahtari`, `services.tablolar`, `services.zaman` | 1 | 7 |
 | `services/istek_kimligi.py` | 112 | 3 | `services.gunluk`, `services.hata_izleme` | 1 | 3 |
 | `services/kapilar.py` | 165 | 11 | `assets_store`, `catalog`, `chat_store`, `credstore`, `etiket`, `i18n`, `services.depo_klasor`, `services.dil`, `services.kuyruk`, `services.platform_anahtari`, `storage` | 4 | 4 |
 | `services/kimlik.py` | 265 | 8 | `i18n`, `kimlik_baglami`, `services.cerez`, `services.db`, `services.depo_kimlik_bilgisi`, `services.dil`, `services.hesap`, `services.kiraci`, `services.platform_anahtari`, `services.tablolar` | 12 | 3 |
-| `services/kiraci.py` | 176 | 0 | — | 9 | 3 |
+| `services/kiraci.py` | 191 | 0 | — | 9 | 3 |
 | `services/koken.py` | 133 | 0 | — | 2 | 5 |
 | `services/kota.py` | 183 | 6 | `i18n`, `services.dil`, `services.tablolar`, `services.zaman` | 3 | 3 |
-| `services/kuyruk.py` | 490 | 10 | `errlog`, `services.ayar`, `services.tablolar`, `services.zaman` | 8 | 10 |
+| `services/kuyruk.py` | 490 | 10 | `errlog`, `services.ayar`, `services.tablolar`, `services.zaman` | 8 | 11 |
 | `services/modeller.py` | 317 | 8 | `catalog`, `credstore`, `etiket`, `i18n`, `services.depo_tercih`, `services.platform_anahtari`, `version` | 3 | 0 |
 | `services/nesne_depo.py` | 317 | 0 | — | 2 | 5 |
 | `services/palet.py` | 185 | 7 | `color_names`, `i18n`, `models`, `palette`, `services.depo_palet`, `services.dil` | 3 | 1 |
@@ -651,8 +656,8 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `services/redaksiyon.py` | 68 | 1 | `catalog` | 1 | 0 |
 | `services/sablon.py` | 68 | 10 | `errlog`, `i18n`, `services.ayar`, `services.dil`, `version` | 3 | 0 |
 | `services/sifre.py` | 151 | 0 | — | 5 | 5 |
-| `services/tablolar.py` | 587 | 5 | `assets_store`, `models` | 29 | 27 |
-| `services/zaman.py` | 71 | 0 | — | 21 | 13 |
+| `services/tablolar.py` | 688 | 5 | `assets_store`, `models` | 30 | 28 |
+| `services/zaman.py` | 71 | 0 | — | 22 | 14 |
 | `storage.py` | 423 | 1 | `catalog`, `jsonstore` | 9 | 9 |
 | `veo_client.py` | 629 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
 | `version.py` | 30 | 0 | — | 9 | 13 |
@@ -667,6 +672,7 @@ Kimsenin ithal etmediği modüller. `app`, `isci`, `desktop`, `android_main` uyg
 * `backup` — ithal eden yok — kullanımı elle doğrulanmalı
 * `isci` — giriş noktası
 * `release_manifest` — ithal eden yok — kullanımı elle doğrulanmalı
+* `services.defter` — ithal eden yok — kullanımı elle doğrulanmalı
 
 ## Yardımcılar (`tools/`)
 

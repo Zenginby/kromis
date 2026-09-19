@@ -35,8 +35,8 @@ KAPALI_PORT_URL = "postgresql+psycopg://kimse@127.0.0.1:1/yok"
 # testler "head'e çıktı mı" sorusunu bu dizeyle soruyor; `ScriptDirectory`den
 # okumak testi göç dosyalarına göre yumuşatır ve yanlış bir `down_revision`
 # zinciri görünmez olurdu.
-BAS = "0006_rls"
-ZINCIR = ["0006_rls", "0005_kota", "0004_isler", "0003_arena_win", "0002_deneme_turu",
+BAS = "0007_kredi"
+ZINCIR = ["0007_kredi", "0006_rls", "0005_kota", "0004_isler", "0003_arena_win", "0002_deneme_turu",
           "0001_veri_modeli", "0000_zemin"]
 
 
@@ -179,7 +179,7 @@ def test_the_session_dependency_runs_its_exit_code_before_the_response_is_sent()
 
 
 def test_the_alembic_config_loads_and_names_the_revision_chain():
-    """`alembic.ini` + `alembic/` okunuyor; hat tek kollu: `0000_zemin` → … → `0004_isler` → `0005_kota` → `0006_rls`."""
+    """`alembic.ini` + `alembic/` okunuyor; hat tek kollu: `0000_zemin` → … → `0005_kota` → `0006_rls` → `0007_kredi`."""
     from alembic.config import Config
     from alembic.script import ScriptDirectory
     cfg = Config(os.path.join(REPO, "alembic.ini"))

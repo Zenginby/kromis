@@ -793,6 +793,9 @@ KULLANICIYA_KONUSMAYAN = {
                          "`None`/`bool`/sayı döndürüyor, cümleyi routers/hesap.py kuruyor",
     "services/kuyruk.py": "iş kuyruğu ilkelleri (Faz 2 / 1): SQL; satır/`bool`/sayı döndürür, "
                           "`hata` sütununa yazdığı `isci yanit vermiyor` bir KOD, cümleyi ön yüz kurar",
+    "services/defter.py": "kredi defteri (Faz 3 / 1): SQL; `Hareket`/`bool`/sayı döndürür, `YetersizBakiye` "
+                          "iki SAYI taşır (402 gövdesini rota kurar, K11); tek metni OPERATÖRE giden "
+                          "`defter.asim` günlük uyarısı",
     "isci.py": "işçi sürecinin bileşim kökü (Faz 2 / 3): kapılar, iş parçacıkları, kalp "
                "atışı, SIGTERM; çıktısı stdout'a ASCII, OPERATÖRE — işin metni services/isci.py'de",
 }

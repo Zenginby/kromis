@@ -47,7 +47,7 @@ from sqlalchemy.orm import Session
 
 import app as appmod
 import providers
-from services import ayar, cerez, db, dosya, hesap, isci, kimlik, kiraci, kuyruk, tablolar
+from services import ayar, cerez, db, defter, dosya, hesap, isci, kimlik, kiraci, kuyruk, tablolar
 from services.tablolar import Kullanici, Medya
 
 pytestmark = pytest.mark.usefixtures("depo_db")
@@ -584,6 +584,27 @@ def test_the_worker_heartbeat_drops_stale_jobs_of_every_tenant_as_admin(uygulama
         assert isci.kalp_turu(s, uuid.uuid4(), [], an, dt.timedelta(minutes=5)).dusen == 1
     with depo_db.connect() as c:
         assert c.execute(text("SELECT durum, hata FROM isler")).one() == ("hata", kuyruk.BAYAT_HATASI)
+
+
+def test_the_worker_heartbeat_refunds_the_stale_job_of_another_tenant_through_the_admin_insert_policy(
+        uygulama_motoru, depo_db, db_oturumu, ikinci):
+    """Faz 3 / 2 × K4: bayat düşürmenin iadesi admin bağlamında `kredi_hareketleri`ye B adına yazar —
+    `yonetici_ekler` INSERT politikasının tek üretim yolu; uygulama rolüyle, süper kullanıcı değil."""
+    an = dt.datetime(2026, 9, 18, 12, 0, tzinfo=dt.UTC)
+    defter.hibe(db_oturumu, ikinci, 100, f"{defter.ONEK_HIBE}{ikinci}:2026-09")
+    is_ = kuyruk.ekle(db_oturumu, ikinci, "generate", {}, "m", 20, an=an - dt.timedelta(minutes=30))
+    defter.rezerve(db_oturumu, ikinci, is_.id, 20, an=an - dt.timedelta(minutes=30))
+    assert kuyruk.al(db_oturumu, uuid.uuid4(), an - dt.timedelta(minutes=30)) is not None
+    db_oturumu.commit()
+    assert defter.bakiye(db_oturumu, ikinci) == 80
+    with Session(uygulama_motoru) as s:
+        assert isci.kalp_turu(s, uuid.uuid4(), [], an, dt.timedelta(minutes=5)).dusen == 1
+    with depo_db.connect() as c:
+        assert c.execute(text("SELECT durum FROM isler WHERE id = :i"), {"i": is_.id}).scalar_one() == "hata"
+        assert c.execute(text("SELECT tur, miktar, kullanici_id, admin_id FROM kredi_hareketleri "
+                              "WHERE is_id = :i ORDER BY olusturuldu"), {"i": is_.id}).all() == [
+            ("rezerv", -20, ikinci, None), ("iade", 20, ikinci, None)]
+        assert c.execute(text("SELECT bakiye FROM kullanicilar WHERE id = :k"), {"k": ikinci}).scalar_one() == 100
 
 
 def test_every_tool_that_opens_a_session_binds_a_tenant_context():

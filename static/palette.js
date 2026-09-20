@@ -168,12 +168,15 @@ function paletteModalStatus(msg) {
   $("palette-modal-status").textContent = msg || "";
 }
 
-/** 422 gövdesi bir dizi olabiliyor; `err.detail` doğrudan basılırsa çöp çıkar. */
+/** 422 gövdesi bir dizi olabiliyor; `err.detail` doğrudan basılırsa çöp çıkar.
+ *  Kodlu gövde (`{kod: "err.…", …}` — 402 `err.kredi_yetersiz`, Faz 3 / 2 K11):
+ *  cümleyi sunucu değil bu taraf kurar, `kod` sözlük anahtarı ve öteki alanlar
+ *  ({bakiye}, {gereken}, {plan}) yer tutucuları doldurur. */
 function detailText(err) {
   const d = err && err.detail;
   if (!d) return "";
   if (typeof d === "string") return d;
-  if (!Array.isArray(d)) return "";
+  if (!Array.isArray(d)) return typeof d.kod === "string" ? t(d.kod, d) : "";
   if (d.some((e) => e && e.type === "extra_forbidden")) {
     return t("err.extra_forbidden");
   }

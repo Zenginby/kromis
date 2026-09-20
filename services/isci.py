@@ -31,10 +31,10 @@ pal["applied"]` aynen). Model `isler.model` sütunundan (rota doğruladı ve
 normalleştirdi). Kredi GERÇEK `catalog.cost_for` (görsel/video başına);
 `isler.kredi_tahmini` sıraya girerken yazılmış TAHMİN, işçi ona bakmaz.
 
-SIRA: nesne yaz → `depo_medya.kaydet` satırı (flush) → `kuyruk.bitir` → TEK
-commit. Satır ya da commit düşerse yazılan nesneler `depo.sil` ile TELAFİ
-edilir ve iş `hata` — Faz 1 / 5'in "dosya + satır atomik değil" borcu burada
-kapanır: web rotası akışın iki ucunu tutamıyordu (commit bağımlılıkta, rota
+SIRA: nesne yaz → `depo_medya.kaydet` satırı (flush) → `kuyruk.bitir` →
+`defter.onayla` → TEK commit. Satır ya da commit düşerse yazılan nesneler
+`depo.sil` ile TELAFİ edilir ve iş `hata` — Faz 1 / 5'in "dosya + satır
+atomik değil" borcu burada kapanır: web rotası akışın iki ucunu tutamıyordu (commit bağımlılıkta, rota
 döndükten sonra), işçi tutuyor. Telafi `_YazimIzi` ile: `kaydet` dosya adını
 kendi üretiyor ve flush düşerse adı çağırana hiç söyleyemez; yazılan her
 yolu depo sarmalayıcısı kaydeder, düşüşte hepsi silinir. `bitir` `False`
@@ -59,6 +59,18 @@ göndermek demek; bekçisi `[A, B]` testi (Faz 1 / 7'nin ikizi). Dil de öyle:
 (`map_error`) `i18n.active()`ten okuyor → `kullanicilar.dil`, seçmemişse ürünün
 öntanımlısı (`i18n.DEFAULT`: "kullanıcı seçmemiş" sorusunun cevabı; `FALLBACK`
 "kullanıcı yok" demek ve burada kullanıcı var). İş bitince `set_active(None)`.
+
+KREDİ DEFTERİ (Faz 3 / 2; docs/faz3-kredi-defteri-filigran.md §2, K2): rota
+platform anahtarlı işin TAHMİNİNİ sıraya girerken rezerve etti; işçi burada
+kapatır. `bitti` → `kredi_gercek = Σ medya.credits` (`_kredi` × yazılan kayıt)
+`kuyruk.bitir(kredi_gercek=)` ile satıra ve `defter.onayla` ile deftere AYNI
+commit'te — iş `bitti` olup farkı iade edilmemiş bir ara durum yok. `hata`
+(sağlayıcı ya da yazım hatası) → `_dusur` içinde `defter.iade` (rezervin
+tamamı, `kuyruk.dusur`la aynı commit). Bayat düşürme → `kalp_turu` düşürdüğü
+her işi admin bağlamında iade eder (`yonetici_ekler`, K4). `iade` idempotent:
+bayat düşürülmüş bir işin işçisi sonra `_dusur` derse ikinci çağrı no-op.
+BYOK iş (K3) rezerv taşımaz: `onayla`/`iade` rezerv bulamaz, `None` döner —
+işçi kaynağa bakmaz, defter karar verir.
 
 YENİDEN DENEME YOK (K8): sağlayıcı çağrısı faturalanır ve düşen bir işçinin
 çağrıyı gönderip göndermediği bilinemez. `ac.ImageError` → `hata` (metin
@@ -141,6 +153,7 @@ import kimlik_baglami
 import providers
 from services import (
     ayar,
+    defter,
     depo_kimlik_bilgisi,
     depo_medya,
     dil,
@@ -403,10 +416,16 @@ def _kredi(is_: Is) -> int:
 
 def _dusur(oturum_ac: Callable[[], Session], is_id: uuid.UUID, metin: str, an: dt.datetime,
            data_dir: str) -> bool:
-    """İşi `hata`ya yazar (kendi oturumu, kendi commit'i); DB de düşerse izi `hata.log`a, patlamaz."""
+    """İşi `hata`ya yazar ve rezervini iade eder (kendi oturumu, TEK commit); DB de düşerse izi `hata.log`a, patlamaz.
+
+    `defter.iade` `dusur`un sonucuna bakmadan çağrılır: 0 satır "iş çoktan
+    bayat düşürülmüş" demek ve kalp turu o işi iade etmiştir — ikinci çağrı
+    idempotent no-op (`iade:<is_id>` anahtarı). Rezervsiz (BYOK) işte de `None`.
+    """
     try:
         with oturum_ac() as db:
             tamam = kuyruk.dusur(db, is_id, metin, an)
+            defter.iade(db, is_id, an=an)
             db.commit()
         return tamam
     except Exception:
@@ -424,8 +443,14 @@ def _yaz(is_: Is, sonuclar: list[bytes], oturum_ac: Callable[[], Session], depo:
         with oturum_ac() as db:
             kayitlar = [depo_medya.kaydet(db, is_.kullanici_id, veri, dict(meta), output_dir,
                                           now=an, depo=izi) for veri in sonuclar]
-            if not kuyruk.bitir(db, is_.id, {"medya": [k["id"] for k in kayitlar]}, an):
+            # GERÇEK kredi = yazılan kayıtların `credits` toplamı (kayıt başına `_kredi`;
+            # spec katalogdan düşmüşse 0). Sağlayıcı istenenden az döndürdüyse toplam da az:
+            # kullanıcı yalnız aldığı kadar öder, farkı `onayla` iade eder (K2).
+            kredi_gercek = sum(int(k.get("credits") or 0) for k in kayitlar)
+            if not kuyruk.bitir(db, is_.id, {"medya": [k["id"] for k in kayitlar]}, an,
+                                kredi_gercek=kredi_gercek):
                 raise _IsArtikCalismiyor(str(is_.id))
+            defter.onayla(db, is_.id, kredi_gercek, an=an)
             db.commit()
     except _IsArtikCalismiyor:
         # İş bu arada bayat düşürüldü (`hata`): sonuç yazılmaz, `dusur` da çağrılmaz
@@ -580,9 +605,15 @@ def kalp_turu(db: Session, isci_id: uuid.UUID, is_idleri: Iterable[uuid.UUID], a
             yeniden = True
         for is_id in is_idleri:
             kuyruk.kalp(db, is_id, an)
-        dusen = kuyruk.bayatlari_dusur(db, an, esik)
+        dusenler = kuyruk.bayatlari_dusur(db, an, esik)
+        # Düşen her işin rezervi geri (Faz 3 / 2, K2): admin bağlamı `kredi_hareketleri`ye
+        # yalnız bu yoldan yazar (`yonetici_ekler`, K4). Aynı commit'te: iş `hata` olup
+        # parası tutulmuş bir ara durum kalmasın. Geç kalan işçinin `_dusur`u aynı işi
+        # ikinci kez iade edemez (`iade:<is_id>` anahtarı çakışır, no-op).
+        for is_id in dusenler:
+            defter.iade(db, is_id, an=an)
         db.commit()
-    return KalpOzeti(dusen, yeniden)
+    return KalpOzeti(len(dusenler), yeniden)
 
 
 def kuyruk_uyarisi(db: Session, an: dt.datetime) -> dict[str, Any] | None:

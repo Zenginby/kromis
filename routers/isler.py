@@ -70,7 +70,7 @@ from sqlalchemy.orm import Session
 
 import catalog
 import i18n
-from services import dil, kapilar, kimlik, kota, kuyruk, platform_anahtari, zaman
+from services import defter, dil, kapilar, kimlik, kota, kuyruk, platform_anahtari, zaman
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
@@ -253,8 +253,14 @@ def is_iptal(is_id: uuid.UUID, db: Session = OTURUM,
     görür — yani "çalışıyor" cevabı bir yarışın kaybedilmiş hâli değil,
     Postgres'in satır kilidinin verdiği kesin cevap. Çalışan iş İPTAL EDİLMEZ:
     sağlayıcı çağrısı çoktan gitti ve faturalandı (K8), işçi sonucu yazar.
+
+    İptal edilen işin rezervi geri (Faz 3 / 2, K2): `defter.iade` iptalle aynı
+    transaksiyonda, kullanıcının bağlamında (`sahip` politikası yazar); BYOK iş
+    rezerv taşımaz, `iade` `None` döner. Yalnız `bekliyor` iptal edildiği için
+    iş hiç koşmadı — sağlayıcı faturası yok, iade tam.
     """
     if kuyruk.iptal(db, kullanici.id, is_id):
+        defter.iade(db, is_id)
         return {"is": _bul(db, kullanici.id, is_id)}
     is_ = _bul(db, kullanici.id, is_id)      # yoksa 404
     raise HTTPException(status_code=409,
@@ -288,6 +294,13 @@ def is_yeniden(is_id: uuid.UUID, db: Session = OTURUM,
     yeniden çözülür: kullanıcı arada kendi anahtarını girmiş (ya da silmiş)
     olabilir. `kredi_tahmini` eski satırdan (aynı model, aynı adet); işçi
     gerçek maliyeti yine kendi yazar.
+
+    YENİ İŞ = YENİ REZERV (Faz 3 / 2, K2): eski işin defteri kapalı (`hata`/
+    `iptal` → iade edilmişti); yeni satır platform anahtarıyla doğuyorsa
+    tahmini yeniden düşer (`kapilar.rezerve_kredi`, satırla aynı transaksiyon),
+    yetmezse 402 ve satır geri alınır. Bakiye ön denetimi (`check_bakiye`)
+    günlük tavandan sonra (K9). "hata → yeniden gönder" döngüsü bakiyeyi
+    değil yalnız saatlik tavanı yer — bilerek: iade tam, rezerv tam.
     """
     eski = kuyruk.satir(db, kullanici.id, is_id)
     if eski is None:
@@ -304,9 +317,11 @@ def is_yeniden(is_id: uuid.UUID, db: Session = OTURUM,
     kapilar.check_is_tavani(db, kullanici.id)
     kota.check_saatlik(db, kullanici.id)
     kota.check_gunluk(db, kullanici, eski.kredi_tahmini, kaynak)
+    kapilar.check_bakiye(db, kullanici, eski.kredi_tahmini, kaynak)
     istek = dict(eski.istek or {})
     if istek.get("arena_id") is not None:
         istek["arena_id"] = None
     yeni = kuyruk.ekle(db, kullanici.id, eski.tur, istek, eski.model, eski.kredi_tahmini,
                        anahtar_kaynagi=kaynak)
+    kapilar.rezerve_kredi(db, kullanici, yeni.id, eski.kredi_tahmini, kaynak)
     return {"is": kuyruk._json(yeni)}

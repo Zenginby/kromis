@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import socket
 import threading
-import time
 
 import pytest
 import uvicorn
@@ -33,6 +32,7 @@ import credstore
 import i18n
 from app import app
 from tests.conftest import KAPANIS_TAVANI_SN
+from tests.test_playwright_studio import sunucu_hazir
 
 # Kapı GERÇEK (Faz 1 / 4): oturum çerezi `e2e_oturum`dan; dil de oradan —
 # `kullanicilar.dil` zincirin 3. halkası, `prefs.json` web yolunda okunmuyor.
@@ -120,7 +120,7 @@ def test_no_dictionary_key_reaches_the_screen(monkeypatch, dil, veritabani, e2e_
     port = _bos_port()
     sunucu = _Sunucu(port)
     sunucu.start()
-    time.sleep(1.0)
+    sunucu_hazir(port)
 
     sizanlar: set[str] = set()
     try:

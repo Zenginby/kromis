@@ -20,26 +20,37 @@ import credstore
 import etiket
 import i18n
 import version
-from services import depo_tercih, platform_anahtari
+from services import defter, depo_tercih, planlar, platform_anahtari
+
+# `sebep` alanının iki değeri (`available: false` yanında): ön yüz `plan`ı rozetle
+# GÖSTERİR, `anahtar`ı gizler (core.js `secilebilirler`).
+SEBEP_ANAHTAR = "anahtar"
+SEBEP_PLAN = "plan"
 
 
-def model_available(configured: bool, plan: str) -> bool:
-    """Bu model kullanıcıya GÖRÜNÜYOR mu — arayüzün sorduğu TEK soru.
+def model_available(spec: catalog.ImageModel | catalog.ChatModel, configured: bool, plan: str) -> bool:
+    """Bu model kullanıcıya KULLANILABİLİR mi — arayüzün sorduğu TEK soru.
 
-    Görünmeme sebebi bugün tek: anahtar kayıtlı değil. Kredi/üyelik sistemi
-    geldiğinde ikincisi ekleniyor — "kullanıcının planı bu modeli kapsamıyor" —
-    ve o gün DEĞİŞECEK YER BURASI, istemci değil. Filtrenin istemcide olduğu
-    bir dünyada iki sebebi ayrı ayrı sormak gerekirdi ve "hangi modeller
-    görünür" sorusunun iki cevabı doğardı; `static/core.js secilebilirler`in
-    var olma sebebi tam olarak o ikiliği önlemek.
+    İki sebep, tek cevap (Faz 3 / 3 — bu işlevin "değişecek yer burası" sözü
+    tutuldu): anahtar kayıtlı değil (`configured`) YA DA kullanıcının planı
+    modeli kapsamıyor (`planlar.kapsiyor`: modelin `plan` alanı + video ↔
+    `Plan.video`, K7). İki sebebi istemcide ayrı ayrı sormak "hangi modeller
+    kullanılabilir" sorusunun iki cevabını doğururdu; `static/core.js
+    secilebilirler`in var olma sebebi tam olarak o ikiliği önlemek. SEBEBİ
+    `sebep(...)` söyler: cümle farklı ("anahtar yok" · "planında yok") ve
+    arayüz ikisine farklı davranır (gizle · rozetle göster).
 
-    `plan` BUGÜN OKUNMUYOR ve bu bilinçli: parametre imzada duruyor çünkü
-    kancanın YERİ burası, ama plan tablosu (kim hangi abonelikte) henüz yok —
-    kullanıcı modeli, kimlik doğrulama ve bakiye SaaS dönüşümüne bağlı
-    (docs/superpowers/specs/2026-08-10-saas-transformation-master-design.md).
-    Uydurma bir eşleştirme yazmak, olmayan bir gerçeği kodlamak olurdu.
+    `plan` KULLANICININ planı (`kullanicilar.plan`, `defter.plan_oku`),
+    modelin değil — modelin planı `spec.plan`.
     """
-    return configured
+    return configured and planlar.kapsiyor(plan, spec)
+
+
+def sebep(spec: catalog.ImageModel | catalog.ChatModel, configured: bool, plan: str) -> str | None:
+    """`available: false`nin nedeni: `"plan"` (anahtar olsa da açılmaz — plan önce) · `"anahtar"` · `None` (kullanılabilir)."""
+    if not planlar.kapsiyor(plan, spec):
+        return SEBEP_PLAN
+    return None if configured else SEBEP_ANAHTAR
 
 
 def provider_logo_url(provider: str) -> str | None:
@@ -59,8 +70,8 @@ def provider_logo_url(provider: str) -> str | None:
     return f"/static/img/providers/{ad}?v={version.APP_VERSION}" if ad else None
 
 
-def model_payload(m: catalog.ImageModel, cfg: dict, kisa: dict) -> dict:
-    """Bir görsel/video modelinin arayüze giden hâli.
+def model_payload(m: catalog.ImageModel, cfg: dict, kisa: dict, plan: str = planlar.PLAN_VARSAYILAN) -> dict:
+    """Bir görsel/video modelinin arayüze giden hâli; `plan` isteğin kullanıcısının planı (Faz 3 / 3).
 
     ÇIKARILDI, kopyalanmadı: `image_models` ve `video_models` listelerinin
     ikisi de bu sözlüğü kuruyor ve elle iki kez yazmak, birine alan ekleyip
@@ -118,22 +129,32 @@ def model_payload(m: catalog.ImageModel, cfg: dict, kisa: dict) -> dict:
         # TEK türetilmiş alan: modelin anahtarı GİRİLMİŞ mi. Arayüzün
         # "#go kilitli mi" kararı ve "anahtar gerekli" etiketi bundan geliyor.
         "configured": cfg.get(m.credential, False),
-        # GÖRÜNÜRLÜK kararı — arayüzün filtresi YALNIZ bunu okuyor.
-        # Bugün `configured` ile birebir aynı; ayrımın gerekçesi
-        # model_available'da yazılı. `configured` KALIYOR çünkü MESAJ ondan
-        # geliyor: "anahtar yok" ile "planın kapsamıyor" aynı cümle değil.
-        "available": model_available(cfg.get(m.credential, False), m.plan),
-        # Bugün her modelde "free". Arayüz bir gün "Pro" rozetini bundan
-        # çizecek; alan şimdiden akıyor ki o gün şema değişikliği gerekmesin.
+        # KULLANILABİLİRLİK kararı — arayüzün seçim mantığı YALNIZ bunu okuyor
+        # (`secilecek`); gerekçesi model_available'da. `configured` KALIYOR
+        # çünkü MESAJ ondan geliyor: "anahtar yok" ile "planında yok" aynı cümle
+        # değil — ve `sebep` ikisini AYIRIR: arayüz `plan`ı rozetle gösterir
+        # (yükseltme çağrısı Faz 4'ün satış yüzü, bugün rozet), `anahtar`ı
+        # gizler (kullanıcı isteği, core.js `secilebilirler`). Kullanılabilir
+        # modelde `None`.
+        "available": model_available(m, cfg.get(m.credential, False), plan),
+        "sebep": sebep(m, cfg.get(m.credential, False), plan),
+        # Bugün her modelde "free" (katalog verisi); video kuralı planın
+        # özelliği ve `sebep`te görünüyor (services/planlar.py, K7).
         "requires_plan": m.plan,
     }
 
 
-def settings_payload(kimlikler: Mapping[str, str] | None = None) -> dict:
+def settings_payload(kimlikler: Mapping[str, str] | None = None, *,
+                     plan: str = planlar.PLAN_VARSAYILAN) -> dict:
     """Kimlik DURUMU + hangi modeller var + hangileri kullanılabilir.
 
     `kimlikler`: isteğin kullanıcısının çözülmüş sözlüğü (`kimlik.KIMLIKLER`);
     rota açık veriyor, `None` isteğin bağlamı demek (credstore.degerler).
+    `plan` (Faz 3 / 3): isteğin kullanıcısının planı (`defter.plan_oku`), rota
+    verir; öntanımlı `free` sütunun `server_default`ıyla aynı kural — planı
+    bilinmeyen kullanıcı ücretsizdir, hiçbir model plan yüzünden yanlışlıkla
+    AÇILMAZ (ters yön — pro'ya kapalı görünmek — yalnız rota vermeyi unutursa
+    olur ve o zaman video şeridi rozetli çıkar, sessiz değil).
 
     `ac.get_settings_status()`un gövdesi GENİŞLETİLMEDİ, üzerine BURADA
     ekleniyor — `version`'ın aynı gerekçesi (o fonksiyonun docstring'i):
@@ -191,9 +212,9 @@ def settings_payload(kimlikler: Mapping[str, str] | None = None) -> dict:
         # `catalog.VIDEO_MODELS`in ayrı bir demet olma gerekçesinin ön yüz
         # tarafındaki karşılığı.
         "default_video_model": catalog.DEFAULT_VIDEO_MODEL,
-        "video_models": [model_payload(m, cfg, kisa_video)
+        "video_models": [model_payload(m, cfg, kisa_video, plan)
                          for m in catalog.VIDEO_MODELS],
-        "image_models": [model_payload(m, cfg, kisa_gorsel)
+        "image_models": [model_payload(m, cfg, kisa_gorsel, plan)
                          for m in catalog.IMAGE_MODELS],
         "default_chat_model": catalog.DEFAULT_CHAT_MODEL,
         "chat_models": [
@@ -206,8 +227,9 @@ def settings_payload(kimlikler: Mapping[str, str] | None = None) -> dict:
              # kurulumda arayüz modeli "kurulu" gösterir ve ilk mesaj 404
              # dönerdi (bkz. credstore.chat_is_configured).
              "configured": chat_cfg.get(m.id, False),
-             # Görsel şeridiyle AYNI alan, aynı gerekçe (model_available).
-             "available": model_available(chat_cfg.get(m.id, False), m.plan),
+             # Görsel şeridiyle AYNI iki alan, aynı gerekçe (model_available / sebep).
+             "available": model_available(m, chat_cfg.get(m.id, False), plan),
+             "sebep": sebep(m, chat_cfg.get(m.id, False), plan),
              "requires_plan": m.plan,
              # Ayarlar formunun dağıtım adı kutusunun kapısı: KATALOGDAN
              # türetiliyor, istemcide sağlayıcı adı literal olarak
@@ -258,7 +280,7 @@ def model_facts(m: catalog.ImageModel) -> dict:
 
 
 def director_context(db: Session, kullanici_id: uuid.UUID,
-                     kimlikler: Mapping[str, str] | None = None) -> dict:
+                     kimlikler: Mapping[str, str] | None = None, *, plan: str | None = None) -> dict:
     """Yönetmenin sistem mesajına giren TUR bağlamı: seçili model + menü + yönlendirme.
 
     Bağlamı burada toplamanın sebebi katman kuralı: `chat_prompt` yalnızca
@@ -299,6 +321,12 @@ def director_context(db: Session, kullanici_id: uuid.UUID,
     p = depo_tercih.oku(db, kullanici_id)
     m = catalog.image_model(p["image_model"])
     cfg = credstore.configured_map(kimlikler)
+    # PLAN da bu turun olgusu (Faz 3 / 3): yönetmen ücretsiz kullanıcıya video
+    # modeli önermesin — arayüzde o model rozetli ve #go kapalı; öneri boşa
+    # bir tur olurdu. Rota yüklü satırdan verir (`kapilar.kullanici_plani`, ek
+    # sorgu yok); vermezse aynı `Session`, tek SELECT (`defter.plan_oku`).
+    if plan is None:
+        plan = defter.plan_oku(db, kullanici_id)
     secili = {p["image_model"], p["video_model"]}
     # GÖRSEL + VİDEO tek listede: `catalog.video_model`in "birleşik arama YOK"
     # kuralı id ile ARAMA hakkında (yanlış türü doğru sanan bir çağıranı
@@ -306,7 +334,7 @@ def director_context(db: Session, kullanici_id: uuid.UUID,
     # satırda `kind` alanıyla açıkça taşınıyor.
     menu = [{**model_facts(x), "selected": x.id in secili}
             for x in catalog.IMAGE_MODELS + catalog.VIDEO_MODELS
-            if model_available(cfg.get(x.credential, False), x.plan)]
+            if model_available(x, cfg.get(x.credential, False), plan)]
     # DİL de bu turun olgusu: persona "kullanıcı hangi dilde yazıyorsa o dilde
     # konuş" diyor, ama ilk mesaj dilsiz olabiliyor (tek kelime, bir oran, bir
     # hex kodu) ve o turda modelin elinde hiçbir işaret kalmıyor. Arayüz dili

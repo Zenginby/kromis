@@ -33,6 +33,7 @@ import guncelleme
 import version
 from app import app
 from tests.conftest import KAPANIS_TAVANI_SN
+from tests.test_playwright_studio import sunucu_hazir
 
 # Kapı GERÇEK (Faz 1 / 4): oturum `e2e_oturum`dan; `guncelleme.json` önbelleği
 # kullanıcının kendi `output/`unda (`ayar.ayarlar` kullanıcıya göre) — kurgu
@@ -102,7 +103,7 @@ def test_the_update_notice_appears_without_reloading_the_page(monkeypatch, verit
     port = _bos_port()
     sunucu = _Sunucu(port)
     sunucu.start()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     try:
         with sync_playwright() as p:
             tarayici = p.chromium.launch(headless=True)
@@ -170,7 +171,7 @@ def test_the_check_now_button_finds_a_release_the_cache_never_asked_for(monkeypa
     port = _bos_port()
     sunucu = _Sunucu(port)
     sunucu.start()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     try:
         with sync_playwright() as p:
             tarayici = p.chromium.launch(headless=True)
@@ -220,7 +221,7 @@ def test_the_check_now_button_answers_when_there_is_nothing_new(monkeypatch, ver
     port = _bos_port()
     sunucu = _Sunucu(port)
     sunucu.start()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     try:
         with sync_playwright() as p:
             tarayici = p.chromium.launch(headless=True)
@@ -274,7 +275,7 @@ def test_on_the_web_build_the_update_ui_is_hidden_and_the_page_never_asks(
     port = _bos_port()
     sunucu = _Sunucu(port)
     sunucu.start()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     try:
         with sync_playwright() as p:
             tarayici = p.chromium.launch(headless=True)

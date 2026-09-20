@@ -1,7 +1,7 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
 # GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
 # Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
-"""Veri modeli — 13 tablo, SQLAlchemy 2 `DeclarativeBase` (Faz 1 / 2. görev; Faz 2 / 1: `isler`, `isciler`).
+"""Veri modeli — 14 tablo, SQLAlchemy 2 `DeclarativeBase` (Faz 1 / 2. görev; Faz 2 / 1: `isler`, `isciler`; Faz 3 / 1: `kredi_hareketleri`).
 
 Bu modül ŞEMANIN tek tanımı: Alembic `alembic/env.py`de `Base.metadata`yı
 okur, `alembic check` göç dosyalarının bu tanımdan ayrışmadığını sınar
@@ -17,6 +17,11 @@ yedisi bugünkü JSON depolarının karşılığı (docs/faz1-veritabani-hesapla
 (üretim kuyruğu ve iş geçmişi — bugün istek içinde koşan sağlayıcı çağrısının
 kaydı) ve `isciler` (işçi süreçlerinin kalp atışı). Kuyruk arka ucu Postgres'in
 kendisi (`FOR UPDATE SKIP LOCKED`, K1), Redis değil; sorgular `services/kuyruk.py`de.
+Bir tablo Faz 3 / 1'in (docs/faz3-kredi-defteri-filigran.md §1): `kredi_hareketleri`
+(append-only kredi defteri; `kullanicilar.bakiye` onun ÖNBELLEĞİ) — tek yazarı
+`services/defter.py`. Aynı göç (`0007_kredi`) ileriki görevlerin sütunlarını da
+getirir: `kullanicilar.plan`, `isler.kredi_gercek`/`saglayici_meta`/
+`saglayici_maliyet_usd`, `medya.filigranli` — hepsi NULL/öntanımlı, geriye uyumlu.
 
 SÜTUN ADLARI — iki dil, tek kural. Bugünkü JSON kaydında da API gövdesinde
 de var olan alanlar ADINI KORUR (`filename`, `prompt`, `folder_id`, `palette`,
@@ -99,6 +104,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
@@ -110,6 +116,7 @@ from sqlalchemy import (
     Integer,
     LargeBinary,
     MetaData,
+    Numeric,
     Text,
     text,
 )
@@ -154,15 +161,33 @@ DURUM_BEKLIYOR, DURUM_CALISIYOR, DURUM_BITTI, DURUM_HATA, DURUM_IPTAL = IS_DURUM
 # sayılmaz). CHECK'te kilitli: üçüncü bir kaynak (ör. kurumsal havuz) göç ister.
 ANAHTAR_KAYNAKLARI: tuple[str, ...] = ("kullanici", "platform")
 
-# Sekiz iş tablosu — belgenin envanteriyle birebir; bekçi test bu kümenin her
+# `kredi_hareketleri.tur` — defter satırının türü (Faz 3 / 1, göç `0007_kredi`;
+# belge §1). `miktar` İMZALI: `rezerv` negatif (sıraya girerken tahmin düşer),
+# `onay` pozitif ya da 0 (gerçek < tahmin farkı geri gelir; "onaylandı" izi
+# fark 0 olsa da yazılır), `iade` pozitif (rezervin tamamı), `hibe` pozitif,
+# `duzeltme` her iki yön (admin), `sona_erme` negatif (Faz 3'te CHECK'te var,
+# yazan yok — K6 "hibeye tamamla" sona erme satırı gerektirmiyor; Faz 4'ün
+# paketleri yazar). `paket`/`satin_alma` Faz 4'te GÖÇLE eklenir: küme CHECK'te
+# kilitli (Faz 1 / 2'nin `text + CHECK` kararı), sessiz yeni tür yok — Faz 4
+# bu adları ve `idempotency_anahtari` biçimlerini (`rezerv:<is_id>` …) okuyacak.
+HAREKET_TURLERI: tuple[str, ...] = ("hibe", "rezerv", "onay", "iade", "duzeltme", "sona_erme")
+
+# `kullanicilar.plan` — üç plan, kodda katalog (Faz 3 / 3 `services/planlar.py`
+# bu kümeye bağlanır; K5: DB tablosu Faz 4'te ödeme gelince). Öntanımlı `free`:
+# göç mevcut kullanıcıları dokunmadan ücretsiz plana koyar.
+PLANLAR_KUMESI: tuple[str, ...] = ("free", "temel", "pro")
+
+# Dokuz iş tablosu — belgenin envanteriyle birebir; bekçi test bu kümenin her
 # üyesinde `kullanici_id` + FK + indeks arar ve kümenin belgeyle eşit olduğunu
 # sınar. Hesap tabloları burada DEĞİL: onlarda sahiplik sütunu ya yok
 # (`kullanicilar`, `giris_denemeleri`) ya da anlamı başka (`oturumlar`).
 # `isciler` de DEĞİL (Faz 2 / 1): işçi süreci bir kullanıcının değil
 # platformun — satırında `kullanici_id` yok, kiracı süzgeci anlamsız.
+# `kredi_hareketleri` (Faz 3 / 1) İÇİNDE: `kullanici_id` taşıyor, iş tablosu —
+# ama `kullanicilar.bakiye` önbelleği hesap tablosunda, politikasız (belge §1 "Risk").
 IS_TABLOLARI: tuple[str, ...] = (
     "medya", "klasorler", "sohbetler", "paletler", "varliklar",
-    "tercihler", "saglayici_kimlikleri", "isler",
+    "tercihler", "saglayici_kimlikleri", "isler", "kredi_hareketleri",
 )
 
 ADLANDIRMA = {
@@ -234,6 +259,7 @@ class Kullanici(Base):
     __tablename__ = "kullanicilar"
     __table_args__ = (
         CheckConstraint("dil IN " + _sql_kumesi(models.ALLOWED_LANGUAGES), name="dil_kumesi"),
+        CheckConstraint("plan IN " + _sql_kumesi(PLANLAR_KUMESI), name="plan_kumesi"),
     )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
@@ -246,6 +272,18 @@ class Kullanici(Base):
     # öntanımlısı (`KROMIS_GUNLUK_KREDI_TAVANI`, services/kota.py); dolu değer bu
     # kullanıcıya özel tavan — admin 8. görevde yazar, bugün yalnız okunur.
     gunluk_kredi_tavani: Mapped[int | None] = mapped_column(Integer)
+    # KREDİ BAKİYESİ — ÖNBELLEK (Faz 3 / 1, göç `0007_kredi`, K1): kaynak gerçek
+    # `SUM(kredi_hareketleri.miktar)`. Tek yazarı `services/defter.py` (AST bekçisi
+    # tests/test_defter.py: başka modül `kullanicilar.bakiye`ye UPDATE kuramaz);
+    # düşüm atomik `UPDATE … SET bakiye = bakiye - :m WHERE bakiye >= :m`, yarış
+    # Postgres'in satır kilidinde. Hesap tablosunda ve politikasız: işçi admin
+    # bağlamında (bayat iade, aylık hibe) ve rota kullanıcı bağlamında yazar,
+    # ikisine de RLS engel olmasın. `defter.tutarlilik` SUM ile karşılaştırır,
+    # sapma günlüğe düşer (sessiz yanılma yok). Eksiye yalnız admin `duzelt` ile iner.
+    bakiye: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    # Plan (`PLANLAR_KUMESI`, CHECK'te): 3. görev okur (`model_available(plan)`,
+    # aylık hibe miktarı, filigran kararı); bugün yalnız `free` yazılıyor (öntanımlı).
+    plan: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'free'"))
     olusturuldu: Mapped[dt.datetime] = _olusturuldu()
     guncellendi: Mapped[dt.datetime] = _guncellendi()
     silindi_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
@@ -391,6 +429,13 @@ class Medya(Base):
     # değil — kısmi UNIQUE `(arena_id) WHERE arena_win` içe aktarılan eski
     # verideki olası çift işareti reddedip 8. görevin aracını durdururdu.
     arena_win: Mapped[bool | None] = mapped_column(Boolean)
+    # FİLİGRAN (Faz 3 / 1 göçü, 4. görev yazar): ücretsiz planın görseli işçide
+    # `_uret` → `_yaz` arasında filigranlanır ve satır bunu bilir (K7: tek nesne,
+    # ham kopya yok). NOT NULL DEFAULT false: göçten önceki her kayıt filigransız,
+    # bu bir olgu — koşullu alanların NULL disiplini burada geçerli değil.
+    # `_json`a yalnız `true` iken dökülür (4. görev: `arena_win`in koşullu deseni;
+    # galeri kartı rozeti kayıttan okur, ayrı bir uç yok).
+    filigranli: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     olusturuldu: Mapped[dt.datetime] = _olusturuldu()
 
 
@@ -559,6 +604,17 @@ class Is(Base):
     kredi_tahmini: Mapped[int] = mapped_column(Integer, nullable=False)
     # Hangi anahtarla koşacak/koştu (`ANAHTAR_KAYNAKLARI`); NULL yalnız eski satırlarda.
     anahtar_kaynagi: Mapped[str | None] = mapped_column(Text)
+    # FAZ 3 (göç `0007_kredi`, üçü de NULL = henüz yazılmadı / göç öncesi satır):
+    # `kredi_gercek` işin GERÇEK kredisi (Σ `medya.credits`; 2. görev `bitir`le
+    # aynı commit'te yazar, `defter.onayla` farkı iade eder) — `kredi_tahmini` üst
+    # sınır, bu gerçek; ikisinin farkı 5. görevin marj raporu. `saglayici_meta`
+    # sağlayıcının yanıtından ContextVar yan kanalıyla (K8) toplanan ham alanlar
+    # (`usage`, `request_id` …), `saglayici_maliyet_usd` ondan türetilen USD
+    # (`numeric(10,6)`: 0,000001 USD çözünürlük — görsel başına milyonda bir
+    # dolar mertebesindeki fiyatlar tam sayı kalsın, float yuvarlaması olmasın).
+    kredi_gercek: Mapped[int | None] = mapped_column(Integer)
+    saglayici_meta: Mapped[dict[str, object] | None] = mapped_column(pg.JSONB)
+    saglayici_maliyet_usd: Mapped[Decimal | None] = mapped_column(Numeric(10, 6))
     isci_id: Mapped[uuid.UUID | None] = mapped_column(pg.UUID(as_uuid=True))
     olusturuldu: Mapped[dt.datetime] = _olusturuldu()
     basladi: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
@@ -585,3 +641,49 @@ class Isci(Base):
     son_kalp: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False,
                                                   server_default=text("now()"))
     es_zamanli: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+# ─────────────────────────────────────────────────────────── defter (Faz 3 / 1)
+
+class KrediHareketi(Base):
+    """Kredi defterinin bir satırı — APPEND-ONLY, `kullanicilar.bakiye` bunun toplamının önbelleği (K1).
+
+    Tek tablo, çift kayıt DEĞİL: tek hesap türü var (kullanıcının kredisi),
+    karşı ayak "platform" her satırda aynı bilgiyi taşırdı; Faz 4'ün ödeme
+    mutabakatı gelince karşı hesap sütunu eklenir, satırlar kalır (belge §1
+    "Defter biçimi"). Yazarı yalnız `services/defter.py` (rota ve işçi `db.add`
+    YAPMAZ — AST bekçisi tests/test_defter.py).
+
+    `is_id` FK `isler` **SET NULL**: saklama süresi dolan iş silinir
+    (`kuyruk.eskileri_sil`, Faz 2 / 10), para izi işten uzun yaşar. `kullanici_id`
+    CASCADE: hesap silinirse defteri de gider (KVKK Faz 4'te yeniden bakar).
+    `admin_id` yalnız `duzeltme` satırında (kim düzeltti), SET NULL — admin
+    hesabı silinse iz kalır. `idempotency_anahtari` UNIQUE: aynı işin rezervi/
+    onayı/iadesi ikinci kez YAZILAMAZ (`INSERT … ON CONFLICT DO NOTHING`);
+    biçimler `rezerv:<is_id>`, `onay:<is_id>`, `iade:<is_id>`, `hibe:<u>:<YYYY-MM>`,
+    `duzeltme:<uuid4>` — Faz 4 webhook event id'sini aynı sütuna yazar.
+
+    İki indeks iki soru: `(kullanici_id, olusturuldu)` hareket listesi (`medya`nın
+    deseni), `(is_id)` "bu işin rezervi var mı" (`defter.onayla`/`iade`).
+    RLS: `IS_TABLOLARI`da, üç politika + yalnız bu tabloda `yonetici_ekler`
+    INSERT (K4: admin düzeltmesi ve işçinin admin bağlamlı bakım turu yazar);
+    DELETE kimseye yok.
+    """
+    __tablename__ = "kredi_hareketleri"
+    __table_args__ = (
+        CheckConstraint("tur IN " + _sql_kumesi(HAREKET_TURLERI), name="tur_kumesi"),
+        _sahip_indeksi("kredi_hareketleri"),
+        Index("ix_kredi_hareketleri_is", "is_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    kullanici_id: Mapped[uuid.UUID] = _kullanici_fk()
+    is_id: Mapped[uuid.UUID | None] = mapped_column(
+        pg.UUID(as_uuid=True), ForeignKey("isler.id", ondelete="SET NULL"))
+    tur: Mapped[str] = mapped_column(Text, nullable=False)
+    miktar: Mapped[int] = mapped_column(Integer, nullable=False)
+    aciklama: Mapped[str | None] = mapped_column(Text)
+    admin_id: Mapped[uuid.UUID | None] = mapped_column(
+        pg.UUID(as_uuid=True), ForeignKey("kullanicilar.id", ondelete="SET NULL"))
+    idempotency_anahtari: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    olusturuldu: Mapped[dt.datetime] = _olusturuldu()

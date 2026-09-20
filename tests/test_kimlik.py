@@ -66,6 +66,9 @@ ADMIN_ROTALAR = {
     ("POST", "/api/admin/kullanicilar/{kullanici_id}/tavan"),
     ("POST", "/api/admin/kullanicilar/{kullanici_id}/oturum-dusur"),
     ("POST", "/api/admin/isler/{is_id}/iptal"),
+    # Faz 3 / 3: plan yazımı ve kredi düzeltmesi (7 → 9).
+    ("POST", "/api/admin/kullanicilar/{kullanici_id}/plan"),
+    ("POST", "/api/admin/kullanicilar/{kullanici_id}/kredi"),
 }
 
 # Kapılı ama DİZİN OKUMAYAN rotalar — kapıyı `ayar.ayarlar` üzerinden değil doğrudan
@@ -180,8 +183,9 @@ def test_every_route_is_either_gated_or_openly_listed_with_a_reason():
         f"kapısız ama listede olmayan: {sorted(ACIK - set(ACIK_ROTALAR))}; "
         f"listede ama kapılı: {sorted(set(ACIK_ROTALAR) - ACIK)}")
     assert all(gerekce.strip() for gerekce in ACIK_ROTALAR.values())
-    # +3 iş rotası (Faz 2 / 4), +2 (Faz 2 / 5), +8 (Faz 2 / 8: `/admin`, 6 `/api/admin/*`, `/api/kota`)
-    assert len(KAPILI) == 60 and len(ACIK) == 7 and len(KAPILI | ACIK) == 67, (
+    # +3 iş rotası (Faz 2 / 4), +2 (Faz 2 / 5), +8 (Faz 2 / 8: `/admin`, 6 `/api/admin/*`, `/api/kota`),
+    # +2 (Faz 3 / 3: `/api/admin/kullanicilar/{id}/plan`, `…/kredi`)
+    assert len(KAPILI) == 62 and len(ACIK) == 7 and len(KAPILI | ACIK) == 69, (
         "rota sayısı ya da kapı sayısı değişti — bilinçliyse belgeyi ve bu sayıları güncelle")
 
 

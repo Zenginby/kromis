@@ -47,6 +47,7 @@ tools/surum_karari.py
 tools/surum_yaz.py
 tools/make_legacy_fixtures.py
 tools/make_logo_goldens.py
+tools/make_filigran.py
 tools/render_brand_assets.py
 node_modules
 package.json

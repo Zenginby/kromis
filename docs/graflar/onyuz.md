@@ -75,7 +75,7 @@ flowchart LR
 | `static/assets.js` | 586 | 25 | `/api/assets/{}`, `/api/assets/{}/{}`, `/api/banner`, `/api/banner/preview`, `/api/logo`, `/api/logo/preview`, `/assets/banners/{}`, `/assets/logos/{}`, `/assets/mottos/{}`, `/assets/{}/{}`, `/output/{}` |
 | `static/chat.js` | 2773 | 90 | `/api/arena/{}`, `/api/arena/{}/winner`, `/api/chat`, `/api/chats`, `/api/chats/{}`, `/api/prefs`, `/output/{}.${videoMu ` |
 | `static/core.js` | 3260 | 91 | `/api/edit`, `/api/generate`, `/api/image/{}`, `/api/output/{}/download`, `/api/prefs`, `/api/video`, `/api/video/animate`, `/output/`, `/output/{}`, `/output/{}.png` |
-| `static/folders.js` | 2172 | 60 | `/api/folders`, `/api/folders/{}`, `/api/folders/{}/download`, `/api/history`, `/api/images`, `/api/import`, `/output/{}`, `/output/{}${videoMu ` |
+| `static/folders.js` | 2182 | 60 | `/api/folders`, `/api/folders/{}`, `/api/folders/{}/download`, `/api/history`, `/api/images`, `/api/import`, `/output/{}`, `/output/{}${videoMu ` |
 | `static/giris.js` | 189 | 0 | `/api/hesap/ben`, `/api/hesap/dogrula`, `/api/hesap/giris`, `/api/hesap/kayit`, `/api/hesap/sifirla`, `/api/hesap/sifirla/dogrula` |
 | `static/i18n.js` | 84 | 2 | — |
 | `static/isler.js` | 573 | 1 | `/api/hesap/ben`, `/api/history`, `/api/isler`, `/api/isler/akis`, `/api/isler/{}/iptal`, `/api/isler/{}/yeniden`, `/api/kota`, `/output/{}${videoMu ` |

@@ -600,6 +600,11 @@ GERCEK_KIMLIK = "gercek_kimlik"
 # tests/test_kimlik.py (iki kullanıcı, iki anahtar).
 GERCEK_ANAHTAR = "gercek_anahtar"
 
+# İşçinin filigranını (services/filigran.py, Faz 3 / 4) GERÇEKTEN sınayan dosyalar
+# için işaret — aşağıdaki `_filigran_yamasi` bunu görünce `uygula`yı yamalamaz:
+# tests/test_filigran.py ve tests/test_isci.py'nin filigran testleri.
+GERCEK_FILIGRAN = "gercek_filigran"
+
 TEST_KULLANICISI_EPOSTA = "test@example.com"
 
 
@@ -777,6 +782,34 @@ def _anahtar_kapisi(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPa
         return
     from services import kapilar
     monkeypatch.setattr(kapilar, "check_anahtar", lambda *a, **k: "kullanici")
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _filigran_yamasi(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch):
+    """Her test "filigran bindirme kimliktir" öncülüyle koşar (Faz 3 / 4) — `filigran.uygula` yamalı.
+
+    NEDEN VAR: 4. görev işçiye `_uret` → `_yaz` arasında ücretsiz planın
+    görselini filigranlama adımını koydu ve conftest'in test kullanıcısı
+    ÜCRETSİZ (sütunun `server_default`ı; `plan_pro`nun gerekçesi). İşçiyi
+    koşturan dosyalar (tests/test_isci.py, tests/test_isler_route.py, E2E
+    `test_playwright_isler.py`) sağlayıcıyı 24 baytlık sahte bir "PNG" ile
+    yamalıyor (`b"\x89PNG\r\n\x1a\n" + …`) ve depoya yazılanı o baytla
+    karşılaştırıyor: gerçek `uygula` o baytı görsel diye açamaz
+    (`GorselIslenemedi`) ve 40'tan çok test kırmızıya dönerdi. `kullanici` /
+    `_anahtar_kapisi` yamalarının ikizi: yaygın çağrı yerleri değişmeden
+    geçer, adımın KENDİSİNİ ölçen dosyalar `@pytest.mark.gercek_filigran`
+    ile yamasız koşar ve gerçek bir PNG verir.
+
+    Yama İŞLEVİ değil KARARI bırakıyor: `_filigranlanir` gerçek koşar, yani
+    ücretsiz kullanıcının kaydı bu yamayla da `filigranli=True` taşır —
+    plan/tür kararı her işçi testinde ölçülü kalır, yalnız piksel işi atlanır.
+    """
+    if request.node.get_closest_marker(GERCEK_FILIGRAN):
+        yield
+        return
+    from services import filigran
+    monkeypatch.setattr(filigran, "uygula", lambda png, **k: png)
     yield
 
 

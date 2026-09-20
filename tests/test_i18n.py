@@ -799,6 +799,9 @@ KULLANICIYA_KONUSMAYAN = {
     "services/planlar.py": "plan kataloğu (Faz 3 / 3, K5): üç `Plan` sabiti ve `kapsiyor` bool'u; 403 "
                            "gövdesini `kapilar.check_plan` (kod), rozeti ön yüz `sebep` alanından kurar; tek "
                            "metni OPERATÖRE giden `KROMIS_FREE_AYLIK_HIBE` `ValueError`ı",
+    "services/filigran.py": "filigran bindirme (Faz 3 / 4, K7): bayt → bayt; istisnaları (`FiligranDosyasiYok`, "
+                            "`GorselIslenemedi`) işçi `hata` sütununa TÜR ADIYLA kod olarak yazar, cümleyi ön yüz "
+                            "kurar; `to_png`ün 422 gövdesi taşınmaz, yalnız sınıfı",
     "isci.py": "işçi sürecinin bileşim kökü (Faz 2 / 3): kapılar, iş parçacıkları, kalp "
                "atışı, SIGTERM; çıktısı stdout'a ASCII, OPERATÖRE — işin metni services/isci.py'de",
 }

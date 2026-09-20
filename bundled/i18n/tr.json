@@ -595,6 +595,7 @@
   "media.action_play": "oynat",
   "media.action_select": "seç",
   "media.badge_imported": "içe aktarıldı",
+  "media.badge_watermarked": "filigranlı",
   "media.clear_selection": "Seçimi temizle",
   "media.delete_body": "Seçili {adet} görsel diskten kalıcı olarak silinecek. Bu işlem geri alınamaz.",
   "media.delete_image": "Görseli sil",

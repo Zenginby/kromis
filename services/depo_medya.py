@@ -105,6 +105,12 @@ def _json(m: Medya) -> dict:
     kayit["credits"] = m.credits
     if m.arena_win:
         kayit["arena_win"] = True
+    # FİLİGRAN (Faz 3 / 4): sütun NOT NULL ama döküm `arena_win` gibi KOŞULLU —
+    # yalnız `true` yazılır. Eski kayıtların ve içe aktarmanın hepsi `false`;
+    # her kayda `"filigranli": false` eklemek eski-biçim bekçisinin alan kümesini
+    # şişirir, ön yüz ise yalnız `true`da rozet çizer (`static/folders.js`).
+    if m.filigranli:
+        kayit["filigranli"] = True
     return kayit
 
 
@@ -127,7 +133,11 @@ def kaydet(db: Session, kullanici_id: uuid.UUID, veri: bytes, meta: dict, output
     `meta` → sütun eşlemesi `storage.save`in kurallarıyla birebir (gerekçeleri
     orada, burada yinelenmiyor): uzantı `kind`dan türetilir; `model` alanı
     GÖNDERİLDİYSE değeri onun sözü (boş dize dâhil), gönderilmediyse günün
-    varsayılanı; `credits` yoksa 0; koşullu alanlar boşsa NULL.
+    varsayılanı; `credits` yoksa 0; koşullu alanlar boşsa NULL. `filigranli`
+    (Faz 3 / 4) yalnız işçi gönderir; yoksa `false` — rotaların yazdığı hiçbir
+    kayıt filigranlı değil. Uzantı değişmez: görsel her zaman `.png`
+    (`ext_for`), filigran da PNG döner — sağlayıcının JPEG'i zaten `.png` adıyla
+    yazılıyordu, işçi artık gerçekten PNG yazıyor.
 
     Kimlik `uuid4().hex` (32 hane) — belge §2: `_SAFE_ID` 8-32 kabul ediyor,
     içe aktarılan eski kayıtlar 12 haneli kimliklerini korur, yeni satırlar
@@ -158,6 +168,7 @@ def kaydet(db: Session, kullanici_id: uuid.UUID, veri: bytes, meta: dict, output
         duration=int(meta["duration"]) if meta.get("duration") else None,
         model=(str(meta["model"] or "") if "model" in meta else catalog.DEFAULT_IMAGE_MODEL),
         credits=int(meta.get("credits") or 0),
+        filigranli=bool(meta.get("filigranli")),
         olusturuldu=an,
     )
     db.add(satir)

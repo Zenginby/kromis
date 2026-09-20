@@ -2,7 +2,7 @@
 
 # Test haritası
 
-`tests/` altında 138 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
+`tests/` altında 139 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
 
 | modül | testler |
 | --- | --- |
@@ -19,7 +19,7 @@
 | `chat_providers` | `test_chat_providers.py`, `test_provider_logos.py` |
 | `chat_store` | `test_chat_store.py`, `test_galeri_db.py`, `test_ice_aktar.py`, `test_sohbet_db.py`, `test_tablolar.py` |
 | `color_names` | `test_color_names.py`, `test_legacy_formats.py`, `test_palette_route.py` |
-| `composite` | `test_composite.py` |
+| `composite` | `test_composite.py`, `test_filigran.py` |
 | `credstore` | `test_credstore.py`, `test_kimlik_bilgisi_db.py`, `test_playwright_dil.py`, `test_playwright_studio.py`, `test_prefs.py`, `test_settings_route.py` |
 | `desktop` | `test_desktop.py`, `test_windows_acilis.py` |
 | `errlog` | `test_errlog.py`, `test_platform_anahtari.py` |
@@ -68,7 +68,8 @@
 | `services.depo_varlik` | `test_artik_dosya.py`, `test_banner.py`, `test_folders.py`, `test_legacy_formats.py`, `test_logo.py`, `test_palette_route.py`, `test_playwright_studio.py`, `test_varlik_db.py` |
 | `services.dil` | `test_dil.py`, `test_gunluk.py`, `test_i18n.py`, `test_isci.py`, `test_koken.py` |
 | `services.dosya` | `test_artik_dosya.py`, `test_docker_kapisi.py`, `test_dosya.py`, `test_dosya_rotalari.py`, `test_gunluk.py`, `test_isci.py`, `test_medya_tasi.py`, `test_rls.py` |
-| `services.gorsel` | `test_edit_route.py`, `test_model_secimi.py`, `test_video_route.py` |
+| `services.filigran` | `test_docker_kapisi.py`, `test_filigran.py`, `test_isci.py` |
+| `services.gorsel` | `test_edit_route.py`, `test_filigran.py`, `test_model_secimi.py`, `test_video_route.py` |
 | `services.gunluk` | `test_admin.py`, `test_docker_kapisi.py`, `test_gunluk.py`, `test_planlar.py` |
 | `services.hata_izleme` | `test_docker_kapisi.py`, `test_sentry.py` |
 | `services.hesap` | `test_admin.py`, `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_defter.py`, `test_dosya_rotalari.py`, `test_galeri_db.py`, `test_hesap.py`, `test_ice_aktar.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik.py`, `test_kimlik_bilgisi_db.py`, `test_kullanici_cli.py`, `test_kuyruk.py`, `test_palet_db.py`, `test_playwright_hesap.py`, `test_rls.py`, `test_sohbet_db.py`, `test_tercih_db.py`, `test_varlik_db.py` |
@@ -99,6 +100,7 @@
 | `tools.graf_uret` | `test_app_bolme.py`, `test_graflar.py`, `test_onyuz_lint_kapisi.py` |
 | `tools.ice_aktar` | `test_ice_aktar.py` |
 | `tools.kullanici` | `test_kullanici_cli.py` |
+| `tools.make_filigran` | — |
 | `tools.make_legacy_fixtures` | — |
 | `tools.make_logo_goldens` | — |
 | `tools.medya_tasi` | `test_medya_tasi.py` |
@@ -121,13 +123,14 @@ Bu modülleri hiçbir test dosyası ithal etmiyor. Dolaylı olarak sınanıyor o
 * `routers.admin` (192 satır)
 * `routers.ayarlar` (403 satır)
 * `routers.bindirme` (282 satır)
-* `routers.galeri` (397 satır)
+* `routers.galeri` (401 satır)
 * `routers.kok` (40 satır)
 * `routers.paletler` (101 satır)
 * `routers.sohbet` (241 satır)
 * `routers.uretim` (548 satır)
 * `services.redaksiyon` (68 satır)
 * `services.sablon` (68 satır)
+* `tools.make_filigran` (103 satır)
 * `tools.make_legacy_fixtures` (211 satır)
 * `tools.make_logo_goldens` (110 satır)
 * `tools.render_brand_assets` (115 satır)

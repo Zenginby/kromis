@@ -433,7 +433,8 @@ class Medya(Base):
     # `_uret` → `_yaz` arasında filigranlanır ve satır bunu bilir (K7: tek nesne,
     # ham kopya yok). NOT NULL DEFAULT false: göçten önceki her kayıt filigransız,
     # bu bir olgu — koşullu alanların NULL disiplini burada geçerli değil.
-    # `_json`a DÖKÜLMEZ (6. görev karar verir: rozet `GET /api/kredi`den mi, kayıttan mı).
+    # `_json`a yalnız `true` iken dökülür (4. görev: `arena_win`in koşullu deseni;
+    # galeri kartı rozeti kayıttan okur, ayrı bir uç yok).
     filigranli: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     olusturuldu: Mapped[dt.datetime] = _olusturuldu()
 

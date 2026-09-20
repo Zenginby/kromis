@@ -2025,6 +2025,16 @@ function renderGallery() {
         : "video";
       card.appendChild(badge);
     }
+    // FİLİGRAN ROZETİ (Faz 3 / 4): ücretsiz planın görseli işçide filigranlandı,
+    // `/api/history` kaydı `filigranli: true` taşıyor (yalnız true'da var). Aynı
+    // desen, aynı yer. Ötekilerle ÇAKIŞMAZ: içe aktarılan kayıt işçiden geçmez,
+    // video hiç filigranlanmaz (K7) — üç rozetten en çok biri çizilir.
+    if (rec.filigranli && !selectMode) {
+      const badge = document.createElement("span");
+      badge.className = "card-badge";
+      badge.textContent = t("media.badge_watermarked");
+      card.appendChild(badge);
+    }
     // Arama sonucu kartı hangi klasörden geldiğini söyler (§4.1 künye kuralı):
     // sonuçlar tüm klasörlerden geliyor, adsız iki varyant ayırt edilemez.
     // Sol ALT köşede — sol üst card-check/card-badge'in, sağ alt .acts'ın.

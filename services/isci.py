@@ -158,6 +158,7 @@ from services import (
     depo_medya,
     dil,
     dosya,
+    filigran,
     gunluk,
     hata_izleme,
     kiraci,
@@ -166,6 +167,7 @@ from services import (
     zaman,
 )
 from services.nesne_depo import Nesne
+from services.planlar import PLAN_VARSAYILAN, PLANLAR
 from services.tablolar import (
     IS_TURLERI,
     Is,
@@ -382,8 +384,8 @@ def _uret(is_: Is, depo: dosya.Depo) -> list[bytes]:
     raise ValueError(f"bilinmeyen is turu: {is_.tur!r} (beklenen: {IS_TURLERI})")
 
 
-def _meta(is_: Is, kredi: int) -> dict[str, Any]:
-    """`depo_medya.kaydet`in `meta`sı — rotaların bugün yazdığı alanlar, aynı kurallarla."""
+def _meta(is_: Is, kredi: int, filigranli: bool = False) -> dict[str, Any]:
+    """`depo_medya.kaydet`in `meta`sı — rotaların bugün yazdığı alanlar, aynı kurallarla (+ `filigranli`, Faz 3 / 4)."""
     istek = _istek(is_)
     pal = istek.get("palette")
     gonderilen = istek.get("prompt_sent")
@@ -393,6 +395,8 @@ def _meta(is_: Is, kredi: int) -> dict[str, Any]:
         "palette": pal, "session_id": istek.get("session_id"),
         "arena_id": istek.get("arena_id"),
         "model": is_.model, "credits": kredi,
+        # Rotalar bu alanı yazmaz (içe aktarma, bindirme uçları filigransız): yalnız işçi bilir.
+        "filigranli": filigranli,
         # Ek düştüyse metin prompt'un birebir aynısı; storage sözleşmesi "yalnızca farklıysa".
         "prompt_sent": gonderilen if (pal and isinstance(pal, Mapping) and pal.get("applied")) else None,
     }
@@ -400,6 +404,24 @@ def _meta(is_: Is, kredi: int) -> dict[str, Any]:
         meta["kind"] = "video"
         meta["duration"] = istek["duration"]
     return meta
+
+
+def _filigranlanir(is_: Is, plan: str) -> bool:
+    """Bu işin sonucu filigranlanır mı: planın `filigran`ı açık VE tür görsel (Faz 3 / 4, K7).
+
+    `kind` KATALOGDAN (`_kredi`nin `spec`i), iş türünden değil — belge §4'ün
+    kuralı "spec.kind == image". Katalogdan düşmüş bir model için spec None:
+    o iş zaten `_uret`te `ImageError` ile düşer, buraya gelmez; yine de tür
+    kümesine düşülür ki karar hiç `None`a bakmasın. Plan CHECK'ten geliyor —
+    tanınmayan ad KeyError, sessiz "filigransız" değil (`planlar.kapsiyor`un duruşu).
+    """
+    if not PLANLAR[plan].filigran:
+        return False
+    if is_.tur in ("video", "animate"):
+        spec: catalog.ImageModel | None = catalog.video_model(is_.model)
+        return spec.kind == "image" if spec else False
+    spec = catalog.image_model(is_.model)
+    return spec.kind == "image" if spec else True
 
 
 def _kredi(is_: Is) -> int:
@@ -434,11 +456,11 @@ def _dusur(oturum_ac: Callable[[], Session], is_id: uuid.UUID, metin: str, an: d
 
 
 def _yaz(is_: Is, sonuclar: list[bytes], oturum_ac: Callable[[], Session], depo: dosya.Depo,
-         ayarlar: ayar.Ayarlar, an: dt.datetime) -> bool:
+         ayarlar: ayar.Ayarlar, an: dt.datetime, *, filigranli: bool = False) -> bool:
     """Nesne → satır → `bitir` → tek commit; düşerse nesneler silinir ve iş `hata`."""
     izi = _YazimIzi(depo)
     output_dir = ayarlar.kullanici_icin(is_.kullanici_id).output_dir
-    meta = _meta(is_, _kredi(is_))
+    meta = _meta(is_, _kredi(is_), filigranli)
     try:
         with oturum_ac() as db:
             kayitlar = [depo_medya.kaydet(db, is_.kullanici_id, veri, dict(meta), output_dir,
@@ -522,6 +544,9 @@ def _kos(is_: Is, oturum_ac: Callable[[], Session], depo: dosya.Depo, ayarlar: a
         # Değerler oturum KAPANMADAN kopyalanıyor: kapanış nesneyi ayırır ve
         # süresi geçmiş bir öznitelik okuması `DetachedInstanceError` olurdu.
         dil_kodu = kullanici.dil if kullanici is not None else None
+        # Plan da burada okunur (`kullanicilar.plan`, `kos` işi alırken — belge §4):
+        # filigran kararı sağlayıcı çağrısından SONRA veriliyor ama o sırada oturum yok.
+        plan = kullanici.plan if kullanici is not None else PLAN_VARSAYILAN
         # Platform anahtarıyla TAMAMLANMIŞ sözlük (Faz 2 / 6): rota `anahtar_kaynagi`ni
         # sıraya alırken yazdı, işçi aynı çözüm sırasıyla (kullanıcı → platform) koşar.
         kimlikler, _ = (platform_anahtari.birlestir(depo_kimlik_bilgisi.oku(db, is_.kullanici_id))
@@ -535,6 +560,13 @@ def _kos(is_: Is, oturum_ac: Callable[[], Session], depo: dosya.Depo, ayarlar: a
     try:
         try:
             sonuclar = _uret(is_, depo)
+            # FİLİGRAN (Faz 3 / 4, K7): `_uret` → `_yaz` arası, TEK yer, yalnız görsel,
+            # yalnız planı isteyen (ücretsiz). `_uret` ve adaptörler değişmez; işaret
+            # dosyası yoksa `FiligranDosyasiYok` aşağıdaki genel dala düşer — iş `hata`,
+            # rezerv iade; SESSİZ filigransız yazım yok (services/filigran.py'nin gerekçesi).
+            filigranli = _filigranlanir(is_, plan)
+            if filigranli:
+                sonuclar = [filigran.uygula(b) for b in sonuclar]
         except ac.ImageError as e:
             # Redaksiyon `kuyruk.dusur`da (yazan yerde).
             _dusur(oturum_ac, is_.id, str(e), bitis(), ayarlar.data_dir)
@@ -549,7 +581,7 @@ def _kos(is_: Is, oturum_ac: Callable[[], Session], depo: dosya.Depo, ayarlar: a
             _dusur(oturum_ac, is_.id, f"{BEKLENMEYEN_HATASI}: {type(e).__name__}", bitis(),
                    ayarlar.data_dir)
             return False
-        return _yaz(is_, sonuclar, oturum_ac, depo, ayarlar, bitis())
+        return _yaz(is_, sonuclar, oturum_ac, depo, ayarlar, bitis(), filigranli=filigranli)
     finally:
         # HER yolda: bir sonraki işin sahibi başka biri.
         kimlik_baglami.coz(jeton)

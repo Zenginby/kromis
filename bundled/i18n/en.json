@@ -595,6 +595,7 @@
   "media.action_play": "play",
   "media.action_select": "select",
   "media.badge_imported": "imported",
+  "media.badge_watermarked": "watermarked",
   "media.clear_selection": "Clear the selection",
   "media.delete_body": "The {adet} selected images will be permanently removed from disk. This cannot be undone.",
   "media.delete_image": "Delete the image",

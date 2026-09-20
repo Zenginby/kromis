@@ -65,6 +65,7 @@ from services import (
     depo_medya,
     dil,
     dosya,
+    filigran,
     hesap,
     isci,
     kiraci,
@@ -79,6 +80,21 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PNG = b"\x89PNG\r\n\x1a\n" + bytes(range(16))
 PNG2 = b"\x89PNG\r\n\x1a\n" + bytes(range(16, 32))
 MP4 = b"\x00\x00\x00\x20ftypmp42" + bytes(8)
+
+
+def _gercek_png(renk: tuple[int, int, int] = (30, 30, 30)) -> bytes:
+    """AÇILABİLİR bir PNG (64×64): filigranın gerçek koştuğu yerler için — sahte `PNG` görsel diye açılamaz.
+
+    Süreç testleri (v) de bunu verir: alt süreçte conftest'in `_filigran_yamasi`
+    yok (yorumlayıcı ayrı), ücretsiz test kullanıcısının görseli GERÇEKTEN
+    filigranlanır — yani o testler `isci.py` sürecinde filigran yolunu da ölçer.
+    """
+    import io
+
+    from PIL import Image
+    out = io.BytesIO()
+    Image.new("RGB", (64, 64), renk).save(out, format="PNG")
+    return out.getvalue()
 GORSEL = catalog.DEFAULT_IMAGE_MODEL
 VIDEO = catalog.DEFAULT_VIDEO_MODEL
 ESIK = dt.timedelta(minutes=5)
@@ -660,6 +676,80 @@ def test_a_job_without_a_reserve_finishes_with_its_real_credit_but_touches_no_le
     assert defter.iade(db_oturumu, is_id) is None, "bitmiş/rezervsiz iş iade edilmez"
 
 
+# ── (vii) filigran (Faz 3 / 4, K7) ──────────────────────────────────────
+# Bu testler `gercek_filigran`: conftest'in autouse yaması (`uygula` → kimlik) kurulmaz,
+# sağlayıcı GERÇEK bir PNG verir (`_gercek_png`; 24 baytlık sahte `PNG` görsel diye açılamaz).
+
+@pytest.mark.gercek_filigran
+def test_a_free_users_image_is_watermarked_between_uret_and_yaz_and_the_row_says_so(
+        db_oturumu, kullanici, depo, yerlesim, tmp_path, monkeypatch):
+    """Ücretsiz plan (conftest kullanıcısının öntanımı) + görsel: yazılan nesne sağlayıcının baytı DEĞİL,
+    PNG ve aynı boyutta; `medya.filigranli=True`, `/api/history` dökümünde `filigranli: true`."""
+    import io
+
+    from PIL import Image
+    ham = _gercek_png()
+    monkeypatch.setattr(providers, "generate", lambda *a, **k: [ham])
+    is_id = _ekle(db_oturumu, kullanici.id)
+    assert isci.tek_tur(db_oturumu, depo, ayarlar=yerlesim) is True
+    assert _is(db_oturumu, is_id).durum == "bitti"
+    (m,) = _medya(db_oturumu, kullanici.id)
+    yazilan = (tmp_path / "kullanicilar" / str(kullanici.id) / "output" / m.filename).read_bytes()
+    assert yazilan != ham and yazilan[:8] == b"\x89PNG\r\n\x1a\n"
+    assert Image.open(io.BytesIO(yazilan)).size == (64, 64)
+    assert m.filigranli is True and m.filename == f"{m.id}.png"
+    assert depo_medya.bul(db_oturumu, kullanici.id, m.id)["filigranli"] is True
+
+
+@pytest.mark.gercek_filigran
+@pytest.mark.usefixtures("plan_pro")
+def test_a_pro_users_image_is_the_providers_bytes_untouched_and_the_row_says_not_watermarked(
+        db_oturumu, kullanici, depo, yerlesim, tmp_path, monkeypatch):
+    ham = _gercek_png()
+    monkeypatch.setattr(providers, "generate", lambda *a, **k: [ham])
+    monkeypatch.setattr(filigran, "uygula", lambda *a, **k: pytest.fail("ücretli planda filigran çağrılmaz"))
+    _ekle(db_oturumu, kullanici.id)
+    assert isci.tek_tur(db_oturumu, depo, ayarlar=yerlesim) is True
+    (m,) = _medya(db_oturumu, kullanici.id)
+    assert (tmp_path / "kullanicilar" / str(kullanici.id) / "output" / m.filename).read_bytes() == ham
+    assert m.filigranli is False
+    assert "filigranli" not in depo_medya.bul(db_oturumu, kullanici.id, m.id), "koşullu alan: false dökülmez"
+
+
+@pytest.mark.gercek_filigran
+@pytest.mark.usefixtures("plan_pro")
+def test_a_video_is_never_watermarked_even_on_a_plan_that_asks_for_it(
+        db_oturumu, kullanici, depo, yerlesim, tmp_path, monkeypatch):
+    """K7: filigran yalnız GÖRSEL. Planın `filigran`ı açılsa da (ücretsizde video kapalı, o yüzden
+    `pro` yamalanır) video sağlayıcının baytıyla yazılır ve `filigranli=False`."""
+    from services import planlar
+    monkeypatch.setitem(planlar.PLANLAR, "pro", dataclasses.replace(planlar.PLANLAR["pro"], filigran=True))
+    monkeypatch.setattr(filigran, "uygula", lambda *a, **k: pytest.fail("video filigranlanmaz"))
+    monkeypatch.setattr(providers, "generate_video", lambda *a, **k: [MP4])
+    _ekle(db_oturumu, kullanici.id, "video", {"size": "16:9", "quality": "720p", "duration": 4}, model=VIDEO)
+    assert isci.tek_tur(db_oturumu, depo, ayarlar=yerlesim) is True
+    (m,) = _medya(db_oturumu, kullanici.id)
+    assert (tmp_path / "kullanicilar" / str(kullanici.id) / "output" / m.filename).read_bytes() == MP4
+    assert (m.kind, m.filigranli) == ("video", False)
+
+
+@pytest.mark.gercek_filigran
+def test_a_missing_watermark_asset_fails_the_job_with_a_type_code_and_refunds_the_reserve(
+        db_oturumu, kullanici, depo, yerlesim, tmp_path, monkeypatch):
+    """Sessiz filigransız yazım YOK: dosya yoksa iş `hata` (`beklenmeyen hata: FiligranDosyasiYok`),
+    nesne yazılmaz, rezerv tam iade (`_dusur`)."""
+    _yukle(db_oturumu, kullanici.id)
+    monkeypatch.setenv(filigran.DOSYA_ENV, str(tmp_path / "yok.png"))
+    monkeypatch.setattr(providers, "generate", lambda *a, **k: [_gercek_png()])
+    is_id = _rezerveli(db_oturumu, kullanici.id, tahmin=20)
+    assert isci.tek_tur(db_oturumu, depo, ayarlar=yerlesim) is True
+    is_ = _is(db_oturumu, is_id)
+    assert (is_.durum, is_.hata) == ("hata", f"{isci.BEKLENMEYEN_HATASI}: FiligranDosyasiYok")
+    assert _medya(db_oturumu, kullanici.id) == [] and _nesneler(tmp_path, kullanici.id) == []
+    assert defter.bakiye(db_oturumu, kullanici.id) == 100
+    assert "FiligranDosyasiYok" in (tmp_path / "hata.log").read_text(encoding="utf-8")
+
+
 # ── (iv) bağlam ─────────────────────────────────────────────────────────
 
 def test_the_credential_context_is_bound_per_job_and_unbound_afterwards(
@@ -1073,7 +1163,7 @@ def _yavas_saglayici(tmp_path, saniye: float) -> str:
 
         def _yavas(model_id, prompt, size, quality, n, **k):
             time.sleep({saniye!r})
-            return [{PNG!r}] * n
+            return [{_gercek_png()!r}] * n
 
         providers.generate = _yavas
     """), encoding="utf-8")

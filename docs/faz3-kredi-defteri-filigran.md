@@ -639,7 +639,7 @@ biter, iade satırı görünür.
 
 ---
 
-## 4. Filigran — `services/filigran.py`, işçide `_uret` → `_yaz` arası, `medya.filigranli` (PR: `faz3/filigran`)
+## 4. Filigran — `services/filigran.py`, işçide `_uret` → `_yaz` arası, `medya.filigranli` ✅ (PR: `faz3/filigran`)
 
 **Kapsam.** Ücretsiz planın görseli filigranlı çıkar; yalnız GÖRSEL, yalnız
 İŞÇİDE, TEK nesne (K7).
@@ -705,6 +705,44 @@ sağda; `pro` kullanıcının görseli sağlayıcının verdiği bayt; golden e�
 `bundled/filigran.png` marka-nötr; sahip kendi PNG'sini (şeffaf arka plan,
 ≥ 512 px genişlik) platformun diskine/imajına koyup `KROMIS_FILIGRAN_DOSYASI`
 ile gösterir. Kontrol: ücretsiz test hesabıyla bir görsel, indir, bak.
+
+**Yapıldığında (2026-09-20) ölçümler ve sapmalar.** Rota YOK, göç YOK (0007
+`filigranli`yi taşıyordu). Yeni `services/filigran.py` (`uygula(png, *, dosya,
+kind)`, `FiligranHatasi` → `FiligranDosyasiYok` / `GorselIslenemedi`,
+`DOSYA_ENV`; modül 106 → **108**, ikincisi `tools/make_filigran.py`), yeni
+`bundled/filigran.png` (512², paletli PNG **13 KB**: halka + dört köşeli
+kıvılcım, beyaz dolgu koyu kenar; gerçek renkli hâli 72 KB'tı, ölçüldü),
+`services/isci.py` `_filigranlanir(is_, plan)` + `_uret` → `_yaz` arasında tek
+liste kavrayışı + `plan` okuması (`kullanici.plan`, dil ile aynı pencerede) +
+`_meta(…, filigranli)`; `services/depo_medya.py` `kaydet` → sütun, `_json`
+KOŞULLU (`arena_win` deseni: yalnız `true` dökülür — eski kayıtların hepsi
+`false`, alan kümesi şişmesin); `routers/galeri.py` yalnız docstring (döküm
+`_json`dan geliyor); `static/folders.js` rozet (`media.badge_watermarked`,
+i18n **+1** tr/en), `.env.example` `KROMIS_FILIGRAN_DOSYASI` + `ALTYAPI` +1,
+`.dockerignore` yalnız `tools/make_filigran.py`. **Sapmalar:** (a) golden
+karşılaştırması PİKSEL, bayt değil — `test_composite.py`nin 2026-07-29 arm64
+ölçümü (PNG sıkıştırması platformlar arası yeniden üretilebilir değil), bayt
+eşitliği CI'ın arm64 koşusunda kırmızı olurdu; (b) `composite_logo` **+1 kwarg**
+`keep_alpha=False` (öntanım değişmedi, golden'lar aynen): filigran `True` verir
+ki sağlayıcının şeffaf PNG'si siyah zemin kazanmasın; opaklık 0,6 composite'e
+parametre olarak değil işaretin alfa kanalını ölçekleyerek uygulanıyor (aynı
+matematik, imza dokunulmadı); (c) `gorsel.to_png`ün 422'si işçide HTTP değil —
+`GorselIslenemedi`ye sarılır, iş `beklenmeyen hata: <Tür>` koduyla düşer
+(`test_isci`nin kod-değil-mesaj kararı); (d) testlerde YENİ autouse yama
+`tests/conftest.py::_filigran_yamasi` (`uygula` → kimlik) + işaret
+`gercek_filigran`: işçiyi koşturan 40+ test sağlayıcıyı 24 baytlık sahte
+"PNG" ile yamalıyor ve depoya yazılanı onunla karşılaştırıyor; yama KARARI
+değil piksel işini atlıyor (`_filigranlanir` her testte gerçek koşar,
+ücretsiz kullanıcının satırı `filigranli=True` alır). Süreç testlerinin
+`sitecustomize` sağlayıcısı GERÇEK 64² PNG verir — alt süreçte yama yok,
+`isci.py` süreci filigranı gerçekten koşturur. Uzantı sorusu yok: görsel her
+zaman `.png` (`storage.ext_for`), sağlayıcının JPEG'i eskiden `.png` adıyla
+yazılıyordu, işçi artık gerçekten PNG yazıyor. Testler: yeni
+`tests/test_filigran.py` **13** (belge "~10": golden 3, biçim 3, red 2, dosya 3,
+video 1, opaklık 1), `tests/test_isci.py` **+4** (belge "+3": free/pro/video +
+işaret yok → `hata` + tam iade), `test_docker_kapisi` `bundled/filigran.png`
+bekçisi, `test_i18n` sınıflandırma. Takım **3.908 → 3.928 geçti, 12 atlandı, 294 sn** (E2E + Postgres zorunlu; +20); ruff, mypy,
+eslint ve prettier temiz, graflar güncel.
 
 ---
 

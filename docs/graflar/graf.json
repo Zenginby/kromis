@@ -489,12 +489,14 @@
       ],
       "ithal_eden": [
         "app",
-        "routers.bindirme"
+        "routers.bindirme",
+        "services.filigran"
       ],
       "katman": 3,
-      "satir": 170,
+      "satir": 176,
       "testler": [
-        "tests/test_composite.py"
+        "tests/test_composite.py",
+        "tests/test_filigran.py"
       ],
       "yol": "composite.py"
     },
@@ -1002,7 +1004,8 @@
         "guncelleme",
         "i18n",
         "routers.ayarlar",
-        "services.ayar"
+        "services.ayar",
+        "services.filigran"
       ],
       "katman": 1,
       "satir": 326,
@@ -1215,7 +1218,7 @@
         "app"
       ],
       "katman": 12,
-      "satir": 397,
+      "satir": 401,
       "testler": [],
       "yol": "routers/galeri.py"
     },
@@ -1659,7 +1662,7 @@
         "services.isci"
       ],
       "katman": 6,
-      "satir": 356,
+      "satir": 367,
       "testler": [
         "tests/test_artik_dosya.py",
         "tests/test_chats_route.py",
@@ -1835,6 +1838,27 @@
       "yol": "services/dosya.py"
     },
     {
+      "ad": "services.filigran",
+      "erteli_ithal": [],
+      "ithal": [
+        "composite",
+        "paths",
+        "services.gorsel"
+      ],
+      "ithal_eden": [
+        "services.isci",
+        "tools.make_filigran"
+      ],
+      "katman": 5,
+      "satir": 128,
+      "testler": [
+        "tests/test_docker_kapisi.py",
+        "tests/test_filigran.py",
+        "tests/test_isci.py"
+      ],
+      "yol": "services/filigran.py"
+    },
+    {
       "ad": "services.gorsel",
       "erteli_ithal": [],
       "ithal": [
@@ -1846,12 +1870,14 @@
         "app",
         "routers.bindirme",
         "routers.galeri",
-        "routers.uretim"
+        "routers.uretim",
+        "services.filigran"
       ],
       "katman": 4,
       "satir": 123,
       "testler": [
         "tests/test_edit_route.py",
+        "tests/test_filigran.py",
         "tests/test_model_secimi.py",
         "tests/test_video_route.py"
       ],
@@ -1961,11 +1987,13 @@
         "services.depo_medya",
         "services.dil",
         "services.dosya",
+        "services.filigran",
         "services.gunluk",
         "services.hata_izleme",
         "services.kiraci",
         "services.kuyruk",
         "services.nesne_depo",
+        "services.planlar",
         "services.platform_anahtari",
         "services.tablolar",
         "services.zaman"
@@ -1974,7 +2002,7 @@
         "isci"
       ],
       "katman": 11,
-      "satir": 719,
+      "satir": 751,
       "testler": [
         "tests/test_docker_kapisi.py",
         "tests/test_gunluk.py",
@@ -2270,6 +2298,7 @@
         "routers.admin",
         "routers.hesap",
         "services.defter",
+        "services.isci",
         "services.kapilar",
         "services.modeller"
       ],
@@ -2428,7 +2457,7 @@
         "tools.uygulama_rolu"
       ],
       "katman": 5,
-      "satir": 688,
+      "satir": 689,
       "testler": [
         "tests/test_admin.py",
         "tests/test_anahtar_dondur.py",
@@ -2667,6 +2696,18 @@
         "tests/test_kullanici_cli.py"
       ],
       "yol": "tools/kullanici.py"
+    },
+    {
+      "ad": "tools.make_filigran",
+      "erteli_ithal": [
+        "services.filigran"
+      ],
+      "ithal": [],
+      "ithal_eden": [],
+      "katman": 6,
+      "satir": 103,
+      "testler": [],
+      "yol": "tools/make_filigran.py"
     },
     {
       "ad": "tools.make_legacy_fixtures",
@@ -2971,7 +3012,7 @@
           "/output/{}${videoMu "
         ],
         "dosya": "static/folders.js",
-        "satir": 2172,
+        "satir": 2182,
         "tanim": 60
       },
       {
@@ -3433,7 +3474,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 138,
+  "test_dosyasi_sayisi": 139,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",
@@ -3591,7 +3632,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 185,
+      "satir": 189,
       "yardimci_sayisi": 5,
       "yol": "/api/arena/{arena_id}",
       "yontem": "GET"
@@ -3608,7 +3649,7 @@
       "onyuz": [
         "static/chat.js"
       ],
-      "satir": 201,
+      "satir": 205,
       "yardimci_sayisi": 3,
       "yol": "/api/arena/{arena_id}/winner",
       "yontem": "POST"
@@ -4111,7 +4152,7 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 218,
+      "satir": 222,
       "yardimci_sayisi": 4,
       "yol": "/api/image/{image_id}",
       "yontem": "DELETE"
@@ -4129,7 +4170,7 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 174,
+      "satir": 178,
       "yardimci_sayisi": 7,
       "yol": "/api/image/{image_id}",
       "yontem": "PATCH"
@@ -4146,7 +4187,7 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 242,
+      "satir": 246,
       "yardimci_sayisi": 4,
       "yol": "/api/images",
       "yontem": "DELETE"
@@ -4164,7 +4205,7 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 230,
+      "satir": 234,
       "yardimci_sayisi": 7,
       "yol": "/api/images",
       "yontem": "PATCH"
@@ -4179,7 +4220,7 @@
       "onyuz": [
         "static/folders.js"
       ],
-      "satir": 255,
+      "satir": 259,
       "yardimci_sayisi": 5,
       "yol": "/api/import",
       "yontem": "POST"
@@ -4324,7 +4365,7 @@
       "onyuz": [
         "static/core.js"
       ],
-      "satir": 356,
+      "satir": 360,
       "yardimci_sayisi": 6,
       "yol": "/api/output/{image_id}/download",
       "yontem": "GET"
@@ -4573,7 +4614,7 @@
         "static/isler.js",
         "static/viewer.js"
       ],
-      "satir": 322,
+      "satir": 326,
       "yardimci_sayisi": 3,
       "yol": "/output/{filename}",
       "yontem": "GET"

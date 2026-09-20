@@ -164,7 +164,11 @@ def rename_folder_route(folder_id: str, req: FolderRequest, db: Session = OTURUM
 @router.get("/api/history")
 def history(folder_id: str | None = None, db: Session = OTURUM,
             kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
-    """folder_id yoksa yalnızca klasörsüz görseller (kök), varsa o klasörünkiler."""
+    """folder_id yoksa yalnızca klasörsüz görseller (kök), varsa o klasörünkiler.
+
+    Kayıt `depo_medya._json`ın dökümü; `filigranli: true` (Faz 3 / 4) yalnız
+    işçinin filigranladığı görselde var, galeri kartı ondan rozet çizer.
+    """
     if folder_id:
         kapilar.check_folder(folder_id, db, kullanici.id)
     return {"images": depo_medya.listele(db, kullanici.id, folder_id=folder_id or None)}

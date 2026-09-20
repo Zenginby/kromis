@@ -49,6 +49,7 @@ from services import (
     cerez,
     db,
     dosya,
+    filigran,
     gunluk,
     hata_izleme,
     isci,
@@ -219,6 +220,11 @@ def test_dockerignore_keeps_everything_the_app_serves_or_imports():
     # `bundled/prompts/*.md`yi (Yönetmen personası) yutardı — kök `*.md` yutmaz.
     assert not any(k in ("*.py", "*", "**/*.md", "**/*") for k in _dislananlar())
     assert os.path.exists(os.path.join(KOK, "bundled", "prompts", "prompt-yonetmeni.md"))
+    # `bundled/filigran.png` (Faz 3 / 4): işçi ücretsiz planın görselini bununla
+    # filigranlıyor; imajdan düşerse iş `hata`ya düşer (sessiz filigransız DEĞİL) —
+    # yani kusur ancak ilk ücretsiz üretimde görünürdü. `*.png` gibi bir kalıp da yutardı.
+    assert os.path.exists(os.path.join(KOK, "bundled", "filigran.png"))
+    assert not any(k in ("*.png", "bundled/filigran.png", "bundled/*") for k in _dislananlar())
 
 
 # `medya_tasi` (Faz 2 / 2): yerel medyayı kovaya taşır — konteyner içinden, `/data` birimine bakar.
@@ -287,6 +293,7 @@ ALTYAPI = {"KROMIS_DATA_DIR", "PORT", db.DATABASE_URL_ENV, koken.KOKEN_ENV,
            isci.ES_ZAMANLI_ENV, isci.KALP_ESIGI_ENV, isci.SAKLAMA_ENV, kapilar.ES_ZAMANLI_IS_ENV,
            kota.SAATLIK_IS_ENV, kota.GUNLUK_KREDI_ENV,
            planlar.FREE_AYLIK_HIBE_ENV,   # Faz 3 / 3: ücretsiz planın aylık hibesi
+           filigran.DOSYA_ENV,            # Faz 3 / 4: ücretsiz planın filigran işareti
            gunluk.BICIM_ENV, hata_izleme.DSN_ENV, hata_izleme.ORTAM_ENV}
 
 

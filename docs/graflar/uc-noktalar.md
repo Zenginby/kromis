@@ -18,8 +18,8 @@
 | POST | `/api/admin/kullanicilar/{kullanici_id}/plan` | `routers/admin.py` | `plan`:130 | `i18n` | `admin.js` |
 | POST | `/api/admin/kullanicilar/{kullanici_id}/tavan` | `routers/admin.py` | `tavan`:120 | `i18n` | `admin.js` |
 | GET | `/api/admin/metrikler` | `routers/admin.py` | `metrikler`:105 | — | `admin.js` |
-| GET | `/api/arena/{arena_id}` | `routers/galeri.py` | `arena_round_route`:185 | `storage` | `chat.js` |
-| POST | `/api/arena/{arena_id}/winner` | `routers/galeri.py` | `set_arena_winner_route`:201 | `i18n`, `models`, `storage` | `chat.js` |
+| GET | `/api/arena/{arena_id}` | `routers/galeri.py` | `arena_round_route`:189 | `storage` | `chat.js` |
+| POST | `/api/arena/{arena_id}/winner` | `routers/galeri.py` | `set_arena_winner_route`:205 | `i18n`, `models`, `storage` | `chat.js` |
 | GET | `/api/assets/{kind}` | `routers/bindirme.py` | `list_assets_route`:243 | `assets_store`, `i18n` | `assets.js` |
 | POST | `/api/assets/{kind}` | `routers/bindirme.py` | `upload_asset`:213 | `assets_store`, `i18n` | `assets.js` |
 | DELETE | `/api/assets/{kind}/{asset_id}` | `routers/bindirme.py` | `delete_asset_route`:251 | `assets_store`, `i18n` | `assets.js` |
@@ -49,11 +49,11 @@
 | POST | `/api/hesap/sifirla` | `routers/hesap.py` | `sifirla`:225 | `errlog`, `i18n`, `models` | `giris.js` |
 | POST | `/api/hesap/sifirla/dogrula` | `routers/hesap.py` | `sifirla_dogrula`:245 | `i18n`, `models` | `giris.js` |
 | GET | `/api/history` | `routers/galeri.py` | `history`:165 | `folders`, `i18n` | `folders.js`, `isler.js` |
-| DELETE | `/api/image/{image_id}` | `routers/galeri.py` | `delete_image`:218 | `i18n`, `storage` | `core.js` |
-| PATCH | `/api/image/{image_id}` | `routers/galeri.py` | `move_image`:174 | `folders`, `i18n`, `models`, `storage` | `core.js` |
-| DELETE | `/api/images` | `routers/galeri.py` | `delete_images`:242 | `i18n`, `models`, `storage` | `folders.js` |
-| PATCH | `/api/images` | `routers/galeri.py` | `move_images`:230 | `folders`, `i18n`, `models`, `storage` | `folders.js` |
-| POST | `/api/import` | `routers/galeri.py` | `import_image`:255 | `i18n` | `folders.js` |
+| DELETE | `/api/image/{image_id}` | `routers/galeri.py` | `delete_image`:222 | `i18n`, `storage` | `core.js` |
+| PATCH | `/api/image/{image_id}` | `routers/galeri.py` | `move_image`:178 | `folders`, `i18n`, `models`, `storage` | `core.js` |
+| DELETE | `/api/images` | `routers/galeri.py` | `delete_images`:246 | `i18n`, `models`, `storage` | `folders.js` |
+| PATCH | `/api/images` | `routers/galeri.py` | `move_images`:234 | `folders`, `i18n`, `models`, `storage` | `folders.js` |
+| POST | `/api/import` | `routers/galeri.py` | `import_image`:259 | `i18n` | `folders.js` |
 | GET | `/api/isler` | `routers/isler.py` | `isleri_listele`:112 | `i18n` | `isler.js` |
 | GET | `/api/isler/akis` | `routers/isler.py` | `isleri_akit`:209 | `i18n` | `isler.js` |
 | GET | `/api/isler/{is_id}` | `routers/isler.py` | `is_getir`:240 | `i18n` | `isler.js` |
@@ -62,7 +62,7 @@
 | GET | `/api/kota` | `routers/isler.py` | `kota_durumu`:129 | — | `isler.js` |
 | POST | `/api/logo` | `routers/bindirme.py` | `add_logo`:94 | `assets_store`, `catalog`, `composite`, `i18n`, `models`, `storage` | `assets.js` |
 | POST | `/api/logo/preview` | `routers/bindirme.py` | `preview_logo`:82 | `assets_store`, `composite`, `i18n`, `models` | `assets.js` |
-| GET | `/api/output/{image_id}/download` | `routers/galeri.py` | `output_download`:356 | `i18n`, `storage` | `core.js` |
+| GET | `/api/output/{image_id}/download` | `routers/galeri.py` | `output_download`:360 | `i18n`, `storage` | `core.js` |
 | POST | `/api/palette/suggest` | `routers/paletler.py` | `suggest_palettes`:33 | `color_names`, `models`, `palette` | `palette.js` |
 | GET | `/api/palettes` | `routers/paletler.py` | `list_palettes_route`:68 | — | `palette.js` |
 | POST | `/api/palettes` | `routers/paletler.py` | `create_palette_route`:74 | `color_names`, `i18n`, `models`, `palette` | `palette.js` |
@@ -76,7 +76,7 @@
 | GET | `/assets/{kind}/{filename}` | `routers/bindirme.py` | `asset_file`:263 | `assets_store`, `i18n` | `assets.js` |
 | GET | `/giris` | `routers/hesap.py` | `giris_sayfasi`:271 | `errlog`, `i18n`, `version` | — |
 | GET | `/health` | `routers/saglik.py` | `health`:149 | `version` | — |
-| GET | `/output/{filename}` | `routers/galeri.py` | `output_file`:322 | `i18n`, `storage` | `assets.js`, `chat.js`, `core.js`, `folders.js`, `isler.js`, `viewer.js` |
+| GET | `/output/{filename}` | `routers/galeri.py` | `output_file`:326 | `i18n`, `storage` | `assets.js`, `chat.js`, `core.js`, `folders.js`, `isler.js`, `viewer.js` |
 
 ## Öbek → modül
 

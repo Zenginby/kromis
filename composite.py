@@ -115,7 +115,8 @@ def composite_logo(base_path: str | BinaryIO, *, logo_path: str | BinaryIO,
                    position: str = "bottom-right",
                    scale: float = 0.14, margin: float = 0.03,
                    shadow_alpha: int = 120, shadow_blur: int = 6,
-                   offset_x: float = 0.0, offset_y: float = 0.0) -> bytes:
+                   offset_x: float = 0.0, offset_y: float = 0.0,
+                   keep_alpha: bool = False) -> bytes:
     """Filigranı bindirip sonuç PNG'yi bayt olarak döndürür (diske yazmaz).
 
     İki girdi de yol YA DA açık ikili akış (`io.BytesIO`): web yolu görseli
@@ -126,6 +127,11 @@ def composite_logo(base_path: str | BinaryIO, *, logo_path: str | BinaryIO,
     olarak (+ sağ/aşağı, − sol/yukarı). Oran, piksel değil: 1024² ile
     1536×1024'te aynı slider aynı görünsün — `scale` ve `margin` ile aynı
     gelenek. Varsayılan 0 ⇒ bu fonksiyonun çıktısı birebir eskisi gibi.
+
+    `keep_alpha`: çıktı RGBA kalır, tabanın şeffaflığı korunur. Öntanım False
+    (RGB) — logo/afiş uçları ve golden'lar dış script'in RGB çıktısına bağlı.
+    Ücretsiz planın filigranı (`services/filigran.py`, Faz 3 / 4) True verir:
+    sağlayıcının şeffaf arka planlı PNG'si filigranlanınca siyah zemin kazanmasın.
     """
     _check_position(position)
     _check_offset(offset_x)
@@ -166,5 +172,5 @@ def composite_logo(base_path: str | BinaryIO, *, logo_path: str | BinaryIO,
     composed = composed.copy()
     composed.alpha_composite(logo, (x, y))
     out = io.BytesIO()
-    composed.convert("RGB").save(out, format="PNG")
+    (composed if keep_alpha else composed.convert("RGB")).save(out, format="PNG")
     return out.getvalue()

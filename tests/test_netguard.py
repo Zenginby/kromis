@@ -23,6 +23,7 @@ import pytest
 import uvicorn
 
 import netguard
+from tests.conftest import KAPANIS_TAVANI_SN
 
 # ── Konak adı ayrıştırma ────────────────────────────────────────────
 
@@ -148,7 +149,8 @@ def sunucu():
     # `ws="none"`: bu uygulamada websocket yok ve "auto" keşfi yalnızca
     # kullanılmayan bir kitaplığı import edip uyarı üretiyor.
     cfg = uvicorn.Config(netguard.sar(app), host="127.0.0.1", port=port,
-                         log_level="error", ws="none")
+                         log_level="error", ws="none",
+                         timeout_graceful_shutdown=KAPANIS_TAVANI_SN)
     server = uvicorn.Server(cfg)
     t = threading.Thread(target=server.run, daemon=True)
     t.start()

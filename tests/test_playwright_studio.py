@@ -137,6 +137,36 @@ def get_free_port() -> int:
         return s.getsockname()[1]
 
 
+def sunucu_hazir(port: int, tavan_sn: float = 10.0) -> None:
+    """Uvicorn dinlemeye BAŞLAYANA KADAR yoklar — sabit uyku yerine.
+
+    NEDEN: burada eskiden `time.sleep(1.0)` vardı ve bir saniye bir TAHMİNDİ.
+    İki ucu da ıskalıyor: yüklü bir CI koşucusunda yetmiyor ve kusur ürünle
+    ilgisi olmayan bir kırmızı olarak, `page.goto`da "connection refused"
+    diye çıkıyor; bu makinede ise uvicorn ~0,15 sn'de dinlemeye başlıyor,
+    yani her çağrı ~0,85 sn'yi boşa yakıyordu. Aynı gizli kırılganlık sınıfı
+    e32e297 ve 1886360'ta kayıtlı, CLAUDE.md §3'te de anlatılıyor. Koşul
+    yoklandığında iki uç birden kapanıyor: yavaş makine bekler, hızlısı
+    beklemez.
+
+    TAVAN VE İDDİA: yoklama sonsuz değil, yoksa sunucu hiç açılmadığında
+    test "hangi adımda takıldı" demeden asılı kalırdı. Tavana varılırsa
+    düşen şey portu ADIYLA söyleyen bir iddia — sonraki `page.goto`nun
+    anlamsız "connection refused"ı değil.
+
+    Deyim `tests/test_playwright_hesap.py`'deki `_bekle`den geliyor.
+    """
+    son = time.monotonic() + tavan_sn
+    while time.monotonic() < son:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.1)
+            if s.connect_ex(("127.0.0.1", port)) == 0:
+                return
+        time.sleep(0.05)
+    raise AssertionError(
+        f"sunucu {tavan_sn:g} sn içinde 127.0.0.1:{port} adresinde dinlemeye başlamadı")
+
+
 class IsciThread(threading.Thread):
     """E2E'nin İŞÇİSİ: `isci.tek_tur` döngüsü, sunucuyla aynı süreçte (Faz 2 / 4).
 
@@ -207,7 +237,7 @@ def test_playwright_studio_single_thread_flow(veritabani, e2e_oturum):
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)  # Wait for server to start
+    sunucu_hazir(port)
 
     base_url = f"http://127.0.0.1:{port}"
 
@@ -331,7 +361,7 @@ def test_playwright_model_sheet_alttan_aciliyor(monkeypatch, veritabani, e2e_otu
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     base_url = f"http://127.0.0.1:{port}"
 
     try:
@@ -458,7 +488,7 @@ def test_playwright_ayarlar_paneli_ortadan_ve_ALANLARI_gosteriyor(veritabani, e2
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     base_url = f"http://127.0.0.1:{port}"
 
     try:
@@ -576,7 +606,7 @@ def test_playwright_yukleme_hedefi_ve_ek_gorsel_kapisi(veritabani, e2e_oturum):
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
 
     try:
         with sync_playwright() as p:
@@ -641,7 +671,7 @@ def test_playwright_secilen_dosya_kapisi_TELEFONUN_gercegine_dayaniyor(veritaban
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
 
     # (ad, tür, beklenen) — telefonun gerçek ürettiği hâller ve karşı kanıtlar.
     TABLO = [
@@ -702,7 +732,7 @@ def test_playwright_secim_modunda_karonun_ortasi_gercekten_seciyor(veritabani, e
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
 
     try:
         with sync_playwright() as p:
@@ -779,7 +809,7 @@ def test_playwright_buyutecte_logo_ekle_kayitli_gorselde_beliriyor(veritabani, e
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
 
     try:
         with sync_playwright() as p:
@@ -831,7 +861,7 @@ def test_playwright_anahtarsiz_acilis_BOS_HALI_anlatiyor(monkeypatch, veritabani
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
 
     try:
         with sync_playwright() as p:
@@ -893,7 +923,7 @@ def test_playwright_composer_GONDERIMDEN_SONRA_kuculuyor(monkeypatch, veritabani
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
 
     try:
         with sync_playwright() as p:
@@ -1109,7 +1139,7 @@ def test_playwright_logo_onizlemesi_kare_OLMAYAN_tabanda_kirpilmiyor(veritabani,
     port = get_free_port()
     server = ServerThread(port)
     server.start()
-    time.sleep(1.0)
+    sunucu_hazir(port)
 
     try:
         with sync_playwright() as p:
@@ -1252,7 +1282,7 @@ def test_playwright_ust_klasor_aramasi_alt_klasoru_ve_SAYACLARI_getiriyor(verita
     port = get_free_port()
     server = ServerThread(port)
     server.start()
-    time.sleep(1.0)
+    sunucu_hazir(port)
 
     try:
         with sync_playwright() as p:
@@ -1383,7 +1413,7 @@ def test_playwright_yonetmen_cekmecesi_SAGDAN_aciliyor(monkeypatch, veritabani, 
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     base_url = f"http://127.0.0.1:{port}"
 
     try:
@@ -1552,7 +1582,7 @@ def test_playwright_aciklamali_oneri_karti_CIZILIYOR_ve_degeri_karismiyor(verita
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     base_url = f"http://127.0.0.1:{port}"
 
     try:

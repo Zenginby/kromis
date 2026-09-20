@@ -265,12 +265,17 @@ const kromisIsler = (() => {
     // Kredi TAHMİNİ (`kredi_tahmini`, rota yazıyor; Faz 2 / 6) ve anahtarın
     // kaynağı: platformun anahtarıyla koşan iş günlük kotaya sayılır, kendi
     // anahtarıyla koşan sayılmaz — kullanıcı hangisi olduğunu satırda görsün.
+    // Bitti satırında "tahmin → gerçek" (`kredi_gercek`, işçi `bitir`le yazıyor;
+    // Faz 3 / 2): tahmin üst sınır, fark iade edildi — ham gösterim, 6. görev süsler.
     if (Number.isFinite(is.kredi_tahmini)) {
       const alt = document.createElement("div");
       alt.className = "is-alt";
       const kredi = document.createElement("span");
       kredi.className = "is-kredi";
-      kredi.textContent = t("isler.kredi", { kredi: is.kredi_tahmini });
+      kredi.textContent =
+        is.durum === "bitti" && Number.isFinite(is.kredi_gercek)
+          ? t("isler.kredi_gercek", { tahmin: is.kredi_tahmini, gercek: is.kredi_gercek })
+          : t("isler.kredi", { kredi: is.kredi_tahmini });
       alt.appendChild(kredi);
       if (is.anahtar_kaynagi === "platform") {
         const kaynak = document.createElement("span");

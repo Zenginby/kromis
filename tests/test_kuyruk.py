@@ -329,7 +329,7 @@ def test_stale_running_jobs_drop_to_error_and_are_never_requeued(db_oturumu, kul
     kuyruk.kalp(db_oturumu, tam_esik, an - ESIK)
     kuyruk.kalp(db_oturumu, taze, an - dt.timedelta(seconds=30))
     db_oturumu.commit()
-    assert kuyruk.bayatlari_dusur(db_oturumu, an, ESIK) == 1
+    assert kuyruk.bayatlari_dusur(db_oturumu, an, ESIK) == [bayat], "düşenlerin id'si döner (Faz 3 / 2: çağıran iade eder)"
     db_oturumu.commit()
     db_oturumu.expire_all()
     dusen = db_oturumu.get(tablolar.Is, bayat)
@@ -341,7 +341,7 @@ def test_stale_running_jobs_drop_to_error_and_are_never_requeued(db_oturumu, kul
     sirada = kuyruk.al(db_oturumu, uuid.uuid4(), an)
     assert sirada is not None and sirada.id == bekleyen
     assert kuyruk.al(db_oturumu, uuid.uuid4(), an) is None
-    assert kuyruk.bayatlari_dusur(db_oturumu, an, ESIK) == 0, "idempotent"
+    assert kuyruk.bayatlari_dusur(db_oturumu, an, ESIK) == [], "idempotent"
 
 
 def test_a_late_worker_cannot_resurrect_a_job_that_was_dropped_as_stale(db_oturumu, kullanici):
@@ -349,7 +349,7 @@ def test_a_late_worker_cannot_resurrect_a_job_that_was_dropped_as_stale(db_oturu
     (is_id,) = _ekle(db_oturumu, kullanici.id)
     kuyruk.al(db_oturumu, ISCI, _an(0))
     db_oturumu.commit()
-    assert kuyruk.bayatlari_dusur(db_oturumu, _an(0) + ESIK + dt.timedelta(seconds=1), ESIK) == 1
+    assert kuyruk.bayatlari_dusur(db_oturumu, _an(0) + ESIK + dt.timedelta(seconds=1), ESIK) == [is_id]
     assert kuyruk.bitir(db_oturumu, is_id, {"medya": ["ab12cd34ef56"]}, _an(400)) is False
     assert kuyruk.kalp(db_oturumu, is_id, _an(400)) is False
     db_oturumu.commit()
@@ -410,15 +410,16 @@ def test_listing_is_newest_first_limited_and_filtered_by_the_last_change(db_otur
 
 
 def test_the_dump_carries_the_contract_fields_and_never_the_request_body(db_oturumu, kullanici):
-    """`_json`: on üç anahtar, `istek` YOK (prompt/klasör `medya`da, referans anahtarları iç iş),
+    """`_json`: on dört anahtar, `istek` YOK (prompt/klasör `medya`da, referans anahtarları iç iş),
     damgalar `medya` biçiminde. `arena_id`/`folder_id` `istek`ten dökülen iki alan (Faz 2 / 5:
     panel gruplaması ve önizlemenin klasörü) — ikisi de `medya`da zaten görünür, prompt değil."""
     is_ = kuyruk.ekle(db_oturumu, kullanici.id, "edit", {"prompt": "GİZLİ", "kaynaklar": ["k1"]}, "m", 8,
                       an=_an())
     db_oturumu.commit()
     dokum = kuyruk.listele(db_oturumu, kullanici.id)[0]
-    assert list(dokum) == ["id", "tur", "durum", "model", "kredi_tahmini", "anahtar_kaynagi",
+    assert list(dokum) == ["id", "tur", "durum", "model", "kredi_tahmini", "kredi_gercek", "anahtar_kaynagi",
                            "olusturuldu", "basladi", "bitti", "sonuc", "hata", "arena_id", "folder_id"]
+    assert dokum["kredi_gercek"] is None, "bitmemiş iş: gerçek kredi henüz yok (Faz 3 / 2, işçi `bitir`le yazar)"
     assert dokum["arena_id"] is None and dokum["folder_id"] is None
     assert dokum["anahtar_kaynagi"] is None, "`ekle` kaynak verilmeden çağrıldı (Faz 2 / 6: rota verir)"
     assert "istek" not in dokum and "GİZLİ" not in repr(dokum) and "isci_id" not in dokum
@@ -426,9 +427,10 @@ def test_the_dump_carries_the_contract_fields_and_never_the_request_body(db_otur
     assert dokum["id"] == str(is_.id) and dokum["olusturuldu"] == zaman.damga_utc(_an()) == "2026-09-17T12:00:00Z"
     assert dokum["basladi"] is None and dokum["bitti"] is None and dokum["sonuc"] is None
     kuyruk.al(db_oturumu, ISCI, _an(5))
-    kuyruk.bitir(db_oturumu, is_.id, {"medya": ["ab12cd34ef56"]}, _an(9))
+    kuyruk.bitir(db_oturumu, is_.id, {"medya": ["ab12cd34ef56"]}, _an(9), kredi_gercek=6)
     db_oturumu.commit()
     dokum = kuyruk.listele(db_oturumu, kullanici.id)[0]
+    assert dokum["kredi_gercek"] == 6 and dokum["kredi_tahmini"] == 8, "`bitir(kredi_gercek=)` sütuna, `_json` dışa"
     assert dokum["basladi"] == zaman.damga_utc(_an(5)) and dokum["bitti"] == zaman.damga_utc(_an(9))
     assert dokum["basladi"].endswith("Z") and dt.datetime.fromisoformat(dokum["bitti"]) == _an(9)
     assert dokum["sonuc"] == {"medya": ["ab12cd34ef56"]} and dokum["durum"] == "bitti"

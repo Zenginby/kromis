@@ -48,6 +48,7 @@ import version
 from services import (
     cerez,
     db,
+    defter,
     depo_admin,
     hesap,
     kiraci,
@@ -342,6 +343,10 @@ def test_a_cap_written_by_the_admin_moves_the_users_429_threshold_on_their_very_
     with TestClient(appmod.app, base_url=HTTPS):
         a_id, a_jeton = _gercek_kullanici(admin=True)
         b_id, b_jeton = _gercek_kullanici()
+        # Platform işi bakiye ister (Faz 3 / 2, 402): B'ye defterden kredi, tavan ölçümü 402'ye takılmasın.
+        with Session(depo_db) as s:
+            defter.hibe(s, b_id, 1000, f"{defter.ONEK_HIBE}{b_id}:2026-09")
+            s.commit()
         a = TestClient(appmod.app, base_url=HTTPS, cookies={cerez.OTURUM_CEREZI: a_jeton})
         b = TestClient(appmod.app, base_url=HTTPS, cookies={cerez.OTURUM_CEREZI: b_jeton})
         assert b.get("/api/hesap/ben").json()["is_admin"] is False

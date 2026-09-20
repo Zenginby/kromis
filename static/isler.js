@@ -272,9 +272,10 @@ const kromisIsler = (() => {
       alt.className = "is-alt";
       const kredi = document.createElement("span");
       kredi.className = "is-kredi";
-      kredi.textContent = is.durum === "bitti" && Number.isFinite(is.kredi_gercek)
-        ? t("isler.kredi_gercek", { tahmin: is.kredi_tahmini, gercek: is.kredi_gercek })
-        : t("isler.kredi", { kredi: is.kredi_tahmini });
+      kredi.textContent =
+        is.durum === "bitti" && Number.isFinite(is.kredi_gercek)
+          ? t("isler.kredi_gercek", { tahmin: is.kredi_tahmini, gercek: is.kredi_gercek })
+          : t("isler.kredi", { kredi: is.kredi_tahmini });
       alt.appendChild(kredi);
       if (is.anahtar_kaynagi === "platform") {
         const kaynak = document.createElement("span");

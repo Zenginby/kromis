@@ -51,7 +51,7 @@ from sqlalchemy.orm import Session
 import errlog
 import i18n
 from models import GirisIstegi, JetonIstegi, KayitIstegi, SifirlamaIstegi, YeniParolaIstegi
-from services import ayar, cerez, dil, hesap, kimlik, koken, posta, sablon
+from services import ayar, cerez, defter, dil, hesap, kimlik, kiraci, koken, planlar, posta, sablon
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
@@ -105,6 +105,26 @@ def _dogrulama_gonder(request: Request, db: Session, kullanici: Kullanici,
         saat=int(hesap.DOGRULAMA_OMRU.total_seconds() // 3600)), ayarlar)
 
 
+def _ilk_hibe(db: Session, kullanici: Kullanici, an: dt.datetime) -> None:
+    """Yeni hesaba AYIN hibesini hemen yatırır (Faz 3 / 3, K6) — bakım turunun 5 dk'sı beklenmez.
+
+    Aynı anahtar (`defter.aylik_hibe_yaz`: `hibe:<u>:<YYYY-MM>`), aynı miktar
+    (`PLANLAR["free"].aylik_hibe`; 0 ise hibe kapalı, satır yok): bakım turu bu
+    ayı çakışık bulur, ikinci hibe yazmaz. Doğrulanmamış hesaba da yatar — hesap
+    doğrulanmadan giriş yok (`giris` 403), yani harcayamaz; doğrulanmadan
+    silinirse satır CASCADE ile gider. KİRACI BAĞLAMI ŞART: istek oturumsuz,
+    `kredi_hareketleri`nin `sahip` politikası `app.kullanici_id` bekler —
+    bağlamsız INSERT uygulama rolünde reddedilirdi (RLS; tests/test_planlar.py
+    uygulama rolüyle ölçer). Transaksiyon açık (`kullanici_olustur` flush etti),
+    `oturum=db` ayarı hemen yazar.
+    """
+    miktar = planlar.PLANLAR[planlar.PLAN_VARSAYILAN].aylik_hibe
+    if miktar <= 0:
+        return
+    with kiraci.baglam(kullanici_id=kullanici.id, oturum=db):
+        defter.aylik_hibe_yaz(db, kullanici.id, miktar, an)
+
+
 @router.post("/api/hesap/kayit")
 def kayit(req: KayitIstegi, request: Request,
           ayarlar: ayar.Ayarlar = Depends(ayar.genel), db: Session = OTURUM) -> dict:
@@ -126,6 +146,7 @@ def kayit(req: KayitIstegi, request: Request,
     kullanici = hesap.kullanici_bul(db, req.eposta)
     if kullanici is None:
         kullanici = hesap.kullanici_olustur(db, req.eposta, req.parola, dil.aktif())
+        _ilk_hibe(db, kullanici, an)
     elif kullanici.dogrulandi_at is None:
         kullanici.parola_ozeti = hesap.parola_ozeti(req.parola)
         kullanici.dil = dil.aktif()

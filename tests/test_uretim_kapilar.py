@@ -16,6 +16,10 @@ AST bekçisi). Beş soru:
         hiç sorulmaz, dokunulmaz (K9).
   (v)   ASIL KAPI — ön denetim atlansa bile `rezerve_kredi`nin atomik düşümü 402
         der ve satır geri alınır (yarışın kaybedeni).
+
+Kullanıcı `pro` (conftest `plan_pro`, Faz 3 / 3): dört rotanın parametrik testi
+videoyu da sürer ve ücretsiz planda video 403 — bu dosya bakiye kapısını ölçer,
+plan kapısı tests/test_planlar.py'de. 402 gövdesinin `plan` alanı o yüzden `pro`.
 """
 from __future__ import annotations
 
@@ -35,7 +39,8 @@ import i18n
 import providers
 from services import defter, isci, kapilar, kota, tablolar
 
-pytestmark = pytest.mark.usefixtures("depo_db")
+# `plan_pro` (Faz 3 / 3): dört rotanın parametrik testi videoyu da sürer; plan kapısı tests/test_planlar.py'de.
+pytestmark = pytest.mark.usefixtures("depo_db", "plan_pro")
 
 GORSEL = {"prompt": "kedi", "size": "1024x1024", "quality": "medium", "n": 1}
 VIDEO = {"prompt": "kedi kosuyor", "size": "16:9", "quality": "720p", "duration": 4}
@@ -191,7 +196,7 @@ def test_an_insufficient_balance_is_402_with_the_three_fields_and_writes_no_row(
     r = c.post("/api/generate", json=GORSEL)
     assert r.status_code == 402, r.text
     assert r.json() == {"detail": {"kod": "err.kredi_yetersiz", "bakiye": KREDI - 1, "gereken": KREDI,
-                                   "plan": "free"}}
+                                   "plan": "pro"}}
     assert "Retry-After" not in r.headers, "402 kota değil: beklemek para getirmez (K11)"
     assert _isler(depo_db) == [], "402'de iş satırı YOK: rezerv satırla aynı transaksiyonda geri alındı"
     assert _bakiye(depo_db, kullanici.id) == KREDI - 1 and _hareketler(depo_db, kullanici.id) == []
@@ -226,7 +231,7 @@ def test_resubmit_is_402_too_when_the_balance_ran_out(c, depo_db, kullanici, mon
     assert c.post("/api/generate", json=GORSEL).status_code == 202
     r = c.post(f"/api/isler/{eski}/yeniden")
     assert r.status_code == 402, r.text
-    assert r.json()["detail"] == {"kod": "err.kredi_yetersiz", "bakiye": 0, "gereken": KREDI, "plan": "free"}
+    assert r.json()["detail"] == {"kod": "err.kredi_yetersiz", "bakiye": 0, "gereken": KREDI, "plan": "pro"}
     assert len(_isler(depo_db)) == 2, "402'de yeni satır doğmadı"
 
 
@@ -258,7 +263,7 @@ def test_the_atomic_reserve_is_the_authority_even_when_the_read_only_precheck_is
     _yukle(depo_db, kullanici.id, KREDI - 1)
     r = c.post("/api/generate", json=GORSEL)
     assert r.status_code == 402, r.text
-    assert r.json()["detail"] == {"kod": "err.kredi_yetersiz", "bakiye": KREDI - 1, "gereken": KREDI, "plan": "free"}
+    assert r.json()["detail"] == {"kod": "err.kredi_yetersiz", "bakiye": KREDI - 1, "gereken": KREDI, "plan": "pro"}
     assert _isler(depo_db) == [], "`kuyruk.ekle` flush etmişti; 402 transaksiyonu geri aldı"
     assert _bakiye(depo_db, kullanici.id) == KREDI - 1 and _hareketler(depo_db, kullanici.id) == []
     # Aynı yol yeterli bakiyede geçer ve satırı yazar.
@@ -276,7 +281,7 @@ def test_the_reserve_helper_raises_402_for_a_platform_job_and_is_a_no_op_for_byo
         with pytest.raises(HTTPException) as e:
             kapilar.check_bakiye(db, kullanici, 8, "platform")
         assert e.value.status_code == 402 and e.value.detail == {"kod": "err.kredi_yetersiz", "bakiye": 3,
-                                                                 "gereken": 8, "plan": "free"}
+                                                                 "gereken": 8, "plan": "pro"}
         with pytest.raises(HTTPException) as e:
             kapilar.rezerve_kredi(db, kullanici, uuid.uuid4(), 8, "platform")
         assert e.value.status_code == 402 and e.value.detail["bakiye"] == 3

@@ -35,6 +35,18 @@ transaksiyon geri alınır — iş satırı da (rota `OTURUM`u istisnada rollbac
 "bakiye", "gereken", "plan"}` — 402 "ödeme gerekir", 429 (kota, `Retry-After`lı)
 ve 403 (plan/yetki) ile karışmasın (K11); cümleyi ön yüz `kod`dan kurar
 (palette.js `detailText`). BYOK (`kullanici`) iş defteri hiç görmez (K3).
+
+Sekizinci kapı `check_plan` (Faz 3 / 3, K5/K7): kullanıcının PLANI seçilen
+modeli kapsıyor mu (`planlar.kapsiyor` — modelin `plan` alanı + video ↔
+`Plan.video`; `modeller.model_available`ın anahtardan bağımsız yarısı). Hayırsa
+**403** JSON `{"kod": "err.plan_kapsamiyor", "model", "plan"}` — 403 "yetki/
+plan", 402 "para", 429 "kota" (K11 ayrımı); cümleyi ön yüz `kod`dan kurar.
+Zincirin EN BAŞINDA, anahtar kapısından ÖNCE: kapı anahtar kaynağından
+BAĞIMSIZ (BYOK'lu ücretsiz kullanıcı da video alamaz — kuralın sebebi
+filigran yokluğu, anahtarın kimin olduğu onu değiştirmez), o yüzden önce
+plan sorulur — planın kapsamadığı modele "anahtar yok" (409) demek kullanıcıyı
+anahtar girmeye yönlendirirdi ve anahtar girse de kapı açılmazdı. Plan yüklü satırdan, yoksa DB'den
+(`kullanici_plani`) — istek başına ek sorgu yok.
 """
 from __future__ import annotations
 
@@ -43,6 +55,7 @@ import uuid
 from collections.abc import Mapping
 
 from fastapi import HTTPException
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -53,7 +66,7 @@ import credstore
 import etiket
 import i18n
 import storage
-from services import defter, depo_klasor, dil, kuyruk, platform_anahtari
+from services import defter, depo_klasor, dil, kuyruk, planlar, platform_anahtari
 from services.tablolar import Kullanici
 
 # Kullanıcı başına eş zamanlı (`bekliyor` + `calisiyor`) iş tavanı — `.env.example`
@@ -179,6 +192,36 @@ def check_anahtar(cred_id: str, kimlikler: Mapping[str, str]) -> str:
                           kimlik=etiket.label_of(cred) if cred is not None else cred_id,
                           env=cred.key_env if cred is not None else cred_id))
     return platform_anahtari.kaynak(cred_id, kimlikler) or platform_anahtari.KAYNAK_KULLANICI
+
+
+def kullanici_plani(db: Session, kullanici: Kullanici) -> str:
+    """İsteğin kullanıcısının planı — YÜKLÜ nesneden, yüklü değilse DB'den (`defter.plan_oku`).
+
+    Kimlik kapısı satırı çoktan çekti (`oturumlar` ⋈ `kullanicilar`, tek sorgu;
+    tests/test_kimlik.py "istek başına tam bir sorgu" bekçisi): plan orada.
+    Ek SELECT yalnız öznitelik YÜKLÜ DEĞİLSE — testlerin `kullanici` override'ı
+    (`server_default`lı sütun flush'ta expire olur, oturum kapanmış:
+    `DetachedInstanceError`; `_yetersiz_bakiye`nin dersi). `inspect().dict`
+    lazy yüklemeyi TETİKLEMEZ, o yüzden o hataya hiç varılmaz.
+    """
+    yuklu = sa_inspect(kullanici).dict.get("plan")
+    return str(yuklu) if yuklu else defter.plan_oku(db, kullanici.id)
+
+
+def check_plan(db: Session, kullanici: Kullanici, spec: catalog.ImageModel) -> str:
+    """Kullanıcının planı bu modeli kapsıyor mu; evetse plan adı, hayırsa 403 `err.plan_kapsamiyor` (Faz 3 / 3, K7).
+
+    Gövde `{"kod", "model", "plan"}` — cümle YOK, ön yüz `kod`u kendi dilinde
+    kurar (`err.plan_kapsamiyor`), iki alan "hangi model, hangi plan" der.
+    Anahtar kaynağından BAĞIMSIZ: `check_anahtar`dan önce çağrılır (sıra
+    modül başında). Karar `planlar.kapsiyor`da — model dökümünün `sebep:
+    "plan"` dediği modele rota da 403 der, iki cevap doğmaz.
+    """
+    plan = kullanici_plani(db, kullanici)
+    if not planlar.kapsiyor(plan, spec):
+        raise HTTPException(status_code=403,
+                            detail={"kod": "err.plan_kapsamiyor", "model": spec.id, "plan": plan})
+    return plan
 
 
 def _yetersiz_bakiye(db: Session, kullanici: Kullanici, bakiye: int, gereken: int) -> HTTPException:

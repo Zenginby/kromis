@@ -316,6 +316,7 @@ def test_the_worker_uses_the_platform_key_then_the_users_own_then_the_platform_a
     assert not any(PLATFORM_AZURE in c or KULLANICI_AZURE in c for c in cevaplar)
 
 
+@pytest.mark.usefixtures("plan_pro")   # Faz 3 / 3: video 409'u ölçmek için plan kapısı (403) önce açılır
 def test_without_a_user_or_platform_key_the_route_answers_409_and_creates_no_job(
         client, depo_db, tmp_path, dizinler, kullanici):
     """§5'in 6'ya devrettiği ilk madde: anahtarsız kullanıcı 202 + `hata`lı iş DEĞİL, 409 ve hiç iş

@@ -47,6 +47,18 @@ politikasız: `bakiye` yazımı rota (kullanıcı) ve işçi (admin) bağlamınd
 ifadeyle geçer; yazan yer YALNIZ bu modül (AST bekçisi tests/test_defter.py:
 `kullanicilar.bakiye`ye UPDATE kuran başka modül yok, `KrediHareketi` kuran da).
 
+AYLIK HİBE "HİBEYE TAMAMLA", DEVRETMEZ (K6, 3. görev): `hibe_turu(db, an)` her
+plan için `bakiye < PLANLAR[plan].aylik_hibe` olan kullanıcıya FARKI yatırır
+(`hibe:<u>:<YYYY-MM>`), dolu bakiyeye DOKUNMAZ. Devretmeme tek kuralla: kullanılmayan
+hibe üstüne binmez, kullanılan kadar dolar; `sona_erme` satırı gerekmez (tamamlama
+kuralında düşecek şey yok — Faz 4 paketleriyle anlam kazanır). Anahtar aylık →
+ay içinde bir kez: bakım turu 5 dk'da bir aynı sorguyu koşar, ikinci koşu satır
+yazmaz (`ON CONFLICT`); ay içinde bakiye tekrar düşse de o ayın anahtarı
+çakışır, ikinci hibe yok. Kayıt (`routers/hesap.py`) aynı anahtarla
+(`aylik_hibe_yaz`) hemen yatırır — ilk hibe için 5 dk beklenmez, bakım turu o ayı
+çakışık bulur.
+`kullanicilar.plan` da bu modülden okunur (`plan_oku`): hesap tablosu, sahip `id`.
+
 KONUŞMAZ: cümle yok; `YetersizBakiye` iki sayı taşır, 402 gövdesini rota kurar
 (`services/db.py`nin `database_unavailable` kararı). Zaman `zaman.an()`
 Python'dan (mikrosaniye, Faz 1 / 5) — testler `an` verir, saatle oynamaz
@@ -65,13 +77,14 @@ from sqlalchemy import ColumnElement, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from services import gunluk, zaman
+from services import gunluk, planlar, zaman
 from services.tablolar import HAREKET_TURLERI, KrediHareketi, Kullanici
 
 __all__ = ["TUR_HIBE", "TUR_REZERV", "TUR_ONAY", "TUR_IADE", "TUR_DUZELTME", "TUR_SONA_ERME",
            "ONEK_REZERV", "ONEK_ONAY", "ONEK_IADE", "ONEK_HIBE", "ONEK_DUZELTME",
            "Hareket", "YetersizBakiye",
-           "bakiye", "hibe", "rezerve", "onayla", "iade", "duzelt", "hareketler", "tutarlilik"]
+           "bakiye", "plan_oku", "hibe", "aylik_hibe_yaz", "rezerve", "onayla", "iade", "duzelt", "hareketler",
+           "hibe_turu", "tutarlilik"]
 
 _gunluk = logging.getLogger("kromis.defter")
 
@@ -171,6 +184,26 @@ def _isin_hareketleri(db: Session, is_id: uuid.UUID) -> dict[str, KrediHareketi]
 def bakiye(db: Session, kullanici_id: uuid.UUID) -> int:
     """Önbellekten (`kullanicilar.bakiye`); satır yoksa 0."""
     return int(db.scalar(select(Kullanici.bakiye).where(_sahibin(kullanici_id))) or 0)
+
+
+def plan_oku(db: Session, kullanici_id: uuid.UUID) -> str:
+    """Kullanıcının planı (`kullanicilar.plan`, CHECK `PLANLAR_KUMESI`); satır yoksa `free` (3. görev).
+
+    DB'den, `kullanici.plan`dan değil (`kapilar._yetersiz_bakiye`nin kararı):
+    sütun `server_default`lı ve bağımlılığın verdiği nesne başka oturumdan/
+    ayrılmış olabilir — `DetachedInstanceError` yerine tek indeksli SELECT.
+    """
+    return str(db.scalar(select(Kullanici.plan).where(_sahibin(kullanici_id))) or planlar.PLAN_VARSAYILAN)
+
+
+def aylik_hibe_yaz(db: Session, kullanici_id: uuid.UUID, miktar: int, an: dt.datetime) -> bool:
+    """`an`ın AYININ hibesi: `hibe` anahtarı `hibe:<u>:<YYYY-MM>` ile (K6); `False` = o ay zaten yatmış.
+
+    Anahtarı TEK yer kurar: kayıt (`routers/hesap.py`, ilk hibe) ve bakım turu
+    (`hibe_turu`) bu işlevi çağırır — biçim iki yerde yazılsaydı biri `%Y-%m`,
+    öteki `%Y%m` derdi ve ay içinde iki hibe yatardı.
+    """
+    return hibe(db, kullanici_id, miktar, f"{ONEK_HIBE}{kullanici_id}:{an:%Y-%m}", an=an)
 
 
 def hibe(db: Session, kullanici_id: uuid.UUID, miktar: int, anahtar: str, aciklama: str | None = None, *,
@@ -287,6 +320,31 @@ def duzelt(db: Session, hedef_id: uuid.UUID, miktar: int, aciklama: str | None, 
         return _hareket(mevcut)
     _bakiye_ekle(db, hedef_id, miktar)
     return _hareket(satir)
+
+
+def hibe_turu(db: Session, an: dt.datetime) -> int:
+    """Aylık hibe turu (K6 "hibeye tamamla"): her planda `bakiye < aylik_hibe` olan kullanıcıya farkı yatırır; yazılan satır sayısı.
+
+    Bakım turu (services/isci.py `bakim_turu`, 5 dk, ADMİN bağlamı —
+    `yonetici_ekler`, K4) çağırır. Plan başına bir SELECT: süzgeç `WHERE plan =
+    :p AND bakiye < :hibe` (belge §3 "Risk": 20-50 kullanıcıda ölçülemez;
+    1.000+ kullanıcıda kısmi indeks adayı, Faz 5). Silinmiş hesap almaz.
+    `aylik_hibe` 0 olan plan (ortam `KROMIS_FREE_AYLIK_HIBE=0`) atlanır. Aynı
+    ay ikinci tur: anahtar çakışır, `hibe` `False` döner, satır ve bakiye
+    oynamaz — sayı 0. Ay değişince yeni anahtar, yeni tamamlama.
+    """
+    yazilan = 0
+    for ad, plan in planlar.PLANLAR.items():
+        if plan.aylik_hibe <= 0:
+            continue
+        satirlar = db.execute(select(Kullanici.id, Kullanici.bakiye)
+                              .where(Kullanici.plan == ad, Kullanici.bakiye < plan.aylik_hibe,
+                                     Kullanici.silindi_at.is_(None))
+                              .order_by(Kullanici.id)).all()
+        for kullanici_id, mevcut in satirlar:
+            if aylik_hibe_yaz(db, kullanici_id, plan.aylik_hibe - int(mevcut), an):
+                yazilan += 1
+    return yazilan
 
 
 def tutarlilik(db: Session) -> list[tuple[uuid.UUID, int, int]]:

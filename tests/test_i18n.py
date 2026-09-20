@@ -796,6 +796,9 @@ KULLANICIYA_KONUSMAYAN = {
     "services/defter.py": "kredi defteri (Faz 3 / 1): SQL; `Hareket`/`bool`/sayı döndürür, `YetersizBakiye` "
                           "iki SAYI taşır (402 gövdesini rota kurar, K11); tek metni OPERATÖRE giden "
                           "`defter.asim` günlük uyarısı",
+    "services/planlar.py": "plan kataloğu (Faz 3 / 3, K5): üç `Plan` sabiti ve `kapsiyor` bool'u; 403 "
+                           "gövdesini `kapilar.check_plan` (kod), rozeti ön yüz `sebep` alanından kurar; tek "
+                           "metni OPERATÖRE giden `KROMIS_FREE_AYLIK_HIBE` `ValueError`ı",
     "isci.py": "işçi sürecinin bileşim kökü (Faz 2 / 3): kapılar, iş parçacıkları, kalp "
                "atışı, SIGTERM; çıktısı stdout'a ASCII, OPERATÖRE — işin metni services/isci.py'de",
 }

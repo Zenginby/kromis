@@ -55,6 +55,7 @@ from services import (
     kapilar,
     koken,
     kota,
+    planlar,
     platform_anahtari,
     posta,
     sifre,
@@ -285,6 +286,7 @@ ALTYAPI = {"KROMIS_DATA_DIR", "PORT", db.DATABASE_URL_ENV, koken.KOKEN_ENV,
            dosya.URL_ENV, dosya.KOVA_ENV, dosya.ANAHTAR_ID_ENV, dosya.GIZLI_ENV, dosya.BOLGE_ENV,
            isci.ES_ZAMANLI_ENV, isci.KALP_ESIGI_ENV, isci.SAKLAMA_ENV, kapilar.ES_ZAMANLI_IS_ENV,
            kota.SAATLIK_IS_ENV, kota.GUNLUK_KREDI_ENV,
+           planlar.FREE_AYLIK_HIBE_ENV,   # Faz 3 / 3: ücretsiz planın aylık hibesi
            gunluk.BICIM_ENV, hata_izleme.DSN_ENV, hata_izleme.ORTAM_ENV}
 
 

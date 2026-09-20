@@ -55,7 +55,8 @@ import providers
 from routers import isler as isler_rotasi
 from services import ayar, defter, hesap, isci, kapilar, kimlik, kuyruk, tablolar
 
-pytestmark = pytest.mark.usefixtures("depo_db")
+# `plan_pro` (Faz 3 / 3): video işleri ücretsiz planda 403; bu dosya iş uçlarını ölçer, planı değil.
+pytestmark = pytest.mark.usefixtures("depo_db", "plan_pro")
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PNG = b"\x89PNG\r\n\x1a\n" + bytes(range(16))

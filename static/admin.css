@@ -75,7 +75,7 @@ body {
 .admin-sekme[hidden] { display: none; }
 
 .admin-arac { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
-.admin-arac input, .admin-arac select, .admin-tablo input {
+.admin-arac input, .admin-arac select, .admin-tablo input, .admin-tablo select {
   padding: 8px 10px;
   border: 1px solid var(--border-strong);
   border-radius: var(--r-item, 12px);
@@ -85,7 +85,7 @@ body {
   outline: none;
 }
 .admin-arac input { min-width: 240px; }
-.admin-arac input:focus-visible, .admin-arac select:focus-visible, .admin-tablo input:focus-visible { border-color: var(--accent); }
+.admin-arac input:focus-visible, .admin-arac select:focus-visible, .admin-tablo input:focus-visible, .admin-tablo select:focus-visible { border-color: var(--accent); }
 .admin-not { color: var(--muted); font-size: 0.85rem; }
 
 .admin-dugme {
@@ -108,6 +108,10 @@ body {
 .admin-tablo th { color: var(--muted); font-weight: 500; background: var(--surface-2); }
 .admin-tablo tr:last-child td { border-bottom: 0; }
 .admin-tablo input[type="number"] { width: 96px; padding: 5px 8px; }
+/* Faz 3 / 3: plan seçici ve kredi düzeltmesi (miktar + açıklama) aynı hücre yerleşimi. */
+.admin-tablo select, .admin-tablo input[type="text"] { padding: 5px 8px; }
+.admin-tablo input[type="text"] { width: 160px; }
+.admin-bakiye { min-width: 3ch; font-variant-numeric: tabular-nums; }
 .admin-islem { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .admin-bos td { color: var(--muted); text-align: center; }
 

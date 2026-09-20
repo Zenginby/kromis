@@ -9,10 +9,8 @@ Belge §8 çıkış ölçütünün tarayıcı yüzü. Sunucu `tests/test_playwri
 """
 from __future__ import annotations
 
-import time
-
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 
 pytest.importorskip("playwright", reason="playwright kurulu değil — E2E testleri atlanıyor")
 
@@ -20,7 +18,7 @@ from playwright.sync_api import sync_playwright
 
 import i18n
 from services import kuyruk, tablolar
-from tests.test_playwright_studio import ServerThread, get_free_port
+from tests.test_playwright_studio import ServerThread, get_free_port, sunucu_hazir
 
 pytestmark = pytest.mark.gercek_kimlik
 
@@ -31,7 +29,7 @@ def _admin_yap(oturum) -> None:
         db.commit()
 
 
-def test_the_admin_walks_the_three_tabs_and_sets_a_users_cap_while_a_non_admin_gets_403(veritabani, e2e_oturum):
+def test_the_admin_walks_the_three_tabs_sets_a_users_cap_plan_and_credits_while_a_non_admin_gets_403(veritabani, e2e_oturum):
     port = get_free_port()
     server = ServerThread(port)
     server.start()
@@ -41,7 +39,7 @@ def test_the_admin_walks_the_three_tabs_and_sets_a_users_cap_while_a_non_admin_g
     with kullanici.db() as db:
         kuyruk.ekle(db, kullanici.kullanici_id, "generate", {"prompt": "x"}, "m", 3)
         db.commit()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     taban = f"http://127.0.0.1:{port}"
     try:
         with sync_playwright() as p:
@@ -71,7 +69,8 @@ def test_the_admin_walks_the_three_tabs_and_sets_a_users_cap_while_a_non_admin_g
             assert satir.locator("td").nth(5).inner_text() in ("0", "1"), "aktif iş sütunu sayı"
 
             # 3. Tavan yaz: kutuya 500, "Yaz" → satır DB'de, mesaj satırı başarı, "Öntanımlıya dön" görünür.
-            satir.locator('input[type="number"]').fill("500")
+            # Etiketle: satırda iki sayı kutusu var (Faz 3 / 3 "kredi ekle" de `type="number"`).
+            satir.get_by_label(i18n.t("admin.sutun_tavan", "tr")).fill("500")
             satir.get_by_role("button", name=i18n.t("admin.tavan_yaz", "tr")).click()
             page.wait_for_function(
                 f'document.querySelector("#admin-mesaj").textContent === {i18n.t("admin.tavan_yazildi", "tr")!r}')
@@ -85,6 +84,55 @@ def test_the_admin_walks_the_three_tabs_and_sets_a_users_cap_while_a_non_admin_g
             # yazıldı) ve `kullanicilariYukle` yeniden çizmeden önce okunabiliyor — yüklü makinede
             # takım koşusunda "Öntanımlıya dön" hâlâ eski satırın gizli düğmesiydi (ölçüldü, 2026-09-19).
             satir.get_by_role("button", name=i18n.t("admin.tavan_sil", "tr")).wait_for(state="visible")
+
+            # 3b. Plan (Faz 3 / 3): seçici `pro` → değişince yazar, mesaj satırı planı söyler, DB `pro`.
+            satir = page.locator(f'#admin-kullanicilar tr[data-id="{kullanici.kullanici_id}"]')
+            assert satir.locator("select.admin-plan").input_value() == "free"
+            # ESKİ satırın tutamacı: yazım `kullanicilariYukle` ile satırları yeniden çizer; "seçici pro
+            # gösteriyor" koşulu eski satırda da doğru (kullanıcı az önce seçti) — tavan adımının aynı tuzağı.
+            # Eski satır DOM'dan düşünce yeni satır gelmiştir; kutular ancak o zaman doldurulur, yoksa
+            # yeniden çizim doldurulan kutuları siler ve "Kredi ekle" boş miktarla (0 → 422) gider (ölçüldü).
+            eski_satir = satir.element_handle()
+            satir.locator("select.admin-plan").select_option("pro")
+            page.wait_for_function(
+                f'document.querySelector("#admin-mesaj").textContent === {i18n.t("admin.plan_yazildi", "tr", plan="pro")!r}')
+            with kullanici.db() as db:
+                assert db.scalar(select(tablolar.Kullanici.plan)
+                                 .where(tablolar.Kullanici.id == kullanici.kullanici_id)) == "pro"
+            eski_satir.wait_for_element_state("hidden")   # ayrılmış öğe "gizli" sayılır: yeniden çizim bitti
+            satir = page.locator(f'#admin-kullanicilar tr[data-id="{kullanici.kullanici_id}"]')
+            assert satir.locator("select.admin-plan").input_value() == "pro", "yeni satır sunucudan `pro` okur"
+
+            # 3c. Kredi (Faz 3 / 3): miktar 50 + açıklama → `duzeltme` satırı `admin_id` iziyle. Bakiyenin
+            # KENDİSİ iddia edilmez: E2E sunucusunun işçisi açılış bakım turunda aylık hibeyi (200) bu
+            # arada yatırmış olabilir — satır deterministik, toplam değil.
+            eski_satir = satir.element_handle()
+            satir.get_by_label(i18n.t("admin.kredi_miktar", "tr")).fill("50")
+            satir.get_by_label(i18n.t("admin.kredi_aciklama", "tr")).fill("e2e jesti")
+            satir.get_by_role("button", name=i18n.t("admin.kredi_ekle", "tr")).click()
+            onek = i18n.t("admin.kredi_yazildi", "tr").split("{")[0]   # yer tutucu yerinde kalır, önek ondan önce
+            page.wait_for_function(
+                f'document.querySelector("#admin-mesaj").textContent.startsWith({onek!r})')
+            eski_satir.wait_for_element_state("hidden")   # yeniden çizim bitti (yukarıdaki gerekçe)
+            with kullanici.db() as db:
+                duzeltmeler = list(db.scalars(
+                    select(tablolar.KrediHareketi)
+                    .where(tablolar.KrediHareketi.kullanici_id == kullanici.kullanici_id,
+                           tablolar.KrediHareketi.tur == "duzeltme")))
+                assert [(h.miktar, h.aciklama, h.admin_id) for h in duzeltmeler] == [(50, "e2e jesti", admin.kullanici_id)]
+                toplam = db.scalar(select(func.coalesce(func.sum(tablolar.KrediHareketi.miktar), 0))
+                                   .where(tablolar.KrediHareketi.kullanici_id == kullanici.kullanici_id))
+                assert toplam == db.scalar(select(tablolar.Kullanici.bakiye)
+                                           .where(tablolar.Kullanici.id == kullanici.kullanici_id)), "SUM(defter) == bakiye"
+            # Boş açıklama sunucuda 422 — mesaj satırı hata türüne döner, satır yazılmaz.
+            satir = page.locator(f'#admin-kullanicilar tr[data-id="{kullanici.kullanici_id}"]')
+            satir.get_by_label(i18n.t("admin.kredi_miktar", "tr")).fill("5")
+            satir.get_by_role("button", name=i18n.t("admin.kredi_ekle", "tr")).click()
+            page.wait_for_function('document.querySelector("#admin-mesaj").dataset.tur === "hata"')
+            with kullanici.db() as db:
+                assert db.scalar(select(func.count()).select_from(tablolar.KrediHareketi)
+                                 .where(tablolar.KrediHareketi.kullanici_id == kullanici.kullanici_id,
+                                        tablolar.KrediHareketi.tur == "duzeltme")) == 1
 
             # 4. Kuyruk sekmesi: B'nin işi sahibiyle (durumu işçiye bağlı), özet satırı çevrili ve dolu.
             page.click('#admin-sekmeler [data-sekme="kuyruk"]')

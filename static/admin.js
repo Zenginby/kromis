@@ -3,10 +3,18 @@
 // Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 //
 // Yönetim sayfasının betiği (Faz 2 / 8) — static/admin.html'in tek betiği
-// (i18n.js dışında). Üç sekme, üç okuma ucu, üç yazma ucu:
+// (i18n.js dışında). Üç sekme, üç okuma ucu, beş yazma ucu:
 //   GET  /api/admin/kullanicilar?q=&sayfa=   · POST /api/admin/kullanicilar/{id}/tavan
 //   GET  /api/admin/isler?durum=             · POST /api/admin/kullanicilar/{id}/oturum-dusur
 //   GET  /api/admin/metrikler                · POST /api/admin/isler/{id}/iptal
+//   (Faz 3 / 3)                              · POST /api/admin/kullanicilar/{id}/plan
+//                                            · POST /api/admin/kullanicilar/{id}/kredi
+//
+// Plan seçici ve "kredi ekle" (Faz 3 / 3): plan adları SUNUCUDAN gelmiyor, listeyi
+// `PLANLAR` sabiti tutuyor — üç ad kodda katalog (services/planlar.py, K5) ve
+// bilinmeyen adı sunucu 422 ile reddeder; bir plan eklendiği gün iki liste
+// birlikte değişir (bekçisi tests/test_planlar.py). Kredi düzeltmesi açıklama
+// İSTER: sunucu boş açıklamayı 422 yapar, kutu o yüzden zorunlu.
 //
 // IIFE İÇİNDE (giris.js'in gerekçesi): eslint her static/*.js dosyasına öteki
 // betiklerin üst düzey adlarını küresel veriyor; kapalı kapsam çakışmayı ve
@@ -23,6 +31,7 @@
   const el = (id) => document.getElementById(id);
   const mesaj = el("admin-mesaj");
   const SEKMELER = ["kullanicilar", "kuyruk", "metrikler"];
+  const PLANLAR = ["free", "temel", "pro"];
   const YENILEME_MS = 30000;
   const SAYFA_ADEDI = 50;
   // Durum/tür etiketleri isler.js'in aynı anahtarları — tablo hâlinde, çünkü
@@ -194,6 +203,54 @@
     });
     sil.hidden = k.gunluk_kredi_tavani === null;
     const tavan = islemHucresi(kutu, yaz, sil);
+    // Plan seçici: değişince hemen yazar (ayrı bir "Yaz" düğmesi üç seçenek için fazla).
+    const secici = document.createElement("select");
+    secici.className = "admin-plan";
+    secici.setAttribute("aria-label", t("admin.sutun_plan"));
+    for (const ad of PLANLAR) {
+      const o = document.createElement("option");
+      o.value = ad;
+      o.textContent = ad;
+      o.selected = ad === k.plan;
+      secici.append(o);
+    }
+    secici.addEventListener("change", async () => {
+      secici.disabled = true;
+      try {
+        await gonder(`/api/admin/kullanicilar/${k.id}/plan`, { plan: secici.value });
+        mesajYaz(t("admin.plan_yazildi", { plan: secici.value }), "basari");
+        await kullanicilariYukle();
+      } catch (err) {
+        mesajYaz(err.message, "hata");
+        secici.value = k.plan;
+      } finally {
+        secici.disabled = false;
+      }
+    });
+    const plan = islemHucresi(secici);
+    // Bakiye + "kredi ekle": miktar ± tam sayı, açıklama zorunlu (sunucu 422).
+    const bakiye = document.createElement("span");
+    bakiye.className = "admin-bakiye";
+    bakiye.textContent = String(k.bakiye);
+    const miktar = document.createElement("input");
+    miktar.type = "number";
+    miktar.step = "1";
+    miktar.placeholder = "±";
+    miktar.setAttribute("aria-label", t("admin.kredi_miktar"));
+    const aciklama = document.createElement("input");
+    aciklama.type = "text";
+    aciklama.maxLength = 500;
+    aciklama.placeholder = t("admin.kredi_aciklama");
+    aciklama.setAttribute("aria-label", t("admin.kredi_aciklama"));
+    const ekle = dugme(t("admin.kredi_ekle"), async () => {
+      const cevap = await gonder(`/api/admin/kullanicilar/${k.id}/kredi`, {
+        miktar: Number(miktar.value),
+        aciklama: aciklama.value.trim(),
+      });
+      mesajYaz(t("admin.kredi_yazildi", { bakiye: cevap.bakiye }), "basari");
+      await kullanicilariYukle();
+    });
+    const kredi = islemHucresi(bakiye, miktar, aciklama, ekle);
     const islem = islemHucresi(
       dugme(
         t("admin.oturum_dusur"),
@@ -212,6 +269,8 @@
       tavan,
       hucre(String(k.kredi_24sa)),
       hucre(String(k.aktif_is)),
+      plan,
+      kredi,
       islem,
     );
     return tr;
@@ -225,7 +284,7 @@
     const veri = await istek(yol);
     toplam = veri.toplam;
     const tbody = el("admin-kullanicilar");
-    if (!veri.kullanicilar.length) bosSatir(tbody, 7);
+    if (!veri.kullanicilar.length) bosSatir(tbody, 9);
     else tbody.replaceChildren(...veri.kullanicilar.map(kullaniciSatiri));
     el("admin-toplam").textContent = t("admin.toplam", { toplam, sayfa });
     el("admin-onceki").disabled = sayfa <= 1;

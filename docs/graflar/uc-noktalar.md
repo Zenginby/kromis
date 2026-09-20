@@ -2,79 +2,81 @@
 
 # Uç nokta grafı
 
-67 HTTP rotası, 11 dosyada (`routers/` altındaki alan router'ları; bileşim kökü `app.py` yalnız takıyor). `modüller` sütunu, rotanın gövdesinin VE yardımcılarının (`services/`, aynı router'daki özel işlevler) dokunduğu KÜTÜPHANE modülleridir — yani bir modülü değiştirirken hangi isteklerin sınanması gerektiği burada yazılı; `routers.*`/`services.*` bilerek sütunda yok (gerekçe: tools/graf_uret.py, uc_noktalar). `ön yüz` sütunu o yolu çağıran tarayıcı betiği.
+69 HTTP rotası, 11 dosyada (`routers/` altındaki alan router'ları; bileşim kökü `app.py` yalnız takıyor). `modüller` sütunu, rotanın gövdesinin VE yardımcılarının (`services/`, aynı router'daki özel işlevler) dokunduğu KÜTÜPHANE modülleridir — yani bir modülü değiştirirken hangi isteklerin sınanması gerektiği burada yazılı; `routers.*`/`services.*` bilerek sütunda yok (gerekçe: tools/graf_uret.py, uc_noktalar). `ön yüz` sütunu o yolu çağıran tarayıcı betiği.
 
 `paths` satırlarda GÖRÜNMÜYOR ve bu bir kör nokta değil, kararın kendisi (Faz 0 / Adım 4): çıktı/varlık dizinleri rotaya `Depends(ayar.ayarlar)` ile gelen ayar nesnesinden okunuyor (`ayarlar.output_dir`), yani bir öznitelik — çağrı değil. `paths`e dokunmak yine neredeyse her ucu etkiler, ama tek bir kapıdan: `app.py`deki `Ayarlar.varsayilan()`. Kiracıya göre dizin (Faz 1) o kapının içini değiştirecek, bu tabloyu değil.
 
 | yöntem | yol | dosya | işlev | modüller | ön yüz |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/` | `routers/kok.py` | `index`:27 | `errlog`, `i18n`, `version` | — |
-| GET | `/admin` | `routers/admin.py` | `admin_sayfasi`:58 | `errlog`, `i18n`, `version` | — |
-| GET | `/api/admin/isler` | `routers/admin.py` | `isler`:77 | `i18n` | `admin.js` |
-| POST | `/api/admin/isler/{is_id}/iptal` | `routers/admin.py` | `is_iptal`:123 | `i18n` | `admin.js` |
-| GET | `/api/admin/kullanicilar` | `routers/admin.py` | `kullanicilar`:65 | — | `admin.js` |
-| POST | `/api/admin/kullanicilar/{kullanici_id}/oturum-dusur` | `routers/admin.py` | `oturum_dusur`:112 | `i18n` | `admin.js` |
-| POST | `/api/admin/kullanicilar/{kullanici_id}/tavan` | `routers/admin.py` | `tavan`:102 | `i18n` | `admin.js` |
-| GET | `/api/admin/metrikler` | `routers/admin.py` | `metrikler`:87 | — | `admin.js` |
-| GET | `/api/arena/{arena_id}` | `routers/galeri.py` | `arena_round_route`:185 | `storage` | `chat.js` |
-| POST | `/api/arena/{arena_id}/winner` | `routers/galeri.py` | `set_arena_winner_route`:201 | `i18n`, `models`, `storage` | `chat.js` |
+| GET | `/admin` | `routers/admin.py` | `admin_sayfasi`:76 | `errlog`, `i18n`, `version` | — |
+| GET | `/api/admin/isler` | `routers/admin.py` | `isler`:95 | `i18n` | `admin.js` |
+| POST | `/api/admin/isler/{is_id}/iptal` | `routers/admin.py` | `is_iptal`:179 | `i18n` | `admin.js` |
+| GET | `/api/admin/kullanicilar` | `routers/admin.py` | `kullanicilar`:83 | — | `admin.js` |
+| POST | `/api/admin/kullanicilar/{kullanici_id}/kredi` | `routers/admin.py` | `kredi`:149 | `i18n` | `admin.js` |
+| POST | `/api/admin/kullanicilar/{kullanici_id}/oturum-dusur` | `routers/admin.py` | `oturum_dusur`:168 | `i18n` | `admin.js` |
+| POST | `/api/admin/kullanicilar/{kullanici_id}/plan` | `routers/admin.py` | `plan`:130 | `i18n` | `admin.js` |
+| POST | `/api/admin/kullanicilar/{kullanici_id}/tavan` | `routers/admin.py` | `tavan`:120 | `i18n` | `admin.js` |
+| GET | `/api/admin/metrikler` | `routers/admin.py` | `metrikler`:105 | — | `admin.js` |
+| GET | `/api/arena/{arena_id}` | `routers/galeri.py` | `arena_round_route`:189 | `storage` | `chat.js` |
+| POST | `/api/arena/{arena_id}/winner` | `routers/galeri.py` | `set_arena_winner_route`:205 | `i18n`, `models`, `storage` | `chat.js` |
 | GET | `/api/assets/{kind}` | `routers/bindirme.py` | `list_assets_route`:243 | `assets_store`, `i18n` | `assets.js` |
 | POST | `/api/assets/{kind}` | `routers/bindirme.py` | `upload_asset`:213 | `assets_store`, `i18n` | `assets.js` |
 | DELETE | `/api/assets/{kind}/{asset_id}` | `routers/bindirme.py` | `delete_asset_route`:251 | `assets_store`, `i18n` | `assets.js` |
 | POST | `/api/banner` | `routers/bindirme.py` | `add_banner`:185 | `assets_store`, `catalog`, `i18n`, `models`, `storage` | `assets.js` |
 | POST | `/api/banner/preview` | `routers/bindirme.py` | `preview_banner`:173 | `assets_store`, `i18n`, `models` | `assets.js` |
 | POST | `/api/chat` | `routers/sohbet.py` | `chat`:38 | `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `credstore`, `etiket`, `i18n`, `models`, `prefs` | `chat.js` |
-| DELETE | `/api/chats` | `routers/sohbet.py` | `delete_all_chats_route`:201 | — | `chat.js` |
-| GET | `/api/chats` | `routers/sohbet.py` | `list_chats_route`:160 | `chat_store` | `chat.js` |
-| POST | `/api/chats` | `routers/sohbet.py` | `create_chat_route`:176 | `chat_store`, `i18n`, `models`, `prefs` | `chat.js` |
-| DELETE | `/api/chats/{chat_id}` | `routers/sohbet.py` | `delete_chat_route`:235 | `chat_store`, `i18n` | `chat.js` |
-| GET | `/api/chats/{chat_id}` | `routers/sohbet.py` | `get_chat_route`:167 | `chat_store`, `i18n` | `chat.js` |
-| PUT | `/api/chats/{chat_id}` | `routers/sohbet.py` | `update_chat_route`:212 | `chat_store`, `i18n`, `models`, `prefs` | `chat.js` |
-| POST | `/api/edit` | `routers/uretim.py` | `edit`:464 | `catalog`, `chat_store`, `etiket`, `i18n`, `models`, `palette` | `core.js` |
+| DELETE | `/api/chats` | `routers/sohbet.py` | `delete_all_chats_route`:202 | — | `chat.js` |
+| GET | `/api/chats` | `routers/sohbet.py` | `list_chats_route`:161 | `chat_store` | `chat.js` |
+| POST | `/api/chats` | `routers/sohbet.py` | `create_chat_route`:177 | `chat_store`, `i18n`, `models`, `prefs` | `chat.js` |
+| DELETE | `/api/chats/{chat_id}` | `routers/sohbet.py` | `delete_chat_route`:236 | `chat_store`, `i18n` | `chat.js` |
+| GET | `/api/chats/{chat_id}` | `routers/sohbet.py` | `get_chat_route`:168 | `chat_store`, `i18n` | `chat.js` |
+| PUT | `/api/chats/{chat_id}` | `routers/sohbet.py` | `update_chat_route`:213 | `chat_store`, `i18n`, `models`, `prefs` | `chat.js` |
+| POST | `/api/edit` | `routers/uretim.py` | `edit`:490 | `catalog`, `chat_store`, `etiket`, `i18n`, `models`, `palette` | `core.js` |
 | GET | `/api/folders` | `routers/galeri.py` | `list_folders_route`:48 | — | `folders.js` |
 | POST | `/api/folders` | `routers/galeri.py` | `create_folder_route`:70 | `folders`, `i18n`, `models` | `folders.js` |
 | DELETE | `/api/folders/{folder_id}` | `routers/galeri.py` | `delete_folder_route`:87 | `folders`, `i18n` | `folders.js` |
 | PATCH | `/api/folders/{folder_id}` | `routers/galeri.py` | `rename_folder_route`:151 | `folders`, `i18n`, `models` | `folders.js` |
 | GET | `/api/folders/{folder_id}/download` | `routers/galeri.py` | `download_folder_route`:102 | `folders`, `i18n` | `folders.js` |
-| POST | `/api/generate` | `routers/uretim.py` | `generate`:133 | `catalog`, `chat_store`, `color_names`, `credstore`, `etiket`, `folders`, `i18n`, `models`, `palette`, `palette_store`, `storage` | `core.js` |
-| GET | `/api/guncelleme` | `routers/ayarlar.py` | `get_guncelleme`:113 | `guncelleme`, `prefs` | `settings.js` |
-| POST | `/api/guncelleme` | `routers/ayarlar.py` | `post_guncelleme`:148 | `guncelleme`, `prefs` | `settings.js` |
-| GET | `/api/hesap/ben` | `routers/hesap.py` | `ben`:244 | — | `giris.js`, `isler.js`, `settings.js` |
-| POST | `/api/hesap/cikis` | `routers/hesap.py` | `cikis`:192 | — | `settings.js` |
-| POST | `/api/hesap/dogrula` | `routers/hesap.py` | `dogrula`:143 | `i18n`, `models` | `giris.js` |
-| POST | `/api/hesap/giris` | `routers/hesap.py` | `giris`:155 | `errlog`, `i18n`, `models` | `giris.js` |
-| POST | `/api/hesap/kayit` | `routers/hesap.py` | `kayit`:109 | `errlog`, `i18n`, `models` | `giris.js` |
-| POST | `/api/hesap/sifirla` | `routers/hesap.py` | `sifirla`:204 | `errlog`, `i18n`, `models` | `giris.js` |
-| POST | `/api/hesap/sifirla/dogrula` | `routers/hesap.py` | `sifirla_dogrula`:224 | `i18n`, `models` | `giris.js` |
+| POST | `/api/generate` | `routers/uretim.py` | `generate`:159 | `catalog`, `chat_store`, `color_names`, `credstore`, `etiket`, `folders`, `i18n`, `models`, `palette`, `palette_store`, `storage` | `core.js` |
+| GET | `/api/guncelleme` | `routers/ayarlar.py` | `get_guncelleme`:114 | `guncelleme`, `prefs` | `settings.js` |
+| POST | `/api/guncelleme` | `routers/ayarlar.py` | `post_guncelleme`:149 | `guncelleme`, `prefs` | `settings.js` |
+| GET | `/api/hesap/ben` | `routers/hesap.py` | `ben`:265 | — | `giris.js`, `isler.js`, `settings.js` |
+| POST | `/api/hesap/cikis` | `routers/hesap.py` | `cikis`:213 | — | `settings.js` |
+| POST | `/api/hesap/dogrula` | `routers/hesap.py` | `dogrula`:164 | `i18n`, `models` | `giris.js` |
+| POST | `/api/hesap/giris` | `routers/hesap.py` | `giris`:176 | `errlog`, `i18n`, `models` | `giris.js` |
+| POST | `/api/hesap/kayit` | `routers/hesap.py` | `kayit`:129 | `errlog`, `i18n`, `models` | `giris.js` |
+| POST | `/api/hesap/sifirla` | `routers/hesap.py` | `sifirla`:225 | `errlog`, `i18n`, `models` | `giris.js` |
+| POST | `/api/hesap/sifirla/dogrula` | `routers/hesap.py` | `sifirla_dogrula`:245 | `i18n`, `models` | `giris.js` |
 | GET | `/api/history` | `routers/galeri.py` | `history`:165 | `folders`, `i18n` | `folders.js`, `isler.js` |
-| DELETE | `/api/image/{image_id}` | `routers/galeri.py` | `delete_image`:218 | `i18n`, `storage` | `core.js` |
-| PATCH | `/api/image/{image_id}` | `routers/galeri.py` | `move_image`:174 | `folders`, `i18n`, `models`, `storage` | `core.js` |
-| DELETE | `/api/images` | `routers/galeri.py` | `delete_images`:242 | `i18n`, `models`, `storage` | `folders.js` |
-| PATCH | `/api/images` | `routers/galeri.py` | `move_images`:230 | `folders`, `i18n`, `models`, `storage` | `folders.js` |
-| POST | `/api/import` | `routers/galeri.py` | `import_image`:255 | `i18n` | `folders.js` |
+| DELETE | `/api/image/{image_id}` | `routers/galeri.py` | `delete_image`:222 | `i18n`, `storage` | `core.js` |
+| PATCH | `/api/image/{image_id}` | `routers/galeri.py` | `move_image`:178 | `folders`, `i18n`, `models`, `storage` | `core.js` |
+| DELETE | `/api/images` | `routers/galeri.py` | `delete_images`:246 | `i18n`, `models`, `storage` | `folders.js` |
+| PATCH | `/api/images` | `routers/galeri.py` | `move_images`:234 | `folders`, `i18n`, `models`, `storage` | `folders.js` |
+| POST | `/api/import` | `routers/galeri.py` | `import_image`:259 | `i18n` | `folders.js` |
 | GET | `/api/isler` | `routers/isler.py` | `isleri_listele`:112 | `i18n` | `isler.js` |
 | GET | `/api/isler/akis` | `routers/isler.py` | `isleri_akit`:209 | `i18n` | `isler.js` |
 | GET | `/api/isler/{is_id}` | `routers/isler.py` | `is_getir`:240 | `i18n` | `isler.js` |
 | POST | `/api/isler/{is_id}/iptal` | `routers/isler.py` | `is_iptal`:247 | `i18n` | `isler.js` |
-| POST | `/api/isler/{is_id}/yeniden` | `routers/isler.py` | `is_yeniden`:265 | `catalog`, `credstore`, `etiket`, `i18n` | `isler.js` |
+| POST | `/api/isler/{is_id}/yeniden` | `routers/isler.py` | `is_yeniden`:271 | `catalog`, `credstore`, `etiket`, `i18n` | `isler.js` |
 | GET | `/api/kota` | `routers/isler.py` | `kota_durumu`:129 | — | `isler.js` |
 | POST | `/api/logo` | `routers/bindirme.py` | `add_logo`:94 | `assets_store`, `catalog`, `composite`, `i18n`, `models`, `storage` | `assets.js` |
 | POST | `/api/logo/preview` | `routers/bindirme.py` | `preview_logo`:82 | `assets_store`, `composite`, `i18n`, `models` | `assets.js` |
-| GET | `/api/output/{image_id}/download` | `routers/galeri.py` | `output_download`:356 | `i18n`, `storage` | `core.js` |
+| GET | `/api/output/{image_id}/download` | `routers/galeri.py` | `output_download`:360 | `i18n`, `storage` | `core.js` |
 | POST | `/api/palette/suggest` | `routers/paletler.py` | `suggest_palettes`:33 | `color_names`, `models`, `palette` | `palette.js` |
 | GET | `/api/palettes` | `routers/paletler.py` | `list_palettes_route`:68 | — | `palette.js` |
 | POST | `/api/palettes` | `routers/paletler.py` | `create_palette_route`:74 | `color_names`, `i18n`, `models`, `palette` | `palette.js` |
 | DELETE | `/api/palettes/{palette_id}` | `routers/paletler.py` | `delete_palette_route`:96 | `i18n`, `palette_store` | `palette.js` |
-| GET | `/api/prefs` | `routers/ayarlar.py` | `get_prefs_route`:361 | `prefs` | `chat.js`, `core.js`, `settings.js` |
-| POST | `/api/prefs` | `routers/ayarlar.py` | `post_prefs_route`:368 | `catalog`, `i18n`, `models`, `prefs` | `chat.js`, `core.js`, `settings.js` |
-| GET | `/api/settings` | `routers/ayarlar.py` | `get_settings`:66 | `catalog`, `credstore`, `etiket`, `guncelleme`, `i18n`, `paths`, `prefs`, `version` | `settings.js` |
-| POST | `/api/settings` | `routers/ayarlar.py` | `post_settings`:181 | `azure_client`, `catalog`, `credstore`, `etiket`, `i18n`, `models`, `version` | `settings.js` |
-| POST | `/api/video` | `routers/uretim.py` | `video`:165 | `catalog`, `chat_store`, `credstore`, `etiket`, `folders`, `i18n`, `models` | `core.js` |
-| POST | `/api/video/animate` | `routers/uretim.py` | `animate`:264 | `catalog`, `chat_store`, `etiket`, `i18n`, `models` | `core.js` |
+| GET | `/api/prefs` | `routers/ayarlar.py` | `get_prefs_route`:363 | `prefs` | `chat.js`, `core.js`, `settings.js` |
+| POST | `/api/prefs` | `routers/ayarlar.py` | `post_prefs_route`:370 | `catalog`, `i18n`, `models`, `prefs` | `chat.js`, `core.js`, `settings.js` |
+| GET | `/api/settings` | `routers/ayarlar.py` | `get_settings`:67 | `catalog`, `credstore`, `etiket`, `guncelleme`, `i18n`, `paths`, `prefs`, `version` | `settings.js` |
+| POST | `/api/settings` | `routers/ayarlar.py` | `post_settings`:182 | `azure_client`, `catalog`, `credstore`, `etiket`, `i18n`, `models`, `version` | `settings.js` |
+| POST | `/api/video` | `routers/uretim.py` | `video`:191 | `catalog`, `chat_store`, `credstore`, `etiket`, `folders`, `i18n`, `models` | `core.js` |
+| POST | `/api/video/animate` | `routers/uretim.py` | `animate`:290 | `catalog`, `chat_store`, `etiket`, `i18n`, `models` | `core.js` |
 | GET | `/assets/{kind}/{filename}` | `routers/bindirme.py` | `asset_file`:263 | `assets_store`, `i18n` | `assets.js` |
-| GET | `/giris` | `routers/hesap.py` | `giris_sayfasi`:250 | `errlog`, `i18n`, `version` | — |
+| GET | `/giris` | `routers/hesap.py` | `giris_sayfasi`:271 | `errlog`, `i18n`, `version` | — |
 | GET | `/health` | `routers/saglik.py` | `health`:149 | `version` | — |
-| GET | `/output/{filename}` | `routers/galeri.py` | `output_file`:322 | `i18n`, `storage` | `assets.js`, `chat.js`, `core.js`, `folders.js`, `isler.js`, `viewer.js` |
+| GET | `/output/{filename}` | `routers/galeri.py` | `output_file`:326 | `i18n`, `storage` | `assets.js`, `chat.js`, `core.js`, `folders.js`, `isler.js`, `viewer.js` |
 
 ## Öbek → modül
 

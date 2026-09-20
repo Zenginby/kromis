@@ -498,6 +498,7 @@ def _menu_ids(talimat):
     return set(re.findall(r"^\* `([^`]+)`", blok, re.M))
 
 
+@pytest.mark.usefixtures("plan_pro")   # Faz 3 / 3: ücretsiz planda video menüye girmez; burada ANAHTAR süzgeci ölçülür
 def test_only_configured_models_reach_the_directors_menu(
         client, fake_kwargs, monkeypatch):
     """ÖZELLİĞİN ÇEKİRDEK İDDİASI: menü "var olan" değil "ULAŞILABİLEN" modeller.
@@ -539,6 +540,7 @@ def test_the_menu_and_the_ui_ask_the_same_visibility_question(
     assert ids == arayuz
 
 
+@pytest.mark.usefixtures("plan_pro")   # Faz 3 / 3: ücretsiz planda video menüye girmez; burada ANAHTAR süzgeci ölçülür
 def test_the_video_instructions_only_ship_when_a_video_model_is_configured(
         client, fake_kwargs, monkeypatch):
     """Video zanaatı HER TURDA ödenen karakter: video kullanmayan kullanıcı
@@ -792,7 +794,7 @@ def test_the_context_is_gathered_outside_the_instruction_guard(client, fake_kwar
               ).read_text(encoding="utf-8")
     assert "instructions = chat_prompt.build_system(**baglam)" in kaynak, (
         "bağlam çağrısı `build_system`in argümanı olarak `try` içinde duruyor")
-    govde = kaynak.split("baglam = modeller.director_context(db, kullanici.id, kimlikler)", 1)
+    govde = kaynak.split("baglam = modeller.director_context(db, kullanici.id, kimlikler, plan=plan)", 1)
     assert len(govde) == 2, "bağlam `try` öncesinde toplanmıyor"
     assert "try:" in govde[1].split("except ValueError", 1)[0], (
         "kapı bağlam toplamadan SONRA açılmıyor")

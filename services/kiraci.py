@@ -7,9 +7,11 @@
 bekçisi tests/test_galeri_db.py) bir AST bekçisiyle korunuyor, ama bekçi yalnız
 depo imzalarını görür — ham `select(Medya)` yazan bir rota ya da araç ondan
 kaçar. Göç `0006_rls` sekiz iş tablosuna (`IS_TABLOLARI`) Postgres politikası
-koyar: satır ancak `kullanici_id = current_setting('app.kullanici_id')` ise
+koyar, `0007_kredi` dokuzuncuyu (`kredi_hareketleri`) aynı politikalarla ekler:
+satır ancak `kullanici_id = current_setting('app.kullanici_id')` ise
 görünür/yazılır; `app.rol = 'admin'` hepsini OKUR ve GÜNCELLER (silmez,
-eklemez). Politika SORGUYU değil BAĞLANTIYI kısıtlar: süzgeç unutulursa sonuç
+eklemez — TEK istisna `kredi_hareketleri`de INSERT, `YONETICI_EKLER_TABLOLARI`,
+Faz 3 K4). Politika SORGUYU değil BAĞLANTIYI kısıtlar: süzgeç unutulursa sonuç
 boş, sızıntı değil (docs/faz2-kuyruk-anahtarlar-depolama.md §7).
 
 BU MODÜL politikanın uygulama tarafı: "bu transaksiyon KİMİN adına?" sorusunun
@@ -62,8 +64,8 @@ from contextvars import ContextVar, Token
 from sqlalchemy import Connection, text
 from sqlalchemy.orm import Session
 
-__all__ = ["ADMIN", "AYAR_KULLANICI", "AYAR_ROL", "IS_TABLOLARI", "Baglam",
-           "bagla", "coz", "aktif", "sifirla", "baglam", "uygula"]
+__all__ = ["ADMIN", "AYAR_KULLANICI", "AYAR_ROL", "IS_TABLOLARI", "YONETICI_EKLER_TABLOLARI",
+           "Baglam", "bagla", "coz", "aktif", "sifirla", "baglam", "uygula"]
 
 # `app.rol`un tek anlamlı değeri. Politika bu dizeyle karşılaştırıyor (0006_rls);
 # 8. görevin `kimlik.admin_kullanici` bağımlılığı da bunu bağlar.
@@ -75,17 +77,30 @@ ADMIN = "admin"
 AYAR_KULLANICI = "app.kullanici_id"
 AYAR_ROL = "app.rol"
 
-# RLS'in kapsadığı SEKİZ iş tablosu — `kullanici_id` taşıyan ve hesap tablosu
-# olmayan her tablo (Faz 1'in yedisi + `isler`). Elle tutulan liste; bekçisi
-# tests/test_rls.py: `services/tablolar.py` metadata'sından türetilen küme,
-# göç dosyasının literali ve DB'deki `pg_class.relforcerowsecurity` üçü aynı
-# olmak zorunda (CLAUDE.md §5 — listede olmayan tablo muaf demek, o yüzden
-# liste metadata'yla karşılaştırılır). Hesap tabloları (`kullanicilar`,
-# `oturumlar`, `jetonlar`, `giris_denemeleri`) ve `isciler` politikasız:
-# kimlik çözülmeden koşan sorgular oradadır ve `kullanicilar.gunluk_kredi_tavani`
-# yazımı 8. görevin sütun düzeyi GRANT'ına kalır (belge §6 devir).
+# RLS'in kapsadığı DOKUZ iş tablosu — `kullanici_id` taşıyan ve hesap tablosu
+# olmayan her tablo (Faz 1'in yedisi + `isler` + Faz 3'ün `kredi_hareketleri`).
+# Elle tutulan liste; bekçisi tests/test_rls.py: `services/tablolar.py`
+# metadata'sından türetilen küme, göç dosyalarının literalleri (`0006_rls` 8 +
+# `0007_kredi` 9) ve DB'deki `pg_class.relforcerowsecurity` hepsi aynı olmak
+# zorunda (CLAUDE.md §5 — listede olmayan tablo muaf demek, o yüzden liste
+# metadata'yla karşılaştırılır). Hesap tabloları (`kullanicilar`, `oturumlar`,
+# `jetonlar`, `giris_denemeleri`) ve `isciler` politikasız: kimlik çözülmeden
+# koşan sorgular oradadır; `kullanicilar.gunluk_kredi_tavani` (admin) ve
+# `kullanicilar.bakiye` (defter — işçi admin bağlamında, rota kullanıcı
+# bağlamında yazar) bu yüzden politikasız tabloda.
 IS_TABLOLARI: tuple[str, ...] = ("klasorler", "medya", "sohbetler", "paletler", "varliklar",
-                                 "tercihler", "saglayici_kimlikleri", "isler")
+                                 "tercihler", "saglayici_kimlikleri", "isler", "kredi_hareketleri")
+
+# Admin bağlamının INSERT de yapabildiği tablolar — TEK istisna (Faz 3 / 1, K4):
+# `0007_kredi` `kredi_hareketleri`ye dördüncü politika `yonetici_ekler` koyar,
+# çünkü iki yazar admin bağlamında yazar: admin düzeltmesi (`defter.duzelt`,
+# `admin_id` iziyle) ve işçinin bakım turu (aylık hibe, bayat işin iadesi).
+# Alternatif — admin rotasını hedef kullanıcının bağlamına bağlamak — `admin_id`
+# izini kaybederdi, `sahip` politikası "kullanıcı yazdı" derdi (K4'ün tuzağı).
+# Öteki sekiz tabloda admin INSERT yapamaz; DELETE hâlâ hiçbir tabloda yok.
+# Bekçileri tests/test_rls.py (dört politika yalnız burada) ve tools/rls_kontrol.py
+# (beklenen politika sayısı 3 × 9 + bu listenin uzunluğu).
+YONETICI_EKLER_TABLOLARI: tuple[str, ...] = ("kredi_hareketleri",)
 
 # İki ayarı TEK ifadede yazar (bir gidiş-dönüş). `set_config(..., true)` = SET
 # LOCAL: transaksiyon sonunda düşer. `SET` bind parametresi almıyor; `set_config`

@@ -48,6 +48,7 @@ import version
 from services import (
     cerez,
     db,
+    defter,
     depo_admin,
     hesap,
     kiraci,
@@ -239,7 +240,7 @@ def test_every_id_the_admin_script_binds_exists_in_the_admin_page_and_it_calls_e
     assert bagli <= idler, f"admin.js şu id'lere bağlanıyor ama sayfada yok: {sorted(bagli - idler)}"
     for yol in ("/api/admin/kullanicilar", "/api/admin/isler", "/api/admin/metrikler"):
         assert f'"{yol}' in js or f"`{yol}" in js, yol
-    for parca in ("/tavan`", "/oturum-dusur`", "/iptal`", '"/giris?sonra="'):
+    for parca in ("/tavan`", "/oturum-dusur`", "/iptal`", "/plan`", "/kredi`", '"/giris?sonra="'):
         assert parca in js, parca
     assert "30000" in js, "sayfa 30 sn'de bir yenilenir (belge §8)"
 
@@ -290,7 +291,8 @@ def test_users_are_listed_newest_first_with_derived_fields_searched_and_paged(c,
     assert satirlar[admin.eposta]["is_admin"] is True and satirlar[admin.eposta]["son_gorulme"] is None
     assert satirlar[d.eposta]["dogrulandi"] is False
     assert set(bs) == {"id", "eposta", "is_admin", "dogrulandi", "olusturuldu", "son_gorulme",
-                       "gunluk_kredi_tavani", "kredi_24sa", "aktif_is"}
+                       "gunluk_kredi_tavani", "kredi_24sa", "aktif_is", "plan", "bakiye"}
+    assert bs["plan"] == "free" and bs["bakiye"] == 0, "Faz 3 / 3: plan ve bakiye satırın kendi sütunları"
     # Arama e-postada geçen metin; joker karakter düz metin.
     assert [k["id"] for k in c.get(f"/api/admin/kullanicilar?q={b.eposta[:10]}").json()["kullanicilar"]] == [str(b.id)]
     assert c.get("/api/admin/kullanicilar?q=%25").json()["toplam"] == 0
@@ -342,6 +344,10 @@ def test_a_cap_written_by_the_admin_moves_the_users_429_threshold_on_their_very_
     with TestClient(appmod.app, base_url=HTTPS):
         a_id, a_jeton = _gercek_kullanici(admin=True)
         b_id, b_jeton = _gercek_kullanici()
+        # Platform işi bakiye ister (Faz 3 / 2, 402): B'ye defterden kredi, tavan ölçümü 402'ye takılmasın.
+        with Session(depo_db) as s:
+            defter.hibe(s, b_id, 1000, f"{defter.ONEK_HIBE}{b_id}:2026-09")
+            s.commit()
         a = TestClient(appmod.app, base_url=HTTPS, cookies={cerez.OTURUM_CEREZI: a_jeton})
         b = TestClient(appmod.app, base_url=HTTPS, cookies={cerez.OTURUM_CEREZI: b_jeton})
         assert b.get("/api/hesap/ben").json()["is_admin"] is False

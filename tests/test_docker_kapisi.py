@@ -49,12 +49,14 @@ from services import (
     cerez,
     db,
     dosya,
+    filigran,
     gunluk,
     hata_izleme,
     isci,
     kapilar,
     koken,
     kota,
+    planlar,
     platform_anahtari,
     posta,
     sifre,
@@ -198,8 +200,11 @@ def _dislananlar() -> set[str]:
 
 
 def test_dockerignore_excludes_tests_docs_android_venv_and_local_secrets():
+    # `.env*`, `.env` DEĞİL: yalın `.env` adın tamamını eşler, `.env.yedek-…`
+    # gibi bir yedek yerel `docker build`de `COPY . /app` ile imaja girerdi —
+    # .gitignore'la aynı kusur (tests/test_env_yok_sayma.py), burada bağlam için.
     eksik = {"tests", "android", "docs", ".venv", "node_modules", ".git",
-             ".env", "output", "assets", "hata.log"} - _dislananlar()
+             ".env*", "output", "assets", "hata.log"} - _dislananlar()
     assert not eksik, f".dockerignore'da yok: {sorted(eksik)}"
 
 
@@ -215,6 +220,11 @@ def test_dockerignore_keeps_everything_the_app_serves_or_imports():
     # `bundled/prompts/*.md`yi (Yönetmen personası) yutardı — kök `*.md` yutmaz.
     assert not any(k in ("*.py", "*", "**/*.md", "**/*") for k in _dislananlar())
     assert os.path.exists(os.path.join(KOK, "bundled", "prompts", "prompt-yonetmeni.md"))
+    # `bundled/filigran.png` (Faz 3 / 4): işçi ücretsiz planın görselini bununla
+    # filigranlıyor; imajdan düşerse iş `hata`ya düşer (sessiz filigransız DEĞİL) —
+    # yani kusur ancak ilk ücretsiz üretimde görünürdü. `*.png` gibi bir kalıp da yutardı.
+    assert os.path.exists(os.path.join(KOK, "bundled", "filigran.png"))
+    assert not any(k in ("*.png", "bundled/filigran.png", "bundled/*") for k in _dislananlar())
 
 
 # `medya_tasi` (Faz 2 / 2): yerel medyayı kovaya taşır — konteyner içinden, `/data` birimine bakar.
@@ -282,6 +292,8 @@ ALTYAPI = {"KROMIS_DATA_DIR", "PORT", db.DATABASE_URL_ENV, koken.KOKEN_ENV,
            dosya.URL_ENV, dosya.KOVA_ENV, dosya.ANAHTAR_ID_ENV, dosya.GIZLI_ENV, dosya.BOLGE_ENV,
            isci.ES_ZAMANLI_ENV, isci.KALP_ESIGI_ENV, isci.SAKLAMA_ENV, kapilar.ES_ZAMANLI_IS_ENV,
            kota.SAATLIK_IS_ENV, kota.GUNLUK_KREDI_ENV,
+           planlar.FREE_AYLIK_HIBE_ENV,   # Faz 3 / 3: ücretsiz planın aylık hibesi
+           filigran.DOSYA_ENV,            # Faz 3 / 4: ücretsiz planın filigran işareti
            gunluk.BICIM_ENV, hata_izleme.DSN_ENV, hata_izleme.ORTAM_ENV}
 
 

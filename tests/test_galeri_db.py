@@ -31,6 +31,12 @@ süzgeç sözleşmesini taşır; işçi tarafı (`al`, `kalp`, `bitir`, `dusur`,
 `bayatlari_dusur`, `isci_*`) KİRACISIZ ve bunun defteri `KIRACISIZ`: işçi
 platformun, kimsenin değil — muaf işlev `kullanici_id` ALMAZ (alsa süzmesi
 gerekirdi), ilk parametresi `db`. Kuyruğun anlamı tests/test_kuyruk.py'de.
+
+FAZ 3 / 1: onuncu depo `services/defter.py` (kredi defteri) — kullanıcı tarafı
+(`bakiye`, `hibe`, `rezerve`, `hareketler`) aynı sözleşme; `kullanicilar`
+sorgusunu `_sahibin(kullanici_id)` süzer (hesap tablosunun sahibi `id`);
+işçi (`onayla`, `iade`), admin (`duzelt` — hedef `hedef_id`) ve bakım turu
+(`tutarlilik`) `KIRACISIZ`da gerekçesiyle. Defterin anlamı tests/test_defter.py'de.
 """
 from __future__ import annotations
 
@@ -69,10 +75,11 @@ DEPOLAR = {
     "services/depo_kimlik_bilgisi.py": 4,   # Faz 1 / 7
     "services/kuyruk.py": 16,               # Faz 2 / 1 (3 kullanıcı + 9 işçi/sonda tarafı; `ekle`/`isci_kaydet` `db.add`); Faz 2 / 10 +4 saklama/bakım
     "services/depo_admin.py": 10,           # Faz 2 / 8 (hepsi kiracısız — `KIRACISIZ_MODULLER`)
+    "services/defter.py": 8,                # Faz 3 / 1 (`bakiye`, `_bakiye_ekle`, `rezerve`, `_isin_hareketleri`, `hareketler`, `tutarlilik`; `_yaz` `insert` — sayılmaz); Faz 3 / 3 +`plan_oku`, +`hibe_turu`
 }
 # `depo_*.py` kalıbının DIŞINDA kalan depolar — `test_the_repository_list_matches_the_files_on_disk`
 # bunları da bekler; kalıba uymayan yeni bir depo buraya yazılmadan listeye giremez.
-EK_DEPOLAR = ("services/kuyruk.py",)
+EK_DEPOLAR = ("services/kuyruk.py", "services/defter.py")
 # Kiracısız işlevler (Faz 2 / 1): işçi işi kimliğiyle sürer, kullanıcıyı bilmez —
 # `al` kuyruğun BAŞINI alır (küresel FIFO, kimin işi olduğuna bakmaz), ötekiler
 # `al`ın verdiği `is_id`/`isci_id` ile çalışır. Her ad gerekçesiyle; bekçinin
@@ -95,6 +102,20 @@ KIRACISIZ = {
         "olu_iscileri_sil": "`isciler` tablosunda kullanıcı sütunu yok; ölü işçi satırı (Faz 2 / 10)",
         "mevcut_isler": "periyodik bakım (Faz 2 / 10): silinen işin dizinine sahip satır kaldı mı — id kümesi, "
                         "kiracıdan bağımsız (dizin adı kullanıcı kökünü zaten taşır)",
+    },
+    # Faz 3 / 1 — kredi defteri: işçi elindeki işin rezervini kapatır, admin düzeltir, bakım turu ölçer.
+    "services/defter.py": {
+        "onayla": "işçi elindeki işin rezervini gerçekle kapatır; `is_id` `al`dan geldi, RLS bağlamını işçi bağlıyor "
+                  "(`kos` işin kullanıcısı)",
+        "iade": "işçi elindeki işin rezervini geri verir; `is_id` `al`dan geldi, RLS bağlamını işçi bağlıyor "
+                "(hata: işin kullanıcısı; bayat düşürme: admin)",
+        "_isin_hareketleri": "`onayla`/`iade`nin ortak sorgusu: `is_id`ye göre satırlar — iş kimliği kiracıyı "
+                             "zaten belirliyor, bağlam çağıranın",
+        "duzelt": "admin düzeltmesi (K4, `yonetici_ekler`): hedef kullanıcı `hedef_id` — `depo_admin`in adlandırması, "
+                  "\"kimin adına\" sorusunun cevabı satırın sahibi değil ADMİN (`admin_id` izi)",
+        "tutarlilik": "periyodik bakım (Faz 3 / 7): bütün kiracıların SUM(defter) ↔ bakiye karşılaştırması",
+        "hibe_turu": "periyodik bakım (Faz 3 / 3, K6): bütün kiracılarda `bakiye < aylik_hibe` olanlara aylık hibe — "
+                     "ADMİN bağlamı (`yonetici_ekler`), süzgeç plan ve bakiye, kiracı değil",
     },
 }
 # Kiracısız MODÜLLER (Faz 2 / 8): işlev işlev değil bütünüyle muaf, gerekçesiyle.

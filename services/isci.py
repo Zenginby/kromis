@@ -31,10 +31,10 @@ pal["applied"]` aynen). Model `isler.model` sütunundan (rota doğruladı ve
 normalleştirdi). Kredi GERÇEK `catalog.cost_for` (görsel/video başına);
 `isler.kredi_tahmini` sıraya girerken yazılmış TAHMİN, işçi ona bakmaz.
 
-SIRA: nesne yaz → `depo_medya.kaydet` satırı (flush) → `kuyruk.bitir` → TEK
-commit. Satır ya da commit düşerse yazılan nesneler `depo.sil` ile TELAFİ
-edilir ve iş `hata` — Faz 1 / 5'in "dosya + satır atomik değil" borcu burada
-kapanır: web rotası akışın iki ucunu tutamıyordu (commit bağımlılıkta, rota
+SIRA: nesne yaz → `depo_medya.kaydet` satırı (flush) → `kuyruk.bitir` →
+`defter.onayla` → TEK commit. Satır ya da commit düşerse yazılan nesneler
+`depo.sil` ile TELAFİ edilir ve iş `hata` — Faz 1 / 5'in "dosya + satır
+atomik değil" borcu burada kapanır: web rotası akışın iki ucunu tutamıyordu (commit bağımlılıkta, rota
 döndükten sonra), işçi tutuyor. Telafi `_YazimIzi` ile: `kaydet` dosya adını
 kendi üretiyor ve flush düşerse adı çağırana hiç söyleyemez; yazılan her
 yolu depo sarmalayıcısı kaydeder, düşüşte hepsi silinir. `bitir` `False`
@@ -59,6 +59,18 @@ göndermek demek; bekçisi `[A, B]` testi (Faz 1 / 7'nin ikizi). Dil de öyle:
 (`map_error`) `i18n.active()`ten okuyor → `kullanicilar.dil`, seçmemişse ürünün
 öntanımlısı (`i18n.DEFAULT`: "kullanıcı seçmemiş" sorusunun cevabı; `FALLBACK`
 "kullanıcı yok" demek ve burada kullanıcı var). İş bitince `set_active(None)`.
+
+KREDİ DEFTERİ (Faz 3 / 2; docs/faz3-kredi-defteri-filigran.md §2, K2): rota
+platform anahtarlı işin TAHMİNİNİ sıraya girerken rezerve etti; işçi burada
+kapatır. `bitti` → `kredi_gercek = Σ medya.credits` (`_kredi` × yazılan kayıt)
+`kuyruk.bitir(kredi_gercek=)` ile satıra ve `defter.onayla` ile deftere AYNI
+commit'te — iş `bitti` olup farkı iade edilmemiş bir ara durum yok. `hata`
+(sağlayıcı ya da yazım hatası) → `_dusur` içinde `defter.iade` (rezervin
+tamamı, `kuyruk.dusur`la aynı commit). Bayat düşürme → `kalp_turu` düşürdüğü
+her işi admin bağlamında iade eder (`yonetici_ekler`, K4). `iade` idempotent:
+bayat düşürülmüş bir işin işçisi sonra `_dusur` derse ikinci çağrı no-op.
+BYOK iş (K3) rezerv taşımaz: `onayla`/`iade` rezerv bulamaz, `None` döner —
+işçi kaynağa bakmaz, defter karar verir.
 
 YENİDEN DENEME YOK (K8): sağlayıcı çağrısı faturalanır ve düşen bir işçinin
 çağrıyı gönderip göndermediği bilinemez. `ac.ImageError` → `hata` (metin
@@ -141,10 +153,12 @@ import kimlik_baglami
 import providers
 from services import (
     ayar,
+    defter,
     depo_kimlik_bilgisi,
     depo_medya,
     dil,
     dosya,
+    filigran,
     gunluk,
     hata_izleme,
     kiraci,
@@ -153,6 +167,7 @@ from services import (
     zaman,
 )
 from services.nesne_depo import Nesne
+from services.planlar import PLAN_VARSAYILAN, PLANLAR
 from services.tablolar import (
     IS_TURLERI,
     Is,
@@ -369,8 +384,8 @@ def _uret(is_: Is, depo: dosya.Depo) -> list[bytes]:
     raise ValueError(f"bilinmeyen is turu: {is_.tur!r} (beklenen: {IS_TURLERI})")
 
 
-def _meta(is_: Is, kredi: int) -> dict[str, Any]:
-    """`depo_medya.kaydet`in `meta`sı — rotaların bugün yazdığı alanlar, aynı kurallarla."""
+def _meta(is_: Is, kredi: int, filigranli: bool = False) -> dict[str, Any]:
+    """`depo_medya.kaydet`in `meta`sı — rotaların bugün yazdığı alanlar, aynı kurallarla (+ `filigranli`, Faz 3 / 4)."""
     istek = _istek(is_)
     pal = istek.get("palette")
     gonderilen = istek.get("prompt_sent")
@@ -380,6 +395,8 @@ def _meta(is_: Is, kredi: int) -> dict[str, Any]:
         "palette": pal, "session_id": istek.get("session_id"),
         "arena_id": istek.get("arena_id"),
         "model": is_.model, "credits": kredi,
+        # Rotalar bu alanı yazmaz (içe aktarma, bindirme uçları filigransız): yalnız işçi bilir.
+        "filigranli": filigranli,
         # Ek düştüyse metin prompt'un birebir aynısı; storage sözleşmesi "yalnızca farklıysa".
         "prompt_sent": gonderilen if (pal and isinstance(pal, Mapping) and pal.get("applied")) else None,
     }
@@ -387,6 +404,24 @@ def _meta(is_: Is, kredi: int) -> dict[str, Any]:
         meta["kind"] = "video"
         meta["duration"] = istek["duration"]
     return meta
+
+
+def _filigranlanir(is_: Is, plan: str) -> bool:
+    """Bu işin sonucu filigranlanır mı: planın `filigran`ı açık VE tür görsel (Faz 3 / 4, K7).
+
+    `kind` KATALOGDAN (`_kredi`nin `spec`i), iş türünden değil — belge §4'ün
+    kuralı "spec.kind == image". Katalogdan düşmüş bir model için spec None:
+    o iş zaten `_uret`te `ImageError` ile düşer, buraya gelmez; yine de tür
+    kümesine düşülür ki karar hiç `None`a bakmasın. Plan CHECK'ten geliyor —
+    tanınmayan ad KeyError, sessiz "filigransız" değil (`planlar.kapsiyor`un duruşu).
+    """
+    if not PLANLAR[plan].filigran:
+        return False
+    if is_.tur in ("video", "animate"):
+        spec: catalog.ImageModel | None = catalog.video_model(is_.model)
+        return spec.kind == "image" if spec else False
+    spec = catalog.image_model(is_.model)
+    return spec.kind == "image" if spec else True
 
 
 def _kredi(is_: Is) -> int:
@@ -403,10 +438,16 @@ def _kredi(is_: Is) -> int:
 
 def _dusur(oturum_ac: Callable[[], Session], is_id: uuid.UUID, metin: str, an: dt.datetime,
            data_dir: str) -> bool:
-    """İşi `hata`ya yazar (kendi oturumu, kendi commit'i); DB de düşerse izi `hata.log`a, patlamaz."""
+    """İşi `hata`ya yazar ve rezervini iade eder (kendi oturumu, TEK commit); DB de düşerse izi `hata.log`a, patlamaz.
+
+    `defter.iade` `dusur`un sonucuna bakmadan çağrılır: 0 satır "iş çoktan
+    bayat düşürülmüş" demek ve kalp turu o işi iade etmiştir — ikinci çağrı
+    idempotent no-op (`iade:<is_id>` anahtarı). Rezervsiz (BYOK) işte de `None`.
+    """
     try:
         with oturum_ac() as db:
             tamam = kuyruk.dusur(db, is_id, metin, an)
+            defter.iade(db, is_id, an=an)
             db.commit()
         return tamam
     except Exception:
@@ -415,17 +456,23 @@ def _dusur(oturum_ac: Callable[[], Session], is_id: uuid.UUID, metin: str, an: d
 
 
 def _yaz(is_: Is, sonuclar: list[bytes], oturum_ac: Callable[[], Session], depo: dosya.Depo,
-         ayarlar: ayar.Ayarlar, an: dt.datetime) -> bool:
+         ayarlar: ayar.Ayarlar, an: dt.datetime, *, filigranli: bool = False) -> bool:
     """Nesne → satır → `bitir` → tek commit; düşerse nesneler silinir ve iş `hata`."""
     izi = _YazimIzi(depo)
     output_dir = ayarlar.kullanici_icin(is_.kullanici_id).output_dir
-    meta = _meta(is_, _kredi(is_))
+    meta = _meta(is_, _kredi(is_), filigranli)
     try:
         with oturum_ac() as db:
             kayitlar = [depo_medya.kaydet(db, is_.kullanici_id, veri, dict(meta), output_dir,
                                           now=an, depo=izi) for veri in sonuclar]
-            if not kuyruk.bitir(db, is_.id, {"medya": [k["id"] for k in kayitlar]}, an):
+            # GERÇEK kredi = yazılan kayıtların `credits` toplamı (kayıt başına `_kredi`;
+            # spec katalogdan düşmüşse 0). Sağlayıcı istenenden az döndürdüyse toplam da az:
+            # kullanıcı yalnız aldığı kadar öder, farkı `onayla` iade eder (K2).
+            kredi_gercek = sum(int(k.get("credits") or 0) for k in kayitlar)
+            if not kuyruk.bitir(db, is_.id, {"medya": [k["id"] for k in kayitlar]}, an,
+                                kredi_gercek=kredi_gercek):
                 raise _IsArtikCalismiyor(str(is_.id))
+            defter.onayla(db, is_.id, kredi_gercek, an=an)
             db.commit()
     except _IsArtikCalismiyor:
         # İş bu arada bayat düşürüldü (`hata`): sonuç yazılmaz, `dusur` da çağrılmaz
@@ -497,6 +544,9 @@ def _kos(is_: Is, oturum_ac: Callable[[], Session], depo: dosya.Depo, ayarlar: a
         # Değerler oturum KAPANMADAN kopyalanıyor: kapanış nesneyi ayırır ve
         # süresi geçmiş bir öznitelik okuması `DetachedInstanceError` olurdu.
         dil_kodu = kullanici.dil if kullanici is not None else None
+        # Plan da burada okunur (`kullanicilar.plan`, `kos` işi alırken — belge §4):
+        # filigran kararı sağlayıcı çağrısından SONRA veriliyor ama o sırada oturum yok.
+        plan = kullanici.plan if kullanici is not None else PLAN_VARSAYILAN
         # Platform anahtarıyla TAMAMLANMIŞ sözlük (Faz 2 / 6): rota `anahtar_kaynagi`ni
         # sıraya alırken yazdı, işçi aynı çözüm sırasıyla (kullanıcı → platform) koşar.
         kimlikler, _ = (platform_anahtari.birlestir(depo_kimlik_bilgisi.oku(db, is_.kullanici_id))
@@ -510,6 +560,13 @@ def _kos(is_: Is, oturum_ac: Callable[[], Session], depo: dosya.Depo, ayarlar: a
     try:
         try:
             sonuclar = _uret(is_, depo)
+            # FİLİGRAN (Faz 3 / 4, K7): `_uret` → `_yaz` arası, TEK yer, yalnız görsel,
+            # yalnız planı isteyen (ücretsiz). `_uret` ve adaptörler değişmez; işaret
+            # dosyası yoksa `FiligranDosyasiYok` aşağıdaki genel dala düşer — iş `hata`,
+            # rezerv iade; SESSİZ filigransız yazım yok (services/filigran.py'nin gerekçesi).
+            filigranli = _filigranlanir(is_, plan)
+            if filigranli:
+                sonuclar = [filigran.uygula(b) for b in sonuclar]
         except ac.ImageError as e:
             # Redaksiyon `kuyruk.dusur`da (yazan yerde).
             _dusur(oturum_ac, is_.id, str(e), bitis(), ayarlar.data_dir)
@@ -524,7 +581,7 @@ def _kos(is_: Is, oturum_ac: Callable[[], Session], depo: dosya.Depo, ayarlar: a
             _dusur(oturum_ac, is_.id, f"{BEKLENMEYEN_HATASI}: {type(e).__name__}", bitis(),
                    ayarlar.data_dir)
             return False
-        return _yaz(is_, sonuclar, oturum_ac, depo, ayarlar, bitis())
+        return _yaz(is_, sonuclar, oturum_ac, depo, ayarlar, bitis(), filigranli=filigranli)
     finally:
         # HER yolda: bir sonraki işin sahibi başka biri.
         kimlik_baglami.coz(jeton)
@@ -580,9 +637,15 @@ def kalp_turu(db: Session, isci_id: uuid.UUID, is_idleri: Iterable[uuid.UUID], a
             yeniden = True
         for is_id in is_idleri:
             kuyruk.kalp(db, is_id, an)
-        dusen = kuyruk.bayatlari_dusur(db, an, esik)
+        dusenler = kuyruk.bayatlari_dusur(db, an, esik)
+        # Düşen her işin rezervi geri (Faz 3 / 2, K2): admin bağlamı `kredi_hareketleri`ye
+        # yalnız bu yoldan yazar (`yonetici_ekler`, K4). Aynı commit'te: iş `hata` olup
+        # parası tutulmuş bir ara durum kalmasın. Geç kalan işçinin `_dusur`u aynı işi
+        # ikinci kez iade edemez (`iade:<is_id>` anahtarı çakışır, no-op).
+        for is_id in dusenler:
+            defter.iade(db, is_id, an=an)
         db.commit()
-    return KalpOzeti(dusen, yeniden)
+    return KalpOzeti(len(dusenler), yeniden)
 
 
 def kuyruk_uyarisi(db: Session, an: dt.datetime) -> dict[str, Any] | None:
@@ -607,11 +670,14 @@ def kuyruk_uyarisi(db: Session, an: dt.datetime) -> dict[str, Any] | None:
 # ────────────────────────────────────────────────────────── bakım
 
 class BakimOzeti(dict[str, int]):
-    """`bakim_turu`nun döndürdüğü sayılar: `silinen_is`, `silinen_nesne`, `korunan_dizin`, `silinen_isci`.
+    """`bakim_turu`nun döndürdüğü sayılar: `silinen_is`, `silinen_nesne`, `korunan_dizin`, `silinen_isci`, `hibe_satiri`.
 
     Sözlük (günlük alanı olarak düz yazılsın); `__bool__` "bir şey yapıldı mı":
-    işçi olayı yalnız bir şey silindiğinde düşürür (`bayat`ın deyimi — boş turda
-    5 dk'da bir satır gürültüdür).
+    işçi olayı yalnız bir şey silindiğinde ya da hibe yazıldığında düşürür
+    (`bayat`ın deyimi — boş turda 5 dk'da bir satır gürültüdür). `hibe_satiri`
+    (Faz 3 / 3): bu turda yatan aylık hibe sayısı — dağıtım sonrası ilk turda
+    bütün kullanıcılar, sonra ay başında; ay içinde 0 (belge §3 "Sahibin adımı":
+    `olay=bakim` satırında `hibe_satiri=N`).
     """
 
     def __bool__(self) -> bool:
@@ -630,19 +696,24 @@ def _dizini_sil(depo: dosya.Depo, onek: str) -> int:
 
 def bakim_turu(db: Session, depo: dosya.Depo, an: dt.datetime, esik: dt.timedelta,
                saklama_suresi: dt.timedelta) -> BakimOzeti:
-    """Bir bakım turu: saklama (satır + referanssız girdi dizini) ve ölü işçi satırları; özet sayılar.
+    """Bir bakım turu: saklama (satır + referanssız girdi dizini), ölü işçi satırları ve aylık hibe; özet sayılar.
 
     Sıra ve bağlamlar (gerekçe modül başında): sahipler ADMIN bağlamında
-    bulunur; her kiracının satırları O KİRACININ bağlamında silinir ve commit
+    bulunur ve aylık hibe (`defter.hibe_turu`, Faz 3 / 3) aynı bağlamda
+    yatar; her kiracının satırları O KİRACININ bağlamında silinir ve commit
     edilir (kiracı başına bir transaksiyon — biri düşerse ötekiler durur);
     sonra ADMIN bağlamında kalan referanslar ve mevcut satırlar okunur, ona
     göre dizinler silinir. Ölü işçi satırı politikasız, bağlam gerekmez.
     `an`/`esik`/`saklama_suresi` çağıranın (testler saatle oynamaz).
     """
-    ozet = BakimOzeti(silinen_is=0, silinen_nesne=0, korunan_dizin=0, silinen_isci=0)
+    ozet = BakimOzeti(silinen_is=0, silinen_nesne=0, korunan_dizin=0, silinen_isci=0, hibe_satiri=0)
     with kiraci.baglam(rol=kiraci.ADMIN, oturum=db):
         sahipler = kuyruk.saklama_sahipleri(db, an, saklama_suresi)
         ozet["silinen_isci"] = kuyruk.olu_iscileri_sil(db, an, esik)
+        # Aylık hibe (Faz 3 / 3, K6) ADMİN bağlamında: `kredi_hareketleri`ye
+        # bütün kiracılar adına yazar — `yonetici_ekler` politikası (K4) tam
+        # bunun için var. Aynı commit: silme ile hibe aynı turun işi.
+        ozet["hibe_satiri"] = defter.hibe_turu(db, an)
         db.commit()
     silinenler: list[kuyruk.SilinenIs] = []
     for kullanici_id in sahipler:

@@ -25,11 +25,12 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 import app as appmod
 import catalog
 import errlog
-from services import depo_kimlik_bilgisi, kapilar, platform_anahtari, tablolar
+from services import defter, depo_kimlik_bilgisi, kapilar, platform_anahtari, tablolar
 
 pytestmark = [pytest.mark.usefixtures("depo_db"), pytest.mark.gercek_anahtar]
 
@@ -269,6 +270,10 @@ def test_the_worker_uses_the_platform_key_then_the_users_own_then_the_platform_a
     _SahteAzure.gorulen.clear()
     _SahteAzure.adresler.clear()
     _platform_azure(monkeypatch)
+    # Platform işi bakiye ister (Faz 3 / 2, 402): kredi yalnız defter üzerinden (`hibe`).
+    with Session(depo_db) as db:
+        defter.hibe(db, kullanici.id, 1000, f"{defter.ONEK_HIBE}{kullanici.id}:2026-09")
+        db.commit()
     cevaplar: list[str] = []
 
     with caplog.at_level(logging.DEBUG):
@@ -311,6 +316,7 @@ def test_the_worker_uses_the_platform_key_then_the_users_own_then_the_platform_a
     assert not any(PLATFORM_AZURE in c or KULLANICI_AZURE in c for c in cevaplar)
 
 
+@pytest.mark.usefixtures("plan_pro")   # Faz 3 / 3: video 409'u ölçmek için plan kapısı (403) önce açılır
 def test_without_a_user_or_platform_key_the_route_answers_409_and_creates_no_job(
         client, depo_db, tmp_path, dizinler, kullanici):
     """§5'in 6'ya devrettiği ilk madde: anahtarsız kullanıcı 202 + `hata`lı iş DEĞİL, 409 ve hiç iş

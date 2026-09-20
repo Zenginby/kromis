@@ -21,6 +21,32 @@ HİÇ doğmaz — `hata` satırı o günden sonra yalnız gerçek sağlayıcı h
 taşır. Kapı `credstore.is_configured`u çağırır (arayüzün "kurulu" dediğiyle
 rotanın kabul ettiği ayrışmasın; credstore'un var olma gerekçesi) ve işin
 `anahtar_kaynagi`ni döndürür. Kota kapıları services/kota.py'de.
+
+Yedinci kapı `check_bakiye` + `rezerve_kredi` (Faz 3 / 2, K2/K9/K11): platform
+anahtarıyla koşacak işin TAHMİNİ kadar kredi var mı. İki yarım, iki sebep:
+`check_bakiye` SALT OKUR (`defter.bakiye < tahmin` → 402) ve `_kapilar`
+zincirinin sonunda, girdi nesnesi yazılmadan ÖNCE koşar — 429 gibi 402 de
+depoya nesne bırakmasın; `rezerve_kredi` ise YAZAR (`defter.rezerve`, atomik
+`UPDATE … WHERE bakiye >= :m`) ve ancak `kuyruk.ekle`den sonra çağrılabilir
+(rezerv satırı `is_id` ister, FK). Asıl kapı ikincisi: ön denetim geçip iki
+istek aynı bakiyeye yarışsa Postgres'in satır kilidi kaybedene 402 der ve
+transaksiyon geri alınır — iş satırı da (rota `OTURUM`u istisnada rollback).
+İkisi de aynı gövdeyi kurar (`_yetersiz_bakiye`): `{"kod": "err.kredi_yetersiz",
+"bakiye", "gereken", "plan"}` — 402 "ödeme gerekir", 429 (kota, `Retry-After`lı)
+ve 403 (plan/yetki) ile karışmasın (K11); cümleyi ön yüz `kod`dan kurar
+(palette.js `detailText`). BYOK (`kullanici`) iş defteri hiç görmez (K3).
+
+Sekizinci kapı `check_plan` (Faz 3 / 3, K5/K7): kullanıcının PLANI seçilen
+modeli kapsıyor mu (`planlar.kapsiyor` — modelin `plan` alanı + video ↔
+`Plan.video`; `modeller.model_available`ın anahtardan bağımsız yarısı). Hayırsa
+**403** JSON `{"kod": "err.plan_kapsamiyor", "model", "plan"}` — 403 "yetki/
+plan", 402 "para", 429 "kota" (K11 ayrımı); cümleyi ön yüz `kod`dan kurar.
+Zincirin EN BAŞINDA, anahtar kapısından ÖNCE: kapı anahtar kaynağından
+BAĞIMSIZ (BYOK'lu ücretsiz kullanıcı da video alamaz — kuralın sebebi
+filigran yokluğu, anahtarın kimin olduğu onu değiştirmez), o yüzden önce
+plan sorulur — planın kapsamadığı modele "anahtar yok" (409) demek kullanıcıyı
+anahtar girmeye yönlendirirdi ve anahtar girse de kapı açılmazdı. Plan yüklü satırdan, yoksa DB'den
+(`kullanici_plani`) — istek başına ek sorgu yok.
 """
 from __future__ import annotations
 
@@ -29,6 +55,8 @@ import uuid
 from collections.abc import Mapping
 
 from fastapi import HTTPException
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import assets_store
@@ -38,7 +66,8 @@ import credstore
 import etiket
 import i18n
 import storage
-from services import depo_klasor, dil, kuyruk, platform_anahtari
+from services import defter, depo_klasor, dil, kuyruk, planlar, platform_anahtari
+from services.tablolar import Kullanici
 
 # Kullanıcı başına eş zamanlı (`bekliyor` + `calisiyor`) iş tavanı — `.env.example`
 # aynı adı buradan okur (bekçisi tests/test_docker_kapisi.py `ALTYAPI`).
@@ -163,3 +192,78 @@ def check_anahtar(cred_id: str, kimlikler: Mapping[str, str]) -> str:
                           kimlik=etiket.label_of(cred) if cred is not None else cred_id,
                           env=cred.key_env if cred is not None else cred_id))
     return platform_anahtari.kaynak(cred_id, kimlikler) or platform_anahtari.KAYNAK_KULLANICI
+
+
+def kullanici_plani(db: Session, kullanici: Kullanici) -> str:
+    """İsteğin kullanıcısının planı — YÜKLÜ nesneden, yüklü değilse DB'den (`defter.plan_oku`).
+
+    Kimlik kapısı satırı çoktan çekti (`oturumlar` ⋈ `kullanicilar`, tek sorgu;
+    tests/test_kimlik.py "istek başına tam bir sorgu" bekçisi): plan orada.
+    Ek SELECT yalnız öznitelik YÜKLÜ DEĞİLSE — testlerin `kullanici` override'ı
+    (`server_default`lı sütun flush'ta expire olur, oturum kapanmış:
+    `DetachedInstanceError`; `_yetersiz_bakiye`nin dersi). `inspect().dict`
+    lazy yüklemeyi TETİKLEMEZ, o yüzden o hataya hiç varılmaz.
+    """
+    yuklu = sa_inspect(kullanici).dict.get("plan")
+    return str(yuklu) if yuklu else defter.plan_oku(db, kullanici.id)
+
+
+def check_plan(db: Session, kullanici: Kullanici, spec: catalog.ImageModel) -> str:
+    """Kullanıcının planı bu modeli kapsıyor mu; evetse plan adı, hayırsa 403 `err.plan_kapsamiyor` (Faz 3 / 3, K7).
+
+    Gövde `{"kod", "model", "plan"}` — cümle YOK, ön yüz `kod`u kendi dilinde
+    kurar (`err.plan_kapsamiyor`), iki alan "hangi model, hangi plan" der.
+    Anahtar kaynağından BAĞIMSIZ: `check_anahtar`dan önce çağrılır (sıra
+    modül başında). Karar `planlar.kapsiyor`da — model dökümünün `sebep:
+    "plan"` dediği modele rota da 403 der, iki cevap doğmaz.
+    """
+    plan = kullanici_plani(db, kullanici)
+    if not planlar.kapsiyor(plan, spec):
+        raise HTTPException(status_code=403,
+                            detail={"kod": "err.plan_kapsamiyor", "model": spec.id, "plan": plan})
+    return plan
+
+
+def _yetersiz_bakiye(db: Session, kullanici: Kullanici, bakiye: int, gereken: int) -> HTTPException:
+    """402 gövdesi (K11): `kod` + üç sayı/ad; cümle YOK — ön yüz `kod`u kendi dilinde kurar
+    (`err.kredi_yetersiz`), üç alan da kullanıcıya "ne kadar var, ne kadar lazım, hangi plan" der.
+
+    `plan` DB'den, `kullanici.plan`dan değil: sütun `server_default`lı ve
+    bağımlılığın verdiği nesne başka bir oturumdan gelmiş/süresi geçmiş
+    olabilir (testlerin `kullanici` override'ı ayrılmış bir nesne verir) —
+    `DetachedInstanceError` yerine tek `SELECT`, yalnız hata yolunda.
+    """
+    plan = db.scalar(select(Kullanici.plan).where(Kullanici.id == kullanici.id))
+    return HTTPException(status_code=402,
+                         detail={"kod": "err.kredi_yetersiz", "bakiye": bakiye, "gereken": gereken,
+                                 "plan": plan})
+
+
+def check_bakiye(db: Session, kullanici: Kullanici, kredi_tahmini: int, anahtar_kaynagi: str | None) -> None:
+    """Salt okunur ön denetim: platform işinde `bakiye < tahmin` ise 402; BYOK'ta sessiz (K3).
+
+    Kapı zincirinin SONUNDA, `check_gunluk`ten sonra (K9: tavan önce sorulur,
+    429 dediyse bakiye hiç okunmaz bile). Kesin karar `rezerve_kredi`nin —
+    bu okuma yalnız girdi nesnesi yazılmadan önce çoğunluğu çevirir.
+    """
+    if anahtar_kaynagi != platform_anahtari.KAYNAK_PLATFORM:
+        return
+    bakiye = defter.bakiye(db, kullanici.id)
+    if bakiye < kredi_tahmini:
+        raise _yetersiz_bakiye(db, kullanici, bakiye, kredi_tahmini)
+
+
+def rezerve_kredi(db: Session, kullanici: Kullanici, is_id: uuid.UUID, kredi_tahmini: int,
+                  anahtar_kaynagi: str | None) -> defter.Hareket | None:
+    """Platform işinin tahminini defterden düşer (`defter.rezerve`, atomik); yetmezse 402. BYOK → `None`.
+
+    `kuyruk.ekle`den SONRA, aynı transaksiyonda (rezerv satırı `is_id` taşır);
+    402 fırlarsa rota `OTURUM`u geri alır — kuyrukta öksüz iş kalmaz, bakiye
+    değişmez (`rezerve` yetmeyince satır da yazmaz).
+    """
+    if anahtar_kaynagi != platform_anahtari.KAYNAK_PLATFORM:
+        return None
+    try:
+        return defter.rezerve(db, kullanici.id, is_id, kredi_tahmini)
+    except defter.YetersizBakiye as e:
+        raise _yetersiz_bakiye(db, kullanici, e.bakiye, e.gereken) from e

@@ -137,6 +137,9 @@ def _json(is_: Is) -> dict[str, Any]:
         "durum": is_.durum,
         "model": is_.model,
         "kredi_tahmini": is_.kredi_tahmini,
+        # Faz 3 / 2: işçinin `bitir`le yazdığı GERÇEK kredi (Σ `medya.credits`); bitmemiş
+        # işte `None`. Panel bitti satırında "tahmin → gerçek" gösterir (static/isler.js).
+        "kredi_gercek": is_.kredi_gercek,
         # Faz 2 / 6: panel "platform anahtarıyla" işaretini, sahibi doğrulamasını buradan okur.
         "anahtar_kaynagi": is_.anahtar_kaynagi,
         "olusturuldu": _damga(is_.olusturuldu),
@@ -278,15 +281,20 @@ def kalp(db: Session, is_id: uuid.UUID, an: dt.datetime) -> bool:
     return _etkilenen(sonuc) > 0
 
 
-def bitir(db: Session, is_id: uuid.UUID, sonuc: dict[str, Any], an: dt.datetime) -> bool:
-    """`calisiyor` → `bitti`, `sonuc` (`{"medya": [id, …]}`) ve `bitti = an`. Başka durumdan 0 satır → `False`.
+def bitir(db: Session, is_id: uuid.UUID, sonuc: dict[str, Any], an: dt.datetime, *,
+          kredi_gercek: int | None = None) -> bool:
+    """`calisiyor` → `bitti`, `sonuc` (`{"medya": [id, …]}`), `bitti = an` ve `kredi_gercek`. Başka durumdan 0 satır → `False`.
 
     `False` işçi için bir sinyal: iş bu arada bayat sayılıp `hata`ya düşmüş
     (kalp 5 dk susmuş) — sonuç satıra yazılamaz, işçi ürettiği nesneyi siler
     (telafi, 3. görev). Yeniden kuyruğa almaz (K8).
+
+    `kredi_gercek` (Faz 3 / 2): işçinin topladığı GERÇEK kredi (Σ `medya.credits`);
+    `isler.kredi_tahmini` üst sınır, bu gerçek — ikisinin farkını `defter.onayla`
+    aynı commit'te iade eder (çağıran işçi). Bu modül defteri bilmez, sayıyı saklar.
     """
     etkilenen = db.execute(update(Is).where(Is.id == is_id, Is.durum == DURUM_CALISIYOR)
-                           .values(durum=DURUM_BITTI, sonuc=sonuc, bitti=an))
+                           .values(durum=DURUM_BITTI, sonuc=sonuc, bitti=an, kredi_gercek=kredi_gercek))
     return _etkilenen(etkilenen) > 0
 
 
@@ -297,18 +305,23 @@ def dusur(db: Session, is_id: uuid.UUID, hata: str, an: dt.datetime) -> bool:
     return _etkilenen(sonuc) > 0
 
 
-def bayatlari_dusur(db: Session, an: dt.datetime, esik: dt.timedelta) -> int:
-    """Kalbi `esik`ten uzun susan `calisiyor` işler → `hata` (`BAYAT_HATASI`); düşürülen sayı.
+def bayatlari_dusur(db: Session, an: dt.datetime, esik: dt.timedelta) -> list[uuid.UUID]:
+    """Kalbi `esik`ten uzun susan `calisiyor` işler → `hata` (`BAYAT_HATASI`); düşürülenlerin id'leri.
 
     Yeniden KUYRUĞA ALMAZ (K8): işçi sağlayıcıyı çağırmış olabilir ve çağrı
     faturalanmıştır; ikinci deneme çift fatura. `bitti = an`: iş kapandı,
     kullanıcı panelden yeniden gönderir. 10. görevin periyodik bakımı ve
     işçinin kendi döngüsü (3) çağırır; `esik` çağıranın (öneri 5 dk, K8).
+
+    Sayı değil İD LİSTESİ (Faz 3 / 2): çağıran (`isci.kalp_turu`, admin
+    bağlamı) düşürülen her işin rezervini `defter.iade` ile geri verir — bu
+    modül defteri bilmez, kimin düştüğünü söyler. `RETURNING` tek ifadede.
     """
     sonuc = db.execute(update(Is)
                        .where(Is.durum == DURUM_CALISIYOR, Is.kalp_atisi < an - esik)
-                       .values(durum=DURUM_HATA, hata=BAYAT_HATASI, bitti=an))
-    return _etkilenen(sonuc)
+                       .values(durum=DURUM_HATA, hata=BAYAT_HATASI, bitti=an)
+                       .returning(Is.id))
+    return list(sonuc.scalars())
 
 
 def bekleyen_ozeti(db: Session, an: dt.datetime) -> tuple[int, int | None]:

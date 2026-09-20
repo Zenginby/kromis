@@ -28,9 +28,11 @@ basılır: kanıt, satırı OLAN bir tabloda bağlamsız 0 ile bağlamlı n'in b
 görülmesidir.
 
 TABLO LİSTESİ ve bağlama ifadesi BURADA TEKRARLANMAZ: `services/kiraci.py`den
-(`IS_TABLOLARI`, `uygula`) gelir — göç ile aracın ayrışması mümkün olmasın
-(CLAUDE.md §5; bekçisi tests/test_rls_kontrol.py). Politika beklentisi tablo
-başına üç: `sahip`, `yonetici_okur`, `yonetici_gunceller`.
+(`IS_TABLOLARI`, `uygula`, `YONETICI_EKLER_TABLOLARI`) gelir — göç ile aracın
+ayrışması mümkün olmasın (CLAUDE.md §5; bekçisi tests/test_rls_kontrol.py).
+Politika beklentisi tablo başına üç: `sahip`, `yonetici_okur`,
+`yonetici_gunceller`; artı Faz 3'ün kredi defterinde bir `yonetici_ekler`
+(`0007_kredi`, K4) — toplam `beklenen_politika()`.
 
 ÇIKIŞ KODLARI öteki araçlarla bir: 0 tamam · 1 en az bir kapı kırmızı ·
 2 ortam (`DATABASE_URL` yok, bozuk argüman ya da sunucuya ulaşılamıyor).
@@ -58,6 +60,11 @@ CIKIS_ORTAM = 2
 
 # Göçün her tabloya koyduğu politika sayısı: `sahip`, `yonetici_okur`, `yonetici_gunceller`.
 POLITIKA_SAYISI = 3
+
+
+def beklenen_politika() -> int:
+    """Bütün iş tablolarında beklenen politika: 3 × tablo + admin INSERT istisnası olan tablo sayısı (Faz 3 / 1)."""
+    return POLITIKA_SAYISI * len(kiraci.IS_TABLOLARI) + len(kiraci.YONETICI_EKLER_TABLOLARI)
 
 
 def _kapi(ad: str, gecti: bool, ayrinti: str) -> bool:
@@ -93,7 +100,7 @@ def olc(baglanti, tablo: str, kullanici: uuid.UUID | None) -> tuple[bool, bool]:
                        f"{len(kiraci.IS_TABLOLARI) - len(eksik)}/{len(kiraci.IS_TABLOLARI)} tablo"
                        + (f" - eksik: {eksik}" if eksik else "")))
 
-    beklenen = POLITIKA_SAYISI * len(kiraci.IS_TABLOLARI)
+    beklenen = beklenen_politika()
     politika = baglanti.execute(text("SELECT count(*) FROM pg_policies WHERE tablename = ANY(:t)"),
                                 {"t": list(kiraci.IS_TABLOLARI)}).scalar_one()
     yesil.append(_kapi("politika", politika == beklenen, f"{politika}/{beklenen}"))

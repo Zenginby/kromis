@@ -1512,6 +1512,22 @@
       "yol": "services/db.py"
     },
     {
+      "ad": "services.defter",
+      "erteli_ithal": [],
+      "ithal": [
+        "services.gunluk",
+        "services.tablolar",
+        "services.zaman"
+      ],
+      "ithal_eden": [],
+      "katman": 6,
+      "satir": 306,
+      "testler": [
+        "tests/test_defter.py"
+      ],
+      "yol": "services/defter.py"
+    },
+    {
       "ad": "services.depo_admin",
       "erteli_ithal": [],
       "ithal": [
@@ -1813,6 +1829,7 @@
         "app",
         "isci",
         "routers.admin",
+        "services.defter",
         "services.hata_izleme",
         "services.isci",
         "services.istek_kimligi"
@@ -1869,6 +1886,7 @@
         "tests/test_admin.py",
         "tests/test_anahtar_dondur.py",
         "tests/test_artik_dosya.py",
+        "tests/test_defter.py",
         "tests/test_dosya_rotalari.py",
         "tests/test_galeri_db.py",
         "tests/test_hesap.py",
@@ -2033,7 +2051,7 @@
         "tools.uygulama_rolu"
       ],
       "katman": 0,
-      "satir": 176,
+      "satir": 191,
       "testler": [
         "tests/test_admin.py",
         "tests/test_rls.py",
@@ -2107,6 +2125,7 @@
       "testler": [
         "tests/test_admin.py",
         "tests/test_artik_dosya.py",
+        "tests/test_defter.py",
         "tests/test_gunluk.py",
         "tests/test_health.py",
         "tests/test_isci.py",
@@ -2305,6 +2324,7 @@
         "routers.sohbet",
         "routers.uretim",
         "services.ayar",
+        "services.defter",
         "services.depo_admin",
         "services.depo_kimlik_bilgisi",
         "services.depo_klasor",
@@ -2325,11 +2345,12 @@
         "tools.uygulama_rolu"
       ],
       "katman": 5,
-      "satir": 587,
+      "satir": 688,
       "testler": [
         "tests/test_admin.py",
         "tests/test_anahtar_dondur.py",
         "tests/test_artik_dosya.py",
+        "tests/test_defter.py",
         "tests/test_dosya_rotalari.py",
         "tests/test_folders.py",
         "tests/test_galeri_db.py",
@@ -2371,6 +2392,7 @@
         "routers.paletler",
         "routers.saglik",
         "routers.sohbet",
+        "services.defter",
         "services.depo_admin",
         "services.depo_kimlik_bilgisi",
         "services.depo_klasor",
@@ -2388,6 +2410,7 @@
       "satir": 71,
       "testler": [
         "tests/test_admin.py",
+        "tests/test_defter.py",
         "tests/test_galeri_db.py",
         "tests/test_gunluk.py",
         "tests/test_health.py",
@@ -2620,7 +2643,7 @@
       ],
       "ithal_eden": [],
       "katman": 2,
-      "satir": 165,
+      "satir": 172,
       "testler": [
         "tests/test_rls_kontrol.py"
       ],
@@ -3323,7 +3346,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 135,
+  "test_dosyasi_sayisi": 136,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",

@@ -125,7 +125,7 @@ Adlar ÖNERİ (Türkçe, ASCII: `kredi_hareketleri`, `services/defter.py`,
 
 ---
 
-## 1. Kredi defteri — `kredi_hareketleri`, `kullanicilar.bakiye`/`plan`, `services/defter.py` (PR: `faz3/kredi-defteri`)
+## 1. Kredi defteri — `kredi_hareketleri`, `kullanicilar.bakiye`/`plan`, `services/defter.py` ✅ (PR: `faz3/kredi-defteri`)
 
 **Kapsam.** Davranış DEĞİŞMEZ; yalnız şema + defter katmanı + bekçileri
 (Faz 2 / 1'in deseni). Göç **`0007_kredi`** — Faz 3'ün TEK göçü (giriş):
@@ -259,6 +259,69 @@ tekrarda çift düşüm 0 (bakiye asla eksiye inmez); RLS dört politika; takım
 **Sahibin adımı — yok.** Göç dağıtım öncesi komutta (`tools/goc.py`, Faz 1 K6);
 `bakiye` öntanımlı 0, `plan` 'free' — mevcut kullanıcılar dokunulmadan geçer,
 ilk hibe 3. görevin bakım turuyla yatar.
+
+**Yapıldığında (2026-09-19) ölçümler ve sapmalar.** Göç `0007_kredi` elle
+yazıldı (0004/0006'nın biçimi): `kredi_hareketleri` 9 sütun, 1 CHECK
+(`ck_kredi_hareketleri_tur_kumesi`, kümesi `HAREKET_TURLERI`), 3 FK
+(`kullanici_id` CASCADE, `is_id` SET NULL, `admin_id` SET NULL), UNIQUE
+`idempotency_anahtari`, 2 indeks; artı **altı** sütun üç tabloda (belge "+5"
+demişti — `kullanicilar.bakiye`/`plan`, `isler.kredi_gercek`/`saglayici_meta`/
+`saglayici_maliyet_usd`, `medya.filigranli` altı eder), `ck_kullanicilar_plan_kumesi`
+(`PLANLAR_KUMESI`, bugün `services/tablolar.py`de; 3. görev `planlar.py`yi ona
+bağlar). **14 tablo**, `IS_TABLOLARI` 8 → 9, politika 24 → **28** (3 × 9 +
+`yonetici_ekler`), ileri-geri-ileri (`0006_rls`e ve `0005_kota`ya) + `alembic
+check` temiz. Yeni `services/defter.py` (306 satır; `bakiye`, `hibe`,
+`rezerve`, `onayla`, `iade`, `duzelt`, `hareketler`, `_json`, `tutarlilik`,
+`Hareket`, `YetersizBakiye`, `TUR_*`/`ONEK_*` sabitleri), yeni
+`tests/test_defter.py` (22 test — belge "~30" demişti, iddialar birleşti:
+şema 4, düşüm 6, kapanış 4, hibe/düzeltme/liste/tutarlılık 3, sınır 4, kaynak
+bekçisi 1). **Eş zamanlı rezerv** iki biçimde ölçüldü: deterministik (A düşer
+ve commit etmez, B iş parçacığında satır kilidinde bekler, A commit edince
+`WHERE bakiye >= :m` tutmaz → `YetersizBakiye(0, 10)`; **100 tekrar, çift
+düşüm 0**, her turda tek `rezerv` satırı, bakiye 0'da) ve zamanlamalı ikizi
+(bariyerle aynı anda iki iş parçacığı, 20 tur, tur başına 1 başarı + 1
+`YetersizBakiye`, `SUM == bakiye`). Takım **3.819 → 3.847 geçti, 12 atlandı, 285 sn** (E2E + Postgres zorunlu; +28: `test_defter` 22, `test_rls` +1, parametrik depo bekçileri +2, sınıflandırma bekçileri); ruff ve mypy temiz, graflar güncel (modül 104 → 105). Rota YOK, davranış
+değişikliği YOK, `static/` dokunulmadı.
+
+SAPMALAR: (a) Yazan işlevler (`hibe`, `rezerve`, `onayla`, `iade`, `duzelt`)
+belgedeki imzaya ek olarak yalnız-anahtar `an: datetime | None` alır —
+`kuyruk.ekle`nin deseni (testler saatle oynamaz, `an` verir); vermeyen çağıran
+`zaman.an()` alır. (b) `rezerve` aynı `is_id` ile İKİNCİ çağrıda düşümü geri
+alır ve var olan satırı döner (anahtar `rezerv:<is_id>` çakıştı) — iş iki kez
+rezerve edilmez; belge bu dalı yazmamıştı. (c) Kapılar `ValueError`: `hibe`
+miktar > 0, `rezerve` miktar ≥ 0, `onayla` gerçek ≥ 0 — çağıranın hatası
+sessizce satır olmasın. (d) `duzelt` bir ÖNBELLEK SAPMASINI KAPATAMAZ: iki
+tarafı birden oynatır (satır + `bakiye`), `tutarlilik`in bulduğu fark aynı
+kalır (ölçüldü, testte). Belgenin "düzeltme admin `duzelt`" cümlesi kullanıcı
+lehine/aleyhine KREDİ düzeltmesi için doğru; önbellek sapmasının kapanışı
+`bakiye = SUM` — 7. görevin bakım turu karar verir (`tutarlilik`e `onar`
+bayrağı ya da ayrı bir `esitle`), bugün yalnız ölçülür ve raporlanır.
+(e) `KIRACISIZ["services/defter.py"]` belgenin üçüne ek `duzelt` (imza
+bekçisi `(db, kullanici_id)` ister; hedef `hedef_id` — `depo_admin` deseni) ve
+`_isin_hareketleri` (`onayla`/`iade`nin ortak `is_id` sorgusu) — her ikisi
+gerekçesiyle; `DEPOLAR` sayısı 6. (f) `kullanicilar` sorgularının sahip süzgeci
+`_sahibin(kullanici_id)` = `Kullanici.id == kullanici_id` (hesap tablosunun
+sahibi kendisi) — `test_galeri_db`nin `_sahibin` deyimi, bekçi metnine
+dokunulmadı. (g) `services/kiraci.py`ye `YONETICI_EKLER_TABLOLARI =
+("kredi_hareketleri",)` eklendi ve **`tools/rls_kontrol.py`** (belgenin
+"Dokunulan"ında yoktu) `beklenen_politika()` = 3 × 9 + 1 ile güncellendi —
+araç aksi hâlde canlıda 27 bekleyip 28 bulur, kapıyı kırmızıya çevirirdi;
+bekçisi `tests/test_rls_kontrol.py` (28 mandallı). (h) `tests/test_rls.py`nin
+ileri-geri-ileri testi `kredi_hareketleri` yeniden kurulduğunda uygulama
+rolüne `GRANT`ı yeniden verir: tablo düşüp doğduğunda eski `GRANT … ON ALL
+TABLES` yeni nesneyi kapsamaz, sonraki testler "permission denied" görürdü
+(ölçüldü); canlıda `tools/uygulama_rolu.py`nin `ALTER DEFAULT PRIVILEGES`i
+aynı boşluğu kapatıyor. (i) Tek-yazar AST bekçisi `tests/test_defter.py`de
+(`test_galeri_db` deseniyle): `.values(bakiye=…)`, `x.bakiye = …`,
+`Kullanici(bakiye=…)`, ham `UPDATE kullanicilar … bakiye`, `KrediHareketi(…)`,
+`insert(KrediHareketi)`, ham `INSERT INTO kredi_hareketleri` — `app.py`,
+`isci.py`, `routers/`, `services/`, `tools/` taranır, yalnız `services/defter.py`
+geçer. (j) Ek dokunulan literaller: `tests/test_kuyruk.py` (13 → 14, baş
+`0007_kredi`), `tests/test_goc.py` (`BAS`), `tests/test_rls_kontrol.py`;
+`tests/test_i18n.py` `KULLANICIYA_KONUSMAYAN` + `services/defter.py`.
+(k) `Hareket` veri sınıfı `kullanici_id`/`admin_id`/`idempotency_anahtari`yi
+TAŞIR (çağıran — 2. görevin işçisi, 3'ün admin rotası — okur), `_json` üçünü
+DÖKMEZ (belgenin altı alanı: `id, tur, miktar, aciklama, is_id, olusturuldu`).
 
 ---
 

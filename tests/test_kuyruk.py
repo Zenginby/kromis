@@ -431,6 +431,9 @@ def test_the_dump_carries_the_contract_fields_and_never_the_request_body(db_otur
     db_oturumu.commit()
     dokum = kuyruk.listele(db_oturumu, kullanici.id)[0]
     assert dokum["kredi_gercek"] == 6 and dokum["kredi_tahmini"] == 8, "`bitir(kredi_gercek=)` sütuna, `_json` dışa"
+    # Faz 3 / 5: `saglayici_meta`/`saglayici_maliyet_usd` sütunda kalır, DÖKÜLMEZ — ham sağlayıcı
+    # verisi ve platformun maliyeti kullanıcıya ait bilgi değil; admin marj raporu okur.
+    assert "saglayici_meta" not in dokum and "saglayici_maliyet_usd" not in dokum
     assert dokum["basladi"] == zaman.damga_utc(_an(5)) and dokum["bitti"] == zaman.damga_utc(_an(9))
     assert dokum["basladi"].endswith("Z") and dt.datetime.fromisoformat(dokum["bitti"]) == _an(9)
     assert dokum["sonuc"] == {"medya": ["ab12cd34ef56"]} and dokum["durum"] == "bitti"

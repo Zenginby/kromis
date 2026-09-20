@@ -11,13 +11,13 @@
 | GET | `/` | `routers/kok.py` | `index`:27 | `errlog`, `i18n`, `version` | — |
 | GET | `/admin` | `routers/admin.py` | `admin_sayfasi`:76 | `errlog`, `i18n`, `version` | — |
 | GET | `/api/admin/isler` | `routers/admin.py` | `isler`:95 | `i18n` | `admin.js` |
-| POST | `/api/admin/isler/{is_id}/iptal` | `routers/admin.py` | `is_iptal`:179 | `i18n` | `admin.js` |
+| POST | `/api/admin/isler/{is_id}/iptal` | `routers/admin.py` | `is_iptal`:180 | `i18n` | `admin.js` |
 | GET | `/api/admin/kullanicilar` | `routers/admin.py` | `kullanicilar`:83 | — | `admin.js` |
-| POST | `/api/admin/kullanicilar/{kullanici_id}/kredi` | `routers/admin.py` | `kredi`:149 | `i18n` | `admin.js` |
-| POST | `/api/admin/kullanicilar/{kullanici_id}/oturum-dusur` | `routers/admin.py` | `oturum_dusur`:168 | `i18n` | `admin.js` |
-| POST | `/api/admin/kullanicilar/{kullanici_id}/plan` | `routers/admin.py` | `plan`:130 | `i18n` | `admin.js` |
-| POST | `/api/admin/kullanicilar/{kullanici_id}/tavan` | `routers/admin.py` | `tavan`:120 | `i18n` | `admin.js` |
-| GET | `/api/admin/metrikler` | `routers/admin.py` | `metrikler`:105 | — | `admin.js` |
+| POST | `/api/admin/kullanicilar/{kullanici_id}/kredi` | `routers/admin.py` | `kredi`:150 | `i18n` | `admin.js` |
+| POST | `/api/admin/kullanicilar/{kullanici_id}/oturum-dusur` | `routers/admin.py` | `oturum_dusur`:169 | `i18n` | `admin.js` |
+| POST | `/api/admin/kullanicilar/{kullanici_id}/plan` | `routers/admin.py` | `plan`:131 | `i18n` | `admin.js` |
+| POST | `/api/admin/kullanicilar/{kullanici_id}/tavan` | `routers/admin.py` | `tavan`:121 | `i18n` | `admin.js` |
+| GET | `/api/admin/metrikler` | `routers/admin.py` | `metrikler`:105 | `catalog` | `admin.js` |
 | GET | `/api/arena/{arena_id}` | `routers/galeri.py` | `arena_round_route`:189 | `storage` | `chat.js` |
 | POST | `/api/arena/{arena_id}/winner` | `routers/galeri.py` | `set_arena_winner_route`:205 | `i18n`, `models`, `storage` | `chat.js` |
 | GET | `/api/assets/{kind}` | `routers/bindirme.py` | `list_assets_route`:243 | `assets_store`, `i18n` | `assets.js` |
@@ -91,6 +91,7 @@ flowchart LR
   n__admin --> n_i18n["i18n"]
   n__admin --> n_version["version"]
   n__api_admin["/api/admin"]
+  n__api_admin --> n_catalog["catalog"]
   n__api_admin --> n_i18n["i18n"]
   n__api_arena["/api/arena"]
   n__api_arena --> n_i18n["i18n"]

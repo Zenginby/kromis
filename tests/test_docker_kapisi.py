@@ -231,8 +231,11 @@ def test_dockerignore_keeps_everything_the_app_serves_or_imports():
 # `rls_kontrol` + `uygulama_rolu` (Faz 2 / 7): canlı `DATABASE_URL` rolünü ölçer ve
 # gerekirse RLS'i atlamayan rolü açar — ikisi de tam o bağlantının olduğu yerden,
 # yani platformun kabuğundan/konteynerden koşuyor (KURULUM.md 1. adım).
+# `marj_raporu` (Faz 3 / 5): canlı `DATABASE_URL`den marj CSV'si — sahibin aylık fatura
+# mutabakatı konteynerin içinden koşar; `tarife_kontrol` ise kaynağı (catalog.py'nin
+# YORUMLARINI) okur, depodan koşulur, .dockerignore'da.
 OPERATOR_ARACLARI = ("goc", "kullanici", "ice_aktar", "artik_dosya", "anahtar_dondur",
-                     "medya_tasi", "rls_kontrol", "uygulama_rolu")
+                     "medya_tasi", "rls_kontrol", "uygulama_rolu", "marj_raporu")
 
 
 def test_dockerignore_ships_the_operator_tools_and_only_the_dev_tools_stay_out():

@@ -802,6 +802,8 @@ KULLANICIYA_KONUSMAYAN = {
     "services/filigran.py": "filigran bindirme (Faz 3 / 4, K7): bayt → bayt; istisnaları (`FiligranDosyasiYok`, "
                             "`GorselIslenemedi`) işçi `hata` sütununa TÜR ADIYLA kod olarak yazar, cümleyi ön yüz "
                             "kurar; `to_png`ün 422 gövdesi taşınmaz, yalnız sınıfı",
+    "services/saglayici_meta.py": "sağlayıcı meta verisinin ContextVar yan kanalı (Faz 3 / 5, K8): "
+                                  "adaptörden işçiye `usage`/`request_id` taşır; metin yok, `kimlik_baglami`nın ikizi",
     "isci.py": "işçi sürecinin bileşim kökü (Faz 2 / 3): kapılar, iş parçacıkları, kalp "
                "atışı, SIGTERM; çıktısı stdout'a ASCII, OPERATÖRE — işin metni services/isci.py'de",
 }

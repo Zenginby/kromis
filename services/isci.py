@@ -164,6 +164,7 @@ from services import (
     kiraci,
     kuyruk,
     platform_anahtari,
+    saglayici_meta,
     zaman,
 )
 from services.nesne_depo import Nesne
@@ -456,8 +457,16 @@ def _dusur(oturum_ac: Callable[[], Session], is_id: uuid.UUID, metin: str, an: d
 
 
 def _yaz(is_: Is, sonuclar: list[bytes], oturum_ac: Callable[[], Session], depo: dosya.Depo,
-         ayarlar: ayar.Ayarlar, an: dt.datetime, *, filigranli: bool = False) -> bool:
-    """Nesne → satır → `bitir` → tek commit; düşerse nesneler silinir ve iş `hata`."""
+         ayarlar: ayar.Ayarlar, an: dt.datetime, *, filigranli: bool = False,
+         saglayici: saglayici_meta.Toplayici | None = None) -> bool:
+    """Nesne → satır → `bitir` → tek commit; düşerse nesneler silinir ve iş `hata`.
+
+    `saglayici` (Faz 3 / 5, K8): `_uret` boyunca yan kanalın topladığı sağlayıcı
+    alanları — `bitir` aynı UPDATE'te `isler.saglayici_meta`/`saglayici_maliyet_usd`
+    sütunlarına yazar (redaksiyon orada). Hiç kayıt yoksa sütunlar NULL kalır.
+    Adı `meta` DEĞİL: aşağıdaki `meta` medya kaydının sözlüğü (`_meta`), ilk sürüm
+    ikisini aynı adla yazdı ve `dict.sozluk` AttributeError'ı her işi düşürdü (ölçüldü).
+    """
     izi = _YazimIzi(depo)
     output_dir = ayarlar.kullanici_icin(is_.kullanici_id).output_dir
     meta = _meta(is_, _kredi(is_), filigranli)
@@ -470,7 +479,9 @@ def _yaz(is_: Is, sonuclar: list[bytes], oturum_ac: Callable[[], Session], depo:
             # kullanıcı yalnız aldığı kadar öder, farkı `onayla` iade eder (K2).
             kredi_gercek = sum(int(k.get("credits") or 0) for k in kayitlar)
             if not kuyruk.bitir(db, is_.id, {"medya": [k["id"] for k in kayitlar]}, an,
-                                kredi_gercek=kredi_gercek):
+                                kredi_gercek=kredi_gercek,
+                                saglayici_meta=saglayici.sozluk() if saglayici is not None else None,
+                                saglayici_maliyet_usd=saglayici.maliyet_usd if saglayici is not None else None):
                 raise _IsArtikCalismiyor(str(is_.id))
             defter.onayla(db, is_.id, kredi_gercek, an=an)
             db.commit()
@@ -559,7 +570,12 @@ def _kos(is_: Is, oturum_ac: Callable[[], Session], depo: dosya.Depo, ayarlar: a
     i18n.set_active(dil_kodu or i18n.DEFAULT)
     try:
         try:
-            sonuclar = _uret(is_, depo)
+            # YAN KANAL (Faz 3 / 5, K8): adaptörler `saglayici_meta.kaydet` ile `usage`/
+            # `request_id` bırakır; `_uret` bu iş parçacığında koşar, bağlam kaybolmaz
+            # (havuza/başka parçacığa geçiş yok — tests/test_saglayici_meta.py ölçer). Toplanan,
+            # `_yaz` → `bitir` ile satıra gider; hata yolunda yazılmaz (`dusur` imzası aynen).
+            with saglayici_meta.toplayici() as meta:
+                sonuclar = _uret(is_, depo)
             # FİLİGRAN (Faz 3 / 4, K7): `_uret` → `_yaz` arası, TEK yer, yalnız görsel,
             # yalnız planı isteyen (ücretsiz). `_uret` ve adaptörler değişmez; işaret
             # dosyası yoksa `FiligranDosyasiYok` aşağıdaki genel dala düşer — iş `hata`,
@@ -581,7 +597,7 @@ def _kos(is_: Is, oturum_ac: Callable[[], Session], depo: dosya.Depo, ayarlar: a
             _dusur(oturum_ac, is_.id, f"{BEKLENMEYEN_HATASI}: {type(e).__name__}", bitis(),
                    ayarlar.data_dir)
             return False
-        return _yaz(is_, sonuclar, oturum_ac, depo, ayarlar, bitis(), filigranli=filigranli)
+        return _yaz(is_, sonuclar, oturum_ac, depo, ayarlar, bitis(), filigranli=filigranli, saglayici=meta)
     finally:
         # HER yolda: bir sonraki işin sahibi başka biri.
         kimlik_baglami.coz(jeton)

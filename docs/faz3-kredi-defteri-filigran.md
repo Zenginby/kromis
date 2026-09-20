@@ -746,7 +746,7 @@ eslint ve prettier temiz, graflar güncel.
 
 ---
 
-## 5. Tarife–maliyet mutabakatı ve marj raporu — `services/saglayici_meta.py`, `isler.saglayici_*`, admin "Marj", `tools/marj_raporu.py`, `tools/tarife_kontrol.py` (PR: `faz3/mutabakat-marj`)
+## 5. Tarife–maliyet mutabakatı ve marj raporu — `services/saglayici_meta.py`, `isler.saglayici_*`, admin "Marj", `tools/marj_raporu.py`, `tools/tarife_kontrol.py` ✅ (PR: `faz3/mutabakat-marj`)
 
 **Kapsam.** Tarifemiz (kredi) ile sağlayıcının faturası (USD) yan yana;
 `isler.bitti − basladi` ve `model` sütunu raporun ham verisi (Faz 2 `:2467-2468`).
@@ -823,6 +823,54 @@ Sağlayıcının fiyat sayfasıyla karşılaştır; doğruysa yorumu sil, değil
 `credits`i düzelt — ikisi de bir PR, geçmiş kayıtlar değişmez (`catalog.py:460-465`
 "retroaktif yazılmasın"). Sonra ayda bir `tools/marj_raporu.py --gun 30` →
 sağlayıcı faturasıyla yan yana.
+
+**Yapıldığında (2026-09-20) ölçümler ve sapmalar.** Rota YOK, göç YOK (0007
+iki sütunu çoktan taşıyordu). Yeni `services/saglayici_meta.py` (`Toplayici`,
+`toplayici()`, `kaydet`, `aktif`, `sifirla`; yaprak — yalnız stdlib; modül 108 →
+**111**, öteki ikisi araçlar), `azure_mai_client.py` **+1 çağrı** (`kaydet(usage=
+govde.get("usage"))`, her isteğin gövdesinden — MAI `n` görsel için `n` istek
+atar, `kayitlar` o yüzden LİSTE) ve `fal_client.py` **+1 çağrı**
+(`kaydet(request_id=rid)`, doğrulanmış id) — ikisi de `services/`den ilk kez
+ithal eden kök adaptörler (katman kuralı yok, `test_app_bolme` yalnız
+`routers`/`services` yönünü sınar); `services/isci.py` `_kos`ta `with
+toplayici() as meta: _uret(...)` ve `_yaz(…, saglayici=meta)` (`meta` adı `_yaz`ın
+medya sözlüğüyle çakıştı, ilk sürüm her işi `AttributeError`la düşürdü —
+ölçüldü, ad değişti); `services/kuyruk.py` `bitir(…, saglayici_meta=,
+saglayici_maliyet_usd=)` + `_redakte` (ağaç gezilir: dize değerler
+`redact_secrets`ten, adı `key|token|secret|authorization|password` ile BİTEN
+alanın değeri koşulsuz `[REDACTED]`; alt dize DEĞİL — `num_output_tokens`
+"token" taşır ve ilk sürüm tam saklamak istediğimiz sayıyı siliyordu,
+ölçüldü); `_json` on dört anahtarda KALDI (ham sağlayıcı verisi ve platformun
+maliyeti kullanıcıya ait değil; `test_kuyruk` iki alanın yokluğunu mandallar);
+`services/depo_admin.py` `marj(db, gun, an)` tek sorgu (`DEPOLAR` 10 → **11**),
+`MARJ_PENCERELERI = (7, 30)`, metriklerde `marj` düz liste (satırda `gun`);
+`catalog.KREDI_USD_CAPASI = Decimal("0.005")` (yorum bloklarının tekrar ettiği
+çapa artık sayı, iki okuyucu: `marj` ve `tarife_kontrol`); `static/admin.js` +
+`admin.html` Marj tablosu (8 sütun, `#admin-marj`), platform kredisi kartında
+"rezerv edilen n" alt satırı; i18n **+11** tr/en; yeni `tools/marj_raporu.py`
+(imajda, `OPERATOR_ARACLARI`) ve `tools/tarife_kontrol.py` (`.dockerignore`:
+kaynağın yorumlarını okur); `tests/test_saglayici_meta.py` (**11**),
+`tests/test_araclar.py` (**7**), `test_admin` **+3**.
+
+**Sapmalar:** (a) `SUM(kredi_tahmini)` → `SUM(COALESCE(kredi_gercek, kredi_tahmini))`,
+salt `kredi_gercek` DEĞİL: bitmemiş iş gerçek taşımaz, yoğun bir saatte kart
+"0" derdi; biten gerçek, ötekiler rezerv, tahminin toplamı `platform_kredi_rezerv`
+olarak yanında (`kullanicilar.kredi_24sa` aynı ifade). (b) `tarife_kontrol`
+deseni `doğrulanamadı` DEĞİL, aynı yorum satırında **`fiyat` + `doğrulan(a)?madı`**:
+sade sözcük Türkçe katlamayla (`I → ı`; `str.lower()` "DOĞRULANAMADI"yı
+eşleştirmiyor, ölçüldü) 8 model buluyordu, dördü boyut/çözünürlük notu ("boyut
+jetonu canlı DOĞRULANMADI"); `fiyat` şartı belgenin dördünü veriyor: `azure-mai-image-2-6`
+(üstündeki blok yorum Flash'ı anlatıyor ama 2.6'nın önünde duruyor — araç
+eşleşen satırı basar, cümleyi Flash girdisine taşımak listeden düşürür),
+`azure-mai-image-2-6-flash`, `azure-flux-2-pro`, `azure-flux-2-flex` (`:806`
+"doğrulanmadı"). Yorum bölgesi = önceki öğenin bitişinden (ilk öğede demetin
+`= (` satırından) bu öğenin bitişine; bekçi testi kataloğu satır bazlı, araç
+`ast` ile okur, ikisi aynı kümeyi vermek zorunda. (c) `marj` penceresi
+`bitti`ye göre (`olusturuldu` değil): fatura kapanışa düşer. (d) Hata yolunda
+`saglayici_meta` YAZILMAZ (`dusur` imzası aynen; spec yalnız `_yaz` dedi) —
+fal `request_id`si düşen işte de değerli olurdu, sonraki tur. (e) `maliyet_usd`
+bugün hiçbir adaptörden gelmiyor; tablo "bilinmiyor (0/N)" yazar, sıfır değil.
+Takım **3928 → 3956** (+28: `test_saglayici_meta` 11, `test_araclar` 7, `test_admin` +3, öteki bekçiler; ilk tam koşuda `test_rls`in `BAGLAM_TASIYAN_ARACLAR` listesi `marj_raporu.py`yi bekliyordu, eklendi), 12 atlanan, ~270 sn.
 
 ---
 

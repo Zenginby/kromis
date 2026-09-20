@@ -21,6 +21,7 @@ from services import (
     depo_kimlik_bilgisi,
     depo_tercih,
     dil,
+    kapilar,
     kimlik,
     modeller,
     platform_anahtari,
@@ -98,7 +99,7 @@ def get_settings(db: Session = OTURUM, ayarlar: ayar.Ayarlar = Depends(ayar.ayar
     sözleşme). İlk açılışta değeri `null` olur, sonrakinde dolar.
     """
     web = guncelleme.web_yapisi()
-    return {**modeller.settings_payload(kimlikler),
+    return {**modeller.settings_payload(kimlikler, plan=kapilar.kullanici_plani(db, kullanici)),
             "version": version.APP_VERSION,
             "web": web,
             "guncelleme": None if web else guncelleme.bilgi(
@@ -352,7 +353,8 @@ def post_settings(req: SettingsRequest, db: Session = OTURUM,
     # platform anahtarıyla tamamlanır ki `providers`/`kaynaklar` GET'le aynı
     # şeyi söylesin (anahtarını silen kullanıcı platforma DÜŞTÜĞÜNÜ hemen görür).
     return modeller.settings_payload(
-        platform_anahtari.kimlikler(depo_kimlik_bilgisi.oku(db, kullanici.id)))
+        platform_anahtari.kimlikler(depo_kimlik_bilgisi.oku(db, kullanici.id)),
+        plan=kapilar.kullanici_plani(db, kullanici))
 
 
 # ── Kullanıcı tercihleri ────────────────────────────────────────────────

@@ -462,7 +462,7 @@ bu görevden sonra yetersiz bakiye platform anahtarlı üretimi 402 ile keser;
 
 ---
 
-## 3. Planlar ve aylık hibe — `services/planlar.py`, `model_available(plan)`, admin plan/kredi rotaları (PR: `faz3/planlar-hibe`)
+## 3. Planlar ve aylık hibe — `services/planlar.py`, `model_available(plan)`, admin plan/kredi rotaları ✅ (PR: `faz3/planlar-hibe`)
 
 **Kapsam.** Kullanıcının planı ve planın parası.
 
@@ -546,6 +546,87 @@ hesabını `pro` yapar (aşağıda).
 ay içinde 120 harcar → bakım turu dokunmaz; ay değişir → +120, 200;
 ücretsiz planda video modeli 403 + rozet; admin `pro` yapar → video açılır;
 takım yeşil.
+
+**Yapıldığında (2026-09-20) ölçümler ve sapmalar.** Rota **+2** (67 → **69**;
+`ADMIN_ROTALAR` 7 → **9**, `KAPILI` 60 → 62), göç YOK (0007 `plan`ı taşıyordu).
+Yeni `services/planlar.py` (SAF: `Plan`, `PLANLAR`, `free_aylik_hibe`, `kapsiyor`;
+DB okumaz — modül 105 → **106**), `services/defter.py` +3 (`plan_oku`,
+`aylik_hibe_yaz`, `hibe_turu`; `DEPOLAR` sayısı 6 → 8), `services/modeller.py`
+`model_available(spec, configured, plan)` + `sebep(...)` + döküm `sebep`
+(görsel/video/sohbet üçünde), `settings_payload(…, plan=)`, `director_context(…,
+plan=)`; `services/kapilar.py` +2 (`kullanici_plani`, `check_plan` 403);
+`routers/uretim.py` `_kapilar` artık `spec` alır ve zincirin BAŞINDA plan sorar;
+`routers/isler.py` yeniden gönderim plan sorar; `routers/hesap.py` `_ilk_hibe`
+(kiracı bağlamıyla); `services/isci.py` `BakimOzeti` +`hibe_satiri`;
+`services/depo_admin.py` `plan_yaz` + listede `plan`/`bakiye`; `routers/admin.py`
+`plan`/`kredi` (`PlanIstegi`/`KrediIstegi`, `olay=admin.plan`/`admin.kredi`);
+`static/admin.js` plan seçici + "kredi ekle" (miktar ± + zorunlu açıklama),
+`admin.html` +2 sütun, `admin.css`; `static/core.js` `secilebilirler` plan kapalıyı
+GÖSTERİR, `modelSecenekMetni`/`renderModelCards` "planında yok" rozeti,
+`goBlockReason` üç dalda plan kapısı anahtardan önce; i18n **+13** (belge "~6":
+`err.plan_kapsamiyor`, `err.plan_gecersiz`, `err.kredi_miktari_sifir`,
+`model.plan_locked`, `gate.model_plan_locked`, `gate.plan_locked_video`, admin 7);
+`.env.example` `KROMIS_FREE_AYLIK_HIBE` + `ALTYAPI` +1; rota sayısı literalleri `test_kimlik` (62/69) ve `test_app_bolme` (69). Testler: yeni
+`tests/test_planlar.py` **28** (belge "~15": katalog 2, `model_available` 8
+parametrik, kapı 6, hibe 5, RLS 2, admin 4, yardımcı 2), E2E +1 senaryo adımı
+(`test_playwright_admin.py`: plan seçici → DB `pro`, kredi 50 → `duzeltme` satırı
+`admin_id`li, boş açıklama 422). Takım **3.874 → 3.908 geçti, 12 atlandı,
+287 sn** (E2E + Postgres zorunlu); ruff, mypy, eslint ve prettier temiz, graflar
+güncel.
+
+SAPMALAR: (a) `model_available` imzası `(spec, configured, plan)` — belge
+`(configured, plan)` yazmıştı ama formülü `spec.plan` ve `spec.kind` okuyor,
+model olmadan cevaplanamaz; eski çağrılar modelin planını `plan` diye
+veriyordu, şimdi `plan` KULLANICININ planı. (b) Plan kapısı `_kapilar`
+zincirinin EN BAŞINDA, anahtar kapısından (409) önce — belge yerini
+söylememişti: kapı anahtar kaynağından bağımsız (K7), planın kapsamadığı
+modele "anahtar yok" demek kullanıcıyı Ayarlar'a yönlendirir ve anahtar girse
+de açılmazdı; 403'te anahtar hiç sorulmaz (test). Kotaya saymaz, nesne
+bırakmaz. (c) Plan YÜKLÜ satırdan okunur (`kapilar.kullanici_plani`:
+`inspect().dict`, lazy yükleme tetiklemez), yüklü değilse tek SELECT —
+istek başına ek sorgu YOK (test_kimlik'in "tam bir sorgu" sayacı aynen 2);
+2. görevin `_yetersiz_bakiye`si SELECT'te kaldı (hata yolu). Testlerin override
+nesnesi `eager_defaults` ile `plan="free"` yüklü ve DB'deki değişikliği görmez
+(`kota.check_gunluk`in `tavan` dersi) — conftest `plan_pro` fixture'ı ikisini
+birden yazar; video rotasını ölçen dört dosya (`test_video_route` 33 çağrı,
+`test_isler_route`, `test_uretim_kapilar`, `test_platform_anahtari`nin 409 testi)
+ve `test_chat_route`nun iki anahtar-süzgeci testi onu opt-in kullanır — conftest
+kullanıcısı ÜCRETSİZ kaldı, kapının öntanımlı hâli kapalı. (d) `sebep`
+üç değerli (`None`/`"anahtar"`/`"plan"`) ve iki sebep birden varsa **plan
+kazanır** (anahtar kapıyı açmaz); ön yüz `anahtar`ı gizler (kullanıcı isteği
+korunur), `plan`ı rozetle gösterir, `secilecek` yalnız `available` okur (plan
+kapalı model otomatik seçilmez), `goBlockReason` sebebini söyler.
+`test_settings_route`nun "available == configured" çivisi bilerek güncellendi:
+görsel/sohbette aynen, videoda ücretsiz için `sebep == "plan"`. (e) Aylık
+anahtarı TEK yer kurar: `defter.aylik_hibe_yaz(db, kullanici_id, miktar, an)`
+(depo imza sözleşmesi `(db, kullanici_id, …)`; saf bir `hibe_anahtari(u, an)`
+bekçiye takıldı) — kayıt ve `hibe_turu` onu çağırır. (f) `hibe_turu` plan
+başına bir SELECT (`WHERE plan = :p AND bakiye < :hibe AND silindi_at IS NULL`),
+hibesi 0 planı atlar (`KROMIS_FREE_AYLIK_HIBE=0` = hibe kapalı — belge "boş =
+200" demişti, 0 ayrıca geçerli), silinmiş hesap almaz; KİRACISIZ defterine
+gerekçesiyle girdi. (g) KAYIT HİBESİ KİRACI BAĞLAMI İSTER: istek oturumsuz,
+`kredi_hareketleri`nin `sahip` politikası `app.kullanici_id` bekler — `_ilk_hibe`
+`kiraci.baglam(kullanici_id=…, oturum=db)` ile yazar; uygulama rolüyle ölçüldü
+(bağlamsız aynı INSERT `row-level security` hatası; `hibe_turu` admin bağlamı
+`yonetici_ekler`). Belge bunu yazmamıştı; süper kullanıcıyla koşan takım
+görmezdi. (h) `temel`/`pro` yer tutucu hibeleri **1.000 / 3.000** — sahip kendi
+hesabını `pro` yapınca bakım turu onu 3.000'e tamamlar (kendi platform
+anahtarına kendi harcaması); Faz 4 fiyatla belirler. (i) Yeniden gönderimde
+katalogdan düşmüş model plan kapısına GİRMEZ (anahtar kapısının aynı dalı).
+(j) `BakimOzeti.__bool__` hibe yazıldığında da doğru: dağıtım sonrası ilk tur
+ve her ay başı `olay=bakim … hibe_satiri=N` düşer (belge "Sahibin adımı"nın
+kontrol satırı); `test_isci`nin sabit sözlükleri turdan önce sayılan
+`_hibe_bekleyen`le kuruldu (önceki testlerin `b-…` satırları kalıyor).
+(k) Admin `kredi` cevabı `{"id", "hareket", "bakiye"}` (yeni bakiye aynı
+transaksiyondan; admin.js satırı onunla tazeler), `miktar == 0` 422
+(`err.kredi_miktari_sifir`), açıklama zorunlu (pydantic `min_length=1`); plan
+doğrulaması rotada 422 `err.plan_gecersiz` (CHECK'in 500'ü yerine). (l) E2E
+admin senaryosu yeniden çizim yarışını ölçtü: "seçici pro" koşulu ESKİ satırda
+da doğru, kutular yeniden çizimden önce doldurulursa siliniyor ve "Kredi ekle"
+0 ile 422 gidiyordu — eski satırın tutamacı `wait_for_element_state("hidden")`
+ile beklenir (tavan adımının aynı tuzağı). Envanter tablosunun satırları
+doğru kaldı (`model_available` → 403, katalog `plan` alanı verisi, admin
+`duzeltme`); değişen yok.
 
 **Sahibin adımı — planı ve hibeyi belirlemek, kendi hesabını `pro` yapmak
 (canlıda bir kez, 1–3 birlikte dağıtılır).** Platformun sırrına

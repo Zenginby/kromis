@@ -621,7 +621,19 @@ function goBlockReason() {
   if (currentMode === "video") {
     // Görsel dalının AYNI üç kademesi, ayrı liste üzerinde.
     if (!videoModels.length) return t("gate.no_video_list");
-    if (!currentVideoModel) return t("gate.no_key");
+    // PLAN KAPISI (Faz 3 / 3) anahtardan önce: ücretsiz planda video şeridi
+    // rozetli çıkar ve hiçbiri seçilebilir olmaz — "anahtar yok" demek
+    // kullanıcıyı Ayarlar'a yollardı, oysa anahtar bu kapıyı açmaz. Seçim
+    // yokken listede plan kapalı model varsa sebep plandır (sunucu 403
+    // `err.plan_kapsamiyor`un aynı kuralı).
+    if (!currentVideoModel) {
+      return videoModels.some((m) => m.sebep === "plan")
+        ? t("gate.plan_locked_video")
+        : t("gate.no_key");
+    }
+    if (currentVideoModel.sebep === "plan") {
+      return t("gate.model_plan_locked", { model: currentVideoModel.label });
+    }
     if (!currentVideoModel.configured) {
       return t("gate.model_no_key", { model: currentVideoModel.label });
     }
@@ -668,6 +680,10 @@ function goBlockReason() {
   if (!imageModels.length) return t("gate.no_model_list");
   // Yönetmen dalının aynı gerekçesi (yukarısı).
   if (!currentModel) return t("gate.no_key");
+  // Plan kapısı anahtardan önce (video dalının aynı gerekçesi).
+  if (currentModel.sebep === "plan") {
+    return t("gate.model_plan_locked", { model: currentModel.label });
+  }
   if (!currentModel.configured) {
     return t("gate.model_no_key", { model: currentModel.label });
   }
@@ -683,9 +699,12 @@ function goBlockReason() {
     // duruşu): kullanıcı arena açıkken referans eklerse ne olacağını
     // görmeli. Düzenleme arenası bilinçli olarak kapsam dışı.
     if (source) return t("gate.arena_no_edit");
-    const anahtarsiz = idler
-      .map((id) => imageModels.find((m) => m.id === id))
-      .filter((m) => m && !m.configured);
+    const sutunlar = idler.map((id) => imageModels.find((m) => m.id === id));
+    const planKapali = sutunlar.filter((m) => m && m.sebep === "plan");
+    if (planKapali.length) {
+      return t("gate.model_plan_locked", { model: planKapali[0].label });
+    }
+    const anahtarsiz = sutunlar.filter((m) => m && !m.configured);
     if (anahtarsiz.length) {
       return t("gate.model_no_key", { model: anahtarsiz[0].label });
     }
@@ -985,7 +1004,14 @@ function applyVideoModel(id, { announce = true } = {}) {
   return model;
 }
 
-/** Seçiciye GİRECEK modeller: KULLANILABİLİR olanlar (+ zorunlu tutulan id).
+/** Seçiciye GİRECEK modeller: KULLANILABİLİR olanlar (+ planın kapattığı olanlar, + zorunlu tutulan id).
+ *
+ * PLANIN KAPATTIĞI MODEL GİZLENMEZ, ROZETLE GÖSTERİLİR (Faz 3 / 3; sunucu
+ * `sebep: "plan"`): "anahtar yok" kullanıcının kendi eksiği ve Ayarlar'da
+ * kapanır, o yüzden gizli; "planında yok" ise ürünün sunduğu bir şeyin
+ * kapısı — görünmezse kullanıcı videonun VAR olduğunu bile bilmez (yükseltme
+ * çağrısı Faz 4'ün satış yüzü, bugün rozet). Seçilebilir ama #go kapalı
+ * (`goBlockReason`), otomatik seçilmez (`secilecek` yalnız `available` okur).
  *
  * FİLTRE, "10+ modele ölçeklenirken alan duvarına dönüşmesin" isteğinin model
  * şeridindeki karşılığı: kullanıcı Azure anahtarıyla çalışıyorsa OpenAI ve
@@ -1019,7 +1045,7 @@ function applyVideoModel(id, { announce = true } = {}) {
  *     sayıyor, yani keşfedilebilirlik oraya taşındı.
  */
 function secilebilirler(liste, zorunluId) {
-  return liste.filter((m) => m.available || m.id === zorunluId);
+  return liste.filter((m) => m.available || m.sebep === "plan" || m.id === zorunluId);
 }
 
 /** Hangi model SEÇİLİ olacak: tercih → varsayılan → ilk kullanılabilir.
@@ -1098,10 +1124,16 @@ function modelKrediAraligi(m) {
  */
 function modelSecenekMetni(m, kredi) {
   const ad = m.short_label || m.label;
-  return (
-    (kredi ? `${ad} — ${modelKrediAraligi(m)}` : ad) +
-    (m.configured ? "" : ` · ${t("model.setup_required")}`)
-  );
+  // Plan rozeti anahtar rozetinden ÖNCE ve onun yerine: plan kapalıysa anahtar
+  // girmek kapıyı açmaz, "kurulum gerekli" yanlış bir iş verirdi (sunucunun
+  // `sebep` sırası aynı — services/modeller.py).
+  const ek =
+    m.sebep === "plan"
+      ? ` · ${t("model.plan_locked")}`
+      : m.configured
+        ? ""
+        : ` · ${t("model.setup_required")}`;
+  return (kredi ? `${ad} — ${modelKrediAraligi(m)}` : ad) + ek;
 }
 
 function renderModelOptions(zorunluId) {
@@ -1698,12 +1730,14 @@ function renderModelCards(eksenAdi) {
     metin.className = "model-row-txt";
     const ad = document.createElement("b");
     ad.textContent = m.short_label || m.label;
-    // Kurulum durumu ROZETLE: `<option>` metninde " · kurulum gerekli" diye
+    // Kurulum/plan durumu ROZETLE: `<option>` metninde " · kurulum gerekli" diye
     // yazıyordu ve bilgi kaybolmuyor, yalnız okunabilir bir biçime geçiyor.
-    if (!m.configured) {
+    // Plan rozeti önce (modelSecenekMetni'nin aynı sırası): anahtar plan
+    // kapısını açmaz.
+    if (m.sebep === "plan" || !m.configured) {
       const rozet = document.createElement("span");
       rozet.className = "model-row-badge";
-      rozet.textContent = t("model.setup_required");
+      rozet.textContent = t(m.sebep === "plan" ? "model.plan_locked" : "model.setup_required");
       ad.append(rozet);
     }
     metin.append(ad);

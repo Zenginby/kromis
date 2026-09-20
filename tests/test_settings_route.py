@@ -487,7 +487,7 @@ def test_sohbet_kataloğu_arayuzun_ihtiyaci_olan_ALANLARI_tasiyor(client):
     for m in body["chat_models"]:
         assert set(m) == {"id", "label", "short_label", "provider", "configured",
                           "needs_deployment", "note", "logo",
-                          "available", "requires_plan"}, m["id"]
+                          "available", "sebep", "requires_plan"}, m["id"]
 
 
 def test_iki_katalog_da_SERIT_ADINI_ayri_alanda_donduruyor(client):
@@ -513,21 +513,23 @@ def test_iki_katalog_da_SERIT_ADINI_ayri_alanda_donduruyor(client):
     assert gorsel["azure-gpt-image-2"]["short_label"] == "Azure · gpt-image-2"
 
 
-def test_GORUNURLUK_karari_TEK_alandan_geliyor_ve_bugun_configured_ile_ayni(client):
-    """Arayüzün görünürlük filtresi TEK alan okuyor: `available`.
+def test_KULLANILABILIRLIK_karari_TEK_alandan_geliyor_ve_SEBEP_iki_nedeni_ayirir(client):
+    """Arayüzün seçim mantığı TEK alan okuyor: `available`; nedenini `sebep` söylüyor.
 
-    NEDEN AYRI BİR ALAN: bugün bir modelin görünmeme sebebi tek ("anahtar
-    kayıtlı değil") ve `available == configured`. Kredi/üyelik sistemi
-    geldiğinde ikincisi ekleniyor ("kullanıcının planı kapsamıyor") ve o karar
-    SUNUCUDA, `app._model_available`da veriliyor. İstemcide iki sebebi ayrı ayrı
-    sormak, "hangi modeller görünür" sorusuna ikinci bir cevap yazmak olurdu —
-    `static/core.js secilebilirler`in var olma sebebi tam olarak o ikiliği
-    önlemek.
+    NEDEN AYRI BİR ALAN: Faz 3 / 3'e kadar bir modelin kullanılamama sebebi
+    tekti ("anahtar kayıtlı değil") ve `available == configured` burada
+    çiviliydi — "ayrıştığı gün bu iddia BİLEREK güncellenir" diyordu. O gün
+    geldi (docs/faz3-kredi-defteri-filigran.md §3): ikinci sebep "kullanıcının
+    planı kapsamıyor" ve karar SUNUCUDA, `services/modeller.model_available`da.
+    İstemcide iki sebebi ayrı ayrı sormak "hangi modeller kullanılabilir"
+    sorusuna ikinci bir cevap yazmak olurdu — `static/core.js secilebilirler`in
+    var olma sebebi tam olarak o ikiliği önlemek.
 
-    Bu test alanın SESSİZCE ÖLMESİNİ engelliyor: bugün ikisi eşit olduğu için
-    `available`ı silmek hiçbir testi düşürmezdi ve kanca fark edilmeden
-    kaybolurdu. Bugünkü eşitlik de burada çivili — ayrıştığı gün bu iddia
-    BİLEREK güncellenir, kazara değil.
+    Yeni çivi: görsel ve sohbet modellerinde (`kind` video değil, `plan` free)
+    hâlâ `available == configured`; video modellerinde ÜCRETSİZ kullanıcı için
+    `available` False ve `sebep == "plan"` — anahtar olsa da (`configured`
+    ne olursa olsun, K7). `sebep` üç değerli: `None` (kullanılabilir),
+    `"anahtar"`, `"plan"`; ve `available` ⇔ `sebep is None`.
     """
     body = client.get("/api/settings").json()
     for anahtar in ("image_models", "chat_models"):
@@ -535,10 +537,19 @@ def test_GORUNURLUK_karari_TEK_alandan_geliyor_ve_bugun_configured_ile_ayni(clie
         for m in body[anahtar]:
             assert isinstance(m["available"], bool), m["id"]
             assert m["available"] == m["configured"], (
-                f"{m['id']}: bugün görünürlük yalnız anahtara bağlı olmalı")
-            # Bugün her model ücretsiz katmanda. Alan şimdiden AKIYOR ki
-            # "Pro" rozeti geldiğinde şema değişikliği gerekmesin.
+                f"{m['id']}: görsel/sohbet modelinde kullanılabilirlik yalnız anahtara bağlı")
+            assert m["sebep"] == (None if m["configured"] else "anahtar"), m["id"]
+            # Katalogda her model ücretsiz katmanda; video kuralı planın
+            # özelliği (services/planlar.py), `requires_plan` katalog verisi.
             assert m["requires_plan"] == "free", m["id"]
+    assert body["video_models"], "video_models boş"
+    for m in body["video_models"]:
+        assert m["available"] is False and m["sebep"] == "plan", (
+            f"{m['id']}: ücretsiz planda video modeli anahtardan bağımsız kapalı (K7)")
+        assert m["requires_plan"] == "free", m["id"]
+    for liste in ("image_models", "chat_models", "video_models"):
+        for m in body[liste]:
+            assert m["available"] == (m["sebep"] is None), m["id"]
 
 
 def test_DAGITIM_ADI_bayragi_yalnizca_ADI_ORTAMDAN_okunan_modelde(client):

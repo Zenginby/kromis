@@ -3,11 +3,15 @@
 # Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Admin uçları — `/admin` sayfası ve `/api/admin/*` (Faz 2 / 8).
 
-Yedi rota: `GET /admin` (statik sayfa, `services/sablon.py` ile çevrili —
+Dokuz rota: `GET /admin` (statik sayfa, `services/sablon.py` ile çevrili —
 `/giris`in yolu), `GET /api/admin/kullanicilar` (sayfalı, `?q=`),
 `GET /api/admin/isler` (`?durum=`, son 200 + özet), `GET /api/admin/metrikler`,
 `POST /api/admin/kullanicilar/{id}/tavan` (yaz/sil),
-`POST /api/admin/kullanicilar/{id}/oturum-dusur`, `POST /api/admin/isler/{id}/iptal`.
+`POST /api/admin/kullanicilar/{id}/oturum-dusur`, `POST /api/admin/isler/{id}/iptal`;
+Faz 3 / 3 ile `POST /api/admin/kullanicilar/{id}/plan` (`kullanicilar.plan`,
+`services/planlar.PLANLAR`dan biri) ve `POST /api/admin/kullanicilar/{id}/kredi`
+(`defter.duzelt`: `duzeltme` satırı `admin_id` iziyle, ± miktar, açıklama zorunlu —
+K4 `yonetici_ekler` politikasının admin rotasındaki yolu).
 
 HER API ROTASI `kimlik.admin_kullanici` TAŞIR — tek bağımlılık, tek çözüm:
 oturumsuz 401, admin değilse **403** (404 değil; gerekçe services/kimlik.py),
@@ -17,9 +21,10 @@ taşımayan rota kırmızı. Sorgular `services/depo_admin.py`de ve KULLANICI
 SÜZGEÇSİZ (gerekçesi orada); bu dosya HTTP'yi kurar — durum kodu, gövde,
 i18n'li `detail`.
 
-ADMİN YAZIMI GÜNLÜĞE, `denetim` TABLOSUNA DEĞİL (belge §8): üç yazım (tavan,
-oturum düşürme, iptal) `gunluk.olay` ile `olay=admin.*` satırı düşürür — kim
-(`admin`), kime/neye (`hedef`/`is`/`sahip`), ne (`tavan`/`adet`) — yapısal
+ADMİN YAZIMI GÜNLÜĞE, `denetim` TABLOSUNA DEĞİL (belge §8): beş yazım (tavan,
+plan, kredi, oturum düşürme, iptal) `gunluk.olay` ile `olay=admin.*` satırı
+düşürür — kim (`admin`), kime/neye (`hedef`/`is`/`sahip`), ne
+(`tavan`/`plan`/`miktar`/`adet`) — yapısal
 alanlar olarak (Faz 2 / 9: JSON satır, `istek_id` bağlamdan gelir; biçim
 services/gunluk.py). Faz 4'ün KVKK/GDPR kalemi denetim tablosu isterse gelir.
 
@@ -37,7 +42,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 import i18n
-from services import ayar, depo_admin, dil, gunluk, hesap, kimlik, sablon, zaman
+from services import ayar, defter, depo_admin, dil, gunluk, hesap, kimlik, planlar, sablon, zaman
 from services.db import OTURUM
 from services.tablolar import IS_DURUMLARI, Kullanici
 
@@ -52,6 +57,19 @@ class TavanIstegi(BaseModel):
     # Üst sınır keyfî değil: `Integer` sütun 2^31'e kadar ve "sınırsız" demenin
     # yolu NULL — dev bir sayı yazmak yerine tavanı kaldırmak istenen şey.
     tavan: int | None = Field(default=None, ge=1, le=1_000_000_000)
+
+
+class PlanIstegi(BaseModel):
+    """`{"plan": "pro"}` — `services/planlar.PLANLAR`dan biri; başkası 422 (CHECK'e varmadan, isteğin dilinde)."""
+    plan: str = Field(min_length=1, max_length=32)
+
+
+class KrediIstegi(BaseModel):
+    """`{"miktar": ±n, "aciklama": "…"}` — `defter.duzelt`: sıfır anlamsız (satır yazar, bakiye oynamaz),
+    açıklama ZORUNLU (iz: kim, neden — `admin_id` kimi söyler, cümle nedenini)."""
+    # Sınır `Integer` sütun ve `TavanIstegi`nin aynı gerekçesi; eksi yön bilerek açık (geri alma).
+    miktar: int = Field(ge=-1_000_000_000, le=1_000_000_000)
+    aciklama: str = Field(min_length=1, max_length=500)
 
 
 @router.get("/admin")
@@ -106,6 +124,44 @@ def tavan(kullanici_id: uuid.UUID, req: TavanIstegi, db: Session = OTURUM,
     depo_admin.tavan_yaz(db, hedef.id, req.tavan)
     gunluk.olay(_gunluk, "admin.tavan", admin=str(admin.id), hedef=str(hedef.id), tavan=req.tavan)
     return {"id": str(hedef.id), "gunluk_kredi_tavani": req.tavan}
+
+
+@router.post("/api/admin/kullanicilar/{kullanici_id}/plan")
+def plan(kullanici_id: uuid.UUID, req: PlanIstegi, db: Session = OTURUM,
+         admin: Kullanici = Depends(kimlik.admin_kullanici)) -> dict:
+    """Kullanıcının planını yazar (Faz 3 / 3); bir sonraki isteği yeni planla kapıdan geçer (`kapilar.check_plan`).
+
+    Doğrulama `PLANLAR`a karşı burada (422, isteğin dilinde): CHECK de aynı
+    kümeyi reddeder ama onun hatası 500 olurdu. Bakiyeye dokunmaz — planın
+    hibesi bakım turunda (K6). Sahibin kendi hesabını `pro` yaptığı rota.
+    """
+    if req.plan not in planlar.PLANLAR:
+        raise HTTPException(status_code=422,
+                            detail=i18n.t("err.plan_gecersiz", dil.aktif(), plan=req.plan,
+                                          planlar=", ".join(planlar.PLANLAR)))
+    hedef = _hedef(db, kullanici_id)
+    depo_admin.plan_yaz(db, hedef.id, req.plan)
+    gunluk.olay(_gunluk, "admin.plan", admin=str(admin.id), hedef=str(hedef.id), plan=req.plan)
+    return {"id": str(hedef.id), "plan": req.plan}
+
+
+@router.post("/api/admin/kullanicilar/{kullanici_id}/kredi")
+def kredi(kullanici_id: uuid.UUID, req: KrediIstegi, db: Session = OTURUM,
+          admin: Kullanici = Depends(kimlik.admin_kullanici)) -> dict:
+    """Kullanıcının bakiyesine ± kredi (Faz 3 / 3): `defter.duzelt` → `duzeltme` satırı `admin_id` iziyle + bakiye.
+
+    Admin bağlamı kapıdan (`yonetici_ekler`, K4). `miktar` 0 → 422: satır
+    yazıp bakiyeyi oynatmayan bir düzeltme iz değil gürültü. Cevap YENİ bakiyeyi
+    söyler (`defter.bakiye`, aynı transaksiyon) — admin.js satırı onunla tazeler.
+    """
+    if req.miktar == 0:
+        raise HTTPException(status_code=422, detail=i18n.t("err.kredi_miktari_sifir", dil.aktif()))
+    hedef = _hedef(db, kullanici_id)
+    hareket = defter.duzelt(db, hedef.id, req.miktar, req.aciklama, admin_id=admin.id)
+    bakiye = defter.bakiye(db, hedef.id)
+    gunluk.olay(_gunluk, "admin.kredi", admin=str(admin.id), hedef=str(hedef.id), miktar=req.miktar,
+                hareket=str(hareket.id))
+    return {"id": str(hedef.id), "hareket": defter._json(hareket), "bakiye": bakiye}
 
 
 @router.post("/api/admin/kullanicilar/{kullanici_id}/oturum-dusur")

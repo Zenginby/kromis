@@ -48,7 +48,7 @@ import time
 import uuid
 
 import pytest
-from sqlalchemy import event, select, text
+from sqlalchemy import event, func, select, text
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Session
 
@@ -138,6 +138,20 @@ def _medya(db: Session, kullanici_id: uuid.UUID) -> list[tablolar.Medya]:
 def _nesneler(tmp_path, kullanici_id: uuid.UUID) -> list[str]:
     kok = tmp_path / "kullanicilar" / str(kullanici_id) / "output"
     return sorted(p.name for p in kok.iterdir()) if kok.exists() else []
+
+
+def _hibe_bekleyen(db: Session) -> int:
+    """Bakım turunun `hibe_satiri`si (Faz 3 / 3): ücretsiz planda `bakiye < aylik_hibe` olan silinmemiş kullanıcı sayısı.
+
+    Sayı SABİT DEĞİL: önceki testlerin `b-…` kullanıcıları satır olarak kalıyor (bu dosya
+    `kullanicilar`ı temizlemiyor) ve her biri ücretsiz, 0 bakiyeli — turdan önce sayılır,
+    tur o kadar satır yazar. Tamamlama kuralının kendisi tests/test_planlar.py'de.
+    """
+    from services import planlar
+    hibe = planlar.PLANLAR["free"].aylik_hibe
+    return int(db.scalar(select(func.count()).select_from(tablolar.Kullanici)
+                         .where(tablolar.Kullanici.plan == "free", tablolar.Kullanici.bakiye < hibe,
+                                tablolar.Kullanici.silindi_at.is_(None))) or 0)
 
 
 def _ikinci_kullanici(db: Session, dil_kodu: str | None = None) -> uuid.UUID:
@@ -849,10 +863,14 @@ def test_the_maintenance_turn_deletes_expired_rows_and_only_the_unreferenced_inp
     kuyruk.isci_kalp(db_oturumu, olu.id, BAKIM_ANI - ESIK - dt.timedelta(seconds=1))
     kuyruk.isci_kalp(db_oturumu, canli.id, BAKIM_ANI - dt.timedelta(seconds=10))
     db_oturumu.commit()
+    hibe_bekleyen = _hibe_bekleyen(db_oturumu)
 
     ozet = isci.bakim_turu(db_oturumu, depo, BAKIM_ANI, ESIK, SAKLAMA)
 
-    assert ozet == {"silinen_is": 2, "silinen_nesne": 1, "korunan_dizin": 1, "silinen_isci": 1} and bool(ozet)
+    # `hibe_satiri`: ücretsiz ve 0 bakiyeli her kullanıcı (en az test kullanıcısı) — ilk tur tamamlar (Faz 3 / 3, K6).
+    assert hibe_bekleyen >= 1
+    assert ozet == {"silinen_is": 2, "silinen_nesne": 1, "korunan_dizin": 1, "silinen_isci": 1,
+                    "hibe_satiri": hibe_bekleyen} and bool(ozet)
     db_oturumu.expire_all()
     assert set(db_oturumu.scalars(select(tablolar.Is.id))) == {b, d}
     assert depo.var(ayar.is_dizini(kullanici.id, a) + "upload.png") and depo.var(ayar.is_dizini(kullanici.id, a) + "ref2.png"), (
@@ -863,7 +881,9 @@ def test_the_maintenance_turn_deletes_expired_rows_and_only_the_unreferenced_inp
     assert db_oturumu.get(tablolar.Medya, medya["id"]) is not None and depo.var(
         f"{ayar.KULLANICILAR_DIZINI}/{kullanici.id}/output/{medya['filename']}"), "ürün galeride durur"
     bos = isci.bakim_turu(db_oturumu, depo, BAKIM_ANI, ESIK, SAKLAMA)
-    assert not bos and dict(bos) == {"silinen_is": 0, "silinen_nesne": 0, "korunan_dizin": 0, "silinen_isci": 0}
+    # Aynı ay ikinci tur: hibe anahtarı çakışır, satır yok — tur boş, olay düşmez.
+    assert not bos and dict(bos) == {"silinen_is": 0, "silinen_nesne": 0, "korunan_dizin": 0, "silinen_isci": 0,
+                                     "hibe_satiri": 0}
 
 
 def test_the_maintenance_turn_frees_a_referenced_directory_once_the_last_referrer_expires(
@@ -909,6 +929,7 @@ def test_the_maintenance_turn_leaves_another_tenants_directory_alone_even_if_a_d
                             "WHERE id = :id"),
                        {"ek": json.dumps([{"ad": "gizli.png", "anahtar": yabanci_dizin + "gizli.png"}]), "id": b})
     _kapat(db_oturumu, b, "bitti", BAKIM_ANI - SAKLAMA - dt.timedelta(days=1))
+    hibe_bekleyen = _hibe_bekleyen(db_oturumu)
     yakala = _Yakala()
     gunlukcu = logging.getLogger("kromis.is")
     # Aynı süreçte koşmuş Alembic `fileConfig` (şablon DB) günlükçüyü KAPATMIŞ olabilir;
@@ -920,7 +941,10 @@ def test_the_maintenance_turn_leaves_another_tenants_directory_alone_even_if_a_d
     finally:
         gunlukcu.removeHandler(yakala)
         gunlukcu.disabled = kapaliydi
-    assert ozet == {"silinen_is": 1, "silinen_nesne": 1, "korunan_dizin": 0, "silinen_isci": 0}
+    # `hibe_satiri`: ücretsiz ve 0 bakiyeli her kullanıcı (en az iki kiracı) — ilk tur tamamlar (Faz 3 / 3).
+    assert hibe_bekleyen >= 2
+    assert ozet == {"silinen_is": 1, "silinen_nesne": 1, "korunan_dizin": 0, "silinen_isci": 0,
+                    "hibe_satiri": hibe_bekleyen}
     assert not depo.var(ayar.is_dizini(kullanici.id, b) + "upload.png"), "işin kendi dizini gider"
     assert depo.var(yabanci_dizin + "gizli.png"), "başka kiracının dizinine dokunulmaz"
     (uyari,) = [k for k in yakala.kayitlar if getattr(k, "olay", None) == "bakim.yabanci_dizin"]
@@ -1148,7 +1172,9 @@ def test_the_process_registers_a_worker_row_beats_and_exits_cleanly_on_sigterm(v
             surec.kill()
             surec.wait(timeout=10)
     assert surec.returncode == 0, hata
-    olaylar = _olaylar(cikti)
+    # Açılış bakım turu `olay=bakim` düşürebilir (Faz 3 / 3: test kullanıcısına aylık hibe yatar,
+    # `hibe_satiri=1`) — bu test yaşam döngüsünü ölçer, bakım olayı `test_the_maintenance_turn_*`in işi.
+    olaylar = [o for o in _olaylar(cikti) if o["olay"] != "bakim"]
     assert [o["olay"] for o in olaylar] == ["isci.basladi", "isci.sinyal", "isci.kapandi"], cikti
     assert olaylar[0]["es_zamanli"] == 2 and olaylar[0]["konak"] and olaylar[1]["sinyal"] == 15
     assert olaylar[0]["isci_id"] == olaylar[2]["isci_id"]

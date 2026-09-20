@@ -17,7 +17,7 @@ import chat_prompt
 import chat_providers
 import i18n
 from models import MAX_CHAT_TITLE_CHARS, ChatRequest, ChatSaveRequest, wire_messages
-from services import depo_sohbet, depo_tercih, dil, kimlik, modeller, zaman
+from services import depo_sohbet, depo_tercih, dil, kapilar, kimlik, modeller, zaman
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
@@ -92,7 +92,8 @@ def chat(req: ChatRequest, db: Session = OTURUM,
         # dosyasının hatasını yakalamalı; bağlamdan (tercih satırı, katalog)
         # gelen bir hata "talimat yüklenemedi" kılığına girmesin. (Bozuk
         # `prefs.json` senaryosu Faz 1 / 6'da kalktı — tercih DB'de.)
-        baglam = modeller.director_context(db, kullanici.id, kimlikler)
+        plan = kapilar.kullanici_plani(db, kullanici)
+        baglam = modeller.director_context(db, kullanici.id, kimlikler, plan=plan)
         try:
             instructions = chat_prompt.build_system(**baglam)
         except ValueError as e:

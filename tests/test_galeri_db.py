@@ -74,7 +74,7 @@ DEPOLAR = {
     "services/depo_kimlik_bilgisi.py": 4,   # Faz 1 / 7
     "services/kuyruk.py": 16,               # Faz 2 / 1 (3 kullanıcı + 9 işçi/sonda tarafı; `ekle`/`isci_kaydet` `db.add`); Faz 2 / 10 +4 saklama/bakım
     "services/depo_admin.py": 10,           # Faz 2 / 8 (hepsi kiracısız — `KIRACISIZ_MODULLER`)
-    "services/defter.py": 6,                # Faz 3 / 1 (`bakiye`, `_bakiye_ekle`, `rezerve`, `_isin_hareketleri`, `hareketler`, `tutarlilik`; `_yaz` `insert` — sayılmaz)
+    "services/defter.py": 8,                # Faz 3 / 1 (`bakiye`, `_bakiye_ekle`, `rezerve`, `_isin_hareketleri`, `hareketler`, `tutarlilik`; `_yaz` `insert` — sayılmaz); Faz 3 / 3 +`plan_oku`, +`hibe_turu`
 }
 # `depo_*.py` kalıbının DIŞINDA kalan depolar — `test_the_repository_list_matches_the_files_on_disk`
 # bunları da bekler; kalıba uymayan yeni bir depo buraya yazılmadan listeye giremez.
@@ -113,6 +113,8 @@ KIRACISIZ = {
         "duzelt": "admin düzeltmesi (K4, `yonetici_ekler`): hedef kullanıcı `hedef_id` — `depo_admin`in adlandırması, "
                   "\"kimin adına\" sorusunun cevabı satırın sahibi değil ADMİN (`admin_id` izi)",
         "tutarlilik": "periyodik bakım (Faz 3 / 7): bütün kiracıların SUM(defter) ↔ bakiye karşılaştırması",
+        "hibe_turu": "periyodik bakım (Faz 3 / 3, K6): bütün kiracılarda `bakiye < aylik_hibe` olanlara aylık hibe — "
+                     "ADMİN bağlamı (`yonetici_ekler`), süzgeç plan ve bakiye, kiracı değil",
     },
 }
 # Kiracısız MODÜLLER (Faz 2 / 8): işlev işlev değil bütünüyle muaf, gerekçesiyle.

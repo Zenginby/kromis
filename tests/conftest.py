@@ -721,6 +721,38 @@ def kullanici(request: pytest.FixtureRequest):
             appmod.app.dependency_overrides.pop(anahtar, None)
 
 
+@pytest.fixture
+def plan_pro(request: pytest.FixtureRequest, kullanici):
+    """Test kullanıcısını `pro` yapar (Faz 3 / 3) — video rotalarını ölçen dosyalar için OPT-IN.
+
+    NEDEN VAR: 3. görev ücretsiz planda video modellerini kapattı
+    (`kapilar.check_plan` → 403 `err.plan_kapsamiyor`, K7) ve conftest'in
+    test kullanıcısı ÜCRETSİZ (sütunun `server_default`ı — kasıtlı: kapının
+    öntanımlı hâli kapalı olsun, plan testleri onu açıkça açsın). Video
+    rotasının SÖZLEŞMESİNİ ölçen dosyalar (`test_video_route` 33 çağrı,
+    `test_isler_route`, `test_uretim_kapilar`) planı değil rotayı sınıyor; her
+    birine "kullanıcıyı pro yap" satırı yazmak yerine tek fixture,
+    `pytestmark = pytest.mark.usefixtures("depo_db", "plan_pro")`. Kapının
+    kendisi tests/test_planlar.py'de ölçülür (free + video → 403).
+
+    Yazım DB'ye (`UPDATE kullanicilar SET plan`; `plan` bakiye değil — defterin
+    tek-yazar bekçisi `bakiye`/`kredi_hareketleri` içindir) ve nesneye: kapı
+    planı DB'den okur (`defter.plan_oku`), nesne ise `kullanici.plan` okuyan
+    bir test için. `depo_db`siz dosyada yalnız nesne yazılır.
+    """
+    kullanici.plan = "pro"
+    if "depo_db" in request.fixturenames:
+        from sqlalchemy import update
+        from sqlalchemy.orm import Session
+
+        from services.tablolar import Kullanici
+
+        with Session(request.getfixturevalue("depo_db")) as s:
+            s.execute(update(Kullanici).where(Kullanici.id == kullanici.id).values(plan="pro"))
+            s.commit()
+    return kullanici
+
+
 @pytest.fixture(autouse=True)
 def _anahtar_kapisi(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch):
     """Her test "seçili modelin anahtarı var" öncülüyle koşar (Faz 2 / 6) — kapı yamalı.

@@ -638,11 +638,14 @@ def kuyruk_uyarisi(db: Session, an: dt.datetime) -> dict[str, Any] | None:
 # ────────────────────────────────────────────────────────── bakım
 
 class BakimOzeti(dict[str, int]):
-    """`bakim_turu`nun döndürdüğü sayılar: `silinen_is`, `silinen_nesne`, `korunan_dizin`, `silinen_isci`.
+    """`bakim_turu`nun döndürdüğü sayılar: `silinen_is`, `silinen_nesne`, `korunan_dizin`, `silinen_isci`, `hibe_satiri`.
 
     Sözlük (günlük alanı olarak düz yazılsın); `__bool__` "bir şey yapıldı mı":
-    işçi olayı yalnız bir şey silindiğinde düşürür (`bayat`ın deyimi — boş turda
-    5 dk'da bir satır gürültüdür).
+    işçi olayı yalnız bir şey silindiğinde ya da hibe yazıldığında düşürür
+    (`bayat`ın deyimi — boş turda 5 dk'da bir satır gürültüdür). `hibe_satiri`
+    (Faz 3 / 3): bu turda yatan aylık hibe sayısı — dağıtım sonrası ilk turda
+    bütün kullanıcılar, sonra ay başında; ay içinde 0 (belge §3 "Sahibin adımı":
+    `olay=bakim` satırında `hibe_satiri=N`).
     """
 
     def __bool__(self) -> bool:
@@ -661,19 +664,24 @@ def _dizini_sil(depo: dosya.Depo, onek: str) -> int:
 
 def bakim_turu(db: Session, depo: dosya.Depo, an: dt.datetime, esik: dt.timedelta,
                saklama_suresi: dt.timedelta) -> BakimOzeti:
-    """Bir bakım turu: saklama (satır + referanssız girdi dizini) ve ölü işçi satırları; özet sayılar.
+    """Bir bakım turu: saklama (satır + referanssız girdi dizini), ölü işçi satırları ve aylık hibe; özet sayılar.
 
     Sıra ve bağlamlar (gerekçe modül başında): sahipler ADMIN bağlamında
-    bulunur; her kiracının satırları O KİRACININ bağlamında silinir ve commit
+    bulunur ve aylık hibe (`defter.hibe_turu`, Faz 3 / 3) aynı bağlamda
+    yatar; her kiracının satırları O KİRACININ bağlamında silinir ve commit
     edilir (kiracı başına bir transaksiyon — biri düşerse ötekiler durur);
     sonra ADMIN bağlamında kalan referanslar ve mevcut satırlar okunur, ona
     göre dizinler silinir. Ölü işçi satırı politikasız, bağlam gerekmez.
     `an`/`esik`/`saklama_suresi` çağıranın (testler saatle oynamaz).
     """
-    ozet = BakimOzeti(silinen_is=0, silinen_nesne=0, korunan_dizin=0, silinen_isci=0)
+    ozet = BakimOzeti(silinen_is=0, silinen_nesne=0, korunan_dizin=0, silinen_isci=0, hibe_satiri=0)
     with kiraci.baglam(rol=kiraci.ADMIN, oturum=db):
         sahipler = kuyruk.saklama_sahipleri(db, an, saklama_suresi)
         ozet["silinen_isci"] = kuyruk.olu_iscileri_sil(db, an, esik)
+        # Aylık hibe (Faz 3 / 3, K6) ADMİN bağlamında: `kredi_hareketleri`ye
+        # bütün kiracılar adına yazar — `yonetici_ekler` politikası (K4) tam
+        # bunun için var. Aynı commit: silme ile hibe aynı turun işi.
+        ozet["hibe_satiri"] = defter.hibe_turu(db, an)
         db.commit()
     silinenler: list[kuyruk.SilinenIs] = []
     for kullanici_id in sahipler:

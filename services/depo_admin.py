@@ -1,7 +1,7 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
 # GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
 # Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
-"""Admin sorguları — kullanıcı listesi, kuyruk görünümü, metrikler, tavan, iptal (Faz 2 / 8).
+"""Admin sorguları — kullanıcı listesi, kuyruk görünümü, metrikler, tavan, plan, iptal (Faz 2 / 8; plan Faz 3 / 3).
 
 BU DEPONUN KULLANICI SÜZGECİ YOK ve bu bilinçli: admin her kiracının satırını
 görür. Öteki depoların `(db, kullanici_id, …)` sözleşmesini (bekçisi
@@ -59,7 +59,7 @@ from services.tablolar import (
 )
 
 __all__ = ["CANLI_ESIK", "SAYFA_ADEDI", "SAYFA_ADEDI_AZAMI", "IS_LISTESI_SINIRI",
-           "kullanicilar", "kullanici_bul", "oturum_sayisi", "tavan_yaz",
+           "kullanicilar", "kullanici_bul", "oturum_sayisi", "tavan_yaz", "plan_yaz",
            "is_listesi", "is_satiri", "is_iptal", "is_dokumu", "metrikler"]
 
 # İşçi kalbi 30 sn (services/isci.py); üç kaçırılan kalp = bayat. Bayat işçi
@@ -105,6 +105,9 @@ def kullanicilar(db: Session, *, q: str | None = None, sayfa: int = 1, adet: int
     sayfa 50 satır): `son_gorulme` (oturumların en yenisi), `kredi_24sa` (son 24
     saatte PLATFORM anahtarıyla sıraya alınan tahmin, `iptal` hariç —
     `kota.gunluk_durum`un aynı süzgeci) ve `aktif_is` (bekliyor + calisiyor).
+    `plan` ve `bakiye` (Faz 3 / 3) satırın kendi sütunları: admin plan seçiciyi ve
+    "kredi ekle" alanını bunlardan kurar; `bakiye` defterin önbelleği (`defter.bakiye`
+    ile aynı sütun, ikinci bir SUM yok).
     """
     an = an if an is not None else zaman.an()
     sayfa = max(1, sayfa)
@@ -135,6 +138,8 @@ def kullanicilar(db: Session, *, q: str | None = None, sayfa: int = 1, adet: int
         "gunluk_kredi_tavani": k.gunluk_kredi_tavani,
         "kredi_24sa": int(kredi_24sa or 0),
         "aktif_is": int(aktif_is or 0),
+        "plan": k.plan,
+        "bakiye": int(k.bakiye),
     } for k, son, kredi_24sa, aktif_is in satirlar], toplam
 
 
@@ -160,6 +165,20 @@ def tavan_yaz(db: Session, hedef_id: uuid.UUID, tavan: int | None) -> bool:
     sonuc = db.execute(update(Kullanici)
                        .where(Kullanici.id == hedef_id, Kullanici.silindi_at.is_(None))
                        .values(gunluk_kredi_tavani=tavan))
+    return kuyruk._etkilenen(sonuc) > 0
+
+
+def plan_yaz(db: Session, hedef_id: uuid.UUID, plan: str) -> bool:
+    """`kullanicilar.plan` yaz (Faz 3 / 3; `PLANLAR_KUMESI`nden biri — rota doğrular, CHECK son kapı); satır yoksa `False`.
+
+    `tavan_yaz`ın ikizi: hesap tablosu politikasız, kapı rotadaki
+    `admin_kullanici`. Kullanıcının bir sonraki isteği yeni planı okur
+    (`kapilar.check_plan`, `modeller.settings_payload`); bakiyeye DOKUNMAZ —
+    planın hibesi bakım turunda tamamlanır (K6), anında para yok.
+    """
+    sonuc = db.execute(update(Kullanici)
+                       .where(Kullanici.id == hedef_id, Kullanici.silindi_at.is_(None))
+                       .values(plan=plan))
     return kuyruk._etkilenen(sonuc) > 0
 
 

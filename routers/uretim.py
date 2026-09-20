@@ -44,11 +44,16 @@ router = APIRouter()
 # çünkü ikisi de kullanıcının O ANKİ paletine/kataloğa bağlı ve palet sonradan
 # silinse iş değişmemeli (`istek` sözleşmesi services/isci.py'nin başında).
 #
-# SIRA BİLİNÇLİ (Faz 2 / 6 ile dört kapı, `_kapilar`; Faz 3 / 2 beşinciyi ekledi):
-# doğrulama → "anahtar yok" (409) → eş zamanlılık (429) → saatlik iş (429) →
-# günlük kredi (429) → bakiye ön denetimi (402, salt okunur) → girdi nesneleri →
-# satır → REZERV (402, yazan; `kapilar.rezerve_kredi`, satırla AYNI transaksiyon).
-# 422 alacak istek 409/429/402 ile maskelenmez; anahtarsız istek kotaya hiç
+# SIRA BİLİNÇLİ (Faz 2 / 6 ile dört kapı, `_kapilar`; Faz 3 / 2 beşinciyi, Faz 3 / 3
+# altıncıyı ekledi): doğrulama → PLAN (403; model çözüldüğü an, anahtardan
+# BAĞIMSIZ — `kapilar.check_plan`, K7) → "anahtar yok" (409) → eş zamanlılık
+# (429) → saatlik iş (429) → günlük kredi (429) → bakiye ön denetimi (402, salt
+# okunur) → girdi nesneleri → satır → REZERV (402, yazan; `kapilar.rezerve_kredi`,
+# satırla AYNI transaksiyon). Plan anahtardan ÖNCE: planın kapsamadığı modele
+# "anahtar yok" demek kullanıcıyı Ayarlar'a yönlendirirdi ve anahtar girse de
+# kapı açılmazdı (BYOK'lu ücretsiz kullanıcı da video alamaz); plan kapısı da
+# kotaya saymaz, nesne bırakmaz.
+# 422 alacak istek 403/409/429/402 ile maskelenmez; anahtarsız istek kotaya hiç
 # sayılmaz (iş doğmaz); 429/402 alacak istek depoya nesne bırakmaz; satır ancak
 # nesneler yazıldıysa doğar (nesne yazımı düşerse istek 500, satır yok, işçi
 # hiç görmez). `is_id` rotada üretilir (`uuid4`) ve `kuyruk.ekle`ye verilir:
@@ -120,18 +125,22 @@ def _siraya_koy(db: Session, kullanici: Kullanici, tur: str, istek: dict[str, An
     return {"is": kuyruk._json(is_)}
 
 
-def _kapilar(db: Session, kullanici: Kullanici, cred_id: str, kimlikler: Mapping[str, str],
+def _kapilar(db: Session, kullanici: Kullanici, spec: catalog.ImageModel, kimlikler: Mapping[str, str],
              kredi_tahmini: int) -> str:
     """Dört rotanın ortak kapı zinciri (sıra dosya başında); işin `anahtar_kaynagi`ni döndürür.
 
-    Doğrulamadan SONRA, girdi nesnesi yazılmadan ÖNCE çağrılır. Anahtar kapısı
-    en başta: anahtarsız kullanıcı kota sayaçlarına hiç dokunmaz ve 429 yerine
-    sebebini (409) okur. Günlük kredi kapısı kaynağı bilmek zorunda — yalnız
-    `platform` sayılır (services/kota.py), o yüzden zincirin sonunda; bakiye
-    ön denetimi (Faz 3 / 2) ondan da sonra (K9: tavan 429 dediyse bakiye hiç
-    sorulmaz). Asıl düşüm `_siraya_koy`da, satırla aynı transaksiyonda.
+    Doğrulamadan SONRA, girdi nesnesi yazılmadan ÖNCE çağrılır. Plan kapısı
+    (Faz 3 / 3) en başta: `spec` çözüldü, kullanıcının planı onu kapsamıyorsa
+    403 — anahtar kaynağından bağımsız kural, anahtar sorulmadan cevaplanır.
+    Anahtar kapısı hemen ardından: anahtarsız kullanıcı kota sayaçlarına hiç
+    dokunmaz ve 429 yerine sebebini (409) okur. Günlük kredi kapısı kaynağı
+    bilmek zorunda — yalnız `platform` sayılır (services/kota.py), o yüzden
+    zincirin sonunda; bakiye ön denetimi (Faz 3 / 2) ondan da sonra (K9: tavan
+    429 dediyse bakiye hiç sorulmaz). Asıl düşüm `_siraya_koy`da, satırla aynı
+    transaksiyonda.
     """
-    kaynak = kapilar.check_anahtar(cred_id, kimlikler)
+    kapilar.check_plan(db, kullanici, spec)
+    kaynak = kapilar.check_anahtar(spec.credential, kimlikler)
     kapilar.check_is_tavani(db, kullanici.id)
     kota.check_saatlik(db, kullanici.id)
     kota.check_gunluk(db, kullanici, kredi_tahmini, kaynak)
@@ -169,7 +178,7 @@ def generate(req: GenerateRequest, db: Session = OTURUM,
     # TAHMİN görsel başına maliyet × adet; işçi gerçek maliyeti satır başına
     # yazar (`isci._kredi`), bu sayı günlük kredi tavanının (services/kota.py) girdisi.
     kredi_tahmini = catalog.cost_for(spec, req.quality) * req.n
-    kaynak = _kapilar(db, kullanici, spec.credential, kimlikler, kredi_tahmini)
+    kaynak = _kapilar(db, kullanici, spec, kimlikler, kredi_tahmini)
     istek = {**_ortak_istek(req.prompt, req.size, req.quality, req.n, folder_id, session_id),
              # Turun sütunları AYRI isteklerle geliyor (istemci fan-out'u; bkz.
              # models.GenerateRequest.arena_id) — onları birbirine bağlayan tek şey bu etiket.
@@ -214,7 +223,7 @@ def video(req: VideoRequest, db: Session = OTURUM,
     spec = catalog.video_model(req.model)
     assert spec is not None
     kredi_tahmini = catalog.cost_for(spec, req.quality, duration=req.duration) * req.n
-    kaynak = _kapilar(db, kullanici, spec.credential, kimlikler, kredi_tahmini)
+    kaynak = _kapilar(db, kullanici, spec, kimlikler, kredi_tahmini)
     istek = {**_ortak_istek(req.prompt, req.size, req.quality, req.n, folder_id, session_id),
              "duration": req.duration}
     return _siraya_koy(db, kullanici, "video", istek, req.model, kredi_tahmini,
@@ -366,7 +375,7 @@ async def animate(
         son_kare = await gorsel.read_upload_png(last_file)
 
     kredi_tahmini = catalog.cost_for(spec, quality, duration=duration) * n
-    kaynak = await run_in_threadpool(_kapilar, db, kullanici, spec.credential, kimlikler,
+    kaynak = await run_in_threadpool(_kapilar, db, kullanici, spec, kimlikler,
                                      kredi_tahmini)
     is_id = uuid.uuid4()
     # Son kare `girdiler`in DIŞINDA, kendi anahtarıyla (`istek.son_kare`): işçi
@@ -528,7 +537,7 @@ async def edit(
         task="edit", db=db, kullanici_id=kullanici.id, drop=drop)
 
     kredi_tahmini = catalog.cost_for(spec, quality) * n
-    kaynak = await run_in_threadpool(_kapilar, db, kullanici, spec.credential, kimlikler,
+    kaynak = await run_in_threadpool(_kapilar, db, kullanici, spec, kimlikler,
                                      kredi_tahmini)
     is_id = uuid.uuid4()
     girdiler = await run_in_threadpool(_girdileri_yaz, depo, kullanici.id, is_id, refs)

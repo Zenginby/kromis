@@ -287,10 +287,12 @@ def is_yeniden(is_id: uuid.UUID, db: Session = OTURUM,
     beklediği bir şey değil — yeniden gönderilen iş tek başına koşar.
 
     Sıra üretim rotalarınınki (routers/uretim.py `_kapilar`): kaynak yok → 404;
-    durum uymuyor → 409; anahtar yok → 409; eş zamanlılık / saatlik iş /
-    günlük kredi → 429; satır. Yeniden gönderim de bir iş doğurur, yani kotayı
-    ve anahtar kapısını ATLAYAMAZ — aksi hâlde "hata → yeniden gönder" döngüsü
-    tavanın arka kapısı olurdu. `anahtar_kaynagi` eski satırdan KOPYALANMAZ,
+    durum uymuyor → 409; plan kapsamıyor → 403 (Faz 3 / 3, `check_plan`;
+    katalogdan düşmüş modelde sorulmaz); anahtar yok → 409; eş zamanlılık /
+    saatlik iş / günlük kredi → 429; satır. Yeniden gönderim de bir iş doğurur,
+    yani planı, kotayı ve anahtar kapısını ATLAYAMAZ — aksi hâlde "hata →
+    yeniden gönder" döngüsü tavanın (ve planın: ücretsize düşen kullanıcının
+    eski video işi) arka kapısı olurdu. `anahtar_kaynagi` eski satırdan KOPYALANMAZ,
     yeniden çözülür: kullanıcı arada kendi anahtarını girmiş (ya da silmiş)
     olabilir. `kredi_tahmini` eski satırdan (aynı model, aynı adet); işçi
     gerçek maliyeti yine kendi yazar.
@@ -309,9 +311,11 @@ def is_yeniden(is_id: uuid.UUID, db: Session = OTURUM,
         raise HTTPException(status_code=409,
                             detail=i18n.t("err.is_yeniden_gonderilemez", dil.aktif(), durum=eski.durum))
     spec = catalog.image_model(eski.model) or catalog.video_model(eski.model)
-    # Katalogdan düşmüş bir model: anahtar kapısı soracak kimlik yok, işçi zaten
-    # "bilinmeyen model" ile düşürür (test_isci); kaynak `kullanici` sayılır ki
-    # platform toplamına girmesin.
+    # Katalogdan düşmüş bir model: plan ve anahtar kapısı soracak kayıt yok, işçi
+    # zaten "bilinmeyen model" ile düşürür (test_isci); kaynak `kullanici` sayılır
+    # ki platform toplamına girmesin.
+    if spec is not None:
+        kapilar.check_plan(db, kullanici, spec)
     kaynak = (kapilar.check_anahtar(spec.credential, kimlikler) if spec is not None
               else platform_anahtari.KAYNAK_KULLANICI)
     kapilar.check_is_tavani(db, kullanici.id)

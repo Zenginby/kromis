@@ -9,8 +9,6 @@ Belge §8 çıkış ölçütünün tarayıcı yüzü. Sunucu `tests/test_playwri
 """
 from __future__ import annotations
 
-import time
-
 import pytest
 from sqlalchemy import func, select, text
 
@@ -20,7 +18,7 @@ from playwright.sync_api import sync_playwright
 
 import i18n
 from services import kuyruk, tablolar
-from tests.test_playwright_studio import ServerThread, get_free_port
+from tests.test_playwright_studio import ServerThread, get_free_port, sunucu_hazir
 
 pytestmark = pytest.mark.gercek_kimlik
 
@@ -41,7 +39,7 @@ def test_the_admin_walks_the_three_tabs_sets_a_users_cap_plan_and_credits_while_
     with kullanici.db() as db:
         kuyruk.ekle(db, kullanici.kullanici_id, "generate", {"prompt": "x"}, "m", 3)
         db.commit()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     taban = f"http://127.0.0.1:{port}"
     try:
         with sync_playwright() as p:

@@ -54,6 +54,7 @@ from tests.test_playwright_studio import (
     _ilk_kurulum_perdesini_kapat,
     _tum_kimlikler_kayitli,
     get_free_port,
+    sunucu_hazir,
 )
 
 pytestmark = pytest.mark.gercek_kimlik
@@ -144,7 +145,7 @@ def test_a_job_that_finishes_while_the_tab_is_closed_shows_up_in_a_fresh_tab(
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     taban = f"http://127.0.0.1:{port}"
     t0 = time.perf_counter()
 
@@ -194,7 +195,7 @@ def test_two_queued_jobs_survive_a_reload_and_both_land_in_the_gallery(
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     taban = f"http://127.0.0.1:{port}"
 
     try:
@@ -250,7 +251,7 @@ def test_a_failed_job_offers_resubmit_and_the_resubmitted_job_finishes(
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     taban = f"http://127.0.0.1:{port}"
 
     try:
@@ -292,7 +293,7 @@ def test_when_the_stream_is_cut_the_panel_falls_back_to_polling_and_still_finish
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     taban = f"http://127.0.0.1:{port}"
     kesilen = threading.Event()
 
@@ -341,7 +342,7 @@ def test_the_elapsed_counter_starts_near_zero_in_a_browser_three_hours_east_of_t
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     taban = f"http://127.0.0.1:{port}"
 
     try:

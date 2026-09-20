@@ -53,7 +53,7 @@ import catalog
 import i18n
 import providers
 from routers import isler as isler_rotasi
-from services import ayar, hesap, isci, kapilar, kimlik, kuyruk, tablolar
+from services import ayar, defter, hesap, isci, kapilar, kimlik, kuyruk, tablolar
 
 pytestmark = pytest.mark.usefixtures("depo_db")
 
@@ -127,8 +127,10 @@ def test_generate_answers_202_with_the_job_and_no_provider_call(c, monkeypatch):
     spec = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
     assert is_["kredi_tahmini"] == catalog.cost_for(spec, "medium") * 3
     assert is_["sonuc"] is None and is_["hata"] is None and is_["basladi"] is None
-    assert set(is_) == {"id", "tur", "durum", "model", "kredi_tahmini", "anahtar_kaynagi", "olusturuldu",
-                        "basladi", "bitti", "sonuc", "hata", "arena_id", "folder_id"}, "`istek` (prompt, anahtarlar) dökülmez"
+    assert set(is_) == {"id", "tur", "durum", "model", "kredi_tahmini", "kredi_gercek", "anahtar_kaynagi",
+                        "olusturuldu", "basladi", "bitti", "sonuc", "hata", "arena_id", "folder_id"}, (
+        "`istek` (prompt, anahtarlar) dökülmez")
+    assert is_["kredi_gercek"] is None, "sırada bekleyen işin gerçek kredisi yok (Faz 3 / 2: işçi yazar)"
     assert is_["anahtar_kaynagi"] == "kullanici", "conftest'in anahtar kapısı yaması `kullanici` der (Faz 2 / 6)"
     assert is_["arena_id"] is None and is_["folder_id"] is None, (
         "`istek`ten dökülen iki alan: tur etiketi (panel gruplaması) ve klasör (önizleme)")
@@ -392,6 +394,52 @@ def test_cancelling_a_waiting_job_takes_it_out_of_the_queue(c, depo_db, monkeypa
     assert r.json()["is"]["durum"] == "iptal" and r.json()["is"]["bitti"]
     assert _tek_tur(depo_db) is False, "işçi iptal edilen işi almaz"
     assert c.post(f"/api/isler/{is_id}/iptal").status_code == 409, "ikinci iptal 409: artık bekliyor değil"
+
+
+def _platformla(depo_db, kullanici, monkeypatch, bakiye: int = 100) -> None:
+    """Bu dosyanın işleri BYOK doğar (conftest yaması); bu iki test platform anahtarı + defter ister (Faz 3 / 2)."""
+    monkeypatch.setattr(kapilar, "check_anahtar", lambda *a, **k: "platform")
+    with Session(depo_db) as db:
+        defter.hibe(db, kullanici.id, bakiye, f"{defter.ONEK_HIBE}{kullanici.id}:2026-09")
+        db.commit()
+
+
+def _bakiye(depo_db, kullanici) -> int:
+    with Session(depo_db) as db:
+        return defter.bakiye(db, kullanici.id)
+
+
+def test_cancelling_a_waiting_platform_job_refunds_its_reserve_in_the_same_transaction(c, depo_db, kullanici,
+                                                                                    monkeypatch):
+    """İptal → `defter.iade` (Faz 3 / 2, K2): iş hiç koşmadı, iade tam; ikinci iptal 409 ve deftere dokunmaz."""
+    _platformla(depo_db, kullanici, monkeypatch)
+    is_ = c.post("/api/generate", json=GORSEL).json()["is"]
+    assert _bakiye(depo_db, kullanici) == 100 - is_["kredi_tahmini"]
+
+    r = c.post(f"/api/isler/{is_['id']}/iptal")
+    assert r.status_code == 200 and r.json()["is"]["durum"] == "iptal"
+    assert _bakiye(depo_db, kullanici) == 100
+    with Session(depo_db) as db:
+        turler = [h.tur for h in defter.hareketler(db, kullanici.id)[::-1]]
+    assert turler == [defter.TUR_HIBE, defter.TUR_REZERV, defter.TUR_IADE]
+    assert c.post(f"/api/isler/{is_['id']}/iptal").status_code == 409
+    with Session(depo_db) as db:
+        assert len(defter.hareketler(db, kullanici.id)) == 3, "409 defteri oynatmaz"
+    assert _bakiye(depo_db, kullanici) == 100
+
+
+def test_the_job_endpoints_carry_the_real_credit_once_the_worker_has_finished(c, depo_db, kullanici, monkeypatch):
+    _platformla(depo_db, kullanici, monkeypatch)
+    is_id = c.post("/api/generate", json={**GORSEL, "n": 2}).json()["is"]["id"]
+    assert c.get(f"/api/isler/{is_id}").json()["is"]["kredi_gercek"] is None
+    assert _tek_tur(depo_db)
+    spec = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
+    tekil = c.get(f"/api/isler/{is_id}").json()["is"]
+    assert tekil["durum"] == "bitti" and tekil["kredi_gercek"] == catalog.cost_for(spec, "medium") * 2
+    assert tekil["kredi_gercek"] == tekil["kredi_tahmini"], "sahte sağlayıcı istenen adedi döndürdü: gerçek == tahmin"
+    (listedeki,) = [i for i in c.get("/api/isler").json()["isler"] if i["id"] == is_id]
+    assert listedeki["kredi_gercek"] == tekil["kredi_gercek"]
+    assert _bakiye(depo_db, kullanici) == 100 - tekil["kredi_gercek"]
 
 
 def test_a_running_or_finished_job_cannot_be_cancelled(c, depo_db, kullanici):

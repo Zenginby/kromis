@@ -20,6 +20,11 @@ düşüp düşmediğini, sekmenin kapanıp açılmasını göremez):
      kusuru): sunucu süreci UTC'de, tarayıcı `Europe/Istanbul` — `basladi`
      dilimli UTC (`Z`) geldiği için geçen süre saniyelerle ölçülür, "180:00"
      değil. Yalnız tarayıcı ölçebilir: `new Date()` tarayıcının dilimindedir.
+  6. KREDİ GERİ GELİYOR (Faz 3 / 2 çıkış ölçütü): platform anahtarlı iş bakiyeyi
+     tahmin kadar düşürür; sahte sağlayıcı düşer → panelde `hata`, bakiye ESKİ
+     değerine döner (iade); "yeniden gönder" → `bitti`, satırda "~tahmin → gerçek",
+     bakiye gerçek kadar eksik. Tarayıcı → 202 → işçi → SSE → panel zinciri
+     defterle birlikte ancak burada uçtan uca ölçülür.
 
 Sunucu ve işçi `tests/test_playwright_studio.py`nin `ServerThread`/`IsciThread`
 ikilisi — aynı süreç, gerçek kuyruk (Postgres), sağlayıcı `monkeypatch`.
@@ -43,7 +48,7 @@ from sqlalchemy import select
 
 import azure_client as ac
 import providers
-from services import tablolar
+from services import defter, kapilar, tablolar
 from tests.test_playwright_studio import (
     ServerThread,
     _ilk_kurulum_perdesini_kapat,
@@ -375,3 +380,58 @@ def test_the_elapsed_counter_starts_near_zero_in_a_browser_three_hours_east_of_t
         else:
             os.environ["TZ"] = eski_tz
         time.tzset()
+
+
+def test_a_failed_platform_job_gives_the_credits_back_and_a_finished_one_shows_the_real_cost(
+        monkeypatch, veritabani, e2e_oturum):
+    """Faz 3 / 2 çıkış ölçütü: sağlayıcı hatası → bakiye eski değer; yeniden gönderim biter →
+    panelde "~tahmin → gerçek", bakiye gerçek kadar düşük. Platform anahtarı: kapı yaması `platform` der."""
+    _tum_kimlikler_kayitli(monkeypatch)
+    monkeypatch.setattr(kapilar, "check_anahtar", lambda *a, **k: "platform")
+
+    def bozuk(*a, **k):
+        raise ac.AzureImageError("Azure isteği başarısız (HTTP 500).")
+    monkeypatch.setattr(providers, "generate", bozuk)
+    port = get_free_port()
+    server = ServerThread(port)
+    server.start()
+    oturum = e2e_oturum()
+    with oturum.db() as db:
+        defter.hibe(db, oturum.kullanici_id, 100, f"{defter.ONEK_HIBE}{oturum.kullanici_id}:2026-09")
+        db.commit()
+    time.sleep(1.0)
+    taban = f"http://127.0.0.1:{port}"
+
+    def bakiye() -> int:
+        with oturum.db() as db:
+            return defter.bakiye(db, oturum.kullanici_id)
+
+    def defter_turleri() -> list[str]:
+        with oturum.db() as db:
+            return [h.tur for h in defter.hareketler(db, oturum.kullanici_id)[::-1]]
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1280, "height": 860})
+            _studyo(page, taban, oturum)
+            _gonder(page, "dusecek")
+            _paneli_ac(page)
+            page.wait_for_selector(PANEL_SATIR + '[data-durum="hata"]', timeout=15000)
+            assert page.eval_on_selector(PANEL_SATIR, "e => e.dataset.durum") == "hata"
+            # Rota tahmini düştü, işçi hatada iade etti: bakiye eski değerinde, defter rezerv + iade.
+            assert bakiye() == 100, defter_turleri()
+            assert defter_turleri() == ["hibe", "rezerv", "iade"]
+            tahmin = page.eval_on_selector(PANEL_SATIR + " .is-kredi", "e => e.textContent")
+            assert "→" not in tahmin and "8" in tahmin, tahmin
+
+            monkeypatch.setattr(providers, "generate", _uyuyan_saglayici(0.1))
+            page.click(PANEL_SATIR + " .is-yeniden")
+            page.wait_for_selector(PANEL_SATIR + '[data-durum="bitti"]', timeout=15000)
+            biten = page.eval_on_selector(PANEL_SATIR + '[data-durum="bitti"] .is-kredi', "e => e.textContent")
+            assert biten == "~8 → 8 credits", biten
+            assert bakiye() == 100 - 8
+            assert defter_turleri() == ["hibe", "rezerv", "iade", "rezerv", "onay"]
+            browser.close()
+    finally:
+        server.stop()

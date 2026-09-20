@@ -25,6 +25,11 @@ Beş soru:
   (v)   SÜREÇ — `isci.py` web'in kapılarını taşır; anahtarsız 2; `--tek-tur`
         boş kuyrukta 0, dolu kuyrukta işi koşturur; `isciler` satırı + kalp +
         SIGTERM → 0 ve satır silinir.
+  (vi)  DEFTER (Faz 3 / 2, K2) — `bitti` → `kredi_gercek` (Σ `medya.credits`) satıra ve
+        `defter.onayla` ile fark iade, `bitir`le AYNI commit; gerçek == tahmin → 0'lık onay;
+        sağlayıcı hatası ve yazım hatası → tam iade (`_dusur`); bayat düşürme → kalp turu
+        admin bağlamında iade; bayat + geç `_dusur` → TEK iade; rezervsiz (BYOK) iş defteri
+        görmez ama `kredi_gercek`i yine yazar.
 """
 from __future__ import annotations
 
@@ -55,12 +60,14 @@ import providers
 from services import (
     ayar,
     db,
+    defter,
     depo_kimlik_bilgisi,
     depo_medya,
     dil,
     dosya,
     hesap,
     isci,
+    kiraci,
     kuyruk,
     tablolar,
     zaman,
@@ -347,7 +354,7 @@ def test_a_job_dropped_as_stale_during_the_call_is_not_resurrected_and_its_objec
     sonuç yazılmaz, nesne silinir, `hata` sütunu `BAYAT_HATASI` kalır (K8: dirilme yok)."""
     def sahte(*a, **k):
         with Session(depo_db) as bakim:
-            assert kuyruk.bayatlari_dusur(bakim, _an(600), ESIK) == 1
+            assert len(kuyruk.bayatlari_dusur(bakim, _an(600), ESIK)) == 1
             bakim.commit()
         return [PNG]
 
@@ -478,6 +485,165 @@ def test_a_user_who_never_chose_a_language_gets_the_product_default_not_the_fall
     _ekle(db_oturumu, kullanici.id)
     assert isci.tek_tur(db_oturumu, depo, ayarlar=yerlesim) is True
     assert gorulen == [i18n.DEFAULT]
+
+
+# ── (vi) defter: onay ve iade (Faz 3 / 2) ────────────────────────────────
+
+_SPEC = catalog.image_model(GORSEL)
+assert _SPEC is not None
+KREDI = catalog.cost_for(_SPEC, "medium")   # tek görselin GERÇEK kredisi (8)
+
+
+def _yukle(db: Session, kullanici_id: uuid.UUID, miktar: int = 100) -> None:
+    """Bakiye yalnız defterle (`hibe`): tests/test_defter.py'nin tek-yazar bekçisi tohumu bile elle yazdırmaz."""
+    assert defter.hibe(db, kullanici_id, miktar, f"{defter.ONEK_HIBE}{kullanici_id}:{uuid.uuid4().hex[:6]}")
+    db.commit()
+
+
+def _rezerveli(db: Session, kullanici_id: uuid.UUID, tahmin: int = 20, **ek) -> uuid.UUID:
+    """Rotanın yaptığı: iş satırı + `rezerv:<is_id>` aynı transaksiyonda; bakiye `tahmin` kadar düşer."""
+    is_id = _ekle(db, kullanici_id, kredi=tahmin, **ek)
+    defter.rezerve(db, kullanici_id, is_id, tahmin, an=_an())
+    db.commit()
+    return is_id
+
+
+def _defter(db: Session, kullanici_id: uuid.UUID) -> list[tuple[str, int, uuid.UUID | None]]:
+    """`(tur, miktar, is_id)`, hibe hariç, eskiden yeniye."""
+    return [(h.tur, h.miktar, h.is_id) for h in defter.hareketler(db, kullanici_id)[::-1] if h.tur != defter.TUR_HIBE]
+
+
+def test_a_finished_job_writes_its_real_credit_and_refunds_the_difference_in_the_bitir_commit(
+        db_oturumu, kullanici, depo, yerlesim, monkeypatch):
+    """Tahmin 20 (üst sınır), gerçek 8: `kredi_gercek = 8`, `onay:<is_id>` +12, bakiye 100 − 20 + 12 = 92 —
+    `onayla` `bitir`den sonra ve commit'ten ÖNCE (sıra ölçülür): `bitti` olup farkı tutulmuş ara durum yok."""
+    _yukle(db_oturumu, kullanici.id)
+    sira: list[str] = []
+    asil_bitir, asil_onayla = kuyruk.bitir, defter.onayla
+    monkeypatch.setattr(kuyruk, "bitir", lambda *a, **k: sira.append("bitir") or asil_bitir(*a, **k))
+    monkeypatch.setattr(defter, "onayla", lambda *a, **k: sira.append("onayla") or asil_onayla(*a, **k))
+
+    def _commit(session):
+        if "onayla" in sira and "commit" not in sira:
+            sira.append("commit")
+
+    monkeypatch.setattr(providers, "generate", lambda *a, **k: [PNG])
+    is_id = _rezerveli(db_oturumu, kullanici.id, tahmin=20)
+    assert defter.bakiye(db_oturumu, kullanici.id) == 80
+    event.listen(Session, "after_commit", _commit)
+    try:
+        assert isci.tek_tur(db_oturumu, depo, _an(5), ayarlar=yerlesim) is True
+    finally:
+        event.remove(Session, "after_commit", _commit)
+    is_ = _is(db_oturumu, is_id)
+    assert (is_.durum, is_.kredi_tahmini, is_.kredi_gercek) == ("bitti", 20, KREDI)
+    assert defter.bakiye(db_oturumu, kullanici.id) == 100 - 20 + (20 - KREDI) == 92
+    assert _defter(db_oturumu, kullanici.id) == [(defter.TUR_REZERV, -20, is_id), (defter.TUR_ONAY, 20 - KREDI, is_id)]
+    assert sira == ["bitir", "onayla", "commit"], sira
+
+
+def test_the_real_credit_is_the_sum_over_every_written_record(db_oturumu, kullanici, depo, yerlesim, monkeypatch):
+    _yukle(db_oturumu, kullanici.id)
+    monkeypatch.setattr(providers, "generate", lambda *a, **k: [PNG, PNG2])
+    is_id = _rezerveli(db_oturumu, kullanici.id, tahmin=20, istek={"n": 2})
+    assert isci.tek_tur(db_oturumu, depo, ayarlar=yerlesim) is True
+    is_ = _is(db_oturumu, is_id)
+    assert is_.kredi_gercek == 2 * KREDI == sum(m.credits for m in _medya(db_oturumu, kullanici.id))
+    assert defter.bakiye(db_oturumu, kullanici.id) == 100 - 20 + (20 - 2 * KREDI)
+
+
+def test_a_real_cost_equal_to_the_estimate_leaves_a_zero_confirmation_row_and_no_refund(
+        db_oturumu, kullanici, depo, yerlesim, monkeypatch):
+    _yukle(db_oturumu, kullanici.id)
+    monkeypatch.setattr(providers, "generate", lambda *a, **k: [PNG])
+    is_id = _rezerveli(db_oturumu, kullanici.id, tahmin=KREDI)
+    assert isci.tek_tur(db_oturumu, depo, ayarlar=yerlesim) is True
+    assert _is(db_oturumu, is_id).kredi_gercek == KREDI
+    assert defter.bakiye(db_oturumu, kullanici.id) == 100 - KREDI
+    assert _defter(db_oturumu, kullanici.id) == [(defter.TUR_REZERV, -KREDI, is_id), (defter.TUR_ONAY, 0, is_id)]
+
+
+def test_a_provider_error_refunds_the_whole_reserve_and_leaves_no_real_credit(
+        db_oturumu, kullanici, depo, yerlesim, monkeypatch):
+    def patlayan(*a, **k):
+        raise ac.ImageError("Azure 500")
+    _yukle(db_oturumu, kullanici.id)
+    monkeypatch.setattr(providers, "generate", patlayan)
+    is_id = _rezerveli(db_oturumu, kullanici.id, tahmin=20)
+    assert isci.tek_tur(db_oturumu, depo, ayarlar=yerlesim) is True
+    is_ = _is(db_oturumu, is_id)
+    assert (is_.durum, is_.kredi_gercek) == ("hata", None)
+    assert defter.bakiye(db_oturumu, kullanici.id) == 100
+    assert _defter(db_oturumu, kullanici.id) == [(defter.TUR_REZERV, -20, is_id), (defter.TUR_IADE, 20, is_id)]
+
+
+def test_a_write_error_deletes_the_objects_and_refunds_the_reserve(
+        db_oturumu, kullanici, depo, yerlesim, tmp_path, monkeypatch):
+    """Nesne yazıldı, satır/commit düştü: telafi (nesneler silinir, iş `hata`) aynen — artı iade."""
+    def patlayan(*a, **k):
+        raise RuntimeError("satir yazilamadi")
+    _yukle(db_oturumu, kullanici.id)
+    monkeypatch.setattr(providers, "generate", lambda *a, **k: [PNG])
+    monkeypatch.setattr(depo_medya, "kaydet", patlayan)
+    is_id = _rezerveli(db_oturumu, kullanici.id, tahmin=20)
+    assert isci.tek_tur(db_oturumu, depo, ayarlar=yerlesim) is True
+    is_ = _is(db_oturumu, is_id)
+    assert is_.durum == "hata" and is_.hata == f"{isci.BEKLENMEYEN_HATASI}: RuntimeError"
+    assert _nesneler(tmp_path, kullanici.id) == [] and _medya(db_oturumu, kullanici.id) == []
+    assert defter.bakiye(db_oturumu, kullanici.id) == 100
+    assert _defter(db_oturumu, kullanici.id) == [(defter.TUR_REZERV, -20, is_id), (defter.TUR_IADE, 20, is_id)]
+
+
+def test_the_heartbeat_refunds_every_job_it_drops_as_stale_in_the_admin_context(db_oturumu, kullanici, monkeypatch):
+    """Bayat düşürme `kalp_turu`nun (admin bağlamı, `yonetici_ekler` — K4); düşen her iş iade, aynı commit.
+    Bağlam burada `kiraci.aktif()` ile ölçülür; gerçek rolle politika tests/test_rls.py'de."""
+    _yukle(db_oturumu, kullanici.id, 200)
+    a = _rezerveli(db_oturumu, kullanici.id, tahmin=20)
+    b = _rezerveli(db_oturumu, kullanici.id, tahmin=30)
+    kuyruk.al(db_oturumu, ISCI, _an(0))
+    kuyruk.al(db_oturumu, ISCI, _an(0))
+    db_oturumu.commit()
+    assert defter.bakiye(db_oturumu, kullanici.id) == 150
+    gorulen: list[str | None] = []
+    asil = defter.iade
+    monkeypatch.setattr(defter, "iade", lambda *a, **k: gorulen.append(kiraci.aktif() and kiraci.aktif().rol) or asil(*a, **k))
+    assert isci.kalp_turu(db_oturumu, ISCI, [], _an(400), ESIK).dusen == 2
+    assert gorulen == [kiraci.ADMIN, kiraci.ADMIN], "iade admin bağlamında çağrıldı"
+    assert (_is(db_oturumu, a).durum, _is(db_oturumu, b).durum) == ("hata", "hata")
+    assert defter.bakiye(db_oturumu, kullanici.id) == 200
+    assert sorted(_defter(db_oturumu, kullanici.id)) == sorted([
+        (defter.TUR_REZERV, -20, a), (defter.TUR_REZERV, -30, b), (defter.TUR_IADE, 20, a), (defter.TUR_IADE, 30, b)])
+
+
+def test_a_job_dropped_as_stale_and_then_failed_by_its_late_worker_is_refunded_once(
+        depo_db, db_oturumu, kullanici, depo, yerlesim, monkeypatch):
+    """(a) ve (c) aynı işe değer: bayat düşürme iade etti, geç kalan işçinin `_dusur`u ikinci kez edemez
+    (`iade:<is_id>` çakışır) — bakiye bir kez geri gelir, defterde TEK iade."""
+    def sahte(*a, **k):
+        with Session(depo_db) as bakim:
+            assert isci.kalp_turu(bakim, uuid.uuid4(), [], _an(600), ESIK).dusen == 1
+        raise ac.ImageError("saglayici da dustu")
+
+    _yukle(db_oturumu, kullanici.id)
+    monkeypatch.setattr(providers, "generate", sahte)
+    is_id = _rezerveli(db_oturumu, kullanici.id, tahmin=20)
+    assert isci.tek_tur(db_oturumu, depo, _an(0), ayarlar=yerlesim) is True
+    is_ = _is(db_oturumu, is_id)
+    assert (is_.durum, is_.hata) == ("hata", kuyruk.BAYAT_HATASI), "geç işçi bayat işi değiştiremez"
+    assert defter.bakiye(db_oturumu, kullanici.id) == 100
+    assert _defter(db_oturumu, kullanici.id) == [(defter.TUR_REZERV, -20, is_id), (defter.TUR_IADE, 20, is_id)]
+
+
+def test_a_job_without_a_reserve_finishes_with_its_real_credit_but_touches_no_ledger(
+        db_oturumu, kullanici, depo, yerlesim, monkeypatch):
+    """BYOK (K3) ya da göç öncesi iş: `onayla` rezerv bulamaz, `None`; `kredi_gercek` yine yazılır (mutabakat, 5. görev)."""
+    _yukle(db_oturumu, kullanici.id)
+    monkeypatch.setattr(providers, "generate", lambda *a, **k: [PNG])
+    is_id = _ekle(db_oturumu, kullanici.id)
+    assert isci.tek_tur(db_oturumu, depo, ayarlar=yerlesim) is True
+    assert (_is(db_oturumu, is_id).durum, _is(db_oturumu, is_id).kredi_gercek) == ("bitti", KREDI)
+    assert defter.bakiye(db_oturumu, kullanici.id) == 100 and _defter(db_oturumu, kullanici.id) == []
+    assert defter.iade(db_oturumu, is_id) is None, "bitmiş/rezervsiz iş iade edilmez"
 
 
 # ── (iv) bağlam ─────────────────────────────────────────────────────────

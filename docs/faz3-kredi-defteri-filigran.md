@@ -113,7 +113,7 @@ Adlar ÖNERİ (Türkçe, ASCII: `kredi_hareketleri`, `services/defter.py`,
 | Tahmin `isler.kredi_tahmini`, rota yazar, tavan toplar | `routers/uretim.py:154`; `0004_isler.py:53` | **Rezerv miktarı**: sıraya girerken bakiyeden düşer (`defter.rezerve`), ledger satırı `rezerv` | 1, 2 |
 | Gerçek `medya.credits`, işçi medya başına yazar | `services/isci.py:392-399`; `tablolar.py:379` | Toplamı `isler.kredi_gercek` (0007); `defter.onayla` farkı iade eder | 1, 2 |
 | `anahtar_kaynagi` kullanici/platform | `0005_kota.py:39-43`; `tablolar.py:155` | BYOK iş rezerv ETMEZ (K3), yalnız saatlik tavan | 2 |
-| Günlük kredi tavanı `check_gunluk` (429) | `services/kota.py:152-183` | KALIR — kötüye kullanım tavanı (K9); bakiye kapısı ondan ÖNCE, 402 | 2 |
+| Günlük kredi tavanı `check_gunluk` (429) | `services/kota.py:152-183` | KALIR — kötüye kullanım tavanı (K9); bakiye kapısı ondan SONRA, 402 | 2 |
 | `model_available(configured, plan)` — `plan` okunmuyor | `services/modeller.py:26-40` | `plan` OKUNUR: `catalog.ImageModel.plan` + `kind=='video'` kapısı → 403 `err.plan_kapsamiyor` | 3 |
 | Katalog `plan: str = "free"` alanı, metadata | `catalog.py:195-202` | Kararın VERİSİ; `services/planlar.py` kod kataloğu onunla eşleşir | 3 |
 | `#run-cost` "≈ N kredi", bakiye yok | `static/core.js:547`; `tr.json:423-424` | "bu tur X düşer · kalan Y"; 402'de plan bağlantısı (stüdyo B1) | 6 |
@@ -325,7 +325,7 @@ DÖKMEZ (belgenin altı alanı: `id, tur, miktar, aciklama, is_id, olusturuldu`)
 
 ---
 
-## 2. Rezerve → onayla / iade — `routers/uretim.py`, `services/isci.py`, `services/kuyruk.py` (PR: `faz3/rezerve-onayla`)
+## 2. Rezerve → onayla / iade — `routers/uretim.py`, `services/isci.py`, `services/kuyruk.py` ✅ (PR: `faz3/rezerve-onayla`)
 
 **Kapsam.** Çıkış kriterinin defter yarısı: para bu görevden sonra SAYILIR.
 
@@ -403,6 +403,62 @@ anahtarıyla iş verir → bakiye tahmin kadar düşer → `tek_tur` → `bitti`
 BYOK iş bakiyeye dokunmaz; 402 gövdesi üç alanı taşır; takım yeşil.
 
 **Sahibin adımı — yok** (3 ile birlikte dağıtılır, oradaki adım).
+
+**Yapıldığında (2026-09-20) ölçümler ve sapmalar.** Rota YOK, göç YOK (0007
+`kredi_gercek`i taşıyordu). `services/kapilar.py` +3 işlev (`_yetersiz_bakiye`
+402 gövdesi, `check_bakiye`, `rezerve_kredi`); `routers/uretim.py` `_kapilar`
+sonuna `check_bakiye`, `_siraya_koy` artık `kullanici` alır ve `ekle`den sonra
+`rezerve_kredi` (dört rota); `routers/isler.py` iptal → `defter.iade`, yeniden
+gönderim → `check_bakiye` + `rezerve_kredi`; `services/kuyruk.py`
+`bitir(kredi_gercek=)`, `_json` +`kredi_gercek` (13 → **14** anahtar),
+`bayatlari_dusur` `int` → `list[uuid]`; `services/isci.py` `_yaz` `Σ
+kayıt.credits` → `bitir` + `onayla` tek commit, `_dusur` → `iade`, `kalp_turu`
+düşen her iş → `iade`; i18n +2 (`err.kredi_yetersiz`, `isler.kredi_gercek`);
+`static/isler.js` bitti satırında "~tahmin → gerçek", `static/palette.js`
+`detailText` kodlu gövdeyi (`{kod, …}`) `t(kod, detail)` ile cümleye çevirir.
+Testler: toplanan **3.859 → 3.886 (+27)** — yeni `tests/test_uretim_kapilar.py`
+15 (belge "~10": dört rota parametrik 4 + rezerv 3 + BYOK 1 + 402 4 + sıra 1 +
+atomik kapı 2), `test_isci` +8 (belge "~10": onay sırası, Σ, gerçek == tahmin,
+sağlayıcı hatası, yazım hatası, bayat admin bağlamı, bayat + geç `_dusur` TEK
+iade, rezervsiz iş), `test_isler_route` +2 (iptal → iade, uçlar `kredi_gercek`
+taşır), `test_rls` +1 (bayat iadesi UYGULAMA ROLÜYLE — `yonetici_ekler`in ilk
+üretim yolu, K4), E2E +1 (`tests/test_playwright_isler.py` 6. senaryo: sahte
+sağlayıcı hata → bakiye 100'e döner, yeniden gönder → "~8 → 8 credits", bakiye
+92). Takım **3.847 → 3.874 geçti, 12 atlandı, 287 sn** (E2E + Postgres zorunlu); ruff ve mypy temiz, graflar güncel.
+
+SAPMALAR: (a) **Bakiye ÖN DENETİMİ** `kapilar.check_bakiye` (salt okunur,
+`defter.bakiye < tahmin` → 402) `_kapilar` zincirinin sonunda, `check_gunluk`ten
+SONRA (K9) ve girdi nesnesi yazılmadan ÖNCE — belge yalnız `rezerve`yi yazmıştı.
+Sebep: multipart uçlarda (`edit`, `animate`) rezerv `ekle`den sonra gelir ve
+`ekle` nesnelerden sonra; ön denetim olmadan her 402 depoya öksüz `isler/<id>/`
+dizini bırakırdı (429'un "nesne bırakmaz" kuralı, `uretim.py` başı). Asıl kapı
+yine `rezerve_kredi` (atomik `WHERE bakiye >= :m`, satırla aynı transaksiyon):
+ön denetim yarışın kaybedenini yakalayamaz, onu UPDATE yakalar — test ön denetimi
+susturup 402 + satır yok'u ayrıca ölçer. (b) `kuyruk.bayatlari_dusur` düşürülen
+SAYI yerine İD LİSTESİ döner (`RETURNING`): iade çağıranın işi, kuyruk defteri
+bilmez (modül sözleşmesi). Belge "bakım turu" demişti; bayat düşürme Faz 2 /
+10'dan beri `kalp_turu`nda (30 sn, admin bağlamı) — iade oraya kondu,
+`bakim_turu` bayat düşürmez, `eskileri_sil` iade ETMEZ (belgedeki gibi). Üç
+eski test `== 1` → `== [is_id]`. (c) 402 gövdesindeki `plan` `SELECT
+kullanicilar.plan`dan, `kullanici.plan`dan değil: sütun `server_default`lı ve
+bağımlılığın verdiği nesne başka oturumdan/ayrılmış olabilir (testlerin
+`kullanici` override'ı) — `DetachedInstanceError` yerine hata yolunda tek
+SELECT. (d) Ön yüz 402'yi bugün OKUR: `detailText` `kod`u sözlük anahtarı, öteki
+alanları yer tutucu sayar — belge cümleyi 6. göreve bırakmıştı, sıfır maliyetli
+ve aksi hâlde kullanıcı "HTTP 402" görürdü; süsleme yine 6'nın. (e) `_dusur`
+`iade`yi `dusur`un sonucuna BAKMADAN çağırır: 0 satır "çoktan bayat düşürülmüş"
+demek, kalp turu iade etmiştir, ikinci çağrı no-op (`iade:<is_id>`); test
+"bayat + geç işçi → TEK iade". (f) İşçi `onayla`/`iade`ye kendi `an`ını verir
+(`bitti` damgasıyla aynı an); rota `rezerve_kredi`de vermez (`zaman.an()`).
+(g) Platform anahtarlı iş artık bakiye istediği için üç eski dosya
+`defter.hibe` ile tohumlanır (`test_kota` autouse `bakiye`, `test_platform_anahtari`,
+`test_admin`) — elle `UPDATE` yok, AST bekçisi (tests/test_defter.py) durur.
+(h) E2E dosyası `tests/test_playwright_isler.py` (belgedeki `test_e2e_isler.py`
+adı depoda yoktu). (i) Envanter tablosunun `check_gunluk` satırı "bakiye kapısı
+ondan ÖNCE" diyordu, K9 ve §2 "SONRA" der — satır düzeltildi. RİSK aynen:
+bu görevden sonra yetersiz bakiye platform anahtarlı üretimi 402 ile keser;
+1 → 2 → 3 tek dağıtım penceresi (3'ün "Sahibin adımı"), hibe gelmeden canlıya
+çıkılmaz.
 
 ---
 

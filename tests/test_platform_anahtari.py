@@ -25,11 +25,12 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 import app as appmod
 import catalog
 import errlog
-from services import depo_kimlik_bilgisi, kapilar, platform_anahtari, tablolar
+from services import defter, depo_kimlik_bilgisi, kapilar, platform_anahtari, tablolar
 
 pytestmark = [pytest.mark.usefixtures("depo_db"), pytest.mark.gercek_anahtar]
 
@@ -269,6 +270,10 @@ def test_the_worker_uses_the_platform_key_then_the_users_own_then_the_platform_a
     _SahteAzure.gorulen.clear()
     _SahteAzure.adresler.clear()
     _platform_azure(monkeypatch)
+    # Platform işi bakiye ister (Faz 3 / 2, 402): kredi yalnız defter üzerinden (`hibe`).
+    with Session(depo_db) as db:
+        defter.hibe(db, kullanici.id, 1000, f"{defter.ONEK_HIBE}{kullanici.id}:2026-09")
+        db.commit()
     cevaplar: list[str] = []
 
     with caplog.at_level(logging.DEBUG):

@@ -10,7 +10,9 @@
         satır yazmaz; yeniden gönderim aynı kapılardan geçer.
 
 Kapı GERÇEK (`gercek_anahtar`) ve platform anahtarı ortamda: bu dosyanın işleri `platform`
-kaynaklı doğar; BYOK için kullanıcı kendi anahtarını kaydeder.
+kaynaklı doğar; BYOK için kullanıcı kendi anahtarını kaydeder. Faz 3 / 2'den beri platform
+işi bakiye de ister (402, K11): `bakiye` fixture'ı test kullanıcısına `defter.hibe` ile bol
+kredi yazar ki bu dosya yalnız TAVANI ölçsün — bakiye kapısının kendisi tests/test_uretim_kapilar.py'de.
 """
 from __future__ import annotations
 
@@ -28,7 +30,7 @@ import app as appmod
 import catalog
 import i18n
 import providers
-from services import kapilar, kota, kuyruk, platform_anahtari, tablolar, zaman
+from services import defter, kapilar, kota, kuyruk, platform_anahtari, tablolar, zaman
 
 pytestmark = [pytest.mark.usefixtures("depo_db"), pytest.mark.gercek_anahtar]
 
@@ -51,6 +53,15 @@ def temiz(depo_db):
     with depo_db.begin() as c:
         c.execute(text("DELETE FROM isler"))
     yield
+
+
+@pytest.fixture(autouse=True)
+def bakiye(depo_db, kullanici):
+    """Test kullanıcısına bol kredi (`defter.hibe`; tek yazar defter — elle `UPDATE` yok): tavan testleri
+    402'ye takılmasın. Kullanıcı satırı her testte yenilenir, anahtar çakışmaz."""
+    with Session(depo_db) as db:
+        defter.hibe(db, kullanici.id, 1_000_000, f"{defter.ONEK_HIBE}{kullanici.id}:2026-09")
+        db.commit()
 
 
 @pytest.fixture

@@ -157,6 +157,20 @@ carrying a foreign `Host` or `Origin`.
 Four dark themes (Mono · Ocean · Amber · Viola), `prefers-reduced-motion` support
 and full-screen sheets on phones are in the box as well.
 
+### Plans and credits (web build)
+
+In the web build a user who generates with the platform's key spends
+**credits**; one who brings their own key does not. Three plans (`free` /
+`temel` / `pro`): the free plan gets a monthly grant (200 credits by default,
+"top up to the grant" — no rollover), its images are watermarked and video
+models are locked; paid plans are watermark-free. The estimate is reserved when
+a job is queued, confirmed at the real cost when it finishes and the difference
+refunded; errors and cancellations refund in full. The balance shows in the
+composer line ("this run takes 8 · 192 left") and in Settings → **Credits**;
+operators get plan, credit adjustments and a **Margin** table in `/admin`.
+Setup and the go-live checklist: [KURULUM.md → Web build, step 10](KURULUM.md#web-sürümü-sunucu-kurulumu)
+(Turkish); decision record [docs/faz3-kredi-defteri-filigran.md](docs/faz3-kredi-defteri-filigran.md).
+
 The complete list — what works per provider, and the roadmap — is in
 **[docs/ozellikler.md](docs/ozellikler.md)** (Turkish).
 

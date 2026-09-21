@@ -2029,7 +2029,7 @@
         "isci"
       ],
       "katman": 11,
-      "satir": 767,
+      "satir": 791,
       "testler": [
         "tests/test_docker_kapisi.py",
         "tests/test_gunluk.py",

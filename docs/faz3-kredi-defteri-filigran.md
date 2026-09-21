@@ -1,6 +1,6 @@
 # Faz 3 — Kredi defteri, tarife–maliyet mutabakatı, planlar ve filigran: görev listesi
 
-**Tarih:** 2026-09-19 · **Karar:** K1–K11 öneriler AYNEN kabul edildi — 2026-09-19 20:23 UTC, Slack #code ("kabul ediyorum") · **Önceki faz:** [faz2-kuyruk-anahtarlar-depolama.md](faz2-kuyruk-anahtarlar-depolama.md) (10/10 ✅, kapanış 2026-09-19, PR #37–#52)
+**Tarih:** 2026-09-19 · **Durum:** **7/7 ✅, kapanış 2026-09-21** (PR #56–#66 + `faz3/operasyon`; "Faz 3 kapanış" bölümü aşağıda) · **Karar:** K1–K11 öneriler AYNEN kabul edildi — 2026-09-19 20:23 UTC, Slack #code ("kabul ediyorum") · **Önceki faz:** [faz2-kuyruk-anahtarlar-depolama.md](faz2-kuyruk-anahtarlar-depolama.md) (10/10 ✅, kapanış 2026-09-19, PR #37–#52)
 **Üst belge:** [superpowers/specs/2026-08-10-saas-transformation-master-design.md](superpowers/specs/2026-08-10-saas-transformation-master-design.md) §5 **"Faz 5"** bölümü (`:170-221`) — sapmalar bu belgenin sonunda tek tek yazılı. **Numaralama tuzağı:** master spec'in "Faz 5"i ürün yol haritasının SaaS kartı; bu belge SaaS dönüşümünün İÇ dizisindeki Faz 3'tür (Faz 0 web-first → Faz 1 DB/hesap → Faz 2 kuyruk → **Faz 3 kredi defteri** → Faz 4 ödeme/KVKK → Faz 5 işletme; [studyo-guncelleme-plani.md](studyo-guncelleme-plani.md):4). Kartın ilgili satırları: "Filigran & Kredi Kuralları: ücretsiz deneme katmanı (filigranlı), ücretli katmanlar (filigransız + ticari haklar), devredilmeyen aylık kredi (no-rollover)" (`:183`); "Tek gerçek kaynak atomik kredi ledger'ı… Webhook'ta idempotency zorunlu… Kredi tarifesi… kendi katalogumuzda durur" (`:205-208`); "Bugün YALNIZ metadata: bakiye düşülmüyor, üretim engellenmiyor" (`:215-219`). **Çıkış kriteri (bu belgenin sonunda tam metin):** ücretsiz kullanıcı platform anahtarıyla iş verir → bakiyesi düşer → iş biter → gerçek maliyetle onaylanır, fark iade; hata/iptal tam iade; ücretsiz görselde filigran; SUM(defter) == bakiye; admin marj tablosu dolu.
 
 Faz 3'ün amacı, Faz 2'nin kurduğu kuyruk + platform anahtarı + günlük tavan
@@ -974,7 +974,7 @@ satıra güncellendi), 12 atlanan, ~262 sn.
 
 ---
 
-## 7. Operasyon ve belgeler — `isletme.md`, `KURULUM.md`/`README`, `.env.example`, bakım turu tutarlılık, Faz 4'e devir (PR: `faz3/operasyon`)
+## 7. Operasyon ve belgeler — `isletme.md`, `KURULUM.md`/`README`, `.env.example`, bakım turu tutarlılık, Faz 4'e devir ✅ (PR: `faz3/operasyon`)
 
 **Kapsam.** Faz 3'ün işletme ayağı ve kapanış belgesi.
 
@@ -1019,7 +1019,54 @@ WARNING, sapma yok sessiz), `tests/test_docker_kapisi.py`, bu belge
 **Sahibin adımı — ilk üretim koşusu kontrolü (canlıda bir kez).** Dağıtım
 sonrası: `olay=bakim` satırında `hibe_satiri` ve `tutarsiz_kullanici=0`;
 `/admin` Marj sekmesi boş değil; kendi hesabında `GET /api/kredi`; ücretsiz
-test hesabıyla bir görsel — filigranlı, bakiye 200 → 192.
+test hesabıyla bir görsel — filigranlı, bakiye 200 → 192. Adım adım hâli
+artık KURULUM.md 10. adımın "Canlı kontrol listesi"nde (yedi madde), 3. ve
+5. görevlerin sahibin adımlarıyla birleşik.
+
+**Yapıldığında (2026-09-21) ölçümler ve sapmalar.** Rota YOK (70), göç YOK
+(0007), yeni modül YOK (111), yeni betik YOK, i18n YOK. `services/isci.py`
+`bakim_turu`: hibeden SONRA aynı ADMİN bağlamında `defter.tutarlilik(db)`;
+sapan kullanıcı başına `olay=defter.tutarsiz` (WARNING; `kullanici_id`,
+`bakiye`, `toplam`, `fark`), `BakimOzeti` +`tutarsiz_kullanici` (`__bool__`
+ona da bakar: sapma varsa `olay=bakim` düşer, sağlıklı boş tur yine sessiz);
+düzeltmez (K1). `tests/test_isci.py` **+2** (sapma: iki kullanıcı, elle
+`UPDATE` ile +29/−5, iki WARNING, özet 2, önbellek dokunulmamış, ikinci
+`tutarlilik` yine 2; sapma yok: `tutarsiz_kullanici=0`, satır yok, tur boş) ve
+üç sabit sözlük +1 anahtar. `docs/isletme.md`: başlık (güncelleme + karar
+kaydı), § 2 yedek tablosuna `kredi_hareketleri` (ayrı yedek yok, aynı
+`pg_dump`/PITR), § 5 tatbikata 6. adımda defter doğrulaması (`tutarsiz_kullanici=0`,
+sapma varsa `duzeltme`), § 6 "Faz 3 (tablo yok)" → "Faz 3'te KAPANDI" +
+`defter.tutarsiz`/`defter.asim` uyarı satırları + KVKK satırına defterin
+kaderi, § 7 sırlar paragrafına iki Faz 3 değişkeni, § 9 günlük olayları,
+uyarı eşikleri (`defter.tutarsiz` ≥ 1 her turda, `defter.asim` günde ≥ 1),
+bakım turu (4) hibe ve (5) tutarlılık maddeleri, sayı listesi +2, ilk üretim
+koşusu kontrol listesine Faz 3 ekleri. `KURULUM.md` **10. adım "Planlar ve
+kredi"**: üç plan, hibe kuralı ve iki sürece aynı değer uyarısı, rezerv →
+onay → iade + 402 + tavanın önceliği (K9), composer/panel/Ayarlar "Kredi" +
+`GET /api/kredi`, filigran değişkeni ve "dosya yoksa hata", admin kredi/plan,
+Marj + iki araç, tutarlılık; **canlı kontrol listesi 7 madde** (3. görevin
+sahibin adımı buraya taşındı, 5.'in tarife doğrulaması 7. madde).
+`README.md` + `README.en.md` "Planlar ve kredi (web sürümü)" / "Plans and
+credits (web build)" kısa bölümü → KURULUM 10. `tests/test_docker_kapisi.py`
+**+1** bekçi (üç belge + iki README + şablonun iki değişkeni; "tablo yok"
+cümlesinin gitmiş olması ayrıca iddia). `.env.example` DOKUNULMADI ve
+`ALTYAPI` DEĞİŞMEDİ — sapma (a): belge "iki yeni değişken üç yerde" demişti,
+ikisi de kendi görevinde (3 ve 4) şablona ve `ALTYAPI`ya çoktan girmişti;
+bu görevin payı KURULUM/README/isletme'de adlarıyla geçmeleri ve bekçinin
+şablon ↔ belge aynı adı ölçmesi. (b) `defter.tutarlilik` 1. görevde
+(#57) yazılmış ve `test_defter`de sınanmıştı; burada eklenen ÇAĞRI, WARNING
+ve özet alanı. (c) `defter.asim` uyarısı 2. görevden beri `defter.onayla`da
+var; isletme § 6 ancak şimdi yazıyor. (d) Belge "Sentry'ye WARNING düşer"
+demişti — DÜŞMEZ: `LoggingIntegration(event_level=ERROR)` WARNING'i
+breadcrumb yapar (Faz 2 / 9 kararı, değiştirilmedi); isletme § 6 bunu açık
+yazıyor, bildirim `uyari` olayıyla aynı günlük kuralına. (e) Tutarlılık
+ölçümü hibeden SONRA (belge sıra söylememişti): hibe satırı + bakiye aynı
+transaksiyonda, ölçüm ikisini birlikte görür; önce ölçülse ay başındaki tur
+hiç sapma görmez ama sonra ölçmek "hibe kendi yazdığını tutarlı mı yazdı"yı
+da her ay sınar. Katalog kredi fiyatlarına ve dört Azure fiyatına
+DOKUNULMADI (5. görevin sahibin adımı, ayrı PR). Takım **3979 → 3982**,
+12 atlanan, ~271 sn (E2E + Postgres zorunlu); ruff, mypy, eslint,
+prettier temiz, graflar güncel (yalnız `moduller.md` satır sayıları).
 
 ---
 
@@ -1032,6 +1079,104 @@ maliyetle onaylanır, fark iade → hata/iptal/bayat düşme → TAM iade →
 tablosu dolu → RLS bekçileri **9 tablo**, `kredi_hareketleri`de dört politika
 → her kullanıcıda `SUM(kredi_hareketleri.miktar) == kullanicilar.bakiye`
 (bakım turu ölçer) → BYOK iş bakiyeye dokunmaz → tam takım yeşil (E2E dahil).
+
+**Karşılandı (2026-09-21):** defter yarısı 2'de (rezerv/onay/iade, 402, BYOK
+muaf), plan/filigran yarısı 3-4'te (403, `filigranli`), marj yarısı 5'te,
+canlı bakiye 6'da, `SUM == bakiye` ölçümü 7'de (bakım turu `tutarsiz_kullanici`);
+RLS bekçileri 9 tablo / 28 politika (`kredi_hareketleri`de dört). Canlının
+kendisi sahibin kontrol listesine bağlı (aşağıda).
+
+---
+
+## Faz 3 kapanış (2026-09-21)
+
+**Ne çıktı — 7/7, sekiz PR + bir düzeltme PR'ı:**
+
+| # | görev | PR |
+| --- | --- | --- |
+| plan | bu belge (K1–K11) | #56 |
+| 1 | `0007_kredi`: `kredi_hareketleri`, `kullanicilar.bakiye`/`plan`, `isler.kredi_gercek`/`saglayici_*`, `medya.filigranli`; `services/defter.py`; `yonetici_ekler` | #57 |
+| 2 | rezerve → onayla / iade: `kapilar.rezerve_kredi` (402), `kuyruk.bitir(kredi_gercek)`, işçide onay/iade | #58 (tabanı `faz3/kredi-defteri`ye inmişti; `main`e #59 ile) |
+| 3 | `services/planlar.py`, `model_available(spec, configured, plan)` 403, aylık hibe (kayıt + bakım turu), admin plan/kredi | #60 |
+| 4 | `services/filigran.py`, işçide `_uret` → `_yaz` arası, `bundled/filigran.png`, rozet | #62 |
+| 5 | `services/saglayici_meta.py`, admin "Marj", `tools/marj_raporu.py`, `tools/tarife_kontrol.py` | #65 |
+| 6 | `GET /api/kredi`, composer "bu tur N düşer · kalan M", 402/403 toast, Ayarlar "Kredi" | #66 |
+| 7 | operasyon: bakım turu tutarlılık, `isletme.md`, KURULUM 10. adım, README, kapanış | bu PR (`faz3/operasyon`) |
+| — | `.dockerignore` `.env.*` (inceleme notu, Faz 3 değil) | #55 (taslak) |
+| — | sahibin E2E düzeltmeleri (uyku → yoklama, kapanış tavanı) | #61, #63 |
+
+Çıkış kriteri yukarıda karşılandı. Takım **3.819** (Faz 2 sonu) →
+**3982** (+163; belge "~+130" demişti, fark rota kümesi üstünden
+parametrelenen bekçiler ve E2E'nin beş senaryosu), 12 atlanan, ~271 sn.
+Rota 67 → **70** (`GET /api/kredi`, admin `plan`/`kredi`; `KAPILI` 60 → 63,
+`ADMIN_ROTALAR` 7 → 9). Modül 104 → **111** (`defter`, `planlar`, `filigran`,
+`saglayici_meta`, `tools/make_filigran`, `tools/marj_raporu`,
+`tools/tarife_kontrol`). Şema `0006_rls` → **`0007_kredi`** (TEK göç, dört
+görevin sütunları). Tablo 13 → **14**, `IS_TABLOLARI` 8 → **9**, RLS politikası
+24 → **28** (`kredi_hareketleri`de dördüncü: `yonetici_ekler`, K4). Tarayıcı
+betiği 13 (değişmedi; Faz 2 K3 vanilla sürüyor). `DEPOLAR` bekçisi 11 modül.
+i18n tr/en birebir. Katalog kredileri DEĞİŞMEDİ.
+
+**Sahibin canlıda bekleyen adımları** — hepsi KURULUM.md 10. adımın "Canlı
+kontrol listesi"nde adım adım; buradaki özet: (1) **Faz 3 tek parça dağıtılır**
+(`main`in tamamı; 1–3 birlikte — 2'nin 402'si 3'ün hibesi olmadan herkesi
+kilitler): `release_command` `0007_kredi`yi koşar, sonra web + işçi. (2)
+`KROMIS_FREE_AYLIK_HIBE` iki sürecin de sırrında (ya da ikisinde de boş = 200);
+isteğe bağlı `KROMIS_FILIGRAN_DOSYASI` (yalnız işçi). (3) İlk `olay=bakim`:
+`hibe_satiri=N`, `tutarsiz_kullanici=0`. (4) `/admin` → kendi hesabı `pro`
+(video kapısı). (5) Kendi hesabında `GET /api/kredi`; ücretsiz test hesabıyla
+bir görsel: 200 → 192, filigranlı, "rezerv 8 · gerçek 8 · iade 0"; video →
+403. (6) Marj sekmesi dolu; `python tools/tarife_kontrol.py` dört modeli fiyat
+sayfasıyla bir kez doğrula, gerekirse `credits` ayrı PR (5. görev; retroaktif
+yazılmaz). Ayda bir `tools/marj_raporu.py --gun 30` → sağlayıcı faturasıyla
+yan yana. Faz 2'den hâlâ bekleyenler aynen (Faz 2 belgesi "kapanış"): üretim
+DB rolü `tools/rls_kontrol.py` (artık 9 tablo / 28 politika bekler), admin
+bayrağı, Sentry DSN iki serviste, `fly.toml`.
+
+**Faz 4'e devir listesi** (bu belgenin "Faz 3 dışı"sından; defter Faz 4'ün
+webhook'una hazır bırakıldı):
+
+* **Paket satın alma** = yeni `tur` (`paket`) + göç (`HAREKET_TURLERI` ↔ CHECK
+  bekçisi ikisini birden ister); `idempotency_anahtari` = `polar:<event_id>`
+  (biçim testleri regex'le, Faz 4 `polar:` önekini ekler).
+* **Kova ayrımı hibe/paket** (K6 alternatifi): paket bakiyesi devreder, hibe
+  devretmez → iki kova ya da FIFO tüketim; bugün tek kova + "hibeye tamamla",
+  paket gelince o gün karar. `GET /api/kredi` ve Ayarlar "Kredi" ikinci kovayı
+  göstermek üzere alan ekler, kırılmaz.
+* **`planlar` tablosu + fiyat + Polar ürün id'si** (K5): `PLANLAR[ad]`
+  arayüzü sabit, kod kataloğu tabloya taşınır; `temel`/`pro` hibe sayıları
+  (bugün yer tutucu 1.000 / 3.000) ve fiyatları orada belirlenir.
+* **"Ticari haklar" metni** ve kullanım şartları (master `:183`, Polar AUP);
+  403 toast'ının "planında yok" cümlesine satış sayfası bağlantısı
+  (`err.plan_kapsamiyor`, 6. görev bilerek boş bıraktı).
+* **KVKK:** hesap silmede `kredi_hareketleri` CASCADE mi anonimleştirme mi
+  (bugün CASCADE, 1); saklama süreleri (`isler` 30 gün öncül); defter ve
+  `isler.istek.prompt` aynı kararın içinde.
+* **BYOK'ta platform payı** (K3 alternatifi) — fiyatlandırma kararı.
+* **Faz 2 K3 "vanilla, yeniden bakış Faz 4"** noktası geldi: kredi ön yüzü
+  +~250 satır vanilla JS ile yazıldı; fatura/satış sayfaları çerçeve
+  kararını açar.
+
+**Açık kalemler (Faz 4/5, ürün kararı ya da ölçüm):** dört Azure fiyatı
+"doğrulanamadı" (`tarife_kontrol`) ve model-barındırma araştırmasının 7 kredi ≠
+maliyet notu — sahibin fiyat kontrolüyle ayrı PR; `gpt-image-1` 2026-10-23'te
+emekli (katalogdan çıkarılması ayrı PR); `saglayici_maliyet_usd` hiçbir
+adaptörden gelmiyor (sahibin fatura CSV'si ya da bir gün API); hata yolunda
+`saglayici_meta` yazılmıyor (fal `request_id` düşen işte de değerli — sonraki
+tur); `hibe_turu` kısmi indeksi ve `tutarlilik`in 5 dk'lık tam taraması
+(LEFT JOIN + GROUP BY, bütün defter) 1.000+ kullanıcıda (Faz 5 ölçümü — o gün
+tur seyrekleşir ya da yalnız son turdan beri hareketi olanlar taranır); sağlayıcı
+idempotency anahtarı yok (Faz 2 K8 aynen); video filigranı yok (ücretsizde
+video kapalı, ihtiyaç doğmadı); E2/E3 hızlı araçlar mini faz (K10); e-posta
+ile iş bitti bildirimi (ürün kararı); dağıtımda çalışan işin kaybı (Faz 5
+"boşalt sonra dağıt"); Sentry'de WARNING olay değil breadcrumb (`defter.*`
+uyarıları günlük kuralıyla).
+
+**Sonraki:** Faz 4 planı (ödeme MoR/Polar, webhook idempotency, paketler ve
+kova ayrımı, `planlar` tablosu, abonelik yaşam döngüsü, vergi/e-Arşiv, KVKK
+silme/dışa aktarma/saklama, ticari haklar metni) ayrı belge ve PR olarak —
+yukarıdaki devir listesi onun girdisi; K-tarzı karar noktaları önerileriyle,
+sahip kabul eder, görevler `faz4/<slug>` dallarında.
 
 ---
 

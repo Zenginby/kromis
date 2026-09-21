@@ -9,7 +9,8 @@ AST bekçisi). Beş soru:
   (i)   REZERV — platform işi 202 ve bakiye tahmin kadar düşer, `rezerv:<is_id>`
         satırı; dört rota da; bakiye tahmine EŞİTKEN geçer (>=); resubmit yeni rezerv.
   (ii)  BYOK — `kullanici` kaynaklı iş bakiyeye dokunmaz, defter satırı yok (K3).
-  (iii) 402 — gövde `{"kod": "err.kredi_yetersiz", "bakiye", "gereken", "plan"}` (K11);
+  (iii) 402 — gövde `{"kod": "err.kredi_yetersiz", "bakiye", "gereken", "plan", "hibe", "paket"}` (K11;
+        Faz 4 / 2: `bakiye` iki kovanın toplamı, `hibe`/`paket` kovalar);
         iş satırı YOK, bakiye değişmez, multipart uçta girdi nesnesi de yok; i18n
         cümlesi üç alanı taşır; resubmit de 402.
   (iv)  SIRA — günlük tavan (429) bakiye kapısından ÖNCE: tavan aşımında bakiye
@@ -88,8 +89,9 @@ def _yukle(depo_db, kullanici_id: uuid.UUID, miktar: int, ay: str = "2026-09") -
 
 
 def _bakiye(depo_db, kullanici_id: uuid.UUID) -> int:
+    """İki kovanın toplamı — bu dosyada paket kovası boş, toplam = hibe (Faz 4 / 2)."""
     with Session(depo_db) as db:
-        return defter.bakiye(db, kullanici_id)
+        return defter.bakiye(db, kullanici_id).toplam
 
 
 def _hareketler(depo_db, kullanici_id: uuid.UUID) -> list[tuple[str, int, str | None]]:
@@ -196,7 +198,7 @@ def test_an_insufficient_balance_is_402_with_the_three_fields_and_writes_no_row(
     r = c.post("/api/generate", json=GORSEL)
     assert r.status_code == 402, r.text
     assert r.json() == {"detail": {"kod": "err.kredi_yetersiz", "bakiye": KREDI - 1, "gereken": KREDI,
-                                   "plan": "pro"}}
+                                   "plan": "pro", "hibe": KREDI - 1, "paket": 0}}
     assert "Retry-After" not in r.headers, "402 kota değil: beklemek para getirmez (K11)"
     assert _isler(depo_db) == [], "402'de iş satırı YOK: rezerv satırla aynı transaksiyonda geri alındı"
     assert _bakiye(depo_db, kullanici.id) == KREDI - 1 and _hareketler(depo_db, kullanici.id) == []
@@ -231,7 +233,8 @@ def test_resubmit_is_402_too_when_the_balance_ran_out(c, depo_db, kullanici, mon
     assert c.post("/api/generate", json=GORSEL).status_code == 202
     r = c.post(f"/api/isler/{eski}/yeniden")
     assert r.status_code == 402, r.text
-    assert r.json()["detail"] == {"kod": "err.kredi_yetersiz", "bakiye": 0, "gereken": KREDI, "plan": "pro"}
+    assert r.json()["detail"] == {"kod": "err.kredi_yetersiz", "bakiye": 0, "gereken": KREDI, "plan": "pro",
+                                  "hibe": 0, "paket": 0}
     assert len(_isler(depo_db)) == 2, "402'de yeni satır doğmadı"
 
 
@@ -263,7 +266,8 @@ def test_the_atomic_reserve_is_the_authority_even_when_the_read_only_precheck_is
     _yukle(depo_db, kullanici.id, KREDI - 1)
     r = c.post("/api/generate", json=GORSEL)
     assert r.status_code == 402, r.text
-    assert r.json()["detail"] == {"kod": "err.kredi_yetersiz", "bakiye": KREDI - 1, "gereken": KREDI, "plan": "pro"}
+    assert r.json()["detail"] == {"kod": "err.kredi_yetersiz", "bakiye": KREDI - 1, "gereken": KREDI, "plan": "pro",
+                                  "hibe": KREDI - 1, "paket": 0}
     assert _isler(depo_db) == [], "`kuyruk.ekle` flush etmişti; 402 transaksiyonu geri aldı"
     assert _bakiye(depo_db, kullanici.id) == KREDI - 1 and _hareketler(depo_db, kullanici.id) == []
     # Aynı yol yeterli bakiyede geçer ve satırı yazar.
@@ -281,7 +285,7 @@ def test_the_reserve_helper_raises_402_for_a_platform_job_and_is_a_no_op_for_byo
         with pytest.raises(HTTPException) as e:
             kapilar.check_bakiye(db, kullanici, 8, "platform")
         assert e.value.status_code == 402 and e.value.detail == {"kod": "err.kredi_yetersiz", "bakiye": 3,
-                                                                 "gereken": 8, "plan": "pro"}
+                                                                 "gereken": 8, "plan": "pro", "hibe": 3, "paket": 0}
         with pytest.raises(HTTPException) as e:
             kapilar.rezerve_kredi(db, kullanici, uuid.uuid4(), 8, "platform")
         assert e.value.status_code == 402 and e.value.detail["bakiye"] == 3

@@ -36,7 +36,11 @@ FAZ 3 / 1: onuncu depo `services/defter.py` (kredi defteri) — kullanıcı tara
 (`bakiye`, `hibe`, `rezerve`, `hareketler`) aynı sözleşme; `kullanicilar`
 sorgusunu `_sahibin(kullanici_id)` süzer (hesap tablosunun sahibi `id`);
 işçi (`onayla`, `iade`), admin (`duzelt` — hedef `hedef_id`) ve bakım turu
-(`tutarlilik`) `KIRACISIZ`da gerekçesiyle. Defterin anlamı tests/test_defter.py'de.
+(`tutarlilik`) `KIRACISIZ`da gerekçesiyle. Faz 4 / 2'nin `paket_yukle`/`dusur`u
+kullanıcı imzalı (`hibe` gibi: çağıran webhook admin bağlamında koşar ama hedef
+kullanıcıyı olaydan çözer ve `kullanici_id` olarak VERİR — sahip süzgeci durur;
+belge §2 "KIRACISIZ +paket_yukle/dusur" demişti, imza sözleşmesi ağır bastı).
+Defterin anlamı tests/test_defter.py'de.
 """
 from __future__ import annotations
 
@@ -75,7 +79,7 @@ DEPOLAR = {
     "services/depo_kimlik_bilgisi.py": 4,   # Faz 1 / 7
     "services/kuyruk.py": 16,               # Faz 2 / 1 (3 kullanıcı + 9 işçi/sonda tarafı; `ekle`/`isci_kaydet` `db.add`); Faz 2 / 10 +4 saklama/bakım
     "services/depo_admin.py": 11,           # Faz 2 / 8 (hepsi kiracısız — `KIRACISIZ_MODULLER`); Faz 3 / 5 +`marj`
-    "services/defter.py": 8,                # Faz 3 / 1 (`bakiye`, `_bakiye_ekle`, `rezerve`, `_isin_hareketleri`, `hareketler`, `tutarlilik`; `_yaz` `insert` — sayılmaz); Faz 3 / 3 +`plan_oku`, +`hibe_turu`
+    "services/defter.py": 10,               # Faz 3 / 1 (`bakiye`, `_bakiye_ekle`, `_isin_hareketleri`, `hareketler`, `duzelt`, `tutarlilik`; `_yaz` `insert` — sayılmaz); Faz 3 / 3 +`plan_oku`, +`hibe_turu`; Faz 4 / 2 +`plan_bitis_oku`, +`dusur` (`rezerve` ham SQL CTE'ye geçti, `select/update` çağrısı yok — sayılmaz)
 }
 # `depo_*.py` kalıbının DIŞINDA kalan depolar — `test_the_repository_list_matches_the_files_on_disk`
 # bunları da bekler; kalıba uymayan yeni bir depo buraya yazılmadan listeye giremez.

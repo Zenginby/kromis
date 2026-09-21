@@ -797,13 +797,14 @@
         "services.hata_izleme",
         "services.isci",
         "services.kuyruk",
+        "services.planlar",
         "services.sifre",
         "services.zaman",
         "version"
       ],
       "ithal_eden": [],
       "katman": 12,
-      "satir": 382,
+      "satir": 384,
       "testler": [],
       "yol": "isci.py"
     },
@@ -1147,7 +1148,7 @@
         "app"
       ],
       "katman": 12,
-      "satir": 193,
+      "satir": 195,
       "testler": [],
       "yol": "routers/admin.py"
     },
@@ -1290,7 +1291,7 @@
         "app"
       ],
       "katman": 12,
-      "satir": 369,
+      "satir": 381,
       "testler": [
         "tests/test_isler_route.py",
         "tests/test_kredi_route.py",
@@ -1571,7 +1572,7 @@
         "services.modeller"
       ],
       "katman": 7,
-      "satir": 364,
+      "satir": 597,
       "testler": [
         "tests/test_admin.py",
         "tests/test_defter.py",
@@ -2029,7 +2030,7 @@
         "isci"
       ],
       "katman": 11,
-      "satir": 791,
+      "satir": 796,
       "testler": [
         "tests/test_docker_kapisi.py",
         "tests/test_gunluk.py",
@@ -2090,7 +2091,7 @@
         "routers.uretim"
       ],
       "katman": 11,
-      "satir": 269,
+      "satir": 272,
       "testler": [
         "tests/test_docker_kapisi.py",
         "tests/test_e2e_kredi.py",
@@ -2159,7 +2160,7 @@
         "tools.uygulama_rolu"
       ],
       "katman": 0,
-      "satir": 191,
+      "satir": 200,
       "testler": [
         "tests/test_admin.py",
         "tests/test_isci.py",
@@ -2328,6 +2329,7 @@
         "services.tablolar"
       ],
       "ithal_eden": [
+        "isci",
         "routers.admin",
         "routers.hesap",
         "routers.isler",
@@ -2337,8 +2339,9 @@
         "services.modeller"
       ],
       "katman": 6,
-      "satir": 110,
+      "satir": 155,
       "testler": [
+        "tests/test_defter.py",
         "tests/test_docker_kapisi.py",
         "tests/test_isci.py",
         "tests/test_kredi_route.py",
@@ -2509,7 +2512,7 @@
         "tools.uygulama_rolu"
       ],
       "katman": 5,
-      "satir": 689,
+      "satir": 885,
       "testler": [
         "tests/test_admin.py",
         "tests/test_anahtar_dondur.py",
@@ -2842,7 +2845,7 @@
       ],
       "ithal_eden": [],
       "katman": 2,
-      "satir": 172,
+      "satir": 173,
       "testler": [
         "tests/test_rls_kontrol.py"
       ],
@@ -3087,7 +3090,7 @@
           "/output/{}.png"
         ],
         "dosya": "static/core.js",
-        "satir": 3388,
+        "satir": 3392,
         "tanim": 95
       },
       {
@@ -3170,7 +3173,7 @@
           "/api/settings"
         ],
         "dosya": "static/settings.js",
-        "satir": 1204,
+        "satir": 1221,
         "tanim": 31
       },
       {
@@ -3624,7 +3627,7 @@
       "onyuz": [
         "static/admin.js"
       ],
-      "satir": 180,
+      "satir": 182,
       "yardimci_sayisi": 10,
       "yol": "/api/admin/isler/{is_id}/iptal",
       "yontem": "POST"
@@ -3653,7 +3656,7 @@
         "static/admin.js"
       ],
       "satir": 150,
-      "yardimci_sayisi": 13,
+      "yardimci_sayisi": 14,
       "yol": "/api/admin/kullanicilar/{kullanici_id}/kredi",
       "yontem": "POST"
     },
@@ -3667,7 +3670,7 @@
       "onyuz": [
         "static/admin.js"
       ],
-      "satir": 169,
+      "satir": 171,
       "yardimci_sayisi": 6,
       "yol": "/api/admin/kullanicilar/{kullanici_id}/oturum-dusur",
       "yontem": "POST"
@@ -4072,7 +4075,7 @@
         "static/core.js"
       ],
       "satir": 159,
-      "yardimci_sayisi": 54,
+      "yardimci_sayisi": 55,
       "yol": "/api/generate",
       "yontem": "POST"
     },
@@ -4182,7 +4185,7 @@
         "static/giris.js"
       ],
       "satir": 129,
-      "yardimci_sayisi": 33,
+      "yardimci_sayisi": 34,
       "yol": "/api/hesap/kayit",
       "yontem": "POST"
     },
@@ -4345,7 +4348,7 @@
       "onyuz": [
         "static/isler.js"
       ],
-      "satir": 247,
+      "satir": 259,
       "yardimci_sayisi": 4,
       "yol": "/api/isler/akis",
       "yontem": "GET"
@@ -4360,7 +4363,7 @@
       "onyuz": [
         "static/isler.js"
       ],
-      "satir": 278,
+      "satir": 290,
       "yardimci_sayisi": 7,
       "yol": "/api/isler/{is_id}",
       "yontem": "GET"
@@ -4375,8 +4378,8 @@
       "onyuz": [
         "static/isler.js"
       ],
-      "satir": 285,
-      "yardimci_sayisi": 16,
+      "satir": 297,
+      "yardimci_sayisi": 21,
       "yol": "/api/isler/{is_id}/iptal",
       "yontem": "POST"
     },
@@ -4393,8 +4396,8 @@
       "onyuz": [
         "static/isler.js"
       ],
-      "satir": 309,
-      "yardimci_sayisi": 37,
+      "satir": 321,
+      "yardimci_sayisi": 38,
       "yol": "/api/isler/{is_id}/yeniden",
       "yontem": "POST"
     },
@@ -4420,7 +4423,7 @@
         "static/core.js"
       ],
       "satir": 169,
-      "yardimci_sayisi": 10,
+      "yardimci_sayisi": 11,
       "yol": "/api/kredi",
       "yontem": "GET"
     },
@@ -4639,7 +4642,7 @@
         "static/core.js"
       ],
       "satir": 191,
-      "yardimci_sayisi": 43,
+      "yardimci_sayisi": 44,
       "yol": "/api/video",
       "yontem": "POST"
     },

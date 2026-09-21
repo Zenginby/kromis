@@ -1,6 +1,6 @@
 # Faz 4 — Ödeme (Polar MoR), paketler ve abonelik, hesap silme / dışa aktarma, hukuki metinler: görev listesi
 
-**Tarih:** 2026-09-21 · **Durum:** **1/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
+**Tarih:** 2026-09-21 · **Durum:** **2/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
 **Üst belge:** [superpowers/specs/2026-08-10-saas-transformation-master-design.md](superpowers/specs/2026-08-10-saas-transformation-master-design.md) §5 "Faz 5" kartının **"Ödeme Altyapısı: Merchant of Record (MoR)"** maddesi (`:184-214`) ve "Filigran & Kredi Kuralları" satırı (`:183`) — sapmalar bu belgenin sonunda tek tek yazılı. **Numaralama tuzağı** aynen (Faz 3 belgesi `:4`): master spec'in "Faz 5"i ürün yol haritasının SaaS kartı; bu belge SaaS dönüşümünün İÇ dizisindeki Faz 4'tür (Faz 0 web-first → 1 DB/hesap → 2 kuyruk → 3 kredi defteri → **4 ödeme/KVKK** → 5 işletme). Yol haritası kartı (Faz 4 "Ödeme, faturalama ve hukuk"): *"Bir kullanıcı kartla abone olup fatura alabiliyor ve hesabını tamamen silebiliyor."* — bu belgenin çıkış kriteri onu genişletir (sonda tam metin). Kartın "Stripe birincil" satırı 2026-09-18'de **MoR/Polar** ile güncellendi (Faz 1 ve Faz 2 belgelerinin "Not" satırı; master `:184-199`): Türkiye'den Stripe'a doğrudan hesap açılamıyor, uluslararası satış Merchant of Record üzerinden.
 
 Faz 4'ün amacı, Faz 3'ün kurduğu defterin (rezerv → onay → iade, aylık hibe,
@@ -370,7 +370,7 @@ doğruladığı anda ayrı küçük bir PR olarak öne alınabilir.
 
 ---
 
-## 2. Ödeme şeması ve iki kova — `0008_odeme`, `kova`, `paket`, `urunler`/`siparisler`/`odeme_olaylari`, `defter` iki kova (PR: `faz4/odeme-semasi`)
+## 2. Ödeme şeması ve iki kova — `0008_odeme`, `kova`, `paket`, `urunler`/`siparisler`/`odeme_olaylari`, `defter` iki kova ✅ (PR: `faz4/odeme-semasi`)
 
 **Kapsam.** Davranış DEĞİŞMEZ (webhook yok, rota yok); yalnız şema + defter
 katmanı + bekçileri — Faz 3 / 1'in deseni. Göç **`0008_odeme`** — Faz 4'ün
@@ -496,7 +496,86 @@ atlaması: 3 gelmeden `pro` yapılan sahibin hesabı bir daha hibe ALMAZ (bugün
 rezerv testi 100 tekrar çift düşüm 0; `SUM(kova=hibe) == bakiye` ve
 `SUM(kova=paket) == paket_bakiye` bakım turunda; takım yeşil.
 
-**Sahibin adımı — yok** (göç dağıtım öncesi komutta).
+**Sahibin adımı — yok** (göç dağıtım öncesi komutta). *Yapıldığında eklendi:*
+2 canlıya 3'ten ÖNCE çıkarsa işçinin ortamına `KROMIS_UCRETLI_HIBE_BAKIMDA=1`
+(aşağıda), 3 ile birlikte silinir.
+
+**Yapıldığında (2026-09-21) ölçümler ve sapmalar.** Rota YOK (70), göç
+**`0008_odeme`** (şema başı `0007_kredi` → `0008_odeme`; ileri-geri-ileri +
+`alembic check` temiz), modül 111, **17 tablo**, `IS_TABLOLARI` **10**,
+`ALTYAPI_TABLOLARI` **3** (`isciler`, `urunler`, `odeme_olaylari`),
+`YONETICI_EKLER_TABLOLARI` **2**, RLS politikası **32**, `HAREKET_TURLERI` **7**,
+`KOVALAR`/`URUN_TURLERI`/`SIPARIS_SEBEPLERI` CHECK'li ve bekçili (her üye
+yazılır, dışı reddedilir; `urunler` ayrıca `tur_plan_uyumu`: plan ürünü
+plansız, paket ürünü planlı olamaz). `DEPOLAR["services/defter.py"]` 8 → **10**
+(+`plan_bitis_oku`, +`dusur`; `rezerve` artık `select/update` çağrısı değil ham
+CTE — sayılmaz). i18n **+2** tr/en (`kredi.tur_paket`, `kredi.kova_satiri`),
+`.env.example` **+3** (`KROMIS_TEMEL_AYLIK_HIBE`, `KROMIS_PRO_AYLIK_HIBE`,
+`KROMIS_UCRETLI_HIBE_BAKIMDA` — `ALTYAPI` bekçisi 3 ad). Gemiye binen API:
+`defter.bakiye(db, u) -> Bakiye(hibe, paket, toplam)`; `defter.rezerve` tek
+ifade (aşağıda), ana satır + gerekirse `:paket` satırı; `defter.onayla`/`iade`
+kova kova, fark ÖNCE pakete; `defter.paket_yukle(db, u, miktar, anahtar,
+aciklama=None, *, an=None) -> bool` (`paket:<order_id>`); `defter.dusur(db, u,
+hedef, anahtar, *, an=None) -> Hareket | None` (`sona_erme`, yalnız hibe kovası,
+`FOR UPDATE`); `defter.duzelt(..., kova="hibe")`; `defter.tutarlilik(db) ->
+list[Sapma(kullanici_id, bakiye, hibe_toplam, paket_bakiye, paket_toplam)]`
+(NamedTuple; bakım turu sapan her kova için `defter.tutarsiz` uyarısına `kova`
+alanı ekler); `defter.plan_bitis_oku`; `YetersizBakiye(toplam, gereken, *,
+hibe, paket)` — `bakiye` alanı toplam; 402 gövdesi `bakiye` (toplam) + `hibe`
++ `paket`; `GET /api/kredi` `bakiye` HİBE kovası olarak kalır (Faz 3'ün alanı,
+sütunla aynı anlam) + `paket_bakiye`, `toplam`, `plan_bitis` (bugün `null`),
+hareket dökümünde `kova`; composer "kalan" ve bölmenin büyük sayısı `toplam`,
+bölmede "Aylık hibe: N · paket kredisi: M" satırı; admin "kredi ekle" cevabı
+hibe kovası (listenin `bakiye` sütunuyla aynı). `planlar.py`: `aylik_hibe(ad,
+varsayilan, ortam)`, `TEMEL/PRO_AYLIK_HIBE_ENV` (boş = 1.000 / 3.000 — K5'in
+1.200 / 4.500'ü sahibin 4. görevde ürünleri yazarken vereceği sayı),
+`ucretli_hibe_bakimda()` (`1`/boş/`0`, başka değer `ValueError`; işçi
+açılışta doğrular, `isci.py hazirla`). `hibe_turu` bayrak kapalıyken YALNIZ
+`free`; paket kovası hesaba girmez (paketli kullanıcı hibesini kaybetmez).
+`0008` downgrade `kova`/`tur = 'paket'` satırı varsa `RuntimeError` ile DURUR
+(test çivili). Testler **+~30**: iki kovadan rezerv bölüşümü 5 durum
+(parametreli), toplam yetersiz, aynı işi iki kez rezerv iki kovayı geri koyar,
+onay farkı 6 durum (önce paket), iade iki satır, `paket_yukle` idempotent,
+`dusur`, `duzelt(kova)`, iki kova `tutarlilik`, eş zamanlı iki kova 100 tekrar
+çift düşüm 0, anahtar regex'leri (`:paket`, `paket:`, `sona_erme:`, `hibe:…:polar:`),
+`hibe_turu` paket kovasını görmez, downgrade kapısı; RLS `siparisler` dört
+politika + admin ekler/silemez, kullanıcı başkasınınkini ne okur ne ekler,
+`urunler` bağlamsız okunur; `/api/kredi` iki kova; bayrak; env değişkenleri.
+Takım sayısı PR gövdesinde.
+
+**Sapmalar — belgeden farklı yapılanlar, gerekçesiyle.** (a) **`paket_yukle`/
+`dusur` `KIRACISIZ` defterinde DEĞİL**: belge "webhook admin bağlamı"
+gerekçesiyle oraya yazmıştı, ama imza bekçisi (tests/test_galeri_db.py)
+kiracısız işlevin `kullanici_id` ALMAMASINI ister ve ikisi de hedef kullanıcıyı
+alır — `hibe` gibi kullanıcı imzalı `(db, kullanici_id, …)`, sahip süzgeci
+`_sahibin`; çağıran (webhook, 3) admin bağlamında koşar ve kullanıcıyı olaydan
+çözüp verir. (b) **`rezerve` `RETURNING eski.bakiye` yerine CTE + `SELECT …
+FOR UPDATE`**: `RETURNING` yalnız YENİ satırı verir (PG 18'in `RETURNING OLD`ı
+test kümesinin PG 16'sında yok) ve yeni değerlerden bölüşüm çıkmaz (hibe 0'a
+inmişse hibeden ne düştüğü bilinmez); CTE aynı satırı kilitler, son commit
+edilmiş değeri döner, UPDATE aynı kilitli satırı bölüşür — yine TEK gidiş-dönüş,
+yarış testi (100 tekrar) yeşil. (c) **Ana satırın kovası**: belge "`rezerv:<is_id>`
+kova hibe, hibeden düşen kadar" demişti; iş TAMAMEN paketten düştüyse
+(hibe kovası boş) ana satır PAKET kovasında yazılır, sıfır miktarlı hibe satırı
+("rezerv +0") yazılmaz — hareket listesinde anlamsız kayıt olurdu; `onay`/`iade`
+aynı kural (`_iki_satir`). (d) **`Bakiye.toplam` alan, özellik değil**: imza
+bekçisi sınıf gövdesindeki açık `def`i tarar. (e) **`tutarlilik` `Sapma`
+NamedTuple** (belgenin 5'li demeti, adlı); bakım turu kova başına uyarı.
+(f) **`GET /api/kredi` `bakiye` = hibe kovası** (belge "`bakiye` = toplam
+kalır" 402 gövdesi için demişti, `/api/kredi` için `toplam` alanını ayrı
+saymıştı — ikisi de öyle): alanın anlamı `kullanicilar.bakiye` sütunuyla aynı
+kaldı, toplam kendi adıyla geldi. (g) **`siparisler.urun_id` NOT NULL, FK NO
+ACTION**: ürünü aynada olmayan sipariş işlenmez (`hata='urun_yok'`, 3), ürün
+satırı silinmez (`aktif=false`) — belge yalnız "FK urunler" demişti. (h)
+**`odeme_olaylari`ya `alindi` indeksi**: 1 yıllık saklama turu (7) tarih
+tarar. (i) **test_rls iş tablosu türetimi NOT NULL `kullanici_id`**:
+`odeme_olaylari.kullanici_id` NULL'lanabilir (sahibi olmayan olay) — eski
+türetim onu iş tablosu sayardı. (j) **`KROMIS_TEMEL/PRO_AYLIK_HIBE` bu
+görevde** (belge "2, 4" demişti; `.env.example` bekçisi kod okuyor → şablon
+aynı PR'da). (k) **`hibe_turu` bayrağı öntanımlı KAPALI** ve işçi açılışta
+doğrular: yanlışlıkla çift hibe yerine yanlışlıkla eksik hibe — ilki para,
+ikincisi bir ortam değişkeni (`.env.example` açıklaması). (l) i18n +2, ~4
+değil: iki kova satırı tek anahtar. Belgenin kalan cümleleri aynen uygulandı.
 
 ---
 
@@ -970,6 +1049,11 @@ tamamen silebiliyor") bunun içinde: fatura Polar'ın, silme 5'in.
 ---
 
 ## Veri modeli değişiklikleri — `0008_odeme` özeti
+
+**Uygulandı 2026-09-21 (2. görev, PR `faz4/odeme-semasi`)** — tablo aynen;
+sapmalar §2 "Yapıldığında": `siparisler.urun_id` NOT NULL, `urunler`
+`tur_plan_uyumu` CHECK'i, `odeme_olaylari` `alindi` indeksi, downgrade paket
+satırıyla durur.
 
 | tablo | değişiklik | görev |
 | --- | --- | --- |

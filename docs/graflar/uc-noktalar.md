@@ -11,10 +11,10 @@
 | GET | `/` | `routers/kok.py` | `index`:27 | `errlog`, `i18n`, `version` | — |
 | GET | `/admin` | `routers/admin.py` | `admin_sayfasi`:76 | `errlog`, `i18n`, `version` | — |
 | GET | `/api/admin/isler` | `routers/admin.py` | `isler`:95 | `i18n` | `admin.js` |
-| POST | `/api/admin/isler/{is_id}/iptal` | `routers/admin.py` | `is_iptal`:180 | `i18n` | `admin.js` |
+| POST | `/api/admin/isler/{is_id}/iptal` | `routers/admin.py` | `is_iptal`:182 | `i18n` | `admin.js` |
 | GET | `/api/admin/kullanicilar` | `routers/admin.py` | `kullanicilar`:83 | — | `admin.js` |
 | POST | `/api/admin/kullanicilar/{kullanici_id}/kredi` | `routers/admin.py` | `kredi`:150 | `i18n` | `admin.js` |
-| POST | `/api/admin/kullanicilar/{kullanici_id}/oturum-dusur` | `routers/admin.py` | `oturum_dusur`:169 | `i18n` | `admin.js` |
+| POST | `/api/admin/kullanicilar/{kullanici_id}/oturum-dusur` | `routers/admin.py` | `oturum_dusur`:171 | `i18n` | `admin.js` |
 | POST | `/api/admin/kullanicilar/{kullanici_id}/plan` | `routers/admin.py` | `plan`:131 | `i18n` | `admin.js` |
 | POST | `/api/admin/kullanicilar/{kullanici_id}/tavan` | `routers/admin.py` | `tavan`:121 | `i18n` | `admin.js` |
 | GET | `/api/admin/metrikler` | `routers/admin.py` | `metrikler`:105 | `catalog` | `admin.js` |
@@ -55,10 +55,10 @@
 | PATCH | `/api/images` | `routers/galeri.py` | `move_images`:234 | `folders`, `i18n`, `models`, `storage` | `folders.js` |
 | POST | `/api/import` | `routers/galeri.py` | `import_image`:259 | `i18n` | `folders.js` |
 | GET | `/api/isler` | `routers/isler.py` | `isleri_listele`:112 | `i18n` | `isler.js` |
-| GET | `/api/isler/akis` | `routers/isler.py` | `isleri_akit`:247 | `i18n` | `isler.js` |
-| GET | `/api/isler/{is_id}` | `routers/isler.py` | `is_getir`:278 | `i18n` | `isler.js` |
-| POST | `/api/isler/{is_id}/iptal` | `routers/isler.py` | `is_iptal`:285 | `i18n` | `isler.js` |
-| POST | `/api/isler/{is_id}/yeniden` | `routers/isler.py` | `is_yeniden`:309 | `catalog`, `credstore`, `etiket`, `i18n` | `isler.js` |
+| GET | `/api/isler/akis` | `routers/isler.py` | `isleri_akit`:259 | `i18n` | `isler.js` |
+| GET | `/api/isler/{is_id}` | `routers/isler.py` | `is_getir`:290 | `i18n` | `isler.js` |
+| POST | `/api/isler/{is_id}/iptal` | `routers/isler.py` | `is_iptal`:297 | `i18n` | `isler.js` |
+| POST | `/api/isler/{is_id}/yeniden` | `routers/isler.py` | `is_yeniden`:321 | `catalog`, `credstore`, `etiket`, `i18n` | `isler.js` |
 | GET | `/api/kota` | `routers/isler.py` | `kota_durumu`:129 | — | `isler.js` |
 | GET | `/api/kredi` | `routers/isler.py` | `kredi_durumu`:169 | — | `core.js` |
 | POST | `/api/logo` | `routers/bindirme.py` | `add_logo`:94 | `assets_store`, `catalog`, `composite`, `i18n`, `models`, `storage` | `assets.js` |

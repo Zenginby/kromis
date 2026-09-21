@@ -168,7 +168,8 @@ def _sonraki_ay_basi(an: dt.datetime) -> dt.datetime:
 @router.get("/api/kredi")
 def kredi_durumu(db: Session = OTURUM,
                  kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
-    """Kullanıcının kredisi (Faz 3 / 6): bakiye, plan, hibe, sonraki hibe, plan kuralları, son 20 hareket.
+    """Kullanıcının kredisi (Faz 3 / 6; Faz 4 / 2 iki kova): bakiye (hibe kovası), paket_bakiye, toplam, plan,
+    plan_bitis, hibe, sonraki hibe, plan kuralları, son 20 hareket.
 
     `/api/kota`nın YANINA, yerine değil: kota günlük tavan (kötüye kullanım, K9),
     kredi bakiye (para) — panel ikisini ayrı okur. Plan kuralları (`filigran`,
@@ -176,14 +177,25 @@ def kredi_durumu(db: Session = OTURUM,
     `hibe` planın aylık sayısı (ortam `KROMIS_FREE_AYLIK_HIBE`), `sonraki_hibe`
     gelecek ayın ilk günü (`zaman.damga_utc`, öteki damgalarla aynı biçim).
     Hareketler `defter.hareketler` (en yeni üstte, kullanıcı süzgeçli; RLS ikinci
-    kapı) ve `defter._json` (admin id / idempotency anahtarı DÖKÜLMEZ). Plan
+    kapı) ve `defter._json` (admin id / idempotency anahtarı DÖKÜLMEZ; `kova` dökülür). Plan
     `kapilar.kullanici_plani`: yüklü nesneden, değilse DB'den (ayrılmış nesne dersi).
+
+    İKİ KOVA (Faz 4 / 2, K3): `bakiye` HİBE kovası olarak KALIR (Faz 3'ün alanı,
+    `kullanicilar.bakiye` sütunuyla aynı şey — anlamı değişmesin), `paket_bakiye`
+    paket kovası, `toplam` ikisinin toplamı — composer "kalan" ve bölmenin büyük
+    sayısı onu okur. `plan_bitis` iptal edilmiş aboneliğin dönem sonu (3. görev
+    yazar; bugün hep `null`) — 4. görevin "dönem sonunda ücretsiz plana geçer" satırı.
     """
     plan_adi = kapilar.kullanici_plani(db, kullanici)
     plan = planlar.PLANLAR[plan_adi]
+    b = defter.bakiye(db, kullanici.id)
+    plan_bitis = defter.plan_bitis_oku(db, kullanici.id)
     return {
-        "bakiye": defter.bakiye(db, kullanici.id),
+        "bakiye": b.hibe,
+        "paket_bakiye": b.paket,
+        "toplam": b.toplam,
         "plan": plan_adi,
+        "plan_bitis": zaman.damga_utc(plan_bitis) if plan_bitis is not None else None,
         "hibe": plan.aylik_hibe,
         "sonraki_hibe": zaman.damga_utc(_sonraki_ay_basi(zaman.an())),
         "filigran": plan.filigran,

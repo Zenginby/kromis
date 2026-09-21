@@ -104,9 +104,10 @@ def test_under_the_superuser_the_check_is_red_because_force_does_not_cover_it(
     cikti = capsys.readouterr().out
     assert "[RED] rolsuper: t" in cikti
     # Şema kapıları yine yeşil: göç koştu, kırmızı olan yalnız ROL.
-    # Faz 3 / 1: 3 × 9 + 1 (`kredi_hareketleri`nin `yonetici_ekler`i) = 28; formül araçta, sayı burada mandallı.
-    assert rls_kontrol.beklenen_politika() == 28
-    assert f"[OK ] politika: {rls_kontrol.beklenen_politika()}/28" in cikti
+    # Faz 3 / 1: 3 × 9 + 1 (`kredi_hareketleri`nin `yonetici_ekler`i) = 28; Faz 4 / 2: 3 × 10 + 2
+    # (`siparisler` de `yonetici_ekler` alır) = 32. Formül araçta, sayı burada mandallı.
+    assert rls_kontrol.beklenen_politika() == 32
+    assert f"[OK ] politika: {rls_kontrol.beklenen_politika()}/32" in cikti
 
 
 def test_the_application_role_it_opens_turns_every_gate_green(

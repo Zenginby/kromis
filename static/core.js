@@ -711,8 +711,12 @@ function krediMetni(toplam, dusen) {
   if (dusen === null)
     return `${tc("gen.cost_one", "gen.cost_many", toplam)} · ${t("kredi.kendi_anahtar")}`;
   if (!krediDurumu) return tc("gen.cost_one", "gen.cost_many", toplam);
-  if (dusen > krediDurumu.bakiye) el.classList.add("run-cost-uyari");
-  return t("kredi.tur_ve_kalan", { n: dusen, kalan: krediDurumu.bakiye });
+  // "kalan" iki kovanın TOPLAMI (Faz 4 / 2, K3): rezerv hibeden başlar, yetmezse
+  // paketten sürer — kullanıcının harcayabileceği sayı ikisinin toplamı. `??`
+  // yalnız eski bir sunucu cevabı için (alan yoksa hibe kovası).
+  const kalan = krediDurumu.toplam ?? krediDurumu.bakiye;
+  if (dusen > kalan) el.classList.add("run-cost-uyari");
+  return t("kredi.tur_ve_kalan", { n: dusen, kalan });
 }
 
 /** #go'nun engel SEBEBİ — boş dize "engel yok".

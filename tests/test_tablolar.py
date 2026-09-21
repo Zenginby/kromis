@@ -3,7 +3,10 @@
 Faz 2 / 1 iki tablo ekledi (`isler`, `isciler`; göç `0004_isler`): `isler`
 sekizinci iş tablosu, `isciler` üçüncü sınıf — ne hesap ne iş, PLATFORMUN
 (kullanıcı sütunu yok). Kuyruk davranışı tests/test_kuyruk.py'de; burada
-yalnız şema, kısıt ve sınıflandırma.
+yalnız şema, kısıt ve sınıflandırma. Faz 4 / 2 üç tablo daha (`0008_odeme`):
+`siparisler` onuncu iş tablosu, `urunler` ve `odeme_olaylari` platformun
+(`ALTYAPI_TABLOLARI` 1 → 3); `kredi_hareketleri.kova`, `kullanicilar.
+paket_bakiye` + Polar/rıza/silme sütunları. Defter davranışı tests/test_defter.py'de.
 
 Hepsi GERÇEK Postgres'e karşı (`veritabani` fixture'ı): sınanan şeylerin
 çoğu — citext eşitliği, `ON DELETE CASCADE`/`SET NULL`, JSONB gidiş-dönüş,
@@ -48,11 +51,13 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BELGE = os.path.join(REPO, "docs", "faz1-veritabani-hesaplar.md")
 BELGE_FAZ2 = os.path.join(REPO, "docs", "faz2-kuyruk-anahtarlar-depolama.md")
 BELGE_FAZ3 = os.path.join(REPO, "docs", "faz3-kredi-defteri-filigran.md")
+BELGE_FAZ4 = os.path.join(REPO, "docs", "faz4-odeme-abonelik-kvkk.md")
 
 HESAP_TABLOLARI = {"kullanicilar", "oturumlar", "jetonlar", "giris_denemeleri"}
-# Ne hesap ne iş: platformun kendi satırları (Faz 2 / 1). `kullanici_id` YOK,
-# kiracı süzgeci anlamsız — o yüzden `IS_TABLOLARI` bekçisinin dışında.
-ALTYAPI_TABLOLARI = {"isciler"}
+# Ne hesap ne iş: platformun kendi satırları (Faz 2 / 1; Faz 4 / 2 +2). `isciler`
+# ve `urunler`de `kullanici_id` YOK, `odeme_olaylari`nda NULL'lanabilir (sahibi
+# olmayan olay) — kiracı süzgeci anlamsız, o yüzden `IS_TABLOLARI` bekçisinin dışında.
+ALTYAPI_TABLOLARI = {"isciler", "urunler", "odeme_olaylari"}
 
 # Belgenin "Kimlik kararı"ndaki beş liste tablosu: `id text` + `_SAFE_ID` CHECK'i
 # + `(kullanici_id, olusturuldu)` indeksi. `tercihler` (PK = kullanici_id) ve
@@ -73,6 +78,7 @@ def temiz(motor):
     with motor.begin() as c:
         c.execute(text("DELETE FROM giris_denemeleri"))
         c.execute(text("DELETE FROM kullanicilar"))   # iş tabloları CASCADE ile boşalır
+        c.execute(text("DELETE FROM urunler"))        # Faz 4 / 2: ürün aynası platformun, kullanıcıyla gitmez
     yield
 
 
@@ -83,11 +89,21 @@ def _kullanici(db: Session, eposta: str = "ali@example.com") -> tablolar.Kullani
     return k
 
 
+def _urun(db: Session) -> tablolar.Urun:
+    """Faz 4 / 2: `siparisler.urun_id` NOT NULL FK — sipariş satırı bir ürün aynası ister (platformun, kullanıcısız)."""
+    u = tablolar.Urun(polar_urun_id=f"prod_{uuid.uuid4().hex[:8]}", tur="paket", kredi=500, fiyat_kurus=500,
+                      para_birimi="usd", ad="500 kredi")
+    db.add(u)
+    db.flush()
+    return u
+
+
 def _her_is_tablosuna_bir_satir(db: Session, k: tablolar.Kullanici) -> None:
-    """Dokuz iş tablosunun her birine, birbirine bağlı biçimde, bir satır."""
+    """On iş tablosunun her birine, birbirine bağlı biçimde, bir satır."""
     klasor = tablolar.Klasor(id=uuid.uuid4().hex, kullanici_id=k.id, name="K")
     db.add(klasor)
     db.flush()
+    urun = _urun(db)
     db.add_all([
         # `filename` UNIQUE (küresel) — kullanıcı başına farklı ad.
         tablolar.Medya(id=uuid.uuid4().hex[:12], kullanici_id=k.id, filename=f"{klasor.id}.png",
@@ -106,6 +122,9 @@ def _her_is_tablosuna_bir_satir(db: Session, k: tablolar.Kullanici) -> None:
         # Faz 3 / 1: anahtar küresel UNIQUE — kullanıcı başına farklı.
         tablolar.KrediHareketi(kullanici_id=k.id, tur="hibe", miktar=1,
                                idempotency_anahtari=f"hibe:{k.id}:2026-09"),
+        # Faz 4 / 2: sipariş kimliği küresel UNIQUE — kullanıcı başına farklı.
+        tablolar.Siparis(kullanici_id=k.id, polar_siparis_id=f"ord_{k.id}", urun_id=urun.id, sebep="purchase",
+                         tutar_kurus=500, para_birimi="usd"),
     ])
     db.flush()
 
@@ -126,8 +145,10 @@ def test_the_business_table_registry_matches_the_document_inventory():
     "`IS_TABLOLARI` bekçi listesi 7 → 8: `isler`" diye ekliyor ve `isciler`i
     "DEĞİL — kullanıcı satırı yok" diye dışarıda bırakıyor; Faz 3 belgesi (§1,
     "Dokunulan") dokuzuncuyu "`IS_TABLOLARI` bekçi listesi 8 → 9:
-    `kredi_hareketleri`" diye ekliyor. Dört küme (üç belge, liste, model)
-    birbirinden ayrılırsa burada görünür.
+    `kredi_hareketleri`" diye ekliyor; Faz 4 belgesi (§2, "Dokunulan")
+    onuncuyu "`IS_TABLOLARI` bekçi listesi 9 → 10: `siparisler`" diye ekliyor
+    ve `ALTYAPI_TABLOLARI`nın üçlü hâlini yazıyor. Beş küme (dört belge, liste,
+    model) birbirinden ayrılırsa burada görünür.
     """
     with open(BELGE, encoding="utf-8") as f:
         belge = f.read()
@@ -144,14 +165,26 @@ def test_the_business_table_registry_matches_the_document_inventory():
     m4 = re.search(r"`IS_TABLOLARI` bekçi\s+listesi 8\s*→ 9: `(\w+)`", belge3)
     assert m4, "Faz 3 belgesinde '`IS_TABLOLARI` bekçi listesi 8 → 9: `…`' cümlesi yok"
     belgedeki.add(m4.group(1))
+    with open(BELGE_FAZ4, encoding="utf-8") as f:
+        belge4 = f.read()
+    m5 = re.search(r"`IS_TABLOLARI` bekçi\s+listesi 9\s*→ 10:\s*`(\w+)`", belge4)
+    assert m5, "Faz 4 belgesinde '`IS_TABLOLARI` bekçi listesi 9 → 10: `…`' cümlesi yok"
+    belgedeki.add(m5.group(1))
     m3 = re.search(r"`(\w+)` DEĞİL — kullanıcı satırı yok", belge2)
-    assert m3 and {m3.group(1)} == ALTYAPI_TABLOLARI, "Faz 2 belgesinin dışarıda bıraktığı tablo ↔ ALTYAPI_TABLOLARI"
+    assert m3 and m3.group(1) in ALTYAPI_TABLOLARI, "Faz 2 belgesinin dışarıda bıraktığı tablo ALTYAPI_TABLOLARI'nda"
+    m6 = re.search(r"ALTYAPI_TABLOLARI `\{isciler\}` → `\{([^}]+)\}`", belge4)
+    assert m6, "Faz 4 belgesinde 'ALTYAPI_TABLOLARI `{isciler}` → `{…}`' cümlesi yok"
+    assert {ad.strip() for ad in m6.group(1).split(",")} == ALTYAPI_TABLOLARI, "Faz 4 belgesi ↔ ALTYAPI_TABLOLARI"
     assert belgedeki == set(tablolar.IS_TABLOLARI), (
         f"belge ↔ IS_TABLOLARI ayrıştı: {belgedeki ^ set(tablolar.IS_TABLOLARI)}")
     modeldeki = set(tablolar.Base.metadata.tables)
     siniflanan = HESAP_TABLOLARI | ALTYAPI_TABLOLARI | set(tablolar.IS_TABLOLARI)
     assert modeldeki == siniflanan, f"modelde sınıflanmamış tablo: {modeldeki ^ siniflanan}"
-    assert len(modeldeki) == 14, "Faz 3 / 1'in çıkış ölçütü: 14 tablo (Faz 2 / 1: 13)"
+    assert len(modeldeki) == 17, "Faz 4 / 2'nin çıkış ölçütü: 17 tablo (Faz 3 / 1: 14)"
+    # Altyapı tablosunun tanımı: kullanıcı sütunu ya yok ya NULL'lanabilir — sahibi olmayan satır olabilir.
+    for ad in ALTYAPI_TABLOLARI:
+        t = tablolar.Base.metadata.tables[ad]
+        assert "kullanici_id" not in t.c or t.c["kullanici_id"].nullable, f"{ad}: NOT NULL kullanici_id → iş tablosu olmalı"
 
 
 def test_the_sql_id_pattern_is_the_safe_id_regex_of_every_json_store():
@@ -168,7 +201,7 @@ def test_the_sql_id_pattern_is_the_safe_id_regex_of_every_json_store():
 
 
 def test_every_business_table_carries_the_owner_column_its_fk_and_its_index():
-    """Çok kiracılılık üç şey ister, dokuz tablonun dokuzunda: sütun, CASCADE FK, önde `kullanici_id` olan indeks."""
+    """Çok kiracılılık üç şey ister, on tablonun onunda: sütun, CASCADE FK, önde `kullanici_id` olan indeks."""
     for ad in tablolar.IS_TABLOLARI:
         t = tablolar.Base.metadata.tables[ad]
         sutun = t.c["kullanici_id"]
@@ -219,7 +252,7 @@ def test_citext_makes_email_uniqueness_case_insensitive(motor, temiz):
 
 
 def test_deleting_a_user_cascades_to_every_business_table(motor, temiz):
-    """Hesap silinince dokuz tablodaki satırları da gider; başka kullanıcının satırı kalır."""
+    """Hesap silinince on tablodaki satırları da gider; başka kullanıcının satırı kalır (ürün aynası platformun, durur)."""
     with Session(motor) as db:
         ali = _kullanici(db, "ali@example.com")
         veli = _kullanici(db, "veli@example.com")
@@ -230,6 +263,8 @@ def test_deleting_a_user_cascades_to_every_business_table(motor, temiz):
         db.delete(ali)
         db.commit()
     assert all(n == 1 for n in _sayimlar(motor).values()), _sayimlar(motor)
+    with motor.connect() as c:
+        assert c.execute(text("SELECT count(*) FROM urunler")).scalar_one() == 2, "ürün aynası kullanıcıyla gitmez"
 
 
 def test_a_business_row_cannot_exist_without_its_user(motor, temiz):
@@ -367,23 +402,66 @@ def test_check_constraints_accept_every_allowed_value_and_reject_the_rest(motor,
         assert db.scalar(text("SELECT durum FROM isler LIMIT 1")) == "bekliyor"
         db.rollback()
 
-    # Faz 3 / 1 (göç 0007): hareket türü — altı değer geçer (`sona_erme` dâhil: CHECK'te var,
-    # yazan yok), Faz 4'ün `paket`i geçmez; plan — üç değer geçer, dördüncüsü geçmez.
+    # Faz 3 / 1 (göç 0007) + Faz 4 / 2 (göç 0008): hareket türü — yedi değer geçer (`paket` dâhil),
+    # sekizincisi geçmez; kova — iki değer geçer, üçüncüsü geçmez, öntanımlı `hibe`;
+    # plan — üç değer geçer, dördüncüsü geçmez.
     def _hareket(**alan) -> tablolar.KrediHareketi:
         alanlar: dict = {"kullanici_id": kid, "tur": "hibe", "miktar": 1,
                          "idempotency_anahtari": f"t:{uuid.uuid4()}"}
         alanlar.update(alan)
         return tablolar.KrediHareketi(**alanlar)
 
-    assert set(tablolar.HAREKET_TURLERI) == {"hibe", "rezerv", "onay", "iade", "duzeltme", "sona_erme"}
+    assert set(tablolar.HAREKET_TURLERI) == {"hibe", "rezerv", "onay", "iade", "duzeltme", "sona_erme", "paket"}
     for tur in tablolar.HAREKET_TURLERI:
         _kabul_ediyor(_hareket(tur=tur))
-    _reddediyor(_hareket(tur="paket"), "ck_kredi_hareketleri_tur_kumesi")
+    _reddediyor(_hareket(tur="satin_alma"), "ck_kredi_hareketleri_tur_kumesi")
+    assert tablolar.KOVALAR == ("hibe", "paket") == (tablolar.KOVA_HIBE, tablolar.KOVA_PAKET)
+    for kova in tablolar.KOVALAR:
+        _kabul_ediyor(_hareket(kova=kova))
+    _reddediyor(_hareket(kova="hediye"), "ck_kredi_hareketleri_kova_kumesi")
+    with Session(motor) as db:
+        db.add(_hareket())
+        db.flush()
+        assert db.scalar(text("SELECT kova FROM kredi_hareketleri LIMIT 1")) == "hibe", "göç öncesi satır hibe kovası"
+        db.rollback()
     assert set(tablolar.PLANLAR_KUMESI) == {"free", "temel", "pro"}
     for plan in tablolar.PLANLAR_KUMESI:
         _kabul_ediyor(tablolar.Kullanici(eposta=f"{plan}@example.com", plan=plan))
     _reddediyor(tablolar.Kullanici(eposta="kurumsal@example.com", plan="kurumsal"),
                 "ck_kullanicilar_plan_kumesi")
+
+    # Faz 4 / 2 (göç 0008): ürün türü ve plan uyumu; sipariş sebebi Polar'ın `billing_reason` literalleri.
+    def _urun_(**alan) -> tablolar.Urun:
+        alanlar: dict = {"polar_urun_id": f"prod_{uuid.uuid4().hex[:8]}", "tur": "paket", "kredi": 500,
+                         "fiyat_kurus": 500, "para_birimi": "usd", "ad": "500 kredi"}
+        alanlar.update(alan)
+        return tablolar.Urun(**alanlar)
+
+    assert tablolar.URUN_TURLERI == ("plan", "paket")
+    _kabul_ediyor(_urun_(tur="paket"))
+    for plan in tablolar.PLANLAR_KUMESI:
+        _kabul_ediyor(_urun_(tur="plan", plan=plan))
+    _reddediyor(_urun_(tur="yillik"), "ck_urunler_tur_kumesi")
+    _reddediyor(_urun_(tur="plan", plan="kurumsal"), "ck_urunler_plan_kumesi")
+    _reddediyor(_urun_(tur="plan"), "ck_urunler_tur_plan_uyumu")
+    _reddediyor(_urun_(tur="paket", plan="pro"), "ck_urunler_tur_plan_uyumu")
+    with Session(motor) as db:
+        urun = _urun(db)
+        db.commit()
+        urun_id = urun.id
+
+    def _siparis(**alan) -> tablolar.Siparis:
+        alanlar: dict = {"kullanici_id": kid, "polar_siparis_id": f"ord_{uuid.uuid4().hex[:8]}", "urun_id": urun_id,
+                         "sebep": "purchase", "tutar_kurus": 500, "para_birimi": "usd"}
+        alanlar.update(alan)
+        return tablolar.Siparis(**alanlar)
+
+    assert tablolar.SIPARIS_SEBEPLERI == ("purchase", "subscription_create", "subscription_cycle",
+                                          "subscription_update")
+    for sebep in tablolar.SIPARIS_SEBEPLERI:
+        _kabul_ediyor(_siparis(sebep=sebep))
+    _reddediyor(_siparis(sebep="refund"), "ck_siparisler_sebep_kumesi")
+    _reddediyor(_siparis(urun_id=uuid.uuid4()), "fk_siparisler_urun_id_urunler")
 
 
 def test_preferences_are_one_row_per_user(motor, temiz):
@@ -425,6 +503,10 @@ def test_server_defaults_fill_ids_timestamps_and_flags(motor, temiz):
         assert k.dogrulandi_at is None and k.silindi_at is None and k.parola_ozeti is None
         # Faz 3 / 1: mevcut kullanıcı göçten dokunulmadan geçer — bakiye 0, plan `free`.
         assert (k.bakiye, k.plan) == (0, "free")
+        # Faz 4 / 2: ikinci kova 0; Polar, rıza ve silme sütunları NULL (hiç satın almamış, onaylamamış, silinmemiş).
+        assert k.paket_bakiye == 0
+        assert (k.polar_musteri_id, k.polar_abonelik_id, k.plan_bitis, k.sartlar_kabul_at, k.sartlar_surumu,
+                k.temizlendi_at) == (None,) * 6
         m = tablolar.Medya(id="a1" * 6, kullanici_id=k.id, filename="a1.png", prompt="p", size="s",
                            quality="q", model="m", credits=1)
         db.add(m)
@@ -451,7 +533,7 @@ def test_updated_at_moves_when_a_row_changes(motor, temiz):
 
 
 def test_downgrade_to_base_leaves_no_table_and_no_extension_behind(veritabani):
-    """Geri alma TEMİZ: 14 tablo ve `citext` uzantısı gider, `upgrade` yeniden kurar.
+    """Geri alma TEMİZ: 17 tablo ve `citext` uzantısı gider, `upgrade` yeniden kurar.
 
     `test_db.py`nin döngü testi `alembic_version`a bakıyor; burası şemanın
     kendisine — bir tablo `downgrade`da unutulsa orada görünmez, burada görünür.

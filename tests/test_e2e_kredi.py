@@ -72,7 +72,7 @@ def _hazirla(monkeypatch, e2e_oturum, hibe: int):
 
 def _bakiye(oturum) -> int:
     with oturum.db() as db:
-        return defter.bakiye(db, oturum.kullanici_id)
+        return defter.bakiye(db, oturum.kullanici_id).toplam
 
 
 def test_the_composer_line_follows_the_ledger_and_the_settings_pane_shows_the_movements(

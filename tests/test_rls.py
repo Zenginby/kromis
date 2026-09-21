@@ -30,6 +30,11 @@ yalnız orada DÖRDÜNCÜ, `yonetici_ekler` INSERT (K4: admin düzeltmesi ve iş
 bakım turu admin bağlamında yazar). Ölçülen dört iddia: kullanıcı başkasının
 hareketini okuyamaz, admin okur, admin EKLER, admin SİLEMEZ; öteki sekiz tabloda
 dördüncü politika BULUNMAZ. Politika sayısı 24 → 28.
+
+FAZ 4 / 2 (`0008_odeme`): onuncu tablo `siparisler` aynı üç politika + `yonetici_ekler`
+(webhook oturumsuz, admin bağlamında yazar — 3. görev); `urunler` ve `odeme_olaylari`
+POLİTİKASIZ altyapı tabloları (kullanıcı sütunu yok / NULL'lanabilir). İş tablosu
+türetimi bu yüzden NOT NULL `kullanici_id` arar. Politika sayısı 28 → 32.
 """
 from __future__ import annotations
 
@@ -115,6 +120,9 @@ def temiz(depo_db):
         c.execute(text("DELETE FROM isler"))
         c.execute(text("DELETE FROM isciler"))
         c.execute(text("DELETE FROM kullanicilar WHERE eposta LIKE 'b-%@example.com'"))
+        # Faz 4 / 2: ürün aynası platformun — kullanıcıyla gitmez, sipariş ona FK'lı (önce sipariş).
+        c.execute(text("DELETE FROM siparisler"))
+        c.execute(text("DELETE FROM urunler"))
     yield
 
 
@@ -136,10 +144,20 @@ def tohum(db_oturumu, kullanici, ikinci) -> tuple[uuid.UUID, uuid.UUID]:
     return kullanici.id, ikinci
 
 
+def _urun(s: Session) -> uuid.UUID:
+    """Faz 4 / 2: `siparisler.urun_id` NOT NULL FK; ürün aynası platformun (politikasız), süper kullanıcı yazar."""
+    u = tablolar.Urun(polar_urun_id=f"prod_{uuid.uuid4().hex[:8]}", tur="paket", kredi=500, fiyat_kurus=500,
+                      para_birimi="usd", ad="500 kredi")
+    s.add(u)
+    s.flush()
+    return u.id
+
+
 def _her_tabloya_bir_satir(s: Session, kid: uuid.UUID) -> None:
     klasor = tablolar.Klasor(id=uuid.uuid4().hex, kullanici_id=kid, name="K")
     s.add(klasor)
     s.flush()
+    urun_id = _urun(s)
     s.add_all([
         Medya(id=uuid.uuid4().hex[:12], kullanici_id=kid, filename=f"{klasor.id}.png", prompt="p",
               size="1024x1024", quality="high", folder_id=None, model="m", credits=1),
@@ -153,6 +171,8 @@ def _her_tabloya_bir_satir(s: Session, kid: uuid.UUID) -> None:
                                   anahtar_surumu=1),
         tablolar.Is(kullanici_id=kid, tur="generate", istek={"prompt": "p"}, model="m", kredi_tahmini=1),
         tablolar.KrediHareketi(kullanici_id=kid, tur="hibe", miktar=5, idempotency_anahtari=f"hibe:{kid}:2026-09"),
+        tablolar.Siparis(kullanici_id=kid, polar_siparis_id=f"ord_{kid}", urun_id=urun_id, sebep="purchase",
+                         tutar_kurus=500, para_birimi="usd"),
     ])
     s.flush()
 
@@ -180,19 +200,25 @@ def _izle(motor) -> tuple[list[tuple[str, object]], object]:
 
 # ────────────────────────────────────────────── göç: kapsam, FORCE, politikalar
 
-def test_the_nine_tenant_tables_and_only_they_have_rls_enabled_and_forced(depo_db):
-    """Dört kaynak aynı kümeyi söyler: `IS_TABLOLARI`, iki göçün literalleri (0006: 8, 0007: 9), metadata
-    (`kullanici_id` − hesap); DB'de hepsi FORCE."""
+def test_the_ten_tenant_tables_and_only_they_have_rls_enabled_and_forced(depo_db):
+    """Beş kaynak aynı kümeyi söyler: `IS_TABLOLARI`, üç göçün literalleri (0006: 8, 0007: 9, 0008: 10), metadata
+    (NOT NULL `kullanici_id` − hesap; `odeme_olaylari`nın NULL'lanabilir sütunu onu iş tablosu yapmaz); DB'de hepsi FORCE."""
     from alembic.config import Config
     from alembic.script import ScriptDirectory
-    turetilen = {ad for ad, t in tablolar.Base.metadata.tables.items() if "kullanici_id" in t.c} - HESAP_TABLOLARI
-    assert turetilen == set(kiraci.IS_TABLOLARI) and len(kiraci.IS_TABLOLARI) == 9
+    turetilen = {ad for ad, t in tablolar.Base.metadata.tables.items()
+                 if "kullanici_id" in t.c and not t.c["kullanici_id"].nullable} - HESAP_TABLOLARI
+    assert turetilen == set(kiraci.IS_TABLOLARI) and len(kiraci.IS_TABLOLARI) == 10
+    assert tablolar.Base.metadata.tables["odeme_olaylari"].c["kullanici_id"].nullable, "sahibi olmayan olay satırı"
     betikler = ScriptDirectory.from_config(Config(os.path.join(REPO, "alembic.ini")))
     goc6 = betikler.get_revision("0006_rls").module
     goc7 = betikler.get_revision("0007_kredi").module
-    assert tuple(goc7.TABLOLAR) == kiraci.IS_TABLOLARI, "0007 literali ile kod listesi ayrıştı"
-    assert tuple(goc6.TABLOLAR) + tuple(goc7.RLS_TABLOLAR) == kiraci.IS_TABLOLARI, "0006 (8) + 0007 (1) = 9"
-    assert tuple(goc7.YONETICI_EKLER) == kiraci.YONETICI_EKLER_TABLOLARI == ("kredi_hareketleri",)
+    goc8 = betikler.get_revision("0008_odeme").module
+    assert tuple(goc8.TABLOLAR) == kiraci.IS_TABLOLARI, "0008 literali ile kod listesi ayrıştı"
+    assert tuple(goc7.TABLOLAR) == kiraci.IS_TABLOLARI[:9], "0007 literali (tarihçe) ilk dokuz"
+    assert tuple(goc6.TABLOLAR) + tuple(goc7.RLS_TABLOLAR) + tuple(goc8.RLS_TABLOLAR) == kiraci.IS_TABLOLARI, \
+        "0006 (8) + 0007 (1) + 0008 (1) = 10"
+    assert tuple(goc7.YONETICI_EKLER) + tuple(goc8.YONETICI_EKLER) == kiraci.YONETICI_EKLER_TABLOLARI == (
+        "kredi_hareketleri", "siparisler")
 
     with depo_db.connect() as c:
         satirlar = c.execute(text("SELECT relname, relrowsecurity, relforcerowsecurity FROM pg_class "
@@ -200,11 +226,13 @@ def test_the_nine_tenant_tables_and_only_they_have_rls_enabled_and_forced(depo_d
     acik = {ad for ad, rls, _ in satirlar if rls}
     assert acik == set(kiraci.IS_TABLOLARI), f"RLS açık tablolar listeyle aynı değil: {sorted(acik)}"
     assert all(force for ad, _, force in satirlar if ad in acik), "FORCE eksik: tablo sahibi politikayı atlar"
-    assert {ad for ad, *_ in satirlar} >= HESAP_TABLOLARI | {"isciler"}, "kapsam dışı tablolar var ve politikasız"
+    assert {ad for ad, *_ in satirlar} >= HESAP_TABLOLARI | {"isciler", "urunler", "odeme_olaylari"}, \
+        "kapsam dışı tablolar var ve politikasız"
 
 
 def test_every_tenant_table_carries_the_owner_policy_and_the_two_admin_policies(depo_db):
-    """…ve YALNIZ `kredi_hareketleri` dördüncüyü (`yonetici_ekler` INSERT, Faz 3 K4); öteki sekizde dört BULUNMAZ."""
+    """…ve YALNIZ `kredi_hareketleri` ile `siparisler` dördüncüyü (`yonetici_ekler` INSERT, Faz 3 K4 / Faz 4 / 2);
+    öteki sekizde dört BULUNMAZ."""
     with depo_db.connect() as c:
         satirlar = c.execute(text("SELECT tablename, policyname, cmd, permissive, qual, with_check "
                                   "FROM pg_policies WHERE schemaname = 'public'")).all()
@@ -222,12 +250,13 @@ def test_every_tenant_table_carries_the_owner_policy_and_the_two_admin_policies(
         assert p["yonetici_gunceller"][0] == "UPDATE" and "app.rol" in p["yonetici_gunceller"][2]
         assert all(izin == "PERMISSIVE" for izin in (v[1] for v in p.values())), "admin kendi satırını da görsün"
     assert not {t for t, *_ in satirlar} - set(kiraci.IS_TABLOLARI), "politika yalnız iş tablolarında"
-    assert len(satirlar) == 28, "3 × 9 + 1 (tools/rls_kontrol.py `beklenen_politika` ile aynı sayı)"
+    assert len(satirlar) == 32, "3 × 10 + 2 (tools/rls_kontrol.py `beklenen_politika` ile aynı sayı)"
 
 
 def test_downgrade_removes_the_policies_and_disables_rls_and_upgrade_restores_them(veritabani, depo_db,
                                                                                  uygulama_motoru):
-    """0007 (kredi tablosu + 4 politika) ve 0006 (8 × 3) geri alınır: 0 politika, RLS'li tablo yok; head 28 politika."""
+    """0008 (sipariş tablosu + 4 politika), 0007 (kredi tablosu + 4) ve 0006 (8 × 3) geri alınır: 0 politika,
+    RLS'li tablo yok; head 32 politika."""
     from alembic.config import Config
 
     from alembic import command
@@ -237,6 +266,10 @@ def test_downgrade_removes_the_policies_and_disables_rls_and_upgrade_restores_th
     uygulama_motoru.dispose()            # havuzdaki bağlantılar DDL'e takılmasın
     motor = create_engine(veritabani)
     try:
+        command.downgrade(cfg, "0007_kredi")
+        with motor.connect() as c:
+            assert c.execute(text("SELECT count(*) FROM pg_policies WHERE schemaname = 'public'")).scalar_one() == 28
+            assert c.execute(text("SELECT to_regclass('siparisler')")).scalar_one() is None
         command.downgrade(cfg, "0006_rls")
         with motor.connect() as c:
             assert c.execute(text("SELECT count(*) FROM pg_policies WHERE schemaname = 'public'")).scalar_one() == 24
@@ -248,10 +281,10 @@ def test_downgrade_removes_the_policies_and_disables_rls_and_upgrade_restores_th
                              ).scalar_one() == 0
         command.upgrade(cfg, "head")
         with motor.connect() as c:
-            assert c.execute(text("SELECT count(*) FROM pg_policies WHERE schemaname = 'public'")).scalar_one() == 28
-            assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0007_kredi"
+            assert c.execute(text("SELECT count(*) FROM pg_policies WHERE schemaname = 'public'")).scalar_one() == 32
+            assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0008_odeme"
         command.check(cfg)               # politika metadata'da değil; `check` şemayı görür, fark yok
-        # `kredi_hareketleri` DÜŞÜP YENİDEN KURULDU: `GRANT … ON ALL TABLES` eski nesneye verilmişti, yeni
+        # `kredi_hareketleri`/`siparisler` DÜŞÜP YENİDEN KURULDU: `GRANT … ON ALL TABLES` eski nesneye verilmişti, yeni
         # tablo yetkisiz doğar ve bu dosyanın sonraki uygulama-rolü testleri "permission denied" görürdü
         # (ölçüldü). Fixture'ın verdiği yetki yeniden verilir; canlıda `tools/uygulama_rolu.py`nin
         # `ALTER DEFAULT PRIVILEGES`i aynı boşluğu kapatır.
@@ -366,6 +399,36 @@ def test_the_admin_role_inserts_into_the_credit_ledger_but_still_cannot_delete_f
         c.rollback()
     with depo_db.connect() as c:
         assert c.execute(text("SELECT count(*) FROM kredi_hareketleri")).scalar_one() == 2, "hiçbir şey kalıcı olmadı"
+
+
+def test_the_admin_role_inserts_orders_for_a_user_but_a_user_cannot_insert_anothers_order(uygulama_motoru, depo_db,
+                                                                                         tohum):
+    """Faz 4 / 2 (K4 devamı): webhook admin bağlamında B adına `siparisler`e EKLER (`yonetici_ekler` — 3. görevin
+    tek yazım yolu), SİLEMEZ; kullanıcı A B'nin siparişini ne okur ne B adına ekler; `urunler` politikasız —
+    uygulama rolü bağlamsız da okur (fiyat listesi herkese)."""
+    a, b = tohum
+    with depo_db.connect() as c:
+        urun_id = c.execute(text("SELECT id FROM urunler LIMIT 1")).scalar_one()
+    with uygulama_motoru.connect() as c:
+        assert c.execute(text("SELECT count(*) FROM urunler")).scalar_one() == 2, "ürün aynası bağlamsız okunur"
+        _bagla_sql(c, rol=kiraci.ADMIN)
+        assert c.execute(text("INSERT INTO siparisler (kullanici_id, polar_siparis_id, urun_id, sebep, tutar_kurus, "
+                              "para_birimi) VALUES (:b, :s, :u, 'purchase', 500, 'usd')"),
+                         {"b": b, "s": f"ord_{uuid.uuid4().hex[:8]}", "u": urun_id}).rowcount == 1
+        assert c.execute(text("SELECT count(*) FROM siparisler")).scalar_one() == 3
+        assert c.execute(text("DELETE FROM siparisler")).rowcount == 0, "admin politikası DELETE vermez"
+        c.rollback()
+    with uygulama_motoru.connect() as c:
+        _bagla_sql(c, kullanici_id=a)
+        assert c.execute(text("SELECT count(*) FROM siparisler WHERE kullanici_id = :b"), {"b": b}).scalar_one() == 0
+        assert c.execute(text("SELECT count(*) FROM siparisler")).scalar_one() == 1
+        with pytest.raises(sa_exc.ProgrammingError, match="row-level security"):
+            c.execute(text("INSERT INTO siparisler (kullanici_id, polar_siparis_id, urun_id, sebep, tutar_kurus, "
+                           "para_birimi) VALUES (:b, :s, :u, 'purchase', 500, 'usd')"),
+                      {"b": b, "s": f"ord_{uuid.uuid4().hex[:8]}", "u": urun_id})
+        c.rollback()
+    with depo_db.connect() as c:
+        assert c.execute(text("SELECT count(*) FROM siparisler")).scalar_one() == 2, "hiçbir şey kalıcı olmadı"
 
 
 def test_set_local_falls_at_the_end_of_the_transaction_so_a_pooled_connection_carries_no_tenant(uygulama_motoru,
@@ -598,7 +661,7 @@ def test_the_worker_heartbeat_refunds_the_stale_job_of_another_tenant_through_th
     defter.rezerve(db_oturumu, ikinci, is_.id, 20, an=an - dt.timedelta(minutes=30))
     assert kuyruk.al(db_oturumu, uuid.uuid4(), an - dt.timedelta(minutes=30)) is not None
     db_oturumu.commit()
-    assert defter.bakiye(db_oturumu, ikinci) == 80
+    assert defter.bakiye(db_oturumu, ikinci).toplam == 80
     with Session(uygulama_motoru) as s:
         assert isci.kalp_turu(s, uuid.uuid4(), [], an, dt.timedelta(minutes=5)).dusen == 1
     with depo_db.connect() as c:

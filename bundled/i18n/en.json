@@ -1024,6 +1024,8 @@
   "kredi.tur_iade": "refund",
   "kredi.tur_duzeltme": "adjustment",
   "kredi.tur_sona_erme": "expiry",
+  "kredi.tur_paket": "pack",
+  "kredi.kova_satiri": "Monthly grant: {hibe} · pack credits: {paket}",
   "kredi.ise_git": "show job",
   "isler.kredi_ozet": "reserved {rezerv} · actual {gercek} · refunded {iade}",
   "isler.kredi_iade": "reserved {rezerv} · fully refunded"

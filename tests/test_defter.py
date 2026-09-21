@@ -1,4 +1,4 @@
-"""Kredi defteri — `services/defter.py` + göç `0007_kredi` (Faz 3 / 1. görev).
+"""Kredi defteri — `services/defter.py` + göç `0007_kredi` (Faz 3 / 1) + göç `0008_odeme` iki kova (Faz 4 / 2).
 
 Hepsi GERÇEK Postgres'e karşı (`depo_db`): sınanan şeylerin özü — `UPDATE …
 WHERE bakiye >= :m` yarışı, `ON CONFLICT DO NOTHING`, `ON DELETE SET NULL`/
@@ -21,8 +21,15 @@ Beş soru:
         döküm iç alanları gizler; `tutarlilik` elle saptırılan önbelleği bulur.
   (v)   SINIR — iki kullanıcı depo düzeyinde izole; hesap silinince defter
         gider (CASCADE), iş silinince satır KALIR (`is_id` NULL); TEK YAZAR
-        kaynak bekçisi (`kullanicilar.bakiye`ye UPDATE ve `kredi_hareketleri`ye
-        INSERT kuran modül yalnız `services/defter.py`).
+        kaynak bekçisi (`kullanicilar.bakiye`/`paket_bakiye`ye UPDATE ve
+        `kredi_hareketleri`ye INSERT kuran modül yalnız `services/defter.py`).
+  (vi)  İKİ KOVA (Faz 4 / 2, K3) — rezerv bölüşümü üç durum (yalnız hibe /
+        hibe + paket / yalnız paket), TEK atomik UPDATE, hibe önce; toplam
+        yetersiz → satır yok; onay farkı ÖNCE pakete; iade iki satırı da kova
+        kova geri koyar; `paket_yukle` idempotent; `dusur` `sona_erme` yalnız
+        hibe kovasında; `tutarlilik` iki SUM; eş zamanlı rezerv iki kovada 100
+        tekrar çift düşüm 0; anahtar `:paket` son eki; `hibe_turu` paket
+        kovasını görmez; 0008 geri alma paket satırıyla DURUR.
 
 RLS iddiaları (kullanıcı başkasının hareketini okuyamaz, admin okur + EKLER,
 SİLEMEZ) tests/test_rls.py'de, uygulama rolüyle.
@@ -49,13 +56,18 @@ pytestmark = pytest.mark.usefixtures("depo_db")
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UUID_DESENI = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 
-# Belge §1 "Risk": geri dönüşsüz adlar — Faz 4 bunları okuyacak. Biçim → regex.
+# Faz 3 belge §1 "Risk" + Faz 4 "Veri modeli": geri dönüşsüz adlar. Biçim → regex.
+# `:paket` son eki aynı işin ikinci kova satırı (Faz 4 / 2); `hibe` aylık YA DA
+# Polar dönem hibesi (`hibe:<u>:polar:<order_id>`, 3. görev kurar); `paket` sipariş
+# kimliği (Polar id biçimi doğrulanmadı — ASCII sözcük); `sona_erme` abonelik + gün.
 ANAHTAR_BICIMLERI = {
-    "rezerv": re.compile(rf"^rezerv:{UUID_DESENI}$"),
-    "onay": re.compile(rf"^onay:{UUID_DESENI}$"),
-    "iade": re.compile(rf"^iade:{UUID_DESENI}$"),
-    "hibe": re.compile(rf"^hibe:{UUID_DESENI}:\d{{4}}-\d{{2}}$"),
+    "rezerv": re.compile(rf"^rezerv:{UUID_DESENI}(:paket)?$"),
+    "onay": re.compile(rf"^onay:{UUID_DESENI}(:paket)?$"),
+    "iade": re.compile(rf"^iade:{UUID_DESENI}(:paket)?$"),
+    "hibe": re.compile(rf"^hibe:{UUID_DESENI}:(\d{{4}}-\d{{2}}|polar:[A-Za-z0-9_-]+)$"),
     "duzeltme": re.compile(rf"^duzeltme:{UUID_DESENI}$"),
+    "paket": re.compile(r"^paket:[A-Za-z0-9_-]+$"),
+    "sona_erme": re.compile(rf"^sona_erme:{UUID_DESENI}:[A-Za-z0-9_-]+:\d{{4}}-\d{{2}}-\d{{2}}$"),
 }
 
 
@@ -92,8 +104,25 @@ def _sayi(db: Session) -> int:
 
 
 def _bakiye_db(db: Session, kullanici_id: uuid.UUID) -> int:
-    """Önbelleği ORM'siz okur — `defter.bakiye`nin kendisini sınayan testler ona güvenmesin."""
+    """HİBE önbelleğini ORM'siz okur — `defter.bakiye`nin kendisini sınayan testler ona güvenmesin."""
     return int(db.execute(text("SELECT bakiye FROM kullanicilar WHERE id = :k"), {"k": kullanici_id}).scalar_one())
+
+
+def _kovalar_db(db: Session, kullanici_id: uuid.UUID) -> tuple[int, int]:
+    """`(bakiye, paket_bakiye)` — iki önbellek ORM'siz (Faz 4 / 2)."""
+    r = db.execute(text("SELECT bakiye, paket_bakiye FROM kullanicilar WHERE id = :k"), {"k": kullanici_id}).one()
+    return int(r[0]), int(r[1])
+
+
+def _kovali_satirlar(db: Session, kullanici_id: uuid.UUID) -> list[tuple[str, str, int, str]]:
+    """`(tur, kova, miktar, anahtar)` — Faz 4 / 2'nin iki kova iddiaları için."""
+    return [tuple(r) for r in db.execute(text(
+        "SELECT tur, kova, miktar, idempotency_anahtari FROM kredi_hareketleri WHERE kullanici_id = :k "
+        "ORDER BY olusturuldu, idempotency_anahtari"), {"k": kullanici_id}).all()]
+
+
+def _paket(db: Session, kullanici_id: uuid.UUID, miktar: int, siparis: str | None = None) -> bool:
+    return defter.paket_yukle(db, kullanici_id, miktar, f"{defter.ONEK_PAKET}{siparis or uuid.uuid4().hex[:12]}")
 
 
 class _Yakala(logging.Handler):
@@ -123,7 +152,8 @@ def yakala():
 # ── (i) şema ───────────────────────────────────────────────────────────
 
 def test_upgrade_downgrade_upgrade_is_clean_and_check_reports_no_drift(veritabani, depo_db):
-    """§1 çıkış ölçütü: 0007 geri alınınca tablo ve BEŞ sütun gider (13 tablo kalır), yeniden kurulunca 14; `check` boş."""
+    """§1 çıkış ölçütü: 0007 geri alınınca tablo ve BEŞ sütun gider (13 tablo kalır — 0008'in üçü de ondan önce),
+    yeniden kurulunca 17; `check` boş."""
     from alembic.config import Config
 
     from alembic import command
@@ -143,10 +173,58 @@ def test_upgrade_downgrade_upgrade_is_clean_and_check_reports_no_drift(veritaban
         assert "ck_kullanicilar_plan_kumesi" not in {c["name"] for c in denetci.get_check_constraints("kullanicilar")}
         command.upgrade(cfg, "head")
         assert set(sa_inspect(motor).get_table_names()) == set(tablolar.Base.metadata.tables) | {"alembic_version"}
-        assert len(tablolar.Base.metadata.tables) == 14
+        assert len(tablolar.Base.metadata.tables) == 17
         with motor.connect() as c:
-            assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0007_kredi"
+            assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0008_odeme"
         command.check(cfg)               # fark varsa AutogenerateDiffsDetected
+    finally:
+        motor.dispose()
+
+
+def test_0008_downgrade_drops_three_tables_nine_columns_and_the_bucket_but_refuses_while_pack_rows_exist(
+        veritabani, depo_db, db_oturumu, kullanici):
+    """Faz 4 §2 çıkış ölçütü + "Veri modeli": 0008 geri alınınca `urunler`/`siparisler`/`odeme_olaylari`, dokuz
+    sütun ve `kova` gider, `tur` CHECK'i altıya döner (`paket` reddedilir); AMA `kova`/`tur = 'paket'` satırı
+    varsa göç DURUR — parayla alınmış kredi sessizce silinmez."""
+    from alembic.config import Config
+
+    from alembic import command
+    cfg = Config(os.path.join(REPO, "alembic.ini"))
+    cfg.attributes["baglanti_dizesi"] = veritabani
+    u = kullanici.id
+    assert _paket(db_oturumu, u, 500, "ord_geri") is True
+    db_oturumu.commit()
+    db_oturumu.close()
+    depo_db.dispose()
+    motor = create_engine(veritabani)
+    try:
+        with pytest.raises(RuntimeError, match="paket satiri"):
+            command.downgrade(cfg, "0007_kredi")
+        with motor.connect() as c:
+            assert c.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0008_odeme"
+            assert c.execute(text("SELECT count(*) FROM kredi_hareketleri WHERE kova = 'paket'")).scalar_one() == 1
+        with motor.begin() as c:      # test paket satırını kaldırır (üretimde sahibin elle kararı)
+            c.execute(text("DELETE FROM kredi_hareketleri WHERE kova = 'paket'"))
+            c.execute(text("UPDATE kullanicilar SET paket_bakiye = 0"))
+        command.downgrade(cfg, "0007_kredi")
+        denetci = sa_inspect(motor)
+        tablolar_ = set(denetci.get_table_names())
+        assert not tablolar_ & {"urunler", "siparisler", "odeme_olaylari"} and len(tablolar_) == 15  # 14 + alembic
+        sutunlar = {c["name"] for c in denetci.get_columns("kullanicilar")}
+        assert not sutunlar & {"paket_bakiye", "polar_musteri_id", "polar_abonelik_id", "plan_bitis",
+                               "sartlar_kabul_at", "sartlar_surumu", "temizlendi_at"}
+        assert "kova" not in {c["name"] for c in denetci.get_columns("kredi_hareketleri")}
+        kisitlar = {c["name"] for c in denetci.get_check_constraints("kredi_hareketleri")}
+        assert "ck_kredi_hareketleri_kova_kumesi" not in kisitlar and "ck_kredi_hareketleri_tur_kumesi" in kisitlar
+        with motor.connect() as c, pytest.raises(Exception, match="ck_kredi_hareketleri_tur_kumesi"):
+            c.execute(text("INSERT INTO kredi_hareketleri (kullanici_id, tur, miktar, idempotency_anahtari) "
+                           "VALUES (:u, 'paket', 1, 'paket:x')"), {"u": u})
+        command.upgrade(cfg, "head")
+        assert set(sa_inspect(motor).get_table_names()) == set(tablolar.Base.metadata.tables) | {"alembic_version"}
+        command.check(cfg)
+        with motor.connect() as c:
+            assert c.execute(text("SELECT kova FROM kredi_hareketleri LIMIT 1")).scalar() in (None, "hibe"), \
+                "eski satırlar hibe kovasında"
     finally:
         motor.dispose()
 
@@ -169,42 +247,50 @@ def test_the_ledger_table_has_its_two_indexes_the_unique_key_and_the_right_delet
 
 def test_the_type_constants_and_key_prefixes_mirror_the_check_set_and_the_documented_formats():
     assert (defter.TUR_HIBE, defter.TUR_REZERV, defter.TUR_ONAY, defter.TUR_IADE, defter.TUR_DUZELTME,
-            defter.TUR_SONA_ERME) == tablolar.HAREKET_TURLERI
-    assert {defter.ONEK_REZERV, defter.ONEK_ONAY, defter.ONEK_IADE, defter.ONEK_HIBE, defter.ONEK_DUZELTME} == {
-        f"{tur}:" for tur in ANAHTAR_BICIMLERI}
+            defter.TUR_SONA_ERME, defter.TUR_PAKET) == tablolar.HAREKET_TURLERI
+    assert {defter.ONEK_REZERV, defter.ONEK_ONAY, defter.ONEK_IADE, defter.ONEK_HIBE, defter.ONEK_DUZELTME,
+            defter.ONEK_PAKET, defter.ONEK_SONA_ERME} == {f"{tur}:" for tur in ANAHTAR_BICIMLERI}
+    assert (defter.KOVA_HIBE, defter.KOVA_PAKET) == tablolar.KOVALAR and defter.EK_PAKET == ":paket"
 
 
 def test_every_key_the_module_writes_matches_the_documented_format(db_oturumu, kullanici):
-    """Belge §1 "Risk": `rezerv:<is_id>`, `onay:<is_id>`, `iade:<is_id>`, `hibe:<u>:<YYYY-MM>`, `duzeltme:<uuid4>`."""
+    """Faz 3 §1 "Risk" + Faz 4 "Veri modeli": `rezerv|onay|iade:<is_id>[:paket]`, `hibe:<u>:<YYYY-MM>`,
+    `duzeltme:<uuid4>`, `paket:<order_id>`, `sona_erme:<u>:<abonelik>:<YYYY-MM-DD>`."""
     u = kullanici.id
-    defter.hibe(db_oturumu, u, 100, f"hibe:{u}:2026-09")
+    defter.hibe(db_oturumu, u, 15, f"hibe:{u}:2026-09")
+    assert _paket(db_oturumu, u, 100, "ord_1") is True
     a, b = _is(db_oturumu, u), _is(db_oturumu, u)
-    defter.rezerve(db_oturumu, u, a, 10)
-    defter.rezerve(db_oturumu, u, b, 10)
+    defter.rezerve(db_oturumu, u, a, 10)          # yalnız hibe
+    defter.rezerve(db_oturumu, u, b, 10)          # hibe 5 + paket 5 → iki satır
     defter.onayla(db_oturumu, a, 4)
-    defter.iade(db_oturumu, b)
+    defter.iade(db_oturumu, b)                    # iki satır
     d = defter.duzelt(db_oturumu, u, -5, "prova", u)
-    anahtarlar = {tur: anahtar for tur, _, anahtar in _satirlar(db_oturumu, u)}
-    for tur, desen in ANAHTAR_BICIMLERI.items():
-        assert desen.match(anahtarlar[tur]), (tur, anahtarlar[tur])
-    assert anahtarlar["rezerv"] in (f"rezerv:{a}", f"rezerv:{b}") and anahtarlar["onay"] == f"onay:{a}"
-    assert anahtarlar["iade"] == f"iade:{b}"
+    defter.dusur(db_oturumu, u, 0, f"sona_erme:{u}:sub_1:2026-09-21")
+    anahtarlar = [(tur, anahtar) for tur, _, _, anahtar in _kovali_satirlar(db_oturumu, u)]
+    assert len(anahtarlar) == 10, anahtarlar
+    for tur, anahtar in anahtarlar:
+        assert ANAHTAR_BICIMLERI[tur].match(anahtar), (tur, anahtar)
+    assert {a_ for t, a_ in anahtarlar if t == "rezerv"} == {f"rezerv:{a}", f"rezerv:{b}", f"rezerv:{b}:paket"}
+    assert {a_ for t, a_ in anahtarlar if t == "iade"} == {f"iade:{b}", f"iade:{b}:paket"}
+    assert {a_ for t, a_ in anahtarlar if t == "onay"} == {f"onay:{a}"}
     uuid.UUID(d.idempotency_anahtari.removeprefix("duzeltme:"))     # uuid4, çözülür
+    assert defter.tutarlilik(db_oturumu) == []
 
 
 # ── (ii) düşüm ─────────────────────────────────────────────────────────
 
 def test_balance_starts_at_zero_and_a_grant_adds_a_row_and_raises_the_cache(db_oturumu, kullanici):
     u = kullanici.id
-    assert defter.bakiye(db_oturumu, u) == 0 and _satirlar(db_oturumu, u) == []
+    assert defter.bakiye(db_oturumu, u) == defter.Bakiye(0, 0, 0) and _satirlar(db_oturumu, u) == []
     an = zaman.an()
     assert defter.hibe(db_oturumu, u, 200, f"hibe:{u}:2026-09", "eylul hibesi", an=an) is True
     db_oturumu.commit()
-    assert defter.bakiye(db_oturumu, u) == 200 == _bakiye_db(db_oturumu, u)
+    b = defter.bakiye(db_oturumu, u)
+    assert (b.hibe, b.paket, b.toplam) == (200, 0, 200) and _bakiye_db(db_oturumu, u) == 200
     (h,) = defter.hareketler(db_oturumu, u)
-    assert (h.tur, h.miktar, h.aciklama, h.is_id, h.admin_id, h.olusturuldu) == ("hibe", 200, "eylul hibesi", None,
-                                                                                   None, an)
-    assert defter.bakiye(db_oturumu, uuid.uuid4()) == 0, "olmayan kullanıcı 0, hata değil"
+    assert (h.tur, h.kova, h.miktar, h.aciklama, h.is_id, h.admin_id, h.olusturuldu) == (
+        "hibe", "hibe", 200, "eylul hibesi", None, None, an)
+    assert defter.bakiye(db_oturumu, uuid.uuid4()) == defter.Bakiye(0, 0, 0), "olmayan kullanıcı 0, hata değil"
 
 
 def test_a_repeated_grant_with_the_same_key_is_a_no_op(db_oturumu, kullanici):
@@ -246,7 +332,7 @@ def test_reserve_with_insufficient_balance_raises_with_balance_and_needed_and_wr
     is_id = _is(db_oturumu, u)
     with pytest.raises(defter.YetersizBakiye) as hata:
         defter.rezerve(db_oturumu, u, is_id, 8)
-    assert (hata.value.bakiye, hata.value.gereken) == (7, 8)
+    assert (hata.value.bakiye, hata.value.gereken, hata.value.hibe, hata.value.paket) == (7, 8, 7, 0)
     assert hata.value.args == (7, 8)
     assert _bakiye_db(db_oturumu, u) == 7
     assert [t for t, *_ in _satirlar(db_oturumu, u)] == ["hibe"], "rezerv satırı YAZILMADI"
@@ -452,9 +538,10 @@ def test_movements_list_newest_first_with_the_limit_and_the_dump_hides_internal_
     assert [h.miktar for h in hepsi] == [-1, -5, 14, 13, 12, 11, 10], "en yeni üstte"
     assert [h.miktar for h in defter.hareketler(db_oturumu, u, limit=2)] == [-1, -5]
     dokum = defter._json(hepsi[0])
-    assert list(dokum) == ["id", "tur", "miktar", "aciklama", "is_id", "olusturuldu"]
+    assert list(dokum) == ["id", "tur", "kova", "miktar", "aciklama", "is_id", "olusturuldu"]
     assert "admin_id" not in dokum and "idempotency_anahtari" not in dokum and "kullanici_id" not in dokum
     assert dokum["olusturuldu"].endswith("Z") and dokum["is_id"] is None and dokum["aciklama"] == "d"
+    assert dokum["kova"] == "hibe"
     assert defter._json(hepsi[1])["is_id"] == str(is_id)
     assert uuid.UUID(dokum["id"]) == hepsi[0].id
 
@@ -474,12 +561,13 @@ def test_consistency_finds_a_manually_skewed_cache_and_nothing_else(db_oturumu, 
     db_oturumu.execute(text("UPDATE kullanicilar SET bakiye = 3 WHERE id = :k"), {"k": c})
     db_oturumu.commit()
     assert sorted(defter.tutarlilik(db_oturumu), key=lambda s: str(s[0])) == sorted(
-        [(u, 99, 70), (c, 3, 0)], key=lambda s: str(s[0]))
+        [(u, 99, 70, 0, 0), (c, 3, 0, 0, 0)], key=lambda s: str(s[0]))
     # `duzelt` sapmayı KAPATMAZ — iki tarafı birden oynatır (satır + önbellek), fark aynı kalır: önbellek
     # sapması bir defter hareketi değil, önbelleğin SUM'a çekilmesidir (7. görevin bakım turu karar verir;
     # belgenin "düzeltme admin `duzelt`" cümlesi buradaki ölçümle daraltıldı — "Yapıldığında" notu).
     defter.duzelt(db_oturumu, u, 5, "deneme", b)
-    assert [(kid, bak - top) for kid, bak, top in defter.tutarlilik(db_oturumu) if kid == u] == [(u, 29)]
+    assert [(s.kullanici_id, s.bakiye - s.hibe_toplam) for s in defter.tutarlilik(db_oturumu)
+            if s.kullanici_id == u] == [(u, 29)]
     # Önbellek SUM'a çekilince (bakım turunun yapacağı şey) sapma kapanır.
     db_oturumu.execute(text("UPDATE kullanicilar SET bakiye = 75 WHERE id = :k"), {"k": u})
     db_oturumu.execute(text("UPDATE kullanicilar SET bakiye = 0 WHERE id = :k"), {"k": c})
@@ -496,13 +584,14 @@ def test_two_users_are_isolated_at_the_repository_layer(db_oturumu, kullanici):
     is_a = _is(db_oturumu, a)
     defter.rezerve(db_oturumu, a, is_a, 40)
     db_oturumu.commit()
-    assert (defter.bakiye(db_oturumu, a), defter.bakiye(db_oturumu, b)) == (60, 20)
+    assert (defter.bakiye(db_oturumu, a).toplam, defter.bakiye(db_oturumu, b).toplam) == (60, 20)
     assert [h.kullanici_id for h in defter.hareketler(db_oturumu, b)] == [b]
     assert all(h.kullanici_id == a for h in defter.hareketler(db_oturumu, a)) and len(defter.hareketler(db_oturumu, a)) == 2
     with pytest.raises(defter.YetersizBakiye):
         defter.rezerve(db_oturumu, b, _is(db_oturumu, b), 21), "B, A'nın bakiyesinden düşemez"
     assert defter.iade(db_oturumu, is_a) is not None
-    assert (defter.bakiye(db_oturumu, a), defter.bakiye(db_oturumu, b)) == (100, 20), "A'nın iadesi B'ye dokunmaz"
+    assert (defter.bakiye(db_oturumu, a).toplam, defter.bakiye(db_oturumu, b).toplam) == (100, 20), \
+        "A'nın iadesi B'ye dokunmaz"
 
 
 def test_deleting_the_user_cascades_the_ledger_but_deleting_the_job_keeps_the_row_with_a_null_job(db_oturumu,
@@ -542,6 +631,263 @@ def test_deleting_the_admin_keeps_the_correction_with_a_null_admin(db_oturumu, k
     assert _bakiye_db(db_oturumu, u) == 10
 
 
+# ── (vi) iki kova (Faz 4 / 2, K3) ──────────────────────────────────────
+
+def test_a_pack_load_writes_a_pack_row_in_the_pack_bucket_and_is_idempotent_per_order(db_oturumu, kullanici):
+    """`paket_yukle`: `paket` satırı kova paket `+miktar`, `paket_bakiye` `+miktar`, hibe kovası DOKUNULMAZ;
+    aynı sipariş ikinci kez (`paket:<order_id>` çakışır — K4) no-op; miktar pozitif."""
+    u = kullanici.id
+    defter.hibe(db_oturumu, u, 100, f"hibe:{u}:2026-09")
+    an = zaman.an()
+    assert defter.paket_yukle(db_oturumu, u, 500, "paket:ord_abc", "500 kredi paketi", an=an) is True
+    db_oturumu.commit()
+    assert _kovalar_db(db_oturumu, u) == (100, 500)
+    assert defter.bakiye(db_oturumu, u) == defter.Bakiye(100, 500, 600)
+    assert defter.paket_yukle(db_oturumu, u, 500, "paket:ord_abc") is False, "aynı sipariş ikinci olayla geldi"
+    assert defter.paket_yukle(db_oturumu, u, 999, "paket:ord_abc") is False, "aynı anahtar, farklı miktar: yine no-op"
+    assert _kovalar_db(db_oturumu, u) == (100, 500) and _sayi(db_oturumu) == 2
+    (h, _) = defter.hareketler(db_oturumu, u)
+    assert (h.tur, h.kova, h.miktar, h.aciklama, h.idempotency_anahtari, h.olusturuldu) == (
+        "paket", "paket", 500, "500 kredi paketi", "paket:ord_abc", an)
+    assert defter._json(h)["kova"] == "paket"
+    for kotu in (0, -1):
+        with pytest.raises(ValueError):
+            defter.paket_yukle(db_oturumu, u, kotu, "paket:ord_kotu")
+    assert defter.tutarlilik(db_oturumu) == []
+
+
+@pytest.mark.parametrize("hibe, paket, m, beklenen", [
+    (100, 500, 30, [("rezerv", "hibe", -30, "")]),                                        # yalnız hibe
+    (10, 500, 30, [("rezerv", "hibe", -10, ""), ("rezerv", "paket", -20, ":paket")]),      # hibe + paket
+    (0, 500, 30, [("rezerv", "paket", -30, "")]),                                          # yalnız paket
+    (30, 500, 30, [("rezerv", "hibe", -30, "")]),                                          # hibe tam yeter (>=)
+    (100, 500, 0, [("rezerv", "hibe", 0, "")]),                                            # sıfır tahmin: iz
+], ids=["yalniz-hibe", "hibe-ve-paket", "yalniz-paket", "hibe-tam-yeter", "sifir"])
+def test_reserve_splits_across_the_two_buckets_grant_first_in_one_statement(db_oturumu, kullanici, hibe, paket, m,
+                                                                            beklenen):
+    """§2: `LEAST` bölüşümü — hibe kovası ÖNCE tükenir, kalan paketten; satırlar `rezerv:<is_id>` (+`:paket`);
+    iş tamamen paketten düştüyse ana satır paket kovasında, sıfır miktarlı hibe satırı yazılmaz."""
+    u = kullanici.id
+    if hibe:
+        defter.hibe(db_oturumu, u, hibe, f"hibe:{u}:2026-09")
+    _paket(db_oturumu, u, paket, "ord_1")
+    is_id = _is(db_oturumu, u)
+    ana = defter.rezerve(db_oturumu, u, is_id, m)
+    db_oturumu.commit()
+    hibe_dusen = min(hibe, m)
+    assert _kovalar_db(db_oturumu, u) == (hibe - hibe_dusen, paket - (m - hibe_dusen))
+    rezervler = [(t, k, mk, a.removeprefix(f"rezerv:{is_id}")) for t, k, mk, a in _kovali_satirlar(db_oturumu, u)
+                 if t == "rezerv"]
+    assert rezervler == beklenen
+    assert ana.idempotency_anahtari == f"rezerv:{is_id}" and ana.is_id == is_id
+    assert ana.kova == beklenen[0][1] and ana.miktar == beklenen[0][2]
+    assert defter.tutarlilik(db_oturumu) == []
+
+
+def test_reserve_fails_on_the_total_of_both_buckets_and_reports_each_bucket(db_oturumu, kullanici):
+    """Toplam yetmezse (`bakiye + paket_bakiye < m`) iki kova da DOKUNULMAZ, satır yok, `YetersizBakiye(toplam,
+    gereken, hibe=…, paket=…)` — 402 gövdesi `bakiye` = toplam, `hibe`/`paket` ayrı."""
+    u = kullanici.id
+    defter.hibe(db_oturumu, u, 4, f"hibe:{u}:2026-09")
+    _paket(db_oturumu, u, 3, "ord_1")
+    is_id = _is(db_oturumu, u)
+    with pytest.raises(defter.YetersizBakiye) as hata:
+        defter.rezerve(db_oturumu, u, is_id, 8)
+    assert (hata.value.bakiye, hata.value.gereken, hata.value.hibe, hata.value.paket) == (7, 8, 4, 3)
+    assert hata.value.args == (7, 8)
+    assert _kovalar_db(db_oturumu, u) == (4, 3)
+    assert [t for t, *_ in _satirlar(db_oturumu, u)] == ["hibe", "paket"], "rezerv satırı YAZILMADI"
+    assert defter.rezerve(db_oturumu, u, is_id, 7).miktar == -4, "tam toplam kadar geçer (>=)"
+    assert _kovalar_db(db_oturumu, u) == (0, 0)
+
+
+def test_reserving_the_same_job_twice_across_two_buckets_restores_both_and_returns_the_main_row(db_oturumu,
+                                                                                                kullanici):
+    u = kullanici.id
+    defter.hibe(db_oturumu, u, 10, f"hibe:{u}:2026-09")
+    _paket(db_oturumu, u, 100, "ord_1")
+    is_id = _is(db_oturumu, u)
+    ilk = defter.rezerve(db_oturumu, u, is_id, 30)
+    assert _kovalar_db(db_oturumu, u) == (0, 80)
+    # İkinci çağrıda hibe kovası boş: bölüşüm bu kez tamamen paketten olurdu — geri alma yine iki kovayı doğru bulur.
+    ikinci = defter.rezerve(db_oturumu, u, is_id, 30)
+    assert ikinci == ilk and ilk.kova == "hibe" and ilk.miktar == -10
+    assert _kovalar_db(db_oturumu, u) == (0, 80) and _sayi(db_oturumu) == 4, "hibe, paket, rezerv, rezerv:paket"
+    assert defter.tutarlilik(db_oturumu) == []
+
+
+@pytest.mark.parametrize("gercek, beklenen_satirlar, beklenen_kovalar", [
+    (30, [("onay", "hibe", 0, "")], (0, 80)),                                                # fark 0: iz
+    (25, [("onay", "paket", 5, "")], (0, 85)),                                               # fark ≤ paket: yalnız paket
+    (10, [("onay", "paket", 20, "")], (0, 100)),                                             # fark == paket
+    (5, [("onay", "hibe", 5, ""), ("onay", "paket", 20, ":paket")], (5, 100)),               # fark > paket: kalan hibe
+    (0, [("onay", "hibe", 10, ""), ("onay", "paket", 20, ":paket")], (10, 100)),             # tamamı geri
+    (45, [("onay", "hibe", 0, "")], (0, 80)),                                                # aşım: ek tahsilat yok
+], ids=["fark-0", "yalniz-paket", "paket-tam", "paket-sonra-hibe", "tamami", "asim"])
+def test_confirm_refunds_the_difference_to_the_pack_bucket_first(db_oturumu, kullanici, yakala, gercek,
+                                                                  beklenen_satirlar, beklenen_kovalar):
+    """K3 "hibeden önce paketi geri koy": rezerv hibe 10 + paket 20 (tahmin 30); fark önce paket kovasına (en son
+    o düşmüştü, iade edilen paket devretmeyi sürdürür), kalan hibeye. Aşımda `onay` 0 + `defter.asim` uyarısı."""
+    u = kullanici.id
+    defter.hibe(db_oturumu, u, 10, f"hibe:{u}:2026-09")
+    _paket(db_oturumu, u, 100, "ord_1")
+    is_id = _is(db_oturumu, u)
+    defter.rezerve(db_oturumu, u, is_id, 30)
+    assert _kovalar_db(db_oturumu, u) == (0, 80)
+    h = defter.onayla(db_oturumu, is_id, gercek)
+    db_oturumu.commit()
+    assert h is not None and h.idempotency_anahtari == f"onay:{is_id}"
+    onaylar = [(t, k, mk, a.removeprefix(f"onay:{is_id}")) for t, k, mk, a in _kovali_satirlar(db_oturumu, u)
+               if t == "onay"]
+    assert onaylar == beklenen_satirlar
+    assert _kovalar_db(db_oturumu, u) == beklenen_kovalar
+    assert [k.olay for k in yakala.kayitlar] == (["defter.asim"] if gercek > 30 else [])
+    assert defter.onayla(db_oturumu, is_id, gercek) is None and defter.iade(db_oturumu, is_id) is None
+    assert defter.tutarlilik(db_oturumu) == []
+
+
+def test_refund_returns_each_bucket_its_own_deduction_with_two_rows(db_oturumu, kullanici):
+    """`iade`: hibeden düşen hibeye, paketten düşen pakete — `iade:<is_id>` + `iade:<is_id>:paket`; tekrar no-op;
+    tamamen paketten düşmüş iş tek satırla paket kovasına döner."""
+    u = kullanici.id
+    defter.hibe(db_oturumu, u, 10, f"hibe:{u}:2026-09")
+    _paket(db_oturumu, u, 100, "ord_1")
+    a, b = _is(db_oturumu, u), _is(db_oturumu, u)
+    defter.rezerve(db_oturumu, u, a, 30)          # hibe 10 + paket 20
+    defter.rezerve(db_oturumu, u, b, 15)          # yalnız paket (hibe boş)
+    assert _kovalar_db(db_oturumu, u) == (0, 65)
+    h = defter.iade(db_oturumu, a)
+    assert h is not None and (h.kova, h.miktar, h.idempotency_anahtari) == ("hibe", 10, f"iade:{a}")
+    assert _kovalar_db(db_oturumu, u) == (10, 85)
+    iadeler = [(k, mk, an) for t, k, mk, an in _kovali_satirlar(db_oturumu, u) if t == "iade"]
+    assert iadeler == [("hibe", 10, f"iade:{a}"), ("paket", 20, f"iade:{a}:paket")]
+    assert defter.iade(db_oturumu, a) is None and defter.onayla(db_oturumu, a, 1) is None
+    hb = defter.iade(db_oturumu, b)
+    assert hb is not None and (hb.kova, hb.miktar, hb.idempotency_anahtari) == ("paket", 15, f"iade:{b}")
+    assert _kovalar_db(db_oturumu, u) == (10, 100) and _sayi(db_oturumu) == 8
+    assert defter.tutarlilik(db_oturumu) == []
+
+
+def test_two_sessions_reserving_against_two_buckets_leave_exactly_one_short_in_100_rounds(depo_db, db_oturumu,
+                                                                                          kullanici):
+    """§2 çıkış ölçütü: iki kovadan (hibe 5 + paket 5) iki eş zamanlı 10'luk rezerv, 100 tekrar, çift düşüm 0,
+    hiçbir kova eksiye inmez — Faz 3'ün kilit deseni (A düşer commit etmez, B kilitte bekler, güncel değeri görür)."""
+    u = kullanici.id
+    yetersiz = 0
+
+    def _b(oturum: Session, is_b: uuid.UUID, sonuclar: list[object]) -> None:
+        try:
+            sonuclar.append(defter.rezerve(oturum, u, is_b, 10))
+            oturum.commit()
+        except defter.YetersizBakiye as e:
+            oturum.rollback()
+            sonuclar.append(e)
+
+    with Session(depo_db) as a, Session(depo_db) as b:
+        for tur in range(100):
+            assert defter.hibe(db_oturumu, u, 5, f"hibe:{u}:tur{tur}") is True
+            assert _paket(db_oturumu, u, 5, f"ord_{tur}") is True
+            db_oturumu.commit()
+            assert _kovalar_db(db_oturumu, u) == (5, 5)
+            is_a, is_b = _is(db_oturumu, u), _is(db_oturumu, u)
+            db_oturumu.commit()
+            sonuclar: list[object] = []
+            ha = defter.rezerve(a, u, is_a, 10)          # kilit A'da
+            parca = threading.Thread(target=_b, args=(b, is_b, sonuclar))
+            parca.start()
+            a.commit()
+            parca.join(10)
+            assert not parca.is_alive(), f"tur {tur}: B kilitte kaldı"
+            (sb,) = sonuclar
+            assert isinstance(sb, defter.YetersizBakiye), f"tur {tur}: ÇİFT DÜŞÜM"
+            assert (sb.bakiye, sb.gereken, sb.hibe, sb.paket) == (0, 10, 0, 0) and (ha.kova, ha.miktar) == ("hibe", -5)
+            yetersiz += 1
+            assert _kovalar_db(db_oturumu, u) == (0, 0), f"tur {tur}: bir kova eksiye indi ya da düşmedi"
+    assert yetersiz == 100
+    rezervler = [r for r in _kovali_satirlar(db_oturumu, u) if r[0] == "rezerv"]
+    assert len(rezervler) == 200 and {r[1] for r in rezervler} == {"hibe", "paket"}, "her turda ana + paket satırı"
+    assert defter.tutarlilik(db_oturumu) == []
+
+
+def test_downgrade_expires_the_grant_bucket_down_to_the_new_plans_grant_and_leaves_the_pack_alone(db_oturumu,
+                                                                                                    kullanici):
+    """`dusur` (K3/K6): hibe kovası `hedef`in üstündeyse `sona_erme` satırı `-(bakiye - hedef)` kova hibe;
+    paket kovası DOKUNULMAZ (devreder); altındaysa/eşitse `None`; aynı anahtar ikinci kez `None`, bakiye oynamaz."""
+    u = kullanici.id
+    defter.hibe(db_oturumu, u, 2_500, f"hibe:{u}:2026-09")
+    _paket(db_oturumu, u, 800, "ord_1")
+    anahtar = f"sona_erme:{u}:sub_1:2026-09-21"
+    an = zaman.an()
+    h = defter.dusur(db_oturumu, u, 200, anahtar, an=an)
+    db_oturumu.commit()
+    assert h is not None and (h.tur, h.kova, h.miktar, h.idempotency_anahtari, h.olusturuldu, h.is_id) == (
+        "sona_erme", "hibe", -2_300, anahtar, an, None)
+    assert _kovalar_db(db_oturumu, u) == (200, 800), "paket durur"
+    assert defter.dusur(db_oturumu, u, 200, anahtar) is None, "aynı anahtar: no-op"
+    assert defter.dusur(db_oturumu, u, 200, f"sona_erme:{u}:sub_1:2026-09-22") is None, "hedefe eşit: düşecek şey yok"
+    assert defter.dusur(db_oturumu, u, 1_000, f"sona_erme:{u}:sub_1:2026-09-23") is None, "hedefin altında: no-op"
+    assert (_kovalar_db(db_oturumu, u), _sayi(db_oturumu)) == ((200, 800), 3)
+    with pytest.raises(ValueError):
+        defter.dusur(db_oturumu, u, -1, "sona_erme:kotu")
+    assert defter.dusur(db_oturumu, uuid.uuid4(), 0, "sona_erme:yok") is None, "olmayan kullanıcı: no-op"
+    assert defter.tutarlilik(db_oturumu) == []
+
+
+def test_an_admin_correction_can_target_the_pack_bucket(db_oturumu, kullanici):
+    """`duzelt(kova='paket')` (iade kararı K6, admin "paket kredisi ekle" 4. görev): `duzeltme` satırı kova paket,
+    `paket_bakiye` oynar, hibe kovası durmaz; tanınmayan kova `ValueError`, satır yok."""
+    u, admin = kullanici.id, _ikinci_kullanici(db_oturumu)
+    _paket(db_oturumu, u, 500, "ord_1")
+    h = defter.duzelt(db_oturumu, u, -120, "kullanılmamış paket iadesi", admin, kova="paket")
+    db_oturumu.commit()
+    assert (h.tur, h.kova, h.miktar, h.admin_id) == ("duzeltme", "paket", -120, admin)
+    assert _kovalar_db(db_oturumu, u) == (0, 380)
+    assert defter.duzelt(db_oturumu, u, 7, None, admin).kova == "hibe", "öntanım hibe kovası"
+    assert _kovalar_db(db_oturumu, u) == (7, 380)
+    with pytest.raises(ValueError):
+        defter.duzelt(db_oturumu, u, 1, None, admin, kova="hediye")
+    assert _sayi(db_oturumu) == 3 and defter.tutarlilik(db_oturumu) == []
+
+
+def test_consistency_measures_the_two_buckets_separately(db_oturumu, kullanici):
+    """`tutarlilik` iki SUM: paket önbelleği saptırılınca `Sapma` paket alanlarında görünür, hibe alanları eşit;
+    ikisi birden sapabilir; hareketi olmayan kullanıcı iki toplamda 0."""
+    u = kullanici.id
+    b = _ikinci_kullanici(db_oturumu)
+    defter.hibe(db_oturumu, u, 100, f"hibe:{u}:2026-09")
+    _paket(db_oturumu, u, 500, "ord_1")
+    defter.rezerve(db_oturumu, u, _is(db_oturumu, u), 130)      # hibe 100 + paket 30
+    db_oturumu.commit()
+    assert _kovalar_db(db_oturumu, u) == (0, 470) and defter.tutarlilik(db_oturumu) == []
+    db_oturumu.execute(text("UPDATE kullanicilar SET paket_bakiye = 471 WHERE id = :k"), {"k": u})
+    db_oturumu.execute(text("UPDATE kullanicilar SET paket_bakiye = 9 WHERE id = :k"), {"k": b})
+    db_oturumu.commit()
+    sapmalar = {s.kullanici_id: s for s in defter.tutarlilik(db_oturumu)}
+    assert sapmalar[u] == defter.Sapma(u, 0, 0, 471, 470) and sapmalar[b] == defter.Sapma(b, 0, 0, 9, 0)
+    db_oturumu.execute(text("UPDATE kullanicilar SET bakiye = -3 WHERE id = :k"), {"k": u})
+    db_oturumu.commit()
+    assert {s.kullanici_id: (s.bakiye - s.hibe_toplam, s.paket_bakiye - s.paket_toplam)
+            for s in defter.tutarlilik(db_oturumu)} == {u: (-3, 1), b: (0, 9)}
+    db_oturumu.execute(text("UPDATE kullanicilar SET bakiye = 0, paket_bakiye = 470 WHERE id = :k"), {"k": u})
+    db_oturumu.execute(text("UPDATE kullanicilar SET paket_bakiye = 0 WHERE id = :k"), {"k": b})
+    db_oturumu.commit()
+    assert defter.tutarlilik(db_oturumu) == []
+
+
+def test_the_monthly_grant_tour_ignores_the_pack_bucket(db_oturumu, kullanici, monkeypatch):
+    """K3'ün sebebi: paketli kullanıcı hibesini kaybetmez — `hibe_turu` yalnız HİBE kovasına bakar; paket 5.000
+    olsa da hibe kovası 0 ise `free` hibesi tam yatar."""
+    from services import planlar
+    u = kullanici.id
+    monkeypatch.delenv(planlar.UCRETLI_HIBE_BAKIMDA_ENV, raising=False)
+    _paket(db_oturumu, u, 5_000, "ord_1")
+    db_oturumu.commit()
+    an = zaman.an()
+    assert defter.hibe_turu(db_oturumu, an) >= 1
+    assert _kovalar_db(db_oturumu, u) == (planlar.PLANLAR["free"].aylik_hibe, 5_000)
+    assert defter.tutarlilik(db_oturumu) == []
+
+
 # ── (v) tek yazar — kaynak bekçisi ─────────────────────────────────────
 
 TEK_YAZAR = "services/defter.py"
@@ -567,13 +913,25 @@ def _urun_dosyalari() -> list[str]:
         for p in glob.glob(os.path.join(REPO, kalip, "*.py")))
 
 
-_BAKIYE_SQL = re.compile(r"UPDATE\s+kullanicilar\b.*\bbakiye\b", re.I | re.S)
+# İki önbellek sütunu (Faz 4 / 2): `bakiye` VE `paket_bakiye` — `\bbakiye\b` alt çizgiden sonra eşleşmez.
+_ONBELLEK = ("bakiye", "paket_bakiye")
+_BAKIYE_SQL = re.compile(r"UPDATE\s+kullanicilar\b.*\b(paket_)?bakiye\b", re.I | re.S)
 _DEFTER_SQL = re.compile(r"INSERT\s+INTO\s+kredi_hareketleri\b", re.I)
 
 
+def _sozluk_anahtarlari(d: ast.Call) -> set[str]:
+    """`.values({"bakiye": …})` biçimi: anahtar sözcük yerine sözlük — o da yazımdır."""
+    adlar: set[str] = set()
+    for a in d.args:
+        if isinstance(a, ast.Dict):
+            adlar |= {k.value for k in a.keys if isinstance(k, ast.Constant) and isinstance(k.value, str)}
+    return adlar
+
+
 def _yazimlar(yol: str) -> tuple[list[int], list[int]]:
-    """`(bakiye yazan satırlar, defter satırı kuran satırlar)` — AST: ORM (`.values(bakiye=…)`, `x.bakiye = …`,
-    `Kullanici(bakiye=…)`, `KrediHareketi(…)`, `insert(KrediHareketi)`) ve ham SQL dizeleri."""
+    """`(bakiye yazan satırlar, defter satırı kuran satırlar)` — AST: ORM (`.values(bakiye=…)`/`.values({"bakiye": …})`,
+    `x.bakiye = …`, `Kullanici(bakiye=…)`, `KrediHareketi(…)`, `insert(KrediHareketi)`) ve ham SQL dizeleri;
+    `paket_bakiye` de aynı yerlerde."""
     with open(os.path.join(REPO, yol), encoding="utf-8") as f:
         agac = ast.parse(f.read())
     bakiye: list[int] = []
@@ -581,9 +939,9 @@ def _yazimlar(yol: str) -> tuple[list[int], list[int]]:
     for d in ast.walk(agac):
         if isinstance(d, ast.Call):
             ad = d.func.attr if isinstance(d.func, ast.Attribute) else d.func.id if isinstance(d.func, ast.Name) else None
-            if ad == "values" and any(k.arg == "bakiye" for k in d.keywords):
+            if ad == "values" and (any(k.arg in _ONBELLEK for k in d.keywords) or _sozluk_anahtarlari(d) & set(_ONBELLEK)):
                 bakiye.append(d.lineno)
-            if ad == "Kullanici" and any(k.arg == "bakiye" for k in d.keywords):
+            if ad == "Kullanici" and any(k.arg in _ONBELLEK for k in d.keywords):
                 bakiye.append(d.lineno)
             if ad == "KrediHareketi":
                 defter_.append(d.lineno)
@@ -592,7 +950,7 @@ def _yazimlar(yol: str) -> tuple[list[int], list[int]]:
                 defter_.append(d.lineno)
         if isinstance(d, ast.Assign | ast.AugAssign):
             hedefler = d.targets if isinstance(d, ast.Assign) else [d.target]
-            if any(isinstance(h, ast.Attribute) and h.attr == "bakiye" for h in hedefler):
+            if any(isinstance(h, ast.Attribute) and h.attr in _ONBELLEK for h in hedefler):
                 bakiye.append(d.lineno)
         if isinstance(d, ast.Constant) and isinstance(d.value, str):
             if _BAKIYE_SQL.search(d.value):
@@ -603,14 +961,18 @@ def _yazimlar(yol: str) -> tuple[list[int], list[int]]:
 
 
 def test_only_the_ledger_module_writes_the_balance_cache_or_inserts_ledger_rows():
-    """Belge §1 "Risk": `kullanicilar.bakiye`ye UPDATE kuran ve `kredi_hareketleri`ye satır yazan modül YALNIZ
-    `services/defter.py` — rota ve işçi defteri ÇAĞIRIR, elle yazmaz (tests/test_galeri_db.py'nin AST deseni).
-    Bekçinin bekçisi: defterin kendisi her ikisini de yapıyor görünmeli (tarama boşa dönmesin)."""
+    """Belge §1 "Risk": `kullanicilar.bakiye`/`paket_bakiye`ye UPDATE kuran ve `kredi_hareketleri`ye satır yazan
+    modül YALNIZ `services/defter.py` — rota ve işçi defteri ÇAĞIRIR, elle yazmaz (tests/test_galeri_db.py'nin
+    AST deseni). Bekçinin bekçisi: defterin kendisi her ikisini de yapıyor görünmeli (tarama boşa dönmesin) —
+    iki kovanın ikisi de (`.values(bakiye=…)`, `.values(paket_bakiye=…)`, CTE'li ham `UPDATE`)."""
     assert TEK_YAZAR in _urun_dosyalari()
+    with open(os.path.join(REPO, TEK_YAZAR), encoding="utf-8") as f:
+        kaynak = f.read()
+    assert ".values(bakiye=" in kaynak and ".values(paket_bakiye=" in kaynak, "iki kova da anahtar sözcükle yazılmalı"
     for yol in _urun_dosyalari():
         bakiye, defter_ = _yazimlar(yol)
         if yol == TEK_YAZAR:
-            assert bakiye and defter_, "defter.py'nin yazımları görünmüyor: bekçi kör"
+            assert len(bakiye) >= 3 and defter_, "defter.py'nin yazımları görünmüyor: bekçi kör"
             continue
         assert not bakiye, f"{yol}:{bakiye} `kullanicilar.bakiye` yazıyor — tek yazar services/defter.py"
         assert not defter_, f"{yol}:{defter_} `kredi_hareketleri`ye satır kuruyor — tek yazar services/defter.py"

@@ -159,7 +159,9 @@ def kredi(kullanici_id: uuid.UUID, req: KrediIstegi, db: Session = OTURUM,
         raise HTTPException(status_code=422, detail=i18n.t("err.kredi_miktari_sifir", dil.aktif()))
     hedef = _hedef(db, kullanici_id)
     hareket = defter.duzelt(db, hedef.id, req.miktar, req.aciklama, admin_id=admin.id)
-    bakiye = defter.bakiye(db, hedef.id)
+    # HİBE kovası: admin listesinin `bakiye` sütunuyla aynı şey (`depo_admin.kullanicilar`), düzeltme
+    # de öntanımlı o kovaya yazar; paket kovası ve `kova='paket'` düzeltmesi 4. görevin admin işi.
+    bakiye = defter.bakiye(db, hedef.id).hibe
     gunluk.olay(_gunluk, "admin.kredi", admin=str(admin.id), hedef=str(hedef.id), miktar=req.miktar,
                 hareket=str(hareket.id))
     return {"id": str(hedef.id), "hareket": defter._json(hareket), "bakiye": bakiye}

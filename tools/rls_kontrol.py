@@ -31,8 +31,9 @@ TABLO LİSTESİ ve bağlama ifadesi BURADA TEKRARLANMAZ: `services/kiraci.py`den
 (`IS_TABLOLARI`, `uygula`, `YONETICI_EKLER_TABLOLARI`) gelir — göç ile aracın
 ayrışması mümkün olmasın (CLAUDE.md §5; bekçisi tests/test_rls_kontrol.py).
 Politika beklentisi tablo başına üç: `sahip`, `yonetici_okur`,
-`yonetici_gunceller`; artı Faz 3'ün kredi defterinde bir `yonetici_ekler`
-(`0007_kredi`, K4) — toplam `beklenen_politika()`.
+`yonetici_gunceller`; artı `yonetici_ekler` istisnası olan tablolarda bir —
+Faz 3'ün kredi defteri (`0007_kredi`, K4) ve Faz 4'ün sipariş tablosu
+(`0008_odeme`) — toplam `beklenen_politika()` (3 × 10 + 2 = 32).
 
 ÇIKIŞ KODLARI öteki araçlarla bir: 0 tamam · 1 en az bir kapı kırmızı ·
 2 ortam (`DATABASE_URL` yok, bozuk argüman ya da sunucuya ulaşılamıyor).
@@ -63,7 +64,7 @@ POLITIKA_SAYISI = 3
 
 
 def beklenen_politika() -> int:
-    """Bütün iş tablolarında beklenen politika: 3 × tablo + admin INSERT istisnası olan tablo sayısı (Faz 3 / 1)."""
+    """Bütün iş tablolarında beklenen politika: 3 × tablo + admin INSERT istisnası olan tablo sayısı (Faz 3 / 1, Faz 4 / 2)."""
     return POLITIKA_SAYISI * len(kiraci.IS_TABLOLARI) + len(kiraci.YONETICI_EKLER_TABLOLARI)
 
 

@@ -17,7 +17,7 @@
 * 111 Python modülü, 486 modül düzeyi ithal kenarı (16 erteli)
 * 70 HTTP uç noktası
 * 13 tarayıcı betiği, 34 betik-arası bağ
-* 144 test dosyası; 15 modülü hiçbir test ithal etmiyor, 16 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
+* 145 test dosyası; 15 modülü hiçbir test ithal etmiyor, 17 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
 * 1 ithal döngüsü, 0 rotaya oturmayan tarayıcı çağrısı
 
 En büyük dosyalar: `catalog` (1472), `models` (1138), `services.isci` (791), `fal_client` (761), `services.tablolar` (689).

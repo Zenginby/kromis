@@ -37,6 +37,7 @@ import models
 import prefs
 import storage
 from services import depo_kimlik_bilgisi, depo_medya, depo_tercih, hesap, sifre, tablolar, zaman
+from tests.conftest import posix_gerekir
 from tools import ice_aktar
 
 pytestmark = pytest.mark.usefixtures("depo_db")
@@ -145,6 +146,9 @@ def baska(db_oturumu):
 
 # ── alan alan ────────────────────────────────────────────────────────────
 
+@posix_gerekir(
+    "POSIX izin bitleri: kullanıcı kökü 0o700 bekleniyor, Windows'ta "
+    "`st_mode & 0o777` her zaman 0o777")
 def test_the_v18_fixture_and_a_current_layout_land_in_the_db_field_by_field(tmp_path, capsys,
                                                                             db_oturumu, kullanici):
     kaynak = _kaynak(tmp_path)

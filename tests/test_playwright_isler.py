@@ -49,6 +49,7 @@ from sqlalchemy import select
 import azure_client as ac
 import providers
 from services import defter, kapilar, tablolar
+from tests.conftest import posix_gerekir
 from tests.test_playwright_studio import (
     ServerThread,
     _ilk_kurulum_perdesini_kapat,
@@ -323,6 +324,9 @@ def test_when_the_stream_is_cut_the_panel_falls_back_to_polling_and_still_finish
         server.stop()
 
 
+@posix_gerekir(
+    "`time.tzset` Windows'ta YOK: sunucunun dilimi `TZ=UTC` ile "
+    "sabitlenemiyor, testin kurduğu 3 saatlik fark hiç oluşmuyor")
 def test_the_elapsed_counter_starts_near_zero_in_a_browser_three_hours_east_of_the_server(
         monkeypatch, veritabani, e2e_oturum):
     """"180" kusuru (docs/studyo-guncelleme-plani.md B3; Faz 2 / 10): sunucu UTC, tarayıcı UTC+3.

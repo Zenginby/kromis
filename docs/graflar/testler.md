@@ -2,7 +2,7 @@
 
 # Test haritası
 
-`tests/` altında 144 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
+`tests/` altında 145 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
 
 | modül | testler |
 | --- | --- |
@@ -155,6 +155,7 @@ Yukarıdaki tablonun kör noktası: sütun ithal ilişkisinden çıktığı içi
 * `tests/test_mypy_kapisi.py`
 * `tests/test_paket_icerik_listesi.py`
 * `tests/test_playwright_kurulumu.py`
+* `tests/test_posix_isareti.py`
 * `tests/test_python_surumu.py`
 * `tests/test_syntax_warnings.py`
 * `tests/test_telif_basligi.py`

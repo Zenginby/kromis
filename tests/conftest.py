@@ -67,6 +67,86 @@ ESKI_PYTHON_IZNI = "KROMIS_ALLOW_OLD_PYTHON"
 # kaybolursa takım "yeşil ama eksik" olmaz, KIRMIZI olur.
 E2E_ZORUNLU = "KROMIS_E2E_ZORUNLU"
 
+# POSIX VARSAYAN TESTLERİN ATLANMASINI yasaklayan ortam değişkeni —
+# `E2E_ZORUNLU`nun kardeşi ve aynı işi görüyor: CI bunu "1" veriyor
+# (`_test.yml`), yani işaret bir gün Linux'ta da atlamaya başlarsa orada KIRMIZI
+# olur. Gerekçesi `pytest_configure`daki kapıda.
+POSIX_ZORUNLU = "KROMIS_POSIX_ZORUNLU"
+
+# İŞARETİN TEK KOŞULU. `posix_gerekir` ile işaretlenmiş HER test buradan
+# geçiyor; kapı (`pytest_configure`), özet (`_posix_atlama_ozeti`) ve bekçi
+# (tests/test_posix_isareti.py) de aynı değeri okuyor. Koşulu bozmak bu yüzden
+# dokuz yeri değil TEK yeri bozmak demek — ve o tek yer bozulduğunda CI'daki
+# `KROMIS_POSIX_ZORUNLU=1` takımı hiç başlatmıyor. `_playwright_var()` ile aynı
+# rol: "atlanacak mı" sorusunun tek yanıtı.
+POSIX_ATLANACAK = sys.platform == "win32"
+
+# İşaretli olup BU platformda atlanan testler: (nodeid, sebep).
+# `_db_atlanan`ın ikizi — ama orada dosya adı yazılabiliyordu, burada test ADI:
+# atlama fixture'da değil işaretin kendisinde olduğu için hangi testin
+# atlandığı dürüstçe söylenebiliyor.
+_posix_atlanan: list[tuple[str, str]] = []
+
+
+def posix_gerekir(sebep: str):
+    """POSIX varsayan bir testi Windows'ta ATLAR ve atlamayı GÖRÜNÜR kılar.
+
+    ÖLÇÜLEN KUSUR (2026-09-19): Windows'ta tam takım "3808 passed, 9 failed"
+    veriyordu ve dokuz kırmızının hiçbiri üründe kusur DEĞİLDİ — hepsi testin
+    kendi yalıtımının POSIX varsayması: `os.sep`, izin bitleri, SIGTERM,
+    `time.tzset`. Asıl sorun sayı değil, sayının SESSİZCE BÜYÜMESİYDİ:
+    2026-09-18'de beş kırmızı vardı, PR #52 dört tane daha ekledi ve kimse fark
+    etmedi. Dokuz "zaten kırmızı" satırın arasında ONUNCU — gerçek — bir
+    gerileme Windows'ta hiç görünmezdi.
+
+    NEDEN İŞARET, DÜZELTME DEĞİL: dokuzunun da sınadığı davranış ÜRETİMDE
+    doğru ve CI (Linux) hepsini yeşil görüyor. Sınanan şey POSIX'e ait —
+    testleri Windows'ta "yeşil" kılmak için gevşetmek, kapıyı Linux'ta da
+    gevşetirdi.
+
+    NEDEN DÜZ `skipif` YETMİYOR: `pytest_terminal_summary`nin yazdığı kural
+    burada da geçerli — her atlama bir kusur değil; kusur olan, atlamanın
+    GÖRÜNMEMESİ. Dokuz testi sessizce atlamak, CLAUDE.md §3'ün savaştığı
+    "yeşil ama koşmamış" durumunun ta kendisi olurdu. Bu yüzden işaret üç
+    mekanizmanın giriş kapısı: özet onları adıyla basıyor
+    (`_posix_atlama_ozeti`), `KROMIS_POSIX_ZORUNLU` atlamayı hataya çeviriyor
+    (`pytest_configure`), defter ile işaretin aynı küme olduğunu bir bekçi
+    ölçüyor (tests/test_posix_isareti.py).
+
+    NEDEN FABRİKA, PAYLAŞILAN TEK BİR `pytest.mark.skipif` DEĞİL: `reason`
+    SOMUT olmak zorunda. "Windows" demek okuyana hiçbir şey öğretmiyor;
+    "`time.tzset` Windows'ta yok" okuyana NEYİN eksik olduğunu ve düzeltmenin
+    mümkün olup olmadığını söylüyor. Paylaşılan tek bir işaret o bilgiyi
+    dokuzunda birden siler. Fabrika ikisini birden veriyor: koşul tek yerde
+    (yukarıdaki `POSIX_ATLANACAK`), gerekçe her testte kendi.
+
+    İki işaret birden takılıyor, biri atlamak biri SAYMAK için: `skipif` işi
+    yapıyor, `pytest.mark.posix_gerekir` ise atlansın atlanmasın testin üstünde
+    duruyor — bekçi defteri onunla karşılaştırıyor, yani işaret POSIX bir
+    makinede de sayılabiliyor.
+    """
+    def _isaretle(islev):
+        islev = pytest.mark.posix_gerekir(sebep)(islev)
+        return pytest.mark.skipif(POSIX_ATLANACAK, reason=f"POSIX gerekir: {sebep}")(islev)
+    return _isaretle
+
+
+def pytest_collection_modifyitems(items) -> None:
+    """İşaretli testlerden bu platformda ATLANACAK olanları toplar — özet onları adıyla basar."""
+    _posix_atlanan.clear()
+    if not POSIX_ATLANACAK:
+        return
+    for oge in items:
+        isaret = oge.get_closest_marker("posix_gerekir")
+        if isaret is not None:
+            _posix_atlanan.append((oge.nodeid.replace("\\", "/"), str(isaret.args[0])))
+
+
+def posix_atlananlar() -> list[tuple[str, str]]:
+    """Bekçinin okuduğu kopya (tests/test_posix_isareti.py) — liste dışarıdan değiştirilmesin."""
+    return list(_posix_atlanan)
+
+
 # Postgres'e dokunan testlerin şablon veri tabanı: Alembic göçü BİR KEZ buraya
 # uygulanır, her test dosyası `CREATE DATABASE … TEMPLATE` ile temiz bir kopya
 # alır (TRUNCATE değil — kopya ~50 ms ve hiçbir tablo listesi tutmaz).
@@ -117,6 +197,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config) -> None:
     dürüstçe söylenemez. Atlanan DOSYALAR söyleniyor.
     """
     _db_atlama_ozeti(terminalreporter)
+    _posix_atlama_ozeti(terminalreporter)
     if _playwright_var():
         return
     atlanan = e2e_dosyalari()
@@ -163,6 +244,41 @@ def _db_atlama_ozeti(terminalreporter) -> None:
     terminalreporter.write_line("Denetle: python3 tools/test_ortami.py --kontrol")
     terminalreporter.write_line(f"Atlamayi hataya cevir: {E2E_ZORUNLU}=1")
     terminalreporter.write_sep("=", yellow=True, bold=True)
+
+
+def _posix_atlama_ozeti(terminalreporter) -> None:
+    """POSIX varsaydığı için bu platformda atlanan testler — E2E/DB uyarılarının üçüzü (2026-09-19).
+
+    AYNI KUSUR SINIFI: pytest son satırda "3817 passed, 10 skipped" diyor ve o
+    cümle, dokuz testin bu makinede HİÇ koşmadığını söylemiyor. Burada tehlike
+    biraz daha sinsi, çünkü atlananlar bir dosya değil dokuz ayrı test: takımın
+    geri kalanı gerçekten yeşil ve yeşil TAMMIŞ gibi duruyor.
+
+    NEDEN DOSYA DEĞİL TEST ADI: E2E'de `importorskip` modül düzeyinde olduğu
+    için "kaç test" dürüstçe söylenemiyordu; burada atlama işaretin kendisinde,
+    yani hangi test olduğu tam olarak biliniyor. Sebep de basılıyor: okuyan
+    kişi "Windows" diye bir şey değil, EKSİK OLAN ŞEYİ görsün.
+    """
+    atlanan = posix_atlananlar()
+    if not atlanan:
+        return
+    # Eyleme dönük kısımlar ASCII (gerekçe: `pytest_configure`) — cp1252 bir
+    # konsola boru ile yazıldığında komut ve değişken adı okunur kalmalı.
+    terminalreporter.write_sep("=", f"POSIX VARSAYAN {len(atlanan)} TEST ATLANDI: bu yesil, TAM yesil degil",
+                               yellow=True, bold=True)
+    terminalreporter.write_line(
+        f"bu platform ({sys.platform}) POSIX degil; su testler HIC kosmadi:")
+    for nodeid, sebep in atlanan:
+        terminalreporter.write_line(f"    {nodeid}")
+        terminalreporter.write_line(f"        {sebep}")
+    terminalreporter.write_line(
+        "Hepsi CI'da (Linux) KOSUYOR ve yesil; urunde kusur degiller. Ama "
+        "buradaki yesil onlari KAPSAMIYOR: bu dosyalardaki bir gerileme ancak "
+        "CI'da gorunur.")
+    terminalreporter.write_line("Defter : tests/test_posix_isareti.py")
+    terminalreporter.write_line(f"Atlamayi hataya cevir: {POSIX_ZORUNLU}=1")
+    terminalreporter.write_sep("=", yellow=True, bold=True)
+
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -227,6 +343,31 @@ def pytest_configure(config: pytest.Config) -> None:
             "ikilisi (initdb/pg_ctl) var; DB testleri atlanacakti."
             "\n\n"
             "COZUM: " + gecici_postgres.kurulum_yonergesi()
+        )
+
+    # AYNI KAPI, POSIX VARSAYAN TESTLER İÇİN (2026-09-19). Değişken ayrı
+    # (`KROMIS_POSIX_ZORUNLU`), çünkü sorduğu soru ayrı: E2E/DB kapısı "ortam
+    # kurulu mu" diye soruyor, bu "bu makine ATLAMAYA yol açar mı" diye.
+    #
+    # NEDEN TEK BİR KOŞULU SINAMAK YETİYOR: işaretli dokuz testin hepsi
+    # `posix_gerekir` üstünden, o da yalnız `POSIX_ATLANACAK` üstünden
+    # atlıyor. Yani "işaret bir gün Linux'ta da atlamaya başladı" durumunun
+    # TEK yolu bu değişkenin orada doğrulanması — ve CI `KROMIS_POSIX_ZORUNLU=1`
+    # verdiği için o gün takım yeşil kalmıyor, HİÇ başlamıyor. İşaretin doğru
+    # testlerin üstünde durduğunu ise `tests/test_posix_isareti.py` ölçüyor;
+    # ikisi farklı şeyler, biri mekanizmayı öteki defteri sınıyor.
+    if os.environ.get(POSIX_ZORUNLU) == "1" and POSIX_ATLANACAK:
+        raise pytest.UsageError(
+            f"{POSIX_ZORUNLU}=1 verildi ama bu platform ({sys.platform}) POSIX "
+            "DEGIL: POSIX varsayan testler atlanacakti."
+            "\n\n"
+            "COZUM: takimi bir POSIX makinede (ya da CI'da) kosturun; bu "
+            "testler izin bitleri, SIGTERM ve time.tzset gibi POSIX "
+            "yeteneklerini sinar."
+            "\n\n"
+            f"Atlamaya izin vermek icin {POSIX_ZORUNLU} degiskenini kaldirin: "
+            "atlama yerelde DOGRU davranis, yanlis olan gorunmemesiydi "
+            "(takimin sonundaki ozet onu kapatiyor)."
         )
 
     # NESNE DEPOLAMA ORTAMI TESTE SIZMASIN (Faz 2 / 2): `app.state.dosya` İTHAL

@@ -80,6 +80,7 @@ markers = [
     "gercek_kimlik: kimlik kapısı GERÇEK — autouse `kullanici` override'ı kurulmaz (tests/conftest.py)",
     "gercek_anahtar: 'anahtar yok' kapısı GERÇEK — autouse `_anahtar_kapisi` yaması kurulmaz (tests/conftest.py)",
     "gercek_filigran: işçinin filigranı GERÇEK — autouse `_filigran_yamasi` kurulmaz (tests/conftest.py)",
+    "posix_gerekir(sebep): test POSIX varsayıyor — Windows'ta atlanır, atlama GÖRÜNÜR (tests/conftest.py)",
 ]
 
 [tool.mypy]

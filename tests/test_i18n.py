@@ -802,6 +802,13 @@ KULLANICIYA_KONUSMAYAN = {
     "services/filigran.py": "filigran bindirme (Faz 3 / 4, K7): bayt → bayt; istisnaları (`FiligranDosyasiYok`, "
                             "`GorselIslenemedi`) işçi `hata` sütununa TÜR ADIYLA kod olarak yazar, cümleyi ön yüz "
                             "kurar; `to_png`ün 422 gövdesi taşınmaz, yalnız sınıfı",
+    # Faz 4 / 3: okuyucu Polar'ın sunucusu ve sahibin admin sekmesi — cümle yok, ASCII kod.
+    "services/polar.py": "Polar sarmalı (Faz 4 / 3): ortam, imza doğrulama, SDK istemcisi; istisnaları "
+                         "KOD taşır (`ImzaHatasi`), 400/503 gövdesini rota kurar",
+    "services/odeme.py": "Polar olay işleme (Faz 4 / 3): defter/plan yazar, `Sonuc(durum, hata)` ASCII "
+                         "kod döndürür — okuyucu Polar'ın teslimat günlüğü ve admin sekmesi",
+    "routers/odeme.py": "`POST /api/odeme/webhook` (Faz 4 / 3): istemci Polar'ın sunucusu, `detail` "
+                        "değerleri KOD (`imza_gecersiz`), dil bağlamı anlamsız",
     "services/saglayici_meta.py": "sağlayıcı meta verisinin ContextVar yan kanalı (Faz 3 / 5, K8): "
                                   "adaptörden işçiye `usage`/`request_id` taşır; metin yok, `kimlik_baglami`nın ikizi",
     "isci.py": "işçi sürecinin bileşim kökü (Faz 2 / 3): kapılar, iş parçacıkları, kalp "

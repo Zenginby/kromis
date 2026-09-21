@@ -223,7 +223,8 @@ def test_the_admin_page_is_served_translated_with_only_the_dictionary_and_its_ow
     assert f'<html lang="{lang}">' in html
     assert "{{t:" not in html and "__APP_" not in html
     assert f'window.KROMIS_LANG="{lang}"' in html and "window.KROMIS_I18N={" in html
-    for anahtar in ("admin.sekme_kullanicilar", "admin.sekme_kuyruk", "admin.sekme_metrikler", "admin.tavan_yaz"):
+    for anahtar in ("admin.sekme_kullanicilar", "admin.sekme_kuyruk", "admin.sekme_metrikler", "admin.sekme_odeme",
+                    "admin.tavan_yaz"):
         assert i18n.t(anahtar, lang) in html, anahtar
     assert re.findall(r'<script src="/static/([a-z0-9_.-]+)\?v=', html) == ["i18n.js", "admin.js"]
     assert re.findall(r'<link rel="stylesheet" href="/static/([a-z0-9_.-]+)\?v=', html) == [
@@ -240,10 +241,10 @@ def test_every_id_the_admin_script_binds_exists_in_the_admin_page_and_it_calls_e
     idler = set(re.findall(r'id="([a-zA-Z0-9_-]+)"', html))
     bagli = set(re.findall(r'\bel\("([a-zA-Z0-9_-]+)"\)', js))
     bagli |= set(re.findall(r'querySelector(?:All)?\(["\']#([a-zA-Z0-9_-]+)', js))
-    bagli |= {f"sekme-{s}" for s in re.findall(r'"(kullanicilar|kuyruk|metrikler)"', js)}
+    bagli |= {f"sekme-{s}" for s in re.findall(r'"(kullanicilar|kuyruk|metrikler|odeme)"', js)}
     assert bagli, "tarama boş — desen bayatladı mı?"
     assert bagli <= idler, f"admin.js şu id'lere bağlanıyor ama sayfada yok: {sorted(bagli - idler)}"
-    for yol in ("/api/admin/kullanicilar", "/api/admin/isler", "/api/admin/metrikler"):
+    for yol in ("/api/admin/kullanicilar", "/api/admin/isler", "/api/admin/metrikler", "/api/admin/odeme-olaylari"):
         assert f'"{yol}' in js or f"`{yol}" in js, yol
     for parca in ("/tavan`", "/oturum-dusur`", "/iptal`", "/plan`", "/kredi`", '"/giris?sonra="'):
         assert parca in js, parca

@@ -78,12 +78,13 @@ DEPOLAR = {
     "services/depo_varlik.py": 3, "services/depo_tercih.py": 1,
     "services/depo_kimlik_bilgisi.py": 4,   # Faz 1 / 7
     "services/kuyruk.py": 16,               # Faz 2 / 1 (3 kullanıcı + 9 işçi/sonda tarafı; `ekle`/`isci_kaydet` `db.add`); Faz 2 / 10 +4 saklama/bakım
-    "services/depo_admin.py": 11,           # Faz 2 / 8 (hepsi kiracısız — `KIRACISIZ_MODULLER`); Faz 3 / 5 +`marj`
+    "services/depo_admin.py": 13,           # Faz 2 / 8 (hepsi kiracısız — `KIRACISIZ_MODULLER`); Faz 3 / 5 +`marj`; Faz 4 / 3 +`odeme_olaylari`, +`odeme_ozeti`
+    "services/odeme.py": 6,                 # Faz 4 / 3 (kiracısız modül — `KIRACISIZ_MODULLER`): `_kapat`, `kullaniciyi_coz`, `urun_bul`, `plan_uygula`, `_plan_bitis_yaz`, `_musteriyi_bagla`; `olayi_kaydet`/`_siparis_yaz` `pg_insert` — sayılmaz
     "services/defter.py": 10,               # Faz 3 / 1 (`bakiye`, `_bakiye_ekle`, `_isin_hareketleri`, `hareketler`, `duzelt`, `tutarlilik`; `_yaz` `insert` — sayılmaz); Faz 3 / 3 +`plan_oku`, +`hibe_turu`; Faz 4 / 2 +`plan_bitis_oku`, +`dusur` (`rezerve` ham SQL CTE'ye geçti, `select/update` çağrısı yok — sayılmaz)
 }
 # `depo_*.py` kalıbının DIŞINDA kalan depolar — `test_the_repository_list_matches_the_files_on_disk`
 # bunları da bekler; kalıba uymayan yeni bir depo buraya yazılmadan listeye giremez.
-EK_DEPOLAR = ("services/kuyruk.py", "services/defter.py")
+EK_DEPOLAR = ("services/kuyruk.py", "services/defter.py", "services/odeme.py")
 # Kiracısız işlevler (Faz 2 / 1): işçi işi kimliğiyle sürer, kullanıcıyı bilmez —
 # `al` kuyruğun BAŞINI alır (küresel FIFO, kimin işi olduğuna bakmaz), ötekiler
 # `al`ın verdiği `is_id`/`isci_id` ile çalışır. Her ad gerekçesiyle; bekçinin
@@ -131,6 +132,13 @@ KIRACISIZ_MODULLER = {
     "services/depo_admin.py": "admin sorguları: kullanıcı listesi, kuyruk, metrikler, tavan, "
                               "iptal — admin HER kiracının satırını görür; kapı rotadaki "
                               "`kimlik.admin_kullanici` (403) ve DB'de `app.rol='admin'` politikası",
+    # Faz 4 / 3 (belge §3 "kiracısız — `KIRACISIZ` defterine gerekçesiyle"): webhook OTURUMSUZ
+    # gelir, isteğin kiracısı yoktur; rota `kiraci.baglam(rol=ADMIN)` kurar (`yonetici_ekler`,
+    # K4), hedef kullanıcı OLAYDAN çözülür (`kullaniciyi_coz`) ve `defter.*`e açık verilir —
+    # işlevler `kullanici_id` almaz, hedef `hedef_id`/`kullanici` nesnesi (tests/test_odeme.py).
+    "services/odeme.py": "Polar webhook olay işleme: oturumsuz istek, admin bağlamı, hedef kullanıcı "
+                         "olaydan (`customer.external_id`) çözülür — kiracı süzgeci anlamsız, RLS "
+                         "`yonetici_ekler` politikası ve `kullaniciyi_coz` kapı",
 }
 DONDURULMUS = {"storage": storage, "folders": folders, "chat_store": chat_store,
                "palette_store": palette_store, "assets_store": assets_store, "prefs": prefs}

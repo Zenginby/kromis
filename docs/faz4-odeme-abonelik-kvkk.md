@@ -1,6 +1,6 @@
 # Faz 4 — Ödeme (Polar MoR), paketler ve abonelik, hesap silme / dışa aktarma, hukuki metinler: görev listesi
 
-**Tarih:** 2026-09-21 · **Durum:** **2/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
+**Tarih:** 2026-09-21 · **Durum:** **3/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
 **Üst belge:** [superpowers/specs/2026-08-10-saas-transformation-master-design.md](superpowers/specs/2026-08-10-saas-transformation-master-design.md) §5 "Faz 5" kartının **"Ödeme Altyapısı: Merchant of Record (MoR)"** maddesi (`:184-214`) ve "Filigran & Kredi Kuralları" satırı (`:183`) — sapmalar bu belgenin sonunda tek tek yazılı. **Numaralama tuzağı** aynen (Faz 3 belgesi `:4`): master spec'in "Faz 5"i ürün yol haritasının SaaS kartı; bu belge SaaS dönüşümünün İÇ dizisindeki Faz 4'tür (Faz 0 web-first → 1 DB/hesap → 2 kuyruk → 3 kredi defteri → **4 ödeme/KVKK** → 5 işletme). Yol haritası kartı (Faz 4 "Ödeme, faturalama ve hukuk"): *"Bir kullanıcı kartla abone olup fatura alabiliyor ve hesabını tamamen silebiliyor."* — bu belgenin çıkış kriteri onu genişletir (sonda tam metin). Kartın "Stripe birincil" satırı 2026-09-18'de **MoR/Polar** ile güncellendi (Faz 1 ve Faz 2 belgelerinin "Not" satırı; master `:184-199`): Türkiye'den Stripe'a doğrudan hesap açılamıyor, uluslararası satış Merchant of Record üzerinden.
 
 Faz 4'ün amacı, Faz 3'ün kurduğu defterin (rezerv → onay → iade, aylık hibe,
@@ -123,14 +123,14 @@ yazılır, kod belgeye değil Polar'a uyar.
 | Ücret — Pro | **20 USD/ay, %3,8 + 0,40 USD**; Growth 100 USD/ay %3,6 + 0,35; Scale 400 USD/ay %3,4 + 0,30; 2026-05-27 öncesi kuruluşlar "Early Member" %4 + 0,40 (+%0,5 abonelik) | master `:197` ("~1.000 USD/ay ciro üstünde Pro ucuzlar"); ikincil kaynaklar 2026 — **doğrulanmadı** |
 | Türkiye'ye ödeme | Stripe Connect Express ile TR'ye payout | master `:194` |
 | Ürünler | tek seferlik ürün (paket) ve abonelik (aylık/yıllık); ürün `metadata` taşır; fiyat Polar'da | master `:195-196`; ikincil |
-| Checkout | `POST /v1/checkouts/` → barındırılan ödeme sayfası URL'si; alanlar `products`, **`external_customer_id`** (eski `customer_external_id` KULLANIMDAN KALDIRILDI — API changelog), `customer_email`, `metadata`, `success_url` | polar.sh/docs/changelog/api (arama özeti) — **alan adları 3. görevde doğrulanır** |
-| Müşteri | `external_id` = bizim `kullanicilar.id`; Customer Session API → **müşteri portalı** bağlantısı (abonelik iptali, kart güncelleme, fatura indirme Polar'da) | ikincil (hookdeck, better-auth eklentisi) |
-| Webhook | **Standard Webhooks**: başlıklar `webhook-id`, `webhook-timestamp`, `webhook-signature` (HMAC-SHA256 base64, `{id}.{timestamp}.{body}`); Python SDK `polar_sdk.webhooks.validate_event(payload, headers, secret)` → `WebhookVerificationError`; bilinmeyen tür `WebhookUnknownTypeError` (imza doğrulandıktan sonra); başarısız teslimat **üstel geri çekilmeyle saatlerce yeniden denenir**, aynı olay birden çok kez GELEBİLİR | hookdeck.com "Polar webhooks" (2026), github.com/polarsource/polar-python; Standard Webhooks spec: `webhook-id` yeniden gönderimde AYNI kalır |
-| Olay türleri | `checkout.created/updated`, **`order.paid`**, `order.created/updated/refunded`, **`subscription.created/active/updated/canceled/uncanceled/revoked`**, `customer.created/updated/deleted`, **`customer.state_changed`** (bütün durumun tek özeti), `benefit_grant.created/revoked/cycled` | polar.sh/docs/integrate/webhooks/events (erişilemedi); ikincil özetler |
-| `order.paid` alanları | `billing_reason` = `purchase` \| `subscription_create` \| `subscription_cycle` \| `subscription_update` (K6 bunu okur); `product_id`, `customer.external_id`, `subscription_id`, `amount`, `currency`, `metadata` | SDK modelinden bilinen adlar — **doğrulanmadı** |
-| Sandbox | `sandbox.polar.sh` ayrı ortam, ayrı jeton ve webhook sırrı; SDK `server="sandbox"`; test kartıyla gerçek para yok | ikincil (encore.dev, opensaas.sh) |
+| Checkout | `POST /v1/checkouts/` → barındırılan ödeme sayfası URL'si; alanlar `products`, **`external_customer_id`** (eski `customer_external_id` KULLANIMDAN KALDIRILDI — API changelog), `customer_email`, `metadata`, `success_url` | **SDK 0.32.0 kaynağıyla doğrulandı (3. görev, 2026-09-21):** `models/checkoutcreate.py` `external_customer_id` var, `customer_external_id` yok; `customer_email`, `metadata`, `success_url`, `products` alanları modelde |
+| Müşteri | `external_id` = bizim `kullanicilar.id`; Customer Session API → **müşteri portalı** bağlantısı (abonelik iptali, kart güncelleme, fatura indirme Polar'da) | `external_id` **SDK'da doğrulandı** (`Customer`/`OrderCustomer`/`SubscriptionCustomer.external_id`, NULL'lanabilir); portal akışı (`customer_sessions`) SDK'da var, davranışı 4. görevde ölçülür |
+| Webhook | **Standard Webhooks**: başlıklar `webhook-id`, `webhook-timestamp`, `webhook-signature` (`v1,<base64>`; HMAC-SHA256 `{id}.{timestamp}.{body}`); zaman toleransı **±5 dk**; Python SDK `polar_sdk.webhooks.validate_event(payload, headers, secret)` = `standardwebhooks.Webhook(base64(secret)).verify` (ham sır base64'lenir → kütüphane çözer; `whsec_` öneki varsa kütüphane soyar) → `WebhookVerificationError`; bilinmeyen tür `WebhookUnknownTypeError` (imza doğrulandıktan sonra); başarısız teslimat **üstel geri çekilmeyle saatlerce yeniden denenir**, aynı olay birden çok kez GELEBİLİR | **SDK 0.32.0 + standardwebhooks 1.1.0 kaynağıyla doğrulandı** (`polar_sdk/_webhooks/__init__.py`, `standardwebhooks/webhooks.py`); yeniden deneme süresi/sayısı ve panelden "yeniden gönder"in `webhook-id`yi koruyup korumadığı **doğrulanmadı** (K4 bu yüzden sipariş anahtarına da dayanır) |
+| Olay türleri | **35 tür (SDK `WebhoookPayload`):** `checkout.created/updated/expired`, `customer.created/updated/deleted/state_changed`, `customer_seat.assigned/claimed/revoked`, `member.created/updated/deleted`, `order.created/updated/paid/refunded`, `subscription.created/updated/active/canceled/uncanceled/revoked/past_due`, `refund.created/updated`, `product.created/updated`, `benefit.created/updated`, `benefit_grant.created/cycled/updated/revoked`, `organization.updated` | **SDK 0.32.0 kaynağıyla doğrulandı** (`models/webhookeventtype.py`); biz dokuzunu işleriz (`odeme.ISLENEN_TURLER`), ötekiler 200 `atlandi` |
+| `order.paid` alanları | `billing_reason` = `purchase` \| `subscription_create` \| `subscription_cycle` \| `subscription_update` (K6 bunu okur); `product_id` (NULL'lanabilir), `subscription_id` (NULL'lanabilir), `customer_id`, `customer.external_id`, **`total_amount`** (`amount` DEĞİL; ayrıca `net_amount`, `tax_amount`, `refunded_amount`), `currency`, `metadata`, `status` (`paid`/`refunded`…) | **SDK 0.32.0 kaynağıyla doğrulandı** (`models/order.py`, `orderbillingreason.py`); Subscription: `status` ∈ `incomplete\|incomplete_expired\|trialing\|active\|past_due\|canceled\|unpaid\|paused`, `current_period_end`, `cancel_at_period_end`, `ends_at`, `ended_at`, `canceled_at`, `product_id` |
+| Sandbox | `sandbox.polar.sh` ayrı ortam, ayrı jeton ve webhook sırrı; SDK `server="sandbox"` → `https://sandbox-api.polar.sh`, production `https://api.polar.sh`; test kartıyla gerçek para yok | sunucu adları **SDK'da doğrulandı** (`sdkconfiguration.SERVERS`); test kartı ve panel akışı **doğrulanmadı** (sahibin sandbox adımı) |
 | Kabul edilebilir kullanım | AI üretim araçları "ek incelemeye tabi"; NSFW, deepfake/face swap, ses klonlama, telif/marka ihlali YASAK — kullanım şartlarına ve moderasyona yazılmadan yayına çıkılmaz | master `:201-204` |
-| Python SDK | `polar-sdk` (PyPI; `polarsource/polar-python`), Pydantic modelleri, senkron + async istemci | github (arama) — sürüm pini 3. görevde |
+| Python SDK | `polar-sdk` (PyPI; `polarsource/polar-python`), Pydantic ≥ 2.11 modelleri, senkron + async istemci; bağımlılıkları `httpx ≥ 0.28.1`, `standardwebhooks ≥ 1,<2`, `jsonpath-python`; saf Python tekerleği ~0,9 MB | **PyPI'dan indirildi ve okundu 2026-09-21:** 0.32.0, openapi `2026-04`; pin `polar-sdk==0.32.*` (requirements.txt, gerekçesiyle) |
 
 **Ücretin fiyata etkisi (K5'in hesabı):** Starter'da 9 USD'lik bir aboneliğin
 ücreti 0,45 + 0,50 (+ 0,135 uluslararası kart) ≈ **1,09 USD (%12)**; 4 USD'lik
@@ -579,7 +579,7 @@ değil: iki kova satırı tek anahtar. Belgenin kalan cümleleri aynen uyguland�
 
 ---
 
-## 3. Polar webhook ve olay işleme — `services/polar.py`, `services/odeme.py`, `POST /api/odeme/webhook` (PR: `faz4/polar-webhook`)
+## 3. Polar webhook ve olay işleme — `services/polar.py`, `services/odeme.py`, `POST /api/odeme/webhook` ✅ (PR: `faz4/polar-webhook`)
 
 **Kapsam.** Para bu görevden sonra DEFTERE GİRER: Polar "ödendi" der, biz
 paket yükler ya da planı yazarız. Satış yüzü yok (4); sandbox'ta elle checkout
@@ -709,6 +709,112 @@ uç noktası (URL `https://<sandbox alan adı>/api/odeme/webhook`, olaylar:
 paketler — metadata yukarıdaki anahtarlarla. Üç sırrı sandbox dağıtımının
 ortamına. **Hesap riski** (master `:201-204`): Polar'ın AI ürün incelemesi için
 kullanım şartları (6) yayında olmalı — production onayı 6'dan sonra istenir.
+
+**Yapıldığında (2026-09-21) ölçümler ve sapmalar.** Rota 70 → **72**
+(`POST /api/odeme/webhook` açık — `ACIK_ROTALAR` 7 → 8 gerekçesiyle; `GET
+/api/admin/odeme-olaylari` `ADMIN_ROTALAR` 9 → **10**; `KAPILI` 63 → 64), modül
+111 → **114** (`services/polar.py`, `services/odeme.py`, `routers/odeme.py`),
+göç YOK (şema 2'den hazır). Polar'a bu oturumdan yine erişilemedi; **SDK
+0.32.0 PyPI'dan indirildi, kaynağı okundu** — yukarıdaki tablo satır satır
+güncellendi (imza şeması, olay türleri, alan adları, sunucu adları
+DOĞRULANDI; ücretler, yeniden deneme süresi, panelden yeniden gönderimin
+`webhook-id`si, test kartı DOĞRULANMADI). Gemiye binen API:
+`polar.ortam()` (boş = sandbox, başka değer `ValueError`), `polar.erisim_jetonu()`,
+`polar.webhook_sirri()`, `polar.olay_dogrula(govde: bytes, basliklar, *, sir=None)
+-> Olay(webhook_id, tur, zaman, govde)` (`.veri`, `.nesne_id`; `ImzaHatasi` /
+`YukHatasi` / `YapilandirmaHatasi`), `polar.imzala(govde, sir, *, webhook_id,
+zaman=None) -> {üç başlık}` (doğrulamanın tersi — testler ve 4. görevin yerel
+Polar'ı), `polar.istemci()` (tembel `polar_sdk.Polar(access_token, server)`);
+`odeme.isle(db, olay, *, an=None) -> Sonuc(durum, hata, kullanici_id, kredi)`
+(`.json()` = rota gövdesi), `odeme.olayi_kaydet(db, olay, an) -> uuid | None`,
+`odeme.kullaniciyi_coz(db, olay)`, `odeme.urun_bul(db, polar_urun_id)`,
+`odeme.plan_uygula(db, hedef_id, plan, *, abonelik_id, plan_bitis=None) -> bool`,
+`odeme.ISLENEN_TURLER` (9 tür — sahibin panelde seçeceği liste), `odeme.HATALAR`
+(`kullanici_yok`, `urun_yok`, `sebep_bilinmiyor`, `urun_sebep_uyumsuz`,
+`musteri_cakisiyor`, `abonelik_eski`, `nesne_yok`); rota cevabı `{"durum":
+"islendi"|"yinelenen"|"atlandi"[, "hata": <kod>]}`, 400 `imza_gecersiz` /
+`govde_gecersiz`, 413 `govde_buyuk` (256 KiB tavan, HMAC'ten önce), 503
+`odeme_yapilandirilmadi` (sır yok), 500 iç hata (olay satırı rollback ile
+gider). Günlük: `olay=odeme.<tur>` INFO (`kullanici_id`, `siparis`, `sebep`,
+`urun`, `plan`, `kredi`, `dusen`), `odeme.webhook` INFO (her cevap),
+`odeme.iade` WARNING, `odeme.imza_gecersiz` WARNING, `odeme.yinelenen` INFO,
+`odeme.hata` ERROR (`exc_info`, Sentry). Admin: `depo_admin.odeme_olaylari(db,
+*, yalniz_hata, limit=100)` + `odeme_ozeti(db)` → `{"olaylar": [...], "ozet":
+{olay, hatali, siparis}}`; `admin.js` dördüncü sekme "Ödeme" (alındı, tür, Polar
+nesnesi, e-posta, işlendi, hata kodu; "yalnız hatalı" kutusu), i18n **+6** tr/en.
+Köprü bayrağı `KROMIS_UCRETLI_HIBE_BAKIMDA` KALDIRILDI (`planlar.py`,
+`defter.hibe_turu` yalnız `free`, `isci.py hazirla`, `.env.example`, KURULUM,
+`ALTYAPI`); `.env.example` **+3** (`KROMIS_POLAR_ORTAM`, `KROMIS_POLAR_ERISIM_JETONU`,
+`KROMIS_POLAR_WEBHOOK_SIRRI`), `ALTYAPI` net +2. `requirements.txt`
+`polar-sdk==0.32.*` (imaja girer; `standardwebhooks` onun bağımlılığı).
+Sahte yükler `tests/fixtures/polar/*.json` **11 dosya**, sandbox'tan
+KAYDEDİLMİŞ DEĞİL (erişim yok) — SDK modellerinden kurulup **SDK'nın
+`WebhookPayloadAdapter`ından geçirildi** (her fixture bir testte yeniden geçer:
+pin ilerlediğinde şema kayması orada görünür); e-posta/ad `DUMMY`. Testler
+**+39** (`tests/test_odeme.py`: imza 6 durum + 5 dk penceresi + zarf hataları +
+SDK `validate_event` bizim imzayı kabul eder; rota 503/413/400/500; yinelenen
+`webhook-id`; aynı sipariş iki teslimat; RLS uygulama rolüyle admin bağlamı
+`siparisler` + `kredi_hareketleri`; paket → `paket_bakiye` + sipariş + redakte
+gövde; `subscription_create` plan + tamamla 300 → 1.000; `cycle` dolu bakiyeye
+dokunmaz, düşükte tamamlar, ikinci teslimat çakışır; `canceled`/`uncanceled`
+`plan_bitis`; `revoked` free + `sona_erme` −800 yalnız hibe, paket 500 durur,
+`tutarlilik` boş; `updated` pro → temel −2.000, `cancel_at_period_end`,
+`past_due` dokunmaz, `abonelik_eski`; aynı plandaki `updated` ve zaten `free`
+hesaba başka gün gelen `revoked` admin kredisini kırpmaz; `customer.*` bağla/çakışma/üçüncü çözüm
+yolu; iade WARNING; 5 hata kodu parametreli + ürün aynası yazılınca yeniden
+gönderim işlenir; `metadata.kullanici_id` yedeği, silinmiş hesap; bakım turu
+`pro`yu tamamlamaz; admin ucu liste/süzgeç/özet/gövde yok) + E2E admin dört
+sekme (`tests/test_playwright_admin.py` "Ödeme" sekmesi: iki tohum, süzgeç,
+çevrili özet). Takım sayısı PR gövdesinde. **Sandbox uçtan uca ölçüm
+YAPILMADI** (Polar erişimi yok; sahibin adımı — PR gövdesindeki kontrol
+listesi).
+
+**Sapmalar — belgeden farklı yapılanlar, gerekçesiyle.** (a) **İmza SDK'nın
+`validate_event`iyle DEĞİL, onun altındaki `standardwebhooks.Webhook.verify`
+ile** (aynı kütüphane, aynı sır dönüşümü — `polar._anahtar` SDK'nın satırının
+kopyası; test SDK'nın bizim imzamızı kabul ettiğini ölçer): `validate_event`
+imzadan sonra yükü SDK'nın pydantic modelinden geçiriyor ve model o günkü
+şemanın HER zorunlu alanını istiyor — Polar bir enum değeri ya da alan
+eklediğinde işimize yaramayan bir doğrulama hatası 500 olur, Polar saatlerce
+yeniden dener ve sonunda ucu kapatır (para yolu). Alan okumaları
+`services/odeme.py`de tolerant (`dict.get`); şemaya bağlılık fixture'ların SDK
+modelinden geçmesiyle ölçülür. (b) **`services/odeme.py` `KIRACISIZ_MODULLER`de**
+(işlev düzeyi `KIRACISIZ` defteri değil): modülün HİÇBİR işlevi `kullanici_id`
+almaz — hedef `hedef_id`/`kullanici` nesnesi (`plan_uygula(db, hedef_id, …)`),
+`depo_admin`in deseni; gerekçe belgeninkiyle aynı. (c) **"hata ama 200"
+gövdesi `{"durum": "atlandi", "hata": <kod>}`** — `durum` üç değerli kaldı,
+`hata` alanı eklendi; belgenin iki koduna (`kullanici_yok`, `urun_yok`) beş kod
+daha: `sebep_bilinmiyor` (tanınmayan `billing_reason` — CHECK'e çarpıp 500
+olmasın), `urun_sebep_uyumsuz` (paket ürünü abonelik sebebiyle ya da tersi —
+ayna yanlış, para YATMAZ), `musteri_cakisiyor` (`polar_musteri_id` UNIQUE'e
+çarpmasın), `abonelik_eski` (olay kullanıcının güncel `polar_abonelik_id`sine
+ait değil — iptal edilmiş eski aboneliğin geciken `revoked`ı yeni aboneliği
+düşürmesin), `nesne_yok`. (d) **`subscription.updated` yalnız `status=active`
+iken yazar** (plan + `plan_bitis`; `cancel_at_period_end` ise dönem sonu) ve
+düşürmede `dusur`; `past_due`/`canceled`/`unpaid` durumlarında dokunmaz —
+belgenin "pro → temel `subscription.updated`" satırı bu dalda. **`sona_erme`
+yalnız plan GERÇEKTEN daha düşük hibeli plana inince** (`_dusur(eski_plan, plan)`):
+belge "düşürmede `dusur`" demişti, uygulamada aynı plandaki bir `updated`
+(iptal bayrağı, metadata) ya da zaten `free` hesaba başka gün yeniden gönderilen
+`revoked` (yeni günlük anahtar) admin `duzelt`le verilmiş fazla hibeyi kırpardı —
+adversarial okumada bulundu, test çivili. `order.paid`
+ayrıca `polar_musteri_id`yi bağlar (ilk siparişte müşteri kimliği öğrenilir;
+`customer.*` olayı seçilmemiş olsa da üçüncü çözüm yolu çalışır). (e) **413 ve
+503** belgede yoktu: 256 KiB gövde tavanı HMAC'ten önce (bedava koruma), sır
+yapılandırılmamışsa 503 `odeme_yapilandirilmadi` (sırsız uç "geçerli" demez).
+(f) **`polar.imzala`** eklendi (doğrulamanın tersi; testler ve 4. görevin E2E
+"yerel Polar"ı gerçek HMAC üretir — `Webhook.verify` yamalanmaz). (g)
+**`checkout_ac`/`portal_baglantisi`/`urunler`/`abonelik_iptal` bu PR'da YOK** —
+belge onları `(4)`/`(5)` diye işaretliyordu, o görevlerde gelir; `istemci()` hazır.
+(h) **`standardwebhooks` ayrıca pinlenmedi**: `polar-sdk`nın bağımlılığı
+(`>=1,<2`), iki pin bir gün çelişirdi. (i) **Admin cevabı `{"olaylar", "ozet"}`**
+(belge yalnız liste demişti) — sahip "kaç sipariş, kaç hatalı" sayısını listeyi
+saymadan görsün; i18n +6, ~10 değil. (j) **Fixture'lar sandbox kaydı değil, SDK
+modelinden kurulmuş** (Polar erişimi yok); DUMMY disiplini aynen. (k) **Admin
+eliyle `pro` yapılmış hesap artık dönem hibesi almaz** (köprü kalktı, webhook
+yalnız Polar siparişinde yatırır) — sahibin yolu admin "kredi ekle";
+KURULUM 10. adıma cümle eklendi, 11. adım 7. görevin. Belgenin kalan cümleleri
+aynen uygulandı.
 
 ---
 

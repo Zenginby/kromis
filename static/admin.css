@@ -140,6 +140,8 @@ body {
 .admin-isciler { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 0.86rem; }
 .admin-isciler li { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-item, 12px); display: flex; gap: 10px; flex-wrap: wrap; }
 .admin-isciler li[data-canli="false"] { color: var(--muted); }
+/* Faz 4 / 3: Ödeme sekmesinde hatalı teslimat satırı (kullanıcı yok, ürün yok …) göze çarpsın. */
+#admin-odeme-olaylar tr[data-hata="true"] td:last-child { color: var(--danger); }
 
 @media (prefers-reduced-motion: reduce) {
   .admin-sekmeler button { transition: none; }

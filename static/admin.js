@@ -3,12 +3,18 @@
 // Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 //
 // Yönetim sayfasının betiği (Faz 2 / 8) — static/admin.html'in tek betiği
-// (i18n.js dışında). Üç sekme, üç okuma ucu, beş yazma ucu:
+// (i18n.js dışında). Dört sekme, dört okuma ucu, beş yazma ucu:
 //   GET  /api/admin/kullanicilar?q=&sayfa=   · POST /api/admin/kullanicilar/{id}/tavan
 //   GET  /api/admin/isler?durum=             · POST /api/admin/kullanicilar/{id}/oturum-dusur
 //   GET  /api/admin/metrikler                · POST /api/admin/isler/{id}/iptal
 //   (Faz 3 / 3)                              · POST /api/admin/kullanicilar/{id}/plan
 //                                            · POST /api/admin/kullanicilar/{id}/kredi
+//   GET  /api/admin/odeme-olaylari?hata=1    (Faz 4 / 3: Polar webhook teslimatları)
+//
+// "Ödeme" sekmesi (Faz 4 / 3): son 100 teslimat — tür, Polar nesnesi, kullanıcı,
+// işlendi damgası ve `hata` KODU (`kullanici_yok`, `urun_yok` …). Kod çevrilmez:
+// sağlayıcı sözlüğü, sahip aynı adı günlükte ve belgede arar. Gövde gösterilmez
+// (e-posta/adres taşır; içerik Polar panelinde).
 //
 // Plan seçici ve "kredi ekle" (Faz 3 / 3): plan adları SUNUCUDAN gelmiyor, listeyi
 // `PLANLAR` sabiti tutuyor — üç ad kodda katalog (services/planlar.py, K5) ve
@@ -30,7 +36,7 @@
 
   const el = (id) => document.getElementById(id);
   const mesaj = el("admin-mesaj");
-  const SEKMELER = ["kullanicilar", "kuyruk", "metrikler"];
+  const SEKMELER = ["kullanicilar", "kuyruk", "metrikler", "odeme"];
   const PLANLAR = ["free", "temel", "pro"];
   const YENILEME_MS = 30000;
   const SAYFA_ADEDI = 50;
@@ -463,12 +469,39 @@
     yenilendiYaz();
   }
 
+  async function odemeyiYukle() {
+    const yalnizHata = el("admin-odeme-yalniz-hata").checked;
+    const m = await istek("/api/admin/odeme-olaylari" + (yalnizHata ? "?hata=1" : ""));
+    el("admin-odeme-ozet").textContent = t("admin.odeme_ozet", m.ozet);
+    const govde = el("admin-odeme-olaylar");
+    if (!m.olaylar.length) bosSatir(govde, 6);
+    else {
+      govde.replaceChildren(
+        ...m.olaylar.map((o) => {
+          const tr = document.createElement("tr");
+          tr.dataset.hata = String(Boolean(o.hata));
+          tr.append(
+            hucre(tarih(o.alindi)),
+            hucre(o.tur),
+            hucre(o.nesne || "—"),
+            hucre(o.eposta || "—"),
+            hucre(tarih(o.islendi_at)),
+            hucre(o.hata || "—"),
+          );
+          return tr;
+        }),
+      );
+    }
+    yenilendiYaz();
+  }
+
   // ── Sekmeler ve yenileme ───────────────────────────────────────────
 
   const YUKLEYICI = {
     kullanicilar: kullanicilariYukle,
     kuyruk: kuyruguYukle,
     metrikler: metrikleriYukle,
+    odeme: odemeyiYukle,
   };
 
   async function yenile() {
@@ -509,6 +542,7 @@
     yenile();
   });
   el("admin-durum").addEventListener("change", yenile);
+  el("admin-odeme-yalniz-hata").addEventListener("change", yenile);
   setInterval(yenile, YENILEME_MS);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") yenile();

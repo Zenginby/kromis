@@ -35,13 +35,12 @@ webhook (`subscription.*`), bugün admin (`POST /api/admin/kullanicilar/{id}/pla
 
 ÜCRETLİ PLANIN HİBESİNİ KİM YATIRIR (K6): Faz 3'te bakım turu her planı kendi
 sayısına tamamlıyordu; Faz 4'te ücretli planın dönem hibesi Polar'ın
-`order.paid` olayıyla gelir (3. görev, `hibe:<u>:polar:<order_id>`), bakım turu
-YALNIZ `free`yi tarar (`defter.hibe_turu`). 3 gelmeden 2 canlıda tek başına
-dursun diye GEÇİCİ bayrak `KROMIS_UCRETLI_HIBE_BAKIMDA=1`: bakım turu eski
-gibi ücretli planları da tamamlar (sahibin `pro` hesabı hibesiz kalmasın — belge
-§2 "Risk"); 3. görev bayrağı kaldırır. Öntanım KAPALI: yanlışlıkla iki kez
-hibe (tur + webhook) yerine yanlışlıkla eksik hibe — ilki para, ikincisi bir
-ortam değişkeni.
+`order.paid` olayıyla gelir (`services/odeme.py`, `hibe:<u>:polar:<order_id>`),
+bakım turu YALNIZ `free`yi tarar (`defter.hibe_turu`). Faz 4 / 2'nin geçici
+köprüsü `KROMIS_UCRETLI_HIBE_BAKIMDA` 3. görevle KALDIRILDI: köprü açık kalsa
+tur + webhook aynı dönemi iki kez tamamlardı. Admin eliyle `pro` yapılmış bir
+hesap (Polar aboneliği yok) artık dönem hibesi ALMAZ — sahibin yolu admin
+"kredi ekle" (`defter.duzelt`), belge §3 "Sapmalar".
 
 `FREE_AYLIK_HIBE` ORTAMDAN (`KROMIS_FREE_AYLIK_HIBE`), kod sabiti değil: sayı
 ürün kararı (K6 — 200 kredi ≈ 1 USD sağlayıcı maliyeti, ~25 Azure `medium`
@@ -50,8 +49,7 @@ görsel), sahip `.env`iyle değiştirir. Boş = 200; bozuk değer YÜKSEK SESLE
 yaptım" sanmasıyla biterdi); 0 GEÇERLİ (hibe kapalı — `defter.hibe_turu` o
 planı atlar), negatif değil. Üç hibe de modül yüklenirken BİR kez okunur:
 bakım turu her 5 dk aynı sayıyı görmeli, istek başına yeniden okumak burada
-bir şey kazandırmaz (testler ortamı değil `PLANLAR`ı yamalar). Bayrak ise
-HER ÇAĞRIDA okunur (`ucretli_hibe_bakimda`): geçici bir anahtar, testler ortamı yamalar.
+bir şey kazandırmaz (testler ortamı değil `PLANLAR`ı yamalar).
 
 Kullanıcının planını DB'den OKUYAN işlev burada değil `services/defter.py`de
 (`plan_oku`): bu modül depo değil katalog — `(db, kullanici_id)` imza
@@ -70,8 +68,8 @@ from services.tablolar import PLANLAR_KUMESI
 
 __all__ = ["FREE_AYLIK_HIBE_ENV", "FREE_AYLIK_HIBE_VARSAYILAN", "FREE_AYLIK_HIBE",
            "TEMEL_AYLIK_HIBE_ENV", "TEMEL_AYLIK_HIBE_VARSAYILAN", "PRO_AYLIK_HIBE_ENV", "PRO_AYLIK_HIBE_VARSAYILAN",
-           "UCRETLI_HIBE_BAKIMDA_ENV", "PLAN_VARSAYILAN",
-           "Plan", "PLANLAR", "free_aylik_hibe", "aylik_hibe", "ucretli_hibe_bakimda", "kapsiyor"]
+           "PLAN_VARSAYILAN",
+           "Plan", "PLANLAR", "free_aylik_hibe", "aylik_hibe", "kapsiyor"]
 
 # `.env.example` 1. bölüm aynı adları buradan okur (bekçisi tests/test_docker_kapisi.py `ALTYAPI`).
 FREE_AYLIK_HIBE_ENV = "KROMIS_FREE_AYLIK_HIBE"
@@ -81,8 +79,6 @@ TEMEL_AYLIK_HIBE_ENV = "KROMIS_TEMEL_AYLIK_HIBE"
 TEMEL_AYLIK_HIBE_VARSAYILAN = 1_000
 PRO_AYLIK_HIBE_ENV = "KROMIS_PRO_AYLIK_HIBE"
 PRO_AYLIK_HIBE_VARSAYILAN = 3_000
-# GEÇİCİ (Faz 4 / 2 → 3): `1` ise bakım turu ücretli planları da tamamlar (Faz 3 davranışı).
-UCRETLI_HIBE_BAKIMDA_ENV = "KROMIS_UCRETLI_HIBE_BAKIMDA"
 # `kullanicilar.plan` sütununun `server_default`ı ile aynı: satırı olmayan/plansız kullanıcı ücretsizdir.
 PLAN_VARSAYILAN = "free"
 
@@ -104,21 +100,6 @@ def aylik_hibe(ad: str, varsayilan: int, ortam: Mapping[str, str] | None = None)
 def free_aylik_hibe(ortam: Mapping[str, str] | None = None) -> int:
     """`KROMIS_FREE_AYLIK_HIBE`; boşsa 200 (Faz 3 / 3'ün imzası, `aylik_hibe`nin üstünde)."""
     return aylik_hibe(FREE_AYLIK_HIBE_ENV, FREE_AYLIK_HIBE_VARSAYILAN, ortam)
-
-
-def ucretli_hibe_bakimda(ortam: Mapping[str, str] | None = None) -> bool:
-    """`KROMIS_UCRETLI_HIBE_BAKIMDA`: boş/`0` = kapalı (bakım turu yalnız `free`), `1` = açık; başka değer `ValueError`.
-
-    Her çağrıda okunur — geçici bir anahtar, sahibin 3. görev gelince
-    kaldıracağı; testler ortamı yamalar. Sessizce "kapalı" sayılan bir yazım
-    hatası (`yes`, `true`) sahibin `pro` hesabını hibesiz bırakırdı — gürültü.
-    """
-    ham = ((os.environ if ortam is None else ortam).get(UCRETLI_HIBE_BAKIMDA_ENV) or "").strip()
-    if ham in ("", "0"):
-        return False
-    if ham == "1":
-        return True
-    raise ValueError(f"{UCRETLI_HIBE_BAKIMDA_ENV} 1 ya da 0 olmali, verilen: {ham!r}")
 
 
 FREE_AYLIK_HIBE = free_aylik_hibe()

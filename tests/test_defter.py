@@ -874,12 +874,11 @@ def test_consistency_measures_the_two_buckets_separately(db_oturumu, kullanici):
     assert defter.tutarlilik(db_oturumu) == []
 
 
-def test_the_monthly_grant_tour_ignores_the_pack_bucket(db_oturumu, kullanici, monkeypatch):
+def test_the_monthly_grant_tour_ignores_the_pack_bucket(db_oturumu, kullanici):
     """K3'ün sebebi: paketli kullanıcı hibesini kaybetmez — `hibe_turu` yalnız HİBE kovasına bakar; paket 5.000
     olsa da hibe kovası 0 ise `free` hibesi tam yatar."""
     from services import planlar
     u = kullanici.id
-    monkeypatch.delenv(planlar.UCRETLI_HIBE_BAKIMDA_ENV, raising=False)
     _paket(db_oturumu, u, 5_000, "ord_1")
     db_oturumu.commit()
     an = zaman.an()

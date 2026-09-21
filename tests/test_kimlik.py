@@ -51,6 +51,9 @@ ACIK_ROTALAR: dict[tuple[str, str], str] = {
     ("POST", "/api/hesap/giris"): "oturumu AÇAN rota",
     ("POST", "/api/hesap/sifirla"): "parolamı unuttum: giremeyen kullanıcının yolu",
     ("POST", "/api/hesap/sifirla/dogrula"): "sıfırlama bağlantısından: kimlik kanıtı jeton",
+    # Faz 4 / 3: Polar'ın sunucusu atar — çerez yok, kimlik Standard Webhooks İMZASI
+    # (services/polar.olay_dogrula); imzasız/yanlış imzalı çağrı 400 (tests/test_odeme.py).
+    ("POST", "/api/odeme/webhook"): "Polar webhook'u: oturumsuz, HMAC imzalı; kullanıcı olaydan çözülür",
 }
 
 # Oturumsuz cevabı 302 olan (tarayıcı gezinmesi) rotalar; geri kalan kapılılar 401 JSON.
@@ -70,6 +73,8 @@ ADMIN_ROTALAR = {
     # Faz 3 / 3: plan yazımı ve kredi düzeltmesi (7 → 9).
     ("POST", "/api/admin/kullanicilar/{kullanici_id}/plan"),
     ("POST", "/api/admin/kullanicilar/{kullanici_id}/kredi"),
+    # Faz 4 / 3: Polar webhook teslimatları (9 → 10).
+    ("GET", "/api/admin/odeme-olaylari"),
 }
 
 # Kapılı ama DİZİN OKUMAYAN rotalar — kapıyı `ayar.ayarlar` üzerinden değil doğrudan
@@ -187,8 +192,9 @@ def test_every_route_is_either_gated_or_openly_listed_with_a_reason():
         f"listede ama kapılı: {sorted(set(ACIK_ROTALAR) - ACIK)}")
     assert all(gerekce.strip() for gerekce in ACIK_ROTALAR.values())
     # +3 iş rotası (Faz 2 / 4), +2 (Faz 2 / 5), +8 (Faz 2 / 8: `/admin`, 6 `/api/admin/*`, `/api/kota`),
-    # +2 (Faz 3 / 3: `/api/admin/kullanicilar/{id}/plan`, `…/kredi`), +1 (Faz 3 / 6: `/api/kredi`)
-    assert len(KAPILI) == 63 and len(ACIK) == 7 and len(KAPILI | ACIK) == 70, (
+    # +2 (Faz 3 / 3: `/api/admin/kullanicilar/{id}/plan`, `…/kredi`), +1 (Faz 3 / 6: `/api/kredi`),
+    # +1 açık (Faz 4 / 3: `/api/odeme/webhook`) +1 kapılı (Faz 4 / 3: `/api/admin/odeme-olaylari`)
+    assert len(KAPILI) == 64 and len(ACIK) == 8 and len(KAPILI | ACIK) == 72, (
         "rota sayısı ya da kapı sayısı değişti — bilinçliyse belgeyi ve bu sayıları güncelle")
 
 

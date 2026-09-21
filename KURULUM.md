@@ -607,11 +607,13 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
     yazar, Faz 4 / 3). Rezerv hibeden başlar, yetmezse paketten sürer; iade
     önce pakete döner. Ücretli planların dönem hibesi `KROMIS_TEMEL_AYLIK_HIBE`
     / `KROMIS_PRO_AYLIK_HIBE` (boş = 1.000 / 3.000; `.env.example` 1. bölüm,
-    web VE işçi). **Geçici köprü** `KROMIS_UCRETLI_HIBE_BAKIMDA=1` (yalnız
-    işçi): Faz 4 / 3 (Polar webhook) dağıtılmadan önce ücretli plandaki bir
-    hesabın aylık hibesini bakım turu tamamlamaya devam etsin — 3. görevle
-    birlikte SİL (yoksa tur + webhook ay ortasında iki kez tamamlar). Boşsa
-    tur yalnız `free` planı tamamlar.
+    web VE işçi). Bakım turu YALNIZ `free` planı tamamlar; ücretli planın dönem
+    hibesini Polar'ın `order.paid` olayı yatırır (Faz 4 / 3, `POST
+    /api/odeme/webhook`; üç `KROMIS_POLAR_*` değişkeni `.env.example` 1.
+    bölümde — kurulum adımı 7. görevde). Faz 4 / 2'nin geçici köprüsü
+    `KROMIS_UCRETLI_HIBE_BAKIMDA` KALDIRILDI: ortamda kalmışsa silin, işçi onu
+    artık okumaz. Admin eliyle `pro` yapılmış (Polar aboneliği olmayan) hesap
+    dönem hibesi almaz — admin "kredi ekle" ile.
 
     *Rezerv → onay → iade* — iş sıraya girerken tahmini kredi bakiyeden
     **rezerve** edilir (yetmezse **402** `err.kredi_yetersiz`, iş açılmaz);

@@ -170,6 +170,8 @@ def test_kod_atiflari_hala_var(ad: str) -> None:
     kayip: list[str] = []
     for metin in _metinler(d):
         for modul, cagrilan in ATIF.findall(metin):
+            if cagrilan == "py":          # `services/polar.py` bir DOSYA ADI, `polar.py` atfı değil —
+                continue                  # modül doğunca (Faz 4 / 3) yanlış pozitif verdi, ölçüldü
             tanimlar = _tanimlar(modul)
             if tanimlar is None:          # services/ altında böyle bir modül yok
                 continue                  # → atıf değil, sıradan metin

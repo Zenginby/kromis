@@ -90,9 +90,8 @@ AYLIK HİBE "HİBEYE TAMAMLA", DEVRETMEZ (K6): `hibe_turu(db, an)` `bakiye <
 aylik_hibe` (HİBE kovası; paket kovası hesaba girmez — paketli kullanıcı
 hibesini kaybetmesin, K3'ün sebebi) olan kullanıcıya FARKI yatırır (`hibe:<u>:
 <YYYY-MM>`). Faz 4 / 2'den itibaren YALNIZ `free` planı tarar: ücretli planın
-dönem hibesi Polar'ın `order.paid` olayıyla gelir (3. görev). GEÇİCİ bayrak
-`KROMIS_UCRETLI_HIBE_BAKIMDA=1` (`planlar.ucretli_hibe_bakimda`) eski davranışı
-korur — 3 gelmeden 2 canlıda tek başına dursun (belge §2 "Risk"); 3 kaldırır.
+dönem hibesi Polar'ın `order.paid` olayıyla gelir (`services/odeme.py`, 3. görev;
+Faz 4 / 2'nin geçici köprü bayrağı 3 ile kaldırıldı).
 Anahtar aylık → ay içinde bir kez; kayıt (`routers/hesap.py`) aynı anahtarla
 (`aylik_hibe_yaz`) hemen yatırır. `kullanicilar.plan`/`plan_bitis` da bu
 modülden okunur (`plan_oku`, `plan_bitis_oku`): hesap tablosu, sahip `id`.
@@ -546,7 +545,7 @@ def dusur(db: Session, kullanici_id: uuid.UUID, hedef: int, anahtar: str, *,
 
 def hibe_turu(db: Session, an: dt.datetime) -> int:
     """Aylık hibe turu (K6 "hibeye tamamla"): `free` planda `bakiye < aylik_hibe` (HİBE kovası) olan kullanıcıya
-    farkı yatırır; yazılan satır sayısı. `KROMIS_UCRETLI_HIBE_BAKIMDA=1` ise ücretli planlar da (geçici, 3. göreve dek).
+    farkı yatırır; yazılan satır sayısı. Ücretli planlar TARANMAZ (dönem hibesi webhook'un — `services/odeme.py`).
 
     Bakım turu (services/isci.py `bakim_turu`, 5 dk, ADMİN bağlamı —
     `yonetici_ekler`, K4) çağırır. Plan başına bir SELECT: süzgeç `WHERE plan =
@@ -557,18 +556,17 @@ def hibe_turu(db: Session, an: dt.datetime) -> int:
     satır ve bakiye oynamaz — sayı 0.
     """
     yazilan = 0
-    taranan = (planlar.PLANLAR.items() if planlar.ucretli_hibe_bakimda()
-               else [(planlar.PLAN_VARSAYILAN, planlar.PLANLAR[planlar.PLAN_VARSAYILAN])])
-    for ad, plan in taranan:
-        if plan.aylik_hibe <= 0:
-            continue
-        satirlar = db.execute(select(Kullanici.id, Kullanici.bakiye)
-                              .where(Kullanici.plan == ad, Kullanici.bakiye < plan.aylik_hibe,
-                                     Kullanici.silindi_at.is_(None))
-                              .order_by(Kullanici.id)).all()
-        for kullanici_id, mevcut in satirlar:
-            if aylik_hibe_yaz(db, kullanici_id, plan.aylik_hibe - int(mevcut), an):
-                yazilan += 1
+    ad = planlar.PLAN_VARSAYILAN
+    plan = planlar.PLANLAR[ad]
+    if plan.aylik_hibe <= 0:
+        return 0
+    satirlar = db.execute(select(Kullanici.id, Kullanici.bakiye)
+                          .where(Kullanici.plan == ad, Kullanici.bakiye < plan.aylik_hibe,
+                                 Kullanici.silindi_at.is_(None))
+                          .order_by(Kullanici.id)).all()
+    for kullanici_id, mevcut in satirlar:
+        if aylik_hibe_yaz(db, kullanici_id, plan.aylik_hibe - int(mevcut), an):
+            yazilan += 1
     return yazilan
 
 

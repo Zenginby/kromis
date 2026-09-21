@@ -35,6 +35,7 @@ import os
 import re
 import uuid
 from collections.abc import Iterator
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -154,11 +155,15 @@ def _ikinci(depo_db, *, oturum: bool = False, dogrulandi: bool = True) -> Kullan
 
 def _is(depo_db, kid: uuid.UUID, *, durum: str = "bekliyor", an: dt.datetime = AN,
         model: str = MODEL_ID, kredi: int = KREDI, kaynak: str | None = "platform",
-        sure_sn: int | None = None) -> uuid.UUID:
-    """Doğrudan `isler`e satır; `sure_sn` verilirse `basladi`/`bitti` ona göre (p50/p95 tohumu)."""
+        sure_sn: int | None = None, gercek: int | None = None,
+        maliyet_usd: str | None = None) -> uuid.UUID:
+    """Doğrudan `isler`e satır; `sure_sn` verilirse `basladi`/`bitti` ona göre (p50/p95 tohumu);
+    `gercek`/`maliyet_usd` (Faz 3 / 5) `kredi_gercek`/`saglayici_maliyet_usd` sütunları (marj tohumu)."""
     with Session(depo_db) as s:
         is_ = kuyruk.ekle(s, kid, "generate", {"prompt": "x"}, model, kredi, an=an, anahtar_kaynagi=kaynak)
         is_.durum = durum
+        is_.kredi_gercek = gercek
+        is_.saglayici_maliyet_usd = Decimal(maliyet_usd) if maliyet_usd is not None else None
         if sure_sn is not None or durum in ("bitti", "hata", "calisiyor"):
             is_.basladi = an
         if sure_sn is not None:
@@ -488,12 +493,15 @@ def test_metrics_are_derived_from_isler_and_isciler_with_seeded_percentiles(c, d
     r = c.get("/api/admin/metrikler")
     assert r.status_code == 200, r.text
     m = r.json()
-    assert set(m) == {"an", "kuyruk", "son_1sa", "son_24sa", "modeller", "isciler"}
+    assert set(m) == {"an", "kuyruk", "son_1sa", "son_24sa", "modeller", "isciler", "marj"}
     assert m["kuyruk"] == {"derinlik": 2, "calisan": 0, "en_eski_bekleyen_sn": 45}
     assert m["son_1sa"] == {"is": 4, "hata": 1, "hata_orani": 0.25}            # baska + hata + 2 bekleyen
     assert m["son_24sa"]["is"] == 8 and m["son_24sa"]["hata"] == 1          # 3 tohum + baska + hata + 2 bekleyen + BYOK
     assert m["son_24sa"]["hata_orani"] == 0.125
+    # Faz 3 / 5: gerçek biliniyorsa gerçek, yoksa rezerv (`COALESCE`); tohumlarda gerçek yok → iki sayı aynı.
     assert m["son_24sa"]["platform_kredi"] == 3 * 100 + 4 * KREDI            # baska, hata, 2 bekleyen; BYOK ve iptal yok
+    assert m["son_24sa"]["platform_kredi_rezerv"] == m["son_24sa"]["platform_kredi"]
+    assert {r["gun"] for r in m["marj"]} <= {7, 30} and all(r["adet"] + r["hata"] > 0 for r in m["marj"])
     assert m["modeller"] == [
         {"model": MODEL_ID, "adet": 4, "p50_sn": 15.0, "p95_sn": 28.5},      # [1, 10, 20, 30] sn (BYOK da biten iş)
         {"model": "baska", "adet": 1, "p50_sn": 5.0, "p95_sn": 5.0},
@@ -513,6 +521,67 @@ def test_percentiles_are_percentile_cont_over_bitti_minus_basladi(depo_db, admin
     assert m["modeller"] == [{"model": MODEL_ID, "adet": 3, "p50_sn": 20.0, "p95_sn": 29.0}]
     assert m["son_24sa"]["hata_orani"] == 0.0 and m["kuyruk"]["en_eski_bekleyen_sn"] is None
     assert m["isciler"] == []
+
+
+# ───────────────────────────────────────────────────────────────── marj (Faz 3 / 5)
+
+def test_the_margin_rows_split_two_models_over_seven_and_thirty_days_with_known_and_unknown_cost(depo_db, admin):
+    """Belge §5 çıkış ölçütü: iki model → iki satır; Σ kredi_gercek ve ≈USD (× 0,005) doğru; süre
+    `AVG(bitti − basladi)`; sağlayıcı USD yalnız dolu satırlardan ve "bilinen n/N"; `hata` işleri ve
+    TAHMİNİ kredileri ayrı; `iptal`/aktif ve pencere dışı işler girmez."""
+    b = _ikinci(depo_db)
+    g = dt.timedelta(days=1)
+    _is(depo_db, b.id, durum="bitti", an=AN - 2 * g, sure_sn=10, gercek=8, maliyet_usd="0.0389")
+    _is(depo_db, b.id, durum="bitti", an=AN - 5 * g, sure_sn=20, gercek=6)
+    _is(depo_db, admin.id, durum="bitti", an=AN - 20 * g, sure_sn=30, gercek=10, maliyet_usd="0.05")
+    _is(depo_db, b.id, durum="hata", an=AN - 1 * g, kredi=16)                          # K8 zararı
+    _is(depo_db, b.id, durum="bitti", an=AN - 40 * g, sure_sn=1, gercek=999)          # 30 gün dışı
+    _is(depo_db, b.id, durum="bitti", an=AN - 10 * g, model="baska", sure_sn=5, gercek=27)
+    _is(depo_db, b.id, durum="iptal", an=AN - 1 * g, model="baska", kredi=50)         # girmez
+    _is(depo_db, b.id, durum="bekliyor", an=AN - 1 * g, model="baska")                # girmez
+    _is(depo_db, b.id, durum="calisiyor", an=AN - 1 * g, model="baska")               # girmez
+    with Session(depo_db) as s:
+        yedi = depo_admin.marj(s, 7, AN)
+        otuz = depo_admin.marj(s, 30, AN)
+    assert yedi == [{"model": MODEL_ID, "gun": 7, "adet": 2, "kredi": 14, "usd": 0.07,
+                     "maliyet_usd": 0.0389, "maliyet_bilinen": 1, "ort_sure_sn": 15.0,
+                     "hata": 1, "hata_kredi": 16}]
+    assert otuz == [
+        {"model": MODEL_ID, "gun": 30, "adet": 3, "kredi": 24, "usd": 0.12,
+         "maliyet_usd": 0.0889, "maliyet_bilinen": 2, "ort_sure_sn": 20.0, "hata": 1, "hata_kredi": 16},
+        {"model": "baska", "gun": 30, "adet": 1, "kredi": 27, "usd": 0.135,
+         "maliyet_usd": None, "maliyet_bilinen": 0, "ort_sure_sn": 5.0, "hata": 0, "hata_kredi": 0},
+    ], "bilinmeyen maliyet `None` (sıfır DEĞİL), sıra en çok iş üstte"
+    assert depo_admin.MARJ_PENCERELERI == (7, 30)
+
+
+def test_the_metrics_endpoint_carries_the_margin_rows_and_the_actual_credit_sum_beside_the_reserved_one(
+        c, depo_db, admin, monkeypatch):
+    from services import zaman
+    monkeypatch.setattr(zaman, "an", lambda: AN)
+    b = _ikinci(depo_db)
+    _is(depo_db, b.id, durum="bitti", an=AN - dt.timedelta(hours=2), sure_sn=10, kredi=8, gercek=6)  # 2 iade edildi
+    _is(depo_db, b.id, durum="bekliyor", an=AN - dt.timedelta(minutes=5), kredi=8)                  # gerçek yok → rezerv
+    m = c.get("/api/admin/metrikler").json()
+    assert m["son_24sa"]["platform_kredi"] == 6 + 8, "bitende GERÇEK (6), bekleyende rezerv (8)"
+    assert m["son_24sa"]["platform_kredi_rezerv"] == 8 + 8, "rezerv edilen: tahminlerin toplamı"
+    assert [(r["gun"], r["model"], r["adet"], r["kredi"]) for r in m["marj"]] == [(7, MODEL_ID, 1, 6), (30, MODEL_ID, 1, 6)]
+    kullanicilar = {k["eposta"]: k for k in c.get("/api/admin/kullanicilar").json()["kullanicilar"]}
+    assert kullanicilar[b.eposta]["kredi_24sa"] == 6 + 8, "`kullanicilar.kredi_24sa` aynı `COALESCE`"
+
+
+def test_the_admin_page_renders_the_margin_table_with_its_own_keys_in_both_languages(c, admin):
+    with open(os.path.join(REPO, "static", "admin.js"), encoding="utf-8") as f:
+        js = f.read()
+    assert 'el("admin-marj")' in js and "m.marj.map" in js and "platform_kredi_rezerv" in js
+    for anahtar in ("admin.marj_bilinmiyor", "admin.marj_maliyet", "admin.marj_hata", "admin.metrik_rezerv"):
+        assert f't("{anahtar}"' in js, anahtar
+    for lang in i18n.LANGUAGES:
+        html = c.get("/admin", headers={"X-Kromis-Lang": lang}).text
+        assert 'id="admin-marj"' in html
+        for anahtar in ("admin.metrik_marj", "admin.sutun_gun", "admin.sutun_kredi", "admin.sutun_usd",
+                        "admin.sutun_maliyet_usd", "admin.sutun_ort_sure", "admin.sutun_hata"):
+            assert i18n.t(anahtar, lang) in html, (lang, anahtar)
 
 
 # ─────────────────────────────────────────────────────────── GET /api/kota

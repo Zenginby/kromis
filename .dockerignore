@@ -49,6 +49,9 @@ tools/make_legacy_fixtures.py
 tools/make_logo_goldens.py
 tools/make_filigran.py
 tools/render_brand_assets.py
+# Faz 3 / 5: `catalog.py`nin YORUMLARINI okur (doğrulanmamış tarife notları) — depodan,
+# sahip koşturur; konteynerde okuyacağı yorum yok. `marj_raporu.py` ise imajda (DB'ye bağlanır).
+tools/tarife_kontrol.py
 node_modules
 package.json
 package-lock.json

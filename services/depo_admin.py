@@ -29,6 +29,22 @@ son 24 sa platform kredisi, `isciler` (son kalp `CANLI_ESIK` içindeyse canlı �
 işçi 30 sn'de bir atıyor, üç kaçırılan kalp bayat sayılır). Sayılar zaten
 DB'de; ikinci bir metrik deposu Faz 5'in ölçeğinde değil.
 
+KREDİ SAYIMI GERÇEKLE (Faz 3 / 5): `platform_kredi` ve `kredi_24sa`
+`SUM(COALESCE(kredi_gercek, kredi_tahmini))` — biten işte GERÇEK (Σ
+`medya.credits`, 2. görev), henüz bitmemiş ya da düşmüş işte REZERV (gerçek
+yok; düşen iş K8 gereği faturalanmış olabilir, tahmin en iyi bilgi). Salt
+`SUM(kredi_gercek)` yoğun bir saatte "0" gösterirdi. Tahminin toplamı
+`platform_kredi_rezerv` olarak yanında durur ("rezerv edilen").
+
+MARJ (`marj`, Faz 3 / 5): model başına, `gun` günlük pencerede kapanan işler
+— iş sayısı, Σ `kredi_gercek`, ≈ USD (× `catalog.KREDI_USD_CAPASI`), Σ
+`saglayici_maliyet_usd` YALNIZ dolu satırlardan ve kaç satırın dolu olduğu
+("bilinen n/N": bugün hiçbir adaptör fiyat vermiyor, sahip fatura CSV'siyle
+doldurur), `AVG(bitti − basladi)` (`percentile_cont` değil: iki satır yeter,
+rapor için ortalama okunur), `hata` iş sayısı ve onların TAHMİNİ kredisi (K8
+zararı: sağlayıcı faturaladı, kullanıcıya iade edildi). Admin metriklerinde
+7 ve 30 gün yan yana; `tools/marj_raporu.py` aynı işlevi CSV'ye döker.
+
 ZAMAN PARAMETRE (`an`): `kota.py`nin aynı kararı — testler saatle oynamaz,
 `an` verir; pencere sınırı `>` (dâhil değil). Konuşmaz: cümle yok, sözlük
 döner; 404/409 metnini rota kurar (`services/db.py`nin `database_unavailable`
@@ -40,11 +56,13 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import Select, case, func, select, update
 from sqlalchemy.orm import Session
 
+import catalog
 from services import kota, kuyruk, platform_anahtari, zaman
 from services.tablolar import (
     DURUM_BEKLIYOR,
@@ -60,7 +78,8 @@ from services.tablolar import (
 
 __all__ = ["CANLI_ESIK", "SAYFA_ADEDI", "SAYFA_ADEDI_AZAMI", "IS_LISTESI_SINIRI",
            "kullanicilar", "kullanici_bul", "oturum_sayisi", "tavan_yaz", "plan_yaz",
-           "is_listesi", "is_satiri", "is_iptal", "is_dokumu", "metrikler"]
+           "is_listesi", "is_satiri", "is_iptal", "is_dokumu", "metrikler", "marj",
+           "MARJ_PENCERELERI"]
 
 # İşçi kalbi 30 sn (services/isci.py); üç kaçırılan kalp = bayat. Bayat işçi
 # satırı listede KALIR (admin "kim kaldı" sorusunu buradan okur), yalnız `canli` düşer.
@@ -73,6 +92,11 @@ IS_LISTESI_SINIRI = 200
 
 _BIR_SAAT = dt.timedelta(hours=1)
 _BIR_GUN = dt.timedelta(hours=24)
+# Admin "Marj" tablosunun iki penceresi (gün): haftalık bakış ve fatura dönemi.
+MARJ_PENCERELERI: tuple[int, ...] = (7, 30)
+
+# Biten işte gerçek, bitmemiş/düşmüş işte rezerv (gerekçe modül başında).
+_KREDI = func.coalesce(Is.kredi_gercek, Is.kredi_tahmini)
 
 
 def _damga(t: dt.datetime | None) -> str | None:
@@ -103,8 +127,9 @@ def kullanicilar(db: Session, *, q: str | None = None, sayfa: int = 1, adet: int
 
     Her satırda üç türetilmiş alan, üçü de korelasyonlu alt sorgu (tek gidiş-dönüş,
     sayfa 50 satır): `son_gorulme` (oturumların en yenisi), `kredi_24sa` (son 24
-    saatte PLATFORM anahtarıyla sıraya alınan tahmin, `iptal` hariç —
-    `kota.gunluk_durum`un aynı süzgeci) ve `aktif_is` (bekliyor + calisiyor).
+    saatte PLATFORM anahtarıyla sıraya alınan kredi — bitende gerçek, ötekinde
+    rezerv (`_KREDI`, Faz 3 / 5) —, `iptal` hariç, `kota.gunluk_durum`un aynı
+    süzgeci) ve `aktif_is` (bekliyor + calisiyor).
     `plan` ve `bakiye` (Faz 3 / 3) satırın kendi sütunları: admin plan seçiciyi ve
     "kredi ekle" alanını bunlardan kurar; `bakiye` defterin önbelleği (`defter.bakiye`
     ile aynı sütun, ikinci bir SUM yok).
@@ -114,7 +139,7 @@ def kullanicilar(db: Session, *, q: str | None = None, sayfa: int = 1, adet: int
     adet = max(1, min(adet, SAYFA_ADEDI_AZAMI))
     son_gorulme = (select(func.max(Oturum.son_gorulme))
                    .where(Oturum.kullanici_id == Kullanici.id).scalar_subquery())
-    kredi = (select(func.coalesce(func.sum(Is.kredi_tahmini), 0))
+    kredi = (select(func.coalesce(func.sum(_KREDI), 0))
              .where(Is.kullanici_id == Kullanici.id, Is.durum != DURUM_IPTAL,
                     Is.anahtar_kaynagi == platform_anahtari.KAYNAK_PLATFORM,
                     Is.olusturuldu > an - kota.GUNLUK_PENCERE).scalar_subquery())
@@ -244,17 +269,17 @@ def _pencereler(db: Session, an: dt.datetime) -> tuple[dict[str, Any], dict[str,
 
 
 def metrikler(db: Session, an: dt.datetime | None = None) -> dict[str, Any]:
-    """`GET /api/admin/metrikler` gövdesi — beş sorgu, hepsi `isler`/`isciler` (belge §8)."""
+    """`GET /api/admin/metrikler` gövdesi — beş sorgu + iki marj penceresi, hepsi `isler`/`isciler` (belge §8; marj Faz 3 / 5)."""
     an = an if an is not None else zaman.an()
     bekleyen, calisan, en_eski = db.execute(
         select(func.count(case((Is.durum == DURUM_BEKLIYOR, 1))),
                func.count(case((Is.durum == DURUM_CALISIYOR, 1))),
                func.min(case((Is.durum == DURUM_BEKLIYOR, Is.olusturuldu))))
         .where(Is.durum.in_(kuyruk.AKTIF_DURUMLAR))).one()
-    platform_kredi = db.scalar(
-        select(func.coalesce(func.sum(Is.kredi_tahmini), 0))
+    platform_kredi, platform_rezerv = db.execute(
+        select(func.coalesce(func.sum(_KREDI), 0), func.coalesce(func.sum(Is.kredi_tahmini), 0))
         .where(Is.durum != DURUM_IPTAL, Is.anahtar_kaynagi == platform_anahtari.KAYNAK_PLATFORM,
-               Is.olusturuldu > an - _BIR_GUN))
+               Is.olusturuldu > an - _BIR_GUN)).one()
     # `percentile_cont(p) WITHIN GROUP (ORDER BY extract(epoch FROM bitti - basladi))`:
     # son 24 saatte BİTEN işler, model başına. `basladi` NULL olan satır (ham
     # SQL'le kapanmış) süreye girmez.
@@ -272,12 +297,64 @@ def metrikler(db: Session, an: dt.datetime | None = None) -> dict[str, Any]:
         "kuyruk": {"derinlik": int(bekleyen or 0), "calisan": int(calisan or 0),
                    "en_eski_bekleyen_sn": _saniye(en_eski, an)},
         "son_1sa": son_1sa,
-        "son_24sa": {**son_24sa, "platform_kredi": int(platform_kredi or 0)},
+        "son_24sa": {**son_24sa, "platform_kredi": int(platform_kredi or 0),
+                     "platform_kredi_rezerv": int(platform_rezerv or 0)},
         "modeller": [{"model": m, "adet": int(n), "p50_sn": round(float(p50), 2),
                       "p95_sn": round(float(p95), 2)} for m, n, p50, p95 in modeller],
         "isciler": [{"id": str(i.id), "konak": i.konak, "surum": i.surum,
                      "es_zamanli": i.es_zamanli, "basladi": _damga(i.basladi),
                      "son_kalp": _damga(i.son_kalp), "canli": i.son_kalp > an - CANLI_ESIK}
                     for i in isciler],
+        # Faz 3 / 5: 7 ve 30 günlük pencereler tek düz liste, satırda `gun` (admin.js tek tablo çizer).
+        "marj": [satir for gun in MARJ_PENCERELERI for satir in marj(db, gun, an)],
     }
+
+
+def marj(db: Session, gun: int, an: dt.datetime | None = None) -> list[dict[str, Any]]:
+    """Model başına tarife–maliyet satırları: son `gun` günde KAPANAN (`bitti > an - gun`) işler — TEK sorgu.
+
+    Satır: `model`, `gun`, `adet` (biten iş), `kredi` (Σ `kredi_gercek`), `usd`
+    (kredi × `catalog.KREDI_USD_CAPASI`, tarifemizin USD karşılığı), `maliyet_usd`
+    (Σ `saglayici_maliyet_usd`, yalnız dolu satırlar; hiç dolu yoksa `None`),
+    `maliyet_bilinen` (kaç biten satır dolu — "bilinen n/N"), `ort_sure_sn`
+    (`AVG(bitti − basladi)`, biten; `basladi` NULL olan satır süreye girmez),
+    `hata` (düşen iş sayısı) ve `hata_kredi` (onların TAHMİNİ kredisi — K8:
+    sağlayıcı faturalamış olabilir, kullanıcıya iade edildi, fark platformun).
+    `iptal`/aktif işler girmez: ne faturalandı ne bitti. Sıra: en çok iş üstte,
+    sonra model adı (`metrikler.modeller` ile aynı).
+
+    Pencere `bitti`ye göre, `olusturuldu`ya değil: fatura kapanışa düşer ve
+    30 gün önce sıraya girip bugün biten iş bu ayın faturasında. Marj
+    hesabı BURADA DEĞİL: `usd − maliyet_usd` farkını okuyan çıkarır; bugün
+    `maliyet_usd` çoğunlukla `None` ve `None`dan fark uydurmak yalan olurdu.
+    """
+    an = an if an is not None else zaman.an()
+    biten = Is.durum == DURUM_BITTI
+    dusen = Is.durum == DURUM_HATA
+    sure = func.extract("epoch", Is.bitti - Is.basladi)
+    satirlar = db.execute(
+        select(Is.model,
+               func.count(case((biten, 1))),
+               func.coalesce(func.sum(case((biten, Is.kredi_gercek))), 0),
+               func.sum(case((biten, Is.saglayici_maliyet_usd))),
+               func.count(case((biten & Is.saglayici_maliyet_usd.is_not(None), 1))),
+               func.avg(case((biten & Is.basladi.is_not(None), sure))),
+               func.count(case((dusen, 1))),
+               func.coalesce(func.sum(case((dusen, Is.kredi_tahmini))), 0))
+        .where(Is.durum.in_((DURUM_BITTI, DURUM_HATA)), Is.bitti.is_not(None),
+               Is.bitti > an - dt.timedelta(days=gun))
+        .group_by(Is.model).order_by(func.count().desc(), Is.model)).all()
+    return [{
+        "model": model,
+        "gun": gun,
+        "adet": int(adet),
+        "kredi": int(kredi),
+        # `float(Decimal)`: JSON'a sayı olarak gitsin; 4 hane 0,0001 USD (kredi çapasının onda biri).
+        "usd": round(float(Decimal(int(kredi)) * catalog.KREDI_USD_CAPASI), 4),
+        "maliyet_usd": round(float(maliyet), 6) if maliyet is not None else None,
+        "maliyet_bilinen": int(bilinen),
+        "ort_sure_sn": round(float(sure_ort), 2) if sure_ort is not None else None,
+        "hata": int(hata),
+        "hata_kredi": int(hata_kredi),
+    } for model, adet, kredi, maliyet, bilinen, sure_ort, hata, hata_kredi in satirlar]
 

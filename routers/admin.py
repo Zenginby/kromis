@@ -104,7 +104,8 @@ def isler(durum: str | None = Query(default=None), db: Session = OTURUM,
 @router.get("/api/admin/metrikler")
 def metrikler(db: Session = OTURUM,
               admin: Kullanici = Depends(kimlik.admin_kullanici)) -> dict:
-    """Kuyruk, son 1 sa / 24 sa, model başına p50/p95, platform kredisi, işçiler (services/depo_admin.py)."""
+    """Kuyruk, son 1 sa / 24 sa, model başına p50/p95, platform kredisi (gerçek + rezerv), işçiler ve
+    `marj` (Faz 3 / 5: model başına 7/30 gün tarife–maliyet satırları) — hepsi services/depo_admin.py."""
     return depo_admin.metrikler(db)
 
 

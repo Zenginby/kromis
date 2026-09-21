@@ -988,5 +988,16 @@
   "settings.kendi_anahtar_kullaniliyor": "Your own key is in use.",
   "isler.gunluk_kalan": "Daily remaining: {kalan} / {tavan} credits",
   "admin.sutun_p50": "p50 (s)",
-  "admin.sutun_p95": "p95 (s)"
+  "admin.sutun_p95": "p95 (s)",
+  "admin.metrik_marj": "Tariff vs. cost (margin): per model, 7 and 30 days, closed jobs",
+  "admin.metrik_rezerv": "reserved {kredi}",
+  "admin.sutun_gun": "Days",
+  "admin.sutun_kredi": "Credits (actual)",
+  "admin.sutun_usd": "≈ USD",
+  "admin.sutun_maliyet_usd": "Provider USD",
+  "admin.sutun_ort_sure": "Avg. duration (s)",
+  "admin.sutun_hata": "Errors",
+  "admin.marj_bilinmiyor": "unknown ({bilinen}/{toplam})",
+  "admin.marj_maliyet": "{usd} (known {bilinen}/{toplam})",
+  "admin.marj_hata": "{adet} jobs · {kredi} credits"
 }

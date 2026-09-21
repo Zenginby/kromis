@@ -52,6 +52,7 @@ import catalog
 import credstore
 import i18n
 import providers
+from services import saglayici_meta
 
 GENERATE_PATH = "/mai/v1/images/generations"
 EDIT_PATH = "/mai/v1/images/edits"
@@ -259,6 +260,9 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, n: int, images,
                                     "width": str(w), "height": str(h)},
                               files=build_image_file(images))
             out.extend(decode_images(govde))
+            # Yan kanal (Faz 3 / 5, K8): `usage.num_output_tokens` gövdede zaten var (sonda
+            # 1024×1024 için 1024 ölçtü); işçi bağlam açmışsa toplar, açmamışsa no-op.
+            saglayici_meta.kaydet(usage=govde.get("usage"))
         return out[:n]
     finally:
         if owns:

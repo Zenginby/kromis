@@ -43,6 +43,7 @@ Android bir gün geri gelirse ince bir WebView kabuğu olarak gelir, Python
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 
 
 @dataclass(frozen=True)
@@ -451,6 +452,16 @@ MAI_SIZES: tuple[str, ...] = (
 # ÖLÇÜLMEDİ; üç jeton tavanın çok altında kaldığı için ilk tur güvenli.
 # Mandal: tests/test_catalog.py::test_FLUX_jetonlari_gpt_image_2_ile_AYNI.
 FLUX_SIZES: tuple[str, ...] = ("1024x1024", "1024x1536", "1536x1024")
+
+
+# KREDİ ÇAPASI, SAYI OLARAK (Faz 3 / 5): aşağıdaki yorum bloklarının tekrar
+# tekrar yazdığı oran — Azure `medium` = 8 kredi ≈ 0,04 USD, yani 1 kredi ≈
+# 0,005 USD. Admin "Marj" tablosu (services/depo_admin.py `marj`) ve
+# `tools/tarife_kontrol.py` "bu kadar kredi ≈ kaç USD" derken buradan okur;
+# yorumdaki sayı ile koddaki sayı tek yerde dursun. Bu bir ORAN, sağlayıcının
+# fiyatı değil: gerçek fatura `isler.saglayici_maliyet_usd`e gelir, rapor ikisini
+# yan yana koyar. `Decimal`: `numeric(10,6)` sütunuyla çarpılıyor, float değil.
+KREDI_USD_CAPASI = Decimal("0.005")
 
 
 # ── Görsel modelleri ────────────────────────────────────────────────────

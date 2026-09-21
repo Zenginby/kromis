@@ -67,6 +67,7 @@ import catalog
 import credstore
 import i18n
 import providers
+from services import saglayici_meta
 
 # Yüklenen referans karenin MIME'ı. `app._to_png` girdiyi koşulsuz PNG'ye
 # çevirdiği için sağlayıcıya sorulacak bir şey yok (`veo_client.PNG_MIME`
@@ -664,6 +665,9 @@ def _tek_uretim(client, key: str, taban: str, yol: str, payload: dict,
     if not _REQUEST_ID.match(rid):
         raise ac.ImageError(
             i18n.t("err.fal_no_request_id", None, anahtarlar=sorted(kuyruk)))
+    # Yan kanal (Faz 3 / 5, K8): doğrulanmış `request_id` işin satırına — fal tarafında
+    # faturalanan işi fatura CSV'siyle eşlemenin tek anahtarı. Bağlam yoksa no-op.
+    saglayici_meta.kaydet(request_id=rid)
 
     # ── 2. Yoklama ───────────────────────────────────────────────────────
     # Döngü UYKUYLA DEĞİL KONTROLLE başlıyor: kısa bir iş ilk yanıtta

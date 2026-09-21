@@ -988,5 +988,16 @@
   "settings.kendi_anahtar_kullaniliyor": "Kendi anahtarın kullanılıyor.",
   "isler.gunluk_kalan": "Günlük kalan: {kalan} / {tavan} kredi",
   "admin.sutun_p50": "p50 (sn)",
-  "admin.sutun_p95": "p95 (sn)"
+  "admin.sutun_p95": "p95 (sn)",
+  "admin.metrik_marj": "Tarife–maliyet (marj): model başına, 7 ve 30 gün, kapanan işler",
+  "admin.metrik_rezerv": "rezerv edilen {kredi}",
+  "admin.sutun_gun": "Gün",
+  "admin.sutun_kredi": "Kredi (gerçek)",
+  "admin.sutun_usd": "≈ USD",
+  "admin.sutun_maliyet_usd": "Sağlayıcı USD",
+  "admin.sutun_ort_sure": "Ort. süre (sn)",
+  "admin.sutun_hata": "Hata",
+  "admin.marj_bilinmiyor": "bilinmiyor ({bilinen}/{toplam})",
+  "admin.marj_maliyet": "{usd} (bilinen {bilinen}/{toplam})",
+  "admin.marj_hata": "{adet} iş · {kredi} kredi"
 }

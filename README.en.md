@@ -54,6 +54,9 @@ when the version does.
 > (Turkish), then database and accounts: [docs/faz1-veritabani-hesaplar.md](docs/faz1-veritabani-hesaplar.md)
 > (Turkish), then job queue, platform keys and object storage:
 > [docs/faz2-kuyruk-anahtarlar-depolama.md](docs/faz2-kuyruk-anahtarlar-depolama.md)
+> (Turkish), then credit ledger, plans and watermark: [docs/faz3-kredi-defteri-filigran.md](docs/faz3-kredi-defteri-filigran.md)
+> (Turkish), then payments (Polar), credit packs, account deletion and legal texts (plan):
+> [docs/faz4-odeme-abonelik-kvkk.md](docs/faz4-odeme-abonelik-kvkk.md)
 > (Turkish). If desktop/Android come back one day, they come back as thin
 > shells around the web app.
 

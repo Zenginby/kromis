@@ -40,6 +40,8 @@ Bağlantılar her zaman **en son yayına** gider; sürüm yükselince adres değ
 > ilk adımların listesi: [docs/faz0-web-first.md](docs/faz0-web-first.md),
 > veri tabanı ve hesaplar: [docs/faz1-veritabani-hesaplar.md](docs/faz1-veritabani-hesaplar.md),
 > kuyruk, platform anahtarları ve nesne depolama: [docs/faz2-kuyruk-anahtarlar-depolama.md](docs/faz2-kuyruk-anahtarlar-depolama.md),
+> kredi defteri, planlar ve filigran: [docs/faz3-kredi-defteri-filigran.md](docs/faz3-kredi-defteri-filigran.md),
+> ödeme (Polar), paketler, hesap silme ve hukuki metinler (plan): [docs/faz4-odeme-abonelik-kvkk.md](docs/faz4-odeme-abonelik-kvkk.md),
 > stüdyo arayüzü için sahibin ileriye dönük notları: [docs/studyo-guncelleme-plani.md](docs/studyo-guncelleme-plani.md).
 > Masaüstü/Android bir gün geri gelirse web uygulamasını gösteren ince bir
 > kabuk olarak gelir.

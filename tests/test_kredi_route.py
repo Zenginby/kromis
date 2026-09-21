@@ -2,8 +2,10 @@
 
 Gerçek Postgres (`depo_db`): bakiye ve hareketler defterden okunur, RLS
 politikaları ve kullanıcı süzgeci birlikte ölçülür. Sekiz soru:
-  (i)   ALANLAR — `{bakiye, plan, hibe, sonraki_hibe, filigran, video, son_hareketler}`,
-        fazlası yok; plan kuralları `PLANLAR`dan (arayüz kataloğu tekrar etmez).
+  (i)   ALANLAR — `{bakiye, paket_bakiye, toplam, plan, plan_bitis, hibe, sonraki_hibe, filigran, video,
+        son_hareketler}`, fazlası yok; plan kuralları `PLANLAR`dan (arayüz kataloğu tekrar etmez).
+        Faz 4 / 2: `bakiye` HİBE kovası olarak kalır, `paket_bakiye` ikinci kova, `toplam` ikisi;
+        `plan_bitis` iptal edilmiş aboneliğin dönem sonu (3. görev yazar, bugün null).
   (ii)  SONRAKİ HİBE — gelecek ayın ilk günü, `aylik_hibe_yaz`ın `%Y-%m` anahtarıyla
         AYNI takvimde (`zaman.an()`ın dilimi), `damga_utc` biçiminde; yıl devri.
   (iii) SINIR — en yeni üstte, en çok 20 (`KREDI_HAREKET_SINIRI`).
@@ -35,8 +37,9 @@ from services.tablolar import Kullanici
 pytestmark = pytest.mark.usefixtures("depo_db")
 
 AN = dt.datetime(2026, 9, 18, 12, 0, tzinfo=dt.UTC)
-ALANLAR = {"bakiye", "plan", "hibe", "sonraki_hibe", "filigran", "video", "son_hareketler"}
-HAREKET_ALANLARI = {"id", "tur", "miktar", "aciklama", "is_id", "olusturuldu"}
+ALANLAR = {"bakiye", "paket_bakiye", "toplam", "plan", "plan_bitis", "hibe", "sonraki_hibe", "filigran", "video",
+           "son_hareketler"}
+HAREKET_ALANLARI = {"id", "tur", "kova", "miktar", "aciklama", "is_id", "olusturuldu"}
 
 
 @pytest.fixture(autouse=True)
@@ -80,6 +83,7 @@ def test_the_credit_endpoint_reports_balance_plan_grant_and_rules_for_a_free_use
     assert set(govde) == ALANLAR
     ucretsiz = planlar.PLANLAR["free"]
     assert govde["bakiye"] == 200 and govde["plan"] == "free"
+    assert (govde["paket_bakiye"], govde["toplam"], govde["plan_bitis"]) == (0, 200, None)
     assert govde["hibe"] == ucretsiz.aylik_hibe
     assert govde["filigran"] is ucretsiz.filigran is True
     assert govde["video"] is ucretsiz.video is False
@@ -90,6 +94,7 @@ def test_the_credit_endpoint_reports_balance_plan_grant_and_rules_for_a_free_use
 def test_a_user_with_no_ledger_yet_gets_zero_and_an_empty_list(c):
     govde = c.get("/api/kredi").json()
     assert govde["bakiye"] == 0 and govde["son_hareketler"] == []
+    assert (govde["paket_bakiye"], govde["toplam"]) == (0, 0)
 
 
 # ─────────────────────────────────────────────────────── (ii) sonraki hibe
@@ -132,6 +137,7 @@ def test_a_movement_row_exposes_only_the_public_fields(c, depo_db, kullanici):
     satir = c.get("/api/kredi").json()["son_hareketler"][0]
     assert set(satir) == HAREKET_ALANLARI, "admin_id / idempotency_anahtari dökülmez"
     assert satir["tur"] == "duzeltme" and satir["miktar"] == 15 and satir["aciklama"] == "test düzeltmesi"
+    assert satir["kova"] == "hibe"
     assert satir["is_id"] is None
     assert satir["olusturuldu"] == zaman.damga_utc(AN) and satir["olusturuldu"].endswith("Z")
     uuid.UUID(satir["id"])
@@ -174,6 +180,33 @@ def test_a_reserved_job_shows_as_a_negative_reserve_row_linked_to_the_job(c, dep
     assert govde["bakiye"] == 100 - tahmin
     rezerv = govde["son_hareketler"][0]
     assert rezerv["tur"] == "rezerv" and rezerv["miktar"] == -tahmin and rezerv["is_id"] == is_id
+
+
+# ───────────────────────────────────────────────────────── (ix) iki kova (Faz 4 / 2)
+
+def test_the_two_buckets_and_the_total_are_reported_and_each_movement_names_its_bucket(c, depo_db, kullanici):
+    """K3: `bakiye` hibe kovası, `paket_bakiye` paket kovası, `toplam` ikisi; rezerv hibeyi tüketip pakete geçince
+    iki `rezerv` satırı (`kova` alanı ayırır); `plan_bitis` sütun doluysa `damga_utc` biçiminde döner."""
+    spec = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
+    assert spec is not None
+    tahmin = catalog.cost_for(spec, "medium")
+    hibe = tahmin - 1                       # hibe yetmez, kalan 1 kredi paketten: iki kova da oynar
+    assert hibe > 0, "tarife en az 2 kredi olmalı ki bölüşüm görülsün"
+    _hibe(depo_db, kullanici.id, hibe)
+    with Session(depo_db) as s:
+        assert defter.paket_yukle(s, kullanici.id, 500, "paket:ord_test", an=AN) is True
+        is_ = kuyruk.ekle(s, kullanici.id, "generate", {"prompt": "x"}, spec.id, tahmin,
+                          an=AN + dt.timedelta(minutes=1), anahtar_kaynagi="platform")
+        defter.rezerve(s, kullanici.id, is_.id, tahmin, an=AN + dt.timedelta(minutes=1))
+        s.execute(text("UPDATE kullanicilar SET plan_bitis = :t WHERE id = :k"),
+                  {"t": dt.datetime(2026, 11, 12, tzinfo=dt.UTC), "k": kullanici.id})
+        s.commit()
+    govde = c.get("/api/kredi").json()
+    assert (govde["bakiye"], govde["paket_bakiye"], govde["toplam"]) == (0, 499, 499)
+    assert govde["plan_bitis"] == "2026-11-12T00:00:00Z"
+    kovali = [(h["tur"], h["kova"], h["miktar"]) for h in govde["son_hareketler"]]
+    assert set(kovali[:2]) == {("rezerv", "hibe", -hibe), ("rezerv", "paket", -1)}, kovali
+    assert ("paket", "paket", 500) in kovali and ("hibe", "hibe", hibe) in kovali
 
 
 # ──────────────────────────────────────────────────────── (viii) model kaynağı

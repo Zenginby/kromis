@@ -23,8 +23,9 @@ rotanın kabul ettiği ayrışmasın; credstore'un var olma gerekçesi) ve işin
 `anahtar_kaynagi`ni döndürür. Kota kapıları services/kota.py'de.
 
 Yedinci kapı `check_bakiye` + `rezerve_kredi` (Faz 3 / 2, K2/K9/K11): platform
-anahtarıyla koşacak işin TAHMİNİ kadar kredi var mı. İki yarım, iki sebep:
-`check_bakiye` SALT OKUR (`defter.bakiye < tahmin` → 402) ve `_kapilar`
+anahtarıyla koşacak işin TAHMİNİ kadar kredi var mı (Faz 4 / 2'den beri iki
+kovanın TOPLAMI — hibe + paket; bölüşümü defter yapar). İki yarım, iki sebep:
+`check_bakiye` SALT OKUR (`defter.bakiye(...).toplam < tahmin` → 402) ve `_kapilar`
 zincirinin sonunda, girdi nesnesi yazılmadan ÖNCE koşar — 429 gibi 402 de
 depoya nesne bırakmasın; `rezerve_kredi` ise YAZAR (`defter.rezerve`, atomik
 `UPDATE … WHERE bakiye >= :m`) ve ancak `kuyruk.ekle`den sonra çağrılabilir
@@ -224,9 +225,11 @@ def check_plan(db: Session, kullanici: Kullanici, spec: catalog.ImageModel) -> s
     return plan
 
 
-def _yetersiz_bakiye(db: Session, kullanici: Kullanici, bakiye: int, gereken: int) -> HTTPException:
-    """402 gövdesi (K11): `kod` + üç sayı/ad; cümle YOK — ön yüz `kod`u kendi dilinde kurar
-    (`err.kredi_yetersiz`), üç alan da kullanıcıya "ne kadar var, ne kadar lazım, hangi plan" der.
+def _yetersiz_bakiye(db: Session, kullanici: Kullanici, bakiye: int, gereken: int, *,
+                     hibe: int, paket: int) -> HTTPException:
+    """402 gövdesi (K11): `kod` + sayılar/ad; cümle YOK — ön yüz `kod`u kendi dilinde kurar
+    (`err.kredi_yetersiz`), alanlar kullanıcıya "ne kadar var, ne kadar lazım, hangi plan" der.
+    `bakiye` iki kovanın TOPLAMI (Faz 3'ün adı korunur — ön yüz onu okur), `hibe`/`paket` kovalar ayrı (Faz 4 / 2).
 
     `plan` DB'den, `kullanici.plan`dan değil: sütun `server_default`lı ve
     bağımlılığın verdiği nesne başka bir oturumdan gelmiş/süresi geçmiş
@@ -236,11 +239,11 @@ def _yetersiz_bakiye(db: Session, kullanici: Kullanici, bakiye: int, gereken: in
     plan = db.scalar(select(Kullanici.plan).where(Kullanici.id == kullanici.id))
     return HTTPException(status_code=402,
                          detail={"kod": "err.kredi_yetersiz", "bakiye": bakiye, "gereken": gereken,
-                                 "plan": plan})
+                                 "plan": plan, "hibe": hibe, "paket": paket})
 
 
 def check_bakiye(db: Session, kullanici: Kullanici, kredi_tahmini: int, anahtar_kaynagi: str | None) -> None:
-    """Salt okunur ön denetim: platform işinde `bakiye < tahmin` ise 402; BYOK'ta sessiz (K3).
+    """Salt okunur ön denetim: platform işinde iki kovanın TOPLAMI `< tahmin` ise 402; BYOK'ta sessiz (K3).
 
     Kapı zincirinin SONUNDA, `check_gunluk`ten sonra (K9: tavan önce sorulur,
     429 dediyse bakiye hiç okunmaz bile). Kesin karar `rezerve_kredi`nin —
@@ -248,9 +251,9 @@ def check_bakiye(db: Session, kullanici: Kullanici, kredi_tahmini: int, anahtar_
     """
     if anahtar_kaynagi != platform_anahtari.KAYNAK_PLATFORM:
         return
-    bakiye = defter.bakiye(db, kullanici.id)
-    if bakiye < kredi_tahmini:
-        raise _yetersiz_bakiye(db, kullanici, bakiye, kredi_tahmini)
+    b = defter.bakiye(db, kullanici.id)
+    if b.toplam < kredi_tahmini:
+        raise _yetersiz_bakiye(db, kullanici, b.toplam, kredi_tahmini, hibe=b.hibe, paket=b.paket)
 
 
 def rezerve_kredi(db: Session, kullanici: Kullanici, is_id: uuid.UUID, kredi_tahmini: int,
@@ -266,4 +269,4 @@ def rezerve_kredi(db: Session, kullanici: Kullanici, is_id: uuid.UUID, kredi_tah
     try:
         return defter.rezerve(db, kullanici.id, is_id, kredi_tahmini)
     except defter.YetersizBakiye as e:
-        raise _yetersiz_bakiye(db, kullanici, e.bakiye, e.gereken) from e
+        raise _yetersiz_bakiye(db, kullanici, e.bakiye, e.gereken, hibe=e.hibe, paket=e.paket) from e

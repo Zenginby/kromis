@@ -601,6 +601,18 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
     sürecine aynı değerle verilir (yalnız birine verilirse kayıt hibesi ile
     aylık hibe farklı sayı olur).
 
+    *İki kova (Faz 4 / 2)* — bakiye artık iki kova: **aylık hibe**
+    (`kullanicilar.bakiye`, devretmez) ve **paket kredisi**
+    (`kullanicilar.paket_bakiye`, satın alınan, devreder — Polar webhook'u
+    yazar, Faz 4 / 3). Rezerv hibeden başlar, yetmezse paketten sürer; iade
+    önce pakete döner. Ücretli planların dönem hibesi `KROMIS_TEMEL_AYLIK_HIBE`
+    / `KROMIS_PRO_AYLIK_HIBE` (boş = 1.000 / 3.000; `.env.example` 1. bölüm,
+    web VE işçi). **Geçici köprü** `KROMIS_UCRETLI_HIBE_BAKIMDA=1` (yalnız
+    işçi): Faz 4 / 3 (Polar webhook) dağıtılmadan önce ücretli plandaki bir
+    hesabın aylık hibesini bakım turu tamamlamaya devam etsin — 3. görevle
+    birlikte SİL (yoksa tur + webhook ay ortasında iki kez tamamlar). Boşsa
+    tur yalnız `free` planı tamamlar.
+
     *Rezerv → onay → iade* — iş sıraya girerken tahmini kredi bakiyeden
     **rezerve** edilir (yetmezse **402** `err.kredi_yetersiz`, iş açılmaz);
     bitince gerçek maliyetle **onaylanır**, fark iade; hata / iptal / bayat
@@ -628,9 +640,10 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
     (depodan) katalogda "fiyat doğrulanamadı" notlu modelleri basar — bir kez
     sağlayıcı fiyatıyla karşılaştır, gerekirse `credits`i PR ile düzelt.
 
-    *Defter tutarlılığı* — işçinin bakım turu her 5 dk her kullanıcıda
-    `SUM(kredi_hareketleri) == bakiye` ölçer; sapma varsa `olay=defter.tutarsiz`
-    (WARNING, kullanıcı başına) ve `olay=bakim` satırında `tutarsiz_kullanici=N`
+    *Defter tutarlılığı* — işçinin bakım turu her 5 dk her kullanıcıda iki
+    kovayı ayrı ölçer (`SUM(kova=hibe) == bakiye`, `SUM(kova=paket) ==
+    paket_bakiye`); sapma varsa `olay=defter.tutarsiz` (WARNING, kullanıcı ve
+    `kova` başına) ve `olay=bakim` satırında `tutarsiz_kullanici=N`
     — tur düzeltmez, "kredi ekle" ile düzeltirsin. Yedeği ayrı değil: tablo DB
     yedeğinin içinde ([docs/isletme.md § 2, § 6, § 9](docs/isletme.md)).
 

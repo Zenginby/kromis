@@ -149,8 +149,9 @@ def _yukle(depo_db, kullanici_id: uuid.UUID, miktar: int, an: dt.datetime = EYLU
 
 
 def _bakiye(depo_db, kullanici_id: uuid.UUID) -> int:
+    """HİBE kovası (`kullanicilar.bakiye`): bu dosya hibeyi ölçer, paket kovası boş (Faz 4 / 2)."""
     with Session(depo_db) as db:
-        return defter.bakiye(db, kullanici_id)
+        return defter.bakiye(db, kullanici_id).hibe
 
 
 def _plan_yaz(depo_db, kullanici_id: uuid.UUID, plan: str, nesne: Kullanici | None = None) -> None:
@@ -188,7 +189,7 @@ def _toplam_esit_bakiye(depo_db, kullanici_id: uuid.UUID) -> None:
     with Session(depo_db) as db:
         toplam = int(db.scalar(select(func.coalesce(func.sum(KrediHareketi.miktar), 0))
                                .where(KrediHareketi.kullanici_id == kullanici_id)) or 0)
-        assert toplam == defter.bakiye(db, kullanici_id), "SUM(defter) != bakiye"
+        assert toplam == defter.bakiye(db, kullanici_id).hibe, "SUM(defter) != bakiye"
 
 
 def _isler(depo_db) -> list[tablolar.Is]:
@@ -411,12 +412,36 @@ def test_the_tour_skips_deleted_accounts_and_a_plan_whose_grant_is_zero(depo_db,
     assert _bakiye(depo_db, canli) == 200
 
 
-def test_pro_users_are_topped_up_to_their_own_placeholder_grant(depo_db):
+def test_pro_users_are_topped_up_by_the_tour_only_while_the_bridge_flag_is_on(depo_db, monkeypatch):
+    """Faz 4 / 2 (K6): ücretli planın dönem hibesi webhook'un (3. görev); bakım turu ücretli planı
+    YALNIZ `KROMIS_UCRETLI_HIBE_BAKIMDA=1` köprüsüyle tamamlar (Faz 3 davranışı) — 3 gelince kaldırılır."""
     u = _kullanici(depo_db, plan="pro")
     _yukle(depo_db, u, 500)
+    monkeypatch.delenv(planlar.UCRETLI_HIBE_BAKIMDA_ENV, raising=False)
+    _hibe_turu(depo_db, EYLUL)
+    assert _bakiye(depo_db, u) == 500, "bayrak kapalı: tur `pro`yu tamamlamaz"
+    monkeypatch.setenv(planlar.UCRETLI_HIBE_BAKIMDA_ENV, "1")
     _hibe_turu(depo_db, EYLUL)
     assert _bakiye(depo_db, u) == planlar.PLANLAR["pro"].aylik_hibe == 3_000
     _toplam_esit_bakiye(depo_db, u)
+    monkeypatch.setenv(planlar.UCRETLI_HIBE_BAKIMDA_ENV, "evet")
+    with pytest.raises(ValueError):
+        _hibe_turu(depo_db, EYLUL)
+    for ham, beklenen in (("", False), ("0", False), ("1", True)):
+        assert planlar.ucretli_hibe_bakimda({planlar.UCRETLI_HIBE_BAKIMDA_ENV: ham}) is beklenen
+
+
+def test_paid_plan_grants_come_from_the_environment_with_the_placeholders_as_defaults():
+    """Faz 4 / 2 (K5): `KROMIS_TEMEL_AYLIK_HIBE` / `KROMIS_PRO_AYLIK_HIBE`; boş = 1.000 / 3.000, bozuk gürültü."""
+    assert planlar.aylik_hibe(planlar.TEMEL_AYLIK_HIBE_ENV, planlar.TEMEL_AYLIK_HIBE_VARSAYILAN, {}) == 1_000
+    assert planlar.aylik_hibe(planlar.PRO_AYLIK_HIBE_ENV, planlar.PRO_AYLIK_HIBE_VARSAYILAN, {}) == 3_000
+    assert planlar.aylik_hibe(planlar.PRO_AYLIK_HIBE_ENV, 3_000, {planlar.PRO_AYLIK_HIBE_ENV: " 4500 "}) == 4_500
+    assert planlar.aylik_hibe(planlar.TEMEL_AYLIK_HIBE_ENV, 1_000, {planlar.TEMEL_AYLIK_HIBE_ENV: "0"}) == 0
+    for kotu in ("bin", "-1", "1.5"):
+        with pytest.raises(ValueError):
+            planlar.aylik_hibe(planlar.TEMEL_AYLIK_HIBE_ENV, 1_000, {planlar.TEMEL_AYLIK_HIBE_ENV: kotu})
+    assert planlar.PLANLAR["temel"].aylik_hibe == 1_000 and planlar.PLANLAR["pro"].aylik_hibe == 3_000
+    assert planlar.PLANLAR["pro"].fiyat is None, "fiyat Polar'da, aynası `urunler` (K5)"
 
 
 # ── (iv) RLS: kayıt hibesi ve bakım turu uygulama rolüyle ───────────────

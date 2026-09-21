@@ -84,7 +84,7 @@
 | `services.modeller` | `test_planlar.py` |
 | `services.nesne_depo` | `test_artik_dosya.py`, `test_dosya.py`, `test_dosya_rotalari.py`, `test_medya_tasi.py`, `test_nesne_depo.py` |
 | `services.palet` | `test_palet_db.py` |
-| `services.planlar` | `test_docker_kapisi.py`, `test_isci.py`, `test_kredi_route.py`, `test_planlar.py` |
+| `services.planlar` | `test_defter.py`, `test_docker_kapisi.py`, `test_isci.py`, `test_kredi_route.py`, `test_planlar.py` |
 | `services.platform_anahtari` | `test_admin.py`, `test_docker_kapisi.py`, `test_gunluk.py`, `test_kota.py`, `test_kredi_route.py`, `test_platform_anahtari.py` |
 | `services.posta` | `test_docker_kapisi.py`, `test_hesap.py`, `test_playwright_hesap.py`, `test_posta.py` |
 | `services.redaksiyon` | — |
@@ -122,8 +122,8 @@
 
 Bu modülleri hiçbir test dosyası ithal etmiyor. Dolaylı olarak sınanıyor olabilirler (`import app` app'in ithal ettiği her şeyi çalıştırır), ama doğrudan bekçileri yok.
 
-* `isci` (382 satır)
-* `routers.admin` (193 satır)
+* `isci` (384 satır)
+* `routers.admin` (195 satır)
 * `routers.ayarlar` (403 satır)
 * `routers.bindirme` (282 satır)
 * `routers.galeri` (401 satır)

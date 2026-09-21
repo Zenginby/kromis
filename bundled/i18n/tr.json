@@ -1024,6 +1024,8 @@
   "kredi.tur_iade": "iade",
   "kredi.tur_duzeltme": "düzeltme",
   "kredi.tur_sona_erme": "sona erme",
+  "kredi.tur_paket": "paket",
+  "kredi.kova_satiri": "Aylık hibe: {hibe} · paket kredisi: {paket}",
   "kredi.ise_git": "işi göster",
   "isler.kredi_ozet": "rezerv {rezerv} · gerçek {gercek} · iade {iade}",
   "isler.kredi_iade": "rezerv {rezerv} · tamamı iade"

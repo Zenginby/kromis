@@ -407,7 +407,7 @@ def _platformla(depo_db, kullanici, monkeypatch, bakiye: int = 100) -> None:
 
 def _bakiye(depo_db, kullanici) -> int:
     with Session(depo_db) as db:
-        return defter.bakiye(db, kullanici.id)
+        return defter.bakiye(db, kullanici.id).toplam
 
 
 def test_cancelling_a_waiting_platform_job_refunds_its_reserve_in_the_same_transaction(c, depo_db, kullanici,

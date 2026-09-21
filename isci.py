@@ -95,7 +95,7 @@ from sqlalchemy.orm import Session
 
 import errlog
 import version
-from services import ayar, db, dosya, gunluk, hata_izleme, isci, kuyruk, sifre, zaman
+from services import ayar, db, dosya, gunluk, hata_izleme, isci, kuyruk, planlar, sifre, zaman
 
 CIKIS_TAMAM = 0
 CIKIS_CALISMA = 1
@@ -321,6 +321,8 @@ def hazirla(*, tek_tur: bool, kalp_araligi: float, bakim_araligi: float) -> Sure
         es_zamanli = 1 if tek_tur else isci.es_zamanli()
         esik = isci.kalp_esigi()
         saklama = isci.saklama()
+        # Faz 4 / 2 → 3 köprüsü: bakım turu her 5 dk okuyacak; bozuk değer orada değil BURADA dursun.
+        planlar.ucretli_hibe_bakimda()
     except ValueError as e:
         _hata(str(e))
         return CIKIS_ORTAM

@@ -611,9 +611,11 @@ function showSettingsPane(ad) {
 // ── Kredi bölmesi (Faz 3 / 6) ───────────────────────────────────────
 // İçerik DİNAMİK, index.html'de yalnız kök (#settings-kredi): #settings-hesap
 // satırının deseni — belgenin metin çapalarına dokunulmuyor. Kaynak core.js'in
-// `krediDurumu`su (`GET /api/kredi`): bakiye, plan, aylık hibe ve tarihi, plan
-// kuralları (filigran/video — `PLANLAR`dan, arayüz kataloğu tekrar etmez), son
-// 20 hareket. Hareketin işi varsa düğme paneldeki satıra gider (`kromisIsler.goster`).
+// `krediDurumu`su (`GET /api/kredi`): toplam ve iki kova (Faz 4 / 2, K3: `bakiye`
+// aylık hibe — devretmez; `paket_bakiye` satın alınan kredi — devreder), plan,
+// aylık hibe ve tarihi, plan kuralları (filigran/video — `PLANLAR`dan, arayüz
+// kataloğu tekrar etmez), son 20 hareket. Hareketin işi varsa düğme paneldeki
+// satıra gider (`kromisIsler.goster`).
 //
 // Anahtarlar TABLODA ve harfiyen (isler.js `DURUM_ANAHTARI`nın gerekçesi):
 // tests/test_i18n.py betikleri anahtar biçimine uyan dizelerle tarıyor.
@@ -622,6 +624,8 @@ const KREDI_PLAN_ANAHTARI = {
   temel: "kredi.plan_temel",
   pro: "kredi.plan_pro",
 };
+// `HAREKET_TURLERI`nin (services/tablolar.py) her türü burada — bekçi
+// tests/test_kredi_route.py: tanınmayan tür "düzeltme"ye düşer, sessiz kalmaz.
 const KREDI_HAREKET_ANAHTARI = {
   hibe: "kredi.tur_hibe",
   rezerv: "kredi.tur_rezerv",
@@ -629,6 +633,7 @@ const KREDI_HAREKET_ANAHTARI = {
   iade: "kredi.tur_iade",
   duzeltme: "kredi.tur_duzeltme",
   sona_erme: "kredi.tur_sona_erme",
+  paket: "kredi.tur_paket",
 };
 
 /** `zaman.damga_utc` (`…Z`) → kullanıcının dilinde kısa tarih(+saat). */
@@ -651,6 +656,9 @@ function krediHareketSatiri(h) {
   const li = document.createElement("li");
   li.className = "kredi-hareket";
   li.dataset.tur = h.tur;
+  // Satırın oynattığı kova (Faz 4 / 2): `rezerv:<is_id>:paket` gibi ikinci kova
+  // satırı da `rezerv` türünde — hangi kova olduğunu yalnız bu alan söyler.
+  if (h.kova) li.dataset.kova = h.kova;
   const tur = document.createElement("span");
   tur.className = "kredi-tur";
   tur.textContent = t(KREDI_HAREKET_ANAHTARI[h.tur] || "kredi.tur_duzeltme");
@@ -690,11 +698,20 @@ function krediBolmesiniCiz() {
   bakiye.className = "kredi-bakiye";
   const sayi = document.createElement("strong");
   sayi.id = "settings-kredi-bakiye";
-  sayi.textContent = String(k.bakiye);
+  // Büyük sayı iki kovanın TOPLAMI (composer "kalan" ile aynı sayı); `??` eski cevap için.
+  sayi.textContent = String(k.toplam ?? k.bakiye);
   const birim = document.createElement("span");
   birim.textContent = ` ${t("kredi.bakiye_birim")}`;
   bakiye.append(sayi, birim);
   kok.appendChild(bakiye);
+  // İki kova satırı (Faz 4 / 2, K3): aylık hibe devretmez, paket devreder — kullanıcı
+  // hangisinin ne kadar olduğunu görsün; satın alma ve sipariş listesi 4. görevde.
+  kok.appendChild(
+    krediNotu(
+      t("kredi.kova_satiri", { hibe: k.bakiye, paket: k.paket_bakiye ?? 0 }),
+      "kredi-kovalar",
+    ),
+  );
   kok.appendChild(
     krediNotu(
       t("kredi.plan_satiri", { plan: t(KREDI_PLAN_ANAHTARI[k.plan] || "kredi.plan_free") }),

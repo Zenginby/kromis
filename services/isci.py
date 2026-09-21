@@ -748,11 +748,16 @@ def bakim_turu(db: Session, depo: dosya.Depo, an: dt.datetime, esik: dt.timedelt
         # (AST bekçisi) elle UPDATE ya da yarım kalmış bir transaksiyon
         # ancak burada görünür. Kullanıcı başına WARNING ki günlük kuralı
         # (`uyari`nınkiyle aynı yer) kimi düzelteceğini söylesin; düzeltilmez.
+        # İKİ KOVA (Faz 4 / 2, K3): sapan her kova AYRI satır (`kova` alanı) — hibe ve paket
+        # önbellekleri ayrı düzeltilir; `tutarsiz_kullanici` yine kullanıcı sayar.
         sapmalar = defter.tutarlilik(db)
-        for kullanici_id, bakiye, toplam in sapmalar:
-            gunluk.olay(_gunluk, "defter.tutarsiz", "bakiye onbellegi defter toplamindan sapti",
-                        seviye=logging.WARNING, kullanici_id=str(kullanici_id), bakiye=bakiye,
-                        toplam=toplam, fark=bakiye - toplam)
+        for sapma in sapmalar:
+            for kova, onbellek, toplam in ((defter.KOVA_HIBE, sapma.bakiye, sapma.hibe_toplam),
+                                           (defter.KOVA_PAKET, sapma.paket_bakiye, sapma.paket_toplam)):
+                if onbellek != toplam:
+                    gunluk.olay(_gunluk, "defter.tutarsiz", "bakiye onbellegi defter toplamindan sapti",
+                                seviye=logging.WARNING, kullanici_id=str(sapma.kullanici_id), kova=kova,
+                                bakiye=onbellek, toplam=toplam, fark=onbellek - toplam)
         ozet["tutarsiz_kullanici"] = len(sapmalar)
         db.commit()
     silinenler: list[kuyruk.SilinenIs] = []

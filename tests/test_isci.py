@@ -560,7 +560,7 @@ def test_a_finished_job_writes_its_real_credit_and_refunds_the_difference_in_the
 
     monkeypatch.setattr(providers, "generate", lambda *a, **k: [PNG])
     is_id = _rezerveli(db_oturumu, kullanici.id, tahmin=20)
-    assert defter.bakiye(db_oturumu, kullanici.id) == 80
+    assert defter.bakiye(db_oturumu, kullanici.id).toplam == 80
     event.listen(Session, "after_commit", _commit)
     try:
         assert isci.tek_tur(db_oturumu, depo, _an(5), ayarlar=yerlesim) is True
@@ -568,7 +568,7 @@ def test_a_finished_job_writes_its_real_credit_and_refunds_the_difference_in_the
         event.remove(Session, "after_commit", _commit)
     is_ = _is(db_oturumu, is_id)
     assert (is_.durum, is_.kredi_tahmini, is_.kredi_gercek) == ("bitti", 20, KREDI)
-    assert defter.bakiye(db_oturumu, kullanici.id) == 100 - 20 + (20 - KREDI) == 92
+    assert defter.bakiye(db_oturumu, kullanici.id).toplam == 100 - 20 + (20 - KREDI) == 92
     assert _defter(db_oturumu, kullanici.id) == [(defter.TUR_REZERV, -20, is_id), (defter.TUR_ONAY, 20 - KREDI, is_id)]
     assert sira == ["bitir", "onayla", "commit"], sira
 
@@ -580,7 +580,7 @@ def test_the_real_credit_is_the_sum_over_every_written_record(db_oturumu, kullan
     assert isci.tek_tur(db_oturumu, depo, ayarlar=yerlesim) is True
     is_ = _is(db_oturumu, is_id)
     assert is_.kredi_gercek == 2 * KREDI == sum(m.credits for m in _medya(db_oturumu, kullanici.id))
-    assert defter.bakiye(db_oturumu, kullanici.id) == 100 - 20 + (20 - 2 * KREDI)
+    assert defter.bakiye(db_oturumu, kullanici.id).toplam == 100 - 20 + (20 - 2 * KREDI)
 
 
 def test_a_real_cost_equal_to_the_estimate_leaves_a_zero_confirmation_row_and_no_refund(
@@ -590,7 +590,7 @@ def test_a_real_cost_equal_to_the_estimate_leaves_a_zero_confirmation_row_and_no
     is_id = _rezerveli(db_oturumu, kullanici.id, tahmin=KREDI)
     assert isci.tek_tur(db_oturumu, depo, ayarlar=yerlesim) is True
     assert _is(db_oturumu, is_id).kredi_gercek == KREDI
-    assert defter.bakiye(db_oturumu, kullanici.id) == 100 - KREDI
+    assert defter.bakiye(db_oturumu, kullanici.id).toplam == 100 - KREDI
     assert _defter(db_oturumu, kullanici.id) == [(defter.TUR_REZERV, -KREDI, is_id), (defter.TUR_ONAY, 0, is_id)]
 
 
@@ -604,7 +604,7 @@ def test_a_provider_error_refunds_the_whole_reserve_and_leaves_no_real_credit(
     assert isci.tek_tur(db_oturumu, depo, ayarlar=yerlesim) is True
     is_ = _is(db_oturumu, is_id)
     assert (is_.durum, is_.kredi_gercek) == ("hata", None)
-    assert defter.bakiye(db_oturumu, kullanici.id) == 100
+    assert defter.bakiye(db_oturumu, kullanici.id).toplam == 100
     assert _defter(db_oturumu, kullanici.id) == [(defter.TUR_REZERV, -20, is_id), (defter.TUR_IADE, 20, is_id)]
 
 
@@ -621,7 +621,7 @@ def test_a_write_error_deletes_the_objects_and_refunds_the_reserve(
     is_ = _is(db_oturumu, is_id)
     assert is_.durum == "hata" and is_.hata == f"{isci.BEKLENMEYEN_HATASI}: RuntimeError"
     assert _nesneler(tmp_path, kullanici.id) == [] and _medya(db_oturumu, kullanici.id) == []
-    assert defter.bakiye(db_oturumu, kullanici.id) == 100
+    assert defter.bakiye(db_oturumu, kullanici.id).toplam == 100
     assert _defter(db_oturumu, kullanici.id) == [(defter.TUR_REZERV, -20, is_id), (defter.TUR_IADE, 20, is_id)]
 
 
@@ -634,14 +634,14 @@ def test_the_heartbeat_refunds_every_job_it_drops_as_stale_in_the_admin_context(
     kuyruk.al(db_oturumu, ISCI, _an(0))
     kuyruk.al(db_oturumu, ISCI, _an(0))
     db_oturumu.commit()
-    assert defter.bakiye(db_oturumu, kullanici.id) == 150
+    assert defter.bakiye(db_oturumu, kullanici.id).toplam == 150
     gorulen: list[str | None] = []
     asil = defter.iade
     monkeypatch.setattr(defter, "iade", lambda *a, **k: gorulen.append(kiraci.aktif() and kiraci.aktif().rol) or asil(*a, **k))
     assert isci.kalp_turu(db_oturumu, ISCI, [], _an(400), ESIK).dusen == 2
     assert gorulen == [kiraci.ADMIN, kiraci.ADMIN], "iade admin bağlamında çağrıldı"
     assert (_is(db_oturumu, a).durum, _is(db_oturumu, b).durum) == ("hata", "hata")
-    assert defter.bakiye(db_oturumu, kullanici.id) == 200
+    assert defter.bakiye(db_oturumu, kullanici.id).toplam == 200
     assert sorted(_defter(db_oturumu, kullanici.id)) == sorted([
         (defter.TUR_REZERV, -20, a), (defter.TUR_REZERV, -30, b), (defter.TUR_IADE, 20, a), (defter.TUR_IADE, 30, b)])
 
@@ -661,7 +661,7 @@ def test_a_job_dropped_as_stale_and_then_failed_by_its_late_worker_is_refunded_o
     assert isci.tek_tur(db_oturumu, depo, _an(0), ayarlar=yerlesim) is True
     is_ = _is(db_oturumu, is_id)
     assert (is_.durum, is_.hata) == ("hata", kuyruk.BAYAT_HATASI), "geç işçi bayat işi değiştiremez"
-    assert defter.bakiye(db_oturumu, kullanici.id) == 100
+    assert defter.bakiye(db_oturumu, kullanici.id).toplam == 100
     assert _defter(db_oturumu, kullanici.id) == [(defter.TUR_REZERV, -20, is_id), (defter.TUR_IADE, 20, is_id)]
 
 
@@ -673,7 +673,7 @@ def test_a_job_without_a_reserve_finishes_with_its_real_credit_but_touches_no_le
     is_id = _ekle(db_oturumu, kullanici.id)
     assert isci.tek_tur(db_oturumu, depo, ayarlar=yerlesim) is True
     assert (_is(db_oturumu, is_id).durum, _is(db_oturumu, is_id).kredi_gercek) == ("bitti", KREDI)
-    assert defter.bakiye(db_oturumu, kullanici.id) == 100 and _defter(db_oturumu, kullanici.id) == []
+    assert defter.bakiye(db_oturumu, kullanici.id).toplam == 100 and _defter(db_oturumu, kullanici.id) == []
     assert defter.iade(db_oturumu, is_id) is None, "bitmiş/rezervsiz iş iade edilmez"
 
 
@@ -747,7 +747,7 @@ def test_a_missing_watermark_asset_fails_the_job_with_a_type_code_and_refunds_th
     is_ = _is(db_oturumu, is_id)
     assert (is_.durum, is_.hata) == ("hata", f"{isci.BEKLENMEYEN_HATASI}: FiligranDosyasiYok")
     assert _medya(db_oturumu, kullanici.id) == [] and _nesneler(tmp_path, kullanici.id) == []
-    assert defter.bakiye(db_oturumu, kullanici.id) == 100
+    assert defter.bakiye(db_oturumu, kullanici.id).toplam == 100
     assert "FiligranDosyasiYok" in (tmp_path / "hata.log").read_text(encoding="utf-8")
 
 
@@ -1074,7 +1074,7 @@ def test_the_maintenance_turn_reports_a_ledger_drift_per_user_and_does_not_corre
     isci.bakim_turu(db_oturumu, depo, BAKIM_ANI, ESIK, SAKLAMA)
     with kiraci.baglam(rol=kiraci.ADMIN, oturum=db_oturumu):
         assert defter.tutarlilik(db_oturumu) == []
-        toplam = defter.bakiye(db_oturumu, kullanici.id)
+        toplam = defter.bakiye(db_oturumu, kullanici.id).hibe
     db_oturumu.execute(text("UPDATE kullanicilar SET bakiye = bakiye + 29 WHERE id = :id"), {"id": kullanici.id})
     db_oturumu.execute(text("UPDATE kullanicilar SET bakiye = bakiye - 5 WHERE id = :id"), {"id": oteki})
     db_oturumu.commit()

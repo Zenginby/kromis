@@ -1,7 +1,7 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
 # GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
 # Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
-"""Veri modeli — 14 tablo, SQLAlchemy 2 `DeclarativeBase` (Faz 1 / 2. görev; Faz 2 / 1: `isler`, `isciler`; Faz 3 / 1: `kredi_hareketleri`).
+"""Veri modeli — 17 tablo, SQLAlchemy 2 `DeclarativeBase` (Faz 1 / 2. görev; Faz 2 / 1: `isler`, `isciler`; Faz 3 / 1: `kredi_hareketleri`; Faz 4 / 2: `urunler`, `siparisler`, `odeme_olaylari`).
 
 Bu modül ŞEMANIN tek tanımı: Alembic `alembic/env.py`de `Base.metadata`yı
 okur, `alembic check` göç dosyalarının bu tanımdan ayrışmadığını sınar
@@ -22,6 +22,15 @@ Bir tablo Faz 3 / 1'in (docs/faz3-kredi-defteri-filigran.md §1): `kredi_hareket
 `services/defter.py`. Aynı göç (`0007_kredi`) ileriki görevlerin sütunlarını da
 getirir: `kullanicilar.plan`, `isler.kredi_gercek`/`saglayici_meta`/
 `saglayici_maliyet_usd`, `medya.filigranli` — hepsi NULL/öntanımlı, geriye uyumlu.
+Üç tablo Faz 4 / 2'nin (docs/faz4-odeme-abonelik-kvkk.md §2, göç `0008_odeme` —
+Faz 4'ün TEK göçü): `urunler` (Polar ürün AYNASI — fiyat ve Polar ürün id'si;
+`planlar` tablosu YOK, K5), `siparisler` (Polar `order.paid` → bizdeki satır;
+iş tablosu, `kullanici_id` taşır) ve `odeme_olaylari` (webhook teslimatlarının
+günlüğü, `webhook_id` UNIQUE = teslimat idempotency'si, K4). Aynı göç iki
+kovayı açar (K3): `kredi_hareketleri.kova` (`hibe`/`paket`) + `kullanicilar.
+paket_bakiye` (ikinci ÖNBELLEK), `tur` kümesine `paket`; ve 3-6. görevlerin
+sütunlarını getirir: `kullanicilar.polar_musteri_id`/`polar_abonelik_id`/
+`plan_bitis` (3), `sartlar_kabul_at`/`sartlar_surumu` (6), `temizlendi_at` (5).
 
 SÜTUN ADLARI — iki dil, tek kural. Bugünkü JSON kaydında da API gövdesinde
 de var olan alanlar ADINI KORUR (`filename`, `prompt`, `folder_id`, `palette`,
@@ -165,12 +174,40 @@ ANAHTAR_KAYNAKLARI: tuple[str, ...] = ("kullanici", "platform")
 # belge §1). `miktar` İMZALI: `rezerv` negatif (sıraya girerken tahmin düşer),
 # `onay` pozitif ya da 0 (gerçek < tahmin farkı geri gelir; "onaylandı" izi
 # fark 0 olsa da yazılır), `iade` pozitif (rezervin tamamı), `hibe` pozitif,
-# `duzeltme` her iki yön (admin), `sona_erme` negatif (Faz 3'te CHECK'te var,
-# yazan yok — K6 "hibeye tamamla" sona erme satırı gerektirmiyor; Faz 4'ün
-# paketleri yazar). `paket`/`satin_alma` Faz 4'te GÖÇLE eklenir: küme CHECK'te
-# kilitli (Faz 1 / 2'nin `text + CHECK` kararı), sessiz yeni tür yok — Faz 4
-# bu adları ve `idempotency_anahtari` biçimlerini (`rezerv:<is_id>` …) okuyacak.
-HAREKET_TURLERI: tuple[str, ...] = ("hibe", "rezerv", "onay", "iade", "duzeltme", "sona_erme")
+# `duzeltme` her iki yön (admin), `sona_erme` negatif (Faz 3'te CHECK'te vardı,
+# yazan yoktu; Faz 4 / 2 `defter.dusur` plan düşürmede hibe kovasını yeni
+# planın hibesine indirirken yazar), `paket` pozitif (Faz 4 / 2, göç `0008_odeme`:
+# satın alınan kredi paketi, `defter.paket_yukle`, anahtar `paket:<polar_order_id>`
+# — K4). Küme CHECK'te kilitli (Faz 1 / 2'nin `text + CHECK` kararı), sessiz yeni
+# tür yok: `tur_kumesi` CHECK'i bu demetten kurulur, bekçisi tests/test_tablolar.py
+# (her üye yazılır, dışı reddedilir) ve settings.js `KREDI_HAREKET_ANAHTARI`
+# (her türün etiketi var — tests/test_kredi_route.py).
+HAREKET_TURLERI: tuple[str, ...] = ("hibe", "rezerv", "onay", "iade", "duzeltme", "sona_erme", "paket")
+
+# `kredi_hareketleri.kova` — satır hangi KOVAYI oynatır (Faz 4 / 2, K3): `hibe`
+# aylık/dönem hibesi (devretmez, `kullanicilar.bakiye` önbelleği) ya da `paket`
+# satın alınan kredi (devreder, `kullanicilar.paket_bakiye`). Öntanımlı `hibe`:
+# göçten önceki her satır hibe kovasıydı (paket yoktu). İki kova TEK tabloda —
+# FIFO satırları ya da Polar sayaçları değil (belge §2 gerekçesi); rezerv hibe
+# kovasından ÖNCE düşer (devretmeyen önce — kullanıcı lehine), iade/onay farkı
+# ÖNCE paket kovasına döner (`services/defter.py`).
+KOVALAR: tuple[str, ...] = ("hibe", "paket")
+KOVA_HIBE, KOVA_PAKET = KOVALAR
+
+# `urunler.tur` — Polar ürünü ne satıyor (Faz 4 / 2, K2): aylık abonelik
+# (`plan`; `urunler.plan` dolu, dönem hibesi devretmez) ya da tek seferlik kredi
+# paketi (`paket`; `urunler.kredi` yüklenen sayı, devreder). `text + CHECK`:
+# yıllık plan/hediye kredisi gelirse (belge "Faz 4 dışı") küme göçle genişler.
+URUN_TURLERI: tuple[str, ...] = ("plan", "paket")
+
+# `siparisler.sebep` — Polar `order.paid` olayının `billing_reason`ı AYNEN (Faz 4 / 2,
+# K6 bunu okur): `purchase` tek seferlik paket, `subscription_create` ilk abonelik
+# dönemi, `subscription_cycle` yenileme, `subscription_update` plan değişikliği.
+# ÇEVİRİ YOK — sağlayıcı sözlüğü: Polar bir gün yeni sebep gönderirse webhook
+# (3. görev) bilinmeyen sebebi `hata` ile kaydeder, küme göçle genişler.
+# Literaller 2026-09-21'de Polar belgesinden DOĞRULANMADI (egress); 3. görev
+# doğrular, farklıysa göçle düzelir (belge "Doğrulanmayanlar").
+SIPARIS_SEBEPLERI: tuple[str, ...] = ("purchase", "subscription_create", "subscription_cycle", "subscription_update")
 
 # `kullanicilar.plan` — üç plan, kodda katalog (Faz 3 / 3 `services/planlar.py`
 # bu kümeye bağlanır; K5: DB tablosu Faz 4'te ödeme gelince). Öntanımlı `free`:
@@ -185,9 +222,14 @@ PLANLAR_KUMESI: tuple[str, ...] = ("free", "temel", "pro")
 # platformun — satırında `kullanici_id` yok, kiracı süzgeci anlamsız.
 # `kredi_hareketleri` (Faz 3 / 1) İÇİNDE: `kullanici_id` taşıyor, iş tablosu —
 # ama `kullanicilar.bakiye` önbelleği hesap tablosunda, politikasız (belge §1 "Risk").
+# `siparisler` (Faz 4 / 2) İÇİNDE: kullanıcının kendi siparişleri ("Kredi"
+# bölmesi). `urunler` ve `odeme_olaylari` DEĞİL: ikisi de platformun —
+# `urunler`de kullanıcı sütunu yok (herkese açık fiyat listesi), `odeme_olaylari`
+# NULL'lanabilir `kullanici_id` taşır (olay gelir, kullanıcı çözülemeyebilir —
+# sahibi olmayan satır) ve yalnız admin okur; kiracı süzgeci ikisinde de anlamsız.
 IS_TABLOLARI: tuple[str, ...] = (
     "medya", "klasorler", "sohbetler", "paletler", "varliklar",
-    "tercihler", "saglayici_kimlikleri", "isler", "kredi_hareketleri",
+    "tercihler", "saglayici_kimlikleri", "isler", "kredi_hareketleri", "siparisler",
 )
 
 ADLANDIRMA = {
@@ -281,12 +323,40 @@ class Kullanici(Base):
     # ikisine de RLS engel olmasın. `defter.tutarlilik` SUM ile karşılaştırır,
     # sapma günlüğe düşer (sessiz yanılma yok). Eksiye yalnız admin `duzelt` ile iner.
     bakiye: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    # PAKET KOVASI — İKİNCİ ÖNBELLEK (Faz 4 / 2, göç `0008_odeme`, K3): kaynak
+    # gerçek `SUM(miktar) WHERE kova = 'paket'`. Satın alınan kredi devreder;
+    # `bakiye` (hibe kovası) devretmez. Rezerv ikisinden TEK atomik UPDATE'le
+    # düşer (hibe önce, `LEAST`), yazarı yine yalnız `services/defter.py` (AST
+    # bekçisi `paket_bakiye`yi de tarar). `defter.tutarlilik` iki SUM'la ikisini
+    # de ölçer. Eksiye yalnız admin `duzelt(kova='paket')` ile iner.
+    paket_bakiye: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     # Plan (`PLANLAR_KUMESI`, CHECK'te): 3. görev okur (`model_available(plan)`,
-    # aylık hibe miktarı, filigran kararı); bugün yalnız `free` yazılıyor (öntanımlı).
+    # aylık hibe miktarı, filigran kararı); Faz 3'te yalnız `free` yazılıyordu
+    # (öntanımlı), Faz 4 / 3 webhook (`subscription.*`) ücretli planı yazar.
     plan: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'free'"))
+    # POLAR (Faz 4 / 2 göçü; 3-4. görev yazar): `polar_musteri_id` Polar'daki
+    # müşteri kaydı (UNIQUE, `customer.created/updated`; portal bağlantısı ve
+    # mutabakat bununla), `polar_abonelik_id` aktif abonelik, `plan_bitis` İPTAL
+    # EDİLMİŞ aboneliğin dönem sonu — plan o güne kadar kalır, "dönem sonunda
+    # free" (K6); NULL = iptal yok. Üçü de NULL = hiç satın almamış kullanıcı.
+    polar_musteri_id: Mapped[str | None] = mapped_column(Text, unique=True)
+    polar_abonelik_id: Mapped[str | None] = mapped_column(Text)
+    plan_bitis: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    # RIZA (Faz 4 / 2 göçü; 6. görev yazar, K11): kullanım şartlarını ne zaman ve
+    # HANGİ SÜRÜMÜNÜ onayladı (`HUKUK_SURUMU` kod sabiti; metin değişince sürüm
+    # değişir, yeni onay istenir — tıkla-onay kanıtı). NULL = henüz onaylamadı
+    # (eski kullanıcı ilk satın almada onaylar, 4. görevin 412'si).
+    sartlar_kabul_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    sartlar_surumu: Mapped[str | None] = mapped_column(Text)
     olusturuldu: Mapped[dt.datetime] = _olusturuldu()
     guncellendi: Mapped[dt.datetime] = _guncellendi()
+    # HESAP SİLME (Faz 4 / 5 yazar, K9): `silindi_at` TALEP anı (anonimleştir +
+    # kilitle hemen), `temizlendi_at` içeriğin bakım turunda silindiği an (talep
+    # + 7 gün; `KROMIS_HESAP_SILME_BEKLEME_GUN`). Satır KALIR: `kredi_hareketleri`
+    # ve `siparisler` anonim sahiple durur (mali kayıt). Faz 1'den beri yer tutucu
+    # olan `silindi_at`ı bugün `hesap.py`/`depo_admin.py` yalnız `IS NULL` süzer.
     silindi_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    temizlendi_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Oturum(Base):
@@ -661,7 +731,15 @@ class KrediHareketi(Base):
     hesabı silinse iz kalır. `idempotency_anahtari` UNIQUE: aynı işin rezervi/
     onayı/iadesi ikinci kez YAZILAMAZ (`INSERT … ON CONFLICT DO NOTHING`);
     biçimler `rezerv:<is_id>`, `onay:<is_id>`, `iade:<is_id>`, `hibe:<u>:<YYYY-MM>`,
-    `duzeltme:<uuid4>` — Faz 4 webhook event id'sini aynı sütuna yazar.
+    `duzeltme:<uuid4>`; Faz 4 / 2 ekledi: `paket:<polar_order_id>` (K4 — sipariş
+    kimliği, olay id'si değil), `rezerv|onay|iade:<is_id>:paket` (aynı işin paket
+    kovasındaki ikinci satırı), `sona_erme:<u>:<abonelik_id>:<YYYY-MM-DD>`,
+    `hibe:<u>:polar:<order_id>` (ücretli dönem hibesi, 3. görev).
+
+    `kova` (Faz 4 / 2, `KOVALAR`): satır hangi önbelleği oynatır — `hibe` →
+    `kullanicilar.bakiye`, `paket` → `kullanicilar.paket_bakiye`. NOT NULL
+    DEFAULT 'hibe': göçten önceki her satır hibe kovasıydı. Bir iş en çok İKİ
+    `rezerv` satırı yazar (hibe yetmezse kalan paketten), çoğu işte bir.
 
     İki indeks iki soru: `(kullanici_id, olusturuldu)` hareket listesi (`medya`nın
     deseni), `(is_id)` "bu işin rezervi var mı" (`defter.onayla`/`iade`).
@@ -672,6 +750,7 @@ class KrediHareketi(Base):
     __tablename__ = "kredi_hareketleri"
     __table_args__ = (
         CheckConstraint("tur IN " + _sql_kumesi(HAREKET_TURLERI), name="tur_kumesi"),
+        CheckConstraint("kova IN " + _sql_kumesi(KOVALAR), name="kova_kumesi"),
         _sahip_indeksi("kredi_hareketleri"),
         Index("ix_kredi_hareketleri_is", "is_id"),
     )
@@ -681,9 +760,126 @@ class KrediHareketi(Base):
     is_id: Mapped[uuid.UUID | None] = mapped_column(
         pg.UUID(as_uuid=True), ForeignKey("isler.id", ondelete="SET NULL"))
     tur: Mapped[str] = mapped_column(Text, nullable=False)
+    kova: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'hibe'"))
     miktar: Mapped[int] = mapped_column(Integer, nullable=False)
     aciklama: Mapped[str | None] = mapped_column(Text)
     admin_id: Mapped[uuid.UUID | None] = mapped_column(
         pg.UUID(as_uuid=True), ForeignKey("kullanicilar.id", ondelete="SET NULL"))
     idempotency_anahtari: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     olusturuldu: Mapped[dt.datetime] = _olusturuldu()
+
+
+# ─────────────────────────────────────────────────────── ödeme (Faz 4 / 2)
+
+class Urun(Base):
+    """Polar ürününün AYNASI — fiyat listesinin ve webhook'un `product_id` → kredi/plan eşlemesinin tek satırı (K5).
+
+    Fiyatın gerçek sahibi Polar (MoR onu tahsil eder); bizde KOPYA değil ayna:
+    yazarı `tools/polar_esitle.py` (4. görev — Polar `products.list` → upsert
+    `polar_urun_id`), okuyanı webhook (`order.paid` `product_id` → bu satır →
+    `kredi`/`plan`) ve satış sayfası. `planlar` tablosu YOK (Faz 3 K5'ten sapma,
+    belge K5): plan KURALLARI `services/planlar.py`de kalır, burada yalnız plan
+    ürününün Polar id'si, fiyatı ve dönem hibesi (bilgi; kural `PLANLAR`da).
+
+    `tur` `plan`/`paket` (`URUN_TURLERI`); `plan` yalnız `tur = 'plan'` iken dolu
+    ve `PLANLAR_KUMESI`nden (CHECK `tur_plan_uyumu`: paket ürünü plan taşımaz,
+    plan ürünü plansız olmaz). `kredi` paket için yüklenen sayı, plan için dönem
+    hibesi. `fiyat_kurus` + `para_birimi` (`usd`): kuruş/cent tam sayı, float yok.
+    `aktif` false = Polar'da arşivlenmiş (satışta değil, eski siparişler FK'yle
+    ona bakar — satır silinmez). `guncellendi` aynanın tazeliği (4. görev: 7
+    günden eskiyse admin uyarısı).
+
+    ALTYAPI tablosu: kullanıcı sütunu yok, RLS yok — herkese açık fiyat listesi;
+    yazımı yalnız araç ve admin bağlamı (`IS_TABLOLARI` dışında, bekçisi
+    tests/test_tablolar.py `ALTYAPI_TABLOLARI`).
+    """
+    __tablename__ = "urunler"
+    __table_args__ = (
+        CheckConstraint("tur IN " + _sql_kumesi(URUN_TURLERI), name="tur_kumesi"),
+        CheckConstraint("plan IN " + _sql_kumesi(PLANLAR_KUMESI), name="plan_kumesi"),
+        CheckConstraint("(tur = 'plan') = (plan IS NOT NULL)", name="tur_plan_uyumu"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    polar_urun_id: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    tur: Mapped[str] = mapped_column(Text, nullable=False)
+    plan: Mapped[str | None] = mapped_column(Text)
+    kredi: Mapped[int] = mapped_column(Integer, nullable=False)
+    fiyat_kurus: Mapped[int] = mapped_column(Integer, nullable=False)
+    para_birimi: Mapped[str] = mapped_column(Text, nullable=False)
+    ad: Mapped[str] = mapped_column(Text, nullable=False)
+    aktif: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    guncellendi: Mapped[dt.datetime] = _guncellendi()
+
+
+class Siparis(Base):
+    """Polar'ın ödenmiş siparişi — bizdeki satır; kullanıcı "Kredi" bölmesinde görür, faturaya Polar'dan gider (K7).
+
+    Yazarı webhook (`order.paid`, 3. görev) ADMİN bağlamında (`yonetici_ekler`
+    — `YONETICI_EKLER_TABLOLARI`nın ikinci üyesi: webhook oturumsuz, hedef
+    kullanıcı olaydan çözülür). `polar_siparis_id` UNIQUE — K4'ün ÜÇÜNCÜ
+    kilidi (teslimat: `odeme_olaylari.webhook_id`; iş: defter anahtarı
+    `paket:<order_id>`; sipariş satırı: burası): aynı siparişi anlatan iki olay
+    ikinci satır yazamaz. `sebep` Polar `billing_reason` aynen (`SIPARIS_SEBEPLERI`).
+    `urun_id` → `urunler` (NOT NULL: ürünü aynada olmayan sipariş İŞLENMEZ,
+    `hata='urun_yok'` ile olay günlüğünde kalır — sahip `polar_esitle` koşar);
+    ürün satırı silinmez (`aktif=false`), FK NO ACTION bunu DB'de de söyler.
+    `tutar_kurus`/`para_birimi` Polar'ın tahsil ettiği (bilgi; vergi ve fatura
+    Polar'da). `kullanici_id` CASCADE ama hesap silinince satır SİLİNMEZ (K9):
+    kullanıcı satırı anonimleşir, CASCADE hiç tetiklenmez — mali kayıt kalır.
+
+    İŞ tablosu (`IS_TABLOLARI` 10.): `sahip` ALL + `yonetici_okur` +
+    `yonetici_gunceller` + `yonetici_ekler` (göç `0008_odeme`); DELETE kimseye yok.
+    """
+    __tablename__ = "siparisler"
+    __table_args__ = (
+        CheckConstraint("sebep IN " + _sql_kumesi(SIPARIS_SEBEPLERI), name="sebep_kumesi"),
+        _sahip_indeksi("siparisler"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    kullanici_id: Mapped[uuid.UUID] = _kullanici_fk()
+    polar_siparis_id: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    polar_abonelik_id: Mapped[str | None] = mapped_column(Text)
+    urun_id: Mapped[uuid.UUID] = mapped_column(pg.UUID(as_uuid=True), ForeignKey("urunler.id"), nullable=False)
+    sebep: Mapped[str] = mapped_column(Text, nullable=False)
+    tutar_kurus: Mapped[int] = mapped_column(Integer, nullable=False)
+    para_birimi: Mapped[str] = mapped_column(Text, nullable=False)
+    olusturuldu: Mapped[dt.datetime] = _olusturuldu()
+
+
+class OdemeOlayi(Base):
+    """Bir webhook TESLİMATININ günlüğü — `webhook_id` UNIQUE, yinelenen teslimat kapıda döner (K4, teslimat katmanı).
+
+    Standard Webhooks `webhook-id` başlığı yeniden gönderimde AYNI kalır: rota
+    (3. görev) `INSERT … ON CONFLICT (webhook_id) DO NOTHING` ile satırı yazar,
+    yazılamadıysa "çoktan alındı" → 200, işleme yok. Kayıt ve işleme AYNI
+    transaksiyonda: işleme düşerse satır da geri alınır, Polar yeniden dener,
+    temiz gelir (belge §3 "DİKKAT"). `tur` olay adı (`order.paid` …), `polar_nesne_id`
+    olayın nesnesi (sipariş/abonelik id'si), `kullanici_id` çözülen kullanıcı —
+    NULL'lanabilir (çözülemedi → `hata='kullanici_yok'`) ve SET NULL (hesap
+    silinince olay kalır, sahibi düşer — K10: 1 yıl saklanır, bakım turu siler).
+    `govde` REDAKTE edilmiş yük (kart verisi zaten gelmez; e-posta/adres
+    gelebilir — `kuyruk._redakte` deseni; silme turu `[SILINDI]` yazar).
+    `islendi_at` dolu = işlendi; `hata` dolu = neden işlenmedi (admin listesi).
+
+    ALTYAPI tablosu: sahibi olmayan satır olabilir, yalnız admin okur; RLS yok
+    (`IS_TABLOLARI` dışında — `kullanici_id` NULL'lanabilir olduğu için bekçi
+    türetimi de onu iş tablosu saymaz, tests/test_rls.py).
+    """
+    __tablename__ = "odeme_olaylari"
+    __table_args__ = (
+        Index("ix_odeme_olaylari_alindi", "alindi"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    webhook_id: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    tur: Mapped[str] = mapped_column(Text, nullable=False)
+    polar_nesne_id: Mapped[str | None] = mapped_column(Text)
+    kullanici_id: Mapped[uuid.UUID | None] = mapped_column(
+        pg.UUID(as_uuid=True), ForeignKey("kullanicilar.id", ondelete="SET NULL"))
+    govde: Mapped[dict[str, object]] = mapped_column(pg.JSONB, nullable=False)
+    alindi: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False,
+                                                server_default=text("now()"))
+    islendi_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    hata: Mapped[str | None] = mapped_column(Text)

@@ -409,7 +409,7 @@ def test_a_failed_platform_job_gives_the_credits_back_and_a_finished_one_shows_t
 
     def bakiye() -> int:
         with oturum.db() as db:
-            return defter.bakiye(db, oturum.kullanici_id)
+            return defter.bakiye(db, oturum.kullanici_id).toplam
 
     def defter_turleri() -> list[str]:
         with oturum.db() as db:

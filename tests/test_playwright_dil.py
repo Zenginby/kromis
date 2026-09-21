@@ -31,6 +31,7 @@ import catalog
 import credstore
 import i18n
 from app import app
+from tests.conftest import KAPANIS_TAVANI_SN
 from tests.test_playwright_studio import sunucu_hazir
 
 # Kapı GERÇEK (Faz 1 / 4): oturum çerezi `e2e_oturum`dan; dil de oradan —
@@ -67,7 +68,8 @@ class _Sunucu(threading.Thread):
     def __init__(self, port: int):
         super().__init__(daemon=True)
         self.server = uvicorn.Server(
-            uvicorn.Config(app=app, host="127.0.0.1", port=port, log_level="warning"))
+            uvicorn.Config(app=app, host="127.0.0.1", port=port, log_level="warning",
+                           timeout_graceful_shutdown=KAPANIS_TAVANI_SN))
 
     def run(self):
         self.server.run()

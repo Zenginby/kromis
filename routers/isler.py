@@ -1,7 +1,7 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
 # GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
 # Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
-"""İş uçları: kullanıcının üretim işleri — liste, tekil, iptal, akış, yeniden gönder; kota (Faz 2 / 4-5, 8).
+"""İş uçları: kullanıcının üretim işleri — liste, tekil, iptal, akış, yeniden gönder; kota (Faz 2 / 4-5, 8); kredi (Faz 3 / 6).
 
 Üretim rotaları (routers/uretim.py) 202 ile bir `is` döndürüyor; tarayıcı
 sonucu buradan izler. 4. görevde izleme core.js'in 2 sn yoklamasıydı
@@ -70,7 +70,7 @@ from sqlalchemy.orm import Session
 
 import catalog
 import i18n
-from services import defter, dil, kapilar, kimlik, kota, kuyruk, platform_anahtari, zaman
+from services import defter, dil, kapilar, kimlik, kota, kuyruk, planlar, platform_anahtari, zaman
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
@@ -152,6 +152,44 @@ def kota_durumu(db: Session = OTURUM,
                    "acilis": _acilis(gunluk_en_eski, kota.GUNLUK_PENCERE)},
         "saatlik": {"tavan": kota.saatlik_is_tavani(), "sayi": sayi,
                     "acilis": _acilis(saatlik_en_eski, kota.SAATLIK_PENCERE)},
+    }
+
+
+KREDI_HAREKET_SINIRI = 20
+
+
+def _sonraki_ay_basi(an: dt.datetime) -> dt.datetime:
+    """`an`ın ayından sonraki ayın ilk günü, 00:00, AYNI dilimde — `aylik_hibe_yaz`ın `%Y-%m` anahtarı
+    `zaman.an()`ın yerel ayından kurulur; sonraki hibe tarihi de aynı takvimden okunmalı, UTC'den değil."""
+    yil, ay = (an.year + 1, 1) if an.month == 12 else (an.year, an.month + 1)
+    return an.replace(year=yil, month=ay, day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+@router.get("/api/kredi")
+def kredi_durumu(db: Session = OTURUM,
+                 kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
+    """Kullanıcının kredisi (Faz 3 / 6): bakiye, plan, hibe, sonraki hibe, plan kuralları, son 20 hareket.
+
+    `/api/kota`nın YANINA, yerine değil: kota günlük tavan (kötüye kullanım, K9),
+    kredi bakiye (para) — panel ikisini ayrı okur. Plan kuralları (`filigran`,
+    `video`) `PLANLAR`dan geliyor ki arayüz plan kataloğunu tekrar etmesin;
+    `hibe` planın aylık sayısı (ortam `KROMIS_FREE_AYLIK_HIBE`), `sonraki_hibe`
+    gelecek ayın ilk günü (`zaman.damga_utc`, öteki damgalarla aynı biçim).
+    Hareketler `defter.hareketler` (en yeni üstte, kullanıcı süzgeçli; RLS ikinci
+    kapı) ve `defter._json` (admin id / idempotency anahtarı DÖKÜLMEZ). Plan
+    `kapilar.kullanici_plani`: yüklü nesneden, değilse DB'den (ayrılmış nesne dersi).
+    """
+    plan_adi = kapilar.kullanici_plani(db, kullanici)
+    plan = planlar.PLANLAR[plan_adi]
+    return {
+        "bakiye": defter.bakiye(db, kullanici.id),
+        "plan": plan_adi,
+        "hibe": plan.aylik_hibe,
+        "sonraki_hibe": zaman.damga_utc(_sonraki_ay_basi(zaman.an())),
+        "filigran": plan.filigran,
+        "video": plan.video,
+        "son_hareketler": [defter._json(h) for h in
+                           defter.hareketler(db, kullanici.id, limit=KREDI_HAREKET_SINIRI)],
     }
 
 

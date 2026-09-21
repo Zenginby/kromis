@@ -22,7 +22,7 @@ düşüp düşmediğini, sekmenin kapanıp açılmasını göremez):
      değil. Yalnız tarayıcı ölçebilir: `new Date()` tarayıcının dilimindedir.
   6. KREDİ GERİ GELİYOR (Faz 3 / 2 çıkış ölçütü): platform anahtarlı iş bakiyeyi
      tahmin kadar düşürür; sahte sağlayıcı düşer → panelde `hata`, bakiye ESKİ
-     değerine döner (iade); "yeniden gönder" → `bitti`, satırda "~tahmin → gerçek",
+     değerine döner (iade); "yeniden gönder" → `bitti`, satırda "rezerv · gerçek · iade",
      bakiye gerçek kadar eksik. Tarayıcı → 202 → işçi → SSE → panel zinciri
      defterle birlikte ancak burada uçtan uca ölçülür.
 
@@ -434,7 +434,8 @@ def test_a_failed_platform_job_gives_the_credits_back_and_a_finished_one_shows_t
             page.click(PANEL_SATIR + " .is-yeniden")
             page.wait_for_selector(PANEL_SATIR + '[data-durum="bitti"]', timeout=15000)
             biten = page.eval_on_selector(PANEL_SATIR + '[data-durum="bitti"] .is-kredi', "e => e.textContent")
-            assert biten == "~8 → 8 credits", biten
+            # Faz 3 / 6: platform işinin bitti satırı "rezerv · gerçek · iade" (isler.js `krediOzeti`).
+            assert biten == "reserved 8 · actual 8 · refunded 0", biten
             assert bakiye() == 100 - 8
             assert defter_turleri() == ["hibe", "rezerv", "iade", "rezerv", "onay"]
             browser.close()

@@ -24,7 +24,9 @@
 // `/giris`) onu görmez. `onerror`da `GET /api/hesap/ben` sorulur — cevap 401
 // ise sarmal giriş sayfasına gider (Faz 1'den devralınan tek kapı kuralı).
 //
-// core.js İLE SÖZLEŞME: `kromisIsler.kaydetIs(is, baglam)`. 202 gövdesindeki
+// core.js İLE SÖZLEŞME: `kromisIsler.kaydetIs(is, baglam)` (ve Faz 3 / 6:
+// `goster(isId)` — Ayarlar "Kredi" hareketinden satıra; `krediYenile` core.js'in,
+// bu betik 202'de ve kapanışta çağırır ki composer'ın "kalan"ı defterle yürüsün). 202 gövdesindeki
 // iş panele teslim edilir; `baglam` yalnız BU SEKMEDE yaşayan iki geri
 // çağrı taşır — `bitince(is, kayitlar)` (galeri kayıtları, `GET /api/history`den
 // iş sırasıyla) ve `hatada(mesaj)`. Sekme yenilenirse geri çağrılar gider,
@@ -210,6 +212,27 @@ const kromisIsler = (() => {
 
   // ── Çizim ──────────────────────────────────────────────────────────
 
+  /** Satırın kredi hattı (Faz 3 / 6). Platform işi: aktifken rezerv (`kredi_tahmini`,
+   *  rota düştü), bitti'de "rezerv · gerçek · iade" (`kredi_gercek` işçiden, fark
+   *  `defter.onayla`nın iadesi), hata/iptal'de TAM iade (`defter.iade`). BYOK işi
+   *  rezerv etmez (K3): aktifken tahmin, bitti'de "~tahmin → gerçek" (yalnız bilgi). */
+  function krediOzeti(is) {
+    const platform = is.anahtar_kaynagi === "platform";
+    if (is.durum === "bitti" && Number.isFinite(is.kredi_gercek)) {
+      return platform
+        ? t("isler.kredi_ozet", {
+            rezerv: is.kredi_tahmini,
+            gercek: is.kredi_gercek,
+            iade: Math.max(0, is.kredi_tahmini - is.kredi_gercek),
+          })
+        : t("isler.kredi_gercek", { tahmin: is.kredi_tahmini, gercek: is.kredi_gercek });
+    }
+    if (platform && (is.durum === "hata" || is.durum === "iptal")) {
+      return t("isler.kredi_iade", { rezerv: is.kredi_tahmini });
+    }
+    return t("isler.kredi", { kredi: is.kredi_tahmini });
+  }
+
   function onizleme(is) {
     const kayitlar = kayitlarCep.get(is.id) || [];
     if (!kayitlar.length) return null;
@@ -262,20 +285,15 @@ const kromisIsler = (() => {
     bas.append(tur, model, durum, sure);
     li.appendChild(bas);
 
-    // Kredi TAHMİNİ (`kredi_tahmini`, rota yazıyor; Faz 2 / 6) ve anahtarın
-    // kaynağı: platformun anahtarıyla koşan iş günlük kotaya sayılır, kendi
-    // anahtarıyla koşan sayılmaz — kullanıcı hangisi olduğunu satırda görsün.
-    // Bitti satırında "tahmin → gerçek" (`kredi_gercek`, işçi `bitir`le yazıyor;
-    // Faz 3 / 2): tahmin üst sınır, fark iade edildi — ham gösterim, 6. görev süsler.
+    // Kredi hattı (`krediOzeti`) ve anahtarın kaynağı: platformun anahtarıyla
+    // koşan iş günlük kotaya sayılır ve bakiyeden düşer, kendi anahtarıyla koşan
+    // ikisine de girmez — kullanıcı hangisi olduğunu satırda görsün.
     if (Number.isFinite(is.kredi_tahmini)) {
       const alt = document.createElement("div");
       alt.className = "is-alt";
       const kredi = document.createElement("span");
       kredi.className = "is-kredi";
-      kredi.textContent =
-        is.durum === "bitti" && Number.isFinite(is.kredi_gercek)
-          ? t("isler.kredi_gercek", { tahmin: is.kredi_tahmini, gercek: is.kredi_gercek })
-          : t("isler.kredi", { kredi: is.kredi_tahmini });
+      kredi.textContent = krediOzeti(is);
       alt.appendChild(kredi);
       if (is.anahtar_kaynagi === "platform") {
         const kaynak = document.createElement("span");
@@ -305,6 +323,7 @@ const kromisIsler = (() => {
         const yeni = await gonder(`/api/isler/${encodeURIComponent(is.id)}/yeniden`);
         if (yeni) {
           guncelle(yeni);
+          krediYenile(); // yeniden gönderim de rezerv düşürür (routers/isler.py)
           durumYaz(t("isler.yeniden_gonderildi"));
         } else {
           yeniden.disabled = false;
@@ -395,6 +414,9 @@ const kromisIsler = (() => {
    *  çağrı yok ama ürün var; `loadHistory` yoksa (ayrı sayfa) sessiz. */
   async function kapanis(is) {
     kotaCiz();
+    // Bakiye (Faz 3 / 6): bitti → onay + fark iadesi, hata/iptal → tam iade —
+    // composer satırındaki "kalan" bu olaydan sonra geri gelir (core.js).
+    krediYenile();
     const baglam = baglamlar.get(is.id);
     baglamlar.delete(is.id);
     if (is.durum === "bitti") {
@@ -453,6 +475,7 @@ const kromisIsler = (() => {
       return;
     }
     guncelle(is);
+    krediYenile(); // 202: rota rezervi düştü (Faz 3 / 2), composer "kalan"ı yenilensin
   }
 
   /** core.js'in 429'u: sunucunun cümlesi + `Retry-After` ipucu panelin durum satırında. */
@@ -545,17 +568,33 @@ const kromisIsler = (() => {
 
   // ── Panel yüzeyi ───────────────────────────────────────────────────
 
+  function paneliAc() {
+    ciz(); // model etiketleri katalog geldikten sonra doğru okunsun
+    kotaCiz();
+    openSheet("isler-sheet");
+    dugme.setAttribute("aria-expanded", "true");
+    sheetTetik = dugme;
+  }
+
   dugme.addEventListener("click", () => {
     const acilacak = !panel.classList.contains("open");
     closeSheets();
-    if (acilacak) {
-      ciz(); // model etiketleri katalog geldikten sonra doğru okunsun
-      kotaCiz();
-      openSheet("isler-sheet");
-      dugme.setAttribute("aria-expanded", "true");
-      sheetTetik = dugme;
-    }
+    if (acilacak) paneliAc();
   });
+
+  /** Ayarlar "Kredi" hareketinden panele (Faz 3 / 6): paneli açar, işin satırını
+   *  vurgular ve görünüre kaydırır. Satır listede yoksa (son 50'den eski) yalnız
+   *  panel açılır — `false` döner, çağıran bunu söyleyebilir. */
+  function goster(isId) {
+    closeSheets();
+    paneliAc();
+    const li = liste.querySelector(`.is-satir[data-id="${CSS.escape(isId)}"]`);
+    if (!li) return false;
+    li.classList.add("is-vurgu");
+    li.scrollIntoView({ block: "center" });
+    setTimeout(() => li.classList.remove("is-vurgu"), 2500);
+    return true;
+  }
   $("isler-close").addEventListener("click", closeSheets);
 
   setInterval(sureleriTazele, 1000);
@@ -569,5 +608,5 @@ const kromisIsler = (() => {
     .catch((e) => durumYaz(e.message))
     .then(bagla);
 
-  return { kaydetIs, uyar, yukle };
+  return { kaydetIs, uyar, yukle, goster };
 })();

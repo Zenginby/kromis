@@ -103,6 +103,8 @@ DIZINSIZ_KAPILI = {
     # Faz 2 / 8: kota durumu (`isler` sayımı) ve admin uçları (`kullanicilar`/`isler`/
     # `isciler`/`oturumlar` satırları; sayfa rotası `/admin` SAYFALAR'da, `ayar.genel` alır).
     ("GET", "/api/kota"), *ADMIN_ROTALAR,
+    # Faz 3 / 6: kredi durumu (`kullanicilar.bakiye` + `kredi_hareketleri` satırları; dizin yok).
+    ("GET", "/api/kredi"),
 }
 
 KAPI = {kimlik.aktif_kullanici, kimlik.sayfa_kullanicisi}
@@ -185,8 +187,8 @@ def test_every_route_is_either_gated_or_openly_listed_with_a_reason():
         f"listede ama kapılı: {sorted(set(ACIK_ROTALAR) - ACIK)}")
     assert all(gerekce.strip() for gerekce in ACIK_ROTALAR.values())
     # +3 iş rotası (Faz 2 / 4), +2 (Faz 2 / 5), +8 (Faz 2 / 8: `/admin`, 6 `/api/admin/*`, `/api/kota`),
-    # +2 (Faz 3 / 3: `/api/admin/kullanicilar/{id}/plan`, `…/kredi`)
-    assert len(KAPILI) == 62 and len(ACIK) == 7 and len(KAPILI | ACIK) == 69, (
+    # +2 (Faz 3 / 3: `/api/admin/kullanicilar/{id}/plan`, `…/kredi`), +1 (Faz 3 / 6: `/api/kredi`)
+    assert len(KAPILI) == 63 and len(ACIK) == 7 and len(KAPILI | ACIK) == 70, (
         "rota sayısı ya da kapı sayısı değişti — bilinçliyse belgeyi ve bu sayıları güncelle")
 
 

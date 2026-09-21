@@ -29,6 +29,7 @@ from playwright.sync_api import sync_playwright
 import catalog
 import credstore
 from app import app
+from tests.conftest import KAPANIS_TAVANI_SN
 
 # Kapı GERÇEK (Faz 1 / 4): sunucu aynı süreçte, `veritabani` fixture'ı Postgres'i
 # verir, `e2e_oturum` DB'ye kullanıcı yazıp çerezi tarayıcıya koyar (conftest).
@@ -216,7 +217,8 @@ class ServerThread(threading.Thread):
     def __init__(self, port: int):
         super().__init__(daemon=True)
         self.port = port
-        self.config = uvicorn.Config(app=app, host="127.0.0.1", port=port, log_level="warning")
+        self.config = uvicorn.Config(app=app, host="127.0.0.1", port=port, log_level="warning",
+                                     timeout_graceful_shutdown=KAPANIS_TAVANI_SN)
         self.server = uvicorn.Server(self.config)
         self.isci = IsciThread()
 

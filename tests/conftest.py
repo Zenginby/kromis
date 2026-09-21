@@ -487,6 +487,25 @@ def _dil_baglami_testler_arasinda_sizmasin():
     yield
 
 
+# E2E SUNUCULARININ İKİ SÜRESİ, BİRLİKTE OKUNMAK ÜZERE BURADA.
+#
+# `KAPANIS_TAVANI_SN` her test sunucusunun `uvicorn.Config`ine veriliyor
+# (`tests/test_e2e_sunucu_kapanisi.py` hiçbirinin unutulmadığını bekliyor).
+# VERİLMEZSE uvicorn'un öntanımlısı `None`, yani "biten bir yanıt bekleyip
+# SONSUZA KADAR dur". Tutan şey açık soket DEĞİL, BİTMEYEN YANIT (ürün yüzü:
+# `isler` panelinin SSE akışı) — ölçüldü 2026-09-20: tavansız sunucu 8 sn
+# sonra hâlâ yaşıyor, 1 sn tavanla 1,21 sn'de ölüyor. `stop()` yalnız
+# `should_exit` yazıyor, beklemiyor; bekleyen aşağıdaki fixture ve o da her
+# testte yeniden bekliyor. Sonuç iki kez görüldü (19 ve 20 Eylül, iki ayrı
+# dosyanın sunucusu sızdı): takım 6 dakikadan 80+ dakikaya çıktı ve bitmedi.
+#
+# İKİSİ ARASINDAKİ İLİŞKİ ŞART: tavan `join` süresinden KÜÇÜK olmalı, yoksa
+# fixture sunucu ölmeden vazgeçer ve aynı vergi geri gelir. Bekçisi
+# `test_the_shutdown_ceiling_stays_under_the_join_deadline`.
+KAPANIS_TAVANI_SN = 1
+JOIN_TAVANI_SN = 10
+
+
 @pytest.fixture(autouse=True)
 def _eski_e2e_sunuculari_kapansin():
     """Önceki testin uvicorn iş parçacığı bitmeden yeni test başlamasın (Faz 1 / 3).
@@ -502,11 +521,18 @@ def _eski_e2e_sunuculari_kapansin():
     önce hâlâ yaşayan her uvicorn iş parçacığı bitirilir. Bedeli sıfıra yakın
     (`threading.enumerate` + `join`), E2E dışı testlerde eşleşen iş parçacığı
     yok. Zaman aşımı: `stop()` denmemiş bir sunucu takımı asmasın.
+
+    "BEDELİ SIFIRA YAKIN" CÜMLESİ TEK BAŞINA DOĞRU DEĞİLDİ ve bunu bir kez
+    ödedik: zaman aşımı asılmayı önlüyor ama ölmeyen bir sunucu varsa bedel
+    sıfır değil, HER TESTTE `JOIN_TAVANI_SN` oluyor — 2026-09-19'da takımı 6
+    dakikadan 80+ dakikaya çıkardı. Cümleyi doğru kılan şey artık yukarıdaki
+    `KAPANIS_TAVANI_SN`: sunucu gerçekten ölüyor, `join` de anında dönüyor.
+    Yani buradaki zaman aşımı SON emniyet, birinci emniyet o tavan.
     """
     import uvicorn
     for t in threading.enumerate():
         if isinstance(getattr(t, "server", None), uvicorn.Server) and t is not threading.current_thread():
-            t.join(timeout=10)
+            t.join(timeout=JOIN_TAVANI_SN)
     yield
 
 

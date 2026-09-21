@@ -672,7 +672,6 @@
   "model.openai-gpt-5.6-luna.note": "The cheapest and fastest tier; for short turns.",
   "model.openai-gpt-5.6-sol.note": "The strongest and most expensive of the family; for long, tightly constrained briefs.",
   "model.openai-gpt-5.6-terra.note": "A balanced tier — the default for everyday briefs.",
-  "model.openai-gpt-image-1.note": "Do not pick: it is retired from the API on 23 October 2026. Switch to gpt-image-2.",
   "model.openai-gpt-image-2.note": "The same model as on Azure, with your own key — pick this if you have no enterprise resource.",
   "model.picker_title": "Models",
   "model.setup_required": "setup required",

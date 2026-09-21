@@ -377,9 +377,10 @@ def test_CAKISAN_ad_tam_etiketini_KORUYOR():
     kisa = etiket.short_labels(catalog.IMAGE_MODELS)
     assert kisa["azure-gpt-image-2"] == "Azure · gpt-image-2"
     assert kisa["openai-gpt-image-2"] == "OpenAI · gpt-image-2"
-    # Aynı listede TEKİL olan `gpt-image-1` önekini bırakıyor: kural çakışmaya
-    # bağlı, sağlayıcıya değil.
-    assert kisa["openai-gpt-image-1"] == "gpt-image-1"
+    # Aynı listede TEKİL olan `Nano Banana 2` önekini bırakıyor: kural çakışmaya
+    # bağlı, sağlayıcıya değil. (Bu rol `openai-gpt-image-1`deydi; girdi
+    # 2026-09-21'de emekliliğinden önce silindi — Faz 4 / 1.)
+    assert kisa["gemini-nano-banana-2"] == "Nano Banana 2"
 
 
 def test_MARKA_ADIN_PARCASI_olan_etiket_kirpilmiyor():
@@ -648,7 +649,7 @@ def test_MAI_girdileri_jetonlari_PAYLASIYOR():
         assert m.supports_edit is True and m.max_refs == 1
         assert m.note and "Önizleme" in i18n.t(m.note, "tr"), (
             f"{m.id}: MAI ailesinin üçü de önizleme; notta yazılı olmalı "
-            "(bkz. openai-gpt-image-1'in duruşu)")
+            "(bkz. Azure MAI blok yorumu: kalkacağı belli olan girdi silinir)")
 
 
 # ── Azure AI Foundry · FLUX.2 (v0.15) ──────────────────────────────────
@@ -737,7 +738,8 @@ def test_her_gorsel_modelinin_notu_NE_ZAMAN_SECILIR_i_cevapliyor(m, dil):
 def test_her_ONIZLEME_modelinin_notu_bunu_SOYLUYOR():
     """MAI ailesinin üçü de önizleme: ad ya da sözleşme haber vermeden
     değişebilir. `openai-gpt-image-1`in duruşu benimseniyor — notta yazılı,
-    kalkınca girdi silinir. Yazılmazsa kullanıcı kararlı bir model sanır.
+    kalkacağı belli olunca girdi silinir (o girdi 2026-09-21'de tam böyle
+    silindi, Faz 4 / 1). Yazılmazsa kullanıcı kararlı bir model sanır.
     """
     # Uyarı HER DİLDE durmak zorunda: yalnız Türkçe'ye bakan bir iddia,
     # İngilizce notta "Preview" unutulduğunda sessizce yeşil kalırdı.

@@ -1,6 +1,6 @@
 # Faz 4 — Ödeme (Polar MoR), paketler ve abonelik, hesap silme / dışa aktarma, hukuki metinler: görev listesi
 
-**Tarih:** 2026-09-21 · **Durum:** **0/7** (plan PR'ı `faz4/plan`; görevler `faz4/<slug>` dallarında, her biri bir PR) · **Karar:** K1–K12 **öneri — sahibin kabulünü bekliyor** (Faz 3'ün deseni: "kabul ediyorum" ile aynen, ya da madde madde değişiklikle) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
+**Tarih:** 2026-09-21 · **Durum:** **1/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
 **Üst belge:** [superpowers/specs/2026-08-10-saas-transformation-master-design.md](superpowers/specs/2026-08-10-saas-transformation-master-design.md) §5 "Faz 5" kartının **"Ödeme Altyapısı: Merchant of Record (MoR)"** maddesi (`:184-214`) ve "Filigran & Kredi Kuralları" satırı (`:183`) — sapmalar bu belgenin sonunda tek tek yazılı. **Numaralama tuzağı** aynen (Faz 3 belgesi `:4`): master spec'in "Faz 5"i ürün yol haritasının SaaS kartı; bu belge SaaS dönüşümünün İÇ dizisindeki Faz 4'tür (Faz 0 web-first → 1 DB/hesap → 2 kuyruk → 3 kredi defteri → **4 ödeme/KVKK** → 5 işletme). Yol haritası kartı (Faz 4 "Ödeme, faturalama ve hukuk"): *"Bir kullanıcı kartla abone olup fatura alabiliyor ve hesabını tamamen silebiliyor."* — bu belgenin çıkış kriteri onu genişletir (sonda tam metin). Kartın "Stripe birincil" satırı 2026-09-18'de **MoR/Polar** ile güncellendi (Faz 1 ve Faz 2 belgelerinin "Not" satırı; master `:184-199`): Türkiye'den Stripe'a doğrudan hesap açılamıyor, uluslararası satış Merchant of Record üzerinden.
 
 Faz 4'ün amacı, Faz 3'ün kurduğu defterin (rezerv → onay → iade, aylık hibe,
@@ -17,7 +17,11 @@ siler** (içerik gider, defter anonim kalır — K9) ve **verisini dışa aktar�
 kullanım şartları, aydınlatma metni, "ticari haklar" ve Polar kabul edilebilir
 kullanım kuralları kayıtta onaylanır (K11). Katalog hijyeni — `gpt-image-1`
 2026-10-23'te emekli, dört Azure fiyatı ve yedi kredi ≠ maliyet notu — bu
-fazın İLK ve bağımsız görevi (1).
+fazın İLK ve bağımsız görevi (1 ✅ 2026-09-21: girdi silindi; fiyat ve kredi
+düzeltmeleri sahibin doğrulamasını bekliyor, 1b'ye devredildi). Hemen ardından
+**katalog genişletme** (1b, 2026-09-21'de eklendi): ~10 görsel + ~10 video
+model, sağlayıcıdan BAĞIMSIZ — sahibin 2026-09-21 yönlendirmesi: Azure bundan
+sonra tek ana sağlayıcı DEĞİL, tarife sağlayıcı başına doğrulanır.
 
 **BU FAZDA YOK** — gerekçeleri "Faz 4 dışı" bölümünde:
 
@@ -37,7 +41,9 @@ fazın İLK ve bağımsız görevi (1).
 Her madde bir PR (`faz4/<slug>` dalı), her PR tek başına yeşil ve geri
 alınabilir; her PR'da testler + `docs/graflar` aynı commit'te, tam takım E2E
 dahil yerelde koşulur (`KROMIS_E2E_ZORUNLU=1`). Sıra bağımlılığa göre: **1**
-(bağımsız, önce — takvim kısıtı 2026-10-23), **2 → 3 → 4** (omurga: şema →
+(bağımsız, önce — takvim kısıtı 2026-10-23), **1b** (1'den sonra; 2-4'ten
+bağımsız, omurgayla paralel gidebilir — sahibin sıralı model listesini bekler),
+**2 → 3 → 4** (omurga: şema →
 webhook → checkout/satış yüzü), **5** (2'den sonra; 3 varsa Polar aboneliğini
 de iptal eder, yoksa o adım sonraki PR'a), **6** (2'den sonra, 3-5'ten
 bağımsız), **7** en son. Çıkış kriterinin ödeme yarısı 3-4'te, KVKK yarısı 5-6'da
@@ -143,7 +149,8 @@ görevde değiştiğini söylüyor.
 
 | bugün | nerede | Faz 4'te | görev |
 | --- | --- | --- | --- |
-| `openai-gpt-image-1` katalogda; 4 fiyat "doğrulanamadı"; 7 kredi ≠ maliyet | `catalog.py:588-602`; `tools/tarife_kontrol.py` | Girdi kaldırılır (2026-10-23 öncesi); dört fiyat sahibin doğrulamasıyla kapanır, yedi kredi düzeltilir; `tarife_kontrol` bekçisi 4 → 0 | 1 |
+| `openai-gpt-image-1` katalogda; 4 fiyat "doğrulanamadı"; 7 kredi ≠ maliyet | `catalog.py:588-602`; `tools/tarife_kontrol.py` | Girdi kaldırılır (2026-10-23 öncesi) — ✅ 1; dört fiyat sahibin doğrulamasıyla kapanır, yedi kredi düzeltilir, `tarife_kontrol` bekçisi 4 → 0 — sahip henüz doğrulamadı, **1b'ye devredildi** | 1, 1b |
+| Katalog **9 görsel** (`azure`, `openai`, `gemini`, `azure-mai`, `azure-flux`) + **6 video** (`gemini`, `fal`); ücretsiz plana 1 kredilik model yok; `emeklilik` alanı yok | `catalog.py` `IMAGE_MODELS`/`VIDEO_MODELS`; `*_client.py` adaptörleri | ~10 görsel + ~10 video, popüler/kaliteli → ucuz sırasıyla, sağlayıcıdan bağımsız (fal, Runware, Azure, OpenAI, Google …); kredi = maliyet × marj (araştırma yöntemi); eksik adaptör eklenir; `emeklilik: date` + `tarife_kontrol` "30 gün" satırı | 1b |
 | `HAREKET_TURLERI` 6, `sona_erme` yazılmıyor; tek kova `bakiye` | `tablolar.py:173`; `defter.py` | `paket` türü (7); `kova` sütunu (`hibe`/`paket`); `kullanicilar.paket_bakiye`; `rezerve` iki kovadan tek UPDATE; `sona_erme` düşürmede yazılır | 2 |
 | Defter anahtarları `rezerv: onay: iade: hibe: duzeltme:` | `defter.ONEK_*` | + `paket:` (`paket:<polar_order_id>`), `hibe:` Polar dönemi için `hibe:<u>:polar:<order_id>` | 2, 3 |
 | `Plan.fiyat None`; `temel`/`pro` hibe yer tutucu | `services/planlar.py` | Hibe ortamdan (`KROMIS_TEMEL_AYLIK_HIBE`, `KROMIS_PRO_AYLIK_HIBE`); fiyat ve Polar ürün id'si `urunler` tablosunda (Polar'ın aynası, `tools/polar_esitle.py`) — `planlar` tablosu YOK (K5) | 2, 4 |
@@ -158,7 +165,7 @@ görevde değiştiğini söylüyor.
 
 ---
 
-## 1. Katalog hijyeni — `gpt-image-1` emekliliği, dört Azure fiyatı, yedi kredi ≠ maliyet (PR: `faz4/katalog-hijyeni`)
+## 1. Katalog hijyeni — `gpt-image-1` emekliliği, dört Azure fiyatı, yedi kredi ≠ maliyet ✅ (PR: `faz4/katalog-hijyeni`)
 
 **Kapsam.** Faz 3'ün "açık kalemler"inden ikisi (`:1160-1163`), ödemeden
 BAĞIMSIZ ve takvimli: para almaya başlamadan tarifenin doğru olması gerekir,
@@ -220,6 +227,146 @@ yorumla gerekçeli; takım yeşil.
 Flash / FLUX.2 pro / flex), OpenAI (gpt-image-2 low/medium/high), Google
 (Nano Banana 2 1K/2K/4K; Veo 3.1 lite/fast saniye), fal (FLUX.2 pro) fiyat
 sayfalarından on bir sayı; PR onlarla yazılır.
+
+**Yapıldığında (2026-09-21) ölçümler ve sapmalar.** Rota YOK (70), göç YOK,
+modül 111. `openai-gpt-image-1` girdisi ve üstündeki "KATALOGDA KALIYOR ama
+ÖMÜRLÜ" bloğu `catalog.py`den SİLİNDİ (`IMAGE_MODELS` 10 → **9**; yerine
+neden silindiğini ve eski satırların kaderini söyleyen bir not — Gemini
+girdisinin yorum bölgesine düşüyor, `fiyat` + `doğrulanamadı` çifti yok,
+`tarife_kontrol` sayısı değişmedi); `gpt-image-2` bloğundaki tarih cümlesi ve
+MAI bloğundaki "duruşu benimseniyor" yorumu silinen girdiye geçmiş zamanla
+işaret eder. i18n **−1** tr/en (`model.openai-gpt-image-1.note`; bekçi
+kullanılmayan anahtarı reddederdi). Testler: `test_openai_client.py` `MODEL`
+artık `openai-gpt-image-2`, `IKINCI` katalogdan DEĞİL — gerçek girdinin
+`dataclasses.replace` kopyası (`wire_model="gpt-image-sentetik"`): bu rol
+`dall-e-3` ve `gpt-image-1` ile iki kez emekli oldu, üçüncüsü dosyaya
+dokunmasın; "model katalogdan geliyor" iddiası uydurma adın tele aynen
+çıkmasıyla ölçülüyor. `test_catalog.py` kısa etiket iddiası tekil örneğini
+`gemini-nano-banana-2`ye taşıdı, iki docstring silinen girdiye geçmiş zamanla
+değinir. **+1 test** `test_isler_route.py`: modeli katalogdan düşmüş `hata`
+işi listede ve tekil uçta `model` dizesiyle durur, `yeniden` plan/anahtar
+kapısını sormaz ve 202 döner (`spec is None` dalı; işçi tarafı `test_isci`
+"bilinmeyen model"). Kod tarafında DEĞİŞİKLİK GEREKMEDİ: liste, tekil uç,
+yeniden gönderim (`routers/isler.py`), işçi ve ön yüz (`secilecek`) katalogda
+olmayan `model` dizesini zaten taşıyordu. `docs/ozellikler.md` sağlayıcı
+satırı güncel; `static/index.html` / `test_index.py` / `test_chat_prompt.py` /
+`GUNCELLEME.md` içindeki `gpt-image-1` geçişleri TARİHÇE (ekran okuyucu
+örneği, sürüm notu, olgusal `input_fidelity` notu) — kalır. Takım **3.982 geçti, 12 atlandı, ~274 sn** (E2E + Postgres zorunlu; toplanan 3.999 → 3.994: `gpt-image-1` üzerinden parametrelenen 6 katalog testi düştü, 1 yeni test geldi — öncesi 3.987 / 12).
+
+**Sapmalar — bilerek yapılmayanlar, gerekçesiyle.** (a) **Dört Azure fiyatı
+ve yedi kredi ≠ maliyet DOKUNULMADI**: sahip fiyat sayfalarını henüz
+doğrulamadı ("Sahibin adımı" yukarıda; bu oturumların ağından Azure/OpenAI/
+Google/fal sayfaları okunamıyor) ve doğrulanmamış sayıyla `credits`
+değiştirmek, düzeltmek istediğimiz kusurun kendisi (retroaktif yazılmaz,
+`catalog.py:460-465`). `tools/tarife_kontrol.py` çıktısı ve bekçisi
+(`tests/test_araclar.py`, TAM DÖRT model) AYNEN. Sahibin 2026-09-21
+yönlendirmesi: Azure bundan sonra TEK ana sağlayıcı değil, tarife sağlayıcı
+başına doğrulanır — bu yüzden fiyat/kredi düzeltmeleri yeni **1b** görevine
+(katalog genişletme) devredildi; sahip doğruladığında orada, ya da 1b'den
+önce ayrı küçük bir PR'da yazılır; bekçi 4 → 0 o PR'da. (b) **`emeklilik:
+date` alanı ve `tarife_kontrol` "30 gün içinde emekli olacak model" satırı
+YAPILMADI**: `gpt-image-1.5`/`-mini`nin girdisi zaten yok (yalnız yorumda
+anılıyor), yani bugün işaretlenecek girdi de yok; alan katalog genişlerken
+(1b) her yeni girdiyle birlikte gelir. (c) Bu PR'da **"Sahibin adımı" yok**:
+fiyat sayfaları 1b'nin ön koşulu olarak duruyor. Çıkış ölçütünün
+"`tarife_kontrol.py` boş liste" ve "`kredi × 0,005` bant içinde" maddeleri
+1b'ye taşındı; "katalogda `gpt-image-1` yok; takım yeşil" karşılandı.
+
+---
+
+## 1b. Katalog genişletme — ~10 görsel + ~10 video model, sağlayıcıdan bağımsız (PR: `faz4/katalog-genisletme`)
+
+**Kapsam.** Sahibin 2026-09-21 yönlendirmesiyle eklendi (1. görevin PR'ında;
+sahip "olur onaylıyorum"): bugünkü katalog **9 görsel + 6 video** model ve
+sağlayıcı ağırlığı Azure'da (5 girdi: `azure`, `azure-mai` × 3, `azure-flux`
+× 2). Azure bundan sonra TEK ana sağlayıcı DEĞİL; katalog **sağlayıcıdan
+bağımsız** büyür: en popüler / en kaliteli olandan daha ucuza doğru sıralı
+**~10 görsel + ~10 video** model — fal, Runware, Azure AI Foundry, OpenAI,
+Google ve sahibin adını vereceği başka sağlayıcılar. Ürün kararı sahibin,
+sayı işi bu PR'ın:
+
+* **Sahip listeyi verir** (sıralı: popülerlik/kalite → fiyat); her satır için
+  bu PR **sağlayıcı**, **birim maliyet** (USD; kaynak + erişim tarihi
+  yorumda — fiyat sayfası bu oturumların ağından okunamıyorsa sahibin verdiği
+  sayı ve tarih), **kredi = maliyet × marj** (araştırma artifact'ının yöntemi:
+  `KREDI_USD_CAPASI` 0,005 USD/kredi çapası, düşük fiyatlı model platform
+  zararı — `claude.ai/artifact/GxN2FA5932GpJYGEgSiruL`), **plan kapsamı**
+  (`free`/`temel`/`pro` — `planlar.kapsiyor`; `ImageModel.plan` alanı veri
+  olur: ücretsiz plana 1 kredilik hızlı model — FLUX schnell / FLUX.2 klein
+  fal ya da Runware'de — masada, Faz 3 araştırması), **yetenek jetonları**
+  (boyut/oran, kalite, `max_n`, düzenleme, referans sayısı — doğrulanmamış
+  jeton beyan edilmez: "seçilebilir bir 400" ilkesi, `catalog.py` gpt-image-2
+  bloğu), **`emeklilik: date`** (1. görevden devir; boşsa yok) yazar.
+  Filigran kuralı DEĞİŞMEZ (Faz 3 / 4: plan belirler, model değil).
+* **Adaptörler yalnız eksikse genişler:** fal (`fal_client.py`), Azure
+  (`azure_client.py`, `azure_mai_client.py`, `azure_flux_client.py`), OpenAI
+  (`openai_client.py`), Gemini (`gemini_client.py`) var; **Runware** ya da
+  başka yeni bir sağlayıcı gelirse yeni `*_client.py` + `CREDENTIALS` girdisi
+  + `providers._resolve` dalı + `saglayici_meta.kaydet` (Faz 3 / 5 deseni) —
+  Azure'a özel varsayım eklenmez, sağlayıcı verisi yan kanalda kalır.
+  Kimlik/anahtar tarafı `credstore`/`platform_anahtari` mevcut deseniyle
+  (platform anahtarı küme katalogdan türer).
+* **1. görevden devredilenler:** dört Azure fiyatı (`azure-mai-image-2-6`,
+  `-flash`, `azure-flux-2-pro`, `-flex`) ve yedi kredi ≠ maliyet satırı
+  (`azure-gpt-image-2 high`, `gemini-nano-banana-2` 1K/2K/4K, `azure-flux-2-pro`,
+  `gemini-veo-3-1-lite`, `-fast`) sahip doğruladığında bu PR'da kapanır:
+  yorumdan "doğrulanamadı" düşer ya da `credits` değişir; **`tarife_kontrol`
+  bekçisi 4 → 0** (`tests/test_araclar.py`, liste katalogdan). Sahip yalnız
+  bir kısmını doğrularsa kalanlar yorumla ve bekçi sayısıyla kalır — sayı
+  PR'da yazılır. `tarife_kontrol` "30 gün içinde emekli olacak model" satırı
+  (bekçi tarih yamalı: bugün 0; `gpt-image-1.5`/`-mini` girdisi eklenirse
+  2026-11-01'den itibaren 2).
+* **Sıra ve varsayılan:** `IMAGE_MODELS`/`VIDEO_MODELS` sırası arayüz sırası
+  ve ilk girdi varsayılan (`catalog.py` başlığı) — sahibin listesi bu sırayı
+  belirler; `DEFAULT_IMAGE_MODEL` değişirse E2E çapaları ve `test_catalog`
+  varsayılan iddiaları onunla.
+* **Retroaktif yok** (1. görev aynen): eski `medya.credits`, `isler.kredi_*`
+  eski tarifeyle kalır.
+
+**Dokunulan.** `catalog.py` (+~15 girdi, `emeklilik` alanı, fiyat yorumları),
+`bundled/i18n/{tr,en}.json` (`model.<id>.note` her girdi için, 20-110
+karakter, adı tekrar etmez — `test_catalog` bekçileri), varsa yeni
+`*_client.py` + `providers.py` + `tools/tarife_kontrol.py` (+emeklilik satırı),
+`tests/test_catalog.py`, `tests/test_araclar.py` (4 → 0, emeklilik 0/2 tarih
+yamalı), yeni adaptörün `tests/test_<saglayici>_client.py`,
+`tests/test_playwright_*` model seçici çapaları (yalnız varsayılan değişirse),
+`docs/ozellikler.md`, `README*.md` sağlayıcı satırı, `docs/graflar/*`.
+
+**Testler / bekçiler.** Katalog bekçileri aynen (`test_catalog`: her girdinin
+notu iki dilde var, adı tekrar etmiyor, jetonlar tutarlı, kısa etiket
+çakışması); i18n eşliği (`test_i18n`: tr ↔ en aynı anahtar kümesi,
+kullanılmayan anahtar yok); `tarife_kontrol` ↔ bağımsız tarama (0 ya da
+kalan sayı); `emeklilik` bekçisi tarih yamalı; yeni adaptör için tel formatı +
+hata çevirisi + `saglayici_meta` testi (Faz 3 / 5 deseni); E2E model seçici
+(seçicide her `available` model bir satır; ücretsiz planın 1 kredilik modeli
+varsa `free` E2E'si onunla); `kredi × 0,005` her girdide araştırmanın "gerçek
+maliyet" bandında ya da yorumla gerekçeli.
+
+**Risk.** Orta. Yeni sağlayıcı = yeni gizli anahtar + dış konak (`.env.example`
+↔ `ALTYAPI` bekçisi, `tests/test_docker_kapisi.py`; Sentry/egress notu
+`docs/isletme.md`); ~20 yeni satır seçicide kaydırma ve mobil düzen
+(ölçülmedi — gerekirse sağlayıcıya göre gruplama, ayrı küçük PR);
+düşük fiyatlı satır platform zararı — kredi hesabı yorumda kaynaklı olmak
+zorunda.
+
+**Çıkış ölçütü.** Katalog ~10 görsel + ~10 video, her girdide sağlayıcı,
+kaynaklı maliyet ve kredi; `tarife_kontrol.py` boş (ya da sahibin
+doğrulamadığı sayı PR'da yazılı); Azure'a özel varsayım yok (sağlayıcı verisi
+yan kanalda, katalog satırı sağlayıcıyı `provider`/`credential` ile söylüyor);
+i18n eşliği; takım yeşil (E2E dahil).
+
+**Sahibin adımı — PR'dan önce.** (1) Sıralı model listesi (~10 görsel + ~10
+video; her satırda sağlayıcı ve varsa tercih ettiği fiyat kaynağı); (2) 1.
+görevden devreden on bir sayı (Azure Foundry MAI 2.6 / Flash / FLUX.2 pro /
+flex; OpenAI gpt-image-2 low/medium/high; Google Nano Banana 2 1K/2K/4K, Veo
+3.1 lite/fast saniye; fal FLUX.2 pro) — doğrulayabildiği kadarı; (3) yeni
+sağlayıcı (Runware vb.) gelirse hesap + anahtar.
+
+**Bağımlılıklar.** 1'den sonra (girdi silinmiş, yorumlar yerinde); 2-4'ten
+BAĞIMSIZ — omurgayla paralel gidebilir; 7 (operasyon) bu görevin sağlayıcı
+listesini KURULUM'a ve `isletme.md`ye yazar. Sahibin listesi gelmeden
+başlamaz — yalnız 1. görevden devreden fiyat/kredi düzeltmeleri, sahip
+doğruladığı anda ayrı küçük bir PR olarak öne alınabilir.
 
 ---
 
@@ -812,7 +959,8 @@ portaldan iptal → `plan_bitis` dolu, plan dönem sonuna kadar → `revoked` �
 e-posta anonim, BYOK yok → 7 gün sonra bakım turu içerik + R2 nesnelerini
 siler, `kredi_hareketleri`/`siparisler` anonim sahiple KALIR → dışa aktarma
 ZIP'i beş dosya → kayıt onay kutusuz 422, `/hukuk/*` iki dilde → katalogda
-`gpt-image-1` yok, `tarife_kontrol` boş → RLS bekçileri **10 tablo / 32
+`gpt-image-1` yok (1 ✅), katalog ~10 görsel + ~10 video sağlayıcıdan bağımsız
+ve `tarife_kontrol` boş (1b) → RLS bekçileri **10 tablo / 32
 politika**, **17 tablo** → her kullanıcıda iki kova SUM == önbellek → tam takım
 yeşil (E2E dahil, sahte Polar ile).
 
@@ -896,8 +1044,10 @@ hibesi), `sona_erme:<u>:<abonelik_id>:<YYYY-MM-DD>`, `rezerv|onay|iade:<is_id>:p
   `ALTYAPI_TABLOLARI` (3), `0008_odeme.TABLOLAR`, `HAREKET_TURLERI` ↔ CHECK,
   `KOVALAR` ↔ CHECK, `SIPARIS_SEBEPLERI` ↔ CHECK, `YONETICI_EKLER_TABLOLARI`
   (2), `ADMIN_ROTALAR` (10), `KAPILI`/muaf listeleri (webhook, urunler, hukuk),
-  `KREDI_HAREKET_ANAHTARI` (7), `ALTYAPI` (+6), `tarife_kontrol` (0),
-  `test_tablolar` dördüncü belge çapası (bu belge), `OPERATOR_ARACLARI` (+2).
+  `KREDI_HAREKET_ANAHTARI` (7), `ALTYAPI` (+6), `tarife_kontrol` (0 — 1b'de;
+  1 ✅ dörtte bıraktı), `test_tablolar` dördüncü belge çapası (bu belge),
+  `OPERATOR_ARACLARI` (+2), katalog ↔ i18n eşliği ve `emeklilik` tarih yamalı
+  bekçisi (1b).
 * **Rota sayısı:** 70 → ~80 (webhook, admin olaylar, checkout, portal, urunler,
   `/planlar`, `/odeme/tesekkur`, sil, sil-dogrula, disa-aktar, sartlar-kabul,
   `/hukuk/{slug}`) — her görev kendi literalini günceller.
@@ -908,8 +1058,12 @@ hibesi), `sona_erme:<u>:<abonelik_id>:<YYYY-MM-DD>`, `rezerv|onay|iade:<is_id>:p
 
 ## Sahibin karar noktaları — öneri ve gerekçe
 
-**Durum: öneri — kabul bekliyor.** Faz 3'teki gibi "kabul ediyorum" hepsini
-karar yapar; madde madde değişiklik de olur (K5'in sayıları özellikle sahibin).
+**Durum: kabul edildi 2026-09-21.** Sahip plan PR'ını (#69) aynen merge etti —
+Faz 3'ün deseni ("kabul ediyorum" ile aynen); madde madde değişiklik gelmedi.
+K5'in sayıları yine sahibin: 4. görevde `urunler` aynasına yazılırken son kez
+sorulur. Aynı gün gelen tek ek yönlendirme kararları değiştirmiyor, kapsamı
+genişletiyor: katalog sağlayıcıdan bağımsız büyür (1b), Azure tek ana
+sağlayıcı değil.
 
 | # | konu | öneri | neden | alternatif ve bedeli |
 | --- | --- | --- | --- | --- |
@@ -989,7 +1143,17 @@ karar yapar; madde madde değişiklik de olur (K5'in sayıları özellikle sahib
   webhook yeniden deneme sayısı/süresi; sandbox API alan adı; aktif abonelikte
   yeni plan checkout'unun davranışı (yükseltme mi ikinci abonelik mi); Polar'ın
   müşteriye gönderdiği e-postalar; Polar müşteri kaydının silinme yolu
-  (K9 sahibin adımı). Azure/OpenAI/Google/fal fiyatları (1. görev, sahibin).
+  (K9 sahibin adımı). Azure/OpenAI/Google/fal fiyatları (1b. görev, sahibin —
+  1. görev onlara dokunmadı).
+* **Prompt yönetmeni modu → Faz 5 planının İLK maddesi** (sahibin
+  yönlendirmesi 2026-09-21, "olur onaylıyorum"): yönetmene **effort / kalite /
+  düşünme** ayarı gelir ve seçime göre istek, onu karşılayabilen sohbet
+  modelleri arasında **ucuz-hızlıdan pahalı-kaliteli-çok düşünene** (Claude
+  gibi) yönlendirilir; ikinci adımda yönetmen **ajanlaşır** — kullanıcının
+  isteğini daha iyi karşılamak için görsel ve video modellerini KENDİSİ çağırır
+  (1b'nin genişlettiği katalog onun araç kümesi). Bu fazda YOK çünkü ödeme ve
+  KVKK omurgası önce; kredi/defter tarafı hazır (Faz 3), model yönlendirmesi
+  `ChatModel` kataloğuna kademe alanı ister — Faz 5 belgesinin işi.
 * **Ölçülmeyen:** webhook gecikmesi (Polar → bizim 200; teşekkür sayfasının
   yoklama süresi buna göre ayarlanır), `silme_turu`nün R2 listeleme maliyeti
   büyük galeride, takım süresi artışı, `polar_esitle` ürün sayısı (< 20).

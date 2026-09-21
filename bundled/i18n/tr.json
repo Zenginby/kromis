@@ -672,7 +672,6 @@
   "model.openai-gpt-5.6-luna.note": "En ucuz ve en hızlı kademe; kısa turlar için.",
   "model.openai-gpt-5.6-sol.note": "Ailenin en güçlüsü ve en pahalısı; uzun, çok kısıtlı brief'ler için.",
   "model.openai-gpt-5.6-terra.note": "Dengeli kademe — günlük brief'ler için varsayılan.",
-  "model.openai-gpt-image-1.note": "Seçmeyin: 23 Ekim 2026'da API'den kalkıyor. gpt-image-2'ye geç.",
   "model.openai-gpt-image-2.note": "Azure'daki modelin aynısı, kendi anahtarınla — kurumsal kaynağın yoksa bunu seç.",
   "model.picker_title": "Modeller",
   "model.setup_required": "kurulum gerekli",

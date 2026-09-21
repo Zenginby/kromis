@@ -137,6 +137,28 @@ def get_free_port() -> int:
         return s.getsockname()[1]
 
 
+def sunucu_hazir(port: int, sure_sn: float = 10.0) -> None:
+    """`ServerThread` DİNLEMEYE başlayana kadar bekler — sabit uyku DEĞİL, yoklama.
+
+    Buradaki çağrı yerlerinin hepsi eskiden `time.sleep(1.0)` yazıyordu. 1 sn iki
+    yönden de yanlış bir sayı: bu makinede uvicorn ~0,15 sn'de dinlemeye başlıyor
+    (yani her test boşuna 0,85 sn bekliyordu), yüklü bir koşucuda ise 1 sn
+    yetmeyebilir ve o zaman düşen şey `page.goto` oluyor — "bağlantı reddedildi",
+    yani ürünle hiç ilgisi olmayan bir kırmızı. Aynı gerekçe
+    `tests/test_playwright_hesap.py`nin `_bekle`sinde de yazılı; deyim oradan.
+
+    KOŞUL SOKETİN KENDİSİ: bağlanabiliyorsak uvicorn `accept` ediyordur.
+    """
+    son = time.monotonic() + sure_sn
+    while time.monotonic() < son:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.1)
+            if s.connect_ex(("127.0.0.1", port)) == 0:
+                return
+        time.sleep(0.05)
+    raise AssertionError(f"sunucu {sure_sn} sn içinde {port} portunu dinlemedi")
+
+
 class IsciThread(threading.Thread):
     """E2E'nin İŞÇİSİ: `isci.tek_tur` döngüsü, sunucuyla aynı süreçte (Faz 2 / 4).
 

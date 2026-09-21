@@ -25,7 +25,7 @@ from sqlalchemy import create_engine, text
 
 pytest.importorskip("playwright", reason="playwright kurulu değil — E2E testleri atlanıyor")
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Error as PlaywrightError, sync_playwright
 
 import i18n
 from app import app
@@ -231,8 +231,34 @@ def test_after_login_the_page_returns_only_to_a_same_origin_path(
             # Oturum düşerse stüdyo `/giris?sonra=<bulunduğu yol>`e gider (core.js sarmalı):
             # çerezi tarayıcıdan silip bir API çağrısı yaptırıyoruz.
             page.context.clear_cookies(name=cerez.OTURUM_CEREZI)
-            page.evaluate("() => fetch('/api/history')")
-            page.wait_for_url(f"{taban}/giris?sonra=*")
+            try:
+                page.evaluate("() => { fetch('/api/history'); }")
+            except PlaywrightError:
+                # YUKARIDAKİ `#view-studio` İSKELETTE duruyor (static/index.html):
+                # o bekleme, sayfa daha kendi açılış isteklerini (ölçüldü: 14
+                # istek) sürerken dönüyor. Çerez tam o sırada silindiğinde 401'i
+                # önce SAYFANIN bir isteği görebilir ve yönlendirmeyi test değil
+                # o başlatır; bu çağrı da "Execution context was destroyed" ile
+                # düşer. Yerelde CPU 20x kısılarak 6/6 tekrarlandı (2026-09-19);
+                # CI'da aynı yarışın öteki yüzü görülmüştü (koşu 35381536354,
+                # `net::ERR_ABORTED`).
+                #
+                # Yutmak İDDİAYI ZAYIFLATMIYOR: hangi istek görürse görsün 401'i
+                # işleyen aynı core.js sarmalı ve `sonra` yine stüdyonun yolu —
+                # aşağıdaki iki satır kapının çalıştığını tam olarak eskisi gibi
+                # kanıtlıyor. Kapı ÇALIŞMADIYSA form hiç açılmaz ve bekleme düşer.
+                pass
+            # `wait_for_url` DEĞİL, DURUM beklemesi: `wait_for_url` gövdesinde
+            # `expect_navigation` var ve o, beklediği gezinme değil HERHANGİ bir
+            # gezinme başarısız olursa reddediyor (playwright/_impl/_frame.py,
+            # kendi yorumu: "Any failed navigation results in a rejection").
+            # Yönlendirme anı tam da sayfanın yıkıldığı, uçuştaki isteklerin
+            # iptal edildiği an; oraya kilitlenen bir OLAY bekleyicisi o
+            # gürültüye açık. Beklenen şey bir olay değil bir DURUM.
+            # İddia GÜÇLENİYOR: URL'nin yanında oturumun gerçekten düştüğü de
+            # kanıtlanıyor — form ancak `/api/hesap/ben` 401 dönünce açılıyor
+            # (static/giris.js `baslat`).
+            page.wait_for_selector("#form-giris:not([hidden])")
             assert page.url == f"{taban}/giris?sonra=" + quote(beklenen, safe="")
             tarayici.close()
     finally:

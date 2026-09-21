@@ -31,7 +31,6 @@ from __future__ import annotations
 import io
 import os
 import re
-import threading
 import time
 
 import pytest
@@ -49,6 +48,7 @@ from tests.test_playwright_studio import (
     _ilk_kurulum_perdesini_kapat,
     _tum_kimlikler_kayitli,
     get_free_port,
+    sunucu_hazir,
 )
 
 pytestmark = pytest.mark.gercek_kimlik
@@ -139,7 +139,7 @@ def test_a_job_that_finishes_while_the_tab_is_closed_shows_up_in_a_fresh_tab(
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     taban = f"http://127.0.0.1:{port}"
     t0 = time.perf_counter()
 
@@ -189,7 +189,7 @@ def test_two_queued_jobs_survive_a_reload_and_both_land_in_the_gallery(
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     taban = f"http://127.0.0.1:{port}"
 
     try:
@@ -245,7 +245,7 @@ def test_a_failed_job_offers_resubmit_and_the_resubmitted_job_finishes(
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     taban = f"http://127.0.0.1:{port}"
 
     try:
@@ -287,21 +287,38 @@ def test_when_the_stream_is_cut_the_panel_falls_back_to_polling_and_still_finish
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     taban = f"http://127.0.0.1:{port}"
-    kesilen = threading.Event()
 
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={"width": 1280, "height": 860})
 
-            def kes(route):
-                kesilen.set()
-                route.abort()
-            page.route("**/api/isler/akis*", kes)
-            _studyo(page, taban, oturum)
-            assert kesilen.wait(5.0), "panel akışa hiç bağlanmayı denemedi"
+            page.route("**/api/isler/akis*", lambda route: route.abort())
+            # AKIŞA BAĞLANMA DENEMESİ `threading.Event` İLE BEKLENEMEZ — burada
+            # eskiden `assert kesilen.wait(5.0)` vardı ve CI'da belirsizdi
+            # (2026-09-19: son sekiz main koşusunun üçü kırmızı).
+            #
+            # NEDEN: sync Playwright'ın gönderici greenlet'i ana iş parçacığında
+            # koşuyor; `page.route` işleyicisi ancak test KENDİSİ bir Playwright
+            # çağrısının içindeyken sıraya girebiliyor. Düz bir `Event.wait()` o
+            # çağrılardan biri DEĞİL: beklerken işleyici hiç koşamaz. Ölçüldü —
+            # istek son Playwright çağrısından SONRA gelirse `wait(5.0)` tam 5
+            # sn dolup `False` dönüyor, oysa istek gelmişti (route isabeti 1).
+            # Yani "panel akışa hiç bağlanmayı denemedi" iddiası YANLIŞTI;
+            # panel bağlanıyordu, test beklerken KÖRDÜ.
+            #
+            # Yarışın iki ucu: panel akışa `GET /api/isler` çözüldükten sonra
+            # bağlanıyor (static/isler.js `yukle().then(bagla)`), `_studyo` ise
+            # `/api/settings`i bekliyor. Hangisinin önce biteceği makinenin
+            # yüküne bağlı — hızlı makinede yeşil, yüklü koşucuda kırmızı.
+            #
+            # `expect_request` iki ucu da kapatıyor: bekleyici gezinmeden ÖNCE
+            # kuruluyor (erken gelen istek kaçmaz) ve blok çıkışında istek
+            # gelene kadar bekliyor (geç gelen istek de kaçmaz).
+            with page.expect_request("**/api/isler/akis*"):
+                _studyo(page, taban, oturum)
             # Üç düşüş (tarayıcının yeniden bağlanma aralığıyla) → yedek yol mesajı.
             page.wait_for_function(
                 'document.querySelector("#isler-durum").textContent.includes("refreshes every 3 seconds")',
@@ -336,7 +353,7 @@ def test_the_elapsed_counter_starts_near_zero_in_a_browser_three_hours_east_of_t
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
-    time.sleep(1.0)
+    sunucu_hazir(port)
     taban = f"http://127.0.0.1:{port}"
 
     try:

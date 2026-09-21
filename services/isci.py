@@ -129,7 +129,14 @@ devri); açılıştaki tur bunu YENİ işçi kalkar kalkmaz kapatır — tek iş
 dağıtımda (K11) ölü satırı silecek başka işçi yok. Bayat İŞ düşürme buraya
 TAŞINMADI: `kalp_turu` onu 30 sn'de bir zaten yapıyor (belge 5 dk der; daha
 sık olması kullanıcıya daha erken "hata" demek, bedeli yok). `medya`ya
-dokunulmaz (`isler.sonuc` yalnız id listesi).
+dokunulmaz (`isler.sonuc` yalnız id listesi). Faz 3 aynı tura iki iş daha
+kattı, ikisi de ADMİN bağlamında: AYLIK HİBE (`defter.hibe_turu`, Faz 3 / 3,
+K6) ve DEFTER TUTARLILIĞI (`defter.tutarlilik`, Faz 3 / 7, K1) — her
+kullanıcıda `SUM(kredi_hareketleri.miktar) == kullanicilar.bakiye` olmalı;
+sapan kullanıcı başına `olay=defter.tutarsiz` (WARNING), sayı `tutarsiz_kullanici`.
+Tur ÖLÇER, DÜZELTMEZ: önbelleği sessizce SUM'a çekmek sapmanın sebebini
+(çift yazar, yarım transaksiyon, elle UPDATE) örterdi; düzeltme admin
+`duzelt` satırıyla, izli.
 """
 from __future__ import annotations
 
@@ -686,14 +693,17 @@ def kuyruk_uyarisi(db: Session, an: dt.datetime) -> dict[str, Any] | None:
 # ────────────────────────────────────────────────────────── bakım
 
 class BakimOzeti(dict[str, int]):
-    """`bakim_turu`nun döndürdüğü sayılar: `silinen_is`, `silinen_nesne`, `korunan_dizin`, `silinen_isci`, `hibe_satiri`.
+    """`bakim_turu`nun döndürdüğü sayılar: `silinen_is`, `silinen_nesne`, `korunan_dizin`, `silinen_isci`, `hibe_satiri`, `tutarsiz_kullanici`.
 
     Sözlük (günlük alanı olarak düz yazılsın); `__bool__` "bir şey yapıldı mı":
-    işçi olayı yalnız bir şey silindiğinde ya da hibe yazıldığında düşürür
-    (`bayat`ın deyimi — boş turda 5 dk'da bir satır gürültüdür). `hibe_satiri`
-    (Faz 3 / 3): bu turda yatan aylık hibe sayısı — dağıtım sonrası ilk turda
-    bütün kullanıcılar, sonra ay başında; ay içinde 0 (belge §3 "Sahibin adımı":
-    `olay=bakim` satırında `hibe_satiri=N`).
+    işçi olayı yalnız bir şey silindiğinde, hibe yazıldığında ya da sapma
+    bulunduğunda düşürür (`bayat`ın deyimi — boş turda 5 dk'da bir satır
+    gürültüdür). `hibe_satiri` (Faz 3 / 3): bu turda yatan aylık hibe sayısı —
+    dağıtım sonrası ilk turda bütün kullanıcılar, sonra ay başında; ay içinde 0
+    (belge §3 "Sahibin adımı": `olay=bakim` satırında `hibe_satiri=N`).
+    `tutarsiz_kullanici` (Faz 3 / 7): `bakiye != SUM(defter)` olan kullanıcı
+    sayısı — sağlıklı dağıtımda hep 0; her sapan için ayrıca `olay=defter.tutarsiz`
+    (WARNING) düşmüştür, sayı yalnız özet.
     """
 
     def __bool__(self) -> bool:
@@ -712,17 +722,20 @@ def _dizini_sil(depo: dosya.Depo, onek: str) -> int:
 
 def bakim_turu(db: Session, depo: dosya.Depo, an: dt.datetime, esik: dt.timedelta,
                saklama_suresi: dt.timedelta) -> BakimOzeti:
-    """Bir bakım turu: saklama (satır + referanssız girdi dizini), ölü işçi satırları ve aylık hibe; özet sayılar.
+    """Bir bakım turu: saklama (satır + referanssız girdi dizini), ölü işçi satırları, aylık hibe ve defter tutarlılığı; özet sayılar.
 
     Sıra ve bağlamlar (gerekçe modül başında): sahipler ADMIN bağlamında
-    bulunur ve aylık hibe (`defter.hibe_turu`, Faz 3 / 3) aynı bağlamda
-    yatar; her kiracının satırları O KİRACININ bağlamında silinir ve commit
+    bulunur, aylık hibe (`defter.hibe_turu`, Faz 3 / 3) aynı bağlamda yatar
+    ve defter tutarlılığı (`defter.tutarlilik`, Faz 3 / 7) hibeden SONRA aynı
+    bağlamda ölçülür (hibe satırı + bakiye aynı transaksiyonda yazıldı, ölçüm
+    onları birlikte görür); her kiracının satırları O KİRACININ bağlamında silinir ve commit
     edilir (kiracı başına bir transaksiyon — biri düşerse ötekiler durur);
     sonra ADMIN bağlamında kalan referanslar ve mevcut satırlar okunur, ona
     göre dizinler silinir. Ölü işçi satırı politikasız, bağlam gerekmez.
     `an`/`esik`/`saklama_suresi` çağıranın (testler saatle oynamaz).
     """
-    ozet = BakimOzeti(silinen_is=0, silinen_nesne=0, korunan_dizin=0, silinen_isci=0, hibe_satiri=0)
+    ozet = BakimOzeti(silinen_is=0, silinen_nesne=0, korunan_dizin=0, silinen_isci=0, hibe_satiri=0,
+                      tutarsiz_kullanici=0)
     with kiraci.baglam(rol=kiraci.ADMIN, oturum=db):
         sahipler = kuyruk.saklama_sahipleri(db, an, saklama_suresi)
         ozet["silinen_isci"] = kuyruk.olu_iscileri_sil(db, an, esik)
@@ -730,6 +743,17 @@ def bakim_turu(db: Session, depo: dosya.Depo, an: dt.datetime, esik: dt.timedelt
         # bütün kiracılar adına yazar — `yonetici_ekler` politikası (K4) tam
         # bunun için var. Aynı commit: silme ile hibe aynı turun işi.
         ozet["hibe_satiri"] = defter.hibe_turu(db, an)
+        # Defter tutarlılığı (Faz 3 / 7, K1): önbellek `kullanicilar.bakiye`
+        # her turda SUM'la karşılaştırılır — tek yazarı `defter.py` olsa da
+        # (AST bekçisi) elle UPDATE ya da yarım kalmış bir transaksiyon
+        # ancak burada görünür. Kullanıcı başına WARNING ki günlük kuralı
+        # (`uyari`nınkiyle aynı yer) kimi düzelteceğini söylesin; düzeltilmez.
+        sapmalar = defter.tutarlilik(db)
+        for kullanici_id, bakiye, toplam in sapmalar:
+            gunluk.olay(_gunluk, "defter.tutarsiz", "bakiye onbellegi defter toplamindan sapti",
+                        seviye=logging.WARNING, kullanici_id=str(kullanici_id), bakiye=bakiye,
+                        toplam=toplam, fark=bakiye - toplam)
+        ozet["tutarsiz_kullanici"] = len(sapmalar)
         db.commit()
     silinenler: list[kuyruk.SilinenIs] = []
     for kullanici_id in sahipler:

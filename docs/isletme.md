@@ -1,17 +1,22 @@
 # İşletme: iki süreç tek imaj, dağıtım öncesi göç, üç ayrı yedek, iş saklama, anahtar döndürme, geri yükleme tatbikatı
 
-**Tarih:** 2026-09-17 (Faz 1 / 9) · **Güncelleme:** 2026-09-19 (Faz 2 / 10: § 7-9) ·
+**Tarih:** 2026-09-17 (Faz 1 / 9) · **Güncelleme:** 2026-09-19 (Faz 2 / 10: § 7-9),
+2026-09-21 (Faz 3 / 7: kredi defteri § 2, § 5-6, § 9 — tutarlılık ölçümü, planlar ve hibe) ·
 **Kime:** web sürümünü işleten kişi ·
 **Kurulum adımları:** [KURULUM.md → Web sürümü](../KURULUM.md#web-sürümü-sunucu-kurulumu) ·
 **Karar kaydı:** [faz1-veritabani-hesaplar.md § 9](faz1-veritabani-hesaplar.md),
-[faz2-kuyruk-anahtarlar-depolama.md § 10](faz2-kuyruk-anahtarlar-depolama.md)
+[faz2-kuyruk-anahtarlar-depolama.md § 10](faz2-kuyruk-anahtarlar-depolama.md),
+[faz3-kredi-defteri-filigran.md § 7](faz3-kredi-defteri-filigran.md)
 
 Bu belge kod değil, işletme düzeni. Söylediği şeyler: şema göçü NEREDE koşar
 (§ 1), veri NEREDE durur ve nasıl yedeklenir (§ 2-4), bir felakette ne sırayla
 geri gelir (§ 5), web ve işçi süreçleri platformda NASIL açılır ve kapanır
 (§ 7), kova nasıl kurulur (§ 8), günlük işletme — dağıt, geri al, sağlık,
-günlük, uyarı, saklama (§ 9). Bekçisi `tests/test_docker_kapisi.py` (belge
-var, üç yedek ayrı, tatbikat adımlı, iki süreç tablosu, saklama).
+günlük, uyarı, saklama, kredi defteri tutarlılığı (§ 9). Planların, aylık
+hibenin ve filigranın kurulumu KURULUM.md'nin 10. adımında; bu belge onların
+işletme yüzünü (yedek, uyarı, kontrol listesi) taşır. Bekçisi
+`tests/test_docker_kapisi.py` (belge var, üç yedek ayrı, tatbikat adımlı, iki
+süreç tablosu, saklama, defter satırları).
 
 ## 1. Şema göçü — dağıtım ÖNCESİ komut, konteyner açılışı DEĞİL
 
@@ -52,7 +57,7 @@ fazlasını verdiği durumlar var, her satırda yazılı.
 
 | parça | nerede | yedeği kimin, nasıl | neden ayrı |
 | --- | --- | --- | --- |
-| **Veri tabanı** — hesaplar, oturumlar, medya/klasör/sohbet/palet/varlık SATIRLARI, tercihler, ŞİFRELİ sağlayıcı anahtarları; Faz 2'den beri **`isler`** (iş kuyruğu ve 30 günlük geçmiş; `istek` prompt'u ve girdi anahtarlarını taşır) ve **`isciler`** (kalp atışı; işçi kalkınca yeniden yazılır, yedeğe girmese de kayıp yok) | PostgreSQL (`DATABASE_URL`) | Yönetilen Postgres'te (Neon, Supabase, Fly Postgres, RDS) **platformun PITR'ı** — açık olduğunu ve saklama süresini PANELDEN doğrula, varsayılan bazı planlarda kapalı. Kendi Postgres'inde `pg_dump -Fc "$DATABASE_URL" > kromis-$(date +%F).dump` cron'u + dosyanın başka bir makineye/kovaya kopyası | Satırlar dosyayı GÖSTERİR (`medya.filename`), dosya DB'de değil: DB yedeği tek başına galeriyi geri getirmez |
+| **Veri tabanı** — hesaplar, oturumlar, medya/klasör/sohbet/palet/varlık SATIRLARI, tercihler, ŞİFRELİ sağlayıcı anahtarları; Faz 2'den beri **`isler`** (iş kuyruğu ve 30 günlük geçmiş; `istek` prompt'u ve girdi anahtarlarını taşır) ve **`isciler`** (kalp atışı; işçi kalkınca yeniden yazılır, yedeğe girmese de kayıp yok); Faz 3'ten beri **`kredi_hareketleri`** (append-only kredi defteri: hibe, rezerv, onay, iade, düzeltme — PARANIN kaydı, `kullanicilar.bakiye`/`plan` onun önbelleği; ayrı yedeği YOK, aynı `pg_dump`/PITR içinde gelir; geri yüklemede § 5'in 6. adımı SUM == bakiye der) | PostgreSQL (`DATABASE_URL`) | Yönetilen Postgres'te (Neon, Supabase, Fly Postgres, RDS) **platformun PITR'ı** — açık olduğunu ve saklama süresini PANELDEN doğrula, varsayılan bazı planlarda kapalı. Kendi Postgres'inde `pg_dump -Fc "$DATABASE_URL" > kromis-$(date +%F).dump` cron'u + dosyanın başka bir makineye/kovaya kopyası | Satırlar dosyayı GÖSTERİR (`medya.filename`), dosya DB'de değil: DB yedeği tek başına galeriyi geri getirmez |
 | **Medya** — `kullanicilar/<uuid>/{output,assets}` (PNG/MP4 dosyaları) ve `kullanicilar/<uuid>/isler/<is_id>/` (üretim işlerinin GİRDİ nesneleri: referans görseller, son kare; 30 gün sonra saklama siler, § 9): yerel diskte (`KROMIS_DATA_DIR`, compose) YA DA aynı anahtarla S3/R2 kovasında (`KROMIS_NESNE_DEPO_*`, Faz 2 / 2 — çok makineli dağıtımda zorunlu) | Kalıcı birim (`/data`) ya da kova | Diskte: **birim anlık görüntüsü** (Fly volume snapshot, bulut disk snapshot) ya da `rsync`/`rclone`; günlük. Kovada: **R2 nesne sürümlemesi** (§ 8: silinen/ezilen nesne 30 gün geri alınabilir) + isteğe bağlı ikinci kovaya `rclone sync` (§ 8, sahibin kararı) | Dosyalar DB'siz anlamsız (hangisi kimin, hangi klasörde — hepsi satırda); DB dosyasız yarım. İkisi AYNI ANDAN olmazsa artık dosya ya da kırık bağlantı doğar — `tools/artik_dosya.py` bunu iki yerde de bulur (§ 4) |
 | **`KROMIS_SECRET_KEY`** — sağlayıcı anahtarlarını şifreleyen kök | Yalnız ortam değişkeni (platform sırları) | **ÜÇÜNCÜ bir yer**, öteki ikisinden ayrı: bir parola kasası (1Password/Bitwarden kasası, ya da basılı zarf). DB yedeğinin YANINA yazılmaz | DB yedeğiyle yan yana duran anahtar, yedeği ele geçirene bütün kullanıcıların sağlayıcı anahtarlarını düz metin verir. Kaybolursa `saglayici_kimlikleri` sütunu hiç okunamaz — kullanıcılar anahtarlarını yeniden girer, başka çare yok |
 | **Platform sırları** (Faz 2 / 10) — `KROMIS_PLATFORM_<AD>` sağlayıcı anahtarları (Faz 2 / 6), R2 jetonu `KROMIS_NESNE_DEPO_ANAHTAR_ID`/`KROMIS_NESNE_DEPO_GIZLI`, `SENTRY_DSN`, `RESEND_API_KEY` | Platformun sır deposu (Fly secrets, Railway/Render env) | **Kasada kopyası** (`KROMIS_SECRET_KEY` ile aynı üçüncü yer): platform hesabı kapanır ya da proje silinirse sırlar onunla gider; hepsi sağlayıcı panelinden yeniden üretilebilir ama kesinti o kadar sürer. Kasadaki kayıt AD + değer + hangi panelden üretildiği | DB'de ve kovada bu değerlerin izi YOK (`.env.example` sözleşmesi; kod ortamdan okur); yedek tabloları onları taşımaz, kasa taşır |
@@ -151,6 +156,15 @@ bu iskeleti doldurur ve ölçtüğü süreleri buraya yazar.
    kayıtlar galeride kırık görsel (bunlar araçta değil; `SELECT filename FROM
    medya` ile dizin karşılaştırılır), dosyası olan ama satırı olmayanlar
    aracın listesinde. Doğrula: her iki sayı kabul edilebilir ve nedeni biliniyor.
+   **Kredi defteri (Faz 3 / 7):** defter ve önbellek aynı yedekten geldiği için
+   birbirinden sapmaz; sapma yalnız yedek yarım bir transaksiyonun ortasından
+   alındıysa (PITR noktası) doğar. İşçi kalkınca ilk bakım turu (≤ 5 dk,
+   § 9) her kullanıcıda `SUM(kredi_hareketleri.miktar) == kullanicilar.bakiye`
+   ölçer. Doğrula: `olay=bakim` satırında `tutarsiz_kullanici=0` ve günlükte
+   `olay=defter.tutarsiz` yok; varsa satır kimin, kaç kredi saptığını söyler
+   (`bakiye`, `toplam`, `fark`) — tur DÜZELTMEZ, `/admin` → kullanıcı →
+   "kredi ekle" ile fark kadar `duzeltme` satırı yazılır (açıklamaya
+   "geri yükleme <tarih>"), izli.
 7. **Kayıt:** tatbikatın tarihi, yedeğin yaşı, 2.-6. adımların süresi ve
    bulunan farklar bu belgenin altına eklenir. Bir sonraki tatbikat bu
    sayıların gerilemediğini ölçer.
@@ -169,9 +183,22 @@ bu iskeleti doldurur ve ölçtüğü süreleri buraya yazar.
   Uyarının BİLDİRİMİ kodda değil: Sentry *Alerts* → "issue/log içeren olay
   sayısı ≥ 1 / 5 dk, `uyari` süzgeciyle" ya da platform günlüğünün metin
   uyarısı; `worker_alive:false` için `/health` gövdesini okuyan bir uptime
-  sondası. KURULUM.md → Web sürümü, 9. adım.
-* Kredi defteri yedeği — Faz 3 (tablo yok).
-* Kimlik/oturum kaydının KVKK/GDPR saklama süresi — Faz 4.
+  sondası. KURULUM.md → Web sürümü, 9. adım. **Faz 3 / 7 iki uyarı satırı
+  daha** (aynı kural, aynı yer): `olay=defter.tutarsiz` (WARNING, bakım turu:
+  bir kullanıcının `bakiye` önbelleği defter toplamından sapmış — `kullanici_id`,
+  `bakiye`, `toplam`, `fark`; § 9) ve `olay=defter.asim` (WARNING, işçi
+  onaylarken: gerçek maliyet tahmini AŞTI — ek tahsilat yok, tahmin üst sınır
+  olmalıydı, `is_id`, `tahmin`, `gercek`; katalogdaki tarifeye bakılır,
+  `tools/tarife_kontrol.py`). İkisi de WARNING: Sentry'de OLAY DEĞİL
+  breadcrumb'dır (`LoggingIntegration` yalnız ERROR'u olay yapar, Faz 2 / 9);
+  bildirim günlük toplayıcısının `olay=defter.*` kuralıyla, `uyari`nınkinin
+  yanına.
+* Kredi defteri yedeği — **Faz 3'te KAPANDI:** `kredi_hareketleri` günlük
+  `pg_dump`un / PITR'ın içinde (§ 2), ayrı yedek yok; geri yükleme sonrası
+  işçinin ilk bakım turu `defter.tutarlilik` ile SUM == bakiye der (§ 5,
+  6. adım; § 9).
+* Kimlik/oturum kaydının KVKK/GDPR saklama süresi ve KREDİ DEFTERİNİN hesap
+  silmede kaderi (CASCADE mi anonimleştirme mi) — Faz 4.
 
 ## 7. Platformda iki süreç, tek imaj — açılış ve kapanış (Faz 2 / 10)
 
@@ -240,7 +267,10 @@ Sırlar (`fly secrets set …`, iki sürece de gider; kasaya kopya, § 2):
 fonlanan sağlayıcıların `KROMIS_PLATFORM_*` anahtarları, isteğe bağlı
 `SENTRY_DSN`/`SENTRY_ENVIRONMENT`. İşçiye özel isteğe bağlı üç sayı
 `.env.example`da: `KROMIS_ISCI_ES_ZAMANLI` (4), `KROMIS_IS_KALP_ESIGI_SN`
-(300), `KROMIS_IS_SAKLAMA_GUN` (30). Tam envanter ve her birinin açıklaması
+(300), `KROMIS_IS_SAKLAMA_GUN` (30). Faz 3'ün ikisi (KURULUM.md 10. adım):
+`KROMIS_FREE_AYLIK_HIBE` (boş = 200; web kayıt anında, işçi bakım turunda
+okur — İKİ sürece de aynı değer) ve `KROMIS_FILIGRAN_DOSYASI` (boş = paketin
+işareti; yalnız işçi). Tam envanter ve her birinin açıklaması
 `.env.example` (bekçisi `tests/test_docker_kapisi.py`, ad kümesi kaynaktan).
 
 **Kapanış (SIGTERM) ne yapar.** İşçi yeni iş almayı bırakır, ELDEKİ işleri
@@ -341,11 +371,15 @@ uvicorn satırı (`Started server process`, `Waiting for application startup`)
 stderr'de düz metin kalır. "Bu istek ne oldu": cevaptaki `X-Request-ID` =
 günlükteki `istek_id`. "Bu iş ne oldu": `grep <is_id>` → `is.alindi` →
 `is.basladi` → `is.bitti`/`is.hata`. İşçi süreç olayları `isci.basladi/
-sinyal/kapandi`, `bayat` (düşürülen iş sayısı), `bakim` (aşağıda), `uyari`.
+sinyal/kapandi`, `bayat` (düşürülen iş sayısı), `bakim` (aşağıda), `uyari`,
+Faz 3'ten `defter.asim` (onayda gerçek > tahmin) ve `defter.tutarsiz`
+(bakım turu, aşağıda); admin dokunuşları `admin.plan`/`admin.kredi`.
 
 **Uyarı** (Sentry *Alerts* ya da günlük toplayıcısının kuralı): `uyari` olayı
 5 dk'da ≥ 1 (kuyruk derinliği > 20 ya da en eski bekleyen > 10 dk — § 6),
-`seviye=ERROR` 1 saatte ≥ 10, `worker_alive:false` 5 dk. Bildirimin kendisi
+`seviye=ERROR` 1 saatte ≥ 10, `worker_alive:false` 5 dk; Faz 3 / 7:
+`olay=defter.tutarsiz` ≥ 1 (her turda yinelenir, sapma düzeltilene dek) ve
+`olay=defter.asim` günde ≥ 1 (tarife düşük kalmış, § 6). Bildirimin kendisi
 kodda değil, panelde.
 
 **İş saklama ve bayat düşürme — ayrı cron YOK.** İşçi zaten sürekli koşan tek
@@ -375,8 +409,21 @@ susarsa eldeki işler bayat düşer, `/health` işçiyi ölü gösterir):
   da `kill_timeout` aşımıyla ölen işçi kendi satırını silemez ve
   `worker_alive:false` sonsuza dek kalırdı; açılıştaki tur yeni işçi kalkar
   kalkmaz bunu kapatır (tek işçili dağıtımda silecek başka işçi yok).
+  (4) **Aylık hibe** (Faz 3 / 3, K6 "hibeye tamamla"): planı hibe veren
+  (`free`: `KROMIS_FREE_AYLIK_HIBE`, boş = 200, 0 = kapalı) her kullanıcıda
+  `bakiye < hibe` ise fark yatar, anahtar `hibe:<kullanici>:<YYYY-MM>` —
+  ay içinde ikinci tur no-op, ay başında yeni satır; kullanılmayan hibe
+  üstüne binmez (devretmez). Dağıtım sonrası İLK tur bütün mevcut
+  kullanıcılara yatırır (`hibe_satiri=N`). (5) **Defter tutarlılığı**
+  (Faz 3 / 7, K1): her kullanıcıda `SUM(kredi_hareketleri.miktar) ==
+  kullanicilar.bakiye` — sapan kullanıcı başına `olay=defter.tutarsiz`
+  (WARNING; `kullanici_id`, `bakiye`, `toplam`, `fark`), özette
+  `tutarsiz_kullanici`. Tur ÖLÇER, DÜZELTMEZ: sessiz düzeltme sapmanın
+  sebebini (elle UPDATE, yarım transaksiyon) örterdi; düzeltme `/admin` →
+  "kredi ekle" (`duzeltme` satırı, `admin_id` izli). Sağlıklı dağıtımda hep 0.
   Günlük satırı sayıları verir: `silinen_is`, `silinen_nesne`,
-  `korunan_dizin`, `silinen_isci`; boş turda satır yok. KVKK saklama süresi
+  `korunan_dizin`, `silinen_isci`, `hibe_satiri`, `tutarsiz_kullanici`; boş
+  turda (hepsi 0) satır yok. KVKK saklama süresi
   kararı Faz 4'te (`istek.prompt`u da kapsar); 30 onun öncülü. Elle tarama
   `tools/artik_dosya.py` (§ 4) aynı referans ölçütünü bilir.
 
@@ -387,3 +434,14 @@ süreç (§ 7), admin hesabı (`tools/kullanici.py admin`), `/health`
 `worker_alive:true`, bir görsel işi panelde saniyelerle sayılıp `bitti`
 oluyor (sayaç 0'dan başlar — Faz 2 / 10 saat dilimi düzeltmesi), Sentry'de
 deneme olayı (isteğe bağlı), platform günlüğünde JSON satırlar.
+**Faz 3 / 7 ekleri** (adım adım KURULUM.md 10. adım): `KROMIS_FREE_AYLIK_HIBE`
+iki sürecin de sırrında (ya da boş = 200); dağıtım sonrası ilk `olay=bakim`
+satırında `hibe_satiri=N` (N = mevcut kullanıcı sayısı) ve
+`tutarsiz_kullanici=0`; `/admin` → kendi hesabı `pro` (`olay=admin.plan`;
+ücretsiz planda video kapalı — kendi hesabın da `free`yken 403 alır);
+kendi hesabında `GET /api/kredi` bakiye/plan/hibe verir; ücretsiz bir test
+hesabıyla platform anahtarlı bir görsel → composer "kalan 200 → 192", indirilen
+görselde işaret alt sağda, iş bitince panelde "rezerv 8 · gerçek 8 · iade 0";
+`/admin` Marj sekmesi o işle dolar; `python tools/tarife_kontrol.py`nin dört
+modeli sağlayıcı fiyatıyla bir kez doğrulanır (§ 6'daki `defter.asim`
+uyarısının önlemi).

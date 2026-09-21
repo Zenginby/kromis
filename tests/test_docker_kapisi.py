@@ -741,3 +741,39 @@ def test_the_install_guide_and_operations_doc_cover_the_two_process_deployment_a
     # Şablon saklama değişkenini açıklıyor ve boş bırakıyor.
     satir = [a for a in _atamalar() if a[0] == isci.SAKLAMA_ENV]
     assert satir and satir[0][1] == "" and satir[0][2], satir
+
+
+def test_the_install_guide_readme_and_operations_doc_cover_plans_credits_and_the_ledger_check():
+    """Faz 3 / 7: kredi defterinin İŞLETME yüzü üç belgede birden yazılı olmalı — yoksa
+    sahip 402'yi, filigranı ve `tutarsiz_kullanici`yi ilk canlı koşuda öğrenirdi.
+
+    KURULUM.md 10. adım: üç plan, hibe değişkeni ve "hibeye tamamla", BYOK düşmez, 402,
+    filigran değişkeni, admin kredi/plan, Marj araçları, tutarlılık ölçümü, canlı kontrol
+    listesi. README (tr + en) kısa bölüm + KURULUM'a bağlantı. docs/isletme.md: defter yedeği
+    satırı "tablo yok"tan "kapandı"ya döndü (§ 6), `kredi_hareketleri` yedek tablosunda (§ 2),
+    iki uyarı olayı ve bakım turunun iki yeni sayısı (§ 6, § 9), geri yükleme tatbikatında
+    defter adımı (§ 5). Şablon iki Faz 3 değişkenini açıklıyor ve boş bırakıyor (ALTYAPI'da
+    zaten; burada belge ↔ şablon aynı adı kullanıyor mu)."""
+    kurulum = _oku(KURULUM)
+    for parca in ("Planlar ve kredi", planlar.FREE_AYLIK_HIBE_ENV, filigran.DOSYA_ENV,
+                  "hibeye tamamla", "402", "rezerve", "iade", "GET /api/kredi", "Kredi",
+                  "filigran", "kendi anahtarıyla üreten harcamaz", "kredi ekle", "Marj",
+                  "tools/marj_raporu.py", "tools/tarife_kontrol.py",
+                  "olay=defter.tutarsiz", "tutarsiz_kullanici", "hibe_satiri",
+                  "Canlı kontrol listesi", "docs/isletme.md"):
+        assert parca in kurulum, parca
+    for ad, parcalar in ((README, ("Planlar ve kredi", "KURULUM.md", "Kredi", "Marj")),
+                         (os.path.join(KOK, "README.en.md"), ("Plans and credits", "KURULUM.md", "Credits", "Margin"))):
+        metin = _oku(ad)
+        for parca in parcalar:
+            assert parca in metin, f"{os.path.basename(ad)}: {parca}"
+    isletme = _oku(ISLETME)
+    assert "Faz 3 (tablo yok)" not in isletme, "defter yedeği satırı Faz 3'te kapandı, eski cümle kalmamalı"
+    for parca in ("kredi_hareketleri", "olay=defter.tutarsiz", "olay=defter.asim",
+                  "tutarsiz_kullanici", "hibe_satiri", "defter.tutarlilik", "SUM",
+                  planlar.FREE_AYLIK_HIBE_ENV, filigran.DOSYA_ENV, "KURULUM.md", "duzeltme"):
+        assert parca in isletme, parca
+    # Şablon: iki değişken açıklamalı ve boş (bekçi ALTYAPI'yı ayrıca ölçüyor; bu, belgeyle aynı ad).
+    for ad in (planlar.FREE_AYLIK_HIBE_ENV, filigran.DOSYA_ENV):
+        satir = [a for a in _atamalar() if a[0] == ad]
+        assert satir and satir[0][1] == "" and satir[0][2], (ad, satir)

@@ -960,7 +960,7 @@ def test_the_maintenance_turn_deletes_expired_rows_and_only_the_unreferenced_inp
     # `hibe_satiri`: ücretsiz ve 0 bakiyeli her kullanıcı (en az test kullanıcısı) — ilk tur tamamlar (Faz 3 / 3, K6).
     assert hibe_bekleyen >= 1
     assert ozet == {"silinen_is": 2, "silinen_nesne": 1, "korunan_dizin": 1, "silinen_isci": 1,
-                    "hibe_satiri": hibe_bekleyen} and bool(ozet)
+                    "hibe_satiri": hibe_bekleyen, "tutarsiz_kullanici": 0} and bool(ozet)
     db_oturumu.expire_all()
     assert set(db_oturumu.scalars(select(tablolar.Is.id))) == {b, d}
     assert depo.var(ayar.is_dizini(kullanici.id, a) + "upload.png") and depo.var(ayar.is_dizini(kullanici.id, a) + "ref2.png"), (
@@ -973,7 +973,7 @@ def test_the_maintenance_turn_deletes_expired_rows_and_only_the_unreferenced_inp
     bos = isci.bakim_turu(db_oturumu, depo, BAKIM_ANI, ESIK, SAKLAMA)
     # Aynı ay ikinci tur: hibe anahtarı çakışır, satır yok — tur boş, olay düşmez.
     assert not bos and dict(bos) == {"silinen_is": 0, "silinen_nesne": 0, "korunan_dizin": 0, "silinen_isci": 0,
-                                     "hibe_satiri": 0}
+                                     "hibe_satiri": 0, "tutarsiz_kullanici": 0}
 
 
 def test_the_maintenance_turn_frees_a_referenced_directory_once_the_last_referrer_expires(
@@ -1034,7 +1034,7 @@ def test_the_maintenance_turn_leaves_another_tenants_directory_alone_even_if_a_d
     # `hibe_satiri`: ücretsiz ve 0 bakiyeli her kullanıcı (en az iki kiracı) — ilk tur tamamlar (Faz 3 / 3).
     assert hibe_bekleyen >= 2
     assert ozet == {"silinen_is": 1, "silinen_nesne": 1, "korunan_dizin": 0, "silinen_isci": 0,
-                    "hibe_satiri": hibe_bekleyen}
+                    "hibe_satiri": hibe_bekleyen, "tutarsiz_kullanici": 0}
     assert not depo.var(ayar.is_dizini(kullanici.id, b) + "upload.png"), "işin kendi dizini gider"
     assert depo.var(yabanci_dizin + "gizli.png"), "başka kiracının dizinine dokunulmaz"
     (uyari,) = [k for k in yakala.kayitlar if getattr(k, "olay", None) == "bakim.yabanci_dizin"]
@@ -1044,6 +1044,67 @@ def test_the_maintenance_turn_leaves_another_tenants_directory_alone_even_if_a_d
     assert ayar.is_dizini_coz(yabanci_dizin) == (yabanci, yabanci_is)
     assert ayar.is_dizini_ayristir(yabanci_dizin) == yabanci_is
     assert ayar.is_dizini_coz("foo/") is None and ayar.is_dizini_coz(f"kullanicilar/{yabanci}/isler/x/") is None
+
+
+def _bakim_turu_yakalayarak(db: Session, depo) -> tuple[isci.BakimOzeti, list[logging.LogRecord]]:
+    """Bir bakım turu + `kromis.is` günlükçüsünün o turdaki kayıtları (yabancı dizin testinin deyimi)."""
+    yakala = _Yakala()
+    gunlukcu = logging.getLogger("kromis.is")
+    kapaliydi, gunlukcu.disabled = gunlukcu.disabled, False
+    gunlukcu.addHandler(yakala)
+    try:
+        ozet = isci.bakim_turu(db, depo, BAKIM_ANI, ESIK, SAKLAMA)
+    finally:
+        gunlukcu.removeHandler(yakala)
+        gunlukcu.disabled = kapaliydi
+    return ozet, yakala.kayitlar
+
+
+def test_the_maintenance_turn_reports_a_ledger_drift_per_user_and_does_not_correct_it(
+        db_oturumu, kullanici, depo):
+    """Faz 3 / 7 (K1): `kullanicilar.bakiye` önbelleği `SUM(kredi_hareketleri)`den sapmışsa tur kullanıcı
+    başına `olay=defter.tutarsiz` (WARNING: `kullanici_id`, `bakiye`, `toplam`, `fark`) düşürür,
+    `tutarsiz_kullanici` sayar ve özet DOĞRU olur (olay düşer) — ama DÜZELTMEZ: sapma admin `duzelt`in
+    işi, sessiz bir "SUM'a çek" sebebi örterdi. Elle UPDATE tek yazar kuralını (defter.py) delen şeyin
+    ta kendisi; test onu bilerek yapıyor."""
+    # Önce bir tur: hibe yatar, herkes tutarlı — sapmayı yalnız bizim dokunuşumuz yaratsın.
+    isci.bakim_turu(db_oturumu, depo, BAKIM_ANI, ESIK, SAKLAMA)
+    oteki = _ikinci_kullanici(db_oturumu)
+    isci.bakim_turu(db_oturumu, depo, BAKIM_ANI, ESIK, SAKLAMA)
+    with kiraci.baglam(rol=kiraci.ADMIN, oturum=db_oturumu):
+        assert defter.tutarlilik(db_oturumu) == []
+        toplam = defter.bakiye(db_oturumu, kullanici.id)
+    db_oturumu.execute(text("UPDATE kullanicilar SET bakiye = bakiye + 29 WHERE id = :id"), {"id": kullanici.id})
+    db_oturumu.execute(text("UPDATE kullanicilar SET bakiye = bakiye - 5 WHERE id = :id"), {"id": oteki})
+    db_oturumu.commit()
+
+    ozet, kayitlar = _bakim_turu_yakalayarak(db_oturumu, depo)
+
+    assert ozet["tutarsiz_kullanici"] == 2 and bool(ozet), dict(ozet)
+    uyarilar = {k.kullanici_id: k for k in kayitlar if getattr(k, "olay", None) == "defter.tutarsiz"}
+    assert set(uyarilar) == {str(kullanici.id), str(oteki)}
+    bizim = uyarilar[str(kullanici.id)]
+    assert bizim.levelno == logging.WARNING
+    assert (bizim.bakiye, bizim.toplam, bizim.fark) == (toplam + 29, toplam, 29)
+    assert uyarilar[str(oteki)].fark == -5
+    # Düzeltilmedi: önbellek sapmış hâliyle duruyor, defter satırı eklenmedi.
+    db_oturumu.expire_all()
+    assert db_oturumu.get(tablolar.Kullanici, kullanici.id).bakiye == toplam + 29
+    with kiraci.baglam(rol=kiraci.ADMIN, oturum=db_oturumu):
+        assert len(defter.tutarlilik(db_oturumu)) == 2
+    # Temizlik: sonraki testlerin turu sıfır sapma beklesin.
+    db_oturumu.execute(text("UPDATE kullanicilar SET bakiye = bakiye - 29 WHERE id = :id"), {"id": kullanici.id})
+    db_oturumu.execute(text("UPDATE kullanicilar SET bakiye = bakiye + 5 WHERE id = :id"), {"id": oteki})
+    db_oturumu.commit()
+
+
+def test_the_maintenance_turn_is_silent_about_the_ledger_when_every_balance_matches(db_oturumu, kullanici, depo):
+    """Sapma yokken `tutarsiz_kullanici=0`, `defter.tutarsiz` satırı YOK ve boş tur olay düşürmez —
+    5 dk'da bir "her şey yolunda" satırı gürültü olurdu (`bayat`/`bakim` deyimi)."""
+    isci.bakim_turu(db_oturumu, depo, BAKIM_ANI, ESIK, SAKLAMA)   # hibe ve varsa saklama bu turda gitsin
+    ozet, kayitlar = _bakim_turu_yakalayarak(db_oturumu, depo)
+    assert ozet["tutarsiz_kullanici"] == 0 and not bool(ozet), dict(ozet)
+    assert not [k for k in kayitlar if getattr(k, "olay", None) == "defter.tutarsiz"]
 
 
 # ── (v) süreç ───────────────────────────────────────────────────────────

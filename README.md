@@ -152,6 +152,19 @@ yabancı `Host`/`Origin` taşıyan her isteği reddeder.
 Dört karanlık tema (Monokrom · Okyanus · Amber · Menekşe), `prefers-reduced-motion`
 desteği ve telefonda tam ekran açılan paneller de kutuda geliyor.
 
+### Planlar ve kredi (web sürümü)
+
+Web sürümünde platformun anahtarıyla üreten kullanıcı **kredi** harcar, kendi
+anahtarıyla üreten harcamaz. Üç plan (`free` / `temel` / `pro`): ücretsiz plan
+aylık hibe alır (öntanımlı 200 kredi, "hibeye tamamla" — devretmez), görselleri
+filigranlı, video modelleri kapalı; ücretli planlar filigransız. İş sıraya
+girerken tahmin rezerve edilir, bitince gerçek maliyetle onaylanır ve fark iade
+edilir; hata/iptal tam iade. Bakiye composer satırında ("bu tur 8 düşer ·
+kalan 192") ve Ayarlar → **Kredi** bölmesinde; işletmen için `/admin`da plan,
+kredi ekleme ve **Marj** tablosu. Kurulum ve canlı kontrol listesi:
+[KURULUM.md → Web sürümü, 10. adım](KURULUM.md#web-sürümü-sunucu-kurulumu);
+karar kaydı [docs/faz3-kredi-defteri-filigran.md](docs/faz3-kredi-defteri-filigran.md).
+
 Maddelerin tamamı, hangi sağlayıcının nesi çalışıyor ve yol haritası:
 **[docs/ozellikler.md](docs/ozellikler.md)**.
 

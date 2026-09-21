@@ -95,3 +95,7 @@ node_modules/
 # (bkz. docs/tasarim-diyagramlari/README.md). ~800 KB'lık tek dosya, diff'i
 # okunamaz; commit'lenen şey ~3 KB'lık JSON.
 docs/tasarim-diyagramlari/*.html
+# `archify visual-check`in yan ürünleri (ekran görüntüleri + makbuz) da
+# çıktıdır, kaynak değil.
+docs/tasarim-diyagramlari/*.png
+docs/tasarim-diyagramlari/*.visual-check.json

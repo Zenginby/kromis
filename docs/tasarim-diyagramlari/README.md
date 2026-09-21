@@ -25,11 +25,23 @@ işidir ve orada kalmalıdır.
 | Tür | Örnek | Bayatlama riski |
 | --- | --- | --- |
 | **Kod aynası** | iş yaşam döngüsü | Var — kod değişir, diyagram sessizce yalan söyler |
-| **Kod öncesi tasarım** | ödeme/MoR akışı | Yok — kayacağı bir kaynak henüz yok |
+| **Melez** | Polar webhook akışı | Kısmi — şeması inmiş (`0008_odeme`), işleyicileri inmemiş |
 
-Kod aynası olan her diyagram `tests/test_tasarim_diyagramlari.py` ile korunur.
-Kapının ne yakalayıp ne yakalamadığı o testin başında yazılı; eklemeden önce
-okuyun.
+Saf "kod öncesi" diyagram pratikte az çıkıyor: bir akışı çizmeye değer hâle
+geldiğinde şemasının bir kısmı genellikle çoktan inmiş oluyor. Webhook akışı
+`defter.paket_yukle` gibi VAR OLAN adlara da, `odeme.isle` gibi HENÜZ YAZILMAMIŞ
+adlara da atıf yapıyor.
+
+`tests/test_tasarim_diyagramlari.py` ikisini de doğru ele alıyor: var olan ad
+denetleniyor, yazılmamış modüle atıf sessizce atlanıyor ve **o dosya indiği gün
+diyagram kendiliğinden korunmaya başlıyor**. Yani bir tasarım diyagramı,
+tasarladığı kod yazıldığı anda kod aynasına dönüşüyor ve kapı bunu kendisi
+devralıyor.
+
+Kapının dört ölçümü ve YAKALAMADIĞI şey o testin başında yazılı; diyagram
+eklemeden önce okuyun. Yeni bir diyagram ya taranan listede ya da muafiyet
+defterinde gerekçesiyle yer almak zorunda (CLAUDE.md §5) — dördüncü test bunu
+zorluyor, sessizce muaf kalınamıyor.
 
 ## Dosya düzeni
 
@@ -37,8 +49,11 @@ Commit'lenen şey **JSON**'dur, HTML değil:
 
 | | Boyut | Üretim maliyeti |
 | --- | --- | --- |
-| `*.lifecycle.json` (kaynak) | ~3 KB | Pahalı — kaynağı okumak, doğrulama turları |
-| `*.html` (çıktı) | ~800 KB | Bedava — tek komut, saniyeler |
+| `<ad>.<tür>.json` (kaynak) | 3–5 KB | Pahalı — kaynağı okumak, doğrulama turları |
+| `<ad>.html` (çıktı) | ~800 KB | Bedava — tek komut, saniyeler |
+
+`archify visual-check` aynı klasöre ekran görüntüleri ve bir makbuz
+(`<ad>.visual-check.json`) bırakır; onlar da çıktıdır ve `.gitignore`dadır.
 
 800 KB'lık bir çıktıyı 13 MB'lık bir depoya her sürümde yazmanın anlamı yok;
 üstelik diff'i okunamaz. HTML `.gitignore`da.
@@ -69,3 +84,7 @@ içeriğin tamamı Türkçe.
 | Dosya | Anlattığı | Tür |
 | --- | --- | --- |
 | [`kromis-is-yasam-dongusu.lifecycle.json`](kromis-is-yasam-dongusu.lifecycle.json) | `isler.durum` geçişleri ve her geçişin tetiklediği defter hareketi | Kod aynası |
+| [`kromis-polar-webhook.sequence.json`](kromis-polar-webhook.sequence.json) | Polar olayının imzadan deftere yolu; hangi dalın hangi HTTP kodunu döndürdüğü ve yeniden deneme döngüsü | Melez (Faz 4 / 3) |
+
+HTML'i üretirken tür adını komuta da yazın: `deliver sequence …`, `deliver
+lifecycle …`.

@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Kromis — Polar Webhook Akışı",
+    "output": "kromis-polar-webhook.html",
+    "viewBox": [
+      1080,
+      660
+    ],
+    "quality_profile": "showcase",
+    "column_fit": "spread"
+  },
+  "participants": [
+    {
+      "id": "polar",
+      "type": "external",
+      "label": "Polar",
+      "sublabel": "MoR sağlayıcı"
+    },
+    {
+      "id": "rota",
+      "type": "backend",
+      "label": "webhook rotası",
+      "sublabel": "oturumsuz · ham gövde"
+    },
+    {
+      "id": "sarmal",
+      "type": "backend",
+      "label": "services/polar.py",
+      "sublabel": "SDK sarmalı"
+    },
+    {
+      "id": "odeme",
+      "type": "backend",
+      "label": "services/odeme.py",
+      "sublabel": "deftere çeviren tek yer"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "olaylar · siparisler · defter"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 264,
+      "label": "İmza"
+    },
+    {
+      "from": 282,
+      "to": 384,
+      "label": "Idempotency"
+    },
+    {
+      "from": 402,
+      "to": 468,
+      "label": "Deftere yazım"
+    },
+    {
+      "from": 486,
+      "to": 588,
+      "label": "Yanıt ve yeniden deneme"
+    }
+  ],
+  "messages": [
+    {
+      "from": "polar",
+      "to": "rota",
+      "y": 180,
+      "label": "POST ham gövde + imza başlıkları",
+      "variant": "emphasis"
+    },
+    {
+      "from": "rota",
+      "to": "sarmal",
+      "y": 216,
+      "label": "polar.olay_dogrula(govde, basliklar)",
+      "variant": "default"
+    },
+    {
+      "from": "sarmal",
+      "to": "rota",
+      "y": 252,
+      "label": "Olay · ImzaHatasi ise 400",
+      "variant": "return"
+    },
+    {
+      "from": "rota",
+      "to": "odeme",
+      "y": 300,
+      "label": "odeme.isle(db, olay) — TEK transaksiyon",
+      "variant": "emphasis"
+    },
+    {
+      "from": "odeme",
+      "to": "db",
+      "y": 336,
+      "label": "odeme_olaylari INSERT ON CONFLICT DO NOTHING",
+      "variant": "default"
+    },
+    {
+      "from": "db",
+      "to": "odeme",
+      "y": 372,
+      "label": "False = yinelenen, işleme yok",
+      "variant": "return"
+    },
+    {
+      "from": "odeme",
+      "to": "db",
+      "y": 420,
+      "label": "kullanıcı ve ürün çöz — bulunamazsa hata kaydı",
+      "variant": "default"
+    },
+    {
+      "from": "odeme",
+      "to": "db",
+      "y": 456,
+      "label": "paket: defter.paket_yukle · plan: defter.hibe",
+      "variant": "emphasis"
+    },
+    {
+      "from": "rota",
+      "to": "polar",
+      "y": 504,
+      "label": "200 islendi | yinelenen | atlandi",
+      "variant": "return"
+    },
+    {
+      "from": "rota",
+      "to": "polar",
+      "y": 540,
+      "label": "500 — transaksiyon geri alınır",
+      "variant": "dashed"
+    },
+    {
+      "from": "polar",
+      "to": "rota",
+      "y": 576,
+      "label": "aynı webhook-id ile yeniden dener",
+      "variant": "dashed"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "rota",
+      "from": 174,
+      "to": 260,
+      "type": "backend"
+    },
+    {
+      "participant": "sarmal",
+      "from": 210,
+      "to": 258,
+      "type": "backend"
+    },
+    {
+      "participant": "odeme",
+      "from": 294,
+      "to": 474,
+      "type": "backend"
+    },
+    {
+      "participant": "db",
+      "from": 330,
+      "to": 474,
+      "type": "database"
+    },
+    {
+      "participant": "rota",
+      "from": 498,
+      "to": 584,
+      "type": "backend"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Neden hep 200",
+      "items": [
+        "Yinelenen, kullanıcı yok, ürün yok: hata kaydı + 200 — yeniden deneme faydasız",
+        "Yalnız imza hatası 400, yalnız iç hata 500",
+        "500 tek transaksiyonu geri alır, yeniden deneme temiz gelir"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "İki kat idempotency",
+      "items": [
+        "odeme_olaylari.webhook_id UNIQUE teslimat yinelemesini durdurur",
+        "siparisler.polar_siparis_id UNIQUE ikinci koruma",
+        "Defter anahtarları order_id taşır: paket:<order_id>"
+      ]
+    }
+  ]
+}

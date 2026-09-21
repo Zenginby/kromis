@@ -12,7 +12,7 @@ bu klasörün ilk diyagramı yazıldıktan saatler sonra `services/defter.py` ik
 kovaya geçti (Faz 4 / 2, +387/-154) ve kartların yarısı o anda eskidi. Kapı
 olmasaydı sessizce eskimiş kalırdı.
 
-Kapı ÜÇ şeyi ölçüyor:
+Kapı DÖRT şeyi ölçüyor:
 
   1. Her diyagram geçerli JSON mu ve bildiği bir tür mü — 2. ile 3. testin
      anlamlı olması buna bağlı; bozuk dosya ikisini de sessizce atlatırdı.
@@ -22,6 +22,10 @@ Kapı ÜÇ şeyi ölçüyor:
      (bkz. services/tablolar.py §`IS_DURUMLARI`), diyagram da ona uymalı.
   3. Metinde geçen her `<modül>.<ad>` atfı o modülde gerçekten TANIMLI mı.
      `kuyruk.bayatlari_dusur` bir gün yeniden adlandırılırsa takım kırmızı olur.
+     Henüz YAZILMAMIŞ bir modüle atıf (`odeme.isle`, Faz 4 / 3) sessizce
+     atlanır ve o dosya indiği gün kendiliğinden korunmaya başlar.
+  4. 2. testin elle tutulan kapsam listesi EKSİKSİZ mi — her diyagram ya
+     taranıyor ya da muafiyet defterinde gerekçesiyle duruyor (CLAUDE.md §5).
 
 Kapının YAKALAMADIĞI: anlamsal kayma. Yarın `calisiyor` iptal edilebilir hâle
 gelirse her ad yerinde durur, test yeşil kalır ve diyagram yalan söylemeye
@@ -45,9 +49,20 @@ DIZIN = os.path.join(REPO, "docs", "tasarim-diyagramlari")
 # Archify'ın ürettiği türler; dosya adı `<ad>.<tür>.json` biçiminde.
 TURLER = frozenset({"architecture", "workflow", "sequence", "dataflow", "lifecycle"})
 
-# KOD AYNASI diyagramlar — 2. test yalnız bunlara uygulanır. Kod öncesi tasarım
-# diyagramları (ödeme akışı gibi) buraya GİRMEZ: kayacakları bir kaynak yok.
+# KOD AYNASI diyagramlar — 2. test yalnız bunlara uygulanır.
 KOD_AYNASI_DURUM = {"kromis-is-yasam-dongusu.lifecycle.json": set(IS_DURUMLARI)}
+
+# MUAFİYET DEFTERİ — 2. testin dışında kalan her diyagram, GEREKÇESİYLE.
+# Bu deponun deyimi (CLAUDE.md §5): elle tutulan bir kapsam listesinde OLMAYAN
+# dosyanın öntanımlı hâli *muaf*tır ve yeni gelen dosya kapıyı hiç görmeden
+# geçer — `fal_client.py` v0.23'te, `static/i18n.js` PR #12'de böyle kaçtı.
+# 4. test iki listenin BİRLİKTE eksiksiz olmasını zorluyor; buraya bir satır
+# yazmadan yeni diyagram ekleyemezsiniz.
+DURUM_MUAF = {
+    "kromis-polar-webhook.sequence.json":
+        "Sıra diyagramı, durum makinesi değil: `states` yok, `IS_DURUMLARI` ile "
+        "kıyaslanacak bir küme taşımıyor. Kod atıfları 3. testte korunuyor.",
+}
 
 # Atıf deseni: `kuyruk.al`, `defter.onayla` … Yalnız services/ altındaki modüller
 # aranır; `isler.durum` gibi tablo/sütun atıfları modül değildir, eşleşmez.
@@ -55,9 +70,16 @@ ATIF = re.compile(r"\b([a-z_]+)\.([a-z_][a-z0-9_]*)\b")
 
 
 def diyagramlar() -> list[str]:
+    """`<ad>.<tür>.json` biçimindeki dosyalar — yan ürünler DEĞİL.
+
+    Deseni dar tutmak bilinçli: `archify visual-check` aynı klasöre
+    `<ad>.visual-check.json` bırakıyor ve "her .json diyagramdır" varsayımı
+    onu diyagram sanmıştı (bu testler yazılırken ölçüldü).
+    """
     if not os.path.isdir(DIZIN):
         return []
-    return sorted(a for a in os.listdir(DIZIN) if a.endswith(".json"))
+    return sorted(a for a in os.listdir(DIZIN)
+                  if a.endswith(".json") and a.rsplit(".", 2)[-2] in TURLER)
 
 
 def _metinler(nesne: object) -> list[str]:
@@ -101,7 +123,9 @@ def test_diyagram_okunabilir(ad: str) -> None:
     tur = ad.rsplit(".", 2)[-2]
     assert tur in TURLER, f"{ad}: bilinmeyen tür {tur!r}"
     assert d.get("diagram_type") == tur, f"{ad}: dosya adı {tur!r}, içerik {d.get('diagram_type')!r}"
-    assert d.get("states") or d.get("nodes"), f"{ad}: boş diyagram"
+    # Düğüm koleksiyonunun adı türe göre değişiyor: lifecycle `states`, sequence
+    # `participants`, ötekiler `nodes`.
+    assert d.get("states") or d.get("participants") or d.get("nodes"), f"{ad}: boş diyagram"
 
 
 @pytest.mark.parametrize("ad", sorted(KOD_AYNASI_DURUM))
@@ -116,6 +140,26 @@ def test_durum_kumesi_sozlesmeyle_ayni(ad: str) -> None:
         f"{ad}: diyagram {sorted(cizilen)} çiziyor, sözleşme {sorted(KOD_AYNASI_DURUM[ad])} diyor "
         f"(services/tablolar.py IS_DURUMLARI)"
     )
+
+
+def test_her_diyagram_ya_taranir_ya_muaftir() -> None:
+    """4. Kapsam listesi EKSİKSİZ mi — sessizce muaf kalan diyagram yok.
+
+    Kapının kapısı. 2. test elle tutulan bir listeye bakıyor; o liste eksik
+    kalırsa yeni diyagram kapıyı hiç görmeden geçer. Burası her dosyanın
+    listelerden BİRİNDE ve yalnız birinde olmasını zorluyor.
+    """
+    dosyalar = set(diyagramlar())
+    taranan, muaf = set(KOD_AYNASI_DURUM), set(DURUM_MUAF)
+    assert not (taranan & muaf), f"hem taranan hem muaf: {sorted(taranan & muaf)}"
+    assert not (dosyalar - taranan - muaf), (
+        f"sınıflandırılmamış diyagram: {sorted(dosyalar - taranan - muaf)} — "
+        f"KOD_AYNASI_DURUM'a ekleyin ya da DURUM_MUAF'a gerekçesiyle yazın"
+    )
+    assert not ((taranan | muaf) - dosyalar), (
+        f"listede olup diskte olmayan: {sorted((taranan | muaf) - dosyalar)}"
+    )
+    assert all(DURUM_MUAF.values()), "muafiyet gerekçesiz olamaz"
 
 
 @pytest.mark.parametrize("ad", diyagramlar())

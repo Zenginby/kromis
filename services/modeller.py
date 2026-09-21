@@ -70,8 +70,12 @@ def provider_logo_url(provider: str) -> str | None:
     return f"/static/img/providers/{ad}?v={version.APP_VERSION}" if ad else None
 
 
-def model_payload(m: catalog.ImageModel, cfg: dict, kisa: dict, plan: str = planlar.PLAN_VARSAYILAN) -> dict:
+def model_payload(m: catalog.ImageModel, cfg: dict, kisa: dict, plan: str = planlar.PLAN_VARSAYILAN,
+                  kaynaklar: Mapping[str, str | None] | None = None) -> dict:
     """Bir görsel/video modelinin arayüze giden hâli; `plan` isteğin kullanıcısının planı (Faz 3 / 3).
+
+    `kaynaklar` (Faz 3 / 6): `settings_payload`ın `{kimlik_id: "kullanici" | "platform" | None}`
+    sözlüğü — modelin `kaynak` alanı ondan okunur (aşağıda), verilmezse `None`.
 
     ÇIKARILDI, kopyalanmadı: `image_models` ve `video_models` listelerinin
     ikisi de bu sözlüğü kuruyor ve elle iki kez yazmak, birine alan ekleyip
@@ -141,6 +145,11 @@ def model_payload(m: catalog.ImageModel, cfg: dict, kisa: dict, plan: str = plan
         # Bugün her modelde "free" (katalog verisi); video kuralı planın
         # özelliği ve `sebep`te görünüyor (services/planlar.py, K7).
         "requires_plan": m.plan,
+        # KİMİN anahtarıyla koşacak (Faz 3 / 6): `kullanici` | `platform` | None. Composer'ın
+        # "bu tur N düşer · kalan M" satırı BYOK modelde "kendi anahtarın · düşmez" der (K3:
+        # kendi anahtarıyla iş rezerv etmez). İstemci sağlayıcı → kimlik eşlemesini bilmiyor
+        # (`SAGLAYICI_KIMLIGI` yalnız Azure'u tanır) — kararı sunucu söyler, `kaynaklar` gibi.
+        "kaynak": (kaynaklar or {}).get(m.credential),
     }
 
 
@@ -212,9 +221,9 @@ def settings_payload(kimlikler: Mapping[str, str] | None = None, *,
         # `catalog.VIDEO_MODELS`in ayrı bir demet olma gerekçesinin ön yüz
         # tarafındaki karşılığı.
         "default_video_model": catalog.DEFAULT_VIDEO_MODEL,
-        "video_models": [model_payload(m, cfg, kisa_video, plan)
+        "video_models": [model_payload(m, cfg, kisa_video, plan, kaynaklar)
                          for m in catalog.VIDEO_MODELS],
-        "image_models": [model_payload(m, cfg, kisa_gorsel, plan)
+        "image_models": [model_payload(m, cfg, kisa_gorsel, plan, kaynaklar)
                          for m in catalog.IMAGE_MODELS],
         "default_chat_model": catalog.DEFAULT_CHAT_MODEL,
         "chat_models": [

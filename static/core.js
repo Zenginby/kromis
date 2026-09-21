@@ -42,8 +42,120 @@ function girisSayfasinaGit() {
   window.fetch = async (girdi, secenekler) => {
     const res = await gercekFetch(girdi, secenekler);
     if (res.status === 401) girisSayfasinaGit();
+    // 402 / 403 (Faz 3 / 6): bakiye ve plan kapıları, gövde `{"kod": …}`. Cevap
+    // ÇOĞALTILIP okunuyor (`clone`): gövde tek okumalık, çağıranın kendi
+    // `res.json()`u aynen çalışmalı. Bekleniyor ki toast, çağıranın durum
+    // satırıyla aynı anda görünsün (E2E ikisini birden ölçüyor).
+    if (res.status === 402 || res.status === 403) await krediKapisiUyar(res.clone());
     return res;
   };
+}
+
+// ── Kredi (Faz 3 / 6; docs/faz3-kredi-defteri-filigran.md §6) ────────
+// `GET /api/kredi`nin son hâli: bakiye, plan, hibe, kurallar, son hareketler.
+// TEK okuma noktası, ÜÇ okuyan: `syncRunCost` ("bu tur N düşer · kalan M"),
+// Ayarlar "Kredi" bölmesi (settings.js) ve iş paneli (isler.js `krediYenile`
+// çağırır — 202 rezervi düşürür, kapanış iade/onay yazar; sayı SSE olayından
+// sonra geri gelir). İstemci yalnız GÖSTERİR: `N > M` satırı uyarı rengine
+// boyar, #go KAPANMAZ — 402 sunucunun tek doğruluk kaynağı (BYOK'ta rezerv
+// yok, günlük tavan ve plan ayrı kapılar; istemcide ikinci bir karar, sunucu
+// kuralı değişince bayatlayan bir kopya olurdu).
+const KREDI_YOLU = "/api/kredi";
+let krediDurumu = null;
+let krediIstegi = null; // süren istek
+let krediTekrar = false; // süren istek bitince bir kez daha sorulsun mu
+
+async function krediYenile() {
+  // Süren istek varsa bitince BİR kez daha sorulur, aynı söz döndürülmez: cevap
+  // isteğin GÖNDERİLDİĞİ ana ait, olay ondan sonra gelmiş olabilir — 202'nin
+  // yenilemesi uçarken hızlı bir işçi işi düşürüp iadeyi yazar, eski cevap
+  // "kalan 192" der ve bir daha sorulmazdı (ölçüldü: E2E sahte sağlayıcı).
+  if (krediIstegi) {
+    krediTekrar = true;
+    return krediIstegi;
+  }
+  krediIstegi = (async () => {
+    do {
+      krediTekrar = false;
+      try {
+        const res = await fetch(KREDI_YOLU);
+        if (res.ok) krediDurumu = await res.json();
+      } catch {
+        /* ağ hatası: eski hâl durur, satır "≈ N kredi"ye düşer */
+      }
+    } while (krediTekrar);
+    krediIstegi = null;
+    syncRunCost();
+    // Ayarlar bölmesi açıksa kendini yeniden çizer (settings.js dinler).
+    document.dispatchEvent(new CustomEvent("kromis:kredi"));
+    return krediDurumu;
+  })();
+  return krediIstegi;
+}
+
+// 402 `err.kredi_yetersiz` / 403 `err.plan_kapsamiyor` (services/kapilar.py):
+// cümle + Ayarlar "Kredi" bağlantısı. Öteki 402/403 gövdeleri (admin kapısı,
+// sağlayıcının kendi 402'si) `kod` taşımaz ya da başka kod taşır → dokunulmaz.
+// Durum satırı cümleyi zaten yazıyor (`detailText`); buradaki ek, kullanıcıyı
+// bakiyesine GÖTÜREN yol. Plan kapısında bağlantı yok: satış sayfası Faz 4.
+const KREDI_KAPI_KODLARI = new Set(["err.kredi_yetersiz", "err.plan_kapsamiyor"]);
+const KREDI_TOAST_MS = 10000;
+let krediToastZamanlayici = null;
+
+async function krediKapisiUyar(res) {
+  let govde;
+  try {
+    govde = await res.json();
+  } catch {
+    return;
+  }
+  const d = govde && govde.detail;
+  if (!d || !KREDI_KAPI_KODLARI.has(d.kod)) return;
+  krediToast(t(d.kod, d), d.kod === "err.kredi_yetersiz");
+  if (d.kod === "err.kredi_yetersiz") krediYenile();
+}
+
+/** Toast yüzeyi ilk kullanımda kurulur (index.html'e id eklenmez — çapa defteri).
+ *  `textContent`: cümle sunucu verisiyle kuruluyor, DOM'a yalnız bu kapıdan. */
+function krediToast(mesaj, baglanti) {
+  let kutu = $("kredi-toast");
+  if (!kutu) {
+    kutu = document.createElement("div");
+    kutu.id = "kredi-toast";
+    kutu.className = "kredi-toast";
+    kutu.setAttribute("role", "status");
+    document.body.appendChild(kutu);
+  }
+  kutu.replaceChildren();
+  const metin = document.createElement("span");
+  metin.className = "kredi-toast-metin";
+  metin.textContent = mesaj;
+  kutu.appendChild(metin);
+  if (baglanti) {
+    const dugme = document.createElement("button");
+    dugme.type = "button";
+    dugme.className = "btn-ghost kredi-toast-baglanti";
+    dugme.textContent = t("kredi.toast_baglanti");
+    dugme.addEventListener("click", () => {
+      kutu.hidden = true;
+      openKrediBolmesi(); // settings.js — olay anında, yükleme sırası sorun değil
+    });
+    kutu.appendChild(dugme);
+  }
+  const kapat = document.createElement("button");
+  kapat.type = "button";
+  kapat.className = "modal-x";
+  kapat.setAttribute("aria-label", t("common.close"));
+  kapat.textContent = "×";
+  kapat.addEventListener("click", () => {
+    kutu.hidden = true;
+  });
+  kutu.appendChild(kapat);
+  kutu.hidden = false;
+  clearTimeout(krediToastZamanlayici);
+  krediToastZamanlayici = setTimeout(() => {
+    kutu.hidden = true;
+  }, KREDI_TOAST_MS);
 }
 const ACCEPTED_UPLOAD_TYPES = ["image/png", "image/jpeg", "image/webp"];
 // Aynı üç türün UZANTI karşılığı. `isAcceptedUpload`ın var oluş sebebi burada.
@@ -535,14 +647,13 @@ function axisLabel(key) {
   return el ? el.textContent.trim() : key;
 }
 
-/** Seçili modelin kredi maliyeti: model × boyut/kalite × adet.
- *
- * Kredi bilgisi ŞİMDİLİK yalnız METADATA — bakiye yok, satın alma yok,
- * zorlama yok. Gerçek bakiye geldiğinde değişecek yer TEK: aşağıdaki metne
- * " · N kalan" ekleniyor ve goBlockReason'a bir satır giriyor.
+/** Seçili modelin kredi maliyeti: model × boyut/kalite × adet — ve bakiye (Faz 3 / 6, stüdyo B1).
  *
  * Tarife SUNUCUDAN geliyor; istemci yalnız anahtar kuruyor, fiyat mantığı
- * kurmuyor — yoksa aynı hesap iki yerde birden yaşardı.
+ * kurmuyor — yoksa aynı hesap iki yerde birden yaşardı. Bakiye de sunucudan
+ * (`krediDurumu`, `GET /api/kredi`); satır yalnız GÖSTERİR, #go'yu kapatmaz
+ * (`goBlockReason`a kredi satırı girmedi: 402 sunucunun kararı, bkz. üstteki
+ * kredi bloğu).
  */
 function syncRunCost() {
   const el = $("run-cost");
@@ -555,8 +666,12 @@ function syncRunCost() {
       el.hidden = true;
       return;
     }
-    const toplam = sutunlar.reduce((t, s) => t + (s.birim || 0), 0);
-    el.textContent = `${tc("gen.cost_one", "gen.cost_many", toplam)} · ${tc("gen.models_one", "gen.models_many", sutunlar.length)}`;
+    const toplam = sutunlar.reduce((t_, s) => t_ + (s.birim || 0), 0);
+    // Düşecek kısım yalnız PLATFORM anahtarıyla koşacak sütunlar (K3): BYOK
+    // sütunun tarifesi toplamda var, rezervde yok.
+    const platform = sutunlar.filter((s) => s.model.kaynak !== "kullanici");
+    const dusen = platform.length ? platform.reduce((t_, s) => t_ + (s.birim || 0), 0) : null;
+    el.textContent = `${krediMetni(toplam, dusen)} · ${tc("gen.models_one", "gen.models_many", sutunlar.length)}`;
     el.hidden = false;
     return;
   }
@@ -581,10 +696,23 @@ function syncRunCost() {
   // iki kopyası olurdu (bkz. app._model_payload'ın `credits` yorumu).
   const sure =
     model.durations && model.durations.length ? Number($("duration").value || 0) || 1 : 1;
-  // `≈` bilerek: bu bir fatura değil, metadata — tilde bunu bir paragraf
-  // açıklama yazmadan söylüyor.
-  el.textContent = tc("gen.cost_one", "gen.cost_many", birim * sure * Number($("n").value || 1));
+  const toplam = birim * sure * Number($("n").value || 1);
+  el.textContent = krediMetni(toplam, model.kaynak === "kullanici" ? null : toplam);
   el.hidden = false;
+}
+
+/** `#run-cost` cümlesi. `dusen` REZERV EDİLECEK kısım; `null` = hiçbir parça
+ *  platform anahtarıyla koşmuyor ("kendi anahtarın · düşmez", K3). Bakiye henüz
+ *  gelmediyse (ilk çizim, ağ hatası) eski "≈ N kredi" — `≈` bilerek: fatura
+ *  değil, tahmin. `N > M` yalnız RENK: düğme sunucuya gider, 402 orada. */
+function krediMetni(toplam, dusen) {
+  const el = $("run-cost");
+  el.classList.remove("run-cost-uyari");
+  if (dusen === null)
+    return `${tc("gen.cost_one", "gen.cost_many", toplam)} · ${t("kredi.kendi_anahtar")}`;
+  if (!krediDurumu) return tc("gen.cost_one", "gen.cost_many", toplam);
+  if (dusen > krediDurumu.bakiye) el.classList.add("run-cost-uyari");
+  return t("kredi.tur_ve_kalan", { n: dusen, kalan: krediDurumu.bakiye });
 }
 
 /** #go'nun engel SEBEBİ — boş dize "engel yok".

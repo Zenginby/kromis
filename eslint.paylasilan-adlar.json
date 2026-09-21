@@ -55,6 +55,8 @@
       "imageModels",
       "indirmeAdresi",
       "isAcceptedUpload",
+      "krediDurumu",
+      "krediYenile",
       "openSheet",
       "promptDialog",
       "renderSource",
@@ -103,6 +105,7 @@
     ],
     "static/settings.js": [
       "applyTheme",
+      "openKrediBolmesi",
       "openSettings",
       "seciliModelTercihi",
       "seciliSohbetModeliTercihi",

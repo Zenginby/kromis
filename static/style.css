@@ -455,6 +455,25 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.72rem; color: var(--muted); flex: none;
 }
+/* Faz 3 / 6: tur bakiyeyi aşıyor — yalnız RENK, düğme kapanmaz (402 sunucuda).
+   --danger-text: --danger'ın metin karışımı, küçük punto monospace'te okunur. */
+.run-cost.run-cost-uyari { color: var(--danger-text); }
+
+/* 402/403 toast'ı (core.js krediToast): tek yüzey, sağ altta, .sheet'lerin ve
+   perdenin ÜSTÜNDE (z 40/50) ki Ayarlar açıkken de görünsün; onay diyaloğunun
+   (z 100) altında. Dinamik kurulur, index.html'de id yok. */
+.kredi-toast {
+  position: fixed; right: 16px; bottom: 16px; z-index: 60;
+  max-width: min(420px, calc(100vw - 32px));
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 12px;
+  background: var(--raised); border: 1px solid var(--hairline);
+  color: var(--text); font-size: 13px; line-height: 1.4;
+  box-shadow: 0 8px 24px oklch(0% 0 0 / 0.35);
+}
+.kredi-toast[hidden] { display: none; }
+.kredi-toast-metin { flex: 1; }
+.kredi-toast-baglanti { flex: none; white-space: nowrap; }
 
 /* ── Slide-over'lar ── */
 .scrim { position: fixed; inset: 0; z-index: 40; background: var(--scrim); display: none; }
@@ -3011,6 +3030,24 @@ body.viewer-open { overflow: hidden; }
 /* Faz 2 / 6: satırın ikinci hattı — kredi tahmini ve (platformsa) anahtarın kaynağı. */
 .is-alt { display: flex; gap: 8px; font-size: 11px; color: var(--muted); margin-top: 2px; }
 .is-kaynak::before { content: "·"; margin-right: 8px; }
+/* Faz 3 / 6: Ayarlar "Kredi" hareketinden gelen satır kısa süre vurgulanır (kromisIsler.goster). */
+.is-satir.is-vurgu { border-color: var(--accent); box-shadow: 0 0 0 2px var(--ring, var(--hairline)); }
+
+/* ── Ayarlar "Kredi" bölmesi (Faz 3 / 6, settings.js krediBolmesiniCiz) ── */
+.kredi-bakiye { margin: 0 0 6px; font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+.kredi-bakiye span { font-size: 0.9rem; color: var(--muted); }
+.kredi-hareketler { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.kredi-hareket {
+  display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 4px 10px;
+  padding: 6px 8px; border-radius: 10px; background: var(--panel-2); font-size: 12px;
+}
+.kredi-tur { font-weight: 600; }
+.kredi-miktar { font-variant-numeric: tabular-nums; }
+.kredi-miktar.eksi { color: var(--danger-text); }
+.kredi-miktar.arti { color: var(--accent); }
+.kredi-zaman { color: var(--muted); }
+.kredi-hareket .kredi-aciklama { grid-column: 1 / -1; margin: 0; }
+.kredi-is { padding: 2px 8px; font-size: 11px; }
 .platform-notu, .anahtar-sil { margin-top: 0.4rem; }
 .is-durum { margin-left: auto; font-size: 12px; }
 .is-sure { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }

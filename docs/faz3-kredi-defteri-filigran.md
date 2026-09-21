@@ -1174,7 +1174,8 @@ uyarıları günlük kuralıyla).
 
 **Sonraki:** Faz 4 planı (ödeme MoR/Polar, webhook idempotency, paketler ve
 kova ayrımı, `planlar` tablosu, abonelik yaşam döngüsü, vergi/e-Arşiv, KVKK
-silme/dışa aktarma/saklama, ticari haklar metni) ayrı belge ve PR olarak —
+silme/dışa aktarma/saklama, ticari haklar metni) ayrı belge ve PR olarak
+→ [faz4-odeme-abonelik-kvkk.md](faz4-odeme-abonelik-kvkk.md) (2026-09-21) —
 yukarıdaki devir listesi onun girdisi; K-tarzı karar noktaları önerileriyle,
 sahip kabul eder, görevler `faz4/<slug>` dallarında.
 

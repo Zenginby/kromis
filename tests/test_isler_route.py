@@ -887,6 +887,34 @@ def test_a_cancelled_job_can_be_resubmitted_but_an_active_or_finished_one_cannot
     assert c.post("/api/isler/bu-uuid-degil/yeniden").status_code == 422
 
 
+def test_a_job_whose_model_has_left_the_catalog_is_still_listed_and_resubmittable(c, depo_db, kullanici):
+    """Katalogdan düşmüş model (`openai-gpt-image-1`, 2026-09-21'de silindi — Faz 4 / 1).
+
+    Eski `isler` satırları `model` dizesini taşımaya devam ediyor; liste ve tekil
+    uç onu olduğu gibi verir, yeniden gönderim plan/anahtar kapısını SORMAZ
+    (`spec is None` dalı: routers/isler.py `yeniden`) ve 202 döner — modelin
+    kaderi işçinin ("bilinmeyen model" → `hata`, test_isci). Bir sonraki
+    emeklilik (`gpt-image-1.5`, 2026-12-01) aynı yoldan geçer.
+    """
+    with Session(depo_db) as db:
+        eski = kuyruk.ekle(db, kullanici.id, "generate", {"prompt": "eski"}, "openai-gpt-image-1", 8)
+        an = dt.datetime.now(dt.UTC)
+        assert kuyruk.al(db, uuid.uuid4(), an) is not None
+        assert kuyruk.dusur(db, eski.id, "OpenAI bu modeli tanımıyor", an)
+        db.commit()
+        eski_id = str(eski.id)
+    assert catalog.image_model("openai-gpt-image-1") is None, "girdi katalogdan silinmiş olmalı"
+
+    liste = c.get("/api/isler").json()["isler"]
+    assert [i["model"] for i in liste if i["id"] == eski_id] == ["openai-gpt-image-1"]
+    assert c.get(f"/api/isler/{eski_id}").json()["is"]["model"] == "openai-gpt-image-1"
+
+    r = c.post(f"/api/isler/{eski_id}/yeniden")
+
+    assert r.status_code == 202, r.text
+    assert r.json()["is"]["model"] == "openai-gpt-image-1"
+
+
 def test_resubmitting_someone_elses_job_is_404(c, depo_db):
     with Session(depo_db) as db:
         baska = tablolar.Kullanici(eposta=f"b-{uuid.uuid4().hex[:8]}@example.com", parola_ozeti=None,

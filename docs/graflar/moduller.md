@@ -123,7 +123,7 @@ flowchart TD
     n_storage["storage<br/>423 satır"]
   end
   subgraph katman0["katman 0"]
-    n_catalog["catalog<br/>1472 satır"]
+    n_catalog["catalog<br/>1461 satır"]
     n_errlog["errlog<br/>133 satır"]
     n_jsonstore["jsonstore<br/>83 satır"]
     n_kimlik_baglami["kimlik_baglami<br/>56 satır"]
@@ -611,7 +611,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `azure_flux_client.py` | 289 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
 | `azure_mai_client.py` | 290 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers`, `services.saglayici_meta` | 1 | 2 |
 | `backup.py` | 190 | 4 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 0 | 1 |
-| `catalog.py` | 1472 | 0 | — | 30 | 43 |
+| `catalog.py` | 1461 | 0 | — | 30 | 43 |
 | `chat_client.py` | 218 | 5 | `azure_client`, `chat_prompt`, `i18n`, `kimlik_baglami`, `models` | 4 | 4 |
 | `chat_prompt.py` | 396 | 2 | `paths` | 4 | 1 |
 | `chat_providers.py` | 133 | 7 | `catalog`, `chat_client`, `credstore`, `etiket`, `i18n`, `openai_chat` | 1 | 2 |

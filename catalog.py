@@ -535,7 +535,8 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
     # yüzden adaptör onun bilinçli ikizi (bkz. openai_client.py'nin başlığı).
     #
     # `gpt-image-2` OpenAI tarafının BAŞINDA duruyor çünkü OpenAI'nin görsel
-    # ailesinde bugün tek KALICI ad o: `gpt-image-1` 23 Ekim 2026'da,
+    # ailesinde bugün tek KALICI ad o: `gpt-image-1` 23 Ekim 2026'da (girdisi
+    # aşağıdaki notta — silindi),
     # `gpt-image-1.5` ve `gpt-image-1-mini` 1 Aralık 2026'da API'den kalkıyor.
     # Yetenek jetonları Azure ikizinden KOPYALANDI ve bu bilinçli bir alt
     # sınır: `gpt-image-2` 2K'ya kadar çıkabiliyor ve tek istekte 8 görsel
@@ -579,28 +580,15 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
         note="model.openai-gpt-image-2.note",
     ),
-    # KATALOGDA KALIYOR ama ÖMÜRLÜ: 23 Ekim 2026'da OpenAI API'sinden kalkıyor.
-    # Bugün çalışıyor ve anahtarı yalnız bu modele erişen hesaplar var, o yüzden
-    # silmek erken; notu uyarıyor. O tarihte girdi silinir — `openai-dall-e-3`
-    # gibi ölmüş bir girdinin katalogda kalmasının bedeli ölçüldü: kullanıcı
-    # seçebiliyor, üretim 404 alıyor ve hata "model bulunamadı" diyor.
-    ImageModel(
-        id="openai-gpt-image-1",
-        label="OpenAI · gpt-image-1",
-        provider="openai",
-        wire_model="gpt-image-1",
-        credential="openai",
-        sizes=("1024x1024", "1024x1536", "1536x1024"),
-        qualities=("low", "medium", "high"),
-        default_quality="medium",
-        max_n=4,
-        images_per_request=4,
-        supports_edit=True,
-        max_refs=4,
-        credits=8,
-        credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
-        note="model.openai-gpt-image-1.note",
-    ),
+    # `openai-gpt-image-1` BURADAYDI ve 2026-09-21'de SİLİNDİ (Faz 4 / 1):
+    # 23 Ekim 2026'da OpenAI API'sinden kalkıyor ve `openai-dall-e-3`ün
+    # ölçülmüş dersi ölü girdinin bedelini söylüyor — kullanıcı seçebiliyor,
+    # üretim 404 alıyor. Emeklilik gününü beklemek yerine para almaya
+    # başlamadan (Faz 4) kaldırıldı; eski `medya`/`isler` satırları `model`
+    # dizesini taşımaya devam eder (yeniden gönderim "katalogdan düşmüş
+    # model" dalına düşer — routers/isler.py `yeniden`), işçi onu
+    # "bilinmeyen model" ile hata sayar (tests/test_isci.py). Sıradaki:
+    # `gpt-image-1.5` / `gpt-image-1-mini` 1 Aralık 2026 (girdileri yok).
     # ── Gemini · Nano Banana ────────────────────────────────────────────
     #
     # KATALOGDA İLK KEZ "BOYUT" YERİNE "ORAN" SEÇEN MODEL. `sizes` alanının
@@ -677,9 +665,10 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
     # ── Azure AI Foundry · MAI-Image (Microsoft) ────────────────────────
     #
     # ÜÇÜ DE ÖNİZLEME ve notlarında yazılı: ad ya da sözleşme haber vermeden
-    # değişebilir. `openai-gpt-image-1` girdisinin duruşu benimseniyor —
-    # kalktığı gün girdi SİLİNİR, çünkü katalogda kalan ölü bir girdi
-    # arayüzde seçilebilir bir 404 demek (`openai-dall-e-3`ün ölçülmüş dersi).
+    # değişebilir. `openai-gpt-image-1`in duruşu benimseniyor — kalkacağı
+    # belli olan girdi SİLİNİR (o girdi 2026-09-21'de, emekliliğinden önce
+    # silindi; Faz 4 / 1), çünkü katalogda kalan ölü bir girdi arayüzde
+    # seçilebilir bir 404 demek (`openai-dall-e-3`ün ölçülmüş dersi).
     #
     # KREDİ ÇAPASI görsel tarafındakiyle AYNI: Azure `medium` = 8 kredi
     # ≈ 0,04 USD, yani 1 kredi ≈ 0,005 USD. MAI token bazlı faturalanıyor ve

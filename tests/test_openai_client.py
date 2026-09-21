@@ -13,6 +13,7 @@ sınanmalı — o dalın tek kullanıcısı artık uyumlu bir vekil (proxy/gatew
 çünkü onu getiren `dall-e-3` 12 Mayıs 2026'da API'den kalktı.
 """
 import base64
+import dataclasses
 
 import pytest
 
@@ -20,11 +21,22 @@ import azure_client as ac
 import catalog
 import openai_client as oc
 
-MODEL = catalog.image_model("openai-gpt-image-1")
+_MODEL = catalog.image_model("openai-gpt-image-2")
+assert _MODEL is not None, "kataloğun tek OpenAI görsel girdisi"
+MODEL = _MODEL
 # İKİNCİ OpenAI modeli: "model KATALOGDAN geliyor, sabit değil" iddiasının
-# ölçülebilir olması için gereken şey iki AYRI ad. Eskiden bu rolde
-# `openai-dall-e-3` vardı; kalktığı için yerine kataloğun yeni mainline'ı geçti.
-IKINCI = catalog.image_model("openai-gpt-image-2")
+# ölçülebilir olması için gereken şey iki AYRI ad. Bu rolde sırayla
+# `openai-dall-e-3` (12 Mayıs 2026'da kalktı) ve `openai-gpt-image-1`
+# (23 Ekim 2026'da kalkıyor; girdisi 2026-09-21'de silindi — Faz 4 / 1)
+# vardı: ikisi de emekli oldu ve her seferinde bu dosya değişti. Katalogda
+# tek OpenAI görsel girdisi kaldığı için ikinci ad artık kataloğa BAĞLI
+# DEĞİL — gerçek girdinin `dataclasses.replace` ile sentetik bir kopyası.
+# Tel adı bilerek uydurma: adaptör adı `wire_model`den okuyorsa uydurma ad
+# tele AYNEN çıkar, sabit bir ada bakıyorsa çıkmaz — iddia bu. Bir sonraki
+# emeklilik bu dosyaya dokunmaz.
+IKINCI = dataclasses.replace(MODEL, id="openai-sentetik-ikinci",
+                             label="OpenAI · sentetik ikinci",
+                             wire_model="gpt-image-sentetik")
 CREDS = ("sk-test-key", "https://api.openai.com/v1")
 
 
@@ -82,7 +94,7 @@ def test_generate_dogru_uca_gidiyor_ve_cozuyor():
     assert c.last_call["headers"]["Authorization"] == "Bearer sk-test-key"
     # Model KATALOGDAN geliyor, sabit değil — iki OpenAI modeli aynı adaptörü
     # paylaşıyor ve ayrımı yalnız bu alan taşıyor.
-    assert c.last_call["json"]["model"] == "gpt-image-1"
+    assert c.last_call["json"]["model"] == "gpt-image-2"
 
 
 def test_ikinci_model_ayni_adaptorden_KENDI_adiyla_gidiyor():
@@ -92,7 +104,7 @@ def test_ikinci_model_ayni_adaptorden_KENDI_adiyla_gidiyor():
     oc.generate(IKINCI, "kedi", "1024x1024", "high", 1,
                 client=c, credentials=CREDS)
 
-    assert c.last_call["json"]["model"] == "gpt-image-2"
+    assert c.last_call["json"]["model"] == "gpt-image-sentetik"
     assert c.last_call["json"]["quality"] == "high"
 
 
@@ -166,7 +178,7 @@ def test_edit_multipart_alanlarini_AZURE_ILE_AYNI_kuruyor():
 
     assert out == [b"E"]
     assert c.last_call["url"] == "https://api.openai.com/v1/images/edits"
-    assert c.last_call["data"]["model"] == "gpt-image-1"
+    assert c.last_call["data"]["model"] == "gpt-image-2"
     # `n` multipart'ta DİZE olmak zorunda (ac.edit'in aynısı).
     assert c.last_call["data"]["n"] == "1"
     assert c.last_call["files"] == {"image": ("a.png", b"AAA", "image/png")}
@@ -263,13 +275,13 @@ def test_gövde_azure_ikizi_ile_AYRISMIYOR():
     """
     azure = ac.build_payload("kedi", "1024x1024", "medium", 2)
     openai = oc.build_payload("kedi", "1024x1024", "medium", 2,
-                              api_model="gpt-image-1")
+                              api_model="gpt-image-2")
 
     assert set(azure) == set(openai), "alan KÜMESİ ayrışmış"
     for anahtar in set(azure) - {"model"}:
         assert azure[anahtar] == openai[anahtar], anahtar
     assert azure["model"] == ac.MODEL_NAME
-    assert openai["model"] == "gpt-image-1"
+    assert openai["model"] == "gpt-image-2"
 
 
 def test_404_MODELIN_adini_soyluyor():

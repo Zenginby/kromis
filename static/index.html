@@ -843,8 +843,9 @@
 
            Bu turun kredi maliyeti: model × boyut × kalite × adet.
            .composer-right'ta DEĞİL, burada — o şeridin ölçülmüş 360px bütçesi
-           (mobile.css:152) dolu. Bugün yalnız METADATA: bakiye yok, satın alma
-           yok, zorlama yok. -->
+           (mobile.css:152) dolu. Faz 3 / 6: "bu tur N düşer · kalan M" —
+           bakiye `GET /api/kredi`den (core.js `krediDurumu`), yetmezse yalnız
+           renk; kapı sunucuda (402). Satın alma yok (Faz 4). -->
       <span id="run-cost" class="run-cost" hidden></span>
       <p id="folder-target" class="folder-target" hidden></p>
       <p id="status" class="status" role="status"></p>
@@ -1239,6 +1240,11 @@
                 data-pane="director"><span>{{t:common.director}}</span></button>
         <button type="button" class="picker-nav-item" data-pane="sessions">
           <span>{{t:sessions.title}}</span></button>
+        <!-- Kredi (Faz 3 / 6): bakiye, plan, hibe, son hareketler — içerik
+             settings.js `krediBolmesiniCiz` ile `/api/kredi`den; 402 toast'ı da
+             buraya açıyor (core.js → `openKrediBolmesi`). -->
+        <button type="button" class="picker-nav-item" data-pane="kredi">
+          <span>{{t:settings.nav_kredi}}</span></button>
         <!-- Etiket İKİ DİLDE birden ve bu bir özensizlik değil, panelin en
              önemli ayrıntısı: yanlış dilde kalmış bir kullanıcının GERİ DÖNÜŞ
              yolu tam olarak bu düğme. Çevrilseydi aradığı kelimeyi göremezdi —
@@ -1427,6 +1433,14 @@
       <p class="field-note">
         {{t:settings.autosave_hint}}
       </p>
+      </section>
+
+      <!-- ── Kredi (Faz 3 / 6) ───────────────────────────────────────── -->
+      <!-- Yalnız KÖK: içerik settings.js `krediBolmesiniCiz` ile `/api/kredi`den
+           kuruluyor (#settings-hesap satırının deseni — belgenin metin çapaları
+           dokunulmuyor, çeviri anahtarları betikte). -->
+      <section class="settings-pane" data-pane="kredi" hidden>
+        <div id="settings-kredi" class="settings-kredi" aria-live="polite"></div>
       </section>
 
       <!-- ── Dil ──────────────────────────────────────────────────────── -->

@@ -2,7 +2,7 @@
 
 # Uç nokta grafı
 
-69 HTTP rotası, 11 dosyada (`routers/` altındaki alan router'ları; bileşim kökü `app.py` yalnız takıyor). `modüller` sütunu, rotanın gövdesinin VE yardımcılarının (`services/`, aynı router'daki özel işlevler) dokunduğu KÜTÜPHANE modülleridir — yani bir modülü değiştirirken hangi isteklerin sınanması gerektiği burada yazılı; `routers.*`/`services.*` bilerek sütunda yok (gerekçe: tools/graf_uret.py, uc_noktalar). `ön yüz` sütunu o yolu çağıran tarayıcı betiği.
+70 HTTP rotası, 11 dosyada (`routers/` altındaki alan router'ları; bileşim kökü `app.py` yalnız takıyor). `modüller` sütunu, rotanın gövdesinin VE yardımcılarının (`services/`, aynı router'daki özel işlevler) dokunduğu KÜTÜPHANE modülleridir — yani bir modülü değiştirirken hangi isteklerin sınanması gerektiği burada yazılı; `routers.*`/`services.*` bilerek sütunda yok (gerekçe: tools/graf_uret.py, uc_noktalar). `ön yüz` sütunu o yolu çağıran tarayıcı betiği.
 
 `paths` satırlarda GÖRÜNMÜYOR ve bu bir kör nokta değil, kararın kendisi (Faz 0 / Adım 4): çıktı/varlık dizinleri rotaya `Depends(ayar.ayarlar)` ile gelen ayar nesnesinden okunuyor (`ayarlar.output_dir`), yani bir öznitelik — çağrı değil. `paths`e dokunmak yine neredeyse her ucu etkiler, ama tek bir kapıdan: `app.py`deki `Ayarlar.varsayilan()`. Kiracıya göre dizin (Faz 1) o kapının içini değiştirecek, bu tabloyu değil.
 
@@ -55,11 +55,12 @@
 | PATCH | `/api/images` | `routers/galeri.py` | `move_images`:234 | `folders`, `i18n`, `models`, `storage` | `folders.js` |
 | POST | `/api/import` | `routers/galeri.py` | `import_image`:259 | `i18n` | `folders.js` |
 | GET | `/api/isler` | `routers/isler.py` | `isleri_listele`:112 | `i18n` | `isler.js` |
-| GET | `/api/isler/akis` | `routers/isler.py` | `isleri_akit`:209 | `i18n` | `isler.js` |
-| GET | `/api/isler/{is_id}` | `routers/isler.py` | `is_getir`:240 | `i18n` | `isler.js` |
-| POST | `/api/isler/{is_id}/iptal` | `routers/isler.py` | `is_iptal`:247 | `i18n` | `isler.js` |
-| POST | `/api/isler/{is_id}/yeniden` | `routers/isler.py` | `is_yeniden`:271 | `catalog`, `credstore`, `etiket`, `i18n` | `isler.js` |
+| GET | `/api/isler/akis` | `routers/isler.py` | `isleri_akit`:247 | `i18n` | `isler.js` |
+| GET | `/api/isler/{is_id}` | `routers/isler.py` | `is_getir`:278 | `i18n` | `isler.js` |
+| POST | `/api/isler/{is_id}/iptal` | `routers/isler.py` | `is_iptal`:285 | `i18n` | `isler.js` |
+| POST | `/api/isler/{is_id}/yeniden` | `routers/isler.py` | `is_yeniden`:309 | `catalog`, `credstore`, `etiket`, `i18n` | `isler.js` |
 | GET | `/api/kota` | `routers/isler.py` | `kota_durumu`:129 | — | `isler.js` |
+| GET | `/api/kredi` | `routers/isler.py` | `kredi_durumu`:169 | — | `core.js` |
 | POST | `/api/logo` | `routers/bindirme.py` | `add_logo`:94 | `assets_store`, `catalog`, `composite`, `i18n`, `models`, `storage` | `assets.js` |
 | POST | `/api/logo/preview` | `routers/bindirme.py` | `preview_logo`:82 | `assets_store`, `composite`, `i18n`, `models` | `assets.js` |
 | GET | `/api/output/{image_id}/download` | `routers/galeri.py` | `output_download`:360 | `i18n`, `storage` | `core.js` |
@@ -172,6 +173,7 @@ flowchart LR
   n__api_isler --> n_etiket["etiket"]
   n__api_isler --> n_i18n["i18n"]
   n__api_kota["/api/kota"]
+  n__api_kredi["/api/kredi"]
   n__api_logo["/api/logo"]
   n__api_logo --> n_assets_store["assets_store"]
   n__api_logo --> n_catalog["catalog"]

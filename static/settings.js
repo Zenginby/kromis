@@ -599,7 +599,148 @@ function showSettingsPane(ad) {
   for (const bolme of document.querySelectorAll("#settings-modal .settings-pane")) {
     bolme.hidden = bolme.dataset.pane !== ad;
   }
+  // "Kredi" bölmesi açılırken bir kez `/api/kredi` (Faz 3 / 6): içerik eldeki
+  // hâlden hemen çizilir, taze cevap gelince yeniden — ikinci istek yok, composer
+  // satırı da aynı cevaptan yenilenir (core.js `krediYenile`).
+  if (ad === "kredi") {
+    krediBolmesiniCiz();
+    krediYenile();
+  }
 }
+
+// ── Kredi bölmesi (Faz 3 / 6) ───────────────────────────────────────
+// İçerik DİNAMİK, index.html'de yalnız kök (#settings-kredi): #settings-hesap
+// satırının deseni — belgenin metin çapalarına dokunulmuyor. Kaynak core.js'in
+// `krediDurumu`su (`GET /api/kredi`): bakiye, plan, aylık hibe ve tarihi, plan
+// kuralları (filigran/video — `PLANLAR`dan, arayüz kataloğu tekrar etmez), son
+// 20 hareket. Hareketin işi varsa düğme paneldeki satıra gider (`kromisIsler.goster`).
+//
+// Anahtarlar TABLODA ve harfiyen (isler.js `DURUM_ANAHTARI`nın gerekçesi):
+// tests/test_i18n.py betikleri anahtar biçimine uyan dizelerle tarıyor.
+const KREDI_PLAN_ANAHTARI = {
+  free: "kredi.plan_free",
+  temel: "kredi.plan_temel",
+  pro: "kredi.plan_pro",
+};
+const KREDI_HAREKET_ANAHTARI = {
+  hibe: "kredi.tur_hibe",
+  rezerv: "kredi.tur_rezerv",
+  onay: "kredi.tur_onay",
+  iade: "kredi.tur_iade",
+  duzeltme: "kredi.tur_duzeltme",
+  sona_erme: "kredi.tur_sona_erme",
+};
+
+/** `zaman.damga_utc` (`…Z`) → kullanıcının dilinde kısa tarih(+saat). */
+function krediTarihi(damga, saatli) {
+  const d = new Date(damga);
+  if (Number.isNaN(d.getTime())) return damga || "";
+  return saatli
+    ? d.toLocaleString(KROMIS_DIL, { dateStyle: "short", timeStyle: "short" })
+    : d.toLocaleDateString(KROMIS_DIL, { dateStyle: "long" });
+}
+
+function krediNotu(metin, sinif) {
+  const p = document.createElement("p");
+  p.className = sinif ? `field-note ${sinif}` : "field-note";
+  p.textContent = metin;
+  return p;
+}
+
+function krediHareketSatiri(h) {
+  const li = document.createElement("li");
+  li.className = "kredi-hareket";
+  li.dataset.tur = h.tur;
+  const tur = document.createElement("span");
+  tur.className = "kredi-tur";
+  tur.textContent = t(KREDI_HAREKET_ANAHTARI[h.tur] || "kredi.tur_duzeltme");
+  const miktar = document.createElement("span");
+  miktar.className = `kredi-miktar ${h.miktar < 0 ? "eksi" : "arti"}`;
+  // İmzalı: defter satırı zaten imzalı (`miktar` rezervde eksi), `−` tipografik.
+  miktar.textContent = h.miktar < 0 ? `−${Math.abs(h.miktar)}` : `+${h.miktar}`;
+  const zaman = document.createElement("span");
+  zaman.className = "kredi-zaman";
+  zaman.textContent = krediTarihi(h.olusturuldu, true);
+  li.append(tur, miktar, zaman);
+  if (h.aciklama) li.appendChild(krediNotu(h.aciklama, "kredi-aciklama"));
+  if (h.is_id) {
+    const dugme = document.createElement("button");
+    dugme.type = "button";
+    dugme.className = "btn-ghost kredi-is";
+    dugme.textContent = t("kredi.ise_git");
+    dugme.addEventListener("click", () => {
+      closeSettings();
+      kromisIsler.goster(h.is_id);
+    });
+    li.appendChild(dugme);
+  }
+  return li;
+}
+
+function krediBolmesiniCiz() {
+  const kok = $("settings-kredi");
+  if (!kok) return;
+  kok.replaceChildren();
+  const k = krediDurumu;
+  if (!k) {
+    kok.appendChild(krediNotu(t("kredi.yuklenemedi")));
+    return;
+  }
+  const bakiye = document.createElement("p");
+  bakiye.className = "kredi-bakiye";
+  const sayi = document.createElement("strong");
+  sayi.id = "settings-kredi-bakiye";
+  sayi.textContent = String(k.bakiye);
+  const birim = document.createElement("span");
+  birim.textContent = ` ${t("kredi.bakiye_birim")}`;
+  bakiye.append(sayi, birim);
+  kok.appendChild(bakiye);
+  kok.appendChild(
+    krediNotu(
+      t("kredi.plan_satiri", { plan: t(KREDI_PLAN_ANAHTARI[k.plan] || "kredi.plan_free") }),
+      "kredi-plan",
+    ),
+  );
+  kok.appendChild(
+    krediNotu(
+      k.hibe > 0
+        ? t("kredi.hibe_satiri", { n: k.hibe, tarih: krediTarihi(k.sonraki_hibe, false) })
+        : t("kredi.hibe_yok"),
+      "kredi-hibe",
+    ),
+  );
+  kok.appendChild(krediNotu(t(k.filigran ? "kredi.filigran_var" : "kredi.filigran_yok")));
+  kok.appendChild(krediNotu(t(k.video ? "kredi.video_acik" : "kredi.video_kapali")));
+  kok.appendChild(krediNotu(t("kredi.byok_notu")));
+  const baslik = document.createElement("h3");
+  baslik.className = "modal-subhead";
+  baslik.textContent = t("kredi.hareketler");
+  kok.appendChild(baslik);
+  const hareketler = k.son_hareketler || [];
+  if (!hareketler.length) {
+    kok.appendChild(krediNotu(t("kredi.hareket_yok")));
+    return;
+  }
+  const ul = document.createElement("ul");
+  ul.id = "settings-kredi-hareketler";
+  ul.className = "kredi-hareketler";
+  for (const h of hareketler) ul.appendChild(krediHareketSatiri(h));
+  kok.appendChild(ul);
+}
+
+/** core.js'in 402 toast'ından (Faz 3 / 6): Ayarlar'ı "Kredi" bölmesinde açar. */
+function openKrediBolmesi() {
+  openSettings();
+  showSettingsPane("kredi");
+  // `openSettings` odağı Erişim bölmesinin seçicisine veriyor (0 ms sonra); o bölme
+  // artık gizli, odak boşa düşerdi — gezinmedeki "Kredi" düğmesine, aynı gecikmeyle sonra.
+  setTimeout(() => $("settings-nav").querySelector('[data-pane="kredi"]').focus(), 0);
+}
+
+// Bakiye başka bir olayla yenilendiyse (iş bitti, 402) açık bölme de yenilensin.
+document.addEventListener("kromis:kredi", () => {
+  if (acikBolme === "kredi" && $("settings-modal").classList.contains("open")) krediBolmesiniCiz();
+});
 
 // TEK dinleyici, olay yetkilendirmeyle (#model-sheet-list'in kalıbı): düğme
 // başına bağ kurmak, bir gün beşinci bölme eklendiğinde sessizce eksik kalırdı.
@@ -1058,3 +1199,6 @@ async function hesapDurumunuYaz() {
   bolme.prepend(satir);
 }
 hesapDurumunuYaz();
+// Bakiye açılışta bir kez (Faz 3 / 6): composer'ın "kalan"ı ilk çizimde dolu gelsin;
+// sonrası iş olaylarına bağlı (isler.js). Kapılı rota: 401'i `fetch` sarmalı görür.
+krediYenile();

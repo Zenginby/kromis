@@ -64,7 +64,9 @@ HESAP_TABLOLARI = {"kullanicilar", "oturumlar", "jetonlar", "giris_denemeleri"}
 # (dosya sisteminden türetilen kümeyle karşılaştırılır; `medya_tasi.py` ve
 # `goc.py` oturum açmaz — biri yalnız dosya taşır, öteki Alembic'e devreder).
 BAGLAM_TASIYAN_ARACLAR = {"anahtar_dondur.py", "artik_dosya.py", "ice_aktar.py",
-                          "kullanici.py", "uygulama_rolu.py"}
+                          "kullanici.py", "uygulama_rolu.py",
+                          # Faz 3 / 5: `isler`i admin bağlamında okur (bağlamsız RLS boş döner).
+                          "marj_raporu.py"}
 
 
 # ────────────────────────────────────────────────────────── fixture'lar

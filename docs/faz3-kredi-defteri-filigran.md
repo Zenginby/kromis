@@ -746,7 +746,7 @@ eslint ve prettier temiz, graflar güncel.
 
 ---
 
-## 5. Tarife–maliyet mutabakatı ve marj raporu — `services/saglayici_meta.py`, `isler.saglayici_*`, admin "Marj", `tools/marj_raporu.py`, `tools/tarife_kontrol.py` (PR: `faz3/mutabakat-marj`)
+## 5. Tarife–maliyet mutabakatı ve marj raporu — `services/saglayici_meta.py`, `isler.saglayici_*`, admin "Marj", `tools/marj_raporu.py`, `tools/tarife_kontrol.py` ✅ (PR: `faz3/mutabakat-marj`)
 
 **Kapsam.** Tarifemiz (kredi) ile sağlayıcının faturası (USD) yan yana;
 `isler.bitti − basladi` ve `model` sütunu raporun ham verisi (Faz 2 `:2467-2468`).
@@ -824,9 +824,57 @@ Sağlayıcının fiyat sayfasıyla karşılaştır; doğruysa yorumu sil, değil
 "retroaktif yazılmasın"). Sonra ayda bir `tools/marj_raporu.py --gun 30` →
 sağlayıcı faturasıyla yan yana.
 
+**Yapıldığında (2026-09-20) ölçümler ve sapmalar.** Rota YOK, göç YOK (0007
+iki sütunu çoktan taşıyordu). Yeni `services/saglayici_meta.py` (`Toplayici`,
+`toplayici()`, `kaydet`, `aktif`, `sifirla`; yaprak — yalnız stdlib; modül 108 →
+**111**, öteki ikisi araçlar), `azure_mai_client.py` **+1 çağrı** (`kaydet(usage=
+govde.get("usage"))`, her isteğin gövdesinden — MAI `n` görsel için `n` istek
+atar, `kayitlar` o yüzden LİSTE) ve `fal_client.py` **+1 çağrı**
+(`kaydet(request_id=rid)`, doğrulanmış id) — ikisi de `services/`den ilk kez
+ithal eden kök adaptörler (katman kuralı yok, `test_app_bolme` yalnız
+`routers`/`services` yönünü sınar); `services/isci.py` `_kos`ta `with
+toplayici() as meta: _uret(...)` ve `_yaz(…, saglayici=meta)` (`meta` adı `_yaz`ın
+medya sözlüğüyle çakıştı, ilk sürüm her işi `AttributeError`la düşürdü —
+ölçüldü, ad değişti); `services/kuyruk.py` `bitir(…, saglayici_meta=,
+saglayici_maliyet_usd=)` + `_redakte` (ağaç gezilir: dize değerler
+`redact_secrets`ten, adı `key|token|secret|authorization|password` ile BİTEN
+alanın değeri koşulsuz `[REDACTED]`; alt dize DEĞİL — `num_output_tokens`
+"token" taşır ve ilk sürüm tam saklamak istediğimiz sayıyı siliyordu,
+ölçüldü); `_json` on dört anahtarda KALDI (ham sağlayıcı verisi ve platformun
+maliyeti kullanıcıya ait değil; `test_kuyruk` iki alanın yokluğunu mandallar);
+`services/depo_admin.py` `marj(db, gun, an)` tek sorgu (`DEPOLAR` 10 → **11**),
+`MARJ_PENCERELERI = (7, 30)`, metriklerde `marj` düz liste (satırda `gun`);
+`catalog.KREDI_USD_CAPASI = Decimal("0.005")` (yorum bloklarının tekrar ettiği
+çapa artık sayı, iki okuyucu: `marj` ve `tarife_kontrol`); `static/admin.js` +
+`admin.html` Marj tablosu (8 sütun, `#admin-marj`), platform kredisi kartında
+"rezerv edilen n" alt satırı; i18n **+11** tr/en; yeni `tools/marj_raporu.py`
+(imajda, `OPERATOR_ARACLARI`) ve `tools/tarife_kontrol.py` (`.dockerignore`:
+kaynağın yorumlarını okur); `tests/test_saglayici_meta.py` (**11**),
+`tests/test_araclar.py` (**7**), `test_admin` **+3**.
+
+**Sapmalar:** (a) `SUM(kredi_tahmini)` → `SUM(COALESCE(kredi_gercek, kredi_tahmini))`,
+salt `kredi_gercek` DEĞİL: bitmemiş iş gerçek taşımaz, yoğun bir saatte kart
+"0" derdi; biten gerçek, ötekiler rezerv, tahminin toplamı `platform_kredi_rezerv`
+olarak yanında (`kullanicilar.kredi_24sa` aynı ifade). (b) `tarife_kontrol`
+deseni `doğrulanamadı` DEĞİL, aynı yorum satırında **`fiyat` + `doğrulan(a)?madı`**:
+sade sözcük Türkçe katlamayla (`I → ı`; `str.lower()` "DOĞRULANAMADI"yı
+eşleştirmiyor, ölçüldü) 8 model buluyordu, dördü boyut/çözünürlük notu ("boyut
+jetonu canlı DOĞRULANMADI"); `fiyat` şartı belgenin dördünü veriyor: `azure-mai-image-2-6`
+(üstündeki blok yorum Flash'ı anlatıyor ama 2.6'nın önünde duruyor — araç
+eşleşen satırı basar, cümleyi Flash girdisine taşımak listeden düşürür),
+`azure-mai-image-2-6-flash`, `azure-flux-2-pro`, `azure-flux-2-flex` (`:806`
+"doğrulanmadı"). Yorum bölgesi = önceki öğenin bitişinden (ilk öğede demetin
+`= (` satırından) bu öğenin bitişine; bekçi testi kataloğu satır bazlı, araç
+`ast` ile okur, ikisi aynı kümeyi vermek zorunda. (c) `marj` penceresi
+`bitti`ye göre (`olusturuldu` değil): fatura kapanışa düşer. (d) Hata yolunda
+`saglayici_meta` YAZILMAZ (`dusur` imzası aynen; spec yalnız `_yaz` dedi) —
+fal `request_id`si düşen işte de değerli olurdu, sonraki tur. (e) `maliyet_usd`
+bugün hiçbir adaptörden gelmiyor; tablo "bilinmiyor (0/N)" yazar, sıfır değil.
+Takım **3928 → 3956** (+28: `test_saglayici_meta` 11, `test_araclar` 7, `test_admin` +3, öteki bekçiler; ilk tam koşuda `test_rls`in `BAGLAM_TASIYAN_ARACLAR` listesi `marj_raporu.py`yi bekliyordu, eklendi), 12 atlanan, ~270 sn.
+
 ---
 
-## 6. Kredi ön yüzü — `GET /api/kredi`, `#run-cost` B1, ayarlar "Kredi", filigran rozeti (PR: `faz3/kredi-onyuz`)
+## 6. Kredi ön yüzü — `GET /api/kredi`, `#run-cost` B1, ayarlar "Kredi", filigran rozeti ✅ (PR: `faz3/kredi-onyuz`)
 
 **Kapsam.** Kullanıcı bakiyesini görür, ne düşeceğini bilir, 402'yi anlar.
 
@@ -875,6 +923,54 @@ noktası yaklaşıyor — bu görev çerçeve tartışmasını AÇMAZ, Faz 4 bak
 hareketini sızdırmaz; 402 toast + bağlantı; galeri rozeti; takım yeşil.
 
 **Sahibin adımı — yok.**
+
+**Yapıldığında (2026-09-21) ölçümler ve sapmalar.** Rota **+1** (69 → **70**:
+`GET /api/kredi`, `routers/isler.py`; `KAPILI` 62 → **63**, `DIZINSIZ_KAPILI`
++1), göç YOK, yeni modül YOK (111), yeni betik YOK (yükleme sırası aynen).
+Rota `kapilar.kullanici_plani` ile planı okur (ayrılmış nesne dersi), kuralları
+`PLANLAR`dan, hareketleri `defter.hareketler(limit=20)` + `defter._json`;
+`sonraki_hibe` = `_sonraki_ay_basi(zaman.an())` — `aylik_hibe_yaz`ın `%Y-%m`
+anahtarıyla AYNI takvim (yerel dilim), sonra `damga_utc` (UTC'de ayın başı
+DEĞİL: 30 Eylül 23:30 +03 → `2026-09-30T21:00:00Z`; test bunu çiviler).
+`static/core.js`: `krediDurumu` + `krediYenile()` tek okuma noktası (süren istek
+varsa bitince BİR kez daha sorar — 202'nin yenilemesi uçarken hızlı işçi iadeyi
+yazıyordu, eski cevap "kalan 192" der ve bir daha sormazdı, E2E'de ölçüldü);
+`syncRunCost` → `krediMetni(toplam, dusen)`: "bu tur N düşer · kalan M",
+`N > M` yalnız `.run-cost-uyari` rengi, `goBlockReason` bakiyeye BAKMAZ (test
+bunu kaynakta çiviler); arena'da `dusen` yalnız platform sütunları. `window.fetch`
+sarmalı 402/403'te gövdeyi `clone()`la okur, `kod` iki kapı kodundan biriyse
+`#kredi-toast` (dinamik, `role=status`, 10 sn) — 402'de "Kredi durumunu gör"
+düğmesi `openKrediBolmesi()` (settings.js), 403'te yalnız cümle (satış sayfası
+Faz 4). `static/isler.js`: `krediOzeti` — platform bitti "rezerv 8 · gerçek 8 ·
+iade 0", hata/iptal "rezerv 8 · tamamı iade", BYOK bitti eski "~8 → 8" (rezerv
+yoktu); `krediYenile()` 202 tesliminde, yeniden gönderimde ve kapanışta;
+`kromisIsler.goster(isId)` paneli açıp satırı vurgular (`.is-vurgu`).
+`static/settings.js`: "Kredi" bölmesi (`data-pane="kredi"`, kök
+`#settings-kredi`, içerik dinamik — `#settings-hesap` deseni, şablonun metin
+çapalarına dokunulmadı): bakiye, plan, hibe + tarih (`toLocaleDateString(KROMIS_DIL)`),
+filigran/video kuralı, BYOK notu, son 20 hareket (tür etiketi TABLODA
+`KREDI_HAREKET_ANAHTARI` — `HAREKET_TURLERI`nin altısı, bekçi testi; imzalı
+miktar; iş varsa "işi göster"); bölme açılırken bir `krediYenile()`, `kromis:kredi`
+olayıyla açıkken yeniden çizim. i18n **+28** tr/en (`kredi.*` 26, `settings.nav_kredi`,
+`isler.kredi_ozet`/`kredi_iade`); `isler.kredi_gercek` KALDI (BYOK bitti satırı).
+`eslint.paylasilan-adlar.json` +3 (`krediDurumu`, `krediYenile`, `openKrediBolmesi`).
+
+**Sapmalar:** (a) Model dökümüne **`kaynak`** alanı (`services/modeller.py`
+`model_payload(…, kaynaklar)`: `kullanici` | `platform` | None) — spec "BYOK
+modelde 'kendi anahtarın · düşmez'" dedi ama istemci sağlayıcı → kimlik
+eşlemesini bilmiyor (`SAGLAYICI_KIMLIGI` yalnız Azure'u tanır); kararı sunucu
+söyler, `kaynaklar` sözlüğünün model başına izdüşümü, sohbet modellerinde yok.
+(b) Filigran rozeti 4. görevde çoktan gelmişti (`folders.js`), burada dokunulmadı.
+(c) `#run-cost` `krediDurumu` gelmeden eski "≈ N kredi" der (ilk çizim / ağ
+hatası) — `≈` bilerek, fatura değil. (d) Toast'ı `fetch` sarmalı KURAR ama cümleyi
+durum satırı da yazar (`detailText` zaten `{"kod"}` gövdesini çeviriyordu); toast'ın
+eklediği şey bakiyeye GÖTÜREN yol. (e) E2E ikinci senaryo 402'yi de ölçer: iade
+→ "kalan 200", admin düzeltmesiyle bakiye 4 → gönderim 402 → toast → tık → "Kredi"
+bölmesi bakiye 4, `#run-cost` uyarı rengi, #go soğuma sonrası AÇIK.
+Takım **3956 → 3979** (+23: yeni 16 — `test_kredi_route` 12, `test_index` +2,
+`test_e2e_kredi` 2 — ve rota kümesi üstünden parametrelenen bekçiler +7, `/api/kredi`
+her birine bir satır; `test_playwright_isler` 6. senaryonun metin iddiası yeni
+satıra güncellendi), 12 atlanan, ~262 sn.
 
 ---
 

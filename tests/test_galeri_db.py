@@ -73,7 +73,7 @@ DEPOLAR = {
     "services/depo_varlik.py": 3, "services/depo_tercih.py": 1,
     "services/depo_kimlik_bilgisi.py": 4,   # Faz 1 / 7
     "services/kuyruk.py": 16,               # Faz 2 / 1 (3 kullanıcı + 9 işçi/sonda tarafı; `ekle`/`isci_kaydet` `db.add`); Faz 2 / 10 +4 saklama/bakım
-    "services/depo_admin.py": 10,           # Faz 2 / 8 (hepsi kiracısız — `KIRACISIZ_MODULLER`)
+    "services/depo_admin.py": 11,           # Faz 2 / 8 (hepsi kiracısız — `KIRACISIZ_MODULLER`); Faz 3 / 5 +`marj`
     "services/defter.py": 8,                # Faz 3 / 1 (`bakiye`, `_bakiye_ekle`, `rezerve`, `_isin_hareketleri`, `hareketler`, `tutarlilik`; `_yaz` `insert` — sayılmaz); Faz 3 / 3 +`plan_oku`, +`hibe_turu`
 }
 # `depo_*.py` kalıbının DIŞINDA kalan depolar — `test_the_repository_list_matches_the_files_on_disk`

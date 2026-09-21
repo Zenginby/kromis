@@ -62,8 +62,10 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import re
 import uuid
 from collections.abc import Collection, Mapping
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import Connection, delete, func, select, text, update
@@ -282,7 +284,8 @@ def kalp(db: Session, is_id: uuid.UUID, an: dt.datetime) -> bool:
 
 
 def bitir(db: Session, is_id: uuid.UUID, sonuc: dict[str, Any], an: dt.datetime, *,
-          kredi_gercek: int | None = None) -> bool:
+          kredi_gercek: int | None = None, saglayici_meta: Mapping[str, Any] | None = None,
+          saglayici_maliyet_usd: Decimal | None = None) -> bool:
     """`calisiyor` → `bitti`, `sonuc` (`{"medya": [id, …]}`), `bitti = an` ve `kredi_gercek`. Başka durumdan 0 satır → `False`.
 
     `False` işçi için bir sinyal: iş bu arada bayat sayılıp `hata`ya düşmüş
@@ -292,10 +295,56 @@ def bitir(db: Session, is_id: uuid.UUID, sonuc: dict[str, Any], an: dt.datetime,
     `kredi_gercek` (Faz 3 / 2): işçinin topladığı GERÇEK kredi (Σ `medya.credits`);
     `isler.kredi_tahmini` üst sınır, bu gerçek — ikisinin farkını `defter.onayla`
     aynı commit'te iade eder (çağıran işçi). Bu modül defteri bilmez, sayıyı saklar.
+
+    `saglayici_meta` / `saglayici_maliyet_usd` (Faz 3 / 5, K8): yan kanalın
+    (`services/saglayici_meta.py`) topladığı ham sağlayıcı alanları ve varsa USD.
+    Sözlük sütuna `errlog.redact_secrets`ten geçerek gider — REDAKSİYON YAZAN
+    YERDE (`dusur`un kararı): sağlayıcı gövdesinden gelen bir parça `pg_dump`ta
+    anahtar taşımasın. `_json` bu iki sütunu DÖKMEZ: ham sağlayıcı verisi ve
+    platformun maliyeti kullanıcıya ait bilgi değil, admin marj raporu okur.
     """
     etkilenen = db.execute(update(Is).where(Is.id == is_id, Is.durum == DURUM_CALISIYOR)
-                           .values(durum=DURUM_BITTI, sonuc=sonuc, bitti=an, kredi_gercek=kredi_gercek))
+                           .values(durum=DURUM_BITTI, sonuc=sonuc, bitti=an, kredi_gercek=kredi_gercek,
+                                   saglayici_meta=_redakte(saglayici_meta),
+                                   saglayici_maliyet_usd=saglayici_maliyet_usd))
     return _etkilenen(etkilenen) > 0
+
+
+# Değeri BÜTÜNÜYLE silinecek alan adları: sağlayıcı gövdesi bir gün başlık ya da anahtar
+# taşırsa (`api-key`, `authorization`, `X_API_KEY`, `access_token`) `redact_secrets`in metin
+# desenleri tek başına bir sözlük DEĞERİNİ görmez (desenler `ad: değer` / `sk-…` biçimine
+# bakar). SONEK eşleşmesi, alt dize DEĞİL: `num_output_tokens` (MAI'nin `usage`ı — tam da
+# saklamak istediğimiz sayı) "token" alt dizesini taşır ve ilk sürüm onu siliyordu (ölçüldü).
+_GIZLI_AD = re.compile(r"(?:key|token|secret|authorization|password|parola)$")
+
+
+def _redakte(deger: Any) -> Any:
+    """Sağlayıcı meta sözlüğünü ALAN ALAN redakte eder; yapı korunur (JSONB geçerli kalır).
+
+    `redact_secrets` metin üstünde çalışır ve sözlük deseni (b') `"AD": "değer"`
+    çiftinin TAMAMINI `[REDACTED_API_KEY]` ile değiştirir — JSON dizesine
+    uygulansa sözlük bozulurdu. Bu yüzden ağaç gezilir: her dize değer
+    desenlerden geçer (`sk-…`, `AIza…`, `Bearer …`), adı gizli kokan alanın
+    değeri koşulsuz düşer. `None` → `None` (sütun NULL kalır).
+    """
+    if deger is None:
+        return None
+    if isinstance(deger, Mapping):
+        sonuc: dict[str, Any] = {}
+        for ad, v in deger.items():
+            ad_s = str(ad)
+            if _GIZLI_AD.search(ad_s.lower()):
+                sonuc[ad_s] = "[REDACTED]"
+            else:
+                sonuc[ad_s] = _redakte(v)
+        return sonuc
+    if isinstance(deger, list | tuple):
+        return [_redakte(v) for v in deger]
+    if isinstance(deger, str):
+        return errlog.redact_secrets(deger)
+    if isinstance(deger, Decimal):
+        return str(deger)
+    return deger
 
 
 def dusur(db: Session, is_id: uuid.UUID, hata: str, an: dt.datetime) -> bool:

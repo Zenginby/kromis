@@ -692,6 +692,34 @@ def test_the_jobs_panel_anchors_are_served():
     assert 'id="isler-sheet" class="sheet sheet-right"' in html
 
 
+def test_the_run_cost_line_reads_the_balance_and_the_credit_pane_root_is_served():
+    """Faz 3 / 6 (stüdyo B1): `#run-cost` "bu tur N düşer · kalan M" — bakiye `GET /api/kredi`den,
+    yetmezse yalnız renk; Ayarlar "Kredi" bölmesinin KÖKÜ şablonda, içeriği settings.js kurar
+    (#settings-hesap deseni — metin çapaları dokunulmaz). 402 toast'ı bölmeyi `openKrediBolmesi` ile açar."""
+    c = TestClient(appmod.app)
+    html = c.get("/").text
+    assert 'id="run-cost"' in html
+    assert re.search(r'class="picker-nav-item" data-pane="kredi"', html), "gezinme düğmesi"
+    assert re.search(r'<section class="settings-pane" data-pane="kredi" hidden>\s*<div id="settings-kredi"', html)
+    core = c.get("/static/core.js").text
+    assert '"/api/kredi"' in core and '"kredi.tur_ve_kalan"' in core and '"kredi.kendi_anahtar"' in core
+    assert 'classList.add("run-cost-uyari")' in core, "N > M yalnız renk"
+    assert 'KREDI_KAPI_KODLARI = new Set(["err.kredi_yetersiz", "err.plan_kapsamiyor"])' in core
+    isler = c.get("/static/isler.js").text
+    assert isler.count("krediYenile();") >= 3, "202 teslimi, yeniden gönderim ve kapanış bakiyeyi yeniler"
+    settings = c.get("/static/settings.js").text
+    assert "function openKrediBolmesi()" in settings and 'showSettingsPane("kredi")' in settings
+
+
+def test_the_go_button_is_not_gated_by_the_balance():
+    """402 sunucunun tek doğruluk kaynağı (belge §6): `goBlockReason` bakiyeye BAKMAZ — kapı istemcide
+    kopyalansa sunucu kuralı değişince bayatlardı; BYOK'ta rezerv yok, satır bunu da yalnız gösterir."""
+    core = TestClient(appmod.app).get("/static/core.js").text
+    m = re.search(r"function goBlockReason\(\) \{.*?\n\}\n", core, re.S)
+    assert m, "goBlockReason bulunamadı"
+    assert "kredi" not in m.group(0).lower() and "bakiye" not in m.group(0).lower()
+
+
 # ── Prompt Yönetmeni (v1.13) ───────────────────────────────────────────
 
 def test_chat_workspace_markup_is_served():

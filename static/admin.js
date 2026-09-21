@@ -391,7 +391,12 @@
       ),
       kart(t("admin.metrik_son_1sa"), m.son_1sa.is, pencereMetni(m.son_1sa)),
       kart(t("admin.metrik_son_24sa"), m.son_24sa.is, pencereMetni(m.son_24sa)),
-      kart(t("admin.metrik_platform_kredi"), m.son_24sa.platform_kredi),
+      // Faz 3 / 5: sayı GERÇEK kredi (bitende), alt satır rezerv edilen tahmin.
+      kart(
+        t("admin.metrik_platform_kredi"),
+        m.son_24sa.platform_kredi,
+        t("admin.metrik_rezerv", { kredi: m.son_24sa.platform_kredi_rezerv }),
+      ),
     );
     const modeller = el("admin-modeller");
     if (!m.modeller.length) bosSatir(modeller, 4);
@@ -404,6 +409,37 @@
             hucre(String(s.adet)),
             hucre(String(s.p50_sn)),
             hucre(String(s.p95_sn)),
+          );
+          return tr;
+        }),
+      );
+    }
+    // Marj (Faz 3 / 5): 7 ve 30 günlük satırlar tek tabloda, `gun` sütunuyla. Sağlayıcı
+    // USD'si bugün çoğunlukla bilinmiyor (hiçbir adaptör fiyat vermiyor) — hücre
+    // "bilinmiyor (0/N)" der, sıfır YAZMAZ: bilinmeyen maliyet sıfır maliyet değil.
+    const marj = el("admin-marj");
+    if (!m.marj.length) bosSatir(marj, 8);
+    else {
+      marj.replaceChildren(
+        ...m.marj.map((s) => {
+          const tr = document.createElement("tr");
+          const maliyet =
+            s.maliyet_usd === null
+              ? t("admin.marj_bilinmiyor", { bilinen: s.maliyet_bilinen, toplam: s.adet })
+              : t("admin.marj_maliyet", {
+                  usd: s.maliyet_usd.toFixed(4),
+                  bilinen: s.maliyet_bilinen,
+                  toplam: s.adet,
+                });
+          tr.append(
+            hucre(String(s.gun)),
+            hucre(s.model),
+            hucre(String(s.adet)),
+            hucre(String(s.kredi)),
+            hucre(s.usd.toFixed(2)),
+            hucre(maliyet),
+            hucre(s.ort_sure_sn === null ? "—" : String(s.ort_sure_sn)),
+            hucre(t("admin.marj_hata", { adet: s.hata, kredi: s.hata_kredi })),
           );
           return tr;
         }),

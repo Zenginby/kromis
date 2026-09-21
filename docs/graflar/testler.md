@@ -2,29 +2,29 @@
 
 # Test haritası
 
-`tests/` altında 140 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
+`tests/` altında 144 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
 
 | modül | testler |
 | --- | --- |
 | `android_main` | `test_android_main.py`, `test_mobile.py` |
-| `app` | `test_admin.py`, `test_app.py`, `test_app_bolme.py`, `test_arena.py`, `test_arena_onyuz.py`, `test_assets_route.py`, `test_backup.py`, `test_banner.py`, `test_chat_prompt.py`, `test_chat_route.py`, `test_chats_route.py`, `test_db.py`, `test_delete_route.py`, `test_dil.py`, `test_dosya.py`, `test_dosya_rotalari.py`, `test_edit_route.py`, `test_folders.py`, `test_fonts.py`, `test_galeri_db.py`, `test_guncelleme_route.py`, `test_gunluk.py`, `test_guvenlik_baslik.py`, `test_health.py`, `test_hesap.py`, `test_i18n.py`, `test_id_contract.py`, `test_import_route.py`, `test_index.py`, `test_isler_route.py`, `test_kimlik.py`, `test_koken.py`, `test_kota.py`, `test_legacy_formats.py`, `test_logo.py`, `test_mobile.py`, `test_model_secimi.py`, `test_palette_route.py`, `test_paths.py`, `test_planlar.py`, `test_platform_anahtari.py`, `test_playwright_dil.py`, `test_playwright_guncelleme.py`, `test_playwright_hesap.py`, `test_playwright_studio.py`, `test_posta.py`, `test_prefs_route.py`, `test_provider_logos.py`, `test_rls.py`, `test_search_predicate.py`, `test_sentry.py`, `test_settings_route.py`, `test_shimmer.py`, `test_sifre.py`, `test_uretim_kapilar.py`, `test_video_onyuz.py`, `test_video_route.py` |
+| `app` | `test_admin.py`, `test_app.py`, `test_app_bolme.py`, `test_arena.py`, `test_arena_onyuz.py`, `test_assets_route.py`, `test_backup.py`, `test_banner.py`, `test_chat_prompt.py`, `test_chat_route.py`, `test_chats_route.py`, `test_db.py`, `test_delete_route.py`, `test_dil.py`, `test_dosya.py`, `test_dosya_rotalari.py`, `test_edit_route.py`, `test_folders.py`, `test_fonts.py`, `test_galeri_db.py`, `test_guncelleme_route.py`, `test_gunluk.py`, `test_guvenlik_baslik.py`, `test_health.py`, `test_hesap.py`, `test_i18n.py`, `test_id_contract.py`, `test_import_route.py`, `test_index.py`, `test_isler_route.py`, `test_kimlik.py`, `test_koken.py`, `test_kota.py`, `test_kredi_route.py`, `test_legacy_formats.py`, `test_logo.py`, `test_mobile.py`, `test_model_secimi.py`, `test_palette_route.py`, `test_paths.py`, `test_planlar.py`, `test_platform_anahtari.py`, `test_playwright_dil.py`, `test_playwright_guncelleme.py`, `test_playwright_hesap.py`, `test_playwright_studio.py`, `test_posta.py`, `test_prefs_route.py`, `test_provider_logos.py`, `test_rls.py`, `test_search_predicate.py`, `test_sentry.py`, `test_settings_route.py`, `test_shimmer.py`, `test_sifre.py`, `test_uretim_kapilar.py`, `test_video_onyuz.py`, `test_video_route.py` |
 | `assets_store` | `test_assets.py`, `test_backup.py`, `test_galeri_db.py`, `test_ice_aktar.py`, `test_legacy_formats.py`, `test_tablolar.py`, `test_varlik_db.py` |
-| `azure_client` | `test_app.py`, `test_app_bolme.py`, `test_arena.py`, `test_azure_client.py`, `test_azure_client_edit.py`, `test_azure_client_http.py`, `test_azure_flux_client.py`, `test_azure_mai_client.py`, `test_banner.py`, `test_catalog.py`, `test_chat_client.py`, `test_credstore.py`, `test_delete_route.py`, `test_dosya_rotalari.py`, `test_edit_route.py`, `test_fal_client.py`, `test_folders.py`, `test_galeri_db.py`, `test_gemini_client.py`, `test_gunluk.py`, `test_i18n.py`, `test_ice_aktar.py`, `test_import_route.py`, `test_isci.py`, `test_isler_route.py`, `test_legacy_formats.py`, `test_logo.py`, `test_model_secimi.py`, `test_openai_client.py`, `test_palette_route.py`, `test_paths.py`, `test_playwright_isler.py`, `test_providers.py`, `test_settings.py`, `test_settings_route.py`, `test_uretim_kapilar.py`, `test_veo_client.py`, `test_video_route.py` |
+| `azure_client` | `test_app.py`, `test_app_bolme.py`, `test_arena.py`, `test_azure_client.py`, `test_azure_client_edit.py`, `test_azure_client_http.py`, `test_azure_flux_client.py`, `test_azure_mai_client.py`, `test_banner.py`, `test_catalog.py`, `test_chat_client.py`, `test_credstore.py`, `test_delete_route.py`, `test_dosya_rotalari.py`, `test_e2e_kredi.py`, `test_edit_route.py`, `test_fal_client.py`, `test_folders.py`, `test_galeri_db.py`, `test_gemini_client.py`, `test_gunluk.py`, `test_i18n.py`, `test_ice_aktar.py`, `test_import_route.py`, `test_isci.py`, `test_isler_route.py`, `test_legacy_formats.py`, `test_logo.py`, `test_model_secimi.py`, `test_openai_client.py`, `test_palette_route.py`, `test_paths.py`, `test_playwright_isler.py`, `test_providers.py`, `test_settings.py`, `test_settings_route.py`, `test_uretim_kapilar.py`, `test_veo_client.py`, `test_video_route.py` |
 | `azure_flux_client` | `test_azure_flux_client.py` |
-| `azure_mai_client` | `test_azure_mai_client.py` |
+| `azure_mai_client` | `test_azure_mai_client.py`, `test_saglayici_meta.py` |
 | `backup` | `test_backup.py` |
-| `catalog` | `test_admin.py`, `test_arena.py`, `test_arena_onyuz.py`, `test_azure_flux_client.py`, `test_azure_mai_client.py`, `test_catalog.py`, `test_chat_prompt.py`, `test_chat_providers.py`, `test_chat_route.py`, `test_credstore.py`, `test_docker_kapisi.py`, `test_errlog.py`, `test_fal_client.py`, `test_gemini_client.py`, `test_gunluk.py`, `test_i18n.py`, `test_index.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik_bilgisi_db.py`, `test_kota.py`, `test_logo.py`, `test_model_secimi.py`, `test_openai_chat.py`, `test_openai_client.py`, `test_planlar.py`, `test_platform_anahtari.py`, `test_playwright_dil.py`, `test_playwright_studio.py`, `test_prefs.py`, `test_prefs_route.py`, `test_provider_logos.py`, `test_providers.py`, `test_settings_route.py`, `test_storage.py`, `test_tercih_db.py`, `test_uretim_kapilar.py`, `test_veo_client.py`, `test_video_onyuz.py`, `test_video_route.py` |
+| `catalog` | `test_admin.py`, `test_araclar.py`, `test_arena.py`, `test_arena_onyuz.py`, `test_azure_flux_client.py`, `test_azure_mai_client.py`, `test_catalog.py`, `test_chat_prompt.py`, `test_chat_providers.py`, `test_chat_route.py`, `test_credstore.py`, `test_docker_kapisi.py`, `test_errlog.py`, `test_fal_client.py`, `test_gemini_client.py`, `test_gunluk.py`, `test_i18n.py`, `test_index.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik_bilgisi_db.py`, `test_kota.py`, `test_kredi_route.py`, `test_logo.py`, `test_model_secimi.py`, `test_openai_chat.py`, `test_openai_client.py`, `test_planlar.py`, `test_platform_anahtari.py`, `test_playwright_dil.py`, `test_playwright_studio.py`, `test_prefs.py`, `test_prefs_route.py`, `test_provider_logos.py`, `test_providers.py`, `test_saglayici_meta.py`, `test_settings_route.py`, `test_storage.py`, `test_tercih_db.py`, `test_uretim_kapilar.py`, `test_veo_client.py`, `test_video_onyuz.py`, `test_video_route.py` |
 | `chat_client` | `test_chat_client.py`, `test_chat_providers.py`, `test_galeri_db.py`, `test_openai_chat.py` |
 | `chat_prompt` | `test_chat_prompt.py` |
 | `chat_providers` | `test_chat_providers.py`, `test_provider_logos.py` |
 | `chat_store` | `test_chat_store.py`, `test_galeri_db.py`, `test_ice_aktar.py`, `test_sohbet_db.py`, `test_tablolar.py` |
 | `color_names` | `test_color_names.py`, `test_legacy_formats.py`, `test_palette_route.py` |
 | `composite` | `test_composite.py`, `test_filigran.py` |
-| `credstore` | `test_credstore.py`, `test_kimlik_bilgisi_db.py`, `test_playwright_dil.py`, `test_playwright_studio.py`, `test_prefs.py`, `test_settings_route.py` |
+| `credstore` | `test_credstore.py`, `test_kimlik_bilgisi_db.py`, `test_kredi_route.py`, `test_playwright_dil.py`, `test_playwright_studio.py`, `test_prefs.py`, `test_settings_route.py` |
 | `desktop` | `test_desktop.py`, `test_windows_acilis.py` |
 | `errlog` | `test_errlog.py`, `test_platform_anahtari.py` |
 | `etiket` | `test_catalog.py` |
-| `fal_client` | `test_fal_client.py`, `test_providers.py` |
+| `fal_client` | `test_fal_client.py`, `test_providers.py`, `test_saglayici_meta.py` |
 | `folders` | `test_folders.py`, `test_galeri_db.py`, `test_guvenlik_baslik.py`, `test_legacy_formats.py`, `test_tablolar.py` |
 | `gemini_client` | `test_gemini_client.py` |
 | `guncelleme` | `test_depo_adresi.py`, `test_guncelleme.py`, `test_guncelleme_route.py`, `test_lisans.py`, `test_playwright_guncelleme.py`, `test_settings_route.py` |
@@ -40,25 +40,25 @@
 | `palette_store` | `test_galeri_db.py`, `test_legacy_formats.py`, `test_palet_db.py`, `test_palette_store.py`, `test_tablolar.py` |
 | `paths` | `test_android_main.py`, `test_chat_prompt.py`, `test_galeri_db.py`, `test_i18n.py`, `test_paths.py` |
 | `prefs` | `test_dil.py`, `test_galeri_db.py`, `test_i18n.py`, `test_ice_aktar.py`, `test_index.py`, `test_kimlik.py`, `test_prefs.py`, `test_prefs_route.py`, `test_tercih_db.py`, `test_video_onyuz.py` |
-| `providers` | `test_azure_flux_client.py`, `test_azure_mai_client.py`, `test_catalog.py`, `test_gemini_client.py`, `test_gunluk.py`, `test_isci.py`, `test_isler_route.py`, `test_kota.py`, `test_planlar.py`, `test_playwright_isler.py`, `test_provider_logos.py`, `test_providers.py`, `test_rls.py`, `test_uretim_kapilar.py`, `test_veo_client.py` |
+| `providers` | `test_azure_flux_client.py`, `test_azure_mai_client.py`, `test_catalog.py`, `test_e2e_kredi.py`, `test_gemini_client.py`, `test_gunluk.py`, `test_isci.py`, `test_isler_route.py`, `test_kota.py`, `test_planlar.py`, `test_playwright_isler.py`, `test_provider_logos.py`, `test_providers.py`, `test_rls.py`, `test_saglayici_meta.py`, `test_uretim_kapilar.py`, `test_veo_client.py` |
 | `release_manifest` | `test_android_apk_name.py`, `test_paketleme_dondurma.py`, `test_release_manifest.py` |
 | `routers.admin` | — |
 | `routers.ayarlar` | — |
 | `routers.bindirme` | — |
 | `routers.galeri` | — |
 | `routers.hesap` | `test_planlar.py`, `test_posta.py` |
-| `routers.isler` | `test_isler_route.py`, `test_rls.py` |
+| `routers.isler` | `test_isler_route.py`, `test_kredi_route.py`, `test_rls.py` |
 | `routers.kok` | — |
 | `routers.paletler` | — |
 | `routers.saglik` | `test_gunluk.py`, `test_health.py`, `test_sentry.py` |
 | `routers.sohbet` | — |
 | `routers.uretim` | — |
 | `screencolor` | `test_screencolor.py` |
-| `services.ayar` | `test_app_bolme.py`, `test_artik_dosya.py`, `test_gunluk.py`, `test_hesap.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik.py`, `test_kuyruk.py`, `test_paths.py`, `test_rls.py` |
+| `services.ayar` | `test_app_bolme.py`, `test_artik_dosya.py`, `test_gunluk.py`, `test_hesap.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik.py`, `test_kuyruk.py`, `test_paths.py`, `test_rls.py`, `test_saglayici_meta.py` |
 | `services.cerez` | `test_admin.py`, `test_docker_kapisi.py`, `test_hesap.py`, `test_kimlik.py`, `test_playwright_hesap.py`, `test_rls.py` |
-| `services.db` | `test_admin.py`, `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_db.py`, `test_dil.py`, `test_docker_kapisi.py`, `test_goc.py`, `test_guncelleme_route.py`, `test_health.py`, `test_ice_aktar.py`, `test_isci.py`, `test_kullanici_cli.py`, `test_planlar.py`, `test_playwright_studio.py`, `test_rls.py` |
-| `services.defter` | `test_admin.py`, `test_defter.py`, `test_isci.py`, `test_isler_route.py`, `test_kota.py`, `test_planlar.py`, `test_platform_anahtari.py`, `test_playwright_isler.py`, `test_rls.py`, `test_uretim_kapilar.py` |
-| `services.depo_admin` | `test_admin.py`, `test_health.py`, `test_planlar.py` |
+| `services.db` | `test_admin.py`, `test_anahtar_dondur.py`, `test_araclar.py`, `test_artik_dosya.py`, `test_db.py`, `test_dil.py`, `test_docker_kapisi.py`, `test_goc.py`, `test_guncelleme_route.py`, `test_health.py`, `test_ice_aktar.py`, `test_isci.py`, `test_kullanici_cli.py`, `test_planlar.py`, `test_playwright_studio.py`, `test_rls.py` |
+| `services.defter` | `test_admin.py`, `test_defter.py`, `test_e2e_kredi.py`, `test_isci.py`, `test_isler_route.py`, `test_kota.py`, `test_kredi_route.py`, `test_planlar.py`, `test_platform_anahtari.py`, `test_playwright_isler.py`, `test_rls.py`, `test_uretim_kapilar.py` |
+| `services.depo_admin` | `test_admin.py`, `test_araclar.py`, `test_health.py`, `test_planlar.py` |
 | `services.depo_kimlik_bilgisi` | `test_anahtar_dondur.py`, `test_ice_aktar.py`, `test_isci.py`, `test_kimlik_bilgisi_db.py`, `test_platform_anahtari.py`, `test_settings_route.py`, `test_sifre.py` |
 | `services.depo_klasor` | `test_folders.py`, `test_galeri_db.py`, `test_guvenlik_baslik.py`, `test_legacy_formats.py`, `test_playwright_studio.py` |
 | `services.depo_medya` | `test_artik_dosya.py`, `test_chats_route.py`, `test_dosya_rotalari.py`, `test_galeri_db.py`, `test_ice_aktar.py`, `test_isci.py`, `test_kimlik.py`, `test_legacy_formats.py`, `test_playwright_studio.py` |
@@ -67,31 +67,32 @@
 | `services.depo_tercih` | `test_dil.py`, `test_ice_aktar.py`, `test_prefs_route.py`, `test_tercih_db.py` |
 | `services.depo_varlik` | `test_artik_dosya.py`, `test_banner.py`, `test_folders.py`, `test_legacy_formats.py`, `test_logo.py`, `test_palette_route.py`, `test_playwright_studio.py`, `test_varlik_db.py` |
 | `services.dil` | `test_dil.py`, `test_gunluk.py`, `test_i18n.py`, `test_isci.py`, `test_koken.py` |
-| `services.dosya` | `test_artik_dosya.py`, `test_docker_kapisi.py`, `test_dosya.py`, `test_dosya_rotalari.py`, `test_gunluk.py`, `test_isci.py`, `test_medya_tasi.py`, `test_rls.py` |
+| `services.dosya` | `test_artik_dosya.py`, `test_docker_kapisi.py`, `test_dosya.py`, `test_dosya_rotalari.py`, `test_gunluk.py`, `test_isci.py`, `test_medya_tasi.py`, `test_rls.py`, `test_saglayici_meta.py` |
 | `services.filigran` | `test_docker_kapisi.py`, `test_filigran.py`, `test_isci.py` |
 | `services.gorsel` | `test_edit_route.py`, `test_filigran.py`, `test_model_secimi.py`, `test_video_route.py` |
 | `services.gunluk` | `test_admin.py`, `test_docker_kapisi.py`, `test_gunluk.py`, `test_planlar.py` |
 | `services.hata_izleme` | `test_docker_kapisi.py`, `test_sentry.py` |
-| `services.hesap` | `test_admin.py`, `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_defter.py`, `test_dosya_rotalari.py`, `test_galeri_db.py`, `test_hesap.py`, `test_ice_aktar.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik.py`, `test_kimlik_bilgisi_db.py`, `test_kullanici_cli.py`, `test_kuyruk.py`, `test_palet_db.py`, `test_playwright_hesap.py`, `test_rls.py`, `test_sohbet_db.py`, `test_tercih_db.py`, `test_varlik_db.py` |
-| `services.isci` | `test_docker_kapisi.py`, `test_gunluk.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik.py`, `test_playwright_studio.py`, `test_rls.py`, `test_uretim_kapilar.py` |
+| `services.hesap` | `test_admin.py`, `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_defter.py`, `test_dosya_rotalari.py`, `test_galeri_db.py`, `test_hesap.py`, `test_ice_aktar.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik.py`, `test_kimlik_bilgisi_db.py`, `test_kredi_route.py`, `test_kullanici_cli.py`, `test_kuyruk.py`, `test_palet_db.py`, `test_playwright_hesap.py`, `test_rls.py`, `test_sohbet_db.py`, `test_tercih_db.py`, `test_varlik_db.py` |
+| `services.isci` | `test_docker_kapisi.py`, `test_gunluk.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik.py`, `test_playwright_studio.py`, `test_rls.py`, `test_saglayici_meta.py`, `test_uretim_kapilar.py` |
 | `services.istek_kimligi` | `test_gunluk.py`, `test_koken.py`, `test_sentry.py` |
-| `services.kapilar` | `test_docker_kapisi.py`, `test_isler_route.py`, `test_kota.py`, `test_planlar.py`, `test_platform_anahtari.py`, `test_playwright_isler.py`, `test_uretim_kapilar.py` |
+| `services.kapilar` | `test_docker_kapisi.py`, `test_e2e_kredi.py`, `test_isler_route.py`, `test_kota.py`, `test_planlar.py`, `test_platform_anahtari.py`, `test_playwright_isler.py`, `test_uretim_kapilar.py` |
 | `services.kimlik` | `test_isler_route.py`, `test_kimlik.py`, `test_rls.py` |
 | `services.kiraci` | `test_admin.py`, `test_isci.py`, `test_planlar.py`, `test_rls.py`, `test_rls_kontrol.py` |
 | `services.koken` | `test_docker_kapisi.py`, `test_gunluk.py`, `test_hesap.py`, `test_koken.py`, `test_playwright_hesap.py` |
 | `services.kota` | `test_admin.py`, `test_docker_kapisi.py`, `test_kota.py`, `test_planlar.py`, `test_uretim_kapilar.py` |
-| `services.kuyruk` | `test_admin.py`, `test_artik_dosya.py`, `test_defter.py`, `test_gunluk.py`, `test_health.py`, `test_isci.py`, `test_isler_route.py`, `test_kota.py`, `test_kuyruk.py`, `test_playwright_admin.py`, `test_rls.py` |
+| `services.kuyruk` | `test_admin.py`, `test_araclar.py`, `test_artik_dosya.py`, `test_defter.py`, `test_gunluk.py`, `test_health.py`, `test_isci.py`, `test_isler_route.py`, `test_kota.py`, `test_kredi_route.py`, `test_kuyruk.py`, `test_playwright_admin.py`, `test_rls.py`, `test_saglayici_meta.py` |
 | `services.modeller` | `test_planlar.py` |
 | `services.nesne_depo` | `test_artik_dosya.py`, `test_dosya.py`, `test_dosya_rotalari.py`, `test_medya_tasi.py`, `test_nesne_depo.py` |
 | `services.palet` | `test_palet_db.py` |
-| `services.planlar` | `test_docker_kapisi.py`, `test_isci.py`, `test_planlar.py` |
-| `services.platform_anahtari` | `test_admin.py`, `test_docker_kapisi.py`, `test_gunluk.py`, `test_kota.py`, `test_platform_anahtari.py` |
+| `services.planlar` | `test_docker_kapisi.py`, `test_isci.py`, `test_kredi_route.py`, `test_planlar.py` |
+| `services.platform_anahtari` | `test_admin.py`, `test_docker_kapisi.py`, `test_gunluk.py`, `test_kota.py`, `test_kredi_route.py`, `test_platform_anahtari.py` |
 | `services.posta` | `test_docker_kapisi.py`, `test_hesap.py`, `test_playwright_hesap.py`, `test_posta.py` |
 | `services.redaksiyon` | — |
 | `services.sablon` | — |
+| `services.saglayici_meta` | `test_saglayici_meta.py` |
 | `services.sifre` | `test_anahtar_dondur.py`, `test_docker_kapisi.py`, `test_ice_aktar.py`, `test_kimlik_bilgisi_db.py`, `test_sifre.py` |
-| `services.tablolar` | `test_admin.py`, `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_defter.py`, `test_dosya_rotalari.py`, `test_folders.py`, `test_galeri_db.py`, `test_hesap.py`, `test_ice_aktar.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik.py`, `test_kimlik_bilgisi_db.py`, `test_kota.py`, `test_kullanici_cli.py`, `test_kuyruk.py`, `test_legacy_formats.py`, `test_palet_db.py`, `test_palette_route.py`, `test_planlar.py`, `test_platform_anahtari.py`, `test_playwright_admin.py`, `test_playwright_hesap.py`, `test_playwright_isler.py`, `test_rls.py`, `test_sohbet_db.py`, `test_tablolar.py`, `test_tercih_db.py`, `test_uretim_kapilar.py`, `test_varlik_db.py` |
-| `services.zaman` | `test_admin.py`, `test_defter.py`, `test_galeri_db.py`, `test_gunluk.py`, `test_health.py`, `test_ice_aktar.py`, `test_isci.py`, `test_kimlik_bilgisi_db.py`, `test_kota.py`, `test_kuyruk.py`, `test_legacy_formats.py`, `test_palet_db.py`, `test_sohbet_db.py`, `test_varlik_db.py` |
+| `services.tablolar` | `test_admin.py`, `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_defter.py`, `test_dosya_rotalari.py`, `test_folders.py`, `test_galeri_db.py`, `test_hesap.py`, `test_ice_aktar.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik.py`, `test_kimlik_bilgisi_db.py`, `test_kota.py`, `test_kredi_route.py`, `test_kullanici_cli.py`, `test_kuyruk.py`, `test_legacy_formats.py`, `test_palet_db.py`, `test_palette_route.py`, `test_planlar.py`, `test_platform_anahtari.py`, `test_playwright_admin.py`, `test_playwright_hesap.py`, `test_playwright_isler.py`, `test_rls.py`, `test_saglayici_meta.py`, `test_sohbet_db.py`, `test_tablolar.py`, `test_tercih_db.py`, `test_uretim_kapilar.py`, `test_varlik_db.py` |
+| `services.zaman` | `test_admin.py`, `test_araclar.py`, `test_defter.py`, `test_e2e_kredi.py`, `test_galeri_db.py`, `test_gunluk.py`, `test_health.py`, `test_ice_aktar.py`, `test_isci.py`, `test_kimlik_bilgisi_db.py`, `test_kota.py`, `test_kredi_route.py`, `test_kuyruk.py`, `test_legacy_formats.py`, `test_palet_db.py`, `test_sohbet_db.py`, `test_varlik_db.py` |
 | `storage` | `test_arena.py`, `test_folders.py`, `test_galeri_db.py`, `test_ice_aktar.py`, `test_legacy_formats.py`, `test_storage.py`, `test_storage_delete.py`, `test_tablolar.py`, `test_video_onyuz.py` |
 | `tools.anahtar_dondur` | `test_anahtar_dondur.py` |
 | `tools.artik_dosya` | `test_artik_dosya.py` |
@@ -103,11 +104,13 @@
 | `tools.make_filigran` | — |
 | `tools.make_legacy_fixtures` | — |
 | `tools.make_logo_goldens` | — |
+| `tools.marj_raporu` | `test_araclar.py` |
 | `tools.medya_tasi` | `test_medya_tasi.py` |
 | `tools.render_brand_assets` | — |
 | `tools.rls_kontrol` | `test_rls_kontrol.py` |
 | `tools.surum_karari` | `test_surum_karari.py` |
 | `tools.surum_yaz` | `test_release_manifest.py`, `test_surum_yaz.py` |
+| `tools.tarife_kontrol` | `test_araclar.py` |
 | `tools.test_ortami` | `test_test_ortami.py` |
 | `tools.uygulama_rolu` | `test_rls_kontrol.py` |
 | `veo_client` | `test_veo_client.py` |
@@ -120,7 +123,7 @@
 Bu modülleri hiçbir test dosyası ithal etmiyor. Dolaylı olarak sınanıyor olabilirler (`import app` app'in ithal ettiği her şeyi çalıştırır), ama doğrudan bekçileri yok.
 
 * `isci` (382 satır)
-* `routers.admin` (192 satır)
+* `routers.admin` (193 satır)
 * `routers.ayarlar` (403 satır)
 * `routers.bindirme` (282 satır)
 * `routers.galeri` (401 satır)

@@ -90,3 +90,8 @@ android/.cxx/
 # proje içeriği değil. Kilit dosyası (package-lock.json) İZLENİYOR — CI `npm ci`
 # ile aynı sürümleri kurmalı.
 node_modules/
+
+# Tasarım diyagramlarının HTML çıktısı: JSON kaynağından tek komutla üretiliyor
+# (bkz. docs/tasarim-diyagramlari/README.md). ~800 KB'lık tek dosya, diff'i
+# okunamaz; commit'lenen şey ~3 KB'lık JSON.
+docs/tasarim-diyagramlari/*.html

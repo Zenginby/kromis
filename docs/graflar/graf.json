@@ -2543,6 +2543,7 @@
         "tests/test_saglayici_meta.py",
         "tests/test_sohbet_db.py",
         "tests/test_tablolar.py",
+        "tests/test_tasarim_diyagramlari.py",
         "tests/test_tercih_db.py",
         "tests/test_uretim_kapilar.py",
         "tests/test_varlik_db.py"
@@ -3570,7 +3571,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 145,
+  "test_dosyasi_sayisi": 146,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",

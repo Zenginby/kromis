@@ -690,7 +690,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `services/sablon.py` | 68 | 10 | `errlog`, `i18n`, `services.ayar`, `services.dil`, `version` | 3 | 0 |
 | `services/saglayici_meta.py` | 126 | 0 | — | 3 | 1 |
 | `services/sifre.py` | 151 | 0 | — | 5 | 5 |
-| `services/tablolar.py` | 885 | 5 | `assets_store`, `models` | 32 | 32 |
+| `services/tablolar.py` | 885 | 5 | `assets_store`, `models` | 32 | 33 |
 | `services/zaman.py` | 71 | 0 | — | 22 | 17 |
 | `storage.py` | 423 | 1 | `catalog`, `jsonstore` | 9 | 9 |
 | `veo_client.py` | 629 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |

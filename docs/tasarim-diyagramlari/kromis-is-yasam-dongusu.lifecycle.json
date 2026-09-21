@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Kromis — İş Yaşam Döngüsü",
+    "output": "kromis-is-yasam-dongusu.html",
+    "viewBox": [
+      920,
+      566
+    ],
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "İş durumu (isler.durum)"
+    },
+    {
+      "id": "kapanis",
+      "label": "Sonuçsuz kapanış"
+    },
+    {
+      "id": "terminal",
+      "label": "(kullanılmıyor)"
+    }
+  ],
+  "states": [
+    {
+      "id": "bekliyor",
+      "type": "start",
+      "label": "bekliyor",
+      "sublabel": "kuyruk.ekle · rezerv düşüldü",
+      "lane": "main",
+      "col": 2,
+      "step": "01",
+      "tag": "aktif"
+    },
+    {
+      "id": "calisiyor",
+      "type": "active",
+      "label": "calisiyor",
+      "sublabel": "işçi aldı · kalp 30 sn",
+      "lane": "main",
+      "col": 3,
+      "step": "02",
+      "tag": "aktif"
+    },
+    {
+      "id": "bitti",
+      "type": "success",
+      "label": "bitti",
+      "sublabel": "sonuç galeride",
+      "lane": "main",
+      "col": 4,
+      "step": "03",
+      "tag": "kapandı"
+    },
+    {
+      "id": "iptal",
+      "type": "failure",
+      "label": "iptal",
+      "sublabel": "kullanıcı durdurdu",
+      "lane": "kapanis",
+      "col": 0,
+      "tag": "kapandı"
+    },
+    {
+      "id": "hata",
+      "type": "failure",
+      "label": "hata",
+      "sublabel": "sağlayıcı hatası ya da bayat",
+      "lane": "kapanis",
+      "col": 1,
+      "tag": "kapandı"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "al",
+      "from": "bekliyor",
+      "to": "calisiyor",
+      "label": "kuyruk.al · FIFO, SKIP LOCKED",
+      "variant": "emphasis",
+      "labelDy": -30
+    },
+    {
+      "id": "bitir",
+      "from": "calisiyor",
+      "to": "bitti",
+      "label": "kuyruk.bitir + defter.onayla",
+      "variant": "emphasis",
+      "labelDy": -30
+    },
+    {
+      "id": "kullanici-iptal",
+      "from": "bekliyor",
+      "to": "iptal",
+      "label": "kuyruk.iptal · defter.iade",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelDy": 70
+    },
+    {
+      "id": "dusur",
+      "from": "calisiyor",
+      "to": "hata",
+      "label": "kuyruk.dusur · defter.iade",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelDy": 70
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Kredi defteri",
+      "items": [
+        "rezerve: iki kovadan atomik düşer, HİBE ÖNCE; kuyruk.ekle ile aynı transaksiyon",
+        "onayla: gerçek maliyet kapatılır, fark ÖNCE PAKET kovasına döner (K3)",
+        "iade: tam geri, kova kova — hibeden düşen hibeye, paketten pakete"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Çizilmemiş kenarlar",
+      "items": [
+        "calisiyor iptal edilemez: sağlayıcı çoktan faturalandı",
+        "Bayat iş yeniden kuyruğa alınmaz (K8 çift fatura)",
+        "Yeniden gönder YENİ iş satırı açar, bu satır kapalı kalır"
+      ]
+    }
+  ]
+}

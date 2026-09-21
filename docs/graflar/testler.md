@@ -2,7 +2,7 @@
 
 # Test haritası
 
-`tests/` altında 145 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
+`tests/` altında 146 dosya. Bir modülü değiştirirken koşturulacak testler burada; sütun, test dosyasının o modülü İTHAL ETMESİNDEN çıkarıldı (kapsam ölçümü değil — hangi testin o modüle dokunduğunun haritası).
 
 | modül | testler |
 | --- | --- |
@@ -91,7 +91,7 @@
 | `services.sablon` | — |
 | `services.saglayici_meta` | `test_saglayici_meta.py` |
 | `services.sifre` | `test_anahtar_dondur.py`, `test_docker_kapisi.py`, `test_ice_aktar.py`, `test_kimlik_bilgisi_db.py`, `test_sifre.py` |
-| `services.tablolar` | `test_admin.py`, `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_defter.py`, `test_dosya_rotalari.py`, `test_folders.py`, `test_galeri_db.py`, `test_hesap.py`, `test_ice_aktar.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik.py`, `test_kimlik_bilgisi_db.py`, `test_kota.py`, `test_kredi_route.py`, `test_kullanici_cli.py`, `test_kuyruk.py`, `test_legacy_formats.py`, `test_palet_db.py`, `test_palette_route.py`, `test_planlar.py`, `test_platform_anahtari.py`, `test_playwright_admin.py`, `test_playwright_hesap.py`, `test_playwright_isler.py`, `test_rls.py`, `test_saglayici_meta.py`, `test_sohbet_db.py`, `test_tablolar.py`, `test_tercih_db.py`, `test_uretim_kapilar.py`, `test_varlik_db.py` |
+| `services.tablolar` | `test_admin.py`, `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_defter.py`, `test_dosya_rotalari.py`, `test_folders.py`, `test_galeri_db.py`, `test_hesap.py`, `test_ice_aktar.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik.py`, `test_kimlik_bilgisi_db.py`, `test_kota.py`, `test_kredi_route.py`, `test_kullanici_cli.py`, `test_kuyruk.py`, `test_legacy_formats.py`, `test_palet_db.py`, `test_palette_route.py`, `test_planlar.py`, `test_platform_anahtari.py`, `test_playwright_admin.py`, `test_playwright_hesap.py`, `test_playwright_isler.py`, `test_rls.py`, `test_saglayici_meta.py`, `test_sohbet_db.py`, `test_tablolar.py`, `test_tasarim_diyagramlari.py`, `test_tercih_db.py`, `test_uretim_kapilar.py`, `test_varlik_db.py` |
 | `services.zaman` | `test_admin.py`, `test_araclar.py`, `test_defter.py`, `test_e2e_kredi.py`, `test_galeri_db.py`, `test_gunluk.py`, `test_health.py`, `test_ice_aktar.py`, `test_isci.py`, `test_kimlik_bilgisi_db.py`, `test_kota.py`, `test_kredi_route.py`, `test_kuyruk.py`, `test_legacy_formats.py`, `test_palet_db.py`, `test_sohbet_db.py`, `test_varlik_db.py` |
 | `storage` | `test_arena.py`, `test_folders.py`, `test_galeri_db.py`, `test_ice_aktar.py`, `test_legacy_formats.py`, `test_storage.py`, `test_storage_delete.py`, `test_tablolar.py`, `test_video_onyuz.py` |
 | `tools.anahtar_dondur` | `test_anahtar_dondur.py` |

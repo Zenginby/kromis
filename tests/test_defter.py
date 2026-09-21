@@ -548,9 +548,23 @@ TEK_YAZAR = "services/defter.py"
 
 
 def _urun_dosyalari() -> list[str]:
-    """Web ve işçi yolu + araçlar: bileşim kökleri, `routers/`, `services/`, `tools/` (testler dışarıda — tohum yazar)."""
-    return ["app.py", "isci.py"] + sorted(os.path.relpath(p, REPO) for kalip in ("routers", "services", "tools")
-                                          for p in glob.glob(os.path.join(REPO, kalip, "*.py")))
+    """Web ve işçi yolu + araçlar: bileşim kökleri, `routers/`, `services/`, `tools/` (testler dışarıda — tohum yazar).
+
+    AYRAÇ `/`'A NORMALİZE EDİLİYOR ve bu satır kozmetik değil: `os.path.relpath`
+    Windows'ta `routers\\admin.py` veriyor, oysa `TEK_YAZAR` ve hata iletileri
+    `services/defter.py` biçiminde yazılı. Normalize edilmezse `TEK_YAZAR in
+    _urun_dosyalari()` orada HİÇ tutmuyor ve bekçi, kendi körlük kontrolünde
+    düşüyor — ölçüldü 2026-09-20, Windows'ta tek kırmızı buydu.
+
+    İŞARETLEMEK DEĞİL ONARMAK doğru olan: bu testin konusu (bakiyeyi kimin
+    yazdığı) platformdan bağımsız. `posix_gerekir` ile atlansaydı kapı
+    Windows'ta hiç koşmaz, yani depo iki platformda geliştirilirken güvencenin
+    yarısı kaybolurdu. Gerçek POSIX bağımlılıkları (SIGTERM, `time.tzset`,
+    izin bitleri) işaretli; bu bir taşınabilirlik kayması, o defterde yeri yok.
+    """
+    return ["app.py", "isci.py"] + sorted(
+        os.path.relpath(p, REPO).replace(os.sep, "/") for kalip in ("routers", "services", "tools")
+        for p in glob.glob(os.path.join(REPO, kalip, "*.py")))
 
 
 _BAKIYE_SQL = re.compile(r"UPDATE\s+kullanicilar\b.*\bbakiye\b", re.I | re.S)

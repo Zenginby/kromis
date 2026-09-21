@@ -20,7 +20,7 @@
 * 144 test dosyası; 15 modülü hiçbir test ithal etmiyor, 16 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)
 * 1 ithal döngüsü, 0 rotaya oturmayan tarayıcı çağrısı
 
-En büyük dosyalar: `catalog` (1472), `models` (1138), `services.isci` (767), `fal_client` (761), `services.tablolar` (689).
+En büyük dosyalar: `catalog` (1472), `models` (1138), `services.isci` (791), `fal_client` (761), `services.tablolar` (689).
 En çok ithal edilenler: `i18n` (39), `services.tablolar` (32), `catalog` (30), `services.db` (23), `services.zaman` (22).
 
 ## Nasıl güncellenir

@@ -581,6 +581,76 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
    *Issues*'ta `kromis@<sürüm>` etiketiyle görünmeli. Kapatmak: değişkeni sil,
    yeniden dağıt. Uyarı kuralları (`uyari` olayı, hata oranı) Sentry
    panelinde *Alerts* altında tanımlanır, kodda değil.
+10. **Planlar ve kredi** (Faz 3). Platform anahtarıyla (1d) üreten kullanıcı
+    artık **kredi harcar**; kendi anahtarıyla üreten harcamaz. Kurallar kodda,
+    sayılar ortamda:
+
+    *Üç plan* (`services/planlar.py`; `kullanicilar.plan`): **`free`** —
+    herkes böyle başlar, aylık hibe alır, görselleri **filigranlı**, video
+    modelleri **kapalı** (403 "planında yok"); **`temel`** ve **`pro`** —
+    filigransız, video açık, hibeleri bugün yer tutucu (1.000 / 3.000; fiyat
+    ve ödeme Faz 4). Plan değişikliği yalnız `/admin` → kullanıcı satırı →
+    plan seçici (`olay=admin.plan`); satın alma yolu yok.
+
+    *Aylık hibe* — `KROMIS_FREE_AYLIK_HIBE` (`.env.example` 1. bölüm): boş =
+    **200** kredi (≈ 1 USD sağlayıcı maliyeti, ~25 Azure `medium` görsel),
+    `0` = hibe kapalı. Kural "**hibeye tamamla**": bakiye bu sayının
+    ALTINDAYSA fark yatar, üstündeyse dokunulmaz; kullanılmayan hibe
+    devretmez. İki yazar: web kayıt anında ilk hibeyi yatırır, işçinin 5
+    dakikalık bakım turu her ay başında tamamlar — değişken **web VE işçi**
+    sürecine aynı değerle verilir (yalnız birine verilirse kayıt hibesi ile
+    aylık hibe farklı sayı olur).
+
+    *Rezerv → onay → iade* — iş sıraya girerken tahmini kredi bakiyeden
+    **rezerve** edilir (yetmezse **402** `err.kredi_yetersiz`, iş açılmaz);
+    bitince gerçek maliyetle **onaylanır**, fark iade; hata / iptal / bayat
+    düşürme **tam iade**. Günlük kredi tavanı (`KROMIS_GUNLUK_KREDI_TAVANI`,
+    8. adımın öncesi) KALIR ve önce sorulur: tavan kötüye kullanımı, bakiye
+    parayı sınırlar. Kullanıcı bakiyesini composer satırında ("bu tur 8
+    düşer · kalan 192"), iş panelinde ("rezerv 8 · gerçek 8 · iade 0") ve
+    Ayarlar → **Kredi** bölmesinde (son 20 hareket) görür; API'si
+    `GET /api/kredi`.
+
+    *Filigran* — `KROMIS_FILIGRAN_DOSYASI` (isteğe bağlı, yalnız işçi okur):
+    şeffaf arka planlı PNG yolu, ≥ 512 px; boşsa paketle gelen marka-nötr
+    `bundled/filigran.png`. Ücretsiz planın görseli işçide alt sağa işaretle
+    yazılır (tek nesne, ham kopya yok); dosya YOKSA iş `hata`ya düşer ve
+    rezerv iade edilir — sessizce filigransız çıkmaz.
+
+    *Admin kredi ekleme* — `/admin` → kullanıcı → "kredi ekle" (± miktar +
+    zorunlu açıklama) `duzeltme` satırı yazar, `admin_id` izli
+    (`olay=admin.kredi`); tek para girişi yolu bu ve aylık hibe.
+
+    *Marj* — `/admin` → **Marj** sekmesi (7 / 30 gün, model başına Σ kredi,
+    ≈USD, sağlayıcı verisi, ortalama süre, hata) ve aynı sayılar CSV olarak
+    `DATABASE_URL=… python tools/marj_raporu.py --gun 30` (konteyner içinden;
+    aylık sağlayıcı faturasıyla yan yana). `python tools/tarife_kontrol.py`
+    (depodan) katalogda "fiyat doğrulanamadı" notlu modelleri basar — bir kez
+    sağlayıcı fiyatıyla karşılaştır, gerekirse `credits`i PR ile düzelt.
+
+    *Defter tutarlılığı* — işçinin bakım turu her 5 dk her kullanıcıda
+    `SUM(kredi_hareketleri) == bakiye` ölçer; sapma varsa `olay=defter.tutarsiz`
+    (WARNING, kullanıcı başına) ve `olay=bakim` satırında `tutarsiz_kullanici=N`
+    — tur düzeltmez, "kredi ekle" ile düzeltirsin. Yedeği ayrı değil: tablo DB
+    yedeğinin içinde ([docs/isletme.md § 2, § 6, § 9](docs/isletme.md)).
+
+    **Canlı kontrol listesi (bir kez, dağıtım sonrası):**
+    1. `KROMIS_FREE_AYLIK_HIBE` iki sürecin de sırrında (ya da ikisinde de boş).
+    2. İlk `olay=bakim` satırı (≤ 5 dk): `hibe_satiri=N` (N = mevcut kullanıcı
+       sayısı — hepsi `free`, hepsi 0 bakiyeyle başlıyor) ve `tutarsiz_kullanici=0`.
+    3. `/admin` → kendi hesabın → plan `pro` (günlükte `olay=admin.plan`);
+       yoksa kendi hesabın da video göremez. Sonraki bakım turu seni 3.000'e
+       tamamlar (kendi platform anahtarına kendi harcaman).
+    4. Kendi hesabınla `GET /api/kredi` → `bakiye`, `plan: "pro"`, `hibe`,
+       `sonraki_hibe`, `filigran: false`, `video: true`.
+    5. Ücretsiz bir TEST hesabıyla platform anahtarlı bir görsel (Azure
+       `medium` = 8 kredi): composer "kalan 200" → gönderince "kalan 192" →
+       iş bitince panelde "rezerv 8 · gerçek 8 · iade 0", indirilen görselde
+       işaret alt sağda, Ayarlar → Kredi'de hibe, rezerv ve onay satırları.
+    6. Aynı hesapla bir video modeli seç → kartta "planında yok" rozeti,
+       gönder düğmesi kapalı (sunucu tarafı aynı kapı: 403 `err.plan_kapsamiyor`).
+    7. `/admin` → Marj sekmesi o işle dolu; `python tools/tarife_kontrol.py`
+       dört modeli bir kez fiyat sayfasıyla doğrula.
 
 ---
 

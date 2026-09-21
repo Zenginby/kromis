@@ -40,7 +40,7 @@ flowchart TD
     n_routers_hesap["routers.hesap<br/>273 satır"]
     n_routers_kok["routers.kok<br/>40 satır"]
     n_services_depo_admin["services.depo_admin<br/>360 satır"]
-    n_services_isci["services.isci<br/>767 satır"]
+    n_services_isci["services.isci<br/>791 satır"]
     n_services_kapilar["services.kapilar<br/>269 satır"]
   end
   subgraph katman10["katman 10"]
@@ -671,7 +671,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `services/gunluk.py` | 332 | 1 | `errlog` | 7 | 4 |
 | `services/hata_izleme.py` | 187 | 2 | `errlog`, `services.gunluk`, `version` | 4 | 2 |
 | `services/hesap.py` | 292 | 6 | `services.cerez`, `services.tablolar` | 6 | 21 |
-| `services/isci.py` | 767 | 11 | `azure_client`, `catalog`, `errlog`, `i18n`, `kimlik_baglami`, `providers`, `services.ayar`, `services.defter`, `services.depo_kimlik_bilgisi`, `services.depo_medya`, `services.dil`, `services.dosya`, `services.filigran`, `services.gunluk`, `services.hata_izleme`, `services.kiraci`, `services.kuyruk`, `services.nesne_depo`, `services.planlar`, `services.platform_anahtari`, `services.saglayici_meta`, `services.tablolar`, `services.zaman` | 1 | 9 |
+| `services/isci.py` | 791 | 11 | `azure_client`, `catalog`, `errlog`, `i18n`, `kimlik_baglami`, `providers`, `services.ayar`, `services.defter`, `services.depo_kimlik_bilgisi`, `services.depo_medya`, `services.dil`, `services.dosya`, `services.filigran`, `services.gunluk`, `services.hata_izleme`, `services.kiraci`, `services.kuyruk`, `services.nesne_depo`, `services.planlar`, `services.platform_anahtari`, `services.saglayici_meta`, `services.tablolar`, `services.zaman` | 1 | 9 |
 | `services/istek_kimligi.py` | 112 | 3 | `services.gunluk`, `services.hata_izleme` | 1 | 3 |
 | `services/kapilar.py` | 269 | 11 | `assets_store`, `catalog`, `chat_store`, `credstore`, `etiket`, `i18n`, `services.defter`, `services.depo_klasor`, `services.dil`, `services.kuyruk`, `services.planlar`, `services.platform_anahtari`, `services.tablolar`, `storage` | 6 | 8 |
 | `services/kimlik.py` | 265 | 8 | `i18n`, `kimlik_baglami`, `services.cerez`, `services.db`, `services.depo_kimlik_bilgisi`, `services.dil`, `services.hesap`, `services.kiraci`, `services.platform_anahtari`, `services.tablolar` | 12 | 3 |

@@ -10,6 +10,7 @@ import pathlib
 import pytest
 
 import azure_client as ac
+import azure_flux_client as flux_client
 import catalog
 import etiket
 import i18n
@@ -675,32 +676,51 @@ def test_FLUX_jetonlari_gpt_image_2_ile_AYNI():
 
 def test_FLUX_girdileri_jetonlari_PAYLASIYOR():
     flux = [m for m in catalog.IMAGE_MODELS if m.provider == "azure-flux"]
-    assert len(flux) == 2, "katalogda iki FLUX girdisi olmalı"
+    assert len(flux) == 1, "flex 2026-09-22'de silindi (1b-D); geriye pro kaldı"
     for m in flux:
         assert m.sizes is catalog.FLUX_SIZES, (
             f"{m.id}: jetonları kopyalamış, FLUX_SIZES'ı paylaşmıyor")
         assert m.credential == "azure_foundry", m.credential
         assert m.images_per_request == 1
         # `num_images` tavanı ÖLÇÜLMEDİ: eksik beyan yalnızca bir yeteneği
-        # kullanmamak, fazla beyan seçilebilir bir hata. Kapasite de bunu
-        # destekliyor (flex belgelenmiş RPM'de 5/dk).
+        # kullanmamak, fazla beyan seçilebilir bir hata.
         assert m.max_n == 1, f"{m.id}: num_images tavanı ölçülmedi (karar 5)"
         assert m.supports_edit is True and m.max_refs == 4
 
 
-def test_FLUX_pro_nun_kalite_ekseni_GIZLI_flex_in_GERCEK():
-    """Ayrım kararın kendisi: pro'da `quality` parametresi YOK (sentetik jeton
-    + gizli knob), flex'te `steps`/`guidance` GERÇEK bir eksen."""
-    pro = catalog.image_model("azure-flux-2-pro")
-    flex = catalog.image_model("azure-flux-2-flex")
+def test_the_deleted_flex_entry_left_nothing_behind_in_the_catalog_or_the_adapter():
+    """1b-D: girdi silindi, ADAPTÖR de temizlendi — yarısı kalsa seçilebilir bir tuzak olurdu.
 
+    `openai-dall-e-3`ün ölçülmüş dersi: katalogda kalan ölü bir girdi arayüzde
+    seçilebilir bir 404 demek. Bunun simetriği de doğru — girdi gidip yolu
+    kalsaydı ölü kod, yol gidip girdi kalsaydı 404. İkisi birlikte taranıyor.
+    """
+    assert catalog.image_model("azure-flux-2-flex") is None
+    assert "azure-flux-2-flex" not in catalog.image_model_ids()
+    assert "FLUX.2-flex" not in flux_client._MODEL_PATHS
+    assert not hasattr(flux_client, "_FLEX_QUALITY")
+    assert not hasattr(flux_client, "quality_axis")
+    # Kalite JETONLARI tabloda KALIYOR ve bu bilinçli: eski `history.json` ve
+    # `ResultParams.quality` kayıtları hâlâ "hizli"/"dengeli"/"detayli"
+    # taşıyor. `etiket.quality_label` bilinmeyen jetonu ham basıyor (hata
+    # değil), ama etiketi silmek geçmiş kayıtları OKUNAKSIZ yapardı —
+    # "eski işlerin kredisi değişmez" kuralının görüntü tarafı.
+    for jeton in ("hizli", "dengeli", "detayli"):
+        assert jeton in catalog.QUALITY_LABELS
+        assert jeton not in {q for m in catalog.IMAGE_MODELS for q in m.qualities}
+
+
+def test_FLUX_pro_nun_kalite_ekseni_GIZLI():
+    """pro'da `quality` parametresi YOK: tek sentetik jeton + gizli knob (karar 4).
+
+    Karşı örnek olan flex silindi (1b-D) — eksen gerçekti ama FATURADA
+    karşılığı yoktu: Azure adım sayısına değil megapiksele bakıyor, üç kademe
+    de aynı parayı ödetiyordu.
+    """
+    pro = catalog.image_model("azure-flux-2-pro")
+    assert pro is not None
     assert pro.quality_hidden is True and pro.qualities == ("standard",)
-    assert flex.quality_hidden is False
-    assert flex.qualities == ("hizli", "dengeli", "detayli")
-    # Tarife jetonların ÜÇÜNE de yazılı: eksik kalan jeton `cost_for`da
-    # sessizce tabana düşer ve seçicideki karşılaştırma yalan söyler.
-    assert set(dict(flex.credits_by_quality)) == set(flex.qualities)
-    assert catalog.default_quality_of(flex) == "dengeli"
+    assert pro.credits == 9, "kademeli MP fiyatı: 0,03 + 0,015 = 0,045 USD"
 
 
 # ── `note` sözleşmesi ──────────────────────────────────────────────────

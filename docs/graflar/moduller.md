@@ -77,7 +77,7 @@ flowchart TD
     n_services_planlar["services.planlar<br/>180 satır"]
   end
   subgraph katman5["katman 5"]
-    n_azure_flux_client["azure_flux_client<br/>289 satır"]
+    n_azure_flux_client["azure_flux_client<br/>284 satır"]
     n_azure_mai_client["azure_mai_client<br/>290 satır"]
     n_chat_client["chat_client<br/>218 satır"]
     n_fal_client["fal_client<br/>761 satır"]
@@ -125,7 +125,7 @@ flowchart TD
     n_storage["storage<br/>423 satır"]
   end
   subgraph katman0["katman 0"]
-    n_catalog["catalog<br/>1493 satır"]
+    n_catalog["catalog<br/>1506 satır"]
     n_errlog["errlog<br/>133 satır"]
     n_jsonstore["jsonstore<br/>83 satır"]
     n_kimlik_baglami["kimlik_baglami<br/>56 satır"]
@@ -624,10 +624,10 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `app.py` | 299 | 13 | `catalog`, `chat_client`, `chat_prompt`, `composite`, `credstore`, `errlog`, `models`, `paths`, `providers`, `routers.admin`, `routers.ayarlar`, `routers.bindirme`, `routers.galeri`, `routers.hesap`, `routers.isler`, `routers.kok`, `routers.odeme`, `routers.paletler`, `routers.saglik`, `routers.sohbet`, `routers.uretim`, `services.ayar`, `services.db`, `services.dil`, `services.dosya`, `services.gorsel`, `services.gunluk`, `services.hata_izleme`, `services.istek_kimligi`, `services.kimlik`, `services.koken`, `services.modeller`, `services.palet`, `services.posta`, `services.redaksiyon`, `services.sifre` | 3 | 59 |
 | `assets_store.py` | 205 | 3 | `i18n`, `jsonstore` | 6 | 7 |
 | `azure_client.py` | 518 | 3 | `i18n`, `kimlik_baglami`, `paths`, `winsec` | 13 | 39 |
-| `azure_flux_client.py` | 289 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
+| `azure_flux_client.py` | 284 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 2 |
 | `azure_mai_client.py` | 290 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers`, `services.saglayici_meta` | 1 | 2 |
 | `backup.py` | 190 | 4 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 0 | 1 |
-| `catalog.py` | 1493 | 0 | — | 30 | 44 |
+| `catalog.py` | 1506 | 0 | — | 30 | 44 |
 | `chat_client.py` | 218 | 5 | `azure_client`, `chat_prompt`, `i18n`, `kimlik_baglami`, `models` | 4 | 4 |
 | `chat_prompt.py` | 396 | 2 | `paths` | 4 | 1 |
 | `chat_providers.py` | 133 | 7 | `catalog`, `chat_client`, `credstore`, `etiket`, `i18n`, `openai_chat` | 1 | 2 |

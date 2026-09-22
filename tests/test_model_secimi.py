@@ -279,8 +279,13 @@ def test_ORAN_jetonu_dogrulamadan_gecip_KAYDA_yazilabiliyor(client, monkeypatch,
     kayit = r.json()["images"][0]
     assert kayit["size"] == "21:9"
     assert kayit["model"] == m.id
-    # Kredi ÜRETİM ANINDA çözülüyor: 4K'nın kendi tarifesi var, tabana düşmüyor.
-    assert kayit["credits"] == catalog.cost_for(m, "4K") == 12
+    # Kredi ÜRETİM ANINDA çözülüyor: 4K'nın kendi tarifesi var, tabana
+    # DÜŞMÜYOR. İddia tarifeden TÜRETİLİR, literal yazılmaz — burada
+    # `== 12` de vardı ve 2026-09-22'de 4K 12 → 30 olunca düştü. Kusur
+    # tarifede değil, testin tarifeyi KOPYALAMASINDAYDI (aynı tur altı testi
+    # daha aynı sebeple düşürdü, bkz. PR #74).
+    assert kayit["credits"] == catalog.cost_for(m, "4K")
+    assert kayit["credits"] != m.credits, "4K tabana düşseydi bu test hiçbir şey ölçmezdi"
 
 
 def test_ORAN_secen_modelde_PIKSEL_jetonu_reddediliyor(client, monkeypatch, uret_ve_bitir):

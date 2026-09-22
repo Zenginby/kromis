@@ -645,7 +645,6 @@
   "media.videos_many": "{n} videos",
   "media.videos_one": "{n} video",
   "model.azure-deployment.note": "The name is entered in Settings: on Azure there are DEPLOYMENTS, not models.",
-  "model.azure-flux-2-flex.note": "Steps and guidance are selectable: for text-heavy layouts. One image per run.",
   "model.azure-flux-2-pro.note": "The highest image quality; slow and expensive. One image per run.",
   "model.azure-gpt-image-2.note": "Strongest at text, signage and multi-reference editing; the application's default.",
   "model.azure-mai-image-2-5-pro.note": "Object and character consistency in crowded scenes; expensive. Edits with a single reference. Preview.",

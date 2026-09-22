@@ -10,7 +10,7 @@ yol ve gövde farklı —
     ve `<model-path>` DAĞITIM ADI DEĞİL (`FLUX.2-pro` → `flux-2-pro`);
   • düzenleme AYRI BİR UÇ DEĞİL: referanslar aynı JSON gövdesine
     `input_image`, `input_image_2`, … olarak base64 giriyor;
-  • flex'te `steps` + `guidance` GERÇEK bir kalite ekseni.
+  • KALİTE EKSENİ YOK — `azure_mai_client`la aynı hâle geldi (aşağıda).
 
 Tek bir `azure_foundry_client.py` REDDEDİLDİ: tek modül iki tel formatı
 taşırdı, hata eşlemesi bulanıklaşırdı ve `PROVIDER_LOGOS` tek anahtara
@@ -67,23 +67,22 @@ NUM_IMAGES = 1
 # TEL ADI → YOL PARÇASI. Dağıtım adı gövdedeki `model` alanına gidiyor, YOLA
 # GİTMİYOR — ikisi farklı ve karıştırmak 404 demek. Tablo elle tutuluyor
 # çünkü türetilebilir değil: `FLUX.2-pro` → `flux-2-pro` dönüşümü noktayı
-# tireye çeviriyor ama `FLUX.2-flex` gibi başka bir ad yarın başka bir kalıp
-# taşıyabilir. Bilinmeyen ad SESSİZ 404 değil Türkçe hata üretiyor.
+# tireye çeviriyor ama başka bir ad yarın başka bir kalıp taşıyabilir.
+# Bilinmeyen ad SESSİZ 404 değil Türkçe hata üretiyor. Tablo TEK SATIR ve
+# öyle kalması bir kusur değil: ikinci satır (`FLUX.2-flex`) 2026-09-22'de
+# silindi (karar 1b-D, gerekçe catalog.py'de) ve tablonun elle tutulma
+# gerekçesi tek girdiyle de aynı — dönüşüm türetilebilir değil.
 _MODEL_PATHS: dict[str, str] = {
     "FLUX.2-pro": "flux-2-pro",
-    "FLUX.2-flex": "flux-2-flex",
 }
 
-# Katalog jetonu → (steps, guidance). YALNIZ flex'te anlamlı; pro'nun
-# `quality` parametresi yok ve tablo onun jetonunu ("standard") HİÇ
-# tanımıyor, yani `quality_axis` None döndürüyor ve gövdeye iki alan da
-# girmiyor. Değerler belgelenmiş aralıklardan: `steps` ≤ 50 (varsayılan 50),
-# `guidance` 1.5–10 (varsayılan 4.5).
-_FLEX_QUALITY: dict[str, tuple[int, float]] = {
-    "hizli": (10, 3.0),
-    "dengeli": (25, 4.5),
-    "detayli": (50, 6.0),
-}
+# KALİTE EKSENİ KALKTI (2026-09-22, karar 1b-D). Burada `_FLEX_QUALITY`
+# tablosu vardı: katalog jetonu → (steps, guidance), YALNIZ flex'te anlamlı.
+# Flex girdisi silinince tablonun tek okuyanı kalmadı — ve silinme sebebi
+# tam olarak bu eksenin FATURADA KARŞILIĞI OLMAMASIYDI: Azure adım sayısına
+# değil megapiksele bakıyor, üç kademe de aynı parayı ödetiyordu. Geriye
+# kalan tek FLUX modeli (pro) `quality` parametresi TAŞIMIYOR, o yüzden
+# `build_payload` da `azure_mai_client`ınkiyle aynı imzaya indi.
 
 
 def model_path(wire_model: str) -> str:
@@ -124,17 +123,7 @@ def split_size(token: str) -> tuple[int, int]:
             i18n.t("err.flux_bad_geometry", None, jeton=token)) from None
 
 
-def quality_axis(quality: str) -> tuple[int, float] | None:
-    """Kalite jetonu → `(steps, guidance)`; ekseni olmayan modelde None.
-
-    None SESSİZ bir yol ve bilinçli: pro'nun jetonu ("standard") tabloda YOK
-    ve gövdeye `steps`/`guidance` GİRMEMESİ gerekiyor. Bilinmeyen bir jetonu
-    hata saymak, kalite ekseni olmayan modelde her üretimi düşürürdü.
-    """
-    return _FLEX_QUALITY.get(quality)
-
-
-def build_payload(prompt: str, size: str, quality: str, *, api_model: str,
+def build_payload(prompt: str, size: str, *, api_model: str,
                   images=None) -> dict:
     """FLUX gövdesi. ÜRETİM ve DÜZENLEME AYNI gövdeyi kullanıyor.
 
@@ -147,9 +136,6 @@ def build_payload(prompt: str, size: str, quality: str, *, api_model: str,
     w, h = split_size(size)
     govde = {"model": api_model, "prompt": prompt,
              "width": w, "height": h, "num_images": NUM_IMAGES}
-    eksen = quality_axis(quality)
-    if eksen is not None:
-        govde["steps"], govde["guidance"] = eksen
     for sira, (_ad, veri) in enumerate(images or ()):
         alan = "input_image" if sira == 0 else f"input_image_{sira + 1}"
         govde[alan] = base64.b64encode(veri).decode("ascii")
@@ -240,7 +226,7 @@ def _post(endpoint: str, key: str, payload: dict, *, client, read: float) -> dic
     return resp.json()
 
 
-def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str, n: int,
+def _uret(m: catalog.ImageModel, prompt: str, size: str, n: int,
           images, *, client, credentials) -> list[bytes]:
     """`generate` ve `edit`in PAYLAŞILAN gövdesi — tek fark `images`.
 
@@ -257,7 +243,7 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str, n: int,
                      else credstore.resolve(m.credential))
     read = providers.read_timeout_for(m, n)
     endpoint = endpoint_for(base_url, m.wire_model)
-    payload = build_payload(prompt, size, quality, api_model=m.wire_model,
+    payload = build_payload(prompt, size, api_model=m.wire_model,
                             images=images)
 
     import httpx
@@ -277,13 +263,22 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str, n: int,
 
 def generate(m: catalog.ImageModel, prompt: str, size: str, quality: str, n: int,
              *, client=None, credentials=None) -> list[bytes]:
-    return _uret(m, prompt, size, quality, n, None,
+    """`quality` BİLEREK YOK SAYILIYOR — `azure_mai_client.generate`in aynı duruşu.
+
+    Parametre sağlayıcı SÖZLEŞMESİNİN parçası (`providers` dört adaptörü aynı
+    imzayla çağırıyor), ama bu telde karşılığı yok: flex silindikten sonra
+    (karar 1b-D) geriye kalan pro `quality_hidden=True` ve tek sentetik jeton
+    beyan ediyor. İmzadan düşürmek sözleşmeyi bozardı; gövdeye taşımak
+    Azure'ın tanımadığı bir alan göndermek olurdu.
+    """
+    return _uret(m, prompt, size, n, None,
                  client=client, credentials=credentials)
 
 
 def edit(m: catalog.ImageModel, prompt: str, images, size: str, quality: str,
          n: int, *, client=None, credentials=None) -> list[bytes]:
     """`images`: sıralı [(dosya_adı, png_baytları), ...] — ilk görsel ana
-    referans ve gövdedeki `input_image` alanına giriyor."""
-    return _uret(m, prompt, size, quality, n, images,
+    referans ve gövdedeki `input_image` alanına giriyor. `quality` yok sayılır
+    (gerekçe `generate`de)."""
+    return _uret(m, prompt, size, n, images,
                  client=client, credentials=credentials)

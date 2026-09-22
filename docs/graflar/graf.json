@@ -252,9 +252,10 @@
         "providers"
       ],
       "katman": 5,
-      "satir": 289,
+      "satir": 284,
       "testler": [
-        "tests/test_azure_flux_client.py"
+        "tests/test_azure_flux_client.py",
+        "tests/test_catalog.py"
       ],
       "yol": "azure_flux_client.py"
     },
@@ -336,7 +337,7 @@
         "veo_client"
       ],
       "katman": 0,
-      "satir": 1493,
+      "satir": 1506,
       "testler": [
         "tests/test_admin.py",
         "tests/test_araclar.py",

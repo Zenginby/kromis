@@ -660,20 +660,30 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         sizes=ASPECT_RATIOS,
         default_size="1:1",
         qualities=("1K", "2K", "4K"),
-        # 2K, 1K ile AYNI fiyatta (ikisi de 1120 jeton) — yani varsayılanı 1K
-        # yapmak bedava çözünürlüğü çöpe atmak olurdu.
+        # VARSAYILAN 2K'NIN GEREKÇESİ ÖLDÜ, KARAR ERTELENDİ (2026-09-22).
+        # Burada "2K, 1K ile AYNI fiyatta (ikisi de 1120 jeton) — varsayılanı
+        # 1K yapmak bedava çözünürlüğü çöpe atmak olurdu" yazıyordu. Google'ın
+        # yayınlanmış fiyatı o denklemi yanlışlıyor: 1K 0,067 · 2K 0,101 USD,
+        # yani 2K %54 DAHA PAHALI ve varsayılan her üretimde 20 kredi
+        # düşürüyor, 13 değil. Varsayılanı 1K'ya çekmek bir ÜRÜN kararı
+        # (çıktı kalitesini düşürür) ve bu PR fiyat düzeltmesi — sessizce
+        # değiştirmek, bu turun tam olarak yakaladığı kusuru tekrarlamak
+        # olurdu. Soru sahibe açık yazıldı (belge §1b).
         default_quality="2K",
         max_n=4,
         images_per_request=1,
         supports_edit=True,
         # Model daha fazlasını kabul ediyor; tavan `app.MAX_EDIT_IMAGES`.
         max_refs=4,
-        credits=6,
-        credits_by_quality=(("1K", 6), ("2K", 6), ("4K", 12)),
-        # "en ucuz" DEĞİL, ölçüldü: MAI-Image 2.6 Flash 4 kredi, bu 6. İddiayı
-        # yazan tur ile onu yanlışlayan tur AYNI daldı. Hız iddiası duruyor —
-        # katalogda gecikme verisi yok, yani ölçülemez; maliyet ölçülebilir ve
-        # artık mandallı.
+        # FİYAT DÜZELTİLDİ (2026-09-22, Google'ın yayınlanmış görsel fiyatı):
+        # 1K 0,067 → 13 · 2K 0,101 → 20 · 4K 0,151 → 30 kredi. Katalog
+        # 6/6/12 diyordu, yani 1K iki kattan fazla EKSİK fiyatlanmıştı.
+        credits=13,
+        credits_by_quality=(("1K", 13), ("2K", 20), ("4K", 30)),
+        # "en ucuz" İDDİASI İKİ KEZ ÖLDÜ: önce MAI 2.6 Flash'a (4 kredi)
+        # yenildi, şimdi düzeltilmiş fiyatla ailenin kendi içinde bile ucuz
+        # değil. Hız iddiası duruyor — katalogda gecikme verisi yok, yani
+        # ölçülemez; maliyet ölçülebilir ve artık mandallı.
         note="model.gemini-nano-banana-2.note",
     ),
     ImageModel(
@@ -707,8 +717,11 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
     # sonda ölçüyü verdi: 1024×1024 görsel için `usage.num_output_tokens`
     # = 1024. 2.6 → 1024 tok × 38 USD/M = 0,0389 USD → 8 kredi;
     # 2.5-Pro → 1024 tok × 47 USD/M = 0,0481 USD → 10 kredi.
-    # 2.6-Flash'ın yayınlanmış birim fiyatı DOĞRULANAMADI (Azure fiyat
-    # sayfaları JS ile çiziliyor, tablo boş döndü) — 4 kredi GEÇİCİ.
+    # 2.6-Flash → 1024 tok × 19 USD/M = 0,0195 USD → 4 kredi. Bu satır
+    # 2026-09-22'ye kadar "DOĞRULANAMADI, 4 kredi GEÇİCİ" diyordu: Azure'ın
+    # fiyat tablosu JS ile çiziliyor ve `WebFetch` boş döndürüyordu. Tablo o
+    # gün TARAYICIYLA açıldı — `tools/tarife_kontrol.py`nin var olma sebebi
+    # tam olarak bu ertelemeydi. Tahmin ("2.6'nın yarısı") tutmuş.
     #
     # KABUL EDİLEN YAKLAŞIKLIK: `cost_for`un boyut ekseni yok, oysa MAI'de
     # token = piksel. Kredi VARSAYILAN boyuttaki maliyeti gösteriyor;
@@ -755,7 +768,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         images_per_request=1,
         supports_edit=True,
         max_refs=1,
-        # GEÇİCİ: birim fiyat doğrulanamadı, oran 2.6'nın yarısı varsayıldı.
+        # 0,0195 USD (19 USD/1M × 1024 jeton), kaynak blok yorumunda.
         credits=4,
         note="model.azure-mai-image-2-6-flash.note",
     ),
@@ -778,11 +791,18 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
     ),
     # ── Azure AI Foundry · FLUX.2 (Black Forest Labs) ───────────────────
     #
-    # KREDİLER GEÇİCİ: FLUX megapiksel başına faturalanıyor ve yayınlanmış
-    # birim fiyat doğrulanamadı (Azure fiyat sayfaları JS ile çiziliyor,
-    # tablo boş döndü). Çapa yine 1 kredi = 0,005 USD (`KREDI_USD_CAPASI`).
-    # Krediler zaten "doğrulanacak bir olgu değil, ürün kararı" — ama ORAN
-    # yanlışsa seçicideki karşılaştırma yalan söyler, o yüzden takip ediliyor.
+    # MEGAPİKSEL FİYATI OKUNDU (2026-09-22, Azure fiyat sayfası TARAYICIYLA;
+    # `WebFetch` boş döndürüyordu — `tools/tarife_kontrol.py`nin var olma
+    # sebebi buydu). FLUX.2 pro KADEMELİ faturalanıyor: ilk megapiksel 0,03
+    # USD, sonrakiler 0,015. Varsayılan 1024×1024 iki MP sayılıyor →
+    # 0,03 + 0,015 = 0,045 USD → **9 kredi**. Çapa 1 kredi = 0,005 USD
+    # (`KREDI_USD_CAPASI`).
+    #
+    # KATALOG 16 DİYORDU, yani pro 1,8 kat FAZLA fiyatlanmıştı. Krediler
+    # "doğrulanacak bir olgu değil, ürün kararı" — ama ORAN yanlışsa
+    # seçicideki karşılaştırma yalan söyler, ve burada söylüyordu: FLUX.2 pro
+    # gerçekte Nano Banana Pro'nun (27) üçte biri, MAI 2.6'nın (8) hemen
+    # üstünde duruyor.
     #
     # `max_n=1` ve gerekçesi iki katmanlı: (1) `num_images`ın üst sınırı
     # ölçülmedi ve fazla beyan arayüzde seçilebilir bir hata; (2) FLUX
@@ -813,32 +833,21 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         images_per_request=1,
         supports_edit=True,
         max_refs=4,
-        credits=16,
+        # 0,045 USD (kademeli MP fiyatı, kaynak blok yorumunda) → 9 kredi.
+        credits=9,
         note="model.azure-flux-2-pro.note",
     ),
-    ImageModel(
-        id="azure-flux-2-flex",
-        label="Black Forest Labs · FLUX.2 flex",
-        provider="azure-flux",
-        wire_model="FLUX.2-flex",
-        credential="azure_foundry",
-        sizes=FLUX_SIZES,
-        # GERÇEK bir eksen (karar 4): jetonlar `steps`/`guidance` çiftlerine
-        # çözülüyor (bkz. azure_flux_client._FLEX_QUALITY). Sentetik bir jeton
-        # burada israf olurdu.
-        qualities=("hizli", "dengeli", "detayli"),
-        default_quality="dengeli",
-        max_n=1,
-        images_per_request=1,
-        supports_edit=True,
-        max_refs=4,
-        credits=10,
-        # Taban `dengeli` (25 adım); ötekiler adım oranından türetildi
-        # (10/25 → 0,6× ve 50/25 → 1,6×, yuvarlanmış). ÜÇÜ DE GEÇİCİ —
-        # megapiksel fiyatı doğrulanmadı.
-        credits_by_quality=(("hizli", 6), ("dengeli", 10), ("detayli", 16)),
-        note="model.azure-flux-2-flex.note",
-    ),
+    # FLUX.2 FLEX SİLİNDİ (2026-09-22, Faz 4 / 1b karar 1b-D). Aynı fiyat
+    # sayfası flex'i KADEMESİZ 0,05 USD/MP'den faturalıyor → 1024×1024'te
+    # 0,10 USD = **20 kredi**, yani pro'nun (9) 2,2 KATI. Üstelik
+    # `hizli`/`dengeli`/`detayli` ÜÇÜ DE AYNI paraya: Azure adım sayısına
+    # değil megapiksele bakıyor, yani `azure_flux_client._FLEX_QUALITY`nin
+    # `steps`/`guidance` çiftlerine çözdüğü eksenin FATURADA KARŞILIĞI YOK.
+    # Aynı ailenin daha iyi modeli daha ucuzken flex'i seçicide tutmanın
+    # gerekçesi kalmıyor; girdi `openai-gpt-image-1`in duruşuyla silindi
+    # (kalkacağı belli olan girdi kalmaz, çünkü seçilebilir bir tuzak olur).
+    # Adaptör tarafı da temizlendi: `_DEPLOYMENTS["FLUX.2-flex"]`,
+    # `_FLEX_QUALITY` ve `quality_for`un flex dalı.
 )
 
 
@@ -959,7 +968,9 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         # Veo 3.1'in ailesi; ilk/son kare geçişi ÜÇÜNDE de var.
         supports_last_frame=True,
         poll_timeout=420.0,
-        credits=16,
+        # 0,05 USD/sn (720p, Google'ın yayınlanmış video fiyatı, 2026-09-22)
+        # → 10 kredi/sn. Katalog 16 diyordu. SANİYE BAŞINA, bkz. `credits`.
+        credits=10,
         kind="video",
         note="model.gemini-veo-3-1-lite.note",
     ),
@@ -982,7 +993,9 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         # Veo 3.1'in ailesi; ilk/son kare geçişi ÜÇÜNDE de var.
         supports_last_frame=True,
         poll_timeout=420.0,
-        credits=30,
+        # 0,10 USD/sn (720p, aynı kaynak) → 20 kredi/sn. Katalog 30 diyordu;
+        # Lite'ın tam iki katı, sıralamadaki yeri değişmiyor.
+        credits=20,
         kind="video",
         note="model.gemini-veo-3-1-fast.note",
     ),

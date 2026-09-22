@@ -645,7 +645,6 @@
   "media.videos_many": "{n} video",
   "media.videos_one": "{n} video",
   "model.azure-deployment.note": "Adı Ayarlar'dan giriliyor: Azure'da model değil DAĞITIM var.",
-  "model.azure-flux-2-flex.note": "Adım ve yönlendirme seçilebiliyor: metin ağırlıklı yerleşimler için. Tek turda 1 görsel.",
   "model.azure-flux-2-pro.note": "En yüksek görsel kalite; yavaş ve pahalı. Tek turda 1 görsel.",
   "model.azure-gpt-image-2.note": "Metin, tabela ve çok referanslı düzenlemede en güçlü; uygulamanın varsayılanı.",
   "model.azure-mai-image-2-5-pro.note": "Kalabalık sahnelerde nesne ve karakter tutarlılığı; pahalı. Tek referansla düzenliyor. Önizleme.",

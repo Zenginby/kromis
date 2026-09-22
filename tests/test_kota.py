@@ -38,7 +38,7 @@ GORSEL = {"prompt": "kedi", "size": "1024x1024", "quality": "medium", "n": 1}
 MODEL_ID = catalog.DEFAULT_IMAGE_MODEL
 SPEC = catalog.image_model(MODEL_ID)
 assert SPEC is not None
-KREDI = catalog.cost_for(SPEC, "medium")          # tek işin tahmini (8)
+KREDI = catalog.cost_for(SPEC, "medium")          # tek işin tahmini — KATALOGDAN
 PNG = b"\x89PNG\r\n\x1a\n" + bytes(range(16))
 
 
@@ -187,10 +187,11 @@ def test_the_hourly_cap_applies_to_byok_users_too_and_counts_only_this_user(c, d
 def test_the_2001st_credit_is_429_and_the_body_tells_the_remaining_credits_and_the_window_end(
         c, depo_db, kullanici, monkeypatch):
     _simdi(monkeypatch, _an(0))
-    # 1.992 kredi platformla harcanmış: en eskisi 20 saat önce (249 × 8).
+    # Tavana TAM oturan harcama (2000 − KREDI), en eskisi 20 saat önce. Sayı
+    # KREDİDEN türetiliyor: elle yazılmış 1992 (= 2000 − 8) tarife 2026-09-22'de ölçümle 8 → 11 olunca sessizce yanlış olurdu.
     _ek(depo_db, kullanici, kac=1, an=_an(-20 * 60), kredi=KREDI)
-    _ek(depo_db, kullanici, kac=1, an=_an(-60), kredi=1992 - KREDI)
-    assert c.post("/api/generate", json=GORSEL).status_code == 202, "1992 + 8 = 2000: tavana EŞİT geçer"
+    _ek(depo_db, kullanici, kac=1, an=_an(-60), kredi=2000 - 2 * KREDI)
+    assert c.post("/api/generate", json=GORSEL).status_code == 202, f"{2000 - KREDI} + {KREDI} = 2000: tavana EŞİT geçer"
     r = c.post("/api/generate", json=GORSEL)
     assert r.status_code == 429, r.text
     acilis = zaman.damga(_an(-20 * 60) + kota.GUNLUK_PENCERE)            # en eski iş 4 saat sonra düşer

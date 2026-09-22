@@ -1,6 +1,6 @@
 # Faz 4 — Ödeme (Polar MoR), paketler ve abonelik, hesap silme / dışa aktarma, hukuki metinler: görev listesi
 
-**Tarih:** 2026-09-21 · **Durum:** **3/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
+**Tarih:** 2026-09-22 · **Durum:** **3/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8; **1b'nin model listesi ve `1b-A`…`1b-G` kararları 2026-09-22'de sahipten geldi; on birinci sayı aynı gün ÖLÇÜLDÜ ve `catalog.py`ye yazıldı — o görev artık uygulanabilir**) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
 **Üst belge:** [superpowers/specs/2026-08-10-saas-transformation-master-design.md](superpowers/specs/2026-08-10-saas-transformation-master-design.md) §5 "Faz 5" kartının **"Ödeme Altyapısı: Merchant of Record (MoR)"** maddesi (`:184-214`) ve "Filigran & Kredi Kuralları" satırı (`:183`) — sapmalar bu belgenin sonunda tek tek yazılı. **Numaralama tuzağı** aynen (Faz 3 belgesi `:4`): master spec'in "Faz 5"i ürün yol haritasının SaaS kartı; bu belge SaaS dönüşümünün İÇ dizisindeki Faz 4'tür (Faz 0 web-first → 1 DB/hesap → 2 kuyruk → 3 kredi defteri → **4 ödeme/KVKK** → 5 işletme). Yol haritası kartı (Faz 4 "Ödeme, faturalama ve hukuk"): *"Bir kullanıcı kartla abone olup fatura alabiliyor ve hesabını tamamen silebiliyor."* — bu belgenin çıkış kriteri onu genişletir (sonda tam metin). Kartın "Stripe birincil" satırı 2026-09-18'de **MoR/Polar** ile güncellendi (Faz 1 ve Faz 2 belgelerinin "Not" satırı; master `:184-199`): Türkiye'den Stripe'a doğrudan hesap açılamıyor, uluslararası satış Merchant of Record üzerinden.
 
 Faz 4'ün amacı, Faz 3'ün kurduğu defterin (rezerv → onay → iade, aylık hibe,
@@ -42,7 +42,8 @@ Her madde bir PR (`faz4/<slug>` dalı), her PR tek başına yeşil ve geri
 alınabilir; her PR'da testler + `docs/graflar` aynı commit'te, tam takım E2E
 dahil yerelde koşulur (`KROMIS_E2E_ZORUNLU=1`). Sıra bağımlılığa göre: **1**
 (bağımsız, önce — takvim kısıtı 2026-10-23), **1b** (1'den sonra; 2-4'ten
-bağımsız, omurgayla paralel gidebilir — sahibin sıralı model listesini bekler),
+bağımsız, omurgayla paralel gidebilir — sahibin sıralı model listesi
+2026-09-22'de geldi, artık bekleyen girdisi yok),
 **2 → 3 → 4** (omurga: şema →
 webhook → checkout/satış yüzü), **5** (2'den sonra; 3 varsa Polar aboneliğini
 de iptal eder, yoksa o adım sonraki PR'a), **6** (2'den sonra, 3-5'ten
@@ -149,8 +150,9 @@ görevde değiştiğini söylüyor.
 
 | bugün | nerede | Faz 4'te | görev |
 | --- | --- | --- | --- |
-| `openai-gpt-image-1` katalogda; 4 fiyat "doğrulanamadı"; 7 kredi ≠ maliyet | `catalog.py:588-602`; `tools/tarife_kontrol.py` | Girdi kaldırılır (2026-10-23 öncesi) — ✅ 1; dört fiyat sahibin doğrulamasıyla kapanır, yedi kredi düzeltilir, `tarife_kontrol` bekçisi 4 → 0 — sahip henüz doğrulamadı, **1b'ye devredildi** | 1, 1b |
-| Katalog **9 görsel** (`azure`, `openai`, `gemini`, `azure-mai`, `azure-flux`) + **6 video** (`gemini`, `fal`); ücretsiz plana 1 kredilik model yok; `emeklilik` alanı yok | `catalog.py` `IMAGE_MODELS`/`VIDEO_MODELS`; `*_client.py` adaptörleri | ~10 görsel + ~10 video, popüler/kaliteli → ucuz sırasıyla, sağlayıcıdan bağımsız (fal, Runware, Azure, OpenAI, Google …); kredi = maliyet × marj (araştırma yöntemi); eksik adaptör eklenir; `emeklilik: date` + `tarife_kontrol` "30 gün" satırı | 1b |
+| `openai-gpt-image-1` katalogda; 4 fiyat "doğrulanamadı"; 7 kredi ≠ maliyet | `catalog.py:588-602`; `tools/tarife_kontrol.py` | Girdi kaldırılır (2026-10-23 öncesi) — ✅ 1; **2026-09-22'de on biri de kapandı** (onu fiyat kaynağından okundu, on birincisi — `azure-gpt-image-2` kalite jetonu — yayınlanmadığı için canlı anahtarla ÖLÇÜLDÜ: 1/11/42, `catalog.py`ye yazıldı) → `tarife_kontrol` bekçisi 1b'nin kod PR'ında 4 → **0** | 1, 1b |
+| Katalog **9 görsel** (`azure`, `openai`, `gemini`, `azure-mai`, `azure-flux`) + **6 video** (`gemini`, `fal`); ücretsiz plana 1 kredilik model yok; `emeklilik` alanı yok | `catalog.py` `IMAGE_MODELS`/`VIDEO_MODELS`; `*_client.py` adaptörleri | **13 görsel + 10 video**, kaliteli/popüler → ucuz sırasıyla; sağlayıcı kümesi DEĞİŞMİYOR (mevcut beş kimlik — yeni adaptör yok, Runware/Replicate masadan kalktı); `azure-flux-2-flex` silinir; ücretsiz planın 1 kredilik modeli `fal` FLUX.1 schnell; `emeklilik: date` + `tarife_kontrol` "30 gün" satırı | 1b |
+| Plan kapısı İKİLİ (`free` ↔ ücretli) ve anahtar kaynağından bağımsız; `ImageModel.plan` her girdide `free` | `services/planlar.py` `kapsiyor`; `services/modeller.py` | **Basamaklı** (`Plan.rank`: free<temel<pro) ve **kendi anahtarı eşiği aşar** (`kapsiyor` anahtar kaynağını alır); `Plan.video` ve filigran kuralı anahtar kaynağından BAĞIMSIZ kalır (K7) | 1b |
 | `HAREKET_TURLERI` 6, `sona_erme` yazılmıyor; tek kova `bakiye` | `tablolar.py:173`; `defter.py` | `paket` türü (7); `kova` sütunu (`hibe`/`paket`); `kullanicilar.paket_bakiye`; `rezerve` iki kovadan tek UPDATE; `sona_erme` düşürmede yazılır | 2 |
 | Defter anahtarları `rezerv: onay: iade: hibe: duzeltme:` | `defter.ONEK_*` | + `paket:` (`paket:<polar_order_id>`), `hibe:` Polar dönemi için `hibe:<u>:polar:<order_id>` | 2, 3 |
 | `Plan.fiyat None`; `temel`/`pro` hibe yer tutucu | `services/planlar.py` | Hibe ortamdan (`KROMIS_TEMEL_AYLIK_HIBE`, `KROMIS_PRO_AYLIK_HIBE`); fiyat ve Polar ürün id'si `urunler` tablosunda (Polar'ın aynası, `tools/polar_esitle.py`) — `planlar` tablosu YOK (K5) | 2, 4 |
@@ -274,99 +276,315 @@ fiyat sayfaları 1b'nin ön koşulu olarak duruyor. Çıkış ölçütünün
 
 ---
 
-## 1b. Katalog genişletme — ~10 görsel + ~10 video model, sağlayıcıdan bağımsız (PR: `faz4/katalog-genisletme`)
+## 1b. Katalog genişletme — 13 görsel + 10 video model, sağlayıcıdan bağımsız (PR: `faz4/katalog-genisletme`)
 
-**Kapsam.** Sahibin 2026-09-21 yönlendirmesiyle eklendi (1. görevin PR'ında;
-sahip "olur onaylıyorum"): bugünkü katalog **9 görsel + 6 video** model ve
-sağlayıcı ağırlığı Azure'da (5 girdi: `azure`, `azure-mai` × 3, `azure-flux`
-× 2). Azure bundan sonra TEK ana sağlayıcı DEĞİL; katalog **sağlayıcıdan
-bağımsız** büyür: en popüler / en kaliteli olandan daha ucuza doğru sıralı
-**~10 görsel + ~10 video** model — fal, Runware, Azure AI Foundry, OpenAI,
-Google ve sahibin adını vereceği başka sağlayıcılar. Ürün kararı sahibin,
-sayı işi bu PR'ın:
+**Kapsam.** Sahibin 2026-09-21 yönlendirmesiyle eklendi; **sıralı liste ve altı
+ürün kararı 2026-09-22'de geldi** — bu bölüm o oturumun çıktısı ve artık bir
+niyet beyanı değil, uygulanabilir bir tarif. Bugünkü katalog **9 görsel + 6
+video** ve sağlayıcı ağırlığı Azure'da (5 girdi). Azure bundan sonra TEK ana
+sağlayıcı DEĞİL: katalog **13 görsel + 10 video** modele çıkıyor, en
+kaliteli/popüler olandan ucuza doğru sıralı.
 
-* **Sahip listeyi verir** (sıralı: popülerlik/kalite → fiyat); her satır için
-  bu PR **sağlayıcı**, **birim maliyet** (USD; kaynak + erişim tarihi
-  yorumda — fiyat sayfası bu oturumların ağından okunamıyorsa sahibin verdiği
-  sayı ve tarih), **kredi = maliyet × marj** (araştırma artifact'ının yöntemi:
-  `KREDI_USD_CAPASI` 0,005 USD/kredi çapası, düşük fiyatlı model platform
-  zararı — `claude.ai/artifact/GxN2FA5932GpJYGEgSiruL`), **plan kapsamı**
-  (`free`/`temel`/`pro` — `planlar.kapsiyor`; `ImageModel.plan` alanı veri
-  olur: ücretsiz plana 1 kredilik hızlı model — FLUX schnell / FLUX.2 klein
-  fal ya da Runware'de — masada, Faz 3 araştırması), **yetenek jetonları**
-  (boyut/oran, kalite, `max_n`, düzenleme, referans sayısı — doğrulanmamış
-  jeton beyan edilmez: "seçilebilir bir 400" ilkesi, `catalog.py` gpt-image-2
-  bloğu), **`emeklilik: date`** (1. görevden devir; boşsa yok) yazar.
-  Filigran kuralı DEĞİŞMEZ (Faz 3 / 4: plan belirler, model değil).
-* **Adaptörler yalnız eksikse genişler:** fal (`fal_client.py`), Azure
-  (`azure_client.py`, `azure_mai_client.py`, `azure_flux_client.py`), OpenAI
-  (`openai_client.py`), Gemini (`gemini_client.py`) var; **Runware** ya da
-  başka yeni bir sağlayıcı gelirse yeni `*_client.py` + `CREDENTIALS` girdisi
-  + `providers._resolve` dalı + `saglayici_meta.kaydet` (Faz 3 / 5 deseni) —
-  Azure'a özel varsayım eklenmez, sağlayıcı verisi yan kanalda kalır.
-  Kimlik/anahtar tarafı `credstore`/`platform_anahtari` mevcut deseniyle
-  (platform anahtarı küme katalogdan türer).
-* **1. görevden devredilenler:** dört Azure fiyatı (`azure-mai-image-2-6`,
-  `-flash`, `azure-flux-2-pro`, `-flex`) ve yedi kredi ≠ maliyet satırı
-  (`azure-gpt-image-2 high`, `gemini-nano-banana-2` 1K/2K/4K, `azure-flux-2-pro`,
-  `gemini-veo-3-1-lite`, `-fast`) sahip doğruladığında bu PR'da kapanır:
-  yorumdan "doğrulanamadı" düşer ya da `credits` değişir; **`tarife_kontrol`
-  bekçisi 4 → 0** (`tests/test_araclar.py`, liste katalogdan). Sahip yalnız
-  bir kısmını doğrularsa kalanlar yorumla ve bekçi sayısıyla kalır — sayı
-  PR'da yazılır. `tarife_kontrol` "30 gün içinde emekli olacak model" satırı
-  (bekçi tarih yamalı: bugün 0; `gpt-image-1.5`/`-mini` girdisi eklenirse
-  2026-11-01'den itibaren 2).
-* **Sıra ve varsayılan:** `IMAGE_MODELS`/`VIDEO_MODELS` sırası arayüz sırası
-  ve ilk girdi varsayılan (`catalog.py` başlığı) — sahibin listesi bu sırayı
-  belirler; `DEFAULT_IMAGE_MODEL` değişirse E2E çapaları ve `test_catalog`
-  varsayılan iddiaları onunla.
-* **Retroaktif yok** (1. görev aynen): eski `medya.credits`, `isler.kredi_*`
-  eski tarifeyle kalır.
+**YENİ SAĞLAYICI YOK** (sahip, 2026-09-22). Mevcut beş kimlik yetiyor:
+`azure_image`, `azure_foundry`, `openai`, `gemini`, `fal`. Runware ve Replicate
+MASADAN KALKTI ve gerekçesi ölçülebilir — fal bir TOPLAYICI, listedeki her fal
+satırı onun tek anahtarıyla geliyor. Yani bu görev yeni `*_client.py`, yeni
+gizli anahtar, yeni dış konak ve `.env.example` ↔ `ALTYAPI` bekçisi
+(`tests/test_docker_kapisi.py`) açmıyor. §1b'nin ilk yazımındaki "Runware
+gelirse yeni istemci" dalı bu yüzden düştü; risk bölümünün yarısı onunla
+birlikte düştü.
 
-**Dokunulan.** `catalog.py` (+~15 girdi, `emeklilik` alanı, fiyat yorumları),
-`bundled/i18n/{tr,en}.json` (`model.<id>.note` her girdi için, 20-110
-karakter, adı tekrar etmez — `test_catalog` bekçileri), varsa yeni
-`*_client.py` + `providers.py` + `tools/tarife_kontrol.py` (+emeklilik satırı),
-`tests/test_catalog.py`, `tests/test_araclar.py` (4 → 0, emeklilik 0/2 tarih
-yamalı), yeni adaptörün `tests/test_<saglayici>_client.py`,
-`tests/test_playwright_*` model seçici çapaları (yalnız varsayılan değişirse),
+### Kararlar (sahip, 2026-09-22)
+
+Faz düzeyindeki K1–K12'den AYRI numaralanıyor (`1b-A`…`1b-G`): o küme
+2026-09-21'de PR #69 ile kabul edildi ve yeniden açılmıyor, bunlar yalnız bu
+görevin içine bakan kararlar.
+
+* **1b-A · Kendi anahtarı plan kapısını AŞAR.** `planlar.kapsiyor` bugün
+  anahtarın kimin olduğunu BİLEREK sormuyor (K7) ve bu bugüne kadar zararsızdı,
+  çünkü `ImageModel.plan` her girdide `"free"`. Bu görev o alanı VERİ yapıyor —
+  ve o an, kendi `gemini` anahtarını girmiş ücretsiz kullanıcı bize hiçbir
+  maliyeti olmayan bir modeli göremez hâle gelirdi. Kapı bu yüzden anahtar
+  kaynağına bakar: `kapsiyor(plan, spec, anahtar_kaynagi)`, model eşiği
+  YALNIZ `platform` anahtarıyla koşan işlere uygulanır.
+
+  İKİ ŞEY DEĞİŞMİYOR ve ikisi de K7'nin taşıyıcı gerekçesi: (1) `Plan.video`
+  kapısı anahtar kaynağından BAĞIMSIZ kalır — sunucuda video işleme aracı yok
+  (ffmpeg imaja girmiyor), ücretsiz video filigransız çıkardı ve anahtarın
+  kimin olduğu filigranın yokluğunu değiştirmez; (2) **filigran kuralı aynen**
+  — `services/isci._filigranlanir` yalnız `PLANLAR[plan].filigran` ve
+  `spec.kind`e bakıyor, anahtar kaynağına değil. Kendi anahtarıyla pahalı model
+  kullanan ücretsiz kullanıcı yine FİLİGRANLI çıktı alır.
+
+  Çağıran üç yer var ve üçü de kimlik sözlüğünü zaten görüyor, yani parametre
+  taşınabilir: `services/modeller.model_available`, `services/modeller.sebep`,
+  `services/kapilar.check_plan`.
+
+* **1b-B · Plan kapısı BASAMAKLI (`free` < `temel` < `pro`).** Bugünkü
+  `kapsiyor` ikili: `spec.plan != "free"` ise `temel` de `pro` da geçiyor, yani
+  **"yalnız pro" bir model ifade EDİLEMİYOR**. 13 + 10 girdide fiyat farkı 95
+  kata çıkıyor (`fal-flux-1-schnell` 1 kredi ↔ `fal-seedance-2-5` 95 kredi/sn);
+  ikili kapı, `temel` planın aylık hibesini tek üretimde eritebilecek bir
+  modeli o plana açık bırakırdı. `Plan` bir `rank: int` alanı kazanır
+  (free=0, temel=1, pro=2), `kapsiyor` eşik karşılaştırması yapar.
+  `Plan.video` AYRI eksende kalır — basamağa katlamak, video kuralının
+  gerekçesini (filigran yokluğu) bir fiyat sıralamasının içinde görünmez
+  kılardı.
+
+* **1b-C · Model başına TEK yol; popülerlerde birinci taraf.** Katalog satırı
+  tek `provider` + tek `credential` taşıyor. Aynı modeli platformda fal'dan,
+  kullanıcıda doğrudan sağlayıcıdan sunmak, seçicide **iki kart** demekti —
+  `catalog.py`nin "MODEL BAŞINA İKİ GİRDİ de reddedildi" dediği durumun
+  kendisi. Bu yüzden BYOK'lanabilir modeller (OpenAI, Gemini) katalogda kendi
+  sağlayıcılarından duruyor: sahip platform anahtarını aynı kimliğe koyar,
+  kullanıcı da aynı kimliğe kendi anahtarını girer ve
+  `services/platform_anahtari.birlestir`in çözüm sırası (kullanıcı → platform →
+  yok) hiçbir kod değişmeden çalışır. fal YALNIZ BYOK'lanmayacak modelleri
+  taşır (Kling, Wan, PixVerse, MiniMax, Seedance, FLUX).
+
+  BEDELİ ÖLÇÜLDÜ ve kabul edildi: fal, Veo 3.1'i sessiz modda 0,20 USD/sn'ye
+  veriyor, Google doğrudan 0,40. Fark bilinçli bırakılıyor — Veo satırının
+  BYOK'lanabilir kalması, iki kart göstermekten ve aynı modelin iki yüzünün
+  farklı davranmasından (boyut jetonları, `max_n`, ses) daha değerli.
+
+* **1b-D · FLUX.2 flex SİLİNİR.** Azure'ın fiyat tablosu (aşağıda, canlı
+  okundu) flex'i düz 0,05 USD/MP'den faturalıyor → 1024×1024'te **20 kredi**,
+  yani FLUX.2 pro'nun (9) **2,2 katı**. Üstelik `hizli`/`dengeli`/`detayli`
+  ÜÇÜ DE AYNI paraya: Azure adım sayısına bakmıyor, megapiksele bakıyor —
+  `azure_flux_client._FLEX_QUALITY`nin `steps`/`guidance` çiftlerine çözdüğü
+  eksen faturada KARŞILIĞI OLMAYAN bir eksen. Aynı ailenin daha iyi modeli
+  daha ucuzken flex'i seçicide tutmanın gerekçesi kalmıyor; girdi
+  `openai-gpt-image-1`in duruşuyla SİLİNİR.
+
+  Silme `azure_flux_client.py`ye kadar iner: `_DEPLOYMENTS["FLUX.2-flex"]`,
+  `_FLEX_QUALITY` ve `quality_for` dalı ölü kod olur, `tests/test_azure_flux_client.py:28,65`
+  ve `tests/test_catalog.py:684` ile `bundled/i18n/{tr,en}.json:648` birlikte
+  düşer. Adaptörün kendisi KALIR — FLUX.2 pro onu kullanıyor.
+
+* **1b-E · GPT Image 2.5 eklenir, varsayılan DEĞİŞMEZ.** OpenAI 2026-09-08'de
+  `gpt-image-2.5-flare` (hızlı) ve `-sunburst` (düzenleme hassasiyeti)
+  modellerini çıkardı; `gpt-image-2` emekli DEĞİL (varsayılan anlık görüntü
+  `gpt-image-2-2026-04-21`). İkisi de listeye giriyor, `DEFAULT_IMAGE_MODEL`
+  `azure-gpt-image-2` KALIYOR. Gerekçe iki katmanlı: (1) varsayılanı kaydırmak
+  E2E model seçici çapalarını, `test_catalog` varsayılan iddialarını ve
+  `prefs` doğrulamasını birlikte değiştirir; (2) 2.5'in yetenek jetonları bu
+  depoda DOĞRULANMADI ve doğrulanmamış jeton beyan etmek arayüzde seçilebilir
+  bir 400 demek — `gpt-image-2` girdisinin "alt sınır" kararının aynısı.
+
+* **1b-F · Kredi çapası SABİT: `KREDI_USD_CAPASI = 0,005`.** Çapa bir ORAN,
+  sağlayıcının fiyatı değil; değiştirmek katalogdaki HER satırı ve admin marj
+  tablosunu birden kaydırırdı. **GÜNCELLEME 2026-09-22:** gpt-image-2'nin
+  kalite maliyeti o gün ÖLÇÜLDÜ (aşağıda) ve krediler 4/8/16 → **1/11/42**
+  oldu; çapa değişmedi ama gerekçesi öldü — artık seçilmiş bir oran, türetilmiş
+  değil. Yuvarlama EN YAKIN tam sayıya.
+
+* **1b-G · Kalite başına plan kapısı YOK (2026-09-22).** Ölçüm `high`ı 42
+  krediye çıkarınca "high yalnız `pro`da olsun" seçeneği masaya geldi ve
+  REDDEDİLDİ. Üç gerekçe: (1) `ImageModel.plan` model başına TEK alan ve
+  `kapsiyor` modeli alıyor, kaliteyi değil — kademe kapatmak yeni bir eksen
+  demek ve o eksen `model_available` · `sebep` · `check_plan` üçlüsünden ön
+  yüze kadar iner; (2) ön yüz bugün model KARTINI soluklaştırıyor, `<option>`
+  soluklaştırmıyor, yani görünen ama yasak bir kalite "seçilebilir 403" olurdu
+  — bu dosyanın her yerde kaçındığı şeyin kalite eksenindeki hâli; (3) kredi
+  zaten caydırıcı ve GÖRÜNÜR: seçicide "42 kredi" yazıyor, varsayılan da
+  `medium` (11). Soru kapanmadı, ERTELENDİ: ödeme açıldıktan sonra `isler`
+  tablosu "ücretsiz kullanıcıların kaçı `high` seçiyor" sorusunu veriyle
+  cevaplar; o güne kadar kapı eklenmez.
+
+### Sıralı görsel listesi (13) — kaliteli/popüler → ucuz
+
+Sıra ARAYÜZ sırası. Fiyatlar 2026-09-22'de kaynağından okundu; kredi =
+birim maliyet ÷ `KREDI_USD_CAPASI`, yuvarlanmış.
+
+| # | model | sağlayıcı | kimlik | birim maliyet (USD) | kredi | BYOK |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Azure · gpt-image-2 ⭐ | `azure` | `azure_image` | 30/1M jeton · **jeton sayısı ölçülmedi** | 4/8/16 (aynen) | — |
+| 2 | OpenAI · GPT Image 2.5 Sunburst | `openai` | `openai` | 30/1M jeton · ölçülmedi | ölçümle | ✅ |
+| 3 | OpenAI · GPT Image 2.5 Flare | `openai` | `openai` | 30/1M jeton · ölçülmedi | ölçümle | ✅ |
+| 4 | Gemini · Nano Banana Pro | `gemini` | `gemini` | 0,134 (1K/2K) · 0,24 (4K) | 27 / 48 ✓ | ✅ |
+| 5 | OpenAI · gpt-image-2 | `openai` | `openai` | Azure ile aynı | 4/8/16 (aynen) | ✅ |
+| 6 | Gemini · Nano Banana 2 | `gemini` | `gemini` | 0,067 / 0,101 / 0,151 | **13 / 20 / 30** | ✅ |
+| 7 | Microsoft · MAI-Image 2.5 Pro | `azure-mai` | `azure_foundry` | 0,0481 | 10 ✓ | — |
+| 8 | Black Forest Labs · FLUX.2 pro | `azure-flux` | `azure_foundry` | 0,045 (2 MP) | **9** | — |
+| 9 | Microsoft · MAI-Image 2.6 | `azure-mai` | `azure_foundry` | 0,0389 | 8 ✓ | — |
+| 10 | Alibaba · Qwen Image | `fal` | `fal` | 0,02/MP → 0,04 | **8** | — |
+| 11 | ByteDance · Seedream V4 | `fal` | `fal` | 0,03/görsel | **6** | — |
+| 12 | Microsoft · MAI-Image 2.6 Flash | `azure-mai` | `azure_foundry` | 0,0195 | 4 ✓ | — |
+| 13 | Black Forest Labs · FLUX.1 schnell | `fal` | `fal` | 0,003/MP | **1** | — |
+
+⭐ `DEFAULT_IMAGE_MODEL` · ✓ bugünkü değer doğru çıktı, değişmiyor.
+
+**13. satır ücretsiz planın 1 kredilik modeli** — §1b'nin ilk yazımının
+"masada" dediği girdi. fal 1 MP'ye yuvarlıyor, yani jeton kümesi 1 MP'nin
+ALTINDA tutulmak zorunda; 1024×1024 (1,048 MP) iki megapiksel sayılır ve
+kredi 1 değil 2 olur. Ücretsiz planın E2E'si bu modelle koşar.
+
+**SAYININ HESABI:** bugünkü 9 görsel girdisinden `azure-flux-2-flex` silinir
+(1b-D), kalan 8'i aynen listede; üstüne 5 yeni girdi (GPT Image 2.5 × 2, Qwen
+Image, Seedream V4, FLUX.1 schnell) → **13**. Video tarafında silinen yok:
+bugünkü 6 girdi + 4 yeni (Seedance 2.5, FLUX 3, Kling V3 Pro, MiniMax H3) →
+**10**.
+
+### Sıralı video listesi (10) — kaliteli/popüler → ucuz
+
+Kredi SANİYE başına (`cost_for`un `kind="video"` dalı).
+
+| # | model | sağlayıcı | kimlik | birim maliyet (USD/sn) | kredi/sn | BYOK |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | ByteDance · Seedance 2.5 | `fal` | `fal` | ~0,473 (720p sesli) | **95** | — |
+| 2 | Gemini · Veo 3.1 | `gemini` | `gemini` | 0,40 (720p/1080p) · 0,60 (4K) | 80 ✓ / 120 | ✅ |
+| 3 | Black Forest Labs · FLUX 3 | `fal` | `fal` | 0,17 (720p) · 0,29 (1080p) | **34 / 58** | — |
+| 4 | Kling · V3 Turbo Pro | `fal` | `fal` | 0,14 | 28 ✓ | — |
+| 5 | Kling · V3 Pro | `fal` | `fal` | 0,112 sessiz · 0,168 sesli | **22 / 34** | — |
+| 6 | Gemini · Veo 3.1 Fast | `gemini` | `gemini` | 0,10 (720p) · 0,12 (1080p) | **20 / 24** | ✅ |
+| 7 | PixVerse · C1 | `fal` | `fal` | 0,065 (720p sesli) · 0,120 (1080p sesli) | 13 / 24 ✓ | — |
+| 8 | Alibaba · Wan 3.0 | `fal` | `fal` | 0,05 / 0,10 / 0,20 | 10 / 20 / 40 ✓ | — |
+| 9 | MiniMax · H3 | `fal` | `fal` | 0,05 (480p) · 0,06 (768p) · 0,13 (2K) · 0,16 (4K) | **10 / 12 / 26 / 32** | — |
+| 10 | Gemini · Veo 3.1 Lite ⭐ | `gemini` | `gemini` | 0,05 (720p) · 0,08 (1080p) | **10 / 16** | ✅ |
+
+⭐ `DEFAULT_VIDEO_MODEL` · ✓ bugünkü değer doğru çıktı, değişmiyor.
+
+**SIRA İLE VARSAYILAN KODDA AYRI, YORUMDA DEĞİL.** `catalog.py`nin başlığı
+"SIRA ANLAMLI: … ilk girdi varsayılan" diyor, ama bu yalnız bugünkü
+yerleşimin tarifi: `DEFAULT_IMAGE_MODEL`/`DEFAULT_VIDEO_MODEL` ayrı SABİTLER
+ve hiçbir kod demetin indeks 0'ına bakmıyor (`catalog.image_model` id ile
+arıyor). Liste kaliteli→ucuz sıralanınca varsayılanlar 1. ve 10. sıraya
+düşüyor, ikisi de yerinde kalıyor — yalnız o yorum düzeltilir. Bu, bu PR'daki
+TEK belge-kod ayrışması ve düzeltilmezse bir sonraki okuyan "varsayılan
+Seedance" sanır.
+
+### 1. görevden devreden on bir sayı — ON BİRİ DE KAPANDI
+
+Dört "doğrulanamadı" notu ve yedi kredi ≠ maliyet satırı. Kaynaklar
+2026-09-22'de okundu; Azure'ın JS ile çizilen tablosu tarayıcıyla açıldı (ilk
+turda `$-` dönüyordu, `tools/tarife_kontrol.py`nin varlık sebebi buydu).
+
+| satır | bulunan | kredi olmalı | katalogda | sonuç |
+| --- | --- | --- | --- | --- |
+| `azure-mai-image-2-6` fiyatı | 38 USD/1M × 1024 jeton = 0,0389 | 8 | 8 | ✅ not düşer |
+| `azure-mai-image-2-6-flash` fiyatı | 19 USD/1M × 1024 jeton = 0,0195 | 4 | 4 | ✅ "GEÇİCİ" düşer, tahmin tutmuş |
+| `azure-flux-2-pro` fiyatı | ilk MP 0,03 + sonraki 0,015 → 2 MP = 0,045 | 9 | 16 | ⚠️ düzeltilir |
+| `azure-flux-2-flex` fiyatı | 0,05/MP × 2 MP = 0,10 | 20 | 6/10/16 | ⚠️ girdi SİLİNİR (1b-D) |
+| `gemini-nano-banana-2` 1K | 0,067 | 13 | 6 | ⚠️ düzeltilir |
+| `gemini-nano-banana-2` 2K | 0,101 | 20 | 6 | ⚠️ düzeltilir |
+| `gemini-nano-banana-2` 4K | 0,151 | 30 | 12 | ⚠️ düzeltilir |
+| `azure-flux-2-pro` kredisi | (üstteki satır) | 9 | 16 | ⚠️ düzeltilir |
+| `gemini-veo-3-1-lite` sn | 0,05 (720p) | 10 | 16 | ⚠️ düzeltilir |
+| `gemini-veo-3-1-fast` sn | 0,10 (720p) | 20 | 30 | ⚠️ düzeltilir |
+| `azure-gpt-image-2` low | 196 jeton × 30 USD/1M = 0,0059 | 1 | 4 | ⚠️ düzeltildi |
+| `azure-gpt-image-2` medium | 1.756 jeton = 0,0527 | 11 | 8 | ⚠️ düzeltildi |
+| `azure-gpt-image-2` high | 7.024 jeton = 0,2107 | 42 | 16 | ⚠️ düzeltildi |
+
+**ON BİRİNCİ SAYI ÖLÇÜLDÜ (2026-09-22).** `gpt-image-2`nin kalite başına ÇIKTI
+JETONU SAYISI hiçbir resmî yerde yayınlanmamış: Azure ve OpenAI aynı birim
+fiyatı veriyor (30 USD/1M çıktı jetonu) ama `low`/`medium`/`high` karşılığı
+yok, üçüncü taraf kaynaklar da açıkça "eski modellerin statik tablosundan
+çıkarım yapmayın" diyor. O yüzden web'den değil ÖLÇÜMLE kapandı — bu deponun
+MAI'de yaptığının aynısı: canlı anahtarla 1024×1024'te üç üretim, yanıttaki
+`usage.output_tokens` **196 / 1.756 / 7.024** (`output_tokens_details.image_tokens`
+aynı sayı). Çapayla **1 / 11 / 42**; katalog 4/8/16 diyordu, yani `high` 2,6 kat
+EKSİK fiyatlanmıştı ve `azure-gpt-image-2` varsayılan model. Uyarının haklılığı
+ölçüldü: `gpt-image-1`in tablosu (272/1056/4160) tutmuyor. Düzeltme `catalog.py`de
+İKİ girdiye birden yazıldı (Azure ve OpenAI ikizi aynı modeli satıyor).
+
+**ÖLÇÜM ÇAPANIN GEREKÇESİNİ ÖLDÜRDÜ.** `KREDI_USD_CAPASI = 0,005` bu dosyaya
+"Azure `medium` = 8 kredi ≈ 0,04 USD" denkleminden girmişti — ve ölçüm
+`medium`ı 0,04 değil **0,0527 USD** buldu. Aynı cümleyi yeni sayıyla yeniden
+türetsen çapa 0,0066 olurdu. Çapa yine de 0,005'te KALIYOR (1b-F): o bir oran,
+sağlayıcının fiyatı değil. Ama artık **seçilmiş** bir oran, türetilmiş değil —
+hiçbir model onu tanımlamıyor, modeller ona bölünüyor. Bu cümlenin `catalog.py`de
+BEŞ blokta tekrarlanan eski hâli (`:458, :479, :483, :685, :763, :899, :903,
+:1008`) aynı turda temizlendi; çürümüştü ve bekçisi yoktu, çünkü CLAUDE.md
+§5'in "türetilen her şeyin bekçisi bir testtir" kuralı sayıyı koruyor,
+sayının GEREKÇE CÜMLESİNİ değil.
+
+**YUVARLAMA EN YAKINA.** 10,54 → **11**, 10 değil. Ayrımı gösteren tek kademe
+bu: `low` (1,18) ve `high` (42,14) iki kuralda da aynı sayıyı veriyor, oysa
+`medium` aşağı yuvarlansa dosyanın öteki girdileriyle çelişirdi (26,8 → 27,
+7,78 → 8, 9,62 → 10 hepsi en yakın). Kural artık `KREDI_USD_CAPASI` yorumunda
+yazılı ki bir sonraki düzeltme hangisini uygulayacağını bilsin.
+
+`tools/tarife_kontrol.py` bekçisi bu satırdan ETKİLENMİYOR (gpt-image-2'nin
+kredisinde "doğrulanamadı" notu hiç yoktu, bekçi dört Azure MAI/FLUX girdisini
+sayıyor); dördün sıfıra inmesi 1b'nin kod PR'ına bağlı — FLUX.2 pro 16 → 9,
+iki MAI notunun düşmesi ve `azure-flux-2-flex`in silinmesi (1b-D) orada.
+
+**YAN ÜRÜN — doğru çıkan beş satır** (bu PR'da DEĞİŞMEZ, ama artık kaynaklı):
+Nano Banana Pro 27/48, Veo 3.1 80, Kling V3 Turbo Pro 28, Wan 3.0 10/20/40,
+PixVerse C1 13/24. Sonuncusu SESLİ fiyattan türemiş ve tutuyor — adaptör sesi
+açık gönderiyor, yani etiket faturayı doğru anlatıyor.
+
+### Düzeltilmiş krediler planları zorluyor — 4. görevin girdisi
+
+Ücretsiz plan aylık 200 kredi (`KROMIS_FREE_AYLIK_HIBE`), `temel` 1.000,
+`pro` 3.000 (yer tutucular, `services/planlar.py`). Düzeltilmiş tarifeyle:
+
+* Veo 3.1 ile **8 saniyelik tek klip = 640 kredi** → `temel`in ayının %64'ü.
+* Seedance 2.5 ile 5 saniye = 475 kredi.
+* Nano Banana 2 düzeltilince ücretsiz kullanıcı ayda 33 değil **15** görsel
+  alıyor (1K).
+
+Basamaklı kapı (1b-B) bunun bir yarısını çözüyor: pahalı video `pro` eşiğine
+konur. Öteki yarısı HİBE SAYILARI ve o bu görevin kararı DEĞİL — sahip 4.
+görevde Polar ürünlerini yazarken verir (K5/K6). Burada yalnız ölçü kayda
+geçiyor ki o gün tahminle değil sayıyla karar verilsin.
+
+**Dokunulan.** `catalog.py` (+13 girdi, −1 girdi, `emeklilik: date` alanı,
+kaynaklı fiyat yorumları, sıra yorumu), `services/planlar.py` (`Plan.rank`,
+`kapsiyor` üçüncü parametre), `services/modeller.py` + `services/kapilar.py`
+(anahtar kaynağını `kapsiyor`a taşır), `azure_flux_client.py` (flex kalkar),
+`bundled/i18n/{tr,en}.json` (`model.<id>.note` her yeni girdi için, 20-110
+karakter, adı tekrar etmez), `tools/tarife_kontrol.py` (+emeklilik satırı),
+`tests/test_catalog.py`, `tests/test_planlar.py`, `tests/test_modeller.py`,
+`tests/test_araclar.py` (4 → 0), `tests/test_azure_flux_client.py`,
 `docs/ozellikler.md`, `README*.md` sağlayıcı satırı, `docs/graflar/*`.
 
 **Testler / bekçiler.** Katalog bekçileri aynen (`test_catalog`: her girdinin
 notu iki dilde var, adı tekrar etmiyor, jetonlar tutarlı, kısa etiket
-çakışması); i18n eşliği (`test_i18n`: tr ↔ en aynı anahtar kümesi,
-kullanılmayan anahtar yok); `tarife_kontrol` ↔ bağımsız tarama (0 ya da
-kalan sayı); `emeklilik` bekçisi tarih yamalı; yeni adaptör için tel formatı +
-hata çevirisi + `saglayici_meta` testi (Faz 3 / 5 deseni); E2E model seçici
-(seçicide her `available` model bir satır; ücretsiz planın 1 kredilik modeli
-varsa `free` E2E'si onunla); `kredi × 0,005` her girdide araştırmanın "gerçek
-maliyet" bandında ya da yorumla gerekçeli.
+çakışması); i18n eşliği (`test_i18n`); `tarife_kontrol` ↔ bağımsız tarama
+(**0** — on birinci sayı 2026-09-22'de ölçüldü, dört Azure notunun dördü de bu
+görevde düşüyor); `emeklilik` bekçisi tarih yamalı;
+**yeni: basamak bekçisi** (`Plan.rank` ↔ `PLANLAR_KUMESI` sırası, `kapsiyor`
+her (plan, model.plan, anahtar_kaynagi) üçlüsünde beklenen cevabı verir) ve
+**BYOK bekçisi** (kendi anahtarıyla plan eşiği aşılır, ama `Plan.video` ve
+filigran AŞILMAZ — K7 bu testle mandallanır); E2E model seçici (seçicide her
+`available` model bir satır; ücretsiz planın E2E'si `fal-flux-1-schnell` ile).
+Yeni adaptör YOK, yani yeni tel formatı/hata çevirisi testi de yok.
 
-**Risk.** Orta. Yeni sağlayıcı = yeni gizli anahtar + dış konak (`.env.example`
-↔ `ALTYAPI` bekçisi, `tests/test_docker_kapisi.py`; Sentry/egress notu
-`docs/isletme.md`); ~20 yeni satır seçicide kaydırma ve mobil düzen
-(ölçülmedi — gerekirse sağlayıcıya göre gruplama, ayrı küçük PR);
-düşük fiyatlı satır platform zararı — kredi hesabı yorumda kaynaklı olmak
-zorunda.
+**Risk.** Düşük-orta — ilk yazımdakinden düşük, çünkü yeni sağlayıcı dalı
+kalktı (yeni gizli anahtar, dış konak, `ALTYAPI` bekçisi, Sentry/egress notu
+yok). Kalan iki risk: (1) **23 satır seçicide kaydırma ve mobil düzen**
+(ölçülmedi — gerekirse sağlayıcıya göre gruplama, ayrı küçük PR); (2)
+**`kapsiyor` imzasının değişmesi** üç çağıranı birden etkiliyor ve biri
+unutulursa kapı sessizce gevşer — bekçi bu yüzden üçlü kombinasyonu tarıyor,
+tek yol değil. Düşük fiyatlı satır (1 kredi) platform zararı olabilir; kredi
+hesabı yorumda kaynaklı.
 
-**Çıkış ölçütü.** Katalog ~10 görsel + ~10 video, her girdide sağlayıcı,
-kaynaklı maliyet ve kredi; `tarife_kontrol.py` boş (ya da sahibin
-doğrulamadığı sayı PR'da yazılı); Azure'a özel varsayım yok (sağlayıcı verisi
-yan kanalda, katalog satırı sağlayıcıyı `provider`/`credential` ile söylüyor);
-i18n eşliği; takım yeşil (E2E dahil).
+**Çıkış ölçütü.** Katalog 13 görsel + 10 video, her girdide sağlayıcı,
+kaynaklı maliyet (kaynak + erişim tarihi yorumda) ve kredi; `azure-flux-2-flex`
+yok; `tarife_kontrol.py` **1 satır** basıyor (`azure-gpt-image-2`, ölçüm
+bekliyor) ve bu sayı PR'da yazılı; Azure'a özel varsayım yok; kendi anahtarıyla
+plan eşiği aşılıyor ama filigran ve video kuralı aşılmıyor (bekçili); i18n
+eşliği; takım yeşil (E2E dahil).
 
-**Sahibin adımı — PR'dan önce.** (1) Sıralı model listesi (~10 görsel + ~10
-video; her satırda sağlayıcı ve varsa tercih ettiği fiyat kaynağı); (2) 1.
-görevden devreden on bir sayı (Azure Foundry MAI 2.6 / Flash / FLUX.2 pro /
-flex; OpenAI gpt-image-2 low/medium/high; Google Nano Banana 2 1K/2K/4K, Veo
-3.1 lite/fast saniye; fal FLUX.2 pro) — doğrulayabildiği kadarı; (3) yeni
-sağlayıcı (Runware vb.) gelirse hesap + anahtar.
+**Sahibin adımı — PR'dan önce.** Sıralı liste ✅ geldi (2026-09-22). Kalan iki
+girdi:
+
+1. **GPT Image 2.5'in yetenek jetonları** — `flare` ve `sunburst` için boyut
+   kümesi, kalite kümesi (`low…xhigh, max, auto` belgede yazılı ama bu depoda
+   doğrulanmadı), `max_n`, referans sayısı. Ya birer canlı üretim, ya da
+   "jetonları `gpt-image-2`den KOPYALA, alt sınır kalsın" talimatı — ikincisi
+   `openai-gpt-image-2` girdisinin zaten kurulmuş deseni ve bu PR'ı
+   bloklamıyor.
+2. **`gpt-image-2` kalite ölçümü** — `low`/`medium`/`high`, 1024×1024,
+   yanıttaki `usage`. Gelmezse 4/8/16 aynen kalır ve bekçi 1'de durur; PR
+   bunun için BEKLEMEZ.
 
 **Bağımlılıklar.** 1'den sonra (girdi silinmiş, yorumlar yerinde); 2-4'ten
 BAĞIMSIZ — omurgayla paralel gidebilir; 7 (operasyon) bu görevin sağlayıcı
-listesini KURULUM'a ve `isletme.md`ye yazar. Sahibin listesi gelmeden
-başlamaz — yalnız 1. görevden devreden fiyat/kredi düzeltmeleri, sahip
-doğruladığı anda ayrı küçük bir PR olarak öne alınabilir.
+listesini KURULUM'a ve `isletme.md`ye yazar. Düzeltilmiş krediler 4. görevin
+hibe/fiyat kararına GİRDİ olur (yukarıdaki "planları zorluyor" bölümü), ama
+onu bloklamaz.
 
 ---
 
@@ -1350,7 +1568,7 @@ sağlayıcı değil.
 
 ---
 
-## Kaynaklar (erişim tarihi 2026-09-21)
+## Kaynaklar (erişim tarihi 2026-09-21; 1b tarife kaynakları 2026-09-22)
 
 * Master design "Ödeme Altyapısı: MoR" (2026-09-18 notu, sahibin araştırması):
   [superpowers/specs/2026-08-10-saas-transformation-master-design.md](superpowers/specs/2026-08-10-saas-transformation-master-design.md) `:184-214`.
@@ -1359,6 +1577,47 @@ sağlayıcı değil.
 * Model barındırma / maliyet araştırması (2026-09-20): claude.ai artifact
   `GxN2FA5932GpJYGEgSiruL` — dört doğrulanmamış Azure fiyatı, yedi kredi ≠
   maliyet, `gpt-image-1` 2026-10-23 (OpenAI duyurusu üzerinden).
+* **1b tarife kaynakları (erişim 2026-09-22).** Azure Foundry Models pricing,
+  Black Forest Labs sekmesi:
+  [azure.microsoft.com/…/ai-foundry-models/black-forest-labs](https://azure.microsoft.com/en-us/pricing/details/ai-foundry-models/black-forest-labs/)
+  — `Flux 2 Pro Initial MP` 0,03, `Flux 2 Pro MP` 0,015, `Flux 2 Ref MP` 0,015,
+  `Flex Global` 0,05, `Flex Ref Global` 0,05 USD/MP. **Sayfa JS ile çiziliyor
+  ve düz `fetch` `$-` döndürüyor** (`tools/tarife_kontrol.py`nin varlık
+  sebebi); tablo TARAYICIYLA açılarak okundu — bir dahaki doğrulamada da aynı
+  yol gerekir. Megapiksel yuvarlama kuralı ("rounded up to the next megapixel,
+  separately for each reference image and for the generated image") Microsoft
+  Community Hub FLUX.2 duyurularından.
+* Azure OpenAI Service pricing, GPT-Image Series tablosu:
+  [azure.microsoft.com/…/cognitive-services/openai-service](https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/)
+  — `GPT-Image-2 Global` çıktı görseli 30 USD/1M jeton (OpenAI doğrudanla
+  AYNI). Kalite başına jeton sayısı bu tabloda **YOK**.
+* MAI-Image jeton fiyatları: techcommunity.microsoft.com "MAI-Image-2.6 and
+  MAI-Image-2.6-Flash" (2026) — 2.6 çıktı 38, **2.6-Flash çıktı 19** USD/1M
+  jeton; 1024×1024 = 1024 jeton ölçümü bu depodan (Faz 3 sondası).
+* [ai.google.dev/gemini-api/docs/pricing](https://ai.google.dev/gemini-api/docs/pricing)
+  — Nano Banana 2 (gemini-3.1-flash-image) 1K 0,067 / 2K 0,101 / 4K 0,151;
+  Nano Banana Pro 1K-2K 0,134 / 4K 0,24; Veo 3.1 0,40 · Fast 0,10 (720p) /
+  0,12 (1080p) · Lite 0,05 (720p) / 0,08 (1080p) USD/sn. **1K ile 2K'nın aynı
+  fiyatta olduğu eski gözlem ARTIK GEÇERSİZ** (1120 ↔ 1680 jeton) — katalogdaki
+  `default_quality="2K"` yorumu o öncüle dayanıyordu.
+* [developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)
+  ve [/models/gpt-image-2.5-sunburst](https://developers.openai.com/api/docs/models/gpt-image-2.5-sunburst)
+  — GPT Image 2.5 (`flare`, `sunburst`) 2026-09-08'de çıktı, 30 USD/1M çıktı
+  jetonu, kalite kümesi `low…xhigh, max, auto`; `gpt-image-2` emekli DEĞİL
+  (anlık görüntü `gpt-image-2-2026-04-21`).
+* fal.ai model sayfaları (fiyat her sayfanın kendi "your request will cost"
+  cümlesinden): [flux/schnell](https://fal.ai/models/fal-ai/flux/schnell) 0,003/MP ·
+  [qwen-image](https://fal.ai/models/fal-ai/qwen-image) 0,02/MP ·
+  [seedream v4](https://fal.ai/models/fal-ai/bytedance/seedream/v4/text-to-image) 0,03/görsel ·
+  [wan-3.0](https://fal.ai/models/alibaba/wan-3.0/text-to-video) 0,05/0,10/0,20 ·
+  [pixverse c1](https://fal.ai/models/fal-ai/pixverse/c1/text-to-video) 0,065/0,120 (sesli) ·
+  [minimax h3](https://fal.ai/models/minimax/h3/text-to-video) 0,05/0,06/0,13/0,16 ·
+  [kling v3 turbo pro](https://fal.ai/models/fal-ai/kling-video/v3/turbo/pro/text-to-video) 0,14 ·
+  [kling v3 pro](https://fal.ai/models/fal-ai/kling-video/v3/pro/image-to-video) 0,112/0,168 ·
+  [flux 3](https://fal.ai/models/blackforestlabs/flux-3/image-to-video) 0,17/0,29 ·
+  [seedance 2.5](https://fal.ai/models/bytedance/seedance-2.5/image-to-video) ~0,473 (720p sesli).
+  fal'ın `/pricing` sayfası ÖZET ve BAYAT (Wan 2.5, Kling 2.5, Veo 3 yazıyor) —
+  gerçek fiyat model sayfasında; bir dahaki turda oradan okunmalı.
 * Polar ücretleri: [polar.sh/docs/merchant-of-record/fees](https://polar.sh/docs/merchant-of-record/fees)
   (**erişilemedi**, egress engeli); ikincil: paritydeals.com "Polar Fee
   Calculator" (2026), dodopayments.com "Polar.sh Review 2026: New 5% + 50¢

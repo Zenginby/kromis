@@ -47,6 +47,7 @@ from playwright.sync_api import sync_playwright
 from sqlalchemy import select
 
 import azure_client as ac
+import catalog
 import providers
 from services import defter, kapilar, tablolar
 from tests.conftest import posix_gerekir
@@ -57,6 +58,15 @@ from tests.test_playwright_studio import (
     get_free_port,
     sunucu_hazir,
 )
+
+# Bir işin kredisi KATALOGDAN türetilir, metne elle yazılmaz: bu ailede
+# "reserved 8 · actual 8" gibi dizeler sabitti ve tarife 2026-09-22'de
+# ölçümle 8 → 11 olunca altı iddia birden düştü (kusur tarifede değil,
+# testin tarifeyi KOPYALAMASINDAYDI). `tests/test_e2e_kredi.py` de bunu
+# buradan ithal ediyor — tek kaynak.
+_SPEC = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
+assert _SPEC is not None
+KREDI = catalog.cost_for(_SPEC, "medium")
 
 pytestmark = pytest.mark.gercek_kimlik
 
@@ -428,15 +438,15 @@ def test_a_failed_platform_job_gives_the_credits_back_and_a_finished_one_shows_t
             assert bakiye() == 100, defter_turleri()
             assert defter_turleri() == ["hibe", "rezerv", "iade"]
             tahmin = page.eval_on_selector(PANEL_SATIR + " .is-kredi", "e => e.textContent")
-            assert "→" not in tahmin and "8" in tahmin, tahmin
+            assert "→" not in tahmin and str(KREDI) in tahmin, tahmin
 
             monkeypatch.setattr(providers, "generate", _uyuyan_saglayici(0.1))
             page.click(PANEL_SATIR + " .is-yeniden")
             page.wait_for_selector(PANEL_SATIR + '[data-durum="bitti"]', timeout=15000)
             biten = page.eval_on_selector(PANEL_SATIR + '[data-durum="bitti"] .is-kredi', "e => e.textContent")
             # Faz 3 / 6: platform işinin bitti satırı "rezerv · gerçek · iade" (isler.js `krediOzeti`).
-            assert biten == "reserved 8 · actual 8 · refunded 0", biten
-            assert bakiye() == 100 - 8
+            assert biten == f"reserved {KREDI} · actual {KREDI} · refunded 0", biten
+            assert bakiye() == 100 - KREDI
             assert defter_turleri() == ["hibe", "rezerv", "iade", "rezerv", "onay"]
             browser.close()
     finally:

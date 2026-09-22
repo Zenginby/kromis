@@ -49,7 +49,7 @@ PNG = b"\x89PNG\r\n\x1a\n" + bytes(range(16))
 MP4 = b"\x00\x00\x00\x20ftypmp42"
 SPEC = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
 assert SPEC is not None
-KREDI = catalog.cost_for(SPEC, "medium")          # tek görselin tahmini (8)
+KREDI = catalog.cost_for(SPEC, "medium")          # tek görselin tahmini — KATALOGDAN
 VIDEO_SPEC = catalog.video_model(catalog.DEFAULT_VIDEO_MODEL)
 assert VIDEO_SPEC is not None
 VIDEO_KREDI = catalog.cost_for(VIDEO_SPEC, "720p", duration=4)
@@ -205,11 +205,16 @@ def test_an_insufficient_balance_is_402_with_the_three_fields_and_writes_no_row(
 
 
 def test_a_402_on_the_multipart_route_leaves_no_row_and_no_input_object(c, depo_db, kullanici, tmp_path):
-    _yukle(depo_db, kullanici.id, 1)
-    r = c.post("/api/edit", data={"prompt": "x", "size": "1024x1024", "quality": "low", "n": "1"},
+    # Bakiye işin maliyetinin BİR ALTINDA — sıfır DEĞİL: boş cüzdanın ayrı bir
+    # dalı kapıyı gizleyebilir, yetersizlik dolu cüzdanla ölçülmeli. Sabit 1
+    # yazılıydı ve low 4 iken yetersizdi; 2026-09-22 ölçümüyle low 1 olunca hem
+    # YETER hâle geldi hem de "bir altı" 0'a indi (hibe pozitif olmak zorunda).
+    # Kademe bu yüzden medium: sayı katalogdan gelir, tarife yine değişse de tutar.
+    _yukle(depo_db, kullanici.id, catalog.cost_for(SPEC, "medium") - 1)
+    r = c.post("/api/edit", data={"prompt": "x", "size": "1024x1024", "quality": "medium", "n": "1"},
                files={"file": ("a.png", _png(), "image/png")})
     assert r.status_code == 402, r.text
-    assert r.json()["detail"]["gereken"] == catalog.cost_for(SPEC, "low")
+    assert r.json()["detail"]["gereken"] == catalog.cost_for(SPEC, "medium")
     assert not any((tmp_path / "kullanicilar").rglob("isler/*/*")), "ön denetim girdi nesnesinden ÖNCE: 402 depoya nesne bırakmaz"
     assert _isler(depo_db) == []
 

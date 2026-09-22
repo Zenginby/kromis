@@ -3,13 +3,14 @@
 İki senaryo, ikisi de yalnız tarayıcıda ölçülebilir (composer satırı, SSE →
 yenileme, toast, Ayarlar bölmesi — kaynak taraması bunların ZAMANLAMASINI göremez):
 
-  1. ÜCRETSİZ KULLANICI, PLATFORM ANAHTARI: açılışta `#run-cost` "this run takes 8 ·
-     200 left" → iş gönderilir → 202 rezerv → "192 left" → sahte sağlayıcı bitirir →
-     panelde "reserved 8 · actual 8 · refunded 0", satır yine "192 left" → Ayarlar
-     "Kredi": bakiye 192, hareketler onay/rezerv/hibe (en yeni üstte), "show job"
+  1. ÜCRETSİZ KULLANICI, PLATFORM ANAHTARI: açılışta `#run-cost` "this run takes
+     <KREDI> · 200 left" → iş gönderilir → 202 rezerv → "200−KREDI left" → sahte
+     sağlayıcı bitirir → panelde "reserved <KREDI> · actual <KREDI> · refunded 0",
+     satır yine aynı → Ayarlar "Kredi": bakiye 200−KREDI, hareketler
+     onay/rezerv/hibe (en yeni üstte), "show job"
      paneldeki satırı vurgular.
-  2. SAHTE HATA → İADE, SONRA 402: sağlayıcı düşer → panelde `hata`, "reserved 8 ·
-     fully refunded", satır "200 left"e GERİ gelir. Bakiye 4'e düşürülür (admin
+  2. SAHTE HATA → İADE, SONRA 402: sağlayıcı düşer → panelde `hata`,
+     "reserved <KREDI> · fully refunded", satır "200 left"e GERİ gelir. Bakiye 4'e düşürülür (admin
      düzeltmesi), gönderim 402 → toast (cümle + "See credits") → tıklanır → Ayarlar
      "Kredi" bölmesi açık, bakiye 4; `#run-cost` "4 left" ve uyarı rengi, #go AÇIK.
 
@@ -31,6 +32,7 @@ import azure_client as ac
 import providers
 from services import defter, kapilar, zaman
 from tests.test_playwright_isler import (
+    KREDI,
     PANEL_SATIR,
     _gonder,
     _paneli_ac,
@@ -87,29 +89,30 @@ def test_the_composer_line_follows_the_ledger_and_the_settings_pane_shows_the_mo
             _studyo(page, taban, oturum)
             _kalan_bekle(page, 200)
             satir = page.inner_text(RUN_COST)
-            assert satir == "this run takes 8 · 200 left", satir
+            assert satir == f"this run takes {KREDI} · 200 left", satir
             assert not page.eval_on_selector(RUN_COST, 'e => e.classList.contains("run-cost-uyari")')
 
             _gonder(page, "kedi")
-            _kalan_bekle(page, 192)  # 202: rezerv düştü, panel `krediYenile` çağırdı
+            _kalan_bekle(page, 200 - KREDI)  # 202: rezerv düştü, panel `krediYenile` çağırdı
             _paneli_ac(page)
             page.wait_for_selector(PANEL_SATIR + '[data-durum="bitti"]', timeout=15000)
             biten = page.eval_on_selector(PANEL_SATIR + " .is-kredi", "e => e.textContent")
-            assert biten == "reserved 8 · actual 8 · refunded 0", biten
-            assert _bakiye(oturum) == 192
-            _kalan_bekle(page, 192)  # onay = tahmin, fark iadesi 0: sayı yerinde
+            assert biten == f"reserved {KREDI} · actual {KREDI} · refunded 0", biten
+            assert _bakiye(oturum) == 200 - KREDI
+            _kalan_bekle(page, 200 - KREDI)  # onay = tahmin, fark iadesi 0: sayı yerinde
 
             # Ayarlar "Kredi": tek istek (`/api/kredi`), bakiye + hareketler + iş bağlantısı.
             page.keyboard.press("Escape")
             page.click("#settings-btn")
             page.wait_for_selector("#settings-modal.open")
             page.click('#settings-nav .picker-nav-item[data-pane="kredi"]')
-            page.wait_for_function('document.querySelector("#settings-kredi-bakiye")?.textContent === "192"')
+            page.wait_for_function('document.querySelector("#settings-kredi-bakiye")?.textContent === "'
+                                   + str(200 - KREDI) + '"')
             assert not page.eval_on_selector('.settings-pane[data-pane="kredi"]', "e => e.hidden")
             turler = page.eval_on_selector_all("#settings-kredi-hareketler li", "els => els.map(e => e.dataset.tur)")
             assert turler == ["onay", "rezerv", "hibe"], turler
             miktarlar = page.eval_on_selector_all("#settings-kredi-hareketler .kredi-miktar", "els => els.map(e => e.textContent)")
-            assert miktarlar == ["+0", "−8", "+200"], miktarlar
+            assert miktarlar == ["+0", f"−{KREDI}", "+200"], miktarlar
             assert page.inner_text('.settings-pane[data-pane="kredi"] .kredi-plan') == "Plan: Free"
             assert "Monthly grant: 200 credits · next on" in page.inner_text('.settings-pane[data-pane="kredi"] .kredi-hibe')
             assert "watermarked (free plan)" in page.inner_text('.settings-pane[data-pane="kredi"]')
@@ -145,7 +148,7 @@ def test_a_failed_job_brings_the_balance_back_and_an_empty_wallet_gets_a_toast_t
             _kalan_bekle(page, 200)
             assert _bakiye(oturum) == 200
             satir = page.eval_on_selector(PANEL_SATIR + " .is-kredi", "e => e.textContent")
-            assert satir == "reserved 8 · fully refunded", satir
+            assert satir == f"reserved {KREDI} · fully refunded", satir
             page.keyboard.press("Escape")
 
             # Bakiye 4'e: admin düzeltmesi (kapı yok, iz var). Sayfa hâlâ "200 left" der — 402
@@ -158,7 +161,7 @@ def test_a_failed_job_brings_the_balance_back_and_an_empty_wallet_gets_a_toast_t
             page.click("#go")
             toast = page.wait_for_selector("#kredi-toast:not([hidden])", timeout=15000)
             metin = toast.inner_text()
-            assert "Your balance is 4 credits" in metin and "~8" in metin, metin
+            assert "Your balance is 4 credits" in metin and f"~{KREDI}" in metin, metin
             assert "Your balance is 4 credits" in page.inner_text("#status"), "durum satırı da cümleyi yazar"
             # Toast'ın ardından bakiye yenilendi: satır "4 left" ve uyarı rengi, düğme AÇIK.
             _kalan_bekle(page, 4)

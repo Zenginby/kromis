@@ -455,8 +455,21 @@ FLUX_SIZES: tuple[str, ...] = ("1024x1024", "1024x1536", "1536x1024")
 
 
 # KREDİ ÇAPASI, SAYI OLARAK (Faz 3 / 5): aşağıdaki yorum bloklarının tekrar
-# tekrar yazdığı oran — Azure `medium` = 8 kredi ≈ 0,04 USD, yani 1 kredi ≈
-# 0,005 USD. Admin "Marj" tablosu (services/depo_admin.py `marj`) ve
+# tekrar yazdığı oran — 1 kredi = 0,005 USD.
+#
+# ÇAPA ARTIK SEÇİLMİŞ BİR ORAN, TÜRETİLMİŞ DEĞİL (Faz 4 / 1b, karar 1b-F).
+# 0,005 bu dosyaya "Azure `medium` = 8 kredi ≈ 0,04 USD" denkleminden girmişti
+# ve o denklem 2026-09-22'de ÖLDÜ: `gpt-image-2`nin kalite başına çıktı jetonu
+# ilk kez ölçüldü (196 / 1.756 / 7.024) ve `medium` 0,04 değil **0,0527 USD**
+# çıktı — aynı cümleyi yeni sayıyla yeniden türetsen çapa 0,0066 olurdu.
+# Oran yine de DEĞİŞMEDİ, çünkü çapa sağlayıcının fiyatı değil bizim
+# tarifemizin birimi: değiştirmek katalogdaki her satırı ve admin marj
+# tablosunu birden kaydırırdı, geçmiş kayıtlar ise zaten donmuş.
+# Yani buradan sonra hiçbir MODEL çapayı tanımlamıyor; modeller çapaya
+# BÖLÜNÜYOR. Yuvarlama EN YAKIN tam sayıya (ayrımı gösteren tek örnek
+# `azure-gpt-image-2` `medium`: 10,54 → 11; gerekçe o girdide).
+#
+# Admin "Marj" tablosu (services/depo_admin.py `marj`) ve
 # `tools/tarife_kontrol.py` "bu kadar kredi ≈ kaç USD" derken buradan okur;
 # yorumdaki sayı ile koddaki sayı tek yerde dursun. Bu bir ORAN, sağlayıcının
 # fiyatı değil: gerçek fatura `isler.saglayici_maliyet_usd`e gelir, rapor ikisini
@@ -475,12 +488,12 @@ KREDI_USD_CAPASI = Decimal("0.005")
 # tarife değişince geçmiş retroaktif olarak yeniden yazılmasın. İleride gelecek
 # ledger'ın ihtiyacı olan tek şey o alan.
 #
-# ORANTI yine de keyfi değil, tek bir çapaya bağlı: Azure'ın `medium` kalitesi
-# 8 kredi ve o üretim sağlayıcıda ~0,04 USD. Yeni girdilerin kredisi kendi
+# ORANTI yine de keyfi değil, tek bir çapaya bağlı: 1 kredi = 0,005 USD
+# (`KREDI_USD_CAPASI`, gerekçesi orada). Her girdinin kredisi kendi
 # yayınlanmış görsel-başı fiyatının bu çapaya bölünmesiyle yazıldı (Nano Banana
 # Pro 1K/2K ≈ 0,134 USD → 27, 4K ≈ 0,24 USD → 48). Böylece seçicideki kredi
 # etiketi kullanıcıya GERÇEK bir karşılaştırma veriyor: "27 kredi" gerçekten
-# "8 kredi"nin üç katı kadar pahalı.
+# "11 kredi"lik bir `gpt-image-2 medium`un iki buçuk katı kadar pahalı.
 #
 # `note` SEÇİCİDE model adının ALTINA yazılıyor (static/core.js) ve tek işi
 # şu soruyu cevaplamak: "ne zaman bunu seçerim?". Bu yüzden notlar bir yetenek
@@ -527,8 +540,24 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         supports_edit=True,
         # 1 ana + 3 ek. `app.MAX_EDIT_IMAGES` ile aynı sayı.
         max_refs=4,
-        credits=8,
-        credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
+        # ÖLÇÜLDÜ 2026-09-22 (1b'nin devreden on birinci sayısı; ötekiler fiyat
+        # sayfasından kapandı, bu kapanmadı): kalite başına ÇIKTI JETONU sayısı
+        # hiçbir resmî yerde yayınlanmamış. Canlı anahtarla 1024x1024'te üç
+        # üretim yapıldı, yanıttaki `usage.output_tokens` 196 / 1.756 / 7.024
+        # (`output_tokens_details.image_tokens` aynı sayı). Birim 30 USD/1M
+        # çıktı jetonu → 0,0059 / 0,0527 / 0,2107 USD; çapa 1 kredi = 0,005 USD
+        # → 1,18 / 10,54 / 42,14, EN YAKIN tam sayıya yuvarlanınca
+        # **1 / 11 / 42**. `gpt-image-1`in tablosu (272/1056/4160) TUTMUYOR:
+        # bu yüzden eski modelden çıkarım değil ölçüm. `high` bugüne dek 16
+        # kredide duruyordu, yani 2,6 kat eksik fiyatlanmıştı.
+        #
+        # `medium` 10 DEĞİL 11 ve tek ayrımı gösteren kademe bu: 10,54'ün
+        # aşağı yuvarlanması dosyanın öteki girdileriyle çelişirdi (26,8 → 27,
+        # 7,78 → 8, 9,62 → 10 hepsi EN YAKIN). `low` ve `high`ın küsuratı
+        # 0,5'in altında, yani iki kuralda da aynı sayıyı veriyor — kural
+        # ancak burada görünüyor ve burada yazılı olmak zorunda.
+        credits=11,
+        credits_by_quality=(("low", 1), ("medium", 11), ("high", 42)),
         note="model.azure-gpt-image-2.note",
     ),
     # OpenAI DOĞRUDAN (Azure üzerinden değil). Tel formatı Azure'ın aynısı, o
@@ -576,8 +605,11 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         images_per_request=4,
         supports_edit=True,
         max_refs=4,
-        credits=8,
-        credits_by_quality=(("low", 4), ("medium", 8), ("high", 16)),
+        # Azure ikiziyle AYNI sayı — aynı model, aynı birim fiyat; ölçümün
+        # kendisi ve gerekçesi `azure-gpt-image-2` girdisinde. İkisi ayrışırsa
+        # kullanıcı sağlayıcı değiştirince kredisi sessizce değişir.
+        credits=11,
+        credits_by_quality=(("low", 1), ("medium", 11), ("high", 42)),
         note="model.openai-gpt-image-2.note",
     ),
     # `openai-gpt-image-1` BURADAYDI ve 2026-09-21'de SİLİNDİ (Faz 4 / 1):
@@ -670,8 +702,8 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
     # silindi; Faz 4 / 1), çünkü katalogda kalan ölü bir girdi arayüzde
     # seçilebilir bir 404 demek (`openai-dall-e-3`ün ölçülmüş dersi).
     #
-    # KREDİ ÇAPASI görsel tarafındakiyle AYNI: Azure `medium` = 8 kredi
-    # ≈ 0,04 USD, yani 1 kredi ≈ 0,005 USD. MAI token bazlı faturalanıyor ve
+    # KREDİ ÇAPASI görsel tarafındakiyle AYNI: 1 kredi = 0,005 USD
+    # (`KREDI_USD_CAPASI`). MAI token bazlı faturalanıyor ve
     # sonda ölçüyü verdi: 1024×1024 görsel için `usage.num_output_tokens`
     # = 1024. 2.6 → 1024 tok × 38 USD/M = 0,0389 USD → 8 kredi;
     # 2.5-Pro → 1024 tok × 47 USD/M = 0,0481 USD → 10 kredi.
@@ -748,7 +780,7 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
     #
     # KREDİLER GEÇİCİ: FLUX megapiksel başına faturalanıyor ve yayınlanmış
     # birim fiyat doğrulanamadı (Azure fiyat sayfaları JS ile çiziliyor,
-    # tablo boş döndü). Çapa yine Azure `medium` = 8 kredi ≈ 0,04 USD.
+    # tablo boş döndü). Çapa yine 1 kredi = 0,005 USD (`KREDI_USD_CAPASI`).
     # Krediler zaten "doğrulanacak bir olgu değil, ürün kararı" — ama ORAN
     # yanlışsa seçicideki karşılaştırma yalan söyler, o yüzden takip ediliyor.
     #
@@ -884,12 +916,12 @@ FAL_VIDEO_ASPECT_RATIOS: tuple[str, ...] = ("16:9", "9:16", "1:1")
 # iddiayı Gemini bloğuna süzüyor, `test_the_default_video_model_is_UNCHANGED`
 # id'nin kendisini dondurup değişmeme gerekçesini taşıyor.
 #
-# KREDİ ÇAPASI görsel tarafındakiyle AYNI: Azure `medium` = 8 kredi ≈ 0,04 USD,
-# yani 1 kredi ≈ 0,005 USD. Veo'nun yayınlanmış saniye fiyatları bu çapaya
+# KREDİ ÇAPASI görsel tarafındakiyle AYNI: 1 kredi = 0,005 USD
+# (`KREDI_USD_CAPASI`). Veo'nun yayınlanmış saniye fiyatları bu çapaya
 # bölündü: lite ~0,08 USD/sn → 16, fast ~0,15 → 30, kalite ~0,40 → 80. Birim
 # SANİYE (bkz. `credits` alanının yorumu), yani 8 saniyelik bir kalite klibi
-# 640 kredi — ve bu, kullanıcıya "8 kredi"lik bir görselle GERÇEK bir
-# karşılaştırma veriyor.
+# 640 kredi — ve bu, kullanıcıya "11 kredi"lik bir `gpt-image-2 medium`
+# görseliyle GERÇEK bir karşılaştırma veriyor.
 #
 # `qualities` ÜÇ GİRDİDE AYNI DEĞİL ve bu da eksik beyan disiplini: Gemini'nin
 # belgesi `resolution`ı "Veo 3 modellerinde desteklenir, varsayılan 720p"
@@ -993,8 +1025,8 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
     # PixVerse · Wan · Kling. Katalog ÖLÇÜMÜ yazıyor, brief'in tahminini değil
     # (bkz. bu görevin talimatındaki "ÖLÇÜM KAZANIR" kuralı).
     #
-    # KREDİ ÇAPASI Veo'yla AYNI (yukarıdaki blok): Azure `medium` = 8 kredi ≈
-    # 0,04 USD, yani 1 kredi ≈ 0,005 USD. Aşağıdaki `credits`/
+    # KREDİ ÇAPASI Veo'yla AYNI (yukarıdaki blok): 1 kredi = 0,005 USD
+    # (`KREDI_USD_CAPASI`). Aşağıdaki `credits`/
     # `credits_by_quality` değerleri fal.ai'nin yayınlanmış saniye
     # fiyatlarından (design.md, 2026-09-14 canlı uçtan ölçüm tablosu, fal.ai
     # model sayfaları kaynak) bu çapaya bölünerek türetildi — brief'in kendi

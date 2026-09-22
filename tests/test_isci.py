@@ -522,7 +522,7 @@ def test_a_user_who_never_chose_a_language_gets_the_product_default_not_the_fall
 
 _SPEC = catalog.image_model(GORSEL)
 assert _SPEC is not None
-KREDI = catalog.cost_for(_SPEC, "medium")   # tek görselin GERÇEK kredisi (8)
+KREDI = catalog.cost_for(_SPEC, "medium")   # tek görselin GERÇEK kredisi — KATALOGDAN, literal değil
 
 
 def _yukle(db: Session, kullanici_id: uuid.UUID, miktar: int = 100) -> None:
@@ -546,7 +546,7 @@ def _defter(db: Session, kullanici_id: uuid.UUID) -> list[tuple[str, int, uuid.U
 
 def test_a_finished_job_writes_its_real_credit_and_refunds_the_difference_in_the_bitir_commit(
         db_oturumu, kullanici, depo, yerlesim, monkeypatch):
-    """Tahmin 20 (üst sınır), gerçek 8: `kredi_gercek = 8`, `onay:<is_id>` +12, bakiye 100 − 20 + 12 = 92 —
+    """Tahmin 20 (üst sınır), gerçek KREDİ: `onay:<is_id>` farkı iade eder, bakiye 100 − 20 + (20 − KREDİ) —
     `onayla` `bitir`den sonra ve commit'ten ÖNCE (sıra ölçülür): `bitti` olup farkı tutulmuş ara durum yok."""
     _yukle(db_oturumu, kullanici.id)
     sira: list[str] = []
@@ -568,7 +568,8 @@ def test_a_finished_job_writes_its_real_credit_and_refunds_the_difference_in_the
         event.remove(Session, "after_commit", _commit)
     is_ = _is(db_oturumu, is_id)
     assert (is_.durum, is_.kredi_tahmini, is_.kredi_gercek) == ("bitti", 20, KREDI)
-    assert defter.bakiye(db_oturumu, kullanici.id).toplam == 100 - 20 + (20 - KREDI) == 92
+    # Sondaki `== 92` KALDIRILDI: türetilmiş ifade zaten iddianın kendisi, literal tarife 2026-09-22'de ölçümle 8 → 11 olunca sessizce yanlış olurdu.
+    assert defter.bakiye(db_oturumu, kullanici.id).toplam == 100 - 20 + (20 - KREDI)
     assert _defter(db_oturumu, kullanici.id) == [(defter.TUR_REZERV, -20, is_id), (defter.TUR_ONAY, 20 - KREDI, is_id)]
     assert sira == ["bitir", "onayla", "commit"], sira
 
@@ -576,11 +577,19 @@ def test_a_finished_job_writes_its_real_credit_and_refunds_the_difference_in_the
 def test_the_real_credit_is_the_sum_over_every_written_record(db_oturumu, kullanici, depo, yerlesim, monkeypatch):
     _yukle(db_oturumu, kullanici.id)
     monkeypatch.setattr(providers, "generate", lambda *a, **k: [PNG, PNG2])
-    is_id = _rezerveli(db_oturumu, kullanici.id, tahmin=20, istek={"n": 2})
+    # TAHMİN DE KATALOGDAN: elle yazılmış 20, iki görsel 8'er krediyken (16) rezervi
+    # AŞMIYORDU, ama tarife 2026-09-22'de 11'e çıkınca gerçek maliyet (22) tahmini
+    # geçti ve `defter.onayla` ek tahsilat YAPMADIĞI için (bkz. services/defter.py:52)
+    # iade satırı hiç yazılmadı — test kırmızıya döndü, üründe kusur olmadan. Rezerv
+    # artık tarifeden türüyor ve ÜSTÜNDE duruyor: bu testin sınadığı dal "tahmin
+    # gerçeği aşıyor, fark iade ediliyor"; eşitlik dalının kendi testi var
+    # (`test_a_real_cost_equal_to_the_estimate_leaves_a_zero_confirmation_row_and_no_refund`).
+    tahmin = 2 * KREDI + 4
+    is_id = _rezerveli(db_oturumu, kullanici.id, tahmin=tahmin, istek={"n": 2})
     assert isci.tek_tur(db_oturumu, depo, ayarlar=yerlesim) is True
     is_ = _is(db_oturumu, is_id)
     assert is_.kredi_gercek == 2 * KREDI == sum(m.credits for m in _medya(db_oturumu, kullanici.id))
-    assert defter.bakiye(db_oturumu, kullanici.id).toplam == 100 - 20 + (20 - 2 * KREDI)
+    assert defter.bakiye(db_oturumu, kullanici.id).toplam == 100 - tahmin + (tahmin - 2 * KREDI)
 
 
 def test_a_real_cost_equal_to_the_estimate_leaves_a_zero_confirmation_row_and_no_refund(

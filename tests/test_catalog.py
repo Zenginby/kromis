@@ -127,10 +127,21 @@ def test_her_sohbet_modeli_bir_ada_cozuluyor(m):
 
 
 def test_cost_for_kaliteye_gore_ve_adetle_carpiyor():
+    """Kalite eşlemesi ve adetle çarpım — beklenen sayılar KATALOGDAN türetilir.
+
+    Burada üç literal yazılıydı (4/16/48) ve tarife her düzeltildiğinde test
+    düşüyordu: 2026-09-22'de `gpt-image-2`nin çıktı jetonu ölçülüp krediler
+    4/8/16 → 1/10/42 olunca da düştü. Oysa sınanan şey tarifenin DEĞERİ değil,
+    `cost_for`un kaliteyi bulup adetle çarpması; değerin bekçisi katalogdaki
+    yorum ve `tools/tarife_kontrol.py`.
+    """
     m = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
-    assert catalog.cost_for(m, "low") == 4
-    assert catalog.cost_for(m, "high") == 16
-    assert catalog.cost_for(m, "high", 3) == 48
+    kalite = dict(m.credits_by_quality)
+    assert catalog.cost_for(m, "low") == kalite["low"]
+    assert catalog.cost_for(m, "high") == kalite["high"]
+    assert catalog.cost_for(m, "high", 3) == kalite["high"] * 3
+    # Kademeler AYRIŞMALI: eşit olsalar üstteki üç iddia da boşa döner.
+    assert kalite["low"] < kalite["high"]
 
 
 def test_cost_for_bilinmeyen_kalitede_tabana_dusuyor_hata_YUKSELTMIYOR():

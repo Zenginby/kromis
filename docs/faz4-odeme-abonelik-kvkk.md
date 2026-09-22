@@ -1,6 +1,6 @@
 # Faz 4 — Ödeme (Polar MoR), paketler ve abonelik, hesap silme / dışa aktarma, hukuki metinler: görev listesi
 
-**Tarih:** 2026-09-22 · **Durum:** **3/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8; **1b'nin model listesi ve `1b-A`…`1b-F` kararları 2026-09-22'de sahipten geldi — o görev artık uygulanabilir**) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
+**Tarih:** 2026-09-22 · **Durum:** **3/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8; **1b'nin model listesi ve `1b-A`…`1b-G` kararları 2026-09-22'de sahipten geldi; on birinci sayı aynı gün ÖLÇÜLDÜ ve `catalog.py`ye yazıldı — o görev artık uygulanabilir**) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
 **Üst belge:** [superpowers/specs/2026-08-10-saas-transformation-master-design.md](superpowers/specs/2026-08-10-saas-transformation-master-design.md) §5 "Faz 5" kartının **"Ödeme Altyapısı: Merchant of Record (MoR)"** maddesi (`:184-214`) ve "Filigran & Kredi Kuralları" satırı (`:183`) — sapmalar bu belgenin sonunda tek tek yazılı. **Numaralama tuzağı** aynen (Faz 3 belgesi `:4`): master spec'in "Faz 5"i ürün yol haritasının SaaS kartı; bu belge SaaS dönüşümünün İÇ dizisindeki Faz 4'tür (Faz 0 web-first → 1 DB/hesap → 2 kuyruk → 3 kredi defteri → **4 ödeme/KVKK** → 5 işletme). Yol haritası kartı (Faz 4 "Ödeme, faturalama ve hukuk"): *"Bir kullanıcı kartla abone olup fatura alabiliyor ve hesabını tamamen silebiliyor."* — bu belgenin çıkış kriteri onu genişletir (sonda tam metin). Kartın "Stripe birincil" satırı 2026-09-18'de **MoR/Polar** ile güncellendi (Faz 1 ve Faz 2 belgelerinin "Not" satırı; master `:184-199`): Türkiye'den Stripe'a doğrudan hesap açılamıyor, uluslararası satış Merchant of Record üzerinden.
 
 Faz 4'ün amacı, Faz 3'ün kurduğu defterin (rezerv → onay → iade, aylık hibe,
@@ -150,7 +150,7 @@ görevde değiştiğini söylüyor.
 
 | bugün | nerede | Faz 4'te | görev |
 | --- | --- | --- | --- |
-| `openai-gpt-image-1` katalogda; 4 fiyat "doğrulanamadı"; 7 kredi ≠ maliyet | `catalog.py:588-602`; `tools/tarife_kontrol.py` | Girdi kaldırılır (2026-10-23 öncesi) — ✅ 1; **2026-09-22'de on biri de araştırıldı: onu kapandı** (dört Azure fiyatı kaynağından okundu, altı kredi düzeltilir), biri açık (`azure-gpt-image-2` kalite jetonu yayınlanmamış, ölçüm ister) → `tarife_kontrol` bekçisi 4 → **1** | 1, 1b |
+| `openai-gpt-image-1` katalogda; 4 fiyat "doğrulanamadı"; 7 kredi ≠ maliyet | `catalog.py:588-602`; `tools/tarife_kontrol.py` | Girdi kaldırılır (2026-10-23 öncesi) — ✅ 1; **2026-09-22'de on biri de kapandı** (onu fiyat kaynağından okundu, on birincisi — `azure-gpt-image-2` kalite jetonu — yayınlanmadığı için canlı anahtarla ÖLÇÜLDÜ: 1/11/42, `catalog.py`ye yazıldı) → `tarife_kontrol` bekçisi 1b'nin kod PR'ında 4 → **0** | 1, 1b |
 | Katalog **9 görsel** (`azure`, `openai`, `gemini`, `azure-mai`, `azure-flux`) + **6 video** (`gemini`, `fal`); ücretsiz plana 1 kredilik model yok; `emeklilik` alanı yok | `catalog.py` `IMAGE_MODELS`/`VIDEO_MODELS`; `*_client.py` adaptörleri | **13 görsel + 10 video**, kaliteli/popüler → ucuz sırasıyla; sağlayıcı kümesi DEĞİŞMİYOR (mevcut beş kimlik — yeni adaptör yok, Runware/Replicate masadan kalktı); `azure-flux-2-flex` silinir; ücretsiz planın 1 kredilik modeli `fal` FLUX.1 schnell; `emeklilik: date` + `tarife_kontrol` "30 gün" satırı | 1b |
 | Plan kapısı İKİLİ (`free` ↔ ücretli) ve anahtar kaynağından bağımsız; `ImageModel.plan` her girdide `free` | `services/planlar.py` `kapsiyor`; `services/modeller.py` | **Basamaklı** (`Plan.rank`: free<temel<pro) ve **kendi anahtarı eşiği aşar** (`kapsiyor` anahtar kaynağını alır); `Plan.video` ve filigran kuralı anahtar kaynağından BAĞIMSIZ kalır (K7) | 1b |
 | `HAREKET_TURLERI` 6, `sona_erme` yazılmıyor; tek kova `bakiye` | `tablolar.py:173`; `defter.py` | `paket` türü (7); `kova` sütunu (`hibe`/`paket`); `kullanicilar.paket_bakiye`; `rezerve` iki kovadan tek UPDATE; `sona_erme` düşürmede yazılır | 2 |
@@ -296,7 +296,7 @@ birlikte düştü.
 
 ### Kararlar (sahip, 2026-09-22)
 
-Faz düzeyindeki K1–K12'den AYRI numaralanıyor (`1b-A`…`1b-F`): o küme
+Faz düzeyindeki K1–K12'den AYRI numaralanıyor (`1b-A`…`1b-G`): o küme
 2026-09-21'de PR #69 ile kabul edildi ve yeniden açılmıyor, bunlar yalnız bu
 görevin içine bakan kararlar.
 
@@ -373,9 +373,23 @@ görevin içine bakan kararlar.
 
 * **1b-F · Kredi çapası SABİT: `KREDI_USD_CAPASI = 0,005`.** Çapa bir ORAN,
   sağlayıcının fiyatı değil; değiştirmek katalogdaki HER satırı ve admin marj
-  tablosunu birden kaydırırdı. gpt-image-2'nin kalite başına maliyeti
-  ölçülemediği için (aşağıda) `azure-gpt-image-2` / `openai-gpt-image-2`
-  kredileri **4/8/16 olduğu gibi kalır** ve PR'da "ölçülmedi" diye yazılır.
+  tablosunu birden kaydırırdı. **GÜNCELLEME 2026-09-22:** gpt-image-2'nin
+  kalite maliyeti o gün ÖLÇÜLDÜ (aşağıda) ve krediler 4/8/16 → **1/11/42**
+  oldu; çapa değişmedi ama gerekçesi öldü — artık seçilmiş bir oran, türetilmiş
+  değil. Yuvarlama EN YAKIN tam sayıya.
+
+* **1b-G · Kalite başına plan kapısı YOK (2026-09-22).** Ölçüm `high`ı 42
+  krediye çıkarınca "high yalnız `pro`da olsun" seçeneği masaya geldi ve
+  REDDEDİLDİ. Üç gerekçe: (1) `ImageModel.plan` model başına TEK alan ve
+  `kapsiyor` modeli alıyor, kaliteyi değil — kademe kapatmak yeni bir eksen
+  demek ve o eksen `model_available` · `sebep` · `check_plan` üçlüsünden ön
+  yüze kadar iner; (2) ön yüz bugün model KARTINI soluklaştırıyor, `<option>`
+  soluklaştırmıyor, yani görünen ama yasak bir kalite "seçilebilir 403" olurdu
+  — bu dosyanın her yerde kaçındığı şeyin kalite eksenindeki hâli; (3) kredi
+  zaten caydırıcı ve GÖRÜNÜR: seçicide "42 kredi" yazıyor, varsayılan da
+  `medium` (11). Soru kapanmadı, ERTELENDİ: ödeme açıldıktan sonra `isler`
+  tablosu "ücretsiz kullanıcıların kaçı `high` seçiyor" sorusunu veriyle
+  cevaplar; o güne kadar kapı eklenmez.
 
 ### Sıralı görsel listesi (13) — kaliteli/popüler → ucuz
 
@@ -439,7 +453,7 @@ düşüyor, ikisi de yerinde kalıyor — yalnız o yorum düzeltilir. Bu, bu PR
 TEK belge-kod ayrışması ve düzeltilmezse bir sonraki okuyan "varsayılan
 Seedance" sanır.
 
-### 1. görevden devreden on bir sayı — onu kapandı, biri açık
+### 1. görevden devreden on bir sayı — ON BİRİ DE KAPANDI
 
 Dört "doğrulanamadı" notu ve yedi kredi ≠ maliyet satırı. Kaynaklar
 2026-09-22'de okundu; Azure'ın JS ile çizilen tablosu tarayıcıyla açıldı (ilk
@@ -457,17 +471,43 @@ turda `$-` dönüyordu, `tools/tarife_kontrol.py`nin varlık sebebi buydu).
 | `azure-flux-2-pro` kredisi | (üstteki satır) | 9 | 16 | ⚠️ düzeltilir |
 | `gemini-veo-3-1-lite` sn | 0,05 (720p) | 10 | 16 | ⚠️ düzeltilir |
 | `gemini-veo-3-1-fast` sn | 0,10 (720p) | 20 | 30 | ⚠️ düzeltilir |
-| `azure-gpt-image-2` high | — | ❓ | 16 | ⛔ **açık** |
+| `azure-gpt-image-2` low | 196 jeton × 30 USD/1M = 0,0059 | 1 | 4 | ⚠️ düzeltildi |
+| `azure-gpt-image-2` medium | 1.756 jeton = 0,0527 | 11 | 8 | ⚠️ düzeltildi |
+| `azure-gpt-image-2` high | 7.024 jeton = 0,2107 | 42 | 16 | ⚠️ düzeltildi |
 
-**AÇIK KALAN TEK SAYI ve neden web'den kapanmıyor:** `gpt-image-2`nin kalite
-başına ÇIKTI JETONU SAYISI hiçbir resmî yerde yayınlanmamış. Azure ve OpenAI
-aynı birim fiyatı veriyor (30 USD/1M çıktı jetonu) ama `low`/`medium`/`high`
-karşılığı yok; üçüncü taraf kaynaklar da açıkça "eski modellerin statik
-tablosundan çıkarım yapmayın" diyor. Kapanış yolu ÖLÇÜM — bu depo aynı şeyi
-MAI'de yapmıştı (`usage.num_output_tokens = 1024`, sonda): bir anahtarla
-1024×1024'te üç üretim, yanıttaki `usage` alanı sayıyı verir.
-`tools/tarife_kontrol.py` bekçisi bu yüzden **4 → 1** olur, 0 değil; sıfıra
-inmesi o ölçüme bağlı.
+**ON BİRİNCİ SAYI ÖLÇÜLDÜ (2026-09-22).** `gpt-image-2`nin kalite başına ÇIKTI
+JETONU SAYISI hiçbir resmî yerde yayınlanmamış: Azure ve OpenAI aynı birim
+fiyatı veriyor (30 USD/1M çıktı jetonu) ama `low`/`medium`/`high` karşılığı
+yok, üçüncü taraf kaynaklar da açıkça "eski modellerin statik tablosundan
+çıkarım yapmayın" diyor. O yüzden web'den değil ÖLÇÜMLE kapandı — bu deponun
+MAI'de yaptığının aynısı: canlı anahtarla 1024×1024'te üç üretim, yanıttaki
+`usage.output_tokens` **196 / 1.756 / 7.024** (`output_tokens_details.image_tokens`
+aynı sayı). Çapayla **1 / 11 / 42**; katalog 4/8/16 diyordu, yani `high` 2,6 kat
+EKSİK fiyatlanmıştı ve `azure-gpt-image-2` varsayılan model. Uyarının haklılığı
+ölçüldü: `gpt-image-1`in tablosu (272/1056/4160) tutmuyor. Düzeltme `catalog.py`de
+İKİ girdiye birden yazıldı (Azure ve OpenAI ikizi aynı modeli satıyor).
+
+**ÖLÇÜM ÇAPANIN GEREKÇESİNİ ÖLDÜRDÜ.** `KREDI_USD_CAPASI = 0,005` bu dosyaya
+"Azure `medium` = 8 kredi ≈ 0,04 USD" denkleminden girmişti — ve ölçüm
+`medium`ı 0,04 değil **0,0527 USD** buldu. Aynı cümleyi yeni sayıyla yeniden
+türetsen çapa 0,0066 olurdu. Çapa yine de 0,005'te KALIYOR (1b-F): o bir oran,
+sağlayıcının fiyatı değil. Ama artık **seçilmiş** bir oran, türetilmiş değil —
+hiçbir model onu tanımlamıyor, modeller ona bölünüyor. Bu cümlenin `catalog.py`de
+BEŞ blokta tekrarlanan eski hâli (`:458, :479, :483, :685, :763, :899, :903,
+:1008`) aynı turda temizlendi; çürümüştü ve bekçisi yoktu, çünkü CLAUDE.md
+§5'in "türetilen her şeyin bekçisi bir testtir" kuralı sayıyı koruyor,
+sayının GEREKÇE CÜMLESİNİ değil.
+
+**YUVARLAMA EN YAKINA.** 10,54 → **11**, 10 değil. Ayrımı gösteren tek kademe
+bu: `low` (1,18) ve `high` (42,14) iki kuralda da aynı sayıyı veriyor, oysa
+`medium` aşağı yuvarlansa dosyanın öteki girdileriyle çelişirdi (26,8 → 27,
+7,78 → 8, 9,62 → 10 hepsi en yakın). Kural artık `KREDI_USD_CAPASI` yorumunda
+yazılı ki bir sonraki düzeltme hangisini uygulayacağını bilsin.
+
+`tools/tarife_kontrol.py` bekçisi bu satırdan ETKİLENMİYOR (gpt-image-2'nin
+kredisinde "doğrulanamadı" notu hiç yoktu, bekçi dört Azure MAI/FLUX girdisini
+sayıyor); dördün sıfıra inmesi 1b'nin kod PR'ına bağlı — FLUX.2 pro 16 → 9,
+iki MAI notunun düşmesi ve `azure-flux-2-flex`in silinmesi (1b-D) orada.
 
 **YAN ÜRÜN — doğru çıkan beş satır** (bu PR'da DEĞİŞMEZ, ama artık kaynaklı):
 Nano Banana Pro 27/48, Veo 3.1 80, Kling V3 Turbo Pro 28, Wan 3.0 10/20/40,
@@ -496,7 +536,7 @@ kaynaklı fiyat yorumları, sıra yorumu), `services/planlar.py` (`Plan.rank`,
 `bundled/i18n/{tr,en}.json` (`model.<id>.note` her yeni girdi için, 20-110
 karakter, adı tekrar etmez), `tools/tarife_kontrol.py` (+emeklilik satırı),
 `tests/test_catalog.py`, `tests/test_planlar.py`, `tests/test_modeller.py`,
-`tests/test_araclar.py` (4 → 1), `tests/test_azure_flux_client.py`,
+`tests/test_araclar.py` (4 → 0), `tests/test_azure_flux_client.py`,
 `docs/ozellikler.md`, `README*.md` sağlayıcı satırı, `docs/graflar/*`.
 
 **Testler / bekçiler.** Katalog bekçileri aynen (`test_catalog`: her girdinin

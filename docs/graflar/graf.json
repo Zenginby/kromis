@@ -336,7 +336,7 @@
         "veo_client"
       ],
       "katman": 0,
-      "satir": 1461,
+      "satir": 1493,
       "testler": [
         "tests/test_admin.py",
         "tests/test_araclar.py",
@@ -368,6 +368,7 @@
         "tests/test_planlar.py",
         "tests/test_platform_anahtari.py",
         "tests/test_playwright_dil.py",
+        "tests/test_playwright_isler.py",
         "tests/test_playwright_studio.py",
         "tests/test_prefs.py",
         "tests/test_prefs_route.py",

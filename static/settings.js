@@ -718,6 +718,15 @@ function krediBolmesiniCiz() {
       "kredi-plan",
     ),
   );
+  // İptal edilmiş abonelik (Faz 4 / 4): plan dönem sonuna kadar kalır, sonra ücretsiz (K6).
+  if (k.plan_bitis) {
+    kok.appendChild(
+      krediNotu(
+        t("kredi.plan_bitis_satiri", { tarih: krediTarihi(k.plan_bitis, false) }),
+        "kredi-plan-bitis",
+      ),
+    );
+  }
   kok.appendChild(
     krediNotu(
       k.hibe > 0
@@ -729,6 +738,8 @@ function krediBolmesiniCiz() {
   kok.appendChild(krediNotu(t(k.filigran ? "kredi.filigran_var" : "kredi.filigran_yok")));
   kok.appendChild(krediNotu(t(k.video ? "kredi.video_acik" : "kredi.video_kapali")));
   kok.appendChild(krediNotu(t("kredi.byok_notu")));
+  kok.appendChild(krediEylemleri());
+  krediSiparisleriCiz(kok, k.siparisler || []);
   const baslik = document.createElement("h3");
   baslik.className = "modal-subhead";
   baslik.textContent = t("kredi.hareketler");
@@ -743,6 +754,102 @@ function krediBolmesiniCiz() {
   ul.className = "kredi-hareketler";
   for (const h of hareketler) ul.appendChild(krediHareketSatiri(h));
   kok.appendChild(ul);
+}
+
+/** Bölmenin iki eylemi (Faz 4 / 4, belge §4): "Plan değiştir / kredi al" → `/planlar`
+ *  (gerçek bağlantı, satış sayfası ayrı belge); "Aboneliğimi ve faturalarımı yönet" →
+ *  `GET /api/odeme/portal` → Polar müşteri portalı (`location.assign`; iptal, kart,
+ *  FATURALAR orada — bizde fatura sayfası yok, K7). 404 `err.musteri_yok` (hiç satın
+ *  almamış) düğmeyi kilitler ve sebebini yazar; sunucu söyler, bölme kopyalamaz. */
+function krediEylemleri() {
+  const kutu = document.createElement("div");
+  kutu.className = "kredi-eylemler";
+  const planlar = document.createElement("a");
+  planlar.id = "settings-kredi-planlar";
+  planlar.className = "btn-ghost";
+  planlar.href = "/planlar";
+  planlar.textContent = t("kredi.plan_degistir");
+  const portal = document.createElement("button");
+  portal.id = "settings-kredi-portal";
+  portal.type = "button";
+  portal.className = "btn-ghost";
+  portal.textContent = t("kredi.portal");
+  portal.addEventListener("click", async () => {
+    portal.disabled = true;
+    try {
+      const res = await fetch("/api/odeme/portal");
+      const govde = await res.json().catch(() => null);
+      if (res.ok && govde && govde.url) {
+        window.location.assign(govde.url);
+        return;
+      }
+      const kod = govde && govde.detail && govde.detail.kod;
+      if (res.status === 404 && kod === "err.musteri_yok") {
+        portal.title = t("kredi.portal_yok");
+        portal.insertAdjacentElement(
+          "afterend",
+          krediNotu(t("kredi.portal_yok"), "kredi-portal-yok"),
+        );
+        return; // kilitli kalır
+      }
+      portal.insertAdjacentElement(
+        "afterend",
+        krediNotu(kod ? t(kod, govde.detail) : t("kredi.yuklenemedi"), "kredi-portal-hata"),
+      );
+    } catch {
+      portal.insertAdjacentElement(
+        "afterend",
+        krediNotu(t("kredi.yuklenemedi"), "kredi-portal-hata"),
+      );
+    }
+    portal.disabled = false;
+  });
+  kutu.append(planlar, portal);
+  return kutu;
+}
+
+/** Son siparişler ÖZET (tarih · ürün · tutar) + "faturalar Polar portalında" (K7). */
+function krediSiparisleriCiz(kok, siparisler) {
+  const baslik = document.createElement("h3");
+  baslik.className = "modal-subhead";
+  baslik.textContent = t("kredi.siparisler");
+  kok.appendChild(baslik);
+  if (!siparisler.length) {
+    kok.appendChild(krediNotu(t("kredi.siparis_yok")));
+    return;
+  }
+  const ul = document.createElement("ul");
+  ul.id = "settings-kredi-siparisler";
+  ul.className = "kredi-siparisler";
+  for (const s of siparisler) {
+    const li = document.createElement("li");
+    li.className = "kredi-siparis";
+    const zaman = document.createElement("span");
+    zaman.className = "kredi-zaman";
+    zaman.textContent = krediTarihi(s.olusturuldu, false);
+    const urun = document.createElement("span");
+    urun.className = "kredi-urun";
+    urun.textContent = s.urun;
+    const tutar = document.createElement("span");
+    tutar.className = "kredi-miktar";
+    tutar.textContent = krediTutari(s.tutar_kurus, s.para_birimi);
+    li.append(zaman, urun, tutar);
+    ul.appendChild(li);
+  }
+  kok.appendChild(ul);
+  kok.appendChild(krediNotu(t("kredi.faturalar_polar"), "kredi-faturalar"));
+}
+
+/** Kuruş/cent → yerel para biçimi; Polar'ın para birimi (`usd`). `Intl` bilinmeyen kodda fırlatır → düz. */
+function krediTutari(kurus, birim) {
+  try {
+    return new Intl.NumberFormat(KROMIS_DIL, {
+      style: "currency",
+      currency: birim.toUpperCase(),
+    }).format(kurus / 100);
+  } catch {
+    return `${(kurus / 100).toFixed(2)} ${String(birim).toUpperCase()}`;
+  }
 }
 
 /** core.js'in 402 toast'ından (Faz 3 / 6): Ayarlar'ı "Kredi" bölmesinde açar. */

@@ -71,7 +71,7 @@ from sqlalchemy import Select, case, func, select, update
 from sqlalchemy.orm import Session
 
 import catalog
-from services import kota, kuyruk, platform_anahtari, zaman
+from services import kota, kuyruk, odeme, platform_anahtari, zaman
 from services.tablolar import (
     DURUM_BEKLIYOR,
     DURUM_BITTI,
@@ -177,6 +177,10 @@ def kullanicilar(db: Session, *, q: str | None = None, sayfa: int = 1, adet: int
         "aktif_is": int(aktif_is or 0),
         "plan": k.plan,
         "bakiye": int(k.bakiye),
+        # Faz 4 / 4: paket kovası ve Polar müşteri kimliği (Polar panelinde arama için;
+        # NULL = hiç satın almamış). "Paket kredisi ekle" `kova='paket'` ile aynı rotaya.
+        "paket_bakiye": int(k.paket_bakiye),
+        "polar_musteri_id": k.polar_musteri_id,
     } for k, son, kredi_24sa, aktif_is in satirlar], toplam
 
 
@@ -394,8 +398,15 @@ def odeme_olaylari(db: Session, *, yalniz_hata: bool = False, limit: int = ODEME
     } for o, eposta in db.execute(sorgu).all()]
 
 
-def odeme_ozeti(db: Session) -> dict[str, int]:
-    """Üç sayı: toplam teslimat, `hata` dolu teslimat, `siparisler` satırı (admin bağlamı hepsini okur, `yonetici_okur`)."""
+def odeme_ozeti(db: Session) -> dict[str, Any]:
+    """Üç sayı + ayna tazeliği: toplam teslimat, `hata` dolu teslimat, `siparisler` satırı, `urunler_bayat`
+    (admin bağlamı hepsini okur, `yonetici_okur`).
+
+    `urunler_bayat` (Faz 4 / 4, belge §4 "Risk"): `odeme.urunler_bayat_mi` — ayna
+    7 günden eski ya da boşsa `True`; admin.js uyarı satırını gösterir. Günlük
+    satırı (`olay=odeme.urunler_bayat`) rotada, her sekme açılışında bir kez.
+    """
     olay, hatali = db.execute(select(func.count(), func.count(OdemeOlayi.hata))).one()
     siparis = db.scalar(select(func.count()).select_from(Siparis))
-    return {"olay": int(olay or 0), "hatali": int(hatali or 0), "siparis": int(siparis or 0)}
+    return {"olay": int(olay or 0), "hatali": int(hatali or 0), "siparis": int(siparis or 0),
+            "urunler_bayat": odeme.urunler_bayat_mi(db)}

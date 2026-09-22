@@ -54,11 +54,15 @@ ACIK_ROTALAR: dict[tuple[str, str], str] = {
     # Faz 4 / 3: Polar'ın sunucusu atar — çerez yok, kimlik Standard Webhooks İMZASI
     # (services/polar.olay_dogrula); imzasız/yanlış imzalı çağrı 400 (tests/test_odeme.py).
     ("POST", "/api/odeme/webhook"): "Polar webhook'u: oturumsuz, HMAC imzalı; kullanıcı olaydan çözülür",
+    # Faz 4 / 4: fiyat listesi herkese — `urunler` politikasız ALTYAPI tablosu, kullanıcı verisi taşımaz;
+    # satış sayfası (`/planlar`) kapılı, veri ucu değil (belge §4).
+    ("GET", "/api/odeme/urunler"): "aktif ürünler + plan kuralları: herkese açık fiyat listesi, kullanıcı verisi yok",
 }
 
 # Oturumsuz cevabı 302 olan (tarayıcı gezinmesi) rotalar; geri kalan kapılılar 401 JSON.
 # `/admin` (Faz 2 / 8): `kimlik.admin_sayfasi` → `sayfa_kullanicisi` üstüne `is_admin`.
-SAYFALAR = {("GET", "/"), ("GET", "/admin")}
+# `/planlar`, `/odeme/tesekkur` (Faz 4 / 4): satış ve teşekkür sayfaları — 302 `/giris?sonra=<yol>`.
+SAYFALAR = {("GET", "/"), ("GET", "/admin"), ("GET", "/planlar"), ("GET", "/odeme/tesekkur")}
 
 # ADMİN ROTALARI (Faz 2 / 8): `/api/admin/` altındaki HER rota `kimlik.admin_kullanici`
 # taşır — liste iki yönlü bekçili (`test_every_admin_route_carries_the_admin_gate_and_only_they_do`):
@@ -108,6 +112,8 @@ DIZINSIZ_KAPILI = {
     # Faz 2 / 8: kota durumu (`isler` sayımı) ve admin uçları (`kullanicilar`/`isler`/
     # `isciler`/`oturumlar` satırları; sayfa rotası `/admin` SAYFALAR'da, `ayar.genel` alır).
     ("GET", "/api/kota"), *ADMIN_ROTALAR,
+    # Faz 4 / 4: checkout ve portal — `urunler`/`kullanicilar` satırı okur, Polar'a gider; dizin yok.
+    ("POST", "/api/odeme/checkout"), ("GET", "/api/odeme/portal"),
     # Faz 3 / 6: kredi durumu (`kullanicilar.bakiye` + `kredi_hareketleri` satırları; dizin yok).
     ("GET", "/api/kredi"),
 }
@@ -193,8 +199,9 @@ def test_every_route_is_either_gated_or_openly_listed_with_a_reason():
     assert all(gerekce.strip() for gerekce in ACIK_ROTALAR.values())
     # +3 iş rotası (Faz 2 / 4), +2 (Faz 2 / 5), +8 (Faz 2 / 8: `/admin`, 6 `/api/admin/*`, `/api/kota`),
     # +2 (Faz 3 / 3: `/api/admin/kullanicilar/{id}/plan`, `…/kredi`), +1 (Faz 3 / 6: `/api/kredi`),
-    # +1 açık (Faz 4 / 3: `/api/odeme/webhook`) +1 kapılı (Faz 4 / 3: `/api/admin/odeme-olaylari`)
-    assert len(KAPILI) == 64 and len(ACIK) == 8 and len(KAPILI | ACIK) == 72, (
+    # +1 açık (Faz 4 / 3: `/api/odeme/webhook`) +1 kapılı (Faz 4 / 3: `/api/admin/odeme-olaylari`),
+    # +1 açık (Faz 4 / 4: `/api/odeme/urunler`) +4 kapılı (Faz 4 / 4: checkout, portal, `/planlar`, `/odeme/tesekkur`)
+    assert len(KAPILI) == 68 and len(ACIK) == 9 and len(KAPILI | ACIK) == 77, (
         "rota sayısı ya da kapı sayısı değişti — bilinçliyse belgeyi ve bu sayıları güncelle")
 
 
@@ -316,6 +323,22 @@ def test_a_bogus_cookie_is_401_and_the_open_routes_stay_open(istemci):
     assert istemci.get("/health").status_code == 200
     assert istemci.post("/api/hesap/giris", json={"eposta": "a@b.co", "parola": "x" * 8}).status_code == 401, (
         "giriş rotası açık: 401'i kapı değil yanlış parola verdi")
+
+
+def test_the_sales_pages_redirect_an_anonymous_browser_to_the_login_page_with_a_return_path(istemci):
+    """Faz 4 / 4 (belge §4 "oturumsuzsa `/giris?sonra=/planlar`"): `sayfa_kullanicisi`nin 302'si `/` dışındaki
+    sayfalarda dönüş yolunu taşır — giris.js `hedef` onu okur (yalnız aynı kökenin yolu). Sorgu dizesi
+    (`?checkout_id=…`) taşınmaz: kimliği yol taşıyor. `/` bare kalır (aşağıdaki test)."""
+    for yol in ("/planlar", "/odeme/tesekkur"):
+        cevap = istemci.get(yol + "?checkout_id=DUMMY", follow_redirects=False)
+        assert cevap.status_code == 302, yol
+        assert cevap.headers["location"] == f"/giris?sonra={yol}", yol
+        assert cevap.headers["cache-control"] == "no-store"
+    assert istemci.get("/admin", follow_redirects=False).headers["location"] == "/giris?sonra=/admin"
+    # …ve API rotaları 401 JSON kalır (`?sonra=` tarayıcı gezinmesinin, `fetch`in değil).
+    assert istemci.post("/api/odeme/checkout", json={"urun_id": str(uuid.uuid4())}).status_code == 401
+    assert istemci.get("/api/odeme/portal").status_code == 401
+    assert istemci.get("/api/odeme/urunler").status_code == 200, "fiyat listesi herkese"
 
 
 def test_the_studio_page_redirects_an_anonymous_browser_to_the_login_page(istemci):

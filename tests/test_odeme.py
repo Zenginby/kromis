@@ -97,6 +97,13 @@ UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 @pytest.fixture(autouse=True)
 def temiz(depo_db, monkeypatch):
     monkeypatch.setenv(polar.WEBHOOK_SIRRI_ENV, SIR)
+    # Plan hibeleri BU DOSYADA 1.000 / 3.000'e çivili: aşağıdaki testler K6 aritmetiğini (300 → 1.000 = +700,
+    # pro → temel = −2.000) sayıyla anlatıyor ve o sayılar dağıtımın öntanımlısından (Faz 4 / 4'te K5'in
+    # 1.200 / 4.500'ü) bağımsız kalmalı — öntanımlı bir gün yine değişirse burada 14 iddia değil sıfır kırılır.
+    # Ortam değil `PLANLAR` yamalanır (services/planlar.py "testler ortamı değil PLANLAR'ı yamalar").
+    import dataclasses
+    monkeypatch.setitem(planlar.PLANLAR, "temel", dataclasses.replace(planlar.PLANLAR["temel"], aylik_hibe=1_000))
+    monkeypatch.setitem(planlar.PLANLAR, "pro", dataclasses.replace(planlar.PLANLAR["pro"], aylik_hibe=3_000))
     with depo_db.begin() as c:
         c.execute(text("DELETE FROM odeme_olaylari"))
         c.execute(text("DELETE FROM siparisler"))
@@ -253,8 +260,11 @@ def test_a_signed_body_round_trips_and_every_tamper_is_rejected_before_the_body_
     # Başlık adları büyük/küçük harften bağımsız (HTTP), Starlette `Headers` gibi bir Mapping de geçer.
     assert polar.olay_dogrula(govde, {k.upper(): v for k, v in b.items()}, sir=SIR).tur == "order.paid"
     # Yanlış sır, oynanmış gövde, eksik başlık, bozuk imza, `v0` sürümü → hepsi ImzaHatasi.
+    # Yanlış sır GERÇEKTEN başka bir anahtar olmalı (`BASKA_SIR`): `SIR + "x"` burada duruyordu ve `SIR`
+    # `=` ile bitince Python'ın gevşek `b64decode`u sondaki `x`i yutuyor, anahtar AYNI çıkıyordu — bekçi
+    # 0c3eb39'dan (gerçek Polar anahtar türetmesi) beri sınadığını sanıp hiçbir şey sınamıyordu.
     with pytest.raises(polar.ImzaHatasi):
-        polar.olay_dogrula(govde, b, sir=SIR + "x")
+        polar.olay_dogrula(govde, b, sir=BASKA_SIR)
     with pytest.raises(polar.ImzaHatasi):
         polar.olay_dogrula(govde + b" ", b, sir=SIR)
     for eksik in (polar.BASLIK_ID, polar.BASLIK_ZAMAN, polar.BASLIK_IMZA):
@@ -732,7 +742,8 @@ def test_the_admin_payment_events_endpoint_lists_deliveries_filters_errors_and_n
     r = c.get("/api/admin/odeme-olaylari")
     assert r.status_code == 200, r.text
     govde = r.json()
-    assert govde["ozet"] == {"olay": 2, "hatali": 1, "siparis": 1}
+    # `urunler_bayat` (Faz 4 / 4): ayna az önce yazıldı (`urunler` fixture'ı) → taze.
+    assert govde["ozet"] == {"olay": 2, "hatali": 1, "siparis": 1, "urunler_bayat": False}
     assert [o["webhook_id"] for o in govde["olaylar"]] == ["wh_kotu", "wh_iyi"], "en yeni üstte"
     kotu = govde["olaylar"][0]
     assert set(kotu) == {"id", "webhook_id", "tur", "nesne", "kullanici_id", "eposta", "alindi", "islendi_at", "hata"}

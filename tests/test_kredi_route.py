@@ -3,7 +3,7 @@
 Gerçek Postgres (`depo_db`): bakiye ve hareketler defterden okunur, RLS
 politikaları ve kullanıcı süzgeci birlikte ölçülür. Sekiz soru:
   (i)   ALANLAR — `{bakiye, paket_bakiye, toplam, plan, plan_bitis, hibe, sonraki_hibe, filigran, video,
-        son_hareketler}`, fazlası yok; plan kuralları `PLANLAR`dan (arayüz kataloğu tekrar etmez).
+        son_hareketler, siparisler}`, fazlası yok; plan kuralları `PLANLAR`dan (arayüz kataloğu tekrar etmez).
         Faz 4 / 2: `bakiye` HİBE kovası olarak kalır, `paket_bakiye` ikinci kova, `toplam` ikisi;
         `plan_bitis` iptal edilmiş aboneliğin dönem sonu (3. görev yazar, bugün null).
   (ii)  SONRAKİ HİBE — gelecek ayın ilk günü, `aylik_hibe_yaz`ın `%Y-%m` anahtarıyla
@@ -12,7 +12,7 @@ politikaları ve kullanıcı süzgeci birlikte ölçülür. Sekiz soru:
   (iv)  DÖKÜM — hareket satırı `defter._json`: iç alanlar (`admin_id`,
         `idempotency_anahtari`) yok, damga `Z`.
   (v)   BAŞKASININ HAREKETİ GÖRÜNMEZ — depo süzgeci (RLS ikinci kapı, tests/test_rls.py).
-  (vi)  PLAN — `pro` kullanıcı kendi kurallarını görür (filigran yok, video açık, hibe 3.000).
+  (vi)  PLAN — `pro` kullanıcı kendi kurallarını görür (filigran yok, video açık, hibe 4.500 — K5).
   (vii) REZERV — sırada bekleyen işin rezervi eksi satır, bakiye düşmüş.
   (viii) MODEL `kaynak` — `/api/settings` her görsel/video modelinde kimin anahtarıyla
         koşacağını söyler; composer "kendi anahtarın · düşmez" satırı bundan okur.
@@ -38,7 +38,7 @@ pytestmark = pytest.mark.usefixtures("depo_db")
 
 AN = dt.datetime(2026, 9, 18, 12, 0, tzinfo=dt.UTC)
 ALANLAR = {"bakiye", "paket_bakiye", "toplam", "plan", "plan_bitis", "hibe", "sonraki_hibe", "filigran", "video",
-           "son_hareketler"}
+           "son_hareketler", "siparisler"}
 HAREKET_ALANLARI = {"id", "tur", "kova", "miktar", "aciklama", "is_id", "olusturuldu"}
 
 
@@ -159,7 +159,7 @@ def test_another_users_movements_and_balance_are_invisible(c, depo_db, kullanici
 def test_a_pro_user_sees_the_rules_of_the_pro_plan(c, plan_pro):
     govde = c.get("/api/kredi").json()
     pro = planlar.PLANLAR["pro"]
-    assert govde["plan"] == "pro" and govde["hibe"] == pro.aylik_hibe == 3_000
+    assert govde["plan"] == "pro" and govde["hibe"] == pro.aylik_hibe == 4_500   # K5 öntanımlısı (Faz 4 / 4)
     assert govde["filigran"] is False and govde["video"] is True
 
 

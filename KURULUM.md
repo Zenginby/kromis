@@ -588,9 +588,11 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
     *Üç plan* (`services/planlar.py`; `kullanicilar.plan`): **`free`** —
     herkes böyle başlar, aylık hibe alır, görselleri **filigranlı**, video
     modelleri **kapalı** (403 "planında yok"); **`temel`** ve **`pro`** —
-    filigransız, video açık, hibeleri bugün yer tutucu (1.000 / 3.000; fiyat
-    ve ödeme Faz 4). Plan değişikliği yalnız `/admin` → kullanıcı satırı →
-    plan seçici (`olay=admin.plan`); satın alma yolu yok.
+    filigransız, video açık, hibeleri öntanımlı 1.200 / 4.500 (K5; fiyat
+    Polar'da). Satın alma yolu `/planlar` (Faz 4 / 4: checkout ve müşteri
+    portalı Polar'ın barındırılan sayfaları; ürün aynası `tools/polar_esitle.py`
+    — kurulum adımı 7. görevde). Admin yolu duruyor: `/admin` → kullanıcı
+    satırı → plan seçici (`olay=admin.plan`), "kredi ekle" (hibe ya da paket kovası).
 
     *Aylık hibe* — `KROMIS_FREE_AYLIK_HIBE` (`.env.example` 1. bölüm): boş =
     **200** kredi (≈ 1 USD sağlayıcı maliyeti, ~25 Azure `medium` görsel),
@@ -606,7 +608,7 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
     (`kullanicilar.paket_bakiye`, satın alınan, devreder — Polar webhook'u
     yazar, Faz 4 / 3). Rezerv hibeden başlar, yetmezse paketten sürer; iade
     önce pakete döner. Ücretli planların dönem hibesi `KROMIS_TEMEL_AYLIK_HIBE`
-    / `KROMIS_PRO_AYLIK_HIBE` (boş = 1.000 / 3.000; `.env.example` 1. bölüm,
+    / `KROMIS_PRO_AYLIK_HIBE` (boş = 1.200 / 4.500 — K5; `.env.example` 1. bölüm,
     web VE işçi). Bakım turu YALNIZ `free` planı tamamlar; ücretli planın dönem
     hibesini Polar'ın `order.paid` olayı yatırır (Faz 4 / 3, `POST
     /api/odeme/webhook`; üç `KROMIS_POLAR_*` değişkeni `.env.example` 1.
@@ -654,8 +656,9 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
     2. İlk `olay=bakim` satırı (≤ 5 dk): `hibe_satiri=N` (N = mevcut kullanıcı
        sayısı — hepsi `free`, hepsi 0 bakiyeyle başlıyor) ve `tutarsiz_kullanici=0`.
     3. `/admin` → kendi hesabın → plan `pro` (günlükte `olay=admin.plan`);
-       yoksa kendi hesabın da video göremez. Sonraki bakım turu seni 3.000'e
-       tamamlar (kendi platform anahtarına kendi harcaman).
+       yoksa kendi hesabın da video göremez. Bakım turu ücretli planı
+       TAMAMLAMAZ (Faz 4 / 3): kendi hesabına krediyi aynı satırdan "kredi
+       ekle" ile ver (kendi platform anahtarına kendi harcaman).
     4. Kendi hesabınla `GET /api/kredi` → `bakiye`, `plan: "pro"`, `hibe`,
        `sonraki_hibe`, `filigran: false`, `video: true`.
     5. Ücretsiz bir TEST hesabıyla platform anahtarlı bir görsel (Azure

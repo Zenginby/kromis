@@ -509,15 +509,16 @@ def test_paid_plans_are_never_topped_up_by_the_tour_their_grant_comes_from_the_w
 
 
 def test_paid_plan_grants_come_from_the_environment_with_the_placeholders_as_defaults():
-    """Faz 4 / 2 (K5): `KROMIS_TEMEL_AYLIK_HIBE` / `KROMIS_PRO_AYLIK_HIBE`; boş = 1.000 / 3.000, bozuk gürültü."""
-    assert planlar.aylik_hibe(planlar.TEMEL_AYLIK_HIBE_ENV, planlar.TEMEL_AYLIK_HIBE_VARSAYILAN, {}) == 1_000
-    assert planlar.aylik_hibe(planlar.PRO_AYLIK_HIBE_ENV, planlar.PRO_AYLIK_HIBE_VARSAYILAN, {}) == 3_000
-    assert planlar.aylik_hibe(planlar.PRO_AYLIK_HIBE_ENV, 3_000, {planlar.PRO_AYLIK_HIBE_ENV: " 4500 "}) == 4_500
+    """Faz 4 / 2 (K5): `KROMIS_TEMEL_AYLIK_HIBE` / `KROMIS_PRO_AYLIK_HIBE`; boş = 1.200 / 4.500 (K5'in tablosu,
+    Faz 4 / 4'te öntanımlı — Faz 3'ün 1.000 / 3.000 yer tutucusu kalktı), bozuk gürültü."""
+    assert planlar.aylik_hibe(planlar.TEMEL_AYLIK_HIBE_ENV, planlar.TEMEL_AYLIK_HIBE_VARSAYILAN, {}) == 1_200
+    assert planlar.aylik_hibe(planlar.PRO_AYLIK_HIBE_ENV, planlar.PRO_AYLIK_HIBE_VARSAYILAN, {}) == 4_500
+    assert planlar.aylik_hibe(planlar.PRO_AYLIK_HIBE_ENV, 3_000, {planlar.PRO_AYLIK_HIBE_ENV: " 5000 "}) == 5_000
     assert planlar.aylik_hibe(planlar.TEMEL_AYLIK_HIBE_ENV, 1_000, {planlar.TEMEL_AYLIK_HIBE_ENV: "0"}) == 0
     for kotu in ("bin", "-1", "1.5"):
         with pytest.raises(ValueError):
             planlar.aylik_hibe(planlar.TEMEL_AYLIK_HIBE_ENV, 1_000, {planlar.TEMEL_AYLIK_HIBE_ENV: kotu})
-    assert planlar.PLANLAR["temel"].aylik_hibe == 1_000 and planlar.PLANLAR["pro"].aylik_hibe == 3_000
+    assert planlar.PLANLAR["temel"].aylik_hibe == 1_200 and planlar.PLANLAR["pro"].aylik_hibe == 4_500
     assert planlar.PLANLAR["pro"].fiyat is None, "fiyat Polar'da, aynası `urunler` (K5)"
 
 

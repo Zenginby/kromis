@@ -2,23 +2,23 @@
 
 # Uç nokta grafı
 
-72 HTTP rotası, 12 dosyada (`routers/` altındaki alan router'ları; bileşim kökü `app.py` yalnız takıyor). `modüller` sütunu, rotanın gövdesinin VE yardımcılarının (`services/`, aynı router'daki özel işlevler) dokunduğu KÜTÜPHANE modülleridir — yani bir modülü değiştirirken hangi isteklerin sınanması gerektiği burada yazılı; `routers.*`/`services.*` bilerek sütunda yok (gerekçe: tools/graf_uret.py, uc_noktalar). `ön yüz` sütunu o yolu çağıran tarayıcı betiği.
+77 HTTP rotası, 12 dosyada (`routers/` altındaki alan router'ları; bileşim kökü `app.py` yalnız takıyor). `modüller` sütunu, rotanın gövdesinin VE yardımcılarının (`services/`, aynı router'daki özel işlevler) dokunduğu KÜTÜPHANE modülleridir — yani bir modülü değiştirirken hangi isteklerin sınanması gerektiği burada yazılı; `routers.*`/`services.*` bilerek sütunda yok (gerekçe: tools/graf_uret.py, uc_noktalar). `ön yüz` sütunu o yolu çağıran tarayıcı betiği.
 
 `paths` satırlarda GÖRÜNMÜYOR ve bu bir kör nokta değil, kararın kendisi (Faz 0 / Adım 4): çıktı/varlık dizinleri rotaya `Depends(ayar.ayarlar)` ile gelen ayar nesnesinden okunuyor (`ayarlar.output_dir`), yani bir öznitelik — çağrı değil. `paths`e dokunmak yine neredeyse her ucu etkiler, ama tek bir kapıdan: `app.py`deki `Ayarlar.varsayilan()`. Kiracıya göre dizin (Faz 1) o kapının içini değiştirecek, bu tabloyu değil.
 
 | yöntem | yol | dosya | işlev | modüller | ön yüz |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/` | `routers/kok.py` | `index`:27 | `errlog`, `i18n`, `version` | — |
-| GET | `/admin` | `routers/admin.py` | `admin_sayfasi`:78 | `errlog`, `i18n`, `version` | — |
-| GET | `/api/admin/isler` | `routers/admin.py` | `isler`:97 | `i18n` | `admin.js` |
-| POST | `/api/admin/isler/{is_id}/iptal` | `routers/admin.py` | `is_iptal`:191 | `i18n` | `admin.js` |
-| GET | `/api/admin/kullanicilar` | `routers/admin.py` | `kullanicilar`:85 | — | `admin.js` |
-| POST | `/api/admin/kullanicilar/{kullanici_id}/kredi` | `routers/admin.py` | `kredi`:159 | `i18n` | `admin.js` |
-| POST | `/api/admin/kullanicilar/{kullanici_id}/oturum-dusur` | `routers/admin.py` | `oturum_dusur`:180 | `i18n` | `admin.js` |
-| POST | `/api/admin/kullanicilar/{kullanici_id}/plan` | `routers/admin.py` | `plan`:140 | `i18n` | `admin.js` |
-| POST | `/api/admin/kullanicilar/{kullanici_id}/tavan` | `routers/admin.py` | `tavan`:130 | `i18n` | `admin.js` |
-| GET | `/api/admin/metrikler` | `routers/admin.py` | `metrikler`:107 | `catalog` | `admin.js` |
-| GET | `/api/admin/odeme-olaylari` | `routers/admin.py` | `odeme_olaylari`:115 | — | `admin.js` |
+| GET | `/` | `routers/kok.py` | `index`:37 | `errlog`, `i18n`, `version` | — |
+| GET | `/admin` | `routers/admin.py` | `admin_sayfasi`:97 | `errlog`, `i18n`, `version` | — |
+| GET | `/api/admin/isler` | `routers/admin.py` | `isler`:116 | `i18n` | `admin.js` |
+| POST | `/api/admin/isler/{is_id}/iptal` | `routers/admin.py` | `is_iptal`:219 | `i18n` | `admin.js` |
+| GET | `/api/admin/kullanicilar` | `routers/admin.py` | `kullanicilar`:104 | — | `admin.js` |
+| POST | `/api/admin/kullanicilar/{kullanici_id}/kredi` | `routers/admin.py` | `kredi`:186 | `i18n` | `admin.js` |
+| POST | `/api/admin/kullanicilar/{kullanici_id}/oturum-dusur` | `routers/admin.py` | `oturum_dusur`:208 | `i18n` | `admin.js` |
+| POST | `/api/admin/kullanicilar/{kullanici_id}/plan` | `routers/admin.py` | `plan`:167 | `i18n` | `admin.js` |
+| POST | `/api/admin/kullanicilar/{kullanici_id}/tavan` | `routers/admin.py` | `tavan`:157 | `i18n` | `admin.js` |
+| GET | `/api/admin/metrikler` | `routers/admin.py` | `metrikler`:126 | `catalog` | `admin.js` |
+| GET | `/api/admin/odeme-olaylari` | `routers/admin.py` | `odeme_olaylari`:134 | — | `admin.js` |
 | GET | `/api/arena/{arena_id}` | `routers/galeri.py` | `arena_round_route`:189 | `storage` | `chat.js` |
 | POST | `/api/arena/{arena_id}/winner` | `routers/galeri.py` | `set_arena_winner_route`:205 | `i18n`, `models`, `storage` | `chat.js` |
 | GET | `/api/assets/{kind}` | `routers/bindirme.py` | `list_assets_route`:243 | `assets_store`, `i18n` | `assets.js` |
@@ -56,15 +56,18 @@
 | PATCH | `/api/images` | `routers/galeri.py` | `move_images`:234 | `folders`, `i18n`, `models`, `storage` | `folders.js` |
 | POST | `/api/import` | `routers/galeri.py` | `import_image`:259 | `i18n` | `folders.js` |
 | GET | `/api/isler` | `routers/isler.py` | `isleri_listele`:112 | `i18n` | `isler.js` |
-| GET | `/api/isler/akis` | `routers/isler.py` | `isleri_akit`:259 | `i18n` | `isler.js` |
-| GET | `/api/isler/{is_id}` | `routers/isler.py` | `is_getir`:290 | `i18n` | `isler.js` |
-| POST | `/api/isler/{is_id}/iptal` | `routers/isler.py` | `is_iptal`:297 | `i18n` | `isler.js` |
-| POST | `/api/isler/{is_id}/yeniden` | `routers/isler.py` | `is_yeniden`:321 | `catalog`, `credstore`, `etiket`, `i18n` | `isler.js` |
+| GET | `/api/isler/akis` | `routers/isler.py` | `isleri_akit`:267 | `i18n` | `isler.js` |
+| GET | `/api/isler/{is_id}` | `routers/isler.py` | `is_getir`:298 | `i18n` | `isler.js` |
+| POST | `/api/isler/{is_id}/iptal` | `routers/isler.py` | `is_iptal`:305 | `i18n` | `isler.js` |
+| POST | `/api/isler/{is_id}/yeniden` | `routers/isler.py` | `is_yeniden`:329 | `catalog`, `credstore`, `etiket`, `i18n` | `isler.js` |
 | GET | `/api/kota` | `routers/isler.py` | `kota_durumu`:129 | — | `isler.js` |
-| GET | `/api/kredi` | `routers/isler.py` | `kredi_durumu`:169 | — | `core.js` |
+| GET | `/api/kredi` | `routers/isler.py` | `kredi_durumu`:171 | — | `core.js`, `planlar.js`, `tesekkur.js` |
 | POST | `/api/logo` | `routers/bindirme.py` | `add_logo`:94 | `assets_store`, `catalog`, `composite`, `i18n`, `models`, `storage` | `assets.js` |
 | POST | `/api/logo/preview` | `routers/bindirme.py` | `preview_logo`:82 | `assets_store`, `composite`, `i18n`, `models` | `assets.js` |
-| POST | `/api/odeme/webhook` | `routers/odeme.py` | `webhook`:84 | — | — |
+| POST | `/api/odeme/checkout` | `routers/odeme.py` | `checkout`:160 | — | `planlar.js` |
+| GET | `/api/odeme/portal` | `routers/odeme.py` | `portal`:189 | — | `planlar.js`, `settings.js` |
+| GET | `/api/odeme/urunler` | `routers/odeme.py` | `urunler`:203 | — | `planlar.js` |
+| POST | `/api/odeme/webhook` | `routers/odeme.py` | `webhook`:126 | — | — |
 | GET | `/api/output/{image_id}/download` | `routers/galeri.py` | `output_download`:360 | `i18n`, `storage` | `core.js` |
 | POST | `/api/palette/suggest` | `routers/paletler.py` | `suggest_palettes`:33 | `color_names`, `models`, `palette` | `palette.js` |
 | GET | `/api/palettes` | `routers/paletler.py` | `list_palettes_route`:68 | — | `palette.js` |
@@ -79,7 +82,9 @@
 | GET | `/assets/{kind}/{filename}` | `routers/bindirme.py` | `asset_file`:263 | `assets_store`, `i18n` | `assets.js` |
 | GET | `/giris` | `routers/hesap.py` | `giris_sayfasi`:271 | `errlog`, `i18n`, `version` | — |
 | GET | `/health` | `routers/saglik.py` | `health`:149 | `version` | — |
+| GET | `/odeme/tesekkur` | `routers/kok.py` | `odeme_tesekkur`:61 | `errlog`, `i18n`, `version` | — |
 | GET | `/output/{filename}` | `routers/galeri.py` | `output_file`:326 | `i18n`, `storage` | `assets.js`, `chat.js`, `core.js`, `folders.js`, `isler.js`, `viewer.js` |
+| GET | `/planlar` | `routers/kok.py` | `planlar`:54 | `errlog`, `i18n`, `version` | — |
 
 ## Öbek → modül
 
@@ -230,9 +235,17 @@ flowchart LR
   n__giris --> n_version["version"]
   n__health["/health"]
   n__health --> n_version["version"]
+  n__odeme_tesekkur["/odeme/tesekkur"]
+  n__odeme_tesekkur --> n_errlog["errlog"]
+  n__odeme_tesekkur --> n_i18n["i18n"]
+  n__odeme_tesekkur --> n_version["version"]
   n__output["/output"]
   n__output --> n_i18n["i18n"]
   n__output --> n_storage["storage"]
+  n__planlar["/planlar"]
+  n__planlar --> n_errlog["errlog"]
+  n__planlar --> n_i18n["i18n"]
+  n__planlar --> n_version["version"]
 ```
 
 ## Tarayıcıdan çağrılmayan rotalar
@@ -244,4 +257,6 @@ Bu rotaları `static/` altındaki hiçbir betik çağırmıyor. Sebebi meşru ol
 * `POST /api/odeme/webhook` → `webhook`
 * `GET /giris` → `giris_sayfasi`
 * `GET /health` → `health`
+* `GET /odeme/tesekkur` → `odeme_tesekkur`
+* `GET /planlar` → `planlar`
 

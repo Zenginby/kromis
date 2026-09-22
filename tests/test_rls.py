@@ -71,7 +71,9 @@ HESAP_TABLOLARI = {"kullanicilar", "oturumlar", "jetonlar", "giris_denemeleri"}
 BAGLAM_TASIYAN_ARACLAR = {"anahtar_dondur.py", "artik_dosya.py", "ice_aktar.py",
                           "kullanici.py", "uygulama_rolu.py",
                           # Faz 3 / 5: `isler`i admin bağlamında okur (bağlamsız RLS boş döner).
-                          "marj_raporu.py"}
+                          "marj_raporu.py",
+                          # Faz 4 / 4: `urunler` politikasız (ALTYAPI) — bağlam gerekmez ama kural sürüyor (gerekçe araçta).
+                          "polar_esitle.py"}
 
 
 # ────────────────────────────────────────────────────────── fixture'lar

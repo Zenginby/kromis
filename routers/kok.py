@@ -11,6 +11,16 @@ Yerleştirmenin KENDİSİ de burada değil, `services/sablon.py`de (Faz 1 / 3):
 ikinci sayfa (`GET /giris`, routers/hesap.py) aynı işi istedi ve router'lar
 birbirini ithal edemez. `FileResponse` yerine neden şablon, neden `no-store`,
 neden okuma hatası 500 HTML — üç gerekçe oraya taşındı.
+
+SATIŞ YÜZÜ (Faz 4 / 4, belge §4): `GET /planlar` (`static/planlar.html` —
+plan ve paket kartları, "Satın al" → `POST /api/odeme/checkout`) ve `GET
+/odeme/tesekkur` (`static/tesekkur.html` — Polar'ın `success_url`u, bakiyeyi
+yoklar). İkisi de `index` gibi `kimlik.sayfa_kullanicisi` taşır (oturumsuz 302
+`/giris?sonra=<yol>`, `SAYFALAR`): teşekkür sayfası kullanıcının bakiyesini
+okur, planlar sayfası da satın alma DÜĞMESİ taşır — fiyat listesinin kendisi
+oturumsuz uçta (`GET /api/odeme/urunler`). Kendi belgeleri, stüdyonun 13
+betiği YÜKLENMEZ (giris.html'in gerekçesi): oturumsuz ziyaretçiye ve bir
+ödeme dönüşüne stüdyoyu indirmenin anlamı yok.
 """
 from __future__ import annotations
 
@@ -38,3 +48,17 @@ def index(kullanici: Kullanici = Depends(kimlik.sayfa_kullanicisi),
     (`kullanicilar.dil`) kapıda uygulanıyor, yani sayfa hesabın dilinde çizilir.
     """
     return sablon.sayfa(ayarlar, "index.html")
+
+
+@router.get("/planlar")
+def planlar(kullanici: Kullanici = Depends(kimlik.sayfa_kullanicisi),
+            ayarlar: ayar.Ayarlar = Depends(ayar.genel)) -> HTMLResponse:
+    """`static/planlar.html` — satış sayfası (Faz 4 / 4); aynı yerleştirme, aynı kapı (gerekçe modül başında)."""
+    return sablon.sayfa(ayarlar, "planlar.html")
+
+
+@router.get("/odeme/tesekkur")
+def odeme_tesekkur(kullanici: Kullanici = Depends(kimlik.sayfa_kullanicisi),
+                   ayarlar: ayar.Ayarlar = Depends(ayar.genel)) -> HTMLResponse:
+    """`static/tesekkur.html` — Polar'dan dönüş (Faz 4 / 4): `/api/kredi`yi 2 sn'de bir 30 sn yoklar."""
+    return sablon.sayfa(ayarlar, "tesekkur.html")

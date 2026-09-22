@@ -94,11 +94,13 @@ async function krediYenile() {
 }
 
 // 402 `err.kredi_yetersiz` / 403 `err.plan_kapsamiyor` (services/kapilar.py):
-// cümle + Ayarlar "Kredi" bağlantısı. Öteki 402/403 gövdeleri (admin kapısı,
-// sağlayıcının kendi 402'si) `kod` taşımaz ya da başka kod taşır → dokunulmaz.
-// Durum satırı cümleyi zaten yazıyor (`detailText`); buradaki ek, kullanıcıyı
-// bakiyesine GÖTÜREN yol. Plan kapısında bağlantı yok: satış sayfası Faz 4.
+// cümle + bir bağlantı. Öteki 402/403 gövdeleri (admin kapısı, sağlayıcının
+// kendi 402'si) `kod` taşımaz ya da başka kod taşır → dokunulmaz. Durum satırı
+// cümleyi zaten yazıyor (`detailText`); buradaki ek, kullanıcıyı ÇÖZÜME GÖTÜREN
+// yol: 402'de Ayarlar "Kredi" bölmesi (bakiyesini görsün), 403'te `/planlar`
+// satış sayfası (Faz 4 / 4 — Faz 3 / 6'nın bilerek boş bıraktığı bağlantı).
 const KREDI_KAPI_KODLARI = new Set(["err.kredi_yetersiz", "err.plan_kapsamiyor"]);
+const PLANLAR_SAYFASI = "/planlar";
 const KREDI_TOAST_MS = 10000;
 let krediToastZamanlayici = null;
 
@@ -111,12 +113,15 @@ async function krediKapisiUyar(res) {
   }
   const d = govde && govde.detail;
   if (!d || !KREDI_KAPI_KODLARI.has(d.kod)) return;
-  krediToast(t(d.kod, d), d.kod === "err.kredi_yetersiz");
+  krediToast(t(d.kod, d), d.kod === "err.kredi_yetersiz" ? "kredi" : "planlar");
   if (d.kod === "err.kredi_yetersiz") krediYenile();
 }
 
 /** Toast yüzeyi ilk kullanımda kurulur (index.html'e id eklenmez — çapa defteri).
- *  `textContent`: cümle sunucu verisiyle kuruluyor, DOM'a yalnız bu kapıdan. */
+ *  `textContent`: cümle sunucu verisiyle kuruluyor, DOM'a yalnız bu kapıdan.
+ *  `baglanti`: "kredi" → Ayarlar "Kredi" bölmesini açan düğme; "planlar" →
+ *  `/planlar`a giden bağlantı (gerçek `<a>`: yeni sekmede açılabilsin, composer'daki
+ *  taslak kaybolmasın). */
 function krediToast(mesaj, baglanti) {
   let kutu = $("kredi-toast");
   if (!kutu) {
@@ -131,7 +136,7 @@ function krediToast(mesaj, baglanti) {
   metin.className = "kredi-toast-metin";
   metin.textContent = mesaj;
   kutu.appendChild(metin);
-  if (baglanti) {
+  if (baglanti === "kredi") {
     const dugme = document.createElement("button");
     dugme.type = "button";
     dugme.className = "btn-ghost kredi-toast-baglanti";
@@ -141,6 +146,12 @@ function krediToast(mesaj, baglanti) {
       openKrediBolmesi(); // settings.js — olay anında, yükleme sırası sorun değil
     });
     kutu.appendChild(dugme);
+  } else if (baglanti === "planlar") {
+    const a = document.createElement("a");
+    a.className = "btn-ghost kredi-toast-baglanti";
+    a.href = PLANLAR_SAYFASI;
+    a.textContent = t("kredi.plan_baglanti");
+    kutu.appendChild(a);
   }
   const kapat = document.createElement("button");
   kapat.type = "button";
@@ -672,6 +683,7 @@ function syncRunCost() {
     const platform = sutunlar.filter((s) => s.model.kaynak !== "kullanici");
     const dusen = platform.length ? platform.reduce((t_, s) => t_ + (s.birim || 0), 0) : null;
     el.textContent = `${krediMetni(toplam, dusen)} · ${tc("gen.models_one", "gen.models_many", sutunlar.length)}`;
+    krediAlBaglantisi(el);
     el.hidden = false;
     return;
   }
@@ -698,7 +710,20 @@ function syncRunCost() {
     model.durations && model.durations.length ? Number($("duration").value || 0) || 1 : 1;
   const toplam = birim * sure * Number($("n").value || 1);
   el.textContent = krediMetni(toplam, model.kaynak === "kullanici" ? null : toplam);
+  krediAlBaglantisi(el);
   el.hidden = false;
+}
+
+/** `N > M` satırına "kredi al" bağlantısı (Faz 4 / 4): `krediMetni` uyarı sınıfını
+ *  koyduysa `/planlar`a bir `<a>` eklenir — `textContent` ataması çocukları sildiği
+ *  için çağıran metni yazdıktan SONRA çağırır. Düğme yine kilitlenmez (402 sunucunun). */
+function krediAlBaglantisi(el) {
+  if (!el.classList.contains("run-cost-uyari")) return;
+  const a = document.createElement("a");
+  a.className = "run-cost-kredi-al";
+  a.href = PLANLAR_SAYFASI;
+  a.textContent = t("kredi.kredi_al");
+  el.append(" · ", a);
 }
 
 /** `#run-cost` cümlesi. `dusen` REZERV EDİLECEK kısım; `null` = hiçbir parça

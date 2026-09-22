@@ -85,6 +85,7 @@ from __future__ import annotations
 
 import html
 from collections.abc import AsyncIterator, Mapping
+from urllib.parse import quote
 
 from fastapi import Depends, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
@@ -180,8 +181,20 @@ async def sayfa_kullanicisi(request: Request, response: Response,
 
 
 async def giris_sayfasina(request: Request, exc: GirisSayfasi) -> RedirectResponse:
-    """`GirisSayfasi` işleyicisi — app.py takıyor. `no-store`: vekil oturumsuz 302'yi saklamasın."""
-    return RedirectResponse(GIRIS_SAYFASI, status_code=302,
+    """`GirisSayfasi` işleyicisi — app.py takıyor. `no-store`: vekil oturumsuz 302'yi saklamasın.
+
+    `?sonra=<yol>` (Faz 4 / 4): `/planlar` ya da `/odeme/tesekkur`a oturumsuz
+    gelen, girişten sonra ORAYA dönmeli (belge §4 "oturumsuzsa
+    `/giris?sonra=/planlar`") — giriş sayfası `sonra`yı zaten okuyor
+    (static/giris.js `hedef`, yalnız aynı kökenin yolu). `/` için eklenmez:
+    stüdyo öntanımlı hedef, adres kirlenmesin (tests/test_kimlik.py `location`).
+    Sorgu dizesi taşınmaz: `/odeme/tesekkur?checkout_id=…` girişten sonra
+    yine yoklamaya gider; kimliği yol taşıyor, sorgu yalnız Polar'ın izi.
+    """
+    hedef = GIRIS_SAYFASI
+    if request.url.path not in ("", "/"):
+        hedef += "?sonra=" + quote(request.url.path, safe="/")
+    return RedirectResponse(hedef, status_code=302,
                             headers={"Cache-Control": "no-store"})
 
 

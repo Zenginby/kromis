@@ -59,6 +59,10 @@ KAPSAM_DISI = {
     "admin.js": "AYRI sayfanın betiği (`/admin` → static/admin.html, Faz 2 / 8): giris.js ile "
                 "aynı gerekçe — index.html'e yüklenmiyor, IIFE, küresel ad bırakmıyor. Kendi id "
                 "bağları tests/test_admin.py'de sınanıyor",
+    "planlar.js": "AYRI sayfanın betiği (`/planlar` → static/planlar.html, Faz 4 / 4): aynı gerekçe — "
+                  "IIFE, küresel ad yok. Kendi id bağları tests/test_odeme_route.py'de sınanıyor",
+    "tesekkur.js": "AYRI sayfanın betiği (`/odeme/tesekkur` → static/tesekkur.html, Faz 4 / 4): aynı "
+                   "gerekçe — IIFE, küresel ad yok. Kendi id bağları tests/test_odeme_route.py'de sınanıyor",
 }
 
 _TOP_LEVEL_DECLARATION_RE = re.compile(

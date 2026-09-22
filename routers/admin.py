@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
@@ -44,7 +45,19 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 import i18n
-from services import ayar, defter, depo_admin, dil, gunluk, hesap, kimlik, planlar, sablon, zaman
+from services import (
+    ayar,
+    defter,
+    depo_admin,
+    dil,
+    gunluk,
+    hesap,
+    kimlik,
+    odeme,
+    planlar,
+    sablon,
+    zaman,
+)
 from services.db import OTURUM
 from services.tablolar import IS_DURUMLARI, Kullanici
 
@@ -67,11 +80,17 @@ class PlanIstegi(BaseModel):
 
 
 class KrediIstegi(BaseModel):
-    """`{"miktar": ±n, "aciklama": "…"}` — `defter.duzelt`: sıfır anlamsız (satır yazar, bakiye oynamaz),
-    açıklama ZORUNLU (iz: kim, neden — `admin_id` kimi söyler, cümle nedenini)."""
+    """`{"miktar": ±n, "aciklama": "…", "kova": "hibe"|"paket"}` — `defter.duzelt`: sıfır anlamsız (satır yazar,
+    bakiye oynamaz), açıklama ZORUNLU (iz: kim, neden — `admin_id` kimi söyler, cümle nedenini).
+
+    `kova` (Faz 4 / 4) öntanımlı `hibe` (Faz 3'ün davranışı aynen); `paket` = "paket
+    kredisi ekle" — devreden kova, iade kararı (K6) ve destek jesti oraya yazılır.
+    `Literal`: CHECK'e (`kova_kumesi`) çarpıp 500 olmasın, 422 isteğin dilinde.
+    """
     # Sınır `Integer` sütun ve `TavanIstegi`nin aynı gerekçesi; eksi yön bilerek açık (geri alma).
     miktar: int = Field(ge=-1_000_000_000, le=1_000_000_000)
     aciklama: str = Field(min_length=1, max_length=500)
+    kova: Literal["hibe", "paket"] = "hibe"
 
 
 @router.get("/admin")
@@ -114,8 +133,16 @@ def metrikler(db: Session = OTURUM,
 @router.get("/api/admin/odeme-olaylari")
 def odeme_olaylari(hata: bool = Query(default=False), db: Session = OTURUM,
                    admin: Kullanici = Depends(kimlik.admin_kullanici)) -> dict:
-    """Son 100 Polar webhook teslimatı + özet (Faz 4 / 3); `?hata=1` yalnız `hata` dolu satırlar. Gövde dökülmez."""
-    return {"olaylar": depo_admin.odeme_olaylari(db, yalniz_hata=hata), "ozet": depo_admin.odeme_ozeti(db)}
+    """Son 100 Polar webhook teslimatı + özet (Faz 4 / 3); `?hata=1` yalnız `hata` dolu satırlar. Gövde dökülmez.
+
+    Özetin `urunler_bayat`ı (Faz 4 / 4) `True` ise `olay=odeme.urunler_bayat` WARNING
+    düşer — sahibin günlüğünde de görünsün, yalnız sekmeyi açanın ekranında değil.
+    """
+    ozet = depo_admin.odeme_ozeti(db)
+    if ozet["urunler_bayat"]:
+        gunluk.olay(_gunluk, "odeme.urunler_bayat", seviye=logging.WARNING, admin=str(admin.id),
+                    gun=odeme.URUNLER_BAYAT_GUN)
+    return {"olaylar": depo_admin.odeme_olaylari(db, yalniz_hata=hata), "ozet": ozet}
 
 
 def _hedef(db: Session, kullanici_id: uuid.UUID) -> Kullanici:
@@ -167,13 +194,14 @@ def kredi(kullanici_id: uuid.UUID, req: KrediIstegi, db: Session = OTURUM,
     if req.miktar == 0:
         raise HTTPException(status_code=422, detail=i18n.t("err.kredi_miktari_sifir", dil.aktif()))
     hedef = _hedef(db, kullanici_id)
-    hareket = defter.duzelt(db, hedef.id, req.miktar, req.aciklama, admin_id=admin.id)
-    # HİBE kovası: admin listesinin `bakiye` sütunuyla aynı şey (`depo_admin.kullanicilar`), düzeltme
-    # de öntanımlı o kovaya yazar; paket kovası ve `kova='paket'` düzeltmesi 4. görevin admin işi.
-    bakiye = defter.bakiye(db, hedef.id).hibe
+    hareket = defter.duzelt(db, hedef.id, req.miktar, req.aciklama, admin_id=admin.id, kova=req.kova)
+    # `bakiye` HİBE kovası olarak KALIR: admin listesinin `bakiye` sütunuyla aynı şey
+    # (`depo_admin.kullanicilar`); `paket_bakiye` ikinci kova (Faz 4 / 4) — admin.js
+    # satırı hangi kovaya yazdıysa o sayıyı tazeler.
+    b = defter.bakiye(db, hedef.id)
     gunluk.olay(_gunluk, "admin.kredi", admin=str(admin.id), hedef=str(hedef.id), miktar=req.miktar,
-                hareket=str(hareket.id))
-    return {"id": str(hedef.id), "hareket": defter._json(hareket), "bakiye": bakiye}
+                kova=req.kova, hareket=str(hareket.id))
+    return {"id": str(hedef.id), "hareket": defter._json(hareket), "bakiye": b.hibe, "paket_bakiye": b.paket}
 
 
 @router.post("/api/admin/kullanicilar/{kullanici_id}/oturum-dusur")

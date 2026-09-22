@@ -147,6 +147,8 @@
         <label class="admin-not"><input id="admin-odeme-yalniz-hata" type="checkbox" /> {{t:admin.odeme_yalniz_hata}}</label>
         <span id="admin-odeme-ozet" class="admin-not"></span>
       </div>
+      <!-- Faz 4 / 4: `urunler` aynası bayat/boş uyarısı — admin.js `ozet.urunler_bayat` ile açar. -->
+      <p id="admin-odeme-uyari" class="admin-mesaj" data-tur="hata" hidden>{{t:admin.odeme_urunler_bayat}}</p>
       <div class="admin-tablo-kap">
         <table class="admin-tablo">
           <thead>

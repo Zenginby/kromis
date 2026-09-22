@@ -1,0 +1,129 @@
+/* Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+   GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+   Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md). */
+/* Satış ve teşekkür sayfaları (Faz 4 / 4). giris.css'in duruşu: yalnız
+   flow-tokens.css tokenları, style.css yüklenmez (gerekçe planlar.html).
+   Kart yarıçapı --r-panel, alan yarıçapı --r-item, birincil düğme pill.
+   Kartlar tek sütundan başlar, 720px'te üç sütuna açılır. */
+
+* { box-sizing: border-box; }
+
+html, body { min-height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 400 15px/1.5 var(--font-body, -apple-system, system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  padding: 24px 16px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
+
+.planlar { width: 100%; max-width: 960px; margin: 0 auto; }
+.planlar-dar { max-width: 480px; text-align: center; padding-top: 10vh; }
+
+.planlar-bas { text-align: center; margin-bottom: 20px; }
+.planlar-bas h1 {
+  margin: 0;
+  font: 600 1.7rem/1.2 var(--font-display, inherit);
+  letter-spacing: -0.01em;
+}
+.planlar-alt { margin: 8px 0 0; color: var(--muted); font-size: 0.95rem; }
+.planlar-geri { color: var(--muted); font-size: 0.88rem; text-decoration: none; }
+.planlar-geri:hover { color: var(--fg); text-decoration: underline; }
+.planlar-bas .planlar-geri { display: inline-block; margin-bottom: 14px; }
+
+/* Mesaj satırı: tür rengi `data-tur` ile (planlar.js `mesajYaz`); teşekkür
+   sayfasında `data-durum` (bekliyor | islendi | gecikti). */
+.planlar-mesaj {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: var(--r-item, 12px);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.planlar-mesaj[hidden] { display: none; }
+.planlar-mesaj[data-tur="hata"] { border-color: var(--danger); }
+.planlar-mesaj[data-durum="islendi"] { border-color: var(--accent); }
+
+.planlar-kutu {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-item, 12px);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+}
+.planlar-kutu[hidden] { display: none; }
+.planlar-sartlar-etiket { display: flex; gap: 8px; align-items: flex-start; flex: 1 1 260px; font-size: 0.92rem; }
+.planlar-sartlar-etiket input { margin-top: 4px; }
+
+.planlar-bolum { margin: 26px 0 0; }
+.planlar-bolum-baslik { margin: 0 0 12px; font: 600 1.15rem/1.3 var(--font-display, inherit); }
+.planlar-not { margin: 0 0 12px; color: var(--muted); font-size: 0.85rem; line-height: 1.45; }
+.planlar-dip { margin-top: 28px; text-align: center; }
+
+.plan-kartlar { display: grid; gap: 14px; grid-template-columns: 1fr; }
+@media (min-width: 720px) {
+  .plan-kartlar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .plan-kartlar-paket { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+}
+.plan-kartlar[data-yukleniyor="true"]::before {
+  content: "…";
+  color: var(--muted);
+}
+
+.plan-kart {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel, 24px);
+  padding: 22px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--shadow, none);
+}
+.plan-kart[data-mevcut="true"] { border-color: var(--accent); }
+.plan-kart-bas { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.plan-kart h3 { margin: 0; font: 600 1.1rem/1.3 var(--font-display, inherit); }
+.plan-rozet {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: var(--r-pill, 999px);
+  background: var(--selected-strong, var(--surface-3));
+  color: var(--fg);
+  white-space: nowrap;
+}
+.plan-fiyat { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.plan-fiyat small { font-size: 0.85rem; font-weight: 400; color: var(--muted); }
+.plan-ozellikler { list-style: none; margin: 4px 0 8px; padding: 0; display: grid; gap: 4px; font-size: 0.9rem; }
+.plan-ozellikler li::before { content: "· "; color: var(--muted); }
+.plan-ozellikler li[data-yok="true"] { color: var(--muted); }
+.plan-kart .planlar-birincil { margin-top: auto; }
+
+.planlar-birincil {
+  padding: 11px 18px;
+  border: 0;
+  border-radius: var(--r-pill, 999px);
+  background: var(--primary);
+  color: var(--on-primary);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+  transition: opacity var(--dur) var(--ease);
+}
+.planlar-birincil:hover { opacity: 0.92; }
+.planlar-birincil:disabled { opacity: 0.5; cursor: default; }
+
+.tesekkur-toplam { margin: 18px 0; font-size: 2rem; font-variant-numeric: tabular-nums; }
+.tesekkur-toplam span { font-size: 0.95rem; color: var(--muted); margin-left: 6px; }
+.tesekkur-baglantilar { display: flex; flex-direction: column; gap: 12px; align-items: center; }

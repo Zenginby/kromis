@@ -156,6 +156,8 @@ def kota_durumu(db: Session = OTURUM,
 
 
 KREDI_HAREKET_SINIRI = 20
+# Faz 4 / 4: bölmenin sipariş özeti — tam liste ve faturalar Polar portalında (K7).
+KREDI_SIPARIS_SINIRI = 10
 
 
 def _sonraki_ay_basi(an: dt.datetime) -> dt.datetime:
@@ -184,7 +186,12 @@ def kredi_durumu(db: Session = OTURUM,
     `kullanicilar.bakiye` sütunuyla aynı şey — anlamı değişmesin), `paket_bakiye`
     paket kovası, `toplam` ikisinin toplamı — composer "kalan" ve bölmenin büyük
     sayısı onu okur. `plan_bitis` iptal edilmiş aboneliğin dönem sonu (3. görev
-    yazar; bugün hep `null`) — 4. görevin "dönem sonunda ücretsiz plana geçer" satırı.
+    yazar) — bölmenin "dönem sonunda ücretsiz plana geçer" satırı (Faz 4 / 4).
+
+    `siparisler` (Faz 4 / 4): son 10 Polar siparişi ÖZET (`defter.siparisler` —
+    tarih, ürün adı, tutar, para birimi, sebep); fatura sayfası bizde yok (K7),
+    bölme "faturalar Polar portalında" der. `/api/odeme/*`ye ayrı bir uç
+    açılmadı: bölme zaten bu cevabı okuyor, ikinci istek ikinci yarış olurdu.
     """
     plan_adi = kapilar.kullanici_plani(db, kullanici)
     plan = planlar.PLANLAR[plan_adi]
@@ -202,6 +209,7 @@ def kredi_durumu(db: Session = OTURUM,
         "video": plan.video,
         "son_hareketler": [defter._json(h) for h in
                            defter.hareketler(db, kullanici.id, limit=KREDI_HAREKET_SINIRI)],
+        "siparisler": defter.siparisler(db, kullanici.id, limit=KREDI_SIPARIS_SINIRI),
     }
 
 

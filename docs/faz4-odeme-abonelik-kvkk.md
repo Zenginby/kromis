@@ -562,8 +562,8 @@ hesabı yorumda kaynaklı.
 
 **Çıkış ölçütü.** Katalog 13 görsel + 10 video, her girdide sağlayıcı,
 kaynaklı maliyet (kaynak + erişim tarihi yorumda) ve kredi; `azure-flux-2-flex`
-yok; `tarife_kontrol.py` **0 satır** basıyor (on birinci sayı 2026-09-22'de
-ölçüldü, kalan dört Azure notu fiyat PR'ında düşüyor); Azure'a özel varsayım yok; kendi anahtarıyla
+yok ✅; `tarife_kontrol.py` **0 satır** basıyor ✅ (on birinci sayı
+2026-09-22'de ölçüldü, kalan dört Azure notu fiyat PR'ında düştü); Azure'a özel varsayım yok; kendi anahtarıyla
 plan eşiği aşılıyor ama filigran ve video kuralı aşılmıyor (bekçili); i18n
 eşliği; takım yeşil (E2E dahil).
 
@@ -571,7 +571,7 @@ eşliği; takım yeşil (E2E dahil).
 
 İlk yazımda tek PR öngörülüyordu. Bölme sahibin kararı ve gerekçesi ölçüldü:
 tasarım PR'ında tarife TEK bir modelde değişti ve **yedi test birden düştü**,
-hepsi ayrı dosyalarda. Fiyat düzeltmeleri adaptöre (`azure_flux_client`) ve iki
+hepsi ayrı dosyalarda. Fiyat düzeltmeleri adaptöre (`azure_flux_client`) ve dört
 test dosyasına daha iniyor, `kapsiyor` imzası üç çağıranı birden etkiliyor.
 Tek PR'da bunlar toplansa hangi kırmızının hangi değişiklikten geldiği
 okunamazdı.
@@ -579,12 +579,20 @@ okunamazdı.
 | PR | dal | kapsam | bağımlılık |
 | --- | --- | --- | --- |
 | **#74 ✅** | `faz4/katalog-genisletme` | tasarım, kararlar, ölçülen kredi | — |
-| **B** | `faz4/1b-plan-kapisi` | `Plan.rank`, `kapsiyor` üçüncü parametre, üç çağıran, iki yeni bekçi | `catalog.py`'ye DOKUNMAZ |
-| **C** | `faz4/1b-fiyat-duzeltme` | on sayı, flex silme, `tarife_kontrol` 4 → 0 | — |
+| **#77 ✅** | `faz4/1b-plan-kapisi` | `Plan.rank`, `kapsiyor` üçüncü parametre, üç çağıran, beş yeni bekçi | `catalog.py`'ye DOKUNMAZ |
+| **#78** | `faz4/1b-fiyat-duzeltme` | on sayı, flex silme, `tarife_kontrol` 4 → 0 | — |
 | **D** | `faz4/1b-yeni-girdiler` | 5 görsel + 4 video, `emeklilik`, i18n, E2E çapaları | **C'den sonra** |
 
-B ile C paralel gidebilir (dosya kümeleri kesişmiyor); D ile C aynı katalog
+B ile C paralel gitti (dosya kümeleri kesişmiyor); D ile C aynı katalog
 satırlarını yazdığı için sıralı.
+
+SIRALAMA REBASE MALİYETİ ÇIKARDI ve kayda değer: B merge edilince C'nin
+§1b'ye yazdığı kayıt B'ninkiyle ÇAKIŞTI — ikisi de aynı yere, aynı
+başlığın altına yazıyordu. Türetilmiş dosyaların çakışması zararsız
+(`graf_uret.py` çözüyor, CLAUDE.md §4), ama BELGE öyle değil: iki kaydın
+hangisinin kalacağı bir birleştirme kararı. İkisi de kaldı. Bir sonraki
+bölünmüş görevde "Yapıldığında" bloklarını PR başına AYRI başlıklara
+yazmak bu turu hiç doğurmazdı.
 
 **KAPI ÖNCE, VERİ SONRA.** B'nin C/D'den önce gelmesi sıra tercihi değil,
 1b-A'nın gereği: `ImageModel.plan` veri olduğu an kapı yerinde olmalı, yoksa
@@ -622,6 +630,45 @@ okunabilirdi — gövde taranıyor.
 Dokunulan: `services/planlar.py`, `services/modeller.py`, `services/kapilar.py`,
 `routers/uretim.py`, `routers/isler.py`, `tests/test_planlar.py`, `CLAUDE.md`,
 `docs/graflar/*`. Katalog ve i18n'e DOKUNULMADI.
+
+**Yapıldığında (C, 2026-09-22) — ölçümler ve sapmalar.**
+
+`tarife_kontrol.py` **4 → 0**: dördü de kapandı. MAI 2.6-Flash'ın "GEÇİCİ"
+notu düştü ve tahmin TUTMUŞ (19 USD/1M × 1024 jeton = 0,0195 → 4 kredi, katalog
+zaten 4 diyordu). FLUX.2 pro 16 → **9** (kademeli MP: ilk 0,03 + sonraki 0,015
+= 0,045 USD), yani 1,8 kat fazla fiyatlanmıştı. Nano Banana 2 6/6/12 →
+**13/20/30**. Veo Lite 16 → **10**, Veo Fast 30 → **20**.
+
+**FLEX SİLİNDİ ve adaptör de temizlendi.** Yarısını yapmak iki ayrı kusur
+üretirdi: girdi kalıp yol gitse arayüzde seçilebilir bir 404
+(`openai-dall-e-3`ün ölçülmüş dersi), yol kalıp girdi gitse ölü kod. `_MODEL_PATHS`
+tek satıra indi, `_FLEX_QUALITY` ve `quality_axis` düştü. Bunun BEKLENMEDİK
+sonucu: `build_payload` artık `quality` ALMIYOR ve `azure_flux_client`
+imza olarak `azure_mai_client`ın ikizi oldu — `generate`/`edit` parametreyi
+sağlayıcı sözleşmesi gereği tutuyor ama gövdeye taşımıyor. Bekçisi bunu
+açıkça tarıyor, çünkü "yarısını yapmak" tam olarak buradan girerdi.
+
+**AÇIK SORU — SAHİBE (Nano Banana 2'nin varsayılan kalitesi).** Girdinin
+`default_quality="2K"` kararı tek bir cümleye dayanıyordu ve o cümle artık
+yanlış: *"2K, 1K ile AYNI fiyatta (ikisi de 1120 jeton) — varsayılanı 1K
+yapmak bedava çözünürlüğü çöpe atmak olurdu."* Yayınlanmış fiyat 1K 0,067 ·
+2K 0,101, yani 2K **%54 daha pahalı** ve varsayılan her üretimde 20 kredi
+düşürüyor, 13 değil. Varsayılan DEĞİŞTİRİLMEDİ: çıktı kalitesini düşürmek bir
+ürün kararı ve bu PR fiyat düzeltmesi — sessizce değiştirmek, bu turun tam
+olarak yakaladığı kusuru (ölen gerekçenin altındaki sayının yaşamaya devam
+etmesi) tekrarlamak olurdu. Gerekçe girdinin yorumuna açıkça yazıldı.
+
+**Tarife bekçisinin bekçisi değişti.** `test_..._finds_exactly_the_models_...`
+içinde "bulgular boş değil" diye bir iddia vardı — hiçbir şey bulmayan bir
+tarayıcının testi geçmesini önlüyordu. Liste kalıcı olarak boşalınca o iddia
+tutulamaz hâle geldi. Yerine gerçek katalog kaynağına bilinen bir not ENJEKTE
+eden bir test geldi (dosyaya dokunmadan, metin üstünde): tarayıcının
+GÖREBİLDİĞİ böyle kanıtlanıyor, kataloğu kirli tutarak değil.
+
+Dokunulan: `catalog.py` (−1 girdi, 8 fiyat/yorum noktası), `azure_flux_client.py`,
+`bundled/i18n/{tr,en}.json` (flex notu), `tests/test_catalog.py`,
+`tests/test_azure_flux_client.py`, `tests/test_araclar.py`, `docs/graflar/*`.
+`services/` ve `routers/`a DOKUNULMADI.
 
 **Sahibin adımı — PR'dan önce.** Sıralı liste ✅ geldi (2026-09-22). Kalan iki
 girdi:

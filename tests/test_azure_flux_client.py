@@ -7,8 +7,11 @@ Bu dosyanın en değerli üç iddiası:
      "model bulunamadı" derken kullanıcıyı anahtarını kurcalamaya iter.
   2. 422 MESAJ DEĞİL LİSTE taşıyor (`error.details[]`). Liste okunmazsa
      bütün 422'ler çıplak bir "HTTP 422"ya çöküyor.
-  3. `steps`/`guidance` YALNIZ flex'te. pro'nun `quality` parametresi yok ve
-     iki alanı göndermek beyan edilmemiş bir alan göndermek olurdu.
+  3. GÖVDEDE `steps`/`guidance` HİÇ YOK. Bu iki alan flex'in ekseniydi;
+     flex 2026-09-22'de silindi (karar 1b-D — Azure adım sayısına değil
+     megapiksele bakıyor, üç kademe de aynı parayı ödetiyordu). Geriye kalan
+     pro'nun `quality` parametresi yok ve beyan edilmemiş bir alan göndermek
+     "gönderdim, demek ki uygulandı" varsayımını doğururdu.
 
 CANLI DOĞRULAMANIN SINIRI: FLUX'un 200 yanıtı bu depodan GÖRÜLMEDİ (şekil
 Microsoft'un örnek deposundan). O yüzden `decode_images`ın sarmalama iddiası
@@ -16,6 +19,7 @@ bu dosyada en yüksek değerli test — şekil değişirse kullanıcı Türkçe 
 hata görmeli, ham 500 değil.
 """
 import base64
+import inspect
 
 import pytest
 
@@ -25,7 +29,6 @@ import catalog
 import providers
 
 PRO = catalog.image_model("azure-flux-2-pro")
-FLEX = catalog.image_model("azure-flux-2-flex")
 CREDS = ("FOUNDRYKEY", "https://ai-ornek.services.ai.azure.com")
 
 
@@ -60,12 +63,17 @@ def _ok(sayi=1):
 # ── Yol eşlemesi ───────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("tel_adi, yol", [
-    ("FLUX.2-pro", "flux-2-pro"),
-    ("FLUX.2-flex", "flux-2-flex"),
-])
-def test_the_path_segment_is_NOT_the_deployment_name(tel_adi, yol):
-    assert flux.model_path(tel_adi) == yol
+def test_the_path_segment_is_NOT_the_deployment_name():
+    """Tablo flex silindikten sonra TEK satır; eşleme yine de türetilmiyor.
+
+    `FLUX.2-pro` gövdedeki `model` alanına, `flux-2-pro` yola gidiyor —
+    noktayı tireye çeviren bir dönüşüm gibi görünüyor ama tablo elle tutuluyor
+    ve bu bilinçli (gerekçe `_MODEL_PATHS`in yorumunda). Silinen ad artık
+    tabloda YOK ve bunu ayrıca sınıyoruz: yol kalsaydı ölü kod olurdu.
+    """
+    assert flux.model_path("FLUX.2-pro") == "flux-2-pro"
+    with pytest.raises(ac.ImageError):
+        flux.model_path("FLUX.2-flex")
 
 
 def test_an_UNMAPPED_wire_name_raises_a_TURKISH_error_not_a_KeyError():
@@ -91,7 +99,7 @@ def test_the_endpoint_carries_the_api_version_query():
 
 
 def test_the_payload_carries_width_height_and_num_images():
-    govde = flux.build_payload("kedi", "1024x1536", "standard",
+    govde = flux.build_payload("kedi", "1024x1536",
                                api_model="FLUX.2-pro")
     assert govde == {"model": "FLUX.2-pro", "prompt": "kedi",
                      "width": 1024, "height": 1536, "num_images": 1}
@@ -100,36 +108,23 @@ def test_the_payload_carries_width_height_and_num_images():
 def test_PRO_never_sends_steps_or_guidance():
     """pro'nun `quality` parametresi YOK; beyan edilmemiş bir alan göndermek
     "gönderdim, demek ki uygulandı" varsayımını doğurur."""
-    govde = flux.build_payload("kedi", "1024x1024", "standard",
+    govde = flux.build_payload("kedi", "1024x1024",
                                api_model="FLUX.2-pro")
     assert "steps" not in govde and "guidance" not in govde
 
 
-@pytest.mark.parametrize("jeton, steps, guidance", [
-    ("hizli", 10, 3.0),
-    ("dengeli", 25, 4.5),
-    ("detayli", 50, 6.0),
-])
-def test_FLEX_maps_the_quality_token_to_steps_and_guidance(jeton, steps, guidance):
-    """Sentetik bir jeton burada İSRAF olurdu: `steps` ve `guidance` kaliteyi
-    doğrudan belirliyor (karar 4)."""
-    govde = flux.build_payload("kedi", "1024x1024", jeton,
-                               api_model="FLUX.2-flex")
-    assert govde["steps"] == steps
-    assert govde["guidance"] == guidance
+def test_the_adapter_signature_matches_its_MAI_sibling_now_that_the_axis_is_gone():
+    """`quality` gövdeye HİÇ ulaşmıyor — `azure_mai_client`ın duruşu benimsendi.
 
-
-def test_EVERY_flex_catalog_token_maps_to_an_axis():
-    """Katalog ile `_FLEX_QUALITY` ayrışırsa jeton sessizce eksen üretmez ve
-    kullanıcı seçtiği kademeyi ALMAZ — üstelik farkı hiçbir yerde okumaz."""
-    for jeton in FLEX.qualities:
-        assert flux.quality_axis(jeton) is not None, jeton
-
-
-def test_the_steps_and_guidance_stay_inside_the_documented_ranges():
-    for steps, guidance in (flux.quality_axis(q) for q in FLEX.qualities):
-        assert 1 <= steps <= 50
-        assert 1.5 <= guidance <= 10
+    Parametre `generate`/`edit`te KALIYOR (sağlayıcı sözleşmesi: `providers`
+    dört adaptörü aynı imzayla çağırıyor), ama `_uret` ve `build_payload`
+    onu artık almıyor. Yarısını yapmak — imzada tutup gövdeye taşımak —
+    Azure'ın tanımadığı bir alan göndermek olurdu.
+    """
+    assert "quality" not in inspect.signature(flux.build_payload).parameters
+    assert "quality" not in inspect.signature(flux._uret).parameters
+    for ad in ("generate", "edit"):
+        assert "quality" in inspect.signature(getattr(flux, ad)).parameters, ad
 
 
 # ── Referans görseller ─────────────────────────────────────────────────
@@ -138,7 +133,7 @@ def test_the_steps_and_guidance_stay_inside_the_documented_ranges():
 def test_the_reference_images_are_numbered_from_TWO():
     """İlk alanın adı sonek TAŞIMIYOR ve bu telin kendi kuralı."""
     gorseller = [("a.png", b"AAA"), ("b.png", b"BBB"), ("c.png", b"CCC")]
-    govde = flux.build_payload("p", "1024x1024", "standard",
+    govde = flux.build_payload("p", "1024x1024",
                                api_model="FLUX.2-pro", images=gorseller)
 
     assert govde["input_image"] == base64.b64encode(b"AAA").decode()
@@ -148,7 +143,7 @@ def test_the_reference_images_are_numbered_from_TWO():
 
 
 def test_generation_carries_NO_input_image_field():
-    govde = flux.build_payload("p", "1024x1024", "standard",
+    govde = flux.build_payload("p", "1024x1024",
                                api_model="FLUX.2-pro")
     assert not [k for k in govde if k.startswith("input_image")]
 

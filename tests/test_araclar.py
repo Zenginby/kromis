@@ -7,9 +7,14 @@ satırlar tohumla; bilinmeyen maliyet BOŞ hücre (sıfır değil); `DATABASE_UR
 
 `tarife_kontrol`: aracın bulduğu küme, kataloğu BAĞIMSIZ bir yolla (satır bazlı:
 `ImageModel(` blokları ve önündeki yorumlar) okuyan testin kümesiyle aynı — liste
-ELLE DEĞİL (CLAUDE.md § 5: not silinince iki taraf birlikte düşer). Bugün dört
-model (`azure-mai-image-2-6`, `-2-6-flash`, `azure-flux-2-pro`, `-flex`); sayı
-katalogdan türetilir, burada yazılı değil.
+ELLE DEĞİL (CLAUDE.md § 5: not silinince iki taraf birlikte düşer). Küme bugün
+BOŞ: devreden dört Azure notu 2026-09-22'de kapandı (Faz 4 / 1b). Sayı
+katalogdan türetilir, burada yazılı değil — bu cümle bir zamanlar dördünü tek
+tek sayıyordu ve "burada yazılı değil" derken tam olarak onu yapıyordu.
+
+BOŞ KÜME TARAYICIYI SINAMAZ: körelmiş bir tarayıcı da boş döner. O yüzden
+ikinci bir test gerçek katalog kaynağına metin üstünde bilinen bir not ENJEKTE
+edip tam olarak onu bulmayı bekliyor — bekçinin bekçisi artık orada.
 """
 from __future__ import annotations
 
@@ -148,14 +153,47 @@ def test_the_tool_finds_exactly_the_models_whose_price_comment_says_unverified_d
     assert {b.model for b in bulgular} == set(beklenen), (
         "araç ile bağımsız tarama ayrıştı — yorum bölgesi kuralı (tools/tarife_kontrol.py başlığı) değişti mi?")
     assert {b.model: list(b.satirlar) for b in bulgular} == beklenen
-    # Bekçinin bekçisi: küme boş değil ve her id gerçekten katalogda (görsel ya da video).
+    # KÜME BOŞ ve bu HEDEFİN KENDİSİ (2026-09-22, Faz 4 / 1b): devreden dört
+    # Azure notu düştü. Buraya kadar "bulgular boş değil" diye bir iddia vardı
+    # — bekçinin bekçisiydi, çünkü hiçbir şey bulmayan bir tarayıcı da bu
+    # testi geçerdi. Liste kalıcı olarak boşalınca o iddia tutulamaz hâle
+    # geldi; tarayıcının GÖREBİLDİĞİ ayrı bir testle kanıtlanıyor (aşağıda),
+    # gerçek kataloğun kirli kalmasıyla değil.
+    assert beklenen == {}, f"katalogda doğrulanmamış tarife notu var: {sorted(beklenen)}"
+    # Her id gerçekten katalogda (görsel ya da video); krediler katalogdaki
+    # gerçek değerler, USD çapayla (`KREDI_USD_CAPASI`).
     idler = {m.id for m in catalog.IMAGE_MODELS} | {m.id for m in catalog.VIDEO_MODELS}
-    assert bulgular and {b.model for b in bulgular} <= idler
-    # Krediler katalogdaki gerçek değerler, USD çapayla (`KREDI_USD_CAPASI`).
+    assert {b.model for b in bulgular} <= idler
     for b in bulgular:
         spec = catalog.image_model(b.model) or catalog.video_model(b.model)
         assert spec is not None and b.credits == spec.credits and b.credits_by_quality == spec.credits_by_quality
         assert b.usd == Decimal(spec.credits) * catalog.KREDI_USD_CAPASI
+
+
+def test_the_scanner_still_SEES_a_note_when_one_is_put_back_into_the_real_catalog():
+    """Boş liste "tarayıcı çalışıyor" DEMEK DEĞİL — körelmiş bir tarayıcı da boş döner.
+
+    Gerçek katalog kaynağına bilinen bir not ENJEKTE ediliyor (dosyaya
+    dokunulmadan, metin üstünde) ve tam olarak o modelin bulunması bekleniyor.
+    Sentetik bir kaynak parçası yerine gerçek dosyanın kullanılması bilinçli:
+    `bul` yorumları AST'nin girdi bölgelerine göre eşliyor (kural
+    `tools/tarife_kontrol.py`nin başlığında) ve uydurma bir iskelet o kuralı
+    sınamazdı.
+    """
+    with open(tarife_kontrol.KATALOG_YOLU, encoding="utf-8") as f:
+        kaynak = f.read()
+    capa = "        credits=9,\n"
+    assert kaynak.count(capa) == 1, "çapa satırı taşındı — test güncellensin"
+    kirli = kaynak.replace(capa, "        # birim fiyat doğrulanamadı (deneme).\n" + capa)
+
+    bulgular = tarife_kontrol.bul(kirli)
+    assert [b.model for b in bulgular] == ["azure-flux-2-pro"]
+    # Satırlar kırpılmış geliyor (araç girintiyi soyuyor) — rapor onları kendi
+    # girintisiyle basıyor, ham kaynak girintisiyle değil.
+    assert bulgular[0].satirlar == ("# birim fiyat doğrulanamadı (deneme).",)
+    assert bulgular[0].credits == 9
+    # Aynı kaynak notsuz hâliyle BOŞ dönüyor: fark gerçekten notun kendisi.
+    assert tarife_kontrol.bul(kaynak) == []
 
 
 def test_the_pattern_is_turkish_case_insensitive_and_needs_the_word_price_on_the_same_line():
@@ -173,14 +211,31 @@ def test_the_pattern_is_turkish_case_insensitive_and_needs_the_word_price_on_the
         assert not tarife_kontrol.DESEN.search(tarife_kontrol._katla(satir)), satir
 
 
-def test_the_tool_prints_every_flagged_model_with_its_credits_and_expected_usd(capsys):
-    assert tarife_kontrol.main([]) == 0
-    out = capsys.readouterr().out
+def test_the_tool_prints_every_flagged_model_with_its_credits_and_expected_usd():
+    """Rapor metni, ENJEKTE edilmiş bir notla sınanıyor — gerçek katalog artık temiz.
+
+    `main`in bugünkü çıktısı "notlu model yok" (öteki test onu ölçüyor); satır
+    biçimini sınamak için listenin DOLU olduğu bir hâl gerekiyor ve o hâl
+    gerçek kataloğu kirli tutarak değil, kaynağı metin üstünde bozarak
+    kuruluyor.
+    """
     with open(tarife_kontrol.KATALOG_YOLU, encoding="utf-8") as f:
-        bulgular = tarife_kontrol.bul(f.read())
+        kaynak = f.read()
+    kirli = kaynak.replace("        credits=9,\n",
+                           "        # birim fiyat doğrulanamadı (deneme).\n        credits=9,\n")
+    bulgular = tarife_kontrol.bul(kirli)
+    assert bulgular, "enjeksiyon tutmadı"
+
+    out = tarife_kontrol.rapor(bulgular)
     assert out.startswith(f"{len(bulgular)} model dogrulama bekliyor (1 kredi = 0.005 USD):")
     for b in bulgular:
         assert f"  {b.model}: {b.credits} kredi ≈ {b.usd} USD" in out
         for s in b.satirlar:
             assert s in out, "eşleşen yorum satırı basılır: sahip 'neden listede' sorusunu buradan okur"
-    assert tarife_kontrol.rapor([]) .startswith("notlu model yok")
+
+
+def test_the_tool_says_the_catalogue_is_clean_and_exits_zero(capsys):
+    """Bugünkü GERÇEK çıktı: dört Azure notu 1b'de düştü, geriye not kalmadı."""
+    assert tarife_kontrol.main([]) == 0
+    assert capsys.readouterr().out.startswith("notlu model yok")
+    assert tarife_kontrol.rapor([]).startswith("notlu model yok")

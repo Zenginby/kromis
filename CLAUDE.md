@@ -84,6 +84,21 @@ indirilemeyen ortamlarda makinede hazır duran chromium'a bağ atıyor.
 python3 -m pytest tests/test_graflar.py -q   # yalnız harita kapısı
 ```
 
+**LİNT TAKIMIN İÇİNDE DEĞİL — üçüncü "yeşil ama değil" hâli.** `ci.yml`in
+**Lint** işi iki ayrı adım koşuyor ve ikisi de pytest'in dışında:
+
+```sh
+.venv/bin/ruff check .        # E, F, I, UP, B (ayarlar pyproject.toml'da)
+.venv/bin/mypy .              # 277 dosya
+```
+
+2026-09-22'de ölçüldü: takım 4065 yeşil verirken CI kırmızı döndü. Bir test
+dosyasında bir sabit ithal bloğunun ORTASINA konmuştu — `ast.parse` temiz
+diyor, pytest umursamıyor, ruff `E402` diyor. Sabit aşağı alınınca mypy ayrı
+bir şey buldu (`catalog.image_model()` `ImageModel | None` döndürüyor,
+`cost_for` `ImageModel` istiyor). Yani "takım yeşil" cümlesi lint için hiçbir
+şey söylemiyor; ikisi de itmeden önce koşulmalı.
+
 Kurulum ve uygulamayı çalıştırma: [KURULUM.md](KURULUM.md). Sürüm/yayın
 düzeni: [docs/yayin-hatti.md](docs/yayin-hatti.md).
 

@@ -276,7 +276,7 @@ fiyat sayfaları 1b'nin ön koşulu olarak duruyor. Çıkış ölçütünün
 
 ---
 
-## 1b. Katalog genişletme — 13 görsel + 10 video model, sağlayıcıdan bağımsız (PR: `faz4/katalog-genisletme`)
+## 1b. Katalog genişletme — 13 görsel + 10 video model, sağlayıcıdan bağımsız (PR'lar: `faz4/katalog-genisletme` ✅, `faz4/1b-plan-kapisi`, `faz4/1b-fiyat-duzeltme`, `faz4/1b-yeni-girdiler`)
 
 **Kapsam.** Sahibin 2026-09-21 yönlendirmesiyle eklendi; **sıralı liste ve altı
 ürün kararı 2026-09-22'de geldi** — bu bölüm o oturumun çıktısı ve artık bir
@@ -562,10 +562,66 @@ hesabı yorumda kaynaklı.
 
 **Çıkış ölçütü.** Katalog 13 görsel + 10 video, her girdide sağlayıcı,
 kaynaklı maliyet (kaynak + erişim tarihi yorumda) ve kredi; `azure-flux-2-flex`
-yok; `tarife_kontrol.py` **1 satır** basıyor (`azure-gpt-image-2`, ölçüm
-bekliyor) ve bu sayı PR'da yazılı; Azure'a özel varsayım yok; kendi anahtarıyla
+yok; `tarife_kontrol.py` **0 satır** basıyor (on birinci sayı 2026-09-22'de
+ölçüldü, kalan dört Azure notu fiyat PR'ında düşüyor); Azure'a özel varsayım yok; kendi anahtarıyla
 plan eşiği aşılıyor ama filigran ve video kuralı aşılmıyor (bekçili); i18n
 eşliği; takım yeşil (E2E dahil).
+
+### Görev DÖRT PR'a bölündü (sahip, 2026-09-22)
+
+İlk yazımda tek PR öngörülüyordu. Bölme sahibin kararı ve gerekçesi ölçüldü:
+tasarım PR'ında tarife TEK bir modelde değişti ve **yedi test birden düştü**,
+hepsi ayrı dosyalarda. Fiyat düzeltmeleri adaptöre (`azure_flux_client`) ve iki
+test dosyasına daha iniyor, `kapsiyor` imzası üç çağıranı birden etkiliyor.
+Tek PR'da bunlar toplansa hangi kırmızının hangi değişiklikten geldiği
+okunamazdı.
+
+| PR | dal | kapsam | bağımlılık |
+| --- | --- | --- | --- |
+| **#74 ✅** | `faz4/katalog-genisletme` | tasarım, kararlar, ölçülen kredi | — |
+| **B** | `faz4/1b-plan-kapisi` | `Plan.rank`, `kapsiyor` üçüncü parametre, üç çağıran, iki yeni bekçi | `catalog.py`'ye DOKUNMAZ |
+| **C** | `faz4/1b-fiyat-duzeltme` | on sayı, flex silme, `tarife_kontrol` 4 → 0 | — |
+| **D** | `faz4/1b-yeni-girdiler` | 5 görsel + 4 video, `emeklilik`, i18n, E2E çapaları | **C'den sonra** |
+
+B ile C paralel gidebilir (dosya kümeleri kesişmiyor); D ile C aynı katalog
+satırlarını yazdığı için sıralı.
+
+**KAPI ÖNCE, VERİ SONRA.** B'nin C/D'den önce gelmesi sıra tercihi değil,
+1b-A'nın gereği: `ImageModel.plan` veri olduğu an kapı yerinde olmalı, yoksa
+kendi anahtarını girmiş ücretsiz kullanıcı bir tur boyunca o modeli göremez.
+Bu yüzden B **hiçbir davranışı değiştirmiyor** — her girdi hâlâ `plan="free"`,
+basamak ve BYOK ekseni boşta çalışıyor. PR'ın tamamı makine + bekçi.
+
+**Yapıldığında (B, 2026-09-22) — sapmalar.** İki yerde tariften SAPILDI,
+ikisi de ölçülmüş gerekçeyle:
+
+(a) **`kapsiyor`un üçüncü parametresi dizge DEĞİL bool** (`platform_anahtariyla`).
+1b-A `kapsiyor(plan, spec, anahtar_kaynagi)` diyordu; o imza
+`platform_anahtari.KAYNAK_PLATFORM`ı ithal etmeyi gerektiriyor ve o modül
+`depo_kimlik_bilgisi` üzerinden SQLAlchemy'yi içeri çekiyor — oysa
+`services/planlar.py`nin dosya başlığı "**Saf: DB yok, cümle yok**" diyor.
+Karşılaştırma çağıranlara taşındı; ikisi de o modülü zaten ithal ediyor.
+
+(b) **Parametrenin öntanımlı değeri YOK ve anahtar sözcüklü.** Tarif öntanımdan
+söz etmiyordu; öntanımlı `None`/`False` verilseydi, unutulan bir çağıran
+"platform değil" diye okunup **model eşiğini sessizce atlardı** — bölümün kendi
+risk notunun ("biri unutulursa kapı sessizce gevşer") tarif ettiği kusur.
+Öntanımsız imzada unutulan çağıran `TypeError` veriyor; bekçisi
+`test_kapsiyor_has_no_default_for_the_key_source_so_a_forgotten_caller_is_loud`.
+
+Bir de **tarifte olmayan bir iş** çıktı: `director_context` kimlik sözlüğünü
+`configured_map`e verip ikinci kez çözüyordu. `platform_anahtari.kaynak`
+`kaynaklar` alanını taşımayan düz bir sözlük görseydi her anahtarı `kullanici`
+sayar ve **plan eşiği yönetmen menüsünde sessizce düşerdi**. Sözlük artık bir
+kez çözülüyor (`credstore.degerler`), ikisi de aynı nesneye bakıyor.
+
+`_filigranlanir`ın bekçisi imza denetimiyle YETİNMİYOR: işlev işin SATIRINI
+alıyor ve `Is.anahtar_kaynagi` o satırda duruyor, yani alan erişimiyle sessizce
+okunabilirdi — gövde taranıyor.
+
+Dokunulan: `services/planlar.py`, `services/modeller.py`, `services/kapilar.py`,
+`routers/uretim.py`, `routers/isler.py`, `tests/test_planlar.py`, `CLAUDE.md`,
+`docs/graflar/*`. Katalog ve i18n'e DOKUNULMADI.
 
 **Sahibin adımı — PR'dan önce.** Sıralı liste ✅ geldi (2026-09-22). Kalan iki
 girdi:

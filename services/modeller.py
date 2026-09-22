@@ -28,27 +28,35 @@ SEBEP_ANAHTAR = "anahtar"
 SEBEP_PLAN = "plan"
 
 
-def model_available(spec: catalog.ImageModel | catalog.ChatModel, configured: bool, plan: str) -> bool:
+def model_available(spec: catalog.ImageModel | catalog.ChatModel, configured: bool, plan: str,
+                    anahtar_kaynagi: str | None) -> bool:
     """Bu model kullanıcıya KULLANILABİLİR mi — arayüzün sorduğu TEK soru.
 
     İki sebep, tek cevap (Faz 3 / 3 — bu işlevin "değişecek yer burası" sözü
     tutuldu): anahtar kayıtlı değil (`configured`) YA DA kullanıcının planı
-    modeli kapsamıyor (`planlar.kapsiyor`: modelin `plan` alanı + video ↔
-    `Plan.video`, K7). İki sebebi istemcide ayrı ayrı sormak "hangi modeller
-    kullanılabilir" sorusunun iki cevabını doğururdu; `static/core.js
-    secilebilirler`in var olma sebebi tam olarak o ikiliği önlemek. SEBEBİ
-    `sebep(...)` söyler: cümle farklı ("anahtar yok" · "planında yok") ve
-    arayüz ikisine farklı davranır (gizle · rozetle göster).
+    modeli kapsamıyor (`planlar.kapsiyor`: basamak + video ↔ `Plan.video`).
+    İki sebebi istemcide ayrı ayrı sormak "hangi modeller kullanılabilir"
+    sorusunun iki cevabını doğururdu; `static/core.js secilebilirler`in var
+    olma sebebi tam olarak o ikiliği önlemek. SEBEBİ `sebep(...)` söyler:
+    cümle farklı ("anahtar yok" · "planında yok") ve arayüz ikisine farklı
+    davranır (gizle · rozetle göster).
 
     `plan` KULLANICININ planı (`kullanicilar.plan`, `defter.plan_oku`),
-    modelin değil — modelin planı `spec.plan`.
+    modelin değil — modelin planı `spec.plan`. `anahtar_kaynagi` (Faz 4 / 1b,
+    1b-A) bu modelin kimin anahtarıyla koşacağı: `settings_payload`ın
+    `kaynaklar` sözlüğünden gelir (`{kimlik_id: "kullanici" | "platform" |
+    None}`), ek sorgu yok. Kendi anahtarıyla koşacak model plan eşiğine
+    TAKILMAZ; video kuralı yine takar (K7).
     """
-    return configured and planlar.kapsiyor(plan, spec)
+    return configured and planlar.kapsiyor(
+        plan, spec, platform_anahtariyla=anahtar_kaynagi == platform_anahtari.KAYNAK_PLATFORM)
 
 
-def sebep(spec: catalog.ImageModel | catalog.ChatModel, configured: bool, plan: str) -> str | None:
+def sebep(spec: catalog.ImageModel | catalog.ChatModel, configured: bool, plan: str,
+          anahtar_kaynagi: str | None) -> str | None:
     """`available: false`nin nedeni: `"plan"` (anahtar olsa da açılmaz — plan önce) · `"anahtar"` · `None` (kullanılabilir)."""
-    if not planlar.kapsiyor(plan, spec):
+    if not planlar.kapsiyor(plan, spec,
+                            platform_anahtariyla=anahtar_kaynagi == platform_anahtari.KAYNAK_PLATFORM):
         return SEBEP_PLAN
     return None if configured else SEBEP_ANAHTAR
 
@@ -140,8 +148,9 @@ def model_payload(m: catalog.ImageModel, cfg: dict, kisa: dict, plan: str = plan
         # (yükseltme çağrısı Faz 4'ün satış yüzü, bugün rozet), `anahtar`ı
         # gizler (kullanıcı isteği, core.js `secilebilirler`). Kullanılabilir
         # modelde `None`.
-        "available": model_available(m, cfg.get(m.credential, False), plan),
-        "sebep": sebep(m, cfg.get(m.credential, False), plan),
+        "available": model_available(m, cfg.get(m.credential, False), plan,
+                                     (kaynaklar or {}).get(m.credential)),
+        "sebep": sebep(m, cfg.get(m.credential, False), plan, (kaynaklar or {}).get(m.credential)),
         # Bugün her modelde "free" (katalog verisi); video kuralı planın
         # özelliği ve `sebep`te görünüyor (services/planlar.py, K7).
         "requires_plan": m.plan,
@@ -237,8 +246,9 @@ def settings_payload(kimlikler: Mapping[str, str] | None = None, *,
              # dönerdi (bkz. credstore.chat_is_configured).
              "configured": chat_cfg.get(m.id, False),
              # Görsel şeridiyle AYNI iki alan, aynı gerekçe (model_available / sebep).
-             "available": model_available(m, chat_cfg.get(m.id, False), plan),
-             "sebep": sebep(m, chat_cfg.get(m.id, False), plan),
+             "available": model_available(m, chat_cfg.get(m.id, False), plan,
+                                          kaynaklar.get(m.credential)),
+             "sebep": sebep(m, chat_cfg.get(m.id, False), plan, kaynaklar.get(m.credential)),
              "requires_plan": m.plan,
              # Ayarlar formunun dağıtım adı kutusunun kapısı: KATALOGDAN
              # türetiliyor, istemcide sağlayıcı adı literal olarak
@@ -329,7 +339,13 @@ def director_context(db: Session, kullanici_id: uuid.UUID,
     """
     p = depo_tercih.oku(db, kullanici_id)
     m = catalog.image_model(p["image_model"])
-    cfg = credstore.configured_map(kimlikler)
+    # Sözlük BİR KEZ çözülüyor: `configured_map` de `platform_anahtari.kaynak`
+    # da aynı `Kimlikler`e bakmalı. `kimlikler=None` "isteğin bağlamı" demek
+    # (`credstore.degerler`) ve bağlamdaki nesne `kaynaklar`ı TAŞIYOR — ikinci
+    # kez çözseydik `kaynak` düz bir sözlük görüp her anahtarı "kullanici"
+    # sayardı, yani plan eşiği (1b-A) yönetmen menüsünde SESSİZCE düşerdi.
+    sozluk = credstore.degerler(kimlikler)
+    cfg = credstore.configured_map(sozluk)
     # PLAN da bu turun olgusu (Faz 3 / 3): yönetmen ücretsiz kullanıcıya video
     # modeli önermesin — arayüzde o model rozetli ve #go kapalı; öneri boşa
     # bir tur olurdu. Rota yüklü satırdan verir (`kapilar.kullanici_plani`, ek
@@ -343,7 +359,8 @@ def director_context(db: Session, kullanici_id: uuid.UUID,
     # satırda `kind` alanıyla açıkça taşınıyor.
     menu = [{**model_facts(x), "selected": x.id in secili}
             for x in catalog.IMAGE_MODELS + catalog.VIDEO_MODELS
-            if model_available(x, cfg.get(x.credential, False), plan)]
+            if model_available(x, cfg.get(x.credential, False), plan,
+                               platform_anahtari.kaynak(x.credential, sozluk))]
     # DİL de bu turun olgusu: persona "kullanıcı hangi dilde yazıyorsa o dilde
     # konuş" diyor, ama ilk mesaj dilsiz olabiliyor (tek kelime, bir oran, bir
     # hex kodu) ve o turda modelin elinde hiçbir işaret kalmıyor. Arayüz dili

@@ -2065,6 +2065,7 @@
         "tests/test_isci.py",
         "tests/test_isler_route.py",
         "tests/test_kimlik.py",
+        "tests/test_planlar.py",
         "tests/test_playwright_studio.py",
         "tests/test_rls.py",
         "tests/test_saglayici_meta.py",
@@ -2119,7 +2120,7 @@
         "routers.uretim"
       ],
       "katman": 11,
-      "satir": 272,
+      "satir": 285,
       "testler": [
         "tests/test_docker_kapisi.py",
         "tests/test_e2e_kredi.py",
@@ -2304,7 +2305,7 @@
         "routers.sohbet"
       ],
       "katman": 8,
-      "satir": 354,
+      "satir": 371,
       "testler": [
         "tests/test_planlar.py"
       ],
@@ -2392,7 +2393,7 @@
         "services.odeme"
       ],
       "katman": 6,
-      "satir": 136,
+      "satir": 180,
       "testler": [
         "tests/test_defter.py",
         "tests/test_docker_kapisi.py",
@@ -2427,6 +2428,7 @@
         "tests/test_gunluk.py",
         "tests/test_kota.py",
         "tests/test_kredi_route.py",
+        "tests/test_planlar.py",
         "tests/test_platform_anahtari.py"
       ],
       "yol": "services/platform_anahtari.py"
@@ -3943,7 +3945,7 @@
         "static/chat.js"
       ],
       "satir": 38,
-      "yardimci_sayisi": 10,
+      "yardimci_sayisi": 11,
       "yol": "/api/chat",
       "yontem": "POST"
     },

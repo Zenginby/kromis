@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import inspect
 import io
 import logging
 import os
@@ -47,7 +48,18 @@ import catalog
 import i18n
 import providers
 from routers import hesap as hesap_router
-from services import defter, depo_admin, kapilar, kiraci, kota, modeller, planlar, tablolar
+from services import (
+    defter,
+    depo_admin,
+    isci,
+    kapilar,
+    kiraci,
+    kota,
+    modeller,
+    planlar,
+    platform_anahtari,
+    tablolar,
+)
 from services.tablolar import KrediHareketi, Kullanici
 from tests.test_rls import ROL, uygulama_motoru  # noqa: F401 — SET ROLE fixture'ı (getfixturevalue)
 
@@ -204,7 +216,7 @@ def test_the_plan_catalogue_matches_the_db_check_set_and_the_admin_selector():
     assert tuple(planlar.PLANLAR) == tablolar.PLANLAR_KUMESI == ("free", "temel", "pro")
     for ad, plan in planlar.PLANLAR.items():
         assert plan.ad == ad and plan.fiyat is None and plan.aylik_hibe >= 0
-    assert planlar.PLANLAR["free"] == planlar.Plan("free", HIBE, filigran=True, video=False)
+    assert planlar.PLANLAR["free"] == planlar.Plan("free", HIBE, filigran=True, video=False, rank=0)
     assert not planlar.PLANLAR["free"].video and planlar.PLANLAR["temel"].video and planlar.PLANLAR["pro"].video
     assert planlar.PLANLAR["free"].filigran and not planlar.PLANLAR["pro"].filigran
     with open(os.path.join(REPO, "static", "admin.js"), encoding="utf-8") as f:
@@ -230,20 +242,88 @@ def test_the_free_grant_comes_from_the_environment_empty_is_200_and_garbage_is_l
 
 # ── (ii) kapı ──────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("spec, configured, plan, beklenen, sebep", [
-    (SPEC, True, "free", True, None),                     # görsel + anahtar → açık
-    (SPEC, False, "free", False, "anahtar"),              # görsel, anahtar yok
-    (VIDEO_SPEC, True, "free", False, "plan"),            # video, ücretsiz: anahtar olsa da kapalı (K7)
-    (VIDEO_SPEC, True, "pro", True, None),                # video, pro → açık
-    (VIDEO_SPEC, False, "pro", False, "anahtar"),         # video, pro, anahtar yok
-    (VIDEO_SPEC, False, "free", False, "plan"),           # iki sebep birden: plan önce
-    (dataclasses.replace(SPEC, plan="pro"), True, "free", False, "plan"),   # katalog `plan` alanı okunur
-    (dataclasses.replace(SPEC, plan="pro"), True, "temel", True, None),
+PLATFORM = platform_anahtari.KAYNAK_PLATFORM
+BENIM = platform_anahtari.KAYNAK_KULLANICI
+
+# Üç eksen birden taranıyor (§1b "basamak bekçisi"): kullanıcının planı ×
+# modelin istediği basamak × anahtarın kaynağı. Tek yol denemek yetmezdi —
+# `kapsiyor`un imzası 1b'de değişti ve üç çağıranı var; risk notu ("biri
+# unutulursa kapı sessizce gevşer") ancak kombinasyon taranırsa kapanır.
+@pytest.mark.parametrize("spec, configured, plan, kaynak, beklenen, sebep", [
+    (SPEC, True, "free", PLATFORM, True, None),                 # görsel + anahtar → açık
+    (SPEC, False, "free", None, False, "anahtar"),              # görsel, anahtar yok
+    (VIDEO_SPEC, True, "free", PLATFORM, False, "plan"),        # video, ücretsiz: anahtar olsa da kapalı (K7)
+    (VIDEO_SPEC, True, "pro", PLATFORM, True, None),            # video, pro → açık
+    (VIDEO_SPEC, False, "pro", None, False, "anahtar"),         # video, pro, anahtar yok
+    (VIDEO_SPEC, False, "free", None, False, "plan"),           # iki sebep birden: plan önce
+    # ── BASAMAK (1b-B): "yalnız pro" artık İFADE EDİLEBİLİR ──
+    (dataclasses.replace(SPEC, plan="pro"), True, "free", PLATFORM, False, "plan"),
+    (dataclasses.replace(SPEC, plan="pro"), True, "temel", PLATFORM, False, "plan"),
+    (dataclasses.replace(SPEC, plan="pro"), True, "pro", PLATFORM, True, None),
+    (dataclasses.replace(SPEC, plan="temel"), True, "free", PLATFORM, False, "plan"),
+    (dataclasses.replace(SPEC, plan="temel"), True, "temel", PLATFORM, True, None),
+    (dataclasses.replace(SPEC, plan="temel"), True, "pro", PLATFORM, True, None),  # üst basamak alt modeli görür
+    # ── BYOK (1b-A): kendi anahtarı EŞİĞİ aşar, VİDEOYU aşmaz ──
+    (dataclasses.replace(SPEC, plan="pro"), True, "free", BENIM, True, None),
+    (dataclasses.replace(SPEC, plan="temel"), True, "free", BENIM, True, None),
+    (VIDEO_SPEC, True, "free", BENIM, False, "plan"),
 ])
-def test_model_available_reads_the_plan_and_sebep_names_the_reason(spec, configured, plan, beklenen, sebep):
-    assert modeller.model_available(spec, configured, plan) is beklenen
-    assert modeller.sebep(spec, configured, plan) == sebep
-    assert planlar.kapsiyor(plan, spec) is (sebep != "plan")
+def test_model_available_reads_the_plan_and_sebep_names_the_reason(spec, configured, plan, kaynak, beklenen, sebep):
+    assert modeller.model_available(spec, configured, plan, kaynak) is beklenen
+    assert modeller.sebep(spec, configured, plan, kaynak) == sebep
+    assert planlar.kapsiyor(plan, spec, platform_anahtariyla=kaynak == PLATFORM) is (sebep != "plan")
+
+
+def test_the_plan_ranks_are_a_contiguous_ascending_ladder_in_the_check_sets_order():
+    """1b-B basamak bekçisi: `rank` ↔ `PLANLAR_KUMESI` sırası ayrışmasın.
+
+    `rank` BİLEREK türetilmiyor (gerekçe `Plan.rank`ın yorumunda: o demetin
+    sözleşmesi CHECK kümesi, sıralama değil). Türetilmeyen her şeyin bekçisi
+    bir testtir — ikisi ayrıştığı gün burası kırmızı olur, kapı sessizce
+    yanlış sıraya geçmez.
+    """
+    sirali = [planlar.PLANLAR[ad].rank for ad in tablolar.PLANLAR_KUMESI]
+    assert sirali == list(range(len(tablolar.PLANLAR_KUMESI))) == [0, 1, 2]
+    assert planlar.PLANLAR["free"].rank < planlar.PLANLAR["temel"].rank < planlar.PLANLAR["pro"].rank
+
+
+def test_the_key_source_gate_never_opens_video_and_never_changes_the_watermark():
+    """1b-A'nın İKİ SINIRI: kendi anahtarı eşiği aşar, ama video kapısını ve filigranı AŞMAZ (K7).
+
+    Bu testin var olma sebebi, 1b-A'nın kendi cümlesi: kural anahtarın kimin
+    olduğuna değil FİLİGRAN YOKLUĞUNA dayanıyor (sunucuda ffmpeg yok) ve
+    anahtarın sahibi o yokluğu değiştirmiyor. Eşik gevşerken bu ikisinin de
+    gevşemesi, kapının en kolay yanlış genellemesi olurdu.
+    """
+    pahali = dataclasses.replace(SPEC, plan="pro")
+    # Eşik: kendi anahtarıyla AŞILIR.
+    assert planlar.kapsiyor("free", pahali, platform_anahtariyla=False)
+    assert not planlar.kapsiyor("free", pahali, platform_anahtariyla=True)
+    # Video: kendi anahtarıyla AŞILMAZ — iki kaynakta da kapalı.
+    for platformla in (True, False):
+        assert not planlar.kapsiyor("free", VIDEO_SPEC, platform_anahtariyla=platformla)
+        assert planlar.kapsiyor("pro", VIDEO_SPEC, platform_anahtariyla=platformla)
+    # Filigran: karar anahtarın sahibine BAKMIYOR. İmza denetimi YETMEZ —
+    # `_filigranlanir` işin SATIRINI alıyor ve `Is.anahtar_kaynagi` o satırda
+    # duruyor, yani alan erişimiyle sessizce okunabilirdi. Bu yüzden gövde
+    # taranıyor: K7'nin taşıyıcı cümlesi ("kendi anahtarıyla pahalı model
+    # kullanan ücretsiz kullanıcı yine FİLİGRANLI çıktı alır") ancak böyle
+    # mandallanır.
+    assert list(inspect.signature(isci._filigranlanir).parameters) == ["is_", "plan"]
+    assert "anahtar_kaynagi" not in inspect.getsource(isci._filigranlanir)
+
+
+def test_kapsiyor_has_no_default_for_the_key_source_so_a_forgotten_caller_is_loud():
+    """Öntanımlı bir değer, unutulan çağıranda eşiği SESSİZCE atlatırdı (§1b risk notu).
+
+    İmza anahtar sözcüklü ve öntanımsız: üç çağıranın biri güncellenmezse
+    `TypeError` — kapı gevşemiyor, takım kırmızı oluyor.
+    """
+    p = inspect.signature(planlar.kapsiyor).parameters["platform_anahtariyla"]
+    assert p.default is inspect.Parameter.empty, "öntanımlı değer kapıyı sessizce gevşetir"
+    assert p.kind is inspect.Parameter.KEYWORD_ONLY
+    with pytest.raises(TypeError):
+        planlar.kapsiyor("free", SPEC)
 
 
 def test_a_free_user_posting_video_gets_403_with_the_body_and_no_row_or_object(c, depo_db, kullanici, tmp_path):
@@ -599,15 +679,42 @@ def test_the_plan_gate_helper_reads_the_loaded_row_without_a_second_query(depo_d
             event.remove(depo_db, "before_cursor_execute", _say)
 
 
+def _kimlikler(spec, kaynak):
+    """Tek kimliği `kaynak`a ayarlanmış bir `Kimlikler` — `check_plan`ın okuduğu tek şey bu."""
+    cred = catalog.credential(spec.credential)
+    assert cred is not None
+    return platform_anahtari.Kimlikler({cred.key_env: "x"}, {cred.key_env: kaynak})
+
+
 def test_check_plan_is_the_route_side_of_the_same_rule(depo_db, kullanici):
+    platform = _kimlikler(SPEC, PLATFORM)
+    video_platform = _kimlikler(VIDEO_SPEC, PLATFORM)
     with Session(depo_db) as s:
-        assert kapilar.check_plan(s, kullanici, SPEC) == "free"
+        assert kapilar.check_plan(s, kullanici, SPEC, platform) == "free"
         with pytest.raises(HTTPException) as e:
-            kapilar.check_plan(s, kullanici, VIDEO_SPEC)
+            kapilar.check_plan(s, kullanici, VIDEO_SPEC, video_platform)
         assert e.value.status_code == 403
         assert e.value.detail == {"kod": "err.plan_kapsamiyor", "model": VIDEO_SPEC.id, "plan": "free"}
         assert depo_admin.plan_yaz(s, kullanici.id, "temel") and s.commit() is None
         yuklu = s.get(Kullanici, kullanici.id)
         assert yuklu is not None
         s.expire(yuklu)   # bağlı nesne yeniden okur — kimlik kapısının her istekte verdiği taze satır
-        assert kapilar.check_plan(s, yuklu, VIDEO_SPEC) == "temel"
+        assert kapilar.check_plan(s, yuklu, VIDEO_SPEC, video_platform) == "temel"
+
+
+def test_check_plan_lets_a_free_user_through_on_a_pro_model_when_the_key_is_theirs(depo_db, kullanici):
+    """1b-A rota tarafında: eşik yalnız PLATFORM anahtarına uygulanır.
+
+    Aynı kullanıcı, aynı model, tek fark anahtarın sahibi — biri 403, öteki
+    geçiyor. `model_available`ın verdiği cevapla birebir aynı olmak zorunda:
+    dökümde görünen model rotada 403 alırsa arayüz "seçilebilir 403" üretirdi.
+    """
+    pahali = dataclasses.replace(SPEC, plan="pro")
+    with Session(depo_db) as s:
+        with pytest.raises(HTTPException) as e:
+            kapilar.check_plan(s, kullanici, pahali, _kimlikler(pahali, PLATFORM))
+        assert e.value.status_code == 403 and e.value.detail["plan"] == "free"
+        assert kapilar.check_plan(s, kullanici, pahali, _kimlikler(pahali, BENIM)) == "free"
+        # Video AŞILMIYOR: kendi anahtarı bu kapıyı açmıyor (K7).
+        with pytest.raises(HTTPException):
+            kapilar.check_plan(s, kullanici, VIDEO_SPEC, _kimlikler(VIDEO_SPEC, BENIM))

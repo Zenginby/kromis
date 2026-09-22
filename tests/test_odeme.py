@@ -9,8 +9,9 @@ fixture'ının kimlik override'ı bu rotaya dokunmaz.
 Sorular:
   (i)   İMZA — geçerli/yanlış sır/eksik başlık/eski damga/bozuk imza/oynanmış gövde
         → `ImzaHatasi`; JSON dışı ya da `type`siz gövde → `YukHatasi`; sır yoksa
-        `YapilandirmaHatasi`; SDK'nın `validate_event`i bizim imzamızı KABUL eder
-        (aynı sır dönüşümü); ortam boş = sandbox, bozuk = gürültü.
+        `YapilandirmaHatasi`; SDK'nın `validate_event`i bizim imzamızı REDDEDER (SDK'nın anahtar
+        türetmesi hatalı, ölçüldü — `services/polar.py`); ortam boş = sandbox,
+        bozuk = gürültü.
   (ii)  ROTA — 503 sırsız, 413 büyük gövde, 400 imza, 200 `islendi`/`yinelenen`/`atlandi`,
         500 iç hata (olay satırı YOK — aynı transaksiyon).
   (iii) İDEMPOTENCY ÜÇ KATMAN — aynı `webhook-id` → satır sayısı aynı; aynı sipariş iki
@@ -50,7 +51,39 @@ pytestmark = pytest.mark.usefixtures("depo_db")
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES = os.path.join(REPO, "tests", "fixtures", "polar")
 # gitleaks dersi (Faz 2 / 9): sır sabit ve `DUMMY`li — gerçek bir sırra benzemez.
-SIR = "DUMMY_polar_webhook_sirri_0123456789abcdef"
+# BİÇİM Polar'ınkiyle AYNI OLMAK ZORUNDA (2026-09-22): Polar'ın sırrı
+# `whsec_<base64>` ve kütüphane öneki soyup base64'ü ÇÖZER, yani anahtar o
+# baytlardır. Buraya düz bir dize yazılıydı; geçerli base64 olmadığı için
+# gerçek sırla çalışan kod testte `binascii.Error` veriyordu — sabit, sınadığı
+# şeyin biçiminde olmazsa bekçi kendi kusurunu saklar. Önek ÇALIŞMA ANINDA
+# ekleniyor (`_onekli`): `whsec_` + base64 dizisi dosyada yan yana durursa
+# gitleaks'in sır tarayıcısı haklı olarak bağırır.
+SIR = "RFVNTVktcG9sYXItd2ViaG9vay1zaWduaW5nLWtleSE="   # base64("DUMMY-polar-webhook-signing-key!")
+# "Yanlış sır" da GEÇERLİ base64 olmalı: kütüphane sırrı çözerek anahtar yapıyor,
+# rastgele bir dize (`"x"`, `"baska-sir"`) `binascii.Error` verir — sınanmak istenen
+# şey imzanın TUTMAMASI, sırrın biçimsiz olması değil.
+BASKA_SIR = "RFVNTVktYmFza2Etc2lyLWhpYy10dXRtYXlhbi1rZXk="   # base64("DUMMY-baska-sir-hic-tutmayan-key")
+
+
+def _onekli(sir: str = SIR) -> str:
+    """Polar'ın verdiği biçim: `whsec_` + base64. Önek burada birleştiriliyor (gerekçe yukarıda)."""
+    return "whsec_" + sir
+
+
+def _spec_imzasi(sir: str, webhook_id: str, zaman: int, govde: bytes) -> str:
+    """Standard Webhooks imzası — deponun kodundan BAĞIMSIZ, doğrudan spesifikasyondan.
+
+    Bekçinin bağımsız olması şart: `imzala`/`olay_dogrula` aynı `_anahtar`la
+    gidip geldiği için YANLIŞ bir anahtar da kendi içinde tutarlıdır ve gidiş
+    dönüş testi onu göremez (2026-09-22'de tam olarak bu oldu — canlı Polar her
+    teslimatı 400'e düşürürken takım yeşildi).
+    """
+    import base64 as _b64
+    import hashlib
+    import hmac
+    anahtar = _b64.b64decode(sir)
+    icerik = f"{webhook_id}.{zaman}.".encode() + govde
+    return "v1," + _b64.b64encode(hmac.new(anahtar, icerik, hashlib.sha256).digest()).decode()
 YOL = "/api/odeme/webhook"
 AN = dt.datetime(2026, 9, 21, 12, 0, tzinfo=dt.UTC)
 URUN_PAKET = "00000000-0000-4000-8000-00000000e001"
@@ -258,17 +291,39 @@ def test_a_validly_signed_body_that_is_not_an_event_envelope_is_a_payload_error_
         polar.olay_dogrula(b"\xff\xfe", polar.imzala(b"{}", SIR, webhook_id="wh_bayt"), sir=SIR)
 
 
-def test_the_sdk_accepts_our_signature_so_the_secret_convention_is_the_sdks(depo_db):
-    """`_anahtar` = SDK `validate_event`in dönüşümü: SDK bizim imzaladığımız gövdeyi aynı ham sırla doğrular."""
-    from polar_sdk.webhooks import WebhookVerificationError, validate_event
+def test_we_verify_the_signature_POLAR_actually_sends_not_the_one_the_sdk_builds(depo_db):
+    """Bekçi: imza kuralımız SPESİFİKASYONUN, yani Polar'ın gönderdiğinin ta kendisi.
+
+    Burada eskiden "SDK bizim imzamızı doğruluyor" yazıyordu ve YEŞİLDİ — ama
+    yanlış şeyi mühürlüyordu. 2026-09-22'de canlı sandbox'ta ölçüldü: Polar'ın
+    ÜÇ gerçek teslimatı yakalanıp dört aday anahtarla HMAC hesaplandı, yalnız
+    `b64decode(sır)` eşleşti. `polar_sdk` 0.32.0'ın `validate_event`i ise sırrı
+    base64'LER (`_webhooks/__init__.py:122`), yani anahtarı sırrın ASCII
+    baytları yapar — o kuralla her gerçek teslimat 400 `imza_gecersiz` olur.
+    SDK'ya değil Polar'a uyuyoruz; bu testin bağımsız oracle'ı `_spec_imzasi`.
+    """
     yuk = _yuk("order_paid_purchase")
     govde = json.dumps(yuk).encode()
-    b = polar.imzala(govde, SIR, webhook_id="wh_sdk")
-    model = validate_event(govde, b, SIR)
-    assert type(model).__name__ == "WebhookOrderPaidPayload"
-    assert model.data.customer.external_id == yuk["data"]["customer"]["external_id"]
+    # Zaman TAZE olmalı: kütüphanenin ±5 dk toleransı sabit bir geçmiş anı reddeder.
+    simdi = dt.datetime.now(tz=dt.UTC)
+    wid, zaman = "wh_spec", int(simdi.timestamp())
+    basliklar = {"webhook-id": wid, "webhook-timestamp": str(zaman),
+                 "webhook-signature": _spec_imzasi(SIR, wid, zaman, govde)}
+
+    olay = polar.olay_dogrula(govde, basliklar, sir=SIR)
+    assert olay.tur == "order.paid" and olay.webhook_id == wid
+
+    # Polar sırrı `whsec_` önekiyle verir; kütüphane öneki soyar, sonuç AYNI.
+    assert polar.olay_dogrula(govde, basliklar, sir=_onekli()).tur == "order.paid"
+
+    # Kendi `imzala`mız da aynı kuralı üretir (gidiş dönüş hâlâ tutarlı).
+    assert polar.imzala(govde, SIR, webhook_id=wid,
+                        zaman=simdi)["webhook-signature"] == basliklar["webhook-signature"]
+
+    # Ve SDK'nın kuralı bu gövdeyi REDDEDER — sapma bilinçli, kayıtlı.
+    from polar_sdk.webhooks import WebhookVerificationError, validate_event
     with pytest.raises(WebhookVerificationError):
-        validate_event(govde, b, SIR + "x")
+        validate_event(govde, basliklar, SIR)
 
 
 @pytest.mark.parametrize("ad", sorted(a[:-5] for a in os.listdir(FIXTURES) if a.endswith(".json")))
@@ -316,7 +371,7 @@ def test_the_route_is_sessionless_and_answers_503_without_a_secret_413_to_a_huge
     assert (r.status_code, r.json()) == (503, {"detail": "odeme_yapilandirilmadi"})
     monkeypatch.setenv(polar.WEBHOOK_SIRRI_ENV, SIR)
     # Sırsız/yanlış sırlı çağrı: 400 + kod; gövde HİÇ işlenmez, satır yok.
-    r = _gonder(c, yuk, sir="baska-sir")
+    r = _gonder(c, yuk, sir=BASKA_SIR)
     assert (r.status_code, r.json()) == (400, {"detail": "imza_gecersiz"})
     r = c.post(YOL, content=json.dumps(yuk).encode(), headers={"content-type": "application/json"})
     assert r.status_code == 400
@@ -333,7 +388,7 @@ def test_the_route_is_sessionless_and_answers_503_without_a_secret_413_to_a_huge
     assert _olaylar(depo_db) == []
     assert "odeme.imza_gecersiz" in gunluk_kaydi.olaylar()
     # Oturum çerezi, CSRF/Origin yok — Polar'ın sunucusu böyle gelir; köken kapısı başlıksız POST'u geçirir.
-    assert "cookie" not in {k.lower() for k in _gonder(c, yuk, sir="x").request.headers}
+    assert "cookie" not in {k.lower() for k in _gonder(c, yuk, sir=BASKA_SIR).request.headers}
 
 
 def test_an_internal_error_rolls_back_the_event_row_too_and_answers_500_so_polar_retries(

@@ -21,10 +21,11 @@ bekçisi tests/test_docker_kapisi.py `ALTYAPI`):
 İMZA — STANDARD WEBHOOKS, SDK'NIN AYNI İLKELİ (doğrulandı 2026-09-21, `polar-sdk`
 0.32.0 kaynağı `polar_sdk/_webhooks/__init__.py`): `validate_event(body, headers,
 secret)` = `standardwebhooks.Webhook(base64(secret)).verify(body, headers)` + tür
-ayrımı + pydantic modeli. Biz aynı `Webhook` sınıfını AYNI sır dönüşümüyle
-çağırıyoruz (`_anahtar`: Polar'ın verdiği ham sır base64'lenir, kütüphane geri
-çözer — HMAC anahtarı ham sırın baytları; `whsec_` önekli sır gelirse de SDK gibi
-davranır, önek soyulmaz), pydantic modeline GİRMİYORUZ — gerekçe belge §3
+ayrımı + pydantic modeli. Biz aynı `Webhook` sınıfını kullanıyoruz ama SIR
+DÖNÜŞÜMÜNDE SDK'DAN SAPIYORUZ: sır olduğu gibi verilir, kütüphane `whsec_`
+önekini soyup base64'ü çözer (gerekçe ve ölçüm `_anahtar`da — SDK'nın dönüşümü
+Polar'ın bugünkü sırrıyla her teslimatı 400'e düşürüyor). Pydantic modeline
+GİRMİYORUZ — gerekçe belge §3
 "Sapmalar (a)": SDK'nın modeli Polar şemasının o günkü hâlini ZORUNLU alan
 alan ister; Polar bir enum değeri ya da alan eklediğinde bizim işimize yaramayan
 bir doğrulama hatası 500 olur, Polar saatlerce yeniden dener ve sonunda ucu
@@ -45,7 +46,6 @@ hiç ihtiyaç duymaz, testler onu hiç yüklemez. `istemci()` çağrılınca ith
 """
 from __future__ import annotations
 
-import base64
 import dataclasses
 import datetime as dt
 import os
@@ -138,8 +138,27 @@ def webhook_sirri(ortam_map: Mapping[str, str] | None = None) -> str | None:
 
 
 def _anahtar(sir: str) -> str:
-    """Polar'ın ham sırı → `standardwebhooks`un beklediği base64 (SDK `validate_event`in birebir dönüşümü)."""
-    return base64.b64encode(sir.encode()).decode()
+    """Sır, `standardwebhooks`a OLDUĞU GİBİ verilir — kütüphane `whsec_` önekini soyar ve base64'ü çözer.
+
+    SDK'DAN BİLEREK SAPMA, ÖLÇÜLDÜ 2026-09-22 (canlı sandbox). Burada
+    `base64.b64encode(sir.encode())` yazıyordu — `polar_sdk` 0.32.0'ın
+    `validate_event`i birebir bu (`_webhooks/__init__.py:122`). O dönüşüm
+    Polar'ın BUGÜN ürettiği sırla ÇALIŞMIYOR: base64'lenmiş dize `whsec_` ile
+    başlamadığı için kütüphane öneki soymaz, base64'ü çözer ve HMAC anahtarı
+    sırın ASCII baytları olur. Oysa Polar, Standard Webhooks kuralıyla
+    imzalıyor: anahtar = `whsec_` sonrasının base64 ÇÖZÜMÜ.
+
+    Üç gerçek Polar teslimatı yakalanıp (başlık + ham gövde) dört aday anahtarla
+    HMAC hesaplandı; yalnız bu kural eşleşti, üçünde de:
+
+        imza = base64(HMAC-SHA256(b64decode(sır[6:]), f"{id}.{zaman}." + gövde))
+
+    Belirti: her teslimat 400 `imza_gecersiz`, uç hiç çalışmaz, Polar saatlerce
+    yeniden dener. Testler bunu GÖRMÜYORDU çünkü `imzala`/`olay_dogrula` aynı
+    `_anahtar`la gidip geliyor — yanlış anahtar da kendi içinde tutarlıdır;
+    bekçisi artık `test_odeme.py`de bağımsız hesaplanan gerçek bir imza.
+    """
+    return sir
 
 
 def olay_dogrula(govde: bytes, basliklar: Mapping[str, str], *, sir: str | None = None) -> Olay:

@@ -65,8 +65,8 @@
 | POST | `/api/logo` | `routers/bindirme.py` | `add_logo`:94 | `assets_store`, `catalog`, `composite`, `i18n`, `models`, `storage` | `assets.js` |
 | POST | `/api/logo/preview` | `routers/bindirme.py` | `preview_logo`:82 | `assets_store`, `composite`, `i18n`, `models` | `assets.js` |
 | POST | `/api/odeme/checkout` | `routers/odeme.py` | `checkout`:160 | — | `planlar.js` |
-| GET | `/api/odeme/portal` | `routers/odeme.py` | `portal`:189 | — | `planlar.js`, `settings.js` |
-| GET | `/api/odeme/urunler` | `routers/odeme.py` | `urunler`:203 | — | `planlar.js` |
+| GET | `/api/odeme/portal` | `routers/odeme.py` | `portal`:195 | — | `planlar.js`, `settings.js` |
+| GET | `/api/odeme/urunler` | `routers/odeme.py` | `urunler`:209 | — | `planlar.js` |
 | POST | `/api/odeme/webhook` | `routers/odeme.py` | `webhook`:126 | — | — |
 | GET | `/api/output/{image_id}/download` | `routers/galeri.py` | `output_download`:360 | `i18n`, `storage` | `core.js` |
 | POST | `/api/palette/suggest` | `routers/paletler.py` | `suggest_palettes`:33 | `color_names`, `models`, `palette` | `palette.js` |

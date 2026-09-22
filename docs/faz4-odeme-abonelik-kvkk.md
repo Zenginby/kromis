@@ -1267,8 +1267,8 @@ portal 404/200, `/api/kredi` son 10 sipariş, iki sayfa × iki dil, id bağları
 412 → onay → "Öde" → GERÇEK HMAC'li `order.paid` webhook → teşekkür sayfası
 "bakiyene işlendi" 200 → **700**, defter `hibe, paket`, sipariş 500; plan
 `temel` → pro'ya "Abone ol" 409 → portal düğmesi yamalı URL'ye gider). Takım
-**4.067 → 4.115 geçti, 12 atlandı, ~270 sn** (E2E + Postgres, `KROMIS_E2E_ZORUNLU=1`;
-toplanan 4.079 → 4.127). Bu makinede bir kez `tests/test_isci.py`nin açılış/aralık
+**4.067 → 4.124 geçti, 12 atlandı, ~270 sn** (E2E + Postgres, `KROMIS_E2E_ZORUNLU=1`;
+toplanan 4.079 → 4.136; inceleme turu +9). Bu makinede bir kez `tests/test_isci.py`nin açılış/aralık
 bakım turu testi yük altında düştü (sinyal ile kapanış arasına ikinci bir `bakim`
 sıkıştı) — tek başına iki dalda da yeşil, bu PR'la ilgisiz; not düşüldü. **Sandbox uçtan uca ölçüm YAPILMADI** (Polar erişimi yok; sahibin
 adımı PR gövdesinde).
@@ -1319,6 +1319,16 @@ kurar**: belge "admin bağlamı gereksiz" demişti (doğru — `urunler` politik
 ama tests/test_rls.py'nin kaynak bekçisi `Session(` açan her aracı bağlamla
 ister; istisna defteri açmak yerine kural sürdürüldü, `BAGLAM_TASIYAN_ARACLAR` +1.
 Belgenin kalan cümleleri aynen uygulandı.
+
+**Açık kalan (inceleme notu, 2026-09-22) — teşekkür sayfasının kanıtı zayıf.**
+Sayfa "işlendi"yi `siparisler[0]` son 15 dk içindeyse söylüyor (sapma (f)):
+aynı 15 dk içinde İKİNCİ bir satın alma, ilk siparişi görüp eski bakiyeyle
+"işlendi" diyebilir (bakiye rakamı yine gerçek — yalnız cümle erken).
+Doğru çözüm `checkout_id`yi `siparisler`e yazmak (Polar `order.checkout_id`
+alanını gönderiyor; webhook `_siparis_yaz` okur) ve sayfanın `?checkout_id=`
+ile eşleştirmesi — GÖÇ ister (`siparisler.checkout_id text NULL` + indeks),
+bu PR'da açılmadı. 7. görevin ya da küçük bir ara PR'ın işi; o güne kadar
+kullanıcı yüzü dürüst kalıyor (bakiye doğru, teşekkür cümlesi en kötü erken).
 
 ---
 

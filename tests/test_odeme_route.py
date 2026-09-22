@@ -255,8 +255,12 @@ def test_a_user_on_a_paid_plan_gets_409_with_the_portal_hint_for_a_plan_product_
     _yaz(depo_db, kullanici.id, plan="temel")
     r = _checkout(c, urunler["pro"].id)
     assert r.status_code == 409, r.text
-    assert r.json()["detail"] == {"kod": "err.abonelik_var", "portal": True, "plan": "temel"}
+    assert r.json()["detail"] == {"kod": "err.abonelik_var", "portal": True, "plan": "temel", "plan_bitis": None}
     assert _checkout(c, urunler["temel"].id).status_code == 409, "aynı plan da portaldan"
+    # İptal edilmiş abonelik: dönem sonu cevapta (sayfa "dönem sonunda ücretsiz plana geçer" der).
+    _yaz(depo_db, kullanici.id, plan_bitis=dt.datetime(2026, 10, 21, 12, 0, tzinfo=dt.UTC))
+    assert _checkout(c, urunler["pro"].id).json()["detail"]["plan_bitis"] == "2026-10-21T12:00:00Z"
+    _yaz(depo_db, kullanici.id, plan_bitis=None)
     assert sahte_polar.cagrilar == []
     assert _checkout(c, urunler["paket"].id).status_code == 200, "paket aboneliğe bağlı değil"
     # Ücretsiz kullanıcı plana abone olabilir (free → ücretli checkout'tan).
@@ -274,10 +278,16 @@ def test_a_polar_failure_is_502_with_the_provider_code_and_an_error_line_for_sen
     _yaz(depo_db, kullanici.id, polar_musteri_id="00000000-0000-4000-8000-00000000d001")
     r = _checkout(c, urunler["paket"].id)
     assert r.status_code == 502 and r.json()["detail"] == {"kod": "err.odeme_saglayici"}
+    # Onay Polar'dan önce yazılır ama istek kapsamlı oturum 502'de ROLLBACK eder: damga kalmaz (rota yorumu).
+    _yaz(depo_db, kullanici.id, sartlar_kabul_at=None, sartlar_surumu=None)
+    assert _checkout(c, urunler["paket"].id, sartlar_kabul=True).status_code == 502
+    assert _satir(depo_db, kullanici.id).sartlar_kabul_at is None, "502'de onay damgası geri alındı"
+    _sartlar_onayli(depo_db, kullanici)
     r = c.get("/api/odeme/portal")
     assert r.status_code == 502 and r.json()["detail"] == {"kod": "err.odeme_saglayici"}
     hatalar = [(s, a) for s, a in gunluk_kaydi.kayitlar if a.get("olay") == "odeme.saglayici_hata"]
-    assert [(s, a["islem"]) for s, a in hatalar] == [(logging.ERROR, "checkout"), (logging.ERROR, "portal")]
+    assert [(s, a["islem"]) for s, a in hatalar] == [(logging.ERROR, "checkout"), (logging.ERROR, "checkout"),
+                                                     (logging.ERROR, "portal")]
     assert all(a["kullanici_id"] == str(kullanici.id) for _, a in hatalar)
     assert "sandbox-api.polar.sh 503" not in r.text, "sağlayıcının metni kullanıcıya gitmez"
 

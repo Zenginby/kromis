@@ -125,6 +125,19 @@ def test_a_free_user_accepts_the_terms_buys_a_pack_on_the_fake_polar_and_sees_th
     monkeypatch.setattr(polar, "portal_baglantisi", _portal)
 
     server.start()
+    # `try` iki sunucu ayağa kalktığı AN başlar: tohumlama ya da `e2e_oturum` düşerse
+    # `finally` yine kapatır — aksi hâlde iki daemon iş parçacığı bağlı port'la takımın
+    # sonuna kadar yaşardı (conftest `_eski_e2e_sunuculari_kapansin`in ölçtüğü sınıf).
+    try:
+        _akis(monkeypatch, e2e_oturum, taban, yerel, port, portal_cagrilari)
+    finally:
+        yerel.shutdown()
+        yerel.server_close()
+        server.stop()
+
+
+def _akis(monkeypatch, e2e_oturum, taban: str, yerel: _YerelPolar, port: int, portal_cagrilari: list[str]) -> None:
+    """Testin gövdesi — tohum + tarayıcı akışı; kaynak kapanışı çağırandaki `finally`de."""
     oturum = e2e_oturum(dil="tr")
     with oturum.db() as db:
         db.add_all([
@@ -150,67 +163,62 @@ def test_a_free_user_accepts_the_terms_buys_a_pack_on_the_fake_polar_and_sees_th
             return k
 
     sunucu_hazir(port)
-    try:
-        with sync_playwright() as p:
-            tarayici = p.chromium.launch(headless=True)
-            page = tarayici.new_page()
-            oturum.cerez(page, taban)
+    with sync_playwright() as p:
+        tarayici = p.chromium.launch(headless=True)
+        page = tarayici.new_page()
+        oturum.cerez(page, taban)
 
-            # 1. Satış sayfası: üç plan kartı (ücretsiz "mevcut"), paket kartı fiyatıyla.
-            page.goto(f"{taban}/planlar")
-            page.wait_for_selector("#planlar-paketler .plan-kart")
-            assert page.locator("#planlar-planlar .plan-kart").count() == 3
-            assert page.locator('#planlar-planlar .plan-kart[data-plan="free"][data-mevcut="true"]').count() == 1
-            assert i18n.t("planlar.mevcut_plan", "tr") in page.inner_text('#planlar-planlar .plan-kart[data-plan="free"]')
-            assert "500 kredi" in page.inner_text("#planlar-paketler")
-            assert page.is_hidden("#planlar-sartlar") and page.is_hidden("#planlar-portal")
+        # 1. Satış sayfası: üç plan kartı (ücretsiz "mevcut"), paket kartı fiyatıyla.
+        page.goto(f"{taban}/planlar")
+        page.wait_for_selector("#planlar-paketler .plan-kart")
+        assert page.locator("#planlar-planlar .plan-kart").count() == 3
+        assert page.locator('#planlar-planlar .plan-kart[data-plan="free"][data-mevcut="true"]').count() == 1
+        assert i18n.t("planlar.mevcut_plan", "tr") in page.inner_text('#planlar-planlar .plan-kart[data-plan="free"]')
+        assert "500 kredi" in page.inner_text("#planlar-paketler")
+        assert page.is_hidden("#planlar-sartlar") and page.is_hidden("#planlar-portal")
 
-            # 1b. Şartlar onaysız → 412 → kutu görünür; işaretle, onayla → Polar'a (yerel) gidilir.
-            page.click('#planlar-paketler .plan-kart button')
-            page.wait_for_selector("#planlar-sartlar:not([hidden])")
-            assert page.inner_text("#planlar-mesaj") == i18n.t("err.sartlar_gerekli", "tr")
-            assert page.is_disabled("#planlar-sartlar-onayla")
-            page.check("#planlar-sartlar-kutu")
-            page.click("#planlar-sartlar-onayla")
-            page.wait_for_selector("#polar")
-            assert page.url.startswith(f"{yerel.taban}/checkout?")
-            k = satir()
-            assert k.sartlar_kabul_at is not None and k.sartlar_surumu, "onay checkout'tan önce yazıldı"
-            assert bakiye().toplam == 200
+        # 1b. Şartlar onaysız → 412 → kutu görünür; işaretle, onayla → Polar'a (yerel) gidilir.
+        page.click('#planlar-paketler .plan-kart button')
+        page.wait_for_selector("#planlar-sartlar:not([hidden])")
+        assert page.inner_text("#planlar-mesaj") == i18n.t("err.sartlar_gerekli", "tr")
+        assert page.is_disabled("#planlar-sartlar-onayla")
+        page.check("#planlar-sartlar-kutu")
+        page.click("#planlar-sartlar-onayla")
+        page.wait_for_selector("#polar")
+        assert page.url.startswith(f"{yerel.taban}/checkout?")
+        k = satir()
+        assert k.sartlar_kabul_at is not None and k.sartlar_surumu, "onay checkout'tan önce yazıldı"
+        assert bakiye().toplam == 200
 
-            # 2. "Öde" → yerel Polar imzalı `order.paid` teslim eder → teşekkür sayfası yoklar → 700.
-            page.click("#ode")
-            page.wait_for_url(f"{taban}/odeme/tesekkur?checkout_id=*")
-            page.wait_for_selector('#tesekkur-mesaj[data-durum="islendi"]', timeout=15_000)
-            assert page.inner_text("#tesekkur-toplam") == "700"
-            assert page.inner_text("#tesekkur-mesaj") == i18n.t("tesekkur.islendi", "tr", toplam=700)
-            assert yerel.webhook_cevaplari == [{"durum": "islendi"}]
-            b = bakiye()
-            assert (b.hibe, b.paket, b.toplam) == (200, 500, 700)
-            with oturum.db() as db:
-                turler = list(db.scalars(select(tablolar.KrediHareketi.tur)
-                                         .where(tablolar.KrediHareketi.kullanici_id == oturum.kullanici_id)
-                                         .order_by(tablolar.KrediHareketi.olusturuldu)))
-                assert turler == ["hibe", "paket"]
-                assert db.scalar(select(tablolar.Siparis.tutar_kurus)
-                                 .where(tablolar.Siparis.kullanici_id == oturum.kullanici_id)) == 500
-            assert satir().polar_musteri_id, "`order.paid` müşteri kimliğini bağladı — portal artık açık"
+        # 2. "Öde" → yerel Polar imzalı `order.paid` teslim eder → teşekkür sayfası yoklar → 700.
+        page.click("#ode")
+        page.wait_for_url(f"{taban}/odeme/tesekkur?checkout_id=*")
+        page.wait_for_selector('#tesekkur-mesaj[data-durum="islendi"]', timeout=15_000)
+        assert page.inner_text("#tesekkur-toplam") == "700"
+        assert page.inner_text("#tesekkur-mesaj") == i18n.t("tesekkur.islendi", "tr", toplam=700)
+        assert yerel.webhook_cevaplari == [{"durum": "islendi"}]
+        b = bakiye()
+        assert (b.hibe, b.paket, b.toplam) == (200, 500, 700)
+        with oturum.db() as db:
+            turler = list(db.scalars(select(tablolar.KrediHareketi.tur)
+                                     .where(tablolar.KrediHareketi.kullanici_id == oturum.kullanici_id)
+                                     .order_by(tablolar.KrediHareketi.olusturuldu)))
+            assert turler == ["hibe", "paket"]
+            assert db.scalar(select(tablolar.Siparis.tutar_kurus)
+                             .where(tablolar.Siparis.kullanici_id == oturum.kullanici_id)) == 500
+        assert satir().polar_musteri_id, "`order.paid` müşteri kimliğini bağladı — portal artık açık"
 
-            # 3. Ücretli planda plan ürünü → 409 → portal düğmesi → yamalı portal URL'sine gider.
-            with oturum.db() as db:
-                db.execute(text("UPDATE kullanicilar SET plan = 'temel' WHERE id = :id"), {"id": oturum.kullanici_id})
-                db.commit()
-            page.goto(f"{taban}/planlar")
-            page.wait_for_selector('#planlar-planlar .plan-kart[data-plan="temel"][data-mevcut="true"]')
-            page.click('#planlar-planlar .plan-kart[data-plan="pro"] button')
-            page.wait_for_selector("#planlar-portal:not([hidden])")
-            assert page.inner_text("#planlar-mesaj") == i18n.t("err.abonelik_var", "tr", plan="temel")
-            page.click("#planlar-portal-dugme")
-            page.wait_for_selector("#portal")
-            assert page.url == f"{yerel.taban}/portal"
-            assert portal_cagrilari == [satir().polar_musteri_id]
-            tarayici.close()
-    finally:
-        yerel.shutdown()
-        yerel.server_close()
-        server.stop()
+        # 3. Ücretli planda plan ürünü → 409 → portal düğmesi → yamalı portal URL'sine gider.
+        with oturum.db() as db:
+            db.execute(text("UPDATE kullanicilar SET plan = 'temel' WHERE id = :id"), {"id": oturum.kullanici_id})
+            db.commit()
+        page.goto(f"{taban}/planlar")
+        page.wait_for_selector('#planlar-planlar .plan-kart[data-plan="temel"][data-mevcut="true"]')
+        page.click('#planlar-planlar .plan-kart[data-plan="pro"] button')
+        page.wait_for_selector("#planlar-portal:not([hidden])")
+        assert page.inner_text("#planlar-mesaj") == i18n.t("err.abonelik_var", "tr", plan="temel")
+        page.click("#planlar-portal-dugme")
+        page.wait_for_selector("#portal")
+        assert page.url == f"{yerel.taban}/portal"
+        assert portal_cagrilari == [satir().polar_musteri_id]
+        tarayici.close()

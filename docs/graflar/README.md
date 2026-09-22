@@ -14,7 +14,7 @@
 
 ## Ölçüler
 
-* 115 Python modülü, 512 modül düzeyi ithal kenarı (16 erteli)
+* 115 Python modülü, 513 modül düzeyi ithal kenarı (16 erteli)
 * 77 HTTP uç noktası
 * 15 tarayıcı betiği, 36 betik-arası bağ
 * 149 test dosyası; 16 modülü hiçbir test ithal etmiyor, 17 test de hiçbir modülü (artefakt sınıyorlar; bkz. testler.md)

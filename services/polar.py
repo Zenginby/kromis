@@ -258,18 +258,21 @@ def portal_baglantisi(polar_musteri_id: str) -> str:
 def urunleri_listele() -> list[dict[str, Any]]:
     """Organizasyonun BÜTÜN ürünleri (arşivlenmişler dâhil), sayfa sayfa; her ürün DÜZ SÖZLÜK (`model_dump`).
 
-    Arşivlenmişler bilerek dâhil (`is_archived` süzgeci verilmiyor): ayna
-    Polar'da kaldırılan ürünü `aktif=false` yapmak zorunda, yalnız aktifleri
-    çekseydi kaldırılan ürün satışta görünmeye devam ederdi
-    (`tools/polar_esitle.py`). Sayfalama SDK'nın `next()` zincirinden; 100'lük
-    sayfa (Polar'ın tavanı) — bir düzine ürün için tek istek.
+    İKİ ÇAĞRI, `is_archived=False` ve `is_archived=True`: ayna Polar'da
+    kaldırılan ürünü `aktif=false` yapmak zorunda (`tools/polar_esitle.py`) ve
+    "süzgeç verilmezse ikisi de gelir" Polar'ın öntanımlısına güvenmek olurdu —
+    öntanımlı bir gün yalnız aktifleri döndürse arşivli ürün satışta kalırdı.
+    Açık istek iki ucu da kapatır. Sayfalama SDK'nın `next()` zincirinden;
+    100'lük sayfa (Polar'ın tavanı) — bir düzine ürün için iki istek.
     """
     urunler: list[dict[str, Any]] = []
-    sayfa = istemci().products.list(limit=100)
-    while sayfa is not None:
-        sonuc = getattr(sayfa, "result", None)
-        for urun in (getattr(sonuc, "items", None) or []):
-            urunler.append(urun.model_dump(mode="json") if hasattr(urun, "model_dump") else dict(urun))
-        sonraki = getattr(sayfa, "next", None)
-        sayfa = sonraki() if callable(sonraki) else None
+    istemci_ = istemci()
+    for arsiv in (False, True):
+        sayfa = istemci_.products.list(is_archived=arsiv, limit=100)
+        while sayfa is not None:
+            sonuc = getattr(sayfa, "result", None)
+            for urun in (getattr(sonuc, "items", None) or []):
+                urunler.append(urun.model_dump(mode="json") if hasattr(urun, "model_dump") else dict(urun))
+            sonraki = getattr(sayfa, "next", None)
+            sayfa = sonraki() if callable(sonraki) else None
     return urunler

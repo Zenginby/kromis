@@ -2,7 +2,7 @@
 
 # Modül grafı
 
-115 Python modülü, 512 modül düzeyi + 16 erteli ithal kenarı.
+115 Python modülü, 513 modül düzeyi + 16 erteli ithal kenarı.
 
 Katman, o modülün depo içindeki en uzun bağımlılık zincirinin uzunluğu:
 **katman 0 hiçbir depo modülüne dayanmaz**, en üst katman uygulamanın
@@ -35,7 +35,7 @@ flowchart TD
     n_routers_bindirme["routers.bindirme<br/>282 satır"]
     n_routers_galeri["routers.galeri<br/>401 satır"]
     n_routers_isler["routers.isler<br/>389 satır"]
-    n_routers_odeme["routers.odeme<br/>209 satır"]
+    n_routers_odeme["routers.odeme<br/>215 satır"]
     n_routers_sohbet["routers.sohbet<br/>241 satır"]
     n_routers_uretim["routers.uretim<br/>548 satır"]
     n_services_depo_admin["services.depo_admin<br/>412 satır"]
@@ -136,7 +136,7 @@ flowchart TD
     n_services_kiraci["services.kiraci<br/>200 satır"]
     n_services_koken["services.koken<br/>133 satır"]
     n_services_nesne_depo["services.nesne_depo<br/>317 satır"]
-    n_services_polar["services.polar<br/>275 satır"]
+    n_services_polar["services.polar<br/>278 satır"]
     n_services_saglayici_meta["services.saglayici_meta<br/>126 satır"]
     n_services_sifre["services.sifre<br/>151 satır"]
     n_services_zaman["services.zaman<br/>71 satır"]
@@ -673,7 +673,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `routers/hesap.py` | 273 | 11 | `errlog`, `i18n`, `models`, `services.ayar`, `services.cerez`, `services.db`, `services.defter`, `services.dil`, `services.hesap`, `services.kimlik`, `services.kiraci`, `services.koken`, `services.planlar`, `services.posta`, `services.sablon`, `services.tablolar` | 1 | 2 |
 | `routers/isler.py` | 389 | 12 | `catalog`, `i18n`, `services.db`, `services.defter`, `services.dil`, `services.kapilar`, `services.kimlik`, `services.kota`, `services.kuyruk`, `services.planlar`, `services.platform_anahtari`, `services.tablolar`, `services.zaman` | 1 | 3 |
 | `routers/kok.py` | 64 | 11 | `services.ayar`, `services.kimlik`, `services.sablon`, `services.tablolar` | 1 | 0 |
-| `routers/odeme.py` | 209 | 12 | `services.db`, `services.defter`, `services.gunluk`, `services.kimlik`, `services.kiraci`, `services.koken`, `services.odeme`, `services.planlar`, `services.polar`, `services.tablolar`, `services.zaman` | 1 | 0 |
+| `routers/odeme.py` | 215 | 12 | `services.db`, `services.defter`, `services.gunluk`, `services.kimlik`, `services.kiraci`, `services.koken`, `services.odeme`, `services.planlar`, `services.polar`, `services.tablolar`, `services.zaman` | 1 | 0 |
 | `routers/paletler.py` | 101 | 9 | `color_names`, `i18n`, `models`, `palette`, `services.db`, `services.depo_palet`, `services.dil`, `services.kimlik`, `services.palet`, `services.tablolar`, `services.zaman` | 1 | 0 |
 | `routers/saglik.py` | 169 | 13 | `services.ayar`, `services.db`, `services.depo_admin`, `services.kuyruk`, `services.zaman`, `version` | 1 | 3 |
 | `routers/sohbet.py` | 241 | 12 | `catalog`, `chat_client`, `chat_prompt`, `chat_providers`, `i18n`, `models`, `services.db`, `services.depo_sohbet`, `services.depo_tercih`, `services.dil`, `services.kapilar`, `services.kimlik`, `services.modeller`, `services.tablolar`, `services.zaman` | 1 | 0 |
@@ -705,14 +705,14 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `services/kiraci.py` | 200 | 0 | — | 13 | 6 |
 | `services/koken.py` | 133 | 0 | — | 3 | 6 |
 | `services/kota.py` | 183 | 6 | `i18n`, `services.dil`, `services.tablolar`, `services.zaman` | 3 | 5 |
-| `services/kuyruk.py` | 552 | 10 | `errlog`, `services.ayar`, `services.tablolar`, `services.zaman` | 9 | 14 |
+| `services/kuyruk.py` | 552 | 10 | `errlog`, `services.ayar`, `services.tablolar`, `services.zaman` | 10 | 14 |
 | `services/modeller.py` | 371 | 8 | `catalog`, `credstore`, `etiket`, `i18n`, `services.defter`, `services.depo_tercih`, `services.planlar`, `services.platform_anahtari`, `version` | 3 | 1 |
 | `services/nesne_depo.py` | 317 | 0 | — | 2 | 5 |
 | `services/odeme.py` | 585 | 11 | `services.defter`, `services.gunluk`, `services.kuyruk`, `services.planlar`, `services.polar`, `services.tablolar`, `services.zaman` | 3 | 2 |
 | `services/palet.py` | 185 | 7 | `color_names`, `i18n`, `models`, `palette`, `services.depo_palet`, `services.dil` | 3 | 1 |
 | `services/planlar.py` | 184 | 6 | `catalog`, `services.tablolar` | 10 | 7 |
 | `services/platform_anahtari.py` | 159 | 7 | `catalog`, `services.depo_kimlik_bilgisi` | 7 | 7 |
-| `services/polar.py` | 275 | 0 | — | 3 | 5 |
+| `services/polar.py` | 278 | 0 | — | 3 | 5 |
 | `services/posta.py` | 187 | 3 | `errlog`, `i18n` | 2 | 4 |
 | `services/redaksiyon.py` | 68 | 1 | `catalog` | 1 | 0 |
 | `services/sablon.py` | 68 | 10 | `errlog`, `i18n`, `services.ayar`, `services.dil`, `version` | 3 | 0 |
@@ -798,6 +798,7 @@ flowchart LR
   n_tools_polar_esitle["tools.polar_esitle"]
   n_tools_polar_esitle --> n_services_db["services.db"]
   n_tools_polar_esitle --> n_services_kiraci["services.kiraci"]
+  n_tools_polar_esitle --> n_services_kuyruk["services.kuyruk"]
   n_tools_polar_esitle --> n_services_planlar["services.planlar"]
   n_tools_polar_esitle --> n_services_polar["services.polar"]
   n_tools_polar_esitle --> n_services_tablolar["services.tablolar"]

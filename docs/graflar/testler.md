@@ -132,7 +132,7 @@ Bu modülleri hiçbir test dosyası ithal etmiyor. Dolaylı olarak sınanıyor o
 * `routers.bindirme` (282 satır)
 * `routers.galeri` (401 satır)
 * `routers.kok` (64 satır)
-* `routers.odeme` (209 satır)
+* `routers.odeme` (215 satır)
 * `routers.paletler` (101 satır)
 * `routers.sohbet` (241 satır)
 * `routers.uretim` (548 satır)

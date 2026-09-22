@@ -774,6 +774,14 @@ function krediEylemleri() {
   portal.type = "button";
   portal.className = "btn-ghost";
   portal.textContent = t("kredi.portal");
+  // Tek not satırı: her başarısız tıklama yeni bir `krediNotu` EKLEMEZ, öncekinin yerine yazar
+  // (ölçüldü: üç tıklama üç aynı satır).
+  const notYaz = (metin, sinif) => {
+    const eski = kutu.querySelector(".kredi-portal-notu");
+    const yeni = krediNotu(metin, `kredi-portal-notu ${sinif}`);
+    if (eski) eski.replaceWith(yeni);
+    else kutu.appendChild(yeni);
+  };
   portal.addEventListener("click", async () => {
     portal.disabled = true;
     try {
@@ -786,21 +794,12 @@ function krediEylemleri() {
       const kod = govde && govde.detail && govde.detail.kod;
       if (res.status === 404 && kod === "err.musteri_yok") {
         portal.title = t("kredi.portal_yok");
-        portal.insertAdjacentElement(
-          "afterend",
-          krediNotu(t("kredi.portal_yok"), "kredi-portal-yok"),
-        );
+        notYaz(t("kredi.portal_yok"), "kredi-portal-yok");
         return; // kilitli kalır
       }
-      portal.insertAdjacentElement(
-        "afterend",
-        krediNotu(kod ? t(kod, govde.detail) : t("kredi.yuklenemedi"), "kredi-portal-hata"),
-      );
+      notYaz(kod ? t(kod, govde.detail) : t("kredi.yuklenemedi"), "kredi-portal-hata");
     } catch {
-      portal.insertAdjacentElement(
-        "afterend",
-        krediNotu(t("kredi.yuklenemedi"), "kredi-portal-hata"),
-      );
+      notYaz(t("kredi.yuklenemedi"), "kredi-portal-hata");
     }
     portal.disabled = false;
   });

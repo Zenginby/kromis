@@ -168,11 +168,17 @@ def checkout(req: CheckoutIstegi, request: Request, db: Session = OTURUM,
     # ürünü serbest — abonelikten bağımsız tek seferlik satın alma.
     plan = defter.plan_oku(db, kullanici.id)
     if urun.tur == odeme.URUN_PLAN and plan != planlar.PLAN_VARSAYILAN:
-        raise HTTPException(status_code=409, detail={"kod": KOD_ABONELIK_VAR, "portal": True, "plan": plan})
+        # `plan_bitis` (iptal edilmiş aboneliğin dönem sonu, yoksa null): sayfa "dönem sonunda
+        # ücretsiz plana geçer" diyebilsin — kullanıcı zaten iptal ettiyse portal yerine beklemesi yeter.
+        bitis = defter.plan_bitis_oku(db, kullanici.id)
+        raise HTTPException(status_code=409, detail={"kod": KOD_ABONELIK_VAR, "portal": True, "plan": plan,
+                                                     "plan_bitis": zaman.damga_utc(bitis) if bitis else None})
     an = zaman.an()
     if odeme.sartlar_kabul_at_oku(db, kullanici.id) is None:
         if not req.sartlar_kabul:
             raise HTTPException(status_code=412, detail={"kod": KOD_SARTLAR_GEREKLI, "surum": odeme.SARTLAR_SURUMU})
+        # Polar çağrısından ÖNCE yazmak güvenli: oturum istek kapsamlı (`db.oturum`), 502'nin
+        # `HTTPException`ı onu ROLLBACK eder — Polar düşerse onay damgası da gitmez, kullanıcı yeniden onaylar.
         odeme.sartlar_kabul_yaz(db, kullanici.id, an)
     success_url = f"{koken.taban(request)}{TESEKKUR_YOLU}?checkout_id={{CHECKOUT_ID}}"
     try:

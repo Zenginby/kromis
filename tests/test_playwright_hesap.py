@@ -197,6 +197,9 @@ def _dogrulanmis_hesap(veritabani_url: str) -> None:
     ("//evil.example/", "/"),                       # şemasız dış adres: /
     ("https://evil.example/", "/"),                 # şemalı dış adres: /
     ("/\\evil.example/", "/"),                    # ters bölü — tarayıcı `//` okur: /
+    ("/\t/evil.example/", "/"),                    # sekme — WHATWG soyar, `//evil.example` olur: / (inceleme 2026-09-22)
+    ("/\n/evil.example/?x=1", "/"),                # satır sonu — aynı soyma: /
+    ("/?sekme=paket#kart", "/?sekme=paket"),       # yol + sorgu aynen, parça düşer (`URL` ayrıştırıcısı)
     ("galeri", "/"),                                # göreli: /
 ])
 def test_after_login_the_page_returns_only_to_a_same_origin_path(

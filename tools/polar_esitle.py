@@ -25,13 +25,30 @@ POLAR'DAKİ SÖZLEŞME — ürün `metadata`sı (sahip panelde yazar):
 
 Metadata'sı eksik/bozuk ürün ATLANIR ve WARNING basılır (`URUN ATLANDI`):
 Polar'da başka amaçla duran bir ürün (bağış, eski deneme) aynaya sızmasın,
-ama sahip yazım hatasını görsün. Fiyat ürünün İLK sabit fiyatından
-(`prices[].amount_type == "fixed"`, arşivlenmemiş): `fiyat_kurus` +
-`para_birimi`. Sabit fiyatı olmayan ürün (`custom`/`metered`/`seat_based`,
-"pay what you want") de atlanır — satış sayfası tek fiyat gösterir.
-Polar'da arşivlenen ürün `aktif=false` olur, SİLİNMEZ (eski siparişler
-FK'yle ona bakar). Upsert `polar_urun_id` UNIQUE üstünden
+ama sahip yazım hatasını görsün. KADANS da doğrulanır: `plan` ürünü
+AYLIK abonelik olmalı (`recurring_interval == "month"` — `subscription.*`
+olayları ve K6'nın "dönem hibesi" aritmetiği aylık döneme göre yazıldı,
+yıllık plan ilk sürümde yok), `paket` TEK SEFERLİK olmalı (abonelik
+sebebiyle gelen paket webhook'ta `urun_sebep_uyumsuz` ile para yatırmazdı —
+hata aynaya girmeden burada görünür). Fiyat ürünün ilk arşivlenmemiş sabit
+fiyatından (`prices[].amount_type == "fixed"`): planda AYLIK olan seçilir
+(eski "legacy" ürünlerde yıllık + aylık iki fiyat yan yana durabilir),
+pakette tek seferlik. Sabit fiyatı olmayan ürün (`custom`/`metered`/
+`seat_based`, "pay what you want") de atlanır — satış sayfası tek fiyat
+gösterir. Polar'da arşivlenen ürün `aktif=false` olur, SİLİNMEZ (eski
+siparişler FK'yle ona bakar). Upsert `polar_urun_id` UNIQUE üstünden
 (`INSERT … ON CONFLICT DO UPDATE`), `guncellendi` her koşuda ilerler.
+
+BAYAT SATIRLAR DA KAPANIR: aynada olup Polar'ın GEÇERLİ kümesinde olmayan
+her satır `aktif=false` yapılır — Polar'da silinmiş ürün ve geçersizleşmiş
+ürün (metadata yazım hatası, fiyatı kaldırılmış) aynı kapıdan. Aksi hâlde
+sahip Polar'da bir ürünü bozduğunda ayna onu satmaya devam eder, checkout
+Polar'da düşer. Kapanan satırlar `- <id>` ile basılır, `--kontrol` fark sayar.
+
+ARŞİVLİLER AÇIKÇA ÇEKİLİR: `products.list` iki kez (`is_archived=False`,
+`is_archived=True`) — süzgeç verilmezse Polar'ın öntanımlısının ikisini de
+döndürdüğüne güvenmek yerine ikisi de istenir; arşivli ürün gelmezse ayna
+onu satışta bırakırdı.
 
 `--kontrol`: Polar'ı okur, farkı (eklenecek / değişecek / arşivlenecek) basar,
 YAZMAZ; fark varsa 2, yoksa 0 — CI değil, sahibin "ne değişecek" bakışı.
@@ -65,12 +82,12 @@ _KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _KOK not in sys.path:
     sys.path.insert(0, _KOK)
 
-from sqlalchemy import select  # noqa: E402
+from sqlalchemy import select, update  # noqa: E402
 from sqlalchemy.dialects.postgresql import insert as pg_insert  # noqa: E402
 from sqlalchemy.exc import SQLAlchemyError  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
-from services import db, kiraci, planlar, polar  # noqa: E402
+from services import db, kiraci, kuyruk, planlar, polar  # noqa: E402
 from services.tablolar import URUN_TURLERI, Urun  # noqa: E402
 
 CIKIS_TAMAM = 0
@@ -101,15 +118,17 @@ class Satir:
 
 @dataclasses.dataclass
 class Fark:
-    """`--kontrol`ün çıktısı ve yazımın özeti: eklenen, değişen, aynı kalan, atlanan (uyarı metinleri)."""
+    """`--kontrol`ün çıktısı ve yazımın özeti: eklenen, değişen, aynı kalan, atlanan (uyarı metinleri),
+    kapanacak (aynada var, Polar'ın geçerli kümesinde yok — `aktif=false` olur; gerekçe modül başında)."""
     eklenen: list[Satir] = dataclasses.field(default_factory=list)
     degisen: list[Satir] = dataclasses.field(default_factory=list)
     ayni: int = 0
     atlanan: list[str] = dataclasses.field(default_factory=list)
+    kapanacak: list[str] = dataclasses.field(default_factory=list)
 
     @property
     def var(self) -> bool:
-        return bool(self.eklenen or self.degisen)
+        return bool(self.eklenen or self.degisen or self.kapanacak)
 
 
 def _tam_sayi(deger: Any) -> int | None:
@@ -120,18 +139,35 @@ def _tam_sayi(deger: Any) -> int | None:
         return deger if deger >= 0 else None
     if isinstance(deger, float) and deger.is_integer():
         return int(deger) if deger >= 0 else None
-    if isinstance(deger, str) and deger.strip().isdigit():
+    # `isdecimal`, `isdigit` DEĞİL: "²" `isdigit()` için doğru ama `int("²")` `ValueError` — araç çökerdi.
+    if isinstance(deger, str) and deger.strip().isdecimal():
         return int(deger.strip())
     return None
 
 
-def _ilk_sabit_fiyat(urun: Mapping[str, Any]) -> tuple[int, str] | None:
-    """Ürünün ilk arşivlenmemiş `fixed` fiyatı → (`price_amount`, `price_currency`); yoksa `None`."""
+AYLIK = "month"
+
+
+def _fiyat_aylik_mi(f: Mapping[str, Any], urun: Mapping[str, Any]) -> bool:
+    """Fiyatın kadansı: eski ("legacy") fiyatlar `recurring_interval`i kendinde taşır, yenilerde ürünün alanı."""
+    aralik = f.get("recurring_interval") if f.get("legacy") else urun.get("recurring_interval")
+    return aralik == AYLIK
+
+
+def _ilk_sabit_fiyat(urun: Mapping[str, Any], *, aylik: bool) -> tuple[int, str] | None:
+    """Ürünün ilk arşivlenmemiş `fixed` fiyatı → (`price_amount`, `price_currency`); yoksa `None`.
+
+    `aylik=True` (plan): yalnız AYLIK kadanslı fiyat sayılır — legacy üründe
+    yıllık + aylık yan yana durabilir, yıllık seçilseydi sayfa 12 katı fiyat
+    gösterirdi. `aylik=False` (paket): tek seferlik ürünün fiyatı kadans taşımaz.
+    """
     fiyatlar = urun.get("prices")
     if not isinstance(fiyatlar, list):
         return None
     for f in fiyatlar:
         if not isinstance(f, Mapping) or f.get("is_archived") or f.get("amount_type") != "fixed":
+            continue
+        if aylik and not _fiyat_aylik_mi(f, urun):
             continue
         miktar, birim = f.get("price_amount"), f.get("price_currency")
         if isinstance(miktar, int) and not isinstance(miktar, bool) and isinstance(birim, str) and birim:
@@ -161,22 +197,40 @@ def satira_cevir(urun: Mapping[str, Any]) -> Satir | str:
     kredi = _tam_sayi(meta.get(META_KREDI))
     if kredi is None or (tur == URUN_PAKET and kredi <= 0):
         return f"{kimlik} ({ad}): {META_KREDI} eksik ya da gecersiz ({meta.get(META_KREDI)!r})"
-    fiyat = _ilk_sabit_fiyat(urun)
+    # Kadans (gerekçe modül başında): plan AYLIK abonelik, paket tek seferlik.
+    tekrarli = bool(urun.get("is_recurring"))
+    if tur == URUN_PLAN and not tekrarli:
+        return f"{kimlik} ({ad}): plan urunu abonelik degil (is_recurring false)"
+    if tur == URUN_PAKET and tekrarli:
+        return f"{kimlik} ({ad}): paket urunu abonelik olamaz (is_recurring true)"
+    fiyat = _ilk_sabit_fiyat(urun, aylik=tur == URUN_PLAN)
     if fiyat is None:
-        return f"{kimlik} ({ad}): sabit fiyat yok (prices[].amount_type == 'fixed')"
+        return (f"{kimlik} ({ad}): sabit fiyat yok (prices[].amount_type == 'fixed'"
+                + (", recurring_interval == 'month'" if tur == URUN_PLAN else "") + ")")
     return Satir(polar_urun_id=kimlik, tur=tur, plan=plan, kredi=kredi, fiyat_kurus=fiyat[0],
                  para_birimi=fiyat[1], ad=ad.strip(), aktif=not bool(urun.get("is_archived")))
 
 
-def fark_hesapla(oturum: Session, urunler: Iterable[Mapping[str, Any]]) -> Fark:
-    """Polar listesi ↔ ayna: hangi satır yeni, hangisi değişti, hangisi aynı; geçersizler `atlanan`da."""
-    mevcut = {u.polar_urun_id: u for u in oturum.scalars(select(Urun))}
-    fark = Fark()
+def satirlara_cevir(urunler: Iterable[Mapping[str, Any]]) -> tuple[list[Satir], list[str]]:
+    """Polar listesi → (geçerli satırlar, atlama gerekçeleri)."""
+    satirlar: list[Satir] = []
+    atlanan: list[str] = []
     for urun in urunler:
         satir = satira_cevir(urun)
         if isinstance(satir, str):
-            fark.atlanan.append(satir)
-            continue
+            atlanan.append(satir)
+        else:
+            satirlar.append(satir)
+    return satirlar, atlanan
+
+
+def fark_hesapla(oturum: Session, urunler: Iterable[Mapping[str, Any]]) -> Fark:
+    """Polar listesi ↔ ayna: yeni / değişen / aynı; geçersizler `atlanan`da; aynada olup geçerli kümede
+    olmayan AKTİF satırlar `kapanacak`ta (zaten `aktif=false` olan sayılmaz — bir kez kapanır)."""
+    mevcut = {u.polar_urun_id: u for u in oturum.scalars(select(Urun))}
+    satirlar, atlanan = satirlara_cevir(urunler)
+    fark = Fark(atlanan=atlanan)
+    for satir in satirlar:
         eski = mevcut.get(satir.polar_urun_id)
         if eski is None:
             fark.eklenen.append(satir)
@@ -184,7 +238,16 @@ def fark_hesapla(oturum: Session, urunler: Iterable[Mapping[str, Any]]) -> Fark:
             fark.ayni += 1
         else:
             fark.degisen.append(satir)
+    gecerli = {s.polar_urun_id for s in satirlar}
+    fark.kapanacak = sorted(k for k, u in mevcut.items() if k not in gecerli and u.aktif)
     return fark
+
+
+def bayatlari_kapat(oturum: Session, gecerli: set[str], an: dt.datetime) -> int:
+    """Geçerli kümede olmayan aktif satırlar → `aktif=false`, `guncellendi = an`; kapanan satır sayısı."""
+    sonuc = oturum.execute(update(Urun).where(Urun.aktif.is_(True), Urun.polar_urun_id.not_in(gecerli))
+                           .values(aktif=False, guncellendi=an))
+    return kuyruk._etkilenen(sonuc)
 
 
 def yaz(oturum: Session, satirlar: Iterable[Satir], an: dt.datetime) -> int:
@@ -211,8 +274,10 @@ def farki_bas(fark: Fark, hedef: Any) -> None:
         print(f"+ {_satir_metni(s)}", file=hedef)
     for s in fark.degisen:
         print(f"~ {_satir_metni(s)}", file=hedef)
-    print(f"{len(fark.eklenen)} yeni, {len(fark.degisen)} degisen, {fark.ayni} ayni, {len(fark.atlanan)} atlanan",
-          file=hedef)
+    for kimlik in fark.kapanacak:
+        print(f"- {kimlik}  aynada var, Polar'da gecerli degil -> aktif=false", file=hedef)
+    print(f"{len(fark.eklenen)} yeni, {len(fark.degisen)} degisen, {fark.ayni} ayni, "
+          f"{len(fark.atlanan)} atlanan, {len(fark.kapanacak)} kapanan", file=hedef)
 
 
 def _ayristirici() -> argparse.ArgumentParser:
@@ -246,10 +311,12 @@ def main(argv: list[str]) -> int:
             if args.kontrol:
                 return CIKIS_ORTAM if fark.var else CIKIS_TAMAM
             # Aynı kalanlar da yazılır: `guncellendi` ilerlesin (tazelik göstergesi bu sütun).
-            satirlar = [s for s in (satira_cevir(u) for u in urunler) if isinstance(s, Satir)]
-            sayi = yaz(oturum, satirlar, dt.datetime.now(tz=dt.UTC))
+            satirlar, _ = satirlara_cevir(urunler)
+            an = dt.datetime.now(tz=dt.UTC)
+            sayi = yaz(oturum, satirlar, an)
+            kapanan = bayatlari_kapat(oturum, {s.polar_urun_id for s in satirlar}, an)
             oturum.commit()
-            print(f"{sayi} urun yazildi ({polar.ortam()})", file=sys.stderr)
+            print(f"{sayi} urun yazildi, {kapanan} bayat satir kapatildi ({polar.ortam()})", file=sys.stderr)
     except SQLAlchemyError as hata:
         # Bağlantı dizesinde parola olabilir; yalnız sınıf adı ve ilk satır (`kullanici.py`nin kararı).
         print(f"veri tabani hatasi ({type(hata).__name__}): {str(hata).splitlines()[0]}", file=sys.stderr)

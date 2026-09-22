@@ -1343,7 +1343,7 @@
         "app"
       ],
       "katman": 12,
-      "satir": 209,
+      "satir": 215,
       "testler": [],
       "yol": "routers/odeme.py"
     },
@@ -2285,7 +2285,8 @@
         "services.isci",
         "services.kapilar",
         "services.odeme",
-        "tools.artik_dosya"
+        "tools.artik_dosya",
+        "tools.polar_esitle"
       ],
       "katman": 10,
       "satir": 552,
@@ -2471,7 +2472,7 @@
         "tools.polar_esitle"
       ],
       "katman": 0,
-      "satir": 275,
+      "satir": 278,
       "testler": [
         "tests/test_araclar.py",
         "tests/test_docker_kapisi.py",
@@ -2946,13 +2947,14 @@
       "ithal": [
         "services.db",
         "services.kiraci",
+        "services.kuyruk",
         "services.planlar",
         "services.polar",
         "services.tablolar"
       ],
       "ithal_eden": [],
-      "katman": 7,
-      "satir": 263,
+      "katman": 11,
+      "satir": 330,
       "testler": [
         "tests/test_araclar.py"
       ],
@@ -3252,7 +3254,7 @@
           "/api/hesap/sifirla/dogrula"
         ],
         "dosya": "static/giris.js",
-        "satir": 189,
+        "satir": 202,
         "tanim": 0
       },
       {
@@ -3319,7 +3321,7 @@
           "/api/settings"
         ],
         "dosya": "static/settings.js",
-        "satir": 1328,
+        "satir": 1327,
         "tanim": 34
       },
       {
@@ -4679,7 +4681,7 @@
         "static/planlar.js"
       ],
       "satir": 160,
-      "yardimci_sayisi": 18,
+      "yardimci_sayisi": 20,
       "yol": "/api/odeme/checkout",
       "yontem": "POST"
     },
@@ -4692,7 +4694,7 @@
         "static/planlar.js",
         "static/settings.js"
       ],
-      "satir": 189,
+      "satir": 195,
       "yardimci_sayisi": 8,
       "yol": "/api/odeme/portal",
       "yontem": "GET"
@@ -4705,7 +4707,7 @@
       "onyuz": [
         "static/planlar.js"
       ],
-      "satir": 203,
+      "satir": 209,
       "yardimci_sayisi": 2,
       "yol": "/api/odeme/urunler",
       "yontem": "GET"

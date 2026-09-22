@@ -2825,7 +2825,7 @@
       ],
       "ithal_eden": [],
       "katman": 7,
-      "satir": 201,
+      "satir": 239,
       "testler": [
         "tests/test_kullanici_cli.py"
       ],

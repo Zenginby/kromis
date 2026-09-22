@@ -7,6 +7,7 @@
     DATABASE_URL=… python tools/kullanici.py olustur --eposta ali@ornek.com [--admin] [--dil tr]
     DATABASE_URL=… python tools/kullanici.py oturum-dusur --eposta ali@ornek.com
     DATABASE_URL=… python tools/kullanici.py admin --eposta ali@ornek.com [--kaldir]
+    DATABASE_URL=… python tools/kullanici.py parola --eposta ali@ornek.com
 
 NEDEN VAR: web sürümünde hesap açmak kayıt → e-posta doğrulama akışından
 geçiyor (routers/hesap.py) ve o akış bir posta servisi istiyor. İlk kullanıcı
@@ -114,6 +115,34 @@ def admin_yap(oturum: Session, eposta: str, *, admin: bool) -> bool:
     return onceki
 
 
+def parola_yaz(oturum: Session, eposta: str, parola: str) -> int:
+    """Parolayı yeniden yazar ve kullanıcının BÜTÜN oturumlarını düşürür; düşen oturum sayısını döner.
+
+    NEDEN VAR: parola geri alınamaz (argon2 özeti), web'deki sıfırlama akışı ise
+    posta servisi istiyor — kurulmadığı bir ortamda (yerel geliştirme, taze
+    dağıtım) sahibi kendi hesabından kilitleyen tek şey buydu. `olustur`la yeni
+    hesap açmak hesabın planını, kredisini ve geçmişini geride bırakır.
+
+    NEDEN OTURUMLAR DA DÜŞÜYOR: parola değiştirmek "bu hesabı artık ben
+    yönetiyorum" demektir; eski çerez ayakta kalırsa değişiklik saldırganı DIŞARI
+    ATMAZ, yalnız yeni girişi engeller. `oturum-dusur` komutunun yaptığının
+    aynısı, tek işlemde.
+
+    ÖZET TEK YERDEN: `hesap.parola_ozeti` — kayıt, web sıfırlaması ve bu araç
+    aynı argon2 ayarını kullanır (modül başındaki "KURAL KÜMESİ TEK"); parola
+    `_parola_al`da `models.check_parola`dan geçmiş olarak gelir.
+    """
+    kullanici = hesap.kullanici_bul(oturum, eposta)
+    if kullanici is None:
+        raise KullaniciHatasi(f"{eposta} diye bir kullanici yok.")
+    kullanici.parola_ozeti = hesap.parola_ozeti(parola)
+    sayi = oturum.scalar(select(func.count()).select_from(Oturum)
+                         .where(Oturum.kullanici_id == kullanici.id)) or 0
+    hesap.oturumlari_dusur(oturum, kullanici.id)
+    oturum.flush()
+    return sayi
+
+
 def oturum_dusur(oturum: Session, eposta: str) -> int:
     """Kullanıcının bütün oturumlarını siler; kaç oturum düştüğünü döner."""
     kullanici = hesap.kullanici_bul(oturum, eposta)
@@ -142,6 +171,10 @@ def _ayristirici() -> argparse.ArgumentParser:
     a = alt.add_parser("admin", help="var olan hesabi admin yap (is_admin=true); --kaldir bayragi dusurur")
     a.add_argument("--eposta", required=True)
     a.add_argument("--kaldir", action="store_true", help="is_admin=false yaz")
+    s = alt.add_parser("parola", help="var olan hesabin parolasini yeniden yaz; BUTUN oturumlar duser")
+    s.add_argument("--eposta", required=True)
+    s.add_argument("--parola-stdin", action="store_true",
+                   help="parolayi standart girdinin ilk satirindan oku (betik/test); TTY'de sorulmaz")
     return p
 
 
@@ -155,7 +188,7 @@ def main(argv: list[str]) -> int:
         eposta = _eposta(args.eposta)
         # Parola DB'ye bağlanmadan ÖNCE alınır: ulaşılamayan bir sunucu yüzünden
         # iki kez parola yazdırmak gereksiz; girdi hatası da hemen görünür.
-        parola = _parola_al(args.parola_stdin) if args.komut == "olustur" else None
+        parola = _parola_al(args.parola_stdin) if args.komut in ("olustur", "parola") else None
     except KullaniciHatasi as hata:
         print(str(hata), file=sys.stderr)
         return CIKIS_KULLANICI
@@ -179,6 +212,11 @@ def main(argv: list[str]) -> int:
                 yeni = "hayir" if args.kaldir else "evet"
                 degisti = "degisti" if onceki == args.kaldir else "zaten oyleydi"
                 print(f"{eposta}: admin = {yeni} ({degisti})")
+            elif args.komut == "parola":
+                assert parola is not None
+                sayi = parola_yaz(oturum, eposta, parola)
+                oturum.commit()
+                print(f"{eposta}: parola yazildi, {sayi} oturum dusuruldu")
             else:
                 sayi = oturum_dusur(oturum, eposta)
                 oturum.commit()

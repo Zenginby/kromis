@@ -58,6 +58,7 @@ from services import (
     kota,
     planlar,
     platform_anahtari,
+    polar,
     posta,
     sifre,
 )
@@ -297,7 +298,7 @@ ALTYAPI = {"KROMIS_DATA_DIR", "PORT", db.DATABASE_URL_ENV, koken.KOKEN_ENV,
            kota.SAATLIK_IS_ENV, kota.GUNLUK_KREDI_ENV,
            planlar.FREE_AYLIK_HIBE_ENV,   # Faz 3 / 3: ücretsiz planın aylık hibesi
            planlar.TEMEL_AYLIK_HIBE_ENV, planlar.PRO_AYLIK_HIBE_ENV,   # Faz 4 / 2: ücretli planların dönem hibesi
-           planlar.UCRETLI_HIBE_BAKIMDA_ENV,   # Faz 4 / 2 → 3: geçici köprü (bakım turu ücretli planı da tamamlar)
+           polar.ORTAM_ENV, polar.JETON_ENV, polar.WEBHOOK_SIRRI_ENV,   # Faz 4 / 3: Polar ortamı, erişim jetonu, webhook sırrı
            filigran.DOSYA_ENV,            # Faz 3 / 4: ücretsiz planın filigran işareti
            gunluk.BICIM_ENV, hata_izleme.DSN_ENV, hata_izleme.ORTAM_ENV}
 

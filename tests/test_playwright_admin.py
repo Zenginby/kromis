@@ -1,7 +1,7 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
 # GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
 # Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
-"""E2E — admin `/admin`e girer, üç sekmeyi gezer, bir kullanıcının tavanını yazar; admin olmayan 403 görür (Faz 2 / 8).
+"""E2E — admin `/admin`e girer, dört sekmeyi gezer, bir kullanıcının tavanını yazar; admin olmayan 403 görür (Faz 2 / 8; "Ödeme" Faz 4 / 3).
 
 Belge §8 çıkış ölçütünün tarayıcı yüzü. Sunucu `tests/test_playwright_studio.py`nin
 `ServerThread`i (uvicorn + işçi iş parçacığı), kullanıcılar `e2e_oturum` (gerçek
@@ -29,7 +29,7 @@ def _admin_yap(oturum) -> None:
         db.commit()
 
 
-def test_the_admin_walks_the_three_tabs_sets_a_users_cap_plan_and_credits_while_a_non_admin_gets_403(veritabani, e2e_oturum):
+def test_the_admin_walks_the_four_tabs_sets_a_users_cap_plan_and_credits_while_a_non_admin_gets_403(veritabani, e2e_oturum):
     port = get_free_port()
     server = ServerThread(port)
     server.start()
@@ -149,6 +149,29 @@ def test_the_admin_walks_the_three_tabs_sets_a_users_cap_plan_and_credits_while_
             assert page.locator("#admin-kartlar .admin-kart").count() == 6
             assert page.inner_text("#admin-kartlar").count(i18n.t("admin.metrik_kuyruk", "tr")) == 1
             assert page.locator("#admin-isciler li").count() >= 1
+
+            # 6. Ödeme sekmesi (Faz 4 / 3): tohumlanan iki teslimat — biri hatalı; "yalnız hatalı" süzer, özet çevrili.
+            with admin.db() as db:
+                db.add_all([
+                    tablolar.OdemeOlayi(webhook_id="wh_e2e_iyi", tur="order.paid", polar_nesne_id="ord_e2e_1",
+                                        kullanici_id=kullanici.kullanici_id, govde={"type": "order.paid"},
+                                        islendi_at=func.now()),
+                    tablolar.OdemeOlayi(webhook_id="wh_e2e_kotu", tur="order.paid", polar_nesne_id="ord_e2e_2",
+                                        govde={"type": "order.paid"}, islendi_at=func.now(), hata="urun_yok"),
+                ])
+                db.commit()
+            page.click('#admin-sekmeler [data-sekme="odeme"]')
+            page.wait_for_selector("#admin-odeme-olaylar tr[data-hata]")
+            assert page.is_hidden("#sekme-metrikler")
+            assert page.locator("#admin-odeme-olaylar tr").count() == 2
+            metin = page.inner_text("#admin-odeme-olaylar")
+            assert "urun_yok" in metin and kullanici.eposta in metin and "ord_e2e_1" in metin
+            ozet = page.inner_text("#admin-odeme-ozet")
+            assert ozet == i18n.t("admin.odeme_ozet", "tr", olay=2, hatali=1, siparis=0), ozet
+            page.check("#admin-odeme-yalniz-hata")
+            page.wait_for_function('document.querySelectorAll("#admin-odeme-olaylar tr").length === 1')
+            assert "wh_e2e_iyi" not in page.inner_text("#admin-odeme-olaylar")
+            assert "ord_e2e_2" in page.inner_text("#admin-odeme-olaylar")
             baglam.close()
             tarayici.close()
     finally:

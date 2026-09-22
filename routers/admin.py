@@ -3,7 +3,7 @@
 # Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Admin uçları — `/admin` sayfası ve `/api/admin/*` (Faz 2 / 8).
 
-Dokuz rota: `GET /admin` (statik sayfa, `services/sablon.py` ile çevrili —
+On rota: `GET /admin` (statik sayfa, `services/sablon.py` ile çevrili —
 `/giris`in yolu), `GET /api/admin/kullanicilar` (sayfalı, `?q=`),
 `GET /api/admin/isler` (`?durum=`, son 200 + özet), `GET /api/admin/metrikler`,
 `POST /api/admin/kullanicilar/{id}/tavan` (yaz/sil),
@@ -11,7 +11,9 @@ Dokuz rota: `GET /admin` (statik sayfa, `services/sablon.py` ile çevrili —
 Faz 3 / 3 ile `POST /api/admin/kullanicilar/{id}/plan` (`kullanicilar.plan`,
 `services/planlar.PLANLAR`dan biri) ve `POST /api/admin/kullanicilar/{id}/kredi`
 (`defter.duzelt`: `duzeltme` satırı `admin_id` iziyle, ± miktar, açıklama zorunlu —
-K4 `yonetici_ekler` politikasının admin rotasındaki yolu).
+K4 `yonetici_ekler` politikasının admin rotasındaki yolu); Faz 4 / 3 ile
+`GET /api/admin/odeme-olaylari` (`?hata=1`: yalnız hatalı — Polar webhook teslimatları,
+sahibin "ürün yok / kullanıcı yok" satırlarını göreceği yer; `depo_admin.odeme_olaylari`).
 
 HER API ROTASI `kimlik.admin_kullanici` TAŞIR — tek bağımlılık, tek çözüm:
 oturumsuz 401, admin değilse **403** (404 değil; gerekçe services/kimlik.py),
@@ -107,6 +109,13 @@ def metrikler(db: Session = OTURUM,
     """Kuyruk, son 1 sa / 24 sa, model başına p50/p95, platform kredisi (gerçek + rezerv), işçiler ve
     `marj` (Faz 3 / 5: model başına 7/30 gün tarife–maliyet satırları) — hepsi services/depo_admin.py."""
     return depo_admin.metrikler(db)
+
+
+@router.get("/api/admin/odeme-olaylari")
+def odeme_olaylari(hata: bool = Query(default=False), db: Session = OTURUM,
+                   admin: Kullanici = Depends(kimlik.admin_kullanici)) -> dict:
+    """Son 100 Polar webhook teslimatı + özet (Faz 4 / 3); `?hata=1` yalnız `hata` dolu satırlar. Gövde dökülmez."""
+    return {"olaylar": depo_admin.odeme_olaylari(db, yalniz_hata=hata), "ozet": depo_admin.odeme_ozeti(db)}
 
 
 def _hedef(db: Session, kullanici_id: uuid.UUID) -> Kullanici:

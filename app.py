@@ -38,6 +38,7 @@ from routers import (
     hesap,
     isler,
     kok,
+    odeme,
     paletler,
     saglik,
     sohbet,
@@ -222,12 +223,11 @@ app.exception_handler(kimlik.GirisSayfasi)(kimlik.giris_sayfasina)
 # services/kimlik.py `YetkiYok`). API rotalarının 403'ü JSON ve kapının kendisinden.
 app.exception_handler(kimlik.YetkiYok)(kimlik.yetki_yok_sayfasi)
 
-# Router'lar ÖNEKSİZ takılıyor: yollar her rotanın üstünde birebir yazılı
-# (bkz. routers/__init__.py). Sıra rota eşleşmesini etkilemiyor — hiçbir iki
-# kalıp aynı yol+fiili paylaşmıyor — ama okunurluk için eski app.py sırası.
+# Router'lar ÖNEKSİZ takılıyor: yollar her rotanın üstünde birebir yazılı (routers/__init__.py).
+# Sıra rota eşleşmesini etkilemiyor (iki kalıp aynı yol+fiili paylaşmıyor); eski app.py sırası.
 for _router in (uretim.router, isler.router, ayarlar.router, sohbet.router, galeri.router,
                 paletler.router, bindirme.router, hesap.router, admin.router, kok.router,
-                saglik.router):
+                saglik.router, odeme.router):
     app.include_router(_router)
 
 

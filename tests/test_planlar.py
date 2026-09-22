@@ -412,23 +412,20 @@ def test_the_tour_skips_deleted_accounts_and_a_plan_whose_grant_is_zero(depo_db,
     assert _bakiye(depo_db, canli) == 200
 
 
-def test_pro_users_are_topped_up_by_the_tour_only_while_the_bridge_flag_is_on(depo_db, monkeypatch):
-    """Faz 4 / 2 (K6): ücretli planın dönem hibesi webhook'un (3. görev); bakım turu ücretli planı
-    YALNIZ `KROMIS_UCRETLI_HIBE_BAKIMDA=1` köprüsüyle tamamlar (Faz 3 davranışı) — 3 gelince kaldırılır."""
+def test_paid_plans_are_never_topped_up_by_the_tour_their_grant_comes_from_the_webhook(depo_db):
+    """Faz 4 / 3 (K6): ücretli planın dönem hibesi `order.paid` webhook'unun (tests/test_odeme.py); bakım turu YALNIZ
+    `free`yi tarar. Faz 4 / 2'nin geçici köprüsü (`KROMIS_UCRETLI_HIBE_BAKIMDA`) 3 ile kaldırıldı — ortamda
+    kalmış bir `1` hiçbir şey açmaz."""
     u = _kullanici(depo_db, plan="pro")
     _yukle(depo_db, u, 500)
-    monkeypatch.delenv(planlar.UCRETLI_HIBE_BAKIMDA_ENV, raising=False)
-    _hibe_turu(depo_db, EYLUL)
-    assert _bakiye(depo_db, u) == 500, "bayrak kapalı: tur `pro`yu tamamlamaz"
-    monkeypatch.setenv(planlar.UCRETLI_HIBE_BAKIMDA_ENV, "1")
-    _hibe_turu(depo_db, EYLUL)
-    assert _bakiye(depo_db, u) == planlar.PLANLAR["pro"].aylik_hibe == 3_000
-    _toplam_esit_bakiye(depo_db, u)
-    monkeypatch.setenv(planlar.UCRETLI_HIBE_BAKIMDA_ENV, "evet")
-    with pytest.raises(ValueError):
+    os.environ["KROMIS_UCRETLI_HIBE_BAKIMDA"] = "1"
+    try:
         _hibe_turu(depo_db, EYLUL)
-    for ham, beklenen in (("", False), ("0", False), ("1", True)):
-        assert planlar.ucretli_hibe_bakimda({planlar.UCRETLI_HIBE_BAKIMDA_ENV: ham}) is beklenen
+    finally:
+        del os.environ["KROMIS_UCRETLI_HIBE_BAKIMDA"]
+    assert _bakiye(depo_db, u) == 500, "tur `pro`yu tamamlamaz — bayrak yok"
+    assert not hasattr(planlar, "ucretli_hibe_bakimda")
+    _toplam_esit_bakiye(depo_db, u)
 
 
 def test_paid_plan_grants_come_from_the_environment_with_the_placeholders_as_defaults():

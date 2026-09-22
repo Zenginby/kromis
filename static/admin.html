@@ -43,6 +43,7 @@
       <button type="button" role="tab" data-sekme="kullanicilar" aria-selected="true">{{t:admin.sekme_kullanicilar}}</button>
       <button type="button" role="tab" data-sekme="kuyruk" aria-selected="false">{{t:admin.sekme_kuyruk}}</button>
       <button type="button" role="tab" data-sekme="metrikler" aria-selected="false">{{t:admin.sekme_metrikler}}</button>
+      <button type="button" role="tab" data-sekme="odeme" aria-selected="false">{{t:admin.sekme_odeme}}</button>
     </nav>
 
     <section id="sekme-kullanicilar" class="admin-sekme" data-sekme="kullanicilar">
@@ -138,6 +139,29 @@
       </div>
       <h2 class="admin-alt-baslik">{{t:admin.metrik_isciler}}</h2>
       <ul id="admin-isciler" class="admin-isciler"></ul>
+    </section>
+
+    <!-- Faz 4 / 3: Polar webhook teslimatları — sahibin "ürün yok / kullanıcı yok" satırlarını göreceği yer. -->
+    <section id="sekme-odeme" class="admin-sekme" data-sekme="odeme" hidden>
+      <div class="admin-arac">
+        <label class="admin-not"><input id="admin-odeme-yalniz-hata" type="checkbox" /> {{t:admin.odeme_yalniz_hata}}</label>
+        <span id="admin-odeme-ozet" class="admin-not"></span>
+      </div>
+      <div class="admin-tablo-kap">
+        <table class="admin-tablo">
+          <thead>
+            <tr>
+              <th>{{t:admin.sutun_alindi}}</th>
+              <th>{{t:admin.sutun_tur}}</th>
+              <th>{{t:admin.sutun_nesne}}</th>
+              <th>{{t:admin.sutun_eposta}}</th>
+              <th>{{t:admin.sutun_islendi}}</th>
+              <th>{{t:admin.sutun_hata}}</th>
+            </tr>
+          </thead>
+          <tbody id="admin-odeme-olaylar"></tbody>
+        </table>
+      </div>
     </section>
   </main>
 

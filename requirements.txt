@@ -47,6 +47,20 @@ cryptography==50.0.*
 # test_sentry.py ile mandallı, kırıcı bir 3.0 ancak pin ilerletilince gelir.
 sentry-sdk==2.*
 
+# Polar (Faz 4 / 3, K1 — Merchant of Record): resmî Python SDK. ÇALIŞMA ZAMANI
+# bağımlılığı: `services/polar.istemci()` checkout/portal/ürün listesi için
+# (4. görev) ve abonelik iptali (5. görev) SDK istemcisini kurar; webhook ucu ise
+# SDK'nın da kullandığı `standardwebhooks` kütüphanesiyle (SDK'nın bağımlılığı,
+# ayrıca pinlenmedi — SDK `>=1,<2` istiyor) imzayı doğrular, pydantic modeline
+# GİRMEZ (gerekçe services/polar.py başında). Saf Python tekerleği
+# (`py3-none-any`), pydantic ≥ 2.11 (FastAPI zaten getiriyor), httpx ≥ 0.28.1
+# (üstteki pinle uyumlu), jsonpath-python. MINOR SABİT (`0.32.*`): SDK henüz
+# 0.x, Speakeasy üretimi her minor'da model adlarını değiştirebiliyor; pin
+# ilerletilirken tests/fixtures/polar/*.json SDK modelinden yeniden geçer
+# (tests/test_odeme.py). 2026-09-21'de PyPI'dan indirilip kaynağı okundu:
+# openapi 2026-04, `validate_event` = Standard Webhooks HMAC-SHA256.
+polar-sdk==0.32.*
+
 # Windows .NET köprüsü — pywebview'ın KENDİ dolaylı bağımlılıkları
 # (`pythonnet; sys_platform=="win32"`), burada yalnız SÜRÜMLERİ sabitleniyor.
 #

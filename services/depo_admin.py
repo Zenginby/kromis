@@ -51,6 +51,14 @@ döner; 404/409 metnini rota kurar (`services/db.py`nin `database_unavailable`
 kararı). İş satırının dökümü `kuyruk._json` — kullanıcının gördüğüyle AYNI
 biçim (`istek` yine dökülmez: admin de prompt'u görmez, galeriden görür) +
 `kullanici_id`/`eposta` (admin kimin işi olduğunu bilmek zorunda).
+
+ÖDEME OLAYLARI (`odeme_olaylari`, `odeme_ozeti`, Faz 4 / 3): admin "Ödeme"
+sekmesi — son 100 webhook teslimatı (`?hata=1` yalnız `hata` dolu olanlar:
+`kullanici_yok`, `urun_yok` … — sahibin `tools/polar_esitle.py` koşacağı ya da
+admin `duzelt`le düzelteceği satırlar) ve üç sayı (olay, hatalı, sipariş).
+Gövde (`govde`) DÖKÜLMEZ: e-posta/adres taşır, admin bunları Polar panelinden
+görür; liste teslimatın kaderini söyler, içeriğini değil. `alindi` indeksi
+sıralamayı taşır (`0008_odeme`).
 """
 from __future__ import annotations
 
@@ -73,7 +81,9 @@ from services.tablolar import (
     Is,
     Isci,
     Kullanici,
+    OdemeOlayi,
     Oturum,
+    Siparis,
 )
 
 __all__ = ["CANLI_ESIK", "SAYFA_ADEDI", "SAYFA_ADEDI_AZAMI", "IS_LISTESI_SINIRI",
@@ -89,6 +99,8 @@ SAYFA_ADEDI = 50
 SAYFA_ADEDI_AZAMI = 200
 # Kuyruk görünümü: son 200 iş (belge §8).
 IS_LISTESI_SINIRI = 200
+# Faz 4 / 3: admin "Ödeme" sekmesinin satır tavanı — 1 yıllık saklama (K10) tabloyu büyütür, liste son 100.
+ODEME_OLAY_SINIRI = 100
 
 _BIR_SAAT = dt.timedelta(hours=1)
 _BIR_GUN = dt.timedelta(hours=24)
@@ -358,3 +370,32 @@ def marj(db: Session, gun: int, an: dt.datetime | None = None) -> list[dict[str,
         "hata_kredi": int(hata_kredi),
     } for model, adet, kredi, maliyet, bilinen, sure_ort, hata, hata_kredi in satirlar]
 
+
+
+# ─────────────────────────────────────────────────────────────── ödeme (Faz 4 / 3)
+
+def odeme_olaylari(db: Session, *, yalniz_hata: bool = False, limit: int = ODEME_OLAY_SINIRI) -> list[dict[str, Any]]:
+    """Son `limit` webhook teslimatı, en yeni üstte; `yalniz_hata` ile `hata` dolu olanlar (gerekçe modül başında)."""
+    sorgu = (select(OdemeOlayi, Kullanici.eposta)
+             .outerjoin(Kullanici, Kullanici.id == OdemeOlayi.kullanici_id)
+             .order_by(OdemeOlayi.alindi.desc(), OdemeOlayi.id).limit(limit))
+    if yalniz_hata:
+        sorgu = sorgu.where(OdemeOlayi.hata.is_not(None))
+    return [{
+        "id": str(o.id),
+        "webhook_id": o.webhook_id,
+        "tur": o.tur,
+        "nesne": o.polar_nesne_id,
+        "kullanici_id": str(o.kullanici_id) if o.kullanici_id is not None else None,
+        "eposta": eposta,
+        "alindi": _damga(o.alindi),
+        "islendi_at": _damga(o.islendi_at),
+        "hata": o.hata,
+    } for o, eposta in db.execute(sorgu).all()]
+
+
+def odeme_ozeti(db: Session) -> dict[str, int]:
+    """Üç sayı: toplam teslimat, `hata` dolu teslimat, `siparisler` satırı (admin bağlamı hepsini okur, `yonetici_okur`)."""
+    olay, hatali = db.execute(select(func.count(), func.count(OdemeOlayi.hata))).one()
+    siparis = db.scalar(select(func.count()).select_from(Siparis))
+    return {"olay": int(olay or 0), "hatali": int(hatali or 0), "siparis": int(siparis or 0)}

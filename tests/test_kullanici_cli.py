@@ -142,6 +142,42 @@ def test_admin_flips_the_flag_on_an_existing_user_reports_whether_it_changed_and
     assert "diye bir kullanici yok" in capsys.readouterr().err
 
 
+def test_parola_rewrites_the_hash_and_revokes_every_session(veritabani_motor, monkeypatch, capsys):
+    """Parola sıfırlama: yeni özet DOĞRULANIR, eskisi artık geçmez ve bütün oturumlar düşer.
+
+    Oturumların düşmesi yan etki değil ŞART: parola değiştirmek "bu hesabı artık
+    ben yönetiyorum" demek; eski çerez ayakta kalırsa saldırgan dışarı atılmaz.
+    """
+    assert _olustur(monkeypatch, eposta="unutan@example.com") == 0
+    with Session(veritabani_motor) as s:
+        k = s.scalar(select(tablolar.Kullanici).where(tablolar.Kullanici.eposta == "unutan@example.com"))
+        assert k is not None
+        jeton = hesap.oturum_ac(s, k, "203.0.113.9", "tarayici", hesap.simdi())
+        s.commit()
+        kid = k.id
+    capsys.readouterr()
+
+    _stdin(monkeypatch, "YepyeniParola123!\n")
+    assert cli.main(["parola", "--eposta", "unutan@example.com", "--parola-stdin"]) == 0
+    assert "parola yazildi, 1 oturum dusuruldu" in capsys.readouterr().out
+
+    with Session(veritabani_motor) as s:
+        k = s.get(tablolar.Kullanici, kid)
+        assert hesap.parola_dogru("YepyeniParola123!", k.parola_ozeti), "yeni parola geçmeli"
+        assert not hesap.parola_dogru(PAROLA, k.parola_ozeti), "eski parola ARTIK geçmemeli"
+        assert hesap.oturum_dogrula(s, jeton, hesap.simdi()) is None, "eski çerez tanınmaz"
+
+    # Bilinmeyen e-posta: 1, hiçbir şey yazılmaz. Parola STDIN'den okunduğu için
+    # DB'ye gitmeden ÖNCE tüketilir — akış bozulmasın diye yeniden veriliyor.
+    _stdin(monkeypatch, "YepyeniParola123!\n")
+    assert cli.main(["parola", "--eposta", "yok@example.com", "--parola-stdin"]) == 1
+    assert "diye bir kullanici yok" in capsys.readouterr().err
+
+    # Kısa parola: DB'ye hiç gidilmez (kural kümesi web ile AYNI, `models.check_parola`).
+    _stdin(monkeypatch, "kisa\n")
+    assert cli.main(["parola", "--eposta", "unutan@example.com", "--parola-stdin"]) == 1
+
+
 def test_without_database_url_the_tool_exits_2(monkeypatch, capsys):
     monkeypatch.delenv(db.DATABASE_URL_ENV)
     _stdin(monkeypatch, PAROLA + "\n")

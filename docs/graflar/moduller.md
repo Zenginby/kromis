@@ -134,7 +134,7 @@ flowchart TD
     n_services_kiraci["services.kiraci<br/>200 satır"]
     n_services_koken["services.koken<br/>133 satır"]
     n_services_nesne_depo["services.nesne_depo<br/>317 satır"]
-    n_services_polar["services.polar<br/>191 satır"]
+    n_services_polar["services.polar<br/>210 satır"]
     n_services_saglayici_meta["services.saglayici_meta<br/>126 satır"]
     n_services_sifre["services.sifre<br/>151 satır"]
     n_services_zaman["services.zaman<br/>71 satır"]
@@ -702,7 +702,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `services/palet.py` | 185 | 7 | `color_names`, `i18n`, `models`, `palette`, `services.depo_palet`, `services.dil` | 3 | 1 |
 | `services/planlar.py` | 136 | 6 | `catalog`, `services.tablolar` | 8 | 6 |
 | `services/platform_anahtari.py` | 159 | 7 | `catalog`, `services.depo_kimlik_bilgisi` | 7 | 6 |
-| `services/polar.py` | 191 | 0 | — | 2 | 2 |
+| `services/polar.py` | 210 | 0 | — | 2 | 2 |
 | `services/posta.py` | 187 | 3 | `errlog`, `i18n` | 2 | 4 |
 | `services/redaksiyon.py` | 68 | 1 | `catalog` | 1 | 0 |
 | `services/sablon.py` | 68 | 10 | `errlog`, `i18n`, `services.ayar`, `services.dil`, `version` | 3 | 0 |

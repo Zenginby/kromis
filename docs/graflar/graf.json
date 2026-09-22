@@ -2440,7 +2440,7 @@
         "services.odeme"
       ],
       "katman": 0,
-      "satir": 191,
+      "satir": 210,
       "testler": [
         "tests/test_docker_kapisi.py",
         "tests/test_odeme.py"

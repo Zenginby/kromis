@@ -74,7 +74,7 @@
 | `services.gunluk` | `test_admin.py`, `test_docker_kapisi.py`, `test_gunluk.py`, `test_odeme.py`, `test_planlar.py` |
 | `services.hata_izleme` | `test_docker_kapisi.py`, `test_sentry.py` |
 | `services.hesap` | `test_admin.py`, `test_anahtar_dondur.py`, `test_artik_dosya.py`, `test_defter.py`, `test_dosya_rotalari.py`, `test_galeri_db.py`, `test_hesap.py`, `test_ice_aktar.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik.py`, `test_kimlik_bilgisi_db.py`, `test_kredi_route.py`, `test_kullanici_cli.py`, `test_kuyruk.py`, `test_palet_db.py`, `test_playwright_hesap.py`, `test_rls.py`, `test_sohbet_db.py`, `test_tercih_db.py`, `test_varlik_db.py` |
-| `services.isci` | `test_docker_kapisi.py`, `test_gunluk.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik.py`, `test_playwright_studio.py`, `test_rls.py`, `test_saglayici_meta.py`, `test_uretim_kapilar.py` |
+| `services.isci` | `test_docker_kapisi.py`, `test_gunluk.py`, `test_isci.py`, `test_isler_route.py`, `test_kimlik.py`, `test_planlar.py`, `test_playwright_studio.py`, `test_rls.py`, `test_saglayici_meta.py`, `test_uretim_kapilar.py` |
 | `services.istek_kimligi` | `test_gunluk.py`, `test_koken.py`, `test_sentry.py` |
 | `services.kapilar` | `test_docker_kapisi.py`, `test_e2e_kredi.py`, `test_isler_route.py`, `test_kota.py`, `test_planlar.py`, `test_platform_anahtari.py`, `test_playwright_isler.py`, `test_uretim_kapilar.py` |
 | `services.kimlik` | `test_isler_route.py`, `test_kimlik.py`, `test_rls.py` |
@@ -87,7 +87,7 @@
 | `services.odeme` | `test_odeme.py` |
 | `services.palet` | `test_palet_db.py` |
 | `services.planlar` | `test_defter.py`, `test_docker_kapisi.py`, `test_isci.py`, `test_kredi_route.py`, `test_odeme.py`, `test_planlar.py` |
-| `services.platform_anahtari` | `test_admin.py`, `test_docker_kapisi.py`, `test_gunluk.py`, `test_kota.py`, `test_kredi_route.py`, `test_platform_anahtari.py` |
+| `services.platform_anahtari` | `test_admin.py`, `test_docker_kapisi.py`, `test_gunluk.py`, `test_kota.py`, `test_kredi_route.py`, `test_planlar.py`, `test_platform_anahtari.py` |
 | `services.polar` | `test_docker_kapisi.py`, `test_odeme.py` |
 | `services.posta` | `test_docker_kapisi.py`, `test_hesap.py`, `test_playwright_hesap.py`, `test_posta.py` |
 | `services.redaksiyon` | — |

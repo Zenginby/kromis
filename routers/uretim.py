@@ -139,7 +139,7 @@ def _kapilar(db: Session, kullanici: Kullanici, spec: catalog.ImageModel, kimlik
     429 dediyse bakiye hiç sorulmaz). Asıl düşüm `_siraya_koy`da, satırla aynı
     transaksiyonda.
     """
-    kapilar.check_plan(db, kullanici, spec)
+    kapilar.check_plan(db, kullanici, spec, kimlikler)
     kaynak = kapilar.check_anahtar(spec.credential, kimlikler)
     kapilar.check_is_tavani(db, kullanici.id)
     kota.check_saatlik(db, kullanici.id)

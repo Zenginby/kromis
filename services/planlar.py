@@ -16,13 +16,21 @@ bu sözlüğün anahtarları onunla EŞİT olmak zorunda (bekçi tests/test_plan
 `PLANLAR[plan]`da KeyError, kodun tanıdığı ama DB'nin reddettiği bir plan admin
 rotasında 500 olurdu.
 
-VİDEO KURALI PLANIN ÖZELLİĞİ, MODELİN DEĞİL (K7): katalogdaki `ImageModel.plan`
-bugün her modelde `"free"` ve öyle kalıyor; ücretsiz planda video modellerinin
-kapanması `Plan.video=False` ile bu katalogda. Sebep filigran yokluğu: sunucuda
-video işleme aracı yok (ffmpeg imaja girmiyor, belge "BU FAZDA YOK"), ücretsiz
-görsel işçide filigranlanır (4. görev), ücretsiz video filigransız çıkardı —
-kapı o yüzden anahtar kaynağından BAĞIMSIZ, BYOK'lu ücretsiz kullanıcı da video
-alamaz (anahtarın kimin olduğu filigranın yokluğunu değiştirmez).
+VİDEO KURALI PLANIN ÖZELLİĞİ, MODELİN DEĞİL (K7): ücretsiz planda video
+modellerinin kapanması `Plan.video=False` ile bu katalogda. Sebep filigran
+yokluğu: sunucuda video işleme aracı yok (ffmpeg imaja girmiyor, belge "BU
+FAZDA YOK"), ücretsiz görsel işçide filigranlanır (4. görev), ücretsiz video
+filigransız çıkardı — kapı o yüzden anahtar kaynağından BAĞIMSIZ, BYOK'lu
+ücretsiz kullanıcı da video alamaz (anahtarın kimin olduğu filigranın
+yokluğunu değiştirmez).
+
+KAPININ ÖTEKİ YARISI ARTIK ANAHTARA BAKIYOR (Faz 4 / 1b, 1b-A): `ImageModel.plan`
+bugün hâlâ her girdide `"free"` — yani `kapsiyor` bu PR'da HİÇBİR davranışı
+değiştirmiyor — ama 1b'nin katalog PR'ı o alanı VERİ yapacak ve o an, kendi
+`gemini` anahtarını girmiş ücretsiz kullanıcı BİZE HİÇ MALİYETİ OLMAYAN bir
+modeli göremez hâle gelirdi. Model eşiği bu yüzden yalnız PLATFORM anahtarıyla
+koşan işlere uygulanıyor (`kapsiyor`un üçüncü parametresi). Makine önce
+geliyor, veri sonra: ters sıra o boşluğu bir tur boyunca canlı bırakırdı.
 
 `temel`/`pro` — KURAL KODDA, HİBE ORTAMDAN, FİYAT POLAR'DA (Faz 4 / 2, K5):
 `planlar` tablosu YOK (Faz 3 K5'in "o gün gelir" cümlesinden SAPMA — fiyatın
@@ -112,25 +120,61 @@ class Plan:
     aylik_hibe: int
     filigran: bool
     video: bool
+    # BASAMAK (Faz 4 / 1b, karar 1b-B): free=0 < temel=1 < pro=2. Bugünkü
+    # kapı İKİLİYDİ (`spec.plan != "free"` → temel de pro da geçer), yani
+    # "YALNIZ pro" bir model İFADE EDİLEMİYORDU. 1b'nin kataloğunda fiyat
+    # farkı 95 kata çıkıyor (`fal-flux-1-schnell` 1 kredi ↔ `fal-seedance-2-5`
+    # 95 kredi/sn); ikili kapı, `temel` planın aylık hibesini TEK üretimde
+    # eritebilecek bir modeli o plana açık bırakırdı.
+    #
+    # `video` BİLEREK AYRI EKSEN, basamağa katlanmadı: video kuralının
+    # gerekçesi fiyat değil FİLİGRAN YOKLUĞU (sunucuda ffmpeg yok) ve onu bir
+    # fiyat sıralamasının içine gömmek gerekçeyi görünmez kılardı.
+    #
+    # `PLANLAR_KUMESI`nden TÜRETİLMİYOR, açıkça yazılıyor: o demetin
+    # sözleşmesi "`kullanicilar.plan` CHECK kümesi" (services/tablolar.py),
+    # sıralama değil. Sırayı ona yüklersek demet bir gün yeniden sıralandığında
+    # — CHECK için tamamen zararsız bir düzenleme — kapı SESSİZCE bozulurdu.
+    # Bekçi ikisinin uyumunu ayrıca ölçüyor (tests/test_planlar.py).
+    rank: int
     fiyat: int | None = None
 
 
 PLANLAR: dict[str, Plan] = {
-    "free": Plan("free", aylik_hibe=FREE_AYLIK_HIBE, filigran=True, video=False),
+    "free": Plan("free", aylik_hibe=FREE_AYLIK_HIBE, filigran=True, video=False, rank=0),
     "temel": Plan("temel", aylik_hibe=aylik_hibe(TEMEL_AYLIK_HIBE_ENV, TEMEL_AYLIK_HIBE_VARSAYILAN),
-                  filigran=False, video=True),
+                  filigran=False, video=True, rank=1),
     "pro": Plan("pro", aylik_hibe=aylik_hibe(PRO_AYLIK_HIBE_ENV, PRO_AYLIK_HIBE_VARSAYILAN),
-                filigran=False, video=True),
+                filigran=False, video=True, rank=2),
 }
 assert tuple(PLANLAR) == PLANLAR_KUMESI, "PLANLAR ↔ kullanicilar.plan CHECK kümesi ayrıştı"
 
 
-def kapsiyor(plan: str, spec: catalog.ImageModel | catalog.ChatModel) -> bool:
-    """Bu plan bu modeli KAPSIYOR mu — anahtardan bağımsız yarı (K7); `model_available` ve `check_plan` aynı soruyu buradan sorar.
+def kapsiyor(plan: str, spec: catalog.ImageModel | catalog.ChatModel, *, platform_anahtariyla: bool) -> bool:
+    """Bu plan bu modeli KAPSIYOR mu; `model_available` ve `check_plan` aynı soruyu buradan sorar.
 
-    İki koşul: modelin kendi `plan` alanı `free` değilse ücretsiz plan onu
-    almaz (katalog verisi, bugün hepsi `free`); model video ise plan videoyu
-    açmış olmalı (plan verisi). `plan` CHECK'ten geliyor — tanınmayan ad
-    KeyError, sessiz "free" değil.
+    İKİ KOŞUL, AYRI EKSENLERDE — ve yalnız BİRİ anahtarın kimin olduğuna bakar:
+
+    1. MODEL EŞİĞİ (basamaklı, 1b-B): kullanıcının planı modelin istediği
+       basamağa erişiyor mu (`Plan.rank`). YALNIZ platform anahtarıyla koşan
+       işlere uygulanır (1b-A): kendi anahtarını girmiş kullanıcının bize
+       maliyeti yok, pahalı modeli ondan saklamanın gerekçesi de yok.
+    2. VİDEO (anahtardan BAĞIMSIZ — K7 AYNEN DURUYOR): sunucuda video işleme
+       aracı yok (ffmpeg imaja girmiyor), ücretsiz video FİLİGRANSIZ çıkardı,
+       ve anahtarın kimin olduğu filigranın YOKLUĞUNU değiştirmez. BYOK'lu
+       ücretsiz kullanıcı da video alamaz. Filigran kuralı da aynı sebeple
+       dokunulmadan kaldı (`services/isci._filigranlanir` yalnız plana bakar).
+
+    `platform_anahtariyla` BOOL, dizge değil: bu modül SAF (dosya başlığı "DB
+    yok") ve `platform_anahtari.KAYNAK_PLATFORM`ı ithal etmek `planlar`a
+    `depo_kimlik_bilgisi` üzerinden bir SQLAlchemy kenarı takardı. Karşılaştırma
+    çağıranda, ikisi de o modülü zaten ithal ediyor.
+
+    ANAHTAR SÖZCÜKLÜ ve ÖNTANIMSIZ, bilerek: üç çağıran var ve biri unutulursa
+    öntanımlı bir değer MODEL EŞİĞİNİ SESSİZCE ATLATIRDI — §1b'nin risk notunun
+    ("kapı sessizce gevşer") tam olarak korktuğu şey. Öntanımsız imzada
+    unutulan çağıran `TypeError` verir. `plan` CHECK'ten geliyor: tanınmayan ad
+    KeyError, sessiz "free" değil — aynı duruş, `spec.plan` için de geçerli.
     """
-    return (spec.plan == PLAN_VARSAYILAN or plan != PLAN_VARSAYILAN) and (spec.kind != "video" or PLANLAR[plan].video)
+    esik = not platform_anahtariyla or PLANLAR[spec.plan].rank <= PLANLAR[plan].rank
+    return esik and (spec.kind != "video" or PLANLAR[plan].video)

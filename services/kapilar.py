@@ -37,17 +37,24 @@ transaksiyon geri alınır — iş satırı da (rota `OTURUM`u istisnada rollbac
 ve 403 (plan/yetki) ile karışmasın (K11); cümleyi ön yüz `kod`dan kurar
 (palette.js `detailText`). BYOK (`kullanici`) iş defteri hiç görmez (K3).
 
-Sekizinci kapı `check_plan` (Faz 3 / 3, K5/K7): kullanıcının PLANI seçilen
-modeli kapsıyor mu (`planlar.kapsiyor` — modelin `plan` alanı + video ↔
-`Plan.video`; `modeller.model_available`ın anahtardan bağımsız yarısı). Hayırsa
-**403** JSON `{"kod": "err.plan_kapsamiyor", "model", "plan"}` — 403 "yetki/
-plan", 402 "para", 429 "kota" (K11 ayrımı); cümleyi ön yüz `kod`dan kurar.
-Zincirin EN BAŞINDA, anahtar kapısından ÖNCE: kapı anahtar kaynağından
-BAĞIMSIZ (BYOK'lu ücretsiz kullanıcı da video alamaz — kuralın sebebi
-filigran yokluğu, anahtarın kimin olduğu onu değiştirmez), o yüzden önce
-plan sorulur — planın kapsamadığı modele "anahtar yok" (409) demek kullanıcıyı
-anahtar girmeye yönlendirirdi ve anahtar girse de kapı açılmazdı. Plan yüklü satırdan, yoksa DB'den
-(`kullanici_plani`) — istek başına ek sorgu yok.
+Sekizinci kapı `check_plan` (Faz 3 / 3, K5/K7; Faz 4 / 1b, 1b-A/1b-B):
+kullanıcının PLANI seçilen modeli kapsıyor mu (`planlar.kapsiyor` — model
+basamağı + video ↔ `Plan.video`; `modeller.model_available`ın rota tarafındaki
+ikizi). Hayırsa **403** JSON `{"kod": "err.plan_kapsamiyor", "model", "plan"}`
+— 403 "yetki/plan", 402 "para", 429 "kota" (K11 ayrımı); cümleyi ön yüz
+`kod`dan kurar.
+
+Zincirin EN BAŞINDA, anahtar kapısından ÖNCE — ve bu sıra 1b'den SONRA da
+duruyor, ama artık bir inceliği var. Kapının VİDEO yarısı anahtar kaynağından
+BAĞIMSIZ (BYOK'lu ücretsiz kullanıcı da video alamaz — sebebi filigran
+yokluğu, anahtarın kimin olduğu onu değiştirmez); MODEL EŞİĞİ yarısı ise
+anahtara BAKAR (1b-A). Eşik için kaynağı öğrenmek `check_anahtar`ı öne almayı
+GEREKTİRMİYOR: `platform_anahtari.kaynak` aynı soruyu 409 fırlatmadan
+cevaplıyor, o yüzden rota "planında yok" derken anahtar kapısı hâlâ hiç
+sorulmamış oluyor (bekçisi tests/test_planlar.py). Sıranın kendisi neden
+korundu: planın kapsamadığı modele "anahtar yok" (409) demek kullanıcıyı
+anahtar girmeye yönlendirirdi ve anahtar girse de kapı açılmazdı. Plan yüklü
+satırdan, yoksa DB'den (`kullanici_plani`) — istek başına ek sorgu yok.
 """
 from __future__ import annotations
 
@@ -209,17 +216,23 @@ def kullanici_plani(db: Session, kullanici: Kullanici) -> str:
     return str(yuklu) if yuklu else defter.plan_oku(db, kullanici.id)
 
 
-def check_plan(db: Session, kullanici: Kullanici, spec: catalog.ImageModel) -> str:
+def check_plan(db: Session, kullanici: Kullanici, spec: catalog.ImageModel,
+               kimlikler: Mapping[str, str]) -> str:
     """Kullanıcının planı bu modeli kapsıyor mu; evetse plan adı, hayırsa 403 `err.plan_kapsamiyor` (Faz 3 / 3, K7).
 
     Gövde `{"kod", "model", "plan"}` — cümle YOK, ön yüz `kod`u kendi dilinde
     kurar (`err.plan_kapsamiyor`), iki alan "hangi model, hangi plan" der.
-    Anahtar kaynağından BAĞIMSIZ: `check_anahtar`dan önce çağrılır (sıra
-    modül başında). Karar `planlar.kapsiyor`da — model dökümünün `sebep:
-    "plan"` dediği modele rota da 403 der, iki cevap doğmaz.
+    Karar `planlar.kapsiyor`da — model dökümünün `sebep: "plan"` dediği modele
+    rota da 403 der, iki cevap doğmaz.
+
+    `kimlikler` YALNIZ anahtarın KAYNAĞINI okumak için (Faz 4 / 1b, 1b-A);
+    `platform_anahtari.kaynak` hata FIRLATMAZ, o yüzden bu kapı hâlâ anahtar
+    kapısından önce koşabiliyor ve 403'te `check_anahtar` hiç sorulmuyor —
+    `sebep`in "plan önce" duruşu rotada da böyle korunuyor.
     """
     plan = kullanici_plani(db, kullanici)
-    if not planlar.kapsiyor(plan, spec):
+    kaynak = platform_anahtari.kaynak(spec.credential, kimlikler)
+    if not planlar.kapsiyor(plan, spec, platform_anahtariyla=kaynak == platform_anahtari.KAYNAK_PLATFORM):
         raise HTTPException(status_code=403,
                             detail={"kod": "err.plan_kapsamiyor", "model": spec.id, "plan": plan})
     return plan

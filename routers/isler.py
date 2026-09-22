@@ -365,7 +365,7 @@ def is_yeniden(is_id: uuid.UUID, db: Session = OTURUM,
     # zaten "bilinmeyen model" ile düşürür (test_isci); kaynak `kullanici` sayılır
     # ki platform toplamına girmesin.
     if spec is not None:
-        kapilar.check_plan(db, kullanici, spec)
+        kapilar.check_plan(db, kullanici, spec, kimlikler)
     kaynak = (kapilar.check_anahtar(spec.credential, kimlikler) if spec is not None
               else platform_anahtari.KAYNAK_KULLANICI)
     kapilar.check_is_tavani(db, kullanici.id)

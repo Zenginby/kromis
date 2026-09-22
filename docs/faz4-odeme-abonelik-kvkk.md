@@ -542,7 +542,8 @@ karakter, adı tekrar etmez), `tools/tarife_kontrol.py` (+emeklilik satırı),
 **Testler / bekçiler.** Katalog bekçileri aynen (`test_catalog`: her girdinin
 notu iki dilde var, adı tekrar etmiyor, jetonlar tutarlı, kısa etiket
 çakışması); i18n eşliği (`test_i18n`); `tarife_kontrol` ↔ bağımsız tarama
-(1, sıfır değil — gerekçesi yukarıda); `emeklilik` bekçisi tarih yamalı;
+(**0** — on birinci sayı 2026-09-22'de ölçüldü, dört Azure notunun dördü de bu
+görevde düşüyor); `emeklilik` bekçisi tarih yamalı;
 **yeni: basamak bekçisi** (`Plan.rank` ↔ `PLANLAR_KUMESI` sırası, `kapsiyor`
 her (plan, model.plan, anahtar_kaynagi) üçlüsünde beklenen cevabı verir) ve
 **BYOK bekçisi** (kendi anahtarıyla plan eşiği aşılır, ama `Plan.video` ve

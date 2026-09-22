@@ -51,13 +51,6 @@ import catalog
 import providers
 from services import defter, kapilar, tablolar
 from tests.conftest import posix_gerekir
-
-# Bir işin kredisi KATALOGDAN türetilir, metne elle yazılmaz: bu ailede
-# "reserved 8 · actual 8" gibi dizeler sabitti ve tarife 2026-09-22'de
-# ölçümle 8 → 11 olunca altı iddia birden düştü (kusur tarifede değil,
-# testin tarifeyi KOPYALAMASINDAYDI). `tests/test_e2e_kredi.py` de bunu
-# buradan ithal ediyor — tek kaynak.
-KREDI = catalog.cost_for(catalog.image_model(catalog.DEFAULT_IMAGE_MODEL), "medium")
 from tests.test_playwright_studio import (
     ServerThread,
     _ilk_kurulum_perdesini_kapat,
@@ -65,6 +58,15 @@ from tests.test_playwright_studio import (
     get_free_port,
     sunucu_hazir,
 )
+
+# Bir işin kredisi KATALOGDAN türetilir, metne elle yazılmaz: bu ailede
+# "reserved 8 · actual 8" gibi dizeler sabitti ve tarife 2026-09-22'de
+# ölçümle 8 → 11 olunca altı iddia birden düştü (kusur tarifede değil,
+# testin tarifeyi KOPYALAMASINDAYDI). `tests/test_e2e_kredi.py` de bunu
+# buradan ithal ediyor — tek kaynak.
+_SPEC = catalog.image_model(catalog.DEFAULT_IMAGE_MODEL)
+assert _SPEC is not None
+KREDI = catalog.cost_for(_SPEC, "medium")
 
 pytestmark = pytest.mark.gercek_kimlik
 

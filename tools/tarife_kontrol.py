@@ -153,8 +153,13 @@ EMEKLILIK_UFKU_GUN = 30
 
 
 def bugun() -> dt.date:
-    """Takvim günü — TEST DİKİŞİ (`fal_client._simdi`nin deseni): test yamalar, üretim saatten okur."""
-    return dt.date.today()
+    """Takvim günü — TEST DİKİŞİ (`fal_client._simdi`nin deseni): test yamalar, üretim saatten okur.
+
+    UTC günü, yerel değil: deponun öteki saatleri UTC okuyor (`services/hesap.py`,
+    `services/polar.py`) ve `emeklilik` tarihi de o takvimde anlaşılmalı; yerel
+    gün sınırı 30 günlük ufku bir gün kaydırırdı (#80 incelemesi).
+    """
+    return dt.datetime.now(dt.UTC).date()
 
 
 @dataclasses.dataclass(frozen=True)

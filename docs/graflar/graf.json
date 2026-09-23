@@ -645,7 +645,7 @@
         "providers"
       ],
       "katman": 5,
-      "satir": 1096,
+      "satir": 1106,
       "testler": [
         "tests/test_fal_client.py",
         "tests/test_fal_client_gorsel.py",
@@ -3029,7 +3029,7 @@
       ],
       "ithal_eden": [],
       "katman": 1,
-      "satir": 227,
+      "satir": 232,
       "testler": [
         "tests/test_araclar.py"
       ],

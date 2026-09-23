@@ -841,24 +841,62 @@ def test_MALIYET_ustunlugu_iddia_eden_not_GERCEKTEN_en_ucuz():
     Hız üstünlüğü burada sınanmıyor: katalogda gecikme verisi yok, yani
     ölçülemez. Maliyet ölçülebilir, o yüzden mandalı bu.
     """
-    en_az = min(m.credits for m in catalog.IMAGE_MODELS)
-    en_cok = max(m.credits for m in catalog.IMAGE_MODELS)
     for m in catalog.IMAGE_MODELS:
-        # TÜRKÇE METİN okunuyor, anahtar DEĞİL (2026-09-23 düzeltmesi): v0.21
-        # `note`u çeviri anahtarına çevirdiğinde bu satır `m.note.lower()`
-        # kalmıştı ve "model.x.note" hiç "en ucuz" içermediği için mandal
-        # SESSİZCE BOŞ ateşliyordu — D'nin schnell notu ("En ucuz görsel")
-        # ilk gerçek sınavı. Metin Türkçe, çünkü iddia sözcükleri Türkçe;
-        # İngilizce çeviri aynı iddiayı taşır (i18n eşliği ayrı bekçi).
-        notu = i18n.t(m.note, "tr").lower()
-        if "en ucuz" in notu:
-            assert m.credits == en_az, (
-                f"{m.id}: not 'en ucuz' diyor ama {m.credits} kredi "
-                f"(katalogdaki en az {en_az})")
-        if "en pahalı" in notu:
-            assert m.credits == en_cok, (
-                f"{m.id}: not 'en pahalı' diyor ama {m.credits} kredi "
-                f"(katalogdaki en çok {en_cok})")
+        _maliyet_iddiasini_sina(m, catalog.IMAGE_MODELS, "görsel kataloğu")
+
+
+def _taban(m: catalog.ImageModel) -> int:
+    """Modelin EN UCUZ kademesi: `credits_by_quality` varsa en küçüğü, yoksa `credits`."""
+    return min((k for _, k in m.credits_by_quality), default=m.credits)
+
+
+def _tavan(m: catalog.ImageModel) -> int:
+    return max((k for _, k in m.credits_by_quality), default=m.credits)
+
+
+def _maliyet_iddiasini_sina(m: catalog.ImageModel, havuz, kapsam: str) -> None:
+    """Bir notun "en ucuz"/"en pahalı" iddiasını `havuz` içinde KADEME düzeyinde sınar.
+
+    TÜRKÇE METİN okunuyor, anahtar DEĞİL (2026-09-23 düzeltmesi): v0.21 `note`u
+    çeviri anahtarına çevirdiğinde mandal `m.note.lower()` kalmıştı ve
+    "model.x.note" hiç "en ucuz" içermediği için SESSİZCE BOŞ ateşliyordu.
+    Metin Türkçe, çünkü iddia sözcükleri Türkçe; İngilizce çeviri aynı iddiayı
+    taşır (i18n eşliği ayrı bekçi).
+
+    KADEME düzeyi (#80 incelemesi): ilk sürüm yalnız VARSAYILAN krediyi
+    karşılaştırıyordu ve iki yanlışı geçirdi — H3 "fal'ın en ucuz kademesi"
+    derken (768P 12) Wan 480p 10 kredi/sn'ydi; schnell "En ucuz görsel: 1"
+    derken gpt-image-2'nin `low` kademesi de 1'di. Kural: NİTELENMEMİŞ "en ucuz"
+    hem varsayılanda hem taban kademede havuzun TEK en ucuzu olmalı — eşitlik
+    de yanlış, kullanıcı "en ucuz" okuyup bir alt satırda aynı rakamı görür.
+    "varsayılan" sözcüğüyle nitelenmiş iddia ("en ucuz varsayılan kademe")
+    yalnız varsayılan kredileri karşılaştırır; eşitlik burada da yanlış değil
+    ama beklenmiyor. "en pahalı" simetrik (tavan kademe).
+    """
+    assert m.note is not None, f"{m.id}: notu yok (not sözleşmesi ayrı bekçi)"
+    notu = i18n.t(m.note, "tr").lower()
+    digerleri = [d for d in havuz if d.id != m.id]
+    if "en ucuz" in notu:
+        en_az = min(d.credits for d in havuz)
+        assert m.credits == en_az, (
+            f"{m.id}: not 'en ucuz' diyor ama varsayılanı {m.credits} kredi "
+            f"({kapsam} içinde en az {en_az})")
+        if "varsayılan" not in notu:
+            esit_veya_ucuz = [d.id for d in digerleri if _taban(d) <= _taban(m)]
+            assert not esit_veya_ucuz, (
+                f"{m.id}: not nitelenmemiş 'en ucuz' diyor (taban {_taban(m)}) ama "
+                f"{kapsam} içinde {esit_veya_ucuz} tabanı bundan ucuz ya da eşit — "
+                f"'en ucuz varsayılan kademe' yaz ya da iddiayı kaldır")
+    if "en pahalı" in notu:
+        en_cok = max(d.credits for d in havuz)
+        assert m.credits == en_cok, (
+            f"{m.id}: not 'en pahalı' diyor ama varsayılanı {m.credits} kredi "
+            f"({kapsam} içinde en çok {en_cok})")
+        if "varsayılan" not in notu:
+            esit_veya_pahali = [d.id for d in digerleri if _tavan(d) >= _tavan(m)]
+            assert not esit_veya_pahali, (
+                f"{m.id}: not nitelenmemiş 'en pahalı' diyor (tavan {_tavan(m)}) ama "
+                f"{kapsam} içinde {esit_veya_pahali} tavanı bundan pahalı ya da eşit")
 
 
 # ── Sahibin sıralı listesi = katalog sırası (Faz 4 / 1b-D, 2026-09-23) ────
@@ -1156,23 +1194,13 @@ def test_MALIYET_ustunlugu_iddia_eden_VIDEO_notu_SAGLAYICI_ICINDE_dogru():
     """
     for provider in {m.provider for m in catalog.VIDEO_MODELS}:
         grup = [m for m in catalog.VIDEO_MODELS if m.provider == provider]
-        en_az = min(m.credits for m in grup)
-        en_cok = max(m.credits for m in grup)
         for m in grup:
-            # Metin, anahtar değil (görsel ikizinin 2026-09-23 düzeltmesi ve
-            # gerekçesi). İlk gerçek sınav D'nin kendisi: PixVerse'in "En ucuz
-            # fal kademesi" notu MiniMax H3 (12) gelince YANLIŞLANDI, Kling
-            # Turbo'nun "En pahalı fal kademesi"ni Seedance (95) yanlışladı —
-            # ikisi de bu turda düzeltildi.
-            notu = i18n.t(m.note, "tr").lower()
-            if "en ucuz" in notu:
-                assert m.credits == en_az, (
-                    f"{m.id}: not 'en ucuz' diyor ama {m.credits} kredi "
-                    f"({provider} içinde en az {en_az})")
-            if "en pahalı" in notu:
-                assert m.credits == en_cok, (
-                    f"{m.id}: not 'en pahalı' diyor ama {m.credits} kredi "
-                    f"({provider} içinde en çok {en_cok})")
+            # Metin, anahtar değil; kademe düzeyi (görsel ikizinin yardımcısı ve
+            # gerekçesi). İlk gerçek sınavlar D'nin kendisi: PixVerse'in "En ucuz
+            # fal kademesi" notu MiniMax H3 (12) gelince, Kling Turbo'nun "En
+            # pahalı"sı Seedance (95) gelince YANLIŞLANDI; sonra H3'ün kendi "en
+            # ucuz"u Wan 480p (10) karşısında kademe düzeyinde yanlış çıktı.
+            _maliyet_iddiasini_sina(m, grup, provider)
 
 
 _COZUNURLUK_JETONLARI = ("480p", "720p", "1080p")

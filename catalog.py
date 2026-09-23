@@ -979,8 +979,8 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
     # Alibaba · Qwen Image — 0,02 USD/MP. Qwen-Image'ın kendi önerdiği beş
     # geometri (`QWEN_SIZES`) 1,5–1,8 MP, fal'da İKİ MP sayılır → 0,04 USD →
     # 8 kredi. Düzenleme ucu (`fal-ai/qwen-image-edit`) TEK `image_url` alıyor
-    # → `max_refs=1`; çıktı geometrisini referanstan alır, `image_size` o uca
-    # gönderilmiyor (şemada varlığı doğrulanmadı — bkz. fal_client).
+    # → `max_refs=1`; `image_size`ı da okuyor, seçilen boyut düzenlemede de
+    # gider (ilk sürüm düşürüyordu — #80 incelemesi; bkz. fal_client).
     ImageModel(
         id="fal-qwen-image",
         label="Alibaba · Qwen Image",

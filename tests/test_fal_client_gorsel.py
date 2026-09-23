@@ -90,11 +90,13 @@ def test_num_images_is_ALWAYS_one_because_the_count_loop_lives_in_the_queue_loop
         assert m.images_per_request == 1
 
 
-def test_qwen_edit_sends_a_SINGLE_image_url_and_no_image_size():
+def test_qwen_edit_sends_a_SINGLE_image_url_and_KEEPS_image_size():
     """`fal-ai/qwen-image-edit` tek `image_url` okuyor (2509/plus varyantları liste alır,
-    listede değiller); `image_size` o uca gönderilmiyor — şemada üç kaynakla görülmedi."""
+    listede değiller) ve `image_size`ı DA: kullanıcının seçtiği boyut düzenlemede
+    düşürülmez — ilk sürüm düşürüyordu, sessiz sapma (#80 incelemesi)."""
     p = fal_client.build_image_payload(QWEN, "kedi", "1328x1328", 1, REFS)
-    assert set(p) == {"prompt", "image_url", "num_images", "output_format"}
+    assert set(p) == {"prompt", "image_url", "image_size", "num_images", "output_format"}
+    assert p["image_size"] == {"width": 1328, "height": 1328}
     onek = "data:image/png;base64,"
     assert p["image_url"].startswith(onek)
     assert base64.b64decode(p["image_url"][len(onek):]) == PNG
@@ -190,6 +192,19 @@ def test_a_non_png_download_is_re_encoded_as_png_so_the_contract_holds():
 
 def test_a_png_download_passes_through_UNCHANGED():
     assert fal_client._png_garantile(PNG) is PNG
+
+
+def test_a_CMYK_download_is_CONVERTED_not_rejected_as_not_an_image():
+    """PNG yazıcı CMYK bilmiyor: `im.save(format="PNG")` OSError verir ve ilk sürüm
+    o hatayı "görsel değil" diye okuyordu — geçerli bir çıktı Türkçe hatayla
+    çöpe gidiyordu (#80 incelemesi). Şimdi RGB'ye çevrilip yazılıyor."""
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new("CMYK", (8, 8), (0, 255, 255, 0)).save(buf, format="JPEG")
+    out = fal_client._png_garantile(buf.getvalue())
+    assert out.startswith(b"\x89PNG\r\n\x1a\n")
+    with Image.open(io.BytesIO(out)) as im:
+        assert im.mode == "RGB" and im.size == (8, 8)
 
 
 def test_bytes_that_are_not_an_image_become_a_TURKISH_error_not_an_UnidentifiedImageError():

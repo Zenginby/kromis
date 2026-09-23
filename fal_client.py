@@ -962,12 +962,16 @@ GORSEL_ALANLAR: dict[str, GorselTelBicimi] = {
     # Qwen Image: metin ucu `image_size` (`{width, height}` nesnesi — fal'ın
     # ortak `ImageSize` tipi, hazır ad ya da nesne), `num_images`,
     # `output_format`. Düzenleme ucu (`fal-ai/qwen-image-edit`) TEK `image_url`
-    # (2509/plus varyantları `image_urls` alıyor, onlar listede değil);
-    # `image_size` o uca GÖNDERİLMİYOR — şemada varlığı üç kaynakla
-    # görülmedi, çıktı referansın geometrisini izler (katalogdaki not).
+    # (2509/plus varyantları `image_urls` alıyor, onlar listede değil) ve
+    # `image_size`ı DA okuyor (fal'ın qwen-image-edit şeması listeliyor).
+    # İlk sürüm alanı bu uçtan DÜŞÜRÜYORDU: kullanıcının seçtiği boyut
+    # `check_capabilities`ten geçmiş, sonra sessizce referansın geometrisine
+    # kaymıştı — "sessiz sapma yasak" (#80 incelemesi). Alanın canlıda kabulü
+    # sahibin sandbox turunun bir durağı (Kling V3 Pro ve Seedance'tan sonra).
     "fal-qwen-image": GorselTelBicimi(
         metin=frozenset({"prompt", "image_size", "num_images", "output_format"}),
-        duzenleme=frozenset({"prompt", "image_url", "num_images", "output_format"}),
+        duzenleme=frozenset({"prompt", "image_url", "image_size", "num_images",
+                             "output_format"}),
         gorsel_alani="image_url",
     ),
     # Seedream V4: `image_size` nesne (kenar 1024–4096), `num_images`;
@@ -1056,8 +1060,14 @@ def _png_garantile(veri: bytes) -> bytes:
     from PIL import Image, UnidentifiedImageError
     try:
         with Image.open(io.BytesIO(veri)) as im:
+            # PNG yazıcı her modu bilmiyor: CMYK (JPEG'de yaygın) ya da YCbCr
+            # `save(format="PNG")`de OSError verir ve o hata aşağıda "görsel
+            # değil" diye okunurdu — oysa görsel geçerli, yalnız modu yabancı
+            # (#80 incelemesi). Saydamlığı olan modlar RGBA'ya, ötekiler
+            # RGB'ye çevrilir; PNG ikisini de yazar.
+            saydam = im.mode in ("RGBA", "LA", "PA") or "transparency" in im.info
             cikti = io.BytesIO()
-            im.save(cikti, format="PNG")
+            im.convert("RGBA" if saydam else "RGB").save(cikti, format="PNG")
     except (UnidentifiedImageError, OSError) as exc:
         raise ac.ImageError(i18n.t("err.fal_not_an_image")) from exc
     return cikti.getvalue()

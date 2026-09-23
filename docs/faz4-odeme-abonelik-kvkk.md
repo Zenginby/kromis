@@ -722,7 +722,8 @@ Seedance/H3 i2v `aspect_ratio` okumuyor. **MiniMax H3'ün belgedeki 480p (10) ve
 4K (32) kademeleri YAZILMADI**: temel `minimax/h3` ucunun şemasında iki kaynak
 `768P, 2K` diyor, 480P yalnız H3 Max Turbo'da görüldü, 4K tek kaynakta —
 doğrulanmamış jeton seçilebilir bir 422. H3 bu yüzden 12/26 (768P/2K), 10
-değil; Veo Lite (10) kataloğun mutlak en ucuzu kaldı. Canlı 422 ile
+değil; Veo Lite (10) kataloğun en ucuz varsayılan kademesi kaldı (Wan 480p ile
+eşit). Canlı 422 ile
 DOĞRULANMADI — sahibin sandbox turu aşağıda.
 
 **SAPMA 3 — GPT Image 2.5 kredisi kopya, `tarife_kontrol` 0 → 2.** Sahibin
@@ -774,7 +775,8 @@ kademesi"ni (28) Seedance (95) YANLIŞLADI; ikisi düzeltildi. Bunu yakalaması
 gereken `test_MALIYET_ustunlugu_iddia_eden_not_GERCEKTEN_en_ucuz` (görsel ve
 video ikizi) v0.21'den beri `m.note.lower()` okuyordu — yani ÇEVİRİ ANAHTARINI,
 metni değil — ve hiç ateşlenmiyordu. İkisi de artık Türkçe metni okuyor;
-schnell'in "En ucuz görsel" notu ilk gerçek sınavı.
+schnell'in notu ilk gerçek sınavı — ve inceleme bulgusu 2'de kademe düzeyinde
+yanlış çıktı (aşağıda).
 
 **Yönetmen menüsü bütçesi 3800 → 5200.** Prompt Yönetmeni'nin model menüsü
 (her turda giden, önbelleksiz metin) dokuz girdiyle 3728'den 5078 karaktere
@@ -782,6 +784,19 @@ schnell'in "En ucuz görsel" notu ilk gerçek sınavı.
 sayısı 14 → 23. Görev 7'deki deyimle aynı: `chat_prompt.py`'de değişen satır
 yok, tavan `tests/test_chat_prompt.py`'de yükseltildi ve gerekçesi orada.
 Menüyü kısaltmak istenirse ayrı bir kararın konusu.
+
+**İnceleme bulguları (#80, ikinci commit).** (1) Qwen düzenleme ucuna
+`image_size` GİDİYOR: ilk sürüm düşürüyordu ve `check_capabilities`ten geçen
+boyut sessizce referansın geometrisine kayıyordu — "sessiz sapma yasak"
+kuralının ihlali; alan fal'ın qwen-image-edit şemasında var, canlı kabulü
+sandbox turunun bir durağı. (2) "En ucuz" notları KADEME düzeyinde yanlıştı:
+H3 (768P 12) derken Wan 480p 10, schnell (1) gpt-image-2 `low` ile eşit. İki
+not "en ucuz VARSAYILAN kademe" oldu; iki MALIYET mandalı artık
+`credits_by_quality`nin tabanını da karşılaştırıyor ve nitelenmemiş "en ucuz"
+için eşitliği de reddediyor. (3) `_png_garantile` CMYK/YCbCr baytı "görsel
+değil" diye reddediyordu (PNG yazıcı o modları bilmiyor); önce RGB/RGBA'ya
+çevriliyor. (4) `tarife_kontrol.bugun()` UTC günü okuyor (deponun öteki
+saatleri gibi; yerel gün sınırı 30 günlük ufku kaydırıyordu).
 
 **`emeklilik: date | None`** `ImageModel`a girdi, hiçbir girdi doldurmuyor;
 `tarife_kontrol` "30 gün içinde emekli olacak model" satırını basıyor (bugün

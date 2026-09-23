@@ -82,7 +82,7 @@ flowchart TD
     n_azure_flux_client["azure_flux_client<br/>284 satır"]
     n_azure_mai_client["azure_mai_client<br/>290 satır"]
     n_chat_client["chat_client<br/>218 satır"]
-    n_fal_client["fal_client<br/>1096 satır"]
+    n_fal_client["fal_client<br/>1106 satır"]
     n_gemini_client["gemini_client<br/>295 satır"]
     n_openai_client["openai_client<br/>217 satır"]
     n_prefs["prefs<br/>268 satır"]
@@ -648,7 +648,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `desktop.py` | 588 | 16 | `errlog`, `i18n`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli), `prefs` (erteli) | 1 | 2 |
 | `errlog.py` | 133 | 0 | — | 13 | 2 |
 | `etiket.py` | 118 | 3 | `catalog`, `i18n` | 8 | 1 |
-| `fal_client.py` | 1096 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers`, `services.saglayici_meta` | 1 | 4 |
+| `fal_client.py` | 1106 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers`, `services.saglayici_meta` | 1 | 4 |
 | `folders.py` | 253 | 3 | `i18n`, `jsonstore`, `storage` | 3 | 5 |
 | `gemini_client.py` | 295 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
 | `guncelleme.py` | 379 | 2 | `errlog`, `jsonstore`, `paths`, `version`, `services.db` (erteli) | 1 | 6 |

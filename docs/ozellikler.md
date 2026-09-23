@@ -8,7 +8,8 @@ video bölümündeki ilk/son kare maddesi).
 Kurulum ve çalıştırma: [KURULUM.md](../KURULUM.md) · depo haritası:
 [docs/graflar](graflar/README.md) · çalışma düzeni: [CLAUDE.md](../CLAUDE.md)
 · ileriye dönük stüdyo planı (sahibin notları, 2026-09-18):
-[docs/studyo-guncelleme-plani.md](studyo-guncelleme-plani.md)
+[docs/studyo-guncelleme-plani.md](studyo-guncelleme-plani.md) · otomasyon akışları
+planı (2026-09-23): [docs/otomasyon-akislari-plani.md](otomasyon-akislari-plani.md)
 
 ---
 

@@ -593,7 +593,7 @@ okunamazdı.
 | **#74 ✅** | `faz4/katalog-genisletme` | tasarım, kararlar, ölçülen kredi | — |
 | **#77 ✅** | `faz4/1b-plan-kapisi` | `Plan.rank`, `kapsiyor` üçüncü parametre, üç çağıran, beş yeni bekçi | `catalog.py`'ye DOKUNMAZ |
 | **#78 ✅** | `faz4/1b-fiyat-duzeltme` | on sayı, flex silme, `tarife_kontrol` 4 → 0 | — |
-| **D ✅** | `faz4/1b-yeni-girdiler` | 5 görsel + 4 video, fal GÖRSEL adaptörü, `emeklilik`, i18n, E2E çapaları | C'den sonra (2026-09-23) |
+| **#80 ✅** | `faz4/1b-yeni-girdiler` | 5 görsel + 4 video, fal GÖRSEL adaptörü, `emeklilik`, i18n, E2E çapaları | C'den sonra (2026-09-23) |
 
 B ile C paralel gitti (dosya kümeleri kesişmiyor); D ile C aynı katalog
 satırlarını yazdığı için sıralı.
@@ -682,7 +682,7 @@ Dokunulan: `catalog.py` (−1 girdi, 8 fiyat/yorum noktası), `azure_flux_client
 `tests/test_azure_flux_client.py`, `tests/test_araclar.py`, `docs/graflar/*`.
 `services/` ve `routers/`a DOKUNULMADI.
 
-### Yapıldığında (D, 2026-09-23) — ölçümler ve sapmalar
+### Yapıldığında (D = #80, 2026-09-23) — ölçümler ve sapmalar
 
 B ve C'nin dersi ("Yapıldığında bloklarını PR başına AYRI başlıklara yazmak")
 burada uygulandı: bu blok kendi başlığının altında, B/C'ninkilerle çakışmadan.

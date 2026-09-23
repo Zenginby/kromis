@@ -1322,6 +1322,130 @@ async function hesapDurumunuYaz() {
   bolme.prepend(satir);
 }
 hesapDurumunuYaz();
+
+// ── Hesap bölmesi (Faz 4 / 5) ───────────────────────────────────────
+// İçerik DİNAMİK, index.html'de yalnız kök (#settings-hesap-islemleri): #settings-kredi
+// deseni. İki iş: (1) "Verimi indir" — `GET /api/hesap/disa-aktar` ZIP'i; indirme
+// `fetch` + blob ile (düz `<a href>` değil): 429 (saatte 1) cevabının cümlesi
+// kullanıcıya gösterilmeli, tarayıcının "indirme başarısız"ı değil. (2) "Hesabımı
+// sil" — parola + ikinci onay metni ("SİL"), `POST /api/hesap/sil`; 200'de
+// `/giris` (`replace`: silinen hesaba geri tuşuyla dönülmez — K9 geri alma yok).
+// Onay metni SUNUCUYA GİTMEZ: kapı parola, metin yalnız yanlış tıklamaya karşı
+// tarayıcı tarafı sürtünme; sözlükten okunur (`hesap.sil_onay_metni`) ki İngilizce
+// arayüzde "DELETE" istenebilsin.
+function hesapNotu(anahtar, sinif) {
+  const p = document.createElement("p");
+  p.className = sinif ? `field-note ${sinif}` : "field-note";
+  p.textContent = t(anahtar);
+  return p;
+}
+
+function hesapBaslik(anahtar) {
+  const h = document.createElement("h3");
+  h.className = "palette-picker-title";
+  h.textContent = t(anahtar);
+  return h;
+}
+
+async function hesapVerisiniIndir(dugme, durum) {
+  dugme.disabled = true;
+  durum.textContent = t("hesap.disa_aktar_hazirlaniyor");
+  try {
+    const res = await fetch("/api/hesap/disa-aktar");
+    if (!res.ok) {
+      const veri = await res.json().catch(() => ({}));
+      throw new Error(typeof veri.detail === "string" ? veri.detail : String(res.status));
+    }
+    const blob = await res.blob();
+    const eslesme = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") || "");
+    // Büyük K bilinçli: küçük harfli `ad.uzanti` dizesi i18n bekçisinin anahtar deseniyle çakışıyor.
+    const ad = eslesme ? eslesme[1] : "Kromis-verim.zip";
+    const url = URL.createObjectURL(blob);
+    downloadViaAnchor(url, ad);
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    durum.textContent = t("hesap.disa_aktar_indi");
+  } catch (e) {
+    durum.textContent = t("hesap.disa_aktar_hata", { hata: e.message });
+  } finally {
+    dugme.disabled = false;
+  }
+}
+
+function hesapBolmesiniCiz() {
+  const kok = $("settings-hesap-islemleri");
+  if (!kok) return;
+  kok.replaceChildren();
+
+  // (1) Veri dışa aktarma
+  kok.appendChild(hesapBaslik("hesap.disa_aktar_baslik"));
+  kok.appendChild(hesapNotu("hesap.disa_aktar_aciklama"));
+  const indir = document.createElement("button");
+  indir.type = "button";
+  indir.id = "hesap-disa-aktar";
+  indir.className = "btn-ghost";
+  indir.textContent = t("hesap.disa_aktar_dugme");
+  const indirDurum = document.createElement("p");
+  indirDurum.id = "hesap-disa-aktar-durum";
+  indirDurum.className = "modal-status";
+  indirDurum.setAttribute("role", "status");
+  indir.addEventListener("click", () => hesapVerisiniIndir(indir, indirDurum));
+  kok.append(indir, indirDurum);
+
+  // (2) Hesap silme
+  const form = document.createElement("form");
+  form.id = "hesap-sil-form";
+  form.className = "hesap-sil-form";
+  form.autocomplete = "off";
+  form.appendChild(hesapBaslik("hesap.sil_baslik"));
+  form.appendChild(hesapNotu("hesap.sil_aciklama", "hesap-sil-uyari"));
+  const parolaEtiket = document.createElement("label");
+  parolaEtiket.htmlFor = "hesap-sil-parola";
+  parolaEtiket.textContent = t("hesap.sil_parola");
+  const parola = document.createElement("input");
+  parola.type = "password";
+  parola.id = "hesap-sil-parola";
+  parola.name = "parola";
+  parola.required = true;
+  parola.autocomplete = "current-password";
+  const onayEtiket = document.createElement("label");
+  onayEtiket.htmlFor = "hesap-sil-onay";
+  onayEtiket.textContent = t("hesap.sil_onay", { metin: t("hesap.sil_onay_metni") });
+  const onay = document.createElement("input");
+  onay.type = "text";
+  onay.id = "hesap-sil-onay";
+  onay.name = "onay";
+  onay.required = true;
+  onay.autocomplete = "off";
+  const sil = document.createElement("button");
+  sil.type = "submit";
+  sil.id = "hesap-sil-dugme";
+  sil.className = "btn-ghost hesap-sil-dugme";
+  sil.textContent = t("hesap.sil_dugme");
+  const silDurum = document.createElement("p");
+  silDurum.id = "hesap-sil-durum";
+  silDurum.className = "modal-status";
+  silDurum.setAttribute("role", "status");
+  form.append(parolaEtiket, parola, onayEtiket, onay, sil, silDurum);
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (onay.value.trim() !== t("hesap.sil_onay_metni")) {
+      silDurum.textContent = t("hesap.sil_onay_uyusmuyor");
+      onay.focus();
+      return;
+    }
+    sil.disabled = true;
+    silDurum.textContent = t("hesap.siliniyor");
+    try {
+      await chatApi("/api/hesap/sil", { method: "POST", body: { parola: parola.value } });
+      window.location.replace("/giris");
+    } catch (err) {
+      sil.disabled = false;
+      silDurum.textContent = t("hesap.sil_hata", { hata: err.message });
+    }
+  });
+  kok.appendChild(form);
+}
+hesapBolmesiniCiz();
 // Bakiye açılışta bir kez (Faz 3 / 6): composer'ın "kalan"ı ilk çizimde dolu gelsin;
 // sonrası iş olaylarına bağlı (isler.js). Kapılı rota: 401'i `fetch` sarmalı görür.
 krediYenile();

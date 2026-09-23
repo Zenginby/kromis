@@ -118,6 +118,19 @@ def sil(db: Session, kullanici_id: uuid.UUID, ad: str) -> bool:
     return int(getattr(sonuc, "rowcount", 0) or 0) > 0
 
 
+def hepsini_sil(db: Session, kullanici_id: uuid.UUID) -> int:
+    """Kullanıcının BÜTÜN sağlayıcı anahtarlarını siler; silinen sayı.
+
+    Hesap silme ANINDA (`routers/hesap.py sil`, Faz 4 / 5, K9) — 7 gün
+    BEKLETİLMEZ: BYOK anahtarı kullanıcının başka bir hizmetteki sırrı, bizim
+    içeriğimiz değil; hesap kapanır kapanmaz elimizde durması için hiçbir
+    gerekçe yok (belge §5 "saglayici_kimlikleri HEMEN silinir"). Kullanıcının
+    kendi bağlamında koşar (`sahip` politikası DELETE verir).
+    """
+    sonuc = db.execute(delete(SaglayiciKimligi).where(SaglayiciKimligi.kullanici_id == kullanici_id))
+    return int(getattr(sonuc, "rowcount", 0) or 0)
+
+
 def dondur(db: Session, kullanici_id: uuid.UUID) -> int:
     """Güncel anahtarla yazılmamış satırları yeniden şifreler; kaç satır döndüğünü söyler.
 

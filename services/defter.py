@@ -422,13 +422,14 @@ def rezerve(db: Session, kullanici_id: uuid.UUID, is_id: uuid.UUID, miktar: int,
     return _hareket(ana)
 
 
-def siparisler(db: Session, kullanici_id: uuid.UUID, *, limit: int = 10) -> list[dict[str, Any]]:
+def siparisler(db: Session, kullanici_id: uuid.UUID, *, limit: int | None = 10) -> list[dict[str, Any]]:
     """Kullanıcının son siparişleri (Faz 4 / 4), en yeni üstte: tarih, ürün adı, tutar, para birimi, sebep.
 
     Ayarlar "Kredi" bölmesinin ÖZET listesi — fatura BİZDE YOK (K7, MoR keser);
     bölme "faturalar Polar portalında" der ve `GET /api/odeme/portal`a gönderir.
     Ürün adı `urunler` aynasından (arşivlenmiş ürün de bulunur: eski sipariş
     adını korur). Kullanıcı süzgeci + RLS `siparisler` politikası ikinci kapı.
+    `limit=None` (Faz 4 / 5): tamamı — dışa aktarmanın `siparisler.csv`si.
     """
     sorgu = (select(Siparis, Urun.ad).join(Urun, Urun.id == Siparis.urun_id)
              .where(Siparis.kullanici_id == kullanici_id)
@@ -438,8 +439,12 @@ def siparisler(db: Session, kullanici_id: uuid.UUID, *, limit: int = 10) -> list
             for s, ad in db.execute(sorgu).all()]
 
 
-def hareketler(db: Session, kullanici_id: uuid.UUID, *, limit: int = 20) -> list[Hareket]:
-    """Kullanıcının son hareketleri, EN YENİ ÜSTTE (`ix_kredi_hareketleri_kullanici_olusturuldu`); `_json` ile dökülür."""
+def hareketler(db: Session, kullanici_id: uuid.UUID, *, limit: int | None = 20) -> list[Hareket]:
+    """Kullanıcının son hareketleri, EN YENİ ÜSTTE (`ix_kredi_hareketleri_kullanici_olusturuldu`); `_json` ile dökülür.
+
+    `limit=None` (Faz 4 / 5): TAMAMI — dışa aktarma (`kredi_hareketleri.csv`, KVKK md. 11 erişim
+    hakkı) defteri eksiksiz döker; "Kredi" bölmesi 20'de kalır.
+    """
     sorgu = (select(KrediHareketi).where(KrediHareketi.kullanici_id == kullanici_id)
              .order_by(KrediHareketi.olusturuldu.desc(), KrediHareketi.id).limit(limit))
     return [_hareket(h) for h in db.scalars(sorgu)]

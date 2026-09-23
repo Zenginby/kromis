@@ -674,6 +674,35 @@ def test_the_worker_heartbeat_refunds_the_stale_job_of_another_tenant_through_th
         assert c.execute(text("SELECT bakiye FROM kullanicilar WHERE id = :k"), {"k": ikinci}).scalar_one() == 100
 
 
+def test_the_purge_turn_deletes_a_tenants_content_under_the_application_role_in_that_tenants_context(
+        uygulama_motoru, depo_db, db_oturumu, tohum, tmp_path):
+    """Faz 4 / 5 (K9): `silme_turu` B'nin satırlarını B'nin bağlamında siler (admin DELETE yapamaz — `eskileri_sil`
+    deseni), A'ya dokunmaz; `kredi_hareketleri`/`siparisler` KALIR, `saglayici_kimlikleri` turun işi değil (silme
+    anında gitti); `temizlendi_at` dolar. Uygulama rolüyle — süper kullanıcı politikayı görmez."""
+    a, b = tohum
+    an = dt.datetime(2026, 9, 23, 12, 0, tzinfo=dt.UTC)
+    with depo_db.begin() as c:
+        c.execute(text("UPDATE kullanicilar SET silindi_at = :t WHERE id = :b"), {"t": an - dt.timedelta(days=8), "b": b})
+    with depo_db.connect() as c:
+        once = _sayimlar(c)
+    with kiraci.baglam(kullanici_id=a), Session(uygulama_motoru) as s:
+        assert isci.silme_turu(s, dosya.YerelDepo(str(tmp_path)), an, dt.timedelta(days=7)) == 1
+    aktif = kiraci.aktif()
+    assert aktif is not None and aktif.kullanici_id == a, "dış bağlam yerinde"
+    with depo_db.connect() as c:
+        sonra = _sayimlar(c)
+    icerik = {"klasorler", "medya", "sohbetler", "paletler", "varliklar", "tercihler", "isler"}
+    for t in icerik:
+        assert (once[t], sonra[t]) == (2, 1), (t, once[t], sonra[t])
+    for t in ("kredi_hareketleri", "siparisler", "saglayici_kimlikleri"):
+        assert sonra[t] == once[t] == 2, t
+    with depo_db.connect() as c:
+        kalan = {t: set(c.execute(text(f"SELECT kullanici_id FROM {t}")).scalars()) for t in icerik}
+        assert all(v == {a} for v in kalan.values()), kalan
+        assert c.execute(text("SELECT temizlendi_at FROM kullanicilar WHERE id = :b"), {"b": b}).scalar_one() == an
+        assert c.execute(text("SELECT temizlendi_at FROM kullanicilar WHERE id = :a"), {"a": a}).scalar_one() is None
+
+
 def test_every_tool_that_opens_a_session_binds_a_tenant_context():
     """Kaynak bekçisi (CLAUDE.md §5): `Session(` açan araç `kiraci.baglam(` taşır; liste dosya sisteminden türetilenle aynı."""
     acan: set[str] = set()

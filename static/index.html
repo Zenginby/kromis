@@ -1252,6 +1252,10 @@
              olurdu. (Aynı sebeple sözlükte de iki dilde AYNI değeri taşıyor.) -->
         <button type="button" class="picker-nav-item" data-pane="language">
           <span>{{t:settings.nav_language}}</span></button>
+        <!-- Hesap (Faz 4 / 5): "Verimi indir" ve "Hesabımı sil" — içerik settings.js
+             `hesapBolmesiniCiz` ile kuruluyor (#settings-kredi deseni). -->
+        <button type="button" class="picker-nav-item" data-pane="hesap">
+          <span>{{t:settings.nav_hesap}}</span></button>
         <button type="button" class="picker-nav-item" data-pane="about">
           <span>{{t:settings.nav_about}}</span></button>
       </nav>
@@ -1483,6 +1487,15 @@
         {{t:settings.language_note}}
       </p>
       <p id="language-status" class="modal-status" role="status"></p>
+      </section>
+
+      <!-- ── Hesap (Faz 4 / 5) ────────────────────────────────────────── -->
+      <!-- Yalnız KÖK: iki form (veri dışa aktarma ZIP'i, hesap silme — parola +
+           "SİL" onayı) settings.js `hesapBolmesiniCiz` ile kuruluyor; çeviri
+           anahtarları betikte (#settings-kredi deseni — metin çapaları dokunulmuyor).
+           Silme sonrası sayfa `/giris`e gider (K9: geri alma yok). -->
+      <section class="settings-pane" data-pane="hesap" hidden>
+        <div id="settings-hesap-islemleri" class="settings-hesap-islemleri"></div>
       </section>
 
       <!-- ── Hakkında ─────────────────────────────────────────────────── -->

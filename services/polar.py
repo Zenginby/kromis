@@ -255,6 +255,28 @@ def portal_baglantisi(polar_musteri_id: str) -> str:
     return str(cevap.customer_portal_url)
 
 
+def abonelik_iptal(abonelik_id: str, *, cancel_at_period_end: bool = True) -> None:
+    """Aboneliği Polar'da kapatır: dönem sonunda (`subscriptions.update` + `SubscriptionCancel`) ya da HEMEN (`revoke`).
+
+    Hesap silme (Faz 4 / 5, K9) `cancel_at_period_end=False` ile çağırır:
+    silinen hesabın ödenmiş dönemi kullanacak kimsesi yok ve bir sonraki
+    yenileme anonim bir müşteriden tahsilat olurdu. Polar `revoke`da kalan
+    dönemi geri ödemez (Polar'ın kuralı; iade sahibin panelinden). Webhook
+    (`subscription.revoked`/`canceled`) yine gelir ve `services/odeme.py` planı
+    düşürür — silinmiş hesap için anlamsız ama zararsız (satır anonim, plan
+    sütunu `free` olur). SDK/ağ hatası çağırana çıkar; rota onu WARNING'e
+    çevirir, silmeyi DURDURMAZ (KVKK md. 7 silme hakkı Polar'ın erişilebilir
+    olmasına bağlanamaz — sahip `olay=hesap.silme_abonelik` satırından elle kapatır).
+    """
+    istemci_ = istemci()
+    if cancel_at_period_end:
+        from polar_sdk import models  # tembel — `istemci()` ile aynı gerekçe
+        istemci_.subscriptions.update(id=abonelik_id,
+                                      subscription_update=models.SubscriptionCancel(cancel_at_period_end=True))
+        return
+    istemci_.subscriptions.revoke(id=abonelik_id)
+
+
 def urunleri_listele() -> list[dict[str, Any]]:
     """Organizasyonun BÜTÜN ürünleri (arşivlenmişler dâhil), sayfa sayfa; her ürün DÜZ SÖZLÜK (`model_dump`).
 

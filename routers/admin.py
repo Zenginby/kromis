@@ -105,10 +105,15 @@ def kullanicilar(q: str | None = Query(default=None, max_length=200),
                  sayfa: int = Query(default=1, ge=1),
                  adet: int = Query(default=depo_admin.SAYFA_ADEDI, ge=1,
                                    le=depo_admin.SAYFA_ADEDI_AZAMI),
+                 silinmis: bool = Query(default=False),
                  db: Session = OTURUM,
                  admin: Kullanici = Depends(kimlik.admin_kullanici)) -> dict:
-    """Kullanıcı sayfası: e-posta, kayıt, son görülme, `is_admin`, tavan, son 24 sa kredi, aktif iş."""
-    satirlar, toplam = depo_admin.kullanicilar(db, q=q or None, sayfa=sayfa, adet=adet)
+    """Kullanıcı sayfası: e-posta, kayıt, son görülme, `is_admin`, tavan, son 24 sa kredi, aktif iş.
+
+    `silinmis=true` (Faz 4 / 5): yalnız silinmiş hesaplar — anonim e-posta ve
+    `silindi_at`/`temizlendi_at`; yaşayanlarla karışmaz, geri alma düğmesi yok (K9).
+    """
+    satirlar, toplam = depo_admin.kullanicilar(db, q=q or None, sayfa=sayfa, adet=adet, silinmis=silinmis)
     return {"kullanicilar": satirlar, "toplam": toplam, "sayfa": sayfa, "adet": adet}
 
 

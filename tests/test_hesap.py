@@ -567,11 +567,13 @@ HESAP_ROTALARI = {
     ("POST", "/api/hesap/giris"), ("POST", "/api/hesap/cikis"),
     ("POST", "/api/hesap/sifirla"), ("POST", "/api/hesap/sifirla/dogrula"),
     ("GET", "/api/hesap/ben"), ("GET", "/giris"),
+    # Faz 4 / 5: hesap silme ve veri dışa aktarma (8 → 10; tests/test_hesap_silme.py).
+    ("POST", "/api/hesap/sil"), ("GET", "/api/hesap/disa-aktar"),
 }
 
 
 def test_the_account_routes_are_exactly_the_eight_the_document_names():
-    """Belge §3: "öneri 8 rota" — liste birebir; 46 → 54 sayısı tests/test_app_bolme.py'de."""
+    """Belge §3: "öneri 8 rota" — liste birebir (Faz 4 / 5 ile 10); 46 → 54 sayısı tests/test_app_bolme.py'de."""
     calisan = {(y, yol) for y, yol in conftest.duz_rotalar(appmod.app)
                if yol.startswith("/api/hesap") or yol == "/giris"}
     assert calisan == HESAP_ROTALARI

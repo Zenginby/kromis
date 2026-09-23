@@ -1,6 +1,6 @@
 # Faz 4 — Ödeme (Polar MoR), paketler ve abonelik, hesap silme / dışa aktarma, hukuki metinler: görev listesi
 
-**Tarih:** 2026-09-23 · **Durum:** **5/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; **4** ✅ 2026-09-22 `faz4/checkout-portal`; **1b** ✅ 2026-09-23 — dördüncü ve son PR'ı `faz4/1b-yeni-girdiler` (D) ile katalog 13 görsel + 10 video; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8; **1b'nin model listesi ve `1b-A`…`1b-G` kararları 2026-09-22'de sahipten geldi; on birinci sayı aynı gün ÖLÇÜLDÜ ve `catalog.py`ye yazıldı — o görev artık uygulanabilir**) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
+**Tarih:** 2026-09-23 · **Durum:** **6/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; **5** ✅ 2026-09-23 `faz4/hesap-silme-disa-aktarma`; **4** ✅ 2026-09-22 `faz4/checkout-portal`; **1b** ✅ 2026-09-23 — dördüncü ve son PR'ı `faz4/1b-yeni-girdiler` (D) ile katalog 13 görsel + 10 video; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8; **1b'nin model listesi ve `1b-A`…`1b-G` kararları 2026-09-22'de sahipten geldi; on birinci sayı aynı gün ÖLÇÜLDÜ ve `catalog.py`ye yazıldı — o görev artık uygulanabilir**) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
 **Üst belge:** [superpowers/specs/2026-08-10-saas-transformation-master-design.md](superpowers/specs/2026-08-10-saas-transformation-master-design.md) §5 "Faz 5" kartının **"Ödeme Altyapısı: Merchant of Record (MoR)"** maddesi (`:184-214`) ve "Filigran & Kredi Kuralları" satırı (`:183`) — sapmalar bu belgenin sonunda tek tek yazılı. **Numaralama tuzağı** aynen (Faz 3 belgesi `:4`): master spec'in "Faz 5"i ürün yol haritasının SaaS kartı; bu belge SaaS dönüşümünün İÇ dizisindeki Faz 4'tür (Faz 0 web-first → 1 DB/hesap → 2 kuyruk → 3 kredi defteri → **4 ödeme/KVKK** → 5 işletme). Yol haritası kartı (Faz 4 "Ödeme, faturalama ve hukuk"): *"Bir kullanıcı kartla abone olup fatura alabiliyor ve hesabını tamamen silebiliyor."* — bu belgenin çıkış kriteri onu genişletir (sonda tam metin). Kartın "Stripe birincil" satırı 2026-09-18'de **MoR/Polar** ile güncellendi (Faz 1 ve Faz 2 belgelerinin "Not" satırı; master `:184-199`): Türkiye'den Stripe'a doğrudan hesap açılamıyor, uluslararası satış Merchant of Record üzerinden.
 
 Faz 4'ün amacı, Faz 3'ün kurduğu defterin (rezerv → onay → iade, aylık hibe,
@@ -1527,7 +1527,7 @@ kullanıcı yüzü dürüst kalıyor (bakiye doğru, teşekkür cümlesi en köt
 
 ---
 
-## 5. Hesap silme ve veri dışa aktarma — `POST /api/hesap/sil`, bakım turunda `silme_turu`, `GET /api/hesap/disa-aktar` (PR: `faz4/hesap-silme-disa-aktarma`)
+## 5. Hesap silme ve veri dışa aktarma — `POST /api/hesap/sil`, bakım turunda `silme_turu`, `GET /api/hesap/disa-aktar` ✅ (PR: `faz4/hesap-silme-disa-aktarma`)
 
 **Kapsam.** Çıkış kriterinin "hesabını tamamen silebiliyor" yarısı + KVKK
 md. 11 / GDPR md. 17 ve 20 (silme, taşınabilirlik).
@@ -1605,11 +1605,105 @@ biçimi `@anonim.invalid` (RFC 2606 rezerve TLD) — posta gönderilmez
 (saat yamalı) 7 gün sonra medya/iş/sohbet/palet sıfır, R2'de kiracı öneki
 boş, `kredi_hareketleri` satır sayısı aynı; dışa aktarma ZIP beş dosya; takım yeşil.
 
+### Yapıldığında (2026-09-23) — ölçümler ve sapmalar
+
+Rota 77 → **79** (`POST /api/hesap/sil`, `GET /api/hesap/disa-aktar`; `KAPILI`
+68 → 70, `ACIK` 9 aynen, `DIZINSIZ_KAPILI` +`disa-aktar` — `sil` `ayar.ayarlar`
+alır, `hata.log` için `data_dir`), göç YOK (`silindi_at`/`temizlendi_at`
+`0001`/`0008`den hazır — beklendiği gibi), modül 115 → **116**
+(`services/disa_aktar.py`). `routers/hesap.py`: `sil` sırası kilit (429,
+`giris_kilidi` — bu uç oturumu çalınmış hesapta parola kâhini olmasın) →
+parolasız 409 → parola (401 `JSONResponse` + `giris_denemeleri` satırı, giriş
+rotasının deseni) → `kuyruk.sahibin_islerini_iptal` + her iş için
+`defter.iade` → `depo_kimlik_bilgisi.hepsini_sil` → `hesap.anonimlestir`
+(`UPDATE … WHERE id`; `silindi_at`, `silindi-<id>@anonim.invalid`,
+`parola_ozeti`/`dil` NULL; `oturumlar`, `jetonlar` ve o adresin
+`giris_denemeleri` gider; `polar_*`, `bakiye`, `plan` durur) →
+`polar.abonelik_iptal(id, cancel_at_period_end=False)` (SDK
+`subscriptions.revoke`) → `posta.silme_postasi` ASIL adrese → 200
+`{"ok", "bekleme_gun"}` + çerez düşer, `olay=hesap.silindi`. `services/isci.py`
+`silme_turu` bakım turunun İLK adımı (silinen hesabın `isler`i saklama
+süzgecine girmeden gider): adaylar admin bağlamında
+(`hesap.silinecek_hesaplar`, `silindi_at < an - bekleme`, KESİN küçük), her
+kiracı KENDİ bağlamında `isler` → `medya` → `klasorler` → `sohbetler` →
+`paletler` → `varliklar` → `tercihler` (yedi depoya `hepsini_sil`/`sil`),
+commit; sonra `kullanicilar/<id>/` öneki TEK listelemeyle süpürülür (output +
+assets + isler/ girdileri birlikte — "R2'de kiracı öneki boş"); admin
+bağlamında `odeme.olaylari_anonimlestir` (`kullanici_id` NULL, `email`/
+`billing_*`/`tax_id`/`avatar_url` ve müşteri nesnesinin `name`i `[SILINDI]`;
+ürün adı kalır — mali kaydın parçası) ve `temizlendi_at`; `BakimOzeti` +
+`temizlenen_hesap`, `olay=hesap.temizlendi` INFO alanlarıyla (`medya`, `is`,
+`nesne`, `odeme_olayi` …). `KROMIS_HESAP_SILME_BEKLEME_GUN`
+(`isci.hesap_silme_beklemesi`: boş 7, **0 geçerli** = ilk turda; eksi/bozuk
+`ValueError`, işçi AÇILIŞTA düşer — `hazirla` okur, `Surec` taşır, `bakim_turu`
+`silme_beklemesi=` anahtar sözcüğüyle alır ki Faz 2-3'ün çağrıları
+değişmesin). `services/disa_aktar.py` DOKUZ dosya (`DOSYALAR`): `hesap.json`,
+`kredi_hareketleri.csv` (`defter.hareketler(limit=None)`), `siparisler.csv`
+(`defter.siparisler(limit=None)`), `isler.json` (`kuyruk.listele(limit=None)`
+— `_json`, `istek`/`saglayici_meta` yok), `sohbetler.json` (`depo_sohbet.hepsi`,
+gövdeli), `paletler.json`, `klasorler.json` (+`indirme`:
+`/api/folders/<id>/download`), `medya.json` (`depo_medya.hepsi` + `nesne`
+yolu), `varliklar.json`; `dosya.YazmaTamponu` üstünden akış
+(`zip_disa_aktar` deyimi), CSV LF, JSON `ensure_ascii=False`; ad
+`kromis-verim-<YYYY-MM-DD>.zip`. `posta.alici_denetle`: `.invalid` alıcı iki
+arka uçta da `PostaHatasi`. Ayarlar'a **yeni bölme "Hesap"** (`data-pane=
+"hesap"`, kök `#settings-hesap-islemleri`, içerik `settings.js
+hesapBolmesiniCiz`): "Verimi indir" (`fetch` + blob — 429 cümlesi görünsün)
+ve silme formu (parola + onay metni `hesap.sil_onay_metni` SİL/DELETE, yerel
+denetim; 200'de `location.replace("/giris")`). Admin: `?silinmis=true`
+süzgeci (yalnız silinmişler), satırda `silindi_at`/`temizlendi_at` + rozet.
+i18n **+23** anahtar (tr/en), `.env.example` + `ALTYAPI` +1. Testler:
+`tests/test_hesap_silme.py` **20**, `tests/test_posta.py` +2, `tests/test_rls.py`
++1 (uygulama rolüyle kiracı bağlamında silme), `tests/test_playwright_hesap.py`
++1 × 2 dil (Ayarlar → Hesap → yanlış onay metni yerel → doğru metin → `/giris`
+→ aynı e-posta ile giriş bilinmeyen adresin 401 cümlesi), `test_isci` özet
++1 anahtar (üç sözlük), `test_kimlik`/`test_app_bolme`/`test_hesap` rota
+literalleri, `test_galeri_db` `DEPOLAR` (+`disa_aktar.py` 0 sorgulu ama imza
+sözleşmeli; medya 10, klasör 5, sohbet 3, palet 3, varlık 4, tercih 2, kimlik
+bilgisi 5, kuyruk 18, odeme 7), `test_admin` alan kümesi, `test_i18n`
+konuşmayan defteri, `test_docker_kapisi` `ALTYAPI`. Takım **4.124 → 4.259 geçti, 12 atlandı, ~317 sn** (E2E + Postgres, `KROMIS_E2E_ZORUNLU=1`; +135, belgenin ~4.150 tahmininin üstünde — silme/dışa aktarma testleri ve iki dilde E2E).
+`ruff`/`mypy` temiz, graflar üretildi.
+
+**Sapmalar — belgeden farklı yapılanlar, gerekçesiyle.** (a) **`sil-dogrula`
+e-posta jetonu akışı YOK; parolasız hesap 409 `err.hesap_parolasiz`.**
+`jetonlar.amac` CHECK'li (`0001`: iki amaç) — yeni amaç GÖÇ ister ve bu fazın
+"tek göç `0008`" kararı var; bugün parolasız hesap AÇAN bir yol da yok (Google
+girişi 3b, gelmedi). Kullanıcının elinde aynı kanıtı veren yol zaten var:
+"parolamı unuttum" adresi kanıtlayıp parola belirler, sonra siler. Google
+girişi geldiğinde bu karar yeniden açılır (3b'nin göçüne `hesap_silme` amacı
+eklenir). (b) **Dışa aktarma kotası SÜREÇ BELLEĞİNDE** (`routers/hesap.py
+_DISA_AKTARIMLAR`): belge `check_saatlik` desenini söylüyordu — o `isler`i
+sayar; dışa aktarmanın tablosu yok, `giris_denemeleri.tur` CHECK'li (yeni tür
+= göç). Tek web süreci (K11) için bellek yeter; yeniden başlatma sayacı
+sıfırlar, bedeli en kötü bir ZIP daha. (c) **`jetonlar` ve `giris_denemeleri`
+turda değil SİLME ANINDA gider**: belge ikisini `silme_turu`nun admin adımına
+koymuştu, ama tur o an ADRESİ bilemez (anonimleşmiş) ve bekleyen bir
+sıfırlama jetonunun 7 gün durması için sebep yok. (d) **`varliklar.json`
+arşive EKLENDİ** (belge sekiz dosya sayıyordu): logo/afiş/slogan kullanıcının
+yüklediği veri. (e) **Kiracı önekiyle TOPTAN nesne silme** — belge "`isler`
+(girdi dizinleri + R2 nesneleri), `medya` + nesneleri" diye tablo tablo
+saymıştı; hepsi `kullanicilar/<id>/` altında ve satırların tamamı gidince
+dizin dizin eleme (`girdi_referanslari`) anlamsız — tek `listele(onek)`,
+N HEAD/DELETE yerine. (f) **`hesap.silme_abonelik` WARNING'i "abonelik
+kapatılamadı" ve "ücretli planda abonelik kimliği yok" hâllerinde**; ücretsiz
+plan + abonelik yok sıradan durum, uyarı yok (belgenin "3 varsa; yoksa
+WARNING" cümlesi görevin yokluğunu anlatıyordu, 3 var). Polar/posta düşerse
+silme DURMAZ (WARNING) — KVKK md. 7 dış servise bağlanamaz. (g) **Ürün
+adı redakte EDİLMEZ** (`odeme.KISISEL_ALANLAR`da `name` yok; müşteri
+nesnesinin `name`i `email`in yanındaysa silinir): sipariş kaydının hangi
+ürüne ait olduğu mali kayıt. (h) **Bekleme metni ön yüzde "öntanımlı 7
+gün"**, sayı iletide (`{gun}`): `GET /api/hesap/ben` gövdesi değişmedi
+(test_hesap sözleşmesi). Belgenin kalan cümleleri aynen.
+
 **Sahibin adımı — Polar tarafı ve saklama süresi teyidi.** Polar müşteri
 kaydını (e-posta, adres) kullanıcı adına Polar'dan silmek: Polar veri işleyen
 mi sorumlu mu (MoR olarak kendi veri sorumlusu — aydınlatma metni 6'da böyle
 yazar) — Polar belgesinden doğrula; mali müşavire "anonim hesabın kredi
 hareketleri ve sipariş kayıtları kaç yıl" sorusu; cevap K10 tablosuna.
+*Yapıldığında eklendi:* Polar sandbox'ında `subscriptions.revoke` uçtan uca
+ÖLÇÜLMEDİ (erişim yok; SDK imzası doğrulandı); ilk gerçek silmede
+`olay=hesap.silme_abonelik` satırı gelmediğini gör. `KROMIS_HESAP_SILME_BEKLEME_GUN`
+ortamda BOŞ bırakılırsa 7.
 
 ---
 

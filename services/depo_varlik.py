@@ -120,6 +120,16 @@ def dosya_yolu_adiyla(db: Session, kullanici_id: uuid.UUID, tur: str, filename: 
     return _dosya(assets_dir, tur, filename, depo)
 
 
+def hepsini_sil(db: Session, kullanici_id: uuid.UUID) -> int:
+    """Kullanıcının BÜTÜN varlık satırlarını (logo/afiş/slogan) siler; silinen sayı. Dosyalara DOKUNMAZ.
+
+    Hesap silme turu (Faz 4 / 5) çağırır; dosyalar kiracı önekinin
+    (`kullanicilar/<id>/assets/…`) toptan süpürülmesiyle gider (services/isci.py).
+    """
+    sonuc = db.execute(delete(Varlik).where(Varlik.kullanici_id == kullanici_id))
+    return int(getattr(sonuc, "rowcount", 0) or 0)
+
+
 def sil(db: Session, kullanici_id: uuid.UUID, tur: str, asset_id: str | None,
         assets_dir: str, *, depo: dosya.Depo | None = None) -> bool:
     """Satır + dosya; ikisinden biri vardıysa True (`assets_store.delete_asset` sözleşmesi)."""

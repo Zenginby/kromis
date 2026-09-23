@@ -335,16 +335,16 @@ def test_the_video_table_is_SEPARATE_from_the_image_table():
     olarak öyle (görselde `gemini_client`, videoda `veo_client`). Tek tabloda
     bu "sağlayıcı → dörtlü demet" olurdu ve görsel adaptörü olmayan bir video
     sağlayıcısı iki boş yuva taşırdı."""
-    # Görev 7: `fal` katıldı — TOPLAYICI, video tablosuna GİRİYOR, görsel
-    # tablosuna GİRMİYOR (bkz. `test_fal_is_registered_ONLY_in_the_video_table`).
+    # Görev 7: `fal` katıldı — TOPLAYICI, önce yalnız video tablosuna; Faz 4 /
+    # 1b-D (2026-09-23) görsel tablosuna da (bkz. `test_fal_sits_in_BOTH_tables_
+    # with_DIFFERENT_pairs`). İki tabloda birden duran İKİNCİ sağlayıcı.
     assert providers.video_adapter_ids() == frozenset({"gemini", "fal"})
-    # Görsel tablosu MAI'yle, şimdi FLUX'la BÜYÜDÜ; iki küme TAMAMEN ayrık
-    # DEĞİL — `gemini` ikisinde birden var (bkz. bu testin kendi docstring'i).
-    # İddia daha dar: her YENİ sağlayıcı (`azure-mai`, `azure-flux`) yalnız
-    # görsel tarafında, video tablosuyla PAYLAŞILMIYOR — ikisinin de video
-    # ucu yok. `fal` de simetrik biçimde TERSİ: yalnız video tablosunda.
+    # Görsel tablosu MAI'yle, FLUX'la, şimdi fal'la BÜYÜDÜ; iki küme TAMAMEN
+    # ayrık DEĞİL — `gemini` ve `fal` ikisinde birden var. İddia daha dar:
+    # `azure-mai` / `azure-flux` yalnız görsel tarafında (video uçları yok),
+    # `azure`/`openai` de öyle (OpenAI'nin Videos API'si kapanıyor).
     assert providers.adapter_ids() == frozenset(
-        {"azure", "openai", "gemini", "azure-mai", "azure-flux"})
+        {"azure", "openai", "gemini", "azure-mai", "azure-flux", "fal"})
 
 
 def test_an_IMAGE_model_id_is_refused_by_the_video_dispatcher():
@@ -413,13 +413,24 @@ def test_video_is_configured_reads_the_SHARED_gemini_credential():
 # ── fal.ai sevkiyatı (Görev 7) ───────────────────────────────────────────
 
 
-def test_fal_is_registered_ONLY_in_the_video_table():
-    """Görsel yolunun telde ürettiği baytlar bu turda DEĞİŞMİYOR."""
-    assert "fal" in providers.video_adapter_ids()
-    assert "fal" not in providers.adapter_ids()
-
-
 def test_the_fal_video_adapter_resolves_to_fal_client():
+    """`generate_video`, `generate` DEĞİL (2026-09-23): görsel çifti o adı aldı.
+    `test_fal_is_registered_ONLY_in_the_video_table` aynı gün düştü — iddiası
+    ("görsel yolunun baytları bu turda değişmiyor") o turun iddiasıydı ve tur
+    bitti; yerine aşağıdaki iki-tablo mandalı."""
     import fal_client
-    assert providers._video_pair("fal") == (fal_client.generate,
+    assert providers._video_pair("fal") == (fal_client.generate_video,
                                             fal_client.animate)
+
+
+def test_fal_sits_in_BOTH_tables_with_DIFFERENT_pairs():
+    """Faz 4 / 1b-D: fal görsel tablosuna da girdi (`_fal_image_adapter`). İki
+    tablonun ayrı olma gerekçesi (dosya başlığı: "bir sağlayıcı iki tabloda
+    birden bulunabiliyor") ikinci örneğini buldu. Çiftler AYRI: görsel yolu
+    `duration` almaz, video yolu alır — aynı çift iki tabloya konsa biri
+    `TypeError` ile düşerdi."""
+    import fal_client
+    assert "fal" in providers.adapter_ids() and "fal" in providers.video_adapter_ids()
+    assert providers._pair("fal") == (fal_client.generate, fal_client.edit)
+    assert providers._video_pair("fal") == (fal_client.generate_video, fal_client.animate)
+    assert providers._pair("fal")[0] is not providers._video_pair("fal")[0]

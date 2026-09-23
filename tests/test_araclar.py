@@ -7,14 +7,23 @@ satırlar tohumla; bilinmeyen maliyet BOŞ hücre (sıfır değil); `DATABASE_UR
 
 `tarife_kontrol`: aracın bulduğu küme, kataloğu BAĞIMSIZ bir yolla (satır bazlı:
 `ImageModel(` blokları ve önündeki yorumlar) okuyan testin kümesiyle aynı — liste
-ELLE DEĞİL (CLAUDE.md § 5: not silinince iki taraf birlikte düşer). Küme bugün
-BOŞ: devreden dört Azure notu 2026-09-22'de kapandı (Faz 4 / 1b). Sayı
-katalogdan türetilir, burada yazılı değil — bu cümle bir zamanlar dördünü tek
-tek sayıyordu ve "burada yazılı değil" derken tam olarak onu yapıyordu.
+ELLE DEĞİL (CLAUDE.md § 5: not silinince iki taraf birlikte düşer). Küme
+2026-09-22'de BOŞALDI (devreden dört Azure notu kapandı, Faz 4 / 1b-C) ve
+2026-09-23'te YENİDEN İKİ oldu (Faz 4 / 1b-D): GPT Image 2.5'in iki girdisi
+krediyi `gpt-image-2`den KOPYALIYOR (sahibin "alt sınır kalsın" talimatı) ve
+`credits` satırındaki not aracın desenine BİLEREK uyuyor — sahip ölçünce düşer.
+Sayı katalogdan türetilir, burada yazılı değil.
 
 BOŞ KÜME TARAYICIYI SINAMAZ: körelmiş bir tarayıcı da boş döner. O yüzden
 ikinci bir test gerçek katalog kaynağına metin üstünde bilinen bir not ENJEKTE
-edip tam olarak onu bulmayı bekliyor — bekçinin bekçisi artık orada.
+edip tam olarak onu bulmayı bekliyor — bekçinin bekçisi orada; küme yeniden
+dolduğu gün de kalıyor, çünkü "2 buldu" cümlesi de körelmiş bir tarayıcının
+(iki satırı ezberlemiş) cümlesi olabilir.
+
+`emeklilik` (Faz 4 / 1b-D): ikinci satır MODÜLÜ okur (tarih bir alan, yorum
+değil); bugün hiçbir girdi tarih taşımıyor ve rapor "yok" diyor. Bekçi tarihi
+YAMALAR (`tarife_kontrol.bugun`) ve kataloğa sentetik bir girdi sokup satırın
+göründüğünü kanıtlar — tarife satırının enjeksiyon deseninin aynısı.
 """
 from __future__ import annotations
 
@@ -154,13 +163,15 @@ def test_the_tool_finds_exactly_the_models_whose_price_comment_says_unverified_d
     assert {b.model for b in bulgular} == set(beklenen), (
         "araç ile bağımsız tarama ayrıştı — yorum bölgesi kuralı (tools/tarife_kontrol.py başlığı) değişti mi?")
     assert {b.model: list(b.satirlar) for b in bulgular} == beklenen
-    # KÜME BOŞ ve bu HEDEFİN KENDİSİ (2026-09-22, Faz 4 / 1b): devreden dört
-    # Azure notu düştü. Buraya kadar "bulgular boş değil" diye bir iddia vardı
-    # — bekçinin bekçisiydi, çünkü hiçbir şey bulmayan bir tarayıcı da bu
-    # testi geçerdi. Liste kalıcı olarak boşalınca o iddia tutulamaz hâle
-    # geldi; tarayıcının GÖREBİLDİĞİ ayrı bir testle kanıtlanıyor (aşağıda),
-    # gerçek kataloğun kirli kalmasıyla değil.
-    assert beklenen == {}, f"katalogda doğrulanmamış tarife notu var: {sorted(beklenen)}"
+    # KÜME BOŞ (2026-09-23, Faz 4 / 1b-D üçüncü commit): 2026-09-22'de dört
+    # Azure notu düşmüştü; D'nin ilk commit'i GPT Image 2.5'in iki kopya
+    # kredisini aracın desenine BİLEREK uydurdu (`== {sunburst, flare}`), aynı
+    # gün sahip OpenAI'nin jeton tablosunu kaynaktan okudu (1/3/11) ve not
+    # düştü. Küme burada ADIYLA (boş) yazılı, çünkü "hangi girdiler doğrulama
+    # bekliyor" sorusunun cevabı bir PR kararı: bir girdiye not sızarsa burası
+    # kırmızı olur.
+    assert set(beklenen) == set(), (
+        f"katalogda doğrulanmamış tarife notu var: {sorted(beklenen)}")
     # Her id gerçekten katalogda (görsel ya da video); krediler katalogdaki
     # gerçek değerler, USD çapayla (`KREDI_USD_CAPASI`).
     idler = {m.id for m in catalog.IMAGE_MODELS} | {m.id for m in catalog.VIDEO_MODELS}
@@ -187,14 +198,16 @@ def test_the_scanner_still_SEES_a_note_when_one_is_put_back_into_the_real_catalo
     assert kaynak.count(capa) == 1, "çapa satırı taşındı — test güncellensin"
     kirli = kaynak.replace(capa, "        # birim fiyat doğrulanamadı (deneme).\n" + capa)
 
+    temiz = [b.model for b in tarife_kontrol.bul(kaynak)]
     bulgular = tarife_kontrol.bul(kirli)
-    assert [b.model for b in bulgular] == ["azure-flux-2-pro"]
+    # Enjeksiyon TAM BİR model ekliyor, başkasını düşürmüyor: fark yalnız FLUX.
+    assert [b.model for b in bulgular if b.model not in temiz] == ["azure-flux-2-pro"]
+    assert [b.model for b in bulgular if b.model in temiz] == temiz
+    flux = next(b for b in bulgular if b.model == "azure-flux-2-pro")
     # Satırlar kırpılmış geliyor (araç girintiyi soyuyor) — rapor onları kendi
     # girintisiyle basıyor, ham kaynak girintisiyle değil.
-    assert bulgular[0].satirlar == ("# birim fiyat doğrulanamadı (deneme).",)
-    assert bulgular[0].credits == 9
-    # Aynı kaynak notsuz hâliyle BOŞ dönüyor: fark gerçekten notun kendisi.
-    assert tarife_kontrol.bul(kaynak) == []
+    assert flux.satirlar == ("# birim fiyat doğrulanamadı (deneme).",)
+    assert flux.credits == 9
 
 
 def test_the_pattern_is_turkish_case_insensitive_and_needs_the_word_price_on_the_same_line():
@@ -235,11 +248,64 @@ def test_the_tool_prints_every_flagged_model_with_its_credits_and_expected_usd()
             assert s in out, "eşleşen yorum satırı basılır: sahip 'neden listede' sorusunu buradan okur"
 
 
-def test_the_tool_says_the_catalogue_is_clean_and_exits_zero(capsys):
-    """Bugünkü GERÇEK çıktı: dört Azure notu 1b'de düştü, geriye not kalmadı."""
+def test_the_tool_reports_no_pending_tariffs_and_no_retirements_and_exits_zero(capsys):
+    """Bugünkü GERÇEK çıktı (2026-09-23): notlu model yok, emekli olan yok.
+
+    D PR'ının ilk commit'inde bu test "2 model dogrulama bekliyor" diyordu (GPT
+    Image 2.5'in kopya kredileri); aynı gün sahip jeton tablosunu kaynaktan
+    okuyunca not düştü. Emeklilik satırı D ile geldi. Çıkış kodu 0 — araç
+    rapor, kapı değil."""
     assert tarife_kontrol.main([]) == 0
-    assert capsys.readouterr().out.startswith("notlu model yok")
+    out = capsys.readouterr().out
+    assert out.startswith("notlu model yok")
+    assert "openai-gpt-image-2-5" not in out
+    assert out.rstrip().endswith("30 gun icinde emekli olacak model yok.")
     assert tarife_kontrol.rapor([]).startswith("notlu model yok")
+
+
+# ── tarife_kontrol · emeklilik satırı (Faz 4 / 1b-D) ──────────────────────
+
+BUGUN = dt.date(2026, 9, 23)
+
+
+def test_no_catalogue_entry_carries_a_retirement_date_today_so_the_row_is_empty(monkeypatch):
+    """Alan bugün her girdide `None` (katalog docstring'i "hiçbir girdi doldurmuyor" diyor) — ve
+    rapor bunu "yok" diye söylüyor. Tarih yamalı: bu test 30 gün sonra da aynı şeyi ölçmeli."""
+    monkeypatch.setattr(tarife_kontrol, "bugun", lambda: BUGUN)
+    assert all(m.emeklilik is None for m in catalog.IMAGE_MODELS + catalog.VIDEO_MODELS)
+    assert tarife_kontrol.emekliler() == []
+    assert tarife_kontrol.emeklilik_raporu([]) == "30 gun icinde emekli olacak model yok."
+
+
+def test_a_synthetic_entry_retiring_within_the_horizon_or_already_past_is_reported(monkeypatch):
+    """Boş liste tarayıcıyı sınamaz (tarife satırının dersi): kataloğa SENTETİK girdiler sokup tam
+    olarak onların görüldüğü kanıtlanıyor. Üç hâl: ufuk içinde (görünür), ufuk dışında (görünmez),
+    GEÇMİŞ (görünür ve "GECTI" der — geçmişi saymayan bir rapor, kalkmış modeli sessizce saklardı)."""
+    import dataclasses
+    monkeypatch.setattr(tarife_kontrol, "bugun", lambda: BUGUN)
+    taban = catalog.IMAGE_MODELS[0]
+    yakin = dataclasses.replace(taban, id="sentetik-yakin", emeklilik=BUGUN + dt.timedelta(days=30))
+    uzak = dataclasses.replace(taban, id="sentetik-uzak", emeklilik=BUGUN + dt.timedelta(days=31))
+    gecmis = dataclasses.replace(taban, id="sentetik-gecmis", emeklilik=BUGUN - dt.timedelta(days=2))
+    monkeypatch.setattr(catalog, "IMAGE_MODELS", catalog.IMAGE_MODELS + (yakin, uzak))
+    monkeypatch.setattr(catalog, "VIDEO_MODELS", catalog.VIDEO_MODELS + (gecmis,))
+
+    liste = tarife_kontrol.emekliler()
+    assert [(e.model, e.kalan_gun) for e in liste] == [("sentetik-yakin", 30), ("sentetik-gecmis", -2)]
+    out = tarife_kontrol.emeklilik_raporu(liste)
+    assert out.startswith("2 model 30 gun icinde emekli oluyor")
+    assert "sentetik-yakin: 2026-10-23 · 30 gun kaldi" in out
+    assert "sentetik-gecmis: 2026-09-21 · 2 gun once GECTI" in out
+    assert "sentetik-uzak" not in out
+    # Ufuk sabiti tek yerden: 31. gün dışarıda kaldı, sayı burada tekrar yazılmıyor.
+    assert tarife_kontrol.EMEKLILIK_UFKU_GUN == 30
+
+
+def test_the_retirement_field_defaults_to_None_and_is_a_date_not_a_string():
+    """Tarih bir `date`: dize olsaydı "30 gün içinde" hesabı yapılamaz, alan yine yoruma dönerdi."""
+    alan = catalog.ImageModel.__dataclass_fields__["emeklilik"]
+    assert alan.default is None
+    assert alan.type == "date | None"
 
 
 # ── polar_esitle (Faz 4 / 4) ─────────────────────────────────────────────

@@ -525,12 +525,19 @@ def test_KULLANILABILIRLIK_karari_TEK_alandan_geliyor_ve_SEBEP_iki_nedeni_ayirir
     sorusuna ikinci bir cevap yazmak olurdu — `static/core.js secilebilirler`in
     var olma sebebi tam olarak o ikiliği önlemek.
 
-    Yeni çivi: görsel ve sohbet modellerinde (`kind` video değil, `plan` free)
-    hâlâ `available == configured`; video modellerinde ÜCRETSİZ kullanıcı için
-    `available` False ve `sebep == "plan"` — anahtar olsa da (`configured`
-    ne olursa olsun, K7). `sebep` üç değerli: `None` (kullanılabilir),
-    `"anahtar"`, `"plan"`; ve `available` ⇔ `sebep is None`.
+    Yeni çivi: görsel ve sohbet modellerinde (`kind` video değil) bu istemcide
+    hâlâ `available == configured` — anahtar YOK, yani kaynak `None` ve plan
+    eşiği (1b-A: yalnız PLATFORM anahtarında) hiç sorulmuyor; `temel`
+    basamaklı GPT Image 2.5 de bu istemcide "anahtar" der, "plan" değil (plan
+    eşiğinin platform anahtarıyla kapanması tests/test_planlar.py'de). Video
+    modellerinde ÜCRETSİZ kullanıcı için `available` False ve `sebep ==
+    "plan"` — anahtar olsa da (`configured` ne olursa olsun, K7). `sebep` üç
+    değerli: `None` (kullanılabilir), `"anahtar"`, `"plan"`; ve `available` ⇔
+    `sebep is None`. `requires_plan` KATALOG VERİSİ: 2026-09-23'e kadar her
+    girdide "free" idi (burada çiviliydi), Faz 4 / 1b-D beş girdiye basamak
+    yazdı — iddia artık katalogla birebir eşitlik, sabit "free" değil.
     """
+    import catalog
     body = client.get("/api/settings").json()
     for anahtar in ("image_models", "chat_models"):
         assert body[anahtar], f"{anahtar} boş"
@@ -539,14 +546,13 @@ def test_KULLANILABILIRLIK_karari_TEK_alandan_geliyor_ve_SEBEP_iki_nedeni_ayirir
             assert m["available"] == m["configured"], (
                 f"{m['id']}: görsel/sohbet modelinde kullanılabilirlik yalnız anahtara bağlı")
             assert m["sebep"] == (None if m["configured"] else "anahtar"), m["id"]
-            # Katalogda her model ücretsiz katmanda; video kuralı planın
-            # özelliği (services/planlar.py), `requires_plan` katalog verisi.
-            assert m["requires_plan"] == "free", m["id"]
+            spec = catalog.image_model(m["id"]) or catalog.chat_model(m["id"])
+            assert m["requires_plan"] == spec.plan, m["id"]
     assert body["video_models"], "video_models boş"
     for m in body["video_models"]:
         assert m["available"] is False and m["sebep"] == "plan", (
             f"{m['id']}: ücretsiz planda video modeli anahtardan bağımsız kapalı (K7)")
-        assert m["requires_plan"] == "free", m["id"]
+        assert m["requires_plan"] == catalog.video_model(m["id"]).plan, m["id"]
     for liste in ("image_models", "chat_models", "video_models"):
         for m in body[liste]:
             assert m["available"] == (m["sebep"] is None), m["id"]

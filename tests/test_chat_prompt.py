@@ -720,6 +720,14 @@ def test_the_model_menu_stays_within_its_budget():
     küçük bir not değişikliğine nefes payı bırakıyor ama sınırsız büyümeyi
     engelliyor (docstring'in "bir bütçe olmadan… sessizce kalıcı maliyet
     ekler" uyarısı hâlâ geçerli).
+
+    FAZ 4 / 1b-D İLE TAVAN 3800'DEN 5200'E YÜKSELTİLDİ: dokuz yeni girdi (beş
+    görsel, dört video) en kötü hâli 5078 karaktere çıkardı — girdi başına
+    yaklaşık 150 karakter, yani menü satırı BAŞINA ödenen bedel değişmedi,
+    yalnız satır sayısı 14'ten 23'e çıktı. Yine chat_prompt.py'de değişen
+    satır yok; karar sahibin sıralı listesini menüye tam almak. 5200 ölçülenin
+    biraz üstünde; menüyü kısaltmak (örn. eşdeğer kalite eksenlerini
+    sıkıştırmak) istenirse o ayrı bir PR'ın kararı, bu tavan onu zorlamaz.
     """
     import catalog
 
@@ -730,7 +738,7 @@ def test_the_model_menu_stays_within_its_budget():
               "supports_last_frame": m.supports_last_frame, "credits": m.credits}
              for m in catalog.IMAGE_MODELS + catalog.VIDEO_MODELS]
     blok = chat_prompt._models_block(hepsi)
-    assert len(blok) <= 3800, f"menü bütçesi aşıldı: {len(blok)} karakter"
+    assert len(blok) <= 5200, f"menü bütçesi aşıldı: {len(blok)} karakter"
 
 
 def test_an_unconfigured_selection_is_flagged_and_a_configured_one_is_not():

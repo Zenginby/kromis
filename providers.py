@@ -145,9 +145,23 @@ def _fal_adapter():
     (`total_budget`, `detail_of` ve iki paylaşılan yüklem için), yani modül
     düzeyinde import etmek DÖNGÜ olurdu. Düz `import` ifadesi, yalnız
     fonksiyon içinde — PyInstaller'ın statik analizi onu da görüyor, yani
-    `hiddenimports=[]` korunuyor."""
+    `hiddenimports=[]` korunuyor.
+
+    VİDEO çifti `generate_video`/`animate` (2026-09-23'e kadar `generate`
+    idi): görsel çifti `fal_client.generate`/`edit` adını alınca video tarafı
+    sözleşmenin kendi adına geçti — iki tablo aynı modülden farklı çift
+    çekiyor, Gemini'nin `gemini_client`/`veo_client` ikilisinin tek dosyalı hâli."""
     import fal_client
-    return (fal_client.generate, fal_client.animate)
+    return (fal_client.generate_video, fal_client.animate)
+
+
+def _fal_image_adapter():
+    """fal'ın GÖRSEL çifti (Faz 4 / 1b-D, 2026-09-23): Qwen Image · Seedream V4 ·
+    FLUX.1 schnell. Aynı modül, aynı kuyruk döngüsü, `_ADAPTERS` sözleşmesinin
+    imzası (`generate(m, prompt, size, quality, n, …)`). Geç bağlama gerekçesi
+    `_fal_adapter`ınki."""
+    import fal_client
+    return (fal_client.generate, fal_client.edit)
 
 
 def _mai_adapter():
@@ -183,17 +197,22 @@ _ADAPTERS: dict[str, tuple | Callable[[], tuple]] = {
     # (Microsoft ve Black Forest Labs).
     "azure-mai": _mai_adapter,
     "azure-flux": _flux_adapter,
+    # fal'ın GÖRSEL yüzü (Faz 4 / 1b-D): v0.23'te yalnız video tablosundaydı
+    # ("görsel yolunun baytları dokunulmadan kalıyor"); 2026-09-23'te üç görsel
+    # modeli geldi ve fal İKİ tabloda birden duran ikinci sağlayıcı oldu
+    # (ilki Gemini). Aynı kimlik (`FAL_KEY`), aynı kuyruk döngüsü.
+    "fal": _fal_image_adapter,
 }
 
 # provider → (generate_video, animate_video). İKİ anahtar: doğrudan
-# `gemini` (Veo) ve TOPLAYICI `fal` (Wan · PixVerse · Kling). Ölü uçların
-# gerekçesi `catalog.VIDEO_MODELS`in başlığında duruyor — OpenAI'nin Videos
-# API'si kapanıyor, Azure AI Foundry'de video barındırılmıyor, Anthropic'in
-# video ucu hiç yok.
+# `gemini` (Veo) ve TOPLAYICI `fal` (Wan · PixVerse · Kling · Seedance · FLUX 3 ·
+# MiniMax). Ölü uçların gerekçesi `catalog.VIDEO_MODELS`in başlığında duruyor
+# — OpenAI'nin Videos API'si kapanıyor, Azure AI Foundry'de video
+# barındırılmıyor, Anthropic'in video ucu hiç yok.
 #
-# `fal` BU TABLODA VAR, `_ADAPTERS`te YOK: bu turun kapsamı video ve görsel
-# yolunun telde ürettiği baytlar dokunulmadan kalıyor. Bu asimetri tam
-# olarak iki tablonun ayrı olma gerekçesi (bkz. dosya başlığı).
+# `fal` İKİ TABLODA DA VAR (2026-09-23'ten beri): görselde `_fal_image_adapter`,
+# videoda `_fal_adapter` — aynı modülden iki farklı çift. İki tablonun ayrı
+# olma gerekçesi (bkz. dosya başlığı) tam da bunu mümkün kılıyor.
 _VIDEO_ADAPTERS: dict[str, tuple | Callable[[], tuple]] = {
     "gemini": _veo_adapter,
     "fal": _fal_adapter,

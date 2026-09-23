@@ -214,6 +214,7 @@
         "tests/test_e2e_kredi.py",
         "tests/test_edit_route.py",
         "tests/test_fal_client.py",
+        "tests/test_fal_client_gorsel.py",
         "tests/test_folders.py",
         "tests/test_galeri_db.py",
         "tests/test_gemini_client.py",
@@ -338,7 +339,7 @@
         "veo_client"
       ],
       "katman": 0,
-      "satir": 1506,
+      "satir": 1954,
       "testler": [
         "tests/test_admin.py",
         "tests/test_araclar.py",
@@ -354,6 +355,7 @@
         "tests/test_docker_kapisi.py",
         "tests/test_errlog.py",
         "tests/test_fal_client.py",
+        "tests/test_fal_client_gorsel.py",
         "tests/test_gemini_client.py",
         "tests/test_gunluk.py",
         "tests/test_i18n.py",
@@ -643,9 +645,10 @@
         "providers"
       ],
       "katman": 5,
-      "satir": 761,
+      "satir": 1114,
       "testler": [
         "tests/test_fal_client.py",
+        "tests/test_fal_client_gorsel.py",
         "tests/test_providers.py",
         "tests/test_saglayici_meta.py"
       ],
@@ -1096,12 +1099,13 @@
         "veo_client"
       ],
       "katman": 5,
-      "satir": 508,
+      "satir": 527,
       "testler": [
         "tests/test_azure_flux_client.py",
         "tests/test_azure_mai_client.py",
         "tests/test_catalog.py",
         "tests/test_e2e_kredi.py",
+        "tests/test_fal_client_gorsel.py",
         "tests/test_gemini_client.py",
         "tests/test_gunluk.py",
         "tests/test_isci.py",
@@ -1109,6 +1113,7 @@
         "tests/test_kota.py",
         "tests/test_planlar.py",
         "tests/test_playwright_isler.py",
+        "tests/test_playwright_studio.py",
         "tests/test_provider_logos.py",
         "tests/test_providers.py",
         "tests/test_rls.py",
@@ -1623,6 +1628,7 @@
         "tests/test_platform_anahtari.py",
         "tests/test_playwright_isler.py",
         "tests/test_playwright_odeme.py",
+        "tests/test_playwright_studio.py",
         "tests/test_rls.py",
         "tests/test_uretim_kapilar.py"
       ],
@@ -2458,7 +2464,8 @@
         "tests/test_kota.py",
         "tests/test_kredi_route.py",
         "tests/test_planlar.py",
-        "tests/test_platform_anahtari.py"
+        "tests/test_platform_anahtari.py",
+        "tests/test_playwright_studio.py"
       ],
       "yol": "services/platform_anahtari.py"
     },
@@ -2651,6 +2658,7 @@
         "tests/test_playwright_hesap.py",
         "tests/test_playwright_isler.py",
         "tests/test_playwright_odeme.py",
+        "tests/test_playwright_studio.py",
         "tests/test_rls.py",
         "tests/test_saglayici_meta.py",
         "tests/test_sohbet_db.py",
@@ -2710,6 +2718,7 @@
         "tests/test_kuyruk.py",
         "tests/test_legacy_formats.py",
         "tests/test_palet_db.py",
+        "tests/test_playwright_studio.py",
         "tests/test_sohbet_db.py",
         "tests/test_varlik_db.py"
       ],
@@ -3020,7 +3029,7 @@
       ],
       "ithal_eden": [],
       "katman": 1,
-      "satir": 162,
+      "satir": 232,
       "testler": [
         "tests/test_araclar.py"
       ],
@@ -3762,7 +3771,7 @@
     ]
   },
   "surum": 1,
-  "test_dosyasi_sayisi": 149,
+  "test_dosyasi_sayisi": 150,
   "uc_noktalar": [
     {
       "dosya": "routers/kok.py",

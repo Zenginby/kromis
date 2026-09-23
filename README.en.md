@@ -93,8 +93,10 @@ give you one, with the English version alongside it.
 
 ### Generate and edit — many models, one strip
 
-Azure OpenAI (`gpt-image-2`), Google Gemini (Nano Banana 2 / Pro), Azure AI
-Foundry (MAI-Image, FLUX.2) and OpenAI are all picked from the same strip. Each
+Azure OpenAI (`gpt-image-2`), OpenAI (`gpt-image-2`, GPT Image 2.5), Google
+Gemini (Nano Banana 2 / Pro), Azure AI Foundry (MAI-Image, FLUX.2) and fal.ai
+(Qwen Image, Seedream V4, FLUX.1 schnell) are all picked from the same strip —
+13 image models, ordered from the strongest to the cheapest. Each
 model card states in one line what it is good at and shows its credit range, and
 the strip lists only providers **whose key you have saved**. In edit (inpainting)
 mode you can attach up to three extra reference images beside the main one.
@@ -104,10 +106,10 @@ mode you can attach up to three extra reference images beside the main one.
 ### Video from text, or from an image you already made
 
 The composer's third mode is video: all three tiers of Gemini · Veo 3.1 (Lite /
-Fast / full) plus three fal.ai models — Alibaba Wan 3.0, PixVerse C1, Kling V3
-Turbo Pro. Veo tops out at 8 seconds; PixVerse and Kling can go **up to 15
-seconds**. The aspect-ratio axis widened too: all three fal models add **1:1**
-alongside 16:9/9:16. Veo shares the image side's key; fal reads its own key
+Fast / full) plus seven fal.ai models — ByteDance Seedance 2.5, Black Forest
+Labs FLUX 3, Kling V3 Turbo Pro / V3 Pro, PixVerse C1, Alibaba Wan 3.0, MiniMax
+H3. Veo tops out at 8 seconds; the fal models can go **up to 15 seconds**. The
+aspect-ratio axis widened too: the fal models add **1:1** alongside 16:9/9:16. Veo shares the image side's key; fal reads its own key
 from Settings — both live in the same composer, no new screen appeared. You
 can also turn a gallery image into the first frame of a clip; the record keeps
 the link back to its parent.

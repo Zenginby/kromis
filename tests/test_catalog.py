@@ -6,6 +6,7 @@ sessiz bir 422 ya da kaydedilemeyen bir oturum olur.
 """
 import ast
 import pathlib
+from decimal import ROUND_HALF_UP, Decimal
 
 import pytest
 
@@ -500,10 +501,11 @@ def test_the_default_video_model_is_the_CHEAPEST_tier():
     gemini = [m for m in catalog.VIDEO_MODELS if m.provider == "gemini"]
 
     assert varsayilan.credits == min(m.credits for m in gemini)
-    # SIRA da artan maliyete göre: ilk girdi varsayılan.
-    assert catalog.VIDEO_MODELS[0].id == catalog.DEFAULT_VIDEO_MODEL
-    krediler = [m.credits for m in gemini]
-    assert krediler == sorted(krediler), f"sıra artan maliyette değil: {krediler}"
+    # SIRA İDDİASI DÜŞTÜ (2026-09-23, Faz 4 / 1b-D): burada "ilk girdi
+    # varsayılan" ve "Gemini bloğu artan maliyette" yazıyordu. Katalog artık
+    # sahibin sıralı listesi (kaliteli → ucuz) ve varsayılan 10. sırada — sıra
+    # ile varsayılan KODDA AYRI (`test_the_video_catalog_follows_the_owners_
+    # RANKED_list`, `test_the_defaults_are_CONSTANTS_not_index_zero`).
 
 
 @pytest.mark.parametrize("m", catalog.VIDEO_MODELS, ids=lambda m: m.id)
@@ -840,23 +842,257 @@ def test_MALIYET_ustunlugu_iddia_eden_not_GERCEKTEN_en_ucuz():
     Hız üstünlüğü burada sınanmıyor: katalogda gecikme verisi yok, yani
     ölçülemez. Maliyet ölçülebilir, o yüzden mandalı bu.
     """
-    en_az = min(m.credits for m in catalog.IMAGE_MODELS)
-    en_cok = max(m.credits for m in catalog.IMAGE_MODELS)
     for m in catalog.IMAGE_MODELS:
-        notu = m.note.lower()
-        if "en ucuz" in notu:
-            assert m.credits == en_az, (
-                f"{m.id}: not 'en ucuz' diyor ama {m.credits} kredi "
-                f"(katalogdaki en az {en_az})")
-        if "en pahalı" in notu:
-            assert m.credits == en_cok, (
-                f"{m.id}: not 'en pahalı' diyor ama {m.credits} kredi "
-                f"(katalogdaki en çok {en_cok})")
+        _maliyet_iddiasini_sina(m, catalog.IMAGE_MODELS, "görsel kataloğu")
 
 
-# ── fal.ai video modelleri (Görev 7) ────────────────────────────────────
+def _taban(m: catalog.ImageModel) -> int:
+    """Modelin EN UCUZ kademesi: `credits_by_quality` varsa en küçüğü, yoksa `credits`."""
+    return min((k for _, k in m.credits_by_quality), default=m.credits)
 
-FAL_IDLER = ("fal-wan-3-0", "fal-pixverse-c1", "fal-kling-v3-turbo-pro")
+
+def _tavan(m: catalog.ImageModel) -> int:
+    return max((k for _, k in m.credits_by_quality), default=m.credits)
+
+
+def _maliyet_iddiasini_sina(m: catalog.ImageModel, havuz, kapsam: str) -> None:
+    """Bir notun "en ucuz"/"en pahalı" iddiasını `havuz` içinde KADEME düzeyinde sınar.
+
+    TÜRKÇE METİN okunuyor, anahtar DEĞİL (2026-09-23 düzeltmesi): v0.21 `note`u
+    çeviri anahtarına çevirdiğinde mandal `m.note.lower()` kalmıştı ve
+    "model.x.note" hiç "en ucuz" içermediği için SESSİZCE BOŞ ateşliyordu.
+    Metin Türkçe, çünkü iddia sözcükleri Türkçe; İngilizce çeviri aynı iddiayı
+    taşır (i18n eşliği ayrı bekçi).
+
+    KADEME düzeyi (#80 incelemesi): ilk sürüm yalnız VARSAYILAN krediyi
+    karşılaştırıyordu ve iki yanlışı geçirdi — H3 "fal'ın en ucuz kademesi"
+    derken (768P 12) Wan 480p 10 kredi/sn'ydi; schnell "En ucuz görsel: 1"
+    derken gpt-image-2'nin `low` kademesi de 1'di. Kural: NİTELENMEMİŞ "en ucuz"
+    hem varsayılanda hem taban kademede havuzun TEK en ucuzu olmalı — eşitlik
+    de yanlış, kullanıcı "en ucuz" okuyup bir alt satırda aynı rakamı görür.
+    "varsayılan" sözcüğüyle nitelenmiş iddia ("en ucuz varsayılan kademe")
+    yalnız varsayılan kredileri karşılaştırır; eşitlik burada da yanlış değil
+    ama beklenmiyor. "en pahalı" simetrik (tavan kademe).
+    """
+    assert m.note is not None, f"{m.id}: notu yok (not sözleşmesi ayrı bekçi)"
+    notu = i18n.t(m.note, "tr").lower()
+    digerleri = [d for d in havuz if d.id != m.id]
+    if "en ucuz" in notu:
+        en_az = min(d.credits for d in havuz)
+        assert m.credits == en_az, (
+            f"{m.id}: not 'en ucuz' diyor ama varsayılanı {m.credits} kredi "
+            f"({kapsam} içinde en az {en_az})")
+        if "varsayılan" not in notu:
+            esit_veya_ucuz = [d.id for d in digerleri if _taban(d) <= _taban(m)]
+            assert not esit_veya_ucuz, (
+                f"{m.id}: not nitelenmemiş 'en ucuz' diyor (taban {_taban(m)}) ama "
+                f"{kapsam} içinde {esit_veya_ucuz} tabanı bundan ucuz ya da eşit — "
+                f"'en ucuz varsayılan kademe' yaz ya da iddiayı kaldır")
+    if "en pahalı" in notu:
+        en_cok = max(d.credits for d in havuz)
+        assert m.credits == en_cok, (
+            f"{m.id}: not 'en pahalı' diyor ama varsayılanı {m.credits} kredi "
+            f"({kapsam} içinde en çok {en_cok})")
+        if "varsayılan" not in notu:
+            esit_veya_pahali = [d.id for d in digerleri if _tavan(d) >= _tavan(m)]
+            assert not esit_veya_pahali, (
+                f"{m.id}: not nitelenmemiş 'en pahalı' diyor (tavan {_tavan(m)}) ama "
+                f"{kapsam} içinde {esit_veya_pahali} tavanı bundan pahalı ya da eşit")
+
+
+# ── Sahibin sıralı listesi = katalog sırası (Faz 4 / 1b-D, 2026-09-23) ────
+#
+# Belge §1b iki liste veriyor (13 görsel, 10 video) ve "Sıra ARAYÜZ sırası"
+# diyor. Liste burada ADIYLA yazılı — türetilemez, çünkü ölçüt kalite/
+# popülerlik, kredi değil (Seedance 95 birinci, MiniMax 12 dokuzuncu ama Veo
+# Lite 10 onuncu). Bir girdi eklenirken listeye yazılmazsa burası kırmızı
+# olur: seçicideki sıra sessizce kaymaz.
+
+SIRALI_GORSEL = (
+    "azure-gpt-image-2",
+    "openai-gpt-image-2-5-sunburst",
+    "openai-gpt-image-2-5-flare",
+    "gemini-nano-banana-pro",
+    "openai-gpt-image-2",
+    "gemini-nano-banana-2",
+    "azure-mai-image-2-5-pro",
+    "azure-flux-2-pro",
+    "azure-mai-image-2-6",
+    "fal-qwen-image",
+    "fal-seedream-v4",
+    "azure-mai-image-2-6-flash",
+    "fal-flux-1-schnell",
+)
+SIRALI_VIDEO = (
+    "fal-seedance-2-5",
+    "gemini-veo-3-1",
+    "fal-flux-3",
+    "fal-kling-v3-turbo-pro",
+    "fal-kling-v3-pro",
+    "gemini-veo-3-1-fast",
+    "fal-pixverse-c1",
+    "fal-wan-3-0",
+    "fal-minimax-h3",
+    "gemini-veo-3-1-lite",
+)
+
+
+def test_the_image_catalog_follows_the_owners_RANKED_list():
+    assert tuple(m.id for m in catalog.IMAGE_MODELS) == SIRALI_GORSEL
+
+
+def test_the_video_catalog_follows_the_owners_RANKED_list():
+    assert tuple(m.id for m in catalog.VIDEO_MODELS) == SIRALI_VIDEO
+
+
+def test_the_defaults_are_CONSTANTS_not_index_zero():
+    """Belge §1b "SIRA İLE VARSAYILAN KODDA AYRI, YORUMDA DEĞİL": `catalog.py`nin
+    başlığı "ilk girdi varsayılan" diyordu ve bu yalnız o günkü yerleşimin
+    tarifiydi. Liste sıralanınca video varsayılanı SONA düştü; görselinki
+    tesadüfen başta kaldı. Bu test ayrımı mandallıyor: varsayılan id ile
+    aranır, demetin bir ucuna oturmak zorunda değil — ve bir sonraki okuyan
+    "varsayılan Seedance" sanmasın.
+    """
+    assert catalog.VIDEO_MODELS[-1].id == catalog.DEFAULT_VIDEO_MODEL
+    assert catalog.VIDEO_MODELS[0].id != catalog.DEFAULT_VIDEO_MODEL
+    assert catalog.video_model(catalog.DEFAULT_VIDEO_MODEL) is catalog.VIDEO_MODELS[-1]
+    assert catalog.image_model(catalog.DEFAULT_IMAGE_MODEL) is catalog.IMAGE_MODELS[0]
+
+
+def test_the_ranked_lists_carry_thirteen_images_and_ten_videos():
+    """Belgenin sayısı (§1b "SAYININ HESABI": 8 + 5 = 13, 6 + 4 = 10)."""
+    assert len(catalog.IMAGE_MODELS) == 13
+    assert len(catalog.VIDEO_MODELS) == 10
+
+
+# ── Plan basamağı VERİ oldu (Faz 4 / 1b-D) ──────────────────────────────
+#
+# B PR'ı (`Plan.rank`, `kapsiyor`) makineyi kurdu, her girdi `"free"` kaldı;
+# D PR'ı beş girdiye basamak yazdı. Eşleme ÖNERİ (sahip onaylamadı — belge
+# §1b "Yapıldığında (D)") ama bir öneri de veri ve verinin bekçisi test:
+# sahip bir kademeyi değiştirdiği gün önce burası kırmızı olur, sonra doğru
+# sayıyla yeşile döner — sessiz kayma yok.
+
+PLAN_BASAMAGI = {
+    # GPT Image 2.5 ×2 ilk sürümde `temel` idi; sahibin fiyat araştırması
+    # (PR #80 yorumu) medium'u 3 kredi buldu — `free` gpt-image-2'nin 11'inden
+    # ucuz — ve basamak gerekçesi fiyat olduğu için ikisi `free`ye indi.
+    "fal-seedance-2-5": "pro",
+    "fal-flux-3": "pro",
+    "fal-kling-v3-pro": "temel",
+}
+
+
+def test_the_plan_tiers_are_exactly_the_proposed_three_videos_and_everything_else_is_free():
+    for m in catalog.IMAGE_MODELS + catalog.VIDEO_MODELS:
+        assert m.plan == PLAN_BASAMAGI.get(m.id, "free"), f"{m.id}: plan={m.plan}"
+    assert all(m.plan == "free" for m in catalog.IMAGE_MODELS), "görselde basamak yok (2026-09-23)"
+
+
+GPT25_JETON_1024 = {"low": 196, "medium": 439, "high": 1756}
+OPENAI_CIKTI_USD_PER_JETON = Decimal("30") / Decimal(1_000_000)
+
+
+def test_gpt_image_2_5_shares_gpt_image_2s_capabilities_but_carries_OpenAIs_OWN_token_table():
+    """Yetenek jetonları `openai-gpt-image-2`den kopya (sahibin talimatı, canlı
+    sınanmadı → eksik beyan yalnız bir yeteneği kullanmamak); KREDİ ise kopya
+    DEĞİL: OpenAI rehberinin 1024×1024 jeton tablosu (196 / 439 / 1.756) × 30
+    USD/1M ÷ çapa → 1 / 3 / 11. İlk sürüm 1/11/42 kopyalıyordu ve medium'da
+    ×3,7 fazla alıyordu (sahibin araştırması, PR #80 yorumu). Bu test krediyi
+    jetondan TÜRETİYOR ki tabloyu değiştiren kişi çapayı da görsün; `xhigh`/
+    `max` bilerek yok (19 / 42 — ayrı karar).
+    """
+    kaynak = catalog.image_model("openai-gpt-image-2")
+    assert kaynak is not None
+    for kimlik, tel in (("openai-gpt-image-2-5-sunburst", "gpt-image-2.5-sunburst"),
+                        ("openai-gpt-image-2-5-flare", "gpt-image-2.5-flare")):
+        m = catalog.image_model(kimlik)
+        assert m is not None and m.provider == "openai" and m.credential == "openai"
+        assert m.wire_model == tel and m.plan == "free"
+        for alan in ("sizes", "qualities", "default_quality", "max_n", "images_per_request",
+                     "supports_edit", "max_refs"):
+            assert getattr(m, alan) == getattr(kaynak, alan), f"{kimlik}.{alan} kopya değil"
+        beklenen = {k: int((Decimal(j) * OPENAI_CIKTI_USD_PER_JETON / catalog.KREDI_USD_CAPASI)
+                           .quantize(Decimal(1), rounding=ROUND_HALF_UP))
+                    for k, j in GPT25_JETON_1024.items()}
+        assert beklenen == {"low": 1, "medium": 3, "high": 11}, beklenen
+        assert dict(m.credits_by_quality) == beklenen, f"{kimlik}: {m.credits_by_quality}"
+        assert m.credits == beklenen[m.default_quality] == 3
+        assert m.credits_by_quality != kaynak.credits_by_quality, "2.5 kopya kalmış"
+
+
+def test_schnell_jetonlari_BIR_megapikselin_ALTINDA():
+    """fal 1 MP'ye YUKARI yuvarlıyor: 1024×1024 (1,048 MP) İKİ MP sayılır ve
+    ücretsiz planın 1 kredilik modeli 2 krediye çıkar (belge §1b "13. satır").
+    Bu test bir kolaylık değil FİYAT KAPISI — `credits=1` yalnız küme 1 MP'nin
+    altındayken doğru. 32'nin katı olma şartı FLUX'un adım kısıtı."""
+    m = catalog.image_model("fal-flux-1-schnell")
+    assert m is not None and m.sizes is catalog.SCHNELL_SIZES and m.credits == 1
+    for jeton in m.sizes:
+        w, h = (int(p) for p in jeton.split("x"))
+        assert w * h < 1_000_000, f"{jeton}: {w * h} piksel — fal iki MP sayar, kredi 2 olur"
+        assert w % 32 == 0 and h % 32 == 0, f"{jeton}: 32'nin katı değil"
+    assert "1024x1024" not in m.sizes
+    assert not m.supports_edit, "schnell'in düzenleme ucu yok (redux ayrı model)"
+
+
+def test_qwen_jetonlari_IKI_megapikseli_ASMIYOR():
+    """`credits=12` = 0,03 USD/MP (DÜZENLEME ucu, katalogdaki tek alan) × 2 MP:
+    kümeden biri 2 MP'yi aşarsa üç MP sayılır ve kredi 18 olur — etiket yalan
+    söyler. Metin ucu 0,02/MP → 8 olurdu; 12 seçildi ki düzenleme zararda
+    kalmasın (catalog.py blok yorumu, sahibin araştırması PR #80)."""
+    m = catalog.image_model("fal-qwen-image")
+    assert m is not None and m.sizes is catalog.QWEN_SIZES and m.credits == 12
+    assert round(0.03 * 2 / float(catalog.KREDI_USD_CAPASI)) == 12
+    assert round(0.02 * 2 / float(catalog.KREDI_USD_CAPASI)) == 8, "metin ucu fiyatı — bilerek YAZILMADI"
+    for jeton in m.sizes:
+        w, h = (int(p) for p in jeton.split("x"))
+        assert 1_000_000 < w * h <= 2_000_000, f"{jeton}: {w * h} piksel, 1–2 MP bandı dışında"
+    assert m.max_refs == 1, "qwen-image-edit tek `image_url` alıyor"
+
+
+def test_seedream_jetonlari_semanin_kenar_araliginda():
+    """Seedream V4 şeması kenar başına 1024–4096 istiyor; gpt-image-2'nin üçlüsü
+    bu aralıkta ve sabit fiyat (6) boyuttan bağımsız."""
+    m = catalog.image_model("fal-seedream-v4")
+    assert m is not None and m.credits == 6 and m.credits_by_quality == ()
+    for jeton in m.sizes:
+        w, h = (int(p) for p in jeton.split("x"))
+        assert 1024 <= w <= 4096 and 1024 <= h <= 4096, jeton
+    assert set(m.sizes) == set(catalog.image_model("openai-gpt-image-2").sizes)
+    assert m.max_refs == 4
+
+
+def test_every_fal_IMAGE_model_declares_what_the_queue_needs():
+    """Video ikizinin (`test_every_video_model_declares_what_the_pipeline_needs`)
+    görsel yarısı: fal görsel de KUYRUKLU — `poll_timeout` yoksa `total_budget`
+    görselin 180 sn formülüne düşer (bugün aynı sayı, ama tesadüfen); adet
+    döngüsü adet başına ayrı istek (`images_per_request=1`, `num_images=1`);
+    adaptörü `_ADAPTERS`ta olmalı."""
+    import providers
+    fal = [m for m in catalog.IMAGE_MODELS if m.provider == "fal"]
+    assert [m.id for m in fal] == ["fal-qwen-image", "fal-seedream-v4", "fal-flux-1-schnell"]
+    assert "fal" in providers.adapter_ids()
+    for m in fal:
+        assert m.poll_timeout, f"{m.id}: poll_timeout yok"
+        assert m.images_per_request == 1 and m.quality_hidden and m.qualities == ("standard",)
+        assert m.credential == "fal"
+        if m.supports_edit:
+            assert m.wire_model_edit and m.wire_model_edit != m.wire_model, m.id
+        else:
+            assert m.wire_model_edit == "", m.id
+
+
+def test_no_entry_carries_a_retirement_date_today():
+    """`emeklilik` alanı D'de açıldı, hiçbir girdi doldurmuyor; doldurulan gün
+    `tools/tarife_kontrol.py` satır basar (bekçisi tests/test_araclar.py)."""
+    assert all(m.emeklilik is None for m in catalog.IMAGE_MODELS + catalog.VIDEO_MODELS)
+
+
+# ── fal.ai video modelleri (Görev 7 + Faz 4 / 1b-D) ────────────────────
+
+FAL_IDLER = ("fal-wan-3-0", "fal-pixverse-c1", "fal-kling-v3-turbo-pro",
+             "fal-seedance-2-5", "fal-flux-3", "fal-kling-v3-pro", "fal-minimax-h3")
 
 
 @pytest.mark.parametrize("model_id", FAL_IDLER)
@@ -875,21 +1111,12 @@ def test_the_default_video_model_is_UNCHANGED():
     assert catalog.DEFAULT_VIDEO_MODEL == "gemini-veo-3-1-lite"
 
 
-def test_fal_video_models_are_ordered_by_ASCENDING_cost():
-    """Sıra ANLAMLI (görsel tarafının kuralı) ve burada artan maliyete göre."""
-    fal = [m for m in catalog.VIDEO_MODELS if m.provider == "fal"]
-    assert [m.credits for m in fal] == sorted(m.credits for m in fal)
-
-
-def test_fal_video_models_are_ordered_PIXVERSE_WAN_KLING():
-    """Görev 7'nin brief'i sırayı Wan · PixVerse · Kling (16 · 20 · 30 kredi
-    varsayarak) tahmin etmişti. Ölçüm (design.md'nin 'Ölçüm sonuçları'
-    bölümü) PixVerse'in 720p'sinin ($0,065/sn sesli tavanla bile 13 kredi)
-    Wan'ın 720p'sinden (0,10 USD/sn = 20 kredi) DAHA UCUZ olduğunu gösterdi —
-    yani varsayılan-kalite maliyetine göre gerçek sıra PixVerse < Wan < Kling.
-    Bu test o düzeltmeyi mandallıyor; brief'in tahmini artık geçersiz."""
-    fal_ids = [m.id for m in catalog.VIDEO_MODELS if m.provider == "fal"]
-    assert fal_ids == ["fal-pixverse-c1", "fal-wan-3-0", "fal-kling-v3-turbo-pro"]
+# `test_fal_video_models_are_ordered_by_ASCENDING_cost` ve
+# `..._PIXVERSE_WAN_KLING` 2026-09-23'te DÜŞTÜ: fal'ın kendi içindeki artan
+# maliyet sırası (Görev 7'nin ölçümü, PixVerse < Wan < Kling) sahibin sıralı
+# listesiyle yer değiştirdi — yeni mandal `test_the_video_catalog_follows_the_
+# owners_RANKED_list` (yukarıda). Ölçümün kendisi hâlâ doğru ve kredilerde
+# yaşıyor (`test_fal_credits_are_derived_from_MEASURED_usd_per_second`).
 
 
 @pytest.mark.parametrize("model_id", FAL_IDLER)
@@ -935,6 +1162,30 @@ def test_fal_credits_are_derived_from_MEASURED_usd_per_second():
     assert kling.credits == 28
     assert kling.credits_by_quality == ()
 
+    # Faz 4 / 1b-D (2026-09-23) — fal.ai model sayfalarının saniye fiyatı
+    # (erişim 2026-09-22, belge §1b tablosu), aynı çapa, en yakına yuvarlama:
+    #
+    #     Seedance 2.5  720p sesli $0,473 · 480p sesli $0,2205 → 95 · 44
+    #     FLUX 3        720p $0,17 · 1080p $0,29               → 34 · 58
+    #     Kling V3 Pro  sessiz $0,112 · sesli $0,168           → 22 · 34
+    #     MiniMax H3    480P $0,05 · 768P $0,06 · 2K $0,13 · 4K $0,16 → 10 · 12 · 26 · 32
+    #
+    # H3'ün 480P/4K'sı ilk sürümde YOKTU (üç kaynakla görülmedi); sahibin
+    # birinci taraf OpenAPI okuması (PR #80 yorumu, 2026-09-23) dördünü de
+    # doğruladı, ikisi eklendi. Varsayılan 768P (yerel) kaldı.
+    seedance = catalog.video_model("fal-seedance-2-5")
+    flux3 = catalog.video_model("fal-flux-3")
+    kling_pro = catalog.video_model("fal-kling-v3-pro")
+    h3 = catalog.video_model("fal-minimax-h3")
+    assert dict(seedance.credits_by_quality) == {"480p": 44, "720p": 95} and seedance.credits == 95
+    assert dict(flux3.credits_by_quality) == {"720p": 34, "1080p": 58} and flux3.credits == 34
+    assert dict(kling_pro.credits_by_quality) == {"sessiz": 22, "sesli": 34} and kling_pro.credits == 22
+    assert dict(h3.credits_by_quality) == {"480P": 10, "768P": 12, "2K": 26, "4K": 32}
+    assert h3.credits == 12 and h3.default_quality == "768P" and h3.qualities == ("480P", "768P", "2K", "4K")
+    # Çapa gerçekten bölüyor: 0,473 / 0,005 = 94,6 → 95; 0,112 / 0,005 = 22,4 → 22.
+    assert round(0.473 / float(catalog.KREDI_USD_CAPASI)) == 95
+    assert round(0.112 / float(catalog.KREDI_USD_CAPASI)) == 22
+
 
 # ── Görev 9 — video notları için mandal ─────────────────────────────────
 #
@@ -965,21 +1216,19 @@ def test_MALIYET_ustunlugu_iddia_eden_VIDEO_notu_SAGLAYICI_ICINDE_dogru():
     """
     for provider in {m.provider for m in catalog.VIDEO_MODELS}:
         grup = [m for m in catalog.VIDEO_MODELS if m.provider == provider]
-        en_az = min(m.credits for m in grup)
-        en_cok = max(m.credits for m in grup)
         for m in grup:
-            notu = m.note.lower()
-            if "en ucuz" in notu:
-                assert m.credits == en_az, (
-                    f"{m.id}: not 'en ucuz' diyor ama {m.credits} kredi "
-                    f"({provider} içinde en az {en_az})")
-            if "en pahalı" in notu:
-                assert m.credits == en_cok, (
-                    f"{m.id}: not 'en pahalı' diyor ama {m.credits} kredi "
-                    f"({provider} içinde en çok {en_cok})")
+            # Metin, anahtar değil; kademe düzeyi (görsel ikizinin yardımcısı ve
+            # gerekçesi). İlk gerçek sınavlar D'nin kendisi: PixVerse'in "En ucuz
+            # fal kademesi" notu MiniMax H3 (12) gelince, Kling Turbo'nun "En
+            # pahalı"sı Seedance (95) gelince YANLIŞLANDI; sonra H3'ün kendi "en
+            # ucuz"u Wan 480p (10) karşısında kademe düzeyinde yanlış çıktı.
+            _maliyet_iddiasini_sina(m, grup, provider)
 
 
-_COZUNURLUK_JETONLARI = ("480p", "720p", "1080p")
+# `768p`/`4k` H3 ile geldi (2026-09-23). Karşılaştırma KÜÇÜK HARFLE: fal H3'ün
+# jetonlarını `480P`/`768P` yazıyor (tele olduğu gibi gidiyor), kullanıcı ise
+# etiketi ("480p · SD", Wan'la paylaşılan) görüyor ve not da öyle konuşuyor.
+_COZUNURLUK_JETONLARI = ("480p", "720p", "768p", "1080p", "4k")
 
 
 def test_COZUNURLUK_iddia_eden_VIDEO_notu_GORUNUR_bir_jetona_dayanir():
@@ -1002,11 +1251,12 @@ def test_COZUNURLUK_iddia_eden_VIDEO_notu_GORUNUR_bir_jetona_dayanir():
     gerçekten mandal.
     """
     for m in catalog.VIDEO_MODELS:
-        notu = m.note.lower()
+        notu = i18n.t(m.note, "tr").lower()
+        kucuk = {q.lower() for q in m.qualities}
         for jeton in _COZUNURLUK_JETONLARI:
             if jeton not in notu:
                 continue
-            assert jeton in m.qualities, (
+            assert jeton in kucuk, (
                 f"{m.id}: not {jeton!r} diyor ama qualities'te yok "
                 f"({m.qualities})")
             assert m.quality_hidden is False, (

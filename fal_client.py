@@ -1,17 +1,38 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
 # GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
 # Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
-"""fal.ai kuyruk teli — Wan · PixVerse · Kling (VİDEO).
+"""fal.ai kuyruk teli — VİDEO (Wan · PixVerse · Kling · Seedance · FLUX 3 · MiniMax)
+ve GÖRSEL (Qwen Image · Seedream · FLUX.1 schnell).
 
 Deponun BEŞİNCİ tel formatı ve ilk TOPLAYICISI: tek anahtar, çok marka.
-Sağlayıcı `providers._VIDEO_ADAPTERS`'e giriyor, `_ADAPTERS`'e GİRMİYOR —
-görsel yolunun telde ürettiği baytlar bu turda dokunulmadan kalıyor.
+Sağlayıcı İKİ tabloda birden: `providers._VIDEO_ADAPTERS` (v0.23) ve
+`providers._ADAPTERS` (2026-09-23, Faz 4 / 1b-D). Görsel tarafı bu dosyaya
+"geldiği gün eklenecek" diye yazılmıştı; o gün geldi ve eklendi
+(`generate`/`edit`), video işlevleri `generate_video`/`animate` adını aldı —
+sevk memurunun görsel sözleşmesi `generate` adını istiyor.
 
 DOSYA BÖLÜNMÜYOR (`azure_mai_client`/`azure_flux_client` gibi değil) ve
 gerekçe o bölünmenin ÖLÇÜTÜNDEN geliyor: orada iki AYRI tel formatı vardı
-(farklı yol, farklı gövde, farklı hata şekli). fal'da protokol TEK; modeller
-arasında değişen yalnız ALAN ADLARI ve onlar `ALANLAR` tablosunda. fal'ın
-görsel tarafı geldiği gün `generate`/`edit` BU dosyaya eklenecek.
+(farklı yol, farklı gövde, farklı hata şekli). fal'da protokol TEK — görsel
+ve video AYNI kuyruk döngüsünden (`_kuyruk_dongusu`: submit → yokla → sonuç →
+indir) geçiyor; değişen yalnız gövdenin alan adları (`ALANLAR` /
+`GORSEL_ALANLAR`) ve sonucun okunduğu anahtar (`video.url` / `images[0].url`).
+
+ŞEMA KAYNAKLARI (2026-09-23, Faz 4 / 1b-D): dört yeni video ve üç görsel
+modelinin uç yolları, alan adları, tipleri ve enum'ları fal.ai'den DOĞRUDAN
+OKUNAMADI — bu turun konteynerinde `fal.ai`/`docs.fal.ai` egress'te kapalı.
+Hepsi fal'ın OpenAPI şemasını kodlayan AÇIK KAYNAK istemcilerden ÇAPRAZ okundu
+(GitHub kod araması, aynı gün): NousResearch/hermes-agent
+`plugins/video_gen/fal/__init__.py` (uç · alan · tip tablosu),
+storytold/artcraft `crates/api_clients/fal_client` (Rust struct'ları, uç
+başına), 0xsline/OpenChatCut `fal-catalog-input.verify.ts` (gövde
+doğrulama örnekleri), simstudioai/sim `falai-video.ts`, TanStack/ai
+`packages/ai-fal` (görsel alan adı tablosu), sandbaseai/sandbase-docs (H3
+enum'ları), Comfy-Org/ComfyUI `nodes_minimax.py`. KURAL: bir ad/tip ancak en
+az ÜÇ kaynak aynı şeyi söylüyorsa yazıldı; tek kaynakta kalan (H3'ün 480P/4K
+kademeleri) yazılmadı. Canlı 422 ile DOĞRULANMADI (POST para harcardı) —
+sahibin sandbox turu (her modelde bir üretim) canlı doğrulamadır ve
+`tests/test_fal_client*.py` gövdenin KENDİSİNİ ölçer, telin cevabını değil.
 
 DOSYA ADI PyPI'daki resmî `fal-client` paketini GÖLGELİYOR. O paket
 kullanılmıyor ve kullanılmamalı: BYOK tasarımı yalnız `httpx` istiyor,
@@ -91,6 +112,13 @@ class TelBicimi:
     gorsel: frozenset[str]       # görsel→video ucunun okuduğu adlar
     gorsel_alani: str            # referans karenin GİTTİĞİ ad (modele göre değişir)
     sure_dize: bool = False      # süre telde DİZE mi gidiyor (Kling)
+    # KALİTE EKSENİ SES EKSENİ Mİ (Faz 4 / 1b-D, Kling V3 Pro): `True` ise
+    # katalogdaki `quality` jetonu (`sessiz`/`sesli`) `resolution` olarak DEĞİL
+    # `generate_audio` bool'u olarak gidiyor — şemada `resolution` yok, ses
+    # anahtarı fiyatı ikiye bölüyor. `False` + kümede `generate_audio` varsa
+    # (Seedance 2.5) değer HEP `True`: fiyat "sesli" rakamla yazıldı, kapalı
+    # göndermek kullanıcının ödediği şeyi eksik teslim etmek olurdu.
+    ses_ekseni: bool = False
 
     def __post_init__(self) -> None:
         # DEĞİŞMEZ: `gorsel_alani` `gorsel` kümesinin ÜYESİ olmak ZORUNDA —
@@ -104,6 +132,18 @@ class TelBicimi:
             raise ValueError(
                 f"gorsel_alani={self.gorsel_alani!r} gorsel kümesinde yok: "
                 f"{sorted(self.gorsel)}")
+        # SES EKSENİ ile `resolution` BİRLİKTE OLAMAZ: jeton ya çözünürlük ya
+        # ses anahtarıdır; ikisi de kümedeyse `build_payload` `sesli` dizesini
+        # `resolution` olarak da gönderir — şemada enum dışı, telde 422 ya da
+        # (fal'ın ölçülmüş huyu) sessiz yok sayım. İthal zamanında patlasın.
+        if self.ses_ekseni and ("resolution" in self.metin or "resolution" in self.gorsel
+                                or "generate_audio" not in self.metin
+                                or "generate_audio" not in self.gorsel):
+            # ASCII: geliştiriciye konuşan ithal-zamanı hatası, kullanıcı metni
+            # değil (`test_no_user_facing_module_still_carries_turkish_text`).
+            raise ValueError(
+                "ses_ekseni=True olan bicim `resolution` tasiyamaz ve iki ucta da "
+                "`generate_audio` okumali")
 
 
 # model id → TelBicimi.
@@ -147,7 +187,73 @@ ALANLAR: dict[str, TelBicimi] = {
         gorsel_alani="image_url",
         sure_dize=True,
     ),
+    # ── Faz 4 / 1b-D (2026-09-23): dört yeni model. Kaynaklar ve "üç kaynak
+    # kuralı" dosya başlığında. Aynı gün sahip 14 ucu fal'ın BİRİNCİ TARAF
+    # OpenAPI'siyle (`fal.ai/api/openapi/queue/openapi.json?endpoint_id=…`)
+    # karşılaştırdı: alan kümeleri ve enum'lar UYUŞUYOR (PR #80 yorumu).
+    # Canlı 422 ile doğrulanmadı; açık kalan iki şey `data:` URI kabulü ve
+    # Qwen'in `image_size`ı çıktıya uygulaması.
+    #
+    # Seedance 2.5: `duration` şemada DİZE enum (Kling'in deseni — hermes-agent
+    # bu modelde `duration_int` bayrağını TAŞIMIYOR, OpenChatCut `'12'` dize
+    # gönderiyor). Görsel ucu `aspect_ratio`yu YALNIZ "auto" olarak tanıyor
+    # (oranı ilk kareden türetiyor) → o uçta düşürülüyor, PixVerse/Kling ile
+    # aynı sessiz-sapma gerekçesi. `generate_audio` iki uçta da var, hep True
+    # (`TelBicimi.ses_ekseni`nin yorumu). i2v'nin `end_image_url`u bilerek
+    # gönderilmiyor (Wan'ın kararı; `supports_last_frame=False`).
+    "fal-seedance-2-5": TelBicimi(
+        metin=frozenset({"prompt", "resolution", "aspect_ratio", "duration",
+                         "generate_audio"}),
+        gorsel=frozenset({"prompt", "image_url", "resolution", "duration",
+                          "generate_audio"}),
+        gorsel_alani="image_url",
+        sure_dize=True,
+    ),
+    # FLUX 3: `duration` TAMSAYI (şema `"auto" | 5..20`; hermes `duration_int`),
+    # `aspect_ratio` ve `resolution` İKİ uçta da okunuyor (artcraft'ın i2v
+    # struct'ı ikisini de taşıyor, atlascloud i2v'ye `aspect_ratio` gönderiyor).
+    # Ses fiyata dahil; şemada `generate_audio` VAR (öntanımlı `true`) ama
+    # GÖNDERİLMİYOR — ses hep açık geliyor, kalite ekseni çözünürlük. Anahtarı
+    # kümeye almak `ses_ekseni` ya da sabit True demek olurdu; ikisi de
+    # bugünkü davranışı değiştirmez, o yüzden yalın bırakıldı (sahibin
+    # OpenAPI okuması, PR #80 yorumu).
+    "fal-flux-3": TelBicimi(
+        metin=frozenset({"prompt", "resolution", "aspect_ratio", "duration"}),
+        gorsel=frozenset({"prompt", "image_url", "resolution", "aspect_ratio",
+                          "duration"}),
+        gorsel_alani="image_url",
+    ),
+    # Kling V3 Pro: Turbo Pro ile AYNI şema ailesi — `resolution` YOK, dize
+    # `duration`, i2v'de `aspect_ratio` yok — ama referans kare `image_url`
+    # DEĞİL `start_image_url` (hermes `image_param_key`, OpenChatCut ve
+    # aso-tracker'ın canlı çağrıları, TanStack belgesi). Turbo Pro'nun v0.23
+    # ölçümünde `image_url` görülmüştü; iki uç ailesi farklı ad okuyor, biri
+    # ötekine kopyalanmadı. `generate_audio` KALİTE EKSENİ (ses_ekseni).
+    "fal-kling-v3-pro": TelBicimi(
+        metin=frozenset({"prompt", "aspect_ratio", "duration", "generate_audio"}),
+        gorsel=frozenset({"prompt", "start_image_url", "duration", "generate_audio"}),
+        gorsel_alani="start_image_url",
+        sure_dize=True,
+        ses_ekseni=True,
+    ),
+    # MiniMax H3: `duration` TAMSAYI (sandbase şeması `integer`, hermes
+    # `duration_int`), `resolution` enum'u BÜYÜK P (`768P`, `2K`) — katalog
+    # jetonu bu yazımla tutuyor, tel dönüşümü yok. i2v `aspect_ratio` okumuyor
+    # (oranı kareden alıyor; hermes `image_drop_keys`, MaxVideoAi tablosu).
+    # Ses yerleşik, anahtarı yok.
+    "fal-minimax-h3": TelBicimi(
+        metin=frozenset({"prompt", "resolution", "aspect_ratio", "duration"}),
+        gorsel=frozenset({"prompt", "image_url", "resolution", "duration"}),
+        gorsel_alani="image_url",
+    ),
 }
+
+# Kling V3 Pro'nun ses jetonları — katalogla AYNI dizeler (`catalog.QUALITY_LABELS`).
+# Buraya kopyalanması `AUTH_HEADER`ın iki kez beyan edilme gerekçesi: katalog
+# yaprak ve bu modül onu zaten ithal ediyor, ama jeton bir TEL sözleşmesi ve
+# tel sözleşmeleri adaptörde literal durur (bekçisi tests/test_fal_client.py).
+SESLI = "sesli"
+SESSIZ = "sessiz"
 
 
 def wire_path_for(m: catalog.ImageModel, *, images) -> str:
@@ -228,6 +334,9 @@ def build_payload(m: catalog.ImageModel, prompt: str, size: str, quality: str,
         "aspect_ratio": size,
         "resolution": quality,
         "duration": str(duration) if bicim.sure_dize else duration,
+        # Ses: eksen ise jetondan, değilse HEP açık (gerekçe `TelBicimi.ses_ekseni`).
+        # Kümede yoksa aşağıdaki süzgeç düşürür — FLUX 3 ve H3 hiç görmez.
+        "generate_audio": (quality == SESLI) if bicim.ses_ekseni else True,
     }
     if images:
         tum[bicim.gorsel_alani] = _data_uri(images[0][1])
@@ -449,6 +558,26 @@ def _video_url(sonuc: dict) -> str:
     return str(url)
 
 
+def _gorsel_url(sonuc: dict) -> str:
+    """`_video_url`un görsel ikizi: fal görsel uçları `images[]` listesi döndürüyor.
+
+    YALNIZ İLK öğe okunuyor ve bu bir kesme değil sözleşme: `build_image_payload`
+    `num_images=1` gönderiyor (`images_per_request=1`, adet döngüsü `_kuyruk_
+    dongusu`nda), yani listede birden fazla öğe beklenmiyor. Şekil değişirse
+    (boş liste, `url`süz öğe) Türkçe `ImageError`, ham `KeyError`/`IndexError`
+    değil — `_video_url`un aynı gerekçesi.
+    """
+    liste = sonuc.get("images") if isinstance(sonuc, dict) else None
+    ilk = liste[0] if isinstance(liste, list) and liste else None
+    url = ilk.get("url") if isinstance(ilk, dict) else None
+    if not url:
+        raise ac.ImageError(
+            i18n.t("err.fal_no_image_url", None,
+                   anahtarlar=sorted(sonuc) if isinstance(sonuc, dict)
+                   else "—"))
+    return str(url)
+
+
 # İndirme hedefinin uyması gereken şema. fal'ın CDN'i HER ZAMAN https
 # veriyor; düz `http` kabul etmek görünürde zararsız ama sessizce bir
 # ortadaki-adam saldırısına açık kapı bırakırdı — reddetmenin bedeli yok.
@@ -597,7 +726,7 @@ def _timeout_message(gecen: float, butce: float) -> str:
 
 def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str,
           duration: int, n: int, images, *, client, credentials) -> list[bytes]:
-    """`generate` ve `animate`in PAYLAŞILAN gövdesi — tek fark `images`.
+    """`generate_video` ve `animate`in PAYLAŞILAN gövdesi — tek fark `images`.
 
     DÖRT ADIM: submit → `COMPLETED` olana kadar yokla → sonucu al → indir.
     `veo_client._uret`in üç adımından farkı, fal'ın sonucu DURUM yanıtında
@@ -616,13 +745,33 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str,
     DÖNGÜ adet başına ayrı istek atıyor (`images_per_request=1`). Bugün
     `max_n=1` olduğu için tek tur, ama yapısı tavan yükseldiği gün hazır.
     """
+    payload = build_payload(m, prompt, size, quality, duration, images)
+    return _kuyruk_dongusu(m, wire_path_for(m, images=images), payload, n,
+                           client=client, credentials=credentials,
+                           cikti_url=_video_url, hata_anahtari="err.fal_no_video")
+
+
+def _kuyruk_dongusu(m: catalog.ImageModel, yol: str, payload: dict, n: int, *,
+                    client, credentials, cikti_url, hata_anahtari: str) -> list[bytes]:
+    """Video ve görselin PAYLAŞTIĞI adet döngüsü: kimlik, bütçe, `n` tur.
+
+    2026-09-23'e kadar bu gövde `_uret`in içindeydi ve yalnız videoya
+    hizmet ediyordu; görsel geldiğinde kopyalanmadı, PARAMETRELENDİ. Video ile
+    görselin farkı iki şey: gövdeyi kim kuruyor (çağıran veriyor) ve sonuçta
+    hangi anahtar okunuyor (`cikti_url`: `_video_url` / `_gorsel_url`, hata
+    metni `hata_anahtari`). Kuyruk mekaniği, son tarih, hata çevirisi ve
+    indirme kapıları (anahtarsızlık, SSRF) İKİ yol için de aynı satırlarda —
+    biri sıkılaşırsa öteki de sıkılaşır, biri gevşerse test ikisini de görür.
+
+    KİMLİK TEMBEL çözülüyor, SON TARİH BİR KEZ hesaplanıyor (gerekçeler
+    `_uret`in docstring'inde).
+    """
     key, base_url = (credentials if credentials is not None
                      else credstore.resolve(m.credential))
     taban = base_url.rstrip("/")
-    yol = wire_path_for(m, images=images).strip("/")
+    yol = yol.strip("/")
     butce = providers.total_budget(m, n)
     son_tarih = _simdi() + butce
-    payload = build_payload(m, prompt, size, quality, duration, images)
 
     import httpx
     owns = client is None
@@ -632,7 +781,8 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str,
         out: list[bytes] = []
         while len(out) < n:
             out.append(_tek_uretim(client, key, taban, yol, payload, butce,
-                                   son_tarih))
+                                   son_tarih, cikti_url=cikti_url,
+                                   hata_anahtari=hata_anahtari))
         return out[:n]
     finally:
         if owns:
@@ -640,13 +790,17 @@ def _uret(m: catalog.ImageModel, prompt: str, size: str, quality: str,
 
 
 def _tek_uretim(client, key: str, taban: str, yol: str, payload: dict,
-                butce: float, son_tarih: float) -> bytes:
+                butce: float, son_tarih: float, *, cikti_url=_video_url,
+                hata_anahtari: str = "err.fal_no_video") -> bytes:
     """Tek bir kuyruk turu: submit → yokla → sonuç → indir.
 
-    `son_tarih` ÇAĞIRANDAN (`_uret`) geliyor ve TÜM turlarda SABİT — bu
-    fonksiyon kendi saatini sıfırlamıyor (bkz. `_uret`'in gerekçesi). `butce`
-    yalnız zaman aşımı MESAJINDA "kaç saniyede bitmedi" diye göstermek için
-    taşınıyor, son tarih hesabına bir daha girmiyor.
+    `son_tarih` ÇAĞIRANDAN (`_kuyruk_dongusu`) geliyor ve TÜM turlarda SABİT —
+    bu fonksiyon kendi saatini sıfırlamıyor (bkz. `_uret`'in gerekçesi).
+    `butce` yalnız zaman aşımı MESAJINDA "kaç saniyede bitmedi" diye göstermek
+    için taşınıyor, son tarih hesabına bir daha girmiyor. `cikti_url` sonuç
+    gövdesinden indirilecek adresi çözüyor (video: `video.url`, görsel:
+    `images[0].url`); öntanımları video, çünkü bu imzanın ilk ve en çok
+    çağıranı o ve testleri o imzayla yazıldı.
     """
     # ── 1. Submit ────────────────────────────────────────────────────────
     # BAŞARI `_basarili` İLE (yalnız `== 200` DEĞİL): fal `202 Accepted` da
@@ -725,15 +879,21 @@ def _tek_uretim(client, key: str, taban: str, yol: str, payload: dict,
     # cümle gösterirdi. Gerekçe doğrudan yazılıyor.
     hata = detail_of(sonuc)
     if hata:
-        raise ac.ImageError(i18n.t("err.fal_no_video", None, hata=hata))
+        raise ac.ImageError(i18n.t(hata_anahtari, None, hata=hata))
 
     # ── 4. İndirme ───────────────────────────────────────────────────────
-    return _indir(client, _video_url(sonuc))
+    return _indir(client, cikti_url(sonuc))
 
 
-def generate(m: catalog.ImageModel, prompt: str, size: str, quality: str,
-             duration: int, n: int, *, client=None,
-             credentials=None) -> list[bytes]:
+def generate_video(m: catalog.ImageModel, prompt: str, size: str, quality: str,
+                   duration: int, n: int, *, client=None,
+                   credentials=None) -> list[bytes]:
+    """Video sözleşmesinin `generate_video`su (providers.py başlığı).
+
+    2026-09-23'e kadar bu işlevin adı `generate` idi; görsel sözleşmesi o adı
+    isteyince (`providers._ADAPTERS` çifti `(generate, edit)`) video tarafı
+    sözleşmenin kendi adını aldı. `providers._fal_adapter` bu adı veriyor.
+    """
     return _uret(m, prompt, size, quality, duration, n, None,
                  client=client, credentials=credentials)
 
@@ -759,3 +919,196 @@ def animate(m: catalog.ImageModel, prompt: str, images, size: str, quality: str,
             i18n.t("err.model_no_last_frame", None, model=m.label))
     return _uret(m, prompt, size, quality, duration, n, images,
                  client=client, credentials=credentials)
+
+
+# ── GÖRSEL (Faz 4 / 1b-D, 2026-09-23) ────────────────────────────────────
+
+
+@dataclasses.dataclass(frozen=True)
+class GorselTelBicimi:
+    """Bir GÖRSEL modelinin tel biçimi — `TelBicimi`nin görsel ikizi.
+
+    AYRI SINIF, `TelBicimi`ye alan eklenmedi: video biçiminin `sure_dize`/
+    `ses_ekseni` eksenleri görselde yok, görselin `output_format`/`image_size`
+    eksenleri videoda yok; tek sınıfta yarısı hep `None` duran alanlar,
+    `__post_init__`ün değişmezlerini de bulanıklaştırırdı.
+
+    `duzenleme=None` = bu modelin DÜZENLEME UCU YOK (schnell). Katalog
+    `supports_edit=False` diyor ve `providers.edit` orada zaten reddediyor; bu
+    tablo İKİNCİ kapı (`providers.edit`in ikinci kapı disiplini): `edit` başka
+    bir yoldan çağrılsa gövde kurulmadan Türkçe hata.
+    """
+
+    metin: frozenset[str]                  # metin→görsel ucunun okuduğu adlar
+    duzenleme: frozenset[str] | None       # düzenleme ucunun okuduğu adlar; None = uç yok
+    gorsel_alani: str = ""                 # referansların gittiği ad: tek `image_url` ya da liste `image_urls`
+
+    def __post_init__(self) -> None:
+        # Düzenleme ucu varsa referans alanı o kümenin ÜYESİ olmak ZORUNDA
+        # (`TelBicimi.__post_init__`ün aynı değişmezi): değilse referans
+        # sessizce düşer ve "düzenleme" metinden üretime döner.
+        if self.duzenleme is not None and self.gorsel_alani not in self.duzenleme:
+            raise ValueError(
+                f"gorsel_alani={self.gorsel_alani!r} duzenleme kumesinde yok: "
+                f"{sorted(self.duzenleme)}")
+        if self.duzenleme is None and self.gorsel_alani:
+            raise ValueError("duzenleme ucu yokken referans alani beyan edilmis")
+
+
+# `image_urls` ile biten ad LİSTE alır, `image_url` TEK dize — fal'ın kendi
+# adlandırma kuralı (TanStack/ai `image-field-overrides.ts` her ucu böyle
+# etiketliyor: `single: 'image_urls'` Seedream'de, `image_url` Qwen'de).
+_LISTE_ALANI_SONEKI = "urls"
+
+# ÇIKTI BİÇİMİ: adaptör sözleşmesi PNG BAYTI istiyor (providers.py başlığı).
+# `output_format` şemada olan uçlara "png" isteniyor; olmayanda (Seedream)
+# dönen bayt `_png_garantile` ile PNG'ye çevriliyor — iki yol da aynı garantiyi
+# veriyor, biri telde biri yerelde.
+PNG_BICIMI = "png"
+
+GORSEL_ALANLAR: dict[str, GorselTelBicimi] = {
+    # Qwen Image: metin ucu `image_size` (`{width, height}` nesnesi — fal'ın
+    # ortak `ImageSize` tipi, hazır ad ya da nesne), `num_images`,
+    # `output_format`. Düzenleme ucu (`fal-ai/qwen-image-edit`) TEK `image_url`
+    # (2509/plus varyantları `image_urls` alıyor, onlar listede değil) ve
+    # `image_size`ı DA okuyor (fal'ın qwen-image-edit şeması listeliyor).
+    # İlk sürüm alanı bu uçtan DÜŞÜRÜYORDU: kullanıcının seçtiği boyut
+    # `check_capabilities`ten geçmiş, sonra sessizce referansın geometrisine
+    # kaymıştı — "sessiz sapma yasak" (#80 incelemesi). Alanın canlıda kabulü
+    # sahibin sandbox turunun bir durağı (Kling V3 Pro ve Seedance'tan sonra).
+    "fal-qwen-image": GorselTelBicimi(
+        metin=frozenset({"prompt", "image_size", "num_images", "output_format"}),
+        duzenleme=frozenset({"prompt", "image_url", "image_size", "num_images",
+                             "output_format"}),
+        gorsel_alani="image_url",
+    ),
+    # Seedream V4: `image_size` nesne (kenar 1024–4096), `num_images`;
+    # `output_format` şemada GÖRÜLMEDİ → gönderilmiyor, PNG yerelde
+    # garantileniyor. Düzenleme ucu `image_urls` LİSTESİ (10'a kadar) ve
+    # `image_size`ı da okuyor (fal-ai-community iş akışı örneği ikisini
+    # birlikte gönderiyor).
+    "fal-seedream-v4": GorselTelBicimi(
+        metin=frozenset({"prompt", "image_size", "num_images"}),
+        duzenleme=frozenset({"prompt", "image_urls", "image_size", "num_images"}),
+        gorsel_alani="image_urls",
+    ),
+    # FLUX.1 [schnell]: yalnız metin→görsel; `image_size` nesne, `num_images`,
+    # `output_format` (varsayılanı jpeg — png İSTENİYOR). Düzenleme ucu YOK.
+    "fal-flux-1-schnell": GorselTelBicimi(
+        metin=frozenset({"prompt", "image_size", "num_images", "output_format"}),
+        duzenleme=None,
+    ),
+}
+
+
+def _boyut(size: str) -> tuple[int, int]:
+    """`"1024x768"` → `(1024, 768)`. Katalog jetonu; `models.check_capabilities`
+    zaten kümeyle sınırladı, burada biçim dışı bir jeton programlama hatası."""
+    w, h = size.lower().split("x", 1)
+    return int(w), int(h)
+
+
+def build_image_payload(m: catalog.ImageModel, prompt: str, size: str, n: int,
+                        images) -> dict:
+    """Görsel isteğinin gövdesi — `build_payload`ın görsel ikizi, aynı süzgeç disiplini.
+
+    `num_images` HEP 1, `n` değil: katalog `images_per_request=1` diyor ve
+    adet döngüsü `_kuyruk_dongusu`nda — fal'ın `num_images` tavanı modele göre
+    değişiyor (ölçülmedi) ve tavanı aşan tek bir istek 422 üretirdi; adet
+    başına ayrı istek her tavanın altında kalıyor. `n` imzada duruyor ki
+    çağıranın niyeti görünür kalsın ve tavan ölçüldüğü gün tek yerde değişsin.
+
+    `images` sıralı [(dosya_adı, png_baytları), ...]; tek alanlı uçta İLKİ,
+    liste alanlı uçta `m.max_refs` kadarı gidiyor (fazlası rotada zaten elendi,
+    burada ikinci kapı).
+    """
+    bicim = GORSEL_ALANLAR[m.id]
+    if images:
+        if bicim.duzenleme is None:
+            # İkinci kapı (`providers.edit` birincisi): uç yokken referansla
+            # çağrılan model metin ucuna DÜŞMEZ — o, kullanıcının yüklediği
+            # görselin sessizce yok sayılması olurdu.
+            raise ac.ImageError(
+                i18n.t("err.model_no_reference", None, model=m.label))
+        izin = bicim.duzenleme
+    else:
+        izin = bicim.metin
+    w, h = _boyut(size)
+    tum: dict = {
+        "prompt": prompt,
+        "image_size": {"width": w, "height": h},
+        "num_images": 1,
+        "output_format": PNG_BICIMI,
+    }
+    if images:
+        uriler = [_data_uri(png) for _, png in images[:max(1, m.max_refs)]]
+        tum[bicim.gorsel_alani] = (uriler if bicim.gorsel_alani.endswith(_LISTE_ALANI_SONEKI)
+                                   else uriler[0])
+    return {ad: deger for ad, deger in tum.items() if ad in izin}
+
+
+_PNG_IMZASI = b"\x89PNG\r\n\x1a\n"
+
+
+def _png_garantile(veri: bytes) -> bytes:
+    """Dönen baytı PNG olarak teslim eder; PNG değilse Pillow ile çevirir.
+
+    Sözleşme "çözülmüş PNG baytları" (providers.py başlığı) ve `storage.save`
+    uzantıyı `kind`ten türetiyor (`.png`): JPEG baytını `.png` adıyla yazmak
+    tarayıcıda açılır ama sessiz bir sapmadır (`composite` PNG bekler, meta
+    okuyucular imzayı okur). `output_format` isteyebildiğimiz uçlarda bu yol
+    hiç çalışmaz (imza tutar, bayt AYNEN geçer); Seedream'de çalışır.
+    Çözülemeyen bayt Türkçe `ImageError`: ham `UnidentifiedImageError`
+    `app.py`nin süzgecinden geçip 500 olurdu.
+    """
+    if veri.startswith(_PNG_IMZASI):
+        return veri
+    import io
+
+    from PIL import Image, UnidentifiedImageError
+    try:
+        with Image.open(io.BytesIO(veri)) as im:
+            # PNG yazıcı her modu bilmiyor: CMYK (JPEG'de yaygın) ya da YCbCr
+            # `save(format="PNG")`de OSError verir ve o hata aşağıda "görsel
+            # değil" diye okunurdu — oysa görsel geçerli, yalnız modu yabancı
+            # (#80 incelemesi). Saydamlığı olan modlar RGBA'ya, ötekiler
+            # RGB'ye çevrilir; PNG ikisini de yazar.
+            saydam = im.mode in ("RGBA", "LA", "PA") or "transparency" in im.info
+            cikti = io.BytesIO()
+            im.convert("RGBA" if saydam else "RGB").save(cikti, format="PNG")
+    except (UnidentifiedImageError, OSError) as exc:
+        raise ac.ImageError(i18n.t("err.fal_not_an_image")) from exc
+    return cikti.getvalue()
+
+
+def _gorsel_uret(m: catalog.ImageModel, prompt: str, size: str, n: int, images, *,
+                 client, credentials) -> list[bytes]:
+    """`generate`/`edit`in paylaşılan gövdesi — `_uret`in görsel ikizi."""
+    payload = build_image_payload(m, prompt, size, n, images)
+    ham = _kuyruk_dongusu(m, wire_path_for(m, images=images), payload, n,
+                          client=client, credentials=credentials,
+                          cikti_url=_gorsel_url, hata_anahtari="err.fal_no_image")
+    return [_png_garantile(b) for b in ham]
+
+
+def generate(m: catalog.ImageModel, prompt: str, size: str, quality: str, n: int,
+             *, client=None, credentials=None) -> list[bytes]:
+    """Görsel sözleşmesinin `generate`i (providers.py başlığı).
+
+    `quality` BİLEREK YOK SAYILIYOR: üç fal görsel modelinin kalite ekseni yok
+    (katalog tek sentetik jeton + `quality_hidden=True`); imzada sözleşme
+    gereği duruyor — `azure_mai_client.generate`in aynı duruşu.
+    """
+    return _gorsel_uret(m, prompt, size, n, None, client=client, credentials=credentials)
+
+
+def edit(m: catalog.ImageModel, prompt: str, images, size: str, quality: str,
+         n: int, *, client=None, credentials=None) -> list[bytes]:
+    """`images`: sıralı [(dosya_adı, png_baytları), ...] — ilk görsel ana referans.
+
+    Referanslar base64 data URI olarak gövdede gidiyor (`_data_uri`; yükleme
+    adımı yok — videonun aynı kararı). Uç yolu `wire_model_edit` (fal'da
+    düzenleme AYRI uç, `wire_path_for`). Düzenleme ucu olmayan model
+    `build_image_payload`da reddediliyor.
+    """
+    return _gorsel_uret(m, prompt, size, n, images, client=client, credentials=credentials)

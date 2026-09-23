@@ -17,6 +17,13 @@ tablo `TelBicimi` dataclass'ına taşındı, çünkü referans karenin GİTTİĞ
 de modele göre değişiyor — Wan'ın görsel ucu `image_url` DEĞİL
 `start_image_url` okuyor, Kling'in `duration`ı şemada STRING enum. Kod
 bugüne kadar üçüne de sabit `image_url`/`int` yazıyordu.
+
+ÜÇÜNCÜ TUR (2026-09-23, Faz 4 / 1b-D): dört yeni video modeli ve
+`generate` → `generate_video` adı (görsel sözleşmesi `generate`i aldı —
+görsel testleri tests/test_fal_client_gorsel.py). Yeni modellerin şeması
+fal.ai'den okunamadı (egress), açık kaynak istemcilerden çapraz okundu
+(fal_client.py başlığı); buradaki testler yine GÖVDEYİ ölçüyor, telin
+cevabını değil — canlı doğrulama sahibin sandbox turu.
 """
 import base64
 
@@ -319,7 +326,7 @@ def _kuyruk_yanitlari(rid="abc123"):
 
 def test_the_happy_path_returns_the_downloaded_mp4_bytes():
     client = FakeClient(*_kuyruk_yanitlari())
-    out = fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+    out = fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                               client=client, credentials=CREDS)
     assert out == [MP4]
 
@@ -332,7 +339,7 @@ def test_the_poll_and_result_urls_are_REBUILT_from_the_trusted_base():
     bu sapma bilinçli — bkz. fal_client başlığı.
     """
     client = FakeClient(*_kuyruk_yanitlari())
-    fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+    fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                         client=client, credentials=CREDS)
     adresler = [c["url"] for c in client.calls]
     assert not any("evil.example" in u for u in adresler)
@@ -349,7 +356,7 @@ def test_the_poll_and_result_urls_are_REBUILT_from_the_trusted_base():
 def test_the_download_step_carries_NO_credentials():
     """Çıktı adresi gövdeden geliyor; anahtar oraya GİTMEMELİ."""
     client = FakeClient(*_kuyruk_yanitlari())
-    fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+    fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                         client=client, credentials=CREDS)
     indirme = client.calls[-1]
     assert indirme["url"] == "https://v3.fal.media/x.mp4"
@@ -358,7 +365,7 @@ def test_the_download_step_carries_NO_credentials():
 
 def test_the_submit_step_uses_the_Key_prefixed_authorization_header():
     client = FakeClient(*_kuyruk_yanitlari())
-    fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+    fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                         client=client, credentials=CREDS)
     assert client.calls[0]["headers"]["Authorization"] == "Key FALKEY"
 
@@ -369,7 +376,7 @@ def test_a_missing_request_id_fails_with_a_TURKISH_error():
     eksik olduğunu (`request_id`) da adıyla söylemesi."""
     client = FakeClient(FakeResponse(200, {"queue_position": 0}))
     with pytest.raises(ac.ImageError) as exc:
-        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+        fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                             client=client, credentials=CREDS)
     assert "fal" in str(exc.value).lower()
     assert "request_id" in str(exc.value)
@@ -384,7 +391,7 @@ def test_a_hostile_request_id_is_REJECTED_before_any_url_is_built():
     HİÇBİR yeni adresin kurulup çağrılmadığı."""
     client = FakeClient(FakeResponse(200, {"request_id": "../../../admin"}))
     with pytest.raises(ac.ImageError):
-        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+        fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                             client=client, credentials=CREDS)
     assert len(client.calls) == 1
 
@@ -399,7 +406,7 @@ def test_COMPLETED_without_a_video_is_a_TURKISH_error_not_a_KeyError():
         FakeResponse(200, {"seed": 7}),
     )
     with pytest.raises(ac.ImageError) as exc:
-        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+        fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                             client=client, credentials=CREDS)
     assert "video" in str(exc.value).lower()
 
@@ -416,7 +423,7 @@ def test_a_failed_job_is_rejected_even_if_the_body_also_carries_a_video():
                            "video": {"url": "https://v3.fal.media/x.mp4"}}),
     )
     with pytest.raises(ac.ImageError) as exc:
-        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+        fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                             client=client, credentials=CREDS)
     assert "düştü" in str(exc.value)
 
@@ -429,7 +436,7 @@ def test_the_wall_clock_budget_ends_the_loop_with_its_own_message(monkeypatch):
         FakeResponse(200, {"status": "IN_PROGRESS"}),
     )
     with pytest.raises(ac.ImageError) as exc:
-        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+        fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                             client=client, credentials=CREDS)
     assert "bitmedi" in str(exc.value).lower()
 
@@ -458,7 +465,7 @@ def test_the_wall_clock_budget_is_shared_across_ALL_tours_not_reset_per_tour(
         FakeResponse(200, {"request_id": "tur2"}),
     )
     with pytest.raises(ac.ImageError) as exc:
-        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 2,
+        fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 2,
                             client=client, credentials=CREDS)
     assert "bitmedi" in str(exc.value).lower()
     # İKİNCİ tur SUBMIT'ten öteye geçmedi: son tarih paylaşılan bir mutlak
@@ -497,7 +504,7 @@ def test_a_download_redirect_is_followed_MANUALLY_and_capped():
     ]
     client = FakeClient(*yanitlar)
     with pytest.raises(ac.ImageError) as exc:
-        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+        fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                             client=client, credentials=CREDS)
     assert "yönlendirme" in str(exc.value).lower()
     # 4 kuyruk çağrısından (submit + 2 yoklama + sonuç) SONRAKİ indirme
@@ -516,7 +523,7 @@ def test_a_relative_redirect_location_is_resolved_against_the_current_url():
         FakeResponse(200, content=MP4),
     ]
     client = FakeClient(*yanitlar)
-    out = fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+    out = fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                               client=client, credentials=CREDS)
     assert out == [MP4]
     assert client.calls[-1]["url"] == "https://v3.fal.media/y.mp4"
@@ -531,7 +538,7 @@ def test_a_loopback_download_target_is_rejected_as_a_potential_SSRF():
     yanitlar[3] = FakeResponse(200, {"video": {"url": "http://127.0.0.1:9/x.mp4"}})
     client = FakeClient(*yanitlar)
     with pytest.raises(ac.ImageError) as exc:
-        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+        fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                             client=client, credentials=CREDS)
     assert "ssrf" in str(exc.value).lower()
     # İndirme GET'i HİÇ atılmadı: kapı ağa çıkmadan ÖNCE reddediyor.
@@ -546,7 +553,7 @@ def test_a_cloud_metadata_download_target_is_rejected_as_a_potential_SSRF():
         200, {"video": {"url": "http://169.254.169.254/latest/meta-data"}})
     client = FakeClient(*yanitlar)
     with pytest.raises(ac.ImageError) as exc:
-        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+        fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                             client=client, credentials=CREDS)
     assert "ssrf" in str(exc.value).lower()
 
@@ -559,7 +566,7 @@ def test_a_redirect_to_a_loopback_address_is_rejected_too():
     ]
     client = FakeClient(*yanitlar)
     with pytest.raises(ac.ImageError) as exc:
-        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+        fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                             client=client, credentials=CREDS)
     assert "ssrf" in str(exc.value).lower()
     # Yalnız İLK indirme denemesi yapıldı; loopback'e ikinci bir çağrı GİTMEDİ.
@@ -605,7 +612,7 @@ def test_a_decimal_IPv4_loopback_download_target_is_rejected_end_to_end():
     yanitlar[3] = FakeResponse(200, {"video": {"url": "https://2130706433/x"}})
     client = FakeClient(*yanitlar)
     with pytest.raises(ac.ImageError) as exc:
-        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+        fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                             client=client, credentials=CREDS)
     assert "ssrf" in str(exc.value).lower()
     assert len(client.calls) == 4
@@ -637,7 +644,7 @@ def test_a_202_Accepted_submit_still_completes_the_happy_path():
     yanitlar = _kuyruk_yanitlari()
     yanitlar[0] = FakeResponse(202, {"request_id": "abc123"})
     client = FakeClient(*yanitlar)
-    out = fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+    out = fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                               client=client, credentials=CREDS)
     assert out == [MP4]
 
@@ -649,7 +656,7 @@ def test_the_request_id_is_read_from_a_202_submit_response_too():
     yanitlar = _kuyruk_yanitlari()
     yanitlar[0] = FakeResponse(202, {"request_id": "abc123"})
     client = FakeClient(*yanitlar)
-    fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+    fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                         client=client, credentials=CREDS)
     assert client.calls[1]["url"] == (
         "https://queue.fal.run/alibaba/wan-3.0/requests/abc123/status")
@@ -661,7 +668,7 @@ def test_a_202_poll_response_is_also_treated_as_success():
     yanitlar = _kuyruk_yanitlari()
     yanitlar[1] = FakeResponse(202, {"status": "IN_QUEUE"})
     client = FakeClient(*yanitlar)
-    out = fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+    out = fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                               client=client, credentials=CREDS)
     assert out == [MP4]
 
@@ -672,7 +679,7 @@ def test_a_202_result_response_is_also_treated_as_success():
     yanitlar[3] = FakeResponse(
         202, {"video": {"url": "https://v3.fal.media/x.mp4"}})
     client = FakeClient(*yanitlar)
-    out = fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+    out = fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                               client=client, credentials=CREDS)
     assert out == [MP4]
 
@@ -683,6 +690,120 @@ def test_a_non_2xx_submit_response_is_still_rejected_as_an_error():
     çevriliyor."""
     client = FakeClient(FakeResponse(500, {"detail": "upstream down"}))
     with pytest.raises(ac.ImageError) as exc:
-        fal_client.generate(WAN, "kedi", "16:9", "720p", 5, 1,
+        fal_client.generate_video(WAN, "kedi", "16:9", "720p", 5, 1,
                             client=client, credentials=CREDS)
     assert "500" in str(exc.value)
+
+
+# ── Faz 4 / 1b-D: dört yeni model ─────────────────────────────────────────
+
+SEEDANCE = _model("fal-seedance-2-5",
+                  "bytedance/seedance-2.5/text-to-video",
+                  "bytedance/seedance-2.5/image-to-video")
+FLUX3 = _model("fal-flux-3",
+               "blackforestlabs/flux-3/text-to-video",
+               "blackforestlabs/flux-3/image-to-video")
+KLING_PRO = _model("fal-kling-v3-pro",
+                   "fal-ai/kling-video/v3/pro/text-to-video",
+                   "fal-ai/kling-video/v3/pro/image-to-video")
+H3 = _model("fal-minimax-h3",
+            "minimax/h3/text-to-video",
+            "minimax/h3/image-to-video")
+
+
+def test_the_field_table_covers_every_fal_video_model_in_the_catalog():
+    """Tablo ile katalog ayrışırsa `build_payload` `KeyError` verir — ve o,
+    kullanıcıya dakikalar sonra değil ANINDA görünen bir 500. Bekçi burada:
+    katalogdaki her fal video girdisinin biçimi var, tablodaki her biçimin
+    girdisi var."""
+    katalog = {m.id for m in catalog.VIDEO_MODELS if m.provider == "fal"}
+    assert katalog == set(fal_client.ALANLAR), katalog ^ set(fal_client.ALANLAR)
+
+
+def test_seedance_sends_a_STRING_duration_audio_ON_and_drops_the_aspect_ratio_on_i2v():
+    """Şema: `duration` dize enum (Kling'in deseni), `generate_audio` iki uçta
+    da var ve HEP açık (fiyat sesli rakamla yazıldı), i2v `aspect_ratio`yu
+    yalnız "auto" tanıyor → gönderilmiyor (PixVerse/Kling'in sessiz-sapma
+    gerekçesi)."""
+    p = fal_client.build_payload(SEEDANCE, "kedi", "16:9", "720p", 10, None)
+    assert p == {"prompt": "kedi", "aspect_ratio": "16:9", "resolution": "720p",
+                 "duration": "10", "generate_audio": True}
+    p2 = fal_client.build_payload(SEEDANCE, "kedi", "16:9", "480p", 5, REFS)
+    assert "aspect_ratio" not in p2 and p2["resolution"] == "480p"
+    assert p2["duration"] == "5" and p2["generate_audio"] is True
+    assert p2["image_url"].startswith("data:image/png;base64,")
+
+
+def test_flux_3_sends_an_INTEGER_duration_and_keeps_aspect_ratio_on_BOTH_endpoints():
+    """Şema `"auto" | 5..20` tamsayı; `aspect_ratio` ve `resolution` i2v'de de
+    okunuyor. Ses anahtarı BEYAN EDİLMİYOR (yerleşik, fiyata dahil)."""
+    p = fal_client.build_payload(FLUX3, "kedi", "9:16", "1080p", 10, None)
+    assert p == {"prompt": "kedi", "aspect_ratio": "9:16", "resolution": "1080p", "duration": 10}
+    p2 = fal_client.build_payload(FLUX3, "kedi", "9:16", "720p", 5, REFS)
+    assert p2["aspect_ratio"] == "9:16" and p2["duration"] == 5 and "image_url" in p2
+    assert "generate_audio" not in p and "generate_audio" not in p2
+
+
+def test_kling_v3_pro_turns_the_quality_token_into_generate_audio_and_never_sends_resolution():
+    """KALİTE EKSENİ SES EKSENİ: `sesli` → `generate_audio: true`, `sessiz` →
+    `false`; `resolution` HİÇ gitmiyor (şemada yok — `sesli` dizesi oraya
+    sızsa enum dışı bir değer olurdu). Referans kare `start_image_url`
+    (Turbo Pro'nun `image_url`undan FARKLI, biri ötekine kopyalanmadı)."""
+    sesli = fal_client.build_payload(KLING_PRO, "kedi", "16:9", "sesli", 5, None)
+    assert sesli == {"prompt": "kedi", "aspect_ratio": "16:9", "duration": "5",
+                     "generate_audio": True}
+    sessiz = fal_client.build_payload(KLING_PRO, "kedi", "16:9", "sessiz", 5, REFS)
+    assert sessiz["generate_audio"] is False
+    assert "resolution" not in sessiz and "aspect_ratio" not in sessiz
+    assert "start_image_url" in sessiz and "image_url" not in sessiz
+    assert isinstance(sessiz["duration"], str)
+
+
+def test_the_audio_tokens_match_the_catalog_and_the_ses_ekseni_invariant_is_enforced():
+    """Tel sözleşmesi adaptörde literal, katalogda etiketli — ikisi AYNI dize.
+    `TelBicimi` ses eksenini `resolution` ile birlikte ya da `generate_audio`
+    olmadan kabul ETMİYOR: ithal zamanında patlar."""
+    kling_pro = catalog.video_model("fal-kling-v3-pro")
+    assert set(kling_pro.qualities) == {fal_client.SESLI, fal_client.SESSIZ}
+    assert fal_client.ALANLAR["fal-kling-v3-pro"].ses_ekseni is True
+    with pytest.raises(ValueError):
+        fal_client.TelBicimi(metin=frozenset({"prompt", "resolution", "generate_audio"}),
+                             gorsel=frozenset({"prompt", "image_url", "generate_audio"}),
+                             gorsel_alani="image_url", ses_ekseni=True)
+    with pytest.raises(ValueError):
+        fal_client.TelBicimi(metin=frozenset({"prompt"}),
+                             gorsel=frozenset({"prompt", "image_url"}),
+                             gorsel_alani="image_url", ses_ekseni=True)
+
+
+def test_minimax_h3_sends_the_UPPERCASE_resolution_token_and_an_integer_duration():
+    """`768P` fal'ın şemasındaki yazım; katalog jetonu aynı dize, dönüşüm yok.
+    i2v `aspect_ratio` okumuyor (oranı kareden alıyor)."""
+    p = fal_client.build_payload(H3, "kedi", "1:1", "768P", 10, None)
+    assert p == {"prompt": "kedi", "aspect_ratio": "1:1", "resolution": "768P", "duration": 10}
+    p2 = fal_client.build_payload(H3, "kedi", "1:1", "2K", 5, REFS)
+    assert "aspect_ratio" not in p2 and p2["resolution"] == "2K" and "image_url" in p2
+
+
+@pytest.mark.parametrize("tam_yol, uygulama", [
+    ("bytedance/seedance-2.5/text-to-video", "bytedance/seedance-2.5"),
+    ("blackforestlabs/flux-3/image-to-video", "blackforestlabs/flux-3"),
+    ("fal-ai/kling-video/v3/pro/text-to-video", "fal-ai/kling-video"),
+    ("minimax/h3/text-to-video", "minimax/h3"),
+])
+def test_the_queue_path_rule_holds_for_the_new_endpoints_too(tam_yol, uygulama):
+    """Yoklama adresi ilk iki segment (ölçülmüş kural) — yeni uçlarda da:
+    `bytedance/seedance-2.5` ve `minimax/h3` iki segmentte biten yollar, kural
+    onları olduğu gibi bırakıyor."""
+    assert fal_client.queue_app_path(tam_yol) == uygulama
+
+
+def test_the_new_video_models_run_the_same_queue_loop_end_to_end():
+    """Dört model, aynı döngü: submit gövdesi modele göre, geri kalanı bayt bayt Wan'la aynı."""
+    client = FakeClient(*_kuyruk_yanitlari())
+    out = fal_client.generate_video(KLING_PRO, "kedi", "16:9", "sesli", 5, 1,
+                                    client=client, credentials=CREDS)
+    assert out == [MP4]
+    assert client.calls[0]["url"] == "https://queue.fal.run/fal-ai/kling-video/v3/pro/text-to-video"
+    assert client.calls[0]["json"]["generate_audio"] is True
+    assert client.calls[1]["url"] == "https://queue.fal.run/fal-ai/kling-video/requests/abc123/status"

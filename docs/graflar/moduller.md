@@ -82,7 +82,7 @@ flowchart TD
     n_azure_flux_client["azure_flux_client<br/>284 satır"]
     n_azure_mai_client["azure_mai_client<br/>290 satır"]
     n_chat_client["chat_client<br/>218 satır"]
-    n_fal_client["fal_client<br/>1106 satır"]
+    n_fal_client["fal_client<br/>1114 satır"]
     n_gemini_client["gemini_client<br/>295 satır"]
     n_openai_client["openai_client<br/>217 satır"]
     n_prefs["prefs<br/>268 satır"]
@@ -127,7 +127,7 @@ flowchart TD
     n_storage["storage<br/>423 satır"]
   end
   subgraph katman0["katman 0"]
-    n_catalog["catalog<br/>1918 satır"]
+    n_catalog["catalog<br/>1954 satır"]
     n_errlog["errlog<br/>133 satır"]
     n_jsonstore["jsonstore<br/>83 satır"]
     n_kimlik_baglami["kimlik_baglami<br/>56 satır"]
@@ -637,7 +637,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `azure_flux_client.py` | 284 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 2 |
 | `azure_mai_client.py` | 290 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers`, `services.saglayici_meta` | 1 | 2 |
 | `backup.py` | 190 | 4 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 0 | 1 |
-| `catalog.py` | 1918 | 0 | — | 30 | 45 |
+| `catalog.py` | 1954 | 0 | — | 30 | 45 |
 | `chat_client.py` | 218 | 5 | `azure_client`, `chat_prompt`, `i18n`, `kimlik_baglami`, `models` | 4 | 4 |
 | `chat_prompt.py` | 396 | 2 | `paths` | 4 | 1 |
 | `chat_providers.py` | 133 | 7 | `catalog`, `chat_client`, `credstore`, `etiket`, `i18n`, `openai_chat` | 1 | 2 |
@@ -648,7 +648,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `desktop.py` | 588 | 16 | `errlog`, `i18n`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli), `prefs` (erteli) | 1 | 2 |
 | `errlog.py` | 133 | 0 | — | 13 | 2 |
 | `etiket.py` | 118 | 3 | `catalog`, `i18n` | 8 | 1 |
-| `fal_client.py` | 1106 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers`, `services.saglayici_meta` | 1 | 4 |
+| `fal_client.py` | 1114 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers`, `services.saglayici_meta` | 1 | 4 |
 | `folders.py` | 253 | 3 | `i18n`, `jsonstore`, `storage` | 3 | 5 |
 | `gemini_client.py` | 295 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
 | `guncelleme.py` | 379 | 2 | `errlog`, `jsonstore`, `paths`, `version`, `services.db` (erteli) | 1 | 6 |

@@ -399,15 +399,15 @@ birim maliyet ÷ `KREDI_USD_CAPASI`, yuvarlanmış.
 | # | model | sağlayıcı | kimlik | birim maliyet (USD) | kredi | BYOK |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Azure · gpt-image-2 ⭐ | `azure` | `azure_image` | 30/1M jeton · **jeton sayısı ölçülmedi** | 4/8/16 (aynen) | — |
-| 2 | OpenAI · GPT Image 2.5 Sunburst | `openai` | `openai` | 30/1M jeton · ölçülmedi | ölçümle | ✅ |
-| 3 | OpenAI · GPT Image 2.5 Flare | `openai` | `openai` | 30/1M jeton · ölçülmedi | ölçümle | ✅ |
+| 2 | OpenAI · GPT Image 2.5 Sunburst | `openai` | `openai` | 30/1M jeton · 196 / 439 / 1.756 jeton (OpenAI rehberi, 2026-09-23) | **1 / 3 / 11** | ✅ |
+| 3 | OpenAI · GPT Image 2.5 Flare | `openai` | `openai` | Sunburst ile aynı | **1 / 3 / 11** | ✅ |
 | 4 | Gemini · Nano Banana Pro | `gemini` | `gemini` | 0,134 (1K/2K) · 0,24 (4K) | 27 / 48 ✓ | ✅ |
 | 5 | OpenAI · gpt-image-2 | `openai` | `openai` | Azure ile aynı | 4/8/16 (aynen) | ✅ |
 | 6 | Gemini · Nano Banana 2 | `gemini` | `gemini` | 0,067 / 0,101 / 0,151 | **13 / 20 / 30** | ✅ |
 | 7 | Microsoft · MAI-Image 2.5 Pro | `azure-mai` | `azure_foundry` | 0,0481 | 10 ✓ | — |
 | 8 | Black Forest Labs · FLUX.2 pro | `azure-flux` | `azure_foundry` | 0,045 (2 MP) | **9** | — |
 | 9 | Microsoft · MAI-Image 2.6 | `azure-mai` | `azure_foundry` | 0,0389 | 8 ✓ | — |
-| 10 | Alibaba · Qwen Image | `fal` | `fal` | 0,02/MP → 0,04 | **8** | — |
+| 10 | Alibaba · Qwen Image | `fal` | `fal` | metin 0,02/MP → 0,04 · **düzenleme 0,03/MP → 0,06** | **12** (düzenleme fiyatı; tek alan) | — |
 | 11 | ByteDance · Seedream V4 | `fal` | `fal` | 0,03/görsel | **6** | — |
 | 12 | Microsoft · MAI-Image 2.6 Flash | `azure-mai` | `azure_foundry` | 0,0195 | 4 ✓ | — |
 | 13 | Black Forest Labs · FLUX.1 schnell | `fal` | `fal` | 0,003/MP | **1** | — |
@@ -549,8 +549,9 @@ kaynaklı fiyat yorumları, sıra yorumu), `services/planlar.py` (`Plan.rank`,
 notu iki dilde var, adı tekrar etmiyor, jetonlar tutarlı, kısa etiket
 çakışması); i18n eşliği (`test_i18n`); `tarife_kontrol` ↔ bağımsız tarama
 (**0** — on birinci sayı 2026-09-22'de ölçüldü, dört Azure notunun dördü de bu
-görevde düşüyor; D'de **2**: GPT Image 2.5'in kopya kredileri, sahip ölçünce
-düşer); `emeklilik` bekçisi tarih yamalı;
+görevde düşüyor; D'nin ilk commit'inde **2** — GPT Image 2.5'in kopya
+kredileri — aynı gün sahibin jeton tablosu okumasıyla yine **0**); `emeklilik`
+bekçisi tarih yamalı;
 **yeni: basamak bekçisi** (`Plan.rank` ↔ `PLANLAR_KUMESI` sırası, `kapsiyor`
 her (plan, model.plan, anahtar_kaynagi) üçlüsünde beklenen cevabı verir) ve
 **BYOK bekçisi** (kendi anahtarıyla plan eşiği aşılır, ama `Plan.video` ve
@@ -570,11 +571,10 @@ hesabı yorumda kaynaklı.
 
 **Çıkış ölçütü.** Katalog 13 görsel + 10 video ✅ (D, 2026-09-23), her
 girdide sağlayıcı, kaynaklı maliyet (kaynak + erişim tarihi yorumda) ve kredi
-✅; `azure-flux-2-flex` yok ✅; `tarife_kontrol.py` **2 satır** basıyor — **0
-DEĞİL** ve bu dürüst bir bekleme: GPT Image 2.5'in iki girdisi krediyi
-`gpt-image-2`den kopyalıyor (sahibin "alt sınır kalsın" talimatı) ve not
-aracın desenine bilerek uyuyor; sahip `usage.output_tokens`ı ölçünce 0'a
-döner (aşağıda "Sahibin adımı"); emeklilik satırı **0** ✅; Azure'a özel
+✅; `azure-flux-2-flex` yok ✅; `tarife_kontrol.py` **0** ✅ (D'nin ilk
+commit'inde 2 idi — GPT Image 2.5 kopya kredi; sahip OpenAI'nin jeton
+tablosunu aynı gün kaynaktan okudu, 1/3/11 yazıldı, not düştü — aşağıda
+"Sahibin fiyat araştırması"); emeklilik satırı **0** ✅; Azure'a özel
 varsayım yok ✅; kendi anahtarıyla plan eşiği aşılıyor ama filigran ve video
 kuralı aşılmıyor (bekçili, gerçek id'lerle) ✅; i18n eşliği ✅; takım yeşil
 (E2E dahil) ✅.
@@ -718,38 +718,47 @@ liste `fal_client.py` başlığında). Kural: ÜÇ kaynak aynı şeyi söylüyor
 yazıldı. Sonuçları: Seedance 2.5 ve Kling V3 Pro `duration`ı DİZE gönderiyor
 (Kling Turbo deseni), FLUX 3 ve H3 tamsayı; Kling V3 Pro'nun i2v referans alanı
 `start_image_url` (Turbo Pro'nun `image_url`undan farklı — kopyalanmadı);
-Seedance/H3 i2v `aspect_ratio` okumuyor. **MiniMax H3'ün belgedeki 480p (10) ve
-4K (32) kademeleri YAZILMADI**: temel `minimax/h3` ucunun şemasında iki kaynak
-`768P, 2K` diyor, 480P yalnız H3 Max Turbo'da görüldü, 4K tek kaynakta —
-doğrulanmamış jeton seçilebilir bir 422. H3 bu yüzden 12/26 (768P/2K), 10
-değil; Veo Lite (10) kataloğun en ucuz varsayılan kademesi kaldı (Wan 480p ile
-eşit). Canlı 422 ile
-DOĞRULANMADI — sahibin sandbox turu aşağıda.
+Seedance/H3 i2v `aspect_ratio` okumuyor. MiniMax H3'ün 480P (10) ve 4K (32)
+kademeleri ilk commit'te YAZILMAMIŞTI (temel `minimax/h3` ucunun şemasında iki
+kaynak `768P, 2K` diyordu, 480P yalnız H3 Max Turbo'da, 4K tek kaynakta);
+sahip aynı gün fal'ın birinci taraf OpenAPI'sinde dördünü de gördü, üçüncü
+commit ikisini ekledi (aşağıda). Varsayılan 768P (yerel) kaldı; Veo Lite (10)
+kataloğun en ucuz varsayılan kademesi (Wan 480p ve H3 480P ile eşit). **ŞEMA
+TARAFI KAPANDI:** sahip 14 ucu `fal.ai/api/openapi/queue/openapi.json?
+endpoint_id=…` ile karşılaştırdı, `TelBicimi`/`GorselTelBicimi` kümeleri ve
+katalogdaki her süre/oran/çözünürlük jetonu enum'larla UYUŞUYOR. Canlı turda
+açık kalan iki şey: `data:` URI kabulü ve Qwen'in `image_size`ı çıktıya
+uygulaması — sahibin sandbox turu aşağıda.
 
-**SAPMA 3 — GPT Image 2.5 kredisi kopya, `tarife_kontrol` 0 → 2.** Sahibin
-1. girdisi "kopyala, alt sınır kalsın" dedi; jetonlar VE 1/11/42 kredisi
-`openai-gpt-image-2`den kopyalandı, `credits` satırına aracın desenine uyan
-not yazıldı — araç iki satır basıyor ve `tests/test_araclar.py` kümeyi ADIYLA
-bekliyor (`== {sunburst, flare}`). Sahip `usage.output_tokens`ı ölçünce not
-düşer, küme boşalır, test bilinçli güncellenir. 2. girdi (gpt-image-2 ölçümü)
+**SAPMA 3 — GPT Image 2.5 kredisi kopya, `tarife_kontrol` 0 → 2 → 0
+(KAPANDI aynı gün).** Sahibin 1. girdisi "kopyala, alt sınır kalsın" dedi;
+ilk commit jetonları VE 1/11/42 kredisini `openai-gpt-image-2`den kopyaladı,
+`credits` satırına aracın desenine uyan not yazdı, `tests/test_araclar.py`
+kümeyi adıyla bekledi. Üçüncü commit'te (sahibin araştırması, aşağıda) kredi
+kaynaktan 1/3/11 oldu, not düştü, küme `set()`. 2. girdi (gpt-image-2 ölçümü)
 zaten 2026-09-22'de kapanmıştı.
 
 **SAPMA 4 — plan basamağı ÖNERİ, sahip onaylamadı.** 1b-B'nin makinesi B'de
-kuruldu, veri D'de yazıldı: GPT Image 2.5 ×2 `temel` (ölçülmemiş tarifeyi
-ücretsize açmamak), Seedance 2.5 ve FLUX 3 `pro` (5 sn = 475 / 170 kredi,
-`temel`in 1.200'lük ayını iki-üç tıkta eritir), Kling V3 Pro `temel`, MiniMax
-H3 ve üç fal görseli `free`. Bekçisi `test_the_plan_tiers_are_exactly_the_
-proposed_five_and_everything_else_is_free` + gerçek id'li basamak testleri
-(`tests/test_planlar.py`: ücretsiz + platform anahtarı 2.5'i görmez, kendi
-OpenAI anahtarıyla görür — 1b-A; video kuralı aşılmaz — K7). Sahip bir kademeyi
-değiştirirse önce test kırmızı olur, sonra doğru sayıyla yeşile döner.
+kuruldu, veri D'de yazıldı: Seedance 2.5 ve FLUX 3 `pro` (5 sn = 475 / 170
+kredi, `temel`in 1.200'lük ayını iki-üç tıkta eritir), Kling V3 Pro `temel`,
+MiniMax H3 ve BÜTÜN GÖRSELLER `free`. GPT Image 2.5 ×2 ilk commit'te `temel`
+idi ("ölçülmemiş tarifeyi ücretsize açmamak"); sahibin araştırması medium'u 3
+kredi bulunca — `free` gpt-image-2'nin 11'inden ucuz — gerekçe düştü ve ikisi
+üçüncü commit'te `free`ye indi (sahibin kendi önerisi). Bekçisi
+`test_the_plan_tiers_are_exactly_the_proposed_three_videos_and_everything_else_is_free`
++ gerçek id'li basamak testleri (`tests/test_planlar.py`: ücretsiz kullanıcı
+2.5'i iki anahtar kaynağıyla da görür; Kling V3 Pro'yu kendi fal anahtarıyla
+bile görmez — K7). Sahip bir kademeyi değiştirirse önce test kırmızı olur,
+sonra doğru sayıyla yeşile döner.
 
 **SAPMA 5 — E2E'de plan kilidi GİZLEMİYOR, ROZETLİYOR.** Talimat "gated
 modeller satır DEĞİL" diyordu; ön yüzün Faz 3 / 3 kararı (core.js
 `secilebilirler`: "görünmezse kullanıcı modelin VAR olduğunu bile bilmez") plan
-kilidini rozetle gösteriyor. E2E kurulu karara uydu: ücretsiz kullanıcıda GPT
-Image 2.5 satırları "not in your plan" rozetiyle VAR, schnell rozetsiz;
-schnell ile üretim uçtan uca (sahte sağlayıcı → filigranlı işçi → panel
+kilidini rozetle gösteriyor. E2E kurulu karara uydu: ilk commit'te ücretsiz
+kullanıcıda GPT Image 2.5 satırları "not in your plan" rozetiyle VARDI; 2.5
+`free`ye inince görselde kilitli girdi kalmadı ve test rozetli kümeyi
+katalogdan türetip "tam o küme, bugün boş" diye ölçüyor (13 satır, sıfır
+rozet), schnell rozetsiz; schnell ile üretim uçtan uca (sahte sağlayıcı → filigranlı işçi → panel
 `bitti` → DB'de 1 kredi → "199 left"). ÖLÇÜLEN TUZAK: conftest'in autouse
 `_anahtar_kapisi`si `check_anahtar`ı "kullanici" yamalıyor — ilk koşumda dökümde
 platform rozetleri doğruyken iş "kendi anahtarı" sayıldı, rezerv düşmedi;
@@ -798,6 +807,34 @@ değil" diye reddediyordu (PNG yazıcı o modları bilmiyor); önce RGB/RGBA'ya
 çevriliyor. (4) `tarife_kontrol.bugun()` UTC günü okuyor (deponun öteki
 saatleri gibi; yerel gün sınırı 30 günlük ufku kaydırıyordu).
 
+**Sahibin fiyat araştırması (#80 yorumu, üçüncü commit).** Canlı üretim
+yapılmadan, sağlayıcının kendi yayınından. (1) **GPT Image 2.5 kredisi 1/3/11**:
+OpenAI rehberinin hesaplayıcısı `jeton = ceil(g×o×(2e6+W×H)/4e6)`, katsayılar
+2.5'te low 16 · medium 24 · high 48 (· xhigh 64 · max 96); gpt-image-2'nin
+16/48/96'sı 1024²'de 196/1.756/7.024 veriyor — 2026-09-22'nin canlı ölçümüyle
+birebir, yani tablo ölçümle tutan kural. 2.5: 196/439/1.756 → 1/3/11; kopya
+1/11/42 medium'da ×3,7 fazla alıyordu. Not düştü, `tarife_kontrol` **0**;
+`test_gpt_image_2_5_…OWN_token_table` krediyi jetondan türetiyor. `xhigh`/`max`
+(19/42) eklenmedi — açık seçenek. **Plan `temel` → `free`** (yukarıda SAPMA 4).
+İki bilinen sapma AÇIK bırakıldı: dikey/yatay kareden ~%25 ucuz (2.5 medium
+343 → 2, high 1.372 → 8) ama katalog her boyuta kare fiyatını yazıyor — boyut
+başına kredi ekseni yok, ayrı karar; görsel GİRDİ jetonu (8 USD/1M, düzenlemede
+yüksek ayrıntı) krediye girmiyor — düzenleme istekleri hesabımızdan pahalı,
+ölçülmedi. OpenAI bu modeller için API Organization Verification isteyebiliyor
+→ BYOK kullanıcısının 403'ü buradan gelebilir (catalog.py blok yorumu). (2)
+**Qwen düzenleme 0,03 USD/MP** (metin 0,02): tek `credits` alanı düzenleme
+için ayrı fiyat taşıyamıyor (`cost_for`, iki rota, `isci._kredi`, `core.js` üç
+yer); `credits=12` yazıldı — metin üretimi 4 kredi fazla öder, düzenleme
+zararda kalmaz. `credits_edit` ekseni doğru ama yeni eksen; ayrı karar. (3)
+**H3 480P (10) / 4K (32)** eklendi, `QUALITY_LABELS["480P"]` Wan'ın 480p
+etiketini paylaşıyor; varsayılan 768P. (4) fal fiyatlarının kalanı tuttu
+(Seedream 6, schnell 1, Seedance 44/95, FLUX 3 34/58, Kling V3 Pro 22/34);
+Seedance 1080p (1,164 USD/sn → **233**) şemada var, EKLENMEDİ — 5 sn = 1.165
+kredi, `pro`nun 4.500'lük ayının dörtte biri; açık seçenek. FLUX 3'ün
+`generate_audio`su şemada var (öntanımlı açık), gönderilmiyor — yorum düzeltildi.
+"Dört ücretsiz fal girdisini tur bitene kadar `temel` yap" önlemi şema
+kapandığı için gündemden düştü.
+
 **`emeklilik: date | None`** `ImageModel`a girdi, hiçbir girdi doldurmuyor;
 `tarife_kontrol` "30 gün içinde emekli olacak model" satırını basıyor (bugün
 "yok"), bekçisi tarih yamalı + sentetik girdili (`tests/test_araclar.py`).
@@ -815,16 +852,18 @@ metni düzeltildi), `tests/test_catalog.py`, `tests/test_planlar.py`,
 ("kopyala, alt sınır kalsın") ✅ uygulandı, 2. girdi (gpt-image-2 ölçümü) ✅
 2026-09-22. Açık kalan üç şey, hepsi sahibin anahtarıyla:
 
-1. **GPT Image 2.5'in kredisi** — `flare` ve `sunburst` için 1024×1024'te
-   `low`/`medium`/`high` birer üretim, yanıttaki `usage.output_tokens`;
-   sayı gelince `credits_by_quality` ve not düzelir, `tarife_kontrol` 2 → 0.
-2. **Plan basamağı** — yukarıdaki beş kademe (SAPMA 4) onay ya da düzeltme;
-   düzeltme tek yer (`catalog.py` `plan=`) + bekçi.
-3. **fal sandbox turu** — yedi yeni fal modelinde birer üretim (görselde
-   `960x960`/`1328x1328`/`1024x1024`, videoda 5 sn 16:9): uç yolları ve alan
-   adları canlı doğrulanır; 422 çıkarsa `fal_client.ALANLAR`/`GORSEL_ALANLAR`
-   tek yerden düzelir. Ayrıca H3'te 480P/4K kademeleri gerçekten varsa
-   (sandbox 422 vermezse) 10/32 kredilerle eklenir.
+1. ~~GPT Image 2.5'in kredisi~~ ✅ kaynaktan (OpenAI jeton tablosu, 1/3/11,
+   üçüncü commit); canlı `usage.output_tokens` sağlaması isteğe bağlı.
+2. **Plan basamağı** — üç video kademesi (SAPMA 4; 2.5 `free`ye indi) onay ya
+   da düzeltme; düzeltme tek yer (`catalog.py` `plan=`) + bekçi.
+3. **fal sandbox turu** — riske göre: Kling V3 Pro (`start_image_url` +
+   `generate_audio`), Seedance (dize `duration`), Qwen düzenleme (`image_url` +
+   `image_size` — seçilen boyut çıktıda tutuyor mu?), kalanlar. Şema tarafı
+   birinci taraf OpenAPI'yle kapandı; canlı soru `data:` URI kabulü ve Qwen
+   `image_size`. 422 çıkarsa `fal_client.ALANLAR`/`GORSEL_ALANLAR` tek yerden.
+4. **Açık seçenekler** (karar sahibin): 2.5'e `xhigh`/`max` (19/42); Seedance
+   1080p (233); Qwen için `credits_edit` ekseni; boyut başına kredi (dikey/
+   yatay ~%25 ucuz); görsel girdi jetonunun krediye alınması.
 
 **Bağımlılıklar.** 1'den sonra (girdi silinmiş, yorumlar yerinde); 2-4'ten
 BAĞIMSIZ — omurgayla paralel gidebilir; 7 (operasyon) bu görevin sağlayıcı
@@ -2011,5 +2050,9 @@ sağlayıcı değil.
   `apps/sim/lib/media/falai-video.ts`, TanStack/ai `packages/ai-fal`
   (görsel alan adı tablosu), sandbaseai/sandbase-docs (H3 `768P, 2K`),
   Comfy-Org/ComfyUI `comfy_api_nodes/nodes_minimax.py`. Kural ("üç kaynak")
-  ve sonuçları §1b "Yapıldığında (D)" SAPMA 2; canlı doğrulama sahibin
+  ve sonuçları §1b "Yapıldığında (D)" SAPMA 2. Aynı gün sahip 14 ucu fal'ın
+  BİRİNCİ TARAF OpenAPI'siyle (`fal.ai/api/openapi/queue/openapi.json?
+  endpoint_id=…`) karşılaştırdı, uyuşmazlık yok (PR #80 yorumu); fiyatlar
+  `fal.ai/models/<uç>` sayfalarından, GPT Image 2.5 jetonları OpenAI görsel
+  üretim rehberi "Cost and latency" hesaplayıcısından. Canlı doğrulama sahibin
   sandbox turu.

@@ -188,7 +188,11 @@ ALANLAR: dict[str, TelBicimi] = {
         sure_dize=True,
     ),
     # ── Faz 4 / 1b-D (2026-09-23): dört yeni model. Kaynaklar ve "üç kaynak
-    # kuralı" dosya başlığında; hiçbiri canlı 422 ile doğrulanmadı.
+    # kuralı" dosya başlığında. Aynı gün sahip 14 ucu fal'ın BİRİNCİ TARAF
+    # OpenAPI'siyle (`fal.ai/api/openapi/queue/openapi.json?endpoint_id=…`)
+    # karşılaştırdı: alan kümeleri ve enum'lar UYUŞUYOR (PR #80 yorumu).
+    # Canlı 422 ile doğrulanmadı; açık kalan iki şey `data:` URI kabulü ve
+    # Qwen'in `image_size`ı çıktıya uygulaması.
     #
     # Seedance 2.5: `duration` şemada DİZE enum (Kling'in deseni — hermes-agent
     # bu modelde `duration_int` bayrağını TAŞIMIYOR, OpenChatCut `'12'` dize
@@ -208,7 +212,11 @@ ALANLAR: dict[str, TelBicimi] = {
     # FLUX 3: `duration` TAMSAYI (şema `"auto" | 5..20`; hermes `duration_int`),
     # `aspect_ratio` ve `resolution` İKİ uçta da okunuyor (artcraft'ın i2v
     # struct'ı ikisini de taşıyor, atlascloud i2v'ye `aspect_ratio` gönderiyor).
-    # Ses yerleşik ve fiyata dahil; bir ses anahtarı BEYAN EDİLMİYOR.
+    # Ses fiyata dahil; şemada `generate_audio` VAR (öntanımlı `true`) ama
+    # GÖNDERİLMİYOR — ses hep açık geliyor, kalite ekseni çözünürlük. Anahtarı
+    # kümeye almak `ses_ekseni` ya da sabit True demek olurdu; ikisi de
+    # bugünkü davranışı değiştirmez, o yüzden yalın bırakıldı (sahibin
+    # OpenAPI okuması, PR #80 yorumu).
     "fal-flux-3": TelBicimi(
         metin=frozenset({"prompt", "resolution", "aspect_ratio", "duration"}),
         gorsel=frozenset({"prompt", "image_url", "resolution", "aspect_ratio",

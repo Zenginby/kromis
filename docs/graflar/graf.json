@@ -339,7 +339,7 @@
         "veo_client"
       ],
       "katman": 0,
-      "satir": 1918,
+      "satir": 1954,
       "testler": [
         "tests/test_admin.py",
         "tests/test_araclar.py",
@@ -645,7 +645,7 @@
         "providers"
       ],
       "katman": 5,
-      "satir": 1106,
+      "satir": 1114,
       "testler": [
         "tests/test_fal_client.py",
         "tests/test_fal_client_gorsel.py",

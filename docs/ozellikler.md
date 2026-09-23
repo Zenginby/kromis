@@ -24,7 +24,7 @@ Kurulum ve çalıştırma: [KURULUM.md](../KURULUM.md) · depo haritası:
 * **Oturum Yönetimi & Kebap Menüsü:** Sohbet geçmişleri diske saklanır (`output/chats.json`), kenar panelinde listelenir. Üst şeritteki kebap menüsü (`#chats-kebab`) ile oturumlar yeniden adlandırılabilir, temizlenebilir veya toplu olarak silinebilir.
 
 ### 🖼️ 2. Görsel Üretimi & Çoklu Referans Düzenleme
-* **Çoklu Sağlayıcı Entegrasyonu:** Azure OpenAI (`gpt-image-2`), OpenAI (`gpt-image-2`, **GPT Image 2.5 Sunburst / Flare** — 2026-09-23), Google Gemini (Nano Banana 2 / Nano Banana Pro), Azure AI Foundry (MAI-Image 2.5 Pro / 2.6 / 2.6 Flash, FLUX.2 pro) ve **fal.ai görsel** (Alibaba Qwen Image, ByteDance Seedream V4, Black Forest Labs FLUX.1 schnell — 2026-09-23) üretimi (1-4 görsel). **Katalog 13 görsel + 10 video** ve sıra sahibin kaliteli→ucuz listesi (docs/faz4-odeme-abonelik-kvkk.md §1b); FLUX.1 schnell **1 kredilik** ücretsiz-plan modeli, GPT Image 2.5 `temel` basamağında (kendi OpenAI anahtarı eşiği aşar). GPT Image 2.5'in kredisi `gpt-image-2`den kopya (sahibin ölçümü bekleniyor, `tools/tarife_kontrol.py` 2 satır basıyor). Gemini'de piksel boyutu yerine oran (1:1 … 21:9) ve 1K/2K/4K çözünürlük seçiliyor. *DALL-E 3 12 Mayıs 2026'da OpenAI API'sinden kalktığı için katalogdan çıkarıldı; `gpt-image-1` de 23 Ekim 2026 emekliliğinden önce, 2026-09-21'de çıkarıldı.*
+* **Çoklu Sağlayıcı Entegrasyonu:** Azure OpenAI (`gpt-image-2`), OpenAI (`gpt-image-2`, **GPT Image 2.5 Sunburst / Flare** — 2026-09-23), Google Gemini (Nano Banana 2 / Nano Banana Pro), Azure AI Foundry (MAI-Image 2.5 Pro / 2.6 / 2.6 Flash, FLUX.2 pro) ve **fal.ai görsel** (Alibaba Qwen Image, ByteDance Seedream V4, Black Forest Labs FLUX.1 schnell — 2026-09-23) üretimi (1-4 görsel). **Katalog 13 görsel + 10 video** ve sıra sahibin kaliteli→ucuz listesi (docs/faz4-odeme-abonelik-kvkk.md §1b); FLUX.1 schnell **1 kredilik** ücretsiz-plan modeli, GPT Image 2.5 `free` (medium 3 kredi — OpenAI'nin yayınlanmış jeton tablosundan 1/3/11, `gpt-image-2`nin 1/11/42'sinden ucuz; `tools/tarife_kontrol.py` 0 satır). Qwen Image 12 kredi (düzenleme ucunun 0,03 USD/MP fiyatı; tek kredi alanı). Gemini'de piksel boyutu yerine oran (1:1 … 21:9) ve 1K/2K/4K çözünürlük seçiliyor. *DALL-E 3 12 Mayıs 2026'da OpenAI API'sinden kalktığı için katalogdan çıkarıldı; `gpt-image-1` de 23 Ekim 2026 emekliliğinden önce, 2026-09-21'de çıkarıldı.*
 * **Sağlayıcı İşareti:** Her iki model şeridi (görsel ve Prompt Yönetmeni) seçili modelin sağlayıcısını bir işaretle de gösteriyor — Gemini modelinde Gemini, OpenAI'de OpenAI, Azure'da Azure. Model değişince işaret de değişiyor.
 * **Alttan Açılan Model Seçici:** Stüdyo'daki model çipine dokununca alttan bir panel yükseliyor ve her model bir kart olarak listeleniyor: sağlayıcı işareti, adı, **ne işe yaradığını anlatan bir satır** ve kredi aralığı. O tanıtım metni daha önce yalnızca `title` özniteliğindeydi, yani telefonda hiç görünmüyordu. Seçili kart arayüz temasının rengiyle işaretleniyor (Monokrom / Okyanus / Amber / Menekşe) ve seçim dokunduğun an geçerli oluyor. Aynı panel Yönetmen modelinde de kullanılıyor; **Ayarlar** da aynı yüzeye taşındı ve "Kaydet" artık panelin dibinde, kaydırmadan erişilebilir yerde duruyor.
 * **Çoklu Referans Görsel Bindirme:** Düzenleme (Inpainting / Edits) modunda ana referans görselin yanına en fazla 3 ek referans görsel eklenebilir.
@@ -68,7 +68,7 @@ Kurulum ve çalıştırma: [KURULUM.md](../KURULUM.md) · depo haritası:
     Bitiş karesi desteklemiyor.
   - **PixVerse C1** — 720p/1080p, 5/10/15 sn (Veo'nun 8 sn tavanını aşan iki
     modelden biri), oran 16:9·9:16·1:1. Ucuz fal kademesi (13 kredi/sn; en
-    ucuzu 2026-09-23'ten beri MiniMax H3, 12). Metin→video
+    ucuz varsayılan kademe 2026-09-23'ten beri MiniMax H3, 12). Metin→video
     CANLI DOĞRULANDI (2026-09-14). **Görsel→video tel alan adı yalnız fal'ın
     OpenAPI ŞEMASINDAN ölçüldü** (`image_url`), canlı üretimle sınanmadı —
     bütçe dışı kaldı (~0,33 USD, ayrı bir tur gerekir). Bitiş karesi
@@ -86,13 +86,13 @@ Kurulum ve çalıştırma: [KURULUM.md](../KURULUM.md) · depo haritası:
     (480p/720p sesli, 5/10/15 sn, `pro` basamağı — saniyesi 95 kredi, katalogun
     en pahalısı), Black Forest Labs **FLUX 3** (720p/1080p, yerleşik ses,
     `pro`), Kling **V3 Pro** (kalite ekseni SES ekseni: sessiz/sesli →
-    `generate_audio`, `temel`), MiniMax **H3** (768P/2K, sesi yerleşik; belgedeki
-    480p/4K kademeleri şemada doğrulanamadığı için beyan edilmedi).
+    `generate_audio`, `temel`), MiniMax **H3** (480P/768P/2K/4K, sesi yerleşik;
+    dört kademe fal'ın birinci taraf şemasından, varsayılan 768P yerel).
   - **Kredi tarifesi** (1 kredi = 0,005 USD, seçilmiş oran — 1b-F):
     Wan 480p/720p/1080p → 10/20/40 kredi/sn; PixVerse 720p/1080p → 13/24
     kredi/sn; Kling Turbo düz 28 kredi/sn (çözünürlükten bağımsız); Seedance
     2.5 480p/720p → 44/95; FLUX 3 720p/1080p → 34/58; Kling V3 Pro
-    sessiz/sesli → 22/34; MiniMax H3 768P/2K → 12/26.
+    sessiz/sesli → 22/34; MiniMax H3 480P/768P/2K/4K → 10/12/26/32.
   - ⚠️ **Bilinen sınır — ölçüldü (2026-09-15, Görev 8).** fal, referans kare
     (Wan'da `start_image_url`) için görselin **en az 240×240 piksel**
     olmasını istiyor; altında kalan bir görsel fal'ın kendi İngilizce `422`

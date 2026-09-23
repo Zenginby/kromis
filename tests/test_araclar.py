@@ -163,15 +163,15 @@ def test_the_tool_finds_exactly_the_models_whose_price_comment_says_unverified_d
     assert {b.model for b in bulgular} == set(beklenen), (
         "araç ile bağımsız tarama ayrıştı — yorum bölgesi kuralı (tools/tarife_kontrol.py başlığı) değişti mi?")
     assert {b.model: list(b.satirlar) for b in bulgular} == beklenen
-    # KÜME TAM OLARAK GPT IMAGE 2.5'İN İKİ GİRDİSİ (2026-09-23, Faz 4 / 1b-D):
-    # 2026-09-22'de dört Azure notu düşüp küme boşalmıştı (o gün buradaki
-    # iddia `== {}` idi); D PR'ı krediyi `gpt-image-2`den kopyalayan iki girdi
-    # ekledi ve notu aracın desenine BİLEREK uydurdu — sahip `usage` ölçünce
-    # not düşer, bu iddia yine `== set()` olur. Küme burada ADIYLA yazılı,
-    # çünkü "hangi girdiler doğrulama bekliyor" sorusunun cevabı bir PR
-    # kararı: başka bir girdiye not sızarsa burası kırmızı olur.
-    assert set(beklenen) == {"openai-gpt-image-2-5-sunburst", "openai-gpt-image-2-5-flare"}, (
-        f"katalogda beklenmeyen doğrulanmamış tarife notu var: {sorted(beklenen)}")
+    # KÜME BOŞ (2026-09-23, Faz 4 / 1b-D üçüncü commit): 2026-09-22'de dört
+    # Azure notu düşmüştü; D'nin ilk commit'i GPT Image 2.5'in iki kopya
+    # kredisini aracın desenine BİLEREK uydurdu (`== {sunburst, flare}`), aynı
+    # gün sahip OpenAI'nin jeton tablosunu kaynaktan okudu (1/3/11) ve not
+    # düştü. Küme burada ADIYLA (boş) yazılı, çünkü "hangi girdiler doğrulama
+    # bekliyor" sorusunun cevabı bir PR kararı: bir girdiye not sızarsa burası
+    # kırmızı olur.
+    assert set(beklenen) == set(), (
+        f"katalogda doğrulanmamış tarife notu var: {sorted(beklenen)}")
     # Her id gerçekten katalogda (görsel ya da video); krediler katalogdaki
     # gerçek değerler, USD çapayla (`KREDI_USD_CAPASI`).
     idler = {m.id for m in catalog.IMAGE_MODELS} | {m.id for m in catalog.VIDEO_MODELS}
@@ -248,16 +248,17 @@ def test_the_tool_prints_every_flagged_model_with_its_credits_and_expected_usd()
             assert s in out, "eşleşen yorum satırı basılır: sahip 'neden listede' sorusunu buradan okur"
 
 
-def test_the_tool_reports_the_two_copied_tariffs_and_no_retirements_and_exits_zero(capsys):
-    """Bugünkü GERÇEK çıktı (2026-09-23): GPT Image 2.5'in iki kopya kredisi bekliyor, emekli olan yok.
+def test_the_tool_reports_no_pending_tariffs_and_no_retirements_and_exits_zero(capsys):
+    """Bugünkü GERÇEK çıktı (2026-09-23): notlu model yok, emekli olan yok.
 
-    2026-09-22'de bu test "notlu model yok" diyordu (dört Azure notu düşmüştü);
-    D PR'ı iki not ekledi ve emeklilik satırını getirdi. Çıkış kodu yine 0 —
-    araç rapor, kapı değil."""
+    D PR'ının ilk commit'inde bu test "2 model dogrulama bekliyor" diyordu (GPT
+    Image 2.5'in kopya kredileri); aynı gün sahip jeton tablosunu kaynaktan
+    okuyunca not düştü. Emeklilik satırı D ile geldi. Çıkış kodu 0 — araç
+    rapor, kapı değil."""
     assert tarife_kontrol.main([]) == 0
     out = capsys.readouterr().out
-    assert out.startswith("2 model dogrulama bekliyor")
-    assert "openai-gpt-image-2-5-sunburst" in out and "openai-gpt-image-2-5-flare" in out
+    assert out.startswith("notlu model yok")
+    assert "openai-gpt-image-2-5" not in out
     assert out.rstrip().endswith("30 gun icinde emekli olacak model yok.")
     assert tarife_kontrol.rapor([]).startswith("notlu model yok")
 

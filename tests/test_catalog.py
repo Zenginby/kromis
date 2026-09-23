@@ -6,6 +6,7 @@ sessiz bir 422 ya da kaydedilemeyen bir oturum olur.
 """
 import ast
 import pathlib
+from decimal import ROUND_HALF_UP, Decimal
 
 import pytest
 
@@ -973,35 +974,51 @@ def test_the_ranked_lists_carry_thirteen_images_and_ten_videos():
 # sayıyla yeşile döner — sessiz kayma yok.
 
 PLAN_BASAMAGI = {
-    "openai-gpt-image-2-5-sunburst": "temel",
-    "openai-gpt-image-2-5-flare": "temel",
+    # GPT Image 2.5 ×2 ilk sürümde `temel` idi; sahibin fiyat araştırması
+    # (PR #80 yorumu) medium'u 3 kredi buldu — `free` gpt-image-2'nin 11'inden
+    # ucuz — ve basamak gerekçesi fiyat olduğu için ikisi `free`ye indi.
     "fal-seedance-2-5": "pro",
     "fal-flux-3": "pro",
     "fal-kling-v3-pro": "temel",
 }
 
 
-def test_the_plan_tiers_are_exactly_the_proposed_five_and_everything_else_is_free():
+def test_the_plan_tiers_are_exactly_the_proposed_three_videos_and_everything_else_is_free():
     for m in catalog.IMAGE_MODELS + catalog.VIDEO_MODELS:
         assert m.plan == PLAN_BASAMAGI.get(m.id, "free"), f"{m.id}: plan={m.plan}"
+    assert all(m.plan == "free" for m in catalog.IMAGE_MODELS), "görselde basamak yok (2026-09-23)"
 
 
-def test_gpt_image_2_5_is_a_COPY_of_gpt_image_2_as_a_lower_bound():
-    """Sahibin talimatı ("jetonları gpt-image-2'den KOPYALA, alt sınır kalsın"):
-    iki 2.5 girdisinin yetenek jetonları VE kredisi `openai-gpt-image-2` ile
-    birebir. Ayrışırsa iki şeyden biri olmuş demek: ya sahip 2.5'i ölçtü (o
-    zaman bu test bilinçli güncellenir ve `tarife_kontrol` notu düşer) ya da
-    biri kopyayı sessizce "iyileştirdi" — ikincisi seçilebilir bir 400.
+GPT25_JETON_1024 = {"low": 196, "medium": 439, "high": 1756}
+OPENAI_CIKTI_USD_PER_JETON = Decimal("30") / Decimal(1_000_000)
+
+
+def test_gpt_image_2_5_shares_gpt_image_2s_capabilities_but_carries_OpenAIs_OWN_token_table():
+    """Yetenek jetonları `openai-gpt-image-2`den kopya (sahibin talimatı, canlı
+    sınanmadı → eksik beyan yalnız bir yeteneği kullanmamak); KREDİ ise kopya
+    DEĞİL: OpenAI rehberinin 1024×1024 jeton tablosu (196 / 439 / 1.756) × 30
+    USD/1M ÷ çapa → 1 / 3 / 11. İlk sürüm 1/11/42 kopyalıyordu ve medium'da
+    ×3,7 fazla alıyordu (sahibin araştırması, PR #80 yorumu). Bu test krediyi
+    jetondan TÜRETİYOR ki tabloyu değiştiren kişi çapayı da görsün; `xhigh`/
+    `max` bilerek yok (19 / 42 — ayrı karar).
     """
     kaynak = catalog.image_model("openai-gpt-image-2")
+    assert kaynak is not None
     for kimlik, tel in (("openai-gpt-image-2-5-sunburst", "gpt-image-2.5-sunburst"),
                         ("openai-gpt-image-2-5-flare", "gpt-image-2.5-flare")):
         m = catalog.image_model(kimlik)
         assert m is not None and m.provider == "openai" and m.credential == "openai"
-        assert m.wire_model == tel
+        assert m.wire_model == tel and m.plan == "free"
         for alan in ("sizes", "qualities", "default_quality", "max_n", "images_per_request",
-                     "supports_edit", "max_refs", "credits", "credits_by_quality"):
+                     "supports_edit", "max_refs"):
             assert getattr(m, alan) == getattr(kaynak, alan), f"{kimlik}.{alan} kopya değil"
+        beklenen = {k: int((Decimal(j) * OPENAI_CIKTI_USD_PER_JETON / catalog.KREDI_USD_CAPASI)
+                           .quantize(Decimal(1), rounding=ROUND_HALF_UP))
+                    for k, j in GPT25_JETON_1024.items()}
+        assert beklenen == {"low": 1, "medium": 3, "high": 11}, beklenen
+        assert dict(m.credits_by_quality) == beklenen, f"{kimlik}: {m.credits_by_quality}"
+        assert m.credits == beklenen[m.default_quality] == 3
+        assert m.credits_by_quality != kaynak.credits_by_quality, "2.5 kopya kalmış"
 
 
 def test_schnell_jetonlari_BIR_megapikselin_ALTINDA():
@@ -1020,10 +1037,14 @@ def test_schnell_jetonlari_BIR_megapikselin_ALTINDA():
 
 
 def test_qwen_jetonlari_IKI_megapikseli_ASMIYOR():
-    """`credits=8` = 0,02 USD/MP × 2 MP: kümeden biri 2 MP'yi aşarsa üç MP
-    sayılır ve kredi 12 olur — etiket yalan söyler."""
+    """`credits=12` = 0,03 USD/MP (DÜZENLEME ucu, katalogdaki tek alan) × 2 MP:
+    kümeden biri 2 MP'yi aşarsa üç MP sayılır ve kredi 18 olur — etiket yalan
+    söyler. Metin ucu 0,02/MP → 8 olurdu; 12 seçildi ki düzenleme zararda
+    kalmasın (catalog.py blok yorumu, sahibin araştırması PR #80)."""
     m = catalog.image_model("fal-qwen-image")
-    assert m is not None and m.sizes is catalog.QWEN_SIZES and m.credits == 8
+    assert m is not None and m.sizes is catalog.QWEN_SIZES and m.credits == 12
+    assert round(0.03 * 2 / float(catalog.KREDI_USD_CAPASI)) == 12
+    assert round(0.02 * 2 / float(catalog.KREDI_USD_CAPASI)) == 8, "metin ucu fiyatı — bilerek YAZILMADI"
     for jeton in m.sizes:
         w, h = (int(p) for p in jeton.split("x"))
         assert 1_000_000 < w * h <= 2_000_000, f"{jeton}: {w * h} piksel, 1–2 MP bandı dışında"
@@ -1147,11 +1168,11 @@ def test_fal_credits_are_derived_from_MEASURED_usd_per_second():
     #     Seedance 2.5  720p sesli $0,473 · 480p sesli $0,2205 → 95 · 44
     #     FLUX 3        720p $0,17 · 1080p $0,29               → 34 · 58
     #     Kling V3 Pro  sessiz $0,112 · sesli $0,168           → 22 · 34
-    #     MiniMax H3    768P $0,06 · 2K $0,13                  → 12 · 26
+    #     MiniMax H3    480P $0,05 · 768P $0,06 · 2K $0,13 · 4K $0,16 → 10 · 12 · 26 · 32
     #
-    # Belge H3 için 480p (10) ve 4K (32) de yazıyor; şemada üç kaynakla
-    # görülmedi, beyan edilmedi (catalog.py blok yorumu) — kademe eklenirse
-    # bu satır bilinçli güncellenir.
+    # H3'ün 480P/4K'sı ilk sürümde YOKTU (üç kaynakla görülmedi); sahibin
+    # birinci taraf OpenAPI okuması (PR #80 yorumu, 2026-09-23) dördünü de
+    # doğruladı, ikisi eklendi. Varsayılan 768P (yerel) kaldı.
     seedance = catalog.video_model("fal-seedance-2-5")
     flux3 = catalog.video_model("fal-flux-3")
     kling_pro = catalog.video_model("fal-kling-v3-pro")
@@ -1159,7 +1180,8 @@ def test_fal_credits_are_derived_from_MEASURED_usd_per_second():
     assert dict(seedance.credits_by_quality) == {"480p": 44, "720p": 95} and seedance.credits == 95
     assert dict(flux3.credits_by_quality) == {"720p": 34, "1080p": 58} and flux3.credits == 34
     assert dict(kling_pro.credits_by_quality) == {"sessiz": 22, "sesli": 34} and kling_pro.credits == 22
-    assert dict(h3.credits_by_quality) == {"768P": 12, "2K": 26} and h3.credits == 12
+    assert dict(h3.credits_by_quality) == {"480P": 10, "768P": 12, "2K": 26, "4K": 32}
+    assert h3.credits == 12 and h3.default_quality == "768P" and h3.qualities == ("480P", "768P", "2K", "4K")
     # Çapa gerçekten bölüyor: 0,473 / 0,005 = 94,6 → 95; 0,112 / 0,005 = 22,4 → 22.
     assert round(0.473 / float(catalog.KREDI_USD_CAPASI)) == 95
     assert round(0.112 / float(catalog.KREDI_USD_CAPASI)) == 22
@@ -1203,7 +1225,10 @@ def test_MALIYET_ustunlugu_iddia_eden_VIDEO_notu_SAGLAYICI_ICINDE_dogru():
             _maliyet_iddiasini_sina(m, grup, provider)
 
 
-_COZUNURLUK_JETONLARI = ("480p", "720p", "1080p")
+# `768p`/`4k` H3 ile geldi (2026-09-23). Karşılaştırma KÜÇÜK HARFLE: fal H3'ün
+# jetonlarını `480P`/`768P` yazıyor (tele olduğu gibi gidiyor), kullanıcı ise
+# etiketi ("480p · SD", Wan'la paylaşılan) görüyor ve not da öyle konuşuyor.
+_COZUNURLUK_JETONLARI = ("480p", "720p", "768p", "1080p", "4k")
 
 
 def test_COZUNURLUK_iddia_eden_VIDEO_notu_GORUNUR_bir_jetona_dayanir():
@@ -1227,10 +1252,11 @@ def test_COZUNURLUK_iddia_eden_VIDEO_notu_GORUNUR_bir_jetona_dayanir():
     """
     for m in catalog.VIDEO_MODELS:
         notu = i18n.t(m.note, "tr").lower()
+        kucuk = {q.lower() for q in m.qualities}
         for jeton in _COZUNURLUK_JETONLARI:
             if jeton not in notu:
                 continue
-            assert jeton in m.qualities, (
+            assert jeton in kucuk, (
                 f"{m.id}: not {jeton!r} diyor ama qualities'te yok "
                 f"({m.qualities})")
             assert m.quality_hidden is False, (

@@ -622,27 +622,46 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
     # varsayılan iddialarını ve `prefs` doğrulamasını birlikte değiştirir;
     # (2) 2.5'in yetenek jetonları bu depoda DOĞRULANMADI.
     #
-    # YETENEK JETONLARI `openai-gpt-image-2`DEN KOPYALANDI — ALT SINIR. Sahibin
-    # talimatı (belge §1b "Sahibin adımı" 1): "jetonları `gpt-image-2`den
-    # KOPYALA, alt sınır kalsın". Belge 2.5 için `low…xhigh, max, auto` kalite
-    # kümesi yazıyor ama bu depoda hiçbir jeton canlı sınanmadı: doğrulanmamış
-    # jeton beyan etmek arayüzde seçilebilir bir 400, eksik beyan yalnızca bir
-    # yeteneği kullanmamak (`openai-gpt-image-2` girdisinin kurulmuş deseni).
+    # YETENEK JETONLARI `openai-gpt-image-2`DEN KOPYALANDI. Sahibin talimatı
+    # (belge §1b "Sahibin adımı" 1): "jetonları `gpt-image-2`den KOPYALA".
+    # OpenAI rehberi 2.5 için `low…xhigh, max, auto` kalite kümesi yazıyor ama
+    # bu depoda hiçbir jeton canlı sınanmadı: doğrulanmamış jeton beyan etmek
+    # arayüzde seçilebilir bir 400, eksik beyan yalnızca bir yeteneği
+    # kullanmamak (`openai-gpt-image-2` girdisinin kurulmuş deseni). `xhigh`
+    # (3.122 jeton → 19) ve `max` (7.024 → 42) bu yüzden YOK; eklenmesi
+    # ayrı karar (belge §1b "Yapıldığında (D)").
     #
-    # KREDİ DE KOPYA ve `tools/tarife_kontrol.py` bunu SAYIYOR (0 → 2): iki
-    # girdinin `credits` satırındaki not aracın desenine ("fiyat" +
-    # "doğrulanamadı") BİLEREK uyuyor. OpenAI 2.5 için de 30 USD/1M çıktı jetonu
-    # yazıyor ama kalite başına JETON SAYISI yayınlanmadı ve 2.5 başka bir
-    # mimari — gpt-image-2'nin ölçülen 196 / 1.756 / 7.024'ü burada yalnız ALT
-    # SINIR. Sahip `usage.output_tokens`ı ölçünce (1024×1024, üç kalite) not
-    # düşer, sayı düzelir; geçmiş kayıtlar değişmez (`cost_for` üretim anında
-    # çözülür, kayda tam sayı yazılır).
+    # KREDİ KAYNAKTAN, KOPYA DEĞİL (sahibin araştırması, PR #80 yorumu,
+    # 2026-09-23): OpenAI görsel üretim rehberi "Cost and latency" — çıktı
+    # 30 USD/1M jeton (gpt-image-2 ile AYNI birim fiyat) ama kalite başına
+    # JETON SAYISI farklı. Rehberdeki hesaplayıcının formülü
+    #     jeton = ceil(g × o × (2e6 + W×H) / 4e6)
+    # (g/o = kısa kenara oranla yuvarlanmış ızgara), kalite katsayıları
+    # gpt-image-2 low 16 · medium 48 · high 96, gpt-image-2.5 low 16 ·
+    # medium 24 · high 48 · xhigh 64 · max 96. SAĞLAMA: formül gpt-image-2'de
+    # 1024×1024 için 196 / 1.756 / 7.024 veriyor — 2026-09-22'de canlı
+    # `usage.output_tokens` ile ÖLÇÜLEN sayıların birebir aynısı; yani tablo
+    # tahmin değil, ölçümle tutan kural. 2.5, 1024×1024: 196 / 439 / 1.756
+    # jeton → 0,0059 / 0,0132 / 0,0527 USD → 1 / 3 / 11 kredi (çapa 0,005,
+    # en yakına). Önceki 1/11/42 kopyası medium'da ×3,7, high'da ×3,8 fazla
+    # alıyordu; `tarife_kontrol` notu düştü (2 → 0). Canlı ölçüm isteğe
+    # bağlı sağlama, ön koşul değil.
     #
-    # `plan="temel"` (1b-B basamağı; ÖNERİ, sahip onaylamadı — belge §1b
-    # "Yapıldığında (D)"): ölçülmemiş bir tarifeyi ücretsiz plana açmak,
-    # `high`ın 42'den yüksek çıkma ihtimalini platformun cebinden ödemek olurdu.
-    # Kendi OpenAI anahtarını giren ücretsiz kullanıcı eşiği aşar (1b-A);
-    # bekçisi tests/test_planlar.py'nin gerçek-id basamak testi.
+    # İKİ BİLİNEN SAPMA, bilerek açık (boyut başına kredi ekseni yok):
+    # (1) dikey/yatay (1024×1536, 1536×1024) formülde KAREDEN UCUZ — 2.5
+    # medium 343 → 2, high 1.372 → 8; katalog her boyuta kare fiyatını yazıyor,
+    # yani dikey/yatayda ~%25 fazla alınıyor (gpt-image-2'de de öyle). (2)
+    # GÖRSEL GİRDİ jetonu (8 USD/1M; düzenlemede referanslar yüksek ayrıntıda
+    # işleniyor) krediye girmiyor — düzenleme istekleri hesabımızdan pahalı,
+    # ölçülmedi. İkisi de ayrı karar; buraya yazılı ki sessiz kalmasın.
+    #
+    # `plan="free"` (sahibin araştırmasıyla değişti; ilk sürüm `temel` idi):
+    # basamak gerekçesi FİYAT ve 2.5 medium'da 3 kredi — `free` olan
+    # gpt-image-2'nin 11'inden UCUZ; ölçülmemiş tarifeyi ücretsize açmamak
+    # gerekçesi tarife kaynaktan okununca düştü. OpenAI bu modeller için
+    # **API Organization Verification** isteyebiliyor: kendi anahtarını giren
+    # (BYOK) kullanıcının 403'ü buradan gelebilir — hata metni sağlayıcının,
+    # katalogda bir kapı yok.
     ImageModel(
         id="openai-gpt-image-2-5-sunburst",
         label="OpenAI · GPT Image 2.5 Sunburst",
@@ -656,10 +675,10 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         images_per_request=4,
         supports_edit=True,
         max_refs=4,
-        # birim fiyat ÖLÇÜLMEDİ: gpt-image-2'nin 1/11/42'si kopya, alt sınır — fiyat doğrulanamadı.
-        credits=11,
-        credits_by_quality=(("low", 1), ("medium", 11), ("high", 42)),
-        plan="temel",
+        # 196 / 439 / 1.756 jeton × 30 USD/1M → 1 / 3 / 11 kredi (OpenAI rehberi, 2026-09-23; blok yorumu).
+        credits=3,
+        credits_by_quality=(("low", 1), ("medium", 3), ("high", 11)),
+        plan="free",
         note="model.openai-gpt-image-2-5-sunburst.note",
     ),
     ImageModel(
@@ -675,10 +694,10 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         images_per_request=4,
         supports_edit=True,
         max_refs=4,
-        # birim fiyat ÖLÇÜLMEDİ: gpt-image-2'nin 1/11/42'si kopya, alt sınır — fiyat doğrulanamadı.
-        credits=11,
-        credits_by_quality=(("low", 1), ("medium", 11), ("high", 42)),
-        plan="temel",
+        # 196 / 439 / 1.756 jeton × 30 USD/1M → 1 / 3 / 11 kredi (OpenAI rehberi, 2026-09-23; blok yorumu).
+        credits=3,
+        credits_by_quality=(("low", 1), ("medium", 3), ("high", 11)),
+        plan="free",
         note="model.openai-gpt-image-2-5-flare.note",
     ),
     # ── Gemini · Nano Banana ────────────────────────────────────────────
@@ -978,9 +997,17 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
     #
     # Alibaba · Qwen Image — 0,02 USD/MP. Qwen-Image'ın kendi önerdiği beş
     # geometri (`QWEN_SIZES`) 1,5–1,8 MP, fal'da İKİ MP sayılır → 0,04 USD →
-    # 8 kredi. Düzenleme ucu (`fal-ai/qwen-image-edit`) TEK `image_url` alıyor
-    # → `max_refs=1`; `image_size`ı da okuyor, seçilen boyut düzenlemede de
-    # gider (ilk sürüm düşürüyordu — #80 incelemesi; bkz. fal_client).
+    # 8 kredi metin ucunda. Düzenleme ucu (`fal-ai/qwen-image-edit`) TEK
+    # `image_url` alıyor → `max_refs=1`; `image_size`ı da okuyor, seçilen boyut
+    # düzenlemede de gider (ilk sürüm düşürüyordu — #80 incelemesi; bkz.
+    # fal_client). DÜZENLEME 0,03 USD/MP (fal model sayfası, sahibin
+    # araştırması 2026-09-23) → 2 MP → 0,06 USD → 12 kredi — ve katalogda TEK
+    # `credits` alanı var, düzenleme için ayrı fiyat taşıyamıyor (`cost_for`,
+    # `routers/uretim` iki rota, `isci._kredi`, `core.js` üç yer aynı alanı
+    # okuyor). Seçim: `credits=12`, yani DÜZENLEME FİYATI — metin üretimi 4
+    # kredi fazla öder, platform zarar etmez; 8 yazmak her düzenlemede 4
+    # kredi zarardı. Ayrı bir `credits_edit` ekseni doğru ama yeni eksen,
+    # gerekirse ayrı PR (belge §1b "Yapıldığında (D)").
     ImageModel(
         id="fal-qwen-image",
         label="Alibaba · Qwen Image",
@@ -999,8 +1026,9 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
         # Kuyruklu sağlayıcı: görselde de submit → yokla → indir. Tavan tek
         # görselin duvar saati; `total_budget` adetle çarpar.
         poll_timeout=180.0,
-        # 0,02 USD/MP × 2 MP (yukarı yuvarlama) = 0,04 USD → 8 kredi (fal.ai, 2026-09-22).
-        credits=8,
+        # 0,03 USD/MP (DÜZENLEME ucu) × 2 MP (yukarı yuvarlama) = 0,06 USD → 12 kredi (fal.ai,
+        # 2026-09-23); metin ucu 0,02/MP → 8 olurdu, tek alan düzenleme fiyatını taşıyor (blok yorumu).
+        credits=12,
         note="model.fal-qwen-image.note",
     ),
     # ByteDance · Seedream V4 — 0,03 USD/GÖRSEL, boyuttan BAĞIMSIZ → 6 kredi.
@@ -1496,10 +1524,15 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         note="model.fal-wan-3-0.note",
     ),
     # MiniMax · H3 — sesi yerleşik (şemada ses anahtarı yok). Jetonlar fal'ın
-    # ŞEMASININ YAZDIĞI gibi: `768P` BÜYÜK P ve `2K` (Gemini'nin görsel
-    # jetonuyla aynı dize, `QUALITY_LABELS` etiketini paylaşıyor). Küçük harfe
-    # çevirmek telde başka bir enum demek — jeton tele OLDUĞU GİBİ gidiyor.
-    # 2K yerel değil, yükseltmeli (şema açıklaması); 768P yerel.
+    # ŞEMASININ YAZDIĞI gibi: `480P`/`768P` BÜYÜK P, `2K`/`4K` (Gemini'nin
+    # görsel jetonlarıyla aynı dize, `QUALITY_LABELS` etiketini paylaşıyor).
+    # Küçük harfe çevirmek telde başka bir enum demek — jeton tele OLDUĞU GİBİ
+    # gidiyor. Dört kademe fal'ın birinci taraf OpenAPI'sinden (sahibin
+    # araştırması 2026-09-23, PR #80 yorumu; ilk sürüm 480P/4K'yı üç kaynakla
+    # göremediği için beyan etmiyordu). 2K ve 4K yerel değil, 768P'nin
+    # yükseltilmiş hâli (şema açıklaması); VARSAYILAN 768P — yerel çözünürlük,
+    # 480P ondan 2 kredi ucuz ama "en ucuz kademe varsayılan" kuralı burada
+    # yerel kaliteye yenildi (Wan'ın 720p kararı gibi).
     ImageModel(
         id="fal-minimax-h3",
         label="MiniMax · H3",
@@ -1509,7 +1542,7 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         credential="fal",
         sizes=FAL_VIDEO_ASPECT_RATIOS,
         default_size="16:9",
-        qualities=("768P", "2K"),
+        qualities=("480P", "768P", "2K", "4K"),
         default_quality="768P",
         durations=(5, 10, 15),
         default_duration=5,
@@ -1520,10 +1553,10 @@ VIDEO_MODELS: tuple[ImageModel, ...] = (
         # i2v şemasında `end_image_url` var, `ALANLAR` göndermiyor (Wan/Seedance kararı).
         supports_last_frame=False,
         poll_timeout=600.0,
-        # 768P $0,06/sn → 12 · 2K $0,13/sn → 26 kredi/sn (fal.ai, 2026-09-22). Belgedeki 480p (10)
-        # ve 4K (32) kademeleri beyan edilmedi — gerekçe blok yorumunda.
+        # 480P $0,05 → 10 · 768P $0,06 → 12 · 2K $0,13 → 26 · 4K $0,16 → 32 kredi/sn
+        # (fal.ai model sayfası, 2026-09-23). İlk 5 referans görsel ücretsiz (şema).
         credits=12,
-        credits_by_quality=(("768P", 12), ("2K", 26)),
+        credits_by_quality=(("480P", 10), ("768P", 12), ("2K", 26), ("4K", 32)),
         kind="video",
         note="model.fal-minimax-h3.note",
     ),
@@ -1654,6 +1687,9 @@ QUALITY_LABELS: dict[str, str] = {
     # olduğu gibi gidiyor, küçük harfe çevirmek başka bir enum olurdu. `2K`
     # Gemini'nin satırını paylaşıyor (aynı dize).
     "768P": "gen.quality_768p",
+    # H3'ün 480P'si Wan'ın 480p etiketini paylaşıyor: aynı çözünürlük, fal'ın
+    # iki ucu farklı yazıyor; kullanıcıya iki farklı "480p" göstermek yanlış.
+    "480P": "gen.quality_480p",
     # Kling V3 Pro'nun KALİTE EKSENİ SES EKSENİ (Faz 4 / 1b-D): `resolution`
     # şemada yok, `generate_audio` fiyatı ikiye bölüyor (22/34 kredi/sn).
     # Jetonlar ASCII ve tele `fal_client.build_payload` çeviriyor.

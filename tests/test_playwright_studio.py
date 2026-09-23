@@ -1757,12 +1757,15 @@ def test_playwright_ucretsiz_plan_BASAMAGI_gosteriyor_ve_schnell_ile_uretiyor(
     platform rozetleri doğruyken işin `anahtar_kaynagi`si "kullanici" idi).
 
     Tarayıcıda ölçülen dört şey:
-      · `temel` basamaklı GPT Image 2.5 satırları PANELDE VAR ama ROZETLİ
-        ("not in your plan"). Plan kilidi GİZLEMİYOR, rozetliyor — Faz 3 / 3
-        kararı (core.js `secilebilirler`: "görünmezse kullanıcı modelin VAR
-        olduğunu bile bilmez; yükseltme çağrısı Faz 4'ün satış yüzü"). Bu
-        görevin talimatı "gated modeller satır DEĞİL" diyordu; ön yüzün
-        kurulu kararına uyuldu ve sapma belgede.
+      · Görsel panelinde 13 satırın 13'ü VAR ve ücretsiz kullanıcıda HİÇBİRİ
+        rozetli değil: görselde basamaklı girdi kalmadı (GPT Image 2.5 ilk
+        sürümde `temel` ve "not in your plan" rozetliydi; sahibin fiyat
+        araştırması — PR #80 yorumu — medium'u 3 kredi bulunca `free`ye
+        indi). Rozet KURALI yine ölçülüyor: kilitli küme katalogdan türetilir
+        ve rozetli satırlar TAM o küme olmalı — bugün ikisi de boş. Plan
+        kilidi GİZLEMİYOR, rozetliyor — Faz 3 / 3 kararı (core.js
+        `secilebilirler`); basamak örnekleri video tarafında ve gerçek
+        id'lerle `tests/test_planlar.py`de.
       · `fal-flux-1-schnell` satırı rozetsiz, seçilebilir.
       · seçilince composer satırı "this run takes 1 · 200 left" — 1 kredilik
         modelin tarifesi ekranda.
@@ -1820,10 +1823,12 @@ def test_playwright_ucretsiz_plan_BASAMAGI_gosteriyor_ve_schnell_ile_uretiyor(
                 """rows => rows.map(r => [r.querySelector("input").value,
                                           (r.querySelector(".model-row-badge") || {}).textContent || ""])"""))
             beklenen_kilitli = {m.id for m in catalog.IMAGE_MODELS if m.plan != "free"}
-            assert beklenen_kilitli == {"openai-gpt-image-2-5-sunburst", "openai-gpt-image-2-5-flare"}
-            for kimlik in beklenen_kilitli:
-                assert rozetler.get(kimlik) == "not in your plan", (
-                    f"{kimlik}: ücretsiz kullanıcıda plan rozeti yok ({rozetler.get(kimlik)!r})")
+            # 2026-09-23'ten beri boş (GPT Image 2.5 `free`); küme yine katalogdan türetiliyor
+            # ki bir gün görsele basamak yazılırsa rozet iddiası kendiliğinden dolsun.
+            assert beklenen_kilitli == set(), beklenen_kilitli
+            rozetli = {k for k, r in rozetler.items() if r == "not in your plan"}
+            assert rozetli == beklenen_kilitli, (
+                f"rozetli satırlar katalogdaki kilitli kümeyle aynı değil: {rozetli}")
             assert rozetler.get("fal-flux-1-schnell") == "", (
                 f"schnell rozetli: {rozetler.get('fal-flux-1-schnell')!r}")
             # Ücretsiz kullanıcıda satır sayısı yine 13: kilit gizlemez (Faz 3 / 3).

@@ -286,13 +286,12 @@ sınırı.
 **Uyum:**
 * **C2PA köken bilgisi:** OpenAI 19.05.2026'dan beri her API görseline C2PA +
   SynthID gömüyor ([OpenAI](https://openai.com/index/advancing-content-provenance/));
-  Meta ve TikTok C2PA'yı okuyup otomatik etiket basıyor. Depoda C2PA'yı koruyan
-  hiçbir şey yok ve iki yer baytı YENİDEN KODLUYOR: `fal_client._png_garantile`
-  (PNG olmayanı, örn. Seedream'in JPEG'ini) ve ücretsiz plandaki filigran
-  (`services/filigran.py`). PNG döndüren sağlayıcının baytı filigransızsa aynen
-  geçer. v1: her çıktının `saglayici_meta`sına "C2PA var/yok" yazılır ve
-  platform AI etiketleri HER durumda işaretlenir. Korumak (manifesti kopyalamak
-  ya da kendimiz imzalamak) herkese açılmadan önce ayrı iş — yeni bağımlılık.
+  Meta ve TikTok C2PA'yı okuyup otomatik etiket basıyor. Sağlayıcıların imzalı
+  kaydını iki yolda BİZ siliyoruz — ÖLÇÜLDÜ; ölçüm, sebep ve seçenekler aşağıda
+  ["Otomasyondan bağımsız iki bulgu"](#otomasyondan-bağımsız-iki-bulgu-2026-09-23).
+  Akış için sonucu: v1'de her çıktının `saglayici_meta.c2pa` durumu yazılır,
+  platform AI etiketleri HER durumda işaretlenir (kayıt düşse bile etiket
+  kaybolmaz) ve yayın, özgün kaydı taşıyan baytı tercih eder (seçenek b).
 * **AB AI Act Madde 50** 2 Ağustos 2026'dan beri yürürlükte; makinece
   okunabilir işaretleme (50(2)) için yalnız o tarihten önce piyasaya çıkmış
   sistemlere 2 Aralık 2026'ya kadar süre var
@@ -378,19 +377,82 @@ Yönetmeni aynı sohbet katmanını kullanır.
 
 ---
 
+## Otomasyondan bağımsız iki bulgu (2026-09-23)
+
+İkisi de BUGÜNKÜ kodun eksiği; akışlar hiç gelmese de geçerli, ayrı küçük
+PR'lar olabilir. Akış işi başlamadan kapanırlarsa A1 ve A3 daha az taşır.
+
+### 1. C2PA köken kaydını biz siliyoruz — ölçüldü
+
+Sağlayıcılar çıktılarına İMZALI C2PA kaydı gömüyor; Meta ve TikTok bu kaydı
+okuyup "AI" etiketini kendiliğinden basıyor, AB AI Act Madde 50(2) makinece
+okunabilir işaret istiyor. Ölçüm (2026-09-23 — PNG'de `caBX` parçası, JPEG'de
+APP11/JUMBF, MP4'te `jumb` kutusu; imzalayan, sertifika dizesinden):
+
+| çıktı | sağlayıcıdan gelen | depoya giden | aradaki yol |
+| --- | --- | --- | --- |
+| Azure `gpt-image-2` (2 dosya, nesne deposundan, filigransız) | — (ölçülmedi) | **var**, Microsoft imzalı | bayt aynen |
+| fal FLUX.1 schnell, Qwen düzenleme (PNG) | fal imzalı | **var** | bayt aynen — `_png_garantile` PNG imzasını görüp dokunmuyor |
+| fal MiniMax H3 (MP4) | fal imzalı (`c2pa.hash.bmff.v3`) | **var** | bayt aynen — video yeniden kodlanmıyor |
+| fal Seedream v4 düzenleme (JPEG) | **BytePlus ModelArk imzalı** | **YOK** | `fal_client._png_garantile`: JPEG → PNG |
+| Filigranlı görsel (ücretsiz plan) | var (C2PA'lı schnell çıktısıyla denendi) | **YOK** | `filigran.uygula` → `composite` yeni PNG yazar |
+
+Koddan, ölçülmedi (aynı mekanizma: Pillow yeni dosya yazar, `caBX`i
+taşımaz): logo bindirme (`composite.py`), afiş (`routers/bindirme.py`),
+içe aktarılan / yüklenen görsel (`services/gorsel.to_png` — kullanıcının KENDİ
+kaydı). Ölçülmeyen sağlayıcılar A0'da: Gemini / Nano Banana, Veo, Azure MAI,
+Azure FLUX.2, OpenAI doğrudan, öteki fal video uçları.
+
+**Neden kopyalamak yetmiyor:** kayıt dosyanın baytlarına hash'le bağlı
+(`c2pa.hash.data`); JPEG → PNG çevirisi de filigran da baytı değiştirdiği için
+eski kayıt yeni dosyada GEÇERSİZ olur. Doğru yol türev dosyaya YENİ bir kayıt:
+özgün dosya "ingredient", eylem `c2pa.edited`, imza bizim —
+[`c2pa-python`](https://github.com/contentauth/c2pa-python) (c2pa-rs
+bağlayıcısı, yeni bağımlılık) ve bir imza sertifikası (platformların güvenmesi
+için C2PA güven listesindeki bir CA'dan; öz imzalı kayıt "güvenilmeyen" görünür).
+
+**Seçenekler** (karar sahibin):
+
+* **(a) Görünür kıl — hemen, bedelsiz.** `_png_garantile` ve filigran,
+  dokunmadan önce kaydın varlığını ölçüp `saglayici_meta.c2pa` = `var` /
+  `dustu` / `yok` yazsın. Davranış değişmez, kayıp GÖRÜNÜR olur; admin marj
+  tablosunun yanında sayılabilir. Test: C2PA'lı JPEG fikstürüyle `dustu`.
+* **(b) Özgün baytı koru — A3 ile.** PNG'ye çevrilen sağlayıcı çıktısının
+  ÖZGÜN dosyası yan nesne olarak saklanır; yayın ve dışa aktarma yan nesne
+  varsa onu kullanır. "PNG baytları" sözleşmesi değişmez; bedel yalnız PNG
+  vermeyen uçlarda (bugün Seedream) çift depolama. Filigranlı çıktıda UYGULANAMAZ:
+  özgün (filigransız) bayt ücretsiz planın filigran kuralını delerdi — orada tek
+  yol (c).
+* **(c) Yeniden imzala — herkese açılışta.** Türev dosyalara (dönüşüm,
+  filigran, bindirme) ingredient'lı yeni kayıt. Eksiksiz; bedeli yeni bağımlılık
+  + sertifika + anahtar yönetimi. Madde 50 hukuki görüşüyle birlikte.
+
+Öneri: (a) şimdi, (b) A3 ile, (c) herkese açılışta. Platform AI etiket
+bayrakları (`containsSyntheticMedia`, `is_aigc`) üç seçenekte de HER durumda
+işaretlenir.
+
+### 2. Silme / dışa aktarma listelerinin kapsam bekçisi yok
+
+Ayrıntı yukarıda, ["Hesap silme ve dışa aktarma"](#hesap-silme-ve-dışa-aktarma--faz-4--5-ile-uyum):
+`isci.silme_turu` ve `services/disa_aktar.py` kiracı tablolarını ELLE TUTULAN
+listelerle dolaşıyor ve yeni bir tablonun hiçbir listeye girmediğini yakalayan
+test yok. Bekçi: RLS'li her tablo ya listede ya gerekçeli muafiyette.
+
+---
+
 ## Aşamalar
 
 Her aşama kendi görev listesi ve PR'larıyla; sıra bağımlılığa göre.
 
 | aşama | içerik | çıkış kriteri |
 | --- | --- | --- |
-| **A0 — doğrulama** | Upload-Post / Zernio karşılaştırması (IG/FB/YT, Shorts'un herkese açık yayını, idempotency, AI etiketi alanları, altyazı/kapak, güncel fiyat); Meta'da AI etiketi API alanı; C2PA'nın bizim yolumuzda nerede düştüğünün ölçümü | Karar notu; kod TUTULMAZ |
+| **A0 — doğrulama** | Upload-Post / Zernio karşılaştırması (IG/FB/YT, Shorts'un herkese açık yayını, idempotency, AI etiketi alanları, altyazı/kapak, güncel fiyat); Meta'da AI etiketi API alanı; ölçülmemiş sağlayıcılarda C2PA (Gemini, Veo, MAI, FLUX.2) | Karar notu; kod TUTULMAZ |
 | **A1 — motor** | Silme/dışa aktarma kapsam bekçisi (önce); göç (`akislar`, `akis_calismalari`, `isler` sütunları), tanım şeması + doğrulama, `yazi` iş türü, `ilerlet`, elle çalıştırma, kredi tahmini, Akışlar arayüzü (liste, düzenleyici, geçmiş); yeni tablolar silme turunda ve dışa aktarmada | Elle çalıştırılan akış dört içerik türünü üretir, çıktılar galeriye düşer; yayın YOK |
 | **A2 — zamanlama** | Takvim + `akis_konulari` | Zamanlanmış çalışma konu listesinden sıradakini alır; liste bitince akış duraklar |
-| **A3 — yayın** | `baglantilar`, birleşik API bağlayıcısı, `yayin` iş türü, onay kuyruğu, AI etiketi, `otomatik_yayin`; hesap silmede bağlantı koparma | IG + FB + YT Shorts'a onaylı yayın, sahibin hesaplarında |
+| **A3 — yayın** | `baglantilar`, birleşik API bağlayıcısı, `yayin` iş türü, onay kuyruğu, AI etiketi, `otomatik_yayin`; hesap silmede bağlantı koparma; C2PA özgün bayt (seçenek b) | IG + FB + YT Shorts'a onaylı yayın, sahibin hesaplarında |
 | **A4 — dış tetikleyiciler** | Webhook + RSS | n8n/Zapier'den ve bir blog akışından tetiklenen çalışma |
 | **A5 — kendi videonu işle** | `video_girdisi`, `transkript`, `ceviri`, `analiz`, `kare`, `kapak`; YouTube çok dilli altyazı + kapak + `localizations` | Webhook'la verilen video çok dilli altyazı, başlık, bölüm ve kapakla onaydan geçip yayınlanır |
-| **Sonra** | Kromis Ajanı + sohbet kredi ekseni; dublaj (üç seçenek); Drive (`drive.file`) / S3 / Canva (ikili yükleme); TikTok (taslak/inbox); resmi bağlayıcılar (Meta App Review, YouTube audit); `Plan.otomasyon` ve fiyatlandırma; C2PA koruma | Herkese açılış |
+| **Sonra** | Kromis Ajanı + sohbet kredi ekseni; dublaj (üç seçenek); Drive (`drive.file`) / S3 / Canva (ikili yükleme); TikTok (taslak/inbox); resmi bağlayıcılar (Meta App Review, YouTube audit); `Plan.otomasyon` ve fiyatlandırma; C2PA yeniden imzalama (seçenek c) | Herkese açılış |
 
 **Bağımlılıklar:** A1 her şeyin önünde; A2, A3, A4 A1'den sonra birbirinden
 bağımsız; A5 A3 ve A4'e dayanır (yayın + webhook). Kromis Ajanı'nın kredi
@@ -405,7 +467,7 @@ kendi anahtarları ya da admin) beklemez.
 * **Meta'da AI etiketi** için API alanı — doğrulanmadı.
 * **`youtube.upload` kapsamının sınıfı** (resmi bağlayıcıda OAuth doğrulaması
   gerekir mi) — tam doğrulanmadı.
-* **C2PA**: koruma mı, yeniden imzalama mı; hukuki görüş (Madde 50).
+* **C2PA**: (a) / (b) / (c) sırası — öneri "Otomasyondan bağımsız iki bulgu"da; hukuki görüş (Madde 50).
 * **Sohbet kredisinin birimi** (jeton mu tur mu) — Kromis Ajanı aşamasında.
 * **Dublaj** — üç seçenekten biri, açıldığında.
 * **Sıralı liste → çizge** — ihtiyaç doğarsa; veri modeli buna açık.
@@ -482,5 +544,6 @@ Video senaryosu: [fal Scribe v2](https://fal.ai/models/fal-ai/elevenlabs/speech-
 [YouTube bölümler](https://support.google.com/youtube/answer/9884579?hl=en).
 
 Uyum: [OpenAI provenance](https://openai.com/index/advancing-content-provenance/) ·
+[c2pa-python](https://github.com/contentauth/c2pa-python) ·
 [EC Madde 50 SSS](https://digital-strategy.ec.europa.eu/en/faqs/transparency-obligations-under-article-50-ai-act) ·
 [YouTube AI slop politikası](https://techcrunch.com/2026/07/20/youtube-clarifies-policies-around-ai-slop-and-upsetting-videos/).

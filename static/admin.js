@@ -9,7 +9,8 @@
 //   GET  /api/admin/metrikler                · POST /api/admin/isler/{id}/iptal
 //   (Faz 3 / 3)                              · POST /api/admin/kullanicilar/{id}/plan
 //                                            · POST /api/admin/kullanicilar/{id}/kredi
-//   GET  /api/admin/odeme-olaylari?hata=1    (Faz 4 / 3: Polar webhook teslimatları)
+//   GET  /api/admin/odeme-olaylari?hata=1    (Faz 4 / 3: Polar webhook teslimatları;
+//                                            Faz 4 / 4: özetin `urunler_bayat`ı uyarı satırı)
 //
 // "Ödeme" sekmesi (Faz 4 / 3): son 100 teslimat — tür, Polar nesnesi, kullanıcı,
 // işlendi damgası ve `hata` KODU (`kullanici_yok`, `urun_yok` …). Kod çevrilmez:
@@ -189,6 +190,13 @@
       rozet.textContent = t("admin.rozet_dogrulanmamis");
       eposta.append(rozet);
     }
+    // Faz 4 / 4: Polar müşteri kimliği (panelde arama için); NULL = hiç satın almamış.
+    if (k.polar_musteri_id) {
+      const musteri = document.createElement("span");
+      musteri.className = "admin-not admin-musteri";
+      musteri.textContent = t("admin.musteri_id", { id: k.polar_musteri_id });
+      eposta.append(musteri);
+    }
     const kutu = document.createElement("input");
     kutu.type = "number";
     kutu.min = "1";
@@ -234,10 +242,22 @@
       }
     });
     const plan = islemHucresi(secici);
-    // Bakiye + "kredi ekle": miktar ± tam sayı, açıklama zorunlu (sunucu 422).
+    // Bakiye (iki kova, Faz 4 / 4) + "kredi ekle": miktar ± tam sayı, açıklama zorunlu
+    // (sunucu 422), kova seçici (`hibe` öntanımlı; `paket` = "paket kredisi ekle").
     const bakiye = document.createElement("span");
     bakiye.className = "admin-bakiye";
-    bakiye.textContent = String(k.bakiye);
+    bakiye.textContent = t("admin.bakiye_kovalar", { hibe: k.bakiye, paket: k.paket_bakiye ?? 0 });
+    const kova = document.createElement("select");
+    kova.className = "admin-kova";
+    kova.setAttribute("aria-label", t("admin.kredi_kova"));
+    // Anahtarlar tabloda, kalıpla kurulmuyor: i18n bekçisi (tests/test_i18n.py) anahtarı metinde arar.
+    const KOVA_ANAHTARI = { hibe: "admin.kova_hibe", paket: "admin.kova_paket" };
+    for (const ad of ["hibe", "paket"]) {
+      const o = document.createElement("option");
+      o.value = ad;
+      o.textContent = t(KOVA_ANAHTARI[ad]);
+      kova.append(o);
+    }
     const miktar = document.createElement("input");
     miktar.type = "number";
     miktar.step = "1";
@@ -252,11 +272,15 @@
       const cevap = await gonder(`/api/admin/kullanicilar/${k.id}/kredi`, {
         miktar: Number(miktar.value),
         aciklama: aciklama.value.trim(),
+        kova: kova.value,
       });
-      mesajYaz(t("admin.kredi_yazildi", { bakiye: cevap.bakiye }), "basari");
+      mesajYaz(
+        t("admin.kredi_yazildi", { bakiye: cevap.bakiye, paket: cevap.paket_bakiye }),
+        "basari",
+      );
       await kullanicilariYukle();
     });
-    const kredi = islemHucresi(bakiye, miktar, aciklama, ekle);
+    const kredi = islemHucresi(bakiye, kova, miktar, aciklama, ekle);
     const islem = islemHucresi(
       dugme(
         t("admin.oturum_dusur"),
@@ -473,6 +497,8 @@
     const yalnizHata = el("admin-odeme-yalniz-hata").checked;
     const m = await istek("/api/admin/odeme-olaylari" + (yalnizHata ? "?hata=1" : ""));
     el("admin-odeme-ozet").textContent = t("admin.odeme_ozet", m.ozet);
+    // Faz 4 / 4: ayna 7 günden eski ya da boş → uyarı satırı (sunucu `olay=odeme.urunler_bayat` düşürür).
+    el("admin-odeme-uyari").hidden = !m.ozet.urunler_bayat;
     const govde = el("admin-odeme-olaylar");
     if (!m.olaylar.length) bosSatir(govde, 6);
     else {

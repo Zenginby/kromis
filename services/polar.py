@@ -43,6 +43,18 @@ hiç ihtiyaç duymaz, testler onu hiç yüklemez. `istemci()` çağrılınca ith
 (services/hata_izleme.py'nin Sentry deyimi). Sunucu adları SDK'nın
 (`sdkconfiguration.SERVERS`): production `https://api.polar.sh`, sandbox
 `https://sandbox-api.polar.sh` — `server="sandbox"` ile seçilir.
+
+POLAR'A GİDEN ÜÇ ÇAĞRI (Faz 4 / 4, K7) — hepsi `istemci()` üstünden, hepsi
+İNCE: `checkout_ac` (`POST /v1/checkouts/` → barındırılan ödeme sayfasının
+URL'si), `portal_baglantisi` (`POST /v1/customer-sessions/` → müşteri portalı
+URL'si), `urunleri_listele` (`GET /v1/products/` sayfa sayfa → düz sözlükler,
+`tools/polar_esitle.py`nin girdisi). SDK'nın pydantic nesneleri bu modülün
+DIŞINA ÇIKMAZ: çağıranlar `str`/`dict` alır, böylece rota ve araç SDK'nın
+model adlarına bağlanmaz ve testler `polar.checkout_ac`ı tek satırla yamalar
+(E2E'nin yerel Polar'ı). SDK'nın kendi istisnaları (`polar_sdk.models.SDKError`
+ailesi, ağ hataları) OLDUĞU GİBİ yukarıya çıkar; rota onları 502
+`err.odeme_saglayici`ye çevirir (`routers/odeme.py`) — burada yutulsa "URL
+gelmedi" ile "Polar 500 verdi" ayrılamazdı.
 """
 from __future__ import annotations
 
@@ -60,7 +72,8 @@ if TYPE_CHECKING:
 __all__ = ["ORTAM_ENV", "JETON_ENV", "WEBHOOK_SIRRI_ENV", "ORTAM_SANDBOX", "ORTAM_PRODUCTION", "ORTAMLAR",
            "BASLIK_ID", "BASLIK_ZAMAN", "BASLIK_IMZA",
            "YapilandirmaHatasi", "ImzaHatasi", "YukHatasi", "Olay",
-           "ortam", "erisim_jetonu", "webhook_sirri", "olay_dogrula", "imzala", "istemci"]
+           "ortam", "erisim_jetonu", "webhook_sirri", "olay_dogrula", "imzala", "istemci",
+           "checkout_ac", "portal_baglantisi", "urunleri_listele"]
 
 # `.env.example` 1. bölüm aynı adları buradan okur (bekçisi tests/test_docker_kapisi.py `ALTYAPI`).
 ORTAM_ENV = "KROMIS_POLAR_ORTAM"
@@ -208,3 +221,58 @@ def istemci(ortam_map: Mapping[str, str] | None = None) -> Polar:
     from polar_sdk import Polar
     return Polar(access_token=jeton, server=ortam(ortam_map))
 
+
+
+def checkout_ac(*, urun_id: str, external_customer_id: str, customer_email: str | None,
+                success_url: str, metadata: Mapping[str, str] | None = None) -> str:
+    """Polar barındırılan checkout oturumu → ödeme sayfasının URL'si (K7; `POST /v1/checkouts/`).
+
+    `external_customer_id` = `kullanicilar.id`: Polar müşteriyi bununla açar ve
+    her olayda `customer.external_id` olarak geri gönderir — webhook'un
+    kullanıcıyı çözdüğü ilk yol (`services/odeme.kullaniciyi_coz`). `metadata`
+    siparişe ve aboneliğe KOPYALANIR (SDK `CheckoutCreate` notu): ikinci yol.
+    `success_url` içindeki `{CHECKOUT_ID}` yer tutucusunu Polar doldurur —
+    biçim çağıranın (`routers/odeme.py`), burada yorumlanmaz.
+    """
+    from polar_sdk import models  # tembel — `istemci()` ile aynı gerekçe
+    istek = models.CheckoutCreate(products=[urun_id], external_customer_id=external_customer_id,
+                                  success_url=success_url, metadata=dict(metadata or {}))
+    if customer_email:
+        istek.customer_email = customer_email
+    cevap = istemci().checkouts.create(request=istek)
+    return str(cevap.url)
+
+
+def portal_baglantisi(polar_musteri_id: str) -> str:
+    """Müşteri portalı oturumu → portal URL'si (`POST /v1/customer-sessions/`; iptal, kart, faturalar Polar'da).
+
+    Polar kimliğiyle (`kullanicilar.polar_musteri_id`), `external_customer_id`
+    ile değil: kimlik yoksa kullanıcı hiç satın almamıştır ve rota 404
+    `err.musteri_yok` der — bu işlev ancak kimlik varken çağrılır. Bağlantı
+    tek kullanımlık ve kısa ömürlü (Polar'ın), saklanmaz.
+    """
+    cevap = istemci().customer_sessions.create(request={"customer_id": polar_musteri_id})
+    return str(cevap.customer_portal_url)
+
+
+def urunleri_listele() -> list[dict[str, Any]]:
+    """Organizasyonun BÜTÜN ürünleri (arşivlenmişler dâhil), sayfa sayfa; her ürün DÜZ SÖZLÜK (`model_dump`).
+
+    İKİ ÇAĞRI, `is_archived=False` ve `is_archived=True`: ayna Polar'da
+    kaldırılan ürünü `aktif=false` yapmak zorunda (`tools/polar_esitle.py`) ve
+    "süzgeç verilmezse ikisi de gelir" Polar'ın öntanımlısına güvenmek olurdu —
+    öntanımlı bir gün yalnız aktifleri döndürse arşivli ürün satışta kalırdı.
+    Açık istek iki ucu da kapatır. Sayfalama SDK'nın `next()` zincirinden;
+    100'lük sayfa (Polar'ın tavanı) — bir düzine ürün için iki istek.
+    """
+    urunler: list[dict[str, Any]] = []
+    istemci_ = istemci()
+    for arsiv in (False, True):
+        sayfa = istemci_.products.list(is_archived=arsiv, limit=100)
+        while sayfa is not None:
+            sonuc = getattr(sayfa, "result", None)
+            for urun in (getattr(sonuc, "items", None) or []):
+                urunler.append(urun.model_dump(mode="json") if hasattr(urun, "model_dump") else dict(urun))
+            sonraki = getattr(sayfa, "next", None)
+            sayfa = sonraki() if callable(sonraki) else None
+    return urunler

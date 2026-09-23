@@ -711,6 +711,26 @@ def test_the_run_cost_line_reads_the_balance_and_the_credit_pane_root_is_served(
     assert "function openKrediBolmesi()" in settings and 'showSettingsPane("kredi")' in settings
 
 
+def test_the_plan_gate_toast_links_to_the_sales_page_and_the_run_cost_line_offers_to_buy_credits():
+    """Faz 4 / 4 (belge §4): 403 `err.plan_kapsamiyor` toast'ının bağlantısı `/planlar` (Faz 3 / 6'nın bilerek boş
+    bıraktığı yer); `#run-cost` `N > M` iken "kredi al" bağlantısı — düğme yine kilitlenmez (402 sunucunun).
+    Ayarlar "Kredi" bölmesi: "Plan değiştir / kredi al" → `/planlar`, portal düğmesi → `GET /api/odeme/portal`."""
+    c = TestClient(appmod.app)
+    core = c.get("/static/core.js").text
+    assert 'const PLANLAR_SAYFASI = "/planlar";' in core
+    assert 'd.kod === "err.kredi_yetersiz" ? "kredi" : "planlar"' in core, "402 → bölme, 403 → satış sayfası"
+    assert 'a.href = PLANLAR_SAYFASI;' in core and '"kredi.plan_baglanti"' in core
+    assert core.count("krediAlBaglantisi(el);") == 2, "iki `#run-cost` yazımı da (arena ve tek model) bağlantıyı ekler"
+    m = re.search(r"function krediAlBaglantisi\(el\) \{.*?\n\}\n", core, re.S)
+    assert m and 'classList.contains("run-cost-uyari")' in m.group(0) and '"kredi.kredi_al"' in m.group(0)
+    settings = c.get("/static/settings.js").text
+    assert 'planlar.href = "/planlar";' in settings and '"/api/odeme/portal"' in settings
+    for anahtar in ("kredi.plan_degistir", "kredi.portal", "kredi.portal_yok", "kredi.siparisler",
+                    "kredi.faturalar_polar", "kredi.plan_bitis_satiri"):
+        assert f'"{anahtar}"' in settings, anahtar
+    assert 'kod === "err.musteri_yok"' in settings, "hiç satın almamış: düğme kilitli kalır, sebebi yazılır"
+
+
 def test_the_go_button_is_not_gated_by_the_balance():
     """402 sunucunun tek doğruluk kaynağı (belge §6): `goBlockReason` bakiyeye BAKMAZ — kapı istemcide
     kopyalansa sunucu kuralı değişince bayatlardı; BYOK'ta rezerv yok, satır bunu da yalnız gösterir."""

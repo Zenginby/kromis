@@ -18,10 +18,11 @@
 // GİRİŞTEN SONRA NEREYE (`?sonra=`): stüdyo betiği 401 görünce buraya
 // `?sonra=<bıraktığı yol>` ile gelir (static/core.js); giriş başarılıysa oraya
 // dönülür. Kapı `hedef()`: değer YALNIZ aynı kökene ait bir yol olabilir —
-// `/` ile başlar, `//` ile başlamaz (şemasız dış adres), ters bölü taşımaz
-// (tarayıcılar `/\evil.com`u `//evil.com` okur). Aksi hâlde `/`. Yoksa bu
-// sayfa bir "açık yönlendirici" olurdu: `/giris?sonra=https://sahte.site`
-// bağlantısı gerçek giriş sayfasından sahte siteye taşırdı.
+// `/` ile başlar ve tarayıcının `URL` ayrıştırıcısı onu BİZİM kökene çözer
+// (şemasız `//`, ters bölü, sekme/satır sonu gibi ayrıştırıcı hileleri hep
+// aynı soruya iner: `origin` bizim mi). Aksi hâlde `/`. Yoksa bu sayfa bir
+// "açık yönlendirici" olurdu: `/giris?sonra=https://sahte.site` bağlantısı
+// gerçek giriş sayfasından sahte siteye taşırdı (tests/test_playwright_hesap.py).
 //
 // E-POSTA BAĞLANTILARI GET, İŞLEM POST: bağlantı `/giris?dogrula=<jeton>` ya da
 // `/giris?sifirla=<jeton>` — sayfa parametreyi okur, POST'a çevirir ve adres
@@ -103,12 +104,24 @@
 
   let sifirlamaJetonu = null;
 
-  /** Girişten sonra gidilecek yol: `?sonra=` geçerli ve aynı kökense o, değilse `/`. */
+  /** Girişten sonra gidilecek yol: `?sonra=` aynı kökene çözülüyorsa yolu + sorgusu, değilse `/`.
+   *
+   *  Karar TARAYICININ ayrıştırıcısına bırakılıyor (`new URL(sonra, origin)`), dize
+   *  kurallarına değil: eski hâl `startsWith("//")` ve `\` denetimiydi ve WHATWG'nin
+   *  sekme/satır sonu SOYMASINI ıskalıyordu — `/%09/evil.example` (`/\t/evil…`) dize
+   *  olarak `//` ile başlamaz ama tarayıcı sekmeyi atıp `//evil.example`e gider
+   *  (inceleme bulgusu, 2026-09-22). Ayrıştırıcı ne yapacaksa onu yapıp kökeni
+   *  karşılaştırmak tek doğru soru; göreli değer (`galeri`) de kökene çözülür ve
+   *  `/galeri` olur — eskisi gibi `/`e düşmesi için `/` ile başlama şartı duruyor. */
   function hedef() {
     const sonra = new URLSearchParams(window.location.search).get("sonra");
     if (typeof sonra !== "string" || !sonra.startsWith("/")) return "/";
-    if (sonra.startsWith("//") || sonra.includes("\\")) return "/";
-    return sonra;
+    try {
+      const u = new URL(sonra, window.location.origin);
+      return u.origin === window.location.origin ? u.pathname + u.search : "/";
+    } catch {
+      return "/";
+    }
   }
 
   formBagla(el("form-giris"), async (veri) => {

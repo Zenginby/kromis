@@ -235,8 +235,10 @@ def test_dockerignore_keeps_everything_the_app_serves_or_imports():
 # `marj_raporu` (Faz 3 / 5): canlı `DATABASE_URL`den marj CSV'si — sahibin aylık fatura
 # mutabakatı konteynerin içinden koşar; `tarife_kontrol` ise kaynağı (catalog.py'nin
 # YORUMLARINI) okur, depodan koşulur, .dockerignore'da.
+# `polar_esitle` (Faz 4 / 4): Polar ürünlerini `urunler` aynasına yazar — canlı `DATABASE_URL` + Polar
+# jetonuyla, web imajının içinden (jeton zaten o sürecin ortamında); sahibin fiyat değişikliği adımı.
 OPERATOR_ARACLARI = ("goc", "kullanici", "ice_aktar", "artik_dosya", "anahtar_dondur",
-                     "medya_tasi", "rls_kontrol", "uygulama_rolu", "marj_raporu")
+                     "medya_tasi", "rls_kontrol", "uygulama_rolu", "marj_raporu", "polar_esitle")
 
 
 def test_dockerignore_ships_the_operator_tools_and_only_the_dev_tools_stay_out():

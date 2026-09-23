@@ -205,5 +205,11 @@ Kurulum ve çalıştırma: [KURULUM.md](../KURULUM.md) · depo haritası:
         şimdiden dolu.
   - [ ] Kullanıcı hesapları ve çoklu çalışma alanları (Workspaces).
   - [ ] Nesne depolama + CDN (Cloudflare R2 / MinIO) ve medya yönetimi.
-  - [ ] Üyelik paketleri (Free, Basic, Pro, Max) ve atomik kredi ledger'ı.
+  - [x] Atomik kredi defteri (Faz 3) ve iki kova (aylık hibe / devreden paket, Faz 4 / 2).
+  - [x] **Satın alma yüzü (Faz 4 / 4):** `/planlar` sayfası — üç plan (ücretsiz / temel / pro) ve kredi
+        paketleri, "Satın al" Polar'ın barındırılan ödeme sayfasına gider (kart verisi bizde değil),
+        teşekkür sayfası bakiyeyi yoklar; Ayarlar › Kredi'de plan, dönem sonu, son siparişler ve
+        "Aboneliğimi ve faturalarımı yönet" (Polar müşteri portalı). Fiyatlar Polar'dan aynalanır
+        (`tools/polar_esitle.py`).
+  - [ ] Üyelik paketleri Max kademesi; yıllık plan.
   - [ ] Ücretsiz pakette filigran (watermark) kuralı.

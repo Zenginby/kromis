@@ -36,9 +36,10 @@ geliyor, veri sonra: ters sıra o boşluğu bir tur boyunca canlı bırakırdı.
 `planlar` tablosu YOK (Faz 3 K5'in "o gün gelir" cümlesinden SAPMA — fiyatın
 gerçek sahibi Polar, bizde kopyası `urunler` aynası, `tools/polar_esitle.py`
 4. görev); `fiyat` alanı None kalır ve kalacak. Dönem hibesi
-`KROMIS_TEMEL_AYLIK_HIBE` / `KROMIS_PRO_AYLIK_HIBE` (boş = 1.000 / 3.000 — Faz
-3'ün yer tutucuları; K5'in önerdiği 1.200 / 4.500 sahibin 4. görevde Polar
-ürünlerini yazarken vereceği sayı). Ücretli plana geçiş 3. görevden itibaren
+`KROMIS_TEMEL_AYLIK_HIBE` / `KROMIS_PRO_AYLIK_HIBE` (boş = **1.200 / 4.500** —
+K5'in fiyat tablosu, Faz 4 / 4'te öntanımlı yapıldı; Faz 3'ün 1.000 / 3.000
+yer tutucuları kalktı. Sahip Polar'da başka sayı yazarsa ortam değişkeniyle
+ezer — sayı ürün kararı, kod sabiti değil). Ücretli plana geçiş 3. görevden itibaren
 webhook (`subscription.*`), bugün admin (`POST /api/admin/kullanicilar/{id}/plan`).
 
 ÜCRETLİ PLANIN HİBESİNİ KİM YATIRIR (K6): Faz 3'te bakım turu her planı kendi
@@ -82,11 +83,14 @@ __all__ = ["FREE_AYLIK_HIBE_ENV", "FREE_AYLIK_HIBE_VARSAYILAN", "FREE_AYLIK_HIBE
 # `.env.example` 1. bölüm aynı adları buradan okur (bekçisi tests/test_docker_kapisi.py `ALTYAPI`).
 FREE_AYLIK_HIBE_ENV = "KROMIS_FREE_AYLIK_HIBE"
 FREE_AYLIK_HIBE_VARSAYILAN = 200
-# Faz 4 / 2 (K5): ücretli planların dönem hibesi de ortamdan; boş = Faz 3'ün yer tutucuları.
+# Faz 4 / 2 (K5): ücretli planların dönem hibesi de ortamdan. Boş = K5'in fiyat
+# tablosundaki sayılar (temel 9 USD / 1.200, pro 29 USD / 4.500) — Faz 4 / 4'te
+# Faz 3'ün 1.000 / 3.000 yer tutucusu yerine yazıldı: `/planlar` sayfası bu
+# sayıyı kullanıcıya GÖSTERİYOR, yer tutucu artık bir vaat olurdu.
 TEMEL_AYLIK_HIBE_ENV = "KROMIS_TEMEL_AYLIK_HIBE"
-TEMEL_AYLIK_HIBE_VARSAYILAN = 1_000
+TEMEL_AYLIK_HIBE_VARSAYILAN = 1_200
 PRO_AYLIK_HIBE_ENV = "KROMIS_PRO_AYLIK_HIBE"
-PRO_AYLIK_HIBE_VARSAYILAN = 3_000
+PRO_AYLIK_HIBE_VARSAYILAN = 4_500
 # `kullanicilar.plan` sütununun `server_default`ı ile aynı: satırı olmayan/plansız kullanıcı ücretsizdir.
 PLAN_VARSAYILAN = "free"
 

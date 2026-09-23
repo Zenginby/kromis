@@ -73,7 +73,7 @@ import uuid
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -81,7 +81,10 @@ from services import defter, gunluk, kuyruk, planlar, polar, zaman
 from services.tablolar import SIPARIS_SEBEPLERI, URUN_TURLERI, Kullanici, OdemeOlayi, Siparis, Urun
 
 __all__ = ["DURUM_ISLENDI", "DURUM_YINELENEN", "DURUM_ATLANDI", "HATALAR", "ISLENEN_TURLER", "Sonuc",
-           "isle", "olayi_kaydet", "kullaniciyi_coz", "urun_bul", "plan_uygula"]
+           "SARTLAR_SURUMU", "URUNLER_BAYAT_GUN",
+           "isle", "olayi_kaydet", "kullaniciyi_coz", "urun_bul", "plan_uygula",
+           "aktif_urunler", "urun_bul_id", "urun_json", "sartlar_kabul_at_oku", "sartlar_kabul_yaz",
+           "polar_musteri_id_oku", "urunler_bayat_mi"]
 
 # `olay=odeme.*` satırlarının kaynağı; biçim `kromis` kökünde (services/gunluk.py).
 _gunluk = logging.getLogger("kromis.odeme")
@@ -104,6 +107,23 @@ HATALAR: tuple[str, ...] = (HATA_KULLANICI_YOK, HATA_URUN_YOK, HATA_SEBEP_BILINM
 
 URUN_PLAN, URUN_PAKET = URUN_TURLERI
 SEBEP_PURCHASE = "purchase"
+
+# ŞARTLAR SÜRÜMÜ — YER TUTUCU (Faz 4 / 4; 6. görev `HUKUK_SURUMU` ile değiştirir).
+# Checkout, `sartlar_kabul_at` NULL olan kullanıcıya 412 verir ve `sartlar_kabul:
+# true` gelince `sartlar_kabul_at` + `sartlar_surumu` yazar (belge §4 "eski
+# kullanıcı ilk satın almada onaylar"). Metin henüz yok (6. görev), ama SÜTUN
+# boş bırakılmaz: onayın hangi sürüme ait olduğu sonradan kurulamaz. 6. görev
+# metni yayınlayınca bu sabiti `HUKUK_SURUMU`ya bağlar; `0000` değeriyle
+# onaylanmış satırlar "metin öncesi onay" olarak ayrışır ve o gün yeniden
+# onay istenir (belge §6 "sürüm değişince banner").
+SARTLAR_SURUMU = "0000-yer-tutucu"
+
+# Ayna tazeliği (belge §4 "Risk"): `urunler.guncellendi`nin en yenisi bundan
+# eskiyse — ya da hiç ürün yoksa — admin "Ödeme" sekmesi uyarır ve
+# `olay=odeme.urunler_bayat` düşer. 7 gün: sahip Polar'da fiyat değiştirip
+# `polar_esitle` koşmayı unutursa sayfa bayat fiyat gösterir (ödeme Polar'ın
+# doğru fiyatıyla); bir hafta o unutkanlığın görünür olması için yeter.
+URUNLER_BAYAT_GUN = 7
 ABONELIK_AKTIF = "active"
 assert SEBEP_PURCHASE in SIPARIS_SEBEPLERI
 
@@ -221,6 +241,65 @@ def urun_bul(db: Session, polar_urun_id: str | None) -> Urun | None:
     if not polar_urun_id:
         return None
     return db.scalars(select(Urun).where(Urun.polar_urun_id == polar_urun_id)).one_or_none()
+
+
+def urun_bul_id(db: Session, urun_id: uuid.UUID) -> Urun | None:
+    """Bizim `urunler.id`miz ile AKTİF ürün; arşivlenmiş ya da bilinmeyen → `None` (checkout 404 `err.urun_yok`).
+
+    `urun_bul`un tersi: o Polar kimliğiyle ve arşivlenmişi de bulur (eski
+    siparişler), bu satış yüzünün seçimini doğrular — arşivlenmiş ürün sayfada
+    görünmez, elle kurulan bir istekle de satılmaz.
+    """
+    return db.scalars(select(Urun).where(Urun.id == urun_id, Urun.aktif.is_(True))).one_or_none()
+
+
+def aktif_urunler(db: Session) -> list[Urun]:
+    """Satıştaki ürünler, kararlı sırada: planlar `PLANLAR`ın basamağıyla, paketler krediye göre artan.
+
+    Sıra SUNUCUDA: satış sayfası kartları geldiği sırayla çizer ve iki dilde
+    aynı sırayı göstermeli. `urunler` politikasız tablo (ALTYAPI): oturumsuz
+    `GET /api/odeme/urunler` de okuyabilir.
+    """
+    satirlar = list(db.scalars(select(Urun).where(Urun.aktif.is_(True))))
+    return sorted(satirlar, key=lambda u: (0, planlar.PLANLAR[u.plan].rank, 0) if u.tur == URUN_PLAN and u.plan
+                  else (1, 0, u.kredi))
+
+
+def urun_json(u: Urun) -> dict[str, Any]:
+    """Satış yüzüne giden satır — `polar_urun_id` YOK (istemci Polar kimliğini bilmez; checkout bizim id'mizle)."""
+    return {"id": str(u.id), "tur": u.tur, "plan": u.plan, "kredi": u.kredi, "fiyat_kurus": u.fiyat_kurus,
+            "para_birimi": u.para_birimi, "ad": u.ad}
+
+
+def sartlar_kabul_at_oku(db: Session, hedef_id: uuid.UUID) -> dt.datetime | None:
+    """`kullanicilar.sartlar_kabul_at` — checkout'un 412 kapısı; DB'den (bağımlılığın nesnesi ayrılmış olabilir,
+    `defter.plan_oku`nun gerekçesi)."""
+    return db.scalar(select(Kullanici.sartlar_kabul_at).where(Kullanici.id == hedef_id))
+
+
+def polar_musteri_id_oku(db: Session, hedef_id: uuid.UUID) -> str | None:
+    """`kullanicilar.polar_musteri_id` — portal için; NULL = hiç satın almamış (rota 404 `err.musteri_yok`)."""
+    return db.scalar(select(Kullanici.polar_musteri_id).where(Kullanici.id == hedef_id))
+
+
+def sartlar_kabul_yaz(db: Session, hedef_id: uuid.UUID, an: dt.datetime, *, surum: str = SARTLAR_SURUMU) -> bool:
+    """`sartlar_kabul_at` + `sartlar_surumu` (checkout'un 412 kapısını açan yazım); satır yoksa `False`.
+
+    Hesap tablosu, RLS dışı (`plan_uygula`nın deseni); hedef `hedef_id` — kiracısız
+    modül sözleşmesi (tests/test_galeri_db.py `KIRACISIZ_MODULLER`). Eski bir onayın
+    üstüne yazar: kullanıcı yeni sürümü onayladığında damga ve sürüm ilerler.
+    """
+    sonuc = db.execute(update(Kullanici)
+                       .where(Kullanici.id == hedef_id, Kullanici.silindi_at.is_(None))
+                       .values(sartlar_kabul_at=an, sartlar_surumu=surum))
+    return kuyruk._etkilenen(sonuc) > 0
+
+
+def urunler_bayat_mi(db: Session, an: dt.datetime | None = None) -> bool:
+    """Ayna `URUNLER_BAYAT_GUN`den eski ya da BOŞ mu (admin uyarısı + `odeme.urunler_bayat`; gerekçe sabitte)."""
+    an = an if an is not None else zaman.an()
+    en_yeni = db.scalar(select(func.max(Urun.guncellendi)))
+    return en_yeni is None or en_yeni < an - dt.timedelta(days=URUNLER_BAYAT_GUN)
 
 
 def plan_uygula(db: Session, hedef_id: uuid.UUID, plan: str, *, abonelik_id: str | None,

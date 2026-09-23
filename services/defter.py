@@ -121,6 +121,8 @@ from services.tablolar import (
     KOVALAR,
     KrediHareketi,
     Kullanici,
+    Siparis,
+    Urun,
 )
 
 __all__ = ["TUR_HIBE", "TUR_REZERV", "TUR_ONAY", "TUR_IADE", "TUR_DUZELTME", "TUR_SONA_ERME", "TUR_PAKET",
@@ -129,7 +131,7 @@ __all__ = ["TUR_HIBE", "TUR_REZERV", "TUR_ONAY", "TUR_IADE", "TUR_DUZELTME", "TU
            "EK_PAKET",
            "Hareket", "Bakiye", "Sapma", "YetersizBakiye",
            "bakiye", "plan_oku", "plan_bitis_oku", "hibe", "aylik_hibe_yaz", "paket_yukle", "rezerve",
-           "onayla", "iade", "duzelt", "dusur", "hareketler", "hibe_turu", "tutarlilik"]
+           "onayla", "iade", "duzelt", "dusur", "hareketler", "siparisler", "hibe_turu", "tutarlilik"]
 
 _gunluk = logging.getLogger("kromis.defter")
 
@@ -418,6 +420,22 @@ def rezerve(db: Session, kullanici_id: uuid.UUID, is_id: uuid.UUID, miktar: int,
                   if s.tur == TUR_REZERV and s.idempotency_anahtari == f"{ONEK_REZERV}{is_id}"]
         return _hareket(mevcut[0])
     return _hareket(ana)
+
+
+def siparisler(db: Session, kullanici_id: uuid.UUID, *, limit: int = 10) -> list[dict[str, Any]]:
+    """Kullanıcının son siparişleri (Faz 4 / 4), en yeni üstte: tarih, ürün adı, tutar, para birimi, sebep.
+
+    Ayarlar "Kredi" bölmesinin ÖZET listesi — fatura BİZDE YOK (K7, MoR keser);
+    bölme "faturalar Polar portalında" der ve `GET /api/odeme/portal`a gönderir.
+    Ürün adı `urunler` aynasından (arşivlenmiş ürün de bulunur: eski sipariş
+    adını korur). Kullanıcı süzgeci + RLS `siparisler` politikası ikinci kapı.
+    """
+    sorgu = (select(Siparis, Urun.ad).join(Urun, Urun.id == Siparis.urun_id)
+             .where(Siparis.kullanici_id == kullanici_id)
+             .order_by(Siparis.olusturuldu.desc(), Siparis.id).limit(limit))
+    return [{"id": str(s.id), "olusturuldu": zaman.damga_utc(s.olusturuldu), "urun": ad,
+             "tutar_kurus": s.tutar_kurus, "para_birimi": s.para_birimi, "sebep": s.sebep}
+            for s, ad in db.execute(sorgu).all()]
 
 
 def hareketler(db: Session, kullanici_id: uuid.UUID, *, limit: int = 20) -> list[Hareket]:

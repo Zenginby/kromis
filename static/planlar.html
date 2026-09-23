@@ -1,0 +1,71 @@
+<!doctype html>
+<!-- Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+     GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+     Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+
+     Satış sayfası (Faz 4 / 4. görev, belge §4; K7/K12): üç plan kartı, paket
+     kartları, "Satın al" → Polar'ın BARINDIRILAN ödeme sayfası. `giris.html`in
+     deseni — `index.html`den AYRI belge: stüdyonun 13 betiği yüklenmez, style.css
+     yüklenmez (token katmanı + planlar.css). Kartların İÇERİĞİ betikten
+     (`GET /api/odeme/urunler` fiyat aynası + `GET /api/kredi` mevcut plan):
+     fiyat Polar'ın, kural `services/planlar.py`nin — şablona sayı yazılmaz.
+
+     Şartlar kutusu (#planlar-sartlar) ve portal düğmesi (#planlar-portal)
+     GİZLİ başlar: yalnız sunucu 412 / 409 dediğinde görünürler — sayfa
+     kullanıcının onay durumunu ve aboneliğini KOPYALAMAZ, sunucu söyler. -->
+<html lang="__APP_LANG__">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{{t:planlar.title}}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=__APP_VERSION__" />
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico?v=__APP_VERSION__" />
+  <link rel="stylesheet" href="/static/fonts.css?v=__APP_VERSION__" />
+  <link rel="stylesheet" href="/static/flow-tokens.css?v=__APP_VERSION__" />
+  <link rel="stylesheet" href="/static/planlar.css?v=__APP_VERSION__" />
+</head>
+<body>
+  <main class="planlar" aria-labelledby="planlar-baslik">
+    <header class="planlar-bas">
+      <a class="planlar-geri" href="/">{{t:planlar.geri}}</a>
+      <h1 id="planlar-baslik">{{t:planlar.baslik}}</h1>
+      <p class="planlar-alt">{{t:planlar.alt_baslik}}</p>
+    </header>
+
+    <p id="planlar-mesaj" class="planlar-mesaj" role="status" aria-live="polite" hidden></p>
+
+    <!-- 412 `err.sartlar_gerekli`: kutu işaretlenip onaylanınca aynı ürün
+         `sartlar_kabul: true` ile yeniden gönderilir (planlar.js `satinAl`). -->
+    <section id="planlar-sartlar" class="planlar-kutu" hidden>
+      <label class="planlar-sartlar-etiket">
+        <input id="planlar-sartlar-kutu" type="checkbox" />
+        <span>{{t:planlar.sartlar_kutu}}</span>
+      </label>
+      <button id="planlar-sartlar-onayla" type="button" class="planlar-birincil" disabled>{{t:planlar.sartlar_onayla}}</button>
+    </section>
+
+    <!-- 409 `err.abonelik_var`: plan değişikliği Polar portalından (oranlama orada). -->
+    <section id="planlar-portal" class="planlar-kutu" hidden>
+      <p class="planlar-not">{{t:planlar.portal_aciklama}}</p>
+      <button id="planlar-portal-dugme" type="button" class="planlar-birincil">{{t:planlar.portal_dugme}}</button>
+    </section>
+
+    <section class="planlar-bolum" aria-labelledby="planlar-planlar-baslik">
+      <h2 id="planlar-planlar-baslik" class="planlar-bolum-baslik">{{t:planlar.planlar_baslik}}</h2>
+      <div id="planlar-planlar" class="plan-kartlar" data-yukleniyor="true"></div>
+    </section>
+
+    <section class="planlar-bolum" aria-labelledby="planlar-paketler-baslik">
+      <h2 id="planlar-paketler-baslik" class="planlar-bolum-baslik">{{t:planlar.paketler_baslik}}</h2>
+      <p class="planlar-not">{{t:planlar.paketler_aciklama}}</p>
+      <div id="planlar-paketler" class="plan-kartlar plan-kartlar-paket"></div>
+    </section>
+
+    <p class="planlar-not planlar-dip">{{t:planlar.polar_notu}}</p>
+  </main>
+
+  <script>window.KROMIS_LANG="__APP_LANG__";window.KROMIS_I18N=__APP_I18N__;</script>
+  <script src="/static/i18n.js?v=__APP_VERSION__"></script>
+  <script src="/static/planlar.js?v=__APP_VERSION__"></script>
+</body>
+</html>

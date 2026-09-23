@@ -1,0 +1,44 @@
+<!doctype html>
+<!-- Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+     GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+     Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+
+     Ödeme sonrası teşekkür sayfası (Faz 4 / 4, belge §4; K7): Polar'ın
+     `success_url`u (`/odeme/tesekkur?checkout_id=…`). Kredi webhook'la yatar
+     ve webhook yönlendirmeden ÖNCE de SONRA da gelebilir — sayfa bu yüzden
+     bakiyeyi 2 sn'de bir 30 sn yoklar (tesekkur.js) ve dürüstçe iki cümleden
+     birini söyler: "bakiyene işlendi" ya da "birkaç dakika sürebilir".
+     `checkout_id` OKUNMAZ: sipariş bize Polar'ın olayıyla gelir, sorgu
+     parametresi yalnız Polar'ın izi. planlar.css paylaşılır (aynı kart dili). -->
+<html lang="__APP_LANG__">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{{t:tesekkur.title}}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=__APP_VERSION__" />
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico?v=__APP_VERSION__" />
+  <link rel="stylesheet" href="/static/fonts.css?v=__APP_VERSION__" />
+  <link rel="stylesheet" href="/static/flow-tokens.css?v=__APP_VERSION__" />
+  <link rel="stylesheet" href="/static/planlar.css?v=__APP_VERSION__" />
+</head>
+<body>
+  <main class="planlar planlar-dar" aria-labelledby="tesekkur-baslik">
+    <header class="planlar-bas">
+      <h1 id="tesekkur-baslik">{{t:tesekkur.baslik}}</h1>
+    </header>
+    <p id="tesekkur-mesaj" class="planlar-mesaj" role="status" aria-live="polite" data-durum="bekliyor">{{t:tesekkur.bekliyor}}</p>
+    <p class="tesekkur-toplam">
+      <strong id="tesekkur-toplam">—</strong>
+      <span>{{t:kredi.bakiye_birim}}</span>
+    </p>
+    <nav class="tesekkur-baglantilar">
+      <a id="tesekkur-studyo" class="planlar-birincil" href="/">{{t:tesekkur.studyo}}</a>
+      <a class="planlar-geri" href="/planlar">{{t:tesekkur.planlar}}</a>
+    </nav>
+  </main>
+
+  <script>window.KROMIS_LANG="__APP_LANG__";window.KROMIS_I18N=__APP_I18N__;</script>
+  <script src="/static/i18n.js?v=__APP_VERSION__"></script>
+  <script src="/static/tesekkur.js?v=__APP_VERSION__"></script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # Faz 4 — Ödeme (Polar MoR), paketler ve abonelik, hesap silme / dışa aktarma, hukuki metinler: görev listesi
 
-**Tarih:** 2026-09-22 · **Durum:** **3/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8; **1b'nin model listesi ve `1b-A`…`1b-G` kararları 2026-09-22'de sahipten geldi; on birinci sayı aynı gün ÖLÇÜLDÜ ve `catalog.py`ye yazıldı — o görev artık uygulanabilir**) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
+**Tarih:** 2026-09-22 · **Durum:** **4/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; **4** ✅ 2026-09-22 `faz4/checkout-portal`; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8; **1b'nin model listesi ve `1b-A`…`1b-G` kararları 2026-09-22'de sahipten geldi; on birinci sayı aynı gün ÖLÇÜLDÜ ve `catalog.py`ye yazıldı — o görev artık uygulanabilir**) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
 **Üst belge:** [superpowers/specs/2026-08-10-saas-transformation-master-design.md](superpowers/specs/2026-08-10-saas-transformation-master-design.md) §5 "Faz 5" kartının **"Ödeme Altyapısı: Merchant of Record (MoR)"** maddesi (`:184-214`) ve "Filigran & Kredi Kuralları" satırı (`:183`) — sapmalar bu belgenin sonunda tek tek yazılı. **Numaralama tuzağı** aynen (Faz 3 belgesi `:4`): master spec'in "Faz 5"i ürün yol haritasının SaaS kartı; bu belge SaaS dönüşümünün İÇ dizisindeki Faz 4'tür (Faz 0 web-first → 1 DB/hesap → 2 kuyruk → 3 kredi defteri → **4 ödeme/KVKK** → 5 işletme). Yol haritası kartı (Faz 4 "Ödeme, faturalama ve hukuk"): *"Bir kullanıcı kartla abone olup fatura alabiliyor ve hesabını tamamen silebiliyor."* — bu belgenin çıkış kriteri onu genişletir (sonda tam metin). Kartın "Stripe birincil" satırı 2026-09-18'de **MoR/Polar** ile güncellendi (Faz 1 ve Faz 2 belgelerinin "Not" satırı; master `:184-199`): Türkiye'den Stripe'a doğrudan hesap açılamıyor, uluslararası satış Merchant of Record üzerinden.
 
 Faz 4'ün amacı, Faz 3'ün kurduğu defterin (rezerv → onay → iade, aylık hibe,
@@ -159,7 +159,7 @@ görevde değiştiğini söylüyor.
 | Plan yazan tek yol admin rotası | `routers/admin.py:130` | + webhook (`subscription.*`) `odeme.plan_uygula`; admin rotası kalır (destek, deneme hesabı) | 3 |
 | Bakiyeye para girişi: hibe + `duzeltme` | `defter.hibe/duzelt` | + `defter.paket_yukle` (webhook `order.paid`, admin bağlamı `yonetici_ekler`) | 2, 3 |
 | Webhook yok; dış ağ yalnız sağlayıcılara | — | `POST /api/odeme/webhook` (oturumsuz, Standard Webhooks imzası); `odeme_olaylari` (webhook-id UNIQUE) | 3 |
-| Satış yüzü yok; 403 toast bağlantısı boş; "Kredi" bölmesi tek bakiye | `static/core.js`, `settings.js` | `/planlar` sayfası; `POST /api/odeme/checkout`; `GET /api/odeme/portal`; "Kredi" bölmesinde iki kova + "satın al" + "aboneliği yönet" + siparişler; toast → `/planlar` | 4 |
+| Satış yüzü yok; 403 toast bağlantısı boş; "Kredi" bölmesi tek bakiye | `static/core.js`, `settings.js` | `/planlar` sayfası; `POST /api/odeme/checkout`; `GET /api/odeme/portal`; "Kredi" bölmesinde iki kova + "satın al" + "aboneliği yönet" + siparişler; toast → `/planlar` — ✅ 4 (2026-09-22; hibe öntanımlısı 1.200 / 4.500 aynı PR'da) | 4 |
 | `silindi_at` yer tutucu; silme rotası yok | `tablolar.py:289` | `POST /api/hesap/sil` → anonimleştir + kilitle; bakım turu 7 gün sonra içeriği ve R2 nesnelerini siler; defter KALIR (K9) | 5 |
 | Dışa aktarma yalnız galeri ZIP'i | `routers/galeri.py:113` | `GET /api/hesap/disa-aktar` → ZIP (profil, hareketler, siparişler, işler JSON/CSV); medya için mevcut galeri ZIP'i | 5 |
 | Hukuki metin yok; kayıtta onay yok | `routers/hesap.py kayit` | `bundled/hukuk/*.html` → `GET /hukuk/{slug}`; kayıtta onay kutusu → `sartlar_kabul_at`/`sartlar_surumu`; footer bağlantıları | 6 |
@@ -527,7 +527,10 @@ açık gönderiyor, yani etiket faturayı doğru anlatıyor.
 Basamaklı kapı (1b-B) bunun bir yarısını çözüyor: pahalı video `pro` eşiğine
 konur. Öteki yarısı HİBE SAYILARI ve o bu görevin kararı DEĞİL — sahip 4.
 görevde Polar ürünlerini yazarken verir (K5/K6). Burada yalnız ölçü kayda
-geçiyor ki o gün tahminle değil sayıyla karar verilsin.
+geçiyor ki o gün tahminle değil sayıyla karar verilsin. **4. görevde
+(2026-09-22) K5'in tablosu öntanımlı yapıldı: `temel` 1.200, `pro` 4.500**
+(`services/planlar.py`; ortam değişkeni ezer) — sahibe söylenen sayı; Polar'da
+başka yazılırsa `.env`e de yazılır (§4 "Sapmalar (a)").
 
 **Dokunulan.** `catalog.py` (+13 girdi, −1 girdi, `emeklilik: date` alanı,
 kaynaklı fiyat yorumları, sıra yorumu), `services/planlar.py` (`Plan.rank`,
@@ -1139,7 +1142,7 @@ aynen uygulandı.
 
 ---
 
-## 4. Checkout, müşteri portalı, satış yüzü — `POST /api/odeme/checkout`, `GET /api/odeme/portal`, `/planlar`, "Kredi" bölmesi, `tools/polar_esitle.py` (PR: `faz4/checkout-portal`)
+## 4. Checkout, müşteri portalı, satış yüzü — `POST /api/odeme/checkout`, `GET /api/odeme/portal`, `/planlar`, "Kredi" bölmesi, `tools/polar_esitle.py` ✅ (PR: `faz4/checkout-portal`)
 
 **Kapsam.** Kullanıcı satın alır; çıkış kriterinin ödeme yarısı.
 
@@ -1219,6 +1222,113 @@ açılır; portal bağlantısı Polar'a gider; E2E sahte Polar yeşil; takım ye
 **Sahibin adımı — fiyatlar ve ürünler (bir kez sandbox, bir kez production).**
 Polar'da ürünleri ve fiyatları yaz (öneri tablosu K5), metadata'yı doldur,
 `python tools/polar_esitle.py` koş, `/planlar`a bak.
+
+**Yapıldığında (2026-09-22) — ölçümler ve sapmalar.** Rota 72 → **77** (`POST
+/api/odeme/checkout`, `GET /api/odeme/portal` `KAPILI` + `DIZINSIZ_KAPILI`; `GET
+/api/odeme/urunler` açık — `ACIK_ROTALAR` 8 → **9** gerekçesiyle; `/planlar` ve
+`/odeme/tesekkur` `SAYFALAR` 2 → **4**; `KAPILI` 64 → **68**), modül 114 →
+**115** (`tools/polar_esitle.py`; yeni `services/` modülü YOK — ürün/şart
+okumaları `services/odeme.py`ye, `siparisler` özeti `services/defter.py`ye),
+tarayıcı betiği 13 → **15** (`planlar.js`, `tesekkur.js`; `KAPSAM_DISI`
+gerekçeli), şablon 3 → **5** (`planlar.html`, `tesekkur.html`; `planlar.css`
+paylaşılır, `style.css` yüklenmez — `giris.html`in gerekçesi), göç YOK,
+`OPERATOR_ARACLARI` 9 → **10**, i18n **+53** tr/en (`err.*` 5, `planlar.*` 26,
+`tesekkur.*` 7, `kredi.*` 9, `admin.*` 6; `admin.kredi_yazildi` iki kovayı söyler),
+`DEPOLAR` `services/odeme.py` 6 → 11, `defter.py` 10 → 11 (alt sınır). Gemiye
+binen API: `polar.checkout_ac(*, urun_id, external_customer_id, customer_email,
+success_url, metadata) -> str`, `polar.portal_baglantisi(polar_musteri_id) ->
+str`, `polar.urunleri_listele() -> list[dict]` (SDK nesnesi modülden çıkmaz;
+pydantic `model_dump`); `odeme.aktif_urunler`, `odeme.urun_bul_id` (yalnız
+aktif), `odeme.urun_json` (Polar kimliği istemciye GİTMEZ), `odeme.sartlar_kabul_at_oku`
+/ `sartlar_kabul_yaz(db, hedef_id, an, *, surum)`, `odeme.polar_musteri_id_oku`,
+`odeme.urunler_bayat_mi` (`URUNLER_BAYAT_GUN = 7`), `odeme.SARTLAR_SURUMU`;
+`defter.siparisler(db, kullanici_id, *, limit=10)`; `GET /api/kredi` + `siparisler`;
+`depo_admin.kullanicilar` + `paket_bakiye`, `polar_musteri_id`;
+`depo_admin.odeme_ozeti` + `urunler_bayat`; admin `KrediIstegi.kova`
+(`hibe`|`paket`, cevap + `paket_bakiye`); `kimlik.giris_sayfasina` `/`
+dışındaki sayfalarda `?sonra=<yol>`. Checkout kapıları sırasıyla: 404
+`err.urun_yok` → 409 `err.abonelik_var` `{"portal": true, "plan"}` → 412
+`err.sartlar_gerekli` `{"surum"}` → Polar; SDK/ağ hatası **502**
+`err.odeme_saglayici` + `olay=odeme.saglayici_hata` ERROR; başarı
+`olay=odeme.checkout` / `odeme.portal` INFO; `detail` hep `{"kod", …}` (cümle
+yok — `check_plan`ın deseni, ön yüz çevirir). `polar_esitle`: metadata sözleşmesi
+`kromis_tur`/`kromis_plan`/`kromis_kredi`, fiyat ürünün ilk arşivlenmemiş
+`fixed` fiyatı, geçersiz ürün `UYARI URUN ATLANDI`, arşiv `aktif=false` (silinmez),
+her koşuda `guncellendi` ilerler, `--kontrol` stderr'e fark + çıkış 2/0.
+Testler **+~45** (`tests/test_odeme_route.py` 20: ürün listesi/sıra/kimlik
+gizli, checkout'un Polar'a giden alanları + `KROMIS_KOKEN`, 412 → onay
+sütunları bir kez, 404/422, 409 portal + paket serbest, 502 + ERROR satırı,
+portal 404/200, `/api/kredi` son 10 sipariş, iki sayfa × iki dil, id bağları,
+412/409 yalnız sunucu deyince, admin özet bayat/taze + WARNING, admin kova;
+`tests/test_araclar.py` 4 + 11 parametre: upsert/değişen/arşiv/atlanan,
+`--kontrol`, ortam hataları, metadata sözleşmesi, SDK sayfalama;
+`tests/test_index.py` toast ve `#run-cost` bağlantıları; `tests/test_kimlik.py`
+`?sonra=`; `tests/test_playwright_odeme.py` E2E: yerel "Polar" HTTP sunucusu,
+412 → onay → "Öde" → GERÇEK HMAC'li `order.paid` webhook → teşekkür sayfası
+"bakiyene işlendi" 200 → **700**, defter `hibe, paket`, sipariş 500; plan
+`temel` → pro'ya "Abone ol" 409 → portal düğmesi yamalı URL'ye gider). Takım
+**4.067 → 4.124 geçti, 12 atlandı, ~270 sn** (E2E + Postgres, `KROMIS_E2E_ZORUNLU=1`;
+toplanan 4.079 → 4.136; inceleme turu +9). Bu makinede bir kez `tests/test_isci.py`nin açılış/aralık
+bakım turu testi yük altında düştü (sinyal ile kapanış arasına ikinci bir `bakim`
+sıkıştı) — tek başına iki dalda da yeşil, bu PR'la ilgisiz; not düşüldü. **Sandbox uçtan uca ölçüm YAPILMADI** (Polar erişimi yok; sahibin
+adımı PR gövdesinde).
+
+**Sapmalar — belgeden farklı yapılanlar, gerekçesiyle.** (a) **Hibe
+öntanımlısı 1.000 / 3.000 → 1.200 / 4.500** (`planlar.py`, `.env.example`,
+KURULUM, testler): belge sayıyı "sahip 4. görevde verir" diye bırakmıştı;
+`/planlar` sayfası hibeyi kullanıcıya GÖSTERİYOR ve yer tutucu bir vaat
+olurdu. K5'in tablosu yazıldı, sahibe söylendi; Polar'da farklı yazılırsa
+ortam değişkeni ezer. `tests/test_odeme.py` K6 aritmetiğini 1.000 / 3.000'e
+ÇİVİLİ tutar (`PLANLAR` yamalı — sayılar anlatı, öntanımlıdan bağımsız). (b)
+**412'nin onayı 6'nın kutusu DEĞİL, checkout gövdesinde `sartlar_kabul: true`**:
+belge "6'nın onay kutusu" demişti ama 6 henüz yok ve 4'ün çıkış ölçütü onsuz
+ölçülemezdi; sayfa kutuyu yalnız sunucu 412 deyince gösterir, sunucu
+`sartlar_kabul_at` + `sartlar_surumu` yazar. **`SARTLAR_SURUMU = "0000-yer-tutucu"`**
+(`services/odeme.py`): metin yok ama sütun boş bırakılmaz — 6. görev sabiti
+`HUKUK_SURUMU`ya bağlar, `0000` satırları "metin öncesi onay" olarak ayrışır ve
+yeniden onay ister (§6 banner). (c) **409 `err.abonelik_var` + `{"portal": true}`**:
+belgenin "öneri"si uygulandı — ücretli plandaki kullanıcı plan ürünü seçince
+checkout AÇILMAZ, sayfa portal düğmesini gösterir (Polar oranlamayı portalda
+yapar; ikinci abonelik açılmaz); paket serbest. Polar'ın aynı aboneliği
+yükseltip yükseltmediği 3. görevde de doğrulanamadı (erişim yok), o yüzden
+güvenli taraf. (d) **`siparisler` `GET /api/kredi`nin içinde**, ayrı uç değil:
+bölme zaten o cevabı okuyor, ikinci istek ikinci yarış olurdu; son 10 özet
+(`defter.siparisler` — defterde, çünkü imza sözleşmesi `(db, kullanici_id)`
+depo kalıbı ve `services/odeme.py` kiracısız). (e) **`/planlar` KAPILI**
+(`sayfa_kullanicisi`, 302 `/giris?sonra=/planlar`): belge "oturumsuzsa
+`/giris?sonra=`" diyordu, fiyat listesinin kendisi oturumsuz uçta
+(`/api/odeme/urunler`); sayfa satın alma düğmesi taşıdığı için kapılı.
+`kimlik.giris_sayfasina` `/` dışındaki her sayfada `?sonra=<yol>` ekler
+(`/admin` dâhil; sorgu dizesi taşınmaz). (f) **Teşekkür sayfasının kanıtı
+sipariş, bakiye farkı değil**: webhook yönlendirmeden ÖNCE gelirse ilk okuma
+zaten yeni bakiyeyi taşır ve fark sıfır görünürdü; `siparisler[0]` son 15 dk
+içindeyse "işlendi", 30 sn sonra "birkaç dakika sürebilir". (g) **Ürün
+aynası uyarısı `depo_admin.odeme_ozeti`nin `urunler_bayat` alanı** + admin
+rotasında WARNING (`kromis.admin` günlükçüsü, `olay=odeme.urunler_bayat`) — ayrı
+uç yok, sekme zaten özeti okuyor. (h) **`tests/test_odeme.py` yanlış-sır
+probu düzeltildi** (kapsam dışı ama CI'ı kırmızı tutuyordu): `SIR + "x"` sondaki
+`=`ten sonra Python'ın gevşek `b64decode`unda AYNI anahtara çözülüyordu —
+0c3eb39'dan beri hiçbir şey sınamıyordu; `BASKA_SIR` kullanılıyor. (i)
+**`static/tesekkur.html` ayrı şablon** (belge "ya da tek şablon" demişti):
+iki sayfanın işi ayrı, CSS ortak. (j) **`.dockerignore`ya dokunulmadı**: araç
+imajda kalır (`OPERATOR_ARACLARI`'na eklendi), dışlama listesi değişmedi. (k)
+**Admin kova seçici** `KrediIstegi.kova` `Literal["hibe","paket"]` (422,
+CHECK'e varmadan); satırda `paket_bakiye` "hibe N · paket M" ve
+`polar_musteri_id`. (l) **`polar_esitle` yine `kiraci.baglam(rol=ADMIN)`
+kurar**: belge "admin bağlamı gereksiz" demişti (doğru — `urunler` politikasız),
+ama tests/test_rls.py'nin kaynak bekçisi `Session(` açan her aracı bağlamla
+ister; istisna defteri açmak yerine kural sürdürüldü, `BAGLAM_TASIYAN_ARACLAR` +1.
+Belgenin kalan cümleleri aynen uygulandı.
+
+**Açık kalan (inceleme notu, 2026-09-22) — teşekkür sayfasının kanıtı zayıf.**
+Sayfa "işlendi"yi `siparisler[0]` son 15 dk içindeyse söylüyor (sapma (f)):
+aynı 15 dk içinde İKİNCİ bir satın alma, ilk siparişi görüp eski bakiyeyle
+"işlendi" diyebilir (bakiye rakamı yine gerçek — yalnız cümle erken).
+Doğru çözüm `checkout_id`yi `siparisler`e yazmak (Polar `order.checkout_id`
+alanını gönderiyor; webhook `_siparis_yaz` okur) ve sayfanın `?checkout_id=`
+ile eşleştirmesi — GÖÇ ister (`siparisler.checkout_id text NULL` + indeks),
+bu PR'da açılmadı. 7. görevin ya da küçük bir ara PR'ın işi; o güne kadar
+kullanıcı yüzü dürüst kalıyor (bakiye doğru, teşekkür cümlesi en kötü erken).
 
 ---
 

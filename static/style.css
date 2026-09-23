@@ -458,6 +458,8 @@ body {
 /* Faz 3 / 6: tur bakiyeyi aşıyor — yalnız RENK, düğme kapanmaz (402 sunucuda).
    --danger-text: --danger'ın metin karışımı, küçük punto monospace'te okunur. */
 .run-cost.run-cost-uyari { color: var(--danger-text); }
+/* "kredi al" (Faz 4 / 4): yalnız uyarı hâlinde eklenir (core.js krediAlBaglantisi). */
+.run-cost-kredi-al { color: inherit; text-decoration: underline; }
 
 /* 402/403 toast'ı (core.js krediToast): tek yüzey, sağ altta, .sheet'lerin ve
    perdenin ÜSTÜNDE (z 40/50) ki Ayarlar açıkken de görünsün; onay diyaloğunun
@@ -3048,6 +3050,12 @@ body.viewer-open { overflow: hidden; }
 .kredi-zaman { color: var(--muted); }
 .kredi-hareket .kredi-aciklama { grid-column: 1 / -1; margin: 0; }
 .kredi-is { padding: 2px 8px; font-size: 11px; }
+/* Faz 4 / 4: bölmenin eylemleri (planlar bağlantısı + portal düğmesi) ve sipariş özeti. */
+.kredi-eylemler { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+.kredi-eylemler a.btn-ghost { text-decoration: none; }
+.kredi-siparisler { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.kredi-siparis { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; }
+.kredi-siparis .kredi-urun { font-weight: 600; }
 .platform-notu, .anahtar-sil { margin-top: 0.4rem; }
 .is-durum { margin-left: auto; font-size: 12px; }
 .is-sure { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }

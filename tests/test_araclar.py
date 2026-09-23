@@ -1,4 +1,4 @@
-"""`tools/marj_raporu.py` ve `tools/tarife_kontrol.py` — sahibin mutabakat araçları (Faz 3 / 5; belge §5).
+"""`tools/marj_raporu.py`, `tools/tarife_kontrol.py` ve `tools/polar_esitle.py` — sahibin araçları (Faz 3 / 5; Faz 4 / 4).
 
 `marj_raporu`: GERÇEK Postgres (`depo_db`; `veritabani` fixture'ı `DATABASE_URL`i
 bu DB'ye çevirir, araç motorunu oradan kurar — tests/test_kullanici_cli.py deseni).
@@ -30,8 +30,9 @@ import pytest
 from sqlalchemy.orm import Session
 
 import catalog
-from services import db, kuyruk, zaman
-from tools import marj_raporu, tarife_kontrol
+from services import db, kuyruk, polar, zaman
+from services.tablolar import Urun
+from tools import marj_raporu, polar_esitle, tarife_kontrol
 
 pytestmark = pytest.mark.usefixtures("depo_db")
 
@@ -239,3 +240,244 @@ def test_the_tool_says_the_catalogue_is_clean_and_exits_zero(capsys):
     assert tarife_kontrol.main([]) == 0
     assert capsys.readouterr().out.startswith("notlu model yok")
     assert tarife_kontrol.rapor([]).startswith("notlu model yok")
+
+
+# ── polar_esitle (Faz 4 / 4) ─────────────────────────────────────────────
+# Sahte Polar: `polar.urunleri_listele` yamalı (düz sözlükler — SDK `model_dump` biçimi);
+# `urunler` gerçek Postgres. Araç `DATABASE_URL`i `veritabani` fixture'ından alır (marj_raporu deseni).
+
+P_PAKET = "00000000-0000-4000-8000-00000000e001"
+P_TEMEL = "00000000-0000-4000-8000-00000000e002"
+P_BAGIS = "00000000-0000-4000-8000-00000000e0ff"
+
+
+def _polar_urunu(kimlik: str, ad: str, meta: dict, fiyat: int = 500, birim: str = "usd", *, arsiv: bool = False,
+                 fiyatlar: list | None = None, tekrarli: bool | None = None, aralik: str | None = "auto") -> dict:
+    """Polar `Product`ının `model_dump(mode="json")` hâlinden okuduğumuz alanlar (SDK 0.32.0 adları).
+
+    Öntanımlı kadans metadata'ya uyar (plan → aylık abonelik, paket → tek seferlik); `tekrarli`/`aralik`
+    ile bilerek UYUMSUZ ürün kurulur (kadans bekçisi testleri)."""
+    plan_mi = meta.get("kromis_tur") == "plan"
+    tekrarli = plan_mi if tekrarli is None else tekrarli
+    if aralik == "auto":
+        aralik = "month" if tekrarli else None
+    return {
+        "id": kimlik, "name": ad, "is_archived": arsiv, "is_recurring": tekrarli, "recurring_interval": aralik,
+        "metadata": meta,
+        "prices": fiyatlar if fiyatlar is not None else [
+            {"id": kimlik + "-p", "amount_type": "fixed", "price_amount": fiyat, "price_currency": birim,
+             "is_archived": False, "type": "recurring" if tekrarli else "one_time"}],
+    }
+
+
+def _polar_listesi() -> list[dict]:
+    return [
+        _polar_urunu(P_PAKET, "500 kredi", {"kromis_tur": "paket", "kromis_kredi": "500"}),
+        _polar_urunu(P_TEMEL, "Temel", {"kromis_tur": "plan", "kromis_plan": "temel", "kromis_kredi": 1200}, fiyat=900),
+        _polar_urunu(P_BAGIS, "Bağış", {}),   # metadata yok → atlanır, WARNING
+    ]
+
+
+@pytest.fixture
+def polar_ortami(depo_db, monkeypatch):
+    monkeypatch.setenv(polar.JETON_ENV, "polar_oat_DUMMY")
+    monkeypatch.delenv(polar.ORTAM_ENV, raising=False)
+    with depo_db.begin() as c:
+        from sqlalchemy import text
+        c.execute(text("DELETE FROM siparisler"))
+        c.execute(text("DELETE FROM urunler"))
+    yield
+
+
+def _ayna(depo_db) -> dict[str, Urun]:
+    from sqlalchemy import select
+    with Session(depo_db, expire_on_commit=False) as s:
+        return {u.polar_urun_id: u for u in s.scalars(select(Urun))}
+
+
+def test_polar_esitle_upserts_new_products_updates_changed_ones_archives_removed_and_skips_invalid_with_a_warning(
+        depo_db, polar_ortami, monkeypatch, capsys):
+    liste = _polar_listesi()
+    monkeypatch.setattr(polar, "urunleri_listele", lambda: liste)
+    assert polar_esitle.main([]) == 0
+    cikti = capsys.readouterr()
+    assert "UYARI URUN ATLANDI" in cikti.out and "kromis_tur eksik" in cikti.out and P_BAGIS in cikti.out
+    assert "2 yeni, 0 degisen, 0 ayni, 1 atlanan, 0 kapanan" in cikti.out
+    assert "2 urun yazildi, 0 bayat satir kapatildi (sandbox)" in cikti.err
+    ayna = _ayna(depo_db)
+    assert set(ayna) == {P_PAKET, P_TEMEL}, "geçersiz ürün aynaya sızmaz"
+    paket, temel = ayna[P_PAKET], ayna[P_TEMEL]
+    assert (paket.tur, paket.plan, paket.kredi, paket.fiyat_kurus, paket.para_birimi, paket.ad, paket.aktif) == \
+        ("paket", None, 500, 500, "usd", "500 kredi", True)
+    assert (temel.tur, temel.plan, temel.kredi, temel.fiyat_kurus, temel.ad) == ("plan", "temel", 1_200, 900, "Temel")
+    ilk_guncelleme = paket.guncellendi
+    # İkinci koşu: fiyat değişti, paket Polar'da arşivlendi → satır KALIR, `aktif=false`; sayı aynı, `guncellendi` ilerler.
+    liste[0]["is_archived"] = True
+    liste[1]["prices"][0]["price_amount"] = 1_200
+    assert polar_esitle.main([]) == 0
+    assert "0 yeni, 2 degisen, 0 ayni, 1 atlanan, 0 kapanan" in capsys.readouterr().out
+    ayna = _ayna(depo_db)
+    assert set(ayna) == {P_PAKET, P_TEMEL}
+    assert ayna[P_PAKET].aktif is False and ayna[P_PAKET].id == paket.id, "arşiv: silinmez, aynı satır"
+    assert ayna[P_TEMEL].fiyat_kurus == 1_200 and ayna[P_TEMEL].guncellendi > ilk_guncelleme
+    # Üçüncü koşu, değişiklik yok: hepsi "ayni", yine yazılır ki tazelik damgası ilersin.
+    assert polar_esitle.main([]) == 0
+    assert "0 yeni, 0 degisen, 2 ayni, 1 atlanan, 0 kapanan" in capsys.readouterr().out
+    assert _ayna(depo_db)[P_TEMEL].guncellendi > ayna[P_TEMEL].guncellendi
+
+
+def test_polar_esitle_kontrol_prints_the_diff_to_stderr_without_writing_and_exits_2_only_when_there_is_one(
+        depo_db, polar_ortami, monkeypatch, capsys):
+    liste = _polar_listesi()
+    monkeypatch.setattr(polar, "urunleri_listele", lambda: liste)
+    assert polar_esitle.main(["--kontrol"]) == 2
+    cikti = capsys.readouterr()
+    assert cikti.out == "" and f"+ {P_PAKET}" in cikti.err and "2 yeni" in cikti.err
+    assert _ayna(depo_db) == {}, "--kontrol yazmaz"
+    assert polar_esitle.main([]) == 0
+    capsys.readouterr()
+    assert polar_esitle.main(["--kontrol"]) == 0, "ayna Polar'la aynı → fark yok"
+    assert "0 yeni, 0 degisen, 2 ayni, 1 atlanan, 0 kapanan" in capsys.readouterr().err
+    liste[1]["name"] = "Temel Plan"
+    assert polar_esitle.main(["--kontrol"]) == 2
+    assert f"~ {P_TEMEL}" in capsys.readouterr().err
+
+
+def test_polar_esitle_refuses_without_a_database_url_or_a_token_and_reports_a_provider_failure_as_2(
+        depo_db, monkeypatch, capsys):
+    monkeypatch.delenv(db.DATABASE_URL_ENV, raising=False)
+    monkeypatch.setenv(polar.JETON_ENV, "polar_oat_DUMMY")
+    assert polar_esitle.main([]) == 2 and db.DATABASE_URL_ENV in capsys.readouterr().err
+    monkeypatch.setenv(db.DATABASE_URL_ENV, "postgresql+psycopg://x:y@127.0.0.1:1/z")
+    monkeypatch.delenv(polar.JETON_ENV, raising=False)
+    assert polar_esitle.main([]) == 2 and polar.JETON_ENV in capsys.readouterr().err
+    monkeypatch.setenv(polar.JETON_ENV, "polar_oat_DUMMY")
+
+    def _dusen():
+        raise ConnectionError("DUMMY: sandbox-api.polar.sh unreachable")
+    monkeypatch.setattr(polar, "urunleri_listele", _dusen)
+    assert polar_esitle.main([]) == 2 and "Polar hatasi (ConnectionError)" in capsys.readouterr().err
+
+
+def test_polar_esitle_closes_mirror_rows_that_polar_no_longer_lists_or_that_became_invalid(
+        depo_db, polar_ortami, monkeypatch, capsys):
+    """Silinmiş ürün (listede yok) ve geçersizleşmiş ürün (metadata bozuldu) aynı kapıdan `aktif=false`;
+    bir kez kapanır (ikinci koşuda `kapanan` 0); `--kontrol` `-` satırıyla gösterir ve 2 döner."""
+    liste = _polar_listesi()
+    monkeypatch.setattr(polar, "urunleri_listele", lambda: liste)
+    assert polar_esitle.main([]) == 0
+    capsys.readouterr()
+    silinen = liste.pop(0)                                  # paket Polar'dan silindi
+    liste[0]["metadata"] = {"kromis_tur": "plna", "kromis_plan": "temel", "kromis_kredi": 1200}   # yazım hatası
+    assert polar_esitle.main(["--kontrol"]) == 2
+    err = capsys.readouterr().err
+    assert f"- {P_PAKET}" in err and f"- {P_TEMEL}" in err and "0 yeni, 0 degisen, 0 ayni, 2 atlanan, 2 kapanan" in err
+    assert all(u.aktif for u in _ayna(depo_db).values()), "--kontrol yazmaz"
+    assert polar_esitle.main([]) == 0
+    cikti = capsys.readouterr()
+    assert f"- {P_PAKET}" in cikti.out and "0 urun yazildi, 2 bayat satir kapatildi" in cikti.err
+    ayna = _ayna(depo_db)
+    assert set(ayna) == {P_PAKET, P_TEMEL} and not any(u.aktif for u in ayna.values()), "satır silinmez, kapanır"
+    assert polar_esitle.main([]) == 0
+    assert "0 bayat satir kapatildi" in capsys.readouterr().err, "zaten kapalı satır yeniden sayılmaz"
+    # Ürün geri gelirse (metadata düzeltildi) yeniden açılır.
+    liste.insert(0, silinen)
+    liste[1]["metadata"]["kromis_tur"] = "plan"
+    assert polar_esitle.main([]) == 0
+    assert all(u.aktif for u in _ayna(depo_db).values())
+
+
+@pytest.mark.parametrize("meta, kadans, beklenen", [
+    # plan tek seferlik satılmış → atla; paket abonelik → atla; plan yıllık → aylık fiyat yok → atla.
+    ({"kromis_tur": "plan", "kromis_plan": "temel", "kromis_kredi": 1200}, {"tekrarli": False}, "abonelik degil"),
+    ({"kromis_tur": "paket", "kromis_kredi": 500}, {"tekrarli": True}, "abonelik olamaz"),
+    ({"kromis_tur": "plan", "kromis_plan": "temel", "kromis_kredi": 1200}, {"aralik": "year"}, "recurring_interval == 'month'"),
+])
+def test_satira_cevir_enforces_the_cadence_a_plan_is_a_monthly_subscription_and_a_pack_is_one_time(meta, kadans, beklenen):
+    satir = polar_esitle.satira_cevir(_polar_urunu("p1", "Ürün", meta, **kadans))
+    assert isinstance(satir, str) and beklenen in satir, satir
+
+
+def test_satira_cevir_picks_the_monthly_price_of_a_legacy_product_that_also_carries_a_yearly_one():
+    """Eski Polar ürünlerinde kadans FİYATTA (`legacy: true`, `recurring_interval`); yıllık önde dursa da aylık seçilir."""
+    fiyatlar = [
+        {"amount_type": "fixed", "is_archived": False, "price_amount": 9_000, "price_currency": "usd",
+         "legacy": True, "recurring_interval": "year", "type": "recurring"},
+        {"amount_type": "fixed", "is_archived": False, "price_amount": 900, "price_currency": "usd",
+         "legacy": True, "recurring_interval": "month", "type": "recurring"},
+    ]
+    urun = _polar_urunu("p1", "Temel", {"kromis_tur": "plan", "kromis_plan": "temel", "kromis_kredi": 1200},
+                        fiyatlar=fiyatlar, aralik=None)
+    satir = polar_esitle.satira_cevir(urun)
+    assert isinstance(satir, polar_esitle.Satir) and satir.fiyat_kurus == 900
+    # Yalnız yıllık fiyatı olan legacy plan → atlanır.
+    urun["prices"] = fiyatlar[:1]
+    assert "recurring_interval == 'month'" in polar_esitle.satira_cevir(urun)
+
+
+@pytest.mark.parametrize("meta, fiyatlar, beklenen", [
+    ({"kromis_tur": "paket", "kromis_kredi": "500"}, None, ("paket", None, 500)),
+    ({"kromis_tur": "paket", "kromis_kredi": 500.0}, None, ("paket", None, 500)),     # Polar float saklayabilir
+    ({"kromis_tur": "plan", "kromis_plan": "pro", "kromis_kredi": 4500}, None, ("plan", "pro", 4_500)),
+    ({"kromis_tur": "abonelik", "kromis_kredi": 1}, None, "kromis_tur"),
+    ({"kromis_tur": "plan", "kromis_plan": "free", "kromis_kredi": 1}, None, "kromis_plan"),   # ücretsiz satılmaz
+    ({"kromis_tur": "plan", "kromis_plan": "temel"}, None, "kromis_kredi"),
+    ({"kromis_tur": "paket", "kromis_kredi": "0"}, None, "kromis_kredi"),
+    ({"kromis_tur": "paket", "kromis_kredi": True}, None, "kromis_kredi"),
+    ({"kromis_tur": "paket", "kromis_kredi": "²"}, None, "kromis_kredi"),         # `isdigit` doğru, `int()` çökerdi
+    ({"kromis_tur": "paket", "kromis_kredi": 5}, [], "sabit fiyat yok"),
+    ({"kromis_tur": "paket", "kromis_kredi": 5},
+     [{"amount_type": "custom", "is_archived": False, "price_currency": "usd", "minimum_amount": 100}], "sabit fiyat yok"),
+    ({"kromis_tur": "paket", "kromis_kredi": 5},
+     [{"amount_type": "fixed", "is_archived": True, "price_amount": 100, "price_currency": "usd"},
+      {"amount_type": "fixed", "is_archived": False, "price_amount": 700, "price_currency": "eur"}], ("paket", None, 5, 700, "eur")),
+])
+def test_satira_cevir_reads_the_metadata_contract_and_the_first_live_fixed_price(meta, fiyatlar, beklenen):
+    satir = polar_esitle.satira_cevir(_polar_urunu("p1", " Ürün ", meta, fiyatlar=fiyatlar))
+    if isinstance(beklenen, str):
+        assert isinstance(satir, str) and beklenen in satir, satir
+    else:
+        assert isinstance(satir, polar_esitle.Satir) and satir.ad == "Ürün"
+        assert (satir.tur, satir.plan, satir.kredi) == beklenen[:3]
+        if len(beklenen) > 3:
+            assert (satir.fiyat_kurus, satir.para_birimi) == beklenen[3:]
+
+
+def test_urunleri_listele_walks_every_sdk_page_and_keeps_archived_products(monkeypatch):
+    """SDK `products.list(is_archived=…, limit=100)` iki kez → `.result.items` + `.next()` zinciri."""
+    class _Urun:
+        def __init__(self, kimlik, arsiv):
+            self.kimlik, self.arsiv = kimlik, arsiv
+
+        def model_dump(self, mode="json"):
+            return {"id": self.kimlik, "is_archived": self.arsiv, "mode": mode}
+
+    class _Sonuc:
+        def __init__(self, items):
+            self.items = items
+
+    class _Sayfa:
+        def __init__(self, items, sonraki):
+            self.result, self._sonraki = _Sonuc(items), sonraki
+
+        def next(self):
+            return self._sonraki
+
+    cagrilar: list[dict] = []
+
+    class _Products:
+        def list(self, **kw):
+            cagrilar.append(kw)
+            if kw["is_archived"]:
+                return _Sayfa([_Urun("z", True)], None)
+            return _Sayfa([_Urun("a", False), _Urun("b", False)], _Sayfa([_Urun("c", False)], None))
+
+    class _Istemci:
+        products = _Products()
+
+    monkeypatch.setattr(polar, "istemci", lambda: _Istemci())
+    urunler = polar.urunleri_listele()
+    assert [(u["id"], u["is_archived"]) for u in urunler] == [("a", False), ("b", False), ("c", False), ("z", True)]
+    assert all(u["mode"] == "json" for u in urunler)
+    assert cagrilar == [{"is_archived": False, "limit": 100}, {"is_archived": True, "limit": 100}], (
+        "iki AÇIK çağrı: arşivlenen ürün `aktif=false` olmak zorunda, öntanımlıya güvenilmez")

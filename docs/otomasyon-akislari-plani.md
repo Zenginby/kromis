@@ -131,7 +131,7 @@ bugünkü eğilim **Upload-Post** (altyazı desteği yüzünden).
 
 ## Bugünkü zemin — plan hangi parçaların üstüne konuşuyor
 
-Koda bakılarak (2026-09-23, `main` `d8b218d`):
+Koda bakılarak (2026-09-23, `main` `664c4e6` — #82 Faz 4 / 5 dâhil):
 
 | parça | nerede | akış için anlamı |
 | --- | --- | --- |
@@ -144,6 +144,8 @@ Koda bakılarak (2026-09-23, `main` `d8b218d`):
 | SSRF kapısı | `fal_client.py::_guvenli_hedef_mi` | RSS okuma ve A5 video çekme aynı kapıdan |
 | Prompt Yönetmeni | `routers/sohbet.py` (`POST /api/chat`), `chat_client.complete` | Bugün **eşzamanlı** ve **kredisiz** (rota defterle konuşmuyor) → işçide `yazi` iş türü; kredi ekseni Kromis Ajanı'yla |
 | Sunucuda video aracı YOK | Faz 3 K7: ffmpeg imaja girmiyor (+~100 MB, yeni ikili) | Kare çıkarma / ses birleştirme BARINDIRILAN uçlardan (fal ffmpeg-api) — karar yeniden açılmıyor |
+| Hesap silme (Faz 4 / 5, #82) | `routers/hesap.py::sil` (anında: bekleyen işler iptal + rezerv iadesi, BYOK anahtarları, oturumlar/jetonlar, Polar aboneliği), `services/isci.py::silme_turu` (7 gün sonra kiracı satırları ELLE TUTULAN listeyle: `isler`, `medya`, `klasorler`, `sohbetler`, `paletler`, `varliklar`, `tercihler` + nesne öneki) | Yeni tabloların her biri iki listeden birine girmek zorunda — aşağıda "Hesap silme ve dışa aktarma" |
+| Veri dışa aktarma (Faz 4 / 5, #82) | `services/disa_aktar.py` — dokuz dosyalık ZIP, yine ELLE TUTULAN liste; `saglayici_meta` dökülmez | Akışlar ve çalışmalar kullanıcının verisi → ZIP'e girer; jeton ve sırlar girmez |
 
 ---
 
@@ -193,6 +195,39 @@ YAGNI — gerekirse aynı sütuna ikinci bir biçim girer.
 * Adım düşerse çalışma `hata`, kalan adımlar koşmaz, düşen işin kredisi bugünkü
   kuralla iade. **Otomatik yeniden deneme YOK** — Faz 2 K8'in gerekçesi aynen
   (çağrının gidip gitmediği bilinmez, çift fatura).
+
+## Hesap silme ve dışa aktarma — Faz 4 / 5 ile uyum
+
+#82 (2026-09-23) hesap silmeyi ve dışa aktarmayı ELLE TUTULAN iki listeyle
+kurdu. Akışların getirdiği her tablo bu listelerde yer almak zorunda; yoksa
+silinen hesabın akışı zamanlayıcıda çalışmaya, bağlı sosyal hesabı yayına devam
+eder.
+
+* **Silme anında** (`routers/hesap.py::sil`, bugünkü "BYOK anahtarları HEMEN"
+  deseni): bütün akışlar `duraklatildi`; süren çalışmalar `iptal` (bekleyen
+  adım işleri zaten `kuyruk.sahibin_islerini_iptal` ile iade ediliyor —
+  `calisma_id`li işler de sıradan iş); webhook jetonları silinir; `baglantilar`
+  satırları silinir ve birleşik API'deki bağlı profil KOPARILIR. Koparma dış
+  bir çağrı: Polar iptalinin deyimiyle, başarısızlık silmeyi durdurmaz, sahibe
+  uyarı düşer.
+* **Silme turunda** (`isci.silme_turu`, 7 gün sonra): `akislar`,
+  `akis_konulari`, `akis_calismalari` (ve RSS'in görülen öğe kayıtları) kiracı
+  bağlamında silinir; A5'in video girdileri zaten `kullanicilar/<id>/`
+  önekinde, nesne süpürmesine girer.
+* **Dışa aktarmada** (`services/disa_aktar.py`): `akislar.json` (tanım, tetik,
+  konular — webhook jetonu HARİÇ), `akis_calismalari.json` (durum, girdi,
+  kredi tahmini; `tanim_kopyasi` dâhil). Bağlantılardan yalnız platform ve hesap
+  adı; jeton ve profil kimliği girmez. Dosya sayısı dokuzdan on bire çıkar —
+  `test_the_export_zip_carries_the_nine_files…` ve "boş hesap" testi birlikte
+  güncellenir.
+* **Bekçi (A1'de, önce):** bugün iki listeyi koruyan bir KAPSAM testi yok —
+  `tests/test_hesap_silme.py` listelerin içeriğini ölçüyor ama yeni bir kiracı
+  tablosunun hiçbir listeye girmediğini yakalamıyor. CLAUDE.md §5'in deyimi:
+  RLS'li her tablo ya silme turunda ya gerekçeli muafiyette (bugün
+  `kredi_hareketleri`, `siparisler` — mali kayıt, K9), ya dışa aktarmada ya
+  gerekçeli muafiyette (`saglayici_kimlikleri`, `oturumlar`, `jetonlar` gibi
+  sırlar). Bu bekçi akışlardan BAĞIMSIZ olarak da Faz 4 / 5'in bir eksiği; A1
+  başlamadan ayrı küçük bir PR olarak gelebilir.
 
 ## Tasarım 2 — Bağlantılar, yayın, onay, tetikleyiciler
 
@@ -350,9 +385,9 @@ Her aşama kendi görev listesi ve PR'larıyla; sıra bağımlılığa göre.
 | aşama | içerik | çıkış kriteri |
 | --- | --- | --- |
 | **A0 — doğrulama** | Upload-Post / Zernio karşılaştırması (IG/FB/YT, Shorts'un herkese açık yayını, idempotency, AI etiketi alanları, altyazı/kapak, güncel fiyat); Meta'da AI etiketi API alanı; C2PA'nın bizim yolumuzda nerede düştüğünün ölçümü | Karar notu; kod TUTULMAZ |
-| **A1 — motor** | Göç (`akislar`, `akis_calismalari`, `isler` sütunları), tanım şeması + doğrulama, `yazi` iş türü, `ilerlet`, elle çalıştırma, kredi tahmini, Akışlar arayüzü (liste, düzenleyici, geçmiş) | Elle çalıştırılan akış dört içerik türünü üretir, çıktılar galeriye düşer; yayın YOK |
+| **A1 — motor** | Silme/dışa aktarma kapsam bekçisi (önce); göç (`akislar`, `akis_calismalari`, `isler` sütunları), tanım şeması + doğrulama, `yazi` iş türü, `ilerlet`, elle çalıştırma, kredi tahmini, Akışlar arayüzü (liste, düzenleyici, geçmiş); yeni tablolar silme turunda ve dışa aktarmada | Elle çalıştırılan akış dört içerik türünü üretir, çıktılar galeriye düşer; yayın YOK |
 | **A2 — zamanlama** | Takvim + `akis_konulari` | Zamanlanmış çalışma konu listesinden sıradakini alır; liste bitince akış duraklar |
-| **A3 — yayın** | `baglantilar`, birleşik API bağlayıcısı, `yayin` iş türü, onay kuyruğu, AI etiketi, `otomatik_yayin` | IG + FB + YT Shorts'a onaylı yayın, sahibin hesaplarında |
+| **A3 — yayın** | `baglantilar`, birleşik API bağlayıcısı, `yayin` iş türü, onay kuyruğu, AI etiketi, `otomatik_yayin`; hesap silmede bağlantı koparma | IG + FB + YT Shorts'a onaylı yayın, sahibin hesaplarında |
 | **A4 — dış tetikleyiciler** | Webhook + RSS | n8n/Zapier'den ve bir blog akışından tetiklenen çalışma |
 | **A5 — kendi videonu işle** | `video_girdisi`, `transkript`, `ceviri`, `analiz`, `kare`, `kapak`; YouTube çok dilli altyazı + kapak + `localizations` | Webhook'la verilen video çok dilli altyazı, başlık, bölüm ve kapakla onaydan geçip yayınlanır |
 | **Sonra** | Kromis Ajanı + sohbet kredi ekseni; dublaj (üç seçenek); Drive (`drive.file`) / S3 / Canva (ikili yükleme); TikTok (taslak/inbox); resmi bağlayıcılar (Meta App Review, YouTube audit); `Plan.otomasyon` ve fiyatlandırma; C2PA koruma | Herkese açılış |

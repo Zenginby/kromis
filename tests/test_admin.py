@@ -298,7 +298,8 @@ def test_users_are_listed_newest_first_with_derived_fields_searched_and_paged(c,
     assert satirlar[d.eposta]["dogrulandi"] is False
     assert set(bs) == {"id", "eposta", "is_admin", "dogrulandi", "olusturuldu", "son_gorulme",
                        "gunluk_kredi_tavani", "kredi_24sa", "aktif_is", "plan", "bakiye",
-                       "paket_bakiye", "polar_musteri_id"}
+                       "paket_bakiye", "polar_musteri_id", "silindi_at", "temizlendi_at"}
+    assert bs["silindi_at"] is None and bs["temizlendi_at"] is None, "Faz 4 / 5: yaşayan hesapta iki damga boş"
     assert bs["plan"] == "free" and bs["bakiye"] == 0, "Faz 3 / 3: plan ve bakiye satırın kendi sütunları"
     assert bs["paket_bakiye"] == 0 and bs["polar_musteri_id"] is None, "Faz 4 / 4: paket kovası ve Polar kimliği"
     # Arama e-postada geçen metin; joker karakter düz metin.

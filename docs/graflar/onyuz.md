@@ -61,7 +61,7 @@ flowchart LR
   n_planlar_js["planlar.js"] -->|1| n_i18n_js["i18n.js"]
   n_settings_js["settings.js"] -->|1| n_assets_js["assets.js"]
   n_settings_js["settings.js"] -->|1| n_chat_js["chat.js"]
-  n_settings_js["settings.js"] -->|13| n_core_js["core.js"]
+  n_settings_js["settings.js"] -->|14| n_core_js["core.js"]
   n_settings_js["settings.js"] -->|3| n_folders_js["folders.js"]
   n_settings_js["settings.js"] -->|1| n_i18n_js["i18n.js"]
   n_settings_js["settings.js"] -->|1| n_palette_js["palette.js"]
@@ -75,7 +75,7 @@ flowchart LR
 
 | betik | satır | üst düzey tanım | çağırdığı sunucu yolları |
 | --- | --- | --- | --- |
-| `static/admin.js` | 579 | 0 | `/api/admin/isler`, `/api/admin/isler/{}/iptal`, `/api/admin/kullanicilar`, `/api/admin/kullanicilar/{}/kredi`, `/api/admin/kullanicilar/{}/oturum-dusur`, `/api/admin/kullanicilar/{}/plan`, `/api/admin/kullanicilar/{}/tavan`, `/api/admin/metrikler`, `/api/admin/odeme-olaylari` |
+| `static/admin.js` | 595 | 0 | `/api/admin/isler`, `/api/admin/isler/{}/iptal`, `/api/admin/kullanicilar`, `/api/admin/kullanicilar/{}/kredi`, `/api/admin/kullanicilar/{}/oturum-dusur`, `/api/admin/kullanicilar/{}/plan`, `/api/admin/kullanicilar/{}/tavan`, `/api/admin/metrikler`, `/api/admin/odeme-olaylari` |
 | `static/assets.js` | 586 | 25 | `/api/assets/{}`, `/api/assets/{}/{}`, `/api/banner`, `/api/banner/preview`, `/api/logo`, `/api/logo/preview`, `/assets/banners/{}`, `/assets/logos/{}`, `/assets/mottos/{}`, `/assets/{}/{}`, `/output/{}` |
 | `static/chat.js` | 2773 | 90 | `/api/arena/{}`, `/api/arena/{}/winner`, `/api/chat`, `/api/chats`, `/api/chats/{}`, `/api/prefs`, `/output/{}.${videoMu ` |
 | `static/core.js` | 3417 | 96 | `/api/edit`, `/api/generate`, `/api/image/{}`, `/api/kredi`, `/api/output/{}/download`, `/api/prefs`, `/api/video`, `/api/video/animate`, `/output/`, `/output/{}`, `/output/{}.png` |
@@ -87,7 +87,7 @@ flowchart LR
 | `static/palette.js` | 847 | 37 | `/api/palette/suggest`, `/api/palettes`, `/api/palettes/{}` |
 | `static/pixel-canvas.js` | 347 | 0 | — |
 | `static/planlar.js` | 255 | 0 | `/api/kredi`, `/api/odeme/checkout`, `/api/odeme/portal`, `/api/odeme/urunler` |
-| `static/settings.js` | 1327 | 34 | `/api/guncelleme`, `/api/hesap/ben`, `/api/hesap/cikis`, `/api/odeme/portal`, `/api/prefs`, `/api/settings` |
+| `static/settings.js` | 1451 | 38 | `/api/guncelleme`, `/api/hesap/ben`, `/api/hesap/cikis`, `/api/hesap/disa-aktar`, `/api/hesap/sil`, `/api/odeme/portal`, `/api/prefs`, `/api/settings` |
 | `static/tesekkur.js` | 68 | 0 | `/api/kredi` |
 | `static/viewer.js` | 540 | 0 | `/output/` |
 

@@ -209,7 +209,7 @@ def aktif_sayisi(db: Session, kullanici_id: uuid.UUID) -> int:
 
 
 def listele(db: Session, kullanici_id: uuid.UUID, *, since: dt.datetime | None = None,
-            limit: int = 50, durumlar: tuple[str, ...] | None = None) -> list[dict[str, Any]]:
+            limit: int | None = 50, durumlar: tuple[str, ...] | None = None) -> list[dict[str, Any]]:
     """Kullanıcının işleri, EN YENİ ÜSTTE; `since` verilmişse yalnız o andan sonra DEĞİŞENLER.
 
     "Değişme" = `olusturuldu`/`basladi`/`bitti`nin en büyüğü (`GREATEST` NULL'u
@@ -220,6 +220,8 @@ def listele(db: Session, kullanici_id: uuid.UUID, *, since: dt.datetime | None =
     `durumlar` (Faz 2 / 4): yalnız bu durumdaki işler — `GET /api/isler`in
     öntanımlı görünümü "aktifler + son 50" ve 51. sıraya düşmüş bir `bekliyor`
     iş listeden kaybolmasın diye aktifler AYRI çekilir (`AKTIF_DURUMLAR`).
+    `limit=None` (Faz 4 / 5): TAMAMI — veri dışa aktarma (`services/disa_aktar.py`)
+    kullanıcının bütün işlerini döker; `LIMIT` olmadan da sıra aynı.
     """
     sorgu = select(Is).where(Is.kullanici_id == kullanici_id)
     if since is not None:
@@ -503,6 +505,36 @@ def eskileri_sil(db: Session, kullanici_id: uuid.UUID, an: dt.datetime,
         dizinler = {ayar.is_dizini(kid, is_id)} | {ayar.girdi_dizini(a) for a in _girdi_anahtarlari(istek)}
         silinenler.append(SilinenIs(kid, is_id, frozenset(dizinler)))
     return silinenler
+
+
+# ─────────────────────────────────────────────────── hesap silme (Faz 4 / 5)
+
+def sahibin_islerini_iptal(db: Session, kullanici_id: uuid.UUID, an: dt.datetime) -> list[uuid.UUID]:
+    """Kullanıcının BÜTÜN `bekliyor` işlerini iptal eder (`bitti = an`); iptal edilen id'ler.
+
+    Hesap silme anında (`routers/hesap.py sil`, K9): kuyrukta bekleyen iş
+    silinmiş bir hesap adına koşmasın ve rezervi hemen geri dönsün — çağıran her
+    id için `defter.iade` yazar (iptal rotasının deseni). `calisiyor` iş
+    DOKUNULMAZ (`iptal`ın gerekçesi: sağlayıcı çoktan faturalandı); işçi onu
+    bitirir, satır ve ürün 7 gün sonra `silme_turu`yla gider. Tek `UPDATE …
+    RETURNING`: işçinin `al`ı ile yarış Postgres'in satır kilidinde biter.
+    """
+    ifade = (update(Is).where(Is.kullanici_id == kullanici_id, Is.durum == DURUM_BEKLIYOR)
+             .values(durum=DURUM_IPTAL, bitti=an).returning(Is.id))
+    return list(db.scalars(ifade))
+
+
+def sahibin_islerini_sil(db: Session, kullanici_id: uuid.UUID) -> int:
+    """Kullanıcının BÜTÜN `isler` satırlarını siler (durumu ne olursa olsun); silinen sayı.
+
+    `silme_turu` (services/isci.py, Faz 4 / 5) çağırır — kiracının KENDİ
+    bağlamında (`eskileri_sil`in gerekçesi: admin politikası DELETE vermez).
+    Girdi nesneleri burada silinmez: tur kiracının bütün önekini
+    (`kullanicilar/<id>/`) tek seferde süpürür, dizin dizin elemeye gerek yok —
+    referans veren başka satır kalmadı, hepsi bu ifadeyle gitti.
+    """
+    sonuc = db.execute(delete(Is).where(Is.kullanici_id == kullanici_id))
+    return _etkilenen(sonuc)
 
 
 def girdi_referanslari(db: Session, kullanici_id: uuid.UUID | None = None) -> set[str]:

@@ -970,7 +970,7 @@ def test_the_maintenance_turn_deletes_expired_rows_and_only_the_unreferenced_inp
     # `hibe_satiri`: ücretsiz ve 0 bakiyeli her kullanıcı (en az test kullanıcısı) — ilk tur tamamlar (Faz 3 / 3, K6).
     assert hibe_bekleyen >= 1
     assert ozet == {"silinen_is": 2, "silinen_nesne": 1, "korunan_dizin": 1, "silinen_isci": 1,
-                    "hibe_satiri": hibe_bekleyen, "tutarsiz_kullanici": 0} and bool(ozet)
+                    "hibe_satiri": hibe_bekleyen, "tutarsiz_kullanici": 0, "temizlenen_hesap": 0} and bool(ozet)
     db_oturumu.expire_all()
     assert set(db_oturumu.scalars(select(tablolar.Is.id))) == {b, d}
     assert depo.var(ayar.is_dizini(kullanici.id, a) + "upload.png") and depo.var(ayar.is_dizini(kullanici.id, a) + "ref2.png"), (
@@ -983,7 +983,7 @@ def test_the_maintenance_turn_deletes_expired_rows_and_only_the_unreferenced_inp
     bos = isci.bakim_turu(db_oturumu, depo, BAKIM_ANI, ESIK, SAKLAMA)
     # Aynı ay ikinci tur: hibe anahtarı çakışır, satır yok — tur boş, olay düşmez.
     assert not bos and dict(bos) == {"silinen_is": 0, "silinen_nesne": 0, "korunan_dizin": 0, "silinen_isci": 0,
-                                     "hibe_satiri": 0, "tutarsiz_kullanici": 0}
+                                     "hibe_satiri": 0, "tutarsiz_kullanici": 0, "temizlenen_hesap": 0}
 
 
 def test_the_maintenance_turn_frees_a_referenced_directory_once_the_last_referrer_expires(
@@ -1044,7 +1044,7 @@ def test_the_maintenance_turn_leaves_another_tenants_directory_alone_even_if_a_d
     # `hibe_satiri`: ücretsiz ve 0 bakiyeli her kullanıcı (en az iki kiracı) — ilk tur tamamlar (Faz 3 / 3).
     assert hibe_bekleyen >= 2
     assert ozet == {"silinen_is": 1, "silinen_nesne": 1, "korunan_dizin": 0, "silinen_isci": 0,
-                    "hibe_satiri": hibe_bekleyen, "tutarsiz_kullanici": 0}
+                    "hibe_satiri": hibe_bekleyen, "tutarsiz_kullanici": 0, "temizlenen_hesap": 0}
     assert not depo.var(ayar.is_dizini(kullanici.id, b) + "upload.png"), "işin kendi dizini gider"
     assert depo.var(yabanci_dizin + "gizli.png"), "başka kiracının dizinine dokunulmaz"
     (uyari,) = [k for k in yakala.kayitlar if getattr(k, "olay", None) == "bakim.yabanci_dizin"]

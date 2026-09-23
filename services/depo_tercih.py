@@ -34,7 +34,7 @@ import datetime as dt
 import uuid
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 import catalog
@@ -110,3 +110,13 @@ def guncelle(db: Session, kullanici_id: uuid.UUID, degerler: dict, *,
         t.guncellendi = an
     db.flush()
     return oku(db, kullanici_id)
+
+
+def sil(db: Session, kullanici_id: uuid.UUID) -> int:
+    """Kullanıcının tercih satırını siler; silinen sayı (0/1). Hesap silme turu (Faz 4 / 5, K9).
+
+    Tema/dil tercihi kişisel veri sayılır (KVKK md. 3: kimliği belirlenebilir
+    kişiye ilişkin her bilgi); anonim satırın yanında kalması için sebep yok.
+    """
+    sonuc = db.execute(delete(Tercih).where(Tercih.kullanici_id == kullanici_id))
+    return int(getattr(sonuc, "rowcount", 0) or 0)

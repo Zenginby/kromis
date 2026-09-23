@@ -60,11 +60,18 @@ import uuid
 from fastapi import Request
 from pwdlib import PasswordHash
 from pwdlib.hashers.argon2 import Argon2Hasher
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from services import cerez
 from services.tablolar import GirisDenemesi, Jeton, Kullanici, Oturum
+
+# Silinen hesabın e-postasının alan adı (Faz 4 / 5, K9): RFC 2606 rezerve TLD —
+# hiçbir zaman çözülmez, `posta.py` bu soneki reddeder. `silindi-<id>@` öneki
+# citext UNIQUE'i korur (id benzersiz) ve satırın "silinmiş" olduğunu adresten
+# okunur kılar (admin listesi, `pg_dump`). Asıl adres GİDER: anonimleştirme
+# KVKK md. 7'de silmeye denk, sonsuz soft delete değil.
+ANONIM_ALAN = "anonim.invalid"
 
 # Jeton amaçları — `tablolar.JETON_AMACLARI`nın iki üyesi, adıyla.
 AMAC_DOGRULAMA = "eposta_dogrulama"
@@ -169,6 +176,54 @@ def kullanici_olustur(db: Session, eposta: str, parola: str, dil: str | None) ->
 def dogrulandi(kullanici: Kullanici, an: dt.datetime) -> None:
     if kullanici.dogrulandi_at is None:
         kullanici.dogrulandi_at = an
+
+
+# ── Hesap silme (Faz 4 / 5, K9) ──────────────────────────────────────
+
+def anonim_eposta(kullanici_id: uuid.UUID) -> str:
+    return f"silindi-{kullanici_id}@{ANONIM_ALAN}"
+
+
+def anonimlestir(db: Session, kullanici: Kullanici, an: dt.datetime) -> None:
+    """Hesabı ANINDA kilitler ve kişisel veriyi satırdan siler; satır KALIR (defter/sipariş FK'si için).
+
+    `silindi_at = an`, `eposta` anonim, `parola_ozeti`/`dil` NULL; bütün
+    `oturumlar` (giriş imkânsız — `oturum_dogrula` zaten `silindi_at IS NULL`
+    süzer, satırın gitmesi ikinci kapı), bütün `jetonlar` (bekleyen sıfırlama
+    bağlantısı hesabı geri açamasın) ve o adresin `giris_denemeleri` satırları
+    (adres kayıtlardan çıkıyor; sayaç satırı adresi taşırdı — belge turun
+    işi diyordu ama tur o an adresi BİLEMEZ, anonimleşmiş; silme anında
+    silinir). `polar_musteri_id`/`polar_abonelik_id` KALIR: Polar mutabakatı
+    ve `siparisler` satırları (K9); Polar'daki müşteri kaydını silmek sahibin
+    adımı. `UPDATE … WHERE id`: nesne bu oturuma bağlı olmayabilir (kimlik
+    kapısı başka transaksiyonda çözdü) — ORM özniteliği yazmak sessizce
+    kaybolurdu. `bakiye`/`paket_bakiye` DOKUNULMAZ (tek yazar `defter.py`,
+    AST bekçisi); tutarlılık turu anonim satırı da ölçer, sapma yok.
+    """
+    eposta = kullanici.eposta
+    db.execute(update(Kullanici).where(Kullanici.id == kullanici.id)
+               .values(silindi_at=an, eposta=anonim_eposta(kullanici.id), parola_ozeti=None, dil=None))
+    db.execute(delete(Oturum).where(Oturum.kullanici_id == kullanici.id))
+    db.execute(delete(Jeton).where(Jeton.kullanici_id == kullanici.id))
+    db.execute(delete(GirisDenemesi).where(GirisDenemesi.eposta == eposta))
+
+
+def silinecek_hesaplar(db: Session, an: dt.datetime, bekleme: dt.timedelta) -> list[uuid.UUID]:
+    """`silindi_at < an - bekleme AND temizlendi_at IS NULL` — bakım turunun içerik silme adayları (admin bağlamı).
+
+    Sınır KESİN küçük (`<`), `eskileri_sil`in deyimi: tam 7. günde tur
+    dokunmaz, 7 gün + 1 sn'de siler. `bekleme = 0` → `silindi_at < an`, yani
+    silme isteğinden sonraki ilk tur (`KROMIS_HESAP_SILME_BEKLEME_GUN=0`).
+    """
+    return list(db.scalars(select(Kullanici.id)
+                           .where(Kullanici.silindi_at.is_not(None), Kullanici.silindi_at < an - bekleme,
+                                  Kullanici.temizlendi_at.is_(None))
+                           .order_by(Kullanici.id)))
+
+
+def temizlendi(db: Session, kullanici_id: uuid.UUID, an: dt.datetime) -> None:
+    """İçerik silindi damgası — ikinci tur bu satırı aday görmez (`temizlendi_at IS NULL` süzgeci)."""
+    db.execute(update(Kullanici).where(Kullanici.id == kullanici_id).values(temizlendi_at=an))
 
 
 # ── Oturum ───────────────────────────────────────────────────────────

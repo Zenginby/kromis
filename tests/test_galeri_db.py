@@ -73,18 +73,24 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Depo modülü → sorgu kuran EN AZ kaç işlev bekleniyor (bekçinin bekçisi: sıfıra
 # düşen bir tarama "hepsi süzüyor" derdi). Sayılar kaynağın bugünkü hâli.
 DEPOLAR = {
-    "services/depo_medya.py": 9, "services/depo_klasor.py": 4,
-    "services/depo_sohbet.py": 3, "services/depo_palet.py": 2,
-    "services/depo_varlik.py": 3, "services/depo_tercih.py": 1,
-    "services/depo_kimlik_bilgisi.py": 4,   # Faz 1 / 7
-    "services/kuyruk.py": 16,               # Faz 2 / 1 (3 kullanıcı + 9 işçi/sonda tarafı; `ekle`/`isci_kaydet` `db.add`); Faz 2 / 10 +4 saklama/bakım
+    # Faz 4 / 5 (hesap silme turu + dışa aktarma): medya/klasör/palet/varlık +`hepsini_sil`, tercih +`sil`, kimlik
+    # bilgisi +`hepsini_sil` — hepsi `kullanici_id` süzgeçli. Medya ve sohbetin `hepsi`si `_sahibin(...)`
+    # üstünden kurulur, doğrudan `select` çağırmaz — sayılmaz (yine de süzgeç bekçisinden geçer).
+    "services/depo_medya.py": 10, "services/depo_klasor.py": 5,
+    "services/depo_sohbet.py": 3, "services/depo_palet.py": 3,
+    "services/depo_varlik.py": 4, "services/depo_tercih.py": 2,
+    "services/depo_kimlik_bilgisi.py": 5,   # Faz 1 / 7; Faz 4 / 5 +`hepsini_sil`
+    "services/kuyruk.py": 18,               # Faz 2 / 1 (3 kullanıcı + 9 işçi/sonda tarafı; `ekle`/`isci_kaydet` `db.add`); Faz 2 / 10 +4 saklama/bakım; Faz 4 / 5 +`sahibin_islerini_iptal`, +`sahibin_islerini_sil`
     "services/depo_admin.py": 13,           # Faz 2 / 8 (hepsi kiracısız — `KIRACISIZ_MODULLER`); Faz 3 / 5 +`marj`; Faz 4 / 3 +`odeme_olaylari`, +`odeme_ozeti`
-    "services/odeme.py": 6,                 # Faz 4 / 3 (kiracısız modül — `KIRACISIZ_MODULLER`): `_kapat`, `kullaniciyi_coz`, `urun_bul`, `plan_uygula`, `_plan_bitis_yaz`, `_musteriyi_bagla`; `olayi_kaydet`/`_siparis_yaz` `pg_insert` — sayılmaz
+    "services/odeme.py": 7,                 # Faz 4 / 3 (kiracısız modül — `KIRACISIZ_MODULLER`): `_kapat`, `kullaniciyi_coz`, `urun_bul`, `plan_uygula`, `_plan_bitis_yaz`, `_musteriyi_bagla`; `olayi_kaydet`/`_siparis_yaz` `pg_insert` — sayılmaz; Faz 4 / 5 +`olaylari_anonimlestir`
     "services/defter.py": 10,               # Faz 3 / 1 (`bakiye`, `_bakiye_ekle`, `_isin_hareketleri`, `hareketler`, `duzelt`, `tutarlilik`; `_yaz` `insert` — sayılmaz); Faz 3 / 3 +`plan_oku`, +`hibe_turu`; Faz 4 / 2 +`plan_bitis_oku`, +`dusur` (`rezerve` ham SQL CTE'ye geçti, `select/update` çağrısı yok — sayılmaz)
+    # Faz 4 / 5: dışa aktarma KENDİ sorgusunu kurmaz (depo işlevlerini çağırır, 0 sorgulu işlev) ama imza
+    # sözleşmesine tabi: `(db, kullanici_id, …)` — başkasının verisini dökebilecek tek modül bu.
+    "services/disa_aktar.py": 0,
 }
 # `depo_*.py` kalıbının DIŞINDA kalan depolar — `test_the_repository_list_matches_the_files_on_disk`
 # bunları da bekler; kalıba uymayan yeni bir depo buraya yazılmadan listeye giremez.
-EK_DEPOLAR = ("services/kuyruk.py", "services/defter.py", "services/odeme.py")
+EK_DEPOLAR = ("services/kuyruk.py", "services/defter.py", "services/odeme.py", "services/disa_aktar.py")
 # Kiracısız işlevler (Faz 2 / 1): işçi işi kimliğiyle sürer, kullanıcıyı bilmez —
 # `al` kuyruğun BAŞINI alır (küresel FIFO, kimin işi olduğuna bakmaz), ötekiler
 # `al`ın verdiği `is_id`/`isci_id` ile çalışır. Her ad gerekçesiyle; bekçinin

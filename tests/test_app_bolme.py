@@ -125,8 +125,9 @@ def test_every_router_module_is_included_in_the_app():
     # docs/faz2-kuyruk-anahtarlar-depolama.md §8 — `/admin`, 6 `/api/admin/*`, `/api/kota`).
     # 67 → 69 (Faz 3 / 3: admin `plan` ve `kredi` rotaları); 69 → 70 (Faz 3 / 6: `GET /api/kredi`);
     # 70 → 72 (Faz 4 / 3: `POST /api/odeme/webhook`, `GET /api/admin/odeme-olaylari`);
-    # 72 → 77 (Faz 4 / 4: checkout, portal, urunler + `/planlar`, `/odeme/tesekkur` şablon rotaları).
-    assert len(graftaki) == 77, "rota sayısı değişti — bilinçliyse bu sayıyı güncelle"
+    # 72 → 77 (Faz 4 / 4: checkout, portal, urunler + `/planlar`, `/odeme/tesekkur` şablon rotaları);
+    # 77 → 79 (Faz 4 / 5: `POST /api/hesap/sil`, `GET /api/hesap/disa-aktar`).
+    assert len(graftaki) == 79, "rota sayısı değişti — bilinçliyse bu sayıyı güncelle"
 
 
 def test_directories_are_read_at_request_time_not_bound_at_import():

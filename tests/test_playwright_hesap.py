@@ -192,6 +192,81 @@ def _dogrulanmis_hesap(veritabani_url: str) -> None:
     motor.dispose()
 
 
+@pytest.mark.parametrize("dil", i18n.LANGUAGES)
+def test_deleting_the_account_from_settings_lands_on_the_login_page_and_the_old_email_no_longer_signs_in(
+        dil, veritabani, monkeypatch, tmp_path, dizinler):
+    """Faz 4 / 5 (belge §5 E2E): Ayarlar → Hesap → parola + onay metni → `/giris`; aynı e-posta ile giriş
+    bilinmeyen adresle AYNI 401 cümlesini alır (numaralandırmaya karşı — routers/hesap.py). Onay metni
+    dile göre (`hesap.sil_onay_metni`: SİL / DELETE), çerez düşer, ileti konsol postacıya ASIL adrese gider."""
+    for ad in (posta.POSTA_ENV, posta.RESEND_ANAHTAR_ENV, koken.KOKEN_ENV, cerez.GUVENLI_ENV):
+        monkeypatch.delenv(ad, raising=False)
+    dizinler(data_dir=str(tmp_path))
+    _dogrulanmis_hesap(veritabani)
+    port = _bos_port()
+    sunucu = _Sunucu(port)
+    sunucu.start()
+    _bekle(port)
+    taban = f"http://127.0.0.1:{port}"
+    try:
+        with sync_playwright() as p:
+            tarayici = p.chromium.launch(headless=True)
+            baglam = tarayici.new_context()
+            baglam.add_cookies([{"name": "kromis_lang", "value": dil, "url": taban}])
+            page = baglam.new_page()
+            page.goto(f"{taban}/giris")
+            page.wait_for_selector("#form-giris:not([hidden])")
+            page.fill("#giris-eposta", EPOSTA)
+            page.fill("#giris-parola", PAROLA)
+            page.click("#form-giris button[type=submit]")
+            page.wait_for_url(f"{taban}/")
+            page.wait_for_selector("#view-studio")
+            page.wait_for_function(
+                '() => { const m = document.querySelector("#model");'
+                ' return (m && m.value !== "") || !!document.querySelector(".sheet.open"); }')
+            if not page.query_selector(".sheet.open"):
+                page.click("#settings-btn")
+            page.wait_for_selector("#settings-modal.open")
+            page.click('#settings-nav [data-pane="hesap"]')
+            page.wait_for_selector("#hesap-sil-dugme")
+            assert page.inner_text("#hesap-sil-dugme") == i18n.t("hesap.sil_dugme", dil)
+            # Yanlış onay metni sunucuya GİTMEZ: cümle yerel, hesap durur.
+            page.fill("#hesap-sil-parola", PAROLA)
+            page.fill("#hesap-sil-onay", "hayir")
+            page.click("#hesap-sil-dugme")
+            page.wait_for_function(
+                '() => document.querySelector("#hesap-sil-durum").textContent !== ""')
+            assert page.inner_text("#hesap-sil-durum") == i18n.t("hesap.sil_onay_uyusmuyor", dil)
+            assert page.url == f"{taban}/"
+            page.fill("#hesap-sil-onay", i18n.t("hesap.sil_onay_metni", dil))
+            page.click("#hesap-sil-dugme")
+            page.wait_for_url(f"{taban}/giris")
+            page.wait_for_selector("#form-giris:not([hidden])")
+            assert cerez.OTURUM_CEREZI not in {c["name"] for c in baglam.cookies()}
+            ileti = app.state.postaci.son
+            assert ileti is not None and ileti.kime == EPOSTA and ileti.konu == i18n.t("posta.silme_konu", dil)
+            # Aynı adresle giriş: "hesap yok" — bilinmeyen adresin 401'iyle aynı cümle.
+            page.fill("#giris-eposta", EPOSTA)
+            page.fill("#giris-parola", PAROLA)
+            page.click("#form-giris button[type=submit]")
+            page.wait_for_function(
+                '() => { const m = document.querySelector("#giris-mesaj");'
+                ' return !m.hidden && m.dataset.tur === "hata"; }')
+            assert page.inner_text("#giris-mesaj") == i18n.t("err.hesap_giris_hatali", dil)
+            assert page.url.startswith(f"{taban}/giris")
+            tarayici.close()
+    finally:
+        sunucu.stop()
+        sunucu.join(timeout=5)
+    motor = create_engine(veritabani)
+    with motor.connect() as c:
+        eposta, silindi, oturum = c.execute(text(
+            "SELECT k.eposta, k.silindi_at, (SELECT count(*) FROM oturumlar o WHERE o.kullanici_id = k.id) "
+            "FROM kullanicilar k")).one()
+    motor.dispose()
+    assert eposta.startswith("silindi-") and eposta.endswith("@anonim.invalid") and silindi is not None
+    assert oturum == 0, "oturum satırı gitti — çerez ölü"
+
+
 @pytest.mark.parametrize("sonra, beklenen", [
     ("/?sekme=galeri", "/?sekme=galeri"),          # aynı kökene ait yol: aynen
     ("//evil.example/", "/"),                       # şemasız dış adres: /

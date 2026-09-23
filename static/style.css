@@ -3036,6 +3036,13 @@ body.viewer-open { overflow: hidden; }
 .is-satir.is-vurgu { border-color: var(--accent); box-shadow: 0 0 0 2px var(--ring, var(--hairline)); }
 
 /* ── Ayarlar "Kredi" bölmesi (Faz 3 / 6, settings.js krediBolmesiniCiz) ── */
+/* Hesap bölmesi (Faz 4 / 5): silme formu dikey yığın, düğme tehlike rengi — yanlış
+   tıklamaya karşı ikinci onay metni de var, renk yalnız görünür uyarı. */
+.settings-hesap-islemleri .palette-picker-title { margin-top: 18px; }
+.hesap-sil-form { display: flex; flex-direction: column; gap: 8px; }
+.hesap-sil-form label { font-size: 0.9rem; color: var(--muted); }
+.hesap-sil-form .hesap-sil-dugme { color: var(--danger-text); align-self: flex-start; }
+.hesap-sil-uyari { color: var(--danger-text); }
 .kredi-bakiye { margin: 0 0 6px; font-size: 1.6rem; font-variant-numeric: tabular-nums; }
 .kredi-bakiye span { font-size: 0.9rem; color: var(--muted); }
 .kredi-hareketler { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }

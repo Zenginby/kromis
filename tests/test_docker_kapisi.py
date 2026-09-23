@@ -297,6 +297,7 @@ ALTYAPI = {"KROMIS_DATA_DIR", "PORT", db.DATABASE_URL_ENV, koken.KOKEN_ENV,
            sifre.ANAHTAR_ENV,
            dosya.URL_ENV, dosya.KOVA_ENV, dosya.ANAHTAR_ID_ENV, dosya.GIZLI_ENV, dosya.BOLGE_ENV,
            isci.ES_ZAMANLI_ENV, isci.KALP_ESIGI_ENV, isci.SAKLAMA_ENV, kapilar.ES_ZAMANLI_IS_ENV,
+           isci.HESAP_SILME_BEKLEME_ENV,  # Faz 4 / 5: hesap silme → içerik temizliği beklemesi (gün)
            kota.SAATLIK_IS_ENV, kota.GUNLUK_KREDI_ENV,
            planlar.FREE_AYLIK_HIBE_ENV,   # Faz 3 / 3: ücretsiz planın aylık hibesi
            planlar.TEMEL_AYLIK_HIBE_ENV, planlar.PRO_AYLIK_HIBE_ENV,   # Faz 4 / 2: ücretli planların dönem hibesi

@@ -60,8 +60,23 @@ VARSAYILAN_GONDEREN = "Kromis Studio <no-reply@localhost>"
 ZAMAN_ASIMI_SN = 10.0
 
 
+# Hiçbir arka ucun göndermeyeceği alan adları (Faz 4 / 5): silinen hesabın
+# e-postası `silindi-<id>@anonim.invalid` olur (RFC 2606 rezerve TLD — hiçbir
+# zaman çözülmez) ve bir gün bir kod yolu o adrese ileti kurarsa (hibe
+# bildirimi, sıfırlama) Resend'e geçersiz alıcı gitmesin, konsol günlüğüne de
+# anonim adres düşmesin. Kapı ARKA UCUN İÇİNDE değil sarmalda: iki arka uç da
+# aynı `gonder`den geçsin, üçüncüsü eklenince unutulmasın.
+GONDERILMEYEN_TLD = ".invalid"
+
+
 class PostaHatasi(Exception):
     """İleti gönderilemedi — arka uç sebebi mesajda söyler; rota 503 döner."""
+
+
+def alici_denetle(kime: str) -> None:
+    """`.invalid` alıcıya ileti KURULMAZ (gerekçe `GONDERILMEYEN_TLD`nin üstünde); `PostaHatasi`."""
+    if kime.strip().lower().endswith(GONDERILMEYEN_TLD):
+        raise PostaHatasi("alici adresi .invalid: anonim hesaba ileti gitmez")
 
 
 @dataclass(frozen=True)
@@ -83,6 +98,7 @@ class KonsolPostaci:
         self.son: Posta | None = None
 
     def gonder(self, posta: Posta) -> None:
+        alici_denetle(posta.kime)
         self.son = posta
         yol = os.path.join(self.data_dir, POSTA_LOG)
         try:
@@ -109,6 +125,7 @@ class ResendPostaci:
         self.istemci = istemci or httpx.Client(timeout=ZAMAN_ASIMI_SN)
 
     def gonder(self, posta: Posta) -> None:
+        alici_denetle(posta.kime)
         try:
             cevap = self.istemci.post(
                 RESEND_ADRESI,
@@ -173,6 +190,18 @@ def sifirlama_postasi(kime: str, baglanti: str, lang: str, dakika: int) -> Posta
     return Posta(kime=kime,
                  konu=i18n.t("posta.sifirlama_konu", lang),
                  metin=i18n.t("posta.sifirlama_govde", lang, baglanti=baglanti, dakika=dakika))
+
+
+def silme_postasi(kime: str, lang: str, gun: int) -> Posta:
+    """Hesap kapatıldı iletisi (Faz 4 / 5): içerik `gun` gün sonra silinir; ASIL adrese, anonimleşmeden ÖNCE kurulur.
+
+    Bağlantı yok: geri alma yok (K9), tıklanacak bir şey de yok. `gun` ortamdan
+    (`KROMIS_HESAP_SILME_BEKLEME_GUN`); 0 = "hemen" cümlesi ayrı anahtar değil,
+    "0 gün" — sayı doğru, cümle dürüst.
+    """
+    return Posta(kime=kime,
+                 konu=i18n.t("posta.silme_konu", lang),
+                 metin=i18n.t("posta.silme_govde", lang, gun=gun))
 
 
 def mevcut_hesap_postasi(kime: str, giris_baglantisi: str, lang: str) -> Posta:

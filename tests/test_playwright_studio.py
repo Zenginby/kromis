@@ -113,6 +113,40 @@ def _tum_kimlikler_kayitli(monkeypatch) -> None:
         lambda *a, **k: {m.id: True for m in catalog.CHAT_MODELS})
 
 
+def _plani_yaz(oturum, plan: str) -> None:
+    """E2E kullanıcısının planını DB'ye yazar (`e2e_oturum` her kullanıcıyı `free` açıyor).
+
+    Sunucu planı her istekte satırdan okuyor (`kapilar.kullanici_plani`), yani
+    sayfa açılmadan önce yazılması yeter; admin rotasını çağırmak ikinci bir
+    oturum ve yetki isterdi (conftest `plan_pro` fixture'ının aynı kararı).
+    """
+    from sqlalchemy import update
+
+    from services.tablolar import Kullanici
+    with oturum.db() as db:
+        db.execute(update(Kullanici).where(Kullanici.id == oturum.kullanici_id).values(plan=plan))
+        db.commit()
+
+
+def _platform_anahtarlari(monkeypatch) -> None:
+    """Sunucuyu "her sağlayıcının anahtarı PLATFORMDAN geliyor" hâline getirir — ORTAMDAN.
+
+    `_tum_kimlikler_kayitli`den FARKI kaynak: o yardımcı `configured_map`i
+    yamalıyor ve kimlik sözlüğü boş kalıyor, yani `platform_anahtari.kaynak`
+    `None` döndürüyor ve plan eşiği (1b-A: yalnız PLATFORM anahtarında) hiç
+    sorulmuyor — o yardımcıyla ücretsiz kullanıcı `temel` modelleri de görür.
+    Basamağı ölçen test anahtarın GERÇEKTEN platformdan gelmesini istiyor:
+    `KROMIS_PLATFORM_<AD>` her katalog adı için (`platform_anahtari.ADLAR`),
+    `kimlik_bilgileri` isteğin sözlüğünü ortamdan tamamlar ve kaynağı
+    "platform" yazar — üretimdeki yol, yama yok. Değerler sahte; sağlayıcı
+    zaten `providers.generate` üstünden yamalı.
+    """
+    from services import platform_anahtari
+    for ad in sorted(platform_anahtari.ADLAR):
+        deger = "https://example.invalid" if ad.endswith("_URL") else "e2e-platform"
+        monkeypatch.setenv(platform_anahtari.ONEK + ad, deger)
+
+
 def _hicbir_kimlik_kayitli_degil(monkeypatch) -> None:
     """Sunucuyu "hiçbir sağlayıcının anahtarı yok" hâline getirir.
 
@@ -353,6 +387,10 @@ def test_playwright_model_sheet_alttan_aciliyor(monkeypatch, veritabani, e2e_otu
       · odağın çipe döndüğü — `document.activeElement` yalnız çalışan bir
         sayfada var.
       · aynı karta ikinci dokunuşun sessiz kaldığı.
+      · (Faz 4 / 1b-D) `pro` kullanıcıda, her anahtar kayıtlıyken, kataloğun
+        HER görsel girdisinin bir satır olduğu — KATALOG SIRASIYLA (sahibin
+        sıralı listesi) ve rozetsiz. 13 satır; seçici uzadı ama yeniden
+        tasarlanmadı (gruplama belgede ayrı küçük PR olarak park edildi).
 
     Depo geleneği bunu şart koşuyor: bu dosyanın ikizi olan üç kırılma
     (`applyChatModel`in dönüş değeri, 360px yatay kayma, sağlayıcı alan
@@ -363,6 +401,7 @@ def test_playwright_model_sheet_alttan_aciliyor(monkeypatch, veritabani, e2e_otu
     server = ServerThread(port)
     server.start()
     oturum = e2e_oturum()
+    _plani_yaz(oturum, "pro")
     sunucu_hazir(port)
     base_url = f"http://127.0.0.1:{port}"
 
@@ -404,6 +443,15 @@ def test_playwright_model_sheet_alttan_aciliyor(monkeypatch, veritabani, e2e_otu
             assert page.eval_on_selector_all(
                 "#model-sheet-list .model-row-txt > span", "e => e.length") > 0, (
                 "kartlarda model tanıtımı yok")
+            # 2b. HER `available` model bir satır, KATALOG SIRASIYLA (Faz 4 / 1b-D):
+            #     pro + bütün anahtarlar → 13 girdinin 13'ü kullanılabilir, rozet yok.
+            satirlar = page.eval_on_selector_all("#model-sheet-list input[type=radio]",
+                                                 "e => e.map(x => x.value)")
+            assert satirlar == [m.id for m in catalog.IMAGE_MODELS], (
+                f"seçici katalog sırasını ya da sayısını kaybetti: {satirlar}")
+            assert page.eval_on_selector_all("#model-sheet-list .model-row-badge",
+                                             "e => e.length") == 0, (
+                "pro kullanıcıda, her anahtar kayıtlıyken rozetli satır var")
 
             # 3. Başka bir model seç → <select>, çip etiketi ve tercih birlikte.
             degerler = page.eval_on_selector_all("#model-sheet-list input",
@@ -1691,3 +1739,128 @@ def test_playwright_aciklamali_oneri_karti_CIZILIYOR_ve_degeri_karismiyor(verita
     finally:
         server.stop()
 
+
+# ── Faz 4 / 1b-D: ücretsiz planın basamağı ve 1 kredilik üretim ──────────────
+
+
+@pytest.mark.gercek_anahtar
+def test_playwright_ucretsiz_plan_BASAMAGI_gosteriyor_ve_schnell_ile_uretiyor(
+        monkeypatch, veritabani, e2e_oturum):
+    """Ücretsiz planın E2E'si — belge §1b "ücretsiz planın E2E'si `fal-flux-1-schnell` ile koşar".
+
+    ÖNCÜL: her sağlayıcının anahtarı PLATFORMDAN (`_platform_anahtarlari`,
+    ortamdan — yama değil), kullanıcı `free`, bakiye 200 (aylık hibe tohumu).
+    `gercek_anahtar` İŞARETİ ŞART: conftest'in autouse `_anahtar_kapisi`si
+    `check_anahtar`ı "kullanici" diye yamalıyor ve o yama bu testin ölçtüğü
+    şeyi tam ortasından keser — iş "kendi anahtarı" sayılır, rezerv düşmez,
+    satır "199 left" demez (ölçüldü: ilk koşum tam burada düştü, dökümde
+    platform rozetleri doğruyken işin `anahtar_kaynagi`si "kullanici" idi).
+
+    Tarayıcıda ölçülen dört şey:
+      · `temel` basamaklı GPT Image 2.5 satırları PANELDE VAR ama ROZETLİ
+        ("not in your plan"). Plan kilidi GİZLEMİYOR, rozetliyor — Faz 3 / 3
+        kararı (core.js `secilebilirler`: "görünmezse kullanıcı modelin VAR
+        olduğunu bile bilmez; yükseltme çağrısı Faz 4'ün satış yüzü"). Bu
+        görevin talimatı "gated modeller satır DEĞİL" diyordu; ön yüzün
+        kurulu kararına uyuldu ve sapma belgede.
+      · `fal-flux-1-schnell` satırı rozetsiz, seçilebilir.
+      · seçilince composer satırı "this run takes 1 · 200 left" — 1 kredilik
+        modelin tarifesi ekranda.
+      · üretim UÇTAN UCA: sahte sağlayıcı → işçi (ücretsiz plan, filigranlı)
+        → panelde `bitti` → DB'de iş `fal-flux-1-schnell` ve 1 kredi → satır
+        "199 left".
+    """
+    from sqlalchemy import select
+
+    import providers
+    from services import defter, zaman
+    from services.tablolar import Is
+
+    def _png() -> bytes:
+        from PIL import Image
+        buf = io.BytesIO()
+        # 256²: filigran yolu (`services/filigran`) ölçekli metin çiziyor, 16px'lik
+        # bir kare o yolu anlamsız kılardı; test_playwright_isler'in _png'si
+        # filigransız (pro) işler için yazıldı.
+        Image.new("RGB", (256, 256), (200, 80, 40)).save(buf, format="PNG")
+        return buf.getvalue()
+
+    cagrilar: list[tuple[str, str]] = []
+
+    def sahte_uret(model, prompt, size, quality, n, **k):
+        cagrilar.append((model, size))
+        return [_png()] * n
+
+    _platform_anahtarlari(monkeypatch)
+    monkeypatch.setattr(providers, "generate", sahte_uret)
+    port = get_free_port()
+    server = ServerThread(port)
+    server.start()
+    oturum = e2e_oturum()
+    with oturum.db() as db:
+        defter.aylik_hibe_yaz(db, oturum.kullanici_id, 200, zaman.an())
+        db.commit()
+    sunucu_hazir(port)
+    base_url = f"http://127.0.0.1:{port}"
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1280, "height": 860})
+            oturum.cerez(page, base_url)
+            page.goto(base_url)
+            page.wait_for_selector("#view-studio")
+            _ilk_kurulum_perdesini_kapat(page)
+
+            # 1. Panel: basamak ROZETLE görünür, schnell rozetsiz.
+            page.click("#model-btn")
+            page.wait_for_selector("#model-sheet.open")
+            rozetler = dict(page.eval_on_selector_all(
+                "#model-sheet-list label.model-row",
+                """rows => rows.map(r => [r.querySelector("input").value,
+                                          (r.querySelector(".model-row-badge") || {}).textContent || ""])"""))
+            beklenen_kilitli = {m.id for m in catalog.IMAGE_MODELS if m.plan != "free"}
+            assert beklenen_kilitli == {"openai-gpt-image-2-5-sunburst", "openai-gpt-image-2-5-flare"}
+            for kimlik in beklenen_kilitli:
+                assert rozetler.get(kimlik) == "not in your plan", (
+                    f"{kimlik}: ücretsiz kullanıcıda plan rozeti yok ({rozetler.get(kimlik)!r})")
+            assert rozetler.get("fal-flux-1-schnell") == "", (
+                f"schnell rozetli: {rozetler.get('fal-flux-1-schnell')!r}")
+            # Ücretsiz kullanıcıda satır sayısı yine 13: kilit gizlemez (Faz 3 / 3).
+            assert set(rozetler) == {m.id for m in catalog.IMAGE_MODELS}
+
+            # 2. schnell seç → composer satırı 1 kredilik tarifeyi yazıyor.
+            page.check('#model-sheet-list input[value="fal-flux-1-schnell"]')
+            page.wait_for_function('document.querySelector("#model").value === "fal-flux-1-schnell"')
+            page.keyboard.press("Escape")
+            page.wait_for_selector("#model-sheet:not(.open)")
+            page.wait_for_function(
+                '!document.querySelector("#run-cost").hidden && '
+                'document.querySelector("#run-cost").textContent.includes("this run takes 1 · 200 left")',
+                timeout=15000)
+
+            # 3. Üretim uçtan uca (ücretsiz plan = filigranlı yol).
+            page.wait_for_function('!document.querySelector("#go").disabled')
+            page.fill("#prompt", "ucretsiz kedi")
+            page.click("#go")
+            page.wait_for_function('document.querySelector("#composer").dataset.sent === "true"')
+            page.click("#isler-btn")
+            page.wait_for_selector("#isler-sheet.open")
+            page.wait_for_selector('#isler-liste .is-satir[data-durum="bitti"]', timeout=20000)
+            page.keyboard.press("Escape")
+            page.wait_for_function(
+                'document.querySelector("#run-cost").textContent.includes("· 199 left")',
+                timeout=15000)
+
+            assert cagrilar == [("fal-flux-1-schnell", catalog.default_size_of(
+                catalog.image_model("fal-flux-1-schnell")))], cagrilar
+            with oturum.db() as db:
+                isler = list(db.scalars(select(Is).where(Is.kullanici_id == oturum.kullanici_id)))
+                bakiye = defter.bakiye(db, oturum.kullanici_id).toplam
+            assert len(isler) == 1
+            assert isler[0].model == "fal-flux-1-schnell" and isler[0].durum == "bitti"
+            assert isler[0].kredi_tahmini == 1 and isler[0].kredi_gercek == 1
+            assert bakiye == 199
+            browser.close()
+    finally:
+        server.stop()

@@ -82,11 +82,11 @@ flowchart TD
     n_azure_flux_client["azure_flux_client<br/>284 satır"]
     n_azure_mai_client["azure_mai_client<br/>290 satır"]
     n_chat_client["chat_client<br/>218 satır"]
-    n_fal_client["fal_client<br/>761 satır"]
+    n_fal_client["fal_client<br/>1096 satır"]
     n_gemini_client["gemini_client<br/>295 satır"]
     n_openai_client["openai_client<br/>217 satır"]
     n_prefs["prefs<br/>268 satır"]
-    n_providers["providers<br/>508 satır"]
+    n_providers["providers<br/>527 satır"]
     n_services_filigran["services.filigran<br/>128 satır"]
     n_services_tablolar["services.tablolar<br/>885 satır"]
     n_veo_client["veo_client<br/>629 satır"]
@@ -127,7 +127,7 @@ flowchart TD
     n_storage["storage<br/>423 satır"]
   end
   subgraph katman0["katman 0"]
-    n_catalog["catalog<br/>1506 satır"]
+    n_catalog["catalog<br/>1918 satır"]
     n_errlog["errlog<br/>133 satır"]
     n_jsonstore["jsonstore<br/>83 satır"]
     n_kimlik_baglami["kimlik_baglami<br/>56 satır"]
@@ -633,11 +633,11 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `android_main.py` | 204 | 17 | `app` (erteli), `desktop` (erteli), `errlog` (erteli), `paths` (erteli) | 0 | 2 |
 | `app.py` | 299 | 14 | `catalog`, `chat_client`, `chat_prompt`, `composite`, `credstore`, `errlog`, `models`, `paths`, `providers`, `routers.admin`, `routers.ayarlar`, `routers.bindirme`, `routers.galeri`, `routers.hesap`, `routers.isler`, `routers.kok`, `routers.odeme`, `routers.paletler`, `routers.saglik`, `routers.sohbet`, `routers.uretim`, `services.ayar`, `services.db`, `services.dil`, `services.dosya`, `services.gorsel`, `services.gunluk`, `services.hata_izleme`, `services.istek_kimligi`, `services.kimlik`, `services.koken`, `services.modeller`, `services.palet`, `services.posta`, `services.redaksiyon`, `services.sifre` | 3 | 60 |
 | `assets_store.py` | 205 | 3 | `i18n`, `jsonstore` | 6 | 7 |
-| `azure_client.py` | 518 | 3 | `i18n`, `kimlik_baglami`, `paths`, `winsec` | 13 | 39 |
+| `azure_client.py` | 518 | 3 | `i18n`, `kimlik_baglami`, `paths`, `winsec` | 13 | 40 |
 | `azure_flux_client.py` | 284 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 2 |
 | `azure_mai_client.py` | 290 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers`, `services.saglayici_meta` | 1 | 2 |
 | `backup.py` | 190 | 4 | `assets_store`, `chat_store`, `folders`, `jsonstore`, `palette_store`, `storage` | 0 | 1 |
-| `catalog.py` | 1506 | 0 | — | 30 | 44 |
+| `catalog.py` | 1918 | 0 | — | 30 | 45 |
 | `chat_client.py` | 218 | 5 | `azure_client`, `chat_prompt`, `i18n`, `kimlik_baglami`, `models` | 4 | 4 |
 | `chat_prompt.py` | 396 | 2 | `paths` | 4 | 1 |
 | `chat_providers.py` | 133 | 7 | `catalog`, `chat_client`, `credstore`, `etiket`, `i18n`, `openai_chat` | 1 | 2 |
@@ -648,7 +648,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `desktop.py` | 588 | 16 | `errlog`, `i18n`, `netguard`, `paths`, `screencolor`, `version`, `winclr`, `app` (erteli), `prefs` (erteli) | 1 | 2 |
 | `errlog.py` | 133 | 0 | — | 13 | 2 |
 | `etiket.py` | 118 | 3 | `catalog`, `i18n` | 8 | 1 |
-| `fal_client.py` | 761 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers`, `services.saglayici_meta` | 1 | 3 |
+| `fal_client.py` | 1096 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers`, `services.saglayici_meta` | 1 | 4 |
 | `folders.py` | 253 | 3 | `i18n`, `jsonstore`, `storage` | 3 | 5 |
 | `gemini_client.py` | 295 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
 | `guncelleme.py` | 379 | 2 | `errlog`, `jsonstore`, `paths`, `version`, `services.db` (erteli) | 1 | 6 |
@@ -664,7 +664,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `palette_store.py` | 96 | 1 | `jsonstore` | 3 | 5 |
 | `paths.py` | 326 | 1 | `errlog` | 10 | 5 |
 | `prefs.py` | 268 | 5 | `catalog`, `i18n`, `jsonstore`, `models` | 3 | 10 |
-| `providers.py` | 508 | 5 | `azure_client`, `catalog`, `credstore`, `etiket`, `i18n`, `azure_flux_client` (erteli), `azure_mai_client` (erteli), `fal_client` (erteli), `gemini_client` (erteli), `openai_client` (erteli), `veo_client` (erteli) | 9 | 17 |
+| `providers.py` | 527 | 5 | `azure_client`, `catalog`, `credstore`, `etiket`, `i18n`, `azure_flux_client` (erteli), `azure_mai_client` (erteli), `fal_client` (erteli), `gemini_client` (erteli), `openai_client` (erteli), `veo_client` (erteli) | 9 | 19 |
 | `release_manifest.py` | 92 | 0 | — | 0 | 3 |
 | `routers/admin.py` | 232 | 13 | `i18n`, `services.ayar`, `services.db`, `services.defter`, `services.depo_admin`, `services.dil`, `services.gunluk`, `services.hesap`, `services.kimlik`, `services.odeme`, `services.planlar`, `services.sablon`, `services.tablolar`, `services.zaman` | 1 | 0 |
 | `routers/ayarlar.py` | 403 | 12 | `azure_client`, `catalog`, `guncelleme`, `i18n`, `models`, `paths`, `services.ayar`, `services.db`, `services.depo_kimlik_bilgisi`, `services.depo_tercih`, `services.dil`, `services.kapilar`, `services.kimlik`, `services.modeller`, `services.platform_anahtari`, `services.tablolar`, `services.zaman`, `version` | 1 | 0 |
@@ -682,7 +682,7 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `services/ayar.py` | 226 | 9 | `paths`, `services.kimlik`, `services.tablolar` | 16 | 11 |
 | `services/cerez.py` | 82 | 2 | `services.db` | 4 | 6 |
 | `services/db.py` | 225 | 1 | `services.kiraci` | 25 | 17 |
-| `services/defter.py` | 613 | 7 | `services.gunluk`, `services.planlar`, `services.tablolar`, `services.zaman` | 8 | 15 |
+| `services/defter.py` | 613 | 7 | `services.gunluk`, `services.planlar`, `services.tablolar`, `services.zaman` | 8 | 16 |
 | `services/depo_admin.py` | 412 | 12 | `catalog`, `services.kota`, `services.kuyruk`, `services.odeme`, `services.platform_anahtari`, `services.tablolar`, `services.zaman` | 3 | 6 |
 | `services/depo_kimlik_bilgisi.py` | 143 | 6 | `catalog`, `services.sifre`, `services.tablolar`, `services.zaman` | 6 | 7 |
 | `services/depo_klasor.py` | 232 | 7 | `folders`, `services.depo_medya`, `services.dosya`, `services.tablolar`, `services.zaman` | 2 | 5 |
@@ -711,15 +711,15 @@ anında bir zincir kurmuyor (bkz. providers.py'nin gerekçesi).
 | `services/odeme.py` | 585 | 11 | `services.defter`, `services.gunluk`, `services.kuyruk`, `services.planlar`, `services.polar`, `services.tablolar`, `services.zaman` | 3 | 2 |
 | `services/palet.py` | 185 | 7 | `color_names`, `i18n`, `models`, `palette`, `services.depo_palet`, `services.dil` | 3 | 1 |
 | `services/planlar.py` | 184 | 6 | `catalog`, `services.tablolar` | 10 | 7 |
-| `services/platform_anahtari.py` | 159 | 7 | `catalog`, `services.depo_kimlik_bilgisi` | 7 | 7 |
+| `services/platform_anahtari.py` | 159 | 7 | `catalog`, `services.depo_kimlik_bilgisi` | 7 | 8 |
 | `services/polar.py` | 278 | 0 | — | 3 | 5 |
 | `services/posta.py` | 187 | 3 | `errlog`, `i18n` | 2 | 4 |
 | `services/redaksiyon.py` | 68 | 1 | `catalog` | 1 | 0 |
 | `services/sablon.py` | 68 | 10 | `errlog`, `i18n`, `services.ayar`, `services.dil`, `version` | 3 | 0 |
 | `services/saglayici_meta.py` | 126 | 0 | — | 3 | 1 |
 | `services/sifre.py` | 151 | 0 | — | 5 | 5 |
-| `services/tablolar.py` | 885 | 5 | `assets_store`, `models` | 35 | 37 |
-| `services/zaman.py` | 71 | 0 | — | 24 | 17 |
+| `services/tablolar.py` | 885 | 5 | `assets_store`, `models` | 35 | 38 |
+| `services/zaman.py` | 71 | 0 | — | 24 | 18 |
 | `storage.py` | 423 | 1 | `catalog`, `jsonstore` | 9 | 9 |
 | `veo_client.py` | 629 | 5 | `azure_client`, `catalog`, `credstore`, `i18n`, `providers` | 1 | 1 |
 | `version.py` | 30 | 0 | — | 9 | 14 |

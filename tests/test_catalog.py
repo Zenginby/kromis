@@ -500,10 +500,11 @@ def test_the_default_video_model_is_the_CHEAPEST_tier():
     gemini = [m for m in catalog.VIDEO_MODELS if m.provider == "gemini"]
 
     assert varsayilan.credits == min(m.credits for m in gemini)
-    # SIRA da artan maliyete göre: ilk girdi varsayılan.
-    assert catalog.VIDEO_MODELS[0].id == catalog.DEFAULT_VIDEO_MODEL
-    krediler = [m.credits for m in gemini]
-    assert krediler == sorted(krediler), f"sıra artan maliyette değil: {krediler}"
+    # SIRA İDDİASI DÜŞTÜ (2026-09-23, Faz 4 / 1b-D): burada "ilk girdi
+    # varsayılan" ve "Gemini bloğu artan maliyette" yazıyordu. Katalog artık
+    # sahibin sıralı listesi (kaliteli → ucuz) ve varsayılan 10. sırada — sıra
+    # ile varsayılan KODDA AYRI (`test_the_video_catalog_follows_the_owners_
+    # RANKED_list`, `test_the_defaults_are_CONSTANTS_not_index_zero`).
 
 
 @pytest.mark.parametrize("m", catalog.VIDEO_MODELS, ids=lambda m: m.id)
@@ -843,7 +844,13 @@ def test_MALIYET_ustunlugu_iddia_eden_not_GERCEKTEN_en_ucuz():
     en_az = min(m.credits for m in catalog.IMAGE_MODELS)
     en_cok = max(m.credits for m in catalog.IMAGE_MODELS)
     for m in catalog.IMAGE_MODELS:
-        notu = m.note.lower()
+        # TÜRKÇE METİN okunuyor, anahtar DEĞİL (2026-09-23 düzeltmesi): v0.21
+        # `note`u çeviri anahtarına çevirdiğinde bu satır `m.note.lower()`
+        # kalmıştı ve "model.x.note" hiç "en ucuz" içermediği için mandal
+        # SESSİZCE BOŞ ateşliyordu — D'nin schnell notu ("En ucuz görsel")
+        # ilk gerçek sınavı. Metin Türkçe, çünkü iddia sözcükleri Türkçe;
+        # İngilizce çeviri aynı iddiayı taşır (i18n eşliği ayrı bekçi).
+        notu = i18n.t(m.note, "tr").lower()
         if "en ucuz" in notu:
             assert m.credits == en_az, (
                 f"{m.id}: not 'en ucuz' diyor ama {m.credits} kredi "
@@ -854,9 +861,179 @@ def test_MALIYET_ustunlugu_iddia_eden_not_GERCEKTEN_en_ucuz():
                 f"(katalogdaki en çok {en_cok})")
 
 
-# ── fal.ai video modelleri (Görev 7) ────────────────────────────────────
+# ── Sahibin sıralı listesi = katalog sırası (Faz 4 / 1b-D, 2026-09-23) ────
+#
+# Belge §1b iki liste veriyor (13 görsel, 10 video) ve "Sıra ARAYÜZ sırası"
+# diyor. Liste burada ADIYLA yazılı — türetilemez, çünkü ölçüt kalite/
+# popülerlik, kredi değil (Seedance 95 birinci, MiniMax 12 dokuzuncu ama Veo
+# Lite 10 onuncu). Bir girdi eklenirken listeye yazılmazsa burası kırmızı
+# olur: seçicideki sıra sessizce kaymaz.
 
-FAL_IDLER = ("fal-wan-3-0", "fal-pixverse-c1", "fal-kling-v3-turbo-pro")
+SIRALI_GORSEL = (
+    "azure-gpt-image-2",
+    "openai-gpt-image-2-5-sunburst",
+    "openai-gpt-image-2-5-flare",
+    "gemini-nano-banana-pro",
+    "openai-gpt-image-2",
+    "gemini-nano-banana-2",
+    "azure-mai-image-2-5-pro",
+    "azure-flux-2-pro",
+    "azure-mai-image-2-6",
+    "fal-qwen-image",
+    "fal-seedream-v4",
+    "azure-mai-image-2-6-flash",
+    "fal-flux-1-schnell",
+)
+SIRALI_VIDEO = (
+    "fal-seedance-2-5",
+    "gemini-veo-3-1",
+    "fal-flux-3",
+    "fal-kling-v3-turbo-pro",
+    "fal-kling-v3-pro",
+    "gemini-veo-3-1-fast",
+    "fal-pixverse-c1",
+    "fal-wan-3-0",
+    "fal-minimax-h3",
+    "gemini-veo-3-1-lite",
+)
+
+
+def test_the_image_catalog_follows_the_owners_RANKED_list():
+    assert tuple(m.id for m in catalog.IMAGE_MODELS) == SIRALI_GORSEL
+
+
+def test_the_video_catalog_follows_the_owners_RANKED_list():
+    assert tuple(m.id for m in catalog.VIDEO_MODELS) == SIRALI_VIDEO
+
+
+def test_the_defaults_are_CONSTANTS_not_index_zero():
+    """Belge §1b "SIRA İLE VARSAYILAN KODDA AYRI, YORUMDA DEĞİL": `catalog.py`nin
+    başlığı "ilk girdi varsayılan" diyordu ve bu yalnız o günkü yerleşimin
+    tarifiydi. Liste sıralanınca video varsayılanı SONA düştü; görselinki
+    tesadüfen başta kaldı. Bu test ayrımı mandallıyor: varsayılan id ile
+    aranır, demetin bir ucuna oturmak zorunda değil — ve bir sonraki okuyan
+    "varsayılan Seedance" sanmasın.
+    """
+    assert catalog.VIDEO_MODELS[-1].id == catalog.DEFAULT_VIDEO_MODEL
+    assert catalog.VIDEO_MODELS[0].id != catalog.DEFAULT_VIDEO_MODEL
+    assert catalog.video_model(catalog.DEFAULT_VIDEO_MODEL) is catalog.VIDEO_MODELS[-1]
+    assert catalog.image_model(catalog.DEFAULT_IMAGE_MODEL) is catalog.IMAGE_MODELS[0]
+
+
+def test_the_ranked_lists_carry_thirteen_images_and_ten_videos():
+    """Belgenin sayısı (§1b "SAYININ HESABI": 8 + 5 = 13, 6 + 4 = 10)."""
+    assert len(catalog.IMAGE_MODELS) == 13
+    assert len(catalog.VIDEO_MODELS) == 10
+
+
+# ── Plan basamağı VERİ oldu (Faz 4 / 1b-D) ──────────────────────────────
+#
+# B PR'ı (`Plan.rank`, `kapsiyor`) makineyi kurdu, her girdi `"free"` kaldı;
+# D PR'ı beş girdiye basamak yazdı. Eşleme ÖNERİ (sahip onaylamadı — belge
+# §1b "Yapıldığında (D)") ama bir öneri de veri ve verinin bekçisi test:
+# sahip bir kademeyi değiştirdiği gün önce burası kırmızı olur, sonra doğru
+# sayıyla yeşile döner — sessiz kayma yok.
+
+PLAN_BASAMAGI = {
+    "openai-gpt-image-2-5-sunburst": "temel",
+    "openai-gpt-image-2-5-flare": "temel",
+    "fal-seedance-2-5": "pro",
+    "fal-flux-3": "pro",
+    "fal-kling-v3-pro": "temel",
+}
+
+
+def test_the_plan_tiers_are_exactly_the_proposed_five_and_everything_else_is_free():
+    for m in catalog.IMAGE_MODELS + catalog.VIDEO_MODELS:
+        assert m.plan == PLAN_BASAMAGI.get(m.id, "free"), f"{m.id}: plan={m.plan}"
+
+
+def test_gpt_image_2_5_is_a_COPY_of_gpt_image_2_as_a_lower_bound():
+    """Sahibin talimatı ("jetonları gpt-image-2'den KOPYALA, alt sınır kalsın"):
+    iki 2.5 girdisinin yetenek jetonları VE kredisi `openai-gpt-image-2` ile
+    birebir. Ayrışırsa iki şeyden biri olmuş demek: ya sahip 2.5'i ölçtü (o
+    zaman bu test bilinçli güncellenir ve `tarife_kontrol` notu düşer) ya da
+    biri kopyayı sessizce "iyileştirdi" — ikincisi seçilebilir bir 400.
+    """
+    kaynak = catalog.image_model("openai-gpt-image-2")
+    for kimlik, tel in (("openai-gpt-image-2-5-sunburst", "gpt-image-2.5-sunburst"),
+                        ("openai-gpt-image-2-5-flare", "gpt-image-2.5-flare")):
+        m = catalog.image_model(kimlik)
+        assert m is not None and m.provider == "openai" and m.credential == "openai"
+        assert m.wire_model == tel
+        for alan in ("sizes", "qualities", "default_quality", "max_n", "images_per_request",
+                     "supports_edit", "max_refs", "credits", "credits_by_quality"):
+            assert getattr(m, alan) == getattr(kaynak, alan), f"{kimlik}.{alan} kopya değil"
+
+
+def test_schnell_jetonlari_BIR_megapikselin_ALTINDA():
+    """fal 1 MP'ye YUKARI yuvarlıyor: 1024×1024 (1,048 MP) İKİ MP sayılır ve
+    ücretsiz planın 1 kredilik modeli 2 krediye çıkar (belge §1b "13. satır").
+    Bu test bir kolaylık değil FİYAT KAPISI — `credits=1` yalnız küme 1 MP'nin
+    altındayken doğru. 32'nin katı olma şartı FLUX'un adım kısıtı."""
+    m = catalog.image_model("fal-flux-1-schnell")
+    assert m is not None and m.sizes is catalog.SCHNELL_SIZES and m.credits == 1
+    for jeton in m.sizes:
+        w, h = (int(p) for p in jeton.split("x"))
+        assert w * h < 1_000_000, f"{jeton}: {w * h} piksel — fal iki MP sayar, kredi 2 olur"
+        assert w % 32 == 0 and h % 32 == 0, f"{jeton}: 32'nin katı değil"
+    assert "1024x1024" not in m.sizes
+    assert not m.supports_edit, "schnell'in düzenleme ucu yok (redux ayrı model)"
+
+
+def test_qwen_jetonlari_IKI_megapikseli_ASMIYOR():
+    """`credits=8` = 0,02 USD/MP × 2 MP: kümeden biri 2 MP'yi aşarsa üç MP
+    sayılır ve kredi 12 olur — etiket yalan söyler."""
+    m = catalog.image_model("fal-qwen-image")
+    assert m is not None and m.sizes is catalog.QWEN_SIZES and m.credits == 8
+    for jeton in m.sizes:
+        w, h = (int(p) for p in jeton.split("x"))
+        assert 1_000_000 < w * h <= 2_000_000, f"{jeton}: {w * h} piksel, 1–2 MP bandı dışında"
+    assert m.max_refs == 1, "qwen-image-edit tek `image_url` alıyor"
+
+
+def test_seedream_jetonlari_semanin_kenar_araliginda():
+    """Seedream V4 şeması kenar başına 1024–4096 istiyor; gpt-image-2'nin üçlüsü
+    bu aralıkta ve sabit fiyat (6) boyuttan bağımsız."""
+    m = catalog.image_model("fal-seedream-v4")
+    assert m is not None and m.credits == 6 and m.credits_by_quality == ()
+    for jeton in m.sizes:
+        w, h = (int(p) for p in jeton.split("x"))
+        assert 1024 <= w <= 4096 and 1024 <= h <= 4096, jeton
+    assert set(m.sizes) == set(catalog.image_model("openai-gpt-image-2").sizes)
+    assert m.max_refs == 4
+
+
+def test_every_fal_IMAGE_model_declares_what_the_queue_needs():
+    """Video ikizinin (`test_every_video_model_declares_what_the_pipeline_needs`)
+    görsel yarısı: fal görsel de KUYRUKLU — `poll_timeout` yoksa `total_budget`
+    görselin 180 sn formülüne düşer (bugün aynı sayı, ama tesadüfen); adet
+    döngüsü adet başına ayrı istek (`images_per_request=1`, `num_images=1`);
+    adaptörü `_ADAPTERS`ta olmalı."""
+    import providers
+    fal = [m for m in catalog.IMAGE_MODELS if m.provider == "fal"]
+    assert [m.id for m in fal] == ["fal-qwen-image", "fal-seedream-v4", "fal-flux-1-schnell"]
+    assert "fal" in providers.adapter_ids()
+    for m in fal:
+        assert m.poll_timeout, f"{m.id}: poll_timeout yok"
+        assert m.images_per_request == 1 and m.quality_hidden and m.qualities == ("standard",)
+        assert m.credential == "fal"
+        if m.supports_edit:
+            assert m.wire_model_edit and m.wire_model_edit != m.wire_model, m.id
+        else:
+            assert m.wire_model_edit == "", m.id
+
+
+def test_no_entry_carries_a_retirement_date_today():
+    """`emeklilik` alanı D'de açıldı, hiçbir girdi doldurmuyor; doldurulan gün
+    `tools/tarife_kontrol.py` satır basar (bekçisi tests/test_araclar.py)."""
+    assert all(m.emeklilik is None for m in catalog.IMAGE_MODELS + catalog.VIDEO_MODELS)
+
+
+# ── fal.ai video modelleri (Görev 7 + Faz 4 / 1b-D) ────────────────────
+
+FAL_IDLER = ("fal-wan-3-0", "fal-pixverse-c1", "fal-kling-v3-turbo-pro",
+             "fal-seedance-2-5", "fal-flux-3", "fal-kling-v3-pro", "fal-minimax-h3")
 
 
 @pytest.mark.parametrize("model_id", FAL_IDLER)
@@ -875,21 +1052,12 @@ def test_the_default_video_model_is_UNCHANGED():
     assert catalog.DEFAULT_VIDEO_MODEL == "gemini-veo-3-1-lite"
 
 
-def test_fal_video_models_are_ordered_by_ASCENDING_cost():
-    """Sıra ANLAMLI (görsel tarafının kuralı) ve burada artan maliyete göre."""
-    fal = [m for m in catalog.VIDEO_MODELS if m.provider == "fal"]
-    assert [m.credits for m in fal] == sorted(m.credits for m in fal)
-
-
-def test_fal_video_models_are_ordered_PIXVERSE_WAN_KLING():
-    """Görev 7'nin brief'i sırayı Wan · PixVerse · Kling (16 · 20 · 30 kredi
-    varsayarak) tahmin etmişti. Ölçüm (design.md'nin 'Ölçüm sonuçları'
-    bölümü) PixVerse'in 720p'sinin ($0,065/sn sesli tavanla bile 13 kredi)
-    Wan'ın 720p'sinden (0,10 USD/sn = 20 kredi) DAHA UCUZ olduğunu gösterdi —
-    yani varsayılan-kalite maliyetine göre gerçek sıra PixVerse < Wan < Kling.
-    Bu test o düzeltmeyi mandallıyor; brief'in tahmini artık geçersiz."""
-    fal_ids = [m.id for m in catalog.VIDEO_MODELS if m.provider == "fal"]
-    assert fal_ids == ["fal-pixverse-c1", "fal-wan-3-0", "fal-kling-v3-turbo-pro"]
+# `test_fal_video_models_are_ordered_by_ASCENDING_cost` ve
+# `..._PIXVERSE_WAN_KLING` 2026-09-23'te DÜŞTÜ: fal'ın kendi içindeki artan
+# maliyet sırası (Görev 7'nin ölçümü, PixVerse < Wan < Kling) sahibin sıralı
+# listesiyle yer değiştirdi — yeni mandal `test_the_video_catalog_follows_the_
+# owners_RANKED_list` (yukarıda). Ölçümün kendisi hâlâ doğru ve kredilerde
+# yaşıyor (`test_fal_credits_are_derived_from_MEASURED_usd_per_second`).
 
 
 @pytest.mark.parametrize("model_id", FAL_IDLER)
@@ -935,6 +1103,29 @@ def test_fal_credits_are_derived_from_MEASURED_usd_per_second():
     assert kling.credits == 28
     assert kling.credits_by_quality == ()
 
+    # Faz 4 / 1b-D (2026-09-23) — fal.ai model sayfalarının saniye fiyatı
+    # (erişim 2026-09-22, belge §1b tablosu), aynı çapa, en yakına yuvarlama:
+    #
+    #     Seedance 2.5  720p sesli $0,473 · 480p sesli $0,2205 → 95 · 44
+    #     FLUX 3        720p $0,17 · 1080p $0,29               → 34 · 58
+    #     Kling V3 Pro  sessiz $0,112 · sesli $0,168           → 22 · 34
+    #     MiniMax H3    768P $0,06 · 2K $0,13                  → 12 · 26
+    #
+    # Belge H3 için 480p (10) ve 4K (32) de yazıyor; şemada üç kaynakla
+    # görülmedi, beyan edilmedi (catalog.py blok yorumu) — kademe eklenirse
+    # bu satır bilinçli güncellenir.
+    seedance = catalog.video_model("fal-seedance-2-5")
+    flux3 = catalog.video_model("fal-flux-3")
+    kling_pro = catalog.video_model("fal-kling-v3-pro")
+    h3 = catalog.video_model("fal-minimax-h3")
+    assert dict(seedance.credits_by_quality) == {"480p": 44, "720p": 95} and seedance.credits == 95
+    assert dict(flux3.credits_by_quality) == {"720p": 34, "1080p": 58} and flux3.credits == 34
+    assert dict(kling_pro.credits_by_quality) == {"sessiz": 22, "sesli": 34} and kling_pro.credits == 22
+    assert dict(h3.credits_by_quality) == {"768P": 12, "2K": 26} and h3.credits == 12
+    # Çapa gerçekten bölüyor: 0,473 / 0,005 = 94,6 → 95; 0,112 / 0,005 = 22,4 → 22.
+    assert round(0.473 / float(catalog.KREDI_USD_CAPASI)) == 95
+    assert round(0.112 / float(catalog.KREDI_USD_CAPASI)) == 22
+
 
 # ── Görev 9 — video notları için mandal ─────────────────────────────────
 #
@@ -968,7 +1159,12 @@ def test_MALIYET_ustunlugu_iddia_eden_VIDEO_notu_SAGLAYICI_ICINDE_dogru():
         en_az = min(m.credits for m in grup)
         en_cok = max(m.credits for m in grup)
         for m in grup:
-            notu = m.note.lower()
+            # Metin, anahtar değil (görsel ikizinin 2026-09-23 düzeltmesi ve
+            # gerekçesi). İlk gerçek sınav D'nin kendisi: PixVerse'in "En ucuz
+            # fal kademesi" notu MiniMax H3 (12) gelince YANLIŞLANDI, Kling
+            # Turbo'nun "En pahalı fal kademesi"ni Seedance (95) yanlışladı —
+            # ikisi de bu turda düzeltildi.
+            notu = i18n.t(m.note, "tr").lower()
             if "en ucuz" in notu:
                 assert m.credits == en_az, (
                     f"{m.id}: not 'en ucuz' diyor ama {m.credits} kredi "
@@ -1002,7 +1198,7 @@ def test_COZUNURLUK_iddia_eden_VIDEO_notu_GORUNUR_bir_jetona_dayanir():
     gerçekten mandal.
     """
     for m in catalog.VIDEO_MODELS:
-        notu = m.note.lower()
+        notu = i18n.t(m.note, "tr").lower()
         for jeton in _COZUNURLUK_JETONLARI:
             if jeton not in notu:
                 continue

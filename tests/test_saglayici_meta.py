@@ -188,7 +188,7 @@ def test_fal_records_the_validated_request_id_of_the_queue_submit(monkeypatch):
                           _FalYanit({"video": {"url": "https://v3.fal.media/x.mp4", "content_type": "video/mp4"}}),
                           _FalYanit(content=MP4))
     with saglayici_meta.toplayici() as meta:
-        out = fal_client.generate(wan, "kedi", "16:9", "720p", 5, 1, client=istemci, credentials=("FALKEY", "https://queue.fal.run"))
+        out = fal_client.generate_video(wan, "kedi", "16:9", "720p", 5, 1, client=istemci, credentials=("FALKEY", "https://queue.fal.run"))
     assert out == [MP4]
     assert meta.kayitlar == [{"request_id": "abc123"}], "yalnız doğrulanmış id; `status_url` gibi düşmanca alanlar yok"
     assert meta.maliyet_usd is None

@@ -1,6 +1,6 @@
 # Faz 4 — Ödeme (Polar MoR), paketler ve abonelik, hesap silme / dışa aktarma, hukuki metinler: görev listesi
 
-**Tarih:** 2026-09-22 · **Durum:** **4/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; **4** ✅ 2026-09-22 `faz4/checkout-portal`; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8; **1b'nin model listesi ve `1b-A`…`1b-G` kararları 2026-09-22'de sahipten geldi; on birinci sayı aynı gün ÖLÇÜLDÜ ve `catalog.py`ye yazıldı — o görev artık uygulanabilir**) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
+**Tarih:** 2026-09-23 · **Durum:** **5/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; **4** ✅ 2026-09-22 `faz4/checkout-portal`; **1b** ✅ 2026-09-23 — dördüncü ve son PR'ı `faz4/1b-yeni-girdiler` (D) ile katalog 13 görsel + 10 video; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8; **1b'nin model listesi ve `1b-A`…`1b-G` kararları 2026-09-22'de sahipten geldi; on birinci sayı aynı gün ÖLÇÜLDÜ ve `catalog.py`ye yazıldı — o görev artık uygulanabilir**) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
 **Üst belge:** [superpowers/specs/2026-08-10-saas-transformation-master-design.md](superpowers/specs/2026-08-10-saas-transformation-master-design.md) §5 "Faz 5" kartının **"Ödeme Altyapısı: Merchant of Record (MoR)"** maddesi (`:184-214`) ve "Filigran & Kredi Kuralları" satırı (`:183`) — sapmalar bu belgenin sonunda tek tek yazılı. **Numaralama tuzağı** aynen (Faz 3 belgesi `:4`): master spec'in "Faz 5"i ürün yol haritasının SaaS kartı; bu belge SaaS dönüşümünün İÇ dizisindeki Faz 4'tür (Faz 0 web-first → 1 DB/hesap → 2 kuyruk → 3 kredi defteri → **4 ödeme/KVKK** → 5 işletme). Yol haritası kartı (Faz 4 "Ödeme, faturalama ve hukuk"): *"Bir kullanıcı kartla abone olup fatura alabiliyor ve hesabını tamamen silebiliyor."* — bu belgenin çıkış kriteri onu genişletir (sonda tam metin). Kartın "Stripe birincil" satırı 2026-09-18'de **MoR/Polar** ile güncellendi (Faz 1 ve Faz 2 belgelerinin "Not" satırı; master `:184-199`): Türkiye'den Stripe'a doğrudan hesap açılamıyor, uluslararası satış Merchant of Record üzerinden.
 
 Faz 4'ün amacı, Faz 3'ün kurduğu defterin (rezerv → onay → iade, aylık hibe,
@@ -276,7 +276,7 @@ fiyat sayfaları 1b'nin ön koşulu olarak duruyor. Çıkış ölçütünün
 
 ---
 
-## 1b. Katalog genişletme — 13 görsel + 10 video model, sağlayıcıdan bağımsız (PR'lar: `faz4/katalog-genisletme` ✅, `faz4/1b-plan-kapisi`, `faz4/1b-fiyat-duzeltme`, `faz4/1b-yeni-girdiler`)
+## 1b. Katalog genişletme — 13 görsel + 10 video model, sağlayıcıdan bağımsız ✅ (PR'lar: `faz4/katalog-genisletme` ✅, `faz4/1b-plan-kapisi` ✅, `faz4/1b-fiyat-duzeltme` ✅, `faz4/1b-yeni-girdiler` ✅)
 
 **Kapsam.** Sahibin 2026-09-21 yönlendirmesiyle eklendi; **sıralı liste ve altı
 ürün kararı 2026-09-22'de geldi** — bu bölüm o oturumun çıktısı ve artık bir
@@ -532,27 +532,32 @@ geçiyor ki o gün tahminle değil sayıyla karar verilsin. **4. görevde
 (`services/planlar.py`; ortam değişkeni ezer) — sahibe söylenen sayı; Polar'da
 başka yazılırsa `.env`e de yazılır (§4 "Sapmalar (a)").
 
-**Dokunulan.** `catalog.py` (+13 girdi, −1 girdi, `emeklilik: date` alanı,
+**Dokunulan.** `catalog.py` (+9 girdi, −1 girdi, `emeklilik: date` alanı,
 kaynaklı fiyat yorumları, sıra yorumu), `services/planlar.py` (`Plan.rank`,
 `kapsiyor` üçüncü parametre), `services/modeller.py` + `services/kapilar.py`
 (anahtar kaynağını `kapsiyor`a taşır), `azure_flux_client.py` (flex kalkar),
-`bundled/i18n/{tr,en}.json` (`model.<id>.note` her yeni girdi için, 20-110
-karakter, adı tekrar etmez), `tools/tarife_kontrol.py` (+emeklilik satırı),
-`tests/test_catalog.py`, `tests/test_planlar.py`, `tests/test_modeller.py`,
-`tests/test_araclar.py` (4 → 0), `tests/test_azure_flux_client.py`,
+**`fal_client.py` (görsel `generate`/`edit` — D'nin sapması, aşağıda) +
+`providers.py` (`_ADAPTERS["fal"]`)**, `bundled/i18n/{tr,en}.json`
+(`model.<id>.note` her yeni girdi için, 20-110 karakter, adı tekrar etmez),
+`tools/tarife_kontrol.py` (+emeklilik satırı), `tests/test_catalog.py`,
+`tests/test_planlar.py`, `tests/test_araclar.py` (4 → 0 → **2**),
+`tests/test_azure_flux_client.py`, `tests/test_fal_client.py` +
+`tests/test_fal_client_gorsel.py`, `tests/test_playwright_studio.py`,
 `docs/ozellikler.md`, `README*.md` sağlayıcı satırı, `docs/graflar/*`.
 
 **Testler / bekçiler.** Katalog bekçileri aynen (`test_catalog`: her girdinin
 notu iki dilde var, adı tekrar etmiyor, jetonlar tutarlı, kısa etiket
 çakışması); i18n eşliği (`test_i18n`); `tarife_kontrol` ↔ bağımsız tarama
 (**0** — on birinci sayı 2026-09-22'de ölçüldü, dört Azure notunun dördü de bu
-görevde düşüyor); `emeklilik` bekçisi tarih yamalı;
+görevde düşüyor; D'de **2**: GPT Image 2.5'in kopya kredileri, sahip ölçünce
+düşer); `emeklilik` bekçisi tarih yamalı;
 **yeni: basamak bekçisi** (`Plan.rank` ↔ `PLANLAR_KUMESI` sırası, `kapsiyor`
 her (plan, model.plan, anahtar_kaynagi) üçlüsünde beklenen cevabı verir) ve
 **BYOK bekçisi** (kendi anahtarıyla plan eşiği aşılır, ama `Plan.video` ve
 filigran AŞILMAZ — K7 bu testle mandallanır); E2E model seçici (seçicide her
 `available` model bir satır; ücretsiz planın E2E'si `fal-flux-1-schnell` ile).
-Yeni adaptör YOK, yani yeni tel formatı/hata çevirisi testi de yok.
+Yeni TEL FORMATI yok — ama fal'ın GÖRSEL yüzü D'de yazıldı (aşağıda), gövde ve
+döngü testleri `tests/test_fal_client_gorsel.py`de.
 
 **Risk.** Düşük-orta — ilk yazımdakinden düşük, çünkü yeni sağlayıcı dalı
 kalktı (yeni gizli anahtar, dış konak, `ALTYAPI` bekçisi, Sentry/egress notu
@@ -563,12 +568,16 @@ unutulursa kapı sessizce gevşer — bekçi bu yüzden üçlü kombinasyonu tar
 tek yol değil. Düşük fiyatlı satır (1 kredi) platform zararı olabilir; kredi
 hesabı yorumda kaynaklı.
 
-**Çıkış ölçütü.** Katalog 13 görsel + 10 video, her girdide sağlayıcı,
-kaynaklı maliyet (kaynak + erişim tarihi yorumda) ve kredi; `azure-flux-2-flex`
-yok ✅; `tarife_kontrol.py` **0 satır** basıyor ✅ (on birinci sayı
-2026-09-22'de ölçüldü, kalan dört Azure notu fiyat PR'ında düştü); Azure'a özel varsayım yok; kendi anahtarıyla
-plan eşiği aşılıyor ama filigran ve video kuralı aşılmıyor (bekçili); i18n
-eşliği; takım yeşil (E2E dahil).
+**Çıkış ölçütü.** Katalog 13 görsel + 10 video ✅ (D, 2026-09-23), her
+girdide sağlayıcı, kaynaklı maliyet (kaynak + erişim tarihi yorumda) ve kredi
+✅; `azure-flux-2-flex` yok ✅; `tarife_kontrol.py` **2 satır** basıyor — **0
+DEĞİL** ve bu dürüst bir bekleme: GPT Image 2.5'in iki girdisi krediyi
+`gpt-image-2`den kopyalıyor (sahibin "alt sınır kalsın" talimatı) ve not
+aracın desenine bilerek uyuyor; sahip `usage.output_tokens`ı ölçünce 0'a
+döner (aşağıda "Sahibin adımı"); emeklilik satırı **0** ✅; Azure'a özel
+varsayım yok ✅; kendi anahtarıyla plan eşiği aşılıyor ama filigran ve video
+kuralı aşılmıyor (bekçili, gerçek id'lerle) ✅; i18n eşliği ✅; takım yeşil
+(E2E dahil) ✅.
 
 ### Görev DÖRT PR'a bölündü (sahip, 2026-09-22)
 
@@ -583,8 +592,8 @@ okunamazdı.
 | --- | --- | --- | --- |
 | **#74 ✅** | `faz4/katalog-genisletme` | tasarım, kararlar, ölçülen kredi | — |
 | **#77 ✅** | `faz4/1b-plan-kapisi` | `Plan.rank`, `kapsiyor` üçüncü parametre, üç çağıran, beş yeni bekçi | `catalog.py`'ye DOKUNMAZ |
-| **#78** | `faz4/1b-fiyat-duzeltme` | on sayı, flex silme, `tarife_kontrol` 4 → 0 | — |
-| **D** | `faz4/1b-yeni-girdiler` | 5 görsel + 4 video, `emeklilik`, i18n, E2E çapaları | **C'den sonra** |
+| **#78 ✅** | `faz4/1b-fiyat-duzeltme` | on sayı, flex silme, `tarife_kontrol` 4 → 0 | — |
+| **D ✅** | `faz4/1b-yeni-girdiler` | 5 görsel + 4 video, fal GÖRSEL adaptörü, `emeklilik`, i18n, E2E çapaları | C'den sonra (2026-09-23) |
 
 B ile C paralel gitti (dosya kümeleri kesişmiyor); D ile C aynı katalog
 satırlarını yazdığı için sıralı.
@@ -673,18 +682,134 @@ Dokunulan: `catalog.py` (−1 girdi, 8 fiyat/yorum noktası), `azure_flux_client
 `tests/test_azure_flux_client.py`, `tests/test_araclar.py`, `docs/graflar/*`.
 `services/` ve `routers/`a DOKUNULMADI.
 
-**Sahibin adımı — PR'dan önce.** Sıralı liste ✅ geldi (2026-09-22). Kalan iki
-girdi:
+### Yapıldığında (D, 2026-09-23) — ölçümler ve sapmalar
 
-1. **GPT Image 2.5'in yetenek jetonları** — `flare` ve `sunburst` için boyut
-   kümesi, kalite kümesi (`low…xhigh, max, auto` belgede yazılı ama bu depoda
-   doğrulanmadı), `max_n`, referans sayısı. Ya birer canlı üretim, ya da
-   "jetonları `gpt-image-2`den KOPYALA, alt sınır kalsın" talimatı — ikincisi
-   `openai-gpt-image-2` girdisinin zaten kurulmuş deseni ve bu PR'ı
-   bloklamıyor.
-2. **`gpt-image-2` kalite ölçümü** — `low`/`medium`/`high`, 1024×1024,
-   yanıttaki `usage`. Gelmezse 4/8/16 aynen kalır ve bekçi 1'de durur; PR
-   bunun için BEKLEMEZ.
+B ve C'nin dersi ("Yapıldığında bloklarını PR başına AYRI başlıklara yazmak")
+burada uygulandı: bu blok kendi başlığının altında, B/C'ninkilerle çakışmadan.
+
+**Katalog 13 + 10, sıra sahibin listesi.** Beş görsel (`openai-gpt-image-2-5-
+sunburst` #2, `-flare` #3, `fal-qwen-image` #10, `fal-seedream-v4` #11,
+`fal-flux-1-schnell` #13) ve dört video (`fal-seedance-2-5` #1, `fal-flux-3`
+#3, `fal-kling-v3-pro` #5, `fal-minimax-h3` #9) girdisi, her ikisi de
+yukarıdaki tabloların SIRASIYLA. Mevcut girdilerin İÇERİĞİ (jeton, kredi,
+plan) değişmedi; DEMETTEKİ YERLERİ listeye göre değişti — sıra arayüz sırası
+ve bu turun talimatı "mevcutlar yerinde kalsın" diyordu, ama listedeki
+konumları öyle değildi (Veo Lite 1 → 10, MAI 2.6 Flash 6 → 12). Belge kazandı.
+Bekçiler: `test_the_image_catalog_follows_the_owners_RANKED_list`,
+`..._video_...`; `catalog.py`nin "ilk girdi varsayılan" cümlesi düzeltildi
+(`DEFAULT_*` sabit, indeks değil — `test_the_defaults_are_CONSTANTS_not_index_zero`).
+
+**SAPMA 1 — fal'a GÖRSEL adaptörü gerekti.** §1b "YENİ SAĞLAYICI YOK … yeni
+`*_client.py` açmıyor" diyordu ve doğru — kimlik, anahtar, konak aynı — ama
+fal `providers`ta YALNIZ video tablosundaydı (`fal_client.py` başlığı: "görsel
+tarafı geldiği gün `generate`/`edit` bu dosyaya eklenecek"). Üç fal görsel
+girdisi için o gün geldi: `fal_client.generate`/`edit` yazıldı (aynı kuyruk
+döngüsü `_kuyruk_dongusu` parametrelendi — kopyalanmadı; sonuç `images[0].url`,
+PNG yerelde garantileniyor), video işlevleri `generate_video`/`animate` adını
+aldı, `providers._ADAPTERS["fal"]` eklendi (fal iki tabloda duran ikinci
+sağlayıcı, Gemini'den sonra). Yeni tel formatı YOK, yeni gizli anahtar YOK.
+
+**SAPMA 2 — şemalar fal.ai'den okunamadı.** Bu turun konteynerinde `fal.ai`,
+`docs.fal.ai` ve aynaları (context7, cellcog, runware) egress'te KAPALI. Yedi
+yeni fal modelinin uç yolları, alan adları, tipleri ve enum'ları fal'ın OpenAPI
+şemasını kodlayan AÇIK KAYNAK istemcilerden ÇAPRAZ okundu (GitHub kod araması:
+hermes-agent, artcraft, OpenChatCut, sim, TanStack/ai, sandbase-docs, ComfyUI;
+liste `fal_client.py` başlığında). Kural: ÜÇ kaynak aynı şeyi söylüyorsa
+yazıldı. Sonuçları: Seedance 2.5 ve Kling V3 Pro `duration`ı DİZE gönderiyor
+(Kling Turbo deseni), FLUX 3 ve H3 tamsayı; Kling V3 Pro'nun i2v referans alanı
+`start_image_url` (Turbo Pro'nun `image_url`undan farklı — kopyalanmadı);
+Seedance/H3 i2v `aspect_ratio` okumuyor. **MiniMax H3'ün belgedeki 480p (10) ve
+4K (32) kademeleri YAZILMADI**: temel `minimax/h3` ucunun şemasında iki kaynak
+`768P, 2K` diyor, 480P yalnız H3 Max Turbo'da görüldü, 4K tek kaynakta —
+doğrulanmamış jeton seçilebilir bir 422. H3 bu yüzden 12/26 (768P/2K), 10
+değil; Veo Lite (10) kataloğun mutlak en ucuzu kaldı. Canlı 422 ile
+DOĞRULANMADI — sahibin sandbox turu aşağıda.
+
+**SAPMA 3 — GPT Image 2.5 kredisi kopya, `tarife_kontrol` 0 → 2.** Sahibin
+1. girdisi "kopyala, alt sınır kalsın" dedi; jetonlar VE 1/11/42 kredisi
+`openai-gpt-image-2`den kopyalandı, `credits` satırına aracın desenine uyan
+not yazıldı — araç iki satır basıyor ve `tests/test_araclar.py` kümeyi ADIYLA
+bekliyor (`== {sunburst, flare}`). Sahip `usage.output_tokens`ı ölçünce not
+düşer, küme boşalır, test bilinçli güncellenir. 2. girdi (gpt-image-2 ölçümü)
+zaten 2026-09-22'de kapanmıştı.
+
+**SAPMA 4 — plan basamağı ÖNERİ, sahip onaylamadı.** 1b-B'nin makinesi B'de
+kuruldu, veri D'de yazıldı: GPT Image 2.5 ×2 `temel` (ölçülmemiş tarifeyi
+ücretsize açmamak), Seedance 2.5 ve FLUX 3 `pro` (5 sn = 475 / 170 kredi,
+`temel`in 1.200'lük ayını iki-üç tıkta eritir), Kling V3 Pro `temel`, MiniMax
+H3 ve üç fal görseli `free`. Bekçisi `test_the_plan_tiers_are_exactly_the_
+proposed_five_and_everything_else_is_free` + gerçek id'li basamak testleri
+(`tests/test_planlar.py`: ücretsiz + platform anahtarı 2.5'i görmez, kendi
+OpenAI anahtarıyla görür — 1b-A; video kuralı aşılmaz — K7). Sahip bir kademeyi
+değiştirirse önce test kırmızı olur, sonra doğru sayıyla yeşile döner.
+
+**SAPMA 5 — E2E'de plan kilidi GİZLEMİYOR, ROZETLİYOR.** Talimat "gated
+modeller satır DEĞİL" diyordu; ön yüzün Faz 3 / 3 kararı (core.js
+`secilebilirler`: "görünmezse kullanıcı modelin VAR olduğunu bile bilmez") plan
+kilidini rozetle gösteriyor. E2E kurulu karara uydu: ücretsiz kullanıcıda GPT
+Image 2.5 satırları "not in your plan" rozetiyle VAR, schnell rozetsiz;
+schnell ile üretim uçtan uca (sahte sağlayıcı → filigranlı işçi → panel
+`bitti` → DB'de 1 kredi → "199 left"). ÖLÇÜLEN TUZAK: conftest'in autouse
+`_anahtar_kapisi`si `check_anahtar`ı "kullanici" yamalıyor — ilk koşumda dökümde
+platform rozetleri doğruyken iş "kendi anahtarı" sayıldı, rezerv düşmedi;
+test `@pytest.mark.gercek_anahtar` ile yamasız koşuyor ve platform anahtarları
+ORTAMDAN (`KROMIS_PLATFORM_<AD>`) veriliyor, yama değil. Pro kullanıcıda 13
+satırın 13'ü, katalog sırasıyla, rozetsiz. 23 satırlık seçici yeniden
+TASARLANMADI (gruplama ayrı küçük PR, risk notundaki gibi).
+
+**schnell'in boyut kümesi 1 MP'nin ALTINDA** (960², 1024×768, 768×1024,
+1024×576, 576×1024 — 32'nin katı): fal 1 MP'ye yukarı yuvarlıyor, 1024×1024
+iki MP sayılır ve 1 kredi 2 olurdu; bekçisi
+`test_schnell_jetonlari_BIR_megapikselin_ALTINDA`. Qwen Image modelin kendi
+beş geometrisinde (1,5–1,8 MP → iki MP → 8 kredi), Seedream sabit fiyatta
+gpt-image-2'nin üçlüsüyle (6 kredi). Kling V3 Pro'nun KALİTE EKSENİ SES
+EKSENİ (`sessiz`/`sesli` → `generate_audio`, 22/34): `resolution` şemada yok,
+PixVerse'in "ölçülemedi, yukarı yuvarla" tahmini bu kez ölçülebilirken
+tekrarlanmadı. Seedance 480p (44) da beyan edildi (fal iki kademeyi de sesli
+fiyatlıyor).
+
+**Yan bulgu — iki not ve iki vakumlu mandal.** PixVerse'in "En ucuz fal
+kademesi" notu (13) MiniMax H3 (12) gelince, Kling Turbo'nun "En pahalı fal
+kademesi"ni (28) Seedance (95) YANLIŞLADI; ikisi düzeltildi. Bunu yakalaması
+gereken `test_MALIYET_ustunlugu_iddia_eden_not_GERCEKTEN_en_ucuz` (görsel ve
+video ikizi) v0.21'den beri `m.note.lower()` okuyordu — yani ÇEVİRİ ANAHTARINI,
+metni değil — ve hiç ateşlenmiyordu. İkisi de artık Türkçe metni okuyor;
+schnell'in "En ucuz görsel" notu ilk gerçek sınavı.
+
+**Yönetmen menüsü bütçesi 3800 → 5200.** Prompt Yönetmeni'nin model menüsü
+(her turda giden, önbelleksiz metin) dokuz girdiyle 3728'den 5078 karaktere
+çıktı; girdi başına ~150 karakter, satır başına bedel değişmedi, yalnız satır
+sayısı 14 → 23. Görev 7'deki deyimle aynı: `chat_prompt.py`'de değişen satır
+yok, tavan `tests/test_chat_prompt.py`'de yükseltildi ve gerekçesi orada.
+Menüyü kısaltmak istenirse ayrı bir kararın konusu.
+
+**`emeklilik: date | None`** `ImageModel`a girdi, hiçbir girdi doldurmuyor;
+`tarife_kontrol` "30 gün içinde emekli olacak model" satırını basıyor (bugün
+"yok"), bekçisi tarih yamalı + sentetik girdili (`tests/test_araclar.py`).
+
+Dokunulan: `catalog.py` (+9 girdi, sıra, `emeklilik`, `QWEN_SIZES`/`SCHNELL_SIZES`,
+etiketler), `fal_client.py`, `providers.py`, `tools/tarife_kontrol.py`,
+`bundled/i18n/{tr,en}.json` (9 not + 3 hata + 3 etiket; 2 not ve 4 indirme
+metni düzeltildi), `tests/test_catalog.py`, `tests/test_planlar.py`,
+`tests/test_araclar.py`, `tests/test_fal_client.py`, `tests/test_fal_client_gorsel.py`
+(yeni), `tests/test_providers.py`, `tests/test_settings_route.py`,
+`tests/test_saglayici_meta.py`, `tests/test_playwright_studio.py`,
+`tests/test_chat_prompt.py` (tavan), `docs/ozellikler.md`, `README*.md`, `docs/graflar/*`.
+
+**Sahibin adımı — D'den SONRA.** Sıralı liste ✅ (2026-09-22), 1. girdi
+("kopyala, alt sınır kalsın") ✅ uygulandı, 2. girdi (gpt-image-2 ölçümü) ✅
+2026-09-22. Açık kalan üç şey, hepsi sahibin anahtarıyla:
+
+1. **GPT Image 2.5'in kredisi** — `flare` ve `sunburst` için 1024×1024'te
+   `low`/`medium`/`high` birer üretim, yanıttaki `usage.output_tokens`;
+   sayı gelince `credits_by_quality` ve not düzelir, `tarife_kontrol` 2 → 0.
+2. **Plan basamağı** — yukarıdaki beş kademe (SAPMA 4) onay ya da düzeltme;
+   düzeltme tek yer (`catalog.py` `plan=`) + bekçi.
+3. **fal sandbox turu** — yedi yeni fal modelinde birer üretim (görselde
+   `960x960`/`1328x1328`/`1024x1024`, videoda 5 sn 16:9): uç yolları ve alan
+   adları canlı doğrulanır; 422 çıkarsa `fal_client.ALANLAR`/`GORSEL_ALANLAR`
+   tek yerden düzelir. Ayrıca H3'te 480P/4K kademeleri gerçekten varsa
+   (sandbox 422 vermezse) 10/32 kredilerle eklenir.
 
 **Bağımlılıklar.** 1'den sonra (girdi silinmiş, yorumlar yerinde); 2-4'ten
 BAĞIMSIZ — omurgayla paralel gidebilir; 7 (operasyon) bu görevin sağlayıcı
@@ -1861,3 +1986,15 @@ sağlayıcı değil.
   (standardwebhooks.com — bu oturumda doğrulanmadı, K4'ün teslimat katmanı
   buna dayanır; farklıysa `odeme_olaylari` yalnız günlük olur, sipariş anahtarı
   yine korur).
+* **1b-D şema kaynakları (2026-09-23).** `fal.ai` ve `docs.fal.ai` (ve aynaları
+  context7 / cellcog / runware) D'nin konteynerinden OKUNAMADI (egress kapalı);
+  yedi yeni fal modelinin uç yolu / alan adı / tip / enum bilgisi fal'ın OpenAPI
+  şemasını kodlayan açık kaynak istemcilerden GitHub kod aramasıyla ÇAPRAZ
+  okundu — NousResearch/hermes-agent `plugins/video_gen/fal/__init__.py`,
+  storytold/artcraft `crates/api_clients/fal_client`, 0xsline/OpenChatCut
+  `server/plugins/fal-catalog-input.verify.ts`, simstudioai/sim
+  `apps/sim/lib/media/falai-video.ts`, TanStack/ai `packages/ai-fal`
+  (görsel alan adı tablosu), sandbaseai/sandbase-docs (H3 `768P, 2K`),
+  Comfy-Org/ComfyUI `comfy_api_nodes/nodes_minimax.py`. Kural ("üç kaynak")
+  ve sonuçları §1b "Yapıldığında (D)" SAPMA 2; canlı doğrulama sahibin
+  sandbox turu.

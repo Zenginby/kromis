@@ -89,8 +89,10 @@ döner.
 
 ### Üret ve düzenle — birçok model, tek şerit
 
-Azure OpenAI (`gpt-image-2`), Google Gemini (Nano Banana 2 / Pro), Azure AI
-Foundry (MAI-Image, FLUX.2) ve OpenAI aynı şeritten seçilir. Her model kartı ne
+Azure OpenAI (`gpt-image-2`), OpenAI (`gpt-image-2`, GPT Image 2.5), Google
+Gemini (Nano Banana 2 / Pro), Azure AI Foundry (MAI-Image, FLUX.2) ve fal.ai
+(Qwen Image, Seedream V4, FLUX.1 schnell) aynı şeritten seçilir — 13 görsel
+modeli, kaliteliden ucuza sıralı. Her model kartı ne
 işe yaradığını bir satırda söyler ve kredi aralığını gösterir; şerit yalnız
 **anahtarı kayıtlı** sağlayıcıları listeler. Düzenleme (inpainting) modunda ana
 referansın yanına 3 ek referans görsel konabilir.
@@ -100,9 +102,10 @@ referansın yanına 3 ek referans görsel konabilir.
 ### Metinden video, tek tıkla canlandırma
 
 Composer'ın üçüncü modu video: Gemini · Veo 3.1'in üç kademesi (Lite / Fast /
-tam) ve fal.ai'nin üç modeli — Alibaba Wan 3.0, PixVerse C1, Kling V3 Turbo
-Pro. Veo 4–6–8 saniye sunarken PixVerse ve Kling **15 saniyeye kadar** klip
-üretebiliyor; oran ekseni de genişledi, üçü de 16:9/9:16'nın yanına **1:1**'i
+tam) ve fal.ai'nin yedi modeli — ByteDance Seedance 2.5, Black Forest Labs
+FLUX 3, Kling V3 Turbo Pro / V3 Pro, PixVerse C1, Alibaba Wan 3.0, MiniMax H3.
+Veo 4–6–8 saniye sunarken fal modelleri **15 saniyeye kadar** klip
+üretebiliyor; oran ekseni de genişledi, fal 16:9/9:16'nın yanına **1:1**'i
 ekliyor. Veo'nun anahtarı görsel tarafıyla paylaşılır; fal kendi anahtarını
 Ayarlar'dan alır — ikisi de aynı composer'da, yeni bir ekran açılmadı.
 Galerideki bir görseli ilk kare yapıp canlandırabilirsin; kayıt türev bağını

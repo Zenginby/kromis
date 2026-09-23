@@ -44,14 +44,27 @@ silinince iki taraf birlikte düşer, elle liste yok (CLAUDE.md § 5).
 
 ÇIKIŞ KODU her zaman 0: bu bir rapor, kapı değil — notlu model olması hata
 sayılmaz (sahibin bilinçli "GEÇİCİ" kararı).
+
+İKİNCİ SATIR — "30 gün içinde emekli olacak model" (Faz 4 / 1b-D, 2026-09-23):
+`ImageModel.emeklilik` tarihi bugünden `EMEKLILIK_UFKU_GUN` gün ya da daha
+yakın (geçmişi de dâhil) olan görsel/video girdileri. Tarife satırının aksine
+KAYNAĞI DEĞİL MODÜLÜ okur: tarih bir yorum değil bir alan ve çalışma zamanında
+var. NEDEN VAR: kalkacağı belli olan girdinin bedeli üç kez ölçüldü
+(`openai-dall-e-3`: kullanıcı seçebiliyor, üretim 404; `openai-gpt-image-1`,
+`gpt-image-1.5`) ve üçünde de tarih yalnız bir yorumdaydı — kimse saymıyordu.
+Bugün hiçbir girdi tarih taşımıyor, rapor "yok" der; bekçisi
+tests/test_araclar.py tarihi YAMALAYIP sentetik bir girdiyle satırın
+görüldüğünü kanıtlar (tarife satırının enjeksiyon testinin aynı deseni).
 """
 from __future__ import annotations
 
 import ast
 import dataclasses
+import datetime as dt
 import os
 import re
 import sys
+from collections.abc import Sequence
 from decimal import Decimal
 
 # Betik olarak koşarken (`python tools/tarife_kontrol.py`) kök modüller görünmez
@@ -134,6 +147,56 @@ def bul(kaynak: str) -> list[Bulgu]:
     return bulgular
 
 
+# Emeklilik ufku: bir aylık hibe döneminden kısa, yani sahip girdiyi bir dönem
+# içinde silebilsin. Ölçülmüş bir sayı değil ürün kararı; sabit adıyla duruyor.
+EMEKLILIK_UFKU_GUN = 30
+
+
+def bugun() -> dt.date:
+    """Takvim günü — TEST DİKİŞİ (`fal_client._simdi`nin deseni): test yamalar, üretim saatten okur."""
+    return dt.date.today()
+
+
+@dataclasses.dataclass(frozen=True)
+class Emekli:
+    """Emekliliği ufuk içinde bir model: kimliği, günü ve bugüne göre kalan gün (geçmişse negatif)."""
+    model: str
+    emeklilik: dt.date
+    kalan_gun: int
+
+
+def emekliler(modeller: Sequence[catalog.ImageModel] | None = None,
+              gun: dt.date | None = None) -> list[Emekli]:
+    """`emeklilik`i `gun`dan en çok `EMEKLILIK_UFKU_GUN` gün sonra (ya da geçmişte) olan girdiler, katalog sırasıyla.
+
+    `modeller` verilmezse görsel + video demetleri (`catalog`tan çalışma zamanında — testin
+    `monkeypatch.setattr(catalog, "IMAGE_MODELS", …)` yaması görülsün diye çağrı anında okunur).
+    """
+    gun = gun or bugun()
+    if modeller is None:
+        modeller = tuple(catalog.IMAGE_MODELS) + tuple(catalog.VIDEO_MODELS)
+    sonuc: list[Emekli] = []
+    for m in modeller:
+        if m.emeklilik is None:
+            continue
+        kalan = (m.emeklilik - gun).days
+        if kalan <= EMEKLILIK_UFKU_GUN:
+            sonuc.append(Emekli(m.id, m.emeklilik, kalan))
+    return sonuc
+
+
+def emeklilik_raporu(liste: list[Emekli]) -> str:
+    """İnsan için satırlar: model · gün · kalan (geçmişse "gecti")."""
+    if not liste:
+        return f"{EMEKLILIK_UFKU_GUN} gun icinde emekli olacak model yok."
+    parcalar = [f"{len(liste)} model {EMEKLILIK_UFKU_GUN} gun icinde emekli oluyor — girdi silinmeli "
+                "(olu girdi katalogda kalmaz: secilebilir 404):"]
+    for e in liste:
+        durum = f"{e.kalan_gun} gun kaldi" if e.kalan_gun >= 0 else f"{-e.kalan_gun} gun once GECTI"
+        parcalar.append(f"  {e.model}: {e.emeklilik.isoformat()} · {durum}")
+    return "\n".join(parcalar)
+
+
 def rapor(bulgular: list[Bulgu]) -> str:
     """İnsan için tablo: model · kredi · ≈USD · kademeler · eşleşen yorum satırları."""
     if not bulgular:
@@ -155,6 +218,8 @@ def main(argv: list[str]) -> int:
     with open(KATALOG_YOLU, encoding="utf-8") as f:
         kaynak = f.read()
     print(rapor(bul(kaynak)))
+    print()
+    print(emeklilik_raporu(emekliler()))
     return 0
 
 

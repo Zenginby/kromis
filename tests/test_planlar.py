@@ -719,3 +719,56 @@ def test_check_plan_lets_a_free_user_through_on_a_pro_model_when_the_key_is_thei
         # Video AŞILMIYOR: kendi anahtarı bu kapıyı açmıyor (K7).
         with pytest.raises(HTTPException):
             kapilar.check_plan(s, kullanici, VIDEO_SPEC, _kimlikler(VIDEO_SPEC, BENIM))
+
+
+# ── (v) basamak GERÇEK katalog id'leriyle (Faz 4 / 1b-D, 2026-09-23) ─────────
+#
+# Yukarıdaki üçlü tarama `dataclasses.replace(SPEC, plan=…)` ile SENTETİK
+# girdiler kullanıyor — B PR'ında katalog hâlâ her girdide "free" idi, başka
+# yolu yoktu. D PR'ı beş girdiye basamak yazdı; aşağıdaki testler aynı kapıyı
+# GERÇEK id'lerle soruyor ki katalog verisi ile makine arasındaki bağ da
+# mandallı olsun: bir gün `openai-gpt-image-2-5-*` "free"ye düşerse (ya da
+# schnell "temel"e çıkarsa) burası kırmızı olur.
+
+GPT25 = catalog.image_model("openai-gpt-image-2-5-sunburst")
+SCHNELL = catalog.image_model("fal-flux-1-schnell")
+SEEDANCE = catalog.video_model("fal-seedance-2-5")
+KLING_PRO = catalog.video_model("fal-kling-v3-pro")
+H3 = catalog.video_model("fal-minimax-h3")
+
+
+@pytest.mark.parametrize("spec, plan, kaynak, beklenen, sebep", [
+    # Ücretsiz + platform anahtarı: 1 kredilik schnell açık, `temel` GPT Image 2.5 kapalı (rozet).
+    (SCHNELL, "free", PLATFORM, True, None),
+    (GPT25, "free", PLATFORM, False, "plan"),
+    # 1b-A: kendi OpenAI anahtarı eşiği AŞAR — ücretsiz kullanıcı 2.5'i görür (bize maliyeti yok).
+    (GPT25, "free", BENIM, True, None),
+    (GPT25, "temel", PLATFORM, True, None),
+    # Video basamağı: `temel` Kling V3 Pro'yu ve H3'ü görür, Seedance'ı (pro) GÖRMEZ.
+    (KLING_PRO, "temel", PLATFORM, True, None),
+    (H3, "temel", PLATFORM, True, None),
+    (SEEDANCE, "temel", PLATFORM, False, "plan"),
+    (SEEDANCE, "pro", PLATFORM, True, None),
+    # K7 AYNEN: ücretsiz plan video alamaz — "free" basamaklı H3 bile, kendi anahtarıyla bile.
+    (H3, "free", PLATFORM, False, "plan"),
+    (H3, "free", BENIM, False, "plan"),
+    (SEEDANCE, "free", BENIM, False, "plan"),
+])
+def test_the_ladder_holds_on_REAL_catalog_entries(spec, plan, kaynak, beklenen, sebep):
+    assert spec is not None
+    assert modeller.model_available(spec, True, plan, kaynak) is beklenen
+    assert modeller.sebep(spec, True, plan, kaynak) == sebep
+
+
+def test_check_plan_agrees_with_model_available_on_the_real_gpt_image_2_5(depo_db, kullanici):
+    """Rota kapısı ile döküm aynı cevabı vermek ZORUNDA (1b-A'nın "seçilebilir 403" uyarısı):
+    ücretsiz kullanıcı platform anahtarıyla 2.5'e 403 alır, kendi anahtarıyla geçer; schnell
+    her iki kaynakla geçer."""
+    assert GPT25 is not None and SCHNELL is not None
+    with Session(depo_db) as s:
+        with pytest.raises(HTTPException) as e:
+            kapilar.check_plan(s, kullanici, GPT25, _kimlikler(GPT25, PLATFORM))
+        assert e.value.status_code == 403 and e.value.detail["model"] == GPT25.id
+        assert kapilar.check_plan(s, kullanici, GPT25, _kimlikler(GPT25, BENIM)) == "free"
+        assert kapilar.check_plan(s, kullanici, SCHNELL, _kimlikler(SCHNELL, PLATFORM)) == "free"
+        assert kapilar.check_plan(s, kullanici, SCHNELL, _kimlikler(SCHNELL, BENIM)) == "free"

@@ -664,7 +664,7 @@
   "model.fal-kling-v3-turbo-pro.note": "Hızlı ve pahalı kademe (28 kredi/sn); çözünürlük seçilemiyor, oran yalnız metin ucunda etkili.",
   "model.fal-minimax-h3.note": "fal'ın en ucuz varsayılan kademesi: 480p'den 4K'ya dört kademe, 768p yerel; sesli, 15 saniyeye kadar.",
   "model.fal-pixverse-c1.note": "Ucuz fal kademesi; 15 saniyeye kadar klip de üretebiliyor.",
-  "model.fal-qwen-image.note": "Metin ve tabela işlemede güçlü, ucuz açık ağırlıklı model; tek referansla düzenliyor.",
+  "model.fal-qwen-image.note": "Metin ve tabelada güçlü, ucuz; tek referansla düzenler. Düzenlemede uzun kenar 1536'ya iner.",
   "model.fal-seedance-2-5.note": "Sesli, sinematik klipler için fal'ın en pahalı kademesi; saniyesi 95 kredi, süreye dikkat.",
   "model.fal-seedream-v4.note": "Boyuttan bağımsız sabit fiyat; çok referanslı düzenleme ve seri üretim için uygun.",
   "model.fal-wan-3-0.note": "480p seçersen saniye maliyeti PixVerse'in altına iner; varsayılan 720p'de fal'ın orta kademesi.",

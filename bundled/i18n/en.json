@@ -664,7 +664,7 @@
   "model.fal-kling-v3-turbo-pro.note": "A fast, expensive tier (28 credits/s); the resolution cannot be chosen and the aspect ratio only takes effect on the text endpoint.",
   "model.fal-minimax-h3.note": "fal's cheapest default tier: four steps from 480p to 4K, native 768p; with audio, up to 15 seconds.",
   "model.fal-pixverse-c1.note": "A cheap fal tier; it can also produce clips of up to 15 seconds.",
-  "model.fal-qwen-image.note": "Strong at text and signage, a cheap open-weights model; edits with a single reference.",
+  "model.fal-qwen-image.note": "Strong at text and signage, cheap; edits with one reference. Edits trim the long side to 1536.",
   "model.fal-seedance-2-5.note": "fal's most expensive tier, for cinematic clips with sound; 95 credits per second, watch the duration.",
   "model.fal-seedream-v4.note": "Flat price at any size; suited to multi-reference edits and batch work.",
   "model.fal-wan-3-0.note": "At 480p the per-second cost drops below PixVerse; at the default 720p it is fal's middle tier.",

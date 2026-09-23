@@ -861,6 +861,22 @@ metni düzeltildi), `tests/test_catalog.py`, `tests/test_planlar.py`,
    `image_size` — seçilen boyut çıktıda tutuyor mu?), kalanlar. Şema tarafı
    birinci taraf OpenAPI'yle kapandı; canlı soru `data:` URI kabulü ve Qwen
    `image_size`. 422 çıkarsa `fal_client.ALANLAR`/`GORSEL_ALANLAR` tek yerden.
+   **Kısmen yapıldı (2026-09-23, sahibin fal anahtarıyla, 0,343 USD):**
+   (a) PARASIZ tel doğrulaması — uygulamanın KENDİ gövdesi (`build_payload` /
+   `build_image_payload`) + bilerek bozuk bir alan `fal.run`a: fal çalıştırmadan
+   önce doğruluyor ve bütün hataları birlikte döndürüyor, bozuk alan koşmayı
+   engelliyor. 7 yeni modelin 12 ucu × katalogdaki her kombinasyon = 209
+   istek, bizim alanlarda SIFIR hata (negatif kontrol: H3'e `"4k"` yakalandı);
+   Kling `duration`ı tamsayıyla da kabul ediyor, yani dize kuralını bu
+   doğrulayıcı ayırt etmiyor. (b) Canlı, adaptörün kendisiyle
+   (`fal_client.generate`/`edit`/`animate`): schnell 1024×768 ✅; Qwen
+   düzenleme 1664×928 → **1536×928** (sahibin kararı: küme kalır, notta
+   yazılı — `catalog.py` Qwen yorumu); Seedream düzenleme 1536×1024 ✅ (fal
+   JPEG döndü, `_png_garantile` PNG yaptı); H3 görsel→video 480P / 5 sn →
+   640×480, 5,18 sn, ses izi VAR (i2v'de oran referanstan: 1024×768 → 4:3).
+   `data:` URI iki düzenleme ucunda ve H3 i2v'de kabul edildi; fatura tahminle
+   kuruşu kuruşuna (0,003 + 0,06 + 0,03 + 0,25). Açık: Kling V3 Pro, Seedance
+   2.5, FLUX 3 canlı üretimi (bakiye yetmedi) ve Qwen metin ucu.
 4. **Açık seçenekler** (karar sahibin): 2.5'e `xhigh`/`max` (19/42); Seedance
    1080p (233); Qwen için `credits_edit` ekseni; boyut başına kredi (dikey/
    yatay ~%25 ucuz); görsel girdi jetonunun krediye alınması.

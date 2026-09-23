@@ -80,3 +80,9 @@ def sil(db: Session, kullanici_id: uuid.UUID, palette_id: str | None) -> bool:
     sonuc = db.execute(delete(Palet).where(Palet.kullanici_id == kullanici_id,
                                            Palet.id == palette_id))
     return int(getattr(sonuc, "rowcount", 0) or 0) > 0
+
+
+def hepsini_sil(db: Session, kullanici_id: uuid.UUID) -> int:
+    """Kullanıcının BÜTÜN paletlerini siler; silinen sayı (hesap silme turu, Faz 4 / 5, K9)."""
+    sonuc = db.execute(delete(Palet).where(Palet.kullanici_id == kullanici_id))
+    return int(getattr(sonuc, "rowcount", 0) or 0)

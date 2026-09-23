@@ -1,12 +1,35 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
 # GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
 # Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
-"""Hesap uçları — kayıt, doğrulama, giriş, çıkış, sıfırlama, `/giris` sayfası (Faz 1 / 3).
+"""Hesap uçları — kayıt, doğrulama, giriş, çıkış, sıfırlama, `/giris` sayfası (Faz 1 / 3); silme ve dışa aktarma (Faz 4 / 5).
 
-Sekiz rota (belge §3): `POST /api/hesap/{kayit,dogrula,giris,cikis,sifirla,
-sifirla/dogrula}`, `GET /api/hesap/ben`, `GET /giris`. HTTP burada (gövde,
-durum kodu, çerez, cümle); hesap mantığı `services/hesap.py`de, posta
-`services/posta.py`de, kapı `services/kimlik.py`de.
+On rota: `POST /api/hesap/{kayit,dogrula,giris,cikis,sifirla,
+sifirla/dogrula}`, `GET /api/hesap/ben`, `GET /giris` (belge Faz 1 §3) +
+`POST /api/hesap/sil`, `GET /api/hesap/disa-aktar` (Faz 4 §5). HTTP burada
+(gövde, durum kodu, çerez, cümle); hesap mantığı `services/hesap.py`de, posta
+`services/posta.py`de, kapı `services/kimlik.py`de, dışa aktarma arşivi
+`services/disa_aktar.py`de.
+
+HESAP SİLME (Faz 4 / 5, K9) — anonimleştir + kilitle ANINDA, içerik 7 gün
+sonra bakım turunda (`services/isci.py silme_turu`), defter ve sipariş KALIR.
+Parola onayı `giris` ile AYNI kapıdan geçer: kilit (429) → parola (401, aynı
+metin, aynı süre) — aksi hâlde bu uç oturumu çalınmış bir hesapta sınırsız
+parola denemesi veren bir kâhin olurdu; yanlış parola `giris_denemeleri`ne
+yazılır (o yüzden 401 `JSONResponse`, `HTTPException` değil — modül başındaki
+commit gerekçesi). Parolasız hesap (Google, 3b — bugün yok) 409
+`err.hesap_parolasiz`: belge e-posta jetonlu `sil-dogrula` akışını yazmıştı;
+`jetonlar.amac` CHECK'i yeni bir amaç için GÖÇ ister ve bugün parolasız hesap
+açan bir yol yok — kullanıcı "parolamı unuttum" ile (adresi kanıtlayarak) parola
+belirleyip siler, aynı kanıt. Polar aboneliği ve e-posta silmeyi DURDURMAZ:
+ikisi de dış hizmet; düşerlerse WARNING (`hesap.silme_abonelik`,
+`hesap.silme_posta`) ve sahip elle kapatır — KVKK md. 7 silme hakkı bir dış
+servisin ayakta olmasına bağlanamaz.
+
+DIŞA AKTARMA saatte 1 (belge §5, `check_saatlik` deseni): sayaç bu sürecin
+belleğinde (`_DISA_AKTARIMLAR`) — `giris_denemeleri.tur` CHECK'li ve yeni tür
+göç isterdi; tek web süreci (K11) için bellek yeter, yeniden başlatma sayacı
+sıfırlar (kabul edilen bedel: en kötü ihtimal bir ZIP daha). Kullanıcı başına
+bir damga, silinen hesabın damgası oturumla birlikte anlamsızlaşır.
 
 AYAR NESNESİ `ayar.genel` (Faz 1 / 4): bu rotaların altısı oturum İSTEMEZ —
 kayıt olmadan kullanıcı, kullanıcı olmadan kullanıcı dizini yok; okudukları
@@ -43,19 +66,54 @@ Sebep `hata.log`a (yalnız durum kodu; alıcı adresi günlüğe girmez).
 from __future__ import annotations
 
 import datetime as dt
+import logging
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 import errlog
 import i18n
-from models import GirisIstegi, JetonIstegi, KayitIstegi, SifirlamaIstegi, YeniParolaIstegi
-from services import ayar, cerez, defter, dil, hesap, kimlik, kiraci, koken, planlar, posta, sablon
+from models import (
+    GirisIstegi,
+    JetonIstegi,
+    KayitIstegi,
+    SifirlamaIstegi,
+    SilmeIstegi,
+    YeniParolaIstegi,
+)
+from services import (
+    ayar,
+    cerez,
+    defter,
+    depo_kimlik_bilgisi,
+    dil,
+    disa_aktar,
+    gunluk,
+    hesap,
+    isci,
+    kimlik,
+    kiraci,
+    koken,
+    kuyruk,
+    planlar,
+    polar,
+    posta,
+    sablon,
+    zaman,
+)
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
 router = APIRouter()
+
+# `olay=hesap.*` satırlarının kaynağı (silme, abonelik/posta uyarıları); işleyici `kromis` kökünde.
+_gunluk = logging.getLogger("kromis.hesap")
+
+# Dışa aktarma kotası (gerekçe modül başında): kullanıcı → son aktarım anı; pencere 1 saat.
+DISA_AKTARMA_PENCERESI = dt.timedelta(hours=1)
+_DISA_AKTARIMLAR: dict[uuid.UUID, dt.datetime] = {}
 
 # Lifespan koşmamış süreçte (`with`siz `TestClient`) postacı yok — `oturum`
 # bağımlılığının `database_unavailable` koduyla aynı sınıf bir 503.
@@ -271,3 +329,111 @@ def ben(kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
 def giris_sayfasi(ayarlar: ayar.Ayarlar = Depends(ayar.genel)) -> HTMLResponse:
     """`static/giris.html` — `index` ile aynı yerleştirme (services/sablon.py), aynı dil zinciri."""
     return sablon.sayfa(ayarlar, "giris.html")
+
+
+# ── Hesap silme ve dışa aktarma (Faz 4 / 5) ──────────────────────────
+
+def _abonelik_kapat(kullanici: Kullanici) -> None:
+    """Aktif Polar aboneliğini HEMEN sonlandırır; başaramazsa WARNING — silmeyi durdurmaz (gerekçe modül başında).
+
+    Ücretli planda ama `polar_abonelik_id` boşsa da uyarı: Polar'da bir abonelik
+    tahsilata devam edebilir ve bizde onu bulan kimlik yok — sahip panelden bakar.
+    Ücretsiz plan + abonelik yok = uyarı yok (sıradan durum, gürültü olmasın).
+    """
+    if kullanici.polar_abonelik_id:
+        try:
+            polar.abonelik_iptal(kullanici.polar_abonelik_id, cancel_at_period_end=False)
+            return
+        except Exception as e:  # SDK/ağ/yapılandırma — hepsi aynı sonuç: elle kapatılacak
+            gunluk.olay(_gunluk, "hesap.silme_abonelik", "polar aboneligi kapatilamadi, sahip elle kapatmali",
+                        seviye=logging.WARNING, kullanici_id=str(kullanici.id),
+                        abonelik_id=kullanici.polar_abonelik_id, hata=type(e).__name__)
+            return
+    if kullanici.plan != planlar.PLAN_VARSAYILAN:
+        gunluk.olay(_gunluk, "hesap.silme_abonelik", "ucretli planda hesap silindi ama abonelik kimligi yok",
+                    seviye=logging.WARNING, kullanici_id=str(kullanici.id), plan=kullanici.plan,
+                    polar_musteri_id=kullanici.polar_musteri_id)
+
+
+def _silme_postasi(request: Request, kime: str, lang: str, gun: int, kullanici_id: uuid.UUID,
+                   ayarlar: ayar.Ayarlar) -> None:
+    """"Hesabın kapatıldı" iletisi ASIL adrese (anonimleşmeden önce alındı); gitmezse WARNING, silme sürer."""
+    try:
+        _postaci(request).gonder(posta.silme_postasi(kime, lang, gun))
+    except (HTTPException, posta.PostaHatasi) as e:
+        errlog.safe_append(ayarlar.data_dir, f"silme postasi gonderilemedi: {type(e).__name__}")
+        gunluk.olay(_gunluk, "hesap.silme_posta", "hesap kapatildi iletisi gonderilemedi",
+                    seviye=logging.WARNING, kullanici_id=str(kullanici_id), hata=type(e).__name__)
+
+
+@router.post("/api/hesap/sil", response_model=None)
+def sil(req: SilmeIstegi, request: Request,
+        kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+        ayarlar: ayar.Ayarlar = Depends(ayar.ayarlar), db: Session = OTURUM) -> Response:
+    """Hesabı siler (anonimleştir + kilitle, K9); cevap 200 `{"ok", "bekleme_gun"}` ve çerez düşer.
+
+    Sıra: kilit (429) → parolasız hesap (409) → parola (401 + deneme satırı) →
+    kuyruktaki `bekliyor` işler iptal + rezerv iadesi (kullanıcının bağlamında,
+    `sahip` politikası yazar) → BYOK anahtarları HEMEN → satır anonim, oturumlar/
+    jetonlar/deneme sayacı gider → Polar aboneliği (dış, uyarıyla) → ileti ASIL
+    adrese (dış, uyarıyla) → `olay=hesap.silindi`. Geri alma YOK: 7 günlük
+    bekleme yalnız içeriğin kalıcı silinmesini erteler, hesap kapandı.
+    """
+    an = hesap.simdi()
+    ip = hesap.ip_adresi(request)
+    bekle = hesap.giris_kilidi(db, kullanici.eposta, ip, an)
+    if bekle is not None:
+        raise _cok_deneme(bekle)
+    if kullanici.parola_ozeti is None:
+        raise HTTPException(status_code=409, detail=i18n.t("err.hesap_parolasiz", dil.aktif()))
+    if not hesap.parola_dogru(req.parola, kullanici.parola_ozeti):
+        hesap.deneme_kaydet(db, hesap.DENEME_GIRIS, kullanici.eposta, ip, an)
+        return JSONResponse({"detail": i18n.t("err.hesap_giris_hatali", dil.aktif())}, status_code=401)
+    eposta, lang = kullanici.eposta, kullanici.dil or dil.aktif()
+    gun = isci.hesap_silme_beklemesi().days
+    iptaller = kuyruk.sahibin_islerini_iptal(db, kullanici.id, an)
+    for is_id in iptaller:
+        defter.iade(db, is_id, an=an)
+    anahtar = depo_kimlik_bilgisi.hepsini_sil(db, kullanici.id)
+    hesap.anonimlestir(db, kullanici, an)
+    _abonelik_kapat(kullanici)
+    _silme_postasi(request, eposta, lang, gun, kullanici.id, ayarlar)
+    gunluk.olay(_gunluk, "hesap.silindi", "hesap anonimlestirildi ve kilitlendi",
+                kullanici_id=str(kullanici.id), iptal_edilen_is=len(iptaller), silinen_anahtar=anahtar,
+                bekleme_gun=gun)
+    cevap = JSONResponse({"ok": True, "bekleme_gun": gun})
+    cerez.oturum_sil(cevap)
+    return cevap
+
+
+def _disa_aktarma_beklemesi(kullanici_id: uuid.UUID, an: dt.datetime) -> int | None:
+    """Son aktarım pencerenin içindeyse beklenecek saniye; değilse `None` (`kota._bekleme_sn` deyimi)."""
+    son = _DISA_AKTARIMLAR.get(kullanici_id)
+    if son is None or an - son >= DISA_AKTARMA_PENCERESI:
+        return None
+    return max(1, int((son + DISA_AKTARMA_PENCERESI - an).total_seconds()) + 1)
+
+
+@router.get("/api/hesap/disa-aktar")
+def disa_aktar_route(kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+                     db: Session = OTURUM) -> StreamingResponse:
+    """Kullanıcının verisi ZIP olarak (services/disa_aktar.py); saatte 1, aşımı 429 + `Retry-After`.
+
+    Damga ARŞİV KURULDUKTAN sonra yazılır: 429'a takılan istek damgayı
+    ilerletmez, veri tabanı hatasıyla düşen istek de. Kullanıcı yoksa (yarışta
+    silinmiş) 404 — kapı zaten 401 verirdi, bu dal kâğıt üstünde.
+    """
+    an = zaman.an()
+    bekle = _disa_aktarma_beklemesi(kullanici.id, an)
+    if bekle is not None:
+        raise HTTPException(status_code=429,
+                            detail=i18n.t("err.hesap_disa_aktar_sinir", dil.aktif(),
+                                          dakika=max(1, -(-bekle // 60))),
+                            headers={"Retry-After": str(bekle)})
+    akis = disa_aktar.zip_akisi(db, kullanici.id, an=an)
+    if akis is None:
+        raise HTTPException(status_code=404, detail=i18n.t("err.hesap_giris_gerekli", dil.aktif()))
+    _DISA_AKTARIMLAR[kullanici.id] = an
+    ad = f"kromis-verim-{zaman.damga_utc(an)[:10]}.zip"
+    return StreamingResponse(akis, media_type="application/zip",
+                             headers={"Content-Disposition": f'attachment; filename="{ad}"'})

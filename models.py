@@ -1136,3 +1136,10 @@ class YeniParolaIstegi(JetonIstegi):
     parola: str
 
     _parola_ok = field_validator("parola")(check_parola)
+
+
+class SilmeIstegi(BaseModel):
+    """`POST /api/hesap/sil` (Faz 4 / 5): mevcut parola, onay olarak. `GirisIstegi`nin parola kuralı:
+    uzunluk denetlenmez (yanlış uzunluk da "parola hatalı" almalı), üst sınır yalnız argon2 için."""
+    model_config = ConfigDict(extra="forbid")
+    parola: str = Field(min_length=1, max_length=1024)

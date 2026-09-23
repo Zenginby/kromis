@@ -116,6 +116,10 @@ DIZINSIZ_KAPILI = {
     ("POST", "/api/odeme/checkout"), ("GET", "/api/odeme/portal"),
     # Faz 3 / 6: kredi durumu (`kullanicilar.bakiye` + `kredi_hareketleri` satırları; dizin yok).
     ("GET", "/api/kredi"),
+    # Faz 4 / 5: veri dışa aktarma — satırları JSON/CSV'ye döker, medya BAYTLARINA dokunmaz (nesne
+    # yolları `ayar.KULLANICILAR_DIZINI` sabitinden); `POST /api/hesap/sil` listede DEĞİL: `ayar.ayarlar`
+    # alır (`hata.log` için `data_dir`).
+    ("GET", "/api/hesap/disa-aktar"),
 }
 
 KAPI = {kimlik.aktif_kullanici, kimlik.sayfa_kullanicisi}
@@ -201,7 +205,8 @@ def test_every_route_is_either_gated_or_openly_listed_with_a_reason():
     # +2 (Faz 3 / 3: `/api/admin/kullanicilar/{id}/plan`, `…/kredi`), +1 (Faz 3 / 6: `/api/kredi`),
     # +1 açık (Faz 4 / 3: `/api/odeme/webhook`) +1 kapılı (Faz 4 / 3: `/api/admin/odeme-olaylari`),
     # +1 açık (Faz 4 / 4: `/api/odeme/urunler`) +4 kapılı (Faz 4 / 4: checkout, portal, `/planlar`, `/odeme/tesekkur`)
-    assert len(KAPILI) == 68 and len(ACIK) == 9 and len(KAPILI | ACIK) == 77, (
+    # +2 kapılı (Faz 4 / 5: `POST /api/hesap/sil`, `GET /api/hesap/disa-aktar`)
+    assert len(KAPILI) == 70 and len(ACIK) == 9 and len(KAPILI | ACIK) == 79, (
         "rota sayısı ya da kapı sayısı değişti — bilinçliyse belgeyi ve bu sayıları güncelle")
 
 

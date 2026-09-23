@@ -190,6 +190,17 @@
       rozet.textContent = t("admin.rozet_dogrulanmamis");
       eposta.append(rozet);
     }
+    // Faz 4 / 5: silinmiş hesap — anonim e-posta, iki damga (istek anı; içerik temizliği).
+    // `temizlendi_at` boşken içerik hâlâ bekleme süresinde (7 gün), bakım turu silecek.
+    if (k.silindi_at) {
+      const rozet = document.createElement("span");
+      rozet.className = "admin-rozet";
+      rozet.dataset.tur = "silindi";
+      rozet.textContent = k.temizlendi_at
+        ? t("admin.rozet_temizlendi", { tarih: tarih(k.temizlendi_at) })
+        : t("admin.rozet_silindi", { tarih: tarih(k.silindi_at) });
+      eposta.append(rozet);
+    }
     // Faz 4 / 4: Polar müşteri kimliği (panelde arama için); NULL = hiç satın almamış.
     if (k.polar_musteri_id) {
       const musteri = document.createElement("span");
@@ -310,7 +321,8 @@
     const q = el("admin-ara").value.trim();
     const yol =
       `/api/admin/kullanicilar?sayfa=${sayfa}&adet=${SAYFA_ADEDI}` +
-      (q ? `&q=${encodeURIComponent(q)}` : "");
+      (q ? `&q=${encodeURIComponent(q)}` : "") +
+      (el("admin-silinmis").checked ? "&silinmis=true" : "");
     const veri = await istek(yol);
     toplam = veri.toplam;
     const tbody = el("admin-kullanicilar");
@@ -558,6 +570,10 @@
       sayfa = 1;
       yenile();
     }, 300);
+  });
+  el("admin-silinmis").addEventListener("change", () => {
+    sayfa = 1;
+    yenile();
   });
   el("admin-onceki").addEventListener("click", () => {
     sayfa = Math.max(1, sayfa - 1);

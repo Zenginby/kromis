@@ -809,6 +809,8 @@ KULLANICIYA_KONUSMAYAN = {
                          "kod döndürür — okuyucu Polar'ın teslimat günlüğü ve admin sekmesi",
     "routers/odeme.py": "`POST /api/odeme/webhook` (Faz 4 / 3): istemci Polar'ın sunucusu, `detail` "
                         "değerleri KOD (`imza_gecersiz`), dil bağlamı anlamsız",
+    "services/disa_aktar.py": "veri dışa aktarma arşivi (Faz 4 / 5): depo işlevlerini JSON/CSV'ye döker; "
+                              "dosya adları ve sütun başlıkları ASCII kimlik, 429/404 cümlesini rota kurar",
     "services/saglayici_meta.py": "sağlayıcı meta verisinin ContextVar yan kanalı (Faz 3 / 5, K8): "
                                   "adaptörden işçiye `usage`/`request_id` taşır; metin yok, `kimlik_baglami`nın ikizi",
     "isci.py": "işçi sürecinin bileşim kökü (Faz 2 / 3): kapılar, iş parçacıkları, kalp "

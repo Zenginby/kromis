@@ -96,6 +96,16 @@ def listele(db: Session, kullanici_id: uuid.UUID) -> list[dict]:
     return [_ozet(s) for s in db.scalars(sorgu)]
 
 
+def hepsi(db: Session, kullanici_id: uuid.UUID) -> list[dict]:
+    """BÜTÜN sohbetler GÖVDELERİYLE, en eski üstte — dışa aktarma (Faz 4 / 5, `sohbetler.json`).
+
+    `listele` özet verir (kenar paneli mesajları yüklemesin); KVKK md. 11
+    dökümü mesajların kendisini ister — `bul`u N kez çağırmak N sorgu olurdu.
+    """
+    sorgu = _sahibin(kullanici_id).order_by(Sohbet.olusturuldu, Sohbet.id)
+    return [_json(s) for s in db.scalars(sorgu)]
+
+
 def bul(db: Session, kullanici_id: uuid.UUID, chat_id: str | None) -> dict | None:
     """Tam kayıt (gövdesiyle). Yok, başkasının ya da geçersiz id ise None."""
     s = _satir(db, kullanici_id, chat_id)

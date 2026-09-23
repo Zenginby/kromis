@@ -123,8 +123,12 @@ def _saniye(baslangic: dt.datetime | None, an: dt.datetime) -> int | None:
 
 # ─────────────────────────────────────────────────────────── kullanıcılar
 
-def _kullanici_sorgusu(q: str | None) -> Select:
-    sorgu = select(Kullanici).where(Kullanici.silindi_at.is_(None))
+def _kullanici_sorgusu(q: str | None, silinmis: bool = False) -> Select:
+    # Faz 4 / 5: öntanımlı liste yaşayan hesaplar; `silinmis=True` YALNIZ silinmişler
+    # (anonim e-posta, `silindi_at`/`temizlendi_at` damgaları) — ikisi bir listede
+    # karışsa "kullanıcı sayısı" anlamını yitirirdi. Geri alma yok (K9).
+    sorgu = select(Kullanici).where(Kullanici.silindi_at.is_not(None) if silinmis
+                                    else Kullanici.silindi_at.is_(None))
     if q:
         # citext sütunda ILIKE gereksiz ama zararsız; `%`/`_` kaçırılıyor ki
         # arama metni joker değil düz metin olsun.
@@ -134,8 +138,8 @@ def _kullanici_sorgusu(q: str | None) -> Select:
 
 
 def kullanicilar(db: Session, *, q: str | None = None, sayfa: int = 1, adet: int = SAYFA_ADEDI,
-                 an: dt.datetime | None = None) -> tuple[list[dict[str, Any]], int]:
-    """Kullanıcı sayfası (en yeni üstte) ve toplam sayı; `q` e-postada geçen metin.
+                 an: dt.datetime | None = None, silinmis: bool = False) -> tuple[list[dict[str, Any]], int]:
+    """Kullanıcı sayfası (en yeni üstte) ve toplam sayı; `q` e-postada geçen metin; `silinmis` yalnız silinmişler.
 
     Her satırda üç türetilmiş alan, üçü de korelasyonlu alt sorgu (tek gidiş-dönüş,
     sayfa 50 satır): `son_gorulme` (oturumların en yenisi), `kredi_24sa` (son 24
@@ -158,7 +162,7 @@ def kullanicilar(db: Session, *, q: str | None = None, sayfa: int = 1, adet: int
     aktif = (select(func.count()).select_from(Is)
              .where(Is.kullanici_id == Kullanici.id, Is.durum.in_(kuyruk.AKTIF_DURUMLAR))
              .scalar_subquery())
-    taban = _kullanici_sorgusu(q)
+    taban = _kullanici_sorgusu(q, silinmis)
     toplam = int(db.scalar(select(func.count()).select_from(taban.subquery())) or 0)
     satirlar = db.execute(
         taban.add_columns(son_gorulme.label("son_gorulme"), kredi.label("kredi_24sa"),
@@ -181,6 +185,9 @@ def kullanicilar(db: Session, *, q: str | None = None, sayfa: int = 1, adet: int
         # NULL = hiç satın almamış). "Paket kredisi ekle" `kova='paket'` ile aynı rotaya.
         "paket_bakiye": int(k.paket_bakiye),
         "polar_musteri_id": k.polar_musteri_id,
+        # Faz 4 / 5 (K9): silme isteğinin ve içerik temizliğinin anı; yaşayan hesapta ikisi de null.
+        "silindi_at": _damga(k.silindi_at),
+        "temizlendi_at": _damga(k.temizlendi_at),
     } for k, son, kredi_24sa, aktif_is in satirlar], toplam
 
 

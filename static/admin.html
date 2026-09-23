@@ -49,6 +49,8 @@
     <section id="sekme-kullanicilar" class="admin-sekme" data-sekme="kullanicilar">
       <div class="admin-arac">
         <input id="admin-ara" type="search" placeholder="{{t:admin.ara}}" aria-label="{{t:admin.ara}}" autocomplete="off" />
+        <!-- Faz 4 / 5: silinmiş hesaplar AYRI süzgeç (`?silinmis=true`) — yaşayanlarla karışmaz, geri alma yok (K9). -->
+        <label class="admin-secim"><input type="checkbox" id="admin-silinmis" /> {{t:admin.silinmis_goster}}</label>
         <span id="admin-toplam" class="admin-not"></span>
         <button type="button" id="admin-onceki" class="admin-dugme">{{t:admin.onceki}}</button>
         <button type="button" id="admin-sonraki" class="admin-dugme">{{t:admin.sonraki}}</button>

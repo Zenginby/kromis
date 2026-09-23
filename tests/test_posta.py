@@ -48,6 +48,39 @@ def test_the_console_backend_survives_an_unwritable_directory(tmp_path):
     assert postaci.son is not None and postaci.son.kime == KIME
 
 
+def test_no_backend_sends_to_an_invalid_address_because_that_is_the_deleted_accounts_domain(tmp_path):
+    """Faz 4 / 5 (K9): silinen hesabın e-postası `silindi-<id>@anonim.invalid` — RFC 2606 rezerve TLD.
+    İki arka uç da kapıda döner: konsol `son`u yazmaz, Resend'e istek hiç çıkmaz."""
+    import uuid
+
+    from services import hesap
+    anonim = hesap.anonim_eposta(uuid.uuid4())
+    assert anonim.endswith("@" + hesap.ANONIM_ALAN) and anonim.endswith(posta.GONDERILMEYEN_TLD)
+    konsol = posta.KonsolPostaci(str(tmp_path / "veri"))
+    with pytest.raises(posta.PostaHatasi, match="invalid"):
+        konsol.gonder(posta.Posta(anonim, "K", "M"))
+    assert konsol.son is None and not (tmp_path / "veri" / posta.POSTA_LOG).exists()
+    istekler: list[httpx.Request] = []
+
+    def _yakala(r: httpx.Request) -> httpx.Response:
+        istekler.append(r)
+        return httpx.Response(200, json={"id": "x"})
+    resend = posta.ResendPostaci("re_DUMMY", "Kromis <no-reply@example.com>",
+                                 httpx.Client(transport=httpx.MockTransport(_yakala)))
+    with pytest.raises(posta.PostaHatasi, match="invalid"):
+        resend.gonder(posta.Posta(anonim.upper(), "K", "M"))
+    assert istekler == [], "Resend'e istek çıkmadı"
+    resend.gonder(posta.Posta(KIME, "K", "M"))
+    assert len(istekler) == 1, "sıradan adres yine gider"
+
+
+@pytest.mark.parametrize("lang", i18n.LANGUAGES)
+def test_the_deletion_mail_says_when_the_content_goes_and_carries_no_link(lang):
+    ileti = posta.silme_postasi(KIME, lang, gun=7)
+    assert ileti.kime == KIME and ileti.konu == i18n.t("posta.silme_konu", lang) != "posta.silme_konu"
+    assert "7" in ileti.metin and "{" not in ileti.metin and "http" not in ileti.metin, "geri alma bağlantısı yok (K9)"
+
+
 # ── Şablonlar ────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("lang", i18n.LANGUAGES)

@@ -142,6 +142,17 @@ def agaci_sil(db: Session, kullanici_id: uuid.UUID, folder_id: str | None) -> li
     return hedefler
 
 
+def hepsini_sil(db: Session, kullanici_id: uuid.UUID) -> int:
+    """Kullanıcının BÜTÜN klasörlerini siler; silinen sayı (hesap silme turu, Faz 4 / 5).
+
+    `agaci_sil` bir ağacı alır; burada ağaç yok, kiracının tamamı gidiyor.
+    `medya.folder_id` SET NULL olur ama o satırlar aynı turda zaten silinir
+    (services/isci.py `silme_turu` sırası: medya → klasör).
+    """
+    sonuc = db.execute(delete(Klasor).where(Klasor.kullanici_id == kullanici_id))
+    return int(getattr(sonuc, "rowcount", 0) or 0)
+
+
 def yeniden_adlandir(db: Session, kullanici_id: uuid.UUID, folder_id: str | None,
                      new_name: str) -> dict | None:
     """Adı günceller. Klasör yoksa ya da ad boşsa None."""

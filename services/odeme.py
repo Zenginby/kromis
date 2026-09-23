@@ -295,6 +295,47 @@ def sartlar_kabul_yaz(db: Session, hedef_id: uuid.UUID, an: dt.datetime, *, suru
     return kuyruk._etkilenen(sonuc) > 0
 
 
+# `odeme_olaylari.govde`de kişisel veri taşıyan alanlar — Polar'ın `customer`
+# nesnesi ve siparişin fatura alanları (tests/fixtures/polar/*.json: `email`,
+# `billing_name`, `billing_address`, `tax_id`; `avatar_url` kişiye gider).
+# Anahtar adıyla, yolla değil: aynı alanlar `data.customer` altında da `data`
+# kökünde de (`billing_address`) geçiyor ve Polar şemasında yeri değişebilir.
+# `name` listede DEĞİL: ürünün de `name`i var ("DUMMY urun") ve o mali kaydın
+# parçası — kişinin adı yalnız `email` taşıyan nesnede (müşteri) silinir.
+KISISEL_ALANLAR: frozenset[str] = frozenset({"email", "billing_name", "billing_address", "tax_id", "avatar_url"})
+SILINDI = "[SILINDI]"
+
+
+def _kisiseli_sil(deger: Any) -> Any:
+    """Gövdeyi alan alan gezer; `KISISEL_ALANLAR`daki her anahtarın değeri `[SILINDI]` (yapı korunur)."""
+    if isinstance(deger, Mapping):
+        musteri = "email" in deger
+        return {str(ad): (SILINDI if str(ad) in KISISEL_ALANLAR or (musteri and str(ad) == "name")
+                          else _kisiseli_sil(v))
+                for ad, v in deger.items()}
+    if isinstance(deger, list):
+        return [_kisiseli_sil(v) for v in deger]
+    return deger
+
+
+def olaylari_anonimlestir(db: Session, hedef_id: uuid.UUID) -> int:
+    """Silinen hesabın olaylarını sahipsizleştirir: `kullanici_id` NULL, gövdedeki e-posta/ad/adres `[SILINDI]`; satır sayısı.
+
+    K10: olay 1 yıl saklanır (webhook teslimatının kanıtı — "geldi mi, işlendi
+    mi" sorusu Polar mutabakatında hâlâ anlamlı), ama kişisel veri hesapla
+    birlikte gider (KVKK md. 7). `SET NULL` FK'sı yalnız SATIR silinince
+    tetiklenir; hesap satırı anonim KALIYOR (K9), o yüzden bağı burası
+    keser. Hesap silme turu (services/isci.py `silme_turu`) admin bağlamında
+    çağırır — tablo politikasız, bağlam yalnız kural.
+    """
+    satirlar = db.execute(select(OdemeOlayi.id, OdemeOlayi.govde)
+                          .where(OdemeOlayi.kullanici_id == hedef_id)).all()
+    for olay_id, govde in satirlar:
+        db.execute(update(OdemeOlayi).where(OdemeOlayi.id == olay_id)
+                   .values(kullanici_id=None, govde=_kisiseli_sil(govde)))
+    return len(satirlar)
+
+
 def urunler_bayat_mi(db: Session, an: dt.datetime | None = None) -> bool:
     """Ayna `URUNLER_BAYAT_GUN`den eski ya da BOŞ mu (admin uyarısı + `odeme.urunler_bayat`; gerekçe sabitte)."""
     an = an if an is not None else zaman.an()

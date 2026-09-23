@@ -123,7 +123,8 @@ class Surec:
     """Süreç durumu: motor, depo, işçi kimliği, eldeki işler, durdurma bayrağı."""
 
     def __init__(self, motor, depo: dosya.Depo, ayarlar: ayar.Ayarlar, es_zamanli: int,
-                 esik, kalp_araligi: float, saklama, bakim_araligi: float) -> None:
+                 esik, kalp_araligi: float, saklama, bakim_araligi: float,
+                 silme_beklemesi=None) -> None:
         self.motor = motor
         self.depo = depo
         self.ayarlar = ayarlar
@@ -132,6 +133,10 @@ class Surec:
         self.kalp_araligi = kalp_araligi
         self.saklama = saklama
         self.bakim_araligi = bakim_araligi
+        # Hesap silme beklemesi (Faz 4 / 5): `hazirla` ortamdan okur ki bozuk değer
+        # açılışta düşsün, 5 dk sonraki ilk turda değil; `None` = ortamın öntanımlısı
+        # (testlerin eski `Surec(...)` çağrısı değişmeden geçer).
+        self.silme_beklemesi = silme_beklemesi
         # İKİ bayrak (gerekçe modül başında, KAPANIŞ): `durdur` = yeni iş alma
         # (SIGTERM anında kalkar); `kapat` = kalp ve bakım da dursun (eldeki
         # işler bittikten SONRA kalkar). Kalp `durdur`a baksaydı boşaltma
@@ -206,7 +211,8 @@ class Surec:
         """Bir bakım turu (services/isci.py `bakim_turu`); bir şey silindiyse `olay=bakim`. Hata turu öldürmez."""
         try:
             with Session(self.motor) as oturum:
-                ozet = isci.bakim_turu(oturum, self.depo, zaman.an(), self.esik, self.saklama)
+                ozet = isci.bakim_turu(oturum, self.depo, zaman.an(), self.esik, self.saklama,
+                                       silme_beklemesi=self.silme_beklemesi)
             if ozet:
                 _olay("bakim", "saklama ve olu isci satirlari", **ozet)
         except Exception:
@@ -321,11 +327,13 @@ def hazirla(*, tek_tur: bool, kalp_araligi: float, bakim_araligi: float) -> Sure
         es_zamanli = 1 if tek_tur else isci.es_zamanli()
         esik = isci.kalp_esigi()
         saklama = isci.saklama()
+        silme_beklemesi = isci.hesap_silme_beklemesi()
     except ValueError as e:
         _hata(str(e))
         return CIKIS_ORTAM
     motor = db.motor_kur(url, pool_size=es_zamanli + 1)
-    return Surec(motor, depo, ayarlar, es_zamanli, esik, kalp_araligi, saklama, bakim_araligi)
+    return Surec(motor, depo, ayarlar, es_zamanli, esik, kalp_araligi, saklama, bakim_araligi,
+                 silme_beklemesi)
 
 
 def main(argv: list[str]) -> int:

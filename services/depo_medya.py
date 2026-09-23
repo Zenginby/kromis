@@ -189,6 +189,28 @@ def listele(db: Session, kullanici_id: uuid.UUID, *, folder_id: str | None = Non
     return [_json(m) for m in db.scalars(sorgu.order_by(Medya.olusturuldu.desc()))]
 
 
+def hepsi(db: Session, kullanici_id: uuid.UUID) -> list[dict]:
+    """Kullanıcının BÜTÜN kayıtları (kök + her klasör), en eski üstte — dışa aktarma (Faz 4 / 5, `medya.json`).
+
+    `listele` kökü, `klasorlerde` seçilen klasörleri verir; KVKK md. 11 dökümü
+    ikisini birden ve klasör süzgeçsiz ister. Kronolojik sıra: döküm bir
+    arşiv, galeri değil.
+    """
+    return [_json(m) for m in db.scalars(_sahibin(kullanici_id).order_by(Medya.olusturuldu, Medya.id))]
+
+
+def hepsini_sil(db: Session, kullanici_id: uuid.UUID) -> int:
+    """Kullanıcının BÜTÜN `medya` satırlarını siler; silinen sayı. Dosyalara DOKUNMAZ.
+
+    Hesap silme turu (services/isci.py `silme_turu`, Faz 4 / 5, K9) kiracının
+    bağlamında çağırır; nesneleri tur kiracının bütün önekini
+    (`kullanicilar/<id>/`) süpürerek siler — dosya dosya `_dosyayi_sil`
+    çağırmak N kez HEAD/DELETE olurdu, önek listesi tek geçiş.
+    """
+    sonuc = db.execute(delete(Medya).where(Medya.kullanici_id == kullanici_id))
+    return _etkilenen(sonuc)
+
+
 def klasorlerde(db: Session, kullanici_id: uuid.UUID, folder_ids: Iterable[str]) -> list[dict]:
     """Verilen klasörlerdeki kayıtlar (ZIP dışa aktarma); en yeni üstte."""
     hedefler = [fid for fid in folder_ids if fid]

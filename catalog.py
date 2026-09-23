@@ -1008,6 +1008,14 @@ IMAGE_MODELS: tuple[ImageModel, ...] = (
     # kredi fazla öder, platform zarar etmez; 8 yazmak her düzenlemede 4
     # kredi zarardı. Ayrı bir `credits_edit` ekseni doğru ama yeni eksen,
     # gerekirse ayrı PR (belge §1b "Yapıldığında (D)").
+    #
+    # DÜZENLEME BOYUTU TAM TUTMUYOR (canlı, 2026-09-23): `image_size`
+    # 1664×928 gönderildi, fal 1536×928 döndürdü — yükseklik kaldı, uzun kenar
+    # 1536'ya indi, oran 1,79 → 1,66. Metin ucu ölçülmedi, 928×1664 de.
+    # Sahibin kararı: küme DARALTILMADI (metin ucunda beş geometri modelin
+    # kendi önerisi), sapma notta yazılı — "sessiz sapma yasak" kuralı notla
+    # karşılanıyor, kullanıcı seçmeden önce görüyor. Fatura 2 MP'de kaldı
+    # (1,43 MP yukarı yuvarlandı → 0,06 USD, ölçülen bakiye düşüşüyle birebir).
     ImageModel(
         id="fal-qwen-image",
         label="Alibaba · Qwen Image",

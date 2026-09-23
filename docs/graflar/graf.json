@@ -339,7 +339,7 @@
         "veo_client"
       ],
       "katman": 0,
-      "satir": 1954,
+      "satir": 1962,
       "testler": [
         "tests/test_admin.py",
         "tests/test_araclar.py",

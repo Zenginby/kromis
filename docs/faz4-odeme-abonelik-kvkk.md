@@ -1937,6 +1937,21 @@ sağlayıcı değil.
 * **`saglayici_maliyet_usd` otomatik** → hiçbir adaptör vermiyor; Polar
   geliriyle birlikte Marj tablosunda gelir sütunu (7) — gider sütunu yine
   sahibin fatura CSV'si.
+* **Sağlayıcı seçimi fiyat açısından — birinci taraf ↔ fal** (sahibin notu,
+  PR #80 yorumu, 2026-09-23; KARAR DEĞİL, 1b-C "model başına tek yol" ve
+  "yeni sağlayıcı yok" aynen duruyor; hiçbir katalog girdisi değişmedi):
+  * **FLUX.2 pro → fal**: 9 → 6 kredi (Azure 1024²'yi 2 MP sayıyor, fal 1 MP),
+    yeni sağlayıcı gerektirmez; bedeli `azure_flux_client` + Foundry dağıtımı
+    düşer, fal düzenlemede GİRDİ MP'sini de faturalıyor (0,015/MP → düzenleme
+    kredisi ayrı), `FLUX_SIZES` fal'ın `image_size` sınırlarıyla yeniden doğrulanır.
+  * **Seedance 2.5 → BytePlus ModelArk**: tam yarı fiyat (95 → 46 kr/sn, 480p
+    44 → 21) ama "yeni sağlayıcı yok" kararını açar (yeni `*_client.py`, gizli
+    anahtar, dış konak, `ALTYAPI` bekçisi) — ödeme açıldıktan sonra `isler`
+    Seedance payını gösterdiğinde karar.
+  * **Nano Banana için Google Flex/Batch katmanı**: aynı sağlayıcı, yarı fiyat
+    (Pro 0,067; NB2 0,034 / 0,050 / 0,076 → ~13 ve ~7/10/15 kredi); üretim
+    zaten kuyruklu/eşzamansız, mimari engel yok — gecikme, kota ve "kapasite
+    yoksa reddet" davranışı ölçülmedi, açık soru.
 * **Doğrulanmayanlar (3. görevin ilk adımı Polar belgesiyle kapatır):** Polar
   ücret tablosunun payout/kur satırları; `external_customer_id` alan adı ve
   eski adın kaldırılma durumu; `order.paid` `billing_reason` literalleri;

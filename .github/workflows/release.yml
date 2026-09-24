@@ -470,8 +470,8 @@ jobs:
             cat ozet/SHA256SUMS.txt
             printf '```\n\n'
             printf 'Özet tutmuyorsa dosya bu yayından gelmiyor demektir — kurma.\n'
-            printf 'Lisans: GNU AGPL-3.0. "Kromis" adı ve logosu lisansın kapsamı\n'
-            printf 'dışındadır (MARKA.md).\n'
+            printf 'Lisans: FSL-1.1-ALv2 (iki yıl sonra Apache-2.0). "Kromis" adı ve logosu\n'
+            printf 'lisansın kapsamı dışındadır (MARKA.md).\n'
           } > notlar.md
           gh release edit "$TAG" --notes-file notlar.md
           echo "doğrulama bölümü yayın notlarına eklendi"

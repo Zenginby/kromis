@@ -1,6 +1,6 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
-# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
-# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+# FSL-1.1-ALv2 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (LICENSE); ad ve logo lisans DIŞIDIR (MARKA.md).
 """İş kuyruğu ilkelleri — `isler` ve `isciler` üstünde saf `(db, …)` işlevler (Faz 2 / 1. görev).
 
 KUYRUK POSTGRES'İN KENDİSİ (docs/faz2-kuyruk-anahtarlar-depolama.md §1, K1):

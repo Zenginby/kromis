@@ -1,6 +1,6 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
-# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
-# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+# FSL-1.1-ALv2 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (LICENSE); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Ödeme olayları — Polar webhook'unu deftere ve plana çeviren TEK yer (Faz 4 / 3; docs/faz4-odeme-abonelik-kvkk.md §3, K4/K6).
 
 PARA BURADAN GİRER: `order.paid` → paket kredisi (`defter.paket_yukle`, kova

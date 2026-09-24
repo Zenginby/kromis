@@ -1,6 +1,6 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
-# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
-# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+# FSL-1.1-ALv2 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (LICENSE); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Veri dışa aktarma — kullanıcının bütün kayıtları tek ZIP'te, JSON/CSV (Faz 4 / 5; KVKK md. 11, GDPR md. 20).
 
 `GET /api/hesap/disa-aktar` (routers/hesap.py) bu modülün ürettiği akışı

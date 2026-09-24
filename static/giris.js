@@ -1,6 +1,6 @@
 // Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
-// GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
-// Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+// FSL-1.1-ALv2 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+// Bu bildirim kaldırılamaz (LICENSE); ad ve logo lisans DIŞIDIR (MARKA.md).
 //
 // Giriş sayfasının betiği (Faz 1 / 3. görev) — static/giris.html'in tek betiği
 // (i18n.js dışında). Dört form, tek mesaj satırı, dört sunucu yolu:

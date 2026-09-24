@@ -1,6 +1,6 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
-# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
-# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+# FSL-1.1-ALv2 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (LICENSE); ad ve logo lisans DIŞIDIR (MARKA.md).
 """İş uçları: kullanıcının üretim işleri — liste, tekil, iptal, akış, yeniden gönder; kota (Faz 2 / 4-5, 8); kredi (Faz 3 / 6).
 
 Üretim rotaları (routers/uretim.py) 202 ile bir `is` döndürüyor; tarayıcı

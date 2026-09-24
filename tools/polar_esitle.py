@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
-# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
-# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+# FSL-1.1-ALv2 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (LICENSE); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Polar ürün kataloğunu `urunler` aynasına yazar — fiyat listesinin ve webhook eşlemesinin tek kaynağı (Faz 4 / 4, K5).
 
     DATABASE_URL=… KROMIS_POLAR_ERISIM_JETONU=… python tools/polar_esitle.py            # yazar

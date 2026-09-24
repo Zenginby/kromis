@@ -1,16 +1,17 @@
 # Marka politikası — "Kromis" adı ve logosu
 
-**Kod AGPL-3.0. Ad ve logo DEĞİL.**
+**Kod FSL-1.1-ALv2. Ad ve logo DEĞİL.**
 
 Bu ayrım bilinçli ve bütün amacı şu: kodu özgürce alabilmen ama aldığın şeyin
 **Kromis olduğunu söyleyememen**. Firefox, Rust, Signal ve Chromium aynı ayrımı
 kullanır — kaynağını açık tutmanın kimliğini feda etmeyi gerektirmediği yer
 burasıdır.
 
-Bir lisans (AGPL) kodun nasıl kullanılacağını söyler. Marka hakkı, bir ürünün
-**kim tarafından yapıldığına** dair kullanıcıyı yanıltmayı engeller. AGPL'e
+Bir lisans (FSL) kodun nasıl kullanılacağını söyler. Marka hakkı, bir ürünün
+**kim tarafından yapıldığına** dair kullanıcıyı yanıltmayı engeller. FSL'e
 harfiyen uyan bir çatal bile, adı "Kromis" kaldığı sürece bu politikayı ihlal
-eder.
+eder — lisansın kendi "Trademarks" maddesi de bunu açıkça söylüyor: kaynağı
+göstermek dışında ad, marka ve ürün adı üzerinde hiçbir hak verilmiyor.
 
 > Adın kendisinin nereden geldiği, hangi ticaret unvanıyla ve hangi alan
 > adlarıyla ilişkilendiği ayrı bir belgede:
@@ -30,7 +31,7 @@ DIŞINDADIR:
 | Uygulama kimlikleri | `com.zenginby.kromis` (Android `applicationId`, macOS `bundle_identifier`) |
 | Ürünün görsel kimliği | bir bütün olarak; kullanıcıyı Kromis'e baktığına inandıracak taklit |
 
-`branding/` altındaki dosyalar depoda AGPL etiketiyle durmuyor: paket
+`branding/` altındaki dosyalar depoda lisans kapsamında durmuyor: paket
 üretilebilsin diye oradalar, yeniden kullanılabilsin diye değil.
 
 ## Yapabileceklerin — izin istemeden
@@ -41,7 +42,8 @@ DIŞINDADIR:
 * **Kaynağın Kromis olduğunu söylemek** — hatta bunu yapman gerekir:
   > "Bu proje, Kromis Studio'dan (https://github.com/Zenginby/kromis) türetilmiştir."
 
-  Bu cümle bir ihlal değil, tam tersi: AGPL'in istediği atfın kendisi.
+  Bu cümle bir ihlal değil, tam tersi: lisansın "Trademarks" maddesinin
+  serbest bıraktığı tek kullanım — kaynağı göstermek — tam olarak bu.
 * **Değiştirilmemiş resmî paketleri yeniden dağıtmak** (ayna, USB, kurum içi
   depo) — dosyalara dokunulmadığı sürece.
 * **Logoyu, Kromis'i gösteren bir bağlantının yanında kullanmak** — bloglarda,
@@ -60,7 +62,8 @@ DIŞINDADIR:
 
 ## Çatal yapıyorsan — değiştirilecekler listesi
 
-AGPL sana çatal hakkını veriyor; bu liste o hakkı kullanırken markayı temiz
+FSL sana çatal hakkını veriyor (rakip bir ürün ya da hizmet olarak sunmamak
+şartıyla — [TELIF.md](TELIF.md)); bu liste o hakkı kullanırken markayı temiz
 bırakmanın somut karşılığı. Uzun görünüyor ama tek oturumluk iş:
 
 1. **Ad.** `README.md`, `README.en.md`, `static/index.html` (`<title>`),
@@ -78,10 +81,13 @@ bırakmanın somut karşılığı. Uzun görünüyor ama tek oturumluk iş:
    trafiğini bindirirsin. (`tests/test_depo_adresi.py` tek kaynağı zaten
    zorluyor; çatalda o testi yeşile döndürmek tam olarak bu adımı yapmaktır.)
 5. **Kaynak kodu bağlantısı.** `static/index.html` → "Hakkında" panelindeki
-   kaynak bağlantısı ve telif satırı. AGPL §13 gereği bu **kendi deponu**
-   göstermek zorunda — burayı silmek bir çözüm değil, ihlaldir.
+   kaynak ve LICENSE bağlantıları ile telif satırı. Bağlantılar **kendi deponu**
+   göstermeli (kullanıcı neyi çalıştırdığını bilsin; Kromis'in köken olduğunu
+   ayrıca söyleyebilirsin), lisans bağlantısı durmalı (FSL → Redistribution)
+   — burayı silmek bir çözüm değil, ihlaldir.
 6. **Telif bildirimi DURUR.** Kendi telifini EKLERSİN, var olanı kaldırmazsın
-   (AGPL §5a). Doğrusu şöyle görünür:
+   (FSL → Redistribution: "not remove any copyright notices"). Doğrusu şöyle
+   görünür:
    ```
    Copyright (C) 2026 Alperen Zengin (@Zenginby)
    Copyright (C) 2026 Senin Adın — değişiklikler

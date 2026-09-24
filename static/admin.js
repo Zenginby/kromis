@@ -487,6 +487,31 @@
         }),
       );
     }
+    // Gelir (Faz 4 / 7): dönem başına TEK satır (sipariş modele bağlanamaz — paket kredisi
+    // her modele harcanır). Polar ücreti TAHMİN (%6,5 + 0,50 varsayımı, başlıkta yazılı);
+    // gerçek kesinti Polar payout raporunda. Sipariş yoksa 0.00 — bilinen sıfır, bilinmeyen
+    // değil (her ödenen sipariş bizde; marj tablosunun "bilinmiyor" hücresinden farkı bu).
+    const gelir = el("admin-gelir");
+    if (!m.gelir.length) bosSatir(gelir, 5);
+    else {
+      gelir.replaceChildren(
+        ...m.gelir.map((s) => {
+          const tr = document.createElement("tr");
+          tr.append(
+            hucre(String(s.gun)),
+            hucre(
+              s.diger_para_birimi
+                ? t("admin.gelir_diger", { adet: s.siparis, diger: s.diger_para_birimi })
+                : String(s.siparis),
+            ),
+            hucre(s.gelir_usd.toFixed(2)),
+            hucre(s.polar_ucreti_usd.toFixed(2)),
+            hucre(s.net_usd.toFixed(2)),
+          );
+          return tr;
+        }),
+      );
+    }
     const isciler = el("admin-isciler");
     if (!m.isciler.length) {
       const li = document.createElement("li");

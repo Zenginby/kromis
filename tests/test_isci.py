@@ -970,7 +970,7 @@ def test_the_maintenance_turn_deletes_expired_rows_and_only_the_unreferenced_inp
     # `hibe_satiri`: ücretsiz ve 0 bakiyeli her kullanıcı (en az test kullanıcısı) — ilk tur tamamlar (Faz 3 / 3, K6).
     assert hibe_bekleyen >= 1
     assert ozet == {"silinen_is": 2, "silinen_nesne": 1, "korunan_dizin": 1, "silinen_isci": 1,
-                    "hibe_satiri": hibe_bekleyen, "tutarsiz_kullanici": 0, "temizlenen_hesap": 0} and bool(ozet)
+                    "hibe_satiri": hibe_bekleyen, "tutarsiz_kullanici": 0, "temizlenen_hesap": 0, "silinen_odeme_olayi": 0} and bool(ozet)
     db_oturumu.expire_all()
     assert set(db_oturumu.scalars(select(tablolar.Is.id))) == {b, d}
     assert depo.var(ayar.is_dizini(kullanici.id, a) + "upload.png") and depo.var(ayar.is_dizini(kullanici.id, a) + "ref2.png"), (
@@ -983,7 +983,7 @@ def test_the_maintenance_turn_deletes_expired_rows_and_only_the_unreferenced_inp
     bos = isci.bakim_turu(db_oturumu, depo, BAKIM_ANI, ESIK, SAKLAMA)
     # Aynı ay ikinci tur: hibe anahtarı çakışır, satır yok — tur boş, olay düşmez.
     assert not bos and dict(bos) == {"silinen_is": 0, "silinen_nesne": 0, "korunan_dizin": 0, "silinen_isci": 0,
-                                     "hibe_satiri": 0, "tutarsiz_kullanici": 0, "temizlenen_hesap": 0}
+                                     "hibe_satiri": 0, "tutarsiz_kullanici": 0, "temizlenen_hesap": 0, "silinen_odeme_olayi": 0}
 
 
 def test_the_maintenance_turn_frees_a_referenced_directory_once_the_last_referrer_expires(
@@ -1044,7 +1044,7 @@ def test_the_maintenance_turn_leaves_another_tenants_directory_alone_even_if_a_d
     # `hibe_satiri`: ücretsiz ve 0 bakiyeli her kullanıcı (en az iki kiracı) — ilk tur tamamlar (Faz 3 / 3).
     assert hibe_bekleyen >= 2
     assert ozet == {"silinen_is": 1, "silinen_nesne": 1, "korunan_dizin": 0, "silinen_isci": 0,
-                    "hibe_satiri": hibe_bekleyen, "tutarsiz_kullanici": 0, "temizlenen_hesap": 0}
+                    "hibe_satiri": hibe_bekleyen, "tutarsiz_kullanici": 0, "temizlenen_hesap": 0, "silinen_odeme_olayi": 0}
     assert not depo.var(ayar.is_dizini(kullanici.id, b) + "upload.png"), "işin kendi dizini gider"
     assert depo.var(yabanci_dizin + "gizli.png"), "başka kiracının dizinine dokunulmaz"
     (uyari,) = [k for k in yakala.kayitlar if getattr(k, "olay", None) == "bakim.yabanci_dizin"]
@@ -1061,11 +1061,16 @@ def _bakim_turu_yakalayarak(db: Session, depo) -> tuple[isci.BakimOzeti, list[lo
     yakala = _Yakala()
     gunlukcu = logging.getLogger("kromis.is")
     kapaliydi, gunlukcu.disabled = gunlukcu.disabled, False
+    # INFO da yakalansın (Faz 4 / 7 `odeme.olaylar_temizlendi`): Alembic `fileConfig`i günlükçüyü
+    # WARNING'e çekmiş olabilir (test_hesap_silme `gunlukler`in notu); eski seviye geri konur.
+    seviye = gunlukcu.level
+    gunlukcu.setLevel(logging.INFO)
     gunlukcu.addHandler(yakala)
     try:
         ozet = isci.bakim_turu(db, depo, BAKIM_ANI, ESIK, SAKLAMA)
     finally:
         gunlukcu.removeHandler(yakala)
+        gunlukcu.setLevel(seviye)
         gunlukcu.disabled = kapaliydi
     return ozet, yakala.kayitlar
 
@@ -1115,6 +1120,59 @@ def test_the_maintenance_turn_is_silent_about_the_ledger_when_every_balance_matc
     ozet, kayitlar = _bakim_turu_yakalayarak(db_oturumu, depo)
     assert ozet["tutarsiz_kullanici"] == 0 and not bool(ozet), dict(ozet)
     assert not [k for k in kayitlar if getattr(k, "olay", None) == "defter.tutarsiz"]
+
+
+def _odeme_olayi(db: Session, alindi: dt.datetime, *, hata: str | None = None) -> uuid.UUID:
+    """`odeme_olaylari` tohumu — webhook teslimatının kaydı; `alindi` sunucu öntanımlısı yerine verilen an."""
+    o = tablolar.OdemeOlayi(webhook_id=f"wh_{uuid.uuid4().hex[:12]}", tur="order.paid", polar_nesne_id="o",
+                            kullanici_id=None, govde={"data": {"id": "o"}}, alindi=alindi, hata=hata)
+    db.add(o)
+    db.commit()
+    return o.id
+
+
+def test_the_maintenance_turn_deletes_payment_events_older_than_the_retention_and_logs_it_once(
+        db_oturumu, kullanici, depo):
+    """Faz 4 / 7 (K10): `odeme_olaylari` 365 gün — 364. günde dokunulmaz, 366. günde silinir (`<`, `eskileri_sil`
+    deyimi); `hata` dolu (hiç işlenmemiş) olay da yaşı dolunca gider; `silinen_odeme_olayi` sayar ve
+    `olay=odeme.olaylar_temizlendi` (INFO: `adet`, `saklama_gun`) BİR kez düşer; ikinci tur 0 ve sessiz."""
+    isci.bakim_turu(db_oturumu, depo, BAKIM_ANI, ESIK, SAKLAMA)   # hibe ve varsa saklama bu turda gitsin
+    db_oturumu.execute(text("DELETE FROM odeme_olaylari"))
+    db_oturumu.commit()
+    gun = dt.timedelta(days=1)
+    genc = _odeme_olayi(db_oturumu, BAKIM_ANI - 364 * gun)
+    sinir = _odeme_olayi(db_oturumu, BAKIM_ANI - 365 * gun)                 # tam sınır: `<` dokunmaz
+    yasli = _odeme_olayi(db_oturumu, BAKIM_ANI - 366 * gun)
+    yasli_hatali = _odeme_olayi(db_oturumu, BAKIM_ANI - 400 * gun, hata="urun_yok")
+
+    ozet, kayitlar = _bakim_turu_yakalayarak(db_oturumu, depo)
+
+    assert ozet["silinen_odeme_olayi"] == 2 and bool(ozet), dict(ozet)
+    kalan = set(db_oturumu.scalars(select(tablolar.OdemeOlayi.id)))
+    assert kalan == {genc, sinir} and yasli not in kalan and yasli_hatali not in kalan
+    olaylar = [k for k in kayitlar if getattr(k, "olay", None) == "odeme.olaylar_temizlendi"]
+    assert len(olaylar) == 1 and olaylar[0].levelno == logging.INFO
+    assert (olaylar[0].adet, olaylar[0].saklama_gun) == (2, 365)
+    # İkinci tur: yaşı dolan yok → 0, olay yok, tur boş (5 dk'da bir "her şey yolunda" satırı gürültü olurdu).
+    ozet, kayitlar = _bakim_turu_yakalayarak(db_oturumu, depo)
+    assert ozet["silinen_odeme_olayi"] == 0 and not bool(ozet), dict(ozet)
+    assert not [k for k in kayitlar if getattr(k, "olay", None) == "odeme.olaylar_temizlendi"]
+    # Süre çağıranın (`olay_saklamasi=`): 30 günlük saklama 364 günlük olayı da götürür, sınırdaki de gider.
+    assert isci.bakim_turu(db_oturumu, depo, BAKIM_ANI, ESIK, SAKLAMA,
+                           olay_saklamasi=dt.timedelta(days=30))["silinen_odeme_olayi"] == 2
+    assert not set(db_oturumu.scalars(select(tablolar.OdemeOlayi.id)))
+
+
+def test_the_payment_event_retention_comes_from_the_environment_where_empty_is_a_year_and_zero_is_refused():
+    """`KROMIS_ODEME_OLAY_SAKLAMA_GUN`: boş = 365; 0 GEÇERSİZ (olay yazılır yazılmaz silinir, mutabakat kör) —
+    `hesap_silme_beklemesi`nin 0'ından bilerek farklı, `saklama`nın kuralıyla aynı."""
+    assert isci.ODEME_OLAY_SAKLAMA_ENV == "KROMIS_ODEME_OLAY_SAKLAMA_GUN"
+    assert isci.odeme_olay_saklamasi({}) == dt.timedelta(days=365)
+    assert isci.odeme_olay_saklamasi({isci.ODEME_OLAY_SAKLAMA_ENV: " "}) == dt.timedelta(days=365)
+    assert isci.odeme_olay_saklamasi({isci.ODEME_OLAY_SAKLAMA_ENV: "730"}) == dt.timedelta(days=730)
+    for kotu in ("0", "-1", "abc", "1.5"):
+        with pytest.raises(ValueError, match=isci.ODEME_OLAY_SAKLAMA_ENV):
+            isci.odeme_olay_saklamasi({isci.ODEME_OLAY_SAKLAMA_ENV: kotu})
 
 
 # ── (v) süreç ───────────────────────────────────────────────────────────

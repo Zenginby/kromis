@@ -458,12 +458,14 @@ def test_the_waiting_period_comes_from_the_environment_where_empty_is_seven_days
     assert _sayimlar(db_oturumu, kid)["medya"] == 0 and _satir(db_oturumu, kid).temizlendi_at == AN
 
 
-def test_the_worker_process_reads_the_waiting_period_at_startup_and_refuses_a_bad_value(monkeypatch, tmp_path):
+@pytest.mark.parametrize("ad, kotu", [(isci.HESAP_SILME_BEKLEME_ENV, "-3"),
+                                      (isci.ODEME_OLAY_SAKLAMA_ENV, "0")])   # Faz 4 / 7: aynı kapı, ikinci değişken
+def test_the_worker_process_reads_the_waiting_period_at_startup_and_refuses_a_bad_value(monkeypatch, tmp_path, ad, kotu):
     """`isci.py hazirla`: bozuk değer 5 dk sonraki ilk turda değil AÇILIŞTA düşürür (öteki ortam kapılarıyla aynı)."""
     import isci as surec_modulu
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://x:y@localhost:1/z")
     monkeypatch.setenv("KROMIS_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv(isci.HESAP_SILME_BEKLEME_ENV, "-3")
+    monkeypatch.setenv(ad, kotu)
     from services import sifre
     monkeypatch.setattr(sifre, "dogrula_ortam", lambda: None)
     assert surec_modulu.hazirla(tek_tur=True, kalp_araligi=1.0, bakim_araligi=1.0) == surec_modulu.CIKIS_ORTAM

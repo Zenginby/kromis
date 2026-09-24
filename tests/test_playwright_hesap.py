@@ -327,7 +327,16 @@ def test_after_login_the_page_returns_only_to_a_same_origin_path(
             # çerezi tarayıcıdan silip bir API çağrısı yaptırıyoruz.
             page.context.clear_cookies(name=cerez.OTURUM_CEREZI)
             page.evaluate("() => fetch('/api/history')")
-            page.wait_for_url(f"{taban}/giris?sonra=*")
+            # `wait_for_url` DEĞİL: Playwright'ın `expect_navigation`ı DÜŞEN her seyri hata sayar,
+            # burada ise seyir ikiye katlanabiliyor. Çerez silinince 401'i yalnız bizim fetch'imiz
+            # değil stüdyonun kendi isteği de görebilir — CI 2026-09-24 (run 35990939599, iş
+            # 107604591195): yavaş koşucuda `EventSource /api/isler/akis` çerez silindikten SONRA açıldı → 401 →
+            # isler.js `oturumKontrol` → `/api/hesap/ben` 401 → ikinci `location.replace`; ilk
+            # /giris seyri henüz yerleşmemişti → `net::ERR_ABORTED; maybe frame was detached?`,
+            # sayfa /giris'e VARMIŞKEN. Ölçülen şey belgenin NEREYE vardığı; kaç seyirle
+            # vardığı değil — o yüzden belgenin kendi konumu yoklanıyor.
+            page.wait_for_function(
+                "() => location.pathname === '/giris' && location.search.startsWith('?sonra=')")
             assert page.url == f"{taban}/giris?sonra=" + quote(beklenen, safe="")
             tarayici.close()
     finally:

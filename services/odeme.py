@@ -73,7 +73,7 @@ import uuid
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -84,7 +84,7 @@ __all__ = ["DURUM_ISLENDI", "DURUM_YINELENEN", "DURUM_ATLANDI", "HATALAR", "ISLE
            "URUNLER_BAYAT_GUN",
            "isle", "olayi_kaydet", "kullaniciyi_coz", "urun_bul", "plan_uygula",
            "aktif_urunler", "urun_bul_id", "urun_json", "sartlar_kabul_at_oku", "sartlar_kabul_yaz",
-           "polar_musteri_id_oku", "urunler_bayat_mi"]
+           "polar_musteri_id_oku", "urunler_bayat_mi", "olaylari_anonimlestir", "eskileri_sil"]
 
 # `olay=odeme.*` satırlarının kaynağı; biçim `kromis` kökünde (services/gunluk.py).
 _gunluk = logging.getLogger("kromis.odeme")
@@ -332,6 +332,28 @@ def olaylari_anonimlestir(db: Session, hedef_id: uuid.UUID) -> int:
         db.execute(update(OdemeOlayi).where(OdemeOlayi.id == olay_id)
                    .values(kullanici_id=None, govde=_kisiseli_sil(govde)))
     return len(satirlar)
+
+
+def eskileri_sil(db: Session, an: dt.datetime, saklama: dt.timedelta) -> int:
+    """`alindi < an - saklama` olan `odeme_olaylari` satırlarını siler (K10: 1 yıl); silinen satır sayısı.
+
+    Bakım turunun yedinci adımı (services/isci.py `bakim_turu`, Faz 4 / 7):
+    olay satırı webhook teslimatının KANITI — "geldi mi, işlendi mi" sorusu
+    aylık Polar mutabakatında (`tools/polar_mutabakat.py`) anlamlı, ama bir
+    yıldan sonra ne mutabakat ne itiraz kalır; gövde kişisel veri taşıyabilir
+    (e-posta/adres — silinmiş hesapta `[SILINDI]`, yaşayan hesapta duruyor) ve
+    KVKK saklamayı amaçla sınırlar. Sınır KESİN küçük (`<`, `eskileri_sil`
+    deyimi): tam 365. günde tur dokunmaz, 365 gün + 1 sn'de siler. `alindi`
+    indeksi (`ix_odeme_olaylari_alindi`, 0008) tam bu tarama için kondu.
+
+    SİPARİŞ VE DEFTER DOKUNULMAZ: `siparisler`/`kredi_hareketleri` mali kayıt
+    (K9, 10 yıl); olay onların kaynağıydı, kendisi değil. `hata` dolu (hiç
+    işlenmemiş) olay da bir yıl sonra gider — bir yıl boyunca düzeltilmemiş
+    bir teslimat artık düzeltilmez. Tablo politikasız (ALTYAPI); çağıran admin
+    bağlamı kurar, kural gereği.
+    """
+    sonuc = db.execute(delete(OdemeOlayi).where(OdemeOlayi.alindi < an - saklama))
+    return kuyruk._etkilenen(sonuc)
 
 
 def urunler_bayat_mi(db: Session, an: dt.datetime | None = None) -> bool:

@@ -1,19 +1,23 @@
 # İşletme: iki süreç tek imaj, dağıtım öncesi göç, üç ayrı yedek, iş saklama, anahtar döndürme, geri yükleme tatbikatı
 
 **Tarih:** 2026-09-17 (Faz 1 / 9) · **Güncelleme:** 2026-09-19 (Faz 2 / 10: § 7-9),
-2026-09-21 (Faz 3 / 7: kredi defteri § 2, § 5-6, § 9 — tutarlılık ölçümü, planlar ve hibe) ·
+2026-09-21 (Faz 3 / 7: kredi defteri § 2, § 5-6, § 9 — tutarlılık ölçümü, planlar ve hibe),
+2026-09-24 (Faz 4 / 7: ödeme § 2, § 6-9 — Polar tabloları, uyarılar, sırlar, ikinci kova AÇILIR,
+bakım turu (6)-(7), aylık mutabakat, KVKK başvurusu) ·
 **Kime:** web sürümünü işleten kişi ·
 **Kurulum adımları:** [KURULUM.md → Web sürümü](../KURULUM.md#web-sürümü-sunucu-kurulumu) ·
 **Karar kaydı:** [faz1-veritabani-hesaplar.md § 9](faz1-veritabani-hesaplar.md),
 [faz2-kuyruk-anahtarlar-depolama.md § 10](faz2-kuyruk-anahtarlar-depolama.md),
-[faz3-kredi-defteri-filigran.md § 7](faz3-kredi-defteri-filigran.md)
+[faz3-kredi-defteri-filigran.md § 7](faz3-kredi-defteri-filigran.md),
+[faz4-odeme-abonelik-kvkk.md § 7](faz4-odeme-abonelik-kvkk.md)
 
 Bu belge kod değil, işletme düzeni. Söylediği şeyler: şema göçü NEREDE koşar
 (§ 1), veri NEREDE durur ve nasıl yedeklenir (§ 2-4), bir felakette ne sırayla
 geri gelir (§ 5), web ve işçi süreçleri platformda NASIL açılır ve kapanır
 (§ 7), kova nasıl kurulur (§ 8), günlük işletme — dağıt, geri al, sağlık,
-günlük, uyarı, saklama, kredi defteri tutarlılığı (§ 9). Planların, aylık
-hibenin ve filigranın kurulumu KURULUM.md'nin 10. adımında; bu belge onların
+günlük, uyarı, saklama, kredi defteri tutarlılığı, aylık Polar mutabakatı ve
+KVKK başvurusu (§ 9). Planların, aylık hibenin ve filigranın kurulumu
+KURULUM.md'nin 10. adımında, ödemenin (Polar) 11. adımında; bu belge onların
 işletme yüzünü (yedek, uyarı, kontrol listesi) taşır. Bekçisi
 `tests/test_docker_kapisi.py` (belge var, üç yedek ayrı, tatbikat adımlı, iki
 süreç tablosu, saklama, defter satırları).
@@ -57,10 +61,10 @@ fazlasını verdiği durumlar var, her satırda yazılı.
 
 | parça | nerede | yedeği kimin, nasıl | neden ayrı |
 | --- | --- | --- | --- |
-| **Veri tabanı** — hesaplar, oturumlar, medya/klasör/sohbet/palet/varlık SATIRLARI, tercihler, ŞİFRELİ sağlayıcı anahtarları; Faz 2'den beri **`isler`** (iş kuyruğu ve 30 günlük geçmiş; `istek` prompt'u ve girdi anahtarlarını taşır) ve **`isciler`** (kalp atışı; işçi kalkınca yeniden yazılır, yedeğe girmese de kayıp yok); Faz 3'ten beri **`kredi_hareketleri`** (append-only kredi defteri: hibe, rezerv, onay, iade, düzeltme — PARANIN kaydı, `kullanicilar.bakiye`/`plan` onun önbelleği; ayrı yedeği YOK, aynı `pg_dump`/PITR içinde gelir; geri yüklemede § 5'in 6. adımı SUM == bakiye der) | PostgreSQL (`DATABASE_URL`) | Yönetilen Postgres'te (Neon, Supabase, Fly Postgres, RDS) **platformun PITR'ı** — açık olduğunu ve saklama süresini PANELDEN doğrula, varsayılan bazı planlarda kapalı. Kendi Postgres'inde `pg_dump -Fc "$DATABASE_URL" > kromis-$(date +%F).dump` cron'u + dosyanın başka bir makineye/kovaya kopyası | Satırlar dosyayı GÖSTERİR (`medya.filename`), dosya DB'de değil: DB yedeği tek başına galeriyi geri getirmez |
+| **Veri tabanı** — hesaplar, oturumlar, medya/klasör/sohbet/palet/varlık SATIRLARI, tercihler, ŞİFRELİ sağlayıcı anahtarları; Faz 2'den beri **`isler`** (iş kuyruğu ve 30 günlük geçmiş; `istek` prompt'u ve girdi anahtarlarını taşır) ve **`isciler`** (kalp atışı; işçi kalkınca yeniden yazılır, yedeğe girmese de kayıp yok); Faz 3'ten beri **`kredi_hareketleri`** (append-only kredi defteri: hibe, rezerv, onay, iade, düzeltme — PARANIN kaydı, `kullanicilar.bakiye`/`plan` onun önbelleği; ayrı yedeği YOK, aynı `pg_dump`/PITR içinde gelir; geri yüklemede § 5'in 6. adımı SUM == bakiye der); Faz 4'ten beri **`urunler`** (Polar ürün AYNASI — kaybolsa `tools/polar_esitle.py` yeniden yazar), **`siparisler`** (Polar'ın ödenmiş siparişi, MALİ KAYIT — anonim hesapta da kalır, K9; ayrı yedek yok, aynı dump) ve **`odeme_olaylari`** (webhook teslimat günlüğü, redakte gövde; **1 yıl saklanır**, bakım turu siler — § 9 (7); mutabakat kanıtı, para kaydı değil) | PostgreSQL (`DATABASE_URL`) | Yönetilen Postgres'te (Neon, Supabase, Fly Postgres, RDS) **platformun PITR'ı** — açık olduğunu ve saklama süresini PANELDEN doğrula, varsayılan bazı planlarda kapalı. Kendi Postgres'inde `pg_dump -Fc "$DATABASE_URL" > kromis-$(date +%F).dump` cron'u + dosyanın başka bir makineye/kovaya kopyası | Satırlar dosyayı GÖSTERİR (`medya.filename`), dosya DB'de değil: DB yedeği tek başına galeriyi geri getirmez |
 | **Medya** — `kullanicilar/<uuid>/{output,assets}` (PNG/MP4 dosyaları) ve `kullanicilar/<uuid>/isler/<is_id>/` (üretim işlerinin GİRDİ nesneleri: referans görseller, son kare; 30 gün sonra saklama siler, § 9): yerel diskte (`KROMIS_DATA_DIR`, compose) YA DA aynı anahtarla S3/R2 kovasında (`KROMIS_NESNE_DEPO_*`, Faz 2 / 2 — çok makineli dağıtımda zorunlu) | Kalıcı birim (`/data`) ya da kova | Diskte: **birim anlık görüntüsü** (Fly volume snapshot, bulut disk snapshot) ya da `rsync`/`rclone`; günlük. Kovada: **R2 nesne sürümlemesi** (§ 8: silinen/ezilen nesne 30 gün geri alınabilir) + isteğe bağlı ikinci kovaya `rclone sync` (§ 8, sahibin kararı) | Dosyalar DB'siz anlamsız (hangisi kimin, hangi klasörde — hepsi satırda); DB dosyasız yarım. İkisi AYNI ANDAN olmazsa artık dosya ya da kırık bağlantı doğar — `tools/artik_dosya.py` bunu iki yerde de bulur (§ 4) |
 | **`KROMIS_SECRET_KEY`** — sağlayıcı anahtarlarını şifreleyen kök | Yalnız ortam değişkeni (platform sırları) | **ÜÇÜNCÜ bir yer**, öteki ikisinden ayrı: bir parola kasası (1Password/Bitwarden kasası, ya da basılı zarf). DB yedeğinin YANINA yazılmaz | DB yedeğiyle yan yana duran anahtar, yedeği ele geçirene bütün kullanıcıların sağlayıcı anahtarlarını düz metin verir. Kaybolursa `saglayici_kimlikleri` sütunu hiç okunamaz — kullanıcılar anahtarlarını yeniden girer, başka çare yok |
-| **Platform sırları** (Faz 2 / 10) — `KROMIS_PLATFORM_<AD>` sağlayıcı anahtarları (Faz 2 / 6), R2 jetonu `KROMIS_NESNE_DEPO_ANAHTAR_ID`/`KROMIS_NESNE_DEPO_GIZLI`, `SENTRY_DSN`, `RESEND_API_KEY` | Platformun sır deposu (Fly secrets, Railway/Render env) | **Kasada kopyası** (`KROMIS_SECRET_KEY` ile aynı üçüncü yer): platform hesabı kapanır ya da proje silinirse sırlar onunla gider; hepsi sağlayıcı panelinden yeniden üretilebilir ama kesinti o kadar sürer. Kasadaki kayıt AD + değer + hangi panelden üretildiği | DB'de ve kovada bu değerlerin izi YOK (`.env.example` sözleşmesi; kod ortamdan okur); yedek tabloları onları taşımaz, kasa taşır |
+| **Platform sırları** (Faz 2 / 10) — `KROMIS_PLATFORM_<AD>` sağlayıcı anahtarları (Faz 2 / 6), R2 jetonu `KROMIS_NESNE_DEPO_ANAHTAR_ID`/`KROMIS_NESNE_DEPO_GIZLI`, `SENTRY_DSN`, `RESEND_API_KEY`; Faz 4 / 3 ile Polar jetonu `KROMIS_POLAR_ERISIM_JETONU` ve webhook sırrı `KROMIS_POLAR_WEBHOOK_SIRRI` (sandbox ve production sırları AYRI — hangisi hangi ortamın, kasada yazılı) | Platformun sır deposu (Fly secrets, Railway/Render env) | **Kasada kopyası** (`KROMIS_SECRET_KEY` ile aynı üçüncü yer): platform hesabı kapanır ya da proje silinirse sırlar onunla gider; hepsi sağlayıcı panelinden yeniden üretilebilir ama kesinti o kadar sürer. Kasadaki kayıt AD + değer + hangi panelden üretildiği | DB'de ve kovada bu değerlerin izi YOK (`.env.example` sözleşmesi; kod ortamdan okur); yedek tabloları onları taşımaz, kasa taşır |
 
 Yedeklenmeyenler, bilerek: `hata.log`/`posta.log` (tanı, veri değil), oturum
 satırları (yedekle gelirse gelir, kullanıcı yeniden girer), `guncelleme.json`
@@ -192,13 +196,31 @@ bu iskeleti doldurur ve ölçtüğü süreleri buraya yazar.
   `tools/tarife_kontrol.py`). İkisi de WARNING: Sentry'de OLAY DEĞİL
   breadcrumb'dır (`LoggingIntegration` yalnız ERROR'u olay yapar, Faz 2 / 9);
   bildirim günlük toplayıcısının `olay=defter.*` kuralıyla, `uyari`nınkinin
-  yanına.
+  yanına. **Faz 4 / 7 üç uyarı satırı daha:** `olay=odeme.hata` (**ERROR —
+  Sentry'de OLAY olur**, `exc_info`li: webhook işlenirken iç hata, rota 500
+  döndü, olay satırı rollback ile gitti, Polar üstel geri çekilmeyle yeniden
+  dener — para yolu, aynı gün bakılır; Polar saatlerce 500 alırsa ucu
+  KAPATIR, o zaman panelden yeniden açılır ve olaylar yeniden gönderilir);
+  `olay=odeme.urunler_bayat` (WARNING, admin "Ödeme" sekmesi her açılışta:
+  ürün aynası 7 günden eski ya da boş — `tools/polar_esitle.py` koşulur,
+  ödeme yine Polar'ın doğru fiyatıyla); `olay=hesap.silme_abonelik` (WARNING,
+  hesap silme rotası: Polar aboneliği kapatılamadı ya da ücretli planda
+  abonelik kimliği yok — silme DURMAZ, KVKK md. 7 dış servise bağlanamaz;
+  sahip aboneliği Polar panelinden elle kapatır, yoksa anonim müşteriden bir
+  sonraki dönem tahsil edilir). İkisi WARNING → breadcrumb, günlük kuralı.
 * Kredi defteri yedeği — **Faz 3'te KAPANDI:** `kredi_hareketleri` günlük
   `pg_dump`un / PITR'ın içinde (§ 2), ayrı yedek yok; geri yükleme sonrası
   işçinin ilk bakım turu `defter.tutarlilik` ile SUM == bakiye der (§ 5,
   6. adım; § 9).
 * Kimlik/oturum kaydının KVKK/GDPR saklama süresi ve KREDİ DEFTERİNİN hesap
-  silmede kaderi (CASCADE mi anonimleştirme mi) — Faz 4.
+  silmede kaderi — **Faz 4'te KAPANDI** (K9/K10, [faz4 belgesi "Güvenlik, RLS,
+  KVKK notları"](faz4-odeme-abonelik-kvkk.md)): hesap silmede `kullanicilar`
+  satırı ANONİMLEŞİR (e-posta `silindi-<id>@anonim.invalid`, parola/dil NULL,
+  oturumlar/jetonlar/BYOK anında gider), içerik 7 gün sonra bakım turunda
+  (§ 9 (6)), **`kredi_hareketleri` ve `siparisler` anonim sahiple KALIR** (mali
+  kayıt, 10 yıl — mali müşavir teyidi sahibin adımı), `odeme_olaylari`
+  sahipsizleşir ve 1 yıl sonra silinir (§ 9 (7)); `isler` 30 gün aynen; Polar'daki
+  müşteri/fatura kaydı Polar'ın (kendi veri sorumlusu). Başvuru işleyişi § 9.
 
 ## 7. Platformda iki süreç, tek imaj — açılış ve kapanış (Faz 2 / 10)
 
@@ -265,7 +287,14 @@ Sırlar (`fly secrets set …`, iki sürece de gider; kasaya kopya, § 2):
 `KROMIS_NESNE_DEPO_KOVA`, `KROMIS_NESNE_DEPO_ANAHTAR_ID`,
 `KROMIS_NESNE_DEPO_GIZLI`, `KROMIS_POSTA`/`KROMIS_POSTA_GONDEREN`/`RESEND_API_KEY`,
 fonlanan sağlayıcıların `KROMIS_PLATFORM_*` anahtarları, isteğe bağlı
-`SENTRY_DSN`/`SENTRY_ENVIRONMENT`. İşçiye özel isteğe bağlı üç sayı
+`SENTRY_DSN`/`SENTRY_ENVIRONMENT`. **Faz 4'ün altısı** (KURULUM.md 11. adım):
+`KROMIS_POLAR_ORTAM` (`sandbox`/`production`, boş = sandbox — yalnız web +
+araçlar), `KROMIS_POLAR_ERISIM_JETONU` (web + araçlar; işçi Polar konuşmaz),
+`KROMIS_POLAR_WEBHOOK_SIRRI` (yalnız web), `KROMIS_TEMEL_AYLIK_HIBE` /
+`KROMIS_PRO_AYLIK_HIBE` (boş = 1.200 / 4.500; web VE işçi — aynı değer),
+`KROMIS_HESAP_SILME_BEKLEME_GUN` (boş = 7, 0 = ilk turda; yalnız işçi) ve
+`KROMIS_ODEME_OLAY_SAKLAMA_GUN` (boş = 365, 0 geçersiz; yalnız işçi — Faz 4 / 7).
+İşçiye özel isteğe bağlı üç sayı
 `.env.example`da: `KROMIS_ISCI_ES_ZAMANLI` (4), `KROMIS_IS_KALP_ESIGI_SN`
 (300), `KROMIS_IS_SAKLAMA_GUN` (30). Faz 3'ün ikisi (KURULUM.md 10. adım):
 `KROMIS_FREE_AYLIK_HIBE` (boş = 200; web kayıt anında, işçi bakım turunda
@@ -325,8 +354,11 @@ de aynı ölçütü kullanır). Dört panel ayarı, kova açılırken bir kez:
    sağlayıcıda `kromis-yedek`, günlük `rclone sync r2:kromis r2-yedek:kromis-yedek
    --fast-list` (cron, sahibin makinesi ya da platformun zamanlanmış işi).
    Sürümleme AYNI hesabın hatalarına karşı korur, ikinci kova hesabın kendisinin
-   kaybına karşı. Kapalı betada sürümleme yeter; ödeyen kullanıcı gelince
-   (Faz 4) ikinci kova açılır.
+   kaybına karşı. Kapalı betada sürümleme yetiyordu; **Faz 4 ile ödeyen kullanıcı
+   geldi: İKİNCİ KOVA AÇILIR** (Faz 4 / 7 — para ödeyen kullanıcının galerisi
+   tek hesabın kaderine bağlanamaz). Kova ve `rclone sync` cron'u KODDA DEĞİL,
+   sahibin adımı: KURULUM.md 11. adımın kontrol listesi; tatbikat (§ 5) ikinci
+   kovadan geri yüklemeyi de bir kez dener.
 
 Jeton (`KROMIS_NESNE_DEPO_ANAHTAR_ID`/`_GIZLI`): **Object Read & Write, yalnız
 bu kova**; kasaya kopya (§ 2). Döndürme: yeni jeton üret → iki sürecin sırrını
@@ -373,13 +405,25 @@ günlükteki `istek_id`. "Bu iş ne oldu": `grep <is_id>` → `is.alindi` →
 `is.basladi` → `is.bitti`/`is.hata`. İşçi süreç olayları `isci.basladi/
 sinyal/kapandi`, `bayat` (düşürülen iş sayısı), `bakim` (aşağıda), `uyari`,
 Faz 3'ten `defter.asim` (onayda gerçek > tahmin) ve `defter.tutarsiz`
-(bakım turu, aşağıda); admin dokunuşları `admin.plan`/`admin.kredi`.
+(bakım turu, aşağıda); admin dokunuşları `admin.plan`/`admin.kredi`. Faz 4:
+"bu ödeme ne oldu" → `grep <polar_order_id>` → `odeme.webhook` (her cevap,
+`durum`), `odeme.order.paid` / `odeme.subscription.*` (`kullanici_id`,
+`siparis`, `kredi`, `plan`), `odeme.yinelenen`, `odeme.iade` (WARNING),
+`odeme.imza_gecersiz` (WARNING), `odeme.hata` (ERROR, § 6), `odeme.checkout`/
+`odeme.portal`, `odeme.saglayici_hata` (ERROR — Polar'a ulaşılamadı, rota 502);
+hesap: `hesap.silindi` (rota), `hesap.silme_abonelik` (WARNING, § 6),
+`hesap.temizlendi` (bakım turu, aşağıda), `odeme.olaylar_temizlendi` (bakım
+turu, yılda bir dolan sayı).
 
 **Uyarı** (Sentry *Alerts* ya da günlük toplayıcısının kuralı): `uyari` olayı
 5 dk'da ≥ 1 (kuyruk derinliği > 20 ya da en eski bekleyen > 10 dk — § 6),
 `seviye=ERROR` 1 saatte ≥ 10, `worker_alive:false` 5 dk; Faz 3 / 7:
 `olay=defter.tutarsiz` ≥ 1 (her turda yinelenir, sapma düzeltilene dek) ve
-`olay=defter.asim` günde ≥ 1 (tarife düşük kalmış, § 6). Bildirimin kendisi
+`olay=defter.asim` günde ≥ 1 (tarife düşük kalmış, § 6); Faz 4 / 7:
+`olay=odeme.hata` ≥ 1 (ERROR — Sentry olayı, para yolu, aynı gün),
+`olay=odeme.saglayici_hata` 1 saatte ≥ 3 (checkout açılamıyor: satış duruyor),
+`olay=hesap.silme_abonelik` ≥ 1 (abonelik Polar'da elle kapatılır), `odeme.urunler_bayat`
+haftada ≥ 1 (sahip `polar_esitle` koşmayı unuttu). Bildirimin kendisi
 kodda değil, panelde.
 
 **İş saklama ve bayat düşürme — ayrı cron YOK.** İşçi zaten sürekli koşan tek
@@ -421,11 +465,77 @@ susarsa eldeki işler bayat düşer, `/health` işçiyi ölü gösterir):
   `tutarsiz_kullanici`. Tur ÖLÇER, DÜZELTMEZ: sessiz düzeltme sapmanın
   sebebini (elle UPDATE, yarım transaksiyon) örterdi; düzeltme `/admin` →
   "kredi ekle" (`duzeltme` satırı, `admin_id` izli). Sağlıklı dağıtımda hep 0.
-  Günlük satırı sayıları verir: `silinen_is`, `silinen_nesne`,
-  `korunan_dizin`, `silinen_isci`, `hibe_satiri`, `tutarsiz_kullanici`; boş
-  turda (hepsi 0) satır yok. KVKK saklama süresi
-  kararı Faz 4'te (`istek.prompt`u da kapsar); 30 onun öncülü. Elle tarama
+  (6) **Hesap silme turu** (Faz 4 / 5, K9 — turun İLK adımı, öteki sayılar
+  onu görür): silme isteği `KROMIS_HESAP_SILME_BEKLEME_GUN` (boş = 7, 0 = ilk
+  turda) günden eski ve henüz temizlenmemiş hesapların İÇERİĞİ kalıcı silinir
+  — `isler`, `medya`, `klasorler`, `sohbetler`, `paletler`, `varliklar`,
+  `tercihler` (kiracı bağlamında, kiracı başına commit) + kovada
+  `kullanicilar/<id>/` önekinin tamamı; `odeme_olaylari` sahipsizleşir
+  (`kullanici_id` NULL, e-posta/adres `[SILINDI]`); `kullanicilar` anonim
+  satırı, `kredi_hareketleri`, `siparisler` KALIR (mali kayıt). `temizlenen_hesap`
+  sayar, hesap başına `olay=hesap.temizlendi` (INFO). Yarıda kalırsa bir
+  sonraki tur aynı hesabı yeniden alır (idempotent; `artik_dosya` kalanı bulur).
+  (7) **Ödeme olayı saklaması** (Faz 4 / 7, K10): `alindi`
+  `KROMIS_ODEME_OLAY_SAKLAMA_GUN` (boş = 365) günden eski `odeme_olaylari`
+  satırları silinir — webhook teslimatının kanıtı, bir yıllık mutabakat ve
+  itiraz penceresi; sipariş ve defter satırı bu süreye BAĞLI DEĞİL. `silinen_odeme_olayi`
+  sayar, sıfır değilse `olay=odeme.olaylar_temizlendi` (INFO; `adet`,
+  `saklama_gun`). Günlük satırı sayıları verir: `silinen_is`, `silinen_nesne`,
+  `korunan_dizin`, `silinen_isci`, `hibe_satiri`, `tutarsiz_kullanici`,
+  `temizlenen_hesap`, `silinen_odeme_olayi`; boş turda (hepsi 0) satır yok.
+  KVKK saklama süreleri Faz 4'te KARARA BAĞLANDI (K10 tablosu: `isler` 30 gün
+  — `istek.prompt` onunla gider —, içerik hesap ömrü + 7 gün, BYOK anında,
+  `odeme_olaylari` 1 yıl, anonim mali kayıt 10 yıl). Elle tarama
   `tools/artik_dosya.py` (§ 4) aynı referans ölçütünü bilir.
+
+**Aylık mutabakat — Polar payout'la yan yana (Faz 4 / 7).** Ay başında, Polar
+payout'u geldiğinde, konteynerin içinden iki araç:
+
+```sh
+DATABASE_URL=… KROMIS_POLAR_ERISIM_JETONU=… python tools/polar_mutabakat.py --cikti fark-$(date +%Y-%m).csv   # geçen ay
+DATABASE_URL=… python tools/marj_raporu.py --gun 30 --cikti marj-$(date +%Y-%m).csv
+```
+
+`polar_mutabakat.py` Polar'ın ödenmiş siparişlerini (`orders.list`, dönem)
+`siparisler` tablosuyla karşılaştırır, farkı CSV'ye döker ve ÇIKIŞ KODUYLA
+konuşur: **0** sıfır fark, **2** fark var (CSV'de satır), **3** ortam/Polar
+hatası — cron'a bağlanır (`|| notify`), 2 sahibi çağırır, 3 yeniden dener.
+İki yön, iki öneri (CSV `yon`/`oneri` sütunları): `polar_eksik` — Polar'da
+ödenmiş, bizde satır yok → **webhook kaçtı**, Polar panelinden o siparişin
+`order.paid` olayını yeniden gönder (K4: yeni `webhook_id`yle gelse de defter
+anahtarı sipariş kimliği, tek kredi yazar; olay `hata=urun_yok` ile
+bekliyorsa önce `polar_esitle.py`); `bizde_fazla` — bizde var, Polar'da yok →
+**olmamalı** (satırı yalnız Polar'ın imzalı olayı yazar): ortam karışıklığı
+(sandbox olayı production DB'ye), iade/void (kredi geri alma admin `duzelt`
+kararı, K6) ya da yabancı olay — incelenir. Özet satırı (stderr) iki tarafın
+sipariş sayısı ve toplamını verir; Polar'ın payout raporundaki brüt bu
+toplam, kesinti Polar'ın (admin "Gelir" tablosundaki ücret satırı TAHMİN: %6,5
++ 0,50 USD/sipariş varsayımı, gerçek payout'la karşılaştırılır — sapma
+büyükse `services/depo_admin.py`deki iki sabit güncellenir). `marj_raporu.py`
+aynı ayın giderini (sağlayıcı faturasıyla) verir; ikisi bir hesap tablosunda
+yan yana konur.
+
+**KVKK / GDPR başvurusu işleyişi (Faz 4 / 5-7).** Kullanıcının kendi düğmesi
+ANINDA çalışır ve başvuru gerektirmez: Ayarlar → Hesap → "Verimi indir"
+(`GET /api/hesap/disa-aktar`, dokuz dosyalık ZIP — erişim/taşınabilirlik, KVKK
+md. 11 / GDPR md. 15, 20) ve "Hesabımı sil" (`POST /api/hesap/sil`, parola +
+onay metni — silme, KVKK md. 7 / GDPR md. 17; anonimleştirme anında, içerik 7
+gün sonra (6)). E-postayla başvuru gelirse (aydınlatma metnindeki adres,
+`/hukuk/gizlilik`) süre **30 gün** (KVKK md. 13) / **1 ay** (GDPR md. 12);
+işleyiş: (1) başvuranın hesabın sahibi olduğunu DOĞRULA — kayıtlı e-posta
+adresinden geldi mi, değilse o adrese doğrulama yaz (başkasının verisi
+başkasına gitmez); (2) silme için kullanıcıya kendi düğmesini göster (parolasını
+bilmiyorsa "parolamı unuttum" → parola → sil); yapamıyorsa ADMİN AYNI YOLU
+koşar — bugün admin rotası yok, `psql` ile `hesap.anonimlestir`in yaptığı
+UPDATE'i elle koşmak yerine kullanıcıyla ekran paylaşımı ya da geçici parola
+(admin `tools/kullanici.py parola`) tercih edilir, işlem `olay=hesap.silindi`
+satırıyla izli; (3) dışa aktarma için aynı düğme ya da admin'in o hesap
+adına ZIP alması (bugün admin rotası yok — sahibin kararı, ihtiyaç doğarsa
+Faz 5); (4) cevabı yaz, tarihi ve ne yapıldığını kasadaki başvuru defterine
+işle (KVKK md. 13 cevap yükümlülüğü — belge, kod değil). Polar'daki müşteri
+kaydı (e-posta, fatura adresi) Polar'ın kendi veri sorumluluğunda: başvuran
+onu da istiyorsa Polar'ın destek yolu gösterilir (sahibin Polar belgesinden
+doğrulayacağı adım, faz4 belgesi §5 "Sahibin adımı").
 
 **İlk üretim koşusu — kontrol listesi.** `tools/rls_kontrol.py` yeşil
 (KURULUM.md 1), göç head (§ 1), kova özel + sürümleme + yaşam döngüsü (§ 8),
@@ -444,4 +554,11 @@ hesabıyla platform anahtarlı bir görsel → composer "kalan 200 → 192", ind
 görselde işaret alt sağda, iş bitince panelde "rezerv 8 · gerçek 8 · iade 0";
 `/admin` Marj sekmesi o işle dolar; `python tools/tarife_kontrol.py`nin dört
 modeli sağlayıcı fiyatıyla bir kez doğrulanır (§ 6'daki `defter.asim`
-uyarısının önlemi).
+uyarısının önlemi). **Faz 4 / 7 ekleri** (adım adım KURULUM.md 11. adımın
+"Canlı kontrol listesi", 10 madde): sandbox'ta paket → bakiye ve abonelik →
+plan; yeniden gönderim tek satır; iptal → `plan_bitis`; production jetonları
+ve webhook sırrı; ilk gerçek 5 USD'lik paket kendi hesabından; portaldan
+fatura; test hesabıyla silme + `KROMIS_HESAP_SILME_BEKLEME_GUN=0` ile tur
+provası; `/hukuk/*` yayında (`HUKUK_ONAYLI = True` avukat sonrası); ilk ay
+sonunda `polar_mutabakat.py` sıfır fark; ikinci kova + `rclone sync` cron'u
+(§ 8).

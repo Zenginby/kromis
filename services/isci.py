@@ -136,7 +136,10 @@ kullanıcıda `SUM(kredi_hareketleri.miktar) == kullanicilar.bakiye` olmalı;
 sapan kullanıcı başına `olay=defter.tutarsiz` (WARNING), sayı `tutarsiz_kullanici`.
 Tur ÖLÇER, DÜZELTMEZ: önbelleği sessizce SUM'a çekmek sapmanın sebebini
 (çift yazar, yarım transaksiyon, elle UPDATE) örterdi; düzeltme admin
-`duzelt` satırıyla, izli.
+`duzelt` satırıyla, izli. Faz 4 iki iş daha: HESAP SİLME (`silme_turu`, Faz 4 / 5,
+K9 — turun İLK adımı, gerekçesi `bakim_turu`da) ve ÖDEME OLAYI SAKLAMASI
+(`odeme.eskileri_sil`, Faz 4 / 7, K10 — `odeme_olaylari` 365 gün,
+`KROMIS_ODEME_OLAY_SAKLAMA_GUN`; sipariş ve defter satırı durur).
 """
 from __future__ import annotations
 
@@ -192,6 +195,7 @@ from services.tablolar import (
 __all__ = ["ES_ZAMANLI_ENV", "ES_ZAMANLI_VARSAYILAN", "KALP_ESIGI_ENV", "KALP_ESIGI_VARSAYILAN",
            "SAKLAMA_ENV", "SAKLAMA_VARSAYILAN_GUN", "BAKIM_ARALIGI_SN",
            "HESAP_SILME_BEKLEME_ENV", "HESAP_SILME_BEKLEME_VARSAYILAN_GUN", "hesap_silme_beklemesi", "silme_turu",
+           "ODEME_OLAY_SAKLAMA_ENV", "ODEME_OLAY_SAKLAMA_VARSAYILAN_GUN", "odeme_olay_saklamasi",
            "KALP_ARALIGI_SN", "YOKLAMA_ARALIGI_SN", "BEKLENMEYEN_HATASI", "KULLANICI_YOK_HATASI",
            "UYARI_KUYRUK_DERINLIGI", "UYARI_EN_ESKI_BEKLEYEN_SN",
            "es_zamanli", "kalp_esigi", "saklama", "siradakini_al", "kos", "tek_tur", "kalp_turu",
@@ -217,6 +221,15 @@ SAKLAMA_VARSAYILAN_GUN = 30
 # isteyen dağıtım). `.env.example` ve `ALTYAPI` bekçisi aynı adı buradan okur.
 HESAP_SILME_BEKLEME_ENV = "KROMIS_HESAP_SILME_BEKLEME_GUN"
 HESAP_SILME_BEKLEME_VARSAYILAN_GUN = 7
+# Ödeme olayı (`odeme_olaylari`) saklama süresi (Faz 4 / 7, K10): 365 gün.
+# Olay satırı webhook teslimatının kanıtı — aylık Polar mutabakatı
+# (`tools/polar_mutabakat.py`) ve itiraz penceresi için gerekir, bir yıldan
+# sonra ikisi de kapanmıştır; gövde e-posta/adres taşıyabilir (KVKK amaçla
+# sınırlı saklama). 0 GEÇERSİZ: olay yazılır yazılmaz silinirdi ve mutabakat
+# kör kalırdı (`saklama`nın "0 yasak" gerekçesi). `.env.example` ve `ALTYAPI`
+# bekçisi aynı adı buradan okur; işçi açılışta doğrular (`isci.py hazirla`).
+ODEME_OLAY_SAKLAMA_ENV = "KROMIS_ODEME_OLAY_SAKLAMA_GUN"
+ODEME_OLAY_SAKLAMA_VARSAYILAN_GUN = 365
 # Kalp atışı aralığı ve boş kuyrukta yoklama aralığı (belge §3: 30 sn / 1 sn;
 # `LISTEN/NOTIFY` yok — senkron sürücüde ayrı bağlantı ister, 1 sn dakikalık işte görünmez).
 KALP_ARALIGI_SN = 30.0
@@ -289,6 +302,12 @@ def hesap_silme_beklemesi(ortam: Mapping[str, str] | None = None) -> dt.timedelt
     """
     return dt.timedelta(days=_tam_sayi(os.environ if ortam is None else ortam, HESAP_SILME_BEKLEME_ENV,
                                        HESAP_SILME_BEKLEME_VARSAYILAN_GUN, en_az=0))
+
+
+def odeme_olay_saklamasi(ortam: Mapping[str, str] | None = None) -> dt.timedelta:
+    """`KROMIS_ODEME_OLAY_SAKLAMA_GUN` (boş = 365; 0/eksi/bozuk → `ValueError`) — `bakim_turu`nun ödeme olayı saklaması (K10)."""
+    return dt.timedelta(days=_tam_sayi(os.environ if ortam is None else ortam, ODEME_OLAY_SAKLAMA_ENV,
+                                       ODEME_OLAY_SAKLAMA_VARSAYILAN_GUN))
 
 
 # ────────────────────────────────────────────────────────── alım
@@ -718,7 +737,7 @@ def kuyruk_uyarisi(db: Session, an: dt.datetime) -> dict[str, Any] | None:
 # ────────────────────────────────────────────────────────── bakım
 
 class BakimOzeti(dict[str, int]):
-    """`bakim_turu`nun döndürdüğü sayılar: `silinen_is`, `silinen_nesne`, `korunan_dizin`, `silinen_isci`, `hibe_satiri`, `tutarsiz_kullanici`, `temizlenen_hesap`.
+    """`bakim_turu`nun döndürdüğü sayılar: `silinen_is`, `silinen_nesne`, `korunan_dizin`, `silinen_isci`, `hibe_satiri`, `tutarsiz_kullanici`, `temizlenen_hesap`, `silinen_odeme_olayi`.
 
     Sözlük (günlük alanı olarak düz yazılsın); `__bool__` "bir şey yapıldı mı":
     işçi olayı yalnız bir şey silindiğinde, hibe yazıldığında ya da sapma
@@ -730,7 +749,10 @@ class BakimOzeti(dict[str, int]):
     sayısı — sağlıklı dağıtımda hep 0; her sapan için ayrıca `olay=defter.tutarsiz`
     (WARNING) düşmüştür, sayı yalnız özet. `temizlenen_hesap` (Faz 4 / 5, K9):
     bu turda içeriği kalıcı silinen hesap sayısı (`silme_turu`); her biri için
-    ayrıca `olay=hesap.temizlendi` (INFO) düşer.
+    ayrıca `olay=hesap.temizlendi` (INFO) düşer. `silinen_odeme_olayi` (Faz 4 / 7,
+    K10): saklama süresini (`KROMIS_ODEME_OLAY_SAKLAMA_GUN`, 365) aşan
+    `odeme_olaylari` satırı sayısı; sıfır değilse ayrıca `olay=odeme.olaylar_temizlendi`
+    (INFO) düşer — yılda bir gün dolan bir sayı, ay içinde 0.
     """
 
     def __bool__(self) -> bool:
@@ -794,8 +816,9 @@ def silme_turu(db: Session, depo: dosya.Depo, an: dt.datetime, bekleme: dt.timed
 
 
 def bakim_turu(db: Session, depo: dosya.Depo, an: dt.datetime, esik: dt.timedelta,
-               saklama_suresi: dt.timedelta, *, silme_beklemesi: dt.timedelta | None = None) -> BakimOzeti:
-    """Bir bakım turu: saklama (satır + referanssız girdi dizini), ölü işçi satırları, aylık hibe, defter tutarlılığı ve hesap silme; özet sayılar.
+               saklama_suresi: dt.timedelta, *, silme_beklemesi: dt.timedelta | None = None,
+               olay_saklamasi: dt.timedelta | None = None) -> BakimOzeti:
+    """Bir bakım turu: saklama (satır + referanssız girdi dizini), ölü işçi satırları, aylık hibe, defter tutarlılığı, hesap silme ve ödeme olayı saklaması; özet sayılar.
 
     Sıra ve bağlamlar (gerekçe modül başında): sahipler ADMIN bağlamında
     bulunur, aylık hibe (`defter.hibe_turu`, Faz 3 / 3) aynı bağlamda yatar
@@ -807,7 +830,14 @@ def bakim_turu(db: Session, depo: dosya.Depo, an: dt.datetime, esik: dt.timedelt
     göre dizinler silinir. Ölü işçi satırı politikasız, bağlam gerekmez.
     `an`/`esik`/`saklama_suresi` çağıranın (testler saatle oynamaz);
     `silme_beklemesi` verilmezse ortamdan (`hesap_silme_beklemesi`) — anahtar
-    sözcüklü ve isteğe bağlı ki Faz 2-3'ün çağrı yerleri değişmesin.
+    sözcüklü ve isteğe bağlı ki Faz 2-3'ün çağrı yerleri değişmesin;
+    `olay_saklamasi` (Faz 4 / 7) aynı deyimle, öntanımlısı `odeme_olay_saklamasi()`.
+
+    ÖDEME OLAYI SAKLAMASI (Faz 4 / 7, K10) hesap silmeden SONRA, hibeyle aynı
+    ADMİN bağlamında ve aynı commit'te: `silme_turu` silinen hesabın olaylarını
+    önce sahipsizleştirir (`olaylari_anonimlestir`), yaşı dolanı bu adım siler —
+    sıra ters olsaydı bir yıllık olay silinmeden önce boşuna redakte edilirdi.
+    Tablo politikasız; bağlam kural gereği (bkz. `odeme.eskileri_sil`).
 
     HESAP SİLME (Faz 4 / 5) EN BAŞTA: silinen hesabın `isler` satırları
     saklama süzgecine girmeden gider, aylık hibe anonim satıra zaten yatmaz
@@ -815,7 +845,8 @@ def bakim_turu(db: Session, depo: dosya.Depo, an: dt.datetime, esik: dt.timedelt
     görür — defteri duruyor, bakiyesi de.
     """
     ozet = BakimOzeti(silinen_is=0, silinen_nesne=0, korunan_dizin=0, silinen_isci=0, hibe_satiri=0,
-                      tutarsiz_kullanici=0, temizlenen_hesap=0)
+                      tutarsiz_kullanici=0, temizlenen_hesap=0, silinen_odeme_olayi=0)
+    olay_saklamasi = olay_saklamasi if olay_saklamasi is not None else odeme_olay_saklamasi()
     ozet["temizlenen_hesap"] = silme_turu(
         db, depo, an, silme_beklemesi if silme_beklemesi is not None else hesap_silme_beklemesi())
     with kiraci.baglam(rol=kiraci.ADMIN, oturum=db):
@@ -841,6 +872,13 @@ def bakim_turu(db: Session, depo: dosya.Depo, an: dt.datetime, esik: dt.timedelt
                                 seviye=logging.WARNING, kullanici_id=str(sapma.kullanici_id), kova=kova,
                                 bakiye=onbellek, toplam=toplam, fark=onbellek - toplam)
         ozet["tutarsiz_kullanici"] = len(sapmalar)
+        # Ödeme olayı saklaması (Faz 4 / 7, K10): 365 günü aşan teslimat kaydı gider;
+        # sipariş ve defter satırı DURUR (mali kayıt, K9). Yalnız sıfır değilse olay:
+        # yılda bir dolan sayı, boş turda gürültü olmasın (`bakim`ın deyimi).
+        ozet["silinen_odeme_olayi"] = odeme.eskileri_sil(db, an, olay_saklamasi)
+        if ozet["silinen_odeme_olayi"]:
+            gunluk.olay(_gunluk, "odeme.olaylar_temizlendi", "saklama suresi dolan odeme olaylari silindi",
+                        adet=ozet["silinen_odeme_olayi"], saklama_gun=olay_saklamasi.days)
         db.commit()
     silinenler: list[kuyruk.SilinenIs] = []
     for kullanici_id in sahipler:

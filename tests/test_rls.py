@@ -73,7 +73,9 @@ BAGLAM_TASIYAN_ARACLAR = {"anahtar_dondur.py", "artik_dosya.py", "ice_aktar.py",
                           # Faz 3 / 5: `isler`i admin bağlamında okur (bağlamsız RLS boş döner).
                           "marj_raporu.py",
                           # Faz 4 / 4: `urunler` politikasız (ALTYAPI) — bağlam gerekmez ama kural sürüyor (gerekçe araçta).
-                          "polar_esitle.py"}
+                          "polar_esitle.py",
+                          # Faz 4 / 7: `siparisler`i admin bağlamında okur (RLS'li — bağlamsız sessizce boş dönerdi).
+                          "polar_mutabakat.py"}
 
 
 # ────────────────────────────────────────────────────────── fixture'lar

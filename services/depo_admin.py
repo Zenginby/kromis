@@ -45,6 +45,12 @@ rapor için ortalama okunur), `hata` iş sayısı ve onların TAHMİNİ kredisi 
 zararı: sağlayıcı faturaladı, kullanıcıya iade edildi). Admin metriklerinde
 7 ve 30 gün yan yana; `tools/marj_raporu.py` aynı işlevi CSV'ye döker.
 
+GELİR (`gelir`, Faz 4 / 7): aynı iki pencerede `siparisler` — adet, Σ
+`tutar_kurus` (USD), Polar ücreti TAHMİNİ (%6,5 + 0,50; varsayım sabitin
+yorumunda) ve net. Dönem başına TEK satır, model başına değil: sipariş modele
+bağlanamaz. Marj tablosunun altında ayrı tablo; gerçek payout Polar'da,
+aylık fark `tools/polar_mutabakat.py`.
+
 ZAMAN PARAMETRE (`an`): `kota.py`nin aynı kararı — testler saatle oynamaz,
 `an` verir; pencere sınırı `>` (dâhil değil). Konuşmaz: cümle yok, sözlük
 döner; 404/409 metnini rota kurar (`services/db.py`nin `database_unavailable`
@@ -88,8 +94,8 @@ from services.tablolar import (
 
 __all__ = ["CANLI_ESIK", "SAYFA_ADEDI", "SAYFA_ADEDI_AZAMI", "IS_LISTESI_SINIRI",
            "kullanicilar", "kullanici_bul", "oturum_sayisi", "tavan_yaz", "plan_yaz",
-           "is_listesi", "is_satiri", "is_iptal", "is_dokumu", "metrikler", "marj",
-           "MARJ_PENCERELERI"]
+           "is_listesi", "is_satiri", "is_iptal", "is_dokumu", "metrikler", "marj", "gelir",
+           "MARJ_PENCERELERI", "POLAR_UCRET_ORAN", "POLAR_UCRET_SABIT_KURUS", "GELIR_PARA_BIRIMI"]
 
 # İşçi kalbi 30 sn (services/isci.py); üç kaçırılan kalp = bayat. Bayat işçi
 # satırı listede KALIR (admin "kim kaldı" sorusunu buradan okur), yalnız `canli` düşer.
@@ -106,6 +112,20 @@ _BIR_SAAT = dt.timedelta(hours=1)
 _BIR_GUN = dt.timedelta(hours=24)
 # Admin "Marj" tablosunun iki penceresi (gün): haftalık bakış ve fatura dönemi.
 MARJ_PENCERELERI: tuple[int, ...] = (7, 30)
+# Polar ücreti TAHMİNİ (Faz 4 / 7; belge §7 "gelir sütunu"): Starter planın ilan
+# edilen tarifesi %5 + 0,50 USD sipariş başına, uluslararası karta +%1,5 (master
+# spec Faz 5 kartı; Polar'dan bu oturumlarda doğrulanamadı). VARSAYIM: her
+# sipariş uluslararası kart sayılır (satıcı Türkiye'de, alıcı hep başka ülkede —
+# kötümser taraf), yani %6,5 + 0,50. Gerçek kesinti Polar'ın payout raporunda;
+# bu sayı yalnız marj tablosunun "gelirin ne kadarı kalır" sorusuna kaba cevap.
+# Etiket (admin.metrik_gelir) varsayımı açık yazar. Ciro ~1.000 USD/ay üstünde
+# Pro plan (%3,8 + 0,40) — sahip geçince iki sabit birlikte değişir.
+POLAR_UCRET_ORAN = Decimal("0.065")
+POLAR_UCRET_SABIT_KURUS = 50
+# Ürünler USD fiyatlı (`urunler.para_birimi`, `tools/polar_esitle.py`); başka
+# para biriminde gelen sipariş TOPLANMAZ, sayısı `diger_para_birimi`nde görünür
+# (kur uydurmak yalan olurdu — okuyan Polar panelinden bakar).
+GELIR_PARA_BIRIMI = "usd"
 
 # Biten işte gerçek, bitmemiş/düşmüş işte rezerv (gerekçe modül başında).
 _KREDI = func.coalesce(Is.kredi_gercek, Is.kredi_tahmini)
@@ -292,7 +312,7 @@ def _pencereler(db: Session, an: dt.datetime) -> tuple[dict[str, Any], dict[str,
 
 
 def metrikler(db: Session, an: dt.datetime | None = None) -> dict[str, Any]:
-    """`GET /api/admin/metrikler` gövdesi — beş sorgu + iki marj penceresi, hepsi `isler`/`isciler` (belge §8; marj Faz 3 / 5)."""
+    """`GET /api/admin/metrikler` gövdesi — beş sorgu + iki marj penceresi (`isler`/`isciler`; belge §8; marj Faz 3 / 5) + iki gelir penceresi (`siparisler`; Faz 4 / 7)."""
     an = an if an is not None else zaman.an()
     bekleyen, calisan, en_eski = db.execute(
         select(func.count(case((Is.durum == DURUM_BEKLIYOR, 1))),
@@ -330,6 +350,7 @@ def metrikler(db: Session, an: dt.datetime | None = None) -> dict[str, Any]:
                     for i in isciler],
         # Faz 3 / 5: 7 ve 30 günlük pencereler tek düz liste, satırda `gun` (admin.js tek tablo çizer).
         "marj": [satir for gun in MARJ_PENCERELERI for satir in marj(db, gun, an)],
+        "gelir": [gelir(db, gun, an) for gun in MARJ_PENCERELERI],
     }
 
 
@@ -381,6 +402,43 @@ def marj(db: Session, gun: int, an: dt.datetime | None = None) -> list[dict[str,
         "hata_kredi": int(hata_kredi),
     } for model, adet, kredi, maliyet, bilinen, sure_ort, hata, hata_kredi in satirlar]
 
+
+
+def gelir(db: Session, gun: int, an: dt.datetime | None = None) -> dict[str, Any]:
+    """Dönemin GELİR satırı (Faz 4 / 7): son `gun` günde işlenen `siparisler` — adet, Σ tutar (USD), Polar ücreti tahmini, net.
+
+    Marj tablosunun karşı sütunu: `marj` gideri (sağlayıcı USD) model başına
+    verir, sipariş modele bağlanamaz (paket kredisi her modele harcanır) — o
+    yüzden gelir MODEL BAŞINA DEĞİL, DÖNEM BAŞINA tek satır. Pencere
+    `olusturuldu`ya göre (webhook'un işlediği an; Polar'ın `created_at`i
+    saniyeler önce — ay sınırındaki farkı `tools/polar_mutabakat.py` bilir).
+    `gelir_usd` yalnız `GELIR_PARA_BIRIMI` satırları; ötekiler `diger_para_birimi`
+    sayısında. `polar_ucreti_usd` = Σ tutar × `POLAR_UCRET_ORAN` + adet ×
+    `POLAR_UCRET_SABIT_KURUS` (VARSAYIM, sabitin yorumunda) — gerçek payout
+    Polar'da; `net_usd` = gelir − tahmini ücret. Sipariş yoksa üç sayı 0.0
+    (bilinen sıfır: dönemde satış olmadı — `marj`ın "bilinmeyen maliyet `None`"
+    kararından farklı, çünkü burada kaynak eksiksiz: her ödenen sipariş bizde).
+    """
+    an = an if an is not None else zaman.an()
+    pencere = Siparis.olusturuldu > an - dt.timedelta(days=gun)
+    usd = Siparis.para_birimi == GELIR_PARA_BIRIMI
+    adet, toplam_kurus, diger = db.execute(
+        select(func.count(case((usd, 1))),
+               func.coalesce(func.sum(case((usd, Siparis.tutar_kurus))), 0),
+               func.count(case((~usd, 1))))
+        .where(pencere)).one()
+    adet, toplam_kurus, diger = int(adet), int(toplam_kurus), int(diger)
+    gelir_ = Decimal(toplam_kurus) / 100
+    ucret = gelir_ * POLAR_UCRET_ORAN + Decimal(adet * POLAR_UCRET_SABIT_KURUS) / 100
+    return {
+        "gun": gun,
+        "siparis": adet,
+        # `float(Decimal)` — JSON'a sayı; 2 hane: cent hassasiyeti, ücret tahmini de cent'e yuvarlanır.
+        "gelir_usd": round(float(gelir_), 2),
+        "polar_ucreti_usd": round(float(ucret), 2),
+        "net_usd": round(float(gelir_ - ucret), 2),
+        "diger_para_birimi": diger,
+    }
 
 
 # ─────────────────────────────────────────────────────────────── ödeme (Faz 4 / 3)

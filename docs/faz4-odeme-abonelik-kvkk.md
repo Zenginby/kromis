@@ -1,6 +1,6 @@
 # Faz 4 — Ödeme (Polar MoR), paketler ve abonelik, hesap silme / dışa aktarma, hukuki metinler: görev listesi
 
-**Tarih:** 2026-09-24 · **Durum:** **7/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; **6** ✅ 2026-09-24 `faz4/hukuk-metinleri` (metinler TASLAK — avukat onayı sahibin adımı); **5** ✅ 2026-09-23 `faz4/hesap-silme-disa-aktarma`; **4** ✅ 2026-09-22 `faz4/checkout-portal`; **1b** ✅ 2026-09-23 — dördüncü ve son PR'ı `faz4/1b-yeni-girdiler` (D) ile katalog 13 görsel + 10 video; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8; **1b'nin model listesi ve `1b-A`…`1b-G` kararları 2026-09-22'de sahipten geldi; on birinci sayı aynı gün ÖLÇÜLDÜ ve `catalog.py`ye yazıldı — o görev artık uygulanabilir**) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
+**Tarih:** 2026-09-24 · **Durum:** **8/8 — Faz 4 TAMAMLANDI** (kapanış 2026-09-24, PR #69–#84 + `faz4/operasyon`; kapanış bölümü "Faz 4 kapanışı"; plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; **7** ✅ 2026-09-24 `faz4/operasyon` (mutabakat aracı, olay saklama, gelir tablosu, KURULUM 11, kapanış); **6** ✅ 2026-09-24 `faz4/hukuk-metinleri` (metinler TASLAK — avukat onayı sahibin adımı); **5** ✅ 2026-09-23 `faz4/hesap-silme-disa-aktarma`; **4** ✅ 2026-09-22 `faz4/checkout-portal`; **1b** ✅ 2026-09-23 — dördüncü ve son PR'ı `faz4/1b-yeni-girdiler` (D) ile katalog 13 görsel + 10 video; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8; **1b'nin model listesi ve `1b-A`…`1b-G` kararları 2026-09-22'de sahipten geldi; on birinci sayı aynı gün ÖLÇÜLDÜ ve `catalog.py`ye yazıldı — o görev artık uygulanabilir**) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
 **Üst belge:** [superpowers/specs/2026-08-10-saas-transformation-master-design.md](superpowers/specs/2026-08-10-saas-transformation-master-design.md) §5 "Faz 5" kartının **"Ödeme Altyapısı: Merchant of Record (MoR)"** maddesi (`:184-214`) ve "Filigran & Kredi Kuralları" satırı (`:183`) — sapmalar bu belgenin sonunda tek tek yazılı. **Numaralama tuzağı** aynen (Faz 3 belgesi `:4`): master spec'in "Faz 5"i ürün yol haritasının SaaS kartı; bu belge SaaS dönüşümünün İÇ dizisindeki Faz 4'tür (Faz 0 web-first → 1 DB/hesap → 2 kuyruk → 3 kredi defteri → **4 ödeme/KVKK** → 5 işletme). Yol haritası kartı (Faz 4 "Ödeme, faturalama ve hukuk"): *"Bir kullanıcı kartla abone olup fatura alabiliyor ve hesabını tamamen silebiliyor."* — bu belgenin çıkış kriteri onu genişletir (sonda tam metin). Kartın "Stripe birincil" satırı 2026-09-18'de **MoR/Polar** ile güncellendi (Faz 1 ve Faz 2 belgelerinin "Not" satırı; master `:184-199`): Türkiye'den Stripe'a doğrudan hesap açılamıyor, uluslararası satış Merchant of Record üzerinden.
 
 Faz 4'ün amacı, Faz 3'ün kurduğu defterin (rezerv → onay → iade, aylık hibe,
@@ -1906,7 +1906,7 @@ değiştiğinde `HUKUK_SURUMU` ilerler ve herkes yeniden onaylar — o gün
 
 ---
 
-## 7. Operasyon ve belgeler — `isletme.md`, KURULUM 11. adım "Ödeme (Polar)", `.env.example`, mutabakat aracı, ikinci kova, Faz 4 kapanışı (PR: `faz4/operasyon`)
+## 7. Operasyon ve belgeler — `isletme.md`, KURULUM 11. adım "Ödeme (Polar)", `.env.example`, mutabakat aracı, ikinci kova, Faz 4 kapanışı ✅ (PR: `faz4/operasyon`)
 
 **Kapsam.** Faz 4'ün işletme ayağı ve kapanış belgesi (Faz 3 / 7'nin deseni).
 
@@ -1962,6 +1962,98 @@ sıfır fark; belge kapanışı dolu; takım yeşil.
 listesi; ikinci kova cron'u; Polar production onayı (AI ürün incelemesi —
 hukuki metinler yayında olmalı).
 
+### Yapıldığında (2026-09-24) — ölçümler ve sapmalar
+
+Rota YOK (81), göç YOK (`0008_odeme`), modül 117 → **118** (`tools/polar_mutabakat.py`;
+yeni `services/` modülü yok — Polar dikişi `services/polar.py`ye, saklama
+`services/odeme.py`ye, gelir `services/depo_admin.py`ye), tarayıcı betiği 15,
+şablon 6, test dosyası 152 (yeni dosya yok; testler dört mevcut dosyaya).
+**`tools/polar_mutabakat.py`**: `--ay YYYY-MM` (öntanımlı GEÇEN UTC takvim ayı),
+`--cikti` (`-` stdout); Polar `orders.list` → `polar.siparisleri_listele(baslangic,
+bitis)` (yeni dikiş: `-created_at` sıralı, 100'lük sayfa, sayfanın en eskisi
+pencerenin gerisine düşünce durur — SDK 0.32.0 `orders.list`te tarih süzgeci
+YOK, ölçüldü kaynaktan) ↔ `siparisler` admin bağlamında; CSV `SUTUNLAR`
+(`yon, siparis_id, olusturuldu, tutar_kurus, para_birimi, musteri, urun, oneri`),
+iki yön iki öneri (`polar_eksik` → "webhook kaçtı, olayı yeniden gönder";
+`bizde_fazla` → "olmamalı, incele"), ay SINIRI için Polar listesi ±1 gün
+PAYLI çekilir ve `polar_eksik` bizim KİMLİK kümesine tarihsiz bakar (geç
+işlenen sipariş eksik sayılmaz, erken işlenen fazla sayılmaz — test çivili);
+ödenmiş = `Order.paid` (iade edilmiş de ödenmişti); özet satırı stderr'e iki
+tarafın sipariş sayısı ve toplamı. `OPERATOR_ARACLARI` 10 → **11**,
+`BAGLAM_TASIYAN_ARACLAR` +1. **Gelir tablosu** admin Metrikler sekmesinde
+Marj'ın altında AYRI tablo (`depo_admin.gelir(db, gun, an)` → `{gun, siparis,
+gelir_usd, polar_ucreti_usd, net_usd, diger_para_birimi}`; `metrikler` +`gelir`
+7/30 gün; `POLAR_UCRET_ORAN = 0.065`, `POLAR_UCRET_SABIT_KURUS = 50`,
+`GELIR_PARA_BIRIMI = "usd"`); i18n **+6** tr/en (`admin.metrik_gelir` başlığı
+varsayımı AÇIK yazar: "ücret TAHMİNİ %6,5 + 0,50 USD/sipariş — gerçek kesinti
+Polar payout raporunda"). **Olay saklaması**: `KROMIS_ODEME_OLAY_SAKLAMA_GUN`
+(boş = 365, 0/eksi/bozuk `ValueError` — işçi açılışta düşer, `isci.py hazirla`
+→ `Surec.olay_saklamasi`; `.env.example` +1, `ALTYAPI` +1 → Faz 4 toplam +7),
+`odeme.eskileri_sil(db, an, saklama)` (`alindi < an - saklama`, `<` kesin —
+tam 365. gün dokunulmaz), `bakim_turu(..., olay_saklamasi=)` hibe/tutarlılıkla
+aynı admin bağlamı ve commit'te, hesap silmeden SONRA; `BakimOzeti`
++`silinen_odeme_olayi` (8 anahtar), `olay=odeme.olaylar_temizlendi` INFO
+(`adet`, `saklama_gun`) yalnız sıfır değilse. Belgeler: `docs/isletme.md`
+başlık + § 2 (üç tablo, 1 yıl), § 6 (üç uyarı; "Faz 4" satırı KAPANDI → K9/K10),
+§ 7 (altı Faz 4 değişkeni), § 8 (**İKİNCİ KOVA AÇILIR** — `rclone sync` cron'u
+sahibin adımı), § 9 (günlük olayları, uyarı eşikleri `odeme.hata`/`saglayici_hata`/
+`silme_abonelik`/`urunler_bayat`, bakım turu (6)-(7), sayı listesi 8, "Aylık
+mutabakat" ve "KVKK / GDPR başvurusu işleyişi" paragrafları, ilk üretim
+koşusuna Faz 4 ekleri); **KURULUM.md 11. adım "Ödeme (Polar)"** (sandbox →
+production dört adım: jeton, webhook URL + dokuz olay `ISLENEN_TURLER`, ürün
+metadata sözleşmesi, `polar_esitle`; hibe değişkenleri, iki kova, iade
+politikası, hesap silme/dışa aktarma, olay günlüğü, hukuki metin sürümü,
+aylık mutabakat; **canlı kontrol listesi 10 madde** belgenin sırasıyla); README
+tr/en "ödeme Polar üzerinden" cümlesi + 11. adım bağlantısı. Testler
+**+15** (`test_araclar` 6: iki yön + pay + ödenmemiş + geç işlenen, sıfır fark
+0 ve yalnız başlık, ortam/sağlayıcı/bozuk ay 3, `donem`/`odenmis`, CSV sütun
+bekçisi, SDK sayfalama ve erken durma; `test_admin` 2: gelir aritmetiği ve
+`diger_para_birimi`, metrikler + sayfa çapaları iki dilde + etikette varsayım;
+`test_isci` 2: 364/365/366. gün + `hata`lı olay + INFO bir kez + ikinci tur
+sessiz + `olay_saklamasi=`, ortam ayrıştırma 0 reddi; `test_hesap_silme` +1
+parametre (işçi açılışta `KROMIS_ODEME_OLAY_SAKLAMA_GUN=0` düşer);
+`test_docker_kapisi` +1 bekçi (KURULUM 11 + dokuz olay `ISLENEN_TURLER`den +
+on madde sıralı + üç metadata anahtarı `polar_esitle`den, README iki dil,
+isletme satırları ve iki eski cümlenin GİTMİŞ olması, yedi Faz 4 değişkeni
+şablon ↔ KURULUM ↔ isletme aynı ad); üç `BakimOzeti` sözlüğü +1 anahtar. Takım
+**4.289 → 4.301 geçti, 12 atlandı, ~296 sn** (E2E + Postgres, `KROMIS_E2E_ZORUNLU=1`). `ruff`/`mypy`/
+eslint/prettier temiz, graflar üretildi.
+
+**Sapmalar — belgeden farklı yapılanlar, gerekçesiyle.** (a) **Gelir MODEL
+BAŞINA SÜTUN DEĞİL, DÖNEM BAŞINA AYRI TABLO**: belge "marj tablosuna gelir
+sütunu" demişti; sipariş modele bağlanamaz (paket kredisi her modele
+harcanır), model satırlarına aynı dönem toplamını yazmak sayıyı 13 kez
+tekrarlardı ve `marj_raporu` CSV'sinin sütun bekçisini (`SUTUNLAR` == satır
+anahtarları) kırardı. Aynı iki pencere (7/30), Marj'ın hemen altında;
+`marj_raporu.py` DOKUNULMADI — aylık gelir özeti `polar_mutabakat`ın stderr
+satırında (iki tarafın toplamı), gider `marj_raporu`da. (b) **Ücret varsayımı
+%6,5 + 0,50, "%5 + 0,50 + %1,5"in birleşik hâli**: hangi siparişin
+uluslararası kart olduğu bizde bilinmiyor; satıcı Türkiye'de olduğu için her
+sipariş uluslararası sayıldı (kötümser). (c) **Çıkış kodu 0/2/3** (belge
+"`--kontrol` tarzı 0/2"): 3 = ortam/Polar hatası AYRI — cron "Polar'a
+ulaşamadım" (yeniden dene) ile "fark var"ı (sahibi çağır) ayırmalı;
+`polar_esitle --kontrol` ikisini 2'de birleştiriyor, orada cron yok. (d)
+**Saklama süresi ortam değişkeni** (belge "sabit ya da env" bırakmıştı):
+`KROMIS_ODEME_OLAY_SAKLAMA_GUN` — mali müşavir bir yıl yerine başka süre
+derse dağıtım değişir, PR değil; 0 GEÇERSİZ (`hesap_silme_beklemesi`nin
+0'ından farklı: olay yazılır yazılmaz silinirse mutabakat kör). (e) **Polar
+listesi ±1 gün paylı**: belge yalnız "aynı dönem" demişti; `created_at` ↔
+`olusturuldu` (webhook'un işlediği an) ay sınırında farklı aya düşebilir,
+paysız ölçüm ayın ilk saniyelerindeki her siparişi "bizde fazla" sayardı. (f)
+**`polar_esitle` jeton kapsamları KURULUM'da adla DEĞİL işlevle**: Polar
+belgesine bu oturumlardan erişilemedi, kapsam adları doğrulanamadı — "panelden
+doğrula" notu. (g) **KVKK başvurusunda admin rotası YOK**: belge "başvuru
+gelirse admin aynı yolu koşar" demişti; silme/dışa aktarma rotaları oturum
+sahibine bağlı, admin adına koşacak uç yazılmadı (yeni rota + kapı + bekçi —
+ihtiyaç doğmadan açılmaz); isletme § 9 admin'in izleyeceği yolu (kimlik
+doğrulama → kullanıcının kendi düğmesi → geçici parola) yazıyor, açık kalem
+Faz 5'e. (h) **`--ay` UTC takvim ayı**: Polar payout dönemi UTC; sahibin
+saati (TR, +3) ay sınırında üç saat kayar — CSV `olusturuldu` UTC damgası. (i)
+**Yol haritası/üst belge kartı**: `docs/ozellikler.md` Faz 5 (SaaS) kartına
+tek `[x]` satırı (Faz 4 kapanışı, PR aralığı); master spec'in kartı Faz 3'te
+de değiştirilmemişti, aynen — sapma listesi bu belgenin sonunda. Belgenin
+kalan cümleleri aynen uygulandı.
+
 ---
 
 ## Faz 4 çıkış kriteri
@@ -1984,6 +2076,177 @@ yeşil (E2E dahil, sahte Polar ile).
 
 Yol haritası kartının cümlesi ("kartla abone olup fatura alabiliyor ve hesabını
 tamamen silebiliyor") bunun içinde: fatura Polar'ın, silme 5'in.
+
+**Karşılandı (2026-09-24) — her adımın kapısı olan test, sahte Polar ile:**
+paket → `paket:<order_id>` → "kalan" artar: `tests/test_odeme.py` (paket →
+`paket_bakiye` + sipariş + redakte gövde) ve E2E `tests/test_playwright_odeme.py`
+(yerel Polar HTTP sunucusu, 412 → onay → "Öde" → GERÇEK HMAC'li `order.paid` →
+teşekkür sayfası 200 → 700); yeniden gönderim satır sayısı AYNI: `test_odeme`
+"yinelenen `webhook-id`" + "aynı sipariş iki teslimat" (K4 üç katman);
+`temel`ye abone → plan, filigran, video, hibe tamamla: `test_odeme`
+`subscription_create` 300 → 1.000 + `tests/test_planlar.py` kapılar; `cycle`
+dolu bakiyeye binmez: `test_odeme` "cycle dolu bakiyeye dokunmaz"; iptal →
+`plan_bitis`: `canceled`/`uncanceled` testleri; `revoked` → `free` + `sona_erme`
+yalnız hibe, paket durur: `test_odeme` (−800, paket 500 durur, `tutarlilik`
+boş); fatura portaldan: `tests/test_odeme_route.py` portal 200 + E2E portal
+düğmesi yamalı URL'ye; hesap silme → giriş yok, e-posta anonim, BYOK yok:
+`tests/test_hesap_silme.py` (20) + E2E `tests/test_playwright_hesap.py` × 2
+dil; 7 gün sonra tur içerik + R2 siler, defter/sipariş anonim kalır:
+`test_hesap_silme` "6. günde dokunmaz / 8. günde siler" + `tests/test_rls.py`
+uygulama rolüyle; dışa aktarma ZIP dokuz dosya (belgenin beşinden çok —
+sapma §5 (d)): `test_hesap_silme`; kayıt onay kutusuz 422 + `/hukuk/*` iki
+dilde: `tests/test_hukuk.py` (24) + E2E kayıt × 2 dil; katalogda `gpt-image-1`
+yok: `tests/test_catalog.py`; 13 görsel + 10 video, `tarife_kontrol` boş:
+`test_catalog` sıralı liste bekçileri + `tests/test_araclar.py` küme `set()`;
+RLS 10 tablo / 32 politika, 17 tablo: `tests/test_rls.py`, `tests/test_tablolar.py`,
+`tools/rls_kontrol.py`; iki kova SUM == önbellek: `tests/test_isci.py` bakım turu
+`tutarsiz_kullanici` (kova alanı) + `tests/test_defter.py` 100 tekrarlık yarış;
+tam takım yeşil: aşağıda. Polar sandbox'ında UÇTAN UCA ölçüm bu oturumlardan
+YAPILAMADI (erişim yok — bütün fazda öyle): canlının kendisi KURULUM.md 11.
+adımın on maddelik listesi, sahibin.
+
+---
+
+## Faz 4 kapanışı (2026-09-24)
+
+**Ne çıktı — 8/8, on üç Faz 4 PR'ı + iki düzeltme PR'ı** (`main` `5c48630`
+= #84'ün merge'i, 2026-09-24 10:05 UTC; bu PR onun üstüne):
+
+| # | görev | PR | merge |
+| --- | --- | --- | --- |
+| plan | bu belge (K1–K12, 7 → 8 görev: 1b eklendi) | #69 | 2026-09-21 |
+| 1 | katalog hijyeni: `openai-gpt-image-1` silindi (emeklilik 2026-10-23), dört Azure fiyatı 1b'ye devredildi | #70 | 2026-09-21 |
+| 2 | `0008_odeme`: `kova`, `paket`, `urunler`/`siparisler`/`odeme_olaylari`, `kullanicilar.polar_*`/`plan_bitis`/`sartlar_*`/`temizlendi_at`; `defter` iki kova (`paket_yukle`, `dusur`, `Bakiye`) | #71 | 2026-09-21 |
+| 3 | Polar webhook: `services/polar.py`, `services/odeme.py`, `POST /api/odeme/webhook`, admin "Ödeme" sekmesi; köprü bayrağı kaldırıldı | #73 | 2026-09-22 |
+| 1b-A | katalog genişletme: dört Azure fiyatı + `emeklilik` alanı, sağlayıcıdan bağımsız iskelet | #74 | 2026-09-22 |
+| — | Polar imza düzeltmesi: `whsec_` anahtar dönüşümü (canlı sandbox'ta ölçüldü — SDK'dan bilerek sapma) | #75 | 2026-09-22 |
+| 1b-B | plan kapısı: model başına plan basamağı (`plan` alanı, `model_available(plan)`) | #77 | 2026-09-22 |
+| 1b-C | fiyat düzeltmesi: `tarife_kontrol` 4 → 0, krediler ölçülen tarifeyle | #78 | 2026-09-22 |
+| 4 | checkout, müşteri portalı, `/planlar`, `/odeme/tesekkur`, "Kredi" bölmesi, `tools/polar_esitle.py`, hibe 1.200 / 4.500 | #79 | 2026-09-23 |
+| 1b-D | yeni girdiler: 13 görsel + 10 video, fal görsel adaptörü, sahibin sıralı listesi | #80 | 2026-09-23 |
+| — | Qwen düzenleme boyutu (1b-D inceleme notu) | #81 | 2026-09-23 |
+| 5 | hesap silme + dışa aktarma: `POST /api/hesap/sil`, `silme_turu`, `GET /api/hesap/disa-aktar`, Ayarlar "Hesap" | #82 | 2026-09-23 |
+| 6 | hukuki metinler: `bundled/hukuk/` 4 × tr/en, `GET /hukuk/{slug}`, kayıtta tıkla-onay, `sartlar-kabul`, banner, `docs/hukuk-kontrol-listesi.md` | #84 | 2026-09-24 |
+| 7 | operasyon: `tools/polar_mutabakat.py`, gelir tablosu, `odeme_olaylari` saklaması, `isletme.md`, KURULUM 11, README, kapanış | bu PR (`faz4/operasyon`) | — |
+| — | Faz 4 dışı, aynı dönemde: tasarım diyagramları #72, `tools/kullanici.py parola` #76, otomasyon akışları planı #83 | | |
+
+Çıkış kriteri yukarıda karşılandı (test/E2E eşlemesiyle). **Ölçümler:** takım
+**3.982** (Faz 3 sonu) → **4.301** (+319; belge "~4.150 (+~170)" demişti — fark
+1b'nin katalog bekçileri, silme/dışa aktarma ve hukuk testleri, iki dilde E2E),
+12 atlanan, süre ~271 sn → **~296 sn** (+25; belge "+30-40 sn" demişti). Rota 70 →
+**81** (`ACIK_ROTALAR` 7 → 10: webhook, urunler, `/hukuk/{slug}`; `KAPILI` 63 →
+71; `ADMIN_ROTALAR` +1 `GET /api/admin/odeme-olaylari` — bugün 9 üye, ölçüldü
+`len(test_kimlik.ADMIN_ROTALAR)`; §3'ün "9 → 10"u satır saymıştı; `SAYFALAR` 2 → 4). Modül 111 → **118** (`polar`,
+`odeme`, `routers/odeme`, `tools/polar_esitle`, `disa_aktar`, `hukuk`,
+`tools/polar_mutabakat`). Şema `0007_kredi` → **`0008_odeme`** (TEK göç, dört
+görevin sütunları — belgenin kararı aynen). Tablo 14 → **17**, `IS_TABLOLARI`
+9 → **10**, `ALTYAPI_TABLOLARI` 1 → **3**, RLS politikası 28 → **32**,
+`HAREKET_TURLERI` 6 → **7**, `YONETICI_EKLER_TABLOLARI` 1 → **2**. Tarayıcı
+betiği 13 → **15** (`planlar.js`, `tesekkur.js`; vanilla sürüyor, K12), şablon 3
+→ **6**. Katalog 9 görsel + 6 video → **13 + 10**, `tarife_kontrol` 4 → **0**.
+`OPERATOR_ARACLARI` 9 → **11**. `.env.example` / `ALTYAPI` **+7** (üç
+`KROMIS_POLAR_*`, iki hibe, silme beklemesi, olay saklaması). i18n tr/en
+birebir, **1.029 → 1.145** (+116 anahtar: kredi/planlar/tesekkur/admin/hukuk/
+hesap; ölçüldü `bb30f9a` ↔ bu dal). Metinler
+sekiz HTML parçası, `HUKUK_SURUMU = "2026-10"`, `HUKUK_ONAYLI = False`.
+
+**Sahibin canlıda bekleyen adımları** — hepsi KURULUM.md 11. adımın "Canlı
+kontrol listesi"nde adım adım (on madde); buradaki özet §1b/§3/§4/§5/§6/§7'nin
+"Sahibin adımı" paragraflarından birleşik:
+
+1. **Polar sandbox turu** (§3, §4 — bu oturumlardan hiç ölçülemedi): paket →
+   bakiye; abonelik → plan; yeniden gönderim tek satır; iptal → `plan_bitis`;
+   `revoke` (§5) → `free`. İlk gerçek teslimatta imza (`whsec_`, #75) ve dokuz
+   olay türünün seçili olduğu doğrulanır.
+2. **`tools/polar_esitle.py`** (§4): metadata sözleşmesi Polar'da yazılır,
+   `--kontrol` 0, sonra yazar; K5'in fiyatları (9 / 29 USD, paketler 5 / 14 / 30)
+   sahibin son sözü — Polar'da başka yazılırsa hibe değişkenleri ezer.
+3. **Polar production başvurusu** (§6, §7): hukuki metinler yayında olmalı
+   (AI ürün incelemesi) — sıra: avukat → mali müşavir → DPA tablosu
+   (`docs/hukuk-kontrol-listesi.md`) → tek satırlık `HUKUK_ONAYLI = True` PR'ı
+   → başvuru → production jetonları + sırrı + `KROMIS_POLAR_ORTAM=production`.
+4. **Avukat incelemesi** (§6): dört metnin `[…]` noktaları (iletişim adresi,
+   KVKK md. 9 yurt dışı aktarım yolu alıcı başına, iade politikasının tüketici
+   mevzuatıyla uyumu, yetki, 18 yaş); sağlayıcı politika bağlantılarının elle
+   doğrulanması (bu oturumlardan 403).
+5. **Mali müşavir teyidi** (§5, K10): anonim hesabın `kredi_hareketleri`/
+   `siparisler` kayıtları kaç yıl (TTK 82 / VUK 253 — tabloda 10 yıl); hizmet
+   ihracı faturasının Polar'a kesilme düzeni (master spec).
+6. **Polar müşteri kaydının silinme yolu** (§5): Polar MoR olarak kendi veri
+   sorumlusu — kullanıcı adına Polar'dan silme isteğinin yolu Polar belgesinden
+   doğrulanır, aydınlatma metnine yazılır; ilk gerçek silmede
+   `olay=hesap.silme_abonelik` gelmediği görülür.
+7. **fal turu kalanı** (§1b-D): `data:` URI kabulü ve Qwen'in `image_size`
+   çıktıya uygulaması sandbox'ta; **video plan basamağı** (Seedance 2.5 / FLUX 3
+   `pro`, Kling V3 Pro `temel`) ÖNERİ — sahip onaylamadı, test çivili, değişirse
+   test önce kırmızı.
+8. **İşçi ortamından köprü bayrağı** `KROMIS_UCRETLI_HIBE_BAKIMDA` SİLİNİR (§3
+   kaldırdı; ortamda kalmışsa zararsız ama okunmuyor).
+9. **İkinci kova + `rclone sync` cron'u** (§7, isletme § 8): ödeyen kullanıcı
+   var; kova başka hesapta/sağlayıcıda, günlük cron sahibin makinesi ya da
+   platformun zamanlanmış işi; tatbikat bir kez ikinci kovadan.
+10. **KURULUM 11 kontrol listesi** (on madde) baştan sona; ilk ay sonunda
+    `polar_mutabakat.py` → 0 ve payout brütü = özet toplamı; `--kontrol`
+    değil, çıkış kodu cron'a.
+11. Faz 2-3'ten hâlâ bekleyenler aynen: üretim DB rolü `tools/rls_kontrol.py`
+    (artık **10 tablo / 32 politika** bekler), Sentry DSN iki serviste, `fly.toml`,
+    ilk `olay=bakim` satırında `hibe_satiri=N`, `tutarsiz_kullanici=0`,
+    `temizlenen_hesap=0`, `silinen_odeme_olayi=0`.
+
+**Faz 5'e devir listesi** (§7 + §1–§6'nın ertelediği kalemler; Faz 5 belgesinin
+girdisi):
+
+* **Kötüye kullanım / IP limitleri, içerik moderasyonu otomasyonu** (NSFW
+  sınıflandırıcı vb.): K11 yalnız kuralı yazdı (kullanım şartları, Polar AUP
+  yansıması); sağlayıcı reddi (`content_policy_violation`) bugün `hata` + iade
+  — sayılır, eşiğe bağlanır. `KROMIS_SAATLIK_IS_TAVANI` tohumu duruyor.
+* **TR ikinci ayak: iyzico/PayTR + e-Arşiv, taksit** — MoR'un yerine değil
+  yanına (master `:189-192`); `urunler.tur`/`para_birimi` genişlemeye açık,
+  `gelir` tablosu USD dışını sayıyor ama toplamıyor.
+* **BYOK'ta platform payı ölçümü** (K8): `isler.anahtar_kaynagi` ile BYOK iş
+  oranı + işçi maliyeti; karar ölçümden sonra.
+* **`tutarlilik` ve `hibe_turu` ölçeği**: 5 dk'da tam defter taraması ve kısmi
+  indeks 1.000+ kullanıcıda; tur seyrekleşir ya da yalnız son turdan beri
+  hareketi olanlar taranır. `silme_turu`nün R2 listeleme maliyeti büyük
+  galeride (ölçülmedi).
+* **Dağıtımda iş kaybı** — "boşalt (drain) sonra dağıt" ya da dağıtım penceresi
+  (`kill_timeout` 300 sn video işini sığdırmıyor).
+* **Yedek tatbikatı** — isletme § 5 iskeleti gerçek bir geri yüklemeyle bir kez
+  koşulur (ikinci kova dâhil).
+* **E2/E3 hızlı araçlar mini fazı** (Faz 3 K10).
+* **Vanilla yeniden bakış** (K12): ölçüm JS satırı ve hata oranı; MoR iki
+  ekranı üstlendi, bugün 15 betik.
+* **Google girişi (3b) gelince hesap silme jeton amacı** (§5 sapma (a)):
+  `jetonlar.amac` CHECK'ine `hesap_silme` — parolasız hesabın `sil-dogrula`
+  akışı o göçle.
+* **Katalog kalemleri**: boyut başına kredi (`credits_edit`, Qwen düzenleme
+  girdisi MP faturası — #81 notu), Seedance 1080p kademesi, GPT Image 2.5
+  `xhigh`/`max` kalite, **FLUX.2 pro → fal** (9 → 6 kredi; sahibin PR #80 notu —
+  karar değil), Seedance → BytePlus ve Nano Banana Flex/Batch (yeni sağlayıcı /
+  ölçülmemiş kapasite).
+* **Teşekkür sayfasının kanıtı**: `siparisler.checkout_id` sütunu (göç) +
+  `?checkout_id=` eşlemesi (§4 inceleme notu — bugün "son 15 dk" ölçütü,
+  dürüst ama erken olabilir).
+* **KVKK başvurusu için admin ucu** (§7 sapma (g)): admin'in bir hesap adına
+  ZIP alması / silmesi — ihtiyaç doğarsa rota + kapı + bekçi.
+* **Sağlayıcı idempotency anahtarı** (Faz 2 K8), **video filigranı**, e-posta ile
+  "iş bitti" bildirimi (ürün kararı), `saglayici_maliyet_usd` otomatik (hiçbir
+  adaptör vermiyor — gider sütunu sahibin fatura CSV'si), Sentry'de WARNING
+  breadcrumb kararı — Faz 3 açık kalemleri aynen.
+* **Prompt yönetmeni modu — Faz 5 planının İLK maddesi** (sahibin
+  yönlendirmesi 2026-09-21): effort/kalite/düşünme ayarı, sohbet modelleri
+  arasında ucuz → pahalı yönlendirme, ikinci adımda ajanlaşma (katalog araç
+  kümesi); `ChatModel`e kademe alanı.
+* **Polar tarafında doğrulanmayanlar** (bu belge "Faz 4 dışı"): ücret
+  tablosunun payout/kur satırları, webhook yeniden deneme sayısı/süresi, aktif
+  abonelikte yeni plan checkout'unun davranışı, Polar'ın müşteri e-postaları —
+  sahibin sandbox turu kapatır, Faz 5 belgesine kalan yazılır.
+
+**Sonraki:** Faz 5 planı (işletme: kötüye kullanım limitleri ve moderasyon,
+prompt yönetmeni modu, TR ikinci ayak kararı, ölçek kalemleri, yedek
+tatbikatı, vanilla yeniden bakış) ayrı belge ve PR olarak — yukarıdaki devir
+listesi onun girdisi; K-tarzı karar noktaları önerileriyle, sahip kabul eder,
+görevler `faz5/<slug>` dallarında.
 
 ---
 
@@ -2132,6 +2395,10 @@ sağlayıcı değil.
   TR tarafı hizmet ihracı faturası (sahip, mali müşavir).
 * **Yol haritası "başarısız ödeme / dunning" → Polar'ın** (K6).
 * **JWT → oturum** (Faz 1 K3), **kuruluş yok** sapmaları aynen.
+* **Kapanışta (7) yol haritası kartı:** `docs/ozellikler.md` Faz 5 (SaaS)
+  kartına tek `[x]` satırı — Faz 4 tamamlandı, tarih ve PR aralığı; master
+  spec'in "Faz 5" kartı Faz 3 kapanışında da elle güncellenmemişti ("Açık"
+  satırı bayat), aynen duruyor — o belge tarihçe, bu belge kaynak.
 
 ---
 

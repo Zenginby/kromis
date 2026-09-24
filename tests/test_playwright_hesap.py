@@ -1,4 +1,4 @@
-"""E2E — tarayıcıdan kayıt → e-posta bağlantısı → giriş → stüdyo → çıkış (Faz 1 / 3).
+"""E2E — tarayıcıdan kayıt → e-posta bağlantısı → giriş → stüdyo → çıkış (Faz 1 / 3); şartlar onayı (Faz 4 / 6).
 
 Belgenin çıkış ölçütü (§3): "tarayıcıdan kayıt → e-posta → giriş → çıkış".
 Sunucu aynı süreçte (`test_playwright_studio.ServerThread` deseni), veri
@@ -29,7 +29,7 @@ from playwright.sync_api import sync_playwright
 
 import i18n
 from app import app
-from services import cerez, koken, posta
+from services import cerez, hukuk, koken, posta
 from tests.conftest import KAPANIS_TAVANI_SN
 
 # Kapı GERÇEK: bu dosya kapının kendisini (form → çerez → stüdyo → çıkış → 401)
@@ -116,10 +116,21 @@ def test_register_verify_login_and_logout_through_the_browser(
             page.click('#giris-sekmeler [data-sekme="kayit"]')
             page.fill("#kayit-eposta", EPOSTA)
             page.fill("#kayit-parola", PAROLA)
+            # 2a. Şartlar kutusu işaretsiz (Faz 4 / 6, K11): sunucu 422, cümlesi mesaj satırında;
+            # hesap AÇILMAZ, posta gitmez. Tarayıcı baloncuğu değil (giris.html'in gerekçesi).
+            assert not page.is_checked("#kayit-sartlar")
             page.click("#form-kayit button[type=submit]")
             page.wait_for_function(
                 '() => { const m = document.querySelector("#giris-mesaj");'
-                ' return !m.hidden && m.dataset.tur !== "bilgi"; }')
+                ' return !m.hidden && m.dataset.tur === "hata"; }')
+            assert page.inner_text("#giris-mesaj") == i18n.t("err.sartlar_gerekli", dil)
+            assert app.state.postaci.son is None, "onaysız kayıt posta göndermez"
+            # 2b. Kutu işaretli → kayıt gider.
+            page.check("#kayit-sartlar")
+            page.click("#form-kayit button[type=submit]")
+            page.wait_for_function(
+                '() => { const m = document.querySelector("#giris-mesaj");'
+                ' return !m.hidden && m.dataset.tur === "basari"; }')
             assert page.inner_text("#giris-mesaj") == i18n.t("giris.kayit_gonderildi", dil)
             assert not page.is_hidden("#form-giris")
             ileti = app.state.postaci.son
@@ -145,6 +156,7 @@ def test_register_verify_login_and_logout_through_the_browser(
             page.wait_for_selector("#view-studio")
             ben = page.evaluate("() => fetch('/api/hesap/ben').then((r) => r.json())")
             assert ben.get("eposta") == EPOSTA, ben
+            assert ben.get("sartlar_guncel") is True, "kayıt kutusu bugünkü sürümü damgaladı (Faz 4 / 6)"
             cerezler = {c["name"]: c for c in baglam.cookies()}
             oturum = cerezler[cerez.OTURUM_CEREZI]
             assert oturum["httpOnly"] and oturum["secure"] and oturum["sameSite"] == "Lax"
@@ -164,6 +176,9 @@ def test_register_verify_login_and_logout_through_the_browser(
             page.wait_for_selector("#settings-cikis")
             assert page.inner_text("#settings-hesap").startswith(
                 i18n.t("hesap.oturum_acik", dil, eposta=EPOSTA))
+            # Şartlar güncel: banner çizilmez (Faz 4 / 6); bağlantılar Hakkında'da.
+            assert page.is_hidden("#settings-sartlar-banner")
+            assert page.locator('#settings-hukuk a[href="/hukuk/kullanim-sartlari"]').count() == 1
             page.click("#settings-cikis")
             page.wait_for_url(f"{taban}/giris")
             page.wait_for_selector("#form-giris:not([hidden])")
@@ -314,6 +329,66 @@ def test_after_login_the_page_returns_only_to_a_same_origin_path(
             page.evaluate("() => fetch('/api/history')")
             page.wait_for_url(f"{taban}/giris?sonra=*")
             assert page.url == f"{taban}/giris?sonra=" + quote(beklenen, safe="")
+            tarayici.close()
+    finally:
+        sunucu.stop()
+        sunucu.join(timeout=5)
+
+
+def test_the_settings_banner_asks_for_a_new_acceptance_when_the_terms_version_changed(
+        veritabani, monkeypatch, tmp_path, dizinler, e2e_oturum):
+    """Faz 4 / 6 (belge §6 "sürüm değişince ayarlarda banner"): eski sürümle onaylı hesap ayarları açar →
+    banner görünür (hangi bölme açık olsun) → "Okudum, onaylıyorum" → `POST /api/hesap/sartlar-kabul` →
+    banner kapanır, satır bugünkü sürümü taşır, yeniden yüklemede banner gelmez. Tek dil: banner metni
+    sözlükten (`hukuk.guncellendi`), sunucu kuralı dilden bağımsız — iki dil kayıt testinin işi."""
+    from sqlalchemy import select, update
+
+    from services.tablolar import Kullanici
+
+    for ad in (posta.POSTA_ENV, posta.RESEND_ANAHTAR_ENV, koken.KOKEN_ENV, cerez.GUVENLI_ENV):
+        monkeypatch.delenv(ad, raising=False)
+    oturum = e2e_oturum(dil="tr")
+    with oturum.db() as db:
+        db.execute(update(Kullanici).where(Kullanici.id == oturum.kullanici_id)
+                   .values(sartlar_surumu="0000-yer-tutucu", sartlar_kabul_at=None))
+        db.commit()
+
+    def surum():
+        with oturum.db() as db:
+            return db.scalar(select(Kullanici.sartlar_surumu).where(Kullanici.id == oturum.kullanici_id))
+
+    port = _bos_port()
+    sunucu = _Sunucu(port)
+    sunucu.start()
+    _bekle(port)
+    taban = f"http://127.0.0.1:{port}"
+    try:
+        with sync_playwright() as p:
+            tarayici = p.chromium.launch(headless=True)
+            page = tarayici.new_page()
+            oturum.cerez(page, taban)
+            page.goto(f"{taban}/")
+            page.wait_for_selector("#view-studio")
+            page.wait_for_function(
+                '() => { const m = document.querySelector("#model");'
+                ' return (m && m.value !== "") || !!document.querySelector(".sheet.open"); }')
+            if not page.query_selector(".sheet.open"):
+                page.click("#settings-btn")
+            page.wait_for_selector("#settings-modal.open")
+            # Banner bölmelerin ÜSTÜNDE: ilk bölme (erişim) açıkken de görünür.
+            page.wait_for_selector("#settings-sartlar-banner:not([hidden])")
+            assert page.inner_text("#settings-sartlar-banner").startswith(i18n.t("hukuk.guncellendi", "tr"))
+            assert page.get_attribute("#settings-sartlar-banner a", "href") == "/hukuk/kullanim-sartlari"
+            assert surum() == "0000-yer-tutucu"
+            page.click("#settings-sartlar-kabul")
+            page.wait_for_selector("#settings-sartlar-banner", state="hidden")
+            assert surum() == hukuk.HUKUK_SURUMU
+            # Yeniden yükleme: `ben.sartlar_guncel` true → banner hiç çizilmez.
+            page.reload()
+            page.wait_for_selector("#view-studio")
+            ben = page.evaluate("() => fetch('/api/hesap/ben').then((r) => r.json())")
+            assert ben["sartlar_guncel"] is True
+            assert page.is_hidden("#settings-sartlar-banner")
             tarayici.close()
     finally:
         sunucu.stop()

@@ -34,7 +34,7 @@ from sqlalchemy.orm import Session
 
 import app as appmod
 import i18n
-from services import defter, depo_admin, gunluk, koken, odeme, planlar, polar
+from services import defter, depo_admin, gunluk, hukuk, koken, odeme, planlar, polar
 from services.tablolar import KrediHareketi, Kullanici, Siparis, Urun
 
 pytestmark = pytest.mark.usefixtures("depo_db")
@@ -222,14 +222,14 @@ def test_checkout_is_412_until_the_terms_are_accepted_and_the_acceptance_writes_
     assert _satir(depo_db, kullanici.id).sartlar_kabul_at is None
     r = _checkout(c, urunler["paket"].id)
     assert r.status_code == 412, r.text
-    assert r.json()["detail"] == {"kod": "err.sartlar_gerekli", "surum": odeme.SARTLAR_SURUMU}
+    assert r.json()["detail"] == {"kod": "err.sartlar_gerekli", "surum": hukuk.HUKUK_SURUMU}
     assert sahte_polar.cagrilar == [], "onaysız istek Polar'a gitmez"
     # `sartlar_kabul: false` açıkça da 412 — yalnız `true` kapıyı açar.
     assert _checkout(c, urunler["paket"].id, sartlar_kabul=False).status_code == 412
     r = _checkout(c, urunler["paket"].id, sartlar_kabul=True)
     assert r.status_code == 200, r.text
     satir = _satir(depo_db, kullanici.id)
-    assert satir.sartlar_kabul_at is not None and satir.sartlar_surumu == odeme.SARTLAR_SURUMU
+    assert satir.sartlar_kabul_at is not None and satir.sartlar_surumu == hukuk.HUKUK_SURUMU
     assert abs((satir.sartlar_kabul_at - dt.datetime.now(tz=dt.UTC)).total_seconds()) < 60
     # Onay bir kez: sonraki checkout bayraksız geçer ve damga DEĞİŞMEZ.
     assert _checkout(c, urunler["paket"].id).status_code == 200
@@ -442,7 +442,7 @@ def test_the_admin_credit_route_writes_the_pack_bucket_when_asked_and_the_grant_
         b.execute(text("UPDATE kullanicilar SET is_admin = false WHERE id = :id"), {"id": kullanici.id})
 
 
-def test_the_terms_version_is_a_named_placeholder_until_the_legal_texts_land():
-    """6. görev `HUKUK_SURUMU`yu getirince bu sabit ona bağlanır; o güne kadar yazılan onaylar bu değeri taşır."""
-    assert odeme.SARTLAR_SURUMU == "0000-yer-tutucu"
+def test_the_terms_version_comes_from_the_legal_module_not_a_placeholder():
+    """Faz 4 / 6: `SARTLAR_SURUMU = "0000-yer-tutucu"` gitti, sabit `services/hukuk.HUKUK_SURUMU` (tests/test_hukuk.py)."""
+    assert not hasattr(odeme, "SARTLAR_SURUMU")
     assert odeme.URUNLER_BAYAT_GUN == 7

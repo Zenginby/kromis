@@ -226,6 +226,11 @@ def test_dockerignore_keeps_everything_the_app_serves_or_imports():
     # yani kusur ancak ilk ücretsiz üretimde görünürdü. `*.png` gibi bir kalıp da yutardı.
     assert os.path.exists(os.path.join(KOK, "bundled", "filigran.png"))
     assert not any(k in ("*.png", "bundled/filigran.png", "bundled/*") for k in _dislananlar())
+    # `bundled/hukuk/*.html` (Faz 4 / 6): hukuki metinler — `GET /hukuk/{slug}` parçayı buradan okur;
+    # imajdan düşerse sayfa 404 verir ve kayıt kutusunun bağlandığı metin yok olur. `*.html` gibi bir
+    # kalıp da yutardı (kök `*.md` kalıbının gerekçesiyle aynı sınıf).
+    assert os.path.exists(os.path.join(KOK, "bundled", "hukuk", "kullanim-sartlari.tr.html"))
+    assert not any(k in ("*.html", "**/*.html", "bundled/hukuk") for k in _dislananlar())
 
 
 # `medya_tasi` (Faz 2 / 2): yerel medyayı kovaya taşır — konteyner içinden, `/data` birimine bakar.

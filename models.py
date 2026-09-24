@@ -1099,13 +1099,29 @@ def check_parola(v: str) -> str:
     return v
 
 
+def check_sartlar(v: bool) -> bool:
+    """Kayıtta şartlar kutusu ZORUNLU (Faz 4 / 6, K11 tıkla-onay): `false` da eksik de 422.
+
+    Cümle `err.sartlar_gerekli` — checkout'un 412'siyle AYNI anahtar: iki kapı
+    aynı şeyi istiyor, iki cümle olsaydı biri bayatlardı.
+    """
+    if v is not True:
+        raise ValueError(i18n.t("err.sartlar_gerekli"))
+    return v
+
+
 class KayitIstegi(BaseModel):
+    """`sartlar` öntanımlı `False` + `validate_default`: alan HİÇ gelmezse de
+    doğrulayıcı koşar ve 422 pydantic'in İngilizce "Field required"ı değil
+    bizim cümlemiz olur (giris.js `detayMetni` onu aynen gösterir)."""
     model_config = ConfigDict(extra="forbid")
     eposta: str
     parola: str
+    sartlar: bool = Field(default=False, validate_default=True)
 
     _eposta_ok = field_validator("eposta")(check_eposta)
     _parola_ok = field_validator("parola")(check_parola)
+    _sartlar_ok = field_validator("sartlar")(check_sartlar)
 
 
 class GirisIstegi(BaseModel):

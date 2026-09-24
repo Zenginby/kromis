@@ -1,0 +1,37 @@
+<!-- Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+     GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+     Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+     Çerez bildirimi — TASLAK (Faz 4 / 6, belge §6). Çerezlerin kaynağı services/cerez.py ve
+     services/dil.py; bu metin onları anlatır, onlar değişirse metin de değişir (sürüm ilerler). -->
+<h1>Çerez Bildirimi</h1>
+<p class="hukuk-meta">Kromis Studio'nun tarayıcınızda ne sakladığı — ve ne saklamadığı.</p>
+
+<h2>1. Kısaca</h2>
+<p>Yalnız hizmetin çalışması için <strong>zorunlu</strong> iki çerez kullanıyoruz. <strong>Üçüncü taraf çerezi, izleme (analitik) çerezi ya da reklam çerezi yok.</strong> Bu yüzden sizden çerez onayı istemiyoruz: kesinlikle gerekli çerezler için onay gerekmez (ePrivacy Direktifi md. 5(3) istisnası; Kişisel Verileri Koruma Kurulu'nun çerez rehberi aynı ayrımı yapar).</p>
+
+<h2>2. Kullandığımız çerezler</h2>
+<table>
+  <thead><tr><th>Çerez</th><th>Ne için</th><th>Ömür</th><th>Bayraklar</th></tr></thead>
+  <tbody>
+    <tr><td><code>kromis_oturum</code></td><td>Oturumunuz: giriş yaptığınızı sunucuya söyler. Çerezde rastgele bir jeton vardır; sunucu yalnız jetonun özetini saklar.</td><td>30 gün, her kullanımda uzar (kayan ömür); çıkış yaptığınızda silinir</td><td><code>Secure</code>, <code>HttpOnly</code>, <code>SameSite=Lax</code></td></tr>
+    <tr><td><code>kromis_lang</code></td><td>Arayüz dili seçiminiz (Ayarlar → Dil), sayfa sunucuda o dilde çizilir.</td><td>1 yıl</td><td><code>Secure</code>, <code>HttpOnly</code>, <code>SameSite=Lax</code></td></tr>
+  </tbody>
+</table>
+<p><code>Secure</code>: çerez yalnız şifreli (HTTPS) bağlantıda taşınır. <code>HttpOnly</code>: sayfadaki betikler çerezi okuyamaz. <code>SameSite=Lax</code>: başka siteden gelen isteklerde çerez gönderilmez.</p>
+
+<h2>3. Tarayıcı depolaması (localStorage)</h2>
+<p>Bazı arayüz tercihlerinizi (seçili model, en-boy oranı, son açılan bölme gibi) tarayıcınızın kendi depolamasında tutarız. Bu veriler sunucuya gönderilmez, yalnız o tarayıcıda kalır ve tarayıcı verilerini temizlediğinizde silinir. Hesabınıza bağlı tercihler ise hesabınızla birlikte sunucuda saklanır (bkz. <a href="/hukuk/gizlilik">Gizlilik Metni</a>).</p>
+
+<h2>4. Kullanmadığımız şeyler</h2>
+<ul>
+  <li>Analitik ya da izleme çerezi (Google Analytics vb.) yok.</li>
+  <li>Reklam ağı, sosyal medya eklentisi, parmak izi (fingerprinting) yok.</li>
+  <li>Ödeme sayfası Polar'ın kendi alanında açılır; Polar'ın kendi çerezleri o sayfada ve Polar'ın çerez politikasına tabidir — bizim sayfalarımıza yüklenmez.</li>
+  <li>Hata izleme (Sentry) sunucu tarafında çalışır; tarayıcınıza betik yüklemez ve kişisel veri (istek gövdesi, e-posta, istem) göndermez.</li>
+</ul>
+
+<h2>5. Çerezleri nasıl yönetirsiniz</h2>
+<p>Tarayıcınızın ayarlarından çerezleri silebilir ya da engelleyebilirsiniz. <code>kromis_oturum</code> engellenirse giriş yapamazsınız; <code>kromis_lang</code> engellenirse dil tercihi her açılışta tarayıcınızın dilinden ya da hesabınızdan yeniden belirlenir.</p>
+
+<h2>6. Değişiklikler</h2>
+<p>Yeni bir çerez ya da depolama biçimi eklersek bu metin güncellenir, sürüm numarası ilerler ve onaya gerektiren bir tür (izleme, reklam) eklenirse ayrıca onayınız istenir.</p>

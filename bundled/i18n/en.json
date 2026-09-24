@@ -1072,7 +1072,6 @@
   "planlar.mevcut_plan": "Your current plan",
   "planlar.abone_ol": "Subscribe",
   "planlar.satin_al": "Buy",
-  "planlar.sartlar_kutu": "I have read and accept the terms of use and the privacy notice.",
   "planlar.sartlar_onayla": "Accept and continue",
   "planlar.portal_aciklama": "Plan changes, cancellation, card and invoices live in the Polar customer portal.",
   "planlar.portal_dugme": "Manage my subscription (Polar)",
@@ -1124,5 +1123,19 @@
   "posta.silme_govde": "Hello,\n\nYour Kromis Studio account has been closed at your request. Your sessions and provider keys were deleted and your email address was removed from our records; no further mail will be sent to this address.\n\nYour images, videos, chats and palettes will be permanently deleted in {gun} days. Credit movements and order records are kept anonymised for the legal retention period.\n\nThis cannot be undone.",
   "admin.silinmis_goster": "Deleted accounts",
   "admin.rozet_silindi": "deleted {tarih} · content pending",
-  "admin.rozet_temizlendi": "deleted · content purged {tarih}"
+  "admin.rozet_temizlendi": "deleted · content purged {tarih}",
+  "hukuk.title": "Legal — Kromis Studio",
+  "hukuk.kullanim_sartlari": "Terms of Use",
+  "hukuk.gizlilik": "Privacy Notice",
+  "hukuk.cerez": "Cookie Notice",
+  "hukuk.ticari_haklar": "Commercial Rights",
+  "hukuk.taslak": "DRAFT — pending legal review. This text has not yet been reviewed by a lawyer and may change before publication.",
+  "hukuk.surum_etiketi": "Text version:",
+  "hukuk.geri": "← Kromis Studio",
+  "hukuk.diger_metinler": "Other legal documents",
+  "hukuk.okudum_kabul": "I have read and accept the following:",
+  "hukuk.guncellendi": "The terms of use and the privacy notice have been updated. Please review and accept the new version to continue:",
+  "hukuk.kabul_dugme": "I have read and accept",
+  "hukuk.kabul_hatasi": "Could not record the acceptance: {hata}",
+  "err.hukuk_metni_yok": "There is no such legal document."
 }

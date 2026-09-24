@@ -1072,7 +1072,6 @@
   "planlar.mevcut_plan": "Mevcut planın",
   "planlar.abone_ol": "Abone ol",
   "planlar.satin_al": "Satın al",
-  "planlar.sartlar_kutu": "Kullanım şartlarını ve gizlilik metnini okudum, kabul ediyorum.",
   "planlar.sartlar_onayla": "Onayla ve devam et",
   "planlar.portal_aciklama": "Plan değişikliği, iptal, kart ve faturalar Polar müşteri portalında.",
   "planlar.portal_dugme": "Aboneliğimi yönet (Polar)",
@@ -1124,5 +1123,19 @@
   "posta.silme_govde": "Merhaba,\n\nKromis Studio hesabın isteğin üzerine kapatıldı. Oturumların ve sağlayıcı anahtarların silindi, e-posta adresin kayıtlarımızdan çıkarıldı; bu adrese bir daha ileti gitmeyecek.\n\nGörsellerin, videoların, sohbetlerin ve paletlerin {gun} gün sonra kalıcı olarak silinecek. Kredi hareketleri ve sipariş kayıtları yasal saklama süresi boyunca anonim olarak tutulur.\n\nBu işlem geri alınamaz.",
   "admin.silinmis_goster": "Silinmiş hesaplar",
   "admin.rozet_silindi": "silindi {tarih} · içerik bekliyor",
-  "admin.rozet_temizlendi": "silindi · içerik temizlendi {tarih}"
+  "admin.rozet_temizlendi": "silindi · içerik temizlendi {tarih}",
+  "hukuk.title": "Hukuki metinler — Kromis Studio",
+  "hukuk.kullanim_sartlari": "Kullanım Şartları",
+  "hukuk.gizlilik": "Gizlilik ve Aydınlatma Metni",
+  "hukuk.cerez": "Çerez Bildirimi",
+  "hukuk.ticari_haklar": "Ticari Haklar",
+  "hukuk.taslak": "TASLAK — avukat onayı bekliyor. Bu metin henüz hukuki incelemeden geçmedi; yayın öncesi değişebilir.",
+  "hukuk.surum_etiketi": "Metin sürümü:",
+  "hukuk.geri": "← Kromis Studio",
+  "hukuk.diger_metinler": "Diğer hukuki metinler",
+  "hukuk.okudum_kabul": "Şunları okudum ve kabul ediyorum:",
+  "hukuk.guncellendi": "Kullanım şartları ve gizlilik metni güncellendi. Devam etmek için yeni sürümü gözden geçirip onayla:",
+  "hukuk.kabul_dugme": "Okudum, onaylıyorum",
+  "hukuk.kabul_hatasi": "Onay kaydedilemedi: {hata}",
+  "err.hukuk_metni_yok": "Böyle bir hukuki metin yok."
 }

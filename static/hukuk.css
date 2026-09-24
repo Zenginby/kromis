@@ -1,0 +1,80 @@
+/* Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+   GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+   Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md). */
+/* Hukuki metin sayfası (Faz 4 / 6). giris.css'in duruşu: yalnız
+   flow-tokens.css tokenları, style.css yüklenmez (gerekçe hukuk.html).
+   Okunacak uzun bir belge: dar sütun (68ch), rahat satır aralığı, tablo
+   (saklama süreleri) taşarsa yatay kaydırma — sayfa değil tablo kayar. */
+
+* { box-sizing: border-box; }
+
+html, body { min-height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 400 15px/1.6 var(--font-body, -apple-system, system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  padding: 24px 16px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
+
+.hukuk { width: 100%; max-width: 68ch; margin: 0 auto; }
+
+.hukuk-bas { margin-bottom: 20px; }
+.hukuk-geri { color: var(--muted); font-size: 0.88rem; text-decoration: none; display: inline-block; margin-bottom: 14px; }
+.hukuk-geri:hover { color: var(--fg); text-decoration: underline; }
+
+/* TASLAK damgası: `HUKUK_ONAYLI` False iken görünür (hukuk.html). Uyarı rengi
+   tokenlardan; sayfanın en üstünde ve kaçırılmaz — belge §6 "Risk"in küçültmesi. */
+.hukuk-taslak {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--danger);
+  border-radius: var(--r-item, 12px);
+  background: var(--surface-2);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.hukuk-taslak[hidden] { display: none; }
+
+.hukuk-metin h1 {
+  margin: 0 0 6px;
+  font: 600 1.6rem/1.2 var(--font-display, inherit);
+  letter-spacing: -0.01em;
+}
+.hukuk-metin h2 { margin: 28px 0 8px; font: 600 1.15rem/1.3 var(--font-display, inherit); }
+.hukuk-metin h3 { margin: 18px 0 6px; font: 600 1rem/1.3 var(--font-display, inherit); }
+.hukuk-metin p, .hukuk-metin li { margin: 0 0 10px; }
+.hukuk-metin ul, .hukuk-metin ol { padding-left: 1.3em; margin: 0 0 10px; }
+.hukuk-metin a { color: var(--accent); }
+.hukuk-metin .hukuk-meta { color: var(--muted); font-size: 0.88rem; margin-bottom: 18px; }
+.hukuk-metin table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 10px 0 14px;
+  font-size: 0.88rem;
+}
+.hukuk-metin th, .hukuk-metin td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.hukuk-metin th { background: var(--surface-2); }
+
+.hukuk-dip {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.hukuk-surum { margin: 0 0 10px; }
+.hukuk-gezinme { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.hukuk-gezinme a { color: var(--muted); text-decoration: none; }
+.hukuk-gezinme a:hover { color: var(--fg); text-decoration: underline; }
+.hukuk-gezinme a[aria-current="page"] { color: var(--fg); font-weight: 600; }

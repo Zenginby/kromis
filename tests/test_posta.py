@@ -206,6 +206,6 @@ def test_without_a_lifespan_the_account_routes_say_mail_is_unavailable_not_500(d
     dizinler(data_dir=str(tmp_path))
     from routers import hesap as hesap_rotalari
     cevap = TestClient(appmod.app).post("/api/hesap/kayit",
-                                        json={"eposta": KIME, "parola": "12345678"})
+                                        json={"eposta": KIME, "parola": "12345678", "sartlar": True})
     assert cevap.status_code == 503
     assert cevap.json()["detail"] in ("database_unavailable", hesap_rotalari.POSTACI_YOK)

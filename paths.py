@@ -174,6 +174,17 @@ def bundled_i18n_dir() -> str:
     return os.path.join(resource_dir(), "bundled", "i18n")
 
 
+def bundled_hukuk_dir() -> str:
+    """Hukuki metinlerin dizini (Faz 4 / 6): `<slug>.<dil>.html` HTML parçaları.
+
+    `bundled/i18n` ile aynı gerekçe: metni SUNUCU okuyor (`GET /hukuk/{slug}`
+    kabuğa yerleştiriyor), tarayıcıya doğrudan servis edilmiyor — `static/`
+    altında dursaydı `/static/hukuk/...` ile kabuksuz ve damgasız da açılırdı.
+    Sözlüğe de girmiyor: dört metin × iki dil ~40 KB, çeviri anahtarı değil belge.
+    """
+    return os.path.join(resource_dir(), "bundled", "hukuk")
+
+
 def chat_instructions_override() -> str:
     """Kullanıcının düzenleyebildiği talimat dosyası (varsa gömülü olanı EZER).
 

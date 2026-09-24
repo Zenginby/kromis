@@ -545,7 +545,7 @@ def test_registration_grants_the_month_immediately_under_the_application_role(re
     from services import db as dbmod
     appmod.app.dependency_overrides[dbmod.oturum] = _uygulama_oturumu    # `kullanici` fixture'ı teardown'da düşürür
     eposta = f"b-{uuid.uuid4().hex[:8]}@example.com"
-    r = c.post("/api/hesap/kayit", json={"eposta": eposta, "parola": "cok-gizli-parola-1"})
+    r = c.post("/api/hesap/kayit", json={"eposta": eposta, "parola": "cok-gizli-parola-1", "sartlar": True})
     assert r.status_code == 200, r.text
     with Session(depo_db) as s:
         k = s.scalar(select(Kullanici).where(Kullanici.eposta == eposta))
@@ -562,7 +562,8 @@ def test_registration_grants_the_month_immediately_under_the_application_role(re
         assert s.scalar(select(func.count()).select_from(KrediHareketi).where(KrediHareketi.kullanici_id == k.id)) == 1
     assert isinstance(yazilan, int)
     # Yeniden kayıt (doğrulanmamış hesap): hesap yenilenir, hibe yeniden YAZILMAZ — `kullanici_olustur` dalı değil.
-    assert c.post("/api/hesap/kayit", json={"eposta": eposta, "parola": "cok-gizli-parola-2"}).status_code == 200
+    assert c.post("/api/hesap/kayit",
+                  json={"eposta": eposta, "parola": "cok-gizli-parola-2", "sartlar": True}).status_code == 200
     with Session(depo_db) as s:
         assert s.scalar(select(Kullanici.bakiye).where(Kullanici.eposta == eposta)) == HIBE
 

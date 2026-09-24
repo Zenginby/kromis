@@ -77,11 +77,11 @@ from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from services import defter, gunluk, kuyruk, planlar, polar, zaman
+from services import defter, gunluk, hukuk, kuyruk, planlar, polar, zaman
 from services.tablolar import SIPARIS_SEBEPLERI, URUN_TURLERI, Kullanici, OdemeOlayi, Siparis, Urun
 
 __all__ = ["DURUM_ISLENDI", "DURUM_YINELENEN", "DURUM_ATLANDI", "HATALAR", "ISLENEN_TURLER", "Sonuc",
-           "SARTLAR_SURUMU", "URUNLER_BAYAT_GUN",
+           "URUNLER_BAYAT_GUN",
            "isle", "olayi_kaydet", "kullaniciyi_coz", "urun_bul", "plan_uygula",
            "aktif_urunler", "urun_bul_id", "urun_json", "sartlar_kabul_at_oku", "sartlar_kabul_yaz",
            "polar_musteri_id_oku", "urunler_bayat_mi"]
@@ -108,15 +108,12 @@ HATALAR: tuple[str, ...] = (HATA_KULLANICI_YOK, HATA_URUN_YOK, HATA_SEBEP_BILINM
 URUN_PLAN, URUN_PAKET = URUN_TURLERI
 SEBEP_PURCHASE = "purchase"
 
-# ŞARTLAR SÜRÜMÜ — YER TUTUCU (Faz 4 / 4; 6. görev `HUKUK_SURUMU` ile değiştirir).
-# Checkout, `sartlar_kabul_at` NULL olan kullanıcıya 412 verir ve `sartlar_kabul:
-# true` gelince `sartlar_kabul_at` + `sartlar_surumu` yazar (belge §4 "eski
-# kullanıcı ilk satın almada onaylar"). Metin henüz yok (6. görev), ama SÜTUN
-# boş bırakılmaz: onayın hangi sürüme ait olduğu sonradan kurulamaz. 6. görev
-# metni yayınlayınca bu sabiti `HUKUK_SURUMU`ya bağlar; `0000` değeriyle
-# onaylanmış satırlar "metin öncesi onay" olarak ayrışır ve o gün yeniden
-# onay istenir (belge §6 "sürüm değişince banner").
-SARTLAR_SURUMU = "0000-yer-tutucu"
+# ŞARTLAR SÜRÜMÜ artık `services/hukuk.HUKUK_SURUMU` (Faz 4 / 6). 4. görev burada
+# `SARTLAR_SURUMU = "0000-yer-tutucu"` taşıyordu: metin yoktu ama sütun boş
+# bırakılmadı (onayın sürümü sonradan kurulamaz). 6. görev metni getirdi, sabit
+# oraya bağlandı ve buradan SİLİNDİ — iki modülde iki sürüm literali, biri bir
+# gün ötekinden ayrı ilerlerdi. `0000-yer-tutucu` ile damgalı satırlar
+# `hukuk.guncel_mi` için "güncel değil"dir ve ayarlar banner'ı yeniden onay ister.
 
 # Ayna tazeliği (belge §4 "Risk"): `urunler.guncellendi`nin en yenisi bundan
 # eskiyse — ya da hiç ürün yoksa — admin "Ödeme" sekmesi uyarır ve
@@ -282,8 +279,9 @@ def polar_musteri_id_oku(db: Session, hedef_id: uuid.UUID) -> str | None:
     return db.scalar(select(Kullanici.polar_musteri_id).where(Kullanici.id == hedef_id))
 
 
-def sartlar_kabul_yaz(db: Session, hedef_id: uuid.UUID, an: dt.datetime, *, surum: str = SARTLAR_SURUMU) -> bool:
-    """`sartlar_kabul_at` + `sartlar_surumu` (checkout'un 412 kapısını açan yazım); satır yoksa `False`.
+def sartlar_kabul_yaz(db: Session, hedef_id: uuid.UUID, an: dt.datetime, *,
+                      surum: str = hukuk.HUKUK_SURUMU) -> bool:
+    """`sartlar_kabul_at` + `sartlar_surumu` (checkout'un 412 kapısı ve `POST /api/hesap/sartlar-kabul`); satır yoksa `False`.
 
     Hesap tablosu, RLS dışı (`plan_uygula`nın deseni); hedef `hedef_id` — kiracısız
     modül sözleşmesi (tests/test_galeri_db.py `KIRACISIZ_MODULLER`). Eski bir onayın

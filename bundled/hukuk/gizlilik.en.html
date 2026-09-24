@@ -1,0 +1,78 @@
+<!-- Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+     GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+     Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+     Privacy notice — DRAFT (Faz 4 / 6, belge §6). English counterpart of gizlilik.tr.html;
+     the two must say the same thing — the version constant covers both. -->
+<h1>Privacy Notice</h1>
+<p class="hukuk-meta">Information on the processing of personal data under Article 10 of the Turkish Personal Data Protection Law (KVKK) and Article 13 of the GDPR. This notice is part of the <a href="/hukuk/kullanim-sartlari">Terms of Use</a>.</p>
+
+<h2>1. Data controller</h2>
+<p>The Kromis Studio service ("Kromis", "we") is provided by, and your personal data is controlled by, <strong>Alperen Zengin</strong> (sole trader, Türkiye). The brand is "Kromis Studio"; the umbrella identity is "Zenginby". Contact: <strong>[contact e-mail — to be filled in before publication]</strong>. Send any request concerning your personal data to that address.</p>
+
+<h2>2. What data we process</h2>
+<ul>
+  <li><strong>Account data:</strong> your e-mail address, a one-way hash of your password (the password itself is never stored), your interface language, the time your account was created and verified, and the time and version at which you accepted the terms of use.</li>
+  <li><strong>Session and security data:</strong> a hash of your session cookie, the time and IP address of sign-in attempts, and a technical request log (request id, path, duration, status code). These exist to protect your account and keep the service running.</li>
+  <li><strong>Generation data:</strong> the prompts you write, the input images you upload, the images and videos you generate, your chat history, palettes, folders and uploaded assets (logos, banners, taglines).</li>
+  <li><strong>Your provider keys (BYOK):</strong> if you enter your own provider API key it is stored encrypted and used only for your own generation requests. It is deleted immediately when the account is deleted.</li>
+  <li><strong>Credit and order data:</strong> your credit ledger (grants, reservations, confirmations, refunds, packs), an order summary (order id, product, amount, currency, date) and your customer id at the payment provider.</li>
+  <li><strong>We do not process card data.</strong> Payment takes place on a page hosted by our payment provider Polar; your card number never enters our systems.</li>
+</ul>
+
+<h2>3. Purposes and legal bases</h2>
+<table>
+  <thead><tr><th>Purpose</th><th>Legal basis (KVKK art. 5 / GDPR art. 6)</th></tr></thead>
+  <tbody>
+    <tr><td>Creating and verifying your account, managing your session, fulfilling your generation requests</td><td>Performance of a contract — KVKK art. 5/2 (c); GDPR art. 6(1)(b)</td></tr>
+    <tr><td>Keeping your credit balance, recording purchases in the ledger, retaining financial records</td><td>Performance of a contract and legal obligation (commercial bookkeeping and tax law) — KVKK art. 5/2 (c), (ç); GDPR art. 6(1)(b), (c)</td></tr>
+    <tr><td>Protecting your account and the service against abuse (sign-in lockout, rate limits, error monitoring)</td><td>Legitimate interest — KVKK art. 5/2 (f); GDPR art. 6(1)(f)</td></tr>
+    <tr><td>Sending you service messages (verification, password reset, account closure)</td><td>Performance of a contract — KVKK art. 5/2 (c); GDPR art. 6(1)(b)</td></tr>
+  </tbody>
+</table>
+<p><strong>We do not send marketing e-mail</strong>, so there is currently no processing based on consent. Should we ever want to, we will ask for your explicit consent separately.</p>
+
+<h2>4. Who we share your data with</h2>
+<ul>
+  <li><strong>Polar (Polar Software Inc.)</strong> — as Merchant of Record, Polar takes the payment, calculates tax and issues the invoice. For payment and invoicing data Polar is an <strong>independent data controller</strong>; your name, e-mail and billing address are held in Polar's systems. Polar's privacy policy is linked on the checkout page.</li>
+  <li><strong>AI model providers</strong> — your prompts and input images are sent to the provider of the model you choose: <strong>Microsoft Azure</strong> (Azure OpenAI and other models hosted on Azure), <strong>Google</strong> (Gemini, Imagen, Veo) and <strong>fal.ai</strong> (third-party models). When you generate with platform credits we make this transfer; when you generate with your own key (BYOK) the request is sent on your behalf under your own provider agreement.</li>
+  <li><strong>Hosting</strong> — the application runs on <strong>Fly.io</strong>, the database is <strong>Neon</strong> (PostgreSQL), and generated media and uploaded files are stored in <strong>Cloudflare R2</strong> object storage.</li>
+  <li><strong>Error monitoring</strong> — <strong>Sentry</strong>. Personal data is switched off: request bodies, e-mail addresses and prompts are never sent to Sentry; only the error type, stack trace and technical context are.</li>
+  <li><strong>E-mail service</strong> — verification, password reset and account closure messages are sent through an e-mail delivery service that sees only the recipient address and the message content.</li>
+</ul>
+<p>We do not share or sell your data for advertising. Apart from a legal obligation (court order, request of a competent authority) there is no transfer to any other third party.</p>
+
+<h2>5. International transfers</h2>
+<p>The recipients above run their servers in the European Union and the United States, so your data is transferred outside Türkiye. Under KVKK art. 9 this transfer relies on standard contractual clauses signed with the provider and/or the mechanisms defined by the Turkish Personal Data Protection Board. <strong>[Pending legal review: the art. 9 route per recipient (standard clauses / explicit consent / adequacy decision) and Board notification — see the internal checklist.]</strong> For users covered by the GDPR, transfers rely on the provider's standard contractual clauses or its EU–US Data Privacy Framework certification.</p>
+
+<h2>6. How long we keep data</h2>
+<table>
+  <thead><tr><th>Data</th><th>Retention</th></tr></thead>
+  <tbody>
+    <tr><td>Generation jobs (prompt, summary of the provider response)</td><td>Deleted <strong>30 days</strong> after the job completes</td></tr>
+    <tr><td>Images and videos, folders, chats, palettes, assets</td><td>While your account exists; permanently deleted <strong>7 days</strong> after account deletion</td></tr>
+    <tr><td>Sessions, e-mail tokens, sign-in attempts</td><td>For their own lifetime (sessions: 30 days, sliding); immediately on account deletion</td></tr>
+    <tr><td>Your provider keys (BYOK)</td><td><strong>Immediately</strong> on account deletion</td></tr>
+    <tr><td>Anonymised account row, credit ledger, order records</td><td><strong>10 years</strong> (retention obligation under the Turkish Commercial Code art. 82 and tax law — pending accountant confirmation); contains no personal data</td></tr>
+    <tr><td>Payment provider event records</td><td><strong>1 year</strong>; personal fields are redacted when the account is deleted</td></tr>
+    <tr><td>Technical logs and error monitoring records</td><td>The hosting platform's and Sentry's own retention (default 90 days)</td></tr>
+    <tr><td>Customer and invoice records at Polar</td><td>Polar's own retention policy (Polar is the controller)</td></tr>
+  </tbody>
+</table>
+
+<h2>7. Your rights</h2>
+<p>Under KVKK art. 11 and GDPR art. 15–21 you have the right to learn whether your data is processed, to access it, to have it corrected, to have it erased or destroyed, to object to processing, to receive your data in a portable format and to claim compensation for damage.</p>
+<ul>
+  <li><strong>Access and portability:</strong> Settings → Account → "Download my data" gives you an immediate JSON/CSV archive of all your account records (once per hour).</li>
+  <li><strong>Deletion:</strong> Settings → Account → "Delete my account" closes your account immediately. Your e-mail address is anonymised, your sessions and provider keys are deleted, and your content is permanently deleted after 7 days. Credit ledger and order records are kept anonymously for the statutory retention period. Account deletion cannot be undone.</li>
+  <li><strong>Requests:</strong> for any other request, write to the address in section 1. We answer within <strong>30 days</strong> (KVKK art. 13) — within <strong>one month</strong> for users covered by the GDPR (GDPR art. 12).</li>
+  <li><strong>Complaints:</strong> if you find our answer insufficient you may complain to the Turkish Personal Data Protection Board (KVKK art. 14) or, under the GDPR, to the supervisory authority of your country.</li>
+</ul>
+
+<h2>8. Security</h2>
+<p>Passwords are stored as one-way hashes (argon2) and provider keys are stored encrypted. Connections are encrypted with TLS; the session cookie travels only over HTTPS and is inaccessible to scripts. In the database each user's rows are separated by row-level access policies. No system is perfectly secure; if we detect a data breach we will inform you and the competent authority within the statutory deadlines.</p>
+
+<h2>9. Cookies</h2>
+<p>We use only two cookies that are strictly necessary for the service; there are no tracking or advertising cookies. Details are in the <a href="/hukuk/cerez">Cookie Notice</a>.</p>
+
+<h2>10. Changes</h2>
+<p>When this notice changes its version number advances and you will be asked to accept the new version at your next sign-in. The current version is shown at the bottom of this page.</p>

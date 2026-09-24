@@ -1,6 +1,6 @@
 # Faz 4 — Ödeme (Polar MoR), paketler ve abonelik, hesap silme / dışa aktarma, hukuki metinler: görev listesi
 
-**Tarih:** 2026-09-23 · **Durum:** **6/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; **5** ✅ 2026-09-23 `faz4/hesap-silme-disa-aktarma`; **4** ✅ 2026-09-22 `faz4/checkout-portal`; **1b** ✅ 2026-09-23 — dördüncü ve son PR'ı `faz4/1b-yeni-girdiler` (D) ile katalog 13 görsel + 10 video; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8; **1b'nin model listesi ve `1b-A`…`1b-G` kararları 2026-09-22'de sahipten geldi; on birinci sayı aynı gün ÖLÇÜLDÜ ve `catalog.py`ye yazıldı — o görev artık uygulanabilir**) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
+**Tarih:** 2026-09-24 · **Durum:** **7/8** (plan PR #69 `faz4/plan`, sahip 2026-09-21'de merge etti; **6** ✅ 2026-09-24 `faz4/hukuk-metinleri` (metinler TASLAK — avukat onayı sahibin adımı); **5** ✅ 2026-09-23 `faz4/hesap-silme-disa-aktarma`; **4** ✅ 2026-09-22 `faz4/checkout-portal`; **1b** ✅ 2026-09-23 — dördüncü ve son PR'ı `faz4/1b-yeni-girdiler` (D) ile katalog 13 görsel + 10 video; görevler `faz4/<slug>` dallarında, her biri bir PR; **1b** görevi 2026-09-21'de sahibin yönlendirmesiyle eklendi, 7 → 8; **1b'nin model listesi ve `1b-A`…`1b-G` kararları 2026-09-22'de sahipten geldi; on birinci sayı aynı gün ÖLÇÜLDÜ ve `catalog.py`ye yazıldı — o görev artık uygulanabilir**) · **Karar:** K1–K12 **kabul edildi 2026-09-21** (PR #69 sahip tarafından aynen merge edildi — Faz 3'ün deseni; madde madde değişiklik gelmedi) · **Önceki faz:** [faz3-kredi-defteri-filigran.md](faz3-kredi-defteri-filigran.md) (7/7 ✅, kapanış 2026-09-21, PR #56–#68)
 **Üst belge:** [superpowers/specs/2026-08-10-saas-transformation-master-design.md](superpowers/specs/2026-08-10-saas-transformation-master-design.md) §5 "Faz 5" kartının **"Ödeme Altyapısı: Merchant of Record (MoR)"** maddesi (`:184-214`) ve "Filigran & Kredi Kuralları" satırı (`:183`) — sapmalar bu belgenin sonunda tek tek yazılı. **Numaralama tuzağı** aynen (Faz 3 belgesi `:4`): master spec'in "Faz 5"i ürün yol haritasının SaaS kartı; bu belge SaaS dönüşümünün İÇ dizisindeki Faz 4'tür (Faz 0 web-first → 1 DB/hesap → 2 kuyruk → 3 kredi defteri → **4 ödeme/KVKK** → 5 işletme). Yol haritası kartı (Faz 4 "Ödeme, faturalama ve hukuk"): *"Bir kullanıcı kartla abone olup fatura alabiliyor ve hesabını tamamen silebiliyor."* — bu belgenin çıkış kriteri onu genişletir (sonda tam metin). Kartın "Stripe birincil" satırı 2026-09-18'de **MoR/Polar** ile güncellendi (Faz 1 ve Faz 2 belgelerinin "Not" satırı; master `:184-199`): Türkiye'den Stripe'a doğrudan hesap açılamıyor, uluslararası satış Merchant of Record üzerinden.
 
 Faz 4'ün amacı, Faz 3'ün kurduğu defterin (rezerv → onay → iade, aylık hibe,
@@ -594,6 +594,7 @@ okunamazdı.
 | **#77 ✅** | `faz4/1b-plan-kapisi` | `Plan.rank`, `kapsiyor` üçüncü parametre, üç çağıran, beş yeni bekçi | `catalog.py`'ye DOKUNMAZ |
 | **#78 ✅** | `faz4/1b-fiyat-duzeltme` | on sayı, flex silme, `tarife_kontrol` 4 → 0 | — |
 | **#80 ✅** | `faz4/1b-yeni-girdiler` | 5 görsel + 4 video, fal GÖRSEL adaptörü, `emeklilik`, i18n, E2E çapaları | C'den sonra (2026-09-23) |
+| **§6 ✅** | `faz4/hukuk-metinleri` | dört metin × iki dil (TASLAK), `GET /hukuk/{slug}`, kayıtta tıkla-onay, `sartlar-kabul`, banner, DPA kontrol listesi | 2'den sonra; 4'ün `SARTLAR_SURUMU` yer tutucusunu kapatır (2026-09-24) |
 
 B ile C paralel gitti (dosya kümeleri kesişmiyor); D ile C aynı katalog
 satırlarını yazdığı için sıralı.
@@ -1707,7 +1708,7 @@ ortamda BOŞ bırakılırsa 7.
 
 ---
 
-## 6. Hukuki metinler ve rıza — `bundled/hukuk/`, `GET /hukuk/{slug}`, kayıtta onay, "ticari haklar", Polar AUP (PR: `faz4/hukuk-metinleri`)
+## 6. Hukuki metinler ve rıza — `bundled/hukuk/`, `GET /hukuk/{slug}`, kayıtta onay, "ticari haklar", Polar AUP ✅ (PR: `faz4/hukuk-metinleri`)
 
 **Kapsam.** Yol haritası kartı: "GDPR + KVKK birlikte: gizlilik/aydınlatma
 metni + açık rıza, kullanım şartları, çerez bildirimi". Metinler TASLAK —
@@ -1790,6 +1791,118 @@ bağlanır; takım yeşil.
 **Sahibin adımı — avukat ve mali müşavir.** Dört metnin gözden geçirilmesi
 (KVKK md. 9 yurt dışı aktarım yolu; iade politikası; yaş), `docs/hukuk-kontrol-listesi.md`
 tablosunun doldurulması, `HUKUK_ONAYLI = True` PR'ı.
+
+### Yapıldığında (2026-09-24) — ölçümler ve sapmalar
+
+Rota 79 → **81** (`GET /hukuk/{slug}` AÇIK — `ACIK_ROTALAR` 9 → **10**, gerekçesi
+"kayıt kutusu bu sayfalara bağlanır, kayıt olmayan ziyaretçi okuyamazsa onay
+'okudum' olmaz"; `POST /api/hesap/sartlar-kabul` `KAPILI` 70 → **71** +
+`DIZINSIZ_KAPILI`; `HESAP_ROTALARI` 10 → **11**), göç YOK (`sartlar_kabul_at`/
+`sartlar_surumu` `0008`den hazır), modül 116 → **117** (`services/hukuk.py`:
+`HUKUK_SURUMU = "2026-10"`, `HUKUK_ONAYLI = False`, `SLUGLAR`, `metin`,
+`guncel_mi` — kullanıcıya konuşmayan, `KULLANICIYA_KONUSMAYAN` defterinde;
+`paths.bundled_hukuk_dir`), şablon 5 → **6** (`static/hukuk.html` + `hukuk.css`;
+betik YOK — düz belge, i18n.js bile yüklenmez), tarayıcı betiği 15 aynen.
+**Sekiz metin** `bundled/hukuk/{kullanim-sartlari,gizlilik,cerez,ticari-haklar}.{tr,en}.html`
+(HTML parçası, telif başlıklı, `<h1>` ile açılır; tr/en aynı `<h2>` sayısı —
+bekçi): gizlilik = KVKK md. 10 + GDPR md. 13 birlikte (veri sorumlusu `Alperen
+Zengin`, işlenen veri "kart verisi YOK", amaç/hukuki sebep tablosu, alıcılar
+Polar (MoR, kendi veri sorumlusu) / Azure–Google–fal / Fly.io–Neon–R2 / Sentry
+PII kapalı / e-posta servisi, md. 9 yurt dışı aktarım **avukat işaretli**,
+K10 saklama tablosu aynen, haklar + 30 gün / 1 ay, silme ve dışa aktarma
+bağlantısı); kullanım şartları = BYOK + platform kredisi, üç plan, hibe
+devretmez / paket devreder, iade (harcanmış iade edilmez, harcanmamış paket
+14 gün, abonelik dönem sonu), Polar AUP yansıması (NSFW, deepfake/face swap,
+ses klonlama, telif/marka, gerçek kişi izinsiz — ihlalde kapatma, iade yok),
+18+, "olduğu gibi", sağlayıcı kesintileri; çerez = yalnız `kromis_oturum` +
+`kromis_lang` (bayraklarıyla) + localStorage, üçüncü taraf yok → banner yok;
+ticari haklar = ücretli plan sağlayıcı lisansı ölçüsünde ticari (OpenAI /
+Google / BFL / fal politikalarına bağlantı), ücretsiz kişisel + filigran
+kaldırılamaz, Kromis hak iddia etmez. Her sayfada `HUKUK_ONAYLI = False` iken
+görünen **"TASLAK — avukat onayı bekliyor"** damgası (kabukta, metinde değil:
+onay PR'ı tek bayrak çevirir) ve sürüm satırı; `Content-Language` başlığı.
+`sablon.sayfa(..., yerlestir=)` — rotanın kendi yer tutucuları, `{{t:…}}`den
+ÖNCE. Kayıt: `KayitIstegi.sartlar: bool = False` + `validate_default` (eksik de
+`false` da 422, cümle `err.sartlar_gerekli` — checkout'un 412'siyle AYNI
+anahtar), başarıda `hesap.sartlar_damgala` (`sartlar_kabul_at` + `HUKUK_SURUMU`;
+doğrulanmamış hesaba yeniden kayıtta da). `GET /api/hesap/ben` + `sartlar_guncel`
+(`hukuk.guncel_mi`: `None` ve `0000-yer-tutucu` → `false`). Ayarlar: banner
+`#settings-sartlar-banner` bölmelerin ÜSTÜNDE (hangi sekme açık olsun görünür),
+`settings.js sartlarBanneriniCiz` `ben.sartlar_guncel === false` deyince;
+düğme `POST /api/hesap/sartlar-kabul` (gövde yok — sürümü sunucu yazar,
+`odeme.sartlar_kabul_yaz(surum=hukuk.HUKUK_SURUMU)`; checkout'un 412 kapısıyla
+AYNI yazıcı). `odeme.SARTLAR_SURUMU` SİLİNDİ, `routers/odeme.py` 412 gövdesi
+ve damgası `hukuk.HUKUK_SURUMU`. Footer bağlantıları `/giris` (kart dibi),
+`/planlar` (dip), ayarlar Hakkında (`#settings-hukuk`); `/planlar` "Ticari
+kullanım hakkı" satırı `<a href="/hukuk/ticari-haklar">` (`planlar.js
+ozellikBaglantili`); kayıt ve 412 kutusunun etiketi `hukuk.okudum_kabul` +
+iki bağlantı (`planlar.sartlar_kutu` anahtarı gitti). i18n **+14 −1** tr/en
+(`hukuk.*` 13 kısa anahtar + `err.hukuk_metni_yok`; metinler değil).
+`docs/hukuk-kontrol-listesi.md`: dokuz alıcı × (rol, aktarılan veri, DPA, DPF,
+veri konumu, KVKK md. 9 yolu, kabul tarihi) — hücreler `_doldurulacak_`, sahip
+doldurur; yayın öncesi adım sırası (avukat → mali müşavir → tablo →
+`HUKUK_ONAYLI = True` → Polar başvurusu) ve "metin değiştiğinde" reçetesi.
+`.dockerignore` DEĞİŞMEDİ (`bundled/` zaten içeride; bekçi `*.html`/`bundled/hukuk`
+kalıbının olmadığını ölçer). Testler: `tests/test_hukuk.py` **24** (4 × 2 sayfa
++ kabuk + `Content-Language`; bilinmeyen/kaçan slug 404; çapa cümleleri
+slug × dil; damga bayrağa bağlı; oturumsuz dil zinciri; parçalar parça — tr/en
+aynı biçim; sürüm sabiti YYYY-AA ve TEK modülde, `odeme.SARTLAR_SURUMU` yok;
+`guncel_mi`; onaysız/`false` kayıt 422 + kullanıcı yok + posta yok; onaylı
+kayıt damga + sürüm, yeniden kayıtta yenilenir; `ben` dört sürüm hâli + sabit
+ilerleyince eskir; `sartlar-kabul` damgalar, gövdeyi yok sayar; checkout aynı
+sabit; imajda + git'te sekiz dosya; sayfalar bağlanıyor + kutu `required`süz;
+kontrol listesi dosyası + dokuz satır), `test_hesap` (`_kayit` `sartlar: True`,
+`ben` anahtar kümesi, `HESAP_ROTALARI`), `test_planlar`/`test_posta` kayıt
+gövdeleri, `test_kimlik`/`test_app_bolme` literalleri, `test_odeme_route`
+(`SARTLAR_SURUMU` → `hukuk.HUKUK_SURUMU`; yer tutucu testi tersine döndü),
+`test_docker_kapisi` (+`bundled/hukuk`), `test_i18n` (`routers/kok.py` →
+KONUŞAN — 404 cümlesi; `services/hukuk.py` KONUŞMAYAN gerekçesiyle), E2E
+`test_playwright_hesap` kayıt testi × 2 dil (kutu işaretsiz → 422 cümlesi
+mesaj satırında, posta yok → işaretli → kayıt; girişte `sartlar_guncel: true`;
+Hakkında'da banner yok + bağlantı var) + **yeni** banner testi (`0000-yer-tutucu`
+ile damgalı hesap → ayarlar açılır, ilk bölmede banner → "Okudum, onaylıyorum"
+→ satır `HUKUK_SURUMU`, yeniden yüklemede banner yok). Takım **4.259 → 4.289 geçti, 12 atlandı, ~295 sn** (+30: `test_hukuk` 24, E2E banner testi, sayfa çapaları; belgenin ~4.150 toplam tahmini 5. görevde aşılmıştı)
+(E2E + Postgres, `KROMIS_E2E_ZORUNLU=1`). `ruff`/`mypy` temiz, graflar üretildi.
+**Sağlayıcı politika bağlantıları DOĞRULANMADI** (geliştirme ortamından
+`openai.com`/`google.com`/`bfl.ai`/`fal.ai` konaklarına erişim yok, 403) —
+kontrol listesinin 1. adımı.
+
+**Sapmalar — belgeden farklı yapılanlar, gerekçesiyle.** (a) **`GET /hukuk/{slug}`
+AÇIK rota, `SAYFALAR`da değil**: belge kapı söylemiyordu; oturumsuz ziyaretçi
+kayıt kutusunun bağlandığı metni okuyamazsa tıkla-onay "okudum" olmaz; metin
+depodan, kullanıcı verisi yok. (b) **Kayıt kutusunda `required` YOK**: tarayıcı
+baloncuğu yerine sunucunun 422 cümlesi mesaj satırında (E2E onu ölçüyor);
+kapı sunucuda, tarayıcı yalnız değeri taşır. (c) **`hesap.sartlar_damgala`
+nesne üstünden, `odeme.sartlar_kabul_yaz` UPDATE'i değil**: kayıt rotası aynı
+transaksiyonda henüz flush edilmiş ORM nesnesini zaten yazıyor; ikinci bir
+UPDATE aynı satıra ikinci yazım olurdu. `services/hesap.py` `hukuk`u ithal
+etmez (sürüm parametre) — sabitin okuyucusu rota katmanı. (d) **Banner
+bölmelerin ÜSTÜNDE, Hakkında'nın içinde değil**: belge "ayarlarda banner"
+demişti; Hakkında'ya gömülü bir banner yalnız oraya tıklayan görürdü. (e)
+**`sartlar-kabul` gövde almaz**: istemcinin yazdığı sürüm eski bir metne onay
+iddia edebilirdi; sürüm sunucunun. (f) **`planlar.sartlar_kutu` anahtarı
+silindi**, yerine `hukuk.okudum_kabul` + iki bağlantı: kutu artık metne
+bağlanıyor, cümle "okudum" diyorsa okunacak şey yanında olmalı; test
+bekçisi (`test_no_catalog_key_is_unused`) ölü anahtarı zaten reddediyordu.
+(g) **`routers/kok.py` KULLANICIYA KONUŞAN oldu**: 404 cümlesi
+(`err.hukuk_metni_yok`) — kod değil cümle, çünkü okuyucu tarayıcıdaki insan.
+(h) **`docs/hukuk-kontrol-listesi.md` alıcı sütunu "Resend" adıyla**:
+aydınlatma metni "e-posta servisi" der (sağlayıcı değişebilir), tablo somut
+adı yazar (`services/posta.py` Resend arka ucu). (i) **Metinlerdeki açık
+noktalar `[…]` içinde ve görünür**: iletişim e-postası (dağıtım değişkeni —
+sabit adres yok), md. 9 yolu, iade politikasının tüketici mevzuatıyla uyumu,
+yetki maddesi — hepsi avukat/mali müşavir maddesi; gizlenmiş bir boşluk yerine
+işaretli boşluk. (j) **`static/hukuk.html` betiksiz**: i18n.js bile yok, sayfa
+düz belge; `giris.html`den de hafif. Belgenin kalan cümleleri aynen.
+
+**Sahibin adımı — avukat ve mali müşavir (değişmedi, ayrıntısı
+`docs/hukuk-kontrol-listesi.md`).** Dört metnin içerik incelemesi (`[…]`
+noktaları: iletişim adresi, KVKK md. 9 yolu alıcı başına, iade politikası,
+yetki, 18 yaş), sağlayıcı politika bağlantılarının elle doğrulanması, mali
+müşavirden 10 yıl teyidi, DPA tablosunun doldurulması, sonra tek satırlık
+`HUKUK_ONAYLI = True` PR'ı; ardından Polar production başvurusu. Metin
+değiştiğinde `HUKUK_SURUMU` ilerler ve herkes yeniden onaylar — o gün
+`0000-yer-tutucu` ile damgalı 4. görev onayları da aynı banner'a düşer.
 
 ---
 

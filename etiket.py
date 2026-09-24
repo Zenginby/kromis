@@ -1,6 +1,6 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
-# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
-# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+# FSL-1.1-ALv2 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (LICENSE); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Katalog verisinin KULLANICIYA giden hâli — etiketler ve kısa adlar.
 
 NEDEN AYRI BİR MODÜL: bu işlevler `catalog` ile `i18n`in ikisine birden

@@ -1,6 +1,6 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
-# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
-# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+# FSL-1.1-ALv2 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (LICENSE); ad ve logo lisans DIŞIDIR (MARKA.md).
 """İstek kimliği ara katmanı — `X-Request-ID` içeri/dışarı, günlük bağlamı, erişim satırı (Faz 2 / 9).
 
 Her HTTP isteğinin bir kimliği var: gelen `X-Request-ID` başlığı (platform

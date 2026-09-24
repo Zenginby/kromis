@@ -1,6 +1,6 @@
 // Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
-// GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
-// Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+// FSL-1.1-ALv2 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+// Bu bildirim kaldırılamaz (LICENSE); ad ve logo lisans DIŞIDIR (MARKA.md).
 //
 // Teşekkür sayfasının betiği (Faz 4 / 4, belge §4) — static/tesekkur.html'in
 // tek betiği (i18n.js dışında). Tek uç: GET /api/kredi, 2 sn'de bir, en çok 30 sn.

@@ -1,6 +1,6 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
-# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
-# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+# FSL-1.1-ALv2 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (LICENSE); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Hukuki metinler — sürüm sabiti, onay damgası, `bundled/hukuk/` parçalarının okuyucusu (Faz 4 / 6, K11).
 
 TEK GERÇEK KAYNAK: `HUKUK_SURUMU` üç yerden okunuyor — kayıt (`routers/hesap.py`

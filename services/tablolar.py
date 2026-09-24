@@ -1,6 +1,6 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
-# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
-# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+# FSL-1.1-ALv2 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (LICENSE); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Veri modeli — 17 tablo, SQLAlchemy 2 `DeclarativeBase` (Faz 1 / 2. görev; Faz 2 / 1: `isler`, `isciler`; Faz 3 / 1: `kredi_hareketleri`; Faz 4 / 2: `urunler`, `siparisler`, `odeme_olaylari`).
 
 Bu modül ŞEMANIN tek tanımı: Alembic `alembic/env.py`de `Base.metadata`yı

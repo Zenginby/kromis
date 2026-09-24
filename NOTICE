@@ -1,41 +1,55 @@
 Kromis Studio
 Copyright (C) 2026 Alperen Zengin (@Zenginby)
 
-This program is free software: you can redistribute it and/or modify it under
-the terms of the GNU Affero General Public License as published by the Free
-Software Foundation, either version 3 of the License, or (at your option) any
-later version.
+Licensed under the Functional Source License, Version 1.1, ALv2 Future License
+(FSL-1.1-ALv2). See the LICENSE file distributed with this program for the full
+Terms and Conditions; the same text is at https://fsl.software/.
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
+You may use, copy, modify and redistribute the Software for any Permitted
+Purpose. A Competing Use -- making the Software available to others in a
+commercial product or service that substitutes for it or offers substantially
+similar functionality -- is not permitted. Not an OSI-approved open source
+license; each version becomes Apache-2.0 two years after its release (Change
+Date), under the Grant of Future License in LICENSE.
 
-You should have received a copy of the GNU Affero General Public License along
-with this program.  If not, see <https://www.gnu.org/licenses/>.
+THE SOFTWARE IS PROVIDED "AS IS" AND WITHOUT WARRANTIES OF ANY KIND. See the
+Disclaimer in LICENSE.
 
 Source code: https://github.com/Zenginby/kromis
 
 --------------------------------------------------------------------------------
 BU DOSYA KOPYALARLA BİRLİKTE TAŞINIR / THIS FILE TRAVELS WITH COPIES
 
-Bu bildirim, kaynağın ve ikili paketlerin her kopyasında bulunmak zorundadır
-(AGPL-3.0 §5a). Kaldırılması lisans ihlalidir.
+Bu bildirim, kaynağın ve ikili paketlerin her kopyasında bulunmak zorundadır:
+FSL-1.1-ALv2'nin "Redistribution" maddesi, dağıtılan her kopya, değişiklik ve
+türevle birlikte lisansın kendisinin ya da bağlantısının gitmesini ve
+yazılımla verilen hiçbir telif bildiriminin kaldırılmamasını şart koşar.
+Kaldırılması lisans ihlalidir.
 
-"Kromis" ve "Kromis Studio" adları ile logo/ikon varlıkları AGPL-3.0'ın
-kapsamı DIŞINDADIR — bkz. MARKA.md. Bir çatal, lisansa tam uysa bile bu adı
-ve logoyu kullanamaz.
+"Kromis" ve "Kromis Studio" adları ile logo/ikon varlıkları lisansın kapsamı
+DIŞINDADIR — bkz. MARKA.md. Lisansın "Trademarks" maddesi de aynı şeyi söyler:
+kaynağı göstermek dışında ad, marka ve ürün adı üzerinde hak verilmez. Bir
+çatal, lisansa tam uysa bile bu adı ve logoyu kullanamaz.
 
-v0.19.0 ve öncesi MIT lisanslıydı; geçişin kaydı TELIF.md'dedir.
+Lisans OSI onaylı bir açık kaynak lisansı DEĞİLDİR; her sürüm yayımlanmasından
+iki yıl sonra Apache-2.0'a döner (Change Date).
+
+Geçmiş: v0.19.0 ve öncesi MIT; d0f6ee2 (2026-09-12) ile v0.20.0–v0.23.1 GNU
+AGPL-3.0; bu commit'ten (2026-09-24) sonrası FSL-1.1-ALv2. Geçişlerin kaydı
+TELIF.md'dedir; verilmiş bir lisans geri alınmaz.
 
 The names "Kromis" and "Kromis Studio", together with the logo and icon assets,
-are NOT covered by the AGPL-3.0 grant -- see MARKA.md. A fork must rename, even
-when it complies with the license in full.
+are NOT covered by the licence grant -- see MARKA.md and the Trademarks clause
+in LICENSE. A fork must rename, even when it complies with the licence in full.
 
 --------------------------------------------------------------------------------
 ÜÇÜNCÜ PARTİ BİLEŞENLER / THIRD-PARTY COMPONENTS
 
 Aşağıdaki bileşenler bu dağıtımın içinde taşınır ve KENDİ lisanslarına tabidir.
-Hepsi AGPL-3.0 ile uyumludur.
+Hepsi izin verici (MIT / BSD / Apache-2.0 / OFL) lisanslardır ve FSL-1.1-ALv2
+altında dağıtılan bir eserle birlikte taşınmalarına engel yoktur; psycopg
+(LGPL-3.0) dinamik bağlanan bir kütüphane olarak kullanılır, bu kullanım
+Kromis'in lisansını etkilemez.
 
   DM Sans (static/fonts/)
     Copyright 2014 The DM Sans Project Authors
@@ -47,7 +61,9 @@ Hepsi AGPL-3.0 ile uyumludur.
 
   FastAPI (MIT), Uvicorn (BSD-3-Clause), httpx (BSD-3-Clause),
   Pillow (MIT-CMU), python-multipart (Apache-2.0), pywebview (BSD-3-Clause),
-  pythonnet (MIT), clr-loader (MIT)
+  SQLAlchemy (MIT), Alembic (MIT), psycopg (LGPL-3.0, dinamik bağlanır),
+  pwdlib (MIT), cryptography (Apache-2.0 / BSD-3-Clause), sentry-sdk (MIT),
+  polar-sdk (MIT), pythonnet (MIT), clr-loader (MIT)
     Sürüm pinleri: requirements.txt
 
   Gradle Wrapper (android/gradle/)
@@ -57,6 +73,6 @@ Hepsi AGPL-3.0 ile uyumludur.
     OpenAI, Microsoft, Azure, Google Gemini ve Black Forest Labs markalarına
     aittir; yalnızca ilgili sağlayıcıyı TANIMLAMAK için kullanılır. Bu
     kullanım bir ortaklık ya da onay ima etmez ve söz konusu markalar
-    AGPL-3.0 kapsamında dağıtılmaz.
+    lisansın kapsamında dağıtılmaz.
 
 Ayrıntı ve ihlal bildirimi yolu: TELIF.md

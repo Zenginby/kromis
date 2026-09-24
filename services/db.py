@@ -1,6 +1,6 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
-# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
-# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+# FSL-1.1-ALv2 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (LICENSE); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Veri tabanı zemini — motor, istek başına `Session`, erişilebilirlik sondası (Faz 1 / 1. görev).
 
 NEDEN VAR: çok kullanıcılı web (docs/faz1-veritabani-hesaplar.md) bugünkü

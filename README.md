@@ -1,7 +1,7 @@
 # Kromis Studio
 
 [![Release](https://img.shields.io/badge/version-v0.23.1-blue.svg)](https://github.com/Zenginby/kromis/releases/latest)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+[![License: FSL-1.1-ALv2](https://img.shields.io/badge/License-FSL--1.1--ALv2-blue.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org/)
 [![Build & Test](https://github.com/Zenginby/kromis/actions/workflows/release.yml/badge.svg)](https://github.com/Zenginby/kromis/actions)
 
@@ -347,17 +347,22 @@ Pratik sonucu, belgelerdeki `#NN` biçimli PR atıflarının bu depoda açılmam
 
 ## 📜 Lisans
 
-**GNU AGPL-3.0** — bkz. [LICENSE](LICENSE).
+**FSL-1.1-ALv2** (Functional Source License 1.1, Apache-2.0 Future License) —
+bkz. [LICENSE](LICENSE).
 
-Özgürce kullan, incele, değiştir, dağıt. Karşılığında istenen tek şey var:
-**değiştirip dağıtırsan kaynağını da aç.** Kapalı kaynak bir ürüne koymak ya da
-kaynağı kapatıp kendi ürünün gibi satmak lisansa aykırıdır.
+Kaynak açık: indir, oku, değiştir, kendin için barındır; şirketinde kullan,
+üzerine hizmet ver, rekabet etmeyen ticari işlerde kullan. Yapılamayan tek şey
+**Kromis'i ya da değiştirilmiş bir kopyasını, Kromis'le rekabet eden bir ürün ya
+da barındırılan hizmet olarak başkalarına sunmak** — lisansın "Competing Use"
+dediği şey bu. Her sürüm, yayımlanmasından **iki yıl sonra Apache-2.0** olur;
+bu dönüşüm lisansın içinde, geri alınamaz bir taahhüt. FSL, OSI'nin "açık
+kaynak" tanımına girmez; kaynağı açık, kullanımı kısıtlı bir lisanstır.
 
 Uygulamayla **ÜRETTİĞİN görseller ve videolar tamamen senindir** — lisans kodu
 kapsar, kodun çıktısını değil. Ticari kullanım da dâhil, hiçbir kısıt yok.
 
-* Telif, önceki lisans (proje MIT olarak açılmıştı) ve ihlal bildirimi yolu:
-  [TELIF.md](TELIF.md)
+* Telif, önceki lisanslar (proje MIT olarak açıldı, sonra AGPL-3.0; hangi sürümlerin hangi lisansla çıktığı orada),
+  "rakip kullanım"ın Türkçesi ve ihlal bildirimi yolu: [TELIF.md](TELIF.md)
 * **"Kromis" adı ve logosu lisansın DIŞINDADIR.** Çatal serbest, ad değil —
   değiştirilecekler listesiyle birlikte: [MARKA.md](MARKA.md)
 * Üçüncü parti bileşenler ve bildirimleri: [NOTICE](NOTICE)

@@ -1,6 +1,6 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
-# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
-# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+# FSL-1.1-ALv2 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (LICENSE); ad ve logo lisans DIŞIDIR (MARKA.md).
 """Hesap uçları — kayıt, doğrulama, giriş, çıkış, sıfırlama, `/giris` sayfası (Faz 1 / 3); silme ve dışa aktarma (Faz 4 / 5); şartlar onayı (Faz 4 / 6).
 
 On bir rota: `POST /api/hesap/{kayit,dogrula,giris,cikis,sifirla,

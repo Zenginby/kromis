@@ -1,6 +1,6 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
-# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
-# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+# FSL-1.1-ALv2 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (LICENSE); ad ve logo lisans DIŞIDIR (MARKA.md).
 """E2E — admin `/admin`e girer, dört sekmeyi gezer, bir kullanıcının tavanını yazar; admin olmayan 403 görür (Faz 2 / 8; "Ödeme" Faz 4 / 3).
 
 Belge §8 çıkış ölçütünün tarayıcı yüzü. Sunucu `tests/test_playwright_studio.py`nin

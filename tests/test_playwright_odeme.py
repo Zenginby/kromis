@@ -1,6 +1,6 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
-# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
-# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+# FSL-1.1-ALv2 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (LICENSE); ad ve logo lisans DIŞIDIR (MARKA.md).
 """E2E — ücretsiz kullanıcı `/planlar` → paket → "Polar" → teşekkür → bakiye 200 → 700 (Faz 4 / 4; belge §4 çıkış ölçütü).
 
 SAHTE POLAR, GERÇEK İMZA (belge "Test stratejisi"): `polar.checkout_ac` yamalı ve bu

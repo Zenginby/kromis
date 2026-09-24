@@ -8,8 +8,9 @@ ihlal iddiasında kasıt tam olarak böyle gösterilir (TELIF.md).
 
 Bunun bir yan kazancı da var: başlıktaki adres `guncelleme.DEPO` ile aynı
 sahibi gösterdiği için (tests/test_depo_adresi.py) bir çatal, kendi deposuna
-geçmeden takımı yeşile döndüremiyor — yani AGPL §5a'nın istediği "kaynağını
-söyle" adımı çatalda kendiliğinden hatırlatılıyor.
+geçmeden takımı yeşile döndüremiyor — yani FSL'in Redistribution maddesinin
+istediği "lisansı ve telif bildirimlerini taşı" adımına, kaynağın nerede
+olduğu da çatalda kendiliğinden ekleniyor.
 
 KAPSAM = DAĞITILAN ilk-el kaynak:
   * kökteki, `routers/`, `services/` ve `tools/` altındaki `.py`  (tests/
@@ -35,13 +36,22 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Başlığın SÖZLEŞMESİ. Üç satırın üçü de anlamlı:
 #   1) kim — telif sahibi,
-#   2) hangi şartlarla + kaynağın nerede olduğu (AGPL §13),
-#   3) kaldırılamayacağı (§5a) ve ad/logo ayrımı (MARKA.md).
+#   2) hangi şartlarla + kaynağın nerede olduğu (FSL → Redistribution: kopyayla
+#      birlikte lisansın kendisi ya da bağlantısı gitmek zorunda; adres o bağ),
+#   3) kaldırılamayacağı (FSL → Redistribution: "not remove any copyright
+#      notices provided in or with the Software") ve ad/logo ayrımı (MARKA.md;
+#      FSL'in Trademarks maddesi de aynı şeyi söylüyor).
 # Yorum işareti dile göre değişiyor, METİN değişmiyor: iddia da metni arıyor.
+#
+# 2026-09-24: satırlar AGPL-3.0'dan FSL-1.1-ALv2'ye çevrildi (sahibin kararı;
+# gerekçe TELIF.md → "Lisans geçişi — AGPL-3.0'dan FSL-1.1-ALv2'ye"). Başlık
+# 180 dosyada satır satır değiştirildi, biçimi ve satır sayısı korundu: bu
+# tuple'ı değiştirmek takımı 160 yerde kırmızıya çevirir, yani geçişin yarım
+# kalması mümkün değil. Eski satırlar tarihsel kayıt olarak TELIF.md'de.
 BASLIK = (
     "Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)",
-    "GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis",
-    "Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).",
+    "FSL-1.1-ALv2 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis",
+    "Bu bildirim kaldırılamaz (LICENSE); ad ve logo lisans DIŞIDIR (MARKA.md).",
 )
 
 # Başlık dosyanın BAŞINDA olmak zorunda: ortasında bir yerde geçen bir telif

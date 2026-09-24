@@ -1,6 +1,6 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
-# GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
-# Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+# FSL-1.1-ALv2 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+# Bu bildirim kaldırılamaz (LICENSE); ad ve logo lisans DIŞIDIR (MARKA.md).
 """S3 uyumlu nesne depolama istemcisi — SigV4 ELLE, HTTP `httpx` ile (Faz 2 / 2, K6).
 
 NEDEN `boto3`/`minio` DEĞİL: ölçüldü (docs/faz2-kuyruk-anahtarlar-depolama.md,

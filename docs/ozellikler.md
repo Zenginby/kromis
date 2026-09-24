@@ -225,5 +225,12 @@ planı (2026-09-23): [docs/otomasyon-akislari-plani.md](otomasyon-akislari-plani
         teşekkür sayfası bakiyeyi yoklar; Ayarlar › Kredi'de plan, dönem sonu, son siparişler ve
         "Aboneliğimi ve faturalarımı yönet" (Polar müşteri portalı). Fiyatlar Polar'dan aynalanır
         (`tools/polar_esitle.py`).
+  - [x] **Faz 4 (ödeme / abonelik / KVKK) tamamlandı — 2026-09-24, PR #69–#84 + `faz4/operasyon`:**
+        Polar webhook (`POST /api/odeme/webhook`, üç katman idempotency), abonelik yaşam döngüsü
+        (plan, `plan_bitis`, `sona_erme`), hesap silme (anonimleştirme + 7 gün) ve veri dışa aktarma
+        (dokuz dosyalık ZIP), hukuki metinler `/hukuk/*` (tr/en, TASLAK damgası avukat onayına kadar),
+        aylık Polar mutabakatı `tools/polar_mutabakat.py`, `odeme_olaylari` 1 yıl saklama; canlı
+        Polar turu ve production başvurusu sahibin adımı (KURULUM.md 11). Karar kaydı ve kapanış:
+        [docs/faz4-odeme-abonelik-kvkk.md](faz4-odeme-abonelik-kvkk.md).
   - [ ] Üyelik paketleri Max kademesi; yıllık plan.
   - [ ] Ücretsiz pakette filigran (watermark) kuralı.

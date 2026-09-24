@@ -591,7 +591,7 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
     filigransız, video açık, hibeleri öntanımlı 1.200 / 4.500 (K5; fiyat
     Polar'da). Satın alma yolu `/planlar` (Faz 4 / 4: checkout ve müşteri
     portalı Polar'ın barındırılan sayfaları; ürün aynası `tools/polar_esitle.py`
-    — kurulum adımı 7. görevde). Admin yolu duruyor: `/admin` → kullanıcı
+    — kurulum **11. adımda**). Admin yolu duruyor: `/admin` → kullanıcı
     satırı → plan seçici (`olay=admin.plan`), "kredi ekle" (hibe ya da paket kovası).
 
     *Aylık hibe* — `KROMIS_FREE_AYLIK_HIBE` (`.env.example` 1. bölüm): boş =
@@ -612,7 +612,7 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
     web VE işçi). Bakım turu YALNIZ `free` planı tamamlar; ücretli planın dönem
     hibesini Polar'ın `order.paid` olayı yatırır (Faz 4 / 3, `POST
     /api/odeme/webhook`; üç `KROMIS_POLAR_*` değişkeni `.env.example` 1.
-    bölümde — kurulum adımı 7. görevde). Faz 4 / 2'nin geçici köprüsü
+    bölümde — kurulum **11. adımda**). Faz 4 / 2'nin geçici köprüsü
     `KROMIS_UCRETLI_HIBE_BAKIMDA` KALDIRILDI: ortamda kalmışsa silin, işçi onu
     artık okumaz. Admin eliyle `pro` yapılmış (Polar aboneliği olmayan) hesap
     dönem hibesi almaz — admin "kredi ekle" ile.
@@ -669,6 +669,150 @@ Masaüstü/Android paketiyle ilgisi yok: bu bölüm uygulamayı bir sunucuda,
        gönder düğmesi kapalı (sunucu tarafı aynı kapı: 403 `err.plan_kapsamiyor`).
     7. `/admin` → Marj sekmesi o işle dolu; `python tools/tarife_kontrol.py`
        dört modeli bir kez fiyat sayfasıyla doğrula.
+
+11. **Ödeme (Polar)** (Faz 4). Para **Polar'da** tahsil edilir — Polar
+    **Merchant of Record**: satıcı hukuken Polar, vergi (KDV/VAT/GST), fatura
+    ve kart verisi onda; bize yalnız imzalı webhook'un deftere yazdığı satır gelir.
+    Bizde kart verisi YOK, fatura sayfası YOK (müşteri portalı Polar'ın).
+    Karar kaydı ve ölçümler: [docs/faz4-odeme-abonelik-kvkk.md](docs/faz4-odeme-abonelik-kvkk.md);
+    işletme yüzü (yedek, uyarı, aylık mutabakat, KVKK başvurusu)
+    [docs/isletme.md § 2, § 6, § 9](docs/isletme.md).
+
+    *Sıra: önce sandbox, sonra production.* Polar'ın sandbox'ı
+    (`sandbox.polar.sh`) AYRI bir organizasyon: kendi jetonu, kendi webhook
+    sırrı, kendi ürünleri. `KROMIS_POLAR_ORTAM` boşken uygulama SANDBOX'a
+    bağlanır (yanlışlıkla canlıya değil yanlışlıkla sandbox'a — ilk canlı
+    denemede "ürün yok" diye fark edilir); canlıya geçerken `production`
+    yazılır. Her iki ortam için aynı dört adım:
+
+    1. **Jeton** — Polar → *Settings → Developers → Access tokens* → yeni
+       organizasyon jetonu — kapsamlar en az: ürünleri ve siparişleri OKUMA
+       (ayna, mutabakat), checkout ve müşteri oturumu AÇMA (satış, portal),
+       abonelik YAZMA (hesap silmede `revoke`); kapsam adlarını panelden
+       doğrula (bu oturumlardan Polar belgesi okunamadı) → `KROMIS_POLAR_ERISIM_JETONU`. Yalnız WEB süreci ve araçlar okur; işçi
+       Polar konuşmaz. Kasaya kopya (isletme § 2).
+    2. **Webhook** — *Settings → Webhooks → Add endpoint*: URL
+       `https://<alan adı>/api/odeme/webhook`, biçim *Raw* (Standard
+       Webhooks), olaylar: `order.paid`, `order.refunded`,
+       `subscription.active`, `subscription.updated`, `subscription.canceled`,
+       `subscription.uncanceled`, `subscription.revoked`, `customer.created`,
+       `customer.updated` (dokuz; `services/odeme.py ISLENEN_TURLER` —
+       seçilmeyen tür kaydedilir, işlenmez). Panelin ürettiği sır →
+       `KROMIS_POLAR_WEBHOOK_SIRRI` (yalnız web). Sır boşsa uç 503 verir,
+       yanlışsa her teslimat 400 `imza_gecersiz` ve `olay=odeme.imza_gecersiz`
+       (WARNING) — Polar saatlerce yeniden dener, sonra ucu kapatır: ilk
+       teslimatı günlükte gör.
+    3. **Ürünler ve metadata** — Polar'da her ürünün *Metadata* alanına
+       sözleşme yazılır (`tools/polar_esitle.py` başlığı): `kromis_tur`
+       `plan` | `paket` (zorunlu); `kromis_plan` `temel` | `pro` (yalnız
+       plan); `kromis_kredi` tam sayı (paket: yüklenen kredi; plan: dönem
+       hibesi, bilgi). Plan ürünü AYLIK abonelik, paket TEK SEFERLİK sabit
+       fiyat; K5'in tablosu: `temel` 9 USD/ay 1.200 kredi, `pro` 29 USD/ay
+       4.500 kredi, paketler 5 USD/500, 14 USD/1.600, 30 USD/3.800 (sahibin
+       sayıları; Polar'da başka yazılırsa aşağıdaki hibe değişkenleri ezer).
+       Metadata'sı eksik ürün (bağış, deneme) aynaya SIZMAZ, `UYARI URUN
+       ATLANDI` ile görünür.
+    4. **Ayna** — konteynerin içinden:
+
+       ```sh
+       DATABASE_URL=… KROMIS_POLAR_ERISIM_JETONU=… python tools/polar_esitle.py --kontrol   # ne değişecek? (fark → 2)
+       DATABASE_URL=… KROMIS_POLAR_ERISIM_JETONU=… python tools/polar_esitle.py             # yazar
+       ```
+
+       `/planlar` fiyatı bu aynadan gösterir; webhook `product_id`yi burada
+       arar — satır yoksa para YATMAZ, olay `hata=urun_yok` ile bekler (admin
+       "Ödeme" sekmesi), aracı koş ve Polar panelinden olayı yeniden gönder.
+       Ayna 7 günden eskiyse admin sekmesi uyarır (`olay=odeme.urunler_bayat`):
+       Polar'da fiyat değiştirdiğin her gün aracı koş.
+
+    *Fiyat ve hibe değişkenleri* (`.env.example` 1. bölüm): fiyat Polar'da,
+    bizde yok. Dönem hibesi `KROMIS_TEMEL_AYLIK_HIBE` / `KROMIS_PRO_AYLIK_HIBE`
+    (boş = 1.200 / 4.500; web VE işçi, aynı değer) — `order.paid` ile "hibeye
+    tamamla" (dolu bakiyeye binmez), `subscription.revoked` ile ücretsiz
+    hibeye iner (`sona_erme`, yalnız hibe kovası). `KROMIS_FREE_AYLIK_HIBE` 10.
+    adımda.
+
+    *İki kova kuralı* (K3): **aylık/dönem hibesi** devretmez ("hibeye
+    tamamla"), **paket kredisi** devreder ve plan düşse de durur. Rezerv
+    hibeden başlar, yetmezse paketten; iade önce pakete. Ayarlar → Kredi
+    ikisini ayrı gösterir; bakım turu ikisini ayrı ölçer (`tutarsiz_kullanici`).
+
+    *İade politikası* (K6, K11; `/hukuk/kullanim-sartlari`): harcanmış kredi
+    iade edilmez; harcanmamış paket 14 gün içinde iade edilebilir; abonelik
+    dönem sonunda biter (iptal eden ödediği dönemi kullanır). Parayı Polar
+    panelinden iade edersin (`order.refunded` bize yalnız WARNING
+    `olay=odeme.iade` düşürür, defter DOKUNULMAZ — harcanmış kredi eksiye
+    inmesin); krediyi `/admin` → kullanıcı → **"kredi ekle"** ile eksi
+    miktar ve açıklamayla düşersin (`duzeltme` satırı, kova seçilir).
+    Otomatik düşüm BİLEREK yok.
+
+    *Hesap silme ve dışa aktarma* (K9, Faz 4 / 5): kullanıcının kendi düğmesi
+    Ayarlar → **Hesap** — "Verimi indir" (dokuz dosyalık ZIP) ve "Hesabımı sil"
+    (parola + onay metni). Silme ANINDA hesabı kilitler (e-posta anonim,
+    oturumlar/BYOK anahtarları gider, bekleyen işler iptal + iade, Polar
+    aboneliği `revoke`), içerik `KROMIS_HESAP_SILME_BEKLEME_GUN` (boş = 7) gün
+    sonra işçinin bakım turunda kalıcı gider; `kredi_hareketleri`/`siparisler`
+    anonim sahiple KALIR (mali kayıt). Polar aboneliği kapatılamazsa
+    `olay=hesap.silme_abonelik` (WARNING) — Polar panelinden elle kapat.
+    E-postayla gelen KVKK başvurusu: isletme § 9 (30 gün).
+
+    *Webhook teslimat günlüğü* (`odeme_olaylari`): admin "Ödeme" sekmesi son
+    100 teslimatı ve hatalıları gösterir; satırlar
+    `KROMIS_ODEME_OLAY_SAKLAMA_GUN` (boş = 365, yalnız işçi) gün sonra bakım
+    turunda silinir (`olay=odeme.olaylar_temizlendi`) — sipariş ve defter
+    satırı bu süreye bağlı değil.
+
+    *Hukuki metin sürümü* (K11, Faz 4 / 6): dört metin `bundled/hukuk/`
+    (kullanım şartları, gizlilik, çerez, ticari haklar; tr/en) `/hukuk/<slug>`
+    altında; sürüm `services/hukuk.py HUKUK_SURUMU` (YYYY-AA), kayıtta ve ilk
+    checkout'ta tıkla-onay bu sürümle damgalanır, sürüm ilerleyince herkes
+    Ayarlar'daki banner'dan yeniden onaylar. `HUKUK_ONAYLI = False` iken her
+    sayfada "TASLAK — avukat onayı bekliyor" damgası; avukat ve mali müşavir
+    incelemesi bitince tek satırlık PR `HUKUK_ONAYLI = True` yapar
+    (adımlar [docs/hukuk-kontrol-listesi.md](docs/hukuk-kontrol-listesi.md)).
+    Polar'ın AI ürün incelemesi bu metinleri yayında ister — production
+    başvurusu ondan sonra.
+
+    *Aylık mutabakat* — payout geldiğinde konteynerin içinden
+    `python tools/polar_mutabakat.py --cikti fark.csv` (geçen ay; `--ay
+    YYYY-MM` ile başka ay): Polar'ın ödenmiş siparişleri ↔ `siparisler`, fark
+    CSV'de, çıkış **0** sıfır fark / **2** fark var / **3** Polar-DB hatası —
+    cron'a bağla. Yanına `tools/marj_raporu.py --gun 30` (gider). Ayrıntı
+    isletme § 9.
+
+    **Canlı kontrol listesi (bir kez; ilk beşi sandbox'ta, sonrası production):**
+    1. Sandbox'ta test hesabıyla bir **kredi paketi** al (Polar test kartı) →
+       teşekkür sayfası "bakiyene işlendi", Ayarlar → Kredi'de paket kovası
+       500 ve sipariş satırı; günlükte `olay=odeme.order.paid kredi=500`.
+    2. Sandbox'ta **`temel`ye abone ol** → plan `temel`, filigran kalkar, video
+       açılır, hibe kovası 1.200'e tamamlanır (`hibe:<u>:polar:<order_id>`).
+    3. Polar panelinden aynı `order.paid` olayını **yeniden gönder** → cevap
+       `yinelenen` ya da `islendi`, ama `siparisler` ve defterde satır sayısı
+       AYNI (K4 üç katman).
+    4. Portaldan aboneliği **iptal et** → `plan_bitis` dolu, plan dönem sonuna
+       kadar `temel`; (sandbox'ta dönem sonu beklenmez) `subscription.revoked`
+       gelince `free` + `sona_erme` satırı, paket kovası DURUR.
+    5. **Production jetonları**: Polar production organizasyonunda jeton +
+       webhook + ürünler + metadata (yukarıdaki dört adım), `KROMIS_POLAR_ORTAM=production`,
+       `polar_esitle.py --kontrol` → 0; dağıt; `/planlar` gerçek fiyatları
+       gösteriyor.
+    6. **İlk gerçek 5 USD'lik paket kendi hesabından** (gerçek kart) → bakiye,
+       sipariş, Polar panelinde ödeme; `olay=odeme.hata` YOK.
+    7. **Portaldan faturayı indir** (Ayarlar → Kredi → "Aboneliğimi ve
+       faturalarımı yönet") — fatura Polar'ın, bizde kopyası yok.
+    8. **Hesap silme test hesabıyla**: Ayarlar → Hesap → "Verimi indir" (ZIP
+       dokuz dosya) → "Hesabımı sil" → giriş yok, e-posta anonim; işçiye geçici
+       `KROMIS_HESAP_SILME_BEKLEME_GUN=0` ver (dağıt), ilk `olay=bakim`
+       satırında `temizlenen_hesap=1` ve `olay=hesap.temizlendi`, R2'de
+       `kullanicilar/<id>/` boş, `siparisler`/`kredi_hareketleri` satırları
+       duruyor → değişkeni geri boşalt (7 gün).
+    9. **`/hukuk/*` yayında**: dört sayfa iki dilde açılıyor, footer bağlantıları
+       çalışıyor; avukat onayı geldiyse `HUKUK_ONAYLI = True` ve damga yok —
+       Polar production başvurusu bundan sonra.
+    10. **İlk ay sonunda `polar_mutabakat.py`** → çıkış 0 (sıfır fark) ve
+        Polar payout brütü = özet satırındaki toplam; yanında `marj_raporu.py`.
+        Aynı gün **ikinci kova** (`kromis-yedek`, başka hesap/sağlayıcı) ve
+        günlük `rclone sync` cron'u kurulur — ödeyen kullanıcı var (isletme § 8).
 
 ---
 

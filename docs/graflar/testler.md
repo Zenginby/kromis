@@ -86,7 +86,7 @@
 | `services.kuyruk` | `test_admin.py`, `test_araclar.py`, `test_artik_dosya.py`, `test_defter.py`, `test_gunluk.py`, `test_health.py`, `test_hesap_silme.py`, `test_isci.py`, `test_isler_route.py`, `test_kota.py`, `test_kredi_route.py`, `test_kuyruk.py`, `test_playwright_admin.py`, `test_rls.py`, `test_saglayici_meta.py` |
 | `services.modeller` | `test_planlar.py` |
 | `services.nesne_depo` | `test_artik_dosya.py`, `test_dosya.py`, `test_dosya_rotalari.py`, `test_medya_tasi.py`, `test_nesne_depo.py` |
-| `services.odeme` | `test_hesap_silme.py`, `test_hukuk.py`, `test_odeme.py`, `test_odeme_route.py` |
+| `services.odeme` | `test_docker_kapisi.py`, `test_hesap_silme.py`, `test_hukuk.py`, `test_odeme.py`, `test_odeme_route.py` |
 | `services.palet` | `test_palet_db.py` |
 | `services.planlar` | `test_defter.py`, `test_docker_kapisi.py`, `test_isci.py`, `test_kredi_route.py`, `test_odeme.py`, `test_odeme_route.py`, `test_planlar.py` |
 | `services.platform_anahtari` | `test_admin.py`, `test_docker_kapisi.py`, `test_gunluk.py`, `test_kota.py`, `test_kredi_route.py`, `test_planlar.py`, `test_platform_anahtari.py`, `test_playwright_studio.py` |
@@ -111,7 +111,8 @@
 | `tools.make_logo_goldens` | — |
 | `tools.marj_raporu` | `test_araclar.py` |
 | `tools.medya_tasi` | `test_medya_tasi.py` |
-| `tools.polar_esitle` | `test_araclar.py` |
+| `tools.polar_esitle` | `test_araclar.py`, `test_docker_kapisi.py` |
+| `tools.polar_mutabakat` | `test_araclar.py` |
 | `tools.render_brand_assets` | — |
 | `tools.rls_kontrol` | `test_rls_kontrol.py` |
 | `tools.surum_karari` | `test_surum_karari.py` |

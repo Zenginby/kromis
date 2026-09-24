@@ -170,6 +170,12 @@ kalan 192") ve Ayarlar → **Kredi** bölmesinde; işletmen için `/admin`da pla
 kredi ekleme ve **Marj** tablosu. Kurulum ve canlı kontrol listesi:
 [KURULUM.md → Web sürümü, 10. adım](KURULUM.md#web-sürümü-sunucu-kurulumu);
 karar kaydı [docs/faz3-kredi-defteri-filigran.md](docs/faz3-kredi-defteri-filigran.md).
+**Ödeme Polar üzerinden** (Merchant of Record — kart, vergi ve fatura Polar'da,
+bizde yalnız webhook'un yazdığı satır): kredi paketleri devreder, `temel`/`pro`
+aboneliğinin dönem hibesi devretmez; hesap silme ve veri dışa aktarma Ayarlar →
+Hesap'ta. Kurulum sırası ve canlı kontrol listesi
+[KURULUM.md → Web sürümü, 11. adım "Ödeme (Polar)"](KURULUM.md#web-sürümü-sunucu-kurulumu);
+karar kaydı [docs/faz4-odeme-abonelik-kvkk.md](docs/faz4-odeme-abonelik-kvkk.md).
 
 Maddelerin tamamı, hangi sağlayıcının nesi çalışıyor ve yol haritası:
 **[docs/ozellikler.md](docs/ozellikler.md)**.

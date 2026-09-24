@@ -44,11 +44,13 @@ hiç ihtiyaç duymaz, testler onu hiç yüklemez. `istemci()` çağrılınca ith
 (`sdkconfiguration.SERVERS`): production `https://api.polar.sh`, sandbox
 `https://sandbox-api.polar.sh` — `server="sandbox"` ile seçilir.
 
-POLAR'A GİDEN ÜÇ ÇAĞRI (Faz 4 / 4, K7) — hepsi `istemci()` üstünden, hepsi
+POLAR'A GİDEN ÇAĞRILAR (Faz 4 / 4, K7; 5; 7) — hepsi `istemci()` üstünden, hepsi
 İNCE: `checkout_ac` (`POST /v1/checkouts/` → barındırılan ödeme sayfasının
 URL'si), `portal_baglantisi` (`POST /v1/customer-sessions/` → müşteri portalı
 URL'si), `urunleri_listele` (`GET /v1/products/` sayfa sayfa → düz sözlükler,
-`tools/polar_esitle.py`nin girdisi). SDK'nın pydantic nesneleri bu modülün
+`tools/polar_esitle.py`nin girdisi), `abonelik_iptal` (Faz 4 / 5, hesap silme),
+`siparisleri_listele` (Faz 4 / 7: `GET /v1/orders/` bir dönemin siparişleri,
+`tools/polar_mutabakat.py`nin girdisi). SDK'nın pydantic nesneleri bu modülün
 DIŞINA ÇIKMAZ: çağıranlar `str`/`dict` alır, böylece rota ve araç SDK'nın
 model adlarına bağlanmaz ve testler `polar.checkout_ac`ı tek satırla yamalar
 (E2E'nin yerel Polar'ı). SDK'nın kendi istisnaları (`polar_sdk.models.SDKError`
@@ -73,7 +75,7 @@ __all__ = ["ORTAM_ENV", "JETON_ENV", "WEBHOOK_SIRRI_ENV", "ORTAM_SANDBOX", "ORTA
            "BASLIK_ID", "BASLIK_ZAMAN", "BASLIK_IMZA",
            "YapilandirmaHatasi", "ImzaHatasi", "YukHatasi", "Olay",
            "ortam", "erisim_jetonu", "webhook_sirri", "olay_dogrula", "imzala", "istemci",
-           "checkout_ac", "portal_baglantisi", "urunleri_listele"]
+           "checkout_ac", "portal_baglantisi", "abonelik_iptal", "urunleri_listele", "siparisleri_listele"]
 
 # `.env.example` 1. bölüm aynı adları buradan okur (bekçisi tests/test_docker_kapisi.py `ALTYAPI`).
 ORTAM_ENV = "KROMIS_POLAR_ORTAM"
@@ -298,3 +300,53 @@ def urunleri_listele() -> list[dict[str, Any]]:
             sonraki = getattr(sayfa, "next", None)
             sayfa = sonraki() if callable(sonraki) else None
     return urunler
+
+
+def _sozluk(nesne: Any) -> dict[str, Any]:
+    """SDK nesnesi → düz sözlük (`model_dump(mode="json")`); sözlük gelmişse aynen — `urunleri_listele`nin deyimi."""
+    return nesne.model_dump(mode="json") if hasattr(nesne, "model_dump") else dict(nesne)
+
+
+def _zaman(deger: Any) -> dt.datetime | None:
+    """`created_at` (`model_dump(mode="json")` ISO dizesi; `Z` sonekli olabilir) → UTC `datetime`; okunamazsa `None`."""
+    if not isinstance(deger, str) or not deger:
+        return None
+    try:
+        t = dt.datetime.fromisoformat(deger.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return t if t.tzinfo is not None else t.replace(tzinfo=dt.UTC)
+
+
+def siparisleri_listele(baslangic: dt.datetime, bitis: dt.datetime) -> list[dict[str, Any]]:
+    """`created_at` `[baslangic, bitis)` aralığındaki BÜTÜN siparişler (ödenmiş ya da değil), en yeni önce; her biri DÜZ SÖZLÜK.
+
+    Polar'ın `orders.list`i tarih süzgeci vermiyor (SDK 0.32.0: ürün, müşteri,
+    abonelik, metadata — tarih yok); liste `-created_at` ile sıralı çekilir ve
+    sayfa sayfa yürünür, bir sayfanın EN ESKİ satırı `baslangic`ın gerisine
+    düştüğünde durulur — ötesi daha eski, istemeye gerek yok. Dönem süzgeci
+    burada; `paid`/`status` süzgeci ÇAĞIRANIN (`tools/polar_mutabakat.py`
+    ödenmişleri alır; bu işlev "Polar ne diyor"u olduğu gibi getirir). 100'lük
+    sayfa (Polar'ın tavanı); bir ayın siparişi için bir-iki istek. Tarihi
+    okunamayan satır ATLANIR (Polar şeması `created_at`i her siparişte veriyor;
+    yoksa mutabakata sokulacak bir dönem de yok).
+    """
+    from polar_sdk import models  # tembel — `istemci()` ile aynı gerekçe
+    siparisler: list[dict[str, Any]] = []
+    sayfa = istemci().orders.list(limit=100, sorting=[models.OrderSortProperty.MINUS_CREATED_AT])
+    while sayfa is not None:
+        sonuc = getattr(sayfa, "result", None)
+        en_eski: dt.datetime | None = None
+        for ham in (getattr(sonuc, "items", None) or []):
+            siparis = _sozluk(ham)
+            t = _zaman(siparis.get("created_at"))
+            if t is None:
+                continue
+            en_eski = t if en_eski is None or t < en_eski else en_eski
+            if baslangic <= t < bitis:
+                siparisler.append(siparis)
+        if en_eski is not None and en_eski < baslangic:
+            break
+        sonraki = getattr(sayfa, "next", None)
+        sayfa = sonraki() if callable(sonraki) else None
+    return siparisler

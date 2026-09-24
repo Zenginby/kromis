@@ -497,7 +497,7 @@ def test_metrics_are_derived_from_isler_and_isciler_with_seeded_percentiles(c, d
     r = c.get("/api/admin/metrikler")
     assert r.status_code == 200, r.text
     m = r.json()
-    assert set(m) == {"an", "kuyruk", "son_1sa", "son_24sa", "modeller", "isciler", "marj"}
+    assert set(m) == {"an", "kuyruk", "son_1sa", "son_24sa", "modeller", "isciler", "marj", "gelir"}
     assert m["kuyruk"] == {"derinlik": 2, "calisan": 0, "en_eski_bekleyen_sn": 45}
     assert m["son_1sa"] == {"is": 4, "hata": 1, "hata_orani": 0.25}            # baska + hata + 2 bekleyen
     assert m["son_24sa"]["is"] == 8 and m["son_24sa"]["hata"] == 1          # 3 tohum + baska + hata + 2 bekleyen + BYOK
@@ -586,6 +586,76 @@ def test_the_admin_page_renders_the_margin_table_with_its_own_keys_in_both_langu
         for anahtar in ("admin.metrik_marj", "admin.sutun_gun", "admin.sutun_kredi", "admin.sutun_usd",
                         "admin.sutun_maliyet_usd", "admin.sutun_ort_sure", "admin.sutun_hata"):
             assert i18n.t(anahtar, lang) in html, (lang, anahtar)
+
+
+# ───────────────────────────────────────────────────────────── gelir (Faz 4 / 7)
+
+def _siparis(depo_db, kid: uuid.UUID, an: dt.datetime, tutar: int, birim: str = "usd") -> None:
+    """`siparisler` tohumu (webhook'un yazdığı satır); ürün aynası tek DUMMY paket."""
+    from services.tablolar import Siparis, Urun
+    with Session(depo_db) as s:
+        urun = s.scalar(select(Urun).limit(1))
+        if urun is None:
+            urun = Urun(polar_urun_id="prod-DUMMY", tur="paket", plan=None, kredi=500, fiyat_kurus=500,
+                        para_birimi="usd", ad="DUMMY paket")
+            s.add(urun)
+            s.flush()
+        s.add(Siparis(kullanici_id=kid, polar_siparis_id=f"ord_{uuid.uuid4().hex[:10]}", urun_id=urun.id,
+                      sebep="purchase", tutar_kurus=tutar, para_birimi=birim, olusturuldu=an))
+        s.commit()
+
+
+def test_the_revenue_rows_sum_usd_orders_per_window_and_estimate_the_polar_fee(depo_db, admin):
+    """Belge §7 "gelir sütunu": dönem başına TEK satır (sipariş modele bağlanamaz) — adet, Σ USD, Polar ücreti
+    TAHMİNİ (%6,5 + 0,50 varsayımı, `POLAR_UCRET_ORAN`/`POLAR_UCRET_SABIT_KURUS`), net; pencere dışı ve başka
+    para birimindeki sipariş toplama GİRMEZ (ikincisi `diger_para_birimi`nde sayılır); sipariş yoksa bilinen 0."""
+    b = _ikinci(depo_db)
+    g = dt.timedelta(days=1)
+    with depo_db.begin() as c:
+        c.execute(text("DELETE FROM siparisler"))
+    _siparis(depo_db, b.id, AN - 2 * g, 1_400)            # 7 ve 30 gün
+    _siparis(depo_db, admin.id, AN - 20 * g, 3_000)       # yalnız 30 gün
+    _siparis(depo_db, b.id, AN - 40 * g, 99_900)          # pencere dışı
+    _siparis(depo_db, b.id, AN - 1 * g, 700, birim="eur")  # toplanmaz, sayılır
+    with Session(depo_db) as s:
+        yedi = depo_admin.gelir(s, 7, AN)
+        otuz = depo_admin.gelir(s, 30, AN)
+        bos = depo_admin.gelir(s, 1, AN + 400 * g)   # pencere `>` alt sınırlı (marj'ın deyimi): ileride boş
+    assert depo_admin.POLAR_UCRET_ORAN == Decimal("0.065") and depo_admin.POLAR_UCRET_SABIT_KURUS == 50
+    assert yedi == {"gun": 7, "siparis": 1, "gelir_usd": 14.0, "polar_ucreti_usd": 1.41, "net_usd": 12.59,
+                    "diger_para_birimi": 1}
+    assert otuz == {"gun": 30, "siparis": 2, "gelir_usd": 44.0, "polar_ucreti_usd": 3.86, "net_usd": 40.14,
+                    "diger_para_birimi": 1}, "14 + 30 USD; ücret 44 × 0,065 + 2 × 0,50"
+    assert bos == {"gun": 1, "siparis": 0, "gelir_usd": 0.0, "polar_ucreti_usd": 0.0, "net_usd": 0.0,
+                   "diger_para_birimi": 0}, "sipariş yokken bilinen sıfır — marj'ın `None`inden farklı"
+    with depo_db.begin() as c:
+        c.execute(text("DELETE FROM siparisler"))
+
+
+def test_the_metrics_endpoint_carries_one_revenue_row_per_margin_window_and_the_page_renders_the_table(
+        c, depo_db, admin, monkeypatch):
+    from services import zaman
+    monkeypatch.setattr(zaman, "an", lambda: AN)
+    b = _ikinci(depo_db)
+    with depo_db.begin() as k:
+        k.execute(text("DELETE FROM siparisler"))
+    _siparis(depo_db, b.id, AN - dt.timedelta(hours=2), 500)
+    m = c.get("/api/admin/metrikler").json()
+    assert [(r["gun"], r["siparis"], r["gelir_usd"]) for r in m["gelir"]] == [(7, 1, 5.0), (30, 1, 5.0)]
+    assert [r["gun"] for r in m["gelir"]] == list(depo_admin.MARJ_PENCERELERI), "marj ile aynı iki pencere"
+    with open(os.path.join(REPO, "static", "admin.js"), encoding="utf-8") as f:
+        js = f.read()
+    assert 'el("admin-gelir")' in js and "m.gelir.map" in js and "polar_ucreti_usd" in js and 't("admin.gelir_diger"' in js
+    for lang in i18n.LANGUAGES:
+        html = c.get("/admin", headers={"X-Kromis-Lang": lang}).text
+        assert 'id="admin-gelir"' in html
+        for anahtar in ("admin.metrik_gelir", "admin.sutun_siparis", "admin.sutun_gelir_usd",
+                        "admin.sutun_polar_ucreti", "admin.sutun_net_usd"):
+            assert i18n.t(anahtar, lang) in html, (lang, anahtar)
+        # Varsayım etikette YAZILI: okuyan sayının tahmin olduğunu tablo başlığından görür.
+        assert "6,5" in i18n.t("admin.metrik_gelir", lang) or "6.5" in i18n.t("admin.metrik_gelir", lang)
+    with depo_db.begin() as k:
+        k.execute(text("DELETE FROM siparisler"))
 
 
 # ─────────────────────────────────────────────────────────── GET /api/kota

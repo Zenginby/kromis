@@ -547,3 +547,191 @@ def test_urunleri_listele_walks_every_sdk_page_and_keeps_archived_products(monke
     assert all(u["mode"] == "json" for u in urunler)
     assert cagrilar == [{"is_archived": False, "limit": 100}, {"is_archived": True, "limit": 100}], (
         "iki AÇIK çağrı: arşivlenen ürün `aktif=false` olmak zorunda, öntanımlıya güvenilmez")
+
+
+# ── polar_mutabakat (Faz 4 / 7) ──────────────────────────────────────────
+# Sahte Polar: `polar.siparisleri_listele` yamalı (düz sözlükler — SDK `Order.model_dump` biçimi);
+# `siparisler` gerçek Postgres (admin bağlamı — RLS'li tablo; bağlamsız araç her siparişi "eksik" görürdü).
+
+from tools import polar_mutabakat  # noqa: E402
+
+DONEM_BASI = dt.datetime(2026, 10, 1, tzinfo=dt.UTC)
+DONEM_SONU = dt.datetime(2026, 11, 1, tzinfo=dt.UTC)
+
+
+def _polar_siparisi(kimlik: str, an: dt.datetime, *, paid: bool = True, tutar: int = 500,
+                    musteri: str | None = "u-1", status: str | None = None) -> dict:
+    """Polar `Order.model_dump(mode="json")` hâlinden okuduğumuz alanlar (SDK 0.32.0 adları); `created_at` ISO `Z`."""
+    return {"id": kimlik, "created_at": an.strftime("%Y-%m-%dT%H:%M:%SZ"), "paid": paid,
+            "status": status or ("paid" if paid else "pending"), "total_amount": tutar, "currency": "usd",
+            "product_id": "prod-1", "customer_id": "cus-1",
+            "customer": {"id": "cus-1", "external_id": musteri, "email": "DUMMY@example.com"}}
+
+
+def _siparis_yaz(depo_db, kullanici_id: uuid.UUID, kimlik: str, an: dt.datetime, *, tutar: int = 500) -> None:
+    from sqlalchemy import select
+
+    from services.tablolar import Siparis
+    with Session(depo_db) as s:
+        urun = s.scalar(select(Urun).limit(1))
+        if urun is None:
+            urun = Urun(polar_urun_id="prod-1", tur="paket", plan=None, kredi=500, fiyat_kurus=500,
+                        para_birimi="usd", ad="DUMMY paket")
+            s.add(urun)
+            s.flush()
+        s.add(Siparis(kullanici_id=kullanici_id, polar_siparis_id=kimlik, urun_id=urun.id, sebep="purchase",
+                      tutar_kurus=tutar, para_birimi="usd", olusturuldu=an))
+        s.commit()
+
+
+def test_polar_mutabakat_lists_orders_missing_on_each_side_with_a_suggestion_and_exits_2(
+        depo_db, polar_ortami, kullanici, monkeypatch, tmp_path, capsys):
+    """İki yön, iki öneri; ay sınırı payı; ödenmemiş sipariş sayılmaz; geç işlenen sipariş eksik değil.
+
+    A ödenmiş + bizde → fark yok. B ödenmiş, bizde YOK → `polar_eksik` (yeniden gönder). C `pending` →
+    girmez. D Polar'da 30 Eylül 23:59'da, bizde 1 Ekim 00:00:30'da işlenmiş → bizde var, Polar'ın PAYLI
+    listesinde var → fark yok (paysız ölçüm onu "bizde fazla" sayardı). E yalnız bizde → `bizde_fazla`.
+    F Polar'da Ekim'de ödenmiş, bizde Kasım'da işlenmiş (webhook geç) → kimlik bizde var → eksik DEĞİL."""
+    g = dt.timedelta
+    liste = [_polar_siparisi("F", DONEM_SONU - g(minutes=1)),
+             _polar_siparisi("B", DONEM_BASI + g(days=10), tutar=1_400, musteri="u-2"),
+             _polar_siparisi("C", DONEM_BASI + g(days=9), paid=False),
+             _polar_siparisi("A", DONEM_BASI + g(days=3)),
+             _polar_siparisi("D", DONEM_BASI - g(seconds=30), tutar=3_000)]
+    cagrilar: list[tuple[dt.datetime, dt.datetime]] = []
+
+    def _listele(baslangic, bitis):
+        cagrilar.append((baslangic, bitis))
+        return liste
+    monkeypatch.setattr(polar, "siparisleri_listele", _listele)
+    _siparis_yaz(depo_db, kullanici.id, "A", DONEM_BASI + g(days=3, seconds=5))
+    _siparis_yaz(depo_db, kullanici.id, "D", DONEM_BASI + g(seconds=30), tutar=3_000)
+    _siparis_yaz(depo_db, kullanici.id, "E", DONEM_BASI + g(days=20), tutar=900)
+    _siparis_yaz(depo_db, kullanici.id, "F", DONEM_SONU + g(hours=2))
+
+    cikti = tmp_path / "fark.csv"
+    assert polar_mutabakat.main(["--ay", "2026-10", "--cikti", str(cikti)]) == polar_mutabakat.CIKIS_FARK
+    assert cagrilar == [(DONEM_BASI - polar_mutabakat.PAY, DONEM_SONU + polar_mutabakat.PAY)], "paylı dönem istenir"
+    with open(cikti, encoding="utf-8", newline="") as f:
+        metin = f.read()
+    assert metin.splitlines()[0] == ",".join(polar_mutabakat.SUTUNLAR)
+    satirlar = _oku(metin)
+    assert [(r["yon"], r["siparis_id"]) for r in satirlar] == [("polar_eksik", "B"), ("bizde_fazla", "E")]
+    b, e = satirlar
+    assert (b["tutar_kurus"], b["para_birimi"], b["musteri"], b["urun"]) == ("1400", "usd", "u-2", "prod-1")
+    assert b["olusturuldu"].startswith("2026-10-11") and "yeniden gonder" in b["oneri"]
+    assert (e["tutar_kurus"], e["musteri"]) == ("900", str(kullanici.id)) and "incele" in e["oneri"]
+    assert "DUMMY@example.com" not in metin, "e-posta CSV'ye girmez (musteri = external_id)"
+    err = capsys.readouterr().err
+    # Özet: Ekim'de Polar 2 ödenmiş sipariş (A, B; C ödenmedi, D Eylül, F Ekim ama... F Ekim'in son dakikası → 3).
+    assert "2026-10 (sandbox): Polar 3 odenmis siparis 24.00 · bizde 3 satir 44.00 · " \
+           "Polar'da olup bizde olmayan 1 · bizde olup Polar'da olmayan 1" in err
+    assert str(cikti) in err
+
+
+def test_polar_mutabakat_prints_only_the_header_and_exits_0_when_the_month_reconciles(
+        depo_db, polar_ortami, kullanici, monkeypatch, capsys):
+    liste = [_polar_siparisi("A", DONEM_BASI + dt.timedelta(days=3))]
+    monkeypatch.setattr(polar, "siparisleri_listele", lambda b, s: liste)
+    _siparis_yaz(depo_db, kullanici.id, "A", DONEM_BASI + dt.timedelta(days=3, seconds=5))
+    assert polar_mutabakat.main(["--ay", "2026-10"]) == polar_mutabakat.CIKIS_TAMAM
+    cikti = capsys.readouterr()
+    assert cikti.out.splitlines() == [",".join(polar_mutabakat.SUTUNLAR)], "sıfır farkta da başlık: dosya okunur"
+    assert "Polar'da olup bizde olmayan 0 · bizde olup Polar'da olmayan 0" in cikti.err
+    # Boş ay da 0: ne Polar'da ne bizde sipariş — cron için "her şey yolunda".
+    monkeypatch.setattr(polar, "siparisleri_listele", lambda b, s: [])
+    assert polar_mutabakat.main(["--ay", "2026-12"]) == 0
+
+
+def test_polar_mutabakat_refuses_without_a_database_url_or_a_token_and_reports_provider_failure_and_a_bad_month_as_3(
+        polar_ortami, monkeypatch, capsys):
+    assert polar_mutabakat.main(["--ay", "2026-13"]) == 3 and "--ay" in capsys.readouterr().err
+    assert polar_mutabakat.main(["--ay", "Ekim"]) == 3
+    monkeypatch.delenv(db.DATABASE_URL_ENV, raising=False)
+    assert polar_mutabakat.main([]) == 3 and db.DATABASE_URL_ENV in capsys.readouterr().err
+    monkeypatch.setenv(db.DATABASE_URL_ENV, "postgresql+psycopg://x:y@localhost:1/z")
+    monkeypatch.delenv(polar.JETON_ENV, raising=False)
+    assert polar_mutabakat.main([]) == 3 and polar.JETON_ENV in capsys.readouterr().err
+    monkeypatch.setenv(polar.JETON_ENV, "polar_oat_DUMMY")
+
+    def _dusen(b, s):
+        raise ConnectionError("sandbox-api.polar.sh: boom")
+    monkeypatch.setattr(polar, "siparisleri_listele", _dusen)
+    assert polar_mutabakat.main([]) == 3 and "Polar hatasi (ConnectionError)" in capsys.readouterr().err
+    assert polar_mutabakat.CIKIS_ORTAM == 3 and polar_mutabakat.CIKIS_FARK == 2, (
+        "cron 'ulaşamadım' ile 'fark var'ı ayırır — polar_esitle'nin 2'sinden bilerek farklı")
+
+
+def test_polar_mutabakat_defaults_to_the_previous_utc_calendar_month_and_parses_ay():
+    an = dt.datetime(2026, 11, 3, 9, 30, tzinfo=dt.UTC)
+    assert polar_mutabakat.donem(None, an) == (DONEM_BASI, DONEM_SONU, "2026-10")
+    # Ocak → geçen ay bir önceki yılın Aralık'ı; Aralık → sonraki ay yeni yılın Ocak'ı.
+    assert polar_mutabakat.donem(None, dt.datetime(2027, 1, 15, tzinfo=dt.UTC))[2] == "2026-12"
+    assert polar_mutabakat.donem("2026-12") == (dt.datetime(2026, 12, 1, tzinfo=dt.UTC),
+                                                dt.datetime(2027, 1, 1, tzinfo=dt.UTC), "2026-12")
+    assert polar_mutabakat.donem(" 2026-10 ")[2] == "2026-10"
+    for kotu in ("2026-0", "2026-00", "2026-13", "202610", "Ekim"):
+        with pytest.raises(ValueError, match="--ay"):
+            polar_mutabakat.donem(kotu)
+    assert polar_mutabakat.odenmis({"paid": True}) and polar_mutabakat.odenmis({"status": "refunded"})
+    assert not polar_mutabakat.odenmis({"paid": False, "status": "paid"}), "`paid` varsa o konuşur"
+    assert not polar_mutabakat.odenmis({"status": "pending"})
+
+
+def test_the_mutabakat_csv_columns_are_exactly_the_keys_of_both_difference_rows():
+    """Başlık iki satır kurucusunun anahtarlarıyla aynı küme (marj_raporu'nun bekçisiyle aynı duruş)."""
+    from services.tablolar import Siparis
+    polar_satiri = polar_mutabakat._polar_satiri(_polar_siparisi("x", DONEM_BASI))
+    bizim = polar_mutabakat._bizim_satir(Siparis(kullanici_id=uuid.uuid4(), polar_siparis_id="x", urun_id=uuid.uuid4(),
+                                                 sebep="purchase", tutar_kurus=1, para_birimi="usd",
+                                                 olusturuldu=DONEM_BASI))
+    assert set(polar_satiri) == set(bizim) == set(polar_mutabakat.SUTUNLAR)
+    assert set(polar_mutabakat.ONERI) == {polar_mutabakat.YON_POLAR_EKSIK, polar_mutabakat.YON_BIZDE_FAZLA}
+
+
+def test_siparisleri_listele_walks_pages_newest_first_and_stops_once_a_page_is_older_than_the_window(monkeypatch):
+    """SDK `orders.list(limit=100, sorting=[-created_at])` → `.result.items` + `.next()`; süzgeç `[baslangic, bitis)`;
+    en eski satırı pencerenin gerisine düşen sayfadan sonra istek YOK (ötesi daha eski)."""
+    class _Siparis:
+        def __init__(self, kimlik, an):
+            self.kimlik, self.an = kimlik, an
+
+        def model_dump(self, mode="json"):
+            return {"id": self.kimlik, "created_at": self.an, "mode": mode}
+
+    class _Sonuc:
+        def __init__(self, items):
+            self.items = items
+
+    sonraki_cagrilari: list[str] = []
+
+    class _Sayfa:
+        def __init__(self, ad, items, sonraki):
+            self.ad, self.result, self._sonraki = ad, _Sonuc(items), sonraki
+
+        def next(self):
+            sonraki_cagrilari.append(self.ad)
+            return self._sonraki
+
+    cagrilar: list[dict] = []
+    ucuncu = _Sayfa("ucuncu", [_Siparis("z", "2026-08-01T00:00:00Z")], None)
+    ikinci = _Sayfa("ikinci", [_Siparis("c", "2026-10-01T00:00:00Z"), _Siparis("d", "2026-09-30T23:59:59Z"),
+                               _Siparis("bozuk", None)], ucuncu)
+    birinci = _Sayfa("birinci", [_Siparis("a", "2026-11-01T00:00:00+00:00"), _Siparis("b", "2026-10-20T12:00:00Z")],
+                     ikinci)
+
+    class _Orders:
+        def list(self, **kw):
+            cagrilar.append(kw)
+            return birinci
+
+    class _Istemci:
+        orders = _Orders()
+
+    monkeypatch.setattr(polar, "istemci", lambda: _Istemci())
+    siparisler = polar.siparisleri_listele(DONEM_BASI, DONEM_SONU)
+    assert [s["id"] for s in siparisler] == ["b", "c"], "a bitişte (dışarı), d başlangıçtan önce, z eski sayfa, bozuk atlandı"
+    assert all(s["mode"] == "json" for s in siparisler)
+    assert len(cagrilar) == 1 and cagrilar[0]["limit"] == 100
+    assert [str(getattr(s, "value", s)) for s in cagrilar[0]["sorting"]] == ["-created_at"]
+    assert sonraki_cagrilari == ["birinci"], "ikinci sayfanın en eskisi (d) başlangıçtan önce → üçüncü sayfa hiç istenmez"

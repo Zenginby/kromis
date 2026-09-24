@@ -124,7 +124,7 @@ class Surec:
 
     def __init__(self, motor, depo: dosya.Depo, ayarlar: ayar.Ayarlar, es_zamanli: int,
                  esik, kalp_araligi: float, saklama, bakim_araligi: float,
-                 silme_beklemesi=None) -> None:
+                 silme_beklemesi=None, olay_saklamasi=None) -> None:
         self.motor = motor
         self.depo = depo
         self.ayarlar = ayarlar
@@ -137,6 +137,8 @@ class Surec:
         # açılışta düşsün, 5 dk sonraki ilk turda değil; `None` = ortamın öntanımlısı
         # (testlerin eski `Surec(...)` çağrısı değişmeden geçer).
         self.silme_beklemesi = silme_beklemesi
+        # Ödeme olayı saklaması (Faz 4 / 7): aynı gerekçe, aynı deyim — açılışta okunur, `None` = öntanımlı.
+        self.olay_saklamasi = olay_saklamasi
         # İKİ bayrak (gerekçe modül başında, KAPANIŞ): `durdur` = yeni iş alma
         # (SIGTERM anında kalkar); `kapat` = kalp ve bakım da dursun (eldeki
         # işler bittikten SONRA kalkar). Kalp `durdur`a baksaydı boşaltma
@@ -212,7 +214,8 @@ class Surec:
         try:
             with Session(self.motor) as oturum:
                 ozet = isci.bakim_turu(oturum, self.depo, zaman.an(), self.esik, self.saklama,
-                                       silme_beklemesi=self.silme_beklemesi)
+                                       silme_beklemesi=self.silme_beklemesi,
+                                       olay_saklamasi=self.olay_saklamasi)
             if ozet:
                 _olay("bakim", "saklama ve olu isci satirlari", **ozet)
         except Exception:
@@ -328,12 +331,13 @@ def hazirla(*, tek_tur: bool, kalp_araligi: float, bakim_araligi: float) -> Sure
         esik = isci.kalp_esigi()
         saklama = isci.saklama()
         silme_beklemesi = isci.hesap_silme_beklemesi()
+        olay_saklamasi = isci.odeme_olay_saklamasi()
     except ValueError as e:
         _hata(str(e))
         return CIKIS_ORTAM
     motor = db.motor_kur(url, pool_size=es_zamanli + 1)
     return Surec(motor, depo, ayarlar, es_zamanli, esik, kalp_araligi, saklama, bakim_araligi,
-                 silme_beklemesi)
+                 silme_beklemesi, olay_saklamasi)
 
 
 def main(argv: list[str]) -> int:

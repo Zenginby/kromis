@@ -56,6 +56,7 @@ from services import (
     kapilar,
     koken,
     kota,
+    odeme,
     planlar,
     platform_anahtari,
     polar,
@@ -242,8 +243,11 @@ def test_dockerignore_keeps_everything_the_app_serves_or_imports():
 # YORUMLARINI) okur, depodan koşulur, .dockerignore'da.
 # `polar_esitle` (Faz 4 / 4): Polar ürünlerini `urunler` aynasına yazar — canlı `DATABASE_URL` + Polar
 # jetonuyla, web imajının içinden (jeton zaten o sürecin ortamında); sahibin fiyat değişikliği adımı.
+# `polar_mutabakat` (Faz 4 / 7): aylık Polar sipariş listesi ↔ `siparisler` farkı, CSV — `marj_raporu`nun
+# ikizi, aynı yerden (canlı DB + Polar jetonu), payout'la yan yana; çıkış kodu cron'a "fark var" der.
 OPERATOR_ARACLARI = ("goc", "kullanici", "ice_aktar", "artik_dosya", "anahtar_dondur",
-                     "medya_tasi", "rls_kontrol", "uygulama_rolu", "marj_raporu", "polar_esitle")
+                     "medya_tasi", "rls_kontrol", "uygulama_rolu", "marj_raporu", "polar_esitle",
+                     "polar_mutabakat")
 
 
 def test_dockerignore_ships_the_operator_tools_and_only_the_dev_tools_stay_out():
@@ -303,6 +307,7 @@ ALTYAPI = {"KROMIS_DATA_DIR", "PORT", db.DATABASE_URL_ENV, koken.KOKEN_ENV,
            dosya.URL_ENV, dosya.KOVA_ENV, dosya.ANAHTAR_ID_ENV, dosya.GIZLI_ENV, dosya.BOLGE_ENV,
            isci.ES_ZAMANLI_ENV, isci.KALP_ESIGI_ENV, isci.SAKLAMA_ENV, kapilar.ES_ZAMANLI_IS_ENV,
            isci.HESAP_SILME_BEKLEME_ENV,  # Faz 4 / 5: hesap silme → içerik temizliği beklemesi (gün)
+           isci.ODEME_OLAY_SAKLAMA_ENV,   # Faz 4 / 7: `odeme_olaylari` saklama süresi (gün, K10)
            kota.SAATLIK_IS_ENV, kota.GUNLUK_KREDI_ENV,
            planlar.FREE_AYLIK_HIBE_ENV,   # Faz 3 / 3: ücretsiz planın aylık hibesi
            planlar.TEMEL_AYLIK_HIBE_ENV, planlar.PRO_AYLIK_HIBE_ENV,   # Faz 4 / 2: ücretli planların dönem hibesi
@@ -788,3 +793,56 @@ def test_the_install_guide_readme_and_operations_doc_cover_plans_credits_and_the
     for ad in (planlar.FREE_AYLIK_HIBE_ENV, filigran.DOSYA_ENV):
         satir = [a for a in _atamalar() if a[0] == ad]
         assert satir and satir[0][1] == "" and satir[0][2], (ad, satir)
+
+
+def test_the_install_guide_readme_operations_doc_and_template_cover_the_payment_step_and_its_variables():
+    """Faz 4 / 7: ödemenin İŞLETME yüzü dört yerde birden yazılı olmalı — yoksa sahip webhook sırrını, ürün
+    metadata sözleşmesini ve aylık mutabakatı ilk canlı ödemede öğrenirdi.
+
+    KURULUM.md 11. adım "Ödeme (Polar)": sandbox → production sırası, webhook URL'si ve dokuz olay
+    (`ISLENEN_TURLER` ile aynı küme — liste elle, bekçisi bu), metadata sözleşmesi (`polar_esitle`nin üç
+    anahtarı), iki kova, iade politikası (admin `duzelt`/"kredi ekle"), hesap silme/dışa aktarma, hukuki metin
+    sürümü (`HUKUK_SURUMU`/`HUKUK_ONAYLI`), mutabakat aracı ve ON maddelik canlı kontrol listesi. README (tr + en):
+    "ödeme Polar üzerinden" cümlesi + 11. adım bağlantısı. docs/isletme.md: § 2 yedek tablosunda üç Faz 4 tablosu
+    ve 1 yıl saklama, § 6 üç uyarı olayı ve "Faz 4" satırının kapanmış olması, § 8 ikinci kovanın AÇILMASI, § 9
+    bakım turunun (6)-(7) adımları, aylık mutabakat ve KVKK başvurusu, sırlar paragrafında Faz 4'ün altı
+    değişkeni. Şablon: altı Faz 4 değişkeni açıklamalı ve boş — ve KURULUM/isletme AYNI ADI yazıyor."""
+    from tools import polar_esitle
+    kurulum = _oku(KURULUM)
+    for parca in ("Ödeme (Polar)", "Merchant of Record", "sandbox", "production", "/api/odeme/webhook",
+                  polar_esitle.META_TUR, polar_esitle.META_PLAN, polar_esitle.META_KREDI, "tools/polar_esitle.py",
+                  "İki kova", "İade politikası", "kredi ekle", "Hesap silme ve dışa aktarma", "HUKUK_SURUMU",
+                  "HUKUK_ONAYLI", "tools/polar_mutabakat.py", "Canlı kontrol listesi", "docs/isletme.md",
+                  "docs/faz4-odeme-abonelik-kvkk.md", "hukuk-kontrol-listesi.md", "rclone sync"):
+        assert parca in kurulum, parca
+    for tur in odeme.ISLENEN_TURLER:
+        assert f"`{tur}`" in kurulum, f"KURULUM 11 webhook olay listesi: {tur}"
+    adim = kurulum.split("**Ödeme (Polar)**", 1)[1].split("\n---", 1)[0]
+    liste = adim.split("Canlı kontrol listesi", 1)[1]
+    assert re.findall(r"^\s+(\d+)\. ", liste, re.M) == [str(i) for i in range(1, 11)], "on madde, sıralı"
+    for madde in ("paket", "abone", "yeniden gönder", "iptal", "Production jetonları", "5 USD", "fatura",
+                  "Hesap silme test hesabıyla", isci.HESAP_SILME_BEKLEME_ENV + "=0", "/hukuk/*", "polar_mutabakat.py"):
+        assert madde in liste, madde
+    for ad, parcalar in ((README, ("Ödeme Polar üzerinden", "11. adım", "faz4-odeme-abonelik-kvkk.md")),
+                         (os.path.join(KOK, "README.en.md"), ("Payment goes through Polar", "step 11",
+                                                              "faz4-odeme-abonelik-kvkk.md"))):
+        metin = _oku(ad)
+        for parca in parcalar:
+            assert parca in metin, f"{os.path.basename(ad)}: {parca}"
+    isletme = _oku(ISLETME)
+    assert "kaderi (CASCADE mi anonimleştirme mi) — Faz 4." not in isletme, "§ 6 Faz 4 satırı kapanmalı"
+    assert "ödeyen kullanıcı gelince\n   (Faz 4) ikinci kova açılır" not in isletme, "§ 8 ikinci kova AÇILDI"
+    for parca in ("`urunler`", "`siparisler`", "`odeme_olaylari`", "1 yıl", "olay=odeme.hata", "Sentry'de OLAY",
+                  "olay=odeme.urunler_bayat", "olay=hesap.silme_abonelik", "İKİNCİ KOVA AÇILIR", "rclone sync",
+                  "(6) **Hesap silme turu**", "(7) **Ödeme olayı saklaması**", "temizlenen_hesap",
+                  "silinen_odeme_olayi", "olay=odeme.olaylar_temizlendi", "Aylık mutabakat",
+                  "tools/polar_mutabakat.py", "polar_eksik", "bizde_fazla", "KVKK / GDPR başvurusu", "30 gün",
+                  "KURULUM.md 11. adım"):
+        assert parca in isletme, parca
+    faz4 = (polar.ORTAM_ENV, polar.JETON_ENV, polar.WEBHOOK_SIRRI_ENV, planlar.TEMEL_AYLIK_HIBE_ENV,
+            planlar.PRO_AYLIK_HIBE_ENV, isci.HESAP_SILME_BEKLEME_ENV, isci.ODEME_OLAY_SAKLAMA_ENV)
+    for ad in faz4:
+        satir = [a for a in _atamalar() if a[0] == ad]
+        assert satir and satir[0][1] == "" and satir[0][2], (ad, satir)
+        assert ad in kurulum, f"KURULUM: {ad}"
+        assert ad in isletme, f"isletme § 7: {ad}"

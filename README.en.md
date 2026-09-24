@@ -175,6 +175,12 @@ composer line ("this run takes 8 · 192 left") and in Settings → **Credits**;
 operators get plan, credit adjustments and a **Margin** table in `/admin`.
 Setup and the go-live checklist: [KURULUM.md → Web build, step 10](KURULUM.md#web-sürümü-sunucu-kurulumu)
 (Turkish); decision record [docs/faz3-kredi-defteri-filigran.md](docs/faz3-kredi-defteri-filigran.md).
+**Payment goes through Polar** (Merchant of Record — card, tax and invoice live
+at Polar, we only keep the row its signed webhook writes): credit packs roll
+over, the `temel`/`pro` subscription grant does not; account deletion and data
+export are in Settings → Account. Setup order and go-live checklist:
+[KURULUM.md → Web build, step 11 "Ödeme (Polar)"](KURULUM.md#web-sürümü-sunucu-kurulumu)
+(Turkish); decision record [docs/faz4-odeme-abonelik-kvkk.md](docs/faz4-odeme-abonelik-kvkk.md).
 
 The complete list — what works per provider, and the roadmap — is in
 **[docs/ozellikler.md](docs/ozellikler.md)** (Turkish).

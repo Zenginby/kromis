@@ -178,6 +178,19 @@ def dogrulandi(kullanici: Kullanici, an: dt.datetime) -> None:
         kullanici.dogrulandi_at = an
 
 
+def sartlar_damgala(kullanici: Kullanici, an: dt.datetime, surum: str) -> None:
+    """Kayıttaki tıkla-onayın damgası (Faz 4 / 6, K11): `sartlar_kabul_at` + `sartlar_surumu`.
+
+    Nesne üstünden, `odeme.sartlar_kabul_yaz`ın UPDATE'i değil: kayıt rotasında
+    satır aynı transaksiyonda henüz `flush` edilmiş bir ORM nesnesi ve rota onu
+    zaten yazıyor (`parola_ozeti`, `dil`); ayrı bir UPDATE aynı satıra ikinci bir
+    yazım olurdu. Sürüm PARAMETRE: bu modül `services/hukuk.py`yi ithal etmiyor,
+    sabitin tek okuyucusu rota katmanı kalsın (harita: `hukuk` → `paths` dışında kenar yok).
+    """
+    kullanici.sartlar_kabul_at = an
+    kullanici.sartlar_surumu = surum
+
+
 # ── Hesap silme (Faz 4 / 5, K9) ──────────────────────────────────────
 
 def anonim_eposta(kullanici_id: uuid.UUID) -> str:

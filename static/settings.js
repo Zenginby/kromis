@@ -1318,10 +1318,50 @@ async function hesapDurumunuYaz() {
       admin.textContent = t("hesap.admin_baglantisi");
       satir.append(" ", admin);
     }
+    sartlarBanneriniCiz(ben);
   }
   bolme.prepend(satir);
 }
 hesapDurumunuYaz();
+
+// ── Şartlar güncellendi banner'ı (Faz 4 / 6, belge §6) ───────────────
+// SUNUCU KARAR VERİR: `ben.sartlar_guncel` `false` ise (onaylanan sürüm ≠
+// `HUKUK_SURUMU`, ya da hiç onay yok) banner çizilir; sayfa sürümü bilmez ve
+// kopyalamaz (planlar.js'in 412 duruşu). Düğme `POST /api/hesap/sartlar-kabul`
+// — gövde yok, sürümü sunucu yazar. Kök `#settings-sartlar-banner` index.html'de,
+// bölmelerin ÜSTÜNDE: hangi sekme açık olsun görünür.
+function sartlarBanneriniCiz(ben) {
+  const kok = $("settings-sartlar-banner");
+  if (!kok || ben.sartlar_guncel !== false) return;
+  kok.replaceChildren();
+  const metin = document.createElement("span");
+  metin.textContent = t("hukuk.guncellendi");
+  const oku = document.createElement("a");
+  oku.href = "/hukuk/kullanim-sartlari";
+  oku.target = "_blank";
+  oku.rel = "noopener";
+  oku.textContent = t("hukuk.kullanim_sartlari");
+  const kabul = document.createElement("button");
+  kabul.type = "button";
+  kabul.id = "settings-sartlar-kabul";
+  kabul.className = "btn-ghost";
+  kabul.textContent = t("hukuk.kabul_dugme");
+  const durum = document.createElement("span");
+  durum.id = "settings-sartlar-durum";
+  durum.className = "modal-status";
+  kabul.addEventListener("click", async () => {
+    kabul.disabled = true;
+    try {
+      await chatApi("/api/hesap/sartlar-kabul", { method: "POST", body: {} });
+      kok.hidden = true;
+    } catch (e) {
+      kabul.disabled = false;
+      durum.textContent = t("hukuk.kabul_hatasi", { hata: e.message });
+    }
+  });
+  kok.append(metin, " ", oku, " ", kabul, " ", durum);
+  kok.hidden = false;
+}
 
 // ── Hesap bölmesi (Faz 4 / 5) ───────────────────────────────────────
 // İçerik DİNAMİK, index.html'de yalnız kök (#settings-hesap-islemleri): #settings-kredi

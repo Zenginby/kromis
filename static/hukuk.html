@@ -1,0 +1,51 @@
+<!doctype html>
+<!-- Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+     GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+     Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+
+     Hukuki metinlerin KABUĞU (Faz 4 / 6, belge §6): `GET /hukuk/{slug}` bu
+     şablonu alır, gövde yer tutucusunun yerine `bundled/hukuk/<slug>.<dil>.html`
+     parçasını koyar (routers/kok.py → services/sablon.py `yerlestir`). Metin
+     dosyada, sözlükte değil (K11) — burada yalnız çerçeve: damga, sürüm, gezinme.
+
+     BETİK YOK: sayfa düz belge; çeviri sunucuda (`t:` anahtarları), etkileşim yok.
+     `giris.html`in deseni — style.css yüklenmez, token katmanı + hukuk.css.
+
+     Damga satırının yer tutucusu: `services/hukuk.HUKUK_ONAYLI` `False` iken boş
+     (damga görünür), `True` olunca `hidden`. Damga şablonda DURUYOR, metin
+     dosyalarında değil: onay gelince tek bayrak değişir, sekiz dosya değil.
+     Bu yorum yer tutucu ADLARINI yazmıyor: yorum servis edilen sayfada kalıyor
+     ve tests/test_hukuk.py "yer tutucu kaldı mı" diye ham metni tarıyor. -->
+<html lang="__APP_LANG__">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{{t:hukuk.title}}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=__APP_VERSION__" />
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico?v=__APP_VERSION__" />
+  <link rel="stylesheet" href="/static/fonts.css?v=__APP_VERSION__" />
+  <link rel="stylesheet" href="/static/flow-tokens.css?v=__APP_VERSION__" />
+  <link rel="stylesheet" href="/static/hukuk.css?v=__APP_VERSION__" />
+</head>
+<body>
+  <main class="hukuk">
+    <header class="hukuk-bas">
+      <a class="hukuk-geri" href="/">{{t:hukuk.geri}}</a>
+      <!-- `role="note"`: damga metnin parçası değil, metin HAKKINDA bir uyarı. -->
+      <p id="hukuk-taslak" class="hukuk-taslak" role="note" __HUKUK_TASLAK_GIZLI__>{{t:hukuk.taslak}}</p>
+    </header>
+
+    <article id="hukuk-metin" class="hukuk-metin">
+__HUKUK_GOVDE__
+    </article>
+
+    <footer class="hukuk-dip">
+      <p class="hukuk-surum">{{t:hukuk.surum_etiketi}} <code id="hukuk-surum">__HUKUK_SURUM__</code></p>
+      <!-- Dört metne bağlantı; seçili olan `aria-current="page"` (routers/kok.py `_hukuk_gezinme`). -->
+      <nav id="hukuk-gezinme" class="hukuk-gezinme" aria-label="{{t:hukuk.diger_metinler}}">
+__HUKUK_GEZINME__
+      </nav>
+    </footer>
+  </main>
+</body>
+</html>

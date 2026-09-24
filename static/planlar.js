@@ -77,6 +77,19 @@
     return li;
   }
 
+  /** "Ticari kullanım hakkı" satırı metne BAĞLANIR (Faz 4 / 6, belge §6): cümlenin
+   *  kaynağı `/hukuk/ticari-haklar`; kullanıcı "hangi ölçüde?" sorusunu orada okur. */
+  function ozellikBaglantili(metin, yol, yok) {
+    const li = ozellik("", yok);
+    const a = document.createElement("a");
+    a.href = yol;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = metin;
+    li.append(a);
+    return li;
+  }
+
   function dugme(metin, tiklandi) {
     const b = document.createElement("button");
     b.type = "button";
@@ -125,8 +138,9 @@
       ozellik(t("planlar.hibe", { n: kural.aylik_hibe })),
       ozellik(t(kural.filigran ? "kredi.filigran_var" : "kredi.filigran_yok"), kural.filigran),
       ozellik(t(kural.video ? "kredi.video_acik" : "kredi.video_kapali"), !kural.video),
-      ozellik(
+      ozellikBaglantili(
         t(ad === "free" ? "planlar.ticari_haklar_yok" : "planlar.ticari_haklar"),
+        "/hukuk/ticari-haklar",
         ad === "free",
       ),
     );

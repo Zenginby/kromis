@@ -42,8 +42,16 @@ import version
 from services import ayar, dil
 
 
-def sayfa(ayarlar: ayar.Ayarlar, dosya: str) -> HTMLResponse:
-    """`static/<dosya>`yı isteğin dilinde, sürüm ve sözlük yerleştirilmiş servis eder."""
+def sayfa(ayarlar: ayar.Ayarlar, dosya: str,
+          yerlestir: dict[str, str] | None = None) -> HTMLResponse:
+    """`static/<dosya>`yı isteğin dilinde, sürüm ve sözlük yerleştirilmiş servis eder.
+
+    `yerlestir` (Faz 4 / 6): rotanın kendi yer tutucuları (`__HUKUK_GOVDE__` →
+    metnin HTML parçası). Sabitlerle AYNI turda, `{{t:…}}`den ÖNCE yerleşir
+    (modül başındaki sıra): parçanın içindeki bir `{{t:…}}` de çevrilir,
+    çevirinin içindeki bir `__X__` ise asla parça sayılmaz. Değer HAM HTML —
+    kaynağı depodan gelen bir dosya olmalı, kullanıcı girdisi değil.
+    """
     dil_kodu = dil.aktif()
     try:
         with open(os.path.join(ayarlar.static_dir, dosya), encoding="utf-8") as f:
@@ -64,5 +72,7 @@ def sayfa(ayarlar: ayar.Ayarlar, dosya: str) -> HTMLResponse:
              .replace("__APP_LANG__", dil_kodu)
              .replace("__APP_I18N__", i18n.js_payload(dil_kodu))
              .replace("__APP_LANG_OPTIONS__", i18n.language_options_html(dil_kodu)))
+    for ad, deger in (yerlestir or {}).items():
+        govde = govde.replace(ad, deger)
     return HTMLResponse(i18n.render(govde, dil_kodu),
                         headers={"Cache-Control": "no-store"})

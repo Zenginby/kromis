@@ -131,7 +131,13 @@
   });
 
   formBagla(el("form-kayit"), async (veri) => {
-    await gonder("/api/hesap/kayit", { eposta: veri.get("eposta"), parola: veri.get("parola") });
+    // Şartlar kutusu (Faz 4 / 6): değer sunucuya gider, kararı sunucu verir —
+    // işaretsizse 422 ve cümlesi mesaj satırına düşer (giris.html'in gerekçesi).
+    await gonder("/api/hesap/kayit", {
+      eposta: veri.get("eposta"),
+      parola: veri.get("parola"),
+      sartlar: el("kayit-sartlar").checked,
+    });
     el("form-kayit").reset();
     sekmeAc("giris");
     mesajYaz(t("giris.kayit_gonderildi"), "basari");

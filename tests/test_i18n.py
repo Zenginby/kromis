@@ -696,6 +696,8 @@ KULLANICIYA_KONUSAN = (
     "routers/ayarlar.py", "routers/bindirme.py", "routers/galeri.py",
     "routers/hesap.py", "routers/paletler.py", "routers/sohbet.py",
     "routers/uretim.py",
+    # Faz 4 / 6: `GET /hukuk/{slug}` bilinmeyen slug'a 404 cümlesi (`err.hukuk_metni_yok`).
+    "routers/kok.py",
     # Faz 2 / 4: iş uçları — 404/409/422 metinleri (`err.is_*`, `err.bad_since`).
     "routers/isler.py",
     # Faz 2 / 8: admin uçları — 404/409/422 metinleri (`err.kullanici_bulunamadi`, `err.is_durumu_gecersiz`).
@@ -776,8 +778,8 @@ KULLANICIYA_KONUSMAYAN = {
                                "yerine ANAHTAR taşıyan `GecersizTercih`, cümleyi rota kurar",
     "services/tablolar.py": "veri modeli (Faz 1 / 2): tablo, sütun, kısıt tanımları; metin yok — "
                             "CHECK değer kümeleri bile kodun sabitleri, cümle değil",
-    "routers/kok.py": "`/` rotası; yerleştirme ve 500 metni `services/sablon.py`ye "
-                      "taşındı (Faz 1 / 3), burada yalnız çağrı kaldı",
+    "services/hukuk.py": "hukuki metinlerin sürüm sabiti ve `bundled/hukuk/` okuyucusu (Faz 4 / 6): "
+                         "cümleyi HTML parçası taşıyor, 404'ü rota kurar",
     "services/cerez.py": "çerez adı ve bayrakları (Faz 1 / 3); metin yok",
     "services/sifre.py": "şifreleme (Faz 1 / 7): hataları OPERATÖRE gidiyor (uvicorn günlüğü, "
                          "`hata.log`), kullanıcıya değil — anahtar yokken uygulama hiç açılmıyor",

@@ -39,7 +39,9 @@
     <section id="planlar-sartlar" class="planlar-kutu" hidden>
       <label class="planlar-sartlar-etiket">
         <input id="planlar-sartlar-kutu" type="checkbox" />
-        <span>{{t:planlar.sartlar_kutu}}</span>
+        <span>{{t:hukuk.okudum_kabul}}
+          <a href="/hukuk/kullanim-sartlari" target="_blank" rel="noopener">{{t:hukuk.kullanim_sartlari}}</a> ·
+          <a href="/hukuk/gizlilik" target="_blank" rel="noopener">{{t:hukuk.gizlilik}}</a></span>
       </label>
       <button id="planlar-sartlar-onayla" type="button" class="planlar-birincil" disabled>{{t:planlar.sartlar_onayla}}</button>
     </section>
@@ -62,6 +64,13 @@
     </section>
 
     <p class="planlar-not planlar-dip">{{t:planlar.polar_notu}}</p>
+    <!-- Hukuki metinler (Faz 4 / 6): "ticari haklar" kartındaki cümlenin kaynağı da burada. -->
+    <footer class="planlar-not planlar-hukuk">
+      <a href="/hukuk/kullanim-sartlari">{{t:hukuk.kullanim_sartlari}}</a> ·
+      <a href="/hukuk/gizlilik">{{t:hukuk.gizlilik}}</a> ·
+      <a href="/hukuk/cerez">{{t:hukuk.cerez}}</a> ·
+      <a href="/hukuk/ticari-haklar">{{t:hukuk.ticari_haklar}}</a>
+    </footer>
   </main>
 
   <script>window.KROMIS_LANG="__APP_LANG__";window.KROMIS_I18N=__APP_I18N__;</script>

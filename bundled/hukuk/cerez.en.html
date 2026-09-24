@@ -1,0 +1,37 @@
+<!-- Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
+     GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
+     Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
+     Cookie notice — DRAFT (Faz 4 / 6). English counterpart of cerez.tr.html; the cookies it
+     describes are set in services/cerez.py and services/dil.py. -->
+<h1>Cookie Notice</h1>
+<p class="hukuk-meta">What Kromis Studio stores in your browser — and what it does not.</p>
+
+<h2>1. In short</h2>
+<p>We use only two cookies that are <strong>strictly necessary</strong> for the service to work. <strong>There are no third-party cookies, no tracking (analytics) cookies and no advertising cookies.</strong> That is why we do not ask for cookie consent: strictly necessary cookies are exempt (ePrivacy Directive art. 5(3); the Turkish Personal Data Protection Board's cookie guidance draws the same line).</p>
+
+<h2>2. The cookies we use</h2>
+<table>
+  <thead><tr><th>Cookie</th><th>Purpose</th><th>Lifetime</th><th>Flags</th></tr></thead>
+  <tbody>
+    <tr><td><code>kromis_oturum</code></td><td>Your session: tells the server you are signed in. The cookie holds a random token; the server stores only a hash of it.</td><td>30 days, extended on each use (sliding); deleted when you sign out</td><td><code>Secure</code>, <code>HttpOnly</code>, <code>SameSite=Lax</code></td></tr>
+    <tr><td><code>kromis_lang</code></td><td>Your interface language choice (Settings → Language); the page is rendered on the server in that language.</td><td>1 year</td><td><code>Secure</code>, <code>HttpOnly</code>, <code>SameSite=Lax</code></td></tr>
+  </tbody>
+</table>
+<p><code>Secure</code>: the cookie travels only over encrypted (HTTPS) connections. <code>HttpOnly</code>: scripts on the page cannot read it. <code>SameSite=Lax</code>: it is not sent with requests originating from other sites.</p>
+
+<h2>3. Browser storage (localStorage)</h2>
+<p>Some interface preferences (selected model, aspect ratio, last opened panel and the like) are kept in your browser's own storage. This data is not sent to the server; it stays in that browser and is removed when you clear your browser data. Preferences tied to your account are stored on the server with your account (see the <a href="/hukuk/gizlilik">Privacy Notice</a>).</p>
+
+<h2>4. What we do not use</h2>
+<ul>
+  <li>No analytics or tracking cookies (Google Analytics and the like).</li>
+  <li>No advertising networks, social media plug-ins or fingerprinting.</li>
+  <li>The checkout page opens on Polar's own domain; Polar's own cookies live on that page under Polar's cookie policy — they are not loaded on our pages.</li>
+  <li>Error monitoring (Sentry) runs server-side; it loads no script into your browser and receives no personal data (request bodies, e-mail, prompts).</li>
+</ul>
+
+<h2>5. Managing cookies</h2>
+<p>You can delete or block cookies in your browser settings. If <code>kromis_oturum</code> is blocked you cannot sign in; if <code>kromis_lang</code> is blocked the language is determined again on each visit from your browser language or your account.</p>
+
+<h2>6. Changes</h2>
+<p>If we add a new cookie or storage mechanism this notice is updated and its version number advances; if a type requiring consent (tracking, advertising) were ever added we would ask for your consent separately.</p>

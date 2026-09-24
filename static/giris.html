@@ -67,6 +67,17 @@
       <input id="kayit-parola" name="parola" type="password" autocomplete="new-password"
              minlength="8" maxlength="128" required />
       <p class="giris-not">{{t:giris.parola_kurali}}</p>
+      <!-- Şartlar onayı (Faz 4 / 6, K11 tıkla-onay): kutu ZORUNLU ama `required`
+           özniteliği BİLEREK yok — tarayıcının kendi baloncuğu yerine sunucunun
+           422 cümlesi (`err.sartlar_gerekli`) mesaj satırında görünsün; kapı
+           sunucuda (`models.KayitIstegi.sartlar`), tarayıcı yalnız değeri taşır.
+           Bağlantılar yeni sekmede: form doldurulurken sayfa kaybolmasın. -->
+      <label class="giris-onay" for="kayit-sartlar">
+        <input id="kayit-sartlar" name="sartlar" type="checkbox" />
+        <span>{{t:hukuk.okudum_kabul}}
+          <a href="/hukuk/kullanim-sartlari" target="_blank" rel="noopener">{{t:hukuk.kullanim_sartlari}}</a> ·
+          <a href="/hukuk/gizlilik" target="_blank" rel="noopener">{{t:hukuk.gizlilik}}</a></span>
+      </label>
       <button type="submit" class="giris-birincil">{{t:giris.kayit_dugme}}</button>
     </form>
 
@@ -85,6 +96,15 @@
       <p class="giris-not">{{t:giris.parola_kurali}}</p>
       <button type="submit" class="giris-birincil">{{t:giris.yeni_parola_dugme}}</button>
     </form>
+
+    <!-- Hukuki metinler (Faz 4 / 6): oturumsuz ziyaretçinin metne ulaştığı yer bu
+         sayfa — kayıt kutusu "okudum" diyor, okunacak şey bir tık uzakta olmalı. -->
+    <footer class="giris-dip">
+      <a href="/hukuk/kullanim-sartlari">{{t:hukuk.kullanim_sartlari}}</a> ·
+      <a href="/hukuk/gizlilik">{{t:hukuk.gizlilik}}</a> ·
+      <a href="/hukuk/cerez">{{t:hukuk.cerez}}</a> ·
+      <a href="/hukuk/ticari-haklar">{{t:hukuk.ticari_haklar}}</a>
+    </footer>
   </main>
 
   <!-- Sözlük ve dil, index.html ile aynı biçimde satır içi (gerekçesi i18n.js'in başında). -->

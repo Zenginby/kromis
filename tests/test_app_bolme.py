@@ -126,8 +126,9 @@ def test_every_router_module_is_included_in_the_app():
     # 67 → 69 (Faz 3 / 3: admin `plan` ve `kredi` rotaları); 69 → 70 (Faz 3 / 6: `GET /api/kredi`);
     # 70 → 72 (Faz 4 / 3: `POST /api/odeme/webhook`, `GET /api/admin/odeme-olaylari`);
     # 72 → 77 (Faz 4 / 4: checkout, portal, urunler + `/planlar`, `/odeme/tesekkur` şablon rotaları);
-    # 77 → 79 (Faz 4 / 5: `POST /api/hesap/sil`, `GET /api/hesap/disa-aktar`).
-    assert len(graftaki) == 79, "rota sayısı değişti — bilinçliyse bu sayıyı güncelle"
+    # 77 → 79 (Faz 4 / 5: `POST /api/hesap/sil`, `GET /api/hesap/disa-aktar`);
+    # 79 → 81 (Faz 4 / 6: `GET /hukuk/{slug}`, `POST /api/hesap/sartlar-kabul`).
+    assert len(graftaki) == 81, "rota sayısı değişti — bilinçliyse bu sayıyı güncelle"
 
 
 def test_directories_are_read_at_request_time_not_bound_at_import():

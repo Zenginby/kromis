@@ -57,6 +57,9 @@ ACIK_ROTALAR: dict[tuple[str, str], str] = {
     # Faz 4 / 4: fiyat listesi herkese — `urunler` politikasız ALTYAPI tablosu, kullanıcı verisi taşımaz;
     # satış sayfası (`/planlar`) kapılı, veri ucu değil (belge §4).
     ("GET", "/api/odeme/urunler"): "aktif ürünler + plan kuralları: herkese açık fiyat listesi, kullanıcı verisi yok",
+    # Faz 4 / 6: hukuki metinler — kayıt kutusu bu sayfalara bağlanır, kayıt olmayan ziyaretçi okuyamazsa
+    # onay "okudum" olmaz; metin depodan (`bundled/hukuk`), kullanıcı verisi yok (routers/kok.py).
+    ("GET", "/hukuk/{slug}"): "hukuki metin sayfası: kayıt öncesi okunur, kullanıcı verisi taşımaz",
 }
 
 # Oturumsuz cevabı 302 olan (tarayıcı gezinmesi) rotalar; geri kalan kapılılar 401 JSON.
@@ -120,6 +123,8 @@ DIZINSIZ_KAPILI = {
     # yolları `ayar.KULLANICILAR_DIZINI` sabitinden); `POST /api/hesap/sil` listede DEĞİL: `ayar.ayarlar`
     # alır (`hata.log` için `data_dir`).
     ("GET", "/api/hesap/disa-aktar"),
+    # Faz 4 / 6: şartlar onayı — `kullanicilar` satırına iki sütun yazar, dizin yok.
+    ("POST", "/api/hesap/sartlar-kabul"),
 }
 
 KAPI = {kimlik.aktif_kullanici, kimlik.sayfa_kullanicisi}
@@ -206,7 +211,8 @@ def test_every_route_is_either_gated_or_openly_listed_with_a_reason():
     # +1 açık (Faz 4 / 3: `/api/odeme/webhook`) +1 kapılı (Faz 4 / 3: `/api/admin/odeme-olaylari`),
     # +1 açık (Faz 4 / 4: `/api/odeme/urunler`) +4 kapılı (Faz 4 / 4: checkout, portal, `/planlar`, `/odeme/tesekkur`)
     # +2 kapılı (Faz 4 / 5: `POST /api/hesap/sil`, `GET /api/hesap/disa-aktar`)
-    assert len(KAPILI) == 70 and len(ACIK) == 9 and len(KAPILI | ACIK) == 79, (
+    # +1 açık (Faz 4 / 6: `GET /hukuk/{slug}`) +1 kapılı (Faz 4 / 6: `POST /api/hesap/sartlar-kabul`)
+    assert len(KAPILI) == 71 and len(ACIK) == 10 and len(KAPILI | ACIK) == 81, (
         "rota sayısı ya da kapı sayısı değişti — bilinçliyse belgeyi ve bu sayıları güncelle")
 
 

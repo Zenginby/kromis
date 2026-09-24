@@ -85,7 +85,8 @@ def _jeton(parametre: str) -> str:
 
 
 def _kayit(c: TestClient, eposta: str = EPOSTA, parola: str = PAROLA):
-    return c.post("/api/hesap/kayit", json={"eposta": eposta, "parola": parola})
+    # `sartlar: True` (Faz 4 / 6): kayıt kutusu zorunlu, onaysız 422 — tests/test_hukuk.py ölçer.
+    return c.post("/api/hesap/kayit", json={"eposta": eposta, "parola": parola, "sartlar": True})
 
 
 def _dogrula(c: TestClient) -> None:
@@ -179,7 +180,8 @@ def test_login_sets_a_hardened_session_cookie_and_ben_returns_the_user(istemci):
     cevap = _giris(istemci)
     assert cevap.status_code == 200
     govde = cevap.json()
-    assert set(govde) == {"id", "eposta", "dil", "is_admin"}
+    # `sartlar_guncel` (Faz 4 / 6): onaylanan sürüm bugünkü mü (tests/test_hukuk.py).
+    assert set(govde) == {"id", "eposta", "dil", "is_admin", "sartlar_guncel"}
     assert govde["eposta"] == EPOSTA and govde["is_admin"] is False and govde["dil"] == "en"
     uuid.UUID(govde["id"])
     cerez_basligi = cevap.headers["set-cookie"].lower()
@@ -423,7 +425,7 @@ def test_a_reset_also_verifies_an_unverified_account(istemci):
 
 
 def test_the_reset_mail_speaks_the_users_stored_language_not_the_requesters(istemci):
-    istemci.post("/api/hesap/kayit", json={"eposta": EPOSTA, "parola": PAROLA},
+    istemci.post("/api/hesap/kayit", json={"eposta": EPOSTA, "parola": PAROLA, "sartlar": True},
                  headers={"X-Kromis-Lang": "tr"})
     assert _son_posta().konu == i18n.t("posta.dogrulama_konu", "tr")
     k = _kullanici()
@@ -436,11 +438,11 @@ def test_the_reset_mail_speaks_the_users_stored_language_not_the_requesters(iste
 
 def test_invalid_email_and_short_password_are_422_in_the_interface_language(istemci):
     for lang, kotu in (("tr", "adres-degil"), ("en", "a@b")):
-        cevap = istemci.post("/api/hesap/kayit", json={"eposta": kotu, "parola": PAROLA},
+        cevap = istemci.post("/api/hesap/kayit", json={"eposta": kotu, "parola": PAROLA, "sartlar": True},
                              headers={"X-Kromis-Lang": lang})
         assert cevap.status_code == 422
         assert i18n.t("err.hesap_gecersiz_eposta", lang) in cevap.text
-    kisa = istemci.post("/api/hesap/kayit", json={"eposta": EPOSTA, "parola": "kisa123"},
+    kisa = istemci.post("/api/hesap/kayit", json={"eposta": EPOSTA, "parola": "kisa123", "sartlar": True},
                         headers={"X-Kromis-Lang": "tr"})
     assert kisa.status_code == 422
     assert i18n.t("err.hesap_parola_uzunluk", "tr", en_az=8, en_cok=128) in kisa.text
@@ -449,7 +451,7 @@ def test_invalid_email_and_short_password_are_422_in_the_interface_language(iste
 
 
 def test_extra_fields_are_rejected_on_every_account_request(istemci):
-    for yol, govde in (("/api/hesap/kayit", {"eposta": EPOSTA, "parola": PAROLA}),
+    for yol, govde in (("/api/hesap/kayit", {"eposta": EPOSTA, "parola": PAROLA, "sartlar": True}),
                        ("/api/hesap/giris", {"eposta": EPOSTA, "parola": PAROLA}),
                        ("/api/hesap/sifirla", {"eposta": EPOSTA}),
                        ("/api/hesap/dogrula", {"jeton": "x" * 43}),
@@ -569,11 +571,13 @@ HESAP_ROTALARI = {
     ("GET", "/api/hesap/ben"), ("GET", "/giris"),
     # Faz 4 / 5: hesap silme ve veri dışa aktarma (8 → 10; tests/test_hesap_silme.py).
     ("POST", "/api/hesap/sil"), ("GET", "/api/hesap/disa-aktar"),
+    # Faz 4 / 6: şartlar onayı — var olan kullanıcı yeni sürümü damgalar (10 → 11; tests/test_hukuk.py).
+    ("POST", "/api/hesap/sartlar-kabul"),
 }
 
 
 def test_the_account_routes_are_exactly_the_eight_the_document_names():
-    """Belge §3: "öneri 8 rota" — liste birebir (Faz 4 / 5 ile 10); 46 → 54 sayısı tests/test_app_bolme.py'de."""
+    """Belge §3: "öneri 8 rota" — liste birebir (Faz 4 / 5 ile 10, Faz 4 / 6 ile 11); 46 → 54 sayısı tests/test_app_bolme.py'de."""
     calisan = {(y, yol) for y, yol in conftest.duz_rotalar(appmod.app)
                if yol.startswith("/api/hesap") or yol == "/giris"}
     assert calisan == HESAP_ROTALARI

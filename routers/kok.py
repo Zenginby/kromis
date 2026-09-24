@@ -21,13 +21,22 @@ okur, planlar sayfası da satın alma DÜĞMESİ taşır — fiyat listesinin ke
 oturumsuz uçta (`GET /api/odeme/urunler`). Kendi belgeleri, stüdyonun 13
 betiği YÜKLENMEZ (giris.html'in gerekçesi): oturumsuz ziyaretçiye ve bir
 ödeme dönüşüne stüdyoyu indirmenin anlamı yok.
+
+HUKUKİ METİNLER (Faz 4 / 6, belge §6): `GET /hukuk/{slug}` — `static/hukuk.html`
+kabuğu + `bundled/hukuk/<slug>.<dil>.html` parçası (`services/hukuk.py`). AÇIK
+rota (tests/test_kimlik.py `ACIK_ROTALAR`, gerekçesiyle): kayıt kutusu bu
+sayfalara BAĞLANIYOR ve kayıt olmayan ziyaretçi metni okuyamazsa onay
+"okudum" olmaz. Slug beyaz listede değilse 404 (kabuk yok — metin yok).
+Dil `services/dil.py` zinciri (oturumsuz: başlık → çerez → Accept-Language),
+cevabın `Content-Language` başlığı hangi dilin çizildiğini söyler.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 
-from services import ayar, kimlik, sablon
+import i18n
+from services import ayar, dil, hukuk, kimlik, sablon
 from services.tablolar import Kullanici
 
 router = APIRouter()
@@ -62,3 +71,40 @@ def odeme_tesekkur(kullanici: Kullanici = Depends(kimlik.sayfa_kullanicisi),
                    ayarlar: ayar.Ayarlar = Depends(ayar.genel)) -> HTMLResponse:
     """`static/tesekkur.html` — Polar'dan dönüş (Faz 4 / 4): `/api/kredi`yi 2 sn'de bir 30 sn yoklar."""
     return sablon.sayfa(ayarlar, "tesekkur.html")
+
+
+def _hukuk_gezinme(secili: str) -> str:
+    """Kabuğun alt gezinmesi: dört metne bağlantı, seçili olan `aria-current="page"`.
+
+    Şablonda değil burada kuruluyor: seçili işaret slug'a bağlı ve `{{t:…}}`
+    yalnız metin çevirir, öznitelik kuramaz. Etiketler `{{t:…}}` olarak kalıyor
+    — yerleştirme `{{t:…}}`den ÖNCE koştuğu için çeviri yine `sablon.sayfa`da olur.
+    """
+    parcalar = []
+    for slug in hukuk.SLUGLAR:
+        simdiki = ' aria-current="page"' if slug == secili else ""
+        parcalar.append(f'<a href="/hukuk/{slug}"{simdiki}>{{{{t:{hukuk.BASLIK_ANAHTARLARI[slug]}}}}}</a>')
+    return "\n".join(parcalar)
+
+
+@router.get("/hukuk/{slug}")
+def hukuk_metni(slug: str, ayarlar: ayar.Ayarlar = Depends(ayar.genel)) -> HTMLResponse:
+    """`bundled/hukuk/<slug>.<dil>.html` parçasını `static/hukuk.html` kabuğunda servis eder (gerekçe modül başında).
+
+    Damga satırı `HUKUK_ONAYLI` `False` iken görünür (`__HUKUK_TASLAK_GIZLI__`
+    boş), `True` olunca `hidden` — metin dosyasına dokunulmaz. Sürüm satırı
+    `HUKUK_SURUMU`: kullanıcı onayladığı sürümü sayfada görür (kayıt damgası
+    aynı sabiti yazıyor).
+    """
+    dil_kodu = dil.aktif()
+    govde = hukuk.metin(slug, dil_kodu)
+    if govde is None:
+        raise HTTPException(status_code=404, detail=i18n.t("err.hukuk_metni_yok", dil_kodu))
+    cevap = sablon.sayfa(ayarlar, "hukuk.html", yerlestir={
+        "__HUKUK_GOVDE__": govde,
+        "__HUKUK_GEZINME__": _hukuk_gezinme(slug),
+        "__HUKUK_SURUM__": hukuk.HUKUK_SURUMU,
+        "__HUKUK_TASLAK_GIZLI__": "" if not hukuk.HUKUK_ONAYLI else "hidden",
+    })
+    cevap.headers["Content-Language"] = dil_kodu
+    return cevap

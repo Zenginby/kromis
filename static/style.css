@@ -3043,6 +3043,20 @@ body.viewer-open { overflow: hidden; }
 .hesap-sil-form label { font-size: 0.9rem; color: var(--muted); }
 .hesap-sil-form .hesap-sil-dugme { color: var(--danger-text); align-self: flex-start; }
 .hesap-sil-uyari { color: var(--danger-text); }
+/* Şartlar güncellendi banner'ı (Faz 4 / 6, settings.js sartlarBanneriniCiz): bölmelerin
+   üstünde tek satır — metin, metne bağlantı, onay düğmesi; kapanınca `hidden`. */
+.settings-sartlar-banner {
+  display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center;
+  margin: 0 0 14px; padding: 10px 12px;
+  border: 1px solid var(--accent); border-radius: var(--r-item, 12px);
+  background: var(--surface-2); font-size: 0.88rem; line-height: 1.45;
+}
+.settings-sartlar-banner[hidden] { display: none; }
+.settings-sartlar-banner a { color: var(--fg); }
+/* Hakkında bölmesi hukuki metin bağlantıları (Faz 4 / 6). */
+.settings-hukuk-row { line-height: 1.8; }
+.settings-hukuk-row a { color: var(--muted); text-decoration: none; }
+.settings-hukuk-row a:hover { color: var(--fg); text-decoration: underline; }
 .kredi-bakiye { margin: 0 0 6px; font-size: 1.6rem; font-variant-numeric: tabular-nums; }
 .kredi-bakiye span { font-size: 0.9rem; color: var(--muted); }
 .kredi-hareketler { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }

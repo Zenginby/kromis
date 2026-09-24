@@ -124,3 +124,13 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .giris-sekmeler button, .giris-form input, .giris-birincil { transition: none; }
 }
+
+/* Şartlar kutusu (Faz 4 / 6): kutu + metin yan yana, metin sarar. */
+.giris-onay { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; font-size: 0.85rem; color: var(--muted); line-height: 1.45; }
+.giris-onay input { margin-top: 3px; flex: none; }
+.giris-onay a { color: var(--fg); }
+
+/* Hukuki metin bağlantıları (Faz 4 / 6): kartın dibinde, sessiz. */
+.giris-dip { margin-top: 22px; text-align: center; font-size: 0.78rem; color: var(--muted); line-height: 1.7; }
+.giris-dip a { color: var(--muted); text-decoration: none; }
+.giris-dip a:hover { color: var(--fg); text-decoration: underline; }

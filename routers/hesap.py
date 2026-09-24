@@ -1,14 +1,24 @@
 # Kromis Studio — Copyright (C) 2026 Alperen Zengin (@Zenginby)
 # GNU AGPL-3.0 ile lisanslı. Kaynak: https://github.com/Zenginby/kromis
 # Bu bildirim kaldırılamaz (AGPL-3.0 §5a); ad ve logo lisans DIŞIDIR (MARKA.md).
-"""Hesap uçları — kayıt, doğrulama, giriş, çıkış, sıfırlama, `/giris` sayfası (Faz 1 / 3); silme ve dışa aktarma (Faz 4 / 5).
+"""Hesap uçları — kayıt, doğrulama, giriş, çıkış, sıfırlama, `/giris` sayfası (Faz 1 / 3); silme ve dışa aktarma (Faz 4 / 5); şartlar onayı (Faz 4 / 6).
 
-On rota: `POST /api/hesap/{kayit,dogrula,giris,cikis,sifirla,
+On bir rota: `POST /api/hesap/{kayit,dogrula,giris,cikis,sifirla,
 sifirla/dogrula}`, `GET /api/hesap/ben`, `GET /giris` (belge Faz 1 §3) +
-`POST /api/hesap/sil`, `GET /api/hesap/disa-aktar` (Faz 4 §5). HTTP burada
+`POST /api/hesap/sil`, `GET /api/hesap/disa-aktar` (Faz 4 §5) +
+`POST /api/hesap/sartlar-kabul` (Faz 4 §6). HTTP burada
 (gövde, durum kodu, çerez, cümle); hesap mantığı `services/hesap.py`de, posta
 `services/posta.py`de, kapı `services/kimlik.py`de, dışa aktarma arşivi
 `services/disa_aktar.py`de.
+
+ŞARTLAR ONAYI (Faz 4 / 6, K11 tıkla-onay): kayıt `sartlar: true` olmadan 422
+(`models.KayitIstegi`); başarılı kayıt `sartlar_kabul_at` + `sartlar_surumu =
+hukuk.HUKUK_SURUMU` yazar (`hesap.sartlar_damgala` — yeniden kayıt olan
+doğrulanmamış hesapta da: onay bu isteğin). Var olan kullanıcı sürüm değişince
+`GET /api/hesap/ben` `sartlar_guncel: false` görür, ayarlar banner'ı
+`POST /api/hesap/sartlar-kabul` ile bugünkü sürümü damgalar
+(`odeme.sartlar_kabul_yaz` — checkout'un 412 kapısıyla AYNI yazıcı, iki yazar
+iki sürüm yazmasın). Sürüm sabiti TEK yerde: `services/hukuk.py`.
 
 HESAP SİLME (Faz 4 / 5, K9) — anonimleştir + kilitle ANINDA, içerik 7 gün
 sonra bakım turunda (`services/isci.py silme_turu`), defter ve sipariş KALIR.
@@ -92,11 +102,13 @@ from services import (
     disa_aktar,
     gunluk,
     hesap,
+    hukuk,
     isci,
     kimlik,
     kiraci,
     koken,
     kuyruk,
+    odeme,
     planlar,
     polar,
     posta,
@@ -149,9 +161,15 @@ def _baglanti(request: Request, parametre: str, jeton: str) -> str:
 
 
 def _ben(kullanici: Kullanici) -> dict:
-    """`GET /api/hesap/ben`in gövdesi (belge: `{id, eposta, dil, is_admin}`); giriş de aynısını döner."""
+    """`GET /api/hesap/ben`in gövdesi (belge: `{id, eposta, dil, is_admin}` + Faz 4 / 6 `sartlar_guncel`); giriş de aynısını döner.
+
+    `sartlar_guncel`: onaylanan sürüm bugünkü metnin sürümü mü (`hukuk.guncel_mi`).
+    Ön yüz (settings.js) `false` görünce "şartlar güncellendi" banner'ını çizer;
+    sunucu kuralı burada, sayfa kopyalamaz.
+    """
     return {"id": str(kullanici.id), "eposta": kullanici.eposta,
-            "dil": kullanici.dil, "is_admin": kullanici.is_admin}
+            "dil": kullanici.dil, "is_admin": kullanici.is_admin,
+            "sartlar_guncel": hukuk.guncel_mi(kullanici.sartlar_surumu)}
 
 
 def _dogrulama_gonder(request: Request, db: Session, kullanici: Kullanici,
@@ -205,9 +223,12 @@ def kayit(req: KayitIstegi, request: Request,
     if kullanici is None:
         kullanici = hesap.kullanici_olustur(db, req.eposta, req.parola, dil.aktif())
         _ilk_hibe(db, kullanici, an)
+        hesap.sartlar_damgala(kullanici, an, hukuk.HUKUK_SURUMU)
     elif kullanici.dogrulandi_at is None:
         kullanici.parola_ozeti = hesap.parola_ozeti(req.parola)
         kullanici.dil = dil.aktif()
+        # Onay da bu isteğin: kutuyu işaretleyen kişi bu parolayı yazan kişi (modül başı).
+        hesap.sartlar_damgala(kullanici, an, hukuk.HUKUK_SURUMU)
     else:
         hesap.parola_ozeti(req.parola)   # süre eşitliği (modül başı)
         _gonder(request, posta.mevcut_hesap_postasi(
@@ -323,6 +344,20 @@ def sifirla_dogrula(req: YeniParolaIstegi, db: Session = OTURUM) -> dict:
 def ben(kullanici: Kullanici = Depends(kimlik.aktif_kullanici)) -> dict:
     """Ön yüzün açılışta sorduğu: kimim? Oturum yoksa kapı 401 verir."""
     return _ben(kullanici)
+
+
+@router.post("/api/hesap/sartlar-kabul")
+def sartlar_kabul(kullanici: Kullanici = Depends(kimlik.aktif_kullanici),
+                  db: Session = OTURUM) -> dict:
+    """Bugünkü şartlar sürümünü damgalar (Faz 4 / 6): ayarlar banner'ının düğmesi; cevap `{"ok", "surum"}`.
+
+    Gövde YOK: onaylanacak tek şey bugünkü metin ve sürümü sunucu bilir — istemcinin
+    yazdığı bir sürüm eski bir metne onay iddia edebilirdi. Kullanıcı yoksa (yarışta
+    silinmiş) 404; kapı zaten 401 verirdi, dal kâğıt üstünde.
+    """
+    if not odeme.sartlar_kabul_yaz(db, kullanici.id, hesap.simdi(), surum=hukuk.HUKUK_SURUMU):
+        raise HTTPException(status_code=404, detail=i18n.t("err.hesap_giris_gerekli", dil.aktif()))
+    return {"ok": True, "surum": hukuk.HUKUK_SURUMU}
 
 
 @router.get("/giris")

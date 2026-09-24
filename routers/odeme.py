@@ -31,8 +31,8 @@ kodu kendi dilinde kurar, `services/kapilar.check_plan`ın deseni):
 seçti: plan değişikliği PORTALDAN — Polar oranlamayı orada yapar, ikinci
 abonelik açılmaz; paket ürünü serbest) → 412 `err.sartlar_gerekli`
 (`sartlar_kabul_at` NULL ve gövdede `sartlar_kabul: true` yok; kutu işaretli
-gelirse `odeme.sartlar_kabul_yaz` — `SARTLAR_SURUMU` yer tutucusu, 6. görev
-`HUKUK_SURUMU` ile değiştirir) → Polar. Polar SDK'sı ya da ağ düşerse **502**
+gelirse `odeme.sartlar_kabul_yaz` — sürüm `hukuk.HUKUK_SURUMU`, Faz 4 / 6'nın
+tek sabiti; 412 gövdesi de o sürümü söyler) → Polar. Polar SDK'sı ya da ağ düşerse **502**
 `err.odeme_saglayici` + `olay=odeme.saglayici_hata` ERROR (Sentry): bizim
 hatamız değil, kullanıcı "az sonra yeniden dene" görür. `success_url`
 `{koken}/odeme/tesekkur?checkout_id={CHECKOUT_ID}` (`koken.taban`: `KROMIS_KOKEN`
@@ -64,7 +64,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from services import defter, gunluk, kimlik, kiraci, koken, odeme, planlar, polar, zaman
+from services import defter, gunluk, hukuk, kimlik, kiraci, koken, odeme, planlar, polar, zaman
 from services.db import OTURUM
 from services.tablolar import Kullanici
 
@@ -176,10 +176,10 @@ def checkout(req: CheckoutIstegi, request: Request, db: Session = OTURUM,
     an = zaman.an()
     if odeme.sartlar_kabul_at_oku(db, kullanici.id) is None:
         if not req.sartlar_kabul:
-            raise HTTPException(status_code=412, detail={"kod": KOD_SARTLAR_GEREKLI, "surum": odeme.SARTLAR_SURUMU})
+            raise HTTPException(status_code=412, detail={"kod": KOD_SARTLAR_GEREKLI, "surum": hukuk.HUKUK_SURUMU})
         # Polar çağrısından ÖNCE yazmak güvenli: oturum istek kapsamlı (`db.oturum`), 502'nin
         # `HTTPException`ı onu ROLLBACK eder — Polar düşerse onay damgası da gitmez, kullanıcı yeniden onaylar.
-        odeme.sartlar_kabul_yaz(db, kullanici.id, an)
+        odeme.sartlar_kabul_yaz(db, kullanici.id, an, surum=hukuk.HUKUK_SURUMU)
     success_url = f"{koken.taban(request)}{TESEKKUR_YOLU}?checkout_id={{CHECKOUT_ID}}"
     try:
         url = polar.checkout_ac(urun_id=urun.polar_urun_id, external_customer_id=str(kullanici.id),

@@ -1261,6 +1261,10 @@
       </nav>
 
       <div class="settings-panes">
+      <!-- Şartlar güncellendi banner'ı (Faz 4 / 6): içerik settings.js `sartlarBanneriniCiz`
+           ile, `GET /api/hesap/ben` `sartlar_guncel: false` dediğinde; bölmelerden BAĞIMSIZ
+           (hepsinin üstünde) — hangi sekme açık olsun, yeni sürümün onayı görünür. -->
+      <div id="settings-sartlar-banner" class="settings-sartlar-banner" role="status" hidden></div>
 
       <!-- ── Erişim ───────────────────────────────────────────────────── -->
       <section class="settings-pane" data-pane="access">
@@ -1500,6 +1504,15 @@
 
       <!-- ── Hakkında ─────────────────────────────────────────────────── -->
       <section class="settings-pane" data-pane="about" hidden>
+
+      <!-- Hukuki metinler (Faz 4 / 6): dört metne bağlantı — oturumlu kullanıcının
+           metne dönüp bakabildiği yer. Yeni sekmede: ayarlar penceresi kapanmasın. -->
+      <p class="field-note settings-hukuk-row" id="settings-hukuk">
+        <a href="/hukuk/kullanim-sartlari" target="_blank" rel="noopener">{{t:hukuk.kullanim_sartlari}}</a> ·
+        <a href="/hukuk/gizlilik" target="_blank" rel="noopener">{{t:hukuk.gizlilik}}</a> ·
+        <a href="/hukuk/cerez" target="_blank" rel="noopener">{{t:hukuk.cerez}}</a> ·
+        <a href="/hukuk/ticari-haklar" target="_blank" rel="noopener">{{t:hukuk.ticari_haklar}}</a>
+      </p>
 
       <!-- Sürüm, üst şeritteki .ver pill'inin İKİNCİ kopyası. Çoğaltma bilerek:
            o pill mobile.css'te `display: none` (360px'de #session-title'ı
